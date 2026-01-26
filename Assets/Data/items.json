@@ -1,0 +1,79 @@
+{
+  "items": [
+    {
+      "id": "sword_bronze_001",
+      "itemName": "ブロンズソード",
+      "description": "初心者用の剣",
+      "flavorText": "誰もが最初に手にする武器",
+      "category": "Weapon",
+      "rarity": "Bronze",
+      "sizeX": 1,
+      "sizeY": 3,
+      "attack": 46,
+      "defense": 0,
+      "health": 0,
+      "mana": 0,
+      "sellValue": 50
+    },
+    {
+      "id": "sword_iron_001",
+      "itemName": "アイアンソード",
+      "description": "鉄製の頑丈な剣",
+      "flavorText": "冒険者の必需品",
+      "category": "Weapon",
+      "rarity": "Silver",
+      "sizeX": 1,
+      "sizeY": 3,
+      "attack": 52,
+      "defense": 0,
+      "health": 0,
+      "mana": 0,
+      "sellValue": 100
+    },
+    {
+      "id": "armor_leather_001",
+      "itemName": "レザーアーマー",
+      "description": "軽量な革製の鎧",
+      "flavorText": "動きやすさを重視",
+      "category": "Armor",
+      "rarity": "Bronze",
+      "sizeX": 2,
+      "sizeY": 2,
+      "attack": 0,
+      "defense": 20,
+      "health": 0,
+      "mana": 0,
+      "sellValue": 80
+    },
+    {
+      "id": "potion_health_001",
+      "itemName": "体力ポーション",
+      "description": "HPを50回復する",
+      "flavorText": "赤い液体が入った小瓶",
+      "category": "Consumable",
+      "rarity": "Bronze",
+      "sizeX": 1,
+      "sizeY": 1,
+      "attack": 0,
+      "defense": 0,
+      "health": 50,
+      "mana": 0,
+      "sellValue": 20
+    },
+    {
+      "id": "ring_strength_001",
+      "itemName": "力の指輪",
+      "description": "攻撃力を上昇させる",
+      "flavorText": "古代の魔力が宿る",
+      "category": "PassiveItem",
+      "rarity": "Gold",
+      "sizeX": 1,
+      "sizeY": 1,
+      "attack": 10,
+      "defense": 0,
+      "health": 0,
+      "mana": 0,
+      "sellValue": 300
+    }
+  ]
+}

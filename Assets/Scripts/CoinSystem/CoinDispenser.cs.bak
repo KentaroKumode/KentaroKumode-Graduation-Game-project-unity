@@ -1,0 +1,1124 @@
+﻿using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using System;
+
+namespace CoinSystem
+{
+    public class CoinDispenser : MonoBehaviour
+    {
+        [Header("蜿ら・繧ｳ繝ｳ繝昴・繝阪Φ繝・)]
+        private CoinPoolManager poolManager;
+        private CoinAudioManager audioManager;
+        private CoinStackManager stackManager;
+        private TicketSystemManager ticketManager;
+        private PaymentManager paymentManager;
+        private CoinTicketConversionManager conversionManager;
+        
+        [Header("謗貞・險ｭ螳・)]
+        [SerializeField] private Transform dispenserPoint; // 謾ｯ謇輔＞蜿｣
+        [SerializeField] private Transform potTarget; // 繝昴ャ繝茨ｼ亥女縺醍堊・・
+        [SerializeField] private float dispenseForce = 5f; // 謗貞・蜉・
+        [SerializeField] private Vector3 forceDirection = Vector3.right; // 謗貞・譁ｹ蜷・
+        [SerializeField] private float randomForceRange = 1f; // 繝ｩ繝ｳ繝繝隕∫ｴ
+        
+        [Header("蜿ｯ螟蛾溷ｺｦ險ｭ螳・)]
+        [SerializeField] private bool enableVariableSpeed = false; // 蜿ｯ螟蛾溷ｺｦ繝｢繝ｼ繝峨・譛牙柑/辟｡蜉ｹ
+        [SerializeField] private int speedScaleThreshold = 100; // 縺薙・譫壽焚縺ｧ譛螟ｧ騾溷ｺｦ縺ｫ縺ｪ繧・
+        [SerializeField] [Range(0.01f, 1.0f)] private float minDispenseInterval = 0.02f; // 譛鬮倬溷ｺｦ譎ゅ・謗貞・髢馴囈
+        [SerializeField] [Range(0.01f, 1.0f)] private float maxDispenseInterval = 0.2f; // 譛菴朱溷ｺｦ譎ゅ・謗貞・髢馴囈
+        
+        [Header("謨ｴ蛻怜盾辣ｧ")]
+        [SerializeField] private Transform stackStartPoint; // 謨ｴ蛻鈴幕蟋倶ｽ咲ｽｮ
+        
+        [Header("繝√こ繝・ヨ蜿ら・")]
+        [SerializeField] private Transform ticketMachinePoint;
+        [SerializeField] private Vector3 ticketDirection = Vector3.down;
+        
+        // 蜀・Κ螟画焚
+        private bool isDispensing = false;
+        private bool isSorting = false;
+        private bool isConsuming = false;
+        
+        // 繝｡繝｢繝ｪ蜉ｹ邇・喧逕ｨ縺ｮ蜀榊茜逕ｨ蜿ｯ閭ｽ螟画焚
+        private Vector3 randomOffset = Vector3.zero;
+        private Vector3 tempTorque = Vector3.zero;
+        
+        // WaitForSeconds縺ｮ繧ｭ繝｣繝・す繝･・医Γ繝｢繝ｪ繝ｪ繝ｼ繧ｯ蟇ｾ遲厄ｼ・
+        private WaitForSeconds[] cachedWaits;
+        private const int maxCachedWaits = 20;
+        
+        // 繧､繝吶Φ繝・
+        public event Action<int> OnDispenseComplete;
+        public event Action<int> OnSortComplete;
+        
+        // 繝励Ο繝代ユ繧｣
+        public bool IsDispensing => isDispensing;
+        public bool IsSorting => isSorting;
+        public GameObject CoinPrefab => poolManager?.CoinPrefab;
+        public int ActiveCoinCount => poolManager?.ActiveCoinCount ?? 0;
+        public int StackCount => stackManager?.StackCount ?? 0;
+        public int CurrentStackCoinCount => stackManager?.CurrentStackCoinCount ?? 0;
+        public int TotalStackedCoins => stackManager?.TotalStackedCoins ?? 0;
+        public int ActiveTicketCount => ticketManager?.ActiveTicketCount ?? 0;
+        
+        private void Awake()
+        {
+            Debug.Log("[CoinDispenser] Initializing...");
+            
+            // 繧ｳ繝ｳ繝昴・繝阪Φ繝亥盾辣ｧ繧貞叙蠕・
+            poolManager = GetComponent<CoinPoolManager>();
+            audioManager = GetComponent<CoinAudioManager>();
+            stackManager = GetComponent<CoinStackManager>();
+            ticketManager = GetComponent<TicketSystemManager>();
+            paymentManager = GetComponent<PaymentManager>();
+            conversionManager = GetComponent<CoinTicketConversionManager>();
+            
+            if (poolManager == null)
+                Debug.LogError("CoinPoolManager not found! Make sure it's attached to the same GameObject.");
+            if (audioManager == null)
+                Debug.LogError("CoinAudioManager not found! Make sure it's attached to the same GameObject.");
+            if (stackManager == null)
+                Debug.LogError("CoinStackManager not found! Make sure it's attached to the same GameObject.");
+            if (ticketManager == null)
+                Debug.LogError("TicketSystemManager not found! Make sure it's attached to the same GameObject.");
+            if (paymentManager == null)
+                Debug.LogError("PaymentManager not found! Make sure it's attached to the same GameObject.");
+            if (conversionManager == null)
+                Debug.LogError("CoinTicketConversionManager not found! Make sure it's attached to the same GameObject.");
+            
+            // 蠢・医・蛻晄悄蛹・
+            InitializeCachedWaits();
+            
+            // StackManager縺ｮ蛻晄悄蛹・
+            if (stackManager != null && stackStartPoint != null)
+            {
+                // stackStartPoint繧担tackManager縺ｫ險ｭ螳・
+                var field = typeof(CoinStackManager).GetField("stackStartPoint", 
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (field != null)
+                    field.SetValue(stackManager, stackStartPoint);
+                    
+                stackManager.InitializeStack();
+            }
+            
+            // coinPrefab遒ｺ隱・
+            if (poolManager != null && poolManager.CoinPrefab == null)
+            {
+                Debug.Log("[CoinDispenser] coinPrefab not yet assigned. Waiting for CoinSystemManager or manual assignment.");
+            }
+            else if (poolManager != null)
+            {
+                Debug.Log($"[CoinDispenser] coinPrefab assigned: {poolManager.CoinPrefab.name}");
+            }
+            
+            Debug.Log("[CoinDispenser] Initialization complete");
+        }
+        
+        void Update()
+        {
+            // 讖溯・縺ｪ縺暦ｼ医け繝ｪ繝ｼ繝ｳ繧｢繝・・縺ｯ蜷・さ繝ｳ繝昴・繝阪Φ繝医〒邂｡逅・ｼ・
+        }
+        
+        /// <summary>
+        /// 邱頑･蟇ｾ遲厄ｼ哂udioListener驥崎､・ｒ蠑ｷ蛻ｶ菫ｮ豁｣
+        /// </summary>
+        private void EmergencyAudioListenerFix()
+        {
+            AudioListener[] listeners = FindObjectsOfType<AudioListener>();
+            if (listeners.Length > 1)
+            {
+                emergencyFixCount++;
+                
+                // 繝｡繧､繝ｳ繧ｫ繝｡繝ｩ莉･螟悶・AudioListener繧貞炎髯､
+                Camera mainCamera = Camera.main;
+                AudioListener mainListener = mainCamera?.GetComponent<AudioListener>();
+                
+                int removedCount = 0;
+                foreach (var listener in listeners)
+                {
+                    if (listener != mainListener && listener != null)
+                    {
+                        // 縺ｩ縺ｮ繧ｪ繝悶ず繧ｧ繧ｯ繝医↓莉倥＞縺ｦ縺・ｋ縺九ｒ隧ｳ邏ｰ繝ｭ繧ｰ
+                        GameObject parent = listener.transform.parent?.gameObject;
+                        string parentName = parent != null ? parent.name : "None";
+                        Debug.LogError($"Removing AudioListener from: {listener.gameObject.name} (Parent: {parentName})");
+                        Destroy(listener);
+                        removedCount++;
+                    }
+                }
+                
+                // 驥崎ｦ√↑菫ｮ豁｣縺ｮ縺ｿ繝ｭ繧ｰ蜃ｺ蜉・
+                if (removedCount > 0)
+                {
+                    Debug.LogWarning($"[AudioListener Fix #{emergencyFixCount}] Removed {removedCount} duplicates");
+                }
+            }
+        }
+        
+        private void InitializeCachedWaits()
+        {
+            cachedWaits = new WaitForSeconds[maxCachedWaits];
+            for (int i = 0; i < maxCachedWaits; i++)
+            {
+                float waitTime = 0.01f + (i * 0.05f); // 0.01縺九ｉ0.96遘偵∪縺ｧ
+                cachedWaits[i] = new WaitForSeconds(waitTime);
+            }
+        }
+        
+        private WaitForSeconds GetCachedWaitForSeconds(float seconds)
+        {
+            // 蛻晄悄蛹悶メ繧ｧ繝・け
+            if (cachedWaits == null || cachedWaits.Length == 0)
+            {
+                Debug.LogWarning("[CoinDispenser] WaitForSeconds cache not initialized! Initializing now...");
+                InitializeCachedWaits();
+            }
+            
+            // 0.01-0.96遘偵・遽・峇縺ｧ繧ｭ繝｣繝・す繝･縺輔ｌ縺溷､繧剃ｽｿ逕ｨ
+            int index = Mathf.Clamp(Mathf.RoundToInt((seconds - 0.01f) / 0.05f), 0, maxCachedWaits - 1);
+            return cachedWaits[index];
+        }
+
+        /// <summary>
+        /// 繧ｳ繧､繝ｳ髻ｳ逕ｨ縺ｮ隍・焚AudioSource繧貞・譛溷喧
+        /// </summary>
+        
+        private void ValidateComponents()
+        {
+            if (dispenserPoint == null)
+            {
+                Debug.LogWarning("Dispenser Point is not assigned. Using this transform as dispenser point.");
+                dispenserPoint = transform;
+            }
+            
+            if (potTarget == null)
+            {
+                Debug.LogWarning("Pot Target is not assigned. Creating default target.");
+                GameObject defaultTarget = new GameObject("DefaultPotTarget");
+                defaultTarget.transform.SetParent(transform);
+                defaultTarget.transform.localPosition = Vector3.forward * 2f;
+                potTarget = defaultTarget.transform;
+            }
+            
+            if (stackStartPoint == null)
+            {
+                Debug.LogWarning("Stack Start Point is not assigned. Using pot target as stack start point.");
+                stackStartPoint = potTarget;
+            }
+        }
+        
+        /// <summary>
+        /// 繧ｳ繧､繝ｳ繧呈欠螳壽椢謨ｰ謗貞・縺吶ｋ
+        /// </summary>
+        /// <param name="amount">謗貞・縺吶ｋ繧ｳ繧､繝ｳ譫壽焚</param>
+        public void DispenseCoins(int amount)
+        {
+            if (poolManager == null || poolManager.CoinPrefab == null)
+            {
+                Debug.LogError("[CoinDispenser] Cannot dispense: coinPrefab is not assigned!");
+                return;
+            }
+            
+            if (isDispensing)
+            {
+                Debug.LogWarning("Already dispensing coins. Wait for completion.");
+                return;
+            }
+            
+            if (amount <= 0)
+            {
+                Debug.LogWarning("Amount must be greater than 0.");
+                return;
+            }
+            
+            StartCoroutine(DispenseCoinsCoroutine(amount));
+        }
+        
+        private IEnumerator DispenseCoinsCoroutine(int amount)
+        {
+            isDispensing = true;
+            
+            // 謇輔＞蜃ｺ縺鈴幕蟋矩浹繧貞・逕・
+            audioManager?.PlayDispensingSound();
+            
+            // 譫壽焚縺ｫ蠢懊§縺滓賜蜃ｺ髢馴囈繧定ｨ育ｮ・
+            float currentDispenseInterval = GetScaledSpeed(amount, minDispenseInterval, maxDispenseInterval);
+            
+            // 繝√こ繝・ヨ繧ｷ繧ｹ繝・Β譛牙柑譎ゑｼ壽賜蜃ｺ蜑阪↓險育ｮ励＠縺ｦ縲・0譫壹ｒ雜・∴繧句・縺ｯ繝√こ繝・ヨ縺ｧ謗貞・
+            int coinsToDispense = amount;
+            int ticketsToDispense = 0;
+            
+            if (enableTicketSystem)
+            {
+                int currentStackedCoins = GetTotalCoinCount();
+                int totalAfterDispense = currentStackedCoins + amount;
+                
+                if (totalAfterDispense > coinThresholdHigh)
+                {
+                    // 60譫壹ｒ雜・∴繧句・繧定ｨ育ｮ・
+                    int excessCoins = totalAfterDispense - coinThresholdHigh;
+                    // 10譫壼腰菴阪〒繝√こ繝・ヨ蛹厄ｼ亥・繧贋ｸ翫￡・・
+                    ticketsToDispense = (excessCoins + coinsPerTicket - 1) / coinsPerTicket;
+                    int coinsInTickets = ticketsToDispense * coinsPerTicket;
+                    
+                    // 繝√こ繝・ヨ縺ｧ謗貞・縺吶ｋ蛻・ｒ蟾ｮ縺怜ｼ輔￥
+                    coinsToDispense = amount - coinsInTickets;
+                    
+                    Debug.Log($"謗貞・險育判: 迴ｾ蝨ｨ{currentStackedCoins}譫・+ 謗貞・莠亥ｮ嘴amount}譫・= {totalAfterDispense}譫・);
+                    Debug.Log($"竊・繝√こ繝・ヨ{ticketsToDispense}譫・{coinsInTickets}繧ｳ繧､繝ｳ蛻・ + 繧ｳ繧､繝ｳ{coinsToDispense}譫壹ｒ謗貞・");
+                }
+            }
+            
+            try
+            {
+                // poolManager.ActiveCoins繧偵け繝ｪ繧｢貂医∩
+                
+                // 蜈医↓繝√こ繝・ヨ繧呈賜蜃ｺ
+                if (ticketsToDispense > 0)
+                {
+                    Debug.Log($"繝√こ繝・ヨ{ticketsToDispense}譫壹ｒ蜈医↓謗貞・");
+                    for (int i = 0; i < ticketsToDispense; i++)
+                    {
+                        yield return StartCoroutine(PrintSingleTicketProcess(i));
+                        yield return GetCachedWaitForSeconds(currentDispenseInterval);
+                    }
+                }
+                
+                // 谺｡縺ｫ繧ｳ繧､繝ｳ繧呈賜蜃ｺ
+                for (int i = 0; i < coinsToDispense; i++)
+                {
+                    GameObject coin = poolManager?.GetCoinFromPool();
+                    if (coin == null) break;
+                    poolManager.ActiveCoins.Add(coin);
+                    
+                    // 謗貞・菴咲ｽｮ縺ｨ蝗櫁ｻ｢縺ｮ險ｭ螳・
+                    coin.transform.position = dispenserPoint.position;
+                    coin.transform.rotation = dispenserPoint.rotation;
+                    coin.SetActive(true);
+                    
+                    // 迚ｩ逅・噪縺ｪ謗貞・
+                    Rigidbody rb = coin.GetComponent<Rigidbody>();
+                    rb.velocity = Vector3.zero;
+                    rb.angularVelocity = Vector3.zero;
+                    
+                    // 繝昴ャ繝域婿蜷代∈縺ｮ蜉帙→繝ｩ繝ｳ繝繝隕∫ｴ繧貞刈縺医ｋ
+                    Vector3 directionToPot = (potTarget.position - dispenserPoint.position).normalized;
+                    
+                    // 繝｡繝｢繝ｪ蜉ｹ邇・喧: 繝ｩ繝ｳ繝繝繧ｪ繝輔そ繝・ヨ縺ｮ蜀榊茜逕ｨ
+                    randomOffset.x = UnityEngine.Random.Range(-randomForceRange, randomForceRange);
+                    randomOffset.y = UnityEngine.Random.Range(0, randomForceRange * 0.5f);
+                    randomOffset.z = UnityEngine.Random.Range(-randomForceRange, randomForceRange);
+                    
+                    Vector3 finalDirection = (directionToPot + randomOffset).normalized;
+                    rb.AddForce(finalDirection * dispenseForce, ForceMode.Impulse);
+                    
+                    // 蝗櫁ｻ｢繧ょｰ代＠蜉縺医ｋ・医Γ繝｢繝ｪ蜉ｹ邇・喧・・
+                    tempTorque.x = UnityEngine.Random.Range(-1f, 1f);
+                    tempTorque.y = UnityEngine.Random.Range(-1f, 1f);
+                    tempTorque.z = UnityEngine.Random.Range(-1f, 1f);
+                    tempTorque = tempTorque.normalized * dispenseForce * 0.5f;
+                    rb.AddTorque(tempTorque, ForceMode.Impulse);
+                    
+                    poolManager.ActiveCoins.Add(coin);
+                    
+                    // 繧ｳ繧､繝ｳ謗貞・髻ｳ・亥崋螳夐浹・峨→繝ｩ繝ｳ繝繝髻ｳ繧貞酔譎ょ・逕・
+                    audioManager?.PlayDispensingSound();
+                    audioManager?.PlayRandomCoinSound();
+                    
+                    // 繝｡繝｢繝ｪ邂｡逅・ 20譫壹＃縺ｨ縺ｫ繝輔Ξ繝ｼ繝繧定ｭｲ繧翫；C繧剃ｿ・ｲ
+                    if (i > 0 && i % 20 == 0)
+                    {
+                        yield return null;
+                    }
+                    
+                    yield return GetCachedWaitForSeconds(currentDispenseInterval);
+                }
+                
+                OnDispenseComplete?.Invoke(amount);
+                
+                // 繝｡繝｢繝ｪ繝ｪ繝ｼ繧ｯ蟇ｾ遲・ 螟ｧ驥乗賜蜃ｺ蠕隈C繧貞他縺ｳ蜃ｺ縺・
+                if (amount > 50)
+                {
+                    System.GC.Collect();
+                    yield return null;
+                }
+                
+                // 謨ｴ蛻鈴幕蟋・
+                yield return new WaitForSeconds(0.1f);
+                StartCoroutine(SortCoinsCoroutine());
+            }
+            finally
+            {
+                isDispensing = false;
+                Debug.Log("DispenseCoinsCoroutine completed, isDispensing set to false");
+            }
+        }
+        
+        private IEnumerator SortCoinsCoroutine()
+        {
+            if (isSorting) 
+            {
+                Debug.LogWarning("SortCoinsCoroutine already running, skipping...");
+                yield break;
+            }
+            
+            isSorting = true;
+            Debug.Log("Starting SortCoinsCoroutine");
+            
+            try
+            {
+                // 繧ｳ繧､繝ｳ縺瑚誠縺｡逹縺上∪縺ｧ蠕・ｩ・
+                yield return GetCachedWaitForSeconds(1f);
+                
+                // 謨ｴ蛻励い繝九Γ繝ｼ繧ｷ繝ｧ繝ｳ
+                yield return StartCoroutine(AnimateCoinsToStacks());
+                
+                OnSortComplete?.Invoke(poolManager.ActiveCoins.Count);
+                Debug.Log("SortCoinsCoroutine completed successfully");
+                
+                // 繝√こ繝・ヨ竊偵さ繧､繝ｳ螟画鋤繝√ぉ繝・け・医さ繧､繝ｳ縺悟ｰ代↑縺・ｴ蜷茨ｼ・
+                if (enableTicketSystem)
+                {
+                    CheckAndConvertFromTickets();
+                }
+            }
+            finally
+            {
+                isSorting = false;
+                Debug.Log("SortCoinsCoroutine finished, isSorting set to false");
+            }
+        }
+        
+        private IEnumerator AnimateCoinsToStacks()
+        {
+            
+            if (poolManager.ActiveCoins.Count == 0)
+            {
+                Debug.LogWarning("No active coins to animate");
+                yield break;
+            }
+
+            // 譌｢蟄倥せ繧ｿ繝・け迥ｶ諷九ｒ繝・ヰ繝・げ蜃ｺ蜉・
+            Debug.Log($"[10譫壻ｻ･荳汽EBUG] Existing stacks: {stackManager.CoinStacks.Count}");
+            for (int i = 0; i < stackManager.CoinStacks.Count; i++)
+            {
+                Debug.Log($"[10譫壻ｻ･荳汽EBUG] Stack {i}: {GetStackContentsDebug(stackManager.CoinStacks[i])}");
+            }
+
+            // 繧ｳ繧､繝ｳ繧貞ｱｱ縺斐→縺ｫ繧ｰ繝ｫ繝ｼ繝怜喧・域里蟄倥・螻ｱ縺ｮ迥ｶ諷九ｒ閠・・・・
+            List<List<GameObject>> stackGroups = new List<List<GameObject>>();
+            int coinIndex = 0;
+            int workingStackIndex = stackManager.CurrentStackIndex;
+            
+            // 蜷・ｱｱ縺ｫ繧ｳ繧､繝ｳ繧貞牡繧雁ｽ薙※・育樟蝨ｨ縺ｮ螻ｱ縺九ｉ邯咏ｶ夲ｼ・
+            while (coinIndex < poolManager.ActiveCoins.Count)
+            {
+                List<GameObject> currentStackCoins = new List<GameObject>();
+                
+                // 迴ｾ蝨ｨ縺ｮ螻ｱ縺ｫ遨ｺ縺阪′縺ゅｋ蝣ｴ蜷医・縲√◎縺ｮ遨ｺ縺阪°繧牙沂繧√ｋ
+                int availableSlots = coinsPerStack;
+                if (workingStackIndex < stackManager.CoinStacks.Count)
+                {
+                    availableSlots = coinsPerStack - stackManager.CoinStacks[workingStackIndex].CoinCount;
+                    Debug.Log($"[10譫壻ｻ･荳汽EBUG] Stack {workingStackIndex} has {availableSlots} available slots (CoinCount: {stackManager.CoinStacks[workingStackIndex].CoinCount})");
+                }
+                else
+                {
+                    Debug.Log($"[10譫壻ｻ･荳汽EBUG] Creating new stack {workingStackIndex} with {coinsPerStack} slots");
+                }
+                
+                // 縺薙・螻ｱ縺ｫ蜑ｲ繧雁ｽ薙※蜿ｯ閭ｽ縺ｪ蛻・□縺代さ繧､繝ｳ繧定ｿｽ蜉
+                for (int i = 0; i < availableSlots && coinIndex < poolManager.ActiveCoins.Count; i++)
+                {
+                    if (poolManager.ActiveCoins[coinIndex] != null)
+                    {
+                        currentStackCoins.Add(poolManager.ActiveCoins[coinIndex]);
+                    }
+                    coinIndex++;
+                }
+                
+                if (currentStackCoins.Count > 0)
+                {
+                    stackGroups.Add(currentStackCoins);
+                    // 繧ｰ繝ｫ繝ｼ繝嶺ｽ懈・螳御ｺ・
+                }
+                
+                workingStackIndex++; // 谺｡縺ｮ螻ｱ縺ｸ
+            }
+            
+            // 繧ｹ繧ｿ繝・け繧ｰ繝ｫ繝ｼ繝嶺ｽ懈・螳御ｺ・
+            
+            // 蜷・ｱｱ繧堤樟蝨ｨ菴咲ｽｮ縺九ｉ鬆・分縺ｫ遨阪∩荳翫￡
+            for (int groupIndex = 0; groupIndex < stackGroups.Count; groupIndex++)
+            {
+                int actualStackIndex = stackManager.CurrentStackIndex + groupIndex;
+                yield return StartCoroutine(AnimateStackSequentially(stackGroups[groupIndex], actualStackIndex));
+                // 繧ｹ繧ｿ繝・け螳御ｺ・∵ｬ｡縺ｸ
+                
+                // 譛蠕後・螻ｱ縺ｧ縺ｪ縺代ｌ縺ｰ縲∵ｬ｡縺ｮ螻ｱ縺ｾ縺ｧ縺ｮ驕・ｻｶ繧貞・繧後ｋ
+                if (groupIndex < stackGroups.Count - 1)
+                {
+                    yield return new WaitForSeconds(stackGroupDelay);
+                    Debug.Log($"Waiting {stackGroupDelay}s before starting stack {actualStackIndex + 1}");
+                }
+            }
+            
+            // currentStackIndex繧呈峩譁ｰ・域ｬ｡蝗槭・縺溘ａ縺ｫ・・
+            UpdateCurrentStackIndex();
+            Debug.Log($"AnimateCoinsToStacks completed. Updated current stack index to: {stackManager.CurrentStackIndex}");
+        }
+        
+        /// <summary>
+        /// 迴ｾ蝨ｨ縺ｮ繧ｹ繧ｿ繝・け繧､繝ｳ繝・ャ繧ｯ繧ｹ繧呈峩譁ｰ・域ｺ譚ｯ縺ｧ縺ｪ縺・怙蛻昴・螻ｱ繧呈爾縺呻ｼ・
+        /// </summary>
+        private void UpdateCurrentStackIndex()
+        {
+            stackManager?.UpdateCurrentIndex();
+        }
+        
+        /// <summary>
+        /// 譫壽焚縺ｫ蠢懊§縺溘せ繧ｱ繝ｼ繝ｫ貂医∩騾溷ｺｦ繧貞叙蠕・
+        /// </summary>
+        /// <param name="coinAmount">繧ｳ繧､繝ｳ譫壽焚</param>
+        /// <param name="minValue">譛鬮倬溷ｺｦ譎ゅ・蛟､・亥ｰ上＆縺・､・・/param>
+        /// <param name="maxValue">譛菴朱溷ｺｦ譎ゅ・蛟､・亥､ｧ縺阪＞蛟､・・/param>
+        /// <returns>繧ｹ繧ｱ繝ｼ繝ｫ貂医∩騾溷ｺｦ蛟､</returns>
+        private float GetScaledSpeed(int coinAmount, float minValue, float maxValue)
+        {
+            if (!enableVariableSpeed)
+            {
+                return minValue < maxValue ? minValue : maxValue; // 蠕捺擂縺ｮ蝗ｺ螳壼､繧剃ｽｿ逕ｨ
+            }
+            
+            // 譫壽焚豈皮紫繧定ｨ育ｮ暦ｼ・.0・・.0・・
+            float ratio = Mathf.Clamp01((float)coinAmount / speedScaleThreshold);
+            
+            // 譫壽焚縺悟､壹＞縺ｻ縺ｩ鬮倬滂ｼ亥ｰ上＆縺・､・峨↓縺ｪ繧九ｈ縺・ｷ壼ｽ｢陬憺俣
+            float scaledValue = Mathf.Lerp(maxValue, minValue, ratio);
+            
+            Debug.Log($"Scaled speed for {coinAmount} coins: {scaledValue} (ratio: {ratio:F2})");
+            return scaledValue;
+        }
+        
+        /// <summary>
+        /// 遨阪∩荳翫￡蜑阪↓繧ｳ繧､繝ｳ謨ｰ繧偵メ繧ｧ繝・け縺励・0譫夊ｶ・℃譎ゅ↓繝√こ繝・ヨ蛹・- ConversionManager縺ｫ蟋碑ｭｲ
+        /// </summary>
+        private IEnumerator CheckCoinsBeforeSorting()
+        {
+            if (conversionManager == null) yield break;
+            
+            yield return conversionManager.CheckAndConvertToTickets(
+                ConvertNewCoinsToTicket,
+                CollectCoinsForTicket
+            );
+        }
+        
+        /// <summary>
+        /// 譁ｰ隕乗賜蜃ｺ縺輔ｌ縺溘さ繧､繝ｳ繧偵メ繧ｱ繝・ヨ縺ｫ螟画鋤 - ConversionManager縺ｫ蟋碑ｭｲ
+        /// </summary>
+        private IEnumerator ConvertNewCoinsToTicket(int coinsToConvert)
+        {
+            if (conversionManager == null) yield break;
+            
+            yield return conversionManager.ConvertNewCoinsToTicket(
+                coinsToConvert,
+                dispenserPoint,
+                AnimateCoinToDispenser,
+                CreateTicketsCoroutine
+            );
+        }
+        
+        /// <summary>
+        /// 螻ｱ縺九ｉ繧ｳ繧､繝ｳ繧貞屓蜿弱＠縺ｦ繝√こ繝・ヨ縺ｫ螟画鋤 - ConversionManager縺ｫ蟋碑ｭｲ
+        /// </summary>
+        private IEnumerator CollectCoinsForTicket(int coinsToCollect)
+        {
+            if (conversionManager == null) yield break;
+            
+            yield return conversionManager.CollectCoinsForTicket(
+                coinsToCollect,
+                dispenserPoint,
+                AnimateCoinToDispenser,
+                CreateTicketsCoroutine,
+                UpdateCurrentStackIndex
+            );
+        }
+        
+        /// <summary>
+        /// 繧ｳ繧､繝ｳ繧偵ョ繧｣繧ｹ繝壹Φ繧ｵ繝ｼ縺ｾ縺ｧ繧｢繝九Γ繝ｼ繧ｷ繝ｧ繝ｳ
+        /// </summary>
+        
+        /// <summary>
+        /// 繧ｳ繧､繝ｳ繧偵ョ繧｣繧ｹ繝壹Φ繧ｵ繝ｼ縺ｫ蜷ｸ縺・ｾｼ繧 - ConversionManager縺ｫ蟋碑ｭｲ
+        /// </summary>
+        private IEnumerator AnimateCoinToDispenser(GameObject coin, Vector3 targetPosition, float delay = 0f)
+        {
+            yield return conversionManager.AnimateCoinToDispenser(coin, targetPosition, delay, PlayRandomCoinSound);
+        }
+        
+        /// <summary>
+        /// 繧ｹ繧ｿ繝・け縺九ｉ繧ｳ繧､繝ｳ繧帝勁蜴ｻ - StackManager縺ｫ蟋碑ｭｲ
+        /// </summary>
+        private void RemoveCoinsFromStacks(int coinAmount)
+        {
+            stackManager?.RemoveCoinsFromStacks(coinAmount, coin => poolManager?.ReturnCoinToPool(coin));
+        }
+        
+        /// <summary>
+        /// 繝√こ繝・ヨ菴懈・繧ｳ繝ｫ繝ｼ繝√Φ - TicketManager縺ｫ蟋碑ｭｲ
+        /// </summary>
+        private IEnumerator CreateTicketsCoroutine(int ticketAmount)
+        {
+            yield return ticketManager?.CreateTickets(ticketAmount, PlayTicketSound);
+        }
+        
+        /// <summary>
+        /// 繝√こ繝・ヨ繧貞魂蛻ｷ讖滄｢ｨ縺ｫ谿ｵ髫守噪謗貞・縺吶ｋ繧ｳ繝ｫ繝ｼ繝√Φ
+        /// </summary>
+        private IEnumerator DispenseTicketsCoroutine(int ticketAmount)
+        {
+            if (ticketPrefab == null || ticketMachinePoint == null)
+            {
+                Debug.LogWarning("Ticket prefab or machine point not set");
+                yield break;
+            }
+            
+            for (int i = 0; i < ticketAmount; i++)
+            {
+                Debug.Log($"Starting ticket {i + 1} printing process");
+                
+                // 繝√こ繝・ヨ謗貞・髻ｳ繧貞・逕・
+                PlayTicketSound();
+                
+                // 髻ｳ螢ｰ繝・ぅ繝ｬ繧､
+                if (ticketSoundDelay > 0)
+                {
+                    yield return new WaitForSeconds(ticketSoundDelay);
+                }
+                
+                yield return StartCoroutine(PrintSingleTicketProcess(i));
+                
+                // 繝√こ繝・ヨ髢薙・蜊ｰ蛻ｷ髢馴囈・亥魂蛻ｷ讖溘ｉ縺励￥・・
+                yield return new WaitForSeconds(0.5f);
+            }
+            
+            Debug.Log($"Completed printing {ticketAmount} tickets");
+        }
+        
+        /// <summary>
+        /// 1譫壹・繝√こ繝・ヨ縺ｮ蜊ｰ蛻ｷ繝励Ο繧ｻ繧ｹ・医す繝ｼ繝育憾騾｣邯壼魂蛻ｷ・・
+        /// </summary>
+        private IEnumerator PrintSingleTicketProcess(int ticketIndex)
+        {
+            GameObject ticket = Instantiate(ticketPrefab);
+            
+            // 蜊ｰ蛻ｷ讖溷・驛ｨ縺ｮ髢句ｧ倶ｽ咲ｽｮ・・icketDispenseDistance縺ｫ蝓ｺ縺･縺擾ｼ・
+            Vector3 hiddenPosition = ticketMachinePoint.position - (ticketDirection.normalized * 0.01f);
+            ticket.transform.position = hiddenPosition;
+            ticket.transform.rotation = ticketMachinePoint.rotation;
+            ticket.SetActive(true);
+            
+            // CRITICAL FIX: 迚ｩ逅・ｼ皮ｮ励ｒ螳悟・縺ｫ繧ｪ繝包ｼ医す繝ｼ繝育憾縺ｫ縺吶ｋ縺溘ａ・・
+            Rigidbody rb = ticket.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.isKinematic = true;
+                rb.useGravity = false;
+                rb.detectCollisions = false; // 陦晉ｪ∵､懷・繧ゅが繝・
+            }
+            
+            // Collider繧ゅが繝輔↓縺吶ｋ・医す繝ｼ繝医ｉ縺励＆縺ｮ縺溘ａ・・
+            Collider col = ticket.GetComponent<Collider>();
+            if (col != null)
+            {
+                col.enabled = false;
+            }
+            
+            // 繧ｹ繧ｱ繝ｼ繝ｫ隱ｿ謨ｴ・亥魂蛻ｷ譁ｹ蜷代↓蠢懊§縺ｦ・・
+            Vector3 originalScale = ticket.transform.localScale;
+            Vector3 printDirection = ticketDirection.normalized;
+            
+            // 繧ｹ繧ｱ繝ｼ繝ｫ縺ｯ蝗ｺ螳壹〒繧ｪ繝ｪ繧ｸ繝翫Ν繧ｵ繧､繧ｺ繧堤ｶｭ謖・
+            ticket.transform.localScale = originalScale;
+            
+            // === 荳螳夐溷ｺｦ縺ｧ繧・▲縺上ｊ謗貞・ ===
+            // 謇輔＞蜃ｺ縺苓ｷ晞屬縺ｮ縺ｿ繧剃ｽｿ逕ｨ・医メ繧ｱ繝・ヨ髢馴囈縺ｯ菴ｿ繧上↑縺・ｼ・
+            Vector3 completePosition = ticketMachinePoint.position + (ticketDirection.normalized * ticketDispenseDistance);
+            
+            // 荳螳夐溷ｺｦ縺ｧ繧・▲縺上ｊ縺ｨ謗貞・
+            yield return StartCoroutine(AnimateTicketEmergence(ticket, hiddenPosition, completePosition, originalScale, originalScale, ticketEmergenceDuration));
+            
+            // 繧｢繝九Γ繝ｼ繧ｷ繝ｧ繝ｳ螳御ｺ・ｾ後∫黄逅・ｼ皮ｮ励ｒ繧ｪ繝ｳ
+            if (rb != null)
+            {
+                rb.isKinematic = false;
+                rb.useGravity = true;
+                rb.detectCollisions = true;
+                
+                // 繝ｩ繝ｳ繝繝縺ｪ蛻晞溷ｺｦ繧剃ｸ弱∴縺ｦ閾ｪ辟ｶ縺ｪ謨｣繧峨・繧翫ｒ螳溽樟
+                Vector3 randomVel = new Vector3(
+                    UnityEngine.Random.Range(-ticketRandomVelocity, ticketRandomVelocity),
+                    0f,
+                    UnityEngine.Random.Range(-ticketRandomVelocity, ticketRandomVelocity)
+                );
+                rb.velocity = randomVel;
+            }
+            if (col != null)
+            {
+                col.enabled = true;
+            }
+            
+            ticketManager.ActiveTickets.Add(ticket);
+            
+            // 謖・ｮ夂ｧ呈焚蠕・ｩ溷ｾ後↓繧ｳ繧､繝ｳ髻ｳ繧貞・逕・
+            if (ticketCoinSoundDelay > 0)
+            {
+                yield return new WaitForSeconds(ticketCoinSoundDelay);
+                audioManager?.PlayRandomCoinSound(ticketCoinSoundPitch);
+            }
+            
+            Debug.Log($"Ticket {ticketIndex + 1} printing process completed as sheet (position: {completePosition})");
+        }
+        
+        /// <summary>
+        /// 繝√こ繝・ヨ縺ｮ谿ｵ髫守噪蜃ｺ迴ｾ繧｢繝九Γ繝ｼ繧ｷ繝ｧ繝ｳ
+        /// </summary>
+        
+        /// <summary>
+        /// 繝√こ繝・ヨ縺ｮ蜃ｺ迴ｾ繧｢繝九Γ繝ｼ繧ｷ繝ｧ繝ｳ - TicketManager縺ｫ蟋碑ｭｲ
+        /// </summary>
+        private IEnumerator AnimateTicketEmergence(GameObject ticket, Vector3 startPos, Vector3 endPos, 
+            Vector3 startScale, Vector3 endScale, float duration)
+        {
+            yield return ticketManager.AnimateTicketEmergence(ticket, startPos, endPos, startScale, endScale, duration);
+        }
+        
+        /// <summary>
+        /// 繝√こ繝・ヨ繧呈紛蛻励＆縺帙ｋ繧ｳ繝ｫ繝ｼ繝√Φ - TicketManager縺ｫ蟋碑ｭｲ
+        /// </summary>
+        private IEnumerator SortTicketsCoroutine()
+        {
+            yield return ticketManager.SortTickets(ticketMachinePoint, ticketSpacing, ticketDirection,
+                (ticket, pos) => ticketManager.AnimateTicketToPositionKinematic(ticket, pos));
+        }
+        
+        /// <summary>
+        /// 繝√こ繝・ヨ繧呈欠螳壻ｽ咲ｽｮ縺ｫ繧｢繝九Γ繝ｼ繧ｷ繝ｧ繝ｳ遘ｻ蜍・- TicketManager縺ｫ蟋碑ｭｲ
+        /// </summary>
+        private IEnumerator AnimateTicketToPositionKinematic(GameObject ticket, Vector3 targetPosition)
+        {
+            yield return ticketManager.AnimateTicketToPositionKinematic(ticket, targetPosition);
+        }
+        
+        /// <summary>
+        /// 繧ｳ繧､繝ｳ繧呈ｶ郁ｲｻ縺吶ｋ・域髪謇輔＞蜃ｦ逅・ｼ・ PaymentManager縺ｫ蟋碑ｭｲ
+        /// </summary>
+        public IEnumerator ConsumeCoins(int amount)
+        {
+            if (paymentManager == null)
+            {
+                Debug.LogError("PaymentManager not available!");
+                yield break;
+            }
+            
+            // PaymentManager縺ｫ蟋碑ｭｲ縺励∝ｿ・ｦ√↑繧ｳ繝ｼ繝ｫ繝舌ャ繧ｯ繧呈ｸ｡縺・
+            yield return paymentManager.ProcessPayment(
+                amount,
+                dispenserPoint,
+                ConsumeCoinsFromStacks,
+                ConsumeTickets,
+                DispenseChangeCoins,
+                ConvertTicketsToCoinsCoroutine,
+                () => StartCoroutine(SortCoinsCoroutine())
+            );
+        }
+        
+        /// <summary>
+        /// 縺翫▽繧翫・繧ｳ繧､繝ｳ繧呈賜蜃ｺ
+        /// </summary>
+        private IEnumerator DispenseChangeCoins(int amount, bool autoSort = true)
+        {
+            Debug.Log($"Dispensing {amount} change coins");
+            
+            for (int i = 0; i < amount; i++)
+            {
+                GameObject coin = poolManager?.GetCoinFromPool();
+                if (coin == null) break;
+                poolManager.ActiveCoins.Add(coin);
+                
+                // 謗貞・菴咲ｽｮ縺ｨ蝗櫁ｻ｢縺ｮ險ｭ螳・
+                coin.transform.position = dispenserPoint.position;
+                coin.transform.rotation = dispenserPoint.rotation;
+                coin.SetActive(true);
+                
+                // 迚ｩ逅・噪縺ｪ謗貞・
+                Rigidbody rb = coin.GetComponent<Rigidbody>();
+                rb.velocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+                
+                // 繝昴ャ繝域婿蜷代∈縺ｮ蜉帙→繝ｩ繝ｳ繝繝隕∫ｴ繧貞刈縺医ｋ
+                Vector3 directionToPot = (potTarget.position - dispenserPoint.position).normalized;
+                
+                randomOffset.x = UnityEngine.Random.Range(-randomForceRange, randomForceRange);
+                randomOffset.y = UnityEngine.Random.Range(0, randomForceRange * 0.5f);
+                randomOffset.z = UnityEngine.Random.Range(-randomForceRange, randomForceRange);
+                
+                Vector3 finalDirection = (directionToPot + randomOffset).normalized;
+                rb.AddForce(finalDirection * dispenseForce, ForceMode.Impulse);
+                
+                // 蝗櫁ｻ｢繧ょｰ代＠蜉縺医ｋ
+                tempTorque.x = UnityEngine.Random.Range(-1f, 1f);
+                tempTorque.y = UnityEngine.Random.Range(-1f, 1f);
+                tempTorque.z = UnityEngine.Random.Range(-1f, 1f);
+                tempTorque = tempTorque.normalized * dispenseForce * 0.5f;
+                rb.AddTorque(tempTorque, ForceMode.Impulse);
+                
+                    poolManager.ActiveCoins.Add(coin);
+                
+                yield return GetCachedWaitForSeconds(0.05f);
+            }
+            
+            // 謨ｴ蛻鈴幕蟋具ｼ医が繝励す繝ｧ繝ｳ・・
+            if (autoSort)
+            {
+                yield return new WaitForSeconds(0.5f);
+                StartCoroutine(SortCoinsCoroutine());
+            }
+        }
+        
+        /// <summary>
+        /// 繧ｹ繧ｿ繝・け縺九ｉ繧ｳ繧､繝ｳ繧呈ｶ郁ｲｻ
+        /// </summary>
+        private IEnumerator ConsumeCoinsFromStacks(int amount)
+        {
+            List<GameObject> coinsToRemove = new List<GameObject>();
+            int coinsCollected = 0;
+            
+            // 蠕後ｍ縺ｮ螻ｱ縺九ｉ鬆・分縺ｫ蝗槫庶
+            for (int stackIndex = stackManager.CoinStacks.Count - 1; stackIndex >= 0 && coinsCollected < amount; stackIndex--)
+            {
+                var stack = stackManager.CoinStacks[stackIndex];
+                
+                while (stack.CoinCount > 0 && coinsCollected < amount)
+                {
+                    GameObject coin = stack.coins[stack.coins.Count - 1];
+                    stack.coins.RemoveAt(stack.coins.Count - 1);
+                    coinsToRemove.Add(coin);
+                    coinsCollected++;
+                }
+                
+                if (stack.CoinCount == 0 && stackManager.CoinStacks.Count > 1)
+                {
+                    stackManager.CoinStacks.RemoveAt(stackIndex);
+                }
+            }
+            
+            UpdateCurrentStackIndex();
+            
+            // 謗貞・蜿｣縺ｮ蟾ｦ蜿ｳ縺ｫ繝ｩ繝ｳ繝繝繧ｪ繝輔そ繝・ヨ
+            Vector3 sideOffset = UnityEngine.Random.value > 0.5f ? 
+                dispenserPoint.right * 0.15f : -dispenserPoint.right * 0.15f;
+            
+            // 鬆・分縺ｫ蜷ｸ縺・ｾｼ繧
+            for (int i = 0; i < coinsToRemove.Count; i++)
+            {
+                GameObject coin = coinsToRemove[i];
+                Vector3 targetPosition = dispenserPoint.position + sideOffset;
+                float delay = i * 0.08f;
+                StartCoroutine(AnimateCoinToDispenser(coin, targetPosition, delay));
+            }
+            
+            float totalAnimationTime = coinsToRemove.Count * 0.08f + 0.5f;
+            yield return new WaitForSeconds(totalAnimationTime);
+            
+            foreach (var coin in coinsToRemove)
+            {
+                ReturnCoinToPool(coin);
+            }
+        }
+        
+        /// <summary>
+        /// 繝√こ繝・ヨ繧呈ｶ郁ｲｻ
+        /// </summary>
+        private IEnumerator ConsumeTickets(int amount)
+        {
+            List<GameObject> ticketsToConsume = new List<GameObject>();
+            
+            // 豸郁ｲｻ縺吶ｋ繝√こ繝・ヨ繧貞叙蠕・
+            for (int i = 0; i < amount && ticketManager.ActiveTickets.Count > 0; i++)
+            {
+                GameObject ticket = ticketManager.ActiveTickets[ticketManager.ActiveTickets.Count - 1];
+                ticketManager.ActiveTickets.RemoveAt(ticketManager.ActiveTickets.Count - 1);
+                ticketsToConsume.Add(ticket);
+                ticketCount--;
+            }
+            
+            // 謗貞・蜿｣縺ｮ蟾ｦ蜿ｳ縺ｫ繝ｩ繝ｳ繝繝繧ｪ繝輔そ繝・ヨ
+            Vector3 sideOffset = UnityEngine.Random.value > 0.5f ? 
+                dispenserPoint.right * 0.15f : -dispenserPoint.right * 0.15f;
+            
+            // 鬆・分縺ｫ蜷ｸ縺・ｾｼ繧
+            for (int i = 0; i < ticketsToConsume.Count; i++)
+            {
+                GameObject ticket = ticketsToConsume[i];
+                Vector3 targetPosition = dispenserPoint.position + sideOffset;
+                float delay = i * 0.1f;
+                StartCoroutine(AnimateTicketToDispenser(ticket, targetPosition, delay));
+            }
+            
+            // 譛蠕後・繝√こ繝・ヨ縺悟精縺・ｾｼ縺ｾ繧後ｋ縺ｾ縺ｧ蠕・▽
+            float totalTime = ticketsToConsume.Count * 0.1f + 0.5f;
+            yield return new WaitForSeconds(totalTime);
+        }
+        
+        /// <summary>
+        /// 繝√こ繝・ヨ繧呈賜蜃ｺ蜿｣縺ｫ蜷代°縺｣縺ｦ繧｢繝九Γ繝ｼ繧ｷ繝ｧ繝ｳ
+        /// </summary>
+        
+        /// <summary>
+        /// 繝√こ繝・ヨ繧偵ョ繧｣繧ｹ繝壹Φ繧ｵ繝ｼ縺ｫ蜷ｸ縺・ｾｼ繧 - TicketManager縺ｫ蟋碑ｭｲ
+        /// </summary>
+        private IEnumerator AnimateTicketToDispenser(GameObject ticket, Vector3 targetPosition, float delay)
+        {
+            yield return ticketManager.AnimateTicketToDispenser(ticket, targetPosition, delay);
+        }
+        
+        /// <summary>
+        /// 繧ｳ繧､繝ｳ謨ｰ縺悟ｰ代↑縺・ｴ蜷医√メ繧ｱ繝・ヨ縺九ｉ繧ｳ繧､繝ｳ縺ｫ謌ｻ縺・
+        /// </summary>
+        private void CheckAndConvertFromTickets()
+        {
+            int currentCoins = GetTotalCoinCount();
+            
+            // 繧ｳ繧､繝ｳ縺・譫壹〒繝√こ繝・ヨ縺後≠繧句ｴ蜷医・縺ｿ螟画鋤・郁・蜍募､画鋤繧呈怙蟆城剞縺ｫ・・
+            if (currentCoins == 0 && ticketManager.ActiveTickets.Count > 0)
+            {
+                int ticketsToConvert = Math.Min(1, ticketManager.ActiveTickets.Count);
+                StartCoroutine(ConvertTicketsToCoinsCoroutine(ticketsToConvert));
+            }
+        }
+        
+        /// <summary>
+        /// 繝√こ繝・ヨ繧偵さ繧､繝ｳ縺ｫ螟画鋤 - ConversionManager縺ｫ蟋碑ｭｲ
+        /// </summary>
+        private IEnumerator ConvertTicketsToCoinsCoroutine(int ticketAmount, bool autoSort = true)
+        {
+            if (conversionManager == null) yield break;
+            
+            yield return conversionManager.ConvertTicketsToCoins(
+                ticketAmount,
+                autoSort,
+                AnimateTicketToDispenser,
+                DispenseChangeCoins,
+                dispenserPoint
+            );
+        }
+        
+        /// <summary>
+        /// 繧ｹ繧ｿ繝・け縺ｫ繧ｳ繧､繝ｳ繧定ｿｽ蜉縺吶ｋ繧ｳ繝ｫ繝ｼ繝√Φ
+        /// </summary>
+        private IEnumerator AddCoinsToStacksCoroutine(int coinAmount)
+        {
+            List<GameObject> newCoins = new List<GameObject>();
+            
+            // 繧ｳ繧､繝ｳ繧剃ｽ懈・
+            for (int i = 0; i < coinAmount; i++)
+            {
+                GameObject coin = GetCoinFromPool();
+                if (coin == null) break;
+                
+                // 繝・ぅ繧ｹ繝壹Φ繧ｵ繝ｼ菴咲ｽｮ縺ｫ荳譎る・鄂ｮ
+                coin.transform.position = dispenserPoint.position + Vector3.up * i * 0.1f;
+                coin.SetActive(true);
+                
+                newCoins.Add(coin);
+                poolManager.ActiveCoins.Add(coin);
+            }
+            
+            // 繧ｹ繧ｿ繝・け縺ｫ謨ｴ蛻・
+            yield return StartCoroutine(AnimateNewCoinsToStacks(newCoins));
+        }
+        
+        /// <summary>
+        /// 譁ｰ縺励＞繧ｳ繧､繝ｳ繧偵せ繧ｿ繝・け縺ｫ謨ｴ蛻暦ｼ井ｿｮ豁｣迚茨ｼ壽ｭ｣遒ｺ縺ｪ繝昴ず繧ｷ繝ｧ繝ｳ邂｡逅・ｼ・
+        /// </summary>
+        
+        /// <summary>
+        /// 譁ｰ隕上さ繧､繝ｳ繧偵せ繧ｿ繝・け縺ｫ霑ｽ蜉 - StackManager縺ｫ蟋碑ｭｲ
+        /// </summary>
+        private IEnumerator AnimateNewCoinsToStacks(List<GameObject> coinsToAdd)
+        {
+            yield return stackManager.AnimateNewCoinsToStacks(coinsToAdd,
+                CreateNewStack,
+                (coin, pos) => AnimateCoinToPosition(coin, pos),
+                stackManager.StackDirection, stackManager.StackSpacing);
+        }
+        
+        /// <summary>
+        /// 1縺､縺ｮ螻ｱ繧帝・分縺ｫ遨阪∩荳翫￡繧九さ繝ｫ繝ｼ繝√Φ - StackManager縺ｫ蟋碑ｭｲ
+        /// </summary>
+        private IEnumerator AnimateStackSequentially(List<GameObject> coinsForStack, int stackIndex)
+        {
+            yield return stackManager.AnimateStackSequentially(coinsForStack, stackIndex,
+                stackManager.StackDirection, stackManager.StackSpacing,
+                (coin, pos) => AnimateCoinToPosition(coin, pos),
+                AddCoinToStackAtPosition,
+                poolManager.ActiveCoins.Count);
+        }
+        
+        private void CreateNewStack()
+        {
+            int stackIndex = stackManager.CoinStacks.Count;
+            Vector3 basePosition = stackStartPoint.position + 
+                stackGroupDirection.normalized * stackGroupSpacing * stackIndex;
+            
+            StackState newStack = new StackState
+            {
+                basePosition = basePosition,
+                stackIndex = stackIndex,
+                maxCoins = coinsPerStack // coinsPerStack繧剃ｽｿ逕ｨ
+            };
+            
+            stackManager.CoinStacks.Add(newStack);
+            Debug.Log($"Created new stack {stackIndex} at position {basePosition} with max coins: {coinsPerStack}");
+        }
+        
+        
+        /// <summary>
+        /// 繧ｳ繧､繝ｳ繧呈欠螳壻ｽ咲ｽｮ縺ｫ繧｢繝九Γ繝ｼ繧ｷ繝ｧ繝ｳ - StackManager縺ｫ蟋碑ｭｲ
+        /// </summary>
+        private IEnumerator AnimateCoinToPosition(GameObject coin, Vector3 targetPosition)
+        {
+            yield return stackManager.AnimateCoinToPosition(coin, targetPosition, sortAnimationDuration,
+                (coinIndex) => audioManager?.PlayStackSound(coinIndex, 10), GetCoinPositionInItsStack);
+        }
+        
+        /// <summary>
+        /// 繧ｳ繧､繝ｳ繧呈欠螳壻ｽ咲ｽｮ縺ｫ繧｢繝九Γ繝ｼ繧ｷ繝ｧ繝ｳ(驕・ｻｶ莉倥″) - StackManager縺ｫ蟋碑ｭｲ
+        /// </summary>
+        private IEnumerator AnimateCoinToPositionWithDelay(GameObject coin, Vector3 targetPosition, float delay)
+        {
+            yield return stackManager.AnimateCoinToPositionWithDelay(coin, targetPosition, delay, sortAnimationDuration,
+                EaseOutBounce, (coinIndex) => audioManager?.PlayStackSound(coinIndex, 10), GetCoinPositionInItsStack);
+        }
+        
+        /// <summary>
+        /// 謖・ｮ壹＠縺溘さ繧､繝ｳ縺悟ｱ槭☆繧句ｱｱ縺ｧ縺ｮ豁｣縺励＞菴咲ｽｮ繧貞叙蠕・
+        /// 驥崎ｦ・ｼ壼ｮ滄圀縺ｮ螻ｱ縺ｧ縺ｮ邨ｶ蟇ｾ菴咲ｽｮ繧定ｿ斐☆・・譫夂岼縺ｪ繧・繧定ｿ斐☆・・
+        /// </summary>
+        /// <param name="coin">菴咲ｽｮ繧貞叙蠕励＠縺溘＞繧ｳ繧､繝ｳ</param>
+        /// <returns>縺昴・螻ｱ縺ｧ縺ｮ邨ｶ蟇ｾ菴咲ｽｮ (0-9)</returns>
+        private int GetCoinPositionInItsStack(GameObject coin)
+        {
+            // 縺昴・繧ｳ繧､繝ｳ縺悟ｱ槭☆繧句ｱｱ繧呈爾縺・
+            foreach (var stack in coinStacks)
+            {
+                // 縺昴・螻ｱ蜀・〒縺ｮ菴咲ｽｮ繧呈爾縺・
+                for (int i = 0; i < stack.coins.Count; i++)
+                {
+                    if (stack.coins[i] == coin)
+                    {
+                        return i;
+                    }
+                }
+            }
+            
+            return 0;
+        }
+        
+        /// <summary>
+        /// 繝・ヰ繝・げ逕ｨ・壹せ繧ｿ繝・け縺ｮ蜀・ｮｹ繧呈枚蟄怜・縺ｧ陦ｨ迴ｾ
+        /// </summary>
+        private string GetStackContentsDebug(StackState stack)
+        {
+            var contents = new System.Text.StringBuilder();
+            contents.Append($"[{stack.coins.Count} slots: ");
+            for (int i = 0; i < stack.coins.Count; i++)
+            {
+                contents.Append(stack.coins[i] != null ? "O" : "X");
+            }
+            contents.Append($"] CoinCount={stack.CoinCount}");
+            return contents.ToString();
+        }
+        
+        /// <summary>
+        /// 繧ｳ繧､繝ｳ繧呈欠螳壻ｽ咲ｽｮ縺ｧ繧ｹ繧ｿ繝・け縺ｫ霑ｽ蜉縺励∵ｭ｣縺励＞菴咲ｽｮ縺ｧ繝斐ャ繝√ｒ險育ｮ・
+        /// </summary>
+        /// <param name="coin">霑ｽ蜉縺吶ｋ繧ｳ繧､繝ｳ</param>
+        /// <param name="stack">蟇ｾ雎｡縺ｮ繧ｹ繧ｿ繝・け</param>
+        /// <param name="position">繧ｹ繧ｿ繝・け蜀・〒縺ｮ菴咲ｽｮ</param>
+        private void AddCoinToStackAtPosition(GameObject coin, StackState stack, int position)
+        {
+            // 繝ｪ繧ｹ繝医・繧ｵ繧､繧ｺ繧定ｪｿ謨ｴ・・ull蝓九ａ縺ｧ菴咲ｽｮ繧堤｢ｺ菫晢ｼ・
+            while (stack.coins.Count <= position)
+            {
+                stack.coins.Add(null);
+            }
+            
+            // 謖・ｮ壻ｽ咲ｽｮ縺ｫ繧ｳ繧､繝ｳ繧帝・鄂ｮ
+            stack.coins[position] = coin;
+            
+            Debug.Log($"[STACK DEBUG] Added coin to stack {stack.stackIndex} at position {position}. Stack now: {GetStackContentsDebug(stack)}");
+        }
+        
+        // 繝舌え繝ｳ繧ｹ繧､繝ｼ繧ｸ繝ｳ繧ｰ髢｢謨ｰ・育ｩ阪∩荳翫￡縺ｮ閾ｪ辟ｶ縺ｪ蜍輔″繧呈ｼ泌・・・
+        private float EaseOutBounce(float t)
+        {
+            if (t < (1f / 2.75f))
+            {
+                return 7.5625f * t * t;
+            }
+            else if (t < (2f / 2.75f))
+            {
+                return 7.5625f * (t -= (1.5f / 2.75f)) * t + 0.75f;
+            }
+            else if (t < (2.5f / 2.75f))
+            {
+                return 7.5625f * (t -= (2.25f / 2.75f)) * t + 0.9375f;
+            }
+            else
+            {
+                return 7.5625f * (t -= (2.625f / 2.75f)) * t + 0.984375f;
+            }
+        }
+        
+        /// <summary>
+        /// 繧ｳ繝ｳ繝昴・繝阪Φ繝育ｴ譽・凾縺ｮ螳悟・繧ｯ繝ｪ繝ｼ繝ｳ繧｢繝・・・医Γ繝｢繝ｪ繝ｪ繝ｼ繧ｯ髦ｲ豁｢・・
+        /// </summary>
+        void OnDestroy()
+        {
+            StopAllCoroutines();
+            
+            OnDispenseComplete = null;
+            OnSortComplete = null;
+            
+            ReturnAllCoinsToPool();
+            
+            cachedWaits = null;
+        }
+        
+        /// <summary>
+        /// 蜈ｨ縺ｦ縺ｮ繧ｳ繧､繝ｳ繧偵・繝ｼ繝ｫ縺ｫ謌ｻ縺・
+        /// </summary>
+        public void ReturnAllCoinsToPool()
+        {
+            Debug.Log("=== COIN CLEANUP INITIATED ===");
+            
+            // 螳溯｡御ｸｭ縺ｮ繧ｳ繝ｫ繝ｼ繝√Φ繧貞●豁｢
+            StopAllCoroutines();
+            
+            // 迥ｶ諷九ｒ繝ｪ繧ｻ繝・ヨ
+            isDispensing = false;
+            isSorting = false;
+            isConsuming = false;
+            
+            // 繧ｳ繝ｳ繝昴・繝阪Φ繝育ｵ檎罰縺ｧ繧ｯ繝ｪ繝ｼ繝ｳ繧｢繝・・
+            poolManager?.ReturnAllCoinsToPool();
+            stackManager?.ClearAllStacks();
+            ticketManager?.ClearAllTickets();
+            
+            Debug.Log("=== COIN CLEANUP COMPLETE ===");
+        }
+    }
+}
