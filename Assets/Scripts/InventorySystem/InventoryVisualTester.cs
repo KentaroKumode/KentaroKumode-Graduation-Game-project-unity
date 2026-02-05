@@ -143,27 +143,27 @@ public class InventoryVisualTester : MonoBehaviour
         Debug.Log($"[InventoryVisualTester] testItemIds配列: [{string.Join(", ", testItemIds)}]");
         Debug.Log($"[InventoryVisualTester] 要求インデックス: {index}, アイテムID: '{itemId}'");
         
-        ItemData itemData = ItemDatabase.Instance.GetItem(itemId);
+        CompleteItemData itemData = ItemDatabase.Instance.GetItem(itemId);
         if (itemData == null)
         {
             Debug.LogError($"[InventoryVisualTester] アイテムが見つかりません: {itemId}");
             return;
         }
         
-        // ItemDataの詳細をデバッグ出力
-        Debug.Log($"[InventoryVisualTester] === ItemData詳細 ===");
+        // CompleteItemDataの詳細をデバッグ出力
+        Debug.Log($"[InventoryVisualTester] === CompleteItemData詳細 ===");
         Debug.Log($"[InventoryVisualTester] itemData: {itemData}");
-        Debug.Log($"[InventoryVisualTester] itemData.id: '{itemData.id}'");
-        Debug.Log($"[InventoryVisualTester] itemData.itemName: '{itemData.itemName}'");
-        Debug.Log($"[InventoryVisualTester] itemData.sizeX: {itemData.sizeX}");
-        Debug.Log($"[InventoryVisualTester] itemData.sizeY: {itemData.sizeY}");
+        Debug.Log($"[InventoryVisualTester] itemData.internalName: '{itemData.internalName}'");
+        Debug.Log($"[InventoryVisualTester] itemData.displayName: '{itemData.displayName}'");
+        Debug.Log($"[InventoryVisualTester] itemData.size.x: {itemData.size.x}");
+        Debug.Log($"[InventoryVisualTester] itemData.size.y: {itemData.size.y}");
         Debug.Log($"[InventoryVisualTester] itemData.cardModel: {itemData.cardModel}");
         
-        // itemNameがnullまたは空の場合の対処
-        if (string.IsNullOrEmpty(itemData.itemName))
+        // displayNameがnullまたは空の場合の対処
+        if (string.IsNullOrEmpty(itemData.displayName))
         {
-            Debug.LogWarning($"[InventoryVisualTester] itemNameがnull/空です。idを代用: {itemData.id}");
-            itemData.itemName = itemData.id ?? $"UnknownItem_{index}";
+            Debug.LogWarning($"[InventoryVisualTester] displayNameがnull/空です。internalNameを代用: {itemData.internalName}");
+            itemData.displayName = itemData.internalName ?? $"UnknownItem_{index}";
         }
         
         Debug.Log($"[InventoryVisualTester] === インベントリ自動配置のみ実行 ===");
@@ -178,11 +178,11 @@ public class InventoryVisualTester : MonoBehaviour
             bool success = inventoryManager.TryAddItemAuto(itemData);
             if (success)
             {
-                Debug.Log($"[InventoryVisualTester] インベントリ配置成功: {itemData.itemName} ({itemData.sizeX}x{itemData.sizeY})");
+                Debug.Log($"[InventoryVisualTester] インベントリ配置成功: {itemData.displayName} ({itemData.size.x}x{itemData.size.y})");
             }
             else
             {
-                Debug.LogWarning($"[InventoryVisualTester] インベントリ配置失敗: {itemData.itemName} - スペース不足");
+                Debug.LogWarning($"[InventoryVisualTester] インベントリ配置失敗: {itemData.displayName} - スペース不足");
             }
         }
         else
@@ -194,15 +194,15 @@ public class InventoryVisualTester : MonoBehaviour
     /// <summary>
     /// 3Dアイテムモデルを作成
     /// </summary>
-    GameObject Create3DItemModel(ItemData itemData)
+    GameObject Create3DItemModel(CompleteItemData itemData)
     {
         // ItemDatabaseから実際の3Dモデルを取得
         ItemDatabase itemDB = ItemDatabase.Instance;
         
-        Debug.Log($"[InventoryVisualTester] アイテム '{itemData.id}' の3Dモデル取得開始");
+        Debug.Log($"[InventoryVisualTester] アイテム '{itemData.internalName}' の3Dモデル取得開始");
         Debug.Log($"[InventoryVisualTester] ItemDatabase.Instance: {(itemDB != null ? "見つかった" : "null")}");
         
-        GameObject prefab = itemDB?.GetCardModel(itemData.id);
+        GameObject prefab = itemDB?.GetCardModel(itemData.internalName);
         Debug.Log($"[InventoryVisualTester] 取得したプレハブ: {(prefab != null ? prefab.name : "null")}");
         
         GameObject itemObject;
@@ -221,7 +221,7 @@ public class InventoryVisualTester : MonoBehaviour
             // フォールバック：Cubeで代用
             Debug.Log($"[InventoryVisualTester] プレハブが見つからないためCubeで代用");
             itemObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            Vector3 baseScale = new Vector3(itemData.sizeX, 0.1f, itemData.sizeY);
+            Vector3 baseScale = new Vector3(itemData.size.x, 0.1f, itemData.size.y);
             itemObject.transform.localScale = baseScale * cardScale;
             
             // 色分け（カテゴリー別）
@@ -235,7 +235,7 @@ public class InventoryVisualTester : MonoBehaviour
         }
         
         // 名前設定
-        itemObject.name = $"Item3D_{itemData.itemName}_{itemData.sizeX}x{itemData.sizeY}";
+        itemObject.name = $"Item3D_{itemData.displayName}_{itemData.size.x}x{itemData.size.y}";
         
         // 親設定
         itemObject.transform.SetParent(displayArea);
@@ -269,18 +269,18 @@ public class InventoryVisualTester : MonoBehaviour
     /// <summary>
     /// アイテム情報表示を追加
     /// </summary>
-    void AddItemInfoDisplay(GameObject itemObject, ItemData itemData)
+    void AddItemInfoDisplay(GameObject itemObject, CompleteItemData itemData)
     {
         // 3D Text として情報を表示
         GameObject textObj = new GameObject("ItemInfo");
         textObj.transform.SetParent(itemObject.transform);
         
         // アイテムの上部に配置（スケールに応じて調整）
-        float textHeight = (itemData.sizeY * cardScale * 0.5f) + (0.3f * cardScale);
+        float textHeight = (itemData.size.y * cardScale * 0.5f) + (0.3f * cardScale);
         textObj.transform.localPosition = Vector3.up * textHeight;
         
         TextMesh textMesh = textObj.AddComponent<TextMesh>();
-        textMesh.text = $"{itemData.itemName}\n{itemData.sizeX}x{itemData.sizeY}";
+        textMesh.text = $"{itemData.displayName}\n{itemData.size.x}x{itemData.size.y}";
         
         // cardScaleに応じてフォントサイズを調整（より読みやすく）
         textMesh.fontSize = Mathf.RoundToInt(20 + (30 * cardScale)); 
@@ -373,7 +373,7 @@ public class InventoryVisualTester : MonoBehaviour
         
         foreach (var item in allItems)
         {
-            Debug.Log($"  - {item.id}: {item.itemName} ({item.sizeX}x{item.sizeY}) [{item.category}]");
+            Debug.Log($"  - {item.internalName}: {item.displayName} ({item.size.x}x{item.size.y}) [{item.category}]");
         }
     }
     

@@ -18,7 +18,7 @@ namespace InventorySystem
         /// <summary>
         /// 比較表示
         /// </summary>
-        public void ShowComparison(ItemData currentItem, ItemData newItem)
+        public void ShowComparison(CompleteItemData currentItem, CompleteItemData newItem)
         {
             if (comparePanel != null)
             {
@@ -28,13 +28,13 @@ namespace InventorySystem
             // 現在の装備
             if (currentItemText != null && currentItem != null)
             {
-                currentItemText.text = $"{currentItem.itemName}\n{GetStatsText(currentItem)}";
+                currentItemText.text = $"{currentItem.displayName}\n{GetStatsText(currentItem)}";
             }
             
             // 新しいアイテム
             if (newItemText != null)
             {
-                newItemText.text = $"{newItem.itemName}\n{GetStatsText(newItem)}";
+                newItemText.text = $"{newItem.displayName}\n{GetStatsText(newItem)}";
             }
             
             // 比較
@@ -58,35 +58,30 @@ namespace InventorySystem
         /// <summary>
         /// ステータステキスト取得
         /// </summary>
-        private string GetStatsText(ItemData item)
+        private string GetStatsText(CompleteItemData item)
         {
             string text = "";
-            if (item.attack > 0)
-                text += $"攻撃力: {item.attack}\n";
-            if (item.defense > 0)
-                text += $"防御力: {item.defense}\n";
-            if (item.health > 0)
-                text += $"HP: {item.health}\n";
-            if (item.mana > 0)
-                text += $"MP: {item.mana}\n";
+            if (item.hasWeaponStats && item.weaponStats != null)
+            {
+                text += $"ダイス: {item.weaponStats.ToString()}\n";
+            }
+            text += $"レアリティ: {item.rarity}\n";
+            text += $"カテゴリ: {item.category}\n";
             return text;
         }
         
         /// <summary>
         /// 比較テキスト取得（矢印と色付き）
         /// </summary>
-        private string GetComparisonText(ItemData current, ItemData newItem)
+        private string GetComparisonText(CompleteItemData current, CompleteItemData newItem)
         {
             string text = "";
             
-            // 攻撃力
-            if (current.attack > 0 || newItem.attack > 0)
-            {
-                text += GetStatComparison("攻撃力", current.attack, newItem.attack);
-            }
+            // レアリティ比較
+            text += $"レアリティ: {current.rarity} → {newItem.rarity}\n";
             
-            // 防御力
-            if (current.defense > 0 || newItem.defense > 0)
+            // 武器ダメージ比較
+            if (current.hasWeaponStats && newItem.hasWeaponStats)
             {
                 text += GetStatComparison("防御力", current.defense, newItem.defense);
             }

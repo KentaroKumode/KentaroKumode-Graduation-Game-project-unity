@@ -29,7 +29,7 @@ namespace InventorySystem
         /// <summary>
         /// インジケーターを表示
         /// </summary>
-        public void ShowIndicator(ItemData item, int gridX, int gridY)
+        public void ShowIndicator(CompleteItemData item, int gridX, int gridY)
         {
             if (gridManager == null || validator == null) return;
             
@@ -42,7 +42,7 @@ namespace InventorySystem
             if (canPlace)
             {
                 // 全体を緑でハイライト
-                gridManager.HighlightCells(gridX, gridY, item.sizeX, item.sizeY, true);
+                gridManager.HighlightCells(gridX, gridY, item.size.x, item.size.y, true);
             }
             else
             {
@@ -50,9 +50,9 @@ namespace InventorySystem
                 validator.GetInvalidCells(item, gridX, gridY, out bool[] invalidCells);
                 
                 int index = 0;
-                for (int y = gridY; y < gridY + item.sizeY; y++)
+                for (int y = gridY; y < gridY + item.size.y; y++)
                 {
-                    for (int x = gridX; x < gridX + item.sizeX; x++)
+                    for (int x = gridX; x < gridX + item.size.x; x++)
                     {
                         GridCell cell = gridManager.GetCell(x, y);
                         if (cell != null)

@@ -27,7 +27,7 @@ namespace InventorySystem
             {
                 // ダブルクリック
                 OnDoubleClick?.Invoke(slot);
-                Debug.Log($"[DoubleClickDetector] Double clicked: {slot.ItemData.itemName}");
+                Debug.Log($"[DoubleClickDetector] Double clicked: {slot.ItemData.displayName}");
                 
                 // リセット
                 lastClickedSlot = null;

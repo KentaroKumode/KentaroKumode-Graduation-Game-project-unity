@@ -339,7 +339,7 @@ namespace InventorySystem
                     
                     if (cell.IsOccupied)
                     {
-                        Debug.Log($"[GridManager] セル占有済み: ({x}, {y}) by {cell.OccupiedItem?.itemName ?? "不明"}");
+                        Debug.Log($"[GridManager] セル占有済み: ({x}, {y}) by {cell.OccupiedItem?.displayName ?? "不明"}");
                         return false;
                     }
                     if (cell.IsLocked)
@@ -357,30 +357,30 @@ namespace InventorySystem
         /// <summary>
         /// アイテムを配置（セルの占有状態を更新 + 3Dオブジェクト配置）
         /// </summary>
-        public void PlaceItem(int gridX, int gridY, int sizeX, int sizeY, ItemData item)
+        public void PlaceItem(int gridX, int gridY, int sizeX, int sizeY, CompleteItemData item)
         {
             Debug.Log($"[GridManager] === PlaceItem開始 ===");
             
             // Nullチェック
             if (item == null)
             {
-                Debug.LogError("[GridManager] ItemDataがnullです！");
+                Debug.LogError("[GridManager] CompleteItemDataがnullです！");
                 return;
             }
             
-            if (string.IsNullOrEmpty(item.itemName))
+            if (string.IsNullOrEmpty(item.displayName))
             {
-                Debug.LogError("[GridManager] ItemData.itemNameがnullまたは空です！");
+                Debug.LogError("[GridManager] CompleteItemData.displayNameがnullまたは空です！");
                 return;
             }
             
-            Debug.Log($"[GridManager] PlaceItem called: gridX={gridX}, gridY={gridY}, sizeX={sizeX}, sizeY={sizeY}, item={item.itemName}");
+            Debug.Log($"[GridManager] PlaceItem called: gridX={gridX}, gridY={gridY}, sizeX={sizeX}, sizeY={sizeY}, item={item.displayName}");
             
             // 既存のアイテムオブジェクトをクリーンアップ（重複防止）
-            CleanupExistingItemObjects(item.itemName);
+            CleanupExistingItemObjects(item.displayName);
             
             // セルの占有状態を設定
-            Debug.Log($"[GridManager] 占有状態設定開始: {item.itemName} 範囲({gridX},{gridY})～({gridX+sizeX-1},{gridY+sizeY-1})");
+            Debug.Log($"[GridManager] 占有状態設定開始: {item.displayName} 範囲({gridX},{gridY})～({gridX+sizeX-1},{gridY+sizeY-1})");
             for (int y = gridY; y < gridY + sizeY; y++)
             {
                 for (int x = gridX; x < gridX + sizeX; x++)
@@ -388,7 +388,7 @@ namespace InventorySystem
                     GridCell cell = GetCell(x, y);
                     if (cell != null)
                     {
-                        Debug.Log($"[GridManager] セル ({x}, {y}) に {item.itemName} を配置開始");
+                        Debug.Log($"[GridManager] セル ({x}, {y}) に {item.displayName} を配置開始");
                         cell.SetOccupied(true, item);
                         Debug.Log($"[GridManager] セル ({x}, {y}) 配置完了: 占有={cell.IsOccupied}");
                     }
@@ -403,7 +403,7 @@ namespace InventorySystem
             Place3DObject(gridX, gridY, sizeX, sizeY, item);
             
             Debug.Log($"[GridManager] === PlaceItem完了 ===");
-            Debug.Log($"[GridManager] Item placed: {item.itemName} at ({gridX}, {gridY})");
+            Debug.Log($"[GridManager] Item placed: {item.displayName} at ({gridX}, {gridY})");
         }
         
         /// <summary>
@@ -452,15 +452,15 @@ namespace InventorySystem
         /// <summary>
         /// 3Dオブジェクトをグリッド上に正確に配置（ピボット左上角対応）
         /// </summary>
-        private void Place3DObject(int gridX, int gridY, int sizeX, int sizeY, ItemData item)
+        private void Place3DObject(int gridX, int gridY, int sizeX, int sizeY, CompleteItemData item)
         {
             if (item.cardModel == null)
             {
-                Debug.LogWarning($"[GridManager] {item.itemName}の3Dモデルが設定されていません");
+                Debug.LogWarning($"[GridManager] {item.displayName}の3Dモデルが設定されていません");
                 return;
             }
             
-            Debug.Log($"[GridManager] === 配置デバッグ: {item.itemName} at Grid({gridX},{gridY}) Size({sizeX}x{sizeY}) ===");
+            Debug.Log($"[GridManager] === 配置デバッグ: {item.displayName} at Grid({gridX},{gridY}) Size({sizeX}x{sizeY}) ===");
             
             // 既存の同名アイテム数をチェック
             int existingCount = 0;
@@ -468,7 +468,7 @@ namespace InventorySystem
             {
                 Transform child = transform.GetChild(i);
                 if (child != null && !string.IsNullOrEmpty(child.name) && 
-                    child.name.Contains(item.itemName) && !child.name.StartsWith("Cell_"))
+                    child.name.Contains(item.displayName) && !child.name.StartsWith("Cell_"))
                 {
                     existingCount++;
                     Debug.Log($"[GridManager] 既存アイテム#{existingCount}: {child.name} at {child.position}");
@@ -509,7 +509,7 @@ namespace InventorySystem
             
             // 3Dオブジェクトを生成
             GameObject itemObject = Instantiate(item.cardModel, itemPosition, Quaternion.identity, transform);
-            itemObject.name = $"{item.itemName}_Grid_{gridX}_{gridY}_{System.DateTime.Now.Ticks}";
+            itemObject.name = $"{item.displayName}_Grid_{gridX}_{gridY}_{System.DateTime.Now.Ticks}";
             
             // コライダーを確保（ドラッグ操作用）
             EnsureCollider(itemObject);
@@ -788,7 +788,7 @@ namespace InventorySystem
         /// <summary>
         /// アイテム名からグリッド位置を検索
         /// </summary>
-        public bool TryGetItemPosition(string itemName, out int gridX, out int gridY, out ItemData itemData)
+        public bool TryGetItemPosition(string itemName, out int gridX, out int gridY, out CompleteItemData itemData)
         {
             gridX = -1;
             gridY = -1;
@@ -803,9 +803,9 @@ namespace InventorySystem
                     GridCell cell = GetCell(x, y);
                     if (cell != null && cell.IsOccupied && cell.OccupiedItem != null)
                     {
-                        Debug.Log($"[GridManager] セル({x},{y}): アイテム '{cell.OccupiedItem.itemName}' が占有中");
+                        Debug.Log($"[GridManager] セル({x},{y}): アイテム '{cell.OccupiedItem.displayName}' が占有中");
                         
-                        if (cell.OccupiedItem.itemName == itemName)
+                        if (cell.OccupiedItem.displayName == itemName)
                         {
                             Debug.Log($"[GridManager] アイテム発見！ '{itemName}' at ({x}, {y})");
                             gridX = x;
@@ -842,7 +842,7 @@ namespace InventorySystem
                     if (cell != null && cell.IsOccupied)
                     {
                         occupiedCount++;
-                        string itemName = cell.OccupiedItem?.itemName ?? "NULL";
+                        string itemName = cell.OccupiedItem?.displayName ?? "NULL";
                         Debug.Log($"セル({x},{y}): '{itemName}' (OccupiedItem: {(cell.OccupiedItem != null ? "あり" : "なし")})");
                     }
                 }

@@ -7,18 +7,18 @@ namespace InventorySystem
     /// </summary>
     public class VirtualItemSlot
     {
-        private ItemData itemData;
+        private CompleteItemData itemData;
         private int gridX;
         private int gridY;
         
-        public ItemData ItemData => itemData;
+        public CompleteItemData ItemData => itemData;
         public int GridX => gridX;
         public int GridY => gridY;
         
         /// <summary>
         /// コンストラクタ
         /// </summary>
-        public VirtualItemSlot(ItemData item, int x, int y)
+        public VirtualItemSlot(CompleteItemData item, int x, int y)
         {
             itemData = item;
             gridX = x;
@@ -28,7 +28,7 @@ namespace InventorySystem
         /// <summary>
         /// アイテムデータを設定
         /// </summary>
-        public void SetItem(ItemData item, int x, int y)
+        public void SetItem(CompleteItemData item, int x, int y)
         {
             itemData = item;
             gridX = x;

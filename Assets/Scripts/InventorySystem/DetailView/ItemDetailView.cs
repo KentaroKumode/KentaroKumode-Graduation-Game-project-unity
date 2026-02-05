@@ -26,7 +26,7 @@ namespace InventorySystem
         [SerializeField] private BackgroundBlur backgroundBlur;
         
         private GameObject currentCard;
-        private ItemData currentItem;
+        private CompleteItemData currentItem;
         private bool isShowing = false;
         
         void Start()
@@ -40,7 +40,7 @@ namespace InventorySystem
         /// <summary>
         /// 詳細表示を開く
         /// </summary>
-        public void ShowDetail(ItemData item)
+        public void ShowDetail(CompleteItemData item)
         {
             if (item == null) return;
             
@@ -65,7 +65,7 @@ namespace InventorySystem
             // 3Dカード表示
             ShowCard();
             
-            Debug.Log($"[ItemDetailView] Showing detail for: {item.itemName}");
+            Debug.Log($"[ItemDetailView] Showing detail for: {item.displayName}");
         }
         
         /// <summary>
@@ -110,7 +110,7 @@ namespace InventorySystem
             // 名前
             if (itemNameText != null)
             {
-                itemNameText.text = currentItem.itemName;
+                itemNameText.text = currentItem.displayName;
             }
             
             // 説明
@@ -126,7 +126,7 @@ namespace InventorySystem
             }
             
             // ステータス（武器・防具・パッシブのみ）
-            if (statsText != null && currentItem.HasStats())
+            if (statsText != null && currentItem.HasStats)
             {
                 string stats = "";
                 if (currentItem.attack > 0)
@@ -187,10 +187,11 @@ namespace InventorySystem
         {
             switch (rarity)
             {
-                case ItemRarity.Bronze: return new Color(0.8f, 0.5f, 0.3f);
-                case ItemRarity.Silver: return new Color(0.75f, 0.75f, 0.75f);
-                case ItemRarity.Gold: return new Color(1f, 0.84f, 0f);
-                case ItemRarity.Mythic: return new Color(0.8f, 0.2f, 0.8f);
+                case ItemRarity.BRONZE: return new Color(0.8f, 0.5f, 0.3f);
+                case ItemRarity.SILVER: return new Color(0.75f, 0.75f, 0.75f);
+                case ItemRarity.GOLD: return new Color(1f, 0.84f, 0f);
+                case ItemRarity.LEGENDARY: return new Color(1f, 0.5f, 0f);
+                case ItemRarity.MYTHIC: return new Color(0.8f, 0.2f, 0.8f);
                 default: return Color.white;
             }
         }

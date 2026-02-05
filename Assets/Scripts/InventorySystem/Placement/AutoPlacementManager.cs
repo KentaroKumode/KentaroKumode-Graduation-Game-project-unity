@@ -23,7 +23,7 @@ namespace InventorySystem
         /// <summary>
         /// アイテムを自動配置
         /// </summary>
-        public bool TryAutoPlace(ItemData item, out int outX, out int outY)
+        public bool TryAutoPlace(CompleteItemData item, out int outX, out int outY)
         {
             outX = -1;
             outY = -1;
@@ -49,14 +49,14 @@ namespace InventorySystem
                 }
             }
             
-            Debug.LogWarning($"[AutoPlacementManager] No space found for item: {item.itemName}");
+            Debug.LogWarning($"[AutoPlacementManager] No space found for item: {item.displayName}");
             return false;
         }
         
         /// <summary>
         /// 最適な配置場所を探す（サイズに合わせて）
         /// </summary>
-        public bool TryFindOptimalPlacement(ItemData item, out int outX, out int outY)
+        public bool TryFindOptimalPlacement(CompleteItemData item, out int outX, out int outY)
         {
             outX = -1;
             outY = -1;

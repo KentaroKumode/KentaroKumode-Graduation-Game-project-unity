@@ -40,7 +40,7 @@ namespace InventorySystem
         
         // ドラッグ状態
         private bool isDragging = false;
-        private ItemData currentDragItem = null;
+        private CompleteItemData currentDragItem = null;
         private Vector2Int originalGridPosition;
         private GameObject dragPreview = null;
         private VirtualItemSlot currentVirtualSlot;
@@ -348,7 +348,7 @@ namespace InventorySystem
                             Debug.Log($"[DragDropHandler] 抽出されたアイテム名: '{itemName}'");
                             
                             // GridManagerから該当アイテムの位置を検索
-                            if (gridManager.TryGetItemPosition(itemName, out int gridX, out int gridY, out ItemData itemData))
+                            if (gridManager.TryGetItemPosition(itemName, out int gridX, out int gridY, out CompleteItemData itemData))
                             {
                                 Debug.Log($"[DragDropHandler] アイテム位置発見: {itemName} at ({gridX}, {gridY})");
                                 
@@ -373,7 +373,7 @@ namespace InventorySystem
                                 string itemName = parentName.Substring(0, gridIndex);
                                 Debug.Log($"[DragDropHandler] 親から抽出されたアイテム名: '{itemName}'");
                                 
-                                if (gridManager.TryGetItemPosition(itemName, out int gridX, out int gridY, out ItemData itemData))
+                                if (gridManager.TryGetItemPosition(itemName, out int gridX, out int gridY, out CompleteItemData itemData))
                                 {
                                     Debug.Log($"[DragDropHandler] 親経由でアイテム位置発見: {itemName} at ({gridX}, {gridY})");
                                     
@@ -400,7 +400,7 @@ namespace InventorySystem
         /// <summary>
         /// グリッド位置からドラッグ開始
         /// </summary>
-        private void StartDragFromGridPosition(ItemData item, int gridX, int gridY)
+        private void StartDragFromGridPosition(CompleteItemData item, int gridX, int gridY)
         {
             if (gridManager == null)
             {
@@ -410,11 +410,11 @@ namespace InventorySystem
             
             if (item == null)
             {
-                Debug.LogError("[DragDropHandler] ItemDataがnullです！");
+                Debug.LogError("[DragDropHandler] CompleteItemDataがnullです！");
                 return;
             }
             
-            Debug.Log($"[DragDropHandler] ドラッグ開始: {item.itemName} at ({gridX}, {gridY})");
+            Debug.Log($"[DragDropHandler] ドラッグ開始: {item.displayName} at ({gridX}, {gridY})");
             
             // ドラッグ状態を設定
             currentDragItem = item;
@@ -426,7 +426,7 @@ namespace InventorySystem
             currentVirtualSlot = new VirtualItemSlot(item, gridX, gridY);
             
             // 元の位置からアイテムを削除
-            gridManager.RemoveItem(gridX, gridY, item.sizeX, item.sizeY);
+            gridManager.RemoveItem(gridX, gridY, item.size.x, item.size.y);
             Debug.Log($"[DragDropHandler] 元の位置からアイテムを削除しました: ({gridX}, {gridY})");
             
             // 元のオブジェクトを非表示にする
@@ -443,15 +443,15 @@ namespace InventorySystem
         /// <summary>
         /// ドラッグプレビューの作成
         /// </summary>
-        private void CreateDragPreview(ItemData item)
+        private void CreateDragPreview(CompleteItemData item)
         {
             try
             {
                 // アイテムのプレハブからプレビューオブジェクトを作成
-                if (item.cardModel != null)
+                if (item.fbxModel != null)
                 {
-                    dragPreview = Instantiate(item.cardModel);
-                    dragPreview.name = $"DragPreview_{item.itemName}";
+                    dragPreview = Instantiate(item.fbxModel);
+                    dragPreview.name = $"DragPreview_{item.displayName}";
                     
                     // 元オブジェクトのスケールを保持
                     if (originalObject != null)
@@ -490,11 +490,11 @@ namespace InventorySystem
                 }
                 else
                 {
-                    Debug.LogWarning($"[DragDropHandler] アイテムcardModelがnull: {item.itemName}");
+                    Debug.LogWarning($"[DragDropHandler] アイテムcardModelがnull: {item.displayName}");
                     
                     // cardModelがnullの場合、簡単なプレースホルダーを作成
                     dragPreview = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    dragPreview.name = $"DragPreview_Placeholder_{item.itemName}";
+                    dragPreview.name = $"DragPreview_Placeholder_{item.displayName}";
                     dragPreview.transform.localScale = Vector3.one * 0.5f;
                     
                     // 色を設定（不透明）
@@ -567,18 +567,18 @@ namespace InventorySystem
                 
                 // グリッド範囲内の場合のみインジケータを表示
                 if (gridPos.x >= 0 && gridPos.y >= 0 && 
-                    gridPos.x + currentDragItem.sizeX <= InventoryConstants.GRID_WIDTH && 
-                    gridPos.y + currentDragItem.sizeY <= InventoryConstants.GRID_HEIGHT)
+                    gridPos.x + currentDragItem.size.x <= InventoryConstants.GRID_WIDTH && 
+                    gridPos.y + currentDragItem.size.y <= InventoryConstants.GRID_HEIGHT)
                 {
                     // セルをハイライト
-                    Debug.Log($"[DragDropHandler] ハイライト開始: 位置({gridPos.x}, {gridPos.y}) サイズ({currentDragItem.sizeX}x{currentDragItem.sizeY})");
+                    Debug.Log($"[DragDropHandler] ハイライト開始: 位置({gridPos.x}, {gridPos.y}) サイズ({currentDragItem.size.x}x{currentDragItem.size.y})");
                     
                     // 既に表示したアイテムを追跡（重複防止）
-                    System.Collections.Generic.HashSet<ItemData> highlightedItems = new System.Collections.Generic.HashSet<ItemData>();
+                    System.Collections.Generic.HashSet<CompleteItemData> highlightedItems = new System.Collections.Generic.HashSet<CompleteItemData>();
                     
-                    for (int y = gridPos.y; y < gridPos.y + currentDragItem.sizeY; y++)
+                    for (int y = gridPos.y; y < gridPos.y + currentDragItem.size.y; y++)
                     {
-                        for (int x = gridPos.x; x < gridPos.x + currentDragItem.sizeX; x++)
+                        for (int x = gridPos.x; x < gridPos.x + currentDragItem.size.x; x++)
                         {
                             var cell = gridManager.GetCell(x, y);
                             if (cell != null)
@@ -598,7 +598,7 @@ namespace InventorySystem
                                     if (cell.IsOccupied && cell.OccupiedItem != null)
                                     {
                                         // 占有済みの場合、占有しているカード全体を表示
-                                        ItemData occupiedItem = cell.OccupiedItem;
+                                        CompleteItemData occupiedItem = cell.OccupiedItem;
                                         
                                         // まだハイライトしていないアイテムの場合のみ処理
                                         if (!highlightedItems.Contains(occupiedItem))
@@ -606,12 +606,12 @@ namespace InventorySystem
                                             highlightedItems.Add(occupiedItem);
                                             
                                             // 占有しているアイテムの位置を検索
-                                            if (gridManager.TryGetItemPosition(occupiedItem.itemName, out int itemX, out int itemY, out ItemData foundItem))
+                                            if (gridManager.TryGetItemPosition(occupiedItem.displayName, out int itemX, out int itemY, out CompleteItemData foundItem))
                                             {
                                                 // アイテムが占有している全セルに配置不可インジケーターを表示
-                                                for (int iy = itemY; iy < itemY + occupiedItem.sizeY; iy++)
+                                                for (int iy = itemY; iy < itemY + occupiedItem.size.y; iy++)
                                                 {
-                                                    for (int ix = itemX; ix < itemX + occupiedItem.sizeX; ix++)
+                                                    for (int ix = itemX; ix < itemX + occupiedItem.size.x; ix++)
                                                     {
                                                         var occupiedCell = gridManager.GetCell(ix, iy);
                                                         if (occupiedCell != null)
@@ -620,7 +620,7 @@ namespace InventorySystem
                                                         }
                                                     }
                                                 }
-                                                Debug.Log($"[DragDropHandler] 占有カード '{occupiedItem.itemName}' 全体({itemX},{itemY} {occupiedItem.sizeX}x{occupiedItem.sizeY})に配置不可インジケーター表示");
+                                                Debug.Log($"[DragDropHandler] 占有カード '{occupiedItem.displayName}' 全体({itemX},{itemY} {occupiedItem.size.x}x{occupiedItem.size.y})に配置不可インジケーター表示");
                                             }
                                         }
                                     }
@@ -678,11 +678,11 @@ namespace InventorySystem
                     Debug.Log($"[DragDropHandler] ワールド座標: {worldPos}");
                     Debug.Log($"[DragDropHandler] 変換されたグリッド座標: ({dropX}, {dropY})");
                     Debug.Log($"[DragDropHandler] 元の位置: ({originalGridPosition.x}, {originalGridPosition.y})");
-                    Debug.Log($"[DragDropHandler] アイテムサイズ: {currentDragItem.sizeX}x{currentDragItem.sizeY}");
+                    Debug.Log($"[DragDropHandler] アイテムサイズ: {currentDragItem.size.x}x{currentDragItem.size.y}");
                     
                     if (dropX >= 0 && dropY >= 0 && 
-                        dropX + currentDragItem.sizeX <= InventoryConstants.GRID_WIDTH && 
-                        dropY + currentDragItem.sizeY <= InventoryConstants.GRID_HEIGHT)
+                        dropX + currentDragItem.size.x <= InventoryConstants.GRID_WIDTH && 
+                        dropY + currentDragItem.size.y <= InventoryConstants.GRID_HEIGHT)
                     {
                         // 配置可能かチェック
                         var placementValidator = FindObjectOfType<PlacementValidator>();
@@ -718,16 +718,16 @@ namespace InventorySystem
                         if (canMove)
                         {
                             // アイテムを配置
-                            Debug.Log($"[DragDropHandler] GridManager.CanPlaceItem呼び出し: ({dropX}, {dropY}) サイズ {currentDragItem.sizeX}x{currentDragItem.sizeY}");
+                            Debug.Log($"[DragDropHandler] GridManager.CanPlaceItem呼び出し: ({dropX}, {dropY}) サイズ {currentDragItem.size.x}x{currentDragItem.size.y}");
                             
-                            bool canPlace = gridManager.CanPlaceItem(dropX, dropY, currentDragItem.sizeX, currentDragItem.sizeY);
+                            bool canPlace = gridManager.CanPlaceItem(dropX, dropY, currentDragItem.size.x, currentDragItem.size.y);
                             Debug.Log($"[DragDropHandler] CanPlaceItem結果: {canPlace}");
                             
                             if (canPlace)
                             {
                                 Debug.Log($"[DragDropHandler] PlaceItem実行: ({dropX}, {dropY})");
-                                gridManager.PlaceItem(dropX, dropY, currentDragItem.sizeX, currentDragItem.sizeY, currentDragItem);
-                                Debug.Log($"[DragDropHandler] アイテム配置成功: {currentDragItem.itemName} at ({dropX}, {dropY})");
+                                gridManager.PlaceItem(dropX, dropY, currentDragItem.size.x, currentDragItem.size.y, currentDragItem);
+                                Debug.Log($"[DragDropHandler] アイテム配置成功: {currentDragItem.displayName} at ({dropX}, {dropY})");
                                 
                                 // ハイライトとインジケータを非表示
                                 gridManager.ClearAllHighlights();
@@ -744,14 +744,14 @@ namespace InventorySystem
                                 Debug.LogWarning($"[DragDropHandler] GridManager.CanPlaceItem失敗: ({dropX}, {dropY}) - セルの状態を確認してください");
                                 
                                 // デバッグ: 指定範囲のセル状態をログ出力
-                                for (int y = dropY; y < dropY + currentDragItem.sizeY && y < InventoryConstants.GRID_HEIGHT; y++)
+                                for (int y = dropY; y < dropY + currentDragItem.size.y && y < InventoryConstants.GRID_HEIGHT; y++)
                                 {
-                                    for (int x = dropX; x < dropX + currentDragItem.sizeX && x < InventoryConstants.GRID_WIDTH; x++)
+                                    for (int x = dropX; x < dropX + currentDragItem.size.x && x < InventoryConstants.GRID_WIDTH; x++)
                                     {
                                         var cell = gridManager.GetCell(x, y);
                                         if (cell != null)
                                         {
-                                            Debug.Log($"[DragDropHandler] セル({x}, {y}): 占有={cell.IsOccupied}, ロック={cell.IsLocked}, アイテム={(cell.OccupiedItem != null ? cell.OccupiedItem.itemName : "なし")}");
+                                            Debug.Log($"[DragDropHandler] セル({x}, {y}): 占有={cell.IsOccupied}, ロック={cell.IsLocked}, アイテム={(cell.OccupiedItem != null ? cell.OccupiedItem.displayName : "なし")}");
                                         }
                                     }
                                 }
@@ -766,7 +766,7 @@ namespace InventorySystem
                     {
                         Debug.LogWarning($"[DragDropHandler] グリッド範囲外またはサイズ制限: dropX={dropX}, dropY={dropY}");
                         Debug.LogWarning($"[DragDropHandler] グリッド制限: 0-{InventoryConstants.GRID_WIDTH-1} x 0-{InventoryConstants.GRID_HEIGHT-1}");
-                        Debug.LogWarning($"[DragDropHandler] 必要範囲: {dropX}-{dropX + currentDragItem.sizeX - 1} x {dropY}-{dropY + currentDragItem.sizeY - 1}");
+                        Debug.LogWarning($"[DragDropHandler] 必要範囲: {dropX}-{dropX + currentDragItem.size.x - 1} x {dropY}-{dropY + currentDragItem.size.y - 1}");
                     }
                 }
                 else
@@ -815,11 +815,11 @@ namespace InventorySystem
             
             if (currentDragItem != null)
             {
-                Debug.Log($"[DragDropHandler] 元の位置に復元: {currentDragItem.itemName} at ({originalGridPosition.x}, {originalGridPosition.y})");
+                Debug.Log($"[DragDropHandler] 元の位置に復元: {currentDragItem.displayName} at ({originalGridPosition.x}, {originalGridPosition.y})");
                 
-                if (gridManager.CanPlaceItem(originalGridPosition.x, originalGridPosition.y, currentDragItem.sizeX, currentDragItem.sizeY))
+                if (gridManager.CanPlaceItem(originalGridPosition.x, originalGridPosition.y, currentDragItem.size.x, currentDragItem.size.y))
                 {
-                    gridManager.PlaceItem(originalGridPosition.x, originalGridPosition.y, currentDragItem.sizeX, currentDragItem.sizeY, currentDragItem);
+                    gridManager.PlaceItem(originalGridPosition.x, originalGridPosition.y, currentDragItem.size.x, currentDragItem.size.y, currentDragItem);
                     
                     // 元のオブジェクトを再表示
                     if (originalObject != null)
@@ -958,14 +958,14 @@ namespace InventorySystem
                     if (gridIndex > 0)
                     {
                         string itemName = gridTransform.name.Substring(0, gridIndex);
-                        if (gridManager.TryGetItemPosition(itemName, out int gx, out int gy, out ItemData itemData))
+                        if (gridManager.TryGetItemPosition(itemName, out int gx, out int gy, out CompleteItemData itemData))
                         {
-                            GameObject source = itemData.cardModel != null ? itemData.cardModel : gridTransform.gameObject;
+                            GameObject source = itemData.fbxModel != null ? itemData.fbxModel : gridTransform.gameObject;
                             Quaternion rot = gridTransform.rotation;
                             Vector3 scale = gridTransform.localScale;
                             
                             // カードサイズに応じてスケールを調整: (4 - max(sizeX, sizeY)) 倍、ただし3x3は1.5倍
-                            int maxSize = Mathf.Max(itemData.sizeX, itemData.sizeY);
+                            int maxSize = Mathf.Max(itemData.size.x, itemData.size.y);
                             float scaleFactor;
                             if (maxSize == 3)
                             {
@@ -978,7 +978,7 @@ namespace InventorySystem
                             Vector3 originalScale = scale;
                             scale *= scaleFactor;
                             
-                            Debug.Log($"[DragDropHandler] プレビュースピン開始: {itemName} at ({gx},{gy}), サイズ {itemData.sizeX}x{itemData.sizeY}, maxSize={maxSize}, スケール係数={scaleFactor}倍, 元スケール: {originalScale}, 最終スケール: {scale}");
+                            Debug.Log($"[DragDropHandler] プレビュースピン開始: {itemName} at ({gx},{gy}), サイズ {itemData.size.x}x{itemData.size.y}, maxSize={maxSize}, スケール係数={scaleFactor}倍, 元スケール: {originalScale}, 最終スケール: {scale}");
                             
                             // グリッド上の元のオブジェクトを一時的に非表示
                             previewSpinSourceObject = gridTransform.gameObject;

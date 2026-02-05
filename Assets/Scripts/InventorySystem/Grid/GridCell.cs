@@ -38,13 +38,13 @@ namespace InventorySystem
         private Color highlightColor = new Color(0.3f, 0.8f, 0.3f, 0.8f);
         private Color invalidColor = new Color(0.8f, 0.2f, 0.2f, 0.8f);
         
-        private ItemData occupiedItem;
+        private CompleteItemData occupiedItem;
         
         public int GridX => gridX;
         public int GridY => gridY;
         public bool IsLocked => isLocked;
         public bool IsOccupied => isOccupied;
-        public ItemData OccupiedItem => occupiedItem;
+        public CompleteItemData OccupiedItem => occupiedItem;
         
         /// <summary>
         /// GridManagerを効率的に取得（キャッシュ付き）
@@ -145,13 +145,13 @@ namespace InventorySystem
         /// <summary>
         /// 占有状態を設定
         /// </summary>
-        public void SetOccupied(bool occupied, ItemData item = null)
+        public void SetOccupied(bool occupied, CompleteItemData item = null)
         {
             Debug.Log($"[GridCell] SetOccupied呼び出し: Cell({gridX},{gridY}) 現在占有={isOccupied} → 新状態={occupied}");
             
             if (isOccupied && occupied && occupiedItem != null && item != null)
             {
-                Debug.LogWarning($"[GridCell] 重複配置警告: Cell({gridX},{gridY}) 既存={occupiedItem.itemName} → 新規={item.itemName}");
+                Debug.LogWarning($"[GridCell] 重複配置警告: Cell({gridX},{gridY}) 既存={occupiedItem.displayName} → 新規={item.displayName}");
             }
             
             isOccupied = occupied;
@@ -160,7 +160,7 @@ namespace InventorySystem
             
             if (occupied && item != null)
             {
-                Debug.Log($"[GridCell] Cell ({gridX}, {gridY}) occupied by {item.itemName}");
+                Debug.Log($"[GridCell] Cell ({gridX}, {gridY}) occupied by {item.displayName}");
             }
             else
             {

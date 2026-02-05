@@ -11,12 +11,12 @@ namespace InventorySystem
         [SerializeField] private TextMeshPro itemNameText;
         [SerializeField] private MeshRenderer backgroundRenderer;
         
-        private ItemData currentItem;
+        private CompleteItemData currentItem;
         
         /// <summary>
         /// アイテムを表示
         /// </summary>
-        public void DisplayItem(ItemData item)
+        public void DisplayItem(CompleteItemData item)
         {
             currentItem = item;
             
@@ -32,7 +32,7 @@ namespace InventorySystem
                 CreateTextDisplay();
             }
             
-            itemNameText.text = item.itemName;
+            itemNameText.text = item.displayName;
             itemNameText.gameObject.SetActive(true);
             
             // 背景色をレアリティで変更
@@ -85,10 +85,11 @@ namespace InventorySystem
         {
             switch (rarity)
             {
-                case ItemRarity.Bronze: return new Color(0.8f, 0.5f, 0.3f, 0.9f);
-                case ItemRarity.Silver: return new Color(0.75f, 0.75f, 0.75f, 0.9f);
-                case ItemRarity.Gold: return new Color(1f, 0.84f, 0f, 0.9f);
-                case ItemRarity.Mythic: return new Color(0.8f, 0.2f, 0.8f, 0.9f);
+                case ItemRarity.BRONZE: return new Color(0.8f, 0.5f, 0.3f, 0.9f);
+                case ItemRarity.SILVER: return new Color(0.75f, 0.75f, 0.75f, 0.9f);
+                case ItemRarity.GOLD: return new Color(1f, 0.84f, 0f, 0.9f);
+                case ItemRarity.LEGENDARY: return new Color(1f, 0.5f, 0f, 0.9f);
+                case ItemRarity.MYTHIC: return new Color(0.8f, 0.2f, 0.8f, 0.9f);
                 default: return new Color(0.3f, 0.8f, 0.3f, 0.9f);
             }
         }

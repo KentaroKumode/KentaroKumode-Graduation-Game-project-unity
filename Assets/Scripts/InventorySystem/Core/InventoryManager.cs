@@ -13,12 +13,12 @@ namespace InventorySystem
         [SerializeField] private GridManager gridManager;
         
         // イベント定義
-        public event Action<ItemData, int, int> OnItemAdded;           // アイテム追加（item, gridX, gridY）
+        public event Action<CompleteItemData, int, int> OnItemAdded;           // アイテム追加（item, gridX, gridY）
         public event Action<int, int> OnItemRemoved;                   // アイテム削除（gridX, gridY）
-        public event Action<ItemData> OnItemEquipped;                  // アイテム装備
-        public event Action<ItemData> OnItemUnequipped;                // アイテム装備解除
-        public event Action<ItemData> OnItemUsed;                      // アイテム使用
-        public event Action<ItemData> OnItemDiscarded;                 // アイテム破棄
+        public event Action<CompleteItemData> OnItemEquipped;                  // アイテム装備
+        public event Action<CompleteItemData> OnItemUnequipped;                // アイテム装備解除
+        public event Action<CompleteItemData> OnItemUsed;                      // アイテム使用
+        public event Action<CompleteItemData> OnItemDiscarded;                 // アイテム破棄
         public event Action<int> OnGridExpanded;                       // グリッド拡張（新しい行数）
         public event Action<ItemCategory> OnFilterChanged;             // フィルター変更
         public event Action OnInventoryOpened;                         // インベントリ開く
@@ -71,7 +71,7 @@ namespace InventorySystem
         /// <summary>
         /// アイテムを追加
         /// </summary>
-        public bool AddItem(ItemData item, int gridX, int gridY)
+        public bool AddItem(CompleteItemData item, int gridX, int gridY)
         {
             if (gridManager == null)
             {
@@ -80,10 +80,10 @@ namespace InventorySystem
             }
             
             // 配置可能かチェック（後でPlacementValidatorに移譲）
-            Debug.Log($"[InventoryManager] AddItem: {item.itemName} を ({gridX}, {gridY}) に配置を試行");
+            Debug.Log($"[InventoryManager] AddItem: {item.displayName} を ({gridX}, {gridY}) に配置を試行");
             if (!CanPlaceItem(item, gridX, gridY))
             {
-                Debug.LogWarning($"[InventoryManager] Cannot place item {item.itemName} at ({gridX}, {gridY})");
+                Debug.LogWarning($"[InventoryManager] Cannot place item {item.displayName} at ({gridX}, {gridY})");
                 return false;
             }
             
@@ -91,18 +91,18 @@ namespace InventorySystem
             // 配置処理（GridManagerの状態を更新）
             if (gridManager != null)
             {
-                gridManager.PlaceItem(gridX, gridY, item.sizeX, item.sizeY, item);
+                gridManager.PlaceItem(gridX, gridY, item.size.x, item.size.y, item);
             }
             
             OnItemAdded?.Invoke(item, gridX, gridY);
-            Debug.Log($"[InventoryManager] Item added: {item.itemName} at ({gridX}, {gridY})");
+            Debug.Log($"[InventoryManager] Item added: {item.displayName} at ({gridX}, {gridY})");
             return true;
         }
         
         /// <summary>
         /// アイテムを自動配置（空きスペースに配置）
         /// </summary>
-        public bool TryAddItemAuto(ItemData item)
+        public bool TryAddItemAuto(CompleteItemData item)
         {
             if (gridManager == null)
             {
@@ -110,13 +110,13 @@ namespace InventorySystem
                 return false;
             }
             
-            Debug.Log($"[InventoryManager] TryAddItemAuto開始: {item.itemName} (size: {item.sizeX}x{item.sizeY})");
+            Debug.Log($"[InventoryManager] TryAddItemAuto開始: {item.displayName} (size: {item.size.x}x{item.size.y})");
             Debug.Log($"[InventoryManager] アンロック行数: {gridManager.GetUnlockedRows()}");
             
             // 空きスペースを検索
             for (int y = 0; y < gridManager.GetUnlockedRows(); y++)
             {
-                for (int x = 0; x <= InventoryConstants.GRID_WIDTH - item.sizeX; x++)
+                for (int x = 0; x <= InventoryConstants.GRID_WIDTH - item.size.x; x++)
                 {
                     Debug.Log($"[InventoryManager] チェック位置 ({x}, {y})");
                     if (CanPlaceItem(item, x, y))
@@ -131,18 +131,18 @@ namespace InventorySystem
                 }
             }
             
-            Debug.LogWarning($"[InventoryManager] No space available for item: {item.itemName} (size: {item.sizeX}x{item.sizeY})");
+            Debug.LogWarning($"[InventoryManager] No space available for item: {item.displayName} (size: {item.size.x}x{item.size.y})");
             return false;
         }
         
         /// <summary>
         /// アイテムを削除
         /// </summary>
-        public void RemoveItem(int gridX, int gridY, ItemData item)
+        public void RemoveItem(int gridX, int gridY, CompleteItemData item)
         {
             if (gridManager != null)
             {
-                gridManager.RemoveItem(gridX, gridY, item.sizeX, item.sizeY);
+                gridManager.RemoveItem(gridX, gridY, item.size.x, item.size.y);
             }
             
             OnItemRemoved?.Invoke(gridX, gridY);
@@ -152,16 +152,16 @@ namespace InventorySystem
         /// <summary>
         /// アイテムを装備
         /// </summary>
-        public void EquipItem(ItemData item)
+        public void EquipItem(CompleteItemData item)
         {
-            if (!item.IsEquippable())
+            if (!item.IsEquippable)
             {
-                Debug.LogWarning($"[InventoryManager] Item {item.itemName} is not equippable");
+                Debug.Log($"[InventoryManager] Item {item.displayName} is not equippable");
                 return;
             }
             
             OnItemEquipped?.Invoke(item);
-            Debug.Log($"[InventoryManager] Item equipped: {item.itemName}");
+            Debug.Log($"[InventoryManager] Item equipped: {item.displayName}");
         }
         
         /// <summary>
@@ -200,9 +200,9 @@ namespace InventorySystem
         }
         
         // 仮の配置チェック(後でPlacementValidatorに移動)
-        private bool CanPlaceItem(ItemData item, int gridX, int gridY)
+        private bool CanPlaceItem(CompleteItemData item, int gridX, int gridY)
         {
-            Debug.Log($"[InventoryManager] CanPlaceItem呼び出し: {item.itemName} at ({gridX}, {gridY}) size {item.sizeX}x{item.sizeY}");
+            Debug.Log($"[InventoryManager] CanPlaceItem呼び出し: {item.displayName} at ({gridX}, {gridY}) size {item.size.x}x{item.size.y}");
             
             if (gridManager == null)
             {
@@ -210,8 +210,8 @@ namespace InventorySystem
                 return false;
             }
             
-            bool result = gridManager.CanPlaceItem(gridX, gridY, item.sizeX, item.sizeY);
-            Debug.Log($"[InventoryManager] CanPlaceItem結果: {result} for {item.itemName} at ({gridX}, {gridY})");
+            bool result = gridManager.CanPlaceItem(gridX, gridY, item.size.x, item.size.y);
+            Debug.Log($"[InventoryManager] CanPlaceItem結果: {result} for {item.displayName} at ({gridX}, {gridY})");
             return result;
         }
         

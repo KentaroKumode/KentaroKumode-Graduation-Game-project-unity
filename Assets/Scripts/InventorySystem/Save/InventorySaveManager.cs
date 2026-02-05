@@ -145,7 +145,7 @@ namespace InventorySystem
             // アイテムを復元
             foreach (var savedItem in data.items)
             {
-                ItemData item = itemDatabase.GetItem(savedItem.itemId);
+                CompleteItemData item = itemDatabase.GetItem(savedItem.itemId);
                 if (item != null)
                 {
                     // InventoryManagerに追加

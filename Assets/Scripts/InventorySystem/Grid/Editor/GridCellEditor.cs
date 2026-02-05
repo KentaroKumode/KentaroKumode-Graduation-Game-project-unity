@@ -5,7 +5,7 @@ namespace InventorySystem
 {
 #if UNITY_EDITOR
     [CustomEditor(typeof(GridCell))]
-    public class GridCellEditor : Editor
+    public class GridCellEditor : UnityEditor.Editor
     {
         private SerializedProperty lockVisualProp;
         private SerializedProperty cellRendererProp;
@@ -77,7 +77,7 @@ namespace InventorySystem
                 
                 if (gridCell.IsOccupied && gridCell.OccupiedItem != null)
                 {
-                    EditorGUILayout.LabelField($"占有アイテム: {gridCell.OccupiedItem.itemName}");
+                    EditorGUILayout.LabelField($"占有アイテム: {gridCell.OccupiedItem.displayName}");
                 }
                 
                 EditorGUILayout.EndVertical();

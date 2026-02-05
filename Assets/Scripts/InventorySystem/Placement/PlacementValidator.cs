@@ -20,7 +20,7 @@ namespace InventorySystem
         /// <summary>
         /// 指定位置にアイテムを配置可能か判定
         /// </summary>
-        public bool CanPlaceItem(ItemData item, int gridX, int gridY, out string reason)
+        public bool CanPlaceItem(CompleteItemData item, int gridX, int gridY, out string reason)
         {
             reason = "";
             
@@ -31,22 +31,22 @@ namespace InventorySystem
                 return false;
             }
             
-            if (gridX + item.sizeX > InventoryConstants.GRID_WIDTH)
+            if (gridX + item.size.x > InventoryConstants.GRID_WIDTH)
             {
                 reason = "右端を超えています";
                 return false;
             }
             
-            if (gridY + item.sizeY > InventoryConstants.GRID_HEIGHT)
+            if (gridY + item.size.y > InventoryConstants.GRID_HEIGHT)
             {
                 reason = "下端を超えています";
                 return false;
             }
             
             // ロック状態チェック
-            for (int y = gridY; y < gridY + item.sizeY; y++)
+            for (int y = gridY; y < gridY + item.size.y; y++)
             {
-                for (int x = gridX; x < gridX + item.sizeX; x++)
+                for (int x = gridX; x < gridX + item.size.x; x++)
                 {
                     GridCell cell = gridManager.GetCell(x, y);
                     if (cell != null && cell.IsLocked)
@@ -60,7 +60,7 @@ namespace InventorySystem
             // GridManagerの占有チェックを使用
             if (gridManager != null)
             {
-                if (!gridManager.CanPlaceItem(gridX, gridY, item.sizeX, item.sizeY))
+                if (!gridManager.CanPlaceItem(gridX, gridY, item.size.x, item.size.y))
                 {
                     reason = "配置不可エリア";
                     return false;
@@ -73,7 +73,7 @@ namespace InventorySystem
         /// <summary>
         /// 移動時の配置可否判定（元の位置を考慮）
         /// </summary>
-        public bool CanMoveItem(ItemData item, int fromX, int fromY, int toX, int toY, out string reason)
+        public bool CanMoveItem(CompleteItemData item, int fromX, int fromY, int toX, int toY, out string reason)
         {
             reason = "";
             
@@ -142,15 +142,15 @@ namespace InventorySystem
         /// <summary>
         /// 配置不可の理由となるセルを取得
         /// </summary>
-        public void GetInvalidCells(ItemData item, int gridX, int gridY, out bool[] invalidCells)
+        public void GetInvalidCells(CompleteItemData item, int gridX, int gridY, out bool[] invalidCells)
         {
-            int cellCount = item.sizeX * item.sizeY;
+            int cellCount = item.size.x * item.size.y;
             invalidCells = new bool[cellCount];
             
             int index = 0;
-            for (int y = gridY; y < gridY + item.sizeY; y++)
+            for (int y = gridY; y < gridY + item.size.y; y++)
             {
-                for (int x = gridX; x < gridX + item.sizeX; x++)
+                for (int x = gridX; x < gridX + item.size.x; x++)
                 {
                     bool isInvalid = false;
                     

@@ -28,7 +28,7 @@ namespace InventorySystem
             // 現在は直接詳細表示を呼び出し
             OnShowDetail?.Invoke(slot);
             
-            Debug.Log($"[RightClickHandler] Context menu for: {slot.ItemData.itemName}");
+            Debug.Log($"[RightClickHandler] Context menu for: {slot.ItemData.displayName}");
         }
         
         /// <summary>

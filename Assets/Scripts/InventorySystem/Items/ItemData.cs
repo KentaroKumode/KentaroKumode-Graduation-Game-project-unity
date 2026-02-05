@@ -3,8 +3,8 @@ using UnityEngine;
 namespace InventorySystem
 {
     /// <summary>
-    /// アイテムの基本データ
-    /// JSONから読み込まれ、アセット参照と統合される
+    /// アイテムの基本データ（後方互換性のため維持）
+    /// 新規開発では CompleteItemData を使用してください
     /// </summary>
     [System.Serializable]
     public class ItemData
@@ -36,13 +36,30 @@ namespace InventorySystem
         [System.NonSerialized] public GameObject equipMarkPrefab;
         
         /// <summary>
+        /// CompleteItemDataに変換
+        /// </summary>
+        public CompleteItemData ToCompleteItemData()
+        {
+            return new CompleteItemData
+            {
+                internalName = id,
+                displayName = itemName,
+                description = description,
+                category = category,
+                rarity = rarity,
+                fbxModel = cardModel,
+                icon = icon
+            };
+        }
+        
+        /// <summary>
         /// ステータスを持つアイテムか
         /// </summary>
         public bool HasStats()
         {
             return category == ItemCategory.Weapon || 
                    category == ItemCategory.Armor || 
-                   category == ItemCategory.PassiveItem;
+                   category == ItemCategory.Passive;
         }
         
         /// <summary>
@@ -59,6 +76,14 @@ namespace InventorySystem
         public bool IsEquippable()
         {
             return category == ItemCategory.Weapon || category == ItemCategory.Armor;
+        }
+        
+        /// <summary>
+        /// アイテムのスプライトを取得
+        /// </summary>
+        public Sprite GetSprite()
+        {
+            return icon;
         }
     }
     

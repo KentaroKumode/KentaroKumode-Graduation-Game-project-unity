@@ -9,7 +9,7 @@ namespace InventorySystem
     /// </summary>
     public class QuestItemDetector : MonoBehaviour
     {
-        private List<ItemData> inventoryItems = new List<ItemData>();
+        private List<CompleteItemData> inventoryItems = new List<CompleteItemData>();
         
         void Start()
         {
@@ -34,7 +34,7 @@ namespace InventorySystem
         /// <summary>
         /// アイテム追加時
         /// </summary>
-        private void OnItemAdded(ItemData item, int x, int y)
+        private void OnItemAdded(CompleteItemData item, int x, int y)
         {
             if (item != null)
             {
@@ -84,9 +84,9 @@ namespace InventorySystem
         /// <summary>
         /// クエストアイテムのリストを取得
         /// </summary>
-        public List<ItemData> GetQuestItems()
+        public List<CompleteItemData> GetQuestItems()
         {
-            List<ItemData> questItems = new List<ItemData>();
+            List<CompleteItemData> questItems = new List<CompleteItemData>();
             foreach (var item in inventoryItems)
             {
                 if (item.category == ItemCategory.Quest)

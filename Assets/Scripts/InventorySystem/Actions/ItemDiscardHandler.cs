@@ -10,7 +10,7 @@ namespace InventorySystem
         /// <summary>
         /// アイテムを破棄
         /// </summary>
-        public void DiscardItem(ItemData item, ItemSlot slot)
+        public void DiscardItem(CompleteItemData item, ItemSlot slot)
         {
             if (item == null)
             {
@@ -28,14 +28,14 @@ namespace InventorySystem
         /// <summary>
         /// 破棄を実行
         /// </summary>
-        private void ExecuteDiscard(ItemData item, ItemSlot slot)
+        private void ExecuteDiscard(CompleteItemData item, ItemSlot slot)
         {
             // アイテムを削除
             if (slot != null)
             {
                 int x = slot.GridX;
                 int y = slot.GridY;
-                ItemData itemData = slot.ItemData; // アイテムデータを取得
+                CompleteItemData itemData = slot.ItemData; // アイテムデータを取得
                 
                 slot.ClearItem();
                 
@@ -49,7 +49,7 @@ namespace InventorySystem
             // 効果音
             InventorySoundManager.Instance?.PlayItemDiscard();
             
-            Debug.Log($"[ItemDiscardHandler] Discarded: {item.itemName}");
+            Debug.Log($"[ItemDiscardHandler] Discarded: {item.displayName}");
         }
     }
 }

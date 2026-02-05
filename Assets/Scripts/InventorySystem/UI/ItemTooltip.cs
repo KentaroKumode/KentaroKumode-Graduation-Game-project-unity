@@ -21,7 +21,7 @@ namespace InventorySystem
         [SerializeField] private float showDelay = InventoryConstants.TOOLTIP_DELAY;
         [SerializeField] private Vector2 offset = new Vector2(10, -10);
         
-        private ItemData currentItem;
+        private CompleteItemData currentItem;
         private Coroutine showCoroutine;
         private bool isShowing = false;
         
@@ -36,7 +36,7 @@ namespace InventorySystem
         /// <summary>
         /// ツールチップ表示開始
         /// </summary>
-        public void ShowTooltip(ItemData item, Vector3 position)
+        public void ShowTooltip(CompleteItemData item, Vector3 position)
         {
             if (item == null) return;
             
@@ -104,8 +104,8 @@ namespace InventorySystem
             // 名前
             if (itemNameText != null)
             {
-                itemNameText.text = currentItem.itemName;
-                itemNameText.color = GetRarityColor(currentItem.rarity);
+                itemNameText.text = currentItem.displayName;
+                itemNameText.color = RarityColorUtility.GetRarityColor(currentItem.rarity);
             }
             
             // 説明
@@ -115,7 +115,7 @@ namespace InventorySystem
             }
             
             // ステータス（簡易版）
-            if (statsText != null && currentItem.HasStats())
+            if (statsText != null && currentItem.HasStats)
             {
                 string stats = "";
                 if (currentItem.attack > 0)
@@ -133,22 +133,7 @@ namespace InventorySystem
             // レアリティアイコン
             if (rarityIcon != null)
             {
-                rarityIcon.color = GetRarityColor(currentItem.rarity);
-            }
-        }
-        
-        /// <summary>
-        /// レアリティ色取得
-        /// </summary>
-        private Color GetRarityColor(ItemRarity rarity)
-        {
-            switch (rarity)
-            {
-                case ItemRarity.Bronze: return new Color(0.8f, 0.5f, 0.3f);
-                case ItemRarity.Silver: return new Color(0.75f, 0.75f, 0.75f);
-                case ItemRarity.Gold: return new Color(1f, 0.84f, 0f);
-                case ItemRarity.Mythic: return new Color(0.8f, 0.2f, 0.8f);
-                default: return Color.white;
+                rarityIcon.color = RarityColorUtility.GetRarityColor(currentItem.rarity);
             }
         }
         

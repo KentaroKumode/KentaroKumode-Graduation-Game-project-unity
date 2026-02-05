@@ -1,0 +1,216 @@
+{
+  "version": "4.1",
+  "lastModified": "2026-02-04",
+  
+  "metadata": {
+    "assetRules": {
+      "models": "Resources/Models/Items/{managementId}",
+      "icons": "Resources/Icons/Items/{managementId}",
+      "textures": "Resources/Textures/Items/{managementId}"
+    },
+    "fileExtensions": {
+      "model": ".prefab",
+      "icon": ".png", 
+      "texture": ".png"
+    }
+  },
+
+  "categories": {
+    "weapon": { 
+      "name": "武器", 
+      "color": "#FF6B6B" 
+    },
+    "armor": { 
+      "name": "防具", 
+      "color": "#4ECDC4" 
+    },
+    "consumable": { 
+      "name": "消耗品", 
+      "color": "#45B7D1" 
+    },
+    "passive": { 
+      "name": "レリック", 
+      "color": "#96CEB4" 
+    },
+    "quest": { 
+      "name": "クエスト", 
+      "color": "#FECA57" 
+    }
+  },
+
+  "rarities": {
+    "BRONZE": { 
+      "name": "BRONZE", 
+      "color": "#CD7F32", 
+      "multiplier": 1.0 
+    },
+    "SILVER": { 
+      "name": "SILVER", 
+      "color": "#C0C0C0", 
+      "multiplier": 1.5 
+    },
+    "GOLD": { 
+      "name": "GOLD", 
+      "color": "#FFD700", 
+      "multiplier": 2.5 
+    },
+    "LEGENDARY": { 
+      "name": "LEGENDARY", 
+      "color": "#FF6347", 
+      "multiplier": 4.0 
+    },
+    "MYTHIC": { 
+      "name": "MYTHIC", 
+      "color": "#9932CC", 
+      "multiplier": 6.0 
+    }
+  },
+
+  "itemDatabase": {
+    "weapons": {
+      "iron_sword_001": {
+        "managementId": "iron_sword_001",
+        "displayName": "鉄の剣",
+        "description": "よくある鉄製の剣。冒険者の基本装備として重宝される。",
+        "category": "weapon",
+        "rarity": "BRONZE",
+        "sizeX": 1,
+        "sizeY": 3,
+        "sellPrice": "45～55",
+        "buyPrice": "30～40",
+        "diceCount": 2,
+        "diceMin": 1,
+        "diceMax": 6,
+        "passive1Name": "鋭利",
+        "passive1Description": "クリティカル率+5%",
+        "passive1Value": 5,
+        "passive2Name": "",
+        "passive2Description": "",
+        "passive2Value": 0,
+        "passive3Name": "",
+        "passive3Description": "",
+        "passive3Value": 0,
+        "modelPath": "Models/Items/iron_sword_001",
+        "iconPath": "Icons/Items/iron_sword_001"
+      },
+      "steel_sword_002": {
+        "managementId": "steel_sword_002",
+        "displayName": "鋼鉄の剣",
+        "description": "鋼鉄で鍛造された頑丈な剣。鉄の剣よりも優れた性能を持つ。",
+        "category": "weapon",
+        "rarity": "SILVER",
+        "sizeX": 1,
+        "sizeY": 3,
+        "sellPrice": "80～100",
+        "buyPrice": "50～65",
+        "diceCount": 2,
+        "diceMin": 2,
+        "diceMax": 8,
+        "passive1Name": "頑丈",
+        "passive1Description": "耐久度減少-20%",
+        "passive1Value": 20,
+        "passive2Name": "鋭利",
+        "passive2Description": "クリティカル率+8%",
+        "passive2Value": 8,
+        "passive3Name": "",
+        "passive3Description": "",
+        "passive3Value": 0,
+        "modelPath": "Models/Items/steel_sword_002",
+        "iconPath": "Icons/Items/steel_sword_002"
+      }
+    },
+    "consumables": {
+      "health_potion_small": {
+        "managementId": "health_potion_small",
+        "displayName": "小さな体力回復ポーション",
+        "description": "体力を30回復する小さな赤いポーション。",
+        "category": "consumable",
+        "rarity": "BRONZE",
+        "sizeX": 1,
+        "sizeY": 1,
+        "sellPrice": "20～30",
+        "buyPrice": "10～15",
+        "effectType": "heal",
+        "effectValue": 30,
+        "usageLimit": 1,
+        "diceCount": 0,
+        "diceMin": 0,
+        "diceMax": 0,
+        "passive1Name": "",
+        "passive1Description": "",
+        "passive1Value": 0,
+        "passive2Name": "",
+        "passive2Description": "",
+        "passive2Value": 0,
+        "passive3Name": "",
+        "passive3Description": "",
+        "passive3Value": 0,
+        "modelPath": "Models/Items/health_potion_small",
+        "iconPath": "Icons/Items/health_potion_small"
+      }
+    },
+    "passives": {
+      "magic_ring_001": {
+        "managementId": "magic_ring_001",
+        "displayName": "魔法の指輪",
+        "description": "魔力を増強する神秘的な指輪。",
+        "category": "passive",
+        "rarity": "GOLD",
+        "sizeX": 1,
+        "sizeY": 1,
+        "sellPrice": "180～220",
+        "buyPrice": "90～110",
+        "diceCount": 0,
+        "diceMin": 0,
+        "diceMax": 0,
+        "passive1Name": "魔力増強",
+        "passive1Description": "最大マナ+20",
+        "passive1Value": 20,
+        "passive2Name": "魔法回復",
+        "passive2Description": "マナ回復速度+10%",
+        "passive2Value": 10,
+        "passive3Name": "",
+        "passive3Description": "",
+        "passive3Value": 0,
+        "effectType": "",
+        "effectValue": 0,
+        "usageLimit": 0,
+        "modelPath": "Models/Items/magic_ring_001",
+        "iconPath": "Icons/Items/magic_ring_001"
+      }
+    },
+    "questItems": {
+      "ancient_scroll_001": {
+        "managementId": "ancient_scroll_001",
+        "displayName": "古代の巻物",
+        "description": "謎に満ちた古代文字が記された巻物。",
+        "category": "quest",
+        "rarity": "MYTHIC",
+        "sizeX": 2,
+        "sizeY": 1,
+        "sellPrice": "0～0",
+        "buyPrice": "0～0",
+        "flavorText": "古代魔法学者が残した最後の研究成果。その真の力は未だ謎に包まれている。",
+        "skillName": "古代の知識",
+        "questId": "ancient_mysteries_01",
+        "diceCount": 0,
+        "diceMin": 0,
+        "diceMax": 0,
+        "passive1Name": "",
+        "passive1Description": "",
+        "passive1Value": 0,
+        "passive2Name": "",
+        "passive2Description": "",
+        "passive2Value": 0,
+        "passive3Name": "",
+        "passive3Description": "",
+        "passive3Value": 0,
+        "effectType": "",
+        "effectValue": 0,
+        "usageLimit": 0,
+        "modelPath": "Models/Items/ancient_scroll_001",
+        "iconPath": "Icons/Items/ancient_scroll_001"
+      }
+    }
+  }
+}

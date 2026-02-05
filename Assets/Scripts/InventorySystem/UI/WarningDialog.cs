@@ -107,11 +107,11 @@ namespace InventorySystem
         /// <summary>
         /// 装備確認ダイアログ
         /// </summary>
-        public void ShowEquipConfirmation(ItemData item, System.Action onConfirm)
+        public void ShowEquipConfirmation(CompleteItemData item, System.Action onConfirm)
         {
             ShowDialog(
                 "装備確認",
-                $"{item.itemName}を装備しますか？",
+                $"{item.displayName}を装備しますか？",
                 onConfirm,
                 null,
                 "装備する",
@@ -122,11 +122,11 @@ namespace InventorySystem
         /// <summary>
         /// 使用確認ダイアログ
         /// </summary>
-        public void ShowUseConfirmation(ItemData item, System.Action onConfirm)
+        public void ShowUseConfirmation(CompleteItemData item, System.Action onConfirm)
         {
             ShowDialog(
                 "使用確認",
-                $"{item.itemName}を使用しますか？",
+                $"{item.displayName}を使用しますか？",
                 onConfirm,
                 null,
                 "使用する",
@@ -137,11 +137,11 @@ namespace InventorySystem
         /// <summary>
         /// 破棄確認ダイアログ
         /// </summary>
-        public void ShowDiscardConfirmation(ItemData item, System.Action onConfirm)
+        public void ShowDiscardConfirmation(CompleteItemData item, System.Action onConfirm)
         {
             ShowDialog(
                 "破棄確認",
-                $"{item.itemName}を破棄しますか？\nこのアイテムは失われます。",
+                $"{item.displayName}を破棄しますか？\nこのアイテムは失われます。",
                 onConfirm,
                 null,
                 "破棄する",

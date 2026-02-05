@@ -20,12 +20,12 @@ namespace InventorySystem
         [SerializeField] private Color goldColor = new Color(1f, 0.84f, 0f);
         [SerializeField] private Color mythicColor = new Color(0.8f, 0.2f, 0.8f);
         
-        private ItemData itemData;
+        private CompleteItemData itemData;
         private int gridX;
         private int gridY;
         private bool isEquipped = false;
         
-        public ItemData ItemData => itemData;
+        public CompleteItemData ItemData => itemData;
         public int GridX => gridX;
         public int GridY => gridY;
         public bool IsEquipped => isEquipped;
@@ -33,7 +33,7 @@ namespace InventorySystem
         /// <summary>
         /// アイテムを設定
         /// </summary>
-        public void SetItem(ItemData item, int x, int y)
+        public void SetItem(CompleteItemData item, int x, int y)
         {
             itemData = item;
             gridX = x;
@@ -79,9 +79,9 @@ namespace InventorySystem
             // アイコン表示
             if (iconImage != null)
             {
-                if (itemData.icon != null)
+                if (itemData.itemIcon != null)
                 {
-                    iconImage.sprite = itemData.icon;
+                    iconImage.sprite = itemData.itemIcon;
                     iconImage.enabled = true;
                 }
                 else
@@ -93,23 +93,9 @@ namespace InventorySystem
             // レアリティ枠の色
             if (rarityFrame != null)
             {
-                rarityFrame.color = GetRarityColor(itemData.rarity);
+                rarityFrame.color = RarityColorUtility.GetRarityColor(itemData.rarity);
             }
         }
         
-        /// <summary>
-        /// レアリティに応じた色を取得
-        /// </summary>
-        private Color GetRarityColor(ItemRarity rarity)
-        {
-            switch (rarity)
-            {
-                case ItemRarity.Bronze: return bronzeColor;
-                case ItemRarity.Silver: return silverColor;
-                case ItemRarity.Gold: return goldColor;
-                case ItemRarity.Mythic: return mythicColor;
-                default: return Color.white;
-            }
-        }
     }
 }

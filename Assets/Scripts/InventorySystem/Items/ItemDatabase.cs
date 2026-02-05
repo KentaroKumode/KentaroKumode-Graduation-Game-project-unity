@@ -13,7 +13,7 @@ namespace InventorySystem
         [SerializeField] private TextAsset itemsJsonFile;
         [SerializeField] private ItemAssetDatabase assetDatabase;
         
-        private Dictionary<string, ItemData> itemDict;
+        private Dictionary<string, CompleteItemData> itemDict;
         private static ItemDatabase instance;
         
         public static ItemDatabase Instance => instance;
@@ -50,7 +50,7 @@ namespace InventorySystem
         /// </summary>
         public void LoadItems()
         {
-            itemDict = new Dictionary<string, ItemData>();
+            itemDict = new Dictionary<string, CompleteItemData>();
             
             if (itemsJsonFile == null)
             {
@@ -79,7 +79,7 @@ namespace InventorySystem
                 // 各アイテムを変換
                 foreach (var jsonItem in jsonData.items)
                 {
-                    ItemData item = ConvertFromJson(jsonItem);
+                    CompleteItemData item = ConvertFromJson(jsonItem);
                     
                     // アセット参照を設定
                     if (assetDatabase != null)
@@ -88,10 +88,10 @@ namespace InventorySystem
                         var assetMapping = assetDatabase.GetAssetMapping(item.id);
                         if (assetMapping != null)
                         {
-                            item.cardModel = assetMapping.cardModel;
+                            // フィールドに直接代入（プロパティではなく）
                             item.icon = assetMapping.icon;
                             item.equipMarkPrefab = assetMapping.equipMarkPrefab;
-                            Debug.Log($"[ItemDatabase] マッピング成功: {item.id} -> cardModel: {(item.cardModel != null ? item.cardModel.name : "null")}");
+                            Debug.Log($"[ItemDatabase] マッピング成功: {item.id} -> cardModel: {(assetMapping.cardModel != null ? assetMapping.cardModel.name : "null")}");
                         }
                         else
                         {
@@ -116,28 +116,38 @@ namespace InventorySystem
         }
         
         /// <summary>
-        /// JSONデータをItemDataに変換
+        /// JSONデータをCompleteItemDataに変換
         /// </summary>
-        private ItemData ConvertFromJson(ItemDataJson jsonItem)
+        private CompleteItemData ConvertFromJson(ItemDataJson jsonItem)
         {
-            ItemData item = new ItemData
+            CompleteItemData item = new CompleteItemData
             {
-                id = jsonItem.id,
-                itemName = jsonItem.itemName,
+                internalName = jsonItem.id,
+                displayName = jsonItem.itemName,
                 description = jsonItem.description,
-                flavorText = jsonItem.flavorText,
-                sizeX = jsonItem.sizeX,
-                sizeY = jsonItem.sizeY,
-                attack = jsonItem.attack,
-                defense = jsonItem.defense,
-                health = jsonItem.health,
-                mana = jsonItem.mana,
-                sellValue = jsonItem.sellValue
+                flavorText = jsonItem.flavorText
             };
+            
+            // サイズ設定
+            item.size = new ItemSize { x = jsonItem.sizeX, y = jsonItem.sizeY };
+            
+            // 売却価格設定
+            item.sellPrice = new PriceRange { min = jsonItem.sellValue, max = jsonItem.sellValue };
             
             // Enum変換
             System.Enum.TryParse(jsonItem.category, out item.category);
             System.Enum.TryParse(jsonItem.rarity, out item.rarity);
+            
+            // 武器の場合、ダイス設定を作成
+            if (item.category == ItemCategory.Weapon)
+            {
+                item.weaponDice = new DiceConfig
+                {
+                    minValue = jsonItem.attack - 5, // サンプル変換
+                    maxValue = jsonItem.attack + 5,
+                    count = 2
+                };
+            }
             
             return item;
         }
@@ -148,52 +158,48 @@ namespace InventorySystem
         private void CreateSampleData()
         {
             // ブロンズソード
-            ItemData bronzeSword = new ItemData
+            CompleteItemData bronzeSword = new CompleteItemData
             {
-                id = "sword_bronze_001",
-                itemName = "ブロンズソード",
+                internalName = "sword_bronze_001",
+                displayName = "ブロンズソード",
                 description = "初心者用の剣",
                 flavorText = "誰もが最初に手にする武器",
                 category = ItemCategory.Weapon,
-                rarity = ItemRarity.Bronze,
-                sizeX = 1,
-                sizeY = 3,
-                attack = 46,
-                sellValue = 50
+                rarity = ItemRarity.BRONZE
             };
-            itemDict[bronzeSword.id] = bronzeSword;
+            bronzeSword.size = new ItemSize { x = 1, y = 3 };
+            bronzeSword.sellPrice = new PriceRange { min = 50, max = 50 };
+            bronzeSword.weaponDice = new DiceConfig { minValue = 41, maxValue = 51, count = 2 };
+            itemDict[bronzeSword.internalName] = bronzeSword;
             
             // アイアンソード
-            ItemData ironSword = new ItemData
+            CompleteItemData ironSword = new CompleteItemData
             {
-                id = "sword_iron_001",
-                itemName = "アイアンソード",
+                internalName = "sword_iron_001",
+                displayName = "アイアンソード",
                 description = "鉄製の頑丈な剣",
                 flavorText = "冒険者の必需品",
                 category = ItemCategory.Weapon,
-                rarity = ItemRarity.Silver,
-                sizeX = 1,
-                sizeY = 3,
-                attack = 52,
-                sellValue = 100
+                rarity = ItemRarity.SILVER
             };
-            itemDict[ironSword.id] = ironSword;
+            ironSword.size = new ItemSize { x = 1, y = 3 };
+            ironSword.sellPrice = new PriceRange { min = 100, max = 100 };
+            ironSword.weaponDice = new DiceConfig { minValue = 47, maxValue = 57, count = 2 };
+            itemDict[ironSword.internalName] = ironSword;
             
             // 体力ポーション
-            ItemData healthPotion = new ItemData
+            CompleteItemData healthPotion = new CompleteItemData
             {
-                id = "potion_health_001",
-                itemName = "体力ポーション",
+                internalName = "potion_health_001",
+                displayName = "体力ポーション",
                 description = "HPを50回復する",
                 flavorText = "赤い液体が入った小瓶",
                 category = ItemCategory.Consumable,
-                rarity = ItemRarity.Bronze,
-                sizeX = 1,
-                sizeY = 1,
-                health = 50,
-                sellValue = 20
+                rarity = ItemRarity.BRONZE
             };
-            itemDict[healthPotion.id] = healthPotion;
+            healthPotion.size = new ItemSize { x = 1, y = 1 };
+            healthPotion.sellPrice = new PriceRange { min = 20, max = 20 };
+            itemDict[healthPotion.internalName] = healthPotion;
             
             Debug.Log($"[ItemDatabase] Created {itemDict.Count} sample items");
         }
@@ -201,9 +207,9 @@ namespace InventorySystem
         /// <summary>
         /// アイテムを取得
         /// </summary>
-        public ItemData GetItem(string itemId)
+        public CompleteItemData GetItem(string itemId)
         {
-            if (itemDict.TryGetValue(itemId, out ItemData item))
+            if (itemDict.TryGetValue(itemId, out CompleteItemData item))
             {
                 return item;
             }
@@ -219,31 +225,31 @@ namespace InventorySystem
         {
             Debug.Log($"[ItemDatabase] GetCardModel called for: {itemId}");
             
-            ItemData item = GetItem(itemId);
+            CompleteItemData item = GetItem(itemId);
             if (item == null)
             {
                 Debug.LogWarning($"[ItemDatabase] Item not found: {itemId}");
                 return null;
             }
             
-            Debug.Log($"[ItemDatabase] Item found: {item.itemName}, cardModel: {(item.cardModel != null ? item.cardModel.name : "null")}");
+            Debug.Log($"[ItemDatabase] Item found: {item.displayName}, cardModel: {(item.cardModel != null ? item.cardModel.name : "null")}");
             return item?.cardModel;
         }
         
         /// <summary>
         /// 全アイテムを取得
         /// </summary>
-        public List<ItemData> GetAllItems()
+        public List<CompleteItemData> GetAllItems()
         {
-            return new List<ItemData>(itemDict.Values);
+            return new List<CompleteItemData>(itemDict.Values);
         }
         
         /// <summary>
         /// カテゴリーでフィルタリング
         /// </summary>
-        public List<ItemData> GetItemsByCategory(ItemCategory category)
+        public List<CompleteItemData> GetItemsByCategory(ItemCategory category)
         {
-            List<ItemData> result = new List<ItemData>();
+            List<CompleteItemData> result = new List<CompleteItemData>();
             foreach (var item in itemDict.Values)
             {
                 if (item.category == category)

@@ -154,20 +154,20 @@ namespace InventorySystem
                 return;
             }
 
-            ItemData randomItem = allItems[Random.Range(0, allItems.Count)];
+            CompleteItemData randomItem = allItems[Random.Range(0, allItems.Count)];
             
             // ランダム位置に配置を試行
-            int randomX = Random.Range(0, InventoryConstants.GRID_WIDTH - randomItem.sizeX + 1);
-            int randomY = Random.Range(0, currentExpandedRows - randomItem.sizeY + 1);
+            int randomX = Random.Range(0, InventoryConstants.GRID_WIDTH - randomItem.size.x + 1);
+            int randomY = Random.Range(0, currentExpandedRows - randomItem.size.y + 1);
 
-            Debug.Log($"[InventoryTest] アイテム追加: {randomItem.itemName} (ID: {randomItem.id}) at ({randomX}, {randomY})");
+            Debug.Log($"[InventoryTest] アイテム追加: {randomItem.displayName} (ID: {randomItem.id}) at ({randomX}, {randomY})");
             
             // GridCellにアイテムを表示
             if (gridManager != null)
             {
-                for (int y = 0; y < randomItem.sizeY; y++)
+                for (int y = 0; y < randomItem.size.y; y++)
                 {
-                    for (int x = 0; x < randomItem.sizeX; x++)
+                    for (int x = 0; x < randomItem.size.x; x++)
                     {
                         GridCell cell = gridManager.GetCell(randomX + x, randomY + y);
                         if (cell != null)
@@ -236,16 +236,16 @@ namespace InventorySystem
 
             for (int i = 0; i < Mathf.Min(testItemCount, allItems.Count); i++)
             {
-                ItemData item = allItems[i];
+                CompleteItemData item = allItems[i];
                 
                 // グリッドに収まるか確認
-                if (currentX + item.sizeX > InventoryConstants.GRID_WIDTH)
+                if (currentX + item.size.x > InventoryConstants.GRID_WIDTH)
                 {
                     currentX = 0;
                     currentY += 1;
                 }
                 
-                if (currentY + item.sizeY > currentExpandedRows)
+                if (currentY + item.size.y > currentExpandedRows)
                 {
                     Debug.LogWarning($"[InventoryTest] グリッドがいっぱいです。{addedCount}個追加しました。");
                     break;
@@ -254,9 +254,9 @@ namespace InventorySystem
                 // アイテムを配置
                 if (gridManager != null)
                 {
-                    for (int y = 0; y < item.sizeY; y++)
+                    for (int y = 0; y < item.size.y; y++)
                     {
-                        for (int x = 0; x < item.sizeX; x++)
+                        for (int x = 0; x < item.size.x; x++)
                         {
                             GridCell cell = gridManager.GetCell(currentX + x, currentY + y);
                             if (cell != null)
@@ -278,9 +278,9 @@ namespace InventorySystem
                     }
                 }
                 
-                Debug.Log($"[InventoryTest] テストアイテム追加 [{i + 1}]: {item.itemName} at ({currentX}, {currentY})");
+                Debug.Log($"[InventoryTest] テストアイテム追加 [{i + 1}]: {item.displayName} at ({currentX}, {currentY})");
                 
-                currentX += item.sizeX;
+                currentX += item.size.x;
                 addedCount++;
             }
 
@@ -332,9 +332,9 @@ namespace InventorySystem
             Debug.Log($"=== アイテムデータベース情報 ===");
             Debug.Log($"総アイテム数: {allItems.Count}");
 
-            foreach (ItemData item in allItems)
+            foreach (CompleteItemData item in allItems)
             {
-                Debug.Log($"- {item.itemName} ({item.category}) [{item.sizeX}x{item.sizeY}] Rarity: {item.rarity}");
+                Debug.Log($"- {item.displayName} ({item.category}) [{item.size.x}x{item.size.y}] Rarity: {item.rarity}");
             }
         }
 

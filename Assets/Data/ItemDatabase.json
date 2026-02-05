@@ -1,0 +1,128 @@
+{
+  "version": "1.0",
+  "lastModified": "2026-02-03",
+  "items": [
+    {
+      "managementId": "sword_basic_001",
+      "displayName": {
+        "ja": "鉄の剣",
+        "en": "Iron Sword"
+      },
+      "description": {
+        "ja": "一般的な鉄製の剣。バランスが良く扱いやすい。",
+        "en": "A common iron sword. Well-balanced and easy to handle."
+      },
+      "flavorText": {
+        "ja": "冒険者の最初の相棒として愛される定番の武器。",
+        "en": "A beloved standard weapon as an adventurer's first companion."
+      },
+      "category": "weapon",
+      "rarity": "common",
+      "size": {
+        "x": 2,
+        "y": 3
+      },
+      "stats": {
+        "attack": 15,
+        "defense": 0,
+        "health": 0,
+        "mana": 0,
+        "durability": 100
+      },
+      "weaponData": {
+        "diceConfig": {
+          "count": 2,
+          "minValue": 1,
+          "maxValue": 6
+        },
+        "specialEffects": [
+          "sharp",
+          "reliable"
+        ],
+        "weaponType": "sword",
+        "attackSpeed": 1.0
+      },
+      "economy": {
+        "sellValue": 50,
+        "buyValue": 100,
+        "rarityMultiplier": 1.0
+      },
+      "assets": {
+        "iconPath": "Icons/Weapons/sword_basic_001",
+        "modelPath": "Models/Weapons/sword_basic_001",
+        "equipMarkPath": "EquipMarks/weapon_mark"
+      },
+      "metadata": {
+        "tags": ["starter", "melee", "metal"],
+        "unlockCondition": null,
+        "questReward": false,
+        "droppable": true
+      }
+    },
+    {
+      "managementId": "potion_health_001",
+      "displayName": {
+        "ja": "体力回復ポーション",
+        "en": "Health Potion"
+      },
+      "description": {
+        "ja": "体力を50回復する赤い薬液。",
+        "en": "A red liquid that restores 50 health points."
+      },
+      "flavorText": {
+        "ja": "甘酸っぱい香りがする。効果は確実だが味は保証できない。",
+        "en": "Has a sweet and sour aroma. The effect is certain, but the taste is not guaranteed."
+      },
+      "category": "consumable",
+      "rarity": "common",
+      "size": {
+        "x": 1,
+        "y": 1
+      },
+      "stats": {
+        "attack": 0,
+        "defense": 0,
+        "health": 0,
+        "mana": 0
+      },
+      "consumableData": {
+        "useEffect": "heal",
+        "effectValue": 50,
+        "duration": 0,
+        "stackable": true,
+        "maxStack": 10
+      },
+      "economy": {
+        "sellValue": 15,
+        "buyValue": 30,
+        "rarityMultiplier": 1.0
+      },
+      "assets": {
+        "iconPath": "Icons/Consumables/potion_health_001",
+        "modelPath": "Models/Consumables/potion_health_001",
+        "equipMarkPath": null
+      },
+      "metadata": {
+        "tags": ["healing", "consumable", "basic"],
+        "unlockCondition": null,
+        "questReward": false,
+        "droppable": true
+      }
+    }
+  ],
+  "categories": {
+    "weapon": "武器",
+    "armor": "防具", 
+    "consumable": "消耗品",
+    "material": "素材",
+    "quest": "クエストアイテム",
+    "passive": "パッシブアイテム"
+  },
+  "rarities": {
+    "common": { "name": "コモン", "color": "#FFFFFF", "multiplier": 1.0 },
+    "uncommon": { "name": "アンコモン", "color": "#00FF00", "multiplier": 1.5 },
+    "rare": { "name": "レア", "color": "#0080FF", "multiplier": 2.0 },
+    "epic": { "name": "エピック", "color": "#8000FF", "multiplier": 3.0 },
+    "legendary": { "name": "レジェンダリー", "color": "#FF8000", "multiplier": 5.0 }
+  }
+}

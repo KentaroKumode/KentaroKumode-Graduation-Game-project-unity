@@ -35,7 +35,7 @@ namespace InventorySystem
         /// <summary>
         /// アイテムを売却
         /// </summary>
-        public void SellItem(ItemData item, ItemSlot slot)
+        public void SellItem(CompleteItemData item, ItemSlot slot)
         {
             if (!isSellMode || item == null)
             {
@@ -52,10 +52,10 @@ namespace InventorySystem
         /// <summary>
         /// 売却を実行
         /// </summary>
-        private void ExecuteSell(ItemData item, ItemSlot slot)
+        private void ExecuteSell(CompleteItemData item, ItemSlot slot)
         {
             // 売却価格を取得
-            int sellPrice = item.sellValue;
+            int sellPrice = item.sellPrice.min; // 最低価格を使用
             
             // 通貨を追加（後でCoinSystemと連携）
             // TODO: CoinSystemに売却額を渡す
@@ -65,7 +65,7 @@ namespace InventorySystem
             {
                 int x = slot.GridX;
                 int y = slot.GridY;
-                ItemData itemData = slot.ItemData; // アイテムデータを取得
+                CompleteItemData itemData = slot.ItemData; // アイテムデータを取得
                 
                 slot.ClearItem();
                 
@@ -76,19 +76,19 @@ namespace InventorySystem
                 }
             }
             
-            Debug.Log($"[ItemSellHandler] Sold: {item.itemName} for {sellPrice} coins");
+            Debug.Log($"[ItemSellHandler] Sold: {item.displayName} for {sellPrice} coins");
         }
         
         /// <summary>
         /// 価格オーバーレイを表示
         /// </summary>
-        public void ShowPriceOverlay(ItemData item, Vector3 position)
+        public void ShowPriceOverlay(CompleteItemData item, Vector3 position)
         {
             if (!isSellMode || item == null) return;
             
             if (priceOverlayText != null)
             {
-                priceOverlayText.text = $"{item.sellValue}G";
+                priceOverlayText.text = $"{item.sellPrice.min}G";
                 priceOverlayText.transform.position = position;
                 priceOverlayText.gameObject.SetActive(true);
             }

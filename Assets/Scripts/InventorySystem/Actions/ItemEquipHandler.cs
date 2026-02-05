@@ -10,22 +10,22 @@ namespace InventorySystem
         [Header("参照")]
         [SerializeField] private ItemCompareView compareView;
         
-        private ItemData currentlyEquippedWeapon;
-        private ItemData currentlyEquippedArmor;
+        private CompleteItemData currentlyEquippedWeapon;
+        private CompleteItemData currentlyEquippedArmor;
         
         /// <summary>
         /// アイテムを装備
         /// </summary>
-        public void EquipItem(ItemData item, ItemSlot slot)
+        public void EquipItem(CompleteItemData item, ItemSlot slot)
         {
-            if (item == null || !item.IsEquippable())
+            if (item == null || !item.IsEquippable)
             {
                 Debug.LogWarning("[ItemEquipHandler] Item is not equippable");
                 return;
             }
             
             // 現在の装備を取得
-            ItemData currentEquip = item.category == ItemCategory.Weapon ? 
+            CompleteItemData currentEquip = item.category == ItemCategory.Weapon ? 
                 currentlyEquippedWeapon : currentlyEquippedArmor;
             
             // 比較表示
@@ -44,7 +44,7 @@ namespace InventorySystem
         /// <summary>
         /// 装備を実行
         /// </summary>
-        private void ExecuteEquip(ItemData item, ItemSlot slot)
+        private void ExecuteEquip(CompleteItemData item, ItemSlot slot)
         {
             // 前の装備を解除
             if (item.category == ItemCategory.Weapon && currentlyEquippedWeapon != null)
@@ -78,7 +78,7 @@ namespace InventorySystem
             // 効果音
             InventorySoundManager.Instance?.PlayItemEquip();
             
-            Debug.Log($"[ItemEquipHandler] Equipped: {item.itemName}");
+            Debug.Log($"[ItemEquipHandler] Equipped: {item.displayName}");
         }
         
         /// <summary>
@@ -108,7 +108,7 @@ namespace InventorySystem
         /// <summary>
         /// 現在の装備を取得
         /// </summary>
-        public ItemData GetCurrentEquipment(ItemCategory category)
+        public CompleteItemData GetCurrentEquipment(ItemCategory category)
         {
             if (category == ItemCategory.Weapon)
                 return currentlyEquippedWeapon;
