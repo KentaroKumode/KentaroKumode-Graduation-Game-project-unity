@@ -27,7 +27,10 @@ namespace InventorySystem
 
         void Update()
         {
-            if (!isInitialized) return;
+            if (!isInitialized) 
+            {
+                return;
+            }
 
             // I: インベントリ開閉
             if (Input.GetKeyDown(KeyCode.I))
@@ -38,6 +41,7 @@ namespace InventorySystem
             // Space: ランダムアイテム追加
             if (Input.GetKeyDown(KeyCode.Space))
             {
+                Debug.Log("[InventoryTest] スペースキーが押されました！");
                 AddRandomItem();
             }
 
@@ -79,16 +83,29 @@ namespace InventorySystem
         {
             Debug.Log("[InventoryTest] システム初期化開始");
 
-            // ItemDatabase初期化
+            // ItemDatabase初期化（ScriptableObject版）
             if (itemDatabase == null)
             {
-                itemDatabase = FindObjectOfType<ItemDatabase>();
+                Debug.Log("[InventoryTest] itemDatabaseがnullなので、Resourcesから読み込み中...");
+                itemDatabase = Resources.Load<ItemDatabase>("ItemDatabase");
             }
 
             if (itemDatabase != null)
             {
-                itemDatabase.LoadItems();
-                Debug.Log($"[InventoryTest] ItemDatabase読み込み完了: {itemDatabase.GetAllItems().Count}個のアイテム");
+                Debug.Log("[InventoryTest] ItemDatabase見つかりました。LoadFromJson()を呼び出し中...");
+                itemDatabase.LoadFromJson();
+                var allItems = itemDatabase.GetAllItems();
+                Debug.Log($"[InventoryTest] ItemDatabase読み込み完了: {allItems?.Count ?? 0}個のアイテム");
+                
+                // 詳細情報を出力
+                if (allItems != null && allItems.Count > 0)
+                {
+                    Debug.Log($"[InventoryTest] 最初のアイテム: {allItems[0]?.displayName ?? "null"}");
+                }
+                else
+                {
+                    Debug.LogError("[InventoryTest] LoadFromJson後にアイテムが0個です！");
+                }
             }
             else
             {
@@ -145,16 +162,37 @@ namespace InventorySystem
         /// </summary>
         void AddRandomItem()
         {
-            if (itemDatabase == null) return;
+            Debug.Log("[InventoryTest] AddRandomItem() 呼び出し開始");
+            
+            if (itemDatabase == null)
+            {
+                Debug.LogError("[InventoryTest] itemDatabaseがnullです！");
+                return;
+            }
 
             var allItems = itemDatabase.GetAllItems();
-            if (allItems.Count == 0)
+            Debug.Log($"[InventoryTest] 取得したアイテム数: {allItems?.Count ?? 0}");
+            
+            if (allItems == null || allItems.Count == 0)
             {
                 Debug.LogWarning("[InventoryTest] アイテムデータがありません");
                 return;
             }
 
             CompleteItemData randomItem = allItems[Random.Range(0, allItems.Count)];
+            Debug.Log($"[InventoryTest] 選択されたアイテム: {randomItem?.displayName ?? "null"}");
+            Debug.Log($"[InventoryTest] アイテムの3Dモデル: {(randomItem?.fbxModel != null ? randomItem.fbxModel.name : "null")}");
+            
+            if (randomItem == null)
+            {
+                Debug.LogError("[InventoryTest] ランダムアイテムがnullです！");
+                return;
+            }
+            
+            if (randomItem.fbxModel == null)
+            {
+                Debug.LogWarning($"[InventoryTest] アイテム '{randomItem.displayName}' に3Dモデルが設定されていません！");
+            }
             
             // ランダム位置に配置を試行
             int randomX = Random.Range(0, InventoryConstants.GRID_WIDTH - randomItem.size.x + 1);

@@ -71,41 +71,9 @@ namespace InventorySystem
                 return;
             }
             
-            // 前のアイテムをクリア
             ClearCurrentPreview();
-            
-            // ランダムアイテムを取得
             currentItem = itemLibrary.GetRandomItem();
-            if (currentItem == null)
-            {
-                Debug.LogWarning("ランダムアイテムの取得に失敗しました。");
-                return;
-            }
-            
-            // FBXモデルを生成
-            if (currentItem.fbxModel != null)
-            {
-                Vector3 spawnPos = spawnPoint.position + spawnOffset;
-                currentPreviewObject = Instantiate(currentItem.fbxModel, spawnPos, spawnPoint.rotation);
-                
-                // レアリティに基づく効果を適用
-                ApplyRarityEffects(currentPreviewObject, currentItem.rarity);
-            }
-            else
-            {
-                Debug.LogWarning($"アイテム '{currentItem.displayName}' にFBXモデルが設定されていません。");
-            }
-            
-            // テキスト表示
-            DisplayItemInfo(currentItem);
-            
-            // 自動削除
-            if (enableAutoDestroy && currentPreviewObject != null)
-            {
-                Destroy(currentPreviewObject, autoDestroyTime);
-            }
-            
-            LogItemInfo(currentItem);
+            ShowCurrentItem();
         }
         
         /// <summary>
@@ -120,20 +88,30 @@ namespace InventorySystem
             }
             
             ClearCurrentPreview();
-            
             currentItem = itemLibrary.GetRandomItemByRarity(rarity);
+            ShowCurrentItem();
+        }
+        
+        /// <summary>
+        /// 現在のアイテムをプレビュー表示（共通処理）
+        /// </summary>
+        private void ShowCurrentItem()
+        {
             if (currentItem == null)
             {
-                Debug.LogWarning($"レアリティ {rarity} のアイテムが見つかりません。");
+                Debug.LogWarning("アイテムの取得に失敗しました。");
                 return;
             }
             
-            // 以下、GenerateRandomItem()と同じ処理
             if (currentItem.fbxModel != null)
             {
                 Vector3 spawnPos = spawnPoint.position + spawnOffset;
                 currentPreviewObject = Instantiate(currentItem.fbxModel, spawnPos, spawnPoint.rotation);
                 ApplyRarityEffects(currentPreviewObject, currentItem.rarity);
+            }
+            else
+            {
+                Debug.LogWarning($"アイテム '{currentItem.displayName}' にFBXモデルが設定されていません。");
             }
             
             DisplayItemInfo(currentItem);
@@ -172,30 +150,8 @@ namespace InventorySystem
         {
             if (textDisplay == null) return;
             
-            var completeItem = new CompleteItemData();
-            CopyItemData(item, completeItem);
+            var completeItem = CompleteItemData.FromItemDataV2(item);
             textDisplay.ShowItemInfo(completeItem);
-        }
-        
-        /// <summary>
-        /// ItemDataV2をCompleteItemDataにコピー
-        /// </summary>
-        private void CopyItemData(ItemDataV2 source, CompleteItemData target)
-        {
-            target.internalName = source.internalName;
-            target.displayName = source.displayName;
-            target.description = source.description;
-            target.category = source.category;
-            target.rarity = source.rarity;
-            target.fbxModel = source.fbxModel;
-            target.flavorText = source.flavorText;
-            target.skillName = source.skillName;
-            target.size = source.size;
-            target.buyPrice = source.buyPrice;
-            target.sellPrice = source.sellPrice;
-            target.weaponDice = source.weaponDice;
-            target.weaponPassives = source.weaponPassives;
-            target.passiveEffects = source.passiveEffects;
         }
         
         /// <summary>

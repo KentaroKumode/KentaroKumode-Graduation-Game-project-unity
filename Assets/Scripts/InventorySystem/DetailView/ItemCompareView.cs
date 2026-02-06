@@ -64,6 +64,8 @@ namespace InventorySystem
             if (item.hasWeaponStats && item.weaponStats != null)
             {
                 text += $"ダイス: {item.weaponStats.ToString()}\n";
+                if (item.criticalRate > 0)
+                    text += $"会心率: {item.criticalRate}/9\n";
             }
             text += $"レアリティ: {item.rarity}\n";
             text += $"カテゴリ: {item.category}\n";
@@ -80,23 +82,22 @@ namespace InventorySystem
             // レアリティ比較
             text += $"レアリティ: {current.rarity} → {newItem.rarity}\n";
             
-            // 武器ダメージ比較
+            // 武器ダイス比較
             if (current.hasWeaponStats && newItem.hasWeaponStats)
             {
-                text += GetStatComparison("防御力", current.defense, newItem.defense);
+                var cd = current.weaponDice;
+                var nd = newItem.weaponDice;
+                text += $"ダイス: {cd.count}d{cd.maxValue} → {nd.count}d{nd.maxValue}\n";
             }
             
-            // HP
-            if (current.health > 0 || newItem.health > 0)
+            // 会心率比較
+            if (current.criticalRate > 0 || newItem.criticalRate > 0)
             {
-                text += GetStatComparison("HP", current.health, newItem.health);
+                text += GetStatComparison("会心率", current.criticalRate, newItem.criticalRate);
             }
             
-            // MP
-            if (current.mana > 0 || newItem.mana > 0)
-            {
-                text += GetStatComparison("MP", current.mana, newItem.mana);
-            }
+            // 価格比較
+            text += GetStatComparison("売却価格", current.sellPrice.min, newItem.sellPrice.min);
             
             return text;
         }

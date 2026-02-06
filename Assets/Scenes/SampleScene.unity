@@ -2175,6 +2175,106 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_IsOn: 0
+--- !u!1 &2046036208
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2046036210}
+  - component: {fileID: 2046036209}
+  m_Layer: 0
+  m_Name: itemUI
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2046036209
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2046036208}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cce9eec70bb5d6f4e87264d94b3f4ab5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  backgroundPlanePrefab: {fileID: 7804543165768020386, guid: ab686381ef6200a4f86bb32b81eb58c5, type: 3}
+  showItemCard: 1
+  targetCamera: {fileID: 963194227}
+  positionOffset: {x: 0, y: 0, z: 0.3}
+  rotationOffset: {x: 0, y: 0, z: 0}
+  scale: {x: 1, y: 1, z: 1}
+  enableSlideAnimation: 1
+  slideAnimationDuration: 0.8
+  slideStartOffsetY: -3
+  slideAnimationCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  cardPositionOffset: {x: 0, y: 0, z: 0}
+  cardSlideStartOffsetY: -4
+  enableInfoPanel: 0
+  infoPanel: {fileID: 0}
+  autoCreateInfoPanel: 0
+  enableTextDisplay: 0
+  textRenderer: {fileID: 0}
+  autoCreateTextRenderer: 0
+  textOffset: {x: 0, y: 0, z: -0.5}
+  enable3DTextDisplay: 1
+  text3DDisplay: {fileID: 0}
+  autoCreate3DTextDisplay: 1
+  text3DPosition: {x: 0, y: 0, z: 0}
+  scale1x1: 3.5
+  scale1x2: 3
+  scale1x3: 2.5
+  scale2x1: 2.5
+  scale2x2: 2
+  scale2x3: 1.8
+  scale3x1: 2
+  scale3x2: 1.8
+  scale3x3: 1.5
+  scaleOther: 1
+--- !u!4 &2046036210
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2046036208}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1.129597, y: 0.43950185, z: 0.41664323}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2058922835
 GameObject:
   m_ObjectHideFlags: 0
@@ -3018,3 +3118,4 @@ SceneRoots:
   - {fileID: 1774750642}
   - {fileID: 2058922838}
   - {fileID: 1173798922}
+  - {fileID: 2046036210}

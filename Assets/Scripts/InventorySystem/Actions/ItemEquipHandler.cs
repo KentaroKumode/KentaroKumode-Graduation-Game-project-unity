@@ -1,4 +1,5 @@
 using UnityEngine;
+using InventorySystem.PassiveSkills;
 
 namespace InventorySystem
 {
@@ -66,6 +67,9 @@ namespace InventorySystem
                 currentlyEquippedArmor = item;
             }
             
+            // パッシブスキル登録
+            PassiveSkillManager.Instance.AddItemSkills(item);
+            
             // スロットに装備マーク
             if (slot != null)
             {
@@ -88,6 +92,14 @@ namespace InventorySystem
         {
             if (currentlyEquippedWeapon != null)
             {
+                // パッシブスキル解除
+                PassiveSkillManager.Instance.RemoveItemSkills(currentlyEquippedWeapon);
+                
+                // イベント発火
+                InventoryManager.Instance?.UnequipItem(currentlyEquippedWeapon);
+                
+                Debug.Log($"[ItemEquipHandler] Unequipped weapon: {currentlyEquippedWeapon.displayName}");
+                
                 // TODO: スロットの装備マークを解除
                 currentlyEquippedWeapon = null;
             }
@@ -100,6 +112,14 @@ namespace InventorySystem
         {
             if (currentlyEquippedArmor != null)
             {
+                // パッシブスキル解除
+                PassiveSkillManager.Instance.RemoveItemSkills(currentlyEquippedArmor);
+                
+                // イベント発火
+                InventoryManager.Instance?.UnequipItem(currentlyEquippedArmor);
+                
+                Debug.Log($"[ItemEquipHandler] Unequipped armor: {currentlyEquippedArmor.displayName}");
+                
                 // TODO: スロットの装備マークを解除
                 currentlyEquippedArmor = null;
             }

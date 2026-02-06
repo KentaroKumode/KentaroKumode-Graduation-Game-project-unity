@@ -24,7 +24,7 @@ public class InventorySystemAutoSetup : EditorWindow
             "このツールは以下を自動実行します:\n" +
             "• フォルダ構造作成\n" +
             "• items.json作成\n" +
-            "• ItemAssetDatabase作成\n" +
+            "• 統合版ItemDatabase作成\n" +
             "• テストシーン作成\n" +
             "• システムオブジェクト配置\n" +
             "• テストスクリプト配置\n" +
@@ -42,7 +42,7 @@ public class InventorySystemAutoSetup : EditorWindow
         EditorGUILayout.LabelField("手動作業（後で実行）:", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
             "1. 3Dカードプレハブの作成（9個）\n" +
-            "2. ItemAssetDatabaseでのマッピング設定", 
+            "2. ItemDatabaseでのFBXマッピング設定", 
             MessageType.Warning);
     }
     
@@ -58,8 +58,8 @@ public class InventorySystemAutoSetup : EditorWindow
             // 2. JSONファイル作成
             CreateItemsJson();
             
-            // 3. ItemAssetDatabase作成
-            CreateItemAssetDatabase();
+            // 3. 統合版ItemDatabase作成
+            CreateItemDatabase();
             
             // 4. 現在のシーンにシステム配置
             SetupInCurrentScene();
@@ -81,7 +81,7 @@ public class InventorySystemAutoSetup : EditorWindow
                 "自動セットアップが完了しました！\n\n" +
                 "次に手動作業を行ってください:\n" +
                 "1. 3Dカードプレハブの作成\n" +
-                "2. ItemAssetDatabaseでのマッピング設定", 
+                "2. ItemDatabaseでのFBXマッピング設定", 
                 "OK");
         }
         catch (System.Exception e)
@@ -133,7 +133,8 @@ public class InventorySystemAutoSetup : EditorWindow
       ""defense"": 0,
       ""health"": 0,
       ""mana"": 0,
-      ""sellValue"": 10
+      ""sellValue"": 10,
+      ""passiveSkills"": []
     },
     {
       ""id"": ""sword_long"",
@@ -147,7 +148,8 @@ public class InventorySystemAutoSetup : EditorWindow
       ""defense"": 0,
       ""health"": 0,
       ""mana"": 0,
-      ""sellValue"": 25
+      ""sellValue"": 25,
+      ""passiveSkills"": []
     },
     {
       ""id"": ""spear"",
@@ -161,7 +163,8 @@ public class InventorySystemAutoSetup : EditorWindow
       ""defense"": 0,
       ""health"": 0,
       ""mana"": 0,
-      ""sellValue"": 45
+      ""sellValue"": 45,
+      ""passiveSkills"": []
     },
     {
       ""id"": ""hammer"",
@@ -175,7 +178,8 @@ public class InventorySystemAutoSetup : EditorWindow
       ""defense"": 0,
       ""health"": 0,
       ""mana"": 0,
-      ""sellValue"": 30
+      ""sellValue"": 30,
+      ""passiveSkills"": []
     },
     {
       ""id"": ""greatsword"",
@@ -189,7 +193,8 @@ public class InventorySystemAutoSetup : EditorWindow
       ""defense"": 0,
       ""health"": 0,
       ""mana"": 0,
-      ""sellValue"": 100
+      ""sellValue"": 100,
+      ""passiveSkills"": []
     },
     {
       ""id"": ""shield"",
@@ -203,7 +208,8 @@ public class InventorySystemAutoSetup : EditorWindow
       ""defense"": 8,
       ""health"": 0,
       ""mana"": 0,
-      ""sellValue"": 20
+      ""sellValue"": 20,
+      ""passiveSkills"": []
     },
     {
       ""id"": ""tower_shield"",
@@ -217,7 +223,8 @@ public class InventorySystemAutoSetup : EditorWindow
       ""defense"": 15,
       ""health"": 0,
       ""mana"": 0,
-      ""sellValue"": 50
+      ""sellValue"": 50,
+      ""passiveSkills"": []
     },
     {
       ""id"": ""plate_armor"",
@@ -231,7 +238,8 @@ public class InventorySystemAutoSetup : EditorWindow
       ""defense"": 20,
       ""health"": 25,
       ""mana"": 0,
-      ""sellValue"": 120
+      ""sellValue"": 120,
+      ""passiveSkills"": []
     },
     {
       ""id"": ""magic_scroll"",
@@ -245,7 +253,8 @@ public class InventorySystemAutoSetup : EditorWindow
       ""defense"": 0,
       ""health"": 0,
       ""mana"": 50,
-      ""sellValue"": 200
+      ""sellValue"": 200,
+      ""passiveSkills"": []
     }
   ]
 }";
@@ -257,35 +266,33 @@ public class InventorySystemAutoSetup : EditorWindow
         Debug.Log($"  • 作成: {filePath}");
     }
     
-    private void CreateItemAssetDatabase()
+    /// <summary>
+    /// 統合版ItemDatabaseを作成（ScriptableObject）
+    /// </summary>
+    private void CreateItemDatabase()
     {
-        Debug.Log("🎨 ItemAssetDatabase作成中...");
+        Debug.Log("📂 統合版ItemDatabase作成中...");
         
         // ScriptableObjectを作成
-        ItemAssetDatabase assetDB = ScriptableObject.CreateInstance<ItemAssetDatabase>();
+        ItemDatabase database = ScriptableObject.CreateInstance<ItemDatabase>();
         
-        // 9個のアセットマッピングを初期化（空の状態）
-        assetDB.assetMappings.Clear();
-        string[] itemIds = {
-            "sword_small", "sword_long", "spear", "hammer", "greatsword",
-            "shield", "tower_shield", "plate_armor", "magic_scroll"
-        };
-        
-        foreach (string itemId in itemIds)
+        // JSONファイルを設定（もし存在したら）
+        TextAsset jsonFile = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Data/ItemDatabase.json");
+        if (jsonFile != null)
         {
-            var mapping = new ItemAssetDatabase.ItemAssetMapping();
-            mapping.itemId = itemId;
-            // cardModel, icon, equipMarkPrefab は手動設定
-            assetDB.assetMappings.Add(mapping);
+            database.itemsJsonFile = jsonFile;
+            Debug.Log("✅ JSONファイルを設定しました");
+        }
+        else
+        {
+            Debug.LogWarning("⚠️ JSONファイルが見つかりません: Assets/Data/ItemDatabase.json");
         }
         
         // アセットとして保存
-        string assetPath = "Assets/Data/InventorySystem/ItemAssetDatabase.asset";
-        AssetDatabase.CreateAsset(assetDB, assetPath);
+        string path = "Assets/Resources/ItemDatabase.asset";
+        AssetDatabase.CreateAsset(database, path);
         AssetDatabase.SaveAssets();
-        
-        Debug.Log($"  • 作成: {assetPath}");
-        Debug.Log("  ⚠️  手動作業: Card Modelの設定が必要");
+        Debug.Log($"✅ ItemDatabaseを作成: {path}");
     }
     
     private void SetupInCurrentScene()
@@ -321,24 +328,13 @@ public class InventorySystemAutoSetup : EditorWindow
         // コンポーネント追加
         inventorySystem.AddComponent<InventoryManager>();
         inventorySystem.AddComponent<GridManager>();
-        ItemDatabase itemDB = inventorySystem.AddComponent<ItemDatabase>();
         
-        // ItemDatabase設定
-        TextAsset itemsJson = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Data/InventorySystem/items.json");
-        ItemAssetDatabase assetDB = AssetDatabase.LoadAssetAtPath<ItemAssetDatabase>("Assets/Data/InventorySystem/ItemAssetDatabase.asset");
-        
-        if (itemsJson != null && assetDB != null)
+        // ItemDatabaseはScriptableObjectなので、Resourcesから読み込み
+        ItemDatabase database = Resources.Load<ItemDatabase>("ItemDatabase");
+        if (database == null)
         {
-            // リフレクションを使用してprivateフィールドにアクセス
-            var itemsJsonField = typeof(ItemDatabase).GetField("itemsJsonFile", 
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var assetDBField = typeof(ItemDatabase).GetField("assetDatabase", 
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            
-            if (itemsJsonField != null) itemsJsonField.SetValue(itemDB, itemsJson);
-            if (assetDBField != null) assetDBField.SetValue(itemDB, assetDB);
-            
-            Debug.Log("  • ItemDatabase設定完了");
+            Debug.Log("ItemDatabaseが見つからないため、新しく作成します");
+            CreateItemDatabase();
         }
         
         Debug.Log("  • InventorySystem配置完了");

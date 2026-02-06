@@ -129,14 +129,15 @@ namespace InventorySystem
             if (statsText != null && currentItem.HasStats)
             {
                 string stats = "";
-                if (currentItem.attack > 0)
-                    stats += $"攻撃力: {currentItem.attack}\n";
-                if (currentItem.defense > 0)
-                    stats += $"防御力: {currentItem.defense}\n";
-                if (currentItem.health > 0)
-                    stats += $"HP: {currentItem.health}\n";
-                if (currentItem.mana > 0)
-                    stats += $"MP: {currentItem.mana}\n";
+                if (currentItem.IsWeapon && currentItem.hasWeaponStats)
+                {
+                    var d = currentItem.weaponDice;
+                    stats += $"ダイス: {d.count}d{d.maxValue}\n";
+                    if (currentItem.criticalRate > 0)
+                        stats += $"会心率: {currentItem.criticalRate}/9\n";
+                }
+                stats += $"購入価格: {currentItem.buyPrice}\n";
+                stats += $"売却価格: {currentItem.sellPrice}\n";
                 
                 statsText.text = stats;
             }

@@ -165,6 +165,17 @@ namespace InventorySystem
         }
         
         /// <summary>
+        /// アイテム装備を解除
+        /// </summary>
+        public void UnequipItem(CompleteItemData item)
+        {
+            if (item == null) return;
+            
+            OnItemUnequipped?.Invoke(item);
+            Debug.Log($"[InventoryManager] Item unequipped: {item.displayName}");
+        }
+        
+        /// <summary>
         /// グリッドを拡張
         /// </summary>
         public void ExpandGrid()

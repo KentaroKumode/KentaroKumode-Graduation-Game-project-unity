@@ -1,0 +1,219 @@
+{
+  "enemies": [
+    {
+      "id": "slime",
+      "displayName": "スライム",
+      "description": "最弱の魔物。ぷるぷると揺れながら近づいてくる。",
+      "floor": 1,
+      "maxHP": 6,
+      "diceCount": 1,
+      "diceMaxValue": 4,
+      "criticalNumerator": 0,
+      "passiveSkills": []
+    },
+    {
+      "id": "goblin",
+      "displayName": "ゴブリン",
+      "description": "小柄だが狡猾な魔物。数の暴力を好む。",
+      "floor": 1,
+      "maxHP": 8,
+      "diceCount": 1,
+      "diceMaxValue": 6,
+      "criticalNumerator": 0,
+      "passiveSkills": []
+    },
+    {
+      "id": "kobold",
+      "displayName": "コボルド",
+      "description": "犬のような顔の小鬼。罠を仕掛けるのが得意。",
+      "floor": 2,
+      "maxHP": 10,
+      "diceCount": 1,
+      "diceMaxValue": 6,
+      "criticalNumerator": 1,
+      "passiveSkills": [
+        { "internalName": "Trapper", "skillName": "罠師", "description": "ロール勝利時、次ターン相手のダイス合計値-1" }
+      ]
+    },
+    {
+      "id": "skeleton",
+      "displayName": "スケルトン",
+      "description": "朽ちた骨が動き出した不死の戦士。痛みを感じない。",
+      "floor": 2,
+      "maxHP": 12,
+      "diceCount": 2,
+      "diceMaxValue": 4,
+      "criticalNumerator": 0,
+      "passiveSkills": [
+        { "internalName": "Undying", "skillName": "不死身", "description": "受けるダメージを-1（最低0）" }
+      ]
+    },
+    {
+      "id": "wolf",
+      "displayName": "ダイアウルフ",
+      "description": "巨大な狼。素早い攻撃で敵を翻弄する。",
+      "floor": 2,
+      "maxHP": 10,
+      "diceCount": 2,
+      "diceMaxValue": 5,
+      "criticalNumerator": 1,
+      "passiveSkills": [
+        { "internalName": "Sprint", "skillName": "疾駆", "description": "初回ロール時、ダイス合計値+2" }
+      ]
+    },
+    {
+      "id": "orc",
+      "displayName": "オーク",
+      "description": "屈強な体躯の蛮族。力任せに武器を振るう。",
+      "floor": 3,
+      "maxHP": 16,
+      "diceCount": 2,
+      "diceMaxValue": 6,
+      "criticalNumerator": 1,
+      "passiveSkills": [
+        { "internalName": "BruteForce", "skillName": "剛力", "description": "ロール勝利時、ダメージ+2" }
+      ]
+    },
+    {
+      "id": "harpy",
+      "displayName": "ハーピィ",
+      "description": "空を舞う鳥人。鋭い爪で襲いかかる。",
+      "floor": 3,
+      "maxHP": 12,
+      "diceCount": 2,
+      "diceMaxValue": 6,
+      "criticalNumerator": 2,
+      "passiveSkills": [
+        { "internalName": "Flight", "skillName": "飛翔", "description": "追撃ダメージを受けない" }
+      ]
+    },
+    {
+      "id": "lizardman",
+      "displayName": "リザードマン",
+      "description": "硬い鱗に覆われた爬虫類の戦士。守りが堅い。",
+      "floor": 4,
+      "maxHP": 20,
+      "diceCount": 2,
+      "diceMaxValue": 6,
+      "criticalNumerator": 1,
+      "passiveSkills": [
+        { "internalName": "HardScales", "skillName": "硬鱗", "description": "受けるダメージを-2（最低0）" },
+        { "internalName": "TailStrike", "skillName": "尾撃", "description": "ロール敗北時、相手に1の固定ダメージ" }
+      ]
+    },
+    {
+      "id": "minotaur",
+      "displayName": "ミノタウロス",
+      "description": "巨大な牛頭の怪物。怒りに任せた突進は壊滅的。",
+      "floor": 4,
+      "maxHP": 22,
+      "diceCount": 3,
+      "diceMaxValue": 5,
+      "criticalNumerator": 2,
+      "passiveSkills": [
+        { "internalName": "Rampage", "skillName": "暴走", "description": "ロール敗北時、次ターンのダイス合計値+3" },
+        { "internalName": "BruteForce", "skillName": "剛力", "description": "ロール勝利時、ダメージ+2" }
+      ]
+    },
+    {
+      "id": "wraith",
+      "displayName": "レイス",
+      "description": "怨念の塊。実体を持たず、攻撃が通りにくい。",
+      "floor": 5,
+      "maxHP": 18,
+      "diceCount": 2,
+      "diceMaxValue": 6,
+      "criticalNumerator": 2,
+      "passiveSkills": [
+        { "internalName": "Ethereal", "skillName": "虚体", "description": "受けるダメージを50%軽減" },
+        { "internalName": "Curse", "skillName": "呪縛", "description": "ロール勝利時、次ターン相手のダイス合計値-2" }
+      ]
+    },
+    {
+      "id": "golem",
+      "displayName": "ストーンゴーレム",
+      "description": "古代魔法で動く石の巨人。膨大なHPを誇る。",
+      "floor": 5,
+      "maxHP": 35,
+      "diceCount": 2,
+      "diceMaxValue": 6,
+      "criticalNumerator": 0,
+      "passiveSkills": [
+        { "internalName": "HardScales", "skillName": "硬鱗", "description": "受けるダメージを-2（最低0）" },
+        { "internalName": "Immovable", "skillName": "不動", "description": "追撃ダメージを受けない" }
+      ]
+    },
+    {
+      "id": "dark_knight",
+      "displayName": "ダークナイト",
+      "description": "闇に堕ちた騎士。かつての技術はなお健在。",
+      "floor": 5,
+      "maxHP": 24,
+      "diceCount": 3,
+      "diceMaxValue": 6,
+      "criticalNumerator": 2,
+      "passiveSkills": [
+        { "internalName": "Undying", "skillName": "不死身", "description": "受けるダメージを-1（最低0）" },
+        { "internalName": "CounterStance", "skillName": "反撃態勢", "description": "ロール敗北時、次ターンのダメージ+3" }
+      ]
+    },
+    {
+      "id": "chimera",
+      "displayName": "キメラ",
+      "description": "複数の獣が融合した怪物。多彩な攻撃手段を持つ。",
+      "floor": 6,
+      "maxHP": 28,
+      "diceCount": 3,
+      "diceMaxValue": 6,
+      "criticalNumerator": 3,
+      "passiveSkills": [
+        { "internalName": "MultiHead", "skillName": "多頭攻撃", "description": "ロール勝利時、追撃ダイスを1個追加" },
+        { "internalName": "Regeneration", "skillName": "再生", "description": "毎ターン開始時、HP2回復" }
+      ]
+    },
+    {
+      "id": "demon",
+      "displayName": "デーモン",
+      "description": "地獄から召喚された悪魔。圧倒的な戦闘能力。",
+      "floor": 6,
+      "maxHP": 30,
+      "diceCount": 3,
+      "diceMaxValue": 6,
+      "criticalNumerator": 3,
+      "passiveSkills": [
+        { "internalName": "DemonAura", "skillName": "魔王の威圧", "description": "戦闘開始時、相手の最大HPを3減少" },
+        { "internalName": "Hellfire", "skillName": "地獄の業火", "description": "ロール勝利時、追加で2の固定ダメージ" }
+      ]
+    },
+    {
+      "id": "elder_vampire",
+      "displayName": "エルダーヴァンパイア",
+      "description": "太古の吸血鬼。血を啜り、力を増す。",
+      "floor": 7,
+      "maxHP": 30,
+      "diceCount": 3,
+      "diceMaxValue": 6,
+      "criticalNumerator": 4,
+      "passiveSkills": [
+        { "internalName": "Lifesteal", "skillName": "吸血", "description": "ダメージを与えた時、その50%分HPを回復" },
+        { "internalName": "NightLord", "skillName": "夜の王", "description": "3ターン目以降、ダイス1個追加" },
+        { "internalName": "Undying", "skillName": "不死身", "description": "受けるダメージを-1（最低0）" }
+      ]
+    },
+    {
+      "id": "death_knight",
+      "displayName": "デスナイト",
+      "description": "死を超越した騎士。絶対的な剣技で相手を圧倒する。",
+      "floor": 7,
+      "maxHP": 35,
+      "diceCount": 4,
+      "diceMaxValue": 6,
+      "criticalNumerator": 3,
+      "passiveSkills": [
+        { "internalName": "DeathSentence", "skillName": "死の宣告", "description": "5ターン以内に倒さなければ即死攻撃を放つ" },
+        { "internalName": "CounterStance", "skillName": "反撃態勢", "description": "ロール敗北時、次ターンのダメージ+3" },
+        { "internalName": "Undying", "skillName": "不死身", "description": "受けるダメージを-1（最低0）" }
+      ]
+    }
+  ]
+}

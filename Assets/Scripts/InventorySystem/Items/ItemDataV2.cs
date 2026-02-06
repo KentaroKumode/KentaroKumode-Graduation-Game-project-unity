@@ -58,9 +58,9 @@ namespace InventorySystem
     [Serializable]
     public class DiceConfig
     {
-        public int count = 1;        // ダイスの数
-        public int minValue = 1;     // 最小値
-        public int maxValue = 6;     // 最大値
+        public int count = 1;
+        public int minValue = 1;
+        public int maxValue = 6;
         
         public int RollDice()
         {
@@ -90,6 +90,30 @@ namespace InventorySystem
     }
 
     /// <summary>
+    /// パッシブスキル（内部名＋表示名＋説明文）
+    /// </summary>
+    [Serializable]
+    public class PassiveSkill
+    {
+        public string internalName = "";
+        public string skillName = "";
+        public string description = "";
+        
+        public PassiveSkill() { }
+        public PassiveSkill(string internalName, string name, string desc)
+        {
+            this.internalName = internalName;
+            skillName = name;
+            description = desc;
+        }
+        
+        public override string ToString()
+        {
+            return $"[{internalName}] {skillName}: {description}";
+        }
+    }
+
+    /// <summary>
     /// アイテムサイズ
     /// </summary>
     [Serializable]
@@ -100,45 +124,61 @@ namespace InventorySystem
     }
 
     /// <summary>
-    /// 統合型アイテムデータ構造
+    /// 経済データ
     /// </summary>
-    [System.Serializable]
+    [Serializable]
+    public class EconomyData
+    {
+        public int baseValue = 0;
+        public float sellMultiplier = 1.0f;
+        public float buyMultiplier = 1.0f;
+    }
+
+    /// <summary>
+    /// アイテムデータ基底クラス
+    /// </summary>
+    [Serializable]
     public class ItemDataV2
     {
         [Header("基本情報")]
-        public string internalName = "";      // 内部名（iron_sword等）
-        public string displayName = "";      // 表示名
+        public string internalName = "";
+        public string displayName = "";
         public ItemCategory category;
         public ItemRarity rarity;
-        public GameObject fbxModel;          // FBXモデル（1:1紐づけ）
+        public GameObject fbxModel;
         
         [Header("説明")]
         [TextArea(2, 4)]
-        public string description = "";      // 説明文
+        public string description = "";
         
         [Header("サイズ")]
         public ItemSize size;
         
         [Header("価格設定")]
-        public PriceRange buyPrice;          // 購入価格範囲
-        public PriceRange sellPrice;         // 売却価格範囲
+        public PriceRange buyPrice;
+        public PriceRange sellPrice;
         
         [Header("武器データ（武器のみ）")]
         public DiceConfig weaponDice;
+        public int criticalRate;     // 会心率の分子（1～9、分母は9）
         public List<PassiveEffect> weaponPassives = new List<PassiveEffect>();
         
         [Header("パッシブアイテムデータ")]
         public List<PassiveEffect> passiveEffects = new List<PassiveEffect>();
         
+        [Header("パッシブスキル")]
+        public List<PassiveSkill> passiveSkills = new List<PassiveSkill>();
+        
         [Header("クエストアイテムデータ（クエストのみ）")]
         [TextArea(1, 3)]
-        public string flavorText = "";       // フレーバーテキスト
-        public string skillName = "";        // スキル名
+        public string flavorText = "";
+        public string skillName = "";
         
-        [System.NonSerialized] 
-        public Sprite icon;
-        [System.NonSerialized] 
-        public GameObject equipMarkPrefab;
+        [NonSerialized] public Sprite icon;
+        [NonSerialized] public GameObject equipMarkPrefab;
+        
+        // 経済データキャッシュ
+        [NonSerialized] private EconomyData _economyCache;
         
         public ItemDataV2()
         {
@@ -148,55 +188,40 @@ namespace InventorySystem
             weaponDice = new DiceConfig();
         }
         
-        /// <summary>
-        /// 武器かどうか
-        /// </summary>
+        // カテゴリ判定
         public bool IsWeapon => category == ItemCategory.Weapon;
-        
-        /// <summary>
-        /// パッシブアイテムかどうか
-        /// </summary>
         public bool IsPassive => category == ItemCategory.Passive || category == ItemCategory.PassiveItem;
-        
-        /// <summary>
-        /// クエストアイテムかどうか
-        /// </summary>
         public bool IsQuest => category == ItemCategory.Quest;
         
-        /// <summary>
-        /// 現在の購入価格を取得
-        /// </summary>
+        // 価格取得
         public int GetCurrentBuyPrice() => buyPrice.GetRandomValue();
-        
-        /// <summary>
-        /// 現在の売却価格を取得
-        /// </summary>
         public int GetCurrentSellPrice() => sellPrice.GetRandomValue();
         
-        // 後方互換性プロパティ（ItemDataV2レベル）
-        /// <summary>
-        /// ダイス情報（後方互換性）
-        /// </summary>
+        // 武器ダイス情報
         public DiceConfig weaponStats => IsWeapon ? weaponDice : null;
-        
-        /// <summary>
-        /// 武器ダイス情報の有無
-        /// </summary>
         public bool hasWeaponStats => IsWeapon && weaponDice != null;
         
         /// <summary>
-        /// 経済データ（後方互換性）
+        /// 経済データ（キャッシュ済み）
         /// </summary>
-        public EconomyData economy => new EconomyData 
-        { 
-            baseValue = GetCurrentSellPrice(),
-            sellMultiplier = 1.0f,
-            buyMultiplier = 1.0f 
-        };
+        public EconomyData economy
+        {
+            get
+            {
+                if (_economyCache == null)
+                {
+                    _economyCache = new EconomyData();
+                }
+                _economyCache.baseValue = GetCurrentSellPrice();
+                _economyCache.sellMultiplier = 1.0f;
+                _economyCache.buyMultiplier = 1.0f;
+                return _economyCache;
+            }
+        }
     }
 
     /// <summary>
-    /// レアリティに基づく色取得ユーティリティ
+    /// レアリティカラーユーティリティ
     /// </summary>
     public static class RarityColorUtility
     {
@@ -207,7 +232,7 @@ namespace InventorySystem
                 case ItemRarity.BRONZE: return new Color(0.8f, 0.5f, 0.2f);
                 case ItemRarity.SILVER: return Color.white;
                 case ItemRarity.GOLD: return Color.yellow;
-                case ItemRarity.LEGENDARY: return new Color(1f, 0.5f, 0f); // オレンジ
+                case ItemRarity.LEGENDARY: return new Color(1f, 0.5f, 0f);
                 case ItemRarity.MYTHIC: return Color.cyan;
                 default: return Color.gray;
             }
@@ -215,75 +240,95 @@ namespace InventorySystem
     }
 
     /// <summary>
-    /// 統合型アイテムデータ（後方互換性）
+    /// 統合型アイテムデータ（ItemDataV2 を拡張）
+    /// 後方互換性プロパティと機能判定を提供
     /// </summary>
     public class CompleteItemData : ItemDataV2
     {
-        public CompleteItemData()
+        /// <summary>
+        /// ItemDataV2 から CompleteItemData を生成
+        /// </summary>
+        public static CompleteItemData FromItemDataV2(ItemDataV2 source)
         {
+            return new CompleteItemData
+            {
+                internalName = source.internalName,
+                displayName = source.displayName,
+                description = source.description,
+                category = source.category,
+                rarity = source.rarity,
+                fbxModel = source.fbxModel,
+                flavorText = source.flavorText,
+                skillName = source.skillName,
+                size = source.size,
+                buyPrice = source.buyPrice,
+                sellPrice = source.sellPrice,
+                weaponDice = source.weaponDice,
+                criticalRate = source.criticalRate,
+                weaponPassives = source.weaponPassives,
+                passiveEffects = source.passiveEffects,
+                passiveSkills = source.passiveSkills,
+                icon = source.icon,
+                equipMarkPrefab = source.equipMarkPrefab,
+            };
         }
+        // === 後方互換性エイリアス（CoinSystem等の外部参照用） ===
         
-        // 後方互換性プロパティ
+        /// <summary>管理ID（CoinSystem互換）</summary>
         public string managementId 
         { 
             get => internalName; 
             set => internalName = value; 
         }
         
+        /// <summary>アイテムID</summary>
+        public string id => internalName;
+        
+        /// <summary>サイズX（PlacementValidator互換）</summary>
         public int sizeX 
         { 
             get => size.x; 
             set => size.x = value; 
         }
         
+        /// <summary>サイズY（PlacementValidator互換）</summary>
         public int sizeY 
         { 
             get => size.y; 
             set => size.y = value; 
         }
         
-        // 武器ステータス（ダイスから計算）
-        public int attack => IsWeapon ? weaponDice.RollDice() : 0;
-        public int defense => 0; // 必要に応じて拡張
-        public int health => 0;  // 必要に応じて拡張
-        public int mana => 0;    // 必要に応じて拡張
+        // === ステータスプロパティ ===
         
-        // 機能判定プロパティ
+        /// <summary>攻撃力（ダイスロール結果）</summary>
+        public int attack => IsWeapon ? weaponDice.RollDice() : 0;
+        
+        /// <summary>設定中央価格</summary>
+        public int basePrice => (buyPrice.min + buyPrice.max + sellPrice.min + sellPrice.max) / 4;
+        
+        // === 機能判定 ===
+        
         public bool IsEquippable => category == ItemCategory.Weapon || category == ItemCategory.Armor;
         public bool IsUsable => category == ItemCategory.Consumable;
         public bool IsConsumable => category == ItemCategory.Consumable;
         public bool HasStats => IsWeapon || category == ItemCategory.Armor;
         
-        // 後方互換性のためのプロパティ
-        public string id => internalName; // idプロパティを追加
+        // === アセット参照エイリアス ===
         
-        // アセット参照
+        /// <summary>カードモデル（fbxModelのエイリアス）</summary>
         public GameObject cardModel => fbxModel;
+        
+        /// <summary>アイコン（CoinSystem互換）</summary>
         public Sprite iconSprite => icon;
-        public GameObject modelPrefab => fbxModel;
+        
+        /// <summary>モデルプレハブ（CoinSystem互換）</summary>
+        public GameObject modelPrefab
+        {
+            get => fbxModel;
+            set => fbxModel = value;
+        }
+        
+        /// <summary>アイテムアイコン（UI互換）</summary>
         public Sprite itemIcon => icon;
-        
-        // 経済データ
-        public EconomyData economy => new EconomyData 
-        { 
-            baseValue = GetCurrentSellPrice(),
-            sellMultiplier = 1.0f,
-            buyMultiplier = 1.0f 
-        };
-        
-        // ダイス情報（後方互換性）
-        public DiceConfig weaponStats => IsWeapon ? weaponDice : null;
-        public bool hasWeaponStats => IsWeapon && weaponDice != null;
-    }
-
-    /// <summary>
-    /// 後方互換性のためのEconomyData
-    /// </summary>
-    [Serializable]
-    public class EconomyData
-    {
-        public int baseValue = 0;
-        public float sellMultiplier = 1.0f;
-        public float buyMultiplier = 1.0f;
     }
 }

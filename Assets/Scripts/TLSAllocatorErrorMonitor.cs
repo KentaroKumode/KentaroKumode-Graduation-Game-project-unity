@@ -48,26 +48,7 @@ public class TLSAllocatorErrorMonitor : MonoBehaviour
         }
     }
     
-    void OnGUI()
-    {
-        if (!enableMonitoring) return;
-        
-        float runtime = Time.realtimeSinceStartup - startTime;
-        
-        GUIStyle style = new GUIStyle(GUI.skin.box);
-        style.alignment = TextAnchor.UpperLeft;
-        style.fontSize = 14;
-        style.normal.textColor = errorCount > 50 ? Color.red : Color.yellow;
-        
-        string status = $"TLS Allocator Monitor\n" +
-                       $"━━━━━━━━━━━━━━━━━━━━\n" +
-                       $"実行時間: {runtime:F1}秒\n" +
-                       $"エラー回数: {errorCount}回\n" +
-                       $"発生頻度: {(errorCount / Mathf.Max(runtime, 1f)):F3}回/秒\n\n" +
-                       $"評価: {GetSeverityLevel()}";
-        
-        GUI.Box(new Rect(10, 10, 300, 150), status, style);
-    }
+
     
     string GetSeverityLevel()
     {
