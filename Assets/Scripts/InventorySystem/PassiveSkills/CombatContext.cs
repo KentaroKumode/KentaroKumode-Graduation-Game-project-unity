@@ -28,6 +28,10 @@ namespace InventorySystem.PassiveSkills
         public int playerDiceTotal;     // プレイヤーのダイス合計値
         public int enemyDiceTotal;      // 敵のダイス合計値
         public int diceDifference;      // ダイス差（player - enemy）
+        
+        // ===== ダイス設定値 =====  
+        public int playerDiceMax;       // プレイヤーのダイス最大出目（装備武器由来）
+        public int enemyDiceMax;        // 敵のダイス最大出目
 
         // ===== ダメージ計算 =====
         public int baseDamage;          // 基本ダメージ
@@ -69,7 +73,6 @@ namespace InventorySystem.PassiveSkills
 
         // ===== 出血・状態異常 =====
         public int enemyBleedStacks;    // 敵の出血スタック数
-        public bool enemyHasFatalWound; // 敵に致命傷が付与されているか
         
         // ===== 勝敗フラグ =====
         public bool playerWonRoll;      // プレイヤーがロール勝利したか
@@ -82,7 +85,6 @@ namespace InventorySystem.PassiveSkills
         // ===== ダメージ無効化フラグ =====
         public bool nullifyAllDamage;   // 双方ダメージ0にするフラグ
         public bool nullifyPursuitDamage; // 追撃ダメージ無効化フラグ
-        public int damageShield;        // 次に受けるダメージの軽減値（天の加護用）
 
         // ===== オーバーダメージ蓄積（夜スキル用） =====
         public int overDamageAccumulated; // この戦闘中のオーバーダメージ蓄積値
@@ -129,7 +131,6 @@ namespace InventorySystem.PassiveSkills
             // 単ターン限りのフラグをリセット
             nullifyAllDamage = false;
             nullifyPursuitDamage = false;
-            damageShield = 0;
             fixedDamageToEnemy = 0;
             damageReduced = false;
             isCritical = false;

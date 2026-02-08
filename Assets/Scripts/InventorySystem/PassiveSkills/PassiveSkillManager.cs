@@ -197,12 +197,18 @@ namespace InventorySystem.PassiveSkills
         /// <summary>
         /// 戦闘開始（CombatContext生成）
         /// </summary>
-        public void BeginCombat(int playerMaxHP, int enemyMaxHP = 0)
+        public void BeginCombat(int playerMaxHP, int enemyMaxHP = 0, int playerDiceMax = 6, int enemyDiceMax = 6)
         {
             context = new CombatContext(playerMaxHP, enemyMaxHP);
+            
+            // ダイス設定値を設定
+            context.playerDiceMax = playerDiceMax;
+            context.enemyDiceMax = enemyDiceMax;
+            
             triggeredPlayerSkills.Clear();
             triggeredEnemySkills.Clear();
             Debug.Log($"[PassiveSkillManager] Combat started. Player skills: {activeSkillNames.Count}, Enemy skills: {enemySkillNames.Count}");
+            Debug.Log($"[PassiveSkillManager] Dice setup - Player: d{playerDiceMax}, Enemy: d{enemyDiceMax}");
         }
 
         /// <summary>
@@ -403,6 +409,13 @@ namespace InventorySystem.PassiveSkills
             // バフによるダイスボーナス適用
             context.playerDiceTotal += (int)context.GetBuff("diceBonus");
 
+            // 敵ダイスデバフ適用（正義への妄執など）
+            int enemyDebuff = (int)context.GetBuff("enemyDiceDebuff");
+            if (enemyDebuff > 0)
+            {
+                context.enemyDiceTotal = System.Math.Max(0, context.enemyDiceTotal - enemyDebuff);
+            }
+
             // パッシブスキル実行（OnPostRoll）
             FireTrigger(PassiveSkillTrigger.OnPostRoll);
 
@@ -467,17 +480,10 @@ namespace InventorySystem.PassiveSkills
             else
                 FireTrigger(PassiveSkillTrigger.OnPreReceiveDamage);
 
-            // 3. ダメージシールド適用（天の加護 — メインダメージのみ軽減）
-            if (context.damageShield > 0)
-            {
-                context.finalDamage = System.Math.Max(0, context.finalDamage - context.damageShield);
-                context.damageShield = 0;
-            }
-
-            // 4. 追撃ダメージスキル
+            // 3. 追撃ダメージスキル
             FireTrigger(PassiveSkillTrigger.OnPrePursuitDamage);
 
-            // 5. 無効化チェック
+            // 4. 無効化チェック
             if (context.nullifyAllDamage)
             {
                 context.finalDamage = 0;
@@ -488,10 +494,10 @@ namespace InventorySystem.PassiveSkills
                 context.pursuitDamage = 0;
             }
 
-            // 6. 全ダメージ合算（メイン＋追撃）
+            // 5. 全ダメージ合算（メイン＋追撃）
             int totalDamage = context.finalDamage + context.pursuitDamage;
 
-            // 7. クリティカル判定（合算後に1回だけ）
+            // 6. クリティカル判定（合算後に1回だけ）
             FireTrigger(PassiveSkillTrigger.OnCriticalCheck);
             context.criticalBonus += (int)context.GetBuff("criticalBonus");
 

@@ -131,6 +131,14 @@ namespace InventorySystem
                 }
             }
             
+            // グリッドに空きがない → HoldingAreaにフォールバック
+            var holdingArea = ItemHoldingArea.Instance;
+            if (holdingArea != null && holdingArea.AddItem(item))
+            {
+                Debug.Log($"[InventoryManager] グリッド満杯のため HoldingArea に一時保持: {item.displayName}");
+                return true; // 一時保持成功もtrueとして返す
+            }
+
             Debug.LogWarning($"[InventoryManager] No space available for item: {item.displayName} (size: {item.size.x}x{item.size.y})");
             return false;
         }

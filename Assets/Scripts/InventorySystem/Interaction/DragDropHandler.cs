@@ -3,6 +3,7 @@ using System.Collections;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 namespace InventorySystem
 {
@@ -31,6 +32,9 @@ namespace InventorySystem
         [Header("ドラッグ動作設定")]
         [SerializeField] private float dragHeightOffset = 0.1f;  // 持ち上げ時のY座標オフセット
         
+        [Header("HoldingArea")]
+        [SerializeField] private ItemHoldingArea holdingArea;
+        
         [Header("インジケーターテクスチャ")]
         [Tooltip("配置可能時に使用するテクスチャ（18x18ピクセル推奨）")]
         [SerializeField] private Texture2D validPlacementTexture;   // 配置可能時のテクスチャ
@@ -55,12 +59,55 @@ namespace InventorySystem
         private GameObject previewSpinSourceObject; // スピン対象の元のオブジェクト参照
         [SerializeField] private float previewSpinDuration = 0.8f; // スピン時間
         [SerializeField] private float previewSpinAngle = 360f;    // 回転角度
-        [SerializeField] private float previewSpinHeightOffset = 0.2f; // プレビュースピン時の追加高さ
+        [SerializeField] private Vector3 cardPositionOffset = Vector3.zero; // プレビューカードの位置オフセット（カメラローカル座標）
         [SerializeField] private Vector3 previewSpinAxis = Vector3.up; // 回転軸（XYZで指定）
         [SerializeField] private float previewSpinDistance = 2f;   // カメラ前方への距離
         private bool cameraLockedForSpin = false;
         private bool cameraLockedFallback = false;
         private bool blurEnabledBySpin = false;
+        
+        // プレビュー中アイテム削除UI
+        private GameObject trashIconPlane;    // ゴミ箱アイコンPlane
+        private Collider trashIconCollider;   // クリック判定用
+        private CompleteItemData previewSpinItemData;  // プレビュー中のアイテムデータ
+        private int previewSpinGridX;         // プレビュー中アイテムのグリッド位置X
+        private int previewSpinGridY;         // プレビュー中アイテムのグリッド位置Y
+        
+        [Header("図鑑プレビュー背景")]
+        [SerializeField] private GameObject previewBookPrefab;  // 図鑑背景Prefab
+        [SerializeField] private Vector3 bookLocalOffset = Vector3.zero;     // カメラローカル座標でのオフセット
+        [SerializeField] private float bookSlideDistance = 3f;   // スライドイン距離（カメラ下方向）
+        [SerializeField] private float bookSlideInDuration = 0.4f; // スライドインアニメーション時間
+        [SerializeField] private AnimationCurve bookSlideCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+        private GameObject previewBookInstance;  // 生成された図鑑背景インスタンス
+        
+        [Header("プレビューサイズ設定（アイテムグリッドサイズ別スケール係数）")]
+        [SerializeField] private float previewScale1x1 = 3.0f;
+        [SerializeField] private float previewScale1x2 = 2.5f;
+        [SerializeField] private float previewScale1x3 = 2.0f;
+        [SerializeField] private float previewScale2x2 = 2.0f;
+        [SerializeField] private float previewScale2x3 = 1.5f;
+        [SerializeField] private float previewScale3x3 = 1.5f;
+        [SerializeField] private float previewScale4x4 = 1.0f;
+        [SerializeField] private float previewScale5x5 = 0.7f;
+        [SerializeField] private float previewScaleDefault = 1.0f;
+        
+        [Header("プレビューアイテム名表示")]
+        [SerializeField] private TMP_FontAsset previewNameFont;        // カスタムフォント
+        [SerializeField] private Color previewNameColor = Color.white;  // 文字色
+        [SerializeField] private float previewNameFontSize = 0.8f;      // 基準フォントサイズ（4文字時）
+        [SerializeField] private int previewNameBaseChars = 4;           // 基準文字数（この文字数でbaseFontSize）
+        [SerializeField] private Vector3 previewNameOffset = new Vector3(0f, -0.8f, 0f); // カメラローカル座標でのオフセット
+        private GameObject previewNameObject;  // アイテム名表示オブジェクト
+        
+        [Header("削除演出")]
+        [SerializeField] private float burnDuration = 1.5f;    // 燃え尽き演出時間
+        [SerializeField] private float trashIconScale = 0.3f;  // ゴミ箱アイコンの大きさ
+        [SerializeField] private Vector3 trashIconOffset = new Vector3(1.2f, -0.8f, 0f); // カメラローカル座標でのオフセット
+        
+        // ドラッグソース追跡
+        private enum DragSource { Grid, HoldingArea }
+        private DragSource currentDragSource = DragSource.Grid;
 
         private void LockCameraMovement(bool forSpin = false)
         {
@@ -210,6 +257,12 @@ namespace InventorySystem
                 Debug.Log($"[DragDropHandler] BackgroundBlurEffect auto-detect: {(previewBackgroundBlur != null ? "Success" : "Failed")}");
             }
             
+            if (holdingArea == null)
+            {
+                holdingArea = ItemHoldingArea.Instance ?? FindObjectOfType<ItemHoldingArea>();
+                Debug.Log($"[DragDropHandler] ItemHoldingArea auto-detect: {(holdingArea != null ? "Success" : "Failed")}");
+            }
+            
             // プレビューライトを自動生成または検出
             if (previewLight == null && autoCreatePreviewLight)
             {
@@ -354,6 +407,7 @@ namespace InventorySystem
                                 
                                 // 元オブジェクトの参照を保存
                                 originalObject = itemObject.gameObject;
+                                currentDragSource = DragSource.Grid;
                                 
                                 StartDragFromGridPosition(itemData, gridX, gridY);
                                 return; // アイテムが見つかったら処理終了
@@ -379,11 +433,43 @@ namespace InventorySystem
                                     
                                     // 元オブジェクトの参照を保存（親オブジェクト）
                                     originalObject = itemObject.parent.gameObject;
+                                    currentDragSource = DragSource.Grid;
                                     
                                     StartDragFromGridPosition(itemData, gridX, gridY);
                                     return; // アイテムが見つかったら処理終了
                                 }
                             }
+                        }
+                    }
+                }
+                
+                Debug.Log("[DragDropHandler] グリッド上にアイテムが見つからなかった。HoldingAreaをチェック...");
+                
+                // HoldingAreaのカードかチェック
+                if (holdingArea == null) holdingArea = ItemHoldingArea.Instance;
+                if (holdingArea != null)
+                {
+                    foreach (var hit in hits)
+                    {
+                        GameObject hitObj = hit.collider.gameObject;
+                        // 親も含めてHoldingAreaのカードか判定
+                        Transform checkTr = hitObj.transform;
+                        while (checkTr != null)
+                        {
+                            if (holdingArea.IsHeldCard(checkTr.gameObject))
+                            {
+                                CompleteItemData heldItem = holdingArea.GetItemByCard(checkTr.gameObject);
+                                if (heldItem != null)
+                                {
+                                    Debug.Log($"[DragDropHandler] HoldingAreaカード検出: {heldItem.displayName}");
+                                    originalObject = checkTr.gameObject;
+                                    currentDragSource = DragSource.HoldingArea;
+                                    holdingArea.RemoveItem(heldItem);
+                                    StartDragFromHoldingArea(heldItem);
+                                    return;
+                                }
+                            }
+                            checkTr = checkTr.parent;
                         }
                     }
                 }
@@ -434,6 +520,35 @@ namespace InventorySystem
             {
                 originalObject.SetActive(false);
                 Debug.Log($"[DragDropHandler] 元オブジェクトを非表示: {originalObject.name}");
+            }
+            
+            // ドラッグプレビューを作成
+            CreateDragPreview(item);
+        }
+        
+        /// <summary>
+        /// HoldingAreaからのドラッグ開始
+        /// </summary>
+        private void StartDragFromHoldingArea(CompleteItemData item)
+        {
+            if (item == null)
+            {
+                Debug.LogError("[DragDropHandler] StartDragFromHoldingArea: CompleteItemDataがnullです！");
+                return;
+            }
+            
+            Debug.Log($"[DragDropHandler] HoldingAreaからドラッグ開始: {item.displayName}");
+            
+            // ドラッグ状態を設定
+            currentDragItem = item;
+            originalGridPosition = new Vector2Int(-1, -1); // グリッド外を示す
+            isDragging = true;
+            LockCameraMovement();
+            
+            // 元のオブジェクトを非表示
+            if (originalObject != null)
+            {
+                originalObject.SetActive(false);
             }
             
             // ドラッグプレビューを作成
@@ -691,7 +806,14 @@ namespace InventorySystem
                         
                         Debug.Log($"[DragDropHandler] PlacementValidator検索: {(placementValidator != null ? "見つかった" : "見つからない")}");
                         
-                        if (placementValidator != null)
+                        if (currentDragSource == DragSource.HoldingArea)
+                        {
+                            // HoldingAreaからの配置は元位置が無いため、常に新規配置として扱う
+                            canMove = true;
+                            reason = "HoldingAreaからの新規配置";
+                            Debug.Log("[DragDropHandler] HoldingAreaソース: PlacementValidator スキップ");
+                        }
+                        else if (placementValidator != null)
                         {
                             canMove = placementValidator.CanMoveItem(currentDragItem, originalGridPosition.x, originalGridPosition.y, dropX, dropY, out reason);
                             Debug.Log($"[DragDropHandler] CanMoveItem結果: {canMove}, 理由: {reason}");
@@ -815,22 +937,40 @@ namespace InventorySystem
             
             if (currentDragItem != null)
             {
-                Debug.Log($"[DragDropHandler] 元の位置に復元: {currentDragItem.displayName} at ({originalGridPosition.x}, {originalGridPosition.y})");
-                
-                if (gridManager.CanPlaceItem(originalGridPosition.x, originalGridPosition.y, currentDragItem.size.x, currentDragItem.size.y))
+                // HoldingAreaソースの場合はHoldingAreaに戻す
+                if (currentDragSource == DragSource.HoldingArea)
                 {
-                    gridManager.PlaceItem(originalGridPosition.x, originalGridPosition.y, currentDragItem.size.x, currentDragItem.size.y, currentDragItem);
-                    
-                    // 元のオブジェクトを再表示
-                    if (originalObject != null)
+                    Debug.Log($"[DragDropHandler] HoldingAreaに復元: {currentDragItem.displayName}");
+                    if (holdingArea == null) holdingArea = ItemHoldingArea.Instance;
+                    if (holdingArea != null)
                     {
-                        originalObject.SetActive(true);
-                        Debug.Log($"[DragDropHandler] 元オブジェクトを再表示: {originalObject.name}");
+                        holdingArea.AddItem(currentDragItem);
+                    }
+                    else
+                    {
+                        Debug.LogError("[DragDropHandler] HoldingAreaが見つからず復元失敗！");
                     }
                 }
                 else
                 {
-                    Debug.LogError("[DragDropHandler] 元の位置への復元に失敗！");
+                    // グリッドソースの場合は元のグリッド位置に戻す
+                    Debug.Log($"[DragDropHandler] 元の位置に復元: {currentDragItem.displayName} at ({originalGridPosition.x}, {originalGridPosition.y})");
+                    
+                    if (gridManager.CanPlaceItem(originalGridPosition.x, originalGridPosition.y, currentDragItem.size.x, currentDragItem.size.y))
+                    {
+                        gridManager.PlaceItem(originalGridPosition.x, originalGridPosition.y, currentDragItem.size.x, currentDragItem.size.y, currentDragItem);
+                        
+                        // 元のオブジェクトを再表示
+                        if (originalObject != null)
+                        {
+                            originalObject.SetActive(true);
+                            Debug.Log($"[DragDropHandler] 元オブジェクトを再表示: {originalObject.name}");
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogError("[DragDropHandler] 元の位置への復元に失敗！");
+                    }
                 }
             }
             
@@ -884,6 +1024,7 @@ namespace InventorySystem
             isPreviewSpinning = false;
             cameraLockedForSpin = false;
             blurEnabledBySpin = false;
+            currentDragSource = DragSource.Grid;
             UnlockCameraMovement();
             if (previewSpinInstance != null)
             {
@@ -899,6 +1040,14 @@ namespace InventorySystem
             {
                 previewBackgroundBlur.DisableBlur();
             }
+            
+            // ゴミ箱アイコンクリーンアップ
+            DestroyTrashIconPlane();
+            // アイテム名クリーンアップ
+            DestroyPreviewNameText();
+            // 図鑑背景クリーンアップ
+            DestroyBookBackground();
+            previewSpinItemData = null;
             
             // スピン対象だった元のオブジェクトを再表示
             if (previewSpinSourceObject != null)
@@ -964,26 +1113,22 @@ namespace InventorySystem
                             Quaternion rot = gridTransform.rotation;
                             Vector3 scale = gridTransform.localScale;
                             
-                            // カードサイズに応じてスケールを調整: (4 - max(sizeX, sizeY)) 倍、ただし3x3は1.5倍
-                            int maxSize = Mathf.Max(itemData.size.x, itemData.size.y);
-                            float scaleFactor;
-                            if (maxSize == 3)
-                            {
-                                scaleFactor = 1.5f; // 3x3は特別に1.5倍
-                            }
-                            else
-                            {
-                                scaleFactor = Mathf.Max(0.5f, 4f - maxSize); // 最小0.5倍にクランプ
-                            }
+                            // カードサイズに応じてInspectorで設定したスケール係数を適用
+                            float scaleFactor = GetPreviewScaleForSize(itemData.size.x, itemData.size.y);
                             Vector3 originalScale = scale;
                             scale *= scaleFactor;
                             
-                            Debug.Log($"[DragDropHandler] プレビュースピン開始: {itemName} at ({gx},{gy}), サイズ {itemData.size.x}x{itemData.size.y}, maxSize={maxSize}, スケール係数={scaleFactor}倍, 元スケール: {originalScale}, 最終スケール: {scale}");
+                            Debug.Log($"[DragDropHandler] プレビュースピン開始: {itemName} at ({gx},{gy}), サイズ {itemData.size.x}x{itemData.size.y}, スケール係数={scaleFactor}倍, 元スケール: {originalScale}, 最終スケール: {scale}");
                             
                             // グリッド上の元のオブジェクトを一時的に非表示
                             previewSpinSourceObject = gridTransform.gameObject;
                             previewSpinSourceObject.SetActive(false);
                             Debug.Log($"[DragDropHandler] スピン対象 {itemName} を非表示にしました");
+                            
+                            // プレビュー中アイテム情報を保存（削除UI用）
+                            previewSpinItemData = itemData;
+                            previewSpinGridX = gx;
+                            previewSpinGridY = gy;
                             
                             LockCameraMovement(forSpin: true);
                             StartCoroutine(SpinPreviewCoroutine(source, rot, scale));
@@ -1051,8 +1196,11 @@ namespace InventorySystem
             Vector3 screenCenter = new Vector3(Screen.width / 2f, Screen.height / 2f, 0);
             Ray centerRay = inventoryCamera.ScreenPointToRay(screenCenter);
             
-            // カメラから前方に一定距離の位置（確実に画面中央）
-            Vector3 centerWorldPos = centerRay.GetPoint(previewSpinDistance);
+            // カメラから前方に一定距離の位置（確実に画面中央）+ カード位置オフセット
+            Vector3 centerWorldPos = centerRay.GetPoint(previewSpinDistance)
+                + inventoryCamera.transform.right * cardPositionOffset.x
+                + inventoryCamera.transform.up * cardPositionOffset.y
+                + inventoryCamera.transform.forward * cardPositionOffset.z;
             
             Debug.Log($"[DragDropHandler] プレビュー位置: スクリーン中央={screenCenter}, ワールド={centerWorldPos}");
             Debug.Log($"[DragDropHandler] SpinPreviewCoroutine開始: initialScale={initialScale}, プレハブ={source.name}");
@@ -1123,11 +1271,24 @@ namespace InventorySystem
                 Debug.Log("[DragDropHandler] プレビューライトを点灯しました");
             }
             
+            // === 図鑑背景とプレビューカードを同時スライドインで表示 ===
+            yield return StartCoroutine(SlideInPreview(centerWorldPos));
+            
+            // === ゴミ箱アイコンをカメラ子として表示 ===
+            CreateTrashIconPlane(centerWorldPos);
+            
+            // === アイテム名をカメラ子として表示 ===
+            if (previewSpinItemData != null)
+            {
+                CreatePreviewNameText(previewSpinItemData.displayName);
+            }
+            
             // 継続スピン: 一定角速度で回し、次のキー入力で停止
             float angularSpeed = angle / duration; // 度/秒
             float startTime = Time.time;
             const float stopCheckDelay = 0.1f; // すぐ停止しないように最小遅延
             Vector3 axis = previewSpinAxis.sqrMagnitude > Mathf.Epsilon ? previewSpinAxis.normalized : Vector3.up;
+            bool burnTriggered = false;
             
             while (previewSpinPivot != null)
             {
@@ -1135,25 +1296,114 @@ namespace InventorySystem
                 previewSpinPivot.transform.Rotate(axis, deltaAngle, Space.Self);
                 
                 bool canStop = Time.time - startTime >= stopCheckDelay;
-                if (canStop && Input.anyKeyDown)
+                
+                if (canStop)
                 {
-                    break;
+                    // 左クリック: ゴミ箱アイコン判定
+                    if (Input.GetMouseButtonDown(0) && IsTrashIconClicked())
+                    {
+                        Debug.Log("[DragDropHandler] 🗑️ ゴミ箱アイコンがクリックされました");
+                        burnTriggered = true;
+                        break;
+                    }
+                    
+                    // その他の入力: プレビュー終了（ただし左クリックは非ゴミ箱なら終了）
+                    if (Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Escape) || 
+                        Input.GetMouseButtonDown(1) || Input.GetKeyDown(KeyCode.Space))
+                    {
+                        break;
+                    }
                 }
                 
                 yield return null;
             }
             
-            if (previewSpinInstance != null)
+            // === ゴミ箱アイコン破棄 ===
+            DestroyTrashIconPlane();
+            
+            // === アイテム名破棄 ===
+            DestroyPreviewNameText();
+            
+            // === 図鑑背景を即座に破棄 ===
+            DestroyBookBackground();
+            
+            if (burnTriggered && previewSpinInstance != null)
             {
-                Destroy(previewSpinInstance);
-                previewSpinInstance = null;
+                // 回転を停止
+                // ピボットからプレビューを外す（燃え演出中に位置を固定するため）
+                if (previewSpinPivot != null)
+                {
+                    previewSpinInstance.transform.SetParent(null, true);
+                    Destroy(previewSpinPivot);
+                    previewSpinPivot = null;
+                }
+                
+                // === 燃え尽き演出 ===
+                Debug.Log($"[DragDropHandler] 🔥 燃え尽き演出開始: {previewSpinItemData?.displayName}");
+                
+                bool burnComplete = false;
+                ItemBurnEffect.Play(previewSpinInstance, burnDuration, () => { burnComplete = true; });
+                
+                // 効果音
+                try { InventorySoundManager.Instance?.PlayItemDiscard(); }
+                catch (System.Exception) { /* ignore */ }
+                
+                // 燃え尽きアニメーション完了を待つ
+                while (!burnComplete)
+                {
+                    yield return null;
+                }
+                
+                // インベントリからアイテム削除  
+                if (previewSpinItemData != null)
+                {
+                    // InventoryManager.RemoveItem がグリッド解放＋OnItemRemovedイベント発火を一括処理
+                    InventoryManager.Instance?.RemoveItem(previewSpinGridX, previewSpinGridY, previewSpinItemData);
+                    
+                    Debug.Log($"[DragDropHandler] 🗑️✅ アイテム削除完了: {previewSpinItemData.displayName} at ({previewSpinGridX},{previewSpinGridY})");
+                }
+                
+                // 元のグリッドオブジェクトを破棄（再表示しない）
+                if (previewSpinSourceObject != null)
+                {
+                    Destroy(previewSpinSourceObject);
+                    previewSpinSourceObject = null;
+                }
+                
+                // プレビューインスタンス破棄
+                if (previewSpinInstance != null)
+                {
+                    Destroy(previewSpinInstance);
+                    previewSpinInstance = null;
+                }
             }
-            if (previewSpinPivot != null)
+            else
             {
-                Destroy(previewSpinPivot);
-                previewSpinPivot = null;
+                // 通常終了: プレビュークリーンアップ
+                if (previewSpinInstance != null)
+                {
+                    Destroy(previewSpinInstance);
+                    previewSpinInstance = null;
+                }
+                if (previewSpinPivot != null)
+                {
+                    Destroy(previewSpinPivot);
+                    previewSpinPivot = null;
+                }
+                
+                // スピン対象だった元のオブジェクトを再表示
+                if (previewSpinSourceObject != null)
+                {
+                    previewSpinSourceObject.SetActive(true);
+                    Debug.Log($"[DragDropHandler] スピン完了: 対象オブジェクトを再表示しました");
+                    previewSpinSourceObject = null;
+                }
             }
+            
+            // 共通クリーンアップ
             isPreviewSpinning = false;
+            previewSpinItemData = null;
+            
             if (cameraLockedForSpin)
             {
                 UnlockCameraMovement();
@@ -1170,13 +1420,279 @@ namespace InventorySystem
                 previewLight.enabled = false;
                 Debug.Log("[DragDropHandler] プレビューライトを消灯しました");
             }
+        }
+        
+        // =================================================================
+        //  図鑑背景 UI
+        // =================================================================
+
+        /// <summary>
+        /// 図鑑背景とプレビューカードを同時にカメラ下方からスライドイン
+        /// </summary>
+        private IEnumerator SlideInPreview(Vector3 targetWorldPos)
+        {
+            // カメラのローカル下方向をワールド空間で計算
+            Vector3 slideOffsetWorld = inventoryCamera.transform.up * (-bookSlideDistance);
             
-            // スピン対象だった元のオブジェクトを再表示
-            if (previewSpinSourceObject != null)
+            // ピボットのスライド開始位置
+            Vector3 pivotStartPos = targetWorldPos + slideOffsetWorld;
+            if (previewSpinPivot != null)
+                previewSpinPivot.transform.position = pivotStartPos;
+            
+            // 図鑑背景のセットアップ
+            if (previewBookPrefab != null)
             {
-                previewSpinSourceObject.SetActive(true);
-                Debug.Log($"[DragDropHandler] スピン完了: 対象オブジェクトを再表示しました");
-                previewSpinSourceObject = null;
+                DestroyBookBackground();
+                
+                previewBookInstance = Instantiate(previewBookPrefab);
+                previewBookInstance.name = "PreviewBookBackground";
+                previewBookInstance.transform.SetParent(inventoryCamera.transform, false);
+                previewBookInstance.transform.localRotation = Quaternion.Euler(90f, 180f, 0f);
+                
+                int previewLayer = LayerMask.NameToLayer("PreviewCard");
+                if (previewLayer >= 0)
+                    SetLayerRecursively(previewBookInstance, previewLayer);
+            }
+            
+            // 図鑑背景のスライド位置
+            Vector3 bookTargetLocal = bookLocalOffset;
+            Vector3 bookStartLocal = bookTargetLocal + Vector3.down * bookSlideDistance;
+            
+            // スライドインアニメーション
+            float elapsed = 0f;
+            while (elapsed < bookSlideInDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / bookSlideInDuration);
+                float curve = bookSlideCurve.Evaluate(t);
+                
+                // プレビューカード（ピボット）をスライド
+                if (previewSpinPivot != null)
+                {
+                    previewSpinPivot.transform.position = Vector3.Lerp(pivotStartPos, targetWorldPos, curve);
+                }
+                
+                // 図鑑背景をスライド
+                if (previewBookInstance != null)
+                {
+                    previewBookInstance.transform.localPosition = Vector3.Lerp(bookStartLocal, bookTargetLocal, curve);
+                }
+                
+                if (previewSpinPivot == null && previewBookInstance == null)
+                    yield break;
+                
+                yield return null;
+            }
+            
+            // 最終位置を確定
+            if (previewSpinPivot != null)
+                previewSpinPivot.transform.position = targetWorldPos;
+            if (previewBookInstance != null)
+                previewBookInstance.transform.localPosition = bookTargetLocal;
+            
+            Debug.Log($"[DragDropHandler] プレビュースライドイン完了");
+        }
+        
+        /// <summary>図鑑背景を即座に破棄</summary>
+        private void DestroyBookBackground()
+        {
+            if (previewBookInstance != null)
+            {
+                Destroy(previewBookInstance);
+                previewBookInstance = null;
+            }
+        }
+
+        // =================================================================
+        //  プレビューサイズヘルパー
+        // =================================================================
+
+        /// <summary>
+        /// アイテムのグリッドサイズに応じたプレビュースケール係数を取得
+        /// </summary>
+        private float GetPreviewScaleForSize(int sizeX, int sizeY)
+        {
+            // 小さい方をX、大きい方をYに正規化（例: 3x1 → 1x3 と同じ扱い）
+            int minS = Mathf.Min(sizeX, sizeY);
+            int maxS = Mathf.Max(sizeX, sizeY);
+            
+            // 1xN系
+            if (minS == 1 && maxS == 1) return previewScale1x1;
+            if (minS == 1 && maxS == 2) return previewScale1x2;
+            if (minS == 1 && maxS == 3) return previewScale1x3;
+            // 2xN系
+            if (minS == 2 && maxS == 2) return previewScale2x2;
+            if (minS == 2 && maxS == 3) return previewScale2x3;
+            // 3x3
+            if (minS == 3 && maxS == 3) return previewScale3x3;
+            // 4x4
+            if (minS == 4 && maxS == 4) return previewScale4x4;
+            // 5x5
+            if (minS >= 5) return previewScale5x5;
+            
+            // その他（中間サイズ）
+            return previewScaleDefault;
+        }
+
+        // =================================================================
+        //  アイテム名表示（TextMeshPro 3D）
+        // =================================================================
+
+        /// <summary>
+        /// TextMeshProを使用してアイテム名を3D空間上に表示（カメラ子）
+        /// </summary>
+        private void CreatePreviewNameText(string itemName)
+        {
+            if (string.IsNullOrEmpty(itemName) || inventoryCamera == null) return;
+            
+            DestroyPreviewNameText();
+            
+            previewNameObject = new GameObject("PreviewItemName");
+            previewNameObject.transform.SetParent(inventoryCamera.transform, false);
+            previewNameObject.transform.localPosition = previewNameOffset;
+            // カメラ正面を向く
+            previewNameObject.transform.localRotation = Quaternion.identity;
+            
+            // TextMeshPro 3Dコンポーネントを追加
+            var tmp = previewNameObject.AddComponent<TextMeshPro>();
+            tmp.text = itemName;
+            tmp.fontSize = GetScaledFontSize(itemName.Length);
+            tmp.color = previewNameColor;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.enableWordWrapping = false;
+            
+            // カスタムフォントが設定されていれば適用
+            if (previewNameFont != null)
+            {
+                tmp.font = previewNameFont;
+            }
+            
+            // RectTransformのサイズ設定（十分な幅を確保）
+            var rt = previewNameObject.GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                rt.sizeDelta = new Vector2(10f, 2f);
+            }
+            
+            // PreviewCardレイヤーに設定
+            int previewLayer = LayerMask.NameToLayer("PreviewCard");
+            if (previewLayer >= 0)
+                previewNameObject.layer = previewLayer;
+            
+            Debug.Log($"[DragDropHandler] アイテム名表示: '{itemName}' offset={previewNameOffset}");
+        }
+        
+        /// <summary>
+        /// 文字数に応じたフォントサイズを算出。
+        /// テキスト幅 ∝ fontSize × charCount なので、
+        /// 同じ幅に収めるため fontSize = baseSize × baseChars / charCount（反比例）で減衰。
+        /// baseChars以下の文字数ではbaseFontSizeをそのまま使用。
+        /// </summary>
+        private float GetScaledFontSize(int charCount)
+        {
+            int baseChars = Mathf.Max(1, previewNameBaseChars);
+            if (charCount <= baseChars) return previewNameFontSize;
+            return previewNameFontSize * baseChars / (float)charCount;
+        }
+
+        /// <summary>アイテム名表示を破棄</summary>
+        private void DestroyPreviewNameText()
+        {
+            if (previewNameObject != null)
+            {
+                Destroy(previewNameObject);
+                previewNameObject = null;
+            }
+        }
+
+        // =================================================================
+        //  ゴミ箱アイコン UI
+        // =================================================================
+
+        /// <summary>
+        /// ゴミ箱アイコンPlaneをカメラの子として配置
+        /// </summary>
+        private void CreateTrashIconPlane(Vector3 centerWorldPos)
+        {
+            // Quad生成
+            trashIconPlane = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            trashIconPlane.name = "TrashIconPlane";
+            
+            // カメラの子として配置（ローカルオフセットで位置決定）
+            trashIconPlane.transform.SetParent(inventoryCamera.transform, false);
+            trashIconPlane.transform.localPosition = trashIconOffset;
+            trashIconPlane.transform.localRotation = Quaternion.identity; // カメラ正面を向く
+            trashIconPlane.transform.localScale = Vector3.one * trashIconScale;
+            
+            // テクスチャ設定 — Unlit/Texture + 透過対応
+            var renderer = trashIconPlane.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                // Built-in RPで確実に動くシェーダーを選択
+                Shader shader = Shader.Find("Unlit/Transparent");
+                if (shader == null) shader = Shader.Find("Sprites/Default");
+                if (shader == null) shader = Shader.Find("UI/Default");
+                
+                var mat = new Material(shader);
+                mat.mainTexture = TextureGenerator.CreateTrashIconTexture(64);
+                mat.color = Color.white;
+                
+                // 透過ブレンドを明示設定
+                mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                mat.SetInt("_ZWrite", 0);
+                mat.renderQueue = 3100; // Transparent キュー
+                
+                renderer.material = mat;
+                renderer.receiveShadows = false;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+            
+            // PreviewCardレイヤー
+            int previewLayer = LayerMask.NameToLayer("PreviewCard");
+            if (previewLayer >= 0)
+                trashIconPlane.layer = previewLayer;
+            
+            // コライダーをクリック判定用に保持
+            trashIconCollider = trashIconPlane.GetComponent<Collider>();
+            
+            Debug.Log($"[DragDropHandler] ゴミ箱アイコン表示: localOffset={trashIconOffset}, scale={trashIconScale}");
+        }
+        
+        /// <summary>ゴミ箱アイコンがクリックされたかチェック</summary>
+        private bool IsTrashIconClicked()
+        {
+            if (trashIconCollider == null || inventoryCamera == null) return false;
+            
+            Ray ray = inventoryCamera.ScreenPointToRay(Input.mousePosition);
+            RaycastHit[] hits = Physics.RaycastAll(ray, 100f);
+            
+            foreach (var hit in hits)
+            {
+                if (hit.collider == trashIconCollider)
+                    return true;
+            }
+            
+            return false;
+        }
+        
+        /// <summary>ゴミ箱アイコンPlaneを破棄</summary>
+        private void DestroyTrashIconPlane()
+        {
+            if (trashIconPlane != null)
+            {
+                // マテリアルとテクスチャのクリーンアップ
+                var renderer = trashIconPlane.GetComponent<Renderer>();
+                if (renderer != null && renderer.material != null)
+                {
+                    if (renderer.material.mainTexture != null)
+                        Destroy(renderer.material.mainTexture);
+                    Destroy(renderer.material);
+                }
+                
+                Destroy(trashIconPlane);
+                trashIconPlane = null;
+                trashIconCollider = null;
             }
         }
         

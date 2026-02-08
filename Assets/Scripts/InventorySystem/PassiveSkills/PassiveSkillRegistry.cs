@@ -93,12 +93,21 @@ namespace InventorySystem.PassiveSkills
             Register(new BloodDecree());
 
             // 短剣系
-            Register(new QuickHands());
+            Register(new Ambush());
             Register(new FatalStab());
             Register(new Sting());
             Register(new Execution());
             Register(new BlindJustice());
             Register(new Nightfall());
+
+            // 合成武器スキル
+            Register(new DawnBreker());
+            Register(new BloodMoon());
+            Register(new Eclipse());
+            Register(new LoadEmperor());
+            Register(new Silence());
+            Register(new Coronation());
+            Register(new TheEnd());
 
             // ============================
             //  敵専用スキル

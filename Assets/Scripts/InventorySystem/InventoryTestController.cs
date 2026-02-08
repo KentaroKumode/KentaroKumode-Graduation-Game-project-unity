@@ -69,8 +69,8 @@ namespace InventorySystem
                 ClearAllItems();
             }
 
-            // D: アイテムデータベース情報表示
-            if (Input.GetKeyDown(KeyCode.D))
+            // F2: アイテムデータベース情報表示（元Dキー → カメラWASDと競合のため変更）
+            if (Input.GetKeyDown(KeyCode.F2))
             {
                 ShowDatabaseInfo();
             }

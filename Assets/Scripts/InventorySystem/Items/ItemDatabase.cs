@@ -251,6 +251,10 @@ namespace InventorySystem
             // 会心率設定（1～9、分母は9）
             item.criticalRate = Mathf.Clamp(jsonItem.criticalRate, 0, 9);
             
+            // 武器ロール設定
+            item.roleName = jsonItem.roleName ?? "";
+            item.roleDescription = jsonItem.roleDescription ?? "";
+            
             // パッシブスキル設定
             item.passiveSkills = new System.Collections.Generic.List<PassiveSkill>();
             if (jsonItem.passiveSkills != null)

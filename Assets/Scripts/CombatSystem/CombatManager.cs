@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using InventorySystem;
 using InventorySystem.PassiveSkills;
+using CombatSystem.DiceLED;
 
 namespace CombatSystem
 {
@@ -120,12 +121,69 @@ namespace CombatSystem
         private bool isCombatActive;
         private List<TurnResult> turnLog = new List<TurnResult>();
 
+        // ===== LED演出管理 =====
+        private DiceLEDManager ledManager;
+
         public bool IsCombatActive => isCombatActive;
         public EnemyData CurrentEnemy => currentEnemy;
         public int PlayerHP => playerHP;
         public int PlayerMaxHP => playerMaxHP;
         public int EnemyHP => enemyHP;
         public int EnemyMaxHP => currentEnemy != null ? currentEnemy.maxHP : 0;
+
+        // ===========================================================
+        //  外部アイテム効果用API
+        // ===========================================================
+
+        /// <summary>
+        /// プレイヤーのHPを回復（戦闘外でも使用可能）
+        /// </summary>
+        /// <param name="amount">回復量</param>
+        /// <returns>実際に回復した量</returns>
+        public int HealPlayer(int amount)
+        {
+            if (amount <= 0) return 0;
+            
+            int oldHP = playerHP;
+            int newHP = Math.Min(playerMaxHP, playerHP + amount);
+            int actualHealed = newHP - oldHP;
+            
+            playerHP = newHP;
+            
+            // 戦闘中の場合、CombatContextも更新
+            var psm = PassiveSkillManager.Instance;
+            if (psm != null && psm.Context != null)
+            {
+                psm.Context.playerCurrentHP = playerHP;
+            }
+            
+            Debug.Log($"[CombatManager] Player healed: {actualHealed} HP ({oldHP} → {playerHP})");
+            return actualHealed;
+        }
+
+        /// <summary>
+        /// プレイヤーの最大HPを一時的に増加（戦闘中のみ）
+        /// </summary>
+        /// <param name="amount">増加量</param>
+        public void BoostPlayerMaxHP(int amount)
+        {
+            if (amount <= 0 || !isCombatActive) return;
+            
+            int oldMaxHP = playerMaxHP;
+            playerMaxHP += amount;
+            playerHP += amount; // 増加分は即回復
+            
+            // CombatContextも更新
+            var psm = PassiveSkillManager.Instance;
+            if (psm != null && psm.Context != null)
+            {
+                var ctx = psm.Context;
+                ctx.playerMaxHP = playerMaxHP;
+                ctx.playerCurrentHP = playerHP;
+            }
+            
+            Debug.Log($"[CombatManager] Player MaxHP boosted: {oldMaxHP} → {playerMaxHP} (+{amount})");
+        }
 
         void Awake()
         {
@@ -208,7 +266,7 @@ namespace CombatSystem
             {
                 psm.RegisterEnemySkills(null);
             }
-            psm.BeginCombat(pMaxHP, enemy.maxHP);
+            psm.BeginCombat(pMaxHP, enemy.maxHP, pDiceMax, enemy.diceMaxValue);
 
             // 魔王の威圧 等の戦闘開始時スキル処理
             psm.FireTrigger(PassiveSkillTrigger.OnBattleStart);
@@ -229,6 +287,24 @@ namespace CombatSystem
             }
 
             OnCombatStart?.Invoke(enemy.id);
+            
+            // ===== LED演出システム初期化 =====
+            ledManager = DiceLEDManager.Instance;
+            if (ledManager != null)
+            {
+                // アクティブなダイス数を設定
+                ledManager.SetActiveDiceCount(playerDiceCount, enemy.diceCount);
+                
+                // LED色をリセット（デフォルトカラーに戻す）
+                ledManager.TurnOffAll();
+                
+                Debug.Log($"[CombatManager] DiceLED initialized - Player: {playerDiceCount}, Enemy: {enemy.diceCount}");
+            }
+            else
+            {
+                Debug.LogWarning("[CombatManager] DiceLEDManager not found! LED animations will be disabled.");
+            }
+            
             Debug.Log($"[CombatManager] ===== COMBAT START: {enemy.displayName} =====");
             Debug.Log($"  Player HP: {playerHP}/{this.playerMaxHP}, Dice: {playerDiceCount}d{playerDiceMax}, Crit: {playerCriticalNumerator}/9");
             Debug.Log($"  Enemy  HP: {enemyHP}/{enemy.maxHP}, Dice: {enemy.DiceNotation}, Crit: {enemyCriticalNumerator}/9");
@@ -274,6 +350,21 @@ namespace CombatSystem
 
             int[] playerDice = RollDice(actualPlayerDiceCount, playerDiceMax);
             int[] enemyDice = RollDice(actualEnemyDiceCount, currentEnemy.diceMaxValue);
+
+            // ===== LED演出実行 =====
+            if (ledManager != null)
+            {
+                // アクティブなダイス数を更新（追加ダイスがある場合）
+                ledManager.SetActiveDiceCount(actualPlayerDiceCount, actualEnemyDiceCount);
+                
+                // ローリングアニメーション開始（非同期）
+                ledManager.PlayRollingAnimation(
+                    playerDice, enemyDice, 
+                    playerDiceMax, currentEnemy.diceMaxValue
+                );
+                
+                Debug.Log($"[CombatManager] LED Animation started - P:{string.Join(",", playerDice)} E:{string.Join(",", enemyDice)}");
+            }
 
             // パッシブスキルによるダイス処理
             psm.ProcessPostRoll(playerDice, enemyDice);
@@ -449,12 +540,6 @@ namespace CombatSystem
                 result.isCritical = false;
             }
 
-            // 致命傷チェック
-            if (ctx.enemyHasFatalWound)
-            {
-                enemyHP = 0;
-            }
-
             // 死の宣告チェック（固定ダメージとして処理済み）
             if (ctx.fixedDamageToEnemy >= 999)
             {
@@ -525,6 +610,15 @@ namespace CombatSystem
         private void FinishCombat()
         {
             isCombatActive = false;
+
+            // ===== LED演出リセット =====
+            if (ledManager != null)
+            {
+                // 全LEDを消灯（ローリングアニメーション停止も含む）
+                ledManager.TurnOffAll();
+                
+                Debug.Log("[CombatManager] LED animations reset");
+            }
 
             var result = GetLastCombatResult();
             PassiveSkillManager.Instance.EndCombat();

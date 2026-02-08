@@ -257,7 +257,7 @@ namespace InventorySystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>夜の王 — 3ターン目以降、ダイス1個追加</summary>
+    /// <summary>夜の王 — 5ターン目以降、ダイス1個追加</summary>
     public class NightLord : IPassiveSkillEffect
     {
         public string SkillId => "NightLord";
@@ -265,7 +265,7 @@ namespace InventorySystem.PassiveSkills.Effects
 
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            if (ctx.currentTurn >= 3)
+            if (ctx.currentTurn >= 5)
             {
                 // extraDice をコンテキスト蓄積で管理（毎ターンリフレッシュ）
                 ctx.accumulatedValues["extraDice"] = 1;
@@ -273,7 +273,7 @@ namespace InventorySystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>死の宣告 — 5ターン以内に倒さなければ即死攻撃（999ダメージ）</summary>
+    /// <summary>死の宣告 — 10ターン以内に倒さなければ即死攻撃（999ダメージ）</summary>
     public class DeathSentence : IPassiveSkillEffect
     {
         public string SkillId => "DeathSentence";
@@ -281,7 +281,7 @@ namespace InventorySystem.PassiveSkills.Effects
 
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            if (ctx.currentTurn > 5)
+            if (ctx.currentTurn > 10)
             {
                 // 即死級ダメージを固定ダメージとして付与
                 ctx.fixedDamageToEnemy += 999;

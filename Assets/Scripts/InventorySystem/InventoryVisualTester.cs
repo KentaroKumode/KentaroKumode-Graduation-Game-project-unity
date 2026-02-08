@@ -21,22 +21,14 @@ public class InventoryVisualTester : MonoBehaviour
     private int currentTestIndex = 0;
     private Vector3 nextSpawnPosition;
     
-    // テスト用アイテムID配列
-    private string[] testItemIds = {
-        "sword_small",      // 1x1
-        "sword_long",       // 1x2
-        "spear",           // 1x3
-        "hammer",          // 2x1
-        "greatsword",      // 3x1
-        "shield",          // 2x2
-        "tower_shield",    // 2x3
-        "plate_armor",     // 3x2
-        "magic_scroll"     // 3x3
-    };
+    // アイテムライブラリから動的取得
+    private string[] testItemIds;
+    private bool itemIdsInitialized = false;
     
     void Start()
     {
         InitializeDisplayArea();
+        InitializeTestItemIds();
         nextSpawnPosition = Vector3.zero;
         
         Debug.Log("[InventoryVisualTester] テスト開始");
@@ -44,7 +36,33 @@ public class InventoryVisualTester : MonoBehaviour
         Debug.Log("  SPACE: 次のアイテムをインベントリに自動配置");
         Debug.Log("  R: 全アイテムをクリア");
         Debug.Log("  1-9: 特定のアイテムをインベントリに配置");
-        Debug.Log("  A: 全アイテムを一度にインベントリに配置");
+        Debug.Log("  F3: 全アイテムを一度にインベントリに配置");
+    }
+    
+    /// <summary>
+    /// ItemDatabaseからアイテムID一覧を動的取得
+    /// </summary>
+    void InitializeTestItemIds()
+    {
+        if (itemIdsInitialized) return;
+        
+        if (ItemDatabase.Instance != null)
+        {
+            var allItems = ItemDatabase.Instance.GetAllItems();
+            testItemIds = new string[allItems.Count];
+            for (int i = 0; i < allItems.Count; i++)
+            {
+                testItemIds[i] = allItems[i].internalName;
+            }
+            itemIdsInitialized = true;
+            Debug.Log($"[InventoryVisualTester] ItemDatabaseから {testItemIds.Length} 個のアイテムを取得");
+        }
+        else
+        {
+            // フォールバック: 遅延初期化用に空配列
+            testItemIds = new string[0];
+            Debug.LogWarning("[InventoryVisualTester] ItemDatabase未初期化 — 次回アクセス時に再取得します");
+        }
     }
     
     void InitializeDisplayArea()
@@ -67,6 +85,12 @@ public class InventoryVisualTester : MonoBehaviour
     
     void HandleKeyboardInput()
     {
+        // 遅延初期化：ItemDatabaseがまだ準備できていなかった場合
+        if (!itemIdsInitialized)
+        {
+            InitializeTestItemIds();
+        }
+        
         // SPACE: 次のアイテムを順番に生成
         if (Input.GetKeyDown(KeyCode.Space))
         {
@@ -79,14 +103,14 @@ public class InventoryVisualTester : MonoBehaviour
             ClearAllItems();
         }
         
-        // A: 全アイテムを一度に生成
-        if (Input.GetKeyDown(KeyCode.A))
+        // F3: 全アイテムを一度に生成（元Aキー → カメラWASDと競合のため変更）
+        if (Input.GetKeyDown(KeyCode.F3))
         {
             SpawnAllTestItems();
         }
         
-        // 1-9: 特定のアイテムを生成
-        for (int i = 1; i <= 9; i++)
+        // 1-9: 特定のアイテムを生成（動的アイテム数に対応）
+        for (int i = 1; i <= Mathf.Min(9, testItemIds.Length); i++)
         {
             if (Input.GetKeyDown(KeyCode.Alpha0 + i))
             {
@@ -389,14 +413,17 @@ public class InventoryVisualTester : MonoBehaviour
         style.fontSize = 12;
         style.normal.textColor = Color.white;
         
+        int itemCount = testItemIds != null ? testItemIds.Length : 0;
+        int keyMax = Mathf.Min(9, itemCount);
         string guideText = "インベントリ 3Dビジュアルテスト\\n" +
                           "━━━━━━━━━━━━━━━━━━━\\n" +
                           "SPACE: 次のアイテム生成\\n" +
                           "R: 全クリア\\n" +
-                          "A: 全アイテム生成\\n" +
-                          "1-9: 特定アイテム生成\\n" +
+                          "F3: 全アイテム生成\\n" +
+                          $"1-{keyMax}: 特定アイテム生成\\n" +
                           "F1: データベース情報表示\\n" +
-                          $"\\n現在のテストインデックス: {currentTestIndex}/{testItemIds.Length}";
+                          $"\\n現在のテストインデックス: {currentTestIndex}/{itemCount}\\n" +
+                          $"登録アイテム総数: {itemCount}";
         
         GUI.Box(new Rect(10, Screen.height - 200, 250, 190), guideText, style);
     }

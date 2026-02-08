@@ -24,6 +24,8 @@ namespace InventorySystem
         public string flavorText;
         public string category;
         public string rarity;
+        public string roleName;      // ロール名（タンク/ナイト/バーサーカー/アサシン）
+        public string roleDescription; // ロール説明
         public int sizeX;
         public int sizeY;
         public int diceCount;        // ダイス数（Weaponのみ）

@@ -161,6 +161,8 @@ namespace InventorySystem
         [Header("武器データ（武器のみ）")]
         public DiceConfig weaponDice;
         public int criticalRate;     // 会心率の分子（1～9、分母は9）
+        public string roleName = "";         // ロール名（タンク/ナイト/バーサーカー/アサシン）
+        public string roleDescription = "";  // ロール説明
         public List<PassiveEffect> weaponPassives = new List<PassiveEffect>();
         
         [Header("パッシブアイテムデータ")]
@@ -265,6 +267,8 @@ namespace InventorySystem
                 sellPrice = source.sellPrice,
                 weaponDice = source.weaponDice,
                 criticalRate = source.criticalRate,
+                roleName = source.roleName,
+                roleDescription = source.roleDescription,
                 weaponPassives = source.weaponPassives,
                 passiveEffects = source.passiveEffects,
                 passiveSkills = source.passiveSkills,
