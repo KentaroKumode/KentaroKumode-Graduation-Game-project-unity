@@ -29,18 +29,15 @@ namespace InventorySystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>不死身 — 受けるダメージを-1（最低0）</summary>
+    /// <summary>不死者 — 毎ターン開始時、HP1回復</summary>
     public class Undying : IPassiveSkillEffect
     {
         public string SkillId => "Undying";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
 
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            if (ctx.playerLostRoll && ctx.finalDamage > 0)
-            {
-                ctx.finalDamage = System.Math.Max(0, ctx.finalDamage - 1);
-            }
+            ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + 1);
         }
     }
 
@@ -286,6 +283,22 @@ namespace InventorySystem.PassiveSkills.Effects
                 // 即死級ダメージを固定ダメージとして付与
                 ctx.fixedDamageToEnemy += 999;
             }
+        }
+    }
+
+    /// <summary>威圧オーラ — ロール敗北時（プレイヤー勝利時）、scratchダメージを付与
+    /// scratch = max(0, enemyThreat - |diceDiff|)
+    /// ※SwapPerspective内で実行されるため、enemyThreatは元の敵threat値のまま</summary>
+    public class ScratchAura : IPassiveSkillEffect
+    {
+        public string SkillId => "ScratchAura";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollLose };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            int diff = System.Math.Abs(ctx.diceDifference);
+            int scratch = System.Math.Max(0, ctx.enemyThreat - diff);
+            if (scratch > 0)
+                ctx.scratchDamage += scratch;
         }
     }
 }

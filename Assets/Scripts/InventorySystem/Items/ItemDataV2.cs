@@ -17,7 +17,8 @@ namespace InventorySystem
         Quest,
         Misc,
         Passive,
-        PassiveItem
+        PassiveItem,
+        Dice
     }
 
     /// <summary>
@@ -161,6 +162,9 @@ namespace InventorySystem
         [Header("武器データ（武器のみ）")]
         public DiceConfig weaponDice;
         public int criticalRate;     // 会心率の分子（1～9、分母は9）
+
+        [Header("ダイスデータ（ダイスのみ）")]
+        public int[] diceFaces;      // カスタムダイスの面配列 (例: {1,2,3,4,5,6})
         public string roleName = "";         // ロール名（タンク/ナイト/バーサーカー/アサシン）
         public string roleDescription = "";  // ロール説明
         public List<PassiveEffect> weaponPassives = new List<PassiveEffect>();
@@ -272,6 +276,7 @@ namespace InventorySystem
                 weaponPassives = source.weaponPassives,
                 passiveEffects = source.passiveEffects,
                 passiveSkills = source.passiveSkills,
+                diceFaces = source.diceFaces,
                 icon = source.icon,
                 equipMarkPrefab = source.equipMarkPrefab,
             };
@@ -312,7 +317,8 @@ namespace InventorySystem
         
         // === 機能判定 ===
         
-        public bool IsEquippable => category == ItemCategory.Weapon || category == ItemCategory.Armor;
+        public bool IsEquippable => category == ItemCategory.Weapon || category == ItemCategory.Armor || category == ItemCategory.Dice;
+        public bool IsDice => category == ItemCategory.Dice;
         public bool IsUsable => category == ItemCategory.Consumable;
         public bool IsConsumable => category == ItemCategory.Consumable;
         public bool HasStats => IsWeapon || category == ItemCategory.Armor;

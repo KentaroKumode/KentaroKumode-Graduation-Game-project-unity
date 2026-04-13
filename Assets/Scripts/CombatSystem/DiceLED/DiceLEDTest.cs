@@ -252,6 +252,7 @@ namespace CombatSystem.DiceLED
 
         void OnGUI()
         {
+            return; // テストUI一時無効化
             if (manager == null) return;
 
             // スタイル初期化

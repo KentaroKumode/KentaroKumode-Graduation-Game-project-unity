@@ -1,4 +1,4 @@
-{
+﻿{
   "enemies": [
     {
       "id": "slime",
@@ -9,6 +9,7 @@
       "diceCount": 1,
       "diceMaxValue": 4,
       "criticalNumerator": 0,
+      "threat": 1,
       "passiveSkills": []
     },
     {
@@ -20,6 +21,7 @@
       "diceCount": 1,
       "diceMaxValue": 6,
       "criticalNumerator": 0,
+      "threat": 1,
       "passiveSkills": []
     },
     {
@@ -31,6 +33,7 @@
       "diceCount": 1,
       "diceMaxValue": 6,
       "criticalNumerator": 1,
+      "threat": 2,
       "passiveSkills": [
         { "internalName": "Trapper", "skillName": "罠師", "description": "ロール勝利時、次ターン相手のダイス合計値-1" }
       ]
@@ -44,8 +47,9 @@
       "diceCount": 2,
       "diceMaxValue": 4,
       "criticalNumerator": 0,
+      "threat": 1,
       "passiveSkills": [
-        { "internalName": "Undying", "skillName": "不死身", "description": "受けるダメージを-1（最低0）" }
+        { "internalName": "Undying", "skillName": "不死者", "description": "毎ターン開始時、HP1回復" }
       ]
     },
     {
@@ -57,6 +61,7 @@
       "diceCount": 2,
       "diceMaxValue": 5,
       "criticalNumerator": 1,
+      "threat": 2,
       "passiveSkills": [
         { "internalName": "Sprint", "skillName": "疾駆", "description": "初回ロール時、ダイス合計値+2" }
       ]
@@ -70,6 +75,7 @@
       "diceCount": 2,
       "diceMaxValue": 6,
       "criticalNumerator": 1,
+      "threat": 3,
       "passiveSkills": [
         { "internalName": "BruteForce", "skillName": "剛力", "description": "ロール勝利時、ダメージ+2" }
       ]
@@ -83,6 +89,7 @@
       "diceCount": 2,
       "diceMaxValue": 6,
       "criticalNumerator": 2,
+      "threat": 2,
       "passiveSkills": [
         { "internalName": "Flight", "skillName": "飛翔", "description": "追撃ダメージを受けない" }
       ]
@@ -96,9 +103,11 @@
       "diceCount": 2,
       "diceMaxValue": 6,
       "criticalNumerator": 1,
+      "threat": 3,
       "passiveSkills": [
         { "internalName": "HardScales", "skillName": "硬鱗", "description": "受けるダメージを-2（最低0）" },
-        { "internalName": "TailStrike", "skillName": "尾撃", "description": "ロール敗北時、相手に1の固定ダメージ" }
+        { "internalName": "TailStrike", "skillName": "尾撃", "description": "ロール敗北時、相手に1の固定ダメージ" },
+        { "internalName": "ScratchAura", "skillName": "威圧", "description": "勝利されても削りダメージを与える" }
       ]
     },
     {
@@ -110,9 +119,11 @@
       "diceCount": 3,
       "diceMaxValue": 5,
       "criticalNumerator": 2,
+      "threat": 4,
       "passiveSkills": [
         { "internalName": "Rampage", "skillName": "暴走", "description": "ロール敗北時、次ターンのダイス合計値+3" },
-        { "internalName": "BruteForce", "skillName": "剛力", "description": "ロール勝利時、ダメージ+2" }
+        { "internalName": "BruteForce", "skillName": "剛力", "description": "ロール勝利時、ダメージ+2" },
+        { "internalName": "ScratchAura", "skillName": "威圧", "description": "勝利されても削りダメージを与える" }
       ]
     },
     {
@@ -124,9 +135,11 @@
       "diceCount": 2,
       "diceMaxValue": 6,
       "criticalNumerator": 2,
+      "threat": 4,
       "passiveSkills": [
         { "internalName": "Ethereal", "skillName": "虚体", "description": "受けるダメージを50%軽減" },
-        { "internalName": "Curse", "skillName": "呪縛", "description": "ロール勝利時、次ターン相手のダイス合計値-2" }
+        { "internalName": "Curse", "skillName": "呪縛", "description": "ロール勝利時、次ターン相手のダイス合計値-2" },
+        { "internalName": "ScratchAura", "skillName": "威圧", "description": "勝利されても削りダメージを与える" }
       ]
     },
     {
@@ -138,9 +151,11 @@
       "diceCount": 2,
       "diceMaxValue": 6,
       "criticalNumerator": 0,
+      "threat": 3,
       "passiveSkills": [
         { "internalName": "HardScales", "skillName": "硬鱗", "description": "受けるダメージを-2（最低0）" },
-        { "internalName": "Immovable", "skillName": "不動", "description": "追撃ダメージを受けない" }
+        { "internalName": "Immovable", "skillName": "不動", "description": "追撃ダメージを受けない" },
+        { "internalName": "ScratchAura", "skillName": "威圧", "description": "勝利されても削りダメージを与える" }
       ]
     },
     {
@@ -152,9 +167,11 @@
       "diceCount": 3,
       "diceMaxValue": 6,
       "criticalNumerator": 2,
+      "threat": 5,
       "passiveSkills": [
-        { "internalName": "Undying", "skillName": "不死身", "description": "受けるダメージを-1（最低0）" },
-        { "internalName": "CounterStance", "skillName": "反撃態勢", "description": "ロール敗北時、次ターンのダメージ+3" }
+        { "internalName": "Undying", "skillName": "不死者", "description": "毎ターン開始時、HP1回復" },
+        { "internalName": "CounterStance", "skillName": "反撃態勢", "description": "ロール敗北時、次ターンのダメージ+3" },
+        { "internalName": "ScratchAura", "skillName": "威圧", "description": "勝利されても削りダメージを与える" }
       ]
     },
     {
@@ -166,9 +183,11 @@
       "diceCount": 3,
       "diceMaxValue": 6,
       "criticalNumerator": 3,
+      "threat": 5,
       "passiveSkills": [
         { "internalName": "MultiHead", "skillName": "多頭攻撃", "description": "ロール勝利時、追撃ダイスを1個追加" },
-        { "internalName": "Regeneration", "skillName": "再生", "description": "毎ターン開始時、HP2回復" }
+        { "internalName": "Regeneration", "skillName": "再生", "description": "毎ターン開始時、HP2回復" },
+        { "internalName": "ScratchAura", "skillName": "威圧", "description": "勝利されても削りダメージを与える" }
       ]
     },
     {
@@ -180,9 +199,11 @@
       "diceCount": 3,
       "diceMaxValue": 6,
       "criticalNumerator": 3,
+      "threat": 6,
       "passiveSkills": [
         { "internalName": "DemonAura", "skillName": "魔王の威圧", "description": "戦闘開始時、相手の最大HPを3減少" },
-        { "internalName": "Hellfire", "skillName": "地獄の業火", "description": "ロール勝利時、追加で2の固定ダメージ" }
+        { "internalName": "Hellfire", "skillName": "地獄の業火", "description": "ロール勝利時、追加で2の固定ダメージ" },
+        { "internalName": "ScratchAura", "skillName": "威圧", "description": "勝利されても削りダメージを与える" }
       ]
     },
     {
@@ -194,10 +215,12 @@
       "diceCount": 3,
       "diceMaxValue": 6,
       "criticalNumerator": 4,
+      "threat": 6,
       "passiveSkills": [
         { "internalName": "Lifesteal", "skillName": "吸血", "description": "ダメージを与えた時、その50%分HPを回復" },
         { "internalName": "NightLord", "skillName": "夜の王", "description": "3ターン目以降、ダイス1個追加" },
-        { "internalName": "Undying", "skillName": "不死身", "description": "受けるダメージを-1（最低0）" }
+        { "internalName": "Undying", "skillName": "不死者", "description": "毎ターン開始時、HP1回復" },
+        { "internalName": "ScratchAura", "skillName": "威圧", "description": "勝利されても削りダメージを与える" }
       ]
     },
     {
@@ -209,10 +232,12 @@
       "diceCount": 4,
       "diceMaxValue": 6,
       "criticalNumerator": 3,
+      "threat": 7,
       "passiveSkills": [
         { "internalName": "DeathSentence", "skillName": "死の宣告", "description": "5ターン以内に倒さなければ即死攻撃を放つ" },
         { "internalName": "CounterStance", "skillName": "反撃態勢", "description": "ロール敗北時、次ターンのダメージ+3" },
-        { "internalName": "Undying", "skillName": "不死身", "description": "受けるダメージを-1（最低0）" }
+        { "internalName": "Undying", "skillName": "不死者", "description": "毎ターン開始時、HP1回復" },
+        { "internalName": "ScratchAura", "skillName": "威圧", "description": "勝利されても削りダメージを与える" }
       ]
     }
   ]

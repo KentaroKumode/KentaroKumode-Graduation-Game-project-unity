@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
@@ -94,14 +95,84 @@ namespace InventorySystem
         
         [Header("プレビューアイテム名表示")]
         [SerializeField] private TMP_FontAsset previewNameFont;        // カスタムフォント
-        [SerializeField] private Color previewNameColor = Color.white;  // 文字色
+        [SerializeField] private Color previewNameColor = Color.white;  // フォールバック文字色
         [SerializeField] private float previewNameFontSize = 0.8f;      // 基準フォントサイズ（4文字時）
         [SerializeField] private int previewNameBaseChars = 4;           // 基準文字数（この文字数でbaseFontSize）
         [SerializeField] private Vector3 previewNameOffset = new Vector3(0f, -0.8f, 0f); // カメラローカル座標でのオフセット
         private GameObject previewNameObject;  // アイテム名表示オブジェクト
+
+        [Header("レアリティ別 名前カラー（上=ハイライト / 下=ベース）")]
+        [SerializeField] private Color nameBronzeTop      = new Color(0.95f, 0.75f, 0.50f); // 明るい銅
+        [SerializeField] private Color nameBronzeBottom   = new Color(0.65f, 0.40f, 0.18f); // 深い銅
+        [SerializeField] private Color nameSilverTop      = new Color(1.00f, 1.00f, 1.00f); // 白銀ハイライト
+        [SerializeField] private Color nameSilverBottom   = new Color(0.72f, 0.75f, 0.80f); // 落ち着いた銀
+        [SerializeField] private Color nameGoldTop        = new Color(1.00f, 1.00f, 0.70f); // 輝くゴールド
+        [SerializeField] private Color nameGoldBottom     = new Color(0.85f, 0.65f, 0.10f); // 深いゴールド
+        [SerializeField] private Color nameLegendaryTop   = new Color(1.00f, 0.85f, 0.50f); // オレンジ輝き
+        [SerializeField] private Color nameLegendaryBottom = new Color(1.00f, 0.35f, 0.00f); // 深いオレンジ
+        [SerializeField] private Color nameMythicTop      = new Color(0.85f, 1.00f, 1.00f); // 白に近いシアン
+        [SerializeField] private Color nameMythicBottom   = new Color(0.20f, 0.75f, 1.00f); // 深いシアン
+        
+        [Header("プレビュー詳細情報表示")]
+        [SerializeField] private float detailFontSize = 0.35f;          // 詳細テキストフォントサイズ
+        [SerializeField] private Color detailTextColor = new Color(0.9f, 0.9f, 0.9f, 1f); // 詳細テキスト色
+        [SerializeField] private Color detailLabelColor = new Color(1f, 0.85f, 0.4f, 1f); // ラベル色（セクション見出し）
+        [SerializeField] private Color detailSkillNameColor = new Color(0.4f, 0.9f, 1f, 1f); // スキル名色
+        [SerializeField] private Color detailRarityColor = new Color(1f, 0.6f, 0.2f, 1f);  // レアリティ色
+        [SerializeField] private Color detailRoleColor = new Color(0.6f, 1f, 0.6f, 1f);    // ロール名色
+        [SerializeField] private Vector3 detailOffset = new Vector3(0f, -1.2f, 0f);       // カメラローカル座標オフセット
+        [SerializeField] private Vector2 detailRectSize = new Vector2(5f, 6f);           // テキストエリアサイズ
+        [SerializeField] private bool detailEnableAutoSize = true;       // フォント自動縮小有効
+        [SerializeField] private float detailAutoSizeMin = 0.1f;         // 自動縮小時の最小フォントサイズ
+        private GameObject previewDetailObject;  // 詳細情報表示オブジェクト
+        
+        [Header("スキルツールチップ")]
+        [SerializeField] private float tooltipFontSize = 0.25f;          // ツールチップフォントサイズ
+        [SerializeField] private Color tooltipBgColor = new Color(0.1f, 0.1f, 0.1f, 0.9f); // 背景色
+        [SerializeField] private Color tooltipTextColor = new Color(0.95f, 0.95f, 0.95f, 1f); // テキスト色
+        [SerializeField] private Vector2 tooltipRectSize = new Vector2(3f, 1f);  // ツールチップエリアサイズ
+        [SerializeField] private Vector3 tooltipOffset = new Vector3(0.3f, 0.1f, 0f); // マウスからのオフセット（カメラローカル）
+        private GameObject skillTooltipObject;   // スキルツールチップオブジェクト
+        private Dictionary<string, string> skillDescriptionCache = new Dictionary<string, string>(); // link ID → 説明文
+        private string currentTooltipSkillId = null; // 現在表示中のスキルID
+        
+        [Header("削除確認UI")]
+        [SerializeField] private GameObject confirmDeleteBookPrefab;     // 確認UI背景Prefab（図鑑と同じ生成方式）
+        [SerializeField] private Vector3 confirmBookLocalOffset = Vector3.zero; // カメラローカル座標オフセット
+        [SerializeField] private string confirmQuestionText = "本当に捨てますか？"; // 質問テキスト
+        [SerializeField] private string confirmYesText = "はい";         // はいボタンテキスト
+        [SerializeField] private string confirmNoText = "いいえ";        // いいえボタンテキスト
+        [SerializeField] private float confirmQuestionFontSize = 0.6f;   // 質問フォントサイズ
+        [SerializeField] private float confirmButtonFontSize = 0.5f;     // ボタンフォントサイズ
+        [SerializeField] private Color confirmQuestionColor = Color.white; // 質問テキスト色
+        [SerializeField] private Color confirmYesColor = new Color(0.3f, 1f, 0.3f, 1f);  // はいテキスト色
+        [SerializeField] private Color confirmNoColor = new Color(1f, 0.3f, 0.3f, 1f);   // いいえテキスト色
+        [SerializeField] private Vector3 confirmQuestionOffset = new Vector3(0f, 0.3f, 0f);  // 質問テキストのローカルオフセット（背景からの相対）
+        [SerializeField] private Vector3 confirmYesOffset = new Vector3(-0.5f, -0.3f, 0f);   // はいボタンのローカルオフセット
+        [SerializeField] private Vector3 confirmNoOffset = new Vector3(0.5f, -0.3f, 0f);     // いいえボタンのローカルオフセット
+        [SerializeField] private Vector2 confirmButtonColliderSize = new Vector2(0.8f, 0.4f); // ボタンコライダーサイズ
+        private GameObject confirmDeleteBookInstance;    // 確認UI背景インスタンス
+        private GameObject confirmQuestionObject;        // 質問テキストオブジェクト
+        private GameObject confirmYesObject;             // はいボタンオブジェクト
+        private GameObject confirmNoObject;              // いいえボタンオブジェクト
+        private Collider confirmYesCollider;             // はいクリック判定用
+        private Collider confirmNoCollider;              // いいえクリック判定用
+        
+        [Header("サウンド")]
+        [SerializeField] private AudioClip previewOpenSound;            // プレビュー開始音
+        [SerializeField] private AudioClip confirmHoverSound;           // はい/いいえホバー音
+        [SerializeField] private AudioClip confirmYesClickSound;        // はいクリック音
+        [SerializeField] private AudioClip confirmNoClickSound;         // いいえクリック音
+        [SerializeField, Range(0f, 1f)] private float previewOpenVolume = 0.5f;    // プレビュー開始音量
+        [SerializeField, Range(0f, 1f)] private float confirmHoverVolume = 0.3f;   // ホバー音量
+        [SerializeField, Range(0f, 1f)] private float confirmClickVolume = 0.5f;   // クリック音量
+        private AudioSource uiAudioSource;     // UI用AudioSource
         
         [Header("削除演出")]
-        [SerializeField] private float burnDuration = 1.5f;    // 燃え尽き演出時間
+        [SerializeField] private float deleteShakeDuration = 0.5f;      // 振動時間
+        [SerializeField] private float deleteShakeIntensity = 0.02f;    // 振動の強さ
+        [SerializeField] private float deleteShakeSpeed = 40f;          // 振動の速さ
+        [Header("ゴミ箱アイコン")]
         [SerializeField] private float trashIconScale = 0.3f;  // ゴミ箱アイコンの大きさ
         [SerializeField] private Vector3 trashIconOffset = new Vector3(1.2f, -0.8f, 0f); // カメラローカル座標でのオフセット
         
@@ -158,6 +229,8 @@ namespace InventorySystem
             if (renderer != null)
             {
                 renderer.receiveShadows = receiveShadows;
+                if (!receiveShadows)
+                    renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             }
             
             foreach (Transform child in obj.transform)
@@ -1218,12 +1291,6 @@ namespace InventorySystem
             SetLayerRecursively(previewSpinInstance, LayerMask.NameToLayer("PreviewCard"));
             Debug.Log("[DragDropHandler] プレビューカードを PreviewCard レイヤーに設定しました");
             
-            // 影を受けないように設定（光の影響は受ける）
-            SetReceiveShadowsRecursively(previewSpinInstance, false);
-            
-            // シーンの暗さに影響されないようEmissionを有効化
-            EnableEmissionRecursively(previewSpinInstance, previewEmissionIntensity);
-            
             // ピボット用の親を作成（画面中央に固定）
             previewSpinPivot = new GameObject("PreviewSpinPivot");
             previewSpinPivot.transform.position = centerWorldPos; // 画面中央
@@ -1271,16 +1338,20 @@ namespace InventorySystem
                 Debug.Log("[DragDropHandler] プレビューライトを点灯しました");
             }
             
+            // === プレビュー開始音 ===
+            PlayUISound(previewOpenSound, previewOpenVolume);
+            
             // === 図鑑背景とプレビューカードを同時スライドインで表示 ===
             yield return StartCoroutine(SlideInPreview(centerWorldPos));
             
             // === ゴミ箱アイコンをカメラ子として表示 ===
             CreateTrashIconPlane(centerWorldPos);
             
-            // === アイテム名をカメラ子として表示 ===
+            // === アイテム名をカメラ子として表示（レアリティグラデーション付き） ===
             if (previewSpinItemData != null)
             {
-                CreatePreviewNameText(previewSpinItemData.displayName);
+                CreatePreviewNameText(previewSpinItemData.displayName, previewSpinItemData.rarity);
+                CreatePreviewDetailText(previewSpinItemData);
             }
             
             // 継続スピン: 一定角速度で回し、次のキー入力で停止
@@ -1294,6 +1365,9 @@ namespace InventorySystem
             {
                 float deltaAngle = angularSpeed * Time.deltaTime;
                 previewSpinPivot.transform.Rotate(axis, deltaAngle, Space.Self);
+                
+                // スキルツールチップホバー判定
+                UpdateSkillTooltipHover();
                 
                 bool canStop = Time.time - startTime >= stopCheckDelay;
                 
@@ -1321,61 +1395,158 @@ namespace InventorySystem
             // === ゴミ箱アイコン破棄 ===
             DestroyTrashIconPlane();
             
-            // === アイテム名破棄 ===
+            // === アイテム名・詳細・ツールチップ破棄 ===
             DestroyPreviewNameText();
+            DestroySkillTooltip();
             
             // === 図鑑背景を即座に破棄 ===
             DestroyBookBackground();
             
-            if (burnTriggered && previewSpinInstance != null)
+            if (burnTriggered)
             {
-                // 回転を停止
-                // ピボットからプレビューを外す（燃え演出中に位置を固定するため）
-                if (previewSpinPivot != null)
-                {
-                    previewSpinInstance.transform.SetParent(null, true);
-                    Destroy(previewSpinPivot);
-                    previewSpinPivot = null;
-                }
+                // === 削除確認フロー: プレビューを閉じて → 確認UIを表示 → はい/いいえ待ち ===
                 
-                // === 燃え尽き演出 ===
-                Debug.Log($"[DragDropHandler] 🔥 燃え尽き演出開始: {previewSpinItemData?.displayName}");
-                
-                bool burnComplete = false;
-                ItemBurnEffect.Play(previewSpinInstance, burnDuration, () => { burnComplete = true; });
-                
-                // 効果音
-                try { InventorySoundManager.Instance?.PlayItemDiscard(); }
-                catch (System.Exception) { /* ignore */ }
-                
-                // 燃え尽きアニメーション完了を待つ
-                while (!burnComplete)
-                {
-                    yield return null;
-                }
-                
-                // インベントリからアイテム削除  
-                if (previewSpinItemData != null)
-                {
-                    // InventoryManager.RemoveItem がグリッド解放＋OnItemRemovedイベント発火を一括処理
-                    InventoryManager.Instance?.RemoveItem(previewSpinGridX, previewSpinGridY, previewSpinItemData);
-                    
-                    Debug.Log($"[DragDropHandler] 🗑️✅ アイテム削除完了: {previewSpinItemData.displayName} at ({previewSpinGridX},{previewSpinGridY})");
-                }
-                
-                // 元のグリッドオブジェクトを破棄（再表示しない）
-                if (previewSpinSourceObject != null)
-                {
-                    Destroy(previewSpinSourceObject);
-                    previewSpinSourceObject = null;
-                }
-                
-                // プレビューインスタンス破棄
+                // プレビューインスタンスを破棄（画面を閉じる）
                 if (previewSpinInstance != null)
                 {
+                    if (previewSpinPivot != null)
+                    {
+                        previewSpinInstance.transform.SetParent(null, true);
+                    }
                     Destroy(previewSpinInstance);
                     previewSpinInstance = null;
                 }
+                if (previewSpinPivot != null)
+                {
+                    Destroy(previewSpinPivot);
+                    previewSpinPivot = null;
+                }
+                // === 確認UI表示（ブラー・カメラロック・ライト維持） ===
+                ShowDeleteConfirmUI(previewSpinItemData?.displayName);
+                
+                // === はい/いいえクリック待ち ===
+                bool confirmed = false;
+                bool wasHoveringYes = false;
+                bool wasHoveringNo = false;
+                while (true)
+                {
+                    // ホバー判定（毎フレーム）
+                    bool hoveringYes = IsHoveringConfirmYes();
+                    bool hoveringNo = IsHoveringConfirmNo();
+                    if (hoveringYes && !wasHoveringYes)
+                        PlayUISound(confirmHoverSound, confirmHoverVolume);
+                    if (hoveringNo && !wasHoveringNo)
+                        PlayUISound(confirmHoverSound, confirmHoverVolume);
+                    wasHoveringYes = hoveringYes;
+                    wasHoveringNo = hoveringNo;
+                    
+                    if (Input.GetMouseButtonDown(0))
+                    {
+                        if (IsConfirmYesClicked())
+                        {
+                            Debug.Log("[DragDropHandler] 🗑️ 削除確認: はい");
+                            PlayUISound(confirmYesClickSound, confirmClickVolume);
+                            confirmed = true;
+                            break;
+                        }
+                        if (IsConfirmNoClicked())
+                        {
+                            Debug.Log("[DragDropHandler] 🗑️ 削除確認: いいえ（キャンセル）");
+                            PlayUISound(confirmNoClickSound, confirmClickVolume);
+                            confirmed = false;
+                            break;
+                        }
+                    }
+                    // Escapeでもキャンセル
+                    if (Input.GetKeyDown(KeyCode.Escape))
+                    {
+                        Debug.Log("[DragDropHandler] 🗑️ 削除確認: Escapeでキャンセル");
+                        PlayUISound(confirmNoClickSound, confirmClickVolume);
+                        confirmed = false;
+                        break;
+                    }
+                    yield return null;
+                }
+                
+                // === 確認UI破棄 ===
+                DestroyDeleteConfirmUI();
+                
+                // ライト消灯
+                if (previewLight != null)
+                {
+                    previewLight.enabled = false;
+                }
+                
+                if (confirmed)
+                {
+                    // === 削除実行: カメラ・ブラー解除 → 振動 → 削除 ===
+                    if (cameraLockedForSpin)
+                    {
+                        UnlockCameraMovement();
+                        cameraLockedForSpin = false;
+                    }
+                    if (blurEnabledBySpin && previewBackgroundBlur != null)
+                    {
+                        previewBackgroundBlur.DisableBlur();
+                        blurEnabledBySpin = false;
+                    }
+                    
+                    yield return null;
+                    
+                    // グリッド上の3Dオブジェクトを再表示して振動させる
+                    if (previewSpinSourceObject != null)
+                    {
+                        previewSpinSourceObject.SetActive(true);
+                        
+                        // === 振動アニメーション ===
+                        Vector3 originalPos = previewSpinSourceObject.transform.localPosition;
+                        float shakeElapsed = 0f;
+                        while (shakeElapsed < deleteShakeDuration)
+                        {
+                            shakeElapsed += Time.deltaTime;
+                            float progress = shakeElapsed / deleteShakeDuration;
+                            float intensity = deleteShakeIntensity * progress;
+                            float ox = Mathf.Sin(shakeElapsed * deleteShakeSpeed) * intensity;
+                            float oy = Mathf.Sin(shakeElapsed * deleteShakeSpeed * 1.3f) * intensity * 0.6f;
+                            previewSpinSourceObject.transform.localPosition = originalPos + new Vector3(ox, oy, 0f);
+                            yield return null;
+                        }
+                        previewSpinSourceObject.transform.localPosition = originalPos;
+                    }
+                    
+                    // 効果音
+                    try { InventorySoundManager.Instance?.PlayItemDiscard(); }
+                    catch (System.Exception) { /* ignore */ }
+                    
+                    // インベントリデータからアイテム削除
+                    if (previewSpinItemData != null)
+                    {
+                        InventoryManager.Instance?.RemoveItem(previewSpinGridX, previewSpinGridY, previewSpinItemData);
+                        Debug.Log($"[DragDropHandler] 🗑️✅ アイテム削除完了: {previewSpinItemData.displayName} at ({previewSpinGridX},{previewSpinGridY})");
+                    }
+                    
+                    // グリッド上の3Dオブジェクトを破棄
+                    if (previewSpinSourceObject != null)
+                    {
+                        Debug.Log($"[DragDropHandler] 🗑️ 3Dオブジェクト破棄: {previewSpinSourceObject.name}");
+                        Destroy(previewSpinSourceObject);
+                        previewSpinSourceObject = null;
+                    }
+                }
+                else
+                {
+                    // === キャンセル: 元のオブジェクトを再表示して通常終了 ===
+                    if (previewSpinSourceObject != null)
+                    {
+                        previewSpinSourceObject.SetActive(true);
+                        Debug.Log("[DragDropHandler] 削除キャンセル: 対象オブジェクトを再表示しました");
+                        previewSpinSourceObject = null;
+                    }
+                }
+                
+                // 共通クリーンアップ
+                isPreviewSpinning = false;
+                previewSpinItemData = null;
             }
             else
             {
@@ -1452,6 +1623,9 @@ namespace InventorySystem
                 int previewLayer = LayerMask.NameToLayer("PreviewCard");
                 if (previewLayer >= 0)
                     SetLayerRecursively(previewBookInstance, previewLayer);
+                
+                // 影の影響を無効化
+                SetReceiveShadowsRecursively(previewBookInstance, false);
             }
             
             // 図鑑背景のスライド位置
@@ -1504,6 +1678,220 @@ namespace InventorySystem
         }
 
         // =================================================================
+        //  削除確認UI
+        // =================================================================
+
+        /// <summary>
+        /// 削除確認UIを即座に表示。
+        /// 図鑑背景と同じ生成方式でPrefabをカメラ子に配置し、
+        /// 質問テキスト・はい・いいえの3D TMPテキストを生成。
+        /// </summary>
+        private void ShowDeleteConfirmUI(string itemName = null)
+        {
+            DestroyDeleteConfirmUI();
+            
+            // --- 背景Prefab生成 ---
+            GameObject bgPrefab = confirmDeleteBookPrefab != null ? confirmDeleteBookPrefab : previewBookPrefab;
+            if (bgPrefab != null && inventoryCamera != null)
+            {
+                confirmDeleteBookInstance = Instantiate(bgPrefab);
+                confirmDeleteBookInstance.name = "ConfirmDeleteBackground";
+                confirmDeleteBookInstance.transform.SetParent(inventoryCamera.transform, false);
+                confirmDeleteBookInstance.transform.localRotation = Quaternion.Euler(90f, 180f, 0f);
+                
+                // 確認UI用オフセット（未設定なら図鑑と同じ位置）
+                Vector3 offset = confirmBookLocalOffset != Vector3.zero ? confirmBookLocalOffset : bookLocalOffset;
+                confirmDeleteBookInstance.transform.localPosition = offset;
+                
+                int previewLayer = LayerMask.NameToLayer("PreviewCard");
+                if (previewLayer >= 0)
+                    SetLayerRecursively(confirmDeleteBookInstance, previewLayer);
+                
+                // 影の影響を無効化
+                SetReceiveShadowsRecursively(confirmDeleteBookInstance, false);
+                
+                // プレビュー背景と同じ明るさにするためEmissionを有効化
+                EnableEmissionRecursively(confirmDeleteBookInstance, previewEmissionIntensity);
+            }
+            
+            // テキストの基準座標 = 背景と同じ位置
+            Vector3 basePos = confirmBookLocalOffset != Vector3.zero ? confirmBookLocalOffset : bookLocalOffset;
+            
+            // --- 質問テキスト（アイテム名を付加） ---
+            string question = string.IsNullOrEmpty(itemName)
+                ? confirmQuestionText
+                : $"『{itemName}』を{confirmQuestionText}";
+            confirmQuestionObject = CreateConfirmTMPText(
+                "ConfirmQuestion", question, confirmQuestionFontSize,
+                confirmQuestionColor, basePos + confirmQuestionOffset, null);
+            
+            // --- はいボタン ---
+            confirmYesObject = CreateConfirmTMPText(
+                "ConfirmYes", confirmYesText, confirmButtonFontSize,
+                confirmYesColor, basePos + confirmYesOffset, confirmButtonColliderSize);
+            confirmYesCollider = confirmYesObject?.GetComponent<Collider>();
+            
+            // --- いいえボタン ---
+            confirmNoObject = CreateConfirmTMPText(
+                "ConfirmNo", confirmNoText, confirmButtonFontSize,
+                confirmNoColor, basePos + confirmNoOffset, confirmButtonColliderSize);
+            confirmNoCollider = confirmNoObject?.GetComponent<Collider>();
+            
+            Debug.Log("[DragDropHandler] 削除確認UIを表示しました");
+        }
+
+        /// <summary>
+        /// 確認UI用の3D TMPテキストを生成するヘルパー。
+        /// colliderSize が指定されていればBoxColliderを追加してクリック判定可能にする。
+        /// </summary>
+        private GameObject CreateConfirmTMPText(string objName, string text, float fontSize, Color color, Vector3 localOffset, Vector2? colliderSize)
+        {
+            if (inventoryCamera == null) return null;
+            
+            var go = new GameObject(objName);
+            go.transform.SetParent(inventoryCamera.transform, false);
+            go.transform.localPosition = localOffset;
+            go.transform.localRotation = Quaternion.identity;
+            
+            var tmp = go.AddComponent<TextMeshPro>();
+            tmp.text = text;
+            tmp.fontSize = fontSize;
+            tmp.color = color;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.enableWordWrapping = false;
+            
+            if (previewNameFont != null)
+                tmp.font = previewNameFont;
+            
+            var rt = go.GetComponent<RectTransform>();
+            if (rt != null)
+                rt.sizeDelta = new Vector2(10f, 2f);
+            
+            // PreviewCardレイヤー
+            int previewLayer = LayerMask.NameToLayer("PreviewCard");
+            if (previewLayer >= 0)
+                go.layer = previewLayer;
+            
+            // レンダリング設定
+            var renderer = go.GetComponent<MeshRenderer>();
+            if (renderer != null)
+            {
+                renderer.sortingOrder = 10;
+                renderer.receiveShadows = false;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+            
+            DisableTMPLighting(tmp);
+            
+            // クリック判定用コライダー
+            if (colliderSize.HasValue)
+            {
+                var box = go.AddComponent<BoxCollider>();
+                box.size = new Vector3(colliderSize.Value.x, colliderSize.Value.y, 0.1f);
+                box.center = Vector3.zero;
+            }
+            
+            return go;
+        }
+
+        /// <summary>確認UIのはいがクリックされたか</summary>
+        private bool IsConfirmYesClicked()
+        {
+            if (confirmYesCollider == null || inventoryCamera == null) return false;
+            Ray ray = inventoryCamera.ScreenPointToRay(Input.mousePosition);
+            RaycastHit[] hits = Physics.RaycastAll(ray, 100f);
+            foreach (var hit in hits)
+            {
+                if (hit.collider == confirmYesCollider)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>確認UIのいいえがクリックされたか</summary>
+        private bool IsConfirmNoClicked()
+        {
+            if (confirmNoCollider == null || inventoryCamera == null) return false;
+            Ray ray = inventoryCamera.ScreenPointToRay(Input.mousePosition);
+            RaycastHit[] hits = Physics.RaycastAll(ray, 100f);
+            foreach (var hit in hits)
+            {
+                if (hit.collider == confirmNoCollider)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>はいボタンにマウスが乗っているか（ホバー判定）</summary>
+        private bool IsHoveringConfirmYes()
+        {
+            if (confirmYesCollider == null || inventoryCamera == null) return false;
+            Ray ray = inventoryCamera.ScreenPointToRay(Input.mousePosition);
+            RaycastHit[] hits = Physics.RaycastAll(ray, 100f);
+            foreach (var hit in hits)
+            {
+                if (hit.collider == confirmYesCollider)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>いいえボタンにマウスが乗っているか（ホバー判定）</summary>
+        private bool IsHoveringConfirmNo()
+        {
+            if (confirmNoCollider == null || inventoryCamera == null) return false;
+            Ray ray = inventoryCamera.ScreenPointToRay(Input.mousePosition);
+            RaycastHit[] hits = Physics.RaycastAll(ray, 100f);
+            foreach (var hit in hits)
+            {
+                if (hit.collider == confirmNoCollider)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>UI用AudioSourceを確保して音を再生</summary>
+        private void PlayUISound(AudioClip clip, float volume)
+        {
+            if (clip == null) return;
+            if (uiAudioSource == null)
+            {
+                uiAudioSource = GetComponent<AudioSource>();
+                if (uiAudioSource == null)
+                    uiAudioSource = gameObject.AddComponent<AudioSource>();
+                uiAudioSource.playOnAwake = false;
+            }
+            uiAudioSource.PlayOneShot(clip, volume);
+        }
+
+        /// <summary>削除確認UIを完全に破棄</summary>
+        private void DestroyDeleteConfirmUI()
+        {
+            if (confirmDeleteBookInstance != null)
+            {
+                Destroy(confirmDeleteBookInstance);
+                confirmDeleteBookInstance = null;
+            }
+            if (confirmQuestionObject != null)
+            {
+                Destroy(confirmQuestionObject);
+                confirmQuestionObject = null;
+            }
+            if (confirmYesObject != null)
+            {
+                Destroy(confirmYesObject);
+                confirmYesObject = null;
+                confirmYesCollider = null;
+            }
+            if (confirmNoObject != null)
+            {
+                Destroy(confirmNoObject);
+                confirmNoObject = null;
+                confirmNoCollider = null;
+            }
+        }
+
+        // =================================================================
         //  プレビューサイズヘルパー
         // =================================================================
 
@@ -1540,8 +1928,9 @@ namespace InventorySystem
 
         /// <summary>
         /// TextMeshProを使用してアイテム名を3D空間上に表示（カメラ子）
+        /// レアリティに応じた上下グラデーションカラーを適用
         /// </summary>
-        private void CreatePreviewNameText(string itemName)
+        private void CreatePreviewNameText(string itemName, ItemRarity rarity = ItemRarity.BRONZE)
         {
             if (string.IsNullOrEmpty(itemName) || inventoryCamera == null) return;
             
@@ -1557,9 +1946,14 @@ namespace InventorySystem
             var tmp = previewNameObject.AddComponent<TextMeshPro>();
             tmp.text = itemName;
             tmp.fontSize = GetScaledFontSize(itemName.Length);
-            tmp.color = previewNameColor;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.enableWordWrapping = false;
+
+            // レアリティ別グラデーションカラーを適用（上=明るい / 下=ベース）
+            GetRarityGradientColors(rarity, out Color topColor, out Color bottomColor);
+            tmp.color = Color.white; // ベースは白（グラデーションが乗算される）
+            tmp.colorGradient = new VertexGradient(topColor, topColor, bottomColor, bottomColor);
+            tmp.enableVertexGradient = true;
             
             // カスタムフォントが設定されていれば適用
             if (previewNameFont != null)
@@ -1579,6 +1973,18 @@ namespace InventorySystem
             if (previewLayer >= 0)
                 previewNameObject.layer = previewLayer;
             
+            // 背景より手前に描画されるようsortingOrderを設定
+            var renderer = previewNameObject.GetComponent<MeshRenderer>();
+            if (renderer != null)
+            {
+                renderer.sortingOrder = 10;
+                renderer.receiveShadows = false;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+            
+            // ライティングの影響を無効化（色が明るくなりすぎるのを防止）
+            DisableTMPLighting(tmp);
+            
             Debug.Log($"[DragDropHandler] アイテム名表示: '{itemName}' offset={previewNameOffset}");
         }
         
@@ -1595,6 +2001,40 @@ namespace InventorySystem
             return previewNameFontSize * baseChars / (float)charCount;
         }
 
+        /// <summary>
+        /// レアリティに応じた上下グラデーション色を返す（上=ハイライト、下=ベース）
+        /// </summary>
+        private void GetRarityGradientColors(ItemRarity rarity, out Color top, out Color bottom)
+        {
+            switch (rarity)
+            {
+                case ItemRarity.BRONZE:
+                    top = nameBronzeTop;
+                    bottom = nameBronzeBottom;
+                    break;
+                case ItemRarity.SILVER:
+                    top = nameSilverTop;
+                    bottom = nameSilverBottom;
+                    break;
+                case ItemRarity.GOLD:
+                    top = nameGoldTop;
+                    bottom = nameGoldBottom;
+                    break;
+                case ItemRarity.LEGENDARY:
+                    top = nameLegendaryTop;
+                    bottom = nameLegendaryBottom;
+                    break;
+                case ItemRarity.MYTHIC:
+                    top = nameMythicTop;
+                    bottom = nameMythicBottom;
+                    break;
+                default:
+                    top = previewNameColor;
+                    bottom = previewNameColor;
+                    break;
+            }
+        }
+
         /// <summary>アイテム名表示を破棄</summary>
         private void DestroyPreviewNameText()
         {
@@ -1602,6 +2042,373 @@ namespace InventorySystem
             {
                 Destroy(previewNameObject);
                 previewNameObject = null;
+            }
+            if (previewDetailObject != null)
+            {
+                Destroy(previewDetailObject);
+                previewDetailObject = null;
+            }
+        }
+
+        /// <summary>
+        /// TMP 3Dテキストをライト非依存にする。
+        /// カスタムUnlit SDFシェーダーに切り替え、指定した色がそのまま表示されるようにする。
+        /// 標準アルファブレンド使用（premultiplied alphaによる色薄れを防止）。
+        /// </summary>
+        private void DisableTMPLighting(TextMeshPro tmp)
+        {
+            if (tmp == null || tmp.font == null) return;
+            
+            // カスタムUnlitシェーダーを検索
+            Shader unlitShader = Shader.Find("Custom/TMP_SDF_Unlit");
+            if (unlitShader == null)
+            {
+                Debug.LogWarning("[DragDropHandler] Custom/TMP_SDF_Unlit shader not found");
+                return;
+            }
+            
+            // フォント基本マテリアルからコピーして新マテリアル作成
+            Material newMat = new Material(tmp.font.material);
+            newMat.shader = unlitShader;
+            
+            // _FaceColorを白に固定（最終色 = 頂点カラー(tmp.color) × _FaceColor）
+            newMat.SetColor("_FaceColor", Color.white);
+            
+            // TMPのfontMaterial setterに代入
+            tmp.fontMaterial = newMat;
+        }
+
+        // =================================================================
+        //  アイテム詳細情報表示（TextMeshPro 3D）
+        // =================================================================
+
+        /// <summary>
+        /// アイテムの詳細情報（ロール、ステータス、スキル、説明文）を
+        /// TextMeshPro 3Dでカメラ子に表示。RichTextで構造化し、
+        /// enableAutoSizingで長文がはみ出さないようにする。
+        /// </summary>
+        private void CreatePreviewDetailText(CompleteItemData itemData)
+        {
+            if (itemData == null || inventoryCamera == null) return;
+            
+            // スキル説明キャッシュをクリア
+            skillDescriptionCache.Clear();
+            currentTooltipSkillId = null;
+            DestroySkillTooltip();
+            
+            // 既存破棄
+            if (previewDetailObject != null)
+            {
+                Destroy(previewDetailObject);
+                previewDetailObject = null;
+            }
+            
+            previewDetailObject = new GameObject("PreviewDetailInfo");
+            previewDetailObject.transform.SetParent(inventoryCamera.transform, false);
+            previewDetailObject.transform.localPosition = detailOffset;
+            previewDetailObject.transform.localRotation = Quaternion.identity;
+            
+            var tmp = previewDetailObject.AddComponent<TextMeshPro>();
+            tmp.richText = true;
+            tmp.text = BuildDetailRichText(itemData);
+            tmp.fontSize = detailFontSize;
+            tmp.color = detailTextColor;
+            tmp.alignment = TextAlignmentOptions.TopLeft;
+            tmp.enableWordWrapping = true;
+            tmp.overflowMode = TextOverflowModes.Truncate;
+            
+            // フォント自動縮小: 長文がはみ出さないように自動でサイズ調整
+            if (detailEnableAutoSize)
+            {
+                tmp.enableAutoSizing = true;
+                tmp.fontSizeMin = detailAutoSizeMin;
+                tmp.fontSizeMax = detailFontSize;
+            }
+            
+            // カスタムフォント
+            if (previewNameFont != null)
+            {
+                tmp.font = previewNameFont;
+            }
+            
+            // RectTransformでテキストエリアを制限
+            var rt = previewDetailObject.GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                rt.sizeDelta = detailRectSize;
+            }
+            
+            // PreviewCardレイヤー
+            int previewLayer = LayerMask.NameToLayer("PreviewCard");
+            if (previewLayer >= 0)
+                previewDetailObject.layer = previewLayer;
+            
+            // 背景より手前に描画されるようsortingOrderを設定
+            var detailRenderer = previewDetailObject.GetComponent<MeshRenderer>();
+            if (detailRenderer != null)
+            {
+                detailRenderer.sortingOrder = 10;
+                detailRenderer.receiveShadows = false;
+                detailRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+            
+            // ライティングの影響を無効化（色が明るくなりすぎるのを防止）
+            DisableTMPLighting(tmp);
+            
+            Debug.Log($"[DragDropHandler] 詳細情報表示: {itemData.displayName}");
+        }
+
+        /// <summary>
+        /// アイテムデータからRichText文字列を構築
+        /// </summary>
+        private string BuildDetailRichText(CompleteItemData itemData)
+        {
+            var sb = new System.Text.StringBuilder();
+            string labelHex = ColorUtility.ToHtmlStringRGB(detailLabelColor);
+            string skillHex = ColorUtility.ToHtmlStringRGB(detailSkillNameColor);
+            string rarityHex = ColorUtility.ToHtmlStringRGB(detailRarityColor);
+            string roleHex = ColorUtility.ToHtmlStringRGB(detailRoleColor);
+            
+            // --- レアリティ ---
+            sb.AppendLine($"<color=#{labelHex}>レアリティ:</color> <color=#{rarityHex}>{itemData.rarity}</color>");
+            
+            // --- ロール名 ---
+            if (!string.IsNullOrEmpty(itemData.roleName))
+            {
+                sb.AppendLine($"<color=#{labelHex}>ロール:</color> <color=#{roleHex}>{itemData.roleName}</color>");
+            }
+            
+            // --- ステータス（武器のみ、1項目1行） ---
+            if (itemData.IsWeapon && itemData.weaponDice != null)
+            {
+                sb.AppendLine();
+                sb.AppendLine($"<color=#{labelHex}>ダイス個数:</color> {itemData.weaponDice.count}");
+                sb.AppendLine($"<color=#{labelHex}>ダイス最大値:</color> {itemData.weaponDice.maxValue}");
+                sb.AppendLine($"<color=#{labelHex}>会心:</color> {itemData.criticalRate}/9");
+                sb.AppendLine($"<color=#{labelHex}>サイズ:</color> {itemData.size.x}×{itemData.size.y}");
+            }
+            
+            // --- パッシブスキル（名前のみ、説明はホバーツールチップ） ---
+            if (itemData.passiveSkills != null && itemData.passiveSkills.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine($"<color=#{labelHex}>スキル:</color>");
+                int lineCharCount = 0;
+                for (int i = 0; i < itemData.passiveSkills.Count; i++)
+                {
+                    var skill = itemData.passiveSkills[i];
+                    string linkId = $"skill_{i}";
+                    int nameLen = skill.skillName.Length;
+                    
+                    // 現在行に追加すると13文字超える場合は改行
+                    if (lineCharCount > 0 && lineCharCount + 1 + nameLen > 13)
+                    {
+                        sb.AppendLine();
+                        lineCharCount = 0;
+                    }
+                    
+                    // 行頭でなければスペース区切り（半角3つ、1文字カウント）
+                    if (lineCharCount > 0)
+                    {
+                        sb.Append("   ");
+                        lineCharCount += 1;
+                    }
+                    
+                    sb.Append($"<link=\"{linkId}\"><color=#{skillHex}>{skill.skillName}</color></link>");
+                    lineCharCount += nameLen;
+                    
+                    // ツールチップ用に説明文をキャッシュ
+                    if (!string.IsNullOrEmpty(skill.description))
+                    {
+                        skillDescriptionCache[linkId] = skill.description;
+                    }
+                }
+                sb.AppendLine();
+            }
+            
+            // --- 説明文（フレーバーテキスト） ---
+            if (!string.IsNullOrEmpty(itemData.description))
+            {
+                sb.AppendLine();
+                sb.Append($"<color=#{labelHex}>{WrapLine(itemData.description, 13)}</color>");
+            }
+            
+            return sb.ToString().TrimEnd();
+        }
+
+        /// <summary>
+        /// 表示文字数で maxCharsPerLine 文字ごとに改行を挿入する。
+        /// RichTextタグはカウントしない。
+        /// </summary>
+        private static string WrapLine(string text, int maxCharsPerLine)
+        {
+            if (string.IsNullOrEmpty(text) || maxCharsPerLine <= 0) return text;
+            
+            var result = new System.Text.StringBuilder(text.Length + text.Length / maxCharsPerLine);
+            int visibleCount = 0;
+            bool inTag = false;
+            
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                
+                if (c == '<') inTag = true;
+                if (c == '>') { inTag = false; result.Append(c); continue; }
+                
+                if (inTag)
+                {
+                    result.Append(c);
+                    continue;
+                }
+                
+                // 元テキストの改行はカウントリセット
+                if (c == '\n')
+                {
+                    result.Append(c);
+                    visibleCount = 0;
+                    continue;
+                }
+                
+                result.Append(c);
+                visibleCount++;
+                
+                if (visibleCount >= maxCharsPerLine && i + 1 < text.Length && text[i + 1] != '\n')
+                {
+                    // 次の文字が句読点なら改行前にねじ込む
+                    char next = text[i + 1];
+                    if (next == '。' || next == '、' || next == '，' || next == '．')
+                    {
+                        result.Append(next);
+                        i++; // 句読点を消費
+                    }
+                    result.Append('\n');
+                    visibleCount = 0;
+                }
+            }
+            
+            return result.ToString();
+        }
+
+        // =================================================================
+        //  スキルツールチップ（マウスホバー）
+        // =================================================================
+
+        /// <summary>
+        /// 毎フレーム呼び出し: 詳細テキスト上のlinkタグにマウスが重なっているか判定し、
+        /// 該当スキルの説明文をツールチップとして表示する。
+        /// </summary>
+        private void UpdateSkillTooltipHover()
+        {
+            if (previewDetailObject == null || inventoryCamera == null) return;
+            
+            var detailTmp = previewDetailObject.GetComponent<TextMeshPro>();
+            if (detailTmp == null) return;
+            
+            // TMP_TextUtilitiesでlinkのヒット判定（ワールドスペースTMP用）
+            int linkIndex = TMP_TextUtilities.FindIntersectingLink(detailTmp, Input.mousePosition, inventoryCamera);
+            
+            if (linkIndex >= 0)
+            {
+                var linkInfo = detailTmp.textInfo.linkInfo[linkIndex];
+                string linkId = linkInfo.GetLinkID();
+                
+                if (linkId != currentTooltipSkillId)
+                {
+                    // 新しいスキルにホバー → ツールチップ更新
+                    if (skillDescriptionCache.TryGetValue(linkId, out string desc))
+                    {
+                        ShowSkillTooltip(desc);
+                        currentTooltipSkillId = linkId;
+                    }
+                }
+                else
+                {
+                    // 同じスキル上 → ツールチップ位置を更新
+                    UpdateTooltipPosition();
+                }
+            }
+            else
+            {
+                // リンク外 → ツールチップを非表示
+                if (currentTooltipSkillId != null)
+                {
+                    DestroySkillTooltip();
+                    currentTooltipSkillId = null;
+                }
+            }
+        }
+
+        /// <summary>
+        /// スキル説明ツールチップを表示
+        /// </summary>
+        private void ShowSkillTooltip(string description)
+        {
+            DestroySkillTooltip();
+            
+            skillTooltipObject = new GameObject("SkillTooltip");
+            skillTooltipObject.transform.SetParent(inventoryCamera.transform, false);
+            
+            // マウス位置をカメラローカル座標に変換してオフセット適用
+            UpdateTooltipPosition();
+            skillTooltipObject.transform.localRotation = Quaternion.identity;
+            
+            var tmp = skillTooltipObject.AddComponent<TextMeshPro>();
+            tmp.richText = true;
+            tmp.text = description;
+            tmp.fontSize = tooltipFontSize;
+            tmp.color = tooltipTextColor;
+            tmp.alignment = TextAlignmentOptions.TopLeft;
+            tmp.enableWordWrapping = true;
+            tmp.overflowMode = TextOverflowModes.Truncate;
+            
+            // 自動縮小で長い説明文もはみ出さない
+            tmp.enableAutoSizing = true;
+            tmp.fontSizeMin = detailAutoSizeMin;
+            tmp.fontSizeMax = tooltipFontSize;
+            
+            if (previewNameFont != null)
+            {
+                tmp.font = previewNameFont;
+            }
+            
+            var rt = skillTooltipObject.GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                rt.sizeDelta = tooltipRectSize;
+            }
+            
+            // PreviewCardレイヤー
+            int previewLayer = LayerMask.NameToLayer("PreviewCard");
+            if (previewLayer >= 0)
+                skillTooltipObject.layer = previewLayer;
+        }
+
+        /// <summary>
+        /// ツールチップ位置をマウスカーソルに追従
+        /// </summary>
+        private void UpdateTooltipPosition()
+        {
+            if (skillTooltipObject == null || inventoryCamera == null) return;
+            
+            // マウスのスクリーン座標をカメラ前方の近距離ワールド座標に変換
+            Vector3 mouseScreen = Input.mousePosition;
+            mouseScreen.z = inventoryCamera.nearClipPlane + 0.5f; // カメラから少し前方
+            Vector3 worldPos = inventoryCamera.ScreenToWorldPoint(mouseScreen);
+            
+            // カメラローカルに変換してオフセット適用
+            Vector3 localPos = inventoryCamera.transform.InverseTransformPoint(worldPos);
+            localPos += tooltipOffset;
+            
+            skillTooltipObject.transform.localPosition = localPos;
+        }
+
+        /// <summary>スキルツールチップを破棄</summary>
+        private void DestroySkillTooltip()
+        {
+            if (skillTooltipObject != null)
+            {
+                Destroy(skillTooltipObject);
+                skillTooltipObject = null;
             }
         }
 
@@ -1760,6 +2567,47 @@ namespace InventorySystem
 
             isAnimatingToMouse = false;
             Debug.Log($"[DragDropHandler] アニメーション完了: 最終スケール {dragPreview.transform.localScale}");
+        }
+
+        // =================================================================
+        //  ギズモ描画（当たり判定の可視化）
+        // =================================================================
+
+        private void OnDrawGizmos()
+        {
+            // 確認UI: はいボタン
+            DrawBoxColliderGizmo(confirmYesCollider, Color.green);
+            // 確認UI: いいえボタン
+            DrawBoxColliderGizmo(confirmNoCollider, Color.red);
+            // ゴミ箱アイコン
+            DrawBoxColliderGizmo(trashIconCollider, Color.yellow);
+        }
+
+        private void DrawBoxColliderGizmo(Collider col, Color color)
+        {
+            if (col == null) return;
+            
+            BoxCollider box = col as BoxCollider;
+            if (box != null)
+            {
+                Gizmos.color = color;
+                Matrix4x4 prev = Gizmos.matrix;
+                Gizmos.matrix = box.transform.localToWorldMatrix;
+                // ワイヤーフレーム
+                Gizmos.DrawWireCube(box.center, box.size);
+                // 半透明の塗りつぶし
+                Color fill = color;
+                fill.a = 0.15f;
+                Gizmos.color = fill;
+                Gizmos.DrawCube(box.center, box.size);
+                Gizmos.matrix = prev;
+            }
+            else
+            {
+                // BoxCollider以外の場合はboundsで描画
+                Gizmos.color = color;
+                Gizmos.DrawWireCube(col.bounds.center, col.bounds.size);
+            }
         }
     }
 }

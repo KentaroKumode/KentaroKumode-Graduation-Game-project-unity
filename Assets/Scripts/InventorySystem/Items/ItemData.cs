@@ -32,6 +32,7 @@ namespace InventorySystem
         public int diceMax;          // ダイス最大出目（Weaponのみ）
         public int criticalRate;     // 会心率の分子（1～9、分母は9）
         public int basePrice;        // 設定中央価格（購入/売却額はシステムが±25%で算出）
+        public int[] diceFaces;      // ダイスアイテムの面配列
         public PassiveSkillJson[] passiveSkills;
     }
     

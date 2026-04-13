@@ -13,6 +13,7 @@ namespace InventorySystem
         
         private CompleteItemData currentlyEquippedWeapon;
         private CompleteItemData currentlyEquippedArmor;
+        private CompleteItemData currentlyEquippedDice;
         
         /// <summary>
         /// アイテムを装備
@@ -56,6 +57,10 @@ namespace InventorySystem
             {
                 UnequipArmor();
             }
+            else if (item.category == ItemCategory.Dice && currentlyEquippedDice != null)
+            {
+                UnequipDice();
+            }
             
             // 新しい装備を設定
             if (item.category == ItemCategory.Weapon)
@@ -65,6 +70,10 @@ namespace InventorySystem
             else if (item.category == ItemCategory.Armor)
             {
                 currentlyEquippedArmor = item;
+            }
+            else if (item.category == ItemCategory.Dice)
+            {
+                currentlyEquippedDice = item;
             }
             
             // パッシブスキル登録
@@ -126,6 +135,20 @@ namespace InventorySystem
         }
         
         /// <summary>
+        /// ダイスを解除
+        /// </summary>
+        private void UnequipDice()
+        {
+            if (currentlyEquippedDice != null)
+            {
+                PassiveSkillManager.Instance.RemoveItemSkills(currentlyEquippedDice);
+                InventoryManager.Instance?.UnequipItem(currentlyEquippedDice);
+                Debug.Log($"[ItemEquipHandler] Unequipped dice: {currentlyEquippedDice.displayName}");
+                currentlyEquippedDice = null;
+            }
+        }
+        
+        /// <summary>
         /// 現在の装備を取得
         /// </summary>
         public CompleteItemData GetCurrentEquipment(ItemCategory category)
@@ -134,6 +157,8 @@ namespace InventorySystem
                 return currentlyEquippedWeapon;
             else if (category == ItemCategory.Armor)
                 return currentlyEquippedArmor;
+            else if (category == ItemCategory.Dice)
+                return currentlyEquippedDice;
             
             return null;
         }

@@ -25,7 +25,7 @@ namespace CombatSystem
         [SerializeField] private int playerCriticalNumerator = 1;
 
         [Header("デバッグ表示")]
-        [SerializeField] private bool showGUI = true;
+        [SerializeField] private bool showGUI = false;
 
         private CombatResult? lastResult;
         private TurnResult? lastTurn;
@@ -137,8 +137,20 @@ namespace CombatSystem
                 Debug.LogWarning($"[CombatTest] 武器未装備のためフォールバック値を使用: {diceCount}d{diceMax} Crit:{critRate}/9");
             }
 
+            // 装備ダイスの面を取得
+            int[] equippedDiceFaces = null;
+            var equipHandler = FindObjectOfType<ItemEquipHandler>();
+            if (equipHandler != null)
+            {
+                var equippedDice = equipHandler.GetCurrentEquipment(ItemCategory.Dice);
+                if (equippedDice != null && equippedDice.diceFaces != null)
+                {
+                    equippedDiceFaces = equippedDice.diceFaces;
+                }
+            }
+
             CombatManager.Instance.StartCombat(
-                enemy, playerMaxHP, diceCount, diceMax, critRate);
+                enemy, playerMaxHP, diceCount, diceMax, critRate, equippedDiceFaces);
         }
 
         /// <summary>
@@ -235,6 +247,7 @@ namespace CombatSystem
 
         void OnGUI()
         {
+            return; // テストUI一時無効化
             if (!showGUI) return;
 
             GUILayout.BeginArea(new Rect(10, 10, 520, 800));

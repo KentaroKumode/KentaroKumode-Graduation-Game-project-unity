@@ -166,25 +166,13 @@ namespace InventorySystem
                 wrapMode = TextureWrapMode.Clamp
             };
 
-            Color bg = new Color(0.15f, 0.15f, 0.15f, 0.75f);       // 暗い半透明背景
             Color iconColor = new Color(1f, 0.35f, 0.2f, 1f);        // 赤オレンジ
             Color lidColor = new Color(1f, 0.5f, 0.3f, 1f);          // 蓋（やや明るい）
 
-            // 全ピクセル初期化
+            // 全ピクセル透明で初期化
             Color[] pixels = new Color[size * size];
-            
-            // 背景: 角丸矩形
-            float radius = size * 0.15f;
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    float dx = Mathf.Max(0, Mathf.Abs(x - size / 2f) - (size / 2f - radius));
-                    float dy = Mathf.Max(0, Mathf.Abs(y - size / 2f) - (size / 2f - radius));
-                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
-                    pixels[y * size + x] = dist <= radius ? bg : Color.clear;
-                }
-            }
+            for (int i = 0; i < pixels.Length; i++)
+                pixels[i] = Color.clear;
 
             // 正規化座標系でゴミ箱を描画
             // 蓋: 上部の横棒
@@ -199,9 +187,9 @@ namespace InventorySystem
             FillRect(pixels, size, 0.73f, 0.18f, 0.78f, 0.50f, Color.clear); // 右下カット
 
             // 縦の削除ライン（3本）
-            FillRect(pixels, size, 0.36f, 0.25f, 0.40f, 0.70f, bg);
-            FillRect(pixels, size, 0.48f, 0.25f, 0.52f, 0.70f, bg);
-            FillRect(pixels, size, 0.60f, 0.25f, 0.64f, 0.70f, bg);
+            FillRect(pixels, size, 0.36f, 0.25f, 0.40f, 0.70f, Color.clear);
+            FillRect(pixels, size, 0.48f, 0.25f, 0.52f, 0.70f, Color.clear);
+            FillRect(pixels, size, 0.60f, 0.25f, 0.64f, 0.70f, Color.clear);
 
             texture.SetPixels(pixels);
             texture.Apply();

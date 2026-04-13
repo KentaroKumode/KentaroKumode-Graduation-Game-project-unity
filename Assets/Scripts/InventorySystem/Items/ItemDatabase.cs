@@ -251,6 +251,12 @@ namespace InventorySystem
             // 会心率設定（1～9、分母は9）
             item.criticalRate = Mathf.Clamp(jsonItem.criticalRate, 0, 9);
             
+            // ダイス面設定（Diceカテゴリ）
+            if (jsonItem.diceFaces != null && jsonItem.diceFaces.Length > 0)
+            {
+                item.diceFaces = jsonItem.diceFaces;
+            }
+            
             // 武器ロール設定
             item.roleName = jsonItem.roleName ?? "";
             item.roleDescription = jsonItem.roleDescription ?? "";

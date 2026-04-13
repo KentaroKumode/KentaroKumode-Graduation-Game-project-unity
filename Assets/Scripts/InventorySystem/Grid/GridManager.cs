@@ -208,24 +208,17 @@ namespace InventorySystem
                 return Vector3.zero;
             }
             
-            // セルの中心座標を取得（左上基準座標系）
             Vector3 cellCenter = transform.position + new Vector3(
-                // X座標: (0,0)が左上なので、x増加で右（X軸マイナス方向）
                 (InventoryConstants.GRID_WIDTH - 1) * (cellSize + cellSpacing) / 2f - x * (cellSize + cellSpacing),
                 0,
-                // Z座標: (0,0)が左上なので、y増加で下（Z軸プラス方向）
                 -(InventoryConstants.GRID_HEIGHT - 1) * (cellSize + cellSpacing) / 2f + y * (cellSize + cellSpacing)
             );
             
-            // セルの左上角座標を計算（カードピボット用）
-            // 座標系: X+ = 左, Z- = 上なので
             Vector3 topLeft = cellCenter + new Vector3(
-                +cellSize / 2f,  // 左に移動（X軸プラス方向）
+                +cellSize / 2f,
                 0,
-                -cellSize / 2f   // 上に移動（Z軸マイナス方向）
+                -cellSize / 2f
             );
-            
-            Debug.Log($"[GridManager] セル({x},{y}): 中心={cellCenter} → 左上角={topLeft} [X+=左, Z-=上]");
             
             return topLeft;
         }
@@ -235,27 +228,7 @@ namespace InventorySystem
         /// </summary>
         public Vector3 GetItemTopLeftPosition(int gridX, int gridY, int sizeX, int sizeY)
         {
-            Debug.Log($"[GridManager] === アイテム左上角座標計算 ===");
-            Debug.Log($"[GridManager] Input: gridX={gridX}, gridY={gridY}, sizeX={sizeX}, sizeY={sizeY}");
-            
-            // 基準セルの左上角座標を取得
-            Vector3 baseCellTopLeft = GetCellTopLeftPosition(gridX, gridY);
-            
-            Debug.Log($"[GridManager] 基準セル({gridX},{gridY})の左上角: {baseCellTopLeft}");
-            Debug.Log($"[GridManager] GridManager中心: {transform.position}");
-            Debug.Log($"[GridManager] セルサイズ: {cellSize}, 間隔: {cellSpacing}");
-            
-            // 座標計算の検証
-            Vector3 gridCenter = transform.position;
-            float totalGridWidth = InventoryConstants.GRID_WIDTH * (cellSize + cellSpacing) - cellSpacing;
-            float totalGridHeight = InventoryConstants.GRID_HEIGHT * (cellSize + cellSpacing) - cellSpacing;
-            Vector3 gridTopLeft = gridCenter - new Vector3(totalGridWidth/2f, 0, -totalGridHeight/2f);
-            
-            Debug.Log($"[GridManager] グリッド全体サイズ: {totalGridWidth} x {totalGridHeight}");
-            Debug.Log($"[GridManager] グリッド左上角: {gridTopLeft}");
-            Debug.Log($"[GridManager] アイテム配置位置: {baseCellTopLeft}");
-            
-            return baseCellTopLeft;
+            return GetCellTopLeftPosition(gridX, gridY);
         }
         
         /// <summary>
@@ -263,27 +236,17 @@ namespace InventorySystem
         /// </summary>
         public Vector3 GetItemCenterPosition(int gridX, int gridY, int sizeX, int sizeY)
         {
-            Debug.Log($"[GridManager] === アイテム中心座標計算 ===");
-            Debug.Log($"[GridManager] Input: gridX={gridX}, gridY={gridY}, sizeX={sizeX}, sizeY={sizeY}");
-            
-            // アイテムが占有する範囲の中心を計算
             float centerX = gridX + (sizeX - 1) / 2f;
             float centerY = gridY + (sizeY - 1) / 2f;
-            Debug.Log($"[GridManager] Grid center offset: centerX={centerX}, centerY={centerY}");
             
-            // グリッド全体の中心オフセット
             float gridCenterOffsetX = (InventoryConstants.GRID_WIDTH - 1) / 2f;
             float gridCenterOffsetY = (InventoryConstants.GRID_HEIGHT - 1) / 2f;
-            Debug.Log($"[GridManager] Grid center offsets: X={gridCenterOffsetX}, Y={gridCenterOffsetY}");
             
             Vector3 itemCenter = transform.position + new Vector3(
                 (centerX - gridCenterOffsetX) * (cellSize + cellSpacing),
                 0,
                 (centerY - gridCenterOffsetY) * (cellSize + cellSpacing)
             );
-            
-            Debug.Log($"[GridManager] Calculated item center: {itemCenter}");
-            Debug.Log($"[GridManager] Transform position: {transform.position}");
             
             return itemCenter;
         }
@@ -293,61 +256,22 @@ namespace InventorySystem
         /// </summary>
         public bool CanPlaceItem(int gridX, int gridY, int sizeX, int sizeY)
         {
-            Debug.Log($"[GridManager] CanPlaceItem チェック: ({gridX}, {gridY}) サイズ {sizeX}x{sizeY}");
-            Debug.Log($"[GridManager] 現在のアンロック行数: {currentUnlockedRows} / {InventoryConstants.GRID_HEIGHT}");
+            if (gridX < 0 || gridY < 0) return false;
+            if (gridX + sizeX > InventoryConstants.GRID_WIDTH) return false;
+            if (gridY + sizeY > InventoryConstants.GRID_HEIGHT) return false;
+            if (gridY + sizeY > currentUnlockedRows) return false;
             
-            // 範囲チェック
-            if (gridX < 0 || gridY < 0)
-            {
-                Debug.Log($"[GridManager] 範囲外: 負の座標");
-                return false;
-            }
-            
-            if (gridX + sizeX > InventoryConstants.GRID_WIDTH)
-            {
-                Debug.Log($"[GridManager] 範囲外: X方向 {gridX + sizeX} > {InventoryConstants.GRID_WIDTH}");
-                return false;
-            }
-            
-            if (gridY + sizeY > InventoryConstants.GRID_HEIGHT)
-            {
-                Debug.Log($"[GridManager] 範囲外: Y方向 {gridY + sizeY} > {InventoryConstants.GRID_HEIGHT}");
-                return false;
-            }
-            
-            // アンロック状態チェック
-            Debug.Log($"[GridManager] アンロックチェック: 配置終了行 {gridY + sizeY} <= アンロック行数 {currentUnlockedRows}");
-            if (gridY + sizeY > currentUnlockedRows)
-            {
-                Debug.Log($"[GridManager] ロック行: {gridY + sizeY} > {currentUnlockedRows}");
-                return false;
-            }
-            
-            // セルの占有状態チェック
             for (int y = gridY; y < gridY + sizeY; y++)
             {
                 for (int x = gridX; x < gridX + sizeX; x++)
                 {
                     GridCell cell = GetCell(x, y);
-                    if (cell == null)
-                    {
-                        Debug.Log($"[GridManager] セルがnull: ({x}, {y})");
+                    if (cell == null || cell.IsOccupied || cell.IsLocked)
                         return false;
-                    }
-                    
-                    Debug.Log($"[GridManager] セル ({x}, {y}) チェック: 占有={cell.IsOccupied}, ロック={cell.IsLocked}");
-                    
-                    if (cell.IsOccupied)
-                    {
-                        Debug.Log($"[GridManager] セル占有済み: ({x}, {y}) by {cell.OccupiedItem?.displayName ?? "不明"}");
-                        return false;
-                    }
-                    if (cell.IsLocked)
-                    {
-                        Debug.Log($"[GridManager] セルロック中: ({x}, {y})");
-                        return false;
-                    }
                 }
+            }
+            return true;
+        }
             }
             
             Debug.Log($"[GridManager] 配置可能: ({gridX}, {gridY})");
@@ -359,9 +283,6 @@ namespace InventorySystem
         /// </summary>
         public void PlaceItem(int gridX, int gridY, int sizeX, int sizeY, CompleteItemData item)
         {
-            Debug.Log($"[GridManager] === PlaceItem開始 ===");
-            
-            // Nullチェック
             if (item == null)
             {
                 Debug.LogError("[GridManager] CompleteItemDataがnullです！");
@@ -374,36 +295,24 @@ namespace InventorySystem
                 return;
             }
             
-            Debug.Log($"[GridManager] PlaceItem called: gridX={gridX}, gridY={gridY}, sizeX={sizeX}, sizeY={sizeY}, item={item.displayName}");
-            
             // 既存のアイテムオブジェクトをクリーンアップ（重複防止）
             CleanupExistingItemObjects(item.displayName);
             
             // セルの占有状態を設定
-            Debug.Log($"[GridManager] 占有状態設定開始: {item.displayName} 範囲({gridX},{gridY})～({gridX+sizeX-1},{gridY+sizeY-1})");
             for (int y = gridY; y < gridY + sizeY; y++)
             {
                 for (int x = gridX; x < gridX + sizeX; x++)
                 {
                     GridCell cell = GetCell(x, y);
                     if (cell != null)
-                    {
-                        Debug.Log($"[GridManager] セル ({x}, {y}) に {item.displayName} を配置開始");
                         cell.SetOccupied(true, item);
-                        Debug.Log($"[GridManager] セル ({x}, {y}) 配置完了: 占有={cell.IsOccupied}");
-                    }
                     else
-                    {
                         Debug.LogError($"[GridManager] セル ({x}, {y}) が見つかりません！");
-                    }
                 }
             }
             
             // 3Dオブジェクトの自動配置
             Place3DObject(gridX, gridY, sizeX, sizeY, item);
-            
-            Debug.Log($"[GridManager] === PlaceItem完了 ===");
-            Debug.Log($"[GridManager] Item placed: {item.displayName} at ({gridX}, {gridY})");
         }
         
         /// <summary>
@@ -411,42 +320,20 @@ namespace InventorySystem
         /// </summary>
         private void CleanupExistingItemObjects(string itemName)
         {
-            if (string.IsNullOrEmpty(itemName))
-            {
-                Debug.LogWarning("[GridManager] itemNameがnullまたは空です。クリーンアップをスキップします。");
-                return;
-            }
+            if (string.IsNullOrEmpty(itemName)) return;
             
-            Debug.Log($"[GridManager] === 既存アイテムクリーンアップ開始: {itemName} ===");
-            
-            int cleanupCount = 0;
-            // GridManager配下の子オブジェクトをチェック
             for (int i = transform.childCount - 1; i >= 0; i--)
             {
                 Transform child = transform.GetChild(i);
-                
-                // child.nameもnullチェック
-                if (child != null && !string.IsNullOrEmpty(child.name))
+                if (child != null && !string.IsNullOrEmpty(child.name) &&
+                    child.name.Contains(itemName) && !child.name.StartsWith("Cell_"))
                 {
-                    // アイテム名でフィルタリング（セル以外のオブジェクトを対象）
-                    if (child.name.Contains(itemName) && !child.name.StartsWith("Cell_"))
-                    {
-                        Debug.Log($"[GridManager] 既存アイテムを削除: {child.name} at {child.position}");
-                        
-                        if (Application.isPlaying)
-                        {
-                            Destroy(child.gameObject);
-                        }
-                        else
-                        {
-                            DestroyImmediate(child.gameObject);
-                        }
-                        cleanupCount++;
-                    }
+                    if (Application.isPlaying)
+                        Destroy(child.gameObject);
+                    else
+                        DestroyImmediate(child.gameObject);
                 }
             }
-            
-            Debug.Log($"[GridManager] === 既存アイテムクリーンアップ完了: {cleanupCount}個削除 ===");
         }
         
         /// <summary>
@@ -460,68 +347,19 @@ namespace InventorySystem
                 return;
             }
             
-            Debug.Log($"[GridManager] === 配置デバッグ: {item.displayName} at Grid({gridX},{gridY}) Size({sizeX}x{sizeY}) ===");
-            
-            // 既存の同名アイテム数をチェック
-            int existingCount = 0;
-            for (int i = 0; i < transform.childCount; i++)
-            {
-                Transform child = transform.GetChild(i);
-                if (child != null && !string.IsNullOrEmpty(child.name) && 
-                    child.name.Contains(item.displayName) && !child.name.StartsWith("Cell_"))
-                {
-                    existingCount++;
-                    Debug.Log($"[GridManager] 既存アイテム#{existingCount}: {child.name} at {child.position}");
-                }
-            }
-            
-            // アイテムの左上角座標を計算
             Vector3 itemPosition = GetItemTopLeftPosition(gridX, gridY, sizeX, sizeY);
             
-            // Y座標を適切に設定（セル位置に合わせる）
             GridCell baseCell = GetCell(gridX, gridY);
             if (baseCell != null)
-            {
-                // 基準セルのY座標を使用し、少し上に配置
                 itemPosition.y = baseCell.transform.position.y + 0.1f;
-                Debug.Log($"[GridManager] Y座標をセル基準に調整: セルY={baseCell.transform.position.y} → アイテムY={itemPosition.y}");
-            }
             else
-            {
-                // フォールバック：GridManager基準
                 itemPosition.y = transform.position.y + 0.1f;
-                Debug.LogWarning($"[GridManager] 基準セルが見つからないため、GridManager基準でY座標設定: {itemPosition.y}");
-            }
             
-            Debug.Log($"[GridManager] 計算された配置位置: {itemPosition}");
-            Debug.Log($"[GridManager] GridManager中心: {transform.position}");
-            Debug.Log($"[GridManager] セルサイズ: {cellSize}, 間隔: {cellSpacing}");
-            
-            // Y座標の検証情報
-            Debug.Log($"[GridManager] === Y座標詳細 ===");
-            Debug.Log($"[GridManager] GridManager Y座標: {transform.position.y}");
-            if (baseCell != null)
-            {
-                Debug.Log($"[GridManager] 基準セル Y座標: {baseCell.transform.position.y}");
-            }
-            Debug.Log($"[GridManager] 最終アイテム Y座標: {itemPosition.y}");
-            Debug.Log($"[GridManager] Y座標オフセット: +0.1f（セル上配置）");
-            
-            // 3Dオブジェクトを生成
             GameObject itemObject = Instantiate(item.cardModel, itemPosition, Quaternion.identity, transform);
             itemObject.name = $"{item.displayName}_Grid_{gridX}_{gridY}_{System.DateTime.Now.Ticks}";
             
-            // コライダーを確保（ドラッグ操作用）
             EnsureCollider(itemObject);
-            
-            Debug.Log($"[GridManager] *** 生成完了: {itemObject.name} at {itemObject.transform.position} ***");
-            
-            // スケールをセルサイズに合わせて自動調整
             AdjustObjectScale(itemObject, sizeX, sizeY);
-            
-            // 最終結果確認
-            Debug.Log($"[GridManager] 最終位置: {itemObject.transform.position}");
-            Debug.Log($"[GridManager] 最終スケール: {itemObject.transform.localScale}");
         }
         
         /// <summary>
@@ -529,13 +367,7 @@ namespace InventorySystem
         /// </summary>
         private void AdjustObjectScale(GameObject itemObject, int sizeX, int sizeY)
         {
-            Debug.Log($"[GridManager] スケール調整: セル {sizeX}x{sizeY} → prefab基準0.5倍に統一");
-            
-            // prefabの基準スケール（通常1.0）の0.5倍に統一
-            Vector3 uniformScale = Vector3.one * 0.5f;
-            itemObject.transform.localScale = uniformScale;
-            
-            Debug.Log($"[GridManager] 統一スケール適用: prefab基準 → 0.5倍 = {uniformScale}");
+            itemObject.transform.localScale = Vector3.one * 0.5f;
         }
         
         /// <summary>
@@ -565,21 +397,10 @@ namespace InventorySystem
         {
             Collider collider = itemObject.GetComponent<Collider>();
             if (collider == null)
-            {
-                // 子オブジェクトからコライダーを検索
                 collider = itemObject.GetComponentInChildren<Collider>();
-            }
             
             if (collider == null)
-            {
-                // コライダーがない場合はBoxColliderを追加
-                BoxCollider boxCollider = itemObject.AddComponent<BoxCollider>();
-                Debug.Log($"[GridManager] BoxCollider追加: {itemObject.name}");
-            }
-            else
-            {
-                Debug.Log($"[GridManager] 既存Collider確認: {collider.GetType().Name} on {itemObject.name}");
-            }
+                itemObject.AddComponent<BoxCollider>();
         }
         
         /// <summary>

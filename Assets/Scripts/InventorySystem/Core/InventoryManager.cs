@@ -11,6 +11,7 @@ namespace InventorySystem
     {
         [Header("参照")]
         [SerializeField] private GridManager gridManager;
+        [SerializeField] private PlacementValidator placementValidator;
         
         // イベント定義
         public event Action<CompleteItemData, int, int> OnItemAdded;           // アイテム追加（item, gridX, gridY）
@@ -56,16 +57,13 @@ namespace InventorySystem
         
         void Start()
         {
-            // GridManagerの参照チェック
             if (gridManager == null)
-            {
                 gridManager = GetComponent<GridManager>();
-            }
-            
             if (gridManager == null)
-            {
                 Debug.LogError("[InventoryManager] GridManager not found!");
-            }
+            
+            if (placementValidator == null)
+                placementValidator = FindObjectOfType<PlacementValidator>();
         }
         
         /// <summary>
@@ -79,23 +77,19 @@ namespace InventorySystem
                 return false;
             }
             
-            // 配置可能かチェック（後でPlacementValidatorに移譲）
-            Debug.Log($"[InventoryManager] AddItem: {item.displayName} を ({gridX}, {gridY}) に配置を試行");
-            if (!CanPlaceItem(item, gridX, gridY))
+            if (placementValidator != null && !placementValidator.CanPlaceItem(item, gridX, gridY))
+            {
+                Debug.LogWarning($"[InventoryManager] Cannot place item {item.displayName} at ({gridX}, {gridY})");
+                return false;
+            }
+            else if (placementValidator == null && !gridManager.CanPlaceItem(gridX, gridY, item.size.x, item.size.y))
             {
                 Debug.LogWarning($"[InventoryManager] Cannot place item {item.displayName} at ({gridX}, {gridY})");
                 return false;
             }
             
-            Debug.Log($"[InventoryManager] 配置可能確認済み、GridManager.PlaceItem呼び出し開始");
-            // 配置処理（GridManagerの状態を更新）
-            if (gridManager != null)
-            {
-                gridManager.PlaceItem(gridX, gridY, item.size.x, item.size.y, item);
-            }
-            
+            gridManager.PlaceItem(gridX, gridY, item.size.x, item.size.y, item);
             OnItemAdded?.Invoke(item, gridX, gridY);
-            Debug.Log($"[InventoryManager] Item added: {item.displayName} at ({gridX}, {gridY})");
             return true;
         }
         
@@ -110,23 +104,22 @@ namespace InventorySystem
                 return false;
             }
             
-            Debug.Log($"[InventoryManager] TryAddItemAuto開始: {item.displayName} (size: {item.size.x}x{item.size.y})");
-            Debug.Log($"[InventoryManager] アンロック行数: {gridManager.GetUnlockedRows()}");
+            int unlockedRows = gridManager.GetUnlockedRows();
             
-            // 空きスペースを検索
-            for (int y = 0; y < gridManager.GetUnlockedRows(); y++)
+            // PlacementValidator経由で空きスペースを検索
+            if (placementValidator != null && placementValidator.TryFindPlacement(item, unlockedRows, out int x, out int y))
             {
-                for (int x = 0; x <= InventoryConstants.GRID_WIDTH - item.size.x; x++)
+                return AddItem(item, x, y);
+            }
+            else if (placementValidator == null)
+            {
+                // フォールバック: PlacementValidatorがない場合は直接検索
+                for (int fy = 0; fy < unlockedRows; fy++)
                 {
-                    Debug.Log($"[InventoryManager] チェック位置 ({x}, {y})");
-                    if (CanPlaceItem(item, x, y))
+                    for (int fx = 0; fx <= InventoryConstants.GRID_WIDTH - item.size.x; fx++)
                     {
-                        Debug.Log($"[InventoryManager] 配置可能位置発見: ({x}, {y})");
-                        return AddItem(item, x, y);
-                    }
-                    else
-                    {
-                        Debug.Log($"[InventoryManager] 配置不可: ({x}, {y})");
+                        if (gridManager.CanPlaceItem(fx, fy, item.size.x, item.size.y))
+                            return AddItem(item, fx, fy);
                     }
                 }
             }
@@ -136,7 +129,7 @@ namespace InventorySystem
             if (holdingArea != null && holdingArea.AddItem(item))
             {
                 Debug.Log($"[InventoryManager] グリッド満杯のため HoldingArea に一時保持: {item.displayName}");
-                return true; // 一時保持成功もtrueとして返す
+                return true;
             }
 
             Debug.LogWarning($"[InventoryManager] No space available for item: {item.displayName} (size: {item.size.x}x{item.size.y})");
@@ -154,7 +147,6 @@ namespace InventorySystem
             }
             
             OnItemRemoved?.Invoke(gridX, gridY);
-            Debug.Log($"[InventoryManager] Item removed at ({gridX}, {gridY})");
         }
         
         /// <summary>
@@ -162,14 +154,8 @@ namespace InventorySystem
         /// </summary>
         public void EquipItem(CompleteItemData item)
         {
-            if (!item.IsEquippable)
-            {
-                Debug.Log($"[InventoryManager] Item {item.displayName} is not equippable");
-                return;
-            }
-            
+            if (!item.IsEquippable) return;
             OnItemEquipped?.Invoke(item);
-            Debug.Log($"[InventoryManager] Item equipped: {item.displayName}");
         }
         
         /// <summary>
@@ -178,9 +164,7 @@ namespace InventorySystem
         public void UnequipItem(CompleteItemData item)
         {
             if (item == null) return;
-            
             OnItemUnequipped?.Invoke(item);
-            Debug.Log($"[InventoryManager] Item unequipped: {item.displayName}");
         }
         
         /// <summary>
@@ -188,15 +172,12 @@ namespace InventorySystem
         /// </summary>
         public void ExpandGrid()
         {
-            if (gridManager != null)
+            if (gridManager == null) return;
+            int newRows = gridManager.GetUnlockedRows() + 1;
+            if (newRows <= InventoryConstants.GRID_HEIGHT)
             {
-                int newRows = gridManager.GetUnlockedRows() + 1;
-                if (newRows <= InventoryConstants.GRID_HEIGHT)
-                {
-                    gridManager.UnlockRow(newRows);
-                    OnGridExpanded?.Invoke(newRows);
-                    Debug.Log($"[InventoryManager] Grid expanded to {newRows} rows");
-                }
+                gridManager.UnlockRow(newRows);
+                OnGridExpanded?.Invoke(newRows);
             }
         }
         
@@ -206,7 +187,6 @@ namespace InventorySystem
         public void OpenInventory()
         {
             OnInventoryOpened?.Invoke();
-            Debug.Log("[InventoryManager] Inventory opened");
         }
         
         /// <summary>
@@ -215,23 +195,6 @@ namespace InventorySystem
         public void CloseInventory()
         {
             OnInventoryClosed?.Invoke();
-            Debug.Log("[InventoryManager] Inventory closed");
-        }
-        
-        // 仮の配置チェック(後でPlacementValidatorに移動)
-        private bool CanPlaceItem(CompleteItemData item, int gridX, int gridY)
-        {
-            Debug.Log($"[InventoryManager] CanPlaceItem呼び出し: {item.displayName} at ({gridX}, {gridY}) size {item.size.x}x{item.size.y}");
-            
-            if (gridManager == null)
-            {
-                Debug.LogError("[InventoryManager] GridManager is null in CanPlaceItem!");
-                return false;
-            }
-            
-            bool result = gridManager.CanPlaceItem(gridX, gridY, item.size.x, item.size.y);
-            Debug.Log($"[InventoryManager] CanPlaceItem結果: {result} for {item.displayName} at ({gridX}, {gridY})");
-            return result;
         }
         
         /// <summary>
@@ -248,7 +211,6 @@ namespace InventorySystem
                 }
                 
                 instance = null;
-                Debug.Log("[InventoryManager] Static instance safely cleared");
             }
         }
     }

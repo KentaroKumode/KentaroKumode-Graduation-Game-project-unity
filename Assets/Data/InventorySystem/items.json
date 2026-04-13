@@ -1,537 +1,524 @@
-{
+﻿{
   "items": [
     {
-      "id": "shield_lv1",
-      "name": "鉄縁の盾",
-      "roleName": "タンク",
-      "roleDescription": "非常に持久戦に強い装備、じわじわと戦闘を優位に進める。",
-      "description": "鍛冶師によって鍛えられた鉄製の盾。これで殴ればそこそこ痛い。",
+      "id": "disp_shield",
+      "name": "木盾",
+      "description": "木で作った簡素な盾。殴ると割れる。",
       "category": "Weapon",
-      "rarity": "Common",
+      "rarity": "BRONZE",
+      "sizeX": 1,
+      "sizeY": 1,
+      "diceCount": 2,
+      "diceMax": 3,
+      "criticalRate": 0,
+      "basePrice": 30,
+      "passiveSkills": [
+        { "internalName": "FortitudeI", "skillName": "頑強I", "description": "被ダメージ-1" }
+      ]
+    },
+    {
+      "id": "disp_knife",
+      "name": "錆びたナイフ",
+      "description": "年季の入ったナイフ。刃はボロボロ。",
+      "category": "Weapon",
+      "rarity": "BRONZE",
+      "sizeX": 1,
+      "sizeY": 1,
+      "diceCount": 1,
+      "diceMax": 5,
+      "criticalRate": 1,
+      "basePrice": 35,
+      "passiveSkills": [
+        { "internalName": "PursuitI", "skillName": "追撃I", "description": "ロール勝利時、与ダメージ+2" }
+      ]
+    },
+    {
+      "id": "disp_charm",
+      "name": "氷結の護符",
+      "description": "冷気を帯びた護符。微かに魔力が宿る。",
+      "category": "Weapon",
+      "rarity": "SILVER",
+      "sizeX": 1,
+      "sizeY": 1,
+      "diceCount": 2,
+      "diceMax": 4,
+      "criticalRate": 2,
+      "basePrice": 80,
+      "passiveSkills": [
+        { "internalName": "InsightI", "skillName": "心眼I", "description": "会心ダイス+1" }
+      ]
+    },
+
+    {
+      "id": "shield_t1",
+      "name": "端材の盾",
+      "roleName": "タンク",
+      "roleDescription": "持久戦に強い。scratch軽減とHP回復で長期戦を制する。",
+      "description": "端材を寄せ集めた粗末な盾。無いよりマシ。",
+      "category": "Weapon",
+      "rarity": "BRONZE",
       "sizeX": 1,
       "sizeY": 1,
       "diceCount": 2,
       "diceMax": 3,
       "criticalRate": 1,
-      "basePrice": 40,
+      "basePrice": 45,
       "passiveSkills": [
-        { "internalName": "Breakfall", "skillName": "受け身", "description": "ロール敗北時、ダメージを-2" }
+        { "internalName": "FortitudeI", "skillName": "頑強I", "description": "被ダメージ-1" },
+        { "internalName": "VitalityI", "skillName": "活力I", "description": "ターン開始時HP+1回復" }
       ]
     },
     {
-      "id": "shield_lv2",
-      "name": "重鉄の大盾",
+      "id": "shield_t2",
+      "name": "鉄盾",
       "roleName": "タンク",
-      "roleDescription": "非常に持久戦に強い装備、じわじわと戦闘を優位に進める。",
-      "description": "要塞の守衛が持つ大盾。防御力に優れる上、打撃武器としても使える。",
+      "roleDescription": "持久戦に強い。scratch軽減とHP回復で長期戦を制する。",
+      "description": "鍛冶師が打った堅牢な鉄盾。信頼の一枚。",
       "category": "Weapon",
-      "rarity": "Common",
+      "rarity": "SILVER",
+      "sizeX": 1,
+      "sizeY": 2,
+      "diceCount": 2,
+      "diceMax": 4,
+      "criticalRate": 1,
+      "basePrice": 110,
+      "passiveSkills": [
+        { "internalName": "FortitudeI", "skillName": "頑強I", "description": "被ダメージ-1" },
+        { "internalName": "VitalityI", "skillName": "活力I", "description": "ターン開始時HP+1回復" },
+        { "internalName": "FortitudeII", "skillName": "頑強II", "description": "被ダメージ-2" }
+      ]
+    },
+    {
+      "id": "shield_t3",
+      "name": "聖騎士の盾",
+      "roleName": "タンク",
+      "roleDescription": "持久戦に強い。scratch軽減とHP回復で長期戦を制する。",
+      "description": "聖騎士団に伝わる祝福の盾。攻撃を受け流す術を宿す。",
+      "category": "Weapon",
+      "rarity": "GOLD",
       "sizeX": 2,
+      "sizeY": 2,
+      "diceCount": 2,
+      "diceMax": 5,
+      "criticalRate": 2,
+      "basePrice": 220,
+      "passiveSkills": [
+        { "internalName": "FortitudeI", "skillName": "頑強I", "description": "被ダメージ-1" },
+        { "internalName": "FortitudeII", "skillName": "頑強II", "description": "被ダメージ-2" },
+        { "internalName": "VitalityII", "skillName": "活力II", "description": "ターン開始時HP+2回復" },
+        { "internalName": "Parry", "skillName": "パリィ", "description": "敵の威圧による削りダメージを無効化" }
+      ]
+    },
+    {
+      "id": "shield_t4",
+      "name": "ドーンブリンガー",
+      "roleName": "タンク",
+      "roleDescription": "持久戦に強い。ダメージ軽減とHP回復で長期戦を制する。",
+      "description": "闇を切り裂き光をもたらす聖盾。すべての害意を退ける。",
+      "category": "Weapon",
+      "rarity": "LEGENDARY",
+      "sizeX": 2,
+      "sizeY": 3,
+      "diceCount": 3,
+      "diceMax": 5,
+      "criticalRate": 2,
+      "basePrice": 450,
+      "passiveSkills": [
+        { "internalName": "FortitudeI", "skillName": "頑強I", "description": "被ダメージ-1" },
+        { "internalName": "FortitudeII", "skillName": "頑強II", "description": "被ダメージ-2" },
+        { "internalName": "VitalityII", "skillName": "活力II", "description": "ターン開始時HP+2回復" },
+        { "internalName": "Parry", "skillName": "パリィ", "description": "敵の威圧による削りダメージを無効化" },
+        { "internalName": "HolyShield", "skillName": "聖なる守り", "description": "ロール敗北時、受けるダメージ50%" }
+      ]
+    },
+
+    {
+      "id": "sword_t1",
+      "name": "訓練用の剣",
+      "roleName": "ナイト",
+      "roleDescription": "攻守バランス型。反撃と追撃でどんな状況でも戦える。",
+      "description": "訓練場で使われる鈍な剣。それでも十分痛い。",
+      "category": "Weapon",
+      "rarity": "BRONZE",
+      "sizeX": 1,
       "sizeY": 1,
       "diceCount": 2,
       "diceMax": 4,
       "criticalRate": 1,
-      "basePrice": 80,
+      "basePrice": 50,
       "passiveSkills": [
-        { "internalName": "Breakfall", "skillName": "受け身", "description": "ロール敗北時、ダメージを-2" },
-        { "internalName": "SpikeArmor", "skillName": "棘鎧", "description": "ロールの勝敗にかかわらず、敵に軽減不能の2ダメージを与える" }
+        { "internalName": "MightI", "skillName": "筋力I", "description": "各ダイス出目+1" },
+        { "internalName": "PursuitI", "skillName": "追撃I", "description": "ロール勝利時、与ダメージ+2" }
       ]
     },
     {
-      "id": "shield_lv3",
-      "name": "騎士の聖盾",
-      "roleName": "タンク",
-      "roleDescription": "非常に持久戦に強い装備、じわじわと戦闘を優位に進める。",
-      "description": "正規騎士が装備している祝福済みの盾。使用者の肉体を強化する。",
+      "id": "sword_t2",
+      "name": "鍛鉄の剣",
+      "roleName": "ナイト",
+      "roleDescription": "攻守バランス型。反撃と追撃でどんな状況でも戦える。",
+      "description": "職人が丹精込めて鍛えた剣。切れ味は鋭い。",
       "category": "Weapon",
-      "rarity": "Common",
+      "rarity": "SILVER",
       "sizeX": 1,
-      "sizeY": 3,
+      "sizeY": 2,
       "diceCount": 2,
       "diceMax": 5,
-      "criticalRate": 1,
-      "basePrice": 160,
+      "criticalRate": 2,
+      "basePrice": 120,
       "passiveSkills": [
-        { "internalName": "Breakfall", "skillName": "受け身", "description": "ロール敗北時、ダメージを-2" },
-        { "internalName": "SpikeArmor", "skillName": "棘鎧", "description": "ロールの勝敗にかかわらず、敵に軽減不能の1ダメージを与える" },
-        { "internalName": "Endurance", "skillName": "持久戦", "description": "ロール敗北時、恒久的に最大HP+1(最大20)" }
+        { "internalName": "MightI", "skillName": "筋力I", "description": "各ダイス出目+1" },
+        { "internalName": "PursuitI", "skillName": "追撃I", "description": "ロール勝利時、与ダメージ+2" },
+        { "internalName": "Riposte", "skillName": "切り返し", "description": "敗北時、受けたダメージの50%を敵に反射" }
       ]
     },
     {
-      "id": "shield_lv4",
-      "name": "守護天使の光聖盾",
-      "roleName": "タンク",
-      "roleDescription": "非常に持久戦に強い装備、じわじわと戦闘を優位に進める。",
-      "description": "守護天使の加護を受けた聖なる盾。加護により激しいダメージに抵抗する。",
+      "id": "sword_t3",
+      "name": "銀の長剣",
+      "roleName": "ナイト",
+      "roleDescription": "攻守バランス型。反撃と追撃でどんな状況でも戦える。",
+      "description": "魔銀を鍛え上げた長剣。敗北しても牙を見せる。",
       "category": "Weapon",
-      "rarity": "Common",
+      "rarity": "GOLD",
       "sizeX": 2,
       "sizeY": 2,
-      "diceCount": 3,
-      "diceMax": 5,
-      "criticalRate": 2,
-      "basePrice": 320,
+      "diceCount": 2,
+      "diceMax": 6,
+      "criticalRate": 3,
+      "basePrice": 240,
       "passiveSkills": [
-        { "internalName": "Breakfall", "skillName": "受け身", "description": "ロール敗北時、ダメージを-2" },
-        { "internalName": "SpikeArmor", "skillName": "棘鎧", "description": "ロールの勝敗にかかわらず、敵に軽減不能の2ダメージを与える" },
-        { "internalName": "Endurance", "skillName": "持久戦", "description": "ロール敗北時、この戦闘中の最大HP+1(最大20)" },
-        { "internalName": "DivineShield", "skillName": "天の加護", "description": "ターン終了時、HPを2回復" }
+        { "internalName": "MightII", "skillName": "筋力II", "description": "各ダイス出目+2" },
+        { "internalName": "PursuitI", "skillName": "追撃I", "description": "ロール勝利時、与ダメージ+2" },
+        { "internalName": "Riposte", "skillName": "切り返し", "description": "敗北時、受けたダメージの50%を敵に反射" },
+        { "internalName": "VoidStance", "skillName": "虚空", "description": "ダイス差≤3で双方ダメ0+軽減不可3ダメ" }
       ]
     },
     {
-      "id": "shield_lv5",
-      "name": "ドーンブリンガー",
-      "roleName": "タンク",
-      "roleDescription": "非常に持久戦に強い装備、じわじわと戦闘を優位に進める。",
-      "description": "夜明けを齎さんとする者。闇を切り裂き、光をもたらす。",
+      "id": "sword_t4",
+      "name": "寂滅",
+      "roleName": "ナイト",
+      "roleDescription": "攻守バランス型。反撃と追撃でどんな状況でも戦える。",
+      "description": "すべてを静寂に還す聖剣。差が小さい戦いほど真価を発揮する。",
       "category": "Weapon",
-      "rarity": "Common",
+      "rarity": "LEGENDARY",
       "sizeX": 2,
       "sizeY": 3,
       "diceCount": 3,
       "diceMax": 6,
-      "criticalRate": 2,
-      "basePrice": 640,
+      "criticalRate": 3,
+      "basePrice": 480,
       "passiveSkills": [
-        { "internalName": "Breakfall", "skillName": "受け身", "description": "ロール敗北時、ダメージを-2" },
-        { "internalName": "SpikeArmor", "skillName": "棘鎧", "description": "ロールの勝敗にかかわらず、敵に軽減不能の2ダメージを与える" },
-        { "internalName": "Endurance", "skillName": "持久戦", "description": "ロール敗北時、恒久的に最大HP+1(最大20)" },
-        { "internalName": "DivineShield", "skillName": "天の加護", "description": "ターン終了時、HPを2回復" },
-        { "internalName": "DawnBlessing", "skillName": "夜明けの祝福", "description": "ロール敗北時、受けるダメージを50%にする" }
+        { "internalName": "MightII", "skillName": "筋力II", "description": "各ダイス出目+2" },
+        { "internalName": "PursuitI", "skillName": "追撃I", "description": "ロール勝利時、与ダメージ+2" },
+        { "internalName": "Riposte", "skillName": "切り返し", "description": "敗北時、受けたダメージの50%を敵に反射" },
+        { "internalName": "VoidStance", "skillName": "虚空", "description": "ダイス差≤3で双方ダメ0+軽減不可3ダメ" },
+        { "internalName": "Destiny", "skillName": "運命", "description": "最大出目なら与ダメ×2、最低出目なら被ダメ0" }
+      ]
+    },
+
+    {
+      "id": "axe_t1",
+      "name": "薪割りの斧",
+      "roleName": "バーサーカー",
+      "roleDescription": "一撃特化型。少ないダイスで高出目と会心を狙うロマン武器。",
+      "description": "薪を割るための斧。雑に振れば人も斬れる。",
+      "category": "Weapon",
+      "rarity": "BRONZE",
+      "sizeX": 1,
+      "sizeY": 1,
+      "diceCount": 1,
+      "diceMax": 6,
+      "criticalRate": 2,
+      "basePrice": 45,
+      "passiveSkills": [
+        { "internalName": "MightI", "skillName": "筋力I", "description": "各ダイス出目+1" },
+        { "internalName": "InsightI", "skillName": "心眼I", "description": "会心ダイス+1" }
       ]
     },
     {
-      "id": "sword_lv1",
-      "name": "鍛鉄の剣",
-      "roleName": "ナイト",
-      "roleDescription": "バランスの取れた装備、平均火力とロールが比較的強い。",
-      "description": "鍛冶師によって鍛えられた鉄製の剣。当然、切られれば痛い。",
+      "id": "axe_t2",
+      "name": "猛斧",
+      "roleName": "バーサーカー",
+      "roleDescription": "一撃特化型。少ないダイスで高出目と会心を狙うロマン武器。",
+      "description": "蛮族の猛者が振るう大斧。重さで叩き斬る。",
       "category": "Weapon",
-      "rarity": "Uncommon",
-      "sizeX": 3,
+      "rarity": "SILVER",
+      "sizeX": 1,
+      "sizeY": 2,
+      "diceCount": 2,
+      "diceMax": 6,
+      "criticalRate": 3,
+      "basePrice": 110,
+      "passiveSkills": [
+        { "internalName": "MightI", "skillName": "筋力I", "description": "各ダイス出目+1" },
+        { "internalName": "InsightI", "skillName": "心眼I", "description": "会心ダイス+1" },
+        { "internalName": "Sting", "skillName": "出血", "description": "ダメージ付与時、敵に出血+1（1ターン1回）" }
+      ]
+    },
+    {
+      "id": "axe_t3",
+      "name": "血塗りの戦斧",
+      "roleName": "バーサーカー",
+      "roleDescription": "一撃特化型。少ないダイスで高出目と会心を狙うロマン武器。",
+      "description": "幾多の血を吸った呪われた戦斧。負けるほどに強くなる。",
+      "category": "Weapon",
+      "rarity": "GOLD",
+      "sizeX": 2,
+      "sizeY": 2,
+      "diceCount": 2,
+      "diceMax": 7,
+      "criticalRate": 5,
+      "basePrice": 230,
+      "passiveSkills": [
+        { "internalName": "MightII", "skillName": "筋力II", "description": "各ダイス出目+2" },
+        { "internalName": "InsightI", "skillName": "心眼I", "description": "会心ダイス+1" },
+        { "internalName": "Frenzy", "skillName": "復讐", "description": "敗北でダイス+1蓄積、勝利でリセット" },
+        { "internalName": "BloodDecree", "skillName": "血令", "description": "ゾロ目時、合計値を固定ダメ+会心+200%+会心ダイス+5" }
+      ]
+    },
+    {
+      "id": "axe_t4",
+      "name": "血帝廻天",
+      "roleName": "バーサーカー",
+      "roleDescription": "一撃特化型。少ないダイスで高出目と会心を狙うロマン武器。",
+      "description": "血に酔い、天を裂く魔斧。ゾロ目で全てを叩き壊す。",
+      "category": "Weapon",
+      "rarity": "LEGENDARY",
+      "sizeX": 2,
       "sizeY": 3,
       "diceCount": 2,
+      "diceMax": 8,
+      "criticalRate": 6,
+      "basePrice": 460,
+      "passiveSkills": [
+        { "internalName": "MightII", "skillName": "筋力II", "description": "各ダイス出目+2" },
+        { "internalName": "InsightII", "skillName": "心眼II", "description": "会心ダイス+2" },
+        { "internalName": "Frenzy", "skillName": "復讐", "description": "敗北でダイス+1蓄積、勝利でリセット" },
+        { "internalName": "BloodDecree", "skillName": "血令", "description": "ゾロ目時、合計値を固定ダメ+会心+200%+会心ダイス+5" }
+      ]
+    },
+
+    {
+      "id": "dagger_t1",
+      "name": "懐刀",
+      "roleName": "アサシン",
+      "roleDescription": "追撃・会心特化型。勝利時の爆発力が最も高い。",
+      "description": "懐に忍ばせる小刀。急所を狙えば侮れない。",
+      "category": "Weapon",
+      "rarity": "BRONZE",
+      "sizeX": 1,
+      "sizeY": 1,
+      "diceCount": 2,
       "diceMax": 4,
+      "criticalRate": 2,
+      "basePrice": 40,
+      "passiveSkills": [
+        { "internalName": "PursuitI", "skillName": "追撃I", "description": "ロール勝利時、与ダメージ+2" },
+        { "internalName": "InsightI", "skillName": "心眼I", "description": "会心ダイス+1" }
+      ]
+    },
+    {
+      "id": "dagger_t2",
+      "name": "盗賊の短刀",
+      "roleName": "アサシン",
+      "roleDescription": "追撃・会心特化型。勝利時の爆発力が最も高い。",
+      "description": "盗賊ギルドで支給されるバランスの良い短刀。",
+      "category": "Weapon",
+      "rarity": "SILVER",
+      "sizeX": 1,
+      "sizeY": 2,
+      "diceCount": 2,
+      "diceMax": 5,
+      "criticalRate": 4,
+      "basePrice": 100,
+      "passiveSkills": [
+        { "internalName": "PursuitI", "skillName": "追撃I", "description": "ロール勝利時、与ダメージ+2" },
+        { "internalName": "InsightI", "skillName": "心眼I", "description": "会心ダイス+1" },
+        { "internalName": "PursuitII", "skillName": "追撃II", "description": "ロール勝利時、与ダメージ+4" }
+      ]
+    },
+    {
+      "id": "dagger_t3",
+      "name": "処刑人の曲刀",
+      "roleName": "アサシン",
+      "roleDescription": "追撃・会心特化型。勝利時の爆発力が最も高い。",
+      "description": "処刑人が最後の一撃に用いる曲刀。次の獲物を呪縛する。",
+      "category": "Weapon",
+      "rarity": "GOLD",
+      "sizeX": 2,
+      "sizeY": 2,
+      "diceCount": 2,
+      "diceMax": 6,
+      "criticalRate": 5,
+      "basePrice": 210,
+      "passiveSkills": [
+        { "internalName": "PursuitI", "skillName": "追撃I", "description": "ロール勝利時、与ダメージ+2" },
+        { "internalName": "InsightI", "skillName": "心眼I", "description": "会心ダイス+1" },
+        { "internalName": "PursuitII", "skillName": "追撃II", "description": "ロール勝利時、与ダメージ+4" },
+        { "internalName": "Execute", "skillName": "処刑", "description": "勝利時、次ターン敵最小ダイス1固定" }
+      ]
+    },
+    {
+      "id": "dagger_t4",
+      "name": "ノクタリア",
+      "roleName": "アサシン",
+      "roleDescription": "追撃・会心特化型。勝利時の爆発力が最も高い。",
+      "description": "夜の名を冠する魔短剣。過剰な暴力を次の獲物に持ち越す。",
+      "category": "Weapon",
+      "rarity": "LEGENDARY",
+      "sizeX": 2,
+      "sizeY": 3,
+      "diceCount": 2,
+      "diceMax": 7,
+      "criticalRate": 7,
+      "basePrice": 440,
+      "passiveSkills": [
+        { "internalName": "PursuitI", "skillName": "追撃I", "description": "ロール勝利時、与ダメージ+2" },
+        { "internalName": "PursuitII", "skillName": "追撃II", "description": "ロール勝利時、与ダメージ+4" },
+        { "internalName": "InsightII", "skillName": "心眼II", "description": "会心ダイス+2" },
+        { "internalName": "Execute", "skillName": "処刑", "description": "勝利時、次ターン敵最小ダイス1固定" },
+        { "internalName": "Nightfall", "skillName": "蝕夜", "description": "オーバーダメ×2蓄積→戦闘開始時放出" }
+      ]
+    },
+
+    {
+      "id": "dead_staff",
+      "name": "炎の杖",
+      "description": "古代の魔道具。戦闘開始時に敵を炎上させる。行き止まり武器。",
+      "category": "Weapon",
+      "rarity": "GOLD",
+      "sizeX": 2,
+      "sizeY": 2,
+      "diceCount": 2,
+      "diceMax": 5,
+      "criticalRate": 2,
+      "basePrice": 200,
+      "passiveSkills": [
+        { "internalName": "MightI", "skillName": "筋力I", "description": "各ダイス出目+1" },
+        { "internalName": "InsightI", "skillName": "心眼I", "description": "会心ダイス+1" },
+        { "internalName": "VitalityI", "skillName": "活力I", "description": "ターン開始時HP+1回復" },
+        { "internalName": "Ignite", "skillName": "業火", "description": "戦闘開始時に敵を炎上(3T,毎T3ダメ)" }
+      ]
+    },
+    {
+      "id": "dead_fang",
+      "name": "猛獣の牙",
+      "description": "巨獣から削り出した牙。会心率が異常に高い。行き止まり武器。",
+      "category": "Weapon",
+      "rarity": "SILVER",
+      "sizeX": 1,
+      "sizeY": 2,
+      "diceCount": 1,
+      "diceMax": 7,
+      "criticalRate": 9,
+      "basePrice": 150,
+      "passiveSkills": [
+        { "internalName": "PursuitI", "skillName": "追撃I", "description": "ロール勝利時、与ダメージ+2" },
+        { "internalName": "InsightI", "skillName": "心眼I", "description": "会心ダイス+1" }
+      ]
+    },
+
+    {
+      "id": "invest_t2",
+      "name": "朽ちた聖剣",
+      "description": "かつて英雄が振るったとされる聖剣。今は力を失っている。",
+      "category": "Weapon",
+      "rarity": "SILVER",
+      "sizeX": 1,
+      "sizeY": 2,
+      "diceCount": 1,
+      "diceMax": 3,
       "criticalRate": 0,
       "basePrice": 100,
       "passiveSkills": [
-        { "internalName": "BasicSword", "skillName": "教本剣技", "description": "ダイス合計値がダイス数×2以上になることを保証" }
+        { "internalName": "FortitudeI", "skillName": "頑強I", "description": "被ダメージ-1" },
+        { "internalName": "CounterI", "skillName": "反撃I", "description": "ロール敗北時、敵に軽減不可1ダメージ" },
+        { "internalName": "HolyMemory", "skillName": "黎明の光", "description": "初回ロール時ダイス+3" }
       ]
     },
     {
-      "id": "sword_lv2",
-      "name": "硬鋼の長剣",
-      "roleName": "ナイト",
-      "roleDescription": "バランスの取れた装備、平均火力とロールが比較的強い。",
-      "description": "リーチの長い鋼の剣。細身の刃は敵の攻撃を受け流す。",
+      "id": "invest_t3",
+      "name": "覚醒した聖剣",
+      "description": "聖剣に宿る力が覚醒し始めた。聖光が傷を癒す。",
       "category": "Weapon",
-      "rarity": "Uncommon",
+      "rarity": "GOLD",
       "sizeX": 2,
-      "sizeY": 3,
-      "diceCount": 2,
-      "diceMax": 5,
-      "criticalRate": 1,
-      "basePrice": 200,
-      "passiveSkills": [
-        { "internalName": "BasicSword", "skillName": "教本剣技", "description": "ダイス合計値がダイス数×2以上になることを保証" },
-        { "internalName": "Recovery", "skillName": "リカバリー", "description": "最低値のダイスをもう一度振りなおす" }
-      ]
-    },
-    {
-      "id": "sword_lv3",
-      "name": "流浪者の大剣",
-      "roleName": "ナイト",
-      "roleDescription": "バランスの取れた装備、平均火力とロールが比較的強い。",
-      "description": "流浪者が使い込んだ体験。使い込むほどに体になじんでいく。",
-      "category": "Weapon",
-      "rarity": "Uncommon",
-      "sizeX": 2,
-      "sizeY": 3,
-      "diceCount": 3,
-      "diceMax": 5,
-      "criticalRate": 1,
-      "basePrice": 400,
-      "passiveSkills": [
-        { "internalName": "BasicSword", "skillName": "教本剣技", "description": "ダイス合計値がダイス数×2以上になることを保証" },
-        { "internalName": "Recovery", "skillName": "リカバリー", "description": "最低値のダイスをもう一度振りなおす" },
-        { "internalName": "WandererWit", "skillName": "流浪の知恵", "description": "ロール差が1以下なら敵の追撃を無効化する" }
-      ]
-    },
-    {
-      "id": "sword_lv4",
-      "name": "龍殺し",
-      "roleName": "ナイト",
-      "roleDescription": "バランスの取れた装備、平均火力とロールが比較的強い。",
-      "description": "本日付けでレッドドラゴンを国認絶滅危惧保護生物とする。-絶滅管理局-",
-      "category": "Weapon",
-      "rarity": "Uncommon",
-      "sizeX": 2,
-      "sizeY": 3,
-      "diceCount": 3,
-      "diceMax": 6,
-      "criticalRate": 2,
-      "basePrice": 800,
-      "passiveSkills": [
-        { "internalName": "BasicSword", "skillName": "教本剣技", "description": "ダイス合計値がダイス数×2以上になることを保証" },
-        { "internalName": "Recovery", "skillName": "リカバリー", "description": "最低値のダイスをもう一度振りなおす" },
-        { "internalName": "WandererWit", "skillName": "流浪の知恵", "description": "ロール差が1以下なら敵の追撃を無効化する" },
-        { "internalName": "DragonSlayer", "skillName": "殺龍", "description": "ダイス差が2以下なら会心ダイスに+2" }
-      ]
-    },
-    {
-      "id": "sword_lv5",
-      "name": "寂滅",
-      "roleName": "ナイト",
-      "roleDescription": "バランスの取れた装備、平均火力とロールが比較的強い。",
-      "description": "すべての動きは無に帰し、すべての思考は停止する。寂滅の時。",
-      "category": "Weapon",
-      "rarity": "Uncommon",
-      "sizeX": 2,
-      "sizeY": 3,
-      "diceCount": 3,
-      "diceMax": 7,
-      "criticalRate": 3,
-      "basePrice": 1600,
-      "passiveSkills": [
-        { "internalName": "BasicSword", "skillName": "教本剣技", "description": "ダイス合計値がダイス数×2以上になることを保証" },
-        { "internalName": "Recovery", "skillName": "リカバリー", "description": "最低値のダイスをもう一度振りなおす" },
-        { "internalName": "WandererWit", "skillName": "流浪の知恵", "description": "ロール差が1以下なら敵の追撃を無効化する" },
-        { "internalName": "DragonSlayer", "skillName": "殺龍", "description": "ダイス差が2以下なら会心ダイスに+2" },
-        { "internalName": "VoidStance", "skillName": "無の境地", "description": "ダイス差3以下なら双方のダメージを0にし、相手に軽減不可の3ダメージを与える" }
-      ]
-    },
-    {
-      "id": "Axe_lv1",
-      "name": "猛斬の斜",
-      "roleName": "バーサーカー",
-      "roleDescription": "一発逆転を狙える装備、敗北をトリガーとして様々な効果を獲得する。",
-      "description": "鍛冶屋によって鍛えられた斜。荒くれものが好む武器。",
-      "category": "Weapon",
-      "rarity": "Rare",
-      "sizeX": 2,
-      "sizeY": 3,
-      "diceCount": 1,
-      "diceMax": 9,
-      "criticalRate": 1,
-      "basePrice": 180,
-      "passiveSkills": [
-        { "internalName": "PainRevert", "skillName": "痛覚反転", "description": "ロール勝利時、自分の減少体力の半分に等しいダメージを与える" }
-      ]
-    },
-    {
-      "id": "Axe_lv2",
-      "name": "轟撃の戦斜",
-      "roleName": "バーサーカー",
-      "roleDescription": "一発逆転を狙える装備、敗北をトリガーとして様々な効果を獲得する。",
-      "description": "勇気と臂力をもたらす戦斜。限界を超えて戦う。",
-      "category": "Weapon",
-      "rarity": "Rare",
-      "sizeX": 2,
-      "sizeY": 3,
-      "diceCount": 1,
-      "diceMax": 9,
-      "criticalRate": 2,
-      "basePrice": 360,
-      "passiveSkills": [
-        { "internalName": "PainRevert", "skillName": "痛覚反転", "description": "ロール勝利時、自分の減少体力の半分に等しいダメージを与える" },
-        { "internalName": "Warcry", "skillName": "雄叫び", "description": "ロール敗北時、次ターン以降のダイス合計値に+1、ロール勝利時にリセット" }
-      ]
-    },
-    {
-      "id": "Axe_lv3",
-      "name": "血掟の断頭斜",
-      "roleName": "バーサーカー",
-      "roleDescription": "一発逆転を狙える装備、敗北をトリガーとして様々な効果を獲得する。",
-      "description": "血と掟。約定は必ず履行される。",
-      "category": "Weapon",
-      "rarity": "Rare",
-      "sizeX": 2,
-      "sizeY": 3,
-      "diceCount": 2,
-      "diceMax": 9,
-      "criticalRate": 2,
-      "basePrice": 720,
-      "passiveSkills": [
-        { "internalName": "PainRevert", "skillName": "痛覚反転", "description": "ロール勝利時、自分の減少体力の半分に等しいダメージを与える" },
-        { "internalName": "Warcry", "skillName": "雄叫び", "description": "ロール敗北時、次ターン以降のダイス合計値に+1、ロール勝利時にリセット" },
-        { "internalName": "BloodPact", "skillName": "血の約定", "description": "ロール敗北時、次ターンに与えるダメージ+3" }
-      ]
-    },
-    {
-      "id": "Axe_lv4",
-      "name": "飢餓の怒り",
-      "roleName": "バーサーカー",
-      "roleDescription": "一発逆転を狙える装備、敗北をトリガーとして様々な効果を獲得する。",
-      "description": "飢えから来る怒りか、怒りから来る飢えなのか。その両方か。",
-      "category": "Weapon",
-      "rarity": "Rare",
-      "sizeX": 2,
-      "sizeY": 3,
-      "diceCount": 2,
-      "diceMax": 9,
-      "criticalRate": 3,
-      "basePrice": 1440,
-      "passiveSkills": [
-        { "internalName": "PainRevert", "skillName": "痛覚反転", "description": "ロール勝利時、自分の減少体力の半分に等しいダメージを与える" },
-        { "internalName": "Warcry", "skillName": "雄叫び", "description": "ロール敗北時、次ターン以降のダイス合計値に+1、ロール勝利時にリセット" },
-        { "internalName": "BloodPact", "skillName": "血の約定", "description": "ロール敗北時、次ターンに与えるダメージ+3" },
-        { "internalName": "ApexPredator", "skillName": "頂点捕食者", "description": "ロール敗北時、追撃ダメージを受けない" }
-      ]
-    },
-    {
-      "id": "Axe_lv5",
-      "name": "血帝廻天",
-      "roleName": "バーサーカー",
-      "roleDescription": "一発逆転を狙える装備、敗北をトリガーとして様々な効果を獲得する。",
-      "description": "血を以て帝、廻る天を制す。",
-      "category": "Weapon",
-      "rarity": "Rare",
-      "sizeX": 2,
-      "sizeY": 3,
-      "diceCount": 2,
-      "diceMax": 9,
-      "criticalRate": 9,
-      "basePrice": 2880,
-      "passiveSkills": [
-        { "internalName": "PainRevert", "skillName": "痛覚反転", "description": "ロール勝利時、自分の減少体力の半分に等しいダメージを与える" },
-        { "internalName": "Warcry", "skillName": "雄叫び", "description": "ロール敗北時、次ターン以降のダイス合計値に+1、ロール勝利時にリセット" },
-        { "internalName": "BloodPact", "skillName": "血の約定", "description": "ロール敗北時、次ターンに与えるダメージ+3" },
-        { "internalName": "ApexPredator", "skillName": "頂点捕食者", "description": "ロール敗北時、追撃ダメージを受けない" },
-        { "internalName": "BloodDecree", "skillName": "血の勅命", "description": "ロール時、ゾロ目ならダイス合計値を軽減不可の固定ダメージとして与える。さらに会心+200%、会心ダイス+5、相手は追撃できない。" }
-      ]
-    },
-    {
-      "id": "dagger_lv1",
-      "name": "盗賊の小刀",
-      "roleName": "アサシン",
-      "roleDescription": "短期決戦を得意とする装備、開幕のバフや、相手へのデバフが多い。",
-      "description": "鍛冶屋によって鍛えられた小刀。本来は戦闘用ではない。",
-      "category": "Weapon",
-      "rarity": "Uncommon",
-      "sizeX": 2,
-      "sizeY": 3,
+      "sizeY": 2,
       "diceCount": 2,
       "diceMax": 4,
-      "criticalRate": 4,
-      "basePrice": 120,
+      "criticalRate": 1,
+      "basePrice": 250,
       "passiveSkills": [
-        { "internalName": "Ambush", "skillName": "不意打ち", "description": "戦闘開始時の初回ロール時、ダイス合計値に+5" }
+        { "internalName": "FortitudeI", "skillName": "頑強I", "description": "被ダメージ-1" },
+        { "internalName": "CounterI", "skillName": "反撃I", "description": "ロール敗北時、敵に軽減不可1ダメージ" },
+        { "internalName": "HolyMemory", "skillName": "黎明の光", "description": "初回ロール時ダイス+3" },
+        { "internalName": "HolyAura", "skillName": "薄暮の光", "description": "ターン開始時HP+2、敗北時被ダメ50%" }
       ]
     },
     {
-      "id": "dagger_lv2",
-      "name": "暗殺者の短剣",
-      "roleName": "アサシン",
-      "roleDescription": "短期決戦を得意とする装備、開幕のバフや、相手へのデバフが多い。",
-      "description": "暗殺者が好む短剣。一撃で目標を仕留める。",
+      "id": "invest_t4",
+      "name": "暁の聖剣",
+      "description": "完全覚醒した聖剣。手にした者に終焉の力を与える。",
       "category": "Weapon",
-      "rarity": "Uncommon",
+      "rarity": "MYTHIC",
       "sizeX": 2,
       "sizeY": 3,
+      "diceCount": 2,
+      "diceMax": 6,
+      "criticalRate": 2,
+      "basePrice": 600,
+      "passiveSkills": [
+        { "internalName": "FortitudeI", "skillName": "頑強I", "description": "被ダメージ-1" },
+        { "internalName": "CounterI", "skillName": "反撃I", "description": "ロール敗北時、敵に軽減不可1ダメージ" },
+        { "internalName": "HolyMemory", "skillName": "黎明の光", "description": "初回ロール時ダイス+3" },
+        { "internalName": "HolyAura", "skillName": "薄暮の光", "description": "ターン開始時HP+2、敗北時被ダメ50%" },
+        { "internalName": "Terminus", "skillName": "終焉", "description": "戦闘開始時、敵MaxHPの30%を軽減不可ダメージ" }
+      ]
+    },
+
+    {
+      "id": "curse_t1",
+      "name": "呪いの短剣",
+      "description": "暗い紫色に輝く短剣。使い手の血を啜り、敵を弱体化する。",
+      "category": "Weapon",
+      "rarity": "BRONZE",
+      "sizeX": 1,
+      "sizeY": 1,
       "diceCount": 2,
       "diceMax": 5,
-      "criticalRate": 5,
-      "basePrice": 240,
-      "passiveSkills": [
-        { "internalName": "Ambush", "skillName": "不意打ち", "description": "戦闘開始時の初回ロール時、ダイス合計値に+5" },
-        { "internalName": "FatalStab", "skillName": "致命の一刺し", "description": "会心ダメージ+100%" }
-      ]
-    },
-    {
-      "id": "dagger_lv3",
-      "name": "処刑人の曲刀",
-      "roleName": "アサシン",
-      "roleDescription": "短期決戦を得意とする装備、開幕のバフや、相手へのデバフが多い。",
-      "description": "処刑人に好まれる曲刀。数多の首と、その血を喰らう。",
-      "category": "Weapon",
-      "rarity": "Uncommon",
-      "sizeX": 2,
-      "sizeY": 3,
-      "diceCount": 2,
-      "diceMax": 6,
-      "criticalRate": 5,
-      "basePrice": 480,
-      "passiveSkills": [
-        { "internalName": "Ambush", "skillName": "不意打ち", "description": "戦闘開始時の初回ロール時、ダイス合計値に+5" },
-        { "internalName": "Sting", "skillName": "一刺し", "description": "相手にダメージを与えたとき、1ターンに1回まで相手に出血+1" },
-        { "internalName": "Execution", "skillName": "処刑", "description": "ロール勝利時、次ターン相手の最も低いダイス1個を1に固定" }
-      ]
-    },
-    {
-      "id": "dagger_lv4",
-      "name": "正義の呼び声",
-      "roleName": "アサシン",
-      "roleDescription": "短期決戦を得意とする装備、開幕のバフや、相手へのデバフが多い。",
-      "description": "声が聞こえる。正義のための呼び声が。",
-      "category": "Weapon",
-      "rarity": "Uncommon",
-      "sizeX": 2,
-      "sizeY": 3,
-      "diceCount": 2,
-      "diceMax": 7,
-      "criticalRate": 6,
-      "basePrice": 960,
-      "passiveSkills": [
-        { "internalName": "Ambush", "skillName": "不意打ち", "description": "戦闘開始時の初回ロール時、ダイス合計値に+5" },
-        { "internalName": "Sting", "skillName": "一刺し", "description": "相手にダメージを与えたとき、1ターンに1回まで相手に出血+1" },
-        { "internalName": "Execution", "skillName": "処刑", "description": "ロール勝利時、次ターン敵の最小値のダイスを1つ無効にする" },
-        { "internalName": "BlindJustice", "skillName": "正義への妄執", "description": "相手の反撃でダメージを受けたとき、次ターン与えるダメージ+10" }
-      ]
-    },
-    {
-      "id": "dagger_lv5",
-      "name": "ノクタリア",
-      "roleName": "アサシン",
-      "roleDescription": "短期決戦を得意とする装備、開幕のバフや、相手へのデバフが多い。",
-      "description": "人は夜を恐れるが、夜は人を恐れない。",
-      "category": "Weapon",
-      "rarity": "Uncommon",
-      "sizeX": 2,
-      "sizeY": 3,
-      "diceCount": 2,
-      "diceMax": 8,
-      "criticalRate": 7,
-      "basePrice": 1920,
-      "passiveSkills": [
-        { "internalName": "Ambush", "skillName": "不意打ち", "description": "戦闘開始時の初回ロール時、ダイス合計値に+5" },
-        { "internalName": "Sting", "skillName": "一刺し", "description": "相手にダメージを与えたとき、1ターンに1回まで相手に出血+1" },
-        { "internalName": "Execution", "skillName": "処刑", "description": "ロール勝利時、次ターン敵の最小値のダイスを1つ無効にする" },
-        { "internalName": "BlindJustice", "skillName": "正義への妄執", "description": "相手の反撃でダメージを受けたとき、次ターン与えるダメージ+10" },
-        { "internalName": "Nightfall", "skillName": "夜", "description": "オーバーダメージ分の2倍を記録し、戦闘開始時に記録値の合計ダメージを与える" }
-      ]
-    },
-        {
-      "id": "shield_sword",
-      "name": "セレナ・ドーンブレイカー",
-      "roleName": "ナイトタンク",
-      "roleDescription": "非常に高い耐久力と戦闘力を兼ね備えた装備。",
-      "description": "静寂の果てで、偽りの暁を砕く者。",
-      "category": "Weapon",
-      "rarity": "Rare",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 4,
-      "diceMax": 7,
       "criticalRate": 3,
-      "basePrice": 3200,
+      "basePrice": 60,
       "passiveSkills": [
-        { "internalName": "DawnBreker", "skillName": "寂滅暁光", "description": "ダイス差4以下なら双方のダメージを0にし、相手に軽減不可の10ダメージを与え、自身のHPを10回復する" }
+        { "internalName": "MightI", "skillName": "筋力I", "description": "各ダイス出目+1" },
+        { "internalName": "CurseBind", "skillName": "呪縛", "description": "毎ターン自分1ダメ、敵ダイス合計-1蓄積" }
       ]
     },
-        {
-      "id": "shield_axe",
-      "name": "ブラッドドーン・インペリウム",
-      "roleName": "タンクバーサーカー",
-      "roleDescription": "耐久と爆発力を併せ持つ装備。戦いを重ねるほど強くなる。",
-      "description": "血を以て天を覆い、暁光をもって地を制す。",
+    {
+      "id": "curse_t4",
+      "name": "呪蝕の深淵",
+      "description": "深淵を覗いた者の末路。致死を踏み越え、狂戦士と化す。",
       "category": "Weapon",
-      "rarity": "Rare",
-      "sizeX": 3,
+      "rarity": "LEGENDARY",
+      "sizeX": 2,
       "sizeY": 3,
       "diceCount": 3,
-      "diceMax": 9,
-      "criticalRate": 4,
-      "basePrice": 2880,
-      "passiveSkills": [
-        { "internalName": "BloodMoon", "skillName": "ブラッドムーン", "description": "敵の撃破数を累積でカウントし、毎ターンカウントの2倍と同じダメージを相手に与え、同じ値だけ自分を回復する。" }
-      ]
-    },
-        {
-      "id": "shield_dagger",
-      "name": "エクリプス",
-      "roleName": "タンクアサシン",
-      "roleDescription": "耐久と暗殺を併せ持つ装備。攻防の切り替えが得意。",
-      "description": "闇が訪れ、光を覆い隠す時、全ては無に帰す。",
-      "category": "Weapon",
-      "rarity": "Rare",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 4,
-      "diceMax": 6,
-      "criticalRate": 5,
-      "basePrice": 2560,
-      "passiveSkills": [
-        { "internalName": "Eclipse", "skillName": "日食", "description": "「日食」が毎ターン増加し、奇数スタックの場合は体力を20回復、偶数スタックかつロール勝利時に相手に軽減不能の20ダメージを与える" }
-      ]
-    },
-        {
-      "id": "sword_axe",
-      "name": "黙血終王",
-      "roleName": "ナイトバーサーカー",
-      "roleDescription": "攻撃と逆転力を併せ持つ装備。敗北を勝利に変える。",
-      "description": "王は多くを語らないが、血は雄弁に物語る。",
-      "category": "Weapon",
-      "rarity": "Rare",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 3,
-      "diceMax": 9,
-      "criticalRate": 5,
-      "basePrice": 3200,
-      "passiveSkills": [
-        { "internalName": "LoadEmperor", "skillName": "天帝", "description": "ロール敗北時、次のターンのロール判定時に相手との差+1だけダイス合計を追加する。ロール勝利時、会心ダメージ+500%" }
-      ]
-    },
-        {
-      "id": "sword_dagger",
-      "name": "沈黙の余白",
-      "roleName": "ナイトアサシン",
-      "roleDescription": "剣の安定と短剣の斜めを併せ持つ装備。相手を完全に制圧する。",
-      "description": "無とは沈黙であり、沈黙とは余白である。",
-      "category": "Weapon",
-      "rarity": "Rare",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 4,
       "diceMax": 7,
-      "criticalRate": 6,
-      "basePrice": 2560,
+      "criticalRate": 5,
+      "basePrice": 500,
       "passiveSkills": [
-        { "internalName": "Silence", "skillName": "沈黙", "description": "相手のダイスの値をすべて1にし、ロール勝利時、相手に大出血を付与、これは無限にスタックする。" }
+        { "internalName": "MightI", "skillName": "筋力I", "description": "各ダイス出目+1" },
+        { "internalName": "InsightI", "skillName": "心眼I", "description": "会心ダイス+1" },
+        { "internalName": "PursuitI", "skillName": "追撃I", "description": "ロール勝利時、与ダメージ+2" },
+        { "internalName": "CurseBind", "skillName": "呪縛", "description": "毎ターン自分1ダメ、敵ダイス合計-1蓄積" },
+        { "internalName": "Abyss", "skillName": "刹那の惜別", "description": "被ダメ記録+踏みとどまり→狂戦士化" }
       ]
     },
-        {
-      "id": "axe_dagger",
-      "name": "見えざる戴冠者",
-      "roleName": "バーサーカーアサシン",
-      "roleDescription": "耐え、積み上げ、爆発する装備。死の淵からの反撃が真髄。",
-      "description": "見えざる帝王、見えざる王冠、見えざる玉座。",
-      "category": "Weapon",
-      "rarity": "Rare",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 3,
-      "diceMax": 8,
-      "criticalRate": 7,
-      "basePrice": 2880,
-      "passiveSkills": [
-        { "internalName": "Coronation", "skillName": "戴冠式", "description": "戦闘中の被ダメージをすべて記録する。HPが0になる攻撃を受けても1度だけ踏みとどまり、狂戦士化する。狂戦士化中はダイス合計+10、蓄積被ダメ×3の固定ダメージを毎ターン与え、会心が確定する" }
-      ]
-    },
-        {
-      "id": "All_weapon",
-      "name": "終局",
-      "roleName": "終焉者",
-      "roleDescription": "全ての武器の集大成。存在そのものが寓話の終わりを告げる。",
-      "description": "寓話の終わり。すべてはここで終局を迎える。",
-      "category": "Weapon",
-      "rarity": "Legendary",
-      "sizeX": 4,
-      "sizeY": 4,
-      "diceCount": 4,
-      "diceMax": 9,
-      "criticalRate": 3,
-      "basePrice": 9600,
-      "passiveSkills": [
-        { "internalName": "TheEnd", "skillName": "終局", "description": "戦闘開始時、敵に9999の軽減不能ダメージ" }
-      ]
-    },
+
     {
       "id": "magic_scroll",
       "name": "魔法の巻物",
       "description": "強力な魔法アイテム。マナ+50",
       "category": "Consumable",
-      "rarity": "Legendary",
+      "rarity": "LEGENDARY",
       "sizeX": 3,
       "sizeY": 3,
       "basePrice": 800,
@@ -546,7 +533,7 @@
       "name": "小回復ポーション",
       "description": "薄いピンク色の液体。HP+25回復。",
       "category": "Consumable",
-      "rarity": "Common",
+      "rarity": "BRONZE",
       "sizeX": 1,
       "sizeY": 2,
       "basePrice": 50
@@ -556,7 +543,7 @@
       "name": "回復ポーション",
       "description": "濃いピンク色の液体。HP+50回復。",
       "category": "Consumable",
-      "rarity": "Uncommon",
+      "rarity": "SILVER",
       "sizeX": 1,
       "sizeY": 2,
       "basePrice": 100
@@ -566,7 +553,7 @@
       "name": "大回復ポーション",
       "description": "深紅の液体。HP+100回復。",
       "category": "Consumable",
-      "rarity": "Rare",
+      "rarity": "GOLD",
       "sizeX": 2,
       "sizeY": 2,
       "basePrice": 200
@@ -576,10 +563,141 @@
       "name": "完全回復エリクサー",
       "description": "神秘的な金色の液体。HPを完全回復する。",
       "category": "Consumable",
-      "rarity": "Legendary",
+      "rarity": "LEGENDARY",
       "sizeX": 2,
       "sizeY": 3,
       "basePrice": 500
+    },
+
+    {
+      "id": "dice_wood",
+      "name": "木のダイス",
+      "description": "手彫りの木製ダイス。すべての冒険はここから始まる。",
+      "category": "Dice",
+      "rarity": "BRONZE",
+      "sizeX": 1,
+      "sizeY": 1,
+      "basePrice": 10,
+      "diceFaces": [1,2,3,4,5,6],
+      "passiveSkills": []
+    },
+    {
+      "id": "dice_bone",
+      "name": "骨のダイス",
+      "description": "魔獣の骨から削り出した三面ダイス。奇数しか出ない。",
+      "category": "Dice",
+      "rarity": "BRONZE",
+      "sizeX": 1,
+      "sizeY": 1,
+      "basePrice": 15,
+      "diceFaces": [1,3,5],
+      "passiveSkills": []
+    },
+    {
+      "id": "dice_iron",
+      "name": "鉄のダイス",
+      "description": "鍛冶師が精密に鋳造した鉄製ダイス。出目の底が高い。",
+      "category": "Dice",
+      "rarity": "SILVER",
+      "sizeX": 1,
+      "sizeY": 1,
+      "basePrice": 80,
+      "diceFaces": [2,3,4,5,6,7],
+      "passiveSkills": []
+    },
+    {
+      "id": "dice_copper",
+      "name": "銅貨のダイス",
+      "description": "表と裏しかない銅貨型ダイス。超安定だが天井も低い。",
+      "category": "Dice",
+      "rarity": "SILVER",
+      "sizeX": 1,
+      "sizeY": 1,
+      "basePrice": 60,
+      "diceFaces": [3,4],
+      "passiveSkills": []
+    },
+    {
+      "id": "dice_biased",
+      "name": "偏りのダイス",
+      "description": "重心が偏った怪しいダイス。低い目と高い目に偏る。",
+      "category": "Dice",
+      "rarity": "SILVER",
+      "sizeX": 1,
+      "sizeY": 1,
+      "basePrice": 90,
+      "diceFaces": [1,1,5,6,6,7],
+      "passiveSkills": []
+    },
+    {
+      "id": "dice_gem",
+      "name": "宝石のダイス",
+      "description": "七色に輝く宝石を削り出したダイス。最大出目で会心が煌めく。",
+      "category": "Dice",
+      "rarity": "GOLD",
+      "sizeX": 1,
+      "sizeY": 1,
+      "basePrice": 200,
+      "diceFaces": [3,4,5,6,7,8],
+      "passiveSkills": [
+        { "internalName": "Shimmer", "skillName": "煌玉", "description": "最大出目のダイスがある時、会心ダイス+1" }
+      ]
+    },
+    {
+      "id": "dice_flame",
+      "name": "血のダイス",
+      "description": "灼熱を帯びたダイス。極端な出目しか出ないが、敗北の怒りを力に変える。",
+      "category": "Dice",
+      "rarity": "GOLD",
+      "sizeX": 1,
+      "sizeY": 1,
+      "basePrice": 180,
+      "diceFaces": [1,1,1,8,8,9],
+      "passiveSkills": [
+        { "internalName": "ReversalFlame", "skillName": "盟約", "description": "ロール敗北時、次ターンのダイス合計+2" }
+      ]
+    },
+    {
+      "id": "dice_stable",
+      "name": "安定のダイス",
+      "description": "精巧な加工で出目が安定したダイス。下振れを救済する。",
+      "category": "Dice",
+      "rarity": "GOLD",
+      "sizeX": 1,
+      "sizeY": 1,
+      "basePrice": 220,
+      "diceFaces": [4,4,5,5,5,6],
+      "passiveSkills": [
+        { "internalName": "Steadfast", "skillName": "堅実", "description": "ダイス合計が(ダイス数×3)以下の時+2" }
+      ]
+    },
+    {
+      "id": "dice_star",
+      "name": "星のダイス",
+      "description": "星の欠片から生まれた伝説のダイス。出目が全体的に高く、ゾロ目で星が瞬く。",
+      "category": "Dice",
+      "rarity": "LEGENDARY",
+      "sizeX": 1,
+      "sizeY": 2,
+      "basePrice": 500,
+      "diceFaces": [4,5,6,7,8,9],
+      "passiveSkills": [
+        { "internalName": "Starguide", "skillName": "星導", "description": "全ダイスが異なる値の時、ダイス合計+3" }
+      ]
+    },
+    {
+      "id": "dice_destiny",
+      "name": "運命のダイス",
+      "description": "神が振るという二面のダイス。1か10、勝利か破滅か。",
+      "category": "Dice",
+      "rarity": "LEGENDARY",
+      "sizeX": 1,
+      "sizeY": 1,
+      "basePrice": 400,
+      "diceFaces": [1,10],
+      "passiveSkills": [
+        { "internalName": "Judgement", "skillName": "裁定", "description": "ダイス合計が敵の2倍以上で追撃+5、敵が2倍以上で被ダメ0" }
+      ]
     }
   ]
 }

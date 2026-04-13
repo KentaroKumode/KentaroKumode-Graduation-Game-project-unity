@@ -33,75 +33,93 @@ namespace InventorySystem.PassiveSkills
         public int playerDiceMax;       // プレイヤーのダイス最大出目（装備武器由来）
         public int enemyDiceMax;        // 敵のダイス最大出目
 
+        // ===== ダイスカスタマイズ（装備ダイス） =====
+        /// <summary>
+        /// 装備中ダイスの面配列。null時は通常ロール(1～diceMax)。
+        /// 全ダイス共通でこの面からランダム抽選。
+        /// </summary>
+        public int[] equippedDiceFaces;
+
         // ===== ダメージ計算 =====
         public int baseDamage;          // 基本ダメージ
         public int finalDamage;         // 最終ダメージ（スキル補正後）
-        public int pursuitDamage;       // 追撃ダメージ
+        public int pursuitDamage;       // 追撃ダメージ（パッシブ由来の固定追撃）
         public int criticalBonus;       // 会心ボーナスダイス補正値
         public bool isCritical;         // 会心判定結果
         public float criticalMultiplier; // 会心倍率（デフォルト2.0）
         public bool damageReduced;      // ダメージ軽減が発生したか
+
+        // ===== Threat/Scratchシステム =====
+        /// <summary>敵の脅威値。毎ターン宣言される削りダメージの基準</summary>
+        public int enemyThreat;
+        /// <summary>今ターンのscratchダメージ（勝利時: max(0, threat-diff)）</summary>
+        public int scratchDamage;
+        /// <summary>scratch無効化フラグ（パリィ等）</summary>
+        public bool nullifyScratchDamage;
+
+        // ===== 戦場修飾子 =====
+        /// <summary>この戦闘のアクティブな修飾子一覧</summary>
+        public List<BattleModifier> activeModifiers = new List<BattleModifier>();
 
         // ===== ターン管理 =====
         public int currentTurn;         // 現在のターン数（1始まり）
         public bool isFirstRoll;        // 戦闘開始後の初回ロールか
 
         // ===== 蓄積/持続値（スキルが読み書き） =====
-        /// <summary>
-        /// スキルごとの蓄積データ（キー = スキルID）
-        /// 例: "持久戦" → 蓄積HP増加量, "夜" → 蓄積ダメージ
-        /// </summary>
+        /// <summary>スキルごとの蓄積データ（キー = スキルID）</summary>
         public Dictionary<string, float> accumulatedValues = new Dictionary<string, float>();
 
-        /// <summary>
-        /// 次ターンへのバフ/デバフ転送用（キー = バフ名）
-        /// ターン終了時にcurrentBuffsへ移行
-        /// </summary>
+        /// <summary>次ターンへのバフ/デバフ転送用（キー = バフ名）</summary>
         public Dictionary<string, float> nextTurnBuffs = new Dictionary<string, float>();
         
-        /// <summary>
-        /// 現在ターンのバフ/デバフ（毎ターン開始時にnextTurnBuffsから移行）
-        /// </summary>
+        /// <summary>現在ターンのバフ/デバフ</summary>
         public Dictionary<string, float> currentBuffs = new Dictionary<string, float>();
 
-        // ===== 敵のダイス制約（処刑/正義への妄執用） =====
-        /// <summary>敵のダイスに対する固定値制約（index → 固定値）</summary>
+        // ===== 敵のダイス制約（処刑用） =====
         public Dictionary<int, int> enemyDiceOverrides = new Dictionary<int, int>();
-        
-        /// <summary>敵のダイスのどれを固定するかの指示（min/max）</summary>
         public List<DiceOverrideRequest> pendingDiceOverrides = new List<DiceOverrideRequest>();
 
         // ===== 出血・状態異常 =====
         public int enemyBleedStacks;    // 敵の出血スタック数
+        /// <summary>炎上残りターン数（業火スキル用）</summary>
+        public int enemyBurnTurns;
+        /// <summary>炎上の毎ターンダメージ</summary>
+        public int enemyBurnDamage;
         
         // ===== 勝敗フラグ =====
-        public bool playerWonRoll;      // プレイヤーがロール勝利したか
-        public bool playerLostRoll;     // プレイヤーがロール敗北したか
+        public bool playerWonRoll;
+        public bool playerLostRoll;
 
         // ===== 連続カウンター =====
-        public int consecutiveWins;     // 連続勝利数
-        public int consecutiveLosses;   // 連続敗北数
+        public int consecutiveWins;
+        public int consecutiveLosses;
 
         // ===== ダメージ無効化フラグ =====
-        public bool nullifyAllDamage;   // 双方ダメージ0にするフラグ
-        public bool nullifyPursuitDamage; // 追撃ダメージ無効化フラグ
+        public bool nullifyAllDamage;
+        public bool nullifyPursuitDamage;
 
-        // ===== オーバーダメージ蓄積（夜スキル用） =====
-        public int overDamageAccumulated; // この戦闘中のオーバーダメージ蓄積値
+        // ===== オーバーダメージ蓄積 =====
+        public int overDamageAccumulated;
 
         // ===== 固定ダメージ =====
-        public int fixedDamageToEnemy;  // 軽減不可の固定ダメージ
+        public int fixedDamageToEnemy;  // プレイヤー→敵への軽減不可固定ダメージ
+        public int fixedDamageToPlayer; // 敵→プレイヤーへの軽減不可固定ダメージ
+
+        // ===== 刻印システム =====
+        /// <summary>刻印による追加パッシブ効果（戦闘開始時に解決済み）</summary>
+        public List<SigilBonus> activeSigilBonuses = new List<SigilBonus>();
 
         /// <summary>
         /// コンテキストを初期化
         /// </summary>
-        public CombatContext(int playerMaxHP, int enemyMaxHP = 0)
+        public CombatContext(int playerMaxHP, int enemyMaxHP = 0, int enemyThreat = 0)
         {
             this.playerMaxHP = playerMaxHP;
             playerBaseMaxHP = playerMaxHP;
             playerCurrentHP = playerMaxHP;
             this.enemyMaxHP = enemyMaxHP;
             enemyCurrentHP = enemyMaxHP;
+            this.enemyThreat = enemyThreat;
             currentTurn = 0;
             isFirstRoll = true;
             criticalMultiplier = 2.0f;
@@ -110,6 +128,8 @@ namespace InventorySystem.PassiveSkills
             currentBuffs = new Dictionary<string, float>();
             enemyDiceOverrides = new Dictionary<int, int>();
             pendingDiceOverrides = new List<DiceOverrideRequest>();
+            activeModifiers = new List<BattleModifier>();
+            activeSigilBonuses = new List<SigilBonus>();
         }
 
         /// <summary>
@@ -131,28 +151,30 @@ namespace InventorySystem.PassiveSkills
             // 単ターン限りのフラグをリセット
             nullifyAllDamage = false;
             nullifyPursuitDamage = false;
+            nullifyScratchDamage = false;
             fixedDamageToEnemy = 0;
+            fixedDamageToPlayer = 0;
+            scratchDamage = 0;
             damageReduced = false;
             isCritical = false;
             criticalBonus = 0;
             criticalMultiplier = 2.0f;
+            pursuitDamage = 0;
+
+            // 出血スタック減衰（毎ターン-1）
+            if (enemyBleedStacks > 0) enemyBleedStacks--;
 
             // ダイス制約を適用
             enemyDiceOverrides.Clear();
-            // pendingDiceOverridesは次ターン開始時に評価→適用
         }
 
-        /// <summary>
-        /// 蓄積値を安全に取得（キーが無ければ0）
-        /// </summary>
+        /// <summary>蓄積値を安全に取得（キーが無ければ0）</summary>
         public float GetAccumulated(string key)
         {
             return accumulatedValues.TryGetValue(key, out float val) ? val : 0f;
         }
 
-        /// <summary>
-        /// 蓄積値を加算
-        /// </summary>
+        /// <summary>蓄積値を加算</summary>
         public void AddAccumulated(string key, float amount)
         {
             if (!accumulatedValues.ContainsKey(key))
@@ -160,18 +182,22 @@ namespace InventorySystem.PassiveSkills
             accumulatedValues[key] += amount;
         }
 
-        /// <summary>
-        /// 現在ターンのバフ値を取得（なければ0）
-        /// </summary>
+        /// <summary>現在ターンのバフ値を取得（なければ0）</summary>
         public float GetBuff(string key)
         {
             return currentBuffs.TryGetValue(key, out float val) ? val : 0f;
         }
+
+        /// <summary>修飾子が有効か確認</summary>
+        public bool HasModifier(BattleModifierId id)
+        {
+            for (int i = 0; i < activeModifiers.Count; i++)
+                if (activeModifiers[i].id == id) return true;
+            return false;
+        }
     }
 
-    /// <summary>
-    /// ダイス固定リクエスト（次ターンに適用される）
-    /// </summary>
+    /// <summary>ダイス固定リクエスト（次ターンに適用される）</summary>
     public class DiceOverrideRequest
     {
         public enum TargetDice { Lowest, Highest }
@@ -185,6 +211,49 @@ namespace InventorySystem.PassiveSkills
             this.target = target;
             this.fixedValue = fixedValue;
             this.sourceSkill = sourceSkill;
+        }
+    }
+
+    // ===== 戦場修飾子 =====
+    public enum BattleModifierId
+    {
+        Downpour,       // 豪雨: 全ダイス最大値-2
+        LunarEclipse,   // 月蝕: 会心率+3
+        CursedFog,      // 呪霧: scratchダメージ2倍
+        BloodTide,      // 血潮: 出血ダメージ2倍
+        IronCurtain,    // 鉄壁: 被ダメ上限5/ターン
+        Deathmatch,     // 死闘: 引き分けなし（同値はプレイヤー敗北）
+        Fortune,        // 幸運: 報酬2倍
+        Adversity,      // 逆境: 敵threat+3
+    }
+
+    public class BattleModifier
+    {
+        public BattleModifierId id;
+        public string displayName;
+        public string description;
+
+        public BattleModifier(BattleModifierId id, string displayName, string description)
+        {
+            this.id = id;
+            this.displayName = displayName;
+            this.description = description;
+        }
+    }
+
+    // ===== 刻印ボーナス =====
+    /// <summary>刻印が武器に隣接して発動するボーナス効果</summary>
+    public class SigilBonus
+    {
+        public string sigilId;          // 刻印の識別名
+        public string bonusType;        // ボーナス種別 (pursuit/counter/might/fortitude/insight/vitality/bleed/threatReduce/diceFace)
+        public int value;               // ボーナス値
+
+        public SigilBonus(string sigilId, string bonusType, int value)
+        {
+            this.sigilId = sigilId;
+            this.bonusType = bonusType;
+            this.value = value;
         }
     }
 }

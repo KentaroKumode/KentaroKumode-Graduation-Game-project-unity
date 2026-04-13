@@ -8,7 +8,7 @@ using InventorySystem;
 public class InventoryVisualTester : MonoBehaviour
 {
     [Header("テスト設定")]
-    [SerializeField] private bool enableKeyboardInput = true;
+    [SerializeField] private bool enableKeyboardInput = false;
     [SerializeField] private float spawnHeight = 2.0f;
     [SerializeField] private float spawnSpacing = 2.5f; // アイテム間の基本間隔
     
@@ -406,6 +406,7 @@ public class InventoryVisualTester : MonoBehaviour
     /// </summary>
     void OnGUI()
     {
+        return; // テストUI一時無効化
         if (!enableKeyboardInput) return;
         
         GUIStyle style = new GUIStyle(GUI.skin.box);

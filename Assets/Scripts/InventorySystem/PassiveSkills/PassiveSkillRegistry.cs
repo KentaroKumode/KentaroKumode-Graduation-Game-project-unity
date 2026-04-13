@@ -68,46 +68,82 @@ namespace InventorySystem.PassiveSkills
         private static void RegisterAll()
         {
             // ============================
-            //  プレイヤー武器スキル
+            //  汎用パッシブ（6種×3段階）
+            // ============================
+
+            // 追撃
+            Register(new PursuitI());
+            Register(new PursuitII());
+            Register(new PursuitIII());
+
+            // 反撃
+            Register(new CounterI());
+            Register(new CounterII());
+            Register(new CounterIII());
+
+            // 剛力
+            Register(new MightI());
+            Register(new MightII());
+            Register(new MightIII());
+
+            // 堅忍
+            Register(new FortitudeI());
+            Register(new FortitudeII());
+            Register(new FortitudeIII());
+
+            // 慧眼
+            Register(new InsightI());
+            Register(new InsightII());
+            Register(new InsightIII());
+
+            // 活力
+            Register(new VitalityI());
+            Register(new VitalityII());
+            Register(new VitalityIII());
+
+            // ============================
+            //  ユニークパッシブ
             // ============================
 
             // 盾系
-            Register(new Breakfall());
-            Register(new SpikeArmor());
-            Register(new Endurance());
-            Register(new DivineShield());
-            Register(new DawnBlessing());
+            Register(new Parry());
+            Register(new HolyShield());
 
             // 剣系
-            Register(new BasicSword());
-            Register(new Recovery());
-            Register(new WandererWit());
-            Register(new DragonSlayer());
+            Register(new Riposte());
             Register(new VoidStance());
 
             // 斧系
-            Register(new PainRevert());
-            Register(new Warcry());
-            Register(new BloodPact());
-            Register(new ApexPredator());
+            Register(new Frenzy());
             Register(new BloodDecree());
+            Register(new Sting());
 
             // 短剣系
-            Register(new Ambush());
-            Register(new FatalStab());
-            Register(new Sting());
-            Register(new Execution());
-            Register(new BlindJustice());
+            Register(new Execute());
             Register(new Nightfall());
 
-            // 合成武器スキル
-            Register(new DawnBreker());
-            Register(new BloodMoon());
-            Register(new Eclipse());
-            Register(new LoadEmperor());
-            Register(new Silence());
-            Register(new Coronation());
-            Register(new TheEnd());
+            // デッドエンド
+            Register(new Ignite());
+
+            // 投資武器（聖剣ライン）
+            Register(new HolyMemory());
+            Register(new HolyAura());
+            Register(new Terminus());
+
+            // 呪い武器
+            Register(new CurseBind());
+            Register(new Abyss());
+
+            // ============================
+            //  ダイス固有パッシブ
+            // ============================
+            Register(new Shimmer());
+            Register(new ReversalFlame());
+            Register(new Steadfast());
+            Register(new StarFate());
+            Register(new Destiny());
+            Register(new Starguide());
+            Register(new Judgement());
 
             // ============================
             //  敵専用スキル
@@ -137,6 +173,7 @@ namespace InventorySystem.PassiveSkills
             Register(new Lifesteal());
             Register(new NightLord());
             Register(new DeathSentence());
+            Register(new ScratchAura());
         }
     }
 }

@@ -140,6 +140,38 @@ namespace InventorySystem
         }
         
         /// <summary>
+        /// 指定位置にアイテムを配置可能か判定（理由不要の簡易版）
+        /// </summary>
+        public bool CanPlaceItem(CompleteItemData item, int gridX, int gridY)
+        {
+            return CanPlaceItem(item, gridX, gridY, out _);
+        }
+
+        /// <summary>
+        /// 空きスペースを左上から検索し、配置可能な位置を返す
+        /// </summary>
+        public bool TryFindPlacement(CompleteItemData item, int unlockedRows, out int outX, out int outY)
+        {
+            outX = -1;
+            outY = -1;
+            if (item == null) return false;
+
+            for (int y = 0; y < unlockedRows; y++)
+            {
+                for (int x = 0; x <= InventoryConstants.GRID_WIDTH - item.size.x; x++)
+                {
+                    if (CanPlaceItem(item, x, y))
+                    {
+                        outX = x;
+                        outY = y;
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
         /// 配置不可の理由となるセルを取得
         /// </summary>
         public void GetInvalidCells(CompleteItemData item, int gridX, int gridY, out bool[] invalidCells)

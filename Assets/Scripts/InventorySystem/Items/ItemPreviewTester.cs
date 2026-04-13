@@ -233,6 +233,7 @@ namespace InventorySystem
         
         void OnGUI()
         {
+            return; // テストUI一時無効化
             // デバッグ情報表示
             GUILayout.BeginArea(new Rect(10, 10, 300, 200));
             GUILayout.Label("=== アイテムプレビューテスト ===");

@@ -197,9 +197,9 @@ namespace InventorySystem.PassiveSkills
         /// <summary>
         /// 戦闘開始（CombatContext生成）
         /// </summary>
-        public void BeginCombat(int playerMaxHP, int enemyMaxHP = 0, int playerDiceMax = 6, int enemyDiceMax = 6)
+        public void BeginCombat(int playerMaxHP, int enemyMaxHP = 0, int playerDiceMax = 6, int enemyDiceMax = 6, int enemyThreat = 0)
         {
-            context = new CombatContext(playerMaxHP, enemyMaxHP);
+            context = new CombatContext(playerMaxHP, enemyMaxHP, enemyThreat);
             
             // ダイス設定値を設定
             context.playerDiceMax = playerDiceMax;
@@ -208,7 +208,7 @@ namespace InventorySystem.PassiveSkills
             triggeredPlayerSkills.Clear();
             triggeredEnemySkills.Clear();
             Debug.Log($"[PassiveSkillManager] Combat started. Player skills: {activeSkillNames.Count}, Enemy skills: {enemySkillNames.Count}");
-            Debug.Log($"[PassiveSkillManager] Dice setup - Player: d{playerDiceMax}, Enemy: d{enemyDiceMax}");
+            Debug.Log($"[PassiveSkillManager] Dice setup - Player: d{playerDiceMax}, Enemy: d{enemyDiceMax}, Threat: {enemyThreat}");
         }
 
         /// <summary>
@@ -302,6 +302,11 @@ namespace InventorySystem.PassiveSkills
             int tmpTotal = context.playerDiceTotal;
             context.playerDiceTotal = context.enemyDiceTotal;
             context.enemyDiceTotal = tmpTotal;
+
+            // 固定ダメージ入れ替え
+            int tmpFixed = context.fixedDamageToEnemy;
+            context.fixedDamageToEnemy = context.fixedDamageToPlayer;
+            context.fixedDamageToPlayer = tmpFixed;
 
             // 勝敗反転
             bool tmpWon = context.playerWonRoll;

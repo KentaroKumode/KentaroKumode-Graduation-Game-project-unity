@@ -3,75 +3,41 @@ using UnityEngine;
 namespace InventorySystem
 {
     /// <summary>
-    /// アイテムの自動配置ロジック
+    /// [非推奨] PlacementValidator.TryFindPlacement に統合済み
+    /// 既存シーン参照の互換性のため残存。新規利用禁止。
     /// </summary>
+    [System.Obsolete("PlacementValidator.TryFindPlacement を使用してください")]
     public class AutoPlacementManager : MonoBehaviour
     {
         [Header("参照")]
-        [SerializeField] private GridManager gridManager;
         [SerializeField] private PlacementValidator validator;
         
         void Start()
         {
-            if (gridManager == null)
-                gridManager = FindObjectOfType<GridManager>();
-            
             if (validator == null)
                 validator = FindObjectOfType<PlacementValidator>();
         }
         
         /// <summary>
-        /// アイテムを自動配置
+        /// PlacementValidator.TryFindPlacement に委譲
         /// </summary>
         public bool TryAutoPlace(CompleteItemData item, out int outX, out int outY)
         {
             outX = -1;
             outY = -1;
+            if (item == null || validator == null) return false;
             
-            if (item == null)
-            {
-                Debug.LogWarning("[AutoPlacementManager] Item is null");
-                return false;
-            }
-            
-            // 左上から順に空きスロットを探す
-            for (int y = 0; y < InventoryConstants.GRID_HEIGHT; y++)
-            {
-                for (int x = 0; x < InventoryConstants.GRID_WIDTH; x++)
-                {
-                    if (validator.CanPlaceItem(item, x, y, out string reason))
-                    {
-                        outX = x;
-                        outY = y;
-                        Debug.Log($"[AutoPlacementManager] Found placement at ({x}, {y})");
-                        return true;
-                    }
-                }
-            }
-            
-            Debug.LogWarning($"[AutoPlacementManager] No space found for item: {item.displayName}");
-            return false;
+            var gridManager = FindObjectOfType<GridManager>();
+            int unlockedRows = gridManager != null ? gridManager.GetUnlockedRows() : InventoryConstants.GRID_HEIGHT;
+            return validator.TryFindPlacement(item, unlockedRows, out outX, out outY);
         }
         
         /// <summary>
-        /// 最適な配置場所を探す（サイズに合わせて）
+        /// TryAutoPlace に委譲
         /// </summary>
         public bool TryFindOptimalPlacement(CompleteItemData item, out int outX, out int outY)
         {
-            outX = -1;
-            outY = -1;
-            
-            // まずは通常の自動配置を試す
-            if (TryAutoPlace(item, out outX, out outY))
-            {
-                return true;
-            }
-            
-            // TODO: より高度な配置アルゴリズム
-            // - 空きスペースの断片化を最小化
-            // - 同じカテゴリーをまとめて配置
-            
-            return false;
+            return TryAutoPlace(item, out outX, out outY);
         }
     }
 }

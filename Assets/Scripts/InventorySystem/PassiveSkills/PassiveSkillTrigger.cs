@@ -40,9 +40,11 @@ namespace InventorySystem.PassiveSkills
         /// <summary>ダメージ確定後（自分が受けた側）</summary>
         OnPostReceiveDamage,
 
-        // === 追撃 ===
+        // === 追撃/scratch ===
         /// <summary>追撃ダメージ計算前</summary>
         OnPrePursuitDamage,
+        /// <summary>scratchダメージ計算前（勝利時のthreat削りダメージ）</summary>
+        OnPreScratchDamage,
 
         // === 会心 ===
         /// <summary>会心判定時</summary>

@@ -9,8 +9,7 @@ namespace InventorySystem
     /// <para><b>機能:</b></para>
     /// <list type="bullet">
     ///   <item>ディゾルブノイズで燃え広がる演出</item>
-    ///   <item>黄→赤のエッジグロー（Emission）</item>
-    ///   <item>火の粉パーティクル自動生成</item>
+    ///   <item>エッジグロー（Emission）— インスペクターで色調整可能</item>
     ///   <item>完了コールバック</item>
     /// </list>
     /// 
@@ -31,13 +30,41 @@ namespace InventorySystem
 
         [Header("シェーダー設定")]
         [SerializeField] private float edgeWidth = 0.06f;
-        [SerializeField] private Color edgeColorInner = new Color(1f, 0.9f, 0.3f, 1f);  // 黄
-        [SerializeField] private Color edgeColorOuter = new Color(1f, 0.15f, 0f, 1f);   // 赤
+        [SerializeField] private Color edgeColorHot = new Color(1f, 1f, 1f, 1f);      // 白（高温）
+        [SerializeField] private Color edgeColorMid = new Color(1f, 1f, 1f, 1f);      // 白（中間）
+        [SerializeField] private Color edgeColorCool = new Color(0f, 0f, 0f, 1f);       // 黒（燃焼終了）
+        [Tooltip("エッジのEmission強度（0=光らない、大=強く光る）")]
+        [SerializeField, Range(0f, 8f)] private float emissionStrength = 1f;
 
-        [Header("パーティクル")]
-        [SerializeField] private bool autoCreateParticles = true;
-        [SerializeField] private int sparkCount = 30;
-        [SerializeField] private Color sparkColor = new Color(1f, 0.6f, 0.1f, 1f);
+        [Header("ディゾルブ溶け方")]
+        [Tooltip("ノイズの粗さ（小=細かい溶け方、大=大きな塁だらで溶ける）")]
+        [SerializeField, Range(1f, 30f)] private float noiseScale = 6f;
+        [Tooltip("ノイズの細かさ（小=スムーズ、大=ギザギザ）")]
+        [SerializeField, Range(0f, 1f)] private float noiseDetail = 0.5f;
+        [Tooltip("下から上へ燃え上がるバイアス（0=均一、1=強い下→上）")]
+        [SerializeField, Range(0f, 1f)] private float burnDirectionBias = 0.4f;
+        [Tooltip("ノイズテクスチャ解像度")]
+        [SerializeField] private int noiseResolution = 20;
+
+        [Header("燃えカスパーティクル")]
+        [Tooltip("燃えカスパーティクルを有効にする")]
+        [SerializeField] private bool ashEnabled = true;
+        [Tooltip("最大同時パーティクル数")]
+        [SerializeField] private int ashMaxParticles = 80;
+        [Tooltip("最大放出レート（個/秒）")]
+        [SerializeField] private float ashEmissionRate = 40f;
+        [Tooltip("パーティクルの大きさ")]
+        [SerializeField] private float ashSize = 0.015f;
+        [Tooltip("パーティクルの寿命（秒）")]
+        [SerializeField] private float ashLifetime = 1.5f;
+        [Tooltip("落下の重力（カメラ下方向）")]
+        [SerializeField] private float ashGravity = 0.8f;
+        [Tooltip("横方向の広がり")]
+        [SerializeField] private float ashSpread = 0.3f;
+        [Tooltip("trueならテクスチャから色を抽出、falseならashColorを使用")]
+        [SerializeField] private bool ashUseTextureColor = true;
+        [Tooltip("カスタム燃えカス色（ashUseTextureColor=false時に使用）")]
+        [SerializeField] private Color ashColor = new Color(0.25f, 0.18f, 0.12f, 1f);
 
         // =================================================================
         //  内部
@@ -46,9 +73,11 @@ namespace InventorySystem
         private Material[] burnMaterials;
         private Shader burnShader;
         private Texture2D noiseTexture;
-        private ParticleSystem sparkParticles;
         private System.Action onComplete;
         private bool isBurning = false;
+        private ParticleSystem ashParticleSystem;
+        private GameObject ashParticleObj;
+        private Transform cameraTransform;
 
         /// <summary>演出中かどうか</summary>
         public bool IsBurning => isBurning;
@@ -75,6 +104,80 @@ namespace InventorySystem
             return effect;
         }
 
+        /// <summary>
+        /// 対象GameObjectに燃え尽き演出を適用して再生（全パラメータ指定）
+        /// </summary>
+        public static ItemBurnEffect Play(GameObject target, float duration, Color flameColor, Color midColor, Color charColor, float edgeWidth, float emissionStrength, float noiseScale, float noiseDetail, float directionBias, bool ashEnabled, int ashMaxParticles, float ashEmissionRate, float ashSize, float ashLifetime, float ashGravity, float ashSpread, bool ashUseTextureColor, Color ashColor, Transform cameraTransform, System.Action onComplete = null)
+        {
+            if (target == null) return null;
+
+            var effect = target.AddComponent<ItemBurnEffect>();
+            effect.burnDuration = duration;
+            effect.edgeColorHot = flameColor;
+            effect.edgeColorMid = midColor;
+            effect.edgeColorCool = charColor;
+            effect.edgeWidth = edgeWidth;
+            effect.emissionStrength = emissionStrength;
+            effect.noiseScale = noiseScale;
+            effect.noiseDetail = noiseDetail;
+            effect.burnDirectionBias = directionBias;
+            effect.ashEnabled = ashEnabled;
+            effect.ashMaxParticles = ashMaxParticles;
+            effect.ashEmissionRate = ashEmissionRate;
+            effect.ashSize = ashSize;
+            effect.ashLifetime = ashLifetime;
+            effect.ashGravity = ashGravity;
+            effect.ashSpread = ashSpread;
+            effect.ashUseTextureColor = ashUseTextureColor;
+            effect.ashColor = ashColor;
+            effect.cameraTransform = cameraTransform;
+            effect.onComplete = onComplete;
+            effect.StartBurn();
+            return effect;
+        }
+
+        /// <summary>
+        /// 対象GameObjectに燃え尽き演出を適用して再生（全パラメータ指定、燃えカスデフォルト）
+        /// </summary>
+        public static ItemBurnEffect Play(GameObject target, float duration, Color flameColor, Color charColor, float edgeWidth, float noiseScale, float noiseDetail, float directionBias, System.Action onComplete = null)
+        {
+            if (target == null) return null;
+
+            var effect = target.AddComponent<ItemBurnEffect>();
+            effect.burnDuration = duration;
+            effect.edgeColorHot = flameColor;
+            effect.edgeColorCool = charColor;
+            effect.edgeWidth = edgeWidth;
+            effect.noiseScale = noiseScale;
+            effect.noiseDetail = noiseDetail;
+            effect.burnDirectionBias = directionBias;
+            effect.onComplete = onComplete;
+            effect.StartBurn();
+            return effect;
+        }
+
+        /// <summary>
+        /// 対象GameObjectに燃え尽き演出を適用して再生（色指定付き）
+        /// </summary>
+        /// <param name="target">燃え尽きるオブジェクト</param>
+        /// <param name="duration">演出時間（秒）</param>
+        /// <param name="flameColor">炎色（内側エッジ）</param>
+        /// <param name="charColor">コゲ色（外側エッジ）</param>
+        /// <param name="onComplete">完了時コールバック</param>
+        /// <returns>演出コンポーネント</returns>
+        public static ItemBurnEffect Play(GameObject target, float duration, Color flameColor, Color charColor, System.Action onComplete = null)
+        {
+            if (target == null) return null;
+
+            var effect = target.AddComponent<ItemBurnEffect>();
+            effect.burnDuration = duration;
+            effect.edgeColorHot = flameColor;
+            effect.edgeColorCool = charColor;
+            effect.onComplete = onComplete;
+            effect.StartBurn();
+            return effect;
+        }
+
         // =================================================================
         //  演出開始
         // =================================================================
@@ -95,7 +198,7 @@ namespace InventorySystem
             }
 
             // ノイズテクスチャ生成
-            noiseTexture = GenerateNoiseTexture(256);
+            noiseTexture = GenerateNoiseTexture(noiseResolution, noiseScale, noiseDetail, burnDirectionBias);
 
             // 全レンダラーのマテリアルをBurnDissolveに差し替え
             var renderers = GetComponentsInChildren<Renderer>();
@@ -120,8 +223,10 @@ namespace InventorySystem
                     burnMat.SetTexture("_NoiseTex", noiseTexture);
                     burnMat.SetFloat("_DissolveAmount", 0f);
                     burnMat.SetFloat("_EdgeWidth", edgeWidth);
-                    burnMat.SetColor("_EdgeColor1", edgeColorInner);
-                    burnMat.SetColor("_EdgeColor2", edgeColorOuter);
+                    burnMat.SetColor("_EdgeColor1", edgeColorHot);
+                    burnMat.SetColor("_EdgeColor2", edgeColorMid);
+                    burnMat.SetColor("_EdgeColor3", edgeColorCool);
+                    burnMat.SetFloat("_EmissionStrength", emissionStrength);
 
                     replaced[i] = burnMat;
                     matList.Add(burnMat);
@@ -132,9 +237,56 @@ namespace InventorySystem
 
             burnMaterials = matList.ToArray();
 
-            // パーティクル生成
-            if (autoCreateParticles)
-                CreateSparkParticles();
+            // --- 燃えカスパーティクル初期化 ---
+            if (ashEnabled)
+            {
+                // burnMaterials（既にコピー済み）からテクスチャを取得
+                // ※ rend.materials を再アクセスするとUnityが新しいMaterialインスタンスを
+                //    生成し、burnMaterialsの参照が無効化されてディゾルブが壊れる
+                Texture mainTex = null;
+                foreach (var mat in burnMaterials)
+                {
+                    if (mat != null && mat.HasProperty("_MainTex") && mat.GetTexture("_MainTex") != null)
+                    {
+                        mainTex = mat.GetTexture("_MainTex");
+                        break;
+                    }
+                }
+
+                Color[] ashColors;
+                if (ashUseTextureColor)
+                {
+                    ashColors = ExtractColorsFromTexture(mainTex);
+                }
+                else
+                {
+                    // カスタム色から明暗バリエーションを生成
+                    ashColors = new Color[]
+                    {
+                        ashColor,
+                        ashColor * 0.7f,
+                        ashColor * 1.2f,
+                        ashColor * 0.4f,
+                        Color.Lerp(ashColor, Color.black, 0.5f),
+                        Color.Lerp(ashColor, new Color(0.3f, 0.2f, 0.1f), 0.3f),
+                        ashColor * 0.85f,
+                        Color.Lerp(ashColor, Color.gray, 0.2f)
+                    };
+                    for (int i = 0; i < ashColors.Length; i++)
+                    {
+                        ashColors[i].a = 1f;
+                    }
+                }
+
+                // モデルの境界を計算
+                Bounds bounds = new Bounds(transform.position, Vector3.zero);
+                foreach (var rend in renderers)
+                {
+                    bounds.Encapsulate(rend.bounds);
+                }
+
+                ashParticleSystem = CreateAshParticleSystem(ashColors, bounds);
+            }
 
             StartCoroutine(BurnCoroutine());
         }
@@ -160,6 +312,21 @@ namespace InventorySystem
                         mat.SetFloat("_DissolveAmount", dissolve);
                 }
 
+                // 燃えカスパーティクル: ディゾルブ値に完全同期
+                if (ashParticleSystem != null)
+                {
+                    var emission = ashParticleSystem.emission;
+                    // dissolve値からsin曲線で自然な放出: 0→ピーク(0.5)→0 をディゾルブと完全一致
+                    float emitCurve = (dissolve > 0.001f)
+                        ? Mathf.Sin(Mathf.Clamp01(dissolve) * Mathf.PI)
+                        : 0f;
+                    emission.rateOverTime = ashEmissionRate * emitCurve;
+
+                    // パーティクル位置をモデル中心に追従
+                    if (ashParticleObj != null)
+                        ashParticleObj.transform.position = transform.position;
+                }
+
                 yield return null;
             }
 
@@ -170,17 +337,31 @@ namespace InventorySystem
                     mat.SetFloat("_DissolveAmount", 1.1f);
             }
 
-            // パーティクルの残りを待つ
-            if (sparkParticles != null)
+            // パーティクル停止（残りは自然消滅）
+            if (ashParticleSystem != null)
             {
-                sparkParticles.Stop();
-                yield return new WaitForSeconds(0.5f);
+                var emission = ashParticleSystem.emission;
+                emission.rateOverTime = 0f;
+                ashParticleSystem.Stop(true, ParticleSystemStopBehavior.StopEmitting);
             }
 
+            // バーン完了→即座にコールバック
             isBurning = false;
             onComplete?.Invoke();
 
+            // パーティクルの残りが消えるまで待ってから破棄
+            if (ashParticleObj != null)
+                StartCoroutine(CleanupAshParticles());
+
             Debug.Log("[ItemBurnEffect] 🔥 Burn complete");
+        }
+
+        /// <summary>残存パーティクルが消えてからオブジェクトを破棄</summary>
+        private IEnumerator CleanupAshParticles()
+        {
+            yield return new WaitForSeconds(ashLifetime + 0.5f);
+            if (ashParticleObj != null)
+                Destroy(ashParticleObj);
         }
 
         /// <summary>シェーダーが無い場合のフォールバック（フェードアウト）</summary>
@@ -230,7 +411,7 @@ namespace InventorySystem
         // =================================================================
 
         /// <summary>PerlinNoiseベースのディゾルブノイズを生成</summary>
-        private static Texture2D GenerateNoiseTexture(int size)
+        private static Texture2D GenerateNoiseTexture(int size, float baseScale, float detail, float directionBias)
         {
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
             {
@@ -239,9 +420,12 @@ namespace InventorySystem
             };
 
             // 複数オクターブのPerlinNoise合成
-            float scale1 = 6f;
-            float scale2 = 12f;
-            float scale3 = 24f;
+            float scale1 = baseScale;
+            float scale2 = baseScale * 2f;
+            float scale3 = baseScale * 4f;
+            float detailWeight2 = detail;
+            float detailWeight3 = detail * 0.5f;
+            float totalWeight = 1f + detailWeight2 + detailWeight3;
             float offsetX = Random.Range(0f, 100f);
             float offsetY = Random.Range(0f, 100f);
 
@@ -253,14 +437,14 @@ namespace InventorySystem
                     float ny = (float)y / size;
 
                     float n1 = Mathf.PerlinNoise(nx * scale1 + offsetX, ny * scale1 + offsetY);
-                    float n2 = Mathf.PerlinNoise(nx * scale2 + offsetX, ny * scale2 + offsetY) * 0.5f;
-                    float n3 = Mathf.PerlinNoise(nx * scale3 + offsetX, ny * scale3 + offsetY) * 0.25f;
+                    float n2 = Mathf.PerlinNoise(nx * scale2 + offsetX, ny * scale2 + offsetY) * detailWeight2;
+                    float n3 = Mathf.PerlinNoise(nx * scale3 + offsetX, ny * scale3 + offsetY) * detailWeight3;
 
-                    float noise = (n1 + n2 + n3) / 1.75f; // 正規化
+                    float noise = (n1 + n2 + n3) / totalWeight; // 正規化
                     noise = Mathf.Clamp01(noise);
 
-                    // 「下から上に燃え上がる」バイアス: 下部ほど早く消えるよう、Y座標でバイアス
-                    float yBias = 1f - ((float)y / size) * 0.4f;
+                    // 方向バイアス: 下部ほど早く消える
+                    float yBias = 1f - ((float)y / size) * directionBias;
                     noise *= yBias;
 
                     tex.SetPixel(x, y, new Color(noise, noise, noise, 1f));
@@ -273,60 +457,158 @@ namespace InventorySystem
         }
 
         // =================================================================
-        //  火の粉パーティクル
+        //  燃えカスパーティクル
         // =================================================================
 
-        private void CreateSparkParticles()
+        /// <summary>テクスチャから代表色を抽出（読み取り不可テクスチャ対応）</summary>
+        private Color[] ExtractColorsFromTexture(Texture mainTex, int sampleCount = 16)
         {
-            var psObj = new GameObject("BurnSparks");
-            psObj.transform.SetParent(transform, false);
-            psObj.transform.localPosition = Vector3.zero;
+            if (mainTex == null)
+            {
+                // テクスチャなし→デフォルトの灰色
+                return new Color[]
+                {
+                    new Color(0.3f, 0.25f, 0.2f),
+                    new Color(0.15f, 0.1f, 0.08f),
+                    new Color(0.5f, 0.4f, 0.3f),
+                    new Color(0.08f, 0.05f, 0.03f)
+                };
+            }
 
-            sparkParticles = psObj.AddComponent<ParticleSystem>();
-            
-            // AddComponent直後に自動再生されるため、停止してからプロパティを設定
-            sparkParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-            
-            var main = sparkParticles.main;
-            main.playOnAwake = false;
-            main.duration = burnDuration;
+            // RenderTextureを使ってGPUから読み取り（isReadableフラグ不要）
+            RenderTexture rt = RenderTexture.GetTemporary(mainTex.width, mainTex.height, 0, RenderTextureFormat.ARGB32);
+            Graphics.Blit(mainTex, rt);
+            RenderTexture prev = RenderTexture.active;
+            RenderTexture.active = rt;
+
+            Texture2D readable = new Texture2D(mainTex.width, mainTex.height, TextureFormat.RGBA32, false);
+            readable.ReadPixels(new Rect(0, 0, mainTex.width, mainTex.height), 0, 0);
+            readable.Apply();
+
+            RenderTexture.active = prev;
+            RenderTexture.ReleaseTemporary(rt);
+
+            // ランダムサンプリング
+            Color[] colors = new Color[sampleCount];
+            for (int i = 0; i < sampleCount; i++)
+            {
+                int px = Random.Range(0, readable.width);
+                int py = Random.Range(0, readable.height);
+                Color c = readable.GetPixel(px, py);
+                // 灰化: 彩度を落として暗くする（燃えカスっぽく）
+                float gray = c.grayscale;
+                c = Color.Lerp(c, new Color(gray, gray, gray), 0.5f); // 彩度50%ダウン
+                c *= 0.6f; // 暗く
+                c.a = 1f;
+                colors[i] = c;
+            }
+
+            Destroy(readable);
+            return colors;
+        }
+
+        /// <summary>燃えカスパーティクルシステムを生成</summary>
+        private ParticleSystem CreateAshParticleSystem(Color[] ashColors, Bounds modelBounds)
+        {
+            ashParticleObj = new GameObject("BurnAshParticles");
+            ashParticleObj.transform.position = modelBounds.center;
+            // ワールド空間で動作させるため親に付けない
+
+            var ps = ashParticleObj.AddComponent<ParticleSystem>();
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+            // ----- Main -----
+            var main = ps.main;
+            main.duration = burnDuration + 1f;
             main.loop = false;
-            main.startLifetime = new ParticleSystem.MinMaxCurve(0.3f, 0.8f);
-            main.startSpeed = new ParticleSystem.MinMaxCurve(0.5f, 2f);
-            main.startSize = new ParticleSystem.MinMaxCurve(0.02f, 0.06f);
-            main.startColor = sparkColor;
-            main.gravityModifier = -0.3f; // 上に昇る
-            main.maxParticles = sparkCount * 2;
+            main.startLifetime = ashLifetime;
+            main.startSpeed = new ParticleSystem.MinMaxCurve(0.01f, 0.08f);
+            main.startSize = new ParticleSystem.MinMaxCurve(ashSize * 0.5f, ashSize);
+            main.maxParticles = ashMaxParticles;
             main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.gravityModifier = 0f; // ワールド重力無効（カメラ相対落下はForceOverLifetimeで実現）
+            main.startRotation = 0f; // ドット風: 回転なしで四角を保つ
 
-            var emission = sparkParticles.emission;
-            emission.rateOverTime = sparkCount / burnDuration;
+            // ----- 色: テクスチャから抽出した色のグラデーション -----
+            var grad = new Gradient();
+            int keyCount = Mathf.Min(ashColors.Length, 8); // GradientKeyは最大8
+            GradientColorKey[] colorKeys = new GradientColorKey[keyCount];
+            GradientAlphaKey[] alphaKeys = new GradientAlphaKey[2];
+            for (int i = 0; i < keyCount; i++)
+            {
+                colorKeys[i] = new GradientColorKey(ashColors[i], (float)i / (keyCount - 1));
+            }
+            alphaKeys[0] = new GradientAlphaKey(1f, 0f);
+            alphaKeys[1] = new GradientAlphaKey(1f, 1f);
+            grad.SetKeys(colorKeys, alphaKeys);
+            main.startColor = new ParticleSystem.MinMaxGradient(grad);
 
-            var shape = sparkParticles.shape;
+            // ----- Emission: 最初はゼロ、BurnCoroutineから制御 -----
+            var emission = ps.emission;
+            emission.enabled = true;
+            emission.rateOverTime = 0f;
+
+            // ----- Shape: モデルの範囲に合わせたBox -----
+            var shape = ps.shape;
+            shape.enabled = true;
             shape.shapeType = ParticleSystemShapeType.Box;
-            // バウンズに合わせる
-            var renderers = GetComponentsInChildren<Renderer>();
-            if (renderers.Length > 0)
-            {
-                Bounds combined = renderers[0].bounds;
-                for (int i = 1; i < renderers.Length; i++)
-                    combined.Encapsulate(renderers[i].bounds);
-                shape.scale = combined.size;
-                psObj.transform.position = combined.center;
-            }
-            else
-            {
-                shape.scale = Vector3.one * 0.5f;
-            }
+            shape.scale = modelBounds.size * 0.8f;
+            shape.position = Vector3.zero;
 
-            var col = sparkParticles.colorOverLifetime;
+            // ----- Force over Lifetime: カメラ下方向への落下 -----
+            var force = ps.forceOverLifetime;
+            force.enabled = true;
+            // カメラの-up方向を「下」として重力をかける
+            Vector3 camDown = (cameraTransform != null)
+                ? -cameraTransform.up
+                : Vector3.down;
+            float gravityForce = ashGravity * 9.81f; // Physics.gravityスケール
+            force.x = new ParticleSystem.MinMaxCurve(camDown.x * gravityForce);
+            force.y = new ParticleSystem.MinMaxCurve(camDown.y * gravityForce);
+            force.z = new ParticleSystem.MinMaxCurve(camDown.z * gravityForce);
+
+            // ----- Velocity over Lifetime: 横揺れ（カメラローカル軸基準） -----
+            var vel = ps.velocityOverLifetime;
+            vel.enabled = true;
+            // カメラのright/forward方向にspreadで揺れ
+            Vector3 camRight = (cameraTransform != null) ? cameraTransform.right : Vector3.right;
+            Vector3 camFwd = (cameraTransform != null) ? cameraTransform.forward : Vector3.forward;
+            // ワールド軸に分解して設定
+            float spreadRight = ashSpread;
+            float spreadFwd = ashSpread * 0.5f;
+            float vxMin = -spreadRight * camRight.x - spreadFwd * camFwd.x;
+            float vxMax =  spreadRight * camRight.x + spreadFwd * camFwd.x;
+            float vyMin = -spreadRight * camRight.y - spreadFwd * camFwd.y;
+            float vyMax =  spreadRight * camRight.y + spreadFwd * camFwd.y;
+            float vzMin = -spreadRight * camRight.z - spreadFwd * camFwd.z;
+            float vzMax =  spreadRight * camRight.z + spreadFwd * camFwd.z;
+            // Min/Maxが逆転していたらswap
+            if (vxMin > vxMax) { float tmp = vxMin; vxMin = vxMax; vxMax = tmp; }
+            if (vyMin > vyMax) { float tmp = vyMin; vyMin = vyMax; vyMax = tmp; }
+            if (vzMin > vzMax) { float tmp = vzMin; vzMin = vzMax; vzMax = tmp; }
+            vel.x = new ParticleSystem.MinMaxCurve(vxMin, vxMax);
+            vel.y = new ParticleSystem.MinMaxCurve(vyMin, vyMax);
+            vel.z = new ParticleSystem.MinMaxCurve(vzMin, vzMax);
+
+            // ----- Size over Lifetime: 縮小して消える -----
+            var sol = ps.sizeOverLifetime;
+            sol.enabled = true;
+            var sizeCurve = new AnimationCurve(
+                new Keyframe(0f, 1f),
+                new Keyframe(0.7f, 0.6f),
+                new Keyframe(1f, 0f)
+            );
+            sol.size = new ParticleSystem.MinMaxCurve(1f, sizeCurve);
+
+            // ----- Color over Lifetime: 後半で暗くフェードアウト -----
+            var col = ps.colorOverLifetime;
             col.enabled = true;
-            Gradient grad = new Gradient();
-            grad.SetKeys(
+            var colorGrad = new Gradient();
+            colorGrad.SetKeys(
                 new GradientColorKey[] {
-                    new GradientColorKey(sparkColor, 0f),
-                    new GradientColorKey(new Color(1f, 0.3f, 0f), 0.5f),
-                    new GradientColorKey(Color.black, 1f)
+                    new GradientColorKey(Color.white, 0f),
+                    new GradientColorKey(new Color(0.4f, 0.3f, 0.2f), 0.6f),
+                    new GradientColorKey(new Color(0.1f, 0.08f, 0.05f), 1f)
                 },
                 new GradientAlphaKey[] {
                     new GradientAlphaKey(1f, 0f),
@@ -334,27 +616,56 @@ namespace InventorySystem
                     new GradientAlphaKey(0f, 1f)
                 }
             );
-            col.color = grad;
+            col.color = colorGrad;
 
-            var sizeOverLife = sparkParticles.sizeOverLifetime;
-            sizeOverLife.enabled = true;
-            sizeOverLife.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
+            // ----- Rotation over Lifetime: ドット風なので回転なし -----
+            var rot = ps.rotationOverLifetime;
+            rot.enabled = false;
 
-            // PreviewCardレイヤーに設定
-            int previewLayer = LayerMask.NameToLayer("PreviewCard");
-            if (previewLayer >= 0)
-                psObj.layer = previewLayer;
+            // ----- Renderer: 四角ドット用テクスチャ + マテリアル -----
+            var renderer = ashParticleObj.GetComponent<ParticleSystemRenderer>();
+            renderer.renderMode = ParticleSystemRenderMode.Billboard;
+            var particleMat = new Material(Shader.Find("Particles/Standard Unlit"));
+            if (particleMat != null)
+            {
+                particleMat.SetFloat("_Mode", 0);
+                particleMat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                particleMat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                particleMat.renderQueue = 3100;
+                // 四角ドットテクスチャ生成
+                particleMat.SetTexture("_MainTex", GenerateSquareDotTexture(8));
+            }
+            renderer.material = particleMat;
 
-            var renderer = sparkParticles.GetComponent<ParticleSystemRenderer>();
-            renderer.material = new Material(Shader.Find("Particles/Standard Unlit"));
-            renderer.material.SetColor("_Color", sparkColor);
-
-            sparkParticles.Play();
+            ps.Play();
+            return ps;
         }
 
         // =================================================================
         //  ヘルパー
         // =================================================================
+
+        /// <summary>四角ドット用テクスチャ（中央に白い四角、周囲は透明）</summary>
+        private static Texture2D GenerateSquareDotTexture(int size)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                filterMode = FilterMode.Point, // ドット感を保つ
+                wrapMode = TextureWrapMode.Clamp
+            };
+
+            // 全体を白に（1ピクセル余白なしの四角）
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    tex.SetPixel(x, y, Color.white);
+                }
+            }
+            tex.Apply();
+            tex.name = "SquareDot";
+            return tex;
+        }
 
         private void SetMaterialTransparent(Material mat)
         {
@@ -385,6 +696,10 @@ namespace InventorySystem
 
             if (noiseTexture != null)
                 Destroy(noiseTexture);
+
+            // パーティクルクリーンアップ
+            if (ashParticleObj != null)
+                Destroy(ashParticleObj);
         }
     }
 }

@@ -119,3 +119,142 @@ Unity 2022.3.22f1で開発されたボードゲーム。コインシステム、
 - 新機能はそれぞれの名前空間内に追加
 - SerializeField + [Header]でInspector整理
 - ダイス最大値の上限は9
+
+---
+
+## 調整履歴（2026-04-14）
+
+### バグ修正
+1. **fixedDamageToEnemy逆適用バグ** — 敵勝利ブランチで`fixedDamageToEnemy`がプレイヤーHPから引かれていた → 敵HPから引くよう修正
+2. **enemyDiceDebuff二重適用バグ** — ProcessPostRollとCombatManagerの両方で適用されていた → CombatManager側の重複コードを削除
+3. **SwapPerspective不完全** — `fixedDamageToPlayer`フィールドを新設し、SwapPerspectiveで`fixedDamageToEnemy ↔ fixedDamageToPlayer`を入れ替えるよう修正。CombatManagerの全ブランチ（勝利/敗北/引分）で両フィールドを正しく適用
+4. **ApplyScratchModifiers未呼び出し** — ScratchAuraがセットしたscratchDamageにCursedFog(呪霧)の2倍補正が適用されていなかった → CombatManagerのscratch適用直前にApplyScratchModifiers()呼び出しを追加
+5. **ApplyBleedModifiers未呼び出し** — 出血ダメージにBloodTide(血潮)の2倍補正が適用されていなかった → 全3ブランチにApplyBleedModifiers()呼び出しを追加
+
+### Scratch（威圧）システム移行
+- Scratchをコア戦闘メカニクスから**敵専用パッシブ「ScratchAura（威圧）」**に移管
+- CombatManagerの自動scratch計算(`ctx.scratchDamage = Max(0, threat - diff)`)を削除
+- ScratchAuraは`OnRollLose`（敵視点 = プレイヤー勝利時）に発火し、`scratch = max(0, enemyThreat - |diceDiff|)`をセット
+- **4層以上の敵**にのみScratchAuraを付与（1〜3層は威圧なし）
+- 引き分け時のscratch計算も完全削除（A案採用）
+- Parryの説明を「敵の威圧による削りダメージを無効化」に更新
+
+### 出血システム整備
+- **Sting（出血）パッシブ新設** — OnPostDealDamage時に`enemyBleedStacks++`（1ターン1回制限）
+- 斧T2にStingを配置（FrenzyはT3以降に移動）、斧T4からStarFateを削除
+- CombatContext.BeginNewTurn()に出血スタック減衰(`enemyBleedStacks--`)を追加
+
+### パッシブ数値調整
+- **追撃（Pursuit）を倍増**: I: +1→**+2**, II: +2→**+4**, III: +3→**+6**
+
+### 名称変更
+| 変更前 | 変更後 | 対象 |
+|---|---|---|
+| 不死身 (Undying) | **不死者** | 敵パッシブ名 |
+| 受けるダメージ-1 | **毎ターンHP+1回復** | Undyingの効果（OnPreReceiveDamage→OnTurnStart） |
+| ジャッジメント (Judgement) | **裁定** | ダイスパッシブ表示名 |
+| 刺那の惜別 (Abyss) | **刹那の惜別** | 呪い武器パッシブ表示名（誤字修正） |
+
+### CombatContext追加フィールド
+- `fixedDamageToPlayer` — 敵→プレイヤーへの軽減不可固定ダメージ（BeginNewTurnで0リセット）
+
+### 現在の実装済みパッシブ一覧（54個）
+
+#### 汎用パッシブ（6種×3段階=18個）
+| 内部名 | 表示名 | 効果 |
+|---|---|---|
+| PursuitI〜III | 追撃I〜III | 与ダメージ+2/+4/+6 |
+| CounterI〜III | 反撃I〜III | 敗北時、敵に軽減不可1/2/3ダメ |
+| MightI〜III | 筋力I〜III | 各ダイス出目+1/+2/+3 |
+| FortitudeI〜III | 頑強I〜III | 被ダメージ-1/-2/-3 |
+| InsightI〜III | 心眼I〜III | 会心ダイス+1/+2/+3 |
+| VitalityI〜III | 活力I〜III | ターン開始時HP+1/+2/+3回復 |
+
+#### 武器ユニーク（15個）
+| 内部名 | 表示名 | 系統 | 効果 |
+|---|---|---|---|
+| Parry | パリィ | 盾 | 敵の威圧による削りダメージを無効化 |
+| HolyShield | 聖なる守り | 盾 | 敗北時、被ダメ50%軽減 |
+| Riposte | 切り返し | 剣 | 敗北時、受けたダメ50%を敵に反射 |
+| VoidStance | 虚空 | 剣 | ダイス差≤3で双方ダメ0+軽減不可3ダメ |
+| Frenzy | 復讐 | 斧 | 敗北でダイス+1蓄積、勝利でリセット |
+| BloodDecree | 血令 | 斧 | ゾロ目→合計値固定ダメ+会心+200%+会心ダイス+5 |
+| Sting | 出血 | 斧 | ダメ付与時、敵に出血+1（1ターン1回） |
+| Execute | 処刑 | 短剣 | 勝利時、次ターン敵最小ダイス1固定 |
+| Nightfall | 蝕夜 | 短剣 | オーバーダメ×2蓄積→次戦闘開始時放出 |
+| Ignite | 業火 | デッドエンド | 戦闘開始時炎上（3T, 毎ターン3ダメ） |
+| HolyMemory | 黎明の光 | 聖剣 | 初回ロール時ダイス+3 |
+| HolyAura | 薄暮の光 | 聖剣 | ターン開始HP+2、敗北時被ダメ50% |
+| Terminus | 終焉 | 聖剣 | 戦闘開始時、敵MaxHP30%軽減不可ダメ |
+| CurseBind | 呪縛 | 呪い | 毎ターン自傷1、敵ダイス-1蓄積デバフ |
+| Abyss | 刹那の惜別 | 呪い | 被ダメ記録+踏みとどまり→狂戦士化 |
+
+#### ダイス固有（7個）
+| 内部名 | 表示名 | 効果 |
+|---|---|---|
+| Shimmer | 煌玉 | 最大出目ダイスあり→会心+1 |
+| ReversalFlame | 盟約 | 敗北時、次Tダイス合計+2 |
+| Steadfast | 堅実 | 合計≤(ダイス数×3)で+2 |
+| StarFate | 星命 | ゾロ目時、追撃+出目値 |
+| Destiny | 運命 | 全最大出目→与ダメ×2、全最低→被ダメ0 |
+| Starguide | 星導 | 全ダイス異なる値→合計+3 |
+| Judgement | 裁定 | 自ダイス≥敵2倍→追撃+5、敵≥自2倍→被ダメ0 |
+
+#### 敵専用（14個）
+| 内部名 | 表示名 | 層 | 効果 |
+|---|---|---|---|
+| Trapper | 罠師 | 1-3 | 勝利時、次T相手ダイス-1 |
+| Undying | 不死者 | 1-3 | 毎ターンHP+1回復 |
+| Sprint | 疾駆 | 1-3 | 初回ロール時ダイス+2 |
+| BruteForce | 剛力 | 1-3 | 勝利時ダメ+2 |
+| Flight | 飛翔 | 1-3 | 追撃ダメ無効 |
+| HardScales | 硬鱗 | 4-5 | 被ダメ-2 |
+| TailStrike | 尾撃 | 4-5 | 敗北時、固定1ダメ |
+| Rampage | 暴走 | 4-5 | 敗北時、次Tダイス+3 |
+| Ethereal | 虚体 | 4-5 | 被ダメ50%軽減 |
+| Curse | 呪縛 | 4-5 | 勝利時、次T相手ダイス-2 |
+| Immovable | 不動 | 4-5 | 追撃ダメ無効 |
+| CounterStance | 反撃態勢 | 4-5 | 敗北時、次Tダメ+3 |
+| MultiHead | 多頭攻撃 | 6-7 | 勝利時、追撃ダイス+1個 |
+| Regeneration | 再生 | 6-7 | 毎ターンHP+2回復 |
+| DemonAura | 魔王の威圧 | 6-7 | 戦闘開始時、相手MaxHP-3 |
+| Hellfire | 地獄の業火 | 6-7 | 勝利時、固定2ダメ |
+| Lifesteal | 吸血 | 6-7 | 与ダメ50%HP回復 |
+| NightLord | 夜の王 | 6-7 | 5T目以降、ダイス+1個 |
+| DeathSentence | 死の宣告 | 6-7 | 10T超で999固定ダメ（即死） |
+| ScratchAura | 威圧 | 4+ | プレイヤー勝利時、max(0,threat-\|diff\|)の削りダメ |
+
+### 戦闘システム計算式
+
+#### 勝敗判定
+```
+diff = (Σ playerDice + diceBonus) - (Σ enemyDice - enemyDiceDebuff)
+diff > 0 → 勝利 / diff < 0 → 敗北 / diff == 0 → 引分
+```
+
+#### ダメージ計算
+```
+base = |diff| + damageBonus + パッシブ補正
+total = base + pursuitDamage（勝利時のみ追撃あり）
+会心確率 = min(9, critRate + critBonus) / 9
+会心時: total × critMultiplier（既定2.0）
+```
+
+#### HP適用（勝利時）
+```
+enemyHP -= total + fixedDmgToEnemy + bleedDmg
+playerHP -= fixedDmgToPlayer + scratchDmg
+scratch = max(0, enemyThreat - |diff|) ※ScratchAura持ち敵のみ
+```
+
+#### HP適用（敗北時）
+```
+playerHP -= total + fixedDmgToPlayer
+enemyHP -= fixedDmgToEnemy + bleedDmg
+※ scratchなし、追撃なし
+```
+
+#### HP適用（引分時）
+```
+mainDamage = 0（固定ダメージ・出血のみ適用）
+```

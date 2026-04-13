@@ -26,10 +26,10 @@ namespace CombatSystem
 
         // ダメージ
         public int mainDamage;          // メインダメージ（ダイス差）
-        public int pursuitDamage;       // 追撃ダメージ
+        public int pursuitDamage;       // 追撃ダメージ（パッシブ由来）
         public int totalDamage;         // 合算ダメージ（クリティカル適用後）
         public int fixedDamage;         // 固定ダメージ（パッシブ由来）
-        public int counterDamage;       // 防御側追撃（ダイス数差）
+        public int scratchDamage;       // scratch削りダメージ（threat由来）
         public bool isCritical;
 
         // HP経過
@@ -58,12 +58,9 @@ namespace CombatSystem
     /// (1) 双方のダイスをすべて振り、合計値でマッチ
     /// (2) 合計値の大きい方が勝利
     /// (3) 勝利者は [勝者合計 - 敗者合計] のメインダメージを与える
-    /// (4) ダイス数差がある場合:
-    ///     (4-1) 攻撃側(マッチ勝者)のダイスが多い → 差分ダイスをリロール、
-    ///           その合計を追撃ダメージとして敗者に与える（軽減不可）
-    ///     (4-2) 防御側(マッチ敗者)のダイスが多い → 差分ダイスをリロール、
-    ///           その合計を反撃ダメージとして勝者に与える（軽減不可）
-    /// (5) すべてのダメージを合算後、クリティカル判定（1回、確率: X/9）
+    /// (4) 追撃/反撃はパッシブスキル（PursuitI-III / CounterI-III）由来の固定値
+    /// (5) scratchは特定の敵パッシブ（ScratchAura）が付与する削りダメージ
+    /// (6) すべてのダメージを合算後、クリティカル判定（1回、確率: X/9）
     ///     クリティカル時は合算ダメージに倍率適用
     /// 
     /// 使い方:
@@ -209,7 +206,7 @@ namespace CombatSystem
         /// <param name="playerDiceMax">プレイヤーのダイス最大出目</param>
         /// <param name="playerCritNumerator">プレイヤーのクリティカル確率分子 (0～9)</param>
         public void StartCombat(string enemyId, int playerMaxHP,
-            int playerDiceCount, int playerDiceMax, int playerCritNumerator = 0)
+            int playerDiceCount, int playerDiceMax, int playerCritNumerator = 0, int[] equippedDiceFaces = null)
         {
             var enemy = EnemyDatabase.Get(enemyId);
             if (enemy == null)
@@ -218,14 +215,14 @@ namespace CombatSystem
                 return;
             }
 
-            StartCombatInternal(enemy, playerMaxHP, playerDiceCount, playerDiceMax, playerCritNumerator);
+            StartCombatInternal(enemy, playerMaxHP, playerDiceCount, playerDiceMax, playerCritNumerator, equippedDiceFaces);
         }
 
         /// <summary>
         /// EnemyData を直接指定して戦闘開始
         /// </summary>
         public void StartCombat(EnemyData enemy, int playerMaxHP,
-            int playerDiceCount, int playerDiceMax, int playerCritNumerator = 0)
+            int playerDiceCount, int playerDiceMax, int playerCritNumerator = 0, int[] equippedDiceFaces = null)
         {
             if (enemy == null)
             {
@@ -233,11 +230,11 @@ namespace CombatSystem
                 return;
             }
 
-            StartCombatInternal(enemy, playerMaxHP, playerDiceCount, playerDiceMax, playerCritNumerator);
+            StartCombatInternal(enemy, playerMaxHP, playerDiceCount, playerDiceMax, playerCritNumerator, equippedDiceFaces);
         }
 
         private void StartCombatInternal(EnemyData enemy, int pMaxHP,
-            int pDiceCount, int pDiceMax, int pCritNumerator)
+            int pDiceCount, int pDiceMax, int pCritNumerator, int[] equippedDiceFaces = null)
         {
             if (isCombatActive)
             {
@@ -266,7 +263,14 @@ namespace CombatSystem
             {
                 psm.RegisterEnemySkills(null);
             }
-            psm.BeginCombat(pMaxHP, enemy.maxHP, pDiceMax, enemy.diceMaxValue);
+            psm.BeginCombat(pMaxHP, enemy.maxHP, pDiceMax, enemy.diceMaxValue, enemy.threat);
+
+            // 装備ダイスの面をコンテキストに設定
+            var ctx = psm.Context;
+            if (ctx != null && equippedDiceFaces != null)
+            {
+                ctx.equippedDiceFaces = equippedDiceFaces;
+            }
 
             // 魔王の威圧 等の戦闘開始時スキル処理
             psm.FireTrigger(PassiveSkillTrigger.OnBattleStart);
@@ -307,7 +311,7 @@ namespace CombatSystem
             
             Debug.Log($"[CombatManager] ===== COMBAT START: {enemy.displayName} =====");
             Debug.Log($"  Player HP: {playerHP}/{this.playerMaxHP}, Dice: {playerDiceCount}d{playerDiceMax}, Crit: {playerCriticalNumerator}/9");
-            Debug.Log($"  Enemy  HP: {enemyHP}/{enemy.maxHP}, Dice: {enemy.DiceNotation}, Crit: {enemyCriticalNumerator}/9");
+            Debug.Log($"  Enemy  HP: {enemyHP}/{enemy.maxHP}, Dice: {enemy.DiceNotation}, Crit: {enemyCriticalNumerator}/9, Threat: {enemy.threat}");
         }
 
         // ===========================================================
@@ -345,10 +349,7 @@ namespace CombatSystem
             int actualPlayerDiceCount = playerDiceCount;
             int actualEnemyDiceCount = currentEnemy.diceCount + enemyExtraDice;
 
-            // enemyDiceDebuff（罠師/呪縛）の適用準備
-            int playerDiceDebuff = (int)ctx.GetBuff("enemyDiceDebuff");
-
-            int[] playerDice = RollDice(actualPlayerDiceCount, playerDiceMax);
+            int[] playerDice = RollDice(actualPlayerDiceCount, playerDiceMax, ctx.equippedDiceFaces);
             int[] enemyDice = RollDice(actualEnemyDiceCount, currentEnemy.diceMaxValue);
 
             // ===== LED演出実行 =====
@@ -368,16 +369,6 @@ namespace CombatSystem
 
             // パッシブスキルによるダイス処理
             psm.ProcessPostRoll(playerDice, enemyDice);
-
-            // enemyDiceDebuff をプレイヤーのダイス合計から減算
-            if (playerDiceDebuff > 0 && ctx != null)
-            {
-                ctx.playerDiceTotal = Math.Max(0, ctx.playerDiceTotal - playerDiceDebuff);
-                // diceDifference再計算
-                ctx.diceDifference = ctx.playerDiceTotal - ctx.enemyDiceTotal;
-                ctx.playerWonRoll = ctx.diceDifference > 0;
-                ctx.playerLostRoll = ctx.diceDifference < 0;
-            }
 
             // 敵スキルのPostRoll発火
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnPostRoll);
@@ -403,55 +394,14 @@ namespace CombatSystem
             };
 
             int diceDiff = Math.Abs(ctx.diceDifference);
-            int diceCountDiff = actualPlayerDiceCount - actualEnemyDiceCount;
 
             if (!result.isDraw)
             {
                 // (3) メインダメージ = ダイス合計差
                 int mainDmg = diceDiff;
 
-                // (4) 追撃/反撃ダメージ
-                int pursuitDmg = 0;
-                int counterDmg = 0;
-
-                if (diceCountDiff > 0)
-                {
-                    // (4-1) プレイヤーのダイスが多い場合
-                    if (result.playerWon)
-                    {
-                        // 勝者(プレイヤー)の追撃: 差分ダイスをリロール
-                        pursuitDmg = RollPursuitDice(diceCountDiff, playerDiceMax, ctx);
-                    }
-                    else
-                    {
-                        // 敗者(プレイヤー)の反撃: 差分ダイスをリロール → プレイヤーが敵に与える
-                        counterDmg = RollPursuitDice(diceCountDiff, playerDiceMax, ctx);
-                    }
-                }
-                else if (diceCountDiff < 0)
-                {
-                    // (4-2) 敵のダイスが多い場合
-                    int absDiff = Math.Abs(diceCountDiff);
-                    if (!result.playerWon)
-                    {
-                        // 勝者(敵)の追撃: 差分ダイスをリロール
-                        pursuitDmg = RollPursuitDice(absDiff, currentEnemy.diceMaxValue, ctx);
-                    }
-                    else
-                    {
-                        // 敗者(敵)の反撃: 差分ダイスをリロール → 敵がプレイヤーに与える
-                        counterDmg = RollPursuitDice(absDiff, currentEnemy.diceMaxValue, ctx);
-                    }
-                }
-
-                // 敵の多頭攻撃チェック（追撃ダイス追加）
-                int extraPursuitDice = (int)ctx.GetAccumulated("extraPursuitDice");
-                ctx.accumulatedValues["extraPursuitDice"] = 0;
-                if (extraPursuitDice > 0 && !result.playerWon)
-                {
-                    // 敵が勝っている場合に追撃追加
-                    pursuitDmg += RollPursuitDiceRaw(extraPursuitDice, currentEnemy.diceMaxValue);
-                }
+                // (4) 追撃ダメージ（パッシブ由来: ctx.pursuitDamage はスキル発火時にセット済み）
+                int pursuitDmg = ctx.pursuitDamage;
 
                 if (result.playerWon)
                 {
@@ -461,35 +411,37 @@ namespace CombatSystem
 
                     // 敵側のダメージ軽減パッシブを発火
                     psm.FireEnemyTrigger(PassiveSkillTrigger.OnPreReceiveDamage);
-                    psm.FireEnemyTrigger(PassiveSkillTrigger.OnPrePursuitDamage);
 
                     result.mainDamage = mainDmg;
                     result.pursuitDamage = pursuitDmg;
                     result.totalDamage = totalDmg;
                     result.fixedDamage = fixedDmg;
-                    result.counterDamage = counterDmg;
                     result.isCritical = isCrit;
 
-                    // 敵にダメージ適用
+                    // 敵にダメージ適用（メイン＋プレイヤー→敵固定）
                     enemyHP = Math.Max(0, enemyHP - totalDmg - fixedDmg);
-
-                    // 反撃ダメージ（敵のダイスが多い場合の敗者反撃）がある場合
-                    if (counterDmg > 0)
-                    {
-                        playerHP = Math.Max(0, playerHP - counterDmg);
-                    }
 
                     // 出血ダメージ
                     if (ctx.enemyBleedStacks > 0)
                     {
-                        enemyHP = Math.Max(0, enemyHP - ctx.enemyBleedStacks);
+                        int bleedDmg = BattleModifierManager.ApplyBleedModifiers(ctx, ctx.enemyBleedStacks);
+                        enemyHP = Math.Max(0, enemyHP - bleedDmg);
                     }
 
-                    // オーバーダメージ計算（夜スキル用）
+                    // 敵→プレイヤー固定ダメージ（TailStrike/Hellfire等）
+                    if (ctx.fixedDamageToPlayer > 0)
+                        playerHP = Math.Max(0, playerHP - ctx.fixedDamageToPlayer);
+
+                    // オーバーダメージ計算（蝕夜スキル用）
                     if (enemyHP == 0 && totalDmg > 0)
-                    {
-                        ctx.overDamageAccumulated = totalDmg + fixedDmg; // 簡易計算
-                    }
+                        ctx.overDamageAccumulated = totalDmg + fixedDmg;
+
+                    // === Scratch計算（敵パッシブScratchAuraがセット済みの場合のみ適用） ===
+                    ctx.scratchDamage = BattleModifierManager.ApplyScratchModifiers(ctx, ctx.scratchDamage);
+                    psm.FireTrigger(PassiveSkillTrigger.OnPreScratchDamage);
+                    if (!ctx.nullifyScratchDamage && ctx.scratchDamage > 0)
+                        playerHP = Math.Max(0, playerHP - ctx.scratchDamage);
+                    result.scratchDamage = ctx.nullifyScratchDamage ? 0 : ctx.scratchDamage;
 
                     // 敵側PostDealDamageトリガー
                     psm.FireEnemyTrigger(PassiveSkillTrigger.OnPostReceiveDamage);
@@ -497,54 +449,66 @@ namespace CombatSystem
                 else
                 {
                     // 敵が勝利 → プレイヤーにダメージ
-                    // 敵側の攻撃スキルを発火
                     psm.FireEnemyTrigger(PassiveSkillTrigger.OnPreDealDamage);
 
                     var (totalDmg, fixedDmg, isCrit) = psm.ProcessDamage(
-                        mainDmg, pursuitDmg, enemyCriticalNumerator);
+                        mainDmg, 0, enemyCriticalNumerator);
 
                     result.mainDamage = mainDmg;
-                    result.pursuitDamage = pursuitDmg;
+                    result.pursuitDamage = 0;
                     result.totalDamage = totalDmg;
                     result.fixedDamage = fixedDmg;
-                    result.counterDamage = counterDmg;
                     result.isCritical = isCrit;
 
-                    // プレイヤーにダメージ適用
+                    // プレイヤーにダメージ適用（メイン＋敵→プレイヤー固定）
                     playerHP = Math.Max(0, playerHP - totalDmg);
+                    if (ctx.fixedDamageToPlayer > 0)
+                        playerHP = Math.Max(0, playerHP - ctx.fixedDamageToPlayer);
 
-                    // 地獄の業火 等の固定ダメージ（敵側fixedDamageToEnemy → プレイヤーへ）
-                    // 敵視点で fixedDamageToEnemy = プレイヤーへの固定ダメ
+                    // 敗北時でも反撃・固定ダメージは敵に適用（Counter/Riposte等）
                     if (fixedDmg > 0)
+                        enemyHP = Math.Max(0, enemyHP - fixedDmg);
+
+                    // 出血ダメージ（敗北時も適用）
+                    if (ctx.enemyBleedStacks > 0)
                     {
-                        playerHP = Math.Max(0, playerHP - fixedDmg);
+                        int bleedDmg = BattleModifierManager.ApplyBleedModifiers(ctx, ctx.enemyBleedStacks);
+                        enemyHP = Math.Max(0, enemyHP - bleedDmg);
                     }
 
-                    // 反撃ダメージ（プレイヤーのダイスが多い場合の敗者反撃）
-                    if (counterDmg > 0)
-                    {
-                        enemyHP = Math.Max(0, enemyHP - counterDmg);
-                    }
+                    // scratchは敗北時なし（メインダメージに含有）
+                    result.scratchDamage = 0;
 
                     psm.FireEnemyTrigger(PassiveSkillTrigger.OnPostDealDamage);
                 }
             }
             else
             {
-                // 引き分け: ダメージなし
+                // 引き分け: メインダメージなし、scratchなし
                 result.mainDamage = 0;
                 result.pursuitDamage = 0;
                 result.totalDamage = 0;
-                result.fixedDamage = 0;
-                result.counterDamage = 0;
+                result.fixedDamage = ctx.fixedDamageToEnemy;
                 result.isCritical = false;
+                result.scratchDamage = 0;
+
+                // 引き分け時も固定ダメージは双方に適用
+                if (ctx.fixedDamageToEnemy > 0)
+                    enemyHP = Math.Max(0, enemyHP - ctx.fixedDamageToEnemy);
+                if (ctx.fixedDamageToPlayer > 0)
+                    playerHP = Math.Max(0, playerHP - ctx.fixedDamageToPlayer);
+
+                // 出血ダメージ（引き分け時も適用）
+                if (ctx.enemyBleedStacks > 0)
+                {
+                    int bleedDmg = BattleModifierManager.ApplyBleedModifiers(ctx, ctx.enemyBleedStacks);
+                    enemyHP = Math.Max(0, enemyHP - bleedDmg);
+                }
             }
 
-            // 死の宣告チェック（固定ダメージとして処理済み）
-            if (ctx.fixedDamageToEnemy >= 999)
-            {
+            // 死の宣告チェック（敵スキル由来の即死ダメージ）
+            if (ctx.fixedDamageToPlayer >= 999)
                 playerHP = 0;
-            }
 
             // コンテキストにHP同期
             ctx.playerCurrentHP = playerHP;
@@ -556,7 +520,7 @@ namespace CombatSystem
             psm.FireTrigger(PassiveSkillTrigger.OnTurnEnd);
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnTurnEnd);
 
-            // ターン終了スキルによるHP変動をCombatManagerに反映（棘鎧等）
+            // ターン終了スキルによるHP変動をCombatManagerに反映（剣鎧等）
             SyncHPFromContext(ctx);
 
             result.playerHPAfter = playerHP;
@@ -650,40 +614,21 @@ namespace CombatSystem
         //  ユーティリティ
         // ===========================================================
 
-        private int[] RollDice(int count, int maxValue)
+        private int[] RollDice(int count, int maxValue, int[] diceFaces = null)
         {
             var results = new int[count];
             for (int i = 0; i < count; i++)
             {
-                results[i] = UnityEngine.Random.Range(1, maxValue + 1);
+                if (diceFaces != null && diceFaces.Length > 0)
+                {
+                    results[i] = diceFaces[UnityEngine.Random.Range(0, diceFaces.Length)];
+                }
+                else
+                {
+                    results[i] = UnityEngine.Random.Range(1, maxValue + 1);
+                }
             }
             return results;
-        }
-
-        /// <summary>
-        /// 追撃ダイスをロール（パッシブ経由の追撃軽減は適用しない）
-        /// </summary>
-        private int RollPursuitDice(int count, int maxValue, CombatContext ctx)
-        {
-            int total = 0;
-            for (int i = 0; i < count; i++)
-            {
-                total += UnityEngine.Random.Range(1, maxValue + 1);
-            }
-            return total;
-        }
-
-        /// <summary>
-        /// 追撃ダイスをロール（パッシブなし、純粋ロール）
-        /// </summary>
-        private int RollPursuitDiceRaw(int count, int maxValue)
-        {
-            int total = 0;
-            for (int i = 0; i < count; i++)
-            {
-                total += UnityEngine.Random.Range(1, maxValue + 1);
-            }
-            return total;
         }
 
         private void SyncHPFromContext(CombatContext ctx)
@@ -707,7 +652,7 @@ namespace CombatSystem
             if (!r.isDraw)
             {
                 Debug.Log($"  Main: {r.mainDamage}, Pursuit: {r.pursuitDamage}, " +
-                          $"Total: {r.totalDamage}, Fixed: {r.fixedDamage}, Counter: {r.counterDamage}");
+                          $"Total: {r.totalDamage}, Fixed: {r.fixedDamage}, Scratch: {r.scratchDamage}");
             }
             Debug.Log($"  Player HP: {r.playerHPAfter}, Enemy HP: {r.enemyHPAfter}");
         }
