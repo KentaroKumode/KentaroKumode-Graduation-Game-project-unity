@@ -272,11 +272,6 @@ namespace InventorySystem
             }
             return true;
         }
-            }
-            
-            Debug.Log($"[GridManager] 配置可能: ({gridX}, {gridY})");
-            return true;
-        }
         
         /// <summary>
         /// アイテムを配置（セルの占有状態を更新 + 3Dオブジェクト配置）

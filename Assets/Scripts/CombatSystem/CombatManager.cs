@@ -277,7 +277,7 @@ namespace CombatSystem
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnBattleStart);
 
             // 敵の戦闘開始スキルによるHP減少適用
-            var ctx = psm.Context;
+            ctx = psm.Context;
             if (ctx != null)
             {
                 float hpReduction = ctx.GetAccumulated("enemyMaxHPReduction");

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using InventorySystem;
 using InventorySystem.PassiveSkills;
 
 namespace InventorySystem.Sigils
@@ -42,7 +43,7 @@ namespace InventorySystem.Sigils
         /// <summary>
         /// グリッド上の武器に隣接する刻印を検出し、CombatContextにボーナスを登録
         /// </summary>
-        public void ResolveSigils(Grid.GridManager gridManager, CombatContext ctx)
+        public void ResolveSigils(GridManager gridManager, CombatContext ctx)
         {
             if (gridManager == null || ctx == null) return;
 
@@ -52,9 +53,9 @@ namespace InventorySystem.Sigils
             var weaponRoots = new HashSet<Vector2Int>();
             var weaponCells = new Dictionary<Vector2Int, CompleteItemData>();
 
-            for (int y = 0; y < Core.InventoryConstants.GRID_HEIGHT; y++)
+            for (int y = 0; y < InventoryConstants.GRID_HEIGHT; y++)
             {
-                for (int x = 0; x < Core.InventoryConstants.GRID_WIDTH; x++)
+                for (int x = 0; x < InventoryConstants.GRID_WIDTH; x++)
                 {
                     var cell = gridManager.GetCell(x, y);
                     if (cell == null || !cell.IsOccupied) continue;
@@ -86,9 +87,9 @@ namespace InventorySystem.Sigils
 
             // 全セルを再スキャンして刻印を検出
             var processedSigils = new HashSet<string>();
-            for (int y = 0; y < Core.InventoryConstants.GRID_HEIGHT; y++)
+            for (int y = 0; y < InventoryConstants.GRID_HEIGHT; y++)
             {
-                for (int x = 0; x < Core.InventoryConstants.GRID_WIDTH; x++)
+                for (int x = 0; x < InventoryConstants.GRID_WIDTH; x++)
                 {
                     var cell = gridManager.GetCell(x, y);
                     if (cell == null || !cell.IsOccupied) continue;

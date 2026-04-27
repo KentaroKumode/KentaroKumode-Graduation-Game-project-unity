@@ -332,7 +332,8 @@ namespace InventorySystem.PassiveSkills.Effects
     {
         public string SkillId => "Execute";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollWin };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        // クラス名と同名メソッドを避けるため明示的インターフェース実装
+        void IPassiveSkillEffect.Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
             ctx.pendingDiceOverrides.Add(
                 new DiceOverrideRequest(DiceOverrideRequest.TargetDice.Lowest, 1, SkillId));
