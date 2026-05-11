@@ -70,5 +70,20 @@ namespace GameLoop
             if (run != null && run.lastStandActive) return 0;
             return gain;
         }
+
+        /// <summary>
+        /// ゴールド入手量を試みる前にこれを呼ぶ。ラストスタンド中なら 0 を返して入手を拒否。
+        /// 損失（負値）はそのまま通す。
+        /// </summary>
+        public static int FilterGoldGain(RunState run, int amount)
+        {
+            if (amount <= 0) return amount;
+            if (run != null && run.lastStandActive)
+            {
+                Debug.Log($"[ラストスタンド] ゴールド入手 {amount}G を無効化（死神は富を許さない）");
+                return 0;
+            }
+            return amount;
+        }
     }
 }

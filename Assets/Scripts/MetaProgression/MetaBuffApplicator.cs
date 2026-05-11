@@ -83,9 +83,10 @@ namespace MetaProgression
             float chance = GetRefundChance();
             if (chance <= 0f || paidAmount <= 0 || run == null) return 0;
             if (Random.value >= chance) return 0;
-            run.coins += paidAmount;
-            Debug.Log($"[MetaBuff] 返金発動: +{paidAmount}G");
-            return paidAmount;
+            int gain = GameLoop.LastStand.FilterGoldGain(run, paidAmount);
+            run.coins += gain;
+            if (gain > 0) Debug.Log($"[MetaBuff] 返金発動: +{gain}G");
+            return gain;
         }
 
         // ============================================================

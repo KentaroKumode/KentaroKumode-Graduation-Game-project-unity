@@ -77,9 +77,13 @@ namespace EventSystem
                     break;
 
                 case EventEffectType.GoldDelta:
-                    run.coins = Mathf.Max(0, run.coins + eff.amount);
-                    result.log.Add($"ゴールド{eff.amount:+0;-0} (現在 {run.coins})");
+                {
+                    int delta = eff.amount;
+                    if (delta > 0) delta = GameLoop.LastStand.FilterGoldGain(run, delta);
+                    run.coins = Mathf.Max(0, run.coins + delta);
+                    result.log.Add($"ゴールド{delta:+0;-0} (現在 {run.coins})");
                     break;
+                }
 
                 case EventEffectType.HungerDelta:
                     if (hunger != null)
@@ -264,9 +268,12 @@ namespace EventSystem
             switch (itemId)
             {
                 case "決意":
-                    run.coins += 1;
-                    result.log.Add("決意の獲得ボーナス: +1ゴールド");
+                {
+                    int gain = GameLoop.LastStand.FilterGoldGain(run, 1);
+                    run.coins += gain;
+                    result.log.Add($"決意の獲得ボーナス: +{gain}ゴールド");
                     break;
+                }
             }
         }
     }

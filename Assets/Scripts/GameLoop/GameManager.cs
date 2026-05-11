@@ -241,7 +241,7 @@ namespace GameLoop
                 int rewardBase = FloorManager.CalculateRewardCoins(Run.currentFloor, true, result.totalTurns) * 2;
                 // 傲慢: ボスはエリート以上扱いで報酬2倍（割合先）
                 if (prideActive) rewardBase *= 2;
-                int reward = rewardBase + metaWinGold;
+                int reward = LastStand.FilterGoldGain(Run, rewardBase + metaWinGold);
                 Run.coins += reward;
 
                 // メタ: ボス撃破時の追加パッシブ報酬
@@ -279,6 +279,7 @@ namespace GameLoop
                 else coins = 0;
             }
             coins += metaWinGold;
+            coins = LastStand.FilterGoldGain(Run, coins);
             Run.coins += coins;
             IsEliteSecondFight = false;
 

@@ -285,8 +285,9 @@ namespace InventorySystem.Shop
                 if (run.weaponMaterials <= 0) { Log("素材がない"); return false; }
                 int sellPrice = 15; // 基準売値（後で調整可）
                 run.weaponMaterials--;
-                run.coins += sellPrice;
-                Debug.Log($"[ShopManager] 強化素材売却: +{sellPrice}G");
+                int gain = GameLoop.LastStand.FilterGoldGain(run, sellPrice);
+                run.coins += gain;
+                Debug.Log($"[ShopManager] 強化素材売却: +{gain}G");
                 OnShopUpdated?.Invoke();
                 return true;
             }
@@ -297,8 +298,9 @@ namespace InventorySystem.Shop
             string id = list[listIndex];
             int price = ResolveSellPrice(id);
             list.RemoveAt(listIndex);
-            run.coins += price;
-            Debug.Log($"[ShopManager] 売却: {id} +{price}G");
+            int gainPrice = GameLoop.LastStand.FilterGoldGain(run, price);
+            run.coins += gainPrice;
+            Debug.Log($"[ShopManager] 売却: {id} +{gainPrice}G");
             OnShopUpdated?.Invoke();
             return true;
         }
