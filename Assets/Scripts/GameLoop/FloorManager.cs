@@ -40,12 +40,13 @@ namespace GameLoop
         {
             if (!playerWon) return 0;
 
-            // 基本報酬: フロア × 10
-            int baseReward = floor * 10;
+            // 基本報酬: フロア + 3 (1層=4, 6層=9。約2.25倍カーブ、速度ボーナス無し)
+            int baseReward = floor + 3;
 
-            // 速度ボーナス: 5ターン以内ならx1.5
-            if (turnsUsed <= 5)
-                baseReward = Mathf.CeilToInt(baseReward * 1.5f);
+            // フロアデバフの報酬倍率（Fortune層・shopPriceMultiplier等）
+            var mod = MapSystem.FloorModifierDatabase.Get(floor);
+            if (mod != null && Mathf.Abs(mod.coinRewardMultiplier - 1f) > 0.001f)
+                baseReward = Mathf.CeilToInt(baseReward * mod.coinRewardMultiplier);
 
             return baseReward;
         }

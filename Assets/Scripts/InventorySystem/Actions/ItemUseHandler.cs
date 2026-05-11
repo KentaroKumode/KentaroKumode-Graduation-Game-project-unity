@@ -35,10 +35,24 @@ namespace InventorySystem
                 Debug.LogWarning("[ItemUseHandler] Item is not usable");
                 return;
             }
-            
+
+            // 恒久デバフ「クェシナの怠惰」: 戦闘開始から3T間、消費アイテム使用不可
+            if (item.category == ItemCategory.Consumable)
+            {
+                var run = GameLoop.GameManager.Instance?.Run;
+                var combat = CombatManager.Instance;
+                if (combat != null && combat.IsCombatActive
+                    && combat.CurrentCombatTurn >= 1 && combat.CurrentCombatTurn <= 3
+                    && MetaProgression.PermanentDebuffEffects.HasSloth(run))
+                {
+                    Debug.LogWarning($"[ItemUseHandler] {MetaProgression.PermanentDebuffIds.Sloth}: 戦闘開始から3T間は消費アイテム使用不可 (現在 {combat.CurrentCombatTurn}T)");
+                    return;
+                }
+            }
+
             // 確認ダイアログ（後で実装）
             // TODO: WarningDialogで確認
-            
+
             // 使用実行
             ExecuteUse(item, slot);
         }

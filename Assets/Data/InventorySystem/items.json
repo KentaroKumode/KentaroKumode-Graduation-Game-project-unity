@@ -11,7 +11,7 @@
       "diceCount": 2,
       "diceMax": 3,
       "criticalRate": 0,
-      "basePrice": 30,
+      "basePrice": 10,
       "passiveSkills": [
         { "internalName": "FortitudeI", "skillName": "頑強I", "description": "被ダメージ-1" }
       ]
@@ -698,6 +698,50 @@
       "passiveSkills": [
         { "internalName": "Judgement", "skillName": "裁定", "description": "ダイス合計が敵の2倍以上で追撃+5、敵が2倍以上で被ダメ0" }
       ]
-    }
+    },
+
+    { "id": "希望の灯片", "name": "希望の灯片", "description": "途切れず瞬く小さな灯。戦いの後の傷を癒す。", "flavorText": "今わの際、薄れゆく意識の中、それでも灯は輝き続ける。", "category": "Passive", "rarity": "SILVER", "sizeX": 2, "sizeY": 2, "basePrice": 25, "passiveSkills": [
+        { "internalName": "希望の灯片", "skillName": "希望の灯", "description": "戦闘終了時、HP+3 回復" }
+    ] },
+    { "id": "巡礼者の杖", "name": "巡礼者の杖", "description": "歩み続けた巡礼者の遺品。歩みのリズムが空腹を慰める。", "flavorText": "歩み続けた巡礼者の遺品。掌に残る温もりは、誰のものか定かではない。", "category": "Passive", "rarity": "SILVER", "sizeX": 2, "sizeY": 2, "basePrice": 25, "passiveSkills": [
+        { "internalName": "巡礼者の杖", "skillName": "巡礼の歩み", "description": "戦闘終了時、50%で空腹度+1" }
+    ] },
+    { "id": "記憶の砂時計", "name": "記憶の砂時計", "description": "落ちぬはずの砂が確かに落ち続ける、止まった砂時計。", "flavorText": "逆さにしても砂は戻らない。だが、砂は確かに落ち続けている。", "category": "Passive", "rarity": "GOLD", "sizeX": 2, "sizeY": 2, "basePrice": 50, "passiveSkills": [
+        { "internalName": "記憶の砂時計", "skillName": "時の砂", "description": "戦闘1ターン目、最低出目のダイスを最大値に置換" }
+    ] },
+    { "id": "激情の刃", "name": "激情の刃", "description": "鞘から抜くたびに鳴る、押し殺された誰かの声。瀕死の刃に宿る。", "flavorText": "鞘から抜くたびに鳴る、押し殺された誰かの声。", "category": "Passive", "rarity": "GOLD", "sizeX": 2, "sizeY": 2, "basePrice": 50, "passiveSkills": [
+        { "internalName": "激情の刃", "skillName": "激情", "description": "HPが最大値の50%以下のとき、与ダメ+30%" }
+    ] },
+
+    { "id": "黄昏の懐中時計", "name": "黄昏の懐中時計", "description": "時を測るのではなく、戦況を測る古い時計。長引いた戦闘ほど精度を増す。", "flavorText": "針が止まる頃、戦場の天秤がようやく傾く。", "category": "Passive", "rarity": "GOLD", "sizeX": 2, "sizeY": 2, "basePrice": 50, "passiveSkills": [] },
+    { "id": "苦難の刻印", "name": "苦難の刻印", "description": "瀕死のさなかにこそ守る刻印。痛みを刻むほど鋭くなる。", "flavorText": "傷を重ねた皮膚に焼き付いた印。痛みは消えない。それを抱えて歩む。", "category": "Passive", "rarity": "SILVER", "sizeX": 2, "sizeY": 2, "basePrice": 25, "passiveSkills": [] },
+    { "id": "死神の数珠", "name": "死神の数珠", "description": "命を数えるための数珠。一つ繰るたびにわずかな対価が落ちてくる。", "flavorText": "一玉繰るたびに、誰かが見送られる。返礼は静かに転がり落ちる。", "category": "Passive", "rarity": "SILVER", "sizeX": 2, "sizeY": 2, "basePrice": 25, "passiveSkills": [] },
+    { "id": "嵐の徽章", "name": "嵐の徽章", "description": "戦の最初の一閃に嵐が宿るとされる古い徽章。", "flavorText": "先陣を切る者の胸に飾られた、嵐の名を冠する徽章。風はいつも一瞬で過ぎる。", "category": "Passive", "rarity": "GOLD", "sizeX": 2, "sizeY": 2, "basePrice": 50, "passiveSkills": [] },
+    { "id": "沈黙の剣帯", "name": "沈黙の剣帯", "description": "言葉も薬も寄せ付けない誓いの帯。剣だけが応える。", "flavorText": "言葉も薬も寄せ付けぬ誓い。剣だけが応える。", "category": "Passive", "rarity": "LEGENDARY", "sizeX": 2, "sizeY": 2, "basePrice": 100, "passiveSkills": [] },
+    { "id": "灯心の鈴", "name": "灯心の鈴", "description": "歩むたびに微かに灯る小さな鈴。空腹を慰める何かを呼び寄せる。", "flavorText": "歩むたびに微かに鳴る。応えるのは何か、答えはまだない。", "category": "Passive", "rarity": "BRONZE", "sizeX": 2, "sizeY": 2, "basePrice": 10, "passiveSkills": [] },
+
+    { "id": "throwing_dagger_sheath", "name": "投げ短剣の鞘", "description": "腰元に隠した小刀を即座に投げる構えを助ける鞘。", "flavorText": "投げ手の勘所は、鞘の擦り切れ具合に宿る。", "category": "Passive", "rarity": "BRONZE", "sizeX": 2, "sizeY": 2, "basePrice": 10, "passiveSkills": [{ "internalName": "PursuitI", "skillName": "追撃I", "description": "ロール勝利時、与ダメ+2" }] },
+    { "id": "twin_blade_gauntlet", "name": "連刃の篭手", "description": "連続斬撃を補助する刃の組み込まれた篭手。", "flavorText": "一の太刀を防ぎ切り、安堵した敵の首と胴体は泣き別れた。", "category": "Passive", "rarity": "SILVER", "sizeX": 2, "sizeY": 2, "basePrice": 25, "passiveSkills": [{ "internalName": "PursuitII", "skillName": "追撃II", "description": "ロール勝利時、与ダメ+4" }] },
+    { "id": "thousand_arms_blade", "name": "千手の戦刃", "description": "千の腕が同時に振るわれるかのような幻惑を生む業物。", "flavorText": "重圧か速さか幻覚か、千の刃と相対する。", "category": "Passive", "rarity": "GOLD", "sizeX": 2, "sizeY": 2, "basePrice": 50, "passiveSkills": [{ "internalName": "PursuitIII", "skillName": "追撃III", "description": "ロール勝利時、与ダメ+6" }] },
+
+    { "id": "leather_handguard", "name": "革の手甲", "description": "受け流しに長けた素朴な革製の手甲。", "flavorText": "受け流しは、最初の一撃を生き延びた者だけが学ぶ。", "category": "Passive", "rarity": "BRONZE", "sizeX": 2, "sizeY": 2, "basePrice": 10, "passiveSkills": [{ "internalName": "CounterI", "skillName": "反撃I", "description": "被弾時に反撃ダメージ+1" }] },
+    { "id": "steel_gauntlet", "name": "鋼の籠手", "description": "重く硬い鋼鉄の籠手。受けの強さで知られる。", "flavorText": "重く、固く、返礼を惜しまない。被弾の鈍い音が誇りとなる。", "category": "Passive", "rarity": "SILVER", "sizeX": 2, "sizeY": 2, "basePrice": 25, "passiveSkills": [{ "internalName": "CounterII", "skillName": "反撃II", "description": "被弾時に反撃ダメージ+2" }] },
+    { "id": "supreme_counter_gauntlet", "name": "反撃の極甲", "description": "受けと返しを極めた古の戦士の籠手。", "flavorText": "致命傷を確信したとき、もっとも大きな隙が生まれる。", "category": "Passive", "rarity": "GOLD", "sizeX": 2, "sizeY": 2, "basePrice": 50, "passiveSkills": [{ "internalName": "CounterIII", "skillName": "反撃III", "description": "被弾時に反撃ダメージ+3" }] },
+
+    { "id": "strength_belt", "name": "力帯", "description": "腰回りに巻くことで踏み込みを安定させる帯。", "flavorText": "腰の据わりが、振るう刃の重みを変える。", "category": "Passive", "rarity": "BRONZE", "sizeX": 2, "sizeY": 2, "basePrice": 10, "passiveSkills": [{ "internalName": "MightI", "skillName": "剛力I", "description": "各ダイス出目+1（合計値補正）" }] },
+    { "id": "iron_armband", "name": "鋼鉄の腕輪", "description": "鋼鉄を編んだ腕輪。腕力を底上げする重み。", "flavorText": "鋼鉄を編んだ腕輪は、腕の長さを変えはしない。だが届く先は確かに伸びる。", "category": "Passive", "rarity": "SILVER", "sizeX": 2, "sizeY": 2, "basePrice": 25, "passiveSkills": [{ "internalName": "MightII", "skillName": "剛力II", "description": "各ダイス出目+2（合計値補正）" }] },
+    { "id": "giants_armband", "name": "巨人の腕輪", "description": "巨人の腕に巻かれていたとされる伝説の腕輪。", "flavorText": "伝承の巨人の腕に巻かれていた品。誰の腕にも合うが、振るうには相応の覚悟が要る。", "category": "Passive", "rarity": "GOLD", "sizeX": 2, "sizeY": 2, "basePrice": 50, "passiveSkills": [{ "internalName": "MightIII", "skillName": "剛力III", "description": "各ダイス出目+3（合計値補正）" }] },
+
+    { "id": "leather_chestguard", "name": "革の胸当て", "description": "簡素な革製の胸当て。被弾を和らげる。", "flavorText": "擦り傷だらけの革。それでも、肌の上にあるだけで違う。", "category": "Passive", "rarity": "BRONZE", "sizeX": 2, "sizeY": 2, "basePrice": 10, "passiveSkills": [{ "internalName": "FortitudeI", "skillName": "堅忍I", "description": "被ダメ-1" }] },
+    { "id": "chain_mail", "name": "鎖帷子", "description": "鎖を編み上げた防具。鋭い刃を弾く。", "flavorText": "重さを嫌って致命傷を負った人間は少なくない。生きていてこそ、反撃があるのだ。", "category": "Passive", "rarity": "SILVER", "sizeX": 2, "sizeY": 2, "basePrice": 25, "passiveSkills": [{ "internalName": "FortitudeII", "skillName": "堅忍II", "description": "被ダメ-2" }] },
+    { "id": "immovable_chestplate", "name": "不動の胸当て", "description": "如何なる衝撃も揺るがさぬとされる名匠の胸当て。", "flavorText": "如何なる衝撃も揺るがさぬ、と謳われる。揺るがないのは胸当てか、着る者か。", "category": "Passive", "rarity": "GOLD", "sizeX": 2, "sizeY": 2, "basePrice": 50, "passiveSkills": [{ "internalName": "FortitudeIII", "skillName": "堅忍III", "description": "被ダメ-3" }] },
+
+    { "id": "observers_glasses", "name": "観察者の眼鏡", "description": "敵の動きをわずかに先読みする補助具。", "flavorText": "曇った硝子越しでも、敵の癖は意外なほど見える。", "category": "Passive", "rarity": "BRONZE", "sizeX": 2, "sizeY": 2, "basePrice": 10, "passiveSkills": [{ "internalName": "InsightI", "skillName": "慧眼I", "description": "会心率+1/9" }] },
+    { "id": "hawks_eye", "name": "鷹の眼", "description": "鋭く澄んだ視野を与える石を埋め込んだ眼帯。", "flavorText": "埋め込まれた緑の石が、瞬きの度に輝く。視線の先にあるものを見落とさない。", "category": "Passive", "rarity": "SILVER", "sizeX": 2, "sizeY": 2, "basePrice": 25, "passiveSkills": [{ "internalName": "InsightII", "skillName": "慧眼II", "description": "会心率+2/9" }] },
+    { "id": "divine_insight", "name": "神の見識", "description": "神の視座から戦場を見下ろすが如き恩恵。", "flavorText": "視座を一段高く据える。神の如く戦場を見下ろせば、踊る駒の動きが読める。", "category": "Passive", "rarity": "GOLD", "sizeX": 2, "sizeY": 2, "basePrice": 50, "passiveSkills": [{ "internalName": "InsightIII", "skillName": "慧眼III", "description": "会心率+3/9" }] },
+
+    { "id": "healing_ring", "name": "治癒の指輪", "description": "ささやかな自然治癒を促す古い指輪。", "flavorText": "古い指輪。傷の治りが少しだけ早くなる、と言われている。", "category": "Passive", "rarity": "BRONZE", "sizeX": 2, "sizeY": 2, "basePrice": 10, "passiveSkills": [{ "internalName": "VitalityI", "skillName": "活力I", "description": "戦闘終了時HP+1" }] },
+    { "id": "life_orb", "name": "生命の宝玉", "description": "脈打つ赤い宝玉。傷を繕う温かさを発する。", "flavorText": "脈打つ赤い宝玉。手に取ると、自分のものではない鼓動が伝わる。", "category": "Passive", "rarity": "SILVER", "sizeX": 2, "sizeY": 2, "basePrice": 25, "passiveSkills": [{ "internalName": "VitalityII", "skillName": "活力II", "description": "戦闘終了時HP+2" }] },
+    { "id": "undying_heart", "name": "不死の心臓", "description": "止まらぬ鼓動を持つとされる伝説の臓器。", "flavorText": "この拍動は永遠に続くのだろう。持ち主が倒れ、その次の持ち主が倒れ、そして私が倒れても...", "category": "Passive", "rarity": "GOLD", "sizeX": 2, "sizeY": 2, "basePrice": 50, "passiveSkills": [{ "internalName": "VitalityIII", "skillName": "活力III", "description": "戦闘終了時HP+3" }] }
   ]
 }

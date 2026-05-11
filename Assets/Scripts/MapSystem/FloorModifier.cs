@@ -92,9 +92,10 @@ namespace MapSystem
             {
                 id = "purgatory_brand",
                 displayName = "煉獄の刻印",
-                description = "空腹度上限-3 / 空腹時ダメージ×2",
+                description = "空腹度上限-3 / 空腹時ダメージ×2 / ショップ価格+20%",
                 hungerMaxBonus = -3,
                 starvationDamageOverride = 0.2f,
+                shopPriceMultiplier = 1.2f,
             });
 
             // ============================================================
@@ -105,9 +106,10 @@ namespace MapSystem
             {
                 id = "hell_gate",
                 displayName = "地獄門",
-                description = "全ダイス最大値-1 / 敗北時の被ダメージ-2",
+                description = "全ダイス最大値-1 / 敗北時の被ダメージ-2 / ショップ価格+40%",
                 diceMaxBonus = -1,
                 defeatDamageReduction = 2,
+                shopPriceMultiplier = 1.4f,
             });
 
             // ============================================================

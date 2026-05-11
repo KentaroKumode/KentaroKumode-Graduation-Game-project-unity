@@ -105,6 +105,20 @@ namespace InventorySystem.PassiveSkills
         public int fixedDamageToEnemy;  // プレイヤー→敵への軽減不可固定ダメージ
         public int fixedDamageToPlayer; // 敵→プレイヤーへの軽減不可固定ダメージ
 
+        // ===== イベント由来時限バフ =====
+        /// <summary>共助: 1ターン目の敵の攻撃ダメージを半減（適用後にfalse）</summary>
+        public bool halveFirstEnemyAttack;
+        /// <summary>獣の絆: 被弾を回数分無効化（>0時、被弾時にデクリメント）</summary>
+        public int playerDamageNegateCharges;
+        /// <summary>獣の恩義: 1ターン目の敵ロールを0扱いに（適用後にfalse）</summary>
+        public bool nullifyFirstEnemyRoll;
+        /// <summary>呪いの渇き: HP回復効果半減</summary>
+        public bool healHalved;
+        /// <summary>亡者の招待: 被ダメ+30% (0.3 = +30%)</summary>
+        public float receivedDamageBonus;
+        /// <summary>激情の刃 等の与ダメ倍率（1.0 = 変化なし。BeginNewTurn でリセット）</summary>
+        public float outgoingDamageMultiplier = 1f;
+
         // ===== 刻印システム =====
         /// <summary>刻印による追加パッシブ効果（戦闘開始時に解決済み）</summary>
         public List<SigilBonus> activeSigilBonuses = new List<SigilBonus>();
@@ -166,6 +180,9 @@ namespace InventorySystem.PassiveSkills
 
             // ダイス制約を適用
             enemyDiceOverrides.Clear();
+
+            // 与ダメ倍率は毎ターンリセット（パッシブが毎ターン再評価する）
+            outgoingDamageMultiplier = 1f;
         }
 
         /// <summary>蓄積値を安全に取得（キーが無ければ0）</summary>

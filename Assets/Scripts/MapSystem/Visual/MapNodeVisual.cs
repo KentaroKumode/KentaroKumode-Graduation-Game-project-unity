@@ -22,15 +22,30 @@ namespace MapSystem.Visual
         private TileIconAtlas atlas;
         private NodeVisualState currentState;
 
-        // === 色設定 ===
-        private static readonly Color colorDefault   = new Color(0.4f, 0.4f, 0.4f, 0.7f);
-        private static readonly Color colorReachable = new Color(1f, 1f, 1f, 1f);
-        private static readonly Color colorCurrent   = new Color(1f, 0.85f, 0.3f, 1f);
-        private static readonly Color colorVisited   = new Color(0.7f, 0.65f, 0.5f, 0.9f);
+        /// <summary>MapVisualizer から渡されるノード色パレット</summary>
+        public struct ColorPalette
+        {
+            public Color Default;
+            public Color Visited;
+            public Color Reachable;
+            public Color Current;
+            public Color BossDeep;
+            public Color BossBright;
+        }
 
-        // ボス専用色 (どす黒い血の赤、まがまがしい脈動)
-        private static readonly Color bossDeep    = new Color(0.18f, 0.02f, 0.02f, 1f); // 深い暗赤
-        private static readonly Color bossBright  = new Color(0.65f, 0.05f, 0.05f, 1f); // 血の赤
+        // === 色設定 (Inspector で MapVisualizer 経由で調整可能) ===
+        private ColorPalette palette;
+
+        // 色未設定時のフォールバック
+        private static readonly ColorPalette DefaultPalette = new ColorPalette
+        {
+            Default    = new Color(0.4f, 0.4f, 0.4f, 0.7f),
+            Visited    = new Color(0.7f, 0.65f, 0.5f, 0.9f),
+            Reachable  = new Color(1f, 1f, 1f, 1f),
+            Current    = new Color(1f, 0.85f, 0.3f, 1f),
+            BossDeep   = new Color(0.18f, 0.02f, 0.02f, 1f),
+            BossBright = new Color(0.65f, 0.05f, 0.05f, 1f),
+        };
 
         private float pulseTimer;
         private Color tileBaseColor; // タイル種別の基色（明滅などの計算基準）
@@ -39,10 +54,11 @@ namespace MapSystem.Visual
         public string NodeId => node?.id;
         public NodeVisualState CurrentState => currentState;
 
-        public void Initialize(MapNode node, TileIconAtlas atlas = null)
+        public void Initialize(MapNode node, TileIconAtlas atlas = null, ColorPalette? colorPalette = null)
         {
             this.node = node;
             this.atlas = atlas;
+            this.palette = colorPalette ?? DefaultPalette;
             sr = GetComponent<SpriteRenderer>();
             if (sr == null) sr = gameObject.AddComponent<SpriteRenderer>();
 
@@ -118,7 +134,7 @@ namespace MapSystem.Visual
             // ボスだけ特別扱い: アイコンを血の赤で染める
             isBoss = (type == TileType.Boss);
             if (isBoss)
-                tileBaseColor = bossDeep;
+                tileBaseColor = palette.BossDeep;
 
             // 状態色を再適用（明滅などの基準色を更新したため）
             SetState(currentState);
@@ -149,13 +165,11 @@ namespace MapSystem.Visual
             // ボスは状態に関係なく、まがまがしい遅い脈動を続ける
             if (isBoss)
             {
-                // 1.2 Hz 程度のゆっくりした鼓動 + 不規則感を演出する2倍音重ね
                 pulseTimer += Time.deltaTime * 1.2f;
                 float pulse = 0.5f + Mathf.Sin(pulseTimer) * 0.35f
                                    + Mathf.Sin(pulseTimer * 2.7f) * 0.10f;
                 pulse = Mathf.Clamp01(pulse);
-                Color c = Color.Lerp(bossDeep, bossBright, pulse);
-                // Reachable / Current 状態では更にわずかに明るく
+                Color c = Color.Lerp(palette.BossDeep, palette.BossBright, pulse);
                 if (currentState == NodeVisualState.Reachable) c *= 1.15f;
                 else if (currentState == NodeVisualState.Current) c *= 1.3f;
                 sr.color = c;
@@ -175,27 +189,27 @@ namespace MapSystem.Visual
         /// </summary>
         private void ApplyStateColor(float pulsePhase)
         {
+            // 各状態を単色置き換えで適用 (タイル基色とブレンドしない)
+            // Reachable / Current は明滅のため明度を脈動させる
             switch (currentState)
             {
                 case NodeVisualState.Default:
-                    sr.color = Blend(tileBaseColor, colorDefault, 0.7f);
+                    sr.color = palette.Default;
+                    break;
+                case NodeVisualState.Visited:
+                    sr.color = palette.Visited;
                     break;
                 case NodeVisualState.Reachable:
-                    // 基色を白めに引き上げ、明滅でわずかに揺らす
                     {
-                        float t = 0.5f + pulsePhase * 0.15f; // 0.35..0.65
-                        sr.color = Color.Lerp(tileBaseColor, colorReachable, t);
+                        float b = 0.85f + pulsePhase * 0.15f; // 0.7..1.0
+                        sr.color = ScaleRgb(palette.Reachable, b);
                     }
                     break;
                 case NodeVisualState.Current:
-                    // 黄色寄りに振り、明度を波打たせる
                     {
-                        float t = 0.85f + pulsePhase * 0.15f; // 0.7..1.0
-                        sr.color = Color.Lerp(tileBaseColor, colorCurrent, t);
+                        float b = 0.80f + pulsePhase * 0.20f; // 0.6..1.0
+                        sr.color = ScaleRgb(palette.Current, b);
                     }
-                    break;
-                case NodeVisualState.Visited:
-                    sr.color = Blend(tileBaseColor, colorVisited, 0.5f);
                     break;
             }
         }
@@ -223,6 +237,12 @@ namespace MapSystem.Visual
         private static Color Blend(Color a, Color b, float t)
         {
             return Color.Lerp(a, b, t);
+        }
+
+        /// <summary>RGB だけ係数倍して明度を変える (アルファは不変)</summary>
+        private static Color ScaleRgb(Color c, float k)
+        {
+            return new Color(c.r * k, c.g * k, c.b * k, c.a);
         }
     }
 }

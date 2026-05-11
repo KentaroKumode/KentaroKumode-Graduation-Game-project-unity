@@ -239,6 +239,93 @@
         { "internalName": "Undying", "skillName": "不死者", "description": "毎ターン開始時、HP1回復" },
         { "internalName": "ScratchAura", "skillName": "威圧", "description": "勝利されても削りダメージを与える" }
       ]
+    },
+    {
+      "id": "13th_death",
+      "displayName": "13番目の死",
+      "description": "大穴の伝承に語られる「13番目の死神」の影。本体は小さな霊体だが、その存在自体が13の宣告を呼び込む。",
+      "floor": 2,
+      "maxHP": 13,
+      "diceCount": 1,
+      "diceMaxValue": 3,
+      "criticalNumerator": 1,
+      "threat": 3,
+      "passiveSkills": [
+        { "internalName": "Decree13th", "skillName": "13番目の宣告", "description": "毎ターン13%で宣告。ターン終了時に本体が生存していれば、両者ダイス合計の会心ダメージをプレイヤーに与える（軽減無視）" }
+      ]
+    },
+    {
+      "id": "boss_layer2",
+      "displayName": "ゴブリン王",
+      "description": "群れを統べる大柄なゴブリン。号令一つで配下を呼び出す。",
+      "floor": 2,
+      "maxHP": 25,
+      "diceCount": 2,
+      "diceMaxValue": 4,
+      "criticalNumerator": 1,
+      "threat": 4,
+      "passiveSkills": [
+        { "internalName": "GoblinKingsCall", "skillName": "号令", "description": "毎ターン、自身のダイス合計+2" }
+      ]
+    },
+    {
+      "id": "boss_layer3",
+      "displayName": "凍れる吟遊詩人",
+      "description": "凍りついた吟遊詩人。歌が空気を凍らせ、聞き続けた者は動けなくなる。",
+      "floor": 3,
+      "maxHP": 35,
+      "diceCount": 1,
+      "diceMaxValue": 6,
+      "criticalNumerator": 2,
+      "threat": 5,
+      "passiveSkills": [
+        { "internalName": "FrozenBardSong", "skillName": "凍えの旋律", "description": "プレイヤーが3ターン連続で消費アイテムを使わないと、毎ターン敵の与ダメ+1が蓄積（上限+5）。アイテム使用でリセット" }
+      ]
+    },
+    {
+      "id": "boss_layer4",
+      "displayName": "鏡の双子",
+      "description": "鏡像のように同じ動きを繰り返す双子。打撃の重さがそのまま跳ね返る。",
+      "floor": 4,
+      "maxHP": 45,
+      "diceCount": 2,
+      "diceMaxValue": 3,
+      "criticalNumerator": 0,
+      "threat": 5,
+      "passiveSkills": [
+        { "internalName": "MirrorTwinsResponse", "skillName": "鏡映の応答", "description": "プレイヤーが10以上のダメージを与えたターン、次ターン開始時に同値を固定ダメで反射" }
+      ]
+    },
+    {
+      "id": "boss_layer5",
+      "displayName": "業火の審判官",
+      "description": "罪人を裁く炎の審判官。罪深きほどその業火は強く燃え盛る。",
+      "floor": 5,
+      "maxHP": 90,
+      "diceCount": 3,
+      "diceMaxValue": 5,
+      "criticalNumerator": 3,
+      "threat": 8,
+      "passiveSkills": [
+        { "internalName": "JudgmentFlames", "skillName": "審判の炎", "description": "毎ターン終了時、固定2ダメ + 所持パッシブ数×0.5ダメ（切り上げ、軽減無視）" }
+      ]
+    },
+    {
+      "id": "boss_layer6",
+      "displayName": "灰燼の王",
+      "description": "灰と燃え残りで形を成す古き王。永劫の業火を纏い、終わりを呼ぶ。",
+      "floor": 6,
+      "maxHP": 120,
+      "diceCount": 3,
+      "diceMaxValue": 6,
+      "criticalNumerator": 3,
+      "threat": 10,
+      "passiveSkills": [
+        { "internalName": "RoyalEmber", "skillName": "王の業炎", "description": "毎ターン終了時、灰の烙印スタック+1。次ターン開始時にスタック数ぶんの固定ダメ（軽減無視）" },
+        { "internalName": "SinChain", "skillName": "業の連鎖", "description": "プレイヤーがロール勝利するたびに敵与ダメ+1累積（上限+5）。ロール敗北でリセット" },
+        { "internalName": "EternalBurning", "skillName": "永劫の燃焼", "description": "プレイヤーHP割合に応じて与ダメ+: 50%以下+2 / 25%以下+3 / 10%以下+5" },
+        { "internalName": "ReturnToAshes", "skillName": "灰燼への回帰", "description": "自身のHP50%以下で、毎ターン開始時に最大HPの5%回復" }
+      ]
     }
   ]
 }

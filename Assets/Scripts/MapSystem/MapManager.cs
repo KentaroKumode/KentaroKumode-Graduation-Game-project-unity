@@ -52,6 +52,9 @@ namespace MapSystem
             int hunger = (floor == 6) ? 3 : hungerPerFloor;
             Hunger.Initialize(hunger);
 
+            // メタデバフ Lv4: 初期位置で視界を反映
+            ApplyMetaSightLimit();
+
             OnMapGenerated?.Invoke(CurrentMap);
         }
 
@@ -104,9 +107,47 @@ namespace MapSystem
                 OnMysteryResolved?.Invoke(target, target.resolvedType.Value);
             }
 
+            // メタデバフ Lv4: 視界制限を再計算
+            ApplyMetaSightLimit();
+
             OnNodeEntered?.Invoke(target);
 
             return starvationDmg;
+        }
+
+        /// <summary>メタデバフ Lv4 前途多難: 現在地から N ホップ先まで以外を unrevealed に。</summary>
+        private void ApplyMetaSightLimit()
+        {
+            int limit = MetaProgression.MetaDebuffApplicator.GetMapSightLimit();
+            if (limit <= 0 || CurrentMap == null || CurrentNode == null) return;
+
+            var nodes = CurrentMap.GetAllNodes();
+            // BFS で各ノードの距離を計算
+            var dist = new Dictionary<string, int>();
+            var queue = new Queue<string>();
+            dist[CurrentNode.id] = 0;
+            queue.Enqueue(CurrentNode.id);
+            while (queue.Count > 0)
+            {
+                string id = queue.Dequeue();
+                int d = dist[id];
+                if (d >= limit) continue;
+                var n = CurrentMap.GetNode(id);
+                if (n == null) continue;
+                foreach (var conn in n.connections)
+                {
+                    if (dist.ContainsKey(conn)) continue;
+                    dist[conn] = d + 1;
+                    queue.Enqueue(conn);
+                }
+            }
+
+            foreach (var n in nodes)
+            {
+                if (n == null) continue;
+                bool inSight = dist.ContainsKey(n.id) || n.visited; // 訪問済みは見える
+                n.revealed = inSight;
+            }
         }
 
         /// <summary>前哨基地効果: 空腹度全回復</summary>

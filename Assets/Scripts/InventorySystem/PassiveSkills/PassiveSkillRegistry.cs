@@ -174,6 +174,24 @@ namespace InventorySystem.PassiveSkills
             Register(new NightLord());
             Register(new DeathSentence());
             Register(new ScratchAura());
+
+            // 6層 SinAltar 由来 (CombatManager から動的に注入される)
+            Register(new Boss6Golgotha());
+            Register(new Boss6SeveredTime());
+            Register(new Boss6Ashen());
+
+            // 13番目の死
+            Register(new Decree13th());
+
+            // 各層ボス専用パッシブ
+            Register(new GoblinKingsCall());
+            Register(new FrozenBardSong());
+            Register(new MirrorTwinsResponse());
+            Register(new JudgmentFlames());
+            Register(new RoyalEmber());
+            Register(new SinChain());
+            Register(new EternalBurning());
+            Register(new ReturnToAshes());
         }
     }
 }

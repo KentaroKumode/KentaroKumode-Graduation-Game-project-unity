@@ -13,6 +13,7 @@ namespace MapSystem
         Mystery,        // ?マス — 他タイプに解決
         Trap,           // 罠
         Boss,           // ボス
+        SinAltar,       // 6層ボス前の儀式祭壇 — 3段階の支払いで永続デバフを回避
     }
 
     /// <summary>イベントのレアリティ</summary>

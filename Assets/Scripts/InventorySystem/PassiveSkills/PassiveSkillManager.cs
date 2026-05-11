@@ -101,13 +101,17 @@ namespace InventorySystem.PassiveSkills
 
             if (equippedItems == null) return;
 
+            // 完全同名アイテム (internalName 一致) は1個扱いで重複排除する。
+            // 別アイテム間で同名スキルがある場合は RegisterSkill 側で重複登録を許可して合算動作させる。
+            var seenItemIds = new HashSet<string>();
             foreach (var item in equippedItems)
             {
-                if (item?.passiveSkills == null) continue;
+                if (item == null) continue;
+                if (!string.IsNullOrEmpty(item.internalName) && !seenItemIds.Add(item.internalName)) continue;
+                if (item.passiveSkills == null) continue;
                 foreach (var ps in item.passiveSkills)
                 {
                     RegisterSkill(ps.internalName);
-                    // 日本語表示名を保存
                     if (!string.IsNullOrEmpty(ps.skillName))
                         skillDisplayNames[ps.internalName] = ps.skillName;
                 }
@@ -152,17 +156,16 @@ namespace InventorySystem.PassiveSkills
                 return;
             }
 
-            // 重複登録チェック
-            if (activeSkillNames.Contains(skillName)) return;
-
+            // 同名スキルでも別アイテム由来であれば重複登録を許可 → 合算動作。
+            // アイテム単位の重複排除は RefreshActiveSkills 側で行う。
             activeSkillNames.Add(skillName);
 
-            // トリガーごとに分類して格納
+            // トリガーごとに分類して格納（同じ effect インスタンスを複数回追加することで N 回発火）
             foreach (var trigger in effect.Triggers)
             {
                 if (!activeSkillsByTrigger.ContainsKey(trigger))
                     activeSkillsByTrigger[trigger] = new List<IPassiveSkillEffect>();
-                
+
                 activeSkillsByTrigger[trigger].Add(effect);
             }
         }

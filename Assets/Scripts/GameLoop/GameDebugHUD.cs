@@ -1,6 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 using CombatSystem;
+using EventSystem;
+using InventorySystem;
+using InventorySystem.Shop;
 using MapSystem;
 
 namespace GameLoop
@@ -24,6 +27,7 @@ namespace GameLoop
         private string battleText = "";
         private string resultText = "";
         private string helpText = "";
+        private string eventText = "";
 
         void Start()
         {
@@ -48,6 +52,12 @@ namespace GameLoop
 
             if (CombatManager.Instance != null)
                 CombatManager.Instance.OnTurnEnd += OnTurnEnd;
+
+            if (EventEncounter.Instance != null)
+            {
+                EventEncounter.Instance.OnEventStarted += OnEventStarted;
+                EventEncounter.Instance.OnEventResolved += OnEventResolved;
+            }
 
             if (MapManager.Instance != null)
             {
@@ -79,6 +89,12 @@ namespace GameLoop
             if (CombatManager.Instance != null)
                 CombatManager.Instance.OnTurnEnd -= OnTurnEnd;
 
+            if (EventEncounter.Instance != null)
+            {
+                EventEncounter.Instance.OnEventStarted -= OnEventStarted;
+                EventEncounter.Instance.OnEventResolved -= OnEventResolved;
+            }
+
             if (MapManager.Instance != null)
             {
                 MapManager.Instance.OnMapGenerated -= OnMapGenerated;
@@ -97,11 +113,15 @@ namespace GameLoop
             {
                 UpdateMoveOptions();
                 if (showMap) mapText = BuildMapDisplay();
+                eventText = "";
             }
             else
             {
                 moveText = "";
             }
+
+            if (phase != GameManager.GamePhase.EventEncounter)
+                eventText = "";
         }
 
         private void OnRunStarted(RunState run)
@@ -189,6 +209,34 @@ namespace GameLoop
             resultText = $"？→ {GameManager.TileToJapanese(resolved)}";
         }
 
+        private void OnEventStarted(EventDefinition ev)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"<b>=== {ev.name} ===</b>");
+            sb.AppendLine(ev.flavor);
+            sb.AppendLine();
+            for (int i = 0; i < ev.choices.Count; i++)
+                sb.AppendLine($"  {i + 1}. {ev.choices[i].text}");
+            eventText = sb.ToString();
+        }
+
+        private void OnEventResolved(EventChoice choice, EventEffectExecutor.ExecutionResult result)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"<b>→ {choice.text}</b>");
+            if (result != null)
+            {
+                foreach (var line in result.log)
+                    sb.AppendLine($"  ・{line}");
+            }
+            sb.AppendLine();
+            sb.AppendLine(choice.postFlavor);
+            sb.AppendLine();
+            sb.AppendLine("[Space] マップに戻る");
+            eventText = sb.ToString();
+            UpdateStatus();
+        }
+
         // === IMGUI描画 ===
 
         void OnGUI()
@@ -220,6 +268,12 @@ namespace GameLoop
 
             if (!string.IsNullOrEmpty(moveText))
                 GUILayout.Label(moveText, style);
+
+            if (!string.IsNullOrEmpty(eventText))
+            {
+                GUILayout.Space(5);
+                GUILayout.Label(eventText, style);
+            }
 
             GUILayout.Space(5);
             GUILayout.Label(helpText, style);
@@ -261,9 +315,11 @@ namespace GameLoop
             if (mm?.Hunger != null)
                 hunger = $"  空腹: {mm.Hunger.Current}/{mm.Hunger.Max}";
 
+            string karma = run.karma > 0 ? $"  <color=#ff6666>カルマ: {run.karma}</color>" : "";
+
             return $"Floor: {run.currentFloor}/{run.maxFloor}  " +
                    $"HP: {run.playerHP}/{run.playerMaxHP}{hunger}  " +
-                   $"コイン: {run.coins}";
+                   $"コイン: {run.coins}{karma}";
         }
 
         private void UpdateMoveOptions()
@@ -382,16 +438,22 @@ namespace GameLoop
                     helpText = "[Space] HP回復  [U] 強化（未実装）";
                     break;
                 case GameManager.GamePhase.ShopVisit:
-                    helpText = "[Space] ショップを出る（未実装）";
+                    helpText = BuildShopHelpText();
                     break;
                 case GameManager.GamePhase.EventEncounter:
-                    helpText = "[Space] イベント完了（未実装）";
+                    helpText = "[1-9] 選択肢を選ぶ → [Space] 完了";
                     break;
                 case GameManager.GamePhase.TreasureOpen:
-                    helpText = "[Space] 秘宝を受け取る（未実装）";
+                    var ts = GameManager.Instance?.LastTreasureSummary;
+                    helpText = string.IsNullOrEmpty(ts)
+                        ? "[Space] 宝箱を確認"
+                        : $"{ts}\n[Space] 受け取って次へ";
                     break;
                 case GameManager.GamePhase.TrapTriggered:
                     helpText = "[Space] 罠効果確認（未実装）";
+                    break;
+                case GameManager.GamePhase.SinRitual:
+                    helpText = "[1] 血の儀 [2] 貪欲の儀 [3] 遺品の儀 → [Space] 完了\n  各キーで支払 (Y/Nではなく押下=捧げる、未押下=拒む)";
                     break;
                 case GameManager.GamePhase.FloorClear:
                     helpText = "[Space] 次フロアへ";
@@ -404,6 +466,107 @@ namespace GameLoop
                     helpText = "";
                     break;
             }
+        }
+
+        // === ショップ表示 ===
+
+        private string BuildShopHelpText()
+        {
+            var gm = GameManager.Instance;
+            var sm = ShopManager.Instance;
+            if (gm == null || sm?.Current == null)
+                return "[Esc] 退店";
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"<b>=== ショップ（{(gm.ShopSellMode ? "売却" : "購入")}モード）===</b>");
+            sb.AppendLine($"所持金: {gm.Run.coins}G  /  [T]モード切替  [Esc]退店");
+
+            if (!gm.ShopSellMode)
+            {
+                // 購入モード: 6スロット
+                var inv = sm.Current;
+                for (int i = 0; i < inv.slots.Count; i++)
+                {
+                    var slot = inv.slots[i];
+                    string label = ResolveItemLabel(slot.itemId, slot.kind);
+                    string price = slot.kind == ShopSlotKind.WeaponMaterial
+                        ? $"{inv.CurrentMaterialPrice}G (在庫∞)"
+                        : (slot.sold ? "[売切]" : $"{slot.price}G");
+                    sb.AppendLine($"  [{i + 1}] {KindLabel(slot.kind)}: {label}  {price}");
+                }
+            }
+            else
+            {
+                // 売却モード: 種別をサイクル + 1-9 で売却
+                sb.AppendLine($"対象: {SellSourceLabel(gm.ShopSellSource)}  [S] 切替");
+                IList<string> list = SellList(gm);
+                if (list == null || list.Count == 0)
+                {
+                    sb.AppendLine("  （所持なし）");
+                }
+                else
+                {
+                    int show = Mathf.Min(list.Count, 9);
+                    for (int i = 0; i < show; i++)
+                    {
+                        string id = list[i];
+                        var data = ItemDatabase.Instance?.GetItem(id);
+                        string name = data != null ? data.displayName : id;
+                        int approx = ApproxSellPrice(data);
+                        sb.AppendLine($"  [{i + 1}] {name} (≈{approx}G)");
+                    }
+                }
+            }
+            return sb.ToString();
+        }
+
+        private IList<string> SellList(GameManager gm)
+        {
+            switch (gm.ShopSellSource)
+            {
+                case ShopManager.SellSource.Passive:        return gm.Run.ownedPassiveItems;
+                case ShopManager.SellSource.Consumable:     return gm.Run.ownedConsumables;
+                case ShopManager.SellSource.WeaponMaterial: return null;
+                default: return null;
+            }
+        }
+
+        private string ResolveItemLabel(string id, ShopSlotKind kind)
+        {
+            if (kind == ShopSlotKind.WeaponMaterial) return "武器強化素材（マグナイト）";
+            if (string.IsNullOrEmpty(id)) return "（空）";
+            var data = ItemDatabase.Instance?.GetItem(id);
+            return data != null ? $"{data.displayName} [{data.rarity}]" : id;
+        }
+
+        private string KindLabel(ShopSlotKind k)
+        {
+            switch (k)
+            {
+                case ShopSlotKind.Passive:        return "パッシブ";
+                case ShopSlotKind.Consumable:     return "消費";
+                case ShopSlotKind.Weapon:         return "武器";
+                case ShopSlotKind.Dice:           return "ダイス";
+                case ShopSlotKind.WeaponMaterial: return "強化素材";
+                default: return "?";
+            }
+        }
+
+        private string SellSourceLabel(ShopManager.SellSource s)
+        {
+            switch (s)
+            {
+                case ShopManager.SellSource.Passive:        return "パッシブ";
+                case ShopManager.SellSource.Consumable:     return "消費";
+                case ShopManager.SellSource.WeaponMaterial: return "強化素材";
+                default: return "?";
+            }
+        }
+
+        private int ApproxSellPrice(CompleteItemData data)
+        {
+            if (data?.sellPrice == null) return 5;
+            return (data.sellPrice.min + data.sellPrice.max) / 2;
         }
 
         private string PhaseToJapanese(GameManager.GamePhase phase)
@@ -422,6 +585,7 @@ namespace GameLoop
                 case GameManager.GamePhase.EventEncounter: return "イベント";
                 case GameManager.GamePhase.TreasureOpen:   return "秘宝";
                 case GameManager.GamePhase.TrapTriggered:  return "罠";
+                case GameManager.GamePhase.SinRitual:      return "祭壇の儀";
                 case GameManager.GamePhase.FloorClear:     return "フロアクリア";
                 case GameManager.GamePhase.RunClear:       return "ランクリア！";
                 case GameManager.GamePhase.GameOver:       return "ゲームオーバー";

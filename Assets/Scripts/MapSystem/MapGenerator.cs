@@ -96,8 +96,16 @@ namespace MapSystem
             for (int lane = 0; lane < LaneCount; lane++)
                 map.AddNode(new MapNode(NodeId(restRow, lane), restRow, lane, TileType.Rest));
 
-            // ボス（Row 10 相当、収束ノード）
-            map.AddNode(new MapNode("boss", RowCount, -1, TileType.Boss));
+            // 5層のみ: ボス前にカルマ清算用の罠ノードを確定配置（収束ノード）
+            bool insertKarmaTrap = floor == 5;
+            if (insertKarmaTrap)
+            {
+                map.AddNode(new MapNode("karma_trap", RowCount, -1, TileType.Trap));
+            }
+
+            // ボス（Row 10 相当、収束ノード）。5層では Row 11 にずらす
+            int bossRow = insertKarmaTrap ? RowCount + 1 : RowCount;
+            map.AddNode(new MapNode("boss", bossRow, -1, TileType.Boss));
             map.bossNodeId = "boss";
 
             // --- エッジ ---
@@ -144,9 +152,18 @@ namespace MapSystem
                 }
             }
 
-            // 休憩行 → ボス
-            for (int lane = 0; lane < LaneCount; lane++)
-                map.AddConnection(NodeId(restRow, lane), "boss");
+            // 休憩行 → ボス（5層は休憩→カルマ罠→ボス で必ず通過）
+            if (insertKarmaTrap)
+            {
+                for (int lane = 0; lane < LaneCount; lane++)
+                    map.AddConnection(NodeId(restRow, lane), "karma_trap");
+                map.AddConnection("karma_trap", "boss");
+            }
+            else
+            {
+                for (int lane = 0; lane < LaneCount; lane++)
+                    map.AddConnection(NodeId(restRow, lane), "boss");
+            }
 
             // 横移動（確率、双方向）— Treasure/Rest 行は除外
             for (int row = 1; row <= restRow; row++)
@@ -173,7 +190,7 @@ namespace MapSystem
 
             map.AddNode(new MapNode("outpost", 0, -1, TileType.Outpost));
             map.AddNode(new MapNode(NodeId(1, 0), 1, 0, TileType.Shop));
-            map.AddNode(new MapNode(NodeId(2, 0), 2, 0, TileType.Trap));
+            map.AddNode(new MapNode(NodeId(2, 0), 2, 0, TileType.SinAltar));
             map.AddNode(new MapNode("boss", 3, -1, TileType.Boss));
 
             map.startNodeId = "outpost";

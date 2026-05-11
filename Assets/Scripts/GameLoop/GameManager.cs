@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using CombatSystem;
+using EventSystem;
 using InventorySystem;
 using InventorySystem.PassiveSkills;
+using InventorySystem.Shop;
 using MapSystem;
 
 namespace GameLoop
@@ -33,6 +35,7 @@ namespace GameLoop
             EventEncounter,   // イベント発生
             TreasureOpen,     // 秘宝
             TrapTriggered,    // 罠発動
+            SinRitual,        // 6層祭壇マスでの3段階儀式
             FloorClear,       // ボス撃破→次フロア
             RunClear,         // ラン完了
             GameOver,         // 敗北
@@ -75,6 +78,16 @@ namespace GameLoop
         private ItemEquipHandler equipHandler;
         private EnemyData firstEliteEnemy;
 
+        // === SinRitual 状態 (3つの儀式それぞれが既に決まったか) ===
+        private bool ritualHpResolved;
+        private bool ritualGoldResolved;
+        private bool ritualItemResolved;
+
+        // === EventEncounter: 選択肢確定後・フレーバー表示中フラグ ===
+        private bool eventChoiceResolved;
+        // 戦闘トリガで保留している場合、戦闘終了後に MapNavigation へ戻すフラグ
+        private bool returnToMapAfterEventCombat;
+
         void Awake()
         {
             if (Instance != null && Instance != this)
@@ -114,6 +127,9 @@ namespace GameLoop
             Run = new RunState();
             Run.Initialize(startingHP);
 
+            // メタ恒久バフを適用（HP/Gold/初期素材を底上げ）
+            MetaProgression.MetaBuffApplicator.ApplyToRunStart(Run, startingHP);
+
             LastCombatResult = null;
             CurrentEnemy = null;
             IsEliteSecondFight = false;
@@ -128,10 +144,32 @@ namespace GameLoop
         /// <summary>マップ上のノードへ移動</summary>
         public void MoveToNode(string nodeId)
         {
+            Debug.Log($"[GameManager] MoveToNode: {nodeId} (phase={CurrentPhase})");
             if (CurrentPhase != GamePhase.MapNavigation) return;
 
             var mm = MapManager.Instance;
+
+            // マップ移動時系時限効果（翼の恩寵・警戒心・導きの光等）
+            EventSystem.TimedEffects.TimedEffectManager.OnMapMove(Run);
+
+            // 名前付き固有パッシブ（マップ移動時系。現状該当なし、フック確保）
+            InventorySystem.PassiveItems.PassiveItemManager.OnMapMove(Run);
+
+            // メタ: ノード踏破トークン
+            MetaProgression.MetaTokenEarner.OnNodeVisited();
+
             int starvDmg = mm.MoveTo(nodeId, Run.playerMaxHP);
+
+            // 恒久デバフ「トゥルハドの暴食」: 飢餓ダメージ ×2 (割合計算が先)
+            if (starvDmg > 0 && MetaProgression.PermanentDebuffEffects.HasGluttony(Run))
+                starvDmg *= 2;
+
+            // メタバフ: 飢餓ダメ削減（実数計算が後・最低1は残す）
+            if (starvDmg > 0)
+            {
+                int red = MetaProgression.MetaBuffApplicator.GetHungerDamageReduction();
+                if (red > 0) starvDmg = Mathf.Max(1, starvDmg - red);
+            }
 
             if (starvDmg > 0)
             {
@@ -141,10 +179,14 @@ namespace GameLoop
 
                 if (Run.playerHP <= 0)
                 {
-                    Run.EndRun();
-                    SetPhase(GamePhase.GameOver);
-                    OnGameOver?.Invoke(Run);
-                    return;
+                    // ちいさな灯火 → ラストスタンドの順で救済を試行
+                    if (!LastStand.TryConsumeRevival(Run))
+                    {
+                        Run.EndRun();
+                        SetPhase(GamePhase.GameOver);
+                        OnGameOver?.Invoke(Run);
+                        return;
+                    }
                 }
             }
 
@@ -159,24 +201,62 @@ namespace GameLoop
 
             var result = LastCombatResult.Value;
 
-            // 敗北 or HP0 → ゲームオーバー
+            // 敗北 or HP0 → 救済（灯火→ラストスタンド）/ なければゲームオーバー
             if (!result.playerWon || Run.playerHP <= 0)
             {
+                if (LastStand.TryConsumeRevival(Run))
+                {
+                    Log("救済発動: マップへ戻る");
+                    SetPhase(GamePhase.MapNavigation);
+                    return;
+                }
                 Run.EndRun();
                 SetPhase(GamePhase.GameOver);
                 OnGameOver?.Invoke(Run);
                 return;
             }
 
+            // イベント由来の戦闘 → 勝利後効果を適用してマップへ戻る
+            if (returnToMapAfterEventCombat)
+            {
+                returnToMapAfterEventCombat = false;
+                EventEncounter.Instance?.ApplyPostCombatEffects();
+                EventEncounter.Instance?.Clear();
+                SetPhase(GamePhase.MapNavigation);
+                return;
+            }
+
             var mm = MapManager.Instance;
             var node = mm.CurrentNode;
+
+            // メタ: 敵撃破トークン + 戦闘勝利金
+            MetaProgression.MetaTokenEarner.OnEnemyDefeated();
+            int metaWinGold = MetaProgression.MetaBuffApplicator.GetCombatGoldBonus();
+            bool prideActive = MetaProgression.PermanentDebuffEffects.HasPride(Run);
 
             // ボス勝利 → フロアクリア
             if (node.type == TileType.Boss)
             {
                 Run.bossDefeatedThisFloor = true;
-                int reward = FloorManager.CalculateRewardCoins(Run.currentFloor, true, result.totalTurns) * 2;
+                int rewardBase = FloorManager.CalculateRewardCoins(Run.currentFloor, true, result.totalTurns) * 2;
+                // 傲慢: ボスはエリート以上扱いで報酬2倍（割合先）
+                if (prideActive) rewardBase *= 2;
+                int reward = rewardBase + metaWinGold;
                 Run.coins += reward;
+
+                // メタ: ボス撃破時の追加パッシブ報酬
+                var extra = MetaProgression.MetaBuffApplicator.GetBossExtraDrop();
+                if (extra != MetaProgression.MetaBuffApplicator.BossExtraDrop.None)
+                {
+                    bool wantRare = extra == MetaProgression.MetaBuffApplicator.BossExtraDrop.Rare;
+                    string id = PickPassiveItemForBossExtra(wantRare);
+                    if (!string.IsNullOrEmpty(id))
+                    {
+                        Run.ownedPassiveItems.Add(id);
+                        Log($"メタ報酬: ボス撃破ボーナス {(wantRare ? "レア" : "ノーマル")}パッシブ獲得: {id}");
+                    }
+                }
+
                 SetPhase(GamePhase.Reward);
                 OnRewardGranted?.Invoke(reward);
                 return;
@@ -190,14 +270,46 @@ namespace GameLoop
                 return;
             }
 
-            // 通常報酬
+            // 通常報酬（傲慢: 通常戦闘=0、エリート以上=×2、いずれも割合計算が先）
             int coins = FloorManager.CalculateRewardCoins(Run.currentFloor, true, result.totalTurns);
             if (IsEliteSecondFight) coins = (int)(coins * 1.5f);
+            if (prideActive)
+            {
+                if (IsEliteSecondFight) coins *= 2;
+                else coins = 0;
+            }
+            coins += metaWinGold;
             Run.coins += coins;
             IsEliteSecondFight = false;
 
             SetPhase(GamePhase.Reward);
             OnRewardGranted?.Invoke(coins);
+        }
+
+        /// <summary>ボス撃破ボーナス用のパッシブ抽選。wantRare=true で GOLD 以上を優先。</summary>
+        private string PickPassiveItemForBossExtra(bool wantRare)
+        {
+            var db = ItemDatabase.Instance;
+            if (db == null) return null;
+            var all = db.GetAllItems();
+            if (all == null || all.Count == 0) return null;
+
+            var pool = new System.Collections.Generic.List<CompleteItemData>();
+            foreach (var it in all)
+            {
+                if (it == null) continue;
+                if (it.category != ItemCategory.Passive) continue;
+                if (!InventorySystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
+                if (wantRare && it.rarity != ItemRarity.GOLD && it.rarity != ItemRarity.LEGENDARY) continue;
+                pool.Add(it);
+            }
+            if (pool.Count == 0)
+            {
+                // wantRare でレア該当なしなら全プールにフォールバック
+                if (wantRare) return PickPassiveItemForBossExtra(false);
+                return null;
+            }
+            return pool[UnityEngine.Random.Range(0, pool.Count)].internalName;
         }
 
         /// <summary>報酬確認→マップに戻る or フロアクリア</summary>
@@ -272,6 +384,18 @@ namespace GameLoop
         {
             var mm = MapManager.Instance;
 
+            // メタ: トークン獲得 + 1層/3層で固有恒久デバフ抽選
+            MetaProgression.MetaTokenEarner.OnFloorReached(Run.currentFloor);
+            if (Run.currentFloor == 1) MetaProgression.MetaDebuffApplicator.TryGrantOnFloor1(Run);
+            if (Run.currentFloor == 3) MetaProgression.MetaDebuffApplicator.TryGrantOnFloor3(Run);
+
+            // 恒久デバフ「ムシュファの強欲」: 5層突入時に所持ゴールド0
+            if (Run.currentFloor == 5 && MetaProgression.PermanentDebuffEffects.HasGreed(Run))
+            {
+                Log($"恒久デバフ {MetaProgression.PermanentDebuffIds.Greed}: 所持ゴールド {Run.coins}→0");
+                Run.coins = 0;
+            }
+
             // 層デバフ取得
             ActiveModifier = FloorModifierDatabase.Get(Run.currentFloor);
 
@@ -285,24 +409,40 @@ namespace GameLoop
                 mm.Hunger.Initialize(Mathf.Max(1, newMax));
             }
 
+            // メタデバフ Lv8: ハンガー初期値 -2/フロア
+            int hungerPenalty = MetaProgression.MetaDebuffApplicator.GetHungerInitialPenalty();
+            if (hungerPenalty > 0 && mm.Hunger != null)
+                mm.Hunger.SetCurrentForTest(Mathf.Max(0, mm.Hunger.Current - hungerPenalty));
+
             // 飢餓ダメージ倍率上書き
             if (ActiveModifier != null && ActiveModifier.starvationDamageOverride >= 0)
                 mm.Hunger.starvationDamageRatio = ActiveModifier.starvationDamageOverride;
 
             mm.ProcessOutpost();
 
-            // 6層前哨基地: HP全回復 + MaxHP+5
-            if (ActiveModifier != null && ActiveModifier.maxHPBonusFlat != 0)
+            // メタデバフ Lv9 で前哨基地効果を無効化
+            bool forwardBaseDisabled = MetaProgression.MetaDebuffApplicator.IsForwardBaseDisabled();
+            int healCap = MetaProgression.MetaDebuffApplicator.GetForwardBaseHealCap(Run.playerMaxHP); // Lv7
+
+            if (forwardBaseDisabled)
             {
+                Log("前哨基地は崩壊している（メタデバフ Lv9）");
+                // MaxHPボーナス含めてスキップ
+            }
+            else if (ActiveModifier != null && ActiveModifier.maxHPBonusFlat != 0)
+            {
+                // 6層前哨基地: HP全回復 + MaxHP+5（Lv7 で上限制限される）
                 Run.playerMaxHP += ActiveModifier.maxHPBonusFlat;
-                Run.playerHP = Run.playerMaxHP;
-                Log($"前哨基地: MaxHP+{ActiveModifier.maxHPBonusFlat} → {Run.playerMaxHP}, HP全回復");
+                int upper = healCap < 0 ? Run.playerMaxHP : Mathf.Min(healCap, Run.playerMaxHP);
+                Run.playerHP = upper;
+                Log($"前哨基地: MaxHP+{ActiveModifier.maxHPBonusFlat} → {Run.playerMaxHP}, HP={Run.playerHP}");
             }
             else
             {
-                // 通常前哨基地: HP30%回復
+                // 通常前哨基地: HP30%回復（Lv7 で上限制限される）
                 int heal = Mathf.CeilToInt(Run.playerMaxHP * 0.3f);
-                Run.playerHP = Mathf.Min(Run.playerMaxHP, Run.playerHP + heal);
+                int upper = healCap < 0 ? Run.playerMaxHP : Mathf.Min(healCap, Run.playerMaxHP);
+                Run.playerHP = Mathf.Min(upper, Run.playerHP + heal);
             }
 
             // MaxHPデバフ（崩れの共鳴等）
@@ -347,6 +487,15 @@ namespace GameLoop
             OnTileActivated?.Invoke(effectiveType);
             Log($"タイル起動: {TileToJapanese(effectiveType)} ({node.id})");
 
+            // 翼の恩寵: トラップマス1回無効
+            if (effectiveType == TileType.Trap && Run.HasTimedBuff("翼の恩寵"))
+            {
+                Run.timedBuffs.Remove("翼の恩寵");
+                Log("翼の恩寵発動: トラップ無効化");
+                SetPhase(GamePhase.MapNavigation);
+                return;
+            }
+
             switch (effectiveType)
             {
                 case TileType.Battle:
@@ -364,21 +513,53 @@ namespace GameLoop
                     SetPhase(GamePhase.RestStop);
                     break;
                 case TileType.Shop:
-                    SetPhase(GamePhase.ShopVisit);
+                    EnterShop();
                     break;
                 case TileType.Event:
-                    SetPhase(GamePhase.EventEncounter);
+                    BeginEventEncounter();
                     break;
                 case TileType.Treasure:
-                    SetPhase(GamePhase.TreasureOpen);
+                    OpenTreasure();
                     break;
                 case TileType.Trap:
-                    SetPhase(GamePhase.TrapTriggered);
+                    HandleTrapTile();
+                    break;
+                case TileType.SinAltar:
+                    BeginSinRitual();
                     break;
                 default:
                     SetPhase(GamePhase.MapNavigation);
                     break;
             }
+        }
+
+        /// <summary>罠マス到達時の処理。5層ボス前の専用罠 (id=karma_trap) ではカルマ清算、それ以外は無効。</summary>
+        private void HandleTrapTile()
+        {
+            var node = MapManager.Instance?.CurrentNode;
+            bool isKarmaTrap = node != null && node.id == "karma_trap";
+
+            // ボス前専用罠でのカルマ清算（最大HP -= カルマ × 10、最低1。清算後 karma=0）
+            if (isKarmaTrap)
+            {
+                if (Run.karma > 0)
+                {
+                    int desired = Run.karma * 10;
+                    int newMax = Mathf.Max(1, Run.playerMaxHP - desired);
+                    int actual = Run.playerMaxHP - newMax;
+                    Run.playerMaxHP = newMax;
+                    Run.playerHP = Mathf.Min(Run.playerHP, Run.playerMaxHP);
+                    Log($"罪の罠: カルマ清算 最大HP-{actual} (カルマ{Run.karma}×10) → {Run.playerMaxHP}");
+                    Run.karma = 0;
+                }
+                else
+                {
+                    Log("罪の罠: カルマ無し、何も起きず通過");
+                }
+            }
+            // それ以外の通常罠マスは現状効果なし
+
+            SetPhase(GamePhase.TrapTriggered);
         }
 
         private void StartBattleTile()
@@ -422,20 +603,350 @@ namespace GameLoop
 
         private void StartBossTile()
         {
-            // TODO: ボス専用のEnemyData選出
-            CurrentEnemy = FloorManager.PickEnemy(Run.currentFloor);
+            // ボス専用ID で取得、なければフロアプール抽選にフォールバック
+            string bossId = $"boss_layer{Run.currentFloor}";
+            CurrentEnemy = CombatSystem.EnemyDatabase.Get(bossId);
+            if (CurrentEnemy == null)
+            {
+                Debug.LogWarning($"[GameManager] ボス '{bossId}' 未定義 — フロア{Run.currentFloor}のプールから抽選");
+                CurrentEnemy = FloorManager.PickEnemy(Run.currentFloor);
+            }
             OnEnemyEncountered?.Invoke(CurrentEnemy);
             Log($"ボス戦: {CurrentEnemy.displayName}");
+
+            // 5層ボス戦の清算系デバフ（カルマ清算は罠マスへ移動済み）
+            if (Run.currentFloor == Run.normalClearFloor)
+            {
+                // 血の負債: 最大HP-15（一度きり、戦闘前に適用）
+                if (Run.permanentDebuffs.Contains("血の負債"))
+                {
+                    int reduction = 15;
+                    Run.playerMaxHP = Mathf.Max(1, Run.playerMaxHP - reduction);
+                    Run.playerHP = Mathf.Min(Run.playerHP, Run.playerMaxHP);
+                    Run.permanentDebuffs.Remove("血の負債"); // 一度限り消費
+                    Log($"血の負債清算: 最大HP-{reduction} → {Run.playerMaxHP}");
+                }
+            }
 
             var (dc, dm, cr, df) = GatherPlayerCombatStats();
             SetPhase(GamePhase.Combat);
             CombatManager.Instance.StartCombat(CurrentEnemy, Run.playerHP, dc, dm, cr, df);
         }
 
+        // ================================================================
+        //  6層 SinAltar 儀式
+        // ================================================================
+
+        /// <summary>祭壇マス到達時に呼ばれ、SinRitual フェーズへ遷移する。</summary>
+        private void BeginSinRitual()
+        {
+            ritualHpResolved = false;
+            ritualGoldResolved = false;
+            ritualItemResolved = false;
+            SetPhase(GamePhase.SinRitual);
+            Log("祭壇に辿り着いた。3つの儀式を捧げよ。");
+        }
+
+        /// <summary>「血の儀」: 現在HPの 30% を支払う。失敗で HeartOfGolgotha 付与。</summary>
+        public void OfferHpSacrifice(bool accept)
+        {
+            if (CurrentPhase != GamePhase.SinRitual) return;
+
+            int demand = Mathf.Max(1, Mathf.CeilToInt(Run.playerHP * 0.3f));
+            if (accept && Run.playerHP > demand)
+            {
+                Run.playerHP -= demand;
+                Log($"血の儀: HP {demand} を捧げた (残 {Run.playerHP})");
+            }
+            else
+            {
+                Run.AddDebuff(SinDebuff.HeartOfGolgotha);
+                Log("血の儀を拒んだ。〈ゴルゴダの心〉が刻まれる。");
+            }
+        }
+
+        /// <summary>「貪欲の儀」: 所持金 50% を支払う。失敗で SeveredTime 付与。</summary>
+        public void OfferGoldSacrifice(bool accept)
+        {
+            if (CurrentPhase != GamePhase.SinRitual) return;
+
+            int demand = Mathf.Max(1, Run.coins / 2);
+            if (accept && Run.coins >= demand)
+            {
+                Run.coins -= demand;
+                Log($"貪欲の儀: コイン {demand} を捧げた (残 {Run.coins})");
+            }
+            else
+            {
+                Run.AddDebuff(SinDebuff.SeveredTime);
+                Log("貪欲の儀を拒んだ。〈断絶した時間〉が刻まれる。");
+            }
+        }
+
+        /// <summary>「遺品の儀」: イベントアイテム 1個 を消費。失敗で AshenBrand 付与。</summary>
+        /// <param name="hasItemAndAccept">所持していて、かつ捧げる選択をしたか</param>
+        public void OfferItemSacrifice(bool hasItemAndAccept)
+        {
+            if (CurrentPhase != GamePhase.SinRitual) return;
+
+            if (hasItemAndAccept)
+            {
+                // TODO: イベントアイテム実装後、実際にインベントリから1個消費する
+                Log("遺品の儀: 遺品を捧げた");
+            }
+            else
+            {
+                Run.AddDebuff(SinDebuff.AshenBrand);
+                Log("遺品の儀を拒んだ。〈灰燼の烙印〉が刻まれる。");
+            }
+        }
+
+        // ================================================================
+        //  ショップマス
+        // ================================================================
+
+        /// <summary>ショップ売却モード（true=売却、false=購入）</summary>
+        public bool ShopSellMode { get; private set; }
+
+        /// <summary>ショップ売却モードでの売却対象種別</summary>
+        public ShopManager.SellSource ShopSellSource { get; private set; } = ShopManager.SellSource.Passive;
+
+        /// <summary>ショップマス到達時。マップ巻取り → 在庫生成 → ShopVisit フェーズへ。</summary>
+        private void EnterShop()
+        {
+            Debug.Log("[GameManager] EnterShop called");
+            ShopSellMode = false;
+            ShopSellSource = ShopManager.SellSource.Passive;
+
+            var transition = MapSystem.Visual.MapTransitionController.Instance;
+            Debug.Log($"[GameManager] MapTransitionController.Instance = {(transition == null ? "null" : "exists")}");
+
+            if (transition != null)
+            {
+                transition.RollUp(() =>
+                {
+                    Debug.Log("[GameManager] RollUp callback fired");
+                    var sm = ShopManager.Instance;
+                    if (sm == null) { Debug.LogError("[GameManager] ShopManager.Instance is null!"); return; }
+                    sm.Generate(Run.currentFloor);
+                    SetPhase(GamePhase.ShopVisit);
+                });
+            }
+            else
+            {
+                var sm = ShopManager.Instance;
+                if (sm == null) { Debug.LogError("[GameManager] ShopManager.Instance is null!"); return; }
+                sm.Generate(Run.currentFloor);
+                SetPhase(GamePhase.ShopVisit);
+            }
+        }
+
+        public void ToggleShopSellMode()
+        {
+            if (CurrentPhase != GamePhase.ShopVisit) return;
+            ShopSellMode = !ShopSellMode;
+            Log($"ショップモード: {(ShopSellMode ? "売却" : "購入")}");
+        }
+
+        public void CycleSellSource()
+        {
+            if (CurrentPhase != GamePhase.ShopVisit || !ShopSellMode) return;
+            ShopSellSource = (ShopManager.SellSource)(((int)ShopSellSource + 1) % 3);
+            Log($"売却対象: {ShopSellSource}");
+        }
+
+        public void ShopBuy(int slotIndex)
+        {
+            if (CurrentPhase != GamePhase.ShopVisit) return;
+            ShopManager.Instance.TryBuy(slotIndex, Run);
+        }
+
+        public void ShopSell(int listIndex)
+        {
+            if (CurrentPhase != GamePhase.ShopVisit) return;
+            ShopManager.Instance.TrySell(ShopSellSource, listIndex, Run);
+        }
+
+        public void ExitShop()
+        {
+            if (CurrentPhase != GamePhase.ShopVisit) return;
+            ShopManager.Instance.Close();
+
+            var transition = MapSystem.Visual.MapTransitionController.Instance;
+            if (transition != null)
+            {
+                transition.Unroll(() => SetPhase(GamePhase.MapNavigation));
+            }
+            else
+            {
+                SetPhase(GamePhase.MapNavigation);
+            }
+        }
+
+        // ================================================================
+        //  宝箱マス
+        // ================================================================
+
+        /// <summary>最後に開けた宝箱の中身（HUD表示用）</summary>
+        public string LastTreasureSummary { get; private set; }
+
+        /// <summary>宝箱マス到達時。ゴールドランダム + パッシブ/消費アイテム1個。</summary>
+        private void OpenTreasure()
+        {
+            int floor = Run.currentFloor;
+            int gold = floor * UnityEngine.Random.Range(5, 16); // 1層:5-15 〜 5層:25-75
+            Run.coins += gold;
+
+            string itemId = PickRandomTreasureItem();
+            string itemLabel = "（なし）";
+            if (!string.IsNullOrEmpty(itemId))
+            {
+                Run.ownedPassiveItems.Add(itemId);
+                var data = ItemDatabase.Instance?.GetItem(itemId);
+                itemLabel = data != null ? data.displayName : itemId;
+            }
+
+            LastTreasureSummary = $"宝箱: ゴールド+{gold}, {itemLabel}";
+            Log(LastTreasureSummary);
+            SetPhase(GamePhase.TreasureOpen);
+        }
+
+        /// <summary>宝箱から獲得するアイテムを ItemDatabase から1個選出。武器・クエスト・イベント限定は除外。</summary>
+        private string PickRandomTreasureItem()
+        {
+            var db = ItemDatabase.Instance;
+            if (db == null) return null;
+            var all = db.GetAllItems();
+            if (all == null || all.Count == 0) return null;
+
+            var pool = new System.Collections.Generic.List<CompleteItemData>();
+            foreach (var it in all)
+            {
+                if (it == null) continue;
+                if (it.category == ItemCategory.Weapon) continue;
+                if (it.category == ItemCategory.Quest) continue;
+                if (!InventorySystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
+                pool.Add(it);
+            }
+            if (pool.Count == 0) return null;
+            return pool[UnityEngine.Random.Range(0, pool.Count)].internalName;
+        }
+
+        // ================================================================
+        //  イベントエンカウンタ
+        // ================================================================
+
+        /// <summary>イベントマスに到達したときに呼ばれる。抽選 → EventEncounter へ。</summary>
+        private void BeginEventEncounter()
+        {
+            eventChoiceResolved = false;
+            returnToMapAfterEventCombat = false;
+
+            var ee = EventEncounter.Instance;
+            if (ee == null)
+            {
+                Debug.LogWarning("[GameManager] EventEncounter シングルトン未配置 — マップに戻る");
+                SetPhase(GamePhase.MapNavigation);
+                return;
+            }
+
+            bool ok = ee.Begin(Run);
+            if (!ok)
+            {
+                // イベント0件なら何もせずマップへ
+                SetPhase(GamePhase.MapNavigation);
+                return;
+            }
+            // メタ: イベント発見トークン
+            MetaProgression.MetaTokenEarner.OnEventEncountered();
+            SetPhase(GamePhase.EventEncounter);
+        }
+
+        /// <summary>イベントの選択肢 i を選ぶ（UI / デバッグから呼ぶ）。</summary>
+        public void ResolveEventChoice(int index)
+        {
+            if (CurrentPhase != GamePhase.EventEncounter) return;
+            var ee = EventEncounter.Instance;
+            if (ee?.Current == null) return;
+            if (eventChoiceResolved) return;
+
+            var result = ee.ResolveChoice(index);
+            eventChoiceResolved = true;
+            if (result == null) return;
+
+            // 戦闘トリガがあれば即時遷移（フレーバー表示は後回し）
+            if (result.triggerEliteCombat)
+            {
+                returnToMapAfterEventCombat = true;
+                StartEventCombat(elite: true);
+                return;
+            }
+            if (result.triggerCombat)
+            {
+                returnToMapAfterEventCombat = true;
+                StartEventCombat(elite: false);
+                return;
+            }
+
+            // ランダムイベント発生: もう一度抽選してフェーズ継続
+            if (result.triggerRandomEvent)
+            {
+                eventChoiceResolved = false;
+                ee.Begin(Run);
+                return;
+            }
+
+            // 通常はフレーバー表示 → Space で完了
+        }
+
+        /// <summary>イベント完了（フレーバー読了） → マップへ戻る。</summary>
+        public void ConfirmEventEncounter()
+        {
+            if (CurrentPhase != GamePhase.EventEncounter) return;
+            if (!eventChoiceResolved) return;
+            EventEncounter.Instance?.Clear();
+            SetPhase(GamePhase.MapNavigation);
+        }
+
+        /// <summary>イベントから戦闘を開始する。</summary>
+        private void StartEventCombat(bool elite)
+        {
+            CurrentEnemy = FloorManager.PickEnemy(Run.currentFloor);
+            if (CurrentEnemy == null)
+            {
+                Debug.LogError("[GameManager] イベント戦闘の敵選出失敗");
+                SetPhase(GamePhase.MapNavigation);
+                return;
+            }
+            OnEnemyEncountered?.Invoke(CurrentEnemy);
+            Log($"イベント戦闘: {CurrentEnemy.displayName} (elite={elite})");
+
+            var (dc, dm, cr, df) = GatherPlayerCombatStats();
+            SetPhase(GamePhase.Combat);
+            CombatManager.Instance.StartCombat(CurrentEnemy, Run.playerHP, dc, dm, cr, df);
+        }
+
+        /// <summary>3つの儀式の選択をすべて完了して MapNavigation に戻る。</summary>
+        public void CompleteSinRitual()
+        {
+            if (CurrentPhase != GamePhase.SinRitual) return;
+            Log($"儀式完了。刻まれた呪い: {Run.sinDebuffs}");
+            SetPhase(GamePhase.MapNavigation);
+        }
+
         private void HandleFloorClear()
         {
+            // 5層クリア時: 「決意」所持なら6層挑戦に進む、なければランクリア確定
             if (Run.IsNormalClear && Run.currentFloor == Run.normalClearFloor)
             {
+                bool hasResolve = Run.ownedPassiveItems != null && Run.ownedPassiveItems.Contains("決意");
+                if (hasResolve)
+                {
+                    SetPhase(GamePhase.FloorClear);
+                    OnFloorAdvanced?.Invoke(Run.currentFloor + 1);
+                    Log($"フロア{Run.currentFloor}クリア → 決意により裏ボス挑戦へ");
+                    return;
+                }
                 Run.EndRun();
                 SetPhase(GamePhase.RunClear);
                 OnRunCleared?.Invoke(Run);
@@ -494,6 +1005,9 @@ namespace GameLoop
                     critRate = Mathf.Clamp(critRate + ActiveModifier.critRateBonus, 0, 9);
             }
 
+            // 影の代償の出目-1 はロール時に50%確率で発動するため、ここでは何もしない。
+            // 実適用は CombatManager.ExecuteTurn のロール直後で処理。
+
             return (diceCount, diceMax, critRate, diceFaces);
         }
 
@@ -529,6 +1043,7 @@ namespace GameLoop
                 case TileType.Mystery:     return "？";
                 case TileType.Trap:        return "罠";
                 case TileType.Boss:        return "ボス";
+                case TileType.SinAltar:    return "祭壇";
                 default:                   return type.ToString();
             }
         }
@@ -539,8 +1054,14 @@ namespace GameLoop
 
         void Update()
         {
-            if (Input.GetKeyDown(KeyCode.G) && CurrentPhase == GamePhase.Title)
-                StartNewRun();
+            if (Input.GetKeyDown(KeyCode.G))
+            {
+                Debug.Log($"[GameManager] G pressed (phase={CurrentPhase})");
+                if (CurrentPhase == GamePhase.Title)
+                    StartNewRun();
+                else
+                    Debug.LogWarning($"[GameManager] G無視: フェーズが Title でない (現在={CurrentPhase})。/clear や autoStartRun=true で既に走っている可能性あり");
+            }
 
             // マップナビゲーション: 数字キーで移動先選択
             if (CurrentPhase == GamePhase.MapNavigation)
@@ -555,6 +1076,106 @@ namespace GameLoop
                             MoveToNode(moves[i].id);
                             return;
                         }
+                    }
+                }
+                return;
+            }
+
+            // SinRitual 中の儀式選択
+            if (CurrentPhase == GamePhase.SinRitual)
+            {
+                if (Input.GetKeyDown(KeyCode.Alpha1) && !ritualHpResolved)
+                {
+                    OfferHpSacrifice(true);
+                    ritualHpResolved = true;
+                }
+                if (Input.GetKeyDown(KeyCode.Alpha2) && !ritualGoldResolved)
+                {
+                    OfferGoldSacrifice(true);
+                    ritualGoldResolved = true;
+                }
+                if (Input.GetKeyDown(KeyCode.Alpha3) && !ritualItemResolved)
+                {
+                    OfferItemSacrifice(true);
+                    ritualItemResolved = true;
+                }
+
+                if (Input.GetKeyDown(KeyCode.Space))
+                {
+                    // 未解決の儀式は拒んだ扱いでデバフを確定
+                    if (!ritualHpResolved)   OfferHpSacrifice(false);
+                    if (!ritualGoldResolved) OfferGoldSacrifice(false);
+                    if (!ritualItemResolved) OfferItemSacrifice(false);
+                    CompleteSinRitual();
+                }
+                return;
+            }
+
+            // ShopVisit 中: Esc 退店、T 売買モード切替、S 売却対象切替、1-9 購入/売却
+            if (CurrentPhase == GamePhase.ShopVisit)
+            {
+                // 購入ダイアログ表示中はキー入力をダイアログ側に渡さない
+                var dialog = InventorySystem.Shop.Visual.ShopPurchaseDialog.Instance;
+                if (dialog != null && dialog.IsOpen)
+                {
+                    if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Y))
+                        dialog.ConfirmPurchase();
+                    else if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.N))
+                        dialog.Close();
+                    return;
+                }
+
+                if (Input.GetKeyDown(KeyCode.Escape))
+                {
+                    ExitShop();
+                    return;
+                }
+                if (Input.GetKeyDown(KeyCode.T))
+                {
+                    ToggleShopSellMode();
+                    return;
+                }
+                if (ShopSellMode && Input.GetKeyDown(KeyCode.S))
+                {
+                    CycleSellSource();
+                    return;
+                }
+                for (int i = 0; i < 9; i++)
+                {
+                    if (Input.GetKeyDown(KeyCode.Alpha1 + i))
+                    {
+                        if (ShopSellMode) ShopSell(i);
+                        else ShopBuy(i);
+                        return;
+                    }
+                }
+                return;
+            }
+
+            // EventEncounter 中: 1～9 で選択肢、Space でフレーバー読了
+            if (CurrentPhase == GamePhase.EventEncounter)
+            {
+                if (!eventChoiceResolved)
+                {
+                    var ev = EventEncounter.Instance?.Current;
+                    if (ev != null)
+                    {
+                        for (int i = 0; i < Mathf.Min(ev.choices.Count, 9); i++)
+                        {
+                            if (Input.GetKeyDown(KeyCode.Alpha1 + i))
+                            {
+                                ResolveEventChoice(i);
+                                return;
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    if (Input.GetKeyDown(KeyCode.Space))
+                    {
+                        ConfirmEventEncounter();
+                        return;
                     }
                 }
                 return;
@@ -577,8 +1198,6 @@ namespace GameLoop
                     case GamePhase.RestStop:
                         RestHeal();
                         break;
-                    case GamePhase.ShopVisit:
-                    case GamePhase.EventEncounter:
                     case GamePhase.TreasureOpen:
                     case GamePhase.TrapTriggered:
                         ConfirmTileEvent();

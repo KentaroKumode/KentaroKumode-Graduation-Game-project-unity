@@ -176,8 +176,8 @@ namespace InventorySystem
                     entry.description = jsonItem.description;
                     
                     // Enum変換
-                    System.Enum.TryParse(jsonItem.category, out entry.category);
-                    System.Enum.TryParse(jsonItem.rarity, out entry.rarity);
+                    System.Enum.TryParse(jsonItem.category, true, out entry.category);
+                    System.Enum.TryParse(jsonItem.rarity, true, out entry.rarity);
                     entry.size = new Vector2Int(jsonItem.sizeX, jsonItem.sizeY);
                     
                     // CompleteItemDataを作成
@@ -216,8 +216,8 @@ namespace InventorySystem
             item.flavorText = jsonItem.flavorText;
             
             // Enum変換
-            System.Enum.TryParse(jsonItem.category, out item.category);
-            System.Enum.TryParse(jsonItem.rarity, out item.rarity);
+            System.Enum.TryParse(jsonItem.category, true, out item.category);
+            System.Enum.TryParse(jsonItem.rarity, true, out item.rarity);
             
             item.size = new ItemSize { x = jsonItem.sizeX, y = jsonItem.sizeY };
             

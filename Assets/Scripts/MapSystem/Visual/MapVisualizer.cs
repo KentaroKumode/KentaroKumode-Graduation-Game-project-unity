@@ -11,9 +11,11 @@ namespace MapSystem.Visual
     public class MapVisualizer : MonoBehaviour
     {
         [Header("レイアウト")]
-        [SerializeField] private float laneSpacing = 3.0f;
-        [SerializeField] private float rowSpacing = 3.0f;
+        [SerializeField] private float laneSpacing = 2.2f;
+        [SerializeField] private float rowSpacing = 2.2f;
         [SerializeField] private float positionJitter = 0.5f;
+        [Tooltip("スクロール範囲を上下に拡張する余白 (unit)。背景サイズには影響しない")]
+        [SerializeField] private float layoutVerticalPadding = 1.5f;
 
         [Header("ライン (ドット配置 — pixel perfect)")]
         [Tooltip("ベジェ計算用のサンプル点数（多いほど滑らかな曲線）")]
@@ -30,24 +32,38 @@ namespace MapSystem.Visual
         [Tooltip("PPU (ノード/ドット解像度の基準。通常32)")]
         [SerializeField] private int pixelsPerUnit = 32;
 
-        [Header("色")]
+        [Header("ライン色")]
         [SerializeField] private Color lineDefault = new Color(0.5f, 0.45f, 0.35f, 0.6f);
         [SerializeField] private Color lineVisited = new Color(0.9f, 0.8f, 0.5f, 1f);
         [SerializeField] private Color lineReachable = new Color(1f, 1f, 1f, 0.9f);
+
+        [Header("ノード状態色 (アトラスアイコン色との混合)")]
+        [Tooltip("未訪問・到達不可のノード色")]
+        [SerializeField] private Color nodeColorDefault   = new Color(0.4f, 0.4f, 0.4f, 0.7f);
+        [Tooltip("訪問済みノード色")]
+        [SerializeField] private Color nodeColorVisited   = new Color(0.7f, 0.65f, 0.5f, 0.9f);
+        [Tooltip("現在ノードから移動可能なノード色 (明滅)")]
+        [SerializeField] private Color nodeColorReachable = new Color(1f, 1f, 1f, 1f);
+        [Tooltip("現在地ノード色 (黄色く明滅)")]
+        [SerializeField] private Color nodeColorCurrent   = new Color(1f, 0.85f, 0.3f, 1f);
+
+        [Header("ボス専用色 (Lerp で脈動)")]
+        [SerializeField] private Color bossDeep   = new Color(0.18f, 0.02f, 0.02f, 1f);
+        [SerializeField] private Color bossBright = new Color(0.65f, 0.05f, 0.05f, 1f);
 
         [Header("ノードPrefab")]
         [SerializeField] private GameObject defaultNodePrefab;
         [SerializeField] private float nodeScale = 1.0f;
 
-        [Header("マップ背景")]
-        [Tooltip("マップの下に敷くスプライト。フロア共通。null なら背景なし")]
-        [SerializeField] private Sprite mapBackgroundSprite;
-        [Tooltip("ノード配置領域の外側にどれだけ広げるか (ワールド単位)")]
-        [SerializeField] private float backgroundPadding = 1.0f;
+        [Header("マップ背景 (Plane投影)")]
+        [Tooltip("背景に投影するテクスチャ。解像度は問わない (Plane に拡大投影される)")]
+        [SerializeField] private Texture2D mapBackgroundTexture;
+        [Tooltip("Plane の一辺ピクセル数 (PPU基準でワールド単位へ変換)")]
+        [SerializeField] private int backgroundPlaneSizePx = 1024;
+        [Tooltip("背景シェーダー。null なら Unlit/Texture を使用")]
+        [SerializeField] private Shader backgroundShader;
         [Tooltip("背景の sortingOrder。ノード/ドットより小さく")]
         [SerializeField] private int backgroundSortingOrder = -10;
-        [Tooltip("ピクセル境界に揃えるか (PPU=32 なら推奨ON)")]
-        [SerializeField] private bool snapBackgroundToPixel = true;
 
         [Header("ピクセルパーフェクト")]
         [SerializeField] private TileIconAtlas tileIconAtlas;
@@ -168,8 +184,13 @@ namespace MapSystem.Visual
                     x = centerLane * laneSpacing;
                     // Y軸を反転: 行0(前哨基地) を下、行N(ボス) を上に表示
                     y = -node.row * rowSpacing;
-                    x += Jitter(rng, positionJitter * 0.3f);
-                    y += Jitter(rng, positionJitter * 0.3f);
+
+                    // ボスは厳密にセンター配置（ジッターなし）
+                    if (node.type != TileType.Boss)
+                    {
+                        x += Jitter(rng, positionJitter * 0.3f);
+                        y += Jitter(rng, positionJitter * 0.3f);
+                    }
                 }
                 else
                 {
@@ -199,12 +220,15 @@ namespace MapSystem.Visual
                 go.transform.localRotation = Quaternion.identity;
 
                 go.name = $"Node_{node.id}";
-                go.transform.localScale = Vector3.one * nodeScale;
+                // ボス・前哨基地は 2 倍サイズ（整数倍なのでピクセル密度は保たれる）
+                bool isBigNode = node.type == TileType.Boss || node.type == TileType.Outpost;
+                float scale = isBigNode ? nodeScale * 2f : nodeScale;
+                go.transform.localScale = Vector3.one * scale;
 
                 var visual = go.GetComponent<MapNodeVisual>();
                 if (visual == null) visual = go.AddComponent<MapNodeVisual>();
 
-                visual.Initialize(node, tileIconAtlas);
+                visual.Initialize(node, tileIconAtlas, BuildColorPalette());
                 nodeVisuals[node.id] = visual;
             }
         }
@@ -264,11 +288,14 @@ namespace MapSystem.Visual
                     reachableIds.Add(r.id);
             }
 
-            // ノード状態更新
+            // ノード状態更新（メタデバフ Lv4: revealed=false のノードは非表示）
             foreach (var kvp in nodeVisuals)
             {
                 var node = currentMap.GetNode(kvp.Key);
                 if (node == null) continue;
+
+                kvp.Value.gameObject.SetActive(node.revealed);
+                if (!node.revealed) continue;
 
                 var state = NodeVisualState.Default;
                 if (node == currentNode)
@@ -498,6 +525,20 @@ namespace MapSystem.Visual
             pixelCamera.SetupForMap(mapBounds);
         }
 
+        /// <summary>Inspector の色フィールドから MapNodeVisual に渡すパレットを組む。</summary>
+        private MapNodeVisual.ColorPalette BuildColorPalette()
+        {
+            return new MapNodeVisual.ColorPalette
+            {
+                Default    = nodeColorDefault,
+                Visited    = nodeColorVisited,
+                Reachable  = nodeColorReachable,
+                Current    = nodeColorCurrent,
+                BossDeep   = bossDeep,
+                BossBright = bossBright,
+            };
+        }
+
         public bool TryGetNodeMapLocalY(string nodeId, out float y)
         {
             if (worldPositions.TryGetValue(nodeId, out var pos))
@@ -542,40 +583,56 @@ namespace MapSystem.Visual
             }
         }
 
-        /// <summary>マップ背景スプライトを SerializeField から自動生成。</summary>
+        /// <summary>
+        /// マップ背景を Quad (Plane) に投影で描画する。
+        /// テクスチャの解像度に関わらず、固定の Plane サイズに拡大して貼る。
+        /// </summary>
         private void SpawnBackground()
         {
-            if (mapBackgroundSprite == null) return;
+            if (mapBackgroundTexture == null) return;
             if (backgroundContainer == null) return;
 
-            // 背景の中心とサイズ (worldPositions と同じローカル空間で計算)
+            // 中心 (ノード配置の bounds 中心)
             Vector3 center = mapBounds.center;
-            float w = mapBounds.size.x + backgroundPadding * 2f;
-            float h = mapBounds.size.y + backgroundPadding * 2f;
 
-            if (snapBackgroundToPixel)
-            {
-                float pixelUnit = 1f / Mathf.Max(1, pixelsPerUnit);
-                center = SnapToPixel(center, pixelUnit);
-                w = Mathf.Round(w / pixelUnit) * pixelUnit;
-                h = Mathf.Round(h / pixelUnit) * pixelUnit;
-            }
+            // Plane の世界サイズは固定。スケールを変えるとテクスチャが
+            // 引き伸ばされてピクセル密度が崩れるため、サイズに padding は加えない。
+            // 余白の広さはノード配置間隔 (rowSpacing/laneSpacing) で調整する。
+            float sizeUnit = backgroundPlaneSizePx / (float)Mathf.Max(1, pixelsPerUnit);
 
-            var bgGo = new GameObject("MapBackground");
+            // Quad プリミティブを作成
+            var bgGo = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            bgGo.name = "MapBackground";
             bgGo.transform.SetParent(backgroundContainer, false);
+
+            // クリック判定を阻害しないよう、自動付与の Collider は削除
+            var col = bgGo.GetComponent<Collider>();
+            if (col != null) Destroy(col);
+
             // ノードより少し奥 (寝かせ後の世界 -Y 方向 = 地中側)
             bgGo.transform.localPosition = new Vector3(center.x, center.y, 0.01f);
             bgGo.transform.localRotation = Quaternion.identity;
+            bgGo.transform.localScale = new Vector3(sizeUnit, sizeUnit, 1f);
 
-            var sr = bgGo.AddComponent<SpriteRenderer>();
-            sr.sprite = mapBackgroundSprite;
-            sr.flipY = true; // 親の寝かせ回転 (X=-90) に合わせる
-            sr.sortingOrder = backgroundSortingOrder;
-            sr.drawMode = SpriteDrawMode.Sliced; // size をワールド単位で指定可能に
-            sr.size = new Vector2(w, h);
+            // テクスチャに Point フィルタを強制 (ピクセル密度維持)
+            mapBackgroundTexture.filterMode = FilterMode.Point;
 
-            if (sr.sprite.texture != null)
-                sr.sprite.texture.filterMode = FilterMode.Point;
+            // Material 作成
+            // Sprites/Default を優先 — Cull Off なので寝かせ回転の向きに関係なく見える、
+            // かつ URP/Built-in 両対応。Unlit/Texture はバックフェースカリングで見えなくなる。
+            var mr = bgGo.GetComponent<MeshRenderer>();
+            var shader = backgroundShader != null
+                ? backgroundShader
+                : (Shader.Find("Sprites/Default")
+                   ?? Shader.Find("Unlit/Transparent")
+                   ?? Shader.Find("Unlit/Texture"));
+            var mat = new Material(shader);
+            mat.mainTexture = mapBackgroundTexture;
+            // 親の寝かせ回転 (X=-90) で UV V が反転して見えるため補正
+            mat.mainTextureScale  = new Vector2(1f, -1f);
+            mat.mainTextureOffset = new Vector2(0f,  1f);
+            mr.sharedMaterial = mat;
+            mr.sortingOrder = backgroundSortingOrder;
         }
 
         /// <summary>戦闘・イベント中などにマップ全体を非表示にする/再表示する。</summary>
@@ -597,6 +654,14 @@ namespace MapSystem.Visual
             mapBounds = new Bounds(enumerator.Current, Vector3.zero);
             while (enumerator.MoveNext())
                 mapBounds.Encapsulate(enumerator.Current);
+
+            // 上下に余白を追加 (スクロール範囲だけがこの分だけ拡張される)
+            if (layoutVerticalPadding > 0f)
+            {
+                float cx = mapBounds.center.x;
+                mapBounds.Encapsulate(new Vector3(cx, mapBounds.max.y + layoutVerticalPadding, 0f));
+                mapBounds.Encapsulate(new Vector3(cx, mapBounds.min.y - layoutVerticalPadding, 0f));
+            }
         }
 
         private void ClearVisuals()
