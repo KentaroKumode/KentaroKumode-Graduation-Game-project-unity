@@ -119,6 +119,12 @@ namespace InventorySystem.PassiveSkills
         /// <summary>激情の刃 等の与ダメ倍率（1.0 = 変化なし。BeginNewTurn でリセット）</summary>
         public float outgoingDamageMultiplier = 1f;
 
+        /// <summary>苦難の刻印・不屈の鎧 等の被ダメ固定減算（複数アイテム合算）。CombatManager 敗北分岐で適用。BeginNewTurn でリセット。</summary>
+        public int playerFlatDamageReduction;
+
+        /// <summary>残り敵パッシブ無効化ターン数。> 0 のとき FireEnemyTrigger をスキップ。各ターン末に減算。</summary>
+        public int enemyPassivesDisabledTurns;
+
         // ===== 刻印システム =====
         /// <summary>刻印による追加パッシブ効果（戦闘開始時に解決済み）</summary>
         public List<SigilBonus> activeSigilBonuses = new List<SigilBonus>();
@@ -183,6 +189,12 @@ namespace InventorySystem.PassiveSkills
 
             // 与ダメ倍率は毎ターンリセット（パッシブが毎ターン再評価する）
             outgoingDamageMultiplier = 1f;
+
+            // 被ダメ固定減算もリセット（毎ターン再評価）
+            playerFlatDamageReduction = 0;
+
+            // 敵パッシブ無効化のターン残数を減算
+            if (enemyPassivesDisabledTurns > 0) enemyPassivesDisabledTurns--;
         }
 
         /// <summary>蓄積値を安全に取得（キーが無ければ0）</summary>

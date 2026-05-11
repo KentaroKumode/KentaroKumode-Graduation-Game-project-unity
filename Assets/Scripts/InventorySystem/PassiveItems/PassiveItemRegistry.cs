@@ -49,6 +49,28 @@ namespace InventorySystem.PassiveItems
             Register(new Effects.SilentSwordbeltEffect());
             Register(new Effects.WickBellEffect());
 
+            // HP閾値発動系
+            Register(new Effects.FrenzyMedallionEffect());
+            Register(new Effects.UnyieldingArmorEffect());
+            Register(new Effects.DeathOmenEffect());
+
+            // 歩行HP回復
+            Register(new Effects.CalmShoesEffect());
+            Register(new Effects.HealingShoesEffect());
+            Register(new Effects.HolyShoesEffect());
+
+            // その他高レア
+            Register(new Effects.GoldenScaleEffect());
+            Register(new Effects.HarmonicClockEffect());
+            Register(new Effects.SilentRobeEffect());
+            Register(new Effects.BlackSmokeTalismanEffect());
+            Register(new Effects.AzureEyeEffect());
+            Register(new Effects.IronHeartEffect());
+            Register(new Effects.GuardianAngelBellEffect());
+            Register(new Effects.CalamityRingEffect());
+            Register(new Effects.EternalLanternEffect());
+            // 商人の符牒・食通の懐刀 は他システム連携でフックされる（PassiveItemRegistry には登録しない）
+
             // 6種の旧名前付きパッシブ（ちいさな灯火 等）は効果未定義につき未登録。
             // 効果を決める時にここに追加する。
         }

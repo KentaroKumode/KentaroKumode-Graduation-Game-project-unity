@@ -689,6 +689,10 @@ namespace CombatSystem
                     if (metaDmgRed > 0 && totalDmg > 0)
                         totalDmg = Mathf.Max(1, totalDmg - metaDmgRed);
 
+                    // 名前付きパッシブ由来の固定被ダメ削減（不屈の鎧・苦難の刻印 等の合算）
+                    if (ctx.playerFlatDamageReduction > 0 && totalDmg > 0)
+                        totalDmg = Mathf.Max(1, totalDmg - ctx.playerFlatDamageReduction);
+
                     // フロアデバフ: 敗北時の被ダメージ軽減（5層 地獄門: -2）
                     if (floorMod != null && floorMod.defeatDamageReduction > 0 && totalDmg > 0)
                     {

@@ -88,13 +88,14 @@ namespace EventSystem
                 case EventEffectType.HungerDelta:
                     if (hunger != null)
                     {
-                        if (eff.amount >= 0) hunger.Restore(eff.amount);
-                        else
-                        {
-                            // SetCurrentForTest で減算
-                            hunger.SetCurrentForTest(hunger.Current + eff.amount);
-                        }
-                        result.log.Add($"空腹度{eff.amount:+0;-0} (現在 {hunger.Current}/{hunger.Max})");
+                        int amount = eff.amount;
+                        // 食通の懐刀: イベント由来の空腹度回復 +1
+                        if (amount > 0 && run.ownedPassiveItems != null && run.ownedPassiveItems.Contains("食通の懐刀"))
+                            amount += 1;
+
+                        if (amount >= 0) hunger.Restore(amount);
+                        else hunger.SetCurrentForTest(hunger.Current + amount);
+                        result.log.Add($"空腹度{amount:+0;-0} (現在 {hunger.Current}/{hunger.Max})");
                     }
                     break;
 
@@ -272,6 +273,17 @@ namespace EventSystem
                     int gain = GameLoop.LastStand.FilterGoldGain(run, 1);
                     run.coins += gain;
                     result.log.Add($"決意の獲得ボーナス: +{gain}ゴールド");
+                    break;
+                }
+                case "鋼の心臓":
+                {
+                    int gain = GameLoop.LastStand.FilterMaxHPGain(run, 20);
+                    if (gain > 0)
+                    {
+                        run.playerMaxHP += gain;
+                        run.playerHP = UnityEngine.Mathf.Min(run.playerMaxHP, run.playerHP + gain);
+                        result.log.Add($"鋼の心臓: 最大HP+{gain} → {run.playerMaxHP}");
+                    }
                     break;
                 }
             }

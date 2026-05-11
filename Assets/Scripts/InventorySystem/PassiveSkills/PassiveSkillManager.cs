@@ -260,6 +260,8 @@ namespace InventorySystem.PassiveSkills
         public void FireEnemyTrigger(PassiveSkillTrigger trigger)
         {
             if (context == null) return;
+            // 静寂のローブ等で敵パッシブが無効化されているターン中はスキップ
+            if (context.enemyPassivesDisabledTurns > 0) return;
             if (!enemySkillsByTrigger.TryGetValue(trigger, out var skills)) return;
 
             // 敵視点に反転

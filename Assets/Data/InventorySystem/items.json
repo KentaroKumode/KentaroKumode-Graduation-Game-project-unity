@@ -713,6 +713,60 @@
         { "internalName": "激情の刃", "skillName": "激情", "description": "HPが最大値の50%以下のとき、与ダメ+30%" }
     ] },
 
+    { "id": "狂乱のメダリオン", "name": "狂乱のメダリオン", "description": "瀕死の戦士のみが意味を解せる、血で曇った銀のメダル。", "flavorText": "意識を手放した瞬間、剣は最も鋭くなる。", "category": "Passive", "rarity": "LEGENDARY", "sizeX": 2, "sizeY": 2, "basePrice": 100, "passiveSkills": [
+        { "internalName": "狂乱のメダリオン", "skillName": "狂乱", "description": "HPが最大値の25%以下のとき、与ダメ+50%" }
+    ] },
+    { "id": "不屈の鎧", "name": "不屈の鎧", "description": "幾度も打ち砕かれては修復された、不気味な凹凸を残す鎧。", "flavorText": "ひびの一つひとつが、生きながらえた証だ。", "category": "Passive", "rarity": "LEGENDARY", "sizeX": 2, "sizeY": 2, "basePrice": 100, "passiveSkills": [
+        { "internalName": "不屈の鎧", "skillName": "不屈", "description": "HPが最大値の50%以下のとき、被ダメ-2" }
+    ] },
+    { "id": "死神の予感", "name": "死神の予感", "description": "迫る死を視る者にだけ刃の急所が見える、と古い書には記される。", "flavorText": "死神が肩越しに囁く距離まで近づいたとき、刃は導かれる。", "category": "Passive", "rarity": "LEGENDARY", "sizeX": 2, "sizeY": 2, "basePrice": 100, "passiveSkills": [
+        { "internalName": "死神の予感", "skillName": "予感", "description": "HPが最大値の20%以下のとき、会心率+3/9" }
+    ] },
+
+    { "id": "安らぎの靴", "name": "安らぎの靴", "description": "歩むたびに微かな治癒の温もりを足元から伝える靴。", "flavorText": "一歩ごとに、誰かが祈りを唱えてくれている気がした。", "category": "Passive", "rarity": "BRONZE", "sizeX": 2, "sizeY": 2, "basePrice": 10, "passiveSkills": [
+        { "internalName": "安らぎの靴", "skillName": "安息の歩み", "description": "マップ移動時、HP+1" }
+    ] },
+    { "id": "癒しの靴", "name": "癒しの靴", "description": "踏みしめるたびに皮膚の下を温かい何かが流れる、革製の靴。", "flavorText": "深い傷も、歩み続けるうちに不思議と塞がっていく。", "category": "Passive", "rarity": "SILVER", "sizeX": 2, "sizeY": 2, "basePrice": 25, "passiveSkills": [
+        { "internalName": "癒しの靴", "skillName": "癒しの歩み", "description": "マップ移動時、HP+2" }
+    ] },
+    { "id": "神聖の靴", "name": "神聖の靴", "description": "神官の祝福を宿すという、銀糸で刺繍された白い靴。", "flavorText": "神に祝福された足跡は、地に光を残しながら進む。", "category": "Passive", "rarity": "GOLD", "sizeX": 2, "sizeY": 2, "basePrice": 50, "passiveSkills": [
+        { "internalName": "神聖の靴", "skillName": "神聖の歩み", "description": "マップ移動時、HP+3" }
+    ] },
+
+    { "id": "黄金の天秤", "name": "黄金の天秤", "description": "戦の後に重さの増す不思議な小型の天秤。", "flavorText": "勝利の重さは、いつも金貨で測られる。", "category": "Passive", "rarity": "GOLD", "sizeX": 2, "sizeY": 2, "basePrice": 50, "passiveSkills": [
+        { "internalName": "黄金の天秤", "skillName": "戦果の秤", "description": "戦闘勝利時、+5ゴールド" }
+    ] },
+    { "id": "倍音のクロック", "name": "倍音のクロック", "description": "三拍ごとに大きく鳴る、不協和な振動を内に持つ古い置時計。", "flavorText": "三度の鼓動が重なる時、刃の重さは倍になる。", "category": "Passive", "rarity": "LEGENDARY", "sizeX": 2, "sizeY": 2, "basePrice": 100, "passiveSkills": [
+        { "internalName": "倍音のクロック", "skillName": "倍音", "description": "戦闘ターン数が3の倍数のとき、与ダメ×2" }
+    ] },
+    { "id": "静寂のローブ", "name": "静寂のローブ", "description": "音を吸い込む黒い繊維で織られたローブ。一瞬だけ世界を黙らせる。", "flavorText": "魔物の最初の囁きを、ローブが飲み込んだ。", "category": "Passive", "rarity": "SILVER", "sizeX": 2, "sizeY": 2, "basePrice": 25, "passiveSkills": [
+        { "internalName": "静寂のローブ", "skillName": "静寂", "description": "戦闘1ターン目のみ敵パッシブ発動しない" }
+    ] },
+    { "id": "黒煙の符", "name": "黒煙の符", "description": "焼けば必ず黒煙を上げる、呪いの符。", "flavorText": "敵の輪郭は、黒煙の中にゆらりと滲んで消える。", "category": "Passive", "rarity": "GOLD", "sizeX": 2, "sizeY": 2, "basePrice": 50, "passiveSkills": [
+        { "internalName": "黒煙の符", "skillName": "黒煙", "description": "戦闘開始時、敵に出血+2スタック付与" }
+    ] },
+    { "id": "蒼穹の眼", "name": "蒼穹の眼", "description": "嵌め込まれた青い宝石が、開戦の刹那に最も冴え渡る。", "flavorText": "最初の一閃には神が宿る、と古き戦士は信じた。", "category": "Passive", "rarity": "GOLD", "sizeX": 2, "sizeY": 2, "basePrice": 50, "passiveSkills": [
+        { "internalName": "蒼穹の眼", "skillName": "蒼穹の一閃", "description": "戦闘1ターン目のロール、必ず会心ヒット" }
+    ] },
+    { "id": "鋼の心臓", "name": "鋼の心臓", "description": "脈打ち続ける鋼鉄製の臓器。胸に収めれば肉の心臓と置き換わる。", "flavorText": "代償は、もう柔らかい鼓動を聞けないこと。", "category": "Passive", "rarity": "LEGENDARY", "sizeX": 2, "sizeY": 2, "basePrice": 100, "passiveSkills": [
+        { "internalName": "鋼の心臓", "skillName": "鋼の鼓動", "description": "獲得時、最大HP+20。戦闘終了時、HP+5" }
+    ] },
+    { "id": "守護天使の鈴", "name": "守護天使の鈴", "description": "瀕死の戦士の枕元で鳴ると謂う、銀製の小さな鈴。", "flavorText": "鈴が鳴ったその瞬間、誰かの手が肩に置かれていた。", "category": "Passive", "rarity": "LEGENDARY", "sizeX": 2, "sizeY": 2, "basePrice": 100, "passiveSkills": [
+        { "internalName": "守護天使の鈴", "skillName": "守護天使の囁き", "description": "戦闘中1回限り、HP25以下になったターン末にHP+15" }
+    ] },
+    { "id": "災厄の指輪", "name": "災厄の指輪", "description": "受けた苦痛を糧に怒りを蓄える、不気味な深紅の指輪。", "flavorText": "傷の数だけ、反撃の刃は重くなる。", "category": "Passive", "rarity": "LEGENDARY", "sizeX": 2, "sizeY": 2, "basePrice": 100, "passiveSkills": [
+        { "internalName": "災厄の指輪", "skillName": "災厄の蓄積", "description": "被弾するたび次の与ダメ+2累積（上限+10、戦闘終了でリセット）" }
+    ] },
+    { "id": "永遠の燈", "name": "永遠の燈", "description": "燃料なく光り続ける小さな燈。瀕死の戦士の闇を払う。", "flavorText": "息絶える間際、その光は何処からともなく傍に降りてくる。", "category": "Passive", "rarity": "LEGENDARY", "sizeX": 2, "sizeY": 2, "basePrice": 100, "passiveSkills": [
+        { "internalName": "永遠の燈", "skillName": "永遠の光", "description": "戦闘終了時、HP10以下ならHP+20" }
+    ] },
+    { "id": "商人の符牒", "name": "商人の符牒", "description": "古い商業ギルドの徽章。所有者は半値で買えるが、何も手放せなくなる。", "flavorText": "「持つ者は、決して譲らない」— ギルドの掟。", "category": "Passive", "rarity": "LEGENDARY", "sizeX": 2, "sizeY": 2, "basePrice": 100, "passiveSkills": [
+        { "internalName": "商人の符牒", "skillName": "商人の誓い", "description": "ショップ価格半額。ただしアイテム売却不可" }
+    ] },
+    { "id": "食通の懐刀", "name": "食通の懐刀", "description": "美食家が常に懐に忍ばせた、不思議な切れ味の小型ナイフ。", "flavorText": "あらゆる食材を最良に捌くため、それは存在する。", "category": "Passive", "rarity": "SILVER", "sizeX": 2, "sizeY": 2, "basePrice": 25, "passiveSkills": [
+        { "internalName": "食通の懐刀", "skillName": "食通の手腕", "description": "イベント由来の空腹度回復+1" }
+    ] },
+
     { "id": "黄昏の懐中時計", "name": "黄昏の懐中時計", "description": "時を測るのではなく、戦況を測る古い時計。長引いた戦闘ほど精度を増す。", "flavorText": "針が止まる頃、戦場の天秤がようやく傾く。", "category": "Passive", "rarity": "GOLD", "sizeX": 2, "sizeY": 2, "basePrice": 50, "passiveSkills": [] },
     { "id": "苦難の刻印", "name": "苦難の刻印", "description": "瀕死のさなかにこそ守る刻印。痛みを刻むほど鋭くなる。", "flavorText": "傷を重ねた皮膚に焼き付いた印。痛みは消えない。それを抱えて歩む。", "category": "Passive", "rarity": "SILVER", "sizeX": 2, "sizeY": 2, "basePrice": 25, "passiveSkills": [] },
     { "id": "死神の数珠", "name": "死神の数珠", "description": "命を数えるための数珠。一つ繰るたびにわずかな対価が落ちてくる。", "flavorText": "一玉繰るたびに、誰かが見送られる。返礼は静かに転がり落ちる。", "category": "Passive", "rarity": "SILVER", "sizeX": 2, "sizeY": 2, "basePrice": 25, "passiveSkills": [] },

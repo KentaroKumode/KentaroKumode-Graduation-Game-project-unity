@@ -66,10 +66,18 @@ namespace InventorySystem.Shop
         {
             var inv = new ShopInventory();
 
-            // フロア価格倍率（FloorModifier.shopPriceMultiplier）× メタデバフ Lv1
+            // フロア価格倍率（FloorModifier.shopPriceMultiplier）× メタデバフ Lv1 × 商人の符牒
             var floorMod = MapSystem.FloorModifierDatabase.Get(floor);
             float baseMul = floorMod != null ? floorMod.shopPriceMultiplier : 1f;
             inv.priceMultiplier = baseMul * MetaProgression.MetaDebuffApplicator.GetShopPriceMultiplier();
+            // 商人の符牒: 価格半額（割合計算が先）
+            var runForSeal = GameLoop.GameManager.Instance?.Run;
+            if (runForSeal != null && runForSeal.ownedPassiveItems != null
+                && runForSeal.ownedPassiveItems.Contains("商人の符牒"))
+            {
+                inv.priceMultiplier *= 0.5f;
+                Debug.Log("[ShopManager] 商人の符牒適用: 価格半額");
+            }
 
             // パッシブ ×2
             for (int i = 0; i < 2; i++)
@@ -279,6 +287,13 @@ namespace InventorySystem.Shop
         public bool TrySell(SellSource source, int listIndex, RunState run)
         {
             if (run == null) return false;
+
+            // 商人の符牒: アイテム売却不可
+            if (run.ownedPassiveItems != null && run.ownedPassiveItems.Contains("商人の符牒"))
+            {
+                Log("商人の符牒の誓いにより売却不可");
+                return false;
+            }
 
             if (source == SellSource.WeaponMaterial)
             {
