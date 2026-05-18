@@ -15,9 +15,17 @@ namespace GameLoop
         /// </summary>
         public static EnemyData PickEnemy(int floor)
         {
-            // そのフロア以下で出現する全敵を候補にする（ボス専用敵 boss_layer* は通常戦闘から除外）
-            var candidates = EnemyDatabase.GetByFloor(floor);
+            // 候補を直近フロア [floor-2, floor] に限定（低層雑魚が後半まで居座って
+            // 道中を無風化する問題への対処。ボス専用敵 boss_layer* は通常戦闘から除外）
+            int minFloor = Mathf.Max(1, floor - 2);
+            var candidates = EnemyDatabase.GetByFloorRange(minFloor, floor);
             candidates?.RemoveAll(IsBossOnly);
+            if (candidates == null || candidates.Count == 0)
+            {
+                // 窓内に候補が無い低層フォールバック: 従来通り floor 以下全敵から
+                candidates = EnemyDatabase.GetByFloor(floor);
+                candidates?.RemoveAll(IsBossOnly);
+            }
             if (candidates == null || candidates.Count == 0)
             {
                 Debug.LogWarning($"[FloorManager] フロア{floor}の敵が見つかりません。全敵からランダム選出");
@@ -46,9 +54,11 @@ namespace GameLoop
         {
             if (!playerWon) return 0;
 
-            // 基本報酬: フロア + 5 (1層=6, 6層=11。戦闘の経済価値を微増し
-            // 戦闘忌避との資源差を広げる。ボスは呼出側で×2)
-            int baseReward = floor + 5;
+            // 基本報酬: 7 + floor/2 で層間をなだらかに
+            // (F1=7, F2=8, F3=8, F4=9, F5=9, F6=10。従来 floor+5 は
+            //  6→11 で序盤が金欠・終盤が過剰だったため傾きを 5→3 に圧縮。
+            //  序盤+1 / 終盤-1。ボスは呼出側で×2)
+            int baseReward = 7 + floor / 2;
 
             // フロアデバフの報酬倍率（Fortune層・shopPriceMultiplier等）
             var mod = MapSystem.FloorModifierDatabase.Get(floor);

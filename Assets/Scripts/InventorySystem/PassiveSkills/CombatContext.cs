@@ -125,6 +125,15 @@ namespace InventorySystem.PassiveSkills
         /// <summary>残り敵パッシブ無効化ターン数。> 0 のとき FireEnemyTrigger をスキップ。各ターン末に減算。</summary>
         public int enemyPassivesDisabledTurns;
 
+        /// <summary>星火燎原 等: 敵(ボス)ダイス合計への加算ボーナス（累積。BeginNewTurn でリセットしない）。
+        /// ProcessPostRoll の勝敗判定前に enemyDiceTotal へ加算される。</summary>
+        public int enemyDiceTotalBonus;
+
+        /// <summary>〈灰燼の烙印〉: 6層ボスがHP1で踏みとどまった後の決着ターン。
+        /// true の間は両ダイスを 1d6 に強制し、ロール勝者の与ダメに +999（相打ち上等のサドンデス）。
+        /// 決着がつくまで持続するため BeginNewTurn ではリセットしない。</summary>
+        public bool ashenSuddenDeath;
+
         // ===== 消費アイテム由来（この1戦闘のみ。ctxは戦闘毎に生成→破棄で自動消去） =====
         public int consAtkBurst;          // 次の勝利ターンで与ダメ+X（適用後0）
         public int consDiceRoll;          // 勝敗判定のみ+X（ダメージには非加算）

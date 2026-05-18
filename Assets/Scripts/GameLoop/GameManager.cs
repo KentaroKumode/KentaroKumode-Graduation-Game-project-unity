@@ -308,6 +308,22 @@ namespace GameLoop
             Run.coins += coins;
             IsEliteSecondFight = false;
 
+            // 戦闘勝利報酬: 50%でパッシブ/消費を獲得。エリートマスは更に50%でもう1つ。
+            // 戦闘を経済の主軸へ（戦闘以外のゴールド源ナーフと対の措置）。
+            bool eliteWin = node != null && node.EffectiveType == TileType.EliteBattle;
+            int drops = 0;
+            if (UnityEngine.Random.value < 0.5f) drops++;
+            if (eliteWin && UnityEngine.Random.value < 0.5f) drops++;
+            for (int d = 0; d < drops; d++)
+            {
+                string did = PickRandomTreasureItem();
+                if (string.IsNullOrEmpty(did)) continue;
+                Run.ownedPassiveItems.Add(did);
+                Loadout.TryAutoEquip(Run, did);
+                var dd = ItemDatabase.Instance?.GetItem(did);
+                Log($"戦闘勝利報酬: {(dd != null ? dd.displayName : did)} を獲得{(eliteWin ? "（精鋭）" : "")}");
+            }
+
             SetPhase(GamePhase.Reward);
             OnRewardGranted?.Invoke(coins);
         }
@@ -689,9 +705,9 @@ namespace GameLoop
                 case "orc":        return ("EliteOrc",         "痛恨の一撃",     "ロール勝利時+8ダメージ、敗北で自ダイス数+1（勝利でリセット・最大5個）");
                 case "lizardman":  return ("EliteLizard",      "重甲",           "被弾時さらに-2軽減（硬鱗と累積）、敗北時に固定1反射");
                 case "wraith":     return ("EliteWraith",      "霊体",           "2ターンに1度 被ダメ全て1に減少、非霊体時はダイス数+1");
-                case "golem":      return ("EliteGolem",       "巌の意志",       "被弾時 固定2軽減、毎ターン意志+1、撃破時にスタック×2の確定ダメージ");
+                case "golem":      return ("EliteGolem",       "巌の意志",       "毎ターン意志+1、撃破時にスタック分の確定ダメージ");
                 case "minotaur":   return ("EliteMinotaur",    "際限なき暴走",   "毎ロール自ダイス合計+1（既に強い→控えめ）");
-                case "dark_knight":return ("EliteDarkKnight",  "闇技",           "勝利時、与ダメ+1（ミニボス級→最小限）");
+                case "dark_knight":return ("EliteDarkKnight",  "闇技",           "勝利時、与ダメ+3");
                 default:           return ("EliteVigor",       "精鋭",           "HP2倍 / threat+2 / 3ターンごとにダイス出目合計+1");
             }
         }
@@ -796,31 +812,37 @@ namespace GameLoop
             Log("祭壇に辿り着いた。3つの儀式を捧げよ。");
         }
 
-        /// <summary>「血の儀」: 現在HPの 30% を支払う。失敗で HeartOfGolgotha 付与。</summary>
+        /// <summary>「血の儀」: 最大HPの 30% を支払う。HP不足 or ラストスタンド中は
+        /// 捧げられず HeartOfGolgotha 付与。</summary>
         public void OfferHpSacrifice(bool accept)
         {
             if (CurrentPhase != GamePhase.SinRitual) return;
 
-            int demand = Mathf.Max(1, Mathf.CeilToInt(Run.playerHP * 0.3f));
-            if (accept && Run.playerHP > demand)
+            int demand = Mathf.Max(1, Mathf.CeilToInt(Run.playerMaxHP * 0.3f));
+            bool canPay = accept && !Run.lastStandActive && Run.playerHP > demand;
+            if (canPay)
             {
                 Run.playerHP -= demand;
-                Log($"血の儀: HP {demand} を捧げた (残 {Run.playerHP})");
+                Log($"血の儀: HP {demand}（最大の30%）を捧げた (残 {Run.playerHP})");
             }
             else
             {
                 Run.AddDebuff(SinDebuff.HeartOfGolgotha);
-                Log("血の儀を拒んだ。〈ゴルゴダの心〉が刻まれる。");
+                Log(Run.lastStandActive
+                    ? "血の儀: ラストスタンド中は捧げられない。〈ゴルゴダの心〉が刻まれる。"
+                    : "血の儀: HP不足／拒否。〈ゴルゴダの心〉が刻まれる。");
             }
         }
 
-        /// <summary>「貪欲の儀」: 所持金 50% を支払う。失敗で SeveredTime 付与。</summary>
+        /// <summary>「貪欲の儀」: 100G を支払う。所持不足 or ラストスタンド中は
+        /// 捧げられず SeveredTime 付与。</summary>
         public void OfferGoldSacrifice(bool accept)
         {
             if (CurrentPhase != GamePhase.SinRitual) return;
 
-            int demand = Mathf.Max(1, Run.coins / 2);
-            if (accept && Run.coins >= demand)
+            const int demand = 100;
+            bool canPay = accept && !Run.lastStandActive && Run.coins >= demand;
+            if (canPay)
             {
                 Run.coins -= demand;
                 Log($"貪欲の儀: コイン {demand} を捧げた (残 {Run.coins})");
@@ -828,17 +850,20 @@ namespace GameLoop
             else
             {
                 Run.AddDebuff(SinDebuff.SeveredTime);
-                Log("貪欲の儀を拒んだ。〈断絶した時間〉が刻まれる。");
+                Log(Run.lastStandActive
+                    ? "貪欲の儀: ラストスタンド中は捧げられない。〈断絶した時間〉が刻まれる。"
+                    : "貪欲の儀: 100G不足／拒否。〈断絶した時間〉が刻まれる。");
             }
         }
 
-        /// <summary>「遺品の儀」: イベントアイテム 1個 を消費。失敗で AshenBrand 付与。</summary>
+        /// <summary>「遺品の儀」: イベントアイテム 1個 を消費。失敗 or ラストスタンド中は
+        /// 捧げられず AshenBrand 付与。</summary>
         /// <param name="hasItemAndAccept">所持していて、かつ捧げる選択をしたか</param>
         public void OfferItemSacrifice(bool hasItemAndAccept)
         {
             if (CurrentPhase != GamePhase.SinRitual) return;
 
-            if (hasItemAndAccept)
+            if (hasItemAndAccept && !Run.lastStandActive)
             {
                 // TODO: イベントアイテム実装後、実際にインベントリから1個消費する
                 Log("遺品の儀: 遺品を捧げた");
@@ -846,7 +871,9 @@ namespace GameLoop
             else
             {
                 Run.AddDebuff(SinDebuff.AshenBrand);
-                Log("遺品の儀を拒んだ。〈灰燼の烙印〉が刻まれる。");
+                Log(Run.lastStandActive
+                    ? "遺品の儀: ラストスタンド中は捧げられない。〈灰燼の烙印〉が刻まれる。"
+                    : "遺品の儀を拒んだ。〈灰燼の烙印〉が刻まれる。");
             }
         }
 

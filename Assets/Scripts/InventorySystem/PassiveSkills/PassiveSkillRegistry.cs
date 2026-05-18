@@ -214,10 +214,10 @@ namespace InventorySystem.PassiveSkills
             Register(new EternalBurning());
             Register(new ReturnToAshes());
             // 灰燼の王 リワーク（見切り＆カウンター型）
-            Register(new AshOmen());
             Register(new JudgmentBlaze());
             Register(new AshArmor());
             Register(new ImmortalEmber());
+            Register(new StarfireProliferation());
         }
     }
 }

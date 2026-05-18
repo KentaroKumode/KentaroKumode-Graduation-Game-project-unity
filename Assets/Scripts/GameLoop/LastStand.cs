@@ -5,11 +5,13 @@ namespace GameLoop
     /// <summary>
     /// ラストスタンド: ランを通して1度だけ発動する救済システム。
     ///
-    /// 仕様:
+    /// 仕様（リワーク版）:
     /// - ちいさな灯火 → ラストスタンド の順で消費される（灯火優先）
     /// - HP が 0 になった瞬間に発動
-    /// - 発動後、最大HPが 1 に固定され、いかなる手段でも増加しない
-    /// - 発動後はロール敗北のメインダメージ以外の全てのダメージを無効化
+    /// - 発動ラウンドに限り「無敵」: 致命の一撃を打ち消して生き延びる
+    /// - 代償として最大HPが半減（恒久・残りラン全体）。生還後は半減バーが満タン
+    /// - 発動後のガード処理は一切なし（DOT無効化/巻き戻し/GOLD入手不可 等は廃止）。
+    ///   以降は通常どおりダメージを受け、再度HP0ならゲームオーバー
     /// </summary>
     public static class LastStand
     {
@@ -33,13 +35,14 @@ namespace GameLoop
             if (InventorySystem.PassiveItems.TorchRevival.TryConsume(run))
                 return true;
 
-            // 2. ラストスタンド（一度きり HP1 化 + ダメージ無効化開始）
+            // 2. ラストスタンド（一度きり・発動ラウンド無敵 + 最大HP半減）
             if (!run.lastStandActive)
             {
                 run.lastStandActive = true;
-                run.playerMaxHP = 1;
-                run.playerHP = 1;
-                Debug.Log($"[ラストスタンド] 発動: 最大HP=1 に固定、以降の非ロール敗北ダメージを無効化");
+                int before = run.playerMaxHP;
+                run.playerMaxHP = Mathf.Max(1, run.playerMaxHP / 2);
+                run.playerHP = run.playerMaxHP; // 致命を打ち消し、半減バー満タンで生還
+                Debug.Log($"[ラストスタンド] 発動: 致命を無敵で耐え、最大HP {before}→{run.playerMaxHP} に半減（以降ガード無し）");
                 return true;
             }
 
@@ -47,43 +50,15 @@ namespace GameLoop
         }
 
         /// <summary>
-        /// 「非ロール敗北ダメージ」を試みる前にこれを呼ぶ。ラストスタンド中なら無効化（0を返す）。
-        /// それ以外は dmg をそのまま返す。
+        /// 旧ガード処理の互換用パススルー（ラストスタンドは経済を制限しない）。
+        /// 既存呼び出し箇所を壊さないため残置。常に amount をそのまま返す。
         /// </summary>
-        public static int FilterIncidentalDamage(RunState run, int dmg)
-        {
-            if (dmg <= 0) return dmg;
-            if (run != null && run.lastStandActive)
-            {
-                Debug.Log($"[ラストスタンド] 非ロール敗北ダメージ {dmg} を無効化");
-                return 0;
-            }
-            return dmg;
-        }
+        public static int FilterGoldGain(RunState run, int amount) => amount;
 
         /// <summary>
-        /// 最大HP増加を試みる前にこれを呼ぶ。ラストスタンド中なら 0 を返して増加を拒否。
+        /// 旧ガード処理の互換用パススルー（ラストスタンドは最大HP増加を妨げない）。
+        /// 既存呼び出し箇所を壊さないため残置。常に gain をそのまま返す。
         /// </summary>
-        public static int FilterMaxHPGain(RunState run, int gain)
-        {
-            if (gain <= 0) return gain;
-            if (run != null && run.lastStandActive) return 0;
-            return gain;
-        }
-
-        /// <summary>
-        /// ゴールド入手量を試みる前にこれを呼ぶ。ラストスタンド中なら 0 を返して入手を拒否。
-        /// 損失（負値）はそのまま通す。
-        /// </summary>
-        public static int FilterGoldGain(RunState run, int amount)
-        {
-            if (amount <= 0) return amount;
-            if (run != null && run.lastStandActive)
-            {
-                Debug.Log($"[ラストスタンド] ゴールド入手 {amount}G を無効化（死神は富を許さない）");
-                return 0;
-            }
-            return amount;
-        }
+        public static int FilterMaxHPGain(RunState run, int gain) => gain;
     }
 }

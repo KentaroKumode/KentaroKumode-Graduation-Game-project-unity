@@ -15,7 +15,9 @@
       "Bash(sed -n '325,340p' Assets/Resources/enemies.json)",
       "Bash(sed -n '228,243p' Assets/Resources/enemies.json)",
       "Bash(sed -n '406,440p' Assets/Scripts/InventorySystem/PassiveSkills/Effects/EnemyPassiveSkillEffects.cs)",
-      "Bash(sed -n '40,60p' Assets/Scripts/GameLoop/FloorManager.cs)"
+      "Bash(sed -n '40,60p' Assets/Scripts/GameLoop/FloorManager.cs)",
+      "Bash(git rm *)",
+      "Bash(python -c ' *)"
     ]
   }
 }

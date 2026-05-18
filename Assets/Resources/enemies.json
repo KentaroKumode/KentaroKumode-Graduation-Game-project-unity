@@ -129,13 +129,13 @@
     {
       "id": "wraith",
       "displayName": "レイス",
-      "description": "怨念の塊。実体を持たず、攻撃が通りにくい。",
+      "description": "怨念の塊。実体を持たず、攻撃が通りにくい。5層の亡霊は生者を確実に道連れにする。",
       "floor": 5,
-      "maxHP": 18,
-      "diceCount": 2,
+      "maxHP": 28,
+      "diceCount": 4,
       "diceMaxValue": 6,
-      "criticalNumerator": 2,
-      "threat": 4,
+      "criticalNumerator": 5,
+      "threat": 9,
       "passiveSkills": [
         { "internalName": "Ethereal", "skillName": "虚体", "description": "受けるダメージを50%軽減" },
         { "internalName": "Curse", "skillName": "呪縛", "description": "ロール勝利時、次ターン相手のダイス合計値-2" },
@@ -145,13 +145,13 @@
     {
       "id": "golem",
       "displayName": "ストーンゴーレム",
-      "description": "古代魔法で動く石の巨人。膨大なHPを誇る。",
+      "description": "古代魔法で動く石の巨人。膨大なHPと、岩塊の一撃で挑む者を磨り潰す。",
       "floor": 5,
-      "maxHP": 35,
-      "diceCount": 2,
+      "maxHP": 48,
+      "diceCount": 3,
       "diceMaxValue": 6,
-      "criticalNumerator": 0,
-      "threat": 3,
+      "criticalNumerator": 2,
+      "threat": 9,
       "passiveSkills": [
         { "internalName": "HardScales", "skillName": "硬鱗", "description": "受けるダメージを-2（最低0）" },
         { "internalName": "Immovable", "skillName": "不動", "description": "追撃ダメージを受けない" },
@@ -161,13 +161,13 @@
     {
       "id": "dark_knight",
       "displayName": "ダークナイト",
-      "description": "闇に堕ちた騎士。かつての技術はなお健在。",
+      "description": "闇に堕ちた騎士。かつての技術はなお健在で、長引くほど刃が冴え必殺に至る。",
       "floor": 5,
-      "maxHP": 24,
+      "maxHP": 32,
       "diceCount": 3,
-      "diceMaxValue": 5,
-      "criticalNumerator": 2,
-      "threat": 5,
+      "diceMaxValue": 6,
+      "criticalNumerator": 3,
+      "threat": 8,
       "passiveSkills": [
         { "internalName": "Undying", "skillName": "不死者", "description": "毎ターン開始時、HP1回復" },
         { "internalName": "CounterStance", "skillName": "反撃態勢", "description": "ロール敗北時、次ターンのダメージ+3" },
@@ -314,13 +314,13 @@
       "displayName": "業火の審判官",
       "description": "罪人を裁く炎の審判官。罪深きほどその業火は強く燃え盛る。",
       "floor": 5,
-      "maxHP": 90,
+      "maxHP": 78,
       "diceCount": 3,
       "diceMaxValue": 5,
       "criticalNumerator": 3,
       "threat": 8,
       "passiveSkills": [
-        { "internalName": "JudgmentFlames", "skillName": "審判の炎", "description": "毎ターン終了時、2+経過ターン+罪の確定ダメ（罪=総戦闘回数/8、上限3。総ダメ上限11、軽減無視）" }
+        { "internalName": "JudgmentFlames", "skillName": "審判の炎", "description": "毎ターン終了時、1+経過ターン+罪の確定ダメ（罪=総戦闘回数/8、上限2。総ダメ上限8、軽減無視）" }
       ]
     },
     {
@@ -328,16 +328,16 @@
       "displayName": "灰燼の王",
       "description": "灰と燃え残りで形を成す古き王。致命の業火を振るうが、その一撃には必ず予兆がある。見切り、間一髪で躱し、一撃ずつ削れ。",
       "floor": 6,
-      "maxHP": 100,
-      "diceCount": 3,
+      "maxHP": 200,
+      "diceCount": 4,
       "diceMaxValue": 6,
       "criticalNumerator": 3,
-      "threat": 10,
+      "threat": 12,
       "passiveSkills": [
-        { "internalName": "AshOmen", "skillName": "灰の予兆", "description": "断罪ターンを予告。完全に読める（運でなく対応の問題）" },
-        { "internalName": "JudgmentBlaze", "skillName": "業火の断罪", "description": "断罪ターン、ロール勝利できなければ即死級の一撃。ロール勝利すれば間一髪回避＋鎧貫通の反撃12" },
-        { "internalName": "AshArmor", "skillName": "灰塵の鎧", "description": "被弾時 受けるダメージ-5、軽減後が10超なら10に丸める（断罪回避の反撃のみ貫通）" },
-        { "internalName": "ImmortalEmber", "skillName": "不滅の残り火", "description": "毎ターン失ったHPの10%回復。HP60%以下で断罪が2ターン毎、30%以下で毎ターンに" }
+        { "internalName": "JudgmentBlaze", "skillName": "業火の断罪", "description": "断罪ターンを予告。断罪ターンにロール勝利できなければ即死級の一撃(×5+8)。ロール勝利すれば間一髪回避＋鎧貫通の反撃18（このターンは鎧も無効）" },
+        { "internalName": "AshArmor", "skillName": "灰塵の鎧", "description": "被弾時 受けるダメージ-5、軽減後が10超なら10に丸める（断罪ターンは無効）" },
+        { "internalName": "ImmortalEmber", "skillName": "不滅の残り火", "description": "毎ターン失ったHPを回復（60%以下で3%/30%以下で6%、断罪ターンは回復なし）。一度割った60%/30%ラインより上には戻れない" },
+        { "internalName": "StarfireProliferation", "skillName": "星火燎原", "description": "ロール敗北するたびダイス合計値+1（無限累積・リセットなし）。粘られるほど確実に追い付く" }
       ]
     }
   ]

@@ -113,8 +113,6 @@ namespace CombatSystem
         private int enemyHP;
         private bool metaLethalSurviveUsed; // メタデバフ Lv10: 敵の初回致命傷を1HPで耐える
         private bool wrathDiceOverrideArmed; // 恒久デバフ「憤怒」: 1T目のダイス最大化トリガー
-        private int turnStartPlayerHP;      // ラストスタンド用: ターン開始時のプレイヤーHP
-        private int rollLossMainDamage;     // ラストスタンド用: 今ターンのロール敗北メインダメ確定値
         private int playerDiceCount;
         private int playerDiceMax;
         private int playerCriticalNumerator;
@@ -464,9 +462,6 @@ namespace CombatSystem
             var ctx = psm.Context;
 
             // --- ターン開始 ---
-            // ラストスタンド: ターン開始 HP をスナップ、ロール敗北メインダメ蓄積をリセット
-            turnStartPlayerHP = playerHP;
-            rollLossMainDamage = 0;
 
             psm.BeginTurn();
 
@@ -507,6 +502,16 @@ namespace CombatSystem
 
             int[] playerDice = RollDice(actualPlayerDiceCount, playerDiceMax, ctx.equippedDiceFaces);
             int[] enemyDice = RollDice(actualEnemyDiceCount, currentEnemy.diceMaxValue);
+
+            // 〈灰燼の烙印〉サドンデス: 両者を 1d6 に強制（決着まで継続）
+            if (ctx.ashenSuddenDeath)
+            {
+                actualPlayerDiceCount = 1;
+                actualEnemyDiceCount = 1;
+                playerDice = new[] { UnityEngine.Random.Range(1, 7) };
+                enemyDice = new[] { UnityEngine.Random.Range(1, 7) };
+                Debug.Log("[CombatManager] 灰燼の烙印サドンデス: 両者1d6強制");
+            }
 
             // 獣の恩義: 1ターン目の敵ロールを全て0にする（プレイヤー実質勝利確定）
             if (ctx.nullifyFirstEnemyRoll && ctx.currentTurn == 1)
@@ -614,6 +619,8 @@ namespace CombatSystem
             {
                 // (3) メインダメージ = ダイス合計差
                 int mainDmg = diceDiff;
+                // 〈灰燼の烙印〉サドンデスの一撃必殺はターン終端で敗者HPを直接0にする
+                // （AshArmor/ImmortalEmber/シールド/LSを全てバイパスするためここでは加算しない）
 
                 // (4) 追撃ダメージ（パッシブ由来: ctx.pursuitDamage はスキル発火時にセット済み）
                 int pursuitDmg = ctx.pursuitDamage;
@@ -797,9 +804,6 @@ namespace CombatSystem
                         Debug.Log($"[CombatManager] 鏡写し反射 {totalDmg} → 敵HP {enemyHP}");
                     }
 
-                    // ラストスタンド用: 純粋なロール敗北メインダメ（シールド適用後）
-                    rollLossMainDamage = totalDmg;
-
                     // プレイヤーにダメージ適用（メイン＋敵→プレイヤー固定）
                     playerHP = Math.Max(0, playerHP - totalDmg);
                     if (ctx.fixedDamageToPlayer > 0)
@@ -889,17 +893,13 @@ namespace CombatSystem
                 Debug.Log($"[CombatManager] カルマの呪い: HP-{dmg} (現在 {playerHP}/{playerMaxHP})");
             }
 
-            // 消費: 継続回復（毎ターン終了時 +consRegen → consRegen--）。LS中は無効。
+            // 消費: 継続回復（毎ターン終了時 +consRegen → consRegen--）
+            if (ctx.consRegen > 0 && playerHP > 0)
             {
-                var crRun = GameLoop.GameManager.Instance?.Run;
-                bool ls = crRun != null && crRun.lastStandActive;
-                if (ctx.consRegen > 0 && playerHP > 0 && !ls)
-                {
-                    int heal = Math.Min(playerMaxHP - playerHP, ctx.consRegen);
-                    if (heal > 0) { playerHP += heal; ctx.playerCurrentHP = playerHP; }
-                    Debug.Log($"[CombatManager] 継続回復 +{heal} (次T {ctx.consRegen - 1})");
-                    ctx.consRegen--;
-                }
+                int heal = Math.Min(playerMaxHP - playerHP, ctx.consRegen);
+                if (heal > 0) { playerHP += heal; ctx.playerCurrentHP = playerHP; }
+                Debug.Log($"[CombatManager] 継続回復 +{heal} (次T {ctx.consRegen - 1})");
+                ctx.consRegen--;
             }
             // 消費: シールド残ターン減算（-1=無制限 / 0で失効）
             if (ctx.consShieldExpireTurn > 0)
@@ -912,17 +912,15 @@ namespace CombatSystem
                 }
             }
 
-            // ラストスタンド: 発動中はロール敗北メインダメ以外を巻き戻し（scratch/固定ダメ/敵パッシブ由来等を全て無効化）
-            var lsRun = GameLoop.GameManager.Instance?.Run;
-            if (lsRun != null && lsRun.lastStandActive)
+            // 〈灰燼の烙印〉サドンデス: 決着ターンはロール勝者が敗者を即死させる
+            // （AshArmor/ImmortalEmber/シールド/LS 等を全てバイパス。引き分けは継続）
+            // 踏みとどまったその同ターンでは決着させない（記録ターン超のみ）
+            if (ctx.ashenSuddenDeath && !result.isDraw
+                && ctx.currentTurn > (int)ctx.GetAccumulated("ashen_endured_turn"))
             {
-                int allowedHP = Math.Max(0, turnStartPlayerHP - rollLossMainDamage);
-                if (playerHP < allowedHP)
-                {
-                    Debug.Log($"[ラストスタンド] 非ロール敗北ダメをリワインド: {playerHP} → {allowedHP}");
-                    playerHP = allowedHP;
-                    ctx.playerCurrentHP = playerHP;
-                }
+                if (result.playerWon) { enemyHP = 0; ctx.enemyCurrentHP = 0; }
+                else { playerHP = 0; ctx.playerCurrentHP = 0; }
+                Debug.Log($"[CombatManager] 灰燼の烙印サドンデス決着: {(result.playerWon ? "ボス" : "プレイヤー")} 即死");
             }
 
             result.playerHPAfter = playerHP;

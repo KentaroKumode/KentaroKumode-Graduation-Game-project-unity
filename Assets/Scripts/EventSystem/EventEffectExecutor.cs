@@ -79,7 +79,12 @@ namespace EventSystem
                 case EventEffectType.GoldDelta:
                 {
                     int delta = eff.amount;
-                    if (delta > 0) delta = GameLoop.LastStand.FilterGoldGain(run, delta);
+                    if (delta > 0)
+                    {
+                        // 戦闘以外のゴールド源を大幅ナーフ: 正の取得を40%に圧縮
+                        delta = Mathf.Max(1, Mathf.RoundToInt(delta * 0.4f));
+                        delta = GameLoop.LastStand.FilterGoldGain(run, delta);
+                    }
                     run.coins = Mathf.Max(0, run.coins + delta);
                     result.log.Add($"ゴールド{delta:+0;-0} (現在 {run.coins})");
                     break;

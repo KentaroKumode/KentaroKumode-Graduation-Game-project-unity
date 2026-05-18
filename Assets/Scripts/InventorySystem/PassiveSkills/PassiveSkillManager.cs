@@ -441,6 +441,10 @@ namespace InventorySystem.PassiveSkills
             if (context.consEnemyDiceDebuff > 0)
                 context.enemyDiceTotal = System.Math.Max(0, context.enemyDiceTotal - context.consEnemyDiceDebuff);
 
+            // 星火燎原 等: 敵(ボス)ダイス合計への加算（勝敗判定前＝ロールを実際に押し上げる）
+            if (context.enemyDiceTotalBonus > 0)
+                context.enemyDiceTotal += context.enemyDiceTotalBonus;
+
             // パッシブスキル実行（OnPostRoll）
             FireTrigger(PassiveSkillTrigger.OnPostRoll);
 

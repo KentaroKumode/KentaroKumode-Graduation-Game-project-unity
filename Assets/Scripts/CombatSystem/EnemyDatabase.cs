@@ -78,6 +78,24 @@ namespace CombatSystem
         }
 
         /// <summary>
+        /// 指定フロア範囲 [minFloor, maxFloor] に出現する敵一覧。
+        /// 低層雑魚が後半まで居座って道中を薄める問題を防ぐため、
+        /// 抽選候補を直近フロアに限定する用途で使う。
+        /// </summary>
+        public static List<EnemyData> GetByFloorRange(int minFloor, int maxFloor)
+        {
+            EnsureInitialized();
+            var result = new List<EnemyData>();
+            foreach (var kvp in database)
+            {
+                int f = kvp.Value.floor;
+                if (f >= minFloor && f <= maxFloor)
+                    result.Add(kvp.Value);
+            }
+            return result;
+        }
+
+        /// <summary>
         /// 指定階層にちょうど初登場する敵一覧
         /// </summary>
         public static List<EnemyData> GetNewOnFloor(int floor)

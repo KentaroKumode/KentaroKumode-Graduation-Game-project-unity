@@ -154,7 +154,6 @@ namespace GameLoop
 
         private static bool HealPct(RunState run, CombatContext ctx, float pct)
         {
-            if (run.lastStandActive) return false;
             if (ctx != null)
             {
                 var cm = CombatManager.Instance;
@@ -275,7 +274,7 @@ namespace GameLoop
         public static bool TryUseBestHeal(RunState run, float urgencyRatio)
         {
             if (run?.ownedConsumables == null || run.ownedConsumables.Count == 0) return false;
-            if (run.lastStandActive || run.playerMaxHP <= 0) return false;
+            if (run.playerMaxHP <= 0) return false;
 
             float ratio = (float)run.playerHP / run.playerMaxHP;
             if (ratio > urgencyRatio || ratio >= 1f) return false;
