@@ -92,9 +92,10 @@ namespace MapSystem
             {
                 id = "purgatory_brand",
                 displayName = "煉獄の刻印",
-                description = "空腹度上限-3 / 空腹時ダメージ×2 / ショップ価格+20%",
+                description = "空腹度上限-3 / 空腹時ダメージ×2 / 戦闘後3ダメージ / ショップ価格+20%",
                 hungerMaxBonus = -3,
                 starvationDamageOverride = 0.2f,
+                postCombatDamage = 3,
                 shopPriceMultiplier = 1.2f,
             });
 

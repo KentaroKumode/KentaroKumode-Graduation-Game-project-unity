@@ -204,12 +204,19 @@ namespace GameLoop
             // 敗北 or HP0 → 救済（灯火→ラストスタンド）/ なければゲームオーバー
             if (!result.playerWon || Run.playerHP <= 0)
             {
-                if (LastStand.TryConsumeRevival(Run))
+                // ボスマス戦闘では救済を一切行わない（ボス敗北＝ラン終了確定）。
+                // ボスノードは収束ノードで出力接続が無く、復活して戻ると進行不能になるため。
+                bool isBossFight = MapManager.Instance?.CurrentNode != null
+                    && MapManager.Instance.CurrentNode.type == TileType.Boss;
+
+                if (!isBossFight && LastStand.TryConsumeRevival(Run))
                 {
                     Log("救済発動: マップへ戻る");
                     SetPhase(GamePhase.MapNavigation);
                     return;
                 }
+                if (isBossFight)
+                    Log("ボス戦敗北: 救済(灯火/ラストスタンド)は無効 → ラン終了");
                 Run.EndRun();
                 SetPhase(GamePhase.GameOver);
                 OnGameOver?.Invoke(Run);
@@ -238,6 +245,20 @@ namespace GameLoop
             if (node.type == TileType.Boss)
             {
                 Run.bossDefeatedThisFloor = true;
+
+                // 1層ボス（トレジャーゴブリン）: 良質な武器/パッシブを1個ドロップ
+                if (Run.currentFloor == 1)
+                {
+                    string dropId = PickTreasureGoblinDrop();
+                    if (!string.IsNullOrEmpty(dropId))
+                    {
+                        Run.ownedPassiveItems.Add(dropId);
+                        Loadout.TryAutoEquip(Run, dropId);
+                        var dd = ItemDatabase.Instance?.GetItem(dropId);
+                        Log($"トレジャーゴブリン討伐報酬: {(dd != null ? dd.displayName : dropId)} を獲得");
+                    }
+                }
+
                 int rewardBase = FloorManager.CalculateRewardCoins(Run.currentFloor, true, result.totalTurns) * 2;
                 // 傲慢: ボスはエリート以上扱いで報酬2倍（割合先）
                 if (prideActive) rewardBase *= 2;
@@ -287,7 +308,7 @@ namespace GameLoop
             OnRewardGranted?.Invoke(coins);
         }
 
-        /// <summary>ボス撃破ボーナス用のパッシブ抽選。wantRare=true で GOLD 以上を優先。</summary>
+        /// <summary>ボス撃破ボーナス用のパッシブ抽選。wantRare=true で GOLD 以上のみ、レア度重み付き。</summary>
         private string PickPassiveItemForBossExtra(bool wantRare)
         {
             var db = ItemDatabase.Instance;
@@ -301,16 +322,42 @@ namespace GameLoop
                 if (it == null) continue;
                 if (it.category != ItemCategory.Passive) continue;
                 if (!InventorySystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
-                if (wantRare && it.rarity != ItemRarity.GOLD && it.rarity != ItemRarity.LEGENDARY) continue;
                 pool.Add(it);
             }
-            if (pool.Count == 0)
+            if (pool.Count == 0) return null;
+
+            ItemRarity? minRarity = wantRare ? ItemRarity.GOLD : (ItemRarity?)null;
+            var picked = InventorySystem.RarityWeightedPicker.Pick(pool, minRarity);
+            if (picked == null && wantRare)
             {
-                // wantRare でレア該当なしなら全プールにフォールバック
-                if (wantRare) return PickPassiveItemForBossExtra(false);
-                return null;
+                // フォールバック: レア該当無しなら全プールから
+                picked = InventorySystem.RarityWeightedPicker.Pick(pool);
             }
-            return pool[UnityEngine.Random.Range(0, pool.Count)].internalName;
+            return picked?.internalName;
+        }
+
+        /// <summary>1層ボス(トレジャーゴブリン)のドロップ抽選。武器+パッシブから、SILVER以上を優先。</summary>
+        private string PickTreasureGoblinDrop()
+        {
+            var db = ItemDatabase.Instance;
+            if (db == null) return null;
+            var all = db.GetAllItems();
+            if (all == null || all.Count == 0) return null;
+
+            var pool = new System.Collections.Generic.List<CompleteItemData>();
+            foreach (var it in all)
+            {
+                if (it == null) continue;
+                if (it.category != ItemCategory.Weapon && it.category != ItemCategory.Passive) continue;
+                if (!InventorySystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
+                pool.Add(it);
+            }
+            if (pool.Count == 0) return null;
+
+            // 「いい感じ」: SILVER 以上を優先抽選、該当無しなら全プール
+            var picked = InventorySystem.RarityWeightedPicker.Pick(pool, ItemRarity.SILVER)
+                         ?? InventorySystem.RarityWeightedPicker.Pick(pool);
+            return picked?.internalName;
         }
 
         /// <summary>報酬確認→マップに戻る or フロアクリア</summary>
@@ -587,7 +634,9 @@ namespace GameLoop
         private void StartEliteSecondCombat()
         {
             var candidates = new System.Collections.Generic.List<EnemyData>(EnemyDatabase.GetByFloor(Run.currentFloor));
-            candidates.RemoveAll(e => e.id == firstEliteEnemy?.id);
+            // 激戦2戦目もボス専用敵(boss_layer*)を除外（残存ボス漏れの修正）
+            candidates.RemoveAll(e => e.id == firstEliteEnemy?.id
+                || (e.id != null && e.id.StartsWith("boss_layer")));
 
             if (candidates.Count > 0)
                 CurrentEnemy = candidates[UnityEngine.Random.Range(0, candidates.Count)];
@@ -795,7 +844,8 @@ namespace GameLoop
         private void OpenTreasure()
         {
             int floor = Run.currentFloor;
-            int gold = floor * UnityEngine.Random.Range(5, 16); // 1層:5-15 〜 5層:25-75
+            int rawGold = floor * UnityEngine.Random.Range(2, 8); // 半減後: 1層:2-7 〜 6層:12-42
+            int gold = LastStand.FilterGoldGain(Run, rawGold);
             Run.coins += gold;
 
             string itemId = PickRandomTreasureItem();
@@ -803,6 +853,7 @@ namespace GameLoop
             if (!string.IsNullOrEmpty(itemId))
             {
                 Run.ownedPassiveItems.Add(itemId);
+                Loadout.TryAutoEquip(Run, itemId);
                 var data = ItemDatabase.Instance?.GetItem(itemId);
                 itemLabel = data != null ? data.displayName : itemId;
             }
@@ -812,7 +863,7 @@ namespace GameLoop
             SetPhase(GamePhase.TreasureOpen);
         }
 
-        /// <summary>宝箱から獲得するアイテムを ItemDatabase から1個選出。武器・クエスト・イベント限定は除外。</summary>
+        /// <summary>宝箱から獲得するアイテムを ItemDatabase からレア度重み付きで1個選出。武器・クエスト・イベント限定は除外。</summary>
         private string PickRandomTreasureItem()
         {
             var db = ItemDatabase.Instance;
@@ -830,7 +881,8 @@ namespace GameLoop
                 pool.Add(it);
             }
             if (pool.Count == 0) return null;
-            return pool[UnityEngine.Random.Range(0, pool.Count)].internalName;
+            var picked = InventorySystem.RarityWeightedPicker.Pick(pool);
+            return picked?.internalName;
         }
 
         // ================================================================
@@ -852,9 +904,9 @@ namespace GameLoop
             }
 
             bool ok = ee.Begin(Run);
-            if (!ok)
+            if (!ok || ee.Current == null)
             {
-                // イベント0件なら何もせずマップへ
+                // イベント0件/抽選失敗なら何もせずマップへ（ソフトロック防止）
                 SetPhase(GamePhase.MapNavigation);
                 return;
             }
@@ -889,11 +941,15 @@ namespace GameLoop
                 return;
             }
 
-            // ランダムイベント発生: もう一度抽選してフェーズ継続
+            // ランダムイベント発生: RandomEvent を含まないプールから1回だけ
+            // 別イベントへ振り直す。振り直し先は RandomEvent を持たないため
+            // 連鎖は構造的に発生しない。抽選失敗時は通常終了。
             if (result.triggerRandomEvent)
             {
-                eventChoiceResolved = false;
-                ee.Begin(Run);
+                if (ee.Begin(Run, excludeRandomEvent: true) && ee.Current != null)
+                    eventChoiceResolved = false;  // 振り直し先を改めて解決させる
+                else
+                    eventChoiceResolved = true;   // 該当なし → 通常終了
                 return;
             }
 
@@ -904,7 +960,10 @@ namespace GameLoop
         public void ConfirmEventEncounter()
         {
             if (CurrentPhase != GamePhase.EventEncounter) return;
-            if (!eventChoiceResolved) return;
+            // 通常は選択確定後のみ。ただし Current==null（抽選失敗/消失）の場合は
+            // ソフトロック回避のため未確定でも強制的にマップへ戻す。
+            bool curNull = EventEncounter.Instance == null || EventEncounter.Instance.Current == null;
+            if (!eventChoiceResolved && !curNull) return;
             EventEncounter.Instance?.Clear();
             SetPhase(GamePhase.MapNavigation);
         }
@@ -980,6 +1039,9 @@ namespace GameLoop
             int critRate = 1;
             int[] diceFaces = null;
 
+            bool weaponResolved = false;
+            bool diceResolved = false;
+
             if (equipHandler != null)
             {
                 var weapon = equipHandler.GetCurrentEquipment(ItemCategory.Weapon);
@@ -988,13 +1050,33 @@ namespace GameLoop
                     diceCount = weapon.weaponDice.count;
                     diceMax = weapon.weaponDice.maxValue;
                     critRate = weapon.criticalRate;
+                    weaponResolved = true;
                 }
 
                 var dice = equipHandler.GetCurrentEquipment(ItemCategory.Dice);
                 if (dice != null && dice.diceFaces != null)
                 {
                     diceFaces = dice.diceFaces;
+                    diceResolved = true;
                 }
+            }
+
+            // ItemEquipHandler が無い/未装備なら RunState の自動装備IDから解決
+            if (!weaponResolved && Run != null && !string.IsNullOrEmpty(Run.equippedWeaponId))
+            {
+                var w = ItemDatabase.Instance?.GetItem(Run.equippedWeaponId);
+                if (w != null && w.hasWeaponStats)
+                {
+                    diceCount = w.weaponDice.count;
+                    diceMax = w.weaponDice.maxValue;
+                    critRate = w.criticalRate;
+                }
+            }
+            if (!diceResolved && Run != null && !string.IsNullOrEmpty(Run.equippedDiceId))
+            {
+                var d = ItemDatabase.Instance?.GetItem(Run.equippedDiceId);
+                if (d != null && d.diceFaces != null)
+                    diceFaces = d.diceFaces;
             }
 
             // 層デバフ適用

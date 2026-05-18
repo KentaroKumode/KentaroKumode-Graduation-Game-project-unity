@@ -252,35 +252,39 @@ namespace InventorySystem.PassiveItems.Effects
     //  歩行HP回復系
     // ============================================================
 
-    private static void StepHeal(int amount, string name)
+    /// <summary>歩行HP回復系の共通処理。</summary>
+    internal static class StepHealHelper
     {
-        var run = GameManager.Instance?.Run;
-        if (run == null) return;
-        int oldHP = run.playerHP;
-        run.playerHP = Mathf.Min(run.playerMaxHP, run.playerHP + amount);
-        if (run.playerHP != oldHP)
-            Debug.Log($"[PassiveItem] {name}: HP+{run.playerHP - oldHP} ({run.playerHP}/{run.playerMaxHP})");
+        public static void StepHeal(int amount, string name)
+        {
+            var run = GameManager.Instance?.Run;
+            if (run == null) return;
+            int oldHP = run.playerHP;
+            run.playerHP = Mathf.Min(run.playerMaxHP, run.playerHP + amount);
+            if (run.playerHP != oldHP)
+                Debug.Log($"[PassiveItem] {name}: HP+{run.playerHP - oldHP} ({run.playerHP}/{run.playerMaxHP})");
+        }
     }
 
     public class CalmShoesEffect : ITimedEffect
     {
         public string Id => "安らぎの靴";
         public TimedEffectTrigger Trigger => TimedEffectTrigger.OnMapMove;
-        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat) => StepHeal(1, Id);
+        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat) => StepHealHelper.StepHeal(1, Id);
     }
 
     public class HealingShoesEffect : ITimedEffect
     {
         public string Id => "癒しの靴";
         public TimedEffectTrigger Trigger => TimedEffectTrigger.OnMapMove;
-        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat) => StepHeal(2, Id);
+        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat) => StepHealHelper.StepHeal(2, Id);
     }
 
     public class HolyShoesEffect : ITimedEffect
     {
         public string Id => "神聖の靴";
         public TimedEffectTrigger Trigger => TimedEffectTrigger.OnMapMove;
-        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat) => StepHeal(3, Id);
+        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat) => StepHealHelper.StepHeal(3, Id);
     }
 
     // ============================================================

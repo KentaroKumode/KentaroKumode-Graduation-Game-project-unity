@@ -262,6 +262,7 @@ namespace InventorySystem.Shop
                 case ShopSlotKind.Weapon:
                 case ShopSlotKind.Dice:
                     run.ownedPassiveItems.Add(slot.itemId);
+                    GameLoop.Loadout.TryAutoEquip(run, slot.itemId);
                     break;
                 case ShopSlotKind.Consumable:
                     run.ownedConsumables.Add(slot.itemId);

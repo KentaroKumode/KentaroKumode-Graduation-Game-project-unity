@@ -241,7 +241,7 @@ namespace EventSystem
             dict[key] = v + delta;
         }
 
-        /// <summary>ItemDatabase から指定カテゴリのアイテムを1個ランダム選出（イベント限定は除外）。</summary>
+        /// <summary>ItemDatabase から指定カテゴリのアイテムをレア度重み付きで1個選出（イベント限定は除外）。</summary>
         private static string PickRandomItemId(ItemCategory category)
         {
             var db = ItemDatabase.Instance;
@@ -251,7 +251,9 @@ namespace EventSystem
 
             var filtered = pool.FindAll(InventorySystem.Shop.EventOnlyItemFilter.IsAllowed);
             if (filtered.Count == 0) return null;
-            return filtered[Random.Range(0, filtered.Count)].internalName;
+
+            var picked = InventorySystem.RarityWeightedPicker.Pick(filtered);
+            return picked?.internalName;
         }
 
         /// <summary>id から表示名を解決。DBに見つからなければ id をそのまま返す。</summary>

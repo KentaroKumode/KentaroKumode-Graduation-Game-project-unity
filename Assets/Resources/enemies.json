@@ -255,17 +255,29 @@
       ]
     },
     {
+      "id": "boss_layer1",
+      "displayName": "トレジャーゴブリン",
+      "description": "財宝を抱え込んだ臆病なゴブリン。戦いは不得手だが、倒せば抱えた戦利品を落とす。",
+      "floor": 1,
+      "maxHP": 10,
+      "diceCount": 1,
+      "diceMaxValue": 4,
+      "criticalNumerator": 0,
+      "threat": 1,
+      "passiveSkills": []
+    },
+    {
       "id": "boss_layer2",
       "displayName": "ゴブリン王",
       "description": "群れを統べる大柄なゴブリン。号令一つで配下を呼び出す。",
       "floor": 2,
-      "maxHP": 25,
+      "maxHP": 32,
       "diceCount": 2,
-      "diceMaxValue": 4,
+      "diceMaxValue": 5,
       "criticalNumerator": 1,
-      "threat": 4,
+      "threat": 5,
       "passiveSkills": [
-        { "internalName": "GoblinKingsCall", "skillName": "号令", "description": "毎ターン、自身のダイス合計+2" }
+        { "internalName": "GoblinKingsCall", "skillName": "号令", "description": "毎ターン、自身のダイス合計+3" }
       ]
     },
     {
@@ -273,27 +285,27 @@
       "displayName": "凍れる吟遊詩人",
       "description": "凍りついた吟遊詩人。歌が空気を凍らせ、聞き続けた者は動けなくなる。",
       "floor": 3,
-      "maxHP": 35,
+      "maxHP": 44,
       "diceCount": 1,
       "diceMaxValue": 6,
       "criticalNumerator": 2,
       "threat": 5,
       "passiveSkills": [
-        { "internalName": "FrozenBardSong", "skillName": "凍えの旋律", "description": "プレイヤーが3ターン連続で消費アイテムを使わないと、毎ターン敵の与ダメ+1が蓄積（上限+5）。アイテム使用でリセット" }
+        { "internalName": "FrozenBardSong", "skillName": "凍えの旋律", "description": "消費アイテム未使用が続くと毎ターン敵の与ダメ+1が蓄積（2ターン目から、上限+8）。アイテム使用でリセット" }
       ]
     },
     {
       "id": "boss_layer4",
       "displayName": "鏡の双子",
-      "description": "鏡像のように同じ動きを繰り返す双子。打撃の重さがそのまま跳ね返る。",
+      "description": "鏡像のように同じ動きを繰り返す双子。重い一撃ほど深く跳ね返す。",
       "floor": 4,
-      "maxHP": 45,
+      "maxHP": 48,
       "diceCount": 2,
-      "diceMaxValue": 3,
+      "diceMaxValue": 6,
       "criticalNumerator": 0,
-      "threat": 5,
+      "threat": 6,
       "passiveSkills": [
-        { "internalName": "MirrorTwinsResponse", "skillName": "鏡映の応答", "description": "プレイヤーが10以上のダメージを与えたターン、次ターン開始時に同値を固定ダメで反射" }
+        { "internalName": "MirrorTwinsResponse", "skillName": "鏡映の応答", "description": "11以上のダメージを与えたターン、次ターン開始時に与ダメの50%（上限9）を固定ダメで反射" }
       ]
     },
     {
@@ -307,7 +319,7 @@
       "criticalNumerator": 3,
       "threat": 8,
       "passiveSkills": [
-        { "internalName": "JudgmentFlames", "skillName": "審判の炎", "description": "毎ターン終了時、固定2ダメ + 所持パッシブ数×0.5ダメ（切り上げ、軽減無視）" }
+        { "internalName": "JudgmentFlames", "skillName": "審判の炎", "description": "毎ターン終了時、2+経過ターン+罪の確定ダメ（罪=総戦闘回数/8、上限3。総ダメ上限11、軽減無視）" }
       ]
     },
     {

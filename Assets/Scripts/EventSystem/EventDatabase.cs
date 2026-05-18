@@ -45,7 +45,11 @@ namespace EventSystem
         /// 優先(priority)タグ持ちが条件を満たしていれば最優先で選ぶ。
         /// 残りからは均等抽選（rare は1/3の重み）。
         /// </summary>
-        public static EventDefinition Pick(RunState run)
+        /// <param name="excludeRandomEvent">
+        /// true の場合、RandomEvent 効果を含むイベントを抽選プールから除外する。
+        /// RandomEvent による振り直しで使用し、連鎖を構造的に発生不能にする。
+        /// </param>
+        public static EventDefinition Pick(RunState run, bool excludeRandomEvent = false)
         {
             EnsureInitialized();
             if (all.Count == 0 || run == null) return null;
@@ -55,6 +59,7 @@ namespace EventSystem
             foreach (var ev in all)
             {
                 if (!IsAvailable(ev, run, floor)) continue;
+                if (excludeRandomEvent && ContainsRandomEvent(ev)) continue;
                 available.Add(ev);
             }
             if (available.Count == 0)
@@ -108,6 +113,28 @@ namespace EventSystem
                     return false;
             }
             return true;
+        }
+
+        /// <summary>このイベントの選択肢(確率分岐含む)に RandomEvent 効果が含まれるか。</summary>
+        public static bool ContainsRandomEvent(EventDefinition ev)
+        {
+            if (ev?.choices == null) return false;
+            foreach (var c in ev.choices)
+                if (c?.effects != null && EffectsHaveRandomEvent(c.effects)) return true;
+            return false;
+        }
+
+        private static bool EffectsHaveRandomEvent(List<EventEffect> effects)
+        {
+            foreach (var e in effects)
+            {
+                if (e == null) continue;
+                if (e.type == EventEffectType.RandomEvent) return true;
+                if (e.branches != null)
+                    foreach (var br in e.branches)
+                        if (br != null && EffectsHaveRandomEvent(br)) return true;
+            }
+            return false;
         }
 
         public static EventDefinition GetById(string id)

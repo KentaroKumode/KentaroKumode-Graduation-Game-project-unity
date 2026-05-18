@@ -368,7 +368,7 @@ namespace InventorySystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
             // 敵視点なので playerDiceTotal = ボス自身のダイス合計
-            ctx.playerDiceTotal += 2;
+            ctx.playerDiceTotal += 3;
         }
     }
 
@@ -391,7 +391,7 @@ namespace InventorySystem.PassiveSkills.Effects
             else if (trigger == PassiveSkillTrigger.OnPostRoll)
             {
                 ctx.accumulatedValues.TryGetValue(Key, out var streak);
-                int bonus = UnityEngine.Mathf.Min(5, UnityEngine.Mathf.Max(0, (int)streak - 2));
+                int bonus = UnityEngine.Mathf.Min(8, UnityEngine.Mathf.Max(0, (int)streak - 1));
                 if (bonus > 0) ctx.playerDiceTotal += bonus; // 敵視点で自分のダイス合計加算
             }
         }
@@ -416,11 +416,13 @@ namespace InventorySystem.PassiveSkills.Effects
             if (trigger == PassiveSkillTrigger.OnPostReceiveDamage)
             {
                 // 敵視点で「自分が被ダメ受けた」 → finalDamage が受けた量
+                // A案: 二軸ボス化に伴い反射は脇役に。閾値11以上で、反射＝与ダメの50%・上限9。
                 int dmg = ctx.finalDamage;
-                if (dmg >= 10)
+                if (dmg >= 11)
                 {
-                    ctx.accumulatedValues[Key] = dmg;
-                    UnityEngine.Debug.Log($"[鏡映の応答] 蓄積: 次ターン{dmg}反射");
+                    int reflect = System.Math.Min(9, UnityEngine.Mathf.CeilToInt(dmg * 0.5f));
+                    ctx.accumulatedValues[Key] = reflect;
+                    UnityEngine.Debug.Log($"[鏡映の応答] 蓄積: 次ターン{reflect}反射 (被ダメ{dmg}の50%・上限9)");
                 }
             }
             else if (trigger == PassiveSkillTrigger.OnTurnStart)
@@ -434,7 +436,9 @@ namespace InventorySystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>業火の審判官 — 審判の炎: 毎ターン終了時、固定2 + 所持パッシブ数×0.5ダメ（切り上げ、軽減無視）</summary>
+    /// <summary>業火の審判官 — 審判の炎: 毎ターン終了時の確定ダメ（軽減無視）。
+    /// = 2 + 経過ターン + 罪。罪 = ラン中の総戦闘回数/8（上限3）。総ダメ上限11。
+    /// 所持パッシブ依存(アンチ成長)は撤廃。「速攻」かつ「無駄な戦闘を避けた」者ほど有利。</summary>
     public class JudgmentFlames : IPassiveSkillEffect
     {
         public string SkillId => "JudgmentFlames";
@@ -442,11 +446,10 @@ namespace InventorySystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
             var run = GameLoop.GameManager.Instance?.Run;
-            int passives = run?.ownedPassiveItems?.Count ?? 0;
-            int weight = UnityEngine.Mathf.CeilToInt(passives * 0.5f);
-            int dmg = 2 + weight;
+            int sin = System.Math.Min(3, (run?.totalBattles ?? 0) / 8); // 罪: プレイで操作可能
+            int dmg = System.Math.Min(11, 2 + System.Math.Max(1, ctx.currentTurn) + sin);
             ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - dmg);
-            UnityEngine.Debug.Log($"[審判の炎] {dmg}ダメ (固定2 + 所持パッシブ{passives}個×0.5={weight}) → プレイヤー残HP={ctx.enemyCurrentHP}");
+            UnityEngine.Debug.Log($"[審判の炎] {dmg}ダメ (2+経過T{ctx.currentTurn}+罪{sin}, 上限11, 軽減無視) → プレイヤー残HP={ctx.enemyCurrentHP}");
         }
     }
 

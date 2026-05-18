@@ -193,8 +193,7 @@ namespace CombatSystem
         public int PlayerHP => playerHP;
         public int PlayerMaxHP => playerMaxHP;
         public int EnemyHP => enemyHP;
-        public int CurrentCombatTurn => ctx?.currentTurn ?? 0;
-        public bool IsCombatActive => isCombatActive;
+        public int CurrentCombatTurn => PassiveSkillManager.Instance?.Context?.currentTurn ?? 0;
         public int EnemyMaxHP => currentEnemy != null ? currentEnemy.maxHP : 0;
 
         // ===========================================================

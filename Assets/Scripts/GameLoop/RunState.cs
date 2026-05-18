@@ -78,6 +78,12 @@ namespace GameLoop
         /// <summary>ラストスタンド発動済みフラグ。ラン中1回のみ true。</summary>
         public bool lastStandActive;
 
+        /// <summary>装備中の武器アイテムID（空=未装備=デフォルト2d6）。取得時に Loadout.TryAutoEquip で更新。</summary>
+        public string equippedWeaponId = "";
+
+        /// <summary>装備中のダイスアイテムID（空=武器ダイス使用）。取得時に Loadout.TryAutoEquip で更新。</summary>
+        public string equippedDiceId = "";
+
         // === 時限バフ・デバフ用ヘルパー ===
 
         public bool HasTimedBuff(string id)
@@ -116,6 +122,8 @@ namespace GameLoop
             permanentDebuffs = new HashSet<string>();
             seenOnceEvents = new HashSet<string>();
             lastStandActive = false;
+            equippedWeaponId = "";
+            equippedDiceId = "";
         }
 
         /// <summary>戦闘結果を反映</summary>

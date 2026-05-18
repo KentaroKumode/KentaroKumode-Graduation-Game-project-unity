@@ -61,11 +61,15 @@ namespace EventSystem
         }
 
         /// <summary>イベントを抽選して開始する。失敗時は false を返す。</summary>
-        public bool Begin(RunState run)
+        /// <param name="excludeRandomEvent">
+        /// RandomEvent による振り直し時 true。RandomEvent を含むイベントを
+        /// 抽選プールから除外し、連鎖を構造的に防ぐ。
+        /// </param>
+        public bool Begin(RunState run, bool excludeRandomEvent = false)
         {
             if (run == null) return false;
 
-            var ev = EventDatabase.Pick(run);
+            var ev = EventDatabase.Pick(run, excludeRandomEvent);
             if (ev == null)
             {
                 Debug.LogWarning("[EventEncounter] 該当イベントなし");
