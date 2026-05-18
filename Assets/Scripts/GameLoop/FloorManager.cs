@@ -46,8 +46,9 @@ namespace GameLoop
         {
             if (!playerWon) return 0;
 
-            // 基本報酬: フロア + 3 (1層=4, 6層=9。約2.25倍カーブ、速度ボーナス無し)
-            int baseReward = floor + 3;
+            // 基本報酬: フロア + 5 (1層=6, 6層=11。戦闘の経済価値を微増し
+            // 戦闘忌避との資源差を広げる。ボスは呼出側で×2)
+            int baseReward = floor + 5;
 
             // フロアデバフの報酬倍率（Fortune層・shopPriceMultiplier等）
             var mod = MapSystem.FloorModifierDatabase.Get(floor);

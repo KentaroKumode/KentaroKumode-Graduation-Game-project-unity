@@ -168,6 +168,22 @@ namespace InventorySystem.PassiveSkills
             Register(new Curse());
             Register(new Immovable());
             Register(new CounterStance());
+            Register(new HoningDuel());
+            Register(new EliteVigor());
+            // エリート固有パッシブ（基敵ごと・逆スケール）
+            Register(new EliteSlime());
+            Register(new EliteGoblin());
+            Register(new EliteKobold());
+            Register(new EliteSkeleton());
+            Register(new EliteWolf());
+            Register(new EliteHarpy());
+            Register(new EliteDecree13());
+            Register(new EliteOrc());
+            Register(new EliteLizard());
+            Register(new EliteWraith());
+            Register(new EliteGolem());
+            Register(new EliteMinotaur());
+            Register(new EliteDarkKnight());
 
             // 6～7層: ユニーク型
             Register(new MultiHead());
@@ -190,12 +206,18 @@ namespace InventorySystem.PassiveSkills
             // 各層ボス専用パッシブ
             Register(new GoblinKingsCall());
             Register(new FrozenBardSong());
+            Register(new MiasmaCorrosion());
             Register(new MirrorTwinsResponse());
             Register(new JudgmentFlames());
             Register(new RoyalEmber());
             Register(new SinChain());
             Register(new EternalBurning());
             Register(new ReturnToAshes());
+            // 灰燼の王 リワーク（見切り＆カウンター型）
+            Register(new AshOmen());
+            Register(new JudgmentBlaze());
+            Register(new AshArmor());
+            Register(new ImmortalEmber());
         }
     }
 }

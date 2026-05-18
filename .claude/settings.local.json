@@ -8,7 +8,14 @@
       "Bash(Get-ChildItem -Recurse -Path \"c:\\\\Users\\\\kumod\\\\My project\" -Filter \"*.cs\")",
       "Bash(Select-Object FullName)",
       "Bash(Sort-Object)",
-      "Bash(xargs grep -l \"class CompleteItemData\\\\|struct CompleteItemData\\\\|struct ItemCategory\\\\|enum ItemCategory\\\\|enum ItemRarity\")"
+      "Bash(xargs grep -l \"class CompleteItemData\\\\|struct CompleteItemData\\\\|struct ItemCategory\\\\|enum ItemCategory\\\\|enum ItemRarity\")",
+      "Bash(grep -c \"灰燼\" detail.log)",
+      "Bash(grep -c \"\\\\[Turn \" detail.log)",
+      "Bash(grep -c \"CombatManager\" detail.log)",
+      "Bash(sed -n '325,340p' Assets/Resources/enemies.json)",
+      "Bash(sed -n '228,243p' Assets/Resources/enemies.json)",
+      "Bash(sed -n '406,440p' Assets/Scripts/InventorySystem/PassiveSkills/Effects/EnemyPassiveSkillEffects.cs)",
+      "Bash(sed -n '40,60p' Assets/Scripts/GameLoop/FloorManager.cs)"
     ]
   }
 }

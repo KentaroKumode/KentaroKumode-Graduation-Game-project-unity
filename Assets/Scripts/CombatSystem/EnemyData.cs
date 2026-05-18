@@ -33,6 +33,25 @@ namespace CombatSystem
 
         /// <summary>ダイス表記文字列 (例: "2d6")</summary>
         public string DiceNotation => $"{diceCount}d{diceMaxValue}";
+
+        /// <summary>DB共有インスタンスを汚さずに改変するための複製。
+        /// passiveSkills もリスト/要素ごと深くコピーする。</summary>
+        public EnemyData Clone()
+        {
+            var c = (EnemyData)MemberwiseClone();
+            if (passiveSkills != null)
+            {
+                c.passiveSkills = new List<EnemyPassiveEntry>(passiveSkills.Count);
+                foreach (var p in passiveSkills)
+                    c.passiveSkills.Add(p == null ? null : new EnemyPassiveEntry
+                    {
+                        internalName = p.internalName,
+                        skillName = p.skillName,
+                        description = p.description,
+                    });
+            }
+            return c;
+        }
     }
 
     /// <summary>

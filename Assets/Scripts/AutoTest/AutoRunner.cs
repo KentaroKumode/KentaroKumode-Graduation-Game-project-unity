@@ -63,6 +63,11 @@ namespace AutoTest
             public int hpBefore;
             public int hpAfter;
             public bool afterLastStand;
+            // ターン内訳（非解決グラインドの原因特定用）
+            public int tWin;       // ロール勝利ターン数
+            public int tDraw;      // 引き分けターン数
+            public int tLoss;      // ロール敗北ターン数
+            public int tLossAbs;   // うちメインダメ0（シールド吸収/無効化で死を回避）
         }
 
         [Serializable]
@@ -91,6 +96,7 @@ namespace AutoTest
             public int lastStandFloor;
             public int combatsAfterLastStand;
             public int winsAfterLastStand;
+            public string profile = "";    // 行動ルーチン: "貪欲"(戦闘貪欲) / "回避"(戦闘回避)
             public string band = "";       // R1..R10 / CRASH / DEADLOCK
             public string bandLabel = "";
             public string note = "";
@@ -110,6 +116,11 @@ namespace AutoTest
         private int _pendingEnemyHpBefore;
         private int _eventStuckCount;
         private string _lastEventInfo = "";
+        // 行動ルーチン分割: 前半50%=戦闘貪欲 / 後半50%=戦闘回避（航行Rankのみ差し替え）
+        private bool _curCombatAverse;
+        private bool _curBossNear;   // 直近のDoNavigateで判定したボス接近フラグ（休憩判断で参照）
+        // 現戦闘のターン内訳タリー（OnEnemyEncounteredでリセット、ExecuteTurnで加算）
+        private int _cwWin, _cwDraw, _cwLoss, _cwLossAbs;
 
         private static readonly string[] LeaveKeywords =
             { "立ち去", "去る", "無視", "帰", "やめ", "見送", "通り過ぎ", "何もしない", "断る", "拒" };
@@ -186,7 +197,9 @@ namespace AutoTest
         private IEnumerator RunOne(int index)
         {
             var gm = GameManager.Instance;
-            _cur = new RunRec { index = index };
+            // 前半50%=戦闘貪欲 / 後半50%=戦闘回避
+            _curCombatAverse = index >= runCount / 2;
+            _cur = new RunRec { index = index, profile = _curCombatAverse ? "回避" : "貪欲" };
             _curLog.Clear();
             _exceptionFlag = false;
             _exceptionMsg = null;
@@ -302,14 +315,28 @@ namespace AutoTest
 
                 case GameManager.GamePhase.RestStop:
                 {
-                    // 余裕がある(HP>60%)かつ素材が足りるなら武器強化、それ以外は回復
+                    // 休憩は3択(食事/回復/強化)から1つ。生存(燃料→HP)優先、余裕あれば成長。
                     var run = gm.Run;
                     float hpR = run.playerMaxHP > 0 ? (float)run.playerHP / run.playerMaxHP : 1f;
                     int cost = GameManager.WeaponUpgradeCost(run.weaponUpgradeLevel);
-                    if (hpR > 0.6f && run.weaponMaterials >= cost)
-                        gm.RestUpgrade();
+                    var hg = MapManager.Instance?.Hunger;
+                    int hCur = hg?.Current ?? 99;
+                    int hMax = hg?.Max ?? 10;
+                    bool starvingSoon = hCur <= 3;            // 次の道中で空腹切れ濃厚
+                    bool greedyBossPrep = !_curCombatAverse && _curBossNear;
+
+                    if (starvingSoon)
+                        gm.RestEat();                        // 餓死回避が最優先
+                    else if (greedyBossPrep && hpR < 0.8f)
+                        gm.RestHeal();                       // 貪欲: ボス前にHPを整える
+                    else if (hpR <= 0.55f)
+                        gm.RestHeal();                       // 低HPは回復
+                    else if (hpR > 0.6f && run.weaponMaterials >= cost)
+                        gm.RestUpgrade();                    // 余裕あれば成長
+                    else if (hCur < hMax)
+                        gm.RestEat();                        // 他に用が無ければ燃料補給
                     else
-                        gm.RestHeal();
+                        gm.RestHeal();                       // 全部満ちていれば回復で無駄なく
                     return false;
                 }
 
@@ -327,9 +354,12 @@ namespace AutoTest
                     return false;
 
                 case GameManager.GamePhase.SinRitual:
-                    gm.OfferHpSacrifice(false);
-                    gm.OfferGoldSacrifice(false);
-                    gm.OfferItemSacrifice(false);
+                    // 方針: 6層固有デバフ(ゴルゴダの心/断絶した時間/灰燼の烙印)は
+                    // 回避できる限り必ず回避する。3儀式すべて支払いを選択（accept=true）。
+                    // ゲーム側で支払い可能なときのみ実際に消費され、不能時のみデバフ付与。
+                    gm.OfferHpSacrifice(true);
+                    gm.OfferGoldSacrifice(true);
+                    gm.OfferItemSacrifice(true);
                     gm.CompleteSinRitual();
                     return false;
 
@@ -359,9 +389,6 @@ namespace AutoTest
             if (mm == null) { Finish(Outcome.Deadlock, "MapManager null"); return true; }
             _eventStuckCount = 0; // マップに戻った＝イベント解決済み
 
-            // HPが半分以下なら所持消費アイテムで回復（過剰回復は避ける）
-            while (Consumables.TryUseBestHeal(gm.Run, 0.5f)) { }
-
             var (fwd, lat) = mm.GetCategorizedMoves();
             var pool = (fwd != null && fwd.Count > 0) ? fwd : lat;
             if (pool == null || pool.Count == 0)
@@ -373,22 +400,62 @@ namespace AutoTest
             float hpRatio = gm.Run.playerMaxHP > 0
                 ? (float)gm.Run.playerHP / gm.Run.playerMaxHP : 1f;
 
+            // ボス接近判定: プールにBossがある or 残り行数が2以内
+            bool bossNear = false;
+            foreach (var n in pool) if (n.EffectiveType == TileType.Boss) { bossNear = true; break; }
+            int rowCount = mm.CurrentMap?.rowCount ?? 10;
+            if (!bossNear && mm.CurrentNode != null && mm.CurrentNode.row >= rowCount - 2)
+                bossNear = true;
+            _curBossNear = bossNear; // 休憩フェーズの選択判断で参照
+
+            // 空腹残量
+            int hungerCur = mm.Hunger?.Current ?? 99;
+            bool hungerLow = hungerCur <= 2;
+
+            // 回復目標: 貪欲はボス接近時 HP8割を目指す。それ以外は半分。
+            float healTarget = (!_curCombatAverse && bossNear) ? 0.8f : 0.5f;
+            while (Consumables.TryUseBestHeal(gm.Run, healTarget)) { }
+
+            // 休憩を強く優先すべき状況:
+            //  - 空腹が尽きかけ（道中赤字回避）
+            //  - 貪欲がボス接近かつHPが8割未満（スケールしたbuildをボスへ生存させる）
+            bool preferRest = hungerLow
+                || (!_curCombatAverse && bossNear && hpRatio < 0.8f);
+
             MapNode best = pool[0];
             int bestRank = int.MaxValue;
             foreach (var n in pool)
             {
-                int r = Rank(n.EffectiveType, hpRatio);
+                int r = Rank(n.EffectiveType, hpRatio, _curCombatAverse, preferRest);
                 if (r < bestRank) { bestRank = r; best = n; }
             }
             gm.MoveToNode(best.id);
             return false;
         }
 
-        /// <summary>低いほど優先。HP帯(危機/低/健康)で重み分け。生存重視＋成長効率。</summary>
-        private int Rank(TileType t, float hpRatio)
+        /// <summary>低いほど優先。HP帯(危機/低/健康)で重み分け。
+        /// 戦闘タイル(Battle/EliteBattle)のみ profile で差し替え、他は共通固定。
+        /// averse=false(戦闘貪欲): 健康なら戦闘を最優先級で選ぶ。
+        /// averse=true(戦闘回避): 戦闘を最下位級にし、戦闘以外があれば必ず回避。</summary>
+        private int Rank(TileType t, float hpRatio, bool averse, bool preferRest)
         {
             bool crit = hpRatio < 0.3f;   // 危機
             bool low  = hpRatio < 0.55f;  // 低HP
+
+            // 空腹尽きかけ／貪欲のボス前整え: 休憩を最優先（食事＝空腹全回復も兼ねる）
+            if (preferRest && t == TileType.Rest) return -1;
+
+            // --- 戦闘タイル: ここだけが比較軸（1変数） ---
+            // 貪欲でも宝箱(Treasure=健康0/低2/危機2)より戦闘を優先しない＝
+            // 全HP帯で Battle/Elite > Treasure になる値にする。
+            if (t == TileType.Battle)
+                return averse ? (crit ? 95 : low ? 92 : 90)
+                              : (crit ? 8  : low ? 3  : 1);
+            if (t == TileType.EliteBattle)
+                return averse ? (crit ? 97 : low ? 95 : 93)
+                              : (crit ? 9  : low ? 4  : 2);
+
+            // --- 非戦闘タイル: 両プロファイル共通固定 ---
             switch (t)
             {
                 case TileType.Rest:        return crit ? 0 : low ? 0 : 6;
@@ -396,8 +463,6 @@ namespace AutoTest
                 case TileType.Treasure:    return crit ? 2 : low ? 2 : 0;  // 装備強化源
                 case TileType.Event:       return crit ? 5 : 3;
                 case TileType.Mystery:     return crit ? 5 : 3;
-                case TileType.Battle:      return crit ? 8 : low ? 5 : 2;
-                case TileType.EliteBattle: return crit ? 9 : low ? 7 : 4;
                 case TileType.Trap:        return crit ? 7 : 6;
                 case TileType.SinAltar:    return 4;
                 case TileType.Boss:        return 9;  // 最後に残れば踏む(フロアクリア必須)
@@ -517,7 +582,10 @@ namespace AutoTest
                     if (cm.PlayerHP <= maxHit)
                         UseFirst(run, "cons_heal_4", "cons_heal_3", "cons_heal_2", "cons_heal_1");
                 }
-                cm.ExecuteTurn();
+                var tr = cm.ExecuteTurn();
+                if (tr.isDraw) _cwDraw++;
+                else if (tr.playerWon) _cwWin++;
+                else { _cwLoss++; if (tr.totalDamage <= 0) _cwLossAbs++; }
             }
         }
 
@@ -598,6 +666,7 @@ namespace AutoTest
             // ボス判定は敵IDのみで厳密に行う（ノード種別フォールバックは誤検出の元）
             _pendingEnemyIsBoss = _pendingEnemyId.StartsWith("boss_layer");
             _pendingEnemyHpBefore = gm.Run?.playerHP ?? 0;
+            _cwWin = _cwDraw = _cwLoss = _cwLossAbs = 0; // 新戦闘のターン内訳リセット
         }
 
         private void OnBattleEnded(CombatResult r)
@@ -614,7 +683,8 @@ namespace AutoTest
                 turns = r.totalTurns,
                 hpBefore = _pendingEnemyHpBefore,
                 hpAfter = r.playerHPRemaining,
-                afterLastStand = _cur.lastStandUsed
+                afterLastStand = _cur.lastStandUsed,
+                tWin = _cwWin, tDraw = _cwDraw, tLoss = _cwLoss, tLossAbs = _cwLossAbs
             };
             _cur.combats.Add(rec);
             _cur.totalCombats++;
@@ -733,31 +803,39 @@ namespace AutoTest
             _detail[r.index] = list;
         }
 
-        /// <summary>結果を10段階バンド + CRASH/DEADLOCK に分類。</summary>
+        /// <summary>結果を10段階バンド + CRASH/DEADLOCK に分類。
+        /// R1:2F以前(道中/ボス問わず) R2:3F道中 R3:3Fボス R4:4F道中 R5:4Fボス
+        /// R6:5F道中 R7:5Fボス R8:5Fクリア R9:6Fボスで死亡 R10:6層クリア。</summary>
         private void Classify(RunRec r)
         {
             if (r.outcome == Outcome.Crash) { r.band = "CRASH"; r.bandLabel = "クラッシュ(例外)"; return; }
             if (r.outcome == Outcome.Deadlock) { r.band = "DEADLOCK"; r.bandLabel = "デッドロック"; return; }
-            if (r.outcome == Outcome.FullClear) { r.band = "R10"; r.bandLabel = "6F完全クリア"; return; }
-            if (r.outcome == Outcome.NormalClear) { r.band = "R8"; r.bandLabel = "5F通常クリア"; return; }
+            if (r.outcome == Outcome.FullClear) { r.band = "R10"; r.bandLabel = "6層クリア"; return; }
+            if (r.outcome == Outcome.NormalClear) { r.band = "R8"; r.bandLabel = "5Fクリア"; return; }
 
             // GameOver
             int f = r.deathFloor;
-            if (r.reached6F) { r.band = "R9"; r.bandLabel = "6F挑戦するも死亡"; return; }
+            bool boss = r.deathInBossFight;
+            if (f >= 6) { r.band = "R9"; r.bandLabel = "6Fボスで死亡"; return; }
             switch (f)
             {
-                case 1: r.band = "R1"; r.bandLabel = "1F道中で死亡"; break;
+                case 1:
                 case 2:
-                    if (r.deathInBossFight) { r.band = "R3"; r.bandLabel = "2Fボスで死亡"; }
-                    else { r.band = "R2"; r.bandLabel = "2F道中で死亡"; }
+                    r.band = "R1"; r.bandLabel = "2F以前で死亡"; break;
+                case 3:
+                    if (boss) { r.band = "R3"; r.bandLabel = "3Fボスで死亡"; }
+                    else      { r.band = "R2"; r.bandLabel = "3F道中で死亡"; }
                     break;
-                case 3: r.band = "R4"; r.bandLabel = "3Fで死亡"; break;
-                case 4: r.band = "R5"; r.bandLabel = "4Fで死亡"; break;
+                case 4:
+                    if (boss) { r.band = "R5"; r.bandLabel = "4Fボスで死亡"; }
+                    else      { r.band = "R4"; r.bandLabel = "4F道中で死亡"; }
+                    break;
                 case 5:
-                    if (r.deathInBossFight) { r.band = "R7"; r.bandLabel = "5Fボスで死亡"; }
-                    else { r.band = "R6"; r.bandLabel = "5F道中/カルマで死亡"; }
+                    if (boss) { r.band = "R7"; r.bandLabel = "5Fボスで死亡"; }
+                    else      { r.band = "R6"; r.bandLabel = "5F道中で死亡"; }
                     break;
-                default: r.band = "R1"; r.bandLabel = $"{f}F道中で死亡"; break;
+                default:
+                    r.band = "R1"; r.bandLabel = "2F以前で死亡"; break;
             }
         }
 
@@ -847,28 +925,57 @@ namespace AutoTest
         private string Pct(int n, int total) =>
             total == 0 ? "0.0%" : (100.0 * n / total).ToString("F1", CultureInfo.InvariantCulture) + "%";
 
+        /// <summary>同一ファイル内で、行動ルーチン別（戦闘貪欲/戦闘回避）に
+        /// 集計ブロックを分離して出力する。各ブロックは自己完結の全集計。</summary>
         private string BuildSummary()
         {
-            int n = _records.Count;
+            var greedy = _records.FindAll(r => r.profile == "貪欲");
+            var averse = _records.FindAll(r => r.profile == "回避");
+            var other  = _records.FindAll(r => r.profile != "貪欲" && r.profile != "回避");
+
             var sb = new StringBuilder();
-            sb.AppendLine("================ AutoRun サマリ ================");
+            sb.AppendLine("################ AutoRun サマリ ################");
             sb.AppendLine($"日時      : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine($"総ラン数  : {_records.Count}  (戦闘貪欲={greedy.Count} / 戦闘回避={averse.Count})");
+            sb.AppendLine("比較軸    : 航行Rankのみ差し替え（消費/ショップ/戦闘実行/イベントは共通固定）");
+            sb.AppendLine("################################################");
+            sb.AppendLine();
+            sb.Append(BuildSummaryBlock("【前半 50% ─ 戦闘貪欲（戦闘マスを最優先で選ぶ）】", greedy));
+            sb.AppendLine();
+            sb.AppendLine();
+            sb.Append(BuildSummaryBlock("【後半 50% ─ 戦闘回避（戦闘以外があれば必ず回避）】", averse));
+            if (other.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine();
+                sb.Append(BuildSummaryBlock("【プロファイル未設定（保険）】", other));
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>1コホート分の自己完結サマリブロック。</summary>
+        private string BuildSummaryBlock(string title, List<RunRec> recs)
+        {
+            int n = recs.Count;
+            var sb = new StringBuilder();
+            sb.AppendLine("================ " + title + " ================");
             sb.AppendLine($"ラン数    : {n}");
             sb.AppendLine($"行動方針  : 前進貪欲 + 生存重視");
             sb.AppendLine();
+            if (n == 0) { sb.AppendLine("（該当ランなし）"); return sb.ToString(); }
 
             // --- 10段階バンド分布 ---
             sb.AppendLine("---- 結果10段階分布（CRASH/DEADLOCK除く母数で割合算出） ----");
             string[] bands = { "R1","R2","R3","R4","R5","R6","R7","R8","R9","R10" };
             string[] labels = {
-                "1F道中で死亡","2F道中で死亡","2Fボスで死亡","3Fで死亡","4Fで死亡",
-                "5F道中/カルマで死亡","5Fボスで死亡","5F通常クリア","6F挑戦するも死亡","6F完全クリア" };
-            int crash = _records.FindAll(r => r.band == "CRASH").Count;
-            int dead  = _records.FindAll(r => r.band == "DEADLOCK").Count;
+                "2F以前で死亡","3F道中で死亡","3Fボスで死亡","4F道中で死亡","4Fボスで死亡",
+                "5F道中で死亡","5Fボスで死亡","5Fクリア","6Fボスで死亡","6層クリア" };
+            int crash = recs.FindAll(r => r.band == "CRASH").Count;
+            int dead  = recs.FindAll(r => r.band == "DEADLOCK").Count;
             int valid = n - crash - dead;
             for (int i = 0; i < bands.Length; i++)
             {
-                int c = _records.FindAll(r => r.band == bands[i]).Count;
+                int c = recs.FindAll(r => r.band == bands[i]).Count;
                 sb.AppendLine($"  {PadR(bands[i],4)}{PadR(labels[i],22)}: {PadL(c.ToString(),4)}  ({Pct(c, valid)})");
             }
             sb.AppendLine();
@@ -878,7 +985,7 @@ namespace AutoTest
 
             // --- 死亡階層・死因 ---
             sb.AppendLine("---- 死亡階層・死因 ----");
-            var deaths = _records.FindAll(r => r.outcome == Outcome.GameOver);
+            var deaths = recs.FindAll(r => r.outcome == Outcome.GameOver);
             sb.AppendLine($"  総死亡数: {deaths.Count} / {n}");
             for (int f = 1; f <= 6; f++)
             {
@@ -895,7 +1002,7 @@ namespace AutoTest
 
             // --- ラストスタンド ---
             sb.AppendLine("---- ラストスタンド ----");
-            var ls = _records.FindAll(r => r.lastStandUsed);
+            var ls = recs.FindAll(r => r.lastStandUsed);
             sb.AppendLine($"  発動ラン数: {ls.Count} / {n}  ({Pct(ls.Count, n)})");
             for (int f = 1; f <= 6; f++)
             {
@@ -966,7 +1073,7 @@ namespace AutoTest
             // --- 経済・燃費 ---
             sb.AppendLine("---- 経済・燃費バランス ----");
             double sCoins=0, sPeak=0, sGain=0, sStarv=0, sStarvHit=0, sShop=0;
-            foreach (var r in _records)
+            foreach (var r in recs)
             { sCoins+=r.finalCoins; sPeak+=r.peakCoins; sGain+=r.totalGoldGained;
               sStarv+=r.starvationTotal; sStarvHit+=r.starvationHits; sShop+=r.shopPurchases; }
             int dn = Math.Max(1, n);
@@ -980,7 +1087,7 @@ namespace AutoTest
             // --- 敵・ボス脅威度 ---
             // key = displayName。boss(enemyId が boss_layer*)は別エントリとして分離集計。
             sb.AppendLine("---- 敵・ボス脅威度 ----");
-            var agg = new Dictionary<string, int[]>();    // key -> [enc, wins, losses, turns, hpLost, fatal]
+            var agg = new Dictionary<string, int[]>();    // key -> [0enc,1wins,2losses,3turns,4hpLost,5fatal, 6tWin,7tDraw,8tLoss,9tLossAbs]
             var isBossKey = new Dictionary<string, bool>(); // key -> boss か
             var dispName = new Dictionary<string, string>(); // key -> 表示名
 
@@ -994,16 +1101,17 @@ namespace AutoTest
                 return key;
             }
 
-            foreach (var r in _records)
+            foreach (var r in recs)
             {
                 foreach (var c in r.combats)
                 {
                     string key = KeyOf(c);
-                    if (!agg.TryGetValue(key, out var a)) { a = new int[6]; agg[key] = a; }
+                    if (!agg.TryGetValue(key, out var a)) { a = new int[10]; agg[key] = a; }
                     a[0]++;
                     if (c.won) a[1]++; else a[2]++;
                     a[3] += c.turns;
                     a[4] += Math.Max(0, c.hpBefore - c.hpAfter);
+                    a[6] += c.tWin; a[7] += c.tDraw; a[8] += c.tLoss; a[9] += c.tLossAbs;
                 }
                 // 致命: そのランの最後の「敗北」戦闘をゲームオーバー要因と見なす
                 if (r.outcome == Outcome.GameOver && r.combats != null && r.combats.Count > 0)
@@ -1014,7 +1122,7 @@ namespace AutoTest
                     if (fatal != null)
                     {
                         string key = KeyOf(fatal);
-                        if (!agg.TryGetValue(key, out var a)) { a = new int[6]; agg[key] = a; }
+                        if (!agg.TryGetValue(key, out var a)) { a = new int[10]; agg[key] = a; }
                         a[5]++;
                     }
                 }
@@ -1023,6 +1131,11 @@ namespace AutoTest
             var keys = new List<string>(agg.Keys);
             keys.Sort((x, y) =>
             {
+                // 勝率の低い順（危険＝主指標）。同率は致命数の多い順→遭遇数の多い順。
+                double wx = agg[x][0] == 0 ? 1.0 : (double)agg[x][1] / agg[x][0];
+                double wy = agg[y][0] == 0 ? 1.0 : (double)agg[y][1] / agg[y][0];
+                int c = wx.CompareTo(wy);
+                if (c != 0) return c;
                 int f = agg[y][5].CompareTo(agg[x][5]);
                 return f != 0 ? f : agg[y][0].CompareTo(agg[x][0]);
             });
@@ -1033,12 +1146,65 @@ namespace AutoTest
                 string wr = a[0] == 0 ? "-" : (100.0*a[1]/a[0]).ToString("F0")+"%";
                 string at = a[0] == 0 ? "-" : ((double)a[3]/a[0]).ToString("F1");
                 string ad = a[0] == 0 ? "-" : ((double)a[4]/a[0]).ToString("F1");
-                string kind = isBossKey.TryGetValue(k, out var b) && b ? "BOSS" : "雑魚";
                 string nm = dispName.TryGetValue(k, out var dn2) ? dn2 : k;
+                string kind = isBossKey.TryGetValue(k, out var b) && b ? "BOSS"
+                            : (!string.IsNullOrEmpty(nm) && nm.StartsWith("精鋭")) ? "精鋭"
+                            : "雑魚";
                 sb.AppendLine($"  {PadR(TruncDisp(nm,16),18)}{PadR(kind,6)}{PadL(a[0].ToString(),5)} {PadL(wr,6)} {PadL(at,7)} {PadL(ad,11)} {PadL(a[5].ToString(),5)}");
             }
             sb.AppendLine();
-            sb.AppendLine("（致命=そのランをゲームオーバーに導いた回数。脅威度の主指標）");
+            sb.AppendLine("（勝率の低い順にソート。致命=そのランをゲームオーバーに導いた回数）");
+            sb.AppendLine();
+
+            // --- ボス戦ターン内訳（非解決グラインドの原因特定） ---
+            // 全ターンの勝/分/敗の比率＋「吸収敗(敗北だがメインダメ0で死回避)」を表示。
+            // 99T級の長期戦＝勝or分or吸収敗ばかりで致命敗が稀、を定量化する。
+            sb.AppendLine("---- ボス戦ターン内訳（勝/分/敗 ％・吸収敗=敗北だが被ダメ0） ----");
+            sb.AppendLine($"  {PadR("ボス名",16)}{PadL("総T",6)} {PadL("勝%",6)} {PadL("分%",6)} {PadL("敗%",6)} {PadL("吸収敗%",8)}");
+            foreach (var k in keys)
+            {
+                if (!(isBossKey.TryGetValue(k, out var b) && b)) continue;
+                var a = agg[k];
+                int tot = a[6] + a[7] + a[8];
+                if (tot == 0) continue;
+                string nm = dispName.TryGetValue(k, out var dn3) ? dn3 : k;
+                string pw = (100.0*a[6]/tot).ToString("F0")+"%";
+                string pd = (100.0*a[7]/tot).ToString("F0")+"%";
+                string pl = (100.0*a[8]/tot).ToString("F0")+"%";
+                string pa = a[8]==0 ? "-" : (100.0*a[9]/a[8]).ToString("F0")+"%";
+                sb.AppendLine($"  {PadR(TruncDisp(nm,16),16)}{PadL(tot.ToString(),6)} {PadL(pw,6)} {PadL(pd,6)} {PadL(pl,6)} {PadL(pa,8)}");
+            }
+            sb.AppendLine("（吸収敗% = 敗北ターンのうちシールド吸収/無効化でメインダメ0だった割合。LS中はこれ＋勝＋分が生存ターン）");
+            sb.AppendLine();
+
+            // --- デッドロック発生時の状況（原因特定用・最下段） ---
+            var dls = recs.FindAll(r => r.band == "DEADLOCK");
+            if (dls.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine($"---- デッドロック発生時の状況（{dls.Count}件・原因特定用） ----");
+                foreach (var r in dls)
+                {
+                    sb.AppendLine($"  ● RUN {r.index} : {r.note}");
+                    sb.AppendLine($"    reached F{r.reachedFloor}  HP {r.finalHP}/{r.finalMaxHP}  " +
+                                  $"coins {r.finalCoins}  combats {r.totalWins}/{r.totalCombats}  " +
+                                  $"LS={r.lastStandUsed}");
+                    if (_detail.TryGetValue(r.index, out var lines) && lines.Count > 0)
+                    {
+                        const int tail = 40;
+                        int start = Math.Max(0, lines.Count - tail);
+                        sb.AppendLine($"    ── 発生時点周辺ログ（末尾 {lines.Count - start} 行 / 総 {lines.Count} 行） ──");
+                        for (int i = start; i < lines.Count; i++)
+                            sb.AppendLine($"    | {lines[i]}");
+                    }
+                    else
+                    {
+                        sb.AppendLine("    （ログ未取得）");
+                    }
+                    sb.AppendLine();
+                }
+            }
+
             sb.AppendLine("=============================================");
             return sb.ToString();
         }

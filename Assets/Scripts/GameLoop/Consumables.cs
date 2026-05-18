@@ -29,6 +29,13 @@ namespace GameLoop
         {
             if (run == null || string.IsNullOrEmpty(id)) return false;
             if (run.ownedConsumables == null || !run.ownedConsumables.Contains(id)) return false;
+            // 精鋭ハーピィ「死翔」: この戦闘中は消費アイテム使用不可
+            var lockCtx = ActiveCtx();
+            if (lockCtx != null && lockCtx.consumablesLocked)
+            {
+                Debug.Log("[Consumables] 死翔により使用不可");
+                return false;
+            }
 
             bool ok = Apply(run, id);
             if (ok)

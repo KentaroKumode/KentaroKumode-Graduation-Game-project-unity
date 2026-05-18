@@ -138,6 +138,9 @@ namespace InventorySystem.PassiveSkills
         public int consEnemyDiceDebuff;   // 敵ダイス合計 -X（毎ロール）
         public bool gamblerArmed;         // 賭博師のダイス（ロール時に発火・消費）
 
+        // ===== エリート: 精鋭ハーピィ「死翔」 =====
+        public bool consumablesLocked;    // この戦闘中、消費アイテム使用不可（戦闘開始時に付与・戦闘ごとに新規生成でリセット）
+
         // ===== 竜閃 =====
         public bool rollPurity;           // 無我無心: カスタムダイス以外の補正を一切受けない（戦闘中持続）
         public bool garyoProc;            // 画竜点睛: このターン発動したか（毎ターンリセット）

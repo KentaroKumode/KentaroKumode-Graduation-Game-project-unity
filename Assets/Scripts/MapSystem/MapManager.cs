@@ -25,7 +25,7 @@ namespace MapSystem
         // === 設定 ===
         [Header("空腹度")]
         [SerializeField] private int hungerPerFloor = 10;
-        [SerializeField] private float starvationDamageRatio = 0.1f;
+        [SerializeField] private float starvationDamageRatio = 0.08f;
 
         void Awake()
         {

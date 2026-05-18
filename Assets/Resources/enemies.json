@@ -165,13 +165,14 @@
       "floor": 5,
       "maxHP": 24,
       "diceCount": 3,
-      "diceMaxValue": 6,
+      "diceMaxValue": 5,
       "criticalNumerator": 2,
       "threat": 5,
       "passiveSkills": [
         { "internalName": "Undying", "skillName": "不死者", "description": "毎ターン開始時、HP1回復" },
         { "internalName": "CounterStance", "skillName": "反撃態勢", "description": "ロール敗北時、次ターンのダメージ+3" },
-        { "internalName": "ScratchAura", "skillName": "威圧", "description": "勝利されても削りダメージを与える" }
+        { "internalName": "ScratchAura", "skillName": "威圧", "description": "勝利されても削りダメージを与える" },
+        { "internalName": "HoningDuel", "skillName": "研ぎ澄まし", "description": "決闘が長引くほど冴える。3ターンごとにロール勝利時の与ダメージ+1（累積）" }
       ]
     },
     {
@@ -282,16 +283,16 @@
     },
     {
       "id": "boss_layer3",
-      "displayName": "凍れる吟遊詩人",
-      "description": "凍りついた吟遊詩人。歌が空気を凍らせ、聞き続けた者は動けなくなる。",
+      "displayName": "毒沼の主",
+      "description": "瘴気の澱から生まれた巨躯。触れる空気すべてを腐毒に変え、長く対峙する者ほど深く蝕まれる。",
       "floor": 3,
-      "maxHP": 44,
-      "diceCount": 1,
-      "diceMaxValue": 6,
-      "criticalNumerator": 2,
+      "maxHP": 48,
+      "diceCount": 2,
+      "diceMaxValue": 3,
+      "criticalNumerator": 1,
       "threat": 5,
       "passiveSkills": [
-        { "internalName": "FrozenBardSong", "skillName": "凍えの旋律", "description": "消費アイテム未使用が続くと毎ターン敵の与ダメ+1が蓄積（2ターン目から、上限+8）。アイテム使用でリセット" }
+        { "internalName": "MiasmaCorrosion", "skillName": "毒の侵蝕", "description": "毎ターン終了時、毒スタック+1（上限5）、その後スタック分の固定ダメージ（軽減無視）。速攻なら軽傷、長期戦は致命" }
       ]
     },
     {
@@ -305,7 +306,7 @@
       "criticalNumerator": 0,
       "threat": 6,
       "passiveSkills": [
-        { "internalName": "MirrorTwinsResponse", "skillName": "鏡映の応答", "description": "11以上のダメージを与えたターン、次ターン開始時に与ダメの50%（上限9）を固定ダメで反射" }
+        { "internalName": "MirrorTwinsResponse", "skillName": "鏡映の応答", "description": "12未満の小さなダメージを与えたターン、次ターン開始時に(12-与ダメ・上限9)を固定反射。高火力(12以上)は反射0＝鏡を叩き割る" }
       ]
     },
     {
@@ -325,18 +326,18 @@
     {
       "id": "boss_layer6",
       "displayName": "灰燼の王",
-      "description": "灰と燃え残りで形を成す古き王。永劫の業火を纏い、終わりを呼ぶ。",
+      "description": "灰と燃え残りで形を成す古き王。致命の業火を振るうが、その一撃には必ず予兆がある。見切り、間一髪で躱し、一撃ずつ削れ。",
       "floor": 6,
-      "maxHP": 120,
+      "maxHP": 100,
       "diceCount": 3,
       "diceMaxValue": 6,
       "criticalNumerator": 3,
       "threat": 10,
       "passiveSkills": [
-        { "internalName": "RoyalEmber", "skillName": "王の業炎", "description": "毎ターン終了時、灰の烙印スタック+1。次ターン開始時にスタック数ぶんの固定ダメ（軽減無視）" },
-        { "internalName": "SinChain", "skillName": "業の連鎖", "description": "プレイヤーがロール勝利するたびに敵与ダメ+1累積（上限+5）。ロール敗北でリセット" },
-        { "internalName": "EternalBurning", "skillName": "永劫の燃焼", "description": "プレイヤーHP割合に応じて与ダメ+: 50%以下+2 / 25%以下+3 / 10%以下+5" },
-        { "internalName": "ReturnToAshes", "skillName": "灰燼への回帰", "description": "自身のHP50%以下で、毎ターン開始時に最大HPの5%回復" }
+        { "internalName": "AshOmen", "skillName": "灰の予兆", "description": "断罪ターンを予告。完全に読める（運でなく対応の問題）" },
+        { "internalName": "JudgmentBlaze", "skillName": "業火の断罪", "description": "断罪ターン、ロール勝利できなければ即死級の一撃。ロール勝利すれば間一髪回避＋鎧貫通の反撃12" },
+        { "internalName": "AshArmor", "skillName": "灰塵の鎧", "description": "被弾時 受けるダメージ-5、軽減後が10超なら10に丸める（断罪回避の反撃のみ貫通）" },
+        { "internalName": "ImmortalEmber", "skillName": "不滅の残り火", "description": "毎ターン失ったHPの10%回復。HP60%以下で断罪が2ターン毎、30%以下で毎ターンに" }
       ]
     }
   ]

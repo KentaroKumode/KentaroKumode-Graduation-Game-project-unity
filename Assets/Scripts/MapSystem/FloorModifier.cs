@@ -79,8 +79,8 @@ namespace MapSystem
             {
                 id = "miasma_erosion",
                 displayName = "瘴気侵蝕",
-                description = "戦闘終了後に固定2ダメージ / 休憩回復量30%→50%",
-                postCombatDamage = 2,
+                description = "戦闘終了後に固定1ダメージ / 休憩回復量30%→50%",
+                postCombatDamage = 1,
                 restHealMultiplier = 0.5f,
             });
 
@@ -92,9 +92,9 @@ namespace MapSystem
             {
                 id = "purgatory_brand",
                 displayName = "煉獄の刻印",
-                description = "空腹度上限-3 / 空腹時ダメージ×2 / 戦闘後3ダメージ / ショップ価格+20%",
+                description = "空腹度上限-3 / 空腹時ダメージ最大HP12% / 戦闘後3ダメージ / ショップ価格+20%",
                 hungerMaxBonus = -3,
-                starvationDamageOverride = 0.2f,
+                starvationDamageOverride = 0.12f,
                 postCombatDamage = 3,
                 shopPriceMultiplier = 1.2f,
             });

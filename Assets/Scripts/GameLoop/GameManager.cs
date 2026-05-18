@@ -204,6 +204,16 @@ namespace GameLoop
             // 敗北 or HP0 → 救済（灯火→ラストスタンド）/ なければゲームオーバー
             if (!result.playerWon || Run.playerHP <= 0)
             {
+                // イベント由来戦闘は勝敗問わずここで終了扱い。フラグを必ず解除する。
+                // 解除しないと「敗北→救済でマップ復帰」後にフラグが残存し、
+                // 後続のボス勝利時に下のイベント復帰ブロックを誤通過して
+                // フロアクリア遷移が発火せず、出口なしボスノードでソフトロックする。
+                if (returnToMapAfterEventCombat)
+                {
+                    returnToMapAfterEventCombat = false;
+                    EventEncounter.Instance?.Clear();
+                }
+
                 // ボスマス戦闘では救済を一切行わない（ボス敗北＝ラン終了確定）。
                 // ボスノードは収束ノードで出力接続が無く、復活して戻ると進行不能になるため。
                 bool isBossFight = MapManager.Instance?.CurrentNode != null
@@ -283,13 +293,7 @@ namespace GameLoop
                 return;
             }
 
-            // 激戦1戦目勝利 → 2戦目
-            if (node.EffectiveType == TileType.EliteBattle && !IsEliteSecondFight)
-            {
-                IsEliteSecondFight = true;
-                StartEliteSecondCombat();
-                return;
-            }
+            // エリートマスは1連戦（精鋭1体で完結）。2連戦は廃止。
 
             // 通常報酬（傲慢: 通常戦闘=0、エリート以上=×2、いずれも割合計算が先）
             int coins = FloorManager.CalculateRewardCoins(Run.currentFloor, true, result.totalTurns);
@@ -388,6 +392,17 @@ namespace GameLoop
             int heal = Mathf.CeilToInt(Run.playerMaxHP * ratio);
             Run.playerHP = Mathf.Min(Run.playerMaxHP, Run.playerHP + heal);
             Log($"休憩回復: +{heal}HP ({(int)(ratio*100)}%) (現在: {Run.playerHP}/{Run.playerMaxHP})");
+            SetPhase(GamePhase.MapNavigation);
+        }
+
+        /// <summary>休憩で食事を選択（空腹を全回復）。HP回復・武器強化と並ぶ独立選択肢。</summary>
+        public void RestEat()
+        {
+            if (CurrentPhase != GamePhase.RestStop) return;
+            var h = MapManager.Instance?.Hunger;
+            int before = h?.Current ?? 0;
+            h?.RestoreFull();
+            Log($"休憩食事: 空腹 {before} → {h?.Current ?? 0}/{h?.Max ?? 0}（全回復）");
             SetPhase(GamePhase.MapNavigation);
         }
 
@@ -626,6 +641,61 @@ namespace GameLoop
             SetPhase(GamePhase.TrapTriggered);
         }
 
+        /// <summary>エリート化対象外の基敵ID（弱すぎてエリートに値しない）。</summary>
+        private static readonly System.Collections.Generic.HashSet<string> EliteExcludedBaseIds =
+            new System.Collections.Generic.HashSet<string> { "slime", "goblin" };
+
+        /// <summary>4層以降のエリートマス戦の敵を「精鋭」化する。
+        /// DB共有インスタンスは汚さずクローンに対して HP×2 / threat+2 /
+        /// 精鋭パッシブ(3Tごとダイス+1) を付与。表示名に「精鋭」を冠し、
+        /// 計測/デバッグ上は通常敵と別枠として集計される。
+        /// 1～3層・通常戦は対象外（raw をそのまま返す）。</summary>
+        private EnemyData MaybeMakeElite(EnemyData raw)
+        {
+            if (raw == null) return raw;
+            var node = MapManager.Instance?.CurrentNode;
+            if (node == null || node.EffectiveType != TileType.EliteBattle) return raw;
+            if (Run.currentFloor < 4) return raw;
+            // スライム/ゴブリン/ハーピィはエリート化対象外（通過しても通常敵のまま）
+            if (EliteExcludedBaseIds.Contains(raw.id)) return raw;
+
+            var e = raw.Clone();
+            e.maxHP = Mathf.Max(1, e.maxHP * 2);
+            e.threat += 2;
+            e.displayName = "精鋭" + e.displayName;
+            if (e.passiveSkills == null)
+                e.passiveSkills = new System.Collections.Generic.List<EnemyPassiveEntry>();
+
+            // 基敵ごとの固有エリートパッシブ（逆スケール: 弱敵ほど強力）。
+            // 未マップ敵は汎用 EliteVigor をフォールバック付与。
+            var (eliteId, eliteName, eliteDesc) = EliteTraitFor(raw.id);
+            e.passiveSkills.Add(new EnemyPassiveEntry
+            {
+                internalName = eliteId, skillName = eliteName, description = eliteDesc,
+            });
+            return e;
+        }
+
+        /// <summary>基敵IDに対応するエリート固有パッシブ定義を返す。</summary>
+        private (string id, string name, string desc) EliteTraitFor(string baseId)
+        {
+            switch (baseId)
+            {
+                case "kobold":     return ("EliteKobold",     "早業",           "ロールの度に5GOLD奪取、50%でダメージを回避");
+                case "skeleton":   return ("EliteSkeleton",   "不死の軍勢",     "致命ダメージで2回までHP全回復で踏みとどまる。発動毎に自ダイス+3（永続・最大+6）");
+                case "wolf":       return ("EliteWolf",        "血盟の疾走",     "自ダイス合計+2、勝利時さらに与ダメ+2");
+                case "harpy":      return ("EliteHarpy",       "死翔",           "プレイヤー消費アイテム使用不可。毎ロール自ダイス+3＋経過ターン（毎T+1無限累積）");
+                case "13th_death": return ("EliteDecree13",    "死の重圧",       "13番目の宣告が灯ったターン中、自ダイス合計+13");
+                case "orc":        return ("EliteOrc",         "痛恨の一撃",     "ロール勝利時+8ダメージ、敗北で自ダイス数+1（勝利でリセット・最大5個）");
+                case "lizardman":  return ("EliteLizard",      "重甲",           "被弾時さらに-2軽減（硬鱗と累積）、敗北時に固定1反射");
+                case "wraith":     return ("EliteWraith",      "霊体",           "2ターンに1度 被ダメ全て1に減少、非霊体時はダイス数+1");
+                case "golem":      return ("EliteGolem",       "巌の意志",       "被弾時 固定2軽減、毎ターン意志+1、撃破時にスタック×2の確定ダメージ");
+                case "minotaur":   return ("EliteMinotaur",    "際限なき暴走",   "毎ロール自ダイス合計+1（既に強い→控えめ）");
+                case "dark_knight":return ("EliteDarkKnight",  "闇技",           "勝利時、与ダメ+1（ミニボス級→最小限）");
+                default:           return ("EliteVigor",       "精鋭",           "HP2倍 / threat+2 / 3ターンごとにダイス出目合計+1");
+            }
+        }
+
         private void StartBattleTile()
         {
             CurrentEnemy = FloorManager.PickEnemy(Run.currentFloor);
@@ -635,6 +705,17 @@ namespace GameLoop
                 SetPhase(GamePhase.MapNavigation);
                 return;
             }
+
+            // エリートマス(4層以降)で除外敵を引いたら、エリートに値する敵へ引き直す
+            var eliteNode = MapManager.Instance?.CurrentNode;
+            if (eliteNode != null && eliteNode.EffectiveType == TileType.EliteBattle
+                && Run.currentFloor >= 4 && EliteExcludedBaseIds.Contains(CurrentEnemy.id))
+            {
+                for (int tries = 0; tries < 12 && EliteExcludedBaseIds.Contains(CurrentEnemy.id); tries++)
+                    CurrentEnemy = FloorManager.PickEnemy(Run.currentFloor) ?? CurrentEnemy;
+            }
+
+            CurrentEnemy = MaybeMakeElite(CurrentEnemy);
 
             if (firstEliteEnemy == null && MapManager.Instance.CurrentNode.EffectiveType == TileType.EliteBattle)
                 firstEliteEnemy = CurrentEnemy;
@@ -658,6 +739,8 @@ namespace GameLoop
                 CurrentEnemy = candidates[UnityEngine.Random.Range(0, candidates.Count)];
             else
                 CurrentEnemy = FloorManager.PickEnemy(Run.currentFloor);
+
+            CurrentEnemy = MaybeMakeElite(CurrentEnemy);
 
             OnEnemyEncountered?.Invoke(CurrentEnemy);
             Log($"激戦2戦目: {CurrentEnemy.displayName}");
@@ -860,7 +943,9 @@ namespace GameLoop
         private void OpenTreasure()
         {
             int floor = Run.currentFloor;
-            int rawGold = floor * UnityEngine.Random.Range(2, 8); // 半減後: 1層:2-7 〜 6層:12-42
+            // 大幅ナーフ: 戦闘以外のゴールド源を絞る。宝箱の価値はアイテムへ移行。
+            // 1層:0-2 / 4層:0-5 / 6層:0-7（旧 floor×2-7 から約-85%）
+            int rawGold = UnityEngine.Random.Range(0, floor + 2);
             int gold = LastStand.FilterGoldGain(Run, rawGold);
             Run.coins += gold;
 
@@ -1025,21 +1110,14 @@ namespace GameLoop
 
         private void HandleFloorClear()
         {
-            // 5層クリア時: 「決意」所持なら6層挑戦に進む、なければランクリア確定
+            // 5層クリア時: 暫定的にフラグアイテム「決意」未所持でも常に6層へ突入
+            // （裏ボスの触感計測のため。本実装時は hasResolve ゲートを復活させる）
             if (Run.IsNormalClear && Run.currentFloor == Run.normalClearFloor)
             {
-                bool hasResolve = Run.ownedPassiveItems != null && Run.ownedPassiveItems.Contains("決意");
-                if (hasResolve)
-                {
-                    SetPhase(GamePhase.FloorClear);
-                    OnFloorAdvanced?.Invoke(Run.currentFloor + 1);
-                    Log($"フロア{Run.currentFloor}クリア → 決意により裏ボス挑戦へ");
-                    return;
-                }
-                Run.EndRun();
-                SetPhase(GamePhase.RunClear);
-                OnRunCleared?.Invoke(Run);
-                Log($"=== ランクリア！=== (Floor {Run.currentFloor})");
+                SetPhase(GamePhase.FloorClear);
+                OnFloorAdvanced?.Invoke(Run.currentFloor + 1);
+                Log($"フロア{Run.currentFloor}クリア → 6層突入（暫定: 決意フラグ不要）");
+                return;
             }
             else if (Run.IsFullClear)
             {
