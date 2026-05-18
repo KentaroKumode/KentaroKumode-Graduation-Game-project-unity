@@ -125,6 +125,24 @@ namespace InventorySystem.PassiveSkills
         /// <summary>残り敵パッシブ無効化ターン数。> 0 のとき FireEnemyTrigger をスキップ。各ターン末に減算。</summary>
         public int enemyPassivesDisabledTurns;
 
+        // ===== 消費アイテム由来（この1戦闘のみ。ctxは戦闘毎に生成→破棄で自動消去） =====
+        public int consAtkBurst;          // 次の勝利ターンで与ダメ+X（適用後0）
+        public int consDiceRoll;          // 勝敗判定のみ+X（ダメージには非加算）
+        public int consShield;            // 残シールド吸収量
+        public int consShieldExpireTurn;  // この番号を超えるターンで失効。-1=無制限/0=無
+        public int consRegen;             // 毎ターン終了時 +consRegen 回復し consRegen--
+        public int consCrit;              // 会心率+X(/9) 永続（毎ターン再適用）
+        public int consFlatReduce;        // 被ダメ定数-X 永続（毎ターン再適用）
+        public int consDmgMultPct;        // 与ダメ +X%
+        public bool consReflect;          // 被メインダメと同量を敵へ反射
+        public int consEnemyDiceDebuff;   // 敵ダイス合計 -X（毎ロール）
+        public bool gamblerArmed;         // 賭博師のダイス（ロール時に発火・消費）
+
+        // ===== 竜閃 =====
+        public bool rollPurity;           // 無我無心: カスタムダイス以外の補正を一切受けない（戦闘中持続）
+        public bool garyoProc;            // 画竜点睛: このターン発動したか（毎ターンリセット）
+        public int  garyoDieValue;        // 画竜点睛: 発動時の出目
+
         // ===== 刻印システム =====
         /// <summary>刻印による追加パッシブ効果（戦闘開始時に解決済み）</summary>
         public List<SigilBonus> activeSigilBonuses = new List<SigilBonus>();
@@ -195,6 +213,10 @@ namespace InventorySystem.PassiveSkills
 
             // 敵パッシブ無効化のターン残数を減算
             if (enemyPassivesDisabledTurns > 0) enemyPassivesDisabledTurns--;
+
+            // 画竜点睛は毎ターン判定（rollPurity は戦闘中持続なのでリセットしない）
+            garyoProc = false;
+            garyoDieValue = 0;
         }
 
         /// <summary>蓄積値を安全に取得（キーが無ければ0）</summary>

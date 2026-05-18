@@ -48,6 +48,23 @@
         { "internalName": "InsightI", "skillName": "心眼I", "description": "会心ダイス+1" }
       ]
     },
+    {
+      "id": "ryusen",
+      "name": "竜閃",
+      "description": "安定を捨て一閃に懸ける斬鉄の刀。最大の出目を引いた刹那、龍が天へ昇る。",
+      "category": "Weapon",
+      "rarity": "LEGENDARY",
+      "sizeX": 1,
+      "sizeY": 1,
+      "diceCount": 1,
+      "diceMax": 6,
+      "criticalRate": 0,
+      "basePrice": 300,
+      "passiveSkills": [
+        { "internalName": "GaryoTensei", "skillName": "画竜点睛", "description": "ダイスがその時点の最大値なら、ロール即勝利＋(出目+10)＋会心確定" },
+        { "internalName": "MugaMushin", "skillName": "無我無心", "description": "ロール時、カスタムダイス以外の補正（バフ/メタ/消費/武器強化等）を一切受けない" }
+      ]
+    },
 
     {
       "id": "shield_t1",
@@ -513,61 +530,56 @@
       ]
     },
 
-    {
-      "id": "magic_scroll",
-      "name": "魔法の巻物",
-      "description": "強力な魔法アイテム。マナ+50",
-      "category": "Consumable",
-      "rarity": "LEGENDARY",
-      "sizeX": 3,
-      "sizeY": 3,
-      "basePrice": 800,
-      "passiveSkills": [
-        { "internalName": "ManaAmplify", "skillName": "魔力増幅", "description": "魔法攻撃のダメージが15%上昇する" },
-        { "internalName": "ManaFlow", "skillName": "マナの奔流", "description": "魔法使用時、20%の確率でマナを消費しない" },
-        { "internalName": "AncientLore", "skillName": "古代の知識", "description": "獲得経験値が10%増加する" }
-      ]
-    },
-    {
-      "id": "minor_healing_potion",
-      "name": "小回復ポーション",
-      "description": "薄いピンク色の液体。HP+25回復。",
-      "category": "Consumable",
-      "rarity": "BRONZE",
-      "sizeX": 1,
-      "sizeY": 2,
-      "basePrice": 50
-    },
-    {
-      "id": "healing_potion",
-      "name": "回復ポーション",
-      "description": "濃いピンク色の液体。HP+50回復。",
-      "category": "Consumable",
-      "rarity": "SILVER",
-      "sizeX": 1,
-      "sizeY": 2,
-      "basePrice": 100
-    },
-    {
-      "id": "greater_healing_potion",
-      "name": "大回復ポーション",
-      "description": "深紅の液体。HP+100回復。",
-      "category": "Consumable",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 200
-    },
-    {
-      "id": "full_heal_elixir",
-      "name": "完全回復エリクサー",
-      "description": "神秘的な金色の液体。HPを完全回復する。",
-      "category": "Consumable",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 3,
-      "basePrice": 500
-    },
+    { "id": "cons_heal_1", "name": "小回復薬", "description": "最大HPの25%回復。", "category": "Consumable", "rarity": "BRONZE", "sizeX": 1, "sizeY": 1, "basePrice": 12 },
+    { "id": "cons_heal_2", "name": "回復薬", "description": "最大HPの50%回復。", "category": "Consumable", "rarity": "SILVER", "sizeX": 1, "sizeY": 1, "basePrice": 28 },
+    { "id": "cons_heal_3", "name": "上級回復薬", "description": "最大HPの75%回復。", "category": "Consumable", "rarity": "GOLD", "sizeX": 1, "sizeY": 1, "basePrice": 55 },
+    { "id": "cons_heal_4", "name": "完全回復薬", "description": "HPを完全回復する。", "category": "Consumable", "rarity": "LEGENDARY", "sizeX": 1, "sizeY": 1, "basePrice": 110 },
+
+    { "id": "cons_atk_1", "name": "力の丸薬", "description": "使用ターンの勝利時、与ダメージ+3。", "category": "Consumable", "rarity": "BRONZE", "sizeX": 1, "sizeY": 1, "basePrice": 12 },
+    { "id": "cons_atk_2", "name": "闘気の丸薬", "description": "使用ターンの勝利時、与ダメージ+6。", "category": "Consumable", "rarity": "SILVER", "sizeX": 1, "sizeY": 1, "basePrice": 28 },
+    { "id": "cons_atk_3", "name": "猛りの丸薬", "description": "使用ターンの勝利時、与ダメージ+9。", "category": "Consumable", "rarity": "GOLD", "sizeX": 1, "sizeY": 1, "basePrice": 55 },
+    { "id": "cons_atk_4", "name": "狂戦の丸薬", "description": "使用ターンの勝利時、与ダメージ+15。", "category": "Consumable", "rarity": "LEGENDARY", "sizeX": 1, "sizeY": 1, "basePrice": 110 },
+
+    { "id": "cons_dice_1", "name": "加重のダイス粉", "description": "戦闘中ずっとダイス合計+1（勝敗判定のみ・ダメージ非加算）。", "category": "Consumable", "rarity": "BRONZE", "sizeX": 1, "sizeY": 1, "basePrice": 12 },
+    { "id": "cons_dice_2", "name": "重心のダイス粉", "description": "戦闘中ずっとダイス合計+2（勝敗判定のみ・ダメージ非加算）。", "category": "Consumable", "rarity": "SILVER", "sizeX": 1, "sizeY": 1, "basePrice": 28 },
+    { "id": "cons_dice_3", "name": "天秤のダイス粉", "description": "戦闘中ずっとダイス合計+3（勝敗判定のみ・ダメージ非加算）。", "category": "Consumable", "rarity": "GOLD", "sizeX": 1, "sizeY": 1, "basePrice": 55 },
+    { "id": "cons_dice_4", "name": "神託のダイス粉", "description": "戦闘中ずっとダイス合計+4（勝敗判定のみ・ダメージ非加算）。", "category": "Consumable", "rarity": "LEGENDARY", "sizeX": 1, "sizeY": 1, "basePrice": 110 },
+
+    { "id": "cons_shield_1", "name": "木の護符", "description": "被ダメージを8吸収。2ターン後に消滅。", "category": "Consumable", "rarity": "BRONZE", "sizeX": 1, "sizeY": 1, "basePrice": 12 },
+    { "id": "cons_shield_2", "name": "鉄の護符", "description": "被ダメージを18吸収。4ターン後に消滅。", "category": "Consumable", "rarity": "SILVER", "sizeX": 1, "sizeY": 1, "basePrice": 28 },
+    { "id": "cons_shield_3", "name": "鋼の護符", "description": "被ダメージを35吸収。6ターン後に消滅。", "category": "Consumable", "rarity": "GOLD", "sizeX": 1, "sizeY": 1, "basePrice": 55 },
+    { "id": "cons_shield_4", "name": "聖盾の護符", "description": "被ダメージを50吸収。戦闘中持続。", "category": "Consumable", "rarity": "LEGENDARY", "sizeX": 1, "sizeY": 1, "basePrice": 120 },
+
+    { "id": "cons_regen_1", "name": "若葉の雫", "description": "戦闘中、毎ターン終了時に回復（5から毎ターン-1）。", "category": "Consumable", "rarity": "BRONZE", "sizeX": 1, "sizeY": 1, "basePrice": 12 },
+    { "id": "cons_regen_2", "name": "泉の雫", "description": "戦闘中、毎ターン終了時に回復（7から毎ターン-1）。", "category": "Consumable", "rarity": "SILVER", "sizeX": 1, "sizeY": 1, "basePrice": 28 },
+    { "id": "cons_regen_3", "name": "霊泉の雫", "description": "戦闘中、毎ターン終了時に回復（9から毎ターン-1）。", "category": "Consumable", "rarity": "GOLD", "sizeX": 1, "sizeY": 1, "basePrice": 55 },
+    { "id": "cons_regen_4", "name": "命の雫", "description": "戦闘中、毎ターン終了時に回復（12から毎ターン-1）。", "category": "Consumable", "rarity": "LEGENDARY", "sizeX": 1, "sizeY": 1, "basePrice": 110 },
+
+    { "id": "cons_crit_1", "name": "鷹の目薬", "description": "戦闘中ずっと会心率+1/9。", "category": "Consumable", "rarity": "BRONZE", "sizeX": 1, "sizeY": 1, "basePrice": 12 },
+    { "id": "cons_crit_2", "name": "鷲の目薬", "description": "戦闘中ずっと会心率+2/9。", "category": "Consumable", "rarity": "SILVER", "sizeX": 1, "sizeY": 1, "basePrice": 28 },
+    { "id": "cons_crit_3", "name": "隼の目薬", "description": "戦闘中ずっと会心率+3/9。", "category": "Consumable", "rarity": "GOLD", "sizeX": 1, "sizeY": 1, "basePrice": 55 },
+    { "id": "cons_crit_4", "name": "天眼の目薬", "description": "戦闘中ずっと会心率+4/9。", "category": "Consumable", "rarity": "LEGENDARY", "sizeX": 1, "sizeY": 1, "basePrice": 110 },
+
+    { "id": "cons_reduce_1", "name": "守りの軟膏", "description": "戦闘中ずっと被ダメージ毎ターン-1。", "category": "Consumable", "rarity": "BRONZE", "sizeX": 1, "sizeY": 1, "basePrice": 12 },
+    { "id": "cons_reduce_2", "name": "堅守の軟膏", "description": "戦闘中ずっと被ダメージ毎ターン-2。", "category": "Consumable", "rarity": "SILVER", "sizeX": 1, "sizeY": 1, "basePrice": 28 },
+    { "id": "cons_reduce_3", "name": "鉄壁の軟膏", "description": "戦闘中ずっと被ダメージ毎ターン-3。", "category": "Consumable", "rarity": "GOLD", "sizeX": 1, "sizeY": 1, "basePrice": 55 },
+    { "id": "cons_reduce_4", "name": "金剛の軟膏", "description": "戦闘中ずっと被ダメージ毎ターン-5。", "category": "Consumable", "rarity": "LEGENDARY", "sizeX": 1, "sizeY": 1, "basePrice": 110 },
+
+    { "id": "cons_food_1", "name": "干し肉", "description": "空腹度を25%回復。", "category": "Consumable", "rarity": "BRONZE", "sizeX": 1, "sizeY": 1, "basePrice": 10 },
+    { "id": "cons_food_2", "name": "携帯食", "description": "空腹度を50%回復。", "category": "Consumable", "rarity": "SILVER", "sizeX": 1, "sizeY": 1, "basePrice": 20 },
+    { "id": "cons_food_3", "name": "豪華な弁当", "description": "空腹度を75%回復。", "category": "Consumable", "rarity": "GOLD", "sizeX": 1, "sizeY": 1, "basePrice": 35 },
+    { "id": "cons_food_4", "name": "王侯の饗宴", "description": "空腹度を100%回復。", "category": "Consumable", "rarity": "LEGENDARY", "sizeX": 1, "sizeY": 1, "basePrice": 60 },
+
+    { "id": "uniq_phil_stone", "name": "賢者の石", "description": "10ゴールドを武器強化素材1に変換（このランで最大5回）。", "category": "Consumable", "rarity": "GOLD", "sizeX": 1, "sizeY": 1, "basePrice": 60 },
+    { "id": "uniq_forge_elixir", "name": "鍛冶の霊薬", "description": "武器強化レベル+1（素材不要・即時）。", "category": "Consumable", "rarity": "GOLD", "sizeX": 1, "sizeY": 1, "basePrice": 90 },
+    { "id": "uniq_mirror", "name": "鏡写しの水晶", "description": "次/この戦闘中、ロール敗北で受けたメインダメージと同量を敵に反射。", "category": "Consumable", "rarity": "LEGENDARY", "sizeX": 1, "sizeY": 1, "basePrice": 130 },
+    { "id": "uniq_gambler", "name": "賭博師のダイス", "description": "次/この戦闘、50%で自ダイス全て最大／50%で全て1。", "category": "Consumable", "rarity": "GOLD", "sizeX": 1, "sizeY": 1, "basePrice": 70 },
+    { "id": "uniq_ambush", "name": "奇襲の発煙筒", "description": "次戦闘、敵の開始HPを15%削った状態で開始。", "category": "Consumable", "rarity": "GOLD", "sizeX": 1, "sizeY": 1, "basePrice": 80 },
+    { "id": "uniq_food_horn", "name": "満腹の角笛", "description": "空腹度を全回復し、このフロアの空腹上限+5。", "category": "Consumable", "rarity": "SILVER", "sizeX": 1, "sizeY": 1, "basePrice": 45 },
+    { "id": "uniq_appraise", "name": "鑑定の眼鏡", "description": "次の宝箱／次のショップ在庫の最低レアをSILVER以上に保証。", "category": "Consumable", "rarity": "SILVER", "sizeX": 1, "sizeY": 1, "basePrice": 50 },
+    { "id": "uniq_merchant_bell", "name": "商人の鈴", "description": "次の1ショップ、全価格-50%。", "category": "Consumable", "rarity": "GOLD", "sizeX": 1, "sizeY": 1, "basePrice": 60 },
+    { "id": "uniq_oni_oil", "name": "鬼火の油", "description": "次/この戦闘中、与ダメージ+50%。", "category": "Consumable", "rarity": "LEGENDARY", "sizeX": 1, "sizeY": 1, "basePrice": 130 },
+    { "id": "uniq_earth_guard", "name": "鉄壁の土塊", "description": "次/この戦闘中、被ダメージ毎ターン-3。", "category": "Consumable", "rarity": "GOLD", "sizeX": 1, "sizeY": 1, "basePrice": 70 },
 
     {
       "id": "dice_wood",

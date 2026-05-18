@@ -392,11 +392,27 @@ namespace GameLoop
         }
 
         /// <summary>休憩で強化を選択（スタブ）</summary>
+        /// <summary>1段階の武器強化に必要な素材数（レベルが上がるほど高くなる）。</summary>
+        public static int WeaponUpgradeCost(int currentLevel) => 2 + currentLevel;
+
         public void RestUpgrade()
         {
             if (CurrentPhase != GamePhase.RestStop) return;
-            Log("休憩強化（未実装）");
-            SetPhase(GamePhase.MapNavigation);
+
+            int cost = WeaponUpgradeCost(Run.weaponUpgradeLevel);
+            if (Run.weaponMaterials >= cost)
+            {
+                Run.weaponMaterials -= cost;
+                Run.weaponUpgradeLevel++;
+                Log($"武器強化: Lv{Run.weaponUpgradeLevel} (素材-{cost}, 残{Run.weaponMaterials})");
+                SetPhase(GamePhase.MapNavigation);
+            }
+            else
+            {
+                // 素材不足なら休憩を無駄にせず回復にフォールバック
+                Log($"武器強化 素材不足 (必要{cost}/所持{Run.weaponMaterials}) → 回復に切替");
+                RestHeal();
+            }
         }
 
         /// <summary>フロアクリア確認→次フロアへ</summary>
@@ -881,7 +897,20 @@ namespace GameLoop
                 pool.Add(it);
             }
             if (pool.Count == 0) return null;
-            var picked = InventorySystem.RarityWeightedPicker.Pick(pool);
+
+            // 鑑定の眼鏡: 次の宝箱の最低レア保証（消費）。ショップで既消費なら -1。
+            CompleteItemData picked;
+            if (Run != null && Run.nextLootMinRarity >= 0)
+            {
+                var minR = (ItemRarity)Run.nextLootMinRarity;
+                Run.nextLootMinRarity = -1;
+                picked = InventorySystem.RarityWeightedPicker.Pick(pool, minR)
+                         ?? InventorySystem.RarityWeightedPicker.Pick(pool);
+            }
+            else
+            {
+                picked = InventorySystem.RarityWeightedPicker.Pick(pool);
+            }
             return picked?.internalName;
         }
 
@@ -1077,6 +1106,17 @@ namespace GameLoop
                 var d = ItemDatabase.Instance?.GetItem(Run.equippedDiceId);
                 if (d != null && d.diceFaces != null)
                     diceFaces = d.diceFaces;
+            }
+
+            // 武器強化レベル反映: Lvごとに diceMax+1、2Lvごとに diceCount+1。
+            // （カスタムダイス装備時は faces が面を上書きするため diceMax 分は無効だが、
+            //   diceCount 分は常に有効＝強化が無駄にならない）
+            int upLv = Run?.weaponUpgradeLevel ?? 0;
+            bool ryusen = Run != null && Run.equippedWeaponId == "ryusen";
+            if (upLv > 0 && !ryusen) // 竜閃(無我無心)は強化補正も受けない
+            {
+                diceMax += upLv;
+                diceCount += upLv / 2;
             }
 
             // 層デバフ適用

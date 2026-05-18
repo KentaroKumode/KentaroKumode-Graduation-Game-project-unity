@@ -123,49 +123,57 @@ namespace InventorySystem
         /// <returns>効果が適用された場合true</returns>
         private bool ApplySpecificItemEffect(string itemId, CombatManager combatManager)
         {
+            // 新消費アイテム体系（cons_* / uniq_*）は統一ルータへ。
+            // 戦闘中なら ctx 即時、戦闘外なら RunState pending に振り分けられる。
+            if (!string.IsNullOrEmpty(itemId)
+                && (itemId.StartsWith("cons_") || itemId.StartsWith("uniq_")))
+            {
+                var run = GameLoop.GameManager.Instance?.Run;
+                return GameLoop.Consumables.ApplyDirect(run, itemId);
+            }
+
             switch (itemId)
             {
                 case "magic_scroll":
-                    // 魔法の巻物: HP全回復 + 一時的MaxHP+10
+                    // 古びた治癒の巻物: HP全回復 + 一時的MaxHP+5
                     if (combatManager != null)
                     {
                         int currentHP = combatManager.PlayerHP;
                         int maxHP = combatManager.PlayerMaxHP;
-                        
+
                         // HP全回復
                         int healAmount = maxHP - currentHP;
                         if (healAmount > 0)
                         {
                             combatManager.HealPlayer(healAmount);
-                            Debug.Log($"[ItemUseHandler] 🧙‍♂️ Magic Scroll: Full heal ({healAmount} HP)");
+                            Debug.Log($"[ItemUseHandler] 🧙‍♂️ 治癒の巻物: Full heal ({healAmount} HP)");
                         }
-                        
+
                         // 一時的MaxHP増加（戦闘中のみ）
                         if (combatManager.IsCombatActive)
                         {
-                            combatManager.BoostPlayerMaxHP(10);
-                            Debug.Log("[ItemUseHandler] 🧙‍♂️ Magic Scroll: MaxHP boosted (+10)");
+                            combatManager.BoostPlayerMaxHP(5);
+                            Debug.Log("[ItemUseHandler] 🧙‍♂️ 治癒の巻物: MaxHP boosted (+5)");
                         }
                     }
                     return true;
 
-                // 今後のアイテム追加用
                 case "healing_potion":
-                    // HP回復ポーション: HP+50
-                    combatManager?.HealPlayer(50);
-                    Debug.Log("[ItemUseHandler] 🧪 Healing Potion: Restored 50 HP");
+                    // 回復ポーション: HP+18
+                    combatManager?.HealPlayer(18);
+                    Debug.Log("[ItemUseHandler] 🧪 Healing Potion: Restored 18 HP");
                     return true;
 
                 case "minor_healing_potion":
-                    // 小回復ポーション: HP+25
-                    combatManager?.HealPlayer(25);
-                    Debug.Log("[ItemUseHandler] 🧪 Minor Healing Potion: Restored 25 HP");
+                    // 小回復ポーション: HP+8
+                    combatManager?.HealPlayer(8);
+                    Debug.Log("[ItemUseHandler] 🧪 Minor Healing Potion: Restored 8 HP");
                     return true;
 
                 case "greater_healing_potion":
-                    // 大回復ポーション: HP+100
-                    combatManager?.HealPlayer(100);
-                    Debug.Log("[ItemUseHandler] 🧪 Greater Healing Potion: Restored 100 HP");
+                    // 大回復ポーション: HP+35
+                    combatManager?.HealPlayer(35);
+                    Debug.Log("[ItemUseHandler] 🧪 Greater Healing Potion: Restored 35 HP");
                     return true;
 
                 case "full_heal_elixir":

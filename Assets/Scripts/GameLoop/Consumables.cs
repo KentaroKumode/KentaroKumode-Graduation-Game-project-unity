@@ -1,0 +1,290 @@
+using UnityEngine;
+using CombatSystem;
+using InventorySystem;
+using InventorySystem.PassiveSkills;
+
+namespace GameLoop
+{
+    /// <summary>
+    /// RunState に対する消費アイテム使用処理（マップ進行モデル / 戦闘内 両対応）。
+    ///
+    /// ・戦闘外で使用 → 即時系はその場適用、戦闘バフ系は RunState.pending* に保持
+    ///   （次戦闘開始時に CombatManager が ctx へコピー）。
+    /// ・戦闘中で使用 → 戦闘バフ系は現在の CombatContext へ即時書き込み（使用ターンから発動）。
+    /// 戦闘終了で ctx は破棄されるため効果は自動消滅。
+    ///
+    /// id 体系: cons_<family>_<tier1-4> / uniq_<name>
+    /// </summary>
+    public static class Consumables
+    {
+        private static CombatContext ActiveCtx()
+        {
+            var cm = CombatManager.Instance;
+            if (cm == null || !cm.IsCombatActive) return null;
+            return PassiveSkillManager.Instance?.Context;
+        }
+
+        /// <summary>所持から id を1つ消費し効果適用。意味があった場合 true。</summary>
+        public static bool Use(RunState run, string id)
+        {
+            if (run == null || string.IsNullOrEmpty(id)) return false;
+            if (run.ownedConsumables == null || !run.ownedConsumables.Contains(id)) return false;
+
+            bool ok = Apply(run, id);
+            if (ok)
+            {
+                run.ownedConsumables.Remove(id);
+                Debug.Log($"[Consumables] 使用: {id}");
+            }
+            return ok;
+        }
+
+        /// <summary>所持リストを介さず効果のみ適用（UI/グリッド経路用。削除はグリッド側が行う）。</summary>
+        public static bool ApplyDirect(RunState run, string id)
+            => run != null && !string.IsNullOrEmpty(id) && Apply(run, id);
+
+        /// <summary>効果適用本体（リスト削除はしない）。</summary>
+        private static bool Apply(RunState run, string id)
+        {
+            var ctx = ActiveCtx();
+
+            switch (id)
+            {
+                // ===== 即時回復: 最大HPの割合（戦闘中はctx、外はrun） =====
+                case "cons_heal_1": return HealPct(run, ctx, 0.25f);
+                case "cons_heal_2": return HealPct(run, ctx, 0.50f);
+                case "cons_heal_3": return HealPct(run, ctx, 0.75f);
+                case "cons_heal_4": return HealPct(run, ctx, 1.00f);
+
+                // ===== 攻撃力: 使用ターンの勝利時に与ダメ+X（単発） =====
+                case "cons_atk_1": return SetBurst(run, ctx, 3);
+                case "cons_atk_2": return SetBurst(run, ctx, 6);
+                case "cons_atk_3": return SetBurst(run, ctx, 9);
+                case "cons_atk_4": return SetBurst(run, ctx, 15);
+
+                // ===== ダイス補正: 勝敗のみ+X（ダメージ非加算・全戦闘持続） =====
+                case "cons_dice_1": return AddInt(run, ctx, "dice", 1);
+                case "cons_dice_2": return AddInt(run, ctx, "dice", 2);
+                case "cons_dice_3": return AddInt(run, ctx, "dice", 3);
+                case "cons_dice_4": return AddInt(run, ctx, "dice", 4);
+
+                // ===== シールド: 吸収量 / 残ターン(-1=無制限) =====
+                case "cons_shield_1": return SetShield(run, ctx, 8, 2);
+                case "cons_shield_2": return SetShield(run, ctx, 18, 4);
+                case "cons_shield_3": return SetShield(run, ctx, 35, 6);
+                case "cons_shield_4": return SetShield(run, ctx, 50, -1);
+
+                // ===== 継続回復: 初期X、毎ターン終了時+X→X-- =====
+                case "cons_regen_1": return SetRegen(run, ctx, 5);
+                case "cons_regen_2": return SetRegen(run, ctx, 7);
+                case "cons_regen_3": return SetRegen(run, ctx, 9);
+                case "cons_regen_4": return SetRegen(run, ctx, 12);
+
+                // ===== 会心率+X(/9)（全戦闘持続） =====
+                case "cons_crit_1": return AddInt(run, ctx, "crit", 1);
+                case "cons_crit_2": return AddInt(run, ctx, "crit", 2);
+                case "cons_crit_3": return AddInt(run, ctx, "crit", 3);
+                case "cons_crit_4": return AddInt(run, ctx, "crit", 4);
+
+                // ===== 定数軽減: 被ダメ毎ターン-X（全戦闘持続） =====
+                case "cons_reduce_1": return AddInt(run, ctx, "reduce", 1);
+                case "cons_reduce_2": return AddInt(run, ctx, "reduce", 2);
+                case "cons_reduce_3": return AddInt(run, ctx, "reduce", 3);
+                case "cons_reduce_4": return AddInt(run, ctx, "reduce", 5);
+
+                // ===== 燃費: 空腹度を割合回復（戦闘外専用） =====
+                case "cons_food_1": return RestoreHunger(0.25f);
+                case "cons_food_2": return RestoreHunger(0.50f);
+                case "cons_food_3": return RestoreHunger(0.75f);
+                case "cons_food_4": return RestoreHunger(1.00f);
+
+                // ===== ユニーク =====
+                case "uniq_phil_stone":  // 賢者の石: 10G→素材1（最大5回/ラン）
+                {
+                    if (run.philStoneUsed >= 5 || run.coins < 10) return false;
+                    run.coins -= 10; run.weaponMaterials++; run.philStoneUsed++;
+                    return true;
+                }
+                case "uniq_forge_elixir": // 鍛冶の霊薬: 武器強化Lv+1（素材不要）
+                    run.weaponUpgradeLevel++;
+                    return true;
+                case "uniq_mirror":       // 鏡写しの水晶: 被メインダメ反射（全戦闘）
+                    return SetBool(run, ctx, "reflect");
+                case "uniq_gambler":      // 賭博師のダイス: 50%全最大/50%全1
+                    return SetBool(run, ctx, "gambler");
+                case "uniq_ambush":       // 奇襲の発煙筒: 敵開始HP-15%（戦闘開始時のみ）
+                    if (ctx != null)
+                    {
+                        int cut = Mathf.CeilToInt(ctx.enemyMaxHP * 0.15f);
+                        ctx.enemyCurrentHP = Mathf.Max(1, ctx.enemyCurrentHP - cut);
+                        return true;
+                    }
+                    run.pendingEnemyStartHpCutPct = 15; return true;
+                case "uniq_food_horn":    // 満腹の角笛: 空腹全回復＋このフロア上限+5
+                {
+                    var h = MapSystem.MapManager.Instance?.Hunger;
+                    if (h == null) return false;
+                    h.Initialize(h.Max + 5);
+                    return true;
+                }
+                case "uniq_appraise":     // 鑑定の眼鏡: 次の宝箱/ショップ最低レアSILVER
+                    run.nextLootMinRarity = (int)ItemRarity.SILVER;
+                    return true;
+                case "uniq_merchant_bell":// 商人の鈴: 次ショップ全価格半額
+                    run.nextShopHalfPrice = true;
+                    return true;
+                case "uniq_oni_oil":      // 鬼火の油: 与ダメ+50%（全戦闘）
+                    return AddInt(run, ctx, "dmgmult", 50);
+                case "uniq_earth_guard":  // 鉄壁の土塊: 被ダメ毎ターン-3（全戦闘）
+                    return AddInt(run, ctx, "reduce", 3);
+
+                default:
+                    return false;
+            }
+        }
+
+        // ===== 効果適用ヘルパー =====
+
+        private static bool HealPct(RunState run, CombatContext ctx, float pct)
+        {
+            if (run.lastStandActive) return false;
+            if (ctx != null)
+            {
+                var cm = CombatManager.Instance;
+                if (cm == null || cm.PlayerHP >= cm.PlayerMaxHP) return false;
+                int amt = Mathf.CeilToInt(cm.PlayerMaxHP * pct);
+                cm.HealPlayer(amt);   // playerHP/ctx 双方を更新
+                return true;
+            }
+            if (run.playerHP >= run.playerMaxHP) return false;
+            int a = Mathf.CeilToInt(run.playerMaxHP * pct);
+            run.playerHP = Mathf.Min(run.playerMaxHP, run.playerHP + a);
+            return true;
+        }
+
+        private static bool SetBurst(RunState run, CombatContext ctx, int x)
+        {
+            if (ctx != null) ctx.consAtkBurst = Mathf.Max(ctx.consAtkBurst, x);
+            else run.pendingConsAtkBurst = Mathf.Max(run.pendingConsAtkBurst, x);
+            return true;
+        }
+
+        private static bool SetShield(RunState run, CombatContext ctx, int amt, int turns)
+        {
+            if (ctx != null) { ctx.consShield = amt; ctx.consShieldExpireTurn = turns; }
+            else { run.pendingConsShield = amt; run.pendingConsShieldTurns = turns; }
+            return true;
+        }
+
+        private static bool SetRegen(RunState run, CombatContext ctx, int x)
+        {
+            if (ctx != null) ctx.consRegen = Mathf.Max(ctx.consRegen, x);
+            else run.pendingConsRegen = Mathf.Max(run.pendingConsRegen, x);
+            return true;
+        }
+
+        private static bool AddInt(RunState run, CombatContext ctx, string kind, int v)
+        {
+            if (ctx != null)
+            {
+                switch (kind)
+                {
+                    case "dice":    ctx.consDiceRoll += v; break;
+                    case "crit":    ctx.consCrit += v; break;
+                    case "reduce":  ctx.consFlatReduce += v; break;
+                    case "dmgmult": ctx.consDmgMultPct += v; break;
+                }
+            }
+            else
+            {
+                switch (kind)
+                {
+                    case "dice":    run.pendingConsDiceRoll += v; break;
+                    case "crit":    run.pendingConsCrit += v; break;
+                    case "reduce":  run.pendingConsFlatReduce += v; break;
+                    case "dmgmult": run.pendingConsDmgMultPct += v; break;
+                }
+            }
+            return true;
+        }
+
+        private static bool SetBool(RunState run, CombatContext ctx, string kind)
+        {
+            if (ctx != null)
+            {
+                if (kind == "reflect") ctx.consReflect = true;
+                else if (kind == "gambler") ctx.gamblerArmed = true;
+            }
+            else
+            {
+                if (kind == "reflect") run.pendingConsReflect = true;
+                else if (kind == "gambler") run.pendingGamblerDice = true;
+            }
+            return true;
+        }
+
+        private static bool RestoreHunger(float pct)
+        {
+            var h = MapSystem.MapManager.Instance?.Hunger;
+            if (h == null) return false;
+            int amt = Mathf.CeilToInt(h.Max * pct);
+            h.Restore(amt);
+            return true;
+        }
+
+        // ===== ボット支援: 種別判定 =====
+
+        /// <summary>戦闘開始直後に使うべきバフ系（攻撃/ダイス/シールド/会心/軽減/継続/鬼火/反射/賭博/奇襲）か。</summary>
+        public static bool IsCombatBuff(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return false;
+            return id.StartsWith("cons_atk_") || id.StartsWith("cons_dice_")
+                || id.StartsWith("cons_shield_") || id.StartsWith("cons_regen_")
+                || id.StartsWith("cons_crit_") || id.StartsWith("cons_reduce_")
+                || id == "uniq_mirror" || id == "uniq_gambler" || id == "uniq_ambush"
+                || id == "uniq_oni_oil" || id == "uniq_earth_guard";
+        }
+
+        /// <summary>緊急回復に使える即時回復系か。</summary>
+        public static bool IsHeal(string id) => !string.IsNullOrEmpty(id) && id.StartsWith("cons_heal_");
+
+        /// <summary>id の即時回復割合（heal系以外は0）。</summary>
+        public static float HealRatio(string id)
+        {
+            switch (id)
+            {
+                case "cons_heal_1": return 0.25f;
+                case "cons_heal_2": return 0.50f;
+                case "cons_heal_3": return 0.75f;
+                case "cons_heal_4": return 1.00f;
+                default: return 0f;
+            }
+        }
+
+        /// <summary>
+        /// HP割合が urgencyRatio 以下なら、不足分を最も無駄なく埋める即時回復を1個使う。
+        /// 過剰回復を避け、不足を満たせない場合は最大の回復を使う。使ったら true。
+        /// </summary>
+        public static bool TryUseBestHeal(RunState run, float urgencyRatio)
+        {
+            if (run?.ownedConsumables == null || run.ownedConsumables.Count == 0) return false;
+            if (run.lastStandActive || run.playerMaxHP <= 0) return false;
+
+            float ratio = (float)run.playerHP / run.playerMaxHP;
+            if (ratio > urgencyRatio || ratio >= 1f) return false;
+
+            float missingFrac = 1f - ratio;
+            string bestCover = null; float bestCoverR = 99f;
+            string bestAny = null;   float bestAnyR = -1f;
+            foreach (var id in run.ownedConsumables)
+            {
+                float r = HealRatio(id);
+                if (r <= 0f) continue;
+                if (r >= missingFrac && r < bestCoverR) { bestCover = id; bestCoverR = r; }
+                if (r > bestAnyR) { bestAny = id; bestAnyR = r; }
+            }
+            string pick = bestCover ?? bestAny;
+            return pick != null && Use(run, pick);
+        }
+    }
+}

@@ -354,6 +354,33 @@ namespace CombatSystem
                 ctx.equippedDiceFaces = equippedDiceFaces;
             }
 
+            // 消費アイテム: マップで使用した「次戦闘バフ」を ctx へコピーし RunState 側をクリア
+            if (ctx != null)
+            {
+                var rs = GameLoop.GameManager.Instance?.Run;
+                if (rs != null)
+                {
+                    ctx.consAtkBurst        = rs.pendingConsAtkBurst;
+                    ctx.consDiceRoll        = rs.pendingConsDiceRoll;
+                    ctx.consShield          = rs.pendingConsShield;
+                    ctx.consShieldExpireTurn= rs.pendingConsShieldTurns;
+                    ctx.consRegen           = rs.pendingConsRegen;
+                    ctx.consCrit            = rs.pendingConsCrit;
+                    ctx.consFlatReduce      = rs.pendingConsFlatReduce;
+                    ctx.consDmgMultPct      = rs.pendingConsDmgMultPct;
+                    ctx.consReflect         = rs.pendingConsReflect;
+                    ctx.consEnemyDiceDebuff = rs.pendingConsEnemyDiceDebuff;
+                    ctx.gamblerArmed        = rs.pendingGamblerDice;
+                    if (rs.pendingEnemyStartHpCutPct > 0)
+                    {
+                        int cut = Mathf.CeilToInt(enemy.maxHP * rs.pendingEnemyStartHpCutPct / 100f);
+                        enemyHP = Math.Max(1, enemyHP - cut);
+                        Debug.Log($"[CombatManager] 奇襲: 敵開始HP-{cut} ({enemyHP}/{enemy.maxHP})");
+                    }
+                    rs.ClearPendingCombatConsumables();
+                }
+            }
+
             // 魔王の威圧 等の戦闘開始時スキル処理
             psm.FireTrigger(PassiveSkillTrigger.OnBattleStart);
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnBattleStart);
@@ -442,6 +469,14 @@ namespace CombatSystem
             rollLossMainDamage = 0;
 
             psm.BeginTurn();
+
+            // 消費アイテム持続効果の毎ターン再適用（BeginNewTurn でリセットされるため）
+            if (ctx != null)
+            {
+                if (ctx.consCrit > 0) ctx.criticalBonus += ctx.consCrit;
+                if (ctx.consFlatReduce > 0) ctx.playerFlatDamageReduction += ctx.consFlatReduce;
+            }
+
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnTurnStart);
 
             // 敵側のターン開始処理を反映（再生、夜の王 等）
@@ -489,6 +524,7 @@ namespace CombatSystem
                 && MapSystem.MapManager.Instance?.CurrentNode != null
                 && MapSystem.MapManager.Instance.CurrentNode.type == MapSystem.TileType.Boss
                 && run.permanentDebuffs.Contains("影の代償")
+                && !ctx.rollPurity
                 && UnityEngine.Random.value < 0.5f)
             {
                 for (int i = 0; i < playerDice.Length; i++)
@@ -508,7 +544,7 @@ namespace CombatSystem
                 ctx, GameLoop.GameManager.Instance?.Run, this);
 
             // 恒久デバフ「コルヴェンの憤怒」: ボス戦1T目に自ダイスを全て最大値化
-            if (wrathDiceOverrideArmed && ctx.currentTurn == 1)
+            if (!ctx.rollPurity && wrathDiceOverrideArmed && ctx.currentTurn == 1)
             {
                 for (int i = 0; i < playerDice.Length; i++) playerDice[i] = playerDiceMax;
                 wrathDiceOverrideArmed = false;
@@ -516,7 +552,7 @@ namespace CombatSystem
             }
 
             // メタバフ: ダイス合計値補正（一番低いダイスから +1 を順次振り分け、各ダイスは playerDiceMax 上限）
-            int metaDiceBonus = MetaProgression.MetaBuffApplicator.GetDiceTotalBonus();
+            int metaDiceBonus = ctx.rollPurity ? 0 : MetaProgression.MetaBuffApplicator.GetDiceTotalBonus();
             int safety = metaDiceBonus * playerDice.Length;
             while (metaDiceBonus > 0 && safety-- > 0)
             {
@@ -588,6 +624,14 @@ namespace CombatSystem
                     var (totalDmg, fixedDmg, isCrit) = psm.ProcessDamage(
                         mainDmg, pursuitDmg, playerCriticalNumerator);
 
+                    // 画竜点睛: ダメージ＝(出目+10)×会心倍率、会心確定
+                    if (ctx.garyoProc)
+                    {
+                        totalDmg = Mathf.CeilToInt((ctx.garyoDieValue + 10) * ctx.criticalMultiplier);
+                        isCrit = true;
+                        Debug.Log($"[画竜点睛] 確定会心 {totalDmg} ダメ (出目{ctx.garyoDieValue}+10 ×{ctx.criticalMultiplier})");
+                    }
+
                     // 与ダメ倍率（激情の刃 等のパッシブ由来）
                     if (ctx.outgoingDamageMultiplier > 0f
                         && Mathf.Abs(ctx.outgoingDamageMultiplier - 1f) > 0.001f)
@@ -595,6 +639,18 @@ namespace CombatSystem
                         int orig = totalDmg;
                         totalDmg = Mathf.CeilToInt(totalDmg * ctx.outgoingDamageMultiplier);
                         Debug.Log($"[CombatManager] 与ダメ補正 ×{ctx.outgoingDamageMultiplier:F2}: {orig}→{totalDmg}");
+                    }
+
+                    // 消費: 鬼火の油 与ダメ+X%（全戦闘）
+                    if (ctx.consDmgMultPct > 0 && totalDmg > 0)
+                        totalDmg += Mathf.CeilToInt(totalDmg * ctx.consDmgMultPct / 100f);
+
+                    // 消費: 攻撃力バースト（この勝利ターンのみ・単発消費）
+                    if (ctx.consAtkBurst > 0)
+                    {
+                        totalDmg += ctx.consAtkBurst;
+                        Debug.Log($"[CombatManager] 攻撃バースト +{ctx.consAtkBurst}");
+                        ctx.consAtkBurst = 0;
                     }
 
                     // メタバフ: 会心時の追加補正
@@ -725,6 +781,23 @@ namespace CombatSystem
                     }
 
                     // ラストスタンド用: 純粋なロール敗北メインダメ
+                    // 消費: シールド吸収（残量から差し引き）
+                    if (ctx.consShield > 0 && totalDmg > 0)
+                    {
+                        int absorbed = Math.Min(ctx.consShield, totalDmg);
+                        ctx.consShield -= absorbed;
+                        totalDmg -= absorbed;
+                        Debug.Log($"[CombatManager] シールド吸収 {absorbed} (残{ctx.consShield})");
+                    }
+
+                    // 消費: 鏡写しの水晶（吸収後の実被ダメと同量を敵へ反射）
+                    if (ctx.consReflect && totalDmg > 0)
+                    {
+                        enemyHP = Math.Max(0, enemyHP - totalDmg);
+                        Debug.Log($"[CombatManager] 鏡写し反射 {totalDmg} → 敵HP {enemyHP}");
+                    }
+
+                    // ラストスタンド用: 純粋なロール敗北メインダメ（シールド適用後）
                     rollLossMainDamage = totalDmg;
 
                     // プレイヤーにダメージ適用（メイン＋敵→プレイヤー固定）
@@ -814,6 +887,29 @@ namespace CombatSystem
                 playerHP = Math.Max(0, playerHP - dmg);
                 ctx.playerCurrentHP = playerHP;
                 Debug.Log($"[CombatManager] カルマの呪い: HP-{dmg} (現在 {playerHP}/{playerMaxHP})");
+            }
+
+            // 消費: 継続回復（毎ターン終了時 +consRegen → consRegen--）。LS中は無効。
+            {
+                var crRun = GameLoop.GameManager.Instance?.Run;
+                bool ls = crRun != null && crRun.lastStandActive;
+                if (ctx.consRegen > 0 && playerHP > 0 && !ls)
+                {
+                    int heal = Math.Min(playerMaxHP - playerHP, ctx.consRegen);
+                    if (heal > 0) { playerHP += heal; ctx.playerCurrentHP = playerHP; }
+                    Debug.Log($"[CombatManager] 継続回復 +{heal} (次T {ctx.consRegen - 1})");
+                    ctx.consRegen--;
+                }
+            }
+            // 消費: シールド残ターン減算（-1=無制限 / 0で失効）
+            if (ctx.consShieldExpireTurn > 0)
+            {
+                ctx.consShieldExpireTurn--;
+                if (ctx.consShieldExpireTurn == 0)
+                {
+                    ctx.consShield = 0;
+                    Debug.Log("[CombatManager] シールド失効");
+                }
             }
 
             // ラストスタンド: 発動中はロール敗北メインダメ以外を巻き戻し（scratch/固定ダメ/敵パッシブ由来等を全て無効化）

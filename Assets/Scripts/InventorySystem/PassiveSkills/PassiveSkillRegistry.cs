@@ -145,6 +145,10 @@ namespace InventorySystem.PassiveSkills
             Register(new Starguide());
             Register(new Judgement());
 
+            // 竜閃（ユニーク武器）
+            Register(new MugaMushin());
+            Register(new GaryoTensei());
+
             // ============================
             //  敵専用スキル
             // ============================

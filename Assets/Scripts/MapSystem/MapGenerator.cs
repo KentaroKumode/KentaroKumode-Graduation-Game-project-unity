@@ -177,7 +177,42 @@ namespace MapSystem
                 }
             }
 
+            // ショップ確定出現: 上下3行を除いた中央行(4〜6)のランダムマスを
+            // 1〜3個 Shop へ強制置換（接続トポロジは不変＝type だけ差し替え）
+            ForceInjectShops(map);
+
             return map;
+        }
+
+        /// <summary>中央行(4〜lastRandomRow-1)からランダムに1〜3マスを Shop に強制置換。</summary>
+        private static void ForceInjectShops(FloorMap map)
+        {
+            int firstCentral = 4;
+            int lastCentral = (RowCount - 3) - 1; // RowCount=10 → 6
+            if (lastCentral < firstCentral) lastCentral = firstCentral;
+
+            var cells = new List<MapNode>();
+            for (int row = firstCentral; row <= lastCentral; row++)
+                for (int lane = 0; lane < LaneCount; lane++)
+                {
+                    var n = map.GetNode(NodeId(row, lane));
+                    if (n != null) cells.Add(n);
+                }
+            if (cells.Count == 0) return;
+
+            // Fisher-Yates シャッフル
+            for (int i = cells.Count - 1; i > 0; i--)
+            {
+                int j = Random.Range(0, i + 1);
+                (cells[i], cells[j]) = (cells[j], cells[i]);
+            }
+
+            int n2 = Mathf.Min(cells.Count, Random.Range(1, 4)); // 1〜3
+            for (int k = 0; k < n2; k++)
+            {
+                cells[k].type = TileType.Shop;
+                cells[k].resolvedType = null; // EffectiveType が Shop を返すように
+            }
         }
 
         // ================================================================

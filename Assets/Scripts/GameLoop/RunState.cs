@@ -84,6 +84,41 @@ namespace GameLoop
         /// <summary>装備中のダイスアイテムID（空=武器ダイス使用）。取得時に Loadout.TryAutoEquip で更新。</summary>
         public string equippedDiceId = "";
 
+        /// <summary>武器強化レベル。休憩マスで weaponMaterials を消費して上昇。戦闘値に反映。</summary>
+        public int weaponUpgradeLevel;
+
+        // === 消費アイテム: 次戦闘へ持ち越すバフ（マップ上で使用した場合） ===
+        // 戦闘中に使用した場合は CombatContext へ直接書き込まれるため、これらは使われない。
+        // 戦闘開始時に CombatContext へコピーされ、ここはクリアされる（1戦のみ）。
+        public int  pendingConsAtkBurst;       // 攻撃力: 次戦闘の最初の勝利ターンに与ダメ+X
+        public int  pendingConsDiceRoll;       // ダイス補正: 勝敗判定のみ+X（ダメージ非加算）
+        public int  pendingConsShield;         // シールド吸収量
+        public int  pendingConsShieldTurns;    // シールド持続(>0)/無制限(-1)/無(0)
+        public int  pendingConsRegen;          // 継続回復: 初期値X（毎T後X回復しX-1）
+        public int  pendingConsCrit;           // 会心率+X(/9)
+        public int  pendingConsFlatReduce;     // 被ダメ毎ターン定数-X
+        public int  pendingConsDmgMultPct;     // 与ダメ+X%（鬼火の油: 50）
+        public bool pendingConsReflect;        // 鏡写し: 被メインダメを敵に反射
+        public int  pendingConsEnemyDiceDebuff;// 敵弱体: 敵ダイス合計-X
+        public int  pendingEnemyStartHpCutPct; // 奇襲: 敵開始HP-X%
+        public bool pendingGamblerDice;        // 賭博師: 50%全最大/50%全1
+
+        // === 消費アイテム: 戦闘外ユーティリティ用フラグ/カウンタ ===
+        public int  nextLootMinRarity = -1;    // 鑑定の眼鏡: 次の宝箱/ショップ最低レア(ItemRarity int)。-1=無
+        public bool nextShopHalfPrice;         // 商人の鈴: 次ショップ全価格半額
+        public int  philStoneUsed;             // 賢者の石: このランでの使用回数(最大5)
+
+        /// <summary>次戦闘持ち越しバフをすべて消去（戦闘開始時にコピー後 or リセット時）。</summary>
+        public void ClearPendingCombatConsumables()
+        {
+            pendingConsAtkBurst = 0; pendingConsDiceRoll = 0;
+            pendingConsShield = 0; pendingConsShieldTurns = 0;
+            pendingConsRegen = 0; pendingConsCrit = 0;
+            pendingConsFlatReduce = 0; pendingConsDmgMultPct = 0;
+            pendingConsReflect = false; pendingConsEnemyDiceDebuff = 0;
+            pendingEnemyStartHpCutPct = 0; pendingGamblerDice = false;
+        }
+
         // === 時限バフ・デバフ用ヘルパー ===
 
         public bool HasTimedBuff(string id)
@@ -124,6 +159,11 @@ namespace GameLoop
             lastStandActive = false;
             equippedWeaponId = "";
             equippedDiceId = "";
+            weaponUpgradeLevel = 0;
+            ClearPendingCombatConsumables();
+            nextLootMinRarity = -1;
+            nextShopHalfPrice = false;
+            philStoneUsed = 0;
         }
 
         /// <summary>戦闘結果を反映</summary>

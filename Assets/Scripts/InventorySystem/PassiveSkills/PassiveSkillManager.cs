@@ -409,6 +409,16 @@ namespace InventorySystem.PassiveSkills
             context.playerDice = playerDice;
             context.enemyDice = enemyDice;
 
+            // 消費: 賭博師のダイス（50%で全最大 / 50%で全1・消費）
+            if (context.gamblerArmed)
+            {
+                int pm = context.playerDiceMax > 0 ? context.playerDiceMax : 6;
+                int v = UnityEngine.Random.value < 0.5f ? pm : 1;
+                for (int i = 0; i < playerDice.Length; i++) playerDice[i] = v;
+                context.gamblerArmed = false;
+                UnityEngine.Debug.Log($"[Consumables] 賭博師のダイス: 全ダイス→{v}");
+            }
+
             // 敵ダイスへの制約適用（処刑/正義への妄執）
             ApplyDiceOverrides(enemyDice);
 
@@ -416,8 +426,9 @@ namespace InventorySystem.PassiveSkills
             context.playerDiceTotal = Sum(playerDice);
             context.enemyDiceTotal = Sum(enemyDice);
 
-            // バフによるダイスボーナス適用
-            context.playerDiceTotal += (int)context.GetBuff("diceBonus");
+            // バフによるダイスボーナス適用（無我無心: カスタムダイス以外の補正を拒否）
+            if (!context.rollPurity)
+                context.playerDiceTotal += (int)context.GetBuff("diceBonus");
 
             // 敵ダイスデバフ適用（正義への妄執など）
             int enemyDebuff = (int)context.GetBuff("enemyDiceDebuff");
@@ -426,15 +437,27 @@ namespace InventorySystem.PassiveSkills
                 context.enemyDiceTotal = System.Math.Max(0, context.enemyDiceTotal - enemyDebuff);
             }
 
+            // 消費: 敵弱体（敵ダイス合計-X・全戦闘）
+            if (context.consEnemyDiceDebuff > 0)
+                context.enemyDiceTotal = System.Math.Max(0, context.enemyDiceTotal - context.consEnemyDiceDebuff);
+
             // パッシブスキル実行（OnPostRoll）
             FireTrigger(PassiveSkillTrigger.OnPostRoll);
 
-            // ダイス差計算
+            // ダイス差計算（ダメージ算出はこの raw 差を使う）
             context.diceDifference = context.playerDiceTotal - context.enemyDiceTotal;
 
-            // 勝敗判定
-            context.playerWonRoll = context.diceDifference > 0;
-            context.playerLostRoll = context.diceDifference < 0;
+            // 勝敗判定（消費「ダイス補正」は勝敗のみ＝ダメージ非加算。無我無心中は無効）
+            int effDiff = context.diceDifference + (context.rollPurity ? 0 : context.consDiceRoll);
+            context.playerWonRoll = effDiff > 0;
+            context.playerLostRoll = effDiff < 0;
+
+            // 画竜点睛: 発動ターンはロール即勝利（敗北/引分を上書き）
+            if (context.garyoProc)
+            {
+                context.playerWonRoll = true;
+                context.playerLostRoll = false;
+            }
 
             // 勝敗トリガー発火
             if (context.playerWonRoll)

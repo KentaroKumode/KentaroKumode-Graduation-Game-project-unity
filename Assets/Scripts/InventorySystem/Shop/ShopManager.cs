@@ -61,6 +61,9 @@ namespace InventorySystem.Shop
         //  在庫生成
         // ============================================================
 
+        /// <summary>鑑定の眼鏡: この入店中の最低レア保証（null=無）。</summary>
+        private ItemRarity? _apprMinRarity;
+
         /// <summary>ショップマス入店時に在庫を生成。</summary>
         public ShopInventory Generate(int floor)
         {
@@ -79,19 +82,37 @@ namespace InventorySystem.Shop
                 Debug.Log("[ShopManager] 商人の符牒適用: 価格半額");
             }
 
-            // パッシブ ×2
-            for (int i = 0; i < 2; i++)
+            // 消費: 商人の鈴（次ショップ全価格半額）/ 鑑定の眼鏡（最低レア保証）
+            var rsCons = GameLoop.GameManager.Instance?.Run;
+            if (rsCons != null && rsCons.nextShopHalfPrice)
+            {
+                inv.priceMultiplier *= 0.5f;
+                rsCons.nextShopHalfPrice = false;
+                Debug.Log("[ShopManager] 商人の鈴: 全価格-50%");
+            }
+            _apprMinRarity = null;
+            if (rsCons != null && rsCons.nextLootMinRarity >= 0)
+            {
+                _apprMinRarity = (ItemRarity)rsCons.nextLootMinRarity;
+                rsCons.nextLootMinRarity = -1; // ショップで消費
+                Debug.Log($"[ShopManager] 鑑定の眼鏡: 最低レア {_apprMinRarity}");
+            }
+
+            // パッシブ ×3
+            for (int i = 0; i < 3; i++)
                 inv.slots.Add(BuildSlot(ShopSlotKind.Passive, inv.priceMultiplier));
 
             // 消費 ×2
             for (int i = 0; i < 2; i++)
                 inv.slots.Add(BuildSlot(ShopSlotKind.Consumable, inv.priceMultiplier));
 
-            // 武器 ×1
-            inv.slots.Add(BuildSlot(ShopSlotKind.Weapon, inv.priceMultiplier));
+            // 武器 ×2
+            for (int i = 0; i < 2; i++)
+                inv.slots.Add(BuildSlot(ShopSlotKind.Weapon, inv.priceMultiplier));
 
-            // ダイス ×1
-            inv.slots.Add(BuildSlot(ShopSlotKind.Dice, inv.priceMultiplier));
+            // ダイス ×2
+            for (int i = 0; i < 2; i++)
+                inv.slots.Add(BuildSlot(ShopSlotKind.Dice, inv.priceMultiplier));
 
             // 武器強化素材 ×1（在庫無限、価格は base × 2^N × priceMultiplier）
             inv.slots.Add(new ShopSlot
@@ -176,6 +197,13 @@ namespace InventorySystem.Shop
             // イベント限定アイテムを除外（ちいさな灯火・決意 等）
             pool = pool.FindAll(EventOnlyItemFilter.IsAllowed);
             if (pool.Count == 0) return null;
+
+            // 鑑定の眼鏡: 最低レア保証（該当無しなら無視）
+            if (_apprMinRarity.HasValue)
+            {
+                var hi = pool.FindAll(p => p.rarity >= _apprMinRarity.Value);
+                if (hi.Count > 0) pool = hi;
+            }
 
             // 武器のみ: 強化ルート最終LEGENDARYを除外
             if (kind == ShopSlotKind.Weapon)

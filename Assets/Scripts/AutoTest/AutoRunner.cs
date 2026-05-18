@@ -289,8 +289,7 @@ namespace AutoTest
                     return DoNavigate();
 
                 case GameManager.GamePhase.Combat:
-                    if (CombatManager.Instance != null && CombatManager.Instance.IsCombatActive)
-                        CombatManager.Instance.ExecuteFullCombat();
+                    RunCombatWithItems(gm);
                     return false;
 
                 case GameManager.GamePhase.BattleResult:
@@ -302,8 +301,17 @@ namespace AutoTest
                     return false;
 
                 case GameManager.GamePhase.RestStop:
-                    gm.RestHeal();
+                {
+                    // 余裕がある(HP>60%)かつ素材が足りるなら武器強化、それ以外は回復
+                    var run = gm.Run;
+                    float hpR = run.playerMaxHP > 0 ? (float)run.playerHP / run.playerMaxHP : 1f;
+                    int cost = GameManager.WeaponUpgradeCost(run.weaponUpgradeLevel);
+                    if (hpR > 0.6f && run.weaponMaterials >= cost)
+                        gm.RestUpgrade();
+                    else
+                        gm.RestHeal();
                     return false;
+                }
 
                 case GameManager.GamePhase.ShopVisit:
                     DoShop();
@@ -350,6 +358,9 @@ namespace AutoTest
             var mm = MapManager.Instance;
             if (mm == null) { Finish(Outcome.Deadlock, "MapManager null"); return true; }
             _eventStuckCount = 0; // マップに戻った＝イベント解決済み
+
+            // HPが半分以下なら所持消費アイテムで回復（過剰回復は避ける）
+            while (Consumables.TryUseBestHeal(gm.Run, 0.5f)) { }
 
             var (fwd, lat) = mm.GetCategorizedMoves();
             var pool = (fwd != null && fwd.Count > 0) ? fwd : lat;
@@ -402,36 +413,122 @@ namespace AutoTest
             var inv = sm != null ? sm.Current : null;
             if (inv != null && inv.slots != null)
             {
-                float hpRatio = gm.Run.playerMaxHP > 0
-                    ? (float)gm.Run.playerHP / gm.Run.playerMaxHP : 1f;
-
-                // 優先度: ①負傷時は回復消費 ②武器/ダイス(自動装備で強化) ③余剰金でパッシブ
-                int buys = 0;
+                var run = gm.Run;
                 bool Buy(int i)
                 {
                     var s = inv.slots[i];
-                    if (s == null || s.sold || s.price > gm.Run.coins) return false;
-                    int before = gm.Run.coins;
+                    if (s == null || s.sold || s.price > run.coins) return false;
+                    int before = run.coins;
                     gm.ShopBuy(i);
-                    if (gm.Run.coins < before) { _cur.shopPurchases++; buys++; return true; }
+                    if (run.coins < before) { _cur.shopPurchases++; return true; }
+                    return false;
+                }
+                bool BuyKind(ShopSlotKind k)
+                {
+                    for (int i = 0; i < inv.slots.Count; i++)
+                        if (inv.slots[i] != null && !inv.slots[i].sold
+                            && inv.slots[i].kind == k && Buy(i)) return true;
                     return false;
                 }
 
-                if (hpRatio < 0.65f)
-                    for (int i = 0; i < inv.slots.Count && buys < 5; i++)
-                        if (inv.slots[i] != null && !inv.slots[i].sold
-                            && inv.slots[i].kind == ShopSlotKind.Consumable) Buy(i);
-
-                for (int i = 0; i < inv.slots.Count && buys < 5; i++)
-                    if (inv.slots[i] != null && !inv.slots[i].sold && gm.Run.coins > 50
-                        && (inv.slots[i].kind == ShopSlotKind.Weapon
-                            || inv.slots[i].kind == ShopSlotKind.Dice)) Buy(i);
-
-                for (int i = 0; i < inv.slots.Count && buys < 5; i++)
-                    if (inv.slots[i] != null && !inv.slots[i].sold && gm.Run.coins > 35
-                        && inv.slots[i].kind == ShopSlotKind.Passive) Buy(i);
+                // 「見える範囲で最後のショップ」(=5層以降) は買える物が尽きるまで使い切る
+                bool lastShop = run.currentFloor >= run.normalClearFloor;
+                if (lastShop)
+                {
+                    int guard = 0;
+                    bool bought = true;
+                    while (bought && guard++ < 40)
+                    {
+                        bought = false;
+                        // 価値順: 武器/ダイス → パッシブ → 強化素材 → 消費
+                        if (BuyKind(ShopSlotKind.Weapon)) { bought = true; continue; }
+                        if (BuyKind(ShopSlotKind.Dice)) { bought = true; continue; }
+                        if (BuyKind(ShopSlotKind.Passive)) { bought = true; continue; }
+                        if (BuyKind(ShopSlotKind.WeaponMaterial)) { bought = true; continue; }
+                        if (BuyKind(ShopSlotKind.Consumable)) { bought = true; continue; }
+                    }
+                }
+                else
+                {
+                    // 通常ショップ: 余剰金を戦力へ。戦闘を避けないので装備/素材/回復を厚めに。
+                    // 武器・ダイス（自動装備で強化見込み）
+                    for (int i = 0; i < inv.slots.Count; i++)
+                        if (inv.slots[i] != null && !inv.slots[i].sold && run.coins > 40
+                            && (inv.slots[i].kind == ShopSlotKind.Weapon
+                                || inv.slots[i].kind == ShopSlotKind.Dice)) Buy(i);
+                    // パッシブ（金が余るので貪欲に）
+                    for (int i = 0; i < inv.slots.Count; i++)
+                        if (inv.slots[i] != null && !inv.slots[i].sold && run.coins > 25
+                            && inv.slots[i].kind == ShopSlotKind.Passive) Buy(i);
+                    // 武器強化素材: 次の強化に届くまで補充（価格倍々なので2個まで）
+                    int needMat = GameManager.WeaponUpgradeCost(run.weaponUpgradeLevel);
+                    int matBuys = 0;
+                    while (run.weaponMaterials < needMat && run.coins > 20 && matBuys++ < 2
+                           && BuyKind(ShopSlotKind.WeaponMaterial)) { }
+                    // 回復消費を3個までストック
+                    int stock = run.ownedConsumables != null ? run.ownedConsumables.Count : 0;
+                    for (int i = 0; i < inv.slots.Count && stock < 3; i++)
+                        if (inv.slots[i] != null && !inv.slots[i].sold && run.coins > 20
+                            && inv.slots[i].kind == ShopSlotKind.Consumable && Buy(i)) stock++;
+                }
             }
             gm.ExitShop();
+        }
+
+        /// <summary>戦闘をターン逐次で進行。開始直後にバフ消費、各ターン前に緊急回復判定。</summary>
+        private void RunCombatWithItems(GameManager gm)
+        {
+            var cm = CombatManager.Instance;
+            if (cm == null || !cm.IsCombatActive) return;
+            var run = gm.Run;
+
+            // バフ/シールドは「重要戦闘」のみ。雑魚相手の初手オールインは非合理なので回避。
+            // 重要 = ボス / 高脅威(threat>=5) / 一撃が現HPの半分以上を奪い得る危険戦闘。
+            var e0 = cm.CurrentEnemy;
+            bool important = false;
+            if (e0 != null)
+            {
+                bool boss = e0.id != null && e0.id.StartsWith("boss_layer");
+                int maxHit = e0.diceCount * e0.diceMaxValue * (e0.criticalNumerator > 0 ? 2 : 1);
+                important = boss || e0.threat >= 5 || maxHit * 2 >= Math.Max(1, cm.PlayerHP);
+            }
+
+            if (important)
+            {
+                // 攻撃/ダイス/会心/鬼火 → シールド/土塊 → 継続 → ユニーク
+                UseFirst(run, "uniq_oni_oil", "cons_atk_4", "cons_atk_3", "cons_dice_4", "cons_dice_3",
+                              "cons_crit_4", "cons_crit_3", "cons_atk_2", "cons_dice_2", "cons_crit_2");
+                UseFirst(run, "cons_shield_4", "cons_shield_3", "cons_shield_2", "uniq_earth_guard",
+                              "cons_reduce_4", "cons_reduce_3", "cons_shield_1");
+                UseFirst(run, "cons_regen_4", "cons_regen_3", "cons_regen_2", "cons_regen_1");
+                UseFirst(run, "uniq_mirror");
+                UseFirst(run, "uniq_ambush");
+            }
+
+            int guard = 0;
+            while (cm.IsCombatActive && guard++ < 250)
+            {
+                // 緊急回復: 敵の最大ダイスダメージ(会心なら×2)で落ちそうなら回復
+                var e = cm.CurrentEnemy;
+                if (e != null)
+                {
+                    int maxHit = e.diceCount * e.diceMaxValue;
+                    if (e.criticalNumerator > 0) maxHit *= 2;
+                    if (cm.PlayerHP <= maxHit)
+                        UseFirst(run, "cons_heal_4", "cons_heal_3", "cons_heal_2", "cons_heal_1");
+                }
+                cm.ExecuteTurn();
+            }
+        }
+
+        /// <summary>所持consumableから優先順に最初の1個を使用（戦闘中＝ctx即時適用）。</summary>
+        private bool UseFirst(GameLoop.RunState run, params string[] ids)
+        {
+            if (run?.ownedConsumables == null) return false;
+            foreach (var id in ids)
+                if (run.ownedConsumables.Contains(id))
+                    return GameLoop.Consumables.Use(run, id);
+            return false;
         }
 
         private void DoEvent()

@@ -700,4 +700,55 @@ namespace InventorySystem.PassiveSkills.Effects
             }
         }
     }
+
+    // ============================================================
+    //  竜閃（ユニーク武器）— 安定性の対極の斬鉄剣
+    // ============================================================
+
+    /// <summary>無我無心 — カスタムダイス以外の補正を一切受けない（戦闘中持続）。</summary>
+    public class MugaMushin : IPassiveSkillEffect
+    {
+        public string SkillId => "MugaMushin";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            ctx.rollPurity = true;
+        }
+    }
+
+    /// <summary>画竜点睛 — 出目がその時点の最大値なら、ロール即勝利＋(出目+10)＋会心確定。</summary>
+    public class GaryoTensei : IPassiveSkillEffect
+    {
+        public string SkillId => "GaryoTensei";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            if (ctx.playerDice == null || ctx.playerDice.Length == 0) return;
+
+            // その時点で取りうる最大値: カスタムダイス装備中はその最大面、無ければ playerDiceMax
+            int maxVal;
+            if (ctx.equippedDiceFaces != null && ctx.equippedDiceFaces.Length > 0)
+            {
+                maxVal = ctx.equippedDiceFaces[0];
+                for (int i = 1; i < ctx.equippedDiceFaces.Length; i++)
+                    if (ctx.equippedDiceFaces[i] > maxVal) maxVal = ctx.equippedDiceFaces[i];
+            }
+            else
+            {
+                maxVal = ctx.playerDiceMax > 0 ? ctx.playerDiceMax : 6;
+            }
+
+            // ダイス数1前提だが、いずれかが最大値なら発動
+            int hit = 0;
+            for (int i = 0; i < ctx.playerDice.Length; i++)
+                if (ctx.playerDice[i] >= maxVal) { hit = ctx.playerDice[i]; break; }
+
+            if (hit > 0)
+            {
+                ctx.garyoProc = true;
+                ctx.garyoDieValue = hit;
+                UnityEngine.Debug.Log($"[画竜点睛] 発動 出目{hit}=最大 → 即勝利＋({hit}+10)会心");
+            }
+        }
+    }
 }
