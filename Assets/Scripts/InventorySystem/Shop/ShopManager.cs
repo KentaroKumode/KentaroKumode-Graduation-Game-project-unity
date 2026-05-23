@@ -198,6 +198,18 @@ namespace InventorySystem.Shop
             pool = pool.FindAll(EventOnlyItemFilter.IsAllowed);
             if (pool.Count == 0) return null;
 
+            // パッシブはラン重複排除（所持済みは並べない）。枯渇時は元プール（重複許可）。
+            if (category.Value == ItemCategory.Passive)
+            {
+                var run = GameLoop.GameManager.Instance?.Run;
+                if (run?.ownedPassiveItems != null)
+                {
+                    var owned = new HashSet<string>(run.ownedPassiveItems);
+                    var dd = pool.FindAll(it => !owned.Contains(it.internalName));
+                    if (dd.Count > 0) pool = dd;
+                }
+            }
+
             // 鑑定の眼鏡: 最低レア保証（該当無しなら無視）
             if (_apprMinRarity.HasValue)
             {
@@ -289,7 +301,7 @@ namespace InventorySystem.Shop
                 case ShopSlotKind.Passive:
                 case ShopSlotKind.Weapon:
                 case ShopSlotKind.Dice:
-                    run.ownedPassiveItems.Add(slot.itemId);
+                    InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(run, slot.itemId);
                     GameLoop.Loadout.TryAutoEquip(run, slot.itemId);
                     break;
                 case ShopSlotKind.Consumable:

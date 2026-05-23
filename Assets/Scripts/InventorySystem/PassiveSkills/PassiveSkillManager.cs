@@ -456,6 +456,32 @@ namespace InventorySystem.PassiveSkills
             context.playerWonRoll = effDiff > 0;
             context.playerLostRoll = effDiff < 0;
 
+            // 引き分けは再ロール（脅威システム下では引分でも脅威被弾するため、引分自体を解消する）。
+            // OnPostRoll の再発火を避けるため、ダイスのみ振り直して合計・勝敗だけ再計算する。
+            int rerollGuard = 20;
+            while (!context.playerWonRoll && !context.playerLostRoll && !context.garyoProc && rerollGuard-- > 0)
+            {
+                RerollDiceForDraw(playerDice, enemyDice);
+                ApplyDiceOverrides(enemyDice);
+
+                context.playerDiceTotal = Sum(playerDice);
+                context.enemyDiceTotal = Sum(enemyDice);
+                if (!context.rollPurity)
+                    context.playerDiceTotal += (int)context.GetBuff("diceBonus");
+                int eDebuff = (int)context.GetBuff("enemyDiceDebuff");
+                if (eDebuff > 0)
+                    context.enemyDiceTotal = System.Math.Max(0, context.enemyDiceTotal - eDebuff);
+                if (context.consEnemyDiceDebuff > 0)
+                    context.enemyDiceTotal = System.Math.Max(0, context.enemyDiceTotal - context.consEnemyDiceDebuff);
+                if (context.enemyDiceTotalBonus > 0)
+                    context.enemyDiceTotal += context.enemyDiceTotalBonus;
+
+                context.diceDifference = context.playerDiceTotal - context.enemyDiceTotal;
+                int reEff = context.diceDifference + (context.rollPurity ? 0 : context.consDiceRoll);
+                context.playerWonRoll = reEff > 0;
+                context.playerLostRoll = reEff < 0;
+            }
+
             // 画竜点睛: 発動ターンはロール即勝利（敗北/引分を上書き）
             if (context.garyoProc)
             {
@@ -609,6 +635,36 @@ namespace InventorySystem.PassiveSkills
             for (int i = 0; i < arr.Length; i++)
                 total += arr[i];
             return total;
+        }
+
+        /// <summary>引き分け解消用にダイス配列を in-place で振り直す。
+        /// サドンデス中は両者1d6、コントラタック中はプレイヤーを1固定で維持する。
+        /// 装備ダイス面(equippedDiceFaces)があればプレイヤー側はそこから抽選。</summary>
+        private void RerollDiceForDraw(int[] playerDice, int[] enemyDice)
+        {
+            bool sudden = context.ashenSuddenDeath || context.myokakuSuddenDeath;
+            bool contre = context.GetAccumulated("player_contre") > 0;
+            int pMax = context.playerDiceMax > 0 ? context.playerDiceMax : 6;
+            int eMax = context.enemyDiceMax > 0 ? context.enemyDiceMax : 6;
+
+            if (playerDice != null && !contre)
+            {
+                for (int i = 0; i < playerDice.Length; i++)
+                {
+                    if (sudden)
+                        playerDice[i] = UnityEngine.Random.Range(1, 7);
+                    else if (context.equippedDiceFaces != null && context.equippedDiceFaces.Length > 0)
+                        playerDice[i] = context.equippedDiceFaces[UnityEngine.Random.Range(0, context.equippedDiceFaces.Length)];
+                    else
+                        playerDice[i] = UnityEngine.Random.Range(1, pMax + 1);
+                }
+            }
+
+            if (enemyDice != null)
+            {
+                for (int i = 0; i < enemyDice.Length; i++)
+                    enemyDice[i] = sudden ? UnityEngine.Random.Range(1, 7) : UnityEngine.Random.Range(1, eMax + 1);
+            }
         }
 
         /// <summary>

@@ -194,6 +194,10 @@ namespace InventorySystem.PassiveSkills
             Register(new NightLord());
             Register(new DeathSentence());
             Register(new ScratchAura());
+            Register(new Berserk());
+            Register(new IntimidatePlus());
+            Register(new IntimidatePlusPlus());
+            Register(new GreedyMerchant());
 
             // 6層 SinAltar 由来 (CombatManager から動的に注入される)
             Register(new Boss6Golgotha());
@@ -218,6 +222,17 @@ namespace InventorySystem.PassiveSkills
             Register(new AshArmor());
             Register(new ImmortalEmber());
             Register(new StarfireProliferation());
+            // 5層裏ボス
+            Register(new SaintGeorgesPhases());
+            // 7層裏ボス: 覚者×7形態大連戦
+            Register(new AwakenedP1Inverse());
+            Register(new AwakenedP2BurstFire());
+            Register(new AwakenedP3Mirror());
+            Register(new AwakenedP4Riposte());
+            Register(new AwakenedP5Silent());
+            Register(new AwakenedP6EmberWill());
+            Register(new AwakenedP7Myokaku());
+            // [互換用残置] 旧 AwakenedTrial は連戦化により未使用
         }
     }
 }

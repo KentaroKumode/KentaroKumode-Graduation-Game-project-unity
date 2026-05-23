@@ -24,7 +24,7 @@ namespace GameLoop
     {
         // === 進行 ===
         public int currentFloor = 1;
-        public int maxFloor = 6;
+        public int maxFloor = 7;
         public int normalClearFloor = 5;
         public bool bossDefeatedThisFloor;
 
@@ -60,6 +60,11 @@ namespace GameLoop
         /// <summary>パッシブアイテム名のリスト（重複可）。匿名取得は "" 名で1個分計上。</summary>
         public List<string> ownedPassiveItems = new List<string>();
 
+        /// <summary>各 ownedPassiveItems[i] に紐づく刻印 (取得時1回ロール、ラン中不変)。
+        /// 並列配列。要素数は ownedPassiveItems と一致させる。
+        /// 取得時に <see cref="InventorySystem.Helpers.PassiveAddHelper"/> 経由で追加すべき。</summary>
+        public List<InventorySystem.Sigils.PassiveSigil> passiveSigils = new List<InventorySystem.Sigils.PassiveSigil>();
+
         /// <summary>消費アイテム名のリスト。</summary>
         public List<string> ownedConsumables = new List<string>();
 
@@ -77,6 +82,18 @@ namespace GameLoop
 
         /// <summary>ラストスタンド発動済みフラグ。ラン中1回のみ true。</summary>
         public bool lastStandActive;
+
+        /// <summary>5層裏ボス（シュヴァリエ・サン=ジョリオラ）撃破済みフラグ。
+        /// 立っている場合、シュヴァリエのレイピア解除時に会心+9 補正が付与される。</summary>
+        public bool defeatedSaintGeorges;
+
+        /// <summary>解脱: 覚者・妙覚のサドンデス勝利による特殊エンディング達成フラグ。</summary>
+        public bool gedatsuVictory;
+
+        /// <summary>確信パッシブの段階。 災厄の予兆 で〈根拠のない確信〉取得時に 1 になり、
+        /// 以降エリート戦勝利毎に +1。 3 で〈決意〉、 6+ で〈真理〉 にアイテム名が変化する。
+        /// 6F進入には〈決意〉以上 (stage>=3)、 7F進入には〈真理〉(stage>=6) が必要。</summary>
+        public int convictionStage;
 
         /// <summary>装備中の武器アイテムID（空=未装備=デフォルト2d6）。取得時に Loadout.TryAutoEquip で更新。</summary>
         public string equippedWeaponId = "";
@@ -151,12 +168,16 @@ namespace GameLoop
             weaponMaterials = 0;
             ownedFlags = new HashSet<string>();
             ownedPassiveItems = new List<string>();
+            passiveSigils = new List<InventorySystem.Sigils.PassiveSigil>();
             ownedConsumables = new List<string>();
             timedBuffs = new Dictionary<string, int>();
             timedDebuffs = new Dictionary<string, int>();
             permanentDebuffs = new HashSet<string>();
             seenOnceEvents = new HashSet<string>();
             lastStandActive = false;
+            defeatedSaintGeorges = false;
+            gedatsuVictory = false;
+            convictionStage = 0;
             equippedWeaponId = "";
             equippedDiceId = "";
             weaponUpgradeLevel = 0;

@@ -54,16 +54,15 @@ namespace GameLoop
         {
             if (!playerWon) return 0;
 
-            // 基本報酬: 7 + floor/2 で層間をなだらかに
-            // (F1=7, F2=8, F3=8, F4=9, F5=9, F6=10。従来 floor+5 は
-            //  6→11 で序盤が金欠・終盤が過剰だったため傾きを 5→3 に圧縮。
-            //  序盤+1 / 終盤-1。ボスは呼出側で×2)
-            int baseReward = 7 + floor / 2;
+            // 1/5 デノミ: 基本報酬 = ceil((7 + floor/2) / 5)
+            // F1=2, F2=2, F3=2, F4=2, F5=2, F6=2。ボスは呼出側で×2 → 4。
+            // (旧 7-10 → 2-2。グラデが消えるが小桁優先)
+            int baseReward = Mathf.Max(1, Mathf.CeilToInt((7 + floor / 2) / 5f));
 
             // フロアデバフの報酬倍率（Fortune層・shopPriceMultiplier等）
             var mod = MapSystem.FloorModifierDatabase.Get(floor);
             if (mod != null && Mathf.Abs(mod.coinRewardMultiplier - 1f) > 0.001f)
-                baseReward = Mathf.CeilToInt(baseReward * mod.coinRewardMultiplier);
+                baseReward = Mathf.Max(1, Mathf.CeilToInt(baseReward * mod.coinRewardMultiplier));
 
             return baseReward;
         }

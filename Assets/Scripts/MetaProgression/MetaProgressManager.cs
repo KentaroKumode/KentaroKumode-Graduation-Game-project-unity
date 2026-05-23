@@ -78,6 +78,16 @@ namespace MetaProgression
             OnStateChanged?.Invoke();
         }
 
+        /// <summary>メタバフ全段(Lv115)を解放した状態に強制セット。AutoRunner の全有効化パターン用。</summary>
+        public void MaxAllForTesting()
+        {
+            State = new MetaProgressState();
+            State.currentLevel = MetaBuffTrack.TotalSteps;
+            State.RecalculateFromTrack();
+            // 永続化はしない（テスト用途専用、PlayerPrefs を汚染しないため Save() しない）
+            OnStateChanged?.Invoke();
+        }
+
         // ============================================================
         //  トークン
         // ============================================================
@@ -138,6 +148,10 @@ namespace MetaProgression
                 case MetaBuffKind.BossExtraRare:    State.bossExtraRareUnlocked = true; break;
                 case MetaBuffKind.RefundLevelUp:    State.refundLevel = Mathf.Min(3, State.refundLevel + step.amount); break;
                 case MetaBuffKind.CritLevelUp:      State.critLevel = Mathf.Min(3, State.critLevel + step.amount); break;
+                case MetaBuffKind.DivineProtect:    State.divineProtectUnlocked = true; break;
+                case MetaBuffKind.StartingPassiveItem: State.startingPassiveItemUnlocked = true; break;
+                case MetaBuffKind.FloorClearHeal:   State.floorClearHeal = Mathf.Min(2, State.floorClearHeal + step.amount); break;
+                case MetaBuffKind.TreasureChestGold: State.treasureChestGoldUnlocked = true; break;
             }
         }
 

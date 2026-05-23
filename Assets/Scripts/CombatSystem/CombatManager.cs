@@ -49,6 +49,8 @@ namespace CombatSystem
         public int playerHPRemaining;
         public int enemyHPRemaining;
         public List<TurnResult> turnLog;
+        /// <summary>解脱 — 妙覚サドンデス勝利。playerWon=true と併用。</summary>
+        public bool gedatsu;
     }
 
     /// <summary>
@@ -111,7 +113,9 @@ namespace CombatSystem
         private int playerHP;
         private int playerMaxHP;
         private int enemyHP;
-        private bool metaLethalSurviveUsed; // メタデバフ Lv10: 敵の初回致命傷を1HPで耐える
+        private bool metaLethalSurviveUsed; // メタデバフ Lv9: 敵の初回致命傷を1HPで耐える
+        private bool metaAgilityDodgeUsed;  // メタデバフ Lv2 俊敏: 敵が初回被弾を回避済みか
+        private int fleeAfterTurns;          // >0 のとき、このターン数を終えても未決着なら敵が逃走（偽の商人）
         private bool wrathDiceOverrideArmed; // 恒久デバフ「憤怒」: 1T目のダイス最大化トリガー
         private int playerDiceCount;
         private int playerDiceMax;
@@ -207,8 +211,13 @@ namespace CombatSystem
         {
             if (amount <= 0) return 0;
 
-            // 呪いの渇き: HP回復効果を半減
+            // 呪いの渇き: HP回復効果を半減 / 狂暴化: 回復完全封印
             var psmCtxForHeal = PassiveSkillManager.Instance?.Context;
+            if (psmCtxForHeal != null && psmCtxForHeal.healBlocked)
+            {
+                Debug.Log("[CombatManager] 狂暴化: 回復が封じられている (回復0)");
+                return 0;
+            }
             if (psmCtxForHeal != null && psmCtxForHeal.healHalved)
                 amount = Math.Max(1, amount / 2);
 
@@ -304,6 +313,18 @@ namespace CombatSystem
             StartCombatInternal(enemy, playerMaxHP, playerDiceCount, playerDiceMax, playerCritNumerator, equippedDiceFaces);
         }
 
+        /// <summary>偽の商人戦用: 規定ターン数を終えても未決着なら敵が逃走する。
+        /// StartCombat の後に呼ぶ（StartCombat 内で 0 にリセットされるため）。</summary>
+        public void SetFleeAfterTurns(int turns) => fleeAfterTurns = Mathf.Max(0, turns);
+
+        /// <summary>敵のダイス合計値へ毎ロール加算するボーナスを足す（偽の商人「貪欲」等）。
+        /// StartCombat の後（ctx 生成後）に呼ぶ。</summary>
+        public void AddEnemyDiceTotalBonus(int bonus)
+        {
+            var ctx = PassiveSkillManager.Instance?.Context;
+            if (ctx != null && bonus > 0) ctx.enemyDiceTotalBonus += bonus;
+        }
+
         private void StartCombatInternal(EnemyData enemy, int pMaxHP,
             int pDiceCount, int pDiceMax, int pCritNumerator, int[] equippedDiceFaces = null)
         {
@@ -331,18 +352,29 @@ namespace CombatSystem
             enemyCriticalNumerator = enemy.criticalNumerator;
             isCombatActive = true;
             metaLethalSurviveUsed = false;
+            metaAgilityDodgeUsed = false;
+            fleeAfterTurns = 0;
             turnLog.Clear();
 
             // パッシブスキルマネージャーに敵スキルを登録
             var psm = PassiveSkillManager.Instance;
-            if (enemy.passiveSkills != null)
+            var enemySkills = enemy.passiveSkills != null
+                ? new List<EnemyPassiveEntry>(enemy.passiveSkills)
+                : new List<EnemyPassiveEntry>();
+
+            // ボスノードの敵には全員「狂暴化」を付与（50T後のエンレイジ）
+            var nodeForBerserk = MapSystem.MapManager.Instance?.CurrentNode;
+            if (nodeForBerserk != null && nodeForBerserk.type == MapSystem.TileType.Boss
+                && !enemySkills.Exists(e => e != null && e.internalName == "Berserk"))
             {
-                psm.RegisterEnemySkills(enemy.passiveSkills);
+                enemySkills.Add(new EnemyPassiveEntry
+                {
+                    internalName = "Berserk",
+                    skillName = "狂暴化",
+                    description = "50ターン経過後、ダイス合計+10・回復封印・被ダメージ3倍",
+                });
             }
-            else
-            {
-                psm.RegisterEnemySkills(null);
-            }
+            psm.RegisterEnemySkills(enemySkills);
             psm.BeginCombat(pMaxHP, enemy.maxHP, pDiceMax, enemy.diceMaxValue, enemy.threat);
 
             // 装備ダイスの面をコンテキストに設定
@@ -382,6 +414,10 @@ namespace CombatSystem
             // 魔王の威圧 等の戦闘開始時スキル処理
             psm.FireTrigger(PassiveSkillTrigger.OnBattleStart);
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnBattleStart);
+
+            // パッシブ刻印: 戦闘開始時の効果を適用 (HP回復・シールド付与・ダイス補正等)
+            InventorySystem.Sigils.PassiveSigilActivator.ApplyOnBattleStart(
+                GameLoop.GameManager.Instance?.Run, psm.Context);
 
             // 敵の戦闘開始スキルによるHP減少適用
             ctx = psm.Context;
@@ -443,6 +479,86 @@ namespace CombatSystem
             Debug.Log($"  Enemy  HP: {enemyHP}/{enemy.maxHP}, Dice: {enemy.DiceNotation}, Crit: {enemyCriticalNumerator}/9, Threat: {enemy.threat}");
         }
 
+        /// <summary>戦闘中にエネミーを差し替える（覚者の連戦などで使用）。
+        /// プレイヤー状態(HP/ダイス/buffs/currentTurn) は完全保持。
+        /// 敵側パッシブと敵固有の accumulatedValues キーは新エネミーのものに置換。</summary>
+        /// <param name="newEnemyId">enemies.json の id</param>
+        /// <param name="logLabel">遷移ログに使うラベル(例:"覚者第二形態へ")</param>
+        /// <returns>差し替え成功なら true</returns>
+        public bool SwapEnemy(string newEnemyId, string logLabel = null)
+        {
+            if (!isCombatActive) { Debug.LogWarning("[CombatManager.SwapEnemy] 戦闘中でない"); return false; }
+            var newEnemy = EnemyDatabase.Get(newEnemyId);
+            if (newEnemy == null) { Debug.LogError($"[CombatManager.SwapEnemy] enemy not found: {newEnemyId}"); return false; }
+
+            string prevName = currentEnemy?.displayName ?? "?";
+            currentEnemy = newEnemy;
+            enemyHP = newEnemy.maxHP;
+            enemyCriticalNumerator = newEnemy.criticalNumerator;
+
+            var psm = PassiveSkillManager.Instance;
+            if (psm == null) { Debug.LogError("[CombatManager.SwapEnemy] PSM null"); return false; }
+
+            // 敵側パッシブを差し替え（プレイヤー側パッシブは保持）。
+            // ボス連戦(覚者等)でも狂暴化を維持する。
+            var swapSkills = newEnemy.passiveSkills != null
+                ? new List<EnemyPassiveEntry>(newEnemy.passiveSkills)
+                : new List<EnemyPassiveEntry>();
+            var nodeForSwapBerserk = MapSystem.MapManager.Instance?.CurrentNode;
+            if (nodeForSwapBerserk != null && nodeForSwapBerserk.type == MapSystem.TileType.Boss
+                && !swapSkills.Exists(e => e != null && e.internalName == "Berserk"))
+            {
+                swapSkills.Add(new EnemyPassiveEntry
+                {
+                    internalName = "Berserk", skillName = "狂暴化",
+                    description = "50ターン経過後、ダイス合計+10・回復封印・被ダメージ3倍",
+                });
+            }
+            psm.RegisterEnemySkills(swapSkills);
+
+            // 敵側固有 accumulatedValues キーを掃除（プレイヤー側補正は保持）
+            // 既知の "enemy-side" prefix を持つキーを除去
+            var ctx = psm.Context;
+            if (ctx != null)
+            {
+                var toRemove = new List<string>();
+                foreach (var k in ctx.accumulatedValues.Keys)
+                {
+                    if (k.StartsWith("sg_") || k.StartsWith("awakened_") || k.StartsWith("ashen_")
+                        || k.StartsWith("boss6_") || k.StartsWith("starfire_") || k.StartsWith("judg")
+                        || k.StartsWith("myokaku_") || k.StartsWith("ember_") || k.StartsWith("berserk_")
+                        || k == "extraDice" || k == "enemyMaxHPReduction")
+                        toRemove.Add(k);
+                }
+                foreach (var k in toRemove) ctx.accumulatedValues.Remove(k);
+
+                // ctx 敵パラメータも更新（プレイヤー視点で書く: enemy = ボス、player = プレイヤー）
+                ctx.enemyMaxHP = newEnemy.maxHP;
+                ctx.enemyCurrentHP = newEnemy.maxHP;
+                ctx.enemyThreat = newEnemy.threat;
+                ctx.enemyDiceMax = newEnemy.diceMaxValue;
+                ctx.enemyDiceTotalBonus = 0;
+                ctx.ashenSuddenDeath = false;
+                ctx.myokakuSuddenDeath = false;
+                ctx.gedatsuPending = false;
+            }
+
+            // 新エネミーの OnBattleStart 発火
+            psm.FireEnemyTrigger(PassiveSkillTrigger.OnBattleStart);
+
+            // LED アクティブダイス数も更新
+            if (ledManager != null)
+                ledManager.SetActiveDiceCount(playerDiceCount, newEnemy.diceCount);
+
+            string label = string.IsNullOrEmpty(logLabel) ? newEnemy.displayName : logLabel;
+            Debug.Log($"[CombatManager] ━━ エネミー差し替え: {prevName} → {label} (HP:{enemyHP}/{newEnemy.maxHP}, Dice:{newEnemy.DiceNotation}, Crit:{enemyCriticalNumerator}/9, Threat:{newEnemy.threat})");
+
+            // 計測フック: 新フォームを「新エネミーとの遭遇」として通知
+            // (AutoRunner 等がチェーン途中フォームのスタッツを取れるようにする)
+            GameLoop.GameManager.Instance?.RaiseEnemyEncountered(newEnemy);
+            return true;
+        }
+
         // ===========================================================
         //  ターン実行
         // ===========================================================
@@ -461,9 +577,48 @@ namespace CombatSystem
             var psm = PassiveSkillManager.Instance;
             var ctx = psm.Context;
 
+            // 偽の商人: 規定ターン数を終えても未決着なら、敵が逃走して戦闘終了。
+            // 両者生存のまま終わる（playerWon=false かつ playerHP>0 ＝ GameManager 側で「逃走」と判定）。
+            if (fleeAfterTurns > 0 && ctx != null && ctx.currentTurn >= fleeAfterTurns
+                && playerHP > 0 && enemyHP > 0)
+            {
+                Debug.Log($"[CombatManager] 偽の商人: {fleeAfterTurns}ターン経過 → 逃走（戦闘強制終了）");
+                FinishCombat();
+                return new TurnResult
+                {
+                    turnNumber = ctx.currentTurn,
+                    playerWon = false,
+                    isDraw = false,
+                    playerHPAfter = playerHP,
+                    enemyHPAfter = enemyHP,
+                };
+            }
+
             // --- ターン開始 ---
 
             psm.BeginTurn();
+
+            // 安全弁: 戦闘が異常に長引いた場合は強制決着（プレイヤー敗北）。
+            // 既知の挙動: 灰燼の王戦などで「ボスにダメージ通らない × プレイヤー再生で死なない」
+            // の二重デッドロックが起きると、Boss6Ashen の発動条件(ボスHP→0)が満たされず
+            // SeveredTime の累積ダイスボーナスだけが膨らんで AutoRunner で 75万ターン超に達した。
+            // 戦闘単体での暴走は許容しない。300T を超えたらプレイヤーHPを0にして即座に終了。
+            const int kHardTurnCap = 300;
+            if (ctx != null && ctx.currentTurn > kHardTurnCap)
+            {
+                Debug.LogWarning($"[CombatManager] 戦闘ターン上限超過 ({ctx.currentTurn} > {kHardTurnCap}) — 強制決着（プレイヤー敗北）");
+                playerHP = 0;
+                ctx.playerCurrentHP = 0;
+                FinishCombat();
+                return new TurnResult
+                {
+                    turnNumber = ctx.currentTurn,
+                    playerWon = false,
+                    isDraw = false,
+                    playerHPAfter = 0,
+                    enemyHPAfter = enemyHP,
+                };
+            }
 
             // 消費アイテム持続効果の毎ターン再適用（BeginNewTurn でリセットされるため）
             if (ctx != null)
@@ -473,6 +628,9 @@ namespace CombatSystem
             }
 
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnTurnStart);
+
+            // パッシブ刻印: T2 開始時に静寂の刻印(T1限定 -2軽減)を剥がす
+            InventorySystem.Sigils.PassiveSigilActivator.ApplyOnTurnStart(ctx);
 
             // 敵側のターン開始処理を反映（再生、夜の王 等）
             // SwapPerspective の影響で敵HP変動がplayerCurrentHPに入っている場合があるので
@@ -511,6 +669,40 @@ namespace CombatSystem
                 playerDice = new[] { UnityEngine.Random.Range(1, 7) };
                 enemyDice = new[] { UnityEngine.Random.Range(1, 7) };
                 Debug.Log("[CombatManager] 灰燼の烙印サドンデス: 両者1d6強制");
+            }
+
+            // 〈妙覚〉サドンデス: 両者を 1d6 に強制（決着まで継続）。勝者が敗者を即死させる。
+            if (ctx.myokakuSuddenDeath)
+            {
+                actualPlayerDiceCount = 1;
+                actualEnemyDiceCount = 1;
+                playerDice = new[] { UnityEngine.Random.Range(1, 7) }; // 1d6
+                enemyDice = new[] { UnityEngine.Random.Range(1, 7) };
+                Debug.Log("[CombatManager] 妙覚サドンデス: 両者1d6強制");
+            }
+
+            // シュヴァリエのレイピア コントラタック発動中: プレイヤーは 1d1 強制（必ず1を出す）
+            if (ctx.GetAccumulated("player_contre") > 0)
+            {
+                actualPlayerDiceCount = 1;
+                playerDice = new[] { 1 };
+                Debug.Log("[CombatManager] コントラタック: プレイヤー 1d1 強制");
+            }
+
+            // シュヴァリエのレイピア 解除後の解放ターン: ダイス個数+1（クリ補正は currentBuffs 経由）
+            if (ctx.GetAccumulated("rapier_release_pending") > 0)
+            {
+                actualPlayerDiceCount += 1;
+                // 1個追加分の出目を生成して配列を拡張
+                var extra = ctx.equippedDiceFaces != null && ctx.equippedDiceFaces.Length > 0
+                    ? ctx.equippedDiceFaces[UnityEngine.Random.Range(0, ctx.equippedDiceFaces.Length)]
+                    : UnityEngine.Random.Range(1, playerDiceMax + 1);
+                var newArr = new int[playerDice.Length + 1];
+                for (int i = 0; i < playerDice.Length; i++) newArr[i] = playerDice[i];
+                newArr[newArr.Length - 1] = extra;
+                playerDice = newArr;
+                ctx.accumulatedValues["rapier_release_pending"] = 0;
+                Debug.Log($"[CombatManager] レイピア解放: ダイス+1 (追加出目={extra})、会心+9 はバフ経由");
             }
 
             // 獣の恩義: 1ターン目の敵ロールを全て0にする（プレイヤー実質勝利確定）
@@ -589,6 +781,22 @@ namespace CombatSystem
 
             // パッシブスキルによるダイス処理
             psm.ProcessPostRoll(playerDice, enemyDice);
+
+            // メタバフ〈神の加護〉: 1戦闘1回、ロール敗北を引分に変換する
+            // (敵 OnPostRoll より前に行うことで、敵の OnRollWin 反応も発火しないようにする)
+            if (ctx.playerLostRoll
+                && MetaProgression.MetaBuffApplicator.IsDivineProtectUnlocked()
+                && ctx.GetAccumulated("divineProtect_used") == 0)
+            {
+                ctx.playerLostRoll = false;
+                ctx.diceDifference = 0;
+                ctx.accumulatedValues["divineProtect_used"] = 1;
+                Debug.Log("[MetaBuff] 神の加護: ロール敗北を引分に変換 (この戦闘の使用権を消費)");
+            }
+
+            // パッシブ刻印: per-roll 効果 (粘り・腐食) を fixedDamageToEnemy に積む
+            if (ctx.playerWonRoll)
+                InventorySystem.Sigils.PassiveSigilActivator.ApplyOnRollWin(ctx);
 
             // 敵スキルのPostRoll発火
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnPostRoll);
@@ -672,8 +880,31 @@ namespace CombatSystem
                     if (metaPlayerDmgRed > 0 && totalDmg > 0)
                         totalDmg = Mathf.Max(1, totalDmg - metaPlayerDmgRed);
 
-                    // 敵側のダメージ軽減パッシブを発火
+                    // 敵側のダメージ軽減パッシブを発火（前後で ctx.finalDamage と totalDmg を同期し、
+                    // 敵パッシブ（AshArmor 等やシュヴァリエのシールド経由処理）が
+                    // 実際の与ダメに反映されるようにする）
+                    ctx.finalDamage = totalDmg;
                     psm.FireEnemyTrigger(PassiveSkillTrigger.OnPreReceiveDamage);
+                    totalDmg = System.Math.Max(0, ctx.finalDamage);
+
+                    // 狂暴化(ボス50T後): エネミーが受けるダメージを倍化（軽減処理の後・適用直前）
+                    if (ctx.enemyDamageTakenMultiplier > 1f && totalDmg > 0)
+                    {
+                        int orig = totalDmg;
+                        totalDmg = Mathf.CeilToInt(totalDmg * ctx.enemyDamageTakenMultiplier);
+                        Debug.Log($"[CombatManager] 狂暴化: 敵被ダメ ×{ctx.enemyDamageTakenMultiplier:F1} ({orig}→{totalDmg})");
+                    }
+
+                    // メタデバフ Lv2 俊敏: 各戦闘の最初の1回の被弾を必ず回避（メイン＋固定ダメを無効化）
+                    if (!metaAgilityDodgeUsed
+                        && (totalDmg + fixedDmg) > 0
+                        && MetaProgression.MetaDebuffApplicator.EnemyDodgesFirstHit())
+                    {
+                        metaAgilityDodgeUsed = true;
+                        Debug.Log($"[CombatManager] メタデバフ Lv2 俊敏: 初撃を回避 (与ダメ {totalDmg}+{fixedDmg} を無効化)");
+                        totalDmg = 0;
+                        fixedDmg = 0;
+                    }
 
                     result.mainDamage = mainDmg;
                     result.pursuitDamage = pursuitDmg;
@@ -684,14 +915,14 @@ namespace CombatSystem
                     // 敵にダメージ適用（メイン＋プレイヤー→敵固定）
                     enemyHP = Math.Max(0, enemyHP - totalDmg - fixedDmg);
 
-                    // メタデバフ Lv10: 敵の初回致命傷を1HPで耐える
+                    // メタデバフ Lv9 鋼の皮膚: 敵の初回致命傷を1HPで耐える
                     if (enemyHP == 0
                         && !metaLethalSurviveUsed
                         && MetaProgression.MetaDebuffApplicator.EnemySurvivesFirstLethal())
                     {
                         enemyHP = 1;
                         metaLethalSurviveUsed = true;
-                        Debug.Log("[CombatManager] メタデバフ Lv10: 敵が初回致命傷で1HPに踏みとどまった");
+                        Debug.Log("[CombatManager] メタデバフ Lv9 鋼の皮膚: 敵が初回致命傷で1HPに踏みとどまった");
                     }
 
                     // 出血ダメージ
@@ -709,7 +940,11 @@ namespace CombatSystem
                     if (enemyHP == 0 && totalDmg > 0)
                         ctx.overDamageAccumulated = totalDmg + fixedDmg;
 
-                    // === Scratch計算（敵パッシブScratchAuraがセット済みの場合のみ適用） ===
+                    // === Scratch計算 ===
+                    // 脅威システム: ロール勝利でも勝ち幅が脅威に満たない分を削りダメージとして受ける
+                    //   scratch += max(0, 脅威 − 勝ち幅)。 大差勝ち(diff≥脅威)なら0。
+                    if (ctx.enemyThreat > 0)
+                        ctx.scratchDamage += Math.Max(0, ctx.enemyThreat - diceDiff);
                     ctx.scratchDamage = BattleModifierManager.ApplyScratchModifiers(ctx, ctx.scratchDamage);
                     psm.FireTrigger(PassiveSkillTrigger.OnPreScratchDamage);
                     if (!ctx.nullifyScratchDamage && ctx.scratchDamage > 0)
@@ -724,22 +959,17 @@ namespace CombatSystem
                     // 敵が勝利 → プレイヤーにダメージ
                     psm.FireEnemyTrigger(PassiveSkillTrigger.OnPreDealDamage);
 
+                    // 脅威システム: ロール敗北時の被ダメは脅威を下回らない。
+                    //   被ダメ基礎 = max(ダイス差, 脅威)。 大差負け(diff>脅威)なら差分がそのまま通る。
+                    int lossBase = Math.Max(mainDmg, ctx.enemyThreat);
                     var (totalDmg, fixedDmg, isCrit) = psm.ProcessDamage(
-                        mainDmg, 0, enemyCriticalNumerator);
+                        lossBase, 0, enemyCriticalNumerator);
 
-                    result.mainDamage = mainDmg;
+                    result.mainDamage = lossBase;
                     result.pursuitDamage = 0;
                     result.totalDamage = totalDmg;
                     result.fixedDamage = fixedDmg;
                     result.isCritical = isCrit;
-
-                    // メタデバフ Lv2 凶暴化: 50%で +1
-                    int rageBonus = MetaProgression.MetaDebuffApplicator.RollEnemyDamageBonus();
-                    if (rageBonus > 0) totalDmg += rageBonus;
-
-                    // メタデバフ Lv5 狂った時計: 7T以降+1/T、最大+5
-                    int madClock = MetaProgression.MetaDebuffApplicator.GetMadClockBonus(ctx.currentTurn);
-                    if (madClock > 0) totalDmg += madClock;
 
                     // メタデバフ Lv10 天変地異: 敵ダメージ ×2.0
                     float enemyMul = MetaProgression.MetaDebuffApplicator.GetEnemyDamageMultiplier();
@@ -785,6 +1015,19 @@ namespace CombatSystem
                         ctx.playerDamageNegateCharges--;
                         Debug.Log($"[CombatManager] 獣の絆発動: 被弾{totalDmg}を無効化（残チャージ{ctx.playerDamageNegateCharges}）");
                         totalDmg = 0;
+                    }
+
+                    // シュヴァリエのレイピア コントラタック: 被ダメ50%軽減 + 軽減量×2 を敵へ反射
+                    if (ctx.GetAccumulated("player_contre") > 0 && totalDmg > 0)
+                    {
+                        int mitigated = totalDmg / 2;
+                        totalDmg -= mitigated;
+                        int reflect = mitigated * 2;
+                        if (reflect > 0)
+                        {
+                            enemyHP = Math.Max(0, enemyHP - reflect);
+                            Debug.Log($"[コントラタック] 軽減{mitigated} → 被ダメ{totalDmg + mitigated}→{totalDmg}、反射{reflect} → 敵HP{enemyHP}");
+                        }
                     }
 
                     // ラストスタンド用: 純粋なロール敗北メインダメ
@@ -864,6 +1107,19 @@ namespace CombatSystem
             psm.FireTrigger(PassiveSkillTrigger.OnTurnEnd);
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnTurnEnd);
 
+            // 覚者連戦: 敵パッシブが予約した SwapEnemy を perspective 復帰後に実行
+            if (!string.IsNullOrEmpty(ctx.pendingEnemySwapId))
+            {
+                string swapId = ctx.pendingEnemySwapId;
+                string swapLabel = ctx.pendingEnemySwapLabel;
+                ctx.pendingEnemySwapId = null;
+                ctx.pendingEnemySwapLabel = null;
+                SwapEnemy(swapId, swapLabel);
+                // 敵HP は SwapEnemy で新形態の MaxHP に再設定済み。
+                // 戦闘継続のため enemyHP <= 0 判定を回避する目的で SyncHP しなおす
+                SyncHPFromContext(ctx);
+            }
+
             // ターン終了系時限効果（中毒等。適用のみ、消費は戦闘終了時）
             EventSystem.TimedEffects.TimedEffectManager.OnTurnEnd(
                 ctx, GameLoop.GameManager.Instance?.Run, this);
@@ -893,8 +1149,8 @@ namespace CombatSystem
                 Debug.Log($"[CombatManager] カルマの呪い: HP-{dmg} (現在 {playerHP}/{playerMaxHP})");
             }
 
-            // 消費: 継続回復（毎ターン終了時 +consRegen → consRegen--）
-            if (ctx.consRegen > 0 && playerHP > 0)
+            // 消費: 継続回復（毎ターン終了時 +consRegen → consRegen--）。狂暴化中は封印。
+            if (ctx.consRegen > 0 && playerHP > 0 && !ctx.healBlocked)
             {
                 int heal = Math.Min(playerMaxHP - playerHP, ctx.consRegen);
                 if (heal > 0) { playerHP += heal; ctx.playerCurrentHP = playerHP; }
@@ -921,6 +1177,16 @@ namespace CombatSystem
                 if (result.playerWon) { enemyHP = 0; ctx.enemyCurrentHP = 0; }
                 else { playerHP = 0; ctx.playerCurrentHP = 0; }
                 Debug.Log($"[CombatManager] 灰燼の烙印サドンデス決着: {(result.playerWon ? "ボス" : "プレイヤー")} 即死");
+            }
+
+            // 〈妙覚〉サドンデス: 1d6 vs 1d6 で勝者が敗者を即死させる（引き分けは継続）。
+            // プレイヤー勝利は AwakenedP7Myokaku.OnTurnEnd が gedatsuPending をセット済み。
+            // ここではボス勝利時のプレイヤー即死だけを保証する（シールド/LS バイパス）。
+            if (ctx.myokakuSuddenDeath && !result.isDraw && !result.playerWon)
+            {
+                playerHP = 0;
+                ctx.playerCurrentHP = 0;
+                Debug.Log("[CombatManager] 妙覚サドンデス決着: プレイヤー即死");
             }
 
             result.playerHPAfter = playerHP;
@@ -1008,6 +1274,7 @@ namespace CombatSystem
 
         private CombatResult GetLastCombatResult()
         {
+            var ctx = PassiveSkillManager.Instance?.Context;
             return new CombatResult
             {
                 enemyId = currentEnemy.id,
@@ -1016,7 +1283,8 @@ namespace CombatSystem
                 totalTurns = turnLog.Count,
                 playerHPRemaining = playerHP,
                 enemyHPRemaining = enemyHP,
-                turnLog = new List<TurnResult>(turnLog)
+                turnLog = new List<TurnResult>(turnLog),
+                gedatsu = ctx != null && ctx.gedatsuPending
             };
         }
 

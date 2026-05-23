@@ -174,33 +174,33 @@ namespace InventorySystem.PassiveSkills.Effects
     //  汎用パッシブ — 活力（Vitality）
     // ============================================================
 
-    /// <summary>活力I — ターン開始時HP+1回復</summary>
+    /// <summary>活力I — ターン終了時HP+1回復</summary>
     public class VitalityI : IPassiveSkillEffect
     {
         public string SkillId => "VitalityI";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
             ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + 1);
         }
     }
 
-    /// <summary>活力II — ターン開始時HP+2回復</summary>
+    /// <summary>活力II — ターン終了時HP+2回復</summary>
     public class VitalityII : IPassiveSkillEffect
     {
         public string SkillId => "VitalityII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
             ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + 2);
         }
     }
 
-    /// <summary>活力III — ターン開始時HP+3回復</summary>
+    /// <summary>活力III — ターン終了時HP+3回復</summary>
     public class VitalityIII : IPassiveSkillEffect
     {
         public string SkillId => "VitalityIII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
             ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + 3);

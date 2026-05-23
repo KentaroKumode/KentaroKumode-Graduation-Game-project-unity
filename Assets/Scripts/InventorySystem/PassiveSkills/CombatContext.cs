@@ -114,6 +114,10 @@ namespace InventorySystem.PassiveSkills
         public bool nullifyFirstEnemyRoll;
         /// <summary>呪いの渇き: HP回復効果半減</summary>
         public bool healHalved;
+        /// <summary>狂暴化(ボス50T後): プレイヤーの回復を完全に封じる。毎ターン狂暴化パッシブが再set。BeginNewTurn でリセット。</summary>
+        public bool healBlocked;
+        /// <summary>狂暴化(ボス50T後): エネミーが受けるダメージ倍率（1.0=等倍, 狂暴化中3.0）。BeginNewTurn でリセット。</summary>
+        public float enemyDamageTakenMultiplier = 1f;
         /// <summary>亡者の招待: 被ダメ+30% (0.3 = +30%)</summary>
         public float receivedDamageBonus;
         /// <summary>激情の刃 等の与ダメ倍率（1.0 = 変化なし。BeginNewTurn でリセット）</summary>
@@ -129,10 +133,28 @@ namespace InventorySystem.PassiveSkills
         /// ProcessPostRoll の勝敗判定前に enemyDiceTotal へ加算される。</summary>
         public int enemyDiceTotalBonus;
 
+        /// <summary>当ターン中にプレイヤーが消費品/レイピアを使用したか。
+        /// BeginNewTurn でリセット。覚者の「悟達の試練」が観想中断判定に使う。</summary>
+        public bool consumablesUsedThisTurn;
+
         /// <summary>〈灰燼の烙印〉: 6層ボスがHP1で踏みとどまった後の決着ターン。
         /// true の間は両ダイスを 1d6 に強制し、ロール勝者の与ダメに +999（相打ち上等のサドンデス）。
         /// 決着がつくまで持続するため BeginNewTurn ではリセットしない。</summary>
         public bool ashenSuddenDeath;
+
+        /// <summary>〈妙覚〉サドンデス: 妙覚T2+でロール敗北かつ生存中。
+        /// 次ターン以降、両ダイスを 1d2 に強制し決着まで継続。
+        /// プレイヤー勝利時 gedatsuPending=true をセットし【解脱】特殊勝利。</summary>
+        public bool myokakuSuddenDeath;
+
+        /// <summary>〈妙覚〉解脱: サドンデスでプレイヤーが勝利。CombatResult.gedatsu に反映される。</summary>
+        public bool gedatsuPending;
+
+        /// <summary>覚者連戦: 次フォームの enemy id。敵パッシブ OnTurnEnd で設定され、
+        /// CombatManager が perspective 復帰後に SwapEnemy で消費 → null クリア。</summary>
+        public string pendingEnemySwapId;
+        /// <summary>覚者連戦: 遷移ログラベル</summary>
+        public string pendingEnemySwapLabel;
 
         // ===== 消費アイテム由来（この1戦闘のみ。ctxは戦闘毎に生成→破棄で自動消去） =====
         public int consAtkBurst;          // 次の勝利ターンで与ダメ+X（適用後0）
@@ -172,7 +194,7 @@ namespace InventorySystem.PassiveSkills
             this.enemyThreat = enemyThreat;
             currentTurn = 0;
             isFirstRoll = true;
-            criticalMultiplier = 2.0f;
+            criticalMultiplier = MetaProgression.MetaBuffApplicator.GetCriticalMultiplier();
             accumulatedValues = new Dictionary<string, float>();
             nextTurnBuffs = new Dictionary<string, float>();
             currentBuffs = new Dictionary<string, float>();
@@ -208,8 +230,9 @@ namespace InventorySystem.PassiveSkills
             damageReduced = false;
             isCritical = false;
             criticalBonus = 0;
-            criticalMultiplier = 2.0f;
+            criticalMultiplier = MetaProgression.MetaBuffApplicator.GetCriticalMultiplier();
             pursuitDamage = 0;
+            consumablesUsedThisTurn = false;
 
             // 出血スタック減衰（毎ターン-1）
             if (enemyBleedStacks > 0) enemyBleedStacks--;
@@ -219,6 +242,10 @@ namespace InventorySystem.PassiveSkills
 
             // 与ダメ倍率は毎ターンリセット（パッシブが毎ターン再評価する）
             outgoingDamageMultiplier = 1f;
+
+            // 狂暴化系も毎ターンリセット（狂暴化パッシブが OnTurnStart で再適用）
+            healBlocked = false;
+            enemyDamageTakenMultiplier = 1f;
 
             // 被ダメ固定減算もリセット（毎ターン再評価）
             playerFlatDamageReduction = 0;

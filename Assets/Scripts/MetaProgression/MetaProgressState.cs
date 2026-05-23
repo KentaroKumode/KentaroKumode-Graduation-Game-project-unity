@@ -25,7 +25,11 @@ namespace MetaProgression
         public int damageReduce;          // 最大2
         public int hungerReduce;          // 最大3
         public int startMaterial;         // 最大3
-        public int combatGoldBonus;       // 最大3
+        public int combatGoldBonus;       // 最大2 (raw 上限。GetCombatGoldBonus でさらに Min(2) クランプ)
+        public int floorClearHeal;        // 最大2 (フロアクリア時HP回復量)
+        public bool divineProtectUnlocked;       // 1戦闘1回ロール敗北→引き分け化
+        public bool startingPassiveItemUnlocked; // 開幕パッシブ獲得
+        public bool treasureChestGoldUnlocked;   // 宝箱マスでゴールドも獲得
 
         public bool HasDebuff(MetaDebuffLevel lv) => activeDebuffs != null && activeDebuffs.Contains((int)lv);
 
@@ -41,10 +45,14 @@ namespace MetaProgression
             hungerReduce = 0;
             startMaterial = 0;
             combatGoldBonus = 0;
+            floorClearHeal = 0;
             refundLevel = 0;
             critLevel = 0;
             bossExtraNormalUnlocked = false;
             bossExtraRareUnlocked = false;
+            divineProtectUnlocked = false;
+            startingPassiveItemUnlocked = false;
+            treasureChestGoldUnlocked = false;
 
             for (int lv = 1; lv <= currentLevel; lv++)
             {
@@ -69,6 +77,10 @@ namespace MetaProgression
                 case MetaBuffKind.BossExtraRare:    bossExtraRareUnlocked = true; break;
                 case MetaBuffKind.RefundLevelUp:    refundLevel = UnityEngine.Mathf.Min(3, refundLevel + step.amount); break;
                 case MetaBuffKind.CritLevelUp:      critLevel = UnityEngine.Mathf.Min(3, critLevel + step.amount); break;
+                case MetaBuffKind.DivineProtect:    divineProtectUnlocked = true; break;
+                case MetaBuffKind.StartingPassiveItem: startingPassiveItemUnlocked = true; break;
+                case MetaBuffKind.FloorClearHeal:   floorClearHeal = UnityEngine.Mathf.Min(2, floorClearHeal + step.amount); break;
+                case MetaBuffKind.TreasureChestGold: treasureChestGoldUnlocked = true; break;
             }
         }
     }

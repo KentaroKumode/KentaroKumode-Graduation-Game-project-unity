@@ -140,8 +140,12 @@ namespace InventorySystem.PassiveItems.Effects
             if (run == null || combat == null) return;
             // 戦闘勝利のときだけ加算。CombatEnd は勝敗問わず呼ばれる前提なので enemyHP=0 で判定
             if (combat.EnemyHP > 0) return;
-            run.coins += 2;
-            Debug.Log($"[PassiveItem] 死神の数珠: +2G (現在 {run.coins})");
+            // 1/5 デノミ後: 50%で +1G (確定+1Gは強すぎたためナーフ)
+            if (UnityEngine.Random.value < 0.5f)
+            {
+                run.coins += 1;
+                Debug.Log($"[PassiveItem] 死神の数珠: +1G (50%抽選成功、現在 {run.coins})");
+            }
         }
     }
 

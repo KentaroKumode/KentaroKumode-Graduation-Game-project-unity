@@ -9,7 +9,7 @@ namespace MetaProgression
     /// </summary>
     public static class MetaBuffTrack
     {
-        public const int TotalSteps = 115;
+        public const int TotalSteps = 58;
 
         private static readonly List<MetaBuffStep> steps = BuildSteps();
 
@@ -37,58 +37,59 @@ namespace MetaProgression
             void Gold() => Add(MetaBuffKind.Gold);
             void Major(MetaBuffKind k, int amount = 1) => Add(k, amount, true);
 
-            // ===== 序盤 (Lv 1-30) =====
-            Hp(); Hp(); Hp(); Gold(); Hp(); Hp(); Gold(); Hp(); Hp();   // 1-9
-            Major(MetaBuffKind.StartMaterial);                           // 10
-            Hp(); Hp(); Hp(); Hp(); Hp(); Gold(); Hp(); Hp(); Gold();    // 11-19
-            Major(MetaBuffKind.CombatGoldBonus);                         // 20
-            Hp(); Hp(); Hp(); Gold();                                    // 21-24
-            Major(MetaBuffKind.DamageReduce);                            // 25
-            Hp(); Hp(); Hp(); Gold();                                    // 26-29
-            Major(MetaBuffKind.BossExtraNormal);                         // 30
+            // 設計サマリ:
+            //   HP 30, Gold 5, SM 3, CGB 2, DR 2, DT 1, CL 2, RL 3, HR 3,
+            //   BEN 1, BER 1, DP 1, SPI 1, FCH 2, TCG 1 → 計 58
+            //   (HP ナーフ: 60→30。出力面ナーフ: DT 3→1, CL 3→2, CritDamageBoost 撤廃)
+            //
+            // ===== 序盤 (Lv 1-20) =====
+            Hp(); Hp(); Gold();                                          // 1-3
+            Major(MetaBuffKind.FloorClearHeal);                          // 4 (+1)
+            Hp(); Hp(); Hp();                                            // 5-7
+            Major(MetaBuffKind.StartMaterial);                           // 8 (1st)
+            Hp(); Hp(); Hp();                                            // 9-11
+            Major(MetaBuffKind.CombatGoldBonus);                         // 12 (1st)
+            Hp(); Hp(); Hp();                                            // 13-15
+            Major(MetaBuffKind.DamageReduce);                            // 16 (-1)
+            Hp(); Gold(); Hp();                                          // 17-19
+            Major(MetaBuffKind.BossExtraNormal);                         // 20
 
-            // ===== 中盤 (Lv 31-70) =====
-            Hp(); Hp(); Hp(); Hp(); Gold(); Hp(); Hp(); Hp(); Gold();    // 31-39
-            Major(MetaBuffKind.StartMaterial);                           // 40
-            Hp(); Hp(); Hp(); Hp(); Gold(); Hp(); Hp(); Hp(); Gold();    // 41-49
-            Major(MetaBuffKind.RefundLevelUp);                           // 50 (5%)
-            Hp(); Hp(); Hp(); Hp();                                      // 51-54
-            Major(MetaBuffKind.HungerReduce);                            // 55
-            Hp(); Hp(); Hp(); Gold();                                    // 56-59
-            Major(MetaBuffKind.CombatGoldBonus);                         // 60
-            Hp(); Hp(); Hp(); Hp();                                      // 61-64
-            Major(MetaBuffKind.DiceTotal);                               // 65
-            Hp(); Hp(); Hp(); Gold();                                    // 66-69
-            Major(MetaBuffKind.CritLevelUp);                             // 70 (+1)
+            // ===== 中盤 (Lv 21-40) =====
+            Hp(); Hp();                                                  // 21-22
+            Major(MetaBuffKind.HungerReduce);                            // 23 (-1)
+            Hp(); Hp();                                                  // 24-25
+            Major(MetaBuffKind.StartMaterial);                           // 26 (2nd)
+            Hp(); Hp();                                                  // 27-28
+            Major(MetaBuffKind.CritLevelUp);                             // 29 (+1)
+            Hp(); Gold(); Hp();                                          // 30-32
+            Major(MetaBuffKind.RefundLevelUp);                           // 33 (5%)
+            Hp();                                                        // 34
+            Major(MetaBuffKind.StartMaterial);                           // 35 (max=3)
+            Hp(); Hp();                                                  // 36-37
+            Major(MetaBuffKind.CombatGoldBonus);                         // 38 (max=2)
+            Hp(); Hp();                                                  // 39-40
 
-            // ===== 終盤 (Lv 71-115) =====
-            Hp(); Hp(); Hp(); Hp(); Gold(); Hp(); Hp(); Hp(); Gold();    // 71-79
-            Major(MetaBuffKind.DamageReduce);                            // 80 (max)
-            Hp(); Hp(); Hp(); Gold();                                    // 81-84
-            Major(MetaBuffKind.RefundLevelUp);                           // 85 (10%)
-            Hp(); Hp(); Hp(); Gold();                                    // 86-89
-            Major(MetaBuffKind.HungerReduce);                            // 90
-            Add(MetaBuffKind.CombatGoldBonus);                           // 91 (3個目=最大)
-            Hp(); Hp(); Gold();                                          // 92-94
-            Major(MetaBuffKind.StartMaterial);                           // 95 (max)
-            Hp(); Hp(); Gold();                                          // 96-98
-            Gold();                                                      // 99（旧 CombatGoldBonus、+3 cap で代替）
-            Major(MetaBuffKind.CritLevelUp);                             // 100 (+2)
-            Add(MetaBuffKind.DiceTotal);                                 // 101
-            Gold();                                                      // 102
-            Hp();                                                        // 103（旧 CombatGoldBonus、+3 cap のため削除）
-            Add(MetaBuffKind.DiceTotal);                                 // 104
-            Major(MetaBuffKind.HungerReduce);                            // 105 (max)
-            Add(MetaBuffKind.DiceTotal);                                 // 106
-            Hp(); Gold();                                                // 107-108
-            Add(MetaBuffKind.DiceTotal);                                 // 109 (max)
-            Major(MetaBuffKind.BossExtraRare);                           // 110 (final big skill 1)
-            Hp(); Hp();                                                  // 111-112
-            Major(MetaBuffKind.RefundLevelUp);                           // 113 (15%, final)
-            Hp();                                                        // 114 (HP max)
-            Major(MetaBuffKind.CritLevelUp);                             // 115 (+3, final)
+            // ===== 終盤 (Lv 41-58) =====
+            Major(MetaBuffKind.DiceTotal);                               // 41 (max=+1)
+            Hp();                                                        // 42
+            Major(MetaBuffKind.StartingPassiveItem);                     // 43
+            Major(MetaBuffKind.TreasureChestGold);                       // 44
+            Gold();                                                      // 45
+            Major(MetaBuffKind.RefundLevelUp);                           // 46 (10%)
+            Hp();                                                        // 47
+            Major(MetaBuffKind.HungerReduce);                            // 48 (-2)
+            Gold();                                                      // 49
+            Major(MetaBuffKind.DamageReduce);                            // 50 (max=-2)
+            Major(MetaBuffKind.FloorClearHeal);                          // 51 (max=+2)
+            Major(MetaBuffKind.HungerReduce);                            // 52 (max=-3)
+            Major(MetaBuffKind.DivineProtect);                           // 53
+            Hp();                                                        // 54
+            Major(MetaBuffKind.BossExtraRare);                           // 55
+            Hp();                                                        // 56
+            Major(MetaBuffKind.RefundLevelUp);                           // 57 (15%, max)
+            Major(MetaBuffKind.CritLevelUp);                             // 58 (+2, max, final)
 
-            // 件数チェック（115 でなければ設計ミス）
+            // 件数チェック（TotalSteps でなければ設計ミス）
             if (list.Count != TotalSteps)
                 UnityEngine.Debug.LogError($"[MetaBuffTrack] step 数が不正: {list.Count} / {TotalSteps}");
 

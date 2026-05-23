@@ -11,28 +11,17 @@ namespace MapSystem
     public static class MapGenerator
     {
         // === タイル抽選ウェイト（ランダム行用）===
+        // 旧 Mystery(15) を廃止し Exchange(7) を新設。余り8を Battle+4 / EliteBattle+4 に再配分。
         private static readonly (TileType type, float weight)[] TileWeights =
         {
-            (TileType.Battle,      30f),
-            (TileType.Mystery,     25f),
-            (TileType.Event,       15f),
+            (TileType.Battle,      29f),   // 旧25 (+4)
+            (TileType.Event,       25f),
+            (TileType.EliteBattle, 14f),   // 旧10 (+4)
             (TileType.Trap,        10f),
-            (TileType.EliteBattle,  8f),
+            (TileType.Exchange,     7f),   // 新設(交換マス)
             (TileType.Shop,         7f),
             (TileType.Treasure,     3f),
             (TileType.Rest,         2f),
-        };
-
-        // ?マス解決ウェイト（Outpost/Boss/Mystery 除外）
-        private static readonly (TileType type, float weight)[] MysteryResolveWeights =
-        {
-            (TileType.Battle,      25f),
-            (TileType.Event,       20f),
-            (TileType.Trap,        12f),
-            (TileType.EliteBattle, 10f),
-            (TileType.Shop,        12f),
-            (TileType.Treasure,    10f),
-            (TileType.Rest,         8f),
         };
 
         public const int LaneCount = 3;
@@ -47,13 +36,15 @@ namespace MapSystem
         /// <summary>指定フロアのマップを生成</summary>
         public static FloorMap Generate(int floor)
         {
-            return floor == 6 ? GenerateLayer6() : GenerateStandard(floor);
+            if (floor == 6) return GenerateLayer6();
+            if (floor == 7) return GenerateLayer7();
+            return GenerateStandard(floor);
         }
 
-        /// <summary>?マスの実タイプを抽選</summary>
+        /// <summary>?マスの実タイプを抽選（Mystery は廃止済み。互換のため残置、呼ばれても Battle を返す）。</summary>
         public static TileType ResolveMystery()
         {
-            return WeightedRandom(MysteryResolveWeights);
+            return TileType.Battle;
         }
 
         // ================================================================
@@ -75,8 +66,8 @@ namespace MapSystem
             map.AddNode(new MapNode("outpost", 0, -1, TileType.Outpost));
             map.startNodeId = "outpost";
 
-            // Row 1 〜 7: ランダムタイル
-            int lastRandomRow = RowCount - 3; // 7
+            // Row 1 〜 8: ランダムタイル（旧 Row8 の宝箱確定を撤廃し通常ランダム行に）
+            int lastRandomRow = RowCount - 2; // 8
             for (int row = 1; row <= lastRandomRow; row++)
             {
                 for (int lane = 0; lane < LaneCount; lane++)
@@ -85,11 +76,6 @@ namespace MapSystem
                     map.AddNode(new MapNode(NodeId(row, lane), row, lane, type));
                 }
             }
-
-            // Row 8: 秘宝（保証）
-            int treasureRow = RowCount - 2;
-            for (int lane = 0; lane < LaneCount; lane++)
-                map.AddNode(new MapNode(NodeId(treasureRow, lane), treasureRow, lane, TileType.Treasure));
 
             // Row 9: 休憩（保証）
             int restRow = RowCount - 1;
@@ -115,12 +101,12 @@ namespace MapSystem
                 map.AddConnection("outpost", NodeId(1, lane));
 
             // Row 1〜9 → 次行: 前方 + 斜め前方
-            // Treasure(行8)・Rest(行9) を含む行/接続では斜めを 0% にする
+            // Rest(行9) を含む行/接続では斜めを 0% にする
             for (int row = 1; row < RowCount; row++)
             {
                 int targetRow = row + 1;
-                bool sourceGuaranteed = (row == treasureRow || row == restRow);
-                bool targetGuaranteed = (targetRow == treasureRow || targetRow == restRow);
+                bool sourceGuaranteed = (row == restRow);
+                bool targetGuaranteed = (targetRow == restRow);
                 bool allowDiagonal = !sourceGuaranteed && !targetGuaranteed;
 
                 for (int lane = 0; lane < LaneCount; lane++)
@@ -165,10 +151,10 @@ namespace MapSystem
                     map.AddConnection(NodeId(restRow, lane), "boss");
             }
 
-            // 横移動（確率、双方向）— Treasure/Rest 行は除外
+            // 横移動（確率、双方向）— Rest 行は除外
             for (int row = 1; row <= restRow; row++)
             {
-                if (row == treasureRow || row == restRow) continue;
+                if (row == restRow) continue;
 
                 for (int lane = 0; lane < LaneCount - 1; lane++)
                 {
@@ -181,10 +167,35 @@ namespace MapSystem
             // 1〜3個 Shop へ強制置換（接続トポロジは不変＝type だけ差し替え）
             ForceInjectShops(map);
 
+            // メタデバフ Lv5 偽の商人: Shopマスを確率で偽商人化（見た目はShopのまま）
+            ApplyFalseMerchant(map);
+
             return map;
         }
 
-        /// <summary>中央行(4〜lastRandomRow-1)からランダムに1〜3マスを Shop に強制置換。</summary>
+        /// <summary>メタデバフ Lv5 が有効なとき、各 Shop マスを 30% で偽商人に変える。
+        /// type は Shop のまま（プレイヤーには判別不可）、isFalseMerchant フラグだけ立てる。</summary>
+        private static void ApplyFalseMerchant(FloorMap map)
+        {
+            // 偽商人は3層以降のみ出現（序盤の事故を避ける）
+            if (map == null || map.floor < 3) return;
+            float chance = MetaProgression.MetaDebuffApplicator.GetFalseMerchantChance();
+            if (chance <= 0f) return;
+
+            for (int row = 0; row <= RowCount; row++)
+                for (int lane = 0; lane < LaneCount; lane++)
+                {
+                    var n = map.GetNode(NodeId(row, lane));
+                    if (n == null || n.EffectiveType != TileType.Shop) continue;
+                    if (Random.value < chance)
+                    {
+                        n.isFalseMerchant = true;
+                        Debug.Log($"[MapGenerator] 偽の商人を配置: {n.id}");
+                    }
+                }
+        }
+
+        /// <summary>中央行(4〜6)のランダムマスから1マスだけ Shop に強制置換（各フロア確定1個）。</summary>
         private static void ForceInjectShops(FloorMap map)
         {
             int firstCentral = 4;
@@ -200,19 +211,10 @@ namespace MapSystem
                 }
             if (cells.Count == 0) return;
 
-            // Fisher-Yates シャッフル
-            for (int i = cells.Count - 1; i > 0; i--)
-            {
-                int j = Random.Range(0, i + 1);
-                (cells[i], cells[j]) = (cells[j], cells[i]);
-            }
-
-            int n2 = Mathf.Min(cells.Count, Random.Range(1, 4)); // 1〜3
-            for (int k = 0; k < n2; k++)
-            {
-                cells[k].type = TileType.Shop;
-                cells[k].resolvedType = null; // EffectiveType が Shop を返すように
-            }
+            // 確定1個のみ Shop 化
+            var pick = cells[Random.Range(0, cells.Count)];
+            pick.type = TileType.Shop;
+            pick.resolvedType = null; // EffectiveType が Shop を返すように
         }
 
         // ================================================================
@@ -234,6 +236,26 @@ namespace MapSystem
             map.AddConnection("outpost", NodeId(1, 0));
             map.AddConnection(NodeId(1, 0), NodeId(2, 0));
             map.AddConnection(NodeId(2, 0), "boss");
+
+            return map;
+        }
+
+        // ================================================================
+        //  7層（覚者）— 固定リニア小フロア
+        // ================================================================
+        /// <summary>7層: 灰燼撃破後の独立小フロア。ファーム不可の一本道(outpost→Boss直結)。
+        /// 6F到達時点のビルドのみで覚者に挑む試金石。回復/精鋭ファーム余地なし。</summary>
+        private static FloorMap GenerateLayer7()
+        {
+            var map = new FloorMap { floor = 7, laneCount = 1, rowCount = 2 };
+
+            map.AddNode(new MapNode("outpost", 0, -1, TileType.Outpost));
+            map.AddNode(new MapNode("boss", 1, -1, TileType.Boss));
+
+            map.startNodeId = "outpost";
+            map.bossNodeId = "boss";
+
+            map.AddConnection("outpost", "boss");
 
             return map;
         }

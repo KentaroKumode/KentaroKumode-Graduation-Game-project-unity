@@ -18,7 +18,8 @@ namespace InventorySystem.PassiveItems
             if (run == null || run.ownedPassiveItems == null) return false;
             if (!run.ownedPassiveItems.Contains(TorchId)) return false;
 
-            run.ownedPassiveItems.Remove(TorchId);
+            int idx = run.ownedPassiveItems.IndexOf(TorchId);
+            InventorySystem.Helpers.PassiveAddHelper.RemoveAt(run, idx);
             run.playerHP = run.playerMaxHP;
             Debug.Log($"[ちいさな灯火] 致命傷を受ける直前に発動: HP全回復 ({run.playerMaxHP}) + アイテム消滅");
             return true;

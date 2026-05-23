@@ -34,6 +34,7 @@ namespace GameLoop
             ShopVisit,        // ショップ
             EventEncounter,   // イベント発生
             TreasureOpen,     // 秘宝
+            ExchangeTile,     // 交換マス（パッシブ1つ→上位Tierパッシブ）
             TrapTriggered,    // 罠発動
             SinRitual,        // 6層祭壇マスでの3段階儀式
             FloorClear,       // ボス撃破→次フロア
@@ -57,6 +58,9 @@ namespace GameLoop
         public event Action<GamePhase> OnPhaseChanged;
         public event Action<RunState> OnRunStarted;
         public event Action<EnemyData> OnEnemyEncountered;
+        /// <summary>覚者連戦などのチェーン swap で次フォームへ切り替わったことを通知する。
+        /// 戦闘自体は継続中だが、計測上は新エネミーとの戦闘扱いにしたい AutoRunner 等が拾う。</summary>
+        public void RaiseEnemyEncountered(EnemyData e) => OnEnemyEncountered?.Invoke(e);
         public event Action<CombatResult> OnBattleEnded;
         public event Action<int> OnRewardGranted;
         public event Action<int> OnFloorAdvanced;
@@ -87,6 +91,15 @@ namespace GameLoop
         private bool eventChoiceResolved;
         // 戦闘トリガで保留している場合、戦闘終了後に MapNavigation へ戻すフラグ
         private bool returnToMapAfterEventCombat;
+
+        // === 戦闘後ドロップの2択 ===
+        // 各ドロップにつき、同カテゴリ・同レア度の2候補(a,b)。プレイヤー/Botが1つ選ぶ。
+        private readonly System.Collections.Generic.List<(string a, string b)> pendingRewardChoices
+            = new System.Collections.Generic.List<(string a, string b)>();
+        private int rewardChoiceIndex;
+
+        // === メタデバフ Lv5: 偽の商人戦の進行中フラグ ===
+        private bool inFalseMerchantCombat;
 
         void Awake()
         {
@@ -130,9 +143,23 @@ namespace GameLoop
             // メタ恒久バフを適用（HP/Gold/初期素材を底上げ）
             MetaProgression.MetaBuffApplicator.ApplyToRunStart(Run, startingHP);
 
+            // メタバフ〈開幕パッシブ〉: ノーマル枠から1個獲得して所持
+            if (MetaProgression.MetaBuffApplicator.IsStartingPassiveItemUnlocked())
+            {
+                string id = PickPassiveItemForBossExtra(false);
+                if (!string.IsNullOrEmpty(id))
+                {
+                    if (Run.ownedPassiveItems == null)
+                        Run.ownedPassiveItems = new System.Collections.Generic.List<string>();
+                    InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
+                    Log($"メタ報酬: 開幕パッシブ「{id}」を獲得");
+                }
+            }
+
             LastCombatResult = null;
             CurrentEnemy = null;
             IsEliteSecondFight = false;
+            inFalseMerchantCombat = false;
 
             SetPhase(GamePhase.RunStart);
             OnRunStarted?.Invoke(Run);
@@ -201,6 +228,40 @@ namespace GameLoop
 
             var result = LastCombatResult.Value;
 
+            // メタデバフ Lv5 偽の商人戦の決着処理（通常の勝敗/報酬ロジックより前に解決）。
+            //   勝利            → レア恒久アイテム(GOLD以上)を1つ獲得
+            //   逃走(生存・未勝利) → 所持パッシブをランダム1つ喪失し、ランは継続
+            //   死亡            → 下の通常敗北処理へフォールスルー（救済/ゲームオーバー）
+            if (inFalseMerchantCombat)
+            {
+                if (result.playerWon)
+                {
+                    inFalseMerchantCombat = false;
+                    string id = PickPassiveItemForBossExtra(wantRare: true);
+                    if (!string.IsNullOrEmpty(id))
+                    {
+                        InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
+                        Loadout.TryAutoEquip(Run, id);
+                        var dd = ItemDatabase.Instance?.GetItem(id);
+                        Log($"偽の商人を討伐 → レア恒久アイテム「{(dd != null ? dd.displayName : id)}」を奪い返した");
+                    }
+                    SetPhase(GamePhase.MapNavigation);
+                    return;
+                }
+                if (Run.playerHP > 0)
+                {
+                    inFalseMerchantCombat = false;
+                    int lost = LoseRandomPassiveItem();
+                    Log(lost >= 0
+                        ? "偽の商人に逃げられた ― 恒久アイテムを1つ奪われた"
+                        : "偽の商人に逃げられた（奪われる恒久アイテムが無かった）");
+                    SetPhase(GamePhase.MapNavigation);
+                    return;
+                }
+                // HP0 で決着 = 通常の死亡として扱う
+                inFalseMerchantCombat = false;
+            }
+
             // 敗北 or HP0 → 救済（灯火→ラストスタンド）/ なければゲームオーバー
             if (!result.playerWon || Run.playerHP <= 0)
             {
@@ -247,8 +308,13 @@ namespace GameLoop
             var node = mm.CurrentNode;
 
             // メタ: 敵撃破トークン + 戦闘勝利金
+            // metaWinGold は最大3、全戦闘に加算すると経済を歪める(1/5 デノミ済み環境で +90G/ラン に到達)。
+            // ボス撃破時のみ適用し、通常戦闘では 0 とする。
             MetaProgression.MetaTokenEarner.OnEnemyDefeated();
-            int metaWinGold = MetaProgression.MetaBuffApplicator.GetCombatGoldBonus();
+            bool isBossNodeForMeta = node != null && node.type == TileType.Boss;
+            int metaWinGold = isBossNodeForMeta
+                ? MetaProgression.MetaBuffApplicator.GetCombatGoldBonus()
+                : 0;
             bool prideActive = MetaProgression.PermanentDebuffEffects.HasPride(Run);
 
             // ボス勝利 → フロアクリア
@@ -256,13 +322,27 @@ namespace GameLoop
             {
                 Run.bossDefeatedThisFloor = true;
 
+                // 5層裏ボス撃破フラグ: 以降のレイピア解除に会心+9 が付くようになる
+                if (CurrentEnemy != null && CurrentEnemy.id == "boss_layer5_hidden")
+                {
+                    Run.defeatedSaintGeorges = true;
+                    Log("剣聖サン=ジョリオラを撃破 ― 真の決闘術が解放された。");
+                }
+
+                // 7層裏ボス 妙覚サドンデス勝利: 解脱エンディング
+                if (result.gedatsu)
+                {
+                    Run.gedatsuVictory = true;
+                    Log("★解脱★ ─ 覚者の試練を超え、真の悟達に至った。");
+                }
+
                 // 1層ボス（トレジャーゴブリン）: 良質な武器/パッシブを1個ドロップ
                 if (Run.currentFloor == 1)
                 {
                     string dropId = PickTreasureGoblinDrop();
                     if (!string.IsNullOrEmpty(dropId))
                     {
-                        Run.ownedPassiveItems.Add(dropId);
+                        InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, dropId);
                         Loadout.TryAutoEquip(Run, dropId);
                         var dd = ItemDatabase.Instance?.GetItem(dropId);
                         Log($"トレジャーゴブリン討伐報酬: {(dd != null ? dd.displayName : dropId)} を獲得");
@@ -272,7 +352,9 @@ namespace GameLoop
                 int rewardBase = FloorManager.CalculateRewardCoins(Run.currentFloor, true, result.totalTurns) * 2;
                 // 傲慢: ボスはエリート以上扱いで報酬2倍（割合先）
                 if (prideActive) rewardBase *= 2;
-                int reward = LastStand.FilterGoldGain(Run, rewardBase + metaWinGold);
+                // パッシブ刻印〈守銭〉: 発動分 × 1G/ボス
+                int sigilGold = InventorySystem.Sigils.PassiveSigilActivator.CountGoldOnBossSigils(Run);
+                int reward = LastStand.FilterGoldGain(Run, rewardBase + metaWinGold + sigilGold);
                 Run.coins += reward;
 
                 // メタ: ボス撃破時の追加パッシブ報酬
@@ -283,7 +365,7 @@ namespace GameLoop
                     string id = PickPassiveItemForBossExtra(wantRare);
                     if (!string.IsNullOrEmpty(id))
                     {
-                        Run.ownedPassiveItems.Add(id);
+                        InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
                         Log($"メタ報酬: ボス撃破ボーナス {(wantRare ? "レア" : "ノーマル")}パッシブ獲得: {id}");
                     }
                 }
@@ -311,17 +393,28 @@ namespace GameLoop
             // 戦闘勝利報酬: 50%でパッシブ/消費を獲得。エリートマスは更に50%でもう1つ。
             // 戦闘を経済の主軸へ（戦闘以外のゴールド源ナーフと対の措置）。
             bool eliteWin = node != null && node.EffectiveType == TileType.EliteBattle;
+
+            // 確信進化: エリート戦勝利時に〈根拠のない確信〉→〈決意〉→〈真理〉と進化
+            if (eliteWin)
+                ConvictionSystem.OnEliteDefeated(Run);
             int drops = 0;
             if (UnityEngine.Random.value < 0.5f) drops++;
             if (eliteWin && UnityEngine.Random.value < 0.5f) drops++;
+
+            // 各ドロップを「同カテゴリ・同レア度の2択」として保留。
+            // 相方候補が無い場合のみ即時付与（単体ドロップにフォールバック）。
+            pendingRewardChoices.Clear();
+            rewardChoiceIndex = 0;
             for (int d = 0; d < drops; d++)
             {
-                string did = PickRandomTreasureItem();
-                if (string.IsNullOrEmpty(did)) continue;
-                Run.ownedPassiveItems.Add(did);
-                Loadout.TryAutoEquip(Run, did);
-                var dd = ItemDatabase.Instance?.GetItem(did);
-                Log($"戦闘勝利報酬: {(dd != null ? dd.displayName : did)} を獲得{(eliteWin ? "（精鋭）" : "")}");
+                var (a, b) = PickTreasureChoicePair();
+                if (string.IsNullOrEmpty(a)) continue;
+                if (string.IsNullOrEmpty(b))
+                {
+                    GrantRewardItem(a, eliteWin);
+                    continue;
+                }
+                pendingRewardChoices.Add((a, b));
             }
 
             SetPhase(GamePhase.Reward);
@@ -336,12 +429,14 @@ namespace GameLoop
             var all = db.GetAllItems();
             if (all == null || all.Count == 0) return null;
 
+            var dedup = BuildDedupExclude();
             var pool = new System.Collections.Generic.List<CompleteItemData>();
             foreach (var it in all)
             {
                 if (it == null) continue;
                 if (it.category != ItemCategory.Passive) continue;
                 if (!InventorySystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
+                if (dedup.Contains(it.internalName)) continue;   // ラン重複排除
                 pool.Add(it);
             }
             if (pool.Count == 0) return null;
@@ -364,12 +459,14 @@ namespace GameLoop
             var all = db.GetAllItems();
             if (all == null || all.Count == 0) return null;
 
+            var dedup = BuildDedupExclude();
             var pool = new System.Collections.Generic.List<CompleteItemData>();
             foreach (var it in all)
             {
                 if (it == null) continue;
                 if (it.category != ItemCategory.Weapon && it.category != ItemCategory.Passive) continue;
                 if (!InventorySystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
+                if (dedup.Contains(it.internalName)) continue;   // ラン重複排除
                 pool.Add(it);
             }
             if (pool.Count == 0) return null;
@@ -384,6 +481,14 @@ namespace GameLoop
         public void ConfirmReward()
         {
             if (CurrentPhase != GamePhase.Reward) return;
+
+            // 未解決のドロップ2択が残っていれば確定を保留（UI/Botが先に選ぶ）。
+            // 万一未選択のまま呼ばれたらソフトロック回避のため既定(option a)で消化。
+            if (HasPendingRewardChoice)
+            {
+                while (HasPendingRewardChoice) ResolveRewardChoice(0);
+                return;
+            }
 
             if (Run.bossDefeatedThisFloor)
             {
@@ -532,6 +637,13 @@ namespace GameLoop
                 Run.playerHP = upper;
                 Log($"前哨基地: MaxHP+{ActiveModifier.maxHPBonusFlat} → {Run.playerMaxHP}, HP={Run.playerHP}");
             }
+            else if (Run.currentFloor == 7)
+            {
+                // 7層前哨基地: 覚者戦に挑む者への餞別。HP全回復（healCap は尊重）
+                int upper = healCap < 0 ? Run.playerMaxHP : Mathf.Min(healCap, Run.playerMaxHP);
+                Run.playerHP = upper;
+                Log($"前哨基地(7F): HP全回復 → {Run.playerHP}/{Run.playerMaxHP}");
+            }
             else
             {
                 // 通常前哨基地: HP30%回復（Lv7 で上限制限される）
@@ -579,6 +691,17 @@ namespace GameLoop
         private void ActivateTile(MapNode node)
         {
             var effectiveType = node.EffectiveType;
+
+            // 収束ノード(Boss/Outpost)以外の一度きりタイルは、再訪時に再発火させない。
+            // （イベントの無限ファーム＝同行マス往復によるデッドロックを構造的に防ぐ）
+            bool oneShot = effectiveType != TileType.Boss && effectiveType != TileType.Outpost;
+            if (oneShot && node.activated)
+            {
+                SetPhase(GamePhase.MapNavigation);
+                return;
+            }
+            if (oneShot) node.activated = true;
+
             OnTileActivated?.Invoke(effectiveType);
             Log($"タイル起動: {TileToJapanese(effectiveType)} ({node.id})");
 
@@ -608,13 +731,17 @@ namespace GameLoop
                     SetPhase(GamePhase.RestStop);
                     break;
                 case TileType.Shop:
-                    EnterShop();
+                    if (node.isFalseMerchant) StartFalseMerchantCombat();
+                    else EnterShop();
                     break;
                 case TileType.Event:
                     BeginEventEncounter();
                     break;
                 case TileType.Treasure:
                     OpenTreasure();
+                    break;
+                case TileType.Exchange:
+                    SetPhase(GamePhase.ExchangeTile);
                     break;
                 case TileType.Trap:
                     HandleTrapTile();
@@ -707,7 +834,7 @@ namespace GameLoop
                 case "wraith":     return ("EliteWraith",      "霊体",           "2ターンに1度 被ダメ全て1に減少、非霊体時はダイス数+1");
                 case "golem":      return ("EliteGolem",       "巌の意志",       "毎ターン意志+1、撃破時にスタック分の確定ダメージ");
                 case "minotaur":   return ("EliteMinotaur",    "際限なき暴走",   "毎ロール自ダイス合計+1（既に強い→控えめ）");
-                case "dark_knight":return ("EliteDarkKnight",  "闇技",           "勝利時、与ダメ+3");
+                case "dark_knight":return ("EliteDarkKnight",  "闇技",           "勝利時、与ダメ+2");
                 default:           return ("EliteVigor",       "精鋭",           "HP2倍 / threat+2 / 3ターンごとにダイス出目合計+1");
             }
         }
@@ -744,6 +871,181 @@ namespace GameLoop
             CombatManager.Instance.StartCombat(CurrentEnemy, Run.playerHP, dc, dm, cr, df);
         }
 
+        /// <summary>所持リストのうちカテゴリが Passive のアイテム数を数える
+        /// （ownedPassiveItems には武器/ダイス/消費品も混在するため category で絞る）。</summary>
+        private int CountOwnedPassiveItems()
+        {
+            var owned = Run?.ownedPassiveItems;
+            if (owned == null) return 0;
+            var db = ItemDatabase.Instance;
+            int n = 0;
+            foreach (var id in owned)
+            {
+                var it = db?.GetItem(id);
+                if (it != null && it.category == ItemCategory.Passive) n++;
+            }
+            return n;
+        }
+
+        /// <summary>ラン重複排除用: 所持済みで「重複させたくない」アイテムの internalName 集合。
+        /// 消費アイテムは使い切る前提なので重複可（除外しない）。パッシブ/武器/ダイスは重複させない。</summary>
+        private System.Collections.Generic.HashSet<string> BuildDedupExclude()
+        {
+            var set = new System.Collections.Generic.HashSet<string>();
+            var owned = Run?.ownedPassiveItems;
+            if (owned == null) return set;
+            var db = ItemDatabase.Instance;
+            foreach (var id in owned)
+            {
+                var it = db?.GetItem(id);
+                if (it != null && it.category == ItemCategory.Consumable) continue;
+                set.Add(id);
+            }
+            return set;
+        }
+
+        // ---- 交換マス（パッシブ1つ → 上位Tierパッシブをランダム入手・任意） ----
+
+        /// <summary>交換可能か（渡せるパッシブを所持しているか）。</summary>
+        public bool CanExchangeTile
+            => CurrentPhase == GamePhase.ExchangeTile && FindLowestTierOwnedPassiveIndex() >= 0;
+
+        /// <summary>所持パッシブのうち最も低Tierのものの index。無ければ -1。</summary>
+        private int FindLowestTierOwnedPassiveIndex()
+        {
+            var owned = Run?.ownedPassiveItems;
+            if (owned == null) return -1;
+            var db = ItemDatabase.Instance;
+            int bestIdx = -1;
+            ItemRarity bestR = ItemRarity.MYTHIC;
+            for (int i = 0; i < owned.Count; i++)
+            {
+                var it = db?.GetItem(owned[i]);
+                if (it == null || it.category != ItemCategory.Passive) continue;
+                if (bestIdx < 0 || it.rarity < bestR) { bestR = it.rarity; bestIdx = i; }
+            }
+            return bestIdx;
+        }
+
+        /// <summary>交換実行: 最低Tierの所持パッシブを渡し、上位Tierのパッシブをランダム入手。</summary>
+        public void DoExchangeTile()
+        {
+            if (CurrentPhase != GamePhase.ExchangeTile) return;
+            int idx = FindLowestTierOwnedPassiveIndex();
+            if (idx < 0) { SetPhase(GamePhase.MapNavigation); return; }
+
+            var db = ItemDatabase.Instance;
+            string givenId = Run.ownedPassiveItems[idx];
+            var given = db?.GetItem(givenId);
+            if (given == null) { SetPhase(GamePhase.MapNavigation); return; }
+
+            string resultId = PickHigherTierPassive(given.rarity);
+            if (string.IsNullOrEmpty(resultId))
+            {
+                Log("交換: 上位Tierのパッシブが無く成立せず");
+                SetPhase(GamePhase.MapNavigation);
+                return;
+            }
+
+            InventorySystem.Helpers.PassiveAddHelper.RemoveAt(Run, idx);
+            InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, resultId);
+            Loadout.TryAutoEquip(Run, resultId);
+            var rd = db?.GetItem(resultId);
+            Log($"交換マス: 「{given.displayName}」を渡し「{(rd != null ? rd.displayName : resultId)}」を入手");
+            SetPhase(GamePhase.MapNavigation);
+        }
+
+        /// <summary>交換せずに通過。</summary>
+        public void SkipExchangeTile()
+        {
+            if (CurrentPhase != GamePhase.ExchangeTile) return;
+            SetPhase(GamePhase.MapNavigation);
+        }
+
+        /// <summary>given より高Tier（上限LEGENDARY、given が LEGENDARY なら据え置き）のパッシブを
+        /// 重複排除の上でレア度重み抽選。未所持が枯渇したら重複許可で再抽選（上位からを許可）。</summary>
+        private string PickHigherTierPassive(ItemRarity givenRarity)
+        {
+            var db = ItemDatabase.Instance;
+            var all = db?.GetAllItems();
+            if (all == null || all.Count == 0) return null;
+
+            bool atCap = givenRarity >= ItemRarity.LEGENDARY;
+            System.Func<ItemRarity, bool> tierOk = atCap
+                ? (System.Func<ItemRarity, bool>)(r => r == ItemRarity.LEGENDARY)
+                : (r => r > givenRarity && r <= ItemRarity.LEGENDARY);
+
+            var excl = BuildDedupExclude();
+            var pool = new System.Collections.Generic.List<CompleteItemData>();
+            foreach (var it in all)
+            {
+                if (it == null || it.category != ItemCategory.Passive) continue;
+                if (!InventorySystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
+                if (!tierOk(it.rarity)) continue;
+                if (excl.Contains(it.internalName)) continue;
+                pool.Add(it);
+            }
+            if (pool.Count == 0) // 枯渇 → 重複許可で再構築
+            {
+                foreach (var it in all)
+                {
+                    if (it == null || it.category != ItemCategory.Passive) continue;
+                    if (!InventorySystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
+                    if (!tierOk(it.rarity)) continue;
+                    pool.Add(it);
+                }
+            }
+            if (pool.Count == 0) return null;
+            return InventorySystem.RarityWeightedPicker.Pick(pool)?.internalName;
+        }
+
+        /// <summary>所持パッシブからランダムに1つ除去（刻印も同期）。除去した index を返す。無ければ -1。</summary>
+        private int LoseRandomPassiveItem()
+        {
+            var owned = Run?.ownedPassiveItems;
+            if (owned == null || owned.Count == 0) return -1;
+            int idx = UnityEngine.Random.Range(0, owned.Count);
+            string lostId = owned[idx];
+            InventorySystem.Helpers.PassiveAddHelper.RemoveAt(Run, idx);
+            var dd = ItemDatabase.Instance?.GetItem(lostId);
+            Log($"恒久アイテム喪失: {(dd != null ? dd.displayName : lostId)}");
+            return idx;
+        }
+
+        /// <summary>メタデバフ Lv5 偽の商人: ショップを装ったマスを踏んだ時の特殊エリート戦。
+        /// 3ターン以内に倒せば勝利報酬(レア恒久アイテム)、倒せず逃走されると恒久アイテム1喪失。</summary>
+        private void StartFalseMerchantCombat()
+        {
+            var baseEnemy = EnemyDatabase.Get("false_merchant");
+            if (baseEnemy == null)
+            {
+                Debug.LogError("[GameManager] false_merchant 敵データが無いため通常ショップへフォールバック");
+                EnterShop();
+                return;
+            }
+
+            // 貪欲: プレイヤーの所持パッシブ数に応じてスケール。
+            //   HP          : +3/個（複製データへ）
+            //   ダイス合計値 : +1/3個（毎ロール加算。enemyDiceTotalBonus 経由）
+            int passiveCount = CountOwnedPassiveItems();
+            int hpBonus = passiveCount * 2;
+            int diceTotalBonus = passiveCount / 3;
+            var enemy = baseEnemy.Clone();
+            enemy.maxHP += hpBonus;
+            Log($"偽の商人[貪欲]: 所持パッシブ{passiveCount}個 → HP {baseEnemy.maxHP}→{enemy.maxHP}, ダイス合計+{diceTotalBonus}/ロール");
+
+            inFalseMerchantCombat = true;
+            CurrentEnemy = enemy;
+            OnEnemyEncountered?.Invoke(enemy);
+            Log("ショップに見えたが――偽の商人だ！(3ターン以内に討て)");
+
+            var (dc, dm, cr, df) = GatherPlayerCombatStats();
+            SetPhase(GamePhase.Combat);
+            CombatManager.Instance.StartCombat(enemy, Run.playerHP, dc, dm, cr, df);
+            CombatManager.Instance.SetFleeAfterTurns(3);
+            CombatManager.Instance.AddEnemyDiceTotalBonus(diceTotalBonus);
+        }
+
         private void StartEliteSecondCombat()
         {
             var candidates = new System.Collections.Generic.List<EnemyData>(EnemyDatabase.GetByFloor(Run.currentFloor));
@@ -770,6 +1072,17 @@ namespace GameLoop
         {
             // ボス専用ID で取得、なければフロアプール抽選にフォールバック
             string bossId = $"boss_layer{Run.currentFloor}";
+
+            // 5F裏ボス置換: カルマ0 かつ シュヴァリエのレイピア所持 → シュヴァリエ・サン=ジョリオラ
+            if (Run.currentFloor == 5
+                && Run.karma == 0
+                && Run.ownedPassiveItems != null
+                && Run.ownedPassiveItems.Contains("chevalier_rapier"))
+            {
+                bossId = "boss_layer5_hidden";
+                Log("挑戦資格を満たす者の前にのみ現れる剣聖の影が形を成す ―");
+            }
+
             CurrentEnemy = CombatSystem.EnemyDatabase.Get(bossId);
             if (CurrentEnemy == null)
             {
@@ -834,13 +1147,13 @@ namespace GameLoop
             }
         }
 
-        /// <summary>「貪欲の儀」: 100G を支払う。所持不足 or ラストスタンド中は
+        /// <summary>「貪欲の儀」: 20G(旧100G・1/5デノミ) を支払う。所持不足 or ラストスタンド中は
         /// 捧げられず SeveredTime 付与。</summary>
         public void OfferGoldSacrifice(bool accept)
         {
             if (CurrentPhase != GamePhase.SinRitual) return;
 
-            const int demand = 100;
+            const int demand = 20; // 旧100G、1/5デノミ
             bool canPay = accept && !Run.lastStandActive && Run.coins >= demand;
             if (canPay)
             {
@@ -970,17 +1283,21 @@ namespace GameLoop
         private void OpenTreasure()
         {
             int floor = Run.currentFloor;
-            // 大幅ナーフ: 戦闘以外のゴールド源を絞る。宝箱の価値はアイテムへ移行。
-            // 1層:0-2 / 4層:0-5 / 6層:0-7（旧 floor×2-7 から約-85%）
-            int rawGold = UnityEngine.Random.Range(0, floor + 2);
-            int gold = LastStand.FilterGoldGain(Run, rawGold);
+            // 宝箱はゴールド0(価値はアイテムのみ)が基準。1/5デノミ後、僅少な変動が無意味になるため撤廃済み。
+            // メタバフ〈宝箱の財宝〉解放時のみ、フロア依存の少額ゴールドが復活する。
+            int gold = 0;
+            if (MetaProgression.MetaBuffApplicator.IsTreasureChestGoldUnlocked())
+            {
+                gold = Mathf.Max(1, 1 + floor / 2); // F1=1, F3=2, F5=3, F7=4
+                gold = LastStand.FilterGoldGain(Run, gold);
+            }
             Run.coins += gold;
 
             string itemId = PickRandomTreasureItem();
             string itemLabel = "（なし）";
             if (!string.IsNullOrEmpty(itemId))
             {
-                Run.ownedPassiveItems.Add(itemId);
+                InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, itemId);
                 Loadout.TryAutoEquip(Run, itemId);
                 var data = ItemDatabase.Instance?.GetItem(itemId);
                 itemLabel = data != null ? data.displayName : itemId;
@@ -999,6 +1316,7 @@ namespace GameLoop
             var all = db.GetAllItems();
             if (all == null || all.Count == 0) return null;
 
+            var dedup = BuildDedupExclude();
             var pool = new System.Collections.Generic.List<CompleteItemData>();
             foreach (var it in all)
             {
@@ -1006,6 +1324,7 @@ namespace GameLoop
                 if (it.category == ItemCategory.Weapon) continue;
                 if (it.category == ItemCategory.Quest) continue;
                 if (!InventorySystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
+                if (dedup.Contains(it.internalName)) continue;   // ラン重複排除
                 pool.Add(it);
             }
             if (pool.Count == 0) return null;
@@ -1024,6 +1343,86 @@ namespace GameLoop
                 picked = InventorySystem.RarityWeightedPicker.Pick(pool);
             }
             return picked?.internalName;
+        }
+
+        /// <summary>戦闘後ドロップ用に「主候補 + 同カテゴリ・同レア度の相方」を抽選する。
+        /// 相方が存在しなければ b = null（単体ドロップ扱い）。</summary>
+        private (string a, string b) PickTreasureChoicePair()
+        {
+            var db = ItemDatabase.Instance;
+            if (db == null) return (null, null);
+            var all = db.GetAllItems();
+            if (all == null || all.Count == 0) return (null, null);
+
+            var dedup = BuildDedupExclude();
+            var pool = new System.Collections.Generic.List<CompleteItemData>();
+            foreach (var it in all)
+            {
+                if (it == null) continue;
+                if (it.category == ItemCategory.Weapon) continue;
+                if (it.category == ItemCategory.Quest) continue;
+                if (!InventorySystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
+                if (dedup.Contains(it.internalName)) continue;   // ラン重複排除
+                pool.Add(it);
+            }
+            if (pool.Count == 0) return (null, null);
+
+            CompleteItemData first;
+            if (Run != null && Run.nextLootMinRarity >= 0)
+            {
+                var minR = (ItemRarity)Run.nextLootMinRarity;
+                Run.nextLootMinRarity = -1;
+                first = InventorySystem.RarityWeightedPicker.Pick(pool, minR)
+                        ?? InventorySystem.RarityWeightedPicker.Pick(pool);
+            }
+            else
+            {
+                first = InventorySystem.RarityWeightedPicker.Pick(pool);
+            }
+            if (first == null) return (null, null);
+
+            // 同カテゴリ・同レア度の相方候補（自身は除外）
+            var partners = new System.Collections.Generic.List<CompleteItemData>();
+            foreach (var it in pool)
+            {
+                if (it == null || it.internalName == first.internalName) continue;
+                if (it.category == first.category && it.rarity == first.rarity)
+                    partners.Add(it);
+            }
+            string b = partners.Count > 0
+                ? partners[UnityEngine.Random.Range(0, partners.Count)].internalName
+                : null;
+            return (first.internalName, b);
+        }
+
+        /// <summary>報酬アイテムを実際に付与（所持追加＋刻印ロール＋自動装備）。</summary>
+        private void GrantRewardItem(string itemId, bool eliteWin)
+        {
+            if (string.IsNullOrEmpty(itemId)) return;
+            InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, itemId);
+            Loadout.TryAutoEquip(Run, itemId);
+            var dd = ItemDatabase.Instance?.GetItem(itemId);
+            Log($"戦闘勝利報酬: {(dd != null ? dd.displayName : itemId)} を獲得{(eliteWin ? "（精鋭）" : "")}");
+        }
+
+        // ---- 戦闘後ドロップ2択: 公開API（UI / Bot から使用）----
+
+        /// <summary>未解決のドロップ2択が残っているか。</summary>
+        public bool HasPendingRewardChoice
+            => CurrentPhase == GamePhase.Reward && rewardChoiceIndex < pendingRewardChoices.Count;
+
+        /// <summary>現在提示中の2択のアイテムID。残っていなければ (null,null)。</summary>
+        public (string a, string b) CurrentRewardChoice
+            => HasPendingRewardChoice ? pendingRewardChoices[rewardChoiceIndex] : (null, null);
+
+        /// <summary>現在の2択から which(0/1) を選んで付与し、次の選択へ進める。</summary>
+        public void ResolveRewardChoice(int which)
+        {
+            if (!HasPendingRewardChoice) return;
+            var pair = pendingRewardChoices[rewardChoiceIndex];
+            string chosen = which == 1 ? pair.b : pair.a;
+            GrantRewardItem(chosen, eliteWin: false);
+            rewardChoiceIndex++;
         }
 
         // ================================================================
@@ -1137,13 +1536,29 @@ namespace GameLoop
 
         private void HandleFloorClear()
         {
-            // 5層クリア時: 暫定的にフラグアイテム「決意」未所持でも常に6層へ突入
-            // （裏ボスの触感計測のため。本実装時は hasResolve ゲートを復活させる）
+            // メタバフ〈フロアクリア回復〉: 階突破時の HP 回復（次層への持ち越し前に適用）
+            int fch = MetaProgression.MetaBuffApplicator.GetFloorClearHeal();
+            if (fch > 0 && Run != null && Run.playerHP > 0 && Run.playerHP < Run.playerMaxHP)
+            {
+                int before = Run.playerHP;
+                Run.playerHP = Mathf.Min(Run.playerMaxHP, Run.playerHP + fch);
+                Log($"メタ恩恵: フロアクリア回復 +{Run.playerHP - before} ({Run.playerHP}/{Run.playerMaxHP})");
+            }
+
+            // 5層クリア時: 〈決意〉以上未所持なら 5層クリアエンディング(NormalClear) で終了
             if (Run.IsNormalClear && Run.currentFloor == Run.normalClearFloor)
             {
+                if (!ConvictionSystem.HasResolveOrBetter(Run))
+                {
+                    Run.EndRun();
+                    SetPhase(GamePhase.RunClear);
+                    OnRunCleared?.Invoke(Run);
+                    Log("=== 5層クリア === 〈決意〉が無いためここで運命に背を向けた");
+                    return;
+                }
                 SetPhase(GamePhase.FloorClear);
                 OnFloorAdvanced?.Invoke(Run.currentFloor + 1);
-                Log($"フロア{Run.currentFloor}クリア → 6層突入（暫定: 決意フラグ不要）");
+                Log($"フロア{Run.currentFloor}クリア → 6層突入（〈{ConvictionSystem.StageToItemId(Run.convictionStage)}〉所持）");
                 return;
             }
             else if (Run.IsFullClear)
@@ -1155,6 +1570,15 @@ namespace GameLoop
             }
             else
             {
+                // 6層 → 7層: 〈真理〉未所持なら 6層クリアエンディングで終了
+                if (Run.currentFloor == 6 && !ConvictionSystem.HasTruth(Run))
+                {
+                    Run.EndRun();
+                    SetPhase(GamePhase.RunClear);
+                    OnRunCleared?.Invoke(Run);
+                    Log("=== 6層クリア === 〈真理〉が無いためここで覚者の門は閉ざされた");
+                    return;
+                }
                 SetPhase(GamePhase.FloorClear);
                 OnFloorAdvanced?.Invoke(Run.currentFloor + 1);
                 Log($"フロア{Run.currentFloor}クリア → 次へ");
@@ -1269,6 +1693,7 @@ namespace GameLoop
                 case TileType.Shop:        return "ショップ";
                 case TileType.Event:       return "イベント";
                 case TileType.Mystery:     return "？";
+                case TileType.Exchange:    return "交換";
                 case TileType.Trap:        return "罠";
                 case TileType.Boss:        return "ボス";
                 case TileType.SinAltar:    return "祭壇";
@@ -1406,6 +1831,22 @@ namespace GameLoop
                         return;
                     }
                 }
+                return;
+            }
+
+            // 報酬フェーズで2択が残っている間: [1]/[2] で選択（Spaceでの確定は選び切ってから）
+            if (CurrentPhase == GamePhase.Reward && HasPendingRewardChoice)
+            {
+                if (Input.GetKeyDown(KeyCode.Alpha1)) { ResolveRewardChoice(0); return; }
+                if (Input.GetKeyDown(KeyCode.Alpha2)) { ResolveRewardChoice(1); return; }
+                return;
+            }
+
+            // 交換マス: [1] 交換する / [Space] 交換せず通過
+            if (CurrentPhase == GamePhase.ExchangeTile)
+            {
+                if (Input.GetKeyDown(KeyCode.Alpha1) && CanExchangeTile) { DoExchangeTile(); return; }
+                if (Input.GetKeyDown(KeyCode.Space)) { SkipExchangeTile(); return; }
                 return;
             }
 

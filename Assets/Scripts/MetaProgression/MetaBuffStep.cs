@@ -29,6 +29,10 @@ namespace MetaProgression
                     case MetaBuffKind.BossExtraRare:    return "ボス追加報酬を レア化";
                     case MetaBuffKind.RefundLevelUp:    return "購入返金 レベル+1";
                     case MetaBuffKind.CritLevelUp:      return "会心ダイス補正 レベル+1";
+                    case MetaBuffKind.DivineProtect:    return "神の加護 (1戦闘1回 ロール敗北→引分)";
+                    case MetaBuffKind.StartingPassiveItem: return "開幕パッシブ獲得";
+                    case MetaBuffKind.FloorClearHeal:   return $"フロアクリア時 HP+{amount}";
+                    case MetaBuffKind.TreasureChestGold: return "宝箱マスでゴールド獲得";
                     default: return kind.ToString();
                 }
             }

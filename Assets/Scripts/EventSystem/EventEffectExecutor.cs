@@ -79,11 +79,17 @@ namespace EventSystem
                 case EventEffectType.GoldDelta:
                 {
                     int delta = eff.amount;
+                    // 1/5 デノミ: イベント記載の値を素直に /5 (差を残すため Mathf.Max(1, ...))。
+                    // 例: +15→+3, +8→+2, +6→+1, +5→+1, +3→+1, +1→+1
+                    //     -5→-1, -1→-1
                     if (delta > 0)
                     {
-                        // 戦闘以外のゴールド源を大幅ナーフ: 正の取得を40%に圧縮
-                        delta = Mathf.Max(1, Mathf.RoundToInt(delta * 0.4f));
+                        delta = Mathf.Max(1, Mathf.RoundToInt(delta / 5f));
                         delta = GameLoop.LastStand.FilterGoldGain(run, delta);
+                    }
+                    else if (delta < 0)
+                    {
+                        delta = -Mathf.Max(1, Mathf.RoundToInt(-delta / 5f));
                     }
                     run.coins = Mathf.Max(0, run.coins + delta);
                     result.log.Add($"ゴールド{delta:+0;-0} (現在 {run.coins})");
@@ -143,11 +149,11 @@ namespace EventSystem
                 case EventEffectType.GainPassiveItem:
                 {
                     string id = string.IsNullOrEmpty(eff.param)
-                        ? PickRandomItemId(ItemCategory.Passive)
+                        ? PickRandomItemId(ItemCategory.Passive, run)
                         : eff.param;
                     if (!string.IsNullOrEmpty(id))
                     {
-                        run.ownedPassiveItems.Add(id);
+                        InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(run, id);
                         result.log.Add($"パッシブアイテム獲得: {ResolveLabel(id)}");
                         ApplyPassiveAcquisitionBonus(run, id, result);
                     }
@@ -171,7 +177,7 @@ namespace EventSystem
                     // カテゴリ未指定: パッシブ扱い（イベントで [固有名] 指定された場合）
                     if (!string.IsNullOrEmpty(eff.param))
                     {
-                        run.ownedPassiveItems.Add(eff.param);
+                        InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(run, eff.param);
                         result.log.Add($"アイテム獲得: {ResolveLabel(eff.param)}");
                         ApplyPassiveAcquisitionBonus(run, eff.param, result);
                     }
@@ -190,7 +196,9 @@ namespace EventSystem
                 case EventEffectType.DiscardPassiveItem:
                     if (!string.IsNullOrEmpty(eff.param))
                     {
-                        run.ownedPassiveItems.Remove(eff.param);
+                        int idx = run.ownedPassiveItems.IndexOf(eff.param);
+                        if (idx >= 0)
+                            InventorySystem.Helpers.PassiveAddHelper.RemoveAt(run, idx);
                         result.log.Add($"パッシブアイテム廃棄: {eff.param}");
                     }
                     break;
@@ -247,7 +255,7 @@ namespace EventSystem
         }
 
         /// <summary>ItemDatabase から指定カテゴリのアイテムをレア度重み付きで1個選出（イベント限定は除外）。</summary>
-        private static string PickRandomItemId(ItemCategory category)
+        private static string PickRandomItemId(ItemCategory category, GameLoop.RunState run = null)
         {
             var db = ItemDatabase.Instance;
             if (db == null) return null;
@@ -256,6 +264,14 @@ namespace EventSystem
 
             var filtered = pool.FindAll(InventorySystem.Shop.EventOnlyItemFilter.IsAllowed);
             if (filtered.Count == 0) return null;
+
+            // パッシブはラン重複排除（消費は使い切る前提なので重複可）。枯渇時は元プール（重複許可）。
+            if (category == ItemCategory.Passive && run?.ownedPassiveItems != null)
+            {
+                var owned = new System.Collections.Generic.HashSet<string>(run.ownedPassiveItems);
+                var dd = filtered.FindAll(it => !owned.Contains(it.internalName));
+                if (dd.Count > 0) filtered = dd;
+            }
 
             var picked = InventorySystem.RarityWeightedPicker.Pick(filtered);
             return picked?.internalName;
@@ -280,6 +296,12 @@ namespace EventSystem
                     int gain = GameLoop.LastStand.FilterGoldGain(run, 1);
                     run.coins += gain;
                     result.log.Add($"決意の獲得ボーナス: +{gain}ゴールド");
+                    break;
+                }
+                case "根拠のない確信":
+                {
+                    GameLoop.ConvictionSystem.OnFirstAcquired(run);
+                    result.log.Add("根拠のない確信が芽吹いた (確信段階1)。エリート撃破毎に成長する。");
                     break;
                 }
                 case "鋼の心臓":

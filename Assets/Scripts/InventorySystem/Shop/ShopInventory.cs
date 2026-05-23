@@ -13,8 +13,8 @@ namespace InventorySystem.Shop
         /// <summary>武器強化素材を購入した回数（価格を倍々にするため）</summary>
         public int materialPurchaseCount;
 
-        /// <summary>強化素材スロットの基準価格</summary>
-        public int materialBasePrice = 15;
+        /// <summary>強化素材スロットの基準価格 (1/5 デノミ後: 旧15→3、2^N倍で 3/6/12/24...)</summary>
+        public int materialBasePrice = 3;
 
         /// <summary>このショップの価格倍率（フロアデバフ等から設定）</summary>
         public float priceMultiplier = 1f;

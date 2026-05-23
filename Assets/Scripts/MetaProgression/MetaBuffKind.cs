@@ -17,5 +17,9 @@ namespace MetaProgression
         BossExtraRare,       // 大スキル: 上の追加報酬をレアパッシブに昇格
         RefundLevelUp,       // 大スキル: 購入返金確率レベル+1（5/10/15%）
         CritLevelUp,         // 大スキル: 会心ダイス補正レベル+1（+1/+2/+3）
+        DivineProtect,       // 大スキル: 1戦闘1回だけロール敗北を引き分け扱いにする〈神の加護〉
+        StartingPassiveItem, // 大スキル: 開幕でノーマルパッシブを1個獲得
+        FloorClearHeal,      // フロアクリア時に +1 HP回復（最大2段=+2）
+        TreasureChestGold,   // 大スキル: 宝箱マスでゴールドも獲得（撤廃された宝箱ゴールドの復活）
     }
 }

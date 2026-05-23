@@ -68,9 +68,41 @@ namespace EventSystem
                 return null;
             }
 
-            // 優先タグ: 条件満たすものがあれば、それらの中から抽選
+            // 優先タグの抽選確率はイベントごとに異なる:
+            //  - 預言者の石板 (チェーン起点): 100% 優先 (条件満たせば確定出現)
+            //  - 啓示 / 災厄の予兆 (チェーン中段): 80% 優先
+            //  - その他 (一度のみ・優先 イベント): 60% 優先
             var priority = available.FindAll(e => e.condition.priority);
-            var pool = priority.Count > 0 ? priority : available;
+
+            // 確信チェーン進行中の隔離: 苦難の予言/苦難の確信 を所持中は、
+            // 該当フラグを要求する優先イベント (= チェーンの次段) を排他扱いにし、
+            // 他の「一度のみ・優先」イベントが横入りしないようにする。
+            if (priority.Count > 0 && run.ownedFlags != null)
+            {
+                string activeChainFlag = null;
+                if (run.ownedFlags.Contains("苦難の予言"))      activeChainFlag = "苦難の予言";
+                else if (run.ownedFlags.Contains("苦難の確信")) activeChainFlag = "苦難の確信";
+                if (activeChainFlag != null)
+                {
+                    var chainOnly = priority.FindAll(e =>
+                        e.condition.requiredFlags != null &&
+                        e.condition.requiredFlags.Contains(activeChainFlag));
+                    if (chainOnly.Count > 0) priority = chainOnly;
+                }
+            }
+
+            // 優先プール採用判定: プール内の最大優先確率で判定 (チェーン起点 100% は確定)
+            var pool = available;
+            if (priority.Count > 0)
+            {
+                float maxChance = 0f;
+                foreach (var p in priority)
+                {
+                    float c = GetPriorityChance(p.name);
+                    if (c > maxChance) maxChance = c;
+                }
+                if (Random.value < maxChance) pool = priority;
+            }
 
             // 重み付き抽選
             float total = 0f;
@@ -87,6 +119,18 @@ namespace EventSystem
                 if ((r -= weights[i]) <= 0f) return pool[i];
             }
             return pool[pool.Count - 1];
+        }
+
+        /// <summary>優先イベントごとの「優先プールへ採用される確率」。
+        /// チェーン起点(預言者)は確定、 チェーン中段(啓示/災厄)は 80%、 それ以外は 60%。</summary>
+        private static float GetPriorityChance(string eventName)
+        {
+            if (string.IsNullOrEmpty(eventName)) return 0.6f;
+            // 確信チェーン3段は全て確定優先 (踏めば必ず次段が出る)
+            if (eventName == "預言者の石板") return 1.0f;
+            if (eventName == "啓示") return 1.0f;
+            if (eventName == "災厄の予兆") return 1.0f;
+            return 0.6f;
         }
 
         /// <summary>イベントが現在の状態で出現可能か判定。</summary>

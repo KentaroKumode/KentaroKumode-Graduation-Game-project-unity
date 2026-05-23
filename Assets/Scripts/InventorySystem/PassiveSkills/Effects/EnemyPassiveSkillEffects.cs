@@ -253,7 +253,7 @@ namespace InventorySystem.PassiveSkills.Effects
             {
                 var run = GameLoop.GameManager.Instance?.Run;
                 if (run == null || run.coins <= 0) return;
-                int steal = System.Math.Min(5, run.coins);
+                int steal = System.Math.Min(1, run.coins); // 1/5 デノミ (旧5G→1G)
                 run.coins -= steal;
                 UnityEngine.Debug.Log($"[精鋭コボルド・早業] GOLD {steal} 強奪 (残{run.coins})");
             }
@@ -446,13 +446,13 @@ namespace InventorySystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.playerDiceTotal += 1;
     }
 
-    /// <summary>精鋭ダークナイト — 闇技: 勝利時、与ダメ+3（精鋭勝率を25%域へ）</summary>
+    /// <summary>精鋭ダークナイト — 闇技: 勝利時、与ダメ+2（4Fへ降格に伴いナーフ）</summary>
     public class EliteDarkKnight : IPassiveSkillEffect
     {
         public string SkillId => "EliteDarkKnight";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        { if (ctx.playerWonRoll) ctx.finalDamage += 3; }
+        { if (ctx.playerWonRoll) ctx.finalDamage += 2; }
     }
 
     // ----------------------------------------------------------
@@ -475,12 +475,13 @@ namespace InventorySystem.PassiveSkills.Effects
     /// <summary>再生 — 毎ターン開始時、HP2回復</summary>
     public class Regeneration : IPassiveSkillEffect
     {
+        // キメラを 6F→4F に降格した際に +2→+1 へ控えめ化（現在唯一の利用元）。
         public string SkillId => "Regeneration";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
 
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + 2);
+            ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + 1);
         }
     }
 
@@ -565,12 +566,71 @@ namespace InventorySystem.PassiveSkills.Effects
     {
         public string SkillId => "ScratchAura";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollLose };
+        // 脅威(threat)による削りダメージは CombatManager 側で全エネミー共通処理に昇格したため、
+        // このパッシブは no-op (二重適用を避ける)。データ互換のためクラスは残す。
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { }
+    }
+
+    /// <summary>威圧+: 戦闘開始時に脅威(threat)を +3 する。精鋭/ボスが脅威上限(8)に届くための補助。</summary>
+    public class IntimidatePlus : IPassiveSkillEffect
+    {
+        public string SkillId => "IntimidatePlus";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            int diff = System.Math.Abs(ctx.diceDifference);
-            int scratch = System.Math.Max(0, ctx.enemyThreat - diff);
-            if (scratch > 0)
-                ctx.scratchDamage += scratch;
+            ctx.enemyThreat += 3;
+            UnityEngine.Debug.Log($"[威圧+] 脅威 +3 → {ctx.enemyThreat}");
+        }
+    }
+
+    /// <summary>威圧++: 戦闘開始時に脅威(threat)を +5 する。ボス専用の最高位脅威(上限10)。</summary>
+    public class IntimidatePlusPlus : IPassiveSkillEffect
+    {
+        public string SkillId => "IntimidatePlusPlus";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            ctx.enemyThreat += 5;
+            UnityEngine.Debug.Log($"[威圧++] 脅威 +5 → {ctx.enemyThreat}");
+        }
+    }
+
+    /// <summary>貪欲(偽の商人): 表示専用マーカー。実際のスケーリング(プレイヤー所持パッシブ数に応じた
+    /// HP+3/個・ダイス合計+1/3個)は GameManager.StartFalseMerchantCombat が戦闘開始時に適用する
+    /// （HP は複製データ、ダイス合計は ctx.enemyDiceTotalBonus 経由）。</summary>
+    public class GreedyMerchant : IPassiveSkillEffect
+    {
+        public string SkillId => "GreedyMerchant";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { }
+    }
+
+    /// <summary>狂暴化: 全ボスに付与される時限エンレイジ。
+    /// 50ターン経過後、エネミーのダイス合計+10、プレイヤーの回復を完全封印、
+    /// エネミーが受けるダメージ3倍（プレイヤーが押し切る窓は残す）。</summary>
+    public class Berserk : IPassiveSkillEffect
+    {
+        public const int EnrageTurn = 50;
+        public const int DiceBonus = 10;
+        public const float EnemyDamageTakenMult = 3f;
+
+        public string SkillId => "Berserk";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            if (ctx.currentTurn <= EnrageTurn) return;
+
+            // 回復封印・敵被ダメ倍化は毎ターン再適用 (BeginNewTurn でリセットされるため)
+            ctx.healBlocked = true;
+            ctx.enemyDamageTakenMultiplier = EnemyDamageTakenMult;
+
+            // ダイス合計+10 は一度だけ積む (enemyDiceTotalBonus は累積でリセットされない)
+            if (ctx.GetAccumulated("berserk_dice_applied") == 0)
+            {
+                ctx.enemyDiceTotalBonus += DiceBonus;
+                ctx.accumulatedValues["berserk_dice_applied"] = 1;
+                UnityEngine.Debug.Log($"[Berserk] 狂暴化発動 (T{ctx.currentTurn}): 敵ダイス+{DiceBonus}, 回復封印, 敵被ダメ×{EnemyDamageTakenMult}");
+            }
         }
     }
 
@@ -581,14 +641,22 @@ namespace InventorySystem.PassiveSkills.Effects
 
     /// <summary>〈ゴルゴダの心〉ボスは毎ターン scratch+1 を上乗せ。
     /// プレイヤーが HP の儀式を拒んだ罰。じわじわ削られる。</summary>
+    /// <summary>〈ゴルゴダの心〉プレイヤーが血の儀を拒んだ罰。
+    /// 灰燼戦開始時、プレイヤー最大HPを半減（戦闘中のみ）。
+    /// 血を流す覚悟を持たぬ者には命そのものが許されない。</summary>
     public class Boss6Golgotha : IPassiveSkillEffect
     {
         public string SkillId => "boss6_golgotha";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            // 敵視点のため、playerCurrentHP は実際にはプレイヤーのHP
-            ctx.scratchDamage += 1;
+            // 敵視点: enemyMaxHP / enemyCurrentHP = プレイヤーの値
+            int beforeMax = ctx.enemyMaxHP;
+            int beforeCur = ctx.enemyCurrentHP;
+            ctx.enemyMaxHP = System.Math.Max(1, ctx.enemyMaxHP / 2);
+            if (ctx.enemyCurrentHP > ctx.enemyMaxHP)
+                ctx.enemyCurrentHP = ctx.enemyMaxHP;
+            UnityEngine.Debug.Log($"[ゴルゴダの心] プレイヤー最大HP半減 {beforeMax}→{ctx.enemyMaxHP} (HP {beforeCur}→{ctx.enemyCurrentHP})");
         }
     }
 
@@ -598,13 +666,16 @@ namespace InventorySystem.PassiveSkills.Effects
     public class Boss6SeveredTime : IPassiveSkillEffect
     {
         public string SkillId => "boss6_severed_time";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
+        // OnTurnStart で enemyDiceTotalBonus に積む。
+        // 旧実装は OnPostRoll で playerDiceTotal を直接いじっていたが、
+        // 敵 OnPostRoll は ProcessPostRoll 完了(=勝敗判定済み)の後に発火するため
+        // ボーナスが判定に乗らず、AutoRunner で 75万ターンの実質無敵化が発生していた。
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            // 敵視点のため playerDiceTotal = ボス自身のダイス合計
+            // ProcessPostRoll 内 (L445) で enemyDiceTotal += enemyDiceTotalBonus が判定前に乗る
             int bonus = System.Math.Max(0, ctx.currentTurn - 1);
-            if (bonus > 0)
-                ctx.playerDiceTotal += bonus;
+            ctx.enemyDiceTotalBonus = bonus;
         }
     }
 
@@ -1059,6 +1130,633 @@ namespace InventorySystem.PassiveSkills.Effects
                     $"[Decree13th] 成就: ({ctx.playerDiceTotal}+{ctx.enemyDiceTotal})×{critMul:F1} = {dmg} ダメ → プレイヤー残HP={ctx.enemyCurrentHP}");
 
                 ctx.currentBuffs.Remove(FlagKey);
+            }
+        }
+    }
+
+    /// <summary>シュヴァリエ・サン=ジョリオラ — 形態転換: 二形態を循環する5層裏ボス。
+    /// 【形態1 コントラタック】戦闘開始時 シールド100展開。自身は 0d0（プレイヤー必勝）。
+    ///   被ダメージは全てシールド経由(ダイス合計分)、ロール勝利した瞬間プレイヤー自身が
+    ///   ダイス合計+プリオリテ×2 の不可避反撃を受け、さらにシールドへ+25確定ダメ。
+    ///   シールドが0になったターンは無敵(あふれた分を無効化)、次T形態2へ。
+    /// 【形態2 オポジション】4d6 + プリオリテ で殴り合い。ボス累積3勝で形態1へ帰還。
+    ///   プレイヤーがロール勝利すると次Tボスダイス合計+4、そのT ボスがロール敗北すれば+15ダメ。
+    ///   次Tが形態1帰還となる場合、報酬を確実に与えるため形態2を1T延長する。
+    /// 【プリオリテ】形態2→1 に再突入する毎にスタック+1（戦闘内累積・上限なし）。
+    ///   各スタック効果: 形態1シールド初期 -20 (最低20まで) / 形態1反撃 +3。
+    ///   シールドが薄くなるほど往復は速くなるが、毎サイクル受ける反撃が指数的に重くなる
+    ///   = "粘る者ほど無駄に身を削る" 罠。0d0仕様を壊さないためダイス合計には触れない。</summary>
+    public class SaintGeorgesPhases : IPassiveSkillEffect
+    {
+        public string SkillId => "SaintGeorgesPhases";
+        public PassiveSkillTrigger[] Triggers => new[] {
+            PassiveSkillTrigger.OnBattleStart,
+            PassiveSkillTrigger.OnTurnStart,
+            PassiveSkillTrigger.OnPreReceiveDamage,
+            PassiveSkillTrigger.OnRollLose,   // 敵視点: ボスが敗北 = プレイヤー勝利
+            PassiveSkillTrigger.OnRollWin,    // 敵視点: ボスが勝利 = プレイヤー敗北
+            PassiveSkillTrigger.OnTurnEnd,
+        };
+
+        // accumulatedValues キー（perspective 非依存・共有スカラ）
+        private const string KPhase           = "sg_phase";            // 1 or 2
+        private const string KShield          = "sg_shield";           // 形態1シールド残量
+        private const string KBossWins        = "sg_boss_wins";        // 形態2のボス累積勝利
+        private const string KPendingP1ToP2   = "sg_pending_p1_to_p2"; // シールド破壊→次T形態2
+        private const string KPendingP2ToP1   = "sg_pending_p2_to_p1"; // ボス3勝→次T形態1
+        private const string KP2RewardPending = "sg_p2_reward_pending"; // P2: 連勝予約
+        private const string KP2RewardActive  = "sg_p2_reward_active";  // P2: 当ターン報酬有効
+        private const string KP2ExtendPending = "sg_p2_extend_pending"; // P2: 帰還1T延長予約
+        private const string KPrioriteStacks  = "sg_priorite_stacks";   // プリオリテ累積（往復ペナルティ）
+
+        private const int BaseDiceCount   = 4; // enemies.json と一致させること
+        private const int BaseShield      = 140; // HP +40% に比例して上方修正
+        private const int MinShield       = 28; // プリオリテ削減後の下限 (20→28, +40%)
+        private const int PrioriteShieldDecPer = 28; // /stack でシールド初期量を減らす
+        private const int PrioriteCounterPer   = 3;  // /stack で反撃ダメ加算
+
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            switch (trigger)
+            {
+                case PassiveSkillTrigger.OnBattleStart:
+                    ctx.accumulatedValues[KPhase] = 1;
+                    ctx.accumulatedValues[KShield] = BaseShield;
+                    ctx.accumulatedValues[KPrioriteStacks] = 0;
+                    UnityEngine.Debug.Log($"[サン=ジョリオラ] 戦闘開始: コントラタック構え シールド{BaseShield}");
+                    break;
+
+                case PassiveSkillTrigger.OnTurnStart:
+                    ApplyPendingTransitions(ctx);
+                    int phaseStart = (int)ctx.GetAccumulated(KPhase);
+                    if (phaseStart == 1)
+                    {
+                        // 形態1: ボスはダイスを振らない (0d0)
+                        ctx.accumulatedValues["extraDice"] = -BaseDiceCount;
+                    }
+                    else
+                    {
+                        // 形態2: 報酬予約→有効化、ボスダイス合計+4
+                        if (ctx.GetAccumulated(KP2RewardPending) > 0)
+                        {
+                            ctx.accumulatedValues[KP2RewardActive] = 1;
+                            ctx.accumulatedValues[KP2RewardPending] = 0;
+                            ctx.enemyDiceTotalBonus += 4;
+                            UnityEngine.Debug.Log("[サン=ジョリオラ・オポジション] 報酬ターン突入: ボスダイス合計+4");
+                        }
+                    }
+                    break;
+
+                case PassiveSkillTrigger.OnPreReceiveDamage:
+                {
+                    // 形態1のみシールド経由
+                    if ((int)ctx.GetAccumulated(KPhase) != 1) break;
+                    if (ctx.finalDamage <= 0) break;
+
+                    float shield = ctx.GetAccumulated(KShield);
+                    if (shield <= 0)
+                    {
+                        // シールド既に0 → このターンは無敵
+                        ctx.finalDamage = 0;
+                        UnityEngine.Debug.Log("[サン=ジョリオラ] シールド0(無敵): ダメージ無効");
+                        break;
+                    }
+
+                    int absorbed = System.Math.Min((int)shield, ctx.finalDamage);
+                    shield -= absorbed;
+                    ctx.finalDamage -= absorbed;
+                    ctx.accumulatedValues[KShield] = shield;
+
+                    if (shield <= 0)
+                    {
+                        // シールド破壊ターン: 残ダメを全て無効化、次T形態2へ
+                        ctx.finalDamage = 0;
+                        ctx.accumulatedValues[KPendingP1ToP2] = 1;
+                        UnityEngine.Debug.Log($"[サン=ジョリオラ] シールド破壊! 吸収{absorbed} + 超過分は無敵で無効化 / 次T 形態2");
+                    }
+                    else
+                    {
+                        UnityEngine.Debug.Log($"[サン=ジョリオラ] シールド吸収{absorbed} → 残{shield}");
+                    }
+                    break;
+                }
+
+                case PassiveSkillTrigger.OnRollLose:
+                {
+                    // 敵視点: ボスがロール敗北 = プレイヤーがロール勝利
+                    int phaseLose = (int)ctx.GetAccumulated(KPhase);
+                    if (phaseLose == 1)
+                    {
+                        // 反撃: プレイヤー自身のダイス合計 + プリオリテ×3 を不可避ダメで返す
+                        // 敵視点では ctx.enemyDiceTotal = プレイヤー実ダイス合計、ctx.enemyCurrentHP = プレイヤー実HP
+                        int playerTotal = ctx.enemyDiceTotal;
+                        int stacks = (int)ctx.GetAccumulated(KPrioriteStacks);
+                        int counter = playerTotal + stacks * PrioriteCounterPer;
+                        if (counter > 0)
+                        {
+                            ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - counter);
+                            UnityEngine.Debug.Log($"[サン=ジョリオラ・コントラタック] 反撃{counter} (素{playerTotal}+プリオリテ{stacks}×{PrioriteCounterPer}, 不可避) → プレイヤーHP={ctx.enemyCurrentHP}");
+                        }
+                        // シールドへ +25 確定ダメ
+                        float s = ctx.GetAccumulated(KShield);
+                        if (s > 0)
+                        {
+                            float newS = System.Math.Max(0, s - 25);
+                            ctx.accumulatedValues[KShield] = newS;
+                            UnityEngine.Debug.Log($"[サン=ジョリオラ・コントラタック] +25確定ダメ シールド{s}→{newS}");
+                            if (newS <= 0)
+                                ctx.accumulatedValues[KPendingP1ToP2] = 1;
+                        }
+                    }
+                    else // 形態2
+                    {
+                        // 当ターン報酬有効中なら +15 ダメ
+                        if (ctx.GetAccumulated(KP2RewardActive) > 0)
+                        {
+                            // 敵視点: ctx.playerCurrentHP = ボス自身のHP
+                            ctx.playerCurrentHP = System.Math.Max(0, ctx.playerCurrentHP - 15);
+                            UnityEngine.Debug.Log($"[サン=ジョリオラ・連勝報酬] +15ダメ → ボスHP={ctx.playerCurrentHP}");
+                        }
+                        // 次ターン分の報酬予約
+                        ctx.accumulatedValues[KP2RewardPending] = 1;
+                        // 形態1帰還を1T遅延する予約
+                        ctx.accumulatedValues[KP2ExtendPending] = 1;
+                    }
+                    break;
+                }
+
+                case PassiveSkillTrigger.OnRollWin:
+                {
+                    // 敵視点: ボスがロール勝利
+                    if ((int)ctx.GetAccumulated(KPhase) != 2) break;
+                    int wins = (int)ctx.GetAccumulated(KBossWins) + 1;
+                    ctx.accumulatedValues[KBossWins] = wins;
+                    UnityEngine.Debug.Log($"[サン=ジョリオラ・オポジション] ボス勝利 累計{wins}/3");
+                    if (wins >= 3)
+                    {
+                        if (ctx.GetAccumulated(KP2ExtendPending) > 0)
+                        {
+                            // 延長: 形態2を1T継続させ、勝利カウントを2に戻す
+                            ctx.accumulatedValues[KBossWins] = 2;
+                            ctx.accumulatedValues[KP2ExtendPending] = 0;
+                            UnityEngine.Debug.Log("[サン=ジョリオラ] 連勝報酬完了まで形態2延長 (勝利数2へ戻す)");
+                        }
+                        else
+                        {
+                            ctx.accumulatedValues[KPendingP2ToP1] = 1;
+                            UnityEngine.Debug.Log("[サン=ジョリオラ] 次T 形態1帰還を予約 → シールド再展開");
+                        }
+                    }
+                    break;
+                }
+
+                case PassiveSkillTrigger.OnTurnEnd:
+                    // 報酬ターン終了処理: +4 ボーナス除去、active クリア
+                    if (ctx.GetAccumulated(KP2RewardActive) > 0)
+                    {
+                        ctx.accumulatedValues[KP2RewardActive] = 0;
+                        ctx.enemyDiceTotalBonus = System.Math.Max(0, ctx.enemyDiceTotalBonus - 4);
+                    }
+                    break;
+            }
+        }
+
+        private void ApplyPendingTransitions(CombatContext ctx)
+        {
+            if (ctx.GetAccumulated(KPendingP1ToP2) > 0)
+            {
+                ctx.accumulatedValues[KPhase] = 2;
+                ctx.accumulatedValues[KShield] = 0;
+                ctx.accumulatedValues[KBossWins] = 0;
+                ctx.accumulatedValues[KPendingP1ToP2] = 0;
+                UnityEngine.Debug.Log("[サン=ジョリオラ] 形態1→2 移行: オポジション(4d6) 開始");
+            }
+            if (ctx.GetAccumulated(KPendingP2ToP1) > 0)
+            {
+                // プリオリテ累積: 帰還の代償としてシールド -20 (最低 MinShield)、反撃 +3
+                int newStacks = (int)ctx.GetAccumulated(KPrioriteStacks) + 1;
+                ctx.accumulatedValues[KPrioriteStacks] = newStacks;
+                int newShield = System.Math.Max(MinShield, BaseShield - newStacks * PrioriteShieldDecPer);
+
+                ctx.accumulatedValues[KPhase] = 1;
+                ctx.accumulatedValues[KShield] = newShield;
+                ctx.accumulatedValues[KBossWins] = 0;
+                ctx.accumulatedValues[KPendingP2ToP1] = 0;
+                // 報酬関連はクリア（形態跨ぎでは持ち越さない）
+                ctx.accumulatedValues[KP2RewardPending] = 0;
+                ctx.accumulatedValues[KP2RewardActive] = 0;
+                ctx.accumulatedValues[KP2ExtendPending] = 0;
+                UnityEngine.Debug.Log($"[サン=ジョリオラ] プリオリテ{newStacks} 主張! 形態2→1 移行: シールド{newShield} (反撃+{newStacks * PrioriteCounterPer})");
+            }
+        }
+    }
+
+    // ===========================================================================
+    //  覚者×7形態大連戦 (boss_layer7 → p2 → p3 → p4 → p5 → p6 → p7)
+    //  各形態は自身の HP=0 を検知して次形態へ SwapEnemy する。
+    //  プレイヤー状態(HP/buffs/currentTurn) は全形態で持ち越し。
+    // ===========================================================================
+
+    /// <summary>形態1【逆観】高出目=自爆。ロール敗北時、プレイヤー最大出目×1 を追加の固定ダメに変換。
+    /// 注: 旧実装(OnPostRoll で playerDiceTotal +=) は勝敗判定後で効かなかった。
+    /// プレイヤー敗北時の被ダメに乗せる方式に変更 (高出目を振ったほど被弾増)。</summary>
+    public class AwakenedP1Inverse : IPassiveSkillEffect
+    {
+        public string SkillId => "AwakenedP1Inverse";
+        // 〈逆観〉: 強い出目ほど自分を蝕む。毎ターン player の最大出目を player に固定ダメ (軽減無視)。
+        // OnPostRoll で fixedDamageToEnemy (= 敵視点ではプレイヤーへの固定ダメ) に積む。
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnTurnEnd };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            if (trigger == PassiveSkillTrigger.OnPostRoll)
+            {
+                if (ctx.enemyDice != null && ctx.enemyDice.Length > 0)
+                {
+                    int maxFace = 0;
+                    foreach (var d in ctx.enemyDice) if (d > maxFace) maxFace = d;
+                    if (maxFace > 0)
+                    {
+                        ctx.fixedDamageToEnemy += maxFace;
+                        UnityEngine.Debug.Log($"[覚者・逆観] プレイヤー最大出目{maxFace} → 固定ダメ(軽減無視)");
+                    }
+                }
+            }
+            else if (trigger == PassiveSkillTrigger.OnTurnEnd)
+            {
+                AwakenedChainHelper.CheckAndSwap(ctx, "boss_layer7_p2", "第二形態：業火・残響");
+            }
+        }
+    }
+
+    /// <summary>形態2【爆ぜ火】プレイヤーロール敗北時、即時5固定ダメ(軽減無視)。HP=0で第三形態へ。</summary>
+    public class AwakenedP2BurstFire : IPassiveSkillEffect
+    {
+        public string SkillId => "AwakenedP2BurstFire";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollWin, PassiveSkillTrigger.OnTurnEnd };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            // OnRollWin (敵視点): enemy won = player lost roll
+            if (trigger == PassiveSkillTrigger.OnRollWin)
+            {
+                ctx.fixedDamageToEnemy += 5; // 敵視点 fixedDamageToEnemy はプレイヤーへの軽減無視ダメ
+                UnityEngine.Debug.Log("[覚者・爆ぜ火] +5 固定ダメ(軽減無視)");
+            }
+            else if (trigger == PassiveSkillTrigger.OnTurnEnd)
+            {
+                AwakenedChainHelper.CheckAndSwap(ctx, "boss_layer7_p3", "第三形態：覚者・無相");
+            }
+        }
+    }
+
+    /// <summary>形態3【鏡映】覚者への与ダメと同量をプレイヤーHPからも引く。HP=0で第四形態へ。</summary>
+    public class AwakenedP3Mirror : IPassiveSkillEffect
+    {
+        public string SkillId => "AwakenedP3Mirror";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage, PassiveSkillTrigger.OnTurnEnd };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            if (trigger == PassiveSkillTrigger.OnPreReceiveDamage)
+            {
+                int dmg = ctx.finalDamage;
+                if (dmg > 0)
+                {
+                    // 反射は fixedDamageToEnemy 経由 (敵視点なので real fixedDamageToPlayer に対応)。
+                    // ctx.enemyCurrentHP を直接書くと CombatManager の ctx.playerCurrentHP = playerHP 同期で上書きされる。
+                    ctx.fixedDamageToEnemy += dmg;
+                    UnityEngine.Debug.Log($"[覚者・鏡映] 与ダメ{dmg}を反射 → プレイヤーへ固定ダメ");
+                }
+            }
+            else if (trigger == PassiveSkillTrigger.OnTurnEnd)
+            {
+                AwakenedChainHelper.CheckAndSwap(ctx, "boss_layer7_p4", "第四形態：シュヴァリエ・残影");
+            }
+        }
+    }
+
+    /// <summary>形態4【一閃返し】1度限り、被ダメ完全無効+2倍反射。HP=0で第五形態へ。</summary>
+    public class AwakenedP4Riposte : IPassiveSkillEffect
+    {
+        public string SkillId => "AwakenedP4Riposte";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage, PassiveSkillTrigger.OnTurnEnd };
+        private const string KUsed = "awakened_p4_riposte_used";
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            if (trigger == PassiveSkillTrigger.OnPreReceiveDamage)
+            {
+                if (ctx.GetAccumulated(KUsed) > 0) return;
+                int dmg = ctx.finalDamage;
+                if (dmg <= 0) return;
+                ctx.accumulatedValues[KUsed] = 1;
+                int reflect = dmg * 2;
+                ctx.finalDamage = 0;
+                // 反射ダメは fixedDamageToEnemy (= 敵視点ではプレイヤーへの固定ダメ) 経由で渡す。
+                ctx.fixedDamageToEnemy += reflect;
+                UnityEngine.Debug.Log($"[覚者・一閃返し] 被ダメ{dmg}無効化 → 反射{reflect}");
+            }
+            else if (trigger == PassiveSkillTrigger.OnTurnEnd)
+            {
+                AwakenedChainHelper.CheckAndSwap(ctx, "boss_layer7_p5", "第五形態：覚者・寂照");
+            }
+        }
+    }
+
+    /// <summary>形態5【寂照】静謐の圧迫感: 毎T 所持パッシブ数 ÷4 の固定ダメ(軽減無視)。
+    /// 加えて、消費品/レイピア使用→ランダムなパッシブを永久喪失。HP=0で第六形態へ。</summary>
+    public class AwakenedP5Silent : IPassiveSkillEffect
+    {
+        public string SkillId => "AwakenedP5Silent";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnTurnEnd };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            var run = GameLoop.GameManager.Instance?.Run;
+
+            if (trigger == PassiveSkillTrigger.OnPostRoll)
+            {
+                // 毎ターン 所持パッシブ数/4 (切り捨て、最低1) の固定ダメ(軽減無視)
+                int owned = run?.ownedPassiveItems?.Count ?? 0;
+                if (owned > 0)
+                {
+                    int dmg = UnityEngine.Mathf.Max(1, owned / 4);
+                    ctx.fixedDamageToEnemy += dmg;
+                    UnityEngine.Debug.Log($"[覚者・寂照] 静謐の圧迫: 所持{owned}個 → 固定ダメ {dmg}");
+                }
+                return;
+            }
+
+            // OnTurnEnd: 消費品使用ならパッシブ喪失 + チェーン swap 判定
+            if (ctx.consumablesUsedThisTurn)
+            {
+                if (run?.ownedPassiveItems != null && run.ownedPassiveItems.Count > 0)
+                {
+                    var candidates = new System.Collections.Generic.List<int>();
+                    for (int i = 0; i < run.ownedPassiveItems.Count; i++)
+                    {
+                        var id = run.ownedPassiveItems[i];
+                        if (id != null && !id.StartsWith("curse_") && id != "chevalier_rapier")
+                            candidates.Add(i);
+                    }
+                    if (candidates.Count > 0)
+                    {
+                        int pick = candidates[UnityEngine.Random.Range(0, candidates.Count)];
+                        string lost = run.ownedPassiveItems[pick];
+                        InventorySystem.Helpers.PassiveAddHelper.RemoveAt(run, pick);
+                        UnityEngine.Debug.Log($"[覚者・寂照] パッシブ永久喪失: {lost}");
+                    }
+                }
+            }
+            AwakenedChainHelper.CheckAndSwap(ctx, "boss_layer7_p6", "第六形態：灰燼・薄火");
+        }
+    }
+
+    /// <summary>形態6【業火の遺志】毎T 覚者ダイス合計 +(灰燼-内部T)。形態内ランプアップ。
+    /// enemyDiceTotalBonus 経由で ProcessPostRoll 判定前に効かせる。</summary>
+    public class AwakenedP6EmberWill : IPassiveSkillEffect
+    {
+        public string SkillId => "AwakenedP6EmberWill";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart, PassiveSkillTrigger.OnTurnEnd };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            if (trigger == PassiveSkillTrigger.OnTurnStart)
+            {
+                if (ctx.GetAccumulated("ember_entered") <= 0)
+                    ctx.accumulatedValues["ember_entered"] = ctx.currentTurn;
+                int enteredAt = (int)ctx.GetAccumulated("ember_entered");
+                int emberT = ctx.currentTurn - enteredAt + 1;
+                ctx.enemyDiceTotalBonus = emberT;
+                UnityEngine.Debug.Log($"[覚者・業火の遺志] 灰燼-T{emberT}: 覚者ダイス合計 +{emberT}");
+            }
+            else if (trigger == PassiveSkillTrigger.OnTurnEnd)
+            {
+                AwakenedChainHelper.CheckAndSwap(ctx, "boss_layer7_p7", "最終形態：覚者・妙覚");
+            }
+        }
+    }
+
+    /// <summary>形態7【妙覚】T1のみ0d0(自由攻撃可)。T2以降、ダイス合計99強制+クリ100%(永続)。
+    /// プレイヤー敗北かつ生存中は次T以降1d2連続サドンデス。サドンデス勝利で【解脱】。
+    /// 注: enemyDiceTotalBonus 経由で ProcessPostRoll 判定前に効かせる。</summary>
+    public class AwakenedP7Myokaku : IPassiveSkillEffect
+    {
+        public string SkillId => "AwakenedP7Myokaku";
+        public PassiveSkillTrigger[] Triggers => new[] {
+            PassiveSkillTrigger.OnTurnStart,
+            PassiveSkillTrigger.OnRollWin,
+            PassiveSkillTrigger.OnTurnEnd,
+        };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            switch (trigger)
+            {
+                case PassiveSkillTrigger.OnTurnStart:
+                    if (ctx.myokakuSuddenDeath)
+                    {
+                        // サドンデス中: CombatManagerが両者1d2強制。ダイスボーナスはクリア。
+                        ctx.enemyDiceTotalBonus = 0;
+                        ctx.accumulatedValues["extraDice"] = 0;
+                        return;
+                    }
+                    // 妙覚-内部T を算出 (連戦累積currentTurn ではなく、妙覚到達後の経過T)
+                    if (ctx.GetAccumulated("myokaku_entered") <= 0)
+                    {
+                        ctx.accumulatedValues["myokaku_entered"] = ctx.currentTurn;
+                    }
+                    int enteredAt = (int)ctx.GetAccumulated("myokaku_entered");
+                    int myokakuT = ctx.currentTurn - enteredAt + 1;
+
+                    if (myokakuT == 1)
+                    {
+                        // 妙覚-T1: 0d0 (静寂、自由攻撃可)
+                        ctx.accumulatedValues["extraDice"] = -5;
+                        ctx.enemyDiceTotalBonus = 0;
+                        UnityEngine.Debug.Log("[覚者・妙覚] 妙覚-T1: 静寂 (覚者0d0)");
+                    }
+                    else
+                    {
+                        // 妙覚-T2+: ダイス合計を圧倒的に押し上げる (raw 5d9 + 99 ≈ 124-144)
+                        ctx.accumulatedValues["extraDice"] = 0;
+                        ctx.enemyDiceTotalBonus = 99;
+                        UnityEngine.Debug.Log($"[覚者・妙覚] 妙覚-T{myokakuT}: ダイス合計 +99 (圧倒)");
+                    }
+                    break;
+
+                case PassiveSkillTrigger.OnRollWin:
+                {
+                    if (ctx.myokakuSuddenDeath) break;
+                    // 妙覚-内部T で T2+判定
+                    int entered = (int)ctx.GetAccumulated("myokaku_entered");
+                    int mT = entered > 0 ? (ctx.currentTurn - entered + 1) : 1;
+                    if (mT >= 2)
+                    {
+                        ctx.fixedDamageToEnemy += 30;
+                        UnityEngine.Debug.Log("[覚者・妙覚] 妙覚-T2+ クリ相当: 固定ダメ +30 (軽減無視)");
+                    }
+                    break;
+                }
+
+                case PassiveSkillTrigger.OnTurnEnd:
+                {
+                    // サドンデス決着判定
+                    if (ctx.myokakuSuddenDeath)
+                    {
+                        // 敵視点: ctx.playerLostRoll = ボスがロール敗北 = プレイヤー勝利
+                        if (ctx.playerLostRoll)
+                        {
+                            ctx.gedatsuPending = true;
+                            ctx.playerCurrentHP = 0; // ボスHP=0 → 戦闘終了処理に乗せる
+                            UnityEngine.Debug.Log("[覚者・妙覚] ★解脱★ サドンデス勝利 (ボス残HP問わず特殊エンディング)");
+                        }
+                        return;
+                    }
+
+                    // 妙覚-T2+ 通常T: ロール敗北 → 次Tからサドンデス開始
+                    // 99ダイスボーナスの被ダメで HP<=0 になっても、妙覚は致命傷を「踏みとどまらせる」
+                    // (= 仕様『敗北かつ生存』の生存条件を強制成立させる)。
+                    // 敵視点: ctx.enemyCurrentHP = 現実のプレイヤーHP
+                    int entered2 = (int)ctx.GetAccumulated("myokaku_entered");
+                    int mT2 = entered2 > 0 ? (ctx.currentTurn - entered2 + 1) : 1;
+                    if (mT2 >= 2 && ctx.playerWonRoll)
+                    {
+                        if (ctx.enemyCurrentHP <= 0)
+                        {
+                            ctx.enemyCurrentHP = 1; // 致命傷踏みとどまり
+                            UnityEngine.Debug.Log("[覚者・妙覚] 致命傷を踏みとどまる → プレイヤーHP1");
+                        }
+                        ctx.myokakuSuddenDeath = true;
+                        UnityEngine.Debug.Log("[覚者・妙覚] ロール敗北検知 → 次T以降 1d6 サドンデス開始");
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    /// <summary>覚者連戦のヘルパ。各形態の OnTurnEnd で呼ぶ。
+    /// 敵パッシブ実行中は perspective が swap されているため、SwapEnemy を直接呼ばず
+    /// ctx.pendingEnemySwapId に予約。CombatManager が enemy トリガー完了後に処理する。</summary>
+    internal static class AwakenedChainHelper
+    {
+        public static void CheckAndSwap(CombatContext ctx, string nextId, string logLabel)
+        {
+            // 敵視点(swapped): ctx.playerCurrentHP = ボス自身のHP
+            if (ctx.playerCurrentHP > 0) return;
+            // 既に予約済みなら無視
+            if (!string.IsNullOrEmpty(ctx.pendingEnemySwapId)) return;
+            ctx.pendingEnemySwapId = nextId;
+            ctx.pendingEnemySwapLabel = logLabel;
+            UnityEngine.Debug.Log($"[覚者連戦] HP=0検知 → 次形態 {logLabel} を予約");
+        }
+    }
+
+    /// <summary>[旧] 覚者 — 悟達の試練: 単体戦時代の試練。連戦化により廃止。
+    /// 残置: コンパイル互換のため。Register からは外す。</summary>
+    public class AwakenedTrial : IPassiveSkillEffect
+    {
+        public string SkillId => "AwakenedTrial";
+        public PassiveSkillTrigger[] Triggers => new[] {
+            PassiveSkillTrigger.OnBattleStart,
+            PassiveSkillTrigger.OnTurnStart,
+            PassiveSkillTrigger.OnTurnEnd,
+            PassiveSkillTrigger.OnPreDealDamage,    // 無心後は与ダメ無効化
+            PassiveSkillTrigger.OnPreReceiveDamage, // 煩悩: 装備数に応じ被ダメ軽減
+        };
+
+        private const string KQuietude     = "awakened_quietude";    // 観想スタック
+        private const string KEnlightened  = "awakened_enlightened"; // 無心化フラグ
+        private const string KHPSnap       = "awakened_hp_snap";     // T開始時プレイヤーHP
+
+        private const int QuietudeThreshold  = 7;
+        private const int BaseDiceCount      = 5;  // enemies.json 5d9 と一致
+        private const int EnlightenedDice    = 2;  // 弱体化後 → 2d (extraDice = -3)
+        private const int VoidInterval       = 3;  // 【空】: 3Tに1回ダイス0
+        private const int KarmaHealPer       = 20; // 【因果】: 消費品/レイピア使用毎にボスHP回復
+        private const float BonnouPerPassive = 0.3f; // 【煩悩】: 装備数 × 0.3 被ダメ軽減
+
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            switch (trigger)
+            {
+                case PassiveSkillTrigger.OnBattleStart:
+                    ctx.accumulatedValues[KQuietude] = 0;
+                    ctx.accumulatedValues[KEnlightened] = 0;
+                    UnityEngine.Debug.Log("[覚者] 戦闘開始: 観想0/7 ─ 戦意を捨てれば剣を収める");
+                    break;
+
+                case PassiveSkillTrigger.OnTurnStart:
+                    if (ctx.GetAccumulated(KEnlightened) > 0)
+                    {
+                        // 弱体化後: 5d9 → 2d6相当 (extraDice = -3)、空も廃止
+                        ctx.accumulatedValues["extraDice"] = -(BaseDiceCount - EnlightenedDice);
+                    }
+                    else if (ctx.currentTurn > 0 && ctx.currentTurn % VoidInterval == 0)
+                    {
+                        // 【空】: ダイス0個に
+                        ctx.accumulatedValues["extraDice"] = -BaseDiceCount;
+                        UnityEngine.Debug.Log($"[覚者・空] T{ctx.currentTurn}: 振らず ─ 殴りの好機");
+                    }
+                    ctx.accumulatedValues[KHPSnap] = ctx.enemyCurrentHP;
+                    break;
+
+                case PassiveSkillTrigger.OnPreReceiveDamage:
+                    // 【煩悩】: プレイヤー所持パッシブ数 × 0.3 軽減（弱体化後は無効）
+                    if (ctx.GetAccumulated(KEnlightened) > 0) break;
+                    if (ctx.finalDamage <= 0) break;
+                    {
+                        var run = GameLoop.GameManager.Instance?.Run;
+                        int passives = run?.ownedPassiveItems?.Count ?? 0;
+                        int mitigation = (int)(passives * BonnouPerPassive);
+                        if (mitigation > 0)
+                        {
+                            int before = ctx.finalDamage;
+                            ctx.finalDamage = System.Math.Max(0, ctx.finalDamage - mitigation);
+                            UnityEngine.Debug.Log($"[覚者・煩悩] 装備{passives}個 → 被ダメ {before}→{ctx.finalDamage} (-{mitigation})");
+                        }
+                    }
+                    break;
+
+                case PassiveSkillTrigger.OnPreDealDamage:
+                    if (ctx.GetAccumulated(KEnlightened) > 0 && ctx.playerWonRoll)
+                    {
+                        ctx.nullifyAllDamage = true;
+                        UnityEngine.Debug.Log("[覚者・無心] 与ダメ放棄");
+                    }
+                    break;
+
+                case PassiveSkillTrigger.OnTurnEnd:
+                    // 【因果】: 消費品/レイピア使用ならボス自己回復（弱体化後は無効）
+                    if (ctx.GetAccumulated(KEnlightened) == 0 && ctx.consumablesUsedThisTurn)
+                    {
+                        int before = ctx.playerCurrentHP;
+                        ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + KarmaHealPer);
+                        int healed = ctx.playerCurrentHP - before;
+                        if (healed > 0)
+                            UnityEngine.Debug.Log($"[覚者・因果] 消費品 → 自己回復 +{healed} ({ctx.playerCurrentHP}/{ctx.playerMaxHP})");
+                    }
+
+                    if (ctx.GetAccumulated(KEnlightened) > 0) break;
+
+                    int snap = (int)ctx.GetAccumulated(KHPSnap);
+                    bool hpIncreased = ctx.enemyCurrentHP > snap;
+                    bool actionTaken = ctx.consumablesUsedThisTurn || hpIncreased;
+
+                    if (actionTaken)
+                    {
+                        if (ctx.GetAccumulated(KQuietude) > 0)
+                            UnityEngine.Debug.Log("[覚者] 観想中断: 行動検知 → 0リセット");
+                        ctx.accumulatedValues[KQuietude] = 0;
+                    }
+                    else
+                    {
+                        int newCount = (int)ctx.GetAccumulated(KQuietude) + 1;
+                        ctx.accumulatedValues[KQuietude] = newCount;
+                        UnityEngine.Debug.Log($"[覚者] 観想 {newCount}/{QuietudeThreshold}");
+                        if (newCount >= QuietudeThreshold)
+                        {
+                            ctx.accumulatedValues[KEnlightened] = 1;
+                            ctx.accumulatedValues["extraDice"] = -(BaseDiceCount - EnlightenedDice);
+                            UnityEngine.Debug.Log("[覚者] ★無心の境地★ ─ 5d9→2d6・全特性停止・与ダメ無効化");
+                        }
+                    }
+                    break;
             }
         }
     }

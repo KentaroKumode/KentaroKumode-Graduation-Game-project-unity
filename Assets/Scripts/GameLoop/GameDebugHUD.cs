@@ -409,6 +409,7 @@ namespace GameLoop
                 case TileType.Shop:        return "買";
                 case TileType.Event:       return "イ";
                 case TileType.Mystery:     return "？";
+                case TileType.Exchange:    return "換";
                 case TileType.Trap:        return "罠";
                 case TileType.Boss:        return "王";
                 default:                   return "？";
@@ -432,7 +433,18 @@ namespace GameLoop
                     helpText = "[Space] 結果確認";
                     break;
                 case GameManager.GamePhase.Reward:
-                    helpText = "[Space] 次へ";
+                    if (GameManager.Instance != null && GameManager.Instance.HasPendingRewardChoice)
+                    {
+                        var (rcA, rcB) = GameManager.Instance.CurrentRewardChoice;
+                        var idb = InventorySystem.ItemDatabase.Instance;
+                        string nA = idb?.GetItem(rcA)?.displayName ?? rcA;
+                        string nB = idb?.GetItem(rcB)?.displayName ?? rcB;
+                        helpText = $"報酬を選択 (同Tier):\n[1] {nA}\n[2] {nB}";
+                    }
+                    else
+                    {
+                        helpText = "[Space] 次へ";
+                    }
                     break;
                 case GameManager.GamePhase.RestStop:
                     helpText = "[Space] HP回復  [U] 強化（未実装）";
@@ -451,6 +463,11 @@ namespace GameLoop
                     break;
                 case GameManager.GamePhase.TrapTriggered:
                     helpText = "[Space] 罠効果確認（未実装）";
+                    break;
+                case GameManager.GamePhase.ExchangeTile:
+                    helpText = (GameManager.Instance != null && GameManager.Instance.CanExchangeTile)
+                        ? "交換マス: [1] 最低Tierパッシブを渡し上位をrandom入手 / [Space] 通過"
+                        : "交換マス: 渡せるパッシブが無い [Space] 通過";
                     break;
                 case GameManager.GamePhase.SinRitual:
                     helpText = "[1] 血の儀 [2] 貪欲の儀 [3] 遺品の儀 → [Space] 完了\n  各キーで支払 (Y/Nではなく押下=捧げる、未押下=拒む)";

@@ -22,15 +22,13 @@ namespace MetaProgression
             => IsActive(MetaDebuffLevel.Lv1_困窮した商隊) ? 1.25f : 1f;
 
         // ============================================================
-        //  Lv2: 凶暴化する魔物
+        //  Lv2: 俊敏
         // ============================================================
 
-        /// <summary>敵の与ダメージへの加算量。50%確率で +1、それ以外 0。</summary>
-        public static int RollEnemyDamageBonus()
-        {
-            if (!IsActive(MetaDebuffLevel.Lv2_凶暴化する魔物)) return 0;
-            return Random.value < 0.5f ? 1 : 0;
-        }
+        /// <summary>敵が各戦闘の最初の1回の被弾を必ず回避するか（Lv2）。
+        /// 「初回回避済み」の管理は CombatManager 側 (metaAgilityDodgeUsed) が行う。</summary>
+        public static bool EnemyDodgesFirstHit()
+            => IsActive(MetaDebuffLevel.Lv2_俊敏);
 
         // ============================================================
         //  Lv3: 向かい風
@@ -49,16 +47,12 @@ namespace MetaProgression
             => IsActive(MetaDebuffLevel.Lv4_前途多難) ? 2 : 0;
 
         // ============================================================
-        //  Lv5: 狂った時計
+        //  Lv5: 偽の商人
         // ============================================================
 
-        /// <summary>戦闘ターン数に応じた敵の追加ダメージ（7ターン目以降 +1/ターン、最大+5）。</summary>
-        public static int GetMadClockBonus(int currentTurn)
-        {
-            if (!IsActive(MetaDebuffLevel.Lv5_狂った時計)) return 0;
-            if (currentTurn < 7) return 0;
-            return Mathf.Min(5, currentTurn - 6);
-        }
+        /// <summary>ショップマスが偽商人へ変化する確率（Lv5 ON で 0.2、OFF で 0）。</summary>
+        public static float GetFalseMerchantChance()
+            => IsActive(MetaDebuffLevel.Lv5_偽の商人) ? 0.2f : 0f;
 
         // ============================================================
         //  Lv6: 死神の影 / Lv10: 天変地異 — 恒久デバフ抽選
@@ -111,12 +105,15 @@ namespace MetaProgression
             => IsActive(MetaDebuffLevel.Lv8_飢餓の極地) ? 2 : 0;
 
         // ============================================================
-        //  Lv9: 崩壊の前触れ
+        //  Lv9: 鋼の皮膚
         // ============================================================
 
-        /// <summary>前哨基地マスの効果が無効化されているか。マス自体は残す。</summary>
-        public static bool IsForwardBaseDisabled()
-            => IsActive(MetaDebuffLevel.Lv9_崩壊の前触れ);
+        /// <summary>敵が初回致命傷で 1HP 耐えるかどうか（Lv9）。</summary>
+        public static bool EnemySurvivesFirstLethal()
+            => IsActive(MetaDebuffLevel.Lv9_鋼の皮膚);
+
+        /// <summary>旧 Lv9(崩壊の前触れ) は廃止。前哨基地は常に有効（互換のため false 固定）。</summary>
+        public static bool IsForwardBaseDisabled() => false;
 
         // ============================================================
         //  Lv10: 天変地異
@@ -126,8 +123,8 @@ namespace MetaProgression
         public static float GetEnemyDamageMultiplier()
             => IsActive(MetaDebuffLevel.Lv10_天変地異) ? 2f : 1f;
 
-        /// <summary>敵が初回致命傷で 1HP 耐えるかどうか（Lv10）。</summary>
-        public static bool EnemySurvivesFirstLethal()
+        /// <summary>ラストスタンドの発動が封じられているか（Lv10）。</summary>
+        public static bool IsLastStandDisabled()
             => IsActive(MetaDebuffLevel.Lv10_天変地異);
     }
 }

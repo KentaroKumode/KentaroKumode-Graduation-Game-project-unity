@@ -25,10 +25,13 @@ namespace MetaProgression
             int hp = baseHP + s.hpBonus;
             run.playerMaxHP = hp;
             run.playerHP = hp;
-            run.coins += s.goldBonus;
+            // 開幕ゴールド: Gold() 段を 5 段に絞ったため、 1段=+1G の素通しに変更。
+            // (旧 21段→/5 デノミ式は段数削減と引き換えに撤廃)
+            int startGold = s.goldBonus;
+            run.coins += startGold;
             run.weaponMaterials += s.startMaterial;
 
-            Debug.Log($"[MetaBuff] 開幕補正: HP {baseHP}→{hp}, Gold +{s.goldBonus}, Material +{s.startMaterial}");
+            Debug.Log($"[MetaBuff] 開幕補正: HP {baseHP}→{hp}, Gold +{startGold}, Material +{s.startMaterial}");
         }
 
         // ============================================================
@@ -39,9 +42,11 @@ namespace MetaProgression
         public static int GetDamageReduction()
             => S != null ? S.damageReduce : 0;
 
-        /// <summary>戦闘勝利時の追加ゴールド。</summary>
+        /// <summary>戦闘勝利時の追加ゴールド。最大3段(MetaBuffTrack)で raw 0-3 だが、
+        /// 1/5 デノミ済み新経済下では出力上限を 2 にクランプする。
+        /// 加えて呼び出し側(GameManager)で「ボス撃破時のみ」適用するよう制限している。</summary>
         public static int GetCombatGoldBonus()
-            => S != null ? S.combatGoldBonus : 0;
+            => S != null ? UnityEngine.Mathf.Min(2, S.combatGoldBonus) : 0;
 
         /// <summary>会心ダイスへの追加補正値（0/1/2/3）。</summary>
         public static int GetCritBonus()
@@ -104,5 +109,29 @@ namespace MetaProgression
             if (s.bossExtraNormalUnlocked) return BossExtraDrop.Normal;
             return BossExtraDrop.None;
         }
+
+        // ============================================================
+        //  新規バフ
+        // ============================================================
+
+        /// <summary>〈神の加護〉解放済みかどうか。1戦闘1回ロール敗北を引分に変える。</summary>
+        public static bool IsDivineProtectUnlocked()
+            => S != null && S.divineProtectUnlocked;
+
+        /// <summary>〈開幕パッシブ〉解放済みかどうか。RunStart で1個獲得。</summary>
+        public static bool IsStartingPassiveItemUnlocked()
+            => S != null && S.startingPassiveItemUnlocked;
+
+        /// <summary>フロアクリア時の追加回復量（0/1/2）。</summary>
+        public static int GetFloorClearHeal()
+            => S != null ? S.floorClearHeal : 0;
+
+        /// <summary>〈宝箱の財宝〉解放済みかどうか。宝箱マスでゴールドも獲得する。</summary>
+        public static bool IsTreasureChestGoldUnlocked()
+            => S != null && S.treasureChestGoldUnlocked;
+
+        /// <summary>会心倍率（恒久バフでの会心倍率変更は撤廃され、常に 2.0）。
+        /// 装備パッシブ等が個別に上書きしうるが、メタ恒久値としては固定。</summary>
+        public static float GetCriticalMultiplier() => 2.0f;
     }
 }

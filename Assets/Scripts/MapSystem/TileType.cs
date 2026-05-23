@@ -10,7 +10,8 @@ namespace MapSystem
         Treasure,       // 秘宝
         Shop,           // ショップ
         Event,          // イベント — レアリティ抽選
-        Mystery,        // ?マス — 他タイプに解決
+        Mystery,        // ?マス — 廃止(生成されない。enum は互換のため残置)
+        Exchange,       // 交換マス — パッシブ1つを渡して上位Tierのパッシブをランダム入手
         Trap,           // 罠
         Boss,           // ボス
         SinAltar,       // 6層ボス前の儀式祭壇 — 3段階の支払いで永続デバフを回避

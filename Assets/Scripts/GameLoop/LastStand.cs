@@ -36,7 +36,9 @@ namespace GameLoop
                 return true;
 
             // 2. ラストスタンド（一度きり・発動ラウンド無敵 + 最大HP半減）
-            if (!run.lastStandActive)
+            //    メタデバフ Lv10 天変地異 が有効な場合は発動しない。
+            if (!run.lastStandActive
+                && !MetaProgression.MetaDebuffApplicator.IsLastStandDisabled())
             {
                 run.lastStandActive = true;
                 int before = run.playerMaxHP;

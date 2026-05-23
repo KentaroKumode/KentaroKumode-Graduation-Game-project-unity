@@ -227,12 +227,13 @@ namespace InventorySystem
             item.equipMarkPrefab = entry.equipMarkPrefab;
             
             // 価格設定（中央価格から±25%の範囲で購入/売却額を算出）
+            // 1/5 デノミ: 表示価格はすべて 1/5 (basePrice 自体は別用途で保持)
             if (jsonItem.basePrice > 0)
             {
-                int buyMin = Mathf.RoundToInt(jsonItem.basePrice * 1.00f);
-                int buyMax = Mathf.RoundToInt(jsonItem.basePrice * 1.25f);
-                int sellMin = Mathf.RoundToInt(jsonItem.basePrice * 0.50f);
-                int sellMax = Mathf.RoundToInt(jsonItem.basePrice * 0.75f);
+                int buyMin  = Mathf.Max(1, Mathf.RoundToInt(jsonItem.basePrice * 1.00f / 5f));
+                int buyMax  = Mathf.Max(1, Mathf.RoundToInt(jsonItem.basePrice * 1.25f / 5f));
+                int sellMin = Mathf.Max(1, Mathf.RoundToInt(jsonItem.basePrice * 0.50f / 5f));
+                int sellMax = Mathf.Max(1, Mathf.RoundToInt(jsonItem.basePrice * 0.75f / 5f));
                 item.buyPrice = new PriceRange { min = buyMin, max = buyMax };
                 item.sellPrice = new PriceRange { min = sellMin, max = sellMax };
             }

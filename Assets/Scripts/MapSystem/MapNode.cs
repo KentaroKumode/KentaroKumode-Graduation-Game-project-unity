@@ -11,6 +11,8 @@ namespace MapSystem
         public TileType type;
         public TileType? resolvedType; // Mystery解決後のタイプ
         public bool visited;
+        public bool activated;         // タイル効果を一度起動済みか（再訪時の再発火を防ぐ）
+        public bool isFalseMerchant;   // メタデバフ Lv5: このShopマスは偽の商人（踏むと特殊エリート戦）
         public bool revealed = true;   // 難易度0では全可視
 
         /// <summary>このノードから移動可能なノードのID一覧</summary>

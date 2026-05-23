@@ -24,6 +24,44 @@ namespace GameLoop
             return PassiveSkillManager.Instance?.Context;
         }
 
+        /// <summary>シュヴァリエのレイピア: 戦闘中に使用するとコントラタックを切替（消費されない）。
+        /// 1回目: プレイヤー 1d1 強制 + 被ダメ50%軽減 + 軽減x2 反射（永続トグル）。
+        /// 2回目: 解除 → 次ターン ダイス+1 / クリティカル補正+9 (1ターン限定)。
+        /// パッシブアイテム所持(`chevalier_rapier`)が条件。</summary>
+        public static bool TryUseRapier(RunState run)
+        {
+            if (run == null || run.ownedPassiveItems == null
+                || !run.ownedPassiveItems.Contains("chevalier_rapier")) return false;
+            var ctx = ActiveCtx();
+            if (ctx == null) { Debug.Log("[レイピア] 戦闘外では使用不可"); return false; }
+            if (ctx.consumablesLocked) { Debug.Log("[レイピア] 死翔により使用不可"); return false; }
+
+            // 覚者用アクションマーク（レイピア起動も観想中断とみなす）
+            ctx.consumablesUsedThisTurn = true;
+
+            if (ctx.GetAccumulated("player_contre") <= 0)
+            {
+                ctx.accumulatedValues["player_contre"] = 1;
+                Debug.Log("[レイピア] コントラタック発動: 1d1強制 / 被ダメ-50% / 軽減x2反射");
+            }
+            else
+            {
+                ctx.accumulatedValues["player_contre"] = 0;
+                ctx.accumulatedValues["rapier_release_pending"] = 1;
+                // 会心+9 補正は サン=ジョリオラ撃破済みのランでのみ付与
+                if (run.defeatedSaintGeorges)
+                {
+                    ctx.nextTurnBuffs["criticalBonus"] = 9;
+                    Debug.Log("[レイピア] コントラタック解除: 次T ダイス+1 / クリティカル+9 (真の決闘術)");
+                }
+                else
+                {
+                    Debug.Log("[レイピア] コントラタック解除: 次T ダイス+1 (剣聖未撃破のため会心補正なし)");
+                }
+            }
+            return true;
+        }
+
         /// <summary>所持から id を1つ消費し効果適用。意味があった場合 true。</summary>
         public static bool Use(RunState run, string id)
         {
@@ -41,6 +79,9 @@ namespace GameLoop
             if (ok)
             {
                 run.ownedConsumables.Remove(id);
+                // 覚者「悟達の試練」用: 当ターン アクション発生をマーク
+                var actCtx = ActiveCtx();
+                if (actCtx != null) actCtx.consumablesUsedThisTurn = true;
                 Debug.Log($"[Consumables] 使用: {id}");
             }
             return ok;
@@ -106,10 +147,10 @@ namespace GameLoop
                 case "cons_food_4": return RestoreHunger(1.00f);
 
                 // ===== ユニーク =====
-                case "uniq_phil_stone":  // 賢者の石: 10G→素材1（最大5回/ラン）
+                case "uniq_phil_stone":  // 賢者の石: 2G→素材1（最大5回/ラン、1/5デノミ後）
                 {
-                    if (run.philStoneUsed >= 5 || run.coins < 10) return false;
-                    run.coins -= 10; run.weaponMaterials++; run.philStoneUsed++;
+                    if (run.philStoneUsed >= 5 || run.coins < 2) return false;
+                    run.coins -= 2; run.weaponMaterials++; run.philStoneUsed++;
                     return true;
                 }
                 case "uniq_forge_elixir": // 鍛冶の霊薬: 武器強化Lv+1（素材不要）

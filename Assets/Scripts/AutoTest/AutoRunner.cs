@@ -40,8 +40,26 @@ namespace AutoTest
         public bool writeDetailLog = true;
         [Tooltip("詳細ログの1ランあたり最大行数。超過時は古い行を捨て末尾(決定的な終端)を必ず保持")]
         public int detailMaxLinesPerRun = 5000;
-        [Tooltip("各ラン開始前にメタ恒久進行をリセット（ラン開始前パッシブボーナス0でバランス計測）")]
-        public bool resetMetaForCleanBaseline = true;
+        /// <summary>メタ恒久進行の扱い方。</summary>
+        public enum MetaPattern
+        {
+            /// <summary>臆病パターン: メタ進行を全リセット。パッシブボーナス0でバランス計測。</summary>
+            Cowardly,
+            /// <summary>全有効化パターン: トラック全段解放。メタバフ込みの上限プレイ計測。</summary>
+            FullProgression,
+            /// <summary>保存済み状態のまま手を付けない（実プレイヤーの進行データを使う）。</summary>
+            Untouched,
+        }
+
+        [Tooltip("メタ恒久進行モード: Cowardly=全リセット / FullProgression=全段解放 / Untouched=保存値そのまま")]
+        public MetaPattern metaPattern = MetaPattern.Cowardly;
+
+        /// <summary>メタデバフ(挑戦モード)を全ON にするか。 最高難易度プレイ計測用。</summary>
+        [Tooltip("メタデバフ Lv1-10 を全ON にする (最高難易度モード)")]
+        public bool enableAllDebuffs = false;
+
+        // 旧フィールド (互換用、内部では metaPattern を見る)
+        [System.Obsolete("metaPattern を使用してください")] public bool resetMetaForCleanBaseline = true;
 
         [Header("実行後")]
         [Tooltip("バッチ完了後にPlayModeを抜ける(Editorメニュー起動時)")]
@@ -99,8 +117,25 @@ namespace AutoTest
             public string profile = "";    // 行動ルーチン: "貪欲"(戦闘貪欲) / "回避"(戦闘回避)
             public string band = "";       // R1..R10 / CRASH / DEADLOCK
             public string bandLabel = "";
+
+            // 5F突入時点の確信チェーン状態スナップショット (-1=未到達)
+            public int convictionStageAt5F = -1;
+            public bool hadConvictionItem5F;       // 〈根拠のない確信〉所持
+            public bool hadResolveAt5F;            // 〈決意〉所持
+            public bool hadTruthAt5F;              // 〈真理〉所持
+            public bool hadFlagYogenAt5F;          // 苦難の予言 所持
+            public bool hadFlagKakushinAt5F;       // 苦難の確信 所持
+            // 実際に起動したタイル種別ごとの回数（再訪・消化済みは含まない＝ActivateTile 初回のみ）
+            public readonly Dictionary<TileType, int> tileVisits = new Dictionary<TileType, int>();
             public string note = "";
             public List<CombatRec> combats = new List<CombatRec>();
+            /// <summary>6F (灰燼の王) 撃破時点のビルド情報スナップショット。
+            /// 後から「どんな装備で6Fまで到達できたか」をサルベージするための行単位プレーンテキスト。
+            /// null = 6F未到達(または到達前にラン終了)。</summary>
+            public string clear6FSnapshot;
+
+            /// <summary>解脱: 覚者・妙覚のサドンデス勝利で完全クリアした場合 true。</summary>
+            public bool gedatsuVictory;
         }
 
         private readonly List<RunRec> _records = new List<RunRec>();
@@ -168,6 +203,7 @@ namespace AutoTest
             gm.OnEnemyEncountered += OnEnemyEncountered;
             gm.OnBattleEnded += OnBattleEnded;
             gm.OnStarvationDamage += OnStarvation;
+            gm.OnTileActivated += OnTileActivated;
 
             Debug.Log($"[AutoRunner] バッチ開始: {runCount} ラン");
 
@@ -180,6 +216,7 @@ namespace AutoTest
             gm.OnEnemyEncountered -= OnEnemyEncountered;
             gm.OnBattleEnded -= OnBattleEnded;
             gm.OnStarvationDamage -= OnStarvation;
+            gm.OnTileActivated -= OnTileActivated;
             Application.logMessageReceived -= OnLog;
             Time.timeScale = prevScale;
 
@@ -218,12 +255,31 @@ namespace AutoTest
                 yield return null;
             }
 
-            // ラン開始前パッシブボーナス0でのバランス計測: メタ恒久進行をリセット
-            if (resetMetaForCleanBaseline)
+            // メタ恒久進行の前処理 (パターン別)
+            try
             {
-                try { MetaProgression.MetaProgressManager.Instance?.ResetAll(); }
-                catch (Exception e) { Debug.LogWarning($"[AutoRunner] Meta reset: {e.Message}"); }
+                switch (metaPattern)
+                {
+                    case MetaPattern.Cowardly:
+                        MetaProgression.MetaProgressManager.Instance?.ResetAll();
+                        break;
+                    case MetaPattern.FullProgression:
+                        MetaProgression.MetaProgressManager.Instance?.MaxAllForTesting();
+                        break;
+                    case MetaPattern.Untouched:
+                        // 何もしない
+                        break;
+                }
+
+                // メタデバフトグル (最高難易度モード)
+                var mgr = MetaProgression.MetaProgressManager.Instance;
+                if (mgr?.State != null)
+                {
+                    for (int lv = 1; lv <= 10; lv++)
+                        mgr.ToggleDebuff((MetaProgression.MetaDebuffLevel)lv, enableAllDebuffs);
+                }
             }
+            catch (Exception e) { Debug.LogWarning($"[AutoRunner] Meta pattern={metaPattern}: {e.Message}"); }
 
             gm.StartNewRun();
             _prevCoins = gm.Run != null ? gm.Run.coins : 0;
@@ -265,6 +321,21 @@ namespace AutoTest
                     }
                 }
                 else stall = 0;
+
+                // 5F突入時 (4→5) にチェーン進行状況をスナップショット
+                if (fl == 5 && lastFloor != 5 && _cur != null && _cur.convictionStageAt5F < 0 && gm.Run != null)
+                {
+                    var rs = gm.Run;
+                    _cur.convictionStageAt5F = rs.convictionStage;
+                    var owned = rs.ownedPassiveItems;
+                    _cur.hadConvictionItem5F = owned != null && owned.Contains(GameLoop.ConvictionSystem.IdConviction);
+                    _cur.hadResolveAt5F     = owned != null && owned.Contains(GameLoop.ConvictionSystem.IdResolve);
+                    _cur.hadTruthAt5F       = owned != null && owned.Contains(GameLoop.ConvictionSystem.IdTruth);
+                    var flags = rs.ownedFlags;
+                    _cur.hadFlagYogenAt5F    = flags != null && flags.Contains("苦難の予言");
+                    _cur.hadFlagKakushinAt5F = flags != null && flags.Contains("苦難の確信");
+                }
+
                 lastPhase = phase; lastNode = node; lastFloor = fl; lastHp = hp;
 
                 // ラストスタンド発動検知
@@ -306,10 +377,28 @@ namespace AutoTest
                     return false;
 
                 case GameManager.GamePhase.BattleResult:
+                    // 6Fクリア時のビルド情報を後でサルベージできるよう、撃破直後にスナップショット
+                    bool floor6BossWinPending = gm.LastCombatResult.HasValue
+                        && gm.LastCombatResult.Value.playerWon
+                        && MapManager.Instance?.CurrentNode != null
+                        && MapManager.Instance.CurrentNode.type == TileType.Boss
+                        && gm.Run != null && gm.Run.currentFloor == 6;
+                    // (旧 TryDropRapierOnFloor4Boss は撤去。レイピアは 4F イベント「亡霊との決闘」 で正規配布される)
                     gm.ConfirmBattleResult();
+                    if (floor6BossWinPending) Capture6FClearSnapshot(gm);
                     return false;
 
                 case GameManager.GamePhase.Reward:
+                    // 戦闘後ドロップ2択: 未所持(ビルドの幅)を優先、同条件なら option a。
+                    while (gm.HasPendingRewardChoice)
+                    {
+                        var (ra, rb) = gm.CurrentRewardChoice;
+                        var owned = gm.Run?.ownedPassiveItems;
+                        bool ownsA = owned != null && ra != null && owned.Contains(ra);
+                        bool ownsB = owned != null && rb != null && owned.Contains(rb);
+                        int pick = (ownsA && !ownsB) ? 1 : 0;
+                        gm.ResolveRewardChoice(pick);
+                    }
                     gm.ConfirmReward();
                     return false;
 
@@ -353,6 +442,12 @@ namespace AutoTest
                     gm.ConfirmTileEvent();
                     return false;
 
+                case GameManager.GamePhase.ExchangeTile:
+                    // 交換は最低Tierパッシブ→上位ランダムの厳密アップグレード。所持があれば必ず交換。
+                    if (gm.CanExchangeTile) gm.DoExchangeTile();
+                    else gm.SkipExchangeTile();
+                    return false;
+
                 case GameManager.GamePhase.SinRitual:
                     // 方針: 6層固有デバフ(ゴルゴダの心/断絶した時間/灰燼の烙印)は
                     // 回避できる限り必ず回避する。3儀式すべて支払いを選択（accept=true）。
@@ -391,6 +486,21 @@ namespace AutoTest
 
             var (fwd, lat) = mm.GetCategorizedMoves();
             var pool = (fwd != null && fwd.Count > 0) ? fwd : lat;
+
+            // 確信チェーン追跡中 (真理未到達) で、 横方向にイベントタイルがあるなら候補に加える。
+            // (前進限定だと同行のイベントを拾えず、 チェーンが進まないため)
+            int convStageNav = gm.Run?.convictionStage ?? 0;
+            if (convStageNav < GameLoop.ConvictionSystem.StageTruth
+                && fwd != null && fwd.Count > 0 && lat != null && lat.Count > 0)
+            {
+                foreach (var ln in lat)
+                {
+                    // 未訪問のイベントマスのみ追跡（訪問済み＝消化済みを追うと同行往復で無限ループ）
+                    if (ln.EffectiveType == TileType.Event && !ln.visited && !pool.Contains(ln))
+                        pool.Add(ln);
+                }
+            }
+
             if (pool == null || pool.Count == 0)
             {
                 Finish(Outcome.Deadlock, "移動先なし(MapNavigation)");
@@ -426,7 +536,7 @@ namespace AutoTest
             int bestRank = int.MaxValue;
             foreach (var n in pool)
             {
-                int r = Rank(n.EffectiveType, hpRatio, _curCombatAverse, preferRest);
+                int r = Rank(n.EffectiveType, hpRatio, _curCombatAverse, preferRest, gm.Run);
                 if (r < bestRank) { bestRank = r; best = n; }
             }
             gm.MoveToNode(best.id);
@@ -437,7 +547,7 @@ namespace AutoTest
         /// 戦闘タイル(Battle/EliteBattle)のみ profile で差し替え、他は共通固定。
         /// averse=false(戦闘貪欲): 健康なら戦闘を最優先級で選ぶ。
         /// averse=true(戦闘回避): 戦闘を最下位級にし、戦闘以外があれば必ず回避。</summary>
-        private int Rank(TileType t, float hpRatio, bool averse, bool preferRest)
+        private int Rank(TileType t, float hpRatio, bool averse, bool preferRest, GameLoop.RunState run)
         {
             bool crit = hpRatio < 0.3f;   // 危機
             bool low  = hpRatio < 0.55f;  // 低HP
@@ -445,15 +555,36 @@ namespace AutoTest
             // 空腹尽きかけ／貪欲のボス前整え: 休憩を最優先（食事＝空腹全回復も兼ねる）
             if (preferRest && t == TileType.Rest) return -1;
 
+            // 確信チェーン進路の強制優先 (両プロファイル共通)
+            //  - 災厄の予兆 未完了 (= convictionStage 0) → イベント/ミステリ を常に最優先
+            //    (Event/Mystery は戦闘でないので HP に関わらず追跡可能)
+            //  - 災厄の予兆 完了 + 真理未到達 (stage 1〜4) → HP≥50% のみエリート最優先
+            //    (エリートは戦闘発生 = HP リスクなので安全時のみ)
+            int convStage = run?.convictionStage ?? 0;
+            if (convStage == 0)
+            {
+                // Mystery は 20% でしか Event 化しないため Bot の確信進路としては当てにせず、
+                // Event タイルのみ強優先する。
+                if (t == TileType.Event) return -10;
+            }
+            else if (convStage > 0 && convStage <= GameLoop.ConvictionSystem.StageTruth)
+            {
+                if (t == TileType.EliteBattle && hpRatio >= 0.5f) return -5;
+            }
+
             // --- 戦闘タイル: ここだけが比較軸（1変数） ---
-            // 貪欲でも宝箱(Treasure=健康0/低2/危機2)より戦闘を優先しない＝
-            // 全HP帯で Battle/Elite > Treasure になる値にする。
+            // HP低下時 (50%未満) は profile に関係なく Battle/Elite を強く忌避する。
+            //  (回復を最優先にしたいというユーザー要望)
             if (t == TileType.Battle)
-                return averse ? (crit ? 95 : low ? 92 : 90)
-                              : (crit ? 8  : low ? 3  : 1);
+            {
+                if (low) return crit ? 96 : 93; // 低HP/危機: averse 同等の忌避
+                return averse ? 90 : 1;
+            }
             if (t == TileType.EliteBattle)
-                return averse ? (crit ? 97 : low ? 95 : 93)
-                              : (crit ? 9  : low ? 4  : 2);
+            {
+                if (low) return crit ? 98 : 95; // 低HP/危機: averse 同等の忌避
+                return averse ? 93 : 2;
+            }
 
             // --- 非戦闘タイル: 両プロファイル共通固定 ---
             switch (t)
@@ -463,6 +594,7 @@ namespace AutoTest
                 case TileType.Treasure:    return crit ? 2 : low ? 2 : 0;  // 装備強化源
                 case TileType.Event:       return crit ? 5 : 3;
                 case TileType.Mystery:     return crit ? 5 : 3;
+                case TileType.Exchange:    return crit ? 5 : 2;  // ビルド強化源（厳密アップグレード）
                 case TileType.Trap:        return crit ? 7 : 6;
                 case TileType.SinAltar:    return 4;
                 case TileType.Boss:        return 9;  // 最後に残れば踏む(フロアクリア必須)
@@ -515,25 +647,25 @@ namespace AutoTest
                 }
                 else
                 {
-                    // 通常ショップ: 余剰金を戦力へ。戦闘を避けないので装備/素材/回復を厚めに。
+                    // 通常ショップ: 余剰金を戦力へ。1/5デノミ後の閾値: 40→8, 25→5, 20→4
                     // 武器・ダイス（自動装備で強化見込み）
                     for (int i = 0; i < inv.slots.Count; i++)
-                        if (inv.slots[i] != null && !inv.slots[i].sold && run.coins > 40
+                        if (inv.slots[i] != null && !inv.slots[i].sold && run.coins > 8
                             && (inv.slots[i].kind == ShopSlotKind.Weapon
                                 || inv.slots[i].kind == ShopSlotKind.Dice)) Buy(i);
                     // パッシブ（金が余るので貪欲に）
                     for (int i = 0; i < inv.slots.Count; i++)
-                        if (inv.slots[i] != null && !inv.slots[i].sold && run.coins > 25
+                        if (inv.slots[i] != null && !inv.slots[i].sold && run.coins > 5
                             && inv.slots[i].kind == ShopSlotKind.Passive) Buy(i);
                     // 武器強化素材: 次の強化に届くまで補充（価格倍々なので2個まで）
                     int needMat = GameManager.WeaponUpgradeCost(run.weaponUpgradeLevel);
                     int matBuys = 0;
-                    while (run.weaponMaterials < needMat && run.coins > 20 && matBuys++ < 2
+                    while (run.weaponMaterials < needMat && run.coins > 4 && matBuys++ < 2
                            && BuyKind(ShopSlotKind.WeaponMaterial)) { }
                     // 回復消費を3個までストック
                     int stock = run.ownedConsumables != null ? run.ownedConsumables.Count : 0;
                     for (int i = 0; i < inv.slots.Count && stock < 3; i++)
-                        if (inv.slots[i] != null && !inv.slots[i].sold && run.coins > 20
+                        if (inv.slots[i] != null && !inv.slots[i].sold && run.coins > 4
                             && inv.slots[i].kind == ShopSlotKind.Consumable && Buy(i)) stock++;
                 }
             }
@@ -573,6 +705,9 @@ namespace AutoTest
             int guard = 0;
             while (cm.IsCombatActive && guard++ < 250)
             {
+                // シュヴァリエ戦専用: ボス形態に同期してレイピアをトグル
+                AutoToggleRapierVsSaintGeorges(cm, run);
+
                 // 緊急回復: 敵の最大ダイスダメージ(会心なら×2)で落ちそうなら回復
                 var e = cm.CurrentEnemy;
                 if (e != null)
@@ -587,6 +722,63 @@ namespace AutoTest
                 else if (tr.playerWon) _cwWin++;
                 else { _cwLoss++; if (tr.totalDamage <= 0) _cwLossAbs++; }
             }
+        }
+
+/// <summary>6F (灰燼の王) 撃破直後のビルド情報を _cur に記録。
+        /// 装備/アイテム/HP/カルマ/各種デバフを 1 行プレーンテキストに圧縮。
+        /// 後でサマリーから「どんな装備で 6F まで来たか」をサルベージする用途。</summary>
+        private void Capture6FClearSnapshot(GameManager gm)
+        {
+            if (_cur == null || gm?.Run == null) return;
+            var run = gm.Run;
+            var sb = new System.Text.StringBuilder();
+            sb.Append($"HP {run.playerHP}/{run.playerMaxHP} | coins {run.coins} | mat {run.weaponMaterials} | upgLv {run.weaponUpgradeLevel} | karma {run.karma}");
+            sb.Append($"\n      武器: {(string.IsNullOrEmpty(run.equippedWeaponId) ? "(無)" : run.equippedWeaponId)} | ダイス: {(string.IsNullOrEmpty(run.equippedDiceId) ? "(武器ダイス)" : run.equippedDiceId)}");
+            int pCnt = run.ownedPassiveItems?.Count ?? 0;
+            string pList = pCnt > 0 ? string.Join(", ", run.ownedPassiveItems) : "(無)";
+            sb.Append($"\n      パッシブ({pCnt}): {pList}");
+            int cCnt = run.ownedConsumables?.Count ?? 0;
+            string cList = cCnt > 0 ? string.Join(", ", run.ownedConsumables) : "(無)";
+            sb.Append($"\n      消費品({cCnt}): {cList}");
+            int fCnt = run.ownedFlags?.Count ?? 0;
+            if (fCnt > 0) sb.Append($"\n      フラグ({fCnt}): {string.Join(", ", run.ownedFlags)}");
+            if (run.timedBuffs != null && run.timedBuffs.Count > 0)
+            {
+                var parts = new List<string>();
+                foreach (var kv in run.timedBuffs) parts.Add($"{kv.Key}×{kv.Value}");
+                sb.Append($"\n      時限バフ: {string.Join(", ", parts)}");
+            }
+            if (run.timedDebuffs != null && run.timedDebuffs.Count > 0)
+            {
+                var parts = new List<string>();
+                foreach (var kv in run.timedDebuffs) parts.Add($"{kv.Key}×{kv.Value}");
+                sb.Append($"\n      時限デバフ: {string.Join(", ", parts)}");
+            }
+            if (run.permanentDebuffs != null && run.permanentDebuffs.Count > 0)
+                sb.Append($"\n      恒久デバフ: {string.Join(", ", run.permanentDebuffs)}");
+            if (run.sinDebuffs != GameLoop.SinDebuff.None)
+                sb.Append($"\n      6層儀式の罪: {run.sinDebuffs}");
+            sb.Append($"\n      LS使用済: {run.lastStandActive} | サン=ジョリオラ撃破: {run.defeatedSaintGeorges}");
+            _cur.clear6FSnapshot = sb.ToString();
+        }
+
+        /// <summary>Bot 専用: 戦闘中、シュヴァリエ・サン=ジョリオラ戦でのレイピア起動同期。
+        /// ボスが形態1(コントラタック)中はレイピアON、形態2(オポジション)中はOFF。
+        /// 切替時の解除効果(次T ダイス+1, 撃破済みなら会心+9)も自動で享受する。</summary>
+        private void AutoToggleRapierVsSaintGeorges(CombatManager cm, GameLoop.RunState run)
+        {
+            if (cm == null || run == null) return;
+            if (run.ownedPassiveItems == null || !run.ownedPassiveItems.Contains("chevalier_rapier")) return;
+            var enemy = cm.CurrentEnemy;
+            if (enemy == null || enemy.id != "boss_layer5_hidden") return;
+            var ctx = InventorySystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+            if (ctx == null) return;
+            int bossPhase = (int)ctx.GetAccumulated("sg_phase");
+            bool contreActive = ctx.GetAccumulated("player_contre") > 0f;
+            if (bossPhase == 1 && !contreActive)
+                GameLoop.Consumables.TryUseRapier(run);
+            else if (bossPhase == 2 && contreActive)
+                GameLoop.Consumables.TryUseRapier(run);
         }
 
         /// <summary>所持consumableから優先順に最初の1個を使用（戦闘中＝ctx即時適用）。</summary>
@@ -636,14 +828,19 @@ namespace AutoTest
         {
             if (def == null || def.choices == null || def.choices.Count == 0) return 0;
 
-            // ① 「立ち去る/無視」系があれば最優先（リスク0で確実に抜ける）
+            // ① フラグ進路スコアリング: フラグ成立 / 名前付きパッシブ獲得を強く優先、
+            //    フラグ放棄のみの選択肢を強く忌避する (チェーン進路を切らないため)
+            int progressIdx = PickFlagProgressChoice(def);
+            if (progressIdx >= 0) return progressIdx;
+
+            // ② 「立ち去る/無視」系があれば最優先（リスク0で確実に抜ける）
             for (int i = 0; i < def.choices.Count; i++)
             {
                 var txt = def.choices[i]?.text ?? "";
                 foreach (var kw in LeaveKeywords)
                     if (txt.Contains(kw)) return i;
             }
-            // ② 危険語を含まない選択肢を選ぶ
+            // ③ 危険語を含まない選択肢を選ぶ
             for (int i = 0; i < def.choices.Count; i++)
             {
                 var txt = def.choices[i]?.text ?? "";
@@ -652,8 +849,56 @@ namespace AutoTest
                     if (txt.Contains(kw)) { danger = true; break; }
                 if (!danger) return i;
             }
-            // ③ 全て危険語入り → 先頭
+            // ④ 全て危険語入り → 先頭
             return 0;
+        }
+
+        /// <summary>選択肢の効果を見て「フラグを進める」スコアを算出。
+        /// いずれかの選択肢がプラスならその index を返し、なければ -1。
+        /// 既存所持フラグを廃棄するだけの選択肢はマイナス点で忌避される。</summary>
+        private int PickFlagProgressChoice(EventDefinition def)
+        {
+            var run = GameLoop.GameManager.Instance?.Run;
+            int bestIdx = -1;
+            int bestScore = 0;
+            for (int i = 0; i < def.choices.Count; i++)
+            {
+                int s = ScoreFlagChoice(def.choices[i], run);
+                if (s > bestScore) { bestScore = s; bestIdx = i; }
+            }
+            return bestIdx;
+        }
+
+        /// <summary>選択肢1つに対するフラグ進路スコア。</summary>
+        private int ScoreFlagChoice(EventSystem.EventChoice choice, GameLoop.RunState run)
+        {
+            if (choice?.effects == null || choice.effects.Count == 0) return 0;
+            int score = 0;
+            bool hasGain = false;
+            int discardCount = 0;
+            foreach (var eff in choice.effects)
+            {
+                switch (eff.type)
+                {
+                    case EventSystem.EventEffectType.GainFlag:
+                        score += 100; hasGain = true;
+                        // 未所持なら追加加点 (フラグ未成立時=新規進路を優先)
+                        if (run?.ownedFlags == null || !run.ownedFlags.Contains(eff.param ?? "")) score += 50;
+                        break;
+                    case EventSystem.EventEffectType.GainPassiveItem:
+                    case EventSystem.EventEffectType.GainSpecificItem:
+                        // 名前付き / パッシブ獲得は基本的に進路系
+                        score += 60; hasGain = true;
+                        break;
+                    case EventSystem.EventEffectType.DiscardFlag:
+                        discardCount++;
+                        break;
+                }
+            }
+            // フラグ廃棄のみで何も獲得しない選択肢は強い忌避
+            if (discardCount > 0 && !hasGain) score -= 80;
+            // 廃棄しつつ獲得もある (チェーン継続: 旧フラグ → 新フラグ/パッシブ) は中立 (gain加点で十分)
+            return score;
         }
 
         // ===== 計測フック =====
@@ -661,6 +906,35 @@ namespace AutoTest
         private void OnEnemyEncountered(EnemyData e)
         {
             var gm = GameManager.Instance;
+            var cm = CombatSystem.CombatManager.Instance;
+
+            // チェーン swap で再エンカウントしたケース: 前フォームの戦績を 1 件確定させる。
+            // (戦闘自体は継続するため OnBattleEnded は鳴らない → ここで明示記録しないと
+            //  途中フォームが永遠に summary に出てこない)
+            bool isChainSwap = cm != null && cm.IsCombatActive
+                && !string.IsNullOrEmpty(_pendingEnemyId);
+            if (isChainSwap && _cur != null)
+            {
+                int hpNow = gm?.Run?.playerHP ?? 0;
+                var midRec = new CombatRec
+                {
+                    enemy = _pendingEnemyName ?? "?",
+                    enemyId = _pendingEnemyId ?? "",
+                    floor = gm?.Run?.currentFloor ?? 0,
+                    isBoss = _pendingEnemyIsBoss,
+                    won = true, // チェーン swap は前形態を倒したから起きる
+                    turns = _cwWin + _cwDraw + _cwLoss,
+                    hpBefore = _pendingEnemyHpBefore,
+                    hpAfter = hpNow,
+                    afterLastStand = _cur.lastStandUsed,
+                    tWin = _cwWin, tDraw = _cwDraw, tLoss = _cwLoss, tLossAbs = _cwLossAbs
+                };
+                _cur.combats.Add(midRec);
+                // 注: totalCombats / totalTurns / totalWins には加算しない
+                // (OnBattleEnded 側のチェーン最終形態分でラン全体の合計が記録されるため、
+                //  ここで足すと二重計上になる。combats リストの per-enemy 集計だけ厚くする)
+            }
+
             _pendingEnemyName = e != null ? e.displayName : "?";
             _pendingEnemyId = e != null && e.id != null ? e.id : "";
             // ボス判定は敵IDのみで厳密に行う（ノード種別フォールバックは誤検出の元）
@@ -704,6 +978,13 @@ namespace AutoTest
             _cur.starvationHits++;
         }
 
+        private void OnTileActivated(TileType t)
+        {
+            if (_cur == null) return;
+            _cur.tileVisits.TryGetValue(t, out int c);
+            _cur.tileVisits[t] = c + 1;
+        }
+
         private void TrackLastStand()
         {
             var run = GameManager.Instance.Run;
@@ -736,7 +1017,7 @@ namespace AutoTest
         {
             var run = GameManager.Instance.Run;
             bool full = run != null && run.currentFloor >= run.maxFloor;
-            Finish(full ? Outcome.FullClear : Outcome.NormalClear, full ? "完全クリア(6F)" : "通常クリア(5F)");
+            Finish(full ? Outcome.FullClear : Outcome.NormalClear, full ? "完全クリア(7F)" : "通常クリア(5F)");
         }
 
         private void FinishGameOver()
@@ -788,6 +1069,7 @@ namespace AutoTest
                 _cur.finalMaxHP = run.playerMaxHP;
                 _cur.finalCoins = run.coins;
                 _cur.deathFloor = (o == Outcome.GameOver) ? run.currentFloor : 0;
+                _cur.gedatsuVictory = run.gedatsuVictory;
             }
             Classify(_cur);
             _records.Add(_cur);
@@ -810,12 +1092,24 @@ namespace AutoTest
         {
             if (r.outcome == Outcome.Crash) { r.band = "CRASH"; r.bandLabel = "クラッシュ(例外)"; return; }
             if (r.outcome == Outcome.Deadlock) { r.band = "DEADLOCK"; r.bandLabel = "デッドロック"; return; }
-            if (r.outcome == Outcome.FullClear) { r.band = "R10"; r.bandLabel = "6層クリア"; return; }
-            if (r.outcome == Outcome.NormalClear) { r.band = "R8"; r.bandLabel = "5Fクリア"; return; }
+            if (r.outcome == Outcome.FullClear)
+            {
+                if (r.gedatsuVictory) { r.band = "R12"; r.bandLabel = "解脱(妙覚サドンデス勝利)"; }
+                else                  { r.band = "R11"; r.bandLabel = "7層クリア(完全クリア)"; }
+                return;
+            }
+            if (r.outcome == Outcome.NormalClear)
+            {
+                // 6F クリア (〈真理〉未所持で 7F 進入不可) と 5F クリア (〈決意〉未所持で 6F 進入不可) を区別
+                if (r.reachedFloor >= 6) { r.band = "R8b"; r.bandLabel = "6Fクリア(真理未所持)"; }
+                else                     { r.band = "R8"; r.bandLabel = "5Fクリア(決意未所持)"; }
+                return;
+            }
 
             // GameOver
             int f = r.deathFloor;
             bool boss = r.deathInBossFight;
+            if (f >= 7) { r.band = "R10"; r.bandLabel = "7Fで死亡(覚者到達)"; return; }
             if (f >= 6) { r.band = "R9"; r.bandLabel = "6Fボスで死亡"; return; }
             switch (f)
             {
@@ -911,7 +1205,15 @@ namespace AutoTest
             string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             string root = Path.Combine(Application.dataPath, "..", "AutoRunLogs");
             root = Path.GetFullPath(root);
-            string dir = Path.Combine(root, $"batch_{stamp}_n{_records.Count}");
+            string metaTag = metaPattern switch
+            {
+                MetaPattern.Cowardly        => "cowardly",
+                MetaPattern.FullProgression => "fullmeta",
+                MetaPattern.Untouched       => "saved",
+                _                           => "meta",
+            };
+            string debuffTag = enableAllDebuffs ? "_debuffON" : "";
+            string dir = Path.Combine(root, $"batch_{stamp}_n{_records.Count}_{metaTag}{debuffTag}");
             Directory.CreateDirectory(dir);
 
             File.WriteAllText(Path.Combine(dir, "summary.txt"), BuildSummary(), new UTF8Encoding(false));
@@ -934,8 +1236,17 @@ namespace AutoTest
             var other  = _records.FindAll(r => r.profile != "貪欲" && r.profile != "回避");
 
             var sb = new StringBuilder();
+            string metaLabel = metaPattern switch
+            {
+                MetaPattern.Cowardly        => "臆病(メタ全リセット)",
+                MetaPattern.FullProgression => $"全有効化(メタLv{MetaProgression.MetaBuffTrack.TotalSteps})",
+                MetaPattern.Untouched       => "保存値そのまま",
+                _                           => metaPattern.ToString(),
+            };
             sb.AppendLine("################ AutoRun サマリ ################");
             sb.AppendLine($"日時      : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine($"メタ進行  : {metaLabel}");
+            sb.AppendLine($"メタデバフ: {(enableAllDebuffs ? "全ON (Lv1-10, 最高難易度)" : "全OFF")}");
             sb.AppendLine($"総ラン数  : {_records.Count}  (戦闘貪欲={greedy.Count} / 戦闘回避={averse.Count})");
             sb.AppendLine("比較軸    : 航行Rankのみ差し替え（消費/ショップ/戦闘実行/イベントは共通固定）");
             sb.AppendLine("################################################");
@@ -964,12 +1275,14 @@ namespace AutoTest
             sb.AppendLine();
             if (n == 0) { sb.AppendLine("（該当ランなし）"); return sb.ToString(); }
 
-            // --- 10段階バンド分布 ---
-            sb.AppendLine("---- 結果10段階分布（CRASH/DEADLOCK除く母数で割合算出） ----");
-            string[] bands = { "R1","R2","R3","R4","R5","R6","R7","R8","R9","R10" };
+            // --- バンド分布 (R1-R12, R8b 含む) ---
+            // R8b = 6Fクリアして 7F進入不可で終了 (真理未所持) を R9 と R10 の間に挿入。
+            sb.AppendLine("---- 結果バンド分布（CRASH/DEADLOCK除く母数で割合算出） ----");
+            string[] bands = { "R1","R2","R3","R4","R5","R6","R7","R8","R9","R8b","R10","R11","R12" };
             string[] labels = {
                 "2F以前で死亡","3F道中で死亡","3Fボスで死亡","4F道中で死亡","4Fボスで死亡",
-                "5F道中で死亡","5Fボスで死亡","5Fクリア","6Fボスで死亡","6層クリア" };
+                "5F道中で死亡","5Fボスで死亡","5Fクリア(決意未所持)","6Fボスで死亡",
+                "6Fクリア(真理未所持)","7Fで死亡(覚者到達)","7層クリア(完全クリア)","解脱(妙覚サドンデス勝利)" };
             int crash = recs.FindAll(r => r.band == "CRASH").Count;
             int dead  = recs.FindAll(r => r.band == "DEADLOCK").Count;
             int valid = n - crash - dead;
@@ -1084,6 +1397,64 @@ namespace AutoTest
             sb.AppendLine($"  {PadR("平均ショップ購入数", 20)}: {(sShop/dn):F2}");
             sb.AppendLine();
 
+            // --- 5F突入時 確信チェーン進行状況 ---
+            // 5F到達ランのみ対象。 各種フラグ/パッシブ所持割合を出して、 どこで詰まったか分析する。
+            var arrived5F = recs.FindAll(r => r.convictionStageAt5F >= 0);
+            if (arrived5F.Count > 0)
+            {
+                sb.AppendLine("---- 5F突入時 確信チェーン進行 ----");
+                int total5F = arrived5F.Count;
+                int yogen   = arrived5F.FindAll(r => r.hadFlagYogenAt5F).Count;
+                int kakushin= arrived5F.FindAll(r => r.hadFlagKakushinAt5F).Count;
+                int gen     = arrived5F.FindAll(r => r.hadConvictionItem5F).Count;
+                int ketsui  = arrived5F.FindAll(r => r.hadResolveAt5F).Count;
+                int shinri  = arrived5F.FindAll(r => r.hadTruthAt5F).Count;
+                int s0 = arrived5F.FindAll(r => r.convictionStageAt5F == 0).Count;
+                int s1 = arrived5F.FindAll(r => r.convictionStageAt5F == 1).Count;
+                int s2 = arrived5F.FindAll(r => r.convictionStageAt5F == 2).Count;
+                int s3 = arrived5F.FindAll(r => r.convictionStageAt5F == 3).Count;
+                int s4plus = arrived5F.FindAll(r => r.convictionStageAt5F >= 4).Count;
+                sb.AppendLine($"  5F到達ラン数      : {total5F}");
+                sb.AppendLine($"  フラグ[苦難の予言]: {PadL(yogen.ToString(),4)}  ({Pct(yogen, total5F)})  ※チェーン1段目完了");
+                sb.AppendLine($"  フラグ[苦難の確信]: {PadL(kakushin.ToString(),4)}  ({Pct(kakushin, total5F)})  ※チェーン2段目完了");
+                sb.AppendLine($"  〈根拠のない確信〉: {PadL(gen.ToString(),4)}  ({Pct(gen, total5F)})  ※チェーン3段目完了 (stage 1)");
+                sb.AppendLine($"  〈決意〉所持      : {PadL(ketsui.ToString(),4)}  ({Pct(ketsui, total5F)})  ※stage 2-3 = 6F進入可");
+                sb.AppendLine($"  〈真理〉所持      : {PadL(shinri.ToString(),4)}  ({Pct(shinri, total5F)})  ※stage 4+ = 7F進入可");
+                sb.AppendLine($"  stage 0           : {PadL(s0.ToString(),4)}  ({Pct(s0, total5F)})");
+                sb.AppendLine($"  stage 1           : {PadL(s1.ToString(),4)}  ({Pct(s1, total5F)})");
+                sb.AppendLine($"  stage 2           : {PadL(s2.ToString(),4)}  ({Pct(s2, total5F)})");
+                sb.AppendLine($"  stage 3           : {PadL(s3.ToString(),4)}  ({Pct(s3, total5F)})");
+                sb.AppendLine($"  stage 4+          : {PadL(s4plus.ToString(),4)}  ({Pct(s4plus, total5F)})");
+                sb.AppendLine();
+            }
+
+            // --- タイル踏破分布（イベント実遭遇数の検証用） ---
+            // 1ランあたり、各タイル種別を実際に何回起動したか（再訪・消化済みは含まない）。
+            // 「イベントを順に3回踏むのが難しい」仮説の真偽を実数で確認する。
+            if (recs.Count > 0)
+            {
+                int runN = recs.Count;
+                sb.AppendLine("---- タイル踏破分布（1ランあたり平均・実起動回数） ----");
+                var order = new[]
+                {
+                    TileType.Battle, TileType.EliteBattle, TileType.Event, TileType.Mystery,
+                    TileType.Shop, TileType.Treasure, TileType.Rest, TileType.Trap,
+                };
+                foreach (var tt in order)
+                {
+                    long sum = 0; int runsWithAny = 0;
+                    foreach (var r in recs)
+                    {
+                        r.tileVisits.TryGetValue(tt, out int c);
+                        sum += c;
+                        if (c > 0) runsWithAny++;
+                    }
+                    double avg = (double)sum / runN;
+                    sb.AppendLine($"  {PadR(tt.ToString(), 12)}: 平均 {avg:F2}/ラン  (総{sum}, 1回以上踏破 {Pct(runsWithAny, runN)})");
+                }
+                sb.AppendLine();
+            }
+
             // --- 敵・ボス脅威度 ---
             // key = displayName。boss(enemyId が boss_layer*)は別エントリとして分離集計。
             sb.AppendLine("---- 敵・ボス脅威度 ----");
@@ -1176,6 +1547,19 @@ namespace AutoTest
             }
             sb.AppendLine("（吸収敗% = 敗北ターンのうちシールド吸収/無効化でメインダメ0だった割合。LS中はこれ＋勝＋分が生存ターン）");
             sb.AppendLine();
+
+            // --- 6Fクリア時ビルドスナップショット（サルベージ用） ---
+            var snaps = recs.FindAll(r => !string.IsNullOrEmpty(r.clear6FSnapshot));
+            if (snaps.Count > 0)
+            {
+                sb.AppendLine($"---- 6Fクリア時ビルドスナップショット ({snaps.Count}件・サルベージ用) ----");
+                foreach (var r in snaps)
+                {
+                    sb.AppendLine($"  ● RUN {r.index} [{r.bandLabel}]");
+                    sb.AppendLine($"      {r.clear6FSnapshot}");
+                }
+                sb.AppendLine();
+            }
 
             // --- デッドロック発生時の状況（原因特定用・最下段） ---
             var dls = recs.FindAll(r => r.band == "DEADLOCK");

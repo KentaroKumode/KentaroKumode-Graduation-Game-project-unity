@@ -79,8 +79,8 @@ namespace InventorySystem
                 return;
             }
             
-            // アイテム価値情報の記録（破棄前）
-            int itemValue = item.sellPrice?.min ?? (item.basePrice / 2);
+            // アイテム価値情報の記録（破棄前）。フォールバックは 1/5 デノミ込み(basePrice / 10)
+            int itemValue = item.sellPrice?.min ?? UnityEngine.Mathf.Max(1, item.basePrice / 10);
             string rarityIcon = GetRarityIcon(item.rarity);
             
             // インベントリからアイテムを削除

@@ -65,12 +65,21 @@ namespace EventSystem
             return n;
         }
 
+        // 条件部が "フラグ:[...]" / "パッシブ:[...]" で始まるか（内部コロンを持つ）
+        private static readonly Regex condColonPrefix = new Regex(@"^(フラグ|パッシブ):\[");
+
         /// <summary>1行をパース</summary>
         private static EventDefinition ParseLine(string line)
         {
-            // 最初の3つの ':' で分割（フレーバー以降はそのまま）
+            // name:condition:flavor:choices を ':' で分割する。
+            // ただし condition が "フラグ:[X]" / "パッシブ:[X]" で始まる場合、その内部コロンを
+            // フィールド区切りと誤認しないよう1つ読み飛ばす（誤読すると優先/要求フラグ/一度のみ等が全消失する）。
             int p1 = line.IndexOf(':');
-            int p2 = line.IndexOf(':', p1 + 1);
+            int condStart = p1 + 1;
+            int searchFrom = condStart;
+            if (condStart < line.Length && condColonPrefix.IsMatch(line.Substring(condStart)))
+                searchFrom = line.IndexOf(':', condStart) + 1;
+            int p2 = line.IndexOf(':', searchFrom);
             int p3 = line.IndexOf(':', p2 + 1);
 
             string name = line.Substring(0, p1).Trim();
