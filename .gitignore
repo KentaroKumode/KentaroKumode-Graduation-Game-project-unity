@@ -130,5 +130,9 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 
-# AutoRun ディテールログ（巨大なのでgit管理外。summary.txt/runs.jsonl は追跡）
+# AutoRun ログ（巨大な生ログはgit管理外。summary.txt / ai_stats.json / 学習集計(item_stats.json等) は追跡）
 AutoRunLogs/**/detail.log
+# 1ラン=1行の生ログ（バッチごと約15MB・合計数GB。再蓄積可能なので除外）
+AutoRunLogs/**/runs.jsonl
+# 回帰の生入力（1ラン=1行、合計100MB超。item_stats.json の集計が残るので除外）
+AutoRunLogs/learning/**/regression_runs.csv

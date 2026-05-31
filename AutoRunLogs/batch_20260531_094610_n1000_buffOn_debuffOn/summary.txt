@@ -1,0 +1,444 @@
+################ AutoRun サマリ ################
+日時      : 2026-05-31 09:46:11
+メタ進行  : 全有効化(メタLv59)
+メタデバフ: 全ON (Lv1-10, 最高難易度)
+総ラン数  : 1000  (戦闘貪欲=1000 / 戦闘回避=0)
+比較軸    : 航行Rankのみ差し替え（消費/ショップ/戦闘実行/イベントは共通固定）
+################################################
+
+【Λ層 ファーム期待値（突入ランのみ）】
+  Λ突入ラン   : 291
+  獲得ゴールド : 平均 +25.4
+  獲得アイテム : 平均 +8.43 個
+  踏破マス     : 平均 24.4
+  Λデバフ段階計: 平均 8.08
+  離脱成功/Λ内死亡: 257 / 34
+
+【武器強化経路 (集計修正バグ検証)】
+  強化発火合計   : 1795 回 (1.80/ラン)
+  強化を行ったラン: 979 / 1000 (97.9%)
+  最終T4到達ラン : 268 / 1000 (26.8%)
+  最終武器Tier分布:
+    axe_t3               : 131 (13.1%)
+    dagger_t3            : 131 (13.1%)
+    shield_t3            : 123 (12.3%)
+    sword_t3             : 115 (11.5%)
+    sword_t4             : 71 (7.1%)
+    axe_t4               : 63 (6.3%)
+    dagger_t4            : 60 (6.0%)
+    shield_t4            : 51 (5.1%)
+    dagger_t2            : 50 (5.0%)
+    axe_t2               : 48 (4.8%)
+    shield_t2            : 47 (4.7%)
+    sword_t2             : 44 (4.4%)
+    curse_t4             : 21 (2.1%)
+    curse_t3             : 16 (1.6%)
+    curse_t2             : 6 (0.6%)
+    dagger_t1            : 5 (0.5%)
+    axe_t1               : 4 (0.4%)
+    sword_t1             : 4 (0.4%)
+    dead_staff           : 4 (0.4%)
+    shield_t1            : 4 (0.4%)
+    invest_t4            : 2 (0.2%)
+
+================ 【前半 50% ─ 戦闘貪欲（戦闘マスを最優先で選ぶ）】 ================
+ラン数    : 1000
+行動方針  : 前進貪欲 + 生存重視
+
+---- 結果バンド分布（上位%＝その結果『以上』に到達したランの割合） ----
+  R1a 1F道中で死亡          :   12  上位 100.0%
+  R1b 1Fボスで死亡          :    5  上位  98.8%
+  R1c 2F道中で死亡          :   88  上位  98.3%
+  R1d 2Fボスで死亡          :   49  上位  89.5%
+  R2  3F道中で死亡          :   11  上位  84.6%
+  R3  3Fボスで死亡          :   19  上位  83.5%
+  R4  4F道中で死亡          :  337  上位  81.6%
+  R5  4Fボスで死亡          :   11  上位  47.9%
+  R6  5F道中で死亡          :   84  上位  46.8%
+  R7  5Fボスで死亡          :  124  上位  38.4%
+  R8  5Fクリア(決意未所持)  :    3  上位  26.0%
+  R9  6Fボスで死亡          :  251  上位  25.7%
+  R8b 6Fクリア(真理未所持)  :    0  上位   0.6%
+  R10 7Fで死亡(覚者到達)    :    6  上位   0.6%
+  R11 7層クリア(完全クリア) :    0  上位   0.0%
+  R12 解脱(妙覚サドンデス勝利):    0  上位   0.0%
+  （例: 「7層クリア 上位X%」= 全ランの上位X%が7層クリア以上を達成）
+
+  CRASHクラッシュ(例外)      :    0  (0.0% of all)
+  DEADデッドロック          :    0  (0.0% of all)
+
+---- 死亡階層・死因 ----
+  総死亡数: 997 / 1000
+   Floor 1         :   17  (1.7%)
+   Floor 2         :  137  (13.7%)
+   Floor 3         :   30  (3.0%)
+   Floor 4         :  348  (34.9%)
+   Floor 5         :  208  (20.9%)
+   Floor 6         :  251  (25.2%)
+   Unknown         :  997  (100.0%)
+
+---- ラストスタンド ----
+  発動ラン数: 0 / 1000  (0.0%)
+
+---- ラストスタンド直接死因 ----
+  発動後に死亡したラン: 0 / 0
+（発動後は基本ロール敗北のメインダメのみ＝致命敵＝その止めを刺した敵）
+
+---- 経済・燃費バランス ----
+  平均最終ゴールド    : 13.7
+  平均ピークゴールド  : 38.1
+  平均総獲得ゴールド  : 72.1
+  平均空腹ダメージ計  : 9.7  (平均被弾 0.9回)
+  平均ショップ購入数  : 5.88
+  平均リロール回数    : 2.06  (平均消費 4.5G)
+  平均優先アイテム取得: 0.00
+
+---- 5F突入時 確信チェーン進行 ----
+  5F到達ラン数      : 468
+  フラグ[苦難の予言]:    0  (0.0%)  ※チェーン1段目完了
+  フラグ[苦難の確信]:    0  (0.0%)  ※チェーン2段目完了
+  〈根拠のない確信〉:   18  (3.8%)  ※チェーン3段目完了 (stage 1)
+  〈決意〉所持      :  131  (28.0%)  ※stage 2-3 = 6F進入可
+  〈真理〉所持      :  317  (67.7%)  ※stage 4+ = 7F進入可
+  stage 0           :    0  (0.0%)
+  stage 1           :   18  (3.8%)
+  stage 2           :   58  (12.4%)
+  stage 3           :   73  (15.6%)
+  stage 4+          :  319  (68.2%)
+
+---- タイル踏破分布（1ランあたり平均・実起動回数） ----
+  Battle      : 平均 6.37/ラン  (総6369, 1回以上踏破 98.1%)
+  EliteBattle : 平均 4.12/ラン  (総4120, 1回以上踏破 91.7%)
+  Event       : 平均 9.90/ラン  (総9896, 1回以上踏破 100.0%)
+  Exchange    : 平均 2.63/ラン  (総2627, 1回以上踏破 91.0%)
+  Shop        : 平均 5.58/ラン  (総5581, 1回以上踏破 97.7%)
+  Treasure    : 平均 1.41/ラン  (総1405, 1回以上踏破 74.8%)
+  Rest        : 平均 4.53/ラン  (総4531, 1回以上踏破 98.8%)
+  Trap        : 平均 2.86/ラン  (総2862, 1回以上踏破 89.7%)
+
+---- 6/7層ボス戦 プレイヤー回復・シールド量（1戦平均） ----
+  6層ボス: 257戦  回復 1.4/戦  シールド 25.6/戦
+  7層ボス: 6戦  回復 54.5/戦  シールド 114.2/戦
+  （7層は覚者連戦全体の累計を1戦として計上）
+
+---- 敵・ボス脅威度 ----
+  敵名              種別   遭遇   勝率   平均T  平均被ダメ  致命
+  覚者・妙覚        BOSS      3     0%    14.7        23.7     3
+  灰燼の王          BOSS    257     2%     5.1        13.6   251
+  業火の審判官      BOSS    110    31%     7.8        32.0    76
+  覚者・寂照        BOSS      5    60%     6.4        11.6     2
+  怪しい商人        雑魚    138    80%     9.7         7.9    20
+  精鋭怪しい商人    精鋭    297    82%     9.9         8.9    39
+  覚者・初眼        BOSS      6    83%     2.8        11.8     1
+  精鋭13番目の死    精鋭     31    84%     2.5         5.9     5
+  偽の商人          雑魚    597    84%     2.6         0.1    22
+  シュヴァリエ・サ  BOSS    308    84%    20.4         6.6    48
+  13番目の死        雑魚    838    87%     2.6         5.4   105
+  精鋭怨嗟の影      精鋭    299    92%     7.4         3.9    17
+  精鋭コボルド      精鋭     26    92%     3.7         0.0     2
+  ゴブリン王        BOSS    895    95%     4.6         1.7    49
+  精鋭キマイラ      精鋭    152    95%     4.2         1.6     8
+  黎明騎士          雑魚    282    95%     3.5         1.0    13
+  キマイラ          雑魚    342    96%     4.0         0.9    10
+  精鋭黎明騎士      精鋭    181    97%     3.7         1.4     5
+  怨嗟の影          雑魚    101    97%     4.7         2.0     3
+  業火の眷属        雑魚    274    97%     3.9         3.6     7
+  精鋭業火の眷属    精鋭    151    97%     4.2         4.6     2
+  蛇鱗の戦士        雑魚    307    97%     3.1         0.9     7
+  鏡の双子          BOSS    479    98%     3.7         0.5    11
+  精鋭蛇鱗の戦士    精鋭    131    98%     3.7         0.9     3
+  毒沼の主          BOSS    835    98%     4.4         6.6    19
+  精鋭血の眷属      精鋭    255    99%     3.7         0.8     3
+  精鋭オーク        精鋭    109    99%     3.0         0.1     1
+  双角の暴牛        雑魚    282    99%     3.1         0.1     2
+  精鋭双角の暴牛    精鋭    163    99%     3.2         0.3     1
+  ゴブリン          雑魚   1797    99%     3.4         0.1    11
+  ダイアウルフ      雑魚    784    99%     2.9         0.1     4
+  トレジャーゴブリ  BOSS    988    99%     3.4         0.0     5
+  オーク            雑魚    868   100%     3.2         0.3     4
+  精鋭落日の騎士    精鋭    237   100%     3.3         0.2     1
+  精鋭ゴーレム      精鋭    241   100%     4.0         4.0     0
+  スライム          雑魚   1569   100%     3.1         0.0     6
+  スケルトン        雑魚    892   100%     2.9         0.1     3
+  ハーピィ          雑魚    809   100%     3.3         0.2     2
+  コボルド          雑魚    819   100%     2.8         0.1     0
+  ゴーレム          雑魚    161   100%     3.9         0.4     0
+  落日の騎士        雑魚    153   100%     3.1         0.1     0
+  血の眷属          雑魚    125   100%     3.4         0.2     0
+  精鋭ハーピィ      精鋭    112   100%     2.6         0.0     0
+  精鋭スケルトン    精鋭     18   100%     5.7         0.6     0
+  精鋭ダイアウルフ  精鋭     15   100%     2.9         0.4     0
+  業火・残響        BOSS      5   100%     1.0         0.0     0
+  覚者・無相        BOSS      5   100%     2.4        18.0     0
+  シュヴァリエ・残  BOSS      5   100%     2.0         0.0     0
+  灰燼・薄火        BOSS      3   100%     1.0         0.0     0
+
+（勝率の低い順にソート。致命=そのランをゲームオーバーに導いた回数）
+
+---- 武器×ダイス 組み合わせ別 戦闘勝率（武器はTierまで・業物/+段階は合算） ----
+  武器            ダイス          戦闘数   勝率
+  axe_t1          dice_wood          718    99%
+  axe_t1          dice_bone           14   100%
+  axe_t1          dice_stable         10   100%
+  axe_t1          dice_perfectio       6   100%
+
+  axe_t2          dice_wood         1011    97%
+  axe_t2          dice_bone          143    93%
+  axe_t2          dice_stable         82    98%
+  axe_t2          dice_flame          52    96%
+  axe_t2          dice_twinsnake      42   100%
+  axe_t2          dice_gem            42   100%
+  axe_t2          dice_destiny        29   100%
+  axe_t2          dice_perfectio      27    96%
+  axe_t2          dice_moroha         16   100%
+  axe_t2          dice_star            2   100%
+
+  axe_t3          dice_wood          620    97%
+  axe_t3          dice_bone          357    92%
+  axe_t3          dice_twinsnake     134    97%
+  axe_t3          dice_stable        112    92%
+  axe_t3          dice_gem           109    94%
+  axe_t3          dice_moroha        106    96%
+  axe_t3          dice_perfectio      97    93%
+  axe_t3          dice_destiny        77    84%
+  axe_t3          dice_star           61    95%
+  axe_t3          dice_flame          53    94%
+  axe_t3          dice_greed          19    95%
+
+  axe_t4          dice_bone           89    85%
+  axe_t4          dice_twinsnake      72    83%
+  axe_t4          dice_moroha         46    83%
+  axe_t4          dice_wood           41    85%
+  axe_t4          dice_gem            39    87%
+  axe_t4          dice_flame          29    86%
+  axe_t4          dice_perfectio      25    88%
+  axe_t4          dice_destiny        24    83%
+  axe_t4          dice_greed          22    86%
+  axe_t4          dice_star           18    89%
+  axe_t4          dice_stable          4    25%
+
+  curse_t2        dice_wood           77    95%
+  curse_t2        dice_gem             8   100%
+  curse_t2        dice_moroha          1   100%
+
+  curse_t3        dice_wood          201    97%
+  curse_t3        dice_bone           23    87%
+  curse_t3        dice_greed          21   100%
+  curse_t3        dice_perfectio      19    84%
+  curse_t3        dice_flame          15   100%
+  curse_t3        dice_moroha          8    88%
+  curse_t3        dice_destiny         8    88%
+  curse_t3        dice_gem             3    67%
+  curse_t3        dice_twinsnake       2    50%
+  curse_t3        dice_star            1     0%
+
+  curse_t4        dice_wood           50    96%
+  curse_t4        dice_twinsnake      29    97%
+  curse_t4        dice_greed          22    86%
+  curse_t4        dice_bone           19    89%
+  curse_t4        dice_star           17    94%
+  curse_t4        dice_perfectio       9    67%
+  curse_t4        dice_gem             8    75%
+  curse_t4        dice_flame           4    75%
+  curse_t4        dice_stable          2     0%
+  curse_t4        dice_destiny         1     0%
+
+  dagger_t1       dice_wood          806    99%
+  dagger_t1       dice_perfectio       4   100%
+  dagger_t1       dice_bone            4   100%
+
+  dagger_t2       dice_wood          945    97%
+  dagger_t2       dice_bone          111    90%
+  dagger_t2       dice_stable         68    97%
+  dagger_t2       dice_twinsnake      44    98%
+  dagger_t2       dice_star           38   100%
+  dagger_t2       dice_gem            35   100%
+  dagger_t2       dice_perfectio      33   100%
+  dagger_t2       dice_destiny        28    96%
+  dagger_t2       dice_flame          25   100%
+  dagger_t2       dice_greed          23   100%
+  dagger_t2       dice_moroha         20    90%
+
+  dagger_t3       dice_wood          481    92%
+  dagger_t3       dice_star          162    95%
+  dagger_t3       dice_bone          155    95%
+  dagger_t3       dice_moroha        126    96%
+  dagger_t3       dice_destiny       120    96%
+  dagger_t3       dice_perfectio     115    91%
+  dagger_t3       dice_gem           110    99%
+  dagger_t3       dice_twinsnake      66    91%
+  dagger_t3       dice_greed          66    97%
+  dagger_t3       dice_stable         65    97%
+  dagger_t3       dice_flame          54    91%
+
+  dagger_t4       dice_wood          100    95%
+  dagger_t4       dice_flame          77    92%
+  dagger_t4       dice_stable         49    90%
+  dagger_t4       dice_star           42    83%
+  dagger_t4       dice_moroha         38    79%
+  dagger_t4       dice_perfectio      36    86%
+  dagger_t4       dice_destiny        30    93%
+  dagger_t4       dice_bone           25    80%
+  dagger_t4       dice_greed          21    81%
+  dagger_t4       dice_gem            20    75%
+  dagger_t4       dice_twinsnake      11    91%
+
+  dead_staff      dice_wood           30   100%
+  dead_staff      dice_stable          4   100%
+  dead_staff      dice_bone            4    50%
+
+  invest_t4       dice_bone           16    88%
+  invest_t4       dice_wood            6   100%
+
+  shield_t1       dice_wood          757    99%
+  shield_t1       dice_bone           15   100%
+  shield_t1       dice_stable          2   100%
+  shield_t1       dice_twinsnake       1   100%
+
+  shield_t2       dice_wood         1004    95%
+  shield_t2       dice_bone          148    93%
+  shield_t2       dice_twinsnake      70    93%
+  shield_t2       dice_greed          43    88%
+  shield_t2       dice_star           39    90%
+  shield_t2       dice_perfectio      23    87%
+  shield_t2       dice_gem            22    86%
+  shield_t2       dice_flame          20   100%
+  shield_t2       dice_moroha         16   100%
+  shield_t2       dice_stable         14    86%
+  shield_t2       dice_destiny         8   100%
+
+  shield_t3       dice_wood          709    94%
+  shield_t3       dice_bone          251    88%
+  shield_t3       dice_greed         132    95%
+  shield_t3       dice_gem           105    89%
+  shield_t3       dice_perfectio      79    97%
+  shield_t3       dice_destiny        78    90%
+  shield_t3       dice_twinsnake      59    95%
+  shield_t3       dice_flame          56    80%
+  shield_t3       dice_star           49    90%
+  shield_t3       dice_moroha         39    95%
+  shield_t3       dice_stable         24    92%
+
+  shield_t4       dice_greed          78    83%
+  shield_t4       dice_wood           55    91%
+  shield_t4       dice_bone           53    96%
+  shield_t4       dice_flame          33    94%
+  shield_t4       dice_gem            32    78%
+  shield_t4       dice_twinsnake      30    87%
+  shield_t4       dice_perfectio      27    74%
+  shield_t4       dice_stable         18    83%
+  shield_t4       dice_destiny        18    83%
+  shield_t4       dice_star           18    72%
+  shield_t4       dice_moroha          2    50%
+
+  sword_t1        dice_wood          724    99%
+  sword_t1        dice_bone           12   100%
+  sword_t1        dice_flame           2   100%
+  sword_t1        dice_gem             2   100%
+
+  sword_t2        dice_wood         1002    97%
+  sword_t2        dice_bone          154   100%
+  sword_t2        dice_twinsnake      79    96%
+  sword_t2        dice_gem            71    97%
+  sword_t2        dice_stable         38   100%
+  sword_t2        dice_flame          36    94%
+  sword_t2        dice_moroha         23   100%
+  sword_t2        dice_perfectio      15   100%
+  sword_t2        dice_greed           9   100%
+  sword_t2        dice_destiny         8   100%
+  sword_t2        dice_star            7   100%
+
+  sword_t3        dice_wood          560    96%
+  sword_t3        dice_bone          267    94%
+  sword_t3        dice_perfectio     148    97%
+  sword_t3        dice_flame         112    94%
+  sword_t3        dice_twinsnake      90    94%
+  sword_t3        dice_destiny        81    99%
+  sword_t3        dice_stable         77   100%
+  sword_t3        dice_gem            56    88%
+  sword_t3        dice_moroha         40   100%
+  sword_t3        dice_star           37    97%
+  sword_t3        dice_greed           9    89%
+
+  sword_t4        dice_wood          154    95%
+  sword_t4        dice_bone          139    88%
+  sword_t4        dice_perfectio      65    85%
+  sword_t4        dice_flame          64    94%
+  sword_t4        dice_destiny        42    81%
+  sword_t4        dice_greed          26    85%
+  sword_t4        dice_stable         23    78%
+  sword_t4        dice_gem            22    86%
+  sword_t4        dice_twinsnake      22    86%
+  sword_t4        dice_star            5    60%
+  sword_t4        dice_moroha          3     0%
+（戦闘数=その組み合わせで戦った戦闘の総数。少数サンプルの勝率は参考値）
+
+---- ボス戦ターン内訳（勝/分/敗 ％・吸収敗=敗北だが被ダメ0） ----
+  ボス名             総T    勝%    分%    敗%  吸収敗%
+  覚者・妙覚           9    33%    33%    33%       0%
+  灰燼の王          1054    49%    21%    30%      44%
+  業火の審判官       752    81%     8%    11%      57%
+  覚者・寂照          12   100%     0%     0%        -
+  覚者・初眼          16    94%     6%     0%        -
+  シュヴァリエ・サ  5970    60%     5%    36%      58%
+  ゴブリン王        3182    91%     5%     4%      32%
+  鏡の双子          1294    94%     4%     3%      74%
+  毒沼の主          2835    97%     2%     1%      88%
+  トレジャーゴブリ  2376    99%     1%     0%     100%
+  業火・残響           5   100%     0%     0%        -
+  覚者・無相          12    92%     8%     0%        -
+  シュヴァリエ・残    10   100%     0%     0%        -
+  灰燼・薄火           3   100%     0%     0%        -
+（吸収敗% = 敗北ターンのうちシールド吸収/無効化でメインダメ0だった割合。LS中はこれ＋勝＋分が生存ターン）
+
+=============================================
+
+
+================ 【後半 50% ─ 戦闘回避（戦闘以外があれば必ず回避）】 ================
+ラン数    : 0
+行動方針  : 前進貪欲 + 生存重視
+
+（該当ランなし）
+
+---- L1学習: Top 25 6F層別lift (チェーン除外, minN=8) ----
+  累積バッチ 66 / 累積ラン 19625 / 更新 2026-05-31 09:46:10
+  注: 6F到達ラン同士で比較し、チェーン進行差を相殺。lift6F が本当の貢献。
+  offLift6F = 提示 vs 未提示 (出現バイアス除去)。差が大きいなら出現自体が勝率を変える。
+  ID                         acq6F  lift6F  offL6F  clrΔ6F  formΔ  liftAll
+  cons_regen_4                    8    9.35    0.02  -0.007   1.39    2.75
+  cons_atk_4                     12    4.65    0.02  -0.007   0.01    3.18
+  cons_reduce_4                  21    3.88    0.00  -0.008  -0.24    2.55
+  cons_shield_4                  15    3.63    0.01  -0.007   0.70    6.70
+  cons_crit_4                    19    3.41    0.03  -0.007   0.13    5.88
+  cons_dice_4                    17    3.08    0.03  -0.007   0.06    5.96
+  cons_heal_4                    32    2.40    0.03  -0.007   0.11    4.21
+  相棒の魂                           14    2.15    2.15  -0.008  -0.24    6.17
+  希望の灯片                          52    1.70    1.70  -0.008  -0.16    2.00
+  cons_food_4                    49    1.65    0.05  -0.008   0.13    2.79
+  uniq_oni_oil                   39    0.92    0.03  -0.007  -0.14    1.73
+  飢餓丸                           124    0.70    0.18  -0.007   0.03   -0.88
+  curse_t1                      352    0.68    0.03   0.088   1.81    1.65
+  商人の符牒                         166    0.61    0.16  -0.007   0.50    0.74
+  利刃IV                          140    0.58    0.14  -0.008   0.01    0.44
+  curse_t4                      250    0.57    0.57   0.044   0.90    1.48
+  賞金首狩りIV                       159    0.52    0.18  -0.007   0.13    1.96
+  dead_staff                    201    0.51    0.03  -0.006   0.50    0.88
+  末那識                           172    0.48    0.12  -0.008   0.01    1.50
+  transcendent_insight          220    0.46    0.11  -0.008  -0.11    1.30
+  狂乱のメダリオン                      189    0.46    0.08  -0.007   0.00    0.77
+  シールドバッシュIV                    166    0.46    0.11  -0.007   0.01    1.04
+  吸血IV                          170    0.46    0.13  -0.008  -0.04    1.57
+  永遠の燈                          203    0.43    0.15  -0.007   0.01    2.00
+  uniq_merchant_bell            176    0.43    0.02  -0.007   0.05    1.84
+
+---- Bottom 10 6F層別lift (acq6Fラン同士で見ても弱い＝罠候補) ----
+  dice_bone                    3746   -0.02
+  cons_regen_1                 2306    0.00
+  cons_dice_1                  2432    0.01
+  shield_t3                    1226    0.01
+  cons_shield_2                1623    0.01
+  cons_crit_1                  2500    0.01
+  dice_biased                  2360    0.01
+  dice_copper                  2110    0.01
+  cons_atk_1                   2410    0.01
+  dice_iron                    2353    0.01

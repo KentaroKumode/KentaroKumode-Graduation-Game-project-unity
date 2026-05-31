@@ -1,0 +1,13 @@
+{
+    "rerollCostRatio": 0.30000001192092898,
+    "consumableStockMax": 3,
+    "robberyMinHpRatio": 0.6438083648681641,
+    "eventExplorationRate": 0.04763747751712799,
+    "importantThreatThreshold": 5,
+    "emergencyHealRatio": 0.8841748237609863,
+    "hpLowThreshold": 0.550000011920929,
+    "hpCritThreshold": 0.47276419401168826,
+    "lastBandScoreAvg": 5.718999862670898,
+    "trialBatches": 4,
+    "updatedAt": "2026-05-31 15:29:37"
+}

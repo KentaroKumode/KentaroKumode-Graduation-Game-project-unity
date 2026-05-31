@@ -1,0 +1,20 @@
+{
+  "updatedAt": "2026-05-31 15:00:11",
+  "mode": "paired",
+  "lastBatch": {
+    "n": 1000,
+    "compositeMean": 8.579,
+    "pairedDiff": -0.216,
+    "pairedSEM": 0.067,
+    "ci95": [-0.35, -0.08]
+  },
+  "best": {
+    "score": 8.573,
+    "summary": "shop[reroll=0.30 cons=3] rob[hp%=0.77] event[exp=0.07] combat[thr=7 heal=1.04] nav[low=0.62 crit=0.36] | last avg=8.57 batches=16"
+  },
+  "decision": "rejected-paired (Δ=-0.22 ≤ margin 0.132)",
+  "effectiveMargin": 0.132,
+  "nextPerturb": { "axis": "multi-axis", "delta": -0.216 },
+  "gates": { "minBatchForL1": 50, "minBatchForL2": 200, "semConfidenceK": 1.96 },
+  "diagnostics": ["OK: ペアテストでノイズ低減中", "OK: サイズ十分"]
+}
