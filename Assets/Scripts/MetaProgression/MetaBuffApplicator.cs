@@ -130,6 +130,10 @@ namespace MetaProgression
         public static bool IsTreasureChestGoldUnlocked()
             => S != null && S.treasureChestGoldUnlocked;
 
+        /// <summary>〈値下げ交渉〉解放済みかどうか。ショップで強盗行動が可能。</summary>
+        public static bool IsShopRobberyUnlocked()
+            => S != null && S.shopRobberyUnlocked;
+
         /// <summary>会心倍率（恒久バフでの会心倍率変更は撤廃され、常に 2.0）。
         /// 装備パッシブ等が個別に上書きしうるが、メタ恒久値としては固定。</summary>
         public static float GetCriticalMultiplier() => 2.0f;

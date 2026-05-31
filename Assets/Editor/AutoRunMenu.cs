@@ -14,70 +14,50 @@ namespace AutoTest.EditorTools
     {
         private const string ScenePath = "Assets/Scenes/SampleScene2.unity";
         private const string PendingKey = "AutoRun.PendingCount";
-        private const string MetaKey    = "AutoRun.MetaPattern";   // EditorPrefs (恒久進行)
-        private const string DebuffKey  = "AutoRun.EnableAllDebuffs"; // EditorPrefs (デバフ全ON)
+        private const string ProfileKey = "AutoRun.MetaProfile";   // EditorPrefs (プロファイル選択)
+        private const string SweepKey   = "AutoRun.Boss5Sweep";    // SessionState (5Fボス勝率スイープ)
+        private const string LambdaKey  = "AutoRun.LambdaFarmSweep"; // SessionState (Λファーム量スイープ)
+        private const string LoopKey    = "AutoRun.AutoLoopBatches"; // SessionState (自動周回バッチ数)
 
-        // メニュー項目パス
-        private const string MenuMetaCowardly = "Tools/AutoRun/メタ進行: 臆病(全リセット)";
-        private const string MenuMetaFull     = "Tools/AutoRun/メタ進行: 全有効化(全段解放)";
-        private const string MenuMetaUntouched= "Tools/AutoRun/メタ進行: 保存値そのまま";
-        private const string MenuDebuffsOff   = "Tools/AutoRun/メタデバフ: 全OFF (難易度標準)";
-        private const string MenuDebuffsOn    = "Tools/AutoRun/メタデバフ: 全ON (Lv1-10, 最高難易度)";
+        // メニュー項目パス (プロファイル選択)
+        private const string MenuProfA = "Tools/AutoRun/プロファイル: 素プレイ (バフOFF・デバフOFF)";
+        private const string MenuProfB = "Tools/AutoRun/プロファイル: バフのみ (バフON・デバフOFF)";
+        private const string MenuProfC = "Tools/AutoRun/プロファイル: フル設定 (バフON・デバフON)";
 
         static AutoRunMenu()
         {
             EditorApplication.playModeStateChanged += OnPlayModeChanged;
         }
 
-        // ===== メタモード切替 (チェック付きメニュー) =====
+        // ===== プロファイル選択 (主軸) =====
 
-        private static AutoRunner.MetaPattern CurrentMetaPattern
+        private static MetaProfile CurrentProfile
         {
             get
             {
-                int v = EditorPrefs.GetInt(MetaKey, (int)AutoRunner.MetaPattern.Cowardly);
-                return (AutoRunner.MetaPattern)v;
+                int v = EditorPrefs.GetInt(ProfileKey, (int)MetaProfile.BuffOn_DebuffOff);
+                return (MetaProfile)v;
             }
-            set => EditorPrefs.SetInt(MetaKey, (int)value);
+            set => EditorPrefs.SetInt(ProfileKey, (int)value);
         }
 
-        [MenuItem(MenuMetaCowardly, priority = 30)]
-        private static void SetMetaCowardly()  { CurrentMetaPattern = AutoRunner.MetaPattern.Cowardly; }
-        [MenuItem(MenuMetaCowardly, validate = true)]
-        private static bool SetMetaCowardlyValidate()
-        { Menu.SetChecked(MenuMetaCowardly, CurrentMetaPattern == AutoRunner.MetaPattern.Cowardly); return true; }
+        [MenuItem(MenuProfA, priority = 50)]
+        private static void SetProfA() { CurrentProfile = MetaProfile.BuffOff_DebuffOff; }
+        [MenuItem(MenuProfA, validate = true)]
+        private static bool SetProfAValidate()
+        { Menu.SetChecked(MenuProfA, CurrentProfile == MetaProfile.BuffOff_DebuffOff); return true; }
 
-        [MenuItem(MenuMetaFull, priority = 31)]
-        private static void SetMetaFull()      { CurrentMetaPattern = AutoRunner.MetaPattern.FullProgression; }
-        [MenuItem(MenuMetaFull, validate = true)]
-        private static bool SetMetaFullValidate()
-        { Menu.SetChecked(MenuMetaFull, CurrentMetaPattern == AutoRunner.MetaPattern.FullProgression); return true; }
+        [MenuItem(MenuProfB, priority = 51)]
+        private static void SetProfB() { CurrentProfile = MetaProfile.BuffOn_DebuffOff; }
+        [MenuItem(MenuProfB, validate = true)]
+        private static bool SetProfBValidate()
+        { Menu.SetChecked(MenuProfB, CurrentProfile == MetaProfile.BuffOn_DebuffOff); return true; }
 
-        [MenuItem(MenuMetaUntouched, priority = 32)]
-        private static void SetMetaUntouched() { CurrentMetaPattern = AutoRunner.MetaPattern.Untouched; }
-        [MenuItem(MenuMetaUntouched, validate = true)]
-        private static bool SetMetaUntouchedValidate()
-        { Menu.SetChecked(MenuMetaUntouched, CurrentMetaPattern == AutoRunner.MetaPattern.Untouched); return true; }
-
-        // ===== メタデバフトグル =====
-
-        private static bool EnableAllDebuffsPref
-        {
-            get => EditorPrefs.GetBool(DebuffKey, false);
-            set => EditorPrefs.SetBool(DebuffKey, value);
-        }
-
-        [MenuItem(MenuDebuffsOff, priority = 40)]
-        private static void SetDebuffsOff() { EnableAllDebuffsPref = false; }
-        [MenuItem(MenuDebuffsOff, validate = true)]
-        private static bool SetDebuffsOffValidate()
-        { Menu.SetChecked(MenuDebuffsOff, !EnableAllDebuffsPref); return true; }
-
-        [MenuItem(MenuDebuffsOn, priority = 41)]
-        private static void SetDebuffsOn() { EnableAllDebuffsPref = true; }
-        [MenuItem(MenuDebuffsOn, validate = true)]
-        private static bool SetDebuffsOnValidate()
-        { Menu.SetChecked(MenuDebuffsOn, EnableAllDebuffsPref); return true; }
+        [MenuItem(MenuProfC, priority = 52)]
+        private static void SetProfC() { CurrentProfile = MetaProfile.BuffOn_DebuffOn; }
+        [MenuItem(MenuProfC, validate = true)]
+        private static bool SetProfCValidate()
+        { Menu.SetChecked(MenuProfC, CurrentProfile == MetaProfile.BuffOn_DebuffOn); return true; }
 
         // ===== ラン起動 =====
 
@@ -97,6 +77,30 @@ namespace AutoTest.EditorTools
             if (n > 0) Launch(n);
         }
 
+        // ===== 自動周回モード (1000ラン × N回、 各バッチ間で L1/L2 自動学習) =====
+
+        [MenuItem("Tools/AutoRun/自動周回: 1000ラン × 5回 (約5-10分)", priority = 5)]
+        public static void RunAutoLoop5() => Launch(1000, loopBatches: 5);
+
+        [MenuItem("Tools/AutoRun/自動周回: 1000ラン × 10回 (約10-20分)", priority = 6)]
+        public static void RunAutoLoop10() => Launch(1000, loopBatches: 10);
+
+        [MenuItem("Tools/AutoRun/自動周回: 1000ラン × 30回 (約30-60分)", priority = 7)]
+        public static void RunAutoLoop30() => Launch(1000, loopBatches: 30);
+
+        [MenuItem("Tools/AutoRun/自動周回: カスタム...", priority = 8)]
+        public static void RunAutoLoopCustom()
+        {
+            var (runs, batches) = AutoLoopConfigWindow.Ask(1000, 10);
+            if (runs > 0 && batches > 0) Launch(runs, loopBatches: batches);
+        }
+
+        [MenuItem("Tools/AutoRun/5Fボス勝率スイープ", priority = 10)]
+        public static void RunBoss5Sweep() => Launch(300, sweep: true);
+
+        [MenuItem("Tools/AutoRun/Λファーム量スイープ (各100ラン)", priority = 11)]
+        public static void RunLambdaFarmSweep() => Launch(100, lambdaSweep: true);
+
         [MenuItem("Tools/AutoRun/Open log folder", priority = 20)]
         public static void OpenLogFolder()
         {
@@ -106,7 +110,7 @@ namespace AutoTest.EditorTools
             EditorUtility.RevealInFinder(dir);
         }
 
-        private static void Launch(int count)
+        private static void Launch(int count, bool sweep = false, bool lambdaSweep = false, int loopBatches = 1)
         {
             if (EditorApplication.isPlaying)
             {
@@ -118,9 +122,15 @@ namespace AutoTest.EditorTools
 
             EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
             SessionState.SetInt(PendingKey, count);
-            SessionState.SetInt(MetaKey, (int)CurrentMetaPattern); // 起動時にスナップショット
-            SessionState.SetBool(DebuffKey, EnableAllDebuffsPref);
-            Debug.Log($"[AutoRunMenu] {count} ラン予約 (メタ: {CurrentMetaPattern}, デバフ全ON: {EnableAllDebuffsPref}) → PlayMode 開始");
+            SessionState.SetInt(ProfileKey, (int)CurrentProfile);   // プロファイル (Meta系の自動切替に使用)
+            SessionState.SetBool(SweepKey, sweep);
+            SessionState.SetBool(LambdaKey, lambdaSweep);
+            SessionState.SetInt(LoopKey, loopBatches);
+            string modeLabel = sweep ? "5Fボス勝率スイープ"
+                              : lambdaSweep ? "Λファーム量スイープ"
+                              : loopBatches >= 2 ? $"自動周回 {count}ラン × {loopBatches}回"
+                              : count + " ラン";
+            Debug.Log($"[AutoRunMenu] {modeLabel}予約 (プロファイル: {MetaProfileHelper.DisplayName(CurrentProfile)}) → PlayMode 開始");
             EditorApplication.EnterPlaymode();
         }
 
@@ -130,21 +140,32 @@ namespace AutoTest.EditorTools
 
             int count = SessionState.GetInt(PendingKey, 0);
             if (count <= 0) return;
-            int metaInt = SessionState.GetInt(MetaKey, (int)AutoRunner.MetaPattern.Cowardly);
-            bool debuffsOn = SessionState.GetBool(DebuffKey, false);
+            int profileInt = SessionState.GetInt(ProfileKey, (int)MetaProfile.BuffOn_DebuffOff);
+            bool sweep = SessionState.GetBool(SweepKey, false);
+            bool lambdaSweep = SessionState.GetBool(LambdaKey, false);
+            int loopBatches = SessionState.GetInt(LoopKey, 1);
             SessionState.EraseInt(PendingKey);
-            SessionState.EraseInt(MetaKey);
-            SessionState.EraseBool(DebuffKey);
+            SessionState.EraseInt(ProfileKey);
+            SessionState.EraseBool(SweepKey);
+            SessionState.EraseBool(LambdaKey);
+            SessionState.EraseInt(LoopKey);
 
             var go = new GameObject("[AutoRunner]");
             var runner = go.AddComponent<AutoRunner>();
             runner.runCount = count;
             runner.autoStart = false;
             runner.exitPlayModeWhenDone = true;
-            runner.metaPattern = (AutoRunner.MetaPattern)metaInt;
-            runner.enableAllDebuffs = debuffsOn;
+            // プロファイルから metaPattern / enableAllDebuffs は Begin() 内で自動上書きされる
+            runner.metaProfile = (MetaProfile)profileInt;
+            runner.simBoss5Sweep = sweep;
+            runner.lambdaFarmSweep = lambdaSweep;
+            runner.autoLoopBatches = loopBatches;
             runner.Begin();
-            Debug.Log($"[AutoRunMenu] AutoRunner 起動 ({count} ラン, メタ: {runner.metaPattern}, デバフ全ON: {runner.enableAllDebuffs})");
+            string startLabel = sweep ? "5Fボス勝率スイープ"
+                              : lambdaSweep ? "Λファーム量スイープ"
+                              : loopBatches >= 2 ? $"自動周回 {count}ラン × {loopBatches}回"
+                              : count + " ラン";
+            Debug.Log($"[AutoRunMenu] AutoRunner 起動 ({startLabel}, プロファイル: {MetaProfileHelper.DisplayName(runner.metaProfile)})");
         }
     }
 
@@ -173,6 +194,45 @@ namespace AutoTest.EditorTools
             using (new EditorGUILayout.HorizontalScope())
             {
                 if (GUILayout.Button("実行")) { _result = _value; _done = true; Close(); }
+                if (GUILayout.Button("キャンセル")) { _done = false; Close(); }
+            }
+        }
+    }
+
+    /// <summary>自動周回モード用: ラン数とバッチ数の同時入力ウィンドウ。</summary>
+    public class AutoLoopConfigWindow : EditorWindow
+    {
+        private int _runs;
+        private int _batches;
+        private bool _done;
+        private int _resultRuns;
+        private int _resultBatches;
+
+        public static (int runs, int batches) Ask(int initialRuns, int initialBatches)
+        {
+            var w = CreateInstance<AutoLoopConfigWindow>();
+            w._runs = initialRuns;
+            w._batches = initialBatches;
+            w.titleContent = new GUIContent("AutoRun 自動周回");
+            w.position = new Rect(Screen.width / 2f, Screen.height / 2f, 320, 140);
+            w.ShowModalUtility();
+            return w._done ? (w._resultRuns, w._resultBatches) : (0, 0);
+        }
+
+        void OnGUI()
+        {
+            EditorGUILayout.LabelField("自動周回モード", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "指定ラン数 × 指定バッチ数を連続実行。\n" +
+                "各バッチ間で L1 (アイテム勝率) と L2 (パラメータ) が自動学習される。\n" +
+                "推奨: 1000ラン × 10-30回。",
+                MessageType.Info);
+            _runs    = EditorGUILayout.IntField("1バッチのラン数", Mathf.Max(1, _runs));
+            _batches = EditorGUILayout.IntField("バッチ数 (周回回数)", Mathf.Max(1, _batches));
+            EditorGUILayout.Space();
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("実行")) { _resultRuns = _runs; _resultBatches = _batches; _done = true; Close(); }
                 if (GUILayout.Button("キャンセル")) { _done = false; Close(); }
             }
         }

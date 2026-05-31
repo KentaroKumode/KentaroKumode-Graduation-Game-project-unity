@@ -64,6 +64,10 @@ namespace InventorySystem.PassiveSkills
         /// <summary>アクティブなスキル名一覧（デバッグ・UI用）</summary>
         private List<string> activeSkillNames = new List<string>();
 
+        /// <summary>現在「発動している」プレイヤーパッシブスキル数（装備武器/ダイス由来＋所持パッシブ＋刻印で
+        /// この戦闘に実際に登録された数。インベントリにあるだけの未装備品は含まない）。共鳴が参照する。</summary>
+        public int ActivePlayerSkillCount => activeSkillNames.Count;
+
         /// <summary>internalName → 日本語表示名のマッピング</summary>
         private Dictionary<string, string> skillDisplayNames = new Dictionary<string, string>();
 
@@ -144,6 +148,14 @@ namespace InventorySystem.PassiveSkills
             {
                 UnregisterSkill(ps.internalName);
             }
+        }
+
+        /// <summary>internalName を直接指定してスキルを登録（武器の段階式動的付与用）。</summary>
+        public void AddSkillById(string internalName, string displayName = null)
+        {
+            RegisterSkill(internalName);
+            if (!string.IsNullOrEmpty(displayName))
+                skillDisplayNames[internalName] = displayName;
         }
 
         private void RegisterSkill(string skillName)
@@ -317,7 +329,8 @@ namespace InventorySystem.PassiveSkills
             bool tmpWon = context.playerWonRoll;
             context.playerWonRoll = context.playerLostRoll;
             context.playerLostRoll = tmpWon;
-            context.diceDifference = -context.diceDifference;
+            // diceDifference は playerDiceTotal/enemyDiceTotal から算出する読み取り専用プロパティ。
+            // 上で両合計を入れ替えたので符号は自動反転する（明示反転は不要）。
         }
 
         /// <summary>
@@ -422,34 +435,13 @@ namespace InventorySystem.PassiveSkills
             // 敵ダイスへの制約適用（処刑/正義への妄執）
             ApplyDiceOverrides(enemyDice);
 
-            // 合計計算
-            context.playerDiceTotal = Sum(playerDice);
-            context.enemyDiceTotal = Sum(enemyDice);
-
-            // バフによるダイスボーナス適用（無我無心: カスタムダイス以外の補正を拒否）
-            if (!context.rollPurity)
-                context.playerDiceTotal += (int)context.GetBuff("diceBonus");
-
-            // 敵ダイスデバフ適用（正義への妄執など）
-            int enemyDebuff = (int)context.GetBuff("enemyDiceDebuff");
-            if (enemyDebuff > 0)
-            {
-                context.enemyDiceTotal = System.Math.Max(0, context.enemyDiceTotal - enemyDebuff);
-            }
-
-            // 消費: 敵弱体（敵ダイス合計-X・全戦闘）
-            if (context.consEnemyDiceDebuff > 0)
-                context.enemyDiceTotal = System.Math.Max(0, context.enemyDiceTotal - context.consEnemyDiceDebuff);
-
-            // 星火燎原 等: 敵(ボス)ダイス合計への加算（勝敗判定前＝ロールを実際に押し上げる）
-            if (context.enemyDiceTotalBonus > 0)
-                context.enemyDiceTotal += context.enemyDiceTotalBonus;
+            // 合計計算（ダイス出目→各種ダイス補正までを集約。リロール時と共通）
+            RecomputeDiceTotals(playerDice, enemyDice);
 
             // パッシブスキル実行（OnPostRoll）
             FireTrigger(PassiveSkillTrigger.OnPostRoll);
 
-            // ダイス差計算（ダメージ算出はこの raw 差を使う）
-            context.diceDifference = context.playerDiceTotal - context.enemyDiceTotal;
+            // ダイス差は context.diceDifference（読み取り専用プロパティ）が常に最新を返す。
 
             // 勝敗判定（消費「ダイス補正」は勝敗のみ＝ダメージ非加算。無我無心中は無効）
             int effDiff = context.diceDifference + (context.rollPurity ? 0 : context.consDiceRoll);
@@ -464,19 +456,11 @@ namespace InventorySystem.PassiveSkills
                 RerollDiceForDraw(playerDice, enemyDice);
                 ApplyDiceOverrides(enemyDice);
 
-                context.playerDiceTotal = Sum(playerDice);
-                context.enemyDiceTotal = Sum(enemyDice);
-                if (!context.rollPurity)
-                    context.playerDiceTotal += (int)context.GetBuff("diceBonus");
-                int eDebuff = (int)context.GetBuff("enemyDiceDebuff");
-                if (eDebuff > 0)
-                    context.enemyDiceTotal = System.Math.Max(0, context.enemyDiceTotal - eDebuff);
-                if (context.consEnemyDiceDebuff > 0)
-                    context.enemyDiceTotal = System.Math.Max(0, context.enemyDiceTotal - context.consEnemyDiceDebuff);
-                if (context.enemyDiceTotalBonus > 0)
-                    context.enemyDiceTotal += context.enemyDiceTotalBonus;
+                // 素点＋各種ダイス補正を再集計（通常ロールと同じ集約関数）。
+                // 注意: OnPostRoll パッシブ(軽量/星導/号令 等)は再発火しないためここでは乗らない
+                //       ＝この refactor 前から同じ挙動。引分解消の素点判定のみを目的とする。
+                RecomputeDiceTotals(playerDice, enemyDice);
 
-                context.diceDifference = context.playerDiceTotal - context.enemyDiceTotal;
                 int reEff = context.diceDifference + (context.rollPurity ? 0 : context.consDiceRoll);
                 context.playerWonRoll = reEff > 0;
                 context.playerLostRoll = reEff < 0;
@@ -500,6 +484,7 @@ namespace InventorySystem.PassiveSkills
             {
                 context.consecutiveLosses++;
                 context.consecutiveWins = 0;
+                context.rollLossOccurredThisCombat = true; // 希望の灯片: 灯が一度でも陰る
                 FireTrigger(PassiveSkillTrigger.OnRollLose);
             }
             else
@@ -564,7 +549,9 @@ namespace InventorySystem.PassiveSkills
             FireTrigger(PassiveSkillTrigger.OnCriticalCheck);
             context.criticalBonus += (int)context.GetBuff("criticalBonus");
 
-            int effectiveNumerator = System.Math.Min(9,
+            // Λデバフ「注意散漫」: 会心分子(X/9)の上限を 8/6/4 に制限（判定の Random(0,9) は不変）
+            int critCap = context.lambdaCritNumeratorCap > 0 ? context.lambdaCritNumeratorCap : 9;
+            int effectiveNumerator = System.Math.Min(critCap,
                 System.Math.Max(0, criticalNumerator + context.criticalBonus));
 
             if (effectiveNumerator > 0)
@@ -576,6 +563,9 @@ namespace InventorySystem.PassiveSkills
             {
                 context.isCritical = false;
             }
+
+            // 末那識など: 会心強制（乱数・会心率capを無視して確定）
+            if (context.forceCritical) context.isCritical = true;
 
             if (context.isCritical && totalDamage > 0)
             {
@@ -590,12 +580,58 @@ namespace InventorySystem.PassiveSkills
             else
                 FireTrigger(PassiveSkillTrigger.OnPostReceiveDamage);
 
+            // 蒼白の槍騎士: 軽減無視ダメージ(fixedDamageToEnemy)を増幅
+            if (context.fixedDamageMultiplier > 1f && context.fixedDamageToEnemy > 0)
+                context.fixedDamageToEnemy = UnityEngine.Mathf.CeilToInt(context.fixedDamageToEnemy * context.fixedDamageMultiplier);
+
             return (totalDamage, context.fixedDamageToEnemy, context.isCritical);
         }
 
         // ===========================================================
         //  ユーティリティ
         // ===========================================================
+
+        /// <summary>
+        /// ダイス出目の合計を計算し、各種ダイス補正（diceBonus / enemyDiceDebuff /
+        /// consEnemyDiceDebuff / enemyDiceTotalBonus / bossDiceBonus）を適用する。
+        /// 通常ロールと引分リロールで共通。OnPostRoll パッシブによる加算はここでは扱わない。
+        /// </summary>
+        private void RecomputeDiceTotals(int[] playerDice, int[] enemyDice)
+        {
+            context.playerDiceTotal = Sum(playerDice);
+            context.enemyDiceTotal = Sum(enemyDice);
+
+            // バフによるダイスボーナス（無我無心: カスタムダイス以外の補正を拒否）
+            if (!context.rollPurity)
+                context.playerDiceTotal += (int)context.GetBuff("diceBonus");
+
+            // Λデバフ「重い足取り」: 1ターン目のみプレイヤーダイス合計を減算(負値・無我無心中は無効)
+            if (!context.rollPurity && context.currentTurn == 1 && context.lambdaFirstTurnDiceDelta != 0)
+                context.playerDiceTotal = System.Math.Max(0, context.playerDiceTotal + context.lambdaFirstTurnDiceDelta);
+
+            // 敵ダイスデバフ（正義への妄執など）
+            int enemyDebuff = (int)context.GetBuff("enemyDiceDebuff");
+            if (enemyDebuff > 0)
+                context.enemyDiceTotal = System.Math.Max(0, context.enemyDiceTotal - enemyDebuff);
+
+            // 消費: 敵弱体（敵ダイス合計-X・全戦闘）
+            if (context.consEnemyDiceDebuff > 0)
+                context.enemyDiceTotal = System.Math.Max(0, context.enemyDiceTotal - context.consEnemyDiceDebuff);
+
+            // 星火燎原 等: 敵(ボス)ダイス合計への加算（勝敗判定前＝ロールを実際に押し上げる）
+            if (context.enemyDiceTotalBonus > 0)
+                context.enemyDiceTotal += context.enemyDiceTotalBonus;
+            // ボス威風（別枠・固定。現在 enemies.json からは撤廃済み）
+            if (context.bossDiceBonus > 0)
+                context.enemyDiceTotal += context.bossDiceBonus;
+
+            // Λデバフ「苛立つ強敵」: 経過 interval ターン毎に敵ダイス合計 +1（累積）
+            if (context.lambdaIrritatingInterval > 0 && context.currentTurn > 0)
+            {
+                int irr = context.currentTurn / context.lambdaIrritatingInterval;
+                if (irr > 0) context.enemyDiceTotal += irr;
+            }
+        }
 
         private void ApplyDiceOverrides(int[] enemyDice)
         {

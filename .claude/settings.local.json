@@ -24,7 +24,11 @@
       "Bash(awk 'NR<=5 || /BOSS/' \"/c/Users/kumod/My project/AutoRunLogs/batch_20260521_003637_n2000/detail.log\")",
       "Bash(sort -t'\\(' -k2 -rn)",
       "Bash(grep -nE \"VitalityI{1,3}|HolyAura\" \"/c/Users/kumod/My project/Assets/Resources/Data/CompleteItemDatabase.json\")",
-      "Bash(python -c \"import json; d=json.load\\(open\\('Assets/Resources/enemies.json',encoding='utf-8'\\)\\); print\\('OK', len\\(d['enemies']\\),'enemies'\\); [print\\(e['id'], e['threat'], [p['internalName'] for p in e['passiveSkills'] if p['internalName'] in \\('IntimidatePlus','IntimidatePlusPlus'\\)]\\) for e in d['enemies']]\")"
+      "Bash(python -c \"import json; d=json.load\\(open\\('Assets/Resources/enemies.json',encoding='utf-8'\\)\\); print\\('OK', len\\(d['enemies']\\),'enemies'\\); [print\\(e['id'], e['threat'], [p['internalName'] for p in e['passiveSkills'] if p['internalName'] in \\('IntimidatePlus','IntimidatePlusPlus'\\)]\\) for e in d['enemies']]\")",
+      "Bash(PYTHONIOENCODING=utf-8 py -c ' *)",
+      "Bash(py -c \"import json; json.load\\(open\\('Assets/Data/InventorySystem/items.json',encoding='utf-8-sig'\\)\\); print\\('items.json OK'\\)\")",
+      "Bash(py -c ' *)",
+      "Bash(py -c \"import json; json.load\\(open\\('Assets/Data/InventorySystem/items.json',encoding='utf-8-sig'\\)\\); print\\('JSON OK'\\)\")"
     ]
   }
 }

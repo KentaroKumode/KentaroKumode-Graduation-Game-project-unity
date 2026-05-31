@@ -23,4 +23,11 @@ namespace InventorySystem.PassiveSkills
         /// <param name="ctx">戦闘コンテキスト（読み書き可能）</param>
         void Execute(PassiveSkillTrigger trigger, CombatContext ctx);
     }
+
+    /// <summary>ラン跨ぎで永続するインスタンス状態を持つスキル向け。
+    /// GameManager.StartNewRun で各スキルの ResetRunState() が呼ばれる。</summary>
+    public interface IRunResettable
+    {
+        void ResetRunState();
+    }
 }

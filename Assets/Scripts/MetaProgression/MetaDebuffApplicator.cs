@@ -97,12 +97,12 @@ namespace MetaProgression
         }
 
         // ============================================================
-        //  Lv8: 飢餓の極地
+        //  Lv8: 飢餓の極地 (2026-05-31 リワーク: 前哨基地全回復化で旧効果失効 → 飢餓ダメ×2 に置換)
         // ============================================================
 
-        /// <summary>フロア毎のハンガー初期値減算量（Lv8 ON なら -2）。</summary>
-        public static int GetHungerInitialPenalty()
-            => IsActive(MetaDebuffLevel.Lv8_飢餓の極地) ? 2 : 0;
+        /// <summary>飢餓ダメージ倍率（Lv8 ON なら 2、 OFF なら 1）。</summary>
+        public static int GetStarvationDamageMultiplier()
+            => IsActive(MetaDebuffLevel.Lv8_飢餓の極地) ? 2 : 1;
 
         // ============================================================
         //  Lv9: 鋼の皮膚

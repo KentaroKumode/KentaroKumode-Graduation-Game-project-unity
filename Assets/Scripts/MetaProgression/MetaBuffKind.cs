@@ -21,5 +21,6 @@ namespace MetaProgression
         StartingPassiveItem, // 大スキル: 開幕でノーマルパッシブを1個獲得
         FloorClearHeal,      // フロアクリア時に +1 HP回復（最大2段=+2）
         TreasureChestGold,   // 大スキル: 宝箱マスでゴールドも獲得（撤廃された宝箱ゴールドの復活）
+        ShopRobberyUnlock,   // 大スキル: ショップで「値下げ」交渉(=強盗) 行動が可能になる
     }
 }

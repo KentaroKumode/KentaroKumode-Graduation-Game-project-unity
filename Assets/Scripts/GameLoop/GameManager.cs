@@ -140,6 +140,22 @@ namespace GameLoop
             Run = new RunState();
             Run.Initialize(startingHP);
 
+            // ラン跨ぎで永続するスキル状態 (Nightfall の蓄積過剰ダメ等) をリセット
+            InventorySystem.PassiveSkills.PassiveSkillRegistry.ResetAllRunState();
+
+            // 初期ダイスは木のダイス（武器はダイス個数のみ定義し、面は装備ダイスが供給する）
+            Run.equippedDiceId = "dice_wood";
+
+            // 初期武器: BRONZE Tier1 から盾/斧/ダガー/剣をランダム配布
+            // (disp_* 削除後の置き換え。 ラン開始時から最低限の装備を保証)
+            string[] starterPool = { "sword_t1", "axe_t1", "dagger_t1", "shield_t1" };
+            string starterWeapon = starterPool[UnityEngine.Random.Range(0, starterPool.Length)];
+            if (Run.ownedPassiveItems == null)
+                Run.ownedPassiveItems = new System.Collections.Generic.List<string>();
+            InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, starterWeapon);
+            Run.equippedWeaponId = starterWeapon;
+            Log($"初期武器: {starterWeapon}");
+
             // メタ恒久バフを適用（HP/Gold/初期素材を底上げ）
             MetaProgression.MetaBuffApplicator.ApplyToRunStart(Run, startingHP);
 
@@ -191,6 +207,10 @@ namespace GameLoop
             if (starvDmg > 0 && MetaProgression.PermanentDebuffEffects.HasGluttony(Run))
                 starvDmg *= 2;
 
+            // メタデバフ Lv8「飢餓の極地」: 飢餓ダメージ ×2 (暴食と独立に重畳、 OFF時は ×1)
+            if (starvDmg > 0)
+                starvDmg *= MetaProgression.MetaDebuffApplicator.GetStarvationDamageMultiplier();
+
             // メタバフ: 飢餓ダメ削減（実数計算が後・最低1は残す）
             if (starvDmg > 0)
             {
@@ -214,6 +234,19 @@ namespace GameLoop
                         OnGameOver?.Invoke(Run);
                         return;
                     }
+                }
+            }
+
+            // Λ層: 環状線マスを踏むたびに「次元の乱れ」を蓄積。3 毎にランダム恒久デバフを付与/段階上昇。
+            // タイル起動(=その戦闘)より前に付与することで、踏んだマスの戦闘へ即座に反映される。
+            if (Run.inLambda && mm.CurrentNode != null && mm.CurrentNode.type == TileType.LambdaRing)
+            {
+                Run.dimensionalDisturbance++;
+                if (Run.dimensionalDisturbance % 3 == 0)
+                {
+                    string granted = GameLoop.Lambda.LambdaDebuffEffects.GrantRandom(Run);
+                    if (granted != null)
+                        Log($"次元の乱れ {Run.dimensionalDisturbance}: Λデバフ「{granted}」lv{Run.GetLambdaDebuffLevel(granted)} 付与");
                 }
             }
 
@@ -527,28 +560,150 @@ namespace GameLoop
             SetPhase(GamePhase.MapNavigation);
         }
 
-        /// <summary>休憩で強化を選択（スタブ）</summary>
-        /// <summary>1段階の武器強化に必要な素材数（レベルが上がるほど高くなる）。</summary>
-        public static int WeaponUpgradeCost(int currentLevel) => 2 + currentLevel;
+        // ===== 武器Tier強化＆限界突破システム =====
+        public const int MaxLimitBreak = 10;
+        private static readonly System.Text.RegularExpressions.Regex TierIdRx
+            = new System.Text.RegularExpressions.Regex(@"^(.+)_t(\d+)$");
+
+        /// <summary>装備武器が家系のTier武器（{family}_t{N}）か。</summary>
+        public static bool IsTierWeapon(string weaponId)
+            => !string.IsNullOrEmpty(weaponId) && TierIdRx.IsMatch(weaponId);
+
+        /// <summary>同家系の次に存在するTier武器ID。無ければ null（=最上位Tier）。</summary>
+        public static string NextTierWeaponId(string weaponId)
+        {
+            if (string.IsNullOrEmpty(weaponId)) return null;
+            var m = TierIdRx.Match(weaponId);
+            if (!m.Success) return null; // _tN 形式でない武器(竜閃等)は強化対象外
+            string family = m.Groups[1].Value;
+            int n = int.Parse(m.Groups[2].Value);
+            var db = ItemDatabase.Instance;
+            if (db == null) return null;
+            for (int k = n + 1; k <= n + 5; k++)
+            {
+                string id = $"{family}_t{k}";
+                if (db.GetItem(id) != null) return id;
+            }
+            return null;
+        }
+
+        /// <summary>現在の総合強化段階。進行武器: (tier-1)*2 + plus + 業物。非進行Tier武器: tier番号-1。</summary>
+        private static int OverallStage(RunState run)
+        {
+            var m = TierIdRx.Match(run.equippedWeaponId ?? "");
+            if (!m.Success) return 0;
+            int n = int.Parse(m.Groups[2].Value);
+            if (InventorySystem.PassiveSkills.WeaponProgression.IsProgressionWeapon(run.equippedWeaponId))
+                return (n - 1) * 2 + (run.weaponPlus > 0 ? 1 : 0) + run.limitBreakStage;
+            return n - 1;
+        }
+
+        /// <summary>T4 までの段階別コスト表 (stage 0..6)。</summary>
+        private static readonly int[] WeaponUpgradeCostTable = { 1, 1, 2, 2, 3, 3, 4 };
+
+        /// <summary>次の1段階強化に必要な素材数。 強化不可なら int.MaxValue。
+        /// 2026-05-31: T4までは {1,1,2,2,3,3,4}、 業物 lv1〜 は 4,5,6,7,... (stage-3)。</summary>
+        public static int WeaponUpgradeCost(RunState run)
+        {
+            if (run == null) return int.MaxValue;
+            bool prog = InventorySystem.PassiveSkills.WeaponProgression.IsProgressionWeapon(run.equippedWeaponId);
+            int stage = OverallStage(run);
+            int cost = stage < WeaponUpgradeCostTable.Length
+                       ? WeaponUpgradeCostTable[stage]
+                       : stage - 3;
+            if (prog)
+            {
+                bool atTopPlus = run.weaponPlus > 0 && NextTierWeaponId(run.equippedWeaponId) == null;
+                if (atTopPlus && run.limitBreakStage >= MaxLimitBreak) return int.MaxValue;
+                return cost;
+            }
+            if (NextTierWeaponId(run.equippedWeaponId) != null) return cost;
+            return int.MaxValue;
+        }
+
+        /// <summary>武器強化で Tier が進んだ際に通知される (旧ID, 新ID)。
+        /// L1 学習が中間 Tier を acquiredItemsEver に記録するためのフック。
+        /// 同一 Tier 内の + 昇格は通知しない (Tier ID が変わらないため)。</summary>
+        public static event System.Action<string, string> OnWeaponTierUpgraded;
+
+        /// <summary>武器を1段階強化。進行武器: T_n→T_n+→次Tier→…→T4+→業物lv++。
+        /// 非進行Tier武器: 従来のTier置換。free=true で素材消費なし（鍛冶の霊薬）。</summary>
+        public static bool TryUpgradeWeapon(RunState run, bool free = false)
+        {
+            if (run == null) return false;
+            int cost = WeaponUpgradeCost(run);
+            if (cost == int.MaxValue) return false;
+            if (!free && run.weaponMaterials < cost) return false;
+
+            string prevWeaponId = run.equippedWeaponId;
+            bool prog = InventorySystem.PassiveSkills.WeaponProgression.IsProgressionWeapon(run.equippedWeaponId);
+            if (prog)
+            {
+                if (run.weaponPlus == 0)
+                {
+                    run.weaponPlus = 1;                 // T_n → T_n+
+                }
+                else
+                {
+                    string next = NextTierWeaponId(run.equippedWeaponId);
+                    if (next != null) { run.equippedWeaponId = next; run.weaponPlus = 0; } // T_n+ → T_{n+1}
+                    else run.limitBreakStage++;          // T4+ → 業物lv++
+                }
+            }
+            else
+            {
+                string next = NextTierWeaponId(run.equippedWeaponId);
+                if (next == null) return false;
+                run.equippedWeaponId = next;
+            }
+            if (!free) run.weaponMaterials -= cost;
+            if (prevWeaponId != run.equippedWeaponId)
+                OnWeaponTierUpgraded?.Invoke(prevWeaponId, run.equippedWeaponId);
+            // 天工開物: 武器を強化するたび、強化素材を1つ返還する
+            if (run.ownedPassiveItems != null && run.ownedPassiveItems.Contains("天工開物"))
+            {
+                run.weaponMaterials += 1;
+                Debug.Log("[天工開物] 強化素材を1つ返還");
+            }
+            return true;
+        }
 
         public void RestUpgrade()
         {
             if (CurrentPhase != GamePhase.RestStop) return;
 
-            int cost = WeaponUpgradeCost(Run.weaponUpgradeLevel);
-            if (Run.weaponMaterials >= cost)
+            // 2026-05-31 v3: 1 Rest = 1 強化のみ (前哨基地強化 (各層1回) と組み合わせて運用)
+            int cost = WeaponUpgradeCost(Run);
+            if (cost == int.MaxValue || Run.weaponMaterials < cost)
             {
-                Run.weaponMaterials -= cost;
-                Run.weaponUpgradeLevel++;
-                Log($"武器強化: Lv{Run.weaponUpgradeLevel} (素材-{cost}, 残{Run.weaponMaterials})");
-                SetPhase(GamePhase.MapNavigation);
-            }
-            else
-            {
-                // 素材不足なら休憩を無駄にせず回復にフォールバック
-                Log($"武器強化 素材不足 (必要{cost}/所持{Run.weaponMaterials}) → 回復に切替");
+                Log($"武器強化 不可 (必要{cost}/所持{Run.weaponMaterials}) → 回復に切替");
                 RestHeal();
+                return;
             }
+            int before = Run.weaponMaterials;
+            if (TryUpgradeWeapon(Run))
+            {
+                int used = before - Run.weaponMaterials;
+                Log($"武器強化 ×1: {Run.equippedWeaponId}{(Run.weaponPlus > 0 ? "+" : "")} 業物Lv{Run.limitBreakStage} (素材-{used}, 残{Run.weaponMaterials})");
+            }
+            SetPhase(GamePhase.MapNavigation);
+        }
+
+        /// <summary>前哨基地強化 (2026-05-31 新規): 各層 (Outpost マス) で 1 回のみ実行可能な武器強化。
+        /// 素材消費は通常の WeaponUpgradeCost に従う。 RestUpgrade とは独立してフラグ管理される。
+        /// 戻り値: true=強化成功、 false=既に使用済 or 素材不足 or 強化不可。</summary>
+        public bool OutpostUpgrade()
+        {
+            if (Run == null) return false;
+            if (Run.outpostUpgradeUsedThisFloor) return false;
+            int cost = WeaponUpgradeCost(Run);
+            if (cost == int.MaxValue || Run.weaponMaterials < cost) return false;
+            int before = Run.weaponMaterials;
+            if (!TryUpgradeWeapon(Run)) return false;
+            Run.outpostUpgradeUsedThisFloor = true;
+            int used = before - Run.weaponMaterials;
+            Log($"[前哨基地] 武器強化 ×1: {Run.equippedWeaponId}{(Run.weaponPlus > 0 ? "+" : "")} 業物Lv{Run.limitBreakStage} (素材-{used}, 残{Run.weaponMaterials})");
+            return true;
         }
 
         /// <summary>フロアクリア確認→次フロアへ</summary>
@@ -578,6 +733,94 @@ namespace GameLoop
         // ============================================================
         //  内部処理
         // ============================================================
+
+        // ============================================================
+        //  Λ層（時間の狭間）
+        // ============================================================
+
+        /// <summary>Λ層へ強制突入。currentFloor は 5 のまま、環状線マップを生成して周回させる。
+        /// 移動毎に「次元の乱れ」を蓄積し、3 毎にランダム恒久デバフを付与する。</summary>
+        private void EnterLambda()
+        {
+            Run.inLambda = true;
+            Run.dimensionalDisturbance = 0;
+            // 5Fボス撃破フラグを下ろす。これを残すと Λ内エリート報酬の ConfirmReward が
+            // 再び HandleFloorClear→EnterLambda を呼び（IsNormalClear が currentFloor==5 で成立し続けるため）、
+            // 毎報酬でΛへ再突入＝dimensionalDisturbance リセット＆マップ再生成のループになる。
+            Run.bossDefeatedThisFloor = false;
+            if (Run.lambdaDebuffs == null)
+                Run.lambdaDebuffs = new System.Collections.Generic.Dictionary<string, int>();
+
+            // Λ層に層デバフ(ActiveModifier)は適用しない
+            ActiveModifier = null;
+
+            MapManager.Instance.GenerateLambda();
+
+            SetPhase(GamePhase.FloorIntro);
+            Log("=== 時間の狭間（Λ層）に突入 === 中央マスを踏むまで周回する");
+            SetPhase(GamePhase.MapNavigation);
+        }
+
+        /// <summary>Λ層の中央マス踏破 → 離脱。6F へ進む（通常の FloorClear→AdvanceFloor→EnterFloor 経路）。</summary>
+        private void ExitLambda()
+        {
+            Run.inLambda = false;
+            Log($"=== 時間の狭間を離脱 === 踏破マス {Run.dimensionalDisturbance} / Λデバフ {Run.lambdaDebuffs.Count}種 → 6層前哨基地へ");
+            SetPhase(GamePhase.FloorClear);
+            OnFloorAdvanced?.Invoke(Run.currentFloor + 1);
+        }
+
+        /// <summary>Λ層の環状線マス起動: エリート戦 or 固有イベント(回復/パッシブ)を抽選。</summary>
+        private void ActivateLambdaRing(MapNode node)
+        {
+            // 50% エリート / 50% 固有イベント
+            if (UnityEngine.Random.value < 0.5f)
+            {
+                // エリート戦: ノードを一時的に EliteBattle 扱いにして既存のエリート抽選/強化を流用
+                node.resolvedType = TileType.EliteBattle;
+                IsEliteSecondFight = false;
+                firstEliteEnemy = null;
+                Log("Λ環状線: エリート戦");
+                StartBattleTile();
+            }
+            else
+            {
+                node.resolvedType = null; // 次回再訪時にまた抽選するため戻す
+                ResolveLambdaEvent();
+            }
+        }
+
+        /// <summary>Λ固有イベント: HPが半分未満なら回復、十分なら未所持寄りのパッシブ1つを獲得。
+        /// (ロジック先行のためボット向け自動解決。UI実装時に2択提示へ差し替える)。</summary>
+        private void ResolveLambdaEvent()
+        {
+            bool wantHeal = Run.playerHP * 2 < Run.playerMaxHP;
+            if (wantHeal)
+            {
+                int heal = Mathf.CeilToInt(Run.playerMaxHP * 0.4f);
+                int before = Run.playerHP;
+                Run.playerHP = Mathf.Min(Run.playerMaxHP, Run.playerHP + heal);
+                Log($"Λ固有イベント: 回復 +{Run.playerHP - before} ({Run.playerHP}/{Run.playerMaxHP})");
+            }
+            else
+            {
+                var (a, b) = PickTreasureChoicePair();
+                string pick = !string.IsNullOrEmpty(a) ? a : b;
+                if (!string.IsNullOrEmpty(pick))
+                {
+                    GrantRewardItem(pick, eliteWin: false);
+                    Log("Λ固有イベント: パッシブアイテム獲得");
+                }
+                else
+                {
+                    // 付与候補が尽きた場合は回復にフォールバック
+                    int heal = Mathf.CeilToInt(Run.playerMaxHP * 0.4f);
+                    Run.playerHP = Mathf.Min(Run.playerMaxHP, Run.playerHP + heal);
+                    Log("Λ固有イベント: 候補なし → 回復にフォールバック");
+                }
+            }
+            SetPhase(GamePhase.MapNavigation);
+        }
 
         /// <summary>フロアに入る（マップ生成、前哨基地処理、デバフ適用）</summary>
         private void EnterFloor()
@@ -609,16 +852,19 @@ namespace GameLoop
                 mm.Hunger.Initialize(Mathf.Max(1, newMax));
             }
 
-            // メタデバフ Lv8: ハンガー初期値 -2/フロア
-            int hungerPenalty = MetaProgression.MetaDebuffApplicator.GetHungerInitialPenalty();
-            if (hungerPenalty > 0 && mm.Hunger != null)
-                mm.Hunger.SetCurrentForTest(Mathf.Max(0, mm.Hunger.Current - hungerPenalty));
+            // 2026-05-31: メタデバフ Lv8 はハンガー初期値減算→飢餓ダメ×2 に変更 (前哨基地全回復で旧効果失効のため)。
+            //             → 倍率適用は MoveTo 後の starvDmg 計算で行うので、 ここでの初期値操作は廃止。
 
             // 飢餓ダメージ倍率上書き
             if (ActiveModifier != null && ActiveModifier.starvationDamageOverride >= 0)
                 mm.Hunger.starvationDamageRatio = ActiveModifier.starvationDamageOverride;
 
             mm.ProcessOutpost();
+
+            // 2026-05-31 v3: 前哨基地で武器強化を1回まで自動実行 (素材があり、 強化可能なら)。
+            // HPゲート無し (前哨基地は安全)。 BOT/プレイヤー共通の自動挙動 (UI 開発まで暫定)。
+            // 各層 1 回制限は OutpostUpgrade 側で outpostUpgradeUsedThisFloor フラグ管理。
+            OutpostUpgrade();
 
             // メタデバフ Lv9 で前哨基地効果を無効化
             bool forwardBaseDisabled = MetaProgression.MetaDebuffApplicator.IsForwardBaseDisabled();
@@ -646,10 +892,11 @@ namespace GameLoop
             }
             else
             {
-                // 通常前哨基地: HP30%回復（Lv7 で上限制限される）
-                int heal = Mathf.CeilToInt(Run.playerMaxHP * 0.3f);
+                // 2026-05-31 v3: 通常前哨基地: HP30%回復 → **全回復** (healCap は尊重)。
+                // 強化と回復は前哨基地で両立し、 進行した時点で選択肢関係なく全回復となる。
                 int upper = healCap < 0 ? Run.playerMaxHP : Mathf.Min(healCap, Run.playerMaxHP);
-                Run.playerHP = Mathf.Min(upper, Run.playerHP + heal);
+                Run.playerHP = upper;
+                Log($"前哨基地: HP全回復 → {Run.playerHP}/{Run.playerMaxHP}");
             }
 
             // MaxHPデバフ（崩れの共鳴等）
@@ -671,6 +918,58 @@ namespace GameLoop
         private void HandleCombatEnd(CombatResult result)
         {
             LastCombatResult = result;
+
+            // 2026-05-30 v2: 戦闘勝利時 25% で強化素材+1 (T4到達率改善・経済補強)
+            if (result.playerWon && Run != null && UnityEngine.Random.value < 0.25f)
+            {
+                Run.weaponMaterials += 1;
+                Log("[戦闘報酬] 強化素材+1 (25%)");
+            }
+
+            // 値下げ交渉(=強盗) の戦闘: 勝敗で報酬/脱出 を独自処理
+            if (Run.shopRobberyInProgress)
+            {
+                Run.shopRobberyInProgress = false;
+                if (result.playerWon)
+                {
+                    // 勝利: スナップ済みアイテム全取得 + 大金 30-60G
+                    int loot = 0;
+                    if (Run.robberyPendingItems != null)
+                    {
+                        foreach (var id in Run.robberyPendingItems)
+                        {
+                            if (string.IsNullOrEmpty(id)) continue;
+                            var data = ItemDatabase.Instance?.GetItem(id);
+                            if (data == null) continue;
+                            if (data.category == ItemCategory.Consumable)
+                                Run.ownedConsumables.Add(id);
+                            else
+                                InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
+                            Loadout.TryAutoEquip(Run, id);
+                            loot++;
+                        }
+                        Run.robberyPendingItems.Clear();
+                    }
+                    int gold = UnityEngine.Random.Range(30, 61);
+                    Run.coins += gold;
+                    Run.playerHP = Mathf.Max(1, result.playerHPRemaining);
+                    Log($"値下げ交渉勝利: 戦利品{loot}件 +{gold}G");
+                    OnBattleEnded?.Invoke(result);
+                    SetPhase(GamePhase.MapNavigation);
+                    return;
+                }
+                else
+                {
+                    // 敗北: ラン継続、 HP1 で外に放り出される
+                    Run.robberyPendingItems?.Clear();
+                    Run.playerHP = 1;
+                    Log("値下げ交渉敗北: HP1 で外に放り出された (ラン継続)");
+                    OnBattleEnded?.Invoke(result);
+                    SetPhase(GamePhase.MapNavigation);
+                    return;
+                }
+            }
+
             Run.ApplyBattleResult(result.playerWon, result.playerHPRemaining, result.totalTurns);
 
             SetPhase(GamePhase.BattleResult);
@@ -694,7 +993,9 @@ namespace GameLoop
 
             // 収束ノード(Boss/Outpost)以外の一度きりタイルは、再訪時に再発火させない。
             // （イベントの無限ファーム＝同行マス往復によるデッドロックを構造的に防ぐ）
-            bool oneShot = effectiveType != TileType.Boss && effectiveType != TileType.Outpost;
+            // Λ環状線/中央は周回前提のため oneShot から除外（毎回再発火＝再抽選）。
+            bool oneShot = effectiveType != TileType.Boss && effectiveType != TileType.Outpost
+                        && effectiveType != TileType.LambdaRing && effectiveType != TileType.LambdaExit;
             if (oneShot && node.activated)
             {
                 SetPhase(GamePhase.MapNavigation);
@@ -731,6 +1032,13 @@ namespace GameLoop
                     SetPhase(GamePhase.RestStop);
                     break;
                 case TileType.Shop:
+                    if (Run != null && Run.shopsBlocked)
+                    {
+                        // 値下げ交渉後は商人ギルドから締め出されている。 ショップマスは素通り
+                        Log("ショップ閉鎖中: 値下げ交渉により商人ギルドから出禁");
+                        SetPhase(GamePhase.MapNavigation);
+                        break;
+                    }
                     if (node.isFalseMerchant) StartFalseMerchantCombat();
                     else EnterShop();
                     break;
@@ -748,6 +1056,12 @@ namespace GameLoop
                     break;
                 case TileType.SinAltar:
                     BeginSinRitual();
+                    break;
+                case TileType.LambdaRing:
+                    ActivateLambdaRing(node);
+                    break;
+                case TileType.LambdaExit:
+                    ExitLambda();
                     break;
                 default:
                     SetPhase(GamePhase.MapNavigation);
@@ -1111,6 +1425,19 @@ namespace GameLoop
             CombatManager.Instance.StartCombat(CurrentEnemy, Run.playerHP, dc, dm, cr, df);
         }
 
+        /// <summary>[検証用] 現在の Run ビルドのまま、指定フロアのボスと1戦だけ即決着し結果を返す。
+        /// AutoRunner の「5Fボス勝率スイープ」専用。通常のフロア遷移・報酬・OnBattleEnded は介さず、
+        /// CombatManager を直接駆動する（GameManager の集計イベントを発火しない）。</summary>
+        public CombatResult SimulateBossFight(int floor)
+        {
+            var enemy = CombatSystem.EnemyDatabase.Get($"boss_layer{floor}");
+            if (enemy == null || Run == null) return default;
+            CurrentEnemy = enemy;
+            var (dc, dm, cr, df) = GatherPlayerCombatStats();
+            CombatManager.Instance.StartCombat(enemy, Run.playerHP, dc, dm, cr, df);
+            return CombatManager.Instance.ExecuteFullCombat();
+        }
+
         // ================================================================
         //  6層 SinAltar 儀式
         // ================================================================
@@ -1158,6 +1485,7 @@ namespace GameLoop
             if (canPay)
             {
                 Run.coins -= demand;
+                Run.coinsSpent += demand;
                 Log($"貪欲の儀: コイン {demand} を捧げた (残 {Run.coins})");
             }
             else
@@ -1254,6 +1582,40 @@ namespace GameLoop
         {
             if (CurrentPhase != GamePhase.ShopVisit) return;
             ShopManager.Instance.TrySell(ShopSellSource, listIndex, Run);
+        }
+
+        public void ShopReroll()
+        {
+            if (CurrentPhase != GamePhase.ShopVisit) return;
+            ShopManager.Instance.TryReroll(Run);
+        }
+
+        /// <summary>
+        /// 値下げ交渉 (=強盗) を実行。
+        /// 1. ShopManager.TryRobbery: 在庫スナップ・カルマ+1・shopsBlocked, ショップを閉じる
+        /// 2. 「怪しい商人」(shady_merchant) との特殊エリート戦に突入
+        /// 3. HandleCombatEnd 内で勝利時=報酬付与/敗北時=HP1脱出 を分岐
+        /// </summary>
+        public void ShopRobbery()
+        {
+            if (CurrentPhase != GamePhase.ShopVisit) return;
+            if (!ShopManager.Instance.TryRobbery(Run)) return;
+
+            // 戦闘準備: 怪しい商人を取得
+            var data = CombatSystem.EnemyDatabase.Get("shady_merchant");
+            if (data == null)
+            {
+                Debug.LogError("[GameManager] shady_merchant が enemies.json に見つかりません");
+                Run.shopRobberyInProgress = false;
+                SetPhase(GamePhase.MapNavigation);
+                return;
+            }
+            CurrentEnemy = data;
+            OnEnemyEncountered?.Invoke(CurrentEnemy);
+            var (dc, dm, cr, df) = GatherPlayerCombatStats();
+            SetPhase(GamePhase.Combat);
+            CombatManager.Instance.StartCombat(CurrentEnemy, Run.playerHP, dc, dm, cr, df);
+            Log("値下げ交渉 → 怪しい商人が刃を抜いた");
         }
 
         public void ExitShop()
@@ -1556,9 +1918,9 @@ namespace GameLoop
                     Log("=== 5層クリア === 〈決意〉が無いためここで運命に背を向けた");
                     return;
                 }
-                SetPhase(GamePhase.FloorClear);
-                OnFloorAdvanced?.Invoke(Run.currentFloor + 1);
-                Log($"フロア{Run.currentFloor}クリア → 6層突入（〈{ConvictionSystem.StageToItemId(Run.convictionStage)}〉所持）");
+                // 〈決意〉以上所持 → 6層へ進む前に Λ層（時間の狭間）へ強制突入。
+                // 中央マス踏破で 6F 前哨基地に着地する（= 通常の FloorClear→6F 遷移）。
+                EnterLambda();
                 return;
             }
             else if (Run.IsFullClear)
@@ -1600,13 +1962,13 @@ namespace GameLoop
             bool weaponResolved = false;
             bool diceResolved = false;
 
+            // 武器はダイスの「個数」と会心のみ定義する（面/最大値は装備ダイスが供給）。
             if (equipHandler != null)
             {
                 var weapon = equipHandler.GetCurrentEquipment(ItemCategory.Weapon);
                 if (weapon != null && weapon.hasWeaponStats)
                 {
                     diceCount = weapon.weaponDice.count;
-                    diceMax = weapon.weaponDice.maxValue;
                     critRate = weapon.criticalRate;
                     weaponResolved = true;
                 }
@@ -1626,7 +1988,6 @@ namespace GameLoop
                 if (w != null && w.hasWeaponStats)
                 {
                     diceCount = w.weaponDice.count;
-                    diceMax = w.weaponDice.maxValue;
                     critRate = w.criticalRate;
                 }
             }
@@ -1637,15 +1998,12 @@ namespace GameLoop
                     diceFaces = d.diceFaces;
             }
 
-            // 武器強化レベル反映: Lvごとに diceMax+1、2Lvごとに diceCount+1。
-            // （カスタムダイス装備時は faces が面を上書きするため diceMax 分は無効だが、
-            //   diceCount 分は常に有効＝強化が無駄にならない）
-            int upLv = Run?.weaponUpgradeLevel ?? 0;
-            bool ryusen = Run != null && Run.equippedWeaponId == "ryusen";
-            if (upLv > 0 && !ryusen) // 竜閃(無我無心)は強化補正も受けない
+            // 面/最大出目は装備ダイス由来。diceMax は面の最大値から導出（RollDice・メタ補正・運命等が参照）。
+            if (diceFaces != null && diceFaces.Length > 0)
             {
-                diceMax += upLv;
-                diceCount += upLv / 2;
+                int mx = diceFaces[0];
+                for (int k = 1; k < diceFaces.Length; k++) if (diceFaces[k] > mx) mx = diceFaces[k];
+                diceMax = mx;
             }
 
             // 層デバフ適用

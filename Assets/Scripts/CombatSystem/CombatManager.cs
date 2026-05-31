@@ -51,6 +51,15 @@ namespace CombatSystem
         public List<TurnResult> turnLog;
         /// <summary>解脱 — 妙覚サドンデス勝利。playerWon=true と併用。</summary>
         public bool gedatsu;
+        /// <summary>検証計測: この戦闘でプレイヤーが獲得した累計回復量／シールド量。</summary>
+        public int healApplied;
+        public int shieldGained;
+        /// <summary>L1学習: プレイヤーが敵に与えた総ダメージ (enemyMaxHP - 残HP の単純差分)。</summary>
+        public int damageDealt;
+        /// <summary>L1学習: プレイヤーが受けた純粋な総ダメージ (healApplied 補正済み)。</summary>
+        public int damageTaken;
+        /// <summary>L1学習: 敵 maxHP（撃破率計算用）。</summary>
+        public int enemyMaxHP;
     }
 
     /// <summary>
@@ -190,6 +199,15 @@ namespace CombatSystem
             if (ctx != null) ctx.playerCurrentHP = playerHP;
         }
 
+        /// <summary>戦闘中、敵に軽減不可ダメージを直接与える（記憶の砂時計・各種パッシブ用）。</summary>
+        public void DealFixedDamageToEnemy(int amount)
+        {
+            if (amount <= 0 || !isCombatActive) return;
+            enemyHP = Math.Max(0, enemyHP - amount);
+            var ctx = PassiveSkillManager.Instance?.Context;
+            if (ctx != null) ctx.enemyCurrentHP = enemyHP;
+        }
+
         public bool IsCombatActive => isCombatActive;
         public EnemyData CurrentEnemy => currentEnemy;
         public int PlayerHP => playerHP;
@@ -220,6 +238,12 @@ namespace CombatSystem
             }
             if (psmCtxForHeal != null && psmCtxForHeal.healHalved)
                 amount = Math.Max(1, amount / 2);
+            // 覚者〈天衣無縫〉: 獲得回復量をスタック分減衰（0未満は0）
+            if (psmCtxForHeal != null && psmCtxForHeal.healShieldReduction > 0)
+            {
+                amount = Math.Max(0, amount - psmCtxForHeal.healShieldReduction);
+                if (amount <= 0) return 0;
+            }
 
             int oldHP = playerHP;
             int newHP = Math.Min(playerMaxHP, playerHP + amount);
@@ -232,8 +256,9 @@ namespace CombatSystem
             if (psm != null && psm.Context != null)
             {
                 psm.Context.playerCurrentHP = playerHP;
+                psm.Context.healAppliedTotal += actualHealed; // 検証計測
             }
-            
+
             Debug.Log($"[CombatManager] Player healed: {actualHealed} HP ({oldHP} → {playerHP})");
             return actualHealed;
         }
@@ -383,6 +408,34 @@ namespace CombatSystem
             {
                 ctx.equippedDiceFaces = equippedDiceFaces;
             }
+            // 敵の基礎防御（被ダメ%軽減）を反映。エリート(EliteVigor)は OnBattleStart で +0.10 する。
+            if (ctx != null)
+            {
+                ctx.enemyDamageReductionPct = enemy.baseDefenseRate;
+            }
+
+            // Λ層（時間の狭間）由来の恒久デバフを ctx へ設定（戦闘スコープで保持）
+            if (ctx != null)
+            {
+                var runForLambda = GameLoop.GameManager.Instance?.Run;
+                if (runForLambda != null && runForLambda.lambdaDebuffs != null && runForLambda.lambdaDebuffs.Count > 0)
+                {
+                    ctx.lambdaFirstTurnDiceDelta     = GameLoop.Lambda.LambdaDebuffEffects.GetFirstTurnDiceDelta(runForLambda);
+                    ctx.lambdaIrritatingInterval     = GameLoop.Lambda.LambdaDebuffEffects.GetIrritatingInterval(runForLambda);
+                    ctx.lambdaDamageDealtMult        = GameLoop.Lambda.LambdaDebuffEffects.GetDamageDealtMult(runForLambda);
+                    ctx.lambdaCritNumeratorCap       = GameLoop.Lambda.LambdaDebuffEffects.GetCritNumeratorCap(runForLambda);
+                    ctx.lambdaMercifulExecThreshold  = GameLoop.Lambda.LambdaDebuffEffects.GetMercifulExecThreshold(runForLambda);
+                    ctx.lambdaConsumableLockUntilTurn= GameLoop.Lambda.LambdaDebuffEffects.GetConsumableLockUntilTurn(runForLambda);
+
+                    // 迫りくる死(lv3): 戦闘開始時に HP を 1 にする（割合計算が先・ボス含む全戦闘）
+                    if (GameLoop.Lambda.LambdaDebuffEffects.ImpendingDeathActive(runForLambda))
+                    {
+                        playerHP = 1;
+                        ctx.playerCurrentHP = 1;
+                        Debug.Log("[CombatManager] Λデバフ 迫りくる死(lv3): 戦闘開始時 HP=1");
+                    }
+                }
+            }
 
             // 消費アイテム: マップで使用した「次戦闘バフ」を ctx へコピーし RunState 側をクリア
             if (ctx != null)
@@ -393,6 +446,7 @@ namespace CombatSystem
                     ctx.consAtkBurst        = rs.pendingConsAtkBurst;
                     ctx.consDiceRoll        = rs.pendingConsDiceRoll;
                     ctx.consShield          = rs.pendingConsShield;
+                    ctx.shieldGainedTotal  += rs.pendingConsShield; // 検証計測
                     ctx.consShieldExpireTurn= rs.pendingConsShieldTurns;
                     ctx.consRegen           = rs.pendingConsRegen;
                     ctx.consCrit            = rs.pendingConsCrit;
@@ -401,6 +455,12 @@ namespace CombatSystem
                     ctx.consReflect         = rs.pendingConsReflect;
                     ctx.consEnemyDiceDebuff = rs.pendingConsEnemyDiceDebuff;
                     ctx.gamblerArmed        = rs.pendingGamblerDice;
+                    if (rs.pendingFirstRollTotal > 0)
+                    {
+                        // 加速の粉: 初回ロール(turn1)のダイス合計+X。nextTurnBuffs→turn1でcurrentBuffsへ移行し適用。
+                        ctx.nextTurnBuffs["diceBonus"] =
+                            (ctx.nextTurnBuffs.TryGetValue("diceBonus", out var db) ? db : 0f) + rs.pendingFirstRollTotal;
+                    }
                     if (rs.pendingEnemyStartHpCutPct > 0)
                     {
                         int cut = Mathf.CeilToInt(enemy.maxHP * rs.pendingEnemyStartHpCutPct / 100f);
@@ -538,6 +598,8 @@ namespace CombatSystem
                 ctx.enemyThreat = newEnemy.threat;
                 ctx.enemyDiceMax = newEnemy.diceMaxValue;
                 ctx.enemyDiceTotalBonus = 0;
+                ctx.bossDiceBonus = 0; // swapで一旦クリア。新形態の OnBattleStart パッシブ(刹那等)が再設定する
+                ctx.enemyDamageReductionPct = newEnemy.baseDefenseRate; // 新形態の基礎防御%を反映
                 ctx.ashenSuddenDeath = false;
                 ctx.myokakuSuddenDeath = false;
                 ctx.gedatsuPending = false;
@@ -672,13 +734,16 @@ namespace CombatSystem
             }
 
             // 〈妙覚〉サドンデス: 両者を 1d6 に強制（決着まで継続）。勝者が敗者を即死させる。
+            // myokakuSuddenDeath はサドンデスが「ターン開始時点で既にアクティブ」=実際に1d2を振るターン
+            // のみ true。開始ターン（99を6ターン耐えた直後）の敗北で即死させないための判別フラグ。
+            bool myokakuSDRollThisTurn = ctx.myokakuSuddenDeath;
             if (ctx.myokakuSuddenDeath)
             {
                 actualPlayerDiceCount = 1;
                 actualEnemyDiceCount = 1;
-                playerDice = new[] { UnityEngine.Random.Range(1, 7) }; // 1d6
-                enemyDice = new[] { UnityEngine.Random.Range(1, 7) };
-                Debug.Log("[CombatManager] 妙覚サドンデス: 両者1d6強制");
+                playerDice = new[] { UnityEngine.Random.Range(1, 3) }; // 1d2
+                enemyDice = new[] { UnityEngine.Random.Range(1, 3) };
+                Debug.Log("[CombatManager] 妙覚サドンデス: 両者1d2強制");
             }
 
             // シュヴァリエのレイピア コントラタック発動中: プレイヤーは 1d1 強制（必ず1を出す）
@@ -782,14 +847,34 @@ namespace CombatSystem
             // パッシブスキルによるダイス処理
             psm.ProcessPostRoll(playerDice, enemyDice);
 
+            // 〈サドンデス〉純粋ダイス判定: 業物/段階補正/ダイス補正/ボス威風/メタ等を一切排し、
+            // ここで両者を新規に振り直して勝敗を決める（真の50/50）。妙覚=1d2 / 灰燼=1d6。
+            if (ctx.myokakuSuddenDeath || ctx.ashenSuddenDeath)
+            {
+                int faces = ctx.myokakuSuddenDeath ? 2 : 6;
+                int pd = UnityEngine.Random.Range(1, faces + 1);
+                int ed = UnityEngine.Random.Range(1, faces + 1);
+                if (playerDice != null && playerDice.Length > 0) playerDice[0] = pd;
+                if (enemyDice != null && enemyDice.Length > 0) enemyDice[0] = ed;
+                ctx.playerDiceTotal = pd;
+                ctx.enemyDiceTotal = ed;
+                // diceDifference は両合計から算出される読み取り専用プロパティ（=pd-ed）
+                ctx.playerWonRoll = pd > ed;
+                ctx.playerLostRoll = pd < ed;
+            }
+
             // メタバフ〈神の加護〉: 1戦闘1回、ロール敗北を引分に変換する
             // (敵 OnPostRoll より前に行うことで、敵の OnRollWin 反応も発火しないようにする)
+            // ※サドンデス中は無効（解脱の50/50を歪めないため）。
             if (ctx.playerLostRoll
+                && !ctx.myokakuSuddenDeath && !ctx.ashenSuddenDeath
                 && MetaProgression.MetaBuffApplicator.IsDivineProtectUnlocked()
                 && ctx.GetAccumulated("divineProtect_used") == 0)
             {
                 ctx.playerLostRoll = false;
-                ctx.diceDifference = 0;
+                // playerLostRoll=false かつ playerWonRoll=false で引分扱い。
+                // diceDifference は読み取り専用プロパティ化したため 0 強制は不可だが、
+                // 引分分岐は diceDifference を参照しないので機能に影響なし。
                 ctx.accumulatedValues["divineProtect_used"] = 1;
                 Debug.Log("[MetaBuff] 神の加護: ロール敗北を引分に変換 (この戦闘の使用権を消費)");
             }
@@ -839,72 +924,9 @@ namespace CombatSystem
                     var (totalDmg, fixedDmg, isCrit) = psm.ProcessDamage(
                         mainDmg, pursuitDmg, playerCriticalNumerator);
 
-                    // 画竜点睛: ダメージ＝(出目+10)×会心倍率、会心確定
-                    if (ctx.garyoProc)
-                    {
-                        totalDmg = Mathf.CeilToInt((ctx.garyoDieValue + 10) * ctx.criticalMultiplier);
-                        isCrit = true;
-                        Debug.Log($"[画竜点睛] 確定会心 {totalDmg} ダメ (出目{ctx.garyoDieValue}+10 ×{ctx.criticalMultiplier})");
-                    }
-
-                    // 与ダメ倍率（激情の刃 等のパッシブ由来）
-                    if (ctx.outgoingDamageMultiplier > 0f
-                        && Mathf.Abs(ctx.outgoingDamageMultiplier - 1f) > 0.001f)
-                    {
-                        int orig = totalDmg;
-                        totalDmg = Mathf.CeilToInt(totalDmg * ctx.outgoingDamageMultiplier);
-                        Debug.Log($"[CombatManager] 与ダメ補正 ×{ctx.outgoingDamageMultiplier:F2}: {orig}→{totalDmg}");
-                    }
-
-                    // 消費: 鬼火の油 与ダメ+X%（全戦闘）
-                    if (ctx.consDmgMultPct > 0 && totalDmg > 0)
-                        totalDmg += Mathf.CeilToInt(totalDmg * ctx.consDmgMultPct / 100f);
-
-                    // 消費: 攻撃力バースト（この勝利ターンのみ・単発消費）
-                    if (ctx.consAtkBurst > 0)
-                    {
-                        totalDmg += ctx.consAtkBurst;
-                        Debug.Log($"[CombatManager] 攻撃バースト +{ctx.consAtkBurst}");
-                        ctx.consAtkBurst = 0;
-                    }
-
-                    // メタバフ: 会心時の追加補正
-                    if (isCrit)
-                    {
-                        int critBonus = MetaProgression.MetaBuffApplicator.GetCritBonus();
-                        if (critBonus > 0) totalDmg += critBonus;
-                    }
-
-                    // メタデバフ Lv3 向かい風: -1（最低 1 は残す）
-                    int metaPlayerDmgRed = MetaProgression.MetaDebuffApplicator.GetPlayerDamageReduction();
-                    if (metaPlayerDmgRed > 0 && totalDmg > 0)
-                        totalDmg = Mathf.Max(1, totalDmg - metaPlayerDmgRed);
-
-                    // 敵側のダメージ軽減パッシブを発火（前後で ctx.finalDamage と totalDmg を同期し、
-                    // 敵パッシブ（AshArmor 等やシュヴァリエのシールド経由処理）が
-                    // 実際の与ダメに反映されるようにする）
-                    ctx.finalDamage = totalDmg;
-                    psm.FireEnemyTrigger(PassiveSkillTrigger.OnPreReceiveDamage);
-                    totalDmg = System.Math.Max(0, ctx.finalDamage);
-
-                    // 狂暴化(ボス50T後): エネミーが受けるダメージを倍化（軽減処理の後・適用直前）
-                    if (ctx.enemyDamageTakenMultiplier > 1f && totalDmg > 0)
-                    {
-                        int orig = totalDmg;
-                        totalDmg = Mathf.CeilToInt(totalDmg * ctx.enemyDamageTakenMultiplier);
-                        Debug.Log($"[CombatManager] 狂暴化: 敵被ダメ ×{ctx.enemyDamageTakenMultiplier:F1} ({orig}→{totalDmg})");
-                    }
-
-                    // メタデバフ Lv2 俊敏: 各戦闘の最初の1回の被弾を必ず回避（メイン＋固定ダメを無効化）
-                    if (!metaAgilityDodgeUsed
-                        && (totalDmg + fixedDmg) > 0
-                        && MetaProgression.MetaDebuffApplicator.EnemyDodgesFirstHit())
-                    {
-                        metaAgilityDodgeUsed = true;
-                        Debug.Log($"[CombatManager] メタデバフ Lv2 俊敏: 初撃を回避 (与ダメ {totalDmg}+{fixedDmg} を無効化)");
-                        totalDmg = 0;
-                        fixedDmg = 0;
-                    }
+                    // 与ダメージ修飾チェーン（順序厳守。詳細は ApplyWinDamageModifiers 参照）
+                    int lbStage = GameLoop.GameManager.Instance?.Run?.limitBreakStage ?? 0;
+                    totalDmg = ApplyWinDamageModifiers(totalDmg, ref fixedDmg, ref isCrit, lbStage, psm, ctx);
 
                     result.mainDamage = mainDmg;
                     result.pursuitDamage = pursuitDmg;
@@ -940,6 +962,24 @@ namespace CombatSystem
                     if (enemyHP == 0 && totalDmg > 0)
                         ctx.overDamageAccumulated = totalDmg + fixedDmg;
 
+                    // 貪欲のダイス/吸血: 与えたダメージの一定割合を回復（HealPlayer が負傷/回復封印を適用）
+                    if (ctx.lifestealPct > 0f && totalDmg > 0)
+                    {
+                        int ls = Mathf.CeilToInt(totalDmg * ctx.lifestealPct);
+                        if (ls > 0) HealPlayer(ls);
+                    }
+
+                    // シールドバッシュ: 与ダメの一定割合をシールド化（天衣無縫 healShieldReduction を適用）
+                    if (ctx.shieldOnWinPct > 0f && totalDmg > 0)
+                    {
+                        int sh = Mathf.CeilToInt(totalDmg * ctx.shieldOnWinPct) - ctx.healShieldReduction;
+                        if (sh > 0)
+                        {
+                            ctx.consShield += sh;
+                            ctx.shieldGainedTotal += sh;
+                        }
+                    }
+
                     // === Scratch計算 ===
                     // 脅威システム: ロール勝利でも勝ち幅が脅威に満たない分を削りダメージとして受ける
                     //   scratch += max(0, 脅威 − 勝ち幅)。 大差勝ち(diff≥脅威)なら0。
@@ -971,86 +1011,21 @@ namespace CombatSystem
                     result.fixedDamage = fixedDmg;
                     result.isCritical = isCrit;
 
-                    // メタデバフ Lv10 天変地異: 敵ダメージ ×2.0
-                    float enemyMul = MetaProgression.MetaDebuffApplicator.GetEnemyDamageMultiplier();
-                    if (Mathf.Abs(enemyMul - 1f) > 0.001f)
-                        totalDmg = Mathf.CeilToInt(totalDmg * enemyMul);
+                    // 被ダメージ修飾チェーン（順序厳守。詳細は ApplyLossDamageModifiers 参照）
+                    totalDmg = ApplyLossDamageModifiers(totalDmg, floorMod, ctx);
 
-                    // メタバフ: 被ダメ -X（最大-2、ただし最低 1）
-                    int metaDmgRed = MetaProgression.MetaBuffApplicator.GetDamageReduction();
-                    if (metaDmgRed > 0 && totalDmg > 0)
-                        totalDmg = Mathf.Max(1, totalDmg - metaDmgRed);
-
-                    // 名前付きパッシブ由来の固定被ダメ削減（不屈の鎧・苦難の刻印 等の合算）
-                    if (ctx.playerFlatDamageReduction > 0 && totalDmg > 0)
-                        totalDmg = Mathf.Max(1, totalDmg - ctx.playerFlatDamageReduction);
-
-                    // フロアデバフ: 敗北時の被ダメージ軽減（5層 地獄門: -2）
-                    if (floorMod != null && floorMod.defeatDamageReduction > 0 && totalDmg > 0)
-                    {
-                        int reduced = Mathf.Min(totalDmg, floorMod.defeatDamageReduction);
-                        totalDmg -= reduced;
-                        Debug.Log($"[CombatManager] フロアデバフ: 敗北時被ダメ-{reduced} → {totalDmg}");
-                    }
-
-                    // 亡者の招待: 被ダメ +30%
-                    if (ctx.receivedDamageBonus > 0f && totalDmg > 0)
-                    {
-                        int bonusDmg = Mathf.CeilToInt(totalDmg * ctx.receivedDamageBonus);
-                        totalDmg += bonusDmg;
-                        Debug.Log($"[CombatManager] 亡者の招待: 被ダメ+{bonusDmg} (合計{totalDmg})");
-                    }
-
-                    // 共助: 1ターン目のメインダメージ半減
-                    if (ctx.halveFirstEnemyAttack && ctx.currentTurn == 1)
-                    {
-                        totalDmg = totalDmg / 2;
-                        ctx.halveFirstEnemyAttack = false;
-                        Debug.Log("[CombatManager] 共助発動: 敵の最初の攻撃を半減");
-                    }
-
-                    // 獣の絆: 被弾無効化チャージ消費
-                    if (ctx.playerDamageNegateCharges > 0 && totalDmg > 0)
-                    {
-                        ctx.playerDamageNegateCharges--;
-                        Debug.Log($"[CombatManager] 獣の絆発動: 被弾{totalDmg}を無効化（残チャージ{ctx.playerDamageNegateCharges}）");
-                        totalDmg = 0;
-                    }
-
-                    // シュヴァリエのレイピア コントラタック: 被ダメ50%軽減 + 軽減量×2 を敵へ反射
-                    if (ctx.GetAccumulated("player_contre") > 0 && totalDmg > 0)
-                    {
-                        int mitigated = totalDmg / 2;
-                        totalDmg -= mitigated;
-                        int reflect = mitigated * 2;
-                        if (reflect > 0)
-                        {
-                            enemyHP = Math.Max(0, enemyHP - reflect);
-                            Debug.Log($"[コントラタック] 軽減{mitigated} → 被ダメ{totalDmg + mitigated}→{totalDmg}、反射{reflect} → 敵HP{enemyHP}");
-                        }
-                    }
-
-                    // ラストスタンド用: 純粋なロール敗北メインダメ
-                    // 消費: シールド吸収（残量から差し引き）
-                    if (ctx.consShield > 0 && totalDmg > 0)
-                    {
-                        int absorbed = Math.Min(ctx.consShield, totalDmg);
-                        ctx.consShield -= absorbed;
-                        totalDmg -= absorbed;
-                        Debug.Log($"[CombatManager] シールド吸収 {absorbed} (残{ctx.consShield})");
-                    }
-
-                    // 消費: 鏡写しの水晶（吸収後の実被ダメと同量を敵へ反射）
-                    if (ctx.consReflect && totalDmg > 0)
-                    {
-                        enemyHP = Math.Max(0, enemyHP - totalDmg);
-                        Debug.Log($"[CombatManager] 鏡写し反射 {totalDmg} → 敵HP {enemyHP}");
-                    }
+                    // [DBG] 妙覚99フェーズの被ダメ消失箇所特定（procOut=ProcessDamage後/applied=修飾後）。特定後に削除。
+                    if (currentEnemy != null && currentEnemy.id == "boss_layer7_p7" && !myokakuSDRollThisTurn)
+                        Debug.Log($"[DBG] 妙覚LOSS lossBase={lossBase} procOut={result.totalDamage} applied={totalDmg} fixToPlayer={ctx.fixedDamageToPlayer} consShield={ctx.consShield} negate={ctx.playerDamageNegateCharges} HP={playerHP}/{playerMaxHP}");
 
                     // プレイヤーにダメージ適用（メイン＋敵→プレイヤー固定）
                     playerHP = Math.Max(0, playerHP - totalDmg);
+                    ctx.playerDamageThisTurn += totalDmg; // 焦土用の被ダメ計測
                     if (ctx.fixedDamageToPlayer > 0)
+                    {
                         playerHP = Math.Max(0, playerHP - ctx.fixedDamageToPlayer);
+                        ctx.playerDamageThisTurn += ctx.fixedDamageToPlayer;
+                    }
 
                     // 敗北時でも反撃・固定ダメージは敵に適用（Counter/Riposte等）
                     if (fixedDmg > 0)
@@ -1079,14 +1054,19 @@ namespace CombatSystem
                 result.isCritical = false;
                 result.scratchDamage = 0;
 
-                // 引き分け時も固定ダメージは双方に適用
+                // 引き分け時も固定ダメージは双方に適用（蒼白の槍騎士: 軽減無視ダメ増幅を停戦協定にも乗せる）
                 if (ctx.fixedDamageToEnemy > 0)
-                    enemyHP = Math.Max(0, enemyHP - ctx.fixedDamageToEnemy);
+                {
+                    int drawFixed = ctx.fixedDamageMultiplier > 1f
+                        ? Mathf.CeilToInt(ctx.fixedDamageToEnemy * ctx.fixedDamageMultiplier)
+                        : ctx.fixedDamageToEnemy;
+                    enemyHP = Math.Max(0, enemyHP - drawFixed);
+                }
                 if (ctx.fixedDamageToPlayer > 0)
                     playerHP = Math.Max(0, playerHP - ctx.fixedDamageToPlayer);
 
-                // 出血ダメージ（引き分け時も適用）
-                if (ctx.enemyBleedStacks > 0)
+                // 出血ダメージ（引き分け時も適用）。停戦協定ターンは他効果を抑止するためスキップ。
+                if (!ctx.truceThisTurn && ctx.enemyBleedStacks > 0)
                 {
                     int bleedDmg = BattleModifierManager.ApplyBleedModifiers(ctx, ctx.enemyBleedStacks);
                     enemyHP = Math.Max(0, enemyHP - bleedDmg);
@@ -1097,11 +1077,30 @@ namespace CombatSystem
             if (ctx.fixedDamageToPlayer >= 999)
                 playerHP = 0;
 
+            // Λデバフ「慈悲の処刑」: 被弾後、HPが最大の5/10/15%以下なら即死。
+            // combatLethalThisTurn 確定の前に処理し、ターン終了回復での蘇生を防ぐ。
+            if (ctx.lambdaMercifulExecThreshold > 0f && playerHP > 0)
+            {
+                bool tookHit = ctx.playerDamageThisTurn > 0
+                             || (ctx.scratchDamage > 0 && !ctx.nullifyScratchDamage)
+                             || ctx.fixedDamageToPlayer > 0;
+                if (tookHit && playerHP <= playerMaxHP * ctx.lambdaMercifulExecThreshold)
+                {
+                    Debug.Log($"[Λ] 慈悲の処刑: HP{playerHP}/{playerMaxHP} ≤ {ctx.lambdaMercifulExecThreshold:P0} → 即死");
+                    playerHP = 0;
+                }
+            }
+
             // コンテキストにHP同期
             ctx.playerCurrentHP = playerHP;
             ctx.playerMaxHP = playerMaxHP;
             ctx.enemyCurrentHP = enemyHP;
             ctx.enemyMaxHP = currentEnemy.maxHP;
+
+            // 戦闘ダメージ（メイン/固定/scratch/死の宣告）でこのターンに致死へ至ったか。
+            // これ以降のターン終了回復(活力/継続回復/剣鎧等)で蘇生させないための確定フラグ。
+            // 天命/深淵は被ダメを上限化してHPを1〜2残すため（HP=0にならず）ここでは false。
+            bool combatLethalThisTurn = playerHP <= 0;
 
             // ターン終了トリガー
             psm.FireTrigger(PassiveSkillTrigger.OnTurnEnd);
@@ -1152,8 +1151,9 @@ namespace CombatSystem
             // 消費: 継続回復（毎ターン終了時 +consRegen → consRegen--）。狂暴化中は封印。
             if (ctx.consRegen > 0 && playerHP > 0 && !ctx.healBlocked)
             {
-                int heal = Math.Min(playerMaxHP - playerHP, ctx.consRegen);
-                if (heal > 0) { playerHP += heal; ctx.playerCurrentHP = playerHP; }
+                int regen = Math.Max(0, ctx.consRegen - ctx.healShieldReduction); // 天衣無縫減衰
+                int heal = Math.Min(playerMaxHP - playerHP, regen);
+                if (heal > 0) { playerHP += heal; ctx.playerCurrentHP = playerHP; ctx.healAppliedTotal += heal; }
                 Debug.Log($"[CombatManager] 継続回復 +{heal} (次T {ctx.consRegen - 1})");
                 ctx.consRegen--;
             }
@@ -1182,7 +1182,7 @@ namespace CombatSystem
             // 〈妙覚〉サドンデス: 1d6 vs 1d6 で勝者が敗者を即死させる（引き分けは継続）。
             // プレイヤー勝利は AwakenedP7Myokaku.OnTurnEnd が gedatsuPending をセット済み。
             // ここではボス勝利時のプレイヤー即死だけを保証する（シールド/LS バイパス）。
-            if (ctx.myokakuSuddenDeath && !result.isDraw && !result.playerWon)
+            if (myokakuSDRollThisTurn && !result.isDraw && !result.playerWon)
             {
                 playerHP = 0;
                 ctx.playerCurrentHP = 0;
@@ -1193,10 +1193,29 @@ namespace CombatSystem
             result.enemyHPAfter = enemyHP;
             turnLog.Add(result);
 
+            // [DBG] 妙覚戦のターン終端トレース（HP復帰・SD・解脱の経路特定用。確定後に削除）
+            if (currentEnemy != null && currentEnemy.id == "boss_layer7_p7")
+            {
+                string wl = result.isDraw ? "分" : (result.playerWon ? "勝" : "敗");
+                Debug.Log($"[DBG] 妙覚EOT T={ctx.currentTurn} 勝敗={wl} P計={ctx.playerDiceTotal} E計={ctx.enemyDiceTotal} " +
+                          $"Eボーナス={ctx.enemyDiceTotalBonus} playerHP={playerHP} enemyHP={enemyHP} " +
+                          $"SD={ctx.myokakuSuddenDeath} SDroll={myokakuSDRollThisTurn} gedatsu={ctx.gedatsuPending}");
+            }
+
             OnTurnEnd?.Invoke(result);
 
             // ログ出力
             LogTurnResult(result);
+
+            // 戦闘ダメージで致死に至っていたら、ターン終了回復で蘇生していても死亡を確定させる
+            // （オーバーキル消失バグの修正：致死ダメージは回復で帳消しにできない）。
+            if (combatLethalThisTurn && playerHP > 0)
+            {
+                Debug.Log($"[CombatManager] 戦闘致死確定: ターン終了回復による蘇生を無効化 (HP {playerHP}→0)");
+                playerHP = 0;
+                ctx.playerCurrentHP = 0;
+                result.playerHPAfter = 0;
+            }
 
             // 戦闘終了チェック
             if (playerHP <= 0 || enemyHP <= 0)
@@ -1205,6 +1224,216 @@ namespace CombatSystem
             }
 
             return result;
+        }
+
+        // ===========================================================
+        //  ダメージ修飾チェーン（ExecuteTurn から分離。順序が結果を左右するため厳守）
+        // ===========================================================
+
+        /// <summary>
+        /// プレイヤー勝利時の与ダメージ修飾（ProcessDamage後〜敵HP適用前）。適用順:
+        /// 画竜点睛 → 与ダメ倍率 → 業物 → 鬼火 → 攻撃バースト → メタ会心 → 向かい風
+        /// → 敵被ダメ軽減(灰塵等の OnPreReceiveDamage) → 基礎防御%(利刃で相殺) → 勝利時最低保証
+        /// → 狂暴化 → メタ俊敏回避。
+        /// </summary>
+        private int ApplyWinDamageModifiers(int totalDmg, ref int fixedDmg, ref bool isCrit,
+                                            int lbStage, PassiveSkillManager psm, CombatContext ctx)
+        {
+            // 画竜点睛: ダメージ＝(出目+10)×会心倍率、会心確定
+            if (ctx.garyoProc)
+            {
+                totalDmg = Mathf.CeilToInt((ctx.garyoDieValue + 10) * ctx.criticalMultiplier);
+                isCrit = true;
+                Debug.Log($"[画竜点睛] 確定会心 {totalDmg} ダメ (出目{ctx.garyoDieValue}+10 ×{ctx.criticalMultiplier})");
+            }
+
+            // 業物: 与ダメ倍率 +20%/lv（outgoingDamageMultiplier に加算）
+            if (lbStage > 0)
+            {
+                if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
+                ctx.outgoingDamageMultiplier += 0.2f * lbStage;
+            }
+
+            // 与ダメ倍率（激情の刃 等のパッシブ由来 + 業物）
+            if (ctx.outgoingDamageMultiplier > 0f
+                && Mathf.Abs(ctx.outgoingDamageMultiplier - 1f) > 0.001f)
+            {
+                int orig = totalDmg;
+                totalDmg = Mathf.CeilToInt(totalDmg * ctx.outgoingDamageMultiplier);
+                Debug.Log($"[CombatManager] 与ダメ補正 ×{ctx.outgoingDamageMultiplier:F2}: {orig}→{totalDmg}");
+            }
+
+            // 消費: 鬼火の油 与ダメ+X%（全戦闘）
+            if (ctx.consDmgMultPct > 0 && totalDmg > 0)
+                totalDmg += Mathf.CeilToInt(totalDmg * ctx.consDmgMultPct / 100f);
+
+            // 消費: 攻撃力バースト（この勝利ターンのみ・単発消費）
+            if (ctx.consAtkBurst > 0)
+            {
+                totalDmg += ctx.consAtkBurst;
+                Debug.Log($"[CombatManager] 攻撃バースト +{ctx.consAtkBurst}");
+                ctx.consAtkBurst = 0;
+            }
+
+            // メタバフ: 会心時の追加補正
+            if (isCrit)
+            {
+                int critBonus = MetaProgression.MetaBuffApplicator.GetCritBonus();
+                if (critBonus > 0) totalDmg += critBonus;
+            }
+
+            // メタデバフ Lv3 向かい風: -1（最低 1 は残す）
+            int metaPlayerDmgRed = MetaProgression.MetaDebuffApplicator.GetPlayerDamageReduction();
+            if (metaPlayerDmgRed > 0 && totalDmg > 0)
+                totalDmg = Mathf.Max(1, totalDmg - metaPlayerDmgRed);
+
+            // 敵側のダメージ軽減パッシブを発火（前後で ctx.finalDamage と totalDmg を同期し、
+            // 敵パッシブ（AshArmor 等やシュヴァリエのシールド経由処理）が
+            // 実際の与ダメに反映されるようにする）
+            ctx.finalDamage = totalDmg;
+            psm.FireEnemyTrigger(PassiveSkillTrigger.OnPreReceiveDamage);
+            totalDmg = System.Math.Max(0, ctx.finalDamage);
+
+            // 基礎防御%軽減（灰塵の鎧の後）。利刃で軽減率(pt)を相殺。倍率が全部乗った最終値に対して%カット。
+            if (ctx.enemyDamageReductionPct > 0f && totalDmg > 0)
+            {
+                float effRate = Mathf.Max(0f, ctx.enemyDamageReductionPct - ctx.armorPenPct);
+                if (effRate > 0f)
+                {
+                    int beforeDef = totalDmg;
+                    totalDmg = Mathf.CeilToInt(totalDmg * (1f - effRate));
+                    Debug.Log($"[基礎防御] 軽減{effRate:P0}（防{ctx.enemyDamageReductionPct:P0}/利刃{ctx.armorPenPct:P0}）{beforeDef}→{totalDmg}");
+                }
+            }
+
+            // 利刃: 敵基礎防御を超えた貫通分(armorPen − 防御率)は腐らせず与ダメ%へ転用。
+            // → 無装甲の敵にも armorPen 分の与ダメ増として常時機能する（対タンク以外でも腐らない）。
+            float wastedPen = Mathf.Max(0f, ctx.armorPenPct - ctx.enemyDamageReductionPct);
+            if (wastedPen > 0f && totalDmg > 0)
+            {
+                int beforePen = totalDmg;
+                totalDmg = Mathf.CeilToInt(totalDmg * (1f + wastedPen));
+                Debug.Log($"[利刃] 余剰貫通 +{wastedPen:P0} {beforePen}→{totalDmg}");
+            }
+
+            // Λデバフ「微妙な手応え」: 敵への最終ダメージを -5/-10/-15%（基礎防御の後、最低保証の前）
+            if (ctx.lambdaDamageDealtMult < 1f && totalDmg > 0)
+            {
+                int beforeVague = totalDmg;
+                totalDmg = Mathf.CeilToInt(totalDmg * ctx.lambdaDamageDealtMult);
+                Debug.Log($"[Λ] 微妙な手応え ×{ctx.lambdaDamageDealtMult:F2} {beforeVague}→{totalDmg}");
+            }
+
+            // 勝利時の与ダメ最低保証（基本1、利刃Lvで1/2/3/4）。「勝ったのに0」を防止。
+            if (totalDmg < ctx.winMinDamage)
+                totalDmg = ctx.winMinDamage;
+
+            // 狂暴化(ボス50T後): エネミーが受けるダメージを倍化（軽減処理の後・適用直前）
+            if (ctx.enemyDamageTakenMultiplier > 1f && totalDmg > 0)
+            {
+                int orig = totalDmg;
+                totalDmg = Mathf.CeilToInt(totalDmg * ctx.enemyDamageTakenMultiplier);
+                Debug.Log($"[CombatManager] 狂暴化: 敵被ダメ ×{ctx.enemyDamageTakenMultiplier:F1} ({orig}→{totalDmg})");
+            }
+
+            // メタデバフ Lv2 俊敏: 各戦闘の最初の1回の被弾を必ず回避（メイン＋固定ダメを無効化）
+            if (!metaAgilityDodgeUsed
+                && (totalDmg + fixedDmg) > 0
+                && MetaProgression.MetaDebuffApplicator.EnemyDodgesFirstHit())
+            {
+                metaAgilityDodgeUsed = true;
+                Debug.Log($"[CombatManager] メタデバフ Lv2 俊敏: 初撃を回避 (与ダメ {totalDmg}+{fixedDmg} を無効化)");
+                totalDmg = 0;
+                fixedDmg = 0;
+            }
+
+            return totalDmg;
+        }
+
+        /// <summary>
+        /// プレイヤー敗北時の被ダメージ修飾（ProcessDamage後〜プレイヤーHP適用前）。適用順:
+        /// 天変地異(×2) → メタ被ダメ軽減 → 不屈の鎧/苦難の刻印 → 地獄門 → 亡者の招待(+30%)
+        /// → 共助(T1半減) → 獣の絆 → コントラタック(50%軽減+反射) → 消費シールド → 鏡写し反射。
+        /// enemyHP はメンバフィールドのため反射系はここで直接削る。
+        /// </summary>
+        private int ApplyLossDamageModifiers(int totalDmg, MapSystem.FloorModifier floorMod, CombatContext ctx)
+        {
+            // メタデバフ Lv10 天変地異: 敵ダメージ ×2.0
+            float enemyMul = MetaProgression.MetaDebuffApplicator.GetEnemyDamageMultiplier();
+            if (Mathf.Abs(enemyMul - 1f) > 0.001f)
+                totalDmg = Mathf.CeilToInt(totalDmg * enemyMul);
+
+            // メタバフ: 被ダメ -X（最大-2、ただし最低 1）
+            int metaDmgRed = MetaProgression.MetaBuffApplicator.GetDamageReduction();
+            if (metaDmgRed > 0 && totalDmg > 0)
+                totalDmg = Mathf.Max(1, totalDmg - metaDmgRed);
+
+            // 名前付きパッシブ由来の固定被ダメ削減（不屈の鎧・苦難の刻印 等の合算）
+            if (ctx.playerFlatDamageReduction > 0 && totalDmg > 0)
+                totalDmg = Mathf.Max(1, totalDmg - ctx.playerFlatDamageReduction);
+
+            // フロアデバフ: 敗北時の被ダメージ軽減（5層 地獄門: -2）
+            if (floorMod != null && floorMod.defeatDamageReduction > 0 && totalDmg > 0)
+            {
+                int reduced = Mathf.Min(totalDmg, floorMod.defeatDamageReduction);
+                totalDmg -= reduced;
+                Debug.Log($"[CombatManager] フロアデバフ: 敗北時被ダメ-{reduced} → {totalDmg}");
+            }
+
+            // 亡者の招待: 被ダメ +30%
+            if (ctx.receivedDamageBonus > 0f && totalDmg > 0)
+            {
+                int bonusDmg = Mathf.CeilToInt(totalDmg * ctx.receivedDamageBonus);
+                totalDmg += bonusDmg;
+                Debug.Log($"[CombatManager] 亡者の招待: 被ダメ+{bonusDmg} (合計{totalDmg})");
+            }
+
+            // 共助: 1ターン目のメインダメージ半減
+            if (ctx.halveFirstEnemyAttack && ctx.currentTurn == 1)
+            {
+                totalDmg = totalDmg / 2;
+                ctx.halveFirstEnemyAttack = false;
+                Debug.Log("[CombatManager] 共助発動: 敵の最初の攻撃を半減");
+            }
+
+            // 獣の絆: 被弾無効化チャージ消費
+            if (ctx.playerDamageNegateCharges > 0 && totalDmg > 0)
+            {
+                ctx.playerDamageNegateCharges--;
+                Debug.Log($"[CombatManager] 獣の絆発動: 被弾{totalDmg}を無効化（残チャージ{ctx.playerDamageNegateCharges}）");
+                totalDmg = 0;
+            }
+
+            // シュヴァリエのレイピア コントラタック: 被ダメ50%軽減 + 軽減量×2 を敵へ反射
+            if (ctx.GetAccumulated("player_contre") > 0 && totalDmg > 0)
+            {
+                int mitigated = totalDmg / 2;
+                totalDmg -= mitigated;
+                int reflect = mitigated * 2;
+                if (reflect > 0)
+                {
+                    enemyHP = Math.Max(0, enemyHP - reflect);
+                    Debug.Log($"[コントラタック] 軽減{mitigated} → 被ダメ{totalDmg + mitigated}→{totalDmg}、反射{reflect} → 敵HP{enemyHP}");
+                }
+            }
+
+            // 消費: シールド吸収（残量から差し引き）
+            if (ctx.consShield > 0 && totalDmg > 0)
+            {
+                int absorbed = Math.Min(ctx.consShield, totalDmg);
+                ctx.consShield -= absorbed;
+                totalDmg -= absorbed;
+                Debug.Log($"[CombatManager] シールド吸収 {absorbed} (残{ctx.consShield})");
+            }
+
+            // 消費: 鏡写しの水晶（吸収後の実被ダメと同量を敵へ反射）
+            if (ctx.consReflect && totalDmg > 0)
+            {
+                enemyHP = Math.Max(0, enemyHP - totalDmg);
+                Debug.Log($"[CombatManager] 鏡写し反射 {totalDmg} → 敵HP {enemyHP}");
+            }
+
+            return totalDmg;
         }
 
         // ===========================================================
@@ -1284,7 +1513,12 @@ namespace CombatSystem
                 playerHPRemaining = playerHP,
                 enemyHPRemaining = enemyHP,
                 turnLog = new List<TurnResult>(turnLog),
-                gedatsu = ctx != null && ctx.gedatsuPending
+                gedatsu = ctx != null && ctx.gedatsuPending,
+                healApplied = ctx?.healAppliedTotal ?? 0,
+                shieldGained = ctx?.shieldGainedTotal ?? 0,
+                damageDealt = Math.Max(0, (currentEnemy != null ? currentEnemy.maxHP : 0) - Math.Max(0, enemyHP)),
+                damageTaken = Math.Max(0, playerMaxHP - Math.Max(0, playerHP)) + (ctx?.healAppliedTotal ?? 0),
+                enemyMaxHP = currentEnemy != null ? currentEnemy.maxHP : 0,
             };
         }
 

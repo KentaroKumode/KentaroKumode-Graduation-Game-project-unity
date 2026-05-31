@@ -40,10 +40,7 @@ namespace InventorySystem.PassiveItems
             // 名前付き固有パッシブの効果実装
             Register(new Effects.PilgrimStaffEffect());
             Register(new Effects.MemoryHourglassEffect());
-            Register(new Effects.FuriousBladeEffect());
             Register(new Effects.HopeEmberEffect());
-            Register(new Effects.TwilightPocketwatchEffect());
-            Register(new Effects.HardshipSigilEffect());
             Register(new Effects.ReapersBeadsEffect());
             Register(new Effects.StormCrestEffect());
             Register(new Effects.SilentSwordbeltEffect());
@@ -51,8 +48,7 @@ namespace InventorySystem.PassiveItems
 
             // HP閾値発動系
             Register(new Effects.FrenzyMedallionEffect());
-            Register(new Effects.UnyieldingArmorEffect());
-            Register(new Effects.DeathOmenEffect());
+            Register(new Effects.ManashikiEffect());     // 末那識（旧 死神の予感）: HP≤20%で会心確定
 
             // 歩行HP回復
             Register(new Effects.CalmShoesEffect());

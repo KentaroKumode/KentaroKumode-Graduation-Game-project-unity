@@ -4,7 +4,7 @@ namespace InventorySystem.Shop
 {
     /// <summary>
     /// 1ショップ訪問あたりの在庫。
-    /// パッシブ2 / 消費2 / 武器1 / 強化素材1 の計6スロット。
+    /// パッシブ3 / 消費4 / 武器2 / ダイス2 / 強化素材1 の計12スロット。
     /// </summary>
     public class ShopInventory
     {
@@ -25,5 +25,22 @@ namespace InventorySystem.Shop
         /// <summary>強化素材スロットの現在価格 = base × 2^purchaseCount × priceMultiplier</summary>
         public int CurrentMaterialPrice
             => UnityEngine.Mathf.CeilToInt(materialBasePrice * (1 << materialPurchaseCount) * priceMultiplier);
+
+        /// <summary>このショップで実施したリロール回数。</summary>
+        public int rerollCount;
+
+        /// <summary>
+        /// 次のリロール価格。
+        /// 緩い曲線（三角数）で 1, 3, 6, 10, 15, 21, ... G。
+        /// priceMultiplier は適用しない（リロールは「在庫操作」コストなので一律）。
+        /// </summary>
+        public int CurrentRerollPrice
+        {
+            get
+            {
+                int n = rerollCount + 1; // 1回目=1, 2回目=3, 3回目=6, 4回目=10, 5回目=15
+                return n * (n + 1) / 2;
+            }
+        }
     }
 }

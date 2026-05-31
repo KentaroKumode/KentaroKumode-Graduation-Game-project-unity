@@ -49,12 +49,14 @@ namespace InventorySystem.Shop
 
                 // 武器枠のみ WeaponShopFilter で LEGENDARY を別途除外（強化最終形対策）
         // MYTHIC は全カテゴリで排出しない
+        // 2026-05-30 v2: LEG 0.07→0.12 (T4武器到達率の改善目的、 ショップでの T4 出現確率を約7割増)
+        // BRONZE/SILVER を相応に減らして合計1.0。
         private static readonly (ItemRarity rarity, float weight)[] tierWeights = new[]
         {
-            (ItemRarity.BRONZE,    0.54f),
-            (ItemRarity.SILVER,    0.35f),
-            (ItemRarity.GOLD,      0.10f),
-            (ItemRarity.LEGENDARY, 0.01f),
+            (ItemRarity.BRONZE,    0.42f),
+            (ItemRarity.SILVER,    0.30f),
+            (ItemRarity.GOLD,      0.16f),
+            (ItemRarity.LEGENDARY, 0.12f),
         };
 
         // ============================================================
@@ -102,8 +104,8 @@ namespace InventorySystem.Shop
             for (int i = 0; i < 3; i++)
                 inv.slots.Add(BuildSlot(ShopSlotKind.Passive, inv.priceMultiplier));
 
-            // 消費 ×2
-            for (int i = 0; i < 2; i++)
+            // 消費 ×4 (2026-05-31 増枠: 消費価格半減と合わせて消費活用を促進)
+            for (int i = 0; i < 4; i++)
                 inv.slots.Add(BuildSlot(ShopSlotKind.Consumable, inv.priceMultiplier));
 
             // 武器 ×2
@@ -122,6 +124,21 @@ namespace InventorySystem.Shop
                 price = inv.CurrentMaterialPrice,
                 sold = false,
             });
+
+            // インベントリ拡張 ×1 (現在の解放列が < MAX のときのみ。 既に最大なら追加しない)
+            var runForExpand = GameLoop.GameManager.Instance?.Run;
+            int expandCost = runForExpand != null
+                ? InventorySystem.Helpers.InventoryCapacity.NextExpansionCost(runForExpand) : int.MaxValue;
+            if (expandCost != int.MaxValue)
+            {
+                inv.slots.Add(new ShopSlot
+                {
+                    kind = ShopSlotKind.InventoryExpansion,
+                    itemId = null,
+                    price = Mathf.CeilToInt(expandCost * inv.priceMultiplier),
+                    sold = false,
+                });
+            }
 
             Current = inv;
             OnShopOpened?.Invoke(inv);
@@ -274,11 +291,27 @@ namespace InventorySystem.Shop
                 int price = Current.CurrentMaterialPrice;
                 if (run.coins < price) { Log("ゴールド不足"); return false; }
                 run.coins -= price;
+                run.coinsSpent += price;
                 run.weaponMaterials++;
                 Current.materialPurchaseCount++;
                 slot.price = Current.CurrentMaterialPrice; // 表示価格を更新
                 Debug.Log($"[ShopManager] 強化素材購入: -{price}G (次回 {Current.CurrentMaterialPrice}G)");
                 MetaProgression.MetaBuffApplicator.RollRefund(price, run);
+                OnShopUpdated?.Invoke();
+                return true;
+            }
+
+            if (slot.kind == ShopSlotKind.InventoryExpansion)
+            {
+                if (slot.sold) { Log("売り切れ"); return false; }
+                if (run.coins < slot.price) { Log("ゴールド不足"); return false; }
+                if (run.inventoryUnlockedRows >= InventoryConstants.MAX_UNLOCKED_ROWS)
+                { Log("インベントリ最大解放済み"); return false; }
+                run.coins -= slot.price;
+                run.coinsSpent += slot.price;
+                run.inventoryUnlockedRows++;
+                slot.sold = true;
+                Debug.Log($"[ShopManager] インベントリ拡張: -{slot.price}G → {run.inventoryUnlockedRows}列 (容量{run.inventoryUnlockedRows * InventoryConstants.GRID_WIDTH}マス)");
                 OnShopUpdated?.Invoke();
                 return true;
             }
@@ -295,6 +328,7 @@ namespace InventorySystem.Shop
             }
 
             run.coins -= slot.price;
+            run.coinsSpent += slot.price;
             Current.purchaseCount++;
             switch (slot.kind)
             {
@@ -315,6 +349,88 @@ namespace InventorySystem.Shop
             Debug.Log($"[ShopManager] 購入: {label} -{slot.price}G");
             MetaProgression.MetaBuffApplicator.RollRefund(slot.price, run);
             OnShopUpdated?.Invoke();
+            return true;
+        }
+
+        // ============================================================
+        //  リロール
+        // ============================================================
+
+        /// <summary>
+        /// 強化素材スロットを除く未売却枠を全部振り直す。
+        /// コストは ShopInventory.CurrentRerollPrice。売却済み枠はそのまま（戻らない）。
+        /// </summary>
+        public bool TryReroll(RunState run)
+        {
+            if (Current == null || run == null) return false;
+            int price = Current.CurrentRerollPrice;
+            if (run.coins < price) { Log($"リロール: ゴールド不足 ({price}G 必要)"); return false; }
+
+            run.coins -= price;
+            run.coinsSpent += price;
+            Current.rerollCount++;
+
+            int rerolled = 0;
+            for (int i = 0; i < Current.slots.Count; i++)
+            {
+                var s = Current.slots[i];
+                if (s == null) continue;
+                if (s.kind == ShopSlotKind.WeaponMaterial) continue; // 価格カーブ独立
+                if (s.sold) continue;
+                var fresh = BuildSlot(s.kind, Current.priceMultiplier);
+                Current.slots[i] = fresh;
+                rerolled++;
+            }
+
+            Debug.Log($"[ShopManager] リロール#{Current.rerollCount}: -{price}G / {rerolled}枠更新 / 次回{Current.CurrentRerollPrice}G");
+            MetaProgression.MetaBuffApplicator.RollRefund(price, run);
+            OnShopUpdated?.Invoke();
+            return true;
+        }
+
+        // ============================================================
+        //  値下げ交渉 (=強盗)
+        // ============================================================
+
+        /// <summary>
+        /// 値下げ交渉を試みる(実態は強盗)。
+        /// ・現在ショップの未売却アイテムIDをスナップショットして run.robberyPendingItems に格納
+        /// ・カルマ+1、shopsBlocked = true (以降ショップ進入不可)
+        /// ・shopRobberyInProgress = true
+        /// ・ショップを閉じ、戻り値 true なら呼び出し側が「怪しい商人」戦闘を開始する
+        /// </summary>
+        public bool TryRobbery(RunState run)
+        {
+            if (Current == null || run == null) return false;
+            if (!MetaProgression.MetaBuffApplicator.IsShopRobberyUnlocked())
+            {
+                Log("値下げ交渉: アンロックされていない");
+                return false;
+            }
+            if (run.shopsBlocked) { Log("値下げ交渉: 既に交渉済み（追放中）"); return false; }
+
+            // 在庫スナップショット (未売却・実アイテムのみ。 強化素材枠は除外)
+            var loot = new List<string>();
+            foreach (var s in Current.slots)
+            {
+                if (s == null || s.sold) continue;
+                if (s.kind == ShopSlotKind.WeaponMaterial) continue;
+                if (string.IsNullOrEmpty(s.itemId)) continue;
+                loot.Add(s.itemId);
+            }
+            if (run.robberyPendingItems == null)
+                run.robberyPendingItems = new List<string>();
+            else
+                run.robberyPendingItems.Clear();
+            run.robberyPendingItems.AddRange(loot);
+
+            run.karma += 1;
+            run.shopsBlocked = true;
+            run.shopRobberyInProgress = true;
+
+            Debug.Log($"[ShopManager] 値下げ交渉(強盗): カルマ+1, 在庫{loot.Count}件をスナップ, 以降ショップ進入不可");
+            // ショップを閉じる (呼び出し側がエリート戦闘を開始する)
+            Close();
             return true;
         }
 

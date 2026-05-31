@@ -48,6 +48,16 @@ namespace InventorySystem
                     Debug.LogWarning($"[ItemUseHandler] {MetaProgression.PermanentDebuffIds.Sloth}: 戦闘開始から3T間は消費アイテム使用不可 (現在 {combat.CurrentCombatTurn}T)");
                     return;
                 }
+
+                // Λデバフ「神経錯乱」: 戦闘開始から 3/5/7 ターン目の開始時まで消費アイテム使用不可
+                int lambdaLockUntil = GameLoop.Lambda.LambdaDebuffEffects.GetConsumableLockUntilTurn(run);
+                if (combat != null && combat.IsCombatActive
+                    && lambdaLockUntil > 0 && combat.CurrentCombatTurn >= 1
+                    && combat.CurrentCombatTurn < lambdaLockUntil)
+                {
+                    Debug.LogWarning($"[ItemUseHandler] Λ 神経錯乱: {lambdaLockUntil}ターン目開始まで消費不可 (現在 {combat.CurrentCombatTurn}T)");
+                    return;
+                }
             }
 
             // 確認ダイアログ（後で実装）

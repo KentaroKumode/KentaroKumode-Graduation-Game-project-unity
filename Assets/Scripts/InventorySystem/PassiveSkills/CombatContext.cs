@@ -27,7 +27,10 @@ namespace InventorySystem.PassiveSkills
         public int[] enemyDice;         // 敵が振った各ダイスの値
         public int playerDiceTotal;     // プレイヤーのダイス合計値
         public int enemyDiceTotal;      // 敵のダイス合計値
-        public int diceDifference;      // ダイス差（player - enemy）
+        /// <summary>ダイス差（playerDiceTotal − enemyDiceTotal）。両合計から常に算出する読み取り専用プロパティ。
+        /// 視点スワップ時も両合計が入れ替わるため符号が自動反転し、明示的な反転代入は不要。
+        /// 常に最新値を返すため、OnPostRoll パッシブが合計を改変しても鮮度ズレが起きない。</summary>
+        public int diceDifference => playerDiceTotal - enemyDiceTotal;
         
         // ===== ダイス設定値 =====  
         public int playerDiceMax;       // プレイヤーのダイス最大出目（装備武器由来）
@@ -46,6 +49,9 @@ namespace InventorySystem.PassiveSkills
         public int pursuitDamage;       // 追撃ダメージ（パッシブ由来の固定追撃）
         public int criticalBonus;       // 会心ボーナスダイス補正値
         public bool isCritical;         // 会心判定結果
+        /// <summary>会心強制フラグ。true なら乱数判定を無視して会心確定（末那識など）。
+        /// 会心率cap(注意散漫)下でも真に確定する。BeginNewTurn でリセット、毎ターン効果側が再set。</summary>
+        public bool forceCritical;
         public float criticalMultiplier; // 会心倍率（デフォルト2.0）
         public bool damageReduced;      // ダメージ軽減が発生したか
 
@@ -118,10 +124,43 @@ namespace InventorySystem.PassiveSkills
         public bool healBlocked;
         /// <summary>狂暴化(ボス50T後): エネミーが受けるダメージ倍率（1.0=等倍, 狂暴化中3.0）。BeginNewTurn でリセット。</summary>
         public float enemyDamageTakenMultiplier = 1f;
+        /// <summary>覚者〈天衣無縫〉: 覚者がロール勝利するたび+1（上限20）。プレイヤーが獲得する回復量・シールド量を
+        /// このスタック分だけ減少させる。戦闘（覚者連戦）を通じて持続するため BeginNewTurn ではリセットしない。</summary>
+        public int healShieldReduction;
+
+        /// <summary>検証用計測: この戦闘でプレイヤーが実際に獲得した累計回復量／シールド量。
+        /// AutoRunner が6/7層ボス戦で集計しサマリに記載する。戦闘ごとに新規生成でリセット。</summary>
+        public int healAppliedTotal;
+        public int shieldGainedTotal;
+        /// <summary>希望の灯片: この戦闘で1度でもロール敗北したか。
+        /// CombatStart 時にリセットし、 PassiveSkillManager の敗北ターン処理で true にする。
+        /// CombatEnd で勝利かつ false なら最大HPボーナス発動。</summary>
+        public bool rollLossOccurredThisCombat;
+        /// <summary>記憶の砂時計: この3ターン区間で蓄積した与ダメ。
+        /// 3T毎(ターン3/6/9...)に30%を軽減不可ダメージとして返却し、リセット。</summary>
+        public int hourglassPendingDamageWindow;
+        /// <summary>L1学習用: 戦闘中にプレイヤーが敵に与えた総ダメージ（メイン+固定+出血+反射 等の合算）。
+        /// 戦闘開始時 enemyMaxHP からの最終 enemyCurrentHP 差分で簡易的に算出するため、
+        /// 実体は OnBattleEnded で評価する。フィールド自体はオプションのインクリメント用。</summary>
+        public int damageDealtTotal;
+        /// <summary>L1学習用: 戦闘中にプレイヤーが受けた総ダメージ（ヒール前の純粋な損失）。
+        /// 同じく OnBattleEnded 時に最終確定する。</summary>
+        public int damageTakenTotal;
+
+        /// <summary>このターンにプレイヤーが実際に受けたダメージ量（メイン＋固定）。
+        /// 焦土〈最大HP -被ダメ10%〉が参照する。BeginNewTurn でリセット。</summary>
+        public int playerDamageThisTurn;
         /// <summary>亡者の招待: 被ダメ+30% (0.3 = +30%)</summary>
         public float receivedDamageBonus;
         /// <summary>激情の刃 等の与ダメ倍率（1.0 = 変化なし。BeginNewTurn でリセット）</summary>
         public float outgoingDamageMultiplier = 1f;
+
+        /// <summary>貪欲のダイス: 与ダメージのこの割合をプレイヤーが回復（0=無し。BeginNewTurn でリセット、パッシブが毎ターン再適用）</summary>
+        public float lifestealPct;
+
+        /// <summary>停戦協定: このターンが「完全引き分け→停戦の一撃」で解決されたか。
+        /// true の間は引き分けブランチで出血など他の効果を発動させない。BeginNewTurn でリセット。</summary>
+        public bool truceThisTurn;
 
         /// <summary>苦難の刻印・不屈の鎧 等の被ダメ固定減算（複数アイテム合算）。CombatManager 敗北分岐で適用。BeginNewTurn でリセット。</summary>
         public int playerFlatDamageReduction;
@@ -132,6 +171,80 @@ namespace InventorySystem.PassiveSkills
         /// <summary>星火燎原 等: 敵(ボス)ダイス合計への加算ボーナス（累積。BeginNewTurn でリセットしない）。
         /// ProcessPostRoll の勝敗判定前に enemyDiceTotal へ加算される。</summary>
         public int enemyDiceTotalBonus;
+
+        /// <summary>ボス強者バフ: ボス(boss_layer*)のダイス合計への固定加算。フロアに応じて戦闘開始/形態swap時に設定。
+        /// enemyDiceTotalBonus とは別枠（星火燎原等の上書きと競合させないため）。勝敗判定前に enemyDiceTotal へ加算。</summary>
+        public int bossDiceBonus;
+
+        /// <summary>敵の基礎防御（被ダメ%軽減 0～1）。EnemyData.baseDefenseRate を戦闘開始/形態swap時に設定、
+        /// エリート(EliteVigor)が +0.10。利刃で相殺。BeginNewTurn ではリセットしない（戦闘通して保持）。
+        /// 勝利分岐で 灰塵の鎧 の後に total ×= (1 - max(0, 軽減率 - armorPenPct))。</summary>
+        public float enemyDamageReductionPct;
+
+        /// <summary>利刃: 敵基礎防御の軽減率を剥がす割合(pt)。Lv1-4=0.15/0.20/0.25/0.30。
+        /// パッシブが OnPostRoll で毎ターン再set。BeginNewTurn で 0 リセット。</summary>
+        public float armorPenPct;
+
+        /// <summary>勝利時の与ダメ最低保証（基本1、利刃Lvで1/2/3/4）。
+        /// パッシブが OnPostRoll で再set。BeginNewTurn で 1 リセット。</summary>
+        public int winMinDamage;
+
+        /// <summary>敵の回復量を減衰させる割合(0～1)。治癒阻害(0.5)/治癒遮断(1.0)が OnBattleStart で設定。
+        /// 敵パッシブの回復は ReduceEnemyHeal() を通すことで適用される。BeginNewTurn でリセットしない。</summary>
+        public float enemyHealReductionPct;
+
+        /// <summary>軽減無視ダメージ(fixedDamageToEnemy)の倍率。蒼白の槍騎士が設定(既定1.0)。
+        /// 血令/反撃/業火/停戦 等の固定ダメに乗る。BeginNewTurn でリセットしない。</summary>
+        public float fixedDamageMultiplier = 1f;
+
+        /// <summary>リピーター: 会心成立時に与ダメ計算前パッシブ(OnPreDealDamage)を再発火するか。
+        /// リピーターが OnBattleStart で設定。BeginNewTurn でリセットしない。</summary>
+        public bool retriggerOnCrit;
+
+        // ===== Λ層（時間の狭間）由来の恒久デバフ（戦闘開始時に RunState から設定。戦闘スコープで保持） =====
+
+        /// <summary>重い足取り: 1ターン目のプレイヤーダイス合計デルタ(負値、lv1/2/3=-2/-4/-6)。0=無効。</summary>
+        public int lambdaFirstTurnDiceDelta;
+
+        /// <summary>苛立つ強敵: 敵ダイス+1 の発生間隔(5/4/3T)。0=無効。毎ロールで floor(turn/interval) を敵合計へ加算。</summary>
+        public int lambdaIrritatingInterval;
+
+        /// <summary>微妙な手応え: 勝利時の与ダメ倍率(lv1/2/3=0.95/0.90/0.85)。1.0=無効。</summary>
+        public float lambdaDamageDealtMult;
+
+        /// <summary>注意散漫: 会心分子(X/9)の上限(lv1/2/3=8/6/4)。9=無効。</summary>
+        public int lambdaCritNumeratorCap;
+
+        /// <summary>慈悲の処刑: 被弾後 HP がこの割合(lv1/2/3=0.05/0.10/0.15)以下で即死。0=無効。</summary>
+        public float lambdaMercifulExecThreshold;
+
+        /// <summary>神経錯乱: このターン未満では消費アイテム使用不可(lv1/2/3=3/5/7)。0=制限なし。</summary>
+        public int lambdaConsumableLockUntilTurn;
+
+        /// <summary>シールドバッシュ: ロール勝利時、与ダメのこの割合をシールド化(5/10/15/20%)。
+        /// パッシブが OnTurnStart で再set。BeginNewTurn で 0 リセット。</summary>
+        public float shieldOnWinPct;
+
+        /// <summary>貸与された時間: 敗北時に被ダメの一部を肩代わりして蓄積した「貸与時間」。
+        /// 上限(最大HP×割合)到達で同値の軽減不能ダメージ＋0リセット。ロール勝利で0クリア。
+        /// 戦闘を通して持続するため BeginNewTurn ではリセットしない。</summary>
+        public int lentTimeStacks;
+        /// <summary>貸与された時間 リワーク: 分割返済の残ターン数。 >0 なら毎ターン1/残ターン ずつ清算。
+        /// 0なら蓄積中。 戦闘中ロール勝利でゼロリセット (帳消し)。</summary>
+        public int lentTimePaybackRemainTurns;
+        /// <summary>貸与された時間 リワーク: 清算開始時の総債務 (残ターンで割って毎T払う元本)。</summary>
+        public int lentTimePaybackTotal;
+        /// <summary>貸与された時間 リワーク: Tier (1-4)。 Tier別の分割ターン数を決める。</summary>
+        public int lentTimeTier;
+        /// <summary>貸与された時間: このターンで返済支払いが行われたか。 true ならこのターン中の新規借入をブロック。</summary>
+        public bool lentTimePaidThisTurn;
+
+        /// <summary>敵(自身)の回復量に enemyHealReductionPct を適用して返す（治癒阻害用）。</summary>
+        public int ReduceEnemyHeal(int heal)
+        {
+            if (enemyHealReductionPct <= 0f || heal <= 0) return heal;
+            return (int)(heal * (1f - enemyHealReductionPct));
+        }
 
         /// <summary>当ターン中にプレイヤーが消費品/レイピアを使用したか。
         /// BeginNewTurn でリセット。覚者の「悟達の試練」が観想中断判定に使う。</summary>
@@ -194,6 +307,25 @@ namespace InventorySystem.PassiveSkills
             this.enemyThreat = enemyThreat;
             currentTurn = 0;
             isFirstRoll = true;
+            enemyDamageReductionPct = 0f;
+            armorPenPct = 0f;
+            winMinDamage = 1;
+            enemyHealReductionPct = 0f;
+            fixedDamageMultiplier = 1f;
+            retriggerOnCrit = false;
+            lambdaFirstTurnDiceDelta = 0;
+            lambdaIrritatingInterval = 0;
+            lambdaDamageDealtMult = 1f;
+            lambdaCritNumeratorCap = 9;
+            lambdaMercifulExecThreshold = 0f;
+            lambdaConsumableLockUntilTurn = 0;
+            shieldOnWinPct = 0f;
+            lentTimeStacks = 0;
+            lentTimePaybackRemainTurns = 0;
+            lentTimePaybackTotal = 0;
+            lentTimeTier = 0;
+            rollLossOccurredThisCombat = false;
+            hourglassPendingDamageWindow = 0;
             criticalMultiplier = MetaProgression.MetaBuffApplicator.GetCriticalMultiplier();
             accumulatedValues = new Dictionary<string, float>();
             nextTurnBuffs = new Dictionary<string, float>();
@@ -229,6 +361,8 @@ namespace InventorySystem.PassiveSkills
             scratchDamage = 0;
             damageReduced = false;
             isCritical = false;
+            forceCritical = false;
+            lentTimePaidThisTurn = false;
             criticalBonus = 0;
             criticalMultiplier = MetaProgression.MetaBuffApplicator.GetCriticalMultiplier();
             pursuitDamage = 0;
@@ -242,6 +376,14 @@ namespace InventorySystem.PassiveSkills
 
             // 与ダメ倍率は毎ターンリセット（パッシブが毎ターン再評価する）
             outgoingDamageMultiplier = 1f;
+            lifestealPct = 0f;
+            shieldOnWinPct = 0f;
+            truceThisTurn = false;
+
+            // 利刃由来は毎ターンリセット（利刃パッシブが OnPostRoll で再set）。
+            // enemyDamageReductionPct は戦闘通して保持するためここではリセットしない。
+            armorPenPct = 0f;
+            winMinDamage = 1;
 
             // 狂暴化系も毎ターンリセット（狂暴化パッシブが OnTurnStart で再適用）
             healBlocked = false;
@@ -249,6 +391,9 @@ namespace InventorySystem.PassiveSkills
 
             // 被ダメ固定減算もリセット（毎ターン再評価）
             playerFlatDamageReduction = 0;
+
+            // 焦土用の被ダメ計測は毎ターンリセット
+            playerDamageThisTurn = 0;
 
             // 敵パッシブ無効化のターン残数を減算
             if (enemyPassivesDisabledTurns > 0) enemyPassivesDisabledTurns--;

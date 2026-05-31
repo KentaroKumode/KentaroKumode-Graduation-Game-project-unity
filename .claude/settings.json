@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(py -c ' *)",
+      "Bash(py -c \"import json; d=json.load\\(open\\('Assets/Data/InventorySystem/items.json',encoding='utf-8-sig'\\)\\); print\\('JSON OK'\\)\")",
+      "PowerShell($files = @\\(\"Assets/Scripts/CombatSystem/CombatManager.cs\",\"Assets/Scripts/InventorySystem/PassiveSkills/PassiveSkillManager.cs\",\"Assets/Scripts/InventorySystem/PassiveSkills/Effects/AllPassiveSkillEffects.cs\",\"Assets/Scripts/InventorySystem/PassiveSkills/CombatContext.cs\"\\); foreach\\($f in $files\\){ $t = Get-Content $f -Raw; $o=\\([regex]::Matches\\($t,'\\\\{'\\)\\).Count; $c=\\([regex]::Matches\\($t,'\\\\}'\\)\\).Count; $p=\\([regex]::Matches\\($t,'\\\\\\('\\)\\).Count; $q=\\([regex]::Matches\\($t,'\\\\\\)'\\)\\).Count; Write-Output \\(\"{0}: braces {1}/{2} parens {3}/{4} {5}\" -f \\(Split-Path $f -Leaf\\),$o,$c,$p,$q, $\\(if\\($o-eq$c -and $p-eq$q\\){'OK'}else{'MISMATCH'}\\)\\) })",
+      "PowerShell($f=\"Assets/Scripts/CombatSystem/CombatManager.cs\"; $head = git show HEAD:\"$f\"; $t = \\($head -join \"`n\"\\); $o=\\([regex]::Matches\\($t,'\\\\{'\\)\\).Count; $c=\\([regex]::Matches\\($t,'\\\\}'\\)\\).Count; Write-Output \\(\"HEAD CombatManager braces {0}/{1} \\(diff {2}\\)\" -f $o,$c,\\($o-$c\\)\\))",
+      "Bash(awk '/妙覚EOT T=15 .*E計=124/{found=1} found{print} /妙覚EOT T=16 .*E計=126/{if\\(found\\)exit}' detail.log)",
+      "Bash(cd \"c:/Users/kumod/My project\" && grep -o '時間の狭間[^\"]\\\\{0,2000\\\\}' \"C:/Users/kumod/.claude/projects/c--Users-kumod-My-project/e3b7a097-bfd8-4777-8e29-b4440fe67763.jsonl\" 2>/dev/null | head -20)",
+      "Read(//c/Users/kumod/.claude/projects/c--Users-kumod-My-project/**)",
+      "Bash(grep -o '強制突入[^\"]\\\\{0,1500\\\\}' \"C:/Users/kumod/.claude/projects/c--Users-kumod-My-project/e3b7a097-bfd8-4777-8e29-b4440fe67763.jsonl\")",
+      "Bash(awk 'NR>=130 && NR<=145' Assets/Resources/Events/event_list.txt)",
+      "Bash(awk 'NR>=125 && NR<=170' Assets/Resources/enemies.json)",
+      "Bash(grep -nB1 -A2 '\"displayName\": \"精鋭' Assets/Resources/enemies.json)",
+      "Bash(python3 -c ' *)"
+    ]
+  }
+}

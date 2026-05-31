@@ -28,18 +28,29 @@ namespace AutoTest
     public class AutoRunner : MonoBehaviour
     {
         [Header("バッチ設定")]
-        public int runCount = 10;
+        [Tooltip("バッチあたりのラン数。 自己学習(L1/L2)を信頼させるには 1000以上推奨。 200未満は L2 が自動スキップされる")]
+        public int runCount = 1000;
+        [Tooltip("自動周回モード: 0 or 1 で通常1バッチのみ。 2以上なら『1000ラン × N回』を連続実行し、 各バッチ間で L1/L2 自動学習が回る")]
+        public int autoLoopBatches = 1;
         public bool autoStart = false;
         [Tooltip("バッチ中の Time.timeScale（演出を早送り）")]
-        public float batchTimeScale = 20f;
+        public float batchTimeScale = 50f;
+        [Tooltip("1フレームあたりに実行する Step 回数。1=旧挙動、20-50で大幅高速化（ゲームロジックがCPUバウンドのため）")]
+        public int stepsPerYield = 20;
+        [Tooltip("バッチ中 VSync を無効化しフレームレート上限を解除する（60fps→数百fps化で大幅高速化）")]
+        public bool disableVSyncDuringBatch = true;
         [Tooltip("1ランあたりの最大ループ反復数。超過でDEADLOCK判定")]
         public int maxIterationsPerRun = 4000;
         [Tooltip("同一フェーズが進展なく続いた反復数の上限。超過でDEADLOCK判定")]
         public int stallLimit = 400;
-        [Tooltip("詳細ログ(全ランのナラティブ)を書き出す")]
-        public bool writeDetailLog = true;
+        [Tooltip("詳細ログ(全ランのナラティブ)を書き出す。 1バッチで 30MB+ に膨らむため自動周回時はOFF推奨")]
+        public bool writeDetailLog = false;
         [Tooltip("詳細ログの1ランあたり最大行数。超過時は古い行を捨て末尾(決定的な終端)を必ず保持")]
         public int detailMaxLinesPerRun = 5000;
+        [Tooltip("バッチ中 Debug.Log を完全抑止 + StackTrace を無効化 (Editor RAM爆発防止)。 10Kラン×400Log×StackTrace 5KB = 20GB+ の蓄積を阻止")]
+        public bool suppressLogsDuringBatch = true;
+        [Tooltip("バッチ終了時に Editor コンソールをクリア + GC.Collect (蓄積したログを即解放)")]
+        public bool clearConsoleAfterBatch = true;
         /// <summary>メタ恒久進行の扱い方。</summary>
         public enum MetaPattern
         {
@@ -58,12 +69,57 @@ namespace AutoTest
         [Tooltip("メタデバフ Lv1-10 を全ON にする (最高難易度モード)")]
         public bool enableAllDebuffs = false;
 
+        /// <summary>バッチ実行時のメタプロファイル。 学習データ分離 + Meta系切替の主軸。
+        /// Begin 時に MetaProfileHelper.SetCurrent し、 metaPattern / enableAllDebuffs を自動上書き。</summary>
+        [Tooltip("メタプロファイル (バフ/デバフ ON/OFF)。 学習データの分離キー兼 Meta系切替の主軸")]
+        public MetaProfile metaProfile = MetaProfile.BuffOn_DebuffOff;
+
         // 旧フィールド (互換用、内部では metaPattern を見る)
         [System.Obsolete("metaPattern を使用してください")] public bool resetMetaForCleanBaseline = true;
 
         [Header("実行後")]
         [Tooltip("バッチ完了後にPlayModeを抜ける(Editorメニュー起動時)")]
         public bool exitPlayModeWhenDone = false;
+
+        [Header("5Fボス勝率スイープ (検証モード)")]
+        [Tooltip("true で通常バッチの代わりに『実ラン採取ビルド × 全武器×ダイス』の5Fボス勝率スイープを実行")]
+        public bool simBoss5Sweep = false;
+        [Tooltip("対象ボスのフロア(既定5)")]
+        public int simBossFloor = 5;
+        [Tooltip("実ランから採取する『5F到達時ビルド』の数。武器・ダイス以外(パッシブ/強化段階)の土台になる。HPは simBaseHP で固定")]
+        public int simSampleBuilds = 10;
+        [Tooltip("各(武器×ダイス)組み合わせの試行回数")]
+        public int simTrialsPerCombo = 300;
+        [Tooltip("戦闘開始HP(固定)。採取ビルドの現在HPは使わず、この値で統一して武器×ダイスを純粋比較する")]
+        public int simBaseHP = 30;
+        [Tooltip("スイープ対象武器(種別+Tier＋ユニーク)。存在しないIDは自動スキップ")]
+        public string[] simWeapons = {
+            "sword_t3","sword_t4","axe_t3","axe_t4","dagger_t3","dagger_t4",
+            "shield_t3","shield_t4","curse_t3","curse_t4",
+            // ユニーク/特殊武器（非進行）。1個ダイス武器は完全性の評価にも有用
+            "ryusen","dead_staff"
+        };
+        [Tooltip("スイープ対象ダイス。存在しないIDは自動スキップ")]
+        public string[] simDice = {
+            "dice_wood","dice_bone","dice_copper","dice_iron","dice_biased",
+            "dice_gem","dice_flame","dice_stable","dice_twinsnake",
+            "dice_star","dice_destiny","dice_greed","dice_moroha","dice_perfection"
+        };
+
+        [Header("Λ層 ファーム量スイープ")]
+        [Tooltip("true で『Λ層を固定Nマス周回してから離脱』を lambdaFarmSweepValues の各値で runCount ラン回し、ファーム量別の勝率を採取")]
+        public bool lambdaFarmSweep = false;
+        [Tooltip("Λ層で離脱(中央踏破)前に周回する目標マス数。スイープ中は各値で上書きされる")]
+        public int lambdaFarmTiles = 6;
+        [Tooltip("スイープするΛファーム量(踏破マス数)。スポークは3マス毎なので中央到達は3の倍数に丸められる")]
+        public int[] lambdaFarmSweepValues = { 3, 6, 9, 12, 16, 18, 21, 24, 27, 30 };
+        private string _lambdaSweepReport;
+
+        // 採取した5F到達ビルド（武器・ダイスは差し替えるため保持しない）
+        private struct SimBuild { public int hp; public int weaponPlus; public int limitBreakStage; public List<string> passives; }
+        private readonly List<SimBuild> _simBases = new List<SimBuild>();
+        private bool _simHarvestArmed;
+        private string _simReport;
 
         // ===== 集計分類 =====
         public enum Outcome { GameOver, NormalClear, FullClear, Deadlock, Crash }
@@ -86,6 +142,17 @@ namespace AutoTest
             public int tDraw;      // 引き分けターン数
             public int tLoss;      // ロール敗北ターン数
             public int tLossAbs;   // うちメインダメ0（シールド吸収/無効化で死を回避）
+            // 検証計測: この戦闘でプレイヤーが獲得した累計回復量／シールド量（OnBattleEnded のみ）
+            public int healApplied;
+            public int shieldGained;
+            // L1学習: 与ダメ・被ダメ・敵maxHP
+            public int damageDealt;
+            public int damageTaken;
+            public int enemyMaxHP;
+            public bool isFightEnd; // OnBattleEnded で確定した1戦分か（チェーン途中形態は false）
+            // この戦闘時点の装備（武器×ダイス勝率集計用）。武器は family_tN まで（業物+段階は区別しない）。
+            public string weaponId = "";
+            public string diceId = "";
         }
 
         [Serializable]
@@ -109,6 +176,13 @@ namespace AutoTest
             public int totalCombats;
             public int totalWins;
             public int shopPurchases;
+            public int shopRerolls;
+            public int shopRerollCoins;
+            public int priorityItemsAcquired; // S/A 級を取得した回数
+            public int inventoryExpansionsPurchased; // ショップでインベントリ列拡張を購入した回数 (0-4)
+            public int tierUpgradeCount;      // 強化で Tier ID が変わった回数 (T1→T2 等、 +昇格は含まず)
+            public string finalWeaponTier = ""; // 終了時の武器 Tier (例: "shield_t4")
+            public int finalLimitBreak;       // 終了時の業物 lv
             public int totalTurns;
             public bool lastStandUsed;
             public int lastStandFloor;
@@ -136,11 +210,56 @@ namespace AutoTest
 
             /// <summary>解脱: 覚者・妙覚のサドンデス勝利で完全クリアした場合 true。</summary>
             public bool gedatsuVictory;
+
+            /// <summary>Λスイープ: このランで使用した目標ファームマス数（非スイープ時は0）。</summary>
+            public int lambdaFarmTilesUsed;
+            /// <summary>このランでΛ層へ突入したか。</summary>
+            public bool enteredLambda;
+            /// <summary>Λ層滞在中に獲得したゴールド量（離脱時 or Λ内死亡時に確定）。</summary>
+            public int lambdaGoldGained;
+            /// <summary>Λ層滞在中に獲得したアイテム数（ownedPassiveItems 増分）。</summary>
+            public int lambdaItemsGained;
+            /// <summary>このランで実際にΛ層で踏破したマス数(=次元の乱れ最終値)。</summary>
+            public int lambdaTilesFarmed;
+            /// <summary>このランで獲得したΛデバフの段階合計(段階1〜3の総和)。</summary>
+            public int lambdaDebuffLevelSum;
+
+            // =========================
+            // L1 学習用フィールド
+            // =========================
+            /// <summary>このランで「過去に1度でも所持/獲得した」アイテムIDの集合（売却や消費で消えたものも含む）。</summary>
+            public HashSet<string> acquiredItemsEver = new HashSet<string>();
+            /// <summary>このランで「ショップ等で1度でも提示された」アイテムIDの集合。
+            /// 取得有無に関わらず記録。 offeredLift = (提示されたラン群) - (提示されなかったラン群) の bandScore 差
+            /// により、出現バイアスを除いた純粋寄与の参考指標となる。</summary>
+            public HashSet<string> offeredItemsEver = new HashSet<string>();
+            /// <summary>このランで実際に与えた累計ダメージ（全戦闘合算）。</summary>
+            public long totalDamageDealt;
+            /// <summary>このランで実際に受けた累計ダメージ（heal込みのgross）。</summary>
+            public long totalDamageTaken;
+            /// <summary>このランで獲得した回復量（healApplied）合算。</summary>
+            public long totalHealed;
+            /// <summary>このランで獲得したシールド量合算。</summary>
+            public long totalShieldGained;
+            /// <summary>覚者連戦で撃破した形態の id 集合（boss_layer7_p1..p7 等）。
+            /// 妙覚到達後の完全撃破は gedatsuVictory が true。</summary>
+            public HashSet<string> awakenedFormsKilled = new HashSet<string>();
+            /// <summary>帯ランクの数値表記 (R1=1, R10=10, 解脱=12, CRASH=-1, DEADLOCK=-2)。集計用。</summary>
+            public int bandScore;
+            /// <summary>L1.5: このランで実施した「eventId|choiceIndex」一覧（重複あり）。
+            /// EventChoiceLearningStats が per-event-choice 集計に使う。</summary>
+            public List<string> eventChoicesMade = new List<string>();
+            /// <summary>L2 ペアテスト: このランで使われたポリシーバリアント。
+            /// "" / "baseline" / "challenger"。 PolicyExplorer がペア diff 計算に使う。</summary>
+            public string policyVariant = "";
+            /// <summary>L2 ペアテスト: このランで使われたシード値 (ペア識別用)。</summary>
+            public int pairedSeed;
         }
 
         private readonly List<RunRec> _records = new List<RunRec>();
         private RunRec _cur;
-        private readonly List<string> _curLog = new List<string>();
+        // Queue で O(1) Dequeue するためのリングバッファ用途。RemoveAt(0) を避ける。
+        private readonly Queue<string> _curLog = new Queue<string>();
         private bool _exceptionFlag;
         private string _exceptionMsg;
         private int _prevCoins;
@@ -151,9 +270,13 @@ namespace AutoTest
         private int _pendingEnemyHpBefore;
         private int _eventStuckCount;
         private string _lastEventInfo = "";
+        private readonly System.Random _rng = new System.Random();
         // 行動ルーチン分割: 前半50%=戦闘貪欲 / 後半50%=戦闘回避（航行Rankのみ差し替え）
         private bool _curCombatAverse;
         private bool _curBossNear;   // 直近のDoNavigateで判定したボス接近フラグ（休憩判断で参照）
+        private int _lambdaNavSteps; // このランのΛ走破ステップ数（無限周回防止の安全弁。RunOneでリセット）
+        private int _lambdaEntryCoins;    // Λ突入時の所持ゴールド（ファーム獲得量の基準）
+        private int _lambdaEntryPassives; // Λ突入時の ownedPassiveItems 数
         // 現戦闘のターン内訳タリー（OnEnemyEncounteredでリセット、ExecuteTurnで加算）
         private int _cwWin, _cwDraw, _cwLoss, _cwLossAbs;
 
@@ -164,6 +287,18 @@ namespace AutoTest
         private static readonly string[] DangerKeywords =
             { "戦", "挑", "賭", "呪", "捧", "食らう", "奪わ", "盗", "襲", "犠牲", "毒", "燃" };
 
+        // ============================================================
+        //  ペアテスト (PolicyExplorer 経由で外部からセット)
+        // ============================================================
+        /// <summary>挑戦者ポリシー。 null でなければバッチを baseline/challenger 交互に実行する。</summary>
+        public static PolicyParameters PairedChallengerPolicy;
+        /// <summary>ベースラインポリシーのスナップショット (バッチ開始時に固定)。</summary>
+        private PolicyParameters _baselinePolicySnap;
+        /// <summary>現ランがどちらのポリシーで実行されているか。</summary>
+        private string _currentRunVariant = "";
+        /// <summary>現ランのシード値。 ペアテスト時は (i/2) を共有して同一マップ・同一RNGを再現。</summary>
+        private int _currentRunSeed;
+
         void Start()
         {
             if (autoStart) Begin();
@@ -171,7 +306,86 @@ namespace AutoTest
 
         public void Begin()
         {
-            StartCoroutine(RunBatch());
+            // メタプロファイルをグローバル反映 (学習データ分離 + Meta系切替)
+            MetaProfileHelper.SetCurrent(metaProfile);
+            // プロファイルから metaPattern / enableAllDebuffs を自動上書き
+            //   BuffOn  → FullProgression (メタバフ全段解放)
+            //   BuffOff → Cowardly        (メタバフ全リセット)
+            //   DebuffOn → enableAllDebuffs = true
+            metaPattern      = MetaProfileHelper.CurrentBuffOn
+                ? MetaPattern.FullProgression : MetaPattern.Cowardly;
+            enableAllDebuffs = MetaProfileHelper.CurrentDebuffOn;
+            Debug.Log($"[AutoRunner] メタプロファイル: {MetaProfileHelper.DisplayName(metaProfile)} → metaPattern={metaPattern}, debuffsOn={enableAllDebuffs}");
+
+            // プロファイル切替で参照先サブディレクトリが変わるため、 各キャッシュを再読み込み
+            try { PolicyParameters.ReloadFromDisk(MetaProfileHelper.LearningRoot()); } catch { }
+            try { EventChoiceLearningStats.Reload(MetaProfileHelper.LearningRoot()); } catch { }
+            try { LearnedPriorityProvider.Reload(MetaProfileHelper.LearningRoot()); } catch { }
+
+            if (autoLoopBatches >= 2)
+                StartCoroutine(RunAutoLoop());
+            else
+                StartCoroutine(RunBatch());
+        }
+
+        /// <summary>
+        /// 1000ラン × autoLoopBatches 回 を連続実行する自動周回モード。
+        /// 各バッチ間で L1 (item_stats) と L2 (policy) が自動更新され、
+        /// 次バッチはその更新後のリストとパラメータを使う。
+        /// 30バッチ程度回せば policy の局所最適化が見える。
+        /// </summary>
+        private bool _suppressExitDuringLoop;
+
+        private IEnumerator RunAutoLoop()
+        {
+            int loops = Mathf.Max(1, autoLoopBatches);
+            bool finalExit = exitPlayModeWhenDone;
+            _suppressExitDuringLoop = true;  // RunBatch 内の exitPlayMode を抑止
+            Debug.Log($"[AutoRunner] === 自動周回モード START: {runCount}ラン × {loops}周 ===");
+            for (int i = 1; i <= loops; i++)
+            {
+                Debug.Log($"[AutoRunner] ── 自動周回 {i}/{loops} 開始 ──");
+                _records.Clear();
+                _detail.Clear();
+                yield return RunBatch();
+                Debug.Log($"[AutoRunner] ── 自動周回 {i}/{loops} 終了 ──");
+                yield return null;
+            }
+            _suppressExitDuringLoop = false;
+            // 最終バッチ後に Reload を1回呼んで、 最新の item_stats を BALANCE_TIER_LIST.md に反映
+            try { LearnedPriorityProvider.Reload(MetaProfileHelper.LearningRoot()); } catch { }
+            Debug.Log($"[AutoRunner] === 自動周回モード END: {loops}周完了 (最終 Reload: {LearnedPriorityProvider.LastLoadedSummary}) ===");
+            if (finalExit)
+            {
+#if UNITY_EDITOR
+                UnityEditor.EditorApplication.isPlaying = false;
+#endif
+            }
+        }
+
+        /// <summary>Editor コンソールを強制クリア + 大規模 GC + Unity未参照リソース解放。
+        /// バッチ後の RAM 占有 (Editor LogEntries が 20GB+ 蓄積するため) を即座に解放する。</summary>
+        private static void ClearEditorConsoleAndCollect()
+        {
+            try
+            {
+#if UNITY_EDITOR
+                // UnityEditor.LogEntries.Clear() をリフレクション経由で呼ぶ (Editor only API)
+                var asm = System.Reflection.Assembly.GetAssembly(typeof(UnityEditor.Editor));
+                var t = asm?.GetType("UnityEditor.LogEntries");
+                var m = t?.GetMethod("Clear", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
+                m?.Invoke(null, null);
+#endif
+            }
+            catch (Exception e) { Debug.LogWarning($"[AutoRunner] ConsoleClear失敗: {e.Message}"); }
+            try
+            {
+                Resources.UnloadUnusedAssets();
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+            }
+            catch (Exception e) { Debug.LogWarning($"[AutoRunner] GC失敗: {e.Message}"); }
         }
 
         private IEnumerator RunBatch()
@@ -179,6 +393,29 @@ namespace AutoTest
             Application.logMessageReceived += OnLog;
             float prevScale = Time.timeScale;
             Time.timeScale = Mathf.Max(1f, batchTimeScale);
+            // VSync解除でフレームレート上限を外す
+            int prevVSync = QualitySettings.vSyncCount;
+            int prevTargetFps = Application.targetFrameRate;
+            if (disableVSyncDuringBatch)
+            {
+                QualitySettings.vSyncCount = 0;
+                Application.targetFrameRate = -1;
+            }
+
+            // RAM爆発防止: Debug.Log を完全抑止 + StackTrace 無効化。
+            //   1ラン400Log × StackTrace 5KB × 10K = 20GB+ になるため必須。
+            //   summary.txt / detail.log ファイル出力には影響しない (Editor コンソール側のみ抑止)。
+            bool prevLogEnabled = Debug.unityLogger.logEnabled;
+            var prevStackLog  = Application.GetStackTraceLogType(LogType.Log);
+            var prevStackWarn = Application.GetStackTraceLogType(LogType.Warning);
+            var prevStackErr  = Application.GetStackTraceLogType(LogType.Error);
+            if (suppressLogsDuringBatch)
+            {
+                Debug.unityLogger.logEnabled = false;
+                Application.SetStackTraceLogType(LogType.Log,     StackTraceLogType.None);
+                Application.SetStackTraceLogType(LogType.Warning, StackTraceLogType.None);
+                Application.SetStackTraceLogType(LogType.Error,   StackTraceLogType.None);
+            }
 
             // DB / 演出の事前準備
             SafeInitDatabases();
@@ -193,37 +430,129 @@ namespace AutoTest
             }
             if (GameManager.Instance == null)
             {
+                // Log抑止を一時解除してエラーを確実に出す
+                if (suppressLogsDuringBatch) Debug.unityLogger.logEnabled = true;
                 Debug.LogError("[AutoRunner] GameManager が見つかりません。SampleScene で実行してください。");
                 Application.logMessageReceived -= OnLog;
                 Time.timeScale = prevScale;
+                if (disableVSyncDuringBatch) { QualitySettings.vSyncCount = prevVSync; Application.targetFrameRate = prevTargetFps; }
+                if (suppressLogsDuringBatch)
+                {
+                    Debug.unityLogger.logEnabled = prevLogEnabled;
+                    Application.SetStackTraceLogType(LogType.Log,     prevStackLog);
+                    Application.SetStackTraceLogType(LogType.Warning, prevStackWarn);
+                    Application.SetStackTraceLogType(LogType.Error,   prevStackErr);
+                }
                 yield break;
             }
+
+            // L1学習データを読み込み、 動的 PriorityItemList を構築
+            LearnedPriorityProvider.Reload();
+            Debug.Log($"[AutoRunner] {LearnedPriorityProvider.LastLoadedSummary}");
+            // L1.5: イベント学習リフトを読み込み
+            EventChoiceLearningStats.Reload();
+            // L2: policy.json を読み込み (前バッチの摂動結果を引き継ぐ)
+            PolicyParameters.ReloadFromDisk();
+            Debug.Log($"[AutoRunner] policy: {PolicyParameters.Current.Summary()}");
+            // L2ペアテスト: 挑戦者ポリシーを生成 (バッチ内 paired diff 評価用)
+            //  ・runCount が L2ゲート(200) 未満ならスキップ
+            //  ・偶数バッチである必要 (runCountを偶数にする)
+            if (runCount >= PolicyExplorer.MinBatchForL2 && runCount % 2 == 0)
+            {
+                PolicyExplorer.PrepareChallenger();
+            }
+            _baselinePolicySnap = PolicyParameters.Current.Clone();
+            if (PairedChallengerPolicy != null)
+                Debug.Log($"[AutoRunner] ペアテスト ON: 挑戦者ポリシー = {PairedChallengerPolicy.Summary()}");
+            // サンプル信頼性警告
+            if (runCount < PolicyExplorer.MinBatchForL2)
+                Debug.LogWarning($"[AutoRunner] runCount={runCount} < {PolicyExplorer.MinBatchForL2}: L2自動更新スキップ (policy 不変)");
+            else if (runCount < 500)
+                Debug.LogWarning($"[AutoRunner] runCount={runCount}: SEM大きめ。 1000以上推奨");
 
             var gm = GameManager.Instance;
             gm.OnEnemyEncountered += OnEnemyEncountered;
             gm.OnBattleEnded += OnBattleEnded;
             gm.OnStarvationDamage += OnStarvation;
             gm.OnTileActivated += OnTileActivated;
+            // 武器強化で Tier が上がるたび新Tier ID を acquiredItemsEver に追記 (L1学習の集計漏れ修正)
+            GameManager.OnWeaponTierUpgraded += OnWeaponTierUpgraded;
 
-            Debug.Log($"[AutoRunner] バッチ開始: {runCount} ラン");
-
-            for (int i = 0; i < runCount; i++)
+            if (simBoss5Sweep)
             {
-                yield return RunOne(i);
-                yield return null; // フレーム譲り
+                Debug.Log($"[AutoRunner] 5Fボス勝率スイープ開始");
+                yield return RunBoss5Sweep(gm);
+            }
+            else if (lambdaFarmSweep)
+            {
+                Debug.Log($"[AutoRunner] Λファーム量スイープ開始");
+                yield return RunLambdaFarmSweep(gm);
+            }
+            else
+            {
+                bool paired = PairedChallengerPolicy != null;
+                Debug.Log($"[AutoRunner] バッチ開始: {runCount} ラン (ペアテスト={(paired ? "ON" : "OFF")})");
+                // ペア時間隔: 2連続を同シードで実行 (i, i+1) → 偶数=baseline, 奇数=challenger
+                for (int i = 0; i < runCount; i++)
+                {
+                    if (paired)
+                    {
+                        // 同じペアシードを (i/2) で共有
+                        _currentRunSeed = 0xC0FFEE ^ (i / 2);
+                        bool isChallenger = (i % 2 == 1);
+                        _currentRunVariant = isChallenger ? "challenger" : "baseline";
+                        // ポリシーをスワップ
+                        PolicyParameters.SetCurrent(isChallenger ? PairedChallengerPolicy : _baselinePolicySnap);
+                        // シード適用 (UnityEngine.Random と System.Random 両方)
+                        UnityEngine.Random.InitState(_currentRunSeed);
+                    }
+                    else
+                    {
+                        _currentRunSeed = 0;
+                        _currentRunVariant = "";
+                    }
+                    yield return RunOne(i);
+                    yield return null;
+                }
+                if (paired)
+                    PolicyParameters.SetCurrent(_baselinePolicySnap); // 戻す
             }
 
             gm.OnEnemyEncountered -= OnEnemyEncountered;
             gm.OnBattleEnded -= OnBattleEnded;
+            GameManager.OnWeaponTierUpgraded -= OnWeaponTierUpgraded;
             gm.OnStarvationDamage -= OnStarvation;
             gm.OnTileActivated -= OnTileActivated;
             Application.logMessageReceived -= OnLog;
             Time.timeScale = prevScale;
+            if (disableVSyncDuringBatch) { QualitySettings.vSyncCount = prevVSync; Application.targetFrameRate = prevTargetFps; }
+
+            // ログ抑止/StackTrace 設定を復元
+            if (suppressLogsDuringBatch)
+            {
+                Debug.unityLogger.logEnabled = prevLogEnabled;
+                Application.SetStackTraceLogType(LogType.Log,     prevStackLog);
+                Application.SetStackTraceLogType(LogType.Warning, prevStackWarn);
+                Application.SetStackTraceLogType(LogType.Error,   prevStackErr);
+            }
+
+            // Editor コンソール強制クリア + GC: 抑止しても少量蓄積 + メモリ即時解放
+            if (clearConsoleAfterBatch) ClearEditorConsoleAndCollect();
 
             string dir = WriteLogs();
+            if (simBoss5Sweep && !string.IsNullOrEmpty(_simReport))
+            {
+                try { File.WriteAllText(Path.Combine(dir, "sim_boss5_winrate.txt"), _simReport, new UTF8Encoding(false)); }
+                catch (Exception ex) { Debug.LogWarning($"[AutoRunner] sim出力失敗: {ex.Message}"); }
+            }
+            if (lambdaFarmSweep && !string.IsNullOrEmpty(_lambdaSweepReport))
+            {
+                try { File.WriteAllText(Path.Combine(dir, "lambda_farm_sweep.txt"), _lambdaSweepReport, new UTF8Encoding(false)); }
+                catch (Exception ex) { Debug.LogWarning($"[AutoRunner] Λスイープ出力失敗: {ex.Message}"); }
+            }
             Debug.Log($"[AutoRunner] バッチ完了。ログ出力先:\n{dir}");
 
-            if (exitPlayModeWhenDone)
+            if (exitPlayModeWhenDone && !_suppressExitDuringLoop)
             {
 #if UNITY_EDITOR
                 UnityEditor.EditorApplication.isPlaying = false;
@@ -231,12 +560,63 @@ namespace AutoTest
             }
         }
 
+        /// <summary>Λファーム量スイープ: lambdaFarmSweepValues の各値で runCount ラン回し、
+        /// ファーム量別の Λ突入/6F到達/7Fクリア/解脱/死亡 を採取して表形式で出力する。</summary>
+        private IEnumerator RunLambdaFarmSweep(GameManager gm)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("=== Λ層 ファーム量スイープ ===");
+            sb.AppendLine($"メタ進行: {metaPattern} / メタデバフ全ON: {enableAllDebuffs} / 各値 {runCount} ラン");
+            sb.AppendLine("※ Λ突入には〈決意〉以上が必要。突入したランのみが分母として意味を持つ。");
+            sb.AppendLine("※ 中央離脱はスポーク(3マス毎)でのみ可能なため、実踏破マスは目標値を3の倍数へ丸めた値。");
+            sb.AppendLine($"※ 期待Λデバフ付与回数 ≒ 踏破マス/3（同種再付与で段階上昇）。");
+            sb.AppendLine();
+            sb.AppendLine("目標 | runs | Λ突入 | 6F到達 | 7Fクリア | 解脱 | 死亡 | 突入別6F% | 突入別7F% | 平均踏破 | 平均デバフLv計");
+            sb.AppendLine("-----+------+-------+--------+----------+------+------+-----------+-----------+----------+--------------");
+
+            foreach (int v in lambdaFarmSweepValues)
+            {
+                lambdaFarmTiles = v;
+                int start = _records.Count;
+                for (int i = 0; i < runCount; i++)
+                {
+                    yield return RunOne(i);
+                    yield return null;
+                }
+
+                int runs = 0, entered = 0, reached6 = 0, full = 0, ged = 0, deaths = 0;
+                long tilesSum = 0, dbgSum = 0;
+                for (int k = start; k < _records.Count; k++)
+                {
+                    var r = _records[k];
+                    runs++;
+                    bool didEnter = r.lambdaTilesFarmed > 0 || r.hadResolveAt5F || r.hadTruthAt5F;
+                    if (didEnter) entered++;
+                    if (r.reached6F) reached6++;
+                    if (r.outcome == Outcome.FullClear) full++;
+                    if (r.gedatsuVictory) ged++;
+                    if (r.outcome == Outcome.GameOver) deaths++;
+                    tilesSum += r.lambdaTilesFarmed;
+                    dbgSum += r.lambdaDebuffLevelSum;
+                }
+                float p6 = entered > 0 ? 100f * reached6 / entered : 0f;
+                float p7 = entered > 0 ? 100f * full / entered : 0f;
+                float avgTiles = runs > 0 ? (float)tilesSum / runs : 0f;
+                float avgDbg = runs > 0 ? (float)dbgSum / runs : 0f;
+                sb.AppendLine($"{v,4} | {runs,4} | {entered,5} | {reached6,6} | {full,8} | {ged,4} | {deaths,4} | {p6,8:F1}% | {p7,8:F1}% | {avgTiles,8:F1} | {avgDbg,13:F2}");
+                Debug.Log($"[AutoRunner] Λスイープ farm={v}: 突入{entered}/{runs} 6F{reached6} 7F{full} 解脱{ged} 死{deaths}");
+            }
+
+            _lambdaSweepReport = sb.ToString();
+            Debug.Log("[AutoRunner] Λファーム量スイープ完了\n" + _lambdaSweepReport);
+        }
+
         private IEnumerator RunOne(int index)
         {
             var gm = GameManager.Instance;
-            // 前半50%=戦闘貪欲 / 後半50%=戦闘回避
-            _curCombatAverse = index >= runCount / 2;
-            _cur = new RunRec { index = index, profile = _curCombatAverse ? "回避" : "貪欲" };
+            // 全ラン戦闘貪欲ルーチン（戦闘回避ルーチンは廃止）
+            _curCombatAverse = false;
+            _cur = new RunRec { index = index, profile = "貪欲" };
             _curLog.Clear();
             _exceptionFlag = false;
             _exceptionMsg = null;
@@ -244,6 +624,7 @@ namespace AutoTest
             _pendingEnemyName = null;
             _eventStuckCount = 0;
             _lastEventInfo = "";
+            _lambdaNavSteps = 0;
 
             // タイトルへ戻す（前ランが RunClear/GameOver 停止のままなら）
             int guard = 0;
@@ -354,9 +735,18 @@ namespace AutoTest
                 }
 
                 if (finished) yield break;
-                yield return null;
+                // 高速化: 1フレームあたり複数 Step を回す。
+                // GameManager は同期遷移なので問題ないが、UI/演出が必要な場合は stepsPerYield=1 にする。
+                _innerStepCount++;
+                if (_innerStepCount >= Mathf.Max(1, stepsPerYield))
+                {
+                    _innerStepCount = 0;
+                    yield return null;
+                }
             }
         }
+
+        private int _innerStepCount;
 
         /// <summary>現フェーズに対する1アクション。ラン終了時 true。</summary>
         private bool Step(GameManager.GamePhase phase)
@@ -407,21 +797,37 @@ namespace AutoTest
                     // 休憩は3択(食事/回復/強化)から1つ。生存(燃料→HP)優先、余裕あれば成長。
                     var run = gm.Run;
                     float hpR = run.playerMaxHP > 0 ? (float)run.playerHP / run.playerMaxHP : 1f;
-                    int cost = GameManager.WeaponUpgradeCost(run.weaponUpgradeLevel);
+                    int cost = GameManager.WeaponUpgradeCost(run);
                     var hg = MapManager.Instance?.Hunger;
                     int hCur = hg?.Current ?? 99;
                     int hMax = hg?.Max ?? 10;
                     bool starvingSoon = hCur <= 3;            // 次の道中で空腹切れ濃厚
                     bool greedyBossPrep = !_curCombatAverse && _curBossNear;
 
+                    // T4 到達率改善 v2: 強化を更に優先 (T4 追跡型)
+                    //   ・素材が足りる && HPギリ余裕 → 必ず強化
+                    //   ・T4 寸前 (cost ≤ 4 で次が T4) なら HP 0.25 でも強化
+                    //   ・素材余剰 (≥2cost) なら HP 0.30 で強化
+                    bool richMaterials = run.weaponMaterials >= cost * 2;
+                    bool canUpgrade    = cost != int.MaxValue && run.weaponMaterials >= cost;
+                    // T4 到達直前判定: 次の強化で T4 になる (現 T3+ → T4 等)
+                    bool nextStepReachesT4 =
+                        canUpgrade &&
+                        !string.IsNullOrEmpty(run.equippedWeaponId) &&
+                        run.equippedWeaponId.Contains("_t3") &&
+                        run.weaponPlus > 0;
                     if (starvingSoon)
                         gm.RestEat();                        // 餓死回避が最優先
+                    else if (nextStepReachesT4 && hpR > 0.25f)
+                        gm.RestUpgrade();                    // T4 寸前は HP低めでも強化 (機会逃さない)
+                    else if (richMaterials && hpR > 0.30f)
+                        gm.RestUpgrade();                    // 素材余剰: 危機未満なら強化を優先
                     else if (greedyBossPrep && hpR < 0.8f)
                         gm.RestHeal();                       // 貪欲: ボス前にHPを整える
-                    else if (hpR <= 0.55f)
-                        gm.RestHeal();                       // 低HPは回復
-                    else if (hpR > 0.6f && run.weaponMaterials >= cost)
-                        gm.RestUpgrade();                    // 余裕あれば成長
+                    else if (hpR <= 0.40f)
+                        gm.RestHeal();                       // 低HPは回復 (0.45→0.40 に引下げ、 強化機会を拡大)
+                    else if (canUpgrade)
+                        gm.RestUpgrade();                    // 中HP+素材有り → 強化優先
                     else if (hCur < hMax)
                         gm.RestEat();                        // 他に用が無ければ燃料補給
                     else
@@ -484,6 +890,10 @@ namespace AutoTest
             if (mm == null) { Finish(Outcome.Deadlock, "MapManager null"); return true; }
             _eventStuckCount = 0; // マップに戻った＝イベント解決済み
 
+            // Λ層（時間の狭間）: 固定Nマス周回してから中央(離脱)へ。
+            if (gm.Run != null && gm.Run.inLambda)
+                return DoNavigateLambda(gm, mm);
+
             var (fwd, lat) = mm.GetCategorizedMoves();
             var pool = (fwd != null && fwd.Count > 0) ? fwd : lat;
 
@@ -543,14 +953,103 @@ namespace AutoTest
             return false;
         }
 
+        /// <summary>Λ層の走破方針。スポーク(lambda_s)で撤退条件を満たしたら中央(離脱)へ。
+        /// 通常バッチ: Λデバフの lv2 以上が4つ到達、または迫りくる死が lv3(>2) に達したら撤退。
+        /// スイープ時(lambdaFarmSweep): 従来どおり固定 lambdaFarmTiles マスで離脱。
+        /// 安全弁: 周回ステップが上限超過 or 踏破マス過多なら強制撤退（加算不具合でも無限周回しない）。</summary>
+        private bool DoNavigateLambda(GameManager gm, MapManager mm)
+        {
+            var node = mm.CurrentNode;
+            if (node == null) { Finish(Outcome.Deadlock, "Λ: CurrentNode null"); return true; }
+
+            _lambdaNavSteps++;
+            var run = gm.Run;
+
+            // Λ突入の基準スナップショット（このランの最初のΛナビ）
+            if (_lambdaNavSteps == 1 && _cur != null)
+            {
+                _cur.enteredLambda = true;
+                _lambdaEntryCoins = run.coins;
+                _lambdaEntryPassives = run.ownedPassiveItems?.Count ?? 0;
+            }
+
+            int farmed = run.dimensionalDisturbance;
+            bool atSpoke = node.id == "lambda_s";
+
+            bool wantExit;
+            if (lambdaFarmSweep)
+            {
+                wantExit = farmed >= Mathf.Max(3, lambdaFarmTiles);
+            }
+            else
+            {
+                // 通常ルーチン: lv2以上のデバフが4つ到達、または迫りくる死が lv2 到達で即時撤退
+                int lv2plus = 0;
+                if (run.lambdaDebuffs != null)
+                    foreach (var kv in run.lambdaDebuffs) if (kv.Value >= 2) lv2plus++;
+                bool impendingDanger =
+                    run.GetLambdaDebuffLevel(GameLoop.Lambda.LambdaDebuffIds.ImpendingDeath) >= 2;
+                wantExit = lv2plus >= 4 || impendingDanger;
+            }
+
+            // 安全弁（加算不具合・条件恒久未達でも周回を止める）
+            if (_lambdaNavSteps > 240 || farmed >= 120) wantExit = true;
+
+            if (atSpoke && wantExit)
+            {
+                RecordLambdaGains(run);
+                Debug.Log($"[Λ] 撤退: 踏破{farmed} 獲得G+{_cur?.lambdaGoldGained} 獲得アイテム+{_cur?.lambdaItemsGained} lv2+={CountLambdaLv2Plus(run)} 迫死lv{run.GetLambdaDebuffLevel(GameLoop.Lambda.LambdaDebuffIds.ImpendingDeath)} steps={_lambdaNavSteps}");
+                gm.MoveToNode("lambda_center");
+                return false;
+            }
+
+            // 環状線の次マス(LambdaRing)へ前進。
+            foreach (var conn in node.connections)
+            {
+                var t = mm.CurrentMap?.GetNode(conn);
+                if (t != null && t.type == TileType.LambdaRing)
+                {
+                    gm.MoveToNode(conn);
+                    return false;
+                }
+            }
+
+            // 異常系（中央しか無い等）。安全に離脱。
+            if (node.connections.Contains("lambda_center"))
+            {
+                RecordLambdaGains(run);
+                gm.MoveToNode("lambda_center");
+                return false;
+            }
+            Finish(Outcome.Deadlock, $"Λ: 前進先なし node={node.id}");
+            return true;
+        }
+
+        private static int CountLambdaLv2Plus(GameLoop.RunState run)
+        {
+            int n = 0;
+            if (run?.lambdaDebuffs != null)
+                foreach (var kv in run.lambdaDebuffs) if (kv.Value >= 2) n++;
+            return n;
+        }
+
+        /// <summary>Λ滞在中のゴールド/アイテム獲得量を突入時スナップショットとの差分で確定し _cur に記録。</summary>
+        private void RecordLambdaGains(GameLoop.RunState run)
+        {
+            if (_cur == null || !_cur.enteredLambda || run == null) return;
+            _cur.lambdaGoldGained = run.coins - _lambdaEntryCoins;
+            _cur.lambdaItemsGained = (run.ownedPassiveItems?.Count ?? 0) - _lambdaEntryPassives;
+        }
+
         /// <summary>低いほど優先。HP帯(危機/低/健康)で重み分け。
         /// 戦闘タイル(Battle/EliteBattle)のみ profile で差し替え、他は共通固定。
         /// averse=false(戦闘貪欲): 健康なら戦闘を最優先級で選ぶ。
         /// averse=true(戦闘回避): 戦闘を最下位級にし、戦闘以外があれば必ず回避。</summary>
         private int Rank(TileType t, float hpRatio, bool averse, bool preferRest, GameLoop.RunState run)
         {
-            bool crit = hpRatio < 0.3f;   // 危機
-            bool low  = hpRatio < 0.55f;  // 低HP
+            var polN = AutoTest.PolicyParameters.Current;
+            bool crit = hpRatio < polN.hpCritThreshold;   // 危機
+            bool low  = hpRatio < polN.hpLowThreshold;    // 低HP
 
             // 空腹尽きかけ／貪欲のボス前整え: 休憩を最優先（食事＝空腹全回復も兼ねる）
             if (preferRest && t == TileType.Rest) return -1;
@@ -591,7 +1090,7 @@ namespace AutoTest
             {
                 case TileType.Rest:        return crit ? 0 : low ? 0 : 6;
                 case TileType.Shop:        return crit ? 1 : 1;
-                case TileType.Treasure:    return crit ? 2 : low ? 2 : 0;  // 装備強化源
+                case TileType.Treasure:    return crit ? 2 : low ? 1 : -2; // 装備強化源: T4到達率改善のため健康時優先度UP (0 → -2)
                 case TileType.Event:       return crit ? 5 : 3;
                 case TileType.Mystery:     return crit ? 5 : 3;
                 case TileType.Exchange:    return crit ? 5 : 2;  // ビルド強化源（厳密アップグレード）
@@ -611,15 +1110,63 @@ namespace AutoTest
             if (inv != null && inv.slots != null)
             {
                 var run = gm.Run;
+
+                // L1出現lift用: このショップでの提示アイテムを記録 (購入有無を問わず)
+                if (_cur != null)
+                {
+                    for (int oi = 0; oi < inv.slots.Count; oi++)
+                    {
+                        var os = inv.slots[oi];
+                        if (os != null && !string.IsNullOrEmpty(os.itemId))
+                            _cur.offeredItemsEver.Add(os.itemId);
+                    }
+                }
+
                 bool Buy(int i)
                 {
                     var s = inv.slots[i];
                     if (s == null || s.sold || s.price > run.coins) return false;
+                    // 拡張/素材は容量を消費しないので CanAdd チェック対象外
+                    if (s.kind != InventorySystem.Shop.ShopSlotKind.InventoryExpansion
+                        && s.kind != InventorySystem.Shop.ShopSlotKind.WeaponMaterial
+                        && !string.IsNullOrEmpty(s.itemId)
+                        && !InventorySystem.Helpers.InventoryCapacity.CanAdd(run, s.itemId))
+                        return false; // 容量不足
                     int before = run.coins;
+                    string id = s.itemId;
                     gm.ShopBuy(i);
-                    if (run.coins < before) { _cur.shopPurchases++; return true; }
+                    if (run.coins < before)
+                    {
+                        _cur.shopPurchases++;
+                        if (s.kind == InventorySystem.Shop.ShopSlotKind.InventoryExpansion)
+                            _cur.inventoryExpansionsPurchased++;
+                        else if (AutoTest.LearnedPriorityProvider.IsPriority(id)) _cur.priorityItemsAcquired++;
+                        // L1学習: 購入時点で取得集合に記録（後で使い切って消えても残る）
+                        if (!string.IsNullOrEmpty(id)) _cur.acquiredItemsEver.Add(id);
+                        return true;
+                    }
                     return false;
                 }
+
+                // 拡張優先購入: 容量がカツカツ (空きセル < 平均アイテムサイズ4) かつ 残金で拡張可能なら先に買う
+                bool TryBuyExpansionIfNeeded()
+                {
+                    int freeCells = InventorySystem.Helpers.InventoryCapacity.FreeCells(run);
+                    if (freeCells >= 4) return false;
+                    int expCost = InventorySystem.Helpers.InventoryCapacity.NextExpansionCost(run);
+                    if (expCost == int.MaxValue) return false;
+                    for (int i = 0; i < inv.slots.Count; i++)
+                    {
+                        var s = inv.slots[i];
+                        if (s != null && !s.sold
+                            && s.kind == InventorySystem.Shop.ShopSlotKind.InventoryExpansion
+                            && s.price <= run.coins)
+                            return Buy(i);
+                    }
+                    return false;
+                }
+                int expGuard = 0;
+                while (TryBuyExpansionIfNeeded() && expGuard++ < 4) { }
                 bool BuyKind(ShopSlotKind k)
                 {
                     for (int i = 0; i < inv.slots.Count; i++)
@@ -628,8 +1175,157 @@ namespace AutoTest
                     return false;
                 }
 
-                // 「見える範囲で最後のショップ」(=5層以降) は買える物が尽きるまで使い切る
+                // ============================================================
+                // フェーズ1: 在庫の S/A 級を先取り（買えるだけ買う）
+                // ============================================================
+                bool BuyPriorityPass(int minScore)
+                {
+                    // 価格に対して効果が大きい順 = まず score 高 → index 順
+                    int bestIdx = -1; int bestScore = -1;
+                    for (int i = 0; i < inv.slots.Count; i++)
+                    {
+                        var s = inv.slots[i];
+                        if (s == null || s.sold) continue;
+                        if (s.price > run.coins) continue;
+                        int sc = AutoTest.LearnedPriorityProvider.Score(s.itemId);
+                        if (sc < minScore) continue;
+                        if (sc > bestScore) { bestScore = sc; bestIdx = i; }
+                    }
+                    if (bestIdx < 0) return false;
+                    return Buy(bestIdx);
+                }
+                // 余金が許す限り S/A を全て取得
+                int safety = 0;
+                while (BuyPriorityPass(1) && safety++ < 30) { }
+
+                // ============================================================
+                // フェーズ2: リロール判定
+                //   トリガ = (S級未所持 かつ 在庫にS級なし) OR
+                //            (5層以降の最終ショップで A級ゼロ かつ 在庫にA級なし)
+                //   コスト ≤ run.coins × 0.30 かつ「購入予算 6G 以上は残す」
+                // ============================================================
+                bool HasSInInventory()
+                {
+                    for (int i = 0; i < inv.slots.Count; i++)
+                    {
+                        var s = inv.slots[i];
+                        if (s == null || s.sold) continue;
+                        if (AutoTest.LearnedPriorityProvider.IsSRank(s.itemId)) return true;
+                    }
+                    return false;
+                }
+                bool HasAInInventory()
+                {
+                    for (int i = 0; i < inv.slots.Count; i++)
+                    {
+                        var s = inv.slots[i];
+                        if (s == null || s.sold) continue;
+                        if (AutoTest.LearnedPriorityProvider.IsARank(s.itemId)) return true;
+                    }
+                    return false;
+                }
+                bool OwnsAnyS()
+                {
+                    if (run.ownedPassiveItems != null)
+                        foreach (var id in run.ownedPassiveItems)
+                            if (AutoTest.LearnedPriorityProvider.IsSRank(id)) return true;
+                    if (run.ownedConsumables != null)
+                        foreach (var id in run.ownedConsumables)
+                            if (AutoTest.LearnedPriorityProvider.IsSRank(id)) return true;
+                    return false;
+                }
+                bool OwnsAnyA()
+                {
+                    if (run.ownedPassiveItems != null)
+                        foreach (var id in run.ownedPassiveItems)
+                            if (AutoTest.LearnedPriorityProvider.IsARank(id)) return true;
+                    return false;
+                }
+
                 bool lastShop = run.currentFloor >= run.normalClearFloor;
+                int rerollGuard = 0;
+                var pol = AutoTest.PolicyParameters.Current;
+                while (rerollGuard++ < 8)
+                {
+                    int price = inv.CurrentRerollPrice;
+                    if (price > run.coins * pol.rerollCostRatio) break;
+                    // 通常ショップでは購入余力を最低 6G 残す (固定: rerollMinResidualG は廃止)
+                    if (!lastShop && run.coins - price < 6) break;
+
+                    bool needS = !OwnsAnyS() && !HasSInInventory();
+                    bool needA = lastShop && !OwnsAnyA() && !HasAInInventory();
+                    if (!needS && !needA) break;
+
+                    int beforeR = run.coins;
+                    gm.ShopReroll();
+                    if (run.coins >= beforeR) break; // リロール失敗
+                    _cur.shopRerolls++;
+                    _cur.shopRerollCoins += (beforeR - run.coins);
+
+                    // 直後に新在庫の S/A をかき集める
+                    int s2 = 0;
+                    while (BuyPriorityPass(1) && s2++ < 30) { }
+                }
+
+                // ============================================================
+                // フェーズ2.5: 値下げ交渉(=強盗) 判定
+                //   条件: アンロック済み AND まだ未使用 AND
+                //         「6層以降」 AND 「勝てそう=HP余裕」
+                //   さらに 強盗実行 直前に「在庫に優先0 OR 購入で在庫が欠けてる」なら
+                //   最大3回までリロールして戦利品を仕込む(=強奪する物を厚くする)。
+                // ============================================================
+                if (MetaProgression.MetaBuffApplicator.IsShopRobberyUnlocked()
+                    && !run.shopsBlocked
+                    && !run.shopRobberyInProgress
+                    && run.currentFloor >= 6     // 強盗は 6F以降 固定
+                    && run.playerMaxHP >= 50     // 最大HP下限 固定 (序盤の貧弱を除外)
+                    && run.playerHP >= run.playerMaxHP * pol.robberyMinHpRatio)
+                {
+                    bool NoPriorityInStock()
+                    {
+                        for (int i = 0; i < inv.slots.Count; i++)
+                        {
+                            var s = inv.slots[i];
+                            if (s == null || s.sold) continue;
+                            if (s.kind == ShopSlotKind.WeaponMaterial) continue;
+                            if (AutoTest.LearnedPriorityProvider.IsPriority(s.itemId)) return false;
+                        }
+                        return true;
+                    }
+                    bool StockDepletedByPurchase()
+                    {
+                        for (int i = 0; i < inv.slots.Count; i++)
+                            if (inv.slots[i] != null && inv.slots[i].sold) return true;
+                        return false;
+                    }
+
+                    int preRobReroll = 0;
+                    while (preRobReroll < 3 && (NoPriorityInStock() || StockDepletedByPurchase()))
+                    {
+                        int price = inv.CurrentRerollPrice;
+                        if (price > run.coins) break; // 払えなければ諦めて強奪
+                        int beforeR = run.coins;
+                        gm.ShopReroll();
+                        if (run.coins >= beforeR) break;
+                        _cur.shopRerolls++;
+                        _cur.shopRerollCoins += (beforeR - run.coins);
+                        preRobReroll++;
+                    }
+                    if (preRobReroll > 0)
+                        Debug.Log($"[AutoRunner] 強奪前リロール {preRobReroll}回 実施");
+
+                    Debug.Log($"[AutoRunner] 値下げ交渉トリガ: F{run.currentFloor} HP{run.playerHP}/{run.playerMaxHP}");
+                    gm.ShopRobbery();
+                    return;
+                }
+
+                // ============================================================
+                // フェーズ3: 通常購入（旧ロジック）
+                //   黄金卿の剣 所持時 (2026-05-31 v3 消費Gold基準に変更後):
+                //   旧 = 余剰金保持 / 新 = **積極消費**で与ダメ倍率を伸ばす
+                //   → 通常購入閾値を緩める (=より積極的に買い回し)
+                // ============================================================
+                bool hasGoldKing = run.ownedPassiveItems != null && run.ownedPassiveItems.Contains("黄金卿の剣");
                 if (lastShop)
                 {
                     int guard = 0;
@@ -637,7 +1333,6 @@ namespace AutoTest
                     while (bought && guard++ < 40)
                     {
                         bought = false;
-                        // 価値順: 武器/ダイス → パッシブ → 強化素材 → 消費
                         if (BuyKind(ShopSlotKind.Weapon)) { bought = true; continue; }
                         if (BuyKind(ShopSlotKind.Dice)) { bought = true; continue; }
                         if (BuyKind(ShopSlotKind.Passive)) { bought = true; continue; }
@@ -647,24 +1342,26 @@ namespace AutoTest
                 }
                 else
                 {
-                    // 通常ショップ: 余剰金を戦力へ。1/5デノミ後の閾値: 40→8, 25→5, 20→4
-                    // 武器・ダイス（自動装備で強化見込み）
+                    // 2026-05-31 v3: 消費Gold基準なので、 黄金卿所持時は **閾値を緩めて積極消費** (旧と逆向き)
+                    int weaponGate   = hasGoldKing ? 5 : 8;
+                    int passiveGate  = hasGoldKing ? 3 : 5;
+                    int materialGate = hasGoldKing ? 2 : 4;
                     for (int i = 0; i < inv.slots.Count; i++)
-                        if (inv.slots[i] != null && !inv.slots[i].sold && run.coins > 8
+                        if (inv.slots[i] != null && !inv.slots[i].sold && run.coins > weaponGate
                             && (inv.slots[i].kind == ShopSlotKind.Weapon
                                 || inv.slots[i].kind == ShopSlotKind.Dice)) Buy(i);
-                    // パッシブ（金が余るので貪欲に）
                     for (int i = 0; i < inv.slots.Count; i++)
-                        if (inv.slots[i] != null && !inv.slots[i].sold && run.coins > 5
+                        if (inv.slots[i] != null && !inv.slots[i].sold && run.coins > passiveGate
                             && inv.slots[i].kind == ShopSlotKind.Passive) Buy(i);
-                    // 武器強化素材: 次の強化に届くまで補充（価格倍々なので2個まで）
-                    int needMat = GameManager.WeaponUpgradeCost(run.weaponUpgradeLevel);
+                    // T4 到達率改善: 素材買い溜め上限 2→4 (連続強化で T3+ → T4 まで一気に届く余地)
+                    int needMat = GameManager.WeaponUpgradeCost(run);
                     int matBuys = 0;
-                    while (run.weaponMaterials < needMat && run.coins > 4 && matBuys++ < 2
+                    int matBuyCap = run.currentFloor >= 4 ? 4 : 2;
+                    while (run.weaponMaterials < needMat * 2 && run.coins > materialGate && matBuys++ < matBuyCap
                            && BuyKind(ShopSlotKind.WeaponMaterial)) { }
-                    // 回復消費を3個までストック
                     int stock = run.ownedConsumables != null ? run.ownedConsumables.Count : 0;
-                    for (int i = 0; i < inv.slots.Count && stock < 3; i++)
+                    int stockCap = pol.consumableStockMax;
+                    for (int i = 0; i < inv.slots.Count && stock < stockCap; i++)
                         if (inv.slots[i] != null && !inv.slots[i].sold && run.coins > 4
                             && inv.slots[i].kind == ShopSlotKind.Consumable && Buy(i)) stock++;
                 }
@@ -683,21 +1380,41 @@ namespace AutoTest
             // 重要 = ボス / 高脅威(threat>=5) / 一撃が現HPの半分以上を奪い得る危険戦闘。
             var e0 = cm.CurrentEnemy;
             bool important = false;
+            var polC = AutoTest.PolicyParameters.Current;
             if (e0 != null)
             {
                 bool boss = e0.id != null && e0.id.StartsWith("boss_layer");
                 int maxHit = e0.diceCount * e0.diceMaxValue * (e0.criticalNumerator > 0 ? 2 : 1);
-                important = boss || e0.threat >= 5 || maxHit * 2 >= Math.Max(1, cm.PlayerHP);
+                important = boss || e0.threat >= polC.importantThreatThreshold
+                                 || maxHit * 2 >= Math.Max(1, cm.PlayerHP);
             }
 
             if (important)
             {
-                // 攻撃/ダイス/会心/鬼火 → シールド/土塊 → 継続 → ユニーク
-                UseFirst(run, "uniq_oni_oil", "cons_atk_4", "cons_atk_3", "cons_dice_4", "cons_dice_3",
-                              "cons_crit_4", "cons_crit_3", "cons_atk_2", "cons_dice_2", "cons_crit_2");
-                UseFirst(run, "cons_shield_4", "cons_shield_3", "cons_shield_2", "uniq_earth_guard",
-                              "cons_reduce_4", "cons_reduce_3", "cons_shield_1");
-                UseFirst(run, "cons_regen_4", "cons_regen_3", "cons_regen_2", "cons_regen_1");
+                // 2026-05-31: LEG (Lv4) は本当の窮地のみ使用 (BOT 過剰消費抑制 = LEG 評価低下対策 C案)。
+                //   desperate = ボス OR HP残り33%以下 → LEG 解禁
+                //   通常 important → GOLD(Lv3)以下のみ
+                bool desperate = (e0?.id != null && e0.id.StartsWith("boss_layer"))
+                              || (run.playerMaxHP > 0 && cm.PlayerHP * 3 <= run.playerMaxHP);
+                if (desperate)
+                {
+                    // 攻撃/ダイス/会心: LEG 解禁
+                    UseFirst(run, "uniq_oni_oil", "cons_atk_4", "cons_dice_4", "cons_crit_4",
+                                  "cons_atk_3", "cons_dice_3", "cons_crit_3",
+                                  "cons_atk_2", "cons_dice_2", "cons_crit_2");
+                    UseFirst(run, "cons_shield_4", "cons_shield_3", "cons_shield_2", "uniq_earth_guard",
+                                  "cons_reduce_4", "cons_reduce_3", "cons_shield_1");
+                    UseFirst(run, "cons_regen_4", "cons_regen_3", "cons_regen_2", "cons_regen_1");
+                }
+                else
+                {
+                    // 通常重要戦闘: GOLD 以下のみ (LEG は温存)
+                    UseFirst(run, "uniq_oni_oil", "cons_atk_3", "cons_dice_3", "cons_crit_3",
+                                  "cons_atk_2", "cons_dice_2", "cons_crit_2");
+                    UseFirst(run, "cons_shield_3", "cons_shield_2", "uniq_earth_guard",
+                                  "cons_reduce_3", "cons_shield_1");
+                    UseFirst(run, "cons_regen_3", "cons_regen_2", "cons_regen_1");
+                }
                 UseFirst(run, "uniq_mirror");
                 UseFirst(run, "uniq_ambush");
             }
@@ -714,8 +1431,15 @@ namespace AutoTest
                 {
                     int maxHit = e.diceCount * e.diceMaxValue;
                     if (e.criticalNumerator > 0) maxHit *= 2;
-                    if (cm.PlayerHP <= maxHit)
-                        UseFirst(run, "cons_heal_4", "cons_heal_3", "cons_heal_2", "cons_heal_1");
+                    int healTrigger = Mathf.RoundToInt(maxHit * polC.emergencyHealRatio);
+                    if (cm.PlayerHP <= healTrigger)
+                    {
+                        // 通常閾値では Lv3 以下のみ使用 (LEG 温存)
+                        UseFirst(run, "cons_heal_3", "cons_heal_2", "cons_heal_1");
+                        // LEG (完全回復薬) は HP <= 25% maxHP の真の窮地のみ
+                        if (run.playerMaxHP > 0 && cm.PlayerHP * 4 <= run.playerMaxHP)
+                            UseFirst(run, "cons_heal_4");
+                    }
                 }
                 var tr = cm.ExecuteTurn();
                 if (tr.isDraw) _cwDraw++;
@@ -732,7 +1456,7 @@ namespace AutoTest
             if (_cur == null || gm?.Run == null) return;
             var run = gm.Run;
             var sb = new System.Text.StringBuilder();
-            sb.Append($"HP {run.playerHP}/{run.playerMaxHP} | coins {run.coins} | mat {run.weaponMaterials} | upgLv {run.weaponUpgradeLevel} | karma {run.karma}");
+            sb.Append($"HP {run.playerHP}/{run.playerMaxHP} | coins {run.coins} | mat {run.weaponMaterials} | 武器 {run.equippedWeaponId} 限界突破{run.limitBreakStage} | karma {run.karma}");
             sb.Append($"\n      武器: {(string.IsNullOrEmpty(run.equippedWeaponId) ? "(無)" : run.equippedWeaponId)} | ダイス: {(string.IsNullOrEmpty(run.equippedDiceId) ? "(武器ダイス)" : run.equippedDiceId)}");
             int pCnt = run.ownedPassiveItems?.Count ?? 0;
             string pList = pCnt > 0 ? string.Join(", ", run.ownedPassiveItems) : "(無)";
@@ -815,6 +1539,9 @@ namespace AutoTest
             {
                 int idx = PickSafeChoice(cur);
                 _lastResolvedEvent = cur;
+                // L1.5: イベント学習用に「id|choiceIndex」を記録
+                if (_cur != null && cur != null && !string.IsNullOrEmpty(cur.id))
+                    _cur.eventChoicesMade.Add(cur.id + "|" + idx);
                 gm.ResolveEventChoice(idx);
             }
             else
@@ -828,28 +1555,42 @@ namespace AutoTest
         {
             if (def == null || def.choices == null || def.choices.Count == 0) return 0;
 
-            // ① フラグ進路スコアリング: フラグ成立 / 名前付きパッシブ獲得を強く優先、
-            //    フラグ放棄のみの選択肢を強く忌避する (チェーン進路を切らないため)
+            var run = GameLoop.GameManager.Instance?.Run;
+
+            // ① フラグ進路は依然として「ほぼ無条件で進める」（チェーン進路は数値スコア以上に価値が高い）
             int progressIdx = PickFlagProgressChoice(def);
             if (progressIdx >= 0) return progressIdx;
 
-            // ② 「立ち去る/無視」系があれば最優先（リスク0で確実に抜ける）
-            for (int i = 0; i < def.choices.Count; i++)
+            // ② 数値スコアラで選定。スコア差が小さければ次点も取り得る（両分岐の探索性）。
+            //    HPが低い時は HpDelta/EnterCombat 系が強烈にマイナス → 自動的に「立ち去り」を選ぶ。
+            //    現状HP余裕で 100G+カルマ vs なし なら 100G を取る（ゴールド価値 > カルマ期待コスト）。
+            int byScore = EventChoiceScorer.PickBestIndex(def, run, _rng,
+                explorationRate: AutoTest.PolicyParameters.Current.eventExplorationRate);
+
+            // ③ 効果が全くない選択肢が複数ある場合は、最低限のフォールバックとして「立ち去り」系を選ぶ
+            //    （スコアラは効果ゼロを 0 と評価するので、明示的な離脱選択肢を優先）
+            if (byScore >= 0 && byScore < def.choices.Count)
             {
-                var txt = def.choices[i]?.text ?? "";
-                foreach (var kw in LeaveKeywords)
-                    if (txt.Contains(kw)) return i;
+                var pickedText = def.choices[byScore]?.text ?? "";
+                bool pickedIsLeave = false;
+                foreach (var kw in LeaveKeywords) if (pickedText.Contains(kw)) { pickedIsLeave = true; break; }
+                // 危険語入り選択肢のスコアが負ならOK、もしスコア同点で危険語のみの選択肢を引いてしまった場合の救済
+                if (!pickedIsLeave)
+                {
+                    // スコア 0 以下なら離脱選択肢を探す
+                    float pickedScore = EventChoiceScorer.Score(def.choices[byScore], run);
+                    if (pickedScore <= 0f)
+                    {
+                        for (int i = 0; i < def.choices.Count; i++)
+                        {
+                            var txt = def.choices[i]?.text ?? "";
+                            foreach (var kw in LeaveKeywords)
+                                if (txt.Contains(kw)) return i;
+                        }
+                    }
+                }
+                return byScore;
             }
-            // ③ 危険語を含まない選択肢を選ぶ
-            for (int i = 0; i < def.choices.Count; i++)
-            {
-                var txt = def.choices[i]?.text ?? "";
-                bool danger = false;
-                foreach (var kw in DangerKeywords)
-                    if (txt.Contains(kw)) { danger = true; break; }
-                if (!danger) return i;
-            }
-            // ④ 全て危険語入り → 先頭
             return 0;
         }
 
@@ -901,12 +1642,190 @@ namespace AutoTest
             return score;
         }
 
+        // ===== 5Fボス勝率スイープ =====
+
+        /// <summary>実ランから5F到達ビルドを採取し、全(武器×ダイス)で5Fボス勝率を総当たり計測。</summary>
+        private IEnumerator RunBoss5Sweep(GameManager gm)
+        {
+            // --- Phase A: 実ランから「5F到達時ビルド」を採取 ---
+            _simHarvestArmed = true;
+            int attempts = 0;
+            int cap = Mathf.Max(runCount, simSampleBuilds * 30);
+            while (_simBases.Count < simSampleBuilds && attempts < cap)
+            {
+                yield return RunOne(attempts);
+                attempts++;
+                yield return null;
+            }
+            _simHarvestArmed = false;
+            Debug.Log($"[AutoRunner] ビルド採取: {_simBases.Count}件 / {attempts}ラン試行");
+            if (_simBases.Count == 0)
+            {
+                _simReport = "5F到達ビルドを採取できませんでした（到達率0）。simSampleBuilds やメタ設定を見直してください。\n";
+                yield break;
+            }
+
+            // --- 有効な武器/ダイスIDに絞る ---
+            var db = ItemDatabase.Instance;
+            var weapons = new List<string>();
+            foreach (var w in simWeapons) if (db?.GetItem(w) != null) weapons.Add(w);
+            var dice = new List<string>();
+            foreach (var d in simDice) if (db?.GetItem(d) != null) dice.Add(d);
+            if (weapons.Count == 0 || dice.Count == 0)
+            {
+                _simReport = "有効な武器/ダイスIDがありません。simWeapons / simDice を確認してください。\n";
+                yield break;
+            }
+
+            // --- クリーンな Run を1つ用意し、毎試行で土台ビルドを上書き ---
+            gm.StartNewRun();
+
+            // --- Phase B: 全(武器×ダイス)スイープ ---
+            var winPct = new Dictionary<string, double>();
+            int comboCount = weapons.Count * dice.Count;
+            int comboIdx = 0;
+            foreach (var weapon in weapons)
+            {
+                foreach (var d in dice)
+                {
+                    int wins = 0;
+                    for (int t = 0; t < simTrialsPerCombo; t++)
+                    {
+                        var b = _simBases[t % _simBases.Count];
+                        var run = gm.Run;
+                        run.playerHP = simBaseHP;
+                        run.playerMaxHP = simBaseHP;
+                        run.weaponPlus = b.weaponPlus;
+                        run.limitBreakStage = b.limitBreakStage;
+                        run.equippedWeaponId = weapon;
+                        run.equippedDiceId = d;
+                        run.ownedPassiveItems = new List<string>(b.passives);
+
+                        var res = gm.SimulateBossFight(simBossFloor);
+                        if (res.playerWon) wins++;
+
+                        if ((t & 127) == 0) yield return null; // フレーム譲り
+                    }
+                    winPct[weapon + "|" + d] = 100.0 * wins / Mathf.Max(1, simTrialsPerCombo);
+                    comboIdx++;
+                    if ((comboIdx & 3) == 0) Debug.Log($"[AutoRunner] スイープ {comboIdx}/{comboCount}");
+                    yield return null;
+                }
+            }
+
+            _simReport = BuildSweepReport(weapons, dice, winPct);
+        }
+
+        /// <summary>ダイスIDの短縮表示コード（マトリクス列見出し用）。</summary>
+        private static string DiceCode(string id)
+        {
+            switch (id)
+            {
+                case "dice_wood": return "Wo";
+                case "dice_bone": return "Bo";
+                case "dice_copper": return "Co";
+                case "dice_iron": return "Ir";
+                case "dice_biased": return "Bi";
+                case "dice_gem": return "Ge";
+                case "dice_flame": return "Fl";
+                case "dice_stable": return "Sb";
+                case "dice_twinsnake": return "Tw";
+                case "dice_star": return "Sr";
+                case "dice_destiny": return "De";
+                case "dice_greed": return "Gr";
+                case "dice_moroha": return "Mo";
+                case "dice_perfection": return "Pf";
+                default: return id.StartsWith("dice_") ? id.Substring(5, Math.Min(2, id.Length - 5)) : id;
+            }
+        }
+
+        private string BuildSweepReport(List<string> weapons, List<string> dice, Dictionary<string, double> winPct)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("================ 5Fボス 勝率スイープ ================");
+            sb.AppendLine($"対象ボス      : boss_layer{simBossFloor}");
+            sb.AppendLine($"採取ビルド数  : {_simBases.Count}（実ランの5F到達時パッシブ/強化段階を土台。武器・ダイスのみ差し替え）");
+            sb.AppendLine($"戦闘開始HP    : {simBaseHP}（固定。採取ビルドの現在HPは不使用）");
+            sb.AppendLine($"試行/組合せ   : {simTrialsPerCombo}（採取ビルドをラウンドロビンで均等使用）");
+            sb.AppendLine("※消費アイテムは不使用（武器×ダイスの素の勝率を比較）");
+            sb.AppendLine();
+
+            // 凡例
+            sb.AppendLine("---- ダイス略号 ----");
+            var legend = new StringBuilder("  ");
+            foreach (var d in dice) legend.Append($"{DiceCode(d)}={d.Replace("dice_", "")}  ");
+            sb.AppendLine(legend.ToString());
+            sb.AppendLine();
+
+            // マトリクス（行=武器, 列=ダイス, 値=勝率%）
+            sb.AppendLine("---- 勝率マトリクス（行=武器 / 列=ダイス） ----");
+            var header = new StringBuilder();
+            header.Append(PadR("武器", 12));
+            foreach (var d in dice) header.Append(PadL(DiceCode(d), 5));
+            sb.AppendLine(header.ToString());
+            foreach (var w in weapons)
+            {
+                var row = new StringBuilder();
+                row.Append(PadR(TruncDisp(w, 11), 12));
+                foreach (var d in dice)
+                {
+                    double v = winPct.TryGetValue(w + "|" + d, out var p) ? p : -1;
+                    row.Append(PadL(v < 0 ? "-" : v.ToString("F0") + "%", 5));
+                }
+                sb.AppendLine(row.ToString());
+            }
+            sb.AppendLine();
+
+            // 上位/下位 組み合わせ
+            var all = new List<KeyValuePair<string, double>>(winPct);
+            all.Sort((a, b) => b.Value.CompareTo(a.Value));
+            sb.AppendLine("---- 勝率トップ10（強コンボ） ----");
+            for (int i = 0; i < all.Count && i < 10; i++)
+            {
+                var k = all[i].Key; int bar = k.IndexOf('|');
+                sb.AppendLine($"  {PadR(k.Substring(0, bar), 12)}{PadR(k.Substring(bar + 1).Replace("dice_", ""), 14)}{PadL(all[i].Value.ToString("F0") + "%", 5)}");
+            }
+            sb.AppendLine();
+            sb.AppendLine("---- 勝率ワースト10（弱コンボ） ----");
+            for (int i = all.Count - 1; i >= 0 && i >= all.Count - 10; i--)
+            {
+                var k = all[i].Key; int bar = k.IndexOf('|');
+                sb.AppendLine($"  {PadR(k.Substring(0, bar), 12)}{PadR(k.Substring(bar + 1).Replace("dice_", ""), 14)}{PadL(all[i].Value.ToString("F0") + "%", 5)}");
+            }
+            sb.AppendLine();
+            return sb.ToString();
+        }
+
         // ===== 計測フック =====
 
         private void OnEnemyEncountered(EnemyData e)
         {
             var gm = GameManager.Instance;
             var cm = CombatSystem.CombatManager.Instance;
+
+            // 5Fボス勝率スイープ: 採取モード中、対象フロアのボスに到達したらビルドを採取
+            if (_simHarvestArmed && e != null && e.id != null
+                && e.id.StartsWith($"boss_layer{simBossFloor}")
+                && _simBases.Count < simSampleBuilds && gm?.Run != null)
+            {
+                var run = gm.Run;
+                var passives = new List<string>();
+                if (run.ownedPassiveItems != null)
+                    foreach (var id in run.ownedPassiveItems)
+                    {
+                        // 武器・ダイスはスイープ側で差し替えるため土台ビルドからは除外
+                        var it = ItemDatabase.Instance?.GetItem(id);
+                        if (it != null && (it.category == ItemCategory.Weapon || it.category == ItemCategory.Dice)) continue;
+                        passives.Add(id);
+                    }
+                _simBases.Add(new SimBuild
+                {
+                    hp = run.playerHP,
+                    weaponPlus = run.weaponPlus,
+                    limitBreakStage = run.limitBreakStage,
+                    passives = passives
+                });
+            }
 
             // チェーン swap で再エンカウントしたケース: 前フォームの戦績を 1 件確定させる。
             // (戦闘自体は継続するため OnBattleEnded は鳴らない → ここで明示記録しないと
@@ -915,7 +1834,9 @@ namespace AutoTest
                 && !string.IsNullOrEmpty(_pendingEnemyId);
             if (isChainSwap && _cur != null)
             {
-                int hpNow = gm?.Run?.playerHP ?? 0;
+                // 戦闘中は Run.playerHP が更新されない（戦闘終了時のみ同期）。
+                // チェーン中の正しい現在HPは CombatManager のライブ値を使う。
+                int hpNow = (cm != null && cm.IsCombatActive) ? cm.PlayerHP : (gm?.Run?.playerHP ?? 0);
                 var midRec = new CombatRec
                 {
                     enemy = _pendingEnemyName ?? "?",
@@ -927,9 +1848,14 @@ namespace AutoTest
                     hpBefore = _pendingEnemyHpBefore,
                     hpAfter = hpNow,
                     afterLastStand = _cur.lastStandUsed,
-                    tWin = _cwWin, tDraw = _cwDraw, tLoss = _cwLoss, tLossAbs = _cwLossAbs
+                    tWin = _cwWin, tDraw = _cwDraw, tLoss = _cwLoss, tLossAbs = _cwLossAbs,
+                    weaponId = gm?.Run?.equippedWeaponId ?? "",
+                    diceId = gm?.Run?.equippedDiceId ?? ""
                 };
                 _cur.combats.Add(midRec);
+                // L1学習: チェーン途中で倒した形態も「撃破記録」に入れる
+                if (!string.IsNullOrEmpty(midRec.enemyId) && midRec.enemyId.StartsWith("boss_layer7"))
+                    _cur.awakenedFormsKilled.Add(midRec.enemyId);
                 // 注: totalCombats / totalTurns / totalWins には加算しない
                 // (OnBattleEnded 側のチェーン最終形態分でラン全体の合計が記録されるため、
                 //  ここで足すと二重計上になる。combats リストの per-enemy 集計だけ厚くする)
@@ -939,7 +1865,9 @@ namespace AutoTest
             _pendingEnemyId = e != null && e.id != null ? e.id : "";
             // ボス判定は敵IDのみで厳密に行う（ノード種別フォールバックは誤検出の元）
             _pendingEnemyIsBoss = _pendingEnemyId.StartsWith("boss_layer");
-            _pendingEnemyHpBefore = gm.Run?.playerHP ?? 0;
+            // 次フォーム開始時点の現在HP。チェーン中は CombatManager のライブHPを使う
+            // （Run.playerHP は戦闘終了まで更新されないため、これが無いと各フォームの被ダメが常に0と誤計測される）。
+            _pendingEnemyHpBefore = (cm != null && cm.IsCombatActive) ? cm.PlayerHP : (gm?.Run?.playerHP ?? 0);
             _cwWin = _cwDraw = _cwLoss = _cwLossAbs = 0; // 新戦闘のターン内訳リセット
         }
 
@@ -958,12 +1886,28 @@ namespace AutoTest
                 hpBefore = _pendingEnemyHpBefore,
                 hpAfter = r.playerHPRemaining,
                 afterLastStand = _cur.lastStandUsed,
-                tWin = _cwWin, tDraw = _cwDraw, tLoss = _cwLoss, tLossAbs = _cwLossAbs
+                tWin = _cwWin, tDraw = _cwDraw, tLoss = _cwLoss, tLossAbs = _cwLossAbs,
+                isFightEnd = true,
+                healApplied = r.healApplied,
+                shieldGained = r.shieldGained,
+                damageDealt = r.damageDealt,
+                damageTaken = r.damageTaken,
+                enemyMaxHP = r.enemyMaxHP,
+                weaponId = gm?.Run?.equippedWeaponId ?? "",
+                diceId = gm?.Run?.equippedDiceId ?? "",
             };
             _cur.combats.Add(rec);
             _cur.totalCombats++;
             _cur.totalTurns += r.totalTurns;
             if (r.playerWon) _cur.totalWins++;
+            // L1学習: ラン全体に加算
+            _cur.totalDamageDealt += r.damageDealt;
+            _cur.totalDamageTaken += r.damageTaken;
+            _cur.totalHealed += r.healApplied;
+            _cur.totalShieldGained += r.shieldGained;
+            // 覚者形態撃破: 7層ボス chain で勝った（含 swap）形態を記録
+            if (r.playerWon && !string.IsNullOrEmpty(rec.enemyId) && rec.enemyId.StartsWith("boss_layer7"))
+                _cur.awakenedFormsKilled.Add(rec.enemyId);
             if (_cur.lastStandUsed)
             {
                 _cur.combatsAfterLastStand++;
@@ -985,6 +1929,14 @@ namespace AutoTest
             _cur.tileVisits[t] = c + 1;
         }
 
+        // 武器強化で新 Tier に到達した瞬間に L1学習へ記録 (中間Tierの集計漏れ修正)
+        private void OnWeaponTierUpgraded(string prevId, string newId)
+        {
+            if (_cur == null || string.IsNullOrEmpty(newId)) return;
+            _cur.acquiredItemsEver.Add(newId);
+            _cur.tierUpgradeCount++;
+        }
+
         private void TrackLastStand()
         {
             var run = GameManager.Instance.Run;
@@ -993,7 +1945,7 @@ namespace AutoTest
             {
                 _cur.lastStandUsed = true;
                 _cur.lastStandFloor = run.currentFloor;
-                _curLog.Add($"[AutoRunner] ラストスタンド発動 (Floor {run.currentFloor})");
+                _curLog.Enqueue($"[AutoRunner] ラストスタンド発動 (Floor {run.currentFloor})");
             }
         }
 
@@ -1070,12 +2022,50 @@ namespace AutoTest
                 _cur.finalCoins = run.coins;
                 _cur.deathFloor = (o == Outcome.GameOver) ? run.currentFloor : 0;
                 _cur.gedatsuVictory = run.gedatsuVictory;
+                _cur.lambdaFarmTilesUsed = lambdaFarmTiles;
+                _cur.lambdaTilesFarmed = run.dimensionalDisturbance;
+                if (run.lambdaDebuffs != null)
+                    foreach (var kv in run.lambdaDebuffs) _cur.lambdaDebuffLevelSum += kv.Value;
+                // Λ内で死亡（未離脱）なら、この時点でファーム獲得量を確定
+                if (run.inLambda) RecordLambdaGains(run);
+
+                // L1学習: 最終所持アイテムを acquiredItemsEver に union
+                //   ・売却/消費で消えた分は別途 ShopBuy/UseItem 経由で捕捉する設計だが、
+                //     現状の最小実装ではラン終了時の最終所持の和をベースラインとする
+                //     （AutoRunner は売却を行わず、消費は使用するため、ここでは「使用前/購入時のスナップ」を別途用意）
+                if (run.ownedPassiveItems != null)
+                    foreach (var id in run.ownedPassiveItems) if (!string.IsNullOrEmpty(id)) _cur.acquiredItemsEver.Add(id);
+                if (run.ownedConsumables != null)
+                    foreach (var id in run.ownedConsumables) if (!string.IsNullOrEmpty(id)) _cur.acquiredItemsEver.Add(id);
+                if (!string.IsNullOrEmpty(run.equippedWeaponId)) _cur.acquiredItemsEver.Add(run.equippedWeaponId);
+                if (!string.IsNullOrEmpty(run.equippedDiceId)) _cur.acquiredItemsEver.Add(run.equippedDiceId);
+                _cur.finalWeaponTier = run.equippedWeaponId ?? "";
+                _cur.finalLimitBreak = run.limitBreakStage;
             }
             Classify(_cur);
+            _cur.bandScore = ComputeBandScore(_cur);
+            // L2ペアテスト記録
+            _cur.policyVariant = _currentRunVariant;
+            _cur.pairedSeed = _currentRunSeed;
             _records.Add(_cur);
-            _curLog.Add($"[AutoRunner] === RUN {_cur.index} 終了: {_cur.band} ({_cur.bandLabel}) — {note} ===");
+            _curLog.Enqueue($"[AutoRunner] === RUN {_cur.index} 終了: {_cur.band} ({_cur.bandLabel}) — {note} ===");
             _curAttachLog(_cur);
             _cur = null;
+        }
+
+        /// <summary>L1学習用: 帯ラベルから数値スコアを返す。
+        /// CRASH=-1, DEADLOCK=-2, R1a..R10/R11/R12 を 1..12 にマップ（先頭文字 R+数字部）。</summary>
+        private int ComputeBandScore(RunRec r)
+        {
+            if (string.IsNullOrEmpty(r.band)) return 0;
+            if (r.band == "CRASH") return -1;
+            if (r.band == "DEADLOCK") return -2;
+            // "R12" → 12, "R8b" → 8 等
+            int v = 0; int i = 1;
+            while (i < r.band.Length && char.IsDigit(r.band[i])) { v = v * 10 + (r.band[i] - '0'); i++; }
+            // 小文字 a/b で 0.5 単位の細分はしないが、6Fクリアは R8b(=8) のまま、5Fクリアは R8(=8) で同点
+            // 7層クリア(R11)/解脱(R12)が最高。死亡 R1a..R10。
+            return v;
         }
 
         private readonly Dictionary<int, List<string>> _detail = new Dictionary<int, List<string>>();
@@ -1114,8 +2104,13 @@ namespace AutoTest
             switch (f)
             {
                 case 1:
+                    if (boss) { r.band = "R1b"; r.bandLabel = "1Fボスで死亡"; }
+                    else      { r.band = "R1a"; r.bandLabel = "1F道中で死亡"; }
+                    break;
                 case 2:
-                    r.band = "R1"; r.bandLabel = "2F以前で死亡"; break;
+                    if (boss) { r.band = "R1d"; r.bandLabel = "2Fボスで死亡"; }
+                    else      { r.band = "R1c"; r.bandLabel = "2F道中で死亡"; }
+                    break;
                 case 3:
                     if (boss) { r.band = "R3"; r.bandLabel = "3Fボスで死亡"; }
                     else      { r.band = "R2"; r.bandLabel = "3F道中で死亡"; }
@@ -1129,7 +2124,7 @@ namespace AutoTest
                     else      { r.band = "R6"; r.bandLabel = "5F道中で死亡"; }
                     break;
                 default:
-                    r.band = "R1"; r.bandLabel = "2F以前で死亡"; break;
+                    r.band = "R1a"; r.bandLabel = "1F道中で死亡"; break;
             }
         }
 
@@ -1162,18 +2157,23 @@ namespace AutoTest
                 if (condition.Contains("開始:"))
                     _lastEventInfo = condition.Substring(condition.IndexOf("開始:"));
             }
+            else if (condition != null && condition.StartsWith("[DBG]"))
+            {
+                AddLog(condition); // 一時トレース（原因特定後に削除）
+            }
             else if (type == LogType.Exception || type == LogType.Error)
             {
                 AddLog($"[{type}] {condition}");
             }
         }
 
-        /// <summary>リングバッファ追記。上限超過時は先頭(古い行)を捨て、末尾の終端ログを必ず残す。</summary>
+        /// <summary>リングバッファ追記。上限超過時は先頭(古い行)を捨て、末尾の終端ログを必ず残す。
+        /// Queue による O(1) Dequeue で 10000ラン規模でも線形時間を維持する。</summary>
         private void AddLog(string line)
         {
             if (_curLog.Count >= detailMaxLinesPerRun && _curLog.Count > 0)
-                _curLog.RemoveAt(0);
-            _curLog.Add(line);
+                _curLog.Dequeue();
+            _curLog.Enqueue(line);
         }
 
         // ===== 初期化補助 =====
@@ -1205,21 +2205,48 @@ namespace AutoTest
             string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             string root = Path.Combine(Application.dataPath, "..", "AutoRunLogs");
             root = Path.GetFullPath(root);
-            string metaTag = metaPattern switch
-            {
-                MetaPattern.Cowardly        => "cowardly",
-                MetaPattern.FullProgression => "fullmeta",
-                MetaPattern.Untouched       => "saved",
-                _                           => "meta",
-            };
-            string debuffTag = enableAllDebuffs ? "_debuffON" : "";
-            string dir = Path.Combine(root, $"batch_{stamp}_n{_records.Count}_{metaTag}{debuffTag}");
+            // バッチ命名: プロファイルサフィックスを使用 (旧 cowardly/fullmeta + debuff タグは廃止)
+            string profileTag = MetaProfileHelper.CurrentSuffix;
+            string dir = Path.Combine(root, $"batch_{stamp}_n{_records.Count}_{profileTag}");
             Directory.CreateDirectory(dir);
 
-            File.WriteAllText(Path.Combine(dir, "summary.txt"), BuildSummary(), new UTF8Encoding(false));
+            // L1学習: プロファイル別サブディレクトリに分離して累積
+            string learningRoot = MetaProfileHelper.LearningRoot();
+            ItemLearningStats.StatsFile learnStats = null;
+            try
+            {
+                learnStats = ItemLearningStats.IngestBatch(learningRoot, _records);
+                File.WriteAllText(Path.Combine(dir, "ai_stats.json"),
+                    ItemLearningStats.BuildAiCompact(learnStats), new UTF8Encoding(false));
+            }
+            catch (Exception e) { Debug.LogWarning($"[AutoRunner] L1学習出力失敗: {e.Message}"); }
+
+            // 回帰用ラン単位生データを永続化 (次バッチ起動時に ItemRegression.Recompute が読む)
+            try { RunDataLogger.AppendBatch(learningRoot, _records); }
+            catch (Exception e) { Debug.LogWarning($"[AutoRunner] RunDataLogger 失敗: {e.Message}"); }
+
+            // L1.5: イベント選択肢の bandScore 集計を更新
+            try { EventChoiceLearningStats.IngestBatch(learningRoot, _records); }
+            catch (Exception e) { Debug.LogWarning($"[AutoRunner] イベント学習失敗: {e.Message}"); }
+
+            // L2自動探索: 今バッチの bandScore で policy を評価し、 次バッチへ向けて1軸摂動
+            try { PolicyExplorer.AssessAndPropose(_records, learningRoot); }
+            catch (Exception e) { Debug.LogWarning($"[AutoRunner] L2探索失敗: {e.Message}"); }
+
+            File.WriteAllText(Path.Combine(dir, "summary.txt"),
+                BuildSummary() + (learnStats != null ? "\n" + ItemLearningStats.BuildHumanLiftTable(learnStats) : ""),
+                new UTF8Encoding(false));
             File.WriteAllText(Path.Combine(dir, "runs.jsonl"), BuildJsonl(), new UTF8Encoding(false));
             if (writeDetailLog)
                 File.WriteAllText(Path.Combine(dir, "detail.log"), BuildDetail(), new UTF8Encoding(false));
+
+            // バッチ完了直後に Reload を呼び、 BALANCE_TIER_LIST.md を最新の集計で必ず更新する
+            try
+            {
+                LearnedPriorityProvider.Reload(learningRoot);
+                Debug.Log($"[AutoRunner] WriteLogs後 Reload: {LearnedPriorityProvider.LastLoadedSummary}");
+            }
+            catch (Exception e) { Debug.LogWarning($"[AutoRunner] WriteLogs後 Reload失敗: {e.Message}"); }
 
             return dir;
         }
@@ -1251,6 +2278,10 @@ namespace AutoTest
             sb.AppendLine("比較軸    : 航行Rankのみ差し替え（消費/ショップ/戦闘実行/イベントは共通固定）");
             sb.AppendLine("################################################");
             sb.AppendLine();
+            sb.Append(BuildLambdaFarmBlock());
+            sb.AppendLine();
+            sb.Append(BuildWeaponProgressionBlock());
+            sb.AppendLine();
             sb.Append(BuildSummaryBlock("【前半 50% ─ 戦闘貪欲（戦闘マスを最優先で選ぶ）】", greedy));
             sb.AppendLine();
             sb.AppendLine();
@@ -1261,6 +2292,76 @@ namespace AutoTest
                 sb.AppendLine();
                 sb.Append(BuildSummaryBlock("【プロファイル未設定（保険）】", other));
             }
+            return sb.ToString();
+        }
+
+        /// <summary>Λ層（時間の狭間）のファーム期待値ブロック。突入ランのみを母数に
+        /// 獲得ゴールド/アイテムの平均、踏破マス・Λデバフ段階合計の平均、離脱/Λ内死亡の内訳を出す。</summary>
+        private string BuildLambdaFarmBlock()
+        {
+            var entered = _records.FindAll(r => r.enteredLambda);
+            var sb = new StringBuilder();
+            sb.AppendLine("【Λ層 ファーム期待値（突入ランのみ）】");
+            if (entered.Count == 0)
+            {
+                sb.AppendLine("  Λ突入ラン: 0（〈決意〉未到達 or 5F到達前に終了）");
+                return sb.ToString();
+            }
+            double gold = 0, items = 0, tiles = 0, dbg = 0;
+            int diedInLambda = 0, exited = 0;
+            foreach (var r in entered)
+            {
+                gold += r.lambdaGoldGained;
+                items += r.lambdaItemsGained;
+                tiles += r.lambdaTilesFarmed;
+                dbg += r.lambdaDebuffLevelSum;
+                // Λ内死亡: 5Fで死亡かつ inLambda 由来（reachedFloor==5 のGameOver）。離脱できれば6F以上へ。
+                if (r.outcome == Outcome.GameOver && r.reachedFloor <= 5) diedInLambda++;
+                else exited++;
+            }
+            int n = entered.Count;
+            sb.AppendLine($"  Λ突入ラン   : {n}");
+            sb.AppendLine($"  獲得ゴールド : 平均 +{gold / n:F1}");
+            sb.AppendLine($"  獲得アイテム : 平均 +{items / n:F2} 個");
+            sb.AppendLine($"  踏破マス     : 平均 {tiles / n:F1}");
+            sb.AppendLine($"  Λデバフ段階計: 平均 {dbg / n:F2}");
+            sb.AppendLine($"  離脱成功/Λ内死亡: {exited} / {diedInLambda}");
+            return sb.ToString();
+        }
+
+        /// <summary>武器強化経路の到達状況。 T4集計バグ修正の効果検証用。
+        /// OnWeaponTierUpgraded 発火回数とラン終了時の武器Tier分布を出す。</summary>
+        private string BuildWeaponProgressionBlock()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("【武器強化経路 (集計修正バグ検証)】");
+            int n = _records.Count;
+            if (n == 0) { sb.AppendLine("  (データなし)"); return sb.ToString(); }
+
+            // 強化回数分布
+            int totalUpgrades = 0;
+            int upgradeUsers = 0;
+            int reachT4 = 0;
+            var tierCount = new Dictionary<string, int>();
+            foreach (var r in _records)
+            {
+                if (r == null) continue;
+                totalUpgrades += r.tierUpgradeCount;
+                if (r.tierUpgradeCount > 0) upgradeUsers++;
+                if (!string.IsNullOrEmpty(r.finalWeaponTier))
+                {
+                    tierCount[r.finalWeaponTier] = tierCount.TryGetValue(r.finalWeaponTier, out int c) ? c + 1 : 1;
+                    if (r.finalWeaponTier.EndsWith("_t4")) reachT4++;
+                }
+            }
+            sb.AppendLine($"  強化発火合計   : {totalUpgrades} 回 ({(double)totalUpgrades / n:F2}/ラン)");
+            sb.AppendLine($"  強化を行ったラン: {upgradeUsers} / {n} ({100.0 * upgradeUsers / n:F1}%)");
+            sb.AppendLine($"  最終T4到達ラン : {reachT4} / {n} ({100.0 * reachT4 / n:F1}%)");
+            sb.AppendLine($"  最終武器Tier分布:");
+            var sorted = new List<KeyValuePair<string, int>>(tierCount);
+            sorted.Sort((a, b) => b.Value.CompareTo(a.Value));
+            foreach (var kv in sorted)
+                sb.AppendLine($"    {kv.Key,-20} : {kv.Value} ({100.0 * kv.Value / n:F1}%)");
             return sb.ToString();
         }
 
@@ -1277,20 +2378,29 @@ namespace AutoTest
 
             // --- バンド分布 (R1-R12, R8b 含む) ---
             // R8b = 6Fクリアして 7F進入不可で終了 (真理未所持) を R9 と R10 の間に挿入。
-            sb.AppendLine("---- 結果バンド分布（CRASH/DEADLOCK除く母数で割合算出） ----");
-            string[] bands = { "R1","R2","R3","R4","R5","R6","R7","R8","R9","R8b","R10","R11","R12" };
+            sb.AppendLine("---- 結果バンド分布（上位%＝その結果『以上』に到達したランの割合） ----");
+            string[] bands = { "R1a","R1b","R1c","R1d","R2","R3","R4","R5","R6","R7","R8","R9","R8b","R10","R11","R12" };
             string[] labels = {
-                "2F以前で死亡","3F道中で死亡","3Fボスで死亡","4F道中で死亡","4Fボスで死亡",
+                "1F道中で死亡","1Fボスで死亡","2F道中で死亡","2Fボスで死亡",
+                "3F道中で死亡","3Fボスで死亡","4F道中で死亡","4Fボスで死亡",
                 "5F道中で死亡","5Fボスで死亡","5Fクリア(決意未所持)","6Fボスで死亡",
                 "6Fクリア(真理未所持)","7Fで死亡(覚者到達)","7層クリア(完全クリア)","解脱(妙覚サドンデス勝利)" };
             int crash = recs.FindAll(r => r.band == "CRASH").Count;
             int dead  = recs.FindAll(r => r.band == "DEADLOCK").Count;
             int valid = n - crash - dead;
+            // bands は進行の浅い→深い順。各バンドの「以上(=そのバンド＋それより良い全て)」を
+            // ベスト側から累積し、valid に対する割合＝上位% として表示する。
+            int[] counts = new int[bands.Length];
+            for (int i = 0; i < bands.Length; i++)
+                counts[i] = recs.FindAll(r => r.band == bands[i]).Count;
+            int[] topCum = new int[bands.Length];
+            int cum = 0;
+            for (int i = bands.Length - 1; i >= 0; i--) { cum += counts[i]; topCum[i] = cum; }
             for (int i = 0; i < bands.Length; i++)
             {
-                int c = recs.FindAll(r => r.band == bands[i]).Count;
-                sb.AppendLine($"  {PadR(bands[i],4)}{PadR(labels[i],22)}: {PadL(c.ToString(),4)}  ({Pct(c, valid)})");
+                sb.AppendLine($"  {PadR(bands[i],4)}{PadR(labels[i],22)}: {PadL(counts[i].ToString(),4)}  上位 {PadL(Pct(topCum[i], valid),6)}");
             }
+            sb.AppendLine("  （例: 「7層クリア 上位X%」= 全ランの上位X%が7層クリア以上を達成）");
             sb.AppendLine();
             sb.AppendLine($"  {PadR("CRASH",4)}{PadR("クラッシュ(例外)",22)}: {PadL(crash.ToString(),4)}  ({Pct(crash, n)} of all)");
             sb.AppendLine($"  {PadR("DEAD",4)}{PadR("デッドロック",22)}: {PadL(dead.ToString(),4)}  ({Pct(dead, n)} of all)");
@@ -1386,15 +2496,19 @@ namespace AutoTest
             // --- 経済・燃費 ---
             sb.AppendLine("---- 経済・燃費バランス ----");
             double sCoins=0, sPeak=0, sGain=0, sStarv=0, sStarvHit=0, sShop=0;
+            double sReroll=0, sRerollG=0, sPrio=0;
             foreach (var r in recs)
             { sCoins+=r.finalCoins; sPeak+=r.peakCoins; sGain+=r.totalGoldGained;
-              sStarv+=r.starvationTotal; sStarvHit+=r.starvationHits; sShop+=r.shopPurchases; }
+              sStarv+=r.starvationTotal; sStarvHit+=r.starvationHits; sShop+=r.shopPurchases;
+              sReroll+=r.shopRerolls; sRerollG+=r.shopRerollCoins; sPrio+=r.priorityItemsAcquired; }
             int dn = Math.Max(1, n);
             sb.AppendLine($"  {PadR("平均最終ゴールド", 20)}: {(sCoins/dn):F1}");
             sb.AppendLine($"  {PadR("平均ピークゴールド", 20)}: {(sPeak/dn):F1}");
             sb.AppendLine($"  {PadR("平均総獲得ゴールド", 20)}: {(sGain/dn):F1}");
             sb.AppendLine($"  {PadR("平均空腹ダメージ計", 20)}: {(sStarv/dn):F1}  (平均被弾 {(sStarvHit/dn):F1}回)");
             sb.AppendLine($"  {PadR("平均ショップ購入数", 20)}: {(sShop/dn):F2}");
+            sb.AppendLine($"  {PadR("平均リロール回数", 20)}: {(sReroll/dn):F2}  (平均消費 {(sRerollG/dn):F1}G)");
+            sb.AppendLine($"  {PadR("平均優先アイテム取得", 20)}: {(sPrio/dn):F2}");
             sb.AppendLine();
 
             // --- 5F突入時 確信チェーン進行状況 ---
@@ -1437,7 +2551,7 @@ namespace AutoTest
                 sb.AppendLine("---- タイル踏破分布（1ランあたり平均・実起動回数） ----");
                 var order = new[]
                 {
-                    TileType.Battle, TileType.EliteBattle, TileType.Event, TileType.Mystery,
+                    TileType.Battle, TileType.EliteBattle, TileType.Event, TileType.Exchange,
                     TileType.Shop, TileType.Treasure, TileType.Rest, TileType.Trap,
                 };
                 foreach (var tt in order)
@@ -1452,6 +2566,25 @@ namespace AutoTest
                     double avg = (double)sum / runN;
                     sb.AppendLine($"  {PadR(tt.ToString(), 12)}: 平均 {avg:F2}/ラン  (総{sum}, 1回以上踏破 {Pct(runsWithAny, runN)})");
                 }
+                sb.AppendLine();
+            }
+
+            // --- 6/7層ボス戦のプレイヤー回復・シールド量（1戦平均・検証用） ---
+            // 回復/シールド依存ビルドが各層ボスでどれだけ"延命資源"を獲得しているかを可視化。
+            // 1戦 = OnBattleEnded で確定した戦闘（7層覚者連戦は最終形態の1件に連戦全体の累計を計上）。
+            {
+                long h6 = 0, s6 = 0, h7 = 0, s7 = 0; int n6 = 0, n7 = 0;
+                foreach (var r in recs)
+                    foreach (var cb in r.combats)
+                    {
+                        if (!cb.isFightEnd || !cb.isBoss) continue;
+                        if (cb.floor == 6) { h6 += cb.healApplied; s6 += cb.shieldGained; n6++; }
+                        else if (cb.floor == 7) { h7 += cb.healApplied; s7 += cb.shieldGained; n7++; }
+                    }
+                sb.AppendLine("---- 6/7層ボス戦 プレイヤー回復・シールド量（1戦平均） ----");
+                sb.AppendLine($"  6層ボス: {n6}戦  回復 {(n6 > 0 ? (double)h6 / n6 : 0):F1}/戦  シールド {(n6 > 0 ? (double)s6 / n6 : 0):F1}/戦");
+                sb.AppendLine($"  7層ボス: {n7}戦  回復 {(n7 > 0 ? (double)h7 / n7 : 0):F1}/戦  シールド {(n7 > 0 ? (double)s7 / n7 : 0):F1}/戦");
+                sb.AppendLine("  （7層は覚者連戦全体の累計を1戦として計上）");
                 sb.AppendLine();
             }
 
@@ -1527,6 +2660,47 @@ namespace AutoTest
             sb.AppendLine("（勝率の低い順にソート。致命=そのランをゲームオーバーに導いた回数）");
             sb.AppendLine();
 
+            // --- 武器×ダイス 組み合わせ別 戦闘勝率 ---
+            // 武器は family_tN（種別＋Tier）まで。業物/+段階は区別せず合算。
+            // 各戦闘時点の装備で集計（ランは途中で装備を変えるため per-combat 粒度）。
+            sb.AppendLine("---- 武器×ダイス 組み合わせ別 戦闘勝率（武器はTierまで・業物/+段階は合算） ----");
+            var wdAgg = new Dictionary<string, int[]>(); // key="weapon|dice" -> [遭遇, 勝]
+            foreach (var r in recs)
+                foreach (var c in r.combats)
+                {
+                    string w = string.IsNullOrEmpty(c.weaponId) ? "(無)" : c.weaponId;
+                    string dd = string.IsNullOrEmpty(c.diceId) ? "(武器ダイス)" : c.diceId;
+                    string key = w + "|" + dd;
+                    if (!wdAgg.TryGetValue(key, out var a)) { a = new int[2]; wdAgg[key] = a; }
+                    a[0]++;
+                    if (c.won) a[1]++;
+                }
+            var wdKeys = new List<string>(wdAgg.Keys);
+            // 武器ID昇順 → 同武器内は遭遇数の多い順
+            wdKeys.Sort((x, y) =>
+            {
+                string wx = x.Substring(0, x.IndexOf('|'));
+                string wy = y.Substring(0, y.IndexOf('|'));
+                int c = string.CompareOrdinal(wx, wy);
+                if (c != 0) return c;
+                return wdAgg[y][0].CompareTo(wdAgg[x][0]);
+            });
+            sb.AppendLine($"  {PadR("武器",16)}{PadR("ダイス",16)}{PadL("戦闘数",6)} {PadL("勝率",6)}");
+            string prevW = null;
+            foreach (var k in wdKeys)
+            {
+                var a = wdAgg[k];
+                int bar = k.IndexOf('|');
+                string w = k.Substring(0, bar);
+                string dd = k.Substring(bar + 1);
+                if (prevW != null && prevW != w) sb.AppendLine();
+                prevW = w;
+                string wr = a[0] == 0 ? "-" : (100.0 * a[1] / a[0]).ToString("F0") + "%";
+                sb.AppendLine($"  {PadR(TruncDisp(w,14),16)}{PadR(TruncDisp(dd,14),16)}{PadL(a[0].ToString(),6)} {PadL(wr,6)}");
+            }
+            sb.AppendLine("（戦闘数=その組み合わせで戦った戦闘の総数。少数サンプルの勝率は参考値）");
+            sb.AppendLine();
+
             // --- ボス戦ターン内訳（非解決グラインドの原因特定） ---
             // 全ターンの勝/分/敗の比率＋「吸収敗(敗北だがメインダメ0で死回避)」を表示。
             // 99T級の長期戦＝勝or分or吸収敗ばかりで致命敗が稀、を定量化する。
@@ -1549,8 +2723,10 @@ namespace AutoTest
             sb.AppendLine();
 
             // --- 6Fクリア時ビルドスナップショット（サルベージ用） ---
+            // 一旦オフ: ログが煩雑になるため出力を抑止（再有効化は EmitClearBuildSnapshot=true）。
+            const bool EmitClearBuildSnapshot = false;
             var snaps = recs.FindAll(r => !string.IsNullOrEmpty(r.clear6FSnapshot));
-            if (snaps.Count > 0)
+            if (EmitClearBuildSnapshot && snaps.Count > 0)
             {
                 sb.AppendLine($"---- 6Fクリア時ビルドスナップショット ({snaps.Count}件・サルベージ用) ----");
                 foreach (var r in snaps)

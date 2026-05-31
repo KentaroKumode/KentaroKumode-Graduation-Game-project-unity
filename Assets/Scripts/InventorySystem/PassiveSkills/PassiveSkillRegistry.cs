@@ -56,6 +56,16 @@ namespace InventorySystem.PassiveSkills
             return registry.ContainsKey(internalName);
         }
 
+        /// <summary>IRunResettable を実装する全スキルの ResetRunState を呼ぶ。
+        /// GameManager.StartNewRun から呼び、 ラン跨ぎ永続状態 (Nightfall.persistentOverdamage 等) を初期化。</summary>
+        public static void ResetAllRunState()
+        {
+            EnsureInitialized();
+            foreach (var effect in registry.Values)
+                if (effect is IRunResettable resettable)
+                    resettable.ResetRunState();
+        }
+
         private static void Register(IPassiveSkillEffect effect)
         {
             registry[effect.SkillId] = effect;
@@ -75,31 +85,37 @@ namespace InventorySystem.PassiveSkills
             Register(new PursuitI());
             Register(new PursuitII());
             Register(new PursuitIII());
+            Register(new PursuitIV());
 
             // 反撃
             Register(new CounterI());
             Register(new CounterII());
             Register(new CounterIII());
+            Register(new CounterIV());
 
             // 剛力
             Register(new MightI());
             Register(new MightII());
             Register(new MightIII());
+            Register(new MightIV());
 
             // 堅忍
             Register(new FortitudeI());
             Register(new FortitudeII());
             Register(new FortitudeIII());
+            Register(new FortitudeIV());
 
             // 慧眼
             Register(new InsightI());
             Register(new InsightII());
             Register(new InsightIII());
+            Register(new InsightIV());
 
             // 活力
             Register(new VitalityI());
             Register(new VitalityII());
             Register(new VitalityIII());
+            Register(new VitalityIV());
 
             // ============================
             //  ユニークパッシブ
@@ -125,11 +141,6 @@ namespace InventorySystem.PassiveSkills
             // デッドエンド
             Register(new Ignite());
 
-            // 投資武器（聖剣ライン）
-            Register(new HolyMemory());
-            Register(new HolyAura());
-            Register(new Terminus());
-
             // 呪い武器
             Register(new CurseBind());
             Register(new Abyss());
@@ -144,6 +155,58 @@ namespace InventorySystem.PassiveSkills
             Register(new Destiny());
             Register(new Starguide());
             Register(new Judgement());
+            Register(new IronWall());
+            Register(new Moroha());
+            Register(new Greed());
+            Register(new Perfection());
+            Register(new Eternal());
+            Register(new Lightweight());
+            Register(new Mastery());
+            Register(new Skill());
+            Register(new BladeEdgeI());
+            Register(new BladeEdgeII());
+            Register(new BladeEdgeIII());
+            Register(new BladeEdgeIV());
+
+            // 処刑・対タンク・役・触媒（2026-05-29 追加）
+            Register(new BountyHunterI());
+            Register(new BountyHunterII());
+            Register(new BountyHunterIII());
+            Register(new BountyHunterIV());
+            Register(new GrievousI());      // 治癒阻害（Silver）
+            Register(new GrievousII());     // 治癒遮断（Gold）
+            Register(new Skyladder());      // 天梯（階段→×2）
+            Register(new ApexCrit());       // 天極（ゾロ目→会心確定+倍率）
+            Register(new ConquerorI());
+            Register(new ConquerorII());
+            Register(new ConquerorIII());
+            Register(new ConquerorIV());
+            Register(new LifestealI());     // 吸血（与ダメ%回復）
+            Register(new LifestealII());
+            Register(new LifestealIII());
+            Register(new LifestealIV());
+            Register(new IndomitableI());   // 不屈（敵threat軽減）
+            Register(new IndomitableII());
+            Register(new IndomitableIII());
+            Register(new IndomitableIV());
+            Register(new ShieldBashI());    // シールドバッシュ（勝利時 与ダメ%シールド化）
+            Register(new ShieldBashII());
+            Register(new ShieldBashIII());
+            Register(new ShieldBashIV());
+            Register(new LentTimeI());       // 貸与された時間（被ダメ遅延・上限で一括）
+            Register(new LentTimeII());
+            Register(new LentTimeIII());
+            Register(new LentTimeIV());
+            Register(new Lifeline());       // 命脈（ユニーク）
+            Register(new Repeater());       // リピーター（会心リトリガー触媒）
+            Register(new PalePikeKnight()); // 蒼白の槍騎士（軽減無視ダメ増幅）
+            Register(new Resonance());      // 共鳴（所持数スケール）
+            Register(new Truce());
+            Register(new TenkouKaibutsu());
+            Register(new Bloodlust());
+            Register(new Hermes());
+            Register(new HungerPill());
+            Register(new GoldKingBlade());
 
             // 竜閃（ユニーク武器）
             Register(new MugaMushin());
@@ -221,7 +284,14 @@ namespace InventorySystem.PassiveSkills
             Register(new JudgmentBlaze());
             Register(new AshArmor());
             Register(new ImmortalEmber());
+            Register(new EmberAura());
             Register(new StarfireProliferation());
+            Register(new ScorchedEarth()); // 焦土（敗北毎に最大HP-2・シールド破壊）
+            // ボス威風（ダイス合計バフ）※現在 enemies.json から撤廃済み・未参照。
+            // 再有効化が容易なよう登録は残置（参照されなければ発火しない）。
+            Register(new StrongOne());  // 強者 +4 (5層)
+            Register(new Throne());     // 玉座 +8 (6層)
+            Register(new Setsuna());    // 刹那 +12 (7層)
             // 5層裏ボス
             Register(new SaintGeorgesPhases());
             // 7層裏ボス: 覚者×7形態大連戦
@@ -232,6 +302,7 @@ namespace InventorySystem.PassiveSkills
             Register(new AwakenedP5Silent());
             Register(new AwakenedP6EmberWill());
             Register(new AwakenedP7Myokaku());
+            Register(new FlawlessRobe()); // 天衣無縫（覚者4形態の回復/シールド減衰）
             // [互換用残置] 旧 AwakenedTrial は連戦化により未使用
         }
     }

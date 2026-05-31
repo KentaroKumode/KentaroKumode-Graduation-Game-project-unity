@@ -25,54 +25,58 @@ namespace InventorySystem.PassiveItems.Effects
     }
 
     /// <summary>
-    /// 記憶の砂時計: 戦闘1ターン目に最低出目を最大値に置換（時の凝視の永続版）。
+    /// 記憶の砂時計: 3ターンごとに、その3T区間で敵に与えた累積ダメの30%を
+    /// 軽減不可ダメージとして敵にもう一度叩き込む（蓄積はその度にリセット）。
+    /// 実装:
+    ///  ・OnTurnEnd で毎ターン、前回スナップショットからの敵HP減少量を hourglassPendingDamageWindow に加算
+    ///  ・ターンが 3 の倍数(3/6/9...) で 30% を DealFixedDamageToEnemy 経由で叩き、ウィンドウをリセット
+    ///  ・スナップショットは ctx.hourglassLastEnemyHPSnap で保持（ここでフィールド名を統一）
     /// </summary>
     public class MemoryHourglassEffect : ITimedEffect
     {
         public string Id => "記憶の砂時計";
-        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
+        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnTurnEnd;
+
+        // 直前ターン終了時の敵HPスナップショット (戦闘ごとに先頭で初期化)
+        private static int _lastEnemyHPSnap;
+        private static bool _initialized;
+        private static int _ownerCombatToken;
 
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
-            if (ctx == null || ctx.playerDice == null || ctx.playerDice.Length == 0) return;
-            if (ctx.currentTurn != 1) return;
+            if (ctx == null || combat == null || !combat.IsCombatActive) return;
 
-            int minIdx = 0;
-            for (int i = 1; i < ctx.playerDice.Length; i++)
-                if (ctx.playerDice[i] < ctx.playerDice[minIdx]) minIdx = i;
-
-            int original = ctx.playerDice[minIdx];
-            if (original < ctx.playerDiceMax)
+            // CombatStart で初期化されない設計のため、 token (currentTurn==1 で reset) で疑似初期化
+            int token = combat.GetHashCode() ^ combat.EnemyMaxHP;
+            if (!_initialized || _ownerCombatToken != token || ctx.currentTurn <= 1)
             {
-                ctx.playerDice[minIdx] = ctx.playerDiceMax;
-                Debug.Log($"[PassiveItem] 記憶の砂時計発動: ダイス[{minIdx}] {original}→{ctx.playerDiceMax}");
+                _lastEnemyHPSnap = combat.EnemyHP;
+                _ownerCombatToken = token;
+                _initialized = true;
+                ctx.hourglassPendingDamageWindow = 0;
+            }
+
+            // このターンに与えたダメージ = 前回スナップ - 現在敵HP
+            int dealt = System.Math.Max(0, _lastEnemyHPSnap - combat.EnemyHP);
+            ctx.hourglassPendingDamageWindow += dealt;
+            _lastEnemyHPSnap = combat.EnemyHP;
+
+            // 3ターン区切りで30%を返却
+            if (ctx.currentTurn > 0 && ctx.currentTurn % 3 == 0 && ctx.hourglassPendingDamageWindow > 0)
+            {
+                int rebound = Mathf.CeilToInt(ctx.hourglassPendingDamageWindow * 0.30f);
+                Debug.Log($"[PassiveItem] 記憶の砂時計発動: T{ctx.currentTurn} 蓄積{ctx.hourglassPendingDamageWindow} → 軽減不可+{rebound}");
+                combat.DealFixedDamageToEnemy(rebound);
+                ctx.hourglassPendingDamageWindow = 0;
+                _lastEnemyHPSnap = combat.EnemyHP; // 自前ダメ後の値で続行
             }
         }
     }
 
     /// <summary>
-    /// 激情の刃: HPが最大値の半分以下のとき、与ダメ+30%。
-    /// 毎ロール時に評価し ctx.outgoingDamageMultiplier をセット。
-    /// </summary>
-    public class FuriousBladeEffect : ITimedEffect
-    {
-        public string Id => "激情の刃";
-        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
-
-        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
-        {
-            if (ctx == null || combat == null) return;
-            if (combat.PlayerMaxHP <= 0) return;
-            // HP <= 50% で発動
-            if (combat.PlayerHP * 2 > combat.PlayerMaxHP) return;
-            // 既存倍率に +0.3 を上乗せ（複数効果の累積に備える）
-            ctx.outgoingDamageMultiplier += 0.3f;
-            Debug.Log($"[PassiveItem] 激情の刃発動: 与ダメ倍率→{ctx.outgoingDamageMultiplier:F2}");
-        }
-    }
-
-    /// <summary>
-    /// 希望の灯片: 戦闘終了時、HP+3 回復。
+    /// 希望の灯片: 戦闘中にロール敗北を一度もせずに勝利した時、最大HP+2（永続・無限スタック）。
+    /// 実装: CombatEnd で勝利かつ ctx.rollLossOccurredThisCombat==false なら playerMaxHP+2。
+    /// PassiveSkillManager の敗北処理で rollLossOccurredThisCombat=true がセットされる。
     /// </summary>
     public class HopeEmberEffect : ITimedEffect
     {
@@ -81,49 +85,15 @@ namespace InventorySystem.PassiveItems.Effects
 
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
-            if (combat == null) return;
-            int healed = combat.HealPlayer(3);
-            Debug.Log($"[PassiveItem] 希望の灯片発動: HP+{healed}");
-        }
-    }
-
-    /// <summary>
-    /// 黄昏の懐中時計: 戦闘5T目以降、毎ターン会心率+1/9（同ターン中に他の補正と加算可能）。
-    /// CombatContext に critNumeratorBonus を直接加える運用ではなく、毎ターンチェック方式。
-    /// </summary>
-    public class TwilightPocketwatchEffect : ITimedEffect
-    {
-        public string Id => "黄昏の懐中時計";
-        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
-
-        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
-        {
-            if (ctx == null || ctx.currentTurn < 5) return;
-            // 既存システムの会心は ProcessDamage 内で乱数判定。会心率を補正するフィールドが
-            // ない場合は ctx の playerDice を1個 max に置き換えて疑似的に成功率を上げる。
-            // ここでは単純に会心ボーナスダメ +1 を加える代替（補正経路）。
-            ctx.criticalBonus += 1;
-            Debug.Log($"[PassiveItem] 黄昏の懐中時計: T{ctx.currentTurn} 会心ボーナス+1 (合計{ctx.criticalBonus})");
-        }
-    }
-
-    /// <summary>
-    /// 苦難の刻印: プレイヤーHPが最大値の20%以下のとき、被ダメ-1。
-    /// CombatContext.receivedDamageBonus は加算系なので、負値分を入れて軽減する。
-    /// </summary>
-    public class HardshipSigilEffect : ITimedEffect
-    {
-        public string Id => "苦難の刻印";
-        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
-
-        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
-        {
-            if (ctx == null || combat == null) return;
-            if (combat.PlayerMaxHP <= 0) return;
-            // HP <= 20%
-            if (combat.PlayerHP * 5 > combat.PlayerMaxHP) return;
-            ctx.playerFlatDamageReduction += 1;
-            Debug.Log("[PassiveItem] 苦難の刻印: 瀕死状態のため被ダメ-1");
+            if (ctx == null || combat == null || run == null) return;
+            // 勝利判定: 敵HP<=0
+            if (combat.EnemyHP > 0) return;
+            // 敗北ロールが一度でもあれば不発
+            if (ctx.rollLossOccurredThisCombat) return;
+            // 永続バフ: ランの最大HP+2 (戦闘外でも残る・無限スタック)
+            run.playerMaxHP += 2;
+            run.playerHP = Mathf.Min(run.playerMaxHP, run.playerHP + 2);
+            Debug.Log($"[PassiveItem] 希望の灯片発動: 無敗勝利→ 最大HP+2 (現在 {run.playerMaxHP})");
         }
     }
 
@@ -210,6 +180,7 @@ namespace InventorySystem.PassiveItems.Effects
     // ============================================================
 
     /// <summary>狂乱のメダリオン: HP≤25%で与ダメ+50%</summary>
+    /// <summary>狂乱のメダリオン (リワーク 2026-05-30): HP≤50% で +30%、 HP≤25% で +60% (差分計算で重複適用しない)。</summary>
     public class FrenzyMedallionEffect : ITimedEffect
     {
         public string Id => "狂乱のメダリオン";
@@ -217,38 +188,32 @@ namespace InventorySystem.PassiveItems.Effects
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
             if (ctx == null || combat == null || combat.PlayerMaxHP <= 0) return;
-            if (combat.PlayerHP * 4 > combat.PlayerMaxHP) return; // HP > 25%
+            int hp = combat.PlayerHP, max = combat.PlayerMaxHP;
+            float bonus = 0f;
+            if (hp * 4 <= max)      bonus = 0.60f; // ≤25%
+            else if (hp * 2 <= max) bonus = 0.30f; // ≤50%
+            else return;
             if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
-            ctx.outgoingDamageMultiplier += 0.5f;
-            Debug.Log("[PassiveItem] 狂乱のメダリオン: HP≤25% → 与ダメ+50%");
+            ctx.outgoingDamageMultiplier += bonus;
+            Debug.Log($"[PassiveItem] 狂乱のメダリオン: HP{hp}/{max} → 与ダメ+{(int)(bonus*100)}%");
         }
     }
 
-    /// <summary>不屈の鎧: HP≤50%で被ダメ-2</summary>
-    public class UnyieldingArmorEffect : ITimedEffect
+    /// <summary>末那識 (リワーク 2026-05-30): HP≤35% で会心確定 + 与ダメ×1.3 (旧 HP≤20% で会心のみ)。
+    /// 閾値緩和+追加倍率で発動機会と威力を 2倍化。</summary>
+    public class ManashikiEffect : ITimedEffect
     {
-        public string Id => "不屈の鎧";
+        public string Id => "末那識";
         public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
             if (ctx == null || combat == null || combat.PlayerMaxHP <= 0) return;
-            if (combat.PlayerHP * 2 > combat.PlayerMaxHP) return; // HP > 50%
-            ctx.playerFlatDamageReduction += 2;
-            Debug.Log("[PassiveItem] 不屈の鎧: HP≤50% → 被ダメ-2");
-        }
-    }
-
-    /// <summary>死神の予感: HP≤20%で会心率+3/9</summary>
-    public class DeathOmenEffect : ITimedEffect
-    {
-        public string Id => "死神の予感";
-        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
-        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
-        {
-            if (ctx == null || combat == null || combat.PlayerMaxHP <= 0) return;
-            if (combat.PlayerHP * 5 > combat.PlayerMaxHP) return; // HP > 20%
-            ctx.criticalBonus += 3;
-            Debug.Log("[PassiveItem] 死神の予感: HP≤20% → 会心率+3/9");
+            // HP×100/Max ≤ 35 → 発動
+            if (combat.PlayerHP * 100 > combat.PlayerMaxHP * 35) return;
+            ctx.forceCritical = true;
+            if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
+            ctx.outgoingDamageMultiplier += 0.3f;
+            Debug.Log($"[PassiveItem] 末那識: HP{combat.PlayerHP}/{combat.PlayerMaxHP} → 会心確定+30%");
         }
     }
 
@@ -310,7 +275,9 @@ namespace InventorySystem.PassiveItems.Effects
         }
     }
 
-    /// <summary>倍音のクロック: 戦闘ターン数が3の倍数のとき与ダメ×2</summary>
+    /// <summary>倍音のクロック (2026-05-31 ナーフ v3): 3の倍数ターンで outgoing+=0.5 (×1.5)。
+    /// 旧 +2.5 (×3.5) → +0.5 (×1.5)。 予兆ターン (3n-1) 効果は削除 (重複排除)。
+    /// 倍率系の暴走を抑制する大幅ナーフ。</summary>
     public class HarmonicClockEffect : ITimedEffect
     {
         public string Id => "倍音のクロック";
@@ -319,8 +286,8 @@ namespace InventorySystem.PassiveItems.Effects
         {
             if (ctx == null || ctx.currentTurn <= 0 || ctx.currentTurn % 3 != 0) return;
             if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
-            ctx.outgoingDamageMultiplier += 1f; // 1.0 → 2.0
-            Debug.Log($"[PassiveItem] 倍音のクロック: T{ctx.currentTurn} 与ダメ×2");
+            ctx.outgoingDamageMultiplier += 0.5f; // 1.0 → 1.5
+            Debug.Log($"[PassiveItem] 倍音のクロック: T{ctx.currentTurn} 拍 与ダメ×1.5");
         }
     }
 
@@ -393,7 +360,8 @@ namespace InventorySystem.PassiveItems.Effects
         }
     }
 
-    /// <summary>災厄の指輪: 被弾するたび次の与ダメ+2累積（上限+10、戦闘終了リセット）</summary>
+    /// <summary>災厄の指輪 (リワーク 2026-05-30): 被弾するたび次の与ダメ+3累積 (上限+15、戦闘終了リセット)。
+    /// 旧+2/+10 → +3/+15 で 1.5倍化。</summary>
     public class CalamityRingEffect : ITimedEffect
     {
         public string Id => "災厄の指輪";
@@ -411,7 +379,7 @@ namespace InventorySystem.PassiveItems.Effects
                 if (combat.PlayerHP < prevHP)
                 {
                     float cur = 0f; ctx.accumulatedValues.TryGetValue(Stack, out cur);
-                    ctx.accumulatedValues[Stack] = Mathf.Min(10f, cur + 2f);
+                    ctx.accumulatedValues[Stack] = Mathf.Min(15f, cur + 3f);
                 }
             }
             ctx.accumulatedValues[LastHP] = combat.PlayerHP;
@@ -425,16 +393,23 @@ namespace InventorySystem.PassiveItems.Effects
         }
     }
 
-    /// <summary>永遠の燈: 戦闘終了時HP10以下ならHP+20</summary>
+    /// <summary>永遠の燈 (リワーク 2026-05-30): 戦闘終了時 HPが最大の25%以下なら最大HPの50%まで回復。</summary>
     public class EternalLanternEffect : ITimedEffect
     {
         public string Id => "永遠の燈";
         public TimedEffectTrigger Trigger => TimedEffectTrigger.CombatEnd;
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
-            if (combat == null || combat.PlayerHP <= 0 || combat.PlayerHP > 10) return;
-            int healed = combat.HealPlayer(20);
-            Debug.Log($"[PassiveItem] 永遠の燈: 瀕死回復 HP+{healed}");
+            if (combat == null || combat.PlayerHP <= 0) return;
+            int maxHP = combat.PlayerMaxHP;
+            int curHP = combat.PlayerHP;
+            // HPが maxHP×25% 以下なら発動
+            if (curHP * 4 > maxHP) return;
+            int targetHP = Mathf.CeilToInt(maxHP * 0.50f);
+            int healAmount = System.Math.Max(0, targetHP - curHP);
+            if (healAmount <= 0) return;
+            int healed = combat.HealPlayer(healAmount);
+            Debug.Log($"[PassiveItem] 永遠の燈: 瀕死回復 HP {curHP}→{curHP + healed} (max{maxHP} の50%まで)");
         }
     }
 }

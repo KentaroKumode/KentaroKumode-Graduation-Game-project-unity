@@ -1,6 +1,22 @@
 ﻿{
   "enemies": [
     {
+      "id": "shady_merchant",
+      "displayName": "怪しい商人",
+      "description": "値下げを切り出した瞬間、ローブの奥から鈍く光る刃が覗いた。商人は静かに笑った。",
+      "floor": 5,
+      "maxHP": 78,
+      "diceCount": 4,
+      "diceMaxValue": 8,
+      "criticalNumerator": 4,
+      "threat": 6,
+      "passiveSkills": [
+        { "internalName": "Ethereal", "skillName": "虚体", "description": "受けるダメージを50%軽減" },
+        { "internalName": "IntimidatePlus", "skillName": "威圧+", "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）" },
+        { "internalName": "EliteWraith", "skillName": "霊体", "description": "2ターンに1度 被ダメ全て1に減少、非霊体時はダイス数+1" }
+      ]
+    },
+    {
       "id": "slime",
       "displayName": "スライム",
       "description": "最弱の魔物。ぷるぷると揺れながら近づいてくる。",
@@ -73,7 +89,7 @@
       "floor": 3,
       "maxHP": 22,
       "diceCount": 2,
-      "diceMaxValue": 6,
+      "diceMaxValue": 7,
       "criticalNumerator": 1,
       "threat": 3,
       "passiveSkills": [
@@ -87,7 +103,7 @@
       "floor": 3,
       "maxHP": 17,
       "diceCount": 2,
-      "diceMaxValue": 6,
+      "diceMaxValue": 7,
       "criticalNumerator": 2,
       "threat": 2,
       "passiveSkills": [
@@ -101,7 +117,7 @@
       "floor": 4,
       "maxHP": 28,
       "diceCount": 2,
-      "diceMaxValue": 6,
+      "diceMaxValue": 8,
       "criticalNumerator": 1,
       "threat": 3,
       "passiveSkills": [
@@ -116,7 +132,7 @@
       "floor": 4,
       "maxHP": 31,
       "diceCount": 3,
-      "diceMaxValue": 5,
+      "diceMaxValue": 7,
       "criticalNumerator": 2,
       "threat": 4,
       "passiveSkills": [
@@ -131,7 +147,7 @@
       "floor": 5,
       "maxHP": 39,
       "diceCount": 4,
-      "diceMaxValue": 6,
+      "diceMaxValue": 8,
       "criticalNumerator": 5,
       "threat": 5,
       "passiveSkills": [
@@ -147,7 +163,7 @@
       "floor": 5,
       "maxHP": 67,
       "diceCount": 3,
-      "diceMaxValue": 6,
+      "diceMaxValue": 8,
       "criticalNumerator": 2,
       "threat": 5,
       "passiveSkills": [
@@ -163,7 +179,7 @@
       "floor": 4,
       "maxHP": 34,
       "diceCount": 3,
-      "diceMaxValue": 5,
+      "diceMaxValue": 7,
       "criticalNumerator": 2,
       "threat": 3,
       "passiveSkills": [
@@ -180,7 +196,7 @@
       "floor": 4,
       "maxHP": 34,
       "diceCount": 3,
-      "diceMaxValue": 6,
+      "diceMaxValue": 8,
       "criticalNumerator": 2,
       "threat": 4,
       "passiveSkills": [
@@ -195,7 +211,7 @@
       "floor": 4,
       "maxHP": 34,
       "diceCount": 3,
-      "diceMaxValue": 6,
+      "diceMaxValue": 8,
       "criticalNumerator": 2,
       "threat": 5,
       "passiveSkills": [
@@ -210,7 +226,7 @@
       "floor": 5,
       "maxHP": 45,
       "diceCount": 3,
-      "diceMaxValue": 6,
+      "diceMaxValue": 8,
       "criticalNumerator": 3,
       "threat": 3,
       "passiveSkills": [
@@ -226,7 +242,7 @@
       "floor": 5,
       "maxHP": 45,
       "diceCount": 3,
-      "diceMaxValue": 6,
+      "diceMaxValue": 8,
       "criticalNumerator": 3,
       "threat": 4,
       "passiveSkills": [
@@ -270,7 +286,7 @@
       "floor": 1,
       "maxHP": 10,
       "diceCount": 1,
-      "diceMaxValue": 4,
+      "diceMaxValue": 5,
       "criticalNumerator": 0,
       "threat": 1,
       "passiveSkills": []
@@ -282,7 +298,7 @@
       "floor": 2,
       "maxHP": 32,
       "diceCount": 2,
-      "diceMaxValue": 5,
+      "diceMaxValue": 6,
       "criticalNumerator": 1,
       "threat": 5,
       "passiveSkills": [
@@ -296,7 +312,7 @@
       "floor": 3,
       "maxHP": 67,
       "diceCount": 2,
-      "diceMaxValue": 3,
+      "diceMaxValue": 5,
       "criticalNumerator": 1,
       "threat": 5,
       "passiveSkills": [
@@ -310,7 +326,7 @@
       "floor": 4,
       "maxHP": 67,
       "diceCount": 2,
-      "diceMaxValue": 6,
+      "diceMaxValue": 9,
       "criticalNumerator": 0,
       "threat": 3,
       "passiveSkills": [
@@ -320,27 +336,29 @@
     },
     {
       "id": "boss_layer5",
+      "baseDefenseRate": 0.15,
       "displayName": "業火の審判官",
       "description": "罪人を裁く炎の審判官。罪深きほどその業火は強く燃え盛る。",
       "floor": 5,
-      "maxHP": 109,
-      "diceCount": 3,
-      "diceMaxValue": 5,
+      "maxHP": 1040,
+      "diceCount": 4,
+      "diceMaxValue": 8,
       "criticalNumerator": 3,
       "threat": 5,
       "passiveSkills": [
-        { "internalName": "JudgmentFlames", "skillName": "審判の炎", "description": "毎ターン終了時、1+経過ターン+罪の確定ダメ（罪=総戦闘回数/8、上限2。総ダメ上限8、軽減無視）" },
+        { "internalName": "JudgmentFlames", "skillName": "審判の炎", "description": "毎ターン終了時、1+経過ターン+罪の確定ダメ（罪=総戦闘回数/8、上限2。総ダメ上限13、軽減無視）" },
         { "internalName": "IntimidatePlus", "skillName": "威圧+", "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）" }
       ]
     },
     {
       "id": "boss_layer5_hidden",
+      "baseDefenseRate": 0.15,
       "displayName": "シュヴァリエ・サン=ジョリオラ",
       "description": "失われた決闘術の継承者。盾の構え(コントラタック)と切り返し(オポジション)を交互に繰り出す剣聖。挑む資格を持つ者だけが見える幻。",
       "floor": 5,
-      "maxHP": 98,
+      "maxHP": 920,
       "diceCount": 4,
-      "diceMaxValue": 6,
+      "diceMaxValue": 8,
       "criticalNumerator": 3,
       "threat": 5,
       "passiveSkills": [
@@ -350,44 +368,50 @@
     },
     {
       "id": "boss_layer6",
+      "baseDefenseRate": 0.25,
       "displayName": "灰燼の王",
       "description": "灰と燃え残りで形を成す古き王。致命の業火を振るうが、その一撃には必ず予兆がある。見切り、間一髪で躱し、一撃ずつ削れ。",
       "floor": 6,
-      "maxHP": 200,
-      "diceCount": 4,
-      "diceMaxValue": 6,
+      "maxHP": 2500,
+      "diceCount": 5,
+      "diceMaxValue": 8,
       "criticalNumerator": 3,
       "threat": 5,
       "passiveSkills": [
         { "internalName": "IntimidatePlusPlus", "skillName": "威圧++", "description": "戦闘開始時、脅威+5（勝利しても削られ、敗北で脅威分被弾）" },
-        { "internalName": "JudgmentBlaze", "skillName": "業火の断罪", "description": "断罪ターンを予告。断罪ターンにロール勝利できなければ即死級の一撃(×5+8)。ロール勝利すれば間一髪回避＋鎧貫通の反撃18（このターンは鎧も無効）" },
-        { "internalName": "AshArmor", "skillName": "灰塵の鎧", "description": "被弾時 受けるダメージ-5、軽減後が10超なら10に丸める（断罪ターンは無効）" },
-        { "internalName": "ImmortalEmber", "skillName": "不滅の残り火", "description": "毎ターン失ったHPを回復（60%以下で3%/30%以下で6%、断罪ターンは回復なし）。一度割った60%/30%ラインより上には戻れない" },
-        { "internalName": "StarfireProliferation", "skillName": "星火燎原", "description": "ロール敗北するたびダイス合計値+1（無限累積・リセットなし）。粘られるほど確実に追い付く" }
+        { "internalName": "JudgmentBlaze", "skillName": "業火の断罪", "description": "断罪ターンを予告。断罪ターン敗北で致命の一撃。係数は1回目×4+4、 以降+2ずつ加算（2回目×6+6、3回目×8+8...）。軽減/シールド有効。ロール勝利すれば間一髪回避＋鎧貫通の反撃18（このターンは鎧も無効）" },
+        { "internalName": "AshArmor", "skillName": "灰塵の鎧", "description": "被弾時 受けるダメージ-9、軽減後が10超なら10に丸める（断罪ターンは無効）" },
+        { "internalName": "ImmortalEmber", "skillName": "不滅の残り火", "description": "毎ターン失ったHPを回復（60%以下で5%/30%以下で8%、断罪ターンは回復なし）。一度割った60%/30%ラインより上には戻れない" },
+        { "internalName": "EmberAura", "skillName": "灰塵の威圧", "description": "常時ダイス合計値+3。さらに HP60%/30% の閾値を跨ぐ被弾は、 そのターン中 閾値+1HP で止まる（一度割れば次から効果なし）" },
+        { "internalName": "StarfireProliferation", "skillName": "星火燎原", "description": "ロール敗北するたびダイス合計値+1（無限累積・リセットなし）。粘られるほど確実に追い付く" },
+        { "internalName": "ScorchedEarth", "skillName": "焦土", "description": "プレイヤーがロール敗北するたび、そのターンの被ダメの10%だけ最大HPを削り＋シールド完全破壊。重い一撃ほど地盤が焼け落ちる" }
       ]
     },
     {
       "id": "boss_layer7",
+      "baseDefenseRate": 0.35,
       "displayName": "覚者・初眼",
       "description": "覚者第一形態。剣を構えるよりも先に、相手の手の内を見抜く者。",
       "floor": 7,
-      "maxHP": 75,
+      "maxHP": 300,
       "diceCount": 5,
       "diceMaxValue": 9,
       "criticalNumerator": 0,
       "threat": 5,
       "passiveSkills": [
-        { "internalName": "AwakenedP1Inverse", "skillName": "逆観", "description": "毎T、プレイヤー最大出目を覚者ダイス合計に加算。HP=0で第二形態(業火・残響)へ。" }
+        { "internalName": "AwakenedP1Inverse", "skillName": "逆観", "description": "毎T、プレイヤー最大出目を覚者ダイス合計に加算。HP=0で第二形態(業火・残響)へ。" },
+        { "internalName": "FlawlessRobe", "skillName": "天衣無縫", "description": "覚者がロール勝利するたび、プレイヤーが以降獲得する回復量・シールド量を-1（上限10スタック・覚者連戦を通じて持続）。" }
       ]
     },
     {
       "id": "boss_layer7_p2",
+      "baseDefenseRate": 0.15,
       "displayName": "業火・残響",
       "description": "覚者の振るう剣がかつての審判官の幻影を呼び覚ます。",
       "floor": 7,
       "maxHP": 50,
-      "diceCount": 3,
-      "diceMaxValue": 5,
+      "diceCount": 5,
+      "diceMaxValue": 6,
       "criticalNumerator": 3,
       "threat": 4,
       "passiveSkills": [
@@ -397,55 +421,61 @@
     },
     {
       "id": "boss_layer7_p3",
+      "baseDefenseRate": 0.35,
       "displayName": "覚者・無相",
       "description": "覚者第二形態。形なき剣。打てば、その分だけ己も斬れる。",
       "floor": 7,
-      "maxHP": 75,
+      "maxHP": 300,
       "diceCount": 5,
       "diceMaxValue": 9,
       "criticalNumerator": 0,
       "threat": 5,
       "passiveSkills": [
-        { "internalName": "AwakenedP3Mirror", "skillName": "鏡映", "description": "覚者への与ダメと同量をプレイヤーHPからも引く。HP=0で第四形態へ。" }
+        { "internalName": "AwakenedP3Mirror", "skillName": "鏡映", "description": "覚者への与ダメの50%をプレイヤーHPからも引く。HP=0で第四形態へ。" },
+        { "internalName": "FlawlessRobe", "skillName": "天衣無縫", "description": "覚者がロール勝利するたび、プレイヤーが以降獲得する回復量・シールド量を-1（上限10スタック・覚者連戦を通じて持続）。" }
       ]
     },
     {
       "id": "boss_layer7_p4",
+      "baseDefenseRate": 0.15,
       "displayName": "シュヴァリエ・残影",
       "description": "覚者の剣筋に剣聖の影が重なる。一閃を、見せられるか。",
       "floor": 7,
-      "maxHP": 50,
-      "diceCount": 4,
-      "diceMaxValue": 6,
+      "maxHP": 150,
+      "diceCount": 5,
+      "diceMaxValue": 7,
       "criticalNumerator": 3,
       "threat": 4,
       "passiveSkills": [
-        { "internalName": "AwakenedP4Riposte", "skillName": "一閃返し", "description": "1度限り、被ダメ完全無効+2倍反射。発動後は通常戦闘。HP=0で第五形態へ。" },
+        { "internalName": "AwakenedP4Riposte", "skillName": "一閃返し", "description": "1度限り、被ダメ完全無効（反射なし）。発動後は通常戦闘。HP=0で第五形態へ。" },
         { "internalName": "IntimidatePlus", "skillName": "威圧+", "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）" }
       ]
     },
     {
       "id": "boss_layer7_p5",
+      "baseDefenseRate": 0.35,
       "displayName": "覚者・寂照",
       "description": "覚者第三形態。煩悩を捨てぬ者、その手から一つずつ消える。",
       "floor": 7,
-      "maxHP": 75,
+      "maxHP": 400,
       "diceCount": 5,
       "diceMaxValue": 9,
       "criticalNumerator": 0,
       "threat": 5,
       "passiveSkills": [
-        { "internalName": "AwakenedP5Silent", "skillName": "寂照", "description": "プレイヤーが消費品/レイピア使用→ランダムなパッシブ装備を永久喪失。HP=0で第六形態へ。" }
+        { "internalName": "AwakenedP5Silent", "skillName": "寂照", "description": "プレイヤーが消費品/レイピア使用→ランダムなパッシブ装備を永久喪失。HP=0で第六形態へ。" },
+        { "internalName": "FlawlessRobe", "skillName": "天衣無縫", "description": "覚者がロール勝利するたび、プレイヤーが以降獲得する回復量・シールド量を-1（上限10スタック・覚者連戦を通じて持続）。" }
       ]
     },
     {
       "id": "boss_layer7_p6",
+      "baseDefenseRate": 0.25,
       "displayName": "灰燼・薄火",
       "description": "覚者の構えに灰燼の遺志が宿る。終わりは近い、しかし容赦はない。",
       "floor": 7,
       "maxHP": 90,
-      "diceCount": 4,
-      "diceMaxValue": 6,
+      "diceCount": 5,
+      "diceMaxValue": 7,
       "criticalNumerator": 3,
       "threat": 5,
       "passiveSkills": [
@@ -455,6 +485,7 @@
     },
     {
       "id": "boss_layer7_p7",
+      "baseDefenseRate": 0.35,
       "displayName": "覚者・妙覚",
       "description": "完全なる悟り。一閃前の静寂、然して全断。動けば、其れにて全てを断つ。",
       "floor": 7,
@@ -464,7 +495,8 @@
       "criticalNumerator": 0,
       "threat": 0,
       "passiveSkills": [
-        { "internalName": "AwakenedP7Myokaku", "skillName": "妙覚", "description": "T1のみ0d0(自由攻撃可)。T2以降、覚者ダイス合計99強制+クリ率100%(永続)。プレイヤーが敗北かつ生存中は1d2連続サドンデス、サドンデスで勝てば【解脱】特殊勝利。" }
+        { "internalName": "AwakenedP7Myokaku", "skillName": "妙覚", "description": "覚者ダイス合計99を6ターン連続で強制する。6ターン耐えれば7ターン目に両者1d2のサドンデス、プレイヤーが勝てば【解脱】特殊勝利。" },
+        { "internalName": "FlawlessRobe", "skillName": "天衣無縫", "description": "覚者がロール勝利するたび、プレイヤーが以降獲得する回復量・シールド量を-1（上限10スタック・覚者連戦を通じて持続）。" }
       ]
     }
   ]

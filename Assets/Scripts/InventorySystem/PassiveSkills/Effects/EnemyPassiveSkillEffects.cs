@@ -37,7 +37,7 @@ namespace InventorySystem.PassiveSkills.Effects
 
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + 1);
+            ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + ctx.ReduceEnemyHeal(1));
         }
     }
 
@@ -209,9 +209,15 @@ namespace InventorySystem.PassiveSkills.Effects
     public class EliteVigor : IPassiveSkillEffect
     {
         public string SkillId => "EliteVigor";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
+            if (trigger == PassiveSkillTrigger.OnBattleStart)
+            {
+                // エリート汎用: 基礎防御10%（被ダメ%軽減）。利刃で剥がせる。
+                ctx.enemyDamageReductionPct += 0.10f;
+                return;
+            }
             int bonus = System.Math.Max(0, ctx.currentTurn) / 3; // 3ターンごとに+1
             if (bonus > 0) ctx.playerDiceTotal += bonus; // 敵視点で自身のダイス合計
         }
@@ -481,7 +487,7 @@ namespace InventorySystem.PassiveSkills.Effects
 
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + 1);
+            ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + ctx.ReduceEnemyHeal(1));
         }
     }
 
@@ -521,7 +527,7 @@ namespace InventorySystem.PassiveSkills.Effects
         {
             if (ctx.playerWonRoll && ctx.finalDamage > 0)
             {
-                int heal = ctx.finalDamage / 2;
+                int heal = ctx.ReduceEnemyHeal(ctx.finalDamage / 2);
                 ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + heal);
             }
         }
@@ -631,6 +637,23 @@ namespace InventorySystem.PassiveSkills.Effects
                 ctx.accumulatedValues["berserk_dice_applied"] = 1;
                 UnityEngine.Debug.Log($"[Berserk] 狂暴化発動 (T{ctx.currentTurn}): 敵ダイス+{DiceBonus}, 回復封印, 敵被ダメ×{EnemyDamageTakenMult}");
             }
+        }
+    }
+
+    /// <summary>天衣無縫: 覚者(寂照/初眼/無相/妙覚)に付与。覚者がロール勝利するたび、
+    /// プレイヤーが以降獲得する回復量・シールド量を-1（上限10スタック）。
+    /// 長期戦＝タンク戦術を覚者連戦を通じて逓減させる。敵視点 OnRollWin = 覚者がロール勝利。
+    /// ※上限20は7形態1020HPの長期戦で持続力を完全枯渇させ0%クリアの主因だったため10へ緩和。</summary>
+    public class FlawlessRobe : IPassiveSkillEffect
+    {
+        public const int MaxStacks = 10;
+        public string SkillId => "FlawlessRobe";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollWin };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            if (ctx.healShieldReduction >= MaxStacks) return;
+            ctx.healShieldReduction++;
+            UnityEngine.Debug.Log($"[天衣無縫] 回復/シールド減衰 +1 → -{ctx.healShieldReduction}");
         }
     }
 
@@ -824,9 +847,9 @@ namespace InventorySystem.PassiveSkills.Effects
         {
             var run = GameLoop.GameManager.Instance?.Run;
             int sin = System.Math.Min(2, (run?.totalBattles ?? 0) / 8); // 罪: プレイで操作可能
-            int dmg = System.Math.Min(8, 1 + System.Math.Max(1, ctx.currentTurn) + sin);
+            int dmg = System.Math.Min(13, 1 + System.Math.Max(1, ctx.currentTurn) + sin);
             ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - dmg);
-            UnityEngine.Debug.Log($"[審判の炎] {dmg}ダメ (1+経過T{ctx.currentTurn}+罪{sin}, 上限8, 軽減無視) → プレイヤー残HP={ctx.enemyCurrentHP}");
+            UnityEngine.Debug.Log($"[審判の炎] {dmg}ダメ (1+経過T{ctx.currentTurn}+罪{sin}, 上限13, 軽減無視) → プレイヤー残HP={ctx.enemyCurrentHP}");
         }
     }
 
@@ -916,7 +939,7 @@ namespace InventorySystem.PassiveSkills.Effects
             // 敵視点で playerCurrentHP / playerMaxHP = 自身（ボス）のHP
             if (ctx.playerMaxHP <= 0) return;
             if (ctx.playerCurrentHP * 2 > ctx.playerMaxHP) return; // 50%超なら何もしない
-            int heal = UnityEngine.Mathf.CeilToInt(ctx.playerMaxHP * 0.05f);
+            int heal = ctx.ReduceEnemyHeal(UnityEngine.Mathf.CeilToInt(ctx.playerMaxHP * 0.05f));
             int oldHP = ctx.playerCurrentHP;
             ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + heal);
             UnityEngine.Debug.Log($"[灰燼への回帰] +{heal} ({oldHP}→{ctx.playerCurrentHP})");
@@ -948,15 +971,16 @@ namespace InventorySystem.PassiveSkills.Effects
     }
 
     /// <summary>業火の断罪 — 断罪ターンを予告（灰の予兆を統合）。
-    /// 断罪ターン、ボスがロール勝利すると与ダメ×4+6の
-    /// 即死級メインダメ（ロール由来＝LSでも巻き戻されない＝必ず決着）。
-    /// プレイヤーがロール勝利＝間一髪回避し、鎧貫通の確定反撃12をボスへ。</summary>
+    /// 断罪ターンにボスがロール勝利すると、 ボス最終ダメージ ×8+8 の致命ダメ
+    /// （軽減/シールド有効経路で適用）。 プレイヤーがロール勝利＝間一髪回避し、
+    /// 鎧貫通の確定反撃18をボスへ。</summary>
     public class JudgmentBlaze : IPassiveSkillEffect
     {
         public string SkillId => "JudgmentBlaze";
         public PassiveSkillTrigger[] Triggers => new[] {
             PassiveSkillTrigger.OnTurnStart,
-            PassiveSkillTrigger.OnPreDealDamage, PassiveSkillTrigger.OnRollLose,
+            PassiveSkillTrigger.OnPreDealDamage,
+            PassiveSkillTrigger.OnRollLose,
             PassiveSkillTrigger.OnTurnEnd };
         private const string CtrKey = "ek_counter";
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
@@ -966,15 +990,27 @@ namespace InventorySystem.PassiveSkills.Effects
                 case PassiveSkillTrigger.OnTurnStart:
                     // 灰の予兆統合: 断罪ターンを予告（読める＝運でなく対応の問題）
                     if (EmberKing.IsJudgment(ctx))
-                        UnityEngine.Debug.Log($"[灰の予兆] 業火の断罪（T{ctx.currentTurn}・周期{EmberKing.Period(ctx)}）—ロール勝利で間一髪回避");
+                    {
+                        ctx.enemyDiceTotalBonus += 10; // 断罪Tは敵ダイス+10 (見切り難度up)
+                        // 断罪Tの累積回数 (この戦闘で何回目か) をカウント
+                        int n = (int)ctx.GetAccumulated("judg_counter") + 1;
+                        ctx.accumulatedValues["judg_counter"] = n;
+                        UnityEngine.Debug.Log($"[灰の予兆] 業火の断罪 第{n}回（T{ctx.currentTurn}・周期{EmberKing.Period(ctx)}）—敵ダイス+10、ロール勝利で間一髪回避");
+                    }
                     break;
 
                 case PassiveSkillTrigger.OnPreDealDamage:
+                    // 敵視点: playerWonRoll = ボスがロール勝利 = プレイヤー敗北。
+                    // 断罪Tに発動 → 係数は 1回目=4、 以降+2ずつ (2回目=6、 3回目=8、 4回目=10...)。
+                    // ctx.finalDamage = base × coef + coef （軽減/シールド有効経路）。
                     if (ctx.playerWonRoll && EmberKing.IsJudgment(ctx))
                     {
+                        int n = (int)ctx.GetAccumulated("judg_counter");
+                        if (n < 1) n = 1;
+                        int coef = 2 + 2 * n; // 1回目=4、2回目=6、3回目=8...
                         int before = ctx.finalDamage;
-                        ctx.finalDamage = ctx.finalDamage * 5 + 8; // 致命の一撃（火力強化で戦闘圧縮）
-                        UnityEngine.Debug.Log($"[業火の断罪] 致命の一撃 {before}→{ctx.finalDamage}");
+                        ctx.finalDamage = ctx.finalDamage * coef + coef;
+                        UnityEngine.Debug.Log($"[業火の断罪] 致命の一撃 第{n}回 {before}→{ctx.finalDamage}（×{coef}+{coef}）");
                     }
                     break;
                 case PassiveSkillTrigger.OnRollLose:
@@ -995,6 +1031,57 @@ namespace InventorySystem.PassiveSkills.Effects
         }
     }
 
+    /// <summary>灰塵の威圧 — 常時ダイス合計+3。 HP60%/30% 閾値を跨ぐ被弾は、
+    /// そのターン中 閾値+1HP で止まる（一度割れば次から効果なし）。
+    /// ImmortalEmber の B60/B30 ラチェットと連動。</summary>
+    public class EmberAura : IPassiveSkillEffect
+    {
+        public string SkillId => "EmberAura";
+        public PassiveSkillTrigger[] Triggers => new[] {
+            PassiveSkillTrigger.OnTurnStart,
+            PassiveSkillTrigger.OnPreReceiveDamage };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            switch (trigger)
+            {
+                case PassiveSkillTrigger.OnTurnStart:
+                    ctx.enemyDiceTotalBonus += 3; // 常時 +3
+                    break;
+                case PassiveSkillTrigger.OnPreReceiveDamage:
+                    // 敵視点: playerCurrentHP = ボス自身のHP、 ctx.finalDamage = 被ダメ予定
+                    if (ctx.playerMaxHP <= 0 || ctx.finalDamage <= 0) return;
+                    int cur = ctx.playerCurrentHP;
+                    int dmg = ctx.finalDamage;
+                    float maxHP = ctx.playerMaxHP;
+                    int t60 = UnityEngine.Mathf.CeilToInt(maxHP * 0.60f);
+                    int t30 = UnityEngine.Mathf.CeilToInt(maxHP * 0.30f);
+
+                    // 60% 閾値ガード: 1戦闘1回のみ。被弾後60%以下になる一撃を 閾値+1HP で止める
+                    if (cur > t60 && cur - dmg <= t60
+                        && ctx.GetAccumulated("ember_guard_60_used") == 0f)
+                    {
+                        int allowed = cur - (t60 + 1);
+                        if (allowed < 0) allowed = 0;
+                        ctx.finalDamage = allowed;
+                        ctx.accumulatedValues["ember_guard_60_used"] = 1f;
+                        UnityEngine.Debug.Log($"[灰塵の威圧] 60%閾値ガード: {dmg}→{allowed} (HP{cur}→{t60 + 1})");
+                        return;
+                    }
+                    // 30% 閾値ガード: 1戦闘1回のみ
+                    if (cur > t30 && cur - dmg <= t30
+                        && ctx.GetAccumulated("ember_guard_30_used") == 0f)
+                    {
+                        int allowed = cur - (t30 + 1);
+                        if (allowed < 0) allowed = 0;
+                        ctx.finalDamage = allowed;
+                        ctx.accumulatedValues["ember_guard_30_used"] = 1f;
+                        UnityEngine.Debug.Log($"[灰塵の威圧] 30%閾値ガード: {dmg}→{allowed} (HP{cur}→{t30 + 1})");
+                    }
+                    break;
+            }
+        }
+    }
+
     /// <summary>灰塵の鎧 — 被弾時、受けるダメージ-5。軽減後が10超なら10に丸める
     /// （通常打は「なんとか一撃」）。断罪ターンは鎧無効＝削りの本命窓。</summary>
     public class AshArmor : IPassiveSkillEffect
@@ -1008,7 +1095,7 @@ namespace InventorySystem.PassiveSkills.Effects
 
             if (ctx.playerLostRoll && ctx.finalDamage > 0)
             {
-                int reduced = System.Math.Max(0, ctx.finalDamage - 5);
+                int reduced = System.Math.Max(0, ctx.finalDamage - 9); // 2026-05-31: -5→-9 (T4装備の高火力削りを抑制)
                 ctx.finalDamage = System.Math.Min(reduced, 10);
             }
         }
@@ -1050,10 +1137,10 @@ namespace InventorySystem.PassiveSkills.Effects
             int missing = ctx.playerMaxHP - cur;
             if (missing <= 0) return;
 
-            float pct = below30 ? 0.06f : below60 ? 0.03f : 0f;
+            float pct = below30 ? 0.08f : below60 ? 0.05f : 0f; // 2026-05-31: 3%/6% → 5%/8% (長期戦化耐性)
             if (pct <= 0f) return; // >60%: 再生なし
 
-            int heal = System.Math.Max(1, UnityEngine.Mathf.FloorToInt(missing * pct));
+            int heal = ctx.ReduceEnemyHeal(System.Math.Max(1, UnityEngine.Mathf.FloorToInt(missing * pct)));
             int target = System.Math.Min(cap, cur + heal);
             if (target <= cur) return;
 
@@ -1077,6 +1164,62 @@ namespace InventorySystem.PassiveSkills.Effects
             ctx.accumulatedValues[Key] = stack;
             ctx.enemyDiceTotalBonus = stack; // 次ロール以降、勝敗判定前にボス合計へ +stack
             UnityEngine.Debug.Log($"[星火燎原] ボス敗北 → ダイス合計補正 累計+{stack}");
+        }
+    }
+
+    /// <summary>強者 — このボスはダイス合計に+4の威風を持つ（5層ボス）。OnBattleStartで設定。</summary>
+    public class StrongOne : IPassiveSkillEffect
+    {
+        public string SkillId => "StrongOne";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { ctx.bossDiceBonus = 4; }
+    }
+
+    /// <summary>玉座 — このボスはダイス合計に+8の威風を持つ（6層ボス）。OnBattleStartで設定。</summary>
+    public class Throne : IPassiveSkillEffect
+    {
+        public string SkillId => "Throne";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { ctx.bossDiceBonus = 8; }
+    }
+
+    /// <summary>刹那 — このボスはダイス合計に+12の威風を持つ（7層ボス・覚者連戦は全形態に再付与）。OnBattleStartで設定。</summary>
+    public class Setsuna : IPassiveSkillEffect
+    {
+        public string SkillId => "Setsuna";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { ctx.bossDiceBonus = 12; }
+    }
+
+    /// <summary>焦土 — プレイヤーがロール敗北するたび、そのターンの被ダメの10%だけ
+    /// プレイヤーの最大HPを削り、シールドを完全破壊する。
+    /// 重い一撃を受けるほど地盤が焼け落ちる。消耗戦の膠着を許さない。
+    /// 敵視点: OnRollWin = ボスがロール勝利 = プレイヤー敗北。
+    /// enemyMaxHP/enemyCurrentHP = 実プレイヤーの最大/現在HP（OnTurnEnd で適用＝SyncHPで反映）。</summary>
+    public class ScorchedEarth : IPassiveSkillEffect
+    {
+        public const float MaxHpLossRatio = 0.10f; // 被ダメの10%を最大HPから削る
+        public string SkillId => "ScorchedEarth";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            // このターンにプレイヤーが敗北した場合のみ（敵視点 playerWonRoll = ボス勝利）
+            if (!ctx.playerWonRoll) return;
+
+            int loss = UnityEngine.Mathf.FloorToInt(ctx.playerDamageThisTurn * MaxHpLossRatio);
+            int beforeMax = ctx.enemyMaxHP;
+            if (loss > 0)
+            {
+                ctx.enemyMaxHP = System.Math.Max(1, ctx.enemyMaxHP - loss);
+                if (ctx.enemyCurrentHP > ctx.enemyMaxHP) ctx.enemyCurrentHP = ctx.enemyMaxHP;
+            }
+
+            bool hadShield = ctx.consShield > 0;
+            ctx.consShield = 0; // シールド完全破壊
+
+            if (loss > 0 || hadShield)
+                UnityEngine.Debug.Log($"[焦土] 被ダメ{ctx.playerDamageThisTurn}→最大HP-{loss} ({beforeMax}→{ctx.enemyMaxHP})"
+                    + (hadShield ? " ＋シールド破壊" : ""));
         }
     }
 
@@ -1181,9 +1324,11 @@ namespace InventorySystem.PassiveSkills.Effects
             {
                 case PassiveSkillTrigger.OnBattleStart:
                     ctx.accumulatedValues[KPhase] = 1;
-                    ctx.accumulatedValues[KShield] = BaseShield;
-                    ctx.accumulatedValues[KPrioriteStacks] = 0;
-                    UnityEngine.Debug.Log($"[サン=ジョリオラ] 戦闘開始: コントラタック構え シールド{BaseShield}");
+                    // 2026-05-31: プリオリテ初期+1 (BaseShield - PrioriteShieldDecPer = 140-28=112 で開始)
+                    ctx.accumulatedValues[KPrioriteStacks] = 1;
+                    int initShield = System.Math.Max(MinShield, BaseShield - PrioriteShieldDecPer);
+                    ctx.accumulatedValues[KShield] = initShield;
+                    UnityEngine.Debug.Log($"[サン=ジョリオラ] 戦闘開始: コントラタック構え シールド{initShield} (プリオリテ初期+1)");
                     break;
 
                 case PassiveSkillTrigger.OnTurnStart:
@@ -1374,10 +1519,13 @@ namespace InventorySystem.PassiveSkills.Effects
                 {
                     int maxFace = 0;
                     foreach (var d in ctx.enemyDice) if (d > maxFace) maxFace = d;
-                    if (maxFace > 0)
+                    // 逆観: プレイヤー最大出目 ＋ 経過ターンに比例した重圧（長期戦ほど致死的に）。
+                    int escalate = ctx.currentTurn / 3; // T3で+1, T9で+3, T15で+5…
+                    int total = maxFace + escalate;
+                    if (total > 0)
                     {
-                        ctx.fixedDamageToEnemy += maxFace;
-                        UnityEngine.Debug.Log($"[覚者・逆観] プレイヤー最大出目{maxFace} → 固定ダメ(軽減無視)");
+                        ctx.fixedDamageToEnemy += total;
+                        UnityEngine.Debug.Log($"[覚者・逆観] 最大出目{maxFace}+重圧{escalate} → 固定ダメ{total}(軽減無視)");
                     }
                 }
             }
@@ -1420,10 +1568,12 @@ namespace InventorySystem.PassiveSkills.Effects
                 int dmg = ctx.finalDamage;
                 if (dmg > 0)
                 {
+                    // 反射は与ダメの50%に軽減（100%反射はHP180・防御35%相手で数学的にほぼ勝てないため）。
                     // 反射は fixedDamageToEnemy 経由 (敵視点なので real fixedDamageToPlayer に対応)。
                     // ctx.enemyCurrentHP を直接書くと CombatManager の ctx.playerCurrentHP = playerHP 同期で上書きされる。
-                    ctx.fixedDamageToEnemy += dmg;
-                    UnityEngine.Debug.Log($"[覚者・鏡映] 与ダメ{dmg}を反射 → プレイヤーへ固定ダメ");
+                    int reflect = UnityEngine.Mathf.CeilToInt(dmg * 0.5f);
+                    ctx.fixedDamageToEnemy += reflect;
+                    UnityEngine.Debug.Log($"[覚者・鏡映] 与ダメ{dmg}の50%={reflect}を反射 → プレイヤーへ固定ダメ");
                 }
             }
             else if (trigger == PassiveSkillTrigger.OnTurnEnd)
@@ -1447,11 +1597,10 @@ namespace InventorySystem.PassiveSkills.Effects
                 int dmg = ctx.finalDamage;
                 if (dmg <= 0) return;
                 ctx.accumulatedValues[KUsed] = 1;
-                int reflect = dmg * 2;
+                // 反射は撤廃（2倍→等倍でも低HP到達プレイヤーを即死させ p4 が96%死亡の壁だったため）。
+                // 「初撃完全無効」のみ＝テンポ損のみで即死はしない見切りの一閃。
                 ctx.finalDamage = 0;
-                // 反射ダメは fixedDamageToEnemy (= 敵視点ではプレイヤーへの固定ダメ) 経由で渡す。
-                ctx.fixedDamageToEnemy += reflect;
-                UnityEngine.Debug.Log($"[覚者・一閃返し] 被ダメ{dmg}無効化 → 反射{reflect}");
+                UnityEngine.Debug.Log($"[覚者・一閃返し] 被ダメ{dmg}を完全無効化（反射なし）");
             }
             else if (trigger == PassiveSkillTrigger.OnTurnEnd)
             {
@@ -1540,7 +1689,6 @@ namespace InventorySystem.PassiveSkills.Effects
         public string SkillId => "AwakenedP7Myokaku";
         public PassiveSkillTrigger[] Triggers => new[] {
             PassiveSkillTrigger.OnTurnStart,
-            PassiveSkillTrigger.OnRollWin,
             PassiveSkillTrigger.OnTurnEnd,
         };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
@@ -1563,35 +1711,11 @@ namespace InventorySystem.PassiveSkills.Effects
                     int enteredAt = (int)ctx.GetAccumulated("myokaku_entered");
                     int myokakuT = ctx.currentTurn - enteredAt + 1;
 
-                    if (myokakuT == 1)
-                    {
-                        // 妙覚-T1: 0d0 (静寂、自由攻撃可)
-                        ctx.accumulatedValues["extraDice"] = -5;
-                        ctx.enemyDiceTotalBonus = 0;
-                        UnityEngine.Debug.Log("[覚者・妙覚] 妙覚-T1: 静寂 (覚者0d0)");
-                    }
-                    else
-                    {
-                        // 妙覚-T2+: ダイス合計を圧倒的に押し上げる (raw 5d9 + 99 ≈ 124-144)
-                        ctx.accumulatedValues["extraDice"] = 0;
-                        ctx.enemyDiceTotalBonus = 99;
-                        UnityEngine.Debug.Log($"[覚者・妙覚] 妙覚-T{myokakuT}: ダイス合計 +99 (圧倒)");
-                    }
+                    // 妙覚-T1〜T6: ダイス合計99強制を6ターン連続（会心補正なし）。
+                    ctx.accumulatedValues["extraDice"] = 0;
+                    ctx.enemyDiceTotalBonus = 99;
+                    UnityEngine.Debug.Log($"[覚者・妙覚] 妙覚-T{myokakuT}(+99 圧倒 {myokakuT}/6)");
                     break;
-
-                case PassiveSkillTrigger.OnRollWin:
-                {
-                    if (ctx.myokakuSuddenDeath) break;
-                    // 妙覚-内部T で T2+判定
-                    int entered = (int)ctx.GetAccumulated("myokaku_entered");
-                    int mT = entered > 0 ? (ctx.currentTurn - entered + 1) : 1;
-                    if (mT >= 2)
-                    {
-                        ctx.fixedDamageToEnemy += 30;
-                        UnityEngine.Debug.Log("[覚者・妙覚] 妙覚-T2+ クリ相当: 固定ダメ +30 (軽減無視)");
-                    }
-                    break;
-                }
 
                 case PassiveSkillTrigger.OnTurnEnd:
                 {
@@ -1608,21 +1732,14 @@ namespace InventorySystem.PassiveSkills.Effects
                         return;
                     }
 
-                    // 妙覚-T2+ 通常T: ロール敗北 → 次Tからサドンデス開始
-                    // 99ダイスボーナスの被ダメで HP<=0 になっても、妙覚は致命傷を「踏みとどまらせる」
-                    // (= 仕様『敗北かつ生存』の生存条件を強制成立させる)。
-                    // 敵視点: ctx.enemyCurrentHP = 現実のプレイヤーHP
+                    // 99 を6ターン連続(T1〜T6)で浴びる。HP0なら通常死亡（救済なし）。
+                    // T6 を生き残れば、7ターン目に両者1d2のサドンデス＝解脱判定へ。
                     int entered2 = (int)ctx.GetAccumulated("myokaku_entered");
                     int mT2 = entered2 > 0 ? (ctx.currentTurn - entered2 + 1) : 1;
-                    if (mT2 >= 2 && ctx.playerWonRoll)
+                    if (mT2 >= 6)
                     {
-                        if (ctx.enemyCurrentHP <= 0)
-                        {
-                            ctx.enemyCurrentHP = 1; // 致命傷踏みとどまり
-                            UnityEngine.Debug.Log("[覚者・妙覚] 致命傷を踏みとどまる → プレイヤーHP1");
-                        }
                         ctx.myokakuSuddenDeath = true;
-                        UnityEngine.Debug.Log("[覚者・妙覚] ロール敗北検知 → 次T以降 1d6 サドンデス開始");
+                        UnityEngine.Debug.Log("[覚者・妙覚] 99を6ターン耐え抜いた → 7ターン目 1d2 サドンデス（解脱判定）");
                     }
                     break;
                 }

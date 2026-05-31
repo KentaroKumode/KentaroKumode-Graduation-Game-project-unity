@@ -56,6 +56,7 @@ namespace InventorySystem.Sigils
             {
                 // 鉛の刻印: 破壊まで永続 (consShieldExpireTurn=-1)
                 ctx.consShield += shieldAdd;
+                ctx.shieldGainedTotal += shieldAdd; // 検証計測
                 ctx.consShieldExpireTurn = -1;
                 Debug.Log($"[Sigil] 鉛の刻印: シールド +{shieldAdd} (永続)");
             }

@@ -58,6 +58,21 @@ namespace MapSystem
             OnMapGenerated?.Invoke(CurrentMap);
         }
 
+        /// <summary>Λ層（時間の狭間）の環状線マップを生成し、スポーク(S)に配置。
+        /// 空腹/飢餓は発生しないため Hunger は十分大きい値で初期化する。</summary>
+        public void GenerateLambda()
+        {
+            CurrentMap = MapGenerator.GenerateLambda();
+            CurrentNode = CurrentMap.GetNode(CurrentMap.startNodeId);
+            CurrentNode.visited = true;
+
+            // Λ層では移動による空腹/飢餓は無いため、枯渇しない大きな値で初期化
+            Hunger = new HungerSystem { starvationDamageRatio = 0f };
+            Hunger.Initialize(99999);
+
+            OnMapGenerated?.Invoke(CurrentMap);
+        }
+
         /// <summary>現在位置から移動可能なノード一覧</summary>
         public List<MapNode> GetAvailableMoves()
         {

@@ -150,12 +150,11 @@ namespace GameLoop
                 case "uniq_phil_stone":  // 賢者の石: 2G→素材1（最大5回/ラン、1/5デノミ後）
                 {
                     if (run.philStoneUsed >= 5 || run.coins < 2) return false;
-                    run.coins -= 2; run.weaponMaterials++; run.philStoneUsed++;
+                    run.coins -= 2; run.coinsSpent += 2; run.weaponMaterials++; run.philStoneUsed++;
                     return true;
                 }
-                case "uniq_forge_elixir": // 鍛冶の霊薬: 武器強化Lv+1（素材不要）
-                    run.weaponUpgradeLevel++;
-                    return true;
+                case "uniq_forge_elixir": // 鍛冶の霊薬: 武器を1段階無償強化（次Tier→無ければ限界突破）
+                    return GameLoop.GameManager.TryUpgradeWeapon(run, free: true);
                 case "uniq_mirror":       // 鏡写しの水晶: 被メインダメ反射（全戦闘）
                     return SetBool(run, ctx, "reflect");
                 case "uniq_gambler":      // 賭博師のダイス: 50%全最大/50%全1
@@ -185,6 +184,14 @@ namespace GameLoop
                     return AddInt(run, ctx, "dmgmult", 50);
                 case "uniq_earth_guard":  // 鉄壁の土塊: 被ダメ毎ターン-3（全戦闘）
                     return AddInt(run, ctx, "reduce", 3);
+                case "uniq_haste_powder": // 加速の粉: 初回(次)ロールのダイス合計+5
+                    if (ctx != null)
+                    {
+                        ctx.nextTurnBuffs["diceBonus"] =
+                            (ctx.nextTurnBuffs.TryGetValue("diceBonus", out var db) ? db : 0f) + 5f;
+                    }
+                    else run.pendingFirstRollTotal += 5;
+                    return true;
 
                 default:
                     return false;
@@ -218,7 +225,7 @@ namespace GameLoop
 
         private static bool SetShield(RunState run, CombatContext ctx, int amt, int turns)
         {
-            if (ctx != null) { ctx.consShield = amt; ctx.consShieldExpireTurn = turns; }
+            if (ctx != null) { int g = Mathf.Max(0, amt - ctx.healShieldReduction); ctx.consShield = g; ctx.shieldGainedTotal += g; ctx.consShieldExpireTurn = turns; } // 天衣無縫減衰＋検証計測
             else { run.pendingConsShield = amt; run.pendingConsShieldTurns = turns; }
             return true;
         }
@@ -289,7 +296,7 @@ namespace GameLoop
                 || id.StartsWith("cons_shield_") || id.StartsWith("cons_regen_")
                 || id.StartsWith("cons_crit_") || id.StartsWith("cons_reduce_")
                 || id == "uniq_mirror" || id == "uniq_gambler" || id == "uniq_ambush"
-                || id == "uniq_oni_oil" || id == "uniq_earth_guard";
+                || id == "uniq_oni_oil" || id == "uniq_earth_guard" || id == "uniq_haste_powder";
         }
 
         /// <summary>緊急回復に使える即時回復系か。</summary>

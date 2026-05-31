@@ -18,6 +18,7 @@ namespace CombatSystem
         public int diceMaxValue;       // ダイス最大出目 (1～この値)
         public int criticalNumerator;  // クリティカル確率の分子 (0～9)
         public int threat;              // 脅威値（勝利時でもプレイヤーが受ける削りダメ基準）
+        public float baseDefenseRate;   // 基礎防御（被ダメ%軽減 0～1。利刃で相殺される）
         public List<EnemyPassiveEntry> passiveSkills; // パッシブスキル一覧
 
         /// <summary>ダイスを振り、各出目の配列を返す</summary>

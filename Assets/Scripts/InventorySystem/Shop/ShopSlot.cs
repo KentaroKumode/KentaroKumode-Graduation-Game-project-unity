@@ -18,6 +18,7 @@ namespace InventorySystem.Shop
         Consumable,
         Weapon,
         Dice,
-        WeaponMaterial,  // 武器強化素材（マグナイト等）。在庫無限。
+        WeaponMaterial,      // 武器強化素材（マグナイト等）。在庫無限。
+        InventoryExpansion,  // インベントリ拡張 (1列追加)。 価格は run.inventoryUnlockedRows から動的決定。
     }
 }

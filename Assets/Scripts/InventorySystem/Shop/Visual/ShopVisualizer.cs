@@ -43,6 +43,8 @@ namespace InventorySystem.Shop.Visual
         [SerializeField] private Transform shopRoot;          // null時は自動生成
 
         private readonly List<ShopSlotVisual> spawnedSlots = new List<ShopSlotVisual>();
+        private ShopRerollButton spawnedRerollButton;
+        private ShopRobberyButton spawnedRobberyButton;
 
         void Awake()
         {
@@ -94,6 +96,8 @@ namespace InventorySystem.Shop.Visual
             ClearSlots();
             SpawnBackground();
             SpawnSlots(inv);
+            SpawnRerollButton();
+            SpawnRobberyButtonIfUnlocked();
             Show();
         }
 
@@ -102,6 +106,7 @@ namespace InventorySystem.Shop.Visual
             // 価格や売却済みなど、各スロットに再描画を依頼
             foreach (var s in spawnedSlots)
                 if (s != null) s.RefreshDisplay();
+            if (spawnedRerollButton != null) spawnedRerollButton.Refresh();
         }
 
         private void HandleShopClosed()
@@ -201,6 +206,52 @@ namespace InventorySystem.Shop.Visual
             spawnedSlots.Add(visual);
         }
 
+        /// <summary>下段の右側にリロールボタンを生成。</summary>
+        private void SpawnRerollButton()
+        {
+            // 下段3スロットの右端よりさらに外側に配置
+            float x = 2.0f * slotSpacing.x;
+            float y = -0.5f * slotSpacing.y;
+
+            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            var meshCol = go.GetComponent<MeshCollider>();
+            if (meshCol != null) Destroy(meshCol);
+            go.AddComponent<BoxCollider>();
+            go.transform.SetParent(shopRoot, false);
+            go.name = "ShopRerollButton";
+            go.transform.localPosition = new Vector3(x, y, 0f);
+            go.transform.localRotation = Quaternion.identity;
+            go.transform.localScale = new Vector3(slotSizeUnits * 0.9f, slotSizeUnits * 0.6f, 1f);
+
+            var btn = go.AddComponent<ShopRerollButton>();
+            // 枠テクスチャは Gold を流用（特別感）
+            btn.Initialize(frameGold);
+            spawnedRerollButton = btn;
+        }
+
+        /// <summary>メタバフ〈値下げ交渉〉アンロック時のみ、 強盗ボタンを下段の左外側に生成。</summary>
+        private void SpawnRobberyButtonIfUnlocked()
+        {
+            if (!MetaProgression.MetaBuffApplicator.IsShopRobberyUnlocked()) return;
+
+            float x = -2.0f * slotSpacing.x;
+            float y = -0.5f * slotSpacing.y;
+
+            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            var meshCol = go.GetComponent<MeshCollider>();
+            if (meshCol != null) Destroy(meshCol);
+            go.AddComponent<BoxCollider>();
+            go.transform.SetParent(shopRoot, false);
+            go.name = "ShopRobberyButton";
+            go.transform.localPosition = new Vector3(x, y, 0f);
+            go.transform.localRotation = Quaternion.identity;
+            go.transform.localScale = new Vector3(slotSizeUnits * 0.9f, slotSizeUnits * 0.6f, 1f);
+
+            var btn = go.AddComponent<ShopRobberyButton>();
+            btn.Initialize(frameLegendary); // 怪しい光を表現するため LEG 枠
+            spawnedRobberyButton = btn;
+        }
+
         /// <summary>スロットの Tier に応じた枠テクスチャを返す。</summary>
         private Texture2D ResolveFrameTexture(ShopSlot slot)
         {
@@ -226,6 +277,16 @@ namespace InventorySystem.Shop.Visual
             foreach (var s in spawnedSlots)
                 if (s != null) Destroy(s.gameObject);
             spawnedSlots.Clear();
+            if (spawnedRerollButton != null)
+            {
+                Destroy(spawnedRerollButton.gameObject);
+                spawnedRerollButton = null;
+            }
+            if (spawnedRobberyButton != null)
+            {
+                Destroy(spawnedRobberyButton.gameObject);
+                spawnedRobberyButton = null;
+            }
 
             if (shopRoot != null)
             {

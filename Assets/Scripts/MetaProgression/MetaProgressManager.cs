@@ -152,6 +152,7 @@ namespace MetaProgression
                 case MetaBuffKind.StartingPassiveItem: State.startingPassiveItemUnlocked = true; break;
                 case MetaBuffKind.FloorClearHeal:   State.floorClearHeal = Mathf.Min(2, State.floorClearHeal + step.amount); break;
                 case MetaBuffKind.TreasureChestGold: State.treasureChestGoldUnlocked = true; break;
+                case MetaBuffKind.ShopRobberyUnlock: State.shopRobberyUnlocked = true; break;
             }
         }
 

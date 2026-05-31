@@ -21,13 +21,33 @@ namespace InventorySystem.PassiveSkills
             var list = new List<CompleteItemData>();
             var db = ItemDatabase.Instance;
 
-            // 装備中の Weapon / Armor / Dice
+            // 段階式進行の対象武器（剣/斧/短剣/盾/呪い）は静的パッシブを使わず、後で動的付与する。
+            string weaponId = run?.equippedWeaponId;
+            bool dynamicWeapon = WeaponProgression.IsProgressionWeapon(weaponId);
+
+            // 装備中の Weapon / Armor / Dice（equipHandler 優先）
+            CompleteItemData weaponItem = null, armorItem = null, diceItem = null;
             if (equip != null)
             {
-                AddIfNotNull(list, equip.GetCurrentEquipment(ItemCategory.Weapon));
-                AddIfNotNull(list, equip.GetCurrentEquipment(ItemCategory.Armor));
-                AddIfNotNull(list, equip.GetCurrentEquipment(ItemCategory.Dice));
+                if (!dynamicWeapon) weaponItem = equip.GetCurrentEquipment(ItemCategory.Weapon);
+                armorItem = equip.GetCurrentEquipment(ItemCategory.Armor);
+                diceItem = equip.GetCurrentEquipment(ItemCategory.Dice);
             }
+
+            // フォールバック: ItemEquipHandler が無い/未装備のヘッドレス実行(AutoRunner)では
+            // RunState の自動装備IDから武器・ダイスのパッシブを解決する。
+            // （これが無いと装備ダイス／非進行武器の passiveSkills がバッチで発火しない）
+            if (db != null && run != null)
+            {
+                if (!dynamicWeapon && weaponItem == null && !string.IsNullOrEmpty(run.equippedWeaponId))
+                    weaponItem = db.GetItem(run.equippedWeaponId);
+                if (diceItem == null && !string.IsNullOrEmpty(run.equippedDiceId))
+                    diceItem = db.GetItem(run.equippedDiceId);
+            }
+
+            AddIfNotNull(list, weaponItem);
+            AddIfNotNull(list, armorItem);
+            AddIfNotNull(list, diceItem);
 
             // ラン中所持パッシブ（イベント・ボス追加報酬・ショップ購入で増える）
             if (run != null && run.ownedPassiveItems != null && db != null)
@@ -46,6 +66,14 @@ namespace InventorySystem.PassiveSkills
             }
 
             PassiveSkillManager.Instance?.RefreshActiveSkills(list);
+
+            // 段階式進行武器: 家系＋段階(+plus)から算出したパッシブを動的に追加登録
+            if (dynamicWeapon)
+            {
+                int plus = run?.weaponPlus ?? 0;
+                foreach (var id in WeaponProgression.Compute(weaponId, plus))
+                    PassiveSkillManager.Instance?.AddSkillById(id, WeaponProgression.DisplayName(id));
+            }
         }
 
         private static void AddIfNotNull(List<CompleteItemData> list, CompleteItemData item)

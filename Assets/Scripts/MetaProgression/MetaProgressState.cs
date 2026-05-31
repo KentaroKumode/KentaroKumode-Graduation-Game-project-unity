@@ -18,6 +18,9 @@ namespace MetaProgression
         public bool bossExtraNormalUnlocked;
         public bool bossExtraRareUnlocked;
 
+        // 双蛇のダイス〈永劫〉: 勝利した戦闘数をランを跨いで永続蓄積。RecalculateFromTrack では触れない。
+        public int eternalStacks;
+
         // === 集計値（currentLevel 進行に応じて再計算） ===
         public int hpBonus;
         public int goldBonus;
@@ -30,6 +33,7 @@ namespace MetaProgression
         public bool divineProtectUnlocked;       // 1戦闘1回ロール敗北→引き分け化
         public bool startingPassiveItemUnlocked; // 開幕パッシブ獲得
         public bool treasureChestGoldUnlocked;   // 宝箱マスでゴールドも獲得
+        public bool shopRobberyUnlocked;         // ショップで「値下げ」交渉(=強盗) 行動が可能
 
         public bool HasDebuff(MetaDebuffLevel lv) => activeDebuffs != null && activeDebuffs.Contains((int)lv);
 
@@ -53,6 +57,7 @@ namespace MetaProgression
             divineProtectUnlocked = false;
             startingPassiveItemUnlocked = false;
             treasureChestGoldUnlocked = false;
+            shopRobberyUnlocked = false;
 
             for (int lv = 1; lv <= currentLevel; lv++)
             {
@@ -81,6 +86,7 @@ namespace MetaProgression
                 case MetaBuffKind.StartingPassiveItem: startingPassiveItemUnlocked = true; break;
                 case MetaBuffKind.FloorClearHeal:   floorClearHeal = UnityEngine.Mathf.Min(2, floorClearHeal + step.amount); break;
                 case MetaBuffKind.TreasureChestGold: treasureChestGoldUnlocked = true; break;
+                case MetaBuffKind.ShopRobberyUnlock: shopRobberyUnlocked = true; break;
             }
         }
     }
