@@ -354,11 +354,11 @@
       "id": "boss_layer5_hidden",
       "baseDefenseRate": 0.15,
       "displayName": "シュヴァリエ・サン=ジョリオラ",
-      "description": "失われた決闘術の継承者。盾の構え(コントラタック)と切り返し(オポジション)を交互に繰り出す剣聖。挑む資格を持つ者だけが見える幻。",
+      "description": "失われた決闘術の継承者。構えと切り返しを交互に繰り出す剣聖。挑む資格を持つ者だけが見える幻。",
       "floor": 5,
       "maxHP": 920,
       "diceCount": 4,
-      "diceMaxValue": 8,
+      "diceMaxValue": 7,
       "criticalNumerator": 3,
       "threat": 5,
       "passiveSkills": [
@@ -391,39 +391,41 @@
       "id": "boss_layer7",
       "baseDefenseRate": 0.35,
       "displayName": "覚者・初眼",
-      "description": "覚者第一形態。剣を構えるよりも先に、相手の手の内を見抜く者。",
+      "description": "覚者はあなたに問いかけている。",
       "floor": 7,
-      "maxHP": 300,
+      "maxHP": 1000,
       "diceCount": 5,
       "diceMaxValue": 9,
       "criticalNumerator": 0,
       "threat": 5,
       "passiveSkills": [
         { "internalName": "AwakenedP1Inverse", "skillName": "逆観", "description": "毎T、プレイヤー最大出目を覚者ダイス合計に加算。HP=0で第二形態(業火・残響)へ。" },
-        { "internalName": "FlawlessRobe", "skillName": "天衣無縫", "description": "覚者がロール勝利するたび、プレイヤーが以降獲得する回復量・シールド量を-1（上限10スタック・覚者連戦を通じて持続）。" }
+        { "internalName": "FlawlessRobe", "skillName": "天衣無縫", "description": "覚者がロール勝利するたび、プレイヤーが以降獲得する回復量・シールド量を-1（上限10スタック・覚者連戦を通じて持続）。" },
+        { "internalName": "TrueSelf", "skillName": "真我", "description": "覚者の素ロールに固定値を加算（基準1）。ダイス上限を超える難度調整用。オートチューナーがロール勝率に応じて増減。" }
       ]
     },
     {
       "id": "boss_layer7_p2",
       "baseDefenseRate": 0.15,
       "displayName": "業火・残響",
-      "description": "覚者の振るう剣がかつての審判官の幻影を呼び覚ます。",
+      "description": "あなたは過去と向き合った。その業火は誰の為だろうか。",
       "floor": 7,
-      "maxHP": 50,
+      "maxHP": 750,
       "diceCount": 5,
       "diceMaxValue": 6,
       "criticalNumerator": 3,
       "threat": 4,
       "passiveSkills": [
         { "internalName": "AwakenedP2BurstFire", "skillName": "爆ぜ火", "description": "プレイヤーのロール敗北時、即時5固定ダメ(軽減無視)。HP=0で第三形態へ。" },
-        { "internalName": "IntimidatePlus", "skillName": "威圧+", "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）" }
+        { "internalName": "IntimidatePlus", "skillName": "威圧+", "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）" },
+        { "internalName": "TrueSelf", "skillName": "真我", "description": "覚者の素ロールに固定値を加算（基準1）。ダイス上限を超える難度調整用。オートチューナーがロール勝率に応じて増減。" }
       ]
     },
     {
       "id": "boss_layer7_p3",
       "baseDefenseRate": 0.35,
       "displayName": "覚者・無相",
-      "description": "覚者第二形態。形なき剣。打てば、その分だけ己も斬れる。",
+      "description": "覚者は問答を繰り返している。無相。形なき剣。",
       "floor": 7,
       "maxHP": 300,
       "diceCount": 5,
@@ -432,14 +434,15 @@
       "threat": 5,
       "passiveSkills": [
         { "internalName": "AwakenedP3Mirror", "skillName": "鏡映", "description": "覚者への与ダメの50%をプレイヤーHPからも引く。HP=0で第四形態へ。" },
-        { "internalName": "FlawlessRobe", "skillName": "天衣無縫", "description": "覚者がロール勝利するたび、プレイヤーが以降獲得する回復量・シールド量を-1（上限10スタック・覚者連戦を通じて持続）。" }
+        { "internalName": "FlawlessRobe", "skillName": "天衣無縫", "description": "覚者がロール勝利するたび、プレイヤーが以降獲得する回復量・シールド量を-1（上限10スタック・覚者連戦を通じて持続）。" },
+        { "internalName": "TrueSelf", "skillName": "真我", "description": "覚者の素ロールに固定値を加算（基準1）。ダイス上限を超える難度調整用。オートチューナーがロール勝率に応じて増減。" }
       ]
     },
     {
       "id": "boss_layer7_p4",
       "baseDefenseRate": 0.15,
       "displayName": "シュヴァリエ・残影",
-      "description": "覚者の剣筋に剣聖の影が重なる。一閃を、見せられるか。",
+      "description": "あなたは過去と向き合った。その剣筋に喜びは感じ取れない。",
       "floor": 7,
       "maxHP": 150,
       "diceCount": 5,
@@ -448,14 +451,15 @@
       "threat": 4,
       "passiveSkills": [
         { "internalName": "AwakenedP4Riposte", "skillName": "一閃返し", "description": "1度限り、被ダメ完全無効（反射なし）。発動後は通常戦闘。HP=0で第五形態へ。" },
-        { "internalName": "IntimidatePlus", "skillName": "威圧+", "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）" }
+        { "internalName": "IntimidatePlus", "skillName": "威圧+", "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）" },
+        { "internalName": "TrueSelf", "skillName": "真我", "description": "覚者の素ロールに固定値を加算（基準1）。ダイス上限を超える難度調整用。オートチューナーがロール勝率に応じて増減。" }
       ]
     },
     {
       "id": "boss_layer7_p5",
       "baseDefenseRate": 0.35,
       "displayName": "覚者・寂照",
-      "description": "覚者第三形態。煩悩を捨てぬ者、その手から一つずつ消える。",
+      "description": "覚者は更なる問答を繰り返している。寂照。心を止め、真理にたどり着く。",
       "floor": 7,
       "maxHP": 400,
       "diceCount": 5,
@@ -464,14 +468,15 @@
       "threat": 5,
       "passiveSkills": [
         { "internalName": "AwakenedP5Silent", "skillName": "寂照", "description": "プレイヤーが消費品/レイピア使用→ランダムなパッシブ装備を永久喪失。HP=0で第六形態へ。" },
-        { "internalName": "FlawlessRobe", "skillName": "天衣無縫", "description": "覚者がロール勝利するたび、プレイヤーが以降獲得する回復量・シールド量を-1（上限10スタック・覚者連戦を通じて持続）。" }
+        { "internalName": "FlawlessRobe", "skillName": "天衣無縫", "description": "覚者がロール勝利するたび、プレイヤーが以降獲得する回復量・シールド量を-1（上限10スタック・覚者連戦を通じて持続）。" },
+        { "internalName": "TrueSelf", "skillName": "真我", "description": "覚者の素ロールに固定値を加算（基準1）。ダイス上限を超える難度調整用。オートチューナーがロール勝率に応じて増減。" }
       ]
     },
     {
       "id": "boss_layer7_p6",
       "baseDefenseRate": 0.25,
-      "displayName": "灰燼・薄火",
-      "description": "覚者の構えに灰燼の遺志が宿る。終わりは近い、しかし容赦はない。",
+      "displayName": "灰燼・灼火",
+      "description": "あなたは過去と向き合った。この熱と火は、覚者が過去に持っていたはずの怒りなのだろうか。",
       "floor": 7,
       "maxHP": 90,
       "diceCount": 5,
@@ -480,14 +485,15 @@
       "threat": 5,
       "passiveSkills": [
         { "internalName": "AwakenedP6EmberWill", "skillName": "業火の遺志", "description": "毎T 覚者ダイス合計+currentTurn(累積、リセットなし)。HP=0で最終形態へ。" },
-        { "internalName": "IntimidatePlus", "skillName": "威圧+", "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）" }
+        { "internalName": "IntimidatePlus", "skillName": "威圧+", "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）" },
+        { "internalName": "TrueSelf", "skillName": "真我", "description": "覚者の素ロールに固定値を加算（基準1）。ダイス上限を超える難度調整用。オートチューナーがロール勝率に応じて増減。" }
       ]
     },
     {
       "id": "boss_layer7_p7",
       "baseDefenseRate": 0.35,
       "displayName": "覚者・妙覚",
-      "description": "完全なる悟り。一閃前の静寂、然して全断。動けば、其れにて全てを断つ。",
+      "description": "究竟の覚り。一切法空。一歩を踏めば万縁を断ち、一閃を放てば諸相は帰滅する。",
       "floor": 7,
       "maxHP": 100,
       "diceCount": 5,

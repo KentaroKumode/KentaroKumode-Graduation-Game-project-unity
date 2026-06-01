@@ -60,6 +60,11 @@ namespace CombatSystem
         public int damageTaken;
         /// <summary>L1学習: 敵 maxHP（撃破率計算用）。</summary>
         public int enemyMaxHP;
+        /// <summary>ボス難易度オートチューナー: プレイヤー敗北時の致死メカニズム分類 (勝利時は Normal)。</summary>
+        public InventorySystem.PassiveSkills.DeathCause deathCause;
+        /// <summary>ボス難易度オートチューナー: この戦闘のプレイヤーロール合計と回数 (平均出目算出用)。</summary>
+        public long playerRollSum;
+        public int playerRollCount;
     }
 
     /// <summary>
@@ -125,6 +130,8 @@ namespace CombatSystem
         private bool metaLethalSurviveUsed; // メタデバフ Lv9: 敵の初回致命傷を1HPで耐える
         private bool metaAgilityDodgeUsed;  // メタデバフ Lv2 俊敏: 敵が初回被弾を回避済みか
         private int fleeAfterTurns;          // >0 のとき、このターン数を終えても未決着なら敵が逃走（偽の商人）
+        private long _fightPlayerRollSum;    // ボス難易度チューナー: この戦闘のプレイヤーロール合計の累計
+        private int _fightPlayerRollCount;   // 同 ロール回数 (平均出目 = sum/count)
         private bool wrathDiceOverrideArmed; // 恒久デバフ「憤怒」: 1T目のダイス最大化トリガー
         private int playerDiceCount;
         private int playerDiceMax;
@@ -359,6 +366,9 @@ namespace CombatSystem
                 return;
             }
 
+            // ボス難易度オートチューナー: hpMul を maxHP に適用 (非ボスは素通り)
+            enemy = AutoTest.BossTuning.Apply(enemy);
+
             currentEnemy = enemy;
 
             // ラン中所持パッシブと装備品を PassiveSkillManager に同期（戦闘ごとに再構築）
@@ -380,6 +390,8 @@ namespace CombatSystem
             metaAgilityDodgeUsed = false;
             fleeAfterTurns = 0;
             turnLog.Clear();
+            _fightPlayerRollSum = 0;
+            _fightPlayerRollCount = 0;
 
             // パッシブスキルマネージャーに敵スキルを登録
             var psm = PassiveSkillManager.Instance;
@@ -412,6 +424,9 @@ namespace CombatSystem
             if (ctx != null)
             {
                 ctx.enemyDamageReductionPct = enemy.baseDefenseRate;
+                // ボス難易度オートチューナー: 軸別係数引き用にボスidを記録 (非ボスは空)
+                ctx.bossId = AutoTest.BossTuning.IsBoss(enemy.id) ? enemy.id : "";
+                ctx.lastDamageCause = InventorySystem.PassiveSkills.DeathCause.Normal;
             }
 
             // Λ層（時間の狭間）由来の恒久デバフを ctx へ設定（戦闘スコープで保持）
@@ -550,6 +565,8 @@ namespace CombatSystem
             if (!isCombatActive) { Debug.LogWarning("[CombatManager.SwapEnemy] 戦闘中でない"); return false; }
             var newEnemy = EnemyDatabase.Get(newEnemyId);
             if (newEnemy == null) { Debug.LogError($"[CombatManager.SwapEnemy] enemy not found: {newEnemyId}"); return false; }
+            // ボス難易度オートチューナー: 覚者連戦の各形態にも hpMul を適用
+            newEnemy = AutoTest.BossTuning.Apply(newEnemy);
 
             string prevName = currentEnemy?.displayName ?? "?";
             currentEnemy = newEnemy;
@@ -600,8 +617,11 @@ namespace CombatSystem
                 ctx.enemyDiceTotalBonus = 0;
                 ctx.bossDiceBonus = 0; // swapで一旦クリア。新形態の OnBattleStart パッシブ(刹那等)が再設定する
                 ctx.enemyDamageReductionPct = newEnemy.baseDefenseRate; // 新形態の基礎防御%を反映
+                ctx.bossId = AutoTest.BossTuning.IsBoss(newEnemy.id) ? newEnemy.id : "";
+                ctx.lastDamageCause = InventorySystem.PassiveSkills.DeathCause.Normal; // 形態swapで死因タグをリセット (前形態の残留防止)
                 ctx.ashenSuddenDeath = false;
                 ctx.myokakuSuddenDeath = false;
+                ctx.myokakuFreeHit = false;
                 ctx.gedatsuPending = false;
             }
 
@@ -687,6 +707,9 @@ namespace CombatSystem
             {
                 if (ctx.consCrit > 0) ctx.criticalBonus += ctx.consCrit;
                 if (ctx.consFlatReduce > 0) ctx.playerFlatDamageReduction += ctx.consFlatReduce;
+                // 死因タグをターン頭でリセット。 このターンに致死スキルが発動すればそれが死因、
+                // 何も無ければ通常ロール敗北(Normal) → ターン単位で正確に死因を帰属できる。
+                ctx.lastDamageCause = InventorySystem.PassiveSkills.DeathCause.Normal;
             }
 
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnTurnStart);
@@ -736,6 +759,7 @@ namespace CombatSystem
             // 〈妙覚〉サドンデス: 両者を 1d6 に強制（決着まで継続）。勝者が敗者を即死させる。
             // myokakuSuddenDeath はサドンデスが「ターン開始時点で既にアクティブ」=実際に1d2を振るターン
             // のみ true。開始ターン（99を6ターン耐えた直後）の敗北で即死させないための判別フラグ。
+            // 2026-06-01 リワーク: myokakuSuddenDeath は常に false (素のロール勝負化) → このブロックは発火しない。
             bool myokakuSDRollThisTurn = ctx.myokakuSuddenDeath;
             if (ctx.myokakuSuddenDeath)
             {
@@ -744,6 +768,14 @@ namespace CombatSystem
                 playerDice = new[] { UnityEngine.Random.Range(1, 3) }; // 1d2
                 enemyDice = new[] { UnityEngine.Random.Range(1, 3) };
                 Debug.Log("[CombatManager] 妙覚サドンデス: 両者1d2強制");
+            }
+
+            // 〈妙覚〉自由攻撃ターン (T1): ボスを 0d0 (ロール合計0) に強制 → プレイヤーが必ず勝って自由に削れる。
+            if (ctx.myokakuFreeHit)
+            {
+                actualEnemyDiceCount = 1;
+                enemyDice = new[] { 0 }; // 合計0 → プレイヤー(≥1)が確実に勝利
+                Debug.Log("[CombatManager] 妙覚T1: ボス0d0 (自由攻撃ターン)");
             }
 
             // シュヴァリエのレイピア コントラタック発動中: プレイヤーは 1d1 強制（必ず1を出す）
@@ -893,6 +925,10 @@ namespace CombatSystem
                 psm.FireEnemyTrigger(PassiveSkillTrigger.OnRollWin);
             else
                 psm.FireEnemyTrigger(PassiveSkillTrigger.OnRollDraw);
+
+            // ボス難易度チューナー: プレイヤーの実ロール合計を累計 (平均出目の算出用)
+            _fightPlayerRollSum += ctx.playerDiceTotal;
+            _fightPlayerRollCount++;
 
             // --- ダメージ計算 ---
             var result = new TurnResult
@@ -1363,6 +1399,8 @@ namespace CombatSystem
             if (Mathf.Abs(enemyMul - 1f) > 0.001f)
                 totalDmg = Mathf.CeilToInt(totalDmg * enemyMul);
 
+            // (2026-06-01) ボス被ダメ倍率(dmgMul)の直接操作は廃止。 硬化/易化は Dice/HP/機構軸で行う。
+
             // メタバフ: 被ダメ -X（最大-2、ただし最低 1）
             int metaDmgRed = MetaProgression.MetaBuffApplicator.GetDamageReduction();
             if (metaDmgRed > 0 && totalDmg > 0)
@@ -1519,6 +1557,11 @@ namespace CombatSystem
                 damageDealt = Math.Max(0, (currentEnemy != null ? currentEnemy.maxHP : 0) - Math.Max(0, enemyHP)),
                 damageTaken = Math.Max(0, playerMaxHP - Math.Max(0, playerHP)) + (ctx?.healAppliedTotal ?? 0),
                 enemyMaxHP = currentEnemy != null ? currentEnemy.maxHP : 0,
+                // プレイヤー敗北時のみ死因を記録 (勝利時は Normal)
+                deathCause = (playerHP <= 0 && ctx != null) ? ctx.lastDamageCause
+                           : InventorySystem.PassiveSkills.DeathCause.Normal,
+                playerRollSum = _fightPlayerRollSum,
+                playerRollCount = _fightPlayerRollCount,
             };
         }
 

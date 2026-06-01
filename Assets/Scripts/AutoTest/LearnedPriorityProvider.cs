@@ -61,8 +61,10 @@ namespace AutoTest
             Reload(learningRoot);
         }
 
-        /// <summary>強制再読み込み。 リスト変化を検出して BotJudgmentLog に追記。</summary>
-        public static void Reload(string learningRoot = null)
+        /// <summary>強制再読み込み。 リスト変化を検出して BotJudgmentLog に追記。
+        /// <paramref name="writeMarkdown"/>=false なら BALANCE_TIER_LIST.md を書かない
+        /// (AIルーチン学習モードで Tier表を凍結したまま BOT用の S/A/B だけ更新する用途)。</summary>
+        public static void Reload(string learningRoot = null, bool writeMarkdown = true)
         {
             // 旧スナップショット (差分検出用)
             var prevS = new HashSet<string>(_dynS);
@@ -188,9 +190,10 @@ namespace AutoTest
                 {
                     _lastLoadedSummary = $"動的S候補 {_dynS.Count}個 < {MinDynamicItemsToTrust} → 手書きフォールバック";
                     _dynS.Clear(); _dynA.Clear(); _dynB.Clear(); _dynC.Clear(); _dynD.Clear(); _dynE.Clear();
-                    // フォールバックでも MD は最新の集計で書き出す (Tier欄は空表示)
-                    try { WriteTierListMarkdown(sf, pool); } catch (Exception ee)
-                    { Debug.LogWarning($"[LearnedPriorityProvider] fallback MD write fail: {ee.Message}"); }
+                    // フォールバックでも MD は最新の集計で書き出す (Tier欄は空表示)。 writeMarkdown=false なら凍結。
+                    if (writeMarkdown)
+                        try { WriteTierListMarkdown(sf, pool); } catch (Exception ee)
+                        { Debug.LogWarning($"[LearnedPriorityProvider] fallback MD write fail: {ee.Message}"); }
                     return;
                 }
 
@@ -205,8 +208,9 @@ namespace AutoTest
 
                 // 差分検出 → BotJudgmentLog に追記
                 LogIfChanged(prevS, prevA, prevFallback, sf);
-                // 人間向け Tier リスト Markdown を出力 (変更有無に関わらず最新で上書き)
-                WriteTierListMarkdown(sf, pool);
+                // 人間向け Tier リスト Markdown を出力 (変更有無に関わらず最新で上書き)。 writeMarkdown=false なら凍結。
+                if (writeMarkdown)
+                    WriteTierListMarkdown(sf, pool);
             }
             catch (Exception e)
             {

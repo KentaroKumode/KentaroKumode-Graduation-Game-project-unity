@@ -651,9 +651,11 @@ namespace InventorySystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollWin };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            if (ctx.healShieldReduction >= MaxStacks) return;
+            // ボス難易度オートチューナー: 天衣無縫の上限スタックを直接調整 (低い=回復封じ弱化=ジリ貧緩和)
+            int maxStacks = UnityEngine.Mathf.Max(1, AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.RobeStacks));
+            if (ctx.healShieldReduction >= maxStacks) return;
             ctx.healShieldReduction++;
-            UnityEngine.Debug.Log($"[天衣無縫] 回復/シールド減衰 +1 → -{ctx.healShieldReduction}");
+            UnityEngine.Debug.Log($"[天衣無縫] 回復/シールド減衰 +1 → -{ctx.healShieldReduction}(上限{maxStacks})");
         }
     }
 
@@ -847,9 +849,12 @@ namespace InventorySystem.PassiveSkills.Effects
         {
             var run = GameLoop.GameManager.Instance?.Run;
             int sin = System.Math.Min(2, (run?.totalBattles ?? 0) / 8); // 罪: プレイで操作可能
-            int dmg = System.Math.Min(13, 1 + System.Math.Max(1, ctx.currentTurn) + sin);
+            // ボス難易度オートチューナー: 審判の炎の総ダメ上限を直接調整 (低い=不可避チップ緩和)。 基準13
+            int cap = AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.ChipCap);
+            int dmg = System.Math.Min(cap, 1 + System.Math.Max(1, ctx.currentTurn) + sin);
             ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - dmg);
-            UnityEngine.Debug.Log($"[審判の炎] {dmg}ダメ (1+経過T{ctx.currentTurn}+罪{sin}, 上限13, 軽減無視) → プレイヤー残HP={ctx.enemyCurrentHP}");
+            if (ctx.enemyCurrentHP <= 0 && dmg > 0) ctx.lastDamageCause = DeathCause.Chip; // 死因タグ
+            UnityEngine.Debug.Log($"[審判の炎] {dmg}ダメ (1+経過T{ctx.currentTurn}+罪{sin}, 上限{cap}, 軽減無視) → プレイヤー残HP={ctx.enemyCurrentHP}");
         }
     }
 
@@ -991,11 +996,14 @@ namespace InventorySystem.PassiveSkills.Effects
                     // 灰の予兆統合: 断罪ターンを予告（読める＝運でなく対応の問題）
                     if (EmberKing.IsJudgment(ctx))
                     {
-                        ctx.enemyDiceTotalBonus += 10; // 断罪Tは敵ダイス+10 (見切り難度up)
+                        // ボス難易度オートチューナー: 断罪Tの敵ダイス上乗せを直接調整
+                        // (低い=見切りロールに勝ちやすく=易化)。 基準+10。
+                        int jdice = AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.JudgmentDice);
+                        ctx.enemyDiceTotalBonus += jdice; // 断罪Tは敵ダイス上乗せ (見切り難度)
                         // 断罪Tの累積回数 (この戦闘で何回目か) をカウント
                         int n = (int)ctx.GetAccumulated("judg_counter") + 1;
                         ctx.accumulatedValues["judg_counter"] = n;
-                        UnityEngine.Debug.Log($"[灰の予兆] 業火の断罪 第{n}回（T{ctx.currentTurn}・周期{EmberKing.Period(ctx)}）—敵ダイス+10、ロール勝利で間一髪回避");
+                        UnityEngine.Debug.Log($"[灰の予兆] 業火の断罪 第{n}回（T{ctx.currentTurn}・周期{EmberKing.Period(ctx)}）—敵ダイス+{jdice}、ロール勝利で間一髪回避");
                     }
                     break;
 
@@ -1007,9 +1015,13 @@ namespace InventorySystem.PassiveSkills.Effects
                     {
                         int n = (int)ctx.GetAccumulated("judg_counter");
                         if (n < 1) n = 1;
-                        int coef = 2 + 2 * n; // 1回目=4、2回目=6、3回目=8...
+                        // ボス難易度オートチューナー: 断罪係数の基礎を直接調整
+                        // (低い=即死性が下がり、 断罪ロールに負けても耐えられる=易化)。 係数 = base + 2n、 基準base=2。
+                        int coefBase = AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.JudgmentCoefBase);
+                        int coef = UnityEngine.Mathf.Max(1, coefBase + 2 * n); // 基準1回目=4、2回目=6...
                         int before = ctx.finalDamage;
                         ctx.finalDamage = ctx.finalDamage * coef + coef;
+                        ctx.lastDamageCause = DeathCause.Judgment; // 死因タグ
                         UnityEngine.Debug.Log($"[業火の断罪] 致命の一撃 第{n}回 {before}→{ctx.finalDamage}（×{coef}+{coef}）");
                     }
                     break;
@@ -1045,7 +1057,7 @@ namespace InventorySystem.PassiveSkills.Effects
             switch (trigger)
             {
                 case PassiveSkillTrigger.OnTurnStart:
-                    ctx.enemyDiceTotalBonus += 3; // 常時 +3
+                    ctx.enemyDiceTotalBonus += 3; // 常時 +3 (固定。 ボスダイス調整は base dice の期待値側で行う)
                     break;
                 case PassiveSkillTrigger.OnPreReceiveDamage:
                     // 敵視点: playerCurrentHP = ボス自身のHP、 ctx.finalDamage = 被ダメ予定
@@ -1095,8 +1107,11 @@ namespace InventorySystem.PassiveSkills.Effects
 
             if (ctx.playerLostRoll && ctx.finalDamage > 0)
             {
-                int reduced = System.Math.Max(0, ctx.finalDamage - 9); // 2026-05-31: -5→-9 (T4装備の高火力削りを抑制)
-                ctx.finalDamage = System.Math.Min(reduced, 10);
+                // ボス難易度オートチューナー: 灰塵の鎧の軽減量を直接調整 (低い=タンク性弱化=ジリ貧緩和)。 基準-9
+                int reduction = AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.RegenReduction);
+                const int cap = 10; // 軽減後キャップ (固定)
+                int reduced = System.Math.Max(0, ctx.finalDamage - reduction);
+                ctx.finalDamage = System.Math.Min(reduced, cap);
             }
         }
     }
@@ -1162,8 +1177,9 @@ namespace InventorySystem.PassiveSkills.Effects
             // 敵視点: OnRollLose = ボスがロール敗北したターン
             int stack = (int)ctx.GetAccumulated(Key) + 1;
             ctx.accumulatedValues[Key] = stack;
-            ctx.enemyDiceTotalBonus = stack; // 次ロール以降、勝敗判定前にボス合計へ +stack
-            UnityEngine.Debug.Log($"[星火燎原] ボス敗北 → ダイス合計補正 累計+{stack}");
+            const int cap = 20; // 累積上限 (固定)。 ボスダイス調整は base dice の期待値側で行う
+            ctx.enemyDiceTotalBonus = System.Math.Min(stack, cap); // 次ロール以降、勝敗判定前にボス合計へ
+            UnityEngine.Debug.Log($"[星火燎原] ボス敗北 → ダイス合計補正 累計+{System.Math.Min(stack, cap)}(上限{cap})");
         }
     }
 
@@ -1189,6 +1205,25 @@ namespace InventorySystem.PassiveSkills.Effects
         public string SkillId => "Setsuna";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { ctx.bossDiceBonus = 12; }
+    }
+
+    /// <summary>真我 — 覚者の到達した境地。 ダイス合計に固定値を加算する素ロール強化（7層全形態）。
+    /// ボス難易度オートチューナー専用の「ダイス上限を超える」難度レバー: 通常のダイス調整(個数≤5・最高出目≤9)が
+    /// 上限に張り付き、 かつプレイヤーのロール勝率が90%を超えて張り付く場合に、 この値(基準1)を上下させて
+    /// ロール勝負を引き締める。 bossDiceBonus 経由で勝敗判定前に enemyDiceTotal へ加算される。
+    /// OnBattleStart で設定（形態swap時は CombatManager が bossDiceBonus を0クリア→各形態の本パッシブが再設定）。</summary>
+    public class TrueSelf : IPassiveSkillEffect
+    {
+        public string SkillId => "TrueSelf";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            // 妙覚はサドンデス専用のため真我は無効 (素ロール加算しない)
+            if (AutoTest.BossTuning.IsMyokaku(ctx.bossId)) return;
+            int bonus = UnityEngine.Mathf.Max(0, AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.TrueSelf));
+            ctx.bossDiceBonus += bonus; // bossDiceBonus は swap時に0クリアされるので加算でよい
+            UnityEngine.Debug.Log($"[真我] 素ロール +{bonus} (ダイス合計加算)");
+        }
     }
 
     /// <summary>焦土 — プレイヤーがロール敗北するたび、そのターンの被ダメの10%だけ
@@ -1285,7 +1320,7 @@ namespace InventorySystem.PassiveSkills.Effects
     /// 【形態2 オポジション】4d6 + プリオリテ で殴り合い。ボス累積3勝で形態1へ帰還。
     ///   プレイヤーがロール勝利すると次Tボスダイス合計+4、そのT ボスがロール敗北すれば+15ダメ。
     ///   次Tが形態1帰還となる場合、報酬を確実に与えるため形態2を1T延長する。
-    /// 【プリオリテ】形態2→1 に再突入する毎にスタック+1（戦闘内累積・上限なし）。
+    /// 【プリオリテ】形態2→1 に再突入する毎にスタック+5（戦闘内累積・上限なし）。
     ///   各スタック効果: 形態1シールド初期 -20 (最低20まで) / 形態1反撃 +3。
     ///   シールドが薄くなるほど往復は速くなるが、毎サイクル受ける反撃が指数的に重くなる
     ///   = "粘る者ほど無駄に身を削る" 罠。0d0仕様を壊さないためダイス合計には触れない。</summary>
@@ -1316,7 +1351,7 @@ namespace InventorySystem.PassiveSkills.Effects
         private const int BaseShield      = 140; // HP +40% に比例して上方修正
         private const int MinShield       = 28; // プリオリテ削減後の下限 (20→28, +40%)
         private const int PrioriteShieldDecPer = 28; // /stack でシールド初期量を減らす
-        private const int PrioriteCounterPer   = 3;  // /stack で反撃ダメ加算
+        private const int PrioriteCounterPer   = 7;  // /stack で反撃ダメ加算
 
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
@@ -1546,8 +1581,11 @@ namespace InventorySystem.PassiveSkills.Effects
             // OnRollWin (敵視点): enemy won = player lost roll
             if (trigger == PassiveSkillTrigger.OnRollWin)
             {
-                ctx.fixedDamageToEnemy += 5; // 敵視点 fixedDamageToEnemy はプレイヤーへの軽減無視ダメ
-                UnityEngine.Debug.Log("[覚者・爆ぜ火] +5 固定ダメ(軽減無視)");
+                // ボス難易度オートチューナー: 爆ぜ火の敗北時固定ダメを直接調整 (基準5)
+                int burst = UnityEngine.Mathf.Max(0, AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.BurstDamage));
+                ctx.fixedDamageToEnemy += burst; // 敵視点 fixedDamageToEnemy はプレイヤーへの軽減無視ダメ
+                if (burst > 0) ctx.lastDamageCause = DeathCause.Burst; // 死因タグ
+                UnityEngine.Debug.Log($"[覚者・爆ぜ火] +{burst} 固定ダメ(軽減無視)");
             }
             else if (trigger == PassiveSkillTrigger.OnTurnEnd)
             {
@@ -1571,9 +1609,12 @@ namespace InventorySystem.PassiveSkills.Effects
                     // 反射は与ダメの50%に軽減（100%反射はHP180・防御35%相手で数学的にほぼ勝てないため）。
                     // 反射は fixedDamageToEnemy 経由 (敵視点なので real fixedDamageToPlayer に対応)。
                     // ctx.enemyCurrentHP を直接書くと CombatManager の ctx.playerCurrentHP = playerHP 同期で上書きされる。
-                    int reflect = UnityEngine.Mathf.CeilToInt(dmg * 0.5f);
+                    // ボス難易度オートチューナー: 鏡映反射率%を直接調整 (基準50%、 上限90%、 低い=易化)
+                    float reflectRate = UnityEngine.Mathf.Clamp(AutoTest.BossTuning.Param(ctx.bossId, AutoTest.BossParam.ReflectPct) / 100f, 0f, 0.9f);
+                    int reflect = UnityEngine.Mathf.CeilToInt(dmg * reflectRate);
                     ctx.fixedDamageToEnemy += reflect;
-                    UnityEngine.Debug.Log($"[覚者・鏡映] 与ダメ{dmg}の50%={reflect}を反射 → プレイヤーへ固定ダメ");
+                    ctx.lastDamageCause = DeathCause.Reflect; // 死因タグ
+                    UnityEngine.Debug.Log($"[覚者・鏡映] 与ダメ{dmg}の{reflectRate:P0}={reflect}を反射 → プレイヤーへ固定ダメ");
                 }
             }
             else if (trigger == PassiveSkillTrigger.OnTurnEnd)
@@ -1681,65 +1722,67 @@ namespace InventorySystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>形態7【妙覚】T1のみ0d0(自由攻撃可)。T2以降、ダイス合計99強制+クリ100%(永続)。
-    /// プレイヤー敗北かつ生存中は次T以降1d2連続サドンデス。サドンデス勝利で【解脱】。
-    /// 注: enemyDiceTotalBonus 経由で ProcessPostRoll 判定前に効かせる。</summary>
+    /// <summary>形態7【妙覚】(2026-06-01 リワーク):
+    ///   ・T1: ボス 0d0 の自由攻撃ターン (CombatManager が enemy 0d0 強制)。 削りきれば通常勝利(R11)。
+    ///   ・T2以降: サドンデス。 ダイス強制なし=素のロール勝負(バフ/デバフ有効)。
+    ///       プレイヤーがロール敗北 → 99ダメージ(軽減/シールド有効) + 妙覚HP全回復。
+    ///   ・サドンデスを SuddenDeathSurviveTurns ターン生存 → 【解脱】特殊勝利(R12)。
+    ///   SuddenDeath軸で 99 をスケール可 (オートチューナー)。</summary>
     public class AwakenedP7Myokaku : IPassiveSkillEffect
     {
         public string SkillId => "AwakenedP7Myokaku";
         public PassiveSkillTrigger[] Triggers => new[] {
             PassiveSkillTrigger.OnTurnStart,
+            PassiveSkillTrigger.OnPreDealDamage,
             PassiveSkillTrigger.OnTurnEnd,
         };
+        private const string ENTER = "myokaku_entered";
+        private const int SuddenDeathSurviveTurns = 7; // サドンデスをこのターン数生存で解脱
+
+        private static int MyokakuTurn(CombatContext ctx)
+        {
+            int entered = (int)ctx.GetAccumulated(ENTER);
+            return entered > 0 ? ctx.currentTurn - entered + 1 : 1;
+        }
+
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
             switch (trigger)
             {
                 case PassiveSkillTrigger.OnTurnStart:
-                    if (ctx.myokakuSuddenDeath)
-                    {
-                        // サドンデス中: CombatManagerが両者1d2強制。ダイスボーナスはクリア。
-                        ctx.enemyDiceTotalBonus = 0;
-                        ctx.accumulatedValues["extraDice"] = 0;
-                        return;
-                    }
-                    // 妙覚-内部T を算出 (連戦累積currentTurn ではなく、妙覚到達後の経過T)
-                    if (ctx.GetAccumulated("myokaku_entered") <= 0)
-                    {
-                        ctx.accumulatedValues["myokaku_entered"] = ctx.currentTurn;
-                    }
-                    int enteredAt = (int)ctx.GetAccumulated("myokaku_entered");
-                    int myokakuT = ctx.currentTurn - enteredAt + 1;
-
-                    // 妙覚-T1〜T6: ダイス合計99強制を6ターン連続（会心補正なし）。
-                    ctx.accumulatedValues["extraDice"] = 0;
-                    ctx.enemyDiceTotalBonus = 99;
-                    UnityEngine.Debug.Log($"[覚者・妙覚] 妙覚-T{myokakuT}(+99 圧倒 {myokakuT}/6)");
+                {
+                    if (ctx.GetAccumulated(ENTER) <= 0)
+                        ctx.accumulatedValues[ENTER] = ctx.currentTurn;
+                    int mt = MyokakuTurn(ctx);
+                    // T1 のみ自由攻撃 (ボス0d0)。 T2以降は素のロール勝負 (サドンデス)。
+                    ctx.myokakuFreeHit = (mt == 1);
                     break;
+                }
+
+                case PassiveSkillTrigger.OnPreDealDamage:
+                {
+                    // T2以降のサドンデス中、 プレイヤーがロール敗北(=敵視点 playerWonRoll) したとき
+                    if (!ctx.myokakuFreeHit && ctx.playerWonRoll)
+                    {
+                        // サドンデスダメ (軽減/シールド有効 → 後段 ApplyLossDamageModifiers が適用)。 基準99。 ※7層専用=通常は不調整
+                        ctx.finalDamage = UnityEngine.Mathf.Max(1, AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.SuddenDeathDamage));
+                        ctx.lastDamageCause = DeathCause.SuddenDeath;
+                        ctx.playerCurrentHP = ctx.playerMaxHP; // 妙覚HP全回復 (敵視点: playerCurrentHP=ボスHP)
+                        UnityEngine.Debug.Log($"[覚者・妙覚] サドンデス: ロール敗北 → {ctx.finalDamage}ダメ(軽減可) + 妙覚HP全回復");
+                    }
+                    break;
+                }
 
                 case PassiveSkillTrigger.OnTurnEnd:
                 {
-                    // サドンデス決着判定
-                    if (ctx.myokakuSuddenDeath)
+                    int mt = MyokakuTurn(ctx);
+                    int sdTurns = mt - 1; // T1は自由攻撃、 サドンデスはT2から
+                    // 敵視点: enemyCurrentHP = プレイヤー現在HP。 生存して規定ターン経過なら解脱。
+                    if (sdTurns >= SuddenDeathSurviveTurns && ctx.enemyCurrentHP > 0)
                     {
-                        // 敵視点: ctx.playerLostRoll = ボスがロール敗北 = プレイヤー勝利
-                        if (ctx.playerLostRoll)
-                        {
-                            ctx.gedatsuPending = true;
-                            ctx.playerCurrentHP = 0; // ボスHP=0 → 戦闘終了処理に乗せる
-                            UnityEngine.Debug.Log("[覚者・妙覚] ★解脱★ サドンデス勝利 (ボス残HP問わず特殊エンディング)");
-                        }
-                        return;
-                    }
-
-                    // 99 を6ターン連続(T1〜T6)で浴びる。HP0なら通常死亡（救済なし）。
-                    // T6 を生き残れば、7ターン目に両者1d2のサドンデス＝解脱判定へ。
-                    int entered2 = (int)ctx.GetAccumulated("myokaku_entered");
-                    int mT2 = entered2 > 0 ? (ctx.currentTurn - entered2 + 1) : 1;
-                    if (mT2 >= 6)
-                    {
-                        ctx.myokakuSuddenDeath = true;
-                        UnityEngine.Debug.Log("[覚者・妙覚] 99を6ターン耐え抜いた → 7ターン目 1d2 サドンデス（解脱判定）");
+                        ctx.gedatsuPending = true;
+                        ctx.playerCurrentHP = 0; // ボスHP=0 → 戦闘終了処理(解脱)に乗せる
+                        UnityEngine.Debug.Log($"[覚者・妙覚] ★解脱★ サドンデス{SuddenDeathSurviveTurns}ターン生存 → プレイヤー勝利");
                     }
                     break;
                 }

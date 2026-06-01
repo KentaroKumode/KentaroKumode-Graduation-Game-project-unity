@@ -329,7 +329,7 @@ fixedDamageToPlayer ≥ 999 → playerHP = 0（死の宣告）
 | ScorchedEarth(焦土) | OnTurnEnd | プレイヤー敗北時 実プレイヤー最大HP −= 被ダメ10%、consShield=0 |
 | Decree13th(13番目の宣告) | OnTurnStart/OnTurnEnd | 13%でフラグ、成就で (playerDiceTotal+enemyDiceTotal)×criticalMultiplier を軽減無視で実プレイヤーへ |
 | StrongOne/Throne/Setsuna(強者/玉座/刹那) | OnBattleStart | bossDiceBonus = 4/8/12 ※**現在enemies.jsonから撤廃・未参照（クラスは残置）** |
-| SaintGeorgesPhases(シュヴァリエ) | 多数 | 形態1:シールド140+ロール勝利で(プレイヤー合計+プリオリテ×3)反撃+シールド−25 / 形態2:4d6+連勝報酬(ボスダイス+4,+15ダメ)・3勝で形態1帰還 / プリオリテ累積でシールド−28・反撃+3 |
+| SaintGeorgesPhases(シュヴァリエ) | 多数 | 形態1:シールド140+ロール勝利で(プレイヤー合計+プリオリテ×3)反撃+シールド−25 / 形態2:4d6+連勝報酬(ボスダイス+4,+15ダメ)・3勝で形態1帰還 / プリオリテ累積でシールド−28・反撃+10 |
 
 ### 覚者7形態連戦（boss_layer7 → p2 → … → p7、各OnTurnEndでHP0検知し次形態SwapEnemy予約）
 
@@ -337,7 +337,7 @@ fixedDamageToPlayer ≥ 999 → playerHP = 0（死の宣告）
 |---|---|---|
 | AwakenedP1Inverse(初眼・逆観) | OnPostRoll | fixedDamageToEnemy += (プレイヤー最大出目 + currentTurn/3) 軽減無視 |
 | AwakenedP2BurstFire(業火残響・爆ぜ火) | OnRollWin | プレイヤー敗北時 fixedDamageToEnemy +5 軽減無視 |
-| AwakenedP3Mirror(無相・鏡映) | OnPreReceiveDamage | 覚者への与ダメの50%を fixedDamageToEnemy(実プレイヤーへ)反射 |
+| AwakenedP3Mirror(無相・鏡映) | OnPreReceiveDamage | 覚者への与ダメの25%を fixedDamageToEnemy(実プレイヤーへ)反射 |
 | AwakenedP4Riposte(残影・一閃返し) | OnPreReceiveDamage | 1回限り finalDamage=0（反射なし・初撃完全無効のみ） |
 | AwakenedP5Silent(寂照) | OnPostRoll/OnTurnEnd | 毎T 所持パッシブ数/4(min1)軽減無視 / 消費品使用でランダムパッシブ永久喪失 |
 | AwakenedP6EmberWill(薄火・業火の遺志) | OnTurnStart | enemyDiceTotalBonus = 形態内経過T(ランプ) |

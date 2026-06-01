@@ -6,15 +6,34 @@ using UnityEngine;
 namespace AutoTest
 {
     /// <summary>
-    /// BOT の判断基準が変化したときに BALANCE_CHANGELOG.md に追記する。
+    /// BOT の判断基準が変化したときに BALANCE_CHANGELOG_&lt;profile&gt;.md に追記する。
+    /// プロファイル (buffOn_debuffOff 等) ごとに別ファイルへ分離 (2026-05-31)。
     /// 挿入ポイント `<!-- BOT_LOG_INSERT_BELOW -->` の直下に新エントリを追記 (降順)。
+    /// ファイルが無ければヘッダ+マーカーを自動生成する。
     /// </summary>
     public static class BotJudgmentLog
     {
         private const string Marker = "<!-- BOT_LOG_INSERT_BELOW -->";
 
+        /// <summary>現プロファイル専用の changelog パス。 例: BALANCE_CHANGELOG_buffOn_debuffOff.md</summary>
         private static string LogPath
-            => Path.GetFullPath(Path.Combine(Application.dataPath, "..", "BALANCE_CHANGELOG.md"));
+            => Path.GetFullPath(Path.Combine(Application.dataPath, "..",
+                $"BALANCE_CHANGELOG_{MetaProfileHelper.CurrentSuffix}.md"));
+
+        /// <summary>ファイルが存在しなければヘッダ + 挿入マーカーで新規作成する。</summary>
+        private static void EnsureFile(string path)
+        {
+            if (File.Exists(path)) return;
+            var sb = new StringBuilder();
+            sb.AppendLine($"# バランス変更ログ ({MetaProfileHelper.CurrentSuffix})");
+            sb.AppendLine();
+            sb.AppendLine("> 自動生成。 BOT の判断基準 (L1 Tier / L2 policy) が変化したバッチで追記される。");
+            sb.AppendLine("> 新しいエントリほど上 (マーカー直下) に挿入される。");
+            sb.AppendLine();
+            sb.AppendLine(Marker);
+            sb.AppendLine();
+            File.WriteAllText(path, sb.ToString(), new UTF8Encoding(false));
+        }
 
         /// <summary>マーカー直下に1ブロックを差し込む (新しいエントリほど上に来る)。</summary>
         public static void Append(string entryMarkdown)
@@ -22,11 +41,7 @@ namespace AutoTest
             try
             {
                 string path = LogPath;
-                if (!File.Exists(path))
-                {
-                    Debug.LogWarning("[BotJudgmentLog] BALANCE_CHANGELOG.md が存在しません。 追記スキップ");
-                    return;
-                }
+                EnsureFile(path);
                 string txt = File.ReadAllText(path, Encoding.UTF8);
                 int idx = txt.IndexOf(Marker, StringComparison.Ordinal);
                 if (idx < 0)

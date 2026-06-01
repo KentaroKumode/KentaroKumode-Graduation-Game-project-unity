@@ -303,6 +303,7 @@ namespace InventorySystem.PassiveSkills
             Register(new AwakenedP6EmberWill());
             Register(new AwakenedP7Myokaku());
             Register(new FlawlessRobe()); // 天衣無縫（覚者4形態の回復/シールド減衰）
+            Register(new TrueSelf());     // 真我（7層全形態・ダイス上限超の素ロール加算。 オートチューナーが調整）
             // [互換用残置] 旧 AwakenedTrial は連戦化により未使用
         }
     }

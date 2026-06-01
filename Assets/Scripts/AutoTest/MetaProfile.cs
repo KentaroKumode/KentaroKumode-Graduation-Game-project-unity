@@ -59,6 +59,19 @@ namespace AutoTest
             return Path.GetFullPath(baseRoot);
         }
 
+        /// <summary>プロファイル非依存の共有ルート (AutoRunLogs/learning)。
+        /// ボス難易度係数など「全プロファイル共通で1つだけ持つべきデータ」用。</summary>
+        public static string SharedLearningRoot()
+        {
+            string baseRoot = Path.Combine(Application.dataPath, "..", "AutoRunLogs", "learning");
+            return Path.GetFullPath(baseRoot);
+        }
+
+        /// <summary>ボス難易度の調整基準プロファイル (デバフ無し=難易度0)。
+        /// このプロファイルのバッチでのみ共有ボス係数を自動調整し、 他は読み取り専用で継承する。</summary>
+        public const MetaProfile BaselineProfile = MetaProfile.BuffOn_DebuffOff;
+        public static bool CurrentIsBaseline => _current == BaselineProfile;
+
         public static string DisplayName(MetaProfile p)
         {
             switch (p)

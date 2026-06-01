@@ -74,6 +74,30 @@ namespace AutoTest
         [Tooltip("メタプロファイル (バフ/デバフ ON/OFF)。 学習データの分離キー兼 Meta系切替の主軸")]
         public MetaProfile metaProfile = MetaProfile.BuffOn_DebuffOff;
 
+        /// <summary>学習モード: 何を更新(成長)させ、 何を凍結するかを切り替える (排他)。</summary>
+        public enum LearningMode
+        {
+            /// <summary>従来挙動: Tier表(item_stats/regression/MD) と AIルーチン(policy/event) を両方更新。</summary>
+            TierAndAi,
+            /// <summary>Tier表更新モード: item_stats / regression / MD を更新。 BOT挙動(policy/event)は凍結 = 純粋なバランス計測。</summary>
+            TierOnly,
+            /// <summary>AIルーチン学習モード: policy / event を成長。 Tier表(item_stats/regression/MD)は凍結。 BOTは凍結済みTierを読みつつ立ち回りだけ最適化。</summary>
+            AiOnly,
+            /// <summary>ボス難易度オートチューナーのみ: ボス係数を自動調整。 Tier/AI(policy/event)は全凍結。
+            /// ボス環境が変動するため他学習と混ぜると統計が濁る → 排他にして単独実行。</summary>
+            BossTuning,
+        }
+
+        [Tooltip("学習モード(排他): TierAndAi=両方更新 / TierOnly=Tier表のみ / AiOnly=AIルーチンのみ / BossTuning=ボス難易度オートチューナーのみ(Tier/AI凍結)")]
+        public LearningMode learningMode = LearningMode.TierAndAi;
+
+        /// <summary>Tier表 (item_stats / regression / BALANCE_TIER_LIST.md) を更新するか。 BossTuning時は凍結。</summary>
+        public bool UpdatesTier => learningMode == LearningMode.TierAndAi || learningMode == LearningMode.TierOnly;
+        /// <summary>AIルーチン (policy / event_stats) を成長させるか。 BossTuning時は凍結。</summary>
+        public bool UpdatesAi => learningMode == LearningMode.TierAndAi || learningMode == LearningMode.AiOnly;
+        /// <summary>ボス難易度オートチューナーを動かすか (BossTuningモードのみ)。</summary>
+        public bool BossAutoTune => learningMode == LearningMode.BossTuning;
+
         // 旧フィールド (互換用、内部では metaPattern を見る)
         [System.Obsolete("metaPattern を使用してください")] public bool resetMetaForCleanBaseline = true;
 
@@ -153,6 +177,11 @@ namespace AutoTest
             // この戦闘時点の装備（武器×ダイス勝率集計用）。武器は family_tN まで（業物+段階は区別しない）。
             public string weaponId = "";
             public string diceId = "";
+            // ボス難易度オートチューナー: 敗北時の致死メカニズム (勝利時は Normal)
+            public InventorySystem.PassiveSkills.DeathCause deathCause;
+            // ボス難易度オートチューナー: プレイヤーロール合計と回数 (平均出目算出用)
+            public long playerRollSum;
+            public int playerRollCount;
         }
 
         [Serializable]
@@ -320,7 +349,8 @@ namespace AutoTest
             // プロファイル切替で参照先サブディレクトリが変わるため、 各キャッシュを再読み込み
             try { PolicyParameters.ReloadFromDisk(MetaProfileHelper.LearningRoot()); } catch { }
             try { EventChoiceLearningStats.Reload(MetaProfileHelper.LearningRoot()); } catch { }
-            try { LearnedPriorityProvider.Reload(MetaProfileHelper.LearningRoot()); } catch { }
+            try { LearnedPriorityProvider.Reload(MetaProfileHelper.LearningRoot(), writeMarkdown: UpdatesTier); } catch { }
+            try { BossTuning.Reload(MetaProfileHelper.LearningRoot()); } catch { }
 
             if (autoLoopBatches >= 2)
                 StartCoroutine(RunAutoLoop());
@@ -341,6 +371,15 @@ namespace AutoTest
             int loops = Mathf.Max(1, autoLoopBatches);
             bool finalExit = exitPlayModeWhenDone;
             _suppressExitDuringLoop = true;  // RunBatch 内の exitPlayMode を抑止
+            string root = MetaProfileHelper.LearningRoot();
+
+            // ── バッチ0回目(初期)スナップショット ──
+            try { BossTuning.Reload(root); } catch { }
+            try { PolicyParameters.ReloadFromDisk(root); } catch { }
+            var bossStart   = SnapshotBossTuning();
+            var policyStart = PolicyParameters.Current?.Clone();
+            float firstClearRate = -1f, lastClearRate = -1f;
+
             Debug.Log($"[AutoRunner] === 自動周回モード START: {runCount}ラン × {loops}周 ===");
             for (int i = 1; i <= loops; i++)
             {
@@ -348,12 +387,18 @@ namespace AutoTest
                 _records.Clear();
                 _detail.Clear();
                 yield return RunBatch();
-                Debug.Log($"[AutoRunner] ── 自動周回 {i}/{loops} 終了 ──");
+                float cr = ComputeFullClearRate(_records);
+                if (i == 1) firstClearRate = cr;
+                lastClearRate = cr;
+                Debug.Log($"[AutoRunner] ── 自動周回 {i}/{loops} 終了 (7層クリア率 {cr:P2}) ──");
                 yield return null;
             }
             _suppressExitDuringLoop = false;
-            // 最終バッチ後に Reload を1回呼んで、 最新の item_stats を BALANCE_TIER_LIST.md に反映
-            try { LearnedPriorityProvider.Reload(MetaProfileHelper.LearningRoot()); } catch { }
+            // 最終バッチ後に Reload を1回呼んで、 最新の item_stats を BALANCE_TIER_LIST.md に反映 (Tier更新モードのみ)
+            try { LearnedPriorityProvider.Reload(root, writeMarkdown: UpdatesTier); } catch { }
+            // ── 周回サマリ: 初期 vs 最終の差分をチェンジログに追記 ──
+            try { AppendAutoLoopSummary(loops, bossStart, policyStart, firstClearRate, lastClearRate); }
+            catch (Exception e) { Debug.LogWarning($"[AutoRunner] 周回サマリ追記失敗: {e.Message}"); }
             Debug.Log($"[AutoRunner] === 自動周回モード END: {loops}周完了 (最終 Reload: {LearnedPriorityProvider.LastLoadedSummary}) ===");
             if (finalExit)
             {
@@ -361,6 +406,131 @@ namespace AutoTest
                 UnityEditor.EditorApplication.isPlaying = false;
 #endif
             }
+        }
+
+        /// <summary>_records から 7層クリア率 (bandScore>=11 / 有効ラン) を算出。</summary>
+        private static float ComputeFullClearRate(List<RunRec> recs)
+        {
+            if (recs == null || recs.Count == 0) return 0f;
+            int valid = 0, full = 0;
+            foreach (var r in recs)
+            {
+                if (r == null || r.bandScore < 0) continue;
+                valid++;
+                if (r.bandScore >= 11) full++;
+            }
+            return valid > 0 ? (float)full / valid : 0f;
+        }
+
+        /// <summary>現在のボス調整値を {key → {ラベル → 実数値}} で複製 (具体パラメータ + HP + Dice期待値)。</summary>
+        private static Dictionary<string, Dictionary<string, float>> SnapshotBossTuning()
+        {
+            var snap = new Dictionary<string, Dictionary<string, float>>();
+            try
+            {
+                foreach (var k in BossTuning.All())
+                {
+                    var m = new Dictionary<string, float>();
+                    foreach (BossParam p in System.Enum.GetValues(typeof(BossParam)))
+                        m[p.ToString()] = BossTuning.GetParam(k, p);
+                    m["HP"] = BossTuning.MaxHpFor(k.key);
+                    m["DiceE"] = BossTuning.CurrentDiceExpected(k.key);
+                    snap[k.key] = m;
+                }
+            }
+            catch { }
+            return snap;
+        }
+
+        /// <summary>自動周回の初期(バッチ0)→最終(バッチN)差分を BALANCE_CHANGELOG_&lt;profile&gt;.md に追記。</summary>
+        private void AppendAutoLoopSummary(int loops,
+            Dictionary<string, Dictionary<string, float>> bossStart,
+            PolicyParameters policyStart, float firstClear, float lastClear)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine($"## {BotJudgmentLog.Now()} — 🔁 自動周回サマリ ({runCount}ラン × {loops}周 / {MetaProfileHelper.CurrentSuffix})");
+            sb.AppendLine();
+            sb.AppendLine($"- **学習モード**: {learningMode} / ボスオートチューン: {(BossAutoTune ? "ON" : "OFF")}");
+            if (firstClear >= 0f && lastClear >= 0f)
+            {
+                float d = lastClear - firstClear;
+                sb.AppendLine($"- **7層クリア率**: 初回 {firstClear:P2} → 最終 {lastClear:P2} ({d:+0.0%;-0.0%})");
+            }
+            sb.AppendLine();
+
+            // ボス難易度係数の差分 (変化した軸のみ)
+            if (BossAutoTune)
+            {
+                var bossEnd = SnapshotBossTuning();
+                var keys = new SortedSet<string>();
+                foreach (var k in bossStart.Keys) keys.Add(k);
+                foreach (var k in bossEnd.Keys) keys.Add(k);
+                var lines = new List<string>();
+                foreach (var key in keys)
+                {
+                    bossStart.TryGetValue(key, out var sa);
+                    bossEnd.TryGetValue(key, out var sb2);
+                    var parts = new List<string>();
+                    var labels = new SortedSet<string>();
+                    if (sa != null) foreach (var l in sa.Keys) labels.Add(l);
+                    if (sb2 != null) foreach (var l in sb2.Keys) labels.Add(l);
+                    foreach (var label in labels)
+                    {
+                        float av = (sa != null && sa.TryGetValue(label, out var v1)) ? v1 : 0f;
+                        float bv = (sb2 != null && sb2.TryGetValue(label, out var v2)) ? v2 : 0f;
+                        if (Mathf.Abs(bv - av) <= 0.05f) continue;
+                        if (label == "DiceE")
+                        {
+                            var (cnt, faces) = BossTuning.BestDiceConfig(bv > 0 ? bv : 1f);
+                            parts.Add($"Dice E{av:F1}→**E{bv:F1}({cnt}d{faces})**");
+                        }
+                        else if (label == "HP")
+                            parts.Add($"HP {av:F0}→**{bv:F0}**");
+                        else
+                            parts.Add($"{label} {av:0.#}→**{bv:0.#}**");
+                    }
+                    if (parts.Count > 0) lines.Add($"| `{key}` | {string.Join(", ", parts)} |");
+                }
+                sb.AppendLine("### ボス難易度パラメータ (変化した実数値のみ)");
+                sb.AppendLine();
+                if (lines.Count == 0) sb.AppendLine("*(変化なし)*");
+                else
+                {
+                    sb.AppendLine("| ボス | 変化したパラメータ |");
+                    sb.AppendLine("|---|---|");
+                    foreach (var l in lines) sb.AppendLine(l);
+                }
+                sb.AppendLine();
+            }
+
+            // policy 差分
+            if (UpdatesAi && policyStart != null)
+            {
+                var p = PolicyParameters.Current;
+                var lines = new List<string>();
+                void Diff(string name, object a, object b) { if (!Equals(a, b)) lines.Add($"| {name} | `{a}` → `{b}` |"); }
+                Diff("rerollCostRatio", policyStart.rerollCostRatio, p.rerollCostRatio);
+                Diff("consumableStockMax", policyStart.consumableStockMax, p.consumableStockMax);
+                Diff("robberyMinHpRatio", policyStart.robberyMinHpRatio, p.robberyMinHpRatio);
+                Diff("eventExplorationRate", policyStart.eventExplorationRate, p.eventExplorationRate);
+                Diff("importantThreatThreshold", policyStart.importantThreatThreshold, p.importantThreatThreshold);
+                Diff("emergencyHealRatio", policyStart.emergencyHealRatio, p.emergencyHealRatio);
+                Diff("hpLowThreshold", policyStart.hpLowThreshold, p.hpLowThreshold);
+                Diff("hpCritThreshold", policyStart.hpCritThreshold, p.hpCritThreshold);
+                sb.AppendLine("### AIポリシー (policy.json)");
+                sb.AppendLine();
+                if (lines.Count == 0) sb.AppendLine("*(変化なし)*");
+                else
+                {
+                    sb.AppendLine("| パラメータ | 初期 → 最終 |");
+                    sb.AppendLine("|---|---|");
+                    foreach (var l in lines) sb.AppendLine(l);
+                }
+                sb.AppendLine();
+            }
+
+            sb.AppendLine("---");
+            BotJudgmentLog.Append(sb.ToString());
         }
 
         /// <summary>Editor コンソールを強制クリア + 大規模 GC + Unity未参照リソース解放。
@@ -446,18 +616,24 @@ namespace AutoTest
                 yield break;
             }
 
-            // L1学習データを読み込み、 動的 PriorityItemList を構築
-            LearnedPriorityProvider.Reload();
+            // L1学習データを読み込み、 動的 PriorityItemList を構築。
+            //  BOTは常に Tier を読む必要がある (S/A/B 判定) ので Reload 自体は常に実行。
+            //  ただし MD 再生成は Tier更新モードのみ (AIルーチン学習モードでは Tier表凍結)。
+            LearnedPriorityProvider.Reload(writeMarkdown: UpdatesTier);
             Debug.Log($"[AutoRunner] {LearnedPriorityProvider.LastLoadedSummary}");
             // L1.5: イベント学習リフトを読み込み
             EventChoiceLearningStats.Reload();
             // L2: policy.json を読み込み (前バッチの摂動結果を引き継ぐ)
             PolicyParameters.ReloadFromDisk();
             Debug.Log($"[AutoRunner] policy: {PolicyParameters.Current.Summary()}");
+            // L3: ボス難易度係数を読み込み (前バッチの自動調整を引き継ぐ)
+            BossTuning.Reload();
+            if (BossAutoTune) Debug.Log($"[AutoRunner] bossTuning: {BossTuning.Summary()}");
             // L2ペアテスト: 挑戦者ポリシーを生成 (バッチ内 paired diff 評価用)
+            //  ・AIルーチン学習モード時のみ (TierOnly では policy 凍結)
             //  ・runCount が L2ゲート(200) 未満ならスキップ
             //  ・偶数バッチである必要 (runCountを偶数にする)
-            if (runCount >= PolicyExplorer.MinBatchForL2 && runCount % 2 == 0)
+            if (UpdatesAi && runCount >= PolicyExplorer.MinBatchForL2 && runCount % 2 == 0)
             {
                 PolicyExplorer.PrepareChallenger();
             }
@@ -1895,6 +2071,9 @@ namespace AutoTest
                 enemyMaxHP = r.enemyMaxHP,
                 weaponId = gm?.Run?.equippedWeaponId ?? "",
                 diceId = gm?.Run?.equippedDiceId ?? "",
+                deathCause = r.deathCause,
+                playerRollSum = r.playerRollSum,
+                playerRollCount = r.playerRollCount,
             };
             _cur.combats.Add(rec);
             _cur.totalCombats++;
@@ -2213,25 +2392,39 @@ namespace AutoTest
             // L1学習: プロファイル別サブディレクトリに分離して累積
             string learningRoot = MetaProfileHelper.LearningRoot();
             ItemLearningStats.StatsFile learnStats = null;
-            try
+            Debug.Log($"[AutoRunner] 学習モード: {learningMode} (Tier更新={UpdatesTier} / AI成長={UpdatesAi})");
+            if (UpdatesTier)
             {
-                learnStats = ItemLearningStats.IngestBatch(learningRoot, _records);
-                File.WriteAllText(Path.Combine(dir, "ai_stats.json"),
-                    ItemLearningStats.BuildAiCompact(learnStats), new UTF8Encoding(false));
+                try
+                {
+                    learnStats = ItemLearningStats.IngestBatch(learningRoot, _records);
+                    File.WriteAllText(Path.Combine(dir, "ai_stats.json"),
+                        ItemLearningStats.BuildAiCompact(learnStats), new UTF8Encoding(false));
+                }
+                catch (Exception e) { Debug.LogWarning($"[AutoRunner] L1学習出力失敗: {e.Message}"); }
+
+                // 回帰用ラン単位生データを永続化 (次バッチ起動時に ItemRegression.Recompute が読む)
+                try { RunDataLogger.AppendBatch(learningRoot, _records); }
+                catch (Exception e) { Debug.LogWarning($"[AutoRunner] RunDataLogger 失敗: {e.Message}"); }
             }
-            catch (Exception e) { Debug.LogWarning($"[AutoRunner] L1学習出力失敗: {e.Message}"); }
 
-            // 回帰用ラン単位生データを永続化 (次バッチ起動時に ItemRegression.Recompute が読む)
-            try { RunDataLogger.AppendBatch(learningRoot, _records); }
-            catch (Exception e) { Debug.LogWarning($"[AutoRunner] RunDataLogger 失敗: {e.Message}"); }
-
-            // L1.5: イベント選択肢の bandScore 集計を更新
-            try { EventChoiceLearningStats.IngestBatch(learningRoot, _records); }
-            catch (Exception e) { Debug.LogWarning($"[AutoRunner] イベント学習失敗: {e.Message}"); }
-
+            // L1.5: イベント選択肢の bandScore 集計を更新 (AIルーチン側)
             // L2自動探索: 今バッチの bandScore で policy を評価し、 次バッチへ向けて1軸摂動
-            try { PolicyExplorer.AssessAndPropose(_records, learningRoot); }
-            catch (Exception e) { Debug.LogWarning($"[AutoRunner] L2探索失敗: {e.Message}"); }
+            if (UpdatesAi)
+            {
+                try { EventChoiceLearningStats.IngestBatch(learningRoot, _records); }
+                catch (Exception e) { Debug.LogWarning($"[AutoRunner] イベント学習失敗: {e.Message}"); }
+
+                try { PolicyExplorer.AssessAndPropose(_records, learningRoot); }
+                catch (Exception e) { Debug.LogWarning($"[AutoRunner] L2探索失敗: {e.Message}"); }
+            }
+
+            // L3: ボス難易度オートチューナー (突破率→目標ファネルへ寄せる)。 learningMode とは独立トグル。
+            if (BossAutoTune)
+            {
+                try { BossBalanceTuner.AssessAndAdjust(_records, MetaProfileHelper.CurrentDebuffOn, learningRoot, learnStats?.totalBatches ?? 0); }
+                catch (Exception e) { Debug.LogWarning($"[AutoRunner] L3ボス調整失敗: {e.Message}"); }
+            }
 
             File.WriteAllText(Path.Combine(dir, "summary.txt"),
                 BuildSummary() + (learnStats != null ? "\n" + ItemLearningStats.BuildHumanLiftTable(learnStats) : ""),
@@ -2240,11 +2433,12 @@ namespace AutoTest
             if (writeDetailLog)
                 File.WriteAllText(Path.Combine(dir, "detail.log"), BuildDetail(), new UTF8Encoding(false));
 
-            // バッチ完了直後に Reload を呼び、 BALANCE_TIER_LIST.md を最新の集計で必ず更新する
+            // バッチ完了直後に Reload。 Tier更新モードのみ BALANCE_TIER_LIST.md を再生成する。
+            // AIルーチン学習モードでは Tier表を凍結 (MDを書かない) が、 BOTが読む in-memory の S/A/B は更新しておく。
             try
             {
-                LearnedPriorityProvider.Reload(learningRoot);
-                Debug.Log($"[AutoRunner] WriteLogs後 Reload: {LearnedPriorityProvider.LastLoadedSummary}");
+                LearnedPriorityProvider.Reload(learningRoot, writeMarkdown: UpdatesTier);
+                Debug.Log($"[AutoRunner] WriteLogs後 Reload (MD書込={UpdatesTier}): {LearnedPriorityProvider.LastLoadedSummary}");
             }
             catch (Exception e) { Debug.LogWarning($"[AutoRunner] WriteLogs後 Reload失敗: {e.Message}"); }
 
@@ -2282,6 +2476,8 @@ namespace AutoTest
             sb.AppendLine();
             sb.Append(BuildWeaponProgressionBlock());
             sb.AppendLine();
+            sb.Append(BuildBossWinRateBlock());
+            sb.AppendLine();
             sb.Append(BuildSummaryBlock("【前半 50% ─ 戦闘貪欲（戦闘マスを最優先で選ぶ）】", greedy));
             sb.AppendLine();
             sb.AppendLine();
@@ -2293,6 +2489,96 @@ namespace AutoTest
                 sb.Append(BuildSummaryBlock("【プロファイル未設定（保険）】", other));
             }
             return sb.ToString();
+        }
+
+        /// <summary>ボス別の戦闘勝率ブロック。 1〜6層 + 5裏 + 7層各形態を遭遇順に並べ、
+        /// 勝率/遭遇数/平均ターン/ロール勝率/主死因を出す (難易度調整の確認用)。</summary>
+        private string BuildBossWinRateBlock()
+        {
+            // enemyId 別に集計
+            var agg = new Dictionary<string, BossWinAgg>();
+            foreach (var r in _records)
+            {
+                if (r?.combats == null) continue;
+                foreach (var c in r.combats)
+                {
+                    if (c == null || string.IsNullOrEmpty(c.enemyId) || !BossTuning.IsBoss(c.enemyId)) continue;
+                    if (!agg.TryGetValue(c.enemyId, out var a)) { a = new BossWinAgg(); agg[c.enemyId] = a; }
+                    a.enc++;
+                    if (c.won) a.wins++;
+                    a.tWin += c.tWin; a.tLoss += c.tLoss; a.tDraw += c.tDraw; a.turns += c.turns;
+                    if (!c.won)
+                    {
+                        string dc = c.deathCause.ToString();
+                        a.causes[dc] = a.causes.TryGetValue(dc, out int n) ? n + 1 : 1;
+                    }
+                }
+            }
+
+            var sb = new StringBuilder();
+            sb.AppendLine("【ボス別 戦闘勝率】");
+            if (agg.Count == 0) { sb.AppendLine("  (ボス戦の記録なし)"); return sb.ToString(); }
+
+            // 表示順: 1,2,3,4,5,5裏,6, 7層各形態(p1..p7), その他
+            string[] ordered = {
+                "boss_layer1", "boss_layer2", "boss_layer3", "boss_layer4",
+                "boss_layer5", "boss_layer5_hidden", "boss_layer6",
+                "boss_layer7", "boss_layer7_p2", "boss_layer7_p3", "boss_layer7_p4",
+                "boss_layer7_p5", "boss_layer7_p6", "boss_layer7_p7",
+            };
+            var shown = new HashSet<string>();
+            foreach (var id in ordered)
+                if (agg.TryGetValue(id, out var a)) { sb.AppendLine(FormatBossRow(BossLabel(id), a)); shown.Add(id); }
+            // 既知順に無い未知ボスを末尾に追加
+            foreach (var kv in agg)
+                if (!shown.Contains(kv.Key)) sb.AppendLine(FormatBossRow(BossLabel(kv.Key), kv.Value));
+
+            return sb.ToString();
+        }
+
+        private class BossWinAgg
+        {
+            public int enc, wins;
+            public long tWin, tLoss, tDraw, turns;
+            public Dictionary<string, int> causes = new Dictionary<string, int>();
+            public float WinRate => enc > 0 ? (float)wins / enc : 0f;
+            public float RollWinRate { get { long t = tWin + tLoss + tDraw; return t > 0 ? (float)tWin / t : 0f; } }
+            public float AvgTurns => enc > 0 ? (float)turns / enc : 0f;
+            public int Losses => enc - wins;
+        }
+
+        private static string FormatBossRow(string label, BossWinAgg a)
+        {
+            string cause = "敗北なし";
+            if (a.Losses > 0)
+            {
+                string dom = ""; int domN = 0;
+                foreach (var kv in a.causes) if (kv.Value > domN) { dom = kv.Key; domN = kv.Value; }
+                cause = domN > 0 ? $"主死因{dom} {(float)domN / a.Losses:P0}" : "—";
+            }
+            return $"  {label,-7}: 勝率 {a.WinRate,6:P1}  (遭遇 {a.enc,5} / 勝 {a.wins,5})  平均{a.AvgTurns,4:F1}T  ロール勝率{a.RollWinRate,5:P0}  {cause}";
+        }
+
+        private static string BossLabel(string id)
+        {
+            switch (id)
+            {
+                case "boss_layer1": return "1層";
+                case "boss_layer2": return "2層";
+                case "boss_layer3": return "3層";
+                case "boss_layer4": return "4層";
+                case "boss_layer5": return "5層";
+                case "boss_layer5_hidden": return "5裏";
+                case "boss_layer6": return "6層";
+                case "boss_layer7": return "7層p1";
+                case "boss_layer7_p2": return "7層p2";
+                case "boss_layer7_p3": return "7層p3";
+                case "boss_layer7_p4": return "7層p4";
+                case "boss_layer7_p5": return "7層p5";
+                case "boss_layer7_p6": return "7層p6";
+                case "boss_layer7_p7": return "7層p7";
+                default: return id;
+            }
         }
 
         /// <summary>Λ層（時間の狭間）のファーム期待値ブロック。突入ランのみを母数に

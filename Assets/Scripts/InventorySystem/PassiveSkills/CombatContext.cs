@@ -2,6 +2,18 @@ using System.Collections.Generic;
 
 namespace InventorySystem.PassiveSkills
 {
+    /// <summary>プレイヤーに止めを刺した致死メカニズムの分類 (ボス難易度オートチューナーの苦戦診断用)。</summary>
+    public enum DeathCause
+    {
+        Normal,       // 通常ロール敗北の被ダメ
+        Judgment,     // 灰燼: 業火の断罪
+        Reflect,      // 覚者・無相: 鏡映反射
+        Burst,        // 業火・残響: 爆ぜ火 (敗北時固定ダメ)
+        Chip,         // 業火の審判官: 審判の炎 (継続ダメ)
+        SuddenDeath,  // 覚者・妙覚: サドンデス
+        Other,
+    }
+
     /// <summary>
     /// 戦闘中の全状態を保持するコンテキスト
     /// パッシブスキルはこのオブジェクトを読み書きしてゲーム状態を変更する
@@ -176,6 +188,14 @@ namespace InventorySystem.PassiveSkills
         /// enemyDiceTotalBonus とは別枠（星火燎原等の上書きと競合させないため）。勝敗判定前に enemyDiceTotal へ加算。</summary>
         public int bossDiceBonus;
 
+        /// <summary>現在の敵ボスid (boss_layer*)。 非ボス戦は空。 各ボススキルが BossTuning.Param(bossId, ...) を引くのに使う。
+        /// 戦闘開始/形態swap時に CombatManager がセット。</summary>
+        public string bossId = "";
+
+        /// <summary>直近にプレイヤーへダメージを与えた致死メカニズムの分類。
+        /// 各致死スキルが発動時にセット、 通常被ダメ経路は Normal。 プレイヤー死亡時の死因記録に使う。</summary>
+        public DeathCause lastDamageCause = DeathCause.Normal;
+
         /// <summary>敵の基礎防御（被ダメ%軽減 0～1）。EnemyData.baseDefenseRate を戦闘開始/形態swap時に設定、
         /// エリート(EliteVigor)が +0.10。利刃で相殺。BeginNewTurn ではリセットしない（戦闘通して保持）。
         /// 勝利分岐で 灰塵の鎧 の後に total ×= (1 - max(0, 軽減率 - armorPenPct))。</summary>
@@ -257,8 +277,14 @@ namespace InventorySystem.PassiveSkills
 
         /// <summary>〈妙覚〉サドンデス: 妙覚T2+でロール敗北かつ生存中。
         /// 次ターン以降、両ダイスを 1d2 に強制し決着まで継続。
-        /// プレイヤー勝利時 gedatsuPending=true をセットし【解脱】特殊勝利。</summary>
+        /// プレイヤー勝利時 gedatsuPending=true をセットし【解脱】特殊勝利。
+        /// 2026-06-01 リワーク後は未使用 (素のロール勝負化により強制ロジック撤廃)。</summary>
         public bool myokakuSuddenDeath;
+
+        /// <summary>〈妙覚〉自由攻撃ターン: 妙覚到達後の最初の1ターンだけ true。
+        /// CombatManager がボスを 0d0 (ロール合計0) に強制 → プレイヤーが自由に削れる。
+        /// 削りきれなければ T2 以降サドンデスへ移行。</summary>
+        public bool myokakuFreeHit;
 
         /// <summary>〈妙覚〉解脱: サドンデスでプレイヤーが勝利。CombatResult.gedatsu に反映される。</summary>
         public bool gedatsuPending;

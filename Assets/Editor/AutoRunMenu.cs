@@ -18,11 +18,18 @@ namespace AutoTest.EditorTools
         private const string SweepKey   = "AutoRun.Boss5Sweep";    // SessionState (5Fボス勝率スイープ)
         private const string LambdaKey  = "AutoRun.LambdaFarmSweep"; // SessionState (Λファーム量スイープ)
         private const string LoopKey    = "AutoRun.AutoLoopBatches"; // SessionState (自動周回バッチ数)
+        private const string LearnModeKey = "AutoRun.LearningMode"; // EditorPrefs (学習モード選択=排他ラジオ)
 
         // メニュー項目パス (プロファイル選択)
         private const string MenuProfA = "Tools/AutoRun/プロファイル: 素プレイ (バフOFF・デバフOFF)";
         private const string MenuProfB = "Tools/AutoRun/プロファイル: バフのみ (バフON・デバフOFF)";
         private const string MenuProfC = "Tools/AutoRun/プロファイル: フル設定 (バフON・デバフON)";
+
+        // メニュー項目パス (学習モード選択 = 排他ラジオ)
+        private const string MenuLearnBoth = "Tools/AutoRun/学習モード: Tier表+AI 両方更新 (従来)";
+        private const string MenuLearnTier = "Tools/AutoRun/学習モード: Tier表のみ更新 (BOT挙動は凍結=バランス計測)";
+        private const string MenuLearnAi   = "Tools/AutoRun/学習モード: AIルーチンのみ成長 (Tier表は凍結)";
+        private const string MenuLearnBoss = "Tools/AutoRun/学習モード: ボス難易度オートチューナーのみ (Tier/AI凍結)";
 
         static AutoRunMenu()
         {
@@ -58,6 +65,42 @@ namespace AutoTest.EditorTools
         [MenuItem(MenuProfC, validate = true)]
         private static bool SetProfCValidate()
         { Menu.SetChecked(MenuProfC, CurrentProfile == MetaProfile.BuffOn_DebuffOn); return true; }
+
+        // ===== 学習モード選択 =====
+
+        private static AutoRunner.LearningMode CurrentLearnMode
+        {
+            get
+            {
+                int v = EditorPrefs.GetInt(LearnModeKey, (int)AutoRunner.LearningMode.TierAndAi);
+                return (AutoRunner.LearningMode)v;
+            }
+            set => EditorPrefs.SetInt(LearnModeKey, (int)value);
+        }
+
+        [MenuItem(MenuLearnBoth, priority = 60)]
+        private static void SetLearnBoth() { CurrentLearnMode = AutoRunner.LearningMode.TierAndAi; }
+        [MenuItem(MenuLearnBoth, validate = true)]
+        private static bool SetLearnBothValidate()
+        { Menu.SetChecked(MenuLearnBoth, CurrentLearnMode == AutoRunner.LearningMode.TierAndAi); return true; }
+
+        [MenuItem(MenuLearnTier, priority = 61)]
+        private static void SetLearnTier() { CurrentLearnMode = AutoRunner.LearningMode.TierOnly; }
+        [MenuItem(MenuLearnTier, validate = true)]
+        private static bool SetLearnTierValidate()
+        { Menu.SetChecked(MenuLearnTier, CurrentLearnMode == AutoRunner.LearningMode.TierOnly); return true; }
+
+        [MenuItem(MenuLearnAi, priority = 62)]
+        private static void SetLearnAi() { CurrentLearnMode = AutoRunner.LearningMode.AiOnly; }
+        [MenuItem(MenuLearnAi, validate = true)]
+        private static bool SetLearnAiValidate()
+        { Menu.SetChecked(MenuLearnAi, CurrentLearnMode == AutoRunner.LearningMode.AiOnly); return true; }
+
+        [MenuItem(MenuLearnBoss, priority = 63)]
+        private static void SetLearnBoss() { CurrentLearnMode = AutoRunner.LearningMode.BossTuning; }
+        [MenuItem(MenuLearnBoss, validate = true)]
+        private static bool SetLearnBossValidate()
+        { Menu.SetChecked(MenuLearnBoss, CurrentLearnMode == AutoRunner.LearningMode.BossTuning); return true; }
 
         // ===== ラン起動 =====
 
@@ -126,11 +169,12 @@ namespace AutoTest.EditorTools
             SessionState.SetBool(SweepKey, sweep);
             SessionState.SetBool(LambdaKey, lambdaSweep);
             SessionState.SetInt(LoopKey, loopBatches);
+            SessionState.SetInt(LearnModeKey, (int)CurrentLearnMode); // 学習モード (排他: Tier/AI/Boss)
             string modeLabel = sweep ? "5Fボス勝率スイープ"
                               : lambdaSweep ? "Λファーム量スイープ"
                               : loopBatches >= 2 ? $"自動周回 {count}ラン × {loopBatches}回"
                               : count + " ラン";
-            Debug.Log($"[AutoRunMenu] {modeLabel}予約 (プロファイル: {MetaProfileHelper.DisplayName(CurrentProfile)}) → PlayMode 開始");
+            Debug.Log($"[AutoRunMenu] {modeLabel}予約 (プロファイル: {MetaProfileHelper.DisplayName(CurrentProfile)}, 学習モード: {CurrentLearnMode}) → PlayMode 開始");
             EditorApplication.EnterPlaymode();
         }
 
@@ -144,11 +188,13 @@ namespace AutoTest.EditorTools
             bool sweep = SessionState.GetBool(SweepKey, false);
             bool lambdaSweep = SessionState.GetBool(LambdaKey, false);
             int loopBatches = SessionState.GetInt(LoopKey, 1);
+            int learnModeInt = SessionState.GetInt(LearnModeKey, (int)AutoRunner.LearningMode.TierAndAi);
             SessionState.EraseInt(PendingKey);
             SessionState.EraseInt(ProfileKey);
             SessionState.EraseBool(SweepKey);
             SessionState.EraseBool(LambdaKey);
             SessionState.EraseInt(LoopKey);
+            SessionState.EraseInt(LearnModeKey);
 
             var go = new GameObject("[AutoRunner]");
             var runner = go.AddComponent<AutoRunner>();
@@ -157,6 +203,7 @@ namespace AutoTest.EditorTools
             runner.exitPlayModeWhenDone = true;
             // プロファイルから metaPattern / enableAllDebuffs は Begin() 内で自動上書きされる
             runner.metaProfile = (MetaProfile)profileInt;
+            runner.learningMode = (AutoRunner.LearningMode)learnModeInt;
             runner.simBoss5Sweep = sweep;
             runner.lambdaFarmSweep = lambdaSweep;
             runner.autoLoopBatches = loopBatches;
@@ -165,7 +212,7 @@ namespace AutoTest.EditorTools
                               : lambdaSweep ? "Λファーム量スイープ"
                               : loopBatches >= 2 ? $"自動周回 {count}ラン × {loopBatches}回"
                               : count + " ラン";
-            Debug.Log($"[AutoRunMenu] AutoRunner 起動 ({startLabel}, プロファイル: {MetaProfileHelper.DisplayName(runner.metaProfile)})");
+            Debug.Log($"[AutoRunMenu] AutoRunner 起動 ({startLabel}, プロファイル: {MetaProfileHelper.DisplayName(runner.metaProfile)}, 学習モード: {runner.learningMode})");
         }
     }
 

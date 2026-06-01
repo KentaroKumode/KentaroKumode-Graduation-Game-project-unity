@@ -618,12 +618,16 @@ namespace InventorySystem.PassiveSkills
             if (context.consEnemyDiceDebuff > 0)
                 context.enemyDiceTotal = System.Math.Max(0, context.enemyDiceTotal - context.consEnemyDiceDebuff);
 
-            // 星火燎原 等: 敵(ボス)ダイス合計への加算（勝敗判定前＝ロールを実際に押し上げる）
-            if (context.enemyDiceTotalBonus > 0)
-                context.enemyDiceTotal += context.enemyDiceTotalBonus;
-            // ボス威風（別枠・固定。現在 enemies.json からは撤廃済み）
-            if (context.bossDiceBonus > 0)
-                context.enemyDiceTotal += context.bossDiceBonus;
+            // 〈妙覚〉T1自由攻撃ターンは敵ロールを確実に0に保つ（真我/星火等の加算を乗せない）。
+            if (!context.myokakuFreeHit)
+            {
+                // 星火燎原 等: 敵(ボス)ダイス合計への加算（勝敗判定前＝ロールを実際に押し上げる）
+                if (context.enemyDiceTotalBonus > 0)
+                    context.enemyDiceTotal += context.enemyDiceTotalBonus;
+                // ボス威風 + 真我（別枠・固定。 真我=7層覚者の素ロール加算でダイス上限超の難度調整）
+                if (context.bossDiceBonus > 0)
+                    context.enemyDiceTotal += context.bossDiceBonus;
+            }
 
             // Λデバフ「苛立つ強敵」: 経過 interval ターン毎に敵ダイス合計 +1（累積）
             if (context.lambdaIrritatingInterval > 0 && context.currentTurn > 0)
