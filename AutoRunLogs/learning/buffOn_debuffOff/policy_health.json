@@ -1,20 +1,20 @@
 {
-  "updatedAt": "2026-05-31 15:00:11",
+  "updatedAt": "2026-06-01 07:59:23",
   "mode": "paired",
   "lastBatch": {
     "n": 1000,
-    "compositeMean": 8.579,
-    "pairedDiff": -0.216,
-    "pairedSEM": 0.067,
-    "ci95": [-0.35, -0.08]
+    "compositeMean": 8.689,
+    "pairedDiff": -0.068,
+    "pairedSEM": 0.074,
+    "ci95": [-0.21, 0.08]
   },
   "best": {
-    "score": 8.573,
-    "summary": "shop[reroll=0.30 cons=3] rob[hp%=0.77] event[exp=0.07] combat[thr=7 heal=1.04] nav[low=0.62 crit=0.36] | last avg=8.57 batches=16"
+    "score": 8.661,
+    "summary": "shop[reroll=0.30 cons=2] rob[hp%=0.79] event[exp=0.04] combat[thr=4 heal=1.02] nav[low=0.76 crit=0.36] | last avg=8.66 batches=22"
   },
-  "decision": "rejected-paired (Δ=-0.22 ≤ margin 0.132)",
-  "effectiveMargin": 0.132,
-  "nextPerturb": { "axis": "multi-axis", "delta": -0.216 },
+  "decision": "rejected-paired (Δ=-0.07 ≤ margin 0.144)",
+  "effectiveMargin": 0.144,
+  "nextPerturb": { "axis": "multi-axis", "delta": -0.068 },
   "gates": { "minBatchForL1": 50, "minBatchForL2": 200, "semConfidenceK": 1.96 },
   "diagnostics": ["OK: ペアテストでノイズ低減中", "OK: サイズ十分"]
 }

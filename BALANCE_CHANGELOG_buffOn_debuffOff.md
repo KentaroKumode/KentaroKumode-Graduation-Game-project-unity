@@ -5,6 +5,89 @@
 
 <!-- BOT_LOG_INSERT_BELOW -->
 
+## 2026-06-01 19:45:08 — L1 動的Tier 変化 (累積バッチ 50, ラン 71000)
+
+- **A級 昇格**: dead_staff
+- **A級 降格**: undying_heart
+
+  (現状: S 8個 / A 16個 / B 47個 / C 40個 / D 24個 / E 23個)
+
+---
+
+
+## 2026-06-01 19:44:44 — L1 動的Tier 変化 (累積バッチ 50, ラン 71000)
+
+- **モード**: 手書き → 動的学習へ切替
+- **S級 昇格** (BOT絶対取得対象): dice_perfection, sword_t4, 蒼白の槍騎士, titans_armband, giants_armband, curse_t4, 吸血IV, iron_armband
+- **A級 昇格**: eternal_heart, axe_t4, dice_greed, dagger_t4, 吸血III, 利刃IV, 永遠の燈, 不屈IV, 災厄の指輪, 賞金首狩りIV, 重畳IV, 賞金首狩りIII, 不屈III, strength_belt, 治癒遮断, undying_heart
+
+  (現状: S 8個 / A 16個 / B 47個 / C 40個 / D 24個 / E 23個)
+
+---
+
+
+## 2026-06-01 19:44:09 — L1 動的Tier 変化 (累積バッチ 50, ラン 71000)
+
+- **モード**: 手書き → 動的学習へ切替
+- **S級 昇格** (BOT絶対取得対象): dice_perfection, sword_t4, 蒼白の槍騎士, titans_armband, giants_armband, curse_t4, 吸血IV, iron_armband
+- **A級 昇格**: eternal_heart, axe_t4, dice_greed, dagger_t4, 吸血III, 利刃IV, 永遠の燈, 不屈IV, 災厄の指輪, 賞金首狩りIV, 重畳IV, 賞金首狩りIII, 不屈III, strength_belt, 治癒遮断, undying_heart
+
+  (現状: S 8個 / A 16個 / B 47個 / C 40個 / D 24個 / E 23個)
+
+---
+
+
+## 2026-06-01 19:05:34 — L1 動的Tier 変化 (累積バッチ 50, ラン 71000)
+
+- **S級 昇格** (BOT絶対取得対象): 吸血IV
+- **S級 降格**: eternal_heart
+- **A級 昇格**: eternal_heart, undying_heart
+- **A級 降格**: 吸血IV, cons_food_4
+
+  (現状: S 8個 / A 16個 / B 47個 / C 40個 / D 24個 / E 23個)
+
+---
+
+
+## 2026-06-01 19:05:09 — L1 動的Tier 変化 (累積バッチ 50, ラン 71000)
+
+- **モード**: 手書き → 動的学習へ切替
+- **S級 昇格** (BOT絶対取得対象): dice_perfection, sword_t4, 蒼白の槍騎士, titans_armband, giants_armband, eternal_heart, curse_t4, iron_armband
+- **A級 昇格**: 吸血IV, axe_t4, dice_greed, dagger_t4, 吸血III, 利刃IV, 永遠の燈, 不屈IV, 災厄の指輪, 賞金首狩りIV, 賞金首狩りIII, 重畳IV, strength_belt, 不屈III, 治癒遮断, cons_food_4
+
+  (現状: S 8個 / A 16個 / B 47個 / C 40個 / D 24個 / E 23個)
+
+---
+
+
+## 2026-06-01 18:51:25 — L1 動的Tier 変化 (累積バッチ 50, ラン 71000)
+
+- **A級 昇格**: cons_food_4
+- **A級 降格**: 天極
+
+  (現状: S 8個 / A 16個 / B 47個 / C 40個 / D 24個 / E 23個)
+
+---
+
+
+## 2026-06-01 18:51:00 — L1 動的Tier 変化 (累積バッチ 50, ラン 71000)
+
+- **モード**: 手書き → 動的学習へ切替
+- **S級 昇格** (BOT絶対取得対象): dice_perfection, sword_t4, 蒼白の槍騎士, giants_armband, titans_armband, eternal_heart, iron_armband, curse_t4
+- **A級 昇格**: axe_t4, 吸血IV, dice_greed, dagger_t4, 利刃IV, 永遠の燈, 吸血III, 不屈IV, 災厄の指輪, 賞金首狩りIV, 賞金首狩りIII, strength_belt, 天極, 不屈III, 治癒遮断, 重畳IV
+
+  (現状: S 8個 / A 16個 / B 47個 / C 40個 / D 24個 / E 23個)
+
+---
+
+
+## 2026-06-01 18:28:07 — L3 ボス難易度 自動調整 (6層以前・苦戦診断・実数値)
+
+- **boss_layer4** 勝率94%→目標91% [ロール勝率31% 平均5.9T 死因Normal 100% 平均出目20.3]: Dice E22.5→**22.5** (5d8, offset+2.3)
+
+---
+
+
 ## 2026-06-01 18:20:48 — L1 動的Tier 変化 (累積バッチ 50, ラン 71000)
 
 - **モード**: 手書き → 動的学習へ切替

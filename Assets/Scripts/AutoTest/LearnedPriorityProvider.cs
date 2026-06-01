@@ -198,6 +198,8 @@ namespace AutoTest
                 }
 
                 _useFallback = false;
+                // 現プロファイルの Tier 配置を保存 (高難度/低難度 タグの単純Tier比較に他プロファイルが参照)
+                SaveTierAssignment(learningRoot);
                 _lastLoadedSummary = $"動的学習 採用: S={_dynS.Count} A={_dynA.Count} (累積バッチ {sf.totalBatches}, ラン {sf.totalRuns})";
                 Debug.Log($"[LearnedPriorityProvider] {_lastLoadedSummary}");
                 if (_dynS.Count > 0)
@@ -294,10 +296,91 @@ namespace AutoTest
         private static double Z(double v, double mean, double std)
             => std > 1e-9 ? (v - mean) / std : 0;
 
+        // ===== 高難度/低難度 タグ (デバフ on/off の単純な Tier 比較) =====
+        // debuffOff(低難度) と debuffOn(高難度) で各アイテムが実際に配置された Tier (S..E) を直接比較する。
+        // 各プロファイルの Reload 時に tier_assignment.json を保存しておき、 それを突合:
+        //   rank(debuffOn) − rank(debuffOff) ≥ +DiffTierGap → [高難度] (高難度で明確に格上)
+        //                                    ≤ −DiffTierGap → [低難度] (低難度で明確に格上 = 高難度では格下げ)
+        // 優先度: OP > 高難度/低難度 > その他 (アーリー/レイト/ミッド/バランス)。
+        // ※ 表示Tierそのものを比較するので「低難度品が高難度S級に居座る」ような矛盾が起きない。
+        public const int DiffTierGap = 3; // 何Tier以上ずれたらタグを付けるか (S=6..E=1 の段差)
+
+        private static Dictionary<string, int> _diffTierRank = new Dictionary<string, int>();
+
+        private static int TierRank(string tier)
+        {
+            switch (tier)
+            {
+                case "S": return 6; case "A": return 5; case "B": return 4;
+                case "C": return 3; case "D": return 2; case "E": return 1;
+                default:  return 0;
+            }
+        }
+
+        [Serializable] private class TierEntry { public string id; public string tier; }
+        [Serializable] private class TierRankFile { public List<TierEntry> items = new List<TierEntry>(); }
+
+        /// <summary>現プロファイルの Tier 配置 (_dynS.._dynE) を tier_assignment.json に保存。
+        /// 高難度/低難度 タグの「単純なTier比較」のために他プロファイルから参照される。</summary>
+        private static void SaveTierAssignment(string learningRoot)
+        {
+            try
+            {
+                var f = new TierRankFile();
+                void Add(HashSet<string> set, string t) { foreach (var id in set) f.items.Add(new TierEntry { id = id, tier = t }); }
+                Add(_dynS, "S"); Add(_dynA, "A"); Add(_dynB, "B"); Add(_dynC, "C"); Add(_dynD, "D"); Add(_dynE, "E");
+                Directory.CreateDirectory(learningRoot);
+                File.WriteAllText(Path.Combine(learningRoot, "tier_assignment.json"),
+                    JsonUtility.ToJson(f, true), new System.Text.UTF8Encoding(false));
+            }
+            catch (Exception e) { Debug.LogWarning($"[LearnedPriorityProvider] tier_assignment 保存失敗: {e.Message}"); }
+        }
+
+        /// <summary>指定プロファイルの tier_assignment.json を {id → rank(S=6..E=1)} で読む。</summary>
+        private static Dictionary<string, int> LoadTierRanks(MetaProfile p)
+        {
+            var result = new Dictionary<string, int>();
+            try
+            {
+                string path = Path.GetFullPath(Path.Combine(MetaProfileHelper.LearningRootFor(p), "tier_assignment.json"));
+                if (!File.Exists(path)) return result;
+                var f = JsonUtility.FromJson<TierRankFile>(File.ReadAllText(path));
+                if (f?.items == null) return result;
+                foreach (var e in f.items)
+                    if (e != null && !string.IsNullOrEmpty(e.id)) result[e.id] = TierRank(e.tier);
+            }
+            catch (Exception e) { Debug.LogWarning($"[LearnedPriorityProvider] tier_assignment 読込失敗({p}): {e.Message}"); }
+            return result;
+        }
+
+        /// <summary>デバフ on/off の Tier 差を全アイテムについて計算しキャッシュ。
+        /// 両プロファイルの tier_assignment.json が揃ったときのみ算出 (どちらか欠けると空 = タグ無し)。</summary>
+        private static void ComputeDifficultySensitivity()
+        {
+            _diffTierRank = new Dictionary<string, int>();
+            var off = LoadTierRanks(MetaProfile.BuffOn_DebuffOff);
+            var on  = LoadTierRanks(MetaProfile.BuffOn_DebuffOn);
+            if (off.Count == 0 || on.Count == 0) return;
+            foreach (var kv in on)
+                if (off.TryGetValue(kv.Key, out int roff))
+                    _diffTierRank[kv.Key] = kv.Value - roff; // >0 = 高難度で格上
+        }
+
+        /// <summary>デバフ Tier差タグ。 [高難度]/[低難度]/null。</summary>
+        private static string DifficultyTag(string id)
+        {
+            if (string.IsNullOrEmpty(id) || !_diffTierRank.TryGetValue(id, out int d)) return null;
+            if (d >= DiffTierGap)  return "[高難度]";
+            if (d <= -DiffTierGap) return "[低難度]";
+            return null;
+        }
+
         /// <summary>
         /// S/A/B 級アイテムにゲームフェーズタグ付与。 環境スケール非依存 (z-score ベース)。
         ///
         ///   OP       : z5/z6/z7 全部 ≥ 1.2σ かつ acq6F ≥ 500 (プール上位 ~12% × 3指標)
+        ///   高難度/低難度 : OP に次ぐ優先。 debuffOn/Off の **実Tier(S..E)差** が ±DiffTierGap 以上
+        ///                  (高難度で格上=[高難度] / 低難度で格上=[低難度])。 該当すればアーリー/レイト等より優先して返す。
         ///   アーリー  : z5 ≥ 1.0 かつ (z5 − z7) ≥ 1.0 (序盤に偏重)
         ///   レイト   : 次のいずれか — 終盤偏重 (lift7F or formΔ ベース)
         ///     (a) zForm ≥ 1.5 (覚者形態突破力が圧倒的 → アーリー判定より優先)
@@ -348,6 +431,10 @@ namespace AutoTest
             // 2026-05-31: レイト判定 かつ アーリー条件も満たす品 → OP扱い (序盤も終盤も強い実質OP)
             //   サンプル不問 (acq6F 制約はオリジナル OP のみ — こちらは「両極で強い」シグナル自体が貴重)
             if (isEarly && isLate) return "**[OP]**";
+
+            // OP に次ぐ優先: デバフ on/off で評価が激変する品 (高難度/低難度特化)
+            string diff = DifficultyTag(a.id);
+            if (diff != null) return diff;
 
             if (isEarly) return "[アーリー]";
             if (isLate)  return "[レイト]";
@@ -616,6 +703,9 @@ namespace AutoTest
                 sb.AppendLine("  - **[OP]** = 次のいずれか (オーバーパワー候補)");
                 sb.AppendLine("    - (1) z5/z6/z7 全部 ≥ 1.2σ **かつ acq6F ≥ 500** (プール上位 ~12% × 3指標)");
                 sb.AppendLine("    - (2) アーリー条件 と レイト条件 を **同時に満たす** (序盤も終盤も強い実質OP)");
+                sb.AppendLine($"  - **[高難度]/[低難度]** = デバフ on/off で **配置Tierが激変** する品 (**OPに次ぐ優先**)。 両プロファイルの実Tier(S..E)を直接比較");
+                sb.AppendLine($"    - **[高難度]** = rank(debuffOn) − rank(debuffOff) ≥ +{DiffTierGap} Tier (高難度で明確に格上) / **[低難度]** = ≤ −{DiffTierGap} Tier (低難度で明確に格上)");
+                sb.AppendLine($"    - {(_diffTierRank.Count > 0 ? $"算出済 (両プロファイルのTier突合 {_diffTierRank.Count}件)" : "未算出 (debuffOff/debuffOn いずれかの tier_assignment.json 不足 → 本タグ無効)")}");
                 sb.AppendLine("  - **[アーリー]** = z5 ≥ 0.8σ かつ z5 − z7 ≥ 0.7σ (序盤偏重)");
                 sb.AppendLine("  - **[レイト]** = 次のいずれか — 終盤偏重 (lift7F or formΔ ベース、 非対称 z 閾値)");
                 sb.AppendLine("    - (a) zForm ≥ 1.5σ (覚者形態突破力が圧倒的 → アーリー判定より優先)");
@@ -636,6 +726,8 @@ namespace AutoTest
 
                 // PhaseTag 用プール統計 (z-score 化で環境スケール差を吸収)
                 ComputePhaseStats(pool);
+                // 高難度/低難度 タグ用: デバフ on/off の Lift6F z-score 差を算出
+                ComputeDifficultySensitivity();
 
                 // 各Tier 表 (共通形式)
                 WriteTierSection(sb, "S", "🟥 絶対取得 (BOT がリロールしてでも入手)", _dynS, pool);

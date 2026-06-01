@@ -1,13 +1,13 @@
 {
     "rerollCostRatio": 0.30000001192092898,
-    "consumableStockMax": 3,
-    "robberyMinHpRatio": 0.7675259709358215,
-    "eventExplorationRate": 0.07000000029802323,
-    "importantThreatThreshold": 7,
-    "emergencyHealRatio": 1.0416629314422608,
-    "hpLowThreshold": 0.6151865720748901,
+    "consumableStockMax": 2,
+    "robberyMinHpRatio": 0.7918372750282288,
+    "eventExplorationRate": 0.04338283836841583,
+    "importantThreatThreshold": 4,
+    "emergencyHealRatio": 1.0208110809326172,
+    "hpLowThreshold": 0.7573034763336182,
     "hpCritThreshold": 0.36162611842155459,
-    "lastBandScoreAvg": 8.572999954223633,
-    "trialBatches": 16,
-    "updatedAt": "2026-05-31 15:00:11"
+    "lastBandScoreAvg": 8.66100025177002,
+    "trialBatches": 22,
+    "updatedAt": "2026-06-01 07:59:23"
 }

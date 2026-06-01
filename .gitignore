@@ -136,3 +136,5 @@ AutoRunLogs/**/detail.log
 AutoRunLogs/**/runs.jsonl
 # 回帰の生入力（1ラン=1行、合計100MB超。item_stats.json の集計が残るので除外）
 AutoRunLogs/learning/**/regression_runs.csv
+AutoRunLogs/**/*summary.txt
+AutoRunLogs/**/*ai_stats.json

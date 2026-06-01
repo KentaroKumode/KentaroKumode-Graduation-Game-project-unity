@@ -1,0 +1,636 @@
+{
+    "items": [
+        {
+            "id": "dice_perfection",
+            "tier": "S"
+        },
+        {
+            "id": "sword_t4",
+            "tier": "S"
+        },
+        {
+            "id": "蒼白の槍騎士",
+            "tier": "S"
+        },
+        {
+            "id": "titans_armband",
+            "tier": "S"
+        },
+        {
+            "id": "giants_armband",
+            "tier": "S"
+        },
+        {
+            "id": "curse_t4",
+            "tier": "S"
+        },
+        {
+            "id": "吸血IV",
+            "tier": "S"
+        },
+        {
+            "id": "iron_armband",
+            "tier": "S"
+        },
+        {
+            "id": "eternal_heart",
+            "tier": "A"
+        },
+        {
+            "id": "axe_t4",
+            "tier": "A"
+        },
+        {
+            "id": "dice_greed",
+            "tier": "A"
+        },
+        {
+            "id": "dagger_t4",
+            "tier": "A"
+        },
+        {
+            "id": "吸血III",
+            "tier": "A"
+        },
+        {
+            "id": "災厄の指輪",
+            "tier": "A"
+        },
+        {
+            "id": "不屈IV",
+            "tier": "A"
+        },
+        {
+            "id": "利刃IV",
+            "tier": "A"
+        },
+        {
+            "id": "永遠の燈",
+            "tier": "A"
+        },
+        {
+            "id": "dead_staff",
+            "tier": "A"
+        },
+        {
+            "id": "賞金首狩りIII",
+            "tier": "A"
+        },
+        {
+            "id": "賞金首狩りIV",
+            "tier": "A"
+        },
+        {
+            "id": "重畳IV",
+            "tier": "A"
+        },
+        {
+            "id": "strength_belt",
+            "tier": "A"
+        },
+        {
+            "id": "不屈III",
+            "tier": "A"
+        },
+        {
+            "id": "治癒遮断",
+            "tier": "A"
+        },
+        {
+            "id": "吸血II",
+            "tier": "B"
+        },
+        {
+            "id": "undying_heart",
+            "tier": "B"
+        },
+        {
+            "id": "cons_food_4",
+            "tier": "B"
+        },
+        {
+            "id": "myriad_arms_blade",
+            "tier": "B"
+        },
+        {
+            "id": "黄金卿の剣",
+            "tier": "B"
+        },
+        {
+            "id": "重畳III",
+            "tier": "B"
+        },
+        {
+            "id": "黄金の天秤",
+            "tier": "B"
+        },
+        {
+            "id": "吸血I",
+            "tier": "B"
+        },
+        {
+            "id": "利刃III",
+            "tier": "B"
+        },
+        {
+            "id": "ヘルメスの靴",
+            "tier": "B"
+        },
+        {
+            "id": "天極",
+            "tier": "B"
+        },
+        {
+            "id": "命脈",
+            "tier": "B"
+        },
+        {
+            "id": "停戦協定",
+            "tier": "B"
+        },
+        {
+            "id": "dice_destiny",
+            "tier": "B"
+        },
+        {
+            "id": "背水の狂刃",
+            "tier": "B"
+        },
+        {
+            "id": "transcendent_insight",
+            "tier": "B"
+        },
+        {
+            "id": "dice_moroha",
+            "tier": "B"
+        },
+        {
+            "id": "immovable_chestplate",
+            "tier": "B"
+        },
+        {
+            "id": "共鳴",
+            "tier": "B"
+        },
+        {
+            "id": "重畳I",
+            "tier": "B"
+        },
+        {
+            "id": "記憶の砂時計",
+            "tier": "B"
+        },
+        {
+            "id": "貸与された時間IV",
+            "tier": "B"
+        },
+        {
+            "id": "シールドバッシュIII",
+            "tier": "B"
+        },
+        {
+            "id": "神聖の靴",
+            "tier": "B"
+        },
+        {
+            "id": "supreme_counter_gauntlet",
+            "tier": "B"
+        },
+        {
+            "id": "divine_insight",
+            "tier": "B"
+        },
+        {
+            "id": "黒煙の符",
+            "tier": "B"
+        },
+        {
+            "id": "蒼穹の眼",
+            "tier": "B"
+        },
+        {
+            "id": "dice_star",
+            "tier": "B"
+        },
+        {
+            "id": "守護天使の鈴",
+            "tier": "B"
+        },
+        {
+            "id": "cons_heal_1",
+            "tier": "B"
+        },
+        {
+            "id": "cons_food_1",
+            "tier": "B"
+        },
+        {
+            "id": "貸与された時間III",
+            "tier": "B"
+        },
+        {
+            "id": "absolute_counter_gauntlet",
+            "tier": "B"
+        },
+        {
+            "id": "賞金首狩りII",
+            "tier": "B"
+        },
+        {
+            "id": "leather_handguard",
+            "tier": "B"
+        },
+        {
+            "id": "倍音のクロック",
+            "tier": "B"
+        },
+        {
+            "id": "cons_crit_1",
+            "tier": "B"
+        },
+        {
+            "id": "天梯",
+            "tier": "B"
+        },
+        {
+            "id": "leather_chestguard",
+            "tier": "B"
+        },
+        {
+            "id": "血の盟約",
+            "tier": "B"
+        },
+        {
+            "id": "末那識",
+            "tier": "B"
+        },
+        {
+            "id": "cons_food_2",
+            "tier": "B"
+        },
+        {
+            "id": "thousand_arms_blade",
+            "tier": "B"
+        },
+        {
+            "id": "dice_bone",
+            "tier": "B"
+        },
+        {
+            "id": "利刃I",
+            "tier": "B"
+        },
+        {
+            "id": "healing_ring",
+            "tier": "B"
+        },
+        {
+            "id": "賞金首狩りI",
+            "tier": "C"
+        },
+        {
+            "id": "安らぎの靴",
+            "tier": "C"
+        },
+        {
+            "id": "リピーター",
+            "tier": "C"
+        },
+        {
+            "id": "cons_dice_1",
+            "tier": "C"
+        },
+        {
+            "id": "dice_twinsnake",
+            "tier": "C"
+        },
+        {
+            "id": "adamant_chestplate",
+            "tier": "C"
+        },
+        {
+            "id": "dice_flame",
+            "tier": "C"
+        },
+        {
+            "id": "シールドバッシュI",
+            "tier": "C"
+        },
+        {
+            "id": "throwing_dagger_sheath",
+            "tier": "C"
+        },
+        {
+            "id": "貸与された時間I",
+            "tier": "C"
+        },
+        {
+            "id": "シールドバッシュIV",
+            "tier": "C"
+        },
+        {
+            "id": "不屈I",
+            "tier": "C"
+        },
+        {
+            "id": "商人の符牒",
+            "tier": "C"
+        },
+        {
+            "id": "dice_biased",
+            "tier": "C"
+        },
+        {
+            "id": "cons_reduce_1",
+            "tier": "C"
+        },
+        {
+            "id": "嵐の徽章",
+            "tier": "C"
+        },
+        {
+            "id": "シールドバッシュII",
+            "tier": "C"
+        },
+        {
+            "id": "cons_food_3",
+            "tier": "C"
+        },
+        {
+            "id": "灯心の鈴",
+            "tier": "C"
+        },
+        {
+            "id": "天工開物",
+            "tier": "C"
+        },
+        {
+            "id": "貸与された時間II",
+            "tier": "C"
+        },
+        {
+            "id": "cons_atk_1",
+            "tier": "C"
+        },
+        {
+            "id": "不屈II",
+            "tier": "C"
+        },
+        {
+            "id": "steel_gauntlet",
+            "tier": "C"
+        },
+        {
+            "id": "重畳II",
+            "tier": "C"
+        },
+        {
+            "id": "死神の数珠",
+            "tier": "C"
+        },
+        {
+            "id": "dice_copper",
+            "tier": "C"
+        },
+        {
+            "id": "cons_regen_1",
+            "tier": "C"
+        },
+        {
+            "id": "cons_reduce_2",
+            "tier": "C"
+        },
+        {
+            "id": "cons_shield_1",
+            "tier": "C"
+        },
+        {
+            "id": "鋼の心臓",
+            "tier": "C"
+        },
+        {
+            "id": "twin_blade_gauntlet",
+            "tier": "C"
+        },
+        {
+            "id": "uniq_forge_elixir",
+            "tier": "C"
+        },
+        {
+            "id": "治癒阻害",
+            "tier": "C"
+        },
+        {
+            "id": "食通の懐刀",
+            "tier": "C"
+        },
+        {
+            "id": "沈黙の剣帯",
+            "tier": "C"
+        },
+        {
+            "id": "dice_gem",
+            "tier": "C"
+        },
+        {
+            "id": "dice_iron",
+            "tier": "C"
+        },
+        {
+            "id": "cons_dice_2",
+            "tier": "C"
+        },
+        {
+            "id": "uniq_phil_stone",
+            "tier": "C"
+        },
+        {
+            "id": "hawks_eye",
+            "tier": "D"
+        },
+        {
+            "id": "uniq_appraise",
+            "tier": "D"
+        },
+        {
+            "id": "cons_heal_4",
+            "tier": "D"
+        },
+        {
+            "id": "observers_glasses",
+            "tier": "D"
+        },
+        {
+            "id": "狂乱のメダリオン",
+            "tier": "D"
+        },
+        {
+            "id": "uniq_merchant_bell",
+            "tier": "D"
+        },
+        {
+            "id": "静寂のローブ",
+            "tier": "D"
+        },
+        {
+            "id": "cons_regen_2",
+            "tier": "D"
+        },
+        {
+            "id": "uniq_haste_powder",
+            "tier": "D"
+        },
+        {
+            "id": "cons_regen_4",
+            "tier": "D"
+        },
+        {
+            "id": "cons_regen_3",
+            "tier": "D"
+        },
+        {
+            "id": "cons_heal_3",
+            "tier": "D"
+        },
+        {
+            "id": "cons_crit_2",
+            "tier": "D"
+        },
+        {
+            "id": "cons_atk_2",
+            "tier": "D"
+        },
+        {
+            "id": "cons_atk_3",
+            "tier": "D"
+        },
+        {
+            "id": "life_orb",
+            "tier": "D"
+        },
+        {
+            "id": "激情の刃",
+            "tier": "D"
+        },
+        {
+            "id": "uniq_food_horn",
+            "tier": "D"
+        },
+        {
+            "id": "利刃II",
+            "tier": "D"
+        },
+        {
+            "id": "cons_shield_4",
+            "tier": "D"
+        },
+        {
+            "id": "chain_mail",
+            "tier": "D"
+        },
+        {
+            "id": "uniq_ambush",
+            "tier": "D"
+        },
+        {
+            "id": "cons_shield_2",
+            "tier": "D"
+        },
+        {
+            "id": "dice_stable",
+            "tier": "D"
+        },
+        {
+            "id": "癒しの靴",
+            "tier": "E"
+        },
+        {
+            "id": "cons_heal_2",
+            "tier": "E"
+        },
+        {
+            "id": "cons_dice_3",
+            "tier": "E"
+        },
+        {
+            "id": "幸運の硬貨",
+            "tier": "E"
+        },
+        {
+            "id": "uniq_gambler",
+            "tier": "E"
+        },
+        {
+            "id": "cons_crit_3",
+            "tier": "E"
+        },
+        {
+            "id": "飢餓丸",
+            "tier": "E"
+        },
+        {
+            "id": "相棒の魂",
+            "tier": "E"
+        },
+        {
+            "id": "cons_dice_4",
+            "tier": "E"
+        },
+        {
+            "id": "狂った計測器",
+            "tier": "E"
+        },
+        {
+            "id": "cons_shield_3",
+            "tier": "E"
+        },
+        {
+            "id": "cons_reduce_3",
+            "tier": "E"
+        },
+        {
+            "id": "希望の灯片",
+            "tier": "E"
+        },
+        {
+            "id": "cons_atk_4",
+            "tier": "E"
+        },
+        {
+            "id": "uniq_oni_oil",
+            "tier": "E"
+        },
+        {
+            "id": "shield_t4",
+            "tier": "E"
+        },
+        {
+            "id": "uniq_earth_guard",
+            "tier": "E"
+        },
+        {
+            "id": "巡礼者の杖",
+            "tier": "E"
+        },
+        {
+            "id": "怪しい水",
+            "tier": "E"
+        },
+        {
+            "id": "cons_crit_4",
+            "tier": "E"
+        },
+        {
+            "id": "英雄の意志",
+            "tier": "E"
+        },
+        {
+            "id": "uniq_mirror",
+            "tier": "E"
+        },
+        {
+            "id": "cons_reduce_4",
+            "tier": "E"
+        }
+    ]
+}

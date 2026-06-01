@@ -1,0 +1,172 @@
+{
+    "updatedAt": "2026-06-01 18:33:56",
+    "batches": 0,
+    "knobs": [
+        {
+            "key": "boss_layer3",
+            "maxHP": 67,
+            "diceExpected": 14.058633804321289,
+            "diceOffset": -1.0546133518218995,
+            "diceTuned": true,
+            "overrides": []
+        },
+        {
+            "key": "boss_layer4",
+            "maxHP": 73,
+            "diceExpected": 22.518400192260743,
+            "diceOffset": 2.2521073818206789,
+            "diceTuned": true,
+            "overrides": []
+        },
+        {
+            "key": "boss_layer5_hidden",
+            "maxHP": 1195,
+            "diceExpected": 25.0,
+            "diceOffset": 11.473474502563477,
+            "diceTuned": true,
+            "overrides": [
+                {
+                    "param": "RegenReduction",
+                    "value": 8.319314956665039
+                }
+            ]
+        },
+        {
+            "key": "boss_layer6",
+            "maxHP": 2766,
+            "diceExpected": 0.0,
+            "diceOffset": 0.0,
+            "diceTuned": false,
+            "overrides": [
+                {
+                    "param": "JudgmentDice",
+                    "value": 4.360816955566406
+                },
+                {
+                    "param": "JudgmentCoefBase",
+                    "value": 0.7835323214530945
+                }
+            ]
+        },
+        {
+            "key": "boss_layer5",
+            "maxHP": 1254,
+            "diceExpected": 0.0,
+            "diceOffset": 0.0,
+            "diceTuned": false,
+            "overrides": [
+                {
+                    "param": "ChipCap",
+                    "value": 3.4536094665527345
+                }
+            ]
+        },
+        {
+            "key": "boss_layer1",
+            "maxHP": 0,
+            "diceExpected": 7.850165367126465,
+            "diceOffset": -1.3550002574920655,
+            "diceTuned": true,
+            "overrides": []
+        },
+        {
+            "key": "boss_layer2",
+            "maxHP": 48,
+            "diceExpected": 8.27202033996582,
+            "diceOffset": -5.637802600860596,
+            "diceTuned": true,
+            "overrides": []
+        },
+        {
+            "key": "boss_layer7",
+            "maxHP": 0,
+            "diceExpected": 0.0,
+            "diceOffset": 0.0,
+            "diceTuned": false,
+            "overrides": [
+                {
+                    "param": "TrueSelf",
+                    "value": 2.165210723876953
+                }
+            ]
+        },
+        {
+            "key": "boss_layer7_p2",
+            "maxHP": 0,
+            "diceExpected": 0.0,
+            "diceOffset": 0.0,
+            "diceTuned": false,
+            "overrides": [
+                {
+                    "param": "TrueSelf",
+                    "value": 11.455628395080567
+                }
+            ]
+        },
+        {
+            "key": "boss_layer7_p3",
+            "maxHP": 0,
+            "diceExpected": 0.0,
+            "diceOffset": 0.0,
+            "diceTuned": false,
+            "overrides": [
+                {
+                    "param": "TrueSelf",
+                    "value": 1.9720289707183838
+                }
+            ]
+        },
+        {
+            "key": "boss_layer7_p4",
+            "maxHP": 0,
+            "diceExpected": 0.0,
+            "diceOffset": 0.0,
+            "diceTuned": false,
+            "overrides": [
+                {
+                    "param": "TrueSelf",
+                    "value": 4.745845794677734
+                }
+            ]
+        },
+        {
+            "key": "boss_layer7_p5",
+            "maxHP": 0,
+            "diceExpected": 0.0,
+            "diceOffset": 0.0,
+            "diceTuned": false,
+            "overrides": [
+                {
+                    "param": "TrueSelf",
+                    "value": 1.8233451843261719
+                }
+            ]
+        },
+        {
+            "key": "boss_layer7_p6",
+            "maxHP": 0,
+            "diceExpected": 0.0,
+            "diceOffset": 0.0,
+            "diceTuned": false,
+            "overrides": [
+                {
+                    "param": "TrueSelf",
+                    "value": 2.9882102012634279
+                }
+            ]
+        },
+        {
+            "key": "boss_layer7_p7",
+            "maxHP": 0,
+            "diceExpected": 0.0,
+            "diceOffset": 0.0,
+            "diceTuned": false,
+            "overrides": [
+                {
+                    "param": "TrueSelf",
+                    "value": 18.80794906616211
+                }
+            ]
+        }
+    ]
+}
