@@ -83,6 +83,21 @@ namespace AutoTest
             new Axis { name = "hpCritThreshold",          step = 0.05f,
                        apply = (p, d) => p.hpCritThreshold += d,
                        read  = p => p.hpCritThreshold },
+            new Axis { name = "lateralHopeFloor",         step = 5f,
+                       apply = (p, d) => p.lateralHopeFloor += d,
+                       read  = p => p.lateralHopeFloor },
+            new Axis { name = "hopeRefillFloor",          step = 5f,
+                       apply = (p, d) => p.hopeRefillFloor += d,
+                       read  = p => p.hopeRefillFloor },
+            new Axis { name = "sublimationReserve",       step = 1f,
+                       apply = (p, d) => p.sublimationReserve += d,
+                       read  = p => p.sublimationReserve },
+            new Axis { name = "stanceDefendWinProb",      step = 0.05f,
+                       apply = (p, d) => p.stanceDefendWinProb += d,
+                       read  = p => p.stanceDefendWinProb },
+            new Axis { name = "stanceDefendHpBias",       step = 0.05f,
+                       apply = (p, d) => p.stanceDefendHpBias += d,
+                       read  = p => p.stanceDefendHpBias },
         };
 
         // ===== スタール状態 =====
@@ -310,6 +325,11 @@ namespace AutoTest
                 AppendDiff(sb, "emergencyHealRatio",       before.emergencyHealRatio,       after.emergencyHealRatio);
                 AppendDiff(sb, "hpLowThreshold",           before.hpLowThreshold,           after.hpLowThreshold);
                 AppendDiff(sb, "hpCritThreshold",          before.hpCritThreshold,          after.hpCritThreshold);
+                AppendDiff(sb, "lateralHopeFloor",         before.lateralHopeFloor,         after.lateralHopeFloor);
+                AppendDiff(sb, "hopeRefillFloor",          before.hopeRefillFloor,          after.hopeRefillFloor);
+                AppendDiff(sb, "sublimationReserve",       before.sublimationReserve,       after.sublimationReserve);
+                AppendDiff(sb, "stanceDefendWinProb",      before.stanceDefendWinProb,      after.stanceDefendWinProb);
+                AppendDiff(sb, "stanceDefendHpBias",       before.stanceDefendHpBias,       after.stanceDefendHpBias);
             }
             else sb.AppendLine("- (初回ベスト)");
             sb.AppendLine();

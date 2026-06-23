@@ -37,6 +37,16 @@
 
 ## 1. 計算パイプライン（適用順・実コード準拠）
 
+### ⓪ ダイス振り直しフェーズ（#1・`CombatManager.MaybeRerollPlayerDice`・ProcessPostRoll の前）
+
+初回ロール後・各種補正（記憶の砂時計/コルヴェン/メタ補正）と ProcessPostRoll の**前**に、希望を払って
+プレイヤーの「期待値割れの出目」を**毎ターン最大1回**振り直す（`playerDice` を in-place 更新）。
+
+- コスト: `HopeSystem.RerollCost`（既定3・暫定）を `HopeSystem.TryPayReroll` で支払い。**払えない（低希望）と振り直せない**＝終盤ほど二度目が無い。
+- 自動ポリシー（UI 未実装の暫定）: 現在 自合計 ≤ 敵合計（負け/拮抗）かつ 平均（面平均 or (max+1)/2）割れダイスがあるときのみ、それらを再ロール。明確に勝っていれば温存。
+- スキップ: 強制ロール状態（`ashenSuddenDeath`/`myokakuSuddenDeath`/`myokakuFreeHit`/`player_contre`）。
+- 将来 UI 配線時に自動判定を人間の選択へ差し替える。希望損は `HopeSystem.Stats.rerollLoss`（AutoRunner で発生源別計上）。
+
 ### ① ダイス合計フェーズ（`PassiveSkillManager.ProcessPostRoll` L434-463）
 
 ```
@@ -45,8 +55,11 @@ playerDiceTotal = Σ(プレイヤー出目)
 enemyDiceTotal  = Σ(敵出目)
                 − buff "enemyDiceDebuff"
                 − consEnemyDiceDebuff      ← 消費:敵弱体
+                − enemyDiceTotalPenalty    ← 床なし減算(負値許容)。沈黙の剣帯=1T目-99
                 + enemyDiceTotalBonus      ← 星火燎原/業火の遺志/狂暴化 等(累積)
                 + bossDiceBonus            ← 強者/玉座/刹那(※現在enemies.jsonから撤廃・常時0)
+   ※敵スタンス弱ロール(ADR-0005)は CombatManager の RollDice 時に敵ダイスの最大出目を縮めて実際に振る
+     （期待値≈0.65倍・結果の事後倍率ではない）→ Σ(敵出目) に既に反映。強ロールは基準(縮小なし)。
 
 → FireTrigger(OnPostRoll)  ← ここで OnPostRoll パッシブが両合計を加算改変
    (軽量/熟練/技量/筋力/星導/永劫/ヘルメス/黄金卿/復讐/Abyss/画竜点睛 など、
@@ -65,7 +78,9 @@ diceDifference = playerDiceTotal − enemyDiceTotal
 ### ② ProcessDamage（`PassiveSkillManager` L541-607・勝敗共通）
 
 ```
-base  = 勝利:|diceDifference|  /  敗北:max(|diceDifference|, enemyThreat)
+base  = 勝利:attackPower + floor(|diceDifference|/3)  /  敗北:max(|diceDifference|, enemyThreat)
+        ※勝利base は CombatManager で算出（#2 案A'・ADR-0004）。attackPower=装備武器の素火力(items.json)、
+          差は WeaponDiffPerBonus=3 ごとに+1の小ボーナス。会心(critRate)には非干渉。敗北/scratch は不変。
 final = base + buff "damageBonus"
 [勝利] FireTrigger(OnPreDealDamage)      ← 与ダメ改変パッシブ
 [敗北] FireTrigger(OnPreReceiveDamage)   ← 被ダメ軽減パッシブ（堅忍/鉄壁/頑強/天命 等）
@@ -76,8 +91,8 @@ total = final + pursuitDamage
        有効分子 = clamp(criticalNumerator + criticalBonus, 0, 9)
        会心成立 = Random.Range(0,9) < 有効分子      ← 会心率 = 有効分子/9
        成立かつ total>0 → FireTrigger(OnCriticalDamage); total ×= criticalMultiplier(既定2.0)
-       【リピーター】retriggerOnCrit時、会心後に total を finalDamage へ戻し OnPreDealDamage 再発火
-                     →集中/運命/完全/血令/利刃%/共鳴 が二重適用（爆発シナジー）
+       【狩猟旅団 (契約)】armed状態の脆弱を持つ敵への会心時、 全段に ×(1 + 0.15/0.30/0.45) 倍率を適用 → 脆弱は consumed へ
+                          (詳細: docs/specs/contracts.md)
 FireTrigger(OnPostDealDamage / OnPostReceiveDamage)
 【蒼白の槍騎士】fixedDamageMultiplier>1 なら fixedDamageToEnemy ×= 倍率（return前）
 return (total, fixedDamageToEnemy, isCritical)
@@ -101,6 +116,7 @@ total = ProcessDamage結果
 ↑ 勝利時最低保証【新】: total = max(total, winMinDamage[既定1, 利刃で1〜4])
 × enemyDamageTakenMultiplier       ← 狂暴化(50T後 ×3)
 メタデバフ俊敏: 各戦闘の初撃を total=0,fixedDmg=0
+プレイヤー防御スタンス(ADR-0006): 防御時 total ×=0.1（与ダメ-90%・末尾。fixedDmgは対象外）
 → enemyHP −= total + fixedDamageToEnemy
   鋼の皮膚(メタデバフ): 敵初回致命を1HPで耐える
   出血(enemyBleedStacks) / 貪欲lifesteal(HealPlayer) / fixedDamageToPlayer
@@ -113,6 +129,7 @@ total = ProcessDamage結果
 ※堅忍/鉄壁/頑強/天命/Destiny/Perfection等の被ダメ軽減は②のProcessDamage内で適用済み
 total = ProcessDamage結果
 × メタデバフ天変地異(×2.0)
+× enemyStanceDamageMult       ← 敵スタンス(ADR-0005・高ダメ>1/低ダメ<1)。以降の軽減はスタンス後の値に効く
 − メタバフ被ダメ軽減(最大−2,最低1)
 − playerFlatDamageReduction(不屈の鎧/苦難の刻印 合算, 最低1)
 − floorMod.defeatDamageReduction(5層 地獄門 −2)
@@ -122,6 +139,7 @@ playerDamageNegateCharges>0 → total=0(獣の絆)
 コントラタック(player_contre): total半減 + 軽減量×2を敵へ反射
 − consShield(消費シールド吸収)
 consReflect(鏡写し): 吸収後の被ダメ同量を敵へ反射
+プレイヤー防御スタンス(ADR-0006): 防御時 total ×=0.5（受け最終-50%・全軽減/シールドの後＝**最後**。反撃等の固定反射は対象外）
 → playerHP −= total (+ fixedDamageToPlayer)
   fixedDamageToEnemy>0 は敗北時も敵へ(反撃/Counter/Riposte) / 出血
 fixedDamageToPlayer ≥ 999 → playerHP = 0（死の宣告）
@@ -147,13 +165,16 @@ fixedDamageToPlayer ≥ 999 → playerHP = 0（死の宣告）
 | `enemyBleedStacks` | 出血。毎ターン-1減衰、毎T末に敵へ | 戦闘保持 |
 | `enemyBurnTurns`/`enemyBurnDamage` | 炎上（業火） | 戦闘保持 |
 | `enemyDiceTotalBonus` | 敵合計への加算（判定前・累積） | **BeginNewTurnでリセットしない** |
+| `enemyDiceTotalPenalty`【新】 | 敵合計への床なし減算（負値許容＝大差勝ち）。沈黙の剣帯=1T目99 | BeginNewTurnで0 |
+| `enemyStanceDamageMult`【新】 | 敵スタンスの被ダメ倍率(高火力>1/低火力<1)。ApplyLossDamageModifiersで乗算 | BeginNewTurnで1.0 |
+| `enemyStanceKind`【新】 | 0なし/1強ロール低火力/2弱ロール高火力。弱(=2)は RollDice時に敵ダイス最大出目を`EnemyStance.WeakRollMax`へ縮小。`OnTelegraph`でUI後付け | BeginNewTurnで0 |
+| `playerStanceDefense`【新】 | プレイヤー防御スタンス(ADR-0006)。与ダメ×0.1(ApplyWin末尾)/受け最終×0.5(ApplyLoss末尾)。反撃等の固定反射は対象外 | BeginNewTurnでfalse |
 | `bossDiceBonus` | 強者/玉座/刹那(現在未使用) | swapで0 |
 | `enemyDamageReductionPct`【新】 | 敵の被ダメ%軽減。EnemyData.baseDefenseRate+EliteVigor0.10 | **戦闘保持**(start/swapで設定) |
 | `armorPenPct`【新】 | 利刃の軽減剥がし(pt) | BeginNewTurnで0 |
 | `winMinDamage`【新】 | 勝利時与ダメ最低保証(既定1,利刃1〜4) | BeginNewTurnで1 |
 | `enemyHealReductionPct`【新】 | 敵回復の減衰率(治癒阻害0.5/遮断1.0)。`ReduceEnemyHeal()`経由で敵自己回復に適用 | 戦闘保持 |
 | `fixedDamageMultiplier`【新】 | 軽減無視ダメ倍率(蒼白の槍騎士1.5)。ProcessDamage末＆引分分岐で fixedDamageToEnemy に乗算 | 戦闘保持(既定1.0) |
-| `retriggerOnCrit`【新】 | リピーター: 会心時に OnPreDealDamage を ProcessDamage が再発火 | 戦闘保持 |
 | `outgoingDamageMultiplier` | プレイヤー与ダメ倍率(激情の刃) | 毎T1.0 |
 | `enemyDamageTakenMultiplier` | 敵被ダメ倍率(狂暴化×3) | 毎T1.0 |
 | `healBlocked`/`healShieldReduction`/`lifestealPct` | 回復封印/回復・シールド減衰量/与ダメ回復% | healBlocked毎T,lifesteal毎T,reductionは戦闘保持 |
@@ -179,7 +200,7 @@ fixedDamageToPlayer ≥ 999 → playerHP = 0（死の宣告）
 | SkillId(表示) | Tier/レア | Trigger | 効果(ctx操作) |
 |---|---|---|---|
 | Pursuit I/II/III/IV(追撃) | B/S/G/L | OnPreDealDamage | finalDamage += 2/4/6/8 |
-| Counter I/II/III/IV(反撃) | B/S/G/L | OnRollLose | fixedDamageToEnemy += 1/2/3/4 |
+| Counter I/II/III/IV(反撃) | B/S/G/L | OnRollLose | fixedDamageToEnemy += 2/4/6/8（2026-06-03 リバフ 1/2/3/4→2/4/6/8） |
 | Might I/II/III/IV(剛力) | B/S/G/L | OnPostRoll | playerDiceTotal += 2/3/4/5（固定・ダイス数非依存） |
 | Fortitude I/II/III/IV(頑強) | B/S/G/L | OnPreReceiveDamage | finalDamage −= 1/2/3/4 (min0) |
 | Insight I/II/III/IV(慧眼) | B/S/G/L | OnCriticalCheck | criticalBonus += 1/2/3/4 |
@@ -207,7 +228,8 @@ fixedDamageToPlayer ≥ 999 → playerHP = 0（死の宣告）
 | Execute(処刑) | OnRollWin | 次ターン敵の最小ダイスを1に固定 |
 | Nightfall(蝕夜) | OnPostDealDamage/OnBattleStart | overDamage×2を永続蓄積→戦闘開始時 fixedDamageToEnemy |
 | Sting(出血) | OnPostDealDamage | enemyBleedStacks++ |
-| Ignite(業火) | OnBattleStart/OnTurnStart | 炎上3T/3ダメ付与、毎T fixedDamageToEnemy += 3 |
+| Ignite(業火) | OnBattleStart | 敵に burn を3スタック付与（#3 統一フレームへ移行）。毎ターンのDOT/減衰は `TickStatuses` が処理（burn=固定3ダメ×3T） |
+| 脆弱(契約・狩猟旅団) | OnBattleStart (Apply) + 防御後最終ダメ | armed状態で会心ダメ時 ×(1+0.15/0.30/0.45) 倍率→consumed / 非会心ロール勝利で再armed。 戦闘終了で剥がれる。 仕様: docs/specs/contracts.md |
 | CurseBind(呪縛) | OnTurnStart/OnPostRoll | 毎T自HP−1+debuff累積 / enemyDiceTotal −= debuff |
 | Abyss(深淵) | 多数 | 致命被ダメで finalDamage=HP−1→狂化: playerDiceTotal+10/fixedDamageToEnemy+=被ダメ蓄積×3/criticalBonus+99 |
 | Shimmer(煌玉) | OnPostRoll | 最大面の出目があれば criticalBonus +1 |
@@ -217,7 +239,6 @@ fixedDamageToPlayer ≥ 999 → playerHP = 0（死の宣告）
 | Skyladder(天梯) | OnPreDealDamage | 出目が3個以上の連続昇順(階段)なら outgoing +=1.0 (旧 finalDamage×2、 2026-05-31 outgoing移行) |
 | ApexCrit(天極) | OnCriticalCheck | ゾロ目(全同値)なら criticalBonus+99(会心確定)＋criticalMultiplier+1.0 |
 | Lifeline(命脈) | OnBattleStart + OnPostReceiveDamage | 戦闘開始時 maxHP×10% 回復／1戦闘1回 HP≤50% で consShield += ceil(maxHP×0.5) |
-| Repeater(リピーター・触媒) | OnBattleStart | retriggerOnCrit=true（会心時 OnPreDealDamage を ProcessDamage が再発火） |
 | PalePikeKnight(蒼白の槍騎士) | OnBattleStart | fixedDamageMultiplier=1.5（軽減無視ダメ×1.5） |
 | Resonance(共鳴・LEG) | OnPreDealDamage | 発動中パッシブ数(over5) × 0.05 を outgoing 加算 (旧 finalDamage×倍率、 2026-05-31 outgoing移行) |
 | Moroha(諸刃・ダイス) | OnRollWin | healShieldReduction++ (max20) ※負傷 |
@@ -231,7 +252,7 @@ fixedDamageToPlayer ≥ 999 → playerHP = 0（死の宣告）
 | TenkouKaibutsu(天工開物) | (なし) | no-op(効果は GameManager.TryUpgradeWeapon の素材返還) |
 | Bloodlust(背水の狂刃) | OnPreDealDamage | HP≤50% → outgoing+=0.3、≤25% → +=0.8 (2026-05-31 outgoing移行) |
 | Hermes(ヘルメスの靴) | OnPostRoll | 初回ロール playerDiceTotal +5 |
-| HungerPill(飢餓丸) | OnTurnStart/OnPreDealDamage/OnPreReceiveDamage | 毎T fixedDamageToPlayer+1、T10覚醒後 与ダメ+10永続/次被ダメ−10(1回) |
+| HungerPill(飢餓丸) | OnTurnStart/OnPreDealDamage/OnPreReceiveDamage | 毎T fixedDamageToPlayer+1、T7覚醒後 与ダメ+18永続/次被ダメ−18(1回)（2026-06-03 リバフ T10/+10/-10→T7/+18/-18） |
 | GoldKingBlade(黄金卿の剣) | OnPreDealDamage | outgoing += 0.01×coinsSpent (100Gで+1.0=×2倍相当、 上限なし、 2026-05-31 v3 消費Gold基準) |
 | Judgement(天命) | OnPreReceiveDamage | 敵合計≥自分×2 かつ HP≥最大30% → finalDamage上限=現HP−2 |
 | MugaMushin(無我無心) | OnBattleStart | rollPurity=true(diceBonus等の補正拒否) |
@@ -255,13 +276,74 @@ fixedDamageToPlayer ≥ 999 → playerHP = 0（死の宣告）
 | 蒼穹の眼 | G | OnRoll(T1) | criticalBonus=max(,9)（1T目 会心確定） |
 | 狂乱のメダリオン | L | OnRoll | HP≤25% → outgoingDamageMultiplier +0.5（与ダメ+50%） |
 | 末那識(旧 死神の予感) | L | OnRoll | HP≤20% → forceCritical=true（会心確定・乱数/会心率cap無視） |
-| 沈黙の剣帯 | L | OnRoll | fixedDamageToEnemy +1（消費封印は ItemUseHandler 側） |
-| 倍音のクロック | L | OnRoll | currentTurn%3==0 → outgoing +=0.5 (×1.5)。 2026-05-31 大幅ナーフ (+2.5→+0.5、 予兆削除) |
+| 沈黙の剣帯 | L | OnRoll | fixedDamageToEnemy +1／1T目のみ enemyDiceTotalPenalty +=99（床なし・先制必殺）。消費封印は ItemUseHandler 側（2026-06-03 -99先制を追加） |
+| 倍音のクロック | L | OnRoll | currentTurn%3==0 → outgoing +=1.0 (×2.0)。 2026-06-03 リバフ (+0.5→+1.0) |
 | 鋼の心臓 | L | CombatEnd | HealPlayer(5)（取得時に最大HP+20ボーナス別途） |
 | 守護天使の鈴 | L | OnTurnEnd | 戦闘中1回 HP≤25 → HealPlayer(15) |
 | 災厄の指輪 | L | OnRoll | 被弾毎に次の与ダメ+2累積(上限+10・戦闘終了リセット) finalDamage加算 |
 | 永遠の燈 | L | CombatEnd | HP≤10 → HealPlayer(20) |
 | 商人の符牒 | L | (ショップ連携) | ショップ系フック（PassiveItemRegistry 非登録） |
+| 巡礼の杖飾り【新2026-06-03】 | B | OnMapMove | 25%で希望+1（HopeSystem.ApplyFood） |
+| 狂宴の仮面【新2026-06-03】 | S | OnRoll | 希望[悲観]以下 outgoing+0.10 ／[絶望]以下 +0.25 |
+
+### 3-D. 2026-06-03 追加の汎用パッシブ（`AllPassiveSkillEffects.cs`・PassiveSkillRegistry 登録）
+
+| SkillId(表示) | レア | Trigger | 効果(ctx操作) |
+|---|---|---|---|
+| EvenEyes(賽振りの目隠し) | B | OnPreDealDamage | 全出目が偶数 → outgoing +=0.15 |
+| TwinDice(双子の賽) | S | OnCriticalCheck | 出目に重複ペアあり → criticalBonus +1 |
+| BloodPathBanner(血路の旗) | G | OnPreDealDamage | outgoing += 0.03 × enemyBleedStacks |
+| MasterworkNotes(匠の手控え) | G | OnPreDealDamage | run.weaponPlus ≥ 3 → outgoing +=0.12 |
+| KaleidoDice(万華の賽) | L | OnPreDealDamage | 全同値/全相異/階段(3+)のいずれか → outgoing +=1.0 |
+| JudgmentScale(断罪の天秤) | L | OnPreDealDamage | 勝利時 outgoing += min(1.0, 0.04×diceDifference) |
+
+### 3-E. [剣の舞] セット（2026-06-04・`AllPassiveSkillEffects.cs`・PassiveSkillRegistry 登録）
+
+Passive カテゴリのシナジー武器群。4枚がインベントリに揃うと全消滅し〈ブレイドダンス〉に変化（`GameLoop.SwordDanceSet`）。
+ダイス合計加算は OnPostRoll（RecomputeDiceTotals 後で確実に効く）。run 参照は `GameManager.Instance.Run`。
+
+| SkillId(表示) | レア | Trigger | 効果(ctx操作) |
+|---|---|---|---|
+| SaberWaltz(サーベル・ワルツ) | B | OnBattleStart / OnPostRoll | playerDiceTotal +1。他の[剣の舞]がインベントリにも昇華にも無い時、開戦時に playerCurrentHP を半減。ショップ出現率上昇は ShopManager フック |
+| EspadaPasodoble(エスパーダ・パソドブレ) | S | OnPostRoll / OnPreReceiveDamage | playerDiceTotal +5・enemyDiceTotal +5・outgoing +=0.2／被弾時 finalDamage ×1.2（被ダメ+20%） |
+| FleuretBallet(フルーレ・バレエ) | B | OnPostRoll | playerDiceTotal +3。敗北時の自壊+最大HP1生還は `LastStand.TryConsumeRevival`（灯火→ラストスタンド→フルーレ の順） |
+| FalconTango(ファコン・タンゴ) | L | OnBattleEnd | ランダムな[剣の舞]以外の所持パッシブを1廃棄し、全カテゴリから無条件ランダム1獲得（武器/ダイスは装備置換・weaponPlus=0） |
+| BladeDance(ブレイドダンス) | L(特殊) | OnBattleStart / OnPostRoll / OnPostDealDamage / OnPostReceiveDamage | 開戦毎に剣先スタック+1(最大99・ラン中持続/IRunResettable)。playerDiceTotal +剣先／与ダメ時 剣先分HP回復／被ダメ時 fixedDamageToEnemy +剣先 |
+
+> 条件の差（仕様厳守）: サーベルの孤剣判定＝`OwnsPassive`（昇華込み）/ 4枚変化判定＝`ownedPassiveItems`のみ（昇華除外）。
+> ブレイドダンスは `EventOnlyItemFilter` 除外でショップ・ランダム配布に出ない（変化でのみ入手）。
+
+### 3-F. 会心バリエーション（2026-06-05・`AllPassiveSkillEffects.cs`・PassiveSkillRegistry 登録）
+
+会心を「ただ ×criticalMultiplier」から質の違う一撃へ。**`OnCriticalDamage` は ProcessDamage 内
+`isCritical && totalDamage>0` 成立後・`totalDamage ×= criticalMultiplier` 適用前**に発火（§1 ②）。
+会心後ダメが要る効果は `(finalDamage + pursuitDamage) × criticalMultiplier` を自前算出する。
+
+| SkillId(表示) | レア | Trigger | 効果(ctx操作) |
+|---|---|---|---|
+| LacerationCore(裂傷の刃心) | B | OnCriticalDamage | `enemyBleedStacks += 2 + floor(max(0, criticalMultiplier−1))`（×2.0で+3, ×3.0で+4。血路の旗と相乗） |
+| GuardFlash(防殻の一閃) | B | OnCriticalDamage | `consShield += ceil(会心後ダメ×0.05)`（`shieldGainedTotal` も加算） |
+| VitalPierce(急所穿ち) | S | OnCriticalDamage | `fixedDamageToEnemy += 5`（軽減無視の追い打ち） |
+| LifeFang(吸命の牙) | S | OnCriticalDamage | `lifestealPct += 0.15`（その勝利の最終ダメ15%回復・負傷/封印尊重） |
+| SinglePoint(一点集中) | G | OnCriticalCheck | `criticalMultiplier += 0.5` ／ `criticalBonus −= 2`（毎T適用。稀だが特大） |
+| ChainApex(連環の極み) | L | OnCriticalCheck / OnCriticalDamage | Check: `criticalMultiplier += 0.2 × accumulated["chainApexStacks"]` ／ Damage: スタック+1（戦闘中持続） |
+
+> 数値は暫定（BOT オートランで要チューニング）。`criticalMultiplier`/`criticalBonus` は毎T再取得・0リセット
+> のため、倍率/分子への加算は **OnCriticalCheck で毎ターン再適用**する。`accumulatedValues` は戦闘開始でのみ
+> リセット＝連環のスタックは戦闘中持続。
+
+### 3-G. ステータス統一フレーム（2026-06-05・`StatusEffectSystem.cs` ＋ `CombatContext`）
+
+汎用ステータス層（#3）。**加算的導入**：既存の出血(`enemyBleedStacks`)/威圧(`enemyThreat`)/負傷
+(`healShieldReduction`)/敵ダイス減 等は**バランス済みのため現状フィールドのまま据え置き**、本フレームは
+新ステータス用＋パイロットとして **炎上(burn) のみ移行**した。
+
+- 保持: `CombatContext.playerStatusStacks` / `enemyStatusStacks`（id→stacks・**絶対視点**＝視点スワップしない）。
+- 定義: `StatusRegistry.Defs[id] = StatusDef{ target, tickTiming, dotPerStack, dotScalesWithStacks, decayPerTurn, maxStacks }`。
+- tick: `CombatContext.TickStatuses(StatusTick.TurnStart)` を **`PassiveSkillManager.BeginTurn` の BeginNewTurn 直後**に1回呼ぶ
+  （fixedDamage 0化後）。DOT＝`dotScalesWithStacks ? stacks×dotPerStack : dotPerStack` を fixedDamageToEnemy/Player へ加算 → decay。
+- burn 定義: target=Enemy, TurnStart, dotPerStack=3, scales=false, decay=1, 初期stacks=3（旧 Ignite と等価）。Ignite は開幕に `AddStatus(Enemy,"burn",3)` するのみ。
+- 制限（パイロット）: DOT値は def 単位（発生源別の可変ダメ未対応）／DOT は軽減無視（fixedDamage 経由）。
 
 ---
 
@@ -317,7 +399,7 @@ fixedDamageToPlayer ≥ 999 → playerHP = 0（死の宣告）
 | FrozenBardSong(凍えの旋律) | OnTurnEnd/OnPostRoll | 未使用streak++ / 自ダイス += min(8, streak−1) |
 | MiasmaCorrosion(毒の侵蝕) | OnTurnEnd | 毒stack+1(max5)、stack分を実プレイヤーへ軽減無視ダメ |
 | MirrorTwinsResponse(鏡映の応答) | OnPostReceiveDamage/OnTurnStart | 与ダメ<12で reflect=min(9,12−ダメ)蓄積、次T開始で反射 |
-| JudgmentFlames(審判の炎) | OnTurnEnd | dmg=min(13, 1+currentTurn+罪)、実プレイヤーへ軽減無視（罪=totalBattles/8,max2） |
+| JudgmentFlames(審判の炎) | OnTurnEnd | dmg=min(10, 1+currentTurn+罪)、実プレイヤーへ軽減無視（罪=totalBattles/8,max2） |
 | RoyalEmber(王の業炎) | OnTurnStart/OnTurnEnd | stack分ダメ / stack++ |
 | SinChain(業の連鎖) | OnRollLose/Win/PostRoll | ボス敗北でcount+1(max5)・勝利reset / 自ダイス += count |
 | EternalBurning(永劫の燃焼) | OnPostRoll | 実プレイヤーHP割合 ≤50/25/10% で 自ダイス +2/3/5 |

@@ -310,16 +310,18 @@ namespace GameLoop
 
         private string FormatStatus(RunState run)
         {
-            string hunger = "";
-            var mm = MapManager.Instance;
-            if (mm?.Hunger != null)
-                hunger = $"  空腹: {mm.Hunger.Current}/{mm.Hunger.Max}";
-
-            string karma = run.karma > 0 ? $"  <color=#ff6666>カルマ: {run.karma}</color>" : "";
+            // 希望(ADR-0002): 飢餓・カルマを統合した精神ゲージ。床に応じて色分け、発狂/狂気スタックも表示。
+            var tier = HopeSystem.GetTier(run);
+            string hopeColor = run.hope <= HopeSystem.FloorDespair ? "#ff4444"
+                             : run.hope <= HopeSystem.FloorPessimism ? "#ffaa44"
+                             : run.hope <= HopeSystem.FloorFretful ? "#ffff66" : "#88ff88";
+            string madness = run.crownHopeLocked ? $" 狂気x{run.madnessStack}"
+                           : (run.madnessMoveCounter >= 0 ? $" 発狂{run.madnessMoveCounter}" : "");
+            string hope = $"  <color={hopeColor}>希望: {run.hope}/{run.hopeCap} [{tier}]{madness}</color>";
 
             return $"Floor: {run.currentFloor}/{run.maxFloor}  " +
-                   $"HP: {run.playerHP}/{run.playerMaxHP}{hunger}  " +
-                   $"コイン: {run.coins}{karma}";
+                   $"HP: {run.playerHP}/{run.playerMaxHP}{hope}  " +
+                   $"コイン: {run.coins}";
         }
 
         private void UpdateMoveOptions()

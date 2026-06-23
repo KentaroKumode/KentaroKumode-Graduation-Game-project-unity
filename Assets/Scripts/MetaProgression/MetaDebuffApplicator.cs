@@ -97,12 +97,12 @@ namespace MetaProgression
         }
 
         // ============================================================
-        //  Lv8: 飢餓の極地 (2026-05-31 リワーク: 前哨基地全回復化で旧効果失効 → 飢餓ダメ×2 に置換)
+        //  Lv8: 絶望的な進軍 (飢餓→希望統合・ADR-0002: 移動するたびに希望-1)
         // ============================================================
 
-        /// <summary>飢餓ダメージ倍率（Lv8 ON なら 2、 OFF なら 1）。</summary>
-        public static int GetStarvationDamageMultiplier()
-            => IsActive(MetaDebuffLevel.Lv8_飢餓の極地) ? 2 : 1;
+        /// <summary>絶望的な進軍（Lv8）が有効か。有効なら移動毎に希望 -1（HopeSystem.ApplyMove へ渡す）。</summary>
+        public static bool IsDespairMarchActive()
+            => IsActive(MetaDebuffLevel.Lv8_絶望的な進軍);
 
         // ============================================================
         //  Lv9: 鋼の皮膚

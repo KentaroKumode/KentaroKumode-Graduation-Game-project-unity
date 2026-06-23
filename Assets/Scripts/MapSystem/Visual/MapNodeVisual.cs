@@ -62,7 +62,8 @@ namespace MapSystem.Visual
             sr = GetComponent<SpriteRenderer>();
             if (sr == null) sr = gameObject.AddComponent<SpriteRenderer>();
 
-            // 親の寝かせ回転 (X=-90°) によって UV Y が反転して見える問題を補正
+            // 親の寝かせ回転 (X=-90°) で UV Y が反転して見える問題を補正。
+            // LCD パイプラインの Quad 回転 (90, 180, 0) でも同様に Y が反転するため、 両ケースとも true で揃える。
             sr.flipY = true;
 
             // 先にスプライトを設定 (SetTileType がスプライトと tileBaseColor を準備)
@@ -91,6 +92,15 @@ namespace MapSystem.Visual
             }
 
             SetState(NodeVisualState.Default);
+        }
+
+        // 親のワールド回転が「寝かせ」状態 (X ≈ ±90°) のときだけ true。
+        private static bool NeedsFlipY(Transform parent)
+        {
+            if (parent == null) return false;
+            float x = parent.eulerAngles.x;
+            if (x > 180f) x -= 360f;
+            return Mathf.Abs(Mathf.Abs(x) - 90f) < 10f;
         }
 
         /// <summary>MapClickHandler から呼ばれる。Reachable 時のみ移動を通知する。</summary>

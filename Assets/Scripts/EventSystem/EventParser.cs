@@ -279,6 +279,7 @@ namespace EventSystem
         private static readonly Regex maxHp        = new Regex(@"^最大HP([+\-])(\d+)$");
         private static readonly Regex gold         = new Regex(@"^ゴールド([+\-])(\d+)$");
         private static readonly Regex hunger       = new Regex(@"^空腹度([+\-])(\d+)$");
+        private static readonly Regex hope         = new Regex(@"^希望([+\-])(\d+)$");
         private static readonly Regex material     = new Regex(@"^武器強化素材([+\-])(\d+)$");
         private static readonly Regex tBuff        = new Regex(@"^時限バフ\[(.+?)\](?:を獲得)?$");
         private static readonly Regex tDebuff      = new Regex(@"^時限デバフ\[(.+?)\](?:を獲得)?$");
@@ -306,12 +307,12 @@ namespace EventSystem
             Match m;
 
             if (t == "なし") return null;
-            if (t == "カルマ獲得") return Eff(EventEffectType.KarmaGain, postCombat: postCombat);
             if (t == "HP全回復") return Eff(EventEffectType.HpFullHeal, postCombat: postCombat);
             if (t == "防具の耐久値減少") return Eff(EventEffectType.ArmorDurabilityLoss, postCombat: postCombat);
             if (t == "戦闘に突入") return Eff(EventEffectType.EnterCombat, postCombat: postCombat);
             if (t == "エリートとの戦闘に突入") return Eff(EventEffectType.EnterEliteCombat, postCombat: postCombat);
             if (t == "ランダムなイベント発生") return Eff(EventEffectType.RandomEvent, postCombat: postCombat);
+            if (t == "サーカス引渡し") return Eff(EventEffectType.CircusHandover, postCombat: postCombat);
             if (t == "パッシブアイテム獲得" || t == "パッシブアイテムを獲得")
                 return Eff(EventEffectType.GainPassiveItem, postCombat: postCombat);
             if (t == "消費アイテム獲得" || t == "消費アイテムを獲得")
@@ -324,6 +325,7 @@ namespace EventSystem
             m = maxHp.Match(t);      if (m.Success) return Eff(EventEffectType.MaxHpDelta, amount: SignedInt(m, 1, 2), postCombat: postCombat);
             m = gold.Match(t);       if (m.Success) return Eff(EventEffectType.GoldDelta, amount: SignedInt(m, 1, 2), postCombat: postCombat);
             m = hunger.Match(t);     if (m.Success) return Eff(EventEffectType.HungerDelta, amount: SignedInt(m, 1, 2), postCombat: postCombat);
+            m = hope.Match(t);       if (m.Success) return Eff(EventEffectType.HopeDelta, amount: SignedInt(m, 1, 2), postCombat: postCombat);
             m = material.Match(t);   if (m.Success) return Eff(EventEffectType.MaterialDelta, amount: SignedInt(m, 1, 2), postCombat: postCombat);
             m = tBuff.Match(t);      if (m.Success) return Eff(EventEffectType.TimedBuff, param: m.Groups[1].Value, postCombat: postCombat);
             m = tDebuff.Match(t);    if (m.Success) return Eff(EventEffectType.TimedDebuff, param: m.Groups[1].Value, postCombat: postCombat);

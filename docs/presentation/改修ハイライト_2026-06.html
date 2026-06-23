@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>プロジェクト改修ハイライト 2026-06</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true, theme:'base', themeVariables:{primaryColor:'#f4ebd6', primaryTextColor:'#2b2b2b', primaryBorderColor:'#8a7355', lineColor:'#5a4a35', secondaryColor:'#ede0c8', tertiaryColor:'#f9f4e6'}});</script>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Hiragino Sans","Yu Gothic","Meiryo",sans-serif;
+    color: #2b2b2b;
+    line-height: 1.55;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 24px;
+    background: #fbf9f3;
+  }
+  h1 {
+    font-size: 26pt;
+    border-bottom: 3px solid #8a7355;
+    padding-bottom: 8px;
+    margin-top: 0;
+    color: #4a3c25;
+    letter-spacing: 0.04em;
+  }
+  h2 {
+    font-size: 18pt;
+    color: #4a3c25;
+    border-left: 6px solid #8a7355;
+    padding: 4px 12px;
+    margin-top: 32px;
+    background: #f4ebd6;
+    page-break-after: avoid;
+  }
+  h3 {
+    font-size: 13pt;
+    color: #6a5a3c;
+    margin-top: 20px;
+    padding-bottom: 2px;
+    border-bottom: 1px dotted #aa9572;
+  }
+  h4 {
+    font-size: 11pt;
+    color: #6a5a3c;
+    margin-top: 14px;
+    margin-bottom: 6px;
+  }
+  p { margin: 8px 0; }
+  .lead {
+    font-size: 11pt;
+    background: #f4ebd6;
+    padding: 12px 16px;
+    border-radius: 6px;
+    border-left: 4px solid #8a7355;
+    margin-bottom: 20px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+    font-size: 9.5pt;
+  }
+  th, td {
+    border: 1px solid #c8b894;
+    padding: 5px 9px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: #ede0c8;
+    color: #4a3c25;
+    font-weight: 600;
+  }
+  tr:nth-child(even) td { background: #fbf6ec; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  code {
+    background: #ede0c8;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: "JetBrains Mono","Consolas",monospace;
+    font-size: 9pt;
+    color: #4a3c25;
+  }
+  pre {
+    background: #f4ebd6;
+    border-left: 3px solid #8a7355;
+    padding: 10px 14px;
+    overflow-x: auto;
+    border-radius: 0 4px 4px 0;
+    font-size: 9pt;
+  }
+  ul, ol { margin: 6px 0 10px 22px; padding: 0; }
+  li { margin: 3px 0; }
+  .mermaid {
+    text-align: center;
+    margin: 16px 0;
+    background: #fff;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #c8b894;
+    font-size: 10pt;
+  }
+  .phase {
+    page-break-before: auto;
+    margin-top: 28px;
+  }
+  .badge {
+    display: inline-block;
+    background: #8a7355;
+    color: #fff;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 9pt;
+    margin-right: 6px;
+  }
+  .kpi {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin: 12px 0;
+  }
+  .kpi > div {
+    background: #fff;
+    padding: 10px 14px;
+    border: 1px solid #c8b894;
+    border-radius: 5px;
+    text-align: center;
+  }
+  .kpi b { display: block; font-size: 16pt; color: #4a3c25; }
+  .kpi span { font-size: 8.5pt; color: #6a5a3c; }
+  blockquote {
+    border-left: 4px solid #8a7355;
+    background: #f9f4e6;
+    margin: 10px 0;
+    padding: 8px 16px;
+    color: #555;
+    font-size: 10pt;
+  }
+  footer {
+    margin-top: 40px;
+    padding-top: 14px;
+    border-top: 1px solid #c8b894;
+    font-size: 9pt;
+    color: #6a5a3c;
+    text-align: center;
+  }
+  @media print {
+    body { background: #fff; padding: 0; }
+    h2 { page-break-after: avoid; }
+    .mermaid { page-break-inside: avoid; }
+    table { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<h1>プロジェクト改修ハイライト</h1>
+<div class="lead">
+旅団契約システム実装〜現在 (2026-06 月期) の主要な変更を、 5 つの Phase に整理。
+全体方針: <strong>「コンテンツ拡張 × バランス調整 × 測定基盤構築」</strong> の三軸並行。
+</div>
+
+<h2>全体俯瞰</h2>
+
+<div class="mermaid">
+graph LR
+    A[旅団契約システム] --> D[BOT 拡張]
+    D --> E[InventoryPower 指標]
+    E --> F[ゲーム体験 4 軸]
+    A --> G[バランス調整]
+    G --> H[ショップ経済リワーク]
+    H --> I[Power 帯認識 BOT]
+    F --> I
+</div>
+
+<p>3 つの柱が連動して進行 ── <span class="badge">機構実装</span><span class="badge">バランス</span><span class="badge">測定</span></p>
+
+<h2 class="phase">Phase 1 — 旅団契約システム</h2>
+
+<h3>仕組み概要</h3>
+
+<div class="mermaid">
+graph TB
+    O[前哨基地] -->|30% 独立抽選 × 12| P[契約提示]
+    P --> N[新規契約 L1]
+    P --> X[延長 L1→L2→L3]
+    N -.->|敵対 6 ペア| R[既存契約強制解除]
+    N -.->|協力 6 ペア| S[両方契約で bonus]
+    X -.->|HP≤20%| Rel[L1/L2 解除]
+    X -.->|維持費不足| Forf[L3 没収 / 任意解除]
+</div>
+
+<h3>主要設計</h3>
+<ul>
+  <li><strong>維持費</strong>: L1=3G / L2=6G / L3=9G/層 (同レベル維持)</li>
+  <li><strong>3 層必須</strong>で L3 到達 (一足飛び不可)</li>
+  <li><strong>敵対 6 ペア</strong>: 取得時に既存敵対契約強制解除 (L3 は 9G 没収)</li>
+  <li><strong>協力 6 ペア</strong>: 両方契約中で常時 bonus 発動</li>
+  <li>12 旅団それぞれに「出自」 ロア設定 (ヴェイランド / 聖教会 / クルガ / 旧アルフォニア)</li>
+</ul>
+
+<h3>BOT 統合</h3>
+<table>
+  <tr><th>機構</th><th>実装</th></tr>
+  <tr><td>契約評価</td><td>ContractAiPicker: BaseValueL1 + AllianceBonus×1.30 + RivalryPenalty -6/-3/-1</td></tr>
+  <tr><td>採用判定</td><td>value ≥ cost × 1.5 (AcceptThreshold)</td></tr>
+  <tr><td>維持費不足対応</td><td>(value - cost) 昇順で切捨候補抽出</td></tr>
+  <tr><td>summary 出力</td><td>新規/延長/解除内訳 + 個別 Tier + 協力ペア Tier</td></tr>
+</table>
+
+<h2 class="phase">Phase 2 — バランス調整</h2>
+
+<h3>雑魚調整 (2F-5F)</h3>
+<ul>
+  <li><strong>11 体</strong>のダイス面値 +1 / 脅威 +1 (kobold/skeleton/wolf/orc/harpy/lizardman/minotaur/dark_knight/chimera/demon/elder_vampire/death_knight)</li>
+  <li><strong>脅威ロジック修正</strong>: 「敵生存時のみ削り発動」 ── 敵を倒した直後の理不尽死を撲滅</li>
+  <li><strong>前哨基地全回復 → 不足HPの30%回復</strong> ── 道中ダメージがボスへ持ち越される設計に</li>
+  <li><strong>T4 武器ショップ出現</strong> ── 0.5% (フルラン10回に1-2件) で超レア入手経路を追加</li>
+</ul>
+
+<h3>ダイス再構築</h3>
+
+<table>
+  <tr><th>ダイス</th><th>旧効果</th><th>新効果</th></tr>
+  <tr><td>iron (SILVER)</td><td>敗北時 -1</td><td><strong>敗北時 -2</strong></td></tr>
+  <tr><td>copper (SILVER)</td><td>効果なし</td><td><strong>戦闘開始時 シールド+5</strong> (CopperSteady)</td></tr>
+  <tr><td>biased (SILVER)</td><td>ゾロ目時 追撃 +出目</td><td>ゾロ目時 追撃 <strong>+出目×2</strong></td></tr>
+</table>
+
+<h3>ショップ価格圧縮</h3>
+
+<div class="mermaid">
+graph LR
+    A["旧 1:11.3 急峻"] -->|圧縮| B["新 1:2.5 武器 / 1:1.75 他"]
+    C["LEGENDARY が割高"] -->|改善| D["LEGENDARY が最高コスパ"]
+    E["出現率 12%"] -->|希少性確保| F["出現率 5%"]
+</div>
+
+<table>
+  <tr><th>Tier</th><th class="num">旧武器</th><th class="num">新武器</th><th class="num">旧ダイス/パッシブ</th><th class="num">新ダイス/パッシブ</th></tr>
+  <tr><td>BRONZE</td><td class="num">8</td><td class="num">8</td><td class="num">8</td><td class="num">8</td></tr>
+  <tr><td>SILVER</td><td class="num">20</td><td class="num"><b>12</b></td><td class="num">15</td><td class="num"><b>10</b></td></tr>
+  <tr><td>GOLD</td><td class="num">45</td><td class="num"><b>16</b></td><td class="num">22</td><td class="num"><b>12</b></td></tr>
+  <tr><td>LEGENDARY</td><td class="num">90</td><td class="num"><b>20</b></td><td class="num">25-30</td><td class="num"><b>14</b></td></tr>
+</table>
+
+<h3>特売品システム</h3>
+<p>メタバフ <code>RefundLevelUp</code> の効果を「購入返金 5/10/15%」 から <strong>「特売品 1/2/3 個出現」</strong> に変更。 各特売 20-60% ランダム割引 ── 「ジャックポット感」 を残しつつ G 管理の戦略性を維持。</p>
+
+<h3>抑制ルール (同名/上位互換)</h3>
+
+<div class="mermaid">
+graph LR
+    A["同名 passive × 2"] -->|抑制| B["1 回のみ発動"]
+    C["MightI + MightII"] -->|抑制| D["MightII のみ発動"]
+</div>
+
+<p>14 家系 (Pursuit/Counter/Might/Fortitude/Insight/Vitality/BladeEdge/BountyHunter/Conqueror/Lifesteal/Indomitable/ShieldBash/LentTime/Grievous) を <code>PassiveSkillRegistry</code> に明示定義。 「弱い同名/下位互換を持ち続けるメリット = ゼロ」 を確定。</p>
+
+<h2 class="phase">Phase 3 — 測定基盤 (InventoryPower / ΔPower)</h2>
+
+<h3>指標体系</h3>
+
+<div class="mermaid">
+graph TB
+    P[InventoryPower 指標]
+    P --> P1[Tier 合算 S=4 A=3 B=2 C=1]
+    P --> P2[武器 Tier 係数 T1=1 ... T4=10]
+    P --> P3[抑制適用後の純粋戦力]
+    P -.-> M1[層別 平均/中央値/最大]
+    P -.-> M2[6F到達 vs 死亡比較]
+    P -.-> M3[Power 帯予測 6F到達率]
+    P -.-> M4[ΔPower アイテム別寄与]
+    P --> B[PowerBand 5 段]
+    B --> Bands["Weak / Early / Mid / Late / Apex"]
+</div>
+
+<h3>定義</h3>
+<ul>
+  <li><strong>InventoryPower</strong> = 武器Tier係数 + Σ RawScore(unique item) (抑制ルール適用)</li>
+  <li><strong>ΔPower(item)</strong> = avg(finalPower | 取得) − avg(finalPower | 非取得)</li>
+  <li><strong>PowerBand</strong>: < 10 Weak / < 25 Early / < 50 Mid / < 80 Late / 80+ Apex</li>
+</ul>
+
+<h3>10000 ラン観測値</h3>
+<div class="kpi">
+  <div><b>54.1</b><span>6F到達時平均 Power</span></div>
+  <div><b>+29.4</b><span>6F到達 vs 死亡の差</span></div>
+  <div><b>~Power 68</b><span>6F 突破ライン</span></div>
+</div>
+
+<h3>高速化</h3>
+<table>
+  <tr><th>修正</th><th>効果</th></tr>
+  <tr><td><code>Compute()</code> dead code 削除</td><td>未使用 CollectFiringSkillIds 呼出撤廃</td></tr>
+  <tr><td>抑制判定 O(skills²) → O(skills)</td><td>family→maxLv マップで 1 ループ化 (~60x)</td></tr>
+  <tr><td>SimulateAddItemDelta O(items) → O(1)</td><td>近似式に置換 (~400x)</td></tr>
+  <tr><td>体感速度</td><td>10000 ラン推定 850s → 15s</td></tr>
+</table>
+
+<h2 class="phase">Phase 4 — ゲーム体験 4 軸メトリクス</h2>
+
+<div class="mermaid">
+graph LR
+    A[緊張感曲線] --> A1["knife-edge勝率<br>blowout率<br>Comeback"]
+    B[ビルド多様性] --> B1["ユニークビルド<br>Top10 集中度<br>Shannon entropy"]
+    C[死因分布質] --> C1["公平死/理不尽死比率"]
+    D[選択意味度] --> D1["Dominant率<br>Balanced率"]
+</div>
+
+<table>
+  <tr><th>軸</th><th>キー指標 (実測)</th><th>用途</th></tr>
+  <tr><td>緊張感曲線</td><td>1F knife 12.4% / 3F blowout 96.5%</td><td>ボス瞬殺型死亡の可視化</td></tr>
+  <tr><td>ビルド多様性</td><td>Shannon 5.39/6.29 = 0.86 正規化</td><td>「みんな同じビルド」 検知</td></tr>
+  <tr><td>死因分布質</td><td>1-5F: 理不尽 0% / 6F-7F: 33-35%</td><td>設計方針の検証</td></tr>
+  <tr><td>選択意味度</td><td>Dominant 65% / Balanced 35%</td><td>「意味の薄い分岐」 抽出</td></tr>
+</table>
+
+<h2 class="phase">Phase 5 — BOT 売却機構 + Power 帯認識</h2>
+
+<h3>売却サイクル</h3>
+
+<div class="mermaid">
+sequenceDiagram
+    actor BOT
+    participant Shop
+    participant Run as RunState
+    BOT->>Run: 容量超過検出
+    BOT->>Shop: TrySell (shopPurchasedCounts >0)
+    alt 売却可
+        Shop->>Run: +G, -item
+    else 売却不可
+        BOT->>Run: 無償廃棄 (Triage)
+    end
+    BOT->>Shop: Score=0 売却 → S/A 購入
+</div>
+
+<h3>Power 帯認識 BOT</h3>
+
+<table>
+  <tr><th>帯</th><th>購入閾値</th><th>リロール</th></tr>
+  <tr><td>Weak / Early</td><td>C+ も買う (Score ≥ 1)</td><td>しない (G 温存)</td></tr>
+  <tr><td>Mid</td><td>標準 B+</td><td>通常 (S 未所持で)</td></tr>
+  <tr><td>Late / Apex</td><td>A+ のみ (ゴミ買い禁止)</td><td>積極 (S 狩り)</td></tr>
+</table>
+
+<blockquote>「自分の現在地」 を見てショップ戦略を動的に変える BOT に進化。 弱い時は底上げ、 強い時は質追求の自然な意思決定。</blockquote>
+
+<h2>現在地と次の打ち手</h2>
+
+<h3>未対応の高優先タスク</h3>
+<ol>
+  <li><strong>契約 AI に Power 帯認識</strong> ── 弱ラン=守り契約、 強ラン=攻め契約</li>
+  <li><strong>イベント選択肢に Power 文脈</strong> ── HP-loss 判断の精度向上</li>
+  <li><strong>UI 実装</strong> ── 契約バフ欄 / 維持費不足選択 / 特売表示</li>
+  <li><strong>長期: シナジー対応 InventoryPower</strong> ── 組合せ補正 +Power</li>
+</ol>
+
+<h2>語彙リスト (本資料初出語)</h2>
+
+<h3>システム関連</h3>
+<table>
+  <tr><th>語</th><th>説明</th></tr>
+  <tr><td>旅団契約</td><td>前哨基地で結ぶ 12 自由業者集団との維持費契約。 ランの戦略軸</td></tr>
+  <tr><td>維持費</td><td>L1=3G / L2=6G / L3=9G/層。 払えなければ強制解除</td></tr>
+  <tr><td>敵対/協力ペア</td><td>旅団間の関係。 敵対は強制解除、 協力は両方契約で bonus</td></tr>
+  <tr><td>InventoryPower</td><td>Tier 表ベースの「現在のインベントリ戦力」 数値</td></tr>
+  <tr><td>ΔPower</td><td>各アイテムの Power 寄与 (取得ラン平均 − 非取得ラン平均)</td></tr>
+  <tr><td>PowerBand</td><td>Power 値の 5 段階表示 (Weak/Early/Mid/Late/Apex)</td></tr>
+  <tr><td>抑制ルール</td><td>同名/同家系下位 Lv passive は最高 Lv のみ発動する仕様</td></tr>
+  <tr><td>特売品</td><td>メタバフで出現するランダム割引商品 (20-60% off)</td></tr>
+  <tr><td>TrySell</td><td>ショップ売却 API。 BOT も活用、 ショップ購入記録ベース</td></tr>
+  <tr><td>shopPurchasedCounts</td><td>ショップ由来在庫のトラッキング (売却可否判定用)</td></tr>
+  <tr><td>Tier 細分化</td><td>S=4/A=3/B=2/C=1/D-E=0 の 5 段階 Score</td></tr>
+</table>
+
+<h3>測定指標</h3>
+<table>
+  <tr><th>語</th><th>説明</th></tr>
+  <tr><td>knife-edge勝率</td><td>残 HP≤20% で勝った戦闘の割合 (緊張感)</td></tr>
+  <tr><td>blowout率</td><td>HP>80% から 1 戦で死亡した割合 (理不尽瞬殺)</td></tr>
+  <tr><td>Comeback</td><td>1-4F で HP<20% を経験 → 6F 到達 (逆転率)</td></tr>
+  <tr><td>Shannon entropy</td><td>ビルド分布の多様性 (bit 単位)</td></tr>
+  <tr><td>selection bias</td><td>「強いラン限定で取得 → アイテムが強く見える」 等の交絡</td></tr>
+  <tr><td>ExcludedFromLift</td><td>lift 計算から除外するアイテム ID 集合 (確信チェーン等)</td></tr>
+  <tr><td>lift6F</td><td>6F 到達ラン同士で比較した bandScore 差 (本当の貢献)</td></tr>
+  <tr><td>bandScore</td><td>ラン rank 数値 (R1=1 ... R10=10 / 解脱=12 / CRASH=-1)</td></tr>
+  <tr><td>ΔPower/G</td><td>Power 増分 ÷ コスト = ショップ判断のコスパ指標</td></tr>
+</table>
+
+<footer>
+プロジェクト改修ハイライト 2026-06 / 詳細は <code>docs/specs/contracts.md</code>、 <code>BALANCE_TIER_LIST_*.md</code> 参照
+</footer>
+
+</body>
+</html>

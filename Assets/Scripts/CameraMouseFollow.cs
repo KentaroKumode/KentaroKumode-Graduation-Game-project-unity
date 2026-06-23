@@ -3,14 +3,15 @@ using UnityEngine.EventSystems;
 
 /// <summary>
 /// WASD キーでカメラビューポイントを切り替えるコンポーネント
-/// 
+///
 /// <para><b>操作:</b></para>
 /// <list type="bullet">
 ///   <item>A → viewpoint_inv（インベントリビュー = 左位置）</item>
 ///   <item>D → viewpoint_pot（ポットビュー = 右位置）</item>
-///   <item>W → viewpoint_base（ベースビュー = 中央位置）</item>
+///   <item>S → viewpoint_base（ベースビュー = 中央位置）</item>
+///   <item>W → viewpoint_zoom（ズームビュー = 近接位置）</item>
 /// </list>
-/// 
+///
 /// <para><b>補間:</b></para>
 /// Lerp/Slerpで滑らかに遷移
 /// </summary>
@@ -18,8 +19,9 @@ public class CameraMouseFollow : MonoBehaviour
 {
     [Header("ビューポイント設定（Transform参照）")]
     [SerializeField] private Transform leftPosition;   // viewpoint_inv（Aキー）
-    [SerializeField] private Transform centerPosition; // viewpoint_base（Wキー）
+    [SerializeField] private Transform centerPosition; // viewpoint_base（Sキー）
     [SerializeField] private Transform rightPosition;  // viewpoint_pot（Dキー）
+    [SerializeField] private Transform zoomPosition;   // viewpoint_zoom（Wキー）
     
     [Header("移動設定")]
     [SerializeField, Range(1f, 20f)] private float moveSpeed = 8f;  // 移動速度（高いほど即応）
@@ -35,7 +37,7 @@ public class CameraMouseFollow : MonoBehaviour
     private Quaternion originalRotation;
     
     // 現在のカメラ状態
-    public enum CameraState { Inventory, Base, Pot }
+    public enum CameraState { Inventory, Base, Pot, Zoom }
     private CameraState currentState = CameraState.Base;
     
     /// <summary>現在のカメラ状態</summary>
@@ -82,9 +84,13 @@ public class CameraMouseFollow : MonoBehaviour
         {
             SetViewpoint(CameraState.Pot);
         }
-        else if (Input.GetKeyDown(KeyCode.W))
+        else if (Input.GetKeyDown(KeyCode.S))
         {
             SetViewpoint(CameraState.Base);
+        }
+        else if (Input.GetKeyDown(KeyCode.W))
+        {
+            SetViewpoint(CameraState.Zoom);
         }
         
         // 現在の状態に応じたターゲット位置を決定
@@ -125,7 +131,8 @@ public class CameraMouseFollow : MonoBehaviour
         {
             CameraState.Inventory => "viewpoint_inv (A)",
             CameraState.Pot => "viewpoint_pot (D)",
-            CameraState.Base => "viewpoint_base (W)",
+            CameraState.Base => "viewpoint_base (S)",
+            CameraState.Zoom => "viewpoint_zoom (W)",
             _ => "unknown"
         };
         Debug.Log($"[CameraWASD] → {viewName}");
@@ -192,7 +199,20 @@ public class CameraMouseFollow : MonoBehaviour
                     targetRot = originalRotation;
                 }
                 break;
-                
+
+            case CameraState.Zoom:
+                if (zoomPosition != null)
+                {
+                    targetPos = zoomPosition.position;
+                    targetRot = zoomPosition.rotation;
+                }
+                else
+                {
+                    targetPos = originalPosition;
+                    targetRot = originalRotation;
+                }
+                break;
+
             case CameraState.Base:
             default:
                 if (centerPosition != null)
@@ -246,6 +266,14 @@ public class CameraMouseFollow : MonoBehaviour
             Gizmos.color = Color.red;
             Gizmos.DrawWireSphere(rightPosition.position, 0.2f);
             Gizmos.DrawLine(targetCamera.transform.position, rightPosition.position);
+        }
+
+        // viewpoint_zoom
+        if (zoomPosition != null)
+        {
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawWireSphere(zoomPosition.position, 0.2f);
+            Gizmos.DrawLine(targetCamera.transform.position, zoomPosition.position);
         }
     }
 }

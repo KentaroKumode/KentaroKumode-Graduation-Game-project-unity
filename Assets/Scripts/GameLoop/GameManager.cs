@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Codex;
 using CombatSystem;
 using EventSystem;
 using InventorySystem;
@@ -172,6 +173,7 @@ namespace GameLoop
                 }
             }
 
+
             LastCombatResult = null;
             CurrentEnemy = null;
             IsEliteSecondFight = false;
@@ -201,39 +203,23 @@ namespace GameLoop
             // メタ: ノード踏破トークン
             MetaProgression.MetaTokenEarner.OnNodeVisited();
 
-            int starvDmg = mm.MoveTo(nodeId, Run.playerMaxHP);
+            var hopeFromNode = mm.CurrentNode; // 希望(ADR-0002): 横移動判定用の移動前ノード
+            // 飢餓→希望統合(ADR-0002): 旧・空腹HPダメージは廃止。移動の生存圧は希望システム
+            // （横移動コスト＋絶望的な進軍）が担う。Hunger ゲージ更新は MoveTo 内で行われるが無害。
+            mm.MoveTo(nodeId, Run.playerMaxHP);
 
-            // 恒久デバフ「トゥルハドの暴食」: 飢餓ダメージ ×2 (割合計算が先)
-            if (starvDmg > 0 && MetaProgression.PermanentDebuffEffects.HasGluttony(Run))
-                starvDmg *= 2;
-
-            // メタデバフ Lv8「飢餓の極地」: 飢餓ダメージ ×2 (暴食と独立に重畳、 OFF時は ×1)
-            if (starvDmg > 0)
-                starvDmg *= MetaProgression.MetaDebuffApplicator.GetStarvationDamageMultiplier();
-
-            // メタバフ: 飢餓ダメ削減（実数計算が後・最低1は残す）
-            if (starvDmg > 0)
+            // 落石のような雹: ノード移動毎に HP-1
+            int boulderDmg = MapSystem.AbyssPhenomena.AbyssPhenomenonCombatHooks.OnNodeMove(Run);
+            if (boulderDmg > 0 && Run.playerHP > 0)
             {
-                int red = MetaProgression.MetaBuffApplicator.GetHungerDamageReduction();
-                if (red > 0) starvDmg = Mathf.Max(1, starvDmg - red);
-            }
-
-            if (starvDmg > 0)
-            {
-                Run.playerHP = Mathf.Max(0, Run.playerHP - starvDmg);
-                OnStarvationDamage?.Invoke(starvDmg);
-                Log($"空腹ダメージ: {starvDmg} (HP: {Run.playerHP}/{Run.playerMaxHP})");
-
+                Run.playerHP = Mathf.Max(0, Run.playerHP - boulderDmg);
+                Log($"異常現象「落石のような雹」 HP-{boulderDmg} (HP:{Run.playerHP})");
                 if (Run.playerHP <= 0)
                 {
-                    // ちいさな灯火 → ラストスタンドの順で救済を試行
-                    if (!LastStand.TryConsumeRevival(Run))
-                    {
-                        Run.EndRun();
-                        SetPhase(GamePhase.GameOver);
-                        OnGameOver?.Invoke(Run);
-                        return;
-                    }
+                    Run.EndRun();
+                    SetPhase(GamePhase.GameOver);
+                    OnGameOver?.Invoke(Run);
+                    return;
                 }
             }
 
@@ -248,6 +234,20 @@ namespace GameLoop
                     if (granted != null)
                         Log($"次元の乱れ {Run.dimensionalDisturbance}: Λデバフ「{granted}」lv{Run.GetLambdaDebuffLevel(granted)} 付与");
                 }
+            }
+
+            // 希望(ADR-0002): 横移動(同行=row不変)で減少。縦/斜め移動は進行のため無料。
+            // 発狂(hope==0)中は秒読みを1消費し、尽きたらラン終了。絶望的な進軍(メタLv8)で全移動 -1。
+            bool hopeLateral = hopeFromNode != null && mm.CurrentNode != null
+                               && hopeFromNode.row == mm.CurrentNode.row && hopeFromNode != mm.CurrentNode;
+            bool despairMarch = MetaProgression.MetaDebuffApplicator.IsDespairMarchActive();
+            if (HopeSystem.ApplyMove(Run, hopeLateral, despairMarch))
+            {
+                Log("発狂: 秒読みが尽きてラン終了");
+                Run.EndRun();
+                SetPhase(GamePhase.GameOver);
+                OnGameOver?.Invoke(Run);
+                return;
             }
 
             ActivateTile(mm.CurrentNode);
@@ -354,6 +354,7 @@ namespace GameLoop
             if (node.type == TileType.Boss)
             {
                 Run.bossDefeatedThisFloor = true;
+                Run.lastBossId = CurrentEnemy?.id ?? Run.lastBossId; // エンディング分岐用（最後に撃破したボス）
 
                 // 5層裏ボス撃破フラグ: 以降のレイピア解除に会心+9 が付くようになる
                 if (CurrentEnemy != null && CurrentEnemy.id == "boss_layer5_hidden")
@@ -538,7 +539,7 @@ namespace GameLoop
             SetPhase(GamePhase.MapNavigation);
         }
 
-        /// <summary>休憩でHP回復を選択</summary>
+        /// <summary>休憩でHP回復を選択。 メタ〈ボス前休憩 回復+強化〉解放時は強化も同時に試みる。</summary>
         public void RestHeal()
         {
             if (CurrentPhase != GamePhase.RestStop) return;
@@ -546,6 +547,9 @@ namespace GameLoop
             int heal = Mathf.CeilToInt(Run.playerMaxHP * ratio);
             Run.playerHP = Mathf.Min(Run.playerMaxHP, Run.playerHP + heal);
             Log($"休憩回復: +{heal}HP ({(int)(ratio*100)}%) (現在: {Run.playerHP}/{Run.playerMaxHP})");
+            // メタ Lv51: 同じ休憩マスで武器強化も同時に試みる（素材不足なら無視・回復は通る）
+            if (MetaProgression.MetaBuffApplicator.IsBossRestHealAndUpgradeUnlocked())
+                TryAutoUpgradeAtRest();
             SetPhase(GamePhase.MapNavigation);
         }
 
@@ -660,7 +664,7 @@ namespace GameLoop
             if (prevWeaponId != run.equippedWeaponId)
                 OnWeaponTierUpgraded?.Invoke(prevWeaponId, run.equippedWeaponId);
             // 天工開物: 武器を強化するたび、強化素材を1つ返還する
-            if (run.ownedPassiveItems != null && run.ownedPassiveItems.Contains("天工開物"))
+            if (run != null && run.OwnsPassive("天工開物"))
             {
                 run.weaponMaterials += 1;
                 Debug.Log("[天工開物] 強化素材を1つ返還");
@@ -686,7 +690,28 @@ namespace GameLoop
                 int used = before - Run.weaponMaterials;
                 Log($"武器強化 ×1: {Run.equippedWeaponId}{(Run.weaponPlus > 0 ? "+" : "")} 業物Lv{Run.limitBreakStage} (素材-{used}, 残{Run.weaponMaterials})");
             }
+            // メタ Lv51: 同じ休憩マスで HP 回復も同時に実行
+            if (MetaProgression.MetaBuffApplicator.IsBossRestHealAndUpgradeUnlocked())
+            {
+                float ratio = ActiveModifier?.restHealMultiplier ?? 0.3f;
+                int heal = Mathf.CeilToInt(Run.playerMaxHP * ratio);
+                Run.playerHP = Mathf.Min(Run.playerMaxHP, Run.playerHP + heal);
+                Log($"[メタLv51] 同時回復: +{heal}HP ({(int)(ratio*100)}%) (現在: {Run.playerHP}/{Run.playerMaxHP})");
+            }
             SetPhase(GamePhase.MapNavigation);
+        }
+
+        /// <summary>RestHeal 経由で呼ばれる、 素材があれば武器強化を1回試みるヘルパー（メタ Lv51 用）。</summary>
+        private void TryAutoUpgradeAtRest()
+        {
+            int cost = WeaponUpgradeCost(Run);
+            if (cost == int.MaxValue || Run.weaponMaterials < cost) return;
+            int before = Run.weaponMaterials;
+            if (TryUpgradeWeapon(Run))
+            {
+                int used = before - Run.weaponMaterials;
+                Log($"[メタLv51] 同時強化 ×1: {Run.equippedWeaponId}{(Run.weaponPlus > 0 ? "+" : "")} 業物Lv{Run.limitBreakStage} (素材-{used}, 残{Run.weaponMaterials})");
+            }
         }
 
         /// <summary>前哨基地強化 (2026-05-31 新規): 各層 (Outpost マス) で 1 回のみ実行可能な武器強化。
@@ -757,7 +782,10 @@ namespace GameLoop
             MapManager.Instance.GenerateLambda();
 
             SetPhase(GamePhase.FloorIntro);
-            Log("=== 時間の狭間（Λ層）に突入 === 中央マスを踏むまで周回する");
+            // 層タイトル表示（Λ層。確定文言の正本: docs/specs/map-run.md）
+            var lambdaIntro = LayerTitles.ForLambda();
+            Log($"=== {lambdaIntro.title} ===　{lambdaIntro.subtitle}　中央マスを踏むまで周回する");
+            LayerTitles.Raise(lambdaIntro);
             SetPhase(GamePhase.MapNavigation);
         }
 
@@ -827,6 +855,11 @@ namespace GameLoop
         {
             var mm = MapManager.Instance;
 
+            // 契約システム: 前層終了 → 新層開始 hook (この呼び順は重要)
+            // 前層終了で 商業連合隊の層末収入支払い、 サーカスフラグクリア等が行われる
+            GameLoop.Contracts.ContractManager.Instance.FireOnLayerEnd(Run);
+            GameLoop.Contracts.ContractManager.Instance.FireOnLayerStart(Run);
+
             // メタ: トークン獲得 + 1層/3層で固有恒久デバフ抽選
             MetaProgression.MetaTokenEarner.OnFloorReached(Run.currentFloor);
             if (Run.currentFloor == 1) MetaProgression.MetaDebuffApplicator.TryGrantOnFloor1(Run);
@@ -842,8 +875,21 @@ namespace GameLoop
             // 層デバフ取得
             ActiveModifier = FloorModifierDatabase.Get(Run.currentFloor);
 
+            // 大穴の異常現象を抽選 (希望連動・1〜2件)
+            MapSystem.AbyssPhenomena.AbyssPhenomenonRoller.RollForFloor(Run);
+            foreach (var phen in Run.activePhenomena)
+            {
+                var def = MapSystem.AbyssPhenomena.AbyssPhenomenonDatabase.Get(phen);
+                if (def != null) Log($"異常現象「{def.displayName}」 — {def.description}");
+            }
+
             // マップ生成（空腹度上限はModifierで調整）
             mm.GenerateFloor(Run.currentFloor);
+
+            // 層タイトル表示（確定文言の正本: docs/specs/map-run.md。ビジュアルは未実装、OnShow を UI が購読）
+            var layerIntro = LayerTitles.ForFloor(Run.currentFloor);
+            Log($"=== {layerIntro.title} ===　{layerIntro.subtitle}");
+            LayerTitles.Raise(layerIntro);
 
             // 空腹度ボーナス適用
             if (ActiveModifier != null && ActiveModifier.hungerMaxBonus != 0)
@@ -860,6 +906,10 @@ namespace GameLoop
                 mm.Hunger.starvationDamageRatio = ActiveModifier.starvationDamageOverride;
 
             mm.ProcessOutpost();
+
+            // 前哨基地は開始ノードのため OnTileActivated イベントが ActivateTile 経由で発火しない。
+            // 旅団契約 AI (AutoRunner) 等のリスナーへ明示的に通知する。
+            OnTileActivated?.Invoke(TileType.Outpost);
 
             // 2026-05-31 v3: 前哨基地で武器強化を1回まで自動実行 (素材があり、 強化可能なら)。
             // HPゲート無し (前哨基地は安全)。 BOT/プレイヤー共通の自動挙動 (UI 開発まで暫定)。
@@ -892,11 +942,14 @@ namespace GameLoop
             }
             else
             {
-                // 2026-05-31 v3: 通常前哨基地: HP30%回復 → **全回復** (healCap は尊重)。
-                // 強化と回復は前哨基地で両立し、 進行した時点で選択肢関係なく全回復となる。
+                // 2026-06-21: 通常前哨基地は「不足HPの30%」 回復 (ceil)。 全回復は廃止 (道中で減った HP がボスへ持ち越される)。
+                // 6F/7F の特殊前哨基地 (全回復+MaxHP+5 / 全回復) は別経路で処理されるためここは通常層のみ。
                 int upper = healCap < 0 ? Run.playerMaxHP : Mathf.Min(healCap, Run.playerMaxHP);
-                Run.playerHP = upper;
-                Log($"前哨基地: HP全回復 → {Run.playerHP}/{Run.playerMaxHP}");
+                int missing = Mathf.Max(0, upper - Run.playerHP);
+                int healAmount = Mathf.CeilToInt(missing * 0.30f);
+                int beforeHP = Run.playerHP;
+                Run.playerHP = Mathf.Min(upper, Run.playerHP + healAmount);
+                Log($"前哨基地: 不足HPの30%回復 +{Run.playerHP - beforeHP} → {Run.playerHP}/{Run.playerMaxHP}");
             }
 
             // MaxHPデバフ（崩れの共鳴等）
@@ -919,11 +972,19 @@ namespace GameLoop
         {
             LastCombatResult = result;
 
-            // 2026-05-30 v2: 戦闘勝利時 25% で強化素材+1 (T4到達率改善・経済補強)
-            if (result.playerWon && Run != null && UnityEngine.Random.value < 0.25f)
+            // 希望(ADR-0002): 戦闘中 Run.playerHP は不変なので、ここでの値が戦闘開始時HP。
+            // 終了時HPと比較してHP収支(マイナス=希望減少)を判定する（ApplyBattleResult 後に適用）。
+            if (Run != null) Run.combatStartHP = Run.playerHP;
+
+            // 2026-06-04: 素材経済の潤沢化（武器フル強化＋昇華5-10レンジを狙う）。
+            // 旧 25%×1 → 戦闘勝利で確定+1、エリート勝利はさらに+1。
+            if (result.playerWon && Run != null)
             {
                 Run.weaponMaterials += 1;
-                Log("[戦闘報酬] 強化素材+1 (25%)");
+                bool elite = MapSystem.MapManager.Instance?.CurrentNode != null
+                             && MapSystem.MapManager.Instance.CurrentNode.EffectiveType == MapSystem.TileType.EliteBattle;
+                if (elite) Run.weaponMaterials += 1;
+                Log($"[戦闘報酬] 強化素材+{(elite ? 2 : 1)}");
             }
 
             // 値下げ交渉(=強盗) の戦闘: 勝敗で報酬/脱出 を独自処理
@@ -971,6 +1032,12 @@ namespace GameLoop
             }
 
             Run.ApplyBattleResult(result.playerWon, result.playerHPRemaining, result.totalTurns);
+
+            // 希望(ADR-0002): HP収支マイナス→床定量を減少／非マイナス→わずか回復。
+            // 飢餓→希望統合の再マップ: 暴食(トゥルハドの暴食)で損×2、HopeLossReduce メタバフで損を軽減。
+            float hopeLossMult = MetaProgression.PermanentDebuffEffects.HasGluttony(Run) ? 2f : 1f;
+            int hopeLossReduce = MetaProgression.MetaBuffApplicator.GetHopeLossReduction();
+            HopeSystem.ApplyCombatHpBalance(Run, hopeLossMult, hopeLossReduce);
 
             SetPhase(GamePhase.BattleResult);
             OnBattleEnded?.Invoke(result);
@@ -1069,31 +1136,10 @@ namespace GameLoop
             }
         }
 
-        /// <summary>罠マス到達時の処理。5層ボス前の専用罠 (id=karma_trap) ではカルマ清算、それ以外は無効。</summary>
+        /// <summary>罠マス到達時の処理。 カルマ系統廃止に伴い、 旧 karma_trap も含めて全て無効。</summary>
         private void HandleTrapTile()
         {
-            var node = MapManager.Instance?.CurrentNode;
-            bool isKarmaTrap = node != null && node.id == "karma_trap";
-
-            // ボス前専用罠でのカルマ清算（最大HP -= カルマ × 10、最低1。清算後 karma=0）
-            if (isKarmaTrap)
-            {
-                if (Run.karma > 0)
-                {
-                    int desired = Run.karma * 10;
-                    int newMax = Mathf.Max(1, Run.playerMaxHP - desired);
-                    int actual = Run.playerMaxHP - newMax;
-                    Run.playerMaxHP = newMax;
-                    Run.playerHP = Mathf.Min(Run.playerHP, Run.playerMaxHP);
-                    Log($"罪の罠: カルマ清算 最大HP-{actual} (カルマ{Run.karma}×10) → {Run.playerMaxHP}");
-                    Run.karma = 0;
-                }
-                else
-                {
-                    Log("罪の罠: カルマ無し、何も起きず通過");
-                }
-            }
-            // それ以外の通常罠マスは現状効果なし
+            // カルマ系統撤去済み。 旧 karma_trap タイルが残っていても何も起きない (放置)。
 
             SetPhase(GamePhase.TrapTriggered);
         }
@@ -1215,6 +1261,8 @@ namespace GameLoop
                 if (it != null && it.category == ItemCategory.Consumable) continue;
                 set.Add(id);
             }
+            // このランで一度取得した(=売却/廃棄した物も含む)パッシブも再抽選しない（重複禁止・捨てた物も対象）。
+            if (Run?.seenPassiveItemIds != null) set.UnionWith(Run.seenPassiveItemIds);
             return set;
         }
 
@@ -1387,9 +1435,8 @@ namespace GameLoop
             // ボス専用ID で取得、なければフロアプール抽選にフォールバック
             string bossId = $"boss_layer{Run.currentFloor}";
 
-            // 5F裏ボス置換: カルマ0 かつ シュヴァリエのレイピア所持 → シュヴァリエ・サン=ジョリオラ
+            // 5F裏ボス置換: シュヴァリエのレイピア所持 → シュヴァリエ・サン=ジョリオラ
             if (Run.currentFloor == 5
-                && Run.karma == 0
                 && Run.ownedPassiveItems != null
                 && Run.ownedPassiveItems.Contains("chevalier_rapier"))
             {
@@ -1406,7 +1453,7 @@ namespace GameLoop
             OnEnemyEncountered?.Invoke(CurrentEnemy);
             Log($"ボス戦: {CurrentEnemy.displayName}");
 
-            // 5層ボス戦の清算系デバフ（カルマ清算は罠マスへ移動済み）
+            // 5層ボス戦の清算系デバフ (カルマ系統廃止済み)
             if (Run.currentFloor == Run.normalClearFloor)
             {
                 // 血の負債: 最大HP-15（一度きり、戦闘前に適用）
@@ -1497,25 +1544,79 @@ namespace GameLoop
             }
         }
 
-        /// <summary>「遺品の儀」: イベントアイテム 1個 を消費。失敗 or ラストスタンド中は
-        /// 捧げられず AshenBrand 付与。</summary>
-        /// <param name="hasItemAndAccept">所持していて、かつ捧げる選択をしたか</param>
-        public void OfferItemSacrifice(bool hasItemAndAccept)
+        /// <summary>「遺品の儀」: グリッド所持の Passive アイテムを 2 個消費する。
+        /// 要件: チェーン/初期装備を除く2個以上 ＋ 消費2個の basePrice 合計が 30G 以上。
+        /// 達成不可 or ラストスタンド中は捧げられず AshenBrand 付与。
+        /// 消費は basePrice 昇順で「合計 ≥30 を満たす最小ペア」を選ぶ（プレイヤー有利）。
+        /// 取得済み(seenPassiveItemIds)からは抹消しない＝重複禁止は維持。</summary>
+        /// <param name="accept">捧げる選択をしたか</param>
+        public void OfferItemSacrifice(bool accept)
         {
             if (CurrentPhase != GamePhase.SinRitual) return;
 
-            if (hasItemAndAccept && !Run.lastStandActive)
-            {
-                // TODO: イベントアイテム実装後、実際にインベントリから1個消費する
-                Log("遺品の儀: 遺品を捧げた");
-            }
-            else
+            if (!accept || Run.lastStandActive)
             {
                 Run.AddDebuff(SinDebuff.AshenBrand);
                 Log(Run.lastStandActive
                     ? "遺品の儀: ラストスタンド中は捧げられない。〈灰燼の烙印〉が刻まれる。"
                     : "遺品の儀を拒んだ。〈灰燼の烙印〉が刻まれる。");
+                return;
             }
+
+            // 候補抽出: ownedPassiveItems から「チェーン保護」を除外し (index, id, basePrice) を集める
+            var candidates = new List<(int index, string id, int price)>();
+            var owned = Run.ownedPassiveItems;
+            var db = ItemDatabase.Instance;
+            if (owned != null && db != null)
+            {
+                for (int i = 0; i < owned.Count; i++)
+                {
+                    string id = owned[i];
+                    if (string.IsNullOrEmpty(id)) continue;
+                    if (AutoTest.ItemLearningStats.ExcludedFromLift.Contains(id)) continue;
+                    var def = db.GetItem(id);
+                    if (def == null) continue;
+                    candidates.Add((i, id, Mathf.Max(0, def.basePrice)));
+                }
+            }
+
+            // 合計 ≥30 を満たす最小コストのペアを探す（basePrice 昇順 → 全ペア列挙）
+            candidates.Sort((a, b) => a.price.CompareTo(b.price));
+            int bestI = -1, bestJ = -1, bestSum = int.MaxValue;
+            for (int a = 0; a < candidates.Count - 1; a++)
+            {
+                for (int b = a + 1; b < candidates.Count; b++)
+                {
+                    int sum = candidates[a].price + candidates[b].price;
+                    if (sum < 30) continue;
+                    if (sum < bestSum)
+                    {
+                        bestSum = sum;
+                        bestI = a;
+                        bestJ = b;
+                    }
+                }
+            }
+
+            if (bestI < 0)
+            {
+                Run.AddDebuff(SinDebuff.AshenBrand);
+                Log(candidates.Count < 2
+                    ? "遺品の儀: 捧げられる遺物が足りない。〈灰燼の烙印〉が刻まれる。"
+                    : "遺品の儀: 価値が足りない (合計30G以上必要)。〈灰燼の烙印〉が刻まれる。");
+                return;
+            }
+
+            // 高 index から除去（並列配列のインデックス崩れ回避）
+            int idxA = candidates[bestI].index;
+            int idxB = candidates[bestJ].index;
+            string nameA = candidates[bestI].id;
+            string nameB = candidates[bestJ].id;
+            int hi = Mathf.Max(idxA, idxB);
+            int lo = Mathf.Min(idxA, idxB);
+            InventorySystem.Helpers.PassiveAddHelper.RemoveAt(Run, hi);
+            InventorySystem.Helpers.PassiveAddHelper.RemoveAt(Run, lo);
+            Log($"遺品の儀: 〈{nameA}〉と〈{nameB}〉を灰にした (basePrice 計{bestSum}G)");
         }
 
         // ================================================================
@@ -1592,7 +1693,7 @@ namespace GameLoop
 
         /// <summary>
         /// 値下げ交渉 (=強盗) を実行。
-        /// 1. ShopManager.TryRobbery: 在庫スナップ・カルマ+1・shopsBlocked, ショップを閉じる
+        /// 1. ShopManager.TryRobbery: 在庫スナップ・希望コスト・shopsBlocked, ショップを閉じる
         /// 2. 「怪しい商人」(shady_merchant) との特殊エリート戦に突入
         /// 3. HandleCombatEnd 内で勝利時=報酬付与/敗北時=HP1脱出 を分岐
         /// </summary>
@@ -1654,6 +1755,8 @@ namespace GameLoop
                 gold = LastStand.FilterGoldGain(Run, gold);
             }
             Run.coins += gold;
+            // 2026-06-04: 宝箱でも強化素材+1（素材経済の潤沢化）
+            Run.weaponMaterials += 1;
 
             string itemId = PickRandomTreasureItem();
             string itemLabel = "（なし）";
@@ -1761,10 +1864,17 @@ namespace GameLoop
         private void GrantRewardItem(string itemId, bool eliteWin)
         {
             if (string.IsNullOrEmpty(itemId)) return;
+            // 2026-06-22: Λ 滞在中の取得は保護対象 + gross カウンタ計上
+            bool fromLambda = Run != null && Run.inLambda;
             InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, itemId);
             Loadout.TryAutoEquip(Run, itemId);
+            if (fromLambda)
+            {
+                Run.lambdaProtectedItemIds.Add(itemId);
+                Run.lambdaItemsAcquiredGross++;
+            }
             var dd = ItemDatabase.Instance?.GetItem(itemId);
-            Log($"戦闘勝利報酬: {(dd != null ? dd.displayName : itemId)} を獲得{(eliteWin ? "（精鋭）" : "")}");
+            Log($"戦闘勝利報酬: {(dd != null ? dd.displayName : itemId)} を獲得{(eliteWin ? "（精鋭）" : "")}{(fromLambda ? " [Λ保護]" : "")}");
         }
 
         // ---- 戦闘後ドロップ2択: 公開API（UI / Bot から使用）----
@@ -1916,6 +2026,9 @@ namespace GameLoop
                     SetPhase(GamePhase.RunClear);
                     OnRunCleared?.Invoke(Run);
                     Log("=== 5層クリア === 〈決意〉が無いためここで運命に背を向けた");
+                    var ending5f = Endings.Resolve(Run);
+                    Log(ending5f.Display);
+                    VignetteUnlockState.OnRunClear(Run, ending5f.id, VignetteUnlockState.IsMaxDifficultyRun(Run));
                     return;
                 }
                 // 〈決意〉以上所持 → 6層へ進む前に Λ層（時間の狭間）へ強制突入。
@@ -1929,6 +2042,9 @@ namespace GameLoop
                 SetPhase(GamePhase.RunClear);
                 OnRunCleared?.Invoke(Run);
                 Log($"=== 完全クリア！=== 裏ボス撃破");
+                var endingFull = Endings.Resolve(Run);
+                Log(endingFull.Display);
+                VignetteUnlockState.OnRunClear(Run, endingFull.id, VignetteUnlockState.IsMaxDifficultyRun(Run));
             }
             else
             {
@@ -1939,6 +2055,9 @@ namespace GameLoop
                     SetPhase(GamePhase.RunClear);
                     OnRunCleared?.Invoke(Run);
                     Log("=== 6層クリア === 〈真理〉が無いためここで覚者の門は閉ざされた");
+                    var ending6f = Endings.Resolve(Run);
+                    Log(ending6f.Display);
+                    VignetteUnlockState.OnRunClear(Run, ending6f.id, VignetteUnlockState.IsMaxDifficultyRun(Run));
                     return;
                 }
                 SetPhase(GamePhase.FloorClear);

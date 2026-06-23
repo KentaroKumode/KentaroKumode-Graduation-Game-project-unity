@@ -584,8 +584,10 @@ namespace InventorySystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            ctx.enemyThreat += 3;
-            UnityEngine.Debug.Log($"[威圧+] 脅威 +3 → {ctx.enemyThreat}");
+            // ボス難易度オートチューナー: 威圧の脅威加算をボス別に直接調整 (基準3)。
+            int add = UnityEngine.Mathf.Max(0, AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.IntimidateThreat));
+            ctx.enemyThreat += add;
+            UnityEngine.Debug.Log($"[威圧+] 脅威 +{add} → {ctx.enemyThreat}");
         }
     }
 
@@ -748,8 +750,8 @@ namespace InventorySystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            // 敵視点なので playerDiceTotal = ボス自身のダイス合計
-            ctx.playerDiceTotal += 3;
+            // 敵視点なので playerDiceTotal = ボス自身のダイス合計。 加算量はオートチューナーで調整 (基準3)。
+            ctx.playerDiceTotal += UnityEngine.Mathf.Max(0, AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.GoblinCall));
         }
     }
 
@@ -793,11 +795,15 @@ namespace InventorySystem.PassiveSkills.Effects
         private const string Key = "miasma_poison_stack";
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
+            // ボス難易度オートチューナー: 毒スタック上限を直接調整 (低い=DOT緩和)。 基準5
+            int cap = UnityEngine.Mathf.Max(1, AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.PoisonStackCap));
             ctx.accumulatedValues.TryGetValue(Key, out var stack);
-            int s = System.Math.Min(5, (int)stack + 1);
+            int s = System.Math.Min(cap, (int)stack + 1);
             ctx.accumulatedValues[Key] = s;
             ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - s); // 敵視点で実プレイヤー
-            UnityEngine.Debug.Log($"[毒の侵蝕] 毒×{s} ダメ (軽減無視) → プレイヤー残HP={ctx.enemyCurrentHP}");
+            ctx.AddPlayerDamageSource(DeathCause.Chip, s); // 支配率診断: 総被ダメ内訳に計上(DOT)
+            if (ctx.enemyCurrentHP <= 0 && s > 0) ctx.lastDamageCause = DeathCause.Chip; // 死因タグ(DOT)
+            UnityEngine.Debug.Log($"[毒の侵蝕] 毒×{s} ダメ (上限{cap}, 軽減無視) → プレイヤー残HP={ctx.enemyCurrentHP}");
         }
     }
 
@@ -818,12 +824,14 @@ namespace InventorySystem.PassiveSkills.Effects
                 // 反転: 弱い小突きほど反射、一定値(閾値12)以上の高火力は反射0＝鏡を叩き割る。
                 // reflect = min(9, 閾値 - 与ダメ)。スケールした火力ほど無傷で通る。
                 const int Thr = 12;
+                // ボス難易度オートチューナー: 反射ダメ上限を直接調整 (低い=反射事故の緩和)。 基準9
+                int reflectCap = UnityEngine.Mathf.Max(0, AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.MirrorReflectCap));
                 int dmg = ctx.finalDamage;
-                if (dmg > 0 && dmg < Thr)
+                if (dmg > 0 && dmg < Thr && reflectCap > 0)
                 {
-                    int reflect = System.Math.Min(9, Thr - dmg);
+                    int reflect = System.Math.Min(reflectCap, Thr - dmg);
                     ctx.accumulatedValues[Key] = reflect;
-                    UnityEngine.Debug.Log($"[鏡映の応答] 蓄積: 次ターン{reflect}反射 (与ダメ{dmg}<{Thr}＝小突きを罰す)");
+                    UnityEngine.Debug.Log($"[鏡映の応答] 蓄積: 次ターン{reflect}反射 (与ダメ{dmg}<{Thr}＝小突きを罰す, 上限{reflectCap})");
                 }
             }
             else if (trigger == PassiveSkillTrigger.OnTurnStart)
@@ -832,6 +840,8 @@ namespace InventorySystem.PassiveSkills.Effects
                 int dmg = (int)pending;
                 ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - dmg); // 敵視点で実プレイヤー
                 ctx.accumulatedValues[Key] = 0f;
+                ctx.AddPlayerDamageSource(DeathCause.Reflect, dmg); // 支配率診断: 総被ダメ内訳に計上
+                if (ctx.enemyCurrentHP <= 0 && dmg > 0) ctx.lastDamageCause = DeathCause.Reflect; // 死因タグ
                 UnityEngine.Debug.Log($"[鏡映の応答] 反射 {dmg}ダメ → プレイヤー残HP={ctx.enemyCurrentHP}");
             }
         }
@@ -853,6 +863,7 @@ namespace InventorySystem.PassiveSkills.Effects
             int cap = AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.ChipCap);
             int dmg = System.Math.Min(cap, 1 + System.Math.Max(1, ctx.currentTurn) + sin);
             ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - dmg);
+            ctx.AddPlayerDamageSource(DeathCause.Chip, dmg); // 支配率診断: 総被ダメ内訳に計上
             if (ctx.enemyCurrentHP <= 0 && dmg > 0) ctx.lastDamageCause = DeathCause.Chip; // 死因タグ
             UnityEngine.Debug.Log($"[審判の炎] {dmg}ダメ (1+経過T{ctx.currentTurn}+罪{sin}, 上限{cap}, 軽減無視) → プレイヤー残HP={ctx.enemyCurrentHP}");
         }
@@ -875,6 +886,8 @@ namespace InventorySystem.PassiveSkills.Effects
                 if (dmg > 0)
                 {
                     ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - dmg);
+                    ctx.AddPlayerDamageSource(DeathCause.Chip, dmg); // 支配率診断: 総被ダメ内訳に計上
+                    if (ctx.enemyCurrentHP <= 0) ctx.lastDamageCause = DeathCause.Chip;
                     UnityEngine.Debug.Log($"[王の業炎] 灰の烙印×{dmg}ダメ → プレイヤー残HP={ctx.enemyCurrentHP}");
                 }
             }

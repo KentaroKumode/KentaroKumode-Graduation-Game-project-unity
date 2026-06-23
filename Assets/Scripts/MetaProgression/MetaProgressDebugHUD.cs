@@ -39,13 +39,12 @@ namespace MetaProgression
             GUILayout.Label($"<b>[Meta] トークン: {s.tokens}    Lv {s.currentLevel}/{MetaBuffTrack.TotalSteps}</b>",
                 new GUIStyle(GUI.skin.label) { fontSize = fontSize + 2, richText = true });
 
-            GUILayout.Label($"集計: HP+{s.hpBonus} / Gold+{s.goldBonus} / Dice+{s.diceTotalBonus} / DmgRed-{s.damageReduce} / Hunger-{s.hungerReduce} / Mat+{s.startMaterial} / WinG+{s.combatGoldBonus} / FloorHeal+{s.floorClearHeal}",
+            GUILayout.Label($"集計: HP+{s.hpBonus} / Gold+{s.goldBonus} / Dice+{s.diceTotalBonus} / DmgRed-{s.damageReduce} / HopeLoss-{s.hopeLossReduce} / Mat+{s.startMaterial} / WinG+{s.combatGoldBonus} / FloorHeal+{s.floorClearHeal}",
                 new GUIStyle(GUI.skin.label) { fontSize = fontSize, wordWrap = true });
             string bossExtra = s.bossExtraRareUnlocked ? "レア" : (s.bossExtraNormalUnlocked ? "ノーマル" : "なし");
-            string extras = (s.divineProtectUnlocked ? " 神加護" : "")
-                          + (s.startingPassiveItemUnlocked ? " 開幕P" : "")
+            string extras = (s.startingPassiveItemUnlocked ? " 開幕P" : "")
                           + (s.treasureChestGoldUnlocked ? " 宝箱G" : "");
-            GUILayout.Label($"Refund Lv{s.refundLevel} ({MetaBuffApplicator.GetRefundChance() * 100f:0}%) / Crit Lv{s.critLevel} / BossExtra: {bossExtra}{extras}",
+            GUILayout.Label($"Sale Lv{s.refundLevel} (特売 {MetaBuffApplicator.GetSaleItemCount()}個/店) / Crit Lv{s.critLevel} / BossExtra: {bossExtra}{extras}",
                 new GUIStyle(GUI.skin.label) { fontSize = fontSize, wordWrap = true });
 
             GUILayout.Space(6);

@@ -17,7 +17,7 @@ namespace MapSystem
             (TileType.Battle,      29f),   // 旧25 (+4)
             (TileType.Event,       25f),
             (TileType.EliteBattle, 14f),   // 旧10 (+4)
-            (TileType.Trap,        10f),
+            // Trap は撤去 (ADR-0001: 効果ゼロの死にノード)。抽選プールから除外。
             (TileType.Exchange,     7f),   // 新設(交換マス)
             (TileType.Shop,         7f),
             (TileType.Treasure,     3f),
@@ -82,8 +82,9 @@ namespace MapSystem
             for (int lane = 0; lane < LaneCount; lane++)
                 map.AddNode(new MapNode(NodeId(restRow, lane), restRow, lane, TileType.Rest));
 
-            // 5層のみ: ボス前にカルマ清算用の罠ノードを確定配置（収束ノード）
-            bool insertKarmaTrap = floor == 5;
+            // カルマ廃止(ADR-0002)＋トラップ撤去(ADR-0001)により karma_trap は撤去。常に false。
+            // （以降の insertKarmaTrap 分岐は不活性。希望システムがカルマ清算を置換する）
+            bool insertKarmaTrap = false;
             if (insertKarmaTrap)
             {
                 map.AddNode(new MapNode("karma_trap", RowCount, -1, TileType.Trap));

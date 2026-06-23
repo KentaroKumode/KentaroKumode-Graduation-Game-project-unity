@@ -65,6 +65,15 @@ namespace InventorySystem.PassiveItems
             Register(new Effects.GuardianAngelBellEffect());
             Register(new Effects.CalamityRingEffect());
             Register(new Effects.EternalLanternEffect());
+
+            // 佯狂者シリーズ（発狂連動）。鈴は店フックのため非登録（商人の符牒と同型）。
+            Register(new Effects.YokyoStaffEffect());
+            Register(new Effects.YokyoGarbEffect());
+            Register(new Effects.YokyoCrownEffect());
+
+            // 2026-06-03 新規追加アイテム
+            Register(new Effects.PilgrimCharmEffect()); // 巡礼の杖飾り（移動時25%で希望+1）
+            Register(new Effects.RevelMaskEffect());    // 狂宴の仮面（低希望スケール与ダメ）
             // 商人の符牒・食通の懐刀 は他システム連携でフックされる（PassiveItemRegistry には登録しない）
 
             // 6種の旧名前付きパッシブ（ちいさな灯火 等）は効果未定義につき未登録。

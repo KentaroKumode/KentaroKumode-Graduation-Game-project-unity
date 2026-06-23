@@ -1,80 +1,159 @@
 {
-    "updatedAt": "2026-06-01 18:33:56",
+    "updatedAt": "2026-06-10 23:37:09",
     "batches": 0,
     "knobs": [
         {
             "key": "boss_layer3",
             "maxHP": 67,
-            "diceExpected": 14.058633804321289,
-            "diceOffset": -1.0546133518218995,
+            "diceExpected": 24.31519317626953,
+            "diceOffset": 0.9381821155548096,
             "diceTuned": true,
-            "overrides": []
+            "diceFaces": [],
+            "overrides": [
+                {
+                    "param": "PoisonStackCap",
+                    "value": 1.0
+                },
+                {
+                    "param": "WeakRollRatio",
+                    "value": 0.7245691418647766
+                }
+            ]
         },
         {
             "key": "boss_layer4",
-            "maxHP": 73,
-            "diceExpected": 22.518400192260743,
-            "diceOffset": 2.2521073818206789,
+            "maxHP": 621,
+            "diceExpected": 25.0,
+            "diceOffset": 20.0,
             "diceTuned": true,
-            "overrides": []
+            "diceFaces": [],
+            "overrides": [
+                {
+                    "param": "MirrorReflectCap",
+                    "value": 0.0
+                },
+                {
+                    "param": "IntimidateThreat",
+                    "value": 3.4505999088287355
+                },
+                {
+                    "param": "WeakRollRatio",
+                    "value": 0.7713358998298645
+                },
+                {
+                    "param": "RegenReduction",
+                    "value": 0.0
+                }
+            ]
         },
         {
             "key": "boss_layer5_hidden",
-            "maxHP": 1195,
+            "maxHP": 1306,
             "diceExpected": 25.0,
-            "diceOffset": 11.473474502563477,
+            "diceOffset": 14.118666648864746,
             "diceTuned": true,
+            "diceFaces": [
+                6,
+                6,
+                7,
+                7,
+                7,
+                7
+            ],
             "overrides": [
                 {
                     "param": "RegenReduction",
-                    "value": 8.319314956665039
+                    "value": 0.0
+                },
+                {
+                    "param": "IntimidateThreat",
+                    "value": 6.426950931549072
                 }
             ]
         },
         {
             "key": "boss_layer6",
-            "maxHP": 2766,
-            "diceExpected": 0.0,
-            "diceOffset": 0.0,
-            "diceTuned": false,
+            "maxHP": 1500,
+            "diceExpected": 12.917682647705079,
+            "diceOffset": -17.0,
+            "diceTuned": true,
+            "diceFaces": [
+                7,
+                7,
+                7,
+                8,
+                8,
+                8
+            ],
             "overrides": [
                 {
                     "param": "JudgmentDice",
-                    "value": 4.360816955566406
+                    "value": 0.0
                 },
                 {
                     "param": "JudgmentCoefBase",
-                    "value": 0.7835323214530945
+                    "value": 0.0
+                },
+                {
+                    "param": "RegenReduction",
+                    "value": 0.0
+                },
+                {
+                    "param": "WeakRollRatio",
+                    "value": 0.7999999523162842
+                },
+                {
+                    "param": "StanceAtkMult",
+                    "value": 1.0
                 }
             ]
         },
         {
             "key": "boss_layer5",
-            "maxHP": 1254,
-            "diceExpected": 0.0,
-            "diceOffset": 0.0,
-            "diceTuned": false,
+            "maxHP": 1716,
+            "diceExpected": 25.0,
+            "diceOffset": 8.60916519165039,
+            "diceTuned": true,
+            "diceFaces": [
+                6,
+                6,
+                7,
+                7,
+                7,
+                7
+            ],
             "overrides": [
                 {
                     "param": "ChipCap",
-                    "value": 3.4536094665527345
+                    "value": 1.797790288925171
+                },
+                {
+                    "param": "WeakRollRatio",
+                    "value": 0.7376242876052856
                 }
             ]
         },
         {
             "key": "boss_layer1",
             "maxHP": 0,
-            "diceExpected": 7.850165367126465,
-            "diceOffset": -1.3550002574920655,
+            "diceExpected": 10.05682373046875,
+            "diceOffset": -0.8734830617904663,
             "diceTuned": true,
-            "overrides": []
+            "diceFaces": [],
+            "overrides": [
+                {
+                    "param": "StanceAtkMult",
+                    "value": 1.4250000715255738
+                }
+            ]
         },
         {
             "key": "boss_layer2",
             "maxHP": 48,
-            "diceExpected": 8.27202033996582,
-            "diceOffset": -5.637802600860596,
+            "diceExpected": 14.108403205871582,
+            "diceOffset": -2.668307065963745,
             "diceTuned": true,
+            "diceFaces": [],
             "overrides": []
         },
         {
@@ -83,12 +162,8 @@
             "diceExpected": 0.0,
             "diceOffset": 0.0,
             "diceTuned": false,
-            "overrides": [
-                {
-                    "param": "TrueSelf",
-                    "value": 2.165210723876953
-                }
-            ]
+            "diceFaces": [],
+            "overrides": []
         },
         {
             "key": "boss_layer7_p2",
@@ -96,6 +171,7 @@
             "diceExpected": 0.0,
             "diceOffset": 0.0,
             "diceTuned": false,
+            "diceFaces": [],
             "overrides": [
                 {
                     "param": "TrueSelf",
@@ -109,6 +185,7 @@
             "diceExpected": 0.0,
             "diceOffset": 0.0,
             "diceTuned": false,
+            "diceFaces": [],
             "overrides": [
                 {
                     "param": "TrueSelf",
@@ -122,6 +199,7 @@
             "diceExpected": 0.0,
             "diceOffset": 0.0,
             "diceTuned": false,
+            "diceFaces": [],
             "overrides": [
                 {
                     "param": "TrueSelf",
@@ -135,6 +213,7 @@
             "diceExpected": 0.0,
             "diceOffset": 0.0,
             "diceTuned": false,
+            "diceFaces": [],
             "overrides": [
                 {
                     "param": "TrueSelf",
@@ -148,6 +227,7 @@
             "diceExpected": 0.0,
             "diceOffset": 0.0,
             "diceTuned": false,
+            "diceFaces": [],
             "overrides": [
                 {
                     "param": "TrueSelf",
@@ -161,6 +241,7 @@
             "diceExpected": 0.0,
             "diceOffset": 0.0,
             "diceTuned": false,
+            "diceFaces": [],
             "overrides": [
                 {
                     "param": "TrueSelf",

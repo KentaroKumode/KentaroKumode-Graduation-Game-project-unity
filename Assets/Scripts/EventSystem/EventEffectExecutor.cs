@@ -97,23 +97,28 @@ namespace EventSystem
                 }
 
                 case EventEffectType.HungerDelta:
-                    if (hunger != null)
-                    {
-                        int amount = eff.amount;
-                        // 食通の懐刀: イベント由来の空腹度回復 +1
-                        if (amount > 0 && run.ownedPassiveItems != null && run.ownedPassiveItems.Contains("食通の懐刀"))
-                            amount += 1;
+                {
+                    // 飢餓→希望統合(ADR-0002): 旧「空腹度±N」を希望±N へ。食通の懐刀は希望獲得+1。
+                    int amount = eff.amount;
+                    if (amount > 0 && run != null && run.OwnsPassive("食通の懐刀"))
+                        amount += 1;
 
-                        if (amount >= 0) hunger.Restore(amount);
-                        else hunger.SetCurrentForTest(hunger.Current + amount);
-                        result.log.Add($"空腹度{amount:+0;-0} (現在 {hunger.Current}/{hunger.Max})");
-                    }
+                    if (amount > 0) GameLoop.HopeSystem.Recover(run, amount);
+                    else if (amount < 0) GameLoop.HopeSystem.Reduce(run, -amount);
+                    result.log.Add($"希望{amount:+0;-0} (現在 {run.hope}/{run.hopeCap})");
                     break;
+                }
 
-                case EventEffectType.KarmaGain:
-                    run.karma++;
-                    result.log.Add($"カルマ獲得 (累計 {run.karma})");
+                case EventEffectType.HopeDelta:
+                {
+                    int amount = eff.amount;
+                    if (amount > 0 && run != null && run.OwnsPassive("食通の懐刀"))
+                        amount += 1;
+                    if (amount > 0) GameLoop.HopeSystem.Recover(run, amount);
+                    else if (amount < 0) GameLoop.HopeSystem.Reduce(run, -amount);
+                    result.log.Add($"希望{amount:+0;-0} (現在 {run.hope}/{run.hopeCap})");
                     break;
+                }
 
                 case EventEffectType.MaterialDelta:
                     run.weaponMaterials = Mathf.Max(0, run.weaponMaterials + eff.amount);
@@ -221,7 +226,40 @@ namespace EventSystem
                 case EventEffectType.Probability:
                     ExecuteProbability(eff, run, hunger, result);
                     break;
+
+                case EventEffectType.CircusHandover:
+                    ExecuteCircusHandover(run, result);
+                    break;
             }
+        }
+
+        /// <summary>サーカス団引渡しイベントの実行。 サーカス団契約 Lv に応じた windfall を支払い、 契約を解除する。
+        /// 報酬テーブル (Lv=1/2/3):
+        ///   ゴールド = 25 / 50 / 90
+        ///   希望      = +10 / +20 / +30
+        /// 仕様: docs/specs/contracts.md「9. 捨て子のサーカス団」</summary>
+        private static void ExecuteCircusHandover(RunState run, ExecutionResult result)
+        {
+            if (run == null) return;
+            var mgr = GameLoop.Contracts.ContractManager.Instance;
+            var circus = mgr.Find(run, GameLoop.Contracts.ContractKind.OrphanCircus);
+            if (circus == null)
+            {
+                result.log.Add("→ サーカス団との契約なし (引渡し不可)");
+                return;
+            }
+            int level = circus.level;
+            int gold = level == 1 ? 25 : level == 2 ? 50 : 90;
+            int hope = level == 1 ? 10 : level == 2 ? 20 : 30;
+
+            run.coins += gold;
+            GameLoop.HopeSystem.Recover(run, hope);
+            run.circusHandedOver = true;
+
+            // 契約を任意解除 (同層失効プールにも入れる)
+            mgr.Cancel(run, GameLoop.Contracts.ContractKind.OrphanCircus);
+
+            result.log.Add($"→ サーカス団引渡し (Lv{level}): ゴールド +{gold} / 希望 +{hope}");
         }
 
         private static void ExecuteProbability(EventEffect eff, RunState run, HungerSystem hunger, ExecutionResult result)
@@ -268,7 +306,10 @@ namespace EventSystem
             // パッシブはラン重複排除（消費は使い切る前提なので重複可）。枯渇時は元プール（重複許可）。
             if (category == ItemCategory.Passive && run?.ownedPassiveItems != null)
             {
+                // 重複禁止（捨てた物・昇華済みも含む）: seen を主軸に owned/ascended も合流。
                 var owned = new System.Collections.Generic.HashSet<string>(run.ownedPassiveItems);
+                if (run.ascendedPassiveIds != null) owned.UnionWith(run.ascendedPassiveIds);
+                if (run.seenPassiveItemIds != null) owned.UnionWith(run.seenPassiveItemIds);
                 var dd = filtered.FindAll(it => !owned.Contains(it.internalName));
                 if (dd.Count > 0) filtered = dd;
             }

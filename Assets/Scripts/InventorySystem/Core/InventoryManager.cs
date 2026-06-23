@@ -34,24 +34,10 @@ namespace InventorySystem
             if (instance != null && instance != this)
             {
                 Debug.LogWarning($"[InventoryManager] Duplicate instance detected. Destroying {gameObject.name}");
-                
-                // メモリリーク防止フレームワークに通知
-                if (MemoryLeakPreventionFramework.Instance != null)
-                {
-                    MemoryLeakPreventionFramework.RegisterStaticInstance(typeof(InventoryManager), this);
-                }
-                
                 Destroy(gameObject);
                 return;
             }
             instance = this;
-            
-            // メモリリーク防止フレームワークに登録
-            if (MemoryLeakPreventionFramework.Instance != null)
-            {
-                MemoryLeakPreventionFramework.RegisterStaticInstance(typeof(InventoryManager), this);
-            }
-            
             Debug.Log("[InventoryManager] Initialized");
         }
         
@@ -197,21 +183,9 @@ namespace InventorySystem
             OnInventoryClosed?.Invoke();
         }
         
-        /// <summary>
-        /// メモリリーク防止：静的インスタンスの安全な解除
-        /// </summary>
         void OnDestroy()
         {
-            if (instance == this)
-            {
-                // メモリリーク防止フレームワークから解除
-                if (MemoryLeakPreventionFramework.Instance != null)
-                {
-                    MemoryLeakPreventionFramework.UnregisterStaticInstance(typeof(InventoryManager));
-                }
-                
-                instance = null;
-            }
+            if (instance == this) instance = null;
         }
     }
 }

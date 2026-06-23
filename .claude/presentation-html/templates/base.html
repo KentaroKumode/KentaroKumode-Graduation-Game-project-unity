@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>{{TITLE}}</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true, theme:'base', themeVariables:{primaryColor:'#f4ebd6', primaryTextColor:'#2b2b2b', primaryBorderColor:'#8a7355', lineColor:'#5a4a35', secondaryColor:'#ede0c8', tertiaryColor:'#f9f4e6', fontSize:'16px'}});</script>
+<style>
+  @page { size: A4 landscape; margin: 10mm 14mm; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #ece4d2; }
+  body {
+    font-family: "Hiragino Sans","Yu Gothic","Meiryo",sans-serif;
+    color: #2b2b2b;
+    line-height: 1.5;
+  }
+  .slide {
+    width: 277mm;
+    height: 190mm;
+    margin: 14px auto;
+    padding: 14mm 18mm;
+    background: #fbf9f3;
+    border: 1px solid #c8b894;
+    box-shadow: 0 4px 18px rgba(74, 60, 37, 0.12);
+    page-break-after: always;
+    page-break-inside: avoid;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .slide:last-child { page-break-after: auto; }
+  .slide-num {
+    position: absolute;
+    bottom: 6mm;
+    right: 10mm;
+    font-size: 10pt;
+    color: #8a7355;
+  }
+  .brand {
+    position: absolute;
+    bottom: 6mm;
+    left: 10mm;
+    font-size: 9pt;
+    color: #8a7355;
+    letter-spacing: 0.1em;
+  }
+  h1 {
+    font-size: 36pt;
+    color: #4a3c25;
+    margin: 0 0 8px 0;
+    border-bottom: 4px solid #8a7355;
+    padding-bottom: 10px;
+    letter-spacing: 0.05em;
+  }
+  h1.title-main {
+    font-size: 44pt;
+    text-align: center;
+    border: none;
+    margin-top: 28mm;
+  }
+  h2 {
+    font-size: 24pt;
+    color: #4a3c25;
+    margin: 0 0 12px 0;
+    padding: 4px 0 8px;
+    border-bottom: 3px solid #8a7355;
+  }
+  h3 {
+    font-size: 14pt;
+    color: #6a5a3c;
+    margin: 16px 0 6px;
+    padding-bottom: 2px;
+    border-bottom: 1px dotted #aa9572;
+  }
+  .lead {
+    font-size: 14pt;
+    text-align: center;
+    margin: 12mm auto 0;
+    max-width: 70%;
+    color: #4a3c25;
+    line-height: 1.7;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 6px 0;
+    font-size: 10pt;
+  }
+  th, td {
+    border: 1px solid #c8b894;
+    padding: 5px 9px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: #ede0c8;
+    color: #4a3c25;
+    font-weight: 600;
+  }
+  tr:nth-child(even) td { background: #fbf6ec; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.cen, th.cen { text-align: center; }
+  code {
+    background: #ede0c8;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: "Consolas",monospace;
+    font-size: 10pt;
+  }
+  ul, ol { margin: 6px 0 8px 22px; padding: 0; font-size: 11pt; }
+  li { margin: 3px 0; }
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    flex: 1;
+  }
+  .three-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+    flex: 1;
+  }
+  .mermaid {
+    text-align: center;
+    margin: 8px 0;
+    background: #fff;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid #c8b894;
+    font-size: 11pt;
+  }
+  .badge {
+    display: inline-block;
+    background: #8a7355;
+    color: #fff;
+    padding: 2px 12px;
+    border-radius: 12px;
+    font-size: 10pt;
+    margin-right: 6px;
+  }
+  .kpi {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin: 18px 0;
+  }
+  .kpi > div {
+    background: #fff;
+    padding: 14px 14px;
+    border: 1px solid #c8b894;
+    border-radius: 8px;
+    text-align: center;
+  }
+  .kpi b { display: block; font-size: 22pt; color: #4a3c25; margin-bottom: 4px; }
+  .kpi span { font-size: 10pt; color: #6a5a3c; }
+  blockquote {
+    border-left: 4px solid #8a7355;
+    background: #f9f4e6;
+    margin: 8px 0;
+    padding: 8px 16px;
+    color: #555;
+    font-size: 11pt;
+  }
+  .compact { font-size: 9.5pt; }
+  .compact th, .compact td { padding: 3px 7px; }
+  @media print {
+    html, body { background: #fff; }
+    .slide {
+      margin: 0;
+      box-shadow: none;
+      border: none;
+      width: 100%;
+      height: 100vh;
+      padding: 10mm 14mm;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ Slide 1: Title ============ -->
+<section class="slide">
+  <h1 class="title-main">{{TITLE}}</h1>
+  <p class="lead">
+    {{SUBTITLE}}<br>
+    <strong>{{N_PHASES}} Phase</strong>に整理
+  </p>
+  <div style="text-align:center; margin-top:28mm;">
+    <span class="badge">{{TAG_1}}</span>
+    <span class="badge">{{TAG_2}}</span>
+    <span class="badge">{{TAG_3}}</span>
+  </div>
+  <div class="brand">{{BRAND}}{{SERIAL_AUTHOR_SUFFIX}}</div>
+  <div class="slide-num">1</div>
+</section>
+
+<!-- ============ Slide 2: 全体俯瞰 (例) ============ -->
+<section class="slide">
+  <h1>全体俯瞰</h1>
+  <div class="mermaid" style="flex:1; display:flex; align-items:center; justify-content:center;">
+graph LR
+    A[ノード A] --> B[ノード B]
+    B --> C[ノード C]
+  </div>
+  <p style="text-align:center; font-size:12pt; margin-top:8px;">
+    {{OVERVIEW_CAPTION}}
+  </p>
+  <div class="brand">{{BRAND}}{{SERIAL_AUTHOR_SUFFIX}}</div>
+  <div class="slide-num">2</div>
+</section>
+
+<!-- ============ Slide N: コンテンツスライド例 (two-col) ============ -->
+<section class="slide">
+  <h1>{{SECTION_TITLE}}</h1>
+  <div class="two-col">
+    <div>
+      <h3>左カラム見出し</h3>
+      <ul>
+        <li>項目1</li>
+        <li>項目2</li>
+      </ul>
+    </div>
+    <div>
+      <h3>右カラム見出し</h3>
+      <table class="compact">
+        <tr><th>列1</th><th>列2</th></tr>
+        <tr><td>値</td><td>値</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="brand">{{BRAND}}{{SERIAL_AUTHOR_SUFFIX}}</div>
+  <div class="slide-num">N</div>
+</section>
+
+<!-- ============ 最終スライド: 語彙リスト (例) ============ -->
+<section class="slide">
+  <h1>語彙リスト</h1>
+  <div class="two-col">
+    <div>
+      <h3>システム関連</h3>
+      <table class="compact">
+        <tr><th>語</th><th>説明</th></tr>
+        <tr><td>用語</td><td>説明</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>測定指標</h3>
+      <table class="compact">
+        <tr><th>語</th><th>説明</th></tr>
+        <tr><td>用語</td><td>説明</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="brand">語彙リスト</div>
+  <div class="slide-num">LAST</div>
+</section>
+
+</body>
+</html>

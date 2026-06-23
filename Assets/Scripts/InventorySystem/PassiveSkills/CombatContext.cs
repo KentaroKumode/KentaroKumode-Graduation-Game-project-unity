@@ -83,6 +83,17 @@ namespace InventorySystem.PassiveSkills
         public int currentTurn;         // 現在のターン数（1始まり）
         public bool isFirstRoll;        // 戦闘開始後の初回ロールか
 
+        // ===== 戦闘相手の種別（暗殺教団契約等で参照） =====
+        /// <summary>戦闘相手の種別 (Normal/Elite/Boss)。 マップタイル種別から StartCombat 時に設定。
+        /// 暗殺教団 (通常戦闘マスのみ発動) / 暗殺教団+戦術家協力 (エリートに拡張) で参照する。</summary>
+        public CombatSystem.EnemyKind currentEnemyKind = CombatSystem.EnemyKind.Normal;
+
+        // ===== 脆弱状態異常（狩猟旅団契約で敵に付与）=====
+        /// <summary>脆弱の倍率 (狩猟旅団 L1=0.15 / L2=0.30 / L3=0.45)。 0 なら契約なし。</summary>
+        public float enemyVulnerabilityMultiplier = 0f;
+        /// <summary>脆弱が armed (発動可能) 状態か。 会心ダメで消費、 ロール勝利時の非会心ダメで再点火。</summary>
+        public bool enemyVulnerabilityArmed = false;
+
         // ===== 蓄積/持続値（スキルが読み書き） =====
         /// <summary>スキルごとの蓄積データ（キー = スキルID）</summary>
         public Dictionary<string, float> accumulatedValues = new Dictionary<string, float>();
@@ -98,12 +109,26 @@ namespace InventorySystem.PassiveSkills
         public List<DiceOverrideRequest> pendingDiceOverrides = new List<DiceOverrideRequest>();
 
         // ===== 出血・状態異常 =====
-        public int enemyBleedStacks;    // 敵の出血スタック数
-        /// <summary>炎上残りターン数（業火スキル用）</summary>
-        public int enemyBurnTurns;
-        /// <summary>炎上の毎ターンダメージ</summary>
-        public int enemyBurnDamage;
-        
+        public int enemyBleedStacks;    // 敵の出血スタック数（※統一フレーム未移行・現状フィールドのまま）
+
+        /// <summary>汎用ステータス・スタック（#3 統一フレーム。id→stacks）。Player/Enemy は絶対視点（スワップしない）。
+        /// 炎上(burn)はここへ移行済み。DOT/減衰は <see cref="TickStatuses"/> が一括処理する。</summary>
+        public Dictionary<string, int> playerStatusStacks = new Dictionary<string, int>();
+        public Dictionary<string, int> enemyStatusStacks = new Dictionary<string, int>();
+
+        // ===== 敵スタンス（毎ターン抽選・ロール前テレグラフ。ADR-0005） =====
+        /// <summary>敵→プレイヤー被ダメ倍率（高火力>1/低火力<1）。ApplyLossDamageModifiers で乗算。毎ターン1.0リセット。
+        /// ロール力は kind を見て CombatManager がロール時に面を縮める（弱ロール=期待値約0.65倍）。</summary>
+        public float enemyStanceDamageMult = 1f;
+        /// <summary>テレグラフ表示用：0=なし / 1=高ロール・低ダメ / 2=低ロール・高ダメ。毎ターン0リセット。</summary>
+        public int enemyStanceKind;
+        /// <summary>弱ロールスタンスの面縮小比（ボス別にチューナーが調整・基準0.65）。EnemyStance.Apply が設定、
+        /// CombatManager が弱ロール時の WeakRollMax/WeakRollFaces に渡す。毎ターン0.65リセット。</summary>
+        public float enemyStanceWeakRollRatio = 0.65f;
+
+        /// <summary>プレイヤー防御スタンス（ADR-0006）。true=防御優先（与ダメ-90%・受け最終-50%）。毎ターンfalseリセット。</summary>
+        public bool playerStanceDefense;
+
         // ===== 勝敗フラグ =====
         public bool playerWonRoll;
         public bool playerLostRoll;
@@ -184,6 +209,11 @@ namespace InventorySystem.PassiveSkills
         /// ProcessPostRoll の勝敗判定前に enemyDiceTotal へ加算される。</summary>
         public int enemyDiceTotalBonus;
 
+        /// <summary>沈黙の剣帯 等: 敵ダイス合計への「床なし」減算ペナルティ。
+        /// enemyDiceDebuff/consEnemyDiceDebuff は Math.Max(0) で0床処理されるが、こちらは床処理せず
+        /// enemyDiceTotal を負値まで押し下げられる（=ロール大差勝ち＝基礎ダメ激増）。BeginNewTurn でリセット。</summary>
+        public int enemyDiceTotalPenalty;
+
         /// <summary>ボス強者バフ: ボス(boss_layer*)のダイス合計への固定加算。フロアに応じて戦闘開始/形態swap時に設定。
         /// enemyDiceTotalBonus とは別枠（星火燎原等の上書きと競合させないため）。勝敗判定前に enemyDiceTotal へ加算。</summary>
         public int bossDiceBonus;
@@ -195,6 +225,21 @@ namespace InventorySystem.PassiveSkills
         /// <summary>直近にプレイヤーへダメージを与えた致死メカニズムの分類。
         /// 各致死スキルが発動時にセット、 通常被ダメ経路は Normal。 プレイヤー死亡時の死因記録に使う。</summary>
         public DeathCause lastDamageCause = DeathCause.Normal;
+
+        /// <summary>この戦闘でプレイヤーが受けた総被ダメの **ソース別内訳** (ボス難易度チューナー用)。
+        /// キル時の一撃ではなく「戦闘を通じてどのメカニズムが何割を占めたか」で診断するための集計。
+        /// 特殊スキル(審判の炎/毒/反射/断罪/爆ぜ火 等)が自分の与ダメを加算。 通常被ダメ(ロール敗北等)は
+        /// 戦闘終了時に総被ダメからの残差として Normal に計上する。 戦闘開始時にクリア。</summary>
+        public readonly System.Collections.Generic.Dictionary<DeathCause, int> playerDamageBySource
+            = new System.Collections.Generic.Dictionary<DeathCause, int>();
+
+        /// <summary>プレイヤー被ダメをソース別に加算 (特殊スキルが自分の与ダメ分を計上)。</summary>
+        public void AddPlayerDamageSource(DeathCause cause, int amount)
+        {
+            if (amount <= 0) return;
+            playerDamageBySource.TryGetValue(cause, out int v);
+            playerDamageBySource[cause] = v + amount;
+        }
 
         /// <summary>敵の基礎防御（被ダメ%軽減 0～1）。EnemyData.baseDefenseRate を戦闘開始/形態swap時に設定、
         /// エリート(EliteVigor)が +0.10。利刃で相殺。BeginNewTurn ではリセットしない（戦闘通して保持）。
@@ -216,10 +261,6 @@ namespace InventorySystem.PassiveSkills
         /// <summary>軽減無視ダメージ(fixedDamageToEnemy)の倍率。蒼白の槍騎士が設定(既定1.0)。
         /// 血令/反撃/業火/停戦 等の固定ダメに乗る。BeginNewTurn でリセットしない。</summary>
         public float fixedDamageMultiplier = 1f;
-
-        /// <summary>リピーター: 会心成立時に与ダメ計算前パッシブ(OnPreDealDamage)を再発火するか。
-        /// リピーターが OnBattleStart で設定。BeginNewTurn でリセットしない。</summary>
-        public bool retriggerOnCrit;
 
         // ===== Λ層（時間の狭間）由来の恒久デバフ（戦闘開始時に RunState から設定。戦闘スコープで保持） =====
 
@@ -338,7 +379,9 @@ namespace InventorySystem.PassiveSkills
             winMinDamage = 1;
             enemyHealReductionPct = 0f;
             fixedDamageMultiplier = 1f;
-            retriggerOnCrit = false;
+            enemyVulnerabilityMultiplier = 0f;
+            enemyVulnerabilityArmed = false;
+            currentEnemyKind = CombatSystem.EnemyKind.Normal;
             lambdaFirstTurnDiceDelta = 0;
             lambdaIrritatingInterval = 0;
             lambdaDamageDealtMult = 1f;
@@ -352,7 +395,9 @@ namespace InventorySystem.PassiveSkills
             lentTimeTier = 0;
             rollLossOccurredThisCombat = false;
             hourglassPendingDamageWindow = 0;
-            criticalMultiplier = MetaProgression.MetaBuffApplicator.GetCriticalMultiplier();
+            // 会心倍率: 基礎 2.0 + メタバフ Lv58 (会心ダメージ +X%)。 他バフ (HopeSystem苦悩・パッシブ) と加算合成。
+            criticalMultiplier = MetaProgression.MetaBuffApplicator.GetCriticalMultiplier()
+                                 + MetaProgression.MetaBuffApplicator.GetCritDamageBonus();
             accumulatedValues = new Dictionary<string, float>();
             nextTurnBuffs = new Dictionary<string, float>();
             currentBuffs = new Dictionary<string, float>();
@@ -360,6 +405,46 @@ namespace InventorySystem.PassiveSkills
             pendingDiceOverrides = new List<DiceOverrideRequest>();
             activeModifiers = new List<BattleModifier>();
             activeSigilBonuses = new List<SigilBonus>();
+            playerStatusStacks = new Dictionary<string, int>();
+            enemyStatusStacks = new Dictionary<string, int>();
+        }
+
+        // ===== ステータス統一フレーム（#3） =====
+
+        /// <summary>ステータスをスタック付与（maxStacks でクランプ）。target は絶対視点。</summary>
+        public void AddStatus(StatusTarget target, string id, int stacks)
+        {
+            if (stacks == 0 || string.IsNullOrEmpty(id)) return;
+            var dict = target == StatusTarget.Enemy ? enemyStatusStacks : playerStatusStacks;
+            int cur = dict.TryGetValue(id, out var v) ? v : 0;
+            int max = StatusRegistry.Defs.TryGetValue(id, out var def) ? def.maxStacks : int.MaxValue;
+            dict[id] = System.Math.Max(0, System.Math.Min(max, cur + stacks));
+        }
+
+        /// <summary>現在スタック数（未付与は0）。</summary>
+        public int GetStatus(StatusTarget target, string id)
+        {
+            var dict = target == StatusTarget.Enemy ? enemyStatusStacks : playerStatusStacks;
+            return dict.TryGetValue(id, out var v) ? v : 0;
+        }
+
+        /// <summary>指定タイミングの全ステータスを一括処理：DOTを fixedDamage へ加算 → decay。
+        /// ターン開始時に1回呼ぶ（PassiveSkillManager.BeginTurn）。fixedDamage は BeginNewTurn で0化済み前提。</summary>
+        public void TickStatuses(StatusTick timing)
+        {
+            foreach (var def in StatusRegistry.Defs.Values)
+            {
+                if (def.tickTiming != timing) continue;
+                var dict = def.target == StatusTarget.Enemy ? enemyStatusStacks : playerStatusStacks;
+                if (!dict.TryGetValue(def.id, out int stacks) || stacks <= 0) continue;
+                int dmg = def.dotScalesWithStacks ? stacks * def.dotPerStack : def.dotPerStack;
+                if (dmg > 0)
+                {
+                    if (def.target == StatusTarget.Enemy) fixedDamageToEnemy += dmg;
+                    else fixedDamageToPlayer += dmg;
+                }
+                dict[def.id] = System.Math.Max(0, stacks - def.decayPerTurn);
+            }
         }
 
         /// <summary>
@@ -378,6 +463,14 @@ namespace InventorySystem.PassiveSkills
             }
             nextTurnBuffs.Clear();
 
+            // 敵スタンス（毎ターン抽選し直すためリセット。ADR-0005）
+            enemyStanceDamageMult = 1f;
+            enemyStanceKind = 0;
+            enemyStanceWeakRollRatio = 0.65f;
+
+            // プレイヤースタンス（毎ターン選び直すためリセット。既定=攻撃。ADR-0006）
+            playerStanceDefense = false;
+
             // 単ターン限りのフラグをリセット
             nullifyAllDamage = false;
             nullifyPursuitDamage = false;
@@ -390,7 +483,9 @@ namespace InventorySystem.PassiveSkills
             forceCritical = false;
             lentTimePaidThisTurn = false;
             criticalBonus = 0;
-            criticalMultiplier = MetaProgression.MetaBuffApplicator.GetCriticalMultiplier();
+            // 会心倍率: 基礎 2.0 + メタバフ Lv58 (会心ダメージ +X%)。 他バフ (HopeSystem苦悩・パッシブ) と加算合成。
+            criticalMultiplier = MetaProgression.MetaBuffApplicator.GetCriticalMultiplier()
+                                 + MetaProgression.MetaBuffApplicator.GetCritDamageBonus();
             pursuitDamage = 0;
             consumablesUsedThisTurn = false;
 
@@ -399,6 +494,9 @@ namespace InventorySystem.PassiveSkills
 
             // ダイス制約を適用
             enemyDiceOverrides.Clear();
+
+            // 敵ダイス床なし減算ペナルティ（沈黙の剣帯の1T目-99 等）は毎ターンリセット
+            enemyDiceTotalPenalty = 0;
 
             // 与ダメ倍率は毎ターンリセット（パッシブが毎ターン再評価する）
             outgoingDamageMultiplier = 1f;
@@ -420,6 +518,10 @@ namespace InventorySystem.PassiveSkills
 
             // 焦土用の被ダメ計測は毎ターンリセット
             playerDamageThisTurn = 0;
+
+            // 被ダメ ソース分類は毎ターン Normal に戻す（断罪等の増幅タグが翌ターンへ残留しないように）。
+            // メイン被ダメ適用時に CombatManager がこの値で帰属する。
+            lastDamageCause = DeathCause.Normal;
 
             // 敵パッシブ無効化のターン残数を減算
             if (enemyPassivesDisabledTurns > 0) enemyPassivesDisabledTurns--;

@@ -153,7 +153,7 @@ namespace EventSystem
             // パッシブアイテム所持要件
             foreach (var passId in ev.condition.requiredPassiveItems)
             {
-                if (run.ownedPassiveItems == null || !run.ownedPassiveItems.Contains(passId))
+                if (run == null || !run.OwnsPassive(passId))
                     return false;
             }
             return true;

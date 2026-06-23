@@ -29,6 +29,12 @@ namespace AutoTest
         RegenReduction,    // 灰燼・灰塵の鎧の被ダメ軽減量 (タンク性/ジリ貧)。 基準9
         SuddenDeathDamage, // 覚者・妙覚のサドンデスダメ。 基準99 (7層専用=通常は不調整)
         TrueSelf,          // 真我: 7層覚者の全形態に付与する素ロール固定加算 (ダイス上限を超える難度調整用)。 基準1
+        IntimidateThreat,  // 威圧+ の脅威加算 (勝利時の削り/敗北時の被弾の基準)。 基準3
+        PoisonStackCap,    // 毒沼の主・毒の侵蝕の毒スタック上限 (DOTの最大強度)。 基準5
+        MirrorReflectCap,  // 鏡の双子・鏡映の応答の反射ダメ上限。 基準9
+        GoblinCall,        // ゴブリン王・号令の毎ターン自ダイス合計加算。 基準3
+        StanceAtkMult,     // 敵スタンス(ADR-0005)・高火力スタンスの被ダメ倍率 (=ボスの攻撃力)。 基準1.6
+        WeakRollRatio,     // 敵スタンス・弱ロールの面縮小比 (高いほどロールが弱まらない=強い)。 基準0.65
     }
 
     /// <summary>各 BossParam の基準値・範囲・チューナーのゲイン (1バッチの最大変化量)。</summary>
@@ -70,10 +76,16 @@ namespace AutoTest
         public const bool TuneChipCap           = true;  // 審判の炎の継続ダメ上限
         public const bool TuneBurstDamage       = true;  // 爆ぜ火の固定ダメ
         public const bool TuneRegenReduction    = true;  // 灰塵の鎧の軽減量
-        public const bool TuneSuddenDeathDamage = true; // サドンデスダメ (7層専用=通常は不調整)
+        public const bool TuneSuddenDeathDamage = false; // サドンデスダメ (7層専用=通常は不調整)
         public const bool TuneDice              = true;  // ボス素ダイスの期待値 (平均出目+offset)
         public const bool TuneHp                = true;  // HP絶対値 (Dice飽和時の受け皿)
         public const bool TuneTrueSelf          = true;  // 真我 (7層: ロール勝率が90%張り付き時の素ロール加算)
+        public const bool TuneIntimidateThreat  = true;  // 威圧+ の脅威加算 (5層業火の審判官ほか)
+        public const bool TunePoisonStackCap    = true;  // 毒の侵蝕の毒スタック上限 (3層毒沼の主)
+        public const bool TuneMirrorReflectCap  = true;  // 鏡映の応答の反射上限 (4層鏡の双子)
+        public const bool TuneGoblinCall        = true;  // 号令の自ダイス合計加算 (2層ゴブリン王)
+        public const bool TuneStanceAtkMult     = true;  // 高火力スタンスの被ダメ倍率=ボス攻撃力 (全ボス)
+        public const bool TuneWeakRollRatio     = true;  // 弱ロールの面縮小比 (弱ロール時ロール勝率の制御)
 
         // ===== ボスごとの学習 有効/無効 (手動トグル) =====
         // false にするとそのボスはオートチューナーが一切調整しない (係数は現状維持)。
@@ -82,10 +94,10 @@ namespace AutoTest
         public const bool TuneBoss_Layer2       = true;
         public const bool TuneBoss_Layer3       = true;
         public const bool TuneBoss_Layer4       = true;
-        public const bool TuneBoss_Layer5       = false;
-        public const bool TuneBoss_Layer5Hidden = false;
-        public const bool TuneBoss_Layer6       = false;
-        public const bool TuneBoss_Layer7       = false;  // 7層p1 (初眼)
+        public const bool TuneBoss_Layer5       = true;
+        public const bool TuneBoss_Layer5Hidden = true;
+        public const bool TuneBoss_Layer6       = true;
+        public const bool TuneBoss_Layer7       = true;  // 7層p1 (初眼)
         public const bool TuneBoss_Layer7P2     = false;  // 業火・残響
         public const bool TuneBoss_Layer7P3     = false;  // 無相
         public const bool TuneBoss_Layer7P4     = false;  // シュヴァリエ・残影
@@ -126,7 +138,7 @@ namespace AutoTest
         public const float RollTarget_Layer4       = 0.80f;
         public const float RollTarget_Layer5       = 0.80f;
         public const float RollTarget_Layer5Hidden = 0.60f;
-        public const float RollTarget_Layer6       = 0.50f;
+        public const float RollTarget_Layer6       = 0.40f;
         public const float RollTarget_Layer7       = 0.90f;  // 7層p1 (初眼)
         public const float RollTarget_Layer7P2     = 0.90f;  // 業火・残響
         public const float RollTarget_Layer7P3     = 0.90f;  // 無相
@@ -158,6 +170,46 @@ namespace AutoTest
             }
         }
 
+        // ===== ボスのスタンス別 ロール勝率レンジ (設定可能・1〜6層) =====
+        //  ボスが opposed ロールで「勝つ」割合(=プレイヤー敗北割合)を、 強ロール/弱ロールスタンス別に帯で管理する。
+        //  ・強ロール時の roll-win → ダイス/固有面で [Floor,Ceil] に収める。
+        //  ・弱ロール時の roll-win → 弱ロール比(WeakRollRatio)で [Floor,Ceil] に収める (弱ロールは高火力との交換なので低め)。
+        //  難度(クリア率)はスキル/攻撃力倍率/HPが担い、 ロール勝率はこのレンジで制御する。 7層は対象外(真我制御)。
+        //  値はボス別に編集可。 既定は層帯で設定。
+        public struct RollWinRange { public float floor, ceil; public RollWinRange(float f, float c) { floor = f; ceil = c; } }
+
+        /// <summary>強ロールスタンス時の ボスroll-win 許容帯。</summary>
+        public static RollWinRange StrongRollWinRange(string id)
+        {
+            switch (id)
+            {
+                case "boss_layer1":
+                case "boss_layer2":         return new RollWinRange(0.30f, 0.50f);
+                case "boss_layer3":
+                case "boss_layer4":         return new RollWinRange(0.40f, 0.55f);
+                case "boss_layer5":
+                case "boss_layer5_hidden":  return new RollWinRange(0.45f, 0.60f);
+                case "boss_layer6":         return new RollWinRange(0.55f, 0.70f);
+                default:                    return new RollWinRange(0.40f, 0.60f);
+            }
+        }
+
+        /// <summary>弱ロールスタンス時の ボスroll-win 許容帯 (高火力との交換ぶん強ロールより低め)。</summary>
+        public static RollWinRange WeakRollWinRange(string id)
+        {
+            switch (id)
+            {
+                case "boss_layer1":
+                case "boss_layer2":         return new RollWinRange(0.10f, 0.25f);
+                case "boss_layer3":
+                case "boss_layer4":         return new RollWinRange(0.15f, 0.30f);
+                case "boss_layer5":
+                case "boss_layer5_hidden":  return new RollWinRange(0.20f, 0.35f);
+                case "boss_layer6":         return new RollWinRange(0.30f, 0.45f);
+                default:                    return new RollWinRange(0.15f, 0.35f);
+            }
+        }
+
         /// <summary>この BossParam をオートチューナーが調整してよいか。</summary>
         public static bool Enabled(BossParam p)
         {
@@ -172,6 +224,12 @@ namespace AutoTest
                 case BossParam.RegenReduction:    return TuneRegenReduction;
                 case BossParam.SuddenDeathDamage: return TuneSuddenDeathDamage;
                 case BossParam.TrueSelf:          return TuneTrueSelf;
+                case BossParam.IntimidateThreat:  return TuneIntimidateThreat;
+                case BossParam.PoisonStackCap:    return TunePoisonStackCap;
+                case BossParam.MirrorReflectCap:  return TuneMirrorReflectCap;
+                case BossParam.GoblinCall:        return TuneGoblinCall;
+                case BossParam.StanceAtkMult:     return TuneStanceAtkMult;
+                case BossParam.WeakRollRatio:     return TuneWeakRollRatio;
                 default: return false;
             }
         }
@@ -186,11 +244,18 @@ namespace AutoTest
                 case BossParam.JudgmentCoefBase:  return new ParamMeta( 2f, 0f,  8f,  6f, 0.5f);
                 case BossParam.RobeStacks:        return new ParamMeta(10f, 1f, 20f, 20f, 1.5f);
                 case BossParam.ReflectPct:        return new ParamMeta(50f, 0f, 90f, 80f, 5f);
-                case BossParam.ChipCap:           return new ParamMeta(13f, 1f, 20f, 20f, 1.5f);
+                case BossParam.ChipCap:           return new ParamMeta(10f, 1f, 20f, 20f, 1.5f);
                 case BossParam.BurstDamage:       return new ParamMeta( 5f, 0f, 20f, 20f, 1.5f);
                 case BossParam.RegenReduction:    return new ParamMeta( 9f, 0f, 20f, 20f, 1.5f);
                 case BossParam.SuddenDeathDamage: return new ParamMeta(99f, 1f, 99f, 99f, 6f);
                 case BossParam.TrueSelf:          return new ParamMeta( 1f, 1f, 30f, 30f, 2f);
+                case BossParam.IntimidateThreat:  return new ParamMeta( 3f, 0f, 10f, 20f, 1f);
+                case BossParam.PoisonStackCap:    return new ParamMeta( 5f, 1f, 12f, 20f, 1f);
+                case BossParam.MirrorReflectCap:  return new ParamMeta( 9f, 0f, 15f, 20f, 1.5f);
+                case BossParam.GoblinCall:        return new ParamMeta( 3f, 0f, 12f, 20f, 1f);
+                //                          base  min   max  gain  maxStep
+                case BossParam.StanceAtkMult:     return new ParamMeta(1.6f, 1.0f, 3.0f, 1.0f, 0.15f);
+                case BossParam.WeakRollRatio:     return new ParamMeta(0.65f, 0.40f, 0.90f, 0.5f, 0.05f);
                 default:                          return new ParamMeta( 1f, 0f,  1f,  1f, 0.1f);
             }
         }
@@ -206,6 +271,7 @@ namespace AutoTest
             public float diceExpected = 0f; // 0 = 未調整 (ベースダイス)。 >0 = 目標期待値
             public float diceOffset = 0f;   // ボス期待値 = プレイヤー平均出目 + diceOffset
             public bool diceTuned = false;
+            public int[] diceFaces = null;  // 固有面ダイス(署名ダイス)の学習値。null=コード既定面を使用。各値∈[1,9]
             public List<ParamOverride> overrides = new List<ParamOverride>();
         }
 
@@ -343,6 +409,62 @@ namespace AutoTest
             return (bestC, bestF);
         }
 
+        // ===== 固有面ダイス(署名ダイス) =====
+        //  対象4ボスは均一ダイス(diceExpected/BestDiceConfig)を使わず、 ボス固有の面構成で振る。
+        //  面はオートチューナー(BossBalanceTuner)が各値を学習し、 boss_tuning.json の Knob.diceFaces に保存する。
+        //  グラフィック制約により 1面の値は [SignatureFaceMin, SignatureFaceMax] にクランプ。
+
+        public const int SignatureDiceCount = 5;   // 署名ダイスは5個振り
+        public const int SignatureFaceCount = 6;   // 面は6つ
+        public const int SignatureFaceMin = 1;
+        public const int SignatureFaceMax = 9;     // 11等はダイスのグラフィック表現不可 → 上限9
+
+        /// <summary>固有面ダイスの初期面(コード既定)。 Knob.diceFaces が空のときの種。</summary>
+        private static readonly Dictionary<string, int[]> _signatureDefaults = new Dictionary<string, int[]>
+        {
+            // 5層 業火の審判官「裁火のダイス」: 二極(赦免/断罪) 平均4.83 ×5 = E24.2
+            { "boss_layer5",        new[] { 2, 3, 3, 6, 7, 8 } },
+            // 5層裏 シュヴァリエ「決闘のダイス」: 低分散・規律 平均5.5 ×5 = E27.5
+            { "boss_layer5_hidden", new[] { 4, 5, 5, 6, 6, 7 } },
+            // 6層 灰燼の王「薄火のダイス」: 上寄り 平均6.67 ×5 = E33.3 (+灰塵の威圧+3で実効E36)
+            { "boss_layer6",        new[] { 4, 6, 7, 7, 8, 8 } },
+            // 7層 覚者「往生呪のダイス」: 高い床 平均8.5 ×5 = E42.5 (プレイヤー1T目天井に匹敵)
+            { "boss_layer7",        new[] { 7, 8, 8, 9, 9, 9 } },
+        };
+
+        public static bool IsSignatureDiceBoss(string id)
+            => !string.IsNullOrEmpty(id) && _signatureDefaults.ContainsKey(id);
+
+        /// <summary>このボスの現在有効な固有面(学習値があればそれ、無ければ既定)。 非対象ボスは null。</summary>
+        public static int[] SignatureFaces(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return null;
+            EnsureLoaded();
+            if (_map.TryGetValue(KeyFor(id), out var k) && IsValidSignature(k.diceFaces))
+                return (int[])k.diceFaces.Clone();
+            if (_signatureDefaults.TryGetValue(id, out var def))
+                return (int[])def.Clone();
+            return null;
+        }
+
+        public static bool IsValidSignature(int[] faces)
+            => faces != null && faces.Length == SignatureFaceCount;
+
+        public static void ClampSignature(int[] faces)
+        {
+            if (faces == null) return;
+            for (int i = 0; i < faces.Length; i++)
+                faces[i] = Mathf.Clamp(faces[i], SignatureFaceMin, SignatureFaceMax);
+            Array.Sort(faces); // 昇順に保つ(可読性・診断ログ用)
+        }
+
+        public static float SignatureExpected(int[] faces)
+        {
+            if (!IsValidSignature(faces)) return 0f;
+            int s = 0; foreach (var v in faces) s += v;
+            return SignatureDiceCount * (float)s / faces.Length;
+        }
+
         // ===== 永続化 =====
 
         private static string PathFor(string root)
@@ -424,18 +546,36 @@ namespace AutoTest
             if (e == null || !IsBoss(e.id)) return e;
             EnsureLoaded();
             _map.TryGetValue(KeyFor(e.id), out var k);
+
+            // 固有面ダイス対象ボス: 均一ダイス(diceExpected/BestDiceConfig)を使わず署名面で振る。
+            if (IsSignatureDiceBoss(e.id))
+            {
+                var c = e.Clone();
+                if (k != null && k.maxHP > 0) c.maxHP = Mathf.Max(1, k.maxHP);
+                var sig = SignatureFaces(e.id);
+                if (IsValidSignature(sig))
+                {
+                    c.diceFaces = sig;
+                    c.diceCount = SignatureDiceCount;
+                    int mx = SignatureFaceMin;
+                    foreach (var v in sig) if (v > mx) mx = v;
+                    c.diceMaxValue = mx; // 弱ロール面縮小/勝率推定など均一前提コードの整合用
+                }
+                return c;
+            }
+
             bool changeHp = k != null && k.maxHP > 0 && k.maxHP != e.maxHP;
             bool changeDice = k != null && k.diceExpected > 0f;
             if (!changeHp && !changeDice) return e;
-            var c = e.Clone();
-            if (changeHp) c.maxHP = Mathf.Max(1, k.maxHP);
+            var cc = e.Clone();
+            if (changeHp) cc.maxHP = Mathf.Max(1, k.maxHP);
             if (changeDice)
             {
                 var (cnt, faces) = BestDiceConfig(Mathf.Clamp(k.diceExpected, DiceEMin, DiceEMax));
-                c.diceCount = cnt;
-                c.diceMaxValue = faces;
+                cc.diceCount = cnt;
+                cc.diceMaxValue = faces;
             }
-            return c;
+            return cc;
         }
 
         public static string Summary()
@@ -453,7 +593,11 @@ namespace AutoTest
                         parts.Add($"{p}={v.ToString("0.#", CultureInfo.InvariantCulture)}");
                 }
                 if (k.maxHP > 0) parts.Add($"HP={k.maxHP}");
-                if (k.diceExpected > 0f)
+                if (IsValidSignature(k.diceFaces))
+                {
+                    parts.Add($"Dice→{SignatureDiceCount}d[{string.Join(",", k.diceFaces)}](E{SignatureExpected(k.diceFaces).ToString("F1", CultureInfo.InvariantCulture)})");
+                }
+                else if (k.diceExpected > 0f)
                 {
                     var (cnt, faces) = BestDiceConfig(k.diceExpected);
                     parts.Add($"Dice→{cnt}d{faces}(E{k.diceExpected.ToString("F1", CultureInfo.InvariantCulture)})");

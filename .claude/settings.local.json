@@ -1,4 +1,5 @@
 {
+  "model": "claude-opus-4-7",
   "permissions": {
     "allow": [
       "Skill(update-config)",
@@ -28,7 +29,16 @@
       "Bash(PYTHONIOENCODING=utf-8 py -c ' *)",
       "Bash(py -c \"import json; json.load\\(open\\('Assets/Data/InventorySystem/items.json',encoding='utf-8-sig'\\)\\); print\\('items.json OK'\\)\")",
       "Bash(py -c ' *)",
-      "Bash(py -c \"import json; json.load\\(open\\('Assets/Data/InventorySystem/items.json',encoding='utf-8-sig'\\)\\); print\\('JSON OK'\\)\")"
+      "Bash(py -c \"import json; json.load\\(open\\('Assets/Data/InventorySystem/items.json',encoding='utf-8-sig'\\)\\); print\\('JSON OK'\\)\")",
+      "PowerShell(powershell -ExecutionPolicy ByPass -c \"irm https://astral.sh/uv/install.ps1 | iex\")",
+      "PowerShell($env:Path = \"C:\\\\Users\\\\kumod\\\\.local\\\\bin;$env:Path\"; \"uv: \" + \\(uv --version\\); \"uvx: \" + \\(uvx --version\\))",
+      "Bash(node -e \"try{const j=require\\('C:/Users/kumod/.claude.json'\\);console.log\\(JSON.stringify\\(j.mcpServers||{},null,2\\)\\);const ps=j.projects&&j.projects['c:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\kumod\\\\\\\\\\\\\\\\My project'];if\\(ps\\)console.log\\('project-scoped mcp:',JSON.stringify\\(ps.mcpServers||{},null,2\\)\\);}catch\\(e\\){console.log\\('cannot read:',e.message\\)}\")",
+      "Read(//c/Users/kumod/**)",
+      "PowerShell($env:Path = \"C:\\\\Users\\\\kumod\\\\.local\\\\bin;$env:Path\"; uvx --python \">=3.11\" coplay-mcp-server@latest --help 2>&1 | Select-Object -First 30)",
+      "mcp__coplay-mcp__get_unity_editor_state",
+      "mcp__coplay-mcp__list_unity_project_roots",
+      "mcp__coplay-mcp__set_unity_project_root",
+      "mcp__coplay-mcp__check_compile_errors"
     ]
   }
 }

@@ -57,42 +57,35 @@ namespace MetaProgression
             => S != null ? S.diceTotalBonus : 0;
 
         // ============================================================
-        //  飢餓
+        //  希望ゲージ減少の軽減 (ADR-0002 で飢餓から希望に統合)
         // ============================================================
 
-        /// <summary>飢餓ダメージ削減量（最大3）。0 未満にはならないよう呼び出し側で clamp。</summary>
-        public static int GetHungerDamageReduction()
-            => S != null ? S.hungerReduce : 0;
+        /// <summary>戦闘後の希望ゲージ減少の軽減量（最大3）。0 未満にはならないよう呼び出し側で clamp。</summary>
+        public static int GetHopeLossReduction()
+            => S != null ? S.hopeLossReduce : 0;
 
         // ============================================================
         //  ショップ
         // ============================================================
 
-        /// <summary>購入返金確率（0.0〜0.15）。</summary>
-        public static float GetRefundChance()
+        /// <summary>2026-06-22: 旧「購入返金確率」 を廃止し、 「特売品」 機構に変更。
+        /// メタバフ refundLevel に応じてショップに 1/2/3 個の特売品を出現させる。
+        /// 特売品は 20-60% の範囲でランダム割引が適用される。</summary>
+        public static int GetSaleItemCount()
         {
             var s = S;
-            if (s == null) return 0f;
-            switch (s.refundLevel)
-            {
-                case 1: return 0.05f;
-                case 2: return 0.10f;
-                case 3: return 0.15f;
-                default: return 0f;
-            }
+            if (s == null) return 0;
+            return Mathf.Clamp(s.refundLevel, 0, 3);
         }
 
-        /// <summary>支払金額に対し、返金抽選を行う。返金された分だけ run.coins に戻す。</summary>
-        public static int RollRefund(int paidAmount, RunState run)
-        {
-            float chance = GetRefundChance();
-            if (chance <= 0f || paidAmount <= 0 || run == null) return 0;
-            if (Random.value >= chance) return 0;
-            int gain = GameLoop.LastStand.FilterGoldGain(run, paidAmount);
-            run.coins += gain;
-            if (gain > 0) Debug.Log($"[MetaBuff] 返金発動: +{gain}G");
-            return gain;
-        }
+        /// <summary>特売割引率の最小・最大値 (%)。 適用時はこの範囲で一様乱数。</summary>
+        public const int SaleDiscountMinPct = 20;
+        public const int SaleDiscountMaxPct = 60;
+
+        /// <summary>互換用: 旧 RollRefund は no-op に。 特売機構へ移行済のため。</summary>
+        public static int RollRefund(int paidAmount, RunState run) => 0;
+        /// <summary>互換用: 旧 GetRefundChance は 0 を返す (特売機構へ移行済)。</summary>
+        public static float GetRefundChance() => 0f;
 
         // ============================================================
         //  ボス追加報酬
@@ -114,10 +107,6 @@ namespace MetaProgression
         //  新規バフ
         // ============================================================
 
-        /// <summary>〈神の加護〉解放済みかどうか。1戦闘1回ロール敗北を引分に変える。</summary>
-        public static bool IsDivineProtectUnlocked()
-            => S != null && S.divineProtectUnlocked;
-
         /// <summary>〈開幕パッシブ〉解放済みかどうか。RunStart で1個獲得。</summary>
         public static bool IsStartingPassiveItemUnlocked()
             => S != null && S.startingPassiveItemUnlocked;
@@ -137,5 +126,30 @@ namespace MetaProgression
         /// <summary>会心倍率（恒久バフでの会心倍率変更は撤廃され、常に 2.0）。
         /// 装備パッシブ等が個別に上書きしうるが、メタ恒久値としては固定。</summary>
         public static float GetCriticalMultiplier() => 2.0f;
+
+        // ============================================================
+        //  与ダメ%ボーナス（コモン10段・最大+50%、他%倍率と加算合成）
+        // ============================================================
+
+        /// <summary>与ダメ%ボーナス(0..50)。CombatManager 側で outgoingDamageMultiplier に加算する。</summary>
+        public static int GetOutgoingDamagePct()
+            => S != null ? UnityEngine.Mathf.Clamp(S.outgoingDamagePct, 0, 50) : 0;
+
+        // ============================================================
+        //  追加 unlock 系フラグ
+        // ============================================================
+
+        /// <summary>ラストスタンド発動時の最大HP半減を無効化するか。</summary>
+        public static bool IsLastStandHpLossDisabled()
+            => S != null && S.lastStandHpLossDisabled;
+
+        /// <summary>フロアボス前の休憩エリアで回復+強化が同時にできるか。</summary>
+        public static bool IsBossRestHealAndUpgradeUnlocked()
+            => S != null && S.bossRestHealAndUpgradeUnlocked;
+
+        /// <summary>会心ダメージ加算量（Lv58 final、 既定 0 / フル取得時 1.0 = +100%）。
+        /// CombatContext.criticalMultiplier に加算される。 他の会心ダメージバフと加算合成。</summary>
+        public static float GetCritDamageBonus()
+            => S != null ? S.critDamageBonus : 0f;
     }
 }

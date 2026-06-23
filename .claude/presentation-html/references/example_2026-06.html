@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>プロジェクト改修ハイライト 2026-06 - スライド版</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true, theme:'base', themeVariables:{primaryColor:'#f4ebd6', primaryTextColor:'#2b2b2b', primaryBorderColor:'#8a7355', lineColor:'#5a4a35', secondaryColor:'#ede0c8', tertiaryColor:'#f9f4e6', fontSize:'16px'}});</script>
+<style>
+  @page { size: A4 landscape; margin: 10mm 14mm; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #ece4d2; }
+  body {
+    font-family: "Hiragino Sans","Yu Gothic","Meiryo",sans-serif;
+    color: #2b2b2b;
+    line-height: 1.5;
+  }
+  .slide {
+    width: 277mm;
+    height: 190mm;
+    margin: 14px auto;
+    padding: 14mm 18mm;
+    background: #fbf9f3;
+    border: 1px solid #c8b894;
+    box-shadow: 0 4px 18px rgba(74, 60, 37, 0.12);
+    page-break-after: always;
+    page-break-inside: avoid;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .slide:last-child { page-break-after: auto; }
+  .slide-num {
+    position: absolute;
+    bottom: 6mm;
+    right: 10mm;
+    font-size: 10pt;
+    color: #8a7355;
+  }
+  .brand {
+    position: absolute;
+    bottom: 6mm;
+    left: 10mm;
+    font-size: 9pt;
+    color: #8a7355;
+    letter-spacing: 0.1em;
+  }
+  h1 {
+    font-size: 36pt;
+    color: #4a3c25;
+    margin: 0 0 8px 0;
+    border-bottom: 4px solid #8a7355;
+    padding-bottom: 10px;
+    letter-spacing: 0.05em;
+  }
+  h1.title-main {
+    font-size: 44pt;
+    text-align: center;
+    border: none;
+    margin-top: 28mm;
+  }
+  h2 {
+    font-size: 24pt;
+    color: #4a3c25;
+    margin: 0 0 12px 0;
+    padding: 4px 0 8px;
+    border-bottom: 3px solid #8a7355;
+  }
+  h3 {
+    font-size: 14pt;
+    color: #6a5a3c;
+    margin: 16px 0 6px;
+    padding-bottom: 2px;
+    border-bottom: 1px dotted #aa9572;
+  }
+  .lead {
+    font-size: 14pt;
+    text-align: center;
+    margin: 12mm auto 0;
+    max-width: 70%;
+    color: #4a3c25;
+    line-height: 1.7;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 6px 0;
+    font-size: 10pt;
+  }
+  th, td {
+    border: 1px solid #c8b894;
+    padding: 5px 9px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: #ede0c8;
+    color: #4a3c25;
+    font-weight: 600;
+  }
+  tr:nth-child(even) td { background: #fbf6ec; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.cen, th.cen { text-align: center; }
+  code {
+    background: #ede0c8;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: "Consolas",monospace;
+    font-size: 10pt;
+  }
+  ul, ol { margin: 6px 0 8px 22px; padding: 0; font-size: 11pt; }
+  li { margin: 3px 0; }
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    flex: 1;
+  }
+  .three-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+    flex: 1;
+  }
+  .mermaid {
+    text-align: center;
+    margin: 8px 0;
+    background: #fff;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid #c8b894;
+    font-size: 11pt;
+  }
+  .badge {
+    display: inline-block;
+    background: #8a7355;
+    color: #fff;
+    padding: 2px 12px;
+    border-radius: 12px;
+    font-size: 10pt;
+    margin-right: 6px;
+  }
+  .kpi {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin: 18px 0;
+  }
+  .kpi > div {
+    background: #fff;
+    padding: 14px 14px;
+    border: 1px solid #c8b894;
+    border-radius: 8px;
+    text-align: center;
+  }
+  .kpi b { display: block; font-size: 22pt; color: #4a3c25; margin-bottom: 4px; }
+  .kpi span { font-size: 10pt; color: #6a5a3c; }
+  blockquote {
+    border-left: 4px solid #8a7355;
+    background: #f9f4e6;
+    margin: 8px 0;
+    padding: 8px 16px;
+    color: #555;
+    font-size: 11pt;
+  }
+  .quote-pair {
+    font-size: 9.5pt;
+    color: #5a4a35;
+    font-style: italic;
+  }
+  .compact { font-size: 9.5pt; }
+  .compact th, .compact td { padding: 3px 7px; }
+  @media print {
+    html, body { background: #fff; }
+    .slide {
+      margin: 0;
+      box-shadow: none;
+      border: none;
+      width: 100%;
+      height: 100vh;
+      padding: 10mm 14mm;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ Slide 1: Title ============ -->
+<section class="slide">
+  <h1 class="title-main">プロジェクト改修ハイライト</h1>
+  <p class="lead">
+    旅団契約システム実装〜現在 (2026-06 月期) の主要変更<br>
+    <strong>5 Phase</strong>に整理し、 「コンテンツ × バランス × 測定基盤」 の三軸で展開
+  </p>
+  <div style="text-align:center; margin-top:28mm;">
+    <span class="badge">機構実装</span>
+    <span class="badge">バランス</span>
+    <span class="badge">測定</span>
+    <span class="badge">BOT 進化</span>
+  </div>
+  <div class="brand">プロジェクト改修ハイライト</div>
+  <div class="slide-num">1</div>
+</section>
+
+<!-- ============ Slide 2: 全体俯瞰 ============ -->
+<section class="slide">
+  <h1>全体俯瞰</h1>
+  <div class="mermaid" style="flex:1; display:flex; align-items:center; justify-content:center;">
+graph LR
+    A[旅団契約システム] --> D[BOT 拡張]
+    D --> E[InventoryPower 指標]
+    E --> F[ゲーム体験 4 軸]
+    A --> G[バランス調整]
+    G --> H[ショップ経済リワーク]
+    H --> I[Power 帯認識 BOT]
+    F --> I
+  </div>
+  <p style="text-align:center; font-size:12pt; margin-top:8px;">
+    3 つの柱が連動 ── 機構実装が測定基盤を呼び、 測定が次のバランス調整を支える循環
+  </p>
+  <div class="brand">プロジェクト改修ハイライト</div>
+  <div class="slide-num">2</div>
+</section>
+
+<!-- ============ Slide 3: Phase 1 概要 ============ -->
+<section class="slide">
+  <h1>Phase 1 ─ 旅団契約システム</h1>
+  <div class="two-col" style="margin-top:8px;">
+    <div>
+      <h3>仕組み</h3>
+      <ul>
+        <li><strong>12 旅団</strong>と前哨基地で契約</li>
+        <li>各旅団 <strong>30% 独立抽選</strong>で提示</li>
+        <li>維持費: L1=3G / L2=6G / L3=9G/層</li>
+        <li>3 層必須で L3 (一足飛び不可)</li>
+        <li>解除: HP≤20% / G不足 / 敵対契約取得</li>
+        <li>L3 没収時は維持費9G失う</li>
+      </ul>
+      <h3>主要効果軸</h3>
+      <ul>
+        <li>戦闘系: 傭兵団 / 暗殺教団 / 狩猟旅団</li>
+        <li>守備系: 騎士 / 影武者一座</li>
+        <li>経済系: 商業連合隊 / 補給キャラバン</li>
+        <li>支援系: 医術官 / 戦術家 / 錬金術師</li>
+        <li>特殊: 宣教師 (希望保護) / サーカス (windfall)</li>
+      </ul>
+    </div>
+    <div>
+      <div class="mermaid">
+graph TB
+    O[前哨基地] -->|30% 独立抽選 × 12| P[契約提示]
+    P --> N[新規契約 L1]
+    P --> X[延長 L1→L2→L3]
+    N -.->|敵対 6 ペア| R[既存契約強制解除]
+    N -.->|協力 6 ペア| S[両方契約で bonus]
+    X -.->|HP≤20%| Rel[L1/L2 解除]
+    X -.->|維持費不足| Forf[L3 没収]
+      </div>
+    </div>
+  </div>
+  <div class="brand">Phase 1 ─ 旅団契約システム</div>
+  <div class="slide-num">3</div>
+</section>
+
+<!-- ============ Slide 4: 敵対 6 ペア ============ -->
+<section class="slide">
+  <h1>Phase 1 ─ 敵対 6 ペア</h1>
+  <p style="font-size:12pt; margin:6px 0 12px;">既存契約と敵対する旅団を取得すると <strong>強制解除</strong>。 L3 なら 9G 没収。 取得時にプレイヤーへ警告表示。</p>
+  <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:14px; flex:1;">
+    <div style="background:#fff; border:1px solid #c8b894; border-radius:6px; padding:14px;">
+      <h3 style="margin-top:0;">攻守ぶつかり系</h3>
+      <ul style="font-size:11.5pt;">
+        <li><strong>騎士 ⟷ 影武者一座</strong></li>
+        <li><strong>宣教師 ⟷ 暗殺教団</strong></li>
+        <li><strong>傭兵団 ⟷ 戦術家</strong></li>
+      </ul>
+    </div>
+    <div style="background:#fff; border:1px solid #c8b894; border-radius:6px; padding:14px;">
+      <h3 style="margin-top:0;">資源/機構ぶつかり系</h3>
+      <ul style="font-size:11.5pt;">
+        <li><strong>狩猟旅団 ⟷ サーカス団</strong></li>
+        <li><strong>商業連合隊 ⟷ 錬金術師</strong></li>
+        <li><strong>補給キャラバン ⟷ 医術官</strong></li>
+      </ul>
+    </div>
+  </div>
+  <blockquote style="margin-top:14px; font-size:11pt;">
+    戦略上、 取得する旅団を間違えると <strong>既存戦力 (特に L3) の喪失</strong>。 慎重なピック設計を要求。<br>
+    BOT は RivalryPenalty (L3 −6 / L2 −3 / L1 −1) で「敵対契約を壊して取りに行く価値があるか」 を評価。
+  </blockquote>
+  <div class="brand">Phase 1 ─ 敵対関係</div>
+  <div class="slide-num">4</div>
+</section>
+
+<!-- ============ Slide 5: 協力 6 ペア ============ -->
+<section class="slide">
+  <h1>Phase 1 ─ 協力 6 ペア</h1>
+  <p style="font-size:11pt; margin:4px 0 6px;">両方契約中 (レベル不問) のとき <strong>常時 bonus 発動</strong>。 シナジービルドの軸となる。</p>
+  <table class="compact" style="flex:1;">
+    <tr><th style="width:23%">協力ペア</th><th>効果</th></tr>
+    <tr>
+      <td><strong>騎士 + 宣教師</strong></td>
+      <td>騎士軽減 <strong>+1</strong> ＋ 宣教師の希望減少緩和 <strong>-1 追加</strong></td>
+    </tr>
+    <tr>
+      <td><strong>暗殺教団 + 戦術家</strong></td>
+      <td>暗殺教団がエリートにも発動 (倍率 <strong>10% / 20% / 30%</strong>)</td>
+    </tr>
+    <tr>
+      <td><strong>サーカス団 + 商業連合隊</strong></td>
+      <td>層終了時 <strong>+ サーカス団 Lv × 2G</strong> ボーナス (HP≤50%ペナルティで連動消滅)</td>
+    </tr>
+    <tr>
+      <td><strong>錬金術師 + 補給キャラバン</strong></td>
+      <td>錬金レアリティ表 <strong>+1 段</strong>: L3 + 補給で <strong>LEGENDARY 5% 追加</strong></td>
+    </tr>
+    <tr>
+      <td><strong>影武者一座 + 傭兵団</strong></td>
+      <td>戦闘ターン終了時 <strong>+1G</strong> (傭兵団 DoT と同タイミング)</td>
+    </tr>
+    <tr>
+      <td><strong>狩猟旅団 + 医術官</strong></td>
+      <td>戦闘終了時、 与ダメ累計の <strong>5% / 10% / 15%</strong> を HP 回復</td>
+    </tr>
+  </table>
+  <p style="font-size:10pt; margin-top:6px; color:#6a5a3c;">→ 6 ペアそれぞれが「ビルド方向性」 を示す。 シナジー成立で戦力が跳ねる設計</p>
+  <div class="brand">Phase 1 ─ 協力関係</div>
+  <div class="slide-num">5</div>
+</section>
+
+<!-- ============ Slide 6: BOT 統合 ============ -->
+<section class="slide">
+  <h1>Phase 1 ─ BOT 統合 (ContractAiPicker)</h1>
+  <div class="two-col">
+    <div>
+      <h3>評価ロジック</h3>
+      <table class="compact">
+        <tr><th>項目</th><th>値</th></tr>
+        <tr><td>BaseValueL1 (各旅団)</td><td>影武者 8 / 騎士 6 / 狩猟 6 / 傭兵 5 / 医術官 5...</td></tr>
+        <tr><td>AllianceBonus</td><td>×1.30 (既存協力旅団と合致時)</td></tr>
+        <tr><td>RivalryPenalty L3</td><td>−6 (没収重い)</td></tr>
+        <tr><td>RivalryPenalty L2 / L1</td><td>−3 / −1</td></tr>
+        <tr><td>AcceptThreshold</td><td>value ≥ cost × 1.5</td></tr>
+      </table>
+      <h3>延長判定</h3>
+      <ul>
+        <li>次 Lv 効果 − 現 Lv 効果 ≥ cost×1.5</li>
+        <li>各層 1 契約まで延長</li>
+      </ul>
+    </div>
+    <div>
+      <h3>summary 出力</h3>
+      <ul>
+        <li>前哨基地訪問数 / 維持費総額</li>
+        <li>解除内訳: 敵対 / HP20% / 維持不足</li>
+        <li>旅団別 新規/延長/最終発効ラン数</li>
+        <li><strong>個別 Tier (純粋寄与)</strong>: bandScore Δ</li>
+        <li><strong>協力ペア Tier (シナジー)</strong>: 両方契約 vs 片方</li>
+      </ul>
+      <h3>不足金処理</h3>
+      <ul>
+        <li>(value - cost) 昇順で切捨候補抽出</li>
+        <li>L3 強制解除は最後の手段</li>
+      </ul>
+    </div>
+  </div>
+  <div class="brand">Phase 1 ─ BOT 統合</div>
+  <div class="slide-num">6</div>
+</section>
+
+<!-- ============ Slide 7: Phase 2 概要 ============ -->
+<section class="slide">
+  <h1>Phase 2 ─ バランス調整</h1>
+  <div class="three-col">
+    <div>
+      <h3>雑魚調整 (2F-5F)</h3>
+      <ul>
+        <li>11 体ダイス面値 +1</li>
+        <li>11 体 脅威 +1</li>
+        <li>脅威ロジック修正<br><span style="font-size:9pt">(敵生存時のみ削り)</span></li>
+        <li>前哨基地<br>全回復 → 不足HPの30%</li>
+        <li>T4 武器 0.5% 出現<br><span style="font-size:9pt">(10ラン/1-2回)</span></li>
+      </ul>
+    </div>
+    <div>
+      <h3>ダイス再構築</h3>
+      <ul>
+        <li>iron: 敗北 -1 → <strong>-2</strong></li>
+        <li>copper: 効果無し → <strong>戦闘開始シールド+5</strong></li>
+        <li>biased: ゾロ目追撃 +出目 → <strong>×2</strong></li>
+        <li>BD 取得時シード<br><strong>floor × 5</strong></li>
+        <li>FalconTango 効果差替<br><span style="font-size:9pt">(孤剣時 最大HP-1)</span></li>
+      </ul>
+    </div>
+    <div>
+      <h3>抑制ルール</h3>
+      <ul>
+        <li>同名 passive → 1 回のみ</li>
+        <li>同家系下位 Lv → 抑制</li>
+        <li>14 家系定義</li>
+        <li><strong>「弱い同名を持つ意味=ゼロ」</strong></li>
+      </ul>
+      <h3>特売品</h3>
+      <ul>
+        <li>RefundLevelUp 変更</li>
+        <li>1/2/3 個出現</li>
+        <li>20-60% 割引</li>
+      </ul>
+    </div>
+  </div>
+  <div class="brand">Phase 2 ─ バランス調整</div>
+  <div class="slide-num">7</div>
+</section>
+
+<!-- ============ Slide 8: ショップ価格圧縮 ============ -->
+<section class="slide">
+  <h1>Phase 2 ─ ショップ価格圧縮</h1>
+  <p style="font-size:11pt; margin:4px 0 8px;"><strong>「LEGENDARY が最高コスパ」</strong>を実現するため価格カーブを圧縮、 希少性は出現率で担保</p>
+  <div class="two-col">
+    <div>
+      <table class="compact">
+        <tr><th>Tier</th><th class="num">旧 武器</th><th class="num">新 武器</th><th class="num">旧 P/D</th><th class="num">新 P/D</th></tr>
+        <tr><td>BRONZE</td><td class="num">8</td><td class="num">8</td><td class="num">8</td><td class="num">8</td></tr>
+        <tr><td>SILVER</td><td class="num">20</td><td class="num"><b>12</b></td><td class="num">15</td><td class="num"><b>10</b></td></tr>
+        <tr><td>GOLD</td><td class="num">45</td><td class="num"><b>16</b></td><td class="num">22</td><td class="num"><b>12</b></td></tr>
+        <tr><td>LEGENDARY</td><td class="num">90</td><td class="num"><b>20</b></td><td class="num">25-30</td><td class="num"><b>14</b></td></tr>
+      </table>
+      <p style="font-size:10pt; color:#6a5a3c; margin-top:8px;">武器 1:11.3 → <strong>1:2.5</strong>、 ダイス/パッシブ 1:1.75 に圧縮</p>
+    </div>
+    <div>
+      <h3>出現率の調整</h3>
+      <table class="compact">
+        <tr><th>Tier</th><th class="num">旧</th><th class="num">新 (全枠)</th><th class="num">新 (武器枠)</th></tr>
+        <tr><td>BRONZE</td><td class="num">42%</td><td class="num">45%</td><td class="num">47.5%</td></tr>
+        <tr><td>SILVER</td><td class="num">30%</td><td class="num">32%</td><td class="num">33.5%</td></tr>
+        <tr><td>GOLD</td><td class="num">16%</td><td class="num">18%</td><td class="num">18.5%</td></tr>
+        <tr><td>LEGENDARY</td><td class="num">12%</td><td class="num">5%</td><td class="num"><strong>0.5%</strong></td></tr>
+      </table>
+      <p style="font-size:10pt; color:#6a5a3c; margin-top:8px;">T4 武器: フルラン 10 回に 1-2 回ペースの超レア化</p>
+    </div>
+  </div>
+  <div class="brand">Phase 2 ─ ショップ経済</div>
+  <div class="slide-num">8</div>
+</section>
+
+<!-- ============ Slide 9: Phase 3 ============ -->
+<section class="slide">
+  <h1>Phase 3 ─ 測定基盤 (InventoryPower)</h1>
+  <div class="two-col">
+    <div>
+      <h3>定義</h3>
+      <p style="font-size:10.5pt; line-height:1.5;">
+        Power = <strong>武器Tier係数</strong> (T1=1...T4=10) <br>
+              + Σ <strong>RawScore</strong>(unique item) <br>
+              <span style="font-size:9pt; color:#6a5a3c;">[S=4 / A=3 / B=2 / C=1 / D-E=0、 抑制ルール適用]</span>
+      </p>
+      <h3>PowerBand 5 段</h3>
+      <table class="compact">
+        <tr><th>帯</th><th>範囲</th><th>状態</th></tr>
+        <tr><td>Weak</td><td>&lt; 10</td><td>雑魚装備</td></tr>
+        <tr><td>Early</td><td>&lt; 25</td><td>序盤</td></tr>
+        <tr><td>Mid</td><td>&lt; 50</td><td>中盤</td></tr>
+        <tr><td>Late</td><td>&lt; 80</td><td>終盤入口</td></tr>
+        <tr><td>Apex</td><td>≥ 80</td><td>高みに至る</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>10000 ラン観測値</h3>
+      <div class="kpi">
+        <div><b>54.1</b><span>6F到達時 平均</span></div>
+        <div><b>+29.4</b><span>到達 vs 死亡 差</span></div>
+        <div><b>~68</b><span>6F 突破ライン</span></div>
+      </div>
+      <h3>主要指標</h3>
+      <ul>
+        <li>層別 平均 / 中央値 / 最大</li>
+        <li>Power 帯別 6F 到達率</li>
+        <li><strong>ΔPower</strong>: アイテム別寄与</li>
+        <li>BALANCE_TIER_LIST_*.md に移植</li>
+      </ul>
+    </div>
+  </div>
+  <div class="brand">Phase 3 ─ InventoryPower</div>
+  <div class="slide-num">9</div>
+</section>
+
+<!-- ============ Slide 10: 高速化 ============ -->
+<section class="slide">
+  <h1>Phase 3 ─ 高速化</h1>
+  <p style="font-size:11pt; margin:4px 0 8px;">InventoryPower 系の計算を 50-400 倍速化、 BOT 10000 ラン推定 850s → 15s</p>
+  <table style="flex:1; font-size:11pt;">
+    <tr><th>修正対象</th><th>旧</th><th>新</th><th class="cen">高速化</th></tr>
+    <tr>
+      <td><code>Compute()</code></td>
+      <td>未使用 CollectFiringSkillIds 呼出あり</td>
+      <td>dead code 削除</td>
+      <td class="cen"><b>~50x</b></td>
+    </tr>
+    <tr>
+      <td>抑制判定</td>
+      <td>O(skills²) (IsHigherTierPresent 内ループ)</td>
+      <td>family→maxLv map で O(skills)</td>
+      <td class="cen"><b>~60x</b></td>
+    </tr>
+    <tr>
+      <td><code>SimulateAddItemDelta</code></td>
+      <td>仮装着 + Compute×2 で O(items)</td>
+      <td>近似式 O(1)</td>
+      <td class="cen"><b>~400x</b></td>
+    </tr>
+    <tr>
+      <td>Triage の Score 呼出</td>
+      <td>penalty 計算込み (CRP)</td>
+      <td>RawScore に切替</td>
+      <td class="cen"><b>~5x</b></td>
+    </tr>
+  </table>
+  <blockquote style="margin-top:12px;">
+    トレードオフ: SimulateAddItemDelta の近似化で「抑制経由の Power 減少」 は捕捉できず。 ただし BuyPriorityPass の主軸は Score (Tier ベース) で、 ΔPower はタイブレーカー扱いなので影響は小さい。
+  </blockquote>
+  <div class="brand">Phase 3 ─ 高速化</div>
+  <div class="slide-num">10</div>
+</section>
+
+<!-- ============ Slide 11: Phase 4 ============ -->
+<section class="slide">
+  <h1>Phase 4 ─ ゲーム体験 4 軸メトリクス</h1>
+  <div class="two-col">
+    <div>
+      <h3>4 軸の定義</h3>
+      <div class="mermaid">
+graph LR
+    A[緊張感曲線] --> A1["knife-edge<br>blowout<br>Comeback"]
+    B[ビルド多様性] --> B1["Top10集中度<br>Shannon entropy"]
+    C[死因分布質] --> C1["公平/理不尽 比率"]
+    D[選択意味度] --> D1["Dominant率<br>Balanced率"]
+      </div>
+    </div>
+    <div>
+      <h3>10000 ラン実測</h3>
+      <table class="compact">
+        <tr><th>軸</th><th>指標</th><th>値</th></tr>
+        <tr><td>緊張感</td><td>1F knife</td><td>12.4%</td></tr>
+        <tr><td>緊張感</td><td>3F blowout</td><td>96.5%</td></tr>
+        <tr><td>多様性</td><td>Shannon 正規化</td><td>0.86</td></tr>
+        <tr><td>多様性</td><td>Top10 集中</td><td>42.6%</td></tr>
+        <tr><td>死因質</td><td>1-5F 理不尽率</td><td>0%</td></tr>
+        <tr><td>死因質</td><td>6-7F 理不尽率</td><td>33-35%</td></tr>
+        <tr><td>選択</td><td>Dominant 率</td><td>65%</td></tr>
+        <tr><td>選択</td><td>Balanced 率</td><td>35%</td></tr>
+      </table>
+    </div>
+  </div>
+  <p style="font-size:10pt; color:#6a5a3c; margin-top:6px;">→ 完走率に出ない 「体感の質」 が定量化される。 ボス瞬殺型、 ビルド収束、 不公平死を早期発見</p>
+  <div class="brand">Phase 4 ─ ゲーム体験指標</div>
+  <div class="slide-num">11</div>
+</section>
+
+<!-- ============ Slide 12: Phase 5 ============ -->
+<section class="slide">
+  <h1>Phase 5 ─ BOT 売却 + Power 帯認識</h1>
+  <div class="two-col">
+    <div>
+      <h3>2 つの分岐</h3>
+      <div class="mermaid">
+graph TB
+    M[移動中 容量超過] --> Discard[無償廃棄 0G]
+    S[ショップ訪問] --> Q1{容量超過?}
+    Q1 -->|あり| Sell1[由来問わず TrySell<br>レア応じて 3〜9G]
+    Q1 -->|なし| Q2{買えないS/A?}
+    Q2 -->|あり &amp; 売却可品所持| SellBuy[ゴミ売却 → S/A 購入]
+    Q2 -->|あり &amp; 売却品なし| Skip[諦める]
+    Q2 -->|なし| Normal[通常購入]
+      </div>
+      <ul style="font-size:10pt;">
+        <li><strong>移動中</strong>: 売却 API 使えず → 容量超過は <strong>常に廃棄</strong></li>
+        <li><strong>ショップ滞在中</strong>: 由来問わず売却可 (商人の符牒のみ阻止)</li>
+        <li>売却額: BRONZE 3G / SILVER 5G / GOLD 7G / LEGENDARY 9G (回収率 37-64%)</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Power 帯認識 BOT</h3>
+      <table class="compact">
+        <tr><th>帯</th><th>購入</th><th>リロール</th></tr>
+        <tr><td>Weak/Early</td><td>C+ も買う</td><td>しない (G 温存)</td></tr>
+        <tr><td>Mid</td><td>標準 B+</td><td>通常 (S 未所持)</td></tr>
+        <tr><td>Late/Apex</td><td>A+ のみ</td><td>積極 (S 狩り)</td></tr>
+      </table>
+      <h3>意義</h3>
+      <ul style="font-size:10pt;">
+        <li>「自分の現在地」 を見てショップ戦略を動的調整</li>
+        <li>弱い時は底上げ、 強い時は質追求</li>
+        <li>BOT が「人間のような」 文脈意思決定に</li>
+      </ul>
+    </div>
+  </div>
+  <div class="brand">Phase 5 ─ BOT 進化</div>
+  <div class="slide-num">12</div>
+</section>
+
+<!-- ============ Slide 13: Phase 6 上位互換 upgrade 割引 + 連続値 LiftScore ============ -->
+<section class="slide">
+  <h1>Phase 6 ─ upgrade 割引 + 連続値 LiftScore</h1>
+  <div class="two-col">
+    <div>
+      <h3>問題: 5 段 Tier の粒度不足</h3>
+      <ul style="font-size:11pt;">
+        <li>同家系 LV3 / LV4 が同 Tier に丸まり区別不能</li>
+        <li>RawScore (S=4...D=0) では 4-fold 幅、 武器 WeaponTierBonus (1-10) と不整合</li>
+        <li>BOT が「LEGENDARY 無視、 GOLD 保持」 を最適解と判断 → 設計上の罠</li>
+      </ul>
+      <h3>解 1: upgrade 割引 (1G/Tier段)</h3>
+      <ul style="font-size:11pt;">
+        <li>同家系下位 Lv 所持時、 上位提示が <strong>Tier 1 段差 = 1G</strong> の超格安に</li>
+        <li>LV2 所持 + LV4 提示 → 2 段差 → <strong>2G</strong></li>
+        <li>「希少品を見たら取る」 体験を取り戻す</li>
+      </ul>
+    </div>
+    <div>
+      <h3>解 2: 連続値 LiftScore (案 A)</h3>
+      <ul style="font-size:11pt;">
+        <li>Tier バケットではなく z-score 加重和を直接スコアに</li>
+        <li>同 Tier 内序列が自動序列化</li>
+        <li>家系 Lv 補正: I=0 / II=0.5 / III=1.0 / IV=1.5</li>
+      </ul>
+      <h3>BuyPriorityPass 三段 tiebreak</h3>
+      <ol style="font-size:11pt;">
+        <li>Score (Tier バケット + 特売補正)</li>
+        <li><strong>LiftScore</strong> (連続値、 案 A) ← 新</li>
+        <li>ΔPower / G (コスパ)</li>
+      </ol>
+      <blockquote style="margin-top:6px; font-size:10.5pt;">
+        Tier 表は人間用 snapshot、 BOT 判定は連続値 LiftScore の二系統運用。
+      </blockquote>
+    </div>
+  </div>
+  <div class="brand">Phase 6 ─ 粒度問題の解消</div>
+  <div class="slide-num">13</div>
+</section>
+
+<!-- ============ Slide 14: Phase 7 selection bias 対策 + pick/retention 分析 ============ -->
+<section class="slide">
+  <h1>Phase 7 ─ ΔPower 提示時 + pick/retention 分析</h1>
+  <div class="two-col">
+    <div>
+      <h3>問題: ΔPower の selection bias</h3>
+      <ul style="font-size:11pt;">
+        <li>dice_bone が +18.5 ΔPower (実態は BRONZE で並)</li>
+        <li>非取得側 = 早期死亡群 で歪み</li>
+        <li>真理 / 剣の舞集約 も同じ bias</li>
+      </ul>
+      <h3>解: ΔPower 提示時 (offered cohort)</h3>
+      <pre style="font-size:10pt;">ΔPower提示 = avg(取得∧提示)
+            − avg(非取得∧提示)</pre>
+      <p style="font-size:10pt;">同じ「提示された」 母集団で比較 → 早期死亡群を除外 → 真の貢献</p>
+      <ul style="font-size:10.5pt;">
+        <li>dice_bone: +18.5 → 推定 <strong>+1〜+3</strong></li>
+        <li>BD バイアス: +68 → <strong>+30 程度</strong>に半減</li>
+      </ul>
+    </div>
+    <div>
+      <h3>pick率 / 保持率 分析 (新規)</h3>
+      <table class="compact">
+        <tr><th>ラベル</th><th>条件</th><th>意味</th></tr>
+        <tr><td>★定番</td><td>pick≥70% & 保持≥70%</td><td>取って残す本命</td></tr>
+        <tr><td>⚠序盤要員</td><td>pick≥70% & 保持&lt;40%</td><td>序盤強・後半捨</td></tr>
+        <tr><td>○常用品</td><td>pick≥70%</td><td>標準的活用</td></tr>
+        <tr><td>◇隠れ強</td><td>pick&lt;20% & 保持≥70%</td><td>取れば離さない</td></tr>
+        <tr><td>△マイナー</td><td>pick&lt;20%</td><td>あまり使われない</td></tr>
+      </table>
+      <blockquote style="margin-top:10px; font-size:10pt;">
+        ⚠は「終盤に置換される設計」 が機能している証拠。 ◇は「BOT 評価不足」 で Tier 上げ候補。
+      </blockquote>
+    </div>
+  </div>
+  <div class="brand">Phase 7 ─ 指標の bias 解消</div>
+  <div class="slide-num">14</div>
+</section>
+
+<!-- ============ Slide 15: 現在地 & 次の打ち手 ============ -->
+<section class="slide">
+  <h1>現在地と次の打ち手</h1>
+  <div class="two-col">
+    <div>
+      <h3>未対応の高優先タスク</h3>
+      <ol style="font-size:11pt;">
+        <li><strong>契約 AI に Power 帯認識</strong><br><span style="font-size:9.5pt; color:#6a5a3c;">弱ラン=守り契約、 強ラン=攻め契約</span></li>
+        <li><strong>イベント選択肢に Power 文脈</strong><br><span style="font-size:9.5pt; color:#6a5a3c;">HP-loss 判断の精度向上</span></li>
+        <li><strong>UI 実装</strong><br><span style="font-size:9.5pt; color:#6a5a3c;">契約バフ欄 / 維持費不足選択 / 特売表示 / upgrade 割引表示</span></li>
+        <li><strong>動的効果品の Power 過小評価対策</strong><br><span style="font-size:9.5pt; color:#6a5a3c;">BD/双蛇/不屈系の intrinsicPower 手動定義</span></li>
+        <li><strong>シナジー対応 InventoryPower</strong><br><span style="font-size:9.5pt; color:#6a5a3c;">組合せ補正 +Power 加算</span></li>
+      </ol>
+    </div>
+    <div>
+      <h3>本期の成果まとめ</h3>
+      <ul style="font-size:11pt;">
+        <li><strong>機構</strong>: 旅団契約システム (12+6+6) + 特売 + upgrade 割引</li>
+        <li><strong>バランス</strong>: ダイス / 価格圧縮 / 抑制 / T4 出現</li>
+        <li><strong>測定</strong>: InventoryPower + ΔPower (全体/提示時) + pick/保持率</li>
+        <li><strong>体感</strong>: 4 軸メトリクス (緊張/多様/死因/選択)</li>
+        <li><strong>BOT</strong>: 売却 + Power 帯認識 + LiftScore 連続値</li>
+        <li><strong>速度</strong>: 推定 50-400 倍高速化</li>
+      </ul>
+      <blockquote style="margin-top:10px;">
+        「機構 → 測定 → 改善」 のループ完成。 selection bias 対策で <strong>指標の信頼性も担保</strong>。 以後はデータ駆動で漸進的調整に移行可能。
+      </blockquote>
+    </div>
+  </div>
+  <div class="brand">現在地と次の打ち手</div>
+  <div class="slide-num">15</div>
+</section>
+
+<!-- ============ Slide 16: 語彙リスト ============ -->
+<section class="slide">
+  <h1>語彙リスト</h1>
+  <div class="two-col">
+    <div>
+      <h3>システム関連</h3>
+      <table class="compact">
+        <tr><th>語</th><th>説明</th></tr>
+        <tr><td>旅団契約</td><td>12 自由業者集団との維持費契約</td></tr>
+        <tr><td>維持費</td><td>L1=3G / L2=6G / L3=9G</td></tr>
+        <tr><td>InventoryPower</td><td>Tier 表ベースの戦力数値</td></tr>
+        <tr><td>ΔPower</td><td>アイテム別 Power 寄与</td></tr>
+        <tr><td>PowerBand</td><td>5 段表示 (Weak..Apex)</td></tr>
+        <tr><td>抑制ルール</td><td>同名/下位 Lv は最高のみ発動</td></tr>
+        <tr><td>特売品</td><td>20-60% 割引のメタバフ品</td></tr>
+        <tr><td><strong>upgrade 割引</strong></td><td>同家系下位所持時、 1G/Tier段の超格安</td></tr>
+        <tr><td><strong>LiftScore</strong></td><td>連続値 lift スコア (案A、 BOT 判断用)</td></tr>
+        <tr><td>TrySell</td><td>ショップ売却 API</td></tr>
+        <tr><td>shopPurchasedCounts</td><td>ショップ由来在庫トラッキング</td></tr>
+        <tr><td>Tier 細分化</td><td>S=4/A=3/B=2/C=1/D-E=0</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>測定指標</h3>
+      <table class="compact">
+        <tr><th>語</th><th>説明</th></tr>
+        <tr><td>knife-edge勝率</td><td>残 HP≤20% で勝った%</td></tr>
+        <tr><td>blowout率</td><td>HP&gt;80%→1戦で死亡 %</td></tr>
+        <tr><td>Comeback</td><td>低 HP 経由 6F 到達 %</td></tr>
+        <tr><td>Shannon entropy</td><td>ビルド多様性指標</td></tr>
+        <tr><td>selection bias</td><td>取得状況が結果を歪める交絡</td></tr>
+        <tr><td>ExcludedFromLift</td><td>lift 計算除外 ID 集合</td></tr>
+        <tr><td>lift6F</td><td>6F到達同士の bandScore 差</td></tr>
+        <tr><td>bandScore</td><td>ラン rank 数値 (1-12)</td></tr>
+        <tr><td>ΔPower/G</td><td>ショップコスパ指標</td></tr>
+        <tr><td>RawScore</td><td>素 Tier (penalty 無し)</td></tr>
+        <tr><td><strong>ΔPower 提示時</strong></td><td>offered cohort 限定の bias 緩和指標</td></tr>
+        <tr><td><strong>pick率 / 保持率</strong></td><td>提示時採用率 / 取得後残存率</td></tr>
+        <tr><td><strong>⚠ 序盤要員</strong></td><td>pick≥70% & 保持&lt;40% (序盤強・終盤捨)</td></tr>
+        <tr><td><strong>◇ 隠れ強</strong></td><td>pick&lt;20% & 保持≥70% (取れば離さず)</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="brand">語彙リスト</div>
+  <div class="slide-num">16</div>
+</section>
+
+</body>
+</html>

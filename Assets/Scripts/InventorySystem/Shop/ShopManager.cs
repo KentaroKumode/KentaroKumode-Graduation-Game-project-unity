@@ -47,16 +47,28 @@ namespace InventorySystem.Shop
         //  Tier 重み（A3）
         // ============================================================
 
-                // 武器枠のみ WeaponShopFilter で LEGENDARY を別途除外（強化最終形対策）
+                // 武器枠のみ別の重みテーブル (T4 を超レア出現に)
         // MYTHIC は全カテゴリで排出しない
-        // 2026-05-30 v2: LEG 0.07→0.12 (T4武器到達率の改善目的、 ショップでの T4 出現確率を約7割増)
-        // BRONZE/SILVER を相応に減らして合計1.0。
+        // 2026-06-22: 価格カーブ圧縮 (BRONZE 8G / LEGENDARY 14G、 1:1.75) に合わせて
+        //             LEGENDARY 出現率を 0.12 → 0.05 に下げ、 希少性を出現頻度で担保。
+        //             安価で買いやすくなった上位 Tier の取得を 「運の良いラン」 に限定する設計。
         private static readonly (ItemRarity rarity, float weight)[] tierWeights = new[]
         {
-            (ItemRarity.BRONZE,    0.42f),
-            (ItemRarity.SILVER,    0.30f),
-            (ItemRarity.GOLD,      0.16f),
-            (ItemRarity.LEGENDARY, 0.12f),
+            (ItemRarity.BRONZE,    0.45f),
+            (ItemRarity.SILVER,    0.32f),
+            (ItemRarity.GOLD,      0.18f),
+            (ItemRarity.LEGENDARY, 0.05f),
+        };
+
+        // 2026-06-22: 武器枠用の Tier 重み。 T4 (LEGENDARY) を 0.005 (0.5%/枠) に絞り、
+        // フルラン (~6 ショップ × 1.5 武器枠 = 9 武器枠) × 10 ラン = 90 枠中 0.5 枠出現 ≒ 10 ランに 1 回ペース。
+        // 強化ルート完走の代替路線として 「直接 T4 を引く運要素」 を残す設計。
+        private static readonly (ItemRarity rarity, float weight)[] weaponTierWeights = new[]
+        {
+            (ItemRarity.BRONZE,    0.475f),
+            (ItemRarity.SILVER,    0.335f),
+            (ItemRarity.GOLD,      0.185f),
+            (ItemRarity.LEGENDARY, 0.005f),
         };
 
         // ============================================================
@@ -77,8 +89,7 @@ namespace InventorySystem.Shop
             inv.priceMultiplier = baseMul * MetaProgression.MetaDebuffApplicator.GetShopPriceMultiplier();
             // 商人の符牒: 価格半額（割合計算が先）
             var runForSeal = GameLoop.GameManager.Instance?.Run;
-            if (runForSeal != null && runForSeal.ownedPassiveItems != null
-                && runForSeal.ownedPassiveItems.Contains("商人の符牒"))
+            if (runForSeal != null && runForSeal.OwnsPassive("商人の符牒"))
             {
                 inv.priceMultiplier *= 0.5f;
                 Debug.Log("[ShopManager] 商人の符牒適用: 価格半額");
@@ -140,6 +151,13 @@ namespace InventorySystem.Shop
                 });
             }
 
+            // 2026-06-23: 上位互換アップグレード割引 (同家系下位所持時、 1G/Tier段の超格安)
+            //   ── 上位 Tier を取らない方が得という設計上の罠を撲滅
+            ApplyUpgradeDiscounts(inv, GameLoop.GameManager.Instance?.Run);
+
+            // 2026-06-22: メタバフ「特売品」 を 1/2/3 個ランダム枠に付与 (Passive/Consumable/Weapon/Dice のみ対象)
+            ApplySaleDiscounts(inv);
+
             Current = inv;
             OnShopOpened?.Invoke(inv);
             Debug.Log($"[ShopManager] 入店: フロア{floor}, スロット{inv.slots.Count}");
@@ -150,6 +168,104 @@ namespace InventorySystem.Shop
                 ForceBuyHighestAffordable(inv, run);
 
             return inv;
+        }
+
+        /// <summary>2026-06-23: 同家系下位 Lv を所持している場合の上位互換アップグレード割引。
+        /// 「Tier 1 段差 = 1G」 の超格安に。 上位を取らない方が得という設計上の罠を撲滅。
+        /// 例: LV2 (SILVER) 所持 + LV4 (LEGENDARY) 提示 → 価格 = 2G (差 2 段)。
+        /// 特売品との重複時は、 より安い方を採用 (= 通常 upgrade 割引が優位)。</summary>
+        private void ApplyUpgradeDiscounts(ShopInventory inv, GameLoop.RunState run)
+        {
+            if (run == null || inv?.slots == null) return;
+            var db = ItemDatabase.Instance;
+            if (db == null) return;
+            for (int i = 0; i < inv.slots.Count; i++)
+            {
+                var s = inv.slots[i];
+                if (s == null || s.sold) continue;
+                if (string.IsNullOrEmpty(s.itemId)) continue;
+                if (s.kind == ShopSlotKind.WeaponMaterial || s.kind == ShopSlotKind.InventoryExpansion) continue;
+                var slotData = db.GetItem(s.itemId);
+                if (slotData?.passiveSkills == null) continue;
+
+                // 候補の家系→最高 Lv マップ
+                var candFamilyLv = new System.Collections.Generic.Dictionary<string, int>();
+                foreach (var ps in slotData.passiveSkills)
+                {
+                    if (string.IsNullOrEmpty(ps.internalName)) continue;
+                    var (fam, lv) = InventorySystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(ps.internalName);
+                    if (lv > 0 && (!candFamilyLv.TryGetValue(fam, out int prev) || lv > prev))
+                        candFamilyLv[fam] = lv;
+                }
+                if (candFamilyLv.Count == 0) continue;
+
+                // 所持品から同家系の最高 Lv を探す (装備武器/ダイス含む)
+                int maxStep = 0;
+                void CheckOwned(string ownedId)
+                {
+                    if (string.IsNullOrEmpty(ownedId)) return;
+                    var od = db.GetItem(ownedId);
+                    if (od?.passiveSkills == null) return;
+                    foreach (var ops in od.passiveSkills)
+                    {
+                        if (string.IsNullOrEmpty(ops.internalName)) continue;
+                        var (ofam, olv) = InventorySystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(ops.internalName);
+                        if (olv <= 0) continue;
+                        if (!candFamilyLv.TryGetValue(ofam, out int candLv)) continue;
+                        if (olv >= candLv) continue;
+                        int step = candLv - olv;
+                        if (step > maxStep) maxStep = step;
+                    }
+                }
+                CheckOwned(run.equippedWeaponId);
+                CheckOwned(run.equippedDiceId);
+                if (run.ownedPassiveItems != null)
+                    foreach (var id in run.ownedPassiveItems) CheckOwned(id);
+
+                if (maxStep <= 0) continue;
+                // 割引適用 (1G/Tier段、 最低 1G、 既存より安くなる場合のみ反映)
+                int newPrice = System.Math.Max(1, maxStep);
+                if (newPrice >= s.price) continue;
+                s.originalPrice = s.price;
+                s.discountPct = (int)(100f * (1f - (float)newPrice / s.price));
+                s.price = newPrice;
+                Debug.Log($"[ShopManager] 上位互換アップグレード割引 slot={i} {s.itemId} ({maxStep}段差) {s.originalPrice}G→{s.price}G ({s.discountPct}%off)");
+            }
+        }
+
+        /// <summary>2026-06-22: メタバフ refundLevel に応じて 1/2/3 個の特売品をランダム選出。
+        /// 特売品は 20-60% の範囲で price を割引、 元価格を originalPrice に保持。
+        /// 対象は Passive/Consumable/Weapon/Dice (アイテム枠) のみ、 強化素材/拡張は除外。</summary>
+        private void ApplySaleDiscounts(ShopInventory inv)
+        {
+            int n = MetaProgression.MetaBuffApplicator.GetSaleItemCount();
+            if (n <= 0 || inv?.slots == null) return;
+            // 特売対象になり得るスロットを抽出 (商品枠かつ未売却かつ itemId あり)
+            var candidates = new System.Collections.Generic.List<int>();
+            for (int i = 0; i < inv.slots.Count; i++)
+            {
+                var s = inv.slots[i];
+                if (s == null || s.sold) continue;
+                if (string.IsNullOrEmpty(s.itemId)) continue;
+                if (s.kind == ShopSlotKind.WeaponMaterial || s.kind == ShopSlotKind.InventoryExpansion) continue;
+                if (s.discountPct > 0) continue; // 2026-06-23: 上位互換割引済は特売対象外 (二重割引防止)
+                candidates.Add(i);
+            }
+            // Fisher-Yates シャッフルで n 個ランダム選出
+            int pick = Mathf.Min(n, candidates.Count);
+            for (int i = 0; i < pick; i++)
+            {
+                int j = Random.Range(i, candidates.Count);
+                (candidates[i], candidates[j]) = (candidates[j], candidates[i]);
+                var s = inv.slots[candidates[i]];
+                int discount = Random.Range(
+                    MetaProgression.MetaBuffApplicator.SaleDiscountMinPct,
+                    MetaProgression.MetaBuffApplicator.SaleDiscountMaxPct + 1);
+                s.originalPrice = s.price;
+                s.discountPct = discount;
+                s.price = Mathf.Max(1, Mathf.CeilToInt(s.price * (1f - discount / 100f)));
+                Debug.Log($"[ShopManager] 特売 slot={candidates[i]} {s.itemId} -{discount}% ({s.originalPrice}G→{s.price}G)");
+            }
         }
 
         private void ForceBuyHighestAffordable(ShopInventory inv, GameLoop.RunState run)
@@ -221,9 +337,30 @@ namespace InventorySystem.Shop
                 var run = GameLoop.GameManager.Instance?.Run;
                 if (run?.ownedPassiveItems != null)
                 {
+                    // 現所持に加え「このランで一度取得した(=捨てた物も含む)」パッシブも陳列しない（重複禁止）。
                     var owned = new HashSet<string>(run.ownedPassiveItems);
+                    if (run.seenPassiveItemIds != null) owned.UnionWith(run.seenPassiveItemIds);
                     var dd = pool.FindAll(it => !owned.Contains(it.internalName));
                     if (dd.Count > 0) pool = dd;
+
+                    // 佯狂者の鈴(ADR-0002): 絶望(≤20)/発狂中、他の[佯狂者]アイテムがショップに出やすい。
+                    // 未所持の佯狂者が在庫候補にあれば 60% で優先排出（セットの組み立てを助ける）。
+                    if (owned.Contains(GameLoop.YokyoSet.Bell)
+                        && GameLoop.HopeSystem.GetTier(run) >= GameLoop.HopeTier.Despair)
+                    {
+                        var yokyo = pool.FindAll(it => System.Array.IndexOf(GameLoop.YokyoSet.All, it.internalName) >= 0);
+                        if (yokyo.Count > 0 && Random.value < 0.6f)
+                            return yokyo[Random.Range(0, yokyo.Count)];
+                    }
+
+                    // サーベル・ワルツ([剣の舞]): 所持(昇華含む)時、未所持の[剣の舞]が出やすい(60%優先排出)。
+                    // セットの組み立てを助ける（佯狂者の鈴と同型・希望条件なし）。
+                    if (run.OwnsPassive(GameLoop.SwordDanceSet.SaberWaltz))
+                    {
+                        var dance = pool.FindAll(it => GameLoop.SwordDanceSet.IsDance(it.internalName));
+                        if (dance.Count > 0 && Random.value < 0.6f)
+                            return dance[Random.Range(0, dance.Count)];
+                    }
                 }
             }
 
@@ -234,15 +371,16 @@ namespace InventorySystem.Shop
                 if (hi.Count > 0) pool = hi;
             }
 
-            // 武器のみ: 強化ルート最終LEGENDARYを除外
+            // 武器のみ: WeaponShopFilter のチェック (LEGENDARY を含めて出現可、 出現率は別重みで制御)
             if (kind == ShopSlotKind.Weapon)
             {
                 pool = pool.FindAll(WeaponShopFilter.IsShopAllowed);
                 if (pool.Count == 0) return null;
             }
 
-            // Tier重みで抽選
-            ItemRarity targetRarity = RollTier(pool);
+            // Tier重みで抽選 (武器は専用重みで T4 を超レア化)
+            var weights = (kind == ShopSlotKind.Weapon) ? weaponTierWeights : tierWeights;
+            ItemRarity targetRarity = RollTier(pool, weights);
             var byTier = pool.FindAll(it => it.rarity == targetRarity);
             if (byTier.Count == 0)
             {
@@ -252,21 +390,22 @@ namespace InventorySystem.Shop
             return byTier[Random.Range(0, byTier.Count)];
         }
 
-        private ItemRarity RollTier(List<CompleteItemData> pool)
+        private ItemRarity RollTier(List<CompleteItemData> pool, (ItemRarity rarity, float weight)[] weights = null)
         {
+            var table = weights ?? tierWeights;
             // pool 内に存在する rarity だけで重み付き抽選
             var availableRarities = new HashSet<ItemRarity>();
             foreach (var it in pool) availableRarities.Add(it.rarity);
 
             float total = 0f;
-            foreach (var (rarity, weight) in tierWeights)
+            foreach (var (rarity, weight) in table)
                 if (availableRarities.Contains(rarity)) total += weight;
 
             if (total <= 0f)
                 return pool.Count > 0 ? pool[0].rarity : ItemRarity.BRONZE;
 
             float r = Random.value * total;
-            foreach (var (rarity, weight) in tierWeights)
+            foreach (var (rarity, weight) in table)
             {
                 if (!availableRarities.Contains(rarity)) continue;
                 if ((r -= weight) <= 0f) return rarity;
@@ -342,6 +481,13 @@ namespace InventorySystem.Shop
                     run.ownedConsumables.Add(slot.itemId);
                     break;
             }
+            // ショップ購入記録 (BOT 売却判定で「ショップ由来」 のみ売却可)
+            if (slot.kind == ShopSlotKind.Passive || slot.kind == ShopSlotKind.Consumable
+                || slot.kind == ShopSlotKind.Weapon || slot.kind == ShopSlotKind.Dice)
+            {
+                run.shopPurchasedCounts.TryGetValue(slot.itemId, out int prev);
+                run.shopPurchasedCounts[slot.itemId] = prev + 1;
+            }
             slot.sold = true;
 
             var data = ItemDatabase.Instance?.GetItem(slot.itemId);
@@ -395,7 +541,7 @@ namespace InventorySystem.Shop
         /// <summary>
         /// 値下げ交渉を試みる(実態は強盗)。
         /// ・現在ショップの未売却アイテムIDをスナップショットして run.robberyPendingItems に格納
-        /// ・カルマ+1、shopsBlocked = true (以降ショップ進入不可)
+        /// ・希望コスト適用、shopsBlocked = true (以降ショップ進入不可)
         /// ・shopRobberyInProgress = true
         /// ・ショップを閉じ、戻り値 true なら呼び出し側が「怪しい商人」戦闘を開始する
         /// </summary>
@@ -424,11 +570,11 @@ namespace InventorySystem.Shop
                 run.robberyPendingItems.Clear();
             run.robberyPendingItems.AddRange(loot);
 
-            run.karma += 1;
+            GameLoop.HopeSystem.ApplyEvilChoice(run, GameLoop.HopeSystem.EvilChoiceCost);
             run.shopsBlocked = true;
             run.shopRobberyInProgress = true;
 
-            Debug.Log($"[ShopManager] 値下げ交渉(強盗): カルマ+1, 在庫{loot.Count}件をスナップ, 以降ショップ進入不可");
+            Debug.Log($"[ShopManager] 値下げ交渉(強盗): 希望-{GameLoop.HopeSystem.EvilChoiceCost}, 在庫{loot.Count}件をスナップ, 以降ショップ進入不可");
             // ショップを閉じる (呼び出し側がエリート戦闘を開始する)
             Close();
             return true;
@@ -446,7 +592,7 @@ namespace InventorySystem.Shop
             if (run == null) return false;
 
             // 商人の符牒: アイテム売却不可
-            if (run.ownedPassiveItems != null && run.ownedPassiveItems.Contains("商人の符牒"))
+            if (run != null && run.OwnsPassive("商人の符牒"))
             {
                 Log("商人の符牒の誓いにより売却不可");
                 return false;
@@ -469,7 +615,14 @@ namespace InventorySystem.Shop
 
             string id = list[listIndex];
             int price = ResolveSellPrice(id);
-            list.RemoveAt(listIndex);
+            // 並列リスト同期のため PassiveAddHelper.RemoveAt を使う (passiveSigils も外す)
+            if (source == SellSource.Passive)
+                InventorySystem.Helpers.PassiveAddHelper.RemoveAt(run, listIndex);
+            else
+                list.RemoveAt(listIndex);
+            // ショップ購入記録があれば在庫を 1 減らす (BOT 用、 売却可能在庫トラッキング)
+            if (run.shopPurchasedCounts.TryGetValue(id, out int shopStock) && shopStock > 0)
+                run.shopPurchasedCounts[id] = shopStock - 1;
             int gainPrice = GameLoop.LastStand.FilterGoldGain(run, price);
             run.coins += gainPrice;
             Debug.Log($"[ShopManager] 売却: {id} +{gainPrice}G");
@@ -477,12 +630,26 @@ namespace InventorySystem.Shop
             return true;
         }
 
+        /// <summary>2026-06-23: 売却額をレアリティに応じてスケール。
+        /// 個別 sellPrice が定義されていれば優先 (旧仕様維持)。
+        /// 未定義時は BRONZE 3G / SILVER 5G / GOLD 7G / LEGENDARY 9G を返す。
+        /// 圧縮後の購入価格 (8/10/12/14) に対して おおよそ 37-64% の回収率。</summary>
         private int ResolveSellPrice(string id)
         {
-            if (string.IsNullOrEmpty(id)) return 5;
+            if (string.IsNullOrEmpty(id)) return 3;
             var data = ItemDatabase.Instance?.GetItem(id);
-            if (data?.sellPrice == null) return 5;
-            return Random.Range(data.sellPrice.min, data.sellPrice.max + 1);
+            if (data == null) return 3;
+            if (data.sellPrice != null)
+                return Random.Range(data.sellPrice.min, data.sellPrice.max + 1);
+            switch (data.rarity)
+            {
+                case ItemRarity.BRONZE:    return 3;
+                case ItemRarity.SILVER:    return 5;
+                case ItemRarity.GOLD:      return 7;
+                case ItemRarity.LEGENDARY: return 9;
+                case ItemRarity.MYTHIC:    return 12;
+                default:                   return 3;
+            }
         }
 
         // ============================================================

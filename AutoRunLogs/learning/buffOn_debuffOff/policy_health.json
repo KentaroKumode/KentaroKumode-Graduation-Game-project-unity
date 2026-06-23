@@ -1,20 +1,20 @@
 {
-  "updatedAt": "2026-06-01 07:59:23",
+  "updatedAt": "2026-06-22 17:47:44",
   "mode": "paired",
   "lastBatch": {
-    "n": 1000,
-    "compositeMean": 8.689,
-    "pairedDiff": -0.068,
-    "pairedSEM": 0.074,
-    "ci95": [-0.21, 0.08]
+    "n": 2000,
+    "compositeMean": 7.584,
+    "pairedDiff": 0.079,
+    "pairedSEM": 0.058,
+    "ci95": [-0.03, 0.19]
   },
   "best": {
-    "score": 8.661,
-    "summary": "shop[reroll=0.30 cons=2] rob[hp%=0.79] event[exp=0.04] combat[thr=4 heal=1.02] nav[low=0.76 crit=0.36] | last avg=8.66 batches=22"
+    "score": 7.546,
+    "summary": "shop[reroll=0.21 cons=2] rob[hp%=0.76] event[exp=0.00] combat[thr=4 heal=1.02] nav[low=0.70 crit=0.40 latHope=20 refill=40] subl[reserve=3] stance[def<0.28 hpBias=0.30] | last avg=7.55 batches=29"
   },
-  "decision": "rejected-paired (Δ=-0.07 ≤ margin 0.144)",
-  "effectiveMargin": 0.144,
-  "nextPerturb": { "axis": "multi-axis", "delta": -0.068 },
+  "decision": "rejected-paired (Δ=+0.08 ≤ margin 0.113)",
+  "effectiveMargin": 0.113,
+  "nextPerturb": { "axis": "multi-axis", "delta": 0.079 },
   "gates": { "minBatchForL1": 50, "minBatchForL2": 200, "semConfidenceK": 1.96 },
   "diagnostics": ["OK: ペアテストでノイズ低減中", "OK: サイズ十分"]
 }

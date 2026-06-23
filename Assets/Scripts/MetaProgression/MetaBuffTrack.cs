@@ -9,7 +9,7 @@ namespace MetaProgression
     /// </summary>
     public static class MetaBuffTrack
     {
-        public const int TotalSteps = 59;
+        public const int TotalSteps = 58;
 
         private static readonly List<MetaBuffStep> steps = BuildSteps();
 
@@ -35,60 +35,59 @@ namespace MetaProgression
                 => list.Add(new MetaBuffStep { kind = k, amount = amount, isMajor = major });
             void Hp() => Add(MetaBuffKind.Hp);
             void Gold() => Add(MetaBuffKind.Gold);
+            void Dmg() => Add(MetaBuffKind.OutgoingDamagePct, 5);
             void Major(MetaBuffKind k, int amount = 1) => Add(k, amount, true);
 
             // 設計サマリ:
-            //   HP 30, Gold 5, SM 3, CGB 2, DR 2, DT 1, CL 2, RL 3, HR 3,
-            //   BEN 1, BER 1, DP 1, SPI 1, FCH 2, TCG 1 → 計 58
-            //   (HP ナーフ: 60→30。出力面ナーフ: DT 3→1, CL 3→2, CritDamageBoost 撤廃)
+            //   HP 30, Gold 5, Dmg(コモン) 10×+5% (cap +50%), 大スキル 13 → 計 58
+            //   大スキルは重複統合・1段でフル効果。 final(Lv58) は会心ダメージ+100%。
             //
             // ===== 序盤 (Lv 1-20) =====
             Hp(); Hp(); Gold();                                          // 1-3
-            Major(MetaBuffKind.FloorClearHeal);                          // 4 (+1)
+            Dmg();                                                       // 4 (+5%)
             Hp(); Hp(); Hp();                                            // 5-7
-            Major(MetaBuffKind.StartMaterial);                           // 8 (1st)
+            Major(MetaBuffKind.StartMaterial, 3);                        // 8 (max=3 一括)
             Hp(); Hp(); Hp();                                            // 9-11
-            Major(MetaBuffKind.CombatGoldBonus);                         // 12 (1st)
+            Major(MetaBuffKind.CombatGoldBonus, 2);                      // 12 (max=2 一括)
             Hp(); Hp(); Hp();                                            // 13-15
-            Major(MetaBuffKind.DamageReduce);                            // 16 (-1)
+            Major(MetaBuffKind.DamageReduce, 2);                         // 16 (max=-2 一括)
             Hp(); Gold(); Hp();                                          // 17-19
             Major(MetaBuffKind.BossExtraNormal);                         // 20
 
             // ===== ミッド (Lv 21-40) =====
             Hp(); Hp();                                                  // 21-22
-            Major(MetaBuffKind.HungerReduce);                            // 23 (-1)
+            Major(MetaBuffKind.HopeLossReduce, 3);                       // 23 (戦闘後の希望減少 -3 一括)
             Hp(); Hp();                                                  // 24-25
-            Major(MetaBuffKind.StartMaterial);                           // 26 (2nd)
-            Major(MetaBuffKind.ShopRobberyUnlock);                       // 27 (ミッド 大スキル: 値下げ交渉=強盗 解禁)
+            Major(MetaBuffKind.StartingPassiveItem);                     // 26 (開幕パッシブ ノーマル)
+            Major(MetaBuffKind.ShopRobberyUnlock);                       // 27
             Hp(); Hp();                                                  // 28-29
-            Major(MetaBuffKind.CritLevelUp);                             // 30 (+1)
+            Major(MetaBuffKind.CritLevelUp, 2);                          // 30 (max=+2 一括)
             Hp(); Gold(); Hp();                                          // 31-33
-            Major(MetaBuffKind.RefundLevelUp);                           // 34 (5%)
+            Dmg();                                                       // 34 (+10%累積)
             Hp();                                                        // 35
-            Major(MetaBuffKind.StartMaterial);                           // 36 (max=3)
+            Dmg();                                                       // 36 (+15%累積)
             Hp(); Hp();                                                  // 37-38
-            Major(MetaBuffKind.CombatGoldBonus);                         // 39 (max=2)
+            Dmg();                                                       // 39 (+20%累積)
             Hp(); Hp();                                                  // 40-41
 
             // ===== 終盤 (Lv 42-59) =====
-            Major(MetaBuffKind.DiceTotal);                               // 42 (max=+1)
+            Major(MetaBuffKind.DiceTotal);                               // 42 (+1)
             Hp();                                                        // 43
-            Major(MetaBuffKind.StartingPassiveItem);                     // 44
-            Major(MetaBuffKind.TreasureChestGold);                       // 45
+            Major(MetaBuffKind.LastStandHpLossDisable);                  // 44 (ラストスタンド 最大HP低下無効)
+            Major(MetaBuffKind.BossExtraRare);                           // 45 (ボス追加報酬を レア化)
             Gold();                                                      // 46
-            Major(MetaBuffKind.RefundLevelUp);                           // 47 (10%)
+            Dmg();                                                       // 47 (+25%累積)
             Hp();                                                        // 48
-            Major(MetaBuffKind.HungerReduce);                            // 49 (-2)
+            Dmg();                                                       // 49 (+30%累積)
             Gold();                                                      // 50
-            Major(MetaBuffKind.DamageReduce);                            // 51 (max=-2)
-            Major(MetaBuffKind.FloorClearHeal);                          // 52 (max=+2)
-            Major(MetaBuffKind.HungerReduce);                            // 53 (max=-3)
-            Major(MetaBuffKind.DivineProtect);                           // 54
-            Hp();                                                        // 55
-            Major(MetaBuffKind.BossExtraRare);                           // 56
-            Hp();                                                        // 57
-            Major(MetaBuffKind.RefundLevelUp);                           // 58 (15%, max)
-            Major(MetaBuffKind.CritLevelUp);                             // 59 (+2, max, final)
+            Major(MetaBuffKind.BossRestHealAndUpgrade);                  // 51 (ボス前休憩 回復+強化)
+            Dmg();                                                       // 52 (+35%累積)
+            Dmg();                                                       // 53 (+40%累積)
+            Hp();                                                        // 54
+            Dmg();                                                       // 55 (+45%累積)
+            Hp();                                                        // 56
+            Dmg();                                                       // 57 (+50%累積=cap)
+            Major(MetaBuffKind.CritDamageBonus, 100);                    // 58 final: 会心ダメージ +100% (他の会心ダメージバフと加算合成)
 
             // 件数チェック（TotalSteps でなければ設計ミス）
             if (list.Count != TotalSteps)

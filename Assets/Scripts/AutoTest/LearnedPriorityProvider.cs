@@ -40,6 +40,10 @@ namespace AutoTest
 
         // ===== 状態 =====
         private static bool _loaded;
+        /// <summary>2026-06-23 案 A: アイテム別の連続値 lift スコア (Tier バケットより細粒度)。
+        /// ItemLearningStats から算出した raw score × confidence (sqrt) をそのまま保持。
+        /// 同 Tier 内序列の判定や同家系 Lv の細粒度比較に用いる。</summary>
+        private static Dictionary<string, double> _itemContinuousScore = new Dictionary<string, double>();
         private static HashSet<string> _dynS = new HashSet<string>();
         private static HashSet<string> _dynA = new HashSet<string>();
         private static HashSet<string> _dynB = new HashSet<string>();
@@ -103,45 +107,86 @@ namespace AutoTest
                 try { ItemRegression.Recompute(learningRoot); }
                 catch (Exception ee) { Debug.LogWarning($"[LearnedPriorityProvider] regression 失敗: {ee.Message}"); }
 
-                // 総合 Score: フロア別 lift を併用し、 5層特化/7層特化アイテムも公平評価。
-                //   regβ_sig 30% / lift6F 25% / lift5F 10% / lift7F 10% / offL6F 15% / formΔ×0.3 10%
-                //   ※ clrΔ6F は debuffOn 環境では機能しないため削除。 form は維持 (形態数差は機能する場合あり)。
-                //   regβ 未収束時は β 重みを lift6F に転送。
-                //   信頼度: sqrt(min(1, acq6F/500)) — 線形→平方根に緩めて、 中サンプル品 (300-500) を救う。
-                //   一致ボーナス: 主要4指標 (regβ/lift6F/lift5F/lift7F) が全部同符号で |raw|>0.05 なら ±25% ブースト。
+                // 除外リスト適用 + minAcq6F フィルタ → スコア用プール確定。
+                // (Score の z-score 正規化に使う μ/σ はこの確定プールで 1 回だけ算出する)
+                var pool = new List<ItemLearningStats.ItemAggregate>();
+                foreach (var a in sf.items)
+                {
+                    if (a == null || string.IsNullOrEmpty(a.id)) continue;
+                    if (ItemLearningStats.ExcludedFromLift.Contains(a.id)) continue;
+                    if (ItemLearningStats.DeletedItems.Contains(a.id)) continue; // 削除済は表示・分類対象外
+                    if (a.acq6FRuns < MinAcq6F) continue;
+                    pool.Add(a);
+                }
+
+                // ============================================================
+                //  総合 Score (2026-06-03 Option B: z-score 正規化)
+                //  従来は生値に重みを掛けていたため、 σ が桁違いに大きい lift5F が
+                //  名目重み 0.10 でもランキングを支配し、 regβ(0.30) の実効influenceが埋没していた。
+                //  各指標をプールσで正規化し、 「重み = ランキング分散の取り分」を成立させる。
+                //   regβ_sig 30% / lift6F 25% / lift5F 10% / lift7F 10% / offL6F 15% / formΔ 10%
+                //   ※ clrΔ6F は debuffOn 環境では機能しないため削除。
+                //   regβ 未収束時は β 重みを lift6F に転送 (従来踏襲)。
+                //   信頼度: sqrt(min(1, acq6F/500)) — 中サンプル品 (300-500) を救う。
+                //   一致ボーナス: 主要4指標が全部「0基準の同符号」(=助ける/害する一致) で ±25% (符号は生値で判定)。
+                // ============================================================
+
+                // regβ: 収束品のみ 2σ 有意ゲート (|b|≥2se で b、 それ以外 0)。 未収束は converged=false。
+                double RegGated(ItemLearningStats.ItemAggregate a, out bool converged)
+                {
+                    if (ItemRegression.TryGetCoef(a.id, out double b, out double se))
+                    { converged = true; return Math.Abs(b) >= 2 * se ? b : 0; }
+                    converged = false; return 0;
+                }
+                // offL6F: |off|>1 は外れ値として 0 に潰す (従来踏襲)。
+                double CapOff(ItemLearningStats.ItemAggregate a)
+                { double off = a.OfferedLift6F; return Math.Abs(off) > 1.0 ? 0 : off; }
+
+                void MeanStd(List<double> xs, out double mu, out double sd)
+                {
+                    if (xs.Count == 0) { mu = 0; sd = 0; return; }
+                    double sum = 0; foreach (var x in xs) sum += x;
+                    mu = sum / xs.Count;
+                    double sq = 0; foreach (var x in xs) { double d = x - mu; sq += d * d; }
+                    sd = Math.Sqrt(sq / xs.Count);
+                }
+                double Z(double x, double mu, double sd) => sd > 1e-9 ? (x - mu) / sd : 0.0;
+
+                // プール全体の μ/σ (regβ は収束品のみ)
+                var regList = new List<double>();
+                foreach (var a in pool) { double v = RegGated(a, out bool cv); if (cv) regList.Add(v); }
+                MeanStd(regList, out double muReg, out double sdReg);
+                MeanStd(pool.ConvertAll(a => a.Lift6F), out double mu6, out double sd6);
+                MeanStd(pool.ConvertAll(a => a.Lift5F), out double mu5, out double sd5);
+                MeanStd(pool.ConvertAll(a => a.Lift7F), out double mu7, out double sd7);
+                MeanStd(pool.ConvertAll(CapOff),        out double muOff, out double sdOff);
+                MeanStd(pool.ConvertAll(a => (double)a.FormsLift6F), out double muForm, out double sdForm);
+
                 double Score(ItemLearningStats.ItemAggregate a)
                 {
-                    double regContribution;
                     double regWeight   = 0.30;
                     double lift6Weight = 0.25;
                     double lift5Weight = 0.10;
                     double lift7Weight = 0.10;
-                    if (ItemRegression.TryGetCoef(a.id, out double b, out double se))
-                    {
-                        regContribution = Math.Abs(b) >= 2 * se ? b : 0;
-                    }
-                    else
-                    {
-                        regContribution = 0;
-                        lift6Weight += regWeight;   // regβ 未収束分は lift6F へ転送
-                        regWeight = 0;
-                    }
 
-                    double off = a.OfferedLift6F;
-                    if (Math.Abs(off) > 1.0) off = 0;
+                    double reg = RegGated(a, out bool converged);
+                    double zReg;
+                    if (converged) zReg = Z(reg, muReg, sdReg);
+                    else { zReg = 0; lift6Weight += regWeight; regWeight = 0; } // 未収束 → β 重みを lift6F へ
 
-                    double rawScore = regWeight   * regContribution
-                                    + lift6Weight * a.Lift6F
-                                    + lift5Weight * a.Lift5F
-                                    + lift7Weight * a.Lift7F
-                                    + 0.15        * off
-                                    + 0.10        * (a.FormsLift6F * 0.3);
+                    double rawScore = regWeight   * zReg
+                                    + lift6Weight * Z(a.Lift6F, mu6, sd6)
+                                    + lift5Weight * Z(a.Lift5F, mu5, sd5)
+                                    + lift7Weight * Z(a.Lift7F, mu7, sd7)
+                                    + 0.15        * Z(CapOff(a), muOff, sdOff)
+                                    + 0.10        * Z(a.FormsLift6F, muForm, sdForm);
 
-                    // 全指標一致ボーナス: 主要4指標 (regβ or lift6F, lift5F, lift6F, lift7F) が全部同符号で ±25%
+                    // 全指標一致ボーナス: 主要4指標が全部「0より上/下」(=助ける/害する) で揃えば ±25%。
+                    // z だと「平均比」になり意味が変わるため、 符号は生値で判定する。
                     if (Math.Abs(rawScore) > 0.05)
                     {
                         double[] signals = {
-                            regContribution != 0 ? regContribution : a.Lift6F,
+                            (converged && reg != 0) ? reg : a.Lift6F,
                             a.Lift5F, a.Lift6F, a.Lift7F
                         };
                         bool allPos = true, allNeg = true;
@@ -154,16 +199,9 @@ namespace AutoTest
                     return rawScore * confidence;
                 }
 
-                // 除外リスト適用 + minAcq6F フィルタ + Score 降順
-                var pool = new List<ItemLearningStats.ItemAggregate>();
-                foreach (var a in sf.items)
-                {
-                    if (a == null || string.IsNullOrEmpty(a.id)) continue;
-                    if (ItemLearningStats.ExcludedFromLift.Contains(a.id)) continue;
-                    if (ItemLearningStats.DeletedItems.Contains(a.id)) continue; // 削除済は表示・分類対象外
-                    if (a.acq6FRuns < MinAcq6F) continue;
-                    pool.Add(a);
-                }
+                // 連続値 score をキャッシュ (RawScore より細粒度の判定に使う)
+                _itemContinuousScore.Clear();
+                foreach (var a in pool) _itemContinuousScore[a.id] = Score(a);
                 pool.Sort((x, y) => Score(y).CompareTo(Score(x)));
 
                 // パーセンタイル配分 (1:2:3:2:1:1 ≒ 10:20:30:20:10:10%)
@@ -192,7 +230,7 @@ namespace AutoTest
                     _dynS.Clear(); _dynA.Clear(); _dynB.Clear(); _dynC.Clear(); _dynD.Clear(); _dynE.Clear();
                     // フォールバックでも MD は最新の集計で書き出す (Tier欄は空表示)。 writeMarkdown=false なら凍結。
                     if (writeMarkdown)
-                        try { WriteTierListMarkdown(sf, pool); } catch (Exception ee)
+                        try { WriteTierListMarkdown(sf, pool, learningRoot); } catch (Exception ee)
                         { Debug.LogWarning($"[LearnedPriorityProvider] fallback MD write fail: {ee.Message}"); }
                     return;
                 }
@@ -212,7 +250,7 @@ namespace AutoTest
                 LogIfChanged(prevS, prevA, prevFallback, sf);
                 // 人間向け Tier リスト Markdown を出力 (変更有無に関わらず最新で上書き)。 writeMarkdown=false なら凍結。
                 if (writeMarkdown)
-                    WriteTierListMarkdown(sf, pool);
+                    WriteTierListMarkdown(sf, pool, learningRoot);
             }
             catch (Exception e)
             {
@@ -225,6 +263,8 @@ namespace AutoTest
         public static bool IsSRank(string id)
         {
             if (string.IsNullOrEmpty(id)) return false;
+            // 剣の舞ピース文脈ブースト: 既に 2 枚以上所持していればピース全てを S 扱い (BD 集約を優先誘導)
+            if (IsDanceBoostedToS(id)) return true;
             EnsureLoaded();
             if (_useFallback) return PriorityItemList.IsSRank(id);
             return _dynS.Contains(id);
@@ -245,11 +285,115 @@ namespace AutoTest
 
         public static bool IsPriority(string id) => IsSRank(id) || IsARank(id);
 
+        /// <summary>2026-06-23 案A: 連続値の lift ベース DecisionScore。
+        /// Tier バケット (RawScore) より細粒度。 同 Tier 内の優劣 (LV3 vs LV4 等) を反映できる。
+        /// 戻り値: 概ね -2.0 〜 +3.0 範囲 (z-score 加重和 × 信頼度)。 サンプル不足品は 0。
+        /// 家系内 Lv 補正: PassiveSkillRegistry から family/Lv を読み、 Lv に応じて +0/0.5/1.0/1.5 加点。</summary>
+        public static float LiftScore(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return 0f;
+            EnsureLoaded();
+            float baseScore = 0f;
+            if (_itemContinuousScore.TryGetValue(id, out double v)) baseScore = (float)v;
+            // 家系内 Lv 補正: 同 Tier 内でも上位 Lv を確実に優先
+            float lvBonus = 0f;
+            var data = InventorySystem.ItemDatabase.Instance?.GetItem(id);
+            if (data?.passiveSkills != null)
+            {
+                int maxLv = 0;
+                foreach (var ps in data.passiveSkills)
+                {
+                    if (string.IsNullOrEmpty(ps.internalName)) continue;
+                    var (_, lv) = InventorySystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(ps.internalName);
+                    if (lv > maxLv) maxLv = lv;
+                }
+                if (maxLv > 0) lvBonus = (maxLv - 1) * 0.5f; // LV1=0, LV2=0.5, LV3=1.0, LV4=1.5
+            }
+            return baseScore + lvBonus;
+        }
+
+        /// <summary>RawScore: アイテム単体の素 Tier スコア。 2026-06-22 細分化: S=4 / A=3 / B=2 / C=1 / D-E=0。
+        /// InventoryPower 算定など 「所持価値」 評価向け。 重複ペナルティは含めない。
+        /// 細分化により B↔A↔S 入替が ΔPower に反映される (Λ farming や upgrade trade の評価精度UP)。</summary>
+        public static int RawScore(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return 0;
+            // 剣の舞 forced top (ラン中文脈ブースト) のみ反映
+            if (IsDanceForcedTop(id)) return 100;
+            EnsureLoaded();
+            if (_useFallback)
+            {
+                if (PriorityItemList.IsSRank(id)) return 4;
+                if (PriorityItemList.IsARank(id)) return 3; // フォールバックは A・B 区別なし
+                return 0;
+            }
+            if (_dynS.Contains(id)) return 4;
+            if (_dynA.Contains(id)) return 3;
+            if (_dynB.Contains(id)) return 2;
+            if (_dynC.Contains(id)) return 1;
+            return 0; // D / E は罠枠
+        }
+
         public static int Score(string id)
         {
-            if (IsSRank(id)) return 2;
-            if (IsARank(id)) return 1;
+            // 剣の舞ピース文脈ブースト: 3 枚以上所持なら全アイテム最優先 (集約一手前)
+            if (IsDanceForcedTop(id)) return 100;
+            // 2026-06-22 細分化: S=4 / A=3 / B=2 / C=1 と整合させる (購入優先度判断にも反映)
+            int baseScore = RawScore(id);
+            // 重複/下位互換ペナルティ: アイテムの全パッシブが既に発動中 (同名 or 下位 Lv) なら -2
+            // 他がそれ以上にゴミなら「マイナスでも仕方なく買う」 ─ 0床は付けない
+            int penalty = ComputeRedundancyPenalty(id);
+            return baseScore - penalty;
+        }
+
+        /// <summary>2026-06-22: 購入候補のパッシブが既に発動中 (同名 or 下位 Lv) ならペナルティ。
+        /// 全 passive が冗長 → -2、 一部冗長 → -1、 新規あり → 0。
+        /// 修正 2026-06-22b: 判定対象アイテム自身を firing 集合から除外する (自分の passive が
+        ///                   firing に含まれているせいで自分が冗長判定されるバグ防止)。</summary>
+        private static int ComputeRedundancyPenalty(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return 0;
+            var run = GameLoop.GameManager.Instance?.Run;
+            var db = InventorySystem.ItemDatabase.Instance;
+            if (run == null || db == null) return 0;
+            var data = db.GetItem(id);
+            if (data?.passiveSkills == null || data.passiveSkills.Count == 0) return 0;
+
+            // 「この id を所持していない状態」 で発動するパッシブ集合を再構成
+            var firing = InventoryPower.CollectFiringSkillIdsExcluding(run, db, id);
+            int redundantCount = 0;
+            int totalSkills = 0;
+            foreach (var ps in data.passiveSkills)
+            {
+                if (string.IsNullOrEmpty(ps.internalName)) continue;
+                totalSkills++;
+                if (firing.Contains(ps.internalName)) { redundantCount++; continue; }
+                if (InventorySystem.PassiveSkills.PassiveSkillRegistry.IsHigherTierPresent(ps.internalName, firing))
+                    redundantCount++;
+            }
+            if (totalSkills == 0) return 0;
+            if (redundantCount >= totalSkills) return 2;
+            if (redundantCount > 0) return 1;
             return 0;
+        }
+
+        /// <summary>剣の舞ピース文脈ブースト判定 (S 扱い): 既に 2 枚以上所持なら集約路線を優先誘導。
+        /// 4 枚集約成功で BD に変化するため、 残りピース取得を S Tier 同等優先度で取りに行く。</summary>
+        private static bool IsDanceBoostedToS(string id)
+        {
+            if (!GameLoop.SwordDanceSet.IsDance(id)) return false;
+            var run = GameLoop.GameManager.Instance?.Run;
+            if (run == null) return false;
+            return GameLoop.SwordDanceSet.OwnedCount(run) >= 2;
+        }
+
+        /// <summary>剣の舞ピース文脈ブースト判定 (最優先): 3 枚所持で残り 1 枚なら全アイテム最優先。</summary>
+        private static bool IsDanceForcedTop(string id)
+        {
+            if (!GameLoop.SwordDanceSet.IsDance(id)) return false;
+            var run = GameLoop.GameManager.Instance?.Run;
+            if (run == null) return false;
+            return GameLoop.SwordDanceSet.OwnedCount(run) >= 3;
         }
 
         /// <summary>
@@ -470,6 +614,138 @@ namespace AutoTest
         private static readonly string[] _tierRomanNum = { "", "Ⅰ", "Ⅱ", "Ⅲ", "Ⅳ" };
 
         /// <summary>
+        /// シナジー探索（別枠）: 既知シナジーグループの「メンバー所持数 k 別 平均bandScore」を表示。
+        ///
+        /// 背景: アイテム単体の lift は「単独で取った時の効果」しか測れず、 セットで化ける品を取りこぼす。
+        ///       例) サーベル・ワルツは単独だと戦闘開始HP半減で罠に見えるが、 [剣の舞]が揃うと化ける。
+        ///       k(所持メンバー数) が増えるほど band が伸びるなら、 そのセットは「集める価値」がある。
+        ///
+        ///   soloΔ = avg(k=1) − avg(k=0)  … 単独で取った時の素の効果（負なら単独罠）
+        ///   synΔ  = avg(k≥2) − avg(k=1)  … 2枚目以降の相乗（正なら集める価値）
+        ///   fullΔ = avg(k=全) − avg(k=1) … フルセット到達価値
+        ///
+        /// データは ItemLearningStats が記録側（共起が観測できる唯一の地点）で k 別に積んだもの。
+        /// グループ登録簿: SynergyGroups.cs。
+        /// </summary>
+        private static void WriteSynergySection(StringBuilder sb, ItemLearningStats.StatsFile sf, string learningRoot)
+        {
+            sb.AppendLine("## シナジー探索 (別枠) — セット相乗の検出");
+            sb.AppendLine();
+            sb.AppendLine("> 単体 lift では「セットで化ける品」を取りこぼす（例: サーベル・ワルツは単独だと戦闘開始HP半減で罠に見えるが、[剣の舞]が揃うと化ける）。");
+            sb.AppendLine("> 既知シナジーグループごとに、 メンバー所持数 **k** 別の平均 bandScore を測り、 k が増えるほど伸びるか（=相乗）を可視化する。");
+            sb.AppendLine("> **soloΔ** = avg(k=1) − avg(k=0)（単独効果。 負なら単独罠）/ **synΔ** = avg(k≥2) − avg(k=1)（2枚目以降の相乗）/ **fullΔ** = avg(k=全) − avg(k=1)（フルセット価値）。");
+            sb.AppendLine("> 登録簿: [SynergyGroups.cs](Assets/Scripts/AutoTest/SynergyGroups.cs)。 数値は全ラン基準（6F到達基準も併記）。");
+            sb.AppendLine();
+
+            if (sf?.synergies == null || sf.synergies.Count == 0)
+            {
+                sb.AppendLine("*(シナジーデータなし — バッチ未蓄積、 または旧フォーマットの item_stats.json)*");
+                sb.AppendLine();
+                return;
+            }
+
+            foreach (var s in sf.synergies)
+            {
+                if (s == null || s.members <= 0) continue;
+                int M = s.members;
+                sb.AppendLine($"### {s.name}（{M}種）");
+                sb.AppendLine();
+
+                var g = System.Array.Find(SynergyGroups.All, x => x.id == s.id);
+                if (g != null)
+                {
+                    var names = new List<string>();
+                    foreach (var m in g.members) names.Add(DisplayName(m));
+                    sb.AppendLine($"- メンバー: {string.Join(" / ", names)}");
+                    if (!string.IsNullOrEmpty(g.note)) sb.AppendLine($"- メモ: {g.note}");
+                }
+
+                double a0 = s.KBandAvg(0), a1 = s.KBandAvg(1), aM = s.KBandAvg(M);
+                double sum2 = 0; int n2 = 0;
+                for (int k = 2; k <= M && k < s.kRuns.Count; k++) { sum2 += s.kBandSum[k]; n2 += s.kRuns[k]; }
+                double a2 = n2 > 0 ? sum2 / n2 : 0;
+                bool hasSolo = (1 < s.kRuns.Count && s.kRuns[1] > 0);
+                bool hasFull = (M < s.kRuns.Count && s.kRuns[M] > 0);
+                string soloD = (hasSolo && s.kRuns.Count > 0 && s.kRuns[0] > 0) ? (a1 - a0).ToString("+0.00;-0.00") : "—";
+                string synD  = (n2 > 0 && hasSolo) ? (a2 - a1).ToString("+0.00;-0.00") : "—";
+                string fullD = (hasFull && hasSolo) ? (aM - a1).ToString("+0.00;-0.00") : "—";
+                sb.AppendLine($"- **soloΔ = {soloD}** / **synΔ = {synD}** / **fullΔ = {fullD}**");
+                sb.AppendLine();
+
+                var headers = new[] { "k(所持数)", "runs", "avgBand", "6Fruns", "6FavgBand" };
+                var rows = new List<string[]>();
+                for (int k = 0; k <= M && k < s.kRuns.Count; k++)
+                {
+                    int r6 = k < s.k6FRuns.Count ? s.k6FRuns[k] : 0;
+                    rows.Add(new[]
+                    {
+                        k.ToString(),
+                        s.kRuns[k].ToString(),
+                        s.KBandAvg(k).ToString("F2"),
+                        r6.ToString(),
+                        s.K6FBandAvg(k).ToString("F2"),
+                    });
+                }
+                WritePaddedTable(sb, headers, rows);
+                sb.AppendLine();
+            }
+
+            // ---- 任意ペア探索（提示条件付き2×2 DiD・セット未登録の自動発掘） ----
+            sb.AppendLine("### 任意ペア探索（セット未登録・自動発掘）");
+            sb.AppendLine();
+            sb.AppendLine("> 全アイテムの2つ組を、 **両方が提示されたラン**に限定した 2×2（A取得?×B取得?）で評価:");
+            sb.AppendLine("> **interaction = avg(両取得) − avg(Aのみ) − avg(Bのみ) + avg(両未取得)**（差分の差分＝純粋な相互作用）。");
+            sb.AppendLine("> 提示条件付けで出現バイアスを除去。 ただし「取得するか」はBOTポリシー依存のため選択交絡は残る（厳密因果ではなく候補抽出）。");
+            sb.AppendLine($"> 全4セル各 ≥ {PairSynergyStats.MinCellForReport} サンプルのペアのみ表示。 データ: `synergy_pairs.json`（学習本体とは別管理）。");
+            sb.AppendLine();
+
+            var pf = PairSynergyStats.Load(learningRoot);
+            var reportable = new List<PairSynergyStats.PairRec>();
+            if (pf?.pairs != null)
+                foreach (var p in pf.pairs)
+                    if (p != null && p.AllCells(PairSynergyStats.MinCellForReport)) reportable.Add(p);
+
+            if (reportable.Count == 0)
+            {
+                sb.AppendLine("*(報告可能なペアなし — サンプル蓄積待ち、 または synergy_pairs.json 未生成)*");
+                sb.AppendLine();
+                return;
+            }
+
+            reportable.Sort((x, y) => y.Interaction().CompareTo(x.Interaction()));
+
+            void EmitPairs(string title, List<PairSynergyStats.PairRec> list)
+            {
+                sb.AppendLine(title);
+                sb.AppendLine();
+                var headers = new[] { "A", "B", "interaction", "n(両取得)", "avg両取得", "avg両未取得" };
+                var rows = new List<string[]>();
+                foreach (var p in list)
+                    rows.Add(new[]
+                    {
+                        DisplayName(p.a),
+                        DisplayName(p.b),
+                        p.Interaction().ToString("+0.00;-0.00"),
+                        p.n[3].ToString(),
+                        p.Avg(3).ToString("F2"),
+                        p.Avg(0).ToString("F2"),
+                    });
+                WritePaddedTable(sb, headers, rows);
+                sb.AppendLine();
+            }
+
+            int topK = System.Math.Min(25, reportable.Count);
+            EmitPairs($"**▲ 相乗トップ{topK}**（正の相互作用＝一緒に取ると単体の和を超える）",
+                reportable.GetRange(0, topK));
+
+            var neg = new List<PairSynergyStats.PairRec>(reportable);
+            neg.Reverse();
+            int botK = System.Math.Min(25, neg.Count);
+            EmitPairs($"**▼ 反目・冗長トップ{botK}**（負の相互作用＝重ねても伸びない/食い合う）",
+                neg.GetRange(0, botK));
+        }
+
+        /// <summary>
         /// 進化チェーン武器 (T1-T3) のミッド性能だけを抽出して別表で表示。
         ///
         /// 背景: T1-T3 武器は ExcludedFromLift で Tier 評価対象外。
@@ -681,7 +957,7 @@ namespace AutoTest
         /// 人間向け Tier リスト Markdown を BALANCE_TIER_LIST.md に上書き出力。
         /// `pool` は除外/サンプル不足を弾いた lift6F 降順のリスト。
         /// </summary>
-        private static void WriteTierListMarkdown(ItemLearningStats.StatsFile sf, List<ItemLearningStats.ItemAggregate> pool)
+        private static void WriteTierListMarkdown(ItemLearningStats.StatsFile sf, List<ItemLearningStats.ItemAggregate> pool, string learningRoot)
         {
             try
             {
@@ -694,7 +970,7 @@ namespace AutoTest
                 sb.AppendLine($"> 最終更新: **{sf.updatedAt}** / 累積バッチ: **{sf.totalBatches}** / 累積ラン: **{sf.totalRuns}**");
                 sb.AppendLine($"> モード: **{(_useFallback ? "手書きフォールバック" : "動的学習採用")}** / 採用基準: `acq6F ≥ {MinAcq6F}`");
                 sb.AppendLine($"> Tier配分 (パーセンタイル): `S {TierRatioS:P0}` / `A {TierRatioA:P0}` / `B {TierRatioB:P0}` / `C {TierRatioC:P0}` / `D {TierRatioD:P0}` / `E 残り (約{1-TierRatioS-TierRatioA-TierRatioB-TierRatioC-TierRatioD:P0})`");
-                sb.AppendLine($"> **分類軸**: 総合Score = [0.30×regβ_sig + 0.25×lift6F + 0.10×lift5F + 0.10×lift7F + 0.15×offL6F(|>1|=0) + 0.10×(formΔ×0.3)] × sqrt(min(1, acq6F/500)) × (全指標同符号なら ×1.25)。clrΔ6F は debuffOn 環境で機能しないため削除。フロア別 lift で 5層/7層特化アイテムも公平評価。");
+                sb.AppendLine($"> **分類軸**: 総合Score = [0.30×z(regβ_sig) + 0.25×z(lift6F) + 0.10×z(lift5F) + 0.10×z(lift7F) + 0.15×z(offL6F|>1|=0) + 0.10×z(formΔ)] × sqrt(min(1, acq6F/500)) × (全指標同符号なら ×1.25)。**各指標はプール内 z-score(=(x−μ)/σ) で正規化**してから重み付けする（2026-06-03 Option B）。これにより重みが実効influenceの取り分そのものになり、σの大きい lift5F の独走を防ぎ regβ を意図通り効かせる。clrΔ6F は debuffOn 環境で機能しないため削除。フロア別 lift で 5層/7層特化アイテムも公平評価。");
                 sb.AppendLine($"> BOT 挙動: **S = 絶対取得 (リロール対象)**、 A+B = 余裕時取得、 C/D/E = 取得優先度なし (D/Eは罠分類)");
                 sb.AppendLine();
                 sb.AppendLine("- **フェーズタグ** (S/A/B 級のみ、 C/D/E は信頼度不足のため非表示):");
@@ -761,6 +1037,9 @@ namespace AutoTest
                 EmitTrapList($"## C級-中立 ({cList.Count}個) — 🟦 中位 (パーセンタイル {TierRatioS+TierRatioA+TierRatioB:P0} 〜 {TierRatioS+TierRatioA+TierRatioB+TierRatioC:P0})", cList, false);
                 EmitTrapList($"## D級-軽罠 ({dList.Count}個) — 🟪 下位 (パーセンタイル {TierRatioS+TierRatioA+TierRatioB+TierRatioC:P0} 〜 {TierRatioS+TierRatioA+TierRatioB+TierRatioC+TierRatioD:P0})", dList, false);
                 EmitTrapList($"## E級-致命罠 ({eList.Count}個) — 💀 最下位 (パーセンタイル {TierRatioS+TierRatioA+TierRatioB+TierRatioC+TierRatioD:P0} 〜 100%、 最優先で調整 or 削除候補)", eList, true);
+
+                // シナジー探索（別枠）: 単体 Tier では拾えないセット相乗を可視化
+                WriteSynergySection(sb, sf, learningRoot);
 
                 // サンプル不足: 集計対象外だがアイテムは存在する (acq6F < 30)
                 var lowSample = new List<ItemLearningStats.ItemAggregate>();

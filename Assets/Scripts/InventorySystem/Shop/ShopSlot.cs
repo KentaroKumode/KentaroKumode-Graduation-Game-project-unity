@@ -8,8 +8,13 @@ namespace InventorySystem.Shop
     {
         public ShopSlotKind kind;
         public string itemId;        // null可（強化素材スロット）
-        public int price;
+        public int price;            // 表示価格 (特売割引適用後)
         public bool sold;
+        /// <summary>2026-06-22: メタバフ「特売品」 で適用された割引率 (0-100, 0=非特売)。
+        /// price は既に discountPct を反映済の値。 表示時に「特売」 マーク + 元価格表示のために保持。</summary>
+        public int discountPct;
+        /// <summary>特売前の元価格 (UI 表示用、 計算では使わない)。</summary>
+        public int originalPrice;
     }
 
     public enum ShopSlotKind
