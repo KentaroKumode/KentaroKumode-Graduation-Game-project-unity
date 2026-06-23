@@ -1,0 +1,28 @@
+# CLAUDE.md
+
+## Project
+
+{{PROJECT_NAME}} — {{ONE_LINE_DESCRIPTION}}
+
+## Stack
+
+- Language: {{LANG}}
+- Framework: {{FRAMEWORK}}
+- Test runner: {{TEST_RUNNER}}
+
+## Documentation
+
+- [docs/specs/](docs/specs/) — functional specs by topic
+- [docs/plans/](docs/plans/) — phase-by-phase implementation plans
+- [docs/open-questions/](docs/open-questions/) — unresolved decisions
+- [docs/adr/](docs/adr/) — architecture decision records
+
+## Commands
+
+- Lint: `{{LINT_CMD}}`
+- Test: `{{TEST_CMD}}`
+- Format: `{{FORMAT_CMD}}`
+
+## Workflow rules
+
+<!-- Keep ≤ 50 lines total. Anything longer belongs in docs/specs/. -->

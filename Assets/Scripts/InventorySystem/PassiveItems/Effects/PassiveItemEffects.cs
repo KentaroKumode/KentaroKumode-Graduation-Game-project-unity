@@ -16,11 +16,10 @@ namespace InventorySystem.PassiveItems.Effects
 
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
-            if (Random.value >= 0.5f) return;
-            var hunger = MapManager.Instance?.Hunger;
-            if (hunger == null) return;
-            hunger.Restore(1);
-            Debug.Log($"[PassiveItem] 巡礼者の杖発動: 空腹度+1 ({hunger.Current}/{hunger.Max})");
+            // 飢餓→希望統合(ADR-0002): 旧「空腹度+1」を希望+1へ
+            if (run == null || Random.value >= 0.5f) return;
+            GameLoop.HopeSystem.ApplyFood(run, 1);
+            Debug.Log($"[PassiveItem] 巡礼者の杖発動: 希望+1 ({run.hope}/{run.hopeCap})");
         }
     }
 
@@ -141,6 +140,8 @@ namespace InventorySystem.PassiveItems.Effects
 
     /// <summary>
     /// 沈黙の剣帯: 戦闘中、消費アイテム使用不可。代わりに毎ターン与ダメ +1。
+    /// さらに「最初のターンの相手のダイスロール結果から-99」＝1T目のみ敵ダイス合計を-99する
+    /// (enemyDiceTotalPenalty・床なし)。実質1T目は確定大差勝ち＋基礎ダメ激増の先制必殺。
     /// 消費禁止フラグは ItemUseHandler 側で参照する。
     /// </summary>
     public class SilentSwordbeltEffect : ITimedEffect
@@ -151,9 +152,13 @@ namespace InventorySystem.PassiveItems.Effects
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
             if (ctx == null) return;
-            ctx.criticalBonus += 0; // ダメには finalDamage 経由
-            ctx.fixedDamageToEnemy += 1;
-            Debug.Log("[PassiveItem] 沈黙の剣帯: 与ダメ+1（消費封印中）");
+            ctx.fixedDamageToEnemy += 1; // 消費封印の見返り（毎ターン）
+            // 1ターン目: 敵ダイス合計-99（床なし）。ProcessPostRoll 前なので勝敗・基礎ダメに反映される。
+            if (ctx.currentTurn == 1 && !ctx.rollPurity)
+            {
+                ctx.enemyDiceTotalPenalty += 99;
+                Debug.Log("[PassiveItem] 沈黙の剣帯: 1T目 敵ダイス合計-99（先制必殺）");
+            }
         }
     }
 
@@ -167,11 +172,10 @@ namespace InventorySystem.PassiveItems.Effects
 
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
-            if (Random.value >= 0.1f) return;
-            var hunger = MapManager.Instance?.Hunger;
-            if (hunger == null) return;
-            hunger.Restore(1);
-            Debug.Log($"[PassiveItem] 灯心の鈴発動: 空腹度+1 ({hunger.Current}/{hunger.Max})");
+            // 飢餓→希望統合(ADR-0002): 旧「空腹度+1」を希望+1へ
+            if (run == null || Random.value >= 0.1f) return;
+            GameLoop.HopeSystem.ApplyFood(run, 1);
+            Debug.Log($"[PassiveItem] 灯心の鈴発動: 希望+1 ({run.hope}/{run.hopeCap})");
         }
     }
 
@@ -275,9 +279,8 @@ namespace InventorySystem.PassiveItems.Effects
         }
     }
 
-    /// <summary>倍音のクロック (2026-05-31 ナーフ v3): 3の倍数ターンで outgoing+=0.5 (×1.5)。
-    /// 旧 +2.5 (×3.5) → +0.5 (×1.5)。 予兆ターン (3n-1) 効果は削除 (重複排除)。
-    /// 倍率系の暴走を抑制する大幅ナーフ。</summary>
+    /// <summary>倍音のクロック (2026-06-03 リバフ): 3の倍数ターンで outgoing+=1.0 (×2.0)。
+    /// 旧 +0.5 (×1.5) → +1.0 (×2.0)。 不発ターンが多くE帯だったため発火時の威力を倍化。</summary>
     public class HarmonicClockEffect : ITimedEffect
     {
         public string Id => "倍音のクロック";
@@ -286,8 +289,8 @@ namespace InventorySystem.PassiveItems.Effects
         {
             if (ctx == null || ctx.currentTurn <= 0 || ctx.currentTurn % 3 != 0) return;
             if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
-            ctx.outgoingDamageMultiplier += 0.5f; // 1.0 → 1.5
-            Debug.Log($"[PassiveItem] 倍音のクロック: T{ctx.currentTurn} 拍 与ダメ×1.5");
+            ctx.outgoingDamageMultiplier += 1.0f; // 1.0 → 2.0
+            Debug.Log($"[PassiveItem] 倍音のクロック: T{ctx.currentTurn} 拍 与ダメ×2.0");
         }
     }
 
@@ -410,6 +413,96 @@ namespace InventorySystem.PassiveItems.Effects
             if (healAmount <= 0) return;
             int healed = combat.HealPlayer(healAmount);
             Debug.Log($"[PassiveItem] 永遠の燈: 瀕死回復 HP {curHP}→{curHP + healed} (max{maxHP} の50%まで)");
+        }
+    }
+
+    // ============================================================
+    //  佯狂者シリーズ（発狂連動・ADR-0002）。鈴は店フックのため非登録。
+    // ============================================================
+
+    /// <summary>佯狂者の杖: [発狂]中、他の[佯狂者]アイテムの数×1 をダイス合計に加える。</summary>
+    public class YokyoStaffEffect : ITimedEffect
+    {
+        public string Id => YokyoSet.Staff;
+        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
+        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
+        {
+            if (ctx == null || run == null || !HopeSystem.IsMadness(run)) return;
+            int n = YokyoSet.OtherCount(run, Id);
+            if (n <= 0) return;
+            ctx.playerDiceTotal += n;
+            Debug.Log($"[佯狂者の杖] 発狂中: ダイス合計+{n}");
+        }
+    }
+
+    /// <summary>佯狂者の衣: [発狂]中、他の[佯狂者]アイテムの数×30% の与ダメージ増加。</summary>
+    public class YokyoGarbEffect : ITimedEffect
+    {
+        public string Id => YokyoSet.Garb;
+        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
+        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
+        {
+            if (ctx == null || run == null || !HopeSystem.IsMadness(run)) return;
+            int n = YokyoSet.OtherCount(run, Id);
+            if (n <= 0) return;
+            if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
+            ctx.outgoingDamageMultiplier += 0.30f * n;
+            Debug.Log($"[佯狂者の衣] 発狂中: 与ダメ+{30 * n}%");
+        }
+    }
+
+    /// <summary>佯狂者の冠（与ダメ部分）: フルセット時のみ、狂気スタック×4% の与ダメージ増加。
+    /// 希望0固定・燃え尽き終了・スタック蓄積は HopeSystem 側で処理する。</summary>
+    public class YokyoCrownEffect : ITimedEffect
+    {
+        public string Id => YokyoSet.Crown;
+        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
+        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
+        {
+            if (ctx == null || run == null || !HopeSystem.IsMadness(run)) return;
+            if (!YokyoSet.IsFullSet(run)) return;     // 与ダメスケールはフルセット限定
+            int stack = run.madnessStack;
+            if (stack <= 0) return;
+            if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
+            ctx.outgoingDamageMultiplier += 0.04f * stack;
+            Debug.Log($"[佯狂者の冠] 発狂スタック{stack}: 与ダメ+{stack * 4}%");
+        }
+    }
+
+    // ============================================================
+    //  2026-06-03 新規追加アイテム（ITimedEffect系）
+    // ============================================================
+
+    /// <summary>巡礼の杖飾り (BRONZE): マップ移動時、25%で希望+1。歩み続けるほど心が慰められる、
+    /// 希望ビルドの序盤の足場。希望システム(ADR-0002)へ直接接続。</summary>
+    public class PilgrimCharmEffect : ITimedEffect
+    {
+        public string Id => "巡礼の杖飾り";
+        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnMapMove;
+        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
+        {
+            if (run == null || Random.value >= 0.25f) return;
+            HopeSystem.ApplyFood(run, 1);
+            Debug.Log($"[PassiveItem] 巡礼の杖飾り: 希望+1 ({run.hope}/{run.hopeCap})");
+        }
+    }
+
+    /// <summary>狂宴の仮面 (SILVER): 希望が低いほど与ダメージ上昇（悲観以下+10% / 絶望以下+25%）。
+    /// 発狂(佯狂者)ビルドや低希望ハイリスク戦法を火力で報いる。OnRoll で毎ターン再適用。</summary>
+    public class RevelMaskEffect : ITimedEffect
+    {
+        public string Id => "狂宴の仮面";
+        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
+        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
+        {
+            if (ctx == null || run == null) return;
+            var tier = HopeSystem.GetTier(run);
+            float add;
+            if (tier >= HopeTier.Despair) add = 0.25f;       // 絶望・発狂
+            else if (tier >= HopeTier.Pessimism) add = 0.10f; // 悲観
+            else return;
+            if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
+            ctx.outgoingDamageMultiplier += add;
         }
     }
 }

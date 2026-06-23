@@ -251,6 +251,9 @@ namespace InventorySystem
             
             // 会心率設定（1～9、分母は9）
             item.criticalRate = Mathf.Clamp(jsonItem.criticalRate, 0, 9);
+
+            // 武器の素火力（#2 案A'）
+            item.attackPower = Mathf.Max(0, jsonItem.attackPower);
             
             // ダイス面設定（Diceカテゴリ）
             if (jsonItem.diceFaces != null && jsonItem.diceFaces.Length > 0)

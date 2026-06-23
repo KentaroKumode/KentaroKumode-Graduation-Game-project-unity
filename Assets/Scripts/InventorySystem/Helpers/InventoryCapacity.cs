@@ -24,7 +24,10 @@ namespace InventorySystem.Helpers
             if (def == null) return CellsOfByIdHeuristic(itemId);
 
             // ItemCategory ベースの判定 (PassiveItem も Passive と同じ扱い)
-            if (def.category == ItemCategory.Weapon) return CELLS_WEAPON;
+            // 武器は装備スロット扱い(ダイスと同じ)＝グリッド枠を消費しない (0)。
+            //  ・武器は1本しか持たない(進化はID差し替え。予備を抱えない)
+            //  ・同じ装備スロットのダイスが既に0セル → 整合のため武器も0
+            if (def.category == ItemCategory.Weapon) return 0;
             if (def.category == ItemCategory.Consumable) return CELLS_CONSUMABLE;
             if (def.category == ItemCategory.Passive || def.category == ItemCategory.PassiveItem) return CELLS_PASSIVE;
             // Dice / Material / その他は容量0
@@ -36,27 +39,27 @@ namespace InventorySystem.Helpers
         {
             if (itemId.StartsWith("cons_") || itemId.StartsWith("uniq_")) return CELLS_CONSUMABLE;
             if (itemId.StartsWith("dice_")) return 0;
-            // 武器の prefix 列挙
+            // 武器の prefix 列挙: 装備スロット扱い(ダイスと同じ) → 0セル
             if (itemId.StartsWith("sword_") || itemId.StartsWith("axe_") || itemId.StartsWith("dagger_")
                 || itemId.StartsWith("shield_") || itemId.StartsWith("curse_") || itemId.StartsWith("invest_")
                 || itemId.StartsWith("ryusen_") || itemId.StartsWith("deadend_") || itemId.StartsWith("holy_"))
-                return CELLS_WEAPON;
+                return 0;
             // それ以外は Passive 扱い
             return CELLS_PASSIVE;
         }
 
-        /// <summary>現在使用中のセル合計 (装備武器 + パッシブ + 消費)。</summary>
+        /// <summary>現在使用中のセル合計 (パッシブ + 消費)。
+        /// 武器/ダイスは装備スロット扱いで 0 セル (CellsOf が 0 を返す)＝グリッド枠を消費しない。
+        /// よって equippedWeaponId を別途加算する必要はなく、 ownedPassiveItems 内の武器ID残骸も
+        /// 自動的に 0 計上になる (二重計上の心配なし)。</summary>
         public static int UsedCells(RunState run)
         {
             if (run == null) return 0;
             int sum = 0;
-            // 装備武器は1個 (equippedWeaponId)
-            if (!string.IsNullOrEmpty(run.equippedWeaponId))
-                sum += CellsOf(run.equippedWeaponId);
             if (run.ownedPassiveItems != null)
-                foreach (var id in run.ownedPassiveItems) sum += CellsOf(id);
+                foreach (var id in run.ownedPassiveItems) sum += CellsOf(id); // 武器/ダイス=0, パッシブ=4
             if (run.ownedConsumables != null)
-                foreach (var id in run.ownedConsumables) sum += CellsOf(id);
+                foreach (var id in run.ownedConsumables) sum += CellsOf(id); // 消費=1
             return sum;
         }
 

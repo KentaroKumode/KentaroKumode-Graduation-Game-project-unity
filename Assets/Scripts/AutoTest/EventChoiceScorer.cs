@@ -10,7 +10,7 @@ namespace AutoTest
     /// 各選択肢の効果を数値スコアに変換し、現在の RunState（HP/空腹/コイン）で文脈補正する。
     ///
     /// 設計方針:
-    ///  - 「100G+カルマ vs なにもなし」は通常 100G を取る（ゴールド価値 > カルマ1の期待コスト）
+    ///  - 「100G+希望損 vs なにもなし」は通常 100G を取る（ゴールド価値 > 希望コスト）
     ///  - 現在HPが低い、被ダメで致死圏ならHP損失を強く忌避
     ///  - 同様に空腹度・コイン量で文脈補正
     ///  - PriorityItemList の S/A 級は加点
@@ -25,7 +25,6 @@ namespace AutoTest
         const float W_MAX_HP     = 2.6f;
         const float W_HUNGER     = 0.35f;
         const float W_MATERIAL   = 3.0f;
-        const float V_KARMA      = -7.0f;   // カルマ1あたり: 期待される将来コスト
         const float V_TIMED_BUFF = +5.0f;
         const float V_TIMED_DEB  = -6.0f;
         const float V_PERM_DEB   = -28.0f;
@@ -72,10 +71,10 @@ namespace AutoTest
             int maxHP  = run != null ? UnityEngine.Mathf.Max(1, run.playerMaxHP) : 30;
             float hpPct = (float)hp / maxHP;
             int coins  = run != null ? run.coins : 0;
-            var hungerSys = MapManager.Instance != null ? MapManager.Instance.Hunger : null;
-            int hunger = hungerSys != null ? hungerSys.Current : 50;
-            int hungerMax = hungerSys != null ? UnityEngine.Mathf.Max(1, hungerSys.Max) : 100;
-            float hungerPct = (float)hunger / hungerMax;
+            // 希望(ADR-0002): 飢餓を統合した精神ゲージ。低いほど回復価値↑・損失忌避↑。
+            int hopeVal = run != null ? run.hope : 100;
+            int hopeCap = run != null ? UnityEngine.Mathf.Max(1, run.hopeCap) : 100;
+            float hopePct = (float)hopeVal / hopeCap;
 
             switch (e.type)
             {
@@ -135,25 +134,21 @@ namespace AutoTest
                 case EventEffectType.MaxHpDelta:
                     return e.amount * W_MAX_HP;
 
-                case EventEffectType.HungerDelta:
+                case EventEffectType.HungerDelta:   // 飢餓→希望統合(ADR-0002): 希望±N
                 {
                     if (e.amount >= 0)
                     {
                         float w = W_HUNGER;
-                        if (hungerPct < 0.25f) w *= 2.0f;
+                        if (hopePct < 0.45f) w *= 2.0f;   // 希望が悲観域(≤45)以下なら回復価値大
                         return e.amount * w;
                     }
                     else
                     {
                         float w = W_HUNGER;
-                        if (hungerPct < 0.30f) w *= 2.5f;
+                        if (hopePct < 0.45f) w *= 2.5f;   // 希望が低いほど損を忌避
                         return e.amount * w; // 負
                     }
                 }
-
-                case EventEffectType.KarmaGain:
-                    // カルマ獲得は基本マイナス（永続デバフのトリガ）
-                    return (e.amount > 0 ? e.amount : 1) * V_KARMA;
 
                 case EventEffectType.MaterialDelta:
                     return e.amount * W_MATERIAL;
@@ -205,6 +200,17 @@ namespace AutoTest
                 }
                 case EventEffectType.RandomEvent:
                     return 0f; // 分散大なので中立
+
+                case EventEffectType.CircusHandover:
+                {
+                    // サーカス引渡し: Lv連動の windfall。 ContractManager から実際のレベルを取得して評価。
+                    var circus = GameLoop.Contracts.ContractManager.Instance.Find(run, GameLoop.Contracts.ContractKind.OrphanCircus);
+                    int lv = circus?.level ?? 0;
+                    int goldReward = lv == 1 ? 25 : lv == 2 ? 50 : lv == 3 ? 90 : 0;
+                    int hopeReward = lv == 1 ? 10 : lv == 2 ? 20 : lv == 3 ? 30 : 0;
+                    // 報酬価値 + サーカス契約解除による維持費負担解消 (3G × 数層分)
+                    return goldReward * 0.5f + hopeReward * 0.3f + 6f;
+                }
 
                 default:
                     return 0f;

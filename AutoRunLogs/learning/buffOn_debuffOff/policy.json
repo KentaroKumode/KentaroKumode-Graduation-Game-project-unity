@@ -1,13 +1,18 @@
 {
-    "rerollCostRatio": 0.30000001192092898,
+    "rerollCostRatio": 0.20588667690753938,
     "consumableStockMax": 2,
-    "robberyMinHpRatio": 0.7918372750282288,
-    "eventExplorationRate": 0.04338283836841583,
+    "robberyMinHpRatio": 0.7643201351165772,
+    "eventExplorationRate": 0.0,
     "importantThreatThreshold": 4,
     "emergencyHealRatio": 1.0208110809326172,
-    "hpLowThreshold": 0.7573034763336182,
-    "hpCritThreshold": 0.36162611842155459,
-    "lastBandScoreAvg": 8.66100025177002,
-    "trialBatches": 22,
-    "updatedAt": "2026-06-01 07:59:23"
+    "hpLowThreshold": 0.7023731470108032,
+    "hpCritThreshold": 0.4047709107398987,
+    "lateralHopeFloor": 20.0,
+    "hopeRefillFloor": 39.87812805175781,
+    "sublimationReserve": 3.2952470779418947,
+    "stanceDefendWinProb": 0.2828885316848755,
+    "stanceDefendHpBias": 0.30000001192092898,
+    "lastBandScoreAvg": 7.546249866485596,
+    "trialBatches": 29,
+    "updatedAt": "2026-06-22 17:47:44"
 }

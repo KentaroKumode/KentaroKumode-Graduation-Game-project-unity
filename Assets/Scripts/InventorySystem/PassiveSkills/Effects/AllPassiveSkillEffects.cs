@@ -40,36 +40,36 @@ namespace InventorySystem.PassiveSkills.Effects
     //  汎用パッシブ — 反撃（Counter）
     // ============================================================
 
-    /// <summary>反撃I — ロール敗北時、敵に軽減不可1ダメージ</summary>
+    /// <summary>反撃I (2026-06-03 リバフ +1→+2) — ロール敗北時、敵に軽減不可2ダメージ</summary>
     public class CounterI : IPassiveSkillEffect
     {
         public string SkillId => "CounterI";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollLose };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { ctx.fixedDamageToEnemy += 1; }
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { ctx.fixedDamageToEnemy += 2; }
     }
 
-    /// <summary>反撃II — ロール敗北時、敵に軽減不可2ダメージ</summary>
+    /// <summary>反撃II (2026-06-03 リバフ +2→+4) — ロール敗北時、敵に軽減不可4ダメージ</summary>
     public class CounterII : IPassiveSkillEffect
     {
         public string SkillId => "CounterII";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollLose };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { ctx.fixedDamageToEnemy += 2; }
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { ctx.fixedDamageToEnemy += 4; }
     }
 
-    /// <summary>反撃III — ロール敗北時、敵に軽減不可3ダメージ</summary>
+    /// <summary>反撃III (2026-06-03 リバフ +3→+6) — ロール敗北時、敵に軽減不可6ダメージ</summary>
     public class CounterIII : IPassiveSkillEffect
     {
         public string SkillId => "CounterIII";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollLose };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { ctx.fixedDamageToEnemy += 3; }
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { ctx.fixedDamageToEnemy += 6; }
     }
 
-    /// <summary>反撃IV — ロール敗北時、敵に軽減不可4ダメージ</summary>
+    /// <summary>反撃IV (2026-06-03 リバフ +4→+8) — ロール敗北時、敵に軽減不可8ダメージ</summary>
     public class CounterIV : IPassiveSkillEffect
     {
         public string SkillId => "CounterIV";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollLose };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { ctx.fixedDamageToEnemy += 4; }
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { ctx.fixedDamageToEnemy += 8; }
     }
 
     // ============================================================
@@ -465,28 +465,16 @@ namespace InventorySystem.PassiveSkills.Effects
     //  ユニークパッシブ — デッドエンド武器
     // ============================================================
 
-    /// <summary>業火 — 戦闘開始時に敵を炎上(3ターン, 毎ターン3ダメ)</summary>
+    /// <summary>業火 — 戦闘開始時に敵を炎上(3ターン, 毎ターン3ダメ)。
+    /// #3 統一フレームへ移行: 開幕に burn を3スタック付与するだけ。毎ターンの DOT/減衰は
+    /// CombatContext.TickStatuses が一括処理する（burn: 固定3ダメ／毎T-1）。</summary>
     public class Ignite : IPassiveSkillEffect
     {
         public string SkillId => "Ignite";
-        public PassiveSkillTrigger[] Triggers => new[]
-        {
-            PassiveSkillTrigger.OnBattleStart,
-            PassiveSkillTrigger.OnTurnStart
-        };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            if (trigger == PassiveSkillTrigger.OnBattleStart)
-            {
-                ctx.enemyBurnTurns = 3;
-                ctx.enemyBurnDamage = 3;
-                return;
-            }
-            if (ctx.enemyBurnTurns > 0)
-            {
-                ctx.fixedDamageToEnemy += ctx.enemyBurnDamage;
-                ctx.enemyBurnTurns--;
-            }
+            ctx.AddStatus(StatusTarget.Enemy, "burn", 3);
         }
     }
 
@@ -627,7 +615,7 @@ namespace InventorySystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>鉄壁 — ロール敗北時の被ダメージ-1（堅実な低位防御）</summary>
+    /// <summary>鉄壁 — ロール敗北時の被ダメージ-2 (2026-06-22 -1→-2 強化、 SILVER 帯としての存在価値を確立)</summary>
     public class IronWall : IPassiveSkillEffect
     {
         public string SkillId => "IronWall";
@@ -635,7 +623,21 @@ namespace InventorySystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
             if (ctx.finalDamage > 0)
-                ctx.finalDamage = System.Math.Max(0, ctx.finalDamage - 1);
+                ctx.finalDamage = System.Math.Max(0, ctx.finalDamage - 2);
+        }
+    }
+
+    /// <summary>銭装 (CopperSteady) — 銅貨のダイス専用。 2026-06-22 新規追加。
+    /// 戦闘開始時 シールド+5。 「安定だが上振れ無し」 の dice_copper にディフェンス特性を後付けで与え、
+    /// wood/bone から乗り換える価値を作る (平均出目は据え置き)。</summary>
+    public class CopperSteady : IPassiveSkillEffect
+    {
+        public string SkillId => "CopperSteady";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            ctx.consShield += 5;
+            ctx.shieldGainedTotal += 5;
         }
     }
 
@@ -948,7 +950,7 @@ namespace InventorySystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>星命 — ゾロ目時、追撃ダメージ+出目値</summary>
+    /// <summary>博打 — ゾロ目時、追撃ダメージ+出目値×2 (2026-06-22 ×1→×2 強化、 偏りダイスのゾロ目偏重設計を活かす)</summary>
     public class StarFate : IPassiveSkillEffect
     {
         public string SkillId => "StarFate";
@@ -962,7 +964,7 @@ namespace InventorySystem.PassiveSkills.Effects
             {
                 if (ctx.playerDice[i] != first) { allSame = false; break; }
             }
-            if (allSame) ctx.pursuitDamage += first;
+            if (allSame) ctx.pursuitDamage += first * 2;
         }
     }
 
@@ -1088,7 +1090,9 @@ namespace InventorySystem.PassiveSkills.Effects
             ctx.playerDiceTotal += 5;        }
     }
 
-    /// <summary>飢餓丸 — ターン開始時HP-1(軽減不能)。10ターン目の発動後、与ダメ+10(戦闘中永続)＋次の被ダメ-10(1回)。</summary>
+    /// <summary>飢餓丸 (2026-06-03 リバフ) — ターン開始時HP-1(軽減不能)。
+    /// 7ターン目の発動後、与ダメ+18(戦闘中永続)＋次の被ダメ-18(1回)。
+    /// 旧 T10/+10/-10 → T8相当より早い T7 覚醒・効果1.8倍。拘束ペイオフの遅さがE帯要因だったため強化。</summary>
     public class HungerPill : IPassiveSkillEffect
     {
         public string SkillId => "HungerPill";
@@ -1100,21 +1104,21 @@ namespace InventorySystem.PassiveSkills.Effects
             {
                 case PassiveSkillTrigger.OnTurnStart:
                     ctx.fixedDamageToPlayer += 1; // 軽減不能の飢餓ダメ（このターンの被ダメ処理で適用）
-                    if (ctx.currentTurn >= 10 && ctx.GetAccumulated("hunger_awake") <= 0)
+                    if (ctx.currentTurn >= 7 && ctx.GetAccumulated("hunger_awake") <= 0)
                     {
-                        ctx.accumulatedValues["hunger_awake"] = 1;   // 以降、与ダメ+10永続
-                        ctx.accumulatedValues["hunger_guard"] = 1;   // 次の被ダメ-10（1回）
-                        UnityEngine.Debug.Log("[飢餓丸] 覚醒: 与ダメ+10(永続) / 次被ダメ-10(1回)");
+                        ctx.accumulatedValues["hunger_awake"] = 1;   // 以降、与ダメ+18永続
+                        ctx.accumulatedValues["hunger_guard"] = 1;   // 次の被ダメ-18（1回）
+                        UnityEngine.Debug.Log("[飢餓丸] 覚醒: 与ダメ+18(永続) / 次被ダメ-18(1回)");
                     }
                     break;
                 case PassiveSkillTrigger.OnPreDealDamage:
                     if (ctx.finalDamage > 0 && ctx.GetAccumulated("hunger_awake") > 0)
-                        ctx.finalDamage += 10;
+                        ctx.finalDamage += 18;
                     break;
                 case PassiveSkillTrigger.OnPreReceiveDamage:
                     if (ctx.finalDamage > 0 && ctx.GetAccumulated("hunger_guard") > 0)
                     {
-                        ctx.finalDamage = System.Math.Max(0, ctx.finalDamage - 10);
+                        ctx.finalDamage = System.Math.Max(0, ctx.finalDamage - 18);
                         ctx.accumulatedValues["hunger_guard"] = 0; // 1回限り
                     }
                     break;
@@ -1136,6 +1140,200 @@ namespace InventorySystem.PassiveSkills.Effects
             if (spent <= 0) return;
             if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
             ctx.outgoingDamageMultiplier += 0.01f * spent;
+        }
+    }
+
+    // ============================================================
+    //  2026-06-03 新規追加アイテム
+    // ============================================================
+
+    /// <summary>賽振りの目隠し (BRONZE) — このターンの全出目が偶数なら与ダメージ+15%。
+    /// 星(全異)/完全(重複) とは別軸の「偶数」パターン報酬。序盤からパターン構築を意識させる。</summary>
+    public class EvenEyes : IPassiveSkillEffect
+    {
+        public string SkillId => "EvenEyes";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            if (ctx.finalDamage <= 0 || ctx.playerDice == null || ctx.playerDice.Length < 1) return;
+            foreach (var d in ctx.playerDice)
+                if (d % 2 != 0) return; // 1つでも奇数なら不発
+            if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
+            ctx.outgoingDamageMultiplier += 0.15f;
+        }
+    }
+
+    /// <summary>双子の賽 (SILVER) — 出目に同値ペア(2個以上重複)があれば会心ダイス+1。
+    /// ゾロ目限定の天極より緩い「ペア」パターン報酬。多ダイスほど発火しやすい。</summary>
+    public class TwinDice : IPassiveSkillEffect
+    {
+        public string SkillId => "TwinDice";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalCheck };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            if (ctx.playerDice == null || ctx.playerDice.Length < 2) return;
+            var seen = new System.Collections.Generic.HashSet<int>();
+            foreach (var d in ctx.playerDice)
+                if (!seen.Add(d)) { ctx.criticalBonus += 1; return; } // 重複 = ペア成立
+        }
+    }
+
+    /// <summary>血路の旗 (GOLD) — 敵の出血スタック数×与ダメージ+3%。出血シナジーを火力に変換する束ね役。</summary>
+    public class BloodPathBanner : IPassiveSkillEffect
+    {
+        public string SkillId => "BloodPathBanner";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            if (ctx.finalDamage <= 0 || ctx.enemyBleedStacks <= 0) return;
+            if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
+            ctx.outgoingDamageMultiplier += 0.03f * ctx.enemyBleedStacks;
+        }
+    }
+
+    /// <summary>匠の手控え (GOLD) — 武器強化(weaponPlus)が3以上で与ダメージ+12%。素材経済に火力の出口を作る。</summary>
+    public class MasterworkNotes : IPassiveSkillEffect
+    {
+        public string SkillId => "MasterworkNotes";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            if (ctx.finalDamage <= 0) return;
+            int plus = GameLoop.GameManager.Instance?.Run?.weaponPlus ?? 0;
+            if (plus < 3) return;
+            if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
+            ctx.outgoingDamageMultiplier += 0.12f;
+        }
+    }
+
+    /// <summary>万華の賽 (LEGENDARY) — 出目が「全て同値」「全て異なる」「連続昇順(階段3個以上)」の
+    /// いずれかなら与ダメージ×2。星/完全/天極/天梯のパターン群を統合する到達ロマン砲。</summary>
+    public class KaleidoDice : IPassiveSkillEffect
+    {
+        public string SkillId => "KaleidoDice";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            if (ctx.finalDamage <= 0 || ctx.playerDice == null || ctx.playerDice.Length < 2) return;
+            var dice = ctx.playerDice;
+            // 全て同値
+            bool allSame = true;
+            for (int i = 1; i < dice.Length; i++) if (dice[i] != dice[0]) { allSame = false; break; }
+            // 全て異なる
+            bool allDistinct = true;
+            var seen = new System.Collections.Generic.HashSet<int>();
+            foreach (var d in dice) if (!seen.Add(d)) { allDistinct = false; break; }
+            // 連続昇順(階段)。3個以上のときのみ成立扱い
+            bool straight = dice.Length >= 3;
+            if (straight)
+            {
+                var sorted = (int[])dice.Clone();
+                System.Array.Sort(sorted);
+                for (int i = 1; i < sorted.Length; i++)
+                    if (sorted[i] != sorted[i - 1] + 1) { straight = false; break; }
+            }
+            if (allSame || allDistinct || straight)
+            {
+                if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
+                ctx.outgoingDamageMultiplier += 1.0f;
+            }
+        }
+    }
+
+    /// <summary>断罪の天秤 (LEGENDARY) — ロール勝利時、ダイス合計差×4%を与ダメージに加算(上限+100%)。
+    /// 大差勝ちを火力化。ダイス合計盛りビルドと直結。OnPreDealDamage は勝利分岐でのみ発火。</summary>
+    public class JudgmentScale : IPassiveSkillEffect
+    {
+        public string SkillId => "JudgmentScale";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            if (ctx.finalDamage <= 0) return;
+            int diff = ctx.diceDifference;
+            if (diff <= 0) return;
+            float add = System.Math.Min(1.0f, 0.04f * diff); // 上限+100%
+            if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
+            ctx.outgoingDamageMultiplier += add;
+        }
+    }
+
+    // ============================================================
+    //  2026-06-05 会心バリエーション（会心を「ただ×2」から質の違う一撃へ）
+    //  発火: OnCriticalDamage（会心成立後・×criticalMultiplier 適用前）／一部 OnCriticalCheck（会心判定前）
+    // ============================================================
+
+    /// <summary>裂傷の刃心 (BRONZE) — 会心時、敵に出血+2。会心倍率の+100%ごとに+1（×2.0で+1, ×3.0で+2）。血路の旗と相乗。</summary>
+    public class LacerationCore : IPassiveSkillEffect
+    {
+        public string SkillId => "LacerationCore";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            int bonus = UnityEngine.Mathf.FloorToInt(UnityEngine.Mathf.Max(0f, ctx.criticalMultiplier - 1f));
+            ctx.enemyBleedStacks += 2 + bonus;
+        }
+    }
+
+    /// <summary>防殻の一閃 (BRONZE) — 会心時、その会心ダメージの5%をシールド化（攻めの会心がわずかな守りになる）。</summary>
+    public class GuardFlash : IPassiveSkillEffect
+    {
+        public string SkillId => "GuardFlash";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            // OnCriticalDamage は ×criticalMultiplier 適用前に発火するため、会心後ダメを自前で算出。
+            int critDmg = UnityEngine.Mathf.CeilToInt((ctx.finalDamage + ctx.pursuitDamage) * ctx.criticalMultiplier);
+            int shield = UnityEngine.Mathf.CeilToInt(critDmg * 0.05f);
+            if (shield > 0) { ctx.consShield += shield; ctx.shieldGainedTotal += shield; }
+        }
+    }
+
+    /// <summary>急所穿ち (SILVER) — 会心時、軽減無視ダメージ+5を追加で与える（硬い敵に刺さる防御貫通の追い打ち）。</summary>
+    public class VitalPierce : IPassiveSkillEffect
+    {
+        public string SkillId => "VitalPierce";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            ctx.fixedDamageToEnemy += 5;
+        }
+    }
+
+    /// <summary>吸命の牙 (SILVER) — 会心したターン、与ダメージの15%をHP回復（lifestealPct加算・負傷/封印を尊重）。</summary>
+    public class LifeFang : IPassiveSkillEffect
+    {
+        public string SkillId => "LifeFang";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            ctx.lifestealPct += 0.15f;
+        }
+    }
+
+    /// <summary>一点集中 (GOLD) — 会心倍率+0.5、代わりに会心率（会心分子）-2。稀だが特大のバースト型。</summary>
+    public class SinglePoint : IPassiveSkillEffect
+    {
+        public string SkillId => "SinglePoint";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalCheck };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            ctx.criticalMultiplier += 0.5f;
+            ctx.criticalBonus -= 2; // 会心分子（有効分子は CombatManager 側で 0..9 にクランプ）
+        }
+    }
+
+    /// <summary>連環の極み (LEGENDARY) — 会心するたび会心倍率+0.2（戦闘中累積）。会心スノーボール。</summary>
+    public class ChainApex : IPassiveSkillEffect
+    {
+        public string SkillId => "ChainApex";
+        private const string StackKey = "chainApexStacks"; // 戦闘中持続（accumulatedValues は戦闘開始でのみリセット）
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalCheck, PassiveSkillTrigger.OnCriticalDamage };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            if (trigger == PassiveSkillTrigger.OnCriticalCheck)
+                ctx.criticalMultiplier += 0.2f * ctx.GetAccumulated(StackKey); // 毎ターン再取得される倍率へ累積分を再適用
+            else
+                ctx.AddAccumulated(StackKey, 1f); // 会心成立ごとに+1スタック
         }
     }
 
@@ -1397,15 +1595,6 @@ namespace InventorySystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>リピーター（触媒）— 2026-05-31 削除済み（火力暴走の主犯のため無効化）。
-    /// 過去アイテム互換のためクラス自体は残すが、 効果は no-op。</summary>
-    public class Repeater : IPassiveSkillEffect
-    {
-        public string SkillId => "Repeater";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { /* removed */ }
-    }
-
     /// <summary>蒼白の槍騎士 (リワーク 2026-05-30) — 軽減無視ダメージを 2.0倍 (旧1.5倍) にする。
     /// 蒼白の穂先は鎧の理を完全に嗤う。</summary>
     public class PalePikeKnight : IPassiveSkillEffect
@@ -1503,4 +1692,158 @@ namespace InventorySystem.PassiveSkills.Effects
             }
         }
     }
+
+    // ============================================================
+    //  [剣の舞] セット（2026-06-04）— Passive カテゴリのシナジー武器群。
+    //  4枚インベントリ集約で〈ブレイドダンス〉(BladeDance) に変化（GameLoop.SwordDanceSet）。
+    //  ダイス合計加算は OnPostRoll（RecomputeDiceTotals 後＝確実に効く）で行う。
+    //  run 参照は GameLoop.GameManager.Instance.Run（StepHeal/Eternal と同じ手法）。
+    // ============================================================
+
+    /// <summary>サーベル・ワルツ (BRONZE): ダイス合計+1。
+    /// 他の[剣の舞]がインベントリにも昇華にも存在しないとき、戦闘開始時にHPを半減（孤剣のリスク）。
+    /// ショップでの[剣の舞]出現率上昇は ShopManager 側のフックで処理。</summary>
+    public class SaberWaltz : IPassiveSkillEffect
+    {
+        public string SkillId => "SaberWaltz";
+        public PassiveSkillTrigger[] Triggers => new[]
+        {
+            PassiveSkillTrigger.OnBattleStart,
+            PassiveSkillTrigger.OnPostRoll,
+        };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            if (trigger == PassiveSkillTrigger.OnBattleStart)
+            {
+                var run = GameLoop.GameManager.Instance?.Run;
+                if (run != null
+                    && GameLoop.SwordDanceSet.OtherCount(run, GameLoop.SwordDanceSet.SaberWaltz) == 0
+                    && ctx.playerCurrentHP > 1)
+                {
+                    int before = ctx.playerCurrentHP;
+                    ctx.playerCurrentHP = System.Math.Max(1, ctx.playerCurrentHP / 2);
+                    UnityEngine.Debug.Log($"[サーベル・ワルツ] 孤剣: 他の剣の舞なし → 戦闘開始HP半減 {before}→{ctx.playerCurrentHP}");
+                }
+                return;
+            }
+            // OnPostRoll: ダイス合計+1
+            ctx.playerDiceTotal += 1;
+        }
+    }
+
+    /// <summary>エスパーダ・パソドブレ (SILVER): 自分と敵のダイス合計に+5。
+    /// 与えるダメージ+20%（outgoing）／受けるダメージ+20%（OnPreReceiveで×1.2）。
+    /// 自他+5でダイス差は不変だが、合計値を読む効果（血令/断罪の天秤/万華 等）と高め合う両刃。</summary>
+    public class EspadaPasodoble : IPassiveSkillEffect
+    {
+        public string SkillId => "EspadaPasodoble";
+        public PassiveSkillTrigger[] Triggers => new[]
+        {
+            PassiveSkillTrigger.OnPostRoll,
+            PassiveSkillTrigger.OnPreReceiveDamage,
+        };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            if (trigger == PassiveSkillTrigger.OnPostRoll)
+            {
+                ctx.playerDiceTotal += 5;
+                ctx.enemyDiceTotal += 5;
+                if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
+                ctx.outgoingDamageMultiplier += 0.2f; // 与ダメ+20%（毎ターンリセット→再適用）
+                return;
+            }
+            // OnPreReceiveDamage: 被ダメ+20%（毎被弾イベントで都度乗る＝累積しない）
+            if (ctx.finalDamage > 0)
+                ctx.finalDamage = UnityEngine.Mathf.CeilToInt(ctx.finalDamage * 1.2f);
+        }
+    }
+
+    /// <summary>フルーレ・バレエ (BRONZE): ダイス合計+3。
+    /// 「戦闘に敗北したとき、このアイテムを廃棄し最大HPを1にして生還」は救済チェーン
+    /// (GameLoop.LastStand.TryConsumeRevival) 側で処理する。ここでは火力部分のみ。</summary>
+    public class FleuretBallet : IPassiveSkillEffect
+    {
+        public string SkillId => "FleuretBallet";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            ctx.playerDiceTotal += 3;
+        }
+    }
+
+    /// <summary>ファコン・タンゴ (LEGENDARY): 2026-06-20 効果変更。
+    /// 他の[剣の舞]がインベントリにも昇華にも存在しないとき、戦闘開始時に最大HPを1減少（孤剣のリスク）。
+    /// 集約路線が組めている (他の剣の舞 1 枚以上所持) なら無害。</summary>
+    public class FalconTango : IPassiveSkillEffect
+    {
+        public string SkillId => "FalconTango";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            if (trigger != PassiveSkillTrigger.OnBattleStart) return;
+            var run = GameLoop.GameManager.Instance?.Run;
+            if (run == null) return;
+            if (GameLoop.SwordDanceSet.OtherCount(run, GameLoop.SwordDanceSet.FalconTango) > 0) return;
+            if (run.playerMaxHP <= 1) return; // 最低 1 を残す
+            int beforeMax = run.playerMaxHP;
+            run.playerMaxHP -= 1;
+            if (run.playerHP > run.playerMaxHP) run.playerHP = run.playerMaxHP;
+            ctx.playerMaxHP = run.playerMaxHP;
+            if (ctx.playerCurrentHP > ctx.playerMaxHP) ctx.playerCurrentHP = ctx.playerMaxHP;
+            UnityEngine.Debug.Log($"[ファコン・タンゴ] 孤剣: 他の剣の舞なし → 最大HP {beforeMax}→{run.playerMaxHP}");
+        }
+    }
+
+    /// <summary>ブレイドダンス (特殊・4枚集約の変化先): 戦闘突入ごとに[剣先]スタック+1（最大99・ラン中持続）。
+    /// ダイス合計に剣先スタック分を加算。与ダメージ時に剣先スタック分HP回復、被ダメージ時に剣先スタック分の
+    /// 軽減不可ダメージを相手へ。スタックはランを跨がず IRunResettable でリセット。</summary>
+    public class BladeDance : IPassiveSkillEffect, IRunResettable
+    {
+        public string SkillId => "BladeDance";
+        private int kensaki = 0; // 剣先スタック（ラン中持続）
+
+        public void ResetRunState() { kensaki = 0; }
+
+        /// <summary>4枚集約による BD 取得時の初期スタック付与 (現在層 × 3)。
+        /// 取得が後半層に偏る構造のため、 集約成功への報酬として「現時点の層数 × 3」 をプリロードする。
+        /// 既に kensaki > seed の場合は上書きしない (後から再取得→上書きで減少を防ぐ)。</summary>
+        public void SeedOnAcquire(int floor)
+        {
+            int seed = System.Math.Min(99, System.Math.Max(0, floor) * 5);
+            if (seed > kensaki) kensaki = seed;
+            UnityEngine.Debug.Log($"[ブレイドダンス] 取得時シード: floor={floor} → kensaki={kensaki}");
+        }
+
+        public PassiveSkillTrigger[] Triggers => new[]
+        {
+            PassiveSkillTrigger.OnBattleStart,
+            PassiveSkillTrigger.OnPostRoll,
+            PassiveSkillTrigger.OnPostDealDamage,
+            PassiveSkillTrigger.OnPostReceiveDamage,
+        };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            switch (trigger)
+            {
+                case PassiveSkillTrigger.OnBattleStart:
+                    kensaki = System.Math.Min(99, kensaki + 1);
+                    UnityEngine.Debug.Log($"[ブレイドダンス] 戦闘突入: 剣先スタック → {kensaki}");
+                    break;
+                case PassiveSkillTrigger.OnPostRoll:
+                    if (kensaki > 0) ctx.playerDiceTotal += kensaki;
+                    break;
+                case PassiveSkillTrigger.OnPostDealDamage:
+                    // 与ダメージ時: 剣先スタック分HP回復
+                    if (kensaki > 0 && ctx.finalDamage > 0)
+                        ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + kensaki);
+                    break;
+                case PassiveSkillTrigger.OnPostReceiveDamage:
+                    // 被ダメージ時: 剣先スタック分の軽減不可ダメージを相手へ
+                    if (kensaki > 0 && ctx.finalDamage > 0)
+                        ctx.fixedDamageToEnemy += kensaki;
+                    break;
+            }
+        }
+    }
+
 }

@@ -42,9 +42,27 @@ namespace GameLoop
             {
                 run.lastStandActive = true;
                 int before = run.playerMaxHP;
-                run.playerMaxHP = Mathf.Max(1, run.playerMaxHP / 2);
-                run.playerHP = run.playerMaxHP; // 致命を打ち消し、半減バー満タンで生還
-                Debug.Log($"[ラストスタンド] 発動: 致命を無敵で耐え、最大HP {before}→{run.playerMaxHP} に半減（以降ガード無し）");
+                bool noHpLoss = MetaProgression.MetaBuffApplicator.IsLastStandHpLossDisabled();
+                if (!noHpLoss)
+                    run.playerMaxHP = Mathf.Max(1, run.playerMaxHP / 2);
+                run.playerHP = run.playerMaxHP; // 致命を打ち消し、 (半減 or 据え置き) バー満タンで生還
+                Debug.Log(noHpLoss
+                    ? $"[ラストスタンド] 発動(メタ:HP低下無効): 致命を無敵で耐え、 最大HP {before} 据置で全回復"
+                    : $"[ラストスタンド] 発動: 致命を無敵で耐え、最大HP {before}→{run.playerMaxHP} に半減（以降ガード無し）");
+                return true;
+            }
+
+            // 3. フルーレ・バレエ（[剣の舞]）: 敗北時の最終救済。
+            //    このアイテムを廃棄し、最大HP=1 で生還する（灯火・ラストスタンドが尽きた後の捨て身）。
+            //    ※昇華済み（グリッド外・永続）の場合は廃棄不能のため発動しない。
+            if (run.ownedPassiveItems != null
+                && run.ownedPassiveItems.Contains(SwordDanceSet.FleuretBallet))
+            {
+                int idx = run.ownedPassiveItems.IndexOf(SwordDanceSet.FleuretBallet);
+                InventorySystem.Helpers.PassiveAddHelper.RemoveAt(run, idx);
+                run.playerMaxHP = 1;
+                run.playerHP = 1;
+                Debug.Log("[フルーレ・バレエ] 敗北の救済: 自壊し最大HP1で生還");
                 return true;
             }
 

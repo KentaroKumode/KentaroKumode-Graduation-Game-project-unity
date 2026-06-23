@@ -105,9 +105,12 @@ namespace InventorySystem.PassiveSkills
 
             if (equippedItems == null) return;
 
-            // 完全同名アイテム (internalName 一致) は1個扱いで重複排除する。
-            // 別アイテム間で同名スキルがある場合は RegisterSkill 側で重複登録を許可して合算動作させる。
+            // 2026-06-22 リワーク:
+            //   同名パッシブ → 1 回のみ発動 (HashSet で dedup)
+            //   同家系の Lv 違い (例: MightI + MightII) → 最高 Lv のみ発動 (下位は抑制)
+            //   これにより 「弱い同名/下位互換を所持し続けるメリット = ゼロ」 が確定する。
             var seenItemIds = new HashSet<string>();
+            var collected = new List<(string id, string display)>();
             foreach (var item in equippedItems)
             {
                 if (item == null) continue;
@@ -115,13 +118,39 @@ namespace InventorySystem.PassiveSkills
                 if (item.passiveSkills == null) continue;
                 foreach (var ps in item.passiveSkills)
                 {
-                    RegisterSkill(ps.internalName);
-                    if (!string.IsNullOrEmpty(ps.skillName))
-                        skillDisplayNames[ps.internalName] = ps.skillName;
+                    if (string.IsNullOrEmpty(ps.internalName)) continue;
+                    collected.Add((ps.internalName, ps.skillName));
                 }
             }
 
-            Debug.Log($"[PassiveSkillManager] Active skills refreshed: {activeSkillNames.Count} skills");
+            // 同名抑制: 一意な ID 集合に
+            var uniqueIds = new HashSet<string>();
+            foreach (var c in collected) uniqueIds.Add(c.id);
+
+            // 上位 Lv 抑制: 同家系で上位がいれば下位を捨てる
+            var finalIds = new HashSet<string>();
+            foreach (var id in uniqueIds)
+            {
+                if (PassiveSkillRegistry.IsHigherTierPresent(id, uniqueIds))
+                {
+                    Debug.Log($"[PassiveSkillManager] 上位互換抑制: {id} (同家系の上位 Lv が存在)");
+                    continue;
+                }
+                finalIds.Add(id);
+            }
+
+            // 登録
+            foreach (var c in collected)
+            {
+                if (!finalIds.Contains(c.id)) continue;
+                // dedup: 同一 ID は 1 回のみ登録 (重複は activeSkillNames が弾く)
+                if (activeSkillNames.Contains(c.id)) continue;
+                RegisterSkill(c.id);
+                if (!string.IsNullOrEmpty(c.display))
+                    skillDisplayNames[c.id] = c.display;
+            }
+
+            Debug.Log($"[PassiveSkillManager] Active skills refreshed: {activeSkillNames.Count} skills (収集{collected.Count}, 同名抑制後{uniqueIds.Count}, 上位抑制後{finalIds.Count})");
         }
 
         /// <summary>
@@ -203,6 +232,25 @@ namespace InventorySystem.PassiveSkills
             activeSkillsByTrigger.Clear();
             activeSkillNames.Clear();
             skillDisplayNames.Clear();
+        }
+
+        /// <summary>希望「迷妄」(絶望帯・ADR-0002): 戦闘開始時にプレイヤーのパッシブスキルを count 個
+        /// ランダムで無効化する。PassiveItem(佯狂者・記憶の砂時計 等)は別系統(PassiveItemManager)のため
+        /// activeSkillNames に含まれず、自動的に対象外。スキルは戦闘ごとに再登録されるため復元は不要。</summary>
+        public void DisableRandomPlayerSkills(int count)
+        {
+            if (count <= 0 || activeSkillNames.Count == 0) return;
+            var distinct = new List<string>(new HashSet<string>(activeSkillNames));
+            int n = System.Math.Min(count, distinct.Count);
+            for (int i = 0; i < n && distinct.Count > 0; i++)
+            {
+                int idx = UnityEngine.Random.Range(0, distinct.Count);
+                string name = distinct[idx];
+                distinct.RemoveAt(idx);
+                while (activeSkillNames.Contains(name)) UnregisterSkill(name);
+                string disp = skillDisplayNames.TryGetValue(name, out var d) ? d : name;
+                Debug.Log($"[迷妄] パッシブ「{disp}」を無効化 (絶望帯)");
+            }
         }
 
         // ===========================================================
@@ -340,6 +388,7 @@ namespace InventorySystem.PassiveSkills
         {
             if (context == null) return;
             context.BeginNewTurn();
+            context.TickStatuses(StatusTick.TurnStart); // #3 統一フレーム: 炎上等のDOT/減衰を一括（fixedDamage 0化後）
 
             // 今ターンの発動追跡をリセット
             triggeredPlayerSkills.Clear();
@@ -617,6 +666,12 @@ namespace InventorySystem.PassiveSkills
             // 消費: 敵弱体（敵ダイス合計-X・全戦闘）
             if (context.consEnemyDiceDebuff > 0)
                 context.enemyDiceTotal = System.Math.Max(0, context.enemyDiceTotal - context.consEnemyDiceDebuff);
+
+            // 沈黙の剣帯 等: 床なし減算（負値許容＝大差勝ち→基礎ダメ激増）
+            if (context.enemyDiceTotalPenalty != 0)
+                context.enemyDiceTotal -= context.enemyDiceTotalPenalty;
+            // 敵スタンス（ADR-0005）の弱ロールは「面を縮めて実際に振る」方式（CombatManager の RollDice 時）。
+            // ＝ここでの合計いじりは無し（事後倍率にしない方針）。
 
             // 〈妙覚〉T1自由攻撃ターンは敵ロールを確実に0に保つ（真我/星火等の加算を乗せない）。
             if (!context.myokakuFreeHit)

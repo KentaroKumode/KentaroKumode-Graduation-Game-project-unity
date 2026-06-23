@@ -71,6 +71,45 @@ namespace InventorySystem.PassiveSkills
             registry[effect.SkillId] = effect;
         }
 
+        // ============================================================
+        //  Lv 家系テーブル (2026-06-22 追加)
+        //  仕様: 同名パッシブは 1 回のみ発動。 同家系で複数 Lv 所持時は最高 Lv のみ発動。
+        //  例: MightI + MightII 同時所持 → MightII のみ発動 (MightI は無効化)
+        // ============================================================
+        private static readonly string[] _leveledFamilies = {
+            "Pursuit", "Counter", "Might", "Fortitude", "Insight", "Vitality",
+            "BladeEdge", "BountyHunter", "Conqueror", "Lifesteal", "Indomitable",
+            "ShieldBash", "LentTime", "Grievous",
+        };
+
+        /// <summary>skill ID から家系名 + Lv (1-4) を解析。 Lv 制でなければ (id, 0) を返す。</summary>
+        public static (string family, int level) GetFamilyLevel(string skillId)
+        {
+            if (string.IsNullOrEmpty(skillId)) return (skillId, 0);
+            foreach (var fam in _leveledFamilies)
+            {
+                if (!skillId.StartsWith(fam)) continue;
+                string suffix = skillId.Substring(fam.Length);
+                int lv = suffix switch { "I" => 1, "II" => 2, "III" => 3, "IV" => 4, _ => 0 };
+                if (lv > 0) return (fam, lv);
+            }
+            return (skillId, 0);
+        }
+
+        /// <summary>同家系の上位 Lv が指定 IDs 集合に存在するか。 上位ありなら true (=自分は抑制対象)。</summary>
+        public static bool IsHigherTierPresent(string skillId, System.Collections.Generic.IEnumerable<string> allSkillIds)
+        {
+            var (family, level) = GetFamilyLevel(skillId);
+            if (level <= 0) return false;
+            foreach (var id in allSkillIds)
+            {
+                if (id == skillId) continue;
+                var (fam2, lv2) = GetFamilyLevel(id);
+                if (fam2 == family && lv2 > level) return true;
+            }
+            return false;
+        }
+
         /// <summary>
         /// 全スキルを登録
         /// ★ 新スキル追加時はここに1行追加するだけ ★
@@ -156,6 +195,7 @@ namespace InventorySystem.PassiveSkills
             Register(new Starguide());
             Register(new Judgement());
             Register(new IronWall());
+            Register(new CopperSteady());
             Register(new Moroha());
             Register(new Greed());
             Register(new Perfection());
@@ -198,7 +238,6 @@ namespace InventorySystem.PassiveSkills
             Register(new LentTimeIII());
             Register(new LentTimeIV());
             Register(new Lifeline());       // 命脈（ユニーク）
-            Register(new Repeater());       // リピーター（会心リトリガー触媒）
             Register(new PalePikeKnight()); // 蒼白の槍騎士（軽減無視ダメ増幅）
             Register(new Resonance());      // 共鳴（所持数スケール）
             Register(new Truce());
@@ -207,6 +246,29 @@ namespace InventorySystem.PassiveSkills
             Register(new Hermes());
             Register(new HungerPill());
             Register(new GoldKingBlade());
+
+            // 2026-06-03 新規追加アイテム
+            Register(new EvenEyes());         // 賽振りの目隠し（全偶数→与ダメ+15%）
+            Register(new TwinDice());         // 双子の賽（ペア→会心ダイス+1）
+            Register(new BloodPathBanner());  // 血路の旗（敵出血stack×与ダメ+3%）
+            Register(new MasterworkNotes());  // 匠の手控え（weaponPlus≥3→与ダメ+12%）
+            Register(new KaleidoDice());      // 万華の賽（全同/全異/階段→与ダメ×2）
+            Register(new JudgmentScale());    // 断罪の天秤（勝利時 合計差×4%、上限+100%）
+
+            // 2026-06-05 会心バリエーション（OnCriticalDamage / OnCriticalCheck）
+            Register(new LacerationCore());   // 裂傷の刃心（会心→出血+2、会心倍率連動）
+            Register(new GuardFlash());       // 防殻の一閃（会心ダメの5%シールド）
+            Register(new VitalPierce());      // 急所穿ち（会心→軽減無視+5）
+            Register(new LifeFang());         // 吸命の牙（会心→与ダメ15%回復）
+            Register(new SinglePoint());      // 一点集中（会心倍率+0.5／分子-2）
+            Register(new ChainApex());        // 連環の極み（会心毎に倍率+0.2累積）
+
+            // 2026-06-04 [剣の舞] セット（4枚集約→ブレイドダンスに変化）
+            Register(new SaberWaltz());       // サーベル・ワルツ（ダイス+1／孤剣時HP半減）
+            Register(new EspadaPasodoble());  // エスパーダ・パソドブレ（自他ダイス+5／与被ダメ+20%）
+            Register(new FleuretBallet());    // フルーレ・バレエ（ダイス+3／敗北時自壊は救済チェーン）
+            Register(new FalconTango());      // ファコン・タンゴ（戦闘終了時 廃棄+全カテゴリ獲得）
+            Register(new BladeDance());       // ブレイドダンス（剣先スタック：ダイス/回復/反射）
 
             // 竜閃（ユニーク武器）
             Register(new MugaMushin());

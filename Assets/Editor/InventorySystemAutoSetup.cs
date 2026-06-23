@@ -72,10 +72,7 @@ public class InventorySystemAutoSetup : EditorWindow
             
             // 7. GridCellプレハブ作成
             CreateGridCellPrefab();
-            
-            // 8. メモリ監視システム配置
-            SetupMemoryMonitor();
-            
+
             Debug.Log("✅ 自動セットアップ完了！");
             EditorUtility.DisplayDialog("セットアップ完了", 
                 "自動セットアップが完了しました！\n\n" +
@@ -348,17 +345,6 @@ public class InventorySystemAutoSetup : EditorWindow
         tester.AddComponent<InventoryVisualTester>();
         
         Debug.Log("  • InventoryTester配置完了");
-    }
-    
-    private void SetupMemoryMonitor()
-    {
-        Debug.Log("👁️ MemoryMonitor配置中...");
-        
-        GameObject monitor = new GameObject("MemoryMonitor");
-        monitor.AddComponent<MemoryLeakPreventionFramework>();
-        monitor.AddComponent<TLSAllocatorErrorMonitor>();
-        
-        Debug.Log("  • MemoryMonitor配置完了");
     }
     
     private void CreateGridCellPrefab()

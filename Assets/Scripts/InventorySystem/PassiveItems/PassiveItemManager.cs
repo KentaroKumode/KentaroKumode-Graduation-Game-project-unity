@@ -35,7 +35,9 @@ namespace InventorySystem.PassiveItems
 
             // 同じアイテムを複数所持している可能性に対応（List なので重複あり得る）
             // 効果はそのまま重複適用される（複数回 Apply）
+            // 〈昇華〉済み永久パッシブ（グリッド外）も owned と同様に発動させる。
             var items = new List<string>(run.ownedPassiveItems);
+            if (run.ascendedPassiveIds != null) items.AddRange(run.ascendedPassiveIds);
             foreach (var id in items)
             {
                 var effect = PassiveItemRegistry.Get(id);

@@ -110,11 +110,11 @@ namespace GameLoop
                 case "cons_atk_3": return SetBurst(run, ctx, 9);
                 case "cons_atk_4": return SetBurst(run, ctx, 15);
 
-                // ===== ダイス補正: 勝敗のみ+X（ダメージ非加算・全戦闘持続） =====
-                case "cons_dice_1": return AddInt(run, ctx, "dice", 1);
-                case "cons_dice_2": return AddInt(run, ctx, "dice", 2);
-                case "cons_dice_3": return AddInt(run, ctx, "dice", 3);
-                case "cons_dice_4": return AddInt(run, ctx, "dice", 4);
+                // ===== ダイス補正: 勝敗のみ+X（ダメージ非加算・次2戦闘ずっと） =====
+                case "cons_dice_1": return AddInt(run, ctx, "dice", 1, durationBattles: 2);
+                case "cons_dice_2": return AddInt(run, ctx, "dice", 2, durationBattles: 2);
+                case "cons_dice_3": return AddInt(run, ctx, "dice", 3, durationBattles: 2);
+                case "cons_dice_4": return AddInt(run, ctx, "dice", 4, durationBattles: 2);
 
                 // ===== シールド: 吸収量 / 残ターン(-1=無制限) =====
                 case "cons_shield_1": return SetShield(run, ctx, 8, 2);
@@ -128,29 +128,29 @@ namespace GameLoop
                 case "cons_regen_3": return SetRegen(run, ctx, 9);
                 case "cons_regen_4": return SetRegen(run, ctx, 12);
 
-                // ===== 会心率+X(/9)（全戦闘持続） =====
-                case "cons_crit_1": return AddInt(run, ctx, "crit", 1);
-                case "cons_crit_2": return AddInt(run, ctx, "crit", 2);
-                case "cons_crit_3": return AddInt(run, ctx, "crit", 3);
-                case "cons_crit_4": return AddInt(run, ctx, "crit", 4);
+                // ===== 会心率+X(/9)（次2戦闘ずっと） =====
+                case "cons_crit_1": return AddInt(run, ctx, "crit", 1, durationBattles: 2);
+                case "cons_crit_2": return AddInt(run, ctx, "crit", 2, durationBattles: 2);
+                case "cons_crit_3": return AddInt(run, ctx, "crit", 3, durationBattles: 2);
+                case "cons_crit_4": return AddInt(run, ctx, "crit", 4, durationBattles: 2);
 
-                // ===== 定数軽減: 被ダメ毎ターン-X（全戦闘持続） =====
-                case "cons_reduce_1": return AddInt(run, ctx, "reduce", 1);
-                case "cons_reduce_2": return AddInt(run, ctx, "reduce", 2);
-                case "cons_reduce_3": return AddInt(run, ctx, "reduce", 3);
-                case "cons_reduce_4": return AddInt(run, ctx, "reduce", 5);
+                // ===== 定数軽減: 被ダメ毎ターン-X（次2戦闘ずっと） =====
+                case "cons_reduce_1": return AddInt(run, ctx, "reduce", 1, durationBattles: 2);
+                case "cons_reduce_2": return AddInt(run, ctx, "reduce", 2, durationBattles: 2);
+                case "cons_reduce_3": return AddInt(run, ctx, "reduce", 3, durationBattles: 2);
+                case "cons_reduce_4": return AddInt(run, ctx, "reduce", 5, durationBattles: 2);
 
-                // ===== 燃費: 空腹度を割合回復（戦闘外専用） =====
-                case "cons_food_1": return RestoreHunger(0.25f);
-                case "cons_food_2": return RestoreHunger(0.50f);
-                case "cons_food_3": return RestoreHunger(0.75f);
-                case "cons_food_4": return RestoreHunger(1.00f);
+                // ===== 食料: 希望を回復（飢餓→希望統合・ADR-0002・戦闘外専用） =====
+                case "cons_food_1": return RestoreHope(10);
+                case "cons_food_2": return RestoreHope(20);
+                case "cons_food_3": return RestoreHope(30);
+                case "cons_food_4": return RestoreHope(45);
 
                 // ===== ユニーク =====
-                case "uniq_phil_stone":  // 賢者の石: 2G→素材1（最大5回/ラン、1/5デノミ後）
-                {
-                    if (run.philStoneUsed >= 5 || run.coins < 2) return false;
-                    run.coins -= 2; run.coinsSpent += 2; run.weaponMaterials++; run.philStoneUsed++;
+                case "uniq_phil_stone":  // 賢者の石(2026-06-04): GOLD変換を廃止し、無条件で強化素材+1（最大5回/ラン）。
+                {                        // ※変動サイズ素材の実装後は「ランダムサイズ1個」に拡張。
+                    if (run.philStoneUsed >= 5) return false;
+                    run.weaponMaterials++; run.philStoneUsed++;
                     return true;
                 }
                 case "uniq_forge_elixir": // 鍛冶の霊薬: 武器を1段階無償強化（次Tier→無ければ限界突破）
@@ -167,13 +167,8 @@ namespace GameLoop
                         return true;
                     }
                     run.pendingEnemyStartHpCutPct = 15; return true;
-                case "uniq_food_horn":    // 満腹の角笛: 空腹全回復＋このフロア上限+5
-                {
-                    var h = MapSystem.MapManager.Instance?.Hunger;
-                    if (h == null) return false;
-                    h.Initialize(h.Max + 5);
-                    return true;
-                }
+                case "uniq_food_horn":    // 満腹の角笛: 希望を大きく回復（飢餓→希望統合・ADR-0002）
+                    return RestoreHope(25);
                 case "uniq_appraise":     // 鑑定の眼鏡: 次の宝箱/ショップ最低レアSILVER
                     run.nextLootMinRarity = (int)ItemRarity.SILVER;
                     return true;
@@ -237,7 +232,9 @@ namespace GameLoop
             return true;
         }
 
-        private static bool AddInt(RunState run, CombatContext ctx, string kind, int v)
+        // durationBattles: dice/crit/reduce が次戦闘以降も持続する戦闘数。 1=次戦闘1回のみ（既定）、 2=次戦闘から2回。
+        // 戦闘中使用時は当戦闘も1戦としてカウント＝持ち越し戦闘数は durationBattles-1。
+        private static bool AddInt(RunState run, CombatContext ctx, string kind, int v, int durationBattles = 1)
         {
             if (ctx != null)
             {
@@ -248,14 +245,28 @@ namespace GameLoop
                     case "reduce":  ctx.consFlatReduce += v; break;
                     case "dmgmult": ctx.consDmgMultPct += v; break;
                 }
+                // 戦闘中使用でもマルチバトル系は次戦闘以降にも持ち越す（残戦闘数 = duration - 1、 当戦闘分を控除）
+                if (run != null && durationBattles > 1)
+                {
+                    int carry = durationBattles - 1;
+                    switch (kind)
+                    {
+                        case "dice":   run.pendingConsDiceRoll = v;     run.pendingConsDiceRollBattles    = Mathf.Max(run.pendingConsDiceRollBattles, carry); break;
+                        case "crit":   run.pendingConsCrit = v;         run.pendingConsCritBattles        = Mathf.Max(run.pendingConsCritBattles, carry); break;
+                        case "reduce": run.pendingConsFlatReduce = v;   run.pendingConsFlatReduceBattles  = Mathf.Max(run.pendingConsFlatReduceBattles, carry); break;
+                    }
+                }
             }
             else
             {
                 switch (kind)
                 {
-                    case "dice":    run.pendingConsDiceRoll += v; break;
-                    case "crit":    run.pendingConsCrit += v; break;
-                    case "reduce":  run.pendingConsFlatReduce += v; break;
+                    case "dice":    run.pendingConsDiceRoll += v;
+                                    run.pendingConsDiceRollBattles    = Mathf.Max(run.pendingConsDiceRollBattles, durationBattles); break;
+                    case "crit":    run.pendingConsCrit += v;
+                                    run.pendingConsCritBattles        = Mathf.Max(run.pendingConsCritBattles, durationBattles); break;
+                    case "reduce":  run.pendingConsFlatReduce += v;
+                                    run.pendingConsFlatReduceBattles  = Mathf.Max(run.pendingConsFlatReduceBattles, durationBattles); break;
                     case "dmgmult": run.pendingConsDmgMultPct += v; break;
                 }
             }
@@ -277,12 +288,11 @@ namespace GameLoop
             return true;
         }
 
-        private static bool RestoreHunger(float pct)
+        private static bool RestoreHope(int amount)
         {
-            var h = MapSystem.MapManager.Instance?.Hunger;
-            if (h == null) return false;
-            int amt = Mathf.CeilToInt(h.Max * pct);
-            h.Restore(amt);
+            var run = GameManager.Instance?.Run;
+            if (run == null) return false;
+            HopeSystem.ApplyFood(run, amount);
             return true;
         }
 
@@ -336,6 +346,46 @@ namespace GameLoop
                 if (r <= 0f) continue;
                 if (r >= missingFrac && r < bestCoverR) { bestCover = id; bestCoverR = r; }
                 if (r > bestAnyR) { bestAny = id; bestAnyR = r; }
+            }
+            string pick = bestCover ?? bestAny;
+            return pick != null && Use(run, pick);
+        }
+
+        /// <summary>id が食料（希望回復）系か。</summary>
+        public static bool IsFood(string id)
+            => !string.IsNullOrEmpty(id) && (id.StartsWith("cons_food_") || id == "uniq_food_horn");
+
+        /// <summary>食料の希望回復量（食料以外は0）。</summary>
+        public static int FoodHopeAmount(string id)
+        {
+            switch (id)
+            {
+                case "cons_food_1": return 10;
+                case "cons_food_2": return 20;
+                case "cons_food_3": return 30;
+                case "cons_food_4": return 45;
+                case "uniq_food_horn": return 25;
+                default: return 0;
+            }
+        }
+
+        /// <summary>希望が上限未満なら、不足を最も無駄なく埋める食料を1個使って希望を回復する。使ったら true。
+        /// 佯狂者の冠で希望0固定中は発狂狙いのため回復しない（浪費回避）。bot/オートランナー用。</summary>
+        public static bool TryUseBestFood(RunState run)
+        {
+            if (run?.ownedConsumables == null || run.ownedConsumables.Count == 0) return false;
+            if (run.crownHopeLocked) return false; // 発狂固定中は回復不可＝浪費しない
+            int missing = run.hopeCap - run.hope;
+            if (missing <= 0) return false;
+
+            string bestCover = null; int bestCoverA = int.MaxValue;
+            string bestAny = null;   int bestAnyA = -1;
+            foreach (var id in run.ownedConsumables)
+            {
+                int a = FoodHopeAmount(id);
+                if (a <= 0) continue;
+                if (a >= missing && a < bestCoverA) { bestCover = id; bestCoverA = a; }
+                if (a > bestAnyA) { bestAny = id; bestAnyA = a; }
             }
             string pick = bestCover ?? bestAny;
             return pick != null && Use(run, pick);

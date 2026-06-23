@@ -58,6 +58,15 @@ namespace MetaProgression
 
         public void Load()
         {
+#if UNITY_EDITOR
+            // エディタ起動時はメタ進行を毎回初期状態へリセット（スキルツリーUI開発中の便宜）。
+            // テスト用に星を付与しておく（リセットされてもすぐ買えるように）。
+            PlayerPrefs.DeleteKey(PrefsKey);
+            State = new MetaProgressState();
+            State.tokens = 3000;
+            State.RecalculateFromTrack();
+            return;
+#else
             string json = PlayerPrefs.GetString(PrefsKey, "");
             if (string.IsNullOrEmpty(json))
             {
@@ -69,6 +78,7 @@ namespace MetaProgression
                 catch { State = new MetaProgressState(); }
             }
             State.RecalculateFromTrack();
+#endif
         }
 
         public void ResetAll()
@@ -141,18 +151,21 @@ namespace MetaProgression
                 case MetaBuffKind.Gold:             State.goldBonus += step.amount; break;
                 case MetaBuffKind.DiceTotal:        State.diceTotalBonus += step.amount; break;
                 case MetaBuffKind.DamageReduce:     State.damageReduce += step.amount; break;
-                case MetaBuffKind.HungerReduce:     State.hungerReduce += step.amount; break;
+                case MetaBuffKind.HopeLossReduce:   State.hopeLossReduce += step.amount; break;
                 case MetaBuffKind.StartMaterial:    State.startMaterial += step.amount; break;
                 case MetaBuffKind.CombatGoldBonus:  State.combatGoldBonus += step.amount; break;
                 case MetaBuffKind.BossExtraNormal:  State.bossExtraNormalUnlocked = true; break;
                 case MetaBuffKind.BossExtraRare:    State.bossExtraRareUnlocked = true; break;
                 case MetaBuffKind.RefundLevelUp:    State.refundLevel = Mathf.Min(3, State.refundLevel + step.amount); break;
                 case MetaBuffKind.CritLevelUp:      State.critLevel = Mathf.Min(3, State.critLevel + step.amount); break;
-                case MetaBuffKind.DivineProtect:    State.divineProtectUnlocked = true; break;
                 case MetaBuffKind.StartingPassiveItem: State.startingPassiveItemUnlocked = true; break;
                 case MetaBuffKind.FloorClearHeal:   State.floorClearHeal = Mathf.Min(2, State.floorClearHeal + step.amount); break;
                 case MetaBuffKind.TreasureChestGold: State.treasureChestGoldUnlocked = true; break;
                 case MetaBuffKind.ShopRobberyUnlock: State.shopRobberyUnlocked = true; break;
+                case MetaBuffKind.OutgoingDamagePct: State.outgoingDamagePct = Mathf.Min(50, State.outgoingDamagePct + step.amount); break;
+                case MetaBuffKind.LastStandHpLossDisable: State.lastStandHpLossDisabled = true; break;
+                case MetaBuffKind.BossRestHealAndUpgrade: State.bossRestHealAndUpgradeUnlocked = true; break;
+                case MetaBuffKind.CritDamageBonus: State.critDamageBonus += step.amount / 100f; break;
             }
         }
 

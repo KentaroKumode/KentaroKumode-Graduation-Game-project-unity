@@ -163,6 +163,32 @@ namespace AutoTest
             public double OfferedLift6F  => Off6FBandAvg - NoOff6FBandAvg;
         }
 
+        /// <summary>シナジー探索（別枠）集計: グループのメンバー所持数 k 別に bandScore を積む。
+        /// k=0..M（M=メンバー数）。 単体 lift では拾えない「セット相乗」を可視化するための単位。</summary>
+        [Serializable]
+        public class SynergyAggregate
+        {
+            public string id = "";
+            public string name = "";
+            public int members;                              // グループのメンバー数 M
+            public List<int> kRuns = new List<int>();        // index k: メンバーをちょうど k 種取得したラン数（全ラン）
+            public List<double> kBandSum = new List<double>();
+            public List<int> k6FRuns = new List<int>();      // 同・6F到達ラン
+            public List<double> k6FBandSum = new List<double>();
+
+            /// <summary>k=0..members の長さを確保する。</summary>
+            public void EnsureSize()
+            {
+                int need = members + 1;
+                while (kRuns.Count < need) kRuns.Add(0);
+                while (kBandSum.Count < need) kBandSum.Add(0);
+                while (k6FRuns.Count < need) k6FRuns.Add(0);
+                while (k6FBandSum.Count < need) k6FBandSum.Add(0);
+            }
+            public double KBandAvg(int k)   => (k >= 0 && k < kRuns.Count   && kRuns[k]   > 0) ? kBandSum[k]   / kRuns[k]   : 0;
+            public double K6FBandAvg(int k) => (k >= 0 && k < k6FRuns.Count && k6FRuns[k] > 0) ? k6FBandSum[k] / k6FRuns[k] : 0;
+        }
+
         /// <summary>1バッチ分のスナップショット (バッチ単位履歴で 直近N バッチを保持するための単位)。</summary>
         [Serializable]
         public class BatchSnapshot
@@ -170,6 +196,7 @@ namespace AutoTest
             public string timestamp = "";
             public int runs;
             public List<ItemAggregate> items = new List<ItemAggregate>();
+            public List<SynergyAggregate> synergies = new List<SynergyAggregate>(); // シナジー探索（別枠）
         }
 
         [Serializable]
@@ -180,6 +207,7 @@ namespace AutoTest
             public int totalRuns;                       // = batches.Sum(b => b.runs)
             public List<ItemAggregate> items = new List<ItemAggregate>(); // 直近Nバッチを合算した表示用
             public List<BatchSnapshot> batches = new List<BatchSnapshot>(); // 直近Nバッチの履歴
+            public List<SynergyAggregate> synergies = new List<SynergyAggregate>(); // 直近Nバッチ合算（シナジー探索表示用）
         }
 
         // ============================================================
@@ -238,6 +266,23 @@ namespace AutoTest
             dst.offSqSum += src.offSqSum;   dst.off6FSqSum += src.off6FSqSum;
         }
 
+        /// <summary>シナジー集計 src を dst に加算（k別バケットを足し合わせる）。</summary>
+        private static void AddSynergy(SynergyAggregate dst, SynergyAggregate src)
+        {
+            if (src == null) return;
+            dst.members = Math.Max(dst.members, src.members);
+            if (!string.IsNullOrEmpty(src.name)) dst.name = src.name;
+            dst.EnsureSize();
+            for (int k = 0; k < src.kRuns.Count; k++)
+            {
+                while (dst.kRuns.Count <= k) { dst.kRuns.Add(0); dst.kBandSum.Add(0); dst.k6FRuns.Add(0); dst.k6FBandSum.Add(0); }
+                dst.kRuns[k]    += src.kRuns[k];
+                dst.kBandSum[k] += src.kBandSum[k];
+                if (k < src.k6FRuns.Count)   dst.k6FRuns[k]    += src.k6FRuns[k];
+                if (k < src.k6FBandSum.Count) dst.k6FBandSum[k] += src.k6FBandSum[k];
+            }
+        }
+
         /// <summary>batches 履歴から items (表示用累積) を再構築。</summary>
         private static void RebuildItemsFromBatches(StatsFile sf)
         {
@@ -254,6 +299,26 @@ namespace AutoTest
                     AddAggregate(dst, a);
                 }
             sf.items = new List<ItemAggregate>(merged.Values);
+
+            // シナジー探索（別枠）も同様に batches から再構築。
+            var mergedSyn = new Dictionary<string, SynergyAggregate>();
+            foreach (var b in sf.batches)
+            {
+                if (b.synergies == null) continue;
+                foreach (var s in b.synergies)
+                {
+                    if (s == null || string.IsNullOrEmpty(s.id)) continue;
+                    if (!mergedSyn.TryGetValue(s.id, out var dst))
+                    {
+                        dst = new SynergyAggregate { id = s.id, name = s.name, members = s.members };
+                        dst.EnsureSize();
+                        mergedSyn[s.id] = dst;
+                    }
+                    AddSynergy(dst, s);
+                }
+            }
+            sf.synergies = new List<SynergyAggregate>(mergedSyn.Values);
+
             sf.totalBatches = sf.batches.Count;
             int rt = 0; foreach (var b in sf.batches) rt += b.runs;
             sf.totalRuns = rt;
@@ -291,6 +356,15 @@ namespace AutoTest
             foreach (var id in allIds)
                 byId[id] = new ItemAggregate { id = id };
 
+            // シナジー探索（別枠）: 既知グループのメンバー所持数 k 別に band を積む。
+            var synById = new Dictionary<string, SynergyAggregate>();
+            foreach (var g in SynergyGroups.All)
+            {
+                var sa = new SynergyAggregate { id = g.id, name = g.name, members = g.members.Length };
+                sa.EnsureSize();
+                synById[g.id] = sa;
+            }
+
             foreach (var r in recs)
             {
                 if (r == null) continue;
@@ -311,6 +385,17 @@ namespace AutoTest
 
                 var acquired = r.acquiredItemsEver ?? new HashSet<string>();
                 var offered  = r.offeredItemsEver  ?? new HashSet<string>();
+
+                // シナジー探索: グループごとに「取得したメンバー数 k」を数えて band を積む。
+                foreach (var g in SynergyGroups.All)
+                {
+                    int k = 0;
+                    foreach (var m in g.members) if (acquired.Contains(m)) k++;
+                    var sa = synById[g.id];
+                    sa.kRuns[k]++; sa.kBandSum[k] += r.bandScore;
+                    if (reach6) { sa.k6FRuns[k]++; sa.k6FBandSum[k] += r.bandScore; }
+                }
+
                 foreach (var kv in byId)
                 {
                     // ---- 出現lift: 提示有無で層別 (取得・未取得問わず) ----
@@ -381,6 +466,7 @@ namespace AutoTest
                 timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                 runs = recs.Count,
                 items = new List<ItemAggregate>(byId.Values),
+                synergies = new List<SynergyAggregate>(synById.Values),
             };
             if (sf.batches == null) sf.batches = new List<BatchSnapshot>();
             sf.batches.Add(snap);
@@ -394,6 +480,10 @@ namespace AutoTest
             Directory.CreateDirectory(learningRoot);
             // Pretty Print オフでサイズ半減 (Unity JsonUtility は大きい JSON 苦手)
             File.WriteAllText(path, JsonUtility.ToJson(sf, false), new UTF8Encoding(false));
+
+            // シナジー探索（別枠・任意ペア発掘）: 本体とは別ファイル synergy_pairs.json に累積。
+            PairSynergyStats.Ingest(learningRoot, recs);
+
             return sf;
         }
 

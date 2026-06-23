@@ -20,8 +20,8 @@ namespace MapSystem.Visual
     public class MapClickHandler : MonoBehaviour
     {
         [Header("カメラ設定")]
-        [Tooltip("マップ専用カメラ（PixelPerfectMapCamera）")]
-        [SerializeField] private PixelPerfectMapCamera mapCamera;
+        [Tooltip("マップ専用カメラ。 PixelPerfectMapCamera でも素のCameraでも可。 LCD content 経由なら ContentCamera を渡す。")]
+        [SerializeField] private Camera mapCamera;
 
         [Header("表示先 (どちらか一方)")]
         [Tooltip("RawImage に RenderTexture を表示している場合")]
@@ -123,7 +123,7 @@ namespace MapSystem.Visual
             // --- 方法1: mapCamera + RawImage (RenderTexture経由) ---
             if (mapCamera != null && displayImage != null)
             {
-                var cam = mapCamera.GetComponent<Camera>();
+                var cam = mapCamera;
                 if (cam == null) goto Fallback;
 
                 RectTransform rt = displayImage.rectTransform;
@@ -156,7 +156,7 @@ namespace MapSystem.Visual
                 if (!Physics.Raycast(mainRay, out RaycastHit quadHit, 500f)) return false;
                 if (quadHit.collider == null || quadHit.collider.gameObject != displayQuad.gameObject) return false;
 
-                var cam = mapCamera.GetComponent<Camera>();
+                var cam = mapCamera;
                 if (cam == null) goto Fallback;
 
                 Vector2 uv = quadHit.textureCoord;

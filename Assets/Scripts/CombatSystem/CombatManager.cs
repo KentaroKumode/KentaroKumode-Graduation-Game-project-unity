@@ -65,6 +65,10 @@ namespace CombatSystem
         /// <summary>ボス難易度オートチューナー: この戦闘のプレイヤーロール合計と回数 (平均出目算出用)。</summary>
         public long playerRollSum;
         public int playerRollCount;
+        /// <summary>ボス難易度オートチューナー: この戦闘の総被ダメの **ソース別内訳** (キル時でなく支配率診断用)。</summary>
+        public Dictionary<InventorySystem.PassiveSkills.DeathCause, int> playerDamageBySource;
+        /// <summary>ボス難易度オートチューナー: スタンス別の「ボスがロール勝ちしたターン数/総ターン数」(強/弱別レンジ制御用)。</summary>
+        public int strongRollTurns, strongRollBossWins, weakRollTurns, weakRollBossWins;
     }
 
     /// <summary>
@@ -132,33 +136,20 @@ namespace CombatSystem
         private int fleeAfterTurns;          // >0 のとき、このターン数を終えても未決着なら敵が逃走（偽の商人）
         private long _fightPlayerRollSum;    // ボス難易度チューナー: この戦闘のプレイヤーロール合計の累計
         private int _fightPlayerRollCount;   // 同 ロール回数 (平均出目 = sum/count)
+        // ボス難易度チューナー: スタンス別の「ボスがロール勝ちしたターン数 / そのスタンスの総ターン数」(強/弱で別レンジ管理)
+        private int _fightStrongTurns, _fightStrongBossWins, _fightWeakTurns, _fightWeakBossWins;
         private bool wrathDiceOverrideArmed; // 恒久デバフ「憤怒」: 1T目のダイス最大化トリガー
         private int playerDiceCount;
         private int playerDiceMax;
+        private int playerAttackPower = 2;            // #2 案A': 装備武器の素火力（勝利base = attackPower + floor(|差|/3)）
+        private const int WeaponDiffPerBonus = 3;     // #2 案A': 差ボーナス＝floor(|差|/3)（差3ごとに+1）。会心には非干渉
         private int playerCriticalNumerator;
         private int enemyCriticalNumerator;
         private bool isCombatActive;
         private List<TurnResult> turnLog = new List<TurnResult>();
 
-        /// <summary>
-        /// 5層ボス戦中、毎ターン終了時にプレイヤーへ与える「カルマの呪い」ダメージ。
-        /// GameManager から SetKarmaCurseForCombat で設定し、FinishCombat でリセット。
-        /// </summary>
-        private int karmaCurseDamagePerTurn;
-
         // ===== LED演出管理 =====
         private DiceLEDManager ledManager;
-
-        /// <summary>
-        /// 次の StartCombat に適用されるカルマの呪いダメージ量を設定する。
-        /// 5層ボス戦開始直前に GameManager から呼ばれる想定。
-        /// </summary>
-        public void SetKarmaCurseForCombat(int amount)
-        {
-            karmaCurseDamagePerTurn = Math.Max(0, amount);
-        }
-
-        public int KarmaCurseDamagePerTurn => karmaCurseDamagePerTurn;
 
         /// <summary>
         /// 時限バフ（解放者）等の効果で、戦闘中の最大HPと現在HPを一時的に増やす。
@@ -376,7 +367,9 @@ namespace CombatSystem
             InventorySystem.PassiveSkills.RunPassiveSync.RefreshFromRun(
                 GameLoop.GameManager.Instance?.Run, equipHandler);
 
-            // SinDebuff による6層ボスへの動的注入は仕様変更で廃止
+            // SinDebuff 動的注入: boss_layer6 のみ・BossTuning.Apply が clone を返すため安全。
+            // 6層SinAltar儀式の不払いごとに該当パッシブを差し込む。
+            ApplySinDebuffsToBossIfApplicable(enemy);
 
             this.playerMaxHP = pMaxHP;
             playerHP = pMaxHP;
@@ -384,6 +377,18 @@ namespace CombatSystem
             playerDiceCount = pDiceCount;
             playerDiceMax = pDiceMax;
             playerCriticalNumerator = pCritNumerator;
+
+            // #2 案A': 装備武器の attackPower を解決（equipHandler優先・equippedWeaponId フォールバック・既定2）
+            playerAttackPower = 2;
+            {
+                var apW = equipHandler?.GetCurrentEquipment(InventorySystem.ItemCategory.Weapon);
+                if (apW == null)
+                {
+                    string wid = GameLoop.GameManager.Instance?.Run?.equippedWeaponId;
+                    if (!string.IsNullOrEmpty(wid)) apW = InventorySystem.ItemDatabase.Instance?.GetItem(wid);
+                }
+                if (apW != null && apW.attackPower > 0) playerAttackPower = apW.attackPower;
+            }
             enemyCriticalNumerator = enemy.criticalNumerator;
             isCombatActive = true;
             metaLethalSurviveUsed = false;
@@ -392,6 +397,7 @@ namespace CombatSystem
             turnLog.Clear();
             _fightPlayerRollSum = 0;
             _fightPlayerRollCount = 0;
+            _fightStrongTurns = _fightStrongBossWins = _fightWeakTurns = _fightWeakBossWins = 0;
 
             // パッシブスキルマネージャーに敵スキルを登録
             var psm = PassiveSkillManager.Instance;
@@ -413,6 +419,12 @@ namespace CombatSystem
             }
             psm.RegisterEnemySkills(enemySkills);
             psm.BeginCombat(pMaxHP, enemy.maxHP, pDiceMax, enemy.diceMaxValue, enemy.threat);
+            psm.Context?.playerDamageBySource.Clear(); // 被ダメ ソース別内訳を戦闘開始でリセット
+
+            // 希望(ADR-0002) 迷妄: 絶望帯(希望≤20)以降、戦闘開始時にプレイヤーパッシブを1-3個ランダム無効化。
+            // 佯狂者は PassiveItem 系統のため対象外（activeSkillNames に含まれない）。
+            int delusionCount = GameLoop.HopeSystem.RollPassiveDisableCount(GameLoop.GameManager.Instance?.Run);
+            if (delusionCount > 0) psm.DisableRandomPlayerSkills(delusionCount);
 
             // 装備ダイスの面をコンテキストに設定
             var ctx = psm.Context;
@@ -427,6 +439,10 @@ namespace CombatSystem
                 // ボス難易度オートチューナー: 軸別係数引き用にボスidを記録 (非ボスは空)
                 ctx.bossId = AutoTest.BossTuning.IsBoss(enemy.id) ? enemy.id : "";
                 ctx.lastDamageCause = InventorySystem.PassiveSkills.DeathCause.Normal;
+
+                // 希望(ADR-0002) 苦悩: 悲観床(45)以下で会心倍率 -0.5。Λ「注意散漫」(会心分子上限)とは
+                // 効く軸が別(倍率 vs 分子)なので非重複。
+                ctx.criticalMultiplier += GameLoop.HopeSystem.GetCritMultiplierDelta(GameLoop.GameManager.Instance?.Run);
             }
 
             // Λ層（時間の狭間）由来の恒久デバフを ctx へ設定（戦闘スコープで保持）
@@ -486,9 +502,27 @@ namespace CombatSystem
                 }
             }
 
+            // 大穴の異常現象: 戦闘開始時の発火判定 (蝕夜の双方T1スキップ・鉄を溶かす太陽の初回T決定)
+            MapSystem.AbyssPhenomena.AbyssPhenomenonCombatHooks.OnCombatStart(GameLoop.GameManager.Instance?.Run);
+
+            // 戦闘相手の種別を CombatContext に設定 (暗殺教団契約等で参照)
+            // MapManager.CurrentNode の TileType から導出。 ノード未取得時は Normal フォールバック。
+            var combatCtx = psm.Context;
+            if (combatCtx != null)
+            {
+                var node = MapSystem.MapManager.Instance?.CurrentNode;
+                combatCtx.currentEnemyKind = node != null
+                    ? node.EffectiveType.ToEnemyKind()
+                    : EnemyKind.Normal;
+            }
+
             // 魔王の威圧 等の戦闘開始時スキル処理
             psm.FireTrigger(PassiveSkillTrigger.OnBattleStart);
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnBattleStart);
+
+            // 契約システム: 戦闘開始時 hook (順序: 暗殺教団 → 狩猟旅団 → 戦術家 → その他)
+            GameLoop.Contracts.ContractManager.Instance.FireOnBattleStart(
+                GameLoop.GameManager.Instance?.Run, combatCtx);
 
             // パッシブ刻印: 戦闘開始時の効果を適用 (HP回復・シールド付与・ダイス補正等)
             InventorySystem.Sigils.PassiveSigilActivator.ApplyOnBattleStart(
@@ -680,6 +714,32 @@ namespace CombatSystem
 
             psm.BeginTurn();
 
+            // 敵スタンス（ADR-0005）: 毎ターン頭にロール前テレグラフで二択を抽選（ロール力↔ダメージのアンチ相関）。
+            // プレイヤースタンス（ADR-0006）: 敵スタンス提示後にロール前選択（攻撃/防御）。強制ロール中はスキップ（=攻撃）。
+            if (ctx != null)
+            {
+                bool forcedRoll = ctx.ashenSuddenDeath || ctx.myokakuSuddenDeath || ctx.myokakuFreeHit;
+                if (!forcedRoll)
+                {
+                    var stance = EnemyStance.Apply(ctx);
+                    int eMax = (stance == EnemyStance.Kind.LowRollHighDmg)
+                        ? EnemyStance.WeakRollMax(currentEnemy.diceMaxValue, ctx.enemyStanceWeakRollRatio) : currentEnemy.diceMaxValue;
+                    string rollNote = (stance == EnemyStance.Kind.LowRollHighDmg)
+                        ? $"弱ロール(面d{currentEnemy.diceMaxValue}→d{eMax})" : "強ロール(基準)";
+                    Debug.Log($"[敵スタンス] {EnemyStance.Label(stance)}（{rollNote} / 被ダメ×{ctx.enemyStanceDamageMult:0.0}）");
+
+                    // ロール前の推定勝率（正規近似・ADR-0006）→ 学習閾値でスタンス選択
+                    float estWinProb = EstimateWinProbability(playerDiceCount, playerDiceMax, ctx.equippedDiceFaces,
+                                                              currentEnemy.diceCount, eMax);
+                    // ロール優勢度を5段階で提示（期待値を暗算せずに優劣を読めるUX。ビジュアルは後付け）。
+                    var odds = RollOddsRating.Telegraph(estWinProb);
+                    Debug.Log($"[ロール優勢度] {RollOddsRating.Label(odds)}（推定勝率{estWinProb:P0}）");
+                    var pStance = PlayerStance.Choose(ctx, playerHP, this.playerMaxHP, estWinProb);
+                    if (pStance == PlayerStance.Kind.Defense)
+                        Debug.Log($"[自スタンス] {PlayerStance.Label(pStance)} (推定勝率{estWinProb:P0}・与ダメ×{PlayerStance.DefenseWinDamageMult:0.0}/受け最終×{PlayerStance.DefenseLossDamageMult:0.0})");
+                }
+            }
+
             // 安全弁: 戦闘が異常に長引いた場合は強制決着（プレイヤー敗北）。
             // 既知の挙動: 灰燼の王戦などで「ボスにダメージ通らない × プレイヤー再生で死なない」
             // の二重デッドロックが起きると、Boss6Ashen の発動条件(ボスHP→0)が満たされず
@@ -744,7 +804,24 @@ namespace CombatSystem
             int actualEnemyDiceCount = currentEnemy.diceCount + enemyExtraDice;
 
             int[] playerDice = RollDice(actualPlayerDiceCount, playerDiceMax, ctx.equippedDiceFaces);
-            int[] enemyDice = RollDice(actualEnemyDiceCount, currentEnemy.diceMaxValue);
+            // 敵スタンス（ADR-0005）: 弱ロール時は面を縮めて実際に振る（期待値≈0.65倍。結果の事後倍率ではない）。
+            bool enemyWeakRoll = ctx != null && ctx.enemyStanceKind == (int)EnemyStance.Kind.LowRollHighDmg;
+            int[] enemyFaces = currentEnemy.diceFaces;
+            int[] enemyDice;
+            float weakRatio = ctx != null ? ctx.enemyStanceWeakRollRatio : EnemyStance.WeakRollRatio;
+            if (enemyFaces != null && enemyFaces.Length > 0)
+            {
+                // 固有面ダイス: 弱ロールは面を一律縮小（ボス別の弱ロール比）。
+                int[] rollFaces = enemyWeakRoll ? EnemyStance.WeakRollFaces(enemyFaces, weakRatio) : enemyFaces;
+                enemyDice = RollDice(actualEnemyDiceCount, 0, rollFaces);
+            }
+            else
+            {
+                int enemyRollMax = enemyWeakRoll
+                    ? EnemyStance.WeakRollMax(currentEnemy.diceMaxValue, weakRatio)
+                    : currentEnemy.diceMaxValue;
+                enemyDice = RollDice(actualEnemyDiceCount, enemyRollMax);
+            }
 
             // 〈灰燼の烙印〉サドンデス: 両者を 1d6 に強制（決着まで継続）
             if (ctx.ashenSuddenDeath)
@@ -810,6 +887,33 @@ namespace CombatSystem
                 Debug.Log("[CombatManager] 獣の恩義発動: 敵の最初のロール無効化");
             }
 
+            // 大穴の異常現象:
+            //   - 鳴りやまない鐘 (20%でプレイヤーダイス1個 -1)
+            //   - 影が落ちない正午 (T1で敵攻撃 50% 空振り = 敵ダイス全0)
+            //   - 蝕夜 (T1で双方ダイス全0 = 行動無効)
+            var phenRun = GameLoop.GameManager.Instance?.Run;
+            MapSystem.AbyssPhenomena.AbyssPhenomenonCombatHooks.ApplyBellPenalty(phenRun, playerDice);
+            if (MapSystem.AbyssPhenomena.AbyssPhenomenonCombatHooks.ShouldNoonMiss(phenRun, ctx.currentTurn))
+            {
+                for (int i = 0; i < enemyDice.Length; i++) enemyDice[i] = 0;
+                Debug.Log("[CombatManager] 異常現象「影が落ちない正午」: 敵T1攻撃空振り");
+            }
+            if (MapSystem.AbyssPhenomena.AbyssPhenomenonCombatHooks.IsEclipsedTurn(phenRun, ctx.currentTurn))
+            {
+                for (int i = 0; i < playerDice.Length; i++) playerDice[i] = 0;
+                for (int i = 0; i < enemyDice.Length; i++) enemyDice[i] = 0;
+                Debug.Log("[CombatManager] 異常現象「蝕夜」: 双方T1行動無効");
+            }
+            // 鉄を溶かす太陽: スケジュール T で発火 (プレイヤー行動無効 + HP-10 後段で適用)
+            int ironSunDmg = MapSystem.AbyssPhenomena.AbyssPhenomenonCombatHooks
+                .ApplyIronSunIfTriggered(phenRun, ctx.currentTurn, playerDice);
+            if (ironSunDmg > 0 && playerHP > 0)
+            {
+                playerHP = Math.Max(0, playerHP - ironSunDmg);
+                ctx.playerCurrentHP = playerHP;
+                Debug.Log($"[CombatManager] 異常現象「鉄を溶かす太陽」: HP-{ironSunDmg} (HP: {playerHP}/{playerMaxHP})");
+            }
+
             // 影の代償: 5層ボス戦中、毎ロール50%でプレイヤーダイス全出目-1
             var run = GameLoop.GameManager.Instance?.Run;
             if (run != null
@@ -825,6 +929,10 @@ namespace CombatSystem
                     playerDice[i] = Math.Max(1, playerDice[i] - 1);
                 Debug.Log("[CombatManager] 影の代償発動 (50%): プレイヤー全出目-1");
             }
+
+            // ダイス振り直し(#1・希望消費・毎T最大1回)。初回ロール後・各種補正前に、期待値割れの出目だけ振り直す。
+            // UI 未実装のため当面は自動ポリシー。終盤(低希望)は払えず振り直せない＝「二度目が無い」。
+            MaybeRerollPlayerDice(ctx, playerDice, enemyDice, playerDiceMax);
 
             // ロール時系時限効果がダイス配列を直接書き換えるため、ctx に参照を渡しておく
             ctx.playerDice = playerDice;
@@ -895,22 +1003,6 @@ namespace CombatSystem
                 ctx.playerLostRoll = pd < ed;
             }
 
-            // メタバフ〈神の加護〉: 1戦闘1回、ロール敗北を引分に変換する
-            // (敵 OnPostRoll より前に行うことで、敵の OnRollWin 反応も発火しないようにする)
-            // ※サドンデス中は無効（解脱の50/50を歪めないため）。
-            if (ctx.playerLostRoll
-                && !ctx.myokakuSuddenDeath && !ctx.ashenSuddenDeath
-                && MetaProgression.MetaBuffApplicator.IsDivineProtectUnlocked()
-                && ctx.GetAccumulated("divineProtect_used") == 0)
-            {
-                ctx.playerLostRoll = false;
-                // playerLostRoll=false かつ playerWonRoll=false で引分扱い。
-                // diceDifference は読み取り専用プロパティ化したため 0 強制は不可だが、
-                // 引分分岐は diceDifference を参照しないので機能に影響なし。
-                ctx.accumulatedValues["divineProtect_used"] = 1;
-                Debug.Log("[MetaBuff] 神の加護: ロール敗北を引分に変換 (この戦闘の使用権を消費)");
-            }
-
             // パッシブ刻印: per-roll 効果 (粘り・腐食) を fixedDamageToEnemy に積む
             if (ctx.playerWonRoll)
                 InventorySystem.Sigils.PassiveSigilActivator.ApplyOnRollWin(ctx);
@@ -929,6 +1021,12 @@ namespace CombatSystem
             // ボス難易度チューナー: プレイヤーの実ロール合計を累計 (平均出目の算出用)
             _fightPlayerRollSum += ctx.playerDiceTotal;
             _fightPlayerRollCount++;
+
+            // スタンス別の「ボスがロール勝ち(=プレイヤー敗北)した割合」を計測。強/弱ロールで別レンジ制御するため分けて集計。
+            if (ctx.enemyStanceKind == (int)EnemyStance.Kind.HighRollLowDmg)
+            { _fightStrongTurns++; if (ctx.playerLostRoll) _fightStrongBossWins++; }
+            else if (ctx.enemyStanceKind == (int)EnemyStance.Kind.LowRollHighDmg)
+            { _fightWeakTurns++; if (ctx.playerLostRoll) _fightWeakBossWins++; }
 
             // --- ダメージ計算 ---
             var result = new TurnResult
@@ -957,14 +1055,35 @@ namespace CombatSystem
                 if (result.playerWon)
                 {
                     // プレイヤーが勝利 → 敵にダメージ
+                    // #2 案A': 勝利base = 武器attackPower + floor(|差|/3)。差は勝敗を主に決め、ダメージ寄与は小（会心には非干渉）。
+                    int winBase = playerAttackPower + diceDiff / WeaponDiffPerBonus;
                     var (totalDmg, fixedDmg, isCrit) = psm.ProcessDamage(
-                        mainDmg, pursuitDmg, playerCriticalNumerator);
+                        winBase, pursuitDmg, playerCriticalNumerator);
 
                     // 与ダメージ修飾チェーン（順序厳守。詳細は ApplyWinDamageModifiers 参照）
                     int lbStage = GameLoop.GameManager.Instance?.Run?.limitBreakStage ?? 0;
                     totalDmg = ApplyWinDamageModifiers(totalDmg, ref fixedDmg, ref isCrit, lbStage, psm, ctx);
 
-                    result.mainDamage = mainDmg;
+                    // 希望(ADR-0002) 疲労: 焦燥床(75)以下で、この攻撃が15%で0ダメージになる。
+                    float fatigueChance = GameLoop.HopeSystem.GetZeroDamageChance(GameLoop.GameManager.Instance?.Run);
+                    if (fatigueChance > 0f && UnityEngine.Random.value < fatigueChance)
+                    {
+                        totalDmg = 0; fixedDmg = 0; isCrit = false;
+                        Debug.Log("[希望] 疲労: 攻撃が0ダメージ");
+                    }
+
+                    // 大穴の異常現象「朱の雪」: 与ダメ -1 (主ダメから引く、 最低 0)
+                    int crimsonDelta = MapSystem.AbyssPhenomena.AbyssPhenomenonCombatHooks
+                        .CrimsonSnowDamageDelta(GameLoop.GameManager.Instance?.Run);
+                    if (crimsonDelta < 0 && totalDmg > 0)
+                    {
+                        int before = totalDmg;
+                        totalDmg = Math.Max(0, totalDmg + crimsonDelta);
+                        if (totalDmg != before)
+                            Debug.Log($"[CombatManager] 異常現象「朱の雪」: 与ダメ {before}→{totalDmg}");
+                    }
+
+                    result.mainDamage = winBase;
                     result.pursuitDamage = pursuitDmg;
                     result.totalDamage = totalDmg;
                     result.fixedDamage = fixedDmg;
@@ -1019,13 +1138,14 @@ namespace CombatSystem
                     // === Scratch計算 ===
                     // 脅威システム: ロール勝利でも勝ち幅が脅威に満たない分を削りダメージとして受ける
                     //   scratch += max(0, 脅威 − 勝ち幅)。 大差勝ち(diff≥脅威)なら0。
-                    if (ctx.enemyThreat > 0)
+                    // 2026-06-21: 敵がプレイヤー攻撃で死亡した場合は削り発動しない (削り切ったのに直後の脅威で死ぬ理不尽を解消)
+                    if (ctx.enemyThreat > 0 && enemyHP > 0)
                         ctx.scratchDamage += Math.Max(0, ctx.enemyThreat - diceDiff);
                     ctx.scratchDamage = BattleModifierManager.ApplyScratchModifiers(ctx, ctx.scratchDamage);
                     psm.FireTrigger(PassiveSkillTrigger.OnPreScratchDamage);
-                    if (!ctx.nullifyScratchDamage && ctx.scratchDamage > 0)
+                    if (!ctx.nullifyScratchDamage && ctx.scratchDamage > 0 && enemyHP > 0)
                         playerHP = Math.Max(0, playerHP - ctx.scratchDamage);
-                    result.scratchDamage = ctx.nullifyScratchDamage ? 0 : ctx.scratchDamage;
+                    result.scratchDamage = (ctx.nullifyScratchDamage || enemyHP <= 0) ? 0 : ctx.scratchDamage;
 
                     // 敵側PostDealDamageトリガー
                     psm.FireEnemyTrigger(PassiveSkillTrigger.OnPostReceiveDamage);
@@ -1036,7 +1156,7 @@ namespace CombatSystem
                     psm.FireEnemyTrigger(PassiveSkillTrigger.OnPreDealDamage);
 
                     // 脅威システム: ロール敗北時の被ダメは脅威を下回らない。
-                    //   被ダメ基礎 = max(ダイス差, 脅威)。 大差負け(diff>脅威)なら差分がそのまま通る。
+                    //   被ダメ基礎 = max(ダイス差, 脅威)。 ボスの攻撃力は敵スタンスの高火力倍率(StanceAtkMult)で表現する。
                     int lossBase = Math.Max(mainDmg, ctx.enemyThreat);
                     var (totalDmg, fixedDmg, isCrit) = psm.ProcessDamage(
                         lossBase, 0, enemyCriticalNumerator);
@@ -1057,10 +1177,13 @@ namespace CombatSystem
                     // プレイヤーにダメージ適用（メイン＋敵→プレイヤー固定）
                     playerHP = Math.Max(0, playerHP - totalDmg);
                     ctx.playerDamageThisTurn += totalDmg; // 焦土用の被ダメ計測
+                    // 支配率診断: メイン被ダメをソース帰属。 lastDamageCause=Judgment(断罪増幅) なら Judgment、 既定 Normal。
+                    ctx.AddPlayerDamageSource(ctx.lastDamageCause, totalDmg);
                     if (ctx.fixedDamageToPlayer > 0)
                     {
                         playerHP = Math.Max(0, playerHP - ctx.fixedDamageToPlayer);
                         ctx.playerDamageThisTurn += ctx.fixedDamageToPlayer;
+                        ctx.AddPlayerDamageSource(ctx.lastDamageCause, ctx.fixedDamageToPlayer);
                     }
 
                     // 敗北時でも反撃・固定ダメージは敵に適用（Counter/Riposte等）
@@ -1138,9 +1261,28 @@ namespace CombatSystem
             // 天命/深淵は被ダメを上限化してHPを1〜2残すため（HP=0にならず）ここでは false。
             bool combatLethalThisTurn = playerHP <= 0;
 
+            // 契約システム: 影武者一座の復活 (致死ダメージ確定の瞬間に判定)。
+            // 残数があれば HP=ceil(maxHP×0.10) で蘇生し戦闘継続。
+            if (combatLethalThisTurn)
+            {
+                int hp = playerHP;
+                if (GameLoop.Contracts.ContractManager.Instance.TryReviveOnLethal(
+                        GameLoop.GameManager.Instance?.Run, ref hp, playerMaxHP))
+                {
+                    playerHP = hp;
+                    ctx.playerCurrentHP = hp;
+                    combatLethalThisTurn = false;
+                    Debug.Log($"[影武者一座] 戦闘継続 HP={hp}/{playerMaxHP}");
+                }
+            }
+
             // ターン終了トリガー
             psm.FireTrigger(PassiveSkillTrigger.OnTurnEnd);
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnTurnEnd);
+
+            // 契約システム: ターン終了時 hook (傭兵団 DoT + 影武者×傭兵協力の +1G)
+            GameLoop.Contracts.ContractManager.Instance.FireOnTurnEnd(
+                GameLoop.GameManager.Instance?.Run, ctx);
 
             // 覚者連戦: 敵パッシブが予約した SwapEnemy を perspective 復帰後に実行
             if (!string.IsNullOrEmpty(ctx.pendingEnemySwapId))
@@ -1172,17 +1314,25 @@ namespace CombatSystem
                 Debug.Log($"[CombatManager] フロアデバフ: 自傷-{dmg} (HP: {playerHP}/{playerMaxHP})");
             }
 
+            // 大穴の異常現象: ターン終了時の累積効果 (鉄を溶かす太陽/崩れる地平/削る砂/間歇の崩落/燃える河/逆さ雷)
+            var phenomenaRun = GameLoop.GameManager.Instance?.Run;
+            var (pDelta, eDelta) = MapSystem.AbyssPhenomena.AbyssPhenomenonCombatHooks
+                .ApplyTurnEnd(phenomenaRun, ctx.currentTurn, currentEnemy?.maxHP ?? 0);
+            if (pDelta < 0 && playerHP > 0)
+            {
+                playerHP = Math.Max(0, playerHP + pDelta);
+                ctx.playerCurrentHP = playerHP;
+                Debug.Log($"[CombatManager] 異常現象: 自HP {pDelta} (HP: {playerHP}/{playerMaxHP})");
+            }
+            if (eDelta < 0 && enemyHP > 0)
+            {
+                enemyHP = Math.Max(0, enemyHP + eDelta);
+                ctx.enemyCurrentHP = enemyHP;
+                Debug.Log($"[CombatManager] 異常現象: 敵HP {eDelta} (HP: {enemyHP}/{currentEnemy?.maxHP})");
+            }
+
             // ターン終了スキルによるHP変動をCombatManagerに反映（剣鎧等）
             SyncHPFromContext(ctx);
-
-            // カルマの呪い（5層ボス戦専用）: 毎ターン終了時にカルマ点数分のダメージ
-            if (karmaCurseDamagePerTurn > 0 && playerHP > 0)
-            {
-                int dmg = karmaCurseDamagePerTurn;
-                playerHP = Math.Max(0, playerHP - dmg);
-                ctx.playerCurrentHP = playerHP;
-                Debug.Log($"[CombatManager] カルマの呪い: HP-{dmg} (現在 {playerHP}/{playerMaxHP})");
-            }
 
             // 消費: 継続回復（毎ターン終了時 +consRegen → consRegen--）。狂暴化中は封印。
             if (ctx.consRegen > 0 && playerHP > 0 && !ctx.healBlocked)
@@ -1290,7 +1440,16 @@ namespace CombatSystem
                 ctx.outgoingDamageMultiplier += 0.2f * lbStage;
             }
 
-            // 与ダメ倍率（激情の刃 等のパッシブ由来 + 業物）
+            // メタバフ: 与ダメ +5%×N (cap 50%)。 他の outgoing% と同じ pool に加算合成
+            // ＝最終に純倍率を掛けるとインフレするので、 ここでは additive。
+            int metaPct = MetaProgression.MetaBuffApplicator.GetOutgoingDamagePct();
+            if (metaPct > 0)
+            {
+                if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
+                ctx.outgoingDamageMultiplier += metaPct * 0.01f;
+            }
+
+            // 与ダメ倍率（激情の刃 等のパッシブ由来 + 業物 + メタ%）
             if (ctx.outgoingDamageMultiplier > 0f
                 && Mathf.Abs(ctx.outgoingDamageMultiplier - 1f) > 0.001f)
             {
@@ -1360,6 +1519,24 @@ namespace CombatSystem
                 Debug.Log($"[Λ] 微妙な手応え ×{ctx.lambdaDamageDealtMult:F2} {beforeVague}→{totalDmg}");
             }
 
+            // 脆弱 (狩猟旅団契約): armed状態で会心ダメージを与えると最終ダメージに ×(1+0.15/0.30/0.45) 倍率。
+            // 適用後 consumed 状態へ遷移。 ロール勝利時の非会心ダメで armed に再点火する処理は応答側で別途。
+            if (isCrit && totalDmg > 0)
+            {
+                float vulMult = VulnerabilityStatus.ConsumeOnCrit(ctx);
+                if (vulMult > 1f)
+                {
+                    int beforeVul = totalDmg;
+                    totalDmg = Mathf.CeilToInt(totalDmg * vulMult);
+                    Debug.Log($"[狩猟旅団] 脆弱発動 ×{vulMult:F2} {beforeVul}→{totalDmg}");
+                }
+            }
+            else if (!isCrit && totalDmg > 0)
+            {
+                // ロール勝利時の非会心ダメで脆弱を再点火 (契約継続中のみ)
+                VulnerabilityStatus.RearmOnNonCritWin(ctx);
+            }
+
             // 勝利時の与ダメ最低保証（基本1、利刃Lvで1/2/3/4）。「勝ったのに0」を防止。
             if (totalDmg < ctx.winMinDamage)
                 totalDmg = ctx.winMinDamage;
@@ -1383,6 +1560,10 @@ namespace CombatSystem
                 fixedDmg = 0;
             }
 
+            // プレイヤー防御スタンス（ADR-0006）: 与ダメージ-90%（主ダメージのみ。fixedDmg=反撃/業火/血令 等は対象外）
+            if (ctx != null && ctx.playerStanceDefense && totalDmg > 0)
+                totalDmg = Mathf.CeilToInt(totalDmg * PlayerStance.DefenseWinDamageMult);
+
             return totalDmg;
         }
 
@@ -1398,6 +1579,10 @@ namespace CombatSystem
             float enemyMul = MetaProgression.MetaDebuffApplicator.GetEnemyDamageMultiplier();
             if (Mathf.Abs(enemyMul - 1f) > 0.001f)
                 totalDmg = Mathf.CeilToInt(totalDmg * enemyMul);
+
+            // 敵スタンス（ADR-0005）: 被ダメ倍率（高ダメ>1/低ダメ<1）。以降の軽減はスタンス後の値に効く。
+            if (ctx != null && Mathf.Abs(ctx.enemyStanceDamageMult - 1f) > 0.001f && totalDmg > 0)
+                totalDmg = Mathf.CeilToInt(totalDmg * ctx.enemyStanceDamageMult);
 
             // (2026-06-01) ボス被ダメ倍率(dmgMul)の直接操作は廃止。 硬化/易化は Dice/HP/機構軸で行う。
 
@@ -1471,6 +1656,11 @@ namespace CombatSystem
                 Debug.Log($"[CombatManager] 鏡写し反射 {totalDmg} → 敵HP {enemyHP}");
             }
 
+            // プレイヤー防御スタンス（ADR-0006）: 全軽減/シールドの後、最終的に受けるダメージを-50%（最後に適用）。
+            // 反撃等の敗北時固定ダメ(fixedDamageToEnemy)はこの totalDmg に含まれない＝対象外。
+            if (ctx != null && ctx.playerStanceDefense && totalDmg > 0)
+                totalDmg = Mathf.CeilToInt(totalDmg * PlayerStance.DefenseLossDamageMult);
+
             return totalDmg;
         }
 
@@ -1516,7 +1706,6 @@ namespace CombatSystem
                 psmCtx, GameLoop.GameManager.Instance?.Run, this);
 
             isCombatActive = false;
-            karmaCurseDamagePerTurn = 0;
 
             // ===== LED演出リセット =====
             if (ledManager != null)
@@ -1529,6 +1718,28 @@ namespace CombatSystem
 
             var result = GetLastCombatResult();
             PassiveSkillManager.Instance.EndCombat();
+
+            // 契約システム: 戦闘終了時 hook (順序: 医術官回復 → 商業連合隊HP判定 → 錬金 → その他)
+            var contractResult = new GameLoop.Contracts.ContractBattleResult
+            {
+                playerWon = result.playerWon,
+                finalPlayerHp = playerHP,
+                playerMaxHp = playerMaxHP,
+                totalDamageDealt = result.damageDealt,
+                enemyKind = psmCtx?.currentEnemyKind ?? EnemyKind.Normal,
+            };
+            GameLoop.Contracts.ContractManager.Instance.FireOnBattleEnd(
+                GameLoop.GameManager.Instance?.Run, contractResult);
+            // 医術官が回復した場合は GameManager 側 Run.playerHP に反映済 (Effect 内で操作)
+            // ここでは CombatManager の playerHP を同期 (UI 表示用)
+            var runRef = GameLoop.GameManager.Instance?.Run;
+            if (runRef != null) playerHP = runRef.playerHP;
+
+            // 契約システム: HP20% 解除判定 (L3 免除)
+            var released = GameLoop.Contracts.ContractManager.Instance.CheckHpReleaseRule(
+                runRef, playerHP, playerMaxHP);
+            foreach (var r in released)
+                Debug.Log($"[契約] HP20%↓ で {r.kind} L{r.level} 解除");
 
             OnCombatEnd?.Invoke(result);
 
@@ -1562,7 +1773,23 @@ namespace CombatSystem
                            : InventorySystem.PassiveSkills.DeathCause.Normal,
                 playerRollSum = _fightPlayerRollSum,
                 playerRollCount = _fightPlayerRollCount,
+                playerDamageBySource = BuildDamageBreakdown(ctx),
+                strongRollTurns = _fightStrongTurns,
+                strongRollBossWins = _fightStrongBossWins,
+                weakRollTurns = _fightWeakTurns,
+                weakRollBossWins = _fightWeakBossWins,
             };
+        }
+
+        /// <summary>被ダメ ソース別内訳のスナップショット (明示帰属のみ)。 メイン被ダメ(ロール敗北/断罪増幅)と
+        /// 特殊スキル(審判の炎/毒/反射/王の業炎)が各自計上済み。 heal 込みのグロスで残差を取ると heal 分が
+        /// Normal を過大計上するため、 残差寄せはしない。 ※診断対象の1〜6層は実質これで全被ダメを網羅。</summary>
+        private Dictionary<InventorySystem.PassiveSkills.DeathCause, int> BuildDamageBreakdown(CombatContext ctx)
+        {
+            var map = new Dictionary<InventorySystem.PassiveSkills.DeathCause, int>();
+            if (ctx == null) return map;
+            foreach (var kv in ctx.playerDamageBySource) map[kv.Key] = kv.Value;
+            return map;
         }
 
         // ===========================================================
@@ -1584,6 +1811,92 @@ namespace CombatSystem
                 }
             }
             return results;
+        }
+
+        /// <summary>ダイス振り直し(#1)。希望(HopeSystem.RerollCost)を払って「期待値割れの出目」を毎ターン最大1回だけ振り直す。
+        /// UI 実装までの自動ポリシー: 現在 負け/拮抗(自合計≤敵合計) かつ 平均割れダイスがあるときのみ、
+        /// 払えれば(TryPayReroll) それらを再ロール。終盤(低希望)は払えず振り直せない＝二度目が無い緊張。
+        /// 強制ロール状態(サドンデス/コントラタック等)ではスキップ。playerDice を in-place で更新する。
+        /// ※将来 UI 配線時はこの自動判定を人間の選択に差し替える（OutpostUpgrade 等と同じ暫定自動パターン）。</summary>
+        private void MaybeRerollPlayerDice(CombatContext ctx, int[] playerDice, int[] enemyDice, int playerDiceMax)
+        {
+            if (ctx == null || playerDice == null || playerDice.Length == 0) return;
+            // 強制ロール中は対象外（出た目が仕様で固定されているため）
+            if (ctx.ashenSuddenDeath || ctx.myokakuSuddenDeath || ctx.myokakuFreeHit) return;
+            if (ctx.GetAccumulated("player_contre") > 0) return;
+
+            var run = GameLoop.GameManager.Instance?.Run;
+            if (run == null) return;
+
+            // 1ダイスの期待値(面平均)。カスタム面があればその平均、無ければ (max+1)/2。
+            float mean;
+            if (ctx.equippedDiceFaces != null && ctx.equippedDiceFaces.Length > 0)
+            {
+                int s = 0; for (int i = 0; i < ctx.equippedDiceFaces.Length; i++) s += ctx.equippedDiceFaces[i];
+                mean = (float)s / ctx.equippedDiceFaces.Length;
+            }
+            else mean = (playerDiceMax + 1) * 0.5f;
+
+            // 防御スタンス中（ADR-0006）は勝っても与ダメ-90%＝勝ちを取りに行く価値が無いため振り直さない。
+            if (ctx.playerStanceDefense) return;
+            // 自動ポリシー（敵スタンスのテレグラフを読む・ADR-0005）
+            // 低ダメスタンス（負けても痛くない）なら振り直さず希望を温存。
+            if (ctx.enemyStanceDamageMult < 1f) return;
+            int playerTotal = 0; for (int i = 0; i < playerDice.Length; i++) playerTotal += playerDice[i];
+            int enemyTotal = 0; if (enemyDice != null) for (int i = 0; i < enemyDice.Length; i++) enemyTotal += enemyDice[i];
+            // enemyDice は敵スタンスの弱ロール（面縮小）を既に反映済み＝そのまま比較してよい
+            if (playerTotal > enemyTotal) return; // 既に勝っているなら温存
+
+            // 期待値割れの出目（改善余地のあるダイス）を抽出
+            var idx = new System.Collections.Generic.List<int>();
+            for (int i = 0; i < playerDice.Length; i++) if (playerDice[i] < mean) idx.Add(i);
+            if (idx.Count == 0) return;
+
+            if (!GameLoop.HopeSystem.TryPayReroll(run)) return; // 希望が足りなければ振り直せない
+
+            foreach (int i in idx)
+            {
+                playerDice[i] = (ctx.equippedDiceFaces != null && ctx.equippedDiceFaces.Length > 0)
+                    ? ctx.equippedDiceFaces[UnityEngine.Random.Range(0, ctx.equippedDiceFaces.Length)]
+                    : UnityEngine.Random.Range(1, playerDiceMax + 1);
+            }
+            Debug.Log($"[CombatManager] ダイス振り直し(#1): {idx.Count}個 / 希望-{GameLoop.HopeSystem.RerollCost} → {run.hope}");
+        }
+
+        /// <summary>ロール前の推定勝率（正規近似・ADR-0006）。P(自合計 > 敵合計) を、両者のダイス期待値・分散から
+        /// 正規近似＋ロジスティックCDFで概算する。Might等のロール後フラット加算は無視（学習閾値が平均バイアスを吸収）。
+        /// 敵の弱ロール（面縮小）は eMax に反映済みで渡る。</summary>
+        private float EstimateWinProbability(int pCount, int pMax, int[] pFaces, int eCount, int eMax)
+        {
+            DiceMoments(pCount, pMax, pFaces, out double muP, out double varP);
+            DiceMoments(eCount, eMax, null,   out double muE, out double varE);
+            double diffMu = muP - muE;
+            double sigma = System.Math.Sqrt(varP + varE);
+            if (sigma < 1e-6) return diffMu > 0 ? 1f : (diffMu < 0 ? 0f : 0.5f);
+            double z = diffMu / sigma;
+            double p = 1.0 / (1.0 + System.Math.Exp(-1.702 * z)); // 標準正規CDFのロジスティック近似
+            return (float)System.Math.Max(0.0, System.Math.Min(1.0, p));
+        }
+
+        /// <summary>ダイス合計の平均・分散。faces 指定時はその面集合、無ければ一様 1..maxValue。</summary>
+        private void DiceMoments(int count, int maxValue, int[] faces, out double mean, out double variance)
+        {
+            double m, v;
+            if (faces != null && faces.Length > 0)
+            {
+                double s = 0, s2 = 0;
+                for (int i = 0; i < faces.Length; i++) { s += faces[i]; s2 += (double)faces[i] * faces[i]; }
+                m = s / faces.Length;
+                v = s2 / faces.Length - m * m;
+            }
+            else
+            {
+                if (maxValue < 1) maxValue = 1;
+                m = (maxValue + 1) / 2.0;
+                v = (maxValue * (double)maxValue - 1.0) / 12.0; // 一様1..M の分散
+            }
+            mean = count * m;
+            variance = count * v;
         }
 
         private void SyncHPFromContext(CombatContext ctx)

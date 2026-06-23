@@ -65,6 +65,18 @@ namespace InventorySystem.PassiveSkills
                 }
             }
 
+            // 〈昇華〉済み永久パッシブ（グリッド外）も戦闘では owned と同様に発動させる。
+            if (run != null && run.ascendedPassiveIds != null && db != null)
+            {
+                foreach (var id in run.ascendedPassiveIds)
+                {
+                    var data = db.GetItem(id);
+                    if (data?.passiveSkills == null || data.passiveSkills.Count == 0) continue;
+                    if (PassiveItems.PassiveItemRegistry.Get(id) != null) continue; // ITimedEffectは別経路
+                    list.Add(data);
+                }
+            }
+
             PassiveSkillManager.Instance?.RefreshActiveSkills(list);
 
             // 段階式進行武器: 家系＋段階(+plus)から算出したパッシブを動的に追加登録

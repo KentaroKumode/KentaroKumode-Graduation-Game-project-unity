@@ -178,10 +178,11 @@ namespace MapSystem.Visual
             {
                 float x, y;
 
+                // 横方向は centerLane を引いて中央起点に揃える(親 transform をカメラ x と同一にできるようにするため)。
                 if (node.lane == -1)
                 {
                     // 収束ノード（前哨基地/ボス）— 中央、ジッター小さめ
-                    x = centerLane * laneSpacing;
+                    x = 0f;
                     // Y軸を反転: 行0(前哨基地) を下、行N(ボス) を上に表示
                     y = -node.row * rowSpacing;
 
@@ -194,7 +195,7 @@ namespace MapSystem.Visual
                 }
                 else
                 {
-                    x = node.lane * laneSpacing;
+                    x = (node.lane - centerLane) * laneSpacing;
                     y = -node.row * rowSpacing;
                     x += Jitter(rng, positionJitter);
                     y += Jitter(rng, positionJitter);

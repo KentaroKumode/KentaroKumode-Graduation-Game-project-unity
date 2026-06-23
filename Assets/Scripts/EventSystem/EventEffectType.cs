@@ -11,8 +11,8 @@ namespace EventSystem
         HpSetTo,                 // HPがNになる
         MaxHpDelta,              // 最大HP+N / 最大HP-N
         GoldDelta,               // ゴールド+N / ゴールド-N
-        HungerDelta,             // 空腹度+N / 空腹度-N
-        KarmaGain,               // カルマ獲得
+        HungerDelta,             // 空腹度+N / 空腹度-N (旧表記、希望±N と等価)
+        HopeDelta,               // 希望+N / 希望-N
         MaterialDelta,           // 武器強化素材+N / 武器強化素材-N
         ArmorDurabilityLoss,     // 防具の耐久値減少
         TimedBuff,               // 時限バフ[xxx]を獲得
@@ -28,5 +28,6 @@ namespace EventSystem
         EnterEliteCombat,        // エリートとの戦闘に突入
         RandomEvent,             // ランダムなイベント発生
         Probability,             // 確率分岐の親（child のリストを持つ）
+        CircusHandover,          // 「サーカス団を引き渡す」(契約解除 + Lv連動報酬)
     }
 }

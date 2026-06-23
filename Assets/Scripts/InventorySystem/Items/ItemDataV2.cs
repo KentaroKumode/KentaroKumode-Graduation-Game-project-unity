@@ -162,6 +162,7 @@ namespace InventorySystem
         [Header("武器データ（武器のみ）")]
         public DiceConfig weaponDice;
         public int criticalRate;     // 会心率の分子（1～9、分母は9）
+        public int attackPower;      // 武器の素火力（#2 案A'：勝利base = attackPower + floor(|差|/3)）
 
         [Header("ダイスデータ（ダイスのみ）")]
         public int[] diceFaces;      // カスタムダイスの面配列 (例: {1,2,3,4,5,6})

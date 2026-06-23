@@ -128,6 +128,9 @@ namespace CombatSystem.DiceLED
         //  イベント
         // =================================================================
 
+        /// <summary>ローリングアニメーション開始時に発火（バトル演出の鍔迫り合い開始用）</summary>
+        public event Action OnRollingStart;
+
         /// <summary>ローリングアニメーション完了時に発火</summary>
         public event Action OnRollingComplete;
 
@@ -300,6 +303,7 @@ namespace CombatSystem.DiceLED
             int playerDiceMax, int enemyDiceMax)
         {
             isRolling = true;
+            OnRollingStart?.Invoke();
 
             int playerCount = playerValues?.Length ?? 0;
             int enemyCount  = enemyValues?.Length  ?? 0;
