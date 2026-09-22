@@ -2,7 +2,7 @@ namespace MapSystem.AbyssPhenomena
 {
     /// <summary>
     /// 大穴の異常現象。 層突入時に重み付き抽選で 1〜2 件が「層モディファイア」 として適用される。
-    /// 正本: docs/specs/abyss-phenomena.md
+    /// 正本: docs/GAME.md §5-7
     /// 番号は spec 準拠 (4/10/12/13/14 は lore のみ ─ enum に含めない)。
     /// </summary>
     public enum AbyssPhenomenon

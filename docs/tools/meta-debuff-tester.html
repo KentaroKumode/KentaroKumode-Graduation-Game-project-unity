@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>メタデバフ配点テスター — DICE BOUND</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root {
+    --bg: #17181a;
+    --panel: #1e2023;
+    --panel-2: #24272b;
+    --line: #2f3339;
+    --line-2: #3a3f46;
+    --ink: #d7d3c8;
+    --ink-dim: #8a8378;
+    --ink-mute: #5b564d;
+    --amber: #e9b458;
+    --amber-hot: #ffca6b;
+    --red: #c85448;
+    --green: #6a9955;
+    --t4: #d4703c;
+    --t4-hot: #ff8c42;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: "Consolas", "MS Gothic", monospace; font-size: 26px; }
+  body { padding: 32px; }
+  h1 { font-size: 30px; letter-spacing: 0.1em; margin: 0 0 8px; color: var(--amber); }
+  .sub { font-size: 20px; color: var(--ink-dim); margin-bottom: 32px; line-height: 1.5; }
+
+  .layout { display: grid; grid-template-columns: 1fr 560px; gap: 32px; align-items: start; }
+  @media (max-width: 1400px) { .layout { grid-template-columns: 1fr; } .sidebar { position: static; } }
+
+  /* Sidebar */
+  .sidebar { position: sticky; top: 32px; background: var(--panel); border: 1px solid var(--line); padding: 26px; max-height: calc(100vh - 64px); overflow-y: auto; }
+  .sidebar h2 { font-size: 20px; letter-spacing: 0.15em; margin: 0 0 14px; color: var(--ink-dim); text-transform: uppercase; }
+  .sidebar h2:not(:first-child) { margin-top: 26px; }
+  .total-block { text-align: center; padding: 20px 0; border-bottom: 1px solid var(--line); margin-bottom: 22px; }
+  .total-nixie {
+    font-family: "Consolas", monospace;
+    font-size: 96px;
+    color: var(--amber-hot);
+    text-shadow: 0 0 8px rgba(255,202,107,0.4);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.05em;
+    line-height: 1;
+  }
+  .total-max { font-size: 20px; color: var(--ink-mute); margin-top: 8px; }
+  .band { text-align: center; font-size: 22px; color: var(--ink-dim); padding: 12px; border: 1px solid var(--line); margin-bottom: 22px; }
+  .band strong { color: var(--ink); }
+  .group-breakdown { font-size: 20px; }
+  .group-breakdown .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+  .group-breakdown .row:last-child { border-bottom: none; }
+  .group-breakdown .lbl { color: var(--ink-dim); }
+  .group-breakdown .lbl.maxed { color: var(--t4-hot); }
+  .group-breakdown .val { font-variant-numeric: tabular-nums; color: var(--amber); }
+  .group-breakdown .val.maxed { color: var(--t4-hot); }
+  .actions { margin-top: 22px; display: flex; gap: 10px; }
+  .actions button {
+    flex: 1; background: var(--panel-2); border: 1px solid var(--line-2); color: var(--ink);
+    font-family: inherit; font-size: 20px; padding: 12px; cursor: pointer;
+  }
+  .actions button:hover { background: var(--line); color: var(--amber); }
+
+  /* Active debuff list in sidebar */
+  .active-list { font-size: 19px; line-height: 1.4; }
+  .active-list .entry { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto); gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+  .active-list .entry:last-child { border-bottom: none; }
+  .active-list .a-name { color: var(--amber); overflow-wrap: anywhere; }
+  .active-list .a-name .t { color: var(--ink-mute); font-size: 16px; margin-left: 6px; }
+  .active-list .a-eff { color: var(--ink); font-size: 17px; text-align: right; overflow-wrap: anywhere; }
+  .active-list .a-eff .kind { color: var(--ink-dim); margin-right: 6px; }
+  /* T4 は説明文が長いのでブロック積み (名前の下に効果を左寄せ) */
+  .active-list .entry.t4 { display: block; }
+  .active-list .entry.t4 .a-name { display: block; color: var(--t4-hot); font-weight: bold; margin-bottom: 4px; }
+  .active-list .entry.t4 .a-eff { display: block; text-align: left; color: var(--ink-dim); font-size: 17px; }
+  .active-list .empty { color: var(--ink-mute); font-style: italic; padding: 12px 0; text-align: center; }
+
+  /* Groups */
+  .group { background: var(--panel); border: 1px solid var(--line); margin-bottom: 26px; }
+  .group.maxed { border-color: var(--t4); box-shadow: 0 0 0 1px var(--t4); }
+  .group-hd {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 22px; background: var(--panel-2); border-bottom: 1px solid var(--line);
+  }
+  .group.maxed .group-hd { background: rgba(212,112,60,0.1); }
+  .group-hd .name { font-size: 22px; letter-spacing: 0.1em; color: var(--amber); }
+  .group.maxed .group-hd .name { color: var(--t4-hot); }
+  .group-hd .name .lead { color: var(--ink-mute); margin-right: 10px; }
+  .group-hd .desc { font-size: 18px; color: var(--ink-dim); margin-left: 14px; }
+  .group-hd .sum { font-size: 22px; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  /* Axes */
+  .axis { display: grid; grid-template-columns: 56px 1fr auto; gap: 18px; padding: 14px 22px; border-bottom: 1px solid var(--line); align-items: center; }
+  .axis:hover { background: rgba(255,255,255,0.02); }
+  .axis-num { color: var(--ink-mute); font-size: 20px; text-align: right; }
+  .axis-main .name { color: var(--ink); font-size: 24px; margin-bottom: 4px; }
+  .axis-main .name .kind { color: var(--ink-dim); font-size: 18px; margin-left: 10px; }
+  .axis-main .effects { font-size: 18px; color: var(--ink-dim); line-height: 1.4; }
+  .axis-main .effects .tier-eff { display: block; }
+  .axis-main .effects .tier-eff .tno { color: var(--ink-mute); margin-right: 8px; }
+  .axis-main .effects .tier-eff.active { color: var(--amber-hot); }
+  .axis-main .effects .tier-eff.active .tno { color: var(--amber); }
+
+  .tier-controls { display: flex; gap: 6px; }
+  .tier-btn {
+    width: 72px; height: 72px; background: var(--panel-2); border: 1px solid var(--line-2);
+    color: var(--ink-dim); font-family: inherit; font-size: 34px; cursor: pointer;
+    font-variant-numeric: tabular-nums; font-weight: bold;
+  }
+  .tier-btn:hover:not(.disabled):not(.active) { border-color: var(--amber); color: var(--amber); }
+  .tier-btn.active { background: var(--amber); color: #17181a; border-color: var(--amber); font-weight: bold; }
+  .tier-btn.disabled { color: var(--ink-mute); cursor: not-allowed; opacity: 0.4; border-style: dashed; }
+
+  /* T4 row */
+  .t4-row {
+    display: grid; grid-template-columns: 56px 1fr auto; gap: 18px;
+    padding: 18px 22px; border-top: 2px solid var(--t4);
+    background: rgba(212,112,60,0.08);
+    align-items: center;
+  }
+  .t4-row.locked { opacity: 0.45; background: transparent; border-top: 2px dashed var(--ink-mute); }
+  .t4-row .t4-label { color: var(--t4-hot); font-size: 22px; text-align: right; font-weight: bold; letter-spacing: 0.05em; }
+  .t4-row.locked .t4-label { color: var(--ink-mute); }
+  .t4-row .t4-main .t4-name { color: var(--t4-hot); font-size: 26px; margin-bottom: 4px; font-weight: bold; }
+  .t4-row .t4-main .t4-name .lock-hint { color: var(--ink-mute); font-size: 16px; margin-left: 12px; font-weight: normal; letter-spacing: 0; }
+  .t4-row.locked .t4-main .t4-name { color: var(--ink-dim); }
+  .t4-row .t4-main .t4-desc { color: var(--ink-dim); font-size: 18px; line-height: 1.4; }
+  .t4-row .t4-btn {
+    padding: 14px 22px; background: var(--panel-2); border: 2px solid var(--t4);
+    color: var(--t4-hot); font-family: inherit; font-size: 26px; font-weight: bold; cursor: pointer;
+    min-width: 130px; font-variant-numeric: tabular-nums;
+  }
+  .t4-row .t4-btn:hover:not(.disabled) { background: var(--t4); color: #17181a; }
+  .t4-row .t4-btn.active { background: var(--t4-hot); color: #17181a; border-color: var(--t4-hot); }
+  .t4-row.locked .t4-btn { border-color: var(--ink-mute); color: var(--ink-mute); cursor: not-allowed; opacity: 0.6; background: transparent; }
+
+</style>
+</head>
+<body>
+
+<h1>メタデバフ 配点テスター</h1>
+<div class="sub">
+  Tier 1 / 2 / 3 はそのまま1 / 2 / 3pt。カテゴリ2軸をT3にするとTier4（4pt）解禁。5カテゴリ全盛り50pt。
+  挑戦効果はラン終了まで継続。俊敏は初撃確定後も確率回避し、出目固定・ボス追加倍率は最初のN回で終了する。
+  仕様: <a href="../GAME.md" style="color:var(--amber-hot)">docs/GAME.md §15-2</a>
+</div>
+
+<div class="layout">
+  <div class="content" id="content"></div>
+
+  <div class="sidebar">
+    <h2>Score</h2>
+    <div class="total-block">
+      <div class="total-nixie" id="total">00</div>
+      <div class="total-max">/ <span id="total-max">00</span> max</div>
+    </div>
+    <div class="band" id="band">— <strong>—</strong></div>
+
+    <h2>Groups</h2>
+    <div class="group-breakdown" id="breakdown"></div>
+
+    <h2>Active</h2>
+    <div class="active-list" id="active-list"></div>
+
+    <div class="actions">
+      <button onclick="resetAll()">Reset</button>
+      <button onclick="maxAll()">Max All</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// 仕様: docs/GAME.md §15-2
+const AXES = [
+  { id:1, g:'A', name:'脆弱な肉体', kind:'最大HP', tiers:{1:'×0.90', 2:'×0.85', 3:'×0.80'} },
+  { id:2, g:'A', name:'練度不足', kind:'与ダメ', tiers:{1:'-10%', 2:'-20%', 3:'-30%'} },
+  { id:3, g:'B', name:'厚い皮膚', kind:'敵HP', tiers:{1:'+10%', 2:'+20%', 3:'+30%'} },
+  { id:4, g:'B', name:'狂暴化', kind:'敵攻撃', tiers:{1:'+10%', 2:'+20%', 3:'+30%'} },
+  { id:5, g:'C', name:'俊敏', kind:'回避', tiers:{1:'第1撃を回避', 2:'第1撃回避 / 第2撃以降20%', 3:'第1撃回避 / 第2撃以降40%'} },
+  { id:6, g:'C', name:'見放された運', kind:'ダイス', tiers:{1:'最初の2T、1個を1固定', 2:'最初の4T、1個を1固定', 3:'最初の6T、1個を1固定'} },
+  { id:7, g:'D', name:'搾取経済', kind:'GOLD / 価格', tiers:{1:'収入-15% / 価格+15%', 2:'収入-30% / 価格+30%', 3:'収入-50% / 価格+50%'} },
+  { id:8, g:'D', name:'補給断絶', kind:'宝箱 / 前哨', tiers:{1:'宝箱80% / 回復-20%', 2:'宝箱60% / 回復-40%', 3:'宝箱40% / 回復-60%'} },
+  { id:9, g:'E', name:'絶望的な戦闘', kind:'希望', tiers:{1:'上限-10 / 損失+1', 2:'上限-20 / 損失+2', 3:'上限-30 / 損失+3'} },
+  { id:10, g:'E', name:'天変地異', kind:'ボス', tiers:{1:'最初の1撃×1.50', 2:'最初の2撃×1.50 / LS不発', 3:'最初の3撃×1.50 / LS不発'} },
+];
+
+const T4S = {
+  A: { name:'破綻',       desc:'各層最初の戦闘でHPをmaxHP70%以下へ切詰め / 全回復量-25%', pts:4 },
+  B: { name:'鋼の皮膚',   desc:'各戦闘1回、敵が致命傷をHP1で耐える', pts:4 },
+  C: { name:'凶運',       desc:'7T目以降もダイス1個の1固定が継続', pts:4 },
+  D: { name:'破産',       desc:'開幕GOLD 0 / 売却額-50%（売却可能）', pts:4 },
+  E: { name:'最後の審判', desc:'F3・F5で未所持の大罪3候補から各1個選択', pts:4 },
+};
+
+const GROUPS = {
+  A: { name:'A. プレイヤー性能', desc:'' },
+  B: { name:'B. 敵性能', desc:'' },
+  C: { name:'C. 戦闘初動', desc:'' },
+  D: { name:'D. 経済・供給', desc:'' },
+  E: { name:'E. 精神・ボス', desc:'' },
+};
+
+const BANDS = [
+  { max:0,  label:'標準',   tone:'デバフなし' },
+  { max:5,  label:'探検',   tone:'標準難易度+' },
+  { max:15, label:'苦境',   tone:'高難易度' },
+  { max:25, label:'絶望的', tone:'高難易度+' },
+  { max:40, label:'死地',   tone:'超高難易度' },
+  { max:50, label:'全盛り', tone:'最高難易度' },
+];
+
+const LEVELS = [1, 2, 3];
+
+const state = {};   // axis id -> selected tier (0 = none)
+const t4State = {}; // group id -> 0 or 1
+AXES.forEach(a => state[a.id] = 0);
+Object.keys(T4S).forEach(g => t4State[g] = 0);
+
+function maxTier(a) {
+  const avail = Object.keys(a.tiers).filter(k => a.tiers[k]).map(Number);
+  return avail.length ? Math.max(...avail) : 0;
+}
+function isCategoryMaxed(g) {
+  return AXES.filter(a => a.g === g).every(a => state[a.id] === maxTier(a));
+}
+const T4_TOTAL = Object.values(T4S).reduce((s, t) => s + t.pts, 0);
+const AXIS_TOTAL = AXES.reduce((s,a) => s + maxTier(a), 0);
+const GRAND_MAX = AXIS_TOTAL + T4_TOTAL;
+
+function render() {
+  const el = document.getElementById('content');
+  let html = '';
+  const grouped = {};
+  AXES.forEach(a => { (grouped[a.g] = grouped[a.g] || []).push(a); });
+
+  for (const gid of Object.keys(GROUPS)) {
+    const maxed = isCategoryMaxed(gid);
+    const t4 = T4S[gid];
+    const t4on = !!t4State[gid];
+    const gsum = (grouped[gid]||[]).reduce((s,a) => s + state[a.id], 0) + (t4on ? t4.pts : 0);
+    const gmax = (grouped[gid]||[]).reduce((s,a) => s + maxTier(a), 0) + (t4 ? t4.pts : 0);
+    html += `<div class="group ${maxed?'maxed':''}"><div class="group-hd">
+      <div><span class="name"><span class="lead">▸</span>${GROUPS[gid].name}</span>
+      <span class="desc">${GROUPS[gid].desc}</span></div>
+      <div class="sum">${gsum} / ${gmax}</div>
+    </div>`;
+
+    for (const a of grouped[gid] || []) {
+      const sel = state[a.id];
+      html += `<div class="axis">
+        <div class="axis-num">#${a.id}</div>
+        <div class="axis-main">
+          <div class="name">${a.name}<span class="kind">${a.kind}</span></div>
+          <div class="effects">`;
+      for (const t of LEVELS) {
+        const eff = a.tiers[t];
+        if (!eff) continue;
+        const cls = (sel === t) ? 'tier-eff active' : 'tier-eff';
+        html += `<span class="${cls}"><span class="tno">${t}pt:</span>${eff}</span>`;
+      }
+      html += `</div></div>
+        <div class="tier-controls">`;
+      for (const t of LEVELS) {
+        const avail = !!a.tiers[t];
+        const active = sel === t;
+        const cls = avail ? (active ? 'active' : '') : 'disabled';
+        const onc = avail ? `onclick="toggle(${a.id}, ${t})"` : '';
+        html += `<button class="tier-btn ${cls}" ${onc}>${t}pt</button>`;
+      }
+      html += `</div></div>`;
+    }
+
+    // T4 row
+    if (t4) {
+      const rowCls = maxed ? '' : 'locked';
+      const btnCls = maxed ? (t4on ? 'active' : '') : 'disabled';
+      const onc = maxed ? `onclick="toggleT4('${gid}')"` : '';
+      const lockHint = maxed ? '' : '<span class="lock-hint">🔒 カテゴリ全軸を最高 Tier で解禁</span>';
+      html += `<div class="t4-row ${rowCls}">
+        <div class="t4-label">T4</div>
+        <div class="t4-main">
+          <div class="t4-name">${t4.name}${lockHint}</div>
+          <div class="t4-desc">${t4.desc}</div>
+        </div>
+        <button class="t4-btn ${btnCls}" ${onc}>+${t4.pts}pt</button>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+  el.innerHTML = html;
+  updateTotal();
+}
+
+function toggle(id, tier) {
+  state[id] = (state[id] === tier) ? 0 : tier;
+  // カテゴリが max でなくなった場合 T4 も強制解除
+  for (const g in T4S) {
+    if (t4State[g] && !isCategoryMaxed(g)) t4State[g] = 0;
+  }
+  render();
+}
+
+function toggleT4(g) {
+  if (!isCategoryMaxed(g)) return;
+  t4State[g] = t4State[g] ? 0 : 1;
+  render();
+}
+
+function updateTotal() {
+  const axisScore = AXES.reduce((s,a) => s + state[a.id], 0);
+  const t4Score = Object.keys(T4S).reduce((s,g) => s + (t4State[g] ? T4S[g].pts : 0), 0);
+  const total = axisScore + t4Score;
+  document.getElementById('total').textContent = String(total).padStart(2, '0');
+  document.getElementById('total-max').textContent = GRAND_MAX;
+
+  // band
+  let band = BANDS[0];
+  for (const b of BANDS) { if (total <= b.max) { band = b; break; } }
+  document.getElementById('band').innerHTML = `<strong>${band.label}</strong> — ${band.tone}`;
+
+  // group breakdown
+  const bd = document.getElementById('breakdown');
+  let html = '';
+  for (const gid of Object.keys(GROUPS)) {
+    const t4 = T4S[gid];
+    const gs = AXES.filter(a => a.g === gid).reduce((n,a) => n + state[a.id], 0) + (t4State[gid] ? t4.pts : 0);
+    const gm = AXES.filter(a => a.g === gid).reduce((n,a) => n + maxTier(a), 0) + (t4 ? t4.pts : 0);
+    const cls = isCategoryMaxed(gid) ? 'maxed' : '';
+    html += `<div class="row"><span class="lbl ${cls}">${GROUPS[gid].name.replace(/^[A-E]\. /, '')}</span><span class="val ${cls}">${gs} / ${gm}</span></div>`;
+  }
+  bd.innerHTML = html;
+
+  // active debuff list
+  const al = document.getElementById('active-list');
+  const rows = [];
+  for (const a of AXES) {
+    const t = state[a.id];
+    if (!t) continue;
+    const eff = a.tiers[t];
+    rows.push(`<div class="entry">
+      <span class="a-name">${a.name}<span class="t">${t}pt</span></span>
+      <span class="a-eff"><span class="kind">${a.kind}</span>${eff}</span>
+    </div>`);
+  }
+  for (const g of Object.keys(T4S)) {
+    if (!t4State[g]) continue;
+    const t4 = T4S[g];
+    rows.push(`<div class="entry t4">
+      <span class="a-name">${t4.name}<span class="t">T4-${g}</span></span>
+      <span class="a-eff">${t4.desc}</span>
+    </div>`);
+  }
+  al.innerHTML = rows.length ? rows.join('') : '<div class="empty">— 未選択 —</div>';
+}
+
+function resetAll() {
+  AXES.forEach(a => state[a.id] = 0);
+  Object.keys(T4S).forEach(g => t4State[g] = 0);
+  render();
+}
+function maxAll() {
+  AXES.forEach(a => { state[a.id] = maxTier(a); });
+  Object.keys(T4S).forEach(g => t4State[g] = 1);
+  render();
+}
+
+render();
+</script>
+
+</body>
+</html>

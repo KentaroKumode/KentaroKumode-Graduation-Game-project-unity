@@ -77,9 +77,6 @@ namespace AutoTest
             new Axis { name = "emergencyHealRatio",       step = 0.10f,
                        apply = (p, d) => p.emergencyHealRatio += d,
                        read  = p => p.emergencyHealRatio },
-            new Axis { name = "hpLowThreshold",           step = 0.05f,
-                       apply = (p, d) => p.hpLowThreshold += d,
-                       read  = p => p.hpLowThreshold },
             new Axis { name = "hpCritThreshold",          step = 0.05f,
                        apply = (p, d) => p.hpCritThreshold += d,
                        read  = p => p.hpCritThreshold },
@@ -89,9 +86,8 @@ namespace AutoTest
             new Axis { name = "hopeRefillFloor",          step = 5f,
                        apply = (p, d) => p.hopeRefillFloor += d,
                        read  = p => p.hopeRefillFloor },
-            new Axis { name = "sublimationReserve",       step = 1f,
-                       apply = (p, d) => p.sublimationReserve += d,
-                       read  = p => p.sublimationReserve },
+            // [削除 2026-09-11] sublimationReserve ── 〈昇華〉の積極度。
+            //   昇華そのものが呼ばれていないので、 探索予算を配っても方策が動かない死に軸だった。
             new Axis { name = "stanceDefendWinProb",      step = 0.05f,
                        apply = (p, d) => p.stanceDefendWinProb += d,
                        read  = p => p.stanceDefendWinProb },
@@ -323,11 +319,9 @@ namespace AutoTest
                 AppendDiff(sb, "eventExplorationRate",     before.eventExplorationRate,     after.eventExplorationRate);
                 AppendDiff(sb, "importantThreatThreshold", before.importantThreatThreshold, after.importantThreatThreshold);
                 AppendDiff(sb, "emergencyHealRatio",       before.emergencyHealRatio,       after.emergencyHealRatio);
-                AppendDiff(sb, "hpLowThreshold",           before.hpLowThreshold,           after.hpLowThreshold);
                 AppendDiff(sb, "hpCritThreshold",          before.hpCritThreshold,          after.hpCritThreshold);
                 AppendDiff(sb, "lateralHopeFloor",         before.lateralHopeFloor,         after.lateralHopeFloor);
                 AppendDiff(sb, "hopeRefillFloor",          before.hopeRefillFloor,          after.hopeRefillFloor);
-                AppendDiff(sb, "sublimationReserve",       before.sublimationReserve,       after.sublimationReserve);
                 AppendDiff(sb, "stanceDefendWinProb",      before.stanceDefendWinProb,      after.stanceDefendWinProb);
                 AppendDiff(sb, "stanceDefendHpBias",       before.stanceDefendHpBias,       after.stanceDefendHpBias);
             }

@@ -1,338 +1,1038 @@
-﻿{
+{
   "enemies": [
     {
       "id": "shady_merchant",
       "displayName": "怪しい商人",
       "description": "値下げを切り出した瞬間、ローブの奥から鈍く光る刃が覗いた。商人は静かに笑った。",
-      "floor": 5,
-      "maxHP": 78,
-      "diceCount": 4,
-      "diceMaxValue": 8,
-      "criticalNumerator": 4,
-      "threat": 6,
+      "floor": 99,
+      "maxHP": 1840,
+      "criticalNumerator": 0,
+      "threat": 8,
       "passiveSkills": [
-        { "internalName": "Ethereal", "skillName": "虚体", "description": "受けるダメージを50%軽減" },
-        { "internalName": "IntimidatePlus", "skillName": "威圧+", "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）" },
-        { "internalName": "EliteWraith", "skillName": "霊体", "description": "2ターンに1度 被ダメ全て1に減少、非霊体時はダイス数+1" }
-      ]
+        {
+          "internalName": "Ethereal",
+          "skillName": "虚体",
+          "description": "受けるダメージを50%軽減",
+          "flavorText": "手応えはある。手応えだけがある。"
+        },
+        {
+          "internalName": "IntimidatePlus",
+          "skillName": "威圧+",
+          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "flavorText": "「なにもされてない。ほんとに、なにも」"
+        },
+        {
+          "internalName": "EliteWraith",
+          "skillName": "霊体",
+          "description": "2ターンに1度 被ダメ全て1に減少、非霊体時はダイス数+1",
+          "flavorText": "「今日はこういう体なんですよ。明日はまた別ですが」"
+        }
+      ],
+      "baseAttack": 12,
+      "attackRollMin": 1,
+      "attackRollMax": 9
     },
     {
       "id": "slime",
       "displayName": "スライム",
       "description": "最弱の魔物。ぷるぷると揺れながら近づいてくる。",
       "floor": 1,
-      "maxHP": 6,
-      "diceCount": 1,
-      "diceMaxValue": 4,
+      "maxHP": 155,
       "criticalNumerator": 0,
       "threat": 1,
-      "passiveSkills": []
+      "passiveSkills": [],
+      "baseAttack": 4,
+      "attackRollMin": 0,
+      "attackRollMax": 3
+    },
+    {
+      "id": "slime_elite",
+      "displayName": "精鋭スライム",
+      "description": "最弱の魔物。ぷるぷると揺れながら近づいてくる。",
+      "floor": 1,
+      "elite": true,
+      "maxHP": 248,
+      "criticalNumerator": 0,
+      "threat": 4,
+      "passiveSkills": [],
+      "baseAttack": 5,
+      "attackRollMin": 0,
+      "attackRollMax": 5
     },
     {
       "id": "goblin",
       "displayName": "ゴブリン",
       "description": "小柄だが狡猾な魔物。数の暴力を好む。",
       "floor": 1,
-      "maxHP": 8,
-      "diceCount": 1,
-      "diceMaxValue": 6,
+      "maxHP": 200,
       "criticalNumerator": 0,
       "threat": 1,
-      "passiveSkills": []
+      "passiveSkills": [],
+      "baseAttack": 3,
+      "attackRollMin": 0,
+      "attackRollMax": 3
+    },
+    {
+      "id": "goblin_elite",
+      "displayName": "精鋭ゴブリン",
+      "description": "小柄だが狡猾な魔物。数の暴力を好む。",
+      "floor": 1,
+      "elite": true,
+      "maxHP": 320,
+      "criticalNumerator": 0,
+      "threat": 4,
+      "passiveSkills": [],
+      "baseAttack": 4,
+      "attackRollMin": 0,
+      "attackRollMax": 5
     },
     {
       "id": "kobold",
       "displayName": "コボルド",
       "description": "犬のような顔の小鬼。罠を仕掛けるのが得意。",
       "floor": 2,
-      "maxHP": 10,
-      "diceCount": 1,
-      "diceMaxValue": 7,
-      "criticalNumerator": 1,
-      "threat": 3,
+      "maxHP": 428,
+      "criticalNumerator": 0,
+      "threat": 4,
       "passiveSkills": [
-        { "internalName": "Trapper", "skillName": "罠師", "description": "ロール勝利時、次ターン相手のダイス合計値-1" }
-      ]
+        {
+          "internalName": "Trapper",
+          "skillName": "罠師",
+          "description": "ロール勝利時、次ターン相手のダイス合計値-1",
+          "flavorText": "「昨日も同じ穴に落ちてませんでした？」「掘り直してんだよ。毎晩」"
+        }
+      ],
+      "baseAttack": 9,
+      "attackRollMin": 0,
+      "attackRollMax": 6
+    },
+    {
+      "id": "kobold_elite",
+      "displayName": "精鋭コボルド",
+      "description": "犬のような顔の小鬼。罠を仕掛けるのが得意。",
+      "floor": 2,
+      "elite": true,
+      "maxHP": 685,
+      "criticalNumerator": 0,
+      "threat": 7,
+      "passiveSkills": [
+        {
+          "internalName": "Trapper",
+          "skillName": "罠師",
+          "description": "ロール勝利時、次ターン相手のダイス合計値-1",
+          "flavorText": "「昨日も同じ穴に落ちてませんでした？」「掘り直してんだよ。毎晩」"
+        }
+      ],
+      "baseAttack": 11,
+      "attackRollMin": 0,
+      "attackRollMax": 9
     },
     {
       "id": "skeleton",
       "displayName": "スケルトン",
       "description": "朽ちた骨が動き出した不死の戦士。痛みを感じない。",
       "floor": 2,
-      "maxHP": 12,
-      "diceCount": 2,
-      "diceMaxValue": 5,
+      "maxHP": 513,
       "criticalNumerator": 0,
       "threat": 2,
       "passiveSkills": [
-        { "internalName": "Undying", "skillName": "不死者", "description": "毎ターン開始時、HP1回復" }
-      ]
+        {
+          "internalName": "Undying",
+          "skillName": "不死者",
+          "description": "毎ターン開始時、HP1回復",
+          "flavorText": "「おい、アイツ今隣のやつの骨を拾わなかったか？」「たいしてかわんねぇだろ」"
+        }
+      ],
+      "baseAttack": 8,
+      "attackRollMin": 0,
+      "attackRollMax": 6
+    },
+    {
+      "id": "skeleton_elite",
+      "displayName": "精鋭スケルトン",
+      "description": "朽ちた骨が動き出した不死の戦士。痛みを感じない。",
+      "floor": 2,
+      "elite": true,
+      "maxHP": 821,
+      "criticalNumerator": 0,
+      "threat": 5,
+      "passiveSkills": [
+        {
+          "internalName": "Undying",
+          "skillName": "不死者",
+          "description": "毎ターン開始時、HP1回復",
+          "flavorText": "「おい、アイツ今隣のやつの骨を拾わなかったか？」「たいしてかわんねぇだろ」"
+        }
+      ],
+      "baseAttack": 10,
+      "attackRollMin": 0,
+      "attackRollMax": 9
     },
     {
       "id": "wolf",
       "displayName": "ダイアウルフ",
       "description": "巨大な狼。素早い攻撃で敵を翻弄する。",
       "floor": 2,
-      "maxHP": 10,
-      "diceCount": 2,
-      "diceMaxValue": 6,
-      "criticalNumerator": 1,
-      "threat": 3,
+      "maxHP": 428,
+      "criticalNumerator": 0,
+      "threat": 4,
       "passiveSkills": [
-        { "internalName": "Sprint", "skillName": "疾駆", "description": "初回ロール時、ダイス合計値+2" }
-      ]
+        {
+          "internalName": "Sprint",
+          "skillName": "疾駆",
+          "description": "初回ロール時、ダイス合計値+2",
+          "flavorText": "「逃げるなら今のうちだぞ」「もう後ろにいます」"
+        }
+      ],
+      "baseAttack": 9,
+      "attackRollMin": 0,
+      "attackRollMax": 6
+    },
+    {
+      "id": "wolf_elite",
+      "displayName": "精鋭ダイアウルフ",
+      "description": "巨大な狼。素早い攻撃で敵を翻弄する。",
+      "floor": 2,
+      "elite": true,
+      "maxHP": 685,
+      "criticalNumerator": 0,
+      "threat": 7,
+      "passiveSkills": [
+        {
+          "internalName": "Sprint",
+          "skillName": "疾駆",
+          "description": "初回ロール時、ダイス合計値+2",
+          "flavorText": "「逃げるなら今のうちだぞ」「もう後ろにいます」"
+        }
+      ],
+      "baseAttack": 11,
+      "attackRollMin": 0,
+      "attackRollMax": 9
     },
     {
       "id": "orc",
       "displayName": "オーク",
       "description": "屈強な体躯の蛮族。力任せに武器を振るう。",
       "floor": 3,
-      "maxHP": 22,
-      "diceCount": 2,
-      "diceMaxValue": 8,
-      "criticalNumerator": 1,
-      "threat": 4,
+      "maxHP": 1050,
+      "criticalNumerator": 0,
+      "threat": 6,
       "passiveSkills": [
-        { "internalName": "BruteForce", "skillName": "剛力", "description": "ロール勝利時、ダメージ+2" }
-      ]
+        {
+          "internalName": "BruteForce",
+          "skillName": "剛力",
+          "description": "ロール勝利時、ダメージ+2",
+          "flavorText": "「当たっただけじゃ終わらんのか」「終わってたら苦労してない」"
+        }
+      ],
+      "baseAttack": 15,
+      "attackRollMin": 1,
+      "attackRollMax": 7
+    },
+    {
+      "id": "orc_elite",
+      "displayName": "精鋭オーク",
+      "description": "屈強な体躯の蛮族。力任せに武器を振るう。",
+      "floor": 3,
+      "elite": true,
+      "maxHP": 1680,
+      "criticalNumerator": 0,
+      "threat": 9,
+      "passiveSkills": [
+        {
+          "internalName": "BruteForce",
+          "skillName": "剛力",
+          "description": "ロール勝利時、ダメージ+2",
+          "flavorText": "「当たっただけじゃ終わらんのか」「終わってたら苦労してない」"
+        }
+      ],
+      "baseAttack": 20,
+      "attackRollMin": 1,
+      "attackRollMax": 10
     },
     {
       "id": "harpy",
       "displayName": "ハーピィ",
       "description": "空を舞う鳥人。鋭い爪で襲いかかる。",
       "floor": 3,
-      "maxHP": 17,
-      "diceCount": 2,
-      "diceMaxValue": 8,
-      "criticalNumerator": 2,
-      "threat": 3,
+      "maxHP": 909,
+      "criticalNumerator": 0,
+      "threat": 4,
       "passiveSkills": [
-        { "internalName": "Flight", "skillName": "飛翔", "description": "追撃ダメージを受けない" }
-      ]
+        {
+          "internalName": "Flight",
+          "skillName": "飛翔",
+          "description": "追撃ダメージを受けない",
+          "flavorText": "「逃げたぞ、追え」「上です」「……上か」"
+        }
+      ],
+      "baseAttack": 17,
+      "attackRollMin": 0,
+      "attackRollMax": 6
+    },
+    {
+      "id": "harpy_elite",
+      "displayName": "精鋭ハーピィ",
+      "description": "空を舞う鳥人。鋭い爪で襲いかかる。",
+      "floor": 3,
+      "elite": true,
+      "maxHP": 1454,
+      "criticalNumerator": 0,
+      "threat": 7,
+      "passiveSkills": [
+        {
+          "internalName": "Flight",
+          "skillName": "飛翔",
+          "description": "追撃ダメージを受けない",
+          "flavorText": "「逃げたぞ、追え」「上です」「……上か」"
+        }
+      ],
+      "baseAttack": 22,
+      "attackRollMin": 0,
+      "attackRollMax": 9
     },
     {
       "id": "lizardman",
       "displayName": "蛇鱗の戦士",
       "description": "硬い鱗に覆われた爬虫類の戦士。守りが堅い。",
       "floor": 4,
-      "maxHP": 28,
-      "diceCount": 2,
-      "diceMaxValue": 8,
-      "criticalNumerator": 1,
-      "threat": 4,
+      "maxHP": 918,
+      "criticalNumerator": 0,
+      "threat": 6,
       "passiveSkills": [
-        { "internalName": "HardScales", "skillName": "硬鱗", "description": "受けるダメージを-2（最低0）" },
-        { "internalName": "TailStrike", "skillName": "尾撃", "description": "ロール敗北時、相手に1の固定ダメージ" }
-      ]
+        {
+          "internalName": "HardScales",
+          "skillName": "硬鱗",
+          "description": "受けるダメージを-2（最低0）",
+          "flavorText": "「またこの深さで止まってる。刃のせいじゃないですよ、これ」"
+        },
+        {
+          "internalName": "TailStrike",
+          "skillName": "尾撃",
+          "description": "ロール敗北時、相手に1の固定ダメージ",
+          "flavorText": "傷は背中にあった。逃げたわけではない。"
+        }
+      ],
+      "baseAttack": 11,
+      "attackRollMin": 1,
+      "attackRollMax": 7
+    },
+    {
+      "id": "lizardman_elite",
+      "displayName": "精鋭蛇鱗の戦士",
+      "description": "硬い鱗に覆われた爬虫類の戦士。守りが堅い。",
+      "floor": 4,
+      "elite": true,
+      "maxHP": 1469,
+      "criticalNumerator": 0,
+      "threat": 9,
+      "passiveSkills": [
+        {
+          "internalName": "HardScales",
+          "skillName": "硬鱗",
+          "description": "受けるダメージを-2（最低0）",
+          "flavorText": "「またこの深さで止まってる。刃のせいじゃないですよ、これ」"
+        },
+        {
+          "internalName": "TailStrike",
+          "skillName": "尾撃",
+          "description": "ロール敗北時、相手に1の固定ダメージ",
+          "flavorText": "傷は背中にあった。逃げたわけではない。"
+        },
+        {
+          "internalName": "EliteLizard",
+          "skillName": "重甲",
+          "description": "被弾時さらに-2軽減（硬鱗と累積）、敗北時に固定1反射"
+        }
+      ],
+      "baseAttack": 15,
+      "attackRollMin": 1,
+      "attackRollMax": 10
     },
     {
       "id": "minotaur",
       "displayName": "双角の暴牛",
       "description": "巨大な牛頭の怪物。怒りに任せた突進は壊滅的。",
       "floor": 4,
-      "maxHP": 31,
-      "diceCount": 3,
-      "diceMaxValue": 8,
-      "criticalNumerator": 2,
-      "threat": 5,
+      "maxHP": 891,
+      "criticalNumerator": 0,
+      "threat": 7,
       "passiveSkills": [
-        { "internalName": "Rampage", "skillName": "暴走", "description": "ロール敗北時、次ターンのダイス合計値+3" },
-        { "internalName": "BruteForce", "skillName": "剛力", "description": "ロール勝利時、ダメージ+2" }
-      ]
+        {
+          "internalName": "Rampage",
+          "skillName": "暴走",
+          "description": "ロール敗北時、次ターンのダイス合計値+3",
+          "flavorText": "「よけたら怒るんだよ、あいつら」"
+        },
+        {
+          "internalName": "BruteForce",
+          "skillName": "剛力",
+          "description": "ロール勝利時、ダメージ+2",
+          "flavorText": "「当たっただけじゃ終わらんのか」「終わってたら苦労してない」"
+        }
+      ],
+      "baseAttack": 10,
+      "attackRollMin": 1,
+      "attackRollMax": 9
+    },
+    {
+      "id": "minotaur_elite",
+      "displayName": "精鋭双角の暴牛",
+      "description": "巨大な牛頭の怪物。怒りに任せた突進は壊滅的。",
+      "floor": 4,
+      "elite": true,
+      "maxHP": 1426,
+      "criticalNumerator": 0,
+      "threat": 10,
+      "passiveSkills": [
+        {
+          "internalName": "Rampage",
+          "skillName": "暴走",
+          "description": "ロール敗北時、次ターンのダイス合計値+3",
+          "flavorText": "「よけたら怒るんだよ、あいつら」"
+        },
+        {
+          "internalName": "BruteForce",
+          "skillName": "剛力",
+          "description": "ロール勝利時、ダメージ+2",
+          "flavorText": "「当たっただけじゃ終わらんのか」「終わってたら苦労してない」"
+        },
+        {
+          "internalName": "EliteMinotaur",
+          "skillName": "際限なき暴走",
+          "description": "毎ロール自ダイス合計+1（既に強い→控えめ）"
+        }
+      ],
+      "baseAttack": 14,
+      "attackRollMin": 1,
+      "attackRollMax": 12
     },
     {
       "id": "wraith",
       "displayName": "怨嗟の影",
       "description": "怨念の塊。実体を持たず、攻撃が通りにくい。5層の亡霊は生者を確実に道連れにする。",
       "floor": 5,
-      "maxHP": 39,
-      "diceCount": 4,
-      "diceMaxValue": 8,
-      "criticalNumerator": 5,
-      "threat": 5,
+      "maxHP": 981,
+      "criticalNumerator": 0,
+      "threat": 7,
       "passiveSkills": [
-        { "internalName": "Ethereal", "skillName": "虚体", "description": "受けるダメージを50%軽減" },
-        { "internalName": "Curse", "skillName": "呪縛", "description": "ロール勝利時、次ターン相手のダイス合計値-2" },
-        { "internalName": "IntimidatePlus", "skillName": "威圧+", "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）" }
-      ]
+        {
+          "internalName": "Ethereal",
+          "skillName": "虚体",
+          "description": "受けるダメージを50%軽減",
+          "flavorText": "手応えはある。手応えだけがある。"
+        },
+        {
+          "internalName": "Curse",
+          "skillName": "呪縛",
+          "description": "ロール勝利時、次ターン相手のダイス合計値-2",
+          "flavorText": "恨まれる覚えは無かった。向こうにはあった。"
+        },
+        {
+          "internalName": "IntimidatePlus",
+          "skillName": "威圧+",
+          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "flavorText": "「なにもされてない。ほんとに、なにも」"
+        }
+      ],
+      "baseAttack": 20,
+      "attackRollMin": 1,
+      "attackRollMax": 9
+    },
+    {
+      "id": "wraith_elite",
+      "displayName": "精鋭怨嗟の影",
+      "description": "怨念の塊。実体を持たず、攻撃が通りにくい。5層の亡霊は生者を確実に道連れにする。",
+      "floor": 5,
+      "elite": true,
+      "maxHP": 1570,
+      "criticalNumerator": 0,
+      "threat": 10,
+      "passiveSkills": [
+        {
+          "internalName": "Ethereal",
+          "skillName": "虚体",
+          "description": "受けるダメージを50%軽減",
+          "flavorText": "手応えはある。手応えだけがある。"
+        },
+        {
+          "internalName": "Curse",
+          "skillName": "呪縛",
+          "description": "ロール勝利時、次ターン相手のダイス合計値-2",
+          "flavorText": "恨まれる覚えは無かった。向こうにはあった。"
+        },
+        {
+          "internalName": "IntimidatePlus",
+          "skillName": "威圧+",
+          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "flavorText": "「なにもされてない。ほんとに、なにも」"
+        },
+        {
+          "internalName": "EliteWraith",
+          "skillName": "霊体",
+          "description": "2ターンに1度 被ダメ全て1に減少、非霊体時はダイス数+1"
+        }
+      ],
+      "baseAttack": 27,
+      "attackRollMin": 1,
+      "attackRollMax": 12
     },
     {
       "id": "golem",
       "displayName": "ゴーレム",
       "description": "古代魔法で動く石の巨人。膨大なHPと、岩塊の一撃で挑む者を磨り潰す。",
       "floor": 5,
-      "maxHP": 67,
-      "diceCount": 3,
-      "diceMaxValue": 8,
-      "criticalNumerator": 2,
-      "threat": 5,
+      "maxHP": 1636,
+      "criticalNumerator": 0,
+      "threat": 7,
       "passiveSkills": [
-        { "internalName": "HardScales", "skillName": "硬鱗", "description": "受けるダメージを-2（最低0）" },
-        { "internalName": "Immovable", "skillName": "不動", "description": "追撃ダメージを受けない" },
-        { "internalName": "IntimidatePlus", "skillName": "威圧+", "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）" }
-      ]
+        {
+          "internalName": "HardScales",
+          "skillName": "硬鱗",
+          "description": "受けるダメージを-2（最低0）",
+          "flavorText": "「またこの深さで止まってる。刃のせいじゃないですよ、これ」"
+        },
+        {
+          "internalName": "Immovable",
+          "skillName": "不動",
+          "description": "追撃ダメージを受けない",
+          "flavorText": "押しても引いても同じだった。休んでいる間も同じだった。"
+        },
+        {
+          "internalName": "IntimidatePlus",
+          "skillName": "威圧+",
+          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "flavorText": "「なにもされてない。ほんとに、なにも」"
+        }
+      ],
+      "baseAttack": 24,
+      "attackRollMin": 1,
+      "attackRollMax": 9
+    },
+    {
+      "id": "golem_elite",
+      "displayName": "精鋭ゴーレム",
+      "description": "古代魔法で動く石の巨人。膨大なHPと、岩塊の一撃で挑む者を磨り潰す。",
+      "floor": 5,
+      "elite": true,
+      "maxHP": 2618,
+      "criticalNumerator": 0,
+      "threat": 10,
+      "passiveSkills": [
+        {
+          "internalName": "HardScales",
+          "skillName": "硬鱗",
+          "description": "受けるダメージを-2（最低0）",
+          "flavorText": "「またこの深さで止まってる。刃のせいじゃないですよ、これ」"
+        },
+        {
+          "internalName": "Immovable",
+          "skillName": "不動",
+          "description": "追撃ダメージを受けない",
+          "flavorText": "押しても引いても同じだった。休んでいる間も同じだった。"
+        },
+        {
+          "internalName": "IntimidatePlus",
+          "skillName": "威圧+",
+          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "flavorText": "「なにもされてない。ほんとに、なにも」"
+        },
+        {
+          "internalName": "EliteGolem",
+          "skillName": "巌の意志",
+          "description": "毎ターン意志+1、撃破時にスタック分の確定ダメージ"
+        }
+      ],
+      "baseAttack": 33,
+      "attackRollMin": 1,
+      "attackRollMax": 12
     },
     {
       "id": "dark_knight",
       "displayName": "黎明騎士",
       "description": "闇に堕ちた騎士。長引くほど刃が冴える。いずれデスナイトへと至る者。",
       "floor": 4,
-      "maxHP": 34,
-      "diceCount": 3,
-      "diceMaxValue": 8,
-      "criticalNumerator": 2,
-      "threat": 4,
+      "maxHP": 977,
+      "criticalNumerator": 0,
+      "threat": 6,
       "passiveSkills": [
-        { "internalName": "Undying", "skillName": "不死者", "description": "毎ターン開始時、HP1回復" },
-        { "internalName": "CounterStance", "skillName": "反撃態勢", "description": "ロール敗北時、次ターンのダメージ+3" },
-        { "internalName": "IntimidatePlus", "skillName": "威圧+", "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）" },
-        { "internalName": "HoningDuel", "skillName": "研ぎ澄まし", "description": "決闘が長引くほど冴える。3ターンごとにロール勝利時の与ダメージ+1（累積）" }
-      ]
+        {
+          "internalName": "Undying",
+          "skillName": "不死者",
+          "description": "毎ターン開始時、HP1回復",
+          "flavorText": "「おい、アイツ今隣のやつの骨を拾わなかったか？」「たいしてかわんねぇだろ」"
+        },
+        {
+          "internalName": "CounterStance",
+          "skillName": "反撃態勢",
+          "description": "ロール敗北時、次ターンのダメージ+3",
+          "flavorText": "ある剣譜の余白に「初太刀は捨ててよい」とだけ。書いた者の名は削られている。"
+        },
+        {
+          "internalName": "IntimidatePlus",
+          "skillName": "威圧+",
+          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "flavorText": "「なにもされてない。ほんとに、なにも」"
+        },
+        {
+          "internalName": "HoningDuel",
+          "skillName": "研ぎ澄まし",
+          "description": "決闘が長引くほど冴える。3ターンごとにロール勝利時の与ダメージ+1（累積）",
+          "flavorText": "立会人は三合目で目を離せなくなった、と後に書いている。"
+        }
+      ],
+      "baseAttack": 10,
+      "attackRollMin": 1,
+      "attackRollMax": 7
+    },
+    {
+      "id": "dark_knight_elite",
+      "displayName": "精鋭黎明騎士",
+      "description": "闇に堕ちた騎士。長引くほど刃が冴える。いずれデスナイトへと至る者。",
+      "floor": 4,
+      "elite": true,
+      "maxHP": 1563,
+      "criticalNumerator": 0,
+      "threat": 9,
+      "passiveSkills": [
+        {
+          "internalName": "Undying",
+          "skillName": "不死者",
+          "description": "毎ターン開始時、HP1回復",
+          "flavorText": "「おい、アイツ今隣のやつの骨を拾わなかったか？」「たいしてかわんねぇだろ」"
+        },
+        {
+          "internalName": "CounterStance",
+          "skillName": "反撃態勢",
+          "description": "ロール敗北時、次ターンのダメージ+3",
+          "flavorText": "ある剣譜の余白に「初太刀は捨ててよい」とだけ。書いた者の名は削られている。"
+        },
+        {
+          "internalName": "IntimidatePlus",
+          "skillName": "威圧+",
+          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "flavorText": "「なにもされてない。ほんとに、なにも」"
+        },
+        {
+          "internalName": "HoningDuel",
+          "skillName": "研ぎ澄まし",
+          "description": "決闘が長引くほど冴える。3ターンごとにロール勝利時の与ダメージ+1（累積）",
+          "flavorText": "立会人は三合目で目を離せなくなった、と後に書いている。"
+        },
+        {
+          "internalName": "EliteDarkKnight",
+          "skillName": "闇技",
+          "description": "勝利時、与ダメ+2"
+        }
+      ],
+      "baseAttack": 13,
+      "attackRollMin": 1,
+      "attackRollMax": 10
     },
     {
       "id": "chimera",
       "displayName": "キマイラ",
       "description": "複数の獣が融合した怪物。多彩な攻撃手段で押し込んでくる。",
       "floor": 4,
-      "maxHP": 34,
-      "diceCount": 3,
-      "diceMaxValue": 8,
-      "criticalNumerator": 2,
-      "threat": 5,
+      "maxHP": 977,
+      "criticalNumerator": 0,
+      "threat": 7,
       "passiveSkills": [
-        { "internalName": "MultiHead", "skillName": "多頭攻撃", "description": "ロール勝利時、追撃ダイスを1個追加" },
-        { "internalName": "Regeneration", "skillName": "再生", "description": "毎ターン開始時、HP1回復" }
-      ]
+        {
+          "internalName": "MultiHead",
+          "skillName": "多頭攻撃",
+          "description": "ロール勝利時、追撃ダイスを1個追加",
+          "flavorText": "「頭数」の欄が、版ごとに違う。"
+        },
+        {
+          "internalName": "Regeneration",
+          "skillName": "再生",
+          "description": "毎ターン開始時、HP1回復",
+          "flavorText": "傷跡が無い。無いから、何度やられたのか誰にも分からない。"
+        }
+      ],
+      "baseAttack": 10,
+      "attackRollMin": 1,
+      "attackRollMax": 9
+    },
+    {
+      "id": "chimera_elite",
+      "displayName": "精鋭キマイラ",
+      "description": "複数の獣が融合した怪物。多彩な攻撃手段で押し込んでくる。",
+      "floor": 4,
+      "elite": true,
+      "maxHP": 1563,
+      "criticalNumerator": 0,
+      "threat": 10,
+      "passiveSkills": [
+        {
+          "internalName": "MultiHead",
+          "skillName": "多頭攻撃",
+          "description": "ロール勝利時、追撃ダイスを1個追加",
+          "flavorText": "「頭数」の欄が、版ごとに違う。"
+        },
+        {
+          "internalName": "Regeneration",
+          "skillName": "再生",
+          "description": "毎ターン開始時、HP1回復",
+          "flavorText": "傷跡が無い。無いから、何度やられたのか誰にも分からない。"
+        },
+        {
+          "internalName": "EliteVigor",
+          "skillName": "精鋭",
+          "description": "被ダメ-10%／3ターンごとに攻撃+1（累積）"
+        }
+      ],
+      "baseAttack": 14,
+      "attackRollMin": 1,
+      "attackRollMax": 12
     },
     {
       "id": "demon",
       "displayName": "業火の眷属",
       "description": "地獄から召喚された悪魔。開幕の威圧と業火で挑戦者を萎縮させる。",
       "floor": 4,
-      "maxHP": 34,
-      "diceCount": 3,
-      "diceMaxValue": 8,
-      "criticalNumerator": 2,
-      "threat": 6,
+      "maxHP": 977,
+      "criticalNumerator": 0,
+      "threat": 8,
       "passiveSkills": [
-        { "internalName": "DemonAura", "skillName": "魔王の威圧", "description": "戦闘開始時、相手の最大HPを3減少" },
-        { "internalName": "Hellfire", "skillName": "地獄の業火", "description": "ロール勝利時、追加で2の固定ダメージ" }
-      ]
+        {
+          "internalName": "DemonAura",
+          "skillName": "魔王の威圧",
+          "description": "戦闘開始時、相手の最大HPを3減少",
+          "flavorText": "帰ってきた者が、少しだけ小さくなっていた。本人は気づいていない。"
+        },
+        {
+          "internalName": "Hellfire",
+          "skillName": "地獄の業火",
+          "description": "ロール勝利時、追加で2の固定ダメージ",
+          "flavorText": "「盾ですか。……これはもう、飾りですね」"
+        }
+      ],
+      "baseAttack": 7,
+      "attackRollMin": 1,
+      "attackRollMax": 9
+    },
+    {
+      "id": "demon_elite",
+      "displayName": "精鋭業火の眷属",
+      "description": "地獄から召喚された悪魔。開幕の威圧と業火で挑戦者を萎縮させる。",
+      "floor": 4,
+      "elite": true,
+      "maxHP": 1563,
+      "criticalNumerator": 0,
+      "threat": 11,
+      "passiveSkills": [
+        {
+          "internalName": "DemonAura",
+          "skillName": "魔王の威圧",
+          "description": "戦闘開始時、相手の最大HPを3減少",
+          "flavorText": "帰ってきた者が、少しだけ小さくなっていた。本人は気づいていない。"
+        },
+        {
+          "internalName": "Hellfire",
+          "skillName": "地獄の業火",
+          "description": "ロール勝利時、追加で2の固定ダメージ",
+          "flavorText": "「盾ですか。……これはもう、飾りですね」"
+        },
+        {
+          "internalName": "EliteVigor",
+          "skillName": "精鋭",
+          "description": "被ダメ-10%／3ターンごとに攻撃+1（累積）"
+        }
+      ],
+      "baseAttack": 10,
+      "attackRollMin": 1,
+      "attackRollMax": 12
     },
     {
       "id": "elder_vampire",
       "displayName": "血の眷属",
       "description": "太古の吸血鬼。血を啜って傷を癒し、夜が深まるほど力を増す。",
       "floor": 5,
-      "maxHP": 45,
-      "diceCount": 3,
-      "diceMaxValue": 8,
-      "criticalNumerator": 3,
-      "threat": 4,
+      "maxHP": 1126,
+      "criticalNumerator": 0,
+      "threat": 6,
       "passiveSkills": [
-        { "internalName": "Lifesteal", "skillName": "吸血", "description": "ダメージを与えた時、その50%分HPを回復" },
-        { "internalName": "NightLord", "skillName": "夜の王", "description": "3ターン目以降、ダイス1個追加" },
-        { "internalName": "IntimidatePlus", "skillName": "威圧+", "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）" }
-      ]
+        {
+          "internalName": "Lifesteal",
+          "skillName": "吸血",
+          "description": "ダメージを与えた時、その50%分HPを回復",
+          "flavorText": "こぼさずに飲む。それが礼儀だと教わったらしい。"
+        },
+        {
+          "internalName": "NightLord",
+          "skillName": "夜の王",
+          "description": "3ターン目以降、ダイス1個追加",
+          "flavorText": "急がなくていい。夜は向こうの持ち物だ。"
+        },
+        {
+          "internalName": "IntimidatePlus",
+          "skillName": "威圧+",
+          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "flavorText": "「なにもされてない。ほんとに、なにも」"
+        }
+      ],
+      "baseAttack": 23,
+      "attackRollMin": 1,
+      "attackRollMax": 7
+    },
+    {
+      "id": "elder_vampire_elite",
+      "displayName": "精鋭血の眷属",
+      "description": "太古の吸血鬼。血を啜って傷を癒し、夜が深まるほど力を増す。",
+      "floor": 5,
+      "elite": true,
+      "maxHP": 1802,
+      "criticalNumerator": 0,
+      "threat": 9,
+      "passiveSkills": [
+        {
+          "internalName": "Lifesteal",
+          "skillName": "吸血",
+          "description": "ダメージを与えた時、その50%分HPを回復",
+          "flavorText": "こぼさずに飲む。それが礼儀だと教わったらしい。"
+        },
+        {
+          "internalName": "NightLord",
+          "skillName": "夜の王",
+          "description": "3ターン目以降、ダイス1個追加",
+          "flavorText": "急がなくていい。夜は向こうの持ち物だ。"
+        },
+        {
+          "internalName": "IntimidatePlus",
+          "skillName": "威圧+",
+          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "flavorText": "「なにもされてない。ほんとに、なにも」"
+        },
+        {
+          "internalName": "EliteVigor",
+          "skillName": "精鋭",
+          "description": "被ダメ-10%／3ターンごとに攻撃+1（累積）"
+        }
+      ],
+      "baseAttack": 31,
+      "attackRollMin": 1,
+      "attackRollMax": 10
     },
     {
       "id": "death_knight",
       "displayName": "落日の騎士",
       "description": "死を超越した騎士。絶対的な剣技で相手を裁断する。制限時間を超えれば即死の宣告が下る。",
       "floor": 5,
-      "maxHP": 45,
-      "diceCount": 3,
-      "diceMaxValue": 8,
-      "criticalNumerator": 3,
-      "threat": 5,
+      "maxHP": 984,
+      "criticalNumerator": 0,
+      "threat": 7,
       "passiveSkills": [
-        { "internalName": "DeathSentence", "skillName": "死の宣告", "description": "5ターン以内に倒さなければ即死攻撃を放つ" },
-        { "internalName": "CounterStance", "skillName": "反撃態勢", "description": "ロール敗北時、次ターンのダメージ+3" },
-        { "internalName": "IntimidatePlus", "skillName": "威圧+", "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）" }
-      ]
+        {
+          "internalName": "DeathSentence",
+          "skillName": "死の宣告",
+          "description": "5ターン以内に倒さなければ即死攻撃を放つ",
+          "flavorText": "期限が切られた。異議の申し立て先は書かれていない。"
+        },
+        {
+          "internalName": "CounterStance",
+          "skillName": "反撃態勢",
+          "description": "ロール敗北時、次ターンのダメージ+3",
+          "flavorText": "ある剣譜の余白に「初太刀は捨ててよい」とだけ。書いた者の名は削られている。"
+        },
+        {
+          "internalName": "IntimidatePlus",
+          "skillName": "威圧+",
+          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "flavorText": "「なにもされてない。ほんとに、なにも」"
+        }
+      ],
+      "baseAttack": 24,
+      "attackRollMin": 1,
+      "attackRollMax": 9
+    },
+    {
+      "id": "death_knight_elite",
+      "displayName": "精鋭落日の騎士",
+      "description": "死を超越した騎士。絶対的な剣技で相手を裁断する。制限時間を超えれば即死の宣告が下る。",
+      "floor": 5,
+      "elite": true,
+      "maxHP": 1574,
+      "criticalNumerator": 0,
+      "threat": 10,
+      "passiveSkills": [
+        {
+          "internalName": "DeathSentence",
+          "skillName": "死の宣告",
+          "description": "5ターン以内に倒さなければ即死攻撃を放つ",
+          "flavorText": "期限が切られた。異議の申し立て先は書かれていない。"
+        },
+        {
+          "internalName": "CounterStance",
+          "skillName": "反撃態勢",
+          "description": "ロール敗北時、次ターンのダメージ+3",
+          "flavorText": "ある剣譜の余白に「初太刀は捨ててよい」とだけ。書いた者の名は削られている。"
+        },
+        {
+          "internalName": "IntimidatePlus",
+          "skillName": "威圧+",
+          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "flavorText": "「なにもされてない。ほんとに、なにも」"
+        },
+        {
+          "internalName": "EliteVigor",
+          "skillName": "精鋭",
+          "description": "被ダメ-10%／3ターンごとに攻撃+1（累積）"
+        }
+      ],
+      "baseAttack": 33,
+      "attackRollMin": 1,
+      "attackRollMax": 12
     },
     {
       "id": "13th_death",
       "displayName": "13番目の死",
       "description": "大穴の伝承に語られる「13番目の死神」の影。本体は小さな霊体だが、その存在自体が13の宣告を呼び込む。",
-      "floor": 2,
-      "maxHP": 13,
-      "diceCount": 1,
-      "diceMaxValue": 3,
-      "criticalNumerator": 1,
-      "threat": 3,
+      "floor": 4,
+      "maxHP": 474,
+      "criticalNumerator": 0,
+      "threat": 4,
       "passiveSkills": [
-        { "internalName": "Decree13th", "skillName": "13番目の宣告", "description": "毎ターン13%で宣告。ターン終了時に本体が生存していれば、両者ダイス合計の会心ダメージをプレイヤーに与える（軽減無視）" }
-      ]
+        {
+          "internalName": "Decree13th",
+          "skillName": "13番目の宣告",
+          "description": "毎ターン13%で宣告。ターン終了時に本体が生存していれば、両者ダイス合計の会心ダメージをプレイヤーに与える（軽減無視）",
+          "flavorText": "「十二番目までは名前がついてる」「じゃあコイツは」「……番号だけだ」"
+        }
+      ],
+      "baseAttack": 3,
+      "attackRollMin": 0,
+      "attackRollMax": 6
+    },
+    {
+      "id": "13th_death_elite",
+      "displayName": "精鋭13番目の死",
+      "description": "大穴の伝承に語られる「13番目の死神」の影。本体は小さな霊体だが、その存在自体が13の宣告を呼び込む。",
+      "floor": 4,
+      "elite": true,
+      "maxHP": 758,
+      "criticalNumerator": 0,
+      "threat": 7,
+      "passiveSkills": [
+        {
+          "internalName": "Decree13th",
+          "skillName": "13番目の宣告",
+          "description": "毎ターン13%で宣告。ターン終了時に本体が生存していれば、両者ダイス合計の会心ダメージをプレイヤーに与える（軽減無視）",
+          "flavorText": "「十二番目までは名前がついてる」「じゃあコイツは」「……番号だけだ」"
+        },
+        {
+          "internalName": "EliteDecree13",
+          "skillName": "死の重圧",
+          "description": "13番目の宣告が灯ったターン中、自ダイス合計+13"
+        }
+      ],
+      "baseAttack": 4,
+      "attackRollMin": 0,
+      "attackRollMax": 9
     },
     {
       "id": "false_merchant",
       "displayName": "偽の商人",
       "description": "商人を装い旅人を誘い込む変異種。正体を現すと牙を剥くが、深追いを嫌い長くは留まらない。3ターン以内に仕留めねば財貨を奪って姿を消す。",
       "floor": 99,
-      "maxHP": 10,
+      "maxHP": 15,
       "diceCount": 0,
       "diceMaxValue": 0,
-      "criticalNumerator": 1,
+      "criticalNumerator": 0,
       "threat": 4,
       "passiveSkills": [
-        { "internalName": "GreedyMerchant", "skillName": "貪欲", "description": "獲物が豊かなほど肥え太る。プレイヤーの所持パッシブ1つにつきHP+2、3つごとにダイス合計値+1" }
-      ]
+        {
+          "internalName": "GreedyMerchant",
+          "skillName": "貪欲",
+          "description": "獲物が豊かなほど肥え太る。プレイヤーの所持パッシブ1つにつきHP+2、3つごとにダイス合計値+1",
+          "flavorText": "「いいものをお持ちで。……ええ、ほんとうに」"
+        }
+      ],
+      "attackRollMin": 0,
+      "attackRollMax": 0
     },
     {
       "id": "boss_layer1",
       "displayName": "トレジャーゴブリン",
       "description": "財宝を抱え込んだ臆病なゴブリン。戦いは不得手だが、倒せば抱えた戦利品を落とす。",
       "floor": 1,
-      "maxHP": 10,
-      "diceCount": 1,
-      "diceMaxValue": 5,
+      "maxHP": 560,
       "criticalNumerator": 0,
       "threat": 1,
-      "passiveSkills": []
+      "passiveSkills": [],
+      "baseAttack": 8,
+      "attackRollMin": 0,
+      "attackRollMax": 2
     },
     {
       "id": "boss_layer2",
       "displayName": "ゴブリン王",
       "description": "群れを統べる大柄なゴブリン。号令一つで配下を呼び出す。",
-      "floor": 2,
-      "maxHP": 32,
-      "diceCount": 2,
-      "diceMaxValue": 6,
-      "criticalNumerator": 1,
-      "threat": 5,
+      "floor": 3,
+      "maxHP": 1964,
+      "criticalNumerator": 0,
+      "threat": 7,
+      "killingIntentSuppressionLevel": 4,
       "passiveSkills": [
-        { "internalName": "GoblinKingsCall", "skillName": "号令", "description": "毎ターン、自身のダイス合計+3" }
-      ]
+        {
+          "internalName": "GoblinKingsCall",
+          "skillName": "号令",
+          "description": "毎ターン、自身のダイス合計+3",
+          "flavorText": "号令の内容は誰にも聞き取れなかった。それでも全員が、同時に、強くなった。"
+        }
+      ],
+      "baseAttack": 21,
+      "attackRollMin": 1,
+      "attackRollMax": 7
     },
     {
       "id": "boss_layer3",
       "displayName": "毒沼の主",
       "description": "瘴気の澱から生まれた巨躯。触れる空気すべてを腐毒に変え、長く対峙する者ほど深く蝕まれる。",
       "floor": 3,
-      "maxHP": 67,
-      "diceCount": 2,
-      "diceMaxValue": 5,
-      "criticalNumerator": 1,
-      "threat": 5,
+      "maxHP": 1824,
+      "criticalNumerator": 0,
+      "threat": 7,
+      "killingIntentSuppressionLevel": 4,
       "passiveSkills": [
-        { "internalName": "MiasmaCorrosion", "skillName": "毒の侵蝕", "description": "毎ターン終了時、毒スタック+1（上限5）、その後スタック分の固定ダメージ（軽減無視）。速攻なら軽傷、長期戦は致命" }
-      ]
+        {
+          "internalName": "MiasmaCorrosion",
+          "skillName": "毒の侵蝕",
+          "description": "毎ターン終了時、毒スタック+1（上限5）、その後スタック分の固定ダメージ（軽減無視）。速攻なら軽傷、長期戦は致命",
+          "flavorText": "沼は急がない。急ぐ理由が、沼の側には無い。"
+        }
+      ],
+      "baseAttack": 21,
+      "attackRollMin": 1,
+      "attackRollMax": 7
     },
     {
       "id": "boss_layer4",
       "displayName": "鏡の双子",
       "description": "鏡像のように同じ動きを繰り返す双子。重い一撃ほど深く跳ね返す。",
-      "floor": 4,
-      "maxHP": 250,
-      "diceCount": 2,
-      "diceMaxValue": 7,
+      "floor": 3,
+      "maxHP": 2400,
       "criticalNumerator": 0,
-      "threat": 3,
+      "threat": 7,
+      "killingIntentSuppressionLevel": 6,
       "passiveSkills": [
-        { "internalName": "MirrorTwinsResponse", "skillName": "鏡映の応答", "description": "12未満の小さなダメージを与えたターン、次ターン開始時に(12-与ダメ・上限9)を固定反射。高火力(12以上)は反射0＝鏡を叩き割る" },
-        { "internalName": "IntimidatePlus", "skillName": "威圧+", "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）" }
-      ]
+        {
+          "internalName": "MirrorTwinsResponse",
+          "skillName": "鏡映の応答",
+          "description": "小さなダメージしか与えなかったターン、次ターン開始時に固定ダメージを反射（軽減無視・上限9）。閾値はこのボスの最大HPの5%。高火力で殴れば反射0＝鏡を叩き割る",
+          "flavorText": "軽く叩けば軽く返る。強く叩けば——そこで唄は途切れている。"
+        },
+        {
+          "internalName": "IntimidatePlus",
+          "skillName": "威圧+",
+          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "flavorText": "「なにもされてない。ほんとに、なにも」"
+        }
+      ],
+      "baseAttack": 19,
+      "attackRollMin": 4,
+      "attackRollMax": 10
     },
     {
       "id": "boss_layer5",
@@ -340,15 +1040,30 @@
       "displayName": "業火の審判官",
       "description": "罪人を裁く炎の審判官。罪深きほどその業火は強く燃え盛る。",
       "floor": 5,
-      "maxHP": 540,
-      "diceCount": 4,
-      "diceMaxValue": 5,
-      "criticalNumerator": 3,
-      "threat": 5,
+      "maxHP": 4100,
+      "criticalNumerator": 0,
+      "threat": 7,
+      "killingIntentSuppressionLevel": 6,
       "passiveSkills": [
-        { "internalName": "JudgmentFlames", "skillName": "審判の炎", "description": "毎ターン終了時、1+経過ターン+罪の確定ダメ（罪=総戦闘回数/8、上限2。総ダメ上限13、軽減無視）" },
-        { "internalName": "IntimidatePlus", "skillName": "威圧+", "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）" }
-      ]
+        {
+          "internalName": "JudgmentFlames",
+          "skillName": "審判の炎",
+          "description": "毎ターン終了時、1+経過ターン+罪の確定ダメ（罪=総戦闘回数/8、上限2。総ダメ上限13、軽減無視）",
+          "flavorText": "ここまでに何度斬ったかを、向こうは正確に知っている。"
+        },
+        {
+          "internalName": "IntimidatePlus",
+          "skillName": "威圧+",
+          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "flavorText": "「なにもされてない。ほんとに、なにも」"
+        }
+      ],
+      "baseAttack": 24,
+      "attackRollMin": 2,
+      "attackRollMax": 9,
+      "heavyPeriod": 3,
+      "heavyMul": 2.0,
+      "heavyWindupMul": 0.7
     },
     {
       "id": "boss_layer5_hidden",
@@ -356,154 +1071,272 @@
       "displayName": "シュヴァリエ・サン=ジョリオラ",
       "description": "失われた決闘術の継承者。構えと切り返しを交互に繰り出す剣聖。挑む資格を持つ者だけが見える幻。",
       "floor": 5,
-      "maxHP": 420,
-      "diceCount": 4,
-      "diceMaxValue": 6,
-      "criticalNumerator": 3,
-      "threat": 5,
+      "maxHP": 4640,
+      "criticalNumerator": 0,
+      "threat": 7,
+      "killingIntentSuppressionLevel": 8,
       "passiveSkills": [
-        { "internalName": "SaintGeorgesPhases", "skillName": "形態転換／プリオリテ", "description": "コントラタック(0d0+シールド+反撃)とオポジション(4d6+連勝報酬)を循環。形態2→1帰還毎にプリオリテ累積=各スタックでシールド初期-20(最低20)/反撃+3。粘る者ほど無駄に身を削る" },
-        { "internalName": "IntimidatePlus", "skillName": "威圧+", "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）" }
-      ]
+        {
+          "internalName": "SaintGeorgesPhases",
+          "skillName": "形態転換／プリオリテ",
+          "description": "コントラタック(0d0+シールド+反撃)とオポジション(4d6+連勝報酬)を循環。形態2→1帰還毎にプリオリテ累積=各スタックでシールド初期-20(最低20)/反撃+3。粘る者ほど無駄に身を削る",
+          "flavorText": "構えを変えるたびに一礼が入る。省いてくれてもいいのだが。"
+        },
+        {
+          "internalName": "IntimidatePlus",
+          "skillName": "威圧+",
+          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "flavorText": "「なにもされてない。ほんとに、なにも」"
+        }
+      ],
+      "baseAttack": 33,
+      "attackRollMin": 2,
+      "attackRollMax": 9,
+      "heavyPeriod": 3,
+      "heavyMul": 2.0,
+      "heavyWindupMul": 0.7
     },
     {
       "id": "boss_layer6",
-      "baseDefenseRate": 0.25,
+      "baseDefenseRate": 0.15,
       "displayName": "灰燼の王",
-      "description": "灰と燃え残りで形を成す古き王。致命の業火を振るうが、その一撃には必ず予兆がある。見切り、間一髪で躱し、一撃ずつ削れ。",
+      "description": "灰と燃え残りで形を成す古き王。半身を焼かれてなお燃え上がり、削れば削るほど残り火が荒れ狂う。",
       "floor": 6,
-      "maxHP": 1500,
-      "diceCount": 5,
-      "diceMaxValue": 6,
-      "criticalNumerator": 3,
-      "threat": 5,
+      "maxHP": 4200,
+      "criticalNumerator": 0,
+      "threat": 7,
+      "killingIntentSuppressionLevel": 10,
       "passiveSkills": [
-        { "internalName": "IntimidatePlusPlus", "skillName": "威圧++", "description": "戦闘開始時、脅威+5（勝利しても削られ、敗北で脅威分被弾）" },
-        { "internalName": "JudgmentBlaze", "skillName": "業火の断罪", "description": "断罪ターンを予告。断罪ターン敗北で致命の一撃。係数は1回目×4+4、 以降+2ずつ加算（2回目×6+6、3回目×8+8...）。軽減/シールド有効。ロール勝利すれば間一髪回避＋鎧貫通の反撃18（このターンは鎧も無効）" },
-        { "internalName": "AshArmor", "skillName": "灰塵の鎧", "description": "被弾時 受けるダメージ-9、軽減後が10超なら10に丸める（断罪ターンは無効）" },
-        { "internalName": "ImmortalEmber", "skillName": "不滅の残り火", "description": "毎ターン失ったHPを回復（60%以下で5%/30%以下で8%、断罪ターンは回復なし）。一度割った60%/30%ラインより上には戻れない" },
-        { "internalName": "EmberAura", "skillName": "灰塵の威圧", "description": "常時ダイス合計値+3。さらに HP60%/30% の閾値を跨ぐ被弾は、 そのターン中 閾値+1HP で止まる（一度割れば次から効果なし）" },
-        { "internalName": "StarfireProliferation", "skillName": "星火燎原", "description": "ロール敗北するたびダイス合計値+1（無限累積・リセットなし）。粘られるほど確実に追い付く" },
-        { "internalName": "ScorchedEarth", "skillName": "焦土", "description": "プレイヤーがロール敗北するたび、そのターンの被ダメの10%だけ最大HPを削り＋シールド完全破壊。重い一撃ほど地盤が焼け落ちる" }
-      ]
+        {
+          "internalName": "EmberOmen",
+          "skillName": "業火の予兆",
+          "description": "HP>50%は周期4T (T1/5/9...)、HP≤50%は周期3T (T1/4/7...) に加速。予兆ターンは敵ダイス合計+15。",
+          "flavorText": "火が小さくなる。次に大きくなるまでの間だけ、息ができる。"
+        },
+        {
+          "internalName": "AshRegrowth",
+          "skillName": "灰の再生",
+          "description": "HP>50%のとき毎ターン最大HPの2%回復（Phase1: 灰をまといながら耐える）。予兆ターンは回復なし。",
+          "flavorText": "削った分が灰になり、灰がまた形を取る。順番が変わっただけだった。"
+        },
+        {
+          "internalName": "EmberFury",
+          "skillName": "憤怒の残滓",
+          "description": "HP≤50%のとき敵ダイス合計+3 常時（Phase2: 再生ゼロ・高火力連打の決着期）。",
+          "flavorText": "燃え残りの方が熱い。もう惜しむものが無いからだ。"
+        },
+        {
+          "internalName": "ScorchedPact",
+          "skillName": "焦土契約",
+          "description": "プレイヤーが収支マイナスで終わったターン、次ターン以降の敵攻撃+1（最大+5スタック・累積ではなく現在スタック値）。",
+          "flavorText": "退いた分だけ火が寄ってくる。そういう取り決めになっている。"
+        },
+        {
+          "internalName": "BlazeBrand",
+          "skillName": "烈炎",
+          "description": "防御端子へ2本以上配線したターン終了時、烈炎+1。ターン開始時、烈炎の数だけ軽減無視ダメージ。",
+          "flavorText": "盾を構えるほど、灰は厚く積もる。焼かれているのは腕ではなく、迷っている時間の方だ。"
+        }
+      ],
+      "baseAttack": 10,
+      "attackRollMin": 2,
+      "attackRollMax": 9
     },
     {
       "id": "boss_layer7",
-      "baseDefenseRate": 0.35,
-      "displayName": "覚者・初眼",
-      "description": "覚者はあなたに問いかけている。",
       "floor": 7,
-      "maxHP": 1000,
-      "diceCount": 5,
-      "diceMaxValue": 9,
+      "displayName": "ヴェスカ・小手調べ",
+      "description": "「小手調べといこう」　見慣れた安物を、明らかに上手く使う。",
+      "maxHP": 2250,
       "criticalNumerator": 0,
-      "threat": 5,
+      "threat": 7,
+      "killingIntentSuppressionLevel": 10,
+      "baseDefenseRate": 0.35,
       "passiveSkills": [
-        { "internalName": "AwakenedP1Inverse", "skillName": "逆観", "description": "毎T、プレイヤー最大出目を覚者ダイス合計に加算。HP=0で第二形態(業火・残響)へ。" },
-        { "internalName": "FlawlessRobe", "skillName": "天衣無縫", "description": "覚者がロール勝利するたび、プレイヤーが以降獲得する回復量・シールド量を-1（上限10スタック・覚者連戦を通じて持続）。" },
-        { "internalName": "TrueSelf", "skillName": "真我", "description": "覚者の素ロールに固定値を加算（基準1）。ダイス上限を超える難度調整用。オートチューナーがロール勝率に応じて増減。" }
-      ]
+        {
+          "internalName": "ContinuousExperiment",
+          "skillName": "連続実験",
+          "description": "HPが0になったとき死亡せず、次のフェーズに移行する。",
+          "flavorText": "「三十一回目。まだ飽きないな」"
+        },
+        {
+          "internalName": "RelicScholar",
+          "skillName": "遺物学者",
+          "description": "ターン開始時、その段の遺物プールから抽選して使用する。抽選結果は予告に『名前[遺物学者]』で開示。",
+          "flavorText": "「さて、今日は何が出るか」"
+        },
+        {
+          "internalName": "StagnantTime",
+          "skillName": "停滞する時間",
+          "description": "攻撃端子への配線がブロック端子以下だったターン、以降の敵攻撃+1（累積・上限99）。",
+          "flavorText": "「見ていないなら、貰っておくよ」"
+        },
+        {
+          "internalName": "AnalyticComputation",
+          "skillName": "解析演算",
+          "description": "プレイヤーが収支プラスで終えるたび回避率+2%（最大40%）。回避は通常・固定・軽減不可すべてを無効化するが、回避した次のターンは回避できない。",
+          "flavorText": "「二度は当たらんよ。」"
+        },
+        {
+          "internalName": "RiftHeldOpen",
+          "skillName": "裂け目",
+          "description": "毎ターン、ヴェスカとプレイヤーの双方が最大HPの2%を失う。",
+          "flavorText": "「開けたのは私だ。だが閉じ方は誰も知らない」"
+        }
+      ],
+      "baseAttack": 17,
+      "attackRollMin": 2,
+      "attackRollMax": 10,
+      "heavyPeriod": 3,
+      "heavyMul": 2.0,
+      "heavyWindupMul": 0.7
     },
     {
       "id": "boss_layer7_p2",
-      "baseDefenseRate": 0.15,
-      "displayName": "業火・残決",
-      "description": "あなたは過去と向き合った。その業火は誰の為だろうか。",
       "floor": 7,
-      "maxHP": 250,
-      "diceCount": 5,
-      "diceMaxValue": 6,
-      "criticalNumerator": 3,
-      "threat": 4,
+      "displayName": "ヴェスカ・遺物学者",
+      "description": "「少しは心得が有るようだが、まだまだ若いな」　深層の遺物が混ざり始める。",
+      "maxHP": 2250,
+      "criticalNumerator": 0,
+      "threat": 7,
+      "killingIntentSuppressionLevel": 10,
+      "baseDefenseRate": 0.35,
       "passiveSkills": [
-        { "internalName": "AwakenedP2BurstFire", "skillName": "爆ぜ火", "description": "プレイヤーのロール敗北時、即時5固定ダメ(軽減無視)。HP=0で第三形態へ。" },
-        { "internalName": "IntimidatePlus", "skillName": "威圧+", "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）" },
-        { "internalName": "TrueSelf", "skillName": "真我", "description": "覚者の素ロールに固定値を加算（基準1）。ダイス上限を超える難度調整用。オートチューナーがロール勝率に応じて増減。" }
-      ]
+        {
+          "internalName": "ContinuousExperiment",
+          "skillName": "連続実験",
+          "description": "HPが0になったとき死亡せず、次のフェーズに移行する。",
+          "flavorText": "「三十一回目。まだ飽きないな」"
+        },
+        {
+          "internalName": "RelicScholar",
+          "skillName": "遺物学者",
+          "description": "ターン開始時、その段の遺物プールから抽選して使用する。抽選結果は予告に『名前[遺物学者]』で開示。",
+          "flavorText": "「さて、今日は何が出るか」"
+        },
+        {
+          "internalName": "StagnantTime",
+          "skillName": "停滞する時間",
+          "description": "攻撃端子への配線がブロック端子以下だったターン、以降の敵攻撃+1（累積・上限99）。",
+          "flavorText": "「見ていないなら、貰っておくよ」"
+        },
+        {
+          "internalName": "AnalyticComputation",
+          "skillName": "解析演算",
+          "description": "プレイヤーが収支プラスで終えるたび回避率+2%（最大40%）。回避は通常・固定・軽減不可すべてを無効化するが、回避した次のターンは回避できない。",
+          "flavorText": "「二度は当たらんよ。」"
+        },
+        {
+          "internalName": "RiftHeldOpen",
+          "skillName": "裂け目",
+          "description": "毎ターン、ヴェスカとプレイヤーの双方が最大HPの2%を失う。",
+          "flavorText": "「開けたのは私だ。だが閉じ方は誰も知らない」"
+        }
+      ],
+      "baseAttack": 17,
+      "attackRollMin": 2,
+      "attackRollMax": 9,
+      "heavyPeriod": 3,
+      "heavyMul": 2.0,
+      "heavyWindupMul": 0.7
     },
     {
       "id": "boss_layer7_p3",
-      "baseDefenseRate": 0.35,
-      "displayName": "覚者・無相",
-      "description": "覚者は問答を繰り返している。無相。形なき剣。",
       "floor": 7,
-      "maxHP": 300,
-      "diceCount": 5,
-      "diceMaxValue": 9,
+      "displayName": "ヴェスカ・神話",
+      "description": "「遺物の使い方を見せてやろう」　神話の遺物。遺物のパワーでも押し負け始める。",
+      "maxHP": 2000,
       "criticalNumerator": 0,
-      "threat": 5,
+      "threat": 7,
+      "killingIntentSuppressionLevel": 12,
+      "baseDefenseRate": 0.35,
       "passiveSkills": [
-        { "internalName": "AwakenedP3Mirror", "skillName": "鏡映", "description": "覚者への与ダメの50%をプレイヤーHPからも引く。HP=0で第四形態へ。" },
-        { "internalName": "FlawlessRobe", "skillName": "天衣無縫", "description": "覚者がロール勝利するたび、プレイヤーが以降獲得する回復量・シールド量を-1（上限10スタック・覚者連戦を通じて持続）。" },
-        { "internalName": "TrueSelf", "skillName": "真我", "description": "覚者の素ロールに固定値を加算（基準1）。ダイス上限を超える難度調整用。オートチューナーがロール勝率に応じて増減。" }
-      ]
+        {
+          "internalName": "ContinuousExperiment",
+          "skillName": "連続実験",
+          "description": "HPが0になったとき死亡せず、次のフェーズに移行する。",
+          "flavorText": "「三十一回目。まだ飽きないな」"
+        },
+        {
+          "internalName": "RelicScholar",
+          "skillName": "遺物学者",
+          "description": "ターン開始時、その段の遺物プールから抽選して使用する。抽選結果は予告に『名前[遺物学者]』で開示。",
+          "flavorText": "「さて、今日は何が出るか」"
+        },
+        {
+          "internalName": "StagnantTime",
+          "skillName": "停滞する時間",
+          "description": "攻撃端子への配線がブロック端子以下だったターン、以降の敵攻撃+1（累積・上限99）。",
+          "flavorText": "「見ていないなら、貰っておくよ」"
+        },
+        {
+          "internalName": "AnalyticComputation",
+          "skillName": "解析演算",
+          "description": "プレイヤーが収支プラスで終えるたび回避率+2%（最大40%）。回避は通常・固定・軽減不可すべてを無効化するが、回避した次のターンは回避できない。",
+          "flavorText": "「二度は当たらんよ。」"
+        },
+        {
+          "internalName": "RiftHeldOpen",
+          "skillName": "裂け目",
+          "description": "毎ターン、ヴェスカとプレイヤーの双方が最大HPの2%を失う。",
+          "flavorText": "「開けたのは私だ。だが閉じ方は誰も知らない」"
+        }
+      ],
+      "baseAttack": 17,
+      "attackRollMin": 2,
+      "attackRollMax": 11,
+      "heavyPeriod": 3,
+      "heavyMul": 2.0,
+      "heavyWindupMul": 0.7
     },
     {
       "id": "boss_layer7_p4",
-      "baseDefenseRate": 0.15,
-      "displayName": "剣聖・残影",
-      "description": "あなたは過去と向き合った。その剣筋に喜びは感じ取れない。",
       "floor": 7,
-      "maxHP": 150,
-      "diceCount": 5,
-      "diceMaxValue": 7,
-      "criticalNumerator": 3,
-      "threat": 4,
-      "passiveSkills": [
-        { "internalName": "AwakenedP4Riposte", "skillName": "一閃返し", "description": "1度限り、被ダメ完全無効（反射なし）。発動後は通常戦闘。HP=0で第五形態へ。" },
-        { "internalName": "IntimidatePlus", "skillName": "威圧+", "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）" },
-        { "internalName": "TrueSelf", "skillName": "真我", "description": "覚者の素ロールに固定値を加算（基準1）。ダイス上限を超える難度調整用。オートチューナーがロール勝率に応じて増減。" }
-      ]
-    },
-    {
-      "id": "boss_layer7_p5",
-      "baseDefenseRate": 0.35,
-      "displayName": "覚者・寂照",
-      "description": "覚者は更なる問答を繰り返している。寂照。心を止め、真理にたどり着く。",
-      "floor": 7,
-      "maxHP": 400,
-      "diceCount": 5,
-      "diceMaxValue": 9,
+      "displayName": "ヴェスカ・天与",
+      "description": "「知りたいぞ、その強さの源が。」　天変地異すらをも引き起こす遺物を、手足のように扱う。",
+      "maxHP": 1000,
       "criticalNumerator": 0,
-      "threat": 5,
-      "passiveSkills": [
-        { "internalName": "AwakenedP5Silent", "skillName": "寂照", "description": "プレイヤーが消費品/レイピア使用→ランダムなパッシブ装備を永久喪失。HP=0で第六形態へ。" },
-        { "internalName": "FlawlessRobe", "skillName": "天衣無縫", "description": "覚者がロール勝利するたび、プレイヤーが以降獲得する回復量・シールド量を-1（上限10スタック・覚者連戦を通じて持続）。" },
-        { "internalName": "TrueSelf", "skillName": "真我", "description": "覚者の素ロールに固定値を加算（基準1）。ダイス上限を超える難度調整用。オートチューナーがロール勝率に応じて増減。" }
-      ]
-    },
-    {
-      "id": "boss_layer7_p6",
-      "baseDefenseRate": 0.25,
-      "displayName": "灰燼・残炎",
-      "description": "あなたは過去と向き合った。この熱と炎は、覚者が置いてきた怒りなのだろうか。",
-      "floor": 7,
-      "maxHP": 450,
-      "diceCount": 5,
-      "diceMaxValue": 7,
-      "criticalNumerator": 3,
-      "threat": 5,
-      "passiveSkills": [
-        { "internalName": "AwakenedP6EmberWill", "skillName": "業火の遺志", "description": "毎T 覚者ダイス合計+currentTurn(累積、リセットなし)。HP=0で最終形態へ。" },
-        { "internalName": "IntimidatePlus", "skillName": "威圧+", "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）" },
-        { "internalName": "TrueSelf", "skillName": "真我", "description": "覚者の素ロールに固定値を加算（基準1）。ダイス上限を超える難度調整用。オートチューナーがロール勝率に応じて増減。" }
-      ]
-    },
-    {
-      "id": "boss_layer7_p7",
+      "threat": 7,
+      "killingIntentSuppressionLevel": 12,
       "baseDefenseRate": 0.35,
-      "displayName": "覚者・妙覚",
-      "description": "究竟の覚り。一切法空。一歩を踏めば万縁を断ち、一閃にて諸相は帰滅する。",
-      "floor": 7,
-      "maxHP": 100,
-      "diceCount": 5,
-      "diceMaxValue": 9,
-      "criticalNumerator": 0,
-      "threat": 0,
       "passiveSkills": [
-        { "internalName": "AwakenedP7Myokaku", "skillName": "妙覚", "description": "覚者ダイス合計99を6ターン連続で強制する。6ターン耐えれば7ターン目に両者1d2のサドンデス、プレイヤーが勝てば【解脱】特殊勝利。" },
-        { "internalName": "FlawlessRobe", "skillName": "天衣無縫", "description": "覚者がロール勝利するたび、プレイヤーが以降獲得する回復量・シールド量を-1（上限10スタック・覚者連戦を通じて持続）。" }
-      ]
+        {
+          "internalName": "RecurrentTruth",
+          "skillName": "回帰性真理",
+          "description": "毒と出血の蓄積を毎ターン半減する。受ける会心ダメージ-50%。毎ターン、プレイヤーの臨界メーターを5減らす。最大HPの変更を受けず、処刑も成立しない。",
+          "flavorText": "「すべては真理へと回帰する」"
+        },
+        {
+          "internalName": "RelicScholar",
+          "skillName": "遺物学者",
+          "description": "ターン開始時、その段の遺物プールから抽選して使用する。抽選結果は予告に『名前[遺物学者]』で開示。",
+          "flavorText": "「さて、今日は何が出るか」"
+        },
+        {
+          "internalName": "StagnantTime",
+          "skillName": "停滞する時間",
+          "description": "攻撃端子への配線がブロック端子以下だったターン、以降の敵攻撃+1（累積・上限99）。",
+          "flavorText": "「見ていないなら、貰っておくよ」"
+        },
+        {
+          "internalName": "DivineTalent",
+          "skillName": "天与の才",
+          "description": "HPが最大値の66%/33%を下回るダメージを受けても、その体力で踏みとどまる。初めて到達した次のターン、遺物を2つ使用する。",
+          "flavorText": "「では、これはどうかな？」"
+        },
+        {
+          "internalName": "RiftHeldOpen",
+          "skillName": "裂け目",
+          "description": "毎ターン、ヴェスカとプレイヤーの双方が最大HPの2%を失う。",
+          "flavorText": "「開けたのは私だ。だが閉じ方は誰も知らない」"
+        }
+      ],
+      "baseAttack": 13,
+      "attackRollMin": 2,
+      "attackRollMax": 11,
+      "heavyPeriod": 3,
+      "heavyMul": 2.0,
+      "heavyWindupMul": 0.7
     }
   ]
 }

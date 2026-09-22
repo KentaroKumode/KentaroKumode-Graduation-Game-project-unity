@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace MapSystem.AbyssPhenomena
 {
-    /// <summary>15 件の異常現象定義 (正本: docs/specs/abyss-phenomena.md)。</summary>
+    /// <summary>15 件の異常現象定義 (正本: docs/GAME.md §5-7)。</summary>
     public static class AbyssPhenomenonDatabase
     {
         private static readonly Dictionary<AbyssPhenomenon, AbyssPhenomenonDef> defs =

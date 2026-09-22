@@ -133,8 +133,8 @@ namespace InventorySystem
                 {
                     var d = currentItem.weaponDice;
                     stats += $"ダイス: {d.count}d{d.maxValue}\n";
-                    if (currentItem.criticalRate > 0)
-                        stats += $"会心率: {currentItem.criticalRate}/9\n";
+                    if (currentItem.critRatePct > 0f)
+                        stats += $"会心率: {currentItem.CriticalRateLabel()}\n";
                 }
                 stats += $"購入価格: {currentItem.buyPrice}\n";
                 stats += $"売却価格: {currentItem.sellPrice}\n";

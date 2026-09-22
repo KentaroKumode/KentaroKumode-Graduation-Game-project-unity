@@ -1,10 +1,10 @@
 ---
 title: プレイヤー攻撃/防御スタンス（毎ターン・ロール前選択）の採用
-status: accepted
+status: superseded
 date: 2026-06-06
 opened: 2026-06-06
 supersedes: []
-superseded_by: null
+superseded_by: 9
 related_specs: [combat]
 related_adrs: [4, 5]
 ---
@@ -13,7 +13,9 @@ related_adrs: [4, 5]
 
 ## Status
 
-Accepted（実装済み。BOT較正前提）
+Superseded by [ADR-0009](0009-mutual-attack-combat.md)（2026-07-15 Accepted ── ロール勝負の
+完全廃止に伴いスタンス選択は廃止＝配線がその役割を担う。
+実コードは W7〈戦闘接続〉実装まで本 ADR のまま稼働）
 
 ## Context
 

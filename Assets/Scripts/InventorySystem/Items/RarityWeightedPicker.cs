@@ -23,7 +23,19 @@ namespace InventorySystem
         /// 候補プールから rarity 重みで1個選出する。
         /// minRarity が指定された場合、それ未満の rarity は除外（ボス追加レア化等で使用）。
         /// </summary>
-        public static CompleteItemData Pick(List<CompleteItemData> pool, ItemRarity? minRarity = null)
+        /// <summary><b>レア度の重みを上位へ寄せる (2026-09-13)。</b> 0 = 素の重み / 1 = 最大の寄せ。
+        ///
+        /// <para>重みを <c>w^(1−bias)</c> へ変形する ── bias=1 で全 rarity が等確率になり、
+        /// LEGENDARY が 1% から 25% へ跳ね上がる。 段ごとに「開幕の手札が良くなる」を
+        /// 本数ではなく<b>質</b>で表現するため (兵站 r3/6/9)。</para>
+        ///
+        /// <para><b>重みの順序は保つ</b> ── 逆転させず、 差を縮めるだけ。
+        /// 「稀少なものほど出にくい」という関係は最後まで壊れない。</para></summary>
+        private static float Biased(float w, float bias)
+            => bias <= 0f ? w : Mathf.Pow(w, 1f - Mathf.Clamp01(bias));
+
+        public static CompleteItemData Pick(List<CompleteItemData> pool, ItemRarity? minRarity = null,
+                                            float rarityBias = 0f)
         {
             if (pool == null || pool.Count == 0) return null;
 
@@ -48,26 +60,26 @@ namespace InventorySystem
             // 利用可能 rarity の合計重み
             float total = 0f;
             foreach (var (rarity, weight) in tierWeights)
-                if (available.Contains(rarity)) total += weight;
+                if (available.Contains(rarity)) total += Biased(weight, rarityBias);
 
             if (total <= 0f)
-                return filtered[Random.Range(0, filtered.Count)];
+                return filtered[GameLoop.GameRng.RangeAuto("RarityWeightedPicker.2", 0, filtered.Count)];
 
             // 重み付き rarity 抽選
-            float r = Random.value * total;
+            float r = GameLoop.GameRng.Value("RarityWeightedPicker.1") * total;
             ItemRarity chosen = ItemRarity.BRONZE;
             foreach (var (rarity, weight) in tierWeights)
             {
                 if (!available.Contains(rarity)) continue;
-                if ((r -= weight) <= 0f) { chosen = rarity; break; }
+                if ((r -= Biased(weight, rarityBias)) <= 0f) { chosen = rarity; break; }
             }
 
             // 該当 rarity 内からフラット抽選
             var byTier = new List<CompleteItemData>();
             foreach (var it in filtered)
                 if (it.rarity == chosen) byTier.Add(it);
-            if (byTier.Count == 0) return filtered[Random.Range(0, filtered.Count)];
-            return byTier[Random.Range(0, byTier.Count)];
+            if (byTier.Count == 0) return filtered[GameLoop.GameRng.RangeAuto("RarityWeightedPicker.3", 0, filtered.Count)];
+            return byTier[GameLoop.GameRng.RangeAuto("RarityWeightedPicker.4", 0, byTier.Count)];
         }
     }
 }

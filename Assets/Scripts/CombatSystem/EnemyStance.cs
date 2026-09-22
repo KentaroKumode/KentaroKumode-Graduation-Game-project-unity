@@ -50,7 +50,7 @@ namespace CombatSystem
         public static Kind Apply(CombatContext ctx)
         {
             if (ctx == null) return Kind.None;
-            Kind k = UnityEngine.Random.value < 0.5f ? Kind.HighRollLowDmg : Kind.LowRollHighDmg;
+            Kind k = GameLoop.GameRng.Value("EnemyStance.1") < 0.5f ? Kind.HighRollLowDmg : Kind.LowRollHighDmg;
             // 高火力スタンスの被ダメ倍率(=ボス攻撃力)・弱ロール比をボス別にチューナーから取得（非ボス/未調整は既定1.6/0.65）。
             float highMult = AutoTest.BossTuning.Param(ctx.bossId, AutoTest.BossParam.StanceAtkMult);
             ctx.enemyStanceDamageMult = (k == Kind.HighRollLowDmg) ? LowDamageMult : highMult;

@@ -28,7 +28,7 @@ namespace MetaProgression
                 if (!run.permanentDebuffs.Contains(id)) available.Add(id);
 
             if (available.Count == 0) return null;
-            int idx = (rng != null) ? rng.Next(available.Count) : UnityEngine.Random.Range(0, available.Count);
+            int idx = (rng != null) ? rng.Next(available.Count) : GameLoop.GameRng.RangeAuto("MetaPermanentDebuffPicker.1", 0, available.Count);
             return available[idx];
         }
 

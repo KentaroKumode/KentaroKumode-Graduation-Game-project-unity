@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Dossier Photo Converter — ドット絵→古写真 (原寸)</title>
+<style>
+  body { margin:0; font-family:"Yu Gothic UI",Meiryo,sans-serif; background:#202426; color:#ddd; display:flex; min-height:100vh; }
+  aside { width:300px; padding:1.2rem; background:#2b3134; box-sizing:border-box; flex-shrink:0; }
+  main { flex:1; display:flex; align-items:center; justify-content:center; padding:1rem; min-width:0; }
+  canvas { image-rendering: pixelated; box-shadow:0 4px 24px rgba(0,0,0,.5); background:#111; }
+  h1 { font-size:1rem; margin:0 0 1rem; color:#e8d9b0; }
+  label { display:block; font-size:.78rem; margin:.8rem 0 .15rem; color:#9fb0b5; }
+  input[type=range] { width:100%; }
+  .val { float:right; color:#e8d9b0; font-size:.78rem; }
+  #drop { border:2px dashed #556; border-radius:8px; padding:1rem; text-align:center; font-size:.8rem; color:#9fb0b5; cursor:pointer; }
+  #drop.over { border-color:#e8d9b0; color:#e8d9b0; }
+  button { width:100%; margin-top:1rem; padding:.55rem; background:#b46a1e; color:#fff; border:none; border-radius:5px; font-weight:700; cursor:pointer; }
+  button:hover { background:#c97d2e; }
+  .hint { font-size:.72rem; color:#7a8a90; margin-top:.8rem; line-height:1.5; }
+  #size { font-size:.75rem; color:#e8d9b0; margin-top:.4rem; }
+</style>
+</head>
+<body>
+<aside>
+  <h1>📷 Dossier Photo (原寸)</h1>
+  <div id="drop">画像をここにドロップ<br>またはクリックして選択</div>
+  <input type="file" id="file" accept="image/png,image/gif,image/webp,image/jpeg" hidden>
+  <div id="size">— 未読込 —</div>
+
+  <label>ボケ <span class="val" id="v_blur"></span></label>
+  <input type="range" id="blur" min="0" max="3" step="0.1" value="0.6">
+  <label>網点セル <span class="val" id="v_cell"></span></label>
+  <input type="range" id="cell" min="1" max="4" step="1" value="1">
+  <label>明るさ <span class="val" id="v_bright"></span></label>
+  <input type="range" id="bright" min="0.6" max="1.6" step="0.02" value="1.08">
+  <label>ビネット <span class="val" id="v_vig"></span></label>
+  <input type="range" id="vig" min="0" max="1" step="0.05" value="0.45">
+  <label>粒子ノイズ <span class="val" id="v_noise"></span></label>
+  <input type="range" id="noise" min="0" max="20" step="0.5" value="5">
+  <label>傷の本数 <span class="val" id="v_scr"></span></label>
+  <input type="range" id="scr" min="0" max="8" step="1" value="2">
+  <label>乱数 seed <span class="val" id="v_seed"></span></label>
+  <input type="range" id="seed" min="1" max="99" step="1" value="7">
+  <label>プレビュー拡大 <span class="val" id="v_prev"></span></label>
+  <input type="range" id="prev" min="1" max="8" step="1" value="3">
+
+  <button id="save">PNG をダウンロード (原寸)</button>
+  <div class="hint">出力は入力画像と同一ピクセル数。透過は保持 (背景の透明部分はそのまま透明)。
+    全てローカル処理。</div>
+</aside>
+<main><canvas id="out" width="256" height="128"></canvas></main>
+
+<script>
+"use strict";
+const SEPIA = [[0,[16,11,6]],[0.25,[54,38,22]],[0.5,[107,79,46]],[0.75,[181,148,100]],[1,[232,217,176]]];
+const BAYER8 = [
+ [0,32,8,40,2,34,10,42],[48,16,56,24,50,18,58,26],[12,44,4,36,14,46,6,38],[60,28,52,20,62,30,54,22],
+ [3,35,11,43,1,33,9,41],[51,19,59,27,49,17,57,25],[15,47,7,39,13,45,5,37],[63,31,55,23,61,29,53,21]
+].map(r => r.map(v => v/64));
+
+let srcImg = null;
+
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+
+function sepiaMap(t){
+  for (let i=0;i<SEPIA.length-1;i++){
+    const [t0,c0]=SEPIA[i],[t1,c1]=SEPIA[i+1];
+    if (t<=t1){ const f=(t-t0)/(t1-t0); return [0,1,2].map(k=>c0[k]+(c1[k]-c0[k])*f); }
+  }
+  return SEPIA[SEPIA.length-1][1];
+}
+
+function render(){
+  if(!srcImg) return;
+  const P = id => parseFloat(document.getElementById(id).value);
+  const blur=P("blur"), cell=Math.max(1,P("cell")|0), bright=P("bright"), vig=P("vig"),
+        noiseAmt=P("noise"), nScr=P("scr")|0, seed=P("seed")|0, prev=P("prev")|0;
+  for (const id of ["blur","cell","bright","vig","noise","scr","seed","prev"])
+    document.getElementById("v_"+id).textContent = document.getElementById(id).value;
+
+  const w=srcImg.width, h=srcImg.height;
+  const out=document.getElementById("out");
+  out.width=w; out.height=h;                      // 原寸 = 入力と同一ピクセル数
+  out.style.width=(w*prev)+"px";                  // 画面上の見た目だけ拡大
+  const oc=out.getContext("2d");
+  oc.clearRect(0,0,w,h);
+  oc.imageSmoothingEnabled=false;
+  if (blur>0.01) oc.filter=`blur(${blur}px)`;
+  oc.drawImage(srcImg,0,0);
+  oc.filter="none";
+
+  const img=oc.getImageData(0,0,w,h), d=img.data;
+  const nrng=mulberry32(seed*104729+3);
+  const cx=w/2, cy=h/2;
+  for(let y=0;y<h;y++){
+    const by=Math.floor(y/cell)%8;
+    for(let x=0;x<w;x++){
+      const i=(y*w+x)*4;
+      if(d[i+3]===0) continue;                    // 完全透過はそのまま
+      let lum=(d[i]+d[i+1]+d[i+2])/(3*255);
+      lum=Math.pow(lum,0.72)*bright;               // 印画紙トーン
+      const damp=Math.min(Math.max((lum-0.06)*6,0),1); // 深影で網点を消す
+      const thr=(BAYER8[by][Math.floor(x/cell)%8]-0.5)*damp;
+      let q=Math.min(Math.max(Math.round(lum*5+thr)/5,0),1); // 6階調
+      const r=Math.sqrt(((y-cy)/cy)**2+((x-cx)/cx)**2);
+      q*=Math.min(Math.max(1.06-vig*(r**2),0.22),1);          // ビネット
+      if(q<0.10) q*=0.35;                                     // 黒潰し
+      const c=sepiaMap(q);
+      const n=(nrng()+nrng()+nrng()-1.5)*noiseAmt*1.6;        // 粒子
+      d[i]  =Math.min(Math.max(c[0]+n,0),255);
+      d[i+1]=Math.min(Math.max(c[1]+n,0),255);
+      d[i+2]=Math.min(Math.max(c[2]+n,0),255);
+    }
+  }
+  oc.putImageData(img,0,0);
+
+  // 引っかき傷 (不透過部分の上にだけ乗せる)
+  if (nScr>0){
+    const rng=mulberry32(seed*7919+1);
+    oc.save();
+    oc.globalCompositeOperation="source-atop";
+    for(let s=0;s<nScr;s++){
+      const x0=rng()*w, y0=rng()*h;
+      const ang=(rng()-0.5)*0.8+(rng()<0.5?0:Math.PI/2);
+      const ln=h*(0.2+rng()*0.5);
+      oc.strokeStyle=`rgba(232,217,176,${0.10+rng()*0.10})`; oc.lineWidth=1;
+      oc.beginPath(); oc.moveTo(x0,y0); oc.lineTo(x0+Math.cos(ang)*ln,y0+Math.sin(ang)*ln); oc.stroke();
+    }
+    oc.restore();
+  }
+}
+
+// ---- 入出力 ----
+const drop=document.getElementById("drop"), file=document.getElementById("file");
+drop.addEventListener("click",()=>file.click());
+drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("over");});
+drop.addEventListener("dragleave",()=>drop.classList.remove("over"));
+drop.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("over");
+  if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);});
+file.addEventListener("change",()=>{ if(file.files[0]) loadFile(file.files[0]); });
+let baseName="dossier";
+function loadFile(f){
+  const img=new Image();
+  img.onload=()=>{
+    srcImg=img; baseName=f.name.replace(/\.[^.]+$/,"");
+    drop.textContent=f.name;
+    document.getElementById("size").textContent=`${img.width} × ${img.height} px (出力も同一)`;
+    render();
+  };
+  img.src=URL.createObjectURL(f);
+}
+for(const id of ["blur","cell","bright","vig","noise","scr","seed","prev"])
+  document.getElementById(id).addEventListener("input",render);
+document.getElementById("save").addEventListener("click",()=>{
+  const a=document.createElement("a");
+  a.download=baseName+"_dossier.png";
+  a.href=document.getElementById("out").toDataURL("image/png");
+  a.click();
+});
+</script>
+</body>
+</html>

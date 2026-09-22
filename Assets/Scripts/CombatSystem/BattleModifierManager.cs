@@ -12,7 +12,7 @@ namespace CombatSystem
     /// 
     /// 修飾子一覧:
     /// - 豪雨(Downpour): 全ダイス最大値-2
-    /// - 月蝕(LunarEclipse): 会心率+3
+    /// - 月蝕(LunarEclipse): 会心率+15%
     /// - 呪霧(CursedFog): scratchダメージ2倍
     /// - 血潮(BloodTide): 出血ダメージ2倍
     /// - 鉄壁(IronCurtain): 被ダメ上限5/ターン
@@ -48,7 +48,7 @@ namespace CombatSystem
         private static readonly BattleModifier[] modifierPool = new BattleModifier[]
         {
             new BattleModifier(BattleModifierId.Downpour,    "豪雨",   "全ダイス最大値-2"),
-            new BattleModifier(BattleModifierId.LunarEclipse,"月蝕",   "会心率+3"),
+            new BattleModifier(BattleModifierId.LunarEclipse,"月蝕",   "会心率+15%"),
             new BattleModifier(BattleModifierId.CursedFog,   "呪霧",   "威圧の削りダメージ2倍"),
             new BattleModifier(BattleModifierId.BloodTide,   "血潮",   "出血ダメージ2倍"),
             new BattleModifier(BattleModifierId.IronCurtain, "鉄壁",   "被ダメージ上限5/ターン"),
@@ -73,7 +73,7 @@ namespace CombatSystem
 
             for (int i = pool.Count - 1; i > 0; i--)
             {
-                int j = Random.Range(0, i + 1);
+                int j = GameLoop.GameRng.RangeAuto("BattleModifierManager.1", 0, i + 1);
                 var tmp = pool[i];
                 pool[i] = pool[j];
                 pool[j] = tmp;
@@ -105,8 +105,8 @@ namespace CombatSystem
                         break;
 
                     case BattleModifierId.LunarEclipse:
-                        // 月蝕: 会心率+3（バフとして永続）
-                        ctx.currentBuffs["criticalBonus"] = ctx.GetBuff("criticalBonus") + 3;
+                        // 月蝕: 会心率 +15%（バフとして永続）
+                        ctx.currentBuffs[CombatContext.CritRateBuffKey] = ctx.GetBuff(CombatContext.CritRateBuffKey) + 0.15f;
                         break;
 
                     case BattleModifierId.Adversity:

@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>DICE BOUND — オーバーレイ層設計図</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root {
+    --bg: #f8f7f2; --ink: #1a1a1a; --ink-2: #4a4a4a; --ink-3: #7a7a7a;
+    --line: #d4d1c8; --grid: #e8e5db; --panel: #fff;
+    --accent: #a15a2a; --dim: #2b6cb0; --bound: #c53030;
+    --warm: #d99a3d; --lcd: #2b3f5c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a; --ink: #e8e6e0; --ink-2: #b5b3ad; --ink-3: #7d7a72;
+      --line: #333740; --grid: #262a32; --panel: #1c1f24;
+      --accent: #e2c58a; --dim: #7ea1d1; --bound: #e57373;
+      --warm: #e8b877; --lcd: #7ea1d1;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
+  body { font-family: "SF Mono","Consolas","Hiragino Kaku Gothic ProN","Yu Gothic",monospace; font-size: 13px; line-height: 1.6; }
+  .doc { max-width: 1180px; margin: 0 auto; padding: 32px 24px 80px; }
+  header { border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 28px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  header .sub { color: var(--ink-3); font-size: 12px; letter-spacing: 0.06em; }
+  h2 { font-size: 15px; margin: 40px 0 12px; padding-bottom: 4px; border-bottom: 1px solid var(--line);
+       color: var(--accent); display: flex; gap: 8px; align-items: baseline; }
+  h2 .num { background: var(--accent); color: var(--bg); padding: 2px 8px; font-size: 11px; }
+  h3 { font-size: 13px; margin: 18px 0 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; margin: 8px 0; }
+  th, td { border: 1px solid var(--line); padding: 5px 9px; text-align: left; vertical-align: top; }
+  th { background: var(--panel); }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  code { background: var(--panel); border: 1px solid var(--line); padding: 1px 5px; font-size: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); padding: 14px; border-radius: 4px; margin: 12px 0; }
+  .warn { background: var(--panel); border-left: 3px solid var(--accent); padding: 10px 14px; margin: 12px 0; font-size: 12px; }
+  .caption { text-align: center; color: var(--ink-3); font-size: 11px; margin-top: 8px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 760px) { .grid-2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="doc">
+
+<header>
+  <h1>DICE BOUND — オーバーレイ層設計図</h1>
+  <div class="sub">条件出現ボタン・GUI レール・一時 UI の仕様 · 筐体の静的レイアウトは <a href="cabinet-layout.html">cabinet-layout.html</a> · 2026-07-24</div>
+</header>
+
+<div class="warn">
+  <b>層の定義</b>: 本書が扱うのは「常時は存在せず、条件や操作で現れて消えるもの」。
+  筐体に常設される計器・スロット・スリットの位置は cabinet-layout.html §2 が正本。
+  本書はそれらの<b>出現状態・アニメーション・操作仕様</b>を持つ。
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="num">§1</span> ボタン井戸 — ロール⇄バトルの出現機構</h2>
+
+<p>井戸 (cabinet §2 #17: 1574,734 · 112×112 角丸) を<b>ロールボタン</b>と<b>バトルボタン (配線決定)</b> が共有し、
+条件を満たした方だけが下からせり上がる。同時に 2 つ出ることは構造上ない = 誤操作を機構で防止。</p>
+
+<h3>2 つのボタンの識別 (刻印なし・どちらも四角)</h3>
+<table>
+  <tr><th>ボタン</th><th>形状</th><th>色</th><th>出現条件</th><th>押した結果</th></tr>
+  <tr><td>ロール</td><td>角丸四角 96×96 (角R=8)</td><td>琥珀 <code>#E8B860</code> + 内部白熱グロー</td><td>自ターン開始 (入力受付開始)</td><td>ダイスシャッフル開始 (cabinet §4) → ボタンは沈んで井戸が閉じる</td></tr>
+  <tr><td>バトル</td><td>角丸四角 96×96 (角R=8) + 外周発光リング</td><td>深橙 <code>#D9713D</code>、リングが明滅</td><td>ロール済み かつ 全有効ダイスが端子に割当済み</td><td>相互攻撃解決 → 沈む。敵処理中は井戸閉のまま</td></tr>
+</table>
+<p style="color:var(--ink-3);font-size:11px">識別は色 + 外周リングの有無。井戸も四角 (112×112・角R=12)。</p>
+
+<h3>出現/沈降アニメーション (24fps)</h3>
+<table>
+  <tr><th>動作</th><th>フレーム</th><th>挙動</th></tr>
+  <tr><td>せり上がり</td><td class="n">10f</td><td>井戸内から 20px 上昇。終端で 2px オーバーシュート → 2f で着座 (機械の「ガチャン」感)</td></tr>
+  <tr><td>押し込み</td><td class="n">3f</td><td>ストローク 8px 沈む + 発光が一瞬強まる</td></tr>
+  <tr><td>沈降 (退場)</td><td class="n">8f</td><td>井戸面と面一まで下降 → 井戸のアイリスシャッタが 4f で閉じる</td></tr>
+  <tr><td>入れ替わり</td><td class="n">計 22f</td><td>ロール沈降 (8f) → 間 2f → バトルせり上がり (10f+2f)。配線が既に完了していれば連続再生</td></tr>
+</table>
+
+<h3>状態規則</h3>
+<ul style="margin:6px 0;padding-left:20px">
+  <li>配線が未完了のままロール済み → 井戸は閉じたまま。<b>全ダイス割当が完了した瞬間</b>にバトルボタンがせり上がる</li>
+  <li>バトルボタン出現後も配線変更は可能。変更で割当が不完全になったら 8f で再沈降 (押せない状態が形で分かる)</li>
+  <li>リロール実行中・シャッフル演出中・敵処理中は両ボタンとも収納</li>
+  <li>戦闘外 (マップ/ショップ) では井戸は常時閉。シャッタ面はシャーシと同素材</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2><span class="num">§2</span> インベントリ GUI レール (パッシブ + 消費の 2 段)</h2>
+
+<p>筐体には固定ラックを持たない。所持品は<b>上端スリット (cabinet §2 #18) から降りてくる 2 段レール</b>で閲覧・操作する。
+レール自体は「筐体からせり出す機械」の見た目だが、挙動は GUI (スクロール・即時開閉)。</p>
+
+<div class="card">
+<svg width="100%" viewBox="0 0 1760 340" preserveAspectRatio="xMidYMid meet" style="background:var(--panel);border:1px solid var(--line)">
+  <!-- rail frame -->
+  <rect x="20" y="20" width="1720" height="300" fill="var(--accent)" fill-opacity="0.04" stroke="var(--accent)" stroke-width="2"/>
+  <!-- tier divider -->
+  <line x1="20" y1="150" x2="1740" y2="150" stroke="var(--line)" stroke-width="1.5"/>
+
+  <!-- tier 1: passive sticks -->
+  <g fill="var(--accent)" fill-opacity="0.35" stroke="var(--accent)" stroke-width="1">
+    <rect x="60" y="50" width="44" height="70"/><rect x="122" y="50" width="44" height="70"/>
+    <rect x="184" y="50" width="44" height="70"/><rect x="246" y="50" width="44" height="70"/>
+    <rect x="308" y="50" width="44" height="70"/><rect x="370" y="50" width="44" height="70"/>
+    <rect x="432" y="50" width="44" height="70"/><rect x="494" y="50" width="44" height="70"/>
+  </g>
+  <text x="600" y="92" font-size="14" fill="var(--accent)" font-family="monospace">→ 横スクロール (全所持数を実体表示)</text>
+  <rect x="1560" y="50" width="120" height="70" fill="none" stroke="var(--warm)" stroke-width="1.5"/>
+  <text x="1620" y="92" font-size="15" fill="var(--warm)" text-anchor="middle" font-family="monospace">8 8 8</text>
+  <text x="1620" y="140" font-size="11" fill="var(--ink-3)" text-anchor="middle" font-family="monospace">総数ニキシー</text>
+
+  <!-- tier 2: consumables 6 sections -->
+  <g stroke="var(--line)" stroke-width="1">
+    <line x1="306" y1="150" x2="306" y2="320"/><line x1="592" y1="150" x2="592" y2="320"/>
+    <line x1="878" y1="150" x2="878" y2="320"/><line x1="1164" y1="150" x2="1164" y2="320"/>
+    <line x1="1450" y1="150" x2="1450" y2="320"/>
+  </g>
+  <!-- capsules with tier heights in section 1 -->
+  <g fill="var(--dim)" fill-opacity="0.25" stroke="var(--dim)" stroke-width="1">
+    <rect x="50" y="230" width="60" height="80" rx="8"/>
+    <rect x="130" y="222" width="60" height="88" rx="8"/>
+    <rect x="210" y="214" width="60" height="96" rx="8"/>
+  </g>
+  <text x="80" y="220" font-size="10" fill="var(--ink-3)" text-anchor="middle" font-family="monospace">T1</text>
+  <text x="160" y="212" font-size="10" fill="var(--ink-3)" text-anchor="middle" font-family="monospace">T2</text>
+  <text x="240" y="204" font-size="10" fill="var(--ink-3)" text-anchor="middle" font-family="monospace">T3</text>
+  <text x="163" y="180" font-size="12" fill="var(--ink-3)" text-anchor="middle" font-family="monospace">回復</text>
+  <text x="449" y="180" font-size="12" fill="var(--ink-3)" text-anchor="middle" font-family="monospace">攻撃</text>
+  <text x="735" y="180" font-size="12" fill="var(--ink-3)" text-anchor="middle" font-family="monospace">防御</text>
+  <text x="1021" y="180" font-size="12" fill="var(--ink-3)" text-anchor="middle" font-family="monospace">倍率</text>
+  <text x="1307" y="180" font-size="12" fill="var(--ink-3)" text-anchor="middle" font-family="monospace">希望</text>
+  <text x="1595" y="180" font-size="12" fill="var(--ink-3)" text-anchor="middle" font-family="monospace">その他</text>
+</svg>
+<div class="caption">図 1: GUI レール展開状態 (1680×260 実寸相当・テキストは設計注釈)</div>
+</div>
+
+<h3>開閉</h3>
+<table>
+  <tr><th>項目</th><th>仕様</th></tr>
+  <tr><td>トリガー</td><td>上端スリットの取っ手 click / ホットキー。もう一度で収納</td></tr>
+  <tr><td>降下アニメ</td><td>10f で y=60 まで降下 + 2px オーバーシュート着座 (§1 と同じ「ガチャン」語彙)</td></tr>
+  <tr><td>展開領域</td><td>120, 60 〜 1800, 320 (1680×260)。敵 HP 横バー + LCD 上部に重なる (一時 GUI なので許容・rev4 座標準拠)</td></tr>
+  <tr><td>自動収納</td><td>ロール/バトルボタン押下時・戦闘解決演出中は強制収納</td></tr>
+  <tr><td>開放条件</td><td>戦闘中含めいつでも開ける (演出中を除く)</td></tr>
+</table>
+
+<h3>上段: パッシブスティック (y=60〜170)</h3>
+<table>
+  <tr><th>項目</th><th>仕様</th></tr>
+  <tr><td>スティック寸法</td><td>44 × 70 px (レール吊り下げ型)、ピッチ 62px</td></tr>
+  <tr><td>スクロール</td><td>横スクロール (ドラッグ / ホイール・慣性あり)。<b>全所持数を実体表示</b> — バンク集積は廃止</td></tr>
+  <tr><td>並び順</td><td>取得順 (新しいものが右端)。右端にニキシーで総数表示</td></tr>
+  <tr><td>色分け</td><td>ビルド軸で本体色: 充電=黄 / 臨界=橙 / 毒=緑 / 鈍器=灰 / 出血=暗赤 / 盾=青灰 / 汎用=茶</td></tr>
+  <tr><td>閲覧</td><td>hover → LCD 内に名前/効果表示</td></tr>
+  <tr><td>抜き取り</td><td>下方向へドラッグ = 破棄 (確認を LCD 内に表示)。ショップ画面中は売却</td></tr>
+</table>
+
+<h3>下段: 消費 (y=180〜300)</h3>
+<table>
+  <tr><th>項目</th><th>仕様</th></tr>
+  <tr><td>セクション</td><td>6 分割: 回復 / 攻撃 / 防御 / 倍率 / 希望 / その他 (賢者の石・職業スターター)。区切りは細縦ライン</td></tr>
+  <tr><td>形状</td><td>カプセル型モジュール 60px 幅 (Tier で背の高さ 3 段階: T1=80 / T2=88 / T3=96px)</td></tr>
+  <tr><td>所持数</td><td>同種は 1 モジュール + ニキシー 1 桁 (×N)。セクション内最大 3 種 (T1/T2/T3) なのでスクロール不要</td></tr>
+  <tr><td>使用</td><td>click で押し込み → 排出演出 (下へスライドアウト) → 効果発動。レールは開いたまま</td></tr>
+  <tr><td>使用不可時</td><td>戦闘外専用 (食料) は戦闘中減光。死翔ロック中は下段全体減光</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2><span class="num">§3</span> オーバーレイ層の共通規則</h2>
+
+<table>
+  <tr><th>規則</th><th>内容</th></tr>
+  <tr><td>z 順序</td><td>卓上小物 &lt; 筐体 &lt; LCD &lt; 常設計器 &lt; 出現ボタン &lt; GUI レール &lt; 確認ダイアログ (LCD 内)</td></tr>
+  <tr><td>同時出現</td><td>GUI レールとボタン井戸は共存可。レール展開中にボタンを押すとレールは強制収納→ボタン処理</td></tr>
+  <tr><td>機械語彙</td><td>すべてのオーバーレイは「筐体からせり出す機構」として描く (フェード/スライドインの GUI 的表現は禁止)。出現 10f + 2px オーバーシュートの「ガチャン」を共通言語にする</td></tr>
+  <tr><td>刻印禁止</td><td>筐体と同じ。文字はニキシー数字のみ。tooltip/確認テキストは LCD 内に出す</td></tr>
+  <tr><td>演出中ロック</td><td>シャッフル・戦闘解決・LCD トランジション中は全オーバーレイ操作不可 + 強制収納</td></tr>
+  <tr><td>将来枠</td><td>タブ的な切替 (コーデックス/スキルツリー等) を筐体に足す場合も本書に追記し、同じ出現語彙に従う</td></tr>
+</table>
+
+<p style="color:var(--ink-3);font-size:11px;margin-top:20px">
+  最終更新: 2026-07-24 · 座標は 1920×1080 デフォルトフレーミング準拠 (cabinet-layout.html と共通)
+</p>
+
+</div>
+</body>
+</html>

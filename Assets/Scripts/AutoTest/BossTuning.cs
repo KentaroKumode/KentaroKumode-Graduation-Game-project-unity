@@ -14,7 +14,7 @@ namespace AutoTest
     /// 設計思想 (2026-06-01 改訂):
     ///   旧版は judgmentMul=0.85 のような隠し倍率を実行時に掛けていたが、 これはゲーム内に明示されず
     ///   「強引なバランス調整」に見える。 そこで各機構パッシブの **実数値** (断罪ダイス上乗せ・断罪係数の基礎・
-    ///   天衣無縫の上限スタック・反射率%・審判の炎の上限・爆ぜ火の固定ダメ・灰塵の鎧の軽減量・サドンデスダメ)
+    ///   天衣無縫の上限スタック・審判の炎の上限・灰塵の鎧の軽減量・停滞する時間の係数 ほか)
     ///   を直接の調整対象とする。 チューナーは目標勝率から具体値を増減し、 パッシブはその値を直接使う。
     ///   ログには「断罪ダイス 10→8」のように実数値の変化が出る。
     /// </summary>
@@ -22,13 +22,12 @@ namespace AutoTest
     {
         JudgmentDice,      // 灰燼/業火・断罪ターンの敵ダイス上乗せ (見切りロール難度)。 基準10
         JudgmentCoefBase,  // 業火の断罪の係数基礎。 係数 = base + 2n。 基準2 (1回目=4)
-        RobeStacks,        // 覚者・天衣無縫の回復/シールド減衰の上限スタック。 基準10
-        ReflectPct,        // 覚者・鏡映の反射率% (上限90)。 基準50
+        RobeStacks,        // 天衣無縫 (FlawlessRobe) の回復/シールド減衰の上限スタック。 基準10
+                           //   現在どの敵も未装備だが Registry には流用可として登録済み
         ChipCap,           // 業火の審判官・審判の炎の毎ターン継続ダメ上限。 基準13
-        BurstDamage,       // 覚者・爆ぜ火のロール敗北時固定ダメ。 基準5
         RegenReduction,    // 灰燼・灰塵の鎧の被ダメ軽減量 (タンク性/ジリ貧)。 基準9
-        SuddenDeathDamage, // 覚者・妙覚のサドンデスダメ。 基準99 (7層専用=通常は不調整)
-        TrueSelf,          // 真我: 7層覚者の全形態に付与する素ロール固定加算 (ダイス上限を超える難度調整用)。 基準1
+        Stagnation,        // 停滞する時間: 攻撃端子が空のTごとに積むスタック1つあたりの敵出目加算。 基準3
+                           //   → **7層ヴェスカの第一レバー** (docs/GAME.md §13-4)
         IntimidateThreat,  // 威圧+ の脅威加算 (勝利時の削り/敗北時の被弾の基準)。 基準3
         PoisonStackCap,    // 毒沼の主・毒の侵蝕の毒スタック上限 (DOTの最大強度)。 基準5
         MirrorReflectCap,  // 鏡の双子・鏡映の応答の反射ダメ上限。 基準9
@@ -72,14 +71,11 @@ namespace AutoTest
         public const bool TuneJudgmentDice      = true;  // 断罪ターンの敵ダイス上乗せ
         public const bool TuneJudgmentCoefBase  = true;  // 断罪係数の基礎
         public const bool TuneRobeStacks        = true;  // 天衣無縫の上限スタック
-        public const bool TuneReflectPct        = true;  // 鏡映の反射率%
         public const bool TuneChipCap           = true;  // 審判の炎の継続ダメ上限
-        public const bool TuneBurstDamage       = true;  // 爆ぜ火の固定ダメ
         public const bool TuneRegenReduction    = true;  // 灰塵の鎧の軽減量
-        public const bool TuneSuddenDeathDamage = false; // サドンデスダメ (7層専用=通常は不調整)
         public const bool TuneDice              = true;  // ボス素ダイスの期待値 (平均出目+offset)
         public const bool TuneHp                = true;  // HP絶対値 (Dice飽和時の受け皿)
-        public const bool TuneTrueSelf          = true;  // 真我 (7層: ロール勝率が90%張り付き時の素ロール加算)
+        public const bool TuneStagnation        = true;  // 停滞する時間 (7層ヴェスカの第一レバー)
         public const bool TuneIntimidateThreat  = true;  // 威圧+ の脅威加算 (5層業火の審判官ほか)
         public const bool TunePoisonStackCap    = true;  // 毒の侵蝕の毒スタック上限 (3層毒沼の主)
         public const bool TuneMirrorReflectCap  = true;  // 鏡映の応答の反射上限 (4層鏡の双子)
@@ -97,13 +93,12 @@ namespace AutoTest
         public const bool TuneBoss_Layer5       = true;
         public const bool TuneBoss_Layer5Hidden = true;
         public const bool TuneBoss_Layer6       = true;
-        public const bool TuneBoss_Layer7       = true;  // 7層p1 (初眼)
-        public const bool TuneBoss_Layer7P2     = false;  // 業火・残響
-        public const bool TuneBoss_Layer7P3     = false;  // 無相
-        public const bool TuneBoss_Layer7P4     = false;  // シュヴァリエ・残影
-        public const bool TuneBoss_Layer7P5     = false;  // 寂照
-        public const bool TuneBoss_Layer7P6     = false;  // 薄火
-        public const bool TuneBoss_Layer7P7     = false; // 妙覚 (サドンデス専用=常に学習しない。 IsMyokaku でも別途除外)
+        // 7層 ヴェスカ 4段連戦 (2026-07-27 リワーク)。 特殊勝利機構が無くなったため、
+        // 「7層は通常調整を行わない」という旧除外規約も解消し、 全段を通常のチューニング対象にする。
+        public const bool TuneBoss_Layer7       = true;  // 段1 小手調べ
+        public const bool TuneBoss_Layer7P2     = true;  // 段2 遺物学者
+        public const bool TuneBoss_Layer7P3     = true;  // 段3 神話
+        public const bool TuneBoss_Layer7P4     = true;  // 段4 天与
 
         /// <summary>このボスをオートチューナーが調整してよいか (ボス別の手動トグル)。</summary>
         public static bool BossEnabled(string id)
@@ -121,17 +116,13 @@ namespace AutoTest
                 case "boss_layer7_p2":      return TuneBoss_Layer7P2;
                 case "boss_layer7_p3":      return TuneBoss_Layer7P3;
                 case "boss_layer7_p4":      return TuneBoss_Layer7P4;
-                case "boss_layer7_p5":      return TuneBoss_Layer7P5;
-                case "boss_layer7_p6":      return TuneBoss_Layer7P6;
-                case "boss_layer7_p7":      return TuneBoss_Layer7P7;
                 default:                    return false; // 未知のボスは調整しない
             }
         }
 
         // ===== ボスごとの目標ロール勝率 (手動設定) =====
-        // プレイヤーのロール勝率がこの値を超えて張り付くと「真我」を上げ (ボスのロール強化)、
-        // 下回れば下げる。 現在ロール勝率を制御点にするのは 7層 (真我) のみ。
-        // 1〜6層の値は予約 (将来 1〜6層でもロール勝率制御を有効化した場合に使用)。
+        // ロール勝率を寄せる先。 現在これを制御点にする調整器は無い (7層の「真我」は
+        // 覚者ごと廃止済み・docs/GAME.md §24)。 レポート表示と将来の制御用に値だけ残す。
         public const float RollTarget_Layer1       = 0.70f;
         public const float RollTarget_Layer2       = 0.70f;
         public const float RollTarget_Layer3       = 0.80f;
@@ -139,15 +130,12 @@ namespace AutoTest
         public const float RollTarget_Layer5       = 0.80f;
         public const float RollTarget_Layer5Hidden = 0.60f;
         public const float RollTarget_Layer6       = 0.40f;
-        public const float RollTarget_Layer7       = 0.90f;  // 7層p1 (初眼)
-        public const float RollTarget_Layer7P2     = 0.90f;  // 業火・残響
-        public const float RollTarget_Layer7P3     = 0.90f;  // 無相
-        public const float RollTarget_Layer7P4     = 0.90f;  // シュヴァリエ・残影
-        public const float RollTarget_Layer7P5     = 0.90f;  // 寂照
-        public const float RollTarget_Layer7P6     = 0.90f;  // 薄火
-        public const float RollTarget_Layer7P7     = 0.90f;  // 妙覚 (真我無効=実際には未使用)
+        public const float RollTarget_Layer7       = 0.90f;  // 段1 小手調べ
+        public const float RollTarget_Layer7P2     = 0.90f;  // 段2 遺物学者
+        public const float RollTarget_Layer7P3     = 0.90f;  // 段3 神話
+        public const float RollTarget_Layer7P4     = 0.90f;  // 段4 天与
 
-        /// <summary>このボスの目標ロール勝率 (真我が寄せる先)。</summary>
+        /// <summary>このボスの目標ロール勝率 (レポート表示用の基準)。</summary>
         public static float TargetRollWinRate(string id)
         {
             switch (id)
@@ -163,9 +151,6 @@ namespace AutoTest
                 case "boss_layer7_p2":      return RollTarget_Layer7P2;
                 case "boss_layer7_p3":      return RollTarget_Layer7P3;
                 case "boss_layer7_p4":      return RollTarget_Layer7P4;
-                case "boss_layer7_p5":      return RollTarget_Layer7P5;
-                case "boss_layer7_p6":      return RollTarget_Layer7P6;
-                case "boss_layer7_p7":      return RollTarget_Layer7P7;
                 default:                    return 0.90f;
             }
         }
@@ -174,7 +159,7 @@ namespace AutoTest
         //  ボスが opposed ロールで「勝つ」割合(=プレイヤー敗北割合)を、 強ロール/弱ロールスタンス別に帯で管理する。
         //  ・強ロール時の roll-win → ダイス/固有面で [Floor,Ceil] に収める。
         //  ・弱ロール時の roll-win → 弱ロール比(WeakRollRatio)で [Floor,Ceil] に収める (弱ロールは高火力との交換なので低め)。
-        //  難度(クリア率)はスキル/攻撃力倍率/HPが担い、 ロール勝率はこのレンジで制御する。 7層は対象外(真我制御)。
+        //  難度(クリア率)はスキル/攻撃力倍率/HPが担い、 ロール勝率はこのレンジで制御する。
         //  値はボス別に編集可。 既定は層帯で設定。
         public struct RollWinRange { public float floor, ceil; public RollWinRange(float f, float c) { floor = f; ceil = c; } }
 
@@ -218,12 +203,9 @@ namespace AutoTest
                 case BossParam.JudgmentDice:      return TuneJudgmentDice;
                 case BossParam.JudgmentCoefBase:  return TuneJudgmentCoefBase;
                 case BossParam.RobeStacks:        return TuneRobeStacks;
-                case BossParam.ReflectPct:        return TuneReflectPct;
                 case BossParam.ChipCap:           return TuneChipCap;
-                case BossParam.BurstDamage:       return TuneBurstDamage;
                 case BossParam.RegenReduction:    return TuneRegenReduction;
-                case BossParam.SuddenDeathDamage: return TuneSuddenDeathDamage;
-                case BossParam.TrueSelf:          return TuneTrueSelf;
+                case BossParam.Stagnation:        return TuneStagnation;
                 case BossParam.IntimidateThreat:  return TuneIntimidateThreat;
                 case BossParam.PoisonStackCap:    return TunePoisonStackCap;
                 case BossParam.MirrorReflectCap:  return TuneMirrorReflectCap;
@@ -240,15 +222,25 @@ namespace AutoTest
             switch (p)
             {
                 //                          base  min  max  gain  maxStep/batch
-                case BossParam.JudgmentDice:      return new ParamMeta(10f, 0f, 25f, 20f, 1.5f);
+                case BossParam.JudgmentDice:      return new ParamMeta(15f, 0f, 30f, 25f, 1.5f);
                 case BossParam.JudgmentCoefBase:  return new ParamMeta( 2f, 0f,  8f,  6f, 0.5f);
+                // 2026-08-15: 一度 10 → 7 にしたが **10 へ戻した**。 「5層の主死因が Chip 95〜98%」
+                //   という根拠自体が、 〈怪しい商人〉が 5層の通常抽選に混ざっていた汚染下の測定だった
+                //   (FloorManager.SpecialEncounterFloor 参照)。 7 で測っても 7層クリアは
+                //   5.9% → 5.8% と動かず、 効いたのは 5層ボス単体の勝率 (70.9→74.1%) だけ。
+                //   出現漏れを直した土俵で測り直してから是非を判断する。
                 case BossParam.RobeStacks:        return new ParamMeta(10f, 1f, 20f, 20f, 1.5f);
-                case BossParam.ReflectPct:        return new ParamMeta(50f, 0f, 90f, 80f, 5f);
                 case BossParam.ChipCap:           return new ParamMeta(10f, 1f, 20f, 20f, 1.5f);
-                case BossParam.BurstDamage:       return new ParamMeta( 5f, 0f, 20f, 20f, 1.5f);
                 case BossParam.RegenReduction:    return new ParamMeta( 9f, 0f, 20f, 20f, 1.5f);
-                case BossParam.SuddenDeathDamage: return new ParamMeta(99f, 1f, 99f, 99f, 6f);
-                case BossParam.TrueSelf:          return new ParamMeta( 1f, 1f, 30f, 30f, 2f);
+                // 2026-08-16: 基準 3 → 1。 〈停滞する時間〉の 1 スタックあたり敵出目加算。
+                //   実測 (7層p4 の攻撃値分解) で 15T+ の停滞寄与が 15.3 ＝ 5.1 スタック × 3 に達し、
+                //   敵ダイス合計 32.0 の 48% を占めていた。 そこへエスカレーション倍率が掛かるので
+                //   攻撃値 70.9 に対しブロック 19.2 ＝ 貫通 51.7 (プレイヤー最大HP 96 の半分超/T)。
+                //   なお StackCap(10) は 5.1 スタックまでしか積まないため**一度も効いていない** ──
+                //   99→10 に戻しても結果が 1 件も変わらなかった。 効くのはこちらの係数。
+                //   StagnantTime.DicePerStackBase(=1) はこの override に負けるので、
+                //   **コード側の定数を読んでも実効値は分からない**点に注意。
+                case BossParam.Stagnation:        return new ParamMeta( 1f, 0f, 12f, 20f, 1f);
                 case BossParam.IntimidateThreat:  return new ParamMeta( 3f, 0f, 10f, 20f, 1f);
                 case BossParam.PoisonStackCap:    return new ParamMeta( 5f, 1f, 12f, 20f, 1f);
                 case BossParam.MirrorReflectCap:  return new ParamMeta( 9f, 0f, 15f, 20f, 1.5f);
@@ -290,10 +282,6 @@ namespace AutoTest
 
         public static bool IsBoss(string id)
             => !string.IsNullOrEmpty(id) && id.StartsWith("boss_layer", StringComparison.Ordinal);
-
-        /// <summary>妙覚 (覚者最終形態)。 サドンデス専用のため真我は無効化・学習対象外。</summary>
-        public const string MyokakuId = "boss_layer7_p7";
-        public static bool IsMyokaku(string id) => id == MyokakuId;
 
         public static string KeyFor(string id) => id;
 
@@ -378,7 +366,10 @@ namespace AutoTest
         public static float BaseDiceExpected(string id)
         {
             var e = EnemyDatabase.Get(id);
-            if (e == null || e.diceCount <= 0 || e.diceMaxValue <= 0) return 0f;
+            if (e == null) return 0f;
+            // 攻撃ロール方式なら範囲の期待値、 旧ダイス方式なら個数×平均。
+            if (e.UsesAttackRoll) return e.AttackRollExpected;
+            if (e.diceCount <= 0 || e.diceMaxValue <= 0) return 0f;
             return DiceE(e.diceCount, e.diceMaxValue);
         }
 
@@ -428,7 +419,7 @@ namespace AutoTest
             { "boss_layer5_hidden", new[] { 4, 5, 5, 6, 6, 7 } },
             // 6層 灰燼の王「薄火のダイス」: 上寄り 平均6.67 ×5 = E33.3 (+灰塵の威圧+3で実効E36)
             { "boss_layer6",        new[] { 4, 6, 7, 7, 8, 8 } },
-            // 7層 覚者「往生呪のダイス」: 高い床 平均8.5 ×5 = E42.5 (プレイヤー1T目天井に匹敵)
+            // 7層 ヴェスカ「往生呪のダイス」: 高い床 平均8.5 ×5 = E42.5 (プレイヤー1T目天井に匹敵)
             { "boss_layer7",        new[] { 7, 8, 8, 9, 9, 9 } },
         };
 
@@ -540,7 +531,13 @@ namespace AutoTest
 
         // ===== 適用 =====
 
-        /// <summary>ボスなら maxHP override と diceExpected を反映した複製を返す。</summary>
+        /// <summary>ボスなら maxHP override と diceExpected を反映した複製を返す。
+        ///
+        /// **戻り値は複製とは限らない。** 非ボス、 およびボスでも調整値が一つも無い場合は
+        /// 引数をそのまま (= EnemyDatabase の共有インスタンスを) 返す。 複製が保証されるのは
+        /// 署名ダイスボスだけ。 **戻り値を書き換える側は自分で <see cref="EnemyData.Clone"/> すること。**
+        /// (2026-08-04: この戻り値を複製と誤認して直接書き換えた結果、 敵 HP が遭遇ごとに
+        ///  複利で膨らみ int を溢れさせた事故がある)</summary>
         public static EnemyData Apply(EnemyData e)
         {
             if (e == null || !IsBoss(e.id)) return e;

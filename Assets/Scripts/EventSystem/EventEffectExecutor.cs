@@ -70,6 +70,18 @@ namespace EventSystem
                     result.log.Add($"HP→{run.playerHP}");
                     break;
 
+                // 現在HPの半分を支払う。 **端数は残す側へ切り上げ、 最低 1 を保証**するので
+                // この効果単体では死なない。 HP を固定値 1 にする旧「災厄の予兆」は、
+                // 高HPほど代償が軽くなる上に直後の雑魚戦でほぼ確実に死ぬため置き換えた
+                // (2026-08-04: 全ランの 29.4% がこの経路で死亡していた)。
+                case EventEffectType.HpHalve:
+                {
+                    int before = run.playerHP;
+                    run.playerHP = Mathf.Max(1, (before + 1) / 2);
+                    result.log.Add($"現在HPの半分を支払った ({before} → {run.playerHP})");
+                    break;
+                }
+
                 case EventEffectType.MaxHpDelta:
                     run.playerMaxHP = Mathf.Max(1, run.playerMaxHP + eff.amount);
                     run.playerHP = Mathf.Min(run.playerHP, run.playerMaxHP);
@@ -82,14 +94,17 @@ namespace EventSystem
                     // 1/5 デノミ: イベント記載の値を素直に /5 (差を残すため Mathf.Max(1, ...))。
                     // 例: +15→+3, +8→+2, +6→+1, +5→+1, +3→+1, +1→+1
                     //     -5→-1, -1→-1
+                    // **2026-08-10 経済リスケール**: 収入 ×3 / 支出 ×5。
+                    //   旧 1/5 デノミの除算を、 収入は ×3/5、 支出 (負の delta) は等倍へ。
+                    //   イベント記載値は 1/5 デノミ**前**のスケールで書かれている。
                     if (delta > 0)
                     {
-                        delta = Mathf.Max(1, Mathf.RoundToInt(delta / 5f));
+                        delta = Mathf.Max(1, Mathf.RoundToInt(delta * 3f / 5f));
                         delta = GameLoop.LastStand.FilterGoldGain(run, delta);
                     }
                     else if (delta < 0)
                     {
-                        delta = -Mathf.Max(1, Mathf.RoundToInt(-delta / 5f));
+                        delta = -Mathf.Max(1, Mathf.RoundToInt(-delta));
                     }
                     run.coins = Mathf.Max(0, run.coins + delta);
                     result.log.Add($"ゴールド{delta:+0;-0} (現在 {run.coins})");
@@ -98,11 +113,9 @@ namespace EventSystem
 
                 case EventEffectType.HungerDelta:
                 {
-                    // 飢餓→希望統合(ADR-0002): 旧「空腹度±N」を希望±N へ。食通の懐刀は希望獲得+1。
+                    // 飢餓→希望統合(ADR-0002): 旧「空腹度±N」を希望±N へ。
+                    // (食通の懐刀 +1 フックは 2026-07-18 アイテム削除に伴い除去)
                     int amount = eff.amount;
-                    if (amount > 0 && run != null && run.OwnsPassive("食通の懐刀"))
-                        amount += 1;
-
                     if (amount > 0) GameLoop.HopeSystem.Recover(run, amount);
                     else if (amount < 0) GameLoop.HopeSystem.Reduce(run, -amount);
                     result.log.Add($"希望{amount:+0;-0} (現在 {run.hope}/{run.hopeCap})");
@@ -112,8 +125,6 @@ namespace EventSystem
                 case EventEffectType.HopeDelta:
                 {
                     int amount = eff.amount;
-                    if (amount > 0 && run != null && run.OwnsPassive("食通の懐刀"))
-                        amount += 1;
                     if (amount > 0) GameLoop.HopeSystem.Recover(run, amount);
                     else if (amount < 0) GameLoop.HopeSystem.Reduce(run, -amount);
                     result.log.Add($"希望{amount:+0;-0} (現在 {run.hope}/{run.hopeCap})");
@@ -172,7 +183,7 @@ namespace EventSystem
                         : eff.param;
                     if (!string.IsNullOrEmpty(id))
                     {
-                        run.ownedConsumables.Add(id);
+                        run.TryAddConsumable(id);
                         result.log.Add($"消費アイテム獲得: {ResolveLabel(id)}");
                     }
                     break;
@@ -191,6 +202,11 @@ namespace EventSystem
                 case EventEffectType.GainFlag:
                     run.ownedFlags.Add(eff.param);
                     result.log.Add($"フラグアイテム獲得: {eff.param}");
+                    break;
+
+                case EventEffectType.ObservatoryTakeCopy:
+                    GameLoop.ObservatoryState.TakeCopy();
+                    result.log.Add("観測所の写しを持ち帰った");
                     break;
 
                 case EventEffectType.DiscardFlag:
@@ -233,33 +249,12 @@ namespace EventSystem
             }
         }
 
-        /// <summary>サーカス団引渡しイベントの実行。 サーカス団契約 Lv に応じた windfall を支払い、 契約を解除する。
-        /// 報酬テーブル (Lv=1/2/3):
-        ///   ゴールド = 25 / 50 / 90
-        ///   希望      = +10 / +20 / +30
-        /// 仕様: docs/specs/contracts.md「9. 捨て子のサーカス団」</summary>
+        /// <summary>[廃止] サーカス団引渡し。 旅団契約システムを 2026-08-11 に削除したため、
+        /// 引き渡す契約自体が存在しない。 効果種別は enum 順序維持のため残置し、 実行は無効。
+        /// 起点イベント〈別れのキャラバン〉もフラグ[サーカス団同行]が立たないので発生しない。</summary>
         private static void ExecuteCircusHandover(RunState run, ExecutionResult result)
         {
-            if (run == null) return;
-            var mgr = GameLoop.Contracts.ContractManager.Instance;
-            var circus = mgr.Find(run, GameLoop.Contracts.ContractKind.OrphanCircus);
-            if (circus == null)
-            {
-                result.log.Add("→ サーカス団との契約なし (引渡し不可)");
-                return;
-            }
-            int level = circus.level;
-            int gold = level == 1 ? 25 : level == 2 ? 50 : 90;
-            int hope = level == 1 ? 10 : level == 2 ? 20 : 30;
-
-            run.coins += gold;
-            GameLoop.HopeSystem.Recover(run, hope);
-            run.circusHandedOver = true;
-
-            // 契約を任意解除 (同層失効プールにも入れる)
-            mgr.Cancel(run, GameLoop.Contracts.ContractKind.OrphanCircus);
-
-            result.log.Add($"→ サーカス団引渡し (Lv{level}): ゴールド +{gold} / 希望 +{hope}");
+            result.log.Add("→ (廃止) サーカス団引渡し");
         }
 
         private static void ExecuteProbability(EventEffect eff, RunState run, HungerSystem hunger, ExecutionResult result)
@@ -271,7 +266,7 @@ namespace EventSystem
             for (int i = 0; i < eff.branchWeights.Count; i++) total += eff.branchWeights[i];
             if (total <= 0f) return;
 
-            float r = Random.value * total;
+            float r = GameLoop.GameRng.Value("EventEffectExecutor.1") * total;
             int picked = eff.branches.Count - 1;
             for (int i = 0; i < eff.branchWeights.Count; i++)
             {
@@ -293,6 +288,35 @@ namespace EventSystem
         }
 
         /// <summary>ItemDatabase から指定カテゴリのアイテムをレア度重み付きで1個選出（イベント限定は除外）。</summary>
+        /// <summary>〈さびれた観測所〉で写しを持ち帰っていた場合の**上乗せ報酬（固定）**。
+        ///
+        /// <para><b>選択肢にはしない。</b> 4 つ目の択にすると通常択と排他になり、
+        /// パッシブ (最も厚い通貨・実測で 2 個 = 7層到達率 +10.5pt) が
+        /// むしろ 1 個減る、という逆転が起きていた。 ラン跨ぎで持ち越した見返りなので
+        /// **どの択を選んでも上乗せで入る**形にする。</para>
+        ///
+        /// <para>付与ロジックを GameManager 側に書き写さず、 ここに置いて
+        /// <see cref="PickRandomItemId"/> と獲得時ボーナスを共用する ──
+        /// 書き写すと抽選プールや取得時処理が静かに食い違う。</para></summary>
+        public static void GrantObservatoryCopyBonus(GameLoop.RunState run)
+        {
+            if (run == null) return;
+            var result = new ExecutionResult();
+
+            string id = PickRandomItemId(ItemCategory.Passive, run);
+            if (!string.IsNullOrEmpty(id))
+            {
+                InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(run, id);
+                ApplyPassiveAcquisitionBonus(run, id, result);
+            }
+            run.weaponMaterials += 8;
+            GameLoop.GoldIncome.Gain(run, 60, "観測所の写し");
+            run.playerHP = run.playerMaxHP;
+
+            UnityEngine.Debug.Log($"[観測所] 写しの上乗せ: パッシブ{(string.IsNullOrEmpty(id) ? "なし" : ResolveLabel(id))}"
+                                + " / 素材+8 / ゴールド+60 / 全回復");
+        }
+
         private static string PickRandomItemId(ItemCategory category, GameLoop.RunState run = null)
         {
             var db = ItemDatabase.Instance;
@@ -334,8 +358,7 @@ namespace EventSystem
             {
                 case "決意":
                 {
-                    int gain = GameLoop.LastStand.FilterGoldGain(run, 1);
-                    run.coins += gain;
+                    int gain = GameLoop.GoldIncome.Gain(run, 1, "イベント(決意)");
                     result.log.Add($"決意の獲得ボーナス: +{gain}ゴールド");
                     break;
                 }
@@ -345,7 +368,7 @@ namespace EventSystem
                     result.log.Add("根拠のない確信が芽吹いた (確信段階1)。エリート撃破毎に成長する。");
                     break;
                 }
-                case "鋼の心臓":
+                case "脈なしの鋼心臓":
                 {
                     int gain = GameLoop.LastStand.FilterMaxHPGain(run, 20);
                     if (gain > 0)

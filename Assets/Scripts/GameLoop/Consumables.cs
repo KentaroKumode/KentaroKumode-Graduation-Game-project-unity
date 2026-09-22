@@ -31,7 +31,7 @@ namespace GameLoop
         public static bool TryUseRapier(RunState run)
         {
             if (run == null || run.ownedPassiveItems == null
-                || !run.ownedPassiveItems.Contains("chevalier_rapier")) return false;
+                || !run.ownedPassiveItems.Contains(ItemIds.ChevalierRapier)) return false;
             var ctx = ActiveCtx();
             if (ctx == null) { Debug.Log("[レイピア] 戦闘外では使用不可"); return false; }
             if (ctx.consumablesLocked) { Debug.Log("[レイピア] 死翔により使用不可"); return false; }
@@ -51,8 +51,8 @@ namespace GameLoop
                 // 会心+9 補正は サン=ジョリオラ撃破済みのランでのみ付与
                 if (run.defeatedSaintGeorges)
                 {
-                    ctx.nextTurnBuffs["criticalBonus"] = 9;
-                    Debug.Log("[レイピア] コントラタック解除: 次T ダイス+1 / クリティカル+9 (真の決闘術)");
+                    ctx.nextTurnBuffs[InventorySystem.PassiveSkills.CombatContext.CritRateBuffKey] = 0.50f;
+                    Debug.Log("[レイピア] コントラタック解除: 次T ダイス+1 / 会心率+50% (真の決闘術)");
                 }
                 else
                 {
@@ -60,6 +60,25 @@ namespace GameLoop
                 }
             }
             return true;
+        }
+
+        /// <summary>[計装 2026-09-14] ヴェスカ連戦の<b>段別</b>消耗品使用数
+        /// (index 0=p1 / 1=p2 / 2=p3 / 3=p4)。
+        ///
+        /// <para><b>「p1〜p3 は致命傷にならないだけで、 消耗はさせているのか」を分けるため。</b>
+        /// 段の勝率 (p1 100% / p2 99.9% / p3 98.6%) だけを見ると何もしていないように読めるが、
+        /// 通貨は HP と消耗品なので、 そこを数えないと結論が出せない。</para></summary>
+        public static readonly long[] VescaPhaseConsumables = new long[4];
+        public static void ResetVescaPhaseStats()
+        { System.Array.Clear(VescaPhaseConsumables, 0, VescaPhaseConsumables.Length); }
+
+        private static void NoteVescaPhaseUse()
+        {
+            var c = ActiveCtx();
+            string b = c != null ? c.bossId : null;
+            if (string.IsNullOrEmpty(b) || !b.StartsWith(BossIds.Layer7Prefix)) return;
+            int i = b.EndsWith("_p4") ? 3 : b.EndsWith("_p3") ? 2 : b.EndsWith("_p2") ? 1 : 0;
+            VescaPhaseConsumables[i]++;
         }
 
         /// <summary>所持から id を1つ消費し効果適用。意味があった場合 true。</summary>
@@ -79,9 +98,11 @@ namespace GameLoop
             if (ok)
             {
                 run.ownedConsumables.Remove(id);
+                MetaProgression.Achievements.AchievementService.NoteConsumableUsed();
                 // 覚者「悟達の試練」用: 当ターン アクション発生をマーク
                 var actCtx = ActiveCtx();
                 if (actCtx != null) actCtx.consumablesUsedThisTurn = true;
+                NoteVescaPhaseUse();
                 Debug.Log($"[Consumables] 使用: {id}");
             }
             return ok;
@@ -98,94 +119,73 @@ namespace GameLoop
 
             switch (id)
             {
-                // ===== 即時回復: 最大HPの割合（戦闘中はctx、外はrun） =====
-                case "cons_heal_1": return HealPct(run, ctx, 0.25f);
-                case "cons_heal_2": return HealPct(run, ctx, 0.50f);
-                case "cons_heal_3": return HealPct(run, ctx, 0.75f);
-                case "cons_heal_4": return HealPct(run, ctx, 1.00f);
+                // ===== 3 系統 × Tier1〜4 (2026-08-04 再編。 詳細と経緯は ItemIds.ConsHealFamily 近傍) =====
+                //   **Tier 軸は効果量のみ。持続は全 Tier「その戦闘中」で固定。**
+                //   旧設計は「効果量↓ × 持続↑」だったため実効量が戦闘の長さで逆転し、
+                //   通常戦では高 Tier ほど弱いという状態になっていた。
 
-                // ===== 攻撃力: 使用ターンの勝利時に与ダメ+X（単発） =====
-                case "cons_atk_1": return SetBurst(run, ctx, 3);
-                case "cons_atk_2": return SetBurst(run, ctx, 6);
-                case "cons_atk_3": return SetBurst(run, ctx, 9);
-                case "cons_atk_4": return SetBurst(run, ctx, 15);
+                // 回復: 最大HP割合の即時回復
+                case "小回復薬": return HealPct(run, ctx, 0.25f);
+                case "回復薬": return HealPct(run, ctx, 0.40f);
+                case "上回復薬": return HealPct(run, ctx, 0.60f);
+                case "完全回復薬": return HealPct(run, ctx, 1.00f);
 
-                // ===== ダイス補正: 勝敗のみ+X（ダメージ非加算・次2戦闘ずっと） =====
-                case "cons_dice_1": return AddInt(run, ctx, "dice", 1, durationBattles: 2);
-                case "cons_dice_2": return AddInt(run, ctx, "dice", 2, durationBattles: 2);
-                case "cons_dice_3": return AddInt(run, ctx, "dice", 3, durationBattles: 2);
-                case "cons_dice_4": return AddInt(run, ctx, "dice", 4, durationBattles: 2);
+                // シールド: 戦闘中持続 (expireTurn=-1)。 **戦闘中にも使用できる** ──
+                //   通常戦が 3〜4T になり「削られてから張る」判断が成立するようになったため。
+                case "木の護符": return AddShield(run, ctx, 15);
+                case "鉄の護符": return AddShield(run, ctx, 30);
+                case "銀の護符": return AddShield(run, ctx, 50);
+                case "惜別の護符": return AddShield(run, ctx, 80);
 
-                // ===== シールド: 吸収量 / 残ターン(-1=無制限) =====
-                case "cons_shield_1": return SetShield(run, ctx, 8, 2);
-                case "cons_shield_2": return SetShield(run, ctx, 18, 4);
-                case "cons_shield_3": return SetShield(run, ctx, 35, 6);
-                case "cons_shield_4": return SetShield(run, ctx, 50, -1);
+                // 攻撃強化: 与ダメ +X% (その戦闘中)。 outgoingDamageMultiplier は**加算プール**
+                //   (実測 ×2.00) なので、 +75% でも最終与ダメは ×1.375 に薄まる。
+                case "鬼火の油": return AddTimedDmgMult(run, ctx, 15, -1);
+                case "燐の油": return AddTimedDmgMult(run, ctx, 30, -1);
+                case "業火の膏薬": return AddTimedDmgMult(run, ctx, 50, -1);
+                case "天火の膏薬": return AddTimedDmgMult(run, ctx, 75, -1);
 
-                // ===== 継続回復: 初期X、毎ターン終了時+X→X-- =====
-                case "cons_regen_1": return SetRegen(run, ctx, 5);
-                case "cons_regen_2": return SetRegen(run, ctx, 7);
-                case "cons_regen_3": return SetRegen(run, ctx, 9);
-                case "cons_regen_4": return SetRegen(run, ctx, 12);
+                // 希望回復: +5/10/15/20 (2026-08-05 追加)。 **上限は伸びず、 現在値だけ戻す。**
+                //   希望は横移動 -5 / 戦闘 -N と一方的に減るだけで回復源が無かった。
+                //   前哨基地での自動回復 (減少分の20%) は毎層リセットになり、 発狂到達率が
+                //   15.6% → 0.4% と資源性を失ったので棄却。 **ゴールドを払う形**に置き換えた。
+                case "湯気の立つ椀": return RecoverHope(run, 5);
+                case "古い手紙": return RecoverHope(run, 10);
+                case "凱旋の記憶": return RecoverHope(run, 15);
+                case "希望の欠片": return RecoverHope(run, 20);
 
-                // ===== 会心率+X(/9)（次2戦闘ずっと） =====
-                case "cons_crit_1": return AddInt(run, ctx, "crit", 1, durationBattles: 2);
-                case "cons_crit_2": return AddInt(run, ctx, "crit", 2, durationBattles: 2);
-                case "cons_crit_3": return AddInt(run, ctx, "crit", 3, durationBattles: 2);
-                case "cons_crit_4": return AddInt(run, ctx, "crit", 4, durationBattles: 2);
-
-                // ===== 定数軽減: 被ダメ毎ターン-X（次2戦闘ずっと） =====
-                case "cons_reduce_1": return AddInt(run, ctx, "reduce", 1, durationBattles: 2);
-                case "cons_reduce_2": return AddInt(run, ctx, "reduce", 2, durationBattles: 2);
-                case "cons_reduce_3": return AddInt(run, ctx, "reduce", 3, durationBattles: 2);
-                case "cons_reduce_4": return AddInt(run, ctx, "reduce", 5, durationBattles: 2);
-
-                // ===== 食料: 希望を回復（飢餓→希望統合・ADR-0002・戦闘外専用） =====
-                case "cons_food_1": return RestoreHope(10);
-                case "cons_food_2": return RestoreHope(20);
-                case "cons_food_3": return RestoreHope(30);
-                case "cons_food_4": return RestoreHope(45);
-
-                // ===== ユニーク =====
-                case "uniq_phil_stone":  // 賢者の石(2026-06-04): GOLD変換を廃止し、無条件で強化素材+1（最大5回/ラン）。
-                {                        // ※変動サイズ素材の実装後は「ランダムサイズ1個」に拡張。
+                // ===== 賢者の石: 10ゴールドを武器強化素材1に変換 (最大5回/ラン) =====
+                case ItemIds.PhilStone:
+                {
                     if (run.philStoneUsed >= 5) return false;
                     run.weaponMaterials++; run.philStoneUsed++;
                     return true;
                 }
-                case "uniq_forge_elixir": // 鍛冶の霊薬: 武器を1段階無償強化（次Tier→無ければ限界突破）
-                    return GameLoop.GameManager.TryUpgradeWeapon(run, free: true);
-                case "uniq_mirror":       // 鏡写しの水晶: 被メインダメ反射（全戦闘）
-                    return SetBool(run, ctx, "reflect");
-                case "uniq_gambler":      // 賭博師のダイス: 50%全最大/50%全1
-                    return SetBool(run, ctx, "gambler");
-                case "uniq_ambush":       // 奇襲の発煙筒: 敵開始HP-15%（戦闘開始時のみ）
+
+                // 2026-06-28: 職業スターター消耗品 4 種 (剣士/騎士/狂戦士/暗殺者)
+                case ClassStarter.PolishId: // 瞬間研磨剤 (剣士): 次の 1 撃だけ 与ダメージ+150%
+                    if (ctx != null) ctx.polishArmed = true;
+                    else run.pendingPolishArmed = true;
+                    return true;
+
+                case ClassStarter.OathId: // 不抜の聖紋 (騎士): HP 80% 維持中 被ダメ -40% (戦闘内のみ意味あり)
                     if (ctx != null)
                     {
-                        int cut = Mathf.CeilToInt(ctx.enemyMaxHP * 0.15f);
-                        ctx.enemyCurrentHP = Mathf.Max(1, ctx.enemyCurrentHP - cut);
-                        return true;
+                        // 戦闘中使用なら直ちに装着。 現 HP が既に 80% 未満なら oathBroken で実質無効
+                        ctx.oathArmed = true;
+                        if (ctx.playerMaxHP > 0 && ctx.playerCurrentHP * 5 < ctx.playerMaxHP * 4)
+                            ctx.oathBroken = true;
                     }
-                    run.pendingEnemyStartHpCutPct = 15; return true;
-                case "uniq_food_horn":    // 満腹の角笛: 希望を大きく回復（飢餓→希望統合・ADR-0002）
-                    return RestoreHope(25);
-                case "uniq_appraise":     // 鑑定の眼鏡: 次の宝箱/ショップ最低レアSILVER
-                    run.nextLootMinRarity = (int)ItemRarity.SILVER;
+                    else run.pendingOathArmed = true;
                     return true;
-                case "uniq_merchant_bell":// 商人の鈴: 次ショップ全価格半額
-                    run.nextShopHalfPrice = true;
+
+                case ClassStarter.PainkillerId: // 痛覚遮断剤 (狂戦士): 戦闘中使用専用
+                    if (ctx == null) { Debug.Log("[痛覚遮断剤] 戦闘外では使用不可"); return false; }
+                    ctx.painkillerArmedThisTurn = true;
                     return true;
-                case "uniq_oni_oil":      // 鬼火の油: 与ダメ+50%（全戦闘）
-                    return AddInt(run, ctx, "dmgmult", 50);
-                case "uniq_earth_guard":  // 鉄壁の土塊: 被ダメ毎ターン-3（全戦闘）
-                    return AddInt(run, ctx, "reduce", 3);
-                case "uniq_haste_powder": // 加速の粉: 初回(次)ロールのダイス合計+5
-                    if (ctx != null)
-                    {
-                        ctx.nextTurnBuffs["diceBonus"] =
-                            (ctx.nextTurnBuffs.TryGetValue("diceBonus", out var db) ? db : 0f) + 5f;
-                    }
-                    else run.pendingFirstRollTotal += 5;
+
+                case ClassStarter.DaggerId: // 仕込み刃 (暗殺者): 次のロール敗北で無効化+反射
+                    if (ctx != null) ctx.daggerArmed = true;
+                    else run.pendingDaggerArmed = true;
                     return true;
 
                 default:
@@ -197,6 +197,8 @@ namespace GameLoop
 
         private static bool HealPct(RunState run, CombatContext ctx, float pct)
         {
+            // T4-A〈破綻〉: 全ての回復量 −25% (§15-2 v3.0)。
+            pct *= MetaProgression.MetaDebuffApplicator.GetHealMultiplier();
             if (ctx != null)
             {
                 var cm = CombatManager.Instance;
@@ -207,28 +209,78 @@ namespace GameLoop
             }
             if (run.playerHP >= run.playerMaxHP) return false;
             int a = Mathf.CeilToInt(run.playerMaxHP * pct);
+            a = MetaProgression.MetaDebuffApplicator.ApplyJudgmentHealReduction(a, run);
+            int before = run.playerHP;
             run.playerHP = Mathf.Min(run.playerMaxHP, run.playerHP + a);
+            MetaProgression.MetaDebuffApplicator.NoteHeal(a, run.playerHP - before, run);
             return true;
         }
 
-        private static bool SetBurst(RunState run, CombatContext ctx, int x)
+        /// <summary>攻撃バフ (cons_atk_*)。 ダイス合計+bonus を turns ターン持続 (-1=戦闘中永続)。
+        /// 既存バフより短ければ turns は延長のみ、 bonus は加算。</summary>
+        private static bool AddTimedDice(RunState run, CombatContext ctx, int bonus, int turns)
         {
-            if (ctx != null) ctx.consAtkBurst = Mathf.Max(ctx.consAtkBurst, x);
-            else run.pendingConsAtkBurst = Mathf.Max(run.pendingConsAtkBurst, x);
+            if (ctx != null)
+            {
+                ctx.consDiceRoll += bonus;
+                if (turns == -1 || ctx.consDiceRollTurnsLeft == -1) ctx.consDiceRollTurnsLeft = -1;
+                else ctx.consDiceRollTurnsLeft = Mathf.Max(ctx.consDiceRollTurnsLeft, turns);
+            }
+            else if (run != null)
+            {
+                run.pendingConsDiceRoll += bonus;
+                if (turns == -1 || run.pendingConsDiceRollTurns == -1) run.pendingConsDiceRollTurns = -1;
+                else run.pendingConsDiceRollTurns = Mathf.Max(run.pendingConsDiceRollTurns, turns);
+            }
             return true;
         }
 
-        private static bool SetShield(RunState run, CombatContext ctx, int amt, int turns)
+        /// <summary>与ダメ倍率バフ (cons_dmg_*)。 outgoing +pct% を turns ターン持続 (-1=戦闘中永続)。</summary>
+        private static bool AddTimedDmgMult(RunState run, CombatContext ctx, int pct, int turns)
         {
-            if (ctx != null) { int g = Mathf.Max(0, amt - ctx.healShieldReduction); ctx.consShield = g; ctx.shieldGainedTotal += g; ctx.consShieldExpireTurn = turns; } // 天衣無縫減衰＋検証計測
-            else { run.pendingConsShield = amt; run.pendingConsShieldTurns = turns; }
+            if (ctx != null)
+            {
+                ctx.consDmgMultPct += pct;
+                if (turns == -1 || ctx.consDmgMultTurnsLeft == -1) ctx.consDmgMultTurnsLeft = -1;
+                else ctx.consDmgMultTurnsLeft = Mathf.Max(ctx.consDmgMultTurnsLeft, turns);
+            }
+            else if (run != null)
+            {
+                run.pendingConsDmgMultPct += pct;
+                if (turns == -1 || run.pendingConsDmgMultTurns == -1) run.pendingConsDmgMultTurns = -1;
+                else run.pendingConsDmgMultTurns = Mathf.Max(run.pendingConsDmgMultTurns, turns);
+            }
             return true;
         }
 
-        private static bool SetRegen(RunState run, CombatContext ctx, int x)
+        /// <summary>希望回復 (cons_hope_*)。 **上限 hopeCap でクランプされ、 上限自体は伸びない。**
+        /// 佯狂者の冠で希望0固定中は <see cref="HopeSystem.Recover"/> 側が弾く。
+        /// 既に満タンなら消費させない (false を返す) ── 無駄撃ちを防ぐ。</summary>
+        private static bool RecoverHope(RunState run, int amount)
         {
-            if (ctx != null) ctx.consRegen = Mathf.Max(ctx.consRegen, x);
-            else run.pendingConsRegen = Mathf.Max(run.pendingConsRegen, x);
+            if (run == null) return false;
+            if (run.hope >= run.hopeCap) return false;
+            int before = run.hope;
+            HopeSystem.Recover(run, amount);
+            return run.hope > before;
+        }
+
+        /// <summary>開幕シールド (cons_def_*)。 戦闘中持続 (expireTurn=-1)、 天衣無縫減衰を適用。</summary>
+        private static bool AddShield(RunState run, CombatContext ctx, int amount)
+        {
+            if (ctx != null)
+            {
+                int gained = Mathf.Max(0, amount - ctx.healShieldReduction);
+                ctx.consShield += gained;
+                CombatSystem.ShieldDiag.Note("消耗品", gained);
+                ctx.shieldGainedTotal += gained;
+                ctx.consShieldExpireTurn = -1;
+            }
+            else if (run != null)
+            {
+                run.pendingConsShield += amount;
+                run.pendingConsShieldTurns = -1;
+            }
             return true;
         }
 
@@ -241,7 +293,7 @@ namespace GameLoop
                 switch (kind)
                 {
                     case "dice":    ctx.consDiceRoll += v; break;
-                    case "crit":    ctx.consCrit += v; break;
+                    case "crit":    ctx.consCritPct += v / 100f; break;   // v は % 表記
                     case "reduce":  ctx.consFlatReduce += v; break;
                     case "dmgmult": ctx.consDmgMultPct += v; break;
                 }
@@ -252,7 +304,7 @@ namespace GameLoop
                     switch (kind)
                     {
                         case "dice":   run.pendingConsDiceRoll = v;     run.pendingConsDiceRollBattles    = Mathf.Max(run.pendingConsDiceRollBattles, carry); break;
-                        case "crit":   run.pendingConsCrit = v;         run.pendingConsCritBattles        = Mathf.Max(run.pendingConsCritBattles, carry); break;
+                        case "crit":   run.pendingConsCritPct = v / 100f;         run.pendingConsCritBattles        = Mathf.Max(run.pendingConsCritBattles, carry); break;
                         case "reduce": run.pendingConsFlatReduce = v;   run.pendingConsFlatReduceBattles  = Mathf.Max(run.pendingConsFlatReduceBattles, carry); break;
                     }
                 }
@@ -263,7 +315,7 @@ namespace GameLoop
                 {
                     case "dice":    run.pendingConsDiceRoll += v;
                                     run.pendingConsDiceRollBattles    = Mathf.Max(run.pendingConsDiceRollBattles, durationBattles); break;
-                    case "crit":    run.pendingConsCrit += v;
+                    case "crit":    run.pendingConsCritPct += v / 100f;
                                     run.pendingConsCritBattles        = Mathf.Max(run.pendingConsCritBattles, durationBattles); break;
                     case "reduce":  run.pendingConsFlatReduce += v;
                                     run.pendingConsFlatReduceBattles  = Mathf.Max(run.pendingConsFlatReduceBattles, durationBattles); break;
@@ -273,54 +325,31 @@ namespace GameLoop
             return true;
         }
 
-        private static bool SetBool(RunState run, CombatContext ctx, string kind)
-        {
-            if (ctx != null)
-            {
-                if (kind == "reflect") ctx.consReflect = true;
-                else if (kind == "gambler") ctx.gamblerArmed = true;
-            }
-            else
-            {
-                if (kind == "reflect") run.pendingConsReflect = true;
-                else if (kind == "gambler") run.pendingGamblerDice = true;
-            }
-            return true;
-        }
-
-        private static bool RestoreHope(int amount)
-        {
-            var run = GameManager.Instance?.Run;
-            if (run == null) return false;
-            HopeSystem.ApplyFood(run, amount);
-            return true;
-        }
+        // 2026-08-04: RestoreHope は cons_food_* 専用だったため、 同系統の廃止とあわせて削除。
 
         // ===== ボット支援: 種別判定 =====
 
-        /// <summary>戦闘開始直後に使うべきバフ系（攻撃/ダイス/シールド/会心/軽減/継続/鬼火/反射/賭博/奇襲）か。</summary>
+        /// <summary>戦闘開始直後に使うべきバフ系（攻撃/防御/与ダメ倍率）か。</summary>
         public static bool IsCombatBuff(string id)
         {
             if (string.IsNullOrEmpty(id)) return false;
-            return id.StartsWith("cons_atk_") || id.StartsWith("cons_dice_")
-                || id.StartsWith("cons_shield_") || id.StartsWith("cons_regen_")
-                || id.StartsWith("cons_crit_") || id.StartsWith("cons_reduce_")
-                || id == "uniq_mirror" || id == "uniq_gambler" || id == "uniq_ambush"
-                || id == "uniq_oni_oil" || id == "uniq_earth_guard" || id == "uniq_haste_powder";
+            // cons_atk_* は 2026-08-04 の再編で廃止 (与ダメ% の cons_dmg_* へ統合)。
+            var fam = ItemIds.ConsFamilyOf(id);
+            return fam == ItemIds.ConsShieldFamily || fam == ItemIds.ConsPowerFamily;
         }
 
         /// <summary>緊急回復に使える即時回復系か。</summary>
-        public static bool IsHeal(string id) => !string.IsNullOrEmpty(id) && id.StartsWith("cons_heal_");
+        public static bool IsHeal(string id) => ItemIds.ConsFamilyOf(id) == ItemIds.ConsHealFamily;
 
         /// <summary>id の即時回復割合（heal系以外は0）。</summary>
         public static float HealRatio(string id)
         {
             switch (id)
             {
-                case "cons_heal_1": return 0.25f;
-                case "cons_heal_2": return 0.50f;
-                case "cons_heal_3": return 0.75f;
-                case "cons_heal_4": return 1.00f;
+                case "小回復薬": return 0.25f;
+                case "回復薬": return 0.40f;
+                case "上回復薬": return 0.60f;
+                case "完全回復薬": return 1.00f;
                 default: return 0f;
             }
         }
@@ -351,44 +380,8 @@ namespace GameLoop
             return pick != null && Use(run, pick);
         }
 
-        /// <summary>id が食料（希望回復）系か。</summary>
-        public static bool IsFood(string id)
-            => !string.IsNullOrEmpty(id) && (id.StartsWith("cons_food_") || id == "uniq_food_horn");
-
-        /// <summary>食料の希望回復量（食料以外は0）。</summary>
-        public static int FoodHopeAmount(string id)
-        {
-            switch (id)
-            {
-                case "cons_food_1": return 10;
-                case "cons_food_2": return 20;
-                case "cons_food_3": return 30;
-                case "cons_food_4": return 45;
-                case "uniq_food_horn": return 25;
-                default: return 0;
-            }
-        }
-
-        /// <summary>希望が上限未満なら、不足を最も無駄なく埋める食料を1個使って希望を回復する。使ったら true。
-        /// 佯狂者の冠で希望0固定中は発狂狙いのため回復しない（浪費回避）。bot/オートランナー用。</summary>
-        public static bool TryUseBestFood(RunState run)
-        {
-            if (run?.ownedConsumables == null || run.ownedConsumables.Count == 0) return false;
-            if (run.crownHopeLocked) return false; // 発狂固定中は回復不可＝浪費しない
-            int missing = run.hopeCap - run.hope;
-            if (missing <= 0) return false;
-
-            string bestCover = null; int bestCoverA = int.MaxValue;
-            string bestAny = null;   int bestAnyA = -1;
-            foreach (var id in run.ownedConsumables)
-            {
-                int a = FoodHopeAmount(id);
-                if (a <= 0) continue;
-                if (a >= missing && a < bestCoverA) { bestCover = id; bestCoverA = a; }
-                if (a > bestAnyA) { bestAny = id; bestAnyA = a; }
-            }
-            string pick = bestCover ?? bestAny;
-            return pick != null && Use(run, pick);
-        }
+        // 2026-08-04: 食料 (希望回復) 系 cons_food_* を廃止。 消費アイテムを
+        //   回復 / シールド / 攻撃強化 の 3 系統に絞ったため、 IsFood / FoodHopeAmount /
+        //   TryUseBestFood もここで削除した。 希望の回復手段はイベント・報酬側に残っている。
     }
 }

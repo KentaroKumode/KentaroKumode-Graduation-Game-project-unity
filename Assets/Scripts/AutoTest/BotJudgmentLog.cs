@@ -38,6 +38,9 @@ namespace AutoTest
         /// <summary>マーカー直下に1ブロックを差し込む (新しいエントリほど上に来る)。</summary>
         public static void Append(string entryMarkdown)
         {
+            // **並列ワーカーは書かない** (2026-09-22)。 測定専用のプロセスで、 22 本が同じファイルへ
+            //   追記して共有違反を起こしていた (ビルド直下に 18MB)。 変化の記録は親の自動周回が行う。
+            if (AutoTest.ParallelSweep.RankMarginWorkerBootstrap.IsWorkerProcess) return;
             try
             {
                 string path = LogPath;

@@ -112,9 +112,9 @@ namespace InventorySystem
                     if (cells[i] != null)
                     {
                         Vector3 offset = new Vector3(
-                            Random.Range(-shakeIntensity, shakeIntensity),
+                            GameLoop.GameRng.RangeAuto("GridExpansionManager.1", -shakeIntensity, shakeIntensity),
                             0,
-                            Random.Range(-shakeIntensity, shakeIntensity)
+                            GameLoop.GameRng.RangeAuto("GridExpansionManager.2", -shakeIntensity, shakeIntensity)
                         );
                         cells[i].transform.position = originalPositions[i] + offset;
                     }

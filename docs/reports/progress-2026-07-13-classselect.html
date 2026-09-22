@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>進捗報告 — 出自選択画面 & 戦闘リデザイン</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --paper: #eef1ef; --panel: #ffffff; --ink: #22313a; --ink-soft: #5b6b73;
+    --line: #c4ccc9; --ok: #2f7a58; --warn: #b46a1e; --risk: #c62828; --plan: #4a6f8a;
+  }
+  body {
+    background: var(--paper); color: var(--ink);
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", Meiryo, sans-serif;
+    line-height: 1.8; margin: 0; padding: 2.5rem 1.25rem 4rem;
+  }
+  main { max-width: 100rem; margin: 0 auto; }
+  /* 横長レイアウト: 広い画面では図と表を横並び、狭い画面では自動で縦積み */
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(28rem, 1fr)); gap: 1rem; align-items: start; }
+  .row > * { margin-top: 0 !important; margin-bottom: 0 !important; min-width: 0; }
+  .row .mermaid-wrap svg { min-width: 0 !important; }
+  .eyebrow {
+    font-family: Consolas, monospace; font-size: .75rem; letter-spacing: .14em;
+    color: var(--ink-soft); text-transform: uppercase;
+  }
+  h1 { font-size: 1.5rem; margin: .2rem 0 1rem; }
+
+  /* ---- サマリーカード ---- */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: .8rem; margin: 1.2rem 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: .8rem 1rem; border-top: 3px solid var(--line); }
+  .card.ok { border-top-color: var(--ok); }
+  .card.warn { border-top-color: var(--warn); }
+  .card.plan { border-top-color: var(--plan); }
+  .card .label { font-size: .72rem; letter-spacing: .08em; color: var(--ink-soft); }
+  .card .value { font-size: 1.05rem; font-weight: 700; margin-top: .1rem; }
+  .card .sub { font-size: .78rem; color: var(--ink-soft); margin-top: .2rem; }
+
+  /* ---- 目次 ---- */
+  nav.toc { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: .7rem 1.1rem; font-size: .85rem; }
+  nav.toc ol { margin: .2rem 0; padding-left: 1.3rem; }
+  nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--line); }
+  nav.toc .tag { margin-left: .5rem; }
+
+  /* ---- セクション ---- */
+  section { margin-top: 3rem; }
+  .sec-head { display: flex; align-items: baseline; gap: .7rem; border-bottom: 2px solid var(--line); padding-bottom: .35rem; margin-bottom: 1rem; }
+  .sec-head .no { font-family: Consolas, monospace; font-size: 1.3rem; font-weight: 700; color: var(--ink-soft); }
+  .sec-head h2 { font-size: 1.15rem; margin: 0; }
+  .sec-head .kind { font-size: .7rem; letter-spacing: .1em; padding: .1rem .55rem; border-radius: 3px; color: #fff; }
+  .kind-impl { background: var(--ok); }
+  .kind-design { background: var(--warn); }
+  .kind-plan { background: var(--plan); }
+  h3 { font-size: .95rem; margin: 1.6rem 0 .5rem; color: var(--ink-soft); }
+  .lead { margin: .2rem 0 1rem; }
+
+  /* ---- 図・表 ---- */
+  .mermaid-wrap { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 1rem; overflow-x: auto; margin: .8rem 0; }
+  table { border-collapse: collapse; width: 100%; font-size: .85rem; background: var(--panel); border: 1px solid var(--line); }
+  th, td { text-align: left; padding: .45rem .8rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: .74rem; color: var(--ink-soft); letter-spacing: .05em; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  .tag { display: inline-block; font-size: .7rem; padding: .02rem .5rem; border-radius: 3px; border: 1px solid; font-weight: 600; white-space: nowrap; }
+  .tag-ok { color: var(--ok); border-color: var(--ok); }
+  .tag-warn { color: var(--warn); border-color: var(--warn); }
+  .tag-plan { color: var(--plan); border-color: var(--plan); }
+  .tag-todo { color: var(--ink-soft); border-color: var(--line); }
+  code { font-family: Consolas, monospace; font-size: .85em; background: rgba(127,127,127,.12); padding: .05rem .3rem; border-radius: 3px; }
+  ul { padding-left: 1.4rem; }
+  li { margin-bottom: .3rem; }
+  a { color: var(--warn); }
+  .note { font-size: .82rem; color: var(--ink-soft); }
+
+  /* ---- 折りたたみ (副次情報) ---- */
+  details { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; margin: .7rem 0; }
+  details summary { cursor: pointer; padding: .55rem 1rem; font-size: .88rem; font-weight: 600; color: var(--ink-soft); user-select: none; }
+  details summary:hover { color: var(--ink); }
+  details[open] summary { border-bottom: 1px solid var(--line); }
+  details .inner { padding: .8rem 1rem; }
+  details table { border: none; }
+
+  /* ---- PDF / 印刷 (A4 横) ---- */
+  @page { size: A4 landscape; margin: 10mm 12mm; }
+  @media print {
+    body { padding: 0; background: #fff; font-size: 12px; line-height: 1.6; }
+    main { max-width: none; }
+    section { break-before: page; margin-top: 0; }
+    section#impl { break-before: auto; }
+    .cards, nav.toc { break-inside: avoid; }
+    .mermaid-wrap, table, .card, details { break-inside: avoid; }
+    .mermaid-wrap { overflow: visible; }
+    .mermaid-wrap svg, svg { max-height: 165mm; width: auto; max-width: 100%; }
+    details summary { list-style: none; }
+    details summary::-webkit-details-marker { display: none; }
+    a { color: inherit; text-decoration: none; }
+    .note a::after { content: ""; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Progress Report / 2026-07-13〜14</div>
+  <h1>出自選択画面 実装 & 戦闘リデザイン設計</h1>
+
+  <!-- ================= 現在地サマリー ================= -->
+  <div class="cards">
+    <div class="card ok">
+      <div class="label">実装</div>
+      <div class="value">出自選択画面 完成</div>
+      <div class="sub">Papers Please 風 / ページめくり / 出自テキストまで動作</div>
+    </div>
+    <div class="card warn">
+      <div class="label">設計決定</div>
+      <div class="value">ADR-0008 / 0009 確定</div>
+      <div class="sub">疑似3D 描画規約 + 戦闘コア刷新 (5本柱)</div>
+    </div>
+    <div class="card plan">
+      <div class="label">次の関門</div>
+      <div class="value">AutoRunner シミュレート</div>
+      <div class="sub">通過で ADR-0009 が Accepted → W2〜 実装へ</div>
+    </div>
+  </div>
+
+  <nav class="toc">
+    <b>目次</b>
+    <ol>
+      <li><a href="#impl">出自選択画面</a><span class="tag tag-ok">実装済</span></li>
+      <li><a href="#design">戦闘リデザイン — ルールの設計 (ADR-0009)</a><span class="tag tag-warn">確定・検証待ち</span></li>
+      <li><a href="#board">描画規約と盤面レイアウト — 見た目の設計 (ADR-0008 / W1)</a><span class="tag tag-plan">規約確定・実測待ち</span></li>
+      <li><a href="#tasks">残タスクと依存関係</a></li>
+      <li><a href="#next">直近のアクション</a></li>
+    </ol>
+  </nav>
+
+  <!-- ================= 1. 実装 ================= -->
+  <section id="impl">
+    <div class="sec-head"><span class="no">1</span><h2>出自選択画面（旧・職業選択）</h2><span class="kind kind-impl">実装</span></div>
+    <p class="lead">タイトル PLAY → 出自選択 → StartNewRun のフローで動作確認済み。LCD リグ（X=3000 ゾーンカメラ → RT 転写）方式。
+       名称は職業選択から出自選択に変更（仕様の正本: <code>docs/specs/class-system.md</code>）。</p>
+
+    <table>
+      <thead><tr><th>機能</th><th>状態</th></tr></thead>
+      <tbody>
+        <tr><td>4 出自タブ（剣士/騎士/狂戦士/暗殺者）土台+アイコン重ね・折り畳み・3 段バウンド</td><td><span class="tag tag-ok">完了</span></td></tr>
+        <tr><td>キャラ票（本スプライト・左端接地）/ 詳細タブ / 受理スタンプ（押下演出+印影）</td><td><span class="tag tag-ok">完了</span></td></tr>
+        <tr><td><b>ページめくり演出</b> — 切替時に本のページ 2 コマでめくる（スキン登録・未登録時はスライドにフォールバック）</td><td><span class="tag tag-ok">完了</span></td></tr>
+        <tr><td><b>職業名の描き文字</b> — nameSprites 登録職業はテキストの代わりにスプライト表示（共通+職業別オフセット）</td><td><span class="tag tag-ok">完了</span></td></tr>
+        <tr><td>スキンアセット（ScriptableObject / PPU=8 / dot 座標調整）・デバッグモード <code>debugStayOnStamp</code></td><td><span class="tag tag-ok">完了</span></td></tr>
+      </tbody>
+    </table>
+
+    <details>
+      <summary>開発中に潰した不具合と教訓（4 件 + PPU 事件)</summary>
+      <div class="inner">
+      <pre class="mermaid">
+flowchart TD
+    P1["クリック不通"] --> S1["Cell_4_1 が LCD Quad より手前で Raycast を奪う<br>→ LcdPointer を RaycastAll + surfaceCollider 判定に変更"]
+    P2["UI が 4 重生成"] --> S2["旧シーン残骸 + ExecuteAlways<br>→ Awake で全子破棄 + 再ビルド"]
+    P3["折り畳み後に復帰不能"] --> S3["破棄済み Transform 参照の残留<br>→ Build 冒頭で _tabs.Clear()"]
+    P4["本が描画されない"] --> S4["book/book2/book3 の PPU が 8100 (入力ミス)<br>→ PPU=8 に修正。新素材インポート時の要注意点"]
+      </pre>
+      <p class="note">RaycastAll の教訓は ADR-0008 の「新設クリック対象は専用レイヤー <code>BoardInput</code> を切る」に反映済み。
+         テキストが指定色より薄く見える件は LCD シェーダの仕様（Lcd/Scanline が全体を ×1.12 補正 + 走査線減光）── 対処保留中。</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ================= 2. 設計決定 ================= -->
+  <section id="design">
+    <div class="sec-head"><span class="no">2</span><h2>戦闘リデザイン — ルールの設計（ADR-0009）</h2><span class="kind kind-design">設計</span></div>
+    <p class="lead">「プレイスキルの介入余地を増やす」議論の結論。<b>何を選ばせ、何が起こるか</b>のルール面はすべて本章
+       ── 描画・盤面配置などの見た目の話は §3 に分離した。Status は Proposed（AutoRunner シミュレート通過で Accepted）。</p>
+
+    <h3>棄却の経緯 — 勝負判定案がダメだった理由</h3>
+    <p>勝負判定の上に配線を載せる案は構造欠陥の連鎖で<b>棄却</b>し、相互攻撃モデルを採択した。</p>
+    <div class="row">
+    <div class="mermaid-wrap">
+    <pre class="mermaid">
+flowchart TD
+    A["勝負判定 + 配線"] -->|"敵合計が見えると<br>逆算の算数に退化"| B["対策: 情報切断"]
+    B -->|"敗北ダメ=差 のため<br>攻撃が軽減まで三役"| C["対策: 敗北ダメを差から分離"]
+    C -->|"純軽減は盤面を進めず<br>ジリ貧の罠択"| D["対策: 分岐ベット化"]
+    D -->|"パッチ3枚は<br>アーキテクチャ不適のシグナル"| E["採択: 相互攻撃モデル<br>+ 段階エスカレーション"]
+    style A fill:#ffebee,stroke:#c62828
+    style E fill:#e8f5e9,stroke:#2f7a58
+    </pre>
+    </div>
+
+    <table>
+      <thead><tr><th>柱</th><th>一言で</th></tr></thead>
+      <tbody>
+        <tr><td><b>1. ダイス配線</b></td><td>ロール後、出目を端子（攻撃/ブロック/充電/<b>特殊</b>）へ割り当て。<b>配線は次ターンも残る</b>・未配置は攻撃へ自動合流（テンポ規約）。特殊端子はショップ商品 11 種（[接続制限 N]=同時接続ダイス数の上限、2026-07-14 確定。職業固有端子は廃止）</td></tr>
+        <tr><td><b>2. 相互攻撃モデル</b></td><td>毎ターン両者が攻撃。自攻撃=武器素火力+攻撃端子出目 / 敵攻撃=敵基礎値+<b>敵ダイスロール</b>−ブロック出目。<b>ロール勝負は完全廃止</b>（2026-07-14）── トリガー層は「収支」（与ダメ−被ダメ）に置換、OnRollWin/Lose を収支±に再定義。勝敗表示は収支表示へ</td></tr>
+        <tr><td><b>3. 完全情報テレグラフ</b></td><td>敵攻撃値・スケール段階を全公開。「被弾を効率よく受ける」レース判断が熟練の中身</td></tr>
+        <tr><td><b>4. 段階エスカレーション</b></td><td>敵攻撃値が T5/10/15/20 でスケール。ラッシュ=HP 前払い / グラインド=スケール後払い。敵別プロファイル</td></tr>
+        <tr><td><b>5. パッシブ電力経済</b></td><td>パッシブ=電源を要する装置。充電端子（<b>ダイス個数</b>参照・最大10）から毎ターン維持費を消費、不足で全停止</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>配線先の効果（柱1+5 の全体像）</h3>
+    <div class="mermaid-wrap">
+    <pre class="mermaid">
+flowchart TD
+    R["🎲 自ダイス（最大5系統）"] --> ATK["攻撃端子"]
+    R --> BLK["ブロック端子"]
+    R --> CHG["充電端子"]
+    R --> CLS["特殊端子"]
+    R -.->|"未配置は自動合流"| ATK
+    ATK --> A2["自攻撃 +出目合計<br>（高い目の定席）"]
+    BLK --> B2["敵攻撃 −出目合計<br>（敵攻撃値に合わせる）"]
+    CHG --> C2["充電 +ダイス個数<br>（屑目の定席・出目不問）"]
+    CLS --> D2["ショップで購入した端子を装着<br>重攻撃/完全防御/出血/治癒/決死/急所<br>照準/蓄電池/冷却材/鋳造口/反攻 (11種)"]
+    style ATK fill:#ffebee,stroke:#c62828
+    style BLK fill:#e3f2fd,stroke:#1565c0
+    style CHG fill:#fff8e1,stroke:#b46a1e
+    style CLS fill:#f3e5f5,stroke:#7b1fa2
+    </pre>
+    </div>
+    <p class="note">出目の高低で端子ごとに定席ができるため、悪いロールにも采配の余地が残る。
+       第三端子候補 10 案とチップ販売案は充電端子への統一で棄却済み。</p>
+
+    <h3>レイヤリング原則（2026-07-14 確定）</h3>
+    <p><b>ダイス=物理のみ（個数/面数・ロジックなし） / 端子=変換 / パッシブ=常時装置（要電力）</b>の 3 層に固定。
+       ダイス側パッシブは廃止し、既存 7 種（完全/星導/運命/星命/永劫/貪欲/諸刃）はパッシブアイテムへ転生。
+       あわせて<b>「見えない補正の禁止」</b>: パッシブは LED の出目を書き換えない（例外は表示が実際に変わる「出目操作」カテゴリのみ）
+       ── 「LED に見えている出目 = 配線に使える値」を常に真にし、収支プレビューの信頼性を保証する。</p>
+
+    <h3>ターン構造（2026-07-14 確定・8 段）</h3>
+    <div class="mermaid-wrap">
+    <pre class="mermaid">
+flowchart LR
+    S0["0 ターン開始<br>充電消費/DoT"] --> S1["1 敵ロール<br>攻撃合計 確定"]
+    S1 --> S2["2 予告<br>敵攻撃値/段階"]
+    S2 --> S3["3 自ロール"]
+    S3 --> S4["4 リロール<br>(任意・配線前のみ)"]
+    S4 --> S5["5 配線<br>収支プレビュー"]
+    S5 --> S6["6 解決<br>自攻撃→敵攻撃"]
+    S6 --> S7["7 ターン終了"] --> S1
+    style S2 fill:#e3f2fd,stroke:#1565c0
+    style S5 fill:#fff8e1,stroke:#b46a1e
+    style S6 fill:#ffebee,stroke:#c62828
+    </pre>
+    </div>
+    <p class="note">敵が先に振って<b>実値を予告</b>し、プレイヤーが応手する（分布への賭けではなく実値への応手）。
+       充電消費が予告より前なのは、停電の有無が確定しないと配線の収支計算が立たないため。
+       解決はプレイヤー先制・撃破時は敵攻撃なし。旧ルール「振り直し後の配線変更不可」は廃止。</p>
+
+    <details>
+      <summary>柱5（電力経済）の確定仕様 Q&amp;A — 6 論点</summary>
+      <div class="inner">
+      <table>
+        <thead><tr><th>論点</th><th>決定</th></tr></thead>
+        <tbody>
+          <tr><td>不足時の挙動</td><td><b>全停止</b>。呪い・デメリット系も止まる（停電悪用はニッチとして許容）</td></tr>
+          <tr><td>課税範囲</td><td>全パッシブ系統。ただし<b>デバフは消費数 N に数えない</b></td></tr>
+          <tr><td>停止範囲</td><td><b>戦闘中トリガーのみ</b>。OnMapMove / CombatEnd 系は免税</td></tr>
+          <tr><td>消費量の確定</td><td><b>ターン開始時の通電対象所持数</b>。毎ターン再計算 = 寂照/迷妄の枚数変動にも自動追従</td></tr>
+          <tr><td>消費予測の表示</td><td>計器盤の充電ゲージで<b>消費予定分の目盛りが点滅</b></td></tr>
+          <tr><td>残る宿題</td><td>数値のみ（N / 最大ゲージ / 初期充電 / スケール傾斜）→ AutoRunner スイープで決定</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </details>
+
+    <p class="note">正本: <code>docs/adr/0009-mutual-attack-combat.md</code>（棄却理由も制約として記録）。
+       影響: DAMAGE_CALC_REFERENCE 全面改訂 / enemies.json に攻撃値+プロファイル新設 / ADR-0005/0006 は Accepted 時に superseded。</p>
+  </section>
+
+  <!-- ================= 3. 盤面計画 ================= -->
+  <section id="board">
+    <div class="sec-head"><span class="no">3</span><h2>描画規約と盤面レイアウト（ADR-0008 / W1）</h2><span class="kind kind-plan">計画</span></div>
+    <p class="lead">§2 のルールを<b>どこに・どう描くか</b>の章。描画ゾーン規約（ADR-0008）とその適用としての机上配置図をまとめる。</p>
+
+    <h3>描画ゾーン規約（ADR-0008・確定）</h3>
+    <ul>
+      <li><b>LCD 内</b> = 平行投影・dot 厳守（<b>読む情報</b>: 敵インテント / ダメージプレビュー / フェーズ画面）</li>
+      <li><b>ワールド</b> = 透視 + 2D スプライトの 3D 空間配置＝疑似3D を許可（<b>触る装置</b>: ダイス / 端子 / 配線）。UI 改修がスプライト差し替えで済む構造にする</li>
+      <li>判定基準: <b>数値・テキストは LCD、機械の部品として実在してほしいクリック対象はワールド</b>。跨る表現は入力=ワールド / 出力=LCD に分割</li>
+      <li>棚卸しでの発見: <b>HP/空腹/希望/ターンの本番 UI は未実装</b>（IMGUI デバッグのみ）→ 盤上「計器盤」を新設。GOLD は物理コイン（CoinSystem）で表示済み = 新造不要</li>
+    </ul>
+
+    <h3>机上配置図（提案版・座標実測待ち）</h3>
+    <p><b>緑実線=既存、橙破線=新規、青破線=カメラと動線</b>。</p>
+
+    <div class="mermaid-wrap">
+    <svg viewBox="0 0 1000 660" role="img" aria-label="机上配置の俯瞰図" style="display:block;min-width:720px;width:100%;height:auto;font-family:inherit;">
+      <rect x="30" y="20" width="940" height="560" rx="10" fill="#e3ddd0" stroke="#b8ad97" stroke-width="2"/>
+      <text x="46" y="44" font-size="13" fill="#5b6b73">机（ワールド・透視 worldCamera）</text>
+      <polygon points="500,652 260,50 740,50" fill="none" stroke="#4a6f8a" stroke-width="1.5" stroke-dasharray="7 5" opacity="0.75"/>
+      <text x="500" y="645" font-size="12" text-anchor="middle" fill="#4a6f8a">▲ worldCamera（戦闘中フレーム＝破線内に LCD+計器+ダイス+配線盤）</text>
+      <rect x="330" y="55" width="340" height="130" rx="4" fill="#ffffff" stroke="#2f7a58" stroke-width="2.5"/>
+      <text x="500" y="105" font-size="15" text-anchor="middle" font-weight="bold" fill="#22313a">LCD 区画</text>
+      <text x="500" y="126" font-size="11" text-anchor="middle" fill="#5b6b73">フェーズ画面（231×139 dot RT）</text>
+      <text x="500" y="143" font-size="11" text-anchor="middle" fill="#5b6b73">新規: 敵インテント / ダメージプレビュー / 確定パネル</text>
+      <rect x="330" y="205" width="340" height="56" rx="4" fill="none" stroke="#b46a1e" stroke-width="2" stroke-dasharray="6 4"/>
+      <text x="352" y="228" font-size="13" font-weight="bold" fill="#b46a1e">計器盤（新設）</text>
+      <text x="352" y="248" font-size="11" fill="#5b6b73">HP ｜ 空腹 ｜ 希望 ｜ ターン+閾値ランプ ｜ 充電ゲージ(消費予定点滅)</text>
+      <rect x="290" y="280" width="420" height="130" rx="4" fill="none" stroke="#2f7a58" stroke-width="2"/>
+      <text x="306" y="302" font-size="13" font-weight="bold" fill="#2f7a58">ダイス卓（既存）</text>
+      <text x="330" y="330" font-size="11" fill="#5b6b73">敵</text>
+      <g fill="#ffffff" stroke="#c4ccc9">
+        <rect x="350" y="314" width="24" height="24" rx="3"/><rect x="382" y="314" width="24" height="24" rx="3"/><rect x="414" y="314" width="24" height="24" rx="3"/><rect x="446" y="314" width="24" height="24" rx="3"/><rect x="478" y="314" width="24" height="24" rx="3"/>
+      </g>
+      <text x="330" y="382" font-size="11" fill="#5b6b73">自</text>
+      <g fill="#ffffff" stroke="#22313a" stroke-width="1.5">
+        <rect x="350" y="364" width="24" height="24" rx="3"/><rect x="382" y="364" width="24" height="24" rx="3"/><rect x="414" y="364" width="24" height="24" rx="3"/><rect x="446" y="364" width="24" height="24" rx="3"/><rect x="478" y="364" width="24" height="24" rx="3"/>
+      </g>
+      <rect x="540" y="314" width="150" height="74" rx="3" fill="#ffffff" stroke="#2f7a58" stroke-width="1.5"/>
+      <text x="615" y="345" font-size="11" text-anchor="middle" fill="#22313a">合計モニター</text>
+      <text x="615" y="366" font-size="11" text-anchor="middle" fill="#5b6b73" font-family="Consolas,monospace">DiceMonitorDisplay</text>
+      <rect x="290" y="425" width="420" height="130" rx="4" fill="none" stroke="#b46a1e" stroke-width="2" stroke-dasharray="6 4"/>
+      <text x="306" y="447" font-size="13" font-weight="bold" fill="#b46a1e">配線盤（新設）</text>
+      <path d="M362,388 L362,455 L370,500" fill="none" stroke="#b46a1e" stroke-width="3"/>
+      <path d="M394,388 L394,455 L398,500" fill="none" stroke="#b46a1e" stroke-width="3"/>
+      <path d="M426,388 L426,460 L460,500" fill="none" stroke="#b46a1e" stroke-width="1.2"/>
+      <path d="M458,388 L458,460 L530,500" fill="none" stroke="#b46a1e" stroke-width="1.2"/>
+      <path d="M490,388 L490,455 L600,500" fill="none" stroke="#b46a1e" stroke-width="1.2"/>
+      <g font-size="10.5" text-anchor="middle" fill="#22313a">
+        <rect x="352" y="500" width="52" height="34" rx="3" fill="#ffffff" stroke="#b46a1e" stroke-width="2"/>
+        <text x="378" y="521">攻撃</text>
+        <rect x="434" y="500" width="52" height="34" rx="3" fill="#ffffff" stroke="#b46a1e" stroke-width="1.2"/>
+        <text x="460" y="521">ブロック</text>
+        <rect x="504" y="500" width="52" height="34" rx="3" fill="#ffffff" stroke="#b46a1e" stroke-width="1.2"/>
+        <text x="530" y="521">充電</text>
+        <rect x="574" y="500" width="52" height="34" rx="3" fill="#ffffff" stroke="#b46a1e" stroke-width="1.2"/>
+        <text x="600" y="521">特殊</text>
+        <rect x="644" y="500" width="52" height="34" rx="3" fill="#ffffff" stroke="#c4ccc9" stroke-width="1.2" stroke-dasharray="3 3"/>
+        <text x="670" y="521" fill="#5b6b73">蓋</text>
+      </g>
+      <text x="378" y="548" font-size="9.5" text-anchor="middle" fill="#5b6b73">← 未配置は自動合流（太線=常灯）</text>
+      <rect x="55" y="200" width="215" height="300" rx="4" fill="none" stroke="#2f7a58" stroke-width="2"/>
+      <text x="71" y="224" font-size="13" font-weight="bold" fill="#2f7a58">収納区画（既存）</text>
+      <g fill="#ffffff" stroke="#c4ccc9">
+        <rect x="80" y="240" width="30" height="30"/><rect x="114" y="240" width="30" height="30"/><rect x="148" y="240" width="30" height="30"/><rect x="182" y="240" width="30" height="30"/>
+        <rect x="80" y="274" width="30" height="30"/><rect x="114" y="274" width="30" height="30"/><rect x="148" y="274" width="30" height="30"/><rect x="182" y="274" width="30" height="30"/>
+        <rect x="80" y="308" width="30" height="30"/><rect x="114" y="308" width="30" height="30"/><rect x="148" y="308" width="30" height="30"/><rect x="182" y="308" width="30" height="30"/>
+      </g>
+      <text x="162" y="365" font-size="11" text-anchor="middle" fill="#5b6b73">インベントリグリッド</text>
+      <rect x="80" y="385" width="165" height="90" rx="3" fill="#ffffff" stroke="#c4ccc9"/>
+      <text x="162" y="425" font-size="11" text-anchor="middle" fill="#5b6b73">アイテムプレビュー</text>
+      <text x="162" y="443" font-size="11" text-anchor="middle" fill="#5b6b73">(3D テキスト)</text>
+      <rect x="730" y="200" width="215" height="300" rx="4" fill="none" stroke="#2f7a58" stroke-width="2"/>
+      <text x="746" y="224" font-size="13" font-weight="bold" fill="#2f7a58">経済区画（既存）</text>
+      <rect x="755" y="240" width="80" height="60" rx="3" fill="#ffffff" stroke="#c4ccc9"/>
+      <text x="795" y="275" font-size="11" text-anchor="middle" fill="#5b6b73">ディスペンサー</text>
+      <circle cx="870" cy="330" r="22" fill="#ffffff" stroke="#c4ccc9"/>
+      <circle cx="880" cy="322" r="22" fill="#ffffff" stroke="#c4ccc9"/>
+      <text x="875" y="372" font-size="11" text-anchor="middle" fill="#5b6b73">コインスタック = GOLD</text>
+      <rect x="755" y="420" width="80" height="44" rx="3" fill="#ffffff" stroke="#c4ccc9"/>
+      <text x="795" y="447" font-size="11" text-anchor="middle" fill="#5b6b73">チケット</text>
+      <g font-size="13" font-weight="bold">
+        <circle cx="312" cy="120" r="12" fill="#4a6f8a"/><text x="312" y="125" text-anchor="middle" fill="#eef1ef">1</text>
+        <circle cx="268" cy="350" r="12" fill="#4a6f8a"/><text x="268" y="355" text-anchor="middle" fill="#eef1ef">2</text>
+        <circle cx="268" cy="490" r="12" fill="#4a6f8a"/><text x="268" y="495" text-anchor="middle" fill="#eef1ef">3</text>
+        <circle cx="692" cy="120" r="12" fill="#4a6f8a"/><text x="692" y="125" text-anchor="middle" fill="#eef1ef">4</text>
+      </g>
+    </svg>
+    </div>
+    <p>視線動線は <b>① LCD（インテント確認）→ ② ダイス卓（出目）→ ③ 配線盤（采配・介入時のみ）→ ④ LCD（プレビュー・確定）</b> の Z 字。計器盤は ①↔② の中間に置く。</p>
+    <p class="note">実測メモ: エディットモードで確認済みの構図は「上からほぼ真下を見下ろす卓上ガジェット」（LCD Quad はほぼ水平・俯角 72°・FOV 29）。
+       ダイス/モニター/グリッドは実行時生成のため、正確な座標は Play 中の再計測待ち。</p>
+
+    <details>
+      <summary>区画・レイヤー・入力経路の一覧</summary>
+      <div class="inner">
+      <table>
+        <thead><tr><th>区画</th><th>収容要素</th><th>状態</th><th>レイヤー案</th><th>入力</th></tr></thead>
+        <tbody>
+          <tr><td>LCD 区画</td><td>LCD Quad（RT 転写面）</td><td><span class="tag tag-ok">既存</span></td><td><code>Default</code> + 面Collider</td><td>LcdPointer</td></tr>
+          <tr><td>ダイス卓</td><td>LED ダイス 自5/敵5・合計モニター</td><td><span class="tag tag-ok">既存</span></td><td>→ <code>BoardInput</code> 層へ移設</td><td>BoardPointer (W5)</td></tr>
+          <tr><td>配線盤</td><td>端子 4 + 予備枠 1（攻/ブロック/充電/特殊/蓋）・配線絵・信号演出</td><td><span class="tag tag-warn">新規</span></td><td><code>BoardInput</code> 層（新設）</td><td>BoardPointer (W5)</td></tr>
+          <tr><td>計器盤</td><td>HP / 空腹 / 希望 / ターン+閾値ランプ / 充電ゲージ</td><td><span class="tag tag-warn">新規</span></td><td><code>Default</code>（入力なし）</td><td>なし</td></tr>
+          <tr><td>経済区画</td><td>ディスペンサー / コインスタック / チケット</td><td><span class="tag tag-ok">既存</span></td><td>現状維持</td><td>既存経路</td></tr>
+          <tr><td>収納区画</td><td>グリッド / プレビュー / ツールチップ</td><td><span class="tag tag-ok">既存</span></td><td>現状維持（Cell 干渉に注意）</td><td>既存経路</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </details>
+
+    <details>
+      <summary>W1 の内訳（W1-a〜g）と決定/未決事項</summary>
+      <div class="inner">
+      <table>
+        <thead><tr><th>ID</th><th>内容</th></tr></thead>
+        <tbody>
+          <tr><td><b>W1-a</b></td><td>机上の区画割り — 6 区画に整理（上の俯瞰図）</td></tr>
+          <tr><td><b>W1-b</b></td><td>計器盤の新設 — HP/空腹/希望/ターンの常設計器 + 充電ゲージ。DiceLED/DiceMonitorDisplay の描画資産を流用</td></tr>
+          <tr><td><b>W1-c</b></td><td>配線盤 — 端子は物理最大 5 枠固定・未開放は蓋絵。extraDice 6 個目以降は自動合流。デフォルト経路は太線/常灯</td></tr>
+          <tr><td><b>W1-d</b></td><td>視線動線 — Z 字。計器盤は動線の中間</td></tr>
+          <tr><td><b>W1-e</b></td><td>カメラ — 戦闘中画角に中央 4 区画が収まること。カメラ揺れと端子クリック精度の検証</td></tr>
+          <tr><td><b>W1-f</b></td><td>干渉チェック — <code>BoardInput</code> 専用レイヤー新設 / コイン物理の流入防止 / 3D テキストとの表示排他</td></tr>
+          <tr><td><b>W1-g</b></td><td>成果物 — 机上配置図 1 枚を正とする（提案版済み・実測待ち）</td></tr>
+        </tbody>
+      </table>
+      <ul class="note" style="margin-top:.6rem">
+        <li><b>決定</b>: 配線盤は自ダイス列の手前 / 端子 5 枠固定 / 専用レイヤー新設</li>
+        <li><b>未決</b>: 計器盤の表現配分（LED バー vs セグメント数字）/ 敵側配線盤の要否（現提案は不要）</li>
+        <li><b>未実測</b>: 全座標・worldCamera 画角 → Play 実測後に確定版へ</li>
+      </ul>
+      </div>
+    </details>
+  </section>
+
+  <!-- ================= 4. 残タスク ================= -->
+  <section id="tasks">
+    <div class="sec-head"><span class="no">4</span><h2>残タスクと依存関係</h2></div>
+
+    <h3>ワールド側実装（W1〜W10）— 着手順は番号順、W7 が山場</h3>
+    <div class="mermaid-wrap">
+    <pre class="mermaid">
+flowchart TD
+    W1["W1 盤面レイアウト<br>📐 提案図済・実測待ち"] --> W2["W2 スロット端子実体化"]
+    W1 --> W3["W3 配線パターン描画"]
+    W2 --> W4["W4 状態ハイライト"]
+    W2 --> W5["W5 BoardPointer 入力"]
+    W1 --> W6["W6 LEDダイス選択対応"]
+    T5["全体#5 配線データ設計"] --> W7["W7 配線永続化+戦闘接続<br>⚠️ ADR-0009 実装の本体"]
+    W5 --> W7
+    W6 --> W7
+    W7 --> W8["W8 転送演出<br>同配線ターンは省略"]
+    W9["W9 3D敵着弾演出<br>独立・並行可"]
+    T3["全体#3 素材規約"] --> W10["W10 素材制作"]
+    style W1 fill:#e8f5e9,stroke:#2f7a58
+    style W7 fill:#ffebee,stroke:#c62828
+    style W9 fill:#f3e5f5,stroke:#7b1fa2
+    </pre>
+    </div>
+
+    <details>
+      <summary>W1〜W10 の内容一覧</summary>
+      <div class="inner">
+      <table>
+        <thead><tr><th>ID</th><th>タスク</th><th>内容</th></tr></thead>
+        <tbody>
+          <tr><td><b>W1</b></td><td>盤面レイアウト設計</td><td>§3 参照（提案版済み・実測で確定）</td></tr>
+          <tr><td><b>W2</b></td><td>スロット端子の実体化</td><td>端子スプライト + BoxCollider。パッシブ由来端子は装備構成から動的生成</td></tr>
+          <tr><td><b>W3</b></td><td>配線パターン描画</td><td>ダイス列 → 各端子の経路絵。接続状態で表示切替</td></tr>
+          <tr><td><b>W4</b></td><td>状態ハイライト</td><td>通常/選択中/接続可/接続済/ロックを色・明度・差し替えで（localScale 禁止）</td></tr>
+          <tr><td><b>W5</b></td><td>BoardPointer 入力（新設）</td><td>worldCamera レイ → Collider 解決。RaycastAll + フィルタ。2 クリック割り当て</td></tr>
+          <tr><td><b>W6</b></td><td>LED ダイスの選択対応</td><td>Collider + 選択点滅。DiceLEDManager に選択/転送 API</td></tr>
+          <tr><td><b>W7</b></td><td>配線永続化 + 戦闘接続 ⚠️</td><td>配線マップを CombatContext/RunState に保持、ADR-0009 のダメージパイプラインを実装。DAMAGE_CALC_REFERENCE 更新対象</td></tr>
+          <tr><td><b>W8</b></td><td>転送演出</td><td>消灯 → 光走り → 端子点灯。0.15〜0.2 秒・スキップ可・同配線ターンは省略</td></tr>
+          <tr><td><b>W9</b></td><td>3D 敵着弾演出</td><td>帰属決定 → 実装。配線と独立に並行可</td></tr>
+          <tr><td><b>W10</b></td><td>素材制作</td><td>端子/配線/マット絵。光源統一・パース規約（全体#3 の策定後）</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </details>
+
+    <h3>全体タスク（LCD 側含む）</h3>
+    <table>
+      <thead><tr><th>#</th><th>タスク</th><th>状態</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Codex / SkillTree の描画経路棚卸し</td><td><span class="tag tag-todo">未着手</span></td></tr>
+        <tr><td>2</td><td>sortingOrder 帯域表の定数化</td><td><span class="tag tag-todo">未着手</span></td></tr>
+        <tr><td>3</td><td>素材制作規約（PPU=8/光源/パース角）文書化</td><td><span class="tag tag-todo">未着手</span></td></tr>
+        <tr><td>4</td><td>盤面レイアウト設計（W1）</td><td><span class="tag tag-warn">提案図まで完了・実測待ち</span></td></tr>
+        <tr><td>5</td><td>配線システムのデータ設計（スロット定義/RunState 保存）</td><td><span class="tag tag-todo">未着手・W7 の前提</span></td></tr>
+        <tr><td>6</td><td>敵インテント表示の情報設計</td><td><span class="tag tag-todo">未着手</span></td></tr>
+        <tr><td>7</td><td>3D 敵着弾演出の帰属決定</td><td><span class="tag tag-todo">未着手</span></td></tr>
+        <tr><td>8</td><td>AutoRunner シミュレート — ADR-0009 の新旧パイプライン比較（Accepted 判定条件）</td><td><span class="tag tag-todo">未着手</span></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ================= 5. 次のアクション ================= -->
+  <section id="next">
+    <div class="sec-head"><span class="no">5</span><h2>直近のアクション（推奨順）</h2></div>
+    <div class="mermaid-wrap">
+    <pre class="mermaid">
+flowchart LR
+    A["Unity Play 実測<br>→ 配置図確定"] --> D["#5 配線データ設計"]
+    B["#8 AutoRunner シミュレート<br>新旧パイプライン比較"] --> C["ADR-0009 を Accepted へ<br>（or 数値再設計）"]
+    C --> D
+    D --> E["W2〜 実装着手"]
+    </pre>
+    </div>
+    <p>W2〜W6（端子・入力・演出）はモデル非依存なので、シミュレートと並行して先行着手も可能。
+       出自選択画面側の残りは素材差し込み（肖像のドシエ版・名前スプライト）と文言確定（傭兵/携行品）のみ。</p>
+  </section>
+
+  <p class="note" style="margin-top:3rem">※ 図の描画には Mermaid (CDN) を使用 — オフライン時はコードブロック表示になります。
+     📐 <a href="https://claude.ai/code/artifact/318f8ec9-5c08-47ee-abed-2d6e49236505">机上配置図（単体版 Artifact）</a></p>
+</main>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: "neutral" });
+  // 印刷 (PDF 化) 時は折りたたみを全展開し、印刷後に元へ戻す
+  window.addEventListener("beforeprint", () => {
+    document.querySelectorAll("details").forEach(d => { d.dataset.wasOpen = d.open ? "1" : ""; d.open = true; });
+  });
+  window.addEventListener("afterprint", () => {
+    document.querySelectorAll("details").forEach(d => { d.open = d.dataset.wasOpen === "1"; });
+  });
+</script>
+</body>
+</html>

@@ -10,7 +10,35 @@ namespace MapSystem
     /// </summary>
     public class MapManager : MonoBehaviour
     {
-        public static MapManager Instance { get; private set; }
+        private static MapManager _instance;
+        private static bool _shuttingDown;
+
+        /// <summary>マップ進行の単一窓口。 アプリ終了中は null を返す。
+        ///
+        /// **getter に FindObjectOfType の復帰口がある理由 (2026-08-05):**
+        /// 再生中のスクリプト再コンパイルはドメインリロードで static だけを初期化し、
+        /// シーン上の GameObject は残す。 すると Awake が二度と走らず Instance だけが
+        /// 永久に null になり、 AutoRunner のマップ航行が進行不能のまま空回りする
+        /// (同日 Λ スイープが 200 秒間 1 ランも進まず停止した)。
+        /// GameManager と同じ CLAUDE.md のシングルトン規約に揃える。</summary>
+        public static MapManager Instance
+        {
+            get
+            {
+                if (_shuttingDown) return null;
+                if (_instance == null) _instance = FindObjectOfType<MapManager>();
+                return _instance;
+            }
+            private set { _instance = value; }
+        }
+
+        /// <summary>ドメインリロード無効設定でも static を必ず初期状態へ戻す。</summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            _instance = null;
+            _shuttingDown = false;
+        }
 
         // === 状態 ===
         public FloorMap CurrentMap { get; private set; }
@@ -29,13 +57,22 @@ namespace MapSystem
 
         void Awake()
         {
-            if (Instance != null && Instance != this)
+            if (_instance != null && _instance != this)
             {
                 Destroy(gameObject);
                 return;
             }
-            Instance = this;
+            _shuttingDown = false;
+            _instance = this;
         }
+
+        void OnDestroy()
+        {
+            // 破棄済み参照を残すと Unity の擬似 null 経由で「非 null だが使えない Instance」になる。
+            if (_instance == this) _instance = null;
+        }
+
+        void OnApplicationQuit() => _shuttingDown = true;
 
         // ================================================================
         //  公開 API
@@ -69,6 +106,34 @@ namespace MapSystem
             // Λ層では移動による空腹/飢餓は無いため、枯渇しない大きな値で初期化
             Hunger = new HungerSystem { starvationDamageRatio = 0f };
             Hunger.Initialize(99999);
+
+            OnMapGenerated?.Invoke(CurrentMap);
+        }
+
+        /// <summary>盤面を復元する。 **Ultra の worker が checkpoint から再開するためだけの口**で、
+        /// 通常のゲーム進行では呼ばれない。
+        ///
+        /// <para><see cref="GenerateFloor"/> との違いは 2 つ。 生成せずに与えられた盤面を据えること、
+        /// そして <b>視界を再計算しないこと</b> ── snapshot の <c>revealed</c> は
+        /// 「その時点でプレイヤーが何を見えていたか」の記録なので、 復元後に
+        /// <see cref="ApplyMetaSightLimit"/> を掛け直すと、 記録した可視状態を
+        /// 現在のデバフ状態で塗り替えてしまう。</para>
+        ///
+        /// <para>Hunger は <see cref="HungerSystem.SetCurrentForTest"/> で据える。 名前は test 向けだが、
+        /// 「現在値を直接置く」以外の用途がここには無い。</para></summary>
+        public void RestoreState(FloorMap map, string currentNodeId, int hungerCurrent, int hungerMax)
+        {
+            if (map == null) throw new System.ArgumentNullException(nameof(map));
+
+            CurrentMap = map;
+            CurrentNode = map.GetNode(currentNodeId) ?? map.GetNode(map.startNodeId);
+            if (CurrentNode == null)
+                throw new System.InvalidOperationException(
+                    "restored map has neither the requested node nor a start node");
+
+            Hunger = new HungerSystem { starvationDamageRatio = starvationDamageRatio };
+            Hunger.Initialize(System.Math.Max(1, hungerMax));
+            Hunger.SetCurrentForTest(hungerCurrent);
 
             OnMapGenerated?.Invoke(CurrentMap);
         }
@@ -130,11 +195,12 @@ namespace MapSystem
             return starvationDmg;
         }
 
-        /// <summary>メタデバフ Lv4 前途多難: 現在地から N ホップ先まで以外を unrevealed に。</summary>
+        /// <summary>挑戦デバフ 軸13〈戦場の霧〉/ T4-C〈暗夜〉: 現在地から N ホップ先まで以外を unrevealed に。
+        /// **limit の意味: -1 = 制限なし / 0 = 暗夜 (現在地以外すべて不可視) / N&gt;0 = N ホップ先まで。**</summary>
         private void ApplyMetaSightLimit()
         {
             int limit = MetaProgression.MetaDebuffApplicator.GetMapSightLimit();
-            if (limit <= 0 || CurrentMap == null || CurrentNode == null) return;
+            if (limit < 0 || CurrentMap == null || CurrentNode == null) return;
 
             var nodes = CurrentMap.GetAllNodes();
             // BFS で各ノードの距離を計算

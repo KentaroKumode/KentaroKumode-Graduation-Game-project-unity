@@ -5,10 +5,12 @@ namespace GameLoop
     /// <summary>
     /// 〈昇華〉システム。
     ///
-    /// 強化素材(pt)を支払い、対象パッシブの【刻印を除去する代わりに】その主効果を
-    /// 「永久パッシブ」(run.ascendedPassiveIds) としてグリッド外に付与する。グリッド枠が1個空く。
+    /// 強化素材(pt)を支払い、対象パッシブの主効果を
+    /// 「永久パッシブ」(run.ascendedPassiveIds) として枠外に付与する。所持枠が1個空く。
     ///
-    /// - 対象: 刻印を持つ Passive カテゴリのみ（刻印を対価に永久化する＝刻印無し/uniq/チェーンは不可）。
+    /// - 対象: 非ユニークの Passive カテゴリのみ（uniq_/チェーンは不可）。
+    ///   2026-08-24 まではここが「刻印を持つもの」という条件だったが、 刻印 (PassiveSigil) の
+    ///   廃止に伴い **同じ集合を指す条件** (= uniq_ で始まらない) へ置き換えた。
     /// - コスト: 逓増 n個目 = n pt（ソフトキャップ。ハードキャップ無し）。素材収入と武器強化が分母。
     /// - 任意タイミング実行可（葛藤はタイミングでなくコスト＝逓増×武器との食い合いに宿す）。
     /// - 発動: RunPassiveSync / PassiveItemManager が owned∪ascended を走査して戦闘で適用。
@@ -32,9 +34,9 @@ namespace GameLoop
             if (ownedIndex < 0 || ownedIndex >= run.ownedPassiveItems.Count) return false;
             string id = run.ownedPassiveItems[ownedIndex];
             if (string.IsNullOrEmpty(id) || Protected.Contains(id)) return false;
-            // 刻印を持つもののみ（刻印を対価に永久化）。並列配列 passiveSigils[ownedIndex] が非null。
-            if (run.passiveSigils == null || ownedIndex >= run.passiveSigils.Count
-                || run.passiveSigils[ownedIndex] == null) return false;
+            // ユニークは対象外 (旧「刻印を持つもの」と同じ集合)。
+            //   **接頭辞では判定しない** (2026-09-22) ── items.json の unique フラグを読む。
+            if (ItemIds.IsUniqueItem(id)) return false;
             // パッシブカテゴリ限定（武器/ダイス/消費は対象外）
             var def = InventorySystem.ItemDatabase.Instance?.GetItem(id);
             if (def == null) return false;
@@ -49,7 +51,7 @@ namespace GameLoop
             if (!CanSublimate(run, ownedIndex)) return false;
             string id = run.ownedPassiveItems[ownedIndex];
             int cost = Cost(run);
-            // グリッドから除去（刻印も並列配列ごと除去＝刻印消滅）
+            // 所持リストから除去
             InventorySystem.Helpers.PassiveAddHelper.RemoveAt(run, ownedIndex);
             if (run.ascendedPassiveIds == null) run.ascendedPassiveIds = new List<string>();
             run.ascendedPassiveIds.Add(id);

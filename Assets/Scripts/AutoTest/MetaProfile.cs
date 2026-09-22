@@ -59,6 +59,48 @@ namespace AutoTest
             return Path.GetFullPath(baseRoot);
         }
 
+        /// <summary>
+        /// 難易度別 Item Tier 学習の隔離領域。
+        /// 通常の policy / event / boss 学習とは混ぜず、同じメタ進行プロファイルの下へ
+        /// tier_score_0 / tier_score_30 / tier_score_50 として保存する。
+        /// </summary>
+        public static string TierLearningRoot(int challengeScore)
+        {
+            string baseRoot = Path.Combine(LearningRoot(), $"tier_score_{Mathf.Max(0, challengeScore)}");
+            return Path.GetFullPath(baseRoot);
+        }
+
+        // ============================================================
+        //  BOT のアイテム評価学習: **挑戦スコア帯ごとに分離** (2026-08-17)
+        // ============================================================
+        // 0pt で無双できるアイテムと、 高難易度で要求されるアイテムは違う。
+        // 全部を 1 つの item_stats.json へ混ぜると、 **ラン数の多い 0pt が序列を支配**し、
+        // 高難易度で本当に要る品 (回復・シールド・希望維持) が下位に沈む。
+        //
+        // 帯は 0 / 1-15 / 16-30 / 31+ の 4 つ。 実際のランは任意の pt を取りうるので
+        // 丸める必要があるが、 細かく割ると 1 帯あたりのサンプルが貯まらない。
+        //
+        // **Tier 表生成用の `tier_score_*` とは別系統。** あちらは人間が読む md を作るための
+        // 隔離領域で、 BOT の購入判断には一切入らない (2026-08-17 に取り違えた)。
+
+        /// <summary>挑戦スコアの帯名。 ディレクトリ名にそのまま使う。</summary>
+        public static string ChallengeBand(int challengeScore)
+        {
+            if (challengeScore <= 0)  return "band_0";
+            if (challengeScore <= 15) return "band_1_15";
+            if (challengeScore <= 30) return "band_16_30";
+            return "band_31up";
+        }
+
+        /// <summary>BOT のアイテム評価学習ルート。 帯 0 は従来どおりプロファイル直下を使う
+        /// (既存の累積 1 万ラン超はほぼ全部 0pt のバッチなので、 そのまま 0pt 帯として引き継ぐ)。</summary>
+        public static string BotLearningRoot(int challengeScore)
+        {
+            string band = ChallengeBand(challengeScore);
+            if (band == "band_0") return LearningRoot();
+            return Path.GetFullPath(Path.Combine(LearningRoot(), "bot_" + band));
+        }
+
         /// <summary>プロファイル非依存の共有ルート (AutoRunLogs/learning)。
         /// ボス難易度係数など「全プロファイル共通で1つだけ持つべきデータ」用。</summary>
         public static string SharedLearningRoot()

@@ -96,18 +96,15 @@ namespace Codex
         // ----------------------------------------------------------------
 
         /// <summary>
-        /// ランが最高難度かどうかを判定する。「メタデバフフル」 = MetaDebuffLevel Lv1〜Lv10 が全てアクティブ。
-        /// MetaProgressManager.State.activeDebuffs を参照する（プレイ開始時に確定するため Run でも参照可能）。
+        /// ランが最高難度かどうかを判定する。 2026-07-29 に配点方式 (docs/GAME.md §15-2) へ移行し、
+        /// 「メタデバフフル」の定義を **挑戦スコア満点 (100pt)** に置き換えた。
+        /// プレイ開始時に確定するため Run 中でも参照できる。
         /// </summary>
         public static bool IsMaxDifficultyRun(RunState run)
         {
             var meta = MetaProgression.MetaProgressManager.Instance?.State;
-            if (meta?.activeDebuffs == null) return false;
-            for (int lv = 1; lv <= 10; lv++)
-            {
-                if (!meta.activeDebuffs.Contains(lv)) return false;
-            }
-            return true;
+            if (meta == null) return false;
+            return meta.ChallengeScore >= MetaProgression.ChallengeCatalog.TotalMaxScore;
         }
 
         // ----------------------------------------------------------------
@@ -129,13 +126,14 @@ namespace Codex
 
         private static bool AllEndingsMaxDifficultyCleared(MetaProgressState meta)
         {
-            // 新フレーム: capstone「最後の一筆」廃止に伴い、 End5 (無上正等覚撃破) を事実上の最高難度
-            // オールクリアとして扱う。 End5 自体が Lv10 + 円環選択を要求するため、 これ単独で
+            // capstone「最後の一筆」廃止に伴い、 **EndTrue〈帳尻〉** を事実上の最高難度
+            // オールクリアとして扱う。 7 層ヴェスカ 4 段連戦の踏破を要求するため、 これ単独で
             // 全制覇相当のゲートとなる。
-            // ※ 2026-06 時点で AllEndingsMaxDifficulty 階層を使う vignette は無い (E5 codex は別途検討中)。
-            //   将来 E5 専用 codex を追加した際にこのゲートを利用する予定。
+            // 2026-08-17: 旧 "end5" (勝利で無条件に出ていたエンド) を EndTrue/EndGood に割った際、
+            //   ここも "end_true" へ移した。 **EndGood は数えない** ── 閉じなかった側は額縁に繋がらない。
+            // ※ AllEndingsMaxDifficulty 階層を使う vignette は現時点で無い (将来の専用 codex 用)。
             if (meta.endingMaxDiffCleared == null) return false;
-            return meta.endingMaxDiffCleared.Contains("end5");
+            return meta.endingMaxDiffCleared.Contains("end_true");
         }
     }
 }

@@ -22,7 +22,7 @@ namespace MapSystem
         public float shopPriceMultiplier = 1f;  // ショップ価格倍率
 
         // === 戦闘ステータス ===
-        public int critRateBonus;               // 会心率加算
+        public float critRatePctBonus;          // 会心率加算 (%)。 武器の会心率にだけ掛かり 0% で止まる
         public int maxHPBonus;                  // MaxHP加算（負=デバフ）
         public int diceMaxBonus;                // ダイス最大値加算（負=デバフ）
 
@@ -66,8 +66,8 @@ namespace MapSystem
             {
                 id = "wailing_echo",
                 displayName = "嘆きの共鳴",
-                description = "会心率+2 / MaxHP-5",
-                critRateBonus = 2,
+                description = "会心率+10% / MaxHP-5",
+                critRatePctBonus = 10f,
                 maxHPBonus = -5,
             });
 
@@ -122,10 +122,10 @@ namespace MapSystem
             {
                 id = "abyss_floor",
                 displayName = "深淵の洗礼",
-                description = "毎ターン自傷1 / 会心率-3 / 敵が毎ターンHP+3回復",
+                description = "毎ターン自傷1 / 会心率-15% / 敵が毎ターンHP+3回復",
                 maxHPBonusFlat = 5,
                 perTurnSelfDamage = 1,
-                critRateBonus = -3,
+                critRatePctBonus = -15f,
                 enemyPerTurnHeal = 3,
             });
         }

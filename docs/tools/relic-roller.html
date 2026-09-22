@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Relic Roller — 遺物生成テスター</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg:#080a0d; --panel:#131a24; --panel2:#0b1119; --line:#28374a;
+      --text:#eef4fb; --muted:#8ea1b8; --cyan:#5ce9ff; --gold:#ffd166;
+      --green:#73eda0; --red:#ff637c; --violet:#b39cff; --amber:#f0a04b;
+    }
+    * { box-sizing:border-box; }
+    body {
+      margin:0; min-height:100vh; color:var(--text);
+      font-family:"Segoe UI","Noto Sans JP",system-ui,sans-serif;
+      background:
+        radial-gradient(circle at 12% 0%,#1a2f42 0,transparent 34rem),
+        radial-gradient(circle at 96% 100%,#2c1c33 0,transparent 30rem),var(--bg);
+    }
+    main { width:min(1180px,calc(100% - 26px)); margin:auto; padding:26px 0 56px;
+           display:flex; flex-direction:column; gap:16px; }
+    header { display:flex; justify-content:space-between; align-items:end; gap:20px; }
+    h1 { margin:0; font-size:clamp(22px,4vw,38px); letter-spacing:.05em; }
+    header p { margin:5px 0 0; color:var(--muted); font-size:13px; }
+    .badge { color:var(--gold); font:800 12px ui-monospace,monospace; letter-spacing:.13em; text-align:right; }
+    .panel { background:color-mix(in srgb,var(--panel) 92%,transparent);
+             border:1px solid var(--line); border-radius:16px; box-shadow:0 16px 52px #0007; }
+    .pad { padding:20px 22px; }
+    h2 { margin:0 0 14px; font-size:13px; letter-spacing:.14em; color:var(--muted); font-weight:800; }
+
+    .controls { display:grid; grid-template-columns:1.1fr 1fr; gap:22px; }
+    .layers { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; }
+    .layers button {
+      padding:10px 6px; border-radius:9px; border:1px solid #33475e; background:#131e2b;
+      color:var(--text); font:700 12px ui-monospace,monospace; cursor:pointer; line-height:1.5;
+    }
+    .layers button b { display:block; color:var(--muted); font-size:10px; font-weight:700; }
+    .layers button.on { border-color:var(--cyan); background:#10303c; color:var(--cyan); }
+    .layers button.on b { color:var(--cyan); }
+    .rangebox { display:flex; flex-direction:column; gap:9px; }
+    .rangerow { display:grid; grid-template-columns:52px 1fr 44px; align-items:center; gap:10px;
+                font:12px ui-monospace,monospace; color:var(--muted); }
+    .rangerow output { color:var(--cyan); font-weight:800; text-align:right; }
+    input[type=range] { width:100%; accent-color:var(--cyan); }
+    .derived { margin-top:4px; padding:10px 12px; border-radius:9px; background:var(--panel2);
+               border:1px solid #1e2b3a; font:11.5px ui-monospace,monospace; color:var(--muted); line-height:1.8; }
+    .derived b { color:var(--text); }
+    .buttons { display:flex; flex-wrap:wrap; gap:9px; margin-top:16px; }
+    button.act { padding:11px 20px; border-radius:9px; border:1px solid #3c5570;
+                 background:#18283a; color:var(--text); font-weight:800; cursor:pointer; }
+    button.act.primary { background:var(--cyan); border-color:var(--cyan); color:#04141a; }
+    button.act:hover { filter:brightness(1.15); }
+
+    .relicwrap { display:grid; grid-template-columns:minmax(0,380px) 1fr; gap:20px; align-items:start; }
+    .relic { border:1px solid #3a4f68; border-radius:14px; background:linear-gradient(#111b27,#0b1218);
+             padding:16px; box-shadow:inset 0 0 40px #0006; }
+    .relic.cursed { border-color:#7a4f8d; box-shadow:inset 0 0 40px #2a0f36; }
+    .rname { font:800 20px "Segoe UI","Noto Sans JP",sans-serif; letter-spacing:.03em; }
+    .relic.cursed .rname { color:var(--violet); }
+    .rmeta { display:flex; justify-content:space-between; align-items:baseline;
+             border-bottom:1px solid #24344a; padding-bottom:10px; margin-bottom:12px; }
+    .rmeta span { color:var(--muted); font:700 11px ui-monospace,monospace; letter-spacing:.08em; }
+    .rmeta strong { font:900 28px ui-monospace,monospace; color:var(--gold); }
+    .curse { margin:-4px 0 12px; padding:8px 10px; border-radius:8px; background:#1d1226;
+             border:1px solid #4a2c5c; color:var(--violet); font:11.5px ui-monospace,monospace; }
+    .aff { display:flex; justify-content:space-between; align-items:center; gap:10px;
+           padding:9px 10px; border-radius:8px; margin-bottom:6px;
+           font:12.5px ui-monospace,monospace; background:#0d1520; border:1px solid #1d2a39; }
+    .aff.main { background:#241d0d; border-color:#6b5520; }
+    .aff.main.cursed { background:#241033; border-color:#6b3f8b; }
+    .aff .nm { color:var(--text); }
+    .aff.main .nm { color:var(--gold); font-weight:800; }
+    .aff.main.cursed .nm { color:var(--violet); }
+    .aff .st { color:var(--muted); font-size:11px; white-space:nowrap; }
+    .empty { color:#4e5c6e; font:12px ui-monospace,monospace; text-align:center; padding:22px 0; }
+    .log { font:11.5px ui-monospace,monospace; color:var(--muted); line-height:1.9;
+           background:var(--panel2); border:1px solid #1e2b3a; border-radius:10px; padding:12px 14px; }
+    .log b { color:var(--text); }
+    .log .hi { color:var(--cyan); }
+
+    .statgrid { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-bottom:16px; }
+    .stat { padding:12px; background:var(--panel2); border:1px solid #1e2b3a; border-radius:9px; }
+    .stat span { display:block; color:var(--muted); font-size:10.5px; }
+    .stat strong { display:block; margin-top:3px; font:850 19px ui-monospace,monospace; }
+    .cols { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+    .bar { display:grid; grid-template-columns:64px 1fr 52px; align-items:center; gap:8px;
+           font:11.5px ui-monospace,monospace; margin-bottom:4px; }
+    .bar .tr { height:10px; border-radius:10px; background:#070b10; overflow:hidden; }
+    .bar .fl { height:100%; width:0; border-radius:10px; }
+    .bar em { font-style:normal; color:var(--muted); text-align:right; }
+    .bar span:first-child { color:var(--muted); }
+    table { border-collapse:collapse; width:100%; font:11.5px ui-monospace,monospace;
+            font-variant-numeric:tabular-nums; }
+    th,td { padding:5px 7px; text-align:right; border-bottom:1px solid #1a2533; white-space:nowrap; }
+    th { color:var(--muted); font-weight:700; }
+    th:first-child, td:first-child { text-align:left; color:var(--cyan); }
+    .tblwrap { overflow-x:auto; }
+    .footnote { margin:14px 0 0; color:var(--muted); font-size:11.5px; line-height:1.75; }
+    .footnote b { color:var(--text); }
+    @media(max-width:900px){
+      .controls,.relicwrap,.cols{grid-template-columns:1fr}
+      .statgrid{grid-template-columns:repeat(3,1fr)}
+      header{flex-direction:column;align-items:start}
+      .badge{text-align:left}
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>RELIC ROLLER</h1>
+      <p>docs/GAME.md §15-5 の遺物生成をそのまま再実装したもの。到達層と挑戦スコアを指定して試行できる。</p>
+    </div>
+    <div class="badge">12 AXES / MAIN 4-6 (刻印7)<br>SUB 1-3 / CAP 18</div>
+  </header>
+
+  <section class="panel pad">
+    <h2>条件</h2>
+    <div class="controls">
+      <div>
+        <div style="color:var(--muted);font:11px ui-monospace,monospace;margin-bottom:7px">到達層</div>
+        <div class="layers" id="layers"></div>
+      </div>
+      <div>
+        <div style="color:var(--muted);font:11px ui-monospace,monospace;margin-bottom:7px">挑戦スコア範囲（0〜50・毎回この範囲から一様抽選）</div>
+        <div class="rangebox">
+          <div class="rangerow"><span>下限</span><input type="range" id="scoreLo" min="0" max="50" value="0"><output id="scoreLoOut">0</output></div>
+          <div class="rangerow"><span>上限</span><input type="range" id="scoreHi" min="0" max="50" value="0"><output id="scoreHiOut">0</output></div>
+          <div class="rangerow"><span>試行数</span><input type="range" id="trials" min="1" max="4" value="3"><output id="trialsOut">1000</output></div>
+        </div>
+        <div class="derived" id="derived"></div>
+      </div>
+    </div>
+    <div class="buttons">
+      <button class="act primary" id="rollOne">1 個引く</button>
+      <button class="act" id="rollMany">まとめて引く</button>
+      <button class="act" id="reset">記録消去</button>
+    </div>
+  </section>
+
+  <section class="panel pad">
+    <h2>直近の 1 個</h2>
+    <div class="relicwrap">
+      <div class="relic" id="relic"><div class="empty">まだ引いていません</div></div>
+      <div class="log" id="rollLog">「1 個引く」を押すと、抽選の各段階がここに出ます。</div>
+    </div>
+  </section>
+
+  <section class="panel pad">
+    <h2>統計</h2>
+    <div class="statgrid">
+      <div class="stat"><span>試行数</span><strong id="nTrials">0</strong></div>
+      <div class="stat"><span>平均総点</span><strong id="avgTotal">—</strong></div>
+      <div class="stat"><span>平均枠数</span><strong id="avgSlots">—</strong></div>
+      <div class="stat"><span>満点(18)率</span><strong id="perfectRate">—</strong></div>
+      <div class="stat"><span>刻印率</span><strong id="curseRate">—</strong></div>
+      <div class="stat"><span>上限/下限 張り付き</span><strong id="stickRate">—</strong></div>
+    </div>
+    <div class="cols">
+      <div>
+        <div style="color:var(--muted);font:11px ui-monospace,monospace;margin-bottom:8px">総点の分布</div>
+        <div id="totalBars"></div>
+        <div style="color:var(--muted);font:11px ui-monospace,monospace;margin:16px 0 8px">枠数の分布</div>
+        <div id="slotBars"></div>
+        <div style="color:var(--muted);font:11px ui-monospace,monospace;margin:16px 0 8px">名前の帯（低 5-9 / 中 10-14 / 高 15-18）</div>
+        <div id="tierBars"></div>
+      </div>
+      <div>
+        <div style="color:var(--muted);font:11px ui-monospace,monospace;margin-bottom:8px">軸別の出現率と、出たときの平均段</div>
+        <div class="tblwrap">
+          <table>
+            <thead><tr><th>軸</th><th>出現率</th><th>メイン率</th><th>平均段</th></tr></thead>
+            <tbody id="axisBody"><tr><td colspan="4" style="color:#4e5c6e">—</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <p class="footnote">
+      <b>本節の数値の正本は docs/GAME.md §15-5 です。</b>このツールはそれを再実装したものなので、片方を変えたら両方直してください。
+      <br><br>
+      抽選の順序は、①到達層から層点を引く → ②挑戦スコアからサブ(3)・サブ(4) の出現を判定（サブ(4) はサブ(3) が出た場合のみ）→ ③ロール +1/+2/+3 を 60/30/10% で引く → ④<b>充填率</b> <code>f =（層点 + 難度点 + ロール）/ 16</code> を枠数ごとの点数レンジへ写して総点を出す → ⑤その総点になる段の組を全列挙し、充填率の散らばり <code>s</code> に対する重み <code>exp(−2.0·s)</code> で抽選 → ⑥12 軸から重複なしで軸を割り当てる → ⑦挑戦スコア 25 以上なら刻印を判定、です。
+      <br><br>
+      <b>クランプは行いません。</b>総点は構造上つねに枠数ごとのレンジ内に収まるので、上限にも下限にも張り付きません（旧仕様では難度0・7層クリア・3枠で必ず 12 に張り付き、組み合わせが (6,3,3) の 1 通りに固定されていました）。「上限/下限 張り付き」の欄はそれが 0% のままであることの確認用です。
+      <br><br>
+      <b>刻印</b>はメインの段を 7 へ上げますが、<b>総点の計算には段 6 として入ります</b>（刻印は総点を増やしません）。条件を満たしている間だけメインが発動し、サブは常に働きます。
+      <br><br>
+      同じ軸が 1 個の遺物の中で 2 度出ることはありません。メインとサブでは段の範囲が違う（メイン 4〜6 / サブ 1〜3）ので、<b>同じ軸でもメインに載るかサブに載るかで値が変わります</b>。
+    </p>
+  </section>
+</main>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ============================================================
+     docs/GAME.md §15-5 の定義をそのまま写したもの。
+     **数値を変えるときは md 側も必ず直すこと。**
+     ============================================================ */
+  const MAIN_LO=3, MAIN_HI=6, SUB_LO=1, SUB_HI=3;
+  const CAP=18;
+  const LAMBDA=2.0;                       // 平均化バイアスの強さ
+  const DEN=16;                           // 充填率の分母 = 層点max11 + 難度点max2 + ロールmax3
+  const ROLL=[[1,0.60],[2,0.30],[3,0.10]];
+  const SCORE_MAX=50;                     // 挑戦スコア満点 (§15-2β 採用)
+
+  // 到達層 → 層点。 4層死(4) → 5層クリア(7) の +3 が「死んだ/クリアした」の壁。
+  // 2026-08-04: 死亡時も「到達した層 = その 1 つ下をクリアした証拠」として扱う。
+  //   6層で死亡 = 5層クリア(7) / 7層で死亡 = 6層クリア(9)。
+  //   旧実装は死亡を一律 clamp(f,1,4) にしていたため、7層で死んでも 2 層で死んでもほぼ同点で、
+  //   「難しくする → 浅く死ぬ → 層点が落ちる → 遺物が弱くなる」という負のループになっていた。
+  const LAYERS=[
+    {label:'1層',sub:'死亡',pt:1},{label:'2層',sub:'死亡',pt:2},
+    {label:'3層',sub:'死亡',pt:3},{label:'4層',sub:'死亡',pt:4},
+    {label:'5層',sub:'死亡',pt:4},
+    {label:'6層',sub:'死亡 (=5層クリア)',pt:7},
+    {label:'7層',sub:'死亡 (=6層クリア)',pt:9},
+    {label:'5層',sub:'クリア',pt:7},{label:'6層',sub:'クリア',pt:9},
+    {label:'7層',sub:'クリア',pt:11},
+  ];
+
+  // 難易度は総点を直接増やさず、枠数と充填率への 0〜2 点だけを動かす。
+  // 2026-08-04: 遺物への難易度ボーナスは挑戦スコア 30 で頭打ち。31 以降は純粋なチャレンジ難易度で、
+  //   遺物の見返りは一切増えない。上限値そのものは不変 (スコア30 で旧スコア50 と同値)。
+  const RELIC_BONUS_CAP = 30;
+  const cap = s => Math.min(Math.max(0,s), RELIC_BONUS_CAP);
+  const sub3Rate = s => Math.min(1, 0.30 + cap(s)*0.0217);
+  const sub4Rate = s => Math.min(1, 0.05 + cap(s)*0.0267);
+  const difPoint = s => Math.round(cap(s) * 2 / RELIC_BONUS_CAP);
+
+  // 刻印: 挑戦スコア 25 以上でのみ出現。
+  const CURSE_MIN_SCORE = 25;
+  const curseRate = s => s < CURSE_MIN_SCORE ? 0 : Math.min(1, 0.20 + (cap(s)-CURSE_MIN_SCORE)*0.02);
+  /* 条件は「守ろうと思えば常に守れる」ものに限る。 損益分岐は成立率 85.7% (=6/7) で、
+     下回ると刻印が純粋な劣化になるため。 一度破ると戻せない条件 (武器強化・所持数) は、
+     外的要因で破られると永久に死ぬので置かない。 */
+  const CURSES=[
+    '消耗品を 1 つも持っていない間',
+    'ゴールドが 10 以下の間',
+    'そのターン、ブロック端子に 1 本も配線していない',
+    'そのターン、役を 1 つも切っていない',
+  ];
+
+  /* 12 軸。 relic[] は総点帯 (低 5-9 / 中 10-14 / 高 15-18) ごとの名前。
+     fmt(step) は段 1〜7 の効果文。 **同じ軸でもメインに載るかサブに載るかで値が変わる**。 */
+  const AXES=[
+    {id:'atk',   name:'攻撃',        relic:['鉄片','据えの鉄芯','鍛えの芯金'],
+     fmt:s=>'攻撃+'+[1,2,3,4,5,6,7][s-1]},
+    {id:'dmg',   name:'与ダメージ%',  relic:['鳴り環','共振環','倍音環'],
+     fmt:s=>'与ダメージ+'+[5,10,15,20,25,30,35][s-1]+'%'},
+    {id:'crit',  name:'会心率',      relic:['覗き窓','間隙測り','寸分の測り'],
+     fmt:s=>'会心率+'+[4,8,12,16,20,24,28][s-1]+'%'},
+    {id:'cmult', name:'会心倍率',    relic:['下げ錘','一打の分銅','極みの分銅'],
+     fmt:s=>'会心倍率+'+[15,30,45,60,75,90,105][s-1]+'%'},
+    {id:'pen',   name:'防御貫通',    relic:['錐先','甲割りの錐','徹しの錐'],
+     fmt:s=>'防御貫通+'+[4,8,12,16,20,24,28][s-1]+'%'},
+    {id:'dr',    name:'被ダメージ%',  relic:['当て革','緩衝綿','受けの厚み'],
+     fmt:s=>'被ダメージ−'+[5,10,15,20,25,30,35][s-1]+'%'},
+    {id:'hp',    name:'最大HP',      relic:['継ぎ布','継ぎ足しの器','満ちの器'],
+     fmt:s=>'最大HP+'+[4,8,12,16,20,24,28][s-1]},
+    {id:'shield',name:'開幕シールド', relic:['端切れ','初手の当て布','先手の帷'],
+     fmt:s=>'開幕シールド+'+[2,4,6,8,10,12,14][s-1]},
+    // 充電は開幕成分と毎ターン成分で効く場面が逆 (開幕=通常戦 / 毎T=ボス戦)。
+    // 毎T は +5 で構造的な天井 (充電はリロールの原資なので溜め込んでも遊ばない)。
+    {id:'charge',name:'充電',        relic:['帯電片','余剰電位','満ちの電位'],
+     // 内部の区切りは中黒。 " / " だと枠の区切りと紛れて複合効果 1 枠が 2 枠に見える。
+     fmt:s=>{ const o=[2,3,4,4,4,4,4][s-1], t=[0,0,0,2,3,4,5][s-1];
+              return '開幕充電+'+o + (t ? '・毎ターン+'+t : ''); }},
+    // 臨界は敵の **現在** HP 比。 最大HP比だと削っても威力が落ちず、遺物1個でボスを2回殺せる。
+    {id:'rinkai',name:'臨界',        relic:['兆し','臨界前夜','臨界の刻'],
+     fmt:s=>'臨界爆発時 敵の現在HP の '+s+'%'},
+    {id:'bleed', name:'開幕出血',    relic:['かすり傷','止血の失敗例','塞がらぬ傷'],
+     fmt:s=>'開幕出血+'+[3,4,5,6,7,8,9][s-1]},
+    {id:'poison',name:'開幕毒',      relic:['一匙','遅効の匙','量り切りの匙'],
+     fmt:s=>'開幕毒+'+[1,2,3,4,5,6,7][s-1]},
+  ];
+
+  const structLow  = n => MAIN_LO + (n-1)*SUB_LO;
+  const structHigh = n => Math.min(CAP, MAIN_HI + (n-1)*SUB_HI);
+  // 名前の帯。 総点 5-9 / 10-14 / 15-18。
+  const tierOf = t => t <= 9 ? 0 : (t <= 14 ? 1 : 2);
+  const TIER_LABEL=['低','中','高'];
+
+  /* 合計 total になる段の組を全列挙する。 index 0 がメイン枠。 */
+  const compCache=new Map();
+  function comps(n,T){
+    const key=n+':'+T;
+    if(compCache.has(key))return compCache.get(key);
+    const out=[], acc=new Array(n);
+    (function rec(idx,rest){
+      if(idx===n){ if(rest===0)out.push(acc.slice()); return; }
+      const lo = idx===0?MAIN_LO:SUB_LO, hi = idx===0?MAIN_HI:SUB_HI;
+      const left=n-idx-1;
+      for(let v=lo; v<=hi; v++){
+        const r=rest-v;
+        if(r < left*SUB_LO || r > left*SUB_HI) continue;   // 残り枠で埋められない値は試さない
+        acc[idx]=v; rec(idx+1,r);
+      }
+    })(0,T);
+    compCache.set(key,out);
+    return out;
+  }
+
+  /* 充填率の散らばり。 メインとサブでレンジが違うので 0〜1 に正規化してから測る。 */
+  function spread(c){
+    let mn=Infinity, mx=-Infinity;
+    for(let i=0;i<c.length;i++){
+      const f = i===0 ? (c[i]-MAIN_LO)/(MAIN_HI-MAIN_LO) : (c[i]-SUB_LO)/(SUB_HI-SUB_LO);
+      if(f<mn)mn=f; if(f>mx)mx=f;
+    }
+    return mx-mn;
+  }
+
+  function pickComp(n,T){
+    const cs=comps(n,T);
+    if(!cs.length)return null;
+    const w=cs.map(c=>Math.exp(-LAMBDA*spread(c)));
+    let s=0; for(const x of w)s+=x;
+    let r=Math.random()*s;
+    for(let i=0;i<cs.length;i++){ r-=w[i]; if(r<=0)return cs[i]; }
+    return cs[cs.length-1];
+  }
+
+  function rollBonus(){
+    const r=Math.random(); let acc=0;
+    for(const [v,p] of ROLL){ acc+=p; if(r<acc)return v; }
+    return ROLL[ROLL.length-1][0];
+  }
+
+  /* 遺物を 1 個生成する。 途中経過も返して、抽選の各段階を画面に出せるようにする。 */
+  function rollRelic(layerPt, score){
+    const r3=sub3Rate(score), r4=sub4Rate(score);
+    const has3=Math.random()<r3;
+    const has4=has3 && Math.random()<r4;
+    const n=3+(has3?1:0)+(has4?1:0);
+    const bonus=rollBonus();
+    const dp=difPoint(score);
+    // **クランプしない。** 充填率を枠数ごとのレンジへ写すので構造上つねにレンジ内。
+    const f=(layerPt+dp+bonus)/DEN;
+    const lo=structLow(n), hi=structHigh(n);
+    const T=Math.round(lo + f*(hi-lo));
+    const comp=pickComp(n,T);
+    // 軸は重複なしで一様に選ぶ (Fisher-Yates の前半だけ)
+    const pool=AXES.slice();
+    for(let i=0;i<n;i++){
+      const j=i+Math.floor(Math.random()*(pool.length-i));
+      const t=pool[i]; pool[i]=pool[j]; pool[j]=t;
+    }
+    const cursed = Math.random() < curseRate(score);
+    const curse = cursed ? CURSES[Math.floor(Math.random()*CURSES.length)] : null;
+    const affixes=comp.map((step,i)=>({
+      axis:pool[i], step, isMain:i===0,
+      // 刻印はメインの段だけを 7 へ上げる。 総点 T は段6 のまま。
+      effStep: (i===0 && cursed) ? 7 : step
+    }));
+    return {score,layerPt,dp,r3,r4,has3,has4,n,bonus,f,lo,hi,T,affixes,cursed,curse,
+            atHi:T===hi, atLo:T===lo};
+  }
+
+  // ============================================================
+  //  画面
+  // ============================================================
+  const $=id=>document.getElementById(id);
+  const ui={
+    layers:$('layers'),scoreLo:$('scoreLo'),scoreHi:$('scoreHi'),
+    scoreLoOut:$('scoreLoOut'),scoreHiOut:$('scoreHiOut'),
+    trials:$('trials'),trialsOut:$('trialsOut'),derived:$('derived'),
+    rollOne:$('rollOne'),rollMany:$('rollMany'),reset:$('reset'),
+    relic:$('relic'),rollLog:$('rollLog'),
+    nTrials:$('nTrials'),avgTotal:$('avgTotal'),avgSlots:$('avgSlots'),
+    perfectRate:$('perfectRate'),curseRate:$('curseRate'),stickRate:$('stickRate'),
+    totalBars:$('totalBars'),slotBars:$('slotBars'),tierBars:$('tierBars'),axisBody:$('axisBody')
+  };
+  const TRIAL_STEPS=[100,500,1000,5000];
+  let layerIdx=4;   // 既定 = 5層クリア
+  let stats=freshStats();
+
+  function freshStats(){
+    return {n:0,totSum:0,slotSum:0,perfect:0,cursed:0,stick:0,
+            totals:new Map(),slots:new Map(),tiers:new Map(),
+            axis:Object.fromEntries(AXES.map(a=>[a.id,{n:0,main:0,stepSum:0}]))};
+  }
+
+  function buildLayers(){
+    ui.layers.replaceChildren(...LAYERS.map((L,i)=>{
+      const b=document.createElement('button');
+      b.innerHTML=`${L.label}<b>${L.sub} / ${L.pt}pt</b>`;
+      if(i===layerIdx)b.className='on';
+      b.addEventListener('click',()=>{ layerIdx=i; buildLayers(); updateDerived(); });
+      return b;
+    }));
+  }
+
+  function scoreRange(){
+    let lo=+ui.scoreLo.value, hi=+ui.scoreHi.value;
+    if(lo>hi){ const t=lo; lo=hi; hi=t; }
+    return [lo,hi];
+  }
+  const drawScore=()=>{ const [lo,hi]=scoreRange(); return lo+Math.floor(Math.random()*(hi-lo+1)); };
+
+  function updateDerived(){
+    const [lo,hi]=scoreRange();
+    ui.scoreLoOut.textContent=ui.scoreLo.value;
+    ui.scoreHiOut.textContent=ui.scoreHi.value;
+    ui.trialsOut.textContent=TRIAL_STEPS[+ui.trials.value-1];
+    const L=LAYERS[layerIdx], es=(lo+hi)/2;
+    const r3=sub3Rate(es), r4=sub4Rate(es);
+    const f=v=>`サブ3 ${(sub3Rate(v)*100).toFixed(0)}% / サブ4 ${(sub4Rate(v)*100).toFixed(0)}% / 難度点 ${difPoint(v)} / 刻印 ${(curseRate(v)*100).toFixed(0)}%`;
+    ui.derived.innerHTML=
+       `層点 <b>${L.pt}</b>（${L.label}${L.sub}）　充填率 = (${L.pt} + 難度点 + ロール) / ${DEN}`
+      +`<br>スコア ${lo}: ${f(lo)}` + (hi!==lo?`<br>スコア ${hi}: ${f(hi)}`:'')
+      +`<br>期待枠数 <b>${(3+r3+r3*r4).toFixed(2)}</b>　構造上限 12 / 15 / 18（3・4・5枠）`;
+  }
+
+  function renderRelic(r){
+    const main=r.affixes[0];
+    const nm=(r.cursed?'刻印の':'') + main.axis.relic[tierOf(r.T)];
+    const rows=r.affixes.map(a=>
+      `<div class="aff${a.isMain?' main':''}${a.isMain&&r.cursed?' cursed':''}">`
+      +`<span class="nm">${a.axis.fmt(a.effStep)}</span>`
+      +`<span class="st">${a.isMain?'MAIN':'SUB'} ・ 段${a.effStep}`
+      +`${a.isMain&&r.cursed?'（刻印 +1）':''}</span></div>`).join('');
+    ui.relic.className='relic'+(r.cursed?' cursed':'');
+    ui.relic.innerHTML=
+       `<div class="rmeta"><span class="rname">${nm}</span><strong>${r.T}</strong></div>`
+      +`<div style="color:var(--muted);font:11px ui-monospace,monospace;margin:-8px 0 12px">`
+      +`${r.n}枠 ・ 名前の帯 ${TIER_LABEL[tierOf(r.T)]}（総点 ${r.T}）</div>`
+      +(r.cursed?`<div class="curse">刻印: <b>${r.curse}</b> ── その間だけメインが発動</div>`:'')
+      +rows;
+    const NL='<br>';
+    ui.rollLog.innerHTML=
+       `① 挑戦スコア <b>${r.score}</b> を抽選 → 難度点 <b>${r.dp}</b>`+NL
+      +`② サブ3 判定 ${(r.r3*100).toFixed(0)}% → <b>${r.has3?'出た':'出ない'}</b>`
+      +(r.has3?`　／　サブ4 判定 ${(r.r4*100).toFixed(0)}% → <b>${r.has4?'出た':'出ない'}</b>`:'')
+      +`　→ 枠数 <b>${r.n}</b>`+NL
+      +`③ ロール <b>+${r.bonus}</b>`+NL
+      +`④ 充填率 f = (${r.layerPt} + ${r.dp} + ${r.bonus}) / ${DEN} = <b>${r.f.toFixed(3)}</b>`+NL
+      +`　 総点 = ${r.lo} + ${r.f.toFixed(3)} × ${r.hi-r.lo} = <b class="hi">${r.T}</b>`
+      +`　（レンジ ${r.lo}〜${r.hi}${r.atHi?' ・上限に一致':''}${r.atLo?' ・下限に一致':''}）`+NL
+      +`⑤ 合計 ${r.T} になる組は <b>${comps(r.n,r.T).length}</b> 通り。充填率の散らばりで重み付けして抽選`+NL
+      +`⑥ 刻印判定 ${(curseRate(r.score)*100).toFixed(0)}% → <b>${r.cursed?'刻印あり（メインが段7）':'なし'}</b>`;
+  }
+
+  function record(r){
+    const s=stats;
+    s.n++; s.totSum+=r.T; s.slotSum+=r.n;
+    if(r.T===CAP)s.perfect++;
+    if(r.cursed)s.cursed++;
+    if(r.atHi||r.atLo)s.stick++;
+    s.totals.set(r.T,(s.totals.get(r.T)||0)+1);
+    s.slots.set(r.n,(s.slots.get(r.n)||0)+1);
+    const ti=tierOf(r.T); s.tiers.set(ti,(s.tiers.get(ti)||0)+1);
+    for(const a of r.affixes){
+      const e=s.axis[a.axis.id];
+      e.n++; e.stepSum+=a.effStep; if(a.isMain)e.main++;
+    }
+  }
+
+  function bars(el,map,colorOf,labelOf){
+    const keys=[...map.keys()].sort((a,b)=>a-b);
+    const total=[...map.values()].reduce((a,b)=>a+b,0)||1;
+    const max=Math.max(...map.values(),1);
+    el.replaceChildren(...keys.map(k=>{
+      const v=map.get(k), row=document.createElement('div');
+      row.className='bar';
+      row.innerHTML=`<span>${labelOf(k)}</span>`
+        +`<div class="tr"><div class="fl" style="width:${v*100/max}%;background:${colorOf(k)}"></div></div>`
+        +`<em>${(v*100/total).toFixed(1)}%</em>`;
+      return row;
+    }));
+  }
+
+  function renderStats(){
+    const s=stats;
+    ui.nTrials.textContent=s.n;
+    ui.avgTotal.textContent=s.n?(s.totSum/s.n).toFixed(2):'—';
+    ui.avgSlots.textContent=s.n?(s.slotSum/s.n).toFixed(2):'—';
+    ui.perfectRate.textContent=s.n?`${(s.perfect*100/s.n).toFixed(1)}%`:'—';
+    ui.curseRate.textContent=s.n?`${(s.cursed*100/s.n).toFixed(1)}%`:'—';
+    ui.stickRate.textContent=s.n?`${(s.stick*100/s.n).toFixed(1)}%`:'—';
+    bars(ui.totalBars,s.totals,k=>k===CAP?'var(--gold)':'var(--cyan)',k=>`合計 ${k}`);
+    bars(ui.slotBars,s.slots,()=>'var(--violet)',k=>`${k} 枠`);
+    bars(ui.tierBars,s.tiers,k=>['#4e6b8a','var(--cyan)','var(--gold)'][k],k=>TIER_LABEL[k]);
+    if(!s.n){ ui.axisBody.innerHTML='<tr><td colspan="4" style="color:#4e5c6e">—</td></tr>'; return; }
+    ui.axisBody.replaceChildren(...AXES.map(a=>{
+      const e=s.axis[a.id], tr=document.createElement('tr');
+      tr.innerHTML=`<td>${a.name}</td>`
+        +`<td>${(e.n*100/s.n).toFixed(1)}%</td>`
+        +`<td>${e.n?(e.main*100/e.n).toFixed(1)+'%':'—'}</td>`
+        +`<td>${e.n?(e.stepSum/e.n).toFixed(2):'—'}</td>`;
+      return tr;
+    }));
+  }
+
+  function doRoll(count){
+    const pt=LAYERS[layerIdx].pt;
+    let last=null;
+    for(let i=0;i<count;i++){ last=rollRelic(pt,drawScore()); record(last); }
+    if(last)renderRelic(last);
+    renderStats();
+  }
+
+  ui.rollOne.addEventListener('click',()=>doRoll(1));
+  ui.rollMany.addEventListener('click',()=>doRoll(TRIAL_STEPS[+ui.trials.value-1]));
+  ui.reset.addEventListener('click',()=>{
+    stats=freshStats(); renderStats();
+    ui.relic.className='relic';
+    ui.relic.innerHTML='<div class="empty">まだ引いていません</div>';
+    ui.rollLog.textContent='記録を消去しました。';
+  });
+  for(const el of [ui.scoreLo,ui.scoreHi,ui.trials]) el.addEventListener('input',updateDerived);
+
+  buildLayers(); updateDerived(); renderStats();
+})();
+</script>
+</body>
+</html>

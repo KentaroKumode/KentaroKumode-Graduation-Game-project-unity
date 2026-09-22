@@ -1,0 +1,695 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Parry Model Probe — 48 Tick</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg:#070a0f; --panel:#101722; --panel2:#0a1018; --line:#263548;
+      --text:#eef6ff; --muted:#91a3bb; --cyan:#5ce9ff; --gold:#ffd166;
+      --green:#73eda0; --red:#ff637c; --violet:#b39cff;
+    }
+    * { box-sizing:border-box; }
+    body {
+      margin:0; min-height:100vh; color:var(--text);
+      font-family:"Segoe UI","Noto Sans JP",system-ui,sans-serif;
+      background:
+        radial-gradient(circle at 16% 0%,#15334a 0,transparent 36rem),
+        radial-gradient(circle at 100% 100%,#29182f 0,transparent 32rem),var(--bg);
+    }
+    main { width:min(1120px,calc(100% - 28px)); margin:auto; padding:28px 0 54px;
+           display:flex; flex-direction:column; gap:18px; }
+    header { display:flex; justify-content:space-between; align-items:end; gap:20px; }
+    h1 { margin:0; font-size:clamp(23px,4vw,40px); letter-spacing:.045em; }
+    header p { margin:5px 0 0; color:var(--muted); }
+    .hz { color:var(--cyan); font:800 13px ui-monospace,monospace; letter-spacing:.14em; text-align:right; }
+    .panel { background:color-mix(in srgb,var(--panel) 92%,transparent); border:1px solid var(--line); border-radius:18px; box-shadow:0 18px 60px #0007; }
+    .arena { padding:24px; display:flex; flex-direction:column; overflow:hidden; }
+    .topline { display:flex; justify-content:space-between; gap:12px; color:var(--muted); font:700 12px ui-monospace,monospace; }
+    #phase { color:var(--text); }
+    .readout { display:flex; justify-content:space-between; align-items:end; margin:14px 0 11px; }
+    .readout strong { font-size:18px; }
+    #foresightReadout { color:var(--cyan); font:800 15px ui-monospace,monospace; }
+    #laneShell { width:100%; height:128px; display:flex; align-items:center;
+                 justify-content:center; justify-content:safe center; overflow-x:auto; }
+    #laneShell::-webkit-scrollbar { height:6px; }
+    #laneShell::-webkit-scrollbar-thumb { background:#2a3a4d; border-radius:6px; }
+    /* 1 tick = 1 ブロック。 48Hz の論理時計に合わせてセルが 1 個ずつ点灯する。
+       ただし **判定は ms 建て** ── 猶予 2f (セル境界が中心) は整数セルでは
+       表現できないため。 セル格子は「いま何 tick 前か」を読ませる目盛りで、
+       判定の正本ではない。 実際の判定帯は下の #perfectBand が正確に描く。 */
+    #lane {
+      position:relative;
+      display:flex; gap:2px; height:98px; padding:6px; flex:0 0 auto;
+      border:1px solid #3a4e67; border-radius:13px; background:#0b1119;
+      box-shadow:inset 0 0 30px #0008;
+    }
+    /* PERFECT 帯。 **セルではなくオーバーレイで描く** ── 猶予 1f/3f は
+       セル中心だが 2f はセル境界が中心になり、 格子に乗らない。
+       幅を ms から直接算出して重ねれば、 偶数幅でも正しい位置に出せる。 */
+    #perfectBand {
+      position:absolute; top:6px; bottom:6px; left:50%; transform:translateX(-50%);
+      border:1px solid var(--gold); border-radius:5px;
+      background:#ffd1661c; box-shadow:inset 0 0 14px #ffd16640;
+      pointer-events:none; z-index:2;
+    }
+    #perfectBand::after {
+      content:attr(data-label); position:absolute; left:50%; bottom:-19px; transform:translateX(-50%);
+      color:var(--gold); font:800 9px ui-monospace,monospace; letter-spacing:.06em; white-space:nowrap;
+    }
+    /* GREAT 帯。 PERFECT の外側へさらに 1 セルぶん。 */
+    #greatBand {
+      position:absolute; top:6px; bottom:6px; left:50%; transform:translateX(-50%);
+      border:1px solid #2d6f86; border-radius:7px; pointer-events:none; z-index:1;
+    }
+    #cueInfo { min-height:20px; text-align:center; margin-bottom:6px;
+               color:var(--violet); font:800 13px ui-monospace,monospace; letter-spacing:.06em; }
+    /* **1 セルの幅は予見に依存しない**。 flex で伸縮させると予見ごとに
+       セルの大きさが変わり、 「1 セル = 1 tick」という時間目盛りの意味が壊れる。
+       幅を固定し、 ゲージ全体の長さだけが予見に比例して伸びる ── 投資が
+       ゲージの物理的な長さとして見えるのが、 この構成の狙いそのもの。 */
+    .cell {
+      flex:0 0 auto; width:22px;
+      border-radius:4px; background:#17212e; border:1px solid #22303f;
+      position:relative; transition:background .04s linear, box-shadow .04s linear;
+    }
+    .cell.lit { background:var(--cyan); border-color:var(--cyan); box-shadow:0 0 16px #5ce9ffaa; z-index:3; }
+    .cell.late { background:#3a1f28; border-color:#713341; }
+    /* **判定されたセル**。 結果表示のあいだ固定で残すので、 判定と描画を目で突き合わせられる。 */
+    .cell.hit { background:#fff; border-color:#fff; box-shadow:0 0 26px #fff,0 0 44px #5ce9ff88; z-index:3; }
+    #result { height:60px; display:grid; place-items:center; margin-top:12px; font:900 clamp(24px,5vw,42px) ui-monospace,monospace; letter-spacing:.08em; }
+    #result.perfect { color:var(--gold); text-shadow:0 0 26px #ffd16688; }
+    #result.great { color:var(--cyan); } #result.good { color:var(--green); }
+    #result.fail,#result.miss { color:var(--red); }
+    #detail { min-height:22px; margin-top:5px; text-align:center; color:var(--muted); font:12px ui-monospace,monospace; }
+    .prompt { margin-top:18px; text-align:center; }
+    .key { display:inline-grid; place-items:center; min-width:230px; padding:15px 28px; border:1px solid #526980; border-bottom-width:5px; border-radius:11px; background:linear-gradient(#1d2b3b,#111923); font-weight:850; letter-spacing:.14em; user-select:none; cursor:pointer; }
+    .key.active { transform:translateY(3px); border-bottom-width:2px; }
+    .buttons { display:flex; justify-content:center; gap:10px; margin-top:16px; }
+    button { padding:11px 22px; color:var(--text); background:#172536; border:1px solid #38516b; border-radius:9px; font-weight:800; cursor:pointer; }
+    button.primary { color:#031015; background:var(--cyan); border-color:var(--cyan); }
+    button:hover { filter:brightness(1.14); }
+    .legend { display:flex; flex-wrap:wrap; gap:8px 20px; justify-content:center; margin-top:16px; color:var(--muted); font-size:12px; }
+    .legend b { color:var(--text); font-family:ui-monospace,monospace; }
+    .stats { padding:20px 24px; }
+    #progressBanner { margin:0 0 14px; padding:11px 14px; border-radius:10px;
+      border:1px solid #2a4a3a; background:#0c1a14; color:var(--green);
+      font:800 13px ui-monospace,monospace; display:none; }
+    .statgrid { display:grid; grid-template-columns:repeat(6,1fr); gap:9px; }
+    .stat { padding:13px; background:var(--panel2); border:1px solid #202d3d; border-radius:10px; }
+    .stat span { display:block; color:var(--muted); font-size:11px; }
+    .stat strong { display:block; margin-top:3px; font:850 20px ui-monospace,monospace; }
+    .bars { display:grid; gap:7px; margin-top:16px; }
+    .barrow { display:grid; grid-template-columns:76px 1fr 58px; align-items:center; gap:9px; font:12px ui-monospace,monospace; }
+    .bartrack { height:9px; border-radius:9px; background:#060a0f; overflow:hidden; }
+    .barfill { height:100%; width:0; transition:width .2s; }
+    .htable { margin-top:18px; overflow-x:auto; }
+    .htable table { border-collapse:collapse; width:100%; font:12px ui-monospace,monospace; font-variant-numeric:tabular-nums; }
+    .htable th, .htable td { padding:5px 8px; text-align:right; border-bottom:1px solid #1c2735; white-space:nowrap; }
+    .htable th { color:var(--muted); font-weight:700; text-align:right; position:sticky; top:0; background:var(--panel2); z-index:1; }
+    .htable th:first-child, .htable td:first-child { text-align:left; color:var(--cyan); }
+    /* 予見が変わる行に区切り線を入れる ── 12 行が 4 グループに読めるように。 */
+    .htable tr.grouptop td { border-top:1px solid #33455c; }
+    .htable tr.done td:first-child { color:var(--green); }
+    .htable td.n { color:var(--text); }
+    .htable td.ok { color:var(--green); } .htable td.ng { color:var(--red); } .htable td.wait { color:var(--muted); }
+    .htable td.tier { color:var(--gold); font-weight:700; }
+    .mini { position:relative; min-width:84px; }
+    .mini i { position:absolute; left:0; bottom:1px; height:3px; background:var(--cyan); border-radius:3px; }
+    #exportBox { width:100%; height:150px; margin-top:12px; padding:10px; resize:vertical;
+      color:var(--text); background:#060a0f; border:1px solid var(--line); border-radius:9px;
+      font:11px ui-monospace,monospace; white-space:pre; display:none; }
+    .expbtns { display:flex; flex-wrap:wrap; gap:9px; margin-top:14px; }
+    .expbtns button { flex:0 0 auto; padding:9px 14px; }
+    .footnote { margin:16px 0 0; color:var(--muted); font-size:12px; line-height:1.7; }
+    .footnote b { color:var(--text); }
+    @media(max-width:820px){ .statgrid{grid-template-columns:repeat(3,1fr)} header{align-items:start;flex-direction:column} .hz{text-align:left} }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div><h1>PARRY MODEL PROBE</h1><p>1セル=1tick=20.8ms。ゲージ全長は <b>予見×2+1</b> セル、判定帯は中央。<b>予見 6〜9 × 猶予 1f/2f/3f</b> の12通りを採取します。</p></div>
+    <div class="hz">48 TICKS/SEC<br>12 CELLS × 15</div>
+  </header>
+
+  <section class="panel arena">
+    <div class="topline"><span id="phase">停止中</span><span id="trialText">ATTACK 0</span></div>
+    <div class="readout"><strong>パリィレーン</strong><span id="foresightReadout">予見 —</span></div>
+    <div id="cueInfo"></div>
+    <div id="laneShell"><div id="lane"></div></div>
+    <div id="result">READY</div>
+    <div id="detail">開始すると、まだ目標本数に届いていない（予見 × 猶予）が優先的に引かれます。</div>
+    <div class="prompt"><div class="key" id="spaceKey">SPACE / CLICK</div></div>
+    <div class="buttons">
+      <button class="primary" id="start">開始</button>
+      <button id="reset">記録消去</button>
+    </div>
+    <div class="legend">
+      <span>PERFECT <b>金の帯の内側（猶予f×20.8ms）</b></span>
+      <span>GREAT <b>そこから外へ1セル</b></span>
+      <span>GOOD <b>ゲージ端まで</b></span>
+      <span>FAIL <b>ゲージ外</b></span>
+    </div>
+  </section>
+
+  <section class="panel stats">
+    <div id="progressBanner"></div>
+    <div class="statgrid">
+      <div class="stat"><span>ATTACKS</span><strong id="attempts">0</strong></div>
+      <div class="stat"><span>採取進捗</span><strong id="progress">0%</strong></div>
+      <div class="stat"><span>PERFECT</span><strong id="perfectRate">—</strong></div>
+      <div class="stat"><span>GREAT+</span><strong id="greatPlusRate">—</strong></div>
+      <div class="stat"><span>平均誤差</span><strong id="meanErr">—</strong></div>
+      <div class="stat"><span>SD</span><strong id="sdErr">—</strong></div>
+    </div>
+    <div class="bars" id="bars"></div>
+
+    <div class="htable">
+      <table>
+        <thead><tr>
+          <th>予見 / 猶予</th><th>Tier</th><th>猶予ms</th><th>PERFECT幅</th><th>N / 目標</th>
+          <th>実測 平均</th><th>±2SE</th><th>模型 平均</th><th>平均判定</th>
+          <th>実測 PERFECT</th><th>模型 PERFECT</th><th>実測 GREAT+</th>
+        </tr></thead>
+        <tbody id="hbody"></tbody>
+      </table>
+    </div>
+
+    <div class="expbtns">
+      <button id="expSummary">セル別サマリを表示</button>
+      <button id="expRaw">生ログを表示</button>
+      <button id="expCopy">クリップボードへコピー</button>
+      <button id="expDownload">CSVで保存</button>
+      <button id="expHide">閉じる</button>
+    </div>
+    <textarea id="exportBox" readonly spellcheck="false"></textarea>
+
+    <p class="footnote">
+      <b>採取するのは 予見 6/7/8/9 × 猶予 1f/2f/3f の 12 通り、各 15 本 = 180 本です。</b>予見の 4 値はアイテム階梯の実値そのもの（基礎 6＝125ms、BRONZE +1、SILVER +2、GOLD/LEGENDARY +3）で、猶予 3 値は候補に挙がっている全パターンです。予見 10 以上は反応遅れが落ちきって平坦なので採りません。全セルが目標に届いた時点で自動停止します。
+      <br><br>
+      <b>猶予を実際に振っているのは、押し方が変わらないという前提そのものを疑うためです。</b>誤差分布が猶予に依存しないなら、猶予 1f のデータだけから 2f/3f の成績を計算できます。しかし判定帯が広く見えると気が緩む可能性があり、それは計算では出てきません。表の「模型 PERFECT」は誤差分布が猶予に依存しないと仮定した予測値なので、実測がそこから系統的に外れるなら前提の側が間違っています。
+      <br><br>
+      <b>判定は ms 建てで、セル格子とは一致しません。</b>猶予 1f と 3f はセル中心ですが、2f はセル境界が中心になるため整数セルでは表現できないからです。金の帯が実際の PERFECT 範囲で、セルは「いま何 tick 前か」を読む目盛りです。GREAT はその外へ 1 セルぶん、GOOD はゲージ端まで、その外が FAIL です。GOOD の幅が予見に連動するので、予見 6 ならゲージは 13 セルしかなく、そこを外れた入力は FAIL になります。
+      <br><br>
+      <b>範囲外の入力も誤差を記録します。</b>判定範囲だけを記録すると観測が打ち切られて平均が実際より 0 に寄ります。着弾の前後 400ms 以内の入力は、FAIL でも必ず誤差を残します。400ms を超える入力だけがノイズとして無視され、ノーツも消費しません。
+      <br><br>
+      入力時刻はハンドラ実行時刻ではなくイベント発生時刻（<code>event.timeStamp</code>）を使います。判定後は判定されたセルを白く固定表示するので、どのセルで判定されたかを目で確認できます。判定セルと描画がずれている場合、それは判定のずれではなく<b>ディスプレイの表示遅延</b>です。平均誤差が系統的に + へ寄るときも同じ原因で、手の癖ではありません。着弾までの待ち時間だけがランダムです。ブラウザ・OS・入力機器・ディスプレイの遅延を含むため、比較には同じ環境を使用してください。
+    </p>
+  </section>
+</main>
+
+<script>
+(() => {
+  'use strict';
+  /* ============================================================
+     判定クロック。 ゲーム本体 (ParrySystem.GaugeHz) と同じ 48Hz。
+     1 セル = 20.8ms で、 実測の運動ノイズ σ≒27ms より細かい。
+     ============================================================ */
+  const HZ=48;
+  const TICK_MS=1000/HZ;
+
+  /* 採取するセル = 予見 × 猶予 の全組み合わせ。
+
+     予見は **アイテム階梯の実値**を使う ── 基礎 6 (125ms) と、
+     そこへ +1 / +2 / +3 した 7 / 8 / 9。 前版は 2 セル刻みで
+     {6,8,10,12} を採っていたが、 それだと BRONZE の 予見+1 を踏まない。
+     予見 10 以上は反応遅れが落ちきって平坦なので採らない。
+
+     猶予は 1f / 2f / 3f の全候補。 **これを実際に振るのが今回の主眼**で、
+     「猶予を広げても押し方は変わらない」という前提を検証するため。
+     前提が正しければ猶予 1f のデータだけで 2f/3f を計算できるが、
+     判定帯が広く見えて気が緩むなら計算では出てこない。 */
+  const V_LIST=[6,7,8,9];
+  const PC_LIST=[1,2,3];
+  const PER_CELL=15;
+  const TOTAL_TARGET=V_LIST.length*PC_LIST.length*PER_CELL;
+  // 階梯上の名前。 表で「どの Tier の条件か」を読ませるためだけに使う。
+  const TIER_OF={'7:1':'BRONZE','8:1':'SILVER','9:1':'GOLD','9:2':'LEGEND','6:1':'基礎'};
+
+  const START_MIN=72, START_MAX=120;
+  const NEXT_DELAY_MS=650;
+  /* 誤差を記録する範囲。 **判定範囲より広く取るのが要点**。
+     GOOD がゲージ端で切れるため、 判定範囲だけを記録すると観測が
+     打ち切られ、 平均が実際より 0 へ寄る。 */
+  const RECORD_MS=400;
+  const SPAWN_HZ=760;
+  const cellState={v:-1,pc:-1,cells:[]};
+
+  /* ============================================================
+     検証対象のモデル (ParrySystem.cs と同じ式・同じ定数)。
+     画面上で実測と並べるために、 ここへ再実装してある。
+     **定数を変えたら C# 側と必ず突き合わせること。**
+     ============================================================ */
+  const sigmoid=x=>1/(1+Math.exp(-x));
+  const leadMsOf=v=>v*TICK_MS;
+  const modelBias=v=>65.0*(1.0-sigmoid((leadMsOf(v)-161.5)/14.6));
+  const lowOf=v=>1.0-sigmoid((leadMsOf(v)-90.0)/20.0);
+  const tailWeightOf=v=>0.20+0.30*lowOf(v);
+  const tailSdOf=v=>44.0*(1.0+3.5*lowOf(v));
+  const strayOf=v=>0.008+0.22*(1.0-sigmoid((leadMsOf(v)-104.2)/16.7));
+  // 芯 19ms / 裾 44ms の混合正規に、 戦闘中固定バイアス 6ms を独立成分として足す。
+  const CORE_SD=19.0, BIAS_SD=6.0, LAPSE=0.002;
+  const modelSd=v=>{
+    const w=tailWeightOf(v), st=tailSdOf(v);
+    return Math.sqrt((1-w)*CORE_SD*CORE_SD + w*st*st + BIAS_SD*BIAS_SD);
+  };
+  /* 正規分布の累積。 Abramowitz-Stegun 7.1.26 の erf 近似 (絶対誤差 1.5e-7)。
+     外部ライブラリを読めないので手で置く。 */
+  function erf(x){
+    const s=x<0?-1:1; x=Math.abs(x);
+    const t=1/(1+0.3275911*x);
+    const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);
+    return s*y;
+  }
+  const Phi=z=>0.5*(1+erf(z/Math.SQRT2));
+  /* 猶予 pc での PERFECT 率の予測。 **誤差分布は猶予に依存しない**という
+     前提のもとで、 帯の幅だけを変えて積分したもの。 実測がここから
+     系統的に外れるなら、 前提の側が間違っている。 */
+  function modelPerfect(v,pc){
+    const b=modelBias(v), hw=pc/2*TICK_MS;
+    const w=tailWeightOf(v);
+    const s1=Math.sqrt(CORE_SD*CORE_SD+BIAS_SD*BIAS_SD);
+    const st=tailSdOf(v), s2=Math.sqrt(st*st+BIAS_SD*BIAS_SD);
+    const band=s=>Phi((hw-b)/s)-Phi((-hw-b)/s);
+    return (1-LAPSE)*(1-strayOf(v))*((1-w)*band(s1)+w*band(s2));
+  }
+
+  let audioCtx=null;
+  function beep(hz,dur){
+    const d=dur||0.07;
+    try{
+      if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+      if(audioCtx.state==='suspended')audioCtx.resume();
+      const t=audioCtx.currentTime;
+      const osc=audioCtx.createOscillator(), g=audioCtx.createGain();
+      osc.type='square'; osc.frequency.setValueAtTime(hz,t);
+      g.gain.setValueAtTime(0.0001,t);
+      g.gain.exponentialRampToValueAtTime(0.25,t+0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+d);
+      osc.connect(g); g.connect(audioCtx.destination);
+      osc.start(t); osc.stop(t+d+0.01);
+    }catch(e){ /* 音が出せない環境でも判定は続ける */ }
+  }
+
+  const $=id=>document.getElementById(id);
+  const ui={
+    phase:$('phase'),trialText:$('trialText'),lane:$('lane'),result:$('result'),
+    detail:$('detail'),foresightReadout:$('foresightReadout'),spaceKey:$('spaceKey'),cueInfo:$('cueInfo'),
+    start:$('start'),reset:$('reset'),attempts:$('attempts'),progress:$('progress'),
+    perfectRate:$('perfectRate'),greatPlusRate:$('greatPlusRate'),
+    meanErr:$('meanErr'),sdErr:$('sdErr'),bars:$('bars'),hbody:$('hbody'),
+    banner:$('progressBanner'),exportBox:$('exportBox'),
+    expSummary:$('expSummary'),expRaw:$('expRaw'),expCopy:$('expCopy'),expDownload:$('expDownload'),expHide:$('expHide')
+  };
+  const grades=['PERFECT','GREAT','GOOD','FAIL','MISS'];
+  const colors={PERFECT:'#ffd166',GREAT:'#5ce9ff',GOOD:'#73eda0',FAIL:'#ff637c',MISS:'#b56a79'};
+
+  let running=false,phase='idle',attackNo=0,attack=null,raf=0,nextTimer=0;
+  let lastFrame={idx:null,t:0};
+  let stats=freshStats();
+  let cells=new Map();          // key "v:pc" → 集計
+  let rawLog=[];
+
+  function freshStats(){return{count:0,PERFECT:0,GREAT:0,GOOD:0,FAIL:0,MISS:0,sum:0,sumSq:0,timed:0};}
+  const keyOf=(v,pc)=>v+':'+pc;
+  function bucket(v,pc){
+    const k=keyOf(v,pc);
+    let b=cells.get(k);
+    if(!b){b=freshStats();cells.set(k,b);}
+    return b;
+  }
+  function allKeys(){
+    const out=[];
+    for(const v of V_LIST) for(const pc of PC_LIST) out.push([v,pc]);
+    return out;
+  }
+
+  /* 0.5 は 0 から遠い側へ丸める。 **奇関数**であること (roundTick(-x) === -roundTick(x)) が
+     表示と判定の一致に効く ── 表示は (impact-now)、 判定は (input-impact) と符号が逆。
+     ただしこれは **セルの位置を出すためだけ** に使う。 grade は ms から直接決める。 */
+  function roundTick(x){return x>=0?Math.floor(x+.5):Math.ceil(x-.5);}
+
+  /* **判定は ms 建て**。 猶予 2f は「中央セルの左右半分ずつ」で、 整数セルに
+     乗らないため。 帯の半幅は pc/2 セル、 GREAT はその外へ 1 セル、
+     GOOD はゲージ端 (= 予見 v セル) まで。 */
+  function gradeOf(errMs,v,pc){
+    const a=Math.abs(errMs);
+    const pw=pc/2*TICK_MS;
+    if(a<pw)return 'PERFECT';
+    if(a<pw+TICK_MS)return 'GREAT';
+    return a<pw+v*TICK_MS?'GOOD':'FAIL';
+  }
+
+  function inputTime(e){
+    const now=performance.now();
+    const t=e&&typeof e.timeStamp==='number'?e.timeStamp:0;
+    return (t>0&&t<=now+1&&now-t<1000)?t:now;
+  }
+
+  function pct(n,d){return d?`${(n*100/d).toFixed(1)}%`:'—';}
+  function signed(n){return n>0?`+${n}`:`${n}`;}
+  function sdOf(b){
+    if(b.timed<2)return null;
+    const m=b.sum/b.timed;
+    return Math.sqrt(Math.max(0,(b.sumSq/b.timed-m*m)*b.timed/(b.timed-1)));
+  }
+
+  /* 次に採るセル。 **等確率では引かない** ── 残り本数に比例させ、
+     全セルが同時に埋まるようにする。 これが「必要なサンプルだけ採る」の中身。 */
+  function drawCell(){
+    const all=allKeys();
+    const need=all.filter(([v,pc])=>bucket(v,pc).count<PER_CELL);
+    const pool=need.length?need:all;
+    const weights=pool.map(([v,pc])=>need.length?Math.max(1,PER_CELL-bucket(v,pc).count):1);
+    const total=weights.reduce((a,b)=>a+b,0);
+    let r=Math.random()*total;
+    for(let i=0;i<pool.length;i++){ r-=weights[i]; if(r<=0)return pool[i]; }
+    return pool[pool.length-1];
+  }
+  function collectedTotal(){
+    return allKeys().reduce((s,[v,pc])=>s+Math.min(bucket(v,pc).count,PER_CELL),0);
+  }
+  function allTargetsMet(){return allKeys().every(([v,pc])=>bucket(v,pc).count>=PER_CELL);}
+
+  /* ゲージを組む。 **長さは予見に連動**し、 左 v 個 + 中央 1 個 + 右 v 個。
+     PERFECT / GREAT の帯はセルではなくオーバーレイで描く ── 猶予 2f は
+     セル境界が中心になり、 格子に乗らないため。 幅は ms から直接出す。 */
+  function buildCells(v,pc){
+    const CELL_W=22, GAP=2;
+    if(cellState.v!==v||!cellState.cells.length){
+      cellState.v=v;
+      const frag=document.createDocumentFragment();
+      for(let i=0;i<v*2+1;i++){
+        const c=document.createElement('div');
+        c.className='cell';
+        frag.appendChild(c);
+      }
+      const band=document.createElement('div'); band.id='perfectBand';
+      const gband=document.createElement('div'); gband.id='greatBand';
+      frag.appendChild(gband); frag.appendChild(band);
+      ui.lane.replaceChildren(frag);
+      cellState.cells=[...ui.lane.querySelectorAll('.cell')];
+    }
+    cellState.pc=pc;
+    // 帯の幅は「セル幅 + 隙間」を 1 tick 分として換算する。
+    const unit=CELL_W+GAP;
+    const band=ui.lane.querySelector('#perfectBand');
+    const gband=ui.lane.querySelector('#greatBand');
+    band.style.width=(pc*unit)+'px';
+    band.setAttribute('data-label',`PERFECT ${pc}f / ±${(pc/2*TICK_MS).toFixed(1)}ms`);
+    gband.style.width=((pc+2)*unit)+'px';
+  }
+
+  function beginSession(){
+    if(running){stopSession();return;}
+    if(allTargetsMet()){
+      ui.detail.textContent='全セルが目標本数に達しています。追加で採るなら「記録消去」してから開始してください。';
+      return;
+    }
+    running=true;
+    ui.banner.style.display='none';
+    ui.start.textContent='停止';ui.start.classList.remove('primary');
+    scheduleAttack(350);
+  }
+  function stopSession(){
+    running=false;phase='idle';attack=null;
+    cancelAnimationFrame(raf);clearTimeout(nextTimer);
+    clearNotes();
+    ui.start.textContent='開始';ui.start.classList.add('primary');ui.phase.textContent='停止中';
+  }
+  function scheduleAttack(ms){clearTimeout(nextTimer);nextTimer=setTimeout(()=>{if(running)beginAttack();},ms);}
+
+  function beginAttack(){
+    attackNo++;
+    const [v,pc]=drawCell();
+    const wait=START_MIN+Math.floor(Math.random()*(START_MAX-START_MIN+1));
+    const impact=performance.now()+wait*TICK_MS;
+    attack={v,pc,wait,impact,grade:null,q:null,rawMs:null,spawned:false,judgedIdx:null,shownIdx:null};
+    lastFrame={idx:null,t:0};
+    phase='active';ui.phase.textContent='PARRY ACTIVE';
+    ui.result.textContent='ARMED';ui.result.className='';
+    const b=bucket(v,pc), tier=TIER_OF[keyOf(v,pc)];
+    ui.cueInfo.textContent=`予見 ${v} / 猶予 ${pc}f${tier?'  ('+tier+')':''}  —  このセル ${b.count}/${PER_CELL}`;
+    ui.foresightReadout.textContent=`予見 ${v}（${Math.round(v*TICK_MS)}ms）/ 全長 ${v*2+1} セル / PERFECT ±${(pc/2*TICK_MS).toFixed(1)}ms`;
+    ui.trialText.textContent=`ATTACK ${attackNo}`;
+    ui.detail.textContent='装填 ── 点灯が金の帯へ重なった瞬間に入力';
+    buildCells(v,pc);clearNotes();
+    raf=requestAnimationFrame(frame);
+  }
+
+  function frame(now){
+    if(!running||!attack)return;
+    if(attack.grade){renderJudged();finishAttack();return;}
+    updateNote(now);
+    // 記録範囲を抜けたら無入力として確定する。 判定範囲ではなく **記録範囲**で切る。
+    if(now>attack.impact+RECORD_MS){
+      attack.grade='MISS';renderJudged();finishAttack();return;
+    }
+    raf=requestAnimationFrame(frame);
+  }
+
+  function updateNote(now){
+    const cs=cellState.cells;
+    if(!cs.length||!attack)return;
+    const v=cellState.v;
+    for(const c of cs)c.classList.remove('lit','late');
+    const snapped=roundTick((attack.impact-now)/TICK_MS);
+    if(!attack.spawned&&snapped<=v){attack.spawned=true;beep(SPAWN_HZ,0.045);}
+    const idx=v-snapped;
+    lastFrame={idx:(idx>=0&&idx<cs.length)?idx:null,t:now};
+    if(idx<0||idx>=cs.length)return;
+    cs[idx].classList.add(idx>v?'late':'lit');
+  }
+
+  function renderJudged(){
+    const cs=cellState.cells;
+    for(const c of cs)c.classList.remove('lit','late','hit');
+    if(attack&&attack.judgedIdx!==null&&attack.judgedIdx>=0&&attack.judgedIdx<cs.length)
+      cs[attack.judgedIdx].classList.add('hit');
+  }
+
+  function input(e){
+    ui.spaceKey.classList.add('active');setTimeout(()=>ui.spaceKey.classList.remove('active'),80);
+    if(!running||phase!=='active'||!attack||attack.grade)return;
+    const errMs=inputTime(e)-attack.impact;
+    /* **記録範囲の外だけを無視する。** 判定範囲 (ゲージ端) の外でも、
+       記録範囲の内なら誤差を必ず残す ── ここを捨てると観測が打ち切られ、
+       平均誤差が実際より 0 へ寄って模型の検証にならない。 */
+    if(Math.abs(errMs)>RECORD_MS){
+      ui.detail.textContent=`記録範囲外（${errMs>=0?'+':''}${errMs.toFixed(0)}ms）── ノーツは未消費`;
+      return;
+    }
+    attack.grade=gradeOf(errMs,attack.v,attack.pc);
+    attack.rawMs=errMs;
+    attack.q=roundTick(errMs/TICK_MS);
+    attack.judgedIdx=cellState.v+attack.q;
+    attack.shownIdx=lastFrame.idx;
+  }
+
+  function finishAttack(){
+    cancelAnimationFrame(raf);phase='result';
+    const g=attack.grade;
+    stats.count++;stats[g]++;
+    const b=bucket(attack.v,attack.pc);
+    b.count++;b[g]++;
+    if(attack.rawMs!==null){
+      stats.sum+=attack.rawMs;stats.sumSq+=attack.rawMs*attack.rawMs;stats.timed++;
+      b.sum+=attack.rawMs;b.sumSq+=attack.rawMs*attack.rawMs;b.timed++;
+    }
+
+    rawLog.push({
+      no:attackNo,v:attack.v,pc:attack.pc,graceMs:Math.round(attack.v*TICK_MS),
+      perfectHalfMs:(attack.pc/2*TICK_MS).toFixed(2),cells:attack.v*2+1,
+      waitTicks:attack.wait,grade:g,
+      q:attack.q===null?'':attack.q,
+      errMs:attack.rawMs===null?'':attack.rawMs.toFixed(1),
+      inGauge:attack.q===null?'':(Math.abs(attack.q)<=attack.v?1:0)
+    });
+
+    ui.result.textContent=g;ui.result.className=g.toLowerCase();ui.phase.textContent='判定確定';
+    if(attack.q===null){
+      ui.detail.textContent=`${g}（入力なし）`;
+    }else{
+      const drift=(attack.shownIdx===null||attack.shownIdx===attack.judgedIdx)
+        ? '一致' : `描画は ${signed(attack.shownIdx-attack.judgedIdx)} セル前`;
+      const out=Math.abs(attack.q)>attack.v?'  ｜ ゲージ外':'';
+      ui.detail.textContent=`${g}  ${attack.rawMs>=0?'+':''}${attack.rawMs.toFixed(1)}ms  `
+        + `(q=${signed(attack.q)})  ｜ 判定セル ⇄ 描画: ${drift}${out}`;
+    }
+    updateStats();
+
+    // **目標を満たしたら自分で止まる。** 何発打てばいいかを人間が数えなくて済むように。
+    if(allTargetsMet()){
+      stopSession();
+      ui.banner.style.display='block';
+      ui.banner.textContent=`採取完了 ── 12 セル全てが ${PER_CELL} 本に到達（計 ${stats.count} 攻撃）。CSV を出力してください。`;
+      ui.phase.textContent='採取完了';
+      return;
+    }
+    scheduleAttack(NEXT_DELAY_MS);
+  }
+
+  function clearNotes(){for(const c of cellState.cells)c.classList.remove('lit','late');}
+
+  function updateStats(){
+    const s=stats;
+    ui.attempts.textContent=s.count;
+    ui.progress.textContent=`${Math.round(collectedTotal()*100/TOTAL_TARGET)}%`;
+    ui.perfectRate.textContent=pct(s.PERFECT,s.count);
+    ui.greatPlusRate.textContent=pct(s.PERFECT+s.GREAT,s.count);
+    ui.meanErr.textContent=s.timed?`${s.sum/s.timed>=0?'+':''}${(s.sum/s.timed).toFixed(1)}`:'—';
+    const sd=sdOf(s);
+    ui.sdErr.textContent=sd===null?'—':sd.toFixed(1);
+    ui.bars.replaceChildren(...grades.map(g=>{
+      const row=document.createElement('div'),rate=s.count?s[g]*100/s.count:0;
+      row.className='barrow';
+      row.innerHTML=`<span>${g}</span><div class="bartrack"><div class="barfill" style="width:${rate}%;background:${colors[g]}"></div></div><b>${pct(s[g],s.count)}</b>`;
+      return row;
+    }));
+    renderTable();
+  }
+
+  /* セル別の一覧。 **実測と模型を同じ行に並べる**のがこの表の目的。
+     「平均判定」は観測平均 ±2SE が模型の予測平均を含むか ── これは
+     反応遅れ曲線の検証。 「模型 PERFECT」は **誤差分布が猶予に依存しない**
+     と仮定した予測で、 実測がここから系統的に外れるなら前提が誤り。 */
+  function renderTable(){
+    const rows=[];
+    for(const v of V_LIST){
+      for(const pc of PC_LIST){
+        const b=bucket(v,pc),tr=document.createElement('tr');
+        const cls=[];
+        if(pc===PC_LIST[0])cls.push('grouptop');
+        if(b.count>=PER_CELL)cls.push('done');
+        if(cls.length)tr.className=cls.join(' ');
+        const mean=b.timed?b.sum/b.timed:null;
+        const sd=sdOf(b);
+        const se=(sd!==null&&b.timed)?sd/Math.sqrt(b.timed):null;
+        const pm=modelBias(v);
+        let verdict='<td class="wait">採取中</td>';
+        if(se!==null&&b.timed>=8)
+          verdict=Math.abs(mean-pm)<=2*se?'<td class="ok">一致</td>':'<td class="ng">不一致</td>';
+        const tier=TIER_OF[keyOf(v,pc)];
+        const bar=Math.min(100,b.count*100/PER_CELL);
+        tr.innerHTML=
+           `<td>予見${v} / ${pc}f</td>`
+          +`<td class="tier">${tier||'—'}</td>`
+          +`<td>${Math.round(v*TICK_MS)}</td>`
+          +`<td>±${(pc/2*TICK_MS).toFixed(1)}</td>`
+          +`<td class="n mini">${b.count} / ${PER_CELL}<i style="width:${bar}%"></i></td>`
+          +`<td>${mean===null?'—':(mean>=0?'+':'')+mean.toFixed(1)}</td>`
+          +`<td>${se===null?'—':'±'+(2*se).toFixed(1)}</td>`
+          +`<td>${(pm>=0?'+':'')+pm.toFixed(1)}</td>`
+          +verdict
+          +`<td>${pct(b.PERFECT,b.count)}</td>`
+          +`<td>${(modelPerfect(v,pc)*100).toFixed(1)}%</td>`
+          +`<td>${pct(b.PERFECT+b.GREAT,b.count)}</td>`;
+        rows.push(tr);
+      }
+    }
+    ui.hbody.replaceChildren(...rows);
+  }
+
+  function resetStats(){
+    stopSession();
+    stats=freshStats();cells=new Map();rawLog=[];attackNo=0;
+    ui.banner.style.display='none';
+    updateStats();
+    ui.result.textContent='READY';ui.result.className='';
+    ui.trialText.textContent='ATTACK 0';
+    ui.exportBox.style.display='none';ui.detail.textContent='記録を消去しました。';
+  }
+
+  // ============================================================
+  //  出力
+  // ============================================================
+
+  // 改行文字。 **ソース中にエスケープ列を直接書かない** ── 一括置換で編集するたびに
+  // 実改行へ潰れて文字列リテラルが壊れる事故を繰り返したため、 コード点から作る。
+  const NL=String.fromCharCode(10);
+  function csvCell(x){
+    const t=String(x??'');
+    const needsQuote=t.indexOf(',')>=0||t.indexOf('"')>=0||t.indexOf(NL)>=0;
+    return needsQuote?'"'+t.split('"').join('""')+'"':t;
+  }
+  function toCsv(rows){return rows.map(r=>r.map(csvCell).join(',')).join(NL);}
+
+  /* セル別サマリ。 割合ではなく **件数と生の和** を出す ── 後から別の基準で
+     まとめ直せるようにするため。 */
+  function buildSummaryCsv(){
+    const rows=[['foresight','windowF','tier','graceMs','perfectHalfMs','n','target',
+                 'PERFECT','GREAT','GOOD','FAIL','MISS','timedN','sumErrMs','sumSqErrMs',
+                 'modelMeanMs','modelSdMs','modelPerfectPct']];
+    for(const v of V_LIST){
+      for(const pc of PC_LIST){
+        const b=bucket(v,pc);
+        rows.push([v,pc,TIER_OF[keyOf(v,pc)]||'',Math.round(v*TICK_MS),(pc/2*TICK_MS).toFixed(2),
+                   b.count,PER_CELL,b.PERFECT,b.GREAT,b.GOOD,b.FAIL,b.MISS,
+                   b.timed,b.sum.toFixed(2),b.sumSq.toFixed(2),
+                   modelBias(v).toFixed(2),modelSd(v).toFixed(2),(modelPerfect(v,pc)*100).toFixed(2)]);
+      }
+    }
+    return toCsv(rows);
+  }
+
+  /* 生ログ。 1 行 = 1 攻撃。 サマリはここから再計算できるので、 こちらが正本。
+     errMs は判定範囲外でも入っている ── 打ち切りの無い分布として使える。 */
+  function buildRawCsv(){
+    const rows=[['attackNo','foresight','windowF','graceMs','perfectHalfMs','cells',
+                 'waitTicks','grade','q','errMs','inGauge']];
+    for(const r of rawLog){
+      rows.push([r.no,r.v,r.pc,r.graceMs,r.perfectHalfMs,r.cells,r.waitTicks,r.grade,r.q,r.errMs,r.inGauge]);
+    }
+    return toCsv(rows);
+  }
+
+  function showExport(text,label){
+    if(!rawLog.length){ui.detail.textContent='出力する記録がありません。';return;}
+    ui.exportBox.value=text;ui.exportBox.style.display='block';
+    ui.detail.textContent=`${label} を表示中（${rawLog.length} 攻撃）`;
+    ui.exportBox.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+
+  function downloadCsv(){
+    if(!rawLog.length){ui.detail.textContent='出力する記録がありません。';return;}
+    const text=ui.exportBox.style.display==='block'&&ui.exportBox.value?ui.exportBox.value:buildRawCsv();
+    // ブラウザによっては blob ダウンロードが塞がれている。 その場合は表示へ落として手動コピーさせる。
+    try{
+      const blob=new Blob([text],{type:'text/csv;charset=utf-8'});
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download=`parry_${new Date().toISOString().replace(/[:.]/g,'-')}.csv`;
+      a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+      ui.detail.textContent='CSV を保存しました。';
+    }catch(e){
+      showExport(text,'CSV（保存が塞がれたため表示）');
+    }
+  }
+
+  async function copyExport(){
+    const text=ui.exportBox.value||buildRawCsv();
+    if(!text){ui.detail.textContent='出力する記録がありません。';return;}
+    try{ await navigator.clipboard.writeText(text); ui.detail.textContent='クリップボードへコピーしました。'; }
+    catch(e){ showExport(text,'CSV（コピー不可のため表示）'); ui.exportBox.select(); }
+  }
+
+  ui.start.addEventListener('click',beginSession);
+  ui.reset.addEventListener('click',resetStats);
+  ui.expSummary.addEventListener('click',()=>showExport(buildSummaryCsv(),'セル別サマリ'));
+  ui.expRaw.addEventListener('click',()=>showExport(buildRawCsv(),'生ログ'));
+  ui.expCopy.addEventListener('click',copyExport);
+  ui.expDownload.addEventListener('click',downloadCsv);
+  ui.expHide.addEventListener('click',()=>{ui.exportBox.style.display='none';});
+  ui.spaceKey.addEventListener('pointerdown',input);
+  ui.lane.addEventListener('pointerdown',input);
+  document.addEventListener('keydown',e=>{if(e.code==='Space'&&!e.repeat){e.preventDefault();input(e);}});
+
+  buildCells(8,1);updateStats();
+})();
+</script>
+</body>
+</html>

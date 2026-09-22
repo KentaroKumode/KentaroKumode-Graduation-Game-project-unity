@@ -67,6 +67,8 @@ namespace InventorySystem.PassiveSkills
         /// <summary>現在「発動している」プレイヤーパッシブスキル数（装備武器/ダイス由来＋所持パッシブ＋刻印で
         /// この戦闘に実際に登録された数。インベントリにあるだけの未装備品は含まない）。共鳴が参照する。</summary>
         public int ActivePlayerSkillCount => activeSkillNames.Count;
+        /// <summary>この戦闘に登録されたプレイヤーパッシブの ID (計装用・読み取り専用)。</summary>
+        public IReadOnlyList<string> ActivePlayerSkillIds => activeSkillNames;
 
         /// <summary>internalName → 日本語表示名のマッピング</summary>
         private Dictionary<string, string> skillDisplayNames = new Dictionary<string, string>();
@@ -244,7 +246,7 @@ namespace InventorySystem.PassiveSkills
             int n = System.Math.Min(count, distinct.Count);
             for (int i = 0; i < n && distinct.Count > 0; i++)
             {
-                int idx = UnityEngine.Random.Range(0, distinct.Count);
+                int idx = GameLoop.GameRng.RangeAuto("PassiveSkillManager.3", 0, distinct.Count);
                 string name = distinct[idx];
                 distinct.RemoveAt(idx);
                 while (activeSkillNames.Contains(name)) UnregisterSkill(name);
@@ -331,7 +333,9 @@ namespace InventorySystem.PassiveSkills
             {
                 try
                 {
+                    CombatContext.CurrentSkillId = skills[i].SkillId;
                     skills[i].Execute(trigger, context);
+                    CombatContext.CurrentSkillId = "";
                     triggeredEnemySkills.Add(skills[i].SkillId);
                 }
                 catch (System.Exception e)
@@ -428,7 +432,11 @@ namespace InventorySystem.PassiveSkills
             {
                 try
                 {
+                    CombatContext.CurrentSkillId = skills[i].SkillId;
+                    var dsBefore = CombatSystem.DmgSourceDiag.Take(context);
                     skills[i].Execute(trigger, context);
+                    CombatSystem.DmgSourceDiag.Attribute(skills[i].SkillId, dsBefore, context);
+                    CombatContext.CurrentSkillId = "";
                     triggeredPlayerSkills.Add(skills[i].SkillId);
                 }
                 catch (System.Exception e)
@@ -475,7 +483,7 @@ namespace InventorySystem.PassiveSkills
             if (context.gamblerArmed)
             {
                 int pm = context.playerDiceMax > 0 ? context.playerDiceMax : 6;
-                int v = UnityEngine.Random.value < 0.5f ? pm : 1;
+                int v = GameLoop.GameRng.Value("PassiveSkillManager.1") < 0.5f ? pm : 1;
                 for (int i = 0; i < playerDice.Length; i++) playerDice[i] = v;
                 context.gamblerArmed = false;
                 UnityEngine.Debug.Log($"[Consumables] 賭博師のダイス: 全ダイス→{v}");
@@ -557,10 +565,22 @@ namespace InventorySystem.PassiveSkills
         /// </summary>
         /// <param name="baseDamage">基本ダメージ（ダイス差）</param>
         /// <param name="pursuitDamage">追撃ダメージ（余剰ダイスのリロール合計）</param>
-        /// <param name="criticalNumerator">クリティカル確率の分子（0～9）</param>
+        /// <param name="critBaseRate">武器 + 層補正の会心率 (小数・0.11 = 11%)。 敵の攻撃では 0</param>
+        /// <param name="attackerIsEnemy">**敵の攻撃を処理するときは必ず true**。 会心判定を丸ごと飛ばす。
+        ///
+        /// 敵の攻撃 (CombatManager の敵攻撃分岐) もこの同じ関数を通る。 会心率は
+        /// レガシー分子 / `context.critRatePctAdd` / メタ精密 の合算で作られるが、 **これらは全て
+        /// プレイヤー側の値**なので、 敵の攻撃がプレイヤーの会心率で会心し、 プレイヤーの
+        /// `criticalMultiplier` で増幅されていた。
+        ///
+        /// enemies.json の criticalNumerator を全て 0 にしても止まらない ── 分子は
+        /// 加算項の 1 つでしかないため。 **敵会心の全廃 (§6-10) はこのフラグで担保する。**
+        /// 実測 (2026-08-08・500ラン): 遺物〈会心倍率+135%〉で倍率が 2.0→4.7 になると
+        /// 1〜4層の戦闘死が 43 → 97 件へ倍増し、 致死敵がトレジャーゴブリン/ハーピィ/オークと
+        /// いった雑魚で埋まった。 遺物なし (72件) より悪いという反転が起きていた。</param>
         /// <returns>(totalDamage: クリティカル適用済み合計ダメージ, fixedDamage: 別枠固定ダメージ, isCritical)</returns>
         public (int totalDamage, int fixedDamage, bool isCritical) ProcessDamage(
-            int baseDamage, int pursuitDamage, int criticalNumerator = 0)
+            int baseDamage, int pursuitDamage, float critBaseRate = 0f, bool attackerIsEnemy = false)
         {
             if (context == null) return (baseDamage + pursuitDamage, 0, false);
 
@@ -591,36 +611,111 @@ namespace InventorySystem.PassiveSkills
                 context.pursuitDamage = 0;
             }
 
+            // [診断] 段 B: damageBonus + OnPreDealDamage の通過後
+            bool diag = CombatSystem.CombatManager.DiagWinAttack;
+            var stg = CombatSystem.CombatManager.DamageStages;
+            if (diag) { stg[0]++; stg[1] += baseDamage; stg[2] += context.finalDamage; }
+
             // 5. 全ダメージ合算（メイン＋追撃）
             int totalDamage = context.finalDamage + context.pursuitDamage;
+            if (diag) stg[3] += totalDamage;   // 段 C
 
             // 6. クリティカル判定（合算後に1回だけ）
-            FireTrigger(PassiveSkillTrigger.OnCriticalCheck);
-            context.criticalBonus += (int)context.GetBuff("criticalBonus");
-
-            // Λデバフ「注意散漫」: 会心分子(X/9)の上限を 8/6/4 に制限（判定の Random(0,9) は不変）
-            int critCap = context.lambdaCritNumeratorCap > 0 ? context.lambdaCritNumeratorCap : 9;
-            int effectiveNumerator = System.Math.Min(critCap,
-                System.Math.Max(0, criticalNumerator + context.criticalBonus));
-
-            if (effectiveNumerator > 0)
-            {
-                int roll = UnityEngine.Random.Range(0, 9); // 0～8
-                context.isCritical = roll < effectiveNumerator;
-            }
-            else
+            //
+            // **敵の攻撃では会心判定を丸ごと飛ばす** (§6-10 敵会心の全廃)。
+            //   下の critAdd はプレイヤー側の会心率ソース (レガシー分子 / critRatePctAdd / メタ精密) を
+            //   合算するので、 敵の攻撃に通すとプレイヤーの会心率で敵が会心し、
+            //   プレイヤーの criticalMultiplier で増幅される。 引数の説明を参照。
+            if (attackerIsEnemy)
             {
                 context.isCritical = false;
             }
+            else
+            {
+            FireTrigger(PassiveSkillTrigger.OnCriticalCheck);
+            float dsBuffCrit = context.GetBuff(CombatContext.CritRateBuffKey);
+            context.critRatePctAdd += dsBuffCrit;
+            if (dsBuffCrit > 0f) CombatSystem.DmgSourceDiag.Note("会心率バフ(月蝕/レイピア)", CombatSystem.DmgSourceDiag.CritRate, dsBuffCrit);
+
+            if (context.critSuppressed)
+            {
+                context.isCritical = false;   // 無心の刃など: 会心そのものを封印
+            }
+            else
+            {
+                // 2026-09-19: 会心率を % に統一。 旧「分子 (1 = 5.5%)」は武器・層・〈心眼〉・バフの全経路から撤去した。
+                float critAdd = critBaseRate
+                                + context.critRatePctAdd
+                                + MetaProgression.MetaBuffApplicator.GetCritRatePctBonus();
+
+                // 挑戦デバフ〈俊敏〉: 会心率 −10/−20/−30 ポイント。
+                // 逓減は 2026-09-15 に撤去したので、 加算合計から引くのと実効率から引くのは同値。
+                // **加算側で引く形を維持する** ── 下限 0 のクランプがここに要るのは変わらない。
+                critAdd = System.Math.Max(0f,
+                    critAdd - MetaProgression.MetaDebuffApplicator.GetPlayerCritRatePenalty());
+
+                // 逓減撤去後は実質クランプのみ。 加算した分がそのまま実効会心率になる。
+                float critRate = CombatContext.ResolveCritRate(critAdd);
+                AutoTest.CritRateCensus.Note(critAdd, critRate);
+
+                // Λデバフ「注意散漫」: 実効会心率そのものに天井をかける (2026-07-27 変更)。
+                // **変換の後**に効くため、レガシー分子・critRatePctAdd のどちら経由でも貫通できない。
+                if (context.lambdaCritRateCap < 1f)
+                    critRate = System.Math.Min(critRate, context.lambdaCritRateCap);
+
+                context.isCritical = critRate > 0f && GameLoop.GameRng.Value("PassiveSkillManager.2") < critRate;
+            }
+            }   // ← if (attackerIsEnemy) の else 閉じ
 
             // 末那識など: 会心強制（乱数・会心率capを無視して確定）
-            if (context.forceCritical) context.isCritical = true;
+            // **敵の攻撃には効かせない** ── forceCritical もプレイヤー側のフラグ。
+            if (context.forceCritical && !attackerIsEnemy) context.isCritical = true;
+
+            // 注意散漫 lv3 (Λ): 会心の枝を通さない (= 会心率の天井 0)。 **非会心の枝は通る**ので
+            //   鈍器ビルドは生き残る ── 会心ビルドだけを止める。
+            if (context.lambdaNoCritBranch && !attackerIsEnemy) context.isCritical = false;
 
             if (context.isCritical && totalDamage > 0)
             {
                 FireTrigger(PassiveSkillTrigger.OnCriticalDamage);
-                totalDamage = (int)(totalDamage * context.criticalMultiplier);
+                // 敵側の会心耐性 (〈回帰性真理〉= 倍率 −0.5)。 **会心倍率が実際に乗る唯一の地点**なので
+                //   ここで引く。 criticalMultiplier 自体を下げると BeginNewTurn の再構築と
+                //   その後の加算 (メタ精密 r10 還元・希望系) に押し流される。
+                //   下限 1.0 ── 会心が通常攻撃より弱くなるのは倒錯するため。
+                float effCritMul = context.criticalMultiplier;
+                if (!attackerIsEnemy && context.enemyCritMultReduction > 0f)
+                    effCritMul = UnityEngine.Mathf.Max(1f, effCritMul - context.enemyCritMultReduction);
+                totalDamage = (int)(totalDamage * effCritMul);
+                // [診断] 会心倍率は 3.0 固定ではない (メタ精密 r10 の逓減還元・一点集中 等)。
+                // 実測の平均を取らないと会心係数を 1+p×2 で見積もれない。
+                if (diag) { stg[16] += context.criticalMultiplier; stg[17]++; }
             }
+            else if (totalDamage > 0 && !attackerIsEnemy
+                     && context.nonCritOutgoingMultiplier > 0f)
+            {
+                // 鈍器キーワード: 非会心攻撃のみ乗算 (isCritical=false 確定後に適用)
+                //
+                // **!attackerIsEnemy が要る (2026-09-08 修正)。** 上の会心側と同じ罠 ──
+                //   ADR-0009 相互攻撃モデルでは 1 ターンの中でプレイヤーの攻撃 (CombatManager
+                //   ExecuteTurnMutual の psm.ProcessDamage) と敵の攻撃 (同 attackerIsEnemy: true) が
+                //   **両方この関数を通る**。 敵の攻撃は上で isCritical=false に確定されるので
+                //   必ずこの else へ落ちるが、 nonCritOutgoingMultiplier は [perTurn] で
+                //   ターン頭にしかリセットされない ── つまりプレイヤーが同ターンに乗せた
+                //   鈍器の倍率が、 **そのまま敵の攻撃を増幅していた**。 Bludgeon_4 なら被ダメ ×2.2。
+                //
+                //   実測 (2026-09-08 / ランダム付与 30,000ラン・因果 ITT):
+                //     Bludgeon_1 (+20%)  band +0.134  被ダメ/戦 -0.41
+                //     Bludgeon_2 (+40%)  band +0.056  被ダメ/戦 +0.09
+                //     Bludgeon_3 (+70%)  band -0.125  被ダメ/戦 +0.63
+                //     Bludgeon_4(+120%)  band -0.365  被ダメ/戦 +0.66
+                //   **倍率が上がるほど被ダメが増える**という、効果の向きと逆の並びが出ていた。
+                //   会心との衝突を疑ったが交互作用は +0.024 ± 0.036 で、 原因はこちらだった。
+                //   旧パイプラインは 1 ターンに片側しか攻撃しないので発現しない
+                //   ── 相互攻撃モデルが既定になった 2026-07-27 に生まれたはず。
+                totalDamage = (int)(totalDamage * (1f + context.nonCritOutgoingMultiplier));
+                if (diag) stg[18]++;
+            }
+            if (diag) stg[4] += totalDamage;   // 段 D
 
             // 8. ダメージ確定後トリガー
             context.finalDamage = totalDamage; // 確定値をコンテキストに反映
@@ -649,13 +744,20 @@ namespace InventorySystem.PassiveSkills
         {
             context.playerDiceTotal = Sum(playerDice);
             context.enemyDiceTotal = Sum(enemyDice);
+            context.rawEnemyDiceTotal = context.enemyDiceTotal;   // [計装] 加算前を控える
 
             // バフによるダイスボーナス（無我無心: カスタムダイス以外の補正を拒否）
             if (!context.rollPurity)
                 context.playerDiceTotal += (int)context.GetBuff("diceBonus");
 
+            // 瞬間研磨剤 (剣士スターター) は 2026-07-27 に「与ダメージ+150%」へ変更。
+            // 旧実装は playerDiceTotal 加算だったが、相互攻撃モデル (ADR-0009) では
+            // 自攻撃が playerAttackPower + 攻撃端子の出目合計 で決まるため一切効かなかった。
+            // 消費点は CombatManager.ApplyWinDamageModifiers (outgoingDamageMultiplier) へ移設。
+
             // Λデバフ「重い足取り」: 1ターン目のみプレイヤーダイス合計を減算(負値・無我無心中は無効)
-            if (!context.rollPurity && context.currentTurn == 1 && context.lambdaFirstTurnDiceDelta != 0)
+            if (!context.rollPurity && context.lambdaFirstTurnDiceDelta != 0
+                && context.currentTurn >= 1 && context.currentTurn <= context.lambdaHeavyStepsTurns)
                 context.playerDiceTotal = System.Math.Max(0, context.playerDiceTotal + context.lambdaFirstTurnDiceDelta);
 
             // 敵ダイスデバフ（正義への妄執など）
@@ -673,16 +775,12 @@ namespace InventorySystem.PassiveSkills
             // 敵スタンス（ADR-0005）の弱ロールは「面を縮めて実際に振る」方式（CombatManager の RollDice 時）。
             // ＝ここでの合計いじりは無し（事後倍率にしない方針）。
 
-            // 〈妙覚〉T1自由攻撃ターンは敵ロールを確実に0に保つ（真我/星火等の加算を乗せない）。
-            if (!context.myokakuFreeHit)
-            {
-                // 星火燎原 等: 敵(ボス)ダイス合計への加算（勝敗判定前＝ロールを実際に押し上げる）
-                if (context.enemyDiceTotalBonus > 0)
-                    context.enemyDiceTotal += context.enemyDiceTotalBonus;
-                // ボス威風 + 真我（別枠・固定。 真我=7層覚者の素ロール加算でダイス上限超の難度調整）
-                if (context.bossDiceBonus > 0)
-                    context.enemyDiceTotal += context.bossDiceBonus;
-            }
+            // 星火燎原 等: 敵(ボス)ダイス合計への加算（勝敗判定前＝ロールを実際に押し上げる）
+            if (context.enemyDiceTotalBonus > 0)
+                context.enemyDiceTotal += context.enemyDiceTotalBonus;
+            // ボス威風（別枠・固定）
+            if (context.bossDiceBonus > 0)
+                context.enemyDiceTotal += context.bossDiceBonus;
 
             // Λデバフ「苛立つ強敵」: 経過 interval ターン毎に敵ダイス合計 +1（累積）
             if (context.lambdaIrritatingInterval > 0 && context.currentTurn > 0)
@@ -733,11 +831,10 @@ namespace InventorySystem.PassiveSkills
         }
 
         /// <summary>引き分け解消用にダイス配列を in-place で振り直す。
-        /// サドンデス中は両者1d6、コントラタック中はプレイヤーを1固定で維持する。
+        /// コントラタック中はプレイヤーを1固定で維持する。
         /// 装備ダイス面(equippedDiceFaces)があればプレイヤー側はそこから抽選。</summary>
         private void RerollDiceForDraw(int[] playerDice, int[] enemyDice)
         {
-            bool sudden = context.ashenSuddenDeath || context.myokakuSuddenDeath;
             bool contre = context.GetAccumulated("player_contre") > 0;
             int pMax = context.playerDiceMax > 0 ? context.playerDiceMax : 6;
             int eMax = context.enemyDiceMax > 0 ? context.enemyDiceMax : 6;
@@ -746,19 +843,17 @@ namespace InventorySystem.PassiveSkills
             {
                 for (int i = 0; i < playerDice.Length; i++)
                 {
-                    if (sudden)
-                        playerDice[i] = UnityEngine.Random.Range(1, 7);
-                    else if (context.equippedDiceFaces != null && context.equippedDiceFaces.Length > 0)
-                        playerDice[i] = context.equippedDiceFaces[UnityEngine.Random.Range(0, context.equippedDiceFaces.Length)];
+                    if (context.equippedDiceFaces != null && context.equippedDiceFaces.Length > 0)
+                        playerDice[i] = context.equippedDiceFaces[GameLoop.GameRng.RangeAuto("PassiveSkillManager.5", 0, context.equippedDiceFaces.Length)];
                     else
-                        playerDice[i] = UnityEngine.Random.Range(1, pMax + 1);
+                        playerDice[i] = GameLoop.GameRng.RangeAuto("PassiveSkillManager.6", 1, pMax + 1);
                 }
             }
 
             if (enemyDice != null)
             {
                 for (int i = 0; i < enemyDice.Length; i++)
-                    enemyDice[i] = sudden ? UnityEngine.Random.Range(1, 7) : UnityEngine.Random.Range(1, eMax + 1);
+                    enemyDice[i] = GameLoop.GameRng.RangeAuto("PassiveSkillManager.8", 1, eMax + 1);
             }
         }
 

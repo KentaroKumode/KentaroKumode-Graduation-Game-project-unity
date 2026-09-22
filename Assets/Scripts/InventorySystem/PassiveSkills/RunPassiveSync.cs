@@ -56,6 +56,11 @@ namespace InventorySystem.PassiveSkills
                 {
                     var data = db.GetItem(id);
                     if (data?.passiveSkills == null || data.passiveSkills.Count == 0) continue;
+                    // **武器は装備枠からだけ効かせる (2026-09-20 修正)。** 購入・入手した武器も
+                    //   ownedPassiveItems に入るため、 ここで拾うと (a) 装備していない予備の武器のスキルが発動し、
+                    //   (b) 装備中の段階式武器は静的 skills と動的付与 (WeaponProgression) で二重に発火していた。
+                    //   実測: 攻撃の 97% で武器が所持一覧にあり、 〈果たし合い〉はほぼ常時 2 重 (額面の 2 倍)。
+                    if (data.category == ItemCategory.Weapon) continue;
 
                     // 名前付き固有パッシブ（PassiveItemRegistry に登録済み）は PassiveItemManager で
                     // 別経路発動するため、PassiveSkillManager 側には流さず二重発火を防ぐ。
@@ -72,6 +77,7 @@ namespace InventorySystem.PassiveSkills
                 {
                     var data = db.GetItem(id);
                     if (data?.passiveSkills == null || data.passiveSkills.Count == 0) continue;
+                    if (data.category == ItemCategory.Weapon) continue;   // 武器は装備枠からだけ (上と同じ)
                     if (PassiveItems.PassiveItemRegistry.Get(id) != null) continue; // ITimedEffectは別経路
                     list.Add(data);
                 }

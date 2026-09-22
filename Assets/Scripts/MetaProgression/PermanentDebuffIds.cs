@@ -7,7 +7,7 @@ namespace MetaProgression
     /// メタ層から付与される固有恒久デバフの ID 定数。
     /// run.permanentDebuffs に格納される文字列キーとして使う。
     /// 効果説明・大罪フレーバー本文も本ファイルに正本として持つ
-    /// (旧 docs/specs/lore-endings.md §1-F の本文をここへ移植済み)。
+    /// (旧 docs/GAME.md §19-6 の本文をここへ移植済み)。
     /// </summary>
     public static class PermanentDebuffIds
     {

@@ -9,68 +9,24 @@ namespace InventorySystem.PassiveItems.Effects
     /// <summary>
     /// 巡礼者の杖: 戦闘終了時、50%で空腹度+1。
     /// </summary>
+    // 2026-07-18 死コード掃除: MemoryHourglass/ReapersBeads/StormCrest/SilentSwordbelt/FrenzyMedallion/
+    //  SilentRobe/BlackSmokeTalisman/AzureEye/GuardianAngelBell の 9 effect を class ごと削除 (対応アイテム削除済み)
     public class PilgrimStaffEffect : ITimedEffect
     {
-        public string Id => "巡礼者の杖";
+        public string Id => "心軽めの巡礼杖";
         public TimedEffectTrigger Trigger => TimedEffectTrigger.CombatEnd;
 
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
             // 飢餓→希望統合(ADR-0002): 旧「空腹度+1」を希望+1へ
-            if (run == null || Random.value >= 0.5f) return;
+            // 2026-09-05: **50% 抽選を廃止して常時発動**。 期待値 +0.5/戦闘 では
+            //   希望の減り (戦闘あたり -4〜-6) に対して桁が合わず、 準パワー -1.60 だった。
+            if (run == null) return;
             GameLoop.HopeSystem.ApplyFood(run, 1);
             Debug.Log($"[PassiveItem] 巡礼者の杖発動: 希望+1 ({run.hope}/{run.hopeCap})");
         }
     }
 
-    /// <summary>
-    /// 記憶の砂時計: 3ターンごとに、その3T区間で敵に与えた累積ダメの30%を
-    /// 軽減不可ダメージとして敵にもう一度叩き込む（蓄積はその度にリセット）。
-    /// 実装:
-    ///  ・OnTurnEnd で毎ターン、前回スナップショットからの敵HP減少量を hourglassPendingDamageWindow に加算
-    ///  ・ターンが 3 の倍数(3/6/9...) で 30% を DealFixedDamageToEnemy 経由で叩き、ウィンドウをリセット
-    ///  ・スナップショットは ctx.hourglassLastEnemyHPSnap で保持（ここでフィールド名を統一）
-    /// </summary>
-    public class MemoryHourglassEffect : ITimedEffect
-    {
-        public string Id => "記憶の砂時計";
-        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnTurnEnd;
-
-        // 直前ターン終了時の敵HPスナップショット (戦闘ごとに先頭で初期化)
-        private static int _lastEnemyHPSnap;
-        private static bool _initialized;
-        private static int _ownerCombatToken;
-
-        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
-        {
-            if (ctx == null || combat == null || !combat.IsCombatActive) return;
-
-            // CombatStart で初期化されない設計のため、 token (currentTurn==1 で reset) で疑似初期化
-            int token = combat.GetHashCode() ^ combat.EnemyMaxHP;
-            if (!_initialized || _ownerCombatToken != token || ctx.currentTurn <= 1)
-            {
-                _lastEnemyHPSnap = combat.EnemyHP;
-                _ownerCombatToken = token;
-                _initialized = true;
-                ctx.hourglassPendingDamageWindow = 0;
-            }
-
-            // このターンに与えたダメージ = 前回スナップ - 現在敵HP
-            int dealt = System.Math.Max(0, _lastEnemyHPSnap - combat.EnemyHP);
-            ctx.hourglassPendingDamageWindow += dealt;
-            _lastEnemyHPSnap = combat.EnemyHP;
-
-            // 3ターン区切りで30%を返却
-            if (ctx.currentTurn > 0 && ctx.currentTurn % 3 == 0 && ctx.hourglassPendingDamageWindow > 0)
-            {
-                int rebound = Mathf.CeilToInt(ctx.hourglassPendingDamageWindow * 0.30f);
-                Debug.Log($"[PassiveItem] 記憶の砂時計発動: T{ctx.currentTurn} 蓄積{ctx.hourglassPendingDamageWindow} → 軽減不可+{rebound}");
-                combat.DealFixedDamageToEnemy(rebound);
-                ctx.hourglassPendingDamageWindow = 0;
-                _lastEnemyHPSnap = combat.EnemyHP; // 自前ダメ後の値で続行
-            }
-        }
-    }
 
     /// <summary>
     /// 希望の灯片: 戦闘中にロール敗北を一度もせずに勝利した時、最大HP+2（永続・無限スタック）。
@@ -96,86 +52,28 @@ namespace InventorySystem.PassiveItems.Effects
         }
     }
 
-    /// <summary>
-    /// 死神の数珠: 敵を撃破するたびに +2 ゴールド。
-    /// </summary>
-    public class ReapersBeadsEffect : ITimedEffect
+
+
+
+    /// <summary>道銭の帯封: 層に入るたび ゴールド+6 (2026-09-15)。
+    ///
+    /// <para><b>層はランに 8 回しか来ない</b>ので 1 回の量を大きく取れる (+48G ≒ 獲得 316G の 15%)。
+    /// マップ移動系 (1 ラン 30〜40 回) と同じ量にすると桁が変わってしまう。</para>
+    ///
+    /// <para><b>ゴールドは倍率チェーンを通らない</b>ので、 攻撃や被ダメ軽減と違って
+    /// 値が暴れない ── atkBase に乗る量は実測で ×4.16 されるが、 金は金のまま。
+    /// 「基礎的な小品」を置ける数少ない軸。</para></summary>
+    public class RoadMoneyBandEffect : ITimedEffect
     {
-        public string Id => "死神の数珠";
-        public TimedEffectTrigger Trigger => TimedEffectTrigger.CombatEnd;
+        private const int Gain = 6;
+        public string Id => "切り分けた帯封";
+        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnFloorEnter;
 
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
-            if (run == null || combat == null) return;
-            // 戦闘勝利のときだけ加算。CombatEnd は勝敗問わず呼ばれる前提なので enemyHP=0 で判定
-            if (combat.EnemyHP > 0) return;
-            // 1/5 デノミ後: 50%で +1G (確定+1Gは強すぎたためナーフ)
-            if (UnityEngine.Random.value < 0.5f)
-            {
-                run.coins += 1;
-                Debug.Log($"[PassiveItem] 死神の数珠: +1G (50%抽選成功、現在 {run.coins})");
-            }
-        }
-    }
-
-    /// <summary>
-    /// 嵐の徽章: 戦闘開始時の1ターン目のみ、ダイス追加+1個。
-    /// CombatContext に bonusPlayerDiceCount のような追加用フィールドがあれば使う。
-    /// 現状はロール時に手動でもう1個振って合計に加える簡易実装。
-    /// </summary>
-    public class StormCrestEffect : ITimedEffect
-    {
-        public string Id => "嵐の徽章";
-        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
-
-        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
-        {
-            if (ctx == null || ctx.currentTurn != 1) return;
-            // 追加ダイス1個分を ctx.playerDiceTotal に加算（最大値の半分を期待値として2加算）
-            int bonus = Mathf.Max(1, ctx.playerDiceMax / 2);
-            ctx.playerDiceTotal += bonus;
-            Debug.Log($"[PassiveItem] 嵐の徽章: 1T目ダイス追加分 +{bonus}");
-        }
-    }
-
-    /// <summary>
-    /// 沈黙の剣帯: 戦闘中、消費アイテム使用不可。代わりに毎ターン与ダメ +1。
-    /// さらに「最初のターンの相手のダイスロール結果から-99」＝1T目のみ敵ダイス合計を-99する
-    /// (enemyDiceTotalPenalty・床なし)。実質1T目は確定大差勝ち＋基礎ダメ激増の先制必殺。
-    /// 消費禁止フラグは ItemUseHandler 側で参照する。
-    /// </summary>
-    public class SilentSwordbeltEffect : ITimedEffect
-    {
-        public string Id => "沈黙の剣帯";
-        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
-
-        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
-        {
-            if (ctx == null) return;
-            ctx.fixedDamageToEnemy += 1; // 消費封印の見返り（毎ターン）
-            // 1ターン目: 敵ダイス合計-99（床なし）。ProcessPostRoll 前なので勝敗・基礎ダメに反映される。
-            if (ctx.currentTurn == 1 && !ctx.rollPurity)
-            {
-                ctx.enemyDiceTotalPenalty += 99;
-                Debug.Log("[PassiveItem] 沈黙の剣帯: 1T目 敵ダイス合計-99（先制必殺）");
-            }
-        }
-    }
-
-    /// <summary>
-    /// 灯心の鈴: マップ移動時、10% で空腹度+1。
-    /// </summary>
-    public class WickBellEffect : ITimedEffect
-    {
-        public string Id => "灯心の鈴";
-        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnMapMove;
-
-        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
-        {
-            // 飢餓→希望統合(ADR-0002): 旧「空腹度+1」を希望+1へ
-            if (run == null || Random.value >= 0.1f) return;
-            GameLoop.HopeSystem.ApplyFood(run, 1);
-            Debug.Log($"[PassiveItem] 灯心の鈴発動: 希望+1 ({run.hope}/{run.hopeCap})");
+            if (run == null) return;
+            GameLoop.GoldIncome.Gain(run, Gain, "切り分けた帯封");
+            Debug.Log($"[PassiveItem] 道銭の帯封: 層突入 ゴールド+{Gain} (所持 {run.coins})");
         }
     }
 
@@ -183,43 +81,6 @@ namespace InventorySystem.PassiveItems.Effects
     //  HP閾値発動系
     // ============================================================
 
-    /// <summary>狂乱のメダリオン: HP≤25%で与ダメ+50%</summary>
-    /// <summary>狂乱のメダリオン (リワーク 2026-05-30): HP≤50% で +30%、 HP≤25% で +60% (差分計算で重複適用しない)。</summary>
-    public class FrenzyMedallionEffect : ITimedEffect
-    {
-        public string Id => "狂乱のメダリオン";
-        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
-        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
-        {
-            if (ctx == null || combat == null || combat.PlayerMaxHP <= 0) return;
-            int hp = combat.PlayerHP, max = combat.PlayerMaxHP;
-            float bonus = 0f;
-            if (hp * 4 <= max)      bonus = 0.60f; // ≤25%
-            else if (hp * 2 <= max) bonus = 0.30f; // ≤50%
-            else return;
-            if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
-            ctx.outgoingDamageMultiplier += bonus;
-            Debug.Log($"[PassiveItem] 狂乱のメダリオン: HP{hp}/{max} → 与ダメ+{(int)(bonus*100)}%");
-        }
-    }
-
-    /// <summary>末那識 (リワーク 2026-05-30): HP≤35% で会心確定 + 与ダメ×1.3 (旧 HP≤20% で会心のみ)。
-    /// 閾値緩和+追加倍率で発動機会と威力を 2倍化。</summary>
-    public class ManashikiEffect : ITimedEffect
-    {
-        public string Id => "末那識";
-        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
-        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
-        {
-            if (ctx == null || combat == null || combat.PlayerMaxHP <= 0) return;
-            // HP×100/Max ≤ 35 → 発動
-            if (combat.PlayerHP * 100 > combat.PlayerMaxHP * 35) return;
-            ctx.forceCritical = true;
-            if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
-            ctx.outgoingDamageMultiplier += 0.3f;
-            Debug.Log($"[PassiveItem] 末那識: HP{combat.PlayerHP}/{combat.PlayerMaxHP} → 会心確定+30%");
-        }
-    }
 
     // ============================================================
     //  歩行HP回復系
@@ -241,7 +102,7 @@ namespace InventorySystem.PassiveItems.Effects
 
     public class CalmShoesEffect : ITimedEffect
     {
-        public string Id => "安らぎの靴";
+        public string Id => "継ぎ革の旅靴";
         public TimedEffectTrigger Trigger => TimedEffectTrigger.OnMapMove;
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat) => StepHealHelper.StepHeal(1, Id);
     }
@@ -255,7 +116,7 @@ namespace InventorySystem.PassiveItems.Effects
 
     public class HolyShoesEffect : ITimedEffect
     {
-        public string Id => "神聖の靴";
+        public string Id => "聖路の白靴";
         public TimedEffectTrigger Trigger => TimedEffectTrigger.OnMapMove;
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat) => StepHealHelper.StepHeal(3, Id);
     }
@@ -264,79 +125,29 @@ namespace InventorySystem.PassiveItems.Effects
     //  その他高レア
     // ============================================================
 
-    /// <summary>黄金の天秤: 戦闘勝利時 +5G</summary>
+    /// <summary>黄金の天秤: 戦闘勝利時 +10G (2026-09-05 に +5G から増額)。
+    /// 経済のインフレに追随できておらず、 準パワー -1.13 / regβ -0.138 (2σ有意) ──
+    /// 枠を 1 つ潰して +5G は、 同じ枠に入る戦闘系パッシブに明確に負けていた。</summary>
     public class GoldenScaleEffect : ITimedEffect
     {
-        public string Id => "黄金の天秤";
+        public string Id => "戦果で傾く天秤";
         public TimedEffectTrigger Trigger => TimedEffectTrigger.CombatEnd;
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
             if (run == null || combat == null) return;
             if (combat.EnemyHP > 0) return; // 勝利ではない
-            int gain = LastStand.FilterGoldGain(run, 5);
-            run.coins += gain;
+            int gain = GameLoop.GoldIncome.Gain(run, 10, "戦果で傾く天秤");
             if (gain > 0) Debug.Log($"[PassiveItem] 黄金の天秤: +{gain}G");
         }
     }
 
-    /// <summary>倍音のクロック (2026-06-03 リバフ): 3の倍数ターンで outgoing+=1.0 (×2.0)。
-    /// 旧 +0.5 (×1.5) → +1.0 (×2.0)。 不発ターンが多くE帯だったため発火時の威力を倍化。</summary>
-    public class HarmonicClockEffect : ITimedEffect
-    {
-        public string Id => "倍音のクロック";
-        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
-        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
-        {
-            if (ctx == null || ctx.currentTurn <= 0 || ctx.currentTurn % 3 != 0) return;
-            if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
-            ctx.outgoingDamageMultiplier += 1.0f; // 1.0 → 2.0
-            Debug.Log($"[PassiveItem] 倍音のクロック: T{ctx.currentTurn} 拍 与ダメ×2.0");
-        }
-    }
 
-    /// <summary>静寂のローブ: 戦闘1ターン目のみ敵パッシブ発動しない</summary>
-    public class SilentRobeEffect : ITimedEffect
-    {
-        public string Id => "静寂のローブ";
-        public TimedEffectTrigger Trigger => TimedEffectTrigger.CombatStart;
-        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
-        {
-            if (ctx == null) return;
-            ctx.enemyPassivesDisabledTurns = 1;
-            Debug.Log("[PassiveItem] 静寂のローブ: 1ターン目の敵パッシブを封印");
-        }
-    }
 
-    /// <summary>黒煙の符: 戦闘開始時、敵に出血+2付与</summary>
-    public class BlackSmokeTalismanEffect : ITimedEffect
-    {
-        public string Id => "黒煙の符";
-        public TimedEffectTrigger Trigger => TimedEffectTrigger.CombatStart;
-        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
-        {
-            if (ctx == null) return;
-            ctx.enemyBleedStacks += 2;
-            Debug.Log("[PassiveItem] 黒煙の符: 敵に出血+2スタック付与");
-        }
-    }
-
-    /// <summary>蒼穹の眼: 戦闘1ターン目のロール必ず会心ヒット</summary>
-    public class AzureEyeEffect : ITimedEffect
-    {
-        public string Id => "蒼穹の眼";
-        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
-        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
-        {
-            if (ctx == null || ctx.currentTurn != 1) return;
-            ctx.criticalBonus = Mathf.Max(ctx.criticalBonus, 9);
-            Debug.Log("[PassiveItem] 蒼穹の眼: 1ターン目会心確定");
-        }
-    }
 
     /// <summary>鋼の心臓: 戦闘終了時HP+5（最大HP+20は獲得時ボーナスで適用）</summary>
     public class IronHeartEffect : ITimedEffect
     {
-        public string Id => "鋼の心臓";
+        public string Id => "脈なしの鋼心臓";
         public TimedEffectTrigger Trigger => TimedEffectTrigger.CombatEnd;
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
@@ -346,28 +157,12 @@ namespace InventorySystem.PassiveItems.Effects
         }
     }
 
-    /// <summary>守護天使の鈴: 戦闘中1回限り、HP25以下になったターン末にHP+15</summary>
-    public class GuardianAngelBellEffect : ITimedEffect
-    {
-        public string Id => "守護天使の鈴";
-        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnTurnEnd;
-        private const string Key = "guardian_angel_used";
-        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
-        {
-            if (ctx == null || combat == null) return;
-            if (ctx.accumulatedValues.TryGetValue(Key, out var used) && used > 0f) return;
-            if (combat.PlayerHP <= 0 || combat.PlayerHP > 25) return;
-            int healed = combat.HealPlayer(15);
-            ctx.accumulatedValues[Key] = 1f;
-            Debug.Log($"[PassiveItem] 守護天使の鈴: HP+{healed}（戦闘中1回限り）");
-        }
-    }
 
     /// <summary>災厄の指輪 (リワーク 2026-05-30): 被弾するたび次の与ダメ+3累積 (上限+15、戦闘終了リセット)。
     /// 旧+2/+10 → +3/+15 で 1.5倍化。</summary>
     public class CalamityRingEffect : ITimedEffect
     {
-        public string Id => "災厄の指輪";
+        public string Id => "傷覚えの災環";
         public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
         private const string Stack = "calamity_stack";
         private const string LastHP = "calamity_last_hp";
@@ -399,7 +194,7 @@ namespace InventorySystem.PassiveItems.Effects
     /// <summary>永遠の燈 (リワーク 2026-05-30): 戦闘終了時 HPが最大の25%以下なら最大HPの50%まで回復。</summary>
     public class EternalLanternEffect : ITimedEffect
     {
-        public string Id => "永遠の燈";
+        public string Id => "鑑定済みの無害灯";
         public TimedEffectTrigger Trigger => TimedEffectTrigger.CombatEnd;
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
@@ -477,32 +272,45 @@ namespace InventorySystem.PassiveItems.Effects
     /// 希望ビルドの序盤の足場。希望システム(ADR-0002)へ直接接続。</summary>
     public class PilgrimCharmEffect : ITimedEffect
     {
-        public string Id => "巡礼の杖飾り";
+        public string Id => "四歩返しの杖飾り";
         public TimedEffectTrigger Trigger => TimedEffectTrigger.OnMapMove;
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
-            if (run == null || Random.value >= 0.25f) return;
+            if (run == null || GameLoop.GameRng.Value("passiveItem.staffCharm") >= 0.25f) return;
             HopeSystem.ApplyFood(run, 1);
             Debug.Log($"[PassiveItem] 巡礼の杖飾り: 希望+1 ({run.hope}/{run.hopeCap})");
         }
     }
 
-    /// <summary>狂宴の仮面 (SILVER): 希望が低いほど与ダメージ上昇（悲観以下+10% / 絶望以下+25%）。
-    /// 発狂(佯狂者)ビルドや低希望ハイリスク戦法を火力で報いる。OnRoll で毎ターン再適用。</summary>
-    public class RevelMaskEffect : ITimedEffect
+    /// <summary>幸運の硬貨: 戦闘勝利時 ゴールド+3 (2026-09-18)。
+    /// 〈黄金の天秤〉(+10G/勝) の 3 割。 イベントで無料で渡されるので BRONZE 相当に抑える。</summary>
+    public class LuckyCoinEffect : ITimedEffect
     {
-        public string Id => "狂宴の仮面";
-        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
+        private const int Gain = 3;
+        public string Id => "幸運の硬貨";
+        public TimedEffectTrigger Trigger => TimedEffectTrigger.CombatEnd;
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
-            if (ctx == null || run == null) return;
-            var tier = HopeSystem.GetTier(run);
-            float add;
-            if (tier >= HopeTier.Despair) add = 0.25f;       // 絶望・発狂
-            else if (tier >= HopeTier.Pessimism) add = 0.10f; // 悲観
-            else return;
-            if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
-            ctx.outgoingDamageMultiplier += add;
+            if (run == null || combat == null || combat.EnemyHP > 0) return;
+            GameLoop.GoldIncome.Gain(run, Gain, "幸運の硬貨");
         }
     }
+
+    /// <summary>相棒の魂: 戦闘開始時 シールド+3 (2026-09-18)。
+    /// 当初案は「ランに 1 度 HP1 で踏みとどまる」だったが、 救済は既に
+    /// 灯火 → ラストスタンド → フルーレ の 3 段があり順序の規則 (LastStand.cs) が重いので見送った。</summary>
+    public class CompanionSoulEffect : ITimedEffect
+    {
+        private const int Shield = 3;
+        public string Id => "相棒の魂";
+        public TimedEffectTrigger Trigger => TimedEffectTrigger.CombatStart;
+        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
+        {
+            if (ctx == null) return;
+            ctx.consShield += Shield;
+            CombatSystem.ShieldDiag.Note("相棒の魂", Shield);
+            ctx.shieldGainedTotal += Shield;
+        }
+    }
+
 }

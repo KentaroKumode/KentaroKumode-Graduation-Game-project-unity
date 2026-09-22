@@ -26,13 +26,12 @@ namespace InventorySystem.Shop
             "英雄の意志",
             "幸運の硬貨",
             "相棒の魂",
-            "巡礼者の杖",
-            "記憶の砂時計",
+            "心軽めの巡礼杖",
+            // "記憶の砂時計" 2026-07-17 削除
             "激情の刃",
             "希望の灯片",
-            "狂った計測器",
-            "怪しい水",
-            "古い歯車",
+            "十五年目の計測器",
+            // "怪しい水" / "古い歯車" は 2026-07-17 削除
             // 以前 EventOnly に含まれていた 23 個（黄昏の懐中時計など6個 + 後続17個）は
             // 固有イベントを持たないため、通常プールへ参加可能とする目的で除外リストから外した。
             // 必要なら個別に再追加可能。
@@ -45,6 +44,16 @@ namespace InventorySystem.Shop
 
             // [剣の舞] 4枚集約の変化先。通常入手・ショップ・ランダム配布の対象外（変化でのみ獲得）。
             "ブレイドダンス",
+
+            // 職業スターター消耗品 (2026-06-28)。ラン開始時に選択職業へ 1 個配布する専用品。
+            // basePrice=0 のためショップに漏れると 0G 陳列になる ── 必ず除外を維持すること。
+            GameLoop.ClassStarter.PolishId,
+            GameLoop.ClassStarter.OathId,
+            GameLoop.ClassStarter.PainkillerId,
+            GameLoop.ClassStarter.DaggerId,
+
+            // シュヴァリエのレイピア (剣聖撃破の固有ドロップ。ランダム配布対象外)
+            GameLoop.ItemIds.ChevalierRapier,
         };
 
         /// <summary>このIDがランダム配布から除外されるか判定。</summary>

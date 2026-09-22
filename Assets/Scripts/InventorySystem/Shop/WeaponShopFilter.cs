@@ -16,6 +16,8 @@ namespace InventorySystem.Shop
             // MYTHIC は全カテゴリで排出しない
             if (item.rarity == ItemRarity.MYTHIC) return false;
 
+            // 複合武器の排除枝は 2026-09-21 に撤去 (複合武器そのものを廃止・GAME.md §24)。
+
             return true;
         }
     }

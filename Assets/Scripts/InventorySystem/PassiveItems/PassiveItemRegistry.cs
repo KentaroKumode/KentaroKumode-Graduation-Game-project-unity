@@ -38,17 +38,13 @@ namespace InventorySystem.PassiveItems
         private static void RegisterAll()
         {
             // 名前付き固有パッシブの効果実装
+            // (2026-07-18 死コード掃除: 記憶の砂時計/死神の数珠/嵐の徽章/沈黙の剣帯/狂乱のメダリオン/
+            //  静寂のローブ/黒煙の符/蒼穹の眼/守護天使の鈴 の 9 effect はアイテム削除に伴い class ごと削除)
             Register(new Effects.PilgrimStaffEffect());
-            Register(new Effects.MemoryHourglassEffect());
             Register(new Effects.HopeEmberEffect());
-            Register(new Effects.ReapersBeadsEffect());
-            Register(new Effects.StormCrestEffect());
-            Register(new Effects.SilentSwordbeltEffect());
-            Register(new Effects.WickBellEffect());
 
             // HP閾値発動系
-            Register(new Effects.FrenzyMedallionEffect());
-            Register(new Effects.ManashikiEffect());     // 末那識（旧 死神の予感）: HP≤20%で会心確定
+            // 末那識 はパッシブスキル側のステータスへ移した (2026-09-19・与ダメ%を他と同じタイミングで加算)
 
             // 歩行HP回復
             Register(new Effects.CalmShoesEffect());
@@ -57,12 +53,7 @@ namespace InventorySystem.PassiveItems
 
             // その他高レア
             Register(new Effects.GoldenScaleEffect());
-            Register(new Effects.HarmonicClockEffect());
-            Register(new Effects.SilentRobeEffect());
-            Register(new Effects.BlackSmokeTalismanEffect());
-            Register(new Effects.AzureEyeEffect());
             Register(new Effects.IronHeartEffect());
-            Register(new Effects.GuardianAngelBellEffect());
             Register(new Effects.CalamityRingEffect());
             Register(new Effects.EternalLanternEffect());
 
@@ -73,11 +64,17 @@ namespace InventorySystem.PassiveItems
 
             // 2026-06-03 新規追加アイテム
             Register(new Effects.PilgrimCharmEffect()); // 巡礼の杖飾り（移動時25%で希望+1）
-            Register(new Effects.RevelMaskEffect());    // 狂宴の仮面（低希望スケール与ダメ）
+            Register(new Effects.RoadMoneyBandEffect()); // 道銭の帯封（層突入でゴールド+6）
+            // 狂宴の仮面 はパッシブスキル側のステータスへ移した (2026-09-19・与ダメ%を他と同じタイミングで加算)
             // 商人の符牒・食通の懐刀 は他システム連携でフックされる（PassiveItemRegistry には登録しない）
 
-            // 6種の旧名前付きパッシブ（ちいさな灯火 等）は効果未定義につき未登録。
-            // 効果を決める時にここに追加する。
+            // イベント入手の名前付きパッシブ (2026-09-18 に items.json へ登録し効果を付与)。
+            //   ちいさな灯火は TorchRevival (救済チェーン)、 希望の灯片は上で登録済み、
+            //   根拠のない確信/決意/真理は ConvictionSystem が扱う ── ここには来ない。
+            Register(new Effects.LuckyCoinEffect());     // 幸運の硬貨（勝利時+3G）
+            // 英雄の意志 はパッシブスキル側のステータスへ移した (2026-09-19・与ダメ%を他と同じタイミングで加算)
+            // 激情の刃 はパッシブスキル側のステータスへ移した (2026-09-19・与ダメ%を他と同じタイミングで加算)
+            Register(new Effects.CompanionSoulEffect()); // 相棒の魂（開幕シールド+3）
         }
     }
 }

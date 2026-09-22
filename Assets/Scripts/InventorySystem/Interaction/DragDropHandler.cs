@@ -2184,7 +2184,7 @@ namespace InventorySystem
                 sb.AppendLine();
                 sb.AppendLine($"<color=#{labelHex}>ダイス個数:</color> {itemData.weaponDice.count}");
                 sb.AppendLine($"<color=#{labelHex}>ダイス最大値:</color> {itemData.weaponDice.maxValue}");
-                sb.AppendLine($"<color=#{labelHex}>会心:</color> {itemData.criticalRate}/9");
+                sb.AppendLine($"<color=#{labelHex}>会心:</color> {itemData.CriticalRateLabel()}");
                 sb.AppendLine($"<color=#{labelHex}>サイズ:</color> {itemData.size.x}×{itemData.size.y}");
             }
             
