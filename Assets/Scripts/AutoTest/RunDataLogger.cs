@@ -11,13 +11,17 @@ namespace AutoTest
     /// 形式: bandScore|reachedFloor|id1,id2,...  (1行=1ラン、 行末=改行)
     /// ファイル: learningRoot/regression_runs.csv (累積追記)
     /// ローテーション: MaxRows を超えたら古い (Rows - TrimTo) 行を破棄して TrimTo 行に縮小
-    /// 行サイズ ~200B → 200K行で約40MB。
+    ///
+    /// <para><b>2026-09-04 上限引き上げ</b> (20万/10万 → 50万/40万)。 <see cref="ItemRegression"/> が
+    /// 行を溜めずストリームで舐めるようになったのでメモリが行数に依存しなくなり、 上限は
+    /// ディスクだけの問題になった。 実測 14.5 万行で 59MB なので 50 万行 ≒ 200MB。
+    /// β の精度は N で決まる ── 25 万ラン 学習の全量を捨てずに使えるようにする。</para>
     /// </summary>
     public static class RunDataLogger
     {
         public const string FileName = "regression_runs.csv";
-        public const int MaxRows = 200000;
-        public const int TrimTo = 100000;
+        public const int MaxRows = 500000;
+        public const int TrimTo = 400000;
 
         public static void AppendBatch(string learningRoot, IList<AutoRunner.RunRec> recs)
         {
@@ -65,11 +69,24 @@ namespace AutoTest
             catch { /* best effort */ }
         }
 
-        /// <summary>回帰計算用の直近行制限。 古い行は読み込まず、 「現在のメタに近いラン」 のみで Fit。</summary>
+        /// <summary>回帰計算用の直近行制限。
+        /// <b>2026-09-04: <see cref="ItemRegression"/> はこの経路を使わなくなった</b> ──
+        /// 自前でストリームするので上限が無い。 旧実装はここで末尾 5 万行に切られ、
+        /// さらに 6F 到達で絞って N=7891 ── 蓄積 14.5 万行の 5.4% しか使っていなかった。
+        /// この定数と <see cref="LoadAll"/> は他の呼び出し元のために残置。</summary>
         public const int LoadRecentRows = 50000;
 
         /// <summary>累積データを読み込み (直近 LoadRecentRows 行のみ)。 6F未到達も含む (フィルタは呼び出し側)。</summary>
         public static List<RunRow> LoadAll(string learningRoot)
+        {
+            // 計装のみ (既定 OFF)。 回帰OLS の内数 ── パースが重いのか行列計算が重いのかで
+            // 打ち手 (キャッシュの粒度) が変わるので分けて測る。
+            long phase = AutoTest.Ultra.UltraPhaseClock.Begin();
+            try { return LoadAllCore(learningRoot); }
+            finally { AutoTest.Ultra.UltraPhaseClock.End("└ └ └ csv読込", phase); }
+        }
+
+        private static List<RunRow> LoadAllCore(string learningRoot)
         {
             var list = new List<RunRow>();
             string path = Path.Combine(learningRoot, FileName);

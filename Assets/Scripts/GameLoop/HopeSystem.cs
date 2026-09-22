@@ -43,8 +43,12 @@ namespace GameLoop
         public const int ComposureRecover = 0; // 2026-06-04: 被弾0勝利の希望回復を撤廃（回復源なし）
 
         // 絶望帯デバフの効果量
-        public const float FatigueZeroDamageChance = 0.15f; // 疲労: 攻撃が0ダメになる確率
-        public const float AnguishCritMultDelta    = -0.5f; // 苦悩: 会心倍率への加算補正
+        // 疲労 (焦燥以下): 15% で最終ダメージが半減する。
+        //   2026-08-09 に **0 ダメージ → 半減** へ緩和。 0 ダメは「そのターンの攻撃が丸ごと
+        //   消える」ため、 与ダメを積むビルドほど損失が大きく、 低希望帯を機械的に忌避させていた。
+        public const float FatigueChance           = 0.15f; // 疲労が起きる確率
+        public const float FatigueDamageMultiplier = 0.5f;  // 疲労時の最終ダメージ倍率
+        public const float AnguishCritMultDelta    = -0.3f; // 苦悩: 会心倍率への加算補正 (2026-08-09 に -0.5 から緩和)
         public const int   DelusionDisableMin = 1;          // 迷妄: 戦闘開始時パッシブ無効の最小個数
         public const int   DelusionDisableMax = 3;          // 同・最大個数
 
@@ -75,8 +79,10 @@ namespace GameLoop
         }
 
         /// <summary>疲労: 攻撃が0ダメになる確率（焦燥以下で発生）。</summary>
-        public static float GetZeroDamageChance(RunState run)
-            => GetTier(run) >= HopeTier.Fretful ? FatigueZeroDamageChance : 0f;
+        /// <summary>疲労が起きる確率（焦燥以下で 15%、それ以外 0）。
+        /// 起きたときは最終ダメージに <see cref="FatigueDamageMultiplier"/> を掛ける。</summary>
+        public static float GetFatigueChance(RunState run)
+            => GetTier(run) >= HopeTier.Fretful ? FatigueChance : 0f;
 
         /// <summary>苦悩: 会心倍率への加算補正（悲観以下で -0.5）。</summary>
         public static float GetCritMultiplierDelta(RunState run)
@@ -88,7 +94,7 @@ namespace GameLoop
             if (GetTier(run) < HopeTier.Despair) return 0;
             return rng != null
                 ? rng.Next(DelusionDisableMin, DelusionDisableMax + 1)
-                : Random.Range(DelusionDisableMin, DelusionDisableMax + 1);
+                : GameLoop.GameRng.RangeAuto("HopeSystem.1", DelusionDisableMin, DelusionDisableMax + 1);
         }
 
         public static bool IsMadness(RunState run) => run != null && run.hope <= 0;
@@ -126,7 +132,7 @@ namespace GameLoop
             var cm = CombatSystem.CombatManager.Instance;
             if (cm == null || !cm.IsCombatActive)
             {
-                contractOffset = GameLoop.Contracts.ContractManager.Instance.GetHopeLossReduction(run);
+                contractOffset = 0;   // [廃止] 旅団契約 (2026-08-11 削除)
             }
             int effective = Mathf.Max(0, amount - contractOffset);
             run.hope = Mathf.Max(0, run.hope - effective - extra);
@@ -152,7 +158,10 @@ namespace GameLoop
             if (run == null) return;
             if (run.playerHP < run.combatStartHP)
             {
-                int loss = Mathf.Max(0, Mathf.CeilToInt(CombatHopeLoss(run) * lossMult) - lossReduce);
+                // 挑戦デバフ 軸5〈絶望的な戦闘〉T1: 戦闘後の希望減少 +1。
+                // **軽減 (lossReduce) より後に足す** ── 軽減で打ち消せてしまうと T1 が無効化される。
+                int loss = Mathf.Max(0, Mathf.CeilToInt(CombatHopeLoss(run) * lossMult) - lossReduce)
+                         + MetaProgression.MetaDebuffApplicator.GetPostCombatHopeLoss(run);
                 int before = run.hope;
                 Reduce(run, loss);
                 Stats.combatLoss += before - run.hope;
@@ -172,7 +181,9 @@ namespace GameLoop
             if (run == null) return false;
             if (isLateral)
             {
-                int b = run.hope; Reduce(run, LateralCost); Stats.lateralLoss += b - run.hope;
+                // 2026-09-10: 燈火 r10 (極点) で 5 → 2 に下がる。
+                int cost = MetaProgression.MetaBuffApplicator.GetLateralHopeCost();
+                int b = run.hope; Reduce(run, cost); Stats.lateralLoss += b - run.hope;
             }
             if (despairMarchActive)
             {

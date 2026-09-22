@@ -130,11 +130,27 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 
-# AutoRun ログ（巨大な生ログはgit管理外。summary.txt / ai_stats.json / 学習集計(item_stats.json等) は追跡）
-AutoRunLogs/**/detail.log
-# 1ラン=1行の生ログ（バッチごと約15MB・合計数GB。再蓄積可能なので除外）
-AutoRunLogs/**/runs.jsonl
-# 回帰の生入力（1ラン=1行、合計100MB超。item_stats.json の集計が残るので除外）
-AutoRunLogs/learning/**/regression_runs.csv
-AutoRunLogs/**/*summary.txt
-AutoRunLogs/**/*ai_stats.json
+# ============================================================
+#  テスト・計測の生成物 (2026-09-22 全面改訂)
+#
+#  **テストを回すたびに増えるものは全部ここで除外する。** 以前は生ログ (runs.jsonl /
+#  detail.log) だけを除外し、 サマリーと学習集計は追跡していたが、 並列スイープ・
+#  ワーカー用ビルドが後から増えたのに追随せず、 git status に未追跡が約 2 万件出ていた
+#  (sweep 10,213 / rank_margin_parallel 3,747 / ワーカー用ビルド 約 5,000 …)。
+#  **生成物を追跡する例外を作らないこと** ── 例外を 1 つ作ると、 次に増えた出力先が
+#  またそこから漏れる。 ディスク側の古い出力は Tools/prune_outputs.py が自動で刈る。
+# ============================================================
+
+# 自動周回・スイープ・並列ランナーの出力すべて (学習データ・サマリー・生ログを含む)
+/AutoRunLogs/
+
+# ワーカー用の Standalone ビルド (実行ファイル + その実行結果)。 EnsureBuilt で再生成できる
+/UltraProductionWorkerBuild/
+
+# BOT が自動で追記するレポート (中身は改変しない規約は変わらない。 追跡だけやめた)
+/BALANCE_CHANGELOG_*.md
+/BALANCE_TIER_LIST_*.md
+
+# スイープのアーム定義 (実験ごとの使い捨て) と Python のキャッシュ
+/Tools/arms/
+__pycache__/

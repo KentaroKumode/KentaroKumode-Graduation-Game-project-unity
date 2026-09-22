@@ -429,7 +429,7 @@ namespace GameLoop
                     helpText = "[1-9] 移動先選択";
                     break;
                 case GameManager.GamePhase.Combat:
-                    helpText = "[Space] 1ターン  [F] 全自動";
+                    helpText = "[Space] 1ターン開始  [LeftShift] パリィ  [F] 全自動（パリィOFF）";
                     break;
                 case GameManager.GamePhase.BattleResult:
                     helpText = "[Space] 結果確認";
@@ -471,8 +471,9 @@ namespace GameLoop
                         ? "交換マス: [1] 最低Tierパッシブを渡し上位をrandom入手 / [Space] 通過"
                         : "交換マス: 渡せるパッシブが無い [Space] 通過";
                     break;
-                case GameManager.GamePhase.SinRitual:
-                    helpText = "[1] 血の儀 [2] 貪欲の儀 [3] 遺品の儀 → [Space] 完了\n  各キーで支払 (Y/Nではなく押下=捧げる、未押下=拒む)";
+                case GameManager.GamePhase.GateRitual:
+                    helpText = "門: [1] 血を捧げる(最大HP-25%) [2] 遺物2個を焚く [3] 光に身を任せる(希望-40) → [Space] 起動\n"
+                             + "  押下=捧げる / 未押下=拒む (拒んだ工程ぶん〈不完全な〜〉を背負う)";
                     break;
                 case GameManager.GamePhase.FloorClear:
                     helpText = "[Space] 次フロアへ";
@@ -565,7 +566,7 @@ namespace GameLoop
                 case ShopSlotKind.Passive:        return "パッシブ";
                 case ShopSlotKind.Consumable:     return "消費";
                 case ShopSlotKind.Weapon:         return "武器";
-                case ShopSlotKind.Dice:           return "ダイス";
+                case ShopSlotKind.FacePart:       return "出目パーツ";
                 case ShopSlotKind.WeaponMaterial: return "強化素材";
                 default: return "?";
             }
@@ -604,7 +605,7 @@ namespace GameLoop
                 case GameManager.GamePhase.EventEncounter: return "イベント";
                 case GameManager.GamePhase.TreasureOpen:   return "秘宝";
                 case GameManager.GamePhase.TrapTriggered:  return "罠";
-                case GameManager.GamePhase.SinRitual:      return "祭壇の儀";
+                case GameManager.GamePhase.GateRitual:     return "門";
                 case GameManager.GamePhase.FloorClear:     return "フロアクリア";
                 case GameManager.GamePhase.RunClear:       return "ランクリア！";
                 case GameManager.GamePhase.GameOver:       return "ゲームオーバー";

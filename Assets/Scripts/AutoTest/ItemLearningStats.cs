@@ -39,15 +39,35 @@ namespace AutoTest
             // 起動でしか取れないイベント専用アイテム (買い目に影響しない)
             "ちいさな灯火",
             // フラグ系武器 (進路条件で配布、 lift評価対象外)
-            "chevalier_rapier",
-            // 武器階梯 T1/T2/T3 (チェーン進化先の強さが lift に流れ込むため、 Tier評価から除外)
-            // T1: 初期装備100%割当により多重共線性で regβ も歪む / T2/T3: 進化下流で lift 膨張
-            // T4 のみ終端でチェーン流れ込み無しのため残す
-            "sword_t1",   "sword_t2",   "sword_t3",
-            "shield_t1",  "shield_t2",  "shield_t3",
-            "axe_t1",     "axe_t2",     "axe_t3",
-            "dagger_t1",  "dagger_t2",  "dagger_t3",
-            "curse_t1",   "curse_t2",   "curse_t3",
+            "シュヴァリエのレイピア",
+            // 武器階梯 T2/T3 (チェーン進化先の強さが lift に流れ込むため、 Tier評価から除外)
+            //   **T1 は 2026-09-05 に廃止** (職業配布が T2 になった)。
+            //   T2: 初期装備100%割当により多重共線性で regβ も歪む / T3: 進化下流で lift 膨張
+            //   T4 (純・複合とも) は終端でチェーン流れ込み無しのため残す
+            "鍛鉄の剣",   "銀の長剣",
+            "鉄盾",  "聖騎士の盾",
+            "猛斧",     "血塗りの戦斧",
+            "盗賊の短刀",  "処刑人の曲刀",
+        };
+
+        /// <summary>**回帰には入れるが、準パワーの順位付けプールからは外す品**（2026-09-05）。
+        ///
+        /// <para>現状は進行武器の終端 (T4) 4 種。 <b>1 ランに武器は 1 本しかない</b>ため、
+        /// 武器ダミーの「持たない側」は<b>そのチェーンを完走できなかったラン</b>になる ──
+        /// 実測で 斧T3止まり の 7層クリアは 5.4%、 T4 到達で 66.0% (差 +60.6pt)。
+        /// 一方パッシブの「持たない側」は「200 品のうちこの 1 品だけ買わなかった」で、
+        /// 反実仮想の大きさが桁違いになる。 結果、 regβ の平均が
+        /// <b>武器 +0.786 / パッシブ +0.128 (6 倍)</b> と系統的に膨らみ、
+        /// regβ 主軸 (重み 0.55) の下では武器 4 品が上位 7 位を占めた
+        /// ── これは強さではなく参照カテゴリの違いである。</para>
+        ///
+        /// <para><see cref="ExcludedFromLift"/> と違い<b>回帰の特徴量からは外さない</b>。
+        /// 外すと「武器を育て切ったか」が残差へ落ち、 それと相関する品 (金回り系) の β を歪める
+        /// ＝ 欠落変数バイアスになる。 <b>正規化プール (z-score の μ/σ) からだけ外し</b>、
+        /// スコア自体は同じ μ/σ で算出して BOT の挙動は変えない。 表示は専用テーブルへ。</para></summary>
+        public static readonly HashSet<string> RankedSeparately = new HashSet<string>
+        {
+            "デュランダル", "血帝廻天", "ノクタリア", "ドーンブリンガー",
         };
 
         /// <summary>削除済みアイテム: ゲームから完全に取り除かれたが累積 item_stats.json に残骸が残るもの。
@@ -62,6 +82,25 @@ namespace AutoTest
             "disp_charm",       // 同上
             "disp_knife",       // 同上
             "賽の女神",         // 2026-05-30 削除 (リワーク失敗、 削除)
+            "curse_t1",         // 2026-07-17 削除 (curse 系列全廃・自傷武器の役割を焦土契約/臨界に統合)
+            "curse_t2",
+            "curse_t3",
+            "curse_t4",
+            "dead_staff",       // 2026-07-17 削除 (Burn パッシブ廃止に伴い意味喪失)
+            "古い歯車",         // 2026-07-17 削除 (フレーバー未実装)
+            "怪しい水",         // 2026-07-17 削除 (フレーバー未実装)
+            "uniq_earth_guard", // 2026-07-17 削除 (cons_reduce_3 と機構重複)
+            "uniq_food_horn",   // 2026-07-17 削除 (cons_food_2/3 の中間値で冗長)
+            "狂乱のメダリオン", // 2026-07-17 削除 (背水の狂刃と機構重複)
+            // 2026-07-17 大掃除 (低使用ユニーク単独品 18品削除):
+            "黒煙の符", "商人の符牒", "守護天使の鈴", "沈黙の剣帯", "蒼白の槍騎士", "飢餓丸",
+            "双子の賽", "吸命の牙", "死神の数珠", "静寂のローブ", "食通の懐刀",
+            "記憶の砂時計", "蒼穹の眼", "血路の旗", "嵐の徽章", "天梯", "停戦協定", "一点集中",
+            // 複合武器 6 品 (2026-09-05 追加 → 2026-09-21 削除)。 純 T2〜T4 で足りると判断。
+            //   **DeletedItems へ移すこと** ── 累積 item_stats.json には 250,000 ラン ぶんの
+            //   残骸が残っているので、 外さないと存在しない武器が序列表に居座り続ける。
+            "swordaxe_t4", "swordshield_t4", "sworddagger_t4",
+            "axeshield_t4", "axedagger_t4", "shielddagger_t4",
         };
 
         /// <summary>1アイテム1行ぶんの累積カウンタ。
@@ -79,9 +118,8 @@ namespace AutoTest
             public double acqHealedSum;
             public double acqShieldSum;
             public int acqFullClear;        // R11+R12
-            public int acqGedatsu;          // R12
             public int acqReachedFloor7;    // 7F到達
-            public int acqAwakenedFormsKilledSum; // 覚者撃破形態数の合計
+            public int acqAwakenedFormsKilledSum; // ヴェスカ撃破段数の合計
             // ---- 全ラン: 未取得 ----
             public int noAcqRuns;
             public double noAcqBandScoreSum;
@@ -90,7 +128,6 @@ namespace AutoTest
             public double noAcqHealedSum;
             public double noAcqShieldSum;
             public int noAcqFullClear;
-            public int noAcqGedatsu;
             public int noAcqReachedFloor7;
             public int noAcqAwakenedFormsKilledSum;
             // ---- 6F到達ラン限定: 取得 ----
@@ -119,6 +156,20 @@ namespace AutoTest
             public int off6FRuns;      public double off6FBandSum;      // 6F到達: 提示された
             public int noOff6F;        public double noOff6FBandSum;    // 6F到達: 提示されなかった
             public int offSqSum;       public double off6FSqSum;        // 分散計算用
+
+            // ---- 探索 lift (ランダム化ホールドアウト・2026-08-17) ----
+            // **上の lift は因果効果ではない。** BOT は金があり順調なときに買うので、
+            // 取得したこと自体が「うまくいっている」の代理変数になっている。
+            // ここは**ランダムに選ばれた決定だけ**を積む ── 候補集合の中では取得/未取得が
+            // 期待値で等質なので、 差がそのまま因果効果になる。
+            // 母集団は「探索の候補に入ったラン」で、 処置群は「探索で実際に選ばれたラン」。
+            public int expAcqRuns;     public double expAcqBandSum;     // 探索で取得された
+            public int expNoAcqRuns;   public double expNoAcqBandSum;   // 候補に入ったが選ばれなかった
+
+            /// <summary>ランダム化決定だけから出した lift。 **これが不偏推定**。
+            /// 両群とも 30 未満ならノイズ扱いにすること (母数が小さい)。</summary>
+            public double ExploreLift => (expAcqRuns > 0 && expNoAcqRuns > 0)
+                ? expAcqBandSum / expAcqRuns - expNoAcqBandSum / expNoAcqRuns : 0;
 
             public double AcqBandAvg     => acqRuns > 0 ? acqBandScoreSum / acqRuns : 0;
             public double NoAcqBandAvg   => noAcqRuns > 0 ? noAcqBandScoreSum / noAcqRuns : 0;
@@ -230,7 +281,6 @@ namespace AutoTest
             dst.acqHealedSum                 += src.acqHealedSum;
             dst.acqShieldSum                 += src.acqShieldSum;
             dst.acqFullClear                  += src.acqFullClear;
-            dst.acqGedatsu                    += src.acqGedatsu;
             dst.acqReachedFloor7              += src.acqReachedFloor7;
             dst.acqAwakenedFormsKilledSum     += src.acqAwakenedFormsKilledSum;
             dst.noAcqRuns                     += src.noAcqRuns;
@@ -240,7 +290,6 @@ namespace AutoTest
             dst.noAcqHealedSum                += src.noAcqHealedSum;
             dst.noAcqShieldSum                += src.noAcqShieldSum;
             dst.noAcqFullClear                += src.noAcqFullClear;
-            dst.noAcqGedatsu                  += src.noAcqGedatsu;
             dst.noAcqReachedFloor7            += src.noAcqReachedFloor7;
             dst.noAcqAwakenedFormsKilledSum   += src.noAcqAwakenedFormsKilledSum;
             dst.acq6FRuns                     += src.acq6FRuns;
@@ -259,6 +308,8 @@ namespace AutoTest
             dst.noAcq5FRuns += src.noAcq5FRuns; dst.noAcq5FBandScoreSum += src.noAcq5FBandScoreSum;
             dst.acq7FRuns += src.acq7FRuns; dst.acq7FBandScoreSum += src.acq7FBandScoreSum;
             dst.noAcq7FRuns += src.noAcq7FRuns; dst.noAcq7FBandScoreSum += src.noAcq7FBandScoreSum;
+            dst.expAcqRuns   += src.expAcqRuns;   dst.expAcqBandSum   += src.expAcqBandSum;
+            dst.expNoAcqRuns += src.expNoAcqRuns; dst.expNoAcqBandSum += src.expNoAcqBandSum;
             dst.offRuns += src.offRuns;     dst.offBandSum += src.offBandSum;
             dst.noOffRuns += src.noOffRuns; dst.noOffBandSum += src.noOffBandSum;
             dst.off6FRuns += src.off6FRuns; dst.off6FBandSum += src.off6FBandSum;
@@ -375,8 +426,7 @@ namespace AutoTest
                 int healed   = (int)r.totalHealed;
                 int shield   = (int)r.totalShieldGained;
                 int forms    = r.awakenedFormsKilled != null ? r.awakenedFormsKilled.Count : 0;
-                bool fullClear = r.bandScore >= 11; // R11/R12
-                bool gedatsu   = r.bandScore == 12;
+                bool fullClear = r.bandScore >= 11; // R11
                 bool reach7    = r.reachedFloor >= 7;
                 bool reach6    = r.reachedFloor >= 6;
                 bool reach3    = r.reachedFloor >= 3;
@@ -385,6 +435,8 @@ namespace AutoTest
 
                 var acquired = r.acquiredItemsEver ?? new HashSet<string>();
                 var offered  = r.offeredItemsEver  ?? new HashSet<string>();
+                var expOffered  = r.exploreOfferedEver  ?? new HashSet<string>();
+                var expAcquired = r.exploreAcquiredEver ?? new HashSet<string>();
 
                 // シナジー探索: グループごとに「取得したメンバー数 k」を数えて band を積む。
                 foreach (var g in SynergyGroups.All)
@@ -396,13 +448,35 @@ namespace AutoTest
                     if (reach6) { sa.k6FRuns[k]++; sa.k6FBandSum[k] += r.bandScore; }
                 }
 
+                // **探索ランは観測統計に入れない (2026-08-17b)。**
+                //   探索で買った品が「取得」として混ざると、 貪欲方策の統計が汚れる。
+                //   実測: band_0 に探索付き 10,000 ランを足しただけで 0pt クリア率が
+                //   Optimal −3.1pt / Super −4.7pt 下がった (技量帯に関係なく下がったので原因は学習側)。
+                //   ラン単位で分けているので、 探索ランは下の探索 lift だけに寄与する。
+                bool greedyRun = !r.isExploreRun;
+
                 foreach (var kv in byId)
                 {
                     // ---- 出現lift: 提示有無で層別 (取得・未取得問わず) ----
                     bool wasOffered = offered.Contains(kv.Key) || acquired.Contains(kv.Key);
                     var ag = kv.Value;
+                    if (greedyRun)
+                    {
                     if (wasOffered) { ag.offRuns++; ag.offBandSum += r.bandScore; if (reach6) { ag.off6FRuns++; ag.off6FBandSum += r.bandScore; } }
                     else            { ag.noOffRuns++; ag.noOffBandSum += r.bandScore; if (reach6) { ag.noOff6F++;  ag.noOff6FBandSum += r.bandScore; } }
+                    }
+
+                    // ---- 探索 lift: **ランダム化された決定だけ**で層別 ----
+                    //   母集団は「探索の候補に入った」ラン。 そこから一様に選ばれているので、
+                    //   取得/未取得の差が交絡なしの因果効果になる。
+                    if (expOffered.Contains(kv.Key))
+                    {
+                        if (expAcquired.Contains(kv.Key)) { ag.expAcqRuns++;   ag.expAcqBandSum   += r.bandScore; }
+                        else                              { ag.expNoAcqRuns++; ag.expNoAcqBandSum += r.bandScore; }
+                    }
+
+                    // 探索ランは取得/未取得の層別にも入れない (上のコメント参照)。
+                    if (!greedyRun) continue;
 
                     bool has = acquired.Contains(kv.Key);
                     var a = kv.Value;
@@ -416,7 +490,6 @@ namespace AutoTest
                         a.acqShieldSum += shield;
                         a.acqAwakenedFormsKilledSum += forms;
                         if (fullClear) a.acqFullClear++;
-                        if (gedatsu)   a.acqGedatsu++;
                         if (reach7)    a.acqReachedFloor7++;
                         // 6F層別
                         if (reach6)
@@ -442,7 +515,6 @@ namespace AutoTest
                         a.noAcqShieldSum += shield;
                         a.noAcqAwakenedFormsKilledSum += forms;
                         if (fullClear) a.noAcqFullClear++;
-                        if (gedatsu)   a.noAcqGedatsu++;
                         if (reach7)    a.noAcqReachedFloor7++;
                         // 6F層別
                         if (reach6)

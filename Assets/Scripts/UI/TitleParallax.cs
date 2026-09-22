@@ -15,7 +15,7 @@ namespace UI
     ///   1) タイトルの親(空 GameObject 等)にこのコンポーネントを付ける。
     ///   2) layers に 奥(背景)→手前 の順でレイヤー Transform を登録。
     ///   3) strength を「奥=小さい / 手前=大きい」に設定（例 背景0.05 / 中0.15 / 手前0.35）。
-    ///   4) タイトル文字やボタンは invert=true で僅かに逆方向に動かすと “浮き” が出る。
+    ///   4) タイトル文字やボタンは invert=true で僅かに逆方向に動かすと “浮き「 が出る。
     /// </summary>
     public class TitleParallax : MonoBehaviour
     {

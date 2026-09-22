@@ -55,7 +55,7 @@ namespace MapSystem
             if (candidates.Count == 0)
                 candidates = allEvents;
 
-            return candidates[Random.Range(0, candidates.Count)];
+            return candidates[GameLoop.GameRng.RangeAuto("MapEvent.1", 0, candidates.Count)];
         }
 
         private static EventRarity DrawRarity()
@@ -63,7 +63,7 @@ namespace MapSystem
             float total = 0f;
             foreach (var (_, w) in RarityWeights) total += w;
 
-            float roll = Random.Range(0f, total);
+            float roll = GameLoop.GameRng.RangeAuto("MapEvent.2", 0f, total);
             float cumulative = 0f;
 
             foreach (var (rarity, weight) in RarityWeights)

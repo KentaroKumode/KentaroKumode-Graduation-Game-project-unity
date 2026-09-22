@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using EventSystem;
 using GameLoop;
 using MapSystem;
+using UnityEngine;
 
 namespace AutoTest
 {
@@ -37,14 +38,79 @@ namespace AutoTest
         const float V_COMBAT     = -8.0f;
         const float V_ELITE      = -22.0f;
 
-        /// <summary>選択肢を評価。複数効果は加算、Probability は期待値。</summary>
+        // ===== 生存拒否権 =====
+        //  加点の最大は V_GAIN_FLAG(+30) なので、 この値ならどんな報酬でも覆せない。
+        const float V_LETHAL_VETO = -400f;   // 選んだ直後の一撃で死ぬ
+        const float V_FRAGILE     = -60f;    // 二撃で死ぬ
+
+        /// <summary>〈観測所の写し〉の評価。 上乗せ (パッシブ×1+素材+8+金+60+全回復) は
+        /// パッシブ 1 個 (V_GAIN_PASS=9) + 雑多 を足して 18 前後だが、
+        /// **次に博士へ会える保証が無い** (出現率 1/50)。 大きく割り引いて
+        /// 「他の択より少し弱いが、選ばれることはある」帯に置く。</summary>
+        const float V_OBSERVATORY_COPY = +7.0f;
+
+        /// <summary>選択肢を評価。複数効果は加算、Probability は期待値。
+        ///
+        /// **加算の上に生存の拒否権を重ねる。** 効果ごとの線形加点だけだと、
+        /// 「HPが1になる ＋ フラグ獲得(+30) ＋ パッシブ獲得(+9)」のような選択肢が
+        /// 正のスコアになり、 BOT が自殺的な取引を選び続ける。 実際に「災厄の予兆」で
+        /// これが起き、 **全ランの 29.4% がその経路で死亡していた** (2026-08-05)。
+        /// 報酬の大小に関係なく、 選んだ結果が致死圏なら選ばせない。</summary>
         public static float Score(EventChoice choice, RunState run)
         {
             if (choice?.effects == null || choice.effects.Count == 0) return 0f;
             float total = 0f;
             foreach (var e in choice.effects)
                 total += ScoreEffect(e, run);
+
+            // 危険度は「このフロアの雑魚 1 発」を尺度にする (進路選択・回復目標と同じ尺度)。
+            int hit = AutoRunner.EstimateFloorMaxHit(run);
+            if (hit > 0 && run != null)
+            {
+                int hpAfter = PredictWorstHp(choice, run);
+                if (hpAfter <= hit)          total += V_LETHAL_VETO;
+                else if (hpAfter <= hit * 2) total += V_FRAGILE;
+            }
             return total;
+        }
+
+        /// <summary>この選択肢を取った直後の HP を、 **最悪分岐**で見積もる。
+        /// Probability は期待値ではなく最悪枝を取る ── 生存判定は平均ではなく下振れで決まるため。</summary>
+        private static int PredictWorstHp(EventChoice choice, RunState run)
+        {
+            int hp = run.playerHP;
+            int maxHp = UnityEngine.Mathf.Max(1, run.playerMaxHP);
+            foreach (var e in choice.effects) ApplyWorst(e, ref hp, ref maxHp);
+            return UnityEngine.Mathf.Clamp(hp, 0, maxHp);
+        }
+
+        private static void ApplyWorst(EventEffect e, ref int hp, ref int maxHp)
+        {
+            if (e == null) return;
+            switch (e.type)
+            {
+                case EventEffectType.HpDelta:    hp = UnityEngine.Mathf.Clamp(hp + e.amount, 0, maxHp); break;
+                case EventEffectType.HpFullHeal: hp = maxHp; break;
+                case EventEffectType.HpSetTo:    hp = UnityEngine.Mathf.Clamp(e.amount, 0, maxHp); break;
+                case EventEffectType.HpHalve:    hp = UnityEngine.Mathf.Max(1, (hp + 1) / 2); break;
+                case EventEffectType.MaxHpDelta:
+                    maxHp = UnityEngine.Mathf.Max(1, maxHp + e.amount);
+                    hp = UnityEngine.Mathf.Min(hp, maxHp);
+                    break;
+                case EventEffectType.Probability:
+                {
+                    if (e.branches == null || e.branches.Count == 0) return;
+                    int worst = int.MaxValue, worstMax = maxHp;
+                    foreach (var br in e.branches)
+                    {
+                        int h = hp, m = maxHp;
+                        foreach (var c in br) ApplyWorst(c, ref h, ref m);
+                        if (h < worst) { worst = h; worstMax = m; }
+                    }
+                    if (worst != int.MaxValue) { hp = worst; maxHp = worstMax; }
+                    break;
+                }
+            }
         }
 
         private static float ScoreEffect(EventEffect e, RunState run)
@@ -127,7 +193,19 @@ namespace AutoTest
                     if (delta >= 0) return delta * W_HP_GAIN;
                     int dmg = -delta;
                     float w = W_HP_LOSS;
+                    // **「HP が 1 になる」も致死域として扱う。** 旧実装は amount<=0 しか
+                    // 増幅せず、 HP1 は通常の被ダメと同じ重みだったため、 アイテム獲得の
+                    // 加点に負けて BOT が選び続けていた (2026-08-04)。
                     if (e.amount <= 0) w *= 8f;
+                    else if (e.amount <= UnityEngine.Mathf.Max(1, maxHP * 0.15f)) w *= 6f;
+                    return -dmg * w;
+                }
+
+                case EventEffectType.HpHalve:
+                {
+                    int dmg = hp - UnityEngine.Mathf.Max(1, (hp + 1) / 2);
+                    float w = W_HP_LOSS;
+                    if (hpPct < 0.35f) w *= 2.5f;   // 低HPで半分はほぼ立て直せない
                     return -dmg * w;
                 }
 
@@ -178,6 +256,19 @@ namespace AutoTest
                     return V_GAIN_CONS;
                 }
 
+                case EventEffectType.ObservatoryTakeCopy:
+                {
+                    // **NPC の帯同と同じ穴。** 即時効果が (素材+6 / 希望+8) しか無いので、
+                    //   写し自体を 0 点にすると 3 バッチ連続で BOT が一度も取らなかった
+                    //   (写し使用 0)。 価値は「次に博士へ会ったときの上乗せ」にある。
+                    //
+                    //   上乗せは パッシブ×1 + 素材+8 + ゴールド+60 + 全回復。
+                    //   ただし **次の遭遇があるとは限らない** (出現率 1/50) ので大きく割り引く。
+                    //   既に持っているなら重複は無意味。
+                    if (GameLoop.ObservatoryState.CopyHeld) return 0f;
+                    return V_OBSERVATORY_COPY;
+                }
+
                 case EventEffectType.GainFlag:
                 {
                     // 既所持なら冗長
@@ -202,15 +293,8 @@ namespace AutoTest
                     return 0f; // 分散大なので中立
 
                 case EventEffectType.CircusHandover:
-                {
-                    // サーカス引渡し: Lv連動の windfall。 ContractManager から実際のレベルを取得して評価。
-                    var circus = GameLoop.Contracts.ContractManager.Instance.Find(run, GameLoop.Contracts.ContractKind.OrphanCircus);
-                    int lv = circus?.level ?? 0;
-                    int goldReward = lv == 1 ? 25 : lv == 2 ? 50 : lv == 3 ? 90 : 0;
-                    int hopeReward = lv == 1 ? 10 : lv == 2 ? 20 : lv == 3 ? 30 : 0;
-                    // 報酬価値 + サーカス契約解除による維持費負担解消 (3G × 数層分)
-                    return goldReward * 0.5f + hopeReward * 0.3f + 6f;
-                }
+                    // [廃止] 旅団契約システムを 2026-08-11 に削除したので、 引き渡す契約が無い。
+                    return 0f;
 
                 default:
                     return 0f;

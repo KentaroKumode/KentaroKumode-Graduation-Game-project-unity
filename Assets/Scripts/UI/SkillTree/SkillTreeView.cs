@@ -941,10 +941,11 @@ namespace UI.SkillTree
             // デバフ側専用のタイトル色を上書き (ApplyWindowSprite では BUFF 用の windowTitleColor が入る)
             _windowTitleText.color = windowDebuffTitleColor;
             var mpm = MetaProgressManager.Instance;
-            bool active = mpm != null && mpm.State.HasDebuff((MetaDebuffLevel)lv);
+            var axDef = AxisAt(lv);
+            int curTier = (mpm != null && axDef != null) ? mpm.State.Challenge.Tier(axDef.axis) : 0;
             string name = DebuffName(lv);
             string desc = DebuffDescription(lv);
-            string status = active ? "[有効化中]" : "[無効]";
+            string status = curTier > 0 ? $"[T{curTier} 有効・{mpm.State.ChallengeScore}pt]" : "[無効]";
             _windowTitleText.text = FilterToFont(name, _windowTitleText.font);
             _windowDescText.text = FilterToFont($"{desc}  {status}", _windowDescText.font);
             _windowGo.SetActive(true);
@@ -1035,40 +1036,47 @@ namespace UI.SkillTree
             _windowCurrentDebuffLv = 0;
         }
 
+        // 2026-07-29: 配点方式 (docs/GAME.md §15-2) へ移行。 ノード i は
+        // ChallengeCatalog.Axes[i] に対応し、 クリックで存在する Tier を順送りする。
+        // **10 ノード鎖という旧トポロジのままの暫定接続** ── 19 軸 + T4 5 種を正しく見せる
+        // UI 改修は S9。 ここではロジックへ繋いで操作できる状態を保つことだけを狙う。
+
+        /// <summary>ノード index (0 起点) に対応する軸定義。 範囲外なら null。</summary>
+        private static AxisDef AxisAt(int lv)
+        {
+            int i = lv - 1;
+            return (i >= 0 && i < ChallengeCatalog.Axes.Count) ? ChallengeCatalog.Axes[i] : null;
+        }
+
+        /// <summary>存在する Tier を順送りする (未選択 → 最小 → … → 最大 → 未選択)。</summary>
+        private static int NextTier(AxisDef d, int cur)
+        {
+            if (d == null) return 0;
+            if (cur == 0) return d.availableTiers[0];
+            for (int i = 0; i < d.availableTiers.Length; i++)
+                if (d.availableTiers[i] == cur)
+                    return (i + 1 < d.availableTiers.Length) ? d.availableTiers[i + 1] : 0;
+            return 0;
+        }
+
         private static string DebuffName(int lv)
         {
-            switch (lv)
-            {
-                case 1:  return "困窮した商隊";
-                case 2:  return "俊敏";
-                case 3:  return "向かい風";
-                case 4:  return "前途多難";
-                case 5:  return "偽の商人";
-                case 6:  return "死神の影";
-                case 7:  return "補給断絶";
-                case 8:  return "絶望的な進軍";
-                case 9:  return "鋼の皮膚";
-                case 10: return "天変地異";
-                default: return "?";
-            }
+            var d = AxisAt(lv);
+            return d != null ? d.displayName : "?";
         }
 
         private static string DebuffDescription(int lv)
         {
-            switch (lv)
+            var d = AxisAt(lv);
+            if (d == null) return "";
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < d.availableTiers.Length; i++)
             {
-                case 1:  return "ショップ価格 +25%";
-                case 2:  return "敵が各戦闘の最初の被弾を必ず回避";
-                case 3:  return "敵への与ダメージ -1";
-                case 4:  return "マップ視界が 2マス先で遮断";
-                case 5:  return "ショップ 30% で偽商人化 (特殊エリート戦)";
-                case 6:  return "3層突入時に恒久デバフ +1";
-                case 7:  return "前哨基地の回復上限 = 最大HPの 50%";
-                case 8:  return "移動するたびに希望 -1";
-                case 9:  return "敵が初回致命傷を HP1 で耐える";
-                case 10: return "全戦闘 敵ダメ+100% / 1層恒久デバフ +1 / ラスタン無効";
-                default: return "";
+                if (i > 0) sb.Append(" / ");
+                // v4.1: Tier 番号 = 点数。 「T3=3pt」と重ねて書かず、 点数だけを見せる。
+                sb.Append(d.availableTiers[i]).Append("pt");
             }
+            return sb.ToString();
         }
 
         // ============================================================
@@ -1229,8 +1237,8 @@ namespace UI.SkillTree
             var mpm = MetaProgressManager.Instance;
             if (mpm != null)
             {
-                bool currentlyActive = mpm.State.HasDebuff((MetaDebuffLevel)lv);
-                mpm.ToggleDebuff((MetaDebuffLevel)lv, !currentlyActive);
+                var d = AxisAt(lv);
+                if (d != null) mpm.SetChallengeTier(d.axis, NextTier(d, mpm.State.Challenge.Tier(d.axis)));
                 // OnStateChanged → RefreshStates 経由で色更新
             }
             ShowDebuffInfo(lv);
@@ -1242,13 +1250,15 @@ namespace UI.SkillTree
             if (mpm == null) return;
             for (int i = 0; i < _debuffNodeSr.Count; i++)
             {
-                bool active = mpm.State.HasDebuff((MetaDebuffLevel)(i + 1));
+                var d = AxisAt(i + 1);
+                bool active = d != null && mpm.State.Challenge.Tier(d.axis) > 0;
                 _debuffNodeSr[i].color = active ? debuffActiveColor : debuffInactiveColor;
             }
             for (int i = 0; i < _debuffLineSr.Count; i++)
             {
                 // 線 i は debuff Lv(i+1) → Lv(i+2)。 i+1 が active なら点灯。
-                bool lit = mpm.State.HasDebuff((MetaDebuffLevel)(i + 1));
+                var d = AxisAt(i + 1);
+                bool lit = d != null && mpm.State.Challenge.Tier(d.axis) > 0;
                 _debuffLineSr[i].color = lit ? debuffLineActiveColor : debuffLineInactiveColor;
             }
         }

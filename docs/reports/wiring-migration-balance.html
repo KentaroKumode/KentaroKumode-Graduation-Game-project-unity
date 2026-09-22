@@ -1,0 +1,401 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>バランス調整報告 — 配線システム移行後</title>
+
+<style>
+:root { color-scheme: light; }
+body{
+  margin:0;padding:0;
+  font:14px/1.65 -apple-system,BlinkMacSystemFont,'SF Pro','Segoe UI','Hiragino Kaku Gothic ProN','Meiryo',sans-serif;
+  background:#faf9f5;
+  color:rgba(0,0,0,.82);
+  overflow-wrap:break-word;
+}
+.page{max-width:1100px;margin:0 auto;padding:36px 40px 80px;}
+.eyebrow{
+  font-size:11px;letter-spacing:.24em;
+  color:rgba(0,0,0,.5);
+  margin:0 0 6px;
+  font-weight:600;
+}
+h1.title{
+  font-size:24px;font-weight:700;
+  margin:0 0 24px;
+  letter-spacing:-.01em;
+  color:#141413;
+}
+
+/* 3-card summary */
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:0 0 22px;}
+.card{
+  border:1px solid rgba(0,0,0,.12);
+  border-radius:8px;
+  padding:12px 16px;
+  background:#fff;
+  border-top:3px solid #888;
+}
+.card.g{border-top-color:#2f7a58;}
+.card.o{border-top-color:#b46a1e;}
+.card.b{border-top-color:#4a70a8;}
+.card .lbl{font-size:11px;color:rgba(0,0,0,.55);margin:0 0 4px;letter-spacing:.05em;}
+.card .val{font-size:15px;font-weight:600;margin:0 0 4px;color:#141413;}
+.card .sub{font-size:12px;color:rgba(0,0,0,.6);margin:0;line-height:1.5;}
+
+/* TOC */
+.toc{
+  border:1px solid rgba(0,0,0,.12);
+  border-radius:8px;
+  padding:12px 18px;
+  background:#fff;
+  margin:0 0 32px;
+}
+.toc .h{font-weight:600;font-size:13px;margin:0 0 8px;}
+.toc ol{margin:0;padding-left:22px;font-size:13px;}
+.toc ol li{margin:3px 0;}
+.toc a{color:#141413;text-decoration:none;}
+.toc a:hover{text-decoration:underline;}
+
+/* Badge */
+.badge{
+  display:inline-block;
+  font-size:11px;
+  padding:2px 8px;
+  margin-left:8px;
+  border-radius:4px;
+  border:1px solid rgba(0,0,0,.2);
+  color:rgba(0,0,0,.7);
+  font-weight:400;
+  vertical-align:middle;
+  background:#fff;
+}
+.badge.g{border-color:#2f7a58;color:#2f7a58;background:#ecf5f0;}
+.badge.o{border-color:#b46a1e;color:#b46a1e;background:#fbf1e5;}
+.badge.b{border-color:#4a70a8;color:#4a70a8;background:#ecf0f7;}
+.badge.r{border-color:#a54235;color:#a54235;background:#f8ebe8;}
+
+/* Section headings */
+h2.sec{
+  font-size:18px;font-weight:700;
+  margin:36px 0 4px;padding-bottom:8px;
+  border-bottom:1px solid rgba(0,0,0,.16);
+  color:#141413;
+}
+h2.sec .num{color:rgba(0,0,0,.35);font-weight:500;margin-right:10px;}
+h3{font-size:14px;font-weight:600;margin:18px 0 8px;color:rgba(0,0,0,.85);}
+p{margin:8px 0;}
+p.lead{color:rgba(0,0,0,.65);}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0;}
+th,td{
+  padding:8px 12px;
+  border-bottom:1px solid rgba(0,0,0,.08);
+  text-align:left;vertical-align:top;
+}
+th{background:rgba(0,0,0,.03);font-weight:600;font-size:12px;color:rgba(0,0,0,.7);}
+td.n{font-variant-numeric:tabular-nums;text-align:right;}
+td.c{text-align:center;}
+tr:last-child td{border-bottom:none;}
+
+/* Callout box */
+.box{
+  border:1px solid rgba(0,0,0,.12);
+  border-radius:8px;
+  padding:14px 18px;
+  background:#fff;
+  margin:14px 0;
+}
+.box h4{margin:0 0 6px;font-size:13px;font-weight:600;color:#141413;}
+.box.tinted{background:#faf7f0;border-color:#e6dfc9;}
+.box.tinted.g{background:#f2f8f4;border-color:#c9e0d3;}
+.box.tinted.o{background:#fbf5eb;border-color:#e6d3af;}
+.box ul{margin:6px 0 0;padding-left:20px;}
+.box ul li{margin:2px 0;}
+
+/* Diagram container */
+.diagram{
+  border:1px solid rgba(0,0,0,.12);
+  border-radius:8px;
+  padding:16px;
+  background:#fff;
+  margin:12px 0;
+  overflow-x:auto;
+}
+.diagram .cap{
+  font-size:12px;color:rgba(0,0,0,.55);
+  margin:0 0 8px;
+}
+.mermaid{text-align:center;font-size:13px;}
+.mermaid svg{max-width:100%;height:auto;}
+
+/* Legend chips */
+.legend{display:inline-flex;gap:12px;font-size:11px;color:rgba(0,0,0,.55);margin-left:10px;vertical-align:middle;}
+.legend .chip{display:inline-flex;align-items:center;gap:4px;}
+.legend .sw{width:9px;height:9px;border-radius:2px;display:inline-block;border:1px solid rgba(0,0,0,.1);}
+
+/* Two-column row */
+.row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0;}
+.row.wide-left{grid-template-columns:1.3fr 1fr;}
+.row.wide-right{grid-template-columns:1fr 1.3fr;}
+@media (max-width:820px){.row,.row.wide-left,.row.wide-right{grid-template-columns:1fr;}}
+
+/* Delta arrow inline */
+.arrow{color:rgba(0,0,0,.45);margin:0 4px;}
+.pos{color:#2f7a58;font-weight:600;}
+.neg{color:#a54235;font-weight:600;}
+code{background:rgba(0,0,0,.05);padding:1px 5px;border-radius:3px;font:12px 'SF Mono',ui-monospace,Menlo,Consolas,monospace;}
+
+/* Print */
+@media print{
+  body{background:#fff;font-size:11pt;}
+  .page{max-width:none;padding:12mm 14mm;}
+  .cards,.toc,.box,.diagram,.card{page-break-inside:avoid;box-shadow:none;}
+  h2.sec{page-break-after:avoid;}
+  a{color:inherit;text-decoration:none;}
+  .diagram{overflow:visible;}
+}
+</style>
+
+<div class="page">
+
+<p class="eyebrow">B A L A N C E &nbsp; R E P O R T &nbsp; / &nbsp; 2 0 2 6 - 0 7 - 1 5 〜 1 8</p>
+<h1 class="title">配線システム移行後 バランス調整ジャーニー</h1>
+
+<div class="cards">
+  <div class="card g">
+    <p class="lbl">起点</p>
+    <p class="val">ADR-0009 相互攻撃モデル</p>
+    <p class="sub">配線・段階エスカレーション。 パッシブは UseMutualAttackPipeline トグルで自動分岐</p>
+  </div>
+  <div class="card o">
+    <p class="lbl">主な成果</p>
+    <p class="val">6F 勝率 13% → 41% / ペルソナ 7.6pp 収束</p>
+    <p class="sub">灰燼の王 v2 二相型・キーワード 5 軸追加 (42品)・Bot 戦術知性化</p>
+  </div>
+  <div class="card b">
+    <p class="lbl">現状</p>
+    <p class="val">アイテム 213 / PNG 132 / 10 ペルソナ稼働</p>
+    <p class="sub">クリア率バグ修正済み・正本ドキュメント同期完了・死コード掃除完了</p>
+  </div>
+</div>
+
+<div class="toc">
+  <p class="h">目次</p>
+  <ol>
+    <li><a href="#s1">相互攻撃モデル導入の直接副作用</a> <span class="badge b">起点</span></li>
+    <li><a href="#s2">6F 灰燼の王リワーク</a> <span class="badge g">v2 完了</span></li>
+    <li><a href="#s3">キーワードビルド軸拡張</a> <span class="badge g">5軸+42品</span></li>
+    <li><a href="#s4">BOT 戦術知性化</a> <span class="badge g">Playbook稼働</span></li>
+    <li><a href="#s5">アイテム整理と ID 統一</a> <span class="badge g">213品</span></li>
+    <li><a href="#s6">ダイス再設計と強化システム</a> <span class="badge g">data-driven</span></li>
+    <li><a href="#s7">品質整備 (バグ修正 / 正本同期 / 死コード)</a> <span class="badge g">完了</span></li>
+    <li><a href="#s8">未着手の課題</a> <span class="badge o">継続</span></li>
+  </ol>
+</div>
+
+<!-- ============= §1 ============= -->
+<h2 class="sec" id="s1"><span class="num">1</span>相互攻撃モデル導入の直接副作用 <span class="badge b">起点</span></h2>
+<p class="lead">ADR-0009 の相互攻撃パイプライン (<code>ExecuteTurnMutual</code>) 導入で、旧「ロール勝負」前提の設計要素が 3 系統で壊れた。以降の調整は全てこの副作用への応答。</p>
+
+<div class="box tinted">
+  <h4>3 つの副作用</h4>
+  <ul>
+    <li><strong>敵パッシブの発火経路が崩れる</strong> — 1759行の <code>OnPreDealDamage</code> は <code>playerWonRoll==true</code> 時 (自攻撃の残り値) を触るため、6F <code>JudgmentBlaze</code> の ×coef+coef が敵攻撃に反映されない</li>
+    <li><strong>「ロール勝敗」概念が消失</strong> — <code>OnRollWin/Lose</code> は解決後の収支トリガーに再定義。ラベルも「収支勝率」に変更</li>
+    <li><strong>配線判断が常時発生</strong> — 攻撃/ブロック/充電の 3 端子分配が毎T必要になり、序盤 T1=1dice では判断成立せず</li>
+  </ul>
+</div>
+
+<!-- ============= §2 ============= -->
+<h2 class="sec" id="s2"><span class="num">2</span>6F 灰燼の王リワーク <span class="badge g">v2 完了</span></h2>
+<p class="lead">相互攻撃で全パッシブが壊れた 6F を段階的にリワーク。v1 で発火経路を修正し、v2 で HP50% 閾値の二相型に転換。</p>
+
+<h3>勝率推移 (計測ベース)</h3>
+<table>
+  <thead><tr><th>ステージ</th><th>変更内容</th><th class="c">6F 勝率</th><th class="c">平均T</th><th>備考</th></tr></thead>
+  <tbody>
+    <tr><td>初回計測</td><td>ADR-0009 適用のみ</td><td class="c"><span class="neg">13.0%</span></td><td class="c">9.1T</td><td>Judgment 死因ゼロ = 断罪不発</td></tr>
+    <tr><td>v1 パッシブ実装</td><td>5 新パッシブ (外殻/予兆/再生/焦土/憤怒 なし)</td><td class="c">18.1%</td><td class="c">12.0T</td><td>OnPreReceiveDamage/OnRollWin 主軸</td></tr>
+    <tr><td>+ BossPlaybook</td><td>ボス別戦術・omen T ブロック配線</td><td class="c">41.0%</td><td class="c">16.8T</td><td>Bot 側の応答</td></tr>
+    <tr><td>+ Persona×Playbook</td><td>耐久 (Shield/Charge) の合成緩和</td><td class="c">41.4%</td><td class="c">15.3T</td><td>ペルソナ差 平準化</td></tr>
+    <tr><td>v2 二相型 (過剰)</td><td>HP50% で Phase2 (Fury+5/Omen 2T)</td><td class="c"><span class="neg">31.0%</span></td><td class="c">15.4T</td><td>Phase2 火力過多</td></tr>
+    <tr><td>Phase2 調整</td><td>Fury +5→+3 / Omen 2T→3T / 再生 8→5%</td><td class="c"><span class="pos">41.4%</span></td><td class="c">15.3T</td><td>着地</td></tr>
+  </tbody>
+</table>
+
+<div class="box tinted g">
+  <h4>v2 二相型 仕様 (現行)</h4>
+  <ul>
+    <li><strong>Phase1 (HP&gt;50%)</strong>: 灰の再生 5%/T / 業火の予兆 周期4T (T1/5/9)</li>
+    <li><strong>Phase2 (HP≤50%)</strong>: 再生停止 / 予兆 周期3T / 憤怒の残滓 敵ダイス+3常時</li>
+    <li><strong>共通</strong>: 灰塵の外殻 (被ダメ15超え半減) / 焦土契約 (収支負けで敵ダイス+2/stack 最大5)</li>
+    <li>削除: JudgmentBlaze/AshArmor/ImmortalEmber/EmberAura/StarfireProliferation/ScorchedEarth (相互攻撃で発火経路が壊れる)</li>
+  </ul>
+</div>
+
+<!-- ============= §3 ============= -->
+<h2 class="sec" id="s3"><span class="num">3</span>キーワードビルド軸拡張 <span class="badge g">5軸+42品</span></h2>
+<p class="lead">配線判断が意味を持つには十分な選択肢が必要。 相互攻撃モデルに沿った新軸を 5 系統追加。 Burn は Bleed との機構重複で全廃、後継として「臨界」を新設。</p>
+
+<table>
+  <thead><tr><th>軸</th><th>コンセプト</th><th class="c">パッシブ</th><th class="c">アイテム</th><th>代表パッシブ</th></tr></thead>
+  <tbody>
+    <tr><td><strong>充電</strong> (Charge)</td><td>リソース経済・過充電で継続火力</td><td class="c">9</td><td class="c">9</td><td>Battery / Spark / Overload / 短絡</td></tr>
+    <tr><td><strong>臨界</strong> (Rinkai)</td><td>メーター蓄積 → 閾値で爆発</td><td class="c">9</td><td class="c">9</td><td>Ignition / CriticalPressure / UnyieldingHeat</td></tr>
+    <tr><td><strong>毒</strong> (Poison)</td><td>拘束/妨害・敵攻撃-N が主効果</td><td class="c">9</td><td class="c">9</td><td>Paralysis / AssassinToxin / SlowVenomCurse</td></tr>
+    <tr><td><strong>鈍器</strong> (Bludgeon)</td><td>会心捨て・非会心強化のトレードオフ</td><td class="c">9</td><td class="c">9</td><td>HeavyStrike / BluntWeapon / SingleMinded</td></tr>
+    <tr><td>出血 拡張 (Bleed ext)</td><td>既存 Bleed に消費/爆発を追加</td><td class="c">6</td><td class="c">6</td><td>BloodStrike / AntiClotting / Wringing</td></tr>
+  </tbody>
+</table>
+
+<div class="box">
+  <h4>「臨界」メーター機構 (詳細)</h4>
+  <ul>
+    <li>毎T 攻撃配線ダイス合計 (<code>attackSum</code>) を <code>rinkaiMeter</code> に加算</li>
+    <li>閾値 (基準 50、<code>LowerThreshold</code> で 35) 到達で次T の攻撃に +50 flat 予約</li>
+    <li>予約消費後 meter は 0 or <code>rinkaiAfterglow</code> (Afterglow: 20 / NoCooldown: threshold/2) に</li>
+    <li><code>ChainCombustion</code> で爆発T の攻撃は会心確定 / <code>UnyieldingHeat</code> は meter≥40 で致命耐え (Immortalflame 継承)</li>
+  </ul>
+</div>
+
+<!-- ============= §4 ============= -->
+<h2 class="sec" id="s4"><span class="num">4</span>BOT 戦術知性化 <span class="badge g">Playbook稼働</span></h2>
+<p class="lead">配線判断が意味を持つ = Bot も応答できないと計測が信頼できない。 3 レイヤで戦術知性化。</p>
+
+<table>
+  <thead><tr><th class="c">レイヤ</th><th>ファイル</th><th>役割</th></tr></thead>
+  <tbody>
+    <tr><td class="c">1</td><td><code>MutualWiringPolicy</code> in AutoRunner</td><td>3端子 (Attack/Block/Charge) の効用計算・ペルソナで重み調整</td></tr>
+    <tr><td class="c">2</td><td><code>BossPlaybook.cs</code> (新設)</td><td>ボス別バイアス: omen / reflect / damageCapped 等のフラグ + wiring 重み変化</td></tr>
+    <tr><td class="c">3</td><td><code>BuildPersona.cs</code></td><td>10 ペルソナ × Playbook 合成: 耐久系は omenDefBoost 緩和、 火力系は omenAtkDamp 緩和</td></tr>
+  </tbody>
+</table>
+
+<h3>ペルソナ収束</h3>
+<table>
+  <thead><tr><th>指標</th><th class="c">初期</th><th class="c">現状</th><th>コメント</th></tr></thead>
+  <tbody>
+    <tr><td>ペルソナ間 勝率差</td><td class="c">9.0pp</td><td class="c"><span class="pos">7.6pp</span></td><td>Standard 77.6% / Charge 68.7% (初期) → 76% / 68% (現状)</td></tr>
+    <tr><td>Standard ペルソナ再定義</td><td class="c">選好なし</td><td class="c">S/A ハンター</td><td><code>LearnedPriorityProvider.IsSRank</code> 参照で高Tier 特化</td></tr>
+    <tr><td>Universal Boost</td><td class="c">なし</td><td class="c">Might/Pursuit 全軸へ</td><td>基礎火力パッシブは全ビルドが拾う</td></tr>
+    <tr><td>Keystone 加点</td><td class="c">+2 一律</td><td class="c">+4 (ShieldBash等)</td><td>ビルド核パッシブは強加点で確実採用</td></tr>
+  </tbody>
+</table>
+
+<!-- ============= §5 ============= -->
+<h2 class="sec" id="s5"><span class="num">5</span>アイテム整理と ID 統一 <span class="badge g">213品</span></h2>
+<p class="lead">キーワード追加で肥大化 (241品) したアイテムプールを整理。 命名規則も統一。</p>
+
+<div class="row">
+  <div class="box">
+    <h4>数の推移</h4>
+    <table>
+      <thead><tr><th>段階</th><th class="c">品数</th><th class="c">増減</th></tr></thead>
+      <tbody>
+        <tr><td>起点</td><td class="c">198</td><td class="c">—</td></tr>
+        <tr><td>キーワード追加</td><td class="c">241</td><td class="c"><span class="pos">+43</span></td></tr>
+        <tr><td>curse + dead_staff 削除</td><td class="c">236</td><td class="c">-5</td></tr>
+        <tr><td>重複ユニーク 5 削除</td><td class="c">231</td><td class="c">-5</td></tr>
+        <tr><td>大掃除 18 削除</td><td class="c">213</td><td class="c">-18</td></tr>
+        <tr><td><strong>現状</strong></td><td class="c"><strong>213</strong></td><td class="c">計 <strong>+15</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="box">
+    <h4>ID 命名統一 (58 品リネーム)</h4>
+    <ul>
+      <li>旧: 利刃I / strength_belt / observers_glasses 等 (混在)</li>
+      <li>新: <code>BladeEdge_1</code> / <code>Might_1</code> / <code>Insight_1</code> 等 (<code>PascalCase_N</code>)</li>
+      <li><code>ItemDatabase.LegacyIdMap</code> で 54 旧 ID → 新 ID を自動解決 (セーブ後方互換)</li>
+      <li>15 家系 × 平均 4 品 = 58 品を data-driven に統一</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============= §6 ============= -->
+<h2 class="sec" id="s6"><span class="num">6</span>ダイス再設計と強化システム <span class="badge g">data-driven</span></h2>
+<p class="lead">武器 Tier で急激に伸びる問題と、LEGENDARY ダイスを引けないと詰む問題を並行で解消。</p>
+
+<h3>武器ダイス数の変遷</h3>
+<table>
+  <thead><tr><th>試行</th><th class="c">T1</th><th class="c">T2</th><th class="c">T3</th><th class="c">T4</th><th>問題 / 判断</th></tr></thead>
+  <tbody>
+    <tr><td>起点</td><td class="c">1</td><td class="c">2</td><td class="c">3</td><td class="c">4</td><td><span class="neg">T1 で配線判断ゼロ</span> (1 端子固定)</td></tr>
+    <tr><td>試行1</td><td class="c">2</td><td class="c">3</td><td class="c">4</td><td class="c">5</td><td><span class="neg">Tier 段差 +50%</span> (2→3 dice)</td></tr>
+    <tr><td><strong>現状</strong></td><td class="c"><strong>3</strong></td><td class="c"><strong>3</strong></td><td class="c"><strong>3</strong></td><td class="c"><strong>4</strong></td><td><span class="pos">段差平準化</span> (T1-T3 で dice 固定、質的成長で差別化)</td></tr>
+  </tbody>
+</table>
+
+<h3>ダイス強化システム (2026-07-18 新設)</h3>
+<div class="box tinted">
+  <ul>
+    <li>共通素材 (<code>weaponMaterials</code>) を dice にも投資可能。 武器強化と同じタイミング (Rest / Outpost / メタLv51 / 鍛冶の霊薬) でフォールバック</li>
+    <li>1 Lv につき「最も低い 2 面に +1」。 レア別に上限あり</li>
+    <li>data-driven: items.json の <code>enhanceMaxLevel</code> / <code>enhanceCosts</code> でダイスごとに個別チューニング可</li>
+  </ul>
+</div>
+
+<table>
+  <thead><tr><th>レア</th><th class="c">Lv 上限</th><th class="c">総コスト</th><th>例: 素値 → MAX (avg)</th><th>素 LEG との比較</th></tr></thead>
+  <tbody>
+    <tr><td>BRONZE (dice_wood)</td><td class="c">4</td><td class="c">6 素材</td><td><code>[1-6]</code> 3.50 <span class="arrow">→</span> <code>[4,4,5,5,6,6]</code> <span class="pos">5.00</span></td><td>LEG 5.33-6.33 に届かず</td></tr>
+    <tr><td>SILVER (dice_iron)</td><td class="c">3</td><td class="c">5 素材</td><td><code>[2,3,3,4,4,5]</code> 3.50 <span class="arrow">→</span> <code>[4,4,4,5,5,5]</code> 4.50</td><td>約 15% 低い</td></tr>
+    <tr><td>GOLD (dice_gem)</td><td class="c">2</td><td class="c">5 素材</td><td><code>[3,4,4,5,6,7]</code> 4.83 <span class="arrow">→</span> 5.50</td><td>LEG 圏内だが特殊効果なし</td></tr>
+    <tr><td>LEGENDARY (dice_perfection)</td><td class="c">1</td><td class="c">3 素材</td><td><code>[3,5,6,7,8,9]</code> <span class="pos">6.33</span> <span class="arrow">→</span> 6.83</td><td>依然最強 (伸びしろ小)</td></tr>
+  </tbody>
+</table>
+
+<!-- ============= §7 ============= -->
+<h2 class="sec" id="s7"><span class="num">7</span>品質整備 <span class="badge g">完了</span></h2>
+
+<div class="row">
+  <div class="box tinted g">
+    <h4>A. クリア率カウントのバグ修正</h4>
+    <ul>
+      <li>ペルソナ表の「クリア率 0%」は集計バグ: <code>rn &gt;= 12</code> (解脱のみ) を <code>&gt;= 11</code> (7層クリア含む) に修正</li>
+      <li><code>R8b</code> (6F クリア) が <code>int.TryParse</code> 失敗で全集計から除外されていた問題も修正</li>
+      <li>実測 p7 撃破 <strong>429/10000 ≈ 4.3%</strong> が実クリア数として現れる</li>
+    </ul>
+  </div>
+  <div class="box tinted o">
+    <h4>B. 正本ドキュメント同期</h4>
+    <ul>
+      <li><code>DAMAGE_CALC_REFERENCE.md §9.2</code>: 臨界爆発の atkBase 加算・過充電閾値 7・メーター更新式</li>
+      <li><code>passives.md</code>: Burn 系 → 臨界系に全面書き換え・短絡改名・盾解放追記</li>
+      <li><code>boss.md</code>: 灰燼の王 v2 二相型 (Phase1/2) の仕様追記</li>
+      <li>AutoRunner サマリ: 「ロール勝率」→「収支勝率」ラベル変更</li>
+    </ul>
+  </div>
+</div>
+
+<div class="box tinted">
+  <h4>C. 死コード掃除 (11 ファイル)</h4>
+  <ul>
+    <li><strong>class 削除</strong>: Ignite / CurseBind / Abyss / 炎上系 8種 / PassiveItemEffects の 9 effect class (計約 240 行)</li>
+    <li><strong>フィールド削除</strong>: <code>CombatContext.burnDecayHalved</code> + TickStatuses の分岐</li>
+    <li><strong>StatusRegistry</strong>: burn 定義削除</li>
+    <li><strong>ItemIds</strong>: MerchantSeal / GourmetKnife / FoodHorn / EarthGuard 定数削除</li>
+    <li><strong>死フック除去</strong>: ShopManager 半額+売却不可 (2) / EventEffectExecutor 食通の懐刀 (2) / Consumables FoodHorn/EarthGuard case / AutoRunner UseFirst (2) / InventoryTriage 売却阻止</li>
+  </ul>
+</div>
+
+<!-- ============= §8 ============= -->
+<h2 class="sec" id="s8"><span class="num">8</span>未着手の課題 <span class="badge o">継続</span></h2>
+
+<table>
+  <thead><tr><th>#</th><th>課題</th><th>現状</th><th>優先度</th></tr></thead>
+  <tbody>
+    <tr><td class="c">1</td><td>7F 覚者連戦の通しクリア率</td><td>p1-p7 各 80-95%、通し <code>0.9^7 ≈ 48%</code> 前後の壁</td><td class="c"><span class="badge r">高</span></td></tr>
+    <tr><td class="c">2</td><td>1〜3層 の空気化</td><td>100% 勝率・平均 1.2T、配線判断が形式化</td><td class="c"><span class="badge o">中</span></td></tr>
+    <tr><td class="c">3</td><td>Λ層 リスク/リワード劣化</td><td>死亡 27-30% vs 純益 +0.5 アイテム/ラン (割に合わない)</td><td class="c"><span class="badge o">中</span></td></tr>
+    <tr><td class="c">4</td><td>5層 Chip 死因の単色化</td><td>敗北 96-98% が Chip 一色、対策多様性の欠如</td><td class="c"><span class="badge">低</span></td></tr>
+    <tr><td class="c">5</td><td>Charge ペルソナの底値</td><td>68% 帯で停滞、充電消費先の Bot 学習未熟</td><td class="c"><span class="badge o">中</span></td></tr>
+    <tr><td class="c">6</td><td>レア分布の逆ピラミッド</td><td>GOLD+LEG で 61% (理想は 20-25%)</td><td class="c"><span class="badge">低</span></td></tr>
+  </tbody>
+</table>
+
+<p style="color:rgba(0,0,0,.5);font-size:12px;margin-top:32px;">
+  ソース: <code>docs/reports/wiring-migration-balance.html</code> / 対応期間: 2026-07-15 〜 2026-07-18
+</p>
+
+</div>

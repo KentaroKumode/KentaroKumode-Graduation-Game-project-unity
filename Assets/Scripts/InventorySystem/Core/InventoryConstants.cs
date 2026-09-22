@@ -8,12 +8,11 @@ namespace InventorySystem
         // グリッドサイズ
         public const int GRID_WIDTH = 5;
         public const int GRID_HEIGHT = 8;
-        public const int INITIAL_UNLOCKED_ROWS = 4; // 初期4列(20マス)、 ショップで拡張可
+        public const int INITIAL_UNLOCKED_ROWS = 4; // 初期4列(20マス)。 UI グリッドの初期表示行数
 
-        // インベントリ拡張コスト (1列ずつ追加)
-        // 4列→5列=5G, 5→6=8G, 6→7=12G, 7→8=17G
-        public static readonly int[] ExpansionCost = { 5, 8, 12, 17 };
-        public const int MAX_UNLOCKED_ROWS = 8;
+        // [削除 2026-09-11] ExpansionCost / MAX_UNLOCKED_ROWS ── ショップのインベントリ拡張。
+        //   容量制限が 2026-07-29 に撤廃され、 拡張枠も 2026-09-03 に陳列から撤去されたため、
+        //   参照元が無くなった。 UI グリッドの行数上限は GRID_HEIGHT が持つ。
 
         // アイテムサイズ制限
         public const int MAX_ITEM_SIZE = 4;

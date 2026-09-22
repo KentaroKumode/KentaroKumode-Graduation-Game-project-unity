@@ -22,7 +22,7 @@ namespace CombatSystem
         [Header("フォールバック（武器未装備時）")]
         [SerializeField] private int playerDiceCount = 2;
         [SerializeField] private int playerDiceMax = 6;
-        [SerializeField] private int playerCriticalNumerator = 1;
+        [SerializeField] private float playerCritRatePct = 5f;
 
         [Header("デバッグ表示")]
         [SerializeField] private bool showGUI = false;
@@ -129,12 +129,12 @@ namespace CombatSystem
                 ? lastEquippedWeapon.weaponDice.count : playerDiceCount;
             int diceMax = lastEquippedWeapon != null && lastEquippedWeapon.hasWeaponStats
                 ? lastEquippedWeapon.weaponDice.maxValue : playerDiceMax;
-            int critRate = lastEquippedWeapon != null && lastEquippedWeapon.criticalRate > 0
-                ? lastEquippedWeapon.criticalRate : playerCriticalNumerator;
+            float critRatePct = lastEquippedWeapon != null && lastEquippedWeapon.critRatePct > 0f
+                ? lastEquippedWeapon.critRatePct : playerCritRatePct;
 
             if (lastEquippedWeapon == null || !lastEquippedWeapon.hasWeaponStats)
             {
-                Debug.LogWarning($"[CombatTest] 武器未装備のためフォールバック値を使用: {diceCount}d{diceMax} Crit:{critRate}/9");
+                Debug.LogWarning($"[CombatTest] 武器未装備のためフォールバック値を使用: {diceCount}d{diceMax} Crit:{critRatePct:0.#}%");
             }
 
             // 装備ダイスの面を取得
@@ -150,7 +150,7 @@ namespace CombatSystem
             }
 
             CombatManager.Instance.StartCombat(
-                enemy, playerMaxHP, diceCount, diceMax, critRate, equippedDiceFaces);
+                enemy, playerMaxHP, diceCount, diceMax, critRatePct / 100f, equippedDiceFaces);
         }
 
         /// <summary>
@@ -190,16 +190,17 @@ namespace CombatSystem
                     skillList += $"  [{ps.internalName}] {ps.skillName}\n";
             }
             string diceInfo = weapon.hasWeaponStats ? $" {weapon.weaponDice.count}d{weapon.weaponDice.maxValue}" : "";
-            string critInfo = weapon.criticalRate > 0 ? $" Crit:{weapon.criticalRate}/9" : "";
+            string critInfo = weapon.critRatePct > 0f ? $" Crit:{weapon.critRatePct:0.#}%" : "";
             weaponText = $"{weapon.displayName}{diceInfo}{critInfo} (スキル{weapon.passiveSkills?.Count ?? 0}個)";
             Debug.Log($"[CombatTest] ランダム武器: {weapon.displayName}{diceInfo}{critInfo}\n{skillList}");
         }
+
 
         private void OnCombatStartHandler(string id)
         {
             var cm = CombatManager.Instance;
             var enemy = EnemyDatabase.Get(id);
-            enemyText = $"{enemy?.displayName ?? id} (HP:{enemy?.maxHP} {enemy?.DiceNotation} Crit:{enemy?.criticalNumerator}/9)";
+            enemyText = $"{enemy?.displayName ?? id} (HP:{enemy?.maxHP} {enemy?.DiceNotation})";
             statusText = $"戦闘開始: {enemy?.displayName ?? id}";
             Debug.Log($"[CombatTest] ====== 戦闘開始 ======\n" +
                       $"対戦相手: {enemyText}\n" +

@@ -26,7 +26,7 @@ namespace AutoTest
             public string key;               // "eventId|index"
             public int trials;
             public double bandScoreSum;
-            public int fullClearCount;       // R11+R12
+            public int fullClearCount;       // R11
             public double BandAvg => trials > 0 ? bandScoreSum / trials : 0;
             public double FullClearRate => trials > 0 ? (double)fullClearCount / trials : 0;
         }

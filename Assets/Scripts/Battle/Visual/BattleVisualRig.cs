@@ -225,10 +225,13 @@ namespace Battle.Visual
             SetLayerRecursively(go, ContentLayer);
 
             // 色乗算: マテリアルがあれば tint を適用 (プレハブのマテリアルが破壊されないよう sharedMaterial をコピー)。
+            // 注意: パーティクル/トレイル等でマテリアル未割当の Renderer が混ざり得るため null はスキップ
+            // (new Material(null) は ArgumentNullException)。
             if (tint != Color.white)
             {
                 foreach (var rend in go.GetComponentsInChildren<Renderer>(true))
                 {
+                    if (rend == null || rend.sharedMaterial == null) continue;
                     var mat = new Material(rend.sharedMaterial);
                     if (mat.HasProperty("_Color")) mat.color *= tint;
                     rend.sharedMaterial = mat;

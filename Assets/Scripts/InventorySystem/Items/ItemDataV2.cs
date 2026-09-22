@@ -24,13 +24,18 @@ namespace InventorySystem
     /// <summary>
     /// アイテム希少性
     /// </summary>
+    /// <remarks>
+    /// MYTHIC / DIVINE は **プレイヤーには入手不能**。 7 層ヴェスカの遺物プール専用の等級で、
+    /// items.json には登録しない (item-dex とドロップ抽選への漏れ防止)。 正本: docs/GAME.md §13-4。
+    /// </remarks>
     public enum ItemRarity
     {
         BRONZE,
         SILVER,
         GOLD,
         LEGENDARY,
-        MYTHIC
+        MYTHIC,
+        DIVINE
     }
 
     /// <summary>
@@ -44,7 +49,7 @@ namespace InventorySystem
         
         public int GetRandomValue()
         {
-            return UnityEngine.Random.Range(min, max + 1);
+            return GameLoop.GameRng.RangeAuto("ItemDataV2.1", min, max + 1);
         }
         
         public override string ToString()
@@ -68,7 +73,7 @@ namespace InventorySystem
             int total = 0;
             for (int i = 0; i < count; i++)
             {
-                total += UnityEngine.Random.Range(minValue, maxValue + 1);
+                total += GameLoop.GameRng.RangeAuto("ItemDataV2.2", minValue, maxValue + 1);
             }
             return total;
         }
@@ -99,7 +104,11 @@ namespace InventorySystem
         public string internalName = "";
         public string skillName = "";
         public string description = "";
-        
+        /// <summary>ステータス表現 (無ければ null)。 あれば効果は汎用の StatModifierEffect が担い、
+        /// 画面では名前付きパッシブではなくステータスの加算として出す。</summary>
+        public StatJson[] stats;
+        public bool IsStatSkill => stats != null && stats.Length > 0;
+
         public PassiveSkill() { }
         public PassiveSkill(string internalName, string name, string desc)
         {
@@ -161,13 +170,40 @@ namespace InventorySystem
         
         [Header("武器データ（武器のみ）")]
         public DiceConfig weaponDice;
-        public int criticalRate;     // 会心率の分子（1～9、分母は9）
+        /// <summary>武器の会心率 (%)。 15 = 15%。 5% 刻み (2026-09-19)。</summary>
+        public float critRatePct;
         public int attackPower;      // 武器の素火力（#2 案A'：勝利base = attackPower + floor(|差|/3)）
+
+        /// <summary>UI 表示用の会心率。 判定と同じ ResolveCritRate を通す (表示と判定の乖離を防ぐ)。</summary>
+        public string CriticalRateLabel()
+        {
+            float rate = PassiveSkills.CombatContext.ResolveCritRate(critRatePct / 100f);
+            return $"{rate * 100f:0.#}%";
+        }
 
         [Header("ダイスデータ（ダイスのみ）")]
         public int[] diceFaces;      // カスタムダイスの面配列 (例: {1,2,3,4,5,6})
+        /// <summary>ADR-0010〈無銘の賽〉: このダイスでは端子役が成立しない。 詳細は ItemData 側。</summary>
+        public bool suppressTerminalRoles;
+        /// <summary>強化 Lv 上限 (2026-07-18・0=強化不可)。 items.json で dice ごとに指定。
+        /// 未指定 (0) の場合は DiceEnhance.MaxLevelForItem() のレア別デフォルトが使われる。</summary>
+        public int enhanceMaxLevel;
+        /// <summary>強化コスト配列 (Lv1 になるためのコスト, Lv2 になるためのコスト, ...)。
+        /// 未指定 (null/空) の場合は DiceEnhance.CostForLevel() のレア別デフォルトが使われる。</summary>
+        public int[] enhanceCosts;
         public string roleName = "";         // ロール名（タンク/ナイト/バーサーカー/アサシン）
         public string roleDescription = "";  // ロール説明
+
+        // === 構造フィールド (2026-09-22。 詳細と経緯は ItemDataJson 側) ===
+        //   **id からパースしない。** id は表示名なので調整で変わる。
+        /// <summary>進行武器の家系 (sword/axe/dagger/shield)。 武器以外は空。</summary>
+        public string family = "";
+        /// <summary>段。 武器 2〜4 / 消費 1〜4 / 持たない品は 0。</summary>
+        public int tier;
+        /// <summary>消費アイテムの系統 (heal/def/dmg/hope)。 それ以外は空。</summary>
+        public string consFamily = "";
+        /// <summary>ユニーク品 (旧 uniq_ 接頭辞)。 昇華の対象外。</summary>
+        public bool unique;
         public List<PassiveEffect> weaponPassives = new List<PassiveEffect>();
         
         [Header("パッシブアイテムデータ")]
@@ -271,13 +307,18 @@ namespace InventorySystem
                 buyPrice = source.buyPrice,
                 sellPrice = source.sellPrice,
                 weaponDice = source.weaponDice,
-                criticalRate = source.criticalRate,
+                critRatePct = source.critRatePct,
                 roleName = source.roleName,
                 roleDescription = source.roleDescription,
+                family = source.family,
+                tier = source.tier,
+                consFamily = source.consFamily,
+                unique = source.unique,
                 weaponPassives = source.weaponPassives,
                 passiveEffects = source.passiveEffects,
                 passiveSkills = source.passiveSkills,
                 diceFaces = source.diceFaces,
+                suppressTerminalRoles = source.suppressTerminalRoles,
                 icon = source.icon,
                 equipMarkPrefab = source.equipMarkPrefab,
             };

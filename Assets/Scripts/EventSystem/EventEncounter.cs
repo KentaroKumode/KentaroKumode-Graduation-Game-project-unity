@@ -68,8 +68,14 @@ namespace EventSystem
         public bool Begin(RunState run, bool excludeRandomEvent = false)
         {
             if (run == null) return false;
+            return BeginWith(run, EventDatabase.Pick(run, excludeRandomEvent));
+        }
 
-            var ev = EventDatabase.Pick(run, excludeRandomEvent);
+        /// <summary>**抽選せず、指定したイベントを開始する**。 召喚専用イベント用。
+        /// 開始後の流れ (選択肢解決 / フレーバー / マップ復帰) は抽選経路と完全に同じ。</summary>
+        public bool BeginWith(RunState run, EventDefinition ev)
+        {
+            if (run == null) return false;
             if (ev == null)
             {
                 Debug.LogWarning("[EventEncounter] 該当イベントなし");
@@ -95,7 +101,23 @@ namespace EventSystem
             var hunger = MapManager.Instance?.Hunger;
             var run = GameManager.Instance?.Run;
 
+            // 行動台帳: 効果の**種別を解釈せず**、 実行前後の差分で「代償を払ったか」を決める。
+            //   EventEffectType は増えるので、 型で分類すると新しい効果が追加されるたびに
+            //   ここが取り残される。 GOLD と HP の減少という結果だけを見る。
+            int chGold = run != null ? run.coins : 0;
+            int chHp   = run != null ? run.playerHP : 0;
+
             var execResult = EventEffectExecutor.Execute(choice.effects, run, hunger);
+
+            if (run != null)
+            {
+                bool paid = run.coins < chGold || run.playerHP < chHp;
+                bool empty = choice.effects == null || choice.effects.Count == 0;
+                string code = empty  ? RunChronicle.EventRefuse
+                            : paid   ? RunChronicle.EventPrice
+                                     : RunChronicle.EventTake;
+                RunChronicle.Event(run, code, Current.id, index);
+            }
 
             // 一度のみイベントの記録
             if (Current.condition.onceOnly && run != null)

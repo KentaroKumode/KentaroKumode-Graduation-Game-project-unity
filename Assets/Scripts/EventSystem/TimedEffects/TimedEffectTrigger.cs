@@ -15,5 +15,8 @@ namespace EventSystem.TimedEffects
         CombatEnd,
         /// <summary>マップ移動時に適用、適用後にチャージ-1</summary>
         OnMapMove,
+        /// <summary>層に入った時に適用 (2026-09-15)。 **1 ランに 8 回しか鳴らない**ので、
+        /// 1 回あたりの量はマップ移動系より大きくてよい (移動は 1 ラン 30〜40 回)。</summary>
+        OnFloorEnter,
     }
 }

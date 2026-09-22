@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>Item Dex — アイテム辞書</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root {
+    --bg: #f6f4ef;
+    --panel: #ffffff;
+    --panel-2: #efece4;
+    --ink: #1a1a1a;
+    --ink-2: #4a4a4a;
+    --ink-3: #7a7a7a;
+    --line: #d9d4c7;
+    --accent: #b7472a;
+    --accent-soft: #f2d9d0;
+    --r-bronze: #a15a2a;
+    --r-silver: #7d7d7d;
+    --r-gold:   #b58a1c;
+    --r-leg:    #b7472a;
+    --r-myth:   #4a6b9a;
+    --tag-bg: #ece7d8;
+    --tag-fg: #4a4a4a;
+    --shadow: 0 1px 0 rgba(0,0,0,0.02), 0 4px 12px rgba(30,20,10,0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --panel: #1c1f24;
+      --panel-2: #24282f;
+      --ink: #e8e6e0;
+      --ink-2: #b5b3ad;
+      --ink-3: #7d7a72;
+      --line: #333740;
+      --accent: #e2795c;
+      --accent-soft: #3a2320;
+      --r-bronze: #c58a5c;
+      --r-silver: #c9c9c9;
+      --r-gold:   #e5c15b;
+      --r-leg:    #e2795c;
+      --r-myth:   #7ea1d1;
+      --tag-bg: #2a2e36;
+      --tag-fg: #b5b3ad;
+      --shadow: 0 1px 0 rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f4ef; --panel: #ffffff; --panel-2: #efece4;
+    --ink: #1a1a1a; --ink-2: #4a4a4a; --ink-3: #7a7a7a; --line: #d9d4c7;
+    --accent: #b7472a; --accent-soft: #f2d9d0;
+    --r-bronze: #a15a2a; --r-silver: #7d7d7d; --r-gold: #b58a1c; --r-leg: #b7472a; --r-myth: #4a6b9a;
+    --tag-bg: #ece7d8; --tag-fg: #4a4a4a;
+    --shadow: 0 1px 0 rgba(0,0,0,0.02), 0 4px 12px rgba(30,20,10,0.05);
+  }
+  :root[data-theme="dark"] {
+    --bg: #14161a; --panel: #1c1f24; --panel-2: #24282f;
+    --ink: #e8e6e0; --ink-2: #b5b3ad; --ink-3: #7d7a72; --line: #333740;
+    --accent: #e2795c; --accent-soft: #3a2320;
+    --r-bronze: #c58a5c; --r-silver: #c9c9c9; --r-gold: #e5c15b; --r-leg: #e2795c; --r-myth: #7ea1d1;
+    --tag-bg: #2a2e36; --tag-fg: #b5b3ad;
+    --shadow: 0 1px 0 rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 14px; line-height: 1.55;
+    font-feature-settings: "palt";
+  }
+  .app {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: 100vh;
+  }
+  aside {
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    padding: 20px 18px;
+    position: sticky; top: 0; align-self: start;
+    height: 100vh; overflow-y: auto;
+  }
+  main {
+    padding: 20px 24px 60px;
+    min-width: 0;
+  }
+  h1 {
+    font-size: 15px; letter-spacing: 0.08em; margin: 0 0 4px;
+    font-weight: 700; text-transform: uppercase; color: var(--accent);
+  }
+  h1 .sub { display: block; font-size: 20px; color: var(--ink); text-transform: none; letter-spacing: 0; margin-top: 2px; font-weight: 700; }
+  .meta { color: var(--ink-3); font-size: 12px; margin-bottom: 20px; }
+  .filter-group { margin-bottom: 18px; }
+  .filter-group h3 {
+    font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-3); margin: 0 0 8px; font-weight: 700;
+  }
+  .search {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line); background: var(--panel-2);
+    color: var(--ink); border-radius: 4px; font-size: 13px; font-family: inherit;
+  }
+  .search:focus { outline: none; border-color: var(--accent); }
+  select {
+    width: 100%; padding: 6px 8px; border: 1px solid var(--line); background: var(--panel-2);
+    color: var(--ink); border-radius: 4px; font-size: 13px; font-family: inherit;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 3px 8px; border: 1px solid var(--line); background: var(--panel-2);
+    color: var(--ink-2); border-radius: 999px; cursor: pointer;
+    font-size: 11px; user-select: none; white-space: nowrap;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--ink); }
+  .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .chip.exclude { background: transparent; color: var(--ink-3); border-color: var(--ink-3); text-decoration: line-through; }
+  .chip.exclude::before { content: "−"; margin-right: 2px; font-weight: 700; }
+  .chip.active::before { content: "+"; margin-right: 2px; font-weight: 700; }
+  .chip .n { opacity: 0.6; font-size: 10px; }
+  .chip.active .n { opacity: 0.85; }
+  .chip.exclude .n { opacity: 0.5; }
+
+  .toolbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+  }
+  .count { color: var(--ink-3); font-size: 13px; }
+  .count b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .sort {
+    display: flex; align-items: center; gap: 6px; color: var(--ink-3); font-size: 12px;
+  }
+  .theme-toggle {
+    background: none; border: 1px solid var(--line); color: var(--ink-2);
+    padding: 4px 10px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 12px;
+  }
+  .theme-toggle:hover { border-color: var(--accent); color: var(--ink); }
+
+  .grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 12px;
+  }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+    padding: 12px 14px; box-shadow: var(--shadow); position: relative;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .card .rarity-bar {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 6px 0 0 6px;
+  }
+  .card .head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .card .name { font-weight: 700; font-size: 15px; color: var(--ink); }
+  .card .price { color: var(--ink-3); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .card .subline { font-size: 11px; color: var(--ink-3); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .card .id { font-family: "SF Mono", "Consolas", "Menlo", monospace; font-size: 10px; color: var(--ink-3); }
+  .card .desc { color: var(--ink-2); font-size: 12.5px; }
+  .card .flavor { color: var(--ink-3); font-size: 11.5px; font-style: italic; border-left: 2px solid var(--line); padding-left: 8px; }
+  .card .stats {
+    display: flex; gap: 10px; font-size: 11px; color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+    background: var(--panel-2); padding: 6px 8px; border-radius: 4px;
+  }
+  .card .stats span b { color: var(--ink); }
+  .card .passives { display: flex; flex-direction: column; gap: 3px; margin-top: 2px; }
+  .card .p {
+    display: grid; grid-template-columns: auto 1fr; gap: 6px;
+    font-size: 11.5px; color: var(--ink-2);
+  }
+  .card .p .pname { color: var(--ink); font-weight: 600; white-space: nowrap; }
+  .card .tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
+  .tag {
+    background: var(--tag-bg); color: var(--tag-fg); font-size: 10px;
+    padding: 1px 6px; border-radius: 3px;
+  }
+  .tag.fam { background: var(--accent-soft); color: var(--accent); }
+  .tag.uniq { background: transparent; color: var(--ink-3); border: 1px dashed var(--line); }
+  .tag.kw   { background: var(--tag-bg); color: var(--ink); font-weight: 600; }
+
+  .r-BRONZE .rarity-bar { background: var(--r-bronze); }
+  .r-SILVER .rarity-bar { background: var(--r-silver); }
+  .r-GOLD   .rarity-bar { background: var(--r-gold); }
+  .r-LEGENDARY .rarity-bar { background: var(--r-leg); }
+  .r-MYTHIC .rarity-bar { background: var(--r-myth); }
+  .r-BRONZE .name { border-bottom: 1px dotted transparent; }
+  .rarity-badge {
+    font-size: 9px; letter-spacing: 0.08em; padding: 1px 6px; border-radius: 3px;
+    text-transform: uppercase; font-weight: 700;
+  }
+  .r-BRONZE .rarity-badge { background: var(--r-bronze); color: #fff; }
+  .r-SILVER .rarity-badge { background: var(--r-silver); color: #fff; }
+  .r-GOLD   .rarity-badge { background: var(--r-gold); color: #fff; }
+  .r-LEGENDARY .rarity-badge { background: var(--r-leg); color: #fff; }
+  .r-MYTHIC .rarity-badge { background: var(--r-myth); color: #fff; }
+
+  .empty { padding: 60px 20px; text-align: center; color: var(--ink-3); }
+  .empty b { color: var(--ink); }
+
+  @media (max-width: 800px) {
+    .app { grid-template-columns: 1fr; }
+    aside { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+
+<!-- Loader overlay: shown until items.json is loaded (fetch → localStorage → drop/pick) -->
+<div id="loader" style="display:none;position:fixed;inset:0;z-index:9999;background:var(--bg);
+     display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="max-width:520px;text-align:center;padding:40px;border:2px dashed var(--line);
+       border-radius:12px;background:var(--panel)" id="drop-zone">
+    <div style="font-size:20px;font-weight:700;margin-bottom:8px;color:var(--accent)">items.json を読み込み</div>
+    <div style="color:var(--ink-2);font-size:13px;margin-bottom:20px" id="loader-msg">
+      Assets/Data/InventorySystem/items.json をここにドロップ、またはボタンから選択</div>
+    <input type="file" id="file-input" accept=".json,application/json" style="display:none">
+    <button id="pick-btn" style="padding:10px 24px;border:1px solid var(--accent);background:var(--accent);
+            color:#fff;border-radius:6px;font-family:inherit;font-size:13px;cursor:pointer">
+      items.json を選択</button>
+    <div style="margin-top:16px;font-size:11px;color:var(--ink-3)">
+      前回読み込んだ items.json は自動でキャッシュされ、次回以降は即座に復元されます。<br>
+      HTTP サーバー経由 (python -m http.server 等) で開くと自動読み込みされます。</div>
+  </div>
+</div>
+
+
+<div class="app">
+  <aside>
+    <h1>Item Dex<span class="sub">アイテム辞書</span></h1>
+    <div class="meta">items.json ダイレクト参照</div>
+
+    <div class="filter-group">
+      <h3>Search</h3>
+      <input class="search" id="q" placeholder="名前・説明・パッシブ...">
+    </div>
+
+    <div class="filter-group">
+      <h3>Category <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink-3)">(クリックで含む→除外→解除)</span></h3>
+      <div class="chips" id="cat-chips"></div>
+    </div>
+
+    <div class="filter-group">
+      <h3>Rarity</h3>
+      <div class="chips" id="rar-chips"></div>
+    </div>
+
+    <div class="filter-group">
+      <h3>Role</h3>
+      <div class="chips" id="role-chips"></div>
+    </div>
+
+    <div class="filter-group">
+      <h3>Keyword Build</h3>
+      <div class="chips" id="kw-chips"></div>
+    </div>
+
+    <div class="filter-group">
+      <h3>Family</h3>
+      <div class="chips" id="fam-scope">
+        <span class="chip" data-scope="any">全て</span>
+        <span class="chip" data-scope="family">家系のみ</span>
+        <span class="chip" data-scope="unique">ユニークのみ</span>
+      </div>
+      <div style="margin-top:8px">
+        <select id="fam-select">
+          <option value="">— 家系を指定 —</option>
+        </select>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="toolbar">
+      <div class="count"><b id="count">0</b> / <span id="total">0</span> items</div>
+      <div class="sort">
+        <label for="sort">Sort</label>
+        <select id="sort" style="width:auto">
+          <option value="name">名前 (五十音)</option>
+          <option value="rarity">レア (低→高)</option>
+          <option value="rarity-desc">レア (高→低)</option>
+          <option value="price">価格 (安→高)</option>
+          <option value="price-desc">価格 (高→安)</option>
+          <option value="family">家系グループ</option>
+        </select>
+        <button class="theme-toggle" id="theme">◐ theme</button>
+      </div>
+    </div>
+    <div id="results" class="grid"></div>
+  </main>
+</div>
+
+<script>
+(function(){
+  // ============================================================
+  //  items.json ローダー (auto-refresh 対応・2026-07-21)
+  //  優先順位:
+  //   1. fetch('../../Assets/Data/InventorySystem/items.json') — HTTP 経由なら成功
+  //   2. localStorage キャッシュ (前回の読込データ)
+  //   3. ドラッグ&ドロップ / ファイル選択
+  //  読込後は自動でキャッシュされ、次回開いた時は即座に復元される。
+  // ============================================================
+  const CACHE_KEY = 'item-dex.items-json.v1';
+  const CACHE_META_KEY = 'item-dex.items-json.meta.v1';
+  const JSON_REL_PATH = '../../Assets/Data/InventorySystem/items.json';
+
+  const loader = document.getElementById('loader');
+  const loaderMsg = document.getElementById('loader-msg');
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const pickBtn = document.getElementById('pick-btn');
+
+  function showLoader(msg){
+    if (loader) loader.style.display = 'flex';
+    if (msg && loaderMsg) loaderMsg.textContent = msg;
+  }
+  function hideLoader(){ if (loader) loader.style.display = 'none'; }
+
+  function saveCache(text){
+    try {
+      localStorage.setItem(CACHE_KEY, text);
+      localStorage.setItem(CACHE_META_KEY, JSON.stringify({ savedAt: new Date().toISOString() }));
+    } catch (e) { console.warn('[item-dex] localStorage 保存失敗:', e); }
+  }
+  function loadCache(){
+    try { return localStorage.getItem(CACHE_KEY); } catch (e) { return null; }
+  }
+
+  function bootFromText(text, source){
+    let parsed;
+    try { parsed = JSON.parse(text); }
+    catch (e) { showLoader('JSON パース失敗: ' + e.message); return false; }
+    // 2026-09-19 書式: パッシブ品は item.skill (+stats)、 武器は item.skills (最上位 skills 表の id)。
+    //   下の描画は旧来の passiveSkills[] を読むので、 ここで展開して渡す。
+    const skillDefs = {};
+    for (const d of (parsed.skills || [])) skillDefs[d.id] = d;
+    const items = (parsed.items || []).map(it => {
+      const ps = [];
+      if (it.skill) ps.push({ internalName: it.id, skillName: it.skill,
+                              description: (it.description || '').replace(/。$/, '') });
+      for (const sid of (it.skills || [])) {
+        const d = skillDefs[sid] || { id: sid, name: sid, description: '(skills 表に無い)' };
+        ps.push({ internalName: d.id, skillName: d.name, description: d.description || '' });
+      }
+      return Object.assign({}, it, { passiveSkills: ps });
+    });
+    if (!items.length) { showLoader('items 配列が空です'); return false; }
+    saveCache(text);
+    hideLoader();
+    console.log(`[item-dex] ${items.length} items loaded from ${source}`);
+    boot(items);
+    return true;
+  }
+
+  async function tryFetch(){
+    try {
+      const res = await fetch(JSON_REL_PATH, { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return await res.text();
+    } catch (e) {
+      // file:// or CORS failure — silent fallback
+      return null;
+    }
+  }
+
+  // File picker + drag-drop wiring
+  if (pickBtn) pickBtn.addEventListener('click', () => fileInput && fileInput.click());
+  if (fileInput) fileInput.addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0];
+    if (f) readAndBoot(f);
+  });
+  if (dropZone) {
+    ['dragenter','dragover'].forEach(ev => dropZone.addEventListener(ev, e => {
+      e.preventDefault(); dropZone.style.borderColor = 'var(--accent)';
+    }));
+    ['dragleave','drop'].forEach(ev => dropZone.addEventListener(ev, e => {
+      e.preventDefault(); dropZone.style.borderColor = 'var(--line)';
+    }));
+    dropZone.addEventListener('drop', e => {
+      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) readAndBoot(f);
+    });
+  }
+  function readAndBoot(file){
+    const reader = new FileReader();
+    reader.onload = e => bootFromText(e.target.result, `file "${file.name}"`);
+    reader.onerror = () => showLoader('ファイル読み込み失敗');
+    reader.readAsText(file);
+  }
+
+  // Reload button (added to toolbar after boot)
+  function installReloadBtn(){
+    const sort = document.querySelector('.sort');
+    if (!sort || document.getElementById('reload-btn')) return;
+    const btn = document.createElement('button');
+    btn.id = 'reload-btn';
+    btn.className = 'theme-toggle';
+    btn.textContent = '↻ reload';
+    btn.title = 'items.json を再読込 (fetch → キャッシュ更新)';
+    btn.addEventListener('click', async () => {
+      btn.textContent = '↻ ...';
+      const text = await tryFetch();
+      if (text) { bootFromText(text, 'fetch (reload)'); location.reload(); }
+      else { showLoader('自動取得失敗 — items.json をドロップしてください'); }
+      btn.textContent = '↻ reload';
+    });
+    sort.appendChild(btn);
+  }
+
+  // Bootstrap sequence
+  (async function bootstrap(){
+    // 1. try fetch (HTTP)
+    let text = await tryFetch();
+    if (text) { bootFromText(text, 'fetch'); return; }
+    // 2. try cache
+    text = loadCache();
+    if (text) {
+      const meta = (() => { try { return JSON.parse(localStorage.getItem(CACHE_META_KEY) || '{}'); } catch(e){ return {}; } })();
+      const age = meta.savedAt ? new Date(meta.savedAt).toLocaleString('ja-JP') : '不明';
+      console.log(`[item-dex] cache hit (saved ${age}) — items.json 更新時は ↻reload / drop`);
+      if (bootFromText(text, 'localStorage cache')) return;
+    }
+    // 3. show loader
+    showLoader('Assets/Data/InventorySystem/items.json をここにドロップ、またはボタンから選択');
+  })();
+
+  // ============================================================
+  //  Main boot: filter/sort/render (旧: DATA を直接使用)
+  // ============================================================
+  function boot(DATA){
+    installReloadBtn();
+
+  // --- Keyword taxonomy: passive internalName -> build tag(s) ---
+  const KW_MAP = {
+    Charge: ['蓄電池','火花','雷撃','過負荷','予備電源','Thundercloud','発電機','触媒'],
+    Rinkai: ['発火','熱伝導','輻射','臨界圧','連鎖爆発','余熱','降下閾値','不冷却','不朽の熱','短絡','ReversalFlame'],
+    Poison: ['毒塗り','麻痺毒','毒の刃','毒液噴射','毒の霧','SlowVenomCurse','蛇の血','CorrosiveStrike','毒殺者'],
+    Bludgeon: ['鈍器','Thumping','Bludgeon_1','Bludgeon_4','絞り出し','裂傷の刃心','溜め打ち'],
+    Bleed: ['Sting','血の一撃','血の匂い','背水の狂刃','紅蓮の刃','止血阻害','GrievousI','GrievousII','血の宿命','BloodDecree'],
+    Shield: ['Fortitude_1','FortitudeII','FortitudeIII','FortitudeIV','ShieldBashI','ShieldBashII','ShieldBashIII','ShieldBash_4','盾解放','Parry','HolyShield','防殻の一閃','IronWall','Riposte','Steadfast','頑迷'],
+    Attack: ['Might_1','MightII','MightIII','MightIV','BladeEdgeI','BladeEdgeII','BladeEdgeIII','BladeEdgeIV','ApexCrit','連環の極み','黄金卿の剣'],
+    Pursuit: ['PursuitI','PursuitII','PursuitIII','Pursuit_4','Execute','Nightfall','BountyHunterI','BountyHunterII','BountyHunter_3','BountyHunterIV'],
+    Insight: ['狂った計測器','Insight_2','InsightIII','InsightIV'],
+    Heal: ['Vitality_1','VitalityII','VitalityIII','VitalityIV','LifestealI','Lifesteal_2','LifestealIII','LifestealIV','命脈','癒しの靴','安らぎの靴','希望の灯片'],
+    Endurance: ['IndomitableI','IndomitableII','Indomitable_3','IndomitableIV','LentTimeI','LentTimeII','LentTimeIII','LentTime_4','CounterI','CounterII','CounterIII','CounterIV','Eternal'],
+    Conqueror: ['ConquerorI','ConquerorII','Conqueror_3','ConquerorIV','Judgement','JudgmentScale','BloodDecree'],
+    DiceControl: ['Destiny','StarFate','Starguide','万華の賽','賽振りの目隠し','Perfection','CopperSteady','Shimmer','Moroha','Greed','Frenzy','GaryoTensei','匠の手控え','天工開物'],
+    Dance: ['ブレイドダンス','サーベル・ワルツ','フルーレ・バレエ','ファコン・タンゴ','エスパーダ・パソドブレ'],
+    Zen: ['MugaMushin','一心不乱','無心の刃','VoidStance','末那識'],
+  };
+  const KW_LOOKUP = {}; // internalName -> [tags]
+  for (const [tag, arr] of Object.entries(KW_MAP)) {
+    for (const n of arr) (KW_LOOKUP[n] = KW_LOOKUP[n] || []).push(tag);
+  }
+
+  // --- Family detection ---
+  // PascalCase_N (BladeEdge_1, Might_2)  OR  suffix _t1/_t2/_t3/_t4  OR  dice_*
+  function familyOf(id){
+    if (!id) return null;
+    let m = id.match(/^([A-Z][A-Za-z]+)_(\d+)$/);
+    if (m) return { key: m[1], label: m[1], idx: parseInt(m[2],10), scheme: 'pascal' };
+    m = id.match(/^([a-z]+)_t(\d)$/);
+    if (m) return { key: m[1] + '_t', label: m[1], idx: parseInt(m[2],10), scheme: 'tier' };
+    return null;
+  }
+
+  // --- Preprocess items ---
+  const items = DATA.map(it => {
+    const passives = (it.passiveSkills || []).map(p => ({
+      internalName: p.internalName || '',
+      skillName: p.skillName || '',
+      description: p.description || '',
+    }));
+    const kwSet = new Set();
+    for (const p of passives) {
+      const tags = KW_LOOKUP[p.internalName];
+      if (tags) tags.forEach(t => kwSet.add(t));
+    }
+    const fam = familyOf(it.id);
+    const searchBlob = [
+      it.id, it.name, it.description, it.flavorText, it.roleName, it.roleDescription,
+      ...passives.map(p => p.internalName + ' ' + p.skillName + ' ' + p.description)
+    ].join(' ').toLowerCase();
+    return { raw: it, passives, kw: [...kwSet], fam, searchBlob };
+  });
+
+  // --- Family index (only families with 2+ members) ---
+  const famMembers = {};
+  for (const it of items) {
+    if (it.fam) (famMembers[it.fam.key] = famMembers[it.fam.key] || []).push(it);
+  }
+  const realFamilies = {};
+  for (const [k,arr] of Object.entries(famMembers)) if (arr.length >= 2) realFamilies[k] = arr;
+  // Annotate items as unique if not in a real family
+  for (const it of items) {
+    it.isFamily = !!(it.fam && realFamilies[it.fam.key]);
+    it.isUnique = !it.isFamily;
+  }
+
+  // --- Facet buckets ---
+  const facetCounts = (key) => {
+    const m = {};
+    for (const it of items) {
+      const v = it.raw[key];
+      if (!v) continue;
+      m[v] = (m[v]||0)+1;
+    }
+    return m;
+  };
+  const catCounts  = facetCounts('category');
+  const rarCounts  = facetCounts('rarity');
+  const roleCounts = facetCounts('roleName');
+  const kwCounts = {};
+  for (const it of items) for (const k of it.kw) kwCounts[k] = (kwCounts[k]||0)+1;
+
+  // --- State ---
+  // 各 filter は { inc: Set, exc: Set } の 2 段構造
+  const mkF = () => ({ inc: new Set(), exc: new Set() });
+  const state = {
+    q: '', cats: mkF(), rars: mkF(), roles: mkF(), kws: mkF(),
+    famScope: 'any', famKey: '', sort: 'name'
+  };
+
+  // --- Build chips ---
+  const RAR_ORDER = ['BRONZE','SILVER','GOLD','LEGENDARY','MYTHIC'];
+  function buildChips(container, entries, filter, opts={}){
+    container.innerHTML = '';
+    const list = opts.order
+      ? opts.order.filter(k => entries[k]).map(k => [k, entries[k]])
+      : Object.entries(entries).sort((a,b) => b[1] - a[1]);
+    for (const [key, n] of list) {
+      const el = document.createElement('span');
+      el.className = 'chip';
+      el.innerHTML = `${key} <span class="n">${n}</span>`;
+      el.dataset.key = key;
+      el.title = 'クリック: 含む → 除外 → 解除';
+      el.addEventListener('click', () => {
+        // 3-state cycle: neutral -> include -> exclude -> neutral
+        if (filter.inc.has(key)) {
+          filter.inc.delete(key); filter.exc.add(key);
+          el.classList.remove('active'); el.classList.add('exclude');
+        } else if (filter.exc.has(key)) {
+          filter.exc.delete(key);
+          el.classList.remove('exclude');
+        } else {
+          filter.inc.add(key);
+          el.classList.add('active');
+        }
+        render();
+      });
+      el.addEventListener('contextmenu', (e) => {
+        // 右クリックで即 exclude トグル
+        e.preventDefault();
+        if (filter.exc.has(key)) {
+          filter.exc.delete(key);
+          el.classList.remove('exclude');
+        } else {
+          filter.inc.delete(key); filter.exc.add(key);
+          el.classList.remove('active'); el.classList.add('exclude');
+        }
+        render();
+      });
+      container.appendChild(el);
+    }
+  }
+  buildChips(document.getElementById('cat-chips'), catCounts, state.cats);
+  buildChips(document.getElementById('rar-chips'), rarCounts, state.rars, {order: RAR_ORDER});
+  buildChips(document.getElementById('role-chips'), roleCounts, state.roles);
+  buildChips(document.getElementById('kw-chips'), kwCounts, state.kws);
+
+  // Family scope chips
+  document.querySelectorAll('#fam-scope .chip').forEach(chip => {
+    if (chip.dataset.scope === 'any') chip.classList.add('active');
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#fam-scope .chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      state.famScope = chip.dataset.scope;
+      render();
+    });
+  });
+
+  // Family select
+  const famSel = document.getElementById('fam-select');
+  const famList = Object.entries(realFamilies)
+    .map(([k,arr]) => ({ key: k, label: arr[0].fam.label, n: arr.length }))
+    .sort((a,b) => a.label.localeCompare(b.label));
+  for (const f of famList) {
+    const opt = document.createElement('option');
+    opt.value = f.key;
+    opt.textContent = `${f.label} (${f.n})`;
+    famSel.appendChild(opt);
+  }
+  famSel.addEventListener('change', () => { state.famKey = famSel.value; render(); });
+
+  // Search
+  document.getElementById('q').addEventListener('input', e => { state.q = e.target.value.toLowerCase().trim(); render(); });
+  document.getElementById('sort').addEventListener('change', e => { state.sort = e.target.value; render(); });
+
+  // Theme toggle
+  document.getElementById('theme').addEventListener('click', () => {
+    const cur = document.documentElement.dataset.theme;
+    const next = cur === 'dark' ? 'light' : (cur === 'light' ? '' : 'dark');
+    if (next) document.documentElement.dataset.theme = next; else delete document.documentElement.dataset.theme;
+  });
+
+  // --- Filter + render ---
+  const results = document.getElementById('results');
+  const countEl = document.getElementById('count');
+  document.getElementById('total').textContent = items.length;
+
+  function matchSingle(filter, val){
+    if (filter.inc.size && !filter.inc.has(val)) return false;
+    if (filter.exc.size && filter.exc.has(val)) return false;
+    return true;
+  }
+  function matchMulti(filter, vals){
+    if (filter.inc.size) {
+      let hit = false;
+      for (const k of filter.inc) if (vals.includes(k)) { hit = true; break; }
+      if (!hit) return false;
+    }
+    if (filter.exc.size) {
+      for (const k of filter.exc) if (vals.includes(k)) return false;
+    }
+    return true;
+  }
+  function match(it){
+    if (!matchSingle(state.cats, it.raw.category)) return false;
+    if (!matchSingle(state.rars, it.raw.rarity)) return false;
+    if (!matchSingle(state.roles, it.raw.roleName)) return false;
+    if (!matchMulti(state.kws, it.kw)) return false;
+    if (state.famScope === 'family' && !it.isFamily) return false;
+    if (state.famScope === 'unique' && !it.isUnique) return false;
+    if (state.famKey && (!it.fam || it.fam.key !== state.famKey)) return false;
+    if (state.q) {
+      // AND semantics on whitespace-split tokens
+      for (const tok of state.q.split(/\s+/)) if (tok && !it.searchBlob.includes(tok)) return false;
+    }
+    return true;
+  }
+
+  function sortFn(a,b){
+    const rArank = RAR_ORDER.indexOf(a.raw.rarity);
+    const rBrank = RAR_ORDER.indexOf(b.raw.rarity);
+    switch (state.sort) {
+      case 'rarity': return rArank - rBrank || (a.raw.name||'').localeCompare(b.raw.name||'','ja');
+      case 'rarity-desc': return rBrank - rArank || (a.raw.name||'').localeCompare(b.raw.name||'','ja');
+      case 'price': return (a.raw.basePrice||0) - (b.raw.basePrice||0);
+      case 'price-desc': return (b.raw.basePrice||0) - (a.raw.basePrice||0);
+      case 'family': {
+        const fa = a.fam ? a.fam.label : 'zzz_' + (a.raw.name||'');
+        const fb = b.fam ? b.fam.label : 'zzz_' + (b.raw.name||'');
+        return fa.localeCompare(fb,'ja') || (a.fam?.idx||0)-(b.fam?.idx||0);
+      }
+      default: return (a.raw.name||'').localeCompare(b.raw.name||'','ja');
+    }
+  }
+
+  function esc(s){ return (s==null?'':String(s)).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+  function renderCard(it){
+    const r = it.raw;
+    const passives = it.passives.map(p =>
+      `<div class="p"><span class="pname">${esc(p.skillName || p.internalName)}</span><span>${esc(p.description)}</span></div>`
+    ).join('');
+    const kwTags = it.kw.map(k => `<span class="tag kw">${esc(k)}</span>`).join('');
+    const famTag = it.isFamily
+      ? `<span class="tag fam">家系: ${esc(it.fam.label)} ${it.fam.idx}/${realFamilies[it.fam.key].length}</span>`
+      : `<span class="tag uniq">ユニーク</span>`;
+    const stats = [];
+    // 武器: ダイス本数のみ (面は装備ダイス側で決まるため diceMax は表示しない)
+    if (r.category === 'Weapon' && r.diceCount) stats.push(`<span>ダイス <b>${r.diceCount}</b> 本</span>`);
+    // ダイス品: 面配列を表示
+    if (r.category === 'Dice' && Array.isArray(r.diceFaces) && r.diceFaces.length)
+        stats.push(`<span>面 <b>[${r.diceFaces.join(',')}]</b></span>`);
+    if (r.attackPower) stats.push(`<span>攻 <b>${r.attackPower}</b></span>`);
+    if (r.critRatePct) stats.push(`<span>会心 <b>${r.critRatePct}%</b></span>`);
+    return `
+      <div class="card r-${esc(r.rarity)}">
+        <div class="rarity-bar"></div>
+        <div class="head">
+          <div class="name">${esc(r.name||r.id)}</div>
+          <div class="price">${r.basePrice ? r.basePrice + 'G' : ''}</div>
+        </div>
+        <div class="subline">
+          <span class="rarity-badge">${esc(r.rarity||'')}</span>
+          <span>${esc(r.category||'')}</span>
+          ${r.roleName ? `<span>· ${esc(r.roleName)}</span>` : ''}
+          <span class="id">${esc(r.id)}</span>
+        </div>
+        ${stats.length ? `<div class="stats">${stats.join('')}</div>` : ''}
+        ${r.description ? `<div class="desc">${esc(r.description)}</div>` : ''}
+        ${r.flavorText ? `<div class="flavor">${esc(r.flavorText)}</div>` : ''}
+        ${passives ? `<div class="passives">${passives}</div>` : ''}
+        <div class="tags">${famTag}${kwTags}</div>
+      </div>
+    `;
+  }
+
+  function render(){
+    const filtered = items.filter(match).sort(sortFn);
+    countEl.textContent = filtered.length;
+    if (!filtered.length) {
+      results.innerHTML = `<div class="empty">条件に一致するアイテムはありません<br><b>フィルタを解除してください</b></div>`;
+      return;
+    }
+    results.innerHTML = filtered.map(renderCard).join('');
+  }
+  render();
+  } // end boot()
+})();
+</script>
+</body>
+</html>

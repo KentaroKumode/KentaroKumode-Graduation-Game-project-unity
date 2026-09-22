@@ -20,7 +20,25 @@ namespace MapSystem.Visual
     /// </summary>
     public class MapTransitionController : MonoBehaviour
     {
-        public static MapTransitionController Instance { get; private set; }
+        private static MapTransitionController _instance;
+        private static bool _shuttingDown;
+
+        /// <summary>再生中の再コンパイルで static だけが消えても復帰できるようにする
+        /// (2026-08-05・MapManager / GameManager と同じ規約)。 ここは呼び出し側に
+        /// null 分岐があるため停止までは至らないが、 演出が黙って消えるのを防ぐ。</summary>
+        public static MapTransitionController Instance
+        {
+            get
+            {
+                if (_shuttingDown) return null;
+                if (_instance == null) _instance = FindObjectOfType<MapTransitionController>();
+                return _instance;
+            }
+            private set { _instance = value; }
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() { _instance = null; _shuttingDown = false; }
 
         [Header("参照")]
         [SerializeField] private MapVisualizer mapVisualizer;
@@ -81,11 +99,15 @@ namespace MapSystem.Visual
 
         void Awake()
         {
-            if (Instance != null && Instance != this) { Destroy(gameObject); return; }
-            Instance = this;
+            if (_instance != null && _instance != this) { Destroy(gameObject); return; }
+            _shuttingDown = false;
+            _instance = this;
             if (mapVisualizer == null) mapVisualizer = FindObjectOfType<MapVisualizer>();
             if (decorationPlacer == null) decorationPlacer = FindObjectOfType<MapDecorationPlacer>();
         }
+
+        void OnDestroy() { if (_instance == this) _instance = null; }
+        void OnApplicationQuit() => _shuttingDown = true;
 
         public void RollUp(System.Action onComplete = null)
         {

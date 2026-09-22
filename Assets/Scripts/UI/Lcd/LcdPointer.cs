@@ -56,9 +56,16 @@ namespace UI.Lcd
             if (mp.x < 0 || mp.y < 0 || mp.x > Screen.width || mp.y > Screen.height) return null;
 
             // ① ワールドカメラのレイが液晶面に当たるか（UV が要るので MeshCollider 前提）。
+            // 2026-07-10: 単一 Raycast だと Layer 0 に配置された他 Collider (インベントリ Cell 等) が
+            // 液晶面より手前に来て Quad が拾えないケースがある。 RaycastAll で全 hit を確認し、
+            // surfaceCollider を含む hit だけを採用する。
             Ray wray = worldCamera.ScreenPointToRay(mp);
-            if (!Physics.Raycast(wray, out RaycastHit hit, maxDistance, surfaceMask)) return null;
-            if (hit.collider != surfaceCollider) return null;
+            var hits = Physics.RaycastAll(wray, maxDistance, surfaceMask);
+            RaycastHit hit = default;
+            bool found = false;
+            for (int i = 0; i < hits.Length; i++)
+                if (hits[i].collider == surfaceCollider) { hit = hits[i]; found = true; break; }
+            if (!found) return null;
 
             Vector2 uv = hit.textureCoord; // MeshCollider のみ有効
             if (uv.x < 0f || uv.x > 1f || uv.y < 0f || uv.y > 1f) return null;

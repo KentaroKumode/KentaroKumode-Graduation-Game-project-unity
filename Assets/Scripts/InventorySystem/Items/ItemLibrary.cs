@@ -49,7 +49,7 @@ namespace InventorySystem
         public ItemDataV2 GetRandomItem()
         {
             if (items.Count == 0) return null;
-            int randomIndex = Random.Range(0, items.Count);
+            int randomIndex = GameLoop.GameRng.RangeAuto("ItemLibrary.1", 0, items.Count);
             return items[randomIndex].itemData;
         }
         
@@ -61,7 +61,7 @@ namespace InventorySystem
             var filteredItems = items.FindAll(item => item.itemData.rarity == rarity);
             if (filteredItems.Count == 0) return null;
             
-            int randomIndex = Random.Range(0, filteredItems.Count);
+            int randomIndex = GameLoop.GameRng.RangeAuto("ItemLibrary.2", 0, filteredItems.Count);
             return filteredItems[randomIndex].itemData;
         }
         

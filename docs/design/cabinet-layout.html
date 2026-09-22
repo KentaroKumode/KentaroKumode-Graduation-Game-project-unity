@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>DICE BOUND — 筐体レイアウト設計図 (dot 精密版)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root {
+    --bg: #f8f7f2; --ink: #1a1a1a; --ink-2: #4a4a4a; --ink-3: #7a7a7a;
+    --line: #d4d1c8; --grid: #e8e5db; --panel: #fff;
+    --accent: #a15a2a; --dim: #2b6cb0; --bound: #c53030;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a; --ink: #e8e6e0; --ink-2: #b5b3ad; --ink-3: #7d7a72;
+      --line: #333740; --grid: #262a32; --panel: #1c1f24;
+      --accent: #e2c58a; --dim: #7ea1d1; --bound: #e57373;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
+  body { font-family: "SF Mono","Consolas","Hiragino Kaku Gothic ProN","Yu Gothic",monospace; font-size: 13px; line-height: 1.6; }
+  .doc { max-width: 1220px; margin: 0 auto; padding: 32px 24px 80px; }
+  header { border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 28px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  header .sub { color: var(--ink-3); font-size: 12px; letter-spacing: 0.06em; }
+  h2 { font-size: 15px; margin: 40px 0 12px; padding-bottom: 4px; border-bottom: 1px solid var(--line);
+       color: var(--accent); display: flex; gap: 8px; align-items: baseline; }
+  h2 .num { background: var(--accent); color: var(--bg); padding: 2px 8px; font-size: 11px; }
+  h3 { font-size: 13px; margin: 18px 0 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; margin: 8px 0; }
+  th, td { border: 1px solid var(--line); padding: 5px 9px; text-align: left; vertical-align: top; }
+  th { background: var(--panel); }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  code { background: var(--panel); border: 1px solid var(--line); padding: 1px 5px; font-size: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); padding: 14px; border-radius: 4px; margin: 12px 0; }
+  .warn { background: var(--panel); border-left: 3px solid var(--accent); padding: 10px 14px; margin: 12px 0; font-size: 12px; }
+  .caption { text-align: center; color: var(--ink-3); font-size: 11px; margin-top: 8px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  .sw { display: inline-block; width: 14px; height: 14px; border: 1px solid var(--line); vertical-align: -2px; margin-right: 4px; }
+  @media (max-width: 760px) { .grid-2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="doc">
+
+<header>
+  <h1>DICE BOUND — 筐体レイアウト設計図 (dot 精密版)</h1>
+  <div class="sub">rev5 (2026-07-24) · <b>正準単位 = dot (1 dot = 4×4 px)</b> · 全画面 480×270 dot = 1920×1080 px · 出現 UI は <a href="overlay-layer.html">overlay-layer.html</a></div>
+</header>
+
+<div class="warn">
+  <b>rev5 の要旨</b>: 全座標を 4px=1dot グリッドに整列した (旧 rev4 の 498px 等の非整合値を補正)。
+  本書の数値は<b>すべて dot</b>。px 換算は ×4。本書は<b>寸法・配置のみ</b>を定義する —
+  色・ベベル・質感などの視覚表現はアート側の裁量 (本書のスコープ外)。
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="num">§1</span> 全体図 — 480×270 dot (寸法付き)</h2>
+
+<div class="card">
+<svg width="100%" viewBox="-64 -48 620 380" preserveAspectRatio="xMidYMid meet"
+     style="max-width:1440px;background:var(--panel);border:1px solid var(--line)">
+  <style>
+    .dm { stroke: var(--dim); stroke-width: 0.6; fill: none; }
+    .dt { fill: var(--dim); font-size: 7px; font-family: monospace; }
+    .zb { fill: var(--panel); stroke: var(--accent); stroke-width: 0.8; }
+    .zn { fill: var(--accent); font-size: 6px; font-family: monospace; font-weight: bold; }
+  </style>
+
+  <!-- ===== canvas + cabinet ===== -->
+  <rect x="0" y="0" width="480" height="270" fill="var(--grid)" stroke="var(--ink-2)" stroke-width="0.8"/>
+  <rect x="10" y="5" width="460" height="260" fill="none" stroke="var(--ink-2)" stroke-width="0.8"/>
+
+  <!-- ===== zone outlines (データは §2 表の同番号を参照) ===== -->
+  <rect x="175" y="6" width="130" height="4" fill="none" stroke="var(--accent)" stroke-width="0.7"/>
+  <rect x="124" y="12" width="231" height="9" fill="none" stroke="var(--bound)" stroke-width="0.7"/>
+  <rect x="361" y="13" width="5" height="5" fill="none" stroke="var(--dim)" stroke-width="0.7"/>
+  <rect x="406" y="8" width="18" height="18" fill="none" stroke="var(--dim)" stroke-width="0.7"/>
+  <rect x="120" y="21" width="239" height="147" fill="none" stroke="var(--ink-3)" stroke-width="0.7"/>
+  <rect x="124" y="25" width="231" height="139" fill="none" stroke="var(--bound)" stroke-width="0.9"/>
+  <text x="239" y="99" fill="var(--bound)" font-size="9" font-family="monospace" text-anchor="middle">LCD 231×139</text>
+  <rect x="20" y="28" width="50" height="18" fill="none" stroke="var(--accent)" stroke-width="0.7"/>
+  <rect x="20" y="53" width="26" height="18" fill="none" stroke="var(--accent)" stroke-width="0.7"/>
+  <rect x="20" y="80" width="74" height="50" fill="none" stroke="var(--ink-3)" stroke-width="0.7"/>
+  <rect x="20" y="150" width="55" height="22" fill="none" stroke="var(--accent)" stroke-width="0.7"/>
+  <rect x="83" y="149" width="24" height="24" fill="none" stroke="var(--dim)" stroke-width="0.7"/>
+  <rect x="390" y="30" width="11" height="132" fill="none" stroke="var(--accent)" stroke-width="0.7"/>
+  <rect x="405" y="30" width="6" height="132" fill="none" stroke="var(--ink-3)" stroke-width="0.7"/>
+  <rect x="415" y="30" width="8" height="132" fill="none" stroke="var(--accent)" stroke-width="0.7"/>
+  <rect x="156" y="172" width="35" height="20" fill="none" stroke="var(--accent)" stroke-width="0.7"/>
+  <rect x="200" y="172" width="35" height="20" fill="none" stroke="var(--accent)" stroke-width="0.7"/>
+  <rect x="244" y="172" width="35" height="20" fill="none" stroke="var(--accent)" stroke-width="0.7"/>
+  <rect x="288" y="172" width="35" height="20" fill="none" stroke="var(--ink-3)" stroke-width="0.7" stroke-dasharray="2,1.5"/>
+  <rect x="156" y="192" width="167" height="9" fill="none" stroke="var(--ink-3)" stroke-width="0.7"/>
+  <rect x="162" y="202" width="28" height="28" fill="none" stroke="var(--accent)" stroke-width="0.7"/>
+  <rect x="194" y="202" width="28" height="28" fill="none" stroke="var(--accent)" stroke-width="0.7"/>
+  <rect x="226" y="202" width="28" height="28" fill="none" stroke="var(--accent)" stroke-width="0.7"/>
+  <rect x="258" y="202" width="28" height="28" fill="none" stroke="var(--ink-3)" stroke-width="0.7" stroke-dasharray="2,1.5"/>
+  <rect x="290" y="202" width="28" height="28" fill="none" stroke="var(--ink-3)" stroke-width="0.7" stroke-dasharray="2,1.5"/>
+  <rect x="394" y="202" width="28" height="28" fill="none" stroke="var(--bound)" stroke-width="0.7"/>
+
+  <!-- ===== zone number badges (§2 表の #) ===== -->
+  <g>
+    <circle class="zb" cx="168" cy="8" r="4.5"/><text class="zn" x="168" y="10.2" text-anchor="middle">2</text>
+    <circle class="zb" cx="116" cy="16" r="4.5"/><text class="zn" x="116" y="18.2" text-anchor="middle">3</text>
+    <circle class="zb" cx="372" cy="15" r="4.5"/><text class="zn" x="372" y="17.2" text-anchor="middle">4</text>
+    <circle class="zb" cx="431" cy="17" r="4.5"/><text class="zn" x="431" y="19.2" text-anchor="middle">5</text>
+    <circle class="zb" cx="239" cy="112" r="4.5"/><text class="zn" x="239" y="114.2" text-anchor="middle">7</text>
+    <circle class="zb" cx="76" cy="37" r="4.5"/><text class="zn" x="76" y="39.2" text-anchor="middle">8</text>
+    <circle class="zb" cx="52" cy="62" r="4.5"/><text class="zn" x="52" y="64.2" text-anchor="middle">9</text>
+    <circle class="zb" cx="57" cy="105" r="4.5"/><text class="zn" x="57" y="107.2" text-anchor="middle">10</text>
+    <circle class="zb" cx="47" cy="161" r="4.5"/><text class="zn" x="47" y="163.2" text-anchor="middle">11</text>
+    <circle class="zb" cx="95" cy="161" r="4.5"/><text class="zn" x="95" y="163.2" text-anchor="middle">12</text>
+    <circle class="zb" cx="395" cy="169" r="4.5"/><text class="zn" x="395" y="171.2" text-anchor="middle">13</text>
+    <circle class="zb" cx="408" cy="180" r="4.5"/><text class="zn" x="408" y="182.2" text-anchor="middle">14</text>
+    <circle class="zb" cx="419" cy="169" r="4.5"/><text class="zn" x="419" y="171.2" text-anchor="middle">15</text>
+    <circle class="zb" cx="173" cy="182" r="4.5"/><text class="zn" x="173" y="184.2" text-anchor="middle">16</text>
+    <circle class="zb" cx="305" cy="182" r="4.5"/><text class="zn" x="305" y="184.2" text-anchor="middle">17</text>
+    <circle class="zb" cx="148" cy="196" r="4.5"/><text class="zn" x="148" y="198.2" text-anchor="middle">18</text>
+    <circle class="zb" cx="176" cy="216" r="4.5"/><text class="zn" x="176" y="218.2" text-anchor="middle">19</text>
+    <circle class="zb" cx="408" cy="216" r="4.5"/><text class="zn" x="408" y="218.2" text-anchor="middle">21</text>
+    <circle class="zb" cx="26" cy="247" r="4.5"/><text class="zn" x="26" y="249.2" text-anchor="middle">22</text>
+  </g>
+
+  <!-- ===== top dimension chain (x) ===== -->
+  <g class="dm">
+    <line x1="0" y1="-12" x2="480" y2="-12"/>
+    <line x1="0" y1="-16" x2="0" y2="-8"/><line x1="124" y1="-16" x2="124" y2="-8"/>
+    <line x1="355" y1="-16" x2="355" y2="-8"/><line x1="480" y1="-16" x2="480" y2="-8"/>
+  </g>
+  <text x="56" y="-16" class="dt" text-anchor="middle">124</text>
+  <text x="239" y="-16" class="dt" text-anchor="middle">231 (LCD)</text>
+  <text x="417" y="-16" class="dt" text-anchor="middle">125</text>
+  <g class="dm">
+    <line x1="0" y1="-30" x2="480" y2="-30"/>
+    <line x1="0" y1="-34" x2="0" y2="-26"/><line x1="480" y1="-34" x2="480" y2="-26"/>
+  </g>
+  <text x="240" y="-34" class="dt" text-anchor="middle">480</text>
+
+  <!-- ===== bottom dimension chains (x) ===== -->
+  <g class="dm">
+    <line x1="0" y1="284" x2="480" y2="284"/>
+    <line x1="0" y1="280" x2="0" y2="288"/><line x1="156" y1="280" x2="156" y2="288"/>
+    <line x1="323" y1="280" x2="323" y2="288"/><line x1="480" y1="280" x2="480" y2="288"/>
+  </g>
+  <text x="78" y="296" class="dt" text-anchor="middle">156</text>
+  <text x="239" y="296" class="dt" text-anchor="middle">167 (端子行 = 4×35+3×9)</text>
+  <text x="400" y="296" class="dt" text-anchor="middle">157</text>
+  <g class="dm">
+    <line x1="0" y1="306" x2="480" y2="306"/>
+    <line x1="0" y1="302" x2="0" y2="310"/><line x1="162" y1="302" x2="162" y2="310"/>
+    <line x1="318" y1="302" x2="318" y2="310"/><line x1="394" y1="302" x2="394" y2="310"/>
+    <line x1="422" y1="302" x2="422" y2="310"/><line x1="480" y1="302" x2="480" y2="310"/>
+  </g>
+  <text x="81" y="318" class="dt" text-anchor="middle">162</text>
+  <text x="240" y="318" class="dt" text-anchor="middle">156 (ダイス行 = 5×28+4×4)</text>
+  <text x="356" y="318" class="dt" text-anchor="middle">76</text>
+  <text x="408" y="318" class="dt" text-anchor="middle">28</text>
+  <text x="451" y="318" class="dt" text-anchor="middle">58</text>
+
+  <!-- ===== left dimension chain (y) ===== -->
+  <g class="dm">
+    <line x1="-12" y1="0" x2="-12" y2="270"/>
+    <line x1="-16" y1="0" x2="-8" y2="0"/><line x1="-16" y1="12" x2="-8" y2="12"/>
+    <line x1="-16" y1="21" x2="-8" y2="21"/><line x1="-16" y1="25" x2="-8" y2="25"/>
+    <line x1="-16" y1="164" x2="-8" y2="164"/><line x1="-16" y1="172" x2="-8" y2="172"/>
+    <line x1="-16" y1="192" x2="-8" y2="192"/><line x1="-16" y1="202" x2="-8" y2="202"/>
+    <line x1="-16" y1="230" x2="-8" y2="230"/><line x1="-16" y1="270" x2="-8" y2="270"/>
+  </g>
+  <text x="-20" y="9" class="dt" text-anchor="end">12</text>
+  <text x="-20" y="20" class="dt" text-anchor="end">9+4</text>
+  <text x="-20" y="98" class="dt" text-anchor="end">139</text>
+  <text x="-20" y="171" class="dt" text-anchor="end">8</text>
+  <text x="-20" y="185" class="dt" text-anchor="end">20</text>
+  <text x="-20" y="200" class="dt" text-anchor="end">9</text>
+  <text x="-20" y="219" class="dt" text-anchor="end">28</text>
+  <text x="-20" y="253" class="dt" text-anchor="end">40</text>
+  <g class="dm">
+    <line x1="-40" y1="0" x2="-40" y2="270"/>
+    <line x1="-44" y1="0" x2="-36" y2="0"/><line x1="-44" y1="270" x2="-36" y2="270"/>
+  </g>
+  <text x="-46" y="138" class="dt" text-anchor="end">270</text>
+
+  <!-- ===== right dimension chain (y) ===== -->
+  <g class="dm">
+    <line x1="492" y1="8" x2="492" y2="162"/>
+    <line x1="488" y1="8" x2="496" y2="8"/><line x1="488" y1="26" x2="496" y2="26"/>
+    <line x1="488" y1="30" x2="496" y2="30"/><line x1="488" y1="162" x2="496" y2="162"/>
+  </g>
+  <text x="500" y="20" class="dt">18</text>
+  <text x="500" y="99" class="dt">132</text>
+</svg>
+<div class="caption">図 1: 全体図 (寸法単位 = dot)。丸数字 = §2 表の # に対応 (座標・サイズは表が正本)。外周チェーンは位置寸法</div>
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="num">§1.5</span> 部品詳細図 (寸法付き・代表 1 箇所主義)</h2>
+
+<div class="grid-2">
+
+<div class="card">
+<svg width="100%" viewBox="-46 -42 356 312" style="background:var(--panel)">
+  <style>.dm2{stroke:var(--dim);stroke-width:0.8;fill:none}.dt2{fill:var(--dim);font-size:9px;font-family:monospace}</style>
+  <!-- socket at 6x: 28dot = 168 -->
+  <g transform="translate(0,0)">
+    <rect x="0" y="0" width="168" height="168" fill="#241B10" stroke="#55493C" stroke-width="2"/>
+    <!-- LEDs 4dot=24, offsets 5/12/19 dot = 30/72/114 -->
+    <rect x="30" y="30" width="24" height="24" fill="#FFD9A0"/><rect x="72" y="30" width="24" height="24" fill="#FFD9A0"/><rect x="114" y="30" width="24" height="24" fill="#FFD9A0"/>
+    <rect x="30" y="72" width="24" height="24" fill="#FFD9A0"/><rect x="72" y="72" width="24" height="24" fill="#FFD9A0"/><rect x="114" y="72" width="24" height="24" fill="#FFD9A0"/>
+    <rect x="30" y="114" width="24" height="24" fill="#FFD9A0"/><rect x="72" y="114" width="24" height="24" fill="#FFD9A0"/><rect x="114" y="114" width="24" height="24" fill="#FFD9A0"/>
+    <!-- reroll straddling top: 6dot=36 at x+23dot=138, y=-3dot=-18 -->
+    <rect x="138" y="-18" width="36" height="36" fill="#3A342E" stroke="#6E5E4A" stroke-width="2"/>
+    <rect x="150" y="-6" width="12" height="12" fill="#FFD9A0"/>
+  </g>
+  <!-- dims -->
+  <g class="dm2">
+    <line x1="0" y1="188" x2="168" y2="188"/><line x1="0" y1="183" x2="0" y2="193"/><line x1="168" y1="183" x2="168" y2="193"/>
+    <line x1="0" y1="206" x2="30" y2="206"/><line x1="30" y1="201" x2="30" y2="211"/>
+    <line x1="30" y1="206" x2="54" y2="206"/><line x1="54" y1="201" x2="54" y2="211"/>
+    <line x1="54" y1="206" x2="72" y2="206"/><line x1="72" y1="201" x2="72" y2="211"/>
+    <line x1="-14" y1="0" x2="-14" y2="168"/><line x1="-19" y1="0" x2="-9" y2="0"/><line x1="-19" y1="168" x2="-9" y2="168"/>
+    <line x1="196" y1="-18" x2="196" y2="18"/><line x1="191" y1="-18" x2="201" y2="-18"/><line x1="191" y1="18" x2="201" y2="18"/>
+  </g>
+  <text x="84" y="184" class="dt2" text-anchor="middle">28</text>
+  <text x="15" y="220" class="dt2" text-anchor="middle">5</text>
+  <text x="42" y="220" class="dt2" text-anchor="middle">4</text>
+  <text x="63" y="220" class="dt2" text-anchor="middle">3</text>
+  <text x="-24" y="88" class="dt2" text-anchor="end">28</text>
+  <text x="206" y="4" class="dt2">6 (リロール)</text>
+  <text x="120" y="-30" class="dt2">@x+23, 上辺跨ぎ -3</text>
+  <text x="-40" y="244" class="dt2">LED: 4×4 · 端 5 · 間 3 (5+4+3+4+3+4+5=28)</text>
+  <text x="-40" y="260" class="dt2">9 点同一 / ソケットピッチ 32 (間 4)</text>
+</svg>
+<div class="caption">詳細 A: ダイスソケット (6 unit/dot)</div>
+</div>
+
+<div class="card">
+<svg width="100%" viewBox="-46 -34 366 254" style="background:var(--panel)">
+  <style>.dm3{stroke:var(--dim);stroke-width:0.8;fill:none}.dt3{fill:var(--dim);font-size:9px;font-family:monospace}</style>
+  <!-- terminal 35x20 at 6x: 210x120 -->
+  <rect x="0" y="0" width="210" height="120" fill="#241B10" stroke="#55493C" stroke-width="2"/>
+  <!-- cells 8x12 at (8,4),(19,4) → 48,24 / 114,24, size 48x72 -->
+  <rect x="48" y="24" width="48" height="72" fill="#1C1814" stroke="#3A342E" stroke-width="2"/>
+  <rect x="114" y="24" width="48" height="72" fill="#1C1814" stroke="#3A342E" stroke-width="2"/>
+  <rect x="60" y="42" width="24" height="36" fill="#FF9E4A"/>
+  <rect x="126" y="42" width="24" height="36" fill="#FF9E4A"/>
+  <g class="dm3">
+    <line x1="0" y1="140" x2="210" y2="140"/><line x1="0" y1="135" x2="0" y2="145"/><line x1="210" y1="135" x2="210" y2="145"/>
+    <line x1="-14" y1="0" x2="-14" y2="120"/><line x1="-19" y1="0" x2="-9" y2="0"/><line x1="-19" y1="120" x2="-9" y2="120"/>
+    <line x1="0" y1="158" x2="48" y2="158"/><line x1="48" y1="153" x2="48" y2="163"/>
+    <line x1="48" y1="158" x2="96" y2="158"/><line x1="96" y1="153" x2="96" y2="163"/>
+    <line x1="96" y1="158" x2="114" y2="158"/><line x1="114" y1="153" x2="114" y2="163"/>
+    <line x1="230" y1="24" x2="230" y2="96"/><line x1="225" y1="24" x2="235" y2="24"/><line x1="225" y1="96" x2="235" y2="96"/>
+  </g>
+  <text x="105" y="136" class="dt3" text-anchor="middle">35</text>
+  <text x="-24" y="64" class="dt3" text-anchor="end">20</text>
+  <text x="24" y="172" class="dt3" text-anchor="middle">8</text>
+  <text x="72" y="172" class="dt3" text-anchor="middle">8</text>
+  <text x="105" y="172" class="dt3" text-anchor="middle">3</text>
+  <text x="240" y="64" class="dt3">12 (セル高)</text>
+  <text x="-40" y="196" class="dt3">端子ピッチ 44 (間 9) ×4 · 数字セル 8×12 ×2 同一 (上端 y+4)</text>
+</svg>
+<div class="caption">詳細 B: 配線端子 (6 unit/dot)</div>
+</div>
+
+<div class="card">
+<svg width="100%" viewBox="-46 -34 406 230" style="background:var(--panel)">
+  <style>.dm4{stroke:var(--dim);stroke-width:0.8;fill:none}.dt4{fill:var(--dim);font-size:9px;font-family:monospace}</style>
+  <!-- gold cluster 50x18 at 5x: 250x90 -->
+  <rect x="0" y="0" width="250" height="90" fill="#241B10" stroke="#55493C" stroke-width="2"/>
+  <!-- tubes 10x16 → 50x80 at x=2dot=10,60,110,160... wait tube x=22-20=2dot → 10; pitch 12dot=60 -->
+  <rect x="10" y="5" width="50" height="80" fill="#1C1814" stroke="#3A342E" stroke-width="2"/>
+  <rect x="70" y="5" width="50" height="80" fill="#1C1814" stroke="#3A342E" stroke-width="2"/>
+  <rect x="130" y="5" width="50" height="80" fill="#1C1814" stroke="#3A342E" stroke-width="2"/>
+  <rect x="190" y="5" width="50" height="80" fill="#1C1814" stroke="#3A342E" stroke-width="2"/>
+  <rect x="25" y="25" width="20" height="40" fill="#FF9E4A"/>
+  <rect x="85" y="25" width="20" height="40" fill="#FF9E4A"/>
+  <rect x="145" y="25" width="20" height="40" fill="#FF9E4A"/>
+  <rect x="205" y="25" width="20" height="40" fill="#FF9E4A"/>
+  <g class="dm4">
+    <line x1="0" y1="108" x2="250" y2="108"/><line x1="0" y1="103" x2="0" y2="113"/><line x1="250" y1="103" x2="250" y2="113"/>
+    <line x1="0" y1="126" x2="10" y2="126"/><line x1="10" y1="121" x2="10" y2="131"/>
+    <line x1="10" y1="126" x2="60" y2="126"/><line x1="60" y1="121" x2="60" y2="131"/>
+    <line x1="60" y1="126" x2="70" y2="126"/><line x1="70" y1="121" x2="70" y2="131"/>
+    <line x1="270" y1="5" x2="270" y2="85"/><line x1="265" y1="5" x2="275" y2="5"/><line x1="265" y1="85" x2="275" y2="85"/>
+  </g>
+  <text x="125" y="104" class="dt4" text-anchor="middle">50 (= 2+10+2+10+2+10+2+10+2)</text>
+  <text x="5" y="140" class="dt4" text-anchor="middle">2</text>
+  <text x="35" y="140" class="dt4" text-anchor="middle">10</text>
+  <text x="65" y="140" class="dt4" text-anchor="middle">2</text>
+  <text x="280" y="50" class="dt4">16 (管高)</text>
+  <text x="-40" y="168" class="dt4">管 10×16 ×4 同一 (枠内 y+1) · 素材クラスタは同管 ×2 (幅 26)</text>
+  <text x="-40" y="184" class="dt4">端子内セルは 8×12 (詳細 B)</text>
+</svg>
+<div class="caption">詳細 C: ニキシー金クラスタ (5 unit/dot)</div>
+</div>
+
+<div class="card">
+<svg width="100%" viewBox="-64 -34 380 240" style="background:var(--panel)">
+  <style>.dm5{stroke:var(--dim);stroke-width:0.8;fill:none}.dt5{fill:var(--dim);font-size:9px;font-family:monospace}</style>
+  <!-- segment cycle spec: draw 5-dot cycle at 12x + gauge widths -->
+  <!-- enemy HP fragment: 3 cycles horizontal at 12x -->
+  <g transform="translate(0,0)">
+    <rect x="0" y="0" width="192" height="84" fill="#1C1814" stroke="#3A342E" stroke-width="2"/>
+    <rect x="12" y="12" width="48" height="60" fill="#C46A3A"/>
+    <rect x="72" y="12" width="48" height="60" fill="#C46A3A"/>
+    <rect x="132" y="12" width="48" height="60" fill="#C46A3A"/>
+  </g>
+  <g class="dm5">
+    <line x1="12" y1="100" x2="60" y2="100"/><line x1="12" y1="95" x2="12" y2="105"/><line x1="60" y1="95" x2="60" y2="105"/>
+    <line x1="60" y1="100" x2="72" y2="100"/><line x1="72" y1="95" x2="72" y2="105"/>
+    <line x1="-14" y1="12" x2="-14" y2="72"/><line x1="-19" y1="12" x2="-9" y2="12"/><line x1="-19" y1="72" x2="-9" y2="72"/>
+    <line x1="-32" y1="0" x2="-32" y2="84"/><line x1="-37" y1="0" x2="-27" y2="0"/><line x1="-37" y1="84" x2="-27" y2="84"/>
+  </g>
+  <text x="36" y="114" class="dt5" text-anchor="middle">4</text>
+  <text x="66" y="114" class="dt5" text-anchor="middle">1</text>
+  <text x="-22" y="46" class="dt5" text-anchor="end">7</text>
+  <text x="-42" y="46" class="dt5" text-anchor="end">9</text>
+  <text x="-60" y="136" class="dt5">敵HP: 4+1 サイクル ×46 = 229 + 枠 2 = 231 (横・左から消灯)</text>
+  <text x="-60" y="152" class="dt5">計器柱: 同サイクル縦 ×26 = 130 + 枠 2 = 132 (下から点灯)</text>
+  <text x="-60" y="168" class="dt5">内幅: 自HP 9 / 盾 4 / 希望 6 (枠含む外幅 11 / 6 / 8)</text>
+  <text x="-60" y="184" class="dt5">ゲージ間: HP→盾 4 · 盾→希望 4 (x=390/405/415)</text>
+</svg>
+<div class="caption">詳細 D: セグメント規格 (12 unit/dot・敵 HP 断片 3 セグ)</div>
+</div>
+
+<div class="card">
+<svg width="100%" viewBox="-46 -52 380 300" style="background:var(--panel)">
+  <style>.dm6{stroke:var(--dim);stroke-width:0.8;fill:none}.dt6{fill:var(--dim);font-size:9px;font-family:monospace}</style>
+  <!-- well 28 at 6x = 168, button 24 = 144 inset 2 = 12 -->
+  <rect x="0" y="0" width="168" height="168" fill="#1C1814"/>
+  <!-- corner cut 3dot=18 well: draw as outline path -->
+  <path d="M 18 0 H 150 L 168 18 V 150 L 150 168 H 18 L 0 150 V 18 Z" fill="none" stroke="#55493C" stroke-width="2"/>
+  <path d="M 24 12 H 144 L 156 24 V 144 L 144 156 H 24 L 12 144 V 24 Z" fill="#E8B860"/>
+  <g class="dm6">
+    <line x1="0" y1="186" x2="168" y2="186"/><line x1="0" y1="181" x2="0" y2="191"/><line x1="168" y1="181" x2="168" y2="191"/>
+    <line x1="12" y1="-14" x2="156" y2="-14"/><line x1="12" y1="-19" x2="12" y2="-9"/><line x1="156" y1="-19" x2="156" y2="-9"/>
+    <line x1="188" y1="0" x2="188" y2="18"/><line x1="183" y1="0" x2="193" y2="0"/><line x1="183" y1="18" x2="193" y2="18"/>
+  </g>
+  <text x="84" y="200" class="dt6" text-anchor="middle">28 (井戸)</text>
+  <text x="84" y="-28" class="dt6" text-anchor="middle">24 (ボタン・インセット 2)</text>
+  <text x="198" y="12" class="dt6">角落とし:</text>
+  <text x="198" y="26" class="dt6">井戸 3 / ボタン 2</text>
+  <text x="-40" y="224" class="dt6">せり上がり 5 dot · 押下ストローク 2 dot</text>
+  <text x="-40" y="240" class="dt6">ランプ: リング18/ドーム10 · 処理中 5×5 (角1落とし)</text>
+</svg>
+<div class="caption">詳細 E: ボタン井戸 (6 unit/dot)</div>
+</div>
+
+<div class="card">
+<svg width="100%" viewBox="-46 -34 380 300" style="background:var(--panel)">
+  <style>.dm7{stroke:var(--dim);stroke-width:0.8;fill:none}.dt7{fill:var(--dim);font-size:9px;font-family:monospace}</style>
+  <!-- grille cell at 8x: cell 12dot=96, hole 4dot=32; show 2x2 cells -->
+  <rect x="0" y="0" width="192" height="192" fill="#241F1A" stroke="#55493C" stroke-width="2"/>
+  <rect x="40" y="40" width="32" height="32" fill="#1C1814"/>
+  <rect x="136" y="40" width="32" height="32" fill="#1C1814"/>
+  <rect x="40" y="136" width="32" height="32" fill="#1C1814"/>
+  <rect x="136" y="136" width="32" height="32" fill="#1C1814"/>
+  <g class="dm7">
+    <line x1="40" y1="208" x2="72" y2="208"/><line x1="40" y1="203" x2="40" y2="213"/><line x1="72" y1="203" x2="72" y2="213"/>
+    <line x1="72" y1="208" x2="136" y2="208"/><line x1="136" y1="203" x2="136" y2="213"/>
+    <line x1="212" y1="40" x2="212" y2="136"/><line x1="207" y1="40" x2="217" y2="40"/><line x1="207" y1="136" x2="217" y2="136"/>
+  </g>
+  <text x="56" y="222" class="dt7" text-anchor="middle">4</text>
+  <text x="104" y="222" class="dt7" text-anchor="middle">8</text>
+  <text x="222" y="92" class="dt7">ピッチ 12</text>
+  <text x="-40" y="244" class="dt7">グリル: 孔 4×4・ピッチ 12・6 列×4 行</text>
+  <text x="-40" y="260" class="dt7">起点 (25,85)・外枠 74×50・パッド 5</text>
+</svg>
+<div class="caption">詳細 F: スピーカーグリル (8 unit/dot・2×2 セル抜粋)</div>
+</div>
+
+</div>
+
+<h3>詳細図に含まれない残り寸法 (直線一覧)</h3>
+<table>
+  <tr><th>部品</th><th>寸法 (dot)</th></tr>
+  <tr><td>スリット</td><td>130×4 @ (175,6)。取っ手 15×2 @ (232,7) = スリット左端から +57</td></tr>
+  <tr><td>カセットスロット / カセット</td><td>スロット 55×22 @ (20,150)。カセット 38×15 @ (28,153) = スロット内オフセット (8,3)。Tier ノッチ 3×8・間 2・左端から 3</td></tr>
+  <tr><td>装備ダイス窪み / ダイス</td><td>窪み 24×24 @ (83,149)。ダイス 17×17 @ (86,152) = 内オフセット (3,3)。目 4×4</td></tr>
+  <tr><td>LCD ベゼル</td><td>枠厚 4 (全周均一)。外形 239×147 @ (120,21)</td></tr>
+  <tr><td>ターンランプ</td><td>外形 18×18 @ (406,8)。リング幅 1・角 1 落とし。ドーム 10×10 @ 内オフセット (4,4)・角 1 落とし</td></tr>
+  <tr><td>下部帯</td><td>460×35 @ (10,230)。リベット 2×2・水平間隔 36 @ y=238。通気 40×1 ×3 本・縦間 2 @ (330,244)</td></tr>
+  <tr><td>バスレーン経路溝</td><td>幅 1。L 字 2 折れ以内。ソケット上辺中央 (x+14) 起点 → 端子下辺 (x+17) 終点</td></tr>
+</table>
+
+
+<!-- ============================================================ -->
+<h2><span class="num">§2</span> ゾーン座標表 — dot 正準 (px = ×4)</h2>
+
+<table>
+  <tr><th>#</th><th>ゾーン</th><th>dot x, y</th><th>dot w × h</th><th>px 換算</th><th>備考</th></tr>
+  <tr><td>1</td><td>筐体面</td><td class="n">10, 5</td><td class="n">460 × 260</td><td class="n">40,20 · 1840×1040</td><td></td></tr>
+  <tr><td>2</td><td>GUI レール収納スリット</td><td class="n">175, 6</td><td class="n">130 × 4</td><td class="n">700,24 · 520×16</td><td>取っ手 15×2 dot (232,7)。展開は <a href="overlay-layer.html">overlay §2</a></td></tr>
+  <tr><td>3</td><td>敵 HP 横バー</td><td class="n">124, 12</td><td class="n">231 × 9</td><td class="n">496,48 · 924×36</td><td>枠 1 dot / 内側 229×7。<b>46 セグ</b> (4 dot 幅 + 1 dot 間) = 229 ちょうど。左から消灯</td></tr>
+  <tr><td>4</td><td>処理中ランプ</td><td class="n">361, 13</td><td class="n">5 × 5</td><td class="n">1444,52 · 20×20</td><td>角 1 dot 落とし円形。点滅=処理中</td></tr>
+  <tr><td>5</td><td>ターンランプ</td><td class="n">406, 8</td><td class="n">18 × 18</td><td class="n">1624,32 · 72×72</td><td>リング 1 dot + ドーム 10×10 (角 1 dot 落とし)</td></tr>
+  <tr><td>6</td><td>LCD ベゼル</td><td class="n">120, 21</td><td class="n">239 × 147</td><td class="n">480,84</td><td>枠厚 4 dot</td></tr>
+  <tr><td>7</td><td>LCD スクリーン</td><td class="n">124, 25</td><td class="n">231 × 139</td><td class="n">496,100 · 924×556</td><td>RT 1:1。中心はキャンバス中心から左へ 0.5 dot (231 が奇数のため・許容)</td></tr>
+  <tr><td>8</td><td>ニキシー: ゴールド</td><td class="n">20, 28</td><td class="n">50 × 18</td><td class="n">80,112</td><td>管 10×16 ×4 本 @ x=22/34/46/58 (pad2+管10+間2 の等式で 50 ちょうど)</td></tr>
+  <tr><td>9</td><td>ニキシー: 素材</td><td class="n">20, 53</td><td class="n">26 × 18</td><td class="n">80,212</td><td>管 ×2 @ x=22/34</td></tr>
+  <tr><td>10</td><td>スピーカーグリル (装飾)</td><td class="n">20, 80</td><td class="n">74 × 50</td><td class="n">80,320</td><td>孔 4×4 dot、12 dot ピッチ、6×4 列 @ (25,85) 起点。機能なし</td></tr>
+  <tr><td>11</td><td>武器カセットスロット</td><td class="n">20, 150</td><td class="n">55 × 22</td><td class="n">80,600</td><td>カセット 38×15 @ (28,153)。背表紙色=武器種 / 縦ノッチ 3×8 ×Tier 本</td></tr>
+  <tr><td>12</td><td>装備ダイス窪み</td><td class="n">83, 149</td><td class="n">24 × 24</td><td class="n">332,596</td><td>実物ダイス 17×17 @ (86,152)。素材色で識別</td></tr>
+  <tr><td>13</td><td>自 HP バー</td><td class="n">390, 30</td><td class="n">11 × 132</td><td class="n">1560,120</td><td>枠 1 / 内 9 幅。<b>26 セグ</b> (4 dot 高 + 1 間) = 130 ちょうど。下から点灯・残 25% 以下明滅</td></tr>
+  <tr><td>14</td><td>シールドバー</td><td class="n">405, 30</td><td class="n">6 × 132</td><td class="n">1620,120</td><td>内 4 幅・26 セグ。0 で全消灯</td></tr>
+  <tr><td>15</td><td>希望ゲージ</td><td class="n">415, 30</td><td class="n">8 × 132</td><td class="n">1660,120</td><td>内 6 幅・26 セグ。hope/hopeCap 比</td></tr>
+  <tr><td>16</td><td>配線端子 ×3</td><td class="n">156 / 200 / 244, 172</td><td class="n">各 35 × 20</td><td class="n">624/800/976, 688</td><td>ピッチ 44 dot。数字セル 8×12 ×2 @ 端子内 (8,4)/(19,4)</td></tr>
+  <tr><td>17</td><td>予備端子枠</td><td class="n">288, 172</td><td class="n">35 × 20</td><td class="n">1152,688</td><td>ブランクプレート (破線=面一の蓋)</td></tr>
+  <tr><td>18</td><td>経路 LED バスレーン</td><td class="n">156, 192</td><td class="n">167 × 9</td><td class="n">624,768</td><td>溝 1 dot 幅 ×15 経路。点灯波 2f/dot (§5)</td></tr>
+  <tr><td>19</td><td>LED ダイスソケット ×5</td><td class="n">162/194/226/258/290, 202</td><td class="n">各 28 × 28</td><td class="n">648〜, 808</td><td>ピッチ 32 dot。LED 4×4 ×9 @ 局所 (5,5)/(12,5)/(19,5)/(5,12)… 間 3 dot</td></tr>
+  <tr><td>20</td><td>リロール小ボタン ×5</td><td class="n">ソケット x+23, 199</td><td class="n">6 × 6</td><td class="n">—</td><td>ソケット上辺を跨ぐ。循環マーク 2×2 芯</td></tr>
+  <tr><td>21</td><td>ボタン井戸</td><td class="n">394, 202</td><td class="n">28 × 28</td><td class="n">1576,808</td><td>ボタン 24×24 @ (396,204)・角 2 dot 落とし。出現は <a href="overlay-layer.html">overlay §1</a></td></tr>
+  <tr><td>22</td><td>下部帯</td><td class="n">10, 230</td><td class="n">460 × 35</td><td class="n">40,920</td><td>リベット 2×2 (36 dot 間隔) + 通気 3 本 (40×1・間 2)</td></tr>
+</table>
+
+<div class="warn">
+  <b>整合の検算</b>
+  · 敵 HP: 枠 2 + セグ列 229 = 231 = LCD 幅 ✓ (46×4 + 45×1 = 229)
+  · ゲージ: 枠 2 + 26×(4+1) = 132 ✓
+  · 端子行: 4×35 + 3×9 = 167 → x 156..322 (中心 239.5 ≈ 240 canvas 中心) ✓
+  · ダイス行: 5×28 + 4×4 = 156 → x 162..317 ✓
+  · ニキシー金: 2+10+2+10+2+10+2+10+2 = 50 ✓
+  · 全 px 座標が 4 の倍数 = dot 整数 ✓
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="num">§3</span> 発光・材質 (スコープ外)</h2>
+
+<p>色・パレット・質感はアート側の裁量。本書が定義するのは<b>挙動の寸法</b>のみ:
+明滅条件・減灯方向は §2 の各ゾーン備考、点灯波の速度は §5 を参照。</p>
+
+<!-- ============================================================ -->
+<h2><span class="num">§4</span> ダイス減速シャッフル演出 (即時ビタ止め禁止)</h2>
+
+<div class="grid-2">
+  <div>
+    <h3>タイムライン (24fps 基準)</h3>
+    <table>
+      <tr><th>フェーズ</th><th>フレーム</th><th>挙動</th></tr>
+      <tr><td>高速回転</td><td class="n">0–8</td><td>2f 間隔でランダム値を LED に順次表示 (スロット感)</td></tr>
+      <tr><td>減速 1</td><td class="n">9–16</td><td>3f 間隔</td></tr>
+      <tr><td>減速 2</td><td class="n">17–24</td><td>4→5f 間隔</td></tr>
+      <tr><td>停止</td><td class="n">25</td><td>確定出目を表示</td></tr>
+      <tr><td>確定光</td><td class="n">25–28</td><td>発光強調 → 通常へ減衰 (3f)</td></tr>
+    </table>
+    <h3>スタッガー (左→右順次停止)</h3>
+    <table>
+      <tr><th>ダイス</th><th>停止フレーム</th></tr>
+      <tr><td>1 個目 (最左)</td><td class="n">25</td></tr>
+      <tr><td>2 個目</td><td class="n">30</td></tr>
+      <tr><td>3 個目</td><td class="n">35</td></tr>
+      <tr><td>4 個目</td><td class="n">40</td></tr>
+      <tr><td>5 個目</td><td class="n">45 (総尺 ≈1.9 秒)</td></tr>
+    </table>
+  </div>
+  <div>
+    <h3>規則</h3>
+    <ul style="margin:6px 0;padding-left:20px">
+      <li>シャッフル中に表示する値は、そのダイスの<b>実面プールから抽選</b> (面にない値を見せない)</li>
+      <li>連続同値は禁止 (直前と違う値を引き直す)</li>
+      <li>リロール時は該当ダイスのみ 0–25f の単独シャッフル</li>
+      <li>実装は現行 <code>DiceLEDManager.PlayRollingAnimation</code> の interval 制御を上表に合わせて改修</li>
+      <li>ダイス数が 3 個のときは 3 個分のスタッガーで総尺短縮 (≈1.5 秒)</li>
+    </ul>
+    <div class="warn">出目は内部では即決定済み。演出は表示遅延のみで、ロジックには一切影響しない。</div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="num">§5</span> 配線経路 LED (ケーブル実体なし)</h2>
+
+<ul style="margin:6px 0;padding-left:20px">
+  <li>各ダイスソケット上辺から端子下辺まで、バスレーン (156,192 · 167×9 dot) に<b>1 dot 幅の溝</b>を彫る (P0)</li>
+  <li>15 経路 (5 ダイス × 3 端子) を全て彫っておく。経路は「ソケット上辺中央 → 縦 → 横 → 端子下辺」の L 字 2 折れまで</li>
+  <li>割当決定で該当経路が<b>根元から 1 dot/2f で流動点灯</b>。旧経路は 4f で消灯に戻る</li>
+  <li>端子側ニキシーは点灯波の到達フレームで数値更新 (光が届いた瞬間に加算される感覚)</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2><span class="num">§5.5</span> ボタン井戸 (仕様は overlay-layer.html §1)</h2>
+
+<p>井戸の物理位置は §2 #21。ロール⇄バトルの出現機構・アニメ・状態規則は
+<a href="overlay-layer.html">overlay-layer.html §1</a> が正本。dot 換算: ボタン 24×24 dot・せり上がり 5 dot・押し込みストローク 2 dot。</p>
+
+<!-- ============================================================ -->
+<h2><span class="num">§6</span> インベントリ GUI レール (仕様は overlay-layer.html §2)</h2>
+
+<p>筐体側の常設物はスリット (§2 #2) のみ。dot 換算: 展開領域 30,15 〜 450,80 (420×65 dot)、
+スティック 11×18 dot ピッチ 16、消費カプセル 15 dot 幅 (T1=20 / T2=22 / T3=24 dot 高)。</p>
+
+<!-- ============================================================ -->
+<h2><span class="num">§7</span> 卓上ステージング (装飾・非機能)</h2>
+
+<table>
+  <tr><th>小物</th><th>配置目安</th><th>備考</th></tr>
+  <tr><td>カード (伏せ札 2-3 枚 + 散り 1 枚)</td><td>左下・筐体の縁にかかる</td><td>オクルージョンで筐体の接地感を作る</td></tr>
+  <tr><td>チップ (積み 2 山 + 崩れ)</td><td>左上</td><td></td></tr>
+  <tr><td>葉巻 + 灰皿</td><td>右上</td><td>細い煙 1 本 (ループ 4 秒)</td></tr>
+  <tr><td>硬貨 + 紙幣</td><td>右下</td><td>紙幣は 1 枚が筐体の下に挟まる</td></tr>
+  <tr><td>酒ボトル + グラス</td><td>右中</td><td>グラスの輪染みを卓面に</td></tr>
+  <tr><td>卓面</td><td>全面</td><td>濃い木目 + 暖色ランプの落ち影。全小物は左上光源で統一 (レシピ A と同一光源)</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2><span class="num">§8</span> 廃止・移設まとめ</h2>
+
+<table>
+  <tr><th>対象</th><th>処置</th></tr>
+  <tr><td>敵側 DiceLED ×5</td><td>削除 (シーン + DiceLEDManager の enemyDice 配列)</td></tr>
+  <tr><td>DiceMonitorDisplay ×2 (合計値)</td><td>削除 → 端子ニキシー (×3) に置換</td></tr>
+  <tr><td>自側 DiceLED ×5</td><td>維持・再配置 (§2 #19)。発光色を暖色へ・28×28 dot</td></tr>
+  <tr><td>rev4 の px 非整合座標</td><td>rev5 で全て 4px=1dot に整列 (LCD x 498→496 / シールド幅 26→24 / 希望幅 34→32 等)</td></tr>
+  <tr><td>敵 HP 縦バー (旧 rev2 左側)</td><td>rev4 で上部横バーに移設</td></tr>
+  <tr><td>希望ニキシー (旧 rev1)</td><td>廃止 → 右計器柱の希望ゲージに置換</td></tr>
+  <tr><td>筐体下部固定ラック (旧 rev2)</td><td>廃止 → GUI レールへ (overlay-layer.html §2)</td></tr>
+  <tr><td>グリッド / シジル</td><td><a href="../GAME.md#23-4-グリッド--シジル廃止承認済未着手">命令書</a>参照。別タスク</td></tr>
+  <tr><td>dice-spec.html</td><td>superseded (前提誤り)</td></tr>
+</table>
+
+<p style="color:var(--ink-3);font-size:11px;margin-top:20px">
+  最終更新: 2026-07-24 rev5 · 正準 480×270 dot (1 dot = 4px) · カメラズーム/パン時は全座標が筐体ローカルに追従
+</p>
+
+</div>
+</body>
+</html>

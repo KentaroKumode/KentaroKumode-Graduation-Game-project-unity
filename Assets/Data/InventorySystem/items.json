@@ -1,3587 +1,1985 @@
 {
+  "skills": [
+    {
+      "id": "血令",
+      "name": "血令",
+      "description": "自分のHP割合が敵より低いとき 与ダメ+50%／被ダメ-15%",
+      "stats": [
+        {
+          "stat": "dmgPct",
+          "value": 50,
+          "when": {
+            "behind": true
+          }
+        },
+        {
+          "stat": "dmgTakenPct",
+          "value": -15,
+          "when": {
+            "behind": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "城壁II",
+      "name": "城壁II",
+      "description": "被ダメ-4／ターン終了時 HP+1",
+      "stats": [
+        {
+          "stat": "dmgTaken",
+          "value": -4
+        },
+        {
+          "stat": "regen",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": "城壁III",
+      "name": "城壁III",
+      "description": "被ダメ-7／ターン終了時 HP+2",
+      "stats": [
+        {
+          "stat": "dmgTaken",
+          "value": -7
+        },
+        {
+          "stat": "regen",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "id": "大鉈I",
+      "name": "大鉈I",
+      "description": "敵の失ったHP割合に比例して 与ダメ+最大30%"
+    },
+    {
+      "id": "大鉈II",
+      "name": "大鉈II",
+      "description": "敵の失ったHP割合に比例して 与ダメ+最大50%"
+    },
+    {
+      "id": "果たし合い",
+      "name": "果たし合い",
+      "description": "単体戦のみ 会心率+15%／与ダメ+25%／被ダメ-15%",
+      "stats": [
+        {
+          "stat": "critPct",
+          "value": 15,
+          "when": {
+            "solo": true
+          }
+        },
+        {
+          "stat": "dmgPct",
+          "value": 25,
+          "when": {
+            "solo": true
+          }
+        },
+        {
+          "stat": "dmgTakenPct",
+          "value": -15,
+          "when": {
+            "solo": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "一対一I",
+      "name": "一対一I",
+      "description": "単体戦のみ 攻撃+3／被ダメ-1",
+      "stats": [
+        {
+          "stat": "atk",
+          "value": 3,
+          "when": {
+            "solo": true
+          }
+        },
+        {
+          "stat": "dmgTaken",
+          "value": -1,
+          "when": {
+            "solo": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "一対一II",
+      "name": "一対一II",
+      "description": "単体戦のみ 攻撃+5／被ダメ-2",
+      "stats": [
+        {
+          "stat": "atk",
+          "value": 5,
+          "when": {
+            "solo": true
+          }
+        },
+        {
+          "stat": "dmgTaken",
+          "value": -2,
+          "when": {
+            "solo": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "処刑",
+      "name": "処刑",
+      "description": "勝利時 次T敵の最大ダイスを1に固定／敵残HP25%以下で与ダメ+80%",
+      "stats": [
+        {
+          "stat": "dmgPct",
+          "value": 80,
+          "when": {
+            "enemyHpPctMax": 25
+          }
+        }
+      ]
+    },
+    {
+      "id": "猛りII",
+      "name": "猛りII",
+      "description": "ターン経過ごとに 攻撃+1（上限+9）"
+    },
+    {
+      "id": "猛りIII",
+      "name": "猛りIII",
+      "description": "ターン経過ごとに 攻撃+1（上限+14）"
+    },
+    {
+      "id": "復讐",
+      "name": "復讐",
+      "description": "被弾するたび 攻撃+2 蓄積（上限+20・戦闘中持続）"
+    },
+    {
+      "id": "画竜点睛",
+      "name": "画竜点睛",
+      "description": "ダイスがその時点の最大値なら、攻撃+（出目+10）＋会心確定"
+    },
+    {
+      "id": "衛士の慣い",
+      "name": "衛士の慣い",
+      "description": "戦闘開始時 シールド+10／ターン終了時 シールドが3未満なら+4"
+    },
+    {
+      "id": "無我無心",
+      "name": "無我無心",
+      "description": "ロール時、カスタムダイス以外の補正（バフ/メタ/消費/武器強化等）を一切受けない"
+    },
+    {
+      "id": "蝕夜",
+      "name": "蝕夜",
+      "description": "過剰ダメージ×4を蓄積し 戦闘開始時に軽減無視で放出"
+    },
+    {
+      "id": "パリィ",
+      "name": "パリィ",
+      "description": "3ターンに1度 被ダメージを完全無効化"
+    },
+    {
+      "id": "反攻I",
+      "name": "反攻I",
+      "description": "ブロック端子へ配線した出目合計×0.4 を軽減無視で敵へ"
+    },
+    {
+      "id": "反攻II",
+      "name": "反攻II",
+      "description": "ブロック端子へ配線した出目合計×0.7 を軽減無視で敵へ"
+    },
+    {
+      "id": "切り返し",
+      "name": "切り返し",
+      "description": "被弾した次のターン 攻撃+7／与ダメ+20%",
+      "stats": [
+        {
+          "stat": "atk",
+          "value": 7,
+          "when": {
+            "hitLastTurn": true
+          }
+        },
+        {
+          "stat": "dmgPct",
+          "value": 20,
+          "when": {
+            "hitLastTurn": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "疾手II",
+      "name": "疾手II",
+      "description": "最初の3ターン 攻撃+5",
+      "stats": [
+        {
+          "stat": "atk",
+          "value": 5,
+          "when": {
+            "turnMax": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "疾手III",
+      "name": "疾手III",
+      "description": "最初の3ターン 攻撃+8",
+      "stats": [
+        {
+          "stat": "atk",
+          "value": 8,
+          "when": {
+            "turnMax": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "間合II",
+      "name": "間合II",
+      "description": "攻撃+3／被ダメ-2",
+      "stats": [
+        {
+          "stat": "atk",
+          "value": 3
+        },
+        {
+          "stat": "dmgTaken",
+          "value": -2
+        }
+      ]
+    },
+    {
+      "id": "間合III",
+      "name": "間合III",
+      "description": "攻撃+5／被ダメ-3",
+      "stats": [
+        {
+          "stat": "atk",
+          "value": 5
+        },
+        {
+          "stat": "dmgTaken",
+          "value": -3
+        }
+      ]
+    },
+    {
+      "id": "毒手I",
+      "name": "毒手I",
+      "description": "戦闘開始時 敵に毒2／会心のたび毒+1"
+    },
+    {
+      "id": "毒手II",
+      "name": "毒手II",
+      "description": "戦闘開始時 敵に毒3／会心のたび毒+1"
+    }
+  ],
   "items": [
     {
-      "id": "axe_t1",
-      "name": "薪割りの斧",
-      "roleName": "バーサーカー",
-      "roleDescription": "一撃特化型。少ないダイスで高出目と会心を狙うロマン武器。",
-      "description": "ダイス1個・高会心の一撃特化型。ダイス合計と会心を底上げする。",
-      "flavorText": "ヴェイランド辺境の薪割り稼業を一段、 やめた日に握ったのがこれだ。 腕の振り方は、 あの頃のままだ。",
-      "category": "Weapon",
-      "rarity": "BRONZE",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 1,
-      "diceMax": 6,
-      "criticalRate": 2,
-      "attackPower": 3,
-      "basePrice": 8,
-      "passiveSkills": [
-        {
-          "internalName": "MightI",
-          "skillName": "筋力I",
-          "description": "ダイス合計+2"
-        },
-        {
-          "internalName": "InsightI",
-          "skillName": "心眼I",
-          "description": "会心ダイス合計値+1"
-        }
-      ]
-    },
-    {
-      "id": "axe_t2",
+      "id": "猛斧",
       "name": "猛斧",
       "roleName": "バーサーカー",
-      "roleDescription": "一撃特化型。少ないダイスで高出目と会心を狙うロマン武器。",
-      "description": "高出目・高会心の一撃特化型。命中ごとに敵へ出血を与える。",
-      "flavorText": "故買屋に出所を尋ねると、 笑って値を下げた。 下げた理由を聞くと、 また笑った。",
+      "roleDescription": "削り合い型。 ターンが進むほど、 双方が削れるほど、 そして自分が押されているほど強くなる。",
+      "description": "削った分だけ加速する。 先に入れた一撃が次の一撃を重くする。",
+      "flavorText": "故買屋に出所を尋ねると、笑って値を下げた。下げた理由を聞くと、また笑った。",
       "category": "Weapon",
       "rarity": "SILVER",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 2,
+      "diceCount": 5,
       "diceMax": 6,
-      "criticalRate": 3,
+      "critRatePct": 10,
       "attackPower": 4,
       "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "MightI",
-          "skillName": "筋力I",
-          "description": "ダイス合計+2"
-        },
-        {
-          "internalName": "InsightI",
-          "skillName": "心眼I",
-          "description": "会心ダイス合計値+1"
-        },
-        {
-          "internalName": "Sting",
-          "skillName": "出血",
-          "description": "ダメージを与えるたび、敵に出血+1"
-        }
-      ]
+      "skills": [
+        "猛りII",
+        "大鉈I"
+      ],
+      "family": "axe",
+      "tier": 2
     },
     {
-      "id": "axe_t3",
+      "id": "血塗りの戦斧",
       "name": "血塗りの戦斧",
       "roleName": "バーサーカー",
-      "roleDescription": "一撃特化型。少ないダイスで高出目と会心を狙うロマン武器。",
-      "description": "一撃特化型。敗北するほどダイスが伸び、命中で出血を与える。",
+      "roleDescription": "削り合い型。 ターンが進むほど、 双方が削れるほど、 そして自分が押されているほど強くなる。",
+      "description": "被弾が力になる。 殴られるほど攻撃が積み上がる。",
       "flavorText": "敗北の数だけ刃が育つ、と古参は言う。裏を返せば、勝ち続けてきた者にはまだ借りがある。",
       "category": "Weapon",
       "rarity": "GOLD",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 3,
-      "diceMax": 7,
-      "criticalRate": 5,
+      "diceCount": 5,
+      "diceMax": 6,
+      "critRatePct": 15,
       "attackPower": 6,
       "basePrice": 16,
-      "passiveSkills": [
-        {
-          "internalName": "MightII",
-          "skillName": "筋力II",
-          "description": "ダイス合計+3"
-        },
-        {
-          "internalName": "InsightI",
-          "skillName": "心眼I",
-          "description": "会心ダイス合計値+1"
-        },
-        {
-          "internalName": "Frenzy",
-          "skillName": "復讐",
-          "description": "敗北でダイス+1蓄積、勝利でリセット"
-        },
-        {
-          "internalName": "Sting",
-          "skillName": "出血",
-          "description": "ダメージを与えるたび、敵に出血+1"
-        }
-      ]
+      "skills": [
+        "猛りII",
+        "大鉈II",
+        "復讐"
+      ],
+      "family": "axe",
+      "tier": 3
     },
     {
-      "id": "axe_t4",
+      "id": "血帝廻天",
       "name": "血帝廻天",
       "roleName": "バーサーカー",
-      "roleDescription": "一撃特化型。少ないダイスで高出目と会心を狙うロマン武器。",
-      "description": "一撃特化型の極致。ゾロ目勝利で、ゾロ目を軽減不可の特大ダメージに変える。",
-      "flavorText": "旧アルフォニアの戦象論に、 一撃で山の稜線を変えた戦鬼の項がある。 山は今もそこにある。 稜線は、 確かに歪んでいる。",
+      "roleDescription": "削り合い型。 ターンが進むほど、 双方が削れるほど、 そして自分が押されているほど強くなる。",
+      "description": "押されているときにこそ本領。 HP 割合で負けている間、 与ダメが跳ね上がる。",
+      "flavorText": "旧アルフォニアの戦象論に、一撃で山の稜線を変えた戦鬼の項がある。山は今もそこにある。稜線は、確かに歪んでいる。",
       "category": "Weapon",
       "rarity": "LEGENDARY",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 4,
-      "diceMax": 8,
-      "criticalRate": 6,
+      "diceCount": 5,
+      "diceMax": 6,
+      "critRatePct": 15,
       "attackPower": 8,
       "basePrice": 20,
-      "passiveSkills": [
-        {
-          "internalName": "MightII",
-          "skillName": "筋力II",
-          "description": "ダイス合計+3"
-        },
-        {
-          "internalName": "InsightII",
-          "skillName": "心眼II",
-          "description": "会心ダイス合計値+2"
-        },
-        {
-          "internalName": "Frenzy",
-          "skillName": "復讐",
-          "description": "敗北でダイス+1蓄積、勝利でリセット"
-        },
-        {
-          "internalName": "BloodDecree",
-          "skillName": "血令",
-          "description": "ゾロ目で勝利時、会心倍率2.5倍の確定（軽減不可）ダメージを与える"
-        }
-      ]
+      "skills": [
+        "猛りIII",
+        "大鉈II",
+        "復讐",
+        "血令"
+      ],
+      "family": "axe",
+      "tier": 4
     },
     {
-      "id": "sword_t1",
-      "name": "訓練用の剣",
-      "roleName": "ナイト",
-      "roleDescription": "攻守バランス型。反撃と追撃でどんな状況でも戦える。",
-      "description": "攻守バランス型。ダイス合計と勝利時の追撃で安定して戦う。",
-      "flavorText": "ストレリツ守備騎士団の稽古場に百本ある、 一番細く一番古いやつだ。 これで傷を負った者が、 一人前になる。",
-      "category": "Weapon",
-      "rarity": "BRONZE",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 1,
-      "diceMax": 4,
-      "criticalRate": 1,
-      "attackPower": 2,
-      "basePrice": 8,
-      "passiveSkills": [
-        {
-          "internalName": "MightI",
-          "skillName": "筋力I",
-          "description": "ダイス合計+2"
-        },
-        {
-          "internalName": "PursuitI",
-          "skillName": "追撃I",
-          "description": "ロール勝利時、与ダメージ+2"
-        }
-      ]
-    },
-    {
-      "id": "sword_t2",
+      "id": "鍛鉄の剣",
       "name": "鍛鉄の剣",
-      "roleName": "ナイト",
-      "roleDescription": "攻守バランス型。反撃と追撃でどんな状況でも戦える。",
-      "description": "攻守バランス型。追撃に加え、敗北時に被ダメージの一部を反射する。",
+      "roleName": "ソードマン",
+      "roleDescription": "一対一に特化した万能型。 攻防どちらにも穴が無く、 単体戦では明確に格上。 2 体戦では持ち味の半分が死ぬ。",
+      "description": "一対一のとき、 間合いの分だけ確実に上を取る。",
       "flavorText": "名も刻印もない。打った者の顔も知らない。それでも、鋼は正直だ。",
       "category": "Weapon",
       "rarity": "SILVER",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 2,
-      "diceMax": 5,
-      "criticalRate": 2,
+      "diceCount": 5,
+      "diceMax": 6,
+      "critRatePct": 15,
       "attackPower": 3,
       "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "MightI",
-          "skillName": "筋力I",
-          "description": "ダイス合計+2"
-        },
-        {
-          "internalName": "PursuitI",
-          "skillName": "追撃I",
-          "description": "ロール勝利時、与ダメージ+2"
-        },
-        {
-          "internalName": "Riposte",
-          "skillName": "切り返し",
-          "description": "敗北時、受けたダメージの50%を敵に反射"
-        }
-      ]
+      "skills": [
+        "間合II",
+        "一対一I"
+      ],
+      "family": "sword",
+      "tier": 2
     },
     {
-      "id": "sword_t3",
+      "id": "銀の長剣",
       "name": "銀の長剣",
-      "roleName": "ナイト",
-      "roleDescription": "攻守バランス型。反撃と追撃でどんな状況でも戦える。",
-      "description": "攻守バランス型。接戦（ダイス差≤3）を相殺し、軽減不可ダメージに変える。",
-      "flavorText": "まともな刃に見えるが、接戦になると妙に言うことを聞く。銀の気まぐれか、持ち主の気まぐれか。",
+      "roleName": "ソードマン",
+      "roleDescription": "一対一に特化した万能型。 攻防どちらにも穴が無く、 単体戦では明確に格上。 2 体戦では持ち味の半分が死ぬ。",
+      "description": "受けた次の一手が重い。 撃ち合いの往復で勝つ。",
+      "flavorText": "まともな刃に見える。だが拮抗した斬り合いの最中だけ、刀身がわずかに軽くなる。銀が好むのは、勝負が決まる寸前の一瞬らしい。",
       "category": "Weapon",
       "rarity": "GOLD",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 3,
+      "diceCount": 5,
       "diceMax": 6,
-      "criticalRate": 3,
+      "critRatePct": 25,
       "attackPower": 4,
       "basePrice": 16,
-      "passiveSkills": [
-        {
-          "internalName": "MightII",
-          "skillName": "筋力II",
-          "description": "ダイス合計+3"
-        },
-        {
-          "internalName": "PursuitI",
-          "skillName": "追撃I",
-          "description": "ロール勝利時、与ダメージ+2"
-        },
-        {
-          "internalName": "Riposte",
-          "skillName": "切り返し",
-          "description": "敗北時、受けたダメージの50%を敵に反射"
-        },
-        {
-          "internalName": "VoidStance",
-          "skillName": "虚空",
-          "description": "ダイス差≤3で双方ダメ0+軽減不可3ダメ"
-        }
-      ]
+      "skills": [
+        "間合II",
+        "一対一II",
+        "切り返し"
+      ],
+      "family": "sword",
+      "tier": 3
     },
     {
-      "id": "sword_t4",
-      "name": "寂滅",
-      "roleName": "ナイト",
-      "roleDescription": "攻守バランス型。反撃と追撃でどんな状況でも戦える。",
-      "description": "攻守バランス型の極致。接戦に強く、全ダイス最大で与ダメ倍化／全最低で被ダメ0。",
-      "flavorText": "寂照の経に 「滅して還らず」 と詠われる一振りの図がある。 「ここに至れた者なし」 と注がある。 これがそれだと言う者がいる。",
+      "id": "デュランダル",
+      "name": "デュランダル",
+      "roleName": "ソードマン",
+      "roleDescription": "一対一に特化した万能型。 攻防どちらにも穴が無く、 単体戦では明確に格上。 2 体戦では持ち味の半分が死ぬ。",
+      "description": "単体戦に限れば、 会心も与ダメも被ダメもすべて有利側に傾く。",
+      "flavorText": "寂照の経に「滅して還らず」と詠われる一振りの図がある。「ここに至れた者なし」と注がある。これがそれだと言う者がいる。",
       "category": "Weapon",
       "rarity": "LEGENDARY",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 4,
+      "diceCount": 5,
       "diceMax": 6,
-      "criticalRate": 3,
+      "critRatePct": 35,
       "attackPower": 5,
       "basePrice": 20,
-      "passiveSkills": [
-        {
-          "internalName": "MightII",
-          "skillName": "筋力II",
-          "description": "ダイス合計+3"
-        },
-        {
-          "internalName": "PursuitI",
-          "skillName": "追撃I",
-          "description": "ロール勝利時、与ダメージ+2"
-        },
-        {
-          "internalName": "Riposte",
-          "skillName": "切り返し",
-          "description": "敗北時、受けたダメージの50%を敵に反射"
-        },
-        {
-          "internalName": "VoidStance",
-          "skillName": "虚空",
-          "description": "ダイス差≤3で双方ダメ0+軽減不可3ダメ"
-        },
-        {
-          "internalName": "Destiny",
-          "skillName": "運命",
-          "description": "全ダイス最大出目で与ダメージ倍率+1.0、 最低出目なら被ダメージ0"
-        }
-      ]
+      "skills": [
+        "間合III",
+        "一対一II",
+        "切り返し",
+        "果たし合い"
+      ],
+      "family": "sword",
+      "tier": 4
     },
     {
-      "id": "dagger_t1",
-      "name": "懐刀",
-      "roleName": "アサシン",
-      "roleDescription": "追撃・会心特化型。勝利時の爆発力が最も高い。",
-      "description": "追撃・会心特化型。勝利時の爆発力に寄せた一本。",
-      "flavorText": "懐の温みで気づく頃には、もう遅い。近い間合いこそが、この刀の本領だ。",
-      "category": "Weapon",
-      "rarity": "BRONZE",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 1,
-      "diceMax": 4,
-      "criticalRate": 2,
-      "attackPower": 1,
-      "basePrice": 8,
-      "passiveSkills": [
-        {
-          "internalName": "PursuitI",
-          "skillName": "追撃I",
-          "description": "ロール勝利時、与ダメージ+2"
-        },
-        {
-          "internalName": "InsightI",
-          "skillName": "心眼I",
-          "description": "会心ダイス合計値+1"
-        }
-      ]
-    },
-    {
-      "id": "dagger_t2",
+      "id": "盗賊の短刀",
       "name": "盗賊の短刀",
       "roleName": "アサシン",
-      "roleDescription": "追撃・会心特化型。勝利時の爆発力が最も高い。",
-      "description": "追撃・会心特化型。高い会心率と勝利追撃で押し込む。",
-      "flavorText": "ヴェイランド裏町のある盗賊団では、 新入りに番号入りで渡される。 六割が、 初仕事で返してこない。 残り四割が、 一人前になる。",
+      "roleDescription": "短期決戦型。 開幕から押し込み、 毒で削り、 瀕死を一息に断つ。 長引くと何も残らない。",
+      "description": "開幕の毒が濃くなる。 会心のたびに毒が乗る。",
+      "flavorText": "ヴェイランド裏町のある盗賊団では、新入りに番号入りで渡される。六割が、初仕事で返してこない。残り四割が、一人前になる。",
       "category": "Weapon",
       "rarity": "SILVER",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 2,
-      "diceMax": 5,
-      "criticalRate": 4,
+      "diceCount": 5,
+      "diceMax": 6,
+      "critRatePct": 20,
       "attackPower": 2,
       "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "InsightI",
-          "skillName": "心眼I",
-          "description": "会心ダイス合計値+1"
-        },
-        {
-          "internalName": "PursuitII",
-          "skillName": "追撃II",
-          "description": "ロール勝利時、与ダメージ+4"
-        }
-      ]
+      "skills": [
+        "疾手II",
+        "毒手I"
+      ],
+      "family": "dagger",
+      "tier": 2
     },
     {
-      "id": "dagger_t3",
+      "id": "処刑人の曲刀",
       "name": "処刑人の曲刀",
       "roleName": "アサシン",
-      "roleDescription": "追撃・会心特化型。勝利時の爆発力が最も高い。",
-      "description": "追撃・会心特化型。勝利すると次ターンの敵ダイスを縛る。",
-      "flavorText": "振るわれたあとで気づく。気づく者は、たいてい次のターンを持たない。",
+      "roleDescription": "短期決戦型。 開幕から押し込み、 毒で削り、 瀕死を一息に断つ。 長引くと何も残らない。",
+      "description": "瀕死の敵に対する決定力を得る。 敵の最強ダイスも潰す。",
+      "flavorText": "振るわれたあとで気づく。気づいた者に、次の一手は残されていない。",
       "category": "Weapon",
       "rarity": "GOLD",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 3,
+      "diceCount": 5,
       "diceMax": 6,
-      "criticalRate": 5,
+      "critRatePct": 30,
       "attackPower": 3,
       "basePrice": 16,
-      "passiveSkills": [
-        {
-          "internalName": "InsightI",
-          "skillName": "心眼I",
-          "description": "会心ダイス合計値+1"
-        },
-        {
-          "internalName": "PursuitII",
-          "skillName": "追撃II",
-          "description": "ロール勝利時、与ダメージ+4"
-        },
-        {
-          "internalName": "Execute",
-          "skillName": "処刑",
-          "description": "勝利時、次ターン敵最小ダイス1固定"
-        }
-      ]
+      "skills": [
+        "疾手II",
+        "毒手II",
+        "処刑"
+      ],
+      "family": "dagger",
+      "tier": 3
     },
     {
-      "id": "dagger_t4",
+      "id": "ノクタリア",
       "name": "ノクタリア",
       "roleName": "アサシン",
-      "roleDescription": "追撃・会心特化型。勝利時の爆発力が最も高い。",
-      "description": "追撃・会心特化型の極致。過剰ダメージを蓄積し、戦闘開始時に解放する。",
+      "roleDescription": "短期決戦型。 開幕から押し込み、 毒で削り、 瀕死を一息に断つ。 長引くと何も残らない。",
+      "description": "短期決戦の極致。 過剰に削った分が次の戦闘の開幕へ持ち越される。",
       "flavorText": "「夜」の名を持つ短剣。ある夜盗の手記には、振るうほど次の獲物が軽く感じた、とある。手記はそこで途切れている。",
       "category": "Weapon",
       "rarity": "LEGENDARY",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 4,
-      "diceMax": 7,
-      "criticalRate": 7,
-      "attackPower": 4,
-      "basePrice": 20,
-      "passiveSkills": [
-        {
-          "internalName": "PursuitII",
-          "skillName": "追撃II",
-          "description": "ロール勝利時、与ダメージ+4"
-        },
-        {
-          "internalName": "InsightII",
-          "skillName": "心眼II",
-          "description": "会心ダイス合計値+2"
-        },
-        {
-          "internalName": "Execute",
-          "skillName": "処刑",
-          "description": "勝利時、次ターン敵最小ダイス1固定"
-        },
-        {
-          "internalName": "Nightfall",
-          "skillName": "蝕夜",
-          "description": "オーバーダメ×2蓄積→戦闘開始時放出"
-        }
-      ]
-    },
-    {
-      "id": "shield_t1",
-      "name": "端材の盾",
-      "roleName": "タンク",
-      "roleDescription": "持久戦に強い。scratch軽減とHP回復で長期戦を制する。",
-      "description": "持久型。被ダメ軽減・HP回復・敗北時の反撃で長期戦を支える。",
-      "flavorText": "よく見ると木目が透ける。それでも、これを持って降りた者の半分は、帰ってくる。",
-      "category": "Weapon",
-      "rarity": "BRONZE",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 1,
-      "diceMax": 3,
-      "criticalRate": 1,
-      "attackPower": 1,
-      "basePrice": 8,
-      "passiveSkills": [
-        {
-          "internalName": "FortitudeI",
-          "skillName": "頑強I",
-          "description": "被ダメージ-1"
-        },
-        {
-          "internalName": "VitalityI",
-          "skillName": "活力I",
-          "description": "ターン終了時HP+1回復"
-        },
-        {
-          "internalName": "CounterI",
-          "skillName": "反撃I",
-          "description": "ロール敗北時、敵に軽減不可2ダメージ"
-        }
-      ]
-    },
-    {
-      "id": "shield_t2",
-      "name": "鉄盾",
-      "roleName": "タンク",
-      "roleDescription": "持久戦に強い。scratch軽減とHP回復で長期戦を制する。",
-      "description": "持久型。より高い被ダメ軽減とHP回復で粘る。",
-      "flavorText": "ヴェイランドの酒場でこの形の盾の話が出ると、 たいてい誰かが袖をまくって傷を見せる。 助かった傷だ。",
-      "category": "Weapon",
-      "rarity": "SILVER",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 2,
-      "diceMax": 4,
-      "criticalRate": 1,
-      "attackPower": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "VitalityII",
-          "skillName": "活力II",
-          "description": "ターン終了時HP+2回復"
-        },
-        {
-          "internalName": "FortitudeII",
-          "skillName": "頑強II",
-          "description": "被ダメージ-2"
-        },
-        {
-          "internalName": "CounterI",
-          "skillName": "反撃I",
-          "description": "ロール敗北時、敵に軽減不可2ダメージ"
-        }
-      ]
-    },
-    {
-      "id": "shield_t3",
-      "name": "聖騎士の盾",
-      "roleName": "タンク",
-      "roleDescription": "持久戦に強い。scratch軽減とHP回復で長期戦を制する。",
-      "description": "持久型。威圧の削りを無効化し、敗北時に強く反撃する。",
-      "flavorText": "祝福を刻んだ守備騎士団は、 もうない。 それでも盾は祝福を憶えており、 持ち手の前に立ち続ける。",
-      "category": "Weapon",
-      "rarity": "GOLD",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 3,
-      "diceMax": 5,
-      "criticalRate": 2,
-      "attackPower": 3,
-      "basePrice": 16,
-      "passiveSkills": [
-        {
-          "internalName": "FortitudeIII",
-          "skillName": "頑強III",
-          "description": "被ダメージ-3"
-        },
-        {
-          "internalName": "VitalityII",
-          "skillName": "活力II",
-          "description": "ターン終了時HP+2回復"
-        },
-        {
-          "internalName": "Parry",
-          "skillName": "パリィ",
-          "description": "敵の威圧による削りダメージを無効化"
-        },
-        {
-          "internalName": "CounterII",
-          "skillName": "反撃II",
-          "description": "ロール敗北時、敵に軽減不可4ダメージ"
-        }
-      ]
-    },
-    {
-      "id": "shield_t4",
-      "name": "ドーンブリンガー",
-      "roleName": "タンク",
-      "roleDescription": "持久戦に強い。ダメージ軽減とHP回復で長期戦を制する。",
-      "description": "持久型の聖盾。威圧を無効化し、敗北時の被ダメを半減しつつ大きく反撃する。",
-      "flavorText": "旧アルフォニアのある従軍記に、 夜明けまで門を守りきった盾の話がある。 盾の名だけが残り、 守った者の名は残らなかった。",
-      "category": "Weapon",
-      "rarity": "LEGENDARY",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 4,
-      "diceMax": 5,
-      "criticalRate": 2,
-      "attackPower": 4,
-      "basePrice": 20,
-      "passiveSkills": [
-        {
-          "internalName": "FortitudeIII",
-          "skillName": "頑強III",
-          "description": "被ダメージ-3"
-        },
-        {
-          "internalName": "VitalityIII",
-          "skillName": "活力III",
-          "description": "ターン終了時HP+3回復"
-        },
-        {
-          "internalName": "Parry",
-          "skillName": "パリィ",
-          "description": "敵の威圧による削りダメージを無効化"
-        },
-        {
-          "internalName": "HolyShield",
-          "skillName": "聖なる守り",
-          "description": "ロール敗北時、受けるダメージ50%"
-        },
-        {
-          "internalName": "CounterIII",
-          "skillName": "反撃III",
-          "description": "ロール敗北時、敵に軽減不可6ダメージ"
-        }
-      ]
-    },
-    {
-      "id": "curse_t1",
-      "name": "呪いの短剣",
-      "description": "自傷型。毎ターン自分に2ダメージを負う代わり、敵のダイス合計を継続して削る。",
-      "flavorText": "冷える指で握る短剣。敵の熱も、こちらの熱も、どこかへ消えていく。先に尽きた方が負けだ。",
-      "category": "Weapon",
-      "rarity": "BRONZE",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 1,
-      "diceMax": 5,
-      "criticalRate": 3,
-      "attackPower": 2,
-      "basePrice": 8,
-      "passiveSkills": [
-        {
-          "internalName": "MightI",
-          "skillName": "筋力I",
-          "description": "ダイス合計+2"
-        },
-        {
-          "internalName": "CurseBind",
-          "skillName": "呪縛",
-          "description": "毎ターン自分2ダメ、敵ダイス合計-1蓄積 (上限-3)"
-        }
-      ]
-    },
-    {
-      "id": "curse_t2",
-      "name": "呪詛の刃",
-      "description": "自傷型の呪刀。毎ターン自傷しつつ、敵のダイス合計を継続して削る。",
-      "flavorText": "露店の売り手は、値をつけてから黙り込んだ。しばらくして、半額にした。理由を聞かなかったのは正解だと思う。",
-      "category": "Weapon",
-      "rarity": "SILVER",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 2,
-      "diceMax": 5,
-      "criticalRate": 3,
-      "attackPower": 3,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "MightI",
-          "skillName": "筋力I",
-          "description": "ダイス合計+2"
-        },
-        {
-          "internalName": "CurseBind",
-          "skillName": "呪縛",
-          "description": "毎ターン自分2ダメ、敵ダイス合計-1蓄積 (上限-3)"
-        }
-      ]
-    },
-    {
-      "id": "curse_t3",
-      "name": "蝕みの刀",
-      "description": "自傷型の呪刀。毎ターン自傷しつつ、敵のダイス合計を継続して削る。",
-      "flavorText": "双方から少しずつ啜っていく。刀は中立だ。先に尽きた方が負けに決まっている。",
-      "category": "Weapon",
-      "rarity": "GOLD",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 3,
+      "diceCount": 5,
       "diceMax": 6,
-      "criticalRate": 4,
+      "critRatePct": 40,
       "attackPower": 4,
-      "basePrice": 16,
-      "passiveSkills": [
-        {
-          "internalName": "MightII",
-          "skillName": "筋力II",
-          "description": "ダイス合計+3"
-        },
-        {
-          "internalName": "CurseBind",
-          "skillName": "呪縛",
-          "description": "毎ターン自分2ダメ、敵ダイス合計-1蓄積 (上限-3)"
-        }
-      ]
+      "basePrice": 20,
+      "skills": [
+        "疾手III",
+        "毒手II",
+        "処刑",
+        "蝕夜"
+      ],
+      "family": "dagger",
+      "tier": 4
     },
     {
-      "id": "curse_t4",
-      "name": "呪蝕の深淵",
-      "description": "自傷型の極致。致死を踏み越えると狂戦士化し、ダイスと反撃が跳ね上がる。",
-      "flavorText": "回収された手記の、 最後の数頁は文字になっていなかった。 持ち主の名は、 七大罪の名簿の方に残っている。",
+      "id": "鉄盾",
+      "name": "鉄盾",
+      "roleName": "ナイト",
+      "roleDescription": "耐久型。 ブロックへ挿した分がそのまま反撃になるので、 守りが手数を兼ねる。",
+      "description": "反撃が重くなる。 守りが手数を兼ねる。",
+      "flavorText": "ヴェイランドの酒場でこの形の盾の話が出ると、たいてい誰かが袖をまくって傷を見せる。助かった傷だ。",
+      "category": "Weapon",
+      "rarity": "SILVER",
+      "diceCount": 5,
+      "diceMax": 6,
+      "critRatePct": 5,
+      "attackPower": 2,
+      "basePrice": 12,
+      "skills": [
+        "城壁II",
+        "反攻I"
+      ],
+      "family": "shield",
+      "tier": 2
+    },
+    {
+      "id": "聖騎士の盾",
+      "name": "聖騎士の盾",
+      "roleName": "ナイト",
+      "roleDescription": "耐久型。 ブロックへ挿した分がそのまま反撃になるので、 守りが手数を兼ねる。",
+      "description": "3 ターンに 1 度、 どんな一撃も通らない。",
+      "flavorText": "祝福を刻んだ守備騎士団は、もうない。それでも盾は祝福を憶えており、持ち手の前に立ち続ける。",
+      "category": "Weapon",
+      "rarity": "GOLD",
+      "diceCount": 5,
+      "diceMax": 6,
+      "critRatePct": 10,
+      "attackPower": 3,
+      "basePrice": 16,
+      "skills": [
+        "城壁II",
+        "反攻II",
+        "パリィ"
+      ],
+      "family": "shield",
+      "tier": 3
+    },
+    {
+      "id": "ドーンブリンガー",
+      "name": "ドーンブリンガー",
+      "roleName": "ナイト",
+      "roleDescription": "耐久型。 ブロックへ挿した分がそのまま反撃になるので、 守りが手数を兼ねる。",
+      "description": "尽きないシールド。 軽減を無視するダメージも、 まず盾が受け止める。",
+      "flavorText": "三年炎上の最後の夜、夜明けまで西門を守りきった盾がある、と従軍記は伝える。夜明けに何が来たのかは、書かれていない。帝都は、その日のうちに落ちた。",
       "category": "Weapon",
       "rarity": "LEGENDARY",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 4,
-      "diceMax": 7,
-      "criticalRate": 3,
-      "attackPower": 5,
+      "diceCount": 5,
+      "diceMax": 6,
+      "critRatePct": 10,
+      "attackPower": 4,
       "basePrice": 20,
-      "passiveSkills": [
-        {
-          "internalName": "MightII",
-          "skillName": "筋力II",
-          "description": "ダイス合計+3"
-        },
-        {
-          "internalName": "InsightII",
-          "skillName": "心眼II",
-          "description": "会心ダイス合計値+2"
-        },
-        {
-          "internalName": "CurseBind",
-          "skillName": "呪縛",
-          "description": "毎ターン自分2ダメ、敵ダイス合計-1蓄積 (上限-3)"
-        },
-        {
-          "internalName": "Abyss",
-          "skillName": "刹那の惜別",
-          "description": "被ダメージ記録+踏みとどまり→狂戦士化 (ダイス+5/反撃 累積×0.5)"
-        }
-      ]
+      "skills": [
+        "城壁III",
+        "反攻II",
+        "パリィ",
+        "衛士の慣い"
+      ],
+      "family": "shield",
+      "tier": 4
     },
     {
-      "id": "ryusen",
+      "id": "竜閃",
       "name": "竜閃",
-      "description": "一点賭けの刀。出目が最大なら即勝利＋特大ダメージ＋会心確定。代償に他の補正を一切受けない。",
+      "description": "一点賭けの刀。出目が最大なら特大の攻撃＋会心確定。代償に他の補正を一切受けない。",
       "flavorText": "とある剣譜は、この刀をただ一行で記す——「抜けば、最も高きものが断たれる」。挿絵には、天へ昇る竜が添えてある。",
       "category": "Weapon",
       "rarity": "LEGENDARY",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 1,
+      "diceCount": 5,
       "diceMax": 6,
-      "criticalRate": 0,
+      "critRatePct": 0,
       "attackPower": 3,
       "basePrice": 20,
-      "passiveSkills": [
+      "skills": [
+        "画竜点睛",
+        "無我無心"
+      ]
+    },
+    {
+      "id": "百一人切りの鉈",
+      "name": "百一人切りの鉈",
+      "description": "ターン終了時、敵HPが最大の30%以下（ボスは15%）なら即処刑＋最大HP9%回復＋3G。",
+      "flavorText": "柄には百本の刻み傷がある。刃元には、それより新しい一本だけが深く入っている。誰が最後の一本を刻んだか、鉈の売り手は答えない。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "百一人切りの鉈"
+    },
+    {
+      "id": "征服者の戦旗",
+      "name": "征服者の戦旗",
+      "description": "収支プラスのターン毎に与ダメージ倍率+5%（戦闘中累積・上限+60%）。",
+      "flavorText": "北方戦役の先鋒を担った将が掲げた戦旗。相手を踏み潰し、征服するほどに士気が高まる。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "征服者の戦旗"
+    },
+    {
+      "id": "魂喰らいの血石",
+      "name": "魂喰らいの血石",
+      "description": "与ダメージ時、最終与ダメージの4%を回復。",
+      "flavorText": "鑑定書に『夜明け前に外すこと』と記載されている。売りに来た前の持ち主は、陽を通さない黒い日傘を店内まで持ち込んだらしい。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "魂喰らいの血石",
+      "stats": [
         {
-          "internalName": "GaryoTensei",
-          "skillName": "画竜点睛",
-          "description": "ダイスがその時点の最大値なら、ロール即勝利＋(出目+10)＋会心確定"
+          "stat": "lifesteal",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "id": "敗残兵の部隊章",
+      "name": "敗残兵の部隊章",
+      "description": "HP40%以下のとき被ダメージ-30%。",
+      "flavorText": "敗走した部隊の軍旗から切り取られた部隊章。旗竿は折れ、隊列も崩れたが、この布だけは殿に散った兵の肩に残った。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "敗残兵の部隊章",
+      "stats": [
+        {
+          "stat": "dmgTakenPct",
+          "value": -30,
+          "when": {
+            "hpPctMax": 40
+          }
+        }
+      ]
+    },
+    {
+      "id": "内から落ちた城盾",
+      "name": "内から落ちた城盾",
+      "description": "攻撃時、残存シールドの80%を攻撃力に加算＋攻撃後にシールド+5。",
+      "flavorText": "城が落ちた朝も、正門の盾列だけは崩れていなかった。外側に傷はなく、内側には守衛たちの爪痕が幾重にも残っている。",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "skill": "内から落ちた城盾"
+    },
+    {
+      "id": "捨盾",
+      "name": "捨盾",
+      "description": "撃破可能な攻撃時、残存シールドを全て消費し、消費量と同値を攻撃力に加算。",
+      "flavorText": "重装兵が盾を捨てるはずがない、捨てる時は逃げる時だ。その隙を、閃光が穿った。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "捨盾"
+    },
+    {
+      "id": "工廠の材料箱",
+      "name": "工廠の材料箱",
+      "description": "戦闘開始時、充電+3。",
+      "flavorText": "たまに中身が増える。",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "skill": "工廠の材料箱"
+    },
+    {
+      "id": "無限モーター",
+      "name": "無限モーター",
+      "description": "被ダメージ時、充電+1（完全防御時は不発）。",
+      "flavorText": "「先輩！永久機関できちゃいました！」「バカなこと言ってないで巻金買ってこい！」",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "skill": "無限モーター"
+    },
+    {
+      "id": "呼雷粉",
+      "name": "呼雷粉",
+      "description": "与ダメージ時、充電+1。",
+      "flavorText": "「あのジイさん、大丈夫かね？手が震えてるぜ。」「大丈夫だろう、そもそも、あのジイさんがドジこいたら全員黒焦げだよ」",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "skill": "呼雷粉"
+    },
+    {
+      "id": "焦げ柄の点火スパナ",
+      "name": "焦げ柄の点火スパナ",
+      "description": "攻撃時、充電1消費で与ダメージ+5（足りなければ不発）。",
+      "flavorText": "「先輩！どうですかこれ！スパナとしてだけじゃなく、スターターとしても使えますよ！」「お前が感電しないことを願うよ。」",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "焦げ柄の点火スパナ"
+    },
+    {
+      "id": "逆さ避雷針",
+      "name": "逆さ避雷針",
+      "description": "攻撃時、充電3消費で与ダメージ+30%（足りなければ不発）。",
+      "flavorText": "「名付けて！逆さ避雷針！」「お前、それ間違っても工廠の玄関に置くなよ。」",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "逆さ避雷針"
+    },
+    {
+      "id": "過負荷チューナー",
+      "name": "過負荷チューナー",
+      "description": "過充電状態（充電7以上）中、与ダメージ+30%。",
+      "flavorText": "「これ、何倍まで行けると思う？「「知らんが、こないだトーマスは90倍で病院送りになったらしい「",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "過負荷チューナー",
+      "stats": [
+        {
+          "stat": "dmgPct",
+          "value": 30,
+          "when": {
+            "hit": true,
+            "overcharged": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "雷壺",
+      "name": "雷壺",
+      "description": "戦闘中、充電が0になった時、一度だけ充電を全回復。",
+      "flavorText": "「先輩！これ即時の予備電源になりませんかね？」「う～ん......」",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "雷壺"
+    },
+    {
+      "id": "余分に乾いた火口箱",
+      "name": "余分に乾いた火口箱",
+      "description": "戦闘開始時、臨界メーター+15。",
+      "flavorText": "箱を閉じても、夜ごと中の火口が一つ増える。朝に灰が減り、蓋の裏側には煤が付かない。",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "skill": "余分に乾いた火口箱"
+    },
+    {
+      "id": "炉番の火床外套",
+      "name": "炉番の火床外套",
+      "description": "被ダメージ量を臨界メーターに追加加算。",
+      "flavorText": "炉番は外套の焦げ穴を繕わなかった。穴が増えるほど炉の具合がよく分かる、と言い、最後には袖だけを着ていた。",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "skill": "炉番の火床外套"
+    },
+    {
+      "id": "過熱石",
+      "name": "過熱石",
+      "description": "攻撃配線したターン、臨界メーターに+5追加。",
+      "flavorText": "１つ放り込めば一晩燃え続け、２つ放り込めば炉ごと燃える。",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "skill": "過熱石"
+    },
+    {
+      "id": "溢れを取る鋳型",
+      "name": "溢れを取る鋳型",
+      "description": "臨界爆発時の追加ダメージを50→80に強化。",
+      "flavorText": "小刀にもならない小さな鋳型なのに、固まった品は必ず型より大きい。余剰分の請求先を巡り、工房と依頼主が今も争っている。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "溢れを取る鋳型"
+    },
+    {
+      "id": "帳簿外の連鎖爆発",
+      "name": "帳簿外の連鎖爆発",
+      "description": "臨界爆発発動ターンの攻撃は会心確定。",
+      "flavorText": "申請書には一発分、購入リストにも一発分、吹っ飛んだのは、鉱床と陰湿な監査官の家。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "帳簿外の連鎖爆発"
+    },
+    {
+      "id": "朝にも熱い竈",
+      "name": "朝にも熱い竈",
+      "description": "臨界爆発後、メーターに20残る。",
+      "flavorText": "廃屋から運び出された竈石。パンを置けば焼けるが、薪を足すと逆に温度が下がる。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "朝にも熱い竈"
+    },
+    {
+      "id": "気短な早沸かし釜",
+      "name": "気短な早沸かし釜",
+      "description": "臨界爆発の閾値を50→35に低下。",
+      "flavorText": "水を入れる前から蓋が鳴る。沸いた後に注ぐのだ、と売り手は説明したが、誰も二度目を試していない。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "気短な早沸かし釜"
+    },
+    {
+      "id": "恒熱の炉壁",
+      "name": "恒熱の炉壁",
+      "description": "臨界爆発後、メーターが半分残る。",
+      "flavorText": "解体された炉から壁一枚だけが切り出された。冬営地では寝床として奪い合われたが、最終的には猫に奪われた。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "恒熱の炉壁"
+    },
+    {
+      "id": "七日目の熾",
+      "name": "七日目の熾",
+      "description": "臨界メーター40以上のとき致命ダメージを受けても HP=1 で踏みとどまり、メーターを全消費（1戦闘1回）。",
+      "flavorText": "寂照の僧は熾の前で七晩祈り、八日目に寺を捨てた。灰には一人分の膝跡だけが焼き付いている。",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "skill": "七日目の熾"
+    },
+    {
+      "id": "鉛入りの握斧",
+      "name": "鉛入りの握斧",
+      "description": "非会心攻撃時、与ダメージ+20%。",
+      "flavorText": "斧としてはなまくらだが、鈍器としては逸品。",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "skill": "鉛入りの握斧",
+      "stats": [
+        {
+          "stat": "nonCritPct",
+          "value": 20
+        }
+      ]
+    },
+    {
+      "id": "一人抱えの破城槌",
+      "name": "一人抱えの破城槌",
+      "description": "非会心攻撃時、与ダメージ+60%。",
+      "flavorText": "運搬命令書には八名、戦闘報告書には一名とある。残る七名の欄には、門を支えたと追記されている。",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "skill": "一人抱えの破城槌",
+      "stats": [
+        {
+          "stat": "nonCritPct",
+          "value": 60
+        }
+      ]
+    },
+    {
+      "id": "研ぎ知らずの銑鉄棍",
+      "name": "研ぎ知らずの銑鉄棍",
+      "description": "会心倍率-0.5、非会心ダメージ+40%。",
+      "flavorText": "鍛冶屋は刃を付け忘れたのではない。注文書の用途欄を読んで、必要ないと判断した。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "研ぎ知らずの銑鉄棍",
+      "stats": [
+        {
+          "stat": "critMul",
+          "value": -0.5
         },
         {
-          "internalName": "MugaMushin",
-          "skillName": "無我無心",
-          "description": "ロール時、カスタムダイス以外の補正（バフ/メタ/消費/武器強化等）を一切受けない"
+          "stat": "nonCritPct",
+          "value": 40
         }
       ]
     },
     {
-      "id": "dead_staff",
-      "name": "炎の杖",
-      "description": "戦闘開始時に敵を炎上（3T・毎T3ダメ）させる。強化不可の行き止まり武器。",
-      "flavorText": "ギルド鑑定所の台帳に 「行き止まり」 とある。 その次の行は空白だ。 空白にも意味がある。",
-      "category": "Weapon",
+      "id": "読めずの無心刃",
+      "name": "読めずの無心刃",
+      "description": "会心を発生させない、非会心ダメージ+30%。",
+      "flavorText": "刃には目釘も銘もなく、持つ向きすら定まらない。道場では型破りの見本として保管され、誰も型を見せられなかった。",
+      "category": "Passive",
       "rarity": "GOLD",
-      "sizeX": 3,
-      "sizeY": 3,
-      "diceCount": 2,
-      "diceMax": 5,
-      "criticalRate": 2,
-      "attackPower": 3,
-      "basePrice": 16,
-      "passiveSkills": [
+      "basePrice": 9,
+      "skill": "読めずの無心刃"
+    },
+    {
+      "id": "千日振りの鉢巻",
+      "name": "千日振りの鉢巻",
+      "description": "3ターン連続で非会心攻撃した場合、非会心ダメージ+50%（会心発生でリセット）。",
+      "flavorText": "千日目に鉢巻を解くよう教えられる。解いた者は翌朝、また一日目と書いて巻き直した。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "千日振りの鉢巻",
+      "stats": [
         {
-          "internalName": "MightI",
-          "skillName": "筋力I",
-          "description": "ダイス合計+2"
-        },
-        {
-          "internalName": "InsightI",
-          "skillName": "心眼I",
-          "description": "会心ダイス合計値+1"
-        },
-        {
-          "internalName": "VitalityI",
-          "skillName": "活力I",
-          "description": "ターン終了時HP+1回復"
-        },
-        {
-          "internalName": "Ignite",
-          "skillName": "業火",
-          "description": "戦闘開始時に敵を炎上(3T,毎T3ダメ)"
+          "stat": "nonCritPct",
+          "value": 50,
+          "when": {
+            "nonCritStreakMin": 3
+          }
         }
       ]
     },
     {
-      "id": "dice_wood",
-      "name": "木のダイス",
-      "description": "標準的な6面ダイス（出目1〜6）。",
-      "flavorText": "手彫りの木賽。どこにでもある。最初の一個で、たいてい最後まで手放さない一個でもある。",
-      "category": "Dice",
-      "rarity": "BRONZE",
-      "sizeX": 0,
-      "sizeY": 0,
+      "id": "重さを増す拳套",
+      "name": "重さを増す拳套",
+      "description": "攻撃時+1蓄積（上限10）、非会心攻撃時 蓄積×10%ダメージ、会心発生でリセット。",
+      "flavorText": "拳套の留め紐は、一撃ごとに短くなる。外した後で測ると元へ戻るため、修繕依頼は一度も受理されない。",
+      "category": "Passive",
+      "rarity": "SILVER",
       "basePrice": 8,
-      "diceFaces": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6
-      ],
-      "passiveSkills": []
+      "skill": "重さを増す拳套"
     },
     {
-      "id": "dice_bone",
-      "name": "骨のダイス",
-      "description": "三面ダイス。出目は1・3・7のみ。",
-      "flavorText": "一、 三、 七。 偶数はない。 七柱神殿で詠まれる聖数だ、 と古文書解読者は言う。 骨が語ることはないので、 真偽は分からない。",
-      "category": "Dice",
-      "rarity": "BRONZE",
-      "sizeX": 0,
-      "sizeY": 0,
+      "id": "直さずの鉢金",
+      "name": "直さずの鉢金",
+      "description": "HP50%以下のとき非会心ダメージ+40%。",
+      "flavorText": "へこみの数だけ所有者が変わった。どの持ち主も直さず、次は自分の番だと一つ増やして手放した。",
+      "category": "Passive",
+      "rarity": "SILVER",
       "basePrice": 8,
-      "diceFaces": [
-        1,
-        3,
-        7
-      ],
-      "passiveSkills": []
-    },
-    {
-      "id": "dice_iron",
-      "name": "鉄のダイス",
-      "description": "出目が中央に寄る安定型。敗北時の被ダメージ-2。",
-      "flavorText": "振れ幅を殺してある賽。山も谷もない。それで十分だ、という者の数は、意外と多い。",
-      "category": "Dice",
-      "rarity": "SILVER",
-      "sizeX": 0,
-      "sizeY": 0,
-      "basePrice": 10,
-      "diceFaces": [
-        2,
-        3,
-        3,
-        4,
-        4,
-        5
-      ],
-      "passiveSkills": [
+      "skill": "直さずの鉢金",
+      "stats": [
         {
-          "internalName": "IronWall",
-          "skillName": "鉄壁",
-          "description": "ロール敗北時の被ダメージ-2"
+          "stat": "nonCritPct",
+          "value": 40,
+          "when": {
+            "hpPctMax": 50
+          }
         }
       ]
     },
     {
-      "id": "dice_copper",
-      "name": "銅貨のダイス",
-      "description": "出目は3か4のみ。極めて安定だが上限が低い。戦闘開始時シールド+5。",
-      "flavorText": "三か四しか出ない。博打師は見向きもしない。生き延びることが目的の者には、十分すぎる。",
-      "category": "Dice",
-      "rarity": "SILVER",
-      "sizeX": 0,
-      "sizeY": 0,
-      "basePrice": 10,
-      "diceFaces": [
-        3,
-        4
-      ],
-      "passiveSkills": [
-        {
-          "internalName": "CopperSteady",
-          "skillName": "銭装",
-          "description": "戦闘開始時シールド+5"
-        }
-      ]
-    },
-    {
-      "id": "dice_biased",
-      "name": "偏りのダイス",
-      "description": "出目が低と高に二極化（中間が出ない）。ゾロ目で追撃ダメージ+出目値×2。",
-      "flavorText": "低いか高いか、どちらかしか来ない。中間というものが、この賽には存在しない。潔いとも言える。",
-      "category": "Dice",
-      "rarity": "SILVER",
-      "sizeX": 0,
-      "sizeY": 0,
-      "basePrice": 10,
-      "diceFaces": [
-        1,
-        1,
-        1,
-        5,
-        6,
-        6
-      ],
-      "passiveSkills": [
-        {
-          "internalName": "StarFate",
-          "skillName": "博打",
-          "description": "ゾロ目時、追撃ダメージ+出目値×2"
-        }
-      ]
-    },
-    {
-      "id": "dice_gem",
-      "name": "宝石のダイス",
-      "description": "やや高めの出目。最大出目のダイスがあると会心ダイス合計値+1。",
-      "flavorText": "転がるたび七色に光る。目を確かめる前に光の方を見てしまう。賽の勝ちだ、と常連は言う。",
-      "category": "Dice",
-      "rarity": "GOLD",
-      "sizeX": 0,
-      "sizeY": 0,
-      "basePrice": 12,
-      "diceFaces": [
-        3,
-        4,
-        4,
-        5,
-        6,
-        7
-      ],
-      "passiveSkills": [
-        {
-          "internalName": "Shimmer",
-          "skillName": "煌玉",
-          "description": "最大出目のダイスがある時、会心ダイス合計値+1"
-        }
-      ]
-    },
-    {
-      "id": "dice_flame",
-      "name": "血のダイス",
-      "description": "振れ幅が大きい。敗北時、次ターンのダイス合計+3。",
-      "flavorText": "負けた直後に手が温かくなる。その分、次の手が少し重くなる。引き分けにはならない賽だ。",
-      "category": "Dice",
-      "rarity": "GOLD",
-      "sizeX": 0,
-      "sizeY": 0,
-      "basePrice": 12,
-      "diceFaces": [
-        1,
-        2,
-        3,
-        6,
-        7,
-        9
-      ],
-      "passiveSkills": [
-        {
-          "internalName": "ReversalFlame",
-          "skillName": "盟約",
-          "description": "ロール敗北時、次ターンのダイス合計+3"
-        }
-      ]
-    },
-    {
-      "id": "dice_stable",
-      "name": "安定のダイス",
-      "description": "出目が極めて安定（4〜5）。敗北時の被ダメージ-3。",
-      "flavorText": "四か五しか出ない退屈な賽。退屈と言った者が先に死んだ、と古参は淡々と言う。",
-      "category": "Dice",
-      "rarity": "GOLD",
-      "sizeX": 0,
-      "sizeY": 0,
-      "basePrice": 12,
-      "diceFaces": [
-        4,
-        4,
-        4,
-        4,
-        5,
-        5
-      ],
-      "passiveSkills": [
-        {
-          "internalName": "Steadfast",
-          "skillName": "堅忍",
-          "description": "ロール敗北時の被ダメージ-3"
-        }
-      ]
-    },
-    {
-      "id": "dice_star",
-      "name": "星のダイス",
-      "description": "高めの出目。全ダイスが異なる値ならダイス合計+3。",
-      "flavorText": "ストラスバウム学界の天文書に、 この欠片の図がある。 ばらけて輝く。 星もそうだが、 揃ってしまえばただの塊だ。",
-      "category": "Dice",
-      "rarity": "LEGENDARY",
-      "sizeX": 0,
-      "sizeY": 0,
-      "basePrice": 14,
-      "diceFaces": [
-        2,
-        4,
-        5,
-        6,
-        7,
-        9
-      ],
-      "passiveSkills": [
-        {
-          "internalName": "Starguide",
-          "skillName": "星導",
-          "description": "全ダイスが異なる値の時、ダイス合計+3"
-        }
-      ]
-    },
-    {
-      "id": "dice_destiny",
-      "name": "運命のダイス",
-      "description": "出目は1か10の二面。敵ダイス合計が自分の2倍以上かつHP30%以上なら、その敗北でHPが1以下にならない。",
-      "flavorText": "二つの面しかない賽。 とある賭博譚に、 これを握って深層に降りた男の話がある。 刻限まで決して死なず、 刻限が来ると、 ただ静かに死んだ。",
-      "category": "Dice",
-      "rarity": "LEGENDARY",
-      "sizeX": 0,
-      "sizeY": 0,
-      "basePrice": 14,
-      "diceFaces": [
-        1,
-        10
-      ],
-      "passiveSkills": [
-        {
-          "internalName": "Judgement",
-          "skillName": "天命",
-          "description": "敵のダイス合計が自分の2倍以上、かつHPが最大の30%以上なら、そのロール敗北ダメージでHPが1以下にならない"
-        }
-      ]
-    },
-    {
-      "id": "dice_moroha",
-      "name": "諸刃のダイス",
-      "description": "総じて高出目。勝利ごとに【負傷】を負う（回復/シールド低下）が、その分だけ与ダメージが増す。",
-      "flavorText": "両側に刃が向いている。斬るたびに、こちらも切れる。それを承知で握る者にだけ、応える賽だ。",
-      "category": "Dice",
-      "rarity": "LEGENDARY",
-      "sizeX": 0,
-      "sizeY": 0,
-      "basePrice": 14,
-      "diceFaces": [
-        3,
-        5,
-        6,
-        7,
-        8,
-        9
-      ],
-      "passiveSkills": [
-        {
-          "internalName": "Moroha",
-          "skillName": "諸刃",
-          "description": "ロール勝利するたびに【負傷】を負う(回復/シールド獲得が負傷Lv分低下、上限20)。さらに勝利時、与ダメージ+(負傷Lv×2)"
-        }
-      ]
-    },
-    {
-      "id": "dice_greed",
-      "name": "貪欲のダイス",
-      "description": "高めの出目。与えたダメージの10%をHPとして回復する。",
-      "flavorText": "聖教会の説教集に、 奪うほど肥える賽を得た男の寓話がある。 男は最後、 己の重さに沈んで動けなくなる。 話はそこで終わる。",
-      "category": "Dice",
-      "rarity": "LEGENDARY",
-      "sizeX": 0,
-      "sizeY": 0,
-      "basePrice": 14,
-      "diceFaces": [
-        2,
-        4,
-        5,
-        6,
-        7,
-        8
-      ],
-      "passiveSkills": [
-        {
-          "internalName": "Greed",
-          "skillName": "貪欲",
-          "description": "与えたダメージの10%をHPとして回復する"
-        }
-      ]
-    },
-    {
-      "id": "dice_twinsnake",
-      "name": "双蛇のダイス",
-      "description": "出目が両極に偏る。勝利数をラン跨ぎで蓄積し、10戦ごとにダイス合計+1（最大+5）。",
-      "flavorText": "数え唄の二匹蛇は、千回目に片方が太ったという。こちらが太る番になるよう、祈るしかない。",
-      "category": "Dice",
-      "rarity": "GOLD",
-      "sizeX": 0,
-      "sizeY": 0,
-      "basePrice": 12,
-      "diceFaces": [
-        1,
-        2,
-        7,
-        8
-      ],
-      "passiveSkills": [
-        {
-          "internalName": "Eternal",
-          "skillName": "永劫",
-          "description": "勝利した戦闘をランを跨いで永続蓄積し、10戦ごとにダイス合計+1（最大+5）"
-        }
-      ]
-    },
-    {
-      "id": "dice_perfection",
-      "name": "完全性のダイス",
-      "description": "高出目。出目に重複があれば与ダメージ×2、全て異なれば半減（ダイス1個では無効）。",
-      "flavorText": "目が揃えば完全、 ばらけば不完全。 旧アルフォニア時代の写本に、 揃うことだけを願って削り続けた職人の名がある。",
-      "category": "Dice",
-      "rarity": "LEGENDARY",
-      "sizeX": 0,
-      "sizeY": 0,
-      "basePrice": 14,
-      "diceFaces": [
-        4,
-        5,
-        6,
-        7,
-        8,
-        9
-      ],
-      "passiveSkills": [
-        {
-          "internalName": "Perfection",
-          "skillName": "完全",
-          "description": "出目に重複があれば与ダメージ×2。全て異なれば不完全として与ダメージ半減（ダイス1個では無効）"
-        }
-      ]
-    },
-    {
-      "id": "利刃I",
-      "name": "研ぎ師の砥石",
-      "description": "敵の基礎防御を15%軽減（超過分は与ダメージ%に転化）。勝利時の与ダメージ最低保証1。",
-      "flavorText": "ヴェイランドの街角で朝から晩まで研ぎ続ける老人の砥石。 丁寧に当てれば、 鎧の面倒な端も素直に開く。",
+      "id": "緑染みの下拵え小刀",
+      "name": "緑染みの下拵え小刀",
+      "description": "戦闘開始時、敵に毒+1。",
+      "flavorText": "刃の緑染みは、酢でも灰でも落ちない。露店商は果物用だと言い張り、試食だけは頑として断った。",
       "category": "Passive",
       "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 8,
-      "passiveSkills": [
-        {
-          "internalName": "BladeEdgeI",
-          "skillName": "利刃",
-          "description": "敵の基礎防御を15%軽減（防御を上回る分は与ダメージ+%に転化）、勝利時の与ダメージ最低保証1"
-        }
-      ]
+      "basePrice": 7,
+      "skill": "緑染みの下拵え小刀"
     },
     {
-      "id": "利刃II",
-      "name": "鋭刃の護符",
-      "description": "敵の基礎防御を20%軽減（超過分は与ダメージ%に転化）。勝利時の与ダメージ最低保証2。",
-      "flavorText": "当てるだけで刃が戻る。研ぎ師組合が訴えようとして、証拠がないと諦めたという品だ。",
+      "id": "素手禁じの蛇血瓶",
+      "name": "素手禁じの蛇血瓶",
+      "description": "会心時、敵に毒+2。",
+      "flavorText": "瓶の封は、手袋をした指で二重に結ばれている。結び目の内側にも、さらに小さな手袋が一枚挟まっていた。",
       "category": "Passive",
       "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "BladeEdgeII",
-          "skillName": "利刃",
-          "description": "敵の基礎防御を20%軽減（防御を上回る分は与ダメージ+%に転化）、勝利時の与ダメージ最低保証2"
-        }
-      ]
+      "basePrice": 8,
+      "skill": "素手禁じの蛇血瓶"
     },
     {
-      "id": "利刃III",
-      "name": "貫通の徽章",
-      "description": "敵の基礎防御を25%軽減（超過分は与ダメージ%に転化）。勝利時の与ダメージ最低保証3。",
-      "flavorText": "旧アルフォニア軍の精鋭に授けられたという徽章が、 今は露店の隅にある。 授かった者たちの話は、 もう誰もしない。",
+      "id": "主より長い香炉",
+      "name": "主より長い香炉",
+      "description": "3ターン毎に敵に毒+1。",
+      "flavorText": "香炉を焚いた館では、翌朝から虫の声が消えた。館主は静けさを気に入り、窓を開けることを禁じた。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "主より長い香炉"
+    },
+    {
+      "id": "石抜きの毒指輪",
+      "name": "石抜きの毒指輪",
+      "description": "敵毒5到達時、敵HP×20%を軽減不可で削る（1戦闘1回）。",
+      "flavorText": "宴席では右手に嵌め、乾杯の前に一度だけ左手へ移す。古い礼法書はそう記すが、その理由の頁は切り取られている。",
       "category": "Passive",
       "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "BladeEdgeIII",
-          "skillName": "利刃",
-          "description": "敵の基礎防御を25%軽減（防御を上回る分は与ダメージ+%に転化）、勝利時の与ダメージ最低保証3"
-        }
-      ]
+      "basePrice": 9,
+      "skill": "石抜きの毒指輪"
     },
     {
-      "id": "利刃IV",
-      "name": "断甲の宝玉",
-      "description": "敵の基礎防御を30%軽減（超過分は与ダメージ%に転化）。勝利時の与ダメージ最低保証4。",
-      "flavorText": "切るというよりは、剥がす感触に近いと持ち手の鍛冶は言った。鎧の継ぎ目をするりと辿り、刃が入るべき隙間を自ら見つける。覚悟は持ち手のほうに要るのであって、宝玉そのものはただ役目を果たすだけだ。果たし続けるうちに、持ち手のほうが先に擦り切れていく。",
+      "id": "跡地庭師の霧吹き",
+      "name": "跡地庭師の霧吹き",
+      "description": "攻撃時、敵の毒スタック×2 の軽減不可ダメージを追加（毒は消費しない）。",
+      "flavorText": "噴口には花弁の意匠がある。旧庭園の区画図で同じ印を探すと、そこだけ植生欄が空白になっている。",
       "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "跡地庭師の霧吹き"
+    },
+    {
+      "id": "岸上げ用の麻痺瓶",
+      "name": "岸上げ用の麻痺瓶",
+      "description": "敵毒スタック分、敵攻撃-N。",
+      "flavorText": "漁協の台帳では漁具に分類され、医務所の台帳では劇薬に分類される。双方とも、保管責任は相手にあると主張している。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "岸上げ用の麻痺瓶"
+    },
+    {
+      "id": "抜かずの控え脇差",
+      "name": "抜かずの控え脇差",
+      "description": "敵毒0超のとき、与ダメージ+15%。",
+      "flavorText": "鞘口は蜜蝋で塞がれ、封には『抜刀不要』とある。刀身だけは毎晩、内側で向きを変えている。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "抜かずの控え脇差",
+      "stats": [
         {
-          "internalName": "BladeEdgeIV",
-          "skillName": "利刃",
-          "description": "敵の基礎防御を30%軽減（防御を上回る分は与ダメージ+%に転化）、勝利時の与ダメージ最低保証4"
+          "stat": "dmgPct",
+          "value": 15,
+          "when": {
+            "hit": true,
+            "enemyPoisoned": true
+          }
         }
       ]
     },
     {
-      "id": "賞金首狩りI",
-      "name": "賞金首の手配書",
-      "description": "ターン終了時、敵HPが最大の10%以下（ボス5%）なら即処刑＋最大HP3%回復＋1G。",
-      "flavorText": "手配書に急所の地図はない。何度も読んで、ようやく自分の目が知っていく。",
+      "id": "血日に澄む佩玉",
+      "name": "血日に澄む佩玉",
+      "description": "敵出血スタック3以上のとき、会心率+5%。",
+      "flavorText": "普段は濁った赤玉だが、狩りの帰りだけ向こう側が透ける。そこに映る獲物は、いつも一頭多い。",
       "category": "Passive",
       "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 8,
-      "passiveSkills": [
+      "basePrice": 7,
+      "skill": "血日に澄む佩玉",
+      "stats": [
         {
-          "internalName": "BountyHunterI",
-          "skillName": "賞金首狩り",
-          "description": "ターン終了時、敵HPが最大の10%以下(ボスは5%)なら即処刑＋最大HP3%回復+1G"
+          "stat": "critPct",
+          "value": 5,
+          "when": {
+            "enemyBleedMin": 3
+          }
         }
       ]
     },
     {
-      "id": "賞金首狩りII",
-      "name": "狩人の双眼鏡",
-      "description": "ターン終了時、敵HPが最大の20%以下（ボス10%）なら即処刑＋最大HP6%回復＋2G。",
-      "flavorText": "遠間の弱りを探す眼鏡。便利なのは双方同じで、向こうも覗いている。先に引き金を引いた方が獲る。",
+      "id": "手負い追いの山刀",
+      "name": "手負い追いの山刀",
+      "description": "与ダメージ時、敵HP割合で出血付与（≥50%: +1 / <50%: +2 / <25%: +3）。",
+      "flavorText": "刃元の刻みは仕留めた数ではなく、逃がした数だという。深い傷ほど刻みが浅く、最後の一本だけ見えない。",
       "category": "Passive",
       "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "BountyHunterII",
-          "skillName": "賞金首狩り",
-          "description": "ターン終了時、敵HPが最大の20%以下(ボスは10%)なら即処刑＋最大HP6%回復+2G"
-        }
-      ]
+      "basePrice": 8,
+      "skill": "手負い追いの山刀"
     },
     {
-      "id": "賞金首狩りIII",
-      "name": "首狩りの鉈",
-      "description": "ターン終了時、敵HPが最大の30%以下（ボス15%）なら即処刑＋最大HP9%回復＋3G。",
-      "flavorText": "百人目まで挙げた狩人がいた。百一人目に挙げられた。鉈は今も同じ仕事をしている。",
+      "id": "逆綴じの止血帯",
+      "name": "逆綴じの止血帯",
+      "description": "ターン終了時、敵出血スタック×2の軽減不可ダメージ。",
+      "flavorText": "紐を締めるほど傷口から遠い血管が浮かび上がる。野戦医は使い方を知っていたが、患者には決して見せなかった。",
       "category": "Passive",
       "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "BountyHunterIII",
-          "skillName": "賞金首狩り",
-          "description": "ターン終了時、敵HPが最大の30%以下(ボスは15%)なら即処刑＋最大HP9%回復+3G"
-        }
-      ]
+      "basePrice": 9,
+      "skill": "逆綴じの止血帯"
     },
     {
-      "id": "賞金首狩りIV",
-      "name": "処刑人の烙印",
-      "description": "ターン終了時、敵HPが最大の40%以下（ボス20%）なら即処刑＋最大HP12%回復＋4G。",
-      "flavorText": "烙印を腰に提げた者が一人前哨基地の酒場に入ると、 話声が一段低くなる。 理由を尋ねる者はいない。 尋ねないほうが面倒がない、 と皆が知っているからだ。 烙印そのものは、 別に何もしない。 ただそこに在るだけで、 人間のほうが勝手に振る舞いを変える。 烙印は、 それを面白がっている節がある。",
+      "id": "末頁の血花太刀",
+      "name": "末頁の血花太刀",
+      "description": "攻撃時、敵出血1消費で与ダメージ+スタック値×3（消費前の値で計算）。",
+      "flavorText": "鞘には抜刀回数ではなく、納刀回数が刻まれている。最後の一回だけ、刃が戻った記録と日付が一致しない。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "末頁の血花太刀"
+    },
+    {
+      "id": "医書裏の開き針",
+      "name": "医書裏の開き針",
+      "description": "敵出血の自然減衰を無効化（永続蓄積）。",
+      "flavorText": "医書の裏表紙へ一本ずつ縫い込まれていた。頁を閉じるたび針先だけが外へ出るため、読者は治療法より先に使い道を悟る。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "医書裏の開き針"
+    },
+    {
+      "id": "先血の腕輪",
+      "name": "先血の腕輪",
+      "description": "戦闘開始時、敵に出血+2。以降、毎ターン出血+1。",
+      "flavorText": "腕輪の内側には、所有者より一日早い日付が刻まれる。決闘の朝、その日付だけが鮮やかな赤に変わる。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "先血の腕輪"
+    },
+    {
+      "id": "三度不良の銅線",
+      "name": "三度不良の銅線",
+      "description": "そのターンに消費した充電の50%を攻撃に加算。",
+      "flavorText": "「工廠の襲撃は成功ですが、被害が甚大です」「ジジイと男は始末したんだろう？一体誰が」「あの薄気味悪いガキですよ！最後の部屋に入った奴らが黒焦げに！とにかく、アレは常軌を逸しています！」",
       "category": "Passive",
       "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "BountyHunterIV",
-          "skillName": "賞金首狩り",
-          "description": "ターン終了時、敵HPが最大の40%以下(ボスは20%)なら即処刑＋最大HP12%回復+4G"
-        }
-      ]
+      "basePrice": 10,
+      "skill": "三度不良の銅線"
     },
     {
-      "id": "重畳I",
-      "name": "連勝の旗印",
-      "description": "ロール勝利ごとに与ダメージ倍率+2%（戦闘中累積・上限+20%）。",
-      "flavorText": "勝てば次も勝てる気がする。気のせいが積み重なれば、やがて気のせいでなくなる日がくる。",
+      "id": "貸与された時間",
+      "name": "貸与された時間",
+      "description": "被ダメージの60%を肩代わり蓄積。最大HPの60%到達で 6ターン分割の軽減不可ダメージで返済開始。 返済中に収支プラスのターンを出せば残債務消失。",
+      "flavorText": "中々砂が落ち切らない砂時計。上に砂が残っているなら、まだ勝負は終わっていない。",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "skill": "貸与された時間"
+    },
+    {
+      "id": "烈刃",
+      "name": "烈刃",
+      "description": "与ダメージ+40%。",
+      "flavorText": "太陽の神が鍛えたとうたわれる片手剣。鋭さではなく、熱ですべてを溶断する。",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "skill": "烈刃"
+    },
+    {
+      "id": "半歩深めの力帯",
+      "name": "半歩深めの力帯",
+      "description": "攻撃+2。",
+      "flavorText": "帯の裏へ半歩分の目盛りが縫われている。戦場から戻った者の帯だけ、目盛りが一つ先まで伸びていた。",
       "category": "Passive",
       "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 8,
-      "passiveSkills": [
+      "basePrice": 7,
+      "skill": "半歩深めの力帯",
+      "stats": [
         {
-          "internalName": "ConquerorI",
-          "skillName": "重畳",
-          "description": "ロール勝利毎に与ダメージ倍率+2%（戦闘中累積・上限+20%）"
+          "stat": "atk",
+          "value": 2
         }
       ]
     },
     {
-      "id": "重畳II",
-      "name": "闘志の腕章",
-      "description": "ロール勝利ごとに与ダメージ倍率+4%（戦闘中累積・上限+40%）。",
-      "flavorText": "連勝者だけが巻けた腕章、という決まりがあった。決めた者がいなくなったので、今は誰でも巻ける。",
-      "category": "Passive",
-      "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "ConquerorII",
-          "skillName": "重畳",
-          "description": "ロール勝利毎に与ダメージ倍率+4%（戦闘中累積・上限+40%）"
-        }
-      ]
-    },
-    {
-      "id": "重畳III",
-      "name": "覇者の戦旗",
-      "description": "ロール勝利ごとに与ダメージ倍率+5%（戦闘中累積・上限+60%）。",
-      "flavorText": "勝てば高く翻る戦旗。翻るために勝つのか、勝つために翻るのか。長くやると、わからなくなる。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "ConquerorIII",
-          "skillName": "重畳",
-          "description": "ロール勝利毎に与ダメージ倍率+5%（戦闘中累積・上限+60%）"
-        }
-      ]
-    },
-    {
-      "id": "重畳IV",
-      "name": "征服王の冠",
-      "description": "ロール勝利ごとに与ダメージ倍率+10%（戦闘中累積・上限+100%）。",
-      "flavorText": "連勝が止まらなくなった頃から、 旧アルフォニア拡大期のある王は鏡を見るのをやめたという。 首が前へ垂れていたから、 ではないらしい。 鏡の中の自分が、 何のために勝ち続けているのか分からなくなっていた、 そのほうの理由だ。 冠は重い。 重さは戦果の上に積み上がる、 と側近は一度だけ口にして、 二度とその話には触れなかった。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "ConquerorIV",
-          "skillName": "重畳",
-          "description": "ロール勝利毎に与ダメージ倍率+10%（戦闘中累積・上限+100%）"
-        }
-      ]
-    },
-    {
-      "id": "吸血I",
-      "name": "吸血蝙蝠の牙",
-      "description": "ロール勝利時、最終与ダメージの2%を回復。",
-      "flavorText": "刃を返す瞬間、指先がほんの少し温かくなる。少しで十分な日が、確かにある。",
-      "category": "Passive",
-      "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 8,
-      "passiveSkills": [
-        {
-          "internalName": "LifestealI",
-          "skillName": "吸血",
-          "description": "ロール勝利時、最終与ダメージの2%を回復"
-        }
-      ]
-    },
-    {
-      "id": "吸血II",
-      "name": "紅蝙蝠の指輪",
-      "description": "ロール勝利時、最終与ダメージの4%を回復。",
-      "flavorText": "傷が塞がるのが早い。塞がるうちに次の無茶が始まる。指輪のせいだ、と持ち手は言う。",
-      "category": "Passive",
-      "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "LifestealII",
-          "skillName": "吸血",
-          "description": "ロール勝利時、最終与ダメージの4%を回復"
-        }
-      ]
-    },
-    {
-      "id": "吸血III",
-      "name": "吸血鬼の杯",
-      "description": "ロール勝利時、最終与ダメージの6%を回復。",
-      "flavorText": "深く斬れば多く返ってくる。気がつけば深さを追っている。杯に飲まれた、と後から気づく。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "LifestealIII",
-          "skillName": "吸血",
-          "description": "ロール勝利時、最終与ダメージの6%を回復"
-        }
-      ]
-    },
-    {
-      "id": "吸血IV",
-      "name": "真祖の血盟",
-      "description": "ロール勝利時、最終与ダメージの10%を回復。",
-      "flavorText": "触れると、ほんのり温い。誰の温度かは、触れた者には分からない。長く所持するほど温度が均されていき、ある時から自分のものか他人のものか区別がつかなくなる。境目を失った者が、たいてい血盟と呼ばれるものに辿り着く。辿り着いた先で、何を見るのかまでは伝わっていない。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "LifestealIV",
-          "skillName": "吸血",
-          "description": "ロール勝利時、最終与ダメージの10%を回復"
-        }
-      ]
-    },
-    {
-      "id": "不屈I",
-      "name": "不屈の鉢巻",
-      "description": "敵の脅威を2軽減＋戦闘開始時シールド+5。",
-      "flavorText": "額に巻いて締める。身が引き締まる、とか、度胸が据わる、とかいう話ではなく、ただ締まる。それで十分だ。",
-      "category": "Passive",
-      "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 8,
-      "passiveSkills": [
-        {
-          "internalName": "IndomitableI",
-          "skillName": "不屈",
-          "description": "敵の脅威を2軽減＋戦闘開始時シールド+5"
-        }
-      ]
-    },
-    {
-      "id": "不屈II",
-      "name": "剛胆の護符",
-      "description": "敵の脅威を4軽減＋戦闘開始時シールド+10。",
-      "flavorText": "握れば怖さが消える——わけではない。怖いまま動ける者だけが、護符の値打ちを知る。",
-      "category": "Passive",
-      "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "IndomitableII",
-          "skillName": "不屈",
-          "description": "敵の脅威を4軽減＋戦闘開始時シールド+10"
-        }
-      ]
-    },
-    {
-      "id": "不屈III",
-      "name": "鋼の闘志",
-      "description": "敵の脅威を6軽減＋戦闘開始時シールド+15。",
-      "flavorText": "砕けぬ心を笑う者がいる。笑える間は、まだ深みへ降りていない証だ。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "IndomitableIII",
-          "skillName": "不屈",
-          "description": "敵の脅威を6軽減＋戦闘開始時シールド+15"
-        }
-      ]
-    },
-    {
-      "id": "不屈IV",
-      "name": "不撓の魂魄",
-      "description": "敵の脅威を8軽減＋戦闘開始時シールド+20。",
-      "flavorText": "一度抜けた魂魄は、戻ってくる時にやや重い、と古参は口を揃える。脅威を見据える目つきが変わる、というよりは、何かを見ないことにする目つきになる。それで助かった者と、助からなかった者がいる。差を分けたものを、古参は語らない。語らない理由は、たぶん語る側にもよく分かっていない。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "IndomitableIV",
-          "skillName": "不屈",
-          "description": "敵の脅威を8軽減＋戦闘開始時シールド+20"
-        }
-      ]
-    },
-    {
-      "id": "シールドバッシュI",
-      "name": "棘付きの小盾",
-      "description": "ロール勝利時、与ダメージの5%をシールド化。",
-      "flavorText": "打ち返すために受ける。守りと攻めを同時にこなす小さな盾は、欲張りな道具だ。",
-      "category": "Passive",
-      "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 8,
-      "passiveSkills": [
-        {
-          "internalName": "ShieldBashI",
-          "skillName": "シールドバッシュ",
-          "description": "ロール勝利時、与ダメージの5%をシールド化"
-        }
-      ]
-    },
-    {
-      "id": "シールドバッシュII",
-      "name": "返しの盾",
-      "description": "ロール勝利時、与ダメージの10%をシールド化。",
-      "flavorText": "受けた力を倍にして返す。腕が痺れるうちはまだ慣れていない証。痺れなくなった頃が、本番だ。",
-      "category": "Passive",
-      "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "ShieldBashII",
-          "skillName": "シールドバッシュ",
-          "description": "ロール勝利時、与ダメージの10%をシールド化"
-        }
-      ]
-    },
-    {
-      "id": "シールドバッシュIII",
-      "name": "城塞の大盾",
-      "description": "ロール勝利時、与ダメージの15%をシールド化。",
-      "flavorText": "構えたまま動かない。恐れか覚悟か、外からは見分けがつかない。中からも、たまにわからない。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "ShieldBashIII",
-          "skillName": "シールドバッシュ",
-          "description": "ロール勝利時、与ダメージの15%をシールド化"
-        }
-      ]
-    },
-    {
-      "id": "シールドバッシュIV",
-      "name": "不落の城盾",
-      "description": "ロール勝利時、与ダメージの20%をシールド化。",
-      "flavorText": "一度盾を構えた門は、構えを解く方法が分からなくなることがある。打たれるほど堅くなり、堅くなるほど扱いが難しくなる。守衛が交代しても、構えだけは引き継がれていく。城が内側から落ちる時、たいてい盾は最後まで気付かない。守衛の側も、たいていは最後まで気付かない。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "ShieldBashIV",
-          "skillName": "シールドバッシュ",
-          "description": "ロール勝利時、与ダメージの20%をシールド化"
-        }
-      ]
-    },
-    {
-      "id": "貸与された時間I",
-      "name": "こぼれ落ちる砂時計",
-      "description": "敗北時、被ダメージの15%を肩代わり蓄積。最大HPの15%到達で3ターン分割の軽減不可ダメージで返済開始（返済中に勝利すれば帳消し）。",
-      "flavorText": "今の痛みを、少し先の自分へ回す。先の自分が何を思うかは、今の自分は知らない。",
-      "category": "Passive",
-      "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 8,
-      "passiveSkills": [
-        {
-          "internalName": "LentTimeI",
-          "skillName": "貸与された時間",
-          "description": "敗北時、被ダメージの15%を肩代わり蓄積。最大HPの15%到達で 3ターン分割の軽減不可ダメージで返済開始。 返済中にロール勝利すれば残債務消失"
-        }
-      ]
-    },
-    {
-      "id": "貸与された時間II",
-      "name": "借時の懐中時計",
-      "description": "敗北時、被ダメージの30%を肩代わり蓄積。最大HPの30%到達で4ターン分割の軽減不可ダメージで返済開始（返済中に勝利すれば帳消し）。",
-      "flavorText": "利息付きで返ってくることは知っている。それでも今を乗り越えるために借りる者がいる。",
-      "category": "Passive",
-      "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "LentTimeII",
-          "skillName": "貸与された時間",
-          "description": "敗北時、被ダメージの30%を肩代わり蓄積。最大HPの30%到達で 4ターン分割の軽減不可ダメージで返済開始。 返済中にロール勝利すれば残債務消失"
-        }
-      ]
-    },
-    {
-      "id": "貸与された時間III",
-      "name": "時貸しの砂時計",
-      "description": "敗北時、被ダメージの45%を肩代わり蓄積。最大HPの45%到達で5ターン分割の軽減不可ダメージで返済開始（返済中に勝利すれば帳消し）。",
-      "flavorText": "傷を先へ先へと回し続ける。いつか大波で戻るとわかっている。それでも今は、先でいい。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "LentTimeIII",
-          "skillName": "貸与された時間",
-          "description": "敗北時、被ダメージの45%を肩代わり蓄積。最大HPの45%到達で 5ターン分割の軽減不可ダメージで返済開始。 返済中にロール勝利すれば残債務消失"
-        }
-      ]
-    },
-    {
-      "id": "貸与された時間IV",
-      "name": "刻限の負債",
-      "description": "敗北時、被ダメージの60%を肩代わり蓄積。最大HPの60%到達で6ターン分割の軽減不可ダメージで返済開始（返済中に勝利すれば帳消し）。",
-      "flavorText": "刻限という言葉を、 ヴェイランド街角の質屋は好んで使う。 返す当てのない借りものに、 必ず付ける条件だからだ。 傷を先送りする者は、 たいてい刻限の話を聞きたがらない。 聞かないまま走り続け、 走り終えた者の話は、 質屋には戻ってこない。 戻ってこない者の数を、 質屋は数えていない。 数えても、 たぶん何にもならない。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "LentTimeIV",
-          "skillName": "貸与された時間",
-          "description": "敗北時、被ダメージの60%を肩代わり蓄積。最大HPの60%到達で 6ターン分割の軽減不可ダメージで返済開始。 返済中にロール勝利すれば残債務消失"
-        }
-      ]
-    },
-    {
-      "id": "治癒阻害",
-      "name": "腐敗の塗り薬",
-      "description": "敵が得る回復量を50%減少させる。",
-      "flavorText": "傷が塞がる前に次の傷をつける。その繰り返しで、ゆっくり削れていく。作った者の名は、ない。",
-      "category": "Passive",
-      "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "GrievousI",
-          "skillName": "治癒阻害",
-          "description": "敵が得る回復量を50%減少させる"
-        }
-      ]
-    },
-    {
-      "id": "治癒遮断",
-      "name": "禁血の呪印",
-      "description": "敵が得る回復量を完全に無効化する。",
-      "flavorText": "印を刻まれた者は、回復薬を飲んで眉をひそめる。味は同じで、効かない。気づく頃には遅い。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "GrievousII",
-          "skillName": "治癒遮断",
-          "description": "敵が得る回復量を完全に無効化する"
-        }
-      ]
-    },
-    {
-      "id": "leather_handguard",
-      "name": "革の手甲",
-      "description": "被弾時の反撃ダメージ+2。",
-      "flavorText": "革の手甲。飾り気はない。これで助かった指が、大穴の中にいくつあるか数えたことはない。",
-      "category": "Passive",
-      "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 8,
-      "passiveSkills": [
-        {
-          "internalName": "CounterI",
-          "skillName": "反撃I",
-          "description": "被弾時に反撃ダメージ+2"
-        }
-      ]
-    },
-    {
-      "id": "steel_gauntlet",
-      "name": "鋼の籠手",
-      "description": "被弾時の反撃ダメージ+4。",
-      "flavorText": "打たれるほど腕が慣れる。慣れた頃、返しが速くなる。それが鋼の籠手の教え方だ。",
-      "category": "Passive",
-      "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "CounterII",
-          "skillName": "反撃II",
-          "description": "被弾時に反撃ダメージ+4"
-        }
-      ]
-    },
-    {
-      "id": "supreme_counter_gauntlet",
-      "name": "反撃の極甲",
-      "description": "被弾時の反撃ダメージ+6。",
-      "flavorText": "極めた者の籠手を受け継いでも、極めた者にはなれない。それでも、返しは確かに鋭くなる。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "CounterIII",
-          "skillName": "反撃III",
-          "description": "被弾時に反撃ダメージ+6"
-        }
-      ]
-    },
-    {
-      "id": "absolute_counter_gauntlet",
-      "name": "反撃の絶甲",
-      "description": "被弾時の反撃ダメージ+8。",
-      "flavorText": "あらゆる一撃を返す、反撃の極みという籠手。返せぬ一撃を探すほうが、難しいと言われる。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "CounterIV",
-          "skillName": "反撃IV",
-          "description": "被弾時に反撃ダメージ+8"
-        }
-      ]
-    },
-    {
-      "id": "twin_blade_gauntlet",
-      "name": "連刃の篭手",
-      "description": "ロール勝利時、与ダメージ+4。",
-      "flavorText": "篭手の内側に仕込まれた刃が、二撃目を誘う。慣れぬうちは自分の腕が一番危ない。",
-      "category": "Passive",
-      "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "PursuitII",
-          "skillName": "追撃II",
-          "description": "ロール勝利時、与ダメージ+4"
-        }
-      ]
-    },
-    {
-      "id": "thousand_arms_blade",
-      "name": "千手の戦刃",
-      "description": "ロール勝利時、与ダメージ+6。",
-      "flavorText": "振るうたびに残影が増える業物。数えきれない刃が見えるらしい。見える方だけが困惑する。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "PursuitIII",
-          "skillName": "追撃III",
-          "description": "ロール勝利時、与ダメージ+6"
-        }
-      ]
-    },
-    {
-      "id": "myriad_arms_blade",
-      "name": "万手の戦刃",
-      "description": "ロール勝利時、与ダメージ+8。",
-      "flavorText": "千の腕すら超え、万の刃と化したという業物。もはや誰も、振るう腕の数を数えようとしない。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "PursuitIV",
-          "skillName": "追撃IV",
-          "description": "ロール勝利時、与ダメージ+8"
-        }
-      ]
-    },
-    {
-      "id": "strength_belt",
-      "name": "力帯",
-      "description": "ダイス合計+2。",
-      "flavorText": "腰に巻くだけの帯。見栄えはしない。ただ、踏み込みの深さが変わる。それで十分だ。",
-      "category": "Passive",
-      "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 8,
-      "passiveSkills": [
-        {
-          "internalName": "MightI",
-          "skillName": "筋力I",
-          "description": "ダイス合計+2"
-        }
-      ]
-    },
-    {
-      "id": "iron_armband",
-      "name": "鋼鉄の腕輪",
-      "description": "ダイス合計+3。",
-      "flavorText": "重い。最初の数日は邪魔だと思う。慣れた頃、外した腕が軽すぎて逆に困る。",
-      "category": "Passive",
-      "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "MightII",
-          "skillName": "筋力II",
-          "description": "ダイス合計+3"
-        }
-      ]
-    },
-    {
-      "id": "giants_armband",
-      "name": "巨人の腕輪",
-      "description": "ダイス合計+4。",
-      "flavorText": "旧アルフォニアの古伝に、 巨人の腕に合わせた腕輪、 とある。 巨人を誰も見ていないが、 腕輪はたしかに大きい。 それで信じる。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "MightIII",
-          "skillName": "筋力III",
-          "description": "ダイス合計+4"
-        }
-      ]
-    },
-    {
-      "id": "titans_armband",
-      "name": "巨神の腕輪",
-      "description": "ダイス合計+6。",
-      "flavorText": "巨人を超える巨神の力を宿す、 と旧アルフォニア古伝にある腕輪。 巨人すら伝説なのだから、 巨神は伝説の伝説だ。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "MightIV",
-          "skillName": "筋力IV",
-          "description": "ダイス合計+6"
-        }
-      ]
-    },
-    {
-      "id": "leather_chestguard",
-      "name": "革の胸当て",
+      "id": "戻り数なき革胸当て",
+      "name": "戻り数なき革胸当て",
       "description": "被ダメージ-1。",
-      "flavorText": "革一枚。一撃を和らげる。和らげきれなかった話は、語る者が戻ってこない。",
+      "flavorText": "表には浅い刃傷、裏には深い爪痕がある。前の持ち主は、助かった日にだけ裏側へ印を付けた。",
       "category": "Passive",
       "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 8,
-      "passiveSkills": [
+      "basePrice": 7,
+      "skill": "戻り数なき革胸当て",
+      "stats": [
         {
-          "internalName": "FortitudeI",
-          "skillName": "頑強I",
-          "description": "被ダメージ-1"
+          "stat": "dmgTaken",
+          "value": -1
         }
       ]
     },
     {
-      "id": "chain_mail",
-      "name": "鎖帷子",
-      "description": "被ダメージ-2。",
-      "flavorText": "刃は弾くが、鈍器には弱い。得意なものと苦手なものが明確な、正直な防具だ。",
+      "id": "測量師の片眼鏡",
+      "name": "測量師の片眼鏡",
+      "description": "会心率+10%。",
+      "flavorText": "大穴の縁を測る測量師が用いた片眼鏡。距離目盛りは途中で増設され、その先は手書きになっている。",
       "category": "Passive",
       "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "FortitudeII",
-          "skillName": "頑強II",
-          "description": "被ダメージ-2"
-        }
-      ]
-    },
-    {
-      "id": "immovable_chestplate",
-      "name": "不動の胸当て",
-      "description": "被ダメージ-3。",
-      "flavorText": "名匠の誇り。揺るがぬのは確かだ。ただ、揺るがないことと痛くないことは別だ、と着た者は言う。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "FortitudeIII",
-          "skillName": "頑強III",
-          "description": "被ダメージ-3"
-        }
-      ]
-    },
-    {
-      "id": "adamant_chestplate",
-      "name": "金剛の胸当て",
-      "description": "被ダメージ-4。",
-      "flavorText": "いかなる衝撃も通さぬ金剛の守り。通さぬだけに、内にこもる衝撃を逃がせない、と着た者はこぼす。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "FortitudeIV",
-          "skillName": "頑強IV",
-          "description": "被ダメージ-4"
-        }
-      ]
-    },
-    {
-      "id": "observers_glasses",
-      "name": "観察者の眼鏡",
-      "description": "会心ダイス合計値+1。",
-      "flavorText": "かけると、敵の次の動きがぼんやり読める。読めるほど選択肢が増えて、かえって迷う。",
-      "category": "Passive",
-      "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
       "basePrice": 8,
-      "passiveSkills": [
+      "skill": "測量師の片眼鏡",
+      "stats": [
         {
-          "internalName": "InsightI",
-          "skillName": "心眼I",
-          "description": "会心ダイス合計値+1"
+          "stat": "critPct",
+          "value": 10
         }
       ]
     },
     {
-      "id": "hawks_eye",
-      "name": "鷹の眼",
-      "description": "会心ダイス合計値+2。",
-      "flavorText": "片目を隠すと、もう片方が冴える。隠した方が見えているのか、という疑問は、深く考えない方がいい。",
-      "category": "Passive",
-      "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "InsightII",
-          "skillName": "心眼II",
-          "description": "会心ダイス合計値+2"
-        }
-      ]
-    },
-    {
-      "id": "divine_insight",
-      "name": "神の見識",
-      "description": "会心ダイス合計値+3。",
-      "flavorText": "遠くが見える恩恵。遠くを見るほど、手元の賽がぼやけてくる。どちらが大事かは、自分で決める。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "InsightIII",
-          "skillName": "心眼III",
-          "description": "会心ダイス合計値+3"
-        }
-      ]
-    },
-    {
-      "id": "transcendent_insight",
-      "name": "天眼の見識",
-      "description": "会心ダイス合計値+5。",
-      "flavorText": "寂照の教えに 「戦場の理を見通す天眼」 とある。 理が見えてなお、 抗う者だけが、 その先に行く。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "InsightIV",
-          "skillName": "心眼IV",
-          "description": "会心ダイス合計値+5"
-        }
-      ]
-    },
-    {
-      "id": "healing_ring",
-      "name": "治癒の指輪",
+      "id": "黙働きの治癒環",
+      "name": "黙働きの治癒環",
       "description": "ターン終了時HP+1回復。",
-      "flavorText": "古びた指輪。劇的なことは何もしない。ただ、つけている間ずっと、黙って働く。",
+      "flavorText": "傷が塞がるたび、環の内側に細い筋が一本増える。数えた治療師は、途中から患者の傷より指輪を診るようになった。",
       "category": "Passive",
       "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 8,
-      "passiveSkills": [
+      "basePrice": 7,
+      "skill": "黙働きの治癒環",
+      "stats": [
         {
-          "internalName": "VitalityI",
-          "skillName": "活力I",
-          "description": "ターン終了時HP+1回復"
+          "stat": "regen",
+          "value": 1
         }
       ]
     },
     {
-      "id": "life_orb",
-      "name": "生命の宝玉",
-      "description": "ターン終了時HP+2回復。",
-      "flavorText": "赤く脈打つ玉。胸に当てると傷が縮む。温もりの出どころは、聞いた者も答えられなかった。",
-      "category": "Passive",
-      "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "VitalityII",
-          "skillName": "活力II",
-          "description": "ターン終了時HP+2回復"
-        }
-      ]
-    },
-    {
-      "id": "undying_heart",
-      "name": "不死の心臓",
-      "description": "ターン終了時HP+3回復。",
-      "flavorText": "止まらない鼓動は、痛みを感じない心臓とは違う。ただ止まらないだけだ。それが、ときに十分だ。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "VitalityIII",
-          "skillName": "活力III",
-          "description": "ターン終了時HP+3回復"
-        }
-      ]
-    },
-    {
-      "id": "eternal_heart",
-      "name": "永生の心臓",
-      "description": "ターン終了時HP+5回復。",
-      "flavorText": "不死をも超え、永遠に脈打つという心臓。永遠は長い。長すぎて、持ち主の方が先に音を上げる。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "VitalityIV",
-          "skillName": "活力IV",
-          "description": "ターン終了時HP+5回復"
-        }
-      ]
-    },
-    {
-      "id": "安らぎの靴",
-      "name": "安らぎの靴",
+      "id": "継ぎ革の旅靴",
+      "name": "継ぎ革の旅靴",
       "description": "マップ移動時、HP+1。",
-      "flavorText": "踏み出すたびに足元が少し温かい。道が長くなるほど、その温かさが重要になってくる。",
+      "flavorText": "底を三度張り替えた旅靴。どの革も持ち主より長く道を覚えている。",
       "category": "Passive",
       "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 8,
-      "passiveSkills": [
-        {
-          "internalName": "安らぎの靴",
-          "skillName": "安息の歩み",
-          "description": "マップ移動時、HP+1"
-        }
-      ]
+      "basePrice": 7,
+      "skill": "継ぎ革の旅靴"
     },
     {
-      "id": "癒しの靴",
-      "name": "癒しの靴",
-      "description": "マップ移動時、HP+2。",
-      "flavorText": "革の下を何かが流れる感触がある。なんなのかを知りたい者は、靴屋に聞く。靴屋も知らない。",
-      "category": "Passive",
-      "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "癒しの靴",
-          "skillName": "癒しの歩み",
-          "description": "マップ移動時、HP+2"
-        }
-      ]
-    },
-    {
-      "id": "神聖の靴",
-      "name": "神聖の靴",
+      "id": "聖路の白靴",
+      "name": "聖路の白靴",
       "description": "マップ移動時、HP+3。",
-      "flavorText": "聖教会の神官が祝福を縫い込んだとされる白い靴。 祝福より、 白いまま帰れるかどうかの方がよほど難しい。",
+      "flavorText": "寂照の巡礼路を踏破した者へ渡される白靴。白いまま帰った者はいない。それでも教会は毎年、新しい一足を用意する。",
       "category": "Passive",
       "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
+      "basePrice": 9,
+      "skill": "聖路の白靴"
+    },
+    {
+      "id": "帝国伝令の三日靴",
+      "name": "帝国伝令の三日靴",
+      "description": "各戦闘の初回ロールで攻撃+5。",
+      "flavorText": "『全ての道はヴァスタリオンに通ず』と詠われた頃、帝国街道を三日で駆けた伝令の靴。道は千年前に途切れたが、靴は今も最初の一歩だけを急がせる。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "帝国伝令の三日靴",
+      "stats": [
         {
-          "internalName": "神聖の靴",
-          "skillName": "神聖の歩み",
-          "description": "マップ移動時、HP+3"
+          "stat": "atk",
+          "value": 5,
+          "when": {
+            "firstRoll": true
+          }
         }
       ]
     },
     {
-      "id": "停戦協定",
-      "name": "停戦協定",
-      "description": "ダイスロールが完全引き分けの時、ロールを打ち切り敵の最大HPの10%を軽減不可ダメージで与える（そのターンは他パッシブ不発）。",
-      "flavorText": "刃を引くのは一拍だけだ。その一拍を利用するために、停戦を提案する者がいる。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "Truce",
-          "skillName": "停戦協定",
-          "description": "ダイスロールが完全に引き分けの時、ロールを打ち切り敵の最大HPの10%を軽減不可ダメージで与える（このターンは他のパッシブを発動させない）"
-        }
-      ]
-    },
-    {
-      "id": "ヘルメスの靴",
-      "name": "ヘルメスの靴",
-      "description": "各戦闘の初回ロールでダイス合計+5。",
-      "flavorText": "伝令の神が履いていたという。神は今いないが、靴だけが残って最初の一撃を速くする。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "Hermes",
-          "skillName": "ヘルメスの靴",
-          "description": "各戦闘の初回ロールでダイス合計+5"
-        }
-      ]
-    },
-    {
-      "id": "背水の狂刃",
-      "name": "背水の狂刃",
+      "id": "退路喰いの狂刃",
+      "name": "退路喰いの狂刃",
       "description": "HPが最大の50%以下で与ダメージ倍率+0.3、25%以下で+0.8。",
-      "flavorText": "追い詰められると冴えてくる、と持ち主は言う。本人も追い詰められない方が良かったとは、思っていない。",
+      "flavorText": "何の変哲もない折れた剣だが、この刃の持ち主たちは皆、退却命令を無視し続け、最後には包囲の中落命したらしい。",
       "category": "Passive",
       "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
+      "basePrice": 9,
+      "skill": "退路喰いの狂刃",
+      "stats": [
         {
-          "internalName": "Bloodlust",
-          "skillName": "背水の狂刃",
-          "description": "HPが最大の50%以下で与ダメージ倍率+0.3、25%以下で+0.8"
+          "stat": "dmgPct",
+          "value": 80,
+          "when": {
+            "hit": true,
+            "hpPctMax": 25
+          }
+        },
+        {
+          "stat": "dmgPct",
+          "value": 30,
+          "when": {
+            "hit": true,
+            "hpPctMax": 50,
+            "hpPctAbove": 25
+          }
         }
       ]
     },
     {
-      "id": "飢餓丸",
-      "name": "飢餓丸",
-      "description": "ターン開始時HP-1（軽減不可）。7ターン目以降、与ダメージ+18（戦闘中永続）＋次の被ダメージ-18（1回）。",
-      "flavorText": "効能書きに「七まで待て」とある。七まで待てた者は、ほとんどいない。それがかえって証明になっている。",
+      "id": "溶かし金の領主剣",
+      "name": "溶かし金の領主剣",
+      "description": "消費したゴールド累計×0.01 を与ダメージ倍率に加算（100Gで実質×2）。",
+      "flavorText": "領主は貨幣を炉へ投じるたび、剣へ新しい都市名を刻ませた。最後の銘は彼自身の領地で、そこだけ金が剥がれている。",
       "category": "Passive",
       "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "HungerPill",
-          "skillName": "飢餓丸",
-          "description": "ターン開始時HP-1(軽減不可)。7ターン目の発動後、与ダメージ+18(戦闘中永続)＋次の被ダメージ-18(1回)"
-        }
-      ]
-    },
-    {
-      "id": "黄金卿の剣",
-      "name": "黄金卿の剣",
-      "description": "消費した累積ゴールド1枚につき与ダメージ倍率+0.01（100Gで実質×2）。",
-      "flavorText": "旧アルフォニア衰退期の伝説に、 黄金卿と呼ばれる領主がいたそうだ。 彼は大陸中の黄金という黄金を集め、 溶かし、 また集め、 溶かした。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "GoldKingBlade",
-          "skillName": "黄金卿の剣",
-          "description": "消費した累積ゴールド1枚につき与ダメージ倍率+0.01 (100Gで+1.0=×2倍相当)"
-        }
-      ]
+      "basePrice": 10,
+      "skill": "溶かし金の領主剣"
     },
     {
       "id": "天工開物",
       "name": "天工開物",
       "description": "武器を強化するたび、強化素材を1つ返還する。",
-      "flavorText": "万物の理を記した書。一読すれば、余分な一打ちがどれだけあったかに気づく。そして二度と打たない。",
+      "flavorText": "旧い時代、東方の技術者によって書かれた産業技術書。",
       "category": "Passive",
       "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "TenkouKaibutsu",
-          "skillName": "天工開物",
-          "description": "武器を強化するたび、強化素材を1つ返還する"
-        }
-      ]
+      "basePrice": 9,
+      "skill": "天工開物"
     },
     {
-      "id": "天梯",
-      "name": "天梯",
-      "description": "出目が連続昇順（階段・3個以上）なら与ダメージ倍率+1.0。",
-      "flavorText": "賽の目が梯子のように並んだ一瞬だけ、天への道が開く。飛び段は認めない、律儀な梯子だ。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "Skyladder",
-          "skillName": "天梯",
-          "description": "出目が連続昇順（階段・3個以上）なら与ダメージ倍率+1.0"
-        }
-      ]
-    },
-    {
-      "id": "天極",
-      "name": "天極",
-      "description": "出目が全て同値（ゾロ目）なら会心確定＋会心倍率+1.0。",
-      "flavorText": "ゾロ目の瞬間だけ宿る、静かな会心。狙うものではないと誰もが言う。誰もが狙っている。",
+      "id": "二拍目の心臓",
+      "name": "二拍目の心臓",
+      "description": "1戦闘1回、HPが最大の50%を下回った瞬間にシールド（最大HP×50%）を獲得＋戦闘開始時に最大HPの10%回復。",
+      "flavorText": "脈を取ると、必ず一拍遅れてもう一つの鼓動が返る。鑑定医は二人分ではないと断じた。では何人分か、とは書かなかった。",
       "category": "Passive",
       "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "ApexCrit",
-          "skillName": "天極",
-          "description": "出目が全て同値（ゾロ目）なら会心確定＋会心倍率+1.0"
-        }
-      ]
+      "basePrice": 10,
+      "skill": "二拍目の心臓"
     },
     {
-      "id": "命脈",
-      "name": "命脈",
-      "description": "1戦闘1回、HPが最大の50%を下回った瞬間にシールド（最大HP×50%）を獲得。戦闘開始時に最大HPの10%回復。",
-      "flavorText": "半分まで削れた命に、盾が生まれる。もう一拍の猶予を何に使うか。それだけが問われる。",
+      "id": "百鳴りの共振箱",
+      "name": "百鳴りの共振箱",
+      "description": "発動中のパッシブ1個につき与ダメージ+1%。",
+      "flavorText": "中身のない木箱。奇物を近くへ置くたび別の音で鳴り、六つ目からは置いていない品の音まで混じり始める。",
       "category": "Passive",
       "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "Lifeline",
-          "skillName": "命脈",
-          "description": "1戦闘1回、HPが最大の50%を下回った瞬間にシールド（最大HP×50%）を獲得＋戦闘開始時に最大HPの10%回復"
-        }
-      ]
+      "basePrice": 10,
+      "skill": "百鳴りの共振箱"
     },
     {
-      "id": "蒼白の槍騎士",
-      "name": "蒼白の槍騎士",
-      "description": "軽減無視ダメージ（血令/反撃/終焉/業火/停戦等）を2.0倍にする。",
-      "flavorText": "蒼白い騎士の槍は、盾を通り越して刺さる。硬く守れば守るほど、あっけない結末になったという。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "PalePikeKnight",
-          "skillName": "蒼白の槍騎士",
-          "description": "軽減無視ダメージ（血令/反撃/終焉/業火/停戦等）を2.0倍にする"
-        }
-      ]
-    },
-    {
-      "id": "共鳴",
-      "name": "共鳴",
-      "description": "発動中のパッシブが5個を超えた分、1個につき与ダメージ倍率+0.05。",
-      "flavorText": "五を超えた力が互いを呼び起こす。なぜかは誰も説明できない。できなくても、響く。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "Resonance",
-          "skillName": "共鳴",
-          "description": "発動中のパッシブが5個を超えた分、1個につき与ダメージ倍率+0.05"
-        }
-      ]
-    },
-    {
-      "id": "希望の灯片",
-      "name": "希望の灯片",
-      "description": "戦闘中に一度も敗北せず勝利すると、最大HP+2（永続・無限スタック）。",
-      "flavorText": "一度も敗けずに勝ちきった、その記録だけが灯になる。完全な勝利が希少なのは、そういう理由だ。",
+      "id": "心軽めの巡礼杖",
+      "name": "心軽めの巡礼杖",
+      "description": "戦闘終了時、希望+1。",
+      "flavorText": "杖には巡礼路の距離ではなく、捨てた荷物の名が刻まれている。終点近くの刻みほど小さく、最後には持ち主の名だけが残る。",
       "category": "Passive",
       "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "希望の灯片",
-          "skillName": "希望の灯",
-          "description": "戦闘中にロール敗北を一度もせずに勝利した時、最大HP+2（永続・無限スタック）"
-        }
-      ]
-    },
-    {
-      "id": "巡礼者の杖",
-      "name": "巡礼者の杖",
-      "description": "戦闘終了時、50%で希望+1。",
-      "flavorText": "寂照の教えを歩き通した者の遺品。 誰が使っても、 突くたびに心が一歩分だけ軽くなる。 仕組みは不明だ。",
-      "category": "Passive",
-      "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "巡礼者の杖",
-          "skillName": "巡礼の歩み",
-          "description": "戦闘終了時、50%で希望+1"
-        }
-      ]
-    },
-    {
-      "id": "記憶の砂時計",
-      "name": "記憶の砂時計",
-      "description": "3ターンごとに、その間の累積与ダメージの30%を軽減不可ダメージで敵に追加（蓄積はリセット）。",
-      "flavorText": "三拍後に反転し、刻んだ分を送り返す砂時計。返した痛みの行方は、砂時計も知らない。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "記憶の砂時計",
-          "skillName": "時の砂",
-          "description": "3ターンごとに、その間に与えた累積ダメージの30%を軽減不可ダメージとして敵に追加で与える（蓄積はその度にリセット）"
-        }
-      ]
-    },
-    {
-      "id": "狂乱のメダリオン",
-      "name": "狂乱のメダリオン",
-      "description": "HPが最大の50%以下で与ダメージ+30%、25%以下で+60%。",
-      "flavorText": "瀕死になると、彫り文字が読めるという銀のメダル。読めた者は戻ってこないので、何と書いてあるか誰も知らない。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "狂乱のメダリオン",
-          "skillName": "狂乱",
-          "description": "HPが最大の50%以下で与ダメージ+30%、 25%以下なら+60%"
-        }
-      ]
-    },
-    {
-      "id": "末那識",
-      "name": "末那識",
-      "description": "HPが最大の35%以下のとき、会心が確定し与ダメージ+30%。",
-      "flavorText": "限界まで削られた者にだけ、急所が光って見える。見えると届くは別の話だが、見えないよりはいい。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "末那識",
-          "skillName": "末那識",
-          "description": "HPが最大値の35%以下のとき、会心が確定し与ダメージ+30%"
-        }
-      ]
-    },
-    {
-      "id": "throwing_dagger_sheath",
-      "name": "投げ短剣の鞘",
-      "description": "ロール勝利時、与ダメージ+2。",
-      "flavorText": "抜くと同時に飛ぶ。手元を離れる一瞬が勝負を分ける者のための、目立たない工夫だ。",
-      "category": "Passive",
-      "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
       "basePrice": 8,
-      "passiveSkills": [
-        {
-          "internalName": "PursuitI",
-          "skillName": "追撃I",
-          "description": "ロール勝利時、与ダメージ+2"
-        }
-      ]
+      "skill": "心軽めの巡礼杖"
     },
     {
-      "id": "黄金の天秤",
-      "name": "黄金の天秤",
-      "description": "戦闘勝利時、+5ゴールド。",
-      "flavorText": "戦いが終わると少し重くなる。金の方が増えているのか、それとも別のものを量っているのか。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "黄金の天秤",
-          "skillName": "戦果の秤",
-          "description": "戦闘勝利時、+5ゴールド"
-        }
-      ]
-    },
-    {
-      "id": "倍音のクロック",
-      "name": "倍音のクロック",
-      "description": "戦闘ターン数が3の倍数のとき、与ダメージ倍率+1.0（×2.0）。",
-      "flavorText": "三拍目だけ音が大きい古時計。その拍子に乗れた者だけが、二倍を受け取る。",
+      "id": "末那識の仮面",
+      "name": "末那識の仮面",
+      "description": "HPが最大値の35%以下のとき、会心が確定し与ダメージ+60%。",
+      "flavorText": "寂照の禁庫に収められていた、目穴のない仮面。息が浅くなるほど視界は澄む。何を使って見ているのかは教義にもない。",
       "category": "Passive",
       "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "倍音のクロック",
-          "skillName": "倍音",
-          "description": "戦闘ターン数が3の倍数のとき、与ダメージ倍率+1.0 (×2.0)"
-        }
-      ]
-    },
-    {
-      "id": "静寂のローブ",
-      "name": "静寂のローブ",
-      "description": "戦闘1ターン目のみ、敵パッシブが発動しない。",
-      "flavorText": "寂照の修行衣の写しだという。 まとうと、 最初の一拍だけ世界が静かになる。 敵のパッシブが鳴らない、 その一拍の静けさが。",
-      "category": "Passive",
-      "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
       "basePrice": 10,
-      "passiveSkills": [
+      "skill": "末那識の仮面",
+      "stats": [
         {
-          "internalName": "静寂のローブ",
-          "skillName": "静寂",
-          "description": "戦闘1ターン目のみ敵パッシブ発動しない"
+          "stat": "critSure",
+          "value": 1,
+          "when": {
+            "hpPctMax": 35
+          }
+        },
+        {
+          "stat": "dmgPct",
+          "value": 60,
+          "when": {
+            "hpPctMax": 35
+          }
         }
       ]
     },
     {
-      "id": "黒煙の符",
-      "name": "黒煙の符",
-      "description": "戦闘開始時、敵に出血+2スタック付与。",
-      "flavorText": "クルガ伝来の符。 焼くと黒煙が立ち、 晴れた頃には敵がすでに出血している。 煙の中で何があったかは、 誰も見ていない。",
+      "id": "戦果で傾く天秤",
+      "name": "戦果で傾く天秤",
+      "description": "戦闘勝利時、+10ゴールド。",
+      "flavorText": "片皿には金貨、もう片皿には戦場の土を載せる。勝者が帰るたび土の皿が上がり、金貨の枚数は変わらない。",
       "category": "Passive",
       "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "黒煙の符",
-          "skillName": "黒煙",
-          "description": "戦闘開始時、敵に出血+2スタック付与"
-        }
-      ]
+      "basePrice": 9,
+      "skill": "戦果で傾く天秤"
     },
     {
-      "id": "蒼穹の眼",
-      "name": "蒼穹の眼",
-      "description": "戦闘1ターン目のロールは必ず会心ヒット。",
-      "flavorText": "最初の一閃だけ、青く冴える石。二閃目からは、ただ青い石だ。一閃に懸けるか否か。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "蒼穹の眼",
-          "skillName": "蒼穹の一閃",
-          "description": "戦闘1ターン目のロール、必ず会心ヒット"
-        }
-      ]
-    },
-    {
-      "id": "鋼の心臓",
-      "name": "鋼の心臓",
+      "id": "脈なしの鋼心臓",
+      "name": "脈なしの鋼心臓",
       "description": "獲得時、最大HP+20。戦闘終了時、HP+5。",
-      "flavorText": "鋼の心臓は脈を打つ。温かくはない。だが止まらない。その差が、深層では命の差になる。",
+      "flavorText": "胸へ収める前から一定の間隔で鳴っている。持ち主が眠ると音は二つに増え、片方だけが朝まで続く。",
       "category": "Passive",
       "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "鋼の心臓",
-          "skillName": "鋼の鼓動",
-          "description": "獲得時、最大HP+20。戦闘終了時、HP+5"
-        }
-      ]
+      "basePrice": 10,
+      "skill": "脈なしの鋼心臓"
     },
     {
-      "id": "守護天使の鈴",
-      "name": "守護天使の鈴",
-      "description": "戦闘中1回限り、HP25以下になったターン末にHP+15。",
-      "flavorText": "瀕死のとき鳴る、という鈴。鳴ったと言う者が生き延びているのは確かだが、その音を誰も覚えていない。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "守護天使の鈴",
-          "skillName": "守護天使の囁き",
-          "description": "戦闘中1回限り、HP25以下になったターン末にHP+15"
-        }
-      ]
-    },
-    {
-      "id": "災厄の指輪",
-      "name": "災厄の指輪",
+      "id": "傷覚えの災環",
+      "name": "傷覚えの災環",
       "description": "被弾するたび次の与ダメージ+3累積（上限+15、戦闘終了でリセット）。",
-      "flavorText": "被弾するたびに深紅が増す。上限まで溜まったとき、吐き出す先は当然、敵だ。",
+      "flavorText": "石面には傷を付けた者の顔が一瞬だけ浮かぶ。二度目から顔は笑い、三度目には持ち主より先に相手を見る。",
       "category": "Passive",
       "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "災厄の指輪",
-          "skillName": "災厄の蓄積",
-          "description": "被弾するたび次の与ダメージ+3累積（上限+15、戦闘終了でリセット）"
-        }
-      ]
-    },
-    {
-      "id": "永遠の燈",
-      "name": "永遠の燈",
-      "description": "戦闘終了時、HP残量が最大の25%以下なら最大HP×50%まで回復。",
-      "flavorText": "燃料なしに灯る。 ギルド鑑定所は 「不明、 害なし」 と書いて終わりにした。 瀕死の者には、 理由より灯の方が大事だ。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "永遠の燈",
-          "skillName": "永遠の光",
-          "description": "戦闘終了時、 HP残量が最大の25%以下なら最大HP×50%まで回復"
-        }
-      ]
-    },
-    {
-      "id": "商人の符牒",
-      "name": "商人の符牒",
-      "description": "ショップ価格半額。ただしアイテム売却不可。",
-      "flavorText": "半値で買えて、何も売れない。収支の計算が合うかどうかは、ランの終わりになってわかる。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "商人の符牒",
-          "skillName": "商人の誓い",
-          "description": "ショップ価格半額。ただしアイテム売却不可"
-        }
-      ]
-    },
-    {
-      "id": "食通の懐刀",
-      "name": "食通の懐刀",
-      "description": "イベント由来の希望回復+1。",
-      "flavorText": "食通の懐刀は、料理にもそれ以外にも使えたという。どちらの腕前が優れていたかは、書かれていない。",
-      "category": "Passive",
-      "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
       "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "食通の懐刀",
-          "skillName": "食通の手腕",
-          "description": "イベント由来の希望回復+1"
-        }
-      ]
+      "skill": "傷覚えの災環"
     },
     {
-      "id": "賽振りの目隠し",
-      "name": "賽振りの目隠し",
+      "id": "鑑定済みの無害灯",
+      "name": "鑑定済みの無害灯",
+      "description": "戦闘終了時、 HP残量が最大の25%以下なら最大HP×50%まで回復。",
+      "flavorText": "鑑定所は百年燃焼試験の終了を待たず、安全証を発行した。証書は黄ばんだが、燈の影だけは初日の位置にある。",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "skill": "鑑定済みの無害灯"
+    },
+    {
+      "id": "二分刀",
+      "name": "二分刀",
       "description": "このターンの出目が全て偶数なら与ダメージ+15%。",
-      "flavorText": "目を閉じて振る方が偶数が出る、と賭場の古株は言う。信じるかどうかは、振る前に決めることだ。",
+      "flavorText": "等分、両断、半割、折半。この小刀はすべてを二等分すると言われるが、世の中そんなに割り切れることばかりではない。",
       "category": "Passive",
       "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 8,
-      "passiveSkills": [
+      "basePrice": 7,
+      "skill": "二分刀",
+      "stats": [
         {
-          "internalName": "EvenEyes",
-          "skillName": "偶の采",
-          "description": "このターンの出目が全て偶数なら与ダメージ+15%"
+          "stat": "dmgPct",
+          "value": 15,
+          "when": {
+            "hit": true,
+            "allEven": true
+          }
         }
       ]
     },
     {
-      "id": "巡礼の杖飾り",
-      "name": "巡礼の杖飾り",
+      "id": "四歩返しの杖飾り",
+      "name": "四歩返しの杖飾り",
       "description": "マップ移動時、25%で希望+1。",
-      "flavorText": "寂照の巡礼者が杖の先に結ぶ小さな護符。 四歩に一度、 何かが返ってくる。 慌てない者向きだ。",
+      "flavorText": "鈴は四歩目にだけ鳴り、三歩で止まると夜中まで鳴らない。巡礼者は急ぐ者ほど遠回りになる、とだけ教える。",
       "category": "Passive",
       "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 8,
-      "passiveSkills": [
-        {
-          "internalName": "巡礼の杖飾り",
-          "skillName": "巡礼の慰め",
-          "description": "マップ移動時、25%で希望+1"
-        }
-      ]
+      "basePrice": 7,
+      "skill": "四歩返しの杖飾り"
     },
     {
-      "id": "双子の賽",
-      "name": "双子の賽",
-      "description": "出目に同値ペア（重複）があれば会心ダイス+1。",
-      "flavorText": "対で作られた賽。揃いの目が出た瞬間だけ、急所の場所を思い出す。一個では、それが消える。",
-      "category": "Passive",
-      "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "TwinDice",
-          "skillName": "双子の符合",
-          "description": "出目に同値ペア(重複)があれば会心ダイス+1"
-        }
-      ]
-    },
-    {
-      "id": "狂宴の仮面",
-      "name": "狂宴の仮面",
+      "id": "笑い主不明の仮面",
+      "name": "笑い主不明の仮面",
       "description": "希望[悲観]以下で与ダメージ+10%、[絶望]以下なら+25%。",
-      "flavorText": "被ると笑い声が出る。自分のものか仮面のものか、しばらくすると区別がつかなくなる。",
+      "flavorText": "宴の出席簿に仮面の席が一つ設けられていた。酒杯は毎回空になり、翌朝には参加者が一人ずつ多く記帳されている。",
       "category": "Passive",
       "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
+      "basePrice": 8,
+      "skill": "笑い主不明の仮面",
+      "stats": [
         {
-          "internalName": "狂宴の仮面",
-          "skillName": "狂宴",
-          "description": "希望[悲観]以下で与ダメージ+10%、[絶望]以下なら+25%"
+          "stat": "dmgPct",
+          "value": 25,
+          "when": {
+            "hopeTierMin": "Despair"
+          }
+        },
+        {
+          "stat": "dmgPct",
+          "value": 10,
+          "when": {
+            "hopeTierMin": "Pessimism",
+            "hopeTierBelow": "Despair"
+          }
         }
       ]
     },
     {
-      "id": "血路の旗",
-      "name": "血路の旗",
-      "description": "敵の出血スタック数×与ダメージ+3%。",
-      "flavorText": "敵が出血するほど、旗の勢いが増す。翻る理由は清くないが、勢いは本物だ。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "BloodPathBanner",
-          "skillName": "血路",
-          "description": "敵の出血スタック数×与ダメージ+3%"
-        }
-      ]
-    },
-    {
-      "id": "匠の手控え",
-      "name": "匠の手控え",
+      "id": "三割読めぬ匠手控え",
+      "name": "三割読めぬ匠手控え",
       "description": "武器強化が3段階以上で与ダメージ+12%。",
-      "flavorText": "旧アルフォニアの名工の秘伝帖。 三割は古アルフ語で解読できない。 解読できた分だけで、 武器の顔が変わる。",
+      "flavorText": "読めない箇所には工具の置き場所だけが図示されている。その通り並べると、翌朝どれか一つが完成品へ置き換わる。",
       "category": "Passive",
       "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
+      "basePrice": 9,
+      "skill": "三割読めぬ匠手控え",
+      "stats": [
         {
-          "internalName": "MasterworkNotes",
-          "skillName": "匠の極み",
-          "description": "武器強化が3段階以上で与ダメージ+12%"
+          "stat": "dmgPct",
+          "value": 12,
+          "when": {
+            "hit": true,
+            "weaponPlusMin": 3
+          }
         }
       ]
     },
     {
-      "id": "万華の賽",
-      "name": "万華の賽",
+      "id": "遅れて応える万華賽",
+      "name": "遅れて応える万華賽",
       "description": "出目が「全て同値」「全て異なる」「連続昇順（階段）」のいずれかなら与ダメージ×2。",
-      "flavorText": "転がるたびに模様が変わる賽。ゾロ目も、バラバラも、階段も来る。狙ったものだけは、なぜか遅い。",
+      "flavorText": "振る前に望んだ目は、必ず一投遅れて現れる。賭場では不正に使えないため合法とされ、勝者だけが異議を唱えた。",
       "category": "Passive",
       "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "KaleidoDice",
-          "skillName": "万華",
-          "description": "出目が「全て同値」「全て異なる」「連続昇順(階段)」のいずれかなら与ダメージ×2"
-        }
-      ]
-    },
-    {
-      "id": "断罪の天秤",
-      "name": "断罪の天秤",
-      "description": "ロール勝利時、ダイス合計差×4%を与ダメージに加算（上限+100%）。",
-      "flavorText": "聖教会の説教にある 「断罪の天秤」 の写しだという。 差が開くほど裁きが重くなる。 量られているのが己の罪かどうかは、 戦いが終わってからわかる。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "JudgmentScale",
-          "skillName": "断罪",
-          "description": "ロール勝利時、ダイス合計差×4%を与ダメージに加算(上限+100%)"
-        }
-      ]
-    },
-    {
-      "id": "死神の数珠",
-      "name": "死神の数珠",
-      "description": "戦闘勝利時、50%で+1ゴールド。",
-      "flavorText": "命を数える数珠だと物売りは言った。繰るたびに金が落ちてくる。誰の命を数えているかは、聞かなかった。",
-      "category": "Passive",
-      "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
       "basePrice": 10,
-      "passiveSkills": []
-    },
-    {
-      "id": "嵐の徽章",
-      "name": "嵐の徽章",
-      "description": "戦闘1ターン目のみ、ダイス合計+（最大出目の半分・最低1）。",
-      "flavorText": "初撃にだけ嵐が宿る徽章。二撃目からは良い徽章だ。最初の一撃を大切にする者向けの品だ。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": []
-    },
-    {
-      "id": "沈黙の剣帯",
-      "name": "沈黙の剣帯",
-      "description": "戦闘中は消費アイテム使用不可。代わりに毎ターン与ダメージ+1、さらに1ターン目は敵のダイスロール-99（先制必殺）。",
-      "flavorText": "消費アイテムを拒む誓いの帯。締めた者に応えるのは剣だけだ。それが分かって締める者だけが、使いこなす。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
+      "skill": "遅れて応える万華賽",
+      "stats": [
         {
-          "internalName": "沈黙の剣帯",
-          "skillName": "沈黙の先制",
-          "description": "戦闘中は消費アイテム使用不可。代わりに毎ターン与ダメージ+1、さらに1ターン目は敵のダイスロール結果-99（先制必殺）"
+          "stat": "dmgPct",
+          "value": 100,
+          "when": {
+            "hit": true,
+            "kaleido": true
+          }
         }
       ]
     },
     {
-      "id": "灯心の鈴",
-      "name": "灯心の鈴",
-      "description": "マップ移動時、10%で希望+1。",
-      "flavorText": "歩くたびに微かに鳴る鈴。宿っているのが何なのかはわからない。ただ歩き続けることで、鳴り続ける。",
-      "category": "Passive",
-      "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 8,
-      "passiveSkills": []
-    },
-    {
-      "id": "裂傷の刃心",
-      "name": "裂傷の刃心",
+      "id": "医家の反り刃",
+      "name": "医家の反り刃",
       "description": "会心時、敵に出血+2（会心倍率の+100%ごとに+1）。",
-      "flavorText": "会心の一閃が傷口を開く。閉じないまま次が来る。そういう設計の刃心だ。",
+      "flavorText": "刀匠は医家の解剖図を上下逆に写し、赤線の箇所だけ刃を反らせた。完成後、家名は医師録と刀工録の双方から消された。",
       "category": "Passive",
       "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 8,
-      "passiveSkills": [
-        {
-          "internalName": "LacerationCore",
-          "skillName": "裂傷の刃心",
-          "description": "会心時、敵に出血+2（会心倍率の+100%ごとに+1）"
-        }
-      ]
+      "basePrice": 7,
+      "skill": "医家の反り刃"
     },
     {
-      "id": "防殻の一閃",
-      "name": "防殻の一閃",
+      "id": "鏡返しの小盾",
+      "name": "鏡返しの小盾",
       "description": "会心時、その会心ダメージの5%をシールド化。",
-      "flavorText": "会心の手応えが守りになる。 旧アルフォニアの剣術書の余白に小さく書いてあった。 本文より役に立った、 と古参は言う。",
+      "flavorText": "鏡面は攻撃を受けた瞬間だけ曇る。次に晴れた時、映っているのは持ち主ではなく、先ほどの刃を構えた誰かだ。",
       "category": "Passive",
       "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
+      "basePrice": 7,
+      "skill": "鏡返しの小盾"
+    },
+    {
+      "id": "鎧縫いの針",
+      "name": "鎧縫いの針",
+      "description": "会心時、軽減不可ダメージ+5を追加で与える。",
+      "flavorText": "鎧師の採寸帳と共に発見された長針。寸法欄には胸囲ではなく、各甲冑の縫い目から心臓までの距離がある。",
+      "category": "Passive",
+      "rarity": "SILVER",
       "basePrice": 8,
-      "passiveSkills": [
-        {
-          "internalName": "GuardFlash",
-          "skillName": "防殻の一閃",
-          "description": "会心時、その会心ダメージの5%をシールド化"
-        }
-      ]
+      "skill": "鎧縫いの針"
     },
     {
-      "id": "急所穿ち",
-      "name": "急所穿ち",
-      "description": "会心時、軽減無視ダメージ+5を追加で与える。",
-      "flavorText": "会心の瞬間だけ、鎧の継ぎ目が光って見える。見えた者は迷わず刺す。それを急所穿ちと呼ぶ。",
-      "category": "Passive",
-      "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "VitalPierce",
-          "skillName": "急所穿ち",
-          "description": "会心時、軽減無視ダメージ+5を追加で与える"
-        }
-      ]
-    },
-    {
-      "id": "吸命の牙",
-      "name": "吸命の牙",
-      "description": "会心したターン、与ダメージの15%をHP回復。",
-      "flavorText": "会心で深く入るたびに、刃が温もりを持ち帰る。望んでいるかどうかは、関係ない。",
-      "category": "Passive",
-      "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "LifeFang",
-          "skillName": "吸命の牙",
-          "description": "会心したターン、与ダメージの15%をHP回復"
-        }
-      ]
-    },
-    {
-      "id": "一点集中",
-      "name": "一点集中",
-      "description": "会心倍率+0.5。代わりに会心率（会心分子）-2。",
-      "flavorText": "旧アルフォニアの剣譜に、 十のうち九を捨てて、 一度の一撃に懸けた決闘者の話がある。 その一撃が当たった話と、 外れた話が両方ある。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "SinglePoint",
-          "skillName": "一点集中",
-          "description": "会心倍率+0.5。代わりに会心率（会心分子）-2"
-        }
-      ]
-    },
-    {
-      "id": "連環の極み",
-      "name": "連環の極み",
+      "id": "連環の指輪",
+      "name": "連環の指輪",
       "description": "会心するたび会心倍率+0.2（戦闘中累積）。",
-      "flavorText": "会心が会心を呼ぶ。際限を誰も教えてくれない。それがこの宝物の、唯一の欠点だ。",
+      "flavorText": "内側の輪を数えるたび一つ多い。鑑定士は数え間違いとして七度訂正し、八度目には自分の指輪を外した。",
       "category": "Passive",
       "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "ChainApex",
-          "skillName": "連環の極み",
-          "description": "会心するたび会心倍率+0.2（戦闘中累積）"
-        }
-      ]
+      "basePrice": 10,
+      "skill": "連環の指輪"
     },
     {
-      "id": "サーベル・ワルツ",
-      "name": "サーベル・ワルツ",
-      "description": "[剣の舞]。ダイス合計+1。他の[剣の舞]がインベントリにも昇華にも無いと戦闘開始時HP半減。ショップで他の[剣の舞]が出やすい。[剣の舞]が4つ揃うと全て消え〈ブレイドダンス〉に変化。",
-      "flavorText": "三拍子の剣舞。一人では足がもつれる。仲間が揃うと嵐になる。仲間を探している、という顔をしている。",
+      "id": "剣舞譜「円舞」",
+      "name": "剣舞譜「円舞」",
+      "description": "[剣の舞]。攻撃+1。[剣の舞]を1枚以上持っていると、ショップのLEGENDARY枠がまれに[剣の舞]に差し替わる。[剣の舞]が4つインベントリに揃うと全て消え〈無銘の剣舞譜〉に変化。",
+      "flavorText": "ホーリン港の剣劇で使われた四枚組の第一譜。円を描く足運びは一人では半分しか踏めず、余白には『伴舞を探せ』とある。",
       "category": "Passive",
-      "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 8,
-      "passiveSkills": [
-        {
-          "internalName": "SaberWaltz",
-          "skillName": "サーベル・ワルツ",
-          "description": "[剣の舞]。ダイス合計+1。他の[剣の舞]がインベントリにも昇華にも無いとき戦闘開始時HP半減。ショップで他の[剣の舞]が出やすくなる。[剣の舞]が4つインベントリに揃うと全て消え〈ブレイドダンス〉に変化"
-        }
-      ]
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "skill": "剣舞譜「円舞」"
     },
     {
       "id": "エスパーダ・パソドブレ",
       "name": "エスパーダ・パソドブレ",
-      "description": "[剣の舞]。自分と敵のダイス合計+5。与ダメージ+20%／被ダメージ+20%。[剣の舞]が4つ揃うと全て消え〈ブレイドダンス〉に変化。",
-      "flavorText": "闘牛の足捌きを剣に写した舞。攻守ともに膨らむ。膨らんだ分は相手にも届く。賑やかな舞だ。",
+      "description": "[剣の舞]。攻撃+5。与えるダメージ+20%、受けるダメージ+20%。[剣の舞]が4つインベントリに揃うと全て消え〈無銘の剣舞譜〉に変化。",
+      "flavorText": "四枚組の第二譜。二人が同時に踏み込み、同時に間合いへ入る。どちらが斬る側かは、譜面のどこにも指定されていない。",
       "category": "Passive",
-      "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
+      "rarity": "LEGENDARY",
       "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "EspadaPasodoble",
-          "skillName": "エスパーダ・パソドブレ",
-          "description": "[剣の舞]。自分と敵のダイス合計+5。与えるダメージ+20%、受けるダメージ+20%。[剣の舞]が4つインベントリに揃うと全て消え〈ブレイドダンス〉に変化"
-        }
-      ]
+      "skill": "エスパーダ・パソドブレ"
     },
     {
       "id": "フルーレ・バレエ",
       "name": "フルーレ・バレエ",
-      "description": "[剣の舞]。ダイス合計+3。戦闘敗北時、本アイテムを廃棄し最大HPを1にして生還する。[剣の舞]が4つ揃うと全て消え〈ブレイドダンス〉に変化。",
-      "flavorText": "倒れる瞬間が振り付けになっている舞。優美だ。ただ、立ち上がる振り付けは、どこにもない。",
+      "description": "[剣の舞]。攻撃+3。戦闘に敗北したときこのアイテムを廃棄し、最大HPを1にして生還する。[剣の舞]が4つインベントリに揃うと全て消え〈無銘の剣舞譜〉に変化。",
+      "flavorText": "四枚組の第三譜。倒れる瞬間までが振り付けになっている。立ち上がる所作はなく、頁の端だけが何度も握り潰されている。",
       "category": "Passive",
-      "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 8,
-      "passiveSkills": [
-        {
-          "internalName": "FleuretBallet",
-          "skillName": "フルーレ・バレエ",
-          "description": "[剣の舞]。ダイス合計+3。戦闘に敗北したときこのアイテムを廃棄し、最大HPを1にして生還する。[剣の舞]が4つインベントリに揃うと全て消え〈ブレイドダンス〉に変化"
-        }
-      ]
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "skill": "フルーレ・バレエ"
     },
     {
       "id": "ファコン・タンゴ",
       "name": "ファコン・タンゴ",
-      "description": "[剣の舞]。他の[剣の舞]がインベントリにも昇華にも無いと戦闘開始時に最大HP-1。[剣の舞]が4つ揃うと全て消え〈ブレイドダンス〉に変化。",
-      "flavorText": "ホーリン港の場末で踊られる、 短剣を絡める激情の舞。 一曲ごとに手の中のものを投げ捨て、 見知らぬ何かを掴み直す。",
+      "description": "[剣の舞]。攻撃+2。[剣の舞]が4つインベントリに揃うと全て消え〈無銘の剣舞譜〉に変化。",
+      "flavorText": "四枚組の第四譜。手の中の得物を捨て、相手の得物を受け取る動きが延々と続く。最後に誰の剣が残るかは、上演ごとに違った。",
       "category": "Passive",
       "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "FalconTango",
-          "skillName": "ファコン・タンゴ",
-          "description": "[剣の舞]。他の[剣の舞]がインベントリにも昇華にも存在しないとき戦闘開始時に最大HP-1。[剣の舞]が4つインベントリに揃うと全て消え〈ブレイドダンス〉に変化"
-        }
-      ]
+      "basePrice": 10,
+      "skill": "ファコン・タンゴ"
     },
     {
       "id": "ブレイドダンス",
       "name": "ブレイドダンス",
-      "description": "戦闘に突入するたび[剣先]スタック+1（最大99）。ダイス合計に剣先スタック分を加算。与ダメージ時に剣先分HP回復、被ダメージ時に剣先分の軽減不可ダメージを相手へ。",
-      "flavorText": "四つの舞が融け合った、名のない演武。舞うほど剣先が冴え、冴えるほど、舞をやめられなくなる。",
+      "description": "戦闘に突入するたび[剣先]スタック+1（最大99）。攻撃に剣先スタック分を加算。与ダメージ時に剣先スタック分HP回復、被ダメージ時に剣先スタック分の軽減不可ダメージを相手へ。",
+      "flavorText": "四枚を重ねると、別々だった線が一つの演武を描く。題名欄は削られている。舞うほど剣先は冴え、観客のいない場所でも終演を許さない。",
       "category": "Passive",
       "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
       "basePrice": 0,
-      "passiveSkills": [
-        {
-          "internalName": "BladeDance",
-          "skillName": "ブレイドダンス",
-          "description": "戦闘に突入するたび[剣先]スタック+1(最大99)。ダイス合計に剣先スタック分を加算。与ダメージ時に剣先スタック分HP回復、被ダメージ時に剣先スタック分の軽減不可ダメージを相手へ"
-        }
-      ]
+      "skill": "ブレイドダンス"
     },
     {
-      "id": "佯狂者の鈴",
-      "name": "佯狂者の鈴",
-      "description": "[絶望]以降（希望20以下）、他の[佯狂者]アイテムがショップに出現しやすくなる。",
-      "flavorText": "「穴がぜんぶ呑む。街も人もぜんぶ」。辻でそう叫ぶ男に、通りすがりは小銭を投げた。見世物代だ、と思いながら。",
-      "category": "Passive",
-      "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 8,
-      "passiveSkills": [
-        {
-          "internalName": "佯狂者の鈴",
-          "skillName": "佯狂の鈴",
-          "description": "[絶望]以降（希望20以下）、他の[佯狂者]アイテムがショップに出現しやすくなる"
-        }
-      ]
-    },
-    {
-      "id": "佯狂者の杖",
-      "name": "佯狂者の杖",
-      "description": "[発狂]中、ダイス合計+（他の[佯狂者]アイテムの数）。※ダイス個数は増えない。",
-      "flavorText": "街が栄えるほど男の予言が当たっていく。当たるたびに人は笑った——あれは気がふれている、と確信しながら。",
-      "category": "Passive",
-      "rarity": "SILVER",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 10,
-      "passiveSkills": [
-        {
-          "internalName": "佯狂者の杖",
-          "skillName": "佯狂の杖",
-          "description": "[発狂]中、ダイス合計+（他の[佯狂者]アイテムの数）。※ダイス個数は増えない"
-        }
-      ]
-    },
-    {
-      "id": "佯狂者の衣",
-      "name": "佯狂者の衣",
-      "description": "[発狂]中、与ダメージ+（他の[佯狂者]アイテムの数×30%）。",
-      "flavorText": "ぼろをまとって笑う方が、最後まで言わせてもらえる。男はそれを学んだ。聞いてもらえるとは、もう思っていない。",
-      "category": "Passive",
-      "rarity": "GOLD",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 12,
-      "passiveSkills": [
-        {
-          "internalName": "佯狂者の衣",
-          "skillName": "佯狂の衣",
-          "description": "[発狂]中、与ダメージ+（他の[佯狂者]アイテムの数×30%）"
-        }
-      ]
-    },
-    {
-      "id": "佯狂者の冠",
-      "name": "佯狂者の冠",
-      "description": "[発狂]時このラン希望0固定。フルセット（他3つ）で発狂による終了が消え、移動ごとに最大HP-1／与ダメージ+4%（最大HPが尽きるとラン終了）。",
-      "flavorText": "紙の冠をかぶり、男は道化の王を名乗った。本当のことを言えるのは、もう狂人だけだから。その祭りの輪の中心で、街はかつてなく賑わい、かつてなく、終わりに近かった。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "sizeX": 2,
-      "sizeY": 2,
-      "basePrice": 14,
-      "passiveSkills": [
-        {
-          "internalName": "佯狂者の冠",
-          "skillName": "佯狂の冠",
-          "description": "[発狂]時このラン希望0固定。フルセット(他3つ)で発狂による終了が消え、移動毎に狂気が募る（最大HP-1／与ダメージ+4%、最大HPが尽きると燃え尽きてラン終了）"
-        }
-      ]
-    },
-    {
-      "id": "cons_heal_1",
+      "id": "小回復薬",
       "name": "小回復薬",
-      "description": "最大HPの25%回復。",
-      "flavorText": "大して効かない。それでも棚の端に常にある。大して効かないものほど、なぜかよく売れる。",
+      "description": "HPを最大HPの25%回復。",
+      "flavorText": "擦り傷から骨折まで、幅広い傷に用いられている薬。小さいからと侮ることなかれ、傷１つが生死を分けることもある。",
       "category": "Consumable",
       "rarity": "BRONZE",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 4
+      "basePrice": 4,
+      "consFamily": "heal",
+      "tier": 1
     },
     {
-      "id": "cons_heal_2",
+      "id": "回復薬",
       "name": "回復薬",
-      "description": "最大HPの50%回復。",
-      "flavorText": "効能書きに「半分まで」とある。残りは自力でどうぞ、という薬だ。それが医者の正直な仕事らしい。",
+      "description": "HPを最大HPの40%回復。",
+      "flavorText": "もっとも一般的な回復薬。間違っても風邪や頭痛で使ってはいけない。",
       "category": "Consumable",
       "rarity": "SILVER",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 7
+      "basePrice": 5,
+      "consFamily": "heal",
+      "tier": 2
     },
     {
-      "id": "cons_heal_3",
-      "name": "上級回復薬",
-      "description": "最大HPの75%回復。",
-      "flavorText": "値は張る。深層では、これ一本で一日生き延びた者がいる。値段を高いと言う者は、深層を知らない。",
+      "id": "上回復薬",
+      "name": "上回復薬",
+      "description": "HPを最大HPの60%回復。",
+      "flavorText": "単純に量が多い、つまり、良く効く。",
       "category": "Consumable",
       "rarity": "GOLD",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 11
+      "basePrice": 6,
+      "consFamily": "heal",
+      "tier": 3
     },
     {
-      "id": "cons_heal_4",
+      "id": "完全回復薬",
       "name": "完全回復薬",
       "description": "HPを完全回復する。",
       "flavorText": "「注意、一日に二本以上使用しないこと。奇形再生のリスク有り」",
       "category": "Consumable",
       "rarity": "LEGENDARY",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 16
+      "basePrice": 7,
+      "consFamily": "heal",
+      "tier": 4
     },
     {
-      "id": "cons_atk_1",
-      "name": "力の丸薬",
-      "description": "使用ターンの勝利時、与ダメージ+3。",
-      "flavorText": "「ひと粒で力こぶ」と行商人は言う。大げさだが、まるきり嘘ではない。そのくらいの品だ。",
-      "category": "Consumable",
-      "rarity": "BRONZE",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 4
-    },
-    {
-      "id": "cons_atk_2",
-      "name": "闘気の丸薬",
-      "description": "使用ターンの勝利時、与ダメージ+6。",
-      "flavorText": "奥から熱が来る。熱が冷めると普通に戻る。熱のあるうちに勝負を決める、というのが使い手の流儀だ。",
-      "category": "Consumable",
-      "rarity": "SILVER",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 7
-    },
-    {
-      "id": "cons_atk_3",
-      "name": "猛りの丸薬",
-      "description": "使用ターンの勝利時、与ダメージ+9。",
-      "flavorText": "効きすぎという苦情がギルド鑑定所に届いている。 返金した記録はない。 苦情を出した者は生きているから問題ない。",
-      "category": "Consumable",
-      "rarity": "GOLD",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 11
-    },
-    {
-      "id": "cons_atk_4",
-      "name": "狂戦の丸薬",
-      "description": "使用ターンの勝利時、与ダメージ+15。",
-      "flavorText": "ある傭兵団では、これを飲んだ者の分け前を生前に渡す習わしだった。飲めば、たいてい戻らないからだ。",
-      "category": "Consumable",
-      "rarity": "LEGENDARY",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 16
-    },
-    {
-      "id": "cons_dice_1",
-      "name": "加重のダイス粉",
-      "description": "次2戦闘ずっとダイス合計+1（勝敗判定のみ・ダメージ非加算）。",
-      "flavorText": "振る前に一振りかける粉。賽が少しこちらへ傾く。気のせいかもしれない。気のせいでも使う。",
-      "category": "Consumable",
-      "rarity": "BRONZE",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 4
-    },
-    {
-      "id": "cons_dice_2",
-      "name": "重心のダイス粉",
-      "description": "次2戦闘ずっとダイス合計+2（勝敗判定のみ・ダメージ非加算）。",
-      "flavorText": "「ほんの少しのイカサマが二つ重なれば技だ」と賭博師は真顔で言った。聞いた者は全員笑ったが、否定できなかった。",
-      "category": "Consumable",
-      "rarity": "SILVER",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 7
-    },
-    {
-      "id": "cons_dice_3",
-      "name": "天秤のダイス粉",
-      "description": "次2戦闘ずっとダイス合計+3（勝敗判定のみ・ダメージ非加算）。",
-      "flavorText": "一振りかけるだけで目に見えて傾く。これほど素直な粉は、賭場では出入り禁止になるのも当然だ。",
-      "category": "Consumable",
-      "rarity": "GOLD",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 11
-    },
-    {
-      "id": "cons_dice_4",
-      "name": "神託のダイス粉",
-      "description": "次2戦闘ずっとダイス合計+4（勝敗判定のみ・ダメージ非加算）。",
-      "flavorText": "ここまで傾けば、もう運とは呼べない。賭場では出入り禁止の品、という噂がある。",
-      "category": "Consumable",
-      "rarity": "LEGENDARY",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 16
-    },
-    {
-      "id": "cons_shield_1",
+      "id": "木の護符",
       "name": "木の護符",
-      "description": "被ダメージを8吸収。2ターン後に消滅。",
-      "flavorText": "薄い守りが二ターンだけ持つ。たった二ターンで十分なことがある。深層ではそういうことが起きる。",
+      "description": "シールド 15 を得る。戦闘中にも使用できる。",
+      "flavorText": "首から下げると、最初の一撃だけ木が代わりに受けてくれるという。新米は皆こぞって買うが、帰ってくるのは半分だ。",
       "category": "Consumable",
       "rarity": "BRONZE",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 4
+      "basePrice": 4,
+      "consFamily": "def",
+      "tier": 1
     },
     {
-      "id": "cons_shield_2",
+      "id": "鉄の護符",
       "name": "鉄の護符",
-      "description": "被ダメージを18吸収。4ターン後に消滅。",
-      "flavorText": "木より長く保つ。長く保つと前に出たくなる。そうして潰れた者の話を、売り手はしない。",
+      "description": "シールド 30 を得る。戦闘中にも使用できる。",
+      "flavorText": "重い鉄製の護符。北方戦役での戦場漁りが出元となり、市場に多く出回っている。",
       "category": "Consumable",
       "rarity": "SILVER",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 7
+      "basePrice": 5,
+      "consFamily": "def",
+      "tier": 2
     },
     {
-      "id": "cons_shield_3",
-      "name": "鋼の護符",
-      "description": "被ダメージを35吸収。6ターン後に消滅。",
-      "flavorText": "硬い守りが六ターン続く。六ターンが長く感じて、前に出すぎる。そこから先は、護符の責任ではない。",
+      "id": "銀の護符",
+      "name": "銀の護符",
+      "description": "シールド 50 を得る。戦闘中にも使用できる。",
+      "flavorText": "銀は錆びない、と売り手は言う。買い手が気にしているのはそこではない。",
       "category": "Consumable",
       "rarity": "GOLD",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 11
+      "basePrice": 6,
+      "consFamily": "def",
+      "tier": 3
     },
     {
-      "id": "cons_shield_4",
-      "name": "聖盾の護符",
-      "description": "被ダメージを50吸収。戦闘中持続。",
-      "flavorText": "戦いの終わりまで砕けないという。砕けないだけで、痛くないとは書いていない。",
+      "id": "惜別の護符",
+      "name": "惜別の護符",
+      "description": "シールド 80 を得る。戦闘中にも使用できる。",
+      "flavorText": "2つの護符が複雑に組み合わさっている護符。一つは残される者のために、一つは死にゆく者のために。",
       "category": "Consumable",
       "rarity": "LEGENDARY",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 16
+      "basePrice": 7,
+      "consFamily": "def",
+      "tier": 4
     },
     {
-      "id": "cons_regen_1",
-      "name": "若葉の雫",
-      "description": "戦闘中、毎ターン終了時に回復（5から毎ターン-1）。",
-      "flavorText": "じわりと効く。最初は少なく、だんだん減る。焦らず戦える者には、静かな味方だ。",
-      "category": "Consumable",
-      "rarity": "BRONZE",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 4
-    },
-    {
-      "id": "cons_regen_2",
-      "name": "泉の雫",
-      "description": "戦闘中、毎ターン終了時に回復（7から毎ターン-1）。",
-      "flavorText": "聖教会の医療院では湯に垂らして患者に飲ませた。 院はなくなり、 処方だけが残った。 残った方が役に立っている。",
-      "category": "Consumable",
-      "rarity": "SILVER",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 7
-    },
-    {
-      "id": "cons_regen_3",
-      "name": "霊泉の雫",
-      "description": "戦闘中、毎ターン終了時に回復（9から毎ターン-1）。",
-      "flavorText": "「霊泉の水」と札にある。どこの泉か誰も確かめに行かなかったが、確かめる必要もなかった。",
-      "category": "Consumable",
-      "rarity": "GOLD",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 11
-    },
-    {
-      "id": "cons_regen_4",
-      "name": "命の雫",
-      "description": "戦闘中、毎ターン終了時に回復（12から毎ターン-1）。",
-      "flavorText": "戦いが長引くほど効く雫。短期決着を好む者には向かない。そういう者はそもそも、これを選ばない。",
-      "category": "Consumable",
-      "rarity": "LEGENDARY",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 16
-    },
-    {
-      "id": "cons_crit_1",
-      "name": "鷹の目薬",
-      "description": "次2戦闘ずっと会心ダイス合計値+1。",
-      "flavorText": "さすと急所がほんの少し浮かぶ。少しだけ見えるというのが、かえって使いやすい。",
-      "category": "Consumable",
-      "rarity": "BRONZE",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 4
-    },
-    {
-      "id": "cons_crit_2",
-      "name": "鷲の目薬",
-      "description": "次2戦闘ずっと会心ダイス合計値+2。",
-      "flavorText": "視野が広がり、隅の動きまで拾える。切れた後、しばらく世界が平坦に見える。それが少し寂しい。",
-      "category": "Consumable",
-      "rarity": "SILVER",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 7
-    },
-    {
-      "id": "cons_crit_3",
-      "name": "隼の目薬",
-      "description": "次2戦闘ずっと会心ダイス合計値+3。",
-      "flavorText": "どこを見ても急所への道が見える。見えすぎて手が迷う。届くかどうかは、また別の話だ。",
-      "category": "Consumable",
-      "rarity": "GOLD",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 11
-    },
-    {
-      "id": "cons_crit_4",
-      "name": "天眼の目薬",
-      "description": "次2戦闘ずっと会心ダイス合計値+4。",
-      "flavorText": "使った者いわく、「急所しか視えなくなる」。それ以外がどうでもよくなるのが、少し怖いそうだ。",
-      "category": "Consumable",
-      "rarity": "LEGENDARY",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 16
-    },
-    {
-      "id": "cons_reduce_1",
-      "name": "守りの軟膏",
-      "description": "次2戦闘ずっと被ダメージ毎ターン-1。",
-      "flavorText": "薄く塗ると痛みが一歩引く。消えはしない。一歩引くだけで、手が動く。",
-      "category": "Consumable",
-      "rarity": "BRONZE",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 4
-    },
-    {
-      "id": "cons_reduce_2",
-      "name": "堅守の軟膏",
-      "description": "次2戦闘ずっと被ダメージ毎ターン-2。",
-      "flavorText": "塗ると衝撃が鈍くなる。塗りすぎると体も鈍くなる、と古参は言う。適量は自分で覚えるしかない。",
-      "category": "Consumable",
-      "rarity": "SILVER",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 7
-    },
-    {
-      "id": "cons_reduce_3",
-      "name": "鉄壁の軟膏",
-      "description": "次2戦闘ずっと被ダメージ毎ターン-3。",
-      "flavorText": "打たれても響かなくなる。響かないので深さを見誤る。見誤って深みに踏み込む者が、たまにいる。",
-      "category": "Consumable",
-      "rarity": "GOLD",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 11
-    },
-    {
-      "id": "cons_reduce_4",
-      "name": "金剛の軟膏",
-      "description": "次2戦闘ずっと被ダメージ毎ターン-5。",
-      "flavorText": "塗ると刃が滑る感触になる。一晩矢を浴び続けた門番がいる。翌朝どうなったかは、聞かなかった。",
-      "category": "Consumable",
-      "rarity": "LEGENDARY",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 16
-    },
-    {
-      "id": "cons_food_1",
-      "name": "干し肉",
-      "description": "希望+10。",
-      "flavorText": "固い。味はない。噛めば腹に入る。深層でしばらく過ごすと、それが最高の評価だとわかる。",
-      "category": "Consumable",
-      "rarity": "BRONZE",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 4
-    },
-    {
-      "id": "cons_food_2",
-      "name": "携帯食",
-      "description": "希望+20。",
-      "flavorText": "食べれば足が軽くなる。下の層では、それだけのことが命を左右する。食料を笑う者は、深層を知らない。",
-      "category": "Consumable",
-      "rarity": "SILVER",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 7
-    },
-    {
-      "id": "cons_food_3",
-      "name": "精神安定剤",
-      "description": "希望+30。",
-      "flavorText": "熟練の探検家は知っている。本当に危機的な状況で役に立つのは、根性でも気合でもないことを。",
-      "category": "Consumable",
-      "rarity": "GOLD",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 11
-    },
-    {
-      "id": "cons_food_4",
-      "name": "反応剤β2",
-      "description": "希望+45。",
-      "flavorText": "一本打てば勇者に、もう一本打てば大半は死体に、３本目は......",
-      "category": "Consumable",
-      "rarity": "LEGENDARY",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 16
-    },
-    {
-      "id": "uniq_phil_stone",
-      "name": "賢者の石",
-      "description": "10ゴールドを武器強化素材1に変換（このランで最大5回）。",
-      "flavorText": "鉛を金にすると言われ続けた石。実際に変わったのは石でなく、探し続けた者たちの一生だった。",
-      "category": "Consumable",
-      "rarity": "GOLD",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 11
-    },
-    {
-      "id": "uniq_forge_elixir",
-      "name": "鍛冶の霊薬",
-      "description": "武器強化レベル+1（素材不要・即時）。",
-      "flavorText": "一塗りで刃が一段上がる。「楽をするための薬だ」と言って使わなかった鍛冶がいた。頑固だと思う。",
-      "category": "Consumable",
-      "rarity": "GOLD",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 11
-    },
-    {
-      "id": "uniq_mirror",
-      "name": "鏡写しの水晶",
-      "description": "次/この戦闘中、ロール敗北で受けたメインダメージと同量を敵に反射。",
-      "flavorText": "受けた痛みを、そっくり相手へ送り返す。覗き込むと、こちらを覗き返してくるという。",
-      "category": "Consumable",
-      "rarity": "LEGENDARY",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 12
-    },
-    {
-      "id": "uniq_gambler",
-      "name": "賭博師のダイス",
-      "description": "次/この戦闘、50%で自ダイス全て最大／50%で全て1。",
-      "flavorText": "最大か最低か、二択しかない賽。中間がないので計算しやすい。「だから好きだ」と持ち主は言う。",
-      "category": "Consumable",
-      "rarity": "GOLD",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 11
-    },
-    {
-      "id": "uniq_ambush",
-      "name": "奇襲の発煙筒",
-      "description": "次戦闘、敵の開始HPを15%削った状態で開始。",
-      "flavorText": "焚けば白煙。晴れた頃には間合いの内にいる。それが理想だ、と使い手は言う。理想通りにいけば、だが。",
-      "category": "Consumable",
-      "rarity": "GOLD",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 11
-    },
-    {
-      "id": "uniq_food_horn",
-      "name": "満腹の角笛",
-      "description": "希望+25。",
-      "flavorText": "吹くと腹が満ちる。 原理は不明。 ギルド鑑定所は 「害なし、 滋養あり」 と書いて次の依頼へ進んだ。",
-      "category": "Consumable",
-      "rarity": "SILVER",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 7
-    },
-    {
-      "id": "uniq_appraise",
-      "name": "鑑定の眼鏡",
-      "description": "次の宝箱／次のショップ在庫の最低レアをSILVER以上に保証。",
-      "flavorText": "かけると品の良し悪しがわかる。良すぎるものほど裏が見えてくる。知りたくなかった場合もある。",
-      "category": "Consumable",
-      "rarity": "SILVER",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 7
-    },
-    {
-      "id": "uniq_merchant_bell",
-      "name": "商人の鈴",
-      "description": "次の1ショップ、全価格-50%。",
-      "flavorText": "鳴らすと店主の財布の紐が緩む。大穴探査の黎明期、商人と先遣隊の間に盟約があったという。今もその効力が残っている。",
-      "category": "Consumable",
-      "rarity": "GOLD",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 11
-    },
-    {
-      "id": "uniq_oni_oil",
+      "id": "鬼火の油",
       "name": "鬼火の油",
-      "description": "次/この戦闘中、与ダメージ+50%。",
-      "flavorText": "塗ると刃が青白い炎をまとう。 旧アルフォニアのある古い旅行記に 「鬼の汗を集めた油」 とあるが、 真偽は知れない。",
+      "description": "その戦闘中、与ダメージ+15%。",
+      "flavorText": "塗ると刃が青白い炎をまとう。旧アルフォニアのある古い旅行記に「鬼の汗を集めた油」とあるが、真偽は知れない。",
+      "category": "Consumable",
+      "rarity": "BRONZE",
+      "basePrice": 4,
+      "consFamily": "dmg",
+      "tier": 1
+    },
+    {
+      "id": "燐の油",
+      "name": "燐の油",
+      "description": "その戦闘中、与ダメージ+30%。",
+      "flavorText": "水に濡れても消えない。消えない、というだけで値が三倍になる。",
+      "category": "Consumable",
+      "rarity": "SILVER",
+      "basePrice": 5,
+      "consFamily": "dmg",
+      "tier": 2
+    },
+    {
+      "id": "業火の膏薬",
+      "name": "業火の膏薬",
+      "description": "その戦闘中、与ダメージ+50%。",
+      "flavorText": "塗った翌日、指の腹の渦が消えていた。効いている証拠だと、売った者は言った。",
+      "category": "Consumable",
+      "rarity": "GOLD",
+      "basePrice": 6,
+      "consFamily": "dmg",
+      "tier": 3
+    },
+    {
+      "id": "天火の膏薬",
+      "name": "天火の膏薬",
+      "description": "その戦闘中、与ダメージ+75%。",
+      "flavorText": "壺の底に古い字で「一度に半分まで」とある。半分がどこかは書かれていない。",
       "category": "Consumable",
       "rarity": "LEGENDARY",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 12
+      "basePrice": 7,
+      "consFamily": "dmg",
+      "tier": 4
     },
     {
-      "id": "uniq_earth_guard",
-      "name": "鉄壁の土塊",
-      "description": "次/この戦闘中、被ダメージ毎ターン-3。",
-      "flavorText": "握ると足元が重くなる。重い分だけ揺れない。戦いが終わると、ただの土塊に戻る。",
+      "id": "湯気の立つ椀",
+      "name": "湯気の立つ椀",
+      "description": "希望を 5 回復する。",
+      "flavorText": "塩気だけの汁物。名を持たないが、名がなくても腹には落ちる。",
+      "category": "Consumable",
+      "rarity": "BRONZE",
+      "basePrice": 4,
+      "consFamily": "hope",
+      "tier": 1
+    },
+    {
+      "id": "古い手紙",
+      "name": "古い手紙",
+      "description": "希望を 10 回復する。",
+      "flavorText": "とうに返せぬ相手からのもの。読み返すたび、送り主の声を忘れていく。",
+      "category": "Consumable",
+      "rarity": "SILVER",
+      "basePrice": 6,
+      "consFamily": "hope",
+      "tier": 2
+    },
+    {
+      "id": "凱旋の記憶",
+      "name": "凱旋の記憶",
+      "description": "希望を 15 回復する。",
+      "flavorText": "誰の凱旋だったかは思い出せない。歓声の輪郭だけが、まだ胸のあたりに残っている。",
       "category": "Consumable",
       "rarity": "GOLD",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 11
+      "basePrice": 9,
+      "consFamily": "hope",
+      "tier": 3
     },
     {
-      "id": "uniq_haste_powder",
-      "name": "加速の粉",
-      "description": "次戦闘の初回ロールでダイス合計+5。",
-      "flavorText": "一手目だけ体が先に動く。二手目には消えている。一手で仕事を終えられる者向きの粉だ。",
+      "id": "希望の欠片",
+      "name": "希望の欠片",
+      "description": "希望を 20 回復する。",
+      "flavorText": "希望とは名ばかりの劇薬。ただ折れぬように、次も立てるように、笑って死を迎えられるように。",
+      "category": "Consumable",
+      "rarity": "LEGENDARY",
+      "basePrice": 13,
+      "consFamily": "hope",
+      "tier": 4
+    },
+    {
+      "id": "瞬間研磨剤",
+      "name": "瞬間研磨剤",
+      "description": "次の1撃だけ、与ダメージ+150%。",
+      "flavorText": "振る直前に、刃へ一滴だけ塗る。研ぎ師組合はこれを「研ぎ」と認めていない。認めるかどうかと、斬れるかどうかは、別の話だ。",
       "category": "Consumable",
       "rarity": "GOLD",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 11
+      "basePrice": 0,
+      "unique": true
     },
     {
-      "id": "狂った計測器",
-      "name": "狂った計測器",
-      "description": "会心ダイス合計値+1。",
-      "flavorText": "壊れているのか、正しく動いているのか。針はただ、何かを指して震えている。十五年読み解こうとした男の残した、唯一の手がかり。",
+      "id": "不抜の聖紋",
+      "name": "不抜の聖紋",
+      "description": "戦闘中、HP80%以上を保っている間、被ダメージ-40%。一度でも80%を割った時点で以後無効。",
+      "flavorText": "ストレリツ守備騎士団で、入団の日に一度だけ押される紋。無傷の間だけ淡く光り、一度でも膝をつけば、その戦いでは二度と光らない。誓いとは、そういうものらしい。",
+      "category": "Consumable",
+      "rarity": "GOLD",
+      "basePrice": 0,
+      "unique": true
+    },
+    {
+      "id": "痛覚遮断剤",
+      "name": "痛覚遮断剤",
+      "description": "使用ターン、致命ダメージを受けてもHP1で踏みとどまる。次ターン開始時HP=1なら攻撃+10・最終与ダメージ+10、ただし攻撃終了時に死亡する。",
+      "flavorText": "「効いている間は死なない。切れた時に、まとめて来る」。処方する薬師は必ずそう前置きし、代金を先に受け取る。",
+      "category": "Consumable",
+      "rarity": "GOLD",
+      "basePrice": 0,
+      "unique": true
+    },
+    {
+      "id": "仕込み刃",
+      "name": "仕込み刃",
+      "description": "次のダイスロールに敗北したとき、受けるダメージを無効化し、同値を相手に軽減不可ダメージとして与える。",
+      "flavorText": "ヴェイランド裏町の決闘には、負けた側が生き残る型がひとつだけあるという。型の名を口にする者はいない。口にした者から順に、それで死んできたからだ。",
+      "category": "Consumable",
+      "rarity": "GOLD",
+      "basePrice": 0,
+      "unique": true
+    },
+    {
+      "id": "シュヴァリエのレイピア",
+      "name": "シュヴァリエのレイピア",
+      "description": "戦闘中に使用でコントラタックを切替（消費されない）。発動中: 1d1強制/被ダメージ50%軽減/軽減×2反射。解除時: 次ターン ダイス+1、剣聖撃破済なら会心+9。",
+      "flavorText": "決闘記録では、シュヴァリエは必ず後手を取った。敗北の記録は一つもなく、先に抜いた相手の名だけがすべて抹消されている。",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10
+    },
+    {
+      "id": "十五年目の計測器",
+      "name": "十五年目の計測器",
+      "description": "会心率+5%。",
+      "flavorText": "針は十五年間、空の椅子を指し続けた。解析者が席を立った瞬間だけ中央へ戻り、彼が座り直すとまた同じ椅子を指した。",
       "category": "Passive",
       "rarity": "BRONZE",
-      "sizeX": 2,
-      "sizeY": 1,
-      "basePrice": 8,
-      "passiveSkills": [
+      "basePrice": 7,
+      "skill": "十五年目の計測器",
+      "stats": [
         {
-          "internalName": "InsightI",
-          "skillName": "心眼I",
-          "description": "会心ダイス合計値+1"
+          "stat": "critPct",
+          "value": 5
         }
       ]
     },
     {
-      "id": "怪しい水",
-      "name": "怪しい水",
-      "description": "使用効果は未実装（フレーバー専用の保存品）。",
-      "flavorText": "綺麗すぎる泉から汲んだ。蓋を閉めてもなお、底で何かが揺れている気がする。",
-      "category": "Consumable",
+      "id": "荒砥",
+      "name": "荒砥",
+      "description": "与ダメージ+5%。",
+      "flavorText": "刃こぼれを直すためだけの荒い研石。切れ味は多少落ちるが、刃こぼれした剣よりは幾分かマシだろう。",
+      "category": "Passive",
       "rarity": "BRONZE",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 3
+      "basePrice": 7,
+      "skill": "荒砥",
+      "stats": [
+        {
+          "stat": "dmgPct",
+          "value": 5
+        }
+      ]
     },
     {
-      "id": "古い歯車",
-      "name": "古い歯車",
-      "description": "使用効果は未実装（フレーバー専用の保存品）。",
-      "flavorText": "Λ層の凍りついた塔から、 一つだけ持ち帰った。 指の腹で擦ると、 ほんの少しだけ温かい気がする。",
-      "category": "Consumable",
+      "id": "肩当て",
+      "name": "肩当て",
+      "description": "戦闘開始時、シールド+1。",
+      "flavorText": "ありふれた革製の肩当て。ないよりマシだが、これに命を預けるのはどうかと思う。",
+      "category": "Passive",
       "rarity": "BRONZE",
-      "sizeX": 1,
-      "sizeY": 1,
-      "basePrice": 3
+      "basePrice": 7,
+      "skill": "肩当て",
+      "stats": [
+        {
+          "stat": "shieldStart",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": "二度目の打金",
+      "name": "二度目の打金",
+      "description": "与ダメージ+10%。",
+      "flavorText": "同じ位置を二度叩いた跡が並ぶ。二度目は要らない工程だが、この工房では誰も省かない。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "二度目の打金",
+      "stats": [
+        {
+          "stat": "dmgPct",
+          "value": 10
+        }
+      ]
+    },
+    {
+      "id": "擦り減った小盾",
+      "name": "擦り減った小盾",
+      "description": "戦闘開始時、シールド+2。",
+      "flavorText": "関所で三十年使われた小盾。打痕は正面ではなく縁にばかり残っていて、受けた回数だけ退いた記録になっている。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "擦り減った小盾",
+      "stats": [
+        {
+          "stat": "shieldStart",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "id": "切り分けた帯封",
+      "name": "切り分けた帯封",
+      "description": "層に入るたび、ゴールド+6。",
+      "flavorText": "旅の路銀を層ごとに分けて封じる習わし。封を切った数がそのまま、どこまで降りたかの記録になる。",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7
+    },
+    {
+      "id": "合札",
+      "name": "合札",
+      "description": "各ショップで最初のリロールが無料。",
+      "flavorText": "常連にだけ渡される木札。一度目は勘定に入れないという符牒だが、二度目からは端数まで取られる。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8
+    },
+    {
+      "id": "銭皿",
+      "name": "銭皿",
+      "description": "ショップで買うたび、希望+1。",
+      "flavorText": "縁の欠けた木皿。釣りを手渡ししない店の作法で、客と店主は最後まで指を合わせない。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8
+    },
+    {
+      "id": "首級控え",
+      "name": "首級控え",
+      "description": "エリート戦に勝利時、ゴールド+4。",
+      "flavorText": "首級の受取を認める控え。等級の欄は狩る側ではなく、狩られた側の格で埋められている。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8
+    },
+    {
+      "id": "ちいさな灯火",
+      "name": "ちいさな灯火",
+      "description": "負けるはずの戦闘で一度だけ、HPを全回復して生還する。発動すると失われる。ボス戦では発動しない。",
+      "flavorText": "油を足した記録は無いのに、灯は減らない。刻印は一つきりで、渡した回数を刻む決まりだったと聞く。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9
+    },
+    {
+      "id": "希望の灯片",
+      "name": "希望の灯片",
+      "description": "ロール敗北を一度もせずに戦闘に勝つたび、最大HP+2（永続）。",
+      "flavorText": "ランタンの火屋の欠片。割れ口はとうに冷えているのに、握ると指先だけが温かい。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "希望の灯片"
+    },
+    {
+      "id": "幸運の硬貨",
+      "name": "幸運の硬貨",
+      "description": "戦闘勝利時、+3ゴールド。",
+      "flavorText": "行商人の帳面には『贈答品』とだけある。同じ硬貨が同じ行に、日付を変えて何度も書かれている。",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7,
+      "skill": "幸運の硬貨"
+    },
+    {
+      "id": "英雄の意志",
+      "name": "英雄の意志",
+      "description": "エリート戦・ボス戦の開始時、シールド+4。",
+      "flavorText": "像の土台から出てきた銀の徽章。裏の番号は、同じ隊の名簿のどこにも載っていない。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "英雄の意志",
+      "stats": [
+        {
+          "stat": "shieldStart",
+          "value": 4,
+          "when": {
+            "strongFoe": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "激情の刃",
+      "name": "激情の刃",
+      "description": "HPが最大の50%以下のとき、与ダメージ+20%。",
+      "flavorText": "柄に巻いた布は何度も替えられている。どの布も同じ位置だけが黒い。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "激情の刃",
+      "stats": [
+        {
+          "stat": "dmgPct",
+          "value": 20,
+          "when": {
+            "hpPctMax": 50
+          }
+        }
+      ]
+    },
+    {
+      "id": "相棒の魂",
+      "name": "相棒の魂",
+      "description": "戦闘開始時、シールド+3。",
+      "flavorText": "首輪の金具だけが残った。泥を拭った名前の刻みは、そこだけ新しい。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "相棒の魂"
+    },
+    {
+      "id": "根拠のない確信",
+      "name": "根拠のない確信",
+      "description": "エリートを倒すたび確信が深まる。5層のボスを倒すと〈決意〉に、6層の記録を読むと〈真理〉に変わる。",
+      "flavorText": "理由を書く欄は空白のまま提出された。受理印だけが押してある。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8
+    },
+    {
+      "id": "決意",
+      "name": "決意",
+      "description": "6層へ進む資格。6層の記録を読むと〈真理〉に変わる。",
+      "flavorText": "帰路の地図を畳んだ跡がある。広げ直された形跡は無い。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9
+    },
+    {
+      "id": "真理",
+      "name": "真理",
+      "description": "7層へ進む資格。",
+      "flavorText": "手記の最後の頁と同じ筆跡で、同じ一行が書かれている。書いた覚えは無い。",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10
     }
   ]
 }

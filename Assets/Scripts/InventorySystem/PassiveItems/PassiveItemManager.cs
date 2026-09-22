@@ -27,6 +27,9 @@ namespace InventorySystem.PassiveItems
         public static void OnMapMove(RunState run)
             => Apply(TimedEffectTrigger.OnMapMove, null, run, null);
 
+        public static void OnFloorEnter(RunState run)
+            => Apply(TimedEffectTrigger.OnFloorEnter, null, run, null);
+
         private static void Apply(TimedEffectTrigger trigger, CombatContext ctx, RunState run,
             CombatSystem.CombatManager combat)
         {
@@ -43,7 +46,9 @@ namespace InventorySystem.PassiveItems
                 var effect = PassiveItemRegistry.Get(id);
                 if (effect == null) continue;
                 if (effect.Trigger != trigger) continue;
+                var dsBefore = CombatSystem.DmgSourceDiag.Take(ctx);
                 effect.Apply(ctx, run, combat);
+                CombatSystem.DmgSourceDiag.Attribute(id, dsBefore, ctx);
             }
         }
     }

@@ -11,7 +11,7 @@ namespace AutoTest
     /// <summary>
     /// L3: ボス難易度オートチューナー (苦戦診断 + 平均出目アンカー)。
     ///
-    /// 対象は **6層以前のボスのみ** (7層=覚者連戦は調整しない)。
+    /// 7層ヴェスカ 4段も含め全ボスが対象 (2026-07-27 のリワークで旧「7層は除外」規約は解消)。
     /// バッチ毎に各ボスの戦闘勝率を目標へ寄せるが、 苦戦の種類を診断して原因に対応する数値だけ動かす。
     ///
     /// **調整は隠し倍率(×1.xx)ではなく、 各パッシブの具体的な数値そのもの** を増減する (BossParam)。
@@ -21,7 +21,7 @@ namespace AutoTest
     ///   ・断罪(Judgment)で即死 →
     ///       見切りロールに負けている(ロール勝率低) → 断罪ダイス上乗せ(JudgmentDice)を下げる
     ///       ロールには勝てているが負けた一撃が致命 → 断罪係数(JudgmentCoefBase)を下げる
-    ///   ・反射/爆ぜ火/審判の炎 → それぞれ ReflectPct / BurstDamage / ChipCap
+    ///   ・反射/審判の炎 → それぞれ MirrorReflectCap / ChipCap
     ///   ・ジリ貧(長期戦) → 灰塵の鎧の軽減量(RegenReduction)
     ///   ・ロール連敗 / その他 / 簡単すぎ → Dice (ボス素ダイスの期待値 = プレイヤー平均出目 + offset)
     ///       期待値が [1,25] を超える要求は HP(絶対値) に回す。
@@ -44,13 +44,12 @@ namespace AutoTest
         public const float RollLossThreshold  = 0.50f; // 断罪Tで見切りロールに勝てているかの境
         public const float AttritionTurns     = 15.0f;  // 平均ターンがこれ以上 = ジリ貧
 
-        // 7層の目標ロール勝率は BossTuning.TargetRollWinRate(id) でボスごとに設定 (これを超え張り付くと真我↑)
         public const float RollPinDeadZone    = 0.02f;  // ロール勝率が目標±この幅内なら動かさない
         // スタンス別 ロール勝率レンジは BossTuning.Strong/WeakRollWinRange(id) で per-boss 設定。
         // 強ロール時=ダイス/固有面、 弱ロール時=弱ロール比 で各レンジに収める。
         public const int RollSampleMin = 30; // スタンス別roll-win制御に必要な そのスタンスの最小ターン数
 
-        /// <summary>ボス戦闘勝率の目標 (フロア 1-6)。 7層は調整対象外。</summary>
+        /// <summary>ボス戦闘勝率の目標 (フロア 1-6)。 7層は末尾要素 (0.5) を使う。</summary>
         private static readonly float[] FloorTarget = { 0f, 0.99f, 0.96f, 0.95f, 0.91f, 0.88f, 0.5f };
 
         private class BossAgg
@@ -103,7 +102,7 @@ namespace AutoTest
                 }
                 BossTuning.Reload(learningRoot);
 
-                // ボス別に戦闘集計 (7層も含む。 7層は真我のみ調整するためロールデータが必要)
+                // ボス別に戦闘集計 (7層も含む)
                 var byBoss = new Dictionary<string, BossAgg>();
                 foreach (var r in recs)
                 {
@@ -138,14 +137,10 @@ namespace AutoTest
                     if (a.enc < MinSampleBoss) continue;
                     if (!BossTuning.BossEnabled(id)) continue; // ボス別トグルで無効化されていれば一切調整しない
 
-                    // 7層は通常の難易度調整(ダイス/HP/機構)を行わない。 唯一「真我」のみ、
-                    // プレイヤーのロール勝率が90%張り付き時にダイス上限を超えて引き締める。
-                    // ただし妙覚はサドンデス専用のため真我も無効・学習停止 (一切調整しない)。
-                    if (BossTuning.FloorOf(id) >= 7)
-                    {
-                        if (!BossTuning.IsMyokaku(id)) AdjustTrueSelf(id, a, changes);
-                        continue;
-                    }
+                    // 2026-07-27: 7層は特殊勝利機構の廃止に伴い、 通常の難易度調整
+                    // (ダイス/HP/機構) の対象へ復帰した。 旧「7層だけロール勝率を寄せる」
+                    // 特例は削除 ── 相互攻撃モデルには寄せる先のロール勝率が存在しない。
+                    // 7層固有の第一レバーは〈停滞する時間〉(BossParam.Stagnation)。 詳細: docs/GAME.md §13-3 / §13-4。
 
                     // 難度(クリア率)を目標へ。 **勝率が目標帯(DeadZone)内なら一切調整しない**
                     //   （ロール勝率調整はクリア率調整の手段であって目的ではない＝勝率OKなのにロール勝率を
@@ -226,16 +221,13 @@ namespace AutoTest
                     case DeathCause.Reflect:
                         // ボスが実際に持つ反射スキルに対応する実数値を選ぶ。
                         if (HasSkill(id, "MirrorTwinsResponse")) list.Add(BossParam.MirrorReflectCap); // 4層 鏡の双子
-                        if (HasSkill(id, "AwakenedP3Mirror"))    list.Add(BossParam.ReflectPct);       // 覚者・鏡映(%)
                         break;
-                    case DeathCause.Burst:   list.Add(BossParam.BurstDamage); break;
                     case DeathCause.Chip:
                         // チップ/DOTの本命はボスが持つ該当スキルの上限。 底に達したら威圧の脅威(勝利時の削り)を次点で下げる。
                         if (HasSkill(id, "JudgmentFlames"))   list.Add(BossParam.ChipCap);         // 5層 審判の炎
                         if (HasSkill(id, "MiasmaCorrosion"))  list.Add(BossParam.PoisonStackCap);  // 3層 毒の侵蝕
                         if (HasSkill(id, "IntimidatePlus"))   list.Add(BossParam.IntimidateThreat);
                         break;
-                    // SuddenDeath は7層専用 → ここには来ない
                 }
             }
             // ② 長期戦 = ジリ貧 (灰塵の鎧/サステイン)
@@ -267,9 +259,10 @@ namespace AutoTest
             Add("MiasmaCorrosion",     BossParam.PoisonStackCap);    // 3層
             Add("MirrorTwinsResponse", BossParam.MirrorReflectCap);  // 4層
             Add("JudgmentFlames",      BossParam.ChipCap);           // 5層 審判の炎
-            Add("JudgmentBlaze",       BossParam.JudgmentDice);      // 6層 業火の断罪 (見切りダイス)
-            Add("JudgmentBlaze",       BossParam.JudgmentCoefBase);  // 6層 業火の断罪 (係数)
-            Add("AshArmor",            BossParam.RegenReduction);    // 6層 灰塵の鎧
+            Add("JudgmentBlaze",       BossParam.JudgmentDice);      // 6層 (旧) 業火の断罪
+            Add("JudgmentBlaze",       BossParam.JudgmentCoefBase);  // 6層 (旧) 業火の断罪 (係数)
+            Add("AshArmor",            BossParam.RegenReduction);    // 6層 (旧) 灰塵の鎧
+            Add("EmberOmen",           BossParam.JudgmentDice);      // 6層 v2 業火の予兆 (予兆Tダイス上乗せ)
             Add("IntimidatePlus",      BossParam.IntimidateThreat);  // 威圧+ (共通・最後=脅威は副次)
         }
 
@@ -490,28 +483,6 @@ namespace AutoTest
             return true;
         }
 
-        /// <summary>7層専用: プレイヤーのロール勝率を ~90% へ寄せる「真我」(素ロール固定加算) の調整。
-        /// 通常のダイス上限(5d9)を超えてボスのロールを引き締められる唯一のレバー。
-        /// 勝率(HP差)ではなく **ロール勝率** を制御点にする。</summary>
-        private static void AdjustTrueSelf(string id, BossAgg a, List<string> changes)
-        {
-            if (!BossTuning.TuneTrueSelf) return;
-            float rwr = a.RollWinRate; // プレイヤーのロール勝率
-            float target = BossTuning.TargetRollWinRate(id); // ボスごとの目標ロール勝率
-            float err = rwr - target; // >0 = プレイヤーがロールに勝ちすぎ → 真我を上げる
-            if (Mathf.Abs(err) < RollPinDeadZone) return;
-
-            var meta = BossTuning.Meta(BossParam.TrueSelf);
-            var knob = BossTuning.GetOrCreate(BossTuning.KeyFor(id));
-            float before = BossTuning.GetParam(knob, BossParam.TrueSelf);
-            float step = Mathf.Clamp(meta.gain * err, -meta.maxStep, meta.maxStep);
-            BossTuning.SetParam(knob, BossParam.TrueSelf, before + step); // err>0→上げる / err<0→基準1まで下げる
-            float after = BossTuning.GetParam(knob, BossParam.TrueSelf);
-            if (Mathf.Abs(after - before) > 0.001f)
-                changes.Add($"- **{id}** ロール勝率{rwr:P0}→目標{target:P0} [勝率{a.WinRate:P0} 平均{a.AvgTurns:F1}T]: "
-                    + $"真我 {Fmt(before)}→**{Fmt(after)}** (ダイス上限超の素ロール加算)");
-        }
-
         private static string ParamLabel(BossParam p)
         {
             switch (p)
@@ -519,12 +490,9 @@ namespace AutoTest
                 case BossParam.JudgmentDice:      return "断罪ダイス上乗せ";
                 case BossParam.JudgmentCoefBase:  return "断罪係数base";
                 case BossParam.RobeStacks:        return "天衣無縫上限";
-                case BossParam.ReflectPct:        return "反射率%";
                 case BossParam.ChipCap:           return "審判の炎上限";
-                case BossParam.BurstDamage:       return "爆ぜ火固定ダメ";
                 case BossParam.RegenReduction:    return "灰塵の鎧軽減";
-                case BossParam.SuddenDeathDamage: return "サドンデスダメ";
-                case BossParam.TrueSelf:          return "真我";
+                case BossParam.Stagnation:        return "停滞する時間";
                 case BossParam.IntimidateThreat:  return "威圧の脅威";
                 case BossParam.PoisonStackCap:    return "毒スタック上限";
                 case BossParam.MirrorReflectCap:  return "反射上限";

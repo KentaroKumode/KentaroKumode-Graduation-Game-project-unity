@@ -9,6 +9,7 @@ namespace EventSystem
         HpDelta,                 // HP+N / HP-N
         HpFullHeal,              // HP全回復
         HpSetTo,                 // HPがNになる
+        HpHalve,                 // 現在HPの半分を支払う (端数切上で残す・最低1)
         MaxHpDelta,              // 最大HP+N / 最大HP-N
         GoldDelta,               // ゴールド+N / ゴールド-N
         HungerDelta,             // 空腹度+N / 空腹度-N (旧表記、希望±N と等価)
@@ -29,5 +30,9 @@ namespace EventSystem
         RandomEvent,             // ランダムなイベント発生
         Probability,             // 確率分岐の親（child のリストを持つ）
         CircusHandover,          // 「サーカス団を引き渡す」(契約解除 + Lv連動報酬)
+
+        /// <summary>観測所の写しを持ち帰る。 **ラン跨ぎ**で残り、次の再訪 1 回で追加報酬になる。
+        /// フラグアイテムでは表現できない (ownedFlags はラン内で消える)。</summary>
+        ObservatoryTakeCopy,
     }
 }

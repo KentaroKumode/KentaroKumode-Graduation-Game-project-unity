@@ -135,8 +135,8 @@ namespace InventorySystem
         {
             // 新消費アイテム体系（cons_* / uniq_*）は統一ルータへ。
             // 戦闘中なら ctx 即時、戦闘外なら RunState pending に振り分けられる。
-            if (!string.IsNullOrEmpty(itemId)
-                && (itemId.StartsWith("cons_") || itemId.StartsWith("uniq_")))
+            //   **接頭辞では判定しない** (2026-09-22) ── items.json の consFamily / unique を読む。
+            if (GameLoop.ItemIds.IsConsumableFamilyItem(itemId) || GameLoop.ItemIds.IsUniqueItem(itemId))
             {
                 var run = GameLoop.GameManager.Instance?.Run;
                 return GameLoop.Consumables.ApplyDirect(run, itemId);

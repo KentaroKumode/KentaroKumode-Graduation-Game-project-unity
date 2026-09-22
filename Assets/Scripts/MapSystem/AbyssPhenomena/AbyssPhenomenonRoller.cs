@@ -8,7 +8,7 @@ namespace MapSystem.AbyssPhenomena
     /// <summary>
     /// 層突入時の異常現象抽選。 種別の重みは現在の希望に線形連動する。
     /// 算式: P(BUFF) = 20 + 0.30·h、 P(MIXED) = 30、 P(DEBUFF) = 50 − 0.30·h (h = 希望 0〜100)
-    /// 正本: docs/specs/abyss-phenomena.md §抽選ルール
+    /// 正本: docs/GAME.md §5-7 §抽選ルール
     /// </summary>
     public static class AbyssPhenomenonRoller
     {
@@ -26,7 +26,7 @@ namespace MapSystem.AbyssPhenomena
             if (first == AbyssPhenomenon.None) return;
             run.activePhenomena.Add(first);
 
-            if (Random.value < TwoRollChance)
+            if (GameLoop.GameRng.Value("AbyssPhenomenonRoller.1") < TwoRollChance)
             {
                 var exclude = new HashSet<AbyssPhenomenon> { first };
                 // MIXED + MIXED は禁止 (中立同士の重複を避ける)
@@ -54,7 +54,7 @@ namespace MapSystem.AbyssPhenomena
                 .ToList();
 
             if (candidates.Count == 0) return AbyssPhenomenon.None;
-            return candidates[Random.Range(0, candidates.Count)];
+            return candidates[GameLoop.GameRng.RangeAuto("AbyssPhenomenonRoller.2", 0, candidates.Count)];
         }
 
         private static AbyssPhenomenonKind RollKind(float pBuff, float pMixed, float pDebuff, AbyssPhenomenonKind? forbid)
@@ -66,7 +66,7 @@ namespace MapSystem.AbyssPhenomena
             float total = pBuff + pMixed + pDebuff;
             if (total <= 0f) return AbyssPhenomenonKind.Mixed;
 
-            float r = Random.Range(0f, total);
+            float r = GameLoop.GameRng.RangeAuto("AbyssPhenomenonRoller.3", 0f, total);
             if (r < pBuff) return AbyssPhenomenonKind.Buff;
             r -= pBuff;
             if (r < pMixed) return AbyssPhenomenonKind.Mixed;

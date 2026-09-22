@@ -13,27 +13,25 @@ namespace AutoTest
         //  武器カテゴリ (Weapons)
         // ============================================================
 
-        /// <summary>武器S級: lift6F 最強格。 sword_t3 / axe_t3 / shield_t3 / curse_t1。
-        /// curse_t1 は BRONZE だが acq6F=3896 で覚者連戦に寄与（formΔ +0.85）。</summary>
+        /// <summary>武器S級: lift6F 最強格。 sword_t3 / axe_t3 / shield_t3。
+        /// (curse 系列 2026-07-17 削除)</summary>
         public static readonly HashSet<string> WeaponSRank = new HashSet<string>
         {
-            "sword_t3",      // 銀の長剣
-            "axe_t3",        // 血塗りの戦斧
-            "shield_t3",     // 聖騎士の盾
-            "curse_t1",      // 呪いの短剣
+            "銀の長剣",      // 銀の長剣
+            "血塗りの戦斧",        // 血塗りの戦斧
+            "聖騎士の盾",     // 聖騎士の盾
         };
 
         /// <summary>武器A級: 次点。 Tier 2 メインラインと dagger_t3。</summary>
         public static readonly HashSet<string> WeaponARank = new HashSet<string>
         {
-            "sword_t2",      // 鍛鉄の剣
-            "axe_t2",        // 猛斧
-            "dagger_t3",     // 千手の戦刃
-            "shield_t4",     // ドーンブリンガー (small N だが lift6F +0.78)
-            "sword_t4",      // 寂滅
-            "axe_t4",        // 血帝廻天
-            "curse_t4",      // 呪蝕の深淵
-            "ryusen",        // 竜閃
+            "鍛鉄の剣",      // 鍛鉄の剣
+            "猛斧",        // 猛斧
+            "処刑人の曲刀",     // 千手の戦刃
+            "ドーンブリンガー",     // ドーンブリンガー (small N だが lift6F +0.78)
+            "デュランダル",      // デュランダル
+            "血帝廻天",        // 血帝廻天
+            "竜閃",        // 竜閃
         };
 
         // ============================================================
@@ -46,28 +44,28 @@ namespace AutoTest
             "dice_perfection",   // 完全性のダイス (L6=0.16, formΔ=+0.66)
             "dice_destiny",      // 運命のダイス (L6=0.15, formΔ=+0.45)
             "dice_greed",        // 貪欲のダイス (L6=0.07, formΔ=+1.18 ★)
-            "titans_armband",    // 剛力IV (L6=0.07)
+            // "Might_4" は 2026-09-05 の家系1段化で削除 (Might は Lv1 のみ残置)
         };
 
         /// <summary>アイテムA級: lift6F ≥ 0.03 で正の formΔ。</summary>
         public static readonly HashSet<string> ItemARank = new HashSet<string>
         {
             // パッシブ (Tier-line 高位)
-            "giants_armband",    // 剛力III
-            "iron_armband",      // 剛力II
-            "strength_belt",     // 剛力I (acq6F=5572 で安定して効く)
-            "黄金の天秤",        // 戦果の秤 (+5G/勝)
+            // "Might_3" / "Might_2" は 2026-09-05 の家系1段化で削除
+            "半歩深めの力帯",           // 剛力I (acq6F=5572 で安定して効く)
+            "戦果で傾く天秤",        // 戦果の秤 (+5G/勝)
             "吸血III",
             "吸血IV",
-            "商人の符牒",
+            // "商人の符牒" 2026-07-17 削除
             "希望の灯片",        // ← リワーク後想定 (無敗勝利で maxHP+2 永続)
             // ダイス
             "dice_star",         // 星のダイス
             "dice_flame",        // 偏りのダイス
             "dice_twinsnake",    // 双蛇のダイス
-            // 消費
-            "cons_dice_3",       // 天秤のダイス粉
-            "uniq_appraise",     // 鑑定の眼鏡
+            // 消費 (2026-08-04 再編: 3 系統 × Tier1〜4。 最上位 T4 のみ S 級)
+            "天火の膏薬",       // 攻撃強化 T4: その戦闘中 与ダメ+75%
+            "惜別の護符",       // シールド T4: 80
+            "完全回復薬",      // 回復 T4: 完全回復
         };
 
         // ============================================================

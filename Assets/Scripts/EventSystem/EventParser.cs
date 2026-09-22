@@ -129,6 +129,7 @@ namespace EventSystem
                 if (t == "一度のみ") { c.onceOnly = true; continue; }
                 if (t == "優先") { c.priority = true; continue; }
                 if (t == "稀") { c.rare = true; continue; }
+                if (t == "召喚専用") { c.summonOnly = true; continue; }
 
                 var m = floorRangeRegex.Match(t);
                 if (m.Success)
@@ -193,6 +194,19 @@ namespace EventSystem
         /// </summary>
         private static EventChoice ParseSingleChoice(string s)
         {
+            // ダイジェスト文を先に切り離す。 **区切りは '-' ではなく "@@"**
+            //   ── '-' は結果セクションの HP-5 と衝突し、 「最初と最後の '-' で挟む」
+            //   ヒューリスティック自体が成立しなくなる。 "@@" は散文に出ないので、
+            //   既存行は 1 文字も変えずにそのまま通る。
+            string digest = null;
+            int at = s.IndexOf("@@", System.StringComparison.Ordinal);
+            if (at >= 0)
+            {
+                digest = s.Substring(at + 2).Trim();
+                s = s.Substring(0, at);
+                if (digest.Length == 0) digest = null;
+            }
+
             int firstDash = s.IndexOf('-');
             int lastDash = s.LastIndexOf('-');
             if (firstDash < 0 || lastDash <= firstDash)
@@ -205,14 +219,27 @@ namespace EventSystem
             string resultStr  = s.Substring(firstDash + 1, lastDash - firstDash - 1).Trim();
             string postFlavor = s.Substring(lastDash + 1).Trim();
 
+            ChoicesParsed++;
+            if (digest != null) ChoicesWithDigest++;
+
             var choice = new EventChoice
             {
                 text = choiceText,
                 postFlavor = postFlavor,
+                digest = digest,
                 effects = ParseEffects(resultStr),
             };
             return choice;
         }
+
+        /// <summary>パースした選択肢の総数と、 ダイジェスト文が記入済みの数。
+        /// **執筆の進捗をコードから見るための計装** ── 130 個を一度に書くのは無理なので、
+        /// どこまで埋まったかを実行時に数えられるようにしておく。
+        /// ロード毎に積むので、 比率で見るか <see cref="ResetDigestAudit"/> を挟むこと。</summary>
+        public static int ChoicesParsed;
+        public static int ChoicesWithDigest;
+
+        public static void ResetDigestAudit() { ChoicesParsed = ChoicesWithDigest = 0; }
 
         // ============================================================
         //  効果パース
@@ -276,6 +303,7 @@ namespace EventSystem
         // 単一効果パース用の正規表現群
         private static readonly Regex hpDelta      = new Regex(@"^HP([+\-])(\d+)$");
         private static readonly Regex hpSet        = new Regex(@"^HPが(\d+)になる$");
+        private static readonly Regex hpHalve      = new Regex(@"^現在HPの半分を支払う$");
         private static readonly Regex maxHp        = new Regex(@"^最大HP([+\-])(\d+)$");
         private static readonly Regex gold         = new Regex(@"^ゴールド([+\-])(\d+)$");
         private static readonly Regex hunger       = new Regex(@"^空腹度([+\-])(\d+)$");
@@ -287,6 +315,7 @@ namespace EventSystem
         private static readonly Regex passiveNamed = new Regex(@"^パッシブアイテム\[(.+?)\](?:を獲得)?$");
         private static readonly Regex consumNamed  = new Regex(@"^消費アイテム\[(.+?)\](?:を獲得)?$");
         private static readonly Regex itemNamed    = new Regex(@"^アイテム\[(.+?)\](?:を獲得)?$");
+        private static readonly Regex obsCopy      = new Regex(@"^観測所の写しを持ち帰る$");
         private static readonly Regex flagGain     = new Regex(@"^フラグアイテム\[(.+?)\]を獲得$");
         private static readonly Regex flagDiscard  = new Regex(@"^フラグアイテム\[(.+?)\]を廃棄$");
         private static readonly Regex passiveDiscard = new Regex(@"^パッシブアイテム\[(.+?)\]を廃棄$");
@@ -322,6 +351,7 @@ namespace EventSystem
 
             m = hpDelta.Match(t);    if (m.Success) return Eff(EventEffectType.HpDelta, amount: SignedInt(m, 1, 2), postCombat: postCombat);
             m = hpSet.Match(t);      if (m.Success) return Eff(EventEffectType.HpSetTo, amount: int.Parse(m.Groups[1].Value), postCombat: postCombat);
+            if (hpHalve.IsMatch(t))  return Eff(EventEffectType.HpHalve, postCombat: postCombat);
             m = maxHp.Match(t);      if (m.Success) return Eff(EventEffectType.MaxHpDelta, amount: SignedInt(m, 1, 2), postCombat: postCombat);
             m = gold.Match(t);       if (m.Success) return Eff(EventEffectType.GoldDelta, amount: SignedInt(m, 1, 2), postCombat: postCombat);
             m = hunger.Match(t);     if (m.Success) return Eff(EventEffectType.HungerDelta, amount: SignedInt(m, 1, 2), postCombat: postCombat);
@@ -333,6 +363,7 @@ namespace EventSystem
             m = passiveNamed.Match(t); if (m.Success) return Eff(EventEffectType.GainPassiveItem, param: m.Groups[1].Value, postCombat: postCombat);
             m = consumNamed.Match(t);  if (m.Success) return Eff(EventEffectType.GainConsumableItem, param: m.Groups[1].Value, postCombat: postCombat);
             m = itemNamed.Match(t);    if (m.Success) return Eff(EventEffectType.GainSpecificItem, param: m.Groups[1].Value, postCombat: postCombat);
+            m = obsCopy.Match(t);      if (m.Success) return Eff(EventEffectType.ObservatoryTakeCopy, postCombat: postCombat);
             m = flagGain.Match(t);     if (m.Success) return Eff(EventEffectType.GainFlag, param: m.Groups[1].Value, postCombat: postCombat);
             m = flagDiscard.Match(t);  if (m.Success) return Eff(EventEffectType.DiscardFlag, param: m.Groups[1].Value, postCombat: postCombat);
             m = passiveDiscard.Match(t); if (m.Success) return Eff(EventEffectType.DiscardPassiveItem, param: m.Groups[1].Value, postCombat: postCombat);

@@ -17,7 +17,7 @@ namespace MapSystem.AbyssPhenomena
             run.eclipsedNightTriggered = false;
             run.ironSunNextTurn = 0;
 
-            if (run.HasPhenomenon(AbyssPhenomenon.EclipsedNight) && UnityEngine.Random.value < 0.30f)
+            if (run.HasPhenomenon(AbyssPhenomenon.EclipsedNight) && GameLoop.GameRng.Value("AbyssPhenomenonCombatHooks.1") < 0.30f)
             {
                 run.eclipsedNightTriggered = true;
                 Debug.Log("[AbyssPhenomenon] 蝕夜: 双方とも開幕 1T 行動不能");
@@ -25,7 +25,7 @@ namespace MapSystem.AbyssPhenomena
 
             if (run.HasPhenomenon(AbyssPhenomenon.IronMeltingSun))
             {
-                run.ironSunNextTurn = UnityEngine.Random.Range(1, 6); // 1〜5T 目に最初の直射
+                run.ironSunNextTurn = GameLoop.GameRng.RangeAuto("AbyssPhenomenonCombatHooks.5", 1, 6); // 1〜5T 目に最初の直射
             }
         }
 
@@ -42,7 +42,7 @@ namespace MapSystem.AbyssPhenomena
             => run != null
                && currentTurn == 1
                && run.HasPhenomenon(AbyssPhenomenon.NoonWithoutShadow)
-               && UnityEngine.Random.value < 0.50f;
+               && GameLoop.GameRng.Value("AbyssPhenomenonCombatHooks.2") < 0.50f;
 
         /// <summary>鉄を溶かす太陽: このターンに直射が発火するか判定。 発火時はプレイヤーダイスを 0 にして HP-10。
         /// 戻り値は HP 損失量 (0=不発)。</summary>
@@ -65,8 +65,8 @@ namespace MapSystem.AbyssPhenomena
         {
             if (run == null || dice == null || dice.Length == 0) return;
             if (!run.HasPhenomenon(AbyssPhenomenon.UnceasingBell)) return;
-            if (UnityEngine.Random.value >= 0.20f) return;
-            int idx = UnityEngine.Random.Range(0, dice.Length);
+            if (GameLoop.GameRng.Value("AbyssPhenomenonCombatHooks.3") >= 0.20f) return;
+            int idx = GameLoop.GameRng.RangeAuto("AbyssPhenomenonCombatHooks.6", 0, dice.Length);
             dice[idx] = Mathf.Max(1, dice[idx] - 1);
             Debug.Log($"[AbyssPhenomenon] 鳴りやまない鐘: ダイス[{idx}] -1 → {dice[idx]}");
         }
@@ -106,7 +106,7 @@ namespace MapSystem.AbyssPhenomena
                     eDelta -= Mathf.Max(1, Mathf.RoundToInt(enemyMaxHP * 0.02f));
                 }
                 // 逆さ雷: 15% で敵 +3
-                if (run.HasPhenomenon(AbyssPhenomenon.InvertedLightning) && UnityEngine.Random.value < 0.15f)
+                if (run.HasPhenomenon(AbyssPhenomenon.InvertedLightning) && GameLoop.GameRng.Value("AbyssPhenomenonCombatHooks.4") < 0.15f)
                 {
                     eDelta -= 3;
                 }

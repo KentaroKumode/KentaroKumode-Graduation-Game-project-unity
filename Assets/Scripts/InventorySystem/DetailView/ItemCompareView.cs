@@ -64,8 +64,8 @@ namespace InventorySystem
             if (item.hasWeaponStats && item.weaponStats != null)
             {
                 text += $"ダイス: {item.weaponStats.ToString()}\n";
-                if (item.criticalRate > 0)
-                    text += $"会心率: {item.criticalRate}/9\n";
+                if (item.critRatePct > 0f)
+                    text += $"会心率: {item.CriticalRateLabel()}\n";
             }
             text += $"レアリティ: {item.rarity}\n";
             text += $"カテゴリ: {item.category}\n";
@@ -90,10 +90,11 @@ namespace InventorySystem
                 text += $"ダイス: {cd.count}d{cd.maxValue} → {nd.count}d{nd.maxValue}\n";
             }
             
-            // 会心率比較
-            if (current.criticalRate > 0 || newItem.criticalRate > 0)
+            // 会心率比較（2026-07-26: 分子 N/9 表記 → 実効会心率 % 表記）
+            if (current.critRatePct > 0f || newItem.critRatePct > 0f)
             {
-                text += GetStatComparison("会心率", current.criticalRate, newItem.criticalRate);
+                text += GetStatComparison("会心率", current.critRatePct, newItem.critRatePct,
+                    current.CriticalRateLabel(), newItem.CriticalRateLabel());
             }
             
             // 価格比較
@@ -106,23 +107,30 @@ namespace InventorySystem
         /// 個別ステータスの比較
         /// </summary>
         private string GetStatComparison(string statName, int currentValue, int newValue)
+            => GetStatComparison(statName, currentValue, newValue,
+                currentValue.ToString(), newValue.ToString());
+
+        /// <summary>個別ステータスの比較（表示文字列を別指定できる版。会心率の % 表記などに使う）。
+        /// 増減の判定は素値 (currentValue/newValue) で行い、表示だけ Label を使う。</summary>
+        private string GetStatComparison(string statName, float currentValue, float newValue,
+            string currentLabel, string newLabel)
         {
-            int diff = newValue - currentValue;
-            
+            float diff = newValue - currentValue;
+
             if (diff > 0)
             {
                 // 上昇（緑）
-                return $"{statName}: {currentValue} → <color=green>{newValue} ↑</color>\n";
+                return $"{statName}: {currentLabel} → <color=green>{newLabel} ↑</color>\n";
             }
             else if (diff < 0)
             {
                 // 下降（赤）
-                return $"{statName}: {currentValue} → <color=red>{newValue} ↓</color>\n";
+                return $"{statName}: {currentLabel} → <color=red>{newLabel} ↓</color>\n";
             }
             else
             {
                 // 変化なし
-                return $"{statName}: {currentValue} → {newValue}\n";
+                return $"{statName}: {currentLabel} → {newLabel}\n";
             }
         }
     }

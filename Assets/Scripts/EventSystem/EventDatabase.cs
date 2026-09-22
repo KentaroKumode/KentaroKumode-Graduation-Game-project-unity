@@ -15,6 +15,15 @@ namespace EventSystem
 
         public const string ResourcePath = "Events/event_list";
 
+        /// <summary>読み込むファイル。**順序を固定したいので明示的に列挙する**
+        /// （<c>Resources.LoadAll</c> は順序が環境依存で、同名イベントの優先が揺れる）。
+        /// 観測所は <c>召喚専用</c> なので通常抽選には出ない。</summary>
+        public static readonly string[] ResourcePaths =
+        {
+            ResourcePath,
+            "Events/event_list_observatory",
+        };
+
         public static IReadOnlyList<EventDefinition> All
         {
             get { EnsureInitialized(); return all; }
@@ -29,15 +38,22 @@ namespace EventSystem
 
         public static void Reload()
         {
-            all.Clear();
-            var asset = Resources.Load<TextAsset>(ResourcePath);
-            if (asset == null)
+            all = new List<EventDefinition>();
+            foreach (var path in ResourcePaths)
             {
-                Debug.LogWarning($"[EventDatabase] Resources/{ResourcePath}.txt が見つかりません");
-                return;
+                var asset = Resources.Load<TextAsset>(path);
+                if (asset == null)
+                {
+                    // 1 本目 (本体) が無いのは異常。 2 本目以降は未作成でも動かす。
+                    if (path == ResourcePath)
+                        Debug.LogWarning($"[EventDatabase] Resources/{path}.txt が見つかりません");
+                    continue;
+                }
+                var parsed = EventParser.ParseAll(asset.text);
+                all.AddRange(parsed);
+                Debug.Log($"[EventDatabase] {path}: {parsed.Count} 件");
             }
-            all = EventParser.ParseAll(asset.text);
-            Debug.Log($"[EventDatabase] {all.Count} イベント読み込み完了");
+            Debug.Log($"[EventDatabase] 合計 {all.Count} イベント読み込み完了");
         }
 
         /// <summary>
@@ -101,7 +117,7 @@ namespace EventSystem
                     float c = GetPriorityChance(p.name);
                     if (c > maxChance) maxChance = c;
                 }
-                if (Random.value < maxChance) pool = priority;
+                if (GameLoop.GameRng.Value("EventDatabase.1") < maxChance) pool = priority;
             }
 
             // 重み付き抽選
@@ -113,7 +129,7 @@ namespace EventSystem
                 weights[i] = w;
                 total += w;
             }
-            float r = Random.value * total;
+            float r = GameLoop.GameRng.Value("EventDatabase.2") * total;
             for (int i = 0; i < pool.Count; i++)
             {
                 if ((r -= weights[i]) <= 0f) return pool[i];
@@ -137,6 +153,9 @@ namespace EventSystem
         public static bool IsAvailable(EventDefinition ev, RunState run, int floor)
         {
             if (ev == null || ev.condition == null) return false;
+            // 召喚専用は名指しでしか出ない。 **抽選プールの門で落とす** ので、
+            //   Pick を通る経路すべて (イベントマス / RandomEvent 効果) から一律に消える。
+            if (ev.condition.summonOnly) return false;
             if (!ev.condition.MatchesFloor(floor)) return false;
 
             // 一度のみイベントが既出ならスキップ
@@ -186,6 +205,18 @@ namespace EventSystem
             EnsureInitialized();
             foreach (var ev in all)
                 if (ev.id == id) return ev;
+            return null;
+        }
+
+        /// <summary>イベント名で引く。 **召喚専用イベントを名指しで呼ぶ唯一の経路**。
+        /// id は名前のハッシュ (<c>EventParser.MakeId</c>) なので、 呼び出し側からは
+        /// 表示名の方が安定して書ける。</summary>
+        public static EventDefinition GetByName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return null;
+            EnsureInitialized();
+            foreach (var ev in all)
+                if (ev.name == name) return ev;
             return null;
         }
     }

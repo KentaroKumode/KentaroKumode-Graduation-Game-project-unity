@@ -38,17 +38,19 @@ namespace InventorySystem.PassiveSkills
     {
         public static readonly Dictionary<string, StatusDef> Defs = new Dictionary<string, StatusDef>
         {
-            // 炎上（パイロット移行）: 敵へ毎ターン開始時 固定3ダメ・3ターン持続（stacks3／毎T-1／固定3）。
-            // 旧 Ignite の enemyBurnTurns=3 / enemyBurnDamage=3 と等価。
-            ["burn"] = new StatusDef
+            // burn (炎上) は 2026-07-18 削除: Burn キーワード全廃 → 臨界 (Rinkai) 軸に置換。
+            // 毒 (2026-07-15 追加): 拘束・妨害中心 (差別化)。小さい DoT + 麻痺毒で敵攻撃-N が主効果。
+            // 減衰なし・上限10・遅効型 = 長期戦に強く、5到達で毒殺 (キル判定) が中間トリガー。
+            // 5〜10 の伸びしろは Paralysis (敵攻撃-N) と DoT で継続拘束に使う。
+            ["poison"] = new StatusDef
             {
-                id = "burn",
+                id = "poison",
                 target = StatusTarget.Enemy,
                 tickTiming = StatusTick.TurnStart,
-                dotPerStack = 3,
-                dotScalesWithStacks = false,
-                decayPerTurn = 1,
-                maxStacks = 99,
+                dotPerStack = 1,
+                dotScalesWithStacks = true,   // stacks×1 = 最大10ダメ/T (副次)
+                decayPerTurn = 0,             // 減衰なし = 永続蓄積
+                maxStacks = 10,
             },
         };
     }

@@ -4,6 +4,12 @@ namespace MetaProgression
 {
     /// <summary>
     /// メタ進行のシングルトン。State の保持・購入処理・保存/ロードを担当。
+    ///
+    /// 2026-07-25 v6 移行:
+    ///   ・購入モデル = 整備パネル (MetaPanel)。
+    ///   ・トークン → ポイント購入 → トラックへランク配点。 ポイント上限 36。
+    ///   ・旧 TryPurchase (58 段トラック) は Deprecated (noop)。 呼び出し側は AutoRunner の
+    ///     MaxAllForTesting と ClassSelect UI 相当のみ、後者は v6 UI 実装時に置換予定。
     /// </summary>
     public class MetaProgressManager : MonoBehaviour
     {
@@ -59,12 +65,11 @@ namespace MetaProgression
         public void Load()
         {
 #if UNITY_EDITOR
-            // エディタ起動時はメタ進行を毎回初期状態へリセット（スキルツリーUI開発中の便宜）。
-            // テスト用に星を付与しておく（リセットされてもすぐ買えるように）。
+            // エディタ起動時はメタ進行を毎回初期状態へリセット (UI 開発中の便宜)。
             PlayerPrefs.DeleteKey(PrefsKey);
             State = new MetaProgressState();
             State.tokens = 3000;
-            State.RecalculateFromTrack();
+            State.EnsurePanelInitialized();
             return;
 #else
             string json = PlayerPrefs.GetString(PrefsKey, "");
@@ -77,7 +82,8 @@ namespace MetaProgression
                 try { State = JsonUtility.FromJson<MetaProgressState>(json) ?? new MetaProgressState(); }
                 catch { State = new MetaProgressState(); }
             }
-            State.RecalculateFromTrack();
+            State.EnsurePanelInitialized();
+            State.MigrateFromLegacyTrackIfNeeded();
 #endif
         }
 
@@ -88,13 +94,16 @@ namespace MetaProgression
             OnStateChanged?.Invoke();
         }
 
-        /// <summary>メタバフ全段(Lv115)を解放した状態に強制セット。AutoRunner の全有効化パターン用。</summary>
+        /// <summary>整備パネルの全トラックを max 状態にする (bot / AutoRunner 用)。
+        /// PlayerPrefs には保存しない (テスト専用)。</summary>
         public void MaxAllForTesting()
         {
             State = new MetaProgressState();
-            State.currentLevel = MetaBuffTrack.TotalSteps;
-            State.RecalculateFromTrack();
-            // 永続化はしない（テスト用途専用、PlayerPrefs を汚染しないため Save() しない）
+            State.EnsurePanelInitialized();
+            // 上限までポイント購入・全トラックを max に
+            State.panelPointsPurchased = MetaPanel.MaxPoints;
+            foreach (MetaPanelKind k in System.Enum.GetValues(typeof(MetaPanelKind)))
+                State.SetRank(k, k.MaxRank());
             OnStateChanged?.Invoke();
         }
 
@@ -111,77 +120,136 @@ namespace MetaProgression
         }
 
         // ============================================================
-        //  購入
+        //  ポイント購入 (整備パネル v6)
         // ============================================================
 
-        public int NextLevel => (State?.currentLevel ?? 0) + 1;
-        public int NextCost => MetaBuffTrack.CalcCost(NextLevel);
-        public bool IsTrackComplete => (State?.currentLevel ?? 0) >= MetaBuffTrack.TotalSteps;
+        public int NextPointCost => State?.NextPointCost() ?? int.MaxValue;
+        public bool IsPointCapReached => (State?.panelPointsPurchased ?? 0) >= MetaPanel.MaxPoints;
 
-        public bool CanPurchase()
+        public bool CanPurchasePoint()
         {
-            if (State == null) return false;
-            if (IsTrackComplete) return false;
-            return State.tokens >= NextCost;
+            if (State == null || IsPointCapReached) return false;
+            return State.tokens >= NextPointCost;
         }
 
-        public bool TryPurchase()
+        /// <summary>ポイントを 1 個購入 (未配分残に加算)。 割り振りは AssignPoint。</summary>
+        public bool TryPurchasePoint()
         {
-            if (!CanPurchase()) return false;
-            int cost = NextCost;
+            if (!CanPurchasePoint()) return false;
+            int cost = NextPointCost;
             State.tokens -= cost;
-            State.currentLevel++;
-            var step = MetaBuffTrack.Get(State.currentLevel);
-            if (step != null)
-            {
-                // RecalculateFromTrack を全走査せず増分のみ反映
-                ApplyStepToState(step);
-            }
+            State.panelPointsPurchased++;
             OnStateChanged?.Invoke();
             Save();
-            Debug.Log($"[MetaProgress] 購入: Lv{State.currentLevel} {step?.DisplayLabel} (-{cost})");
+            Debug.Log($"[MetaProgress] ポイント購入: {State.panelPointsPurchased}/{MetaPanel.MaxPoints} (-{cost})");
             return true;
         }
 
-        private void ApplyStepToState(MetaBuffStep step)
-        {
-            switch (step.kind)
-            {
-                case MetaBuffKind.Hp:               State.hpBonus += step.amount; break;
-                case MetaBuffKind.Gold:             State.goldBonus += step.amount; break;
-                case MetaBuffKind.DiceTotal:        State.diceTotalBonus += step.amount; break;
-                case MetaBuffKind.DamageReduce:     State.damageReduce += step.amount; break;
-                case MetaBuffKind.HopeLossReduce:   State.hopeLossReduce += step.amount; break;
-                case MetaBuffKind.StartMaterial:    State.startMaterial += step.amount; break;
-                case MetaBuffKind.CombatGoldBonus:  State.combatGoldBonus += step.amount; break;
-                case MetaBuffKind.BossExtraNormal:  State.bossExtraNormalUnlocked = true; break;
-                case MetaBuffKind.BossExtraRare:    State.bossExtraRareUnlocked = true; break;
-                case MetaBuffKind.RefundLevelUp:    State.refundLevel = Mathf.Min(3, State.refundLevel + step.amount); break;
-                case MetaBuffKind.CritLevelUp:      State.critLevel = Mathf.Min(3, State.critLevel + step.amount); break;
-                case MetaBuffKind.StartingPassiveItem: State.startingPassiveItemUnlocked = true; break;
-                case MetaBuffKind.FloorClearHeal:   State.floorClearHeal = Mathf.Min(2, State.floorClearHeal + step.amount); break;
-                case MetaBuffKind.TreasureChestGold: State.treasureChestGoldUnlocked = true; break;
-                case MetaBuffKind.ShopRobberyUnlock: State.shopRobberyUnlocked = true; break;
-                case MetaBuffKind.OutgoingDamagePct: State.outgoingDamagePct = Mathf.Min(50, State.outgoingDamagePct + step.amount); break;
-                case MetaBuffKind.LastStandHpLossDisable: State.lastStandHpLossDisabled = true; break;
-                case MetaBuffKind.BossRestHealAndUpgrade: State.bossRestHealAndUpgradeUnlocked = true; break;
-                case MetaBuffKind.CritDamageBonus: State.critDamageBonus += step.amount / 100f; break;
-            }
-        }
-
         // ============================================================
-        //  デバフトグル
+        //  配点 (拠点でいつでも無料・無制限)
         // ============================================================
 
-        public bool ToggleDebuff(MetaDebuffLevel lv, bool enabled)
+        /// <summary>指定トラックに 1 ランク配点 (未配分ポイントが必要)。 max 到達で false。</summary>
+        public bool TryAssignRank(MetaPanelKind kind)
         {
             if (State == null) return false;
-            int v = (int)lv;
-            bool changed = false;
-            if (enabled && !State.activeDebuffs.Contains(v)) { State.activeDebuffs.Add(v); changed = true; }
-            else if (!enabled && State.activeDebuffs.Contains(v)) { State.activeDebuffs.Remove(v); changed = true; }
-            if (changed) { OnStateChanged?.Invoke(); Save(); }
-            return changed;
+            // 2026-09-10: 宣言系は 3pt/段 なので、 残 pt が単価に足りるかで判定する。
+            if (State.UnassignedPoints() < MetaPanel.RankCost(kind)) return false;
+            int cur = State.GetRank(kind);
+            if (cur >= kind.MaxRank()) return false;
+            State.SetRank(kind, cur + 1);
+            OnStateChanged?.Invoke();
+            Save();
+            return true;
         }
+
+        /// <summary>指定トラックから 1 ランク払い戻し (未配分残に戻る・拠点無料)。</summary>
+        public bool TryRefundRank(MetaPanelKind kind)
+        {
+            if (State == null) return false;
+            int cur = State.GetRank(kind);
+            if (cur <= 0) return false;
+            State.SetRank(kind, cur - 1);
+            OnStateChanged?.Invoke();
+            Save();
+            return true;
+        }
+
+        /// <summary>全トラックのランクを 0 に戻し、ポイントを未配分に返す (拠点リスペック)。</summary>
+        public void RespecAllRanks()
+        {
+            if (State == null) return;
+            foreach (MetaPanelKind k in System.Enum.GetValues(typeof(MetaPanelKind)))
+                State.SetRank(k, 0);
+            OnStateChanged?.Invoke();
+            Save();
+        }
+
+        // ============================================================
+        //  挑戦デバフ (docs/GAME.md §15-2)
+        // ============================================================
+
+        /// <summary>軸の Tier を設定する。 tier = 0 で解除。 軸内排他は Loadout 側が保証する。
+        /// 存在しない Tier を渡すと false を返して何もしない。</summary>
+        public bool SetChallengeTier(ChallengeAxis axis, int tier)
+        {
+            if (State?.challenge == null) return false;
+            if (State.challenge.GetTier(axis) == tier) return false;
+            if (!State.challenge.SetTier(axis, tier)) return false;
+            State.InvalidateChallenge();
+            OnStateChanged?.Invoke();
+            Save();
+            return true;
+        }
+
+        /// <summary>T4 の ON/OFF。 選択するとカテゴリ全軸が最高 Tier へ強制される (解決時)。</summary>
+        public bool SetChallengeT4(ChallengeT4 v, bool enabled)
+        {
+            if (State?.challenge == null) return false;
+            if (State.challenge.HasT4(v) == enabled) return false;
+            State.challenge.SetT4(v, enabled);
+            State.InvalidateChallenge();
+            OnStateChanged?.Invoke();
+            Save();
+            return true;
+        }
+
+        /// <summary>挑戦構成を全解除。</summary>
+        public void ClearChallenge()
+        {
+            if (State?.challenge == null) return;
+            State.challenge.Clear();
+            State.InvalidateChallenge();
+            OnStateChanged?.Invoke();
+            Save();
+        }
+
+        /// <summary>満点 (100pt) 構成にする / 全解除する。 AutoRunner の最高難度モード用。</summary>
+        public void SetChallengeMax(bool on)
+        {
+            if (State?.challenge == null) return;
+            State.challenge.Clear();
+            if (on)
+                for (int i = 0; i < ChallengeCatalog.T4s.Count; i++)
+                    State.challenge.SetT4(ChallengeCatalog.T4s[i].t4, true);   // T4 が全軸を最高 Tier へ引き上げる
+            State.InvalidateChallenge();
+            OnStateChanged?.Invoke();
+            Save();
+        }
+
+        // ============================================================
+        //  レガシー API (互換のため残置・v6 では noop)
+        // ============================================================
+
+        [System.Obsolete("v6: 旧 58 段トラックは廃止。TryPurchasePoint + TryAssignRank を使用。")]
+        public int NextLevel => 0;
+        [System.Obsolete("v6: 旧 58 段トラックは廃止。NextPointCost を使用。")]
+        public int NextCost => int.MaxValue;
+        [System.Obsolete("v6: 旧 58 段トラックは廃止。IsPointCapReached を使用。")]
+        public bool IsTrackComplete => true;
+        [System.Obsolete("v6: 旧 58 段トラックは廃止。CanPurchasePoint を使用。")]
+        public bool CanPurchase() => false;
+        [System.Obsolete("v6: 旧 58 段トラックは廃止。TryPurchasePoint を使用。")]
+        public bool TryPurchase() => false;
     }
 }

@@ -244,12 +244,9 @@ namespace Battle.Visual
         private static int ParseWeaponTier(string id)
         {
             if (string.IsNullOrEmpty(id)) return 1;
-            // id 例: "sword_t1", "sword_t3" 等。 末尾の "_t<digit>" を抽出。
-            int i = id.LastIndexOf("_t");
-            if (i < 0 || i + 2 >= id.Length) return 1;
-            int n = 0;
-            for (int k = i + 2; k < id.Length && char.IsDigit(id[k]); k++) n = n * 10 + (id[k] - '0');
-            return n >= 1 ? n : 1;
+            // **id を綴りで切らない** (2026-09-22)。 id は表示名なので tier フィールドを読む。
+            var d = InventorySystem.ItemDatabase.Instance?.GetItem(id);
+            return d != null && d.tier >= 1 ? d.tier : 1;
         }
 
         private void CleanupFx()

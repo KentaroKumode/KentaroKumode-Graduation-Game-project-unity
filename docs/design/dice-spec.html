@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>DICE BOUND — ダイス寸法設計図</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root {
+    --bg: #f8f7f2;
+    --ink: #1a1a1a;
+    --ink-2: #4a4a4a;
+    --ink-3: #7a7a7a;
+    --line: #d4d1c8;
+    --grid: #e8e5db;
+    --dot: #2b3f5c;
+    --dot-empty: #f0eee5;
+    --bound: #c53030;
+    --dim: #2b6cb0;
+    --accent: #a15a2a;
+    --panel: #fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --ink: #e8e6e0;
+      --ink-2: #b5b3ad;
+      --ink-3: #7d7a72;
+      --line: #333740;
+      --grid: #262a32;
+      --dot: #7ea1d1;
+      --dot-empty: #1c1f24;
+      --bound: #e57373;
+      --dim: #7ea1d1;
+      --accent: #e2c58a;
+      --panel: #1c1f24;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
+  body {
+    font-family: "SF Mono", "Consolas", "Menlo", "Hiragino Kaku Gothic ProN", "Yu Gothic", monospace;
+    font-size: 13px; line-height: 1.6;
+  }
+  .doc { max-width: 1100px; margin: 0 auto; padding: 32px 24px 80px; }
+  header {
+    border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 32px;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: 0.02em; }
+  header .sub {
+    color: var(--ink-3); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  h2 {
+    font-size: 15px; margin: 40px 0 12px; padding-bottom: 4px;
+    border-bottom: 1px solid var(--line);
+    color: var(--accent); letter-spacing: 0.05em;
+    display: flex; align-items: baseline; gap: 8px;
+  }
+  h2 .num {
+    background: var(--accent); color: var(--bg);
+    padding: 2px 8px; font-size: 11px; letter-spacing: 0.1em;
+  }
+  h3 { font-size: 13px; margin: 20px 0 8px; color: var(--ink); font-weight: 700; }
+  p { margin: 6px 0; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: start; }
+  .grid-6 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; align-items: start; }
+  table {
+    border-collapse: collapse; width: 100%;
+    font-family: inherit; font-size: 12px;
+  }
+  th, td {
+    border: 1px solid var(--line); padding: 6px 10px; text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--panel); font-weight: 700; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  code {
+    background: var(--panel); border: 1px solid var(--line);
+    padding: 1px 5px; border-radius: 2px; font-family: inherit; font-size: 12px;
+  }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    padding: 14px; border-radius: 4px;
+  }
+  .card svg { display: block; margin: 0 auto; }
+  .caption {
+    text-align: center; color: var(--ink-3); font-size: 11px;
+    margin-top: 8px; letter-spacing: 0.02em;
+  }
+  .kv { display: grid; grid-template-columns: 140px 1fr; gap: 4px 12px; font-size: 12px; }
+  .kv .k { color: var(--ink-3); }
+  .kv .v { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .warn {
+    background: var(--panel); border-left: 3px solid var(--accent);
+    padding: 10px 14px; margin: 12px 0; font-size: 12px;
+  }
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 16px; font-size: 11px; color: var(--ink-2);
+    padding: 8px 12px; background: var(--panel); border-radius: 3px; margin: 12px 0;
+  }
+  .legend span::before {
+    content: ""; display: inline-block; width: 12px; height: 12px;
+    margin-right: 4px; vertical-align: middle; border-radius: 2px;
+  }
+  .legend .l-dot::before { background: var(--dot); }
+  .legend .l-empty::before { background: var(--dot-empty); border: 1px solid var(--line); }
+  .legend .l-bound::before { background: transparent; border: 2px solid var(--bound); }
+  .legend .l-dim::before { background: var(--dim); }
+  @media (max-width: 700px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .grid-6 { grid-template-columns: repeat(3, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="doc">
+
+<header>
+  <h1>DICE BOUND — ダイス寸法設計図</h1>
+  <div class="sub">LCD ネイティブ 924×556 physical pixel / 4 pixel per dot = <strong>231×139 dot 内部解像度</strong> 基準</div>
+  <div style="margin-top:12px;padding:10px 14px;background:var(--panel);border-left:4px solid var(--bound);font-size:13px">
+    <strong>SUPERSEDED (2026-07-24)</strong> — 本書は「ダイスを LCD 内に描く」前提で書かれたが、実際の設計ではダイスは LCD 外
+    (筐体上の 3×3 LED ソケット) に置く。現行正本は <a href="cabinet-layout.html">cabinet-layout.html</a>。
+    §4 の 6 面 pip パターンのみ参考価値あり。
+  </div>
+</header>
+
+<!-- ============================================================ -->
+<h2><span class="num">§1</span> 基準単位・座標系</h2>
+
+<div class="grid-2">
+  <div>
+    <div class="kv">
+      <div class="k">LCD 物理解像度</div><div class="v">924 × 556 pixel</div>
+      <div class="k">dot 単位換算</div><div class="v">1 dot = 4×4 physical pixel</div>
+      <div class="k">内部ドット解像度</div><div class="v"><strong>231 × 139 dot</strong></div>
+      <div class="k">アスペクト比</div><div class="v">1.662 : 1 (16:9 = 1.778)</div>
+      <div class="k">座標原点</div><div class="v">左上 (0,0) / 右下 (230, 138)</div>
+      <div class="k">中心座標</div><div class="v">(115.5, 69.5) dot</div>
+    </div>
+  </div>
+  <div class="warn">
+    <strong>本設計図の寸法値は全て「dot 単位」</strong>で記載。 physical pixel に換算する時は各値 × 4。
+    Unity 側の実装では 1 world unit = 1 dot として設計するのが最も破綻しにくい (Pixel Perfect Camera + dot 単位 snap)。
+  </div>
+</div>
+
+<div class="legend">
+  <span class="l-dot">点灯 pip / 塗りマス</span>
+  <span class="l-empty">消灯 / 空マス</span>
+  <span class="l-bound">バウンディング</span>
+  <span class="l-dim">寸法線・注釈</span>
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="num">§2</span> LCD 全景 — 231 × 139 dot</h2>
+
+<div class="card">
+<!-- 231 × 139 dot canvas visualization at 4x zoom = 924 × 556 SVG viewport -->
+<svg width="100%" viewBox="0 0 924 556" preserveAspectRatio="xMidYMid meet"
+     style="max-width:924px;background:var(--panel);border:1px solid var(--line)">
+  <!-- Grid: every 10 dots -->
+  <defs>
+    <pattern id="grid10" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="var(--grid)" stroke-width="0.5"/>
+    </pattern>
+    <pattern id="grid1" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="4" fill="none" stroke="var(--grid)" stroke-width="0.15"/>
+    </pattern>
+  </defs>
+  <rect width="924" height="556" fill="url(#grid1)"/>
+  <rect width="924" height="556" fill="url(#grid10)"/>
+  <!-- LCD border -->
+  <rect x="0.5" y="0.5" width="923" height="555" fill="none" stroke="var(--ink-2)" stroke-width="1"/>
+
+  <!-- Landing zone highlight (bottom ~30 dot) -->
+  <rect x="60" y="376" width="804" height="120" fill="var(--dot)" fill-opacity="0.06"
+        stroke="var(--dim)" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="66" y="392" font-size="12" fill="var(--dim)" font-family="monospace">DICE LANDING ZONE (y = 94–124 dot)</text>
+
+  <!-- 3-dice example placement -->
+  <g transform="translate(0,0)">
+    <!-- die 1 at x-center 91.5 dot (=366 px), y-center 108 dot (=432 px) -->
+    <rect x="334" y="400" width="64" height="64" fill="none" stroke="var(--bound)" stroke-width="1.5"/>
+    <text x="366" y="480" font-size="10" fill="var(--bound)" text-anchor="middle" font-family="monospace">16×16 dot</text>
+    <text x="366" y="392" font-size="9" fill="var(--ink-3)" text-anchor="middle" font-family="monospace">center (91.5, 108)</text>
+
+    <rect x="446" y="400" width="64" height="64" fill="none" stroke="var(--bound)" stroke-width="1.5"/>
+    <text x="478" y="392" font-size="9" fill="var(--ink-3)" text-anchor="middle" font-family="monospace">(115.5, 108)</text>
+
+    <rect x="558" y="400" width="64" height="64" fill="none" stroke="var(--bound)" stroke-width="1.5"/>
+    <text x="590" y="392" font-size="9" fill="var(--ink-3)" text-anchor="middle" font-family="monospace">(139.5, 108)</text>
+  </g>
+
+  <!-- Dimension: total width -->
+  <line x1="0" y1="536" x2="924" y2="536" stroke="var(--dim)" stroke-width="1"/>
+  <line x1="0" y1="530" x2="0" y2="542" stroke="var(--dim)" stroke-width="1"/>
+  <line x1="924" y1="530" x2="924" y2="542" stroke="var(--dim)" stroke-width="1"/>
+  <text x="462" y="550" font-size="11" fill="var(--dim)" text-anchor="middle" font-family="monospace">231 dot (= 924 px)</text>
+
+  <!-- Dimension: total height -->
+  <line x1="892" y1="0" x2="892" y2="556" stroke="var(--dim)" stroke-width="1"/>
+  <line x1="886" y1="0" x2="898" y2="0" stroke="var(--dim)" stroke-width="1"/>
+  <line x1="886" y1="556" x2="898" y2="556" stroke="var(--dim)" stroke-width="1"/>
+  <text x="905" y="284" font-size="11" fill="var(--dim)" font-family="monospace" transform="rotate(90 905 284)" text-anchor="middle">139 dot</text>
+
+  <!-- Origin marker -->
+  <circle cx="0" cy="0" r="3" fill="var(--bound)"/>
+  <text x="6" y="14" font-size="10" fill="var(--bound)" font-family="monospace">(0,0)</text>
+</svg>
+<div class="caption">図 1: LCD 全景 (4x zoom SVG · 灰グリッド = 1 dot / 太グリッド = 10 dot)</div>
+</div>
+
+<h3>着地スロット位置</h3>
+<table>
+  <tr><th>ダイス数</th><th>Y 中心 (dot)</th><th>X 中心座標 (dot)</th><th>ダイス間中心距離</th></tr>
+  <tr><td>3 個</td><td class="n">108</td><td>91.5 / 115.5 / 139.5</td><td class="n">24 dot</td></tr>
+  <tr><td>4 個</td><td class="n">108</td><td>79.5 / 103.5 / 127.5 / 151.5</td><td class="n">24 dot</td></tr>
+  <tr><td>5 個</td><td class="n">108</td><td>67.5 / 91.5 / 115.5 / 139.5 / 163.5</td><td class="n">24 dot</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2><span class="num">§3</span> 単一ダイス寸法</h2>
+
+<div class="grid-2">
+  <div class="card">
+<!-- Zoomed single die 16x16 dot at 20x zoom = 320x320 -->
+<svg width="320" height="320" viewBox="0 0 320 320" style="background:var(--panel)">
+  <!-- 1 dot = 20 SVG units -->
+  <defs>
+    <pattern id="grid20" width="20" height="20" patternUnits="userSpaceOnUse">
+      <rect width="20" height="20" fill="none" stroke="var(--grid)" stroke-width="0.5"/>
+    </pattern>
+  </defs>
+  <rect width="320" height="320" fill="url(#grid20)"/>
+  <!-- Bounding: 16x16 dot -->
+  <rect x="0.5" y="0.5" width="319" height="319" fill="none" stroke="var(--bound)" stroke-width="2"/>
+  <!-- Face visible area: 12x12 dot centered = starts at dot (2,2), 12x12 -->
+  <rect x="40" y="40" width="240" height="240" fill="none" stroke="var(--dim)" stroke-width="1.5" stroke-dasharray="3,3"/>
+  <!-- 3x3 pip position markers on the face (pip top-left at dot 3, 7, 11 relative to bounding) -->
+  <g fill="var(--dot)" fill-opacity="0.15" stroke="var(--dot)" stroke-width="1" stroke-dasharray="2,2">
+    <!-- pip TL at dot (3,3) size 2x2 -->
+    <rect x="60" y="60" width="40" height="40"/>
+    <rect x="140" y="60" width="40" height="40"/>
+    <rect x="220" y="60" width="40" height="40"/>
+    <rect x="60" y="140" width="40" height="40"/>
+    <rect x="140" y="140" width="40" height="40"/>
+    <rect x="220" y="140" width="40" height="40"/>
+    <rect x="60" y="220" width="40" height="40"/>
+    <rect x="140" y="220" width="40" height="40"/>
+    <rect x="220" y="220" width="40" height="40"/>
+  </g>
+  <!-- Callouts -->
+  <text x="160" y="18" font-size="12" fill="var(--bound)" text-anchor="middle" font-family="monospace">bounding 16×16 dot</text>
+  <text x="160" y="35" font-size="10" fill="var(--dim)" text-anchor="middle" font-family="monospace">face visible 12×12 dot (dashed)</text>
+  <!-- Pip dimension -->
+  <line x1="60" y1="106" x2="100" y2="106" stroke="var(--dim)" stroke-width="1"/>
+  <line x1="60" y1="102" x2="60" y2="110" stroke="var(--dim)" stroke-width="1"/>
+  <line x1="100" y1="102" x2="100" y2="110" stroke="var(--dim)" stroke-width="1"/>
+  <text x="80" y="120" font-size="9" fill="var(--dim)" text-anchor="middle" font-family="monospace">pip 2×2</text>
+  <!-- Pip gap -->
+  <line x1="100" y1="80" x2="140" y2="80" stroke="var(--accent)" stroke-width="1"/>
+  <text x="120" y="76" font-size="9" fill="var(--accent)" text-anchor="middle" font-family="monospace">gap 2</text>
+</svg>
+<div class="caption">図 2: ダイス単体寸法 (20x zoom) · 破線内=面可視領域 · 破線 pip = 配置候補 9 点</div>
+  </div>
+  <div>
+    <h3>寸法定義</h3>
+    <div class="kv">
+      <div class="k">バウンディング</div><div class="v">16 × 16 dot (= 64×64 px)</div>
+      <div class="k">面可視領域</div><div class="v">12 × 12 dot (中央配置)</div>
+      <div class="k">単一 pip</div><div class="v">2 × 2 dot (= 8×8 px)</div>
+      <div class="k">pip 間隔</div><div class="v">2 dot (中心間 = 4 dot)</div>
+      <div class="k">pip 配置候補</div><div class="v">3×3 grid = 9 点</div>
+    </div>
+    <h3>3×3 grid 上の pip top-left 座標</h3>
+    <table>
+      <tr><th>位置</th><th>bounding 内 (dot)</th></tr>
+      <tr><td>TL (top-left)</td><td class="n">(3, 3)</td></tr>
+      <tr><td>TC (top-center)</td><td class="n">(7, 3)</td></tr>
+      <tr><td>TR (top-right)</td><td class="n">(11, 3)</td></tr>
+      <tr><td>ML (mid-left)</td><td class="n">(3, 7)</td></tr>
+      <tr><td>MC (mid-center)</td><td class="n">(7, 7)</td></tr>
+      <tr><td>MR (mid-right)</td><td class="n">(11, 7)</td></tr>
+      <tr><td>BL (bottom-left)</td><td class="n">(3, 11)</td></tr>
+      <tr><td>BC (bottom-center)</td><td class="n">(7, 11)</td></tr>
+      <tr><td>BR (bottom-right)</td><td class="n">(11, 11)</td></tr>
+    </table>
+    <p style="color:var(--ink-3);font-size:11px;margin-top:8px">
+      pip は 2×2 dot なので、各座標は pip の左上角。 pip の右下角は各座標 + (1,1)。
+    </p>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="num">§4</span> 6 面パターン (標準ダイス)</h2>
+
+<p>面 = 12×12 dot、pip 配置は §3 の 9 点から選択。</p>
+
+<div class="grid-6">
+<!-- Reusable face SVG: 12x12 dot at 12x zoom = 144x144 SVG -->
+<!-- Pip positions: TL(3,3) TC(7,3) TR(11,3) ML(3,7) MC(7,7) MR(11,7) BL(3,11) BC(7,11) BR(11,11) -->
+<!-- Note: pip top-left offsets within face (0..11 range for a 12-wide face) are (1,1)(5,1)(9,1)(1,5)(5,5)(9,5)(1,9)(5,9)(9,9) -->
+<!-- Working in 144 SVG = 12x zoom, dot size = 12 SVG units, pip = 24 SVG units -->
+
+<div class="card">
+<svg width="144" height="144" viewBox="0 0 144 144" style="background:var(--panel);border:1px solid var(--line)">
+  <defs><pattern id="fg" width="12" height="12" patternUnits="userSpaceOnUse"><rect width="12" height="12" fill="none" stroke="var(--grid)" stroke-width="0.4"/></pattern></defs>
+  <rect width="144" height="144" fill="url(#fg)"/>
+  <!-- 1: MC (5,5) -->
+  <rect x="60" y="60" width="24" height="24" fill="var(--dot)"/>
+</svg>
+<div class="caption">面 <strong>1</strong> · MC</div>
+</div>
+
+<div class="card">
+<svg width="144" height="144" viewBox="0 0 144 144" style="background:var(--panel);border:1px solid var(--line)">
+  <rect width="144" height="144" fill="url(#fg)"/>
+  <!-- 2: TL(1,1) BR(9,9) -->
+  <rect x="12" y="12" width="24" height="24" fill="var(--dot)"/>
+  <rect x="108" y="108" width="24" height="24" fill="var(--dot)"/>
+</svg>
+<div class="caption">面 <strong>2</strong> · TL, BR</div>
+</div>
+
+<div class="card">
+<svg width="144" height="144" viewBox="0 0 144 144" style="background:var(--panel);border:1px solid var(--line)">
+  <rect width="144" height="144" fill="url(#fg)"/>
+  <!-- 3: TL, MC, BR -->
+  <rect x="12" y="12" width="24" height="24" fill="var(--dot)"/>
+  <rect x="60" y="60" width="24" height="24" fill="var(--dot)"/>
+  <rect x="108" y="108" width="24" height="24" fill="var(--dot)"/>
+</svg>
+<div class="caption">面 <strong>3</strong> · TL, MC, BR</div>
+</div>
+
+<div class="card">
+<svg width="144" height="144" viewBox="0 0 144 144" style="background:var(--panel);border:1px solid var(--line)">
+  <rect width="144" height="144" fill="url(#fg)"/>
+  <!-- 4: 4 corners -->
+  <rect x="12" y="12" width="24" height="24" fill="var(--dot)"/>
+  <rect x="108" y="12" width="24" height="24" fill="var(--dot)"/>
+  <rect x="12" y="108" width="24" height="24" fill="var(--dot)"/>
+  <rect x="108" y="108" width="24" height="24" fill="var(--dot)"/>
+</svg>
+<div class="caption">面 <strong>4</strong> · 四隅</div>
+</div>
+
+<div class="card">
+<svg width="144" height="144" viewBox="0 0 144 144" style="background:var(--panel);border:1px solid var(--line)">
+  <rect width="144" height="144" fill="url(#fg)"/>
+  <!-- 5: 4 corners + MC -->
+  <rect x="12" y="12" width="24" height="24" fill="var(--dot)"/>
+  <rect x="108" y="12" width="24" height="24" fill="var(--dot)"/>
+  <rect x="60" y="60" width="24" height="24" fill="var(--dot)"/>
+  <rect x="12" y="108" width="24" height="24" fill="var(--dot)"/>
+  <rect x="108" y="108" width="24" height="24" fill="var(--dot)"/>
+</svg>
+<div class="caption">面 <strong>5</strong> · 四隅 + MC</div>
+</div>
+
+<div class="card">
+<svg width="144" height="144" viewBox="0 0 144 144" style="background:var(--panel);border:1px solid var(--line)">
+  <rect width="144" height="144" fill="url(#fg)"/>
+  <!-- 6: 2 columns of 3 (TL, ML, BL, TR, MR, BR) -->
+  <rect x="12" y="12" width="24" height="24" fill="var(--dot)"/>
+  <rect x="12" y="60" width="24" height="24" fill="var(--dot)"/>
+  <rect x="12" y="108" width="24" height="24" fill="var(--dot)"/>
+  <rect x="108" y="12" width="24" height="24" fill="var(--dot)"/>
+  <rect x="108" y="60" width="24" height="24" fill="var(--dot)"/>
+  <rect x="108" y="108" width="24" height="24" fill="var(--dot)"/>
+</svg>
+<div class="caption">面 <strong>6</strong> · 左右 2 列</div>
+</div>
+</div>
+
+<div class="warn">
+  カスタム面ダイス (dice_wood / dice_bone / dice_iron 等) は面ごとの値が 1〜9 の範囲で任意。
+  9 pip 全点灯を最大とすれば §3 の 9 点で全パターン (現行 <code>SingleDiceLED.DicePatterns[]</code> と一致) を賄える。
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="num">§5</span> モーション仕様</h2>
+
+<div class="grid-2">
+  <div class="card">
+<!-- Bob motion side view: 240 x 160 SVG showing dice bob at 2 positions -->
+<svg width="100%" viewBox="0 0 480 200" style="background:var(--panel)">
+  <!-- ground -->
+  <line x1="20" y1="140" x2="460" y2="140" stroke="var(--ink-2)" stroke-width="1"/>
+  <text x="24" y="156" font-size="10" fill="var(--ink-3)" font-family="monospace">landing y = 108 dot (LCD)</text>
+
+  <!-- die bob path (sinusoidal) -->
+  <path d="M 60 140 Q 100 100 140 140 T 220 140 T 300 140 T 380 140 T 460 140"
+        fill="none" stroke="var(--dim)" stroke-width="1" stroke-dasharray="3,3"/>
+
+  <!-- die shadow -->
+  <ellipse cx="240" cy="140" rx="30" ry="4" fill="var(--ink)" fill-opacity="0.2"/>
+
+  <!-- die at bob peak -->
+  <rect x="220" y="60" width="40" height="40" fill="var(--panel)" stroke="var(--dot)" stroke-width="2"/>
+  <!-- pip TL, BR (face 2 example) -->
+  <rect x="228" y="68" width="6" height="6" fill="var(--dot)"/>
+  <rect x="246" y="86" width="6" height="6" fill="var(--dot)"/>
+
+  <!-- amplitude arrow -->
+  <line x1="290" y1="80" x2="290" y2="140" stroke="var(--dim)" stroke-width="1"/>
+  <line x1="286" y1="80" x2="294" y2="80" stroke="var(--dim)" stroke-width="1"/>
+  <line x1="286" y1="140" x2="294" y2="140" stroke="var(--dim)" stroke-width="1"/>
+  <text x="300" y="112" font-size="11" fill="var(--dim)" font-family="monospace">amp = 2 dot</text>
+
+  <text x="240" y="30" font-size="11" fill="var(--ink-2)" text-anchor="middle" font-family="monospace">
+    bob motion (idle after landing)
+  </text>
+</svg>
+<div class="caption">図 3: bob 揺動 (着地後の待機状態)</div>
+  </div>
+  <div>
+    <h3>bob (待機時の上下揺動)</h3>
+    <div class="kv">
+      <div class="k">振幅</div><div class="v">±2 dot (peak-to-peak = 4 dot)</div>
+      <div class="k">周期</div><div class="v">36 frame @ 24fps (= 1.5 sec)</div>
+      <div class="k">波形</div><div class="v">sin (滑らか)</div>
+      <div class="k">Z 軸回転</div><div class="v">±3° 同期揺れ</div>
+      <div class="k">影のスケール</div><div class="v">bob 高さで rx を 30↔26 dot に補間</div>
+    </div>
+    <h3>roll (投げ→着地アニメ)</h3>
+    <div class="kv">
+      <div class="k">開始位置</div><div class="v">y = 0 dot (LCD 上端外)</div>
+      <div class="k">着地位置</div><div class="v">y = 108 dot (§2 参照)</div>
+      <div class="k">アーク峰</div><div class="v">y = 40 dot</div>
+      <div class="k">総フレーム</div><div class="v">15 frame @ 24fps (= 0.625 sec)</div>
+      <div class="k">3D 回転</div><div class="v">2 回転 (720°) ランダム軸</div>
+      <div class="k">着地後 wobble</div><div class="v">3 frame 追加 (± 1 dot 沈み)</div>
+    </div>
+    <p style="color:var(--ink-3);font-size:11px;margin-top:12px">
+      roll → wobble → bob idle の順に自動遷移。 roll と wobble は非ループ、 bob idle はループ。
+    </p>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="num">§6</span> 3D → 2D パイプライン</h2>
+
+<div class="grid-2">
+  <div class="card">
+<!-- Camera setup diagram -->
+<svg width="100%" viewBox="0 0 480 240" style="background:var(--panel)">
+  <!-- ground -->
+  <line x1="40" y1="180" x2="440" y2="180" stroke="var(--ink-2)" stroke-width="1"/>
+  <!-- die on ground -->
+  <g transform="translate(220,150)">
+    <!-- top face -->
+    <polygon points="0,0 60,0 70,-15 10,-15" fill="var(--dot)" fill-opacity="0.3" stroke="var(--dot)" stroke-width="1"/>
+    <!-- front face -->
+    <rect x="0" y="0" width="60" height="30" fill="var(--panel)" stroke="var(--dot)" stroke-width="1"/>
+    <!-- right face -->
+    <polygon points="60,0 70,-15 70,15 60,30" fill="var(--dot)" fill-opacity="0.15" stroke="var(--dot)" stroke-width="1"/>
+    <!-- pip on front -->
+    <rect x="26" y="12" width="8" height="8" fill="var(--dot)"/>
+  </g>
+  <!-- Camera symbol -->
+  <g transform="translate(60,60)">
+    <rect x="0" y="0" width="40" height="30" fill="var(--panel)" stroke="var(--ink)" stroke-width="1.5"/>
+    <polygon points="40,10 55,0 55,30 40,20" fill="var(--panel)" stroke="var(--ink)" stroke-width="1.5"/>
+    <text x="20" y="-6" font-size="10" fill="var(--ink)" text-anchor="middle" font-family="monospace">Ortho Cam</text>
+  </g>
+  <!-- View line from camera to die -->
+  <line x1="115" y1="75" x2="255" y2="165" stroke="var(--dim)" stroke-width="1" stroke-dasharray="4,4"/>
+  <!-- Angle arc -->
+  <path d="M 130 75 A 25 25 0 0 1 145 90" fill="none" stroke="var(--accent)" stroke-width="1"/>
+  <text x="150" y="98" font-size="10" fill="var(--accent)" font-family="monospace">tilt X = 15°</text>
+
+  <!-- Ortho frustum outline -->
+  <line x1="115" y1="75" x2="440" y2="20" stroke="var(--dim)" stroke-width="0.5" stroke-dasharray="2,2"/>
+  <line x1="115" y1="75" x2="440" y2="200" stroke="var(--dim)" stroke-width="0.5" stroke-dasharray="2,2"/>
+
+  <text x="240" y="220" font-size="10" fill="var(--ink-3)" text-anchor="middle" font-family="monospace">
+    ortho camera + tilt X → 上面が薄く見える → bob でパースが変わる感
+  </text>
+</svg>
+<div class="caption">図 4: カメラ設定の側面図</div>
+  </div>
+  <div>
+    <h3>Unity カメラ設定</h3>
+    <div class="kv">
+      <div class="k">投影</div><div class="v">Orthographic</div>
+      <div class="k">Orthographic Size</div><div class="v">69.5 (world unit)</div>
+      <div class="k">Aspect</div><div class="v">231 / 139 = 1.662</div>
+      <div class="k">X 軸 tilt</div><div class="v">15° (下向き)</div>
+      <div class="k">Y / Z 回転</div><div class="v">0</div>
+      <div class="k">Near / Far</div><div class="v">0.1 / 100</div>
+      <div class="k">Clear</div><div class="v">SolidColor (LCD 背景色)</div>
+      <div class="k">Antialiasing</div><div class="v">OFF (RT 側で pixel snap)</div>
+      <div class="k">HDR</div><div class="v">OFF</div>
+    </div>
+    <h3>RT 設定 (LcdProfile)</h3>
+    <div class="kv">
+      <div class="k">nativeWidth</div><div class="v">924 (physical px, 既存)</div>
+      <div class="k">nativeHeight</div><div class="v">556 (physical px, 既存)</div>
+      <div class="k">filterMode</div><div class="v">Point (dot くっきり)</div>
+      <div class="k">antiAliasing</div><div class="v">1 (無)</div>
+    </div>
+    <p style="color:var(--ink-3);font-size:11px;margin-top:12px">
+      world unit = dot と定義するので、 1 world unit = 4 physical px = LCD 上 1 dot。
+      物体は 1/4 単位でスナップ (Pixel Perfect Camera or 手動 Vector3 丸め)。
+    </p>
+  </div>
+</div>
+
+<h3>スナップ規則</h3>
+<div class="warn">
+  ダイスの Transform.position を毎フレーム <code>Mathf.Round(pos * 4) / 4</code> で 1/4 world unit 単位に snap 必須。
+  これを怠るとサブピクセル移動で LCD 出力にジッター (シマー) が発生。
+  bob の sin 値も dot 単位 (整数 dot) に量子化して代入するのが安全。
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="num">§7</span> 物量サマリ</h2>
+
+<table>
+  <tr><th>要素</th><th>個数</th><th>寸法</th><th>備考</th></tr>
+  <tr><td>3D メッシュ (立方体)</td><td class="n">1 種</td><td>1×1×1 world unit</td><td>全ダイス種で共有</td></tr>
+  <tr><td>面テクスチャ</td><td class="n">ダイス種類分</td><td>16×16 pixel × 6 面</td><td>1 枚に 6 面 atlas 化推奨 = 96×16 px or 48×32 px</td></tr>
+  <tr><td>pip スプライト</td><td class="n">1 種</td><td>2×2 dot (8×8 px)</td><td>白点のみ、色は shader で差し替え</td></tr>
+  <tr><td>影スプライト</td><td class="n">1 種</td><td>楕円 rx=30 ry=4 dot</td><td>bob 高さで rx 補間</td></tr>
+  <tr><td>アニメーションクリップ</td><td class="n">3 種</td><td>bob 36f / roll 15f / wobble 3f</td><td>3D 側で動的生成可 (クリップなしでも OK)</td></tr>
+</table>
+
+<div class="warn">
+  <strong>手描き 2D 全パターンが不要な理由</strong>: 面のパターンは <code>面テクスチャの UV 差し替え</code> で切り替え、
+  転がりは <code>3D 回転補間</code> で生成、揺れによるパース変化は <code>3D 空間 + ortho カメラ</code> の副産物として自動発生。
+  ダイス種類 13 種でも制作コストは「面テクスチャ 13 セット + pip / 影の共通アセット 2 種」で完結。
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="num">§8</span> 現行 DiceLED からの移行判断</h2>
+
+<p>既存 <code>SingleDiceLED.cs</code> の 3×3 LED 発光は既に「面パターン問題を回避する仕組み」として機能している。 本設計図に基づく移行のトリガーは以下:</p>
+
+<table>
+  <tr><th>ケース</th><th>推奨方式</th></tr>
+  <tr><td>現状の LED 発光ダイスをそのまま維持し、揺れ演出だけ足したい</td><td>3D LED ダイスに bob モーション追加 (§5 の bob 仕様のみ適用)</td></tr>
+  <tr><td>Slot and Daggers 風の「石 or 骨 or 金属の pip 彫り込みキューブ」に置き換えたい</td><td>本設計図の全項目適用 (LED 発光を廃し、面テクスチャ + pip 彫り込みへ)</td></tr>
+  <tr><td>ハイブリッド (投擲は 3D キューブ、集計は小型 LED 表示)</td><td>本設計図 + 現行 LED を集計ゾーン用に温存、投擲は §3-6 適用</td></tr>
+</table>
+
+<p style="color:var(--ink-3);font-size:11px;margin-top:16px">
+  最終更新: 2026-07-24 · dot 単位 = 4 physical pixel · LCD 231×139 dot 基準
+</p>
+
+</div>
+</body>
+</html>
