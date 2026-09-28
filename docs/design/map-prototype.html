@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>自由移動マップ 試作</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root { --bg:#101214; --panel:#181b1f; --line:#2c3137; --ink:#e6e2d8; --ink2:#a9a498; --ink3:#6f6b62;
+          --amber:#f0aa42; --red:#d8544a; --blue:#6aa4d8; --green:#a0d646; --teal:#60d6c8; --gold:#e6c664; --violet:#b58ad8; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:var(--bg); color:var(--ink); }
+  body { font-family:"Consolas","Yu Gothic","Hiragino Kaku Gothic ProN",monospace; font-size:13px; line-height:1.5; padding:16px; }
+  h1 { font-size:16px; margin:0 0 4px; } .sub { color:var(--ink3); font-size:11px; margin-bottom:10px; }
+  .wrap { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .mapbox { position:relative; border:1px solid var(--line); background:#0b0d0f; max-width:100%; overflow:auto; }
+  canvas { display:block; }
+  .side { width:300px; max-width:100%; display:flex; flex-direction:column; gap:10px; }
+  .card { background:var(--panel); border:1px solid var(--line); padding:10px 12px; }
+  .row { display:flex; justify-content:space-between; gap:8px; font-variant-numeric:tabular-nums; }
+  .k { color:var(--ink2); }
+  .bar { height:8px; background:#23272c; margin:4px 0 2px; position:relative; }
+  .bar > i { position:absolute; left:0; top:0; bottom:0; display:block; }
+  button { font:inherit; background:#22262b; color:var(--ink); border:1px solid #3a4047; padding:5px 10px; cursor:pointer; }
+  button:hover { border-color:var(--amber); } button:disabled { opacity:.4; cursor:default; }
+  button:focus-visible, input:focus-visible { outline:2px solid var(--amber); outline-offset:1px; }
+  button.on { background:var(--amber); color:#1a1408; border-color:var(--amber); }
+  .btns { display:flex; flex-wrap:wrap; gap:6px; }
+  .stone { font-weight:700; } .stone.hot { color:var(--red); } .stone.near { color:var(--amber); } .stone.far { color:#a88a55; font-weight:400; } .stone.cold { color:var(--ink3); font-weight:400; }
+  #log { height:190px; overflow:auto; font-size:12px; color:var(--ink2); }
+  #log div { border-bottom:1px solid #22262b; padding:2px 0; }
+  #preview { min-height:38px; font-size:12px; color:var(--ink2); }
+  .modal { position:absolute; inset:0; background:rgba(5,6,7,.72); display:flex; align-items:center; justify-content:center; }
+  .modal[hidden] { display:none; }
+  .dlg { background:var(--panel); border:1px solid var(--amber); padding:16px 18px; width:380px; max-width:92%; }
+  .dlg h2 { font-size:15px; margin:0 0 8px; color:var(--amber); } .dlg p { margin:6px 0; }
+  .legend span { display:inline-block; margin-right:10px; font-size:11px; color:var(--ink2); }
+  label { color:var(--ink2); font-size:12px; } input[type=number] { width:80px; background:#0b0d0f; color:var(--ink); border:1px solid #3a4047; padding:3px; }
+</style></head><body>
+<h1>自由移動マップ 試作（1層完結）</h1>
+<div class="sub">GAME.md §23-21 の仮置き数値で動く手触り確認用。戦闘は簡略版（ダイスで被害を決めるだけ）。<b>時間は流れ続ける（Highfleet 式）</b>── <b>スペースを短く押すと停止⇄順速、0.5 秒以上押し続けると押している間だけ早送り</b>（P キーでも停止⇄順速）。最初は停止。点をクリック → 経路と費用を確認 → もう一度クリックで出発（移動中でも行き先を変えられる）。</div>
+<div class="wrap">
+  <div class="mapbox" id="mapbox"><canvas id="cv" width="960" height="560"></canvas>
+    <div class="modal" id="modal" hidden><div class="dlg" role="dialog" aria-modal="true"><h2 id="mt"></h2><div id="mb"></div><div class="btns" id="mbtn" style="margin-top:12px"></div></div></div>
+  </div>
+  <div class="side">
+    <div class="card">
+      <div class="row"><span class="k">物資</span><span><b id="sup"></b> / 1000 <span id="stage" class="k"></span></span></div>
+      <div class="bar"><i id="supbar" style="background:var(--gold)"></i></div>
+      <div class="row"><span class="k">HP</span><span><b id="hp"></b> / <span id="hpmax"></span></span></div>
+      <div class="bar"><i id="hpbar" style="background:var(--red)"></i></div>
+      <div class="row"><span class="k">ゴールド</span><span id="gold"></span></div>
+      <div class="row"><span class="k">経過</span><span id="turn"></span></div>
+      <div class="row"><span class="k">気配 / 察知距離</span><span id="kehai"></span></div>
+    </div>
+    <div class="card">
+      <div class="row"><span class="k">魔石の反応（距離4）</span></div>
+      <div id="stone" class="stone cold" aria-live="polite">反応なし</div>
+    </div>
+    <div class="card">
+      <div class="btns">
+        <button id="bFlare" type="button" title="点灯中は物資を毎手番 +5 消費。半径5のマス・敵が見えるが、敵からも半径5で見られる（察知距離 5 で固定）">照明</button>
+        <button id="bScout" type="button" title="2手番その場で動けない。半径3のマス・敵が見える。気配は上がらない">偵察</button>
+        <button id="bStop" type="button" disabled>移動をやめる</button>
+      </div>
+      <div class="btns" style="margin-top:6px" role="group" aria-label="時間の流れ">
+        <button id="tPause" type="button" title="スペース（短く）か P キーで停止⇄順速">⏸ 停止</button>
+        <button id="tNormal" type="button" title="スペース（短く）か P キーで停止⇄順速">▶ 順速</button>
+        <button id="tFast" type="button" title="押している間だけ早送り（スペースを 0.5 秒以上押し続けても同じ）">⏩ 早送り（長押し）</button>
+      </div>
+      <div class="btns" style="margin-top:6px" role="group" aria-label="移動の速さ">
+        <button id="spSneak" type="button" title="時間が2倍かかる。道の上でも気配0">忍び足</button>
+        <button id="spNormal" type="button">通常</button>
+        <button id="spHurry" type="button" title="時間は半分。物資1.5倍・気配+1">急ぐ</button>
+      </div>
+      <div class="btns" style="margin-top:6px">
+        <button id="bDecoy" type="button" title="今いる場所に置く。1手番後から6手番、半径4の敵を呼び寄せる。敵が着くと壊れる">囮を置く</button>
+        <button id="bTrap" type="button" title="今いる場所に置く（道の上に置くこと）。徘徊エネミーが踏むと3手番足止め・連戦が1戦減る">罠を置く</button>
+      </div>
+      <div id="preview" style="margin-top:8px"></div>
+    </div>
+    <div class="card"><div id="log" aria-live="polite"></div></div>
+    <div class="card">
+      <div class="btns" style="align-items:center">
+        <label>シード <input type="number" id="seed" value="1"></label>
+        <button id="bNew" type="button">新しい層</button>
+      </div>
+      <label style="display:block;margin-top:6px"><input type="checkbox" id="dbg"> 敵と痕跡を常に表示（デバッグ）</label>
+      <div class="btns" style="align-items:center;margin-top:6px"><label><input type="checkbox" id="snd" checked> 効果音</label>
+        <label>音量 <input type="range" id="vol" min="0" max="100" value="60" style="width:110px;vertical-align:middle"></label></div>
+      <div class="k" style="font-size:11px">最初に画面を一度クリックすると音が出る（ブラウザの決まり）</div>
+      <div class="legend" style="margin-top:6px"><span>戦=戦闘</span><span>精=エリート</span><span>イ=イベント</span><span>店=ショップ</span><span>休=休憩</span><span>宝=秘宝</span><span>拠=補給庫（敵の縄張りの中）</span><span>?=未確認</span><span>茶の塊=山岳（通行不可）</span><span>炎=囮</span><span>×=罠</span></div>
+    </div>
+  </div>
+</div>
+<script>
+"use strict";
+// ═══ 数値（§23-21 の仮置き） ═══════════════════════════════════
+const P = {
+  supMax: 1000, costRoad: 10, costOff: 20, costFlare: 5,          // 物資 / 距離
+  hpPayRoad: 1, hpPayOff: 2,                                       // 払底中の HP / 距離
+  visNone: 1, visFlare: 5, visStone: 4, visScout: 3, scoutTurns: 2,
+  kehaiRoad: 2, kehaiBattle: 2, battleKehaiTurns: 2, detectBase: 2,
+  detectCap: 4,                                                   // 最大察知距離: 照明なしは魔石の範囲 (4) を超えない
+  cacheNoise: 3,                                                  // 補給庫を漁った物音（気配は上げない）
+  enemyPatrol: 0.5, enemyChase: 1.0, lostTurns: 3, catchDist: 0.45,
+  trackRoad: 3, trackOff: 1, battleNoise: 4,                       // C: 物音 6 → 4
+  fleeSup: 100, fleeFreezeTurns: 2,
+  rewSup: { battle: 30, elite: 80, gauntlet: 300, base: 150 }, hpLoss: [40, 50, 70, 100],
+  shopSupPrice: 10, shopSupPack: 100, shopSupStock: 3, shopHealPrice: 8, shopHeal: 10,
+  hpMax: 40, gold0: 30,
+  decoyTurns: 6, decoyDelay: 1, decoyNoise: 4, decoyBreak: 1.0, trapFreeze: 1, trapHit: 0.35,                                      // 罠: 足止め 1 手番 ＋ 位置が判明（連戦は減らない）
+  msPerTick: { normal: 600, fast: 60 },                            // 時間の速さ: 1 刻み（0.1 手番）あたりの実時間。 順速 1 手番 ≒ 6 秒・早送りはその 10 倍
+  shopDecoyPrice: 6, shopTrapPrice: 8, decoy0: 1, trap0: 1, gauntletFights: 2,
+};
+// 移動の速さ: 時間の倍率 / 物資の倍率 / 気配（道の上の +2 を置き換える）
+const SPEED = { sneak: { name: "忍び足", time: 2, cost: 1, kehai: () => 0 },
+                normal: { name: "通常", time: 1, cost: 1, kehai: road => road ? 2 : 0 },
+                hurry: { name: "急ぐ", time: 0.5, cost: 1.5, kehai: road => (road ? 2 : 0) + 1 } };
+const STAGES = [ [751, "充足", 1.0], [451, "目減り", 1.1], [201, "枯渇し始める", 1.25], [1, "枯渇寸前", 1.5], [0, "払底", 1.5] ];
+const SCALE = 78, OX = 24, OY = 24;           // 距離1 = 78px
+const W = 11.6, H = 6.6;                       // 層の広さ（距離）
+
+// ═══ 乱数（シード固定） ═══════════════════════════════════════
+let rnd;
+function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const d6 = () => 1 + Math.floor(rnd() * 6);
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+// ═══ 層の生成 ═════════════════════════════════════════════════
+let N, E, adj, S;
+function segCross(a, b, c, d) {
+  const o = (p, q, r) => Math.sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x));
+  if (a === c || a === d || b === c || b === d) return false;
+  return o(a, b, c) !== o(a, b, d) && o(c, d, a) !== o(c, d, b);
+}
+// 山岳: 通れない楕円の地帯。 点も道も置かない・直線の移動も横切れない
+let MTS = [];
+function inMount(p, m = 0) { return MTS.some(k => { const dx = p.x - k.x, dy = p.y - k.y, c = Math.cos(k.r), s = Math.sin(k.r);
+  const u = (dx * c + dy * s) / (k.a + m), v = (-dx * s + dy * c) / (k.b + m); return u * u + v * v <= 1; }); }
+function segHitsMount(p, q) { for (let t = 0; t <= 1.0001; t += 0.03) if (inMount({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t }, 0.04)) return true; return false; }
+function genMap() {
+  for (let attempt = 0; attempt < 40; attempt++) { const r = genMapOnce(); if (r) return r; }
+  MTS = []; return genMapOnce();
+}
+function genMapOnce() {
+  MTS = [];
+  const nm = 2 + (rnd() < 0.5 ? 1 : 0);
+  for (let k = 0, guard = 0; k < nm && guard < 200; guard++) {
+    const m = { x: 2.4 + rnd() * (W - 4.8), y: 0.9 + rnd() * (H - 1.8), a: 0.7 + rnd() * 0.7, b: 0.45 + rnd() * 0.5, r: rnd() * Math.PI };
+    if (dist(m, { x: 0.5, y: 3.3 }) < 2 || dist(m, { x: W - 0.5, y: H / 2 }) < 1.8) continue;
+    MTS.push(m); k++;
+  }
+  N = [{ x: 0.5, y: 3.3, type: "前" }, { x: W - 0.5, y: 1 + rnd() * (H - 2), type: "出" }];
+  if (inMount(N[1], 0.4)) return null;
+  for (let tries = 0; N.length < 28 && tries < 5000; tries++) {
+    const p = { x: 0.3 + rnd() * (W - 0.6), y: 0.3 + rnd() * (H - 0.6) };
+    if (!inMount(p, 0.35) && N.every(q => dist(p, q) >= 1.15)) N.push(p);
+  }
+  // 道: 最小全域木（つながりを保証）+ 近い組を交差しない範囲で足す
+  const pairs = [];
+  for (let i = 0; i < N.length; i++) for (let j = i + 1; j < N.length; j++) pairs.push([dist(N[i], N[j]), i, j]);
+  pairs.sort((a, b) => a[0] - b[0]);
+  const par = N.map((_, i) => i), f = i => par[i] === i ? i : (par[i] = f(par[i]));
+  E = [];
+  const ok = (i, j) => !segHitsMount(N[i], N[j]) && E.every(([a, b]) => !segCross(N[i], N[j], N[a], N[b]));
+  for (const [, i, j] of pairs) if (f(i) !== f(j) && ok(i, j)) { par[f(i)] = f(j); E.push([i, j]); }
+  for (const [d, i, j] of pairs) if (d < 1.9 && rnd() < 0.45 && ok(i, j) && !E.some(([a, b]) => (a === i && b === j))) E.push([i, j]);
+  adj = N.map(() => []);
+  for (const [a, b] of E) { adj[a].push(b); adj[b].push(a); }
+  { const seen = new Set([0]), q = [0]; while (q.length) { const u = q.shift(); for (const v of adj[u]) if (!seen.has(v)) { seen.add(v); q.push(v); } }
+    if (seen.size < N.length) return null; }                       // 山岳で分断されたら引き直す
+  // 敵の縄張り: 層の中ほどの一角。 中心から道でつながった 6〜9 点（幅優先で広げるので必ずつながる）
+  const mids = N.map((p, i) => i).filter(i => i > 1 && N[i].x > 3.2 && N[i].x < W - 2.8);
+  const center = mids[Math.floor(rnd() * mids.length)];
+  let terr = [center];
+  for (let r = 2.2; r <= 4.6; r += 0.4) {
+    terr = [center]; const q = [center];
+    while (q.length) { const u = q.shift(); for (const v of adj[u]) if (v > 1 && !terr.includes(v) && dist(N[v], N[center]) <= r) { terr.push(v); q.push(v); } }
+    if (terr.length >= 6) break;
+  }
+  terr = terr.slice(0, 9);
+  // 巡回点: 縄張りの外周寄りの 3〜4 点を、 中心の周りの角度順に並べて輪にする（毎回同じ順で回る）
+  const way = [];
+  const wn = terr.length >= 7 ? 4 : 3;
+  while (way.length < Math.min(wn, terr.length)) {
+    let best = -1, bd = -1;
+    for (const i of terr) { if (way.includes(i)) continue; const dd = Math.min(dist(N[i], N[center]) + 0.01, ...way.map(w => dist(N[i], N[w]))); if (dd > bd) { bd = dd; best = i; } }
+    way.push(best);
+  }
+  way.sort((a, b) => Math.atan2(N[a].y - N[center].y, N[a].x - N[center].x) - Math.atan2(N[b].y - N[center].y, N[b].x - N[center].x));
+  // 補給庫（拠）は縄張りの中に 2 か所
+  const caches = terr.filter(i => !way.includes(i)).slice(0, 2);
+  while (caches.length < 2 && way.length > caches.length) caches.push(way[caches.length]);
+  const bases = caches;
+  const bag = [["戦", 29], ["イ", 25], ["精", 14], ["店", 7], ["宝", 3], ["休", 3]], tot = bag.reduce((s, x) => s + x[1], 0);
+  for (let i = 2; i < N.length; i++) {
+    if (bases.includes(i)) { N[i].type = "拠"; continue; }
+    let r = rnd() * tot; for (const [t, w] of bag) { if ((r -= w) < 0) { N[i].type = t; break; } }
+  }
+  const others = N.map((p, i) => i).filter(i => i > 1 && !bases.includes(i));
+  for (const need of ["店", "休"]) if (!others.some(i => N[i].type === need)) N[others[Math.floor(rnd() * others.length)]].type = need;
+  N.forEach(p => { p.done = false; p.known = false; p.stock = P.shopSupStock; });
+  return { terr, way };
+}
+
+// ═══ 状態 ═══════════════════════════════════════════════════
+function newGame() {
+  const seed = parseInt(document.getElementById("seed").value, 10) || 1;
+  rnd = mulberry(seed);
+  const { terr, way } = genMap();
+  const start = way[0];
+  S = {
+    seed, bases: way, terr: new Set(terr), time: 0, turnAcc: 0, sup: P.supMax, hp: P.hpMax, gold: P.gold0,
+    me: { x: N[0].x, y: N[0].y, node: 0, seg: null }, prevNode: 0,
+    move: null, scout: 0, flare: false, battleHeat: 0, tracks: [], trackAcc: 0,
+    speed: "normal", decoys: [], traps: [], nDecoy: P.decoy0, nTrap: P.trap0,
+    foe: { alive: true, a: start, b: start, t: 0, path: [], state: "巡回", baseIdx: 0, lastKnown: null, lost: 0, freeze: 0, freezeResume: "追跡", fights: P.gauntletFights },
+    seenFoe: null, foeArrow: null, scoutObs: [], scoutDone: false, stone: "反応なし", over: false, log: [], target: null, timeMode: "pause", fastHeld: false, holdFromPause: false,
+  };
+  reveal(P.visNone); log(`シード ${seed}。前哨基地から出口を目指す。徘徊エネミーがどこかの縄張りを巡回している。`);
+  planFoe(); draw(); ui();
+}
+function log(s) { S.log.unshift(`[${S.time.toFixed(1)}] ${s}`); S.log.length = Math.min(S.log.length, 80);
+  document.getElementById("log").innerHTML = S.log.map(x => `<div>${x}</div>`).join(""); }
+const stageOf = v => STAGES.find(s => v >= s[0]);
+const foePos = () => { const f = S.foe, a = N[f.a], b = N[f.b]; return { x: a.x + (b.x - a.x) * f.t, y: a.y + (b.y - a.y) * f.t }; };
+const onRoad = () => S.me.node !== null || S.me.seg !== null;
+// A: 「道の上 +2」は道を移動している間だけ。 点に止まっている時は 0（立ち止まって息を潜める）
+const movingOnRoad = () => !!S.move && S.move.rate === "road";
+const kehai = () => (S.move ? SPEED[S.speed].kehai(movingOnRoad()) : 0) + (S.battleHeat > 0 ? P.kehaiBattle : 0);
+// 照明中は「こちらが見える範囲 ＝ 敵から見られる範囲」で固定（物音を足しても伸びない）。 照明なしは 2＋気配、 最大 4
+const detectR = () => S.flare ? P.visFlare : Math.min(P.detectCap, P.detectBase + kehai());
+function reveal(r) { N.forEach(p => { if (dist(p, S.me) <= r + 1e-6) p.known = true; }); }
+function roadBetween(i, j) { return adj[i].includes(j); }
+
+// 移動の費用: 今いる場所から点 j へ。道で結ばれていれば 1 倍
+function moveRate(j) {
+  const m = S.me;
+  if (m.node !== null && roadBetween(m.node, j)) return "road";
+  if (m.seg && (m.seg[0] === j || m.seg[1] === j)) return "road";
+  return "off";
+}
+function preview(j) {
+  const sp = SPEED[S.speed], d = dist(S.me, N[j]), rate = moveRate(j);
+  const per = ((rate === "road" ? P.costRoad : P.costOff) + (S.flare ? P.costFlare : 0)) * sp.cost;
+  const cost = Math.round(d * per), short = Math.max(0, cost - S.sup);
+  const hpPay = short > 0 ? Math.ceil(short / per * (rate === "road" ? P.hpPayRoad : P.hpPayOff) * sp.cost) : 0;
+  const blocked = rate !== "road" && segHitsMount(S.me, N[j]);
+  return { d, rate, per, cost, hpPay, time: d * sp.time, blocked };
+}
+
+// ═══ 敵（道の上しか動けない） ═══════════════════════════════════
+function nearestNode(p) { let b = 0, bd = 1e9; N.forEach((q, i) => { const d = dist(p, q); if (d < bd) { bd = d; b = i; } }); return b; }
+function shortest(from, to, allowed = null) {
+  // allowed を渡すとその点だけを通る（巡回は縄張りの外へ出ない）。 通れなければ制限なしで引き直す
+  const d = N.map(() => 1e9), pr = N.map(() => -1), used = N.map(() => false); d[from] = 0;
+  for (;;) { let u = -1; for (let i = 0; i < N.length; i++) if (!used[i] && (u < 0 || d[i] < d[u])) u = i;
+    if (u < 0 || d[u] >= 1e9) break; used[u] = true; if (u === to) break;
+    for (const v of adj[u]) { if (allowed && !allowed.has(v) && v !== to) continue;
+      const nd = d[u] + dist(N[u], N[v]); if (nd < d[v]) { d[v] = nd; pr[v] = u; } } }
+  if (from !== to && pr[to] < 0) return allowed ? shortest(from, to) : [];
+  const path = []; for (let v = to; v !== from && v >= 0; v = pr[v]) path.unshift(v); return path;
+}
+function foeTargetNode() {
+  const f = S.foe;
+  if (f.state === "追跡") return nearestNode(S.me);
+  if (f.state === "警戒" && f.lastKnown) return nearestNode(f.lastKnown);
+  return S.bases[f.baseIdx];
+}
+function planFoe() {
+  const f = S.foe; if (!f.alive) return;
+  const here = f.t < 0.5 ? f.a : f.b;
+  if (f.a !== f.b && f.t > 0 && f.t < 1) { // 道の途中: いったん近い端へ
+    const tgt = foeTargetNode(); const via = shortest(f.b, tgt, f.state === "巡回" ? S.terr : null);
+    f.path = via; return; }
+  f.a = f.b = here; f.t = 0; f.path = shortest(here, foeTargetNode(), f.state === "巡回" ? S.terr : null);
+}
+function advanceFoe(amount) {
+  const f = S.foe; if (!f.alive || f.freeze > 0) return;
+  while (amount > 1e-9) {
+    if (f.a === f.b) {
+      if (!f.path.length) {                                   // 目的地に着いた
+        if (f.state === "巡回") { f.baseIdx = (f.baseIdx + 1) % S.bases.length; f.path = shortest(f.a, S.bases[f.baseIdx], S.terr); if (!f.path.length) return; }
+        else if (f.state === "警戒") {                         // 何も無かった: 最寄りの巡回点へ戻り、 縄張りの巡回を再開
+          f.state = "巡回"; f.lastKnown = null;
+          f.baseIdx = S.bases.reduce((bi, w, i) => dist(N[w], N[f.a]) < dist(N[S.bases[bi]], N[f.a]) ? i : bi, 0);
+          planFoe(); if (!f.path.length) return; }
+        else return;                                          // 追跡: 道の端で待つ（道の外へは出られない）
+      }
+      f.b = f.path.shift(); f.t = 0;
+    }
+    const len = dist(N[f.a], N[f.b]) || 1e-6, rest = (1 - f.t) * len, step = Math.min(rest, amount);
+    f.t += step / len; amount -= step;
+    if (f.t >= 1 - 1e-9) { f.a = f.b; f.t = 0; }
+  }
+}
+
+// ═══ 時間の進行（Highfleet 式: 止まっていても流れる。 内部は 0.1 手番刻み） ═══════
+// 通常の速さで距離 1 ＝ 1 手番。 表示だけが実時間で、 中身は刻みで進むので同じ操作なら同じ結果になる
+const TICK = 0.1;
+// 早送りの解除: 順速へ戻す。 スペースを押したままでも再開しない（押し直せば再び早送り）
+function cancelFast(why) { if (!S.fastHeld) return; S.fastHeld = false; S.holdFromPause = false; if (S.timeMode === "pause") S.timeMode = "normal"; log(`早送りを解除（${why}）`); }
+function pauseTime(msg) { S.timeMode = "pause"; S.fastHeld = false; S.holdFromPause = false; if (msg) log(msg); }   // 長押し中でも止める
+function tick() {
+  if (S.over || S.timeMode === "pause" || !document.getElementById("modal").hidden) return;
+  let dt = TICK;
+  if (S.move) dt = stepMove();
+  else if (S.scout > 0) { S.scout -= TICK; if (S.scout <= 1e-9) { S.scout = 0; S.scoutDone = true; } }
+  if (dt <= 0) return;
+  S.time += dt;
+  const f = S.foe;
+  if (f.alive && f.freeze <= 0) advanceFoe(dt * (f.state === "巡回" ? P.enemyPatrol : P.enemyChase));
+  if (f.alive && f.freeze <= 0) { const fp = foePos(), k = S.traps.findIndex(t => dist(t, fp) <= P.trapHit);
+    if (k >= 0) { const t = S.traps[k]; S.traps.splice(k, 1); f.freezeResume = f.state === "追跡" ? "追跡" : "巡回"; f.freeze = P.trapFreeze;
+      S.seenFoe = { x: fp.x, y: fp.y, t: S.time, state: f.state };            // 罠が作動した場所 ＝ 敵の位置が分かる
+      log(`（罠が作動した）徘徊エネミーの位置が分かった。${P.trapFreeze} 手番足止め。`); sfxTrap(); } }
+  if (S.scout > 0 || S.scoutDone) scoutObserve(S.scoutDone);
+  if (S.scoutDone) { S.scoutDone = false; finishScout(); }
+  S.turnAcc += dt;
+  while (S.turnAcc >= 1 - 1e-9) { S.turnAcc -= 1; turn(); if (S.over) return; }
+  if (S.flare) { reveal(P.visFlare); snapshotFoe(P.visFlare); }
+  reveal(P.visNone); snapshotFoe(P.visNone);
+  if (f.alive && f.freeze <= 0 && dist(foePos(), S.me) <= P.catchDist) { caught(); }
+  if (S.move === null && S.pendingArrive !== undefined) { const j = S.pendingArrive; S.pendingArrive = undefined; arrive(j); }
+}
+function stepMove() {
+  const sp = SPEED[S.speed], m = S.move, rem = dist(S.me, N[m.to]), step = Math.min(TICK / sp.time, rem);
+  const per = ((m.rate === "road" ? P.costRoad : P.costOff) + (S.flare ? P.costFlare : 0)) * sp.cost;
+  pay(step * per, step * (m.rate === "road" ? P.hpPayRoad : P.hpPayOff) * sp.cost);
+  if (S.over) return 0;
+  const k = step / rem; S.me.x += (N[m.to].x - S.me.x) * k; S.me.y += (N[m.to].y - S.me.y) * k;
+  S.me.node = null; S.me.seg = m.rate === "road" && m.from !== null ? [m.from, m.to] : null;
+  S.trackAcc += step;
+  if (S.trackAcc >= 1) { S.trackAcc -= 1; S.tracks.push({ x: S.me.x, y: S.me.y, s: m.rate === "road" ? P.trackRoad : P.trackOff }); }
+  if (rem - step <= 1e-6) { S.me.x = N[m.to].x; S.me.y = N[m.to].y; S.me.node = m.to; S.me.seg = null; S.pendingArrive = m.to; S.move = null; ui(); }
+  return step * sp.time;
+}
+let supFrac = 0;
+function pay(supCost, hpPerDistUnit) {
+  // 物資で払えない分は HP で払う（払底）。死ぬ移動も許す
+  if (S.sup >= supCost) { supFrac += supCost; const whole = Math.floor(supFrac); S.sup -= whole; supFrac -= whole; return; }
+  const covered = S.sup / supCost; S.sup = 0; supFrac = 0;
+  S.hpFrac = (S.hpFrac || 0) + hpPerDistUnit * (1 - covered);
+  const whole = Math.floor(S.hpFrac); if (whole > 0) { S.hp -= whole; S.hpFrac -= whole; }
+  if (S.hp <= 0) { S.hp = 0; end(false, "物資が尽き、歩き続けた末に倒れた。"); }
+}
+function turn() {
+  // 手番ごと: 痕跡が薄れる / 戦闘の気配が冷める / 照明の消費（止まっている時） / 敵の察知
+  S.tracks.forEach(t => t.s--); S.tracks = S.tracks.filter(t => t.s > 0);
+  if (S.battleHeat > 0) S.battleHeat--;
+  if (S.flare && !S.move) pay(P.costFlare, 0);
+  const f = S.foe; if (!f.alive) { updateStone(); return; }
+  if (f.freeze > 0) { f.freeze--; if (f.freeze === 0) { f.state = f.freezeResume; f.lost = 0; planFoe(); log(f.state === "追跡" ? "徘徊エネミーが追跡を再開した。" : "（徘徊エネミーが動き出した気配がする）"); f.freezeResume = "追跡"; } updateStone(); return; }
+  // 囮: 置いてから decoyDelay 手番後に鳴り始め、 追跡中でない近くの敵を呼ぶ。 敵が着くと壊れる
+  for (const d of S.decoys) { d.turns--; if (d.delay > 0) { d.delay--; continue; }
+    if (f.state !== "追跡" && dist(foePos(), d) <= P.decoyNoise) { if (f.state !== "警戒" || !f.lastKnown || dist(f.lastKnown, d) > 0.1) { f.state = "警戒"; f.lastKnown = { x: d.x, y: d.y }; planFoe(); } }
+    if (dist(foePos(), d) <= P.decoyBreak) { d.turns = 0; log("（囮が壊された）"); } }
+  S.decoys = S.decoys.filter(d => d.turns > 0);
+  const d = dist(foePos(), S.me), R = detectR();
+  let seen = false;
+  if (d <= R) { const roll = d6(), need = Math.min(6, Math.max(1, Math.floor(R - d + 1))); /* B: ×2 → ×1 */ seen = roll <= need; }
+  if (seen) {
+    if (f.state !== "追跡") { log("（どこかで何かがこちらを嗅ぎつけた）"); sfxDetected(); }
+    f.state = "追跡"; f.lost = 0; f.lastKnown = { x: S.me.x, y: S.me.y }; planFoe();
+  } else if (f.state === "追跡") {
+    if (++f.lost >= P.lostTurns) { f.state = "警戒"; f.lastKnown = f.lastKnown || { x: S.me.x, y: S.me.y }; planFoe(); }
+    else planFoe();
+  } else if (f.state === "巡回") {
+    const p = foePos(), t = S.tracks.find(t => dist(t, p) <= 0.6);
+    if (t) { f.state = "警戒"; f.lastKnown = { x: t.x, y: t.y }; planFoe(); }
+  }
+  updateStone();
+}
+function updateStone() {
+  const f = S.foe, el = document.getElementById("stone");
+  let txt = "反応なし", cls = "cold";
+  if (f.alive) { const d = dist(foePos(), S.me);
+    if (d <= P.visStone) {                                           // 察知されている ＞ されていないが近い ＞ されておらず遠い
+      if (f.state === "追跡" || f.freeze > 0) { txt = `強く反応 ── 察知されている（${d <= 2 ? "距離1〜2" : "距離3〜4"}）`; cls = "hot"; }
+      else if (d <= 2) { txt = "反応 ── 察知されていないが、かなり近い（距離1〜2）"; cls = "near"; }
+      else { txt = "微かに反応 ── 察知されておらず、遠い（距離3〜4）"; cls = "far"; } } }
+  const lv = cls === "hot" ? 3 : cls === "near" ? 2 : cls === "far" ? 1 : 0;
+  if (lv !== stoneLevel) { if (lv === 2 && stoneLevel < 2) sfxNear(); if (lv > stoneLevel) { lastPulse = 0; cancelFast("魔石が反応した"); } stoneLevel = lv; }
+  if (txt !== S.stone) {
+    S.stone = txt;                                                   // 先に更新する（ui → updateStone の再入で無限に回らないように）
+    if (cls === "hot" && S.timeMode !== "pause") { pauseTime("魔石が強く反応した。時間を止めた。"); sfxStop(); }
+  }
+  el.textContent = txt; el.className = "stone " + cls;
+}
+function snapshotFoe(r) { const f = S.foe; if (!f.alive) return; const p = foePos();
+  if (dist(p, S.me) <= r + 1e-6) { const was = S.seenFoe && S.time - S.seenFoe.t < 0.2; S.seenFoe = { x: p.x, y: p.y, t: S.time, state: f.state };
+    if (!was && r === P.visNone && S.timeMode !== "pause") { pauseTime("徘徊エネミーが目の前に見えた。時間を止めた。"); sfxStop(); ui(); } } }
+
+// 偵察: 範囲内の敵の位置を手番ごとに記録し、 終わった時にまとめて出す。 2 点以上で動いていれば移動方向の矢印
+function scoutObserve(final) {
+  const f = S.foe; if (!f.alive) return; const p = foePos();
+  if (dist(p, S.me) > P.visScout) return;
+  const last = S.scoutObs[S.scoutObs.length - 1];
+  if (!last || final || S.time - last.t >= 1 - 1e-9) S.scoutObs.push({ x: p.x, y: p.y, t: S.time });
+}
+function finishScout() {
+  reveal(P.visScout);
+  const obs = S.scoutObs, f = S.foe; let msg = "偵察を終えた。";
+  if (obs.length) { const a = obs[0], b = obs[obs.length - 1];
+    S.seenFoe = { x: b.x, y: b.y, t: b.t, state: f.state };
+    if (obs.length >= 2 && dist(a, b) > 0.15) { S.foeArrow = { from: a, to: b, t: b.t }; msg += "徘徊エネミーの移動方向を確認した。"; }
+    else msg += "徘徊エネミーを確認した（動いていない）。"; }
+  S.scoutObs = []; log(msg); ui();
+}
+
+// ═══ 点に着いた時 ═══════════════════════════════════════════════
+function arrive(j) {
+  const p = N[j]; reveal(P.visNone); cancelFast("点に着いた");
+  if (p.type === "出") return end(true, "出口に着いた。層を抜けた。");
+  if (p.done && p.type !== "店") return;
+  switch (p.type) {
+    case "戦": return battle(j, "戦闘", 2, 2, P.rewSup.battle, 5 + d6());
+    case "精": return battle(j, "エリート", 3, 0, P.rewSup.elite, 12 + d6());
+    case "イ": return eventTile(j);
+    case "店": return shop(j);
+    case "休": { const h = Math.round(P.hpMax * 0.4); S.hp = Math.min(P.hpMax, S.hp + h); p.done = true; log(`休憩した。HP +${h}`); return ui(); }
+    case "宝": { const g = 20 + d6() * 2; S.gold += g; p.done = true; log(`秘宝を見つけた。ゴールド +${g}`); return ui(); }
+    case "拠": { S.sup = Math.min(P.supMax, S.sup + P.rewSup.base); p.done = true; log(`補給庫を漁った。物資 +${P.rewSup.base}（物音を立てた）`); noise(P.cacheNoise); return ui(); }
+  }
+}
+function noise(r = P.battleNoise) { const f = S.foe; if (f.alive && f.state !== "追跡" && dist(foePos(), S.me) <= r) { f.state = "警戒"; f.lastKnown = { x: S.me.x, y: S.me.y }; planFoe(); } }
+function hpLossRoll(nd, minus) { let s = 0; for (let i = 0; i < nd; i++) s += d6(); return Math.max(0, s - minus); }
+function battle(j, name, nd, minus, sup, gold) {
+  const st = stageOf(S.sup), lo = Math.max(0, nd - minus), hi = nd * 6 - minus;
+  modal(`${name}`, `<p>予想される被害: HP ${Math.round(lo * st[2])}〜${Math.round(hi * st[2])}（物資の段階「${st[1]}」×${st[2]}）</p><p class="k">勝てば 物資 +${sup} / ゴールド +${gold}。HP が減ると物資も −${P.hpLoss[Math.min(3, STAGES.indexOf(st))]}。</p>`, [
+    ["戦う", () => { const loss = Math.round(hpLossRoll(nd, minus) * st[2]); S.hp -= loss;
+      if (S.hp <= 0) { S.hp = 0; return end(false, `${name}で倒れた。`); }
+      if (loss > 0) S.sup = Math.max(0, S.sup - P.hpLoss[Math.min(3, STAGES.indexOf(st))]);
+      S.sup = Math.min(P.supMax, S.sup + sup); S.gold += gold; N[j].done = true; S.battleHeat = P.battleKehaiTurns; noise();
+      log(`${name}に勝った。HP −${loss}、物資 +${sup}、ゴールド +${gold}`); ui(); }],
+    ["逃げる", () => flee(j, name)],
+  ]);
+}
+function flee(j, name) {
+  const hit = Math.max(0, d6() - 1);                                // 予告攻撃（ブロック有効）
+  S.hp -= hit; S.sup = Math.max(0, S.sup - P.fleeSup); S.gold = Math.floor(S.gold / 2);
+  if (S.hp <= 0) { S.hp = 0; return end(false, "逃げる途中で倒れた。"); }
+  S.me = { x: N[S.prevNode].x, y: N[S.prevNode].y, node: S.prevNode, seg: null };
+  log(`${name}から逃げた。HP −${hit}、物資 −${P.fleeSup}、ゴールド半減。直前の点へ戻った（敵は残っている）。`); ui();
+}
+function eventTile(j) {
+  const r = rnd(); N[j].done = true;
+  if (r < 0.45) { const s = 50 + d6() * 20; S.sup = Math.min(P.supMax, S.sup + s); log(`放棄された補給箱。物資 +${s}`); }
+  else if (r < 0.7) { const h = d6() + 2; S.hp -= h; S.gold += 10; log(`崩れた坑道で荷を拾った。HP −${h}、ゴールド +10`); if (S.hp <= 0) { S.hp = 0; return end(false, "坑道で倒れた。"); } }
+  else { S.sup = Math.max(0, S.sup - 60); S.hp = Math.min(P.hpMax, S.hp + 8); log("温かい湧き水で休んだ。物資 −60、HP +8"); }
+  ui();
+}
+function shop(j) {
+  const p = N[j];
+  const buy = () => { if (p.stock > 0 && S.gold >= P.shopSupPrice) { S.gold -= P.shopSupPrice; p.stock--; S.sup = Math.min(P.supMax, S.sup + P.shopSupPack); log(`物資を買った（+${P.shopSupPack}）`); } shop(j); ui(); };
+  const heal = () => { if (S.gold >= P.shopHealPrice) { S.gold -= P.shopHealPrice; S.hp = Math.min(P.hpMax, S.hp + P.shopHeal); log(`傷薬を買った（HP +${P.shopHeal}）`); } shop(j); ui(); };
+  const decoy = () => { if (S.gold >= P.shopDecoyPrice) { S.gold -= P.shopDecoyPrice; S.nDecoy++; log("囮を買った"); } shop(j); ui(); };
+  const trap = () => { if (S.gold >= P.shopTrapPrice) { S.gold -= P.shopTrapPrice; S.nTrap++; log("罠を買った"); } shop(j); ui(); };
+  modal("ショップ", `<p>物資 ${P.shopSupPack} = ${P.shopSupPrice}G（在庫 ${p.stock}）／ 傷薬 HP+${P.shopHeal} = ${P.shopHealPrice}G<br>囮 = ${P.shopDecoyPrice}G ／ 罠 = ${P.shopTrapPrice}G</p><p class="k">所持 ${S.gold}G・囮 ${S.nDecoy}・罠 ${S.nTrap}</p>`,
+    [["物資を買う", buy, p.stock <= 0 || S.gold < P.shopSupPrice], ["傷薬を買う", heal, S.gold < P.shopHealPrice],
+     ["囮を買う", decoy, S.gold < P.shopDecoyPrice], ["罠を買う", trap, S.gold < P.shopTrapPrice], ["出る", () => {}]]);
+}
+function caught() {
+  sfxCaught();
+  S.move = null; S.pendingArrive = undefined;
+  const f = S.foe; let fight = 1;
+  const round = () => {
+    const loss = Math.round(P.hpMax * (0.28 + rnd() * 0.14) * stageOf(S.sup)[2]);
+    S.hp -= loss; log(`徘徊エネミーの連戦 ${fight}/${f.fights}: HP −${loss}`);
+    if (S.hp <= 0) { S.hp = 0; ui(); return end(false, "徘徊エネミーの連戦で倒れた。"); }
+    ui();
+    if (fight >= f.fights) { f.alive = false; S.sup = Math.min(P.supMax, S.sup + P.rewSup.gauntlet); S.battleHeat = P.battleKehaiTurns;
+      log(`徘徊エネミーを退けた。物資 +${P.rewSup.gauntlet}`); updateStone(); return ui(); }
+    fight++;
+    modal("連戦の途中", `<p>${fight - 1} 戦目を切り抜けた。HP ${S.hp}/${P.hpMax}。</p>`, [["続ける", round], ["逃げる", gauntletFlee]]);
+  };
+  const gauntletFlee = () => { S.sup = Math.max(0, S.sup - P.fleeSup); S.gold = Math.floor(S.gold / 2); f.freeze = P.fleeFreezeTurns; f.state = "追跡";
+    log(`連戦から逃げた。物資 −${P.fleeSup}、ゴールド半減。${P.fleeFreezeTurns} 手番後に追跡が始まる。`); ui(); };
+  modal("徘徊エネミーに捕まった", `<p>精鋭の群れ（次の層のエリート）との ${f.fights} 連戦。</p><p class="k">1 戦ごとに HP の 28〜42%（段階の倍率つき）を失う想定。勝ち切れば物資 +${P.rewSup.gauntlet}。</p>`,
+    [["戦う", round], ["逃げる", gauntletFlee]]);
+}
+function end(win, msg) {
+  S.over = true; S.move = null; log(msg); ui();
+  modal(win ? "層を抜けた" : "倒れた", `<p>${msg}</p><p class="k">経過 ${S.time.toFixed(1)} 手番 / 残り物資 ${S.sup} / HP ${S.hp} / ゴールド ${S.gold}</p>`,
+    [["同じシードでもう一度", newGame], ["次のシード", () => { const e = document.getElementById("seed"); e.value = (parseInt(e.value, 10) || 1) + 1; newGame(); }]]);
+}
+function modal(title, body, buttons) {
+  document.getElementById("mt").textContent = title; document.getElementById("mb").innerHTML = body;
+  const bx = document.getElementById("mbtn"); bx.innerHTML = "";
+  for (const [label, fn, disabled] of buttons) { const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.disabled = !!disabled;
+    b.onclick = () => { document.getElementById("modal").hidden = true; fn(); draw(); }; bx.appendChild(b); }
+  document.getElementById("modal").hidden = false; bx.firstChild && bx.firstChild.focus();
+}
+
+// ═══ 効果音（Web Audio で合成・音声ファイル不要） ═══════════════════
+let AC = null, master = null, lastPulse = 0, stoneLevel = 0;
+function audio() {
+  if (typeof window === "undefined") return null;
+  const Ctor = window.AudioContext || window.webkitAudioContext; if (!Ctor) return null;
+  if (!AC) { AC = new Ctor(); master = AC.createGain(); master.connect(AC.destination); }
+  if (AC.state === "suspended") AC.resume();
+  master.gain.value = document.getElementById("snd").checked ? document.getElementById("vol").value / 100 * 0.6 : 0;
+  return AC;
+}
+function tone(freq, dur, { type = "sine", vol = 0.3, at = 0, slide = null, attack = 0.005 } = {}) {
+  const a = audio(); if (!a) return; const t = a.currentTime + at;
+  const o = a.createOscillator(), g = a.createGain(); o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + attack); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.02);
+}
+function hiss(dur, { vol = 0.3, at = 0, lp = 800 } = {}) {   // 音の関数（戦闘の物音 noise() と名前を分ける）
+  const a = audio(); if (!a) return; const t = a.currentTime + at, n = Math.floor(a.sampleRate * dur);
+  const b = a.createBuffer(1, n, a.sampleRate), d = b.getChannelData(0); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const src = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); src.buffer = b; f.type = "lowpass"; f.frequency.value = lp; g.gain.value = vol;
+  src.connect(f); f.connect(g); g.connect(master); src.start(t);
+}
+// 魔石の脈動: 遠い → かなり近い → 察知されている で、 速く・高く・不穏に
+const PULSE = { 1: 1.8, 2: 0.85, 3: 0.5 };
+function pulse(level) {
+  if (level === 1) { tone(62, 0.18, { vol: 0.35 }); tone(392, 0.25, { vol: 0.05, at: 0.02 }); }
+  if (level === 2) { tone(74, 0.16, { vol: 0.45 }); tone(622, 0.22, { vol: 0.09, at: 0.02 }); tone(659, 0.22, { vol: 0.05, at: 0.02 }); }
+  if (level === 3) { tone(58, 0.13, { vol: 0.6 }); tone(55, 0.16, { vol: 0.5, at: 0.16 }); tone(740, 0.2, { type: "triangle", vol: 0.08, at: 0.02 }); tone(784, 0.2, { type: "triangle", vol: 0.07, at: 0.02 }); }
+}
+function sfxStop() { tone(620, 0.55, { type: "sawtooth", vol: 0.08, slide: 60 }); tone(310, 0.55, { vol: 0.12, slide: 40 }); hiss(0.35, { vol: 0.08, lp: 500 }); }
+function sfxDetected() { tone(110, 0.8, { vol: 0.5, slide: 38 }); hiss(0.5, { vol: 0.25, lp: 1200 }); tone(1320, 0.45, { type: "sawtooth", vol: 0.06, slide: 880, at: 0.05 }); tone(1397, 0.45, { type: "sawtooth", vol: 0.05, slide: 930, at: 0.05 }); }
+function sfxCaught() { hiss(0.6, { vol: 0.5, lp: 400 }); tone(80, 0.9, { vol: 0.6, slide: 30 }); tone(160, 0.5, { type: "square", vol: 0.06, slide: 60 }); }
+function sfxTrap() { tone(1800, 0.06, { type: "square", vol: 0.05 }); tone(900, 0.12, { type: "square", vol: 0.05, at: 0.05 }); hiss(0.15, { vol: 0.1, lp: 2500, at: 0.03 }); }
+function sfxNear() { tone(523, 0.12, { vol: 0.08 }); tone(659, 0.16, { vol: 0.08, at: 0.1 }); }
+function soundTick(now) {
+  if (!AC || stoneLevel === 0) return;
+  if (now - lastPulse >= PULSE[stoneLevel] * 1000) { lastPulse = now; pulse(stoneLevel); }
+}
+
+// ═══ 操作 ═══════════════════════════════════════════════════
+const cv = document.getElementById("cv"), cx = cv.getContext("2d");
+const toPx = p => ({ x: OX + p.x * SCALE, y: OY + p.y * SCALE });
+cv.addEventListener("click", e => {
+  if (S.over || S.scout > 0 || !document.getElementById("modal").hidden) return;
+  const r = cv.getBoundingClientRect(), mx = (e.clientX - r.left) * cv.width / r.width, my = (e.clientY - r.top) * cv.height / r.height;
+  let hit = -1; N.forEach((p, i) => { const q = toPx(p); if (Math.hypot(q.x - mx, q.y - my) < 14) hit = i; });
+  if (hit < 0 || hit === S.me.node || (S.move && hit === S.move.to)) { S.target = null; return ui(); }
+  if (S.target === hit) {                                            // 2 回目のクリックで出発
+    const pv = preview(hit);
+    if (pv.blocked) { log("山岳を横切ることはできない。道を使うか、回り込む。"); S.target = null; return ui(); }
+    if (!S.move) S.prevNode = S.me.node !== null ? S.me.node : nearestNode(S.me);
+    const turning = !!S.move;
+    S.move = { to: hit, rate: pv.rate, from: S.me.node !== null ? S.me.node : (S.me.seg ? (S.me.seg[0] === hit ? S.me.seg[1] : S.me.seg[0]) : null) };
+    S.target = null; log(`${turning ? "行き先を変えた: " : ""}${N[hit].known ? N[hit].type : "?"} へ（距離 ${pv.d.toFixed(2)}・${pv.rate === "road" ? "道" : "道の外"}）`);
+  } else S.target = hit;
+  ui();
+});
+document.getElementById("bFlare").onclick = () => { S.flare = !S.flare; log(S.flare ? "照明を打ち上げた。" : "照明を消した。"); if (S.flare) { reveal(P.visFlare); snapshotFoe(P.visFlare); } ui(); };
+document.getElementById("bScout").onclick = () => { if (S.move || S.scout > 0) return; S.scout = P.scoutTurns; S.scoutObs = []; scoutObserve(false); log(`偵察を始めた（${P.scoutTurns} 手番動けない）。`); ui(); };
+document.getElementById("bStop").onclick = () => {
+  if (S.move) { const m = S.move; S.move = null; S.me.node = null; S.me.seg = m.rate === "road" && m.from !== null ? [m.from, m.to] : null; log("その場で止まった（時間は流れ続ける）。"); }
+  ui();
+};
+function setTime(mode) { S.timeMode = mode; ui(); }
+// 早送り: 押している間だけ。 停止中に押したら、 離した時に停止へ戻る
+function holdFast(on) {
+  if (S.over) return;
+  if (on && !S.fastHeld) { S.fastHeld = true; S.holdFromPause = S.timeMode === "pause"; if (S.holdFromPause) S.timeMode = "normal"; }
+  else if (!on && S.fastHeld) { S.fastHeld = false; if (S.holdFromPause && S.timeMode === "normal") S.timeMode = "pause"; S.holdFromPause = false; }
+  ui();
+}
+document.getElementById("tPause").onclick = () => setTime("pause");
+document.getElementById("tNormal").onclick = () => setTime("normal");
+{ const bf = document.getElementById("tFast");
+  bf.onpointerdown = e => { e.preventDefault(); holdFast(true); };
+  bf.onpointerup = bf.onpointerleave = bf.onpointercancel = () => holdFast(false); }
+const typing = e => e.target && /INPUT|TEXTAREA/.test(e.target.tagName);
+if (typeof window !== "undefined" && window.addEventListener) {
+  // スペース: 短く押して離す ＝ 停止⇄順速 / 0.5 秒以上押し続ける ＝ その時点から早送り（離すと戻る）
+  let spaceTimer = null, spaceLong = false;
+  window.addEventListener("keydown", e => {
+    if (typing(e)) return;
+    if (e.code === "Space") { e.preventDefault(); if (e.repeat || spaceTimer) return;
+      spaceLong = false; spaceTimer = setTimeout(() => { spaceLong = true; holdFast(true); }, 500); }
+    else if (e.code === "KeyP" && !e.repeat) setTime(S.timeMode === "pause" ? "normal" : "pause");
+  });
+  window.addEventListener("keyup", e => {
+    if (e.code !== "Space") return; e.preventDefault();
+    clearTimeout(spaceTimer); spaceTimer = null;
+    if (spaceLong) holdFast(false); else setTime(S.timeMode === "pause" ? "normal" : "pause");
+    spaceLong = false;
+  });
+  window.addEventListener("blur", () => { clearTimeout(spaceTimer); spaceTimer = null; spaceLong = false; holdFast(false); });   // 押したままウィンドウを離れても戻す
+}
+for (const [id, sp] of [["spSneak", "sneak"], ["spNormal", "normal"], ["spHurry", "hurry"]])
+  document.getElementById(id).onclick = () => { S.speed = sp; log(`速さ: ${SPEED[sp].name}`); ui(); };
+document.getElementById("bDecoy").onclick = () => { if (S.nDecoy <= 0 || S.over) return; S.nDecoy--;
+  S.decoys.push({ x: S.me.x, y: S.me.y, turns: P.decoyTurns, delay: P.decoyDelay }); log(`囮を置いた（${P.decoyDelay} 手番後から ${P.decoyTurns} 手番鳴る）。離れよう。`); ui(); };
+document.getElementById("bTrap").onclick = () => { if (S.nTrap <= 0 || S.over) return; S.nTrap--;
+  S.traps.push({ x: S.me.x, y: S.me.y }); log(onRoad() ? "罠を仕掛けた。" : "罠を仕掛けた（道の外なので敵が踏むことはまず無い）。"); ui(); };
+document.getElementById("bNew").onclick = newGame;
+document.getElementById("dbg").onchange = () => draw();
+
+// ═══ 表示 ═══════════════════════════════════════════════════
+const COL = { "戦": "#d8544a", "精": "#9a2f2a", "イ": "#6aa4d8", "店": "#a0d646", "休": "#60d6c8", "宝": "#e6c664", "拠": "#b58ad8", "前": "#e6e2d8", "出": "#e6e2d8" };
+let renderAlpha = 1, prevMe = null, prevFoe = null;
+function lerpP(prev, cur) { if (!prev || renderAlpha >= 1) return cur; const a = Math.max(0, renderAlpha);
+  return { x: prev.x + (cur.x - prev.x) * a, y: prev.y + (cur.y - prev.y) * a }; }
+function circle(p, r, stroke, dash) { const q = toPx(p); cx.beginPath(); cx.setLineDash(dash || []); cx.strokeStyle = stroke; cx.arc(q.x, q.y, r * SCALE, 0, 7); cx.stroke(); cx.setLineDash([]); }
+function draw() {
+  cx.fillStyle = "#0b0d0f"; cx.fillRect(0, 0, cv.width, cv.height);
+  const dbg = document.getElementById("dbg").checked;
+  for (const m of MTS) {                                           // 山岳（通行不可）
+    const q = toPx(m); cx.save(); cx.translate(q.x, q.y); cx.rotate(m.r);
+    cx.fillStyle = "#231f1b"; cx.strokeStyle = "#4a4036"; cx.lineWidth = 2; cx.beginPath(); cx.ellipse(0, 0, m.a * SCALE, m.b * SCALE, 0, 0, 7); cx.fill(); cx.stroke();
+    cx.strokeStyle = "#5a4e42"; cx.lineWidth = 1.5;
+    for (let i = -2; i <= 2; i++) { const x = i * m.a * SCALE * 0.32, h = m.b * SCALE * (0.55 - Math.abs(i) * 0.12);
+      cx.beginPath(); cx.moveTo(x - h * 0.8, h * 0.4); cx.lineTo(x, -h * 0.6); cx.lineTo(x + h * 0.8, h * 0.4); cx.stroke(); }
+    cx.restore(); }
+  cx.lineWidth = 2;
+  for (const [a, b] of E) { const p = toPx(N[a]), q = toPx(N[b]); cx.strokeStyle = "#3a3326"; cx.beginPath(); cx.moveTo(p.x, p.y); cx.lineTo(q.x, q.y); cx.stroke(); }
+  if (dbg) for (const t of S.tracks) { const q = toPx(t); cx.fillStyle = `rgba(240,170,66,${0.15 * t.s})`; cx.fillRect(q.x - 3, q.y - 3, 6, 6); }
+  // 索敵の範囲（表示上の自分の位置は刻みの間を補間する）
+  const meP = lerpP(prevMe, S.me);
+  cx.lineWidth = 1;
+  circle(meP, P.visStone, "rgba(181,138,216,.35)", [4, 5]);
+  if (S.flare) { const q = toPx(meP); const g = cx.createRadialGradient(q.x, q.y, 0, q.x, q.y, P.visFlare * SCALE);
+    g.addColorStop(0, "rgba(240,170,66,.10)"); g.addColorStop(1, "rgba(240,170,66,0)"); cx.fillStyle = g; cx.beginPath(); cx.arc(q.x, q.y, P.visFlare * SCALE, 0, 7); cx.fill();
+    circle(meP, P.visFlare, "rgba(240,170,66,.45)"); }
+  if (S.scout > 0) circle(meP, P.visScout, "rgba(96,214,200,.6)", [2, 3]);
+  circle(meP, detectR(), "rgba(216,84,74,.25)", [1, 6]);
+  // 行き先の予告
+  if (S.move) {                                                    // いま向かっている行き先: 常に点線と輪で示す
+    const p = toPx(meP), q = toPx(N[S.move.to]);
+    cx.strokeStyle = "rgba(240,170,66,.85)"; cx.lineWidth = 2; cx.setLineDash([2, 6]);
+    cx.beginPath(); cx.moveTo(p.x, p.y); cx.lineTo(q.x, q.y); cx.stroke(); cx.setLineDash([]);
+    cx.beginPath(); cx.arc(q.x, q.y, 17, 0, 7); cx.stroke(); }
+  if (S.target !== null && S.target !== undefined) { const p = toPx(meP), q = toPx(N[S.target]), pv = preview(S.target);
+    cx.strokeStyle = pv.blocked ? "#6f6b62" : pv.rate === "road" ? "#f0aa42" : "#d8544a"; cx.lineWidth = 2; cx.setLineDash(pv.rate === "road" ? [] : [6, 5]);
+    cx.beginPath(); cx.moveTo(p.x, p.y); cx.lineTo(q.x, q.y); cx.stroke(); cx.setLineDash([]); }
+  // 点
+  cx.font = "bold 13px Consolas, 'Yu Gothic', monospace"; cx.textAlign = "center"; cx.textBaseline = "middle";
+  N.forEach((p, i) => { const q = toPx(p), known = p.known || p.type === "出" || p.type === "前";
+    cx.fillStyle = p.done ? "#23272c" : "#16191c"; cx.strokeStyle = known ? (p.done ? "#454b52" : COL[p.type]) : "#454b52"; cx.lineWidth = 2;
+    cx.beginPath(); cx.arc(q.x, q.y, 11, 0, 7); cx.fill(); cx.stroke();
+    cx.fillStyle = known ? (p.done ? "#6f6b62" : COL[p.type]) : "#6f6b62"; cx.fillText(known ? p.type : "?", q.x, q.y + 1); });
+  // 敵
+  const f = S.foe;
+  if (f.alive) {
+    const vis = dbg || (S.seenFoe && S.time - S.seenFoe.t < 0.15);
+    if (S.seenFoe && !vis) { const q = toPx(S.seenFoe), age = S.time - S.seenFoe.t; cx.globalAlpha = Math.max(0.15, 1 - age / 12);
+      cx.strokeStyle = "#d8544a"; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(q.x - 7, q.y - 7); cx.lineTo(q.x + 7, q.y + 7); cx.moveTo(q.x + 7, q.y - 7); cx.lineTo(q.x - 7, q.y + 7); cx.stroke();
+      cx.fillStyle = "#d8544a"; cx.font = "11px Consolas, monospace"; cx.fillText(`最後の位置 ${age.toFixed(0)}手番前`, q.x, q.y - 16); cx.globalAlpha = 1; }
+    if (vis) { const q = toPx(lerpP(prevFoe, foePos())); cx.fillStyle = "#d8544a"; cx.beginPath(); cx.moveTo(q.x, q.y - 10); cx.lineTo(q.x + 9, q.y + 7); cx.lineTo(q.x - 9, q.y + 7); cx.closePath(); cx.fill();
+      cx.fillStyle = "#e6e2d8"; cx.font = "11px Consolas, 'Yu Gothic', monospace"; cx.fillText(`精鋭の群れ（${f.freeze > 0 ? "足止め" : f.state}）`, q.x, q.y - 18); }
+    if (S.foeArrow) { const age = S.time - S.foeArrow.t, a = toPx(S.foeArrow.from), b = toPx(S.foeArrow.to);   // 偵察で見た移動方向
+      if (age < 12) { const ang = Math.atan2(b.y - a.y, b.x - a.x), len = Math.max(26, Math.hypot(b.x - a.x, b.y - a.y));
+        const tip = { x: a.x + Math.cos(ang) * (len + 14), y: a.y + Math.sin(ang) * (len + 14) };
+        cx.globalAlpha = Math.max(0.2, 1 - age / 12); cx.strokeStyle = "#d8544a"; cx.fillStyle = "#d8544a"; cx.lineWidth = 3;
+        cx.beginPath(); cx.moveTo(a.x, a.y); cx.lineTo(tip.x, tip.y); cx.stroke();
+        cx.beginPath(); cx.moveTo(tip.x + Math.cos(ang) * 4, tip.y + Math.sin(ang) * 4);
+        cx.lineTo(tip.x - Math.cos(ang - 0.5) * 12, tip.y - Math.sin(ang - 0.5) * 12); cx.lineTo(tip.x - Math.cos(ang + 0.5) * 12, tip.y - Math.sin(ang + 0.5) * 12); cx.closePath(); cx.fill();
+        cx.globalAlpha = 1; } }
+    if (dbg) { S.terr.forEach(i => circle(N[i], 0.26, "rgba(181,138,216,.45)")); S.bases.forEach((b, k) => { circle(N[b], 0.36, "rgba(181,138,216,.95)");
+      const q = toPx(N[b]); cx.fillStyle = "#b58ad8"; cx.font = "10px Consolas, monospace"; cx.fillText("巡" + (k + 1), q.x, q.y + 22); }); }
+  }
+  for (const d of S.decoys) { const q = toPx(d); cx.fillStyle = d.delay > 0 ? "#8a6a3a" : "#f08a32";   // 囮（炎）
+    cx.beginPath(); cx.moveTo(q.x, q.y - 9); cx.quadraticCurveTo(q.x + 7, q.y, q.x, q.y + 5); cx.quadraticCurveTo(q.x - 7, q.y, q.x, q.y - 9); cx.fill();
+    if (d.delay <= 0) circle(d, P.decoyNoise, "rgba(240,138,50,.25)", [3, 6]); }
+  for (const t of S.traps) { const q = toPx(t); cx.strokeStyle = "#a9a498"; cx.lineWidth = 2;   // 罠
+    cx.beginPath(); cx.moveTo(q.x - 5, q.y - 5); cx.lineTo(q.x + 5, q.y + 5); cx.moveTo(q.x + 5, q.y - 5); cx.lineTo(q.x - 5, q.y + 5); cx.stroke(); }
+  // 自分
+  const q = toPx(meP); cx.fillStyle = "#f0aa42"; cx.strokeStyle = "#1a1408"; cx.lineWidth = 2; cx.beginPath(); cx.arc(q.x, q.y, 7, 0, 7); cx.fill(); cx.stroke();
+}
+function ui() {
+  const st = stageOf(S.sup);
+  document.getElementById("sup").textContent = S.sup; document.getElementById("stage").textContent = `【${st[1]}】`;
+  document.getElementById("supbar").style.width = (S.sup / P.supMax * 100) + "%";
+  document.getElementById("hp").textContent = S.hp; document.getElementById("hpmax").textContent = P.hpMax;
+  document.getElementById("hpbar").style.width = (S.hp / P.hpMax * 100) + "%";
+  document.getElementById("gold").textContent = S.gold + " G";
+  document.getElementById("turn").textContent = S.time.toFixed(1) + " 手番";
+  document.getElementById("kehai").textContent = S.flare ? `照明中 / ${detectR()}` : `${kehai()} / ${detectR()}${S.move ? (S.move.rate === "road" ? "（道を" : "（道の外を") + SPEED[S.speed].name + "）" : "（静止）"}`;
+  for (const [id, sp] of [["spSneak", "sneak"], ["spNormal", "normal"], ["spHurry", "hurry"]]) { const b = document.getElementById(id); b.classList.toggle("on", S.speed === sp); b.setAttribute("aria-pressed", S.speed === sp); }
+  const bD = document.getElementById("bDecoy"); bD.textContent = `囮を置く（${S.nDecoy}）`; bD.disabled = S.nDecoy <= 0 || S.over;
+  const bT = document.getElementById("bTrap"); bT.textContent = `罠を置く（${S.nTrap}）`; bT.disabled = S.nTrap <= 0 || S.over;
+  const bF = document.getElementById("bFlare"); bF.classList.toggle("on", S.flare); bF.setAttribute("aria-pressed", S.flare);
+  document.getElementById("bScout").disabled = !!S.move || S.scout > 0 || S.over;
+  const bS = document.getElementById("bStop"); bS.disabled = !S.move;
+  const tm = S.timeMode === "pause" ? "pause" : S.fastHeld ? "fast" : "normal";
+  for (const [id, m] of [["tPause", "pause"], ["tNormal", "normal"], ["tFast", "fast"]]) { const b = document.getElementById(id); b.classList.toggle("on", tm === m); b.setAttribute("aria-pressed", tm === m); }
+  let pv = "";
+  if (S.scout > 0) pv = `偵察中… 残り ${S.scout.toFixed(1)} 手番`;
+  else if (S.move && (S.target === null || S.target === undefined)) pv = `移動中（${S.move.rate === "road" ? "道" : "道の外"}）${S.timeMode === "pause" ? " ── 時間停止中" : ""}<br><span class="k">別の点を2回クリックで行き先を変える（時間停止中でもできる）</span>`;
+  else if (S.target !== null && S.target !== undefined) { const p = preview(S.target);
+    pv = p.blocked ? `行き先 ${N[S.target].known ? N[S.target].type : "?"}：<span style="color:var(--red)">山岳を横切るので通れない</span>` :
+      `行き先 ${N[S.target].known ? N[S.target].type : "?"}：距離 ${p.d.toFixed(2)}・${p.rate === "road" ? "道（×1）" : "道の外（×2）"}・${SPEED[S.speed].name}<br>物資 −${p.cost}（${+p.per.toFixed(1)}/距離）・時間 ${p.time.toFixed(1)} 手番` +
+      (p.hpPay ? `<br><span style="color:var(--red)">物資が足りない。HP −${p.hpPay} で払う</span>` : "") + `<br>もう一度クリックで出発`; }
+  else pv = S.timeMode === "pause" ? "時間停止中。点をクリックして行き先を選ぶ（スペースを短く押して時間を進める・0.5 秒以上押し続けると早送り）" : "点をクリックして行き先を選ぶ";
+  document.getElementById("preview").innerHTML = pv;
+  updateStone(); draw();
+}
+let last = 0;
+function loop(ts) {
+  soundTick(ts);
+  if (S.timeMode !== "pause") { const per = P.msPerTick[S.fastHeld ? "fast" : "normal"];
+    if (ts - last >= per) {
+      const n = Math.min(5, Math.floor((ts - last) / per)); last = ts;
+      prevMe = { x: S.me.x, y: S.me.y }; prevFoe = S.foe.alive ? foePos() : null;
+      for (let i = 0; i < n; i++) tick(); renderAlpha = 0; ui();
+    } else { renderAlpha = (ts - last) / per; draw(); }
+  } else { last = ts; renderAlpha = 1; }
+  requestAnimationFrame(loop);
+}
+document.addEventListener("pointerdown", () => audio());
+document.getElementById("snd").onchange = () => audio(); document.getElementById("vol").oninput = () => audio();
+newGame(); requestAnimationFrame(loop);
+</script></body></html>

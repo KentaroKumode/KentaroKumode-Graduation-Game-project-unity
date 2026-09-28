@@ -154,3 +154,7 @@ crashlytics-build.properties
 # スイープのアーム定義 (実験ごとの使い捨て) と Python のキャッシュ
 /Tools/arms/
 __pycache__/
+
+# 個人のファイル (ポートフォリオ・履歴書)。 このプロジェクトとは無関係なので push しない
+/portfolio/
+/resume/

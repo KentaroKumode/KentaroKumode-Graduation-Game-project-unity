@@ -268,20 +268,6 @@ namespace InventorySystem.PassiveItems.Effects
     //  2026-06-03 新規追加アイテム（ITimedEffect系）
     // ============================================================
 
-    /// <summary>巡礼の杖飾り (BRONZE): マップ移動時、25%で希望+1。歩み続けるほど心が慰められる、
-    /// 希望ビルドの序盤の足場。希望システム(ADR-0002)へ直接接続。</summary>
-    public class PilgrimCharmEffect : ITimedEffect
-    {
-        public string Id => "四歩返しの杖飾り";
-        public TimedEffectTrigger Trigger => TimedEffectTrigger.OnMapMove;
-        public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
-        {
-            if (run == null || GameLoop.GameRng.Value("passiveItem.staffCharm") >= 0.25f) return;
-            HopeSystem.ApplyFood(run, 1);
-            Debug.Log($"[PassiveItem] 巡礼の杖飾り: 希望+1 ({run.hope}/{run.hopeCap})");
-        }
-    }
-
     /// <summary>幸運の硬貨: 戦闘勝利時 ゴールド+3 (2026-09-18)。
     /// 〈黄金の天秤〉(+10G/勝) の 3 割。 イベントで無料で渡されるので BRONZE 相当に抑える。</summary>
     public class LuckyCoinEffect : ITimedEffect

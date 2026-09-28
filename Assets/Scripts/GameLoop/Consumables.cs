@@ -183,7 +183,7 @@ namespace GameLoop
                     ctx.painkillerArmedThisTurn = true;
                     return true;
 
-                case ClassStarter.DaggerId: // 仕込み刃 (暗殺者): 次のロール敗北で無効化+反射
+                case ClassStarter.DaggerId: // 仕込み刃 (暗殺者): このターンの被ダメ 0 + 5 倍を軽減不可で反撃
                     if (ctx != null) ctx.daggerArmed = true;
                     else run.pendingDaggerArmed = true;
                     return true;

@@ -25,8 +25,8 @@ namespace MetaProgression
             ["rinkai"] = new HashSet<string>
             {
                 "余分に乾いた火口箱","炉番の火床外套","過熱石","溢れを取る鋳型","帳簿外の連鎖爆発",
-                "朝にも熱い竈","気短な早沸かし釜","恒熱の炉壁","七日目の熾",
-                "三度不良の銅線",
+                "朝にも熱い竈","気短な早沸かし釜","恒熱の炉壁","八日目の灰燼",
+                "雷神槍",
             },
             ["poison"] = new HashSet<string>
             {
@@ -35,7 +35,7 @@ namespace MetaProgression
             },
             ["bleed"] = new HashSet<string>
             {
-                "Sting","末頁の血花太刀","血日に澄む佩玉","退路喰いの狂刃","手負い追いの山刀",
+                "Sting","末頁の血花太刀","血日に澄む佩玉","退路喰いの狂刃","鋸引き刃の山刀",
                 "医書裏の開き針","GrievousI","GrievousII","先血の腕輪","血令",
             },
         };
