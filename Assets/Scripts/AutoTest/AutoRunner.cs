@@ -1000,7 +1000,7 @@ namespace AutoTest
         /// <summary>〈不完全な転移〉ブロック貫通率。 <b>負 = 触らない。</b></summary>
         public float gatePierceRate = -1f;
 
-        /// <summary>〈門〉で物資 40 を払うつもりのランが、その 40 を<b>取り置く</b>ようになる層。
+        /// <summary>〈門〉で物資 400 (2026-09-28 に ×10) を払うつもりのランが、その 400 を<b>取り置く</b>ようになる層。
         /// 0 で無効。 既定 6 = 6 層に入った時点から。
         ///
         /// <para><b>なぜ要るか。</b> 素の方策は物資を「使い切ってよい資源」として扱う。
@@ -1321,8 +1321,8 @@ namespace AutoTest
             // 物資(ADR-0002): 最終/最低物資と発狂到達
             public int finalProvision;
             public int finalProvisionCap;
-            public int minProvision = 100;
-            public bool reachedMadness;   // 物資0(発狂)に到達したか
+            public int minProvision = GameLoop.ProvisionRules.Max;   // 2026-09-28: 物資 ×10
+            public bool reachedMadness;   // 物資0(払底)に到達したか (旧・発狂。 名前は集計の互換のため据え置き)
             // 物資の発生源別 収支（ProvisionSystem.Stats を1ラン分キャプチャ）
             public int provisionCombatLoss;
             public int provisionComposureGain;
@@ -3378,7 +3378,7 @@ namespace AutoTest
                     //   ランが終わり、 上限まで満たすと〈渇き〉の発動条件から外れる。
                     //   実測ではどちらも軸が死んだので、 発動閾値 (provisionCap×40%) の少し下を
                     //   天井に、 発狂を避けられる高さを床に置いて **帯 [18, 38] を維持**する。
-                    armProvisionRefill = 18f;
+                    armProvisionRefill = 180f;   // 2026-09-28: 物資 ×10
                     armProvisionCeil   = 0.38f;
                     groupTag = "渇き";
                     if (ci == extraCrit + 1) { armAxis = MetaProgression.Relics.RelicAxis.ProvisionBurn; armStep = step; }
@@ -7862,6 +7862,16 @@ namespace AutoTest
             var gm = GameManager.Instance;
             var sm = ShopManager.Instance;
             var inv = sm != null ? sm.Current : null;
+
+            // 物資の補給 (2026-09-28): 物資が物資回復の閾値を割っていたら、 棚より先に包 (100 = 10G) を買う。
+            //   自由移動の層では物資が移動の燃料で、 払底すると HP で歩くことになる。
+            if (sm != null && gm.Run != null)
+            {
+                int guardPack = 0;
+                while (gm.Run.provision <= ProvisionRefillFloorEffective() && guardPack++ < ShopManager.ProvisionPackStock
+                       && sm.TryBuyProvisionPack(gm.Run)) { }
+            }
+
             if (inv != null && inv.slots != null)
             {
                 var run = gm.Run;
@@ -10722,7 +10732,11 @@ namespace AutoTest
 
         private string CurrentNodeId()
         {
-            return MapManager.Instance?.CurrentNode?.id ?? "";
+            var mm = MapManager.Instance;
+            // 自由移動の層では道の途中で止まることがある (魔石の反応で航行を立て直す)。 点が同じでも
+            //   時間が進んでいれば進展なので、 刻みを添えてストール検出に誤判定させない。
+            if (mm != null && mm.IsFreeMap) return $"{mm.CurrentNode?.id ?? ""}@{mm.Sim.Ticks}";
+            return mm?.CurrentNode?.id ?? "";
         }
 
         // ===== ラン終了処理 =====

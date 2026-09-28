@@ -144,8 +144,9 @@ namespace MapSystem
         {
             if (map == null) throw new System.ArgumentNullException(nameof(map));
             // 自由移動の層は位置・時間・徘徊エネミーの状態を持つが、 snapshot はノードしか保存しない。
-            //   座標まで保存する口は作っていない ── Ultra は自由移動の層では checkpoint を取らない
-            //   (UltraMapSnapshot.Capture が null を返す)。 ここへ来たら取り違え。
+            //   座標まで保存する口は作っていない ── Ultra は自由移動の層では無効
+            //   (AutoRunner.DoNavigateFree は Ultra の決定点を通らない・UltraMapSnapshot.Capture も拒否する)。
+            //   ここへ来たら取り違え。
             if (map.IsFreeMap)
                 throw new System.NotSupportedException("自由移動の層は Ultra の盤面復元に対応しない");
             Sim = null;
