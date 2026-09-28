@@ -80,10 +80,10 @@ namespace UI.ClassSelect
                          "あなたは折れなかった。処分される前に、自分の足で教団を去った。",
                 starterId = ClassStarter.DaggerId,
                 starterNameFallback = "仕込み刃",
-                starterDescFallback = "次のダイスロールに敗北したとき、受けるダメージを無効化し、同値を相手に軽減不能ダメージとして与える。",
+                starterDescFallback = "次のターンに受けるダメージを0にし、その5倍を相手に軽減不可ダメージとして与える。",
                 flavorFallback = "負けた側が生き残る型が、ひとつだけあるという。",
                 weaponNameFallback = "懐刀",
-                traits = "一点賭けの奇襲構成。配給品は敗北を反撃に変える仕込みで、短期決戦ほど強く、長期戦では価値が薄れる。",
+                traits = "一点賭けの奇襲構成。配給品は被弾を反撃に変える仕込みで、短期決戦ほど強く、長期戦では価値が薄れる。",
             },
         };
 

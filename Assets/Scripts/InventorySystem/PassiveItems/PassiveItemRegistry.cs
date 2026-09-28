@@ -63,7 +63,7 @@ namespace InventorySystem.PassiveItems
             Register(new Effects.YokyoCrownEffect());
 
             // 2026-06-03 新規追加アイテム
-            Register(new Effects.PilgrimCharmEffect()); // 巡礼の杖飾り（移動時25%で希望+1）
+            // 四歩返しの杖飾り (旧 巡礼の杖飾り) は 2026-09-22 削除 ── 弱すぎた (GAME.md §24)
             Register(new Effects.RoadMoneyBandEffect()); // 道銭の帯封（層突入でゴールド+6）
             // 狂宴の仮面 はパッシブスキル側のステータスへ移した (2026-09-19・与ダメ%を他と同じタイミングで加算)
             // 商人の符牒・食通の懐刀 は他システム連携でフックされる（PassiveItemRegistry には登録しない）

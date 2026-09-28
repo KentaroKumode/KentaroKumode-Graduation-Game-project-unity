@@ -9054,7 +9054,7 @@ namespace AutoTest
                 // 不抜の聖紋 (騎士): HP 90% 以上で発動 (80% gate を最大活用)
                 if (run.playerMaxHP > 0 && cm.PlayerHP * 10 >= run.playerMaxHP * 9)
                     UseFirst(run, GameLoop.ClassStarter.OathId);
-                // 仕込み刃 (暗殺者): 敗北は予測不能なので強敵戦冒頭で常時貼る
+                // 仕込み刃 (暗殺者): このターン限り。 強敵戦の冒頭で切る (予告攻撃を見た判断はまだ入れていない)
                 UseFirst(run, GameLoop.ClassStarter.DaggerId);
                 // 瞬間研磨剤 (剣士): 1 ロール burst なので強敵戦冒頭で切る
                 UseFirst(run, GameLoop.ClassStarter.PolishId);

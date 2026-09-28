@@ -647,8 +647,9 @@ namespace InventorySystem.PassiveSkills
         /// armedThisTurn=使用ターン中、 procced=次ターンに踏みとどまり判定済+強化バフ発動中。</summary>
         public bool painkillerArmedThisTurn;
         public bool painkillerProcced;
-        /// <summary>仕込み刃 (暗殺者): 次のダイスロール敗北時、 受けるダメージ無効化 +
-        /// 同値を軽減不能で敵に与える。 敗北発火 or 戦闘終了で破棄。</summary>
+        /// <summary>仕込み刃 (暗殺者): 使ったターンの被ダメを 0 にし、 その
+        /// <see cref="CombatSystem.CombatManager.DaggerReflectMultiplier"/> 倍を軽減不可で敵に与える。
+        /// <b>このターン限り</b>: 被弾の有無にかかわらず敵の攻撃処理 (行動不能を含む) で破棄。 persistent 区分。</summary>
         public bool daggerArmed;
 
         /// <summary>ボス連戦 (ヴェスカ 4段): 次段の enemy id。敵パッシブ OnTurnEnd で設定され、

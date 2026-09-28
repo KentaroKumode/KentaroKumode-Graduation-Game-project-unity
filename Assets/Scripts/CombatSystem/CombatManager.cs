@@ -1727,11 +1727,10 @@ namespace CombatSystem
                     // 被ダメージ修飾チェーン（順序厳守。詳細は ApplyLossDamageModifiers 参照）
                     totalDmg = ApplyLossDamageModifiers(totalDmg, floorMod, ctx);
 
-                    // 2026-06-28: 仕込み刃 (暗殺者スターター): 次のダイス敗北で被ダメ無効化 +
-                    // 同値を軽減不能で敵に返す。 1 ロール限定 → 発火後 disarm。
+                    // 仕込み刃 (暗殺者スターター): 旧ロール勝負モデルの経路。 倍率は相互攻撃側と揃える。
                     if (ctx.daggerArmed && totalDmg > 0)
                     {
-                        int reflect = totalDmg;
+                        int reflect = totalDmg * DaggerReflectMultiplier;
                         Debug.Log($"[仕込み刃] 敗北ダメ {totalDmg} を無効化 + 軽減不能 {reflect} で反射");
                         totalDmg = 0;
                         enemyHP = Math.Max(0, enemyHP - reflect);
@@ -2930,6 +2929,7 @@ namespace CombatSystem
             if (enemyHP > 0 && enemyStunnedThisTurn)
             {
                 Debug.Log($"[役] 大束: 敵は行動不能 (予告されていた攻撃 {enemyAtkValue} は不発)");
+                ctx.daggerArmed = false;   // 仕込み刃はこのターン限り ── 攻撃が来なくても失効
             }
             else if (enemyHP > 0)
             {
@@ -2988,13 +2988,19 @@ namespace CombatSystem
                     Debug.Log($"[役] 束(防): 被ダメ {before} → {takenDmg}");
                 }
 
-                // 仕込み刃 (暗殺者): 被ダメ無効化 + 同値反射 (収支ベースでは「被弾ターン」で発火)
-                if (ctx.daggerArmed && takenDmg > 0)
+                // 仕込み刃 (暗殺者): **使ったターンの被ダメを 0 にし、 その 5 倍を軽減不可で返す** (2026-09-22)。
+                //   旧仕様は「被弾するまで持ち越し・同値で返す」だった。 **効くのはこのターンだけ** ──
+                //   被弾しなくても失効させる (持ち越すと「いつか必ず 1 回は無傷」という保険になり、
+                //   使いどころの判断が消える)。 敵が行動不能のターンは上の分岐で失効させている。
+                if (ctx.daggerArmed)
                 {
-                    int reflect = takenDmg;
-                    Debug.Log($"[仕込み刃] 被ダメ {takenDmg} を無効化 + 軽減不能 {reflect} で反射");
-                    takenDmg = 0;
-                    enemyHP = Math.Max(0, enemyHP - reflect);
+                    if (takenDmg > 0)
+                    {
+                        int reflect = takenDmg * DaggerReflectMultiplier;
+                        Debug.Log($"[仕込み刃] 被ダメ {takenDmg} を無効化 + 軽減不可 {reflect} (×{DaggerReflectMultiplier}) で反撃");
+                        takenDmg = 0;
+                        enemyHP = Math.Max(0, enemyHP - reflect);
+                    }
                     ctx.daggerArmed = false;
                 }
 
@@ -3807,6 +3813,9 @@ namespace CombatSystem
         // ===========================================================
         //  戦闘終了
         // ===========================================================
+
+        /// <summary>仕込み刃の反撃倍率 (2026-09-22: 1 → 5)。 無効化した被ダメの何倍を軽減不可で返すか。</summary>
+        public const int DaggerReflectMultiplier = 5;
 
         private void FinishCombat()
         {

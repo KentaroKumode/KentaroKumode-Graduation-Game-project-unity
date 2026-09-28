@@ -49,7 +49,7 @@ namespace AutoTest
                 [BuildPersona.Bleed] = new HashSet<string>
                 {
                     "Sting", "医家の反り刃",   // BloodPathBanner は 2026-08-09 削除 (死にID)
-                    "血日に澄む佩玉", "手負い追いの山刀", "逆綴じの止血帯", "末頁の血花太刀",
+                    "血日に澄む佩玉", "鋸引き刃の山刀", "逆綴じの止血帯", "末頁の血花太刀",
                     "医書裏の開き針", "先血の腕輪",
                 },
                 // 臨界 (Rinkai) 2026-07-16 追加: メーター蓄積型 (attackSum を積み、閾値到達で爆発)
@@ -59,7 +59,7 @@ namespace AutoTest
                 {
                     "余分に乾いた火口箱", "炉番の火床外套", "過熱石",
                     "溢れを取る鋳型", "帳簿外の連鎖爆発", "朝にも熱い竈",
-                    "気短な早沸かし釜", "恒熱の炉壁", "七日目の熾",
+                    "気短な早沸かし釜", "恒熱の炉壁", "八日目の灰燼",
                 },
                 [BuildPersona.Poison] = new HashSet<string>
                 {
@@ -80,7 +80,7 @@ namespace AutoTest
                 {
                     "工廠の材料箱", "無限モーター", "呼雷粉", "Thundercloud",
                     "焦げ柄の点火スパナ", "逆さ避雷針",
-                    "過負荷チューナー", "三度不良の銅線", "雷壺",
+                    "過負荷チューナー", "雷神槍", "雷壺",
                 },
                 [BuildPersona.Shield] = new HashSet<string>
                 {
@@ -133,7 +133,7 @@ namespace AutoTest
                 [BuildPersona.Shield] = new HashSet<string>
                 {
                     "ShieldBashI", "ShieldBashII", "ShieldBashIII", "内から落ちた城盾",
-                    "捨盾", // 2026-07-16: 撃破局面のフィニッシャー
+                    "騎士団の切り札", // 2026-07-16: 撃破局面のフィニッシャー
                 },
             };
 

@@ -659,7 +659,7 @@ namespace InventorySystem.PassiveSkills.Effects
     /// 敵HP <= 予定与ダメ+残存シールド の時に Bot が発動判断する運用を想定 (現状は無条件消費・実装単純化)。</summary>
     public class ShieldRelease : IPassiveSkillEffect
     {
-        public string SkillId => "捨盾";
+        public string SkillId => "騎士団の切り札";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -1508,7 +1508,7 @@ namespace InventorySystem.PassiveSkills.Effects
     /// (≥50%: +1 / <50%: +2 / <25%: +3)。追い込み時ほど加速する出血ジェネレータ。</summary>
     public class CrimsonBlade : IPassiveSkillEffect
     {
-        public string SkillId => "手負い追いの山刀";
+        public string SkillId => "鋸引き刃の山刀";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -1684,7 +1684,7 @@ namespace InventorySystem.PassiveSkills.Effects
         /// <summary>消費充電の何割を攻撃へ回すか。</summary>
         private const float ReturnRate = 0.50f;
 
-        public string SkillId => "三度不良の銅線";
+        public string SkillId => "雷神槍";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -1849,7 +1849,7 @@ namespace InventorySystem.PassiveSkills.Effects
     /// HP=1 で踏みとどまり meter を全消費 (Burn Immortalflame の遺伝子継承)。 1戦闘1回。</summary>
     public class UnyieldingHeat : IPassiveSkillEffect
     {
-        public string SkillId => "七日目の熾";
+        public string SkillId => "八日目の灰燼";
         public PassiveSkillTrigger[] Triggers => new[] {
             PassiveSkillTrigger.OnBattleStart,
             PassiveSkillTrigger.OnPreReceiveDamage };
