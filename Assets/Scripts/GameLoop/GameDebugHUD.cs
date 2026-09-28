@@ -5,6 +5,7 @@ using EventSystem;
 using InventorySystem;
 using InventorySystem.Shop;
 using MapSystem;
+using MapSystem.FreeMove;
 
 namespace GameLoop
 {
@@ -328,22 +329,22 @@ namespace GameLoop
             var mm = MapManager.Instance;
             if (mm == null) { moveText = ""; return; }
 
-            var (forward, lateral) = mm.GetCategorizedMoves();
-            var all = new List<MapNode>();
-            all.AddRange(forward);
-            all.AddRange(lateral);
-
+            // 数字キーの移動先 (GameManager.Update と同じ並び ── 道で結ばれた点)。
+            var all = mm.GetAvailableMoves();
             if (all.Count == 0) { moveText = "移動先なし"; return; }
 
             var sb = new System.Text.StringBuilder();
-            sb.AppendLine("移動先:");
+            var sim = mm.Sim;
+            if (sim != null)
+                sb.AppendLine($"時間 {sim.TimeTurns:0.0} 手番 / {sim.Speed.DisplayName()} / 魔石 {sim.StoneLevel}"
+                            + (sim.FlareOn ? " / 照明中" : "") + (sim.IsMoving ? " / 移動中" : ""));
+            sb.AppendLine("移動先 (道):");
             for (int i = 0; i < all.Count; i++)
             {
                 var n = all[i];
-                string dir = n.row > mm.CurrentNode.row ? "↑" : "→";
-                string tName = GameManager.TileToJapanese(n.EffectiveType);
-                string lane = n.lane >= 0 ? $"L{n.lane}" : "";
-                sb.AppendLine($"  {i + 1}. {dir} [{tName}] (行{n.row} {lane})");
+                string tName = n.revealed ? GameManager.TileToJapanese(n.EffectiveType) : "？";
+                string dist = sim != null && n.index >= 0 ? $" 距離{sim.Preview(n.index).distance:0.0}" : "";
+                sb.AppendLine($"  {i + 1}. [{tName}]{dist}");
             }
             moveText = sb.ToString();
         }

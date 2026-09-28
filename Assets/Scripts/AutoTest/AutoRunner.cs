@@ -28,7 +28,7 @@ namespace AutoTest
     /// ゲーム側コードは一切改変せず、Debug.Log("[GameManager] ...") を購読して
     /// 進行ナラティブを取得する。
     /// </summary>
-    public class AutoRunner : MonoBehaviour
+    public partial class AutoRunner : MonoBehaviour
     {
         [Header("バッチ設定")]
         [Tooltip("バッチあたりのラン数。 自己学習(L1/L2)を信頼させるには 1000以上推奨。 200未満は L2 が自動スキップされる")]
@@ -6380,26 +6380,11 @@ namespace AutoTest
             if (gm.Run != null && gm.Run.inLambda)
                 return DoNavigateLambda(gm, mm);
 
-            var (fwd, lat) = mm.GetCategorizedMoves();
-            bool hasFwd = fwd != null && fwd.Count > 0;
-            var pool = new List<MapNode>(hasFwd ? fwd : (lat ?? new List<MapNode>()));
+            // 自由移動の層 (2026-09-28): 距離と物資で点を選ぶ航行へ (AutoRunner.FreeMap.cs)。
+            if (mm.IsFreeMap) return DoNavigateFree(gm, mm);
 
-            // 利得最大化(ADR-0002・物資のリソース化): 前進のみでなく、横方向の「未訪問」マスも
-            // 価値評価(Rank)の候補に含める。Rank が前進候補より価値が高いと判定した時だけ横移動し、
-            // その対価として物資-LateralCost を支払う＝物資を消費して利得を取りにいく挙動。
-            // pool は前進候補が先頭なので、Rank 同点なら前進が勝つ（横移動は厳密に価値が上の時のみ）。
-            // 「どこまで物資を損耗して寄り道するか」は L2 学習軸 lateralProvisionFloor が勝率(composite)で最適化する
-            // （現在物資がこの下限を超えるときのみ寄り道。低いほど深く損耗、高いほど温存）。
-            // 2026-09-12: **横移動が無税 (燈火 r10) なら物資の下限ゲートを掛けない。**
-            //   ゲートは「物資を払ってまで寄り道するか」の判断なので、 払うものが無ければ
-            //   判断自体が不要。 旧実装は無税でも物資 20 以下で寄り道を止めていた。
-            if (hasFwd && lat != null && lat.Count > 0
-                && (0 /* 横移動は廃止 (2026-09-28) */ <= 0
-                    || gm.Run.provision > LateralProvisionFloorEffective()))
-            {
-                foreach (var ln in lat)
-                    if (!ln.visited && !pool.Contains(ln)) pool.Add(ln); // 訪問済みを追うと同行往復で無限ループ
-            }
+            // 離散マップ (8 層: 前哨基地 → ボス。 通常は EnterFloor が自動でボスへ入る) は道の先へ進むだけ。
+            var pool = mm.GetAvailableMoves();
 
             if (pool == null || pool.Count == 0)
             {
@@ -6479,7 +6464,6 @@ namespace AutoTest
             foreach (var n in pool)
             {
                 float score = Rank(n, hpRatio, _curCombatAverse, preferRest, gm.Run, lowBar);
-                score += LateralPenalty(here, n, gm.Run);
 
                 float nextHpRatio = PredictHpRatioAfter(n, hpRatio, floorHit, gm.Run);
                 var succ = fmap?.GetReachableFrom(n.id);
@@ -6496,7 +6480,6 @@ namespace AutoTest
                         float r2 = useFloorDpNavigation
                             ? FloorDpValue(fmap, s, HpBandOf(nextHpRatio), floorHit, gm.Run, lowBar)
                             : Rank(s, nextHpRatio, _curCombatAverse, false, gm.Run, lowBar);
-                        r2 += LateralPenalty(n, s, gm.Run);   // 先の手の横移動も勘定に入れる
                         if (r2 < bestNext) bestNext = r2;
                     }
                     if (bestNext != float.MaxValue) score += LookaheadDiscount * bestNext;
@@ -6506,7 +6489,7 @@ namespace AutoTest
             }
 
             // --- [計装] 航行スコアの同点率 ---
-            //   `Rank()` は **int** を返し、 `LateralPenalty` は 1 判断の中では {0, L} の 2 値。
+            //   `Rank()` は **int** を返す (旧 `LateralPenalty` は 2026-09-28 に削除)。
             //   合成は int + {0,L} + 0.6×(int + {0,L}) の粗い格子なので、 同点が多発するはず
             //   ── だが**戦闘で同じ推測を 6 倍外した**ので数える。 最良と厳密同値の本数を採る。
             if (pool.Count > 1)
@@ -7379,8 +7362,7 @@ namespace AutoTest
                 {
                     MapNode s = succ[i];
                     if (s == null || s.row <= node.row) continue;   // 前進辺のみ = 循環しない
-                    float v = LateralPenalty(node, s, run)
-                            + FloorDpValue(map, s, nextBand, floorHit, run, lowBar);
+                    float v = FloorDpValue(map, s, nextBand, floorHit, run, lowBar);
                     if (v < bestNext) bestNext = v;
                 }
                 if (bestNext != float.MaxValue) total += floorDpDiscount * bestNext;
@@ -7391,39 +7373,7 @@ namespace AutoTest
             return total;
         }
 
-        /// <summary>横移動 (row が増えない移動) に課す物資コストのペナルティ。
-        ///
-        /// **先読みを入れるならこれが必須。** Rank() はタイル種別と HP しか見ないので、
-        /// 横移動が物資を削ることが score に現れず、 先読みは「タダで遠回りできる」と誤認する。
-        /// 実際 2 手先読みだけを入れた測定で横移動の物資損が +60%、
-        /// 発狂到達率が 15.6% → 33.0% へ倍増した (2026-08-05)。
-        /// 物資が低いほど 1 回の横移動が重いので、 残量で重み付けする。
-        ///
-        /// <para><b>2026-09-12 修正: 実コストを引くようにした。</b> 旧実装は定数
-        /// <c>ProvisionSystem.LateralCost</c> (5) を直接読んでおり、 燈火 r10 で実コストが
-        /// 下がっても<b>BOT の評価は 5 のまま</b>だった。 課金側 (<c>ProvisionSystem.ApplyMove</c>) は
-        /// メタ調整後の値を引いているので、 <b>規則と方策がずれていた</b> ──
-        /// 極点を取っても BOT は寄り道を増やさず、 効果が測定に現れない。</para></summary>
-        private static float LateralPenalty(MapNode from, MapNode to, GameLoop.RunState run)
-        {
-            if (from == null || to == null || run == null) return 0f;
-            if (to.row > from.row) return 0f;                 // 前進・斜めは無料
-            int cost = 0 /* 横移動は廃止 (2026-09-28) */;
-            if (cost <= 0) return 0f;                         // 無税なら寄り道を抑制しない
-            float cap = Mathf.Max(1, run.provisionCap);
-            float pct = Mathf.Clamp01(run.provision / cap);
-            // 物資満タンなら軽く、 枯渇に近いほど重く (満: ×1 → 空: ×4)。
-            float p = cost * (1f + 3f * (1f - pct));
-
-            // **2026-09-13: 余裕があるときは物資を資源として使う。**
-            //   比 (provision/cap) だけだと、 上限が伸びても「満タンなら ×1」で頭打ちになり、
-            //   燈火で上限を +135 積んでも BOT の寄り道量が変わらなかった。
-            //   実際のコストは「あと何回払えるか」なので、 **悲観帯 (45) までの絶対距離**で割る。
-            //   cost 10 回ぶんの余裕があれば、 1 回の横移動はほぼ無視できる。
-            int headroom = Mathf.Max(0, run.provision - GameLoop.ProvisionSystem.FloorDepleting);
-            float rich = Mathf.Clamp01(headroom / (float)(cost * 10));
-            return p * (1f - 0.85f * rich);
-        }
+        // 2026-09-28: LateralPenalty (横移動の物資ペナルティ) は横移動の廃止に伴い削除 (docs/GAME.md §24)。
 
         /// <summary>そのタイルを踏んだ後の HP 割合の概算。 2 手先読みで「次の状態」を作るために使う。
         /// 精度は要らない ── 必要なのは「回復系なら上がる / 戦闘系なら下がる」の向きだけ。
@@ -7740,7 +7690,8 @@ namespace AutoTest
             if (run != null && run.currentFloor == 6
                 && GameLoop.ConvictionSystem.HasResolveOrBetter(run)
                 && !GameLoop.ConvictionSystem.HasTruth(run)
-                && t == TileType.Event)
+                && t == TileType.Event
+                && (!node.freeMap || node.isFixedEvent))   // 自由移動の層では固定の点「裂け目の記録」だけ
                 return -20;
             if (convStage == 0)
             {
@@ -9180,6 +9131,9 @@ namespace AutoTest
                         UseFirst(run, "回復薬", "小回復薬");
                     }
                 }
+                // 逃げる (2026-09-28): 徘徊エネミーの連戦は、 各戦の頭で HP が少なければ逃げる。
+                if (cm.CurrentCombatTurn <= 1 && ShouldFleeGauntlet(run, GameManager.Instance) && cm.RequestFlee())
+                    FreeMapGauntletFlees++;
                 var tr = cm.ExecuteTurn();
                 if (tr.isDraw) _cwDraw++;
                 else if (tr.playerWon) _cwWin++;

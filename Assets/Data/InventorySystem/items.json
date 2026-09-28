@@ -1703,6 +1703,26 @@
       "tier": 4
     },
     {
+      "id": "囮",
+      "name": "囮",
+      "description": "マップで使う。今いる場所に置くと、1手番後から6手番のあいだ鳴り続け、半径4の（追跡中でない）徘徊エネミーを呼び寄せる。敵が着くと壊れる。",
+      "flavorText": "油を吸わせた布を巻いた鈴。火を付けると、風の無い坑道でも勝手に揺れ始める。",
+      "category": "Consumable",
+      "rarity": "BRONZE",
+      "basePrice": 6,
+      "consFamily": "decoy"
+    },
+    {
+      "id": "罠",
+      "name": "罠",
+      "description": "マップで使う。今いる場所に仕掛けると、踏んだ徘徊エネミーを1手番足止めし、その位置が分かる。連戦の数は減らない。",
+      "flavorText": "錆びた顎の鉄罠。噛む力より、鳴る音のほうが役に立つ。",
+      "category": "Consumable",
+      "rarity": "BRONZE",
+      "basePrice": 8,
+      "consFamily": "trap"
+    },
+    {
       "id": "瞬間研磨剤",
       "name": "瞬間研磨剤",
       "description": "次の1撃だけ、与ダメージ+150%。",
