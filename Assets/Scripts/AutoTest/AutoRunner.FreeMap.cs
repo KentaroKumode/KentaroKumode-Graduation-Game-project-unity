@@ -106,7 +106,7 @@ namespace AutoTest
             bool alert = sim.StoneLevel >= 2;   // かなり近い / 察知されている
             gm.SetTravelSpeed(alert ? MoveSpeed.Sneak : MoveSpeed.Normal);
             int hop = NextHop(sim, map, at, target, preferOffRoad: alert);
-            if (hop < 0 || hop == at)
+            if (hop < 0 || hop == sim.AtNode)
             {
                 // ここに来るのは「山岳で直線も道も無い」場合だけ (道は必ずつながっているので実際には起きない)
                 Finish(Outcome.Deadlock, $"自由移動の層で行き先 {target} へ動けない");
@@ -155,15 +155,31 @@ namespace AutoTest
                 ? pv.distance * (pv.road ? FreeMapParams.CostRoad : FreeMapParams.CostOffRoad) : double.PositiveInfinity;
             double roadCost = road * FreeMapParams.CostRoad;
             if (directCost < roadCost) return target;
+            int hop = -1;
             if (path.Count > 0)
             {
                 var hopNode = map.GetNodeByIndex(path[0]);
                 bool hopUnused = path[0] != target && hopNode != null && !hopNode.activated
                                  && hopNode.type != TileType.Outpost;
-                if (hopUnused && pv.valid && !pv.blocked) return target;
-                return path[0];
+                hop = hopUnused && pv.valid && !pv.blocked ? target : path[0];
             }
-            return pv.valid && !pv.blocked ? target : -1;
+            else if (pv.valid && !pv.blocked) hop = target;
+
+            // 道の途中・道の外で止まっていると、 「最寄りの点」から引いた経路の最初の点が山岳の向こうのことがある。
+            //   その時は行ける点 (道の両端・山岳に塞がれない点) のうち、 そこから行き先までが一番近い点へ向かう。
+            if (hop < 0 || sim.Preview(hop).blocked || !sim.Preview(hop).valid)
+            {
+                double bestD = double.PositiveInfinity; hop = -1;
+                for (int i = 0; i < L.Count; i++)
+                {
+                    if (i == sim.AtNode) continue;
+                    var p = sim.Preview(i);
+                    if (!p.valid || p.blocked) continue;
+                    double d = p.distance + L.RoadDistance(i, target);
+                    if (d < bestD) { bestD = d; hop = i; }
+                }
+            }
+            return hop;
         }
 
         /// <summary>連戦の各戦の頭で逃げるか: HP が少なく、 まだ 2 戦以上残っているか最後の 1 戦でも瀕死なら逃げる。</summary>

@@ -54,6 +54,11 @@ namespace AutoTest.Ultra
             if (manager == null) throw new ArgumentNullException(nameof(manager));
             FloorMap map = manager.CurrentMap;
             if (map == null) throw new InvalidOperationException("MapManager has no current map");
+            // 2026-09-28: the free-movement floors carry position, time and the wandering enemy,
+            // none of which this snapshot stores. Ultra is disabled there (AutoRunner.DoNavigateFree
+            // never reaches the Ultra decision points), so reaching this line is a wiring mistake.
+            if (map.IsFreeMap)
+                throw new NotSupportedException("Ultra snapshots do not support free-movement floors");
 
             var snapshot = new UltraMapSnapshot
             {

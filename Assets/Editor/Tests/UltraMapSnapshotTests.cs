@@ -273,6 +273,9 @@ namespace AutoTest.EditorTests.Ultra
             {
                 "id", "row", "lane", "type", "resolvedType", "visited", "activated",
                 "isFalseMerchant", "revealed", "connections",
+                // 2026-09-28 自由移動のマップ: Ultra は自由移動の層では無効なので snapshot には含めない
+                //   (UltraMapSnapshot.Capture が自由移動の層を拒否する)。
+                "freeMap", "index", "x", "y", "isFixedEvent",
             };
             string[] actual = typeof(MapNode)
                 .GetFields(BindingFlags.Public | BindingFlags.Instance)
