@@ -36,7 +36,7 @@
 <h1>自由移動マップ 試作（1層完結）</h1>
 <div class="sub">GAME.md §23-21 の仮置き数値で動く手触り確認用。戦闘は簡略版（ダイスで被害を決めるだけ）。<b>時間は流れ続ける（Highfleet 式）</b>── <b>スペースを短く押すと停止⇄順速、0.5 秒以上押し続けると押している間だけ早送り</b>（P キーでも停止⇄順速）。最初は停止。点をクリック → 経路と費用を確認 → もう一度クリックで出発（移動中でも行き先を変えられる）。</div>
 <div class="wrap">
-  <div class="mapbox" id="mapbox"><canvas id="cv" width="960" height="560"></canvas>
+  <div class="mapbox" id="mapbox"><canvas id="cv" width="1000" height="596"></canvas>
     <div class="modal" id="modal" hidden><div class="dlg" role="dialog" aria-modal="true"><h2 id="mt"></h2><div id="mb"></div><div class="btns" id="mbtn" style="margin-top:12px"></div></div></div>
   </div>
   <div class="side">
@@ -81,11 +81,17 @@
         <label>シード <input type="number" id="seed" value="1"></label>
         <button id="bNew" type="button">新しい層</button>
       </div>
+      <div class="btns" style="align-items:center;margin-top:6px">
+        <label>性質 <select id="prof"><option value="random">ランダム</option></select></label>
+        <label>使い魔 <select id="fam"></select></label>
+      </div>
+      <label style="display:block;margin-top:6px"><input type="checkbox" id="showProf" checked> 性質を明かす（切ると伏せたまま遊ぶ）</label>
+      <div id="profDesc" class="k" style="font-size:11px;margin-top:4px"></div>
       <label style="display:block;margin-top:6px"><input type="checkbox" id="dbg"> 敵と痕跡を常に表示（デバッグ）</label>
       <div class="btns" style="align-items:center;margin-top:6px"><label><input type="checkbox" id="snd" checked> 効果音</label>
         <label>音量 <input type="range" id="vol" min="0" max="100" value="60" style="width:110px;vertical-align:middle"></label></div>
       <div class="k" style="font-size:11px">最初に画面を一度クリックすると音が出る（ブラウザの決まり）</div>
-      <div class="legend" style="margin-top:6px"><span>戦=戦闘</span><span>精=エリート</span><span>イ=イベント</span><span>店=ショップ</span><span>休=休憩</span><span>宝=秘宝</span><span>拠=補給庫（敵の縄張りの中）</span><span>?=未確認</span><span>茶の塊=山岳（通行不可）</span><span>炎=囮</span><span>×=罠</span></div>
+      <div class="legend" style="margin-top:6px"><span>戦=戦闘</span><span>精=エリート</span><span>イ=イベント</span><span>店=ショップ</span><span>休=休憩</span><span>宝=秘宝</span><span>拠=補給庫（敵の縄張りの中）</span><span>?=未確認</span><span>茶の塊=山岳（通行不可）</span><span>炎=囮</span><span>×=罠</span><span>桃の点=使い魔</span><span>青緑の点=斥候の使い魔</span><span>放射線=網</span><span>扇=魔石の方角</span></div>
     </div>
   </div>
 </div>
@@ -99,7 +105,8 @@ const P = {
   kehaiRoad: 2, kehaiBattle: 2, battleKehaiTurns: 2, detectBase: 2,
   detectCap: 4,                                                   // 最大察知距離: 照明なしは魔石の範囲 (4) を超えない
   cacheNoise: 3,                                                  // 補給庫を漁った物音（気配は上げない）
-  enemyPatrol: 0.5, enemyChase: 1.0, lostTurns: 3, catchDist: 0.45,
+  enemyPatrol: 0.5, enemyChase: 1.0, lostTurns: 5, catchDist: 0.45,
+  chaseDetectBonus: 1.5,                                          // 追跡中だけ察知距離に足す (2026-09-28: 道の外へ出れば必ず振り切れた)
   trackRoad: 3, trackOff: 1, battleNoise: 4,                       // C: 物音 6 → 4
   fleeSup: 100, fleeFreezeTurns: 2,
   rewSup: { battle: 30, elite: 80, gauntlet: 300, base: 150 }, hpLoss: [40, 50, 70, 100],
@@ -108,14 +115,37 @@ const P = {
   decoyTurns: 6, decoyDelay: 1, decoyNoise: 4, decoyBreak: 1.0, trapFreeze: 1, trapHit: 0.35,                                      // 罠: 足止め 1 手番 ＋ 位置が判明（連戦は減らない）
   msPerTick: { normal: 600, fast: 60 },                            // 時間の速さ: 1 刻み（0.1 手番）あたりの実時間。 順速 1 手番 ≒ 6 秒・早送りはその 10 倍
   shopDecoyPrice: 6, shopTrapPrice: 8, decoy0: 1, trap0: 1, gauntletFights: 2,
+  // 使い魔 (巡航ミサイル・2026-09-28): 察知した地点へ直線で飛ぶ。 探知範囲の内に居ればこちらへ向きを変える。 目標で見つからなければ消える
+  famSpeed: 3.0, famDetect: 1.2, famCatch: 0.45, famCooldown: 8, famMax: 1,
+  famHomingSpeed: 1.5, famHomingDetect: 3.0, famHomingTurns: 10, famSplitDist: 1.0,
+  webStuck: 1, webHit: 0.35, webEvery: 3, webMax: 6,
+  territoryStartClear: 3,
+};
+// 徘徊エネミーの性質 (2026-09-28)。 数値は全部仮置き。 docs/GAME.md §5-9
+const PROFILES = {
+  standard:   { name: "徘徊者",     desc: "基準" },
+  shadow:     { name: "影",         desc: "追跡中は魔石に一切反応しない・察知の合図も出ない", chase: 1.2, silent: true },
+  altar:      { name: "祭壇",       desc: "補給庫の上に据わり一歩も動かない。察知距離 +2。察知している間は 2 手番ごとに使い魔を放つ（同時 3 体まで）。触れれば壊せる（連戦）", stationary: true, sense: 2, famMax: 3, famCooldown: 2 },
+  pouncer:    { name: "飛び掛かり", desc: "追跡中、距離 2.5 以内なら道を外れて直進する", chase: 1.4, lunge: 2.5 },
+  echo:       { name: "木霊",       desc: "魔石の方角が 2 つ出る（片方は木霊の偽物で、2 手番ごとに飛ぶ。本物は敵の動きに付いてくる）", echo: 2 },
+  blind:      { name: "盲目",       desc: "目が無い（気配で察知しない）。物音 2 倍の範囲（最低でも半径 6）・急ぐ足音（半径 2）・痕跡で追う。痕跡を辿る間だけ 1.5 倍速い", blind: true, hearMul: 2, hear: 6, trackMul: 1.5 },
+  weaver:     { name: "網張り",     desc: "巡回路に見えない網を撒く（踏むと 1 手番動けない・偵察/照明で見える）", webs: true },
+};
+const FAMILIARS = {
+  none:    { name: "なし" },
+  cruise:  { name: "巡航",   desc: "察知地点へ直線で速さ 3。探知 1.2。目標で見つからなければ消える" },
+  scout:   { name: "斥候",   desc: "交戦しない。触れた地点を本体に知らせる（本体が警戒で来る）" },
+  homing:  { name: "追尾",   desc: "遅い（1.5）が探知 3・10 手番こちらを追い続ける" },
+  split:   { name: "分裂",   desc: "目標で見つからなければ 2 つに分かれて左右 1 距離を探す" },
 };
 // 移動の速さ: 時間の倍率 / 物資の倍率 / 気配（道の上の +2 を置き換える）
 const SPEED = { sneak: { name: "忍び足", time: 2, cost: 1, kehai: () => 0 },
                 normal: { name: "通常", time: 1, cost: 1, kehai: road => road ? 2 : 0 },
                 hurry: { name: "急ぐ", time: 0.5, cost: 1.5, kehai: road => (road ? 2 : 0) + 1 } };
 const STAGES = [ [751, "充足", 1.0], [451, "目減り", 1.1], [201, "枯渇し始める", 1.25], [1, "枯渇寸前", 1.5], [0, "払底", 1.5] ];
-const SCALE = 78, OX = 24, OY = 24;           // 距離1 = 78px
-const W = 11.6, H = 6.6;                       // 層の広さ（距離）
+const SCALE = 58, OX = 24, OY = 24;           // 距離1 = 58px
+const W = 16.4, H = 9.4;                       // 層の広さ（距離）── 2026-09-28 に 11.6×6.6 から広げた
+const NODE_COUNT = 50, MOUNT_MIN = 3, MOUNT_EXTRA = 3, TERR_MIN = 7, TERR_MAX = 11;
 
 // ═══ 乱数（シード固定） ═══════════════════════════════════════
 let rnd;
@@ -140,17 +170,24 @@ function genMap() {
   for (let attempt = 0; attempt < 40; attempt++) { const r = genMapOnce(); if (r) return r; }
   MTS = []; return genMapOnce();
 }
+function shortestPlain(from, to) {
+  const d = N.map(() => 1e9), used = N.map(() => false); d[from] = 0;
+  for (;;) { let u = -1; for (let i = 0; i < N.length; i++) if (!used[i] && (u < 0 || d[i] < d[u])) u = i;
+    if (u < 0 || d[u] >= 1e9 || u === to) break; used[u] = true;
+    for (const v of adj[u]) { const nd = d[u] + dist(N[u], N[v]); if (nd < d[v]) d[v] = nd; } }
+  return d[to];
+}
 function genMapOnce() {
   MTS = [];
-  const nm = 2 + (rnd() < 0.5 ? 1 : 0);
+  const nm = MOUNT_MIN + Math.floor(rnd() * MOUNT_EXTRA);
   for (let k = 0, guard = 0; k < nm && guard < 200; guard++) {
     const m = { x: 2.4 + rnd() * (W - 4.8), y: 0.9 + rnd() * (H - 1.8), a: 0.7 + rnd() * 0.7, b: 0.45 + rnd() * 0.5, r: rnd() * Math.PI };
-    if (dist(m, { x: 0.5, y: 3.3 }) < 2 || dist(m, { x: W - 0.5, y: H / 2 }) < 1.8) continue;
+    if (dist(m, { x: 0.5, y: H / 2 }) < 2 || dist(m, { x: W - 0.5, y: H / 2 }) < 1.8) continue;
     MTS.push(m); k++;
   }
-  N = [{ x: 0.5, y: 3.3, type: "前" }, { x: W - 0.5, y: 1 + rnd() * (H - 2), type: "出" }];
+  N = [{ x: 0.5, y: H / 2, type: "前" }, { x: W - 0.5, y: 1 + rnd() * (H - 2), type: "出" }];
   if (inMount(N[1], 0.4)) return null;
-  for (let tries = 0; N.length < 28 && tries < 5000; tries++) {
+  for (let tries = 0; N.length < NODE_COUNT && tries < 8000; tries++) {
     const p = { x: 0.3 + rnd() * (W - 0.6), y: 0.3 + rnd() * (H - 0.6) };
     if (!inMount(p, 0.35) && N.every(q => dist(p, q) >= 1.15)) N.push(p);
   }
@@ -165,21 +202,34 @@ function genMapOnce() {
   for (const [d, i, j] of pairs) if (d < 1.9 && rnd() < 0.45 && ok(i, j) && !E.some(([a, b]) => (a === i && b === j))) E.push([i, j]);
   adj = N.map(() => []);
   for (const [a, b] of E) { adj[a].push(b); adj[b].push(a); }
+  // 行き止まりを潰す (2026-09-28): 敵は道しか歩けないので、 行き止まりへ誘い込んで道の外へ抜けると必ず振り切れた。
+  // 次数 1 の点を、 まだ道の無い近い点 (距離 2.6 以内・交差しない) とつなぐ
+  const link = (i, j) => { E.push([i, j]); adj[i].push(j); adj[j].push(i); };
+  for (let i = 0; i < N.length; i++) {
+    if (adj[i].length !== 1) continue;
+    const cand = N.map((_, j) => j).filter(j => j !== i && !adj[i].includes(j) && dist(N[i], N[j]) <= 2.6 && ok(i, j)).sort((a, b) => dist(N[i], N[a]) - dist(N[i], N[b]));
+    if (cand.length) link(i, cand[0]);
+  }
+  // 遠回りを減らす: 直線で近いのに道だと 2 倍以上かかる組に、 交差しなければ近道を足す
+  for (const [d, i, j] of pairs) { if (d > 2.2) break; if (adj[i].includes(j) || !ok(i, j)) continue;
+    const path = shortestPlain(i, j); if (path > d * 2) link(i, j); }
   { const seen = new Set([0]), q = [0]; while (q.length) { const u = q.shift(); for (const v of adj[u]) if (!seen.has(v)) { seen.add(v); q.push(v); } }
     if (seen.size < N.length) return null; }                       // 山岳で分断されたら引き直す
   // 敵の縄張り: 層の中ほどの一角。 中心から道でつながった 6〜9 点（幅優先で広げるので必ずつながる）
-  const mids = N.map((p, i) => i).filter(i => i > 1 && N[i].x > 3.2 && N[i].x < W - 2.8);
+  const mids = N.map((p, i) => i).filter(i => i > 1 && N[i].x > 3.2 && N[i].x < W - 2.8 && dist(N[i], N[0]) >= P.territoryStartClear);
+  if (!mids.length) return null;
   const center = mids[Math.floor(rnd() * mids.length)];
   let terr = [center];
-  for (let r = 2.2; r <= 4.6; r += 0.4) {
+  for (let k = 0; k <= 8; k++) { const r = 2.2 + 0.4 * k;
     terr = [center]; const q = [center];
-    while (q.length) { const u = q.shift(); for (const v of adj[u]) if (v > 1 && !terr.includes(v) && dist(N[v], N[center]) <= r) { terr.push(v); q.push(v); } }
-    if (terr.length >= 6) break;
+    while (q.length) { const u = q.shift(); for (const v of adj[u]) if (v > 1 && !terr.includes(v) && dist(N[v], N[center]) <= r && dist(N[v], N[0]) >= P.territoryStartClear) { terr.push(v); q.push(v); } }
+    if (terr.length >= TERR_MIN) break;
   }
-  terr = terr.slice(0, 9);
+  terr = terr.slice(0, TERR_MAX);
+  if (terr.length < 3) return null;
   // 巡回点: 縄張りの外周寄りの 3〜4 点を、 中心の周りの角度順に並べて輪にする（毎回同じ順で回る）
   const way = [];
-  const wn = terr.length >= 7 ? 4 : 3;
+  const wn = terr.length >= 9 ? 5 : terr.length >= 7 ? 4 : 3;
   while (way.length < Math.min(wn, terr.length)) {
     let best = -1, bd = -1;
     for (const i of terr) { if (way.includes(i)) continue; const dd = Math.min(dist(N[i], N[center]) + 0.01, ...way.map(w => dist(N[i], N[w]))); if (dd > bd) { bd = dd; best = i; } }
@@ -196,39 +246,57 @@ function genMapOnce() {
     let r = rnd() * tot; for (const [t, w] of bag) { if ((r -= w) < 0) { N[i].type = t; break; } }
   }
   const others = N.map((p, i) => i).filter(i => i > 1 && !bases.includes(i));
-  for (const need of ["店", "休"]) if (!others.some(i => N[i].type === need)) N[others[Math.floor(rnd() * others.length)]].type = need;
+  for (const need of ["店", "休"]) if (!others.some(i => N[i].type === need)) {   // 店・休憩を 1 つずつ保証 (互いを上書きしない)
+    const pool = others.filter(i => N[i].type !== "店" && N[i].type !== "休"); N[(pool.length ? pool : others)[Math.floor(rnd() * (pool.length || others.length))]].type = need; }
   N.forEach(p => { p.done = false; p.known = false; p.stock = P.shopSupStock; });
-  return { terr, way };
+  return { terr, way, caches: bases };
 }
 
 // ═══ 状態 ═══════════════════════════════════════════════════
+const PR = () => PROFILES[S.prof];
+function pickProfile() { const sel = document.getElementById("prof").value; if (sel !== "random") return sel;
+  const keys = Object.keys(PROFILES); return keys[Math.floor(rnd() * keys.length)]; }
+function makeFoe(id, prof, startNode, terr, way, fights) {
+  return { id, alive: true, a: startNode, b: startNode, t: 0, path: [], state: "巡回", baseIdx: 0,
+    lastKnown: null, lost: 0, freeze: 0, freezeResume: "追跡", fights, terr: new Set(terr), way: way.slice(),
+    lunge: null, webTimer: 0, famCd: 0, seenT: -99, tracking: false };
+}
 function newGame() {
   const seed = parseInt(document.getElementById("seed").value, 10) || 1;
   rnd = mulberry(seed);
-  const { terr, way } = genMap();
-  const start = way[0];
+  const { terr, way, caches } = genMap();
+  const profKey = pickProfile(), prof = PROFILES[profKey];
+  // 祭壇は補給庫の上に据える (補給庫を取りたければ祭壇と向き合う)
+  const foes = [prof.stationary ? makeFoe(0, prof, caches[0], terr, [caches[0]], P.gauntletFights) : makeFoe(0, prof, way[0], terr, way, P.gauntletFights)];
   S = {
-    seed, bases: way, terr: new Set(terr), time: 0, turnAcc: 0, sup: P.supMax, hp: P.hpMax, gold: P.gold0,
+    seed, time: 0, turnAcc: 0, sup: P.supMax, hp: P.hpMax, gold: P.gold0,
     me: { x: N[0].x, y: N[0].y, node: 0, seg: null }, prevNode: 0,
     move: null, scout: 0, flare: false, battleHeat: 0, tracks: [], trackAcc: 0,
     speed: "normal", decoys: [], traps: [], nDecoy: P.decoy0, nTrap: P.trap0,
-    foe: { alive: true, a: start, b: start, t: 0, path: [], state: "巡回", baseIdx: 0, lastKnown: null, lost: 0, freeze: 0, freezeResume: "追跡", fights: P.gauntletFights },
+    foes, prof: profKey, famKey: document.getElementById("fam").value, familiars: [], webs: [], stuck: 0, famSightPrev: false,
+    stoneBearing: -1, stoneGhost: -1, echoOff: 0, echoT: 0,
     seenFoe: null, foeArrow: null, scoutObs: [], scoutDone: false, stone: "反応なし", over: false, log: [], target: null, timeMode: "pause", fastHeld: false, holdFromPause: false,
   };
-  reveal(P.visNone); log(`シード ${seed}。前哨基地から出口を目指す。徘徊エネミーがどこかの縄張りを巡回している。`);
-  planFoe(); draw(); ui();
+  reveal(P.visNone);
+  log(`シード ${seed}。前哨基地から出口を目指す。徘徊エネミーがどこかを巡回している${document.getElementById("showProf").checked ? `（性質: ${prof.name} ── ${prof.desc} / 使い魔: ${FAMILIARS[S.famKey].name}）` : "（性質は伏せてある）"}。`);
+  S.foes.forEach(planFoe); draw(); ui();
 }
 function log(s) { S.log.unshift(`[${S.time.toFixed(1)}] ${s}`); S.log.length = Math.min(S.log.length, 80);
   document.getElementById("log").innerHTML = S.log.map(x => `<div>${x}</div>`).join(""); }
 const stageOf = v => STAGES.find(s => v >= s[0]);
-const foePos = () => { const f = S.foe, a = N[f.a], b = N[f.b]; return { x: a.x + (b.x - a.x) * f.t, y: a.y + (b.y - a.y) * f.t }; };
+const foePos = f => f.lunge ? f.lunge : { x: N[f.a].x + (N[f.b].x - N[f.a].x) * f.t, y: N[f.a].y + (N[f.b].y - N[f.a].y) * f.t };
+const aliveFoes = () => S.foes.filter(f => f.alive);
 const onRoad = () => S.me.node !== null || S.me.seg !== null;
-// A: 「道の上 +2」は道を移動している間だけ。 点に止まっている時は 0（立ち止まって息を潜める）
 const movingOnRoad = () => !!S.move && S.move.rate === "road";
-const kehai = () => (S.move ? SPEED[S.speed].kehai(movingOnRoad()) : 0) + (S.battleHeat > 0 ? P.kehaiBattle : 0);
-// 照明中は「こちらが見える範囲 ＝ 敵から見られる範囲」で固定（物音を足しても伸びない）。 照明なしは 2＋気配、 最大 4
+const kehai = () => (S.move && !S.stuck ? SPEED[S.speed].kehai(movingOnRoad()) : 0) + (S.battleHeat > 0 ? P.kehaiBattle : 0);
+// 照明中は「こちらが見える範囲 ＝ 敵から見られる範囲」で固定。 灯喰いは照明中 7
 const detectR = () => S.flare ? P.visFlare : Math.min(P.detectCap, P.detectBase + kehai());
-function reveal(r) { N.forEach(p => { if (dist(p, S.me) <= r + 1e-6) p.known = true; }); }
+const chaseSpeed = () => PR().chase || P.enemyChase;
+const patrolSpeed = () => PR().patrol || P.enemyPatrol;
+const lostTurns = () => P.lostTurns;
+const hearR = base => { const pr = PR(); let r = base; if (pr.hear) r = Math.max(r, pr.hear); if (pr.hearMul) r *= pr.hearMul; return r; };
+function reveal(r) { N.forEach(p => { if (dist(p, S.me) <= r + 1e-6) p.known = true; });
+  S.webs.forEach(w => { if (r >= P.visScout && dist(w, S.me) <= r + 1e-6) w.seen = true; }); }   // 網は照明・偵察でだけ見える
 function roadBetween(i, j) { return adj[i].includes(j); }
 
 // 移動の費用: 今いる場所から点 j へ。道で結ばれていれば 1 倍
@@ -247,10 +315,9 @@ function preview(j) {
   return { d, rate, per, cost, hpPay, time: d * sp.time, blocked };
 }
 
-// ═══ 敵（道の上しか動けない） ═══════════════════════════════════
+// ═══ 敵（道の上しか動けない ── 飛び掛かりだけ例外） ═══════════════
 function nearestNode(p) { let b = 0, bd = 1e9; N.forEach((q, i) => { const d = dist(p, q); if (d < bd) { bd = d; b = i; } }); return b; }
 function shortest(from, to, allowed = null) {
-  // allowed を渡すとその点だけを通る（巡回は縄張りの外へ出ない）。 通れなければ制限なしで引き直す
   const d = N.map(() => 1e9), pr = N.map(() => -1), used = N.map(() => false); d[from] = 0;
   for (;;) { let u = -1; for (let i = 0; i < N.length; i++) if (!used[i] && (u < 0 || d[i] < d[u])) u = i;
     if (u < 0 || d[u] >= 1e9) break; used[u] = true; if (u === to) break;
@@ -259,31 +326,36 @@ function shortest(from, to, allowed = null) {
   if (from !== to && pr[to] < 0) return allowed ? shortest(from, to) : [];
   const path = []; for (let v = to; v !== from && v >= 0; v = pr[v]) path.unshift(v); return path;
 }
-function foeTargetNode() {
-  const f = S.foe;
+function foeTargetNode(f) {
   if (f.state === "追跡") return nearestNode(S.me);
   if (f.state === "警戒" && f.lastKnown) return nearestNode(f.lastKnown);
-  return S.bases[f.baseIdx];
+  return f.way[f.baseIdx % f.way.length];
 }
-function planFoe() {
-  const f = S.foe; if (!f.alive) return;
-  const here = f.t < 0.5 ? f.a : f.b;
-  if (f.a !== f.b && f.t > 0 && f.t < 1) { // 道の途中: いったん近い端へ
-    const tgt = foeTargetNode(); const via = shortest(f.b, tgt, f.state === "巡回" ? S.terr : null);
-    f.path = via; return; }
-  f.a = f.b = here; f.t = 0; f.path = shortest(here, foeTargetNode(), f.state === "巡回" ? S.terr : null);
+function planFoe(f) {
+  if (!f.alive || f.lunge) return;
+  const allow = f.state === "巡回" ? f.terr : null;
+  if (f.a !== f.b && f.t > 0 && f.t < 1) { f.path = shortest(f.b, foeTargetNode(f), allow); return; }
+  const here = f.t < 0.5 ? f.a : f.b; f.a = f.b = here; f.t = 0; f.path = shortest(here, foeTargetNode(f), allow);
 }
-function advanceFoe(amount) {
-  const f = S.foe; if (!f.alive || f.freeze > 0) return;
+function returnToRoad(f) { const n = nearestNode(f.lunge); f.lunge = null; f.a = f.b = n; f.t = 0; planFoe(f); }
+function advanceFoe(f, amount) {
+  if (!f.alive || f.freeze > 0 || PR().stationary) return;
+  const pr = PR();
+  if (pr.lunge) {   // 飛び掛かり: 追跡中で近ければ道を外れて直進
+    if (f.state === "追跡") { const fp = foePos(f), d = dist(fp, S.me);
+      if (d <= pr.lunge || (f.lunge && d <= pr.lunge + 1)) { const k = Math.min(1, amount / Math.max(1e-9, d));
+        f.lunge = { x: fp.x + (S.me.x - fp.x) * k, y: fp.y + (S.me.y - fp.y) * k }; return; } }
+    if (f.lunge) returnToRoad(f);
+  }
   while (amount > 1e-9) {
     if (f.a === f.b) {
-      if (!f.path.length) {                                   // 目的地に着いた
-        if (f.state === "巡回") { f.baseIdx = (f.baseIdx + 1) % S.bases.length; f.path = shortest(f.a, S.bases[f.baseIdx], S.terr); if (!f.path.length) return; }
-        else if (f.state === "警戒") {                         // 何も無かった: 最寄りの巡回点へ戻り、 縄張りの巡回を再開
-          f.state = "巡回"; f.lastKnown = null;
-          f.baseIdx = S.bases.reduce((bi, w, i) => dist(N[w], N[f.a]) < dist(N[S.bases[bi]], N[f.a]) ? i : bi, 0);
-          planFoe(); if (!f.path.length) return; }
-        else return;                                          // 追跡: 道の端で待つ（道の外へは出られない）
+      if (!f.path.length) {
+        if (f.state === "巡回") {
+          f.baseIdx = (f.baseIdx + 1) % f.way.length; f.path = shortest(f.a, f.way[f.baseIdx], f.terr); if (!f.path.length) return; }
+        else if (f.state === "警戒") { f.state = "巡回"; f.lastKnown = null;
+          f.baseIdx = f.way.reduce((bi, w, i) => dist(N[w], N[f.a]) < dist(N[f.way[bi]], N[f.a]) ? i : bi, 0);
+          planFoe(f); if (!f.path.length) return; }
+        else return;
       }
       f.b = f.path.shift(); f.t = 0;
     }
@@ -293,32 +365,92 @@ function advanceFoe(amount) {
   }
 }
 
+// ═══ 使い魔 ═══════════════════════════════════════════════════
+function launchFamiliar(f) {
+  const kind = S.famKey !== "none" ? S.famKey : PR().stationary ? "cruise" : null;   // 祭壇は使い魔が本体なので「なし」でも巡航を撃つ
+  if (!kind) return;
+  const pr = PR(), max = pr.famMax || P.famMax, cd = pr.famCooldown || P.famCooldown;
+  if (f.famCd > 0 || S.familiars.filter(m => m.owner === f).length >= max) return;
+  const fp = foePos(f);
+  S.familiars.push({ x: fp.x, y: fp.y, tx: S.me.x, ty: S.me.y, kind, owner: f, life: P.famHomingTurns, split: false });
+  f.famCd = cd;
+}
+function advanceFamiliars(dt) {
+  const vis = S.flare ? P.visFlare : P.visNone;
+  for (let i = S.familiars.length - 1; i >= 0; i--) {
+    const m = S.familiars[i], homing = m.kind === "homing";
+    const speed = homing ? P.famHomingSpeed : P.famSpeed, det = homing ? P.famHomingDetect : P.famDetect;
+    if (homing) { m.life -= dt; if (m.life <= 0) { S.familiars.splice(i, 1); if (dist(m, S.me) <= vis) log("（追尾の使い魔が力尽きて消えた）"); continue; }
+      if (dist(m, S.me) <= det) { m.tx = S.me.x; m.ty = S.me.y; } }
+    else if (dist(m, S.me) <= det) { m.tx = S.me.x; m.ty = S.me.y; }
+    const rem = Math.hypot(m.tx - m.x, m.ty - m.y), step = speed * dt;
+    if (rem > 1e-9) { m.vx = (m.tx - m.x) / rem; m.vy = (m.ty - m.y) / rem; }
+    if (rem <= step) { m.x = m.tx; m.y = m.ty; } else { m.x += m.vx * step; m.y += m.vy * step; }
+    if (dist(m, S.me) <= P.famCatch) { S.familiars.splice(i, 1); famContact(m); return; }
+    if (Math.hypot(m.tx - m.x, m.ty - m.y) <= 1e-9) {
+      if (dist(m, S.me) <= det) { m.tx = S.me.x; m.ty = S.me.y; continue; }
+      if (homing) continue;   // 追尾は寿命まで最後の位置の周りで待つ
+      S.familiars.splice(i, 1);
+      if (m.kind === "split" && !m.split) {   // 分裂: 飛んできた向きの左右へ 1 距離ずつ
+        for (const sgn of [1, -1]) S.familiars.push({ x: m.x, y: m.y, tx: m.x - (m.vy || 0) * sgn * P.famSplitDist, ty: m.y + (m.vx || 0) * sgn * P.famSplitDist, kind: "split", owner: m.owner, split: true });
+        if (dist(m, S.me) <= vis) log("（使い魔が二つに分かれた）");
+      } else if (dist(m, S.me) <= vis) log("（使い魔は目標を見失って消えた）");
+    }
+  }
+  const inSight = S.familiars.some(m => dist(m, S.me) <= vis + 1e-6);
+  if (inSight && !S.famSightPrev && S.timeMode !== "pause") { pauseTime("使い魔が飛んでくるのが見えた。時間を止めた。"); sfxStop(); }
+  S.famSightPrev = inSight;
+}
+function famContact(m) {
+  if (m.kind === "scout") {   // 斥候: 交戦しない。 本体へ居場所を知らせる
+    const f = m.owner; if (f.alive && f.state !== "追跡") { f.state = "警戒"; f.lastKnown = { x: S.me.x, y: S.me.y }; planFoe(f); }
+    sfxDetected(); pauseTime("斥候の使い魔に触れられた。居場所を知られた。"); return;
+  }
+  sfxCaught(); S.move = null; S.pendingArrive = undefined;
+  const st = stageOf(S.sup);
+  modal("使い魔に捕捉された", `<p>${FAMILIARS[m.kind].name}の使い魔との交戦（簡略版: 通常の戦闘より少し重い）。</p><p class="k">予想される被害: HP ${Math.round(3 * st[2])}〜${Math.round(18 * st[2])}。勝てば物資 +${P.rewSup.battle}。</p>`, [
+    ["戦う", () => { const loss = Math.round(hpLossRoll(3, 0) * st[2]); S.hp -= loss;
+      if (S.hp <= 0) { S.hp = 0; return end(false, "使い魔との交戦で倒れた。"); }
+      S.sup = Math.min(P.supMax, S.sup + P.rewSup.battle); S.battleHeat = P.battleKehaiTurns; noise();
+      log(`使い魔を退けた。HP −${loss}、物資 +${P.rewSup.battle}`); ui(); }],
+    ["逃げる", () => { S.sup = Math.max(0, S.sup - P.fleeSup); S.gold = Math.floor(S.gold / 2);
+      log(`使い魔から逃げた。物資 −${P.fleeSup}、ゴールド半減。`); ui(); }],
+  ]);
+}
+
 // ═══ 時間の進行（Highfleet 式: 止まっていても流れる。 内部は 0.1 手番刻み） ═══════
-// 通常の速さで距離 1 ＝ 1 手番。 表示だけが実時間で、 中身は刻みで進むので同じ操作なら同じ結果になる
 const TICK = 0.1;
-// 早送りの解除: 順速へ戻す。 スペースを押したままでも再開しない（押し直せば再び早送り）
 function cancelFast(why) { if (!S.fastHeld) return; S.fastHeld = false; S.holdFromPause = false; if (S.timeMode === "pause") S.timeMode = "normal"; log(`早送りを解除（${why}）`); }
-function pauseTime(msg) { S.timeMode = "pause"; S.fastHeld = false; S.holdFromPause = false; if (msg) log(msg); }   // 長押し中でも止める
+function pauseTime(msg) { S.timeMode = "pause"; S.fastHeld = false; S.holdFromPause = false; if (msg) log(msg); }
 function tick() {
   if (S.over || S.timeMode === "pause" || !document.getElementById("modal").hidden) return;
   let dt = TICK;
-  if (S.move) dt = stepMove();
+  if (S.stuck > 0) { S.stuck = Math.max(0, S.stuck - TICK); if (S.stuck === 0) log("網から抜け出した。"); }
+  else if (S.move) dt = stepMove();
   else if (S.scout > 0) { S.scout -= TICK; if (S.scout <= 1e-9) { S.scout = 0; S.scoutDone = true; } }
   if (dt <= 0) return;
   S.time += dt;
-  const f = S.foe;
-  if (f.alive && f.freeze <= 0) advanceFoe(dt * (f.state === "巡回" ? P.enemyPatrol : P.enemyChase));
-  if (f.alive && f.freeze <= 0) { const fp = foePos(), k = S.traps.findIndex(t => dist(t, fp) <= P.trapHit);
-    if (k >= 0) { const t = S.traps[k]; S.traps.splice(k, 1); f.freezeResume = f.state === "追跡" ? "追跡" : "巡回"; f.freeze = P.trapFreeze;
-      S.seenFoe = { x: fp.x, y: fp.y, t: S.time, state: f.state };            // 罠が作動した場所 ＝ 敵の位置が分かる
-      log(`（罠が作動した）徘徊エネミーの位置が分かった。${P.trapFreeze} 手番足止め。`); sfxTrap(); } }
+  for (const f of S.foes) {
+    if (!f.alive || f.freeze > 0) continue;
+    if (f.state !== "警戒") f.tracking = false;
+    advanceFoe(f, dt * (f.state === "巡回" ? patrolSpeed() : chaseSpeed()) * (f.tracking ? PR().trackMul : 1));
+    const fp = foePos(f), k = S.traps.findIndex(t => dist(t, fp) <= P.trapHit);
+    if (k >= 0) { S.traps.splice(k, 1); f.freezeResume = f.state === "追跡" ? "追跡" : "巡回"; f.freeze = P.trapFreeze;
+      S.seenFoe = { x: fp.x, y: fp.y, t: S.time, state: f.state };
+      log(`（罠が作動した）徘徊エネミーの位置が分かった。${P.trapFreeze} 手番足止め。`); sfxTrap(); }
+  }
+  // 網: 踏むと 1 手番動けない (見えていなくても掛かる)
+  if (S.move && !S.stuck) { const w = S.webs.findIndex(w => dist(w, S.me) <= P.webHit);
+    if (w >= 0) { S.webs.splice(w, 1); S.stuck = P.webStuck; pauseTime("見えない網に掛かった！ 1 手番動けない。"); sfxTrap(); } }
+  advanceFamiliars(dt);
+  if (!document.getElementById("modal").hidden) return;
   if (S.scout > 0 || S.scoutDone) scoutObserve(S.scoutDone);
   if (S.scoutDone) { S.scoutDone = false; finishScout(); }
   S.turnAcc += dt;
   while (S.turnAcc >= 1 - 1e-9) { S.turnAcc -= 1; turn(); if (S.over) return; }
   if (S.flare) { reveal(P.visFlare); snapshotFoe(P.visFlare); }
   reveal(P.visNone); snapshotFoe(P.visNone);
-  if (f.alive && f.freeze <= 0 && dist(foePos(), S.me) <= P.catchDist) { caught(); }
+  for (const f of S.foes) if (f.alive && f.freeze <= 0 && dist(foePos(f), S.me) <= P.catchDist) { caught(f); return; }
   if (S.move === null && S.pendingArrive !== undefined) { const j = S.pendingArrive; S.pendingArrive = undefined; arrive(j); }
 }
 function stepMove() {
@@ -335,7 +467,6 @@ function stepMove() {
 }
 let supFrac = 0;
 function pay(supCost, hpPerDistUnit) {
-  // 物資で払えない分は HP で払う（払底）。死ぬ移動も許す
   if (S.sup >= supCost) { supFrac += supCost; const whole = Math.floor(supFrac); S.sup -= whole; supFrac -= whole; return; }
   const covered = S.sup / supCost; S.sup = 0; supFrac = 0;
   S.hpFrac = (S.hpFrac || 0) + hpPerDistUnit * (1 - covered);
@@ -343,66 +474,97 @@ function pay(supCost, hpPerDistUnit) {
   if (S.hp <= 0) { S.hp = 0; end(false, "物資が尽き、歩き続けた末に倒れた。"); }
 }
 function turn() {
-  // 手番ごと: 痕跡が薄れる / 戦闘の気配が冷める / 照明の消費（止まっている時） / 敵の察知
   S.tracks.forEach(t => t.s--); S.tracks = S.tracks.filter(t => t.s > 0);
   if (S.battleHeat > 0) S.battleHeat--;
   if (S.flare && !S.move) pay(P.costFlare, 0);
-  const f = S.foe; if (!f.alive) { updateStone(); return; }
-  if (f.freeze > 0) { f.freeze--; if (f.freeze === 0) { f.state = f.freezeResume; f.lost = 0; planFoe(); log(f.state === "追跡" ? "徘徊エネミーが追跡を再開した。" : "（徘徊エネミーが動き出した気配がする）"); f.freezeResume = "追跡"; } updateStone(); return; }
-  // 囮: 置いてから decoyDelay 手番後に鳴り始め、 追跡中でない近くの敵を呼ぶ。 敵が着くと壊れる
+  const pr = PR();
+  // 木霊: 魔石の方角のずれを手番ごとに振り直す
+  // 木霊: 偽の方角は本物から 2〜3 方角ずれた所に出て、 2 手番ごとに飛ぶ (本物は敵の動きに付いてくるので、 見比べれば分かる)
+  if (pr.echo && S.echoT++ % pr.echo === 0) S.echoOff = [2, 3, 4][Math.floor(rnd() * 3)];
+  // 盲目: 急いで歩く足音 (半径 2) を聞きつける
+  if (pr.blind && S.move && S.speed === "hurry" && !S.stuck) noiseAt(2 / (pr.hearMul || 1), "足音");
+  // 囮
   for (const d of S.decoys) { d.turns--; if (d.delay > 0) { d.delay--; continue; }
-    if (f.state !== "追跡" && dist(foePos(), d) <= P.decoyNoise) { if (f.state !== "警戒" || !f.lastKnown || dist(f.lastKnown, d) > 0.1) { f.state = "警戒"; f.lastKnown = { x: d.x, y: d.y }; planFoe(); } }
-    if (dist(foePos(), d) <= P.decoyBreak) { d.turns = 0; log("（囮が壊された）"); } }
+    for (const f of aliveFoes()) {
+      if (f.state !== "追跡" && dist(foePos(f), d) <= hearR(P.decoyNoise)) { if (f.state !== "警戒" || !f.lastKnown || dist(f.lastKnown, d) > 0.1) { f.state = "警戒"; f.lastKnown = { x: d.x, y: d.y }; planFoe(f); } }
+      if (dist(foePos(f), d) <= P.decoyBreak) { d.turns = 0; log("（囮が壊された）"); } } }
   S.decoys = S.decoys.filter(d => d.turns > 0);
-  const d = dist(foePos(), S.me), R = detectR();
-  let seen = false;
-  if (d <= R) { const roll = d6(), need = Math.min(6, Math.max(1, Math.floor(R - d + 1))); /* B: ×2 → ×1 */ seen = roll <= need; }
-  if (seen) {
-    if (f.state !== "追跡") { log("（どこかで何かがこちらを嗅ぎつけた）"); sfxDetected(); }
-    f.state = "追跡"; f.lost = 0; f.lastKnown = { x: S.me.x, y: S.me.y }; planFoe();
-  } else if (f.state === "追跡") {
-    if (++f.lost >= P.lostTurns) { f.state = "警戒"; f.lastKnown = f.lastKnown || { x: S.me.x, y: S.me.y }; planFoe(); }
-    else planFoe();
-  } else if (f.state === "巡回") {
-    const p = foePos(), t = S.tracks.find(t => dist(t, p) <= 0.6);
-    if (t) { f.state = "警戒"; f.lastKnown = { x: t.x, y: t.y }; planFoe(); }
-  }
+  for (const f of S.foes) turnFoe(f);
   updateStone();
 }
+function turnFoe(f) {
+  if (!f.alive) return;
+  if (f.famCd > 0) f.famCd--;
+  if (f.freeze > 0) { f.freeze--; if (f.freeze === 0) { f.state = f.freezeResume; f.lost = 0; planFoe(f); log(f.state === "追跡" ? "徘徊エネミーが追跡を再開した。" : "（徘徊エネミーが動き出した気配がする）"); f.freezeResume = "追跡"; } return; }
+  const pr = PR(), fp = foePos(f);
+  if (pr.stationary && f.state === "警戒") f.state = "巡回";   // 祭壇は探しに行けないので、 見失えばそのまま待つ
+  if (pr.webs && f.state === "巡回" && ++f.webTimer >= P.webEvery) { f.webTimer = 0; S.webs.push({ x: fp.x, y: fp.y, seen: false }); if (S.webs.length > P.webMax) S.webs.shift(); }
+  const d = dist(fp, S.me), R = detectR() + (f.state === "追跡" ? P.chaseDetectBonus : 0) + (pr.sense || 0);
+  let seen = false;
+  if (pr.blind) seen = d <= 0.9;   // 盲目: 触れるほど近ければ分かる
+  else if (d <= R) { const roll = d6(), need = Math.min(6, Math.max(1, Math.floor(R - d + 1))); seen = roll <= need; }
+  if (seen) {
+    if (f.state !== "追跡") { if (!pr.silent) { log("（どこかで何かがこちらを嗅ぎつけた）"); sfxDetected(); } launchFamiliar(f); }
+    if (pr.stationary) launchFamiliar(f);   // 祭壇: 察知している間は冷却ごとに撃ち続ける
+    f.state = "追跡"; f.lost = 0; f.tracking = false; f.lastKnown = { x: S.me.x, y: S.me.y }; planFoe(f);
+  } else if (f.state === "追跡") {
+    if (++f.lost >= lostTurns()) { f.state = "警戒"; f.lastKnown = f.lastKnown || { x: S.me.x, y: S.me.y }; }
+    planFoe(f);
+  } else {
+    // 痕跡: 巡回中は踏むと警戒へ。 盲目は警戒中も新しい痕跡を辿り続ける
+    const t = S.tracks.filter(t => dist(t, fp) <= (pr.blind ? 1.0 : 0.6)).sort((a, b) => b.s - a.s)[0];
+    if (t && (f.state === "巡回" || pr.blind)) { f.state = "警戒"; f.lastKnown = { x: t.x, y: t.y }; f.tracking = !!pr.trackMul; planFoe(f); }
+  }
+}
+// 魔石の方角 (60° ずつ 6 方向)。 画面は y が下向き
+const BEARING = ["→ 東", "↘ 南東", "↙ 南西", "← 西", "↖ 北西", "↗ 北東"];
+function bearingOf(p) { const a = Math.atan2(p.y - S.me.y, p.x - S.me.x); return ((Math.round(a / (Math.PI / 3)) % 6) + 6) % 6; }
 function updateStone() {
-  const f = S.foe, el = document.getElementById("stone");
+  const el = document.getElementById("stone");
+  let lv = 0, bearing = -1, bestD = 1e9;
+  for (const f of aliveFoes()) { const d = dist(foePos(f), S.me); if (d > P.visStone) continue;
+    const hunting = f.state === "追跡" || f.freeze > 0;
+    if (hunting && PR().silent) continue;   // 影: 追跡中は一切反応しない
+    const l = hunting ? 3 : d <= 2 ? 2 : 1;
+    if (l > lv || (l === lv && d < bestD)) { lv = l; bestD = d; bearing = bearingOf(foePos(f)); } }
+  S.stoneBearing = bearing;
+  S.stoneGhost = bearing >= 0 && PR().echo ? (bearing + S.echoOff) % 6 : -1;
+  // 2 つ出る時は方角の番号順に並べる (並び順で本物が分からないように)
+  const dirs = [bearing, S.stoneGhost].filter(b => b >= 0).sort((a, b) => a - b);
+  const dirTxt = dirs.length ? `　方角 ${dirs.map(b => BEARING[b]).join(" / ")}` : "";
   let txt = "反応なし", cls = "cold";
-  if (f.alive) { const d = dist(foePos(), S.me);
-    if (d <= P.visStone) {                                           // 察知されている ＞ されていないが近い ＞ されておらず遠い
-      if (f.state === "追跡" || f.freeze > 0) { txt = `強く反応 ── 察知されている（${d <= 2 ? "距離1〜2" : "距離3〜4"}）`; cls = "hot"; }
-      else if (d <= 2) { txt = "反応 ── 察知されていないが、かなり近い（距離1〜2）"; cls = "near"; }
-      else { txt = "微かに反応 ── 察知されておらず、遠い（距離3〜4）"; cls = "far"; } } }
-  const lv = cls === "hot" ? 3 : cls === "near" ? 2 : cls === "far" ? 1 : 0;
+  if (lv === 3) { txt = `強く反応 ── 察知されている（${bestD <= 2 ? "距離1〜2" : "距離3〜4"}）${dirTxt}`; cls = "hot"; }
+  else if (lv === 2) { txt = `反応 ── 察知されていないが、かなり近い（距離1〜2）${dirTxt}`; cls = "near"; }
+  else if (lv === 1) { txt = `微かに反応 ── 察知されておらず、遠い（距離3〜4）${dirTxt}`; cls = "far"; }
   if (lv !== stoneLevel) { if (lv === 2 && stoneLevel < 2) sfxNear(); if (lv > stoneLevel) { lastPulse = 0; cancelFast("魔石が反応した"); } stoneLevel = lv; }
   if (txt !== S.stone) {
-    S.stone = txt;                                                   // 先に更新する（ui → updateStone の再入で無限に回らないように）
-    if (cls === "hot" && S.timeMode !== "pause") { pauseTime("魔石が強く反応した。時間を止めた。"); sfxStop(); }
+    const wasHot = S.stone.startsWith("強く");
+    S.stone = txt;
+    if (cls === "hot" && !wasHot && S.timeMode !== "pause") { pauseTime("魔石が強く反応した。時間を止めた。"); sfxStop(); }
   }
   el.textContent = txt; el.className = "stone " + cls;
 }
-function snapshotFoe(r) { const f = S.foe; if (!f.alive) return; const p = foePos();
-  if (dist(p, S.me) <= r + 1e-6) { const was = S.seenFoe && S.time - S.seenFoe.t < 0.2; S.seenFoe = { x: p.x, y: p.y, t: S.time, state: f.state };
-    if (!was && r === P.visNone && S.timeMode !== "pause") { pauseTime("徘徊エネミーが目の前に見えた。時間を止めた。"); sfxStop(); ui(); } } }
+function snapshotFoe(r) {
+  for (const f of aliveFoes()) { const p = foePos(f);
+    if (dist(p, S.me) <= r + 1e-6) { const was = S.time - f.seenT < 0.2; f.seenT = S.time; S.seenFoe = { x: p.x, y: p.y, t: S.time, state: f.state };
+      if (!was && r === P.visNone && S.timeMode !== "pause") { pauseTime("徘徊エネミーが目の前に見えた。時間を止めた。"); sfxStop(); ui(); } } }
+}
 
-// 偵察: 範囲内の敵の位置を手番ごとに記録し、 終わった時にまとめて出す。 2 点以上で動いていれば移動方向の矢印
+// 偵察: 範囲内で一番近い敵の位置を手番ごとに記録し、 終わった時にまとめて出す。 網も見える
 function scoutObserve(final) {
-  const f = S.foe; if (!f.alive) return; const p = foePos();
-  if (dist(p, S.me) > P.visScout) return;
+  const fs = aliveFoes().map(f => ({ f, p: foePos(f) })).filter(o => dist(o.p, S.me) <= P.visScout).sort((a, b) => dist(a.p, S.me) - dist(b.p, S.me));
+  if (!fs.length) return; const p = fs[0].p;
   const last = S.scoutObs[S.scoutObs.length - 1];
   if (!last || final || S.time - last.t >= 1 - 1e-9) S.scoutObs.push({ x: p.x, y: p.y, t: S.time });
 }
 function finishScout() {
   reveal(P.visScout);
-  const obs = S.scoutObs, f = S.foe; let msg = "偵察を終えた。";
+  const obs = S.scoutObs; let msg = "偵察を終えた。";
   if (obs.length) { const a = obs[0], b = obs[obs.length - 1];
-    S.seenFoe = { x: b.x, y: b.y, t: b.t, state: f.state };
+    S.seenFoe = { x: b.x, y: b.y, t: b.t, state: "?" };
     if (obs.length >= 2 && dist(a, b) > 0.15) { S.foeArrow = { from: a, to: b, t: b.t }; msg += "徘徊エネミーの移動方向を確認した。"; }
     else msg += "徘徊エネミーを確認した（動いていない）。"; }
+  const webs = S.webs.filter(w => w.seen && dist(w, S.me) <= P.visScout).length; if (webs) msg += `網を ${webs} つ見つけた。`;
   S.scoutObs = []; log(msg); ui();
 }
 
@@ -421,7 +583,12 @@ function arrive(j) {
     case "拠": { S.sup = Math.min(P.supMax, S.sup + P.rewSup.base); p.done = true; log(`補給庫を漁った。物資 +${P.rewSup.base}（物音を立てた）`); noise(P.cacheNoise); return ui(); }
   }
 }
-function noise(r = P.battleNoise) { const f = S.foe; if (f.alive && f.state !== "追跡" && dist(foePos(), S.me) <= r) { f.state = "警戒"; f.lastKnown = { x: S.me.x, y: S.me.y }; planFoe(); } }
+// 物音: 半径 r の (追跡中でない) 敵を警戒させる。 盲目は範囲が広い
+function noiseAt(r, what) {
+  for (const f of aliveFoes()) { if (f.state === "追跡") continue; const d = dist(foePos(f), S.me);
+    if (d <= hearR(r)) { f.state = "警戒"; f.lastKnown = { x: S.me.x, y: S.me.y }; planFoe(f); } }
+}
+function noise(r = P.battleNoise) { noiseAt(r, "物音"); }
 function hpLossRoll(nd, minus) { let s = 0; for (let i = 0; i < nd; i++) s += d6(); return Math.max(0, s - minus); }
 function battle(j, name, nd, minus, sup, gold) {
   const st = stageOf(S.sup), lo = Math.max(0, nd - minus), hi = nd * 6 - minus;
@@ -435,7 +602,7 @@ function battle(j, name, nd, minus, sup, gold) {
   ]);
 }
 function flee(j, name) {
-  const hit = Math.max(0, d6() - 1);                                // 予告攻撃（ブロック有効）
+  const hit = Math.max(0, d6() - 1);
   S.hp -= hit; S.sup = Math.max(0, S.sup - P.fleeSup); S.gold = Math.floor(S.gold / 2);
   if (S.hp <= 0) { S.hp = 0; return end(false, "逃げる途中で倒れた。"); }
   S.me = { x: N[S.prevNode].x, y: N[S.prevNode].y, node: S.prevNode, seg: null };
@@ -458,23 +625,24 @@ function shop(j) {
     [["物資を買う", buy, p.stock <= 0 || S.gold < P.shopSupPrice], ["傷薬を買う", heal, S.gold < P.shopHealPrice],
      ["囮を買う", decoy, S.gold < P.shopDecoyPrice], ["罠を買う", trap, S.gold < P.shopTrapPrice], ["出る", () => {}]]);
 }
-function caught() {
+function caught(f) {
   sfxCaught();
   S.move = null; S.pendingArrive = undefined;
-  const f = S.foe; let fight = 1;
+  let fight = 1; const mul = 1;
   const round = () => {
-    const loss = Math.round(P.hpMax * (0.28 + rnd() * 0.14) * stageOf(S.sup)[2]);
+    const loss = Math.round(P.hpMax * (0.28 + rnd() * 0.14) * stageOf(S.sup)[2] * mul);
     S.hp -= loss; log(`徘徊エネミーの連戦 ${fight}/${f.fights}: HP −${loss}`);
     if (S.hp <= 0) { S.hp = 0; ui(); return end(false, "徘徊エネミーの連戦で倒れた。"); }
     ui();
-    if (fight >= f.fights) { f.alive = false; S.sup = Math.min(P.supMax, S.sup + P.rewSup.gauntlet); S.battleHeat = P.battleKehaiTurns;
-      log(`徘徊エネミーを退けた。物資 +${P.rewSup.gauntlet}`); updateStone(); return ui(); }
+    if (fight >= f.fights) { f.alive = false; const rew = P.rewSup.gauntlet;
+      S.sup = Math.min(P.supMax, S.sup + rew); S.battleHeat = P.battleKehaiTurns;
+      log(`徘徊エネミーを退けた。物資 +${rew}${aliveFoes().length ? `（残り ${aliveFoes().length} 体）` : ""}`); updateStone(); return ui(); }
     fight++;
     modal("連戦の途中", `<p>${fight - 1} 戦目を切り抜けた。HP ${S.hp}/${P.hpMax}。</p>`, [["続ける", round], ["逃げる", gauntletFlee]]);
   };
-  const gauntletFlee = () => { S.sup = Math.max(0, S.sup - P.fleeSup); S.gold = Math.floor(S.gold / 2); f.freeze = P.fleeFreezeTurns; f.state = "追跡";
+  const gauntletFlee = () => { S.sup = Math.max(0, S.sup - P.fleeSup); S.gold = Math.floor(S.gold / 2); f.freeze = P.fleeFreezeTurns; f.state = "追跡"; f.freezeResume = "追跡";
     log(`連戦から逃げた。物資 −${P.fleeSup}、ゴールド半減。${P.fleeFreezeTurns} 手番後に追跡が始まる。`); ui(); };
-  modal("徘徊エネミーに捕まった", `<p>精鋭の群れ（次の層のエリート）との ${f.fights} 連戦。</p><p class="k">1 戦ごとに HP の 28〜42%（段階の倍率つき）を失う想定。勝ち切れば物資 +${P.rewSup.gauntlet}。</p>`,
+  modal("徘徊エネミーに捕まった", `<p>${PR().stationary ? "祭壇を守る" : ""}精鋭の群れ（次の層のエリート）との ${f.fights} 連戦。</p><p class="k">1 戦ごとに HP の ${Math.round(28 * mul)}〜${Math.round(42 * mul)}%（段階の倍率つき）を失う想定。勝ち切れば物資 +${P.rewSup.gauntlet}。</p>`,
     [["戦う", round], ["逃げる", gauntletFlee]]);
 }
 function end(win, msg) {
@@ -592,11 +760,19 @@ document.getElementById("bDecoy").onclick = () => { if (S.nDecoy <= 0 || S.over)
 document.getElementById("bTrap").onclick = () => { if (S.nTrap <= 0 || S.over) return; S.nTrap--;
   S.traps.push({ x: S.me.x, y: S.me.y }); log(onRoad() ? "罠を仕掛けた。" : "罠を仕掛けた（道の外なので敵が踏むことはまず無い）。"); ui(); };
 document.getElementById("bNew").onclick = newGame;
+{ const ps = document.getElementById("prof"), fs = document.getElementById("fam");
+  for (const [k, v] of Object.entries(PROFILES)) ps.add(new Option(v.name, k));
+  for (const [k, v] of Object.entries(FAMILIARS)) fs.add(new Option(v.name, k));
+  fs.value = "cruise";
+  const desc = () => { const v = ps.value; document.getElementById("profDesc").textContent = v === "random" ? "新しい層ごとに性質をくじで決める。" : `${PROFILES[v].name}: ${PROFILES[v].desc}`
+    + ` ／ 使い魔 ${FAMILIARS[fs.value].name}: ${FAMILIARS[fs.value].desc || ""}`; };
+  ps.onchange = () => { desc(); newGame(); }; fs.onchange = () => { desc(); newGame(); }; desc();
+  document.getElementById("showProf").onchange = () => draw(); }
 document.getElementById("dbg").onchange = () => draw();
 
 // ═══ 表示 ═══════════════════════════════════════════════════
 const COL = { "戦": "#d8544a", "精": "#9a2f2a", "イ": "#6aa4d8", "店": "#a0d646", "休": "#60d6c8", "宝": "#e6c664", "拠": "#b58ad8", "前": "#e6e2d8", "出": "#e6e2d8" };
-let renderAlpha = 1, prevMe = null, prevFoe = null;
+let renderAlpha = 1, prevMe = null, prevFoes = [];
 function lerpP(prev, cur) { if (!prev || renderAlpha >= 1) return cur; const a = Math.max(0, renderAlpha);
   return { x: prev.x + (cur.x - prev.x) * a, y: prev.y + (cur.y - prev.y) * a }; }
 function circle(p, r, stroke, dash) { const q = toPx(p); cx.beginPath(); cx.setLineDash(dash || []); cx.strokeStyle = stroke; cx.arc(q.x, q.y, r * SCALE, 0, 7); cx.stroke(); cx.setLineDash([]); }
@@ -637,26 +813,47 @@ function draw() {
     cx.fillStyle = p.done ? "#23272c" : "#16191c"; cx.strokeStyle = known ? (p.done ? "#454b52" : COL[p.type]) : "#454b52"; cx.lineWidth = 2;
     cx.beginPath(); cx.arc(q.x, q.y, 11, 0, 7); cx.fill(); cx.stroke();
     cx.fillStyle = known ? (p.done ? "#6f6b62" : COL[p.type]) : "#6f6b62"; cx.fillText(known ? p.type : "?", q.x, q.y + 1); });
+  // 網（照明・偵察で見つけたものだけ。 デバッグ時は全部）
+  for (const w of S.webs) { if (!w.seen && !dbg) continue; const q = toPx(w); cx.strokeStyle = w.seen ? "rgba(200,200,220,.8)" : "rgba(200,200,220,.3)"; cx.lineWidth = 1;
+    for (let k = 0; k < 4; k++) { const a = k * Math.PI / 4; cx.beginPath(); cx.moveTo(q.x - Math.cos(a) * 9, q.y - Math.sin(a) * 9); cx.lineTo(q.x + Math.cos(a) * 9, q.y + Math.sin(a) * 9); cx.stroke(); }
+    cx.beginPath(); cx.arc(q.x, q.y, 5, 0, 7); cx.stroke(); }
   // 敵
-  const f = S.foe;
-  if (f.alive) {
-    const vis = dbg || (S.seenFoe && S.time - S.seenFoe.t < 0.15);
-    if (S.seenFoe && !vis) { const q = toPx(S.seenFoe), age = S.time - S.seenFoe.t; cx.globalAlpha = Math.max(0.15, 1 - age / 12);
-      cx.strokeStyle = "#d8544a"; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(q.x - 7, q.y - 7); cx.lineTo(q.x + 7, q.y + 7); cx.moveTo(q.x + 7, q.y - 7); cx.lineTo(q.x - 7, q.y + 7); cx.stroke();
-      cx.fillStyle = "#d8544a"; cx.font = "11px Consolas, monospace"; cx.fillText(`最後の位置 ${age.toFixed(0)}手番前`, q.x, q.y - 16); cx.globalAlpha = 1; }
-    if (vis) { const q = toPx(lerpP(prevFoe, foePos())); cx.fillStyle = "#d8544a"; cx.beginPath(); cx.moveTo(q.x, q.y - 10); cx.lineTo(q.x + 9, q.y + 7); cx.lineTo(q.x - 9, q.y + 7); cx.closePath(); cx.fill();
-      cx.fillStyle = "#e6e2d8"; cx.font = "11px Consolas, 'Yu Gothic', monospace"; cx.fillText(`精鋭の群れ（${f.freeze > 0 ? "足止め" : f.state}）`, q.x, q.y - 18); }
-    if (S.foeArrow) { const age = S.time - S.foeArrow.t, a = toPx(S.foeArrow.from), b = toPx(S.foeArrow.to);   // 偵察で見た移動方向
-      if (age < 12) { const ang = Math.atan2(b.y - a.y, b.x - a.x), len = Math.max(26, Math.hypot(b.x - a.x, b.y - a.y));
-        const tip = { x: a.x + Math.cos(ang) * (len + 14), y: a.y + Math.sin(ang) * (len + 14) };
-        cx.globalAlpha = Math.max(0.2, 1 - age / 12); cx.strokeStyle = "#d8544a"; cx.fillStyle = "#d8544a"; cx.lineWidth = 3;
-        cx.beginPath(); cx.moveTo(a.x, a.y); cx.lineTo(tip.x, tip.y); cx.stroke();
-        cx.beginPath(); cx.moveTo(tip.x + Math.cos(ang) * 4, tip.y + Math.sin(ang) * 4);
-        cx.lineTo(tip.x - Math.cos(ang - 0.5) * 12, tip.y - Math.sin(ang - 0.5) * 12); cx.lineTo(tip.x - Math.cos(ang + 0.5) * 12, tip.y - Math.sin(ang + 0.5) * 12); cx.closePath(); cx.fill();
-        cx.globalAlpha = 1; } }
-    if (dbg) { S.terr.forEach(i => circle(N[i], 0.26, "rgba(181,138,216,.45)")); S.bases.forEach((b, k) => { circle(N[b], 0.36, "rgba(181,138,216,.95)");
-      const q = toPx(N[b]); cx.fillStyle = "#b58ad8"; cx.font = "10px Consolas, monospace"; cx.fillText("巡" + (k + 1), q.x, q.y + 22); }); }
+  if (S.seenFoe && S.time - S.seenFoe.t >= 0.15 && aliveFoes().length) { const q = toPx(S.seenFoe), age = S.time - S.seenFoe.t; cx.globalAlpha = Math.max(0.15, 1 - age / 12);
+    cx.strokeStyle = "#d8544a"; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(q.x - 7, q.y - 7); cx.lineTo(q.x + 7, q.y + 7); cx.moveTo(q.x + 7, q.y - 7); cx.lineTo(q.x - 7, q.y + 7); cx.stroke();
+    cx.fillStyle = "#d8544a"; cx.font = "11px Consolas, monospace"; cx.fillText(`最後の位置 ${age.toFixed(0)}手番前`, q.x, q.y - 16); cx.globalAlpha = 1; }
+  const showProf = document.getElementById("showProf").checked;
+  S.foes.forEach((f, k) => {
+    if (!f.alive) return;
+    if (dbg) { f.terr.forEach(i => circle(N[i], 0.26 + k * 0.05, "rgba(181,138,216,.45)")); f.way.forEach((b, wi) => { circle(N[b], 0.36, "rgba(181,138,216,.95)");
+      const q = toPx(N[b]); cx.fillStyle = "#b58ad8"; cx.font = "10px Consolas, monospace"; cx.fillText("巡" + (wi + 1), q.x, q.y + 22); }); }
+    const vis = dbg || S.time - f.seenT < 0.15;
+    if (!vis) return;
+    const q = toPx(lerpP(prevFoes[k], foePos(f))), sz = 1;
+    cx.fillStyle = "#d8544a"; cx.beginPath(); cx.moveTo(q.x, q.y - 10 * sz); cx.lineTo(q.x + 9 * sz, q.y + 7 * sz); cx.lineTo(q.x - 9 * sz, q.y + 7 * sz); cx.closePath(); cx.fill();
+    cx.fillStyle = "#e6e2d8"; cx.font = "11px Consolas, 'Yu Gothic', monospace";
+    cx.fillText(`${PR().stationary ? "祭壇" : "精鋭の群れ"}${showProf ? "・" + PR().name : ""}（${f.freeze > 0 ? "足止め" : f.lunge ? "飛び掛かり" : f.tracking ? "痕跡を辿る" : f.state}）`, q.x, q.y - 18);
+  });
+  if (S.foeArrow) { const age = S.time - S.foeArrow.t, a = toPx(S.foeArrow.from), b = toPx(S.foeArrow.to);   // 偵察で見た移動方向
+    if (age < 12) { const ang = Math.atan2(b.y - a.y, b.x - a.x), len = Math.max(26, Math.hypot(b.x - a.x, b.y - a.y));
+      const tip = { x: a.x + Math.cos(ang) * (len + 14), y: a.y + Math.sin(ang) * (len + 14) };
+      cx.globalAlpha = Math.max(0.2, 1 - age / 12); cx.strokeStyle = "#d8544a"; cx.fillStyle = "#d8544a"; cx.lineWidth = 3;
+      cx.beginPath(); cx.moveTo(a.x, a.y); cx.lineTo(tip.x, tip.y); cx.stroke();
+      cx.beginPath(); cx.moveTo(tip.x + Math.cos(ang) * 4, tip.y + Math.sin(ang) * 4);
+      cx.lineTo(tip.x - Math.cos(ang - 0.5) * 12, tip.y - Math.sin(ang - 0.5) * 12); cx.lineTo(tip.x - Math.cos(ang + 0.5) * 12, tip.y - Math.sin(ang + 0.5) * 12); cx.closePath(); cx.fill();
+      cx.globalAlpha = 1; } }
+  // 使い魔（見える範囲だけ。 デバッグ時は目標地点も）
+  const famVis = S.flare ? P.visFlare : P.visNone;
+  for (const m of S.familiars) {
+    if (!dbg && dist(m, S.me) > famVis + 1e-6) continue;
+    const q = toPx(m), t = toPx({ x: m.tx, y: m.ty });
+    if (dbg) { cx.strokeStyle = "rgba(255,120,200,.4)"; cx.setLineDash([2, 4]); cx.lineWidth = 1; cx.beginPath(); cx.moveTo(q.x, q.y); cx.lineTo(t.x, t.y); cx.stroke(); cx.setLineDash([]); }
+    cx.fillStyle = m.kind === "scout" ? "#60d6c8" : "#ff78c8"; cx.beginPath(); cx.arc(q.x, q.y, 5, 0, 7); cx.fill();
+    if (m.vx !== undefined) { cx.strokeStyle = cx.fillStyle; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(q.x, q.y); cx.lineTo(q.x - m.vx * 14, q.y - m.vy * 14); cx.stroke(); }
   }
+  // 魔石の方角: 60° の扇を自分の周りに描く
+  for (const b of [S.stoneBearing, S.stoneGhost]) { if (b < 0) continue; const c = toPx(meP), a0 = b * Math.PI / 3;
+    cx.fillStyle = S.stone.startsWith("強く") ? "rgba(216,84,74,.16)" : "rgba(181,138,216,.16)";
+    cx.beginPath(); cx.moveTo(c.x, c.y); cx.arc(c.x, c.y, P.visStone * SCALE, a0 - Math.PI / 6, a0 + Math.PI / 6); cx.closePath(); cx.fill(); }
   for (const d of S.decoys) { const q = toPx(d); cx.fillStyle = d.delay > 0 ? "#8a6a3a" : "#f08a32";   // 囮（炎）
     cx.beginPath(); cx.moveTo(q.x, q.y - 9); cx.quadraticCurveTo(q.x + 7, q.y, q.x, q.y + 5); cx.quadraticCurveTo(q.x - 7, q.y, q.x, q.y - 9); cx.fill();
     if (d.delay <= 0) circle(d, P.decoyNoise, "rgba(240,138,50,.25)", [3, 6]); }
@@ -699,7 +896,7 @@ function loop(ts) {
   if (S.timeMode !== "pause") { const per = P.msPerTick[S.fastHeld ? "fast" : "normal"];
     if (ts - last >= per) {
       const n = Math.min(5, Math.floor((ts - last) / per)); last = ts;
-      prevMe = { x: S.me.x, y: S.me.y }; prevFoe = S.foe.alive ? foePos() : null;
+      prevMe = { x: S.me.x, y: S.me.y }; prevFoes = S.foes.map(f => f.alive ? foePos(f) : null);
       for (let i = 0; i < n; i++) tick(); renderAlpha = 0; ui();
     } else { renderAlpha = (ts - last) / per; draw(); }
   } else { last = ts; renderAlpha = 1; }

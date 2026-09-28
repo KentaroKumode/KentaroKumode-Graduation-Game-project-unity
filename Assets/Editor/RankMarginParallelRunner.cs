@@ -385,7 +385,7 @@ namespace AutoTest.EditorTools
                 .ToString(CultureInfo.InvariantCulture));
             Add("robberyFinalShopOnly",
                 EditorPrefs.GetBool("AutoRun.RobberyFinalShopOnly", false).ToString());
-            Add("robberyHopeCost", EditorPrefs.GetInt("AutoRun.RobberyHopeCost", -1)
+            Add("robberyProvisionCost", EditorPrefs.GetInt("AutoRun.RobberyProvisionCost", -1)
                 .ToString(CultureInfo.InvariantCulture));
             Add("bossTraceFloor", EditorPrefs.GetInt("AutoRun.BossTraceFloor", 0)
                 .ToString(CultureInfo.InvariantCulture));
@@ -549,7 +549,7 @@ namespace AutoTest.EditorTools
             var stage = new Dictionary<string, double>();
             var bands = new Dictionary<string, List<(int seed, int band, string digest)>>();
             var revivals = new Dictionary<string, (long torch, long lastStand, long fleuret, long hp)>();
-            var hopePay = new Dictionary<string, (long count, long spent)>();
+            var provisionPay = new Dictionary<string, (long count, long spent)>();
             var vault = new Dictionary<string, (long doublings, long gained, long capHits)>();
             long plunder = 0, robAttempts = 0, robWins = 0, robLosses = 0, robLoot = 0, robApplied = 0;
 
@@ -563,12 +563,12 @@ namespace AutoTest.EditorTools
                     valid[label] = 0; clears[label] = 0; stage[label] = 0;
                     bands[label] = new List<(int, int, string)>();
                     revivals[label] = (0, 0, 0, 0);
-                    hopePay[label] = (0, 0);
+                    provisionPay[label] = (0, 0);
                     vault[label] = (0, 0, 0);
                 }
-                var hp = hopePay[label];
-                hopePay[label] = (hp.count + s.response.hopePayments,
-                    hp.spent + s.response.hopeSpent);
+                var hp = provisionPay[label];
+                provisionPay[label] = (hp.count + s.response.provisionPayments,
+                    hp.spent + s.response.provisionSpent);
                 var vb = vault[label];
                 vault[label] = (vb.doublings + s.response.vaultDoublings,
                     vb.gained + s.response.vaultGoldGained,
@@ -680,16 +680,16 @@ namespace AutoTest.EditorTools
             }
 
             // 燈火 r10。 **0 件なら機構が使われていない** ── 効果の有無を論じる前にここを見る。
-            long anyHopePay = 0;
-            foreach (var kv in hopePay) anyHopePay += kv.Value.count;
-            if (anyHopePay > 0)
+            long anyProvisionPay = 0;
+            foreach (var kv in provisionPay) anyProvisionPay += kv.Value.count;
+            if (anyProvisionPay > 0)
             {
                 sb.AppendLine();
-                sb.AppendLine("希望での支払い (燈火 r10)");
-                sb.AppendLine("アーム                  |     回数 | ラン当たり | 1回あたり希望");
+                sb.AppendLine("物資での支払い (燈火 r10)");
+                sb.AppendLine("アーム                  |     回数 | ラン当たり | 1回あたり物資");
                 foreach (string label in order)
                 {
-                    var hp = hopePay[label];
+                    var hp = provisionPay[label];
                     if (hp.count == 0) continue;
                     int n = Mathf.Max(1, valid[label]);
                     sb.AppendLine($"{label,-22} | {hp.count,8:N0} | {hp.count / (double)n,9:F2}"
@@ -753,7 +753,7 @@ namespace AutoTest.EditorTools
                 }
             }
 
-            // ボス突入時の状態。 **休憩で戻る HP と、 戻らない希望・消耗品を並べる。**
+            // ボス突入時の状態。 **休憩で戻る HP と、 戻らない物資・消耗品を並べる。**
             {
                 var be = new Dictionary<string, long[][]>();
                 foreach (var s3 in _slots)
@@ -766,8 +766,8 @@ namespace AutoTest.EditorTools
                     for (int f = 0; f < 9 && f < s3.response.bossEntryCount.Length; f++)
                     {
                         a[0][f] += s3.response.bossEntryCount[f];
-                        a[1][f] += s3.response.bossEntryHope[f];
-                        a[2][f] += s3.response.bossEntryHopeTier[f];
+                        a[1][f] += s3.response.bossEntryProvision[f];
+                        a[2][f] += s3.response.bossEntryProvisionTier[f];
                         a[3][f] += s3.response.bossEntryConsumables[f];
                         a[4][f] += s3.response.bossEntryHpPct[f];
                         a[5][f] += s3.response.bossEntryPassives[f];
@@ -779,8 +779,8 @@ namespace AutoTest.EditorTools
                     sb.AppendLine();
                     // **7 層にボスは無い (2026-09-14)。** 最終戦は 8 層 Null Point。
                     sb.AppendLine("ボス突入時の状態 (6層 / 8層 Null Point)");
-                    sb.AppendLine("アーム                  | 6F到達 | 希望 | 帯 | 消耗品 |  HP%"
-                                + " | パッシブ | 装備力 || 8F到達 | 希望 | 帯 | 消耗品 |  HP%"
+                    sb.AppendLine("アーム                  | 6F到達 | 物資 | 帯 | 消耗品 |  HP%"
+                                + " | パッシブ | 装備力 || 8F到達 | 物資 | 帯 | 消耗品 |  HP%"
                                 + " | パッシブ | 装備力");
                     foreach (string label in order)
                     {

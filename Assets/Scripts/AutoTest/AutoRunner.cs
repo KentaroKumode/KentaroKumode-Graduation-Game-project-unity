@@ -28,7 +28,7 @@ namespace AutoTest
     /// ゲーム側コードは一切改変せず、Debug.Log("[GameManager] ...") を購読して
     /// 進行ナラティブを取得する。
     /// </summary>
-    public class AutoRunner : MonoBehaviour
+    public partial class AutoRunner : MonoBehaviour
     {
         [Header("バッチ設定")]
         [Tooltip("バッチあたりのラン数。 自己学習(L1/L2)を信頼させるには 1000以上推奨。 200未満は L2 が自動スキップされる")]
@@ -846,10 +846,10 @@ namespace AutoTest
 
         /// <summary>強盗の罰 (以降のショップ価格倍率) の上書き。 <b>0 = 触らない (既定 2.0)。</b>
         ///
-        /// <para>切り分け用。 強盗は 3 つのコストを同時に払う ── 価格 ×2 / 希望 −10 /
+        /// <para>切り分け用。 強盗は 3 つのコストを同時に払う ── 価格 ×2 / 物資 −10 /
         /// エリート戦 (HP1840・被ダメ50%軽減)。 極点が負けているとき、
         /// <b>どれが効いているかは 1 つずつ外さないと分からない</b>。
-        /// 1.0 にすれば罰だけが消え、 残りは希望と戦闘の負担になる。</para></summary>
+        /// 1.0 にすれば罰だけが消え、 残りは物資と戦闘の負担になる。</para></summary>
         public float robberySurcharge = 0f;
 
         /// <summary>強盗を<b>ラン最後の店でだけ</b>撃つ (旧方策)。 既定 false = 6 層以降で撃つ。
@@ -859,10 +859,10 @@ namespace AutoTest
         /// 旧測定の +0.68pt は戦闘経路が違う上に発動率が 4.4 分の 1 で、 比較に使えない。</para></summary>
         public bool robberyFinalShopOnly = false;
 
-        /// <summary>強盗の希望コストの上書き。 <b>-1 = 触らない (既定 10)。</b>
+        /// <summary>強盗の物資コストの上書き。 <b>-1 = 触らない (既定 10)。</b>
         /// 切り分け用 ── 罰 (価格×2) は外しても 0.14pt しか動かなかったので、
-        /// 残る「戻らない資源」は希望だけ。 0 にして 6 層ボス突破率が戻れば希望が原因。</summary>
-        public int robberyHopeCost = -1;
+        /// 残る「戻らない資源」は物資だけ。 0 にして 6 層ボス突破率が戻れば物資が原因。</summary>
+        [UnityEngine.Serialization.FormerlySerializedAs("robberyHopeCost")] public int robberyProvisionCost = -1;
 
         /// <summary>この層のボス戦だけをターン単位で記録する。 <b>0 = 無効 (既定)。</b>
         /// 出力は <c>productionOutputRootOverride</c> 配下の boss_trace.tsv。
@@ -877,7 +877,7 @@ namespace AutoTest
         /// <summary>〈門〉② 遺物 2 個を焚くか。 <b>既定 true</b>。
         /// false にすると〈不完全な起動〉(同一端子は 2 本まで) を背負って戦う。</summary>
         public bool gateBotPaysRelics = true;
-        /// <summary>〈門〉③ 希望 40 を払うか。 <b>既定 true</b>。
+        /// <summary>〈門〉③ 物資 40 を払うか。 <b>既定 true</b>。
         /// false にすると〈不完全な転移〉(ブロック貫通) を背負って戦う。</summary>
         public bool gateBotPaysTransfer = true;
 
@@ -1000,42 +1000,42 @@ namespace AutoTest
         /// <summary>〈不完全な転移〉ブロック貫通率。 <b>負 = 触らない。</b></summary>
         public float gatePierceRate = -1f;
 
-        /// <summary>〈門〉で希望 40 を払うつもりのランが、その 40 を<b>取り置く</b>ようになる層。
+        /// <summary>〈門〉で物資 400 (2026-09-28 に ×10) を払うつもりのランが、その 400 を<b>取り置く</b>ようになる層。
         /// 0 で無効。 既定 6 = 6 層に入った時点から。
         ///
-        /// <para><b>なぜ要るか。</b> 素の方策は希望を「使い切ってよい資源」として扱う。
+        /// <para><b>なぜ要るか。</b> 素の方策は物資を「使い切ってよい資源」として扱う。
         /// そこへ 40 の支払いを足すと、 実測で 7 層突入時の平均 86 から 46 へ落ちる ──
-        /// これは <see cref="GameLoop.HopeSystem.FloorPessimism"/> (45) の 1 上で、
-        /// <c>UpdateCapLock</c> が<b>希望上限を 45 に恒久ロック</b>する境界のすぐ際。
+        /// これは <see cref="GameLoop.ProvisionSystem.FloorDepleting"/> (45) の 1 上で、
+        /// <c>UpdateCapLock</c> が<b>物資上限を 45 に恒久ロック</b>する境界のすぐ際。
         /// つまり「払う」を選ぶだけで帯が落ち、 二度と戻らない。
         /// これでは測っているのが<b>代償の重さ</b>ではなく<b>取り置きを知らない方策の損</b>になる
         /// (規則と方策はセット)。</para>
         ///
         /// <para><b>6 層からにしてある。</b> 1 層から効かせると寄り道の判断が全ラン変わり、
         /// 「門の代償」ではなく「迂回方策」を測ることになる。 6/7 層は一本道 (横移動なし・
-        /// 6 層は戦闘 1 回) なので、 実質は<b>希望回復の使用と購入が早まるだけ</b>で、
+        /// 6 層は戦闘 1 回) なので、 実質は<b>物資回復の使用と購入が早まるだけ</b>で、
         /// 道中の経路は動かない。</para></summary>
-        public int gateHopeReserveFromFloor = 6;
+        [UnityEngine.Serialization.FormerlySerializedAs("gateHopeReserveFromFloor")] public int gateProvisionReserveFromFloor = 6;
 
-        /// <summary>いま取り置くべき希望。 払わないアーム・素通りアーム・門より手前の層では 0。</summary>
-        private int GateHopeReserve()
+        /// <summary>いま取り置くべき物資。 払わないアーム・素通りアーム・門より手前の層では 0。</summary>
+        private int GateProvisionReserve()
         {
             var run = GameLoop.GameManager.Instance?.Run;
-            if (run == null || gateHopeReserveFromFloor <= 0) return 0;
+            if (run == null || gateProvisionReserveFromFloor <= 0) return 0;
             if (gateBotSkipsAll || !gateBotPaysTransfer) return 0;
             // 7 層を越えたら門は解決済み。 取り置く理由が無い。
-            if (run.currentFloor < gateHopeReserveFromFloor || run.currentFloor > 7) return 0;
-            return GameLoop.GameManager.GateHopeDemand;
+            if (run.currentFloor < gateProvisionReserveFromFloor || run.currentFloor > 7) return 0;
+            return GameLoop.GameManager.GateProvisionDemand;
         }
 
-        /// <summary>希望回復を使う/買う閾値。 取り置きぶんだけ底上げする。</summary>
-        private float HopeRefillFloorEffective()
-            => AutoTest.PolicyParameters.Current.hopeRefillFloor + GateHopeReserve();
+        /// <summary>物資回復を使う/買う閾値。 取り置きぶんだけ底上げする。</summary>
+        private float ProvisionRefillFloorEffective()
+            => AutoTest.PolicyParameters.Current.provisionRefillFloor + GateProvisionReserve();
 
-        /// <summary>寄り道を許す希望の下限。 取り置きぶんだけ底上げする。
+        /// <summary>寄り道を許す物資の下限。 取り置きぶんだけ底上げする。
         /// (6/7 層は一本道なので実効は無いが、 <b>規則を 1 か所に閉じる</b>ために揃えておく。)</summary>
-        private float LateralHopeFloorEffective()
-            => AutoTest.PolicyParameters.Current.lateralHopeFloor + GateHopeReserve();
+        private float LateralProvisionFloorEffective()
+            => AutoTest.PolicyParameters.Current.lateralProvisionFloor + GateProvisionReserve();
 
         /// <summary><b>通常バッチを固定の挑戦スコアで走らせる (2026-09-10)。</b> 0 = 触らない。
         ///
@@ -1318,19 +1318,19 @@ namespace AutoTest
             public int materialsGainedTotal; // このランで得た強化素材の累計(全源: 戦闘/イベント/ショップ/賢者の石/天工開物/メタ)
             public int starvationTotal;
             public int starvationHits;
-            // 希望(ADR-0002): 最終/最低希望と発狂到達
-            public int finalHope;
-            public int finalHopeCap;
-            public int minHope = 100;
-            public bool reachedMadness;   // 希望0(発狂)に到達したか
-            // 希望の発生源別 収支（HopeSystem.Stats を1ラン分キャプチャ）
-            public int hopeCombatLoss;
-            public int hopeComposureGain;
-            public int hopeLateralLoss;
-            public int hopeMarchLoss;
-            public int hopeEvilLoss;
-            public int hopeFoodGain;
-            public int hopeRerollLoss;   // ダイス振り直しコスト（#1）
+            // 物資(ADR-0002): 最終/最低物資と発狂到達
+            public int finalProvision;
+            public int finalProvisionCap;
+            public int minProvision = GameLoop.ProvisionRules.Max;   // 2026-09-28: 物資 ×10
+            public bool reachedMadness;   // 物資0(払底)に到達したか (旧・発狂。 名前は集計の互換のため据え置き)
+            // 物資の発生源別 収支（ProvisionSystem.Stats を1ラン分キャプチャ）
+            public int provisionCombatLoss;
+            public int provisionComposureGain;
+            public int provisionLateralLoss;
+            public int provisionMarchLoss;
+            public int provisionEvilLoss;
+            public int provisionFoodGain;
+            public int provisionRerollLoss;   // ダイス振り直しコスト（#1）
             public int totalCombats;
             public int totalWins;
             public int shopPurchases;
@@ -1468,7 +1468,7 @@ namespace AutoTest
             /// <summary>ラン終了時点 (死亡/クリア) の InventoryPower。</summary>
             public int finalInventoryPower;
             /// <summary>死亡時の抱え落ち診断。消耗品は戦闘中に即使用できる種類ごとに分離。</summary>
-            public int finalConsumableCount, finalHealCount, finalDamageBuffCount, finalShieldCount, finalHopeCount;
+            public int finalConsumableCount, finalHealCount, finalDamageBuffCount, finalShieldCount, finalProvisionCount;
             public List<string> finalConsumableIds = new List<string>();
             /// <summary>未使用素材と、その場で次の武器強化が可能だったか。</summary>
             public int finalMaterials, finalUpgradeCost;
@@ -1772,7 +1772,7 @@ namespace AutoTest
             InventorySystem.Shop.ShopManager.RobberyAttempts = 0;
             GameManager.RobberyWins = GameManager.RobberyLosses = GameManager.RobberyLootTotal = 0;
             // 罰の実体も static。 出禁と価格割増は排他 (両方掛けると二重罰になる)。
-            InventorySystem.Shop.ShopManager.RobberyHopeCost = robberyHopeCost;
+            InventorySystem.Shop.ShopManager.RobberyProvisionCost = robberyProvisionCost;
             CombatSystem.BossCombatTrace.TargetFloor = bossTraceFloor;
             if (bossTraceFloor > 0)
             {
@@ -3276,7 +3276,7 @@ namespace AutoTest
         ///
         /// 高難易度限定軸 (Λ共鳴/渇き/刻限/背水) は条件付きなので、 挑戦 0 では条件が
         /// 揃わず低く出る可能性がある ── その場合は軸が弱いのではなく **BOT が条件を
-        /// 踏みに行かない**（回復目標が高く低HP/低希望に留まらない）ことを疑うこと。</summary>
+        /// 踏みに行かない**（回復目標が高く低HP/低物資に留まらない）ことを疑うこと。</summary>
         private IEnumerator RunRelicAxisSweep()
         {
             bool prevSuppress = MetaProgression.MetaBuffApplicator.SuppressRelicGrant;
@@ -3324,14 +3324,14 @@ namespace AutoTest
             //   ただし条件を変えたら**基準も同じ条件で取り直す**こと ── そうしないと
             //   「軸の寄与」と「ビルドを変えた効果」が混ざる。 区分ごとに基準を先頭へ置く。
             //     会心群: ペルソナ Crit (メタ側の会心軸は 2026-09-10 に撤去)
-            //     渇き群: hopeRefillFloor = 0 ＝ **希望を買い戻さない** = 低希望を維持する命令
+            //     渇き群: provisionRefillFloor = 0 ＝ **物資を買い戻さない** = 低物資を維持する命令
             int extraCrit = 3;   // [会心基準]攻撃3 / 会心率 / 会心倍率
-            int extraHope = 2;   // [渇き基準]攻撃3 / 渇き
-            int total = axes.Length + extraCrit + extraHope;
+            int extraProvision = 2;   // [渇き基準]攻撃3 / 渇き
+            int total = axes.Length + extraCrit + extraProvision;
 
             // 診断モード: [基準]攻撃3 と指定軸の 2 アームだけ。 追加区分は回さない。
             bool diagOne = relicAxisSweepOnlyAxis >= 0 && relicAxisSweepOnlyAxis < axes.Length;
-            if (diagOne) { extraCrit = 0; extraHope = 0; total = axes.Length; }
+            if (diagOne) { extraCrit = 0; extraProvision = 0; total = axes.Length; }
             ResetScreenProgress((diagOne ? 3 : total + 2) * runs, "遺物単軸");
 
             var prevPolicy = PolicyParameters.Current;
@@ -3348,11 +3348,11 @@ namespace AutoTest
                 // ── この区分の測定条件を決める ──
                 var armPersona = BuildPersona.Standard;
                 var armMeta    = prevMetaAxis;
-                float armHopeRefill = -1f;                 // <0 = 既定のまま
+                float armProvisionRefill = -1f;                 // <0 = 既定のまま
                 var armAxis = MetaProgression.Relics.RelicAxis.Attack;
                 int  armStep = MetaProgression.Relics.RelicAxisCatalog.MainStepMin;
                 string groupTag = "";
-                float armHopeCeil = -1f;                   // <0 = 既定 (上限まで満たす)
+                float armProvisionCeil = -1f;                   // <0 = 既定 (上限まで満たす)
 
                 // 診断モードでは指定軸以外の本体アームを飛ばす (基準 ai==-1 は残す)。
                 if (diagOne && ai >= 0 && ai != relicAxisSweepOnlyAxis) continue;
@@ -3374,20 +3374,20 @@ namespace AutoTest
                 }
                 else if (ci >= extraCrit)
                 {
-                    // **帯を維持する**。 補充を止める (refill=0) と希望が 0 まで落ちて発狂で
+                    // **帯を維持する**。 補充を止める (refill=0) と物資が 0 まで落ちて発狂で
                     //   ランが終わり、 上限まで満たすと〈渇き〉の発動条件から外れる。
-                    //   実測ではどちらも軸が死んだので、 発動閾値 (hopeCap×40%) の少し下を
+                    //   実測ではどちらも軸が死んだので、 発動閾値 (provisionCap×40%) の少し下を
                     //   天井に、 発狂を避けられる高さを床に置いて **帯 [18, 38] を維持**する。
-                    armHopeRefill = 18f;
-                    armHopeCeil   = 0.38f;
+                    armProvisionRefill = 180f;   // 2026-09-28: 物資 ×10
+                    armProvisionCeil   = 0.38f;
                     groupTag = "渇き";
-                    if (ci == extraCrit + 1) { armAxis = MetaProgression.Relics.RelicAxis.HopeBurn; armStep = step; }
+                    if (ci == extraCrit + 1) { armAxis = MetaProgression.Relics.RelicAxis.ProvisionBurn; armStep = step; }
                 }
 
                 metaBuildAxis = armMeta;
                 var pol = prevPolicy.Clone();
-                if (armHopeRefill >= 0f) pol.hopeRefillFloor = armHopeRefill;
-                if (armHopeCeil   >= 0f) pol.hopeBandCeilRatio = armHopeCeil;
+                if (armProvisionRefill >= 0f) pol.provisionRefillFloor = armProvisionRefill;
+                if (armProvisionCeil   >= 0f) pol.provisionBandCeilRatio = armProvisionCeil;
                 PolicyParameters.SetCurrent(pol);
 
                 bool isGroupBase = ci >= 0 && (ci == 0 || ci == extraCrit);
@@ -3414,7 +3414,7 @@ namespace AutoTest
                 var thisC5 = new bool[runs];
                 var thisC7 = new bool[runs];
                 CombatSystem.CombatManager.ResetFloorDamage();
-                MetaProgression.Relics.RelicApplicator.ResetHopeBurnStats();
+                MetaProgression.Relics.RelicApplicator.ResetProvisionBurnStats();
 
                 for (int i = 0; i < runs; i++)
                 {
@@ -3498,8 +3498,8 @@ namespace AutoTest
                             + $"{c5 * 100.0 / runs,8:F1}% | {c7 * 100.0 / runs,8:F1}% | "
                             + $"{(atk > 0 ? dmgOut / atk : 0),11:F1} | {(fights > 0 ? dmgIn / fights : 0),9:F1} | {mc} | {mc7}");
                 // 〈渇き〉のアームだけ、 発動率を追記する。 「弱い」と「発動していない」を分けるため。
-                if (armAxis == MetaProgression.Relics.RelicAxis.HopeBurn)
-                    sb.AppendLine($"             └ {MetaProgression.Relics.RelicApplicator.DescribeHopeBurnStats()}");
+                if (armAxis == MetaProgression.Relics.RelicAxis.ProvisionBurn)
+                    sb.AppendLine($"             └ {MetaProgression.Relics.RelicApplicator.DescribeProvisionBurnStats()}");
             }
 
             sb.AppendLine();
@@ -3509,7 +3509,7 @@ namespace AutoTest
             sb.AppendLine("※ Λ共鳴は **5層クリア後**の Λ 層でしか積まないので 5F 指標では必ず 0 に出る。");
             sb.AppendLine("   Λ は 6層への強制通過点 (実測: 7F到達ランの100%が通過) なので **7F 指標で読む**。");
             sb.AppendLine("※ 末尾 5 行は測定条件を変えた区分。 会心群=ペルソナCrit /");
-            sb.AppendLine("   渇き群=希望を帯 [18, hopeCap×38%] に維持 (発動閾値 40% の下に留めつつ発狂を避ける)。");
+            sb.AppendLine("   渇き群=物資を帯 [18, provisionCap×38%] に維持 (発動閾値 40% の下に留めつつ発狂を避ける)。");
             sb.AppendLine("   **各区分の先頭が対の基準**。");
             _relicAxisSweepReport = sb.ToString();
 
@@ -3799,7 +3799,7 @@ namespace AutoTest
                 { "Plunder", "ショップ強盗 解禁" },
                 { "Trade",   "99%引きの特売枠が出る" },
                 { "Supply",  "開幕パッシブが 2択" },
-                { "Lantern", "横移動の希望消費 5→2" },
+                { "Lantern", "横移動の物資消費 5→2" },
             };
 
             double baseClear = 0;
@@ -5817,7 +5817,7 @@ namespace AutoTest
                 persona = _currentPersona.ToString(),
                 metaAxis = metaAllocation.ToString(),
             };
-            GameLoop.HopeSystem.Stats.Reset(); // 希望の発生源別収支を1ラン単位で集計
+            GameLoop.ProvisionSystem.Stats.Reset(); // 物資の発生源別収支を1ラン単位で集計
             _curLog.Clear();
             _exceptionFlag = false;
             _exceptionMsg = null;
@@ -6232,7 +6232,7 @@ namespace AutoTest
                     var run = gm.Run;
                     float hpR = run.playerMaxHP > 0 ? (float)run.playerHP / run.playerMaxHP : 1f;
                     int cost = GameManager.WeaponUpgradeCost(run);
-                    // 希望(ADR-0002): 飢餓→希望統合で「食事」休憩は廃止。休憩は HP回復 or 武器強化のみ。
+                    // 物資(ADR-0002): 飢餓→物資統合で「食事」休憩は廃止。休憩は HP回復 or 武器強化のみ。
                     bool greedyBossPrep = !_curCombatAverse && _curBossNear;
 
                     // T4 到達率改善 v2: 強化を更に優先 (T4 追跡型)
@@ -6317,7 +6317,7 @@ namespace AutoTest
 
                 case GameManager.GamePhase.GateRitual:
                     // **方針: 3 工程とも払う (既定)。** 欠陥は避けられる限り避ける。
-                    //   払えないとき (最大HP を割る / 遺物が 2 個未満 / 希望 40 未満) だけ
+                    //   払えないとき (最大HP を割る / 遺物が 2 個未満 / 物資 40 未満) だけ
                     //   〈不完全な〜〉が付く。
                     //
                     //   **これは方策であって最適解ではない。** 旧儀式では「払う方が
@@ -6380,26 +6380,11 @@ namespace AutoTest
             if (gm.Run != null && gm.Run.inLambda)
                 return DoNavigateLambda(gm, mm);
 
-            var (fwd, lat) = mm.GetCategorizedMoves();
-            bool hasFwd = fwd != null && fwd.Count > 0;
-            var pool = new List<MapNode>(hasFwd ? fwd : (lat ?? new List<MapNode>()));
+            // 自由移動の層 (2026-09-28): 距離と物資で点を選ぶ航行へ (AutoRunner.FreeMap.cs)。
+            if (mm.IsFreeMap) return DoNavigateFree(gm, mm);
 
-            // 利得最大化(ADR-0002・希望のリソース化): 前進のみでなく、横方向の「未訪問」マスも
-            // 価値評価(Rank)の候補に含める。Rank が前進候補より価値が高いと判定した時だけ横移動し、
-            // その対価として希望-LateralCost を支払う＝希望を消費して利得を取りにいく挙動。
-            // pool は前進候補が先頭なので、Rank 同点なら前進が勝つ（横移動は厳密に価値が上の時のみ）。
-            // 「どこまで希望を損耗して寄り道するか」は L2 学習軸 lateralHopeFloor が勝率(composite)で最適化する
-            // （現在希望がこの下限を超えるときのみ寄り道。低いほど深く損耗、高いほど温存）。
-            // 2026-09-12: **横移動が無税 (燈火 r10) なら希望の下限ゲートを掛けない。**
-            //   ゲートは「希望を払ってまで寄り道するか」の判断なので、 払うものが無ければ
-            //   判断自体が不要。 旧実装は無税でも希望 20 以下で寄り道を止めていた。
-            if (hasFwd && lat != null && lat.Count > 0
-                && (MetaProgression.MetaBuffApplicator.GetLateralHopeCost() <= 0
-                    || gm.Run.hope > LateralHopeFloorEffective()))
-            {
-                foreach (var ln in lat)
-                    if (!ln.visited && !pool.Contains(ln)) pool.Add(ln); // 訪問済みを追うと同行往復で無限ループ
-            }
+            // 離散マップ (8 層: 前哨基地 → ボス。 通常は EnterFloor が自動でボスへ入る) は道の先へ進むだけ。
+            var pool = mm.GetAvailableMoves();
 
             if (pool == null || pool.Count == 0)
             {
@@ -6434,25 +6419,25 @@ namespace AutoTest
             float healTarget = dangerTarget;
             while (Consumables.TryUseBestHeal(gm.Run, healTarget)) { }
 
-            // 希望の補充 (2026-08-05: cons_hope_* 新設で復活)。
-            //   学習軸 hopeRefillFloor 以下に落ちたら手持ちの希望回復を使う。
+            // 物資の補充 (2026-08-05: cons_hope_* 新設で復活)。
+            //   学習軸 provisionRefillFloor 以下に落ちたら手持ちの物資回復を使う。
             //   **溢れさせない** ── 不足分を超える Tier は温存し、 小さい方から充てる。
             //
-            //   戻す先は hopeCap ではなく **hopeCap × hopeBandCeilRatio** (既定 1.0 = 従来どおり上限)。
-            //   1 未満なら「補充はするが上へ戻し切らない」＝ 希望を帯の中に留める。
-            //   〈渇き〉のような低希望発動の効果を維持したまま発狂を避けるために要る。
-            if (gm.Run.hope <= HopeRefillFloorEffective())
+            //   戻す先は provisionCap ではなく **provisionCap × provisionBandCeilRatio** (既定 1.0 = 従来どおり上限)。
+            //   1 未満なら「補充はするが上へ戻し切らない」＝ 物資を帯の中に留める。
+            //   〈渇き〉のような低物資発動の効果を維持したまま発狂を避けるために要る。
+            if (gm.Run.provision <= ProvisionRefillFloorEffective())
             {
-                int hopeCeil = Mathf.RoundToInt(
-                    gm.Run.hopeCap * AutoTest.PolicyParameters.Current.hopeBandCeilRatio);
-                int guardHope = 0;
-                while (gm.Run.hope < hopeCeil && guardHope++ < 8
+                int provisionCeil = Mathf.RoundToInt(
+                    gm.Run.provisionCap * AutoTest.PolicyParameters.Current.provisionBandCeilRatio);
+                int guardProvision = 0;
+                while (gm.Run.provision < provisionCeil && guardProvision++ < 8
                        && UseFirst(gm.Run, "湯気の立つ椀", "古い手紙", "凱旋の記憶", "希望の欠片")) { }
             }
 
             // 休憩を強く優先すべき状況:
             //  - 貪欲がボス接近かつHPが8割未満（スケールしたbuildをボスへ生存させる）
-            //  ※旧・空腹切れ条件は飢餓→希望統合で廃止（休憩は希望を回復しない＝希望は食料で対応）。
+            //  ※旧・空腹切れ条件は飢餓→物資統合で廃止（休憩は物資を回復しない＝物資は食料で対応）。
             bool preferRest = (!_curCombatAverse && bossNear && hpRatio < dangerTarget);
 
             // 戦闘忌避の境界 ＝ 危険度そのもの (2026-09-15)。
@@ -6479,7 +6464,6 @@ namespace AutoTest
             foreach (var n in pool)
             {
                 float score = Rank(n, hpRatio, _curCombatAverse, preferRest, gm.Run, lowBar);
-                score += LateralPenalty(here, n, gm.Run);
 
                 float nextHpRatio = PredictHpRatioAfter(n, hpRatio, floorHit, gm.Run);
                 var succ = fmap?.GetReachableFrom(n.id);
@@ -6496,7 +6480,6 @@ namespace AutoTest
                         float r2 = useFloorDpNavigation
                             ? FloorDpValue(fmap, s, HpBandOf(nextHpRatio), floorHit, gm.Run, lowBar)
                             : Rank(s, nextHpRatio, _curCombatAverse, false, gm.Run, lowBar);
-                        r2 += LateralPenalty(n, s, gm.Run);   // 先の手の横移動も勘定に入れる
                         if (r2 < bestNext) bestNext = r2;
                     }
                     if (bestNext != float.MaxValue) score += LookaheadDiscount * bestNext;
@@ -6506,7 +6489,7 @@ namespace AutoTest
             }
 
             // --- [計装] 航行スコアの同点率 ---
-            //   `Rank()` は **int** を返し、 `LateralPenalty` は 1 判断の中では {0, L} の 2 値。
+            //   `Rank()` は **int** を返す (旧 `LateralPenalty` は 2026-09-28 に削除)。
             //   合成は int + {0,L} + 0.6×(int + {0,L}) の粗い格子なので、 同点が多発するはず
             //   ── だが**戦闘で同じ推測を 6 倍外した**ので数える。 最良と厳密同値の本数を採る。
             if (pool.Count > 1)
@@ -6781,9 +6764,9 @@ namespace AutoTest
         /// 残っていたため、 2026-08-21 の Phase H 測定で敗因の解釈を誤らせた。
         /// **正本は実コード。 コメントを根拠に測定結果を説明しないこと。**</para>
         ///
-        /// <para><b>候補は生産方策の pool ではなく合法手全体。</b> pool は希望残量で横移動を
+        /// <para><b>候補は生産方策の pool ではなく合法手全体。</b> pool は物資残量で横移動を
         /// 足すかどうかを決める発見的な絞り込みで、 それを継承すると Ultra の選択肢が
-        /// Super の選択肢に頭打ちされる。 横移動の希望コストは
+        /// Super の選択肢に頭打ちされる。 横移動の物資コストは
         /// <c>GameManager.MoveToNode</c> が row の比較から徴収するので、
         /// **誰が選んでも同じように支払われる** ── 方策側で払い忘れる経路は無い。</para></summary>
         private MapNode UltraOverrideMove(GameManager gm, MapManager mm, MapNode productionChoice)
@@ -7379,8 +7362,7 @@ namespace AutoTest
                 {
                     MapNode s = succ[i];
                     if (s == null || s.row <= node.row) continue;   // 前進辺のみ = 循環しない
-                    float v = LateralPenalty(node, s, run)
-                            + FloorDpValue(map, s, nextBand, floorHit, run, lowBar);
+                    float v = FloorDpValue(map, s, nextBand, floorHit, run, lowBar);
                     if (v < bestNext) bestNext = v;
                 }
                 if (bestNext != float.MaxValue) total += floorDpDiscount * bestNext;
@@ -7391,39 +7373,7 @@ namespace AutoTest
             return total;
         }
 
-        /// <summary>横移動 (row が増えない移動) に課す希望コストのペナルティ。
-        ///
-        /// **先読みを入れるならこれが必須。** Rank() はタイル種別と HP しか見ないので、
-        /// 横移動が希望を削ることが score に現れず、 先読みは「タダで遠回りできる」と誤認する。
-        /// 実際 2 手先読みだけを入れた測定で横移動の希望損が +60%、
-        /// 発狂到達率が 15.6% → 33.0% へ倍増した (2026-08-05)。
-        /// 希望が低いほど 1 回の横移動が重いので、 残量で重み付けする。
-        ///
-        /// <para><b>2026-09-12 修正: 実コストを引くようにした。</b> 旧実装は定数
-        /// <c>HopeSystem.LateralCost</c> (5) を直接読んでおり、 燈火 r10 で実コストが
-        /// 下がっても<b>BOT の評価は 5 のまま</b>だった。 課金側 (<c>HopeSystem.ApplyMove</c>) は
-        /// メタ調整後の値を引いているので、 <b>規則と方策がずれていた</b> ──
-        /// 極点を取っても BOT は寄り道を増やさず、 効果が測定に現れない。</para></summary>
-        private static float LateralPenalty(MapNode from, MapNode to, GameLoop.RunState run)
-        {
-            if (from == null || to == null || run == null) return 0f;
-            if (to.row > from.row) return 0f;                 // 前進・斜めは無料
-            int cost = MetaProgression.MetaBuffApplicator.GetLateralHopeCost();
-            if (cost <= 0) return 0f;                         // 無税なら寄り道を抑制しない
-            float cap = Mathf.Max(1, run.hopeCap);
-            float pct = Mathf.Clamp01(run.hope / cap);
-            // 希望満タンなら軽く、 枯渇に近いほど重く (満: ×1 → 空: ×4)。
-            float p = cost * (1f + 3f * (1f - pct));
-
-            // **2026-09-13: 余裕があるときは希望を資源として使う。**
-            //   比 (hope/cap) だけだと、 上限が伸びても「満タンなら ×1」で頭打ちになり、
-            //   燈火で上限を +135 積んでも BOT の寄り道量が変わらなかった。
-            //   実際のコストは「あと何回払えるか」なので、 **悲観帯 (45) までの絶対距離**で割る。
-            //   cost 10 回ぶんの余裕があれば、 1 回の横移動はほぼ無視できる。
-            int headroom = Mathf.Max(0, run.hope - GameLoop.HopeSystem.FloorPessimism);
-            float rich = Mathf.Clamp01(headroom / (float)(cost * 10));
-            return p * (1f - 0.85f * rich);
-        }
+        // 2026-09-28: LateralPenalty (横移動の物資ペナルティ) は横移動の廃止に伴い削除 (docs/GAME.md §24)。
 
         /// <summary>そのタイルを踏んだ後の HP 割合の概算。 2 手先読みで「次の状態」を作るために使う。
         /// 精度は要らない ── 必要なのは「回復系なら上がる / 戦闘系なら下がる」の向きだけ。
@@ -7740,7 +7690,8 @@ namespace AutoTest
             if (run != null && run.currentFloor == 6
                 && GameLoop.ConvictionSystem.HasResolveOrBetter(run)
                 && !GameLoop.ConvictionSystem.HasTruth(run)
-                && t == TileType.Event)
+                && t == TileType.Event
+                && (!node.freeMap || node.isFixedEvent))   // 自由移動の層では固定の点「裂け目の記録」だけ
                 return -20;
             if (convStage == 0)
             {
@@ -7911,6 +7862,16 @@ namespace AutoTest
             var gm = GameManager.Instance;
             var sm = ShopManager.Instance;
             var inv = sm != null ? sm.Current : null;
+
+            // 物資の補給 (2026-09-28): 物資が物資回復の閾値を割っていたら、 棚より先に包 (100 = 10G) を買う。
+            //   自由移動の層では物資が移動の燃料で、 払底すると HP で歩くことになる。
+            if (sm != null && gm.Run != null)
+            {
+                int guardPack = 0;
+                while (gm.Run.provision <= ProvisionRefillFloorEffective() && guardPack++ < ShopManager.ProvisionPackStock
+                       && sm.TryBuyProvisionPack(gm.Run)) { }
+            }
+
             if (inv != null && inv.slots != null)
             {
                 var run = gm.Run;
@@ -7929,12 +7890,12 @@ namespace AutoTest
                 bool Buy(int i)
                 {
                     var s = inv.slots[i];
-                    // **支払い可能額で見る** ── 燈火 r10 は不足分を希望で払える。
+                    // **支払い可能額で見る** ── 燈火 r10 は不足分を物資で払える。
                     //   ここを run.coins のままにすると、 足切りを通した候補が
                     //   この入口で弾かれ、 **機構が 1 回も発動しない** (実測 170,000 ラン で 0 件)。
                     //   同じ判断を 2 箇所に置いた典型で、 2026-08-10 の WouldUpgrade と同じ形。
                     if (s == null || s.sold
-                        || s.price > GameLoop.HopePayment.PolicyAffordable(run) - _shopReserve)
+                        || s.price > GameLoop.ProvisionPayment.PolicyAffordable(run) - _shopReserve)
                         return false;
                     if (s.kind != InventorySystem.Shop.ShopSlotKind.WeaponMaterial
                         && !string.IsNullOrEmpty(s.itemId))
@@ -7945,7 +7906,7 @@ namespace AutoTest
                     int before = run.coins;
                     string id = s.itemId;
                     gm.ShopBuy(i);
-                    // **成否は「金が減ったか」では判定しない。** 全額を希望で払った場合
+                    // **成否は「金が減ったか」では判定しない。** 全額を物資で払った場合
                     //   (所持金 0 で購入) は金が動かないので、 買えたのに失敗として数えてしまう。
                     //   在庫が売り切れたかを見るのが素直 ── 素材枠だけは sold を立てないので
                     //   従来どおり金の減少で見る。
@@ -8065,7 +8026,7 @@ namespace AutoTest
                     return false;
                 }
 
-                /// <summary>手持ちの**回復薬**の本数。 シールド薬・攻撃薬・希望薬は数えない。</summary>
+                /// <summary>手持ちの**回復薬**の本数。 シールド薬・攻撃薬・物資薬は数えない。</summary>
                 int HealCount()
                 {
                     if (run.ownedConsumables == null) return 0;
@@ -8098,7 +8059,7 @@ namespace AutoTest
                 /// <summary>**回復薬を 1 本も持っていないなら、 何より先に確保する (2026-08-16)。**
                 ///
                 /// <para>旧実装は「消耗品を 1 つも持っていないなら」だったが、 消耗品は 4 系統
-                /// (回復/シールド/攻撃強化/希望) あるので、 **シールド薬 1 本を持っているだけで
+                /// (回復/シールド/攻撃強化/物資) あるので、 **シールド薬 1 本を持っているだけで
                 /// この保険が外れていた**。 実測 (batch_20260816_145127): p4 で死亡した 199 ランのうち
                 /// 回復薬 0 本が 90.5% ある一方、 消耗品の所持数は平均 0.86 ＝
                 /// 「回復以外は持っているのに回復は無い」状態が常態化していた。
@@ -8150,7 +8111,7 @@ namespace AutoTest
                 /// 「ボスに入る時点で満タンか」を保証する。</para>
                 ///
                 /// <para>回復は毎回 1 枠固定で並ぶ (ItemIds.ConsumableFixedFamily) が、
-                /// シールドは残り 2 枠を攻撃強化・希望と争う抽選なので **並ばない店がある**。
+                /// シールドは残り 2 枠を攻撃強化・物資と争う抽選なので **並ばない店がある**。
                 /// リロールが要るのは主にシールド側。</para></summary>
                 void StockDefensive(int cap)
                 {
@@ -8226,7 +8187,7 @@ namespace AutoTest
                 // [計装 2026-09-18] 7 層の店に入った時点の所持金 (ランで最初の 1 回だけ)。
                 if (run.currentFloor >= 7 && _floor7ShopEntryCoins < 0) _floor7ShopEntryCoins = run.coins;
                 // [廃止 2026-09-14] 〈貪欲の儀〉のためのゴールド取り置き。
-                //   門リワークでゴールドの要求そのものが無くなった (代償は 最大HP / 遺物 / 希望)。
+                //   門リワークでゴールドの要求そのものが無くなった (代償は 最大HP / 遺物 / 物資)。
 
                 // ============================================================
                 // フェーズ1: 在庫の S/A 級を先取り（買えるだけ買う）
@@ -8259,8 +8220,8 @@ namespace AutoTest
                     {
                         var s = inv.slots[i];
                         if (s == null || s.sold) continue;
-                        // 希望で届くなら「買えない」ではないので、 売却して工面する必要が無い。
-                        if (s.price <= GameLoop.HopePayment.PolicyAffordable(run)) continue;
+                        // 物資で届くなら「買えない」ではないので、 売却して工面する必要が無い。
+                        if (s.price <= GameLoop.ProvisionPayment.PolicyAffordable(run)) continue;
                         if (string.IsNullOrEmpty(s.itemId)) continue;
                         // Score 細分化 (2026-06-22): B+ (>=2) を S/A/B 帯として扱う
                         // 特売補正込み: 40% 割引以上は Score +1、 60% 以上は +2
@@ -8308,8 +8269,8 @@ namespace AutoTest
                     pw = 0f;
                     var s = inv.slots[i];
                     if (s == null || s.sold) return false;
-                    // 燈火 r10 (希望払い) を織り込んだ支払い可能額。 規則より保守的な PolicyFloor。
-                    if (s.price > GameLoop.HopePayment.PolicyAffordable(run) - _shopReserve) return false;
+                    // 燈火 r10 (物資払い) を織り込んだ支払い可能額。 規則より保守的な PolicyFloor。
+                    if (s.price > GameLoop.ProvisionPayment.PolicyAffordable(run) - _shopReserve) return false;
                     // **武器は装備判定を通す** (2026-08-10)。 主経路にゲートが無く素通りしていた。
                     if (s.kind == ShopSlotKind.Weapon && !GameLoop.Loadout.WouldUpgrade(run, s.itemId)) return false;
                     float step = AutoTest.LearnedPriorityProvider.StepPerTier;
@@ -8442,7 +8403,7 @@ namespace AutoTest
                     {
                         var s = inv.slots[i];
                         // 準パワー・支払可否・武器の装備判定・特売補正は TrySlotPower に一本化。
-                        //   経緯 (燈火 r10 の希望払い / 武器ゲートの取りこぼし / 60/40 の線引き) は
+                        //   経緯 (燈火 r10 の物資払い / 武器ゲートの取りこぼし / 60/40 の線引き) は
                         //   git log を参照。
                         if (!TrySlotPower(i, out float pw)) continue;
                         if (pw < effMinPower) continue;
@@ -8752,17 +8713,17 @@ namespace AutoTest
                     //   2026-08-17: **回復・シールドを上限まで積む** (リロールしてでも) へ強化。
                     StockDefensive(pol.consumableStockMax);
 
-                    // 希望が枯れかけているなら希望回復も最優先で確保する (2026-08-05)。
-                    //   希望は横移動・戦闘で一方的に減り、 発狂すると秒読みでランが終わる。
+                    // 物資が枯れかけているなら物資回復も最優先で確保する (2026-08-05)。
+                    //   物資は横移動・戦闘で一方的に減り、 発狂すると秒読みでランが終わる。
                     //   回復源が cons_hope_* だけになったので、 切らすと進路の自由度を失う。
-                    // 取り置き中 (門で希望を払うアーム) はここが底上げされ、
-                    //   6/7 層の店で希望回復を先に確保する。
-                    if (run.hope <= HopeRefillFloorEffective())
+                    // 取り置き中 (門で物資を払うアーム) はここが底上げされ、
+                    //   6/7 層の店で物資回復を先に確保する。
+                    if (run.provision <= ProvisionRefillFloorEffective())
                         for (int i = 0; i < inv.slots.Count; i++)
                         {
                             var s = inv.slots[i];
                             if (s != null && !s.sold && s.kind == ShopSlotKind.Consumable
-                                && GameLoop.ItemIds.ConsFamilyOf(s.itemId) == GameLoop.ItemIds.ConsHopeFamily
+                                && GameLoop.ItemIds.ConsFamilyOf(s.itemId) == GameLoop.ItemIds.ConsProvisionFamily
                                 && run.coins >= s.price) { Buy(i); break; }
                         }
 
@@ -9079,7 +9040,7 @@ namespace AutoTest
                 //   現行条件で測り直すと符号が反転している:
                 //     両AIが7層へ到達した 379 ラン に限定して Optimalだけクリア 71 /
                 //     Superだけクリア 41 (p=0.0059)。 到達時点の状態 (HP率・パッシブ数・
-                //     武器Tier・希望) は Super が僅かに上なので、 選択バイアスでは説明できない。
+                //     武器Tier・物資) は Super が僅かに上なので、 選択バイアスでは説明できない。
                 //   IsSuperTailMode で絞らない ── 0pt で観測した差なので難度条件を付けない。
                 bool useLayer7Routine = effectiveSkill == WiringSkill.Super
                                      && superLayer7OptimalCombatRoutine
@@ -9180,6 +9141,9 @@ namespace AutoTest
                         UseFirst(run, "回復薬", "小回復薬");
                     }
                 }
+                // 逃げる (2026-09-28): 徘徊エネミーの連戦は、 各戦の頭で HP が少なければ逃げる。
+                if (cm.CurrentCombatTurn <= 1 && ShouldFleeGauntlet(run, GameManager.Instance) && cm.RequestFlee())
+                    FreeMapGauntletFlees++;
                 var tr = cm.ExecuteTurn();
                 if (tr.isDraw) _cwDraw++;
                 else if (tr.playerWon) _cwWin++;
@@ -9189,14 +9153,14 @@ namespace AutoTest
 
 
 /// <summary>6F (灰燼の王) 撃破直後のビルド情報を _cur に記録。
-        /// 装備/アイテム/HP/希望/各種デバフを 1 行プレーンテキストに圧縮。
+        /// 装備/アイテム/HP/物資/各種デバフを 1 行プレーンテキストに圧縮。
         /// 後でサマリーから「どんな装備で 6F まで来たか」をサルベージする用途。</summary>
         private void Capture6FClearSnapshot(GameManager gm)
         {
             if (_cur == null || gm?.Run == null) return;
             var run = gm.Run;
             var sb = new System.Text.StringBuilder();
-            sb.Append($"HP {run.playerHP}/{run.playerMaxHP} | coins {run.coins} | mat {run.weaponMaterials} | 武器 {run.equippedWeaponId} 限界突破{run.limitBreakStage} | 希望 {run.hope}/{run.hopeCap}[{GameLoop.HopeSystem.GetTier(run)}]");
+            sb.Append($"HP {run.playerHP}/{run.playerMaxHP} | coins {run.coins} | mat {run.weaponMaterials} | 武器 {run.equippedWeaponId} 限界突破{run.limitBreakStage} | 物資 {run.provision}/{run.provisionCap}[{GameLoop.ProvisionSystem.GetTier(run)}]");
             sb.Append($"\n      武器: {(string.IsNullOrEmpty(run.equippedWeaponId) ? "(無)" : run.equippedWeaponId)} | ダイス: {(string.IsNullOrEmpty(run.equippedDiceId) ? "(武器ダイス)" : run.equippedDiceId)}");
             int pCnt = run.ownedPassiveItems?.Count ?? 0;
             string pList = pCnt > 0 ? string.Join(", ", run.ownedPassiveItems) : "(無)";
@@ -10323,7 +10287,7 @@ namespace AutoTest
 
             // ② 数値スコアラで選定。スコア差が小さければ次点も取り得る（両分岐の探索性）。
             //    HPが低い時は HpDelta/EnterCombat 系が強烈にマイナス → 自動的に「立ち去り」を選ぶ。
-            //    現状HP余裕で 100G+希望損 vs なし なら 100G を取る（ゴールド価値 > 希望コスト）。
+            //    現状HP余裕で 100G+物資損 vs なし なら 100G を取る（ゴールド価値 > 物資コスト）。
             int byScore = EventChoiceScorer.PickBestIndex(def, run, _rng,
                 explorationRate: AutoTest.PolicyParameters.Current.eventExplorationRate);
 
@@ -10761,14 +10725,18 @@ namespace AutoTest
             // 素材収入(差分): 増加分だけ累計（昇華コスト逓増カーブ較正用の pt 基準）
             if (run.weaponMaterials > _prevMaterials) _cur.materialsGainedTotal += (run.weaponMaterials - _prevMaterials);
             _prevMaterials = run.weaponMaterials;
-            // 希望(ADR-0002): 最低希望と発狂到達を追跡
-            if (run.hope < _cur.minHope) _cur.minHope = run.hope;
-            if (run.hope <= 0) _cur.reachedMadness = true;
+            // 物資(ADR-0002): 最低物資と発狂到達を追跡
+            if (run.provision < _cur.minProvision) _cur.minProvision = run.provision;
+            if (run.provision <= 0) _cur.reachedMadness = true;
         }
 
         private string CurrentNodeId()
         {
-            return MapManager.Instance?.CurrentNode?.id ?? "";
+            var mm = MapManager.Instance;
+            // 自由移動の層では道の途中で止まることがある (魔石の反応で航行を立て直す)。 点が同じでも
+            //   時間が進んでいれば進展なので、 刻みを添えてストール検出に誤判定させない。
+            if (mm != null && mm.IsFreeMap) return $"{mm.CurrentNode?.id ?? ""}@{mm.Sim.Ticks}";
+            return mm?.CurrentNode?.id ?? "";
         }
 
         // ===== ラン終了処理 =====
@@ -10852,16 +10820,16 @@ namespace AutoTest
                 _cur.finalHP = run.playerHP;
                 _cur.finalMaxHP = run.playerMaxHP;
                 _cur.finalCoins = run.coins;
-                _cur.finalHope = run.hope;
-                _cur.finalHopeCap = run.hopeCap;
-                if (run.hope <= 0) _cur.reachedMadness = true;
-                _cur.hopeCombatLoss   = GameLoop.HopeSystem.Stats.combatLoss;
-                _cur.hopeComposureGain = GameLoop.HopeSystem.Stats.composureGain;
-                _cur.hopeLateralLoss  = GameLoop.HopeSystem.Stats.lateralLoss;
-                _cur.hopeMarchLoss    = GameLoop.HopeSystem.Stats.marchLoss;
-                _cur.hopeEvilLoss     = GameLoop.HopeSystem.Stats.evilLoss;
-                _cur.hopeFoodGain     = GameLoop.HopeSystem.Stats.foodGain;
-                _cur.hopeRerollLoss   = GameLoop.HopeSystem.Stats.rerollLoss;
+                _cur.finalProvision = run.provision;
+                _cur.finalProvisionCap = run.provisionCap;
+                if (run.provision <= 0) _cur.reachedMadness = true;
+                _cur.provisionCombatLoss   = GameLoop.ProvisionSystem.Stats.combatLoss;
+                _cur.provisionComposureGain = GameLoop.ProvisionSystem.Stats.composureGain;
+                _cur.provisionLateralLoss  = GameLoop.ProvisionSystem.Stats.travelLoss;
+                _cur.provisionMarchLoss    = GameLoop.ProvisionSystem.Stats.marchLoss;
+                _cur.provisionEvilLoss     = GameLoop.ProvisionSystem.Stats.evilLoss;
+                _cur.provisionFoodGain     = GameLoop.ProvisionSystem.Stats.foodGain;
+                _cur.provisionRerollLoss   = GameLoop.ProvisionSystem.Stats.rerollLoss;
                 _cur.deathFloor = (o == Outcome.GameOver) ? run.currentFloor : 0;
                 _cur.deathInLambda = (o == Outcome.GameOver) && run.inLambda;
                 _cur.appliedChallengeScore = MetaProgression.MetaDebuffApplicator.Score;
@@ -10885,7 +10853,7 @@ namespace AutoTest
                             case "heal": _cur.finalHealCount++; break;
                             case "dmg":  _cur.finalDamageBuffCount++; break;
                             case "def":  _cur.finalShieldCount++; break;
-                            case "hope": _cur.finalHopeCount++; break;
+                            case "provision": _cur.finalProvisionCount++; break;
                         }
                     }
                 }
@@ -11517,7 +11485,7 @@ namespace AutoTest
             void Append(string label, List<RunRec> rows)
             {
                 int n = rows.Count;
-                int any = 0, heal = 0, dmg = 0, shield = 0, hope = 0;
+                int any = 0, heal = 0, dmg = 0, shield = 0, provision = 0;
                 int gold10 = 0, gold30 = 0, upgrade = 0;
                 long consSum = 0, goldSum = 0, matSum = 0;
                 foreach (var r in rows)
@@ -11526,7 +11494,7 @@ namespace AutoTest
                     if (r.finalHealCount > 0) heal++;
                     if (r.finalDamageBuffCount > 0) dmg++;
                     if (r.finalShieldCount > 0) shield++;
-                    if (r.finalHopeCount > 0) hope++;
+                    if (r.finalProvisionCount > 0) provision++;
                     if (r.finalCoins >= 10) gold10++;
                     if (r.finalCoins >= 30) gold30++;
                     if (r.finalUpgradeReady) upgrade++;
@@ -11536,7 +11504,7 @@ namespace AutoTest
                 }
                 sb.AppendLine($"  {label,-12}: {n,4}死 / 戦闘資源あり {Pct(any,n),6}"
                     + $" (回復{Pct(heal,n)}, 油{Pct(dmg,n)}, 盾{Pct(shield,n)})"
-                    + $" / 希望薬{Pct(hope,n)} / 強化可能{Pct(upgrade,n)}");
+                    + $" / 物資薬{Pct(provision,n)} / 強化可能{Pct(upgrade,n)}");
                 sb.AppendLine($"  {"",-12}  平均残: 消耗品{(n > 0 ? consSum/(double)n : 0):F2}個"
                     + $" Gold{(n > 0 ? goldSum/(double)n : 0):F1} (10+:{Pct(gold10,n)}, 30+:{Pct(gold30,n)})"
                     + $" 素材{(n > 0 ? matSum/(double)n : 0):F1}");
@@ -12583,15 +12551,15 @@ namespace AutoTest
             sb.AppendLine("---- 経済・燃費バランス ----");
             double sCoins=0, sPeak=0, sGain=0, sStarv=0, sStarvHit=0, sShop=0;
             double sReroll=0, sRerollG=0, sPrio=0, sMatGain=0;
-            double sFinalHope=0, sMinHope=0; int madnessCount=0;   // 希望(ADR-0002)
-            double sHCombat=0, sHComposure=0, sHLateral=0, sHMarch=0, sHEvil=0, sHFood=0, sHReroll=0; // 希望 発生源別収支
+            double sFinalProvision=0, sMinProvision=0; int madnessCount=0;   // 物資(ADR-0002)
+            double sHCombat=0, sHComposure=0, sHLateral=0, sHMarch=0, sHEvil=0, sHFood=0, sHReroll=0; // 物資 発生源別収支
             foreach (var r in recs)
             { sCoins+=r.finalCoins; sPeak+=r.peakCoins; sGain+=r.totalGoldGained;
               sStarv+=r.starvationTotal; sStarvHit+=r.starvationHits; sShop+=r.shopPurchases;
               sReroll+=r.shopRerolls; sRerollG+=r.shopRerollCoins; sPrio+=r.priorityItemsAcquired; sMatGain+=r.materialsGainedTotal;
-              sFinalHope+=r.finalHope; sMinHope+=r.minHope; if (r.reachedMadness) madnessCount++;
-              sHCombat+=r.hopeCombatLoss; sHComposure+=r.hopeComposureGain; sHLateral+=r.hopeLateralLoss;
-              sHMarch+=r.hopeMarchLoss; sHEvil+=r.hopeEvilLoss; sHFood+=r.hopeFoodGain; sHReroll+=r.hopeRerollLoss; }
+              sFinalProvision+=r.finalProvision; sMinProvision+=r.minProvision; if (r.reachedMadness) madnessCount++;
+              sHCombat+=r.provisionCombatLoss; sHComposure+=r.provisionComposureGain; sHLateral+=r.provisionLateralLoss;
+              sHMarch+=r.provisionMarchLoss; sHEvil+=r.provisionEvilLoss; sHFood+=r.provisionFoodGain; sHReroll+=r.provisionRerollLoss; }
             int dn = Math.Max(1, n);
             sb.AppendLine($"  {PadR("平均最終ゴールド", 20)}: {(sCoins/dn):F1}");
             sb.AppendLine($"  {PadR("平均ピークゴールド", 20)}: {(sPeak/dn):F1}");
@@ -12607,9 +12575,9 @@ namespace AutoTest
                                  + $"  平均戦利品 {(rw > 0 ? GameManager.RobberyLootTotal / (double)rw : 0):F1} 件"
                                : "  ※未発動"));
             }
-            sb.AppendLine($"  {PadR("平均最終希望", 20)}: {(sFinalHope/dn):F1}");
-            sb.AppendLine($"  {PadR("平均最低希望", 20)}: {(sMinHope/dn):F1}  (発狂到達 {madnessCount}/{n} = {Pct(madnessCount, n)})");
-            sb.AppendLine($"  ── 希望 発生源別収支（1ラン平均・損は−） ──");
+            sb.AppendLine($"  {PadR("平均最終物資", 20)}: {(sFinalProvision/dn):F1}");
+            sb.AppendLine($"  {PadR("平均最低物資", 20)}: {(sMinProvision/dn):F1}  (発狂到達 {madnessCount}/{n} = {Pct(madnessCount, n)})");
+            sb.AppendLine($"  ── 物資 発生源別収支（1ラン平均・損は−） ──");
             sb.AppendLine($"  {PadR("  戦闘損", 20)}: -{(sHCombat/dn):F1}   {PadR("被弾0回復", 12)}: +{(sHComposure/dn):F1}");
             sb.AppendLine($"  {PadR("  横移動損", 20)}: -{(sHLateral/dn):F1}   {PadR("絶望進軍損", 12)}: -{(sHMarch/dn):F1}");
             sb.AppendLine($"  {PadR("  悪選択損", 20)}: -{(sHEvil/dn):F1}   {PadR("食料回復", 12)}: +{(sHFood/dn):F1}");
@@ -12768,7 +12736,7 @@ namespace AutoTest
                                 / System.Math.Max(1L, InventorySystem.Shop.ShopManager.SaleWanted);
                     double saved = InventorySystem.Shop.ShopManager.SaleDiscountSum / dn;
                     sb.AppendLine($"  {PadR("商才〈特売〉", 20)}: 店 {shops / dn:F1}/ラン"
-                        + $" / 希望枠 {want:F1} / 候補 {cand:F1}"
+                        + $" / 物資枠 {want:F1} / 候補 {cand:F1}"
                         + $" / **実際に乗った {appl:F1}** ({pct:F0}% 消化)"
                         + $" / 浮いた金 {saved:F1}G/ラン");
                 }

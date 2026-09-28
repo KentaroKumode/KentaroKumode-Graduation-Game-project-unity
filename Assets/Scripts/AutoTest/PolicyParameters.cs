@@ -13,7 +13,7 @@ namespace AutoTest
     ///   ・強盗系 (1軸):     robberyMinHpRatio  (フロア閾値は固定)
     ///   ・イベント系 (1軸): eventExplorationRate
     ///   ・戦闘系 (2軸):     importantThreatThreshold / emergencyHealRatio
-    ///   ・航行系 (3軸):     hpCritThreshold / lateralHopeFloor(損耗点) / hopeRefillFloor(補充点)
+    ///   ・航行系 (3軸):     hpCritThreshold / lateralProvisionFloor(損耗点) / provisionRefillFloor(補充点)
     ///   (昇華系 1軸 sublimationReserve は 2026-09-11 撤去 ── 昇華そのものが未使用のため)
     ///
     /// PolicyExplorer が毎バッチ 1軸を摂動させて bandScore 平均で評価。
@@ -56,24 +56,24 @@ namespace AutoTest
 
         /// <summary>HP危機境界 (危機判定)。 これ未満で Rest を最優先タイルへ。</summary>
         public float hpCritThreshold = 0.30f;
-        /// <summary>横移動(寄り道)を許可する希望の下限。 現在希望がこの値を超えるときだけ希望-LateralCost を払って寄り道する。
-        /// 低いほど「希望を資源として深く損耗してでも利得を取りにいく」、 高いほど温存重視。 L2が勝率(composite)で最適点を学習。
+        /// <summary>横移動(寄り道)を許可する物資の下限。 現在物資がこの値を超えるときだけ物資-LateralCost を払って寄り道する。
+        /// 低いほど「物資を資源として深く損耗してでも利得を取りにいく」、 高いほど温存重視。 L2が勝率(composite)で最適点を学習。
         /// 既定20 = 旧ハードコード(絶望帯≤20で見送り)と同等。</summary>
-        public float lateralHopeFloor = 20f;
-        /// <summary>希望回復(食料消費)を始める希望の上限。 現在希望がこの値以下になったら食料で補充する。
+        [UnityEngine.Serialization.FormerlySerializedAs("lateralHopeFloor")] public float lateralProvisionFloor = 200f;   // 2026-09-28: 物資 ×10 (横移動は廃止・読まれない)
+        /// <summary>物資回復(食料消費)を始める物資の上限。 現在物資がこの値以下になったら食料で補充する。
         /// 高いほど早めに補充(温存・安全)、 低いほど枯渇近くまで引っ張る(食料を出し惜しみ他用途へ)。 L2が勝率で最適化。
         /// 既定45 = 旧ハードコード(悲観帯≤45で補充)と同等。 ※佯狂者の冠所持時は発狂狙いのため別途補充しない。</summary>
-        public float hopeRefillFloor = 45f;
-        /// <summary>希望の補充を **hopeCap のこの割合で打ち切る**。 既定 1.0 = 上限まで満たす（従来動作）。
+        [UnityEngine.Serialization.FormerlySerializedAs("hopeRefillFloor")] public float provisionRefillFloor = 450f;   // 2026-09-28: 物資 ×10
+        /// <summary>物資の補充を **provisionCap のこの割合で打ち切る**。 既定 1.0 = 上限まで満たす（従来動作）。
         ///
-        /// 1 未満にすると「補充はするが上へ戻し切らない」＝ **希望を帯の中に留める**。
-        /// 〈渇き〉のように *低希望でだけ発動する* 効果を維持するために要る ──
-        /// 補充を止めるだけ (hopeRefillFloor=0) だと希望が 0 まで落ちて発狂でランが終わり、
+        /// 1 未満にすると「補充はするが上へ戻し切らない」＝ **物資を帯の中に留める**。
+        /// 〈渇き〉のように *低物資でだけ発動する* 効果を維持するために要る ──
+        /// 補充を止めるだけ (provisionRefillFloor=0) だと物資が 0 まで落ちて発狂でランが終わり、
         /// 上限まで満たすと発動条件から外れる。 実測ではどちらも軸が死んだ (2026-08-08)。
         ///
         /// 使い方: 発動閾値の少し下を天井にし、 床は発狂を避けられる高さに置く。
-        /// 例) 〈渇き〉は 希望 ≤ hopeCap×40% で発動 → 天井 0.38 / 床 18 で帯 [18, 38] を維持。</summary>
-        public float hopeBandCeilRatio = 1f;
+        /// 例) 〈渇き〉は 物資 ≤ provisionCap×40% で発動 → 天井 0.38 / 床 18 で帯 [18, 38] を維持。</summary>
+        [UnityEngine.Serialization.FormerlySerializedAs("hopeBandCeilRatio")] public float provisionBandCeilRatio = 1f;
 
         // === 昇華系 ===
         // [削除 2026-09-11] sublimationReserve ── 〈昇華〉の積極度。
@@ -167,9 +167,9 @@ namespace AutoTest
             importantThreatThreshold = Mathf.Clamp(importantThreatThreshold, 2, 9);
             emergencyHealRatio       = Mathf.Clamp(emergencyHealRatio, 0.50f, 2.00f);
             hpCritThreshold          = Mathf.Clamp(hpCritThreshold, 0.10f, 0.50f);
-            lateralHopeFloor         = Mathf.Clamp(lateralHopeFloor, 0f, 60f);
-            hopeRefillFloor          = Mathf.Clamp(hopeRefillFloor, 0f, 75f);
-            hopeBandCeilRatio        = Mathf.Clamp(hopeBandCeilRatio, 0.10f, 1.00f);
+            lateralProvisionFloor         = Mathf.Clamp(lateralProvisionFloor, 0f, 600f);
+            provisionRefillFloor          = Mathf.Clamp(provisionRefillFloor, 0f, 750f);
+            provisionBandCeilRatio        = Mathf.Clamp(provisionBandCeilRatio, 0.10f, 1.00f);
             stanceDefendWinProb      = Mathf.Clamp(stanceDefendWinProb, 0f, 0.90f);
             stanceDefendHpBias       = Mathf.Clamp(stanceDefendHpBias, 0f, 0.60f);
             // 整合性: crit < low を強制
@@ -186,9 +186,9 @@ namespace AutoTest
                 importantThreatThreshold = importantThreatThreshold,
                 emergencyHealRatio       = emergencyHealRatio,
                 hpCritThreshold          = hpCritThreshold,
-                lateralHopeFloor         = lateralHopeFloor,
-                hopeRefillFloor          = hopeRefillFloor,
-                hopeBandCeilRatio        = hopeBandCeilRatio,
+                lateralProvisionFloor         = lateralProvisionFloor,
+                provisionRefillFloor          = provisionRefillFloor,
+                provisionBandCeilRatio        = provisionBandCeilRatio,
                 stanceDefendWinProb      = stanceDefendWinProb,
                 stanceDefendHpBias       = stanceDefendHpBias,
                 lastBandScoreAvg         = lastBandScoreAvg,
@@ -202,7 +202,7 @@ namespace AutoTest
             return $"shop[reroll={rerollCostRatio:F2} cons={consumableStockMax}] "
                  + $"rob[hp%={robberyMinHpRatio:F2}] event[exp={eventExplorationRate:F2}] "
                  + $"combat[thr={importantThreatThreshold} heal={emergencyHealRatio:F2}] "
-                 + $"nav[crit={hpCritThreshold:F2} latHope={lateralHopeFloor:F0} refill={hopeRefillFloor:F0}→{hopeBandCeilRatio:P0}] "
+                 + $"nav[crit={hpCritThreshold:F2} latProvision={lateralProvisionFloor:F0} refill={provisionRefillFloor:F0}→{provisionBandCeilRatio:P0}] "
                  + $"stance[def<{stanceDefendWinProb:F2} hpBias={stanceDefendHpBias:F2}] "
                  + $"| last avg={lastBandScoreAvg:F2} batches={trialBatches}";
         }

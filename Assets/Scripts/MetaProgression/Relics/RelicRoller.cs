@@ -232,7 +232,7 @@ namespace MetaProgression.Relics
         ///
         /// **高難易度限定軸は挑戦 25pt 以上でのみ、 しかもメイン枠 (index 0) にだけ出る。**
         /// サブ段 (1〜5) に落ちると効果が小さすぎて、 その軸が要求する賭け
-        /// （Λ へ潜る・希望を切らす・長期戦を選ぶ・低HP で走る）に見合わず死に枠になるため。</summary>
+        /// （Λ へ潜る・物資を切らす・長期戦を選ぶ・低HP で走る）に見合わず死に枠になるため。</summary>
         public static RelicAxis[] PickAxes(int slots, int rngIndex, int challengeScore = 0)
         {
             bool highDiffAllowed = challengeScore >= HighDifficultyAxisMinScore;

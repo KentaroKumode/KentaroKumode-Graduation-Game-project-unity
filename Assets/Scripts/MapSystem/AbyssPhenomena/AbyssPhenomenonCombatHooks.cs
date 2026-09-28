@@ -123,8 +123,8 @@ namespace MapSystem.AbyssPhenomena
         public static int OnNodeMove(RunState run)
             => (run != null && run.HasPhenomenon(AbyssPhenomenon.BoulderHail)) ? 1 : 0;
 
-        /// <summary>希望が減少するときに 追加で発生する損失量 (薄れる人: +1)。</summary>
-        public static int OnHopeReduceExtraLoss(RunState run)
-            => (run != null && run.HasPhenomenon(AbyssPhenomenon.FadingPerson)) ? 1 : 0;
+        /// <summary>物資が減少するときに 追加で発生する損失量 (薄れる人: +10)。</summary>
+        public static int OnProvisionReduceExtraLoss(RunState run)
+            => (run != null && run.HasPhenomenon(AbyssPhenomenon.FadingPerson)) ? 10 : 0;   // 2026-09-28: 物資 ×10
     }
 }

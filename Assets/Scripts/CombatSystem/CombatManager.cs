@@ -255,6 +255,8 @@ namespace CombatSystem
         public string enemyId;
         public string enemyDisplayName;
         public bool playerWon;
+        /// <summary>逃げて終わった (2026-09-28)。 playerWon は false・HP は残っている。</summary>
+        public bool playerFled;
         public int totalTurns;
         public int playerHPRemaining;
         public int enemyHPRemaining;
@@ -352,6 +354,29 @@ namespace CombatSystem
         /// **最初の最大 3 撃で終了する** ── 深層で恒常倍率にしないため (§15-2 v3.0)。</summary>
         private int challengeBossStrikeCount;
         private int fleeAfterTurns;          // >0 のとき、このターン数を終えても未決着なら敵が逃走（偽の商人）
+
+        // ── 逃げる (2026-09-28・docs/GAME.md §6-3) ──
+        //   プレイヤーの手番 (配線の前) に選べる。 そのターンはこちらの攻撃が発生せず、 敵の予告攻撃は
+        //   ブロック有効で受ける (配線したブロック端子で軽減できる)。 生き残ったらそこで戦闘を抜ける。
+        //   代償 (物資 −100・ゴールド半減・報酬なし・直前の点へ戻る) は GameManager 側。
+        private bool _fleeRequested;
+        /// <summary>この戦闘で逃げられるか。 GameManager が戦闘開始時に立てる
+        /// (自由移動の層の戦闘・エリート・徘徊エネミーの連戦だけ。 層のボス・イベント戦・Λ では false)。</summary>
+        public bool FleeAllowed { get; set; }
+        /// <summary>このターンに逃げると宣言済みか。</summary>
+        public bool FleeRequested => _fleeRequested;
+        /// <summary>直前の戦闘が逃げて終わったか。 CombatResult.playerFled と同じ値。</summary>
+        public bool LastCombatFled { get; private set; }
+
+        /// <summary>逃げると宣言する。 次の <see cref="ExecuteTurn"/> がそのターンを逃げとして解決する。
+        /// 層のボスからは逃げられない (<see cref="FleeAllowed"/> が false)。</summary>
+        public bool RequestFlee()
+        {
+            if (!isCombatActive || !FleeAllowed) return false;
+            if (currentEnemy != null && GameLoop.BossIds.IsBoss(currentEnemy.id)) return false;
+            _fleeRequested = true;
+            return true;
+        }
         private long _fightPlayerRollSum;    // ボス難易度チューナー: この戦闘のプレイヤーロール合計の累計
         private int _fightPlayerRollCount;   // 同 ロール回数 (平均出目 = sum/count)
         // ボス難易度チューナー: スタンス別の「ボスがロール勝ちしたターン数 / そのスタンスの総ターン数」(強/弱で別レンジ管理)
@@ -402,7 +427,7 @@ namespace CombatSystem
         }
 
         // [撤去 2026-09-13] TryTriggerOverload / OverloadFires ── 出力 r10 の旧極点。
-        //   反動を HP でも 希望 でも成立させられず、 〈戦意〉(累積成長) へ差し替えた。
+        //   反動を HP でも 物資 でも成立させられず、 〈戦意〉(累積成長) へ差し替えた。
         //   経緯は MetaProgression.MetaPanel.BattleSpiritUnlocked。
 
         /// <summary>
@@ -789,6 +814,9 @@ namespace CombatSystem
             metaAgilityDodgeUsed = false;
             challengeBossStrikeCount = 0;
             fleeAfterTurns = 0;
+            _fleeRequested = false;
+            LastCombatFled = false;
+            FleeAllowed = false;   // 戦闘ごとに GameManager が立て直す (既定は逃げられない)
             turnLog.Clear();
             mutualWiring = null; // ADR-0009: 配線は戦闘単位でリセット (ラン跨ぎ既定値は W7 後段)
             _fightPlayerRollSum = 0;
@@ -861,9 +889,9 @@ namespace CombatSystem
             if (psm.Context != null) psm.Context.playerCurrentHP = playerHP;
             psm.Context?.playerDamageBySource.Clear(); // 被ダメ ソース別内訳を戦闘開始でリセット
 
-            // 希望(ADR-0002) 迷妄: 絶望帯(希望≤20)以降、戦闘開始時にプレイヤーパッシブを1-3個ランダム無効化。
+            // 物資(ADR-0002) 迷妄: 絶望帯(物資≤20)以降、戦闘開始時にプレイヤーパッシブを1-3個ランダム無効化。
             // 佯狂者は PassiveItem 系統のため対象外（activeSkillNames に含まれない）。
-            int delusionCount = GameLoop.HopeSystem.RollPassiveDisableCount(GameLoop.GameManager.Instance?.Run);
+            int delusionCount = GameLoop.ProvisionSystem.RollPassiveDisableCount(GameLoop.GameManager.Instance?.Run);
             if (delusionCount > 0) psm.DisableRandomPlayerSkills(delusionCount);
 
             // 装備ダイスの面をコンテキストに設定
@@ -887,9 +915,9 @@ namespace CombatSystem
                 ctx.bossId = AutoTest.BossTuning.IsBoss(enemy.id) ? enemy.id : "";
                 ctx.lastDamageCause = InventorySystem.PassiveSkills.DeathCause.Normal;
 
-                // 希望(ADR-0002) 苦悩: 悲観床(45)以下で会心倍率 -0.5。Λ「注意散漫」(会心分子上限)とは
+                // 物資(ADR-0002) 苦悩: 悲観床(45)以下で会心倍率 -0.5。Λ「注意散漫」(会心分子上限)とは
                 // 効く軸が別(倍率 vs 分子)なので非重複。
-                ctx.criticalMultiplier += GameLoop.HopeSystem.GetCritMultiplierDelta(GameLoop.GameManager.Instance?.Run);
+                ctx.criticalMultiplier += GameLoop.ProvisionSystem.GetCritMultiplierDelta(GameLoop.GameManager.Instance?.Run);
             }
 
             // Λ層（時間の狭間）由来の恒久デバフを ctx へ設定（戦闘スコープで保持）
@@ -1492,7 +1520,7 @@ namespace CombatSystem
                 Debug.Log("[CombatManager] 影の代償発動 (50%): プレイヤー全出目-1");
             }
 
-            // ダイス振り直し。 ADR-0010 で希望消費の自動ポリシーから充電消費の方策注入へ移行。
+            // ダイス振り直し。 ADR-0010 で物資消費の自動ポリシーから充電消費の方策注入へ移行。
             // 旧パイプライン (UseMutualAttackPipeline=false) でも同じ実装を通す。
             RerollPhase(ctx, playerDice, enemyDice, playerDiceMax);
 
@@ -1608,16 +1636,16 @@ namespace CombatSystem
                     int lbStage = GameLoop.GameManager.Instance?.Run?.limitBreakStage ?? 0;
                     totalDmg = ApplyWinDamageModifiers(totalDmg, ref fixedDmg, ref isCrit, lbStage, psm, ctx);
 
-                    // 希望(ADR-0002) 疲労: 焦燥床(75)以下で、この攻撃が15%で**最終ダメージ半減**。
+                    // 物資(ADR-0002) 疲労: 焦燥床(75)以下で、この攻撃が15%で**最終ダメージ半減**。
                     //   2026-08-09 に 0 ダメージから緩和。 **isCrit は落とさない** ──
                     //   会心の成否は判定済みの事実で、 疲労は結果の目減りでしかないため。
-                    float fatigueChance = GameLoop.HopeSystem.GetFatigueChance(GameLoop.GameManager.Instance?.Run);
+                    float fatigueChance = GameLoop.ProvisionSystem.GetFatigueChance(GameLoop.GameManager.Instance?.Run);
                     if (fatigueChance > 0f && GameLoop.GameRng.Chance(fatigueChance, "combat.fatigue", RngIdx(2)))
                     {
-                        float fm = GameLoop.HopeSystem.FatigueDamageMultiplier;
+                        float fm = GameLoop.ProvisionSystem.FatigueDamageMultiplier;
                         totalDmg = totalDmg > 0 ? Math.Max(1, Mathf.RoundToInt(totalDmg * fm)) : totalDmg;
                         fixedDmg = fixedDmg > 0 ? Math.Max(1, Mathf.RoundToInt(fixedDmg * fm)) : fixedDmg;
-                        Debug.Log($"[希望] 疲労: 最終ダメージ半減 → 主{totalDmg} 固{fixedDmg}");
+                        Debug.Log($"[物資] 疲労: 最終ダメージ半減 → 主{totalDmg} 固{fixedDmg}");
                     }
 
                     // 大穴の異常現象「朱の雪」: 与ダメ -1 (主ダメから引く、 最低 0)
@@ -2647,7 +2675,13 @@ namespace CombatSystem
             //     反撃・出血・毒は「自分が攻撃したこと」と独立に成立する別チャネルであり、
             //     さらに〈虚空〉(sword_t3/t4) は **攻撃端子 0 の時に** そこへ最大HP5% を積む札なので、
             //     ここを潰すと「攻撃しない」を選ぶための札そのものが死ぬ。
-            bool skipAttack = attackDiceCount <= 0;
+            bool skipAttack = attackDiceCount <= 0 || _fleeRequested;
+            if (_fleeRequested)
+            {
+                // 逃げるターン: こちらの攻撃は発生しない (素火力・パッシブ・追撃・固定ダメの枠も捨てる)。
+                ctx.fixedDamageToEnemy = 0;
+                Debug.Log("[逃げる] このターンは攻撃しない ── 敵の予告攻撃をブロックで受けて離脱する");
+            }
             if (skipAttack)
             {
                 if (atkBase > 0 || ctx.pursuitDamage > 0)
@@ -2735,15 +2769,15 @@ namespace CombatSystem
             DamageBreakdown[10] += ctx.pursuitDamage;
             RecordFloorDamage(ctx, dealtDmg, dealtFixed);
 
-            // 希望(ADR-0002) 疲労: 攻撃が15%で**最終ダメージ半減** (2026-08-09 に 0 ダメから緩和)。
+            // 物資(ADR-0002) 疲労: 攻撃が15%で**最終ダメージ半減** (2026-08-09 に 0 ダメから緩和)。
             //   **isCrit は落とさない** ── 会心の成否は判定済みの事実で、 疲労は結果の目減り。
-            float fatigueChance = GameLoop.HopeSystem.GetFatigueChance(GameLoop.GameManager.Instance?.Run);
+            float fatigueChance = GameLoop.ProvisionSystem.GetFatigueChance(GameLoop.GameManager.Instance?.Run);
             if (fatigueChance > 0f && GameLoop.GameRng.Chance(fatigueChance, "combat.fatigue", RngIdx(2)))
             {
-                float fm = GameLoop.HopeSystem.FatigueDamageMultiplier;
+                float fm = GameLoop.ProvisionSystem.FatigueDamageMultiplier;
                 dealtDmg   = dealtDmg   > 0 ? Math.Max(1, Mathf.RoundToInt(dealtDmg   * fm)) : dealtDmg;
                 dealtFixed = dealtFixed > 0 ? Math.Max(1, Mathf.RoundToInt(dealtFixed * fm)) : dealtFixed;
-                Debug.Log($"[希望] 疲労: 最終ダメージ半減 → 主{dealtDmg} 固{dealtFixed}");
+                Debug.Log($"[物資] 疲労: 最終ダメージ半減 → 主{dealtDmg} 固{dealtFixed}");
             }
 
             result.mainDamage = atkBase;
@@ -3182,7 +3216,20 @@ namespace CombatSystem
                 psm.FireEnemyTrigger(PassiveSkillTrigger.OnRollDraw);
 
             // --- 7. ターン終了処理 (共通終端) ---
-            return FinishTurnCommon(result, ctx);
+            var turnResult = FinishTurnCommon(result, ctx);
+
+            // 逃げる: 生き残っていればここで戦闘を抜ける (敵を倒してしまった・倒れた場合は通常の決着)。
+            if (_fleeRequested)
+            {
+                _fleeRequested = false;
+                if (isCombatActive && playerHP > 0 && enemyHP > 0)
+                {
+                    LastCombatFled = true;
+                    Debug.Log($"[逃げる] 戦闘から離脱 (HP {playerHP})");
+                    FinishCombat();
+                }
+            }
+            return turnResult;
         }
 
         // ===========================================================
@@ -4024,6 +4071,7 @@ namespace CombatSystem
                 enemyId = currentEnemy.id,
                 enemyDisplayName = currentEnemy.displayName,
                 playerWon = playerHP > 0 && enemyHP <= 0,
+                playerFled = LastCombatFled,
                 totalTurns = turnLog.Count,
                 playerHPRemaining = playerHP,
                 enemyHPRemaining = enemyHP,
@@ -4217,7 +4265,7 @@ namespace CombatSystem
         /// これがヨットの「何を残すか」をコスト面からも支える。
         ///
         /// 振り直す対象は <see cref="RerollPolicy"/> が決める (BOT / UI が差す)。
-        /// null なら振り直さない ── 旧実装は希望消費の自動ポリシーだったが、
+        /// null なら振り直さない ── 旧実装は物資消費の自動ポリシーだったが、
         /// リロールのたびに発狂へ近づく形だとヨットの中核が経済ペナルティに潰される (§design-yacht)。
         /// </summary>
         private void RerollPhase(CombatContext ctx, int[] playerDice, int[] enemyDice, int playerDiceMax,

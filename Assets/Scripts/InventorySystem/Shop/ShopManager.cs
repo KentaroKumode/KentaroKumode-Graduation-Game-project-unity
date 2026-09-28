@@ -116,8 +116,53 @@ namespace InventorySystem.Shop
         private ItemRarity? _apprMinRarity;
 
         /// <summary>ショップマス入店時に在庫を生成。</summary>
+        // ================================================================
+        //  自由移動のマップの補給 (2026-09-28・docs/GAME.md §16-1)
+        //  棚 (スロット) とは別の、 どの店にもある売り物。 値段は層で変えない。
+        // ================================================================
+
+        /// <summary>物資 1 包の量と値段 (1G ＝ 10 物資)。</summary>
+        public const int ProvisionPackAmount = 100;
+        public static int ProvisionPackPrice => ProvisionPackAmount / MapSystem.FreeMove.FreeMapParams.ProvisionPerGold;
+        /// <summary>1 つの店で買える物資の包の数。</summary>
+        public const int ProvisionPackStock = 3;
+        /// <summary>この店に残っている物資の包。 <see cref="Generate"/> で戻る。</summary>
+        public int ProvisionPacksLeft { get; private set; } = ProvisionPackStock;
+
+        /// <summary>物資を 1 包買う (ゴールドのみ・燈火の物資払いは使わない ── 物資を物資で買うことになる)。</summary>
+        public bool TryBuyProvisionPack(RunState run)
+        {
+            if (run == null || ProvisionPacksLeft <= 0 || run.coins < ProvisionPackPrice) return false;
+            if (run.provision >= run.provisionCap) return false;
+            run.coins -= ProvisionPackPrice;
+            run.coinsSpent += ProvisionPackPrice;
+            ProvisionPacksLeft--;
+            GameLoop.ProvisionSystem.Supply(run, ProvisionPackAmount);
+            Debug.Log($"[ShopManager] 物資を買った +{ProvisionPackAmount} (-{ProvisionPackPrice}G / 残り {ProvisionPacksLeft} 包)");
+            return true;
+        }
+
+        /// <summary>囮 (6G) を買う。 在庫の上限は無い。</summary>
+        public bool TryBuyDecoy(RunState run)
+            => TryBuyMapTool(run, GameLoop.ItemIds.Decoy, MapSystem.FreeMove.FreeMapParams.ShopDecoyPrice);
+
+        /// <summary>罠 (8G) を買う。 在庫の上限は無い。</summary>
+        public bool TryBuyTrap(RunState run)
+            => TryBuyMapTool(run, GameLoop.ItemIds.Trap, MapSystem.FreeMove.FreeMapParams.ShopTrapPrice);
+
+        private static bool TryBuyMapTool(RunState run, string id, int price)
+        {
+            if (run == null || run.coins < price) return false;
+            if (!run.TryAddConsumable(id)) return false;   // 〈穴の空いた鞄〉の上限
+            run.coins -= price;
+            run.coinsSpent += price;
+            Debug.Log($"[ShopManager] {id} を買った (-{price}G)");
+            return true;
+        }
+
         public ShopInventory Generate(int floor)
         {
+            ProvisionPacksLeft = ProvisionPackStock;
             var inv = new ShopInventory();
 
             // フロア価格倍率（FloorModifier.shopPriceMultiplier）× メタデバフ Lv1
@@ -164,8 +209,8 @@ namespace InventorySystem.Shop
 
             // 消費 ×3 ── **回復は固定、 残り 2 枠は他 3 系統から重複なしで抽選** (2026-08-05)。
             //   回復が並ばない店があると消費で耐久を賄う設計が成立しないので 1 枠目は固定。
-            //   希望回復を 4 系統目に足したため全系統は並べきれず、 残り 2 枠を
-            //   シールド / 攻撃強化 / 希望 から引く。 Tier は T1〜4 から一様。
+            //   物資回復を 4 系統目に足したため全系統は並べきれず、 残り 2 枠を
+            //   シールド / 攻撃強化 / 物資 から引く。 Tier は T1〜4 から一様。
             {
                 int tier0 = GameLoop.GameRng.Range(1, GameLoop.ItemIds.ConsumableMaxTier + 1, "shop.consTier");
                 inv.slots.Add(BuildConsumableSlot(
@@ -552,7 +597,7 @@ namespace InventorySystem.Shop
                     // 2026-06-23c: 60% 短絡で全レア無差別ピックではなく、 60% でプール自体を佯狂者に絞る (Tier 重みは下流の RollTier に委譲)。
                     // これにより [佯狂者] セット組み立てを後押ししつつ LEG 出現率は 0.05 のまま維持される。
                     if (owned.Contains(GameLoop.YokyoSet.Bell)
-                        && GameLoop.HopeSystem.GetTier(run) >= GameLoop.HopeTier.Despair)
+                        && GameLoop.ProvisionSystem.GetTier(run) >= GameLoop.ProvisionTier.Scarce)
                     {
                         var yokyo = pool.FindAll(it => System.Array.IndexOf(GameLoop.YokyoSet.All, it.internalName) >= 0);
                         if (yokyo.Count > 0 && GameLoop.GameRng.Chance(0.6f, "shop.yokyo")) pool = yokyo;
@@ -699,8 +744,8 @@ namespace InventorySystem.Shop
             if (slot.kind == ShopSlotKind.WeaponMaterial)
             {
                 int price = Current.CurrentMaterialPrice;
-                // 燈火 r10: 不足分は希望で払える。 未解禁ならゴールドのみで判定する。
-                if (!GameLoop.HopePayment.TryPay(run, price, "強化素材"))
+                // 燈火 r10: 不足分は物資で払える。 未解禁ならゴールドのみで判定する。
+                if (!GameLoop.ProvisionPayment.TryPay(run, price, "強化素材"))
                 { Log("ゴールド不足"); return false; }
                 MetaProgression.Achievements.AchievementService.NoteShopPurchase(run.coins);
                 run.weaponMaterials++;
@@ -715,7 +760,7 @@ namespace InventorySystem.Shop
             if (slot.sold) { Log("売り切れ"); return false; }
             if (string.IsNullOrEmpty(slot.itemId)) { Log("空スロット"); return false; }
             // 燈火 r10 を含めた支払い可能額で判定する。 未解禁なら run.coins と同じ。
-            if (GameLoop.HopePayment.Affordable(run) < slot.price)
+            if (GameLoop.ProvisionPayment.Affordable(run) < slot.price)
             {
                 // 行動台帳〈見送り〉: **買おうとして届かなかった**ときだけ積む。
                 //   棚を眺めただけの回は通らない ── ここまで来たのは購入の意思があった証拠。
@@ -730,16 +775,16 @@ namespace InventorySystem.Shop
                 return false;
             }
 
-            if (!GameLoop.HopePayment.TryPay(run, slot.price, slot.itemId))
+            if (!GameLoop.ProvisionPayment.TryPay(run, slot.price, slot.itemId))
             { Log("支払いに失敗"); return false; }
             MetaProgression.Achievements.AchievementService.NoteShopPurchase(run.coins);
             Current.purchaseCount++;
 
-            // 〈釣り銭の受け皿〉: 買うたび 希望+1 (2026-09-15)。 **払った直後に鳴らす** ──
-            //   希望払い (HopePayment) で希望を使った場合でも、 買い物そのものへの見返りは出す。
+            // 〈釣り銭の受け皿〉: 買うたび 物資+10 (2026-09-15)。 **払った直後に鳴らす** ──
+            //   物資払い (ProvisionPayment) で物資を使った場合でも、 買い物そのものへの見返りは出す。
             //   1 ラン の購入は 24.6 件、 戦闘損は −38.2/ラン なので実質の回復源になる。
             if (run.OwnsPassive(ItemIds.ChangeTray))
-                GameLoop.HopeSystem.ApplyFood(run, 1);
+                GameLoop.ProvisionSystem.ApplyFood(run, 10);   // 2026-09-28: 物資 ×10
 
             switch (slot.kind)
             {
@@ -870,8 +915,8 @@ namespace InventorySystem.Shop
         /// 「方策修正 + 価格割増」 を切り分けて測るための退避口。
         /// <b>static はドメインリロードで既定へ戻る</b>ので、 バッチ側が毎回設定すること。</para></summary>
         public static float RobberySurcharge = 2.0f;
-        /// <summary>強盗の希望コスト。 -1 = 既定 (HopeSystem.EvilChoiceCost)。 切り分け用。</summary>
-        public static int RobberyHopeCost = -1;
+        /// <summary>強盗の物資コスト。 -1 = 既定 (ProvisionSystem.EvilChoiceCost)。 切り分け用。</summary>
+        public static int RobberyProvisionCost = -1;
 
         /// <summary><b>旧仕様の「出禁」へ戻す退避経路 (既定 false)。</b> true にすると強盗後の
         /// ショップマスを素通りする ── 2026-09-12 以前の挙動。
@@ -891,7 +936,7 @@ namespace InventorySystem.Shop
         /// <summary>
         /// 値下げ交渉を試みる(実態は強盗)。
         /// ・現在ショップの未売却アイテムIDをスナップショットして run.robberyPendingItems に格納
-        /// ・希望コスト適用、shopsBlocked = true (以降ショップ進入不可)
+        /// ・物資コスト適用、shopsBlocked = true (以降ショップ進入不可)
         /// ・shopRobberyInProgress = true
         /// ・ショップを閉じ、戻り値 true なら呼び出し側が「怪しい商人」戦闘を開始する
         /// </summary>
@@ -926,8 +971,8 @@ namespace InventorySystem.Shop
                 run.robberyPendingItems.Clear();
             run.robberyPendingItems.AddRange(loot);
 
-            GameLoop.HopeSystem.ApplyEvilChoice(run,
-                RobberyHopeCost >= 0 ? RobberyHopeCost : GameLoop.HopeSystem.EvilChoiceCost);
+            GameLoop.ProvisionSystem.ApplyEvilChoice(run,
+                RobberyProvisionCost >= 0 ? RobberyProvisionCost : GameLoop.ProvisionSystem.EvilChoiceCost);
             run.shopRobberyDone = true;
             run.shopRobberyInProgress = true;
             RobberyAttempts++;
@@ -939,7 +984,7 @@ namespace InventorySystem.Shop
                 RobberyByFloor[f]++;
             }
 
-            Debug.Log($"[ShopManager] 値下げ交渉(強盗): 希望-{GameLoop.HopeSystem.EvilChoiceCost}, "
+            Debug.Log($"[ShopManager] 値下げ交渉(強盗): 物資-{GameLoop.ProvisionSystem.EvilChoiceCost}, "
                     + $"在庫{loot.Count}件をスナップ, 以降のショップ価格 ×{RobberySurcharge:F2}");
             // ショップを閉じる (呼び出し側がエリート戦闘を開始する)
             Close();

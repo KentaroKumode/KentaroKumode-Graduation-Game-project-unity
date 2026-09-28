@@ -80,6 +80,8 @@ namespace GameLoop
         public static int NodeRngIndex(int floor, MapSystem.MapNode node)
         {
             if (node == null) return 0;
+            // 自由移動の層 (2026-09-28): 点の添字で決める。 離散マップ (Λ・8 層) の行×列と重ならない帯へ置く。
+            if (node.freeMap) return floor * 4096 + 1024 + node.index;
             // lane は収束ノードで -1 を取るので +1 して 0 以上に寄せる。
             return floor * 4096 + node.row * 8 + Mathf.Clamp(node.lane + 1, 0, 7);
         }

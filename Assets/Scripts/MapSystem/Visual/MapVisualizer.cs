@@ -178,6 +178,15 @@ namespace MapSystem.Visual
             {
                 float x, y;
 
+                // 自由移動の層 (2026-09-28): 座標をそのまま置く (層の中央を原点に)。 本番の表示は次の段階。
+                if (node.freeMap)
+                {
+                    x = (node.x - FreeMove.FreeMapParams.Width / 2f) * laneSpacing * 0.5f;
+                    y = (node.y - FreeMove.FreeMapParams.Height / 2f) * rowSpacing * 0.5f;
+                    worldPositions[node.id] = new Vector3(x, y, 0f);
+                    continue;
+                }
+
                 // 横方向は centerLane を引いて中央起点に揃える(親 transform をカメラ x と同一にできるようにするため)。
                 if (node.lane == -1)
                 {

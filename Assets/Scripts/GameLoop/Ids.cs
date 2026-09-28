@@ -24,7 +24,7 @@ namespace GameLoop
         //   下の帯 (BRONZE/SILVER) に店の機能へ触る品が 1 つも無かったのを埋めるもの。
         /// <summary>試し振りの符牒: 各ショップの初回リロールが無料 (ShopManager.TryReroll)。</summary>
         public const string TrialTossToken = "合札";
-        /// <summary>釣り銭の受け皿: ショップで買うたび 希望+1 (ShopManager.TryBuy)。</summary>
+        /// <summary>釣り銭の受け皿: ショップで買うたび 物資+10 (ShopManager.TryBuy)。</summary>
         public const string ChangeTray = "銭皿";
         /// <summary>精鋭首の請取証: エリート勝利だけ ゴールド+2 (GameManager の戦闘報酬)。</summary>
         public const string EliteBountyReceipt = "首級控え";
@@ -40,7 +40,7 @@ namespace GameLoop
 
         // === 消費アイテム 3 系統 × Tier1〜4 (2026-08-04 再編) ===
         //   旧 5 系統 (heal/atk/def/dmg/food) から 3 系統へ。 削除したのは:
-        //     ・cons_food_* (希望回復) …… 希望の供給はイベント/報酬側へ寄せた
+        //     ・cons_food_* (物資回復) …… 物資の供給はイベント/報酬側へ寄せた
         //     ・cons_atk_*  (攻撃+N)   …… 与ダメ% の cons_dmg_* へ統合
         //   **Tier 軸は「効果量」のみ。持続を Tier 軸に混ぜない。**
         //   旧設計は「効果量↓ × 持続↑」で Tier を上げていたため、 実効量 (%·ターン) が
@@ -52,22 +52,32 @@ namespace GameLoop
         public const string ConsHealFamily   = "heal";   // 回復:     最大HP の 25/40/60/100%
         public const string ConsShieldFamily = "def";    // シールド: 15/30/50/80 (戦闘中に使用可)
         public const string ConsPowerFamily  = "dmg";    // 攻撃強化: 与ダメ +15/30/50/75% (戦闘中)
-        public const string ConsHopeFamily   = "hope";   // 希望回復: +5/10/15/20 (2026-08-05 追加)
+        public const string ConsProvisionFamily   = "provision";   // 物資回復: +50/100/150/200 (2026-08-05 追加・2026-09-28 ×10)
+
+        // === 自由移動のマップで使う消耗品 (2026-09-28) ===
+        //   **系統で判定する** (ConsFamilyOf)。 下の id 定数は「開始時に 1 個ずつ配る」「店で買う」の
+        //   跨ファイル参照のためだけにあり、 効果の分岐には使わない。
+        public const string ConsDecoyFamily = "decoy";   // 囮: 1 手番後から 6 手番、 半径 4 の敵を呼ぶ
+        public const string ConsTrapFamily  = "trap";    // 罠: 踏んだ徘徊エネミーを 1 手番足止め・位置が判明
+        /// <summary>囮 (items.json の id ＝ 表示名)。</summary>
+        public const string Decoy = "囮";
+        /// <summary>罠 (items.json の id ＝ 表示名)。</summary>
+        public const string Trap = "罠";
 
         /// <summary>**回復は毎回並ぶ。** 消費枠は 3 で、 1 枠目を回復で固定する。
         /// 回復が並ばない店があると消費で耐久を賄う設計自体が成立しないため (2026-08-04)。</summary>
         public static readonly string ConsumableFixedFamily = ConsHealFamily;
 
         /// <summary>残り 2 枠をここから重複なしで抽選する 3 系統 (2026-08-05)。
-        /// 希望は横移動・戦闘で一方的に減る一方で回復源が無く、 進路判断の自由度を奪っていた。
+        /// 物資は横移動・戦闘で一方的に減る一方で回復源が無く、 進路判断の自由度を奪っていた。
         /// 前哨基地での自動回復は「毎層リセット」になり発狂到達率が 0.4% まで落ちて棄却したので、
         /// **ゴールドを払って買う**形にして資源のやり取りとして残す。</summary>
         public static readonly string[] ConsumableRandomFamilies =
-            { ConsShieldFamily, ConsPowerFamily, ConsHopeFamily };
+            { ConsShieldFamily, ConsPowerFamily, ConsProvisionFamily };
 
         /// <summary>全系統 (効果解決・カタログ用)。</summary>
         public static readonly string[] ConsumableFamilies =
-            { ConsHealFamily, ConsShieldFamily, ConsPowerFamily, ConsHopeFamily };
+            { ConsHealFamily, ConsShieldFamily, ConsPowerFamily, ConsProvisionFamily };
 
         /// <summary>消費アイテムの Tier 段数 (1〜4)。</summary>
         public const int ConsumableMaxTier = 4;
@@ -96,7 +106,7 @@ namespace GameLoop
             return d != null && !string.IsNullOrEmpty(d.consFamily);
         }
 
-        /// <summary>その id の消費アイテム系統 (heal/def/dmg/hope)。 消費アイテムでなければ null。
+        /// <summary>その id の消費アイテム系統 (heal/def/dmg/provision)。 消費アイテムでなければ null。
         /// <b>接頭辞では判定しない</b> (2026-09-22)。</summary>
         public static string ConsFamilyOf(string itemId)
         {

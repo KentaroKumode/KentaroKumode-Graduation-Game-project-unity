@@ -22,7 +22,7 @@ namespace MetaProgression
                     case MetaBuffKind.Gold:             return $"開幕ゴールド +{amount}";
                     case MetaBuffKind.DiceTotal:        return $"ダイス合計 +{amount}";
                     case MetaBuffKind.DamageReduce:     return $"被ダメージ -{amount}";
-                    case MetaBuffKind.HopeLossReduce:   return $"戦闘後の希望減少 -{amount}";
+                    case MetaBuffKind.ProvisionLossReduce:   return $"戦闘後の物資減少 -{amount}";
                     case MetaBuffKind.StartMaterial:    return $"開幕武器強化素材 +{amount}";
                     case MetaBuffKind.CombatGoldBonus:  return $"戦闘勝利金 +{amount}";
                     case MetaBuffKind.BossExtraNormal:  return "ボス撃破時 ノーマルパッシブ獲得";
