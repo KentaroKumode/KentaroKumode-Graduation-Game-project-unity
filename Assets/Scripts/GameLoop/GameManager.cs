@@ -1516,7 +1516,8 @@ namespace GameLoop
             }
 
             // 物資の補給 (2026-09-28): 前哨基地 +200。 8 層は転移した先の一点で補給は無い。
-            if (Run.currentFloor != 8)
+            //   1 層は満タンで始まるので足さない ── 足すと遺物〈渇き〉の「開幕物資を下げる」が 1 手目で消える。
+            if (Run.currentFloor != 8 && Run.currentFloor != MapSystem.FreeMove.FloorPlan.FirstFloor)
                 ProvisionSystem.Supply(Run, MapSystem.FreeMove.FreeMapParams.RewardOutpost);
 
             SetPhase(GamePhase.FloorIntro);
