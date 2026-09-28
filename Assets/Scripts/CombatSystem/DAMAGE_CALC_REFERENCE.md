@@ -46,13 +46,13 @@
 
 ### ⓪ ダイス振り直しフェーズ（#1・`CombatManager.MaybeRerollPlayerDice`・ProcessPostRoll の前）
 
-初回ロール後・各種補正（記憶の砂時計/コルヴェン/メタ補正）と ProcessPostRoll の**前**に、希望を払って
+初回ロール後・各種補正（記憶の砂時計/コルヴェン/メタ補正）と ProcessPostRoll の**前**に、物資を払って
 プレイヤーの「期待値割れの出目」を**毎ターン最大1回**振り直す（`playerDice` を in-place 更新）。
 
-- コスト: `HopeSystem.RerollCost`（既定3・暫定）を `HopeSystem.TryPayReroll` で支払い。**払えない（低希望）と振り直せない**＝終盤ほど二度目が無い。
+- コスト: `ProvisionSystem.RerollCost`（既定30・2026-09-28 に希望 3 → 物資 30）を `ProvisionSystem.TryPayReroll` で支払い。**払えない（低物資）と振り直せない**＝終盤ほど二度目が無い。
 - 自動ポリシー（UI 未実装の暫定）: 現在 自合計 ≤ 敵合計（負け/拮抗）かつ 平均（面平均 or (max+1)/2）割れダイスがあるときのみ、それらを再ロール。明確に勝っていれば温存。
 - スキップ: 強制ロール状態（`ashenSuddenDeath`/`myokakuSuddenDeath`/`myokakuFreeHit`/`player_contre`）。
-- 将来 UI 配線時に自動判定を人間の選択へ差し替える。希望損は `HopeSystem.Stats.rerollLoss`（AutoRunner で発生源別計上）。
+- 将来 UI 配線時に自動判定を人間の選択へ差し替える。物資の損は `ProvisionSystem.Stats.rerollLoss`（AutoRunner で発生源別計上）。
 
 ### ① ダイス合計フェーズ（`PassiveSkillManager.ProcessPostRoll` L434-463）
 
@@ -343,7 +343,7 @@ SwordReachII・III / BulwarkII・III。 置き換え前と同一シード 10,000
 | `allEven` / `kaleido` | 出目が全て偶数（1 個以上）/ 全同値・全て異なる・連続 3 個以上 のいずれか（2 個以上） |
 | `weaponPlusMin: N` | `run.weaponPlus ≥ N` |
 | `strongFoe` | `MapManager.CurrentNode.type` が EliteBattle か Boss |
-| `hopeTierMin: 名` / `hopeTierBelow: 名` | 希望段階（HopeTier・数字が大きいほど希望が低い）が 名 以上 / 名 未満 |
+| `provisionTierMin: 名` / `provisionTierBelow: 名` | 物資の段階（ProvisionTier・数字が大きいほど物資が少ない）が 名 以上 / 名 未満。旧名 `hopeTierMin` / `hopeTierBelow`・旧段階名 Calm〜Madness も読む |
 | `nonCritStreakMin: N` | 連続非会心数 ≥ N。OnPostDealDamage で 会心→0 / 非会心→+1（`accumulatedValues["nonCritStreak:<ID>"]`） |
 
 **固有部分を持つスキル**（〈処刑〉のダイス潰し）は専用クラスに固有部分だけを残し、`StatModifierEffect` が
@@ -471,8 +471,8 @@ OnPreDealDamage で `mutualAttackBonus` を足しても**一切乗らない**。
 | 災厄の指輪 | L | OnRoll | 被弾毎に次の与ダメ+2累積(上限+10・戦闘終了リセット) finalDamage加算 |
 | 永遠の燈 | L | CombatEnd | HP≤10 → HealPlayer(20) |
 | 商人の符牒 | L | (ショップ連携) | ショップ系フック（PassiveItemRegistry 非登録） |
-| 巡礼の杖飾り【新2026-06-03】 | B | OnMapMove | 25%で希望+1（HopeSystem.ApplyFood） |
-| 狂宴の仮面【新2026-06-03】 | S | OnPreDealDamage | 希望[悲観]以下 outgoing+0.10 ／[絶望]以下 +0.25。**2026-09-19 ステータス化 §2-C**（旧 OnRoll の ITimedEffect） |
+| 巡礼の杖飾り【新2026-06-03】 | B | OnMapMove | 25%で物資+10（ProvisionSystem.ApplyFood・2026-09-28 に ×10） |
+| 狂宴の仮面【新2026-06-03】 | S | OnPreDealDamage | 物資[枯渇し始める]以下 outgoing+0.10 ／[枯渇寸前]以下 +0.25。**2026-09-19 ステータス化 §2-C**（旧 OnRoll の ITimedEffect） |
 
 > **2026-07-18 削除済み**（`PassiveItemEffects.cs` から class ごと削除・items.json からも撤去）:
 > 記憶の砂時計 / 死神の数珠 / 嵐の徽章 / 沈黙の剣帯 / 狂乱のメダリオン / 静寂のローブ / 黒煙の符 /
@@ -702,7 +702,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            (rinkaiCritOnBurst なら forceCritical=true。消費後 false に戻す)
          → ProcessDamage(atkBase, pursuitDamage, playerCriticalNumerator)
          → ApplyWinDamageModifiers（旧勝利分岐と同一チェーン）
-         → 希望疲労（15% で**最終ダメージ半減**。 isCrit は落とさない）
+         → 物資の疲労（15% で**最終ダメージ半減**。 isCrit は落とさない）
          → 敵HP -= dealtDmg + dealtFixed
          → 鋼の皮膚
          → **役の削り**: 極(instantWin フラグ + yachtChunkPct)。 **鋼の皮膚より後**に置く
