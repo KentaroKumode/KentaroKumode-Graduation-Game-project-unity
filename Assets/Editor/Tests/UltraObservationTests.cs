@@ -41,7 +41,7 @@ namespace AutoTest.EditorTests.Ultra
             // progress / resources
             "currentFloor", "maxFloor", "normalClearFloor", "bossDefeatedThisFloor",
             "playerHP", "playerMaxHP", "coins", "coinsSpent", "weaponMaterials",
-            "hope", "hopeCap", "crownHopeLocked", "tilesThisFloor", "isRunActive",
+            "provision", "provisionCap", "crownProvisionLocked", "tilesThisFloor", "isRunActive",
             "totalBattles", "totalWins", "totalTurns", "totalCombatTurns", "combatStartHP",
             "baseMaxHPAtRunStart",
             // build / equipment
@@ -54,7 +54,7 @@ namespace AutoTest.EditorTests.Ultra
             "seenOnceEvents", "seenPassiveItemIds", "shopPurchasedCounts",
             // status / debuffs
             "timedBuffs", "timedDebuffs", "permanentDebuffs", "gateFlaws", "lambdaDebuffs",
-            "sealedRoleMask", "lastStandActive", "madnessStack", "madnessMoveCounter",
+            "sealedRoleMask", "lastStandActive", "madnessStack",
             "breakdownCount", "lingeringWoundLost", "lingeringWoundTriggers",
             "lingeringWoundDamageAccum",
             // world / progression

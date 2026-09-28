@@ -12,8 +12,8 @@ namespace EventSystem
         HpHalve,                 // 現在HPの半分を支払う (端数切上で残す・最低1)
         MaxHpDelta,              // 最大HP+N / 最大HP-N
         GoldDelta,               // ゴールド+N / ゴールド-N
-        HungerDelta,             // 空腹度+N / 空腹度-N (旧表記、希望±N と等価)
-        HopeDelta,               // 希望+N / 希望-N
+        HungerDelta,             // 空腹度+N / 空腹度-N (旧表記、物資±N と等価)
+        ProvisionDelta,               // 物資+N / 物資-N
         MaterialDelta,           // 武器強化素材+N / 武器強化素材-N
         ArmorDurabilityLoss,     // 防具の耐久値減少
         TimedBuff,               // 時限バフ[xxx]を獲得
