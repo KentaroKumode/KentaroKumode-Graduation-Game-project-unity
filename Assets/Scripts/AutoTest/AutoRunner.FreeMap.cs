@@ -150,7 +150,7 @@ namespace AutoTest
             }
 
             string hopId = map.NodeIdAt(hop);
-            var ev = gm.TravelSync(hopId, FreeMapEvent.StoneRaised | FreeMapEvent.Detected | FreeMapEvent.FoeSighted);
+            var ev = gm.TravelSync(hopId, FreeMapEvent.StoneRaised | FreeMapEvent.Detected | FreeMapEvent.FoeSighted | FreeMapEvent.FamiliarSighted);
             if (ev == FreeMapEvent.None && gm.CurrentPhase == GameManager.GamePhase.MapNavigation && sim.AtNode == at)
             {
                 Finish(Outcome.Deadlock, $"自由移動の層で {hopId} へ出発できない");
@@ -204,7 +204,7 @@ namespace AutoTest
             }
             gm.SetTravelSpeed(d.speed);
             string hopId = map.NodeIdAt(hop);
-            var ev = gm.TravelSync(hopId, FreeMapEvent.StoneRaised | FreeMapEvent.Detected | FreeMapEvent.FoeSighted);
+            var ev = gm.TravelSync(hopId, FreeMapEvent.StoneRaised | FreeMapEvent.Detected | FreeMapEvent.FoeSighted | FreeMapEvent.FamiliarSighted);
             if (ev == FreeMapEvent.None && gm.CurrentPhase == GameManager.GamePhase.MapNavigation && sim.AtNode == at)
             {
                 Finish(Outcome.Deadlock, $"自由移動の層で {hopId} へ出発できない (方策 {navMode})");

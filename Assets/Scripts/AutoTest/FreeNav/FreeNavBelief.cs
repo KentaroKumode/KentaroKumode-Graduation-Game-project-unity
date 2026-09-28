@@ -26,6 +26,11 @@ namespace AutoTest.FreeNav
         private Vec2 _stonePos;
         private double _stoneTime = -1;
         private double _lastObsTime = -1;
+        // 見えている使い魔 (巡航ミサイル)。 見えた時だけ入る ── 見えていない使い魔は知らない
+        private readonly System.Collections.Generic.List<Vec2> _familiars = new System.Collections.Generic.List<Vec2>();
+        private double _familiarTime = -1;
+        /// <summary>直前の観測で使い魔が見えていたか。</summary>
+        public bool FamiliarVisible => _familiars.Count > 0;
 
         // 道の全点対の最短距離と次の点 (Floyd–Warshall)。 層の形は変わらないので 1 回だけ作る。
         private readonly double[,] _roadDist;
@@ -73,6 +78,9 @@ namespace AutoTest.FreeNav
                 _lastSeenTime = sim.LastSeenFoeTime;
                 AddKernel(_lastSeen.Value, 1.0, 1.5);
             }
+            _familiars.Clear();
+            foreach (var f in sim.VisibleFamiliars()) _familiars.Add(f);
+            _familiarTime = now;
             _stone = sim.StoneLevel;
             _stonePos = sim.Me;
             _stoneTime = now;
@@ -103,6 +111,8 @@ namespace AutoTest.FreeNav
                     t += (1 - age / 6.0) * Math.Max(0, 1 - d / (r + 2));
                 }
             }
+            if (_familiars.Count > 0 && now - _familiarTime < 0.5)
+                foreach (var f in _familiars) t += 1.5 * Math.Max(0, 1 - Vec2.Dist(p, f) / 2.5);   // 使い魔は速い: 近くは強く避ける
             if (_stone >= 1 && now - _stoneTime < 1.0)
             {
                 double reach = _stone >= 2 ? 3.0 : 5.0;
@@ -129,6 +139,12 @@ namespace AutoTest.FreeNav
         /// どちらも無ければ null。 <paramref name="useHeat"/> は Super だけ。</summary>
         public Vec2? ThreatSource(Vec2 me, double now, bool useHeat)
         {
+            if (_familiars.Count > 0 && now - _familiarTime < 0.5)
+            {   // 一番近い使い魔から離れる
+                Vec2 best = _familiars[0];
+                foreach (var f in _familiars) if (Vec2.Dist(me, f) < Vec2.Dist(me, best)) best = f;
+                return best;
+            }
             if (_lastSeen.HasValue && now - _lastSeenTime <= 4) return _lastSeen.Value;
             if (!useHeat) return null;
             double sx = 0, sy = 0, sw = 0;

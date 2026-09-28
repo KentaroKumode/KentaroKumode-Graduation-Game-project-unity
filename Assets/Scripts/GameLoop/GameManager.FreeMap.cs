@@ -31,6 +31,14 @@ namespace GameLoop
         private int _gauntletCount;
         /// <summary>徘徊エネミーの連戦の途中か。</summary>
         public bool InGauntletCombat => _inGauntlet;
+
+        // ── 使い魔との交戦 ──
+        private bool _inFamiliarFight;
+        private int _familiarFightCount;
+        /// <summary>使い魔 (巡航ミサイル) との交戦中か。</summary>
+        public bool InFamiliarCombat => _inFamiliarFight;
+        /// <summary>マスに紐づかない戦闘 (連戦・使い魔) の途中か。 マスの報酬・ボス判定を通さない。</summary>
+        public bool InMapEncounterCombat => _inGauntlet || _inFamiliarFight;
         /// <summary>連戦の何戦目か (0 起点) と、 全部で何戦か。</summary>
         public int GauntletFightIndex => _gauntletFightIndex;
         public int GauntletFightTotal => FreeMap?.GauntletFights ?? 0;
@@ -74,7 +82,7 @@ namespace GameLoop
             if (sim == null) return acc;
             for (int i = 0; i < maxTicks; i++)
             {
-                if (CurrentPhase != GamePhase.MapNavigation || sim.Dead || sim.InGauntlet) break;
+                if (CurrentPhase != GamePhase.MapNavigation || sim.Dead || sim.InGauntlet || sim.InFamiliarFight) break;
                 var ev = sim.Tick();
                 acc |= ev;
                 if (ev != FreeMapEvent.None) OnFreeMapEvent?.Invoke(ev);
@@ -92,6 +100,8 @@ namespace GameLoop
             if ((ev & FreeMapEvent.FoeSighted) != 0) Log("徘徊エネミーが目の前に見えた");
             if ((ev & FreeMapEvent.TrapTriggered) != 0) Log($"（罠が作動した）徘徊エネミーの位置が分かった。{FreeMapParams.TrapFreezeTurns} 手番足止め");
             if ((ev & FreeMapEvent.DecoyBroken) != 0) Log("（囮が壊された）");
+            if ((ev & FreeMapEvent.FamiliarSighted) != 0) Log("使い魔が飛んでくるのが見えた");
+            if ((ev & FreeMapEvent.FamiliarVanished) != 0) Log("（使い魔は目標を見失って消えた）");
 
             if ((ev & FreeMapEvent.Died) != 0)
             {
@@ -99,6 +109,11 @@ namespace GameLoop
                 Run.EndRun();
                 SetPhase(GamePhase.GameOver);
                 OnGameOver?.Invoke(Run);
+                return;
+            }
+            if ((ev & FreeMapEvent.FamiliarContact) != 0)
+            {
+                StartFamiliarFight();
                 return;
             }
             if ((ev & FreeMapEvent.Caught) != 0)
@@ -265,9 +280,63 @@ namespace GameLoop
             Run.coins = g;
         }
 
+        // =====================================================================
+        //  使い魔 (巡航ミサイル) との交戦
+        // =====================================================================
+
+        /// <summary>使い魔に接触した: その層のエリート 1 体との交戦 (仮置き)。 逃げられる。</summary>
+        private void StartFamiliarFight()
+        {
+            _inFamiliarFight = true;
+            _familiarFightCount++;
+            int idx = Run.currentFloor * 4096 + 3072 + _familiarFightCount;
+            var enemy = FloorManager.PickEnemyForNode(Run.currentFloor, idx, elite: true)?.Clone();
+            if (enemy == null)
+            {
+                Debug.LogError("[GameManager] 使い魔の敵の選出に失敗 ── 交戦を打ち切る");
+                EndFamiliarFight(fled: false);
+                return;
+            }
+            CurrentEnemy = enemy;
+            CurrentEnemySecondary = null;
+            CurrentEncounterRewardMultiplier = 1f;
+            OnEnemyEncountered?.Invoke(CurrentEnemy);
+            Log($"使い魔に捕捉された: {CurrentEnemy.displayName}");
+            var (dc, dm, cr, df, ft_, str_) = GatherPlayerCombatStats();
+            SetPhase(GamePhase.Combat);
+            CombatManager.Instance.StartCombat(CurrentEnemy, Run.playerHP, dc, dm, cr, df, str_, ft_);
+            CombatManager.Instance.FleeAllowed = true;
+        }
+
+        /// <summary>使い魔との交戦が終わった (勝っても逃げても使い魔は消える)。</summary>
+        private void EndFamiliarFight(bool fled)
+        {
+            _inFamiliarFight = false;
+            FreeMap?.ResolveFamiliarFight(fled);
+            MapManager.Instance?.SyncCurrentNodeFromSim();
+            SetPhase(GamePhase.MapNavigation);
+            FlushPendingArrival();
+        }
+
+        /// <summary>使い魔に勝った: 通常の戦闘と同じ物資 (+30) と戦闘の物音。</summary>
+        private void HandleFamiliarFightWon()
+        {
+            ProvisionSystem.Supply(Run, FreeMapParams.RewardBattle);
+            FreeMap?.NoteBattleEnded();
+            Log("使い魔を退けた");
+            EndFamiliarFight(fled: false);
+        }
+
         /// <summary>戦闘から逃げた。 通常の戦闘なら直前の点へ戻り、 そのマスは使い切りにならない (敵が残る)。</summary>
         private void HandleFledBattle()
         {
+            if (_inFamiliarFight)
+            {
+                PayFleeCost();
+                Log("使い魔から逃げた");
+                EndFamiliarFight(fled: true);
+                return;
+            }
             if (_inGauntlet)
             {
                 EndGauntletAsFled(payCost: true);
