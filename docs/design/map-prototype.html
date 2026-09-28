@@ -127,13 +127,12 @@ const PROFILES = {
   shadow:     { name: "影",         desc: "追跡中は魔石に一切反応しない・察知の合図も出ない", chase: 1.2, silent: true },
   summoner:   { name: "使役者",     desc: "本体は遅いが使い魔を同時に 2 体・4 手番ごとに放つ", chase: 0.8, famMax: 2, famCooldown: 4 },
   pouncer:    { name: "飛び掛かり", desc: "追跡中、距離 2.5 以内なら道を外れて直進する", chase: 1.4, lunge: 2.5 },
-  echo:       { name: "木霊",       desc: "魔石の方角が手番ごとに 35% で隣の方角へずれる", echo: 0.35 },
+  echo:       { name: "木霊",       desc: "魔石の方角が 2 つ出る（片方は木霊の偽物で、2 手番ごとに飛ぶ。本物は敵の動きに付いてくる）", echo: 2 },
   lampEater:  { name: "灯喰い",     desc: "照明中は察知距離 7。半径 9 の照明に寄ってくる", flareDetect: 7, flareLure: 9 },
-  blind:      { name: "盲目",       desc: "目が無い（気配で察知しない）。物音 2 倍の範囲・急ぐ足音（半径 2）・痕跡で追う", blind: true, hearMul: 2 },
+  blind:      { name: "盲目",       desc: "目が無い（気配で察知しない）。物音 2 倍の範囲・急ぐ足音（半径 2）・痕跡で追う。痕跡を辿る間だけ 1.5 倍速い", blind: true, hearMul: 2, trackMul: 1.5 },
   listener:   { name: "聞き耳",     desc: "巡回中でも半径 6 の物音（戦闘・補給庫・囮）に寄ってくる", hear: 6 },
   gravekeeper:{ name: "墓守",       desc: "戦闘の跡の点を巡回路に加えていく（歩いた跡ほど危なくなる）", grave: true },
   wanderer:   { name: "放浪",       desc: "縄張りを持たず、層全体をゆっくり巡回する", roam: true, patrol: 0.4 },
-  swell:      { name: "膨張",       desc: "5 手番ごとに縄張りが 1 点ずつ広がる", swell: 5 },
   nest:       { name: "巣籠もり",   desc: "補給庫の上から動かない。追跡しても見失えば巣へ戻る", nest: true },
   dormant:    { name: "目覚め",     desc: "眠っている。近く（半径 6）の物音が 3 回で起きる", dormant: 3 },
   relentless: { name: "執念",       desc: "一度察知したら見失わない（ただし追跡の速さ 0.7）", chase: 0.7, relentless: true },
@@ -250,7 +249,7 @@ function pickProfile() { const sel = document.getElementById("prof").value; if (
 function makeFoe(id, prof, startNode, terr, way, fights, weak) {
   return { id, alive: true, a: startNode, b: startNode, t: 0, path: [], state: prof.dormant ? "眠り" : "巡回", baseIdx: 0,
     lastKnown: null, lost: 0, freeze: 0, freezeResume: "追跡", fights, weak: !!weak, terr: new Set(terr), way: way.slice(),
-    lunge: null, wakeNoise: 0, webTimer: 0, nest: prof.nest ? startNode : null, famCd: 0, seenT: -99, grown: 0 };
+    lunge: null, wakeNoise: 0, webTimer: 0, nest: prof.nest ? startNode : null, famCd: 0, seenT: -99, tracking: false };
 }
 // 巡回点を中心の周りの角度順に並べる
 function sortByAngle(list) { const c = list.reduce((s, i) => ({ x: s.x + N[i].x / list.length, y: s.y + N[i].y / list.length }), { x: 0, y: 0 });
@@ -279,7 +278,7 @@ function newGame() {
     move: null, scout: 0, flare: false, battleHeat: 0, tracks: [], trackAcc: 0,
     speed: "normal", decoys: [], traps: [], nDecoy: P.decoy0, nTrap: P.trap0,
     foes, prof: profKey, famKey: document.getElementById("fam").value, familiars: [], webs: [], stuck: 0, famSightPrev: false,
-    stoneBearing: -1, echoShift: 0, swellT: 0,
+    stoneBearing: -1, stoneGhost: -1, echoOff: 0, echoT: 0,
     seenFoe: null, foeArrow: null, scoutObs: [], scoutDone: false, stone: "反応なし", over: false, log: [], target: null, timeMode: "pause", fastHeld: false, holdFromPause: false,
   };
   reveal(P.visNone);
@@ -444,7 +443,8 @@ function tick() {
   S.time += dt;
   for (const f of S.foes) {
     if (!f.alive || f.freeze > 0) continue;
-    advanceFoe(f, dt * (f.state === "巡回" ? patrolSpeed() : chaseSpeed()));
+    if (f.state !== "警戒") f.tracking = false;
+    advanceFoe(f, dt * (f.state === "巡回" ? patrolSpeed() : chaseSpeed()) * (f.tracking ? PR().trackMul : 1));
     const fp = foePos(f), k = S.traps.findIndex(t => dist(t, fp) <= P.trapHit);
     if (k >= 0) { S.traps.splice(k, 1); f.freezeResume = f.state === "追跡" ? "追跡" : "巡回"; f.freeze = P.trapFreeze;
       S.seenFoe = { x: fp.x, y: fp.y, t: S.time, state: f.state };
@@ -490,7 +490,8 @@ function turn() {
   if (S.flare && !S.move) pay(P.costFlare, 0);
   const pr = PR();
   // 木霊: 魔石の方角のずれを手番ごとに振り直す
-  S.echoShift = pr.echo && rnd() < pr.echo ? (rnd() < 0.5 ? -1 : 1) : 0;
+  // 木霊: 偽の方角は本物から 2〜3 方角ずれた所に出て、 2 手番ごとに飛ぶ (本物は敵の動きに付いてくるので、 見比べれば分かる)
+  if (pr.echo && S.echoT++ % pr.echo === 0) S.echoOff = [2, 3, 4][Math.floor(rnd() * 3)];
   // 盲目: 急いで歩く足音 (半径 2) を聞きつける
   if (pr.blind && S.move && S.speed === "hurry" && !S.stuck) noiseAt(2 / (pr.hearMul || 1), "足音");
   // 囮
@@ -500,12 +501,6 @@ function turn() {
       if (f.state !== "追跡" && dist(foePos(f), d) <= hearR(P.decoyNoise)) { if (f.state !== "警戒" || !f.lastKnown || dist(f.lastKnown, d) > 0.1) { f.state = "警戒"; f.lastKnown = { x: d.x, y: d.y }; planFoe(f); } }
       if (dist(foePos(f), d) <= P.decoyBreak) { d.turns = 0; log("（囮が壊された）"); } } }
   S.decoys = S.decoys.filter(d => d.turns > 0);
-  // 膨張: 縄張りが 1 点ずつ広がる
-  if (pr.swell && ++S.swellT % pr.swell === 0) for (const f of aliveFoes()) {
-    let best = -1, bd = 1e9; const c = [...f.terr].reduce((s, i) => ({ x: s.x + N[i].x / f.terr.size, y: s.y + N[i].y / f.terr.size }), { x: 0, y: 0 });
-    f.terr.forEach(i => adj[i].forEach(v => { if (v > 1 && !f.terr.has(v) && dist(N[v], N[0]) >= P.territoryStartClear) { const d = dist(N[v], c); if (d < bd) { bd = d; best = v; } } }));
-    if (best >= 0) { f.grown++; growTerritory(f, best, f.grown % 2 === 0); }
-  }
   for (const f of S.foes) turnFoe(f);
   updateStone();
 }
@@ -523,14 +518,14 @@ function turnFoe(f) {
   else if (d <= R) { const roll = d6(), need = Math.min(6, Math.max(1, Math.floor(R - d + 1))); seen = roll <= need; }
   if (seen) {
     if (f.state !== "追跡") { if (!pr.silent) { log("（どこかで何かがこちらを嗅ぎつけた）"); sfxDetected(); } launchFamiliar(f); }
-    f.state = "追跡"; f.lost = 0; f.lastKnown = { x: S.me.x, y: S.me.y }; planFoe(f);
+    f.state = "追跡"; f.lost = 0; f.tracking = false; f.lastKnown = { x: S.me.x, y: S.me.y }; planFoe(f);
   } else if (f.state === "追跡") {
     if (++f.lost >= lostTurns()) { f.state = "警戒"; f.lastKnown = f.lastKnown || { x: S.me.x, y: S.me.y }; }
     planFoe(f);
   } else {
     // 痕跡: 巡回中は踏むと警戒へ。 盲目は警戒中も新しい痕跡を辿り続ける
     const t = S.tracks.filter(t => dist(t, fp) <= (pr.blind ? 1.0 : 0.6)).sort((a, b) => b.s - a.s)[0];
-    if (t && (f.state === "巡回" || pr.blind)) { f.state = "警戒"; f.lastKnown = { x: t.x, y: t.y }; planFoe(f); }
+    if (t && (f.state === "巡回" || pr.blind)) { f.state = "警戒"; f.lastKnown = { x: t.x, y: t.y }; f.tracking = !!pr.trackMul; planFoe(f); }
   }
 }
 function wakeUp(f) { f.wakeNoise++; log(f.wakeNoise < PR().dormant ? "（地の底で何かが身じろぎした）" : "（何かが目を覚ました気配がする）");
@@ -546,9 +541,11 @@ function updateStone() {
     if (hunting && PR().silent) continue;   // 影: 追跡中は一切反応しない
     const l = hunting ? 3 : d <= 2 ? 2 : 1;
     if (l > lv || (l === lv && d < bestD)) { lv = l; bestD = d; bearing = bearingOf(foePos(f)); } }
-  if (bearing >= 0 && S.echoShift) bearing = (bearing + S.echoShift + 6) % 6;
   S.stoneBearing = bearing;
-  const dirTxt = bearing >= 0 ? `　方角 ${BEARING[bearing]}` : "";
+  S.stoneGhost = bearing >= 0 && PR().echo ? (bearing + S.echoOff) % 6 : -1;
+  // 2 つ出る時は方角の番号順に並べる (並び順で本物が分からないように)
+  const dirs = [bearing, S.stoneGhost].filter(b => b >= 0).sort((a, b) => a - b);
+  const dirTxt = dirs.length ? `　方角 ${dirs.map(b => BEARING[b]).join(" / ")}` : "";
   let txt = "反応なし", cls = "cold";
   if (lv === 3) { txt = `強く反応 ── 察知されている（${bestD <= 2 ? "距離1〜2" : "距離3〜4"}）${dirTxt}`; cls = "hot"; }
   else if (lv === 2) { txt = `反応 ── 察知されていないが、かなり近い（距離1〜2）${dirTxt}`; cls = "near"; }
@@ -850,7 +847,7 @@ function draw() {
     const q = toPx(lerpP(prevFoes[k], foePos(f))), sz = f.weak ? 0.7 : 1;
     cx.fillStyle = f.state === "眠り" ? "#7a4a46" : "#d8544a"; cx.beginPath(); cx.moveTo(q.x, q.y - 10 * sz); cx.lineTo(q.x + 9 * sz, q.y + 7 * sz); cx.lineTo(q.x - 9 * sz, q.y + 7 * sz); cx.closePath(); cx.fill();
     cx.fillStyle = "#e6e2d8"; cx.font = "11px Consolas, 'Yu Gothic', monospace";
-    cx.fillText(`${f.weak ? "群れの 1 体" : "精鋭の群れ"}${showProf ? "・" + PR().name : ""}（${f.freeze > 0 ? "足止め" : f.lunge ? "飛び掛かり" : f.state}）`, q.x, q.y - 18);
+    cx.fillText(`${f.weak ? "群れの 1 体" : "精鋭の群れ"}${showProf ? "・" + PR().name : ""}（${f.freeze > 0 ? "足止め" : f.lunge ? "飛び掛かり" : f.tracking ? "痕跡を辿る" : f.state}）`, q.x, q.y - 18);
   });
   if (S.foeArrow) { const age = S.time - S.foeArrow.t, a = toPx(S.foeArrow.from), b = toPx(S.foeArrow.to);   // 偵察で見た移動方向
     if (age < 12) { const ang = Math.atan2(b.y - a.y, b.x - a.x), len = Math.max(26, Math.hypot(b.x - a.x, b.y - a.y));
@@ -870,7 +867,7 @@ function draw() {
     if (m.vx !== undefined) { cx.strokeStyle = cx.fillStyle; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(q.x, q.y); cx.lineTo(q.x - m.vx * 14, q.y - m.vy * 14); cx.stroke(); }
   }
   // 魔石の方角: 60° の扇を自分の周りに描く
-  if (S.stoneBearing >= 0) { const c = toPx(meP), a0 = S.stoneBearing * Math.PI / 3;
+  for (const b of [S.stoneBearing, S.stoneGhost]) { if (b < 0) continue; const c = toPx(meP), a0 = b * Math.PI / 3;
     cx.fillStyle = S.stone.startsWith("強く") ? "rgba(216,84,74,.16)" : "rgba(181,138,216,.16)";
     cx.beginPath(); cx.moveTo(c.x, c.y); cx.arc(c.x, c.y, P.visStone * SCALE, a0 - Math.PI / 6, a0 + Math.PI / 6); cx.closePath(); cx.fill(); }
   for (const d of S.decoys) { const q = toPx(d); cx.fillStyle = d.delay > 0 ? "#8a6a3a" : "#f08a32";   // 囮（炎）
