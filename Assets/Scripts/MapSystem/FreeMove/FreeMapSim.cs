@@ -42,6 +42,20 @@ namespace MapSystem.FreeMove
         DecoyBroken = 1 << 9,
         /// <summary>手番が 1 つ進んだ (察知の判定・痕跡の減衰が走った)。</summary>
         TurnPassed = 1 << 10,
+        /// <summary>使い魔が見えた瞬間 (視界 1・照明中は 5)。</summary>
+        FamiliarSighted = 1 << 11,
+        /// <summary>使い魔に接触した。 交戦の決着まで時間は進まない。</summary>
+        FamiliarContact = 1 << 12,
+        /// <summary>見えている使い魔が消えた (目標地点でプレイヤーを見つけられなかった)。</summary>
+        FamiliarVanished = 1 << 13,
+    }
+
+    /// <summary>使い魔 (巡航ミサイル)。 察知された地点へ直線で飛び、 狭い探知範囲の内にプレイヤーが居れば向きを変える。
+    /// 目標地点に着いてもプレイヤーを探知できなければ消える。 接触すると交戦。</summary>
+    public struct Familiar
+    {
+        public Vec2 pos;
+        public Vec2 target;
     }
 
     /// <summary>移動に払う物資と HP の窓口。 素の C# 側は RunState を知らないのでここを通す。</summary>
@@ -163,7 +177,22 @@ namespace MapSystem.FreeMove
         private int _lost;
         public int GauntletFights { get; private set; }
 
-        public FreeMapSim(FreeMapLayout layout, IFreeMapWallet wallet, bool withFoe)
+        /// <summary>この層の徘徊エネミーの性質。 <b>プレイヤーには明かさない</b> (BOT も読まない)。</summary>
+        public FoeProfile Profile { get; private set; }
+        /// <summary>道を外れて飛び掛かっている最中の位置 (飛び掛かりの性質)。 道の上なら null。</summary>
+        private Vec2? _lungePos;
+
+        // ── 使い魔 ──
+        public readonly List<Familiar> Familiars = new List<Familiar>();
+        private int _familiarCooldownTicks;
+        private bool _familiarInSightPrev;
+        /// <summary>使い魔と交戦中 (時間は進まない)。</summary>
+        public bool InFamiliarFight { get; private set; }
+        /// <summary>[計装] 放った使い魔の数・接触した数。</summary>
+        public int FamiliarsLaunched { get; private set; }
+        public int FamiliarContacts { get; private set; }
+
+        public FreeMapSim(FreeMapLayout layout, IFreeMapWallet wallet, bool withFoe, FoeProfile profile = null)
         {
             Layout = layout ?? throw new ArgumentNullException(nameof(layout));
             Floor = layout.floor;
@@ -175,6 +204,7 @@ namespace MapSystem.FreeMove
             HasFoe = withFoe && layout.waypoints.Count > 0;
             FoeAlive = HasFoe;
             GauntletFights = FloorPlan.GauntletFights(Floor);
+            Profile = profile ?? (HasFoe ? FoeProfile.ForFloor(Floor) : FoeProfile.Standard);
             if (HasFoe)
             {
                 _fa = _fb = layout.waypoints[0];
@@ -191,7 +221,14 @@ namespace MapSystem.FreeMove
         //  読み取り
         // =====================================================================
 
-        public Vec2 FoePos => Vec2.Lerp(Layout.pos[_fa], Layout.pos[_fb], _ft);
+        public Vec2 FoePos => _lungePos ?? Vec2.Lerp(Layout.pos[_fa], Layout.pos[_fb], _ft);
+
+        /// <summary>いま見えている使い魔 (視界 1・照明中は 5)。 見えていないものは返さない。</summary>
+        public IEnumerable<Vec2> VisibleFamiliars()
+        {
+            double r = FlareOn ? FreeMapParams.VisionFlare : FreeMapParams.VisionNone;
+            foreach (var f in Familiars) if (Vec2.Dist(f.pos, Me) <= r + 1e-6) yield return f.pos;
+        }
 
         public double FoeDistance => FoeAlive ? Vec2.Dist(FoePos, Me) : double.PositiveInfinity;
 
@@ -253,7 +290,7 @@ namespace MapSystem.FreeMove
         /// <summary>行き先を決める (移動中なら行き先を変える)。 山岳を横切る・偵察中・連戦中は false。</summary>
         public bool SetDestination(int j)
         {
-            if (Dead || InGauntlet || IsScouting) return false;
+            if (Dead || InGauntlet || InFamiliarFight || IsScouting) return false;
             var pv = Preview(j);
             if (!pv.valid || pv.blocked) return false;
             if (!IsMoving) PrevNode = AtNode >= 0 ? AtNode : Layout.NearestNode(Me);
@@ -355,7 +392,7 @@ namespace MapSystem.FreeMove
             {
                 var ev = Tick();
                 acc |= ev;
-                if ((ev & stopMask) != 0 || Dead || InGauntlet) break;
+                if ((ev & stopMask) != 0 || Dead || InGauntlet || InFamiliarFight) break;
             }
             return acc;
         }
@@ -363,7 +400,7 @@ namespace MapSystem.FreeMove
         /// <summary>0.1 手番進める。</summary>
         public FreeMapEvent Tick()
         {
-            if (Dead || InGauntlet) return FreeMapEvent.None;
+            if (Dead || InGauntlet || InFamiliarFight) return FreeMapEvent.None;
             var ev = FreeMapEvent.None;
             int arrivedAt = -1;
             if (_pendingArrival >= 0 && !IsMoving && AtNode == _pendingArrival) arrivedAt = _pendingArrival;
@@ -387,7 +424,7 @@ namespace MapSystem.FreeMove
             }
             else if (FoeAlive && FoeFreezeTicks <= 0)
             {
-                AdvanceFoe(FreeMapParams.Tick * (FoeState == FoeState.Patrol ? FreeMapParams.FoePatrolSpeed : FreeMapParams.FoeChaseSpeed));
+                AdvanceFoe(FreeMapParams.Tick * (FoeState == FoeState.Patrol ? Profile.patrolSpeed : Profile.chaseSpeed));
                 var fp = FoePos;
                 int k = Traps.FindIndex(t => Vec2.Dist(t, fp) <= FreeMapParams.TrapHitDist);
                 if (k >= 0)
@@ -427,6 +464,15 @@ namespace MapSystem.FreeMove
             _foeInSightPrev = inSight;
 
             ev |= UpdateStone();
+
+            if (_familiarCooldownTicks > 0) _familiarCooldownTicks--;
+            ev |= AdvanceFamiliars();
+            if (InFamiliarFight)
+            {
+                MoveTarget = -1;
+                _pendingArrival = arrivedAt;         // 着いた点は交戦の後で発動する
+                return ev | FreeMapEvent.FamiliarContact;
+            }
 
             if (FoeAlive && FoeFreezeTicks <= 0 && Vec2.Dist(FoePos, Me) <= FreeMapParams.CatchDist)
             {
@@ -538,12 +584,17 @@ namespace MapSystem.FreeMove
             }
             if (seen)
             {
-                if (FoeState != FoeState.Chase) ev |= FreeMapEvent.Detected;
+                if (FoeState != FoeState.Chase)
+                {
+                    // 影の性質は察知した合図を出さない (魔石にも反応しない)
+                    if (!Profile.silentWhileChasing) ev |= FreeMapEvent.Detected;
+                    LaunchFamiliar(Me);   // 察知した地点へ使い魔を放つ
+                }
                 FoeState = FoeState.Chase; _lost = 0; _lastKnown = Me; PlanFoe();
             }
             else if (FoeState == FoeState.Chase)
             {
-                if (++_lost >= FreeMapParams.FoeLostTurns)
+                if (++_lost >= Profile.lostTurns)
                 {
                     FoeState = FoeState.Alert;
                     if (_lastKnown == null) _lastKnown = Me;
@@ -565,7 +616,9 @@ namespace MapSystem.FreeMove
             if (!FoeAlive) return 0;
             double d = Vec2.Dist(FoePos, Me);
             if (d > FreeMapParams.VisionStone) return 0;
-            if (FoeState == FoeState.Chase || FoeFreezeTicks > 0) return 3;   // 察知されている
+            bool hunting = FoeState == FoeState.Chase || FoeFreezeTicks > 0;
+            if (hunting && Profile.silentWhileChasing) return 0;              // 影: 追跡中は一切反応しない
+            if (hunting) return 3;                                              // 察知されている
             return d <= FreeMapParams.StoneNearDist ? 2 : 1;                    // かなり近い / 遠い
         }
 
@@ -646,6 +699,21 @@ namespace MapSystem.FreeMove
 
         private void AdvanceFoe(double amount)
         {
+            // 飛び掛かり: 追跡中で近ければ道を外れて直進。 離れたら最寄りの点から道へ戻る
+            if (Profile.lungeRange > 0)
+            {
+                if (FoeState == FoeState.Chase)
+                {
+                    var fp = FoePos; double d = Vec2.Dist(fp, Me);
+                    if (d <= Profile.lungeRange || (_lungePos.HasValue && d <= Profile.lungeRange + 1.0))
+                    {
+                        double k = Math.Min(1, amount / Math.Max(1e-9, d));
+                        _lungePos = Vec2.Lerp(fp, Me, k);
+                        return;
+                    }
+                }
+                if (_lungePos.HasValue) ReturnToRoad();
+            }
             int guard = 0;
             while (amount > 1e-9 && guard++ < 64)
             {
@@ -681,6 +749,77 @@ namespace MapSystem.FreeMove
             }
         }
 
+        /// <summary>飛び掛かりの後、 最寄りの点へ戻って道の上の動きに戻る。</summary>
+        private void ReturnToRoad()
+        {
+            var p = _lungePos.Value;
+            _lungePos = null;
+            _fa = _fb = Layout.NearestNode(p); _ft = 0;
+            PlanFoe();
+        }
+
+        // =====================================================================
+        //  使い魔 (巡航ミサイル)
+        // =====================================================================
+
+        private void LaunchFamiliar(Vec2 target)
+        {
+            if (!FoeAlive || !Profile.LaunchesFamiliars) return;
+            if (_familiarCooldownTicks > 0 || Familiars.Count >= Profile.familiarMax) return;
+            Familiars.Add(new Familiar { pos = FoePos, target = target });
+            _familiarCooldownTicks = Profile.familiarCooldownTurns * FreeMapParams.TicksPerTurn;
+            FamiliarsLaunched++;
+        }
+
+        /// <summary>使い魔を 1 刻み飛ばす。 探知範囲の内にプレイヤーが居れば向きを変え、 目標地点で見つけられなければ消える。</summary>
+        private FreeMapEvent AdvanceFamiliars()
+        {
+            var ev = FreeMapEvent.None;
+            if (Familiars.Count == 0) { _familiarInSightPrev = false; return ev; }
+            double step = FreeMapParams.FamiliarSpeed * FreeMapParams.Tick;
+            double vis = FlareOn ? FreeMapParams.VisionFlare : FreeMapParams.VisionNone;
+            bool anyInSight = false;
+            for (int i = Familiars.Count - 1; i >= 0; i--)
+            {
+                var f = Familiars[i];
+                if (Vec2.Dist(f.pos, Me) <= FreeMapParams.FamiliarDetectRange) f.target = Me;
+                double rem = Vec2.Dist(f.pos, f.target);
+                if (rem <= step) f.pos = f.target;
+                else f.pos = Vec2.Lerp(f.pos, f.target, step / rem);
+                bool visible = Vec2.Dist(f.pos, Me) <= vis + 1e-6;
+                if (Vec2.Dist(f.pos, Me) <= FreeMapParams.FamiliarCatchDist)
+                {
+                    Familiars.RemoveAt(i);
+                    InFamiliarFight = true;
+                    FamiliarContacts++;
+                    return ev;
+                }
+                if (Vec2.Dist(f.pos, f.target) <= 1e-9)
+                {
+                    if (Vec2.Dist(f.pos, Me) <= FreeMapParams.FamiliarDetectRange) f.target = Me;
+                    else
+                    {
+                        Familiars.RemoveAt(i);
+                        if (visible) ev |= FreeMapEvent.FamiliarVanished;
+                        continue;
+                    }
+                }
+                Familiars[i] = f;
+                anyInSight |= visible;
+            }
+            if (anyInSight && !_familiarInSightPrev) ev |= FreeMapEvent.FamiliarSighted;
+            _familiarInSightPrev = anyInSight;
+            return ev;
+        }
+
+        /// <summary>使い魔との交戦が終わった (勝っても逃げても使い魔は消える)。 逃げたなら移動中は出発した点へ戻る。</summary>
+        public void ResolveFamiliarFight(bool fled)
+        {
+            InFamiliarFight = false;
+            if (fled && AtNode < 0) FleeToPrevious();
+            MoveTarget = -1;
+        }
+
         /// <summary>テスト・デバッグ用: 徘徊エネミーが今いる道の両端 (点の上なら同じ値)。</summary>
         public (int a, int b) FoeEdge => (_fa, _fb);
     }
@@ -692,9 +831,10 @@ namespace MapSystem.FreeMove
     /// </summary>
     public static class FreeMapClockPolicy
     {
-        /// <summary>時間を止める契機: 察知された・魔石が「察知されている」に入った・敵を目視・捕まった・死んだ。</summary>
+        /// <summary>時間を止める契機: 察知された・魔石が「察知されている」に入った・敵を目視・使い魔を目視・接触・捕まった・死んだ。</summary>
         public const FreeMapEvent PauseMask =
             FreeMapEvent.Detected | FreeMapEvent.StoneHot | FreeMapEvent.FoeSighted
+            | FreeMapEvent.FamiliarSighted | FreeMapEvent.FamiliarContact
             | FreeMapEvent.Caught | FreeMapEvent.Died;
 
         /// <summary>早送りを解除する契機 (止めはしない): 点に着いた・魔石の反応が一段上がった。</summary>

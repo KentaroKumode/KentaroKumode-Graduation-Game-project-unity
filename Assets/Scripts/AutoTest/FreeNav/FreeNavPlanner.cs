@@ -301,6 +301,7 @@ namespace AutoTest.FreeNav
         private static bool ShouldFlee(FreeNavContext c, double now)
         {
             if (c.sim.StoneLevel >= 3) return true;   // 察知されている
+            if (c.belief.FamiliarVisible) return true; // 使い魔が見えている
             var ls = c.sim.LastSeenFoe;
             return ls.HasValue && now - c.sim.LastSeenFoeTime < 1.0 && Vec2.Dist(ls.Value, c.sim.Me) < 2.0;
         }

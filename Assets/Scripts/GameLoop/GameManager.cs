@@ -341,6 +341,8 @@ namespace GameLoop
             inFalseMerchantCombat = false;
             _inGauntlet = false;
             _gauntletCount = 0;
+            _inFamiliarFight = false;
+            _familiarFightCount = 0;
 
             // 自由移動のマップの消耗品: 囮・罠を 1 個ずつ (2026-09-28)
             GrantStartingMapTools();
@@ -529,7 +531,7 @@ namespace GameLoop
                 // **ラストスタンドはここには居ない** ── 2026-09-13 から戦闘内で
                 // その場蘇生する (CombatManager.TryLastStandRevive)。 退却を伴わないので
                 // ボスノードで詰まらない。
-                bool isBossFight = !InGauntletCombat && MapManager.Instance?.CurrentNode != null
+                bool isBossFight = !InMapEncounterCombat && MapManager.Instance?.CurrentNode != null
                     && MapManager.Instance.CurrentNode.type == TileType.Boss;
 
                 if (LastStand.TryConsumeRevival(Run, isBossFight))
@@ -538,6 +540,7 @@ namespace GameLoop
                     // 徘徊エネミーの連戦の途中なら、 連戦から抜けた扱い (逃げた時と同じく 2 手番後から追跡)。
                     //   代償は取らない ── 救済そのものが代償 (灯火を失う)。
                     bool wasGauntlet = InGauntletCombat;
+                    if (InFamiliarCombat) { EndFamiliarFight(fled: false); return; }
                     if (wasGauntlet) EndGauntletAsFled(payCost: false);
                     SetPhase(GamePhase.MapNavigation);
                     if (wasGauntlet) FlushPendingArrival();
@@ -581,6 +584,11 @@ namespace GameLoop
             if (InGauntletCombat)
             {
                 HandleGauntletFightWon();
+                return;
+            }
+            if (InFamiliarCombat)
+            {
+                HandleFamiliarFightWon();
                 return;
             }
 
