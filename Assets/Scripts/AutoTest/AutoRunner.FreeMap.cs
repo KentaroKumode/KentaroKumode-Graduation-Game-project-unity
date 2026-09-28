@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using AutoTest.FreeNav;
 using GameLoop;
 using MapSystem;
 using MapSystem.FreeMove;
@@ -7,10 +8,16 @@ using UnityEngine;
 namespace AutoTest
 {
     /// <summary>
-    /// 自由移動の層 (2026-09-28・docs/GAME.md §5) の BOT の航行。 <b>簡素で決定的</b>に保つ ──
-    /// バランスの測定は次の段階で、 ここで要るのは「最後まで歩けて、 バッチが無限に回らない」こと。
+    /// 自由移動の層 (2026-09-28・docs/GAME.md §5) の BOT の航行。 <b>技量で方策が変わる</b> (§21):
+    /// <list type="bullet">
+    /// <item><b>Naive</b>: 下の簡素な方策 (最初の実装のまま)。</item>
+    /// <item><b>Optimal</b>: 近視眼 ── 1 手先だけを最善にする (<see cref="NavMode.Myopic"/>)。</item>
+    /// <item><b>Super / Exact / Ultra</b>: マクロ ── 出口までの道順を読み、 反応の履歴から縄張りを推定する
+    ///       (<see cref="NavMode.Macro"/>)。 中身は素の C# の <see cref="FreeNavPlanner"/>。</item>
+    /// </list>
+    /// <see cref="freeNavModeOverride"/> で戦闘の技量と切り離して測れる。 どの方策も乱数を使わない。
     ///
-    /// <para>方針:</para>
+    /// <para>Naive の方針:</para>
     /// <list type="number">
     /// <item>物資が「出口までの費用 ＋ 余裕」を割ったら出口 (ボス / 門) へ。 1 層の行動回数の上限に達しても出口へ。</item>
     /// <item>それ以外は、 まだ使っていない点のうち <b>既存のマス評価 (Rank) を移動の費用で割った価値</b>が最大の点へ。
@@ -37,6 +44,27 @@ namespace AutoTest
 
         private int _freeMapActions;
         private FreeMapLayout _freeMapLayout;
+        private FreeNavBelief _freeNavBelief;
+
+        /// <summary>航行の目盛り (Optimal / Super)。 全部仮置き ── スイープで差し替える。</summary>
+        [System.NonSerialized] public FreeNavTuning freeNavTuning = new FreeNavTuning();
+        /// <summary>航行の方策を戦闘の技量から切り離す。 -1 = 技量に従う (既定) / 0 = Naive / 1 = Optimal (近視眼) / 2 = Super (マクロ)。
+        /// 「航行の読みの深さ」と「戦闘の読みの深さ」を別々に測るためのつまみ。</summary>
+        [System.NonSerialized] public int freeNavModeOverride = -1;
+        /// <summary>[計装] 方策ごとの航行判断の回数・逃げた回数・出口へ向かった回数 (バッチ累計)。 添字は 0 Naive / 1 Optimal / 2 Super。</summary>
+        public static readonly long[] FreeNavDecisions = new long[3], FreeNavFlees = new long[3], FreeNavExits = new long[3];
+
+        /// <summary>この判断で使う航行の方策 (0 Naive / 1 Myopic / 2 Macro)。</summary>
+        private int FreeNavModeNow()
+        {
+            if (freeNavModeOverride >= 0 && freeNavModeOverride <= 2) return freeNavModeOverride;
+            switch (EffectiveWiringSkill)
+            {
+                case WiringSkill.Naive: return 0;
+                case WiringSkill.Optimal: return 1;
+                default: return 2;   // Super / Exact / (Ultra の基準手は Super)
+            }
+        }
 
         /// <summary>[計装] 自由移動の層で行動の上限に達した回数 (バッチ累計)。</summary>
         public static long FreeMapActionCapHits;
@@ -50,7 +78,11 @@ namespace AutoTest
             var map = mm.CurrentMap;
             if (run == null || sim == null || map == null) { Finish(Outcome.Deadlock, "自由移動の層の状態が無い"); return true; }
 
-            if (!ReferenceEquals(map.layout, _freeMapLayout)) { _freeMapLayout = map.layout; _freeMapActions = 0; }
+            if (!ReferenceEquals(map.layout, _freeMapLayout))
+            {
+                _freeMapLayout = map.layout; _freeMapActions = 0;
+                _freeNavBelief = new FreeNavBelief(map.layout);   // 層ごとに作り直す (縄張りの推定は層で別物)
+            }
             if (++_freeMapActions > 2 * MaxFreeMapActionsPerFloor)
             {
                 Finish(Outcome.Deadlock, $"自由移動の層で行動の上限 ({2 * MaxFreeMapActionsPerFloor}) を超えた");
@@ -75,7 +107,11 @@ namespace AutoTest
             var L = map.layout;
             int at = sim.AtNode >= 0 ? sim.AtNode : L.NearestNode(sim.Me);
 
-            // ── 行き先 ──
+            int navMode = FreeNavModeNow();
+            FreeNavDecisions[navMode]++;
+            if (navMode > 0) return DoNavigateFreePlanned(gm, mm, navMode, hpRatio, floorHit, dangerTarget);
+
+            // ── 行き先 (Naive) ──
             int target = -1;
             bool toExit = _freeMapActions > MaxFreeMapActionsPerFloor
                           || run.provision < CostToNode(sim, L, L.goal) + FreeMapExitMargin;
@@ -121,6 +157,113 @@ namespace AutoTest
                 return true;
             }
             return false;
+        }
+
+        /// <summary>Optimal (近視眼) / Super (マクロ) の航行。 判断は <see cref="FreeNavPlanner"/>、 ここは材料を揃えて指すだけ。</summary>
+        private bool DoNavigateFreePlanned(GameManager gm, MapManager mm, int navMode, float hpRatio, int floorHit, float dangerTarget)
+        {
+            var run = gm.Run; var sim = mm.Sim; var map = mm.CurrentMap; var L = map.layout;
+            _freeNavBelief.Observe(sim);
+
+            int n = L.Count;
+            var used = new bool[n];
+            var known = new bool[n];
+            foreach (var node in map.GetAllNodes())
+            {
+                if (node.index < 0 || node.index >= n) continue;
+                used[node.index] = node.activated || node.index == L.start;
+                known[node.index] = node.revealed;
+            }
+
+            // ボス前に欲しい HP: 危険度駆動の目標 ＋ ボスの 1 発ぶん (旧航行のボス接近と同じ考え方)
+            float bossNeed = dangerTarget;
+            if (floorHit > 0 && run.playerMaxHP > 0)
+                bossNeed = Mathf.Clamp(dangerTarget + (float)floorHit / run.playerMaxHP, 0.5f, 0.95f);
+
+            var memo = new Dictionary<long, NavOutcome>();
+            var ctx = new FreeNavContext
+            {
+                sim = sim, L = L, used = used, known = known,
+                maxHp = run.playerMaxHP, hp = hpRatio, provision = run.provision, provisionCap = run.provisionCap,
+                bossHpNeed = bossNeed, belief = _freeNavBelief, tune = freeNavTuning,
+                forceExit = _freeMapActions > MaxFreeMapActionsPerFloor,
+                outcome = (j, hp, prov) => FreeNavOutcome(map, j, hp, prov, run, floorHit, dangerTarget, memo),
+            };
+            var d = FreeNavPlanner.Decide(ctx, navMode == 2 ? NavMode.Macro : NavMode.Myopic);
+            if (d.fleeing) FreeNavFlees[navMode]++;
+            if (d.toExit) FreeNavExits[navMode]++;
+            _curBossNear = d.toExit;
+
+            int at = sim.AtNode >= 0 ? sim.AtNode : L.NearestNode(sim.Me);
+            int hop = d.hop;
+            if (hop < 0 || hop == sim.AtNode) hop = NextHop(sim, map, at, d.target >= 0 ? d.target : L.goal, preferOffRoad: false);
+            if (hop < 0 || hop == sim.AtNode)
+            {
+                Finish(Outcome.Deadlock, $"自由移動の層で行き先 {d.target} へ動けない (方策 {navMode})");
+                return true;
+            }
+            gm.SetTravelSpeed(d.speed);
+            string hopId = map.NodeIdAt(hop);
+            var ev = gm.TravelSync(hopId, FreeMapEvent.StoneRaised | FreeMapEvent.Detected | FreeMapEvent.FoeSighted);
+            if (ev == FreeMapEvent.None && gm.CurrentPhase == GameManager.GamePhase.MapNavigation && sim.AtNode == at)
+            {
+                Finish(Outcome.Deadlock, $"自由移動の層で {hopId} へ出発できない (方策 {navMode})");
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>点 j を (HP 比, 物資) の状態で踏んだ時の見込み。 マスの価値は既存の <see cref="Rank"/> (天井 10 からの距離)、
+        /// HP の増減は <see cref="PredictHpRatioAfter"/>、 物資は戦闘の報酬と被弾の損・補給庫。
+        /// <b>種別が見えていない点は抽選重みで平均する</b> (見えていない種別を覗かない)。 同じ判断の中ではメモする。</summary>
+        private NavOutcome FreeNavOutcome(FloorMap map, int j, double hp, double prov, RunState run,
+                                          int floorHit, float dangerTarget, Dictionary<long, NavOutcome> memo)
+        {
+            var node = map.GetNodeByIndex(j);
+            if (node == null) return default;
+            int hpKey = (int)System.Math.Round(hp * 50), provKey = (int)System.Math.Round(prov / 25);
+            long key = ((long)j << 32) | ((long)(hpKey & 0xFFFF) << 16) | (long)(provKey & 0xFFFF);
+            if (memo.TryGetValue(key, out var hit)) return hit;
+
+            NavOutcome o;
+            if (node.revealed) o = KnownNavOutcome(node, hp, prov, run, floorHit, dangerTarget);
+            else
+            {
+                o = default;
+                float tot = 0f;
+                foreach (var (type, w) in FreeMapGenerator.TileWeights) tot += w;
+                foreach (var (type, w) in FreeMapGenerator.TileWeights)
+                {
+                    var k = KnownNavOutcome(SyntheticNavNode(type), hp, prov, run, floorHit, dangerTarget);
+                    double f = w / tot;
+                    o.value += f * k.value; o.hpDelta += f * k.hpDelta; o.provDelta += f * k.provDelta;
+                }
+            }
+            memo[key] = o;
+            return o;
+        }
+
+        private NavOutcome KnownNavOutcome(MapNode node, double hp, double prov, RunState run, int floorHit, float dangerTarget)
+        {
+            var o = new NavOutcome();
+            var t = node.EffectiveType;
+            if (t == TileType.SupplyCache) { o.provDelta = FreeMapParams.RewardCache; return o; }
+            float h = Mathf.Clamp01((float)hp);
+            o.value = RankCeil - Rank(node, h, _curCombatAverse, false, run, dangerTarget);
+            o.hpDelta = PredictHpRatioAfter(node, h, floorHit, run) - h;
+            int loss = ProvisionRules.CombatLoss(ProvisionRules.TierOf((int)prov));
+            if (t == TileType.Battle) o.provDelta = FreeMapParams.RewardBattle - loss;
+            else if (t == TileType.EliteBattle) o.provDelta = FreeMapParams.RewardElite - loss;
+            return o;
+        }
+
+        private readonly Dictionary<TileType, MapNode> _syntheticNavNodes = new Dictionary<TileType, MapNode>();
+        /// <summary>種別だけを持つ仮のノード (戦闘名は未開示)。 見えていない点の期待値を Rank で出すためだけに使う。</summary>
+        private MapNode SyntheticNavNode(TileType t)
+        {
+            if (!_syntheticNavNodes.TryGetValue(t, out var n))
+                _syntheticNavNodes[t] = n = new MapNode("nav?" + (int)t, 0, 0, t) { freeMap = true };
+            return n;
         }
 
         /// <summary>今いる場所から点 j までの物資の見積もり: 直線 (山岳を横切るなら不可) と道の安い方。</summary>
