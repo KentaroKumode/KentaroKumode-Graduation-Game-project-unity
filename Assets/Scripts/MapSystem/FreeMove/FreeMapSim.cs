@@ -108,6 +108,10 @@ namespace MapSystem.FreeMove
         /// <summary>戦闘の後の気配が残る手番。</summary>
         public int BattleHeatTurns { get; private set; }
         public int LastArrived { get; private set; } = -1;
+        /// <summary>着いた刻みに捕まった点。 連戦が終わった次の刻みで Arrived を出す (新しい行き先を決めたら捨てる)。</summary>
+        private int _pendingArrival = -1;
+        /// <summary>着いた刻みに捕まった点が、 連戦の後の発動を待っているか。</summary>
+        public bool HasPendingArrival => _pendingArrival >= 0 && !IsMoving && AtNode == _pendingArrival;
         public bool InGauntlet { get; private set; }
         public bool Dead { get; private set; }
 
@@ -253,6 +257,7 @@ namespace MapSystem.FreeMove
             var pv = Preview(j);
             if (!pv.valid || pv.blocked) return false;
             if (!IsMoving) PrevNode = AtNode >= 0 ? AtNode : Layout.NearestNode(Me);
+            _pendingArrival = -1;
             MoveOnRoad = pv.road;
             _moveFrom = AtNode >= 0 ? AtNode : (Segment.a >= 0 ? (Segment.a == j ? Segment.b : Segment.a) : -1);
             MoveTarget = j;
@@ -309,6 +314,7 @@ namespace MapSystem.FreeMove
         {
             int to = PrevNode >= 0 ? PrevNode : Layout.start;
             MoveTarget = -1;
+            _pendingArrival = -1;
             Me = Layout.pos[to];
             AtNode = to;
             Segment = (-1, -1);
@@ -360,6 +366,8 @@ namespace MapSystem.FreeMove
             if (Dead || InGauntlet) return FreeMapEvent.None;
             var ev = FreeMapEvent.None;
             int arrivedAt = -1;
+            if (_pendingArrival >= 0 && !IsMoving && AtNode == _pendingArrival) arrivedAt = _pendingArrival;
+            _pendingArrival = -1;
 
             if (IsMoving)
             {
@@ -424,7 +432,8 @@ namespace MapSystem.FreeMove
             {
                 InGauntlet = true;
                 MoveTarget = -1;
-                return ev | FreeMapEvent.Caught;     // 着いた点は発動しない (捕まった方が先)
+                _pendingArrival = arrivedAt;         // 着いた点は連戦の後で発動する (捕まった方が先)
+                return ev | FreeMapEvent.Caught;
             }
 
             if (arrivedAt >= 0)

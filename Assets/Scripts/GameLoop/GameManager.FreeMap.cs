@@ -231,6 +231,15 @@ namespace GameLoop
             if (!string.IsNullOrEmpty(pid)) GrantRewardItem(pid, eliteWin: true);
             Log($"徘徊エネミーを退けた。物資 +{Run.provision - before}" + (string.IsNullOrEmpty(pid) ? "" : $"、{pid}"));
             SetPhase(GamePhase.MapNavigation);
+            FlushPendingArrival();
+        }
+
+        /// <summary>点に着いた刻みに捕まっていたら、 連戦が終わった今その点を発動させる (1 刻み進める)。
+        /// 放っておくと次の行き先を決めた時点で捨てられ、 着いたのに起動しない点ができる。</summary>
+        private void FlushPendingArrival()
+        {
+            if (CurrentPhase == GamePhase.MapNavigation && FreeMap != null && FreeMap.HasPendingArrival)
+                AdvanceFreeMap(1, FreeMapEvent.Arrived);
         }
 
         /// <summary>連戦から抜けた (逃げた・救済で生き延びた): 2 手番後から追跡が始まる。</summary>
@@ -263,6 +272,7 @@ namespace GameLoop
             {
                 EndGauntletAsFled(payCost: true);
                 SetPhase(GamePhase.MapNavigation);
+                FlushPendingArrival();
                 return;
             }
             PayFleeCost();
