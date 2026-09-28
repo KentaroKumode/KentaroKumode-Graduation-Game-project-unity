@@ -23,6 +23,7 @@ namespace AutoTest.FreeNav
         private double _lastSeenTime = -1;
         private Vec2? _lastSeen;
         private int _stone;
+        private int _bearing = -1;
         private Vec2 _stonePos;
         private double _stoneTime = -1;
         private double _lastObsTime = -1;
@@ -82,11 +83,15 @@ namespace AutoTest.FreeNav
             foreach (var f in sim.VisibleFamiliars()) _familiars.Add(f);
             _familiarTime = now;
             _stone = sim.StoneLevel;
+            _bearing = sim.StoneBearing;
             _stonePos = sim.Me;
             _stoneTime = now;
             if (now - _lastObsTime < 0.5) return;   // 同じ所で続けて呼ばれた分は証拠を足さない
             _lastObsTime = now;
-            if (_stone >= 2) AddKernel(sim.Me, 0.5, 2.0);
+            // 方角が分かるので、 段の距離帯の真ん中あたりへ熱を置く (方角が無かった頃は自分の周りに撒いていた)
+            var est = BearingEstimate();
+            if (est.HasValue) AddKernel(est.Value, _stone >= 2 ? 0.6 : 0.3, 1.8);
+            else if (_stone >= 2) AddKernel(sim.Me, 0.5, 2.0);
             else if (_stone == 1) AddRing(sim.Me, 0.12, 2.0, FreeMapParams.VisionStone);
             else
             {
@@ -115,9 +120,14 @@ namespace AutoTest.FreeNav
                 foreach (var f in _familiars) t += 1.5 * Math.Max(0, 1 - Vec2.Dist(p, f) / 2.5);   // 使い魔は速い: 近くは強く避ける
             if (_stone >= 1 && now - _stoneTime < 1.0)
             {
-                double reach = _stone >= 2 ? 3.0 : 5.0;
                 double w = _stone >= 3 ? 1.0 : _stone == 2 ? 0.8 : 0.3;
-                t += w * Math.Max(0, 1 - Vec2.Dist(p, _stonePos) / reach);
+                var est = BearingEstimate();
+                if (est.HasValue) t += w * Math.Max(0, 1 - Vec2.Dist(p, est.Value) / 2.5);
+                else
+                {
+                    double reach = _stone >= 2 ? 3.0 : 5.0;
+                    t += w * Math.Max(0, 1 - Vec2.Dist(p, _stonePos) / reach);
+                }
             }
             return t;
         }
@@ -145,6 +155,9 @@ namespace AutoTest.FreeNav
                 foreach (var f in _familiars) if (Vec2.Dist(me, f) < Vec2.Dist(me, best)) best = f;
                 return best;
             }
+            if (_lastSeen.HasValue && now - _lastSeenTime <= 1) return _lastSeen.Value;
+            // 魔石の方角 (段と方角から推した位置)
+            if (_stone >= 1 && now - _stoneTime < 1.0) { var est = BearingEstimate(); if (est.HasValue) return est.Value; }
             if (_lastSeen.HasValue && now - _lastSeenTime <= 4) return _lastSeen.Value;
             if (!useHeat) return null;
             double sx = 0, sy = 0, sw = 0;
@@ -156,6 +169,14 @@ namespace AutoTest.FreeNav
             }
             if (sw < 0.3) return null;
             return new Vec2(sx / sw, sy / sw);
+        }
+
+        /// <summary>魔石の段と方角から推した敵の位置: 方角の中心の向きに、 段の距離帯の真ん中 (かなり近い 1.5・遠い 3・察知されている 2.5)。</summary>
+        public Vec2? BearingEstimate()
+        {
+            if (_stone <= 0 || _bearing < 0) return null;
+            double d = _stone == 2 ? 1.5 : _stone == 1 ? 3.0 : 2.5;
+            return _stonePos + FreeMapSim.BearingVector(_bearing) * d;
         }
 
         private void AddKernel(Vec2 c, double w, double radius)

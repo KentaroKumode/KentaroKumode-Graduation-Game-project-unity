@@ -139,6 +139,9 @@ namespace MapSystem.FreeMove
         /// <summary>マスの種別が判明している点。 点と道の配置は層全体が見える。</summary>
         public readonly bool[] Known;
         public int StoneLevel { get; private set; }
+        /// <summary>魔石が指す方角 (2026-09-28): 徘徊エネミーの居る向きを 60° ずつ 6 つに分けた番号 (0〜5)。
+        /// 反応なし (段 0) の時は -1。 0 は +x (右) を中心に ±30°、 以後 +y へ回る (<see cref="BearingVector"/>)。</summary>
+        public int StoneBearing { get; private set; } = -1;
         /// <summary>徘徊エネミーの最後に分かった位置 (目視・照明・偵察・罠)。</summary>
         public Vec2? LastSeenFoe { get; private set; }
         public double LastSeenFoeTime { get; private set; } = -1;
@@ -215,6 +218,7 @@ namespace MapSystem.FreeMove
             Reveal(FreeMapParams.VisionNone);
             _foeInSightPrev = FoeAlive && Vec2.Dist(FoePos, Me) <= FreeMapParams.VisionNone + 1e-6;
             StoneLevel = ComputeStoneLevel();
+            StoneBearing = StoneLevel > 0 ? BearingOf(FoePos - Me) : -1;
         }
 
         // =====================================================================
@@ -364,6 +368,7 @@ namespace MapSystem.FreeMove
             FoeAlive = false;
             BattleHeatTurns = FreeMapParams.BattleKehaiTurns;
             StoneLevel = 0;
+            StoneBearing = -1;
         }
 
         /// <summary>連戦から逃げた: 2 手番後から追跡。 移動中に捕まったなら出発した点へ戻る
@@ -629,8 +634,37 @@ namespace MapSystem.FreeMove
             if (lv > StoneLevel) ev |= FreeMapEvent.StoneRaised;
             if (lv == 3 && StoneLevel != 3) ev |= FreeMapEvent.StoneHot;
             StoneLevel = lv;
+            StoneBearing = lv > 0 ? BearingOf(FoePos - Me) : -1;
             return ev;
         }
+
+        // 方角の境目 (30° + 60°k の単位ベクトル)。 三角関数を使わず √3 の定数だけで決める ── 実装差で境目が揺れない
+        private const double H3 = 0.8660254037844386;   // √3 / 2
+        private static readonly Vec2[] BearingEdges =
+        {
+            new Vec2(H3, 0.5), new Vec2(0, 1), new Vec2(-H3, 0.5), new Vec2(-H3, -0.5), new Vec2(0, -1), new Vec2(H3, -0.5),
+        };
+        private static readonly Vec2[] BearingCenters =
+        {
+            new Vec2(1, 0), new Vec2(0.5, H3), new Vec2(-0.5, H3), new Vec2(-1, 0), new Vec2(-0.5, -H3), new Vec2(0.5, -H3),
+        };
+
+        /// <summary>向き d が 6 つの方角のどれか (0〜5)。 0 は +x を中心に ±30°。</summary>
+        public static int BearingOf(Vec2 d)
+        {
+            if (d.x == 0 && d.y == 0) return 0;
+            for (int k = 0; k < 6; k++)
+            {
+                var a = BearingEdges[(k + 5) % 6]; var b = BearingEdges[k];   // 方角 k は境目 k-1 から境目 k まで
+                if (Cross(a, d) >= 0 && Cross(d, b) > 0) return k;
+            }
+            return 0;
+        }
+
+        /// <summary>方角の中心の単位ベクトル。</summary>
+        public static Vec2 BearingVector(int sector) => BearingCenters[((sector % 6) + 6) % 6];
+
+        private static double Cross(Vec2 a, Vec2 b) => a.x * b.y - a.y * b.x;
 
         private void Reveal(double r)
         {

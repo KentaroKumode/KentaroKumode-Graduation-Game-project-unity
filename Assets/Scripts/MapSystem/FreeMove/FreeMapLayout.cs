@@ -14,6 +14,9 @@ namespace MapSystem.FreeMove
             return Math.Sqrt(dx * dx + dy * dy);
         }
         public static Vec2 Lerp(Vec2 a, Vec2 b, double t) => new Vec2(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+        public static Vec2 operator -(Vec2 a, Vec2 b) => new Vec2(a.x - b.x, a.y - b.y);
+        public static Vec2 operator +(Vec2 a, Vec2 b) => new Vec2(a.x + b.x, a.y + b.y);
+        public static Vec2 operator *(Vec2 a, double k) => new Vec2(a.x * k, a.y * k);
         public override string ToString() => $"({x:0.00},{y:0.00})";
     }
 
