@@ -6,8 +6,8 @@ using UnityEngine;
 namespace MapSystem.AbyssPhenomena
 {
     /// <summary>
-    /// 層突入時の異常現象抽選。 種別の重みは現在の希望に線形連動する。
-    /// 算式: P(BUFF) = 20 + 0.30·h、 P(MIXED) = 30、 P(DEBUFF) = 50 − 0.30·h (h = 希望 0〜100)
+    /// 層突入時の異常現象抽選。 種別の重みは現在の物資に線形連動する。
+    /// 算式: P(BUFF) = 20 + 0.30·h、 P(MIXED) = 30、 P(DEBUFF) = 50 − 0.30·h (h = 物資 0〜100)
     /// 正本: docs/GAME.md §5-7 §抽選ルール
     /// </summary>
     public static class AbyssPhenomenonRoller
@@ -38,10 +38,11 @@ namespace MapSystem.AbyssPhenomena
             }
         }
 
-        /// <summary>1 件抽選。 種別を希望連動で選び、 種別内のエントリは均等抽選。</summary>
+        /// <summary>1 件抽選。 種別を物資連動で選び、 種別内のエントリは均等抽選。</summary>
         public static AbyssPhenomenon RollOne(RunState run, HashSet<AbyssPhenomenon> exclude = null, AbyssPhenomenonKind? forbidKind = null)
         {
-            int h = Mathf.Clamp(run?.hope ?? 0, 0, HopeSystem.HopeMax);
+            // 物資は 2026-09-28 に ×10 (0〜1000)。 式は旧 0〜100 のまま、 10 で割って当てる。
+            int h = Mathf.Clamp(run?.provision ?? 0, 0, ProvisionSystem.ProvisionMax) / 10;
             float pBuff   = 20f + 0.30f * h;
             float pMixed  = 30f;
             float pDebuff = 50f - 0.30f * h;

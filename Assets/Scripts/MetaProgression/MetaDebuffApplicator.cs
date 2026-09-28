@@ -376,27 +376,27 @@ namespace MetaProgression
         //  E. 崩壊 — 絶望的な戦闘 / 天変地異  (T4: 最後の審判)
         // ============================================================
 
-        /// <summary>戦闘後の希望減少への加算量。T1は0、T2は4層以降、T3は3層以降で+1。
-        /// 発火するのは <see cref="GameLoop.HopeSystem.ApplyCombatHpBalance"/> の
+        /// <summary>戦闘後の物資減少への加算量。T1は0、T2は4層以降、T3は3層以降で+1。
+        /// 発火するのは <see cref="GameLoop.ProvisionSystem.ApplyCombatHpBalance"/> の
         /// **HP 収支マイナス側だけ** ── 無傷で勝った戦闘には乗らない。
-        /// 2026-08-04: 旧 +1/+2/+3 から定数化。 Tier で伸びるのは希望上限側だけにして、
-        /// 1000ランでT1が−4.5ptと初段へ効果が偏ったため、希望上限低下だけへ一本化した。</summary>
-        public static int GetPostCombatHopeLoss(RunState run)
+        /// 2026-08-04: 旧 +1/+2/+3 から定数化。 Tier で伸びるのは物資上限側だけにして、
+        /// 1000ランでT1が−4.5ptと初段へ効果が偏ったため、物資上限低下だけへ一本化した。</summary>
+        public static int GetPostCombatProvisionLoss(RunState run)
         {
             int tier = Tier(ChallengeAxis.絶望的な戦闘);
             if (run == null || tier < 2) return 0;
             // 低層から一律に削ると T1 と同じ初段負荷へ偏るため、上位 Tier は
             // 深層でのみ圧を加える。乱数を使わないのでペア比較のシード列も保つ。
             int startFloor = tier >= 3 ? 3 : 4;
-            return run.currentFloor >= startFloor ? 1 : 0;
+            return run.currentFloor >= startFloor ? 10 : 0;   // 2026-09-28: 物資 ×10
         }
 
-        /// <summary>希望上限への加算量 (負値)。 T1 −4 / T2 −8 / T3 −12。
+        /// <summary>物資上限への加算量 (負値)。 T1 −4 / T2 −8 / T3 −12。
         /// **整備パネル適用後に足すこと** (§6-4)。 先に引くとパネル側の計算で薄まる。
         /// 2026-08-05: −5/−10/−15 から圧縮。 T1 据え置きで T3 だけを緩める同型の調整。</summary>
         /// 2026-08-10: −3/−7/−11 → **−5/−10/−15**。 単独 T3 −8.3pt でカテゴリ E が 6pt −14.0 と
         /// 最軽量級だったため。 段の刻みは実測で線形 (−4.3 / −6.3 / −8.3) なので比率で伸ばす。
-        public static int GetHopeCapDelta() => PickI(ChallengeAxis.絶望的な戦闘, 0, -4, -8, -12);
+        public static int GetProvisionCapDelta() => PickI(ChallengeAxis.絶望的な戦闘, 0, -40, -80, -120);   // 2026-09-28: 物資 ×10
 
         /// <summary>エスカレーション段階の到達を何ターン前倒しするか。 T1 = 1 / T2 = 1 / T3 = 2。
         ///
@@ -652,7 +652,7 @@ namespace MetaProgression
 
         /// <summary>[廃止: 焦燥] 常に 0 (無効)。</summary>
         public static int GetImpatienceTileThreshold() => 0;
-        public const int ImpatienceHopeLoss = 5;
+        public const int ImpatienceProvisionLoss = 50;   // 2026-09-28: 物資 ×10
 
         /// <summary>[廃止: 反響] 常に 0。</summary>
         public static float GetEchoReflectRate() => 0f;

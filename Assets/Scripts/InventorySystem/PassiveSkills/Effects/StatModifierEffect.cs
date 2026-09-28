@@ -52,8 +52,8 @@ namespace InventorySystem.PassiveSkills.Effects
         private readonly string _id;
         private readonly StatJson[] _stats;
         private readonly StatWhen[] _when;   // 条件なしは null
-        private readonly int[] _hopeMin;     // 希望段階の下限・上限 (-1 = 使わない)。 生成時に名前から引く
-        private readonly int[] _hopeBelow;
+        private readonly int[] _provisionMin;     // 物資段階の下限・上限 (-1 = 使わない)。 生成時に名前から引く
+        private readonly int[] _provisionBelow;
         private readonly IPassiveSkillEffect _inner;
         private readonly PassiveSkillTrigger[] _triggers;
         private readonly bool _tracksHit;
@@ -78,8 +78,8 @@ namespace InventorySystem.PassiveSkills.Effects
             _streakKey = "nonCritStreak:" + skillId;
             _amount = new float[stats.Length];
             _when = new StatWhen[stats.Length];
-            _hopeMin = new int[stats.Length];
-            _hopeBelow = new int[stats.Length];
+            _provisionMin = new int[stats.Length];
+            _provisionBelow = new int[stats.Length];
             var ts = new List<PassiveSkillTrigger>();
             if (inner != null)
                 foreach (var t in inner.Triggers) if (!ts.Contains(t)) ts.Add(t);
@@ -88,8 +88,8 @@ namespace InventorySystem.PassiveSkills.Effects
                 var s = stats[i];
                 _amount[i] = Amount(s.stat, s.value);
                 _when[i] = s.when == null || s.when.IsEmpty ? null : s.when;
-                _hopeMin[i] = HopeTierOf(skillId, s.when?.hopeTierMin);
-                _hopeBelow[i] = HopeTierOf(skillId, s.when?.hopeTierBelow);
+                _provisionMin[i] = ProvisionTierOf(skillId, s.when?.provisionTierMin);
+                _provisionBelow[i] = ProvisionTierOf(skillId, s.when?.provisionTierBelow);
                 if (_when[i] != null)
                 {
                     _tracksHit    |= _when[i].hitLastTurn;
@@ -105,11 +105,20 @@ namespace InventorySystem.PassiveSkills.Effects
             _triggers = ts.ToArray();
         }
 
-        private static int HopeTierOf(string skillId, string name)
+        private static int ProvisionTierOf(string skillId, string name)
         {
             if (string.IsNullOrEmpty(name)) return -1;
-            if (System.Enum.TryParse(name, out GameLoop.HopeTier t)) return (int)t;
-            UnityEngine.Debug.LogError($"[StatModifierEffect] {skillId}: 未知の希望段階 '{name}'");
+            if (System.Enum.TryParse(name, out GameLoop.ProvisionTier t)) return (int)t;
+            // 旧・希望の段階名 (2026-09-28 以前の items.json)。 段の中身は同じなので読み替える
+            switch (name)
+            {
+                case "Calm":      return (int)GameLoop.ProvisionTier.Ample;
+                case "Fretful":   return (int)GameLoop.ProvisionTier.Dwindling;
+                case "Pessimism": return (int)GameLoop.ProvisionTier.Depleting;
+                case "Despair":   return (int)GameLoop.ProvisionTier.Scarce;
+                case "Madness":   return (int)GameLoop.ProvisionTier.Exhausted;
+            }
+            UnityEngine.Debug.LogError($"[StatModifierEffect] {skillId}: 未知の物資段階 '{name}'");
             return -1;
         }
 
@@ -215,11 +224,11 @@ namespace InventorySystem.PassiveSkills.Effects
                 var type = MapSystem.MapManager.Instance?.CurrentNode?.type;
                 if (type != MapSystem.TileType.EliteBattle && type != MapSystem.TileType.Boss) return false;
             }
-            if (_hopeMin[i] >= 0 || _hopeBelow[i] >= 0)
+            if (_provisionMin[i] >= 0 || _provisionBelow[i] >= 0)
             {
-                int tier = (int)GameLoop.HopeSystem.GetTier(GameLoop.GameManager.Instance?.Run);
-                if (_hopeMin[i] >= 0 && tier < _hopeMin[i]) return false;     // 段階は数字が大きいほど希望が低い
-                if (_hopeBelow[i] >= 0 && tier >= _hopeBelow[i]) return false;
+                int tier = (int)GameLoop.ProvisionSystem.GetTier(GameLoop.GameManager.Instance?.Run);
+                if (_provisionMin[i] >= 0 && tier < _provisionMin[i]) return false;     // 段階は数字が大きいほど物資が低い
+                if (_provisionBelow[i] >= 0 && tier >= _provisionBelow[i]) return false;
             }
             return true;
         }

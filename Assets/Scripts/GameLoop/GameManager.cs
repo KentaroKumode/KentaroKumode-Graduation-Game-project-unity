@@ -365,8 +365,7 @@ namespace GameLoop
             // メタ: ノード踏破トークン
             MetaProgression.MetaTokenEarner.OnNodeVisited();
 
-            var hopeFromNode = mm.CurrentNode; // 希望(ADR-0002): 横移動判定用の移動前ノード
-            // 飢餓→希望統合(ADR-0002): 旧・空腹HPダメージは廃止。移動の生存圧は希望システム
+            // 飢餓→物資統合(ADR-0002): 旧・空腹HPダメージは廃止。移動の生存圧は物資システム
             // （横移動コスト＋絶望的な進軍）が担う。Hunger ゲージ更新は MoveTo 内で行われるが無害。
             mm.MoveTo(nodeId, Run.playerMaxHP);
 
@@ -407,26 +406,22 @@ namespace GameLoop
                 }
             }
 
-            // 希望(ADR-0002): 横移動(同行=row不変)で減少。縦/斜め移動は進行のため無料。
-            // 発狂(hope==0)中は秒読みを1消費し、尽きたらラン終了。絶望的な進軍(メタLv8)で全移動 -1。
-            bool hopeLateral = hopeFromNode != null && mm.CurrentNode != null
-                               && hopeFromNode.row == mm.CurrentNode.row && hopeFromNode != mm.CurrentNode;
             bool despairMarch = MetaProgression.MetaDebuffApplicator.IsDespairMarchActive();
 
-            // 挑戦デバフ 軸14〈焦燥〉: この層の踏破が閾値を超えたら、 1 マスごとに希望 −5。
+            // 挑戦デバフ 軸14〈焦燥〉: この層の踏破が閾値を超えたら、 1 マスごとに物資 −5。
             //   「長く彷徨うほど追い詰められる」形。 閾値以内なら一切効かないので、
             //   最短で降りるプレイには無害 ── 寄り道の対価としてだけ働く。
             Run.tilesThisFloor++;
             int impatienceMax = MetaProgression.MetaDebuffApplicator.GetImpatienceTileThreshold();
             if (impatienceMax > 0 && Run.tilesThisFloor > impatienceMax)
             {
-                HopeSystem.Reduce(Run, MetaProgression.MetaDebuffApplicator.ImpatienceHopeLoss);
-                Log($"焦燥: {Run.currentFloor}層 {Run.tilesThisFloor}マス目 (閾値{impatienceMax}) → 希望 -{MetaProgression.MetaDebuffApplicator.ImpatienceHopeLoss}");
+                ProvisionSystem.Reduce(Run, MetaProgression.MetaDebuffApplicator.ImpatienceProvisionLoss);
+                Log($"焦燥: {Run.currentFloor}層 {Run.tilesThisFloor}マス目 (閾値{impatienceMax}) → 物資 -{MetaProgression.MetaDebuffApplicator.ImpatienceProvisionLoss}");
             }
 
-            if (HopeSystem.ApplyMove(Run, hopeLateral, despairMarch))
+            if (ProvisionSystem.ApplyArrival(Run, despairMarch))
             {
-                Log("発狂: 秒読みが尽きてラン終了");
+                Log("燃え尽き: 佯狂者の冠で最大HPが尽きてラン終了");
                 Run.EndRun();
                 SetPhase(GamePhase.GameOver);
                 OnGameOver?.Invoke(Run);
@@ -1332,7 +1327,7 @@ namespace GameLoop
             // 層デバフ取得
             ActiveModifier = FloorModifierDatabase.Get(Run.currentFloor);
 
-            // 大穴の異常現象を抽選 (希望連動・1〜2件)
+            // 大穴の異常現象を抽選 (物資連動・1〜2件)
             MapSystem.AbyssPhenomena.AbyssPhenomenonRoller.RollForFloor(Run);
             foreach (var phen in Run.activePhenomena)
             {
@@ -1448,10 +1443,10 @@ namespace GameLoop
                 Log($"前哨基地: 不足HPの30%回復 +{Run.playerHP - beforeHP} → {Run.playerHP}/{Run.playerMaxHP}");
             }
 
-            // [撤回] 前哨基地の希望回復 (減少分の20%)。 2026-08-05 に試して即日撤回。
+            // [撤回] 前哨基地の物資回復 (減少分の20%)。 2026-08-05 に試して即日撤回。
             //   各層で発動し、 減っているほど回復量が増えるため実質「毎層リセット」になり、
-            //   最低希望 38.9 → 71.0 / 発狂到達率 15.6% → 0.4% と希望が資源でなくなった。
-            //   希望の回復は消費アイテム側 (cons_hope_*) で行う。
+            //   最低物資 38.9 → 71.0 / 発狂到達率 15.6% → 0.4% と物資が資源でなくなった。
+            //   物資の回復は消費アイテム側 (cons_hope_*) で行う。
 
             // MaxHPデバフ（崩れの共鳴等）
             if (ActiveModifier != null && ActiveModifier.maxHPBonus != 0)
@@ -1473,8 +1468,8 @@ namespace GameLoop
         {
             LastCombatResult = result;
 
-            // 希望(ADR-0002): 戦闘中 Run.playerHP は不変なので、ここでの値が戦闘開始時HP。
-            // 終了時HPと比較してHP収支(マイナス=希望減少)を判定する（ApplyBattleResult 後に適用）。
+            // 物資(ADR-0002): 戦闘中 Run.playerHP は不変なので、ここでの値が戦闘開始時HP。
+            // 終了時HPと比較してHP収支(マイナス=物資減少)を判定する（ApplyBattleResult 後に適用）。
             if (Run != null) Run.combatStartHP = Run.playerHP;
 
             // 2026-06-04: 素材経済の潤沢化（武器フル強化＋昇華5-10レンジを狙う）。
@@ -1590,11 +1585,11 @@ namespace GameLoop
 
             Run.ApplyBattleResult(result.playerWon, result.playerHPRemaining, result.totalTurns);
 
-            // 希望(ADR-0002): HP収支マイナス→床定量を減少／非マイナス→わずか回復。
-            // 飢餓→希望統合の再マップ: 暴食(トゥルハドの暴食)で損×2、HopeLossReduce メタバフで損を軽減。
-            float hopeLossMult = MetaProgression.PermanentDebuffEffects.HasGluttony(Run) ? 2f : 1f;
-            int hopeLossReduce = MetaProgression.MetaBuffApplicator.GetHopeLossReduction();
-            HopeSystem.ApplyCombatHpBalance(Run, hopeLossMult, hopeLossReduce);
+            // 物資(ADR-0002): HP収支マイナス→床定量を減少／非マイナス→わずか回復。
+            // 飢餓→物資統合の再マップ: 暴食(トゥルハドの暴食)で損×2、ProvisionLossReduce メタバフで損を軽減。
+            float provisionLossMult = MetaProgression.PermanentDebuffEffects.HasGluttony(Run) ? 2f : 1f;
+            int provisionLossReduce = MetaProgression.MetaBuffApplicator.GetProvisionLossReduction();
+            ProvisionSystem.ApplyCombatHpBalance(Run, provisionLossMult, provisionLossReduce);
 
             SetPhase(GamePhase.BattleResult);
             OnBattleEnded?.Invoke(result);
@@ -2075,10 +2070,10 @@ namespace GameLoop
 
         /// <summary>[計装] ボス突入時の状態を層別に積む (index 0 = 1層)。
         /// <b>「休憩で HP は戻るのに突破率が落ちる」の正体を掴むため。</b>
-        /// 戻らない資源 (希望・消耗品) が消えているなら、 ここに差が出る。</summary>
+        /// 戻らない資源 (物資・消耗品) が消えているなら、 ここに差が出る。</summary>
         public static readonly long[] BossEntryCount = new long[9];
-        public static readonly long[] BossEntryHope = new long[9];
-        public static readonly long[] BossEntryHopeTierSum = new long[9];  // 0=平穏..3=絶望
+        public static readonly long[] BossEntryProvision = new long[9];
+        public static readonly long[] BossEntryProvisionTierSum = new long[9];  // 0=平穏..3=絶望
         public static readonly long[] BossEntryConsumables = new long[9];
         public static readonly long[] BossEntryHpPct = new long[9];
         public static readonly long[] BossEntryPassives = new long[9];
@@ -2087,8 +2082,8 @@ namespace GameLoop
         public static void ResetBossEntryStats()
         {
             Array.Clear(BossEntryCount, 0, BossEntryCount.Length);
-            Array.Clear(BossEntryHope, 0, BossEntryHope.Length);
-            Array.Clear(BossEntryHopeTierSum, 0, BossEntryHopeTierSum.Length);
+            Array.Clear(BossEntryProvision, 0, BossEntryProvision.Length);
+            Array.Clear(BossEntryProvisionTierSum, 0, BossEntryProvisionTierSum.Length);
             Array.Clear(BossEntryConsumables, 0, BossEntryConsumables.Length);
             Array.Clear(BossEntryHpPct, 0, BossEntryHpPct.Length);
             Array.Clear(BossEntryPassives, 0, BossEntryPassives.Length);
@@ -2102,18 +2097,18 @@ namespace GameLoop
         /// 「払うアーム」の結果が<b>払えた率と代償の重さの混合</b>になり、
         /// どちらが効いているのか読めない。
         ///
-        /// <c>GateHopeBefore/After</c> は取り置き方策 (<c>AutoRunner.gateHopeReserveFromFloor</c>)
-        /// が効いているかの検算用。 払った後の希望が 45 (悲観・上限恒久ロック) を
+        /// <c>GateProvisionBefore/After</c> は取り置き方策 (<c>AutoRunner.gateProvisionReserveFromFloor</c>)
+        /// が効いているかの検算用。 払った後の物資が 45 (悲観・上限恒久ロック) を
         /// 割っていないかをここで見る。</summary>
         public static long GateReached;
         public static long GateBloodPaid, GateRelicsPaid, GateTransferPaid;
-        public static long GateHopeBefore, GateHopeAfter;
+        public static long GateProvisionBefore, GateProvisionAfter;
         public static long GateMaxHpPaid, GateRelicsBurned;
         public static void ResetGateStats()
         {
             GateReached = 0;
             GateBloodPaid = GateRelicsPaid = GateTransferPaid = 0;
-            GateHopeBefore = GateHopeAfter = 0;
+            GateProvisionBefore = GateProvisionAfter = 0;
             GateMaxHpPaid = GateRelicsBurned = 0;
         }
 
@@ -2123,8 +2118,8 @@ namespace GameLoop
             {
                 int fi = Mathf.Clamp(Run.currentFloor, 1, 8);
                 BossEntryCount[fi]++;
-                BossEntryHope[fi] += Run.hope;
-                BossEntryHopeTierSum[fi] += (int)HopeSystem.GetTier(Run);
+                BossEntryProvision[fi] += Run.provision;
+                BossEntryProvisionTierSum[fi] += (int)ProvisionSystem.GetTier(Run);
                 BossEntryConsumables[fi] += Run.ownedConsumables?.Count ?? 0;
                 BossEntryHpPct[fi] += Run.playerMaxHP > 0
                     ? Mathf.RoundToInt(Run.playerHP * 100f / Run.playerMaxHP) : 0;
@@ -2132,7 +2127,7 @@ namespace GameLoop
                 try { BossEntryPower[fi] += AutoTest.InventoryPower.Compute(Run); } catch { }
                 CombatSystem.BossCombatTrace.BeginFight(Run.currentFloor,
                     GameLoop.GameRng.RunIndex, "boss", Run.playerHP, Run.playerMaxHP,
-                    0, Run.hope, Run.ownedPassiveItems?.Count ?? 0);
+                    0, Run.provision, Run.ownedPassiveItems?.Count ?? 0);
             }
             // ボスの正体は **マス側に焼き付けてある** (FloorManager.EnsureEncounter)。
             //   3 層は 3 体プールからの抽選 (2026-07-29: ボス配置を 1/3/5/6/7 に絞った際、
@@ -2210,7 +2205,7 @@ namespace GameLoop
         //
         //  旧設計 (血の儀 / 貪欲の儀 / 遺品の儀) からの変更点:
         //    ・名前が機能を説明する。 「何を選んでいるのか」が読める。
-        //    ・代償が 3 種類とも別の資源 (最大HP / 遺物 / 希望)。 ゴールドは外した ──
+        //    ・代償が 3 種類とも別の資源 (最大HP / 遺物 / 物資)。 ゴールドは外した ──
         //      直前がショップなので、 ゴールドの要求は実質「買い物を我慢したか」にしかならず、
         //      選択ではなく所持金チェックだった。
         //    ・罰が 3 種類とも別のビルドを刺す (充電依存 / 一点集中 / 防御依存)。
@@ -2222,7 +2217,7 @@ namespace GameLoop
             gateRelicResolved = false;
             gateTransferResolved = false;
             GateReached++;
-            GateHopeBefore += Run.hope;   // [計装] 取り置き方策の検算用 (支払い前)
+            GateProvisionBefore += Run.provision;   // [計装] 取り置き方策の検算用 (支払い前)
             SetPhase(GamePhase.GateRitual);
             Log("地獄の果てに、大きな円盤が壁へ立てかけられている。横の文が、不思議と読める ── これは門だ。");
         }
@@ -2327,22 +2322,22 @@ namespace GameLoop
             Log($"遺物を門に捧げた。〈{string.Join("〉と〈", names)}〉は光を放った後、門の中で塵になって消えた。");
         }
 
-        /// <summary>③で支払う希望。</summary>
-        public const int GateHopeDemand = 40;
+        /// <summary>③で支払う物資。</summary>
+        public const int GateProvisionDemand = 400;   // 2026-09-28: 物資 ×10
 
         /// <summary>③「門が転移を開始した時、あなたの意識が薄れゆく…」
-        /// — 光に身を任せる = 希望 −40。 抗う/不足なら〈不完全な転移〉。</summary>
+        /// — 光に身を任せる = 物資 −40。 抗う/不足なら〈不完全な転移〉。</summary>
         public void OfferGateTransfer(bool accept)
         {
             if (CurrentPhase != GamePhase.GateRitual) return;
 
-            bool canPay = accept && !Run.lastStandActive && Run.hope >= GateHopeDemand;
+            bool canPay = accept && !Run.lastStandActive && Run.provision >= GateProvisionDemand;
             if (canPay)
             {
-                int before = Run.hope;
-                HopeSystem.Reduce(Run, GateHopeDemand);
+                int before = Run.provision;
+                ProvisionSystem.Reduce(Run, GateProvisionDemand);
                 GateTransferPaid++;
-                Log($"光に身を任せ、転移の行く末に思いを馳せた (希望 {before}→{Run.hope})");
+                Log($"光に身を任せ、転移の行く末に思いを馳せた (物資 {before}→{Run.provision})");
             }
             else
             {
@@ -2457,7 +2452,7 @@ namespace GameLoop
 
         /// <summary>
         /// 値下げ交渉 (=強盗) を実行。
-        /// 1. ShopManager.TryRobbery: 在庫スナップ・希望コスト・shopsBlocked, ショップを閉じる
+        /// 1. ShopManager.TryRobbery: 在庫スナップ・物資コスト・shopsBlocked, ショップを閉じる
         /// 2. 「怪しい商人」(shady_merchant) との特殊エリート戦に突入
         /// 3. HandleCombatEnd 内で勝利時=報酬付与/敗北時=HP1脱出 を分岐
         /// </summary>
@@ -2694,7 +2689,7 @@ namespace GameLoop
         /// 「そこへ向かう」判断は必ず先に済んでおり、 空だと分かるのは着いてから。
         /// 迂回で避けられない代わりに、 有利マスの期待値そのものが目減りする。
         ///
-        /// イベント側は効果も選択肢も持たない ── 罰は**この関数が一律で取る希望 −3** に
+        /// イベント側は効果も選択肢も持たない ── 罰は**この関数が一律で取る物資 −3** に
         /// 一本化する。 文面ごとに効果を散らすと、 どの文面を引いたかで罰が変わり、
         /// 空白化の確率だけを較正できなくなる。</summary>
         private bool TryVoidAdvantageTile(TileType type)
@@ -2708,14 +2703,14 @@ namespace GameLoop
             MetaProgression.MetaDebuffApplicator.VoidTileTriggers++;
 
             Log($"[破綻] {TileToJapanese(type)} は空白だった");
-            // **希望 −3 を必ず取る (2026-08-17)。**
+            // **物資 −3 を必ず取る (2026-08-17)。**
             //   空白化だけでは 4pt を払って p=0.103 の死に段だった (実測 −2.0pt)。
             //   有利マスを 1 つ失う痛みは「そこへ向かった手番が無駄になった」だけで、
             //   盤面には何も残らない ── 損失が観測されないので判断も変わらない。
-            //   希望を削れば以後の振り直し・進路選択に効き続けるので、罰が持続する。
+            //   物資を削れば以後の振り直し・進路選択に効き続けるので、罰が持続する。
             //   **空白化の 4 種すべてに一律で乗せる**。 文面ごとに差を付けると、
             //   イベント側に効果を持たせないという設計 (下の doc 参照) が崩れる。
-            HopeSystem.ApplyEvilChoice(Run, VoidTileHopeCost);
+            ProvisionSystem.ApplyEvilChoice(Run, VoidTileProvisionCost);
             var ee = EventSystem.EventEncounter.Instance;
             // 文面の抽選は**発動判定と別の乱数列**から引く。 同じ列を続けて消費すると、
             //   文面を増減しただけで発動の並びまで変わり、 シード固定のペア比較が壊れる。
@@ -2737,8 +2732,8 @@ namespace GameLoop
             return true;
         }
 
-        /// <summary>〈破綻〉の空白化で失う希望。 4 種の文面すべてに一律で掛かる。</summary>
-        private const int VoidTileHopeCost = 3;
+        /// <summary>〈破綻〉の空白化で失う物資。 4 種の文面すべてに一律で掛かる。</summary>
+        private const int VoidTileProvisionCost = 30;   // 2026-09-28: 物資 ×10
 
         /// <summary>〈破綻〉の空白化で呼ぶ召喚専用イベントの名前 (event_list.txt と一致させる)。
         ///
@@ -2952,7 +2947,7 @@ namespace GameLoop
         public void CompleteGateRitual()
         {
             if (CurrentPhase != GamePhase.GateRitual) return;
-            GateHopeAfter += Run.hope;    // [計装] 支払い後。 45 (悲観・上限恒久ロック) を割っていないか
+            GateProvisionAfter += Run.provision;    // [計装] 支払い後。 45 (悲観・上限恒久ロック) を割っていないか
             Log(Run.gateFlaws == GateFlaw.None
                 ? "門は完全に起動した。"
                 : $"門が起動した ── 不完全なまま: {Run.gateFlaws}");

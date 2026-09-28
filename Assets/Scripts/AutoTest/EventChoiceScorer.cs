@@ -11,7 +11,7 @@ namespace AutoTest
     /// 各選択肢の効果を数値スコアに変換し、現在の RunState（HP/空腹/コイン）で文脈補正する。
     ///
     /// 設計方針:
-    ///  - 「100G+希望損 vs なにもなし」は通常 100G を取る（ゴールド価値 > 希望コスト）
+    ///  - 「100G+物資損 vs なにもなし」は通常 100G を取る（ゴールド価値 > 物資コスト）
     ///  - 現在HPが低い、被ダメで致死圏ならHP損失を強く忌避
     ///  - 同様に空腹度・コイン量で文脈補正
     ///  - PriorityItemList の S/A 級は加点
@@ -137,10 +137,10 @@ namespace AutoTest
             int maxHP  = run != null ? UnityEngine.Mathf.Max(1, run.playerMaxHP) : 30;
             float hpPct = (float)hp / maxHP;
             int coins  = run != null ? run.coins : 0;
-            // 希望(ADR-0002): 飢餓を統合した精神ゲージ。低いほど回復価値↑・損失忌避↑。
-            int hopeVal = run != null ? run.hope : 100;
-            int hopeCap = run != null ? UnityEngine.Mathf.Max(1, run.hopeCap) : 100;
-            float hopePct = (float)hopeVal / hopeCap;
+            // 物資(ADR-0002): 飢餓を統合した精神ゲージ。低いほど回復価値↑・損失忌避↑。
+            int provisionVal = run != null ? run.provision : 100;
+            int provisionCap = run != null ? UnityEngine.Mathf.Max(1, run.provisionCap) : 100;
+            float provisionPct = (float)provisionVal / provisionCap;
 
             switch (e.type)
             {
@@ -212,18 +212,18 @@ namespace AutoTest
                 case EventEffectType.MaxHpDelta:
                     return e.amount * W_MAX_HP;
 
-                case EventEffectType.HungerDelta:   // 飢餓→希望統合(ADR-0002): 希望±N
+                case EventEffectType.HungerDelta:   // 飢餓→物資統合(ADR-0002): 物資±N
                 {
                     if (e.amount >= 0)
                     {
                         float w = W_HUNGER;
-                        if (hopePct < 0.45f) w *= 2.0f;   // 希望が悲観域(≤45)以下なら回復価値大
+                        if (provisionPct < 0.45f) w *= 2.0f;   // 物資が悲観域(≤45)以下なら回復価値大
                         return e.amount * w;
                     }
                     else
                     {
                         float w = W_HUNGER;
-                        if (hopePct < 0.45f) w *= 2.5f;   // 希望が低いほど損を忌避
+                        if (provisionPct < 0.45f) w *= 2.5f;   // 物資が低いほど損を忌避
                         return e.amount * w; // 負
                     }
                 }
@@ -258,7 +258,7 @@ namespace AutoTest
 
                 case EventEffectType.ObservatoryTakeCopy:
                 {
-                    // **NPC の帯同と同じ穴。** 即時効果が (素材+6 / 希望+8) しか無いので、
+                    // **NPC の帯同と同じ穴。** 即時効果が (素材+6 / 物資+8) しか無いので、
                     //   写し自体を 0 点にすると 3 バッチ連続で BOT が一度も取らなかった
                     //   (写し使用 0)。 価値は「次に博士へ会ったときの上乗せ」にある。
                     //

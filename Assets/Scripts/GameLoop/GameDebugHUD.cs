@@ -310,17 +310,16 @@ namespace GameLoop
 
         private string FormatStatus(RunState run)
         {
-            // 希望(ADR-0002): 飢餓・カルマを統合した精神ゲージ。床に応じて色分け、発狂/狂気スタックも表示。
-            var tier = HopeSystem.GetTier(run);
-            string hopeColor = run.hope <= HopeSystem.FloorDespair ? "#ff4444"
-                             : run.hope <= HopeSystem.FloorPessimism ? "#ffaa44"
-                             : run.hope <= HopeSystem.FloorFretful ? "#ffff66" : "#88ff88";
-            string madness = run.crownHopeLocked ? $" 狂気x{run.madnessStack}"
-                           : (run.madnessMoveCounter >= 0 ? $" 発狂{run.madnessMoveCounter}" : "");
-            string hope = $"  <color={hopeColor}>希望: {run.hope}/{run.hopeCap} [{tier}]{madness}</color>";
+            // 物資(ADR-0002): 飢餓・カルマを統合した精神ゲージ。床に応じて色分け、発狂/狂気スタックも表示。
+            var tier = ProvisionSystem.GetTier(run);
+            string provisionColor = run.provision <= ProvisionSystem.FloorScarce ? "#ff4444"
+                             : run.provision <= ProvisionSystem.FloorDepleting ? "#ffaa44"
+                             : run.provision <= ProvisionSystem.FloorDwindling ? "#ffff66" : "#88ff88";
+            string madness = run.crownProvisionLocked ? $" 狂気x{run.madnessStack}" : "";
+            string provision = $"  <color={provisionColor}>物資: {run.provision}/{run.provisionCap} [{ProvisionSystem.TierName(tier)}]{madness}</color>";
 
             return $"Floor: {run.currentFloor}/{run.maxFloor}  " +
-                   $"HP: {run.playerHP}/{run.playerMaxHP}{hope}  " +
+                   $"HP: {run.playerHP}/{run.playerMaxHP}{provision}  " +
                    $"コイン: {run.coins}";
         }
 
@@ -472,7 +471,7 @@ namespace GameLoop
                         : "交換マス: 渡せるパッシブが無い [Space] 通過";
                     break;
                 case GameManager.GamePhase.GateRitual:
-                    helpText = "門: [1] 血を捧げる(最大HP-25%) [2] 遺物2個を焚く [3] 光に身を任せる(希望-40) → [Space] 起動\n"
+                    helpText = "門: [1] 血を捧げる(最大HP-25%) [2] 遺物2個を焚く [3] 光に身を任せる(物資-40) → [Space] 起動\n"
                              + "  押下=捧げる / 未押下=拒む (拒んだ工程ぶん〈不完全な〜〉を背負う)";
                     break;
                 case GameManager.GamePhase.FloorClear:

@@ -10,7 +10,7 @@ namespace MetaProgression
         Gold,                // +1 開幕ゴールド
         DiceTotal,           // +1 ダイス合計値補正
         DamageReduce,        // -1 被ダメージ（最大-2、0未満にはならない）
-        HopeLossReduce,      // -1 戦闘後の希望ゲージ減少（最大-3、0未満にはならない）※ADR-0002 で飢餓は希望に統合
+        ProvisionLossReduce,      // -1 戦闘後の物資ゲージ減少（最大-3、0未満にはならない）※ADR-0002 で飢餓は物資に統合
         StartMaterial,       // +1 開幕の武器強化素材
         CombatGoldBonus,     // +1 戦闘勝利時の追加ゴールド
         BossExtraNormal,     // 大スキル: ボス撃破時、追加でノーマルパッシブ獲得

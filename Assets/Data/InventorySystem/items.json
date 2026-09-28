@@ -1276,7 +1276,7 @@
     {
       "id": "心軽めの巡礼杖",
       "name": "心軽めの巡礼杖",
-      "description": "戦闘終了時、希望+1。",
+      "description": "戦闘終了時、物資+10。",
       "flavorText": "杖には巡礼路の距離ではなく、捨てた荷物の名が刻まれている。終点近くの刻みほど小さく、最後には持ち主の名だけが残る。",
       "category": "Passive",
       "rarity": "SILVER",
@@ -1372,7 +1372,7 @@
     {
       "id": "笑い主不明の仮面",
       "name": "笑い主不明の仮面",
-      "description": "希望[悲観]以下で与ダメージ+10%、[絶望]以下なら+25%。",
+      "description": "物資[枯渇し始める]以下で与ダメージ+10%、[枯渇寸前]以下なら+25%。",
       "flavorText": "宴の出席簿に仮面の席が一つ設けられていた。酒杯は毎回空になり、翌朝には参加者が一人ずつ多く記帳されている。",
       "category": "Passive",
       "rarity": "SILVER",
@@ -1383,15 +1383,15 @@
           "stat": "dmgPct",
           "value": 25,
           "when": {
-            "hopeTierMin": "Despair"
+            "provisionTierMin": "Scarce"
           }
         },
         {
           "stat": "dmgPct",
           "value": 10,
           "when": {
-            "hopeTierMin": "Pessimism",
-            "hopeTierBelow": "Despair"
+            "provisionTierMin": "Depleting",
+            "provisionTierBelow": "Scarce"
           }
         }
       ]
@@ -1661,45 +1661,45 @@
     {
       "id": "湯気の立つ椀",
       "name": "湯気の立つ椀",
-      "description": "希望を 5 回復する。",
+      "description": "物資を 50 回復する。",
       "flavorText": "塩気だけの汁物。名を持たないが、名がなくても腹には落ちる。",
       "category": "Consumable",
       "rarity": "BRONZE",
       "basePrice": 4,
-      "consFamily": "hope",
+      "consFamily": "provision",
       "tier": 1
     },
     {
       "id": "古い手紙",
       "name": "古い手紙",
-      "description": "希望を 10 回復する。",
+      "description": "物資を 100 回復する。",
       "flavorText": "とうに返せぬ相手からのもの。読み返すたび、送り主の声を忘れていく。",
       "category": "Consumable",
       "rarity": "SILVER",
       "basePrice": 6,
-      "consFamily": "hope",
+      "consFamily": "provision",
       "tier": 2
     },
     {
       "id": "凱旋の記憶",
       "name": "凱旋の記憶",
-      "description": "希望を 15 回復する。",
+      "description": "物資を 150 回復する。",
       "flavorText": "誰の凱旋だったかは思い出せない。歓声の輪郭だけが、まだ胸のあたりに残っている。",
       "category": "Consumable",
       "rarity": "GOLD",
       "basePrice": 9,
-      "consFamily": "hope",
+      "consFamily": "provision",
       "tier": 3
     },
     {
       "id": "希望の欠片",
       "name": "希望の欠片",
-      "description": "希望を 20 回復する。",
+      "description": "物資を 200 回復する。",
       "flavorText": "希望とは名ばかりの劇薬。ただ折れぬように、次も立てるように、笑って死を迎えられるように。",
       "category": "Consumable",
       "rarity": "LEGENDARY",
       "basePrice": 13,
-      "consFamily": "hope",
+      "consFamily": "provision",
       "tier": 4
     },
     {
@@ -1852,7 +1852,7 @@
     {
       "id": "銭皿",
       "name": "銭皿",
-      "description": "ショップで買うたび、希望+1。",
+      "description": "ショップで買うたび、物資+10。",
       "flavorText": "縁の欠けた木皿。釣りを手渡ししない店の作法で、客と店主は最後まで指を合わせない。",
       "category": "Passive",
       "rarity": "SILVER",

@@ -144,14 +144,14 @@ namespace GameLoop
                 case "業火の膏薬": return AddTimedDmgMult(run, ctx, 50, -1);
                 case "天火の膏薬": return AddTimedDmgMult(run, ctx, 75, -1);
 
-                // 希望回復: +5/10/15/20 (2026-08-05 追加)。 **上限は伸びず、 現在値だけ戻す。**
-                //   希望は横移動 -5 / 戦闘 -N と一方的に減るだけで回復源が無かった。
+                // 物資回復: +50/100/150/200 (2026-08-05 追加・2026-09-28 に ×10)。 **上限は伸びず、 現在値だけ戻す。**
+                //   物資は横移動 -5 / 戦闘 -N と一方的に減るだけで回復源が無かった。
                 //   前哨基地での自動回復 (減少分の20%) は毎層リセットになり、 発狂到達率が
                 //   15.6% → 0.4% と資源性を失ったので棄却。 **ゴールドを払う形**に置き換えた。
-                case "湯気の立つ椀": return RecoverHope(run, 5);
-                case "古い手紙": return RecoverHope(run, 10);
-                case "凱旋の記憶": return RecoverHope(run, 15);
-                case "希望の欠片": return RecoverHope(run, 20);
+                case "湯気の立つ椀": return RecoverProvision(run, 50);
+                case "古い手紙": return RecoverProvision(run, 100);
+                case "凱旋の記憶": return RecoverProvision(run, 150);
+                case "希望の欠片": return RecoverProvision(run, 200);
 
                 // ===== 賢者の石: 10ゴールドを武器強化素材1に変換 (最大5回/ラン) =====
                 case ItemIds.PhilStone:
@@ -253,16 +253,16 @@ namespace GameLoop
             return true;
         }
 
-        /// <summary>希望回復 (cons_hope_*)。 **上限 hopeCap でクランプされ、 上限自体は伸びない。**
-        /// 佯狂者の冠で希望0固定中は <see cref="HopeSystem.Recover"/> 側が弾く。
+        /// <summary>物資回復 (cons_hope_*)。 **上限 provisionCap でクランプされ、 上限自体は伸びない。**
+        /// 佯狂者の冠で物資0固定中は <see cref="ProvisionSystem.Recover"/> 側が弾く。
         /// 既に満タンなら消費させない (false を返す) ── 無駄撃ちを防ぐ。</summary>
-        private static bool RecoverHope(RunState run, int amount)
+        private static bool RecoverProvision(RunState run, int amount)
         {
             if (run == null) return false;
-            if (run.hope >= run.hopeCap) return false;
-            int before = run.hope;
-            HopeSystem.Recover(run, amount);
-            return run.hope > before;
+            if (run.provision >= run.provisionCap) return false;
+            int before = run.provision;
+            ProvisionSystem.Recover(run, amount);
+            return run.provision > before;
         }
 
         /// <summary>開幕シールド (cons_def_*)。 戦闘中持続 (expireTurn=-1)、 天衣無縫減衰を適用。</summary>
@@ -325,7 +325,7 @@ namespace GameLoop
             return true;
         }
 
-        // 2026-08-04: RestoreHope は cons_food_* 専用だったため、 同系統の廃止とあわせて削除。
+        // 2026-08-04: RestoreProvision は cons_food_* 専用だったため、 同系統の廃止とあわせて削除。
 
         // ===== ボット支援: 種別判定 =====
 
@@ -380,8 +380,8 @@ namespace GameLoop
             return pick != null && Use(run, pick);
         }
 
-        // 2026-08-04: 食料 (希望回復) 系 cons_food_* を廃止。 消費アイテムを
-        //   回復 / シールド / 攻撃強化 の 3 系統に絞ったため、 IsFood / FoodHopeAmount /
-        //   TryUseBestFood もここで削除した。 希望の回復手段はイベント・報酬側に残っている。
+        // 2026-08-04: 食料 (物資回復) 系 cons_food_* を廃止。 消費アイテムを
+        //   回復 / シールド / 攻撃強化 の 3 系統に絞ったため、 IsFood / FoodProvisionAmount /
+        //   TryUseBestFood もここで削除した。 物資の回復手段はイベント・報酬側に残っている。
     }
 }

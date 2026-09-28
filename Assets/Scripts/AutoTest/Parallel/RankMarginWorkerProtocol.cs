@@ -65,9 +65,9 @@ namespace AutoTest.ParallelSweep
         /// <b>「値を変えたのに効いていない」を数字で切り分けるために要る。</b>
         /// 発動数が同じでも配った HP が変わっていなければ、 変更が届いていない。</summary>
         public long revivalHpRestored;
-        /// <summary>燈火 r10: 希望で払った回数と希望の総消費。</summary>
-        public long hopePayments;
-        public long hopeSpent;
+        /// <summary>燈火 r10: 物資で払った回数と物資の総消費。</summary>
+        public long provisionPayments;
+        public long provisionSpent;
         /// <summary>金庫 r10: 層跨ぎの倍化回数 / 増えたゴールド / 上限に当たった回数。</summary>
         public long vaultDoublings;
         public long vaultGoldGained;
@@ -92,8 +92,8 @@ namespace AutoTest.ParallelSweep
         public long[] robberyByFloor = new long[7];
         /// <summary>ボス突入時の状態 (index = 層)。 休憩で戻らない資源の消耗を見る。</summary>
         public long[] bossEntryCount = new long[9];
-        public long[] bossEntryHope = new long[9];
-        public long[] bossEntryHopeTier = new long[9];
+        public long[] bossEntryProvision = new long[9];
+        public long[] bossEntryProvisionTier = new long[9];
         public long[] bossEntryConsumables = new long[9];
         public long[] bossEntryHpPct = new long[9];
         public long[] bossEntryPassives = new long[9];
@@ -106,7 +106,7 @@ namespace AutoTest.ParallelSweep
         /// 分けないとアームの結果が「払えた率 × 代償の重さ」の混合になる。</summary>
         public long gateReached;
         public long gateBloodPaid, gateRelicsPaid, gateTransferPaid;
-        public long gateHopeBefore, gateHopeAfter;
+        public long gateProvisionBefore, gateProvisionAfter;
         public long gateMaxHpPaid, gateRelicsBurned;
 
         /// <summary>[計装 2026-09-14] atkBase の <c>パッシブ加算</c> の内訳。
@@ -243,12 +243,12 @@ namespace AutoTest.ParallelSweep
                 //   運ぶ可能性のあるフィールドは全部ここに並べること。
                 "useIttBeta", "lockWeaponFamily", "metaBuildAxis", "sweepAllMetaAxes",
                 "challengeSpec", "metaRankSpec",
-                "robberySurcharge", "robberyFinalShopOnly", "robberyHopeCost", "bossTraceFloor",
+                "robberySurcharge", "robberyFinalShopOnly", "robberyProvisionCost", "bossTraceFloor",
                 // 〈門〉の 3 工程 (2026-09-14)。 アームごとに切り替えるので**必ず印字する**
                 //   ── 送ったつもりの値ではなく、 入っていた値を読む。
                 "gateBotPaysBlood", "gateBotPaysRelics", "gateBotPaysTransfer", "gateBotSkipsAll",
                 "gateRepairDrainPct", "gateIgnitionAttackCutPct", "gatePierceRate",
-                "gateHopeReserveFromFloor", "saberWaltzShopBias", "enemyAttackSpec", "enemyAttackMul", "enemyHpSpec", "superRerollMode", "superLightRerollSamples", "superLightExactMaxDice", "logWiringDiff", "eliteUpgradePctOverride", "eliteRewardMul", "flatAttackMul",
+                "gateProvisionReserveFromFloor", "saberWaltzShopBias", "enemyAttackSpec", "enemyAttackMul", "enemyHpSpec", "superRerollMode", "superLightRerollSamples", "superLightExactMaxDice", "logWiringDiff", "eliteUpgradePctOverride", "eliteRewardMul", "flatAttackMul",
                 // 航行配点のエリート評価 (2026-09-15)。 BOT の手そのものを変えるので必ず印字する。
                 "eliteNavBase", "eliteNavHpBonus", "navEliteCost",
                 // 戦闘報酬の配分 (2026-09-15)。 **3 つはセットで意味を持つ** ので 3 つとも印字する

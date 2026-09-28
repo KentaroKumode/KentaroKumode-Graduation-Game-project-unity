@@ -1,15 +1,15 @@
 namespace GameLoop
 {
     /// <summary>
-    /// [佯狂者] セット（鈴/杖/衣/冠）の定義と所持数ヘルパ。発狂(希望0)連動アイテム群。
-    /// 設計: docs/adr/0002-hope-system.md（佯狂者シリーズ）。状態は RunState.ownedPassiveItems を読むだけ。
+    /// [佯狂者] セット（鈴/杖/衣/冠）の定義と所持数ヘルパ。発狂(物資0)連動アイテム群。
+    /// 設計: docs/adr/0002-provision-system.md（佯狂者シリーズ）。状態は RunState.ownedPassiveItems を読むだけ。
     /// </summary>
     public static class YokyoSet
     {
         public const string Bell  = "佯狂者の鈴";  // BRONZE: 発狂中、他の佯狂者がショップに出やすい
         public const string Staff = "佯狂者の杖";  // SILVER: 発狂中、他の佯狂者数×1 ダイス合計
         public const string Garb  = "佯狂者の衣";  // GOLD:   発狂中、他の佯狂者数×30% 与ダメ
-        public const string Crown = "佯狂者の冠";  // LEGENDARY: 発狂で希望0固定・フルセットで燃え尽き＋スケール
+        public const string Crown = "佯狂者の冠";  // LEGENDARY: 発狂で物資0固定・フルセットで燃え尽き＋スケール
 
         public static readonly string[] All = { Bell, Staff, Garb, Crown };
 

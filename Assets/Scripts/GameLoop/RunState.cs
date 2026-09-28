@@ -447,18 +447,16 @@ namespace GameLoop
         /// 廃止理由と代償は <see cref="GameManager.WeaponUpgradeCost"/> のコメント参照。</summary>
         public int limitBreakStage;
 
-        // === 希望（カルマ＋飢餓を統合・ADR-0002 / 正本: docs/GAME.md §5・adr/0002-hope-system.md） ===
+        // === 物資（旧・希望。カルマ＋飢餓を統合した ADR-0002 の後継 / 正本: docs/GAME.md §10） ===
 
-        /// <summary>希望ゲージ(0-100)。開始100。被弾HP収支マイナス・横移動・悪選択・絶望的な進軍で減少し、
-        /// HP収支非マイナス勝利と食料で回復。床(75/45/20)ごとにデバフが累積し、0で発狂(秒読み)。
-        /// 後ろ重心: 上は暇・終盤は絶望。ロジックは <see cref="HopeSystem"/>。</summary>
-        public int hope;
+        /// <summary>物資ゲージ(0-1000)。開始1000。移動（距離に応じて）・被弾HP収支マイナス・悪選択で減少し、
+        /// 戦闘の報酬・補給庫・前哨基地・ショップ・食料で補給する。床(750/450/200)ごとにデバフが累積し、
+        /// 0（払底）の間は移動に HP を払う。ロジックは <see cref="ProvisionSystem"/>。</summary>
+        public int provision;
 
-        /// <summary>希望の上限。**一方向のラチェット** ── 希望が 45 以下になったら上限 45、
-        /// 20 以下になったら上限 20 に固定され、回復してもその値を超えられない
-        /// (<see cref="HopeSystem"/> の UpdateCapLock)。
-        /// 75帯までは上限100のまま完全回復可。</summary>
-        public int hopeCap;
+        /// <summary>物資の上限（素の 1000 ＋ 整備パネル − 挑戦デバフ）。
+        /// **2026-09-28 にラチェット（45 / 20 以下で上限を固定）を撤廃** ── 燃料のように補給できる資源にした。</summary>
+        public int provisionCap;
 
         /// <summary>防御 r10 (極点): 前戦闘の残りシールドの <b>50%</b> (2026-09-12)。
         /// 次の戦闘の開幕シールドへ加算して 0 に戻す。
@@ -470,16 +468,15 @@ namespace GameLoop
         /// 極点が未解禁でも数えるが、 参照されないので無害。</summary>
         public int battleSpiritWins;
 
-        /// <summary>戦闘開始時HPのスナップショット。戦闘終了時HPと比較してHP収支(マイナス=希望減少)を判定する。</summary>
+        /// <summary>戦闘開始時HPのスナップショット。戦闘終了時HPと比較してHP収支(マイナス=物資減少)を判定する。</summary>
         public int combatStartHP;
 
-        /// <summary>発狂(hope==0)時の残り移動回数。-1=非発狂。0到達でラン終了。hope>=10 回復で-1へリセット。</summary>
-        public int madnessMoveCounter = -1;
+        // 2026-09-28: madnessMoveCounter（発狂の 5 移動秒読み）は発狂の撤廃に伴い削除。
 
-        /// <summary>佯狂者の冠: 発狂したら true。希望を0固定し、回復を拒否する（ラン中不変）。</summary>
-        public bool crownHopeLocked;
+        /// <summary>佯狂者の冠: 払底したら true。物資を0固定し、回復を拒否する（ラン中不変）。</summary>
+        public bool crownProvisionLocked;
 
-        /// <summary>佯狂者の冠フルセット時の「狂気スタック」。移動毎+1。最大HP-スタック・与ダメ+スタック×4%。
+        /// <summary>佯狂者の冠フルセット時の「狂気スタック」。払底中に点へ着くたび+1。最大HP-スタック・与ダメ+スタック×4%。
         /// 最大HPが尽きると燃え尽きてラン終了。</summary>
         public int madnessStack;
 
@@ -645,24 +642,23 @@ namespace GameLoop
             diceEnhanceValues.Clear();
             weaponPlus = 0;
             limitBreakStage = 0;
-            // 2026-07-25 v6: 燈火 r10 で希望上限 +N (通常 0、r10 で +10)
-            int hopeCapBonus = MetaProgression.MetaBuffApplicator.GetHopeCapBonus();
-            // 挑戦デバフ 軸5〈絶望的な戦闘〉T2: 希望上限 −5。
+            // 燈火: 物資上限 +150/段 (2026-09-28 に ×10)
+            int provisionCapBonus = MetaProgression.MetaBuffApplicator.GetProvisionCapBonus();
+            // 挑戦デバフ 軸5〈絶望的な戦闘〉: 物資上限 −40/−80/−120。
             // **整備パネル適用後に足す** (plan §6-4)。 先に引くとパネル側の計算で薄まる。
-            int hopeCapPenalty = MetaProgression.MetaDebuffApplicator.GetHopeCapDelta();
-            hopeCap = UnityEngine.Mathf.Max(1, HopeSystem.HopeMax + hopeCapBonus + hopeCapPenalty);
-            hope    = hopeCap;
+            int provisionCapPenalty = MetaProgression.MetaDebuffApplicator.GetProvisionCapDelta();
+            provisionCap = UnityEngine.Mathf.Max(1, ProvisionSystem.ProvisionMax + provisionCapBonus + provisionCapPenalty);
+            provision    = provisionCap;
 
-            // 遺物軸〈渇き〉: **開幕希望を下げる**（既定 60）。 上限 (hopeCap) は動かさない。
-            //   この軸は「希望 ≤ hopeCap×40% の間だけ与ダメ+N%」なので、 開幕 100 のままだと
+            // 遺物軸〈渇き〉: **開幕物資を下げる**（既定 600）。 上限 (provisionCap) は動かさない。
+            //   この軸は「物資 ≤ 600 の間だけ与ダメ+N%」なので、 開幕 1000 のままだと
             //   序盤に一度も発動せず、 実測で 1〜3層の与ダメが遺物なしと同じ (+2.5%) だった。
             //   軸が**自分で発動条件を作る**形にして、 最初から圧倒的な火力を出す代わりに
-            //   希望という資源を丸ごと前借りする ── 賭けとして自己完結させる。
-            int hopeStartCap = MetaProgression.Relics.RelicApplicator.GetHopeBurnStartHope();
-            if (hopeStartCap > 0) hope = UnityEngine.Mathf.Min(hope, hopeStartCap);
+            //   物資という資源を丸ごと前借りする ── 賭けとして自己完結させる。
+            int provisionStartCap = MetaProgression.Relics.RelicApplicator.GetProvisionBurnStartProvision();
+            if (provisionStartCap > 0) provision = UnityEngine.Mathf.Min(provision, provisionStartCap);
             combatStartHP = 0;
-            madnessMoveCounter = -1;
-            crownHopeLocked = false;
+            crownProvisionLocked = false;
             madnessStack = 0;
             ClearPendingCombatConsumables();
             nextLootMinRarity = -1;

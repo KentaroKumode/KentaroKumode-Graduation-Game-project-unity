@@ -405,7 +405,7 @@ namespace InventorySystem.PassiveSkills
         ///
         /// <para><c>criticalMultiplier</c> を直接下げないのは、 あちらが BeginNewTurn で
         /// メタ値+遺物から**毎ターン再構築される**ため。 パッシブ側で書き換えても、
-        /// その後に走る加算 (メタ精密 r10 の還元・希望系) に押し流されて効かない。
+        /// その後に走る加算 (メタ精密 r10 の還元・物資系) に押し流されて効かない。
         /// 会心倍率が実際に乗る 1 箇所 (PassiveSkillManager の isCritical 分岐) で引く。</para></summary>
         public float enemyCritMultReduction = 0f;
 
@@ -721,7 +721,7 @@ namespace InventorySystem.PassiveSkills
             lentTimeTier = 0;
             rollLossOccurredThisCombat = false;
             hourglassPendingDamageWindow = 0;
-            // 会心倍率: 基礎 2.0 + メタバフ Lv58 (会心ダメージ +X%)。 他バフ (HopeSystem苦悩・パッシブ) と加算合成。
+            // 会心倍率: 基礎 2.0 + メタバフ Lv58 (会心ダメージ +X%)。 他バフ (ProvisionSystem苦悩・パッシブ) と加算合成。
             criticalMultiplier = MetaProgression.MetaBuffApplicator.GetCriticalMultiplier()
                                  + MetaProgression.MetaBuffApplicator.GetCritDamageBonus();
             accumulatedValues = new Dictionary<string, float>();
@@ -915,7 +915,7 @@ namespace InventorySystem.PassiveSkills
             forceCritical = false;
             critSuppressed = false;
             critRatePctAdd = 0f;
-            // 会心倍率: 基礎 3.0 (2026-07-26 リバランス) + メタバフ。 他バフ (HopeSystem苦悩・パッシブ) と加算合成。
+            // 会心倍率: 基礎 3.0 (2026-07-26 リバランス) + メタバフ。 他バフ (ProvisionSystem苦悩・パッシブ) と加算合成。
             criticalMultiplier = MetaProgression.MetaBuffApplicator.GetCriticalMultiplier()
                                  + MetaProgression.MetaBuffApplicator.GetCritDamageBonus();
 
