@@ -178,6 +178,13 @@ function genMap() {
   for (let attempt = 0; attempt < 40; attempt++) { const r = genMapOnce(); if (r) return r; }
   MTS = []; return genMapOnce();
 }
+function shortestPlain(from, to) {
+  const d = N.map(() => 1e9), used = N.map(() => false); d[from] = 0;
+  for (;;) { let u = -1; for (let i = 0; i < N.length; i++) if (!used[i] && (u < 0 || d[i] < d[u])) u = i;
+    if (u < 0 || d[u] >= 1e9 || u === to) break; used[u] = true;
+    for (const v of adj[u]) { const nd = d[u] + dist(N[u], N[v]); if (nd < d[v]) d[v] = nd; } }
+  return d[to];
+}
 function genMapOnce() {
   MTS = [];
   const nm = MOUNT_MIN + Math.floor(rnd() * MOUNT_EXTRA);
@@ -203,6 +210,17 @@ function genMapOnce() {
   for (const [d, i, j] of pairs) if (d < 1.9 && rnd() < 0.45 && ok(i, j) && !E.some(([a, b]) => (a === i && b === j))) E.push([i, j]);
   adj = N.map(() => []);
   for (const [a, b] of E) { adj[a].push(b); adj[b].push(a); }
+  // 行き止まりを潰す (2026-09-28): 敵は道しか歩けないので、 行き止まりへ誘い込んで道の外へ抜けると必ず振り切れた。
+  // 次数 1 の点を、 まだ道の無い近い点 (距離 2.6 以内・交差しない) とつなぐ
+  const link = (i, j) => { E.push([i, j]); adj[i].push(j); adj[j].push(i); };
+  for (let i = 0; i < N.length; i++) {
+    if (adj[i].length !== 1) continue;
+    const cand = N.map((_, j) => j).filter(j => j !== i && !adj[i].includes(j) && dist(N[i], N[j]) <= 2.6 && ok(i, j)).sort((a, b) => dist(N[i], N[a]) - dist(N[i], N[b]));
+    if (cand.length) link(i, cand[0]);
+  }
+  // 遠回りを減らす: 直線で近いのに道だと 2 倍以上かかる組に、 交差しなければ近道を足す
+  for (const [d, i, j] of pairs) { if (d > 2.2) break; if (adj[i].includes(j) || !ok(i, j)) continue;
+    const path = shortestPlain(i, j); if (path > d * 2) link(i, j); }
   { const seen = new Set([0]), q = [0]; while (q.length) { const u = q.shift(); for (const v of adj[u]) if (!seen.has(v)) { seen.add(v); q.push(v); } }
     if (seen.size < N.length) return null; }                       // 山岳で分断されたら引き直す
   // 敵の縄張り: 層の中ほどの一角。 中心から道でつながった 6〜9 点（幅優先で広げるので必ずつながる）
