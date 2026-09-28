@@ -105,7 +105,8 @@ const P = {
   kehaiRoad: 2, kehaiBattle: 2, battleKehaiTurns: 2, detectBase: 2,
   detectCap: 4,                                                   // 最大察知距離: 照明なしは魔石の範囲 (4) を超えない
   cacheNoise: 3,                                                  // 補給庫を漁った物音（気配は上げない）
-  enemyPatrol: 0.5, enemyChase: 1.0, lostTurns: 3, catchDist: 0.45,
+  enemyPatrol: 0.5, enemyChase: 1.0, lostTurns: 5, catchDist: 0.45,
+  chaseDetectBonus: 1.5,                                          // 追跡中だけ察知距離に足す (2026-09-28: 道の外へ出れば必ず振り切れた)
   trackRoad: 3, trackOff: 1, battleNoise: 4,                       // C: 物音 6 → 4
   fleeSup: 100, fleeFreezeTurns: 2,
   rewSup: { battle: 30, elite: 80, gauntlet: 300, base: 150 }, hpLoss: [40, 50, 70, 100],
@@ -123,19 +124,17 @@ const P = {
 // 徘徊エネミーの性質 (2026-09-28)。 数値は全部仮置き。 docs/GAME.md §5-9
 const PROFILES = {
   standard:   { name: "徘徊者",     desc: "基準" },
-  hound:      { name: "猟犬",       desc: "追跡中の速さ 1.6・見失うまで 5 手番", chase: 1.6, lost: 5 },
   shadow:     { name: "影",         desc: "追跡中は魔石に一切反応しない・察知の合図も出ない", chase: 1.2, silent: true },
-  summoner:   { name: "使役者",     desc: "本体は遅いが使い魔を同時に 2 体・4 手番ごとに放つ", chase: 0.8, famMax: 2, famCooldown: 4 },
+  altar:      { name: "祭壇",       desc: "一歩も動かない。察知距離 +2。察知している間は 2 手番ごとに使い魔を放つ（同時 3 体まで）。触れれば壊せる（連戦）", stationary: true, sense: 2, famMax: 3, famCooldown: 2 },
   pouncer:    { name: "飛び掛かり", desc: "追跡中、距離 2.5 以内なら道を外れて直進する", chase: 1.4, lunge: 2.5 },
   echo:       { name: "木霊",       desc: "魔石の方角が 2 つ出る（片方は木霊の偽物で、2 手番ごとに飛ぶ。本物は敵の動きに付いてくる）", echo: 2 },
   lampEater:  { name: "灯喰い",     desc: "照明中は察知距離 7。半径 9 の照明に寄ってくる", flareDetect: 7, flareLure: 9 },
-  blind:      { name: "盲目",       desc: "目が無い（気配で察知しない）。物音 2 倍の範囲・急ぐ足音（半径 2）・痕跡で追う。痕跡を辿る間だけ 1.5 倍速い", blind: true, hearMul: 2, trackMul: 1.5 },
-  listener:   { name: "聞き耳",     desc: "巡回中でも半径 6 の物音（戦闘・補給庫・囮）に寄ってくる", hear: 6 },
+  blind:      { name: "盲目",       desc: "目が無い（気配で察知しない）。物音 2 倍の範囲（最低でも半径 6）・急ぐ足音（半径 2）・痕跡で追う。痕跡を辿る間だけ 1.5 倍速い", blind: true, hearMul: 2, hear: 6, trackMul: 1.5 },
   gravekeeper:{ name: "墓守",       desc: "戦闘の跡の点を巡回路に加えていく（歩いた跡ほど危なくなる）", grave: true },
   wanderer:   { name: "放浪",       desc: "縄張りを持たず、層全体をゆっくり巡回する", roam: true, patrol: 0.4 },
   nest:       { name: "巣籠もり",   desc: "補給庫の上から動かない。追跡しても見失えば巣へ戻る", nest: true },
   dormant:    { name: "目覚め",     desc: "眠っている。近く（半径 6）の物音が 3 回で起きる", dormant: 3 },
-  relentless: { name: "執念",       desc: "一度察知したら見失わない（ただし追跡の速さ 0.7）", chase: 0.7, relentless: true },
+  relentless: { name: "執念",       desc: "一度察知したら見失わない（ただし追跡の速さ 0.8）", chase: 0.8, relentless: true },
   swarm:      { name: "群れ",       desc: "弱い徘徊エネミー 3 体。捕まると 1 戦だけ", swarm: 3 },
   weaver:     { name: "網張り",     desc: "巡回路に見えない網を撒く（踏むと 1 手番動けない・偵察/照明で見える）", webs: true },
 };
@@ -362,7 +361,7 @@ function planFoe(f) {
 }
 function returnToRoad(f) { const n = nearestNode(f.lunge); f.lunge = null; f.a = f.b = n; f.t = 0; planFoe(f); }
 function advanceFoe(f, amount) {
-  if (!f.alive || f.freeze > 0 || f.state === "眠り") return;
+  if (!f.alive || f.freeze > 0 || f.state === "眠り" || PR().stationary) return;
   const pr = PR();
   if (pr.lunge) {   // 飛び掛かり: 追跡中で近ければ道を外れて直進
     if (f.state === "追跡") { const fp = foePos(f), d = dist(fp, S.me);
@@ -397,11 +396,12 @@ function growTerritory(f, j, asWaypoint) {
 
 // ═══ 使い魔 ═══════════════════════════════════════════════════
 function launchFamiliar(f) {
-  if (S.famKey === "none") return;
+  const kind = S.famKey !== "none" ? S.famKey : PR().stationary ? "cruise" : null;   // 祭壇は使い魔が本体なので「なし」でも巡航を撃つ
+  if (!kind) return;
   const pr = PR(), max = pr.famMax || P.famMax, cd = pr.famCooldown || P.famCooldown;
   if (f.famCd > 0 || S.familiars.filter(m => m.owner === f).length >= max) return;
   const fp = foePos(f);
-  S.familiars.push({ x: fp.x, y: fp.y, tx: S.me.x, ty: S.me.y, kind: S.famKey, owner: f, life: P.famHomingTurns, split: false });
+  S.familiars.push({ x: fp.x, y: fp.y, tx: S.me.x, ty: S.me.y, kind, owner: f, life: P.famHomingTurns, split: false });
   f.famCd = cd;
 }
 function advanceFamiliars(dt) {
@@ -528,14 +528,16 @@ function turnFoe(f) {
   if (f.freeze > 0) { f.freeze--; if (f.freeze === 0) { f.state = f.freezeResume; f.lost = 0; planFoe(f); log(f.state === "追跡" ? "徘徊エネミーが追跡を再開した。" : "（徘徊エネミーが動き出した気配がする）"); f.freezeResume = "追跡"; } return; }
   if (f.state === "眠り") return;
   const pr = PR(), fp = foePos(f);
+  if (pr.stationary && f.state === "警戒") f.state = "巡回";   // 祭壇は探しに行けないので、 見失えばそのまま待つ
   if (pr.webs && f.state === "巡回" && ++f.webTimer >= P.webEvery) { f.webTimer = 0; S.webs.push({ x: fp.x, y: fp.y, seen: false }); if (S.webs.length > P.webMax) S.webs.shift(); }
   if (pr.flareLure && S.flare && f.state !== "追跡" && dist(fp, S.me) <= pr.flareLure) { f.state = "警戒"; f.lastKnown = { x: S.me.x, y: S.me.y }; planFoe(f); }
-  const d = dist(fp, S.me), R = detectR();
+  const d = dist(fp, S.me), R = detectR() + (f.state === "追跡" ? P.chaseDetectBonus : 0) + (pr.sense || 0);
   let seen = false;
   if (pr.blind) seen = d <= 0.9;   // 盲目: 触れるほど近ければ分かる
   else if (d <= R) { const roll = d6(), need = Math.min(6, Math.max(1, Math.floor(R - d + 1))); seen = roll <= need; }
   if (seen) {
     if (f.state !== "追跡") { if (!pr.silent) { log("（どこかで何かがこちらを嗅ぎつけた）"); sfxDetected(); } launchFamiliar(f); }
+    if (pr.stationary) launchFamiliar(f);   // 祭壇: 察知している間は冷却ごとに撃ち続ける
     f.state = "追跡"; f.lost = 0; f.tracking = false; f.lastKnown = { x: S.me.x, y: S.me.y }; planFoe(f);
   } else if (f.state === "追跡") {
     if (++f.lost >= lostTurns()) { f.state = "警戒"; f.lastKnown = f.lastKnown || { x: S.me.x, y: S.me.y }; }
