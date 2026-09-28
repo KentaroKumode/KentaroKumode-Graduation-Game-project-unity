@@ -117,6 +117,12 @@ namespace GameLoop
         {
             var ctx = ActiveCtx();
 
+            // 自由移動のマップで使う消耗品 (2026-09-28)。 **系統で判定する** ── id を綴りで読まない。
+            //   戦闘中・自由移動でない層では使えない (false = 消費しない)。
+            string mapFamily = ItemIds.ConsFamilyOf(id);
+            if (mapFamily == ItemIds.ConsDecoyFamily) return GameManager.Instance != null && GameManager.Instance.TryPlaceDecoy();
+            if (mapFamily == ItemIds.ConsTrapFamily)  return GameManager.Instance != null && GameManager.Instance.TryPlaceTrap();
+
             switch (id)
             {
                 // ===== 3 系統 × Tier1〜4 (2026-08-04 再編。 詳細と経緯は ItemIds.ConsHealFamily 近傍) =====

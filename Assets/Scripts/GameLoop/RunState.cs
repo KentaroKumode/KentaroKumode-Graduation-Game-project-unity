@@ -677,11 +677,12 @@ namespace GameLoop
                 totalWins++;
         }
 
-        /// <summary>フロアを進める</summary>
+        /// <summary>フロアを進める。 **2 層と 4 層は削除済み**で 1 → 3 → 5 → 6 → 7 → 8 と飛ぶ
+        /// (2026-09-28・正本は <see cref="MapSystem.FreeMove.FloorPlan"/>)。 内部の層番号は深さのまま。</summary>
         public bool AdvanceFloor()
         {
             if (currentFloor >= maxFloor) return false;
-            currentFloor++;
+            currentFloor = MapSystem.FreeMove.FloorPlan.Next(currentFloor);
             bossDefeatedThisFloor = false;
             outpostUpgradeUsedThisFloor = false; // 層が変わるたびに前哨基地強化を再解禁
             return true;

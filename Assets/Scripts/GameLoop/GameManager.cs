@@ -16,7 +16,7 @@ namespace GameLoop
     /// マップベース進行: 3レーン×10行のマップを探索し、タイルイベントを処理する。
     /// ビジュアル/UIは別コンポーネントがイベントを購読して実装する想定。
     /// </summary>
-    public class GameManager : MonoBehaviour
+    public partial class GameManager : MonoBehaviour
     {
         // === シングルトン ===
         private static GameManager _instance;
@@ -339,6 +339,11 @@ namespace GameLoop
             CurrentEnemy = null;
             IsEliteSecondFight = false;
             inFalseMerchantCombat = false;
+            _inGauntlet = false;
+            _gauntletCount = 0;
+
+            // 自由移動のマップの消耗品: 囮・罠を 1 個ずつ (2026-09-28)
+            GrantStartingMapTools();
 
             SetPhase(GamePhase.RunStart);
             MetaProgression.Achievements.AchievementService.BeginRun(Run);
@@ -348,14 +353,37 @@ namespace GameLoop
             EnterFloor();
         }
 
-        /// <summary>マップ上のノードへ移動</summary>
+        /// <summary>マップ上のノードへ移動。
+        ///
+        /// <para><b>自由移動の層</b>（2026-09-28）では行き先を決めるだけで、 移動は時間とともに進む
+        /// （<see cref="TravelTo"/>）。 人の時計 (<c>FreeMapClock</c>) が無い場面 ── 旧来の UI・デバッグキー・
+        /// テスト ── では、 着く (または捕まる・倒れる) まで同期的に進める。</para>
+        ///
+        /// <para>Λ 環状線と 8 層は離散のまま、 1 手で隣へ動く。</para></summary>
         public void MoveToNode(string nodeId)
         {
             Debug.Log($"[GameManager] MoveToNode: {nodeId} (phase={CurrentPhase})");
             if (CurrentPhase != GamePhase.MapNavigation) return;
 
             var mm = MapManager.Instance;
+            if (mm != null && mm.IsFreeMap)
+            {
+                TravelTo(nodeId, runSyncIfNoClock: true);
+                return;
+            }
 
+            BeforeNodeEntered();
+
+            // 飢餓→物資統合(ADR-0002): 旧・空腹HPダメージは廃止。
+            // Hunger ゲージ更新は MoveTo 内で行われるが無害。
+            mm.MoveTo(nodeId, Run.playerMaxHP);
+
+            AfterNodeEntered();
+        }
+
+        /// <summary>点に入る前のフック (離散の 1 手 / 自由移動の到着で共通)。</summary>
+        private void BeforeNodeEntered()
+        {
             // マップ移動時系時限効果（翼の恩寵・警戒心・導きの光等）
             EventSystem.TimedEffects.TimedEffectManager.OnMapMove(Run);
 
@@ -364,10 +392,13 @@ namespace GameLoop
 
             // メタ: ノード踏破トークン
             MetaProgression.MetaTokenEarner.OnNodeVisited();
+        }
 
-            // 飢餓→物資統合(ADR-0002): 旧・空腹HPダメージは廃止。移動の生存圧は物資システム
-            // （横移動コスト＋絶望的な進軍）が担う。Hunger ゲージ更新は MoveTo 内で行われるが無害。
-            mm.MoveTo(nodeId, Run.playerMaxHP);
+        /// <summary>点に入った後の処理 (離散の 1 手 / 自由移動の到着で共通): 戦闘名の開示・
+        /// 異常現象・Λ の次元の乱れ・〈焦燥〉・絶望的な進軍 → タイル起動。</summary>
+        private void AfterNodeEntered()
+        {
+            var mm = MapManager.Instance;
 
             // 戦闘名の開示 (2026-08-28)。 **到着した時点で、隣接ノードぶんだけ**開く。
             //   遠くからは見えないので「危険なプリセットを何手も前から迂回する」ことはできず、
@@ -473,6 +504,13 @@ namespace GameLoop
                 inFalseMerchantCombat = false;
             }
 
+            // 逃げた (2026-09-28): 物資 −100・ゴールド半減・報酬なし。 直前の点へ戻る。
+            if (result.playerFled && Run.playerHP > 0)
+            {
+                HandleFledBattle();
+                return;
+            }
+
             // 敗北 or HP0 → 救済（灯火→ラストスタンド）/ なければゲームオーバー
             if (!result.playerWon || Run.playerHP <= 0)
             {
@@ -491,12 +529,15 @@ namespace GameLoop
                 // **ラストスタンドはここには居ない** ── 2026-09-13 から戦闘内で
                 // その場蘇生する (CombatManager.TryLastStandRevive)。 退却を伴わないので
                 // ボスノードで詰まらない。
-                bool isBossFight = MapManager.Instance?.CurrentNode != null
+                bool isBossFight = !InGauntletCombat && MapManager.Instance?.CurrentNode != null
                     && MapManager.Instance.CurrentNode.type == TileType.Boss;
 
                 if (LastStand.TryConsumeRevival(Run, isBossFight))
                 {
                     Log("救済発動: マップへ戻る");
+                    // 徘徊エネミーの連戦の途中なら、 連戦から抜けた扱い (逃げた時と同じく 2 手番後から追跡)。
+                    //   代償は取らない ── 救済そのものが代償 (灯火を失う)。
+                    if (InGauntletCombat) EndGauntletAsFled(payCost: false);
                     SetPhase(GamePhase.MapNavigation);
                     return;
                 }
@@ -529,6 +570,15 @@ namespace GameLoop
                 EventEncounter.Instance?.ApplyPostCombatEffects();
                 EventEncounter.Instance?.Clear();
                 SetPhase(GamePhase.MapNavigation);
+                return;
+            }
+
+            // 徘徊エネミーの連戦: 次の 1 戦へ / 勝ち切ったら物資 +300 とアイテム 1 個。
+            //   **マスに紐づく報酬 (下) は通さない** ── 連戦は道の途中で起きるので、
+            //   CurrentNode は「直前に居た点」でしかない。
+            if (InGauntletCombat)
+            {
+                HandleGauntletFightWon();
                 return;
             }
 
@@ -587,6 +637,8 @@ namespace GameLoop
                 if (prideActive) rewardBase *= 2;
                 // パッシブ刻印〈守銭〉: 発動分 × 1G/ボス
                 int reward = GoldIncome.Gain(Run, rewardBase + metaWinGold, "ボス報酬");
+                // 物資の補給 (2026-09-28): ボス +150
+                ProvisionSystem.Supply(Run, MapSystem.FreeMove.FreeMapParams.RewardBoss);
 
                 // [廃止 2026-09-12] メタ: ボス撃破時の追加パッシブ報酬 (旧 強奪 r10)。
 
@@ -637,6 +689,13 @@ namespace GameLoop
             coins += metaWinGold;
             coins = GoldIncome.Gain(Run, coins, "戦闘報酬");
             IsEliteSecondFight = false;
+
+            // 物資の補給 (2026-09-28): 通常 +30 / エリート +80。 払底したら戦って奪うしかない
+            //   (Highfleet の「追ってきた敵から燃料を奪う」)。 Λ 環状線にも同じ額が乗る。
+            ProvisionSystem.Supply(Run, eliteNodeReward
+                ? MapSystem.FreeMove.FreeMapParams.RewardElite : MapSystem.FreeMove.FreeMapParams.RewardBattle);
+            // 戦闘の物音と気配 (半径 4 の敵を呼ぶ・2 手番 気配 +2)
+            mm.Sim?.NoteBattleEnded();
 
             // 戦闘勝利報酬: **エリートは確定 1 個 / 通常は 15%** (2026-09-09 変更)。
             //
@@ -1171,7 +1230,7 @@ namespace GameLoop
             Run.inLambda = false;
             Log($"=== 時間の狭間を離脱 === 踏破マス {Run.dimensionalDisturbance} / Λデバフ {Run.lambdaDebuffs.Count}種 → 6層前哨基地へ");
             SetPhase(GamePhase.FloorClear);
-            OnFloorAdvanced?.Invoke(Run.currentFloor + 1);
+            OnFloorAdvanced?.Invoke(MapSystem.FreeMove.FloorPlan.Next(Run.currentFloor));
         }
 
         /// <summary>Λ層の環状線マス起動: エリート戦 or 固有イベント(回復/パッシブ)を抽選。</summary>
@@ -1456,11 +1515,19 @@ namespace GameLoop
                 Log($"層デバフ: MaxHP{ActiveModifier.maxHPBonus:+0;-0} → {Run.playerMaxHP}");
             }
 
+            // 物資の補給 (2026-09-28): 前哨基地 +200。 8 層は転移した先の一点で補給は無い。
+            if (Run.currentFloor != 8)
+                ProvisionSystem.Supply(Run, MapSystem.FreeMove.FreeMapParams.RewardOutpost);
+
             SetPhase(GamePhase.FloorIntro);
             Log($"--- フロア {Run.currentFloor} [{ActiveModifier?.displayName ?? "なし"}] ---");
             OnFloorModifierApplied?.Invoke(ActiveModifier);
 
             SetPhase(GamePhase.MapNavigation);
+
+            // 8 層 (Null Point) は内部でボス戦だけの層。 マップを挟まず、 そのままヴェスカ戦へ入る。
+            if (Run.currentFloor == 8 && mm.CurrentMap != null && !string.IsNullOrEmpty(mm.CurrentMap.bossNodeId))
+                MoveToNode(mm.CurrentMap.bossNodeId);
         }
 
         /// <summary>戦闘終了ハンドラ</summary>
@@ -1628,7 +1695,10 @@ namespace GameLoop
             FloorManager.EnsureEncounter(floor, here);
             here.encounterRevealed = true;
 
-            var reachable = map.GetReachableFrom(here.id);
+            // 自由移動の層 (2026-09-28): 道の隣ではなく「マスの種別が見えている点」を開く
+            //   (何もしない時の視界 1・照明 5・偵察 3)。 道の隣は遠いことがあるので 1 ホップの規則は使えない。
+            if (mm.IsFreeMap) mm.SyncFreeKnowledge();
+            var reachable = mm.IsFreeMap ? null : map.GetReachableFrom(here.id);
             if (reachable != null)
             {
                 for (int i = 0; i < reachable.Count; i++)
@@ -1735,6 +1805,9 @@ namespace GameLoop
                 case TileType.LambdaExit:
                     ExitLambda();
                     break;
+                case TileType.SupplyCache:
+                    LootSupplyCache();
+                    break;
                 default:
                     SetPhase(GamePhase.MapNavigation);
                     break;
@@ -1806,6 +1879,8 @@ namespace GameLoop
             SetPhase(GamePhase.Combat);
             CombatManager.Instance.StartCombat(CurrentEnemy, Run.playerHP, dc, dm, cr, df, str_, ft_,
                                                CurrentEnemySecondary);
+            // 逃げる (2026-09-28): 自由移動の層の戦闘・エリートだけ。 Λ 環状線は層を抜ける唯一の道なので対象外。
+            CombatManager.Instance.FleeAllowed = MapManager.Instance != null && MapManager.Instance.IsFreeMap;
         }
 
         /// <summary>所持リストのうちカテゴリが Passive のアイテム数を数える
@@ -2045,9 +2120,8 @@ namespace GameLoop
             CombatManager.Instance.AddEnemyDiceTotalBonus(diceTotalBonus);
         }
 
-        /// <summary>ボスノードを持たない層 (2/4) で、 終端の休憩行を踏み終えたか。
-        /// その層のボス撃破に相当する「層クリア」条件として使う。
-        /// 終端判定は **前方への接続が無いこと** で行う (行番号を直に見ない)。</summary>
+        /// <summary>ボスノードを持たない層 (7 層) で、 終点の〈門〉を処理し終えたか。
+        /// その層のボス撃破に相当する「層クリア」条件として使う。</summary>
         private bool IsBosslessFloorCleared()
         {
             if (Run == null) return false;
@@ -2055,9 +2129,9 @@ namespace GameLoop
             var mm = MapManager.Instance;
             var node = mm?.CurrentNode;
             if (node == null || mm.CurrentMap == null) return false;
-            // 横移動しか残っていない = 前へ進めない = 終端
-            var (forward, _) = mm.CurrentMap.CategorizeMovesFrom(node.id);
-            return forward == null || forward.Count == 0;
+            // 2026-09-28: ボスの居ない層は 7 層だけで、 終点は〈門〉。 門を処理し終えて
+            //   マップへ戻った瞬間が層クリア (そのまま 8 層へ転移する)。
+            return node.type == TileType.Gate && node.activated;
         }
 
         /// <summary>タイル解決後の共通後処理。 ボス撃破 または ボスなし層の終端到達で層クリア。</summary>
@@ -2773,10 +2847,13 @@ namespace GameLoop
                 return;
             }
 
-            // 6層で最初に踏んだイベントマスは〈真理〉へ至る専用イベントにする。
+            // 6層の固定の点「裂け目の記録」は〈真理〉へ至る専用イベントにする (2026-09-28: 自由移動の層では
+            //   「最初に踏んだイベントマス」ではなく生成時に決めた固定の点 ── MapNode.isFixedEvent)。
             // BeginWith は EventDatabase.Pick を通らないため乱数列を消費しない。
             EventSystem.EventDefinition forced = null;
+            var eventNode = MapManager.Instance?.CurrentNode;
             if (Run != null && Run.currentFloor == 6
+                && (eventNode == null || !eventNode.freeMap || eventNode.isFixedEvent)
                 && ConvictionSystem.HasResolveOrBetter(Run)
                 && !ConvictionSystem.HasTruth(Run))
             {
@@ -3030,7 +3107,7 @@ namespace GameLoop
                     return;
                 }
                 SetPhase(GamePhase.FloorClear);
-                OnFloorAdvanced?.Invoke(Run.currentFloor + 1);
+                OnFloorAdvanced?.Invoke(MapSystem.FreeMove.FloorPlan.Next(Run.currentFloor));
                 Log($"フロア{Run.currentFloor}クリア → 次へ");
             }
         }

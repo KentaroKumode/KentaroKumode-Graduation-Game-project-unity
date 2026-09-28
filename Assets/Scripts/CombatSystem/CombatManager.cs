@@ -255,6 +255,8 @@ namespace CombatSystem
         public string enemyId;
         public string enemyDisplayName;
         public bool playerWon;
+        /// <summary>逃げて終わった (2026-09-28)。 playerWon は false・HP は残っている。</summary>
+        public bool playerFled;
         public int totalTurns;
         public int playerHPRemaining;
         public int enemyHPRemaining;
@@ -352,6 +354,29 @@ namespace CombatSystem
         /// **最初の最大 3 撃で終了する** ── 深層で恒常倍率にしないため (§15-2 v3.0)。</summary>
         private int challengeBossStrikeCount;
         private int fleeAfterTurns;          // >0 のとき、このターン数を終えても未決着なら敵が逃走（偽の商人）
+
+        // ── 逃げる (2026-09-28・docs/GAME.md §6-3) ──
+        //   プレイヤーの手番 (配線の前) に選べる。 そのターンはこちらの攻撃が発生せず、 敵の予告攻撃は
+        //   ブロック有効で受ける (配線したブロック端子で軽減できる)。 生き残ったらそこで戦闘を抜ける。
+        //   代償 (物資 −100・ゴールド半減・報酬なし・直前の点へ戻る) は GameManager 側。
+        private bool _fleeRequested;
+        /// <summary>この戦闘で逃げられるか。 GameManager が戦闘開始時に立てる
+        /// (自由移動の層の戦闘・エリート・徘徊エネミーの連戦だけ。 層のボス・イベント戦・Λ では false)。</summary>
+        public bool FleeAllowed { get; set; }
+        /// <summary>このターンに逃げると宣言済みか。</summary>
+        public bool FleeRequested => _fleeRequested;
+        /// <summary>直前の戦闘が逃げて終わったか。 CombatResult.playerFled と同じ値。</summary>
+        public bool LastCombatFled { get; private set; }
+
+        /// <summary>逃げると宣言する。 次の <see cref="ExecuteTurn"/> がそのターンを逃げとして解決する。
+        /// 層のボスからは逃げられない (<see cref="FleeAllowed"/> が false)。</summary>
+        public bool RequestFlee()
+        {
+            if (!isCombatActive || !FleeAllowed) return false;
+            if (currentEnemy != null && GameLoop.BossIds.IsBoss(currentEnemy.id)) return false;
+            _fleeRequested = true;
+            return true;
+        }
         private long _fightPlayerRollSum;    // ボス難易度チューナー: この戦闘のプレイヤーロール合計の累計
         private int _fightPlayerRollCount;   // 同 ロール回数 (平均出目 = sum/count)
         // ボス難易度チューナー: スタンス別の「ボスがロール勝ちしたターン数 / そのスタンスの総ターン数」(強/弱で別レンジ管理)
@@ -789,6 +814,9 @@ namespace CombatSystem
             metaAgilityDodgeUsed = false;
             challengeBossStrikeCount = 0;
             fleeAfterTurns = 0;
+            _fleeRequested = false;
+            LastCombatFled = false;
+            FleeAllowed = false;   // 戦闘ごとに GameManager が立て直す (既定は逃げられない)
             turnLog.Clear();
             mutualWiring = null; // ADR-0009: 配線は戦闘単位でリセット (ラン跨ぎ既定値は W7 後段)
             _fightPlayerRollSum = 0;
@@ -2647,7 +2675,13 @@ namespace CombatSystem
             //     反撃・出血・毒は「自分が攻撃したこと」と独立に成立する別チャネルであり、
             //     さらに〈虚空〉(sword_t3/t4) は **攻撃端子 0 の時に** そこへ最大HP5% を積む札なので、
             //     ここを潰すと「攻撃しない」を選ぶための札そのものが死ぬ。
-            bool skipAttack = attackDiceCount <= 0;
+            bool skipAttack = attackDiceCount <= 0 || _fleeRequested;
+            if (_fleeRequested)
+            {
+                // 逃げるターン: こちらの攻撃は発生しない (素火力・パッシブ・追撃・固定ダメの枠も捨てる)。
+                ctx.fixedDamageToEnemy = 0;
+                Debug.Log("[逃げる] このターンは攻撃しない ── 敵の予告攻撃をブロックで受けて離脱する");
+            }
             if (skipAttack)
             {
                 if (atkBase > 0 || ctx.pursuitDamage > 0)
@@ -3182,7 +3216,20 @@ namespace CombatSystem
                 psm.FireEnemyTrigger(PassiveSkillTrigger.OnRollDraw);
 
             // --- 7. ターン終了処理 (共通終端) ---
-            return FinishTurnCommon(result, ctx);
+            var turnResult = FinishTurnCommon(result, ctx);
+
+            // 逃げる: 生き残っていればここで戦闘を抜ける (敵を倒してしまった・倒れた場合は通常の決着)。
+            if (_fleeRequested)
+            {
+                _fleeRequested = false;
+                if (isCombatActive && playerHP > 0 && enemyHP > 0)
+                {
+                    LastCombatFled = true;
+                    Debug.Log($"[逃げる] 戦闘から離脱 (HP {playerHP})");
+                    FinishCombat();
+                }
+            }
+            return turnResult;
         }
 
         // ===========================================================
@@ -4024,6 +4071,7 @@ namespace CombatSystem
                 enemyId = currentEnemy.id,
                 enemyDisplayName = currentEnemy.displayName,
                 playerWon = playerHP > 0 && enemyHP <= 0,
+                playerFled = LastCombatFled,
                 totalTurns = turnLog.Count,
                 playerHPRemaining = playerHP,
                 enemyHPRemaining = enemyHP,

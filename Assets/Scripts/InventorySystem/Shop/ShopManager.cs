@@ -116,8 +116,53 @@ namespace InventorySystem.Shop
         private ItemRarity? _apprMinRarity;
 
         /// <summary>ショップマス入店時に在庫を生成。</summary>
+        // ================================================================
+        //  自由移動のマップの補給 (2026-09-28・docs/GAME.md §16-1)
+        //  棚 (スロット) とは別の、 どの店にもある売り物。 値段は層で変えない。
+        // ================================================================
+
+        /// <summary>物資 1 包の量と値段 (1G ＝ 10 物資)。</summary>
+        public const int ProvisionPackAmount = 100;
+        public static int ProvisionPackPrice => ProvisionPackAmount / MapSystem.FreeMove.FreeMapParams.ProvisionPerGold;
+        /// <summary>1 つの店で買える物資の包の数。</summary>
+        public const int ProvisionPackStock = 3;
+        /// <summary>この店に残っている物資の包。 <see cref="Generate"/> で戻る。</summary>
+        public int ProvisionPacksLeft { get; private set; } = ProvisionPackStock;
+
+        /// <summary>物資を 1 包買う (ゴールドのみ・燈火の物資払いは使わない ── 物資を物資で買うことになる)。</summary>
+        public bool TryBuyProvisionPack(RunState run)
+        {
+            if (run == null || ProvisionPacksLeft <= 0 || run.coins < ProvisionPackPrice) return false;
+            if (run.provision >= run.provisionCap) return false;
+            run.coins -= ProvisionPackPrice;
+            run.coinsSpent += ProvisionPackPrice;
+            ProvisionPacksLeft--;
+            GameLoop.ProvisionSystem.Supply(run, ProvisionPackAmount);
+            Debug.Log($"[ShopManager] 物資を買った +{ProvisionPackAmount} (-{ProvisionPackPrice}G / 残り {ProvisionPacksLeft} 包)");
+            return true;
+        }
+
+        /// <summary>囮 (6G) を買う。 在庫の上限は無い。</summary>
+        public bool TryBuyDecoy(RunState run)
+            => TryBuyMapTool(run, GameLoop.ItemIds.Decoy, MapSystem.FreeMove.FreeMapParams.ShopDecoyPrice);
+
+        /// <summary>罠 (8G) を買う。 在庫の上限は無い。</summary>
+        public bool TryBuyTrap(RunState run)
+            => TryBuyMapTool(run, GameLoop.ItemIds.Trap, MapSystem.FreeMove.FreeMapParams.ShopTrapPrice);
+
+        private static bool TryBuyMapTool(RunState run, string id, int price)
+        {
+            if (run == null || run.coins < price) return false;
+            if (!run.TryAddConsumable(id)) return false;   // 〈穴の空いた鞄〉の上限
+            run.coins -= price;
+            run.coinsSpent += price;
+            Debug.Log($"[ShopManager] {id} を買った (-{price}G)");
+            return true;
+        }
+
         public ShopInventory Generate(int floor)
         {
+            ProvisionPacksLeft = ProvisionPackStock;
             var inv = new ShopInventory();
 
             // フロア価格倍率（FloorModifier.shopPriceMultiplier）× メタデバフ Lv1

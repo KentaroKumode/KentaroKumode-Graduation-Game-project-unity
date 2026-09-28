@@ -6,8 +6,8 @@ namespace MapSystem
     public class MapNode
     {
         public string id;
-        public int row;
-        public int lane;           // 0-2 for normal lanes, -1 for convergence nodes (outpost/boss)
+        public int row;            // 離散マップ (Λ) の行。 自由移動の層では x 座標の整数部 (表示コードの互換用)
+        public int lane;           // 離散マップ (Λ) の列。 -1 は収束ノード。 自由移動の層では点の添字 (表示コードの互換用)
         public TileType type;
         public TileType? resolvedType; // Mystery解決後のタイプ
         public bool visited;
@@ -29,7 +29,18 @@ namespace MapSystem
         /// 遠くからは見えないので、 危険なプリセットを何手も前から迂回することはできない。</summary>
         public bool encounterRevealed;
 
-        /// <summary>このノードから移動可能なノードのID一覧</summary>
+        // ── 自由移動のマップ (2026-09-28) ──
+        /// <summary>自由移動の層の点か。 false は Λ 環状線・8 層 (ボス戦だけ) の離散マップ。</summary>
+        public bool freeMap;
+        /// <summary>自由移動の層での添字 (<c>FreeMapLayout</c> の点の番号)。 離散マップでは -1。</summary>
+        public int index = -1;
+        /// <summary>座標 (距離の単位。 点どうしの標準の間隔 ≒ 1)。 離散マップでは 0。</summary>
+        public float x, y;
+        /// <summary>6 層の「裂け目の記録」の固定の点。</summary>
+        public bool isFixedEvent;
+
+        /// <summary>このノードから移動可能なノードのID一覧。
+        /// 自由移動の層では<b>道で結ばれた点</b>（双方向）── 移動そのものはどの点へも直接できる。</summary>
         public List<string> connections = new List<string>();
 
         public MapNode(string id, int row, int lane, TileType type)
