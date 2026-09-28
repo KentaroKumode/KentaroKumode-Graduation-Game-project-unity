@@ -80,12 +80,12 @@ namespace AutoTest
             new Axis { name = "hpCritThreshold",          step = 0.05f,
                        apply = (p, d) => p.hpCritThreshold += d,
                        read  = p => p.hpCritThreshold },
-            new Axis { name = "lateralHopeFloor",         step = 5f,
-                       apply = (p, d) => p.lateralHopeFloor += d,
-                       read  = p => p.lateralHopeFloor },
-            new Axis { name = "hopeRefillFloor",          step = 5f,
-                       apply = (p, d) => p.hopeRefillFloor += d,
-                       read  = p => p.hopeRefillFloor },
+            new Axis { name = "lateralProvisionFloor",         step = 5f,
+                       apply = (p, d) => p.lateralProvisionFloor += d,
+                       read  = p => p.lateralProvisionFloor },
+            new Axis { name = "provisionRefillFloor",          step = 5f,
+                       apply = (p, d) => p.provisionRefillFloor += d,
+                       read  = p => p.provisionRefillFloor },
             // [削除 2026-09-11] sublimationReserve ── 〈昇華〉の積極度。
             //   昇華そのものが呼ばれていないので、 探索予算を配っても方策が動かない死に軸だった。
             new Axis { name = "stanceDefendWinProb",      step = 0.05f,
@@ -320,8 +320,8 @@ namespace AutoTest
                 AppendDiff(sb, "importantThreatThreshold", before.importantThreatThreshold, after.importantThreatThreshold);
                 AppendDiff(sb, "emergencyHealRatio",       before.emergencyHealRatio,       after.emergencyHealRatio);
                 AppendDiff(sb, "hpCritThreshold",          before.hpCritThreshold,          after.hpCritThreshold);
-                AppendDiff(sb, "lateralHopeFloor",         before.lateralHopeFloor,         after.lateralHopeFloor);
-                AppendDiff(sb, "hopeRefillFloor",          before.hopeRefillFloor,          after.hopeRefillFloor);
+                AppendDiff(sb, "lateralProvisionFloor",         before.lateralProvisionFloor,         after.lateralProvisionFloor);
+                AppendDiff(sb, "provisionRefillFloor",          before.provisionRefillFloor,          after.provisionRefillFloor);
                 AppendDiff(sb, "stanceDefendWinProb",      before.stanceDefendWinProb,      after.stanceDefendWinProb);
                 AppendDiff(sb, "stanceDefendHpBias",       before.stanceDefendHpBias,       after.stanceDefendHpBias);
             }

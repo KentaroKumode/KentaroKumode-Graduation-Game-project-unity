@@ -101,7 +101,7 @@ namespace AutoTest
             //   残骸が残っているので、 外さないと存在しない武器が序列表に居座り続ける。
             "swordaxe_t4", "swordshield_t4", "sworddagger_t4",
             "axeshield_t4", "axedagger_t4", "shielddagger_t4",
-            "四歩返しの杖飾り",   // 2026-09-22 削除 (移動時 25% で希望+1。 弱すぎた)
+            "四歩返しの杖飾り",   // 2026-09-22 削除 (移動時 25% で物資+1。 弱すぎた)
         };
 
         /// <summary>1アイテム1行ぶんの累積カウンタ。

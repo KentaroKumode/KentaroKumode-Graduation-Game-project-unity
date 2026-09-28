@@ -34,7 +34,7 @@ namespace MetaProgression.Relics
         //    **全て「条件付きで高分散」に揃える。** 期待値を平坦に薄めるのではなく、
         //    賭けに乗った時だけ大きく返る (均して薄める方向は最適方策下では期待値の平行移動に
         //    しかならない・§24)。 4 本それぞれ **賭ける資源が違う**:
-        //      Λ共鳴 = Λ探索 / 渇き = 希望 / 刻限 = 時間 / 背水 = HP
+        //      Λ共鳴 = Λ探索 / 渇き = 物資 / 刻限 = 時間 / 背水 = HP
         //
         //    追加するときは RelicAxisCatalog.HighDifficultyOnly にも足すこと。
 
@@ -42,10 +42,10 @@ namespace MetaProgression.Relics
         /// 賭けるのは **Λ探索** ── 突入には〈決意〉が要り、 潜れば 3 マスごとに恒久デバフを背負う。</summary>
         LambdaResonance,
 
-        /// <summary>〈渇き〉希望が上限の 40% 以下の間、 与ダメージ +N%。
-        /// 賭けるのは **希望** ── 回復を渋るほど強いが、 0 で発狂してランが終わる。
-        /// 高難易度は〈絶望的な戦闘〉〈補給断絶〉で希望が構造的に枯れるので、 難易度と噛み合う。</summary>
-        HopeBurn,
+        /// <summary>〈渇き〉物資が上限の 40% 以下の間、 与ダメージ +N%。
+        /// 賭けるのは **物資** ── 回復を渋るほど強いが、 0 で発狂してランが終わる。
+        /// 高難易度は〈絶望的な戦闘〉〈補給断絶〉で物資が構造的に枯れるので、 難易度と噛み合う。</summary>
+        ProvisionBurn,
 
         /// <summary>〈刻限〉戦闘の経過ターン数 1 つにつき 与ダメージ +N%（そのターン数 × N%）。
         /// 賭けるのは **時間** ── 速攻を捨てて殴り合いを選ぶほど返る。 戦闘ごとにリセット。
@@ -102,31 +102,31 @@ namespace MetaProgression.Relics
         public const int MainStepMin = 3, MainStepMax = 9, CursedStep = 10;
         public const int SubStepMin  = 1, SubStepMax  = 5;
 
-        /// <summary>〈渇き〉が働く希望の閾値。 **絶対値**であって hopeCap に対する比ではない。
+        /// <summary>〈渇き〉が働く物資の閾値。 **絶対値**であって provisionCap に対する比ではない。
         ///
-        /// **比にしてはいけない** (2026-08-09 修正)。 hopeCap は**一方向のラチェット**で、
-        /// 希望が 45 以下になると上限 45、 20 以下になると上限 20 に固定される
-        /// （＝それ以上は回復できなくなる・<see cref="GameLoop.HopeSystem"/> の UpdateCapLock）。
-        /// 比で取ると **閾値が希望と一緒に下へ逃げて永久に届かない**:
+        /// **比にしてはいけない** (2026-08-09 修正)。 provisionCap は**一方向のラチェット**で、
+        /// 物資が 45 以下になると上限 45、 20 以下になると上限 20 に固定される
+        /// （＝それ以上は回復できなくなる・<see cref="GameLoop.ProvisionSystem"/> の UpdateCapLock）。
+        /// 比で取ると **閾値が物資と一緒に下へ逃げて永久に届かない**:
         /// <code>
-        ///   開始      hope 60 / cap 89 → 閾値 35.6   まだ発動しない
-        ///   45 以下   hope 44 / cap 45 → 閾値 18     閾値が下がる
-        ///   20 以下   hope 19 / cap 20 → 閾値  8     さらに下がる
+        ///   開始      provision 60 / cap 89 → 閾値 35.6   まだ発動しない
+        ///   45 以下   provision 44 / cap 45 → 閾値 18     閾値が下がる
+        ///   20 以下   provision 19 / cap 20 → 閾値  8     さらに下がる
         /// </code>
-        /// 実測 (計装・33,864 判定): 発動率 **6.6%**、 判定時の平均希望 42.3 に対し平均閾値 25.5。
+        /// 実測 (計装・33,864 判定): 発動率 **6.6%**、 判定時の平均物資 42.3 に対し平均閾値 25.5。
         /// 倍率を +63%→+126%→+180% と 3 度上げても与ダメが動かなかった真因がこれ。</summary>
-        /// 2026-08-09: 40 → **60**。 <see cref="HopeBurnStartHope"/> と同値にして、
+        /// 2026-08-09: 40 → **60**。 <see cref="ProvisionBurnStartProvision"/> と同値にして、
         /// **開幕から発動圏に居る**形にした。 40 では発動率 40.5% で、 残り 6 割の攻撃が
-        /// 素の火力のまま ＝ 希望を前借りした対価が返ってこなかった。
-        public const int HopeBurnThreshold = 60;
+        /// 素の火力のまま ＝ 物資を前借りした対価が返ってこなかった。
+        public const int ProvisionBurnThreshold = 600;   // 2026-09-28: 物資 ×10
         /// <summary>〈背水〉が働く HP の閾値（playerMaxHP に対する比）。</summary>
         public const float LastBreathThreshold = 0.35f;
 
-        /// <summary>〈渇き〉装備時の**開幕希望**（既定 60・上限 hopeCap は動かさない）。
-        /// <see cref="HopeBurnThreshold"/> と同値なので **開幕から発動圏**に居る。
-        /// 賭けの対価は「発動までの猶予」ではなく **希望という資源そのものを前借りすること**
+        /// <summary>〈渇き〉装備時の**開幕物資**（既定 60・上限 provisionCap は動かさない）。
+        /// <see cref="ProvisionBurnThreshold"/> と同値なので **開幕から発動圏**に居る。
+        /// 賭けの対価は「発動までの猶予」ではなく **物資という資源そのものを前借りすること**
         /// （横移動の自由度・発狂までの余裕・上限ラチェットの早期発動）に置いている。</summary>
-        public const int HopeBurnStartHope = 60;
+        public const int ProvisionBurnStartProvision = 600;   // 2026-09-28: 物資 ×10
 
         public static readonly RelicAxis[] All =
             (RelicAxis[])System.Enum.GetValues(typeof(RelicAxis));
@@ -155,19 +155,19 @@ namespace MetaProgression.Relics
         /// Λ の 1 周は 3 マスで期待 1.5 戦なので、 20 マス潜れば約 10 戦 = 段6 で +140%。
         /// 潜らなければ 0。 **難易度 25 以上でしか出ない**。</summary>
         private static readonly int[] LambdaReso  = {  6,  8, 10, 12, 14, 14,  16,  18,  20,  22 };
-        /// <summary>渇き: 希望が上限の 40% 以下の間だけ 与ダメージ +N%。
+        /// <summary>渇き: 物資が上限の 40% 以下の間だけ 与ダメージ +N%。
         ///
         /// **2026-08-08 に倍化** (7N% → 14N%)。 旧値 (段9 で +63%) では、 BOT に
-        /// 帯 [18, hopeCap×38%] を維持させて条件を常時成立させても **5F の McNemar が
-        /// 33/64・p=0.002 と有意に有害**だった ── 希望を低く保つコスト（横移動の制限・
-        /// 発狂リスク・希望デバフの累積）が与ダメの上乗せを上回っていた。
+        /// 帯 [18, provisionCap×38%] を維持させて条件を常時成立させても **5F の McNemar が
+        /// 33/64・p=0.002 と有意に有害**だった ── 物資を低く保つコスト（横移動の制限・
+        /// 発狂リスク・物資デバフの累積）が与ダメの上乗せを上回っていた。
         /// 通常の与ダメ軸 (5N%) の **2.8 倍**。 賭けの対価としてはこの水準が要る。
         ///
-        /// **2026-08-09 にさらに増量** (14N% → 20N%) し、 同時に <see cref="HopeBurnStartHope"/> で
-        /// 開幕希望を 60 へ落として**発動圏から始める**ようにした。 倍化だけでは効かなかった ──
+        /// **2026-08-09 にさらに増量** (14N% → 20N%) し、 同時に <see cref="ProvisionBurnStartProvision"/> で
+        /// 開幕物資を 60 へ落として**発動圏から始める**ようにした。 倍化だけでは効かなかった ──
         /// 1〜3層の 1攻撃与ダメが遺物なし比 +2.5% で、 **そもそも発動していなかった**ため。
         /// 発動しない区間では倍率をいくら上げても 0 のまま、 という当たり前の壁だった。</summary>
-        private static readonly int[] HopeBurnPct = { 20, 40, 60, 80, 100, 120, 140, 160, 180, 200 };
+        private static readonly int[] ProvisionBurnPct = { 20, 40, 60, 80, 100, 120, 140, 160, 180, 200 };
         /// <summary>刻限: 経過ターン数 1 つにつき 与ダメージ +N%（そのターン数 × N%）。
         /// ターン加重の平均ターン番号が 4.06 なので、 段9 (15%) の期待は +61% ＝
         /// 与ダメ軸段9 (+45%) の **1.35 倍**。 ボス戦なら +86%、 通常戦なら +55%。</summary>
@@ -198,7 +198,7 @@ namespace MetaProgression.Relics
         /// 追加したら RelicAxis の enum 末尾へ足し、 ここにも登録すること。</summary>
         public static readonly RelicAxis[] HighDifficultyOnly =
         {
-            RelicAxis.LambdaResonance, RelicAxis.HopeBurn,
+            RelicAxis.LambdaResonance, RelicAxis.ProvisionBurn,
             RelicAxis.LongBattle,      RelicAxis.LastBreath,
         };
 
@@ -273,7 +273,7 @@ namespace MetaProgression.Relics
                 case RelicAxis.OpeningPoison:      return Poison;
                 case RelicAxis.Rinkai:             return RinkaiPct;
                 case RelicAxis.LambdaResonance:    return LambdaReso;
-                case RelicAxis.HopeBurn:           return HopeBurnPct;
+                case RelicAxis.ProvisionBurn:           return ProvisionBurnPct;
                 case RelicAxis.LongBattle:         return LongBattlePct;
                 case RelicAxis.LastBreath:         return LastBreathPct;
                 default:                           return null;   // Charge は複合なので個別
@@ -332,9 +332,9 @@ namespace MetaProgression.Relics
                 // ── 高難易度限定軸。 条件が効果の半分なので、 効果文に条件を必ず書く ──
                 case RelicAxis.LambdaResonance:
                     return $"Λ層の戦闘 1 回ごとに 会心倍率+{ValueOf(axis, step)}%（累積）";
-                case RelicAxis.HopeBurn:
-                    return $"希望 {HopeBurnThreshold} 以下の間 与ダメージ+{ValueOf(axis, step)}%"
-                         + $"（開幕希望 {HopeBurnStartHope}）";
+                case RelicAxis.ProvisionBurn:
+                    return $"物資 {ProvisionBurnThreshold} 以下の間 与ダメージ+{ValueOf(axis, step)}%"
+                         + $"（開幕物資 {ProvisionBurnStartProvision}）";
                 case RelicAxis.LongBattle:
                     return $"経過ターン 1 つにつき 与ダメージ+{ValueOf(axis, step)}%";
                 case RelicAxis.LastBreath:

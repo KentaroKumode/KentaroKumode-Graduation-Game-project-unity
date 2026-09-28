@@ -127,7 +127,7 @@ namespace UI.SkillTree
         [Tooltip("Lv20 ボス撃破時 ノーマルパッシブ獲得 (BossExtraNormal)")]    public Sprite iconBossExtraNormal;
 
         [Header("ノードアイコン: 大スキル ミッド (Lv 21-41)")]
-        [Tooltip("Lv23 戦闘後の希望減少 -3 (HopeLossReduce)")]                public Sprite iconHopeLossReduce;
+        [Tooltip("Lv23 戦闘後の物資減少 -3 (ProvisionLossReduce)")]                [UnityEngine.Serialization.FormerlySerializedAs("iconHopeLossReduce")] public Sprite iconProvisionLossReduce;
         [Tooltip("Lv26 開幕ノーマルパッシブ獲得 (StartingPassiveItem)")]        public Sprite iconStartingPassiveItem;
         [Tooltip("Lv27 ショップ強盗 解禁 (ShopRobberyUnlock)")]                public Sprite iconShopRobberyUnlock;
         [Tooltip("Lv30 会心ダイス補正 +2 (CritLevelUp)")]                      public Sprite iconCritLevelUp;
@@ -214,7 +214,7 @@ namespace UI.SkillTree
         [Tooltip("Lv5 偽の商人 (ショップ 30% で偽商人化)")]               public Sprite iconDebuffLv5;
         [Tooltip("Lv6 死神の影 (3層突入時に恒久デバフ +1)")]              public Sprite iconDebuffLv6;
         [Tooltip("Lv7 補給断絶 (前哨基地回復上限 50%)")]                  public Sprite iconDebuffLv7;
-        [Tooltip("Lv8 絶望的な進軍 (移動毎に希望 -1)")]                   public Sprite iconDebuffLv8;
+        [Tooltip("Lv8 絶望的な進軍 (移動毎に物資 -1)")]                   public Sprite iconDebuffLv8;
         [Tooltip("Lv9 鋼の皮膚 (敵が初回致命傷を HP1 で耐える)")]         public Sprite iconDebuffLv9;
         [Tooltip("Lv10 天変地異 (final / 敵ダメ+100% / 1層恒久 / ラスタン無効)")] public Sprite iconDebuffLv10;
         [Tooltip("DEBUFF ノード間の一定縦間隔 (world)。 全ノード直線等間隔で配置。")]
@@ -969,7 +969,7 @@ namespace UI.SkillTree
                 case MetaBuffKind.CombatGoldBonus:          return "追いはぎ";
                 case MetaBuffKind.DamageReduce:             return "防御術";
                 case MetaBuffKind.BossExtraNormal:          return "戦利品活用";
-                case MetaBuffKind.HopeLossReduce:           return "折れぬ心";
+                case MetaBuffKind.ProvisionLossReduce:           return "折れぬ心";
                 case MetaBuffKind.StartingPassiveItem:      return "事前の備え";
                 case MetaBuffKind.ShopRobberyUnlock:        return "値下げ交渉";
                 case MetaBuffKind.CritLevelUp:              return "手応えアリ";
@@ -1715,7 +1715,7 @@ namespace UI.SkillTree
                     case MetaBuffKind.CombatGoldBonus:          s = iconCombatGoldBonus; break;
                     case MetaBuffKind.DamageReduce:             s = iconDamageReduce; break;
                     case MetaBuffKind.BossExtraNormal:          s = iconBossExtraNormal; break;
-                    case MetaBuffKind.HopeLossReduce:           s = iconHopeLossReduce; break;
+                    case MetaBuffKind.ProvisionLossReduce:           s = iconProvisionLossReduce; break;
                     case MetaBuffKind.StartingPassiveItem:      s = iconStartingPassiveItem; break;
                     case MetaBuffKind.ShopRobberyUnlock:        s = iconShopRobberyUnlock; break;
                     case MetaBuffKind.CritLevelUp:              s = iconCritLevelUp; break;

@@ -88,7 +88,7 @@ namespace MetaProgression
                 $"素材+{MetaPanel.SupplyStartMaterial(s.GetRank(MetaPanelKind.Supply))} " +
                 $"与ダメ+{MetaBuffApplicator.GetOutgoingDamagePct()}% " +
                 $"被ダメ-{MetaBuffApplicator.GetGuardDamageReductionPct() * 100f:F0}% " +
-                $"希望-{MetaBuffApplicator.GetHopeLossReduction()} " +
+                $"物資-{MetaBuffApplicator.GetProvisionLossReduction()} " +
                 $"会心率+{MetaBuffApplicator.GetCritRatePctBonus() * 100f:F1}%",
                 new GUIStyle(GUI.skin.label) { fontSize = fontSize, wordWrap = true });
 

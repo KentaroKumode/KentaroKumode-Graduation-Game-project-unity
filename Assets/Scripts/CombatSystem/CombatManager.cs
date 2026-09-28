@@ -402,7 +402,7 @@ namespace CombatSystem
         }
 
         // [撤去 2026-09-13] TryTriggerOverload / OverloadFires ── 出力 r10 の旧極点。
-        //   反動を HP でも 希望 でも成立させられず、 〈戦意〉(累積成長) へ差し替えた。
+        //   反動を HP でも 物資 でも成立させられず、 〈戦意〉(累積成長) へ差し替えた。
         //   経緯は MetaProgression.MetaPanel.BattleSpiritUnlocked。
 
         /// <summary>
@@ -861,9 +861,9 @@ namespace CombatSystem
             if (psm.Context != null) psm.Context.playerCurrentHP = playerHP;
             psm.Context?.playerDamageBySource.Clear(); // 被ダメ ソース別内訳を戦闘開始でリセット
 
-            // 希望(ADR-0002) 迷妄: 絶望帯(希望≤20)以降、戦闘開始時にプレイヤーパッシブを1-3個ランダム無効化。
+            // 物資(ADR-0002) 迷妄: 絶望帯(物資≤20)以降、戦闘開始時にプレイヤーパッシブを1-3個ランダム無効化。
             // 佯狂者は PassiveItem 系統のため対象外（activeSkillNames に含まれない）。
-            int delusionCount = GameLoop.HopeSystem.RollPassiveDisableCount(GameLoop.GameManager.Instance?.Run);
+            int delusionCount = GameLoop.ProvisionSystem.RollPassiveDisableCount(GameLoop.GameManager.Instance?.Run);
             if (delusionCount > 0) psm.DisableRandomPlayerSkills(delusionCount);
 
             // 装備ダイスの面をコンテキストに設定
@@ -887,9 +887,9 @@ namespace CombatSystem
                 ctx.bossId = AutoTest.BossTuning.IsBoss(enemy.id) ? enemy.id : "";
                 ctx.lastDamageCause = InventorySystem.PassiveSkills.DeathCause.Normal;
 
-                // 希望(ADR-0002) 苦悩: 悲観床(45)以下で会心倍率 -0.5。Λ「注意散漫」(会心分子上限)とは
+                // 物資(ADR-0002) 苦悩: 悲観床(45)以下で会心倍率 -0.5。Λ「注意散漫」(会心分子上限)とは
                 // 効く軸が別(倍率 vs 分子)なので非重複。
-                ctx.criticalMultiplier += GameLoop.HopeSystem.GetCritMultiplierDelta(GameLoop.GameManager.Instance?.Run);
+                ctx.criticalMultiplier += GameLoop.ProvisionSystem.GetCritMultiplierDelta(GameLoop.GameManager.Instance?.Run);
             }
 
             // Λ層（時間の狭間）由来の恒久デバフを ctx へ設定（戦闘スコープで保持）
@@ -1492,7 +1492,7 @@ namespace CombatSystem
                 Debug.Log("[CombatManager] 影の代償発動 (50%): プレイヤー全出目-1");
             }
 
-            // ダイス振り直し。 ADR-0010 で希望消費の自動ポリシーから充電消費の方策注入へ移行。
+            // ダイス振り直し。 ADR-0010 で物資消費の自動ポリシーから充電消費の方策注入へ移行。
             // 旧パイプライン (UseMutualAttackPipeline=false) でも同じ実装を通す。
             RerollPhase(ctx, playerDice, enemyDice, playerDiceMax);
 
@@ -1608,16 +1608,16 @@ namespace CombatSystem
                     int lbStage = GameLoop.GameManager.Instance?.Run?.limitBreakStage ?? 0;
                     totalDmg = ApplyWinDamageModifiers(totalDmg, ref fixedDmg, ref isCrit, lbStage, psm, ctx);
 
-                    // 希望(ADR-0002) 疲労: 焦燥床(75)以下で、この攻撃が15%で**最終ダメージ半減**。
+                    // 物資(ADR-0002) 疲労: 焦燥床(75)以下で、この攻撃が15%で**最終ダメージ半減**。
                     //   2026-08-09 に 0 ダメージから緩和。 **isCrit は落とさない** ──
                     //   会心の成否は判定済みの事実で、 疲労は結果の目減りでしかないため。
-                    float fatigueChance = GameLoop.HopeSystem.GetFatigueChance(GameLoop.GameManager.Instance?.Run);
+                    float fatigueChance = GameLoop.ProvisionSystem.GetFatigueChance(GameLoop.GameManager.Instance?.Run);
                     if (fatigueChance > 0f && GameLoop.GameRng.Chance(fatigueChance, "combat.fatigue", RngIdx(2)))
                     {
-                        float fm = GameLoop.HopeSystem.FatigueDamageMultiplier;
+                        float fm = GameLoop.ProvisionSystem.FatigueDamageMultiplier;
                         totalDmg = totalDmg > 0 ? Math.Max(1, Mathf.RoundToInt(totalDmg * fm)) : totalDmg;
                         fixedDmg = fixedDmg > 0 ? Math.Max(1, Mathf.RoundToInt(fixedDmg * fm)) : fixedDmg;
-                        Debug.Log($"[希望] 疲労: 最終ダメージ半減 → 主{totalDmg} 固{fixedDmg}");
+                        Debug.Log($"[物資] 疲労: 最終ダメージ半減 → 主{totalDmg} 固{fixedDmg}");
                     }
 
                     // 大穴の異常現象「朱の雪」: 与ダメ -1 (主ダメから引く、 最低 0)
@@ -2735,15 +2735,15 @@ namespace CombatSystem
             DamageBreakdown[10] += ctx.pursuitDamage;
             RecordFloorDamage(ctx, dealtDmg, dealtFixed);
 
-            // 希望(ADR-0002) 疲労: 攻撃が15%で**最終ダメージ半減** (2026-08-09 に 0 ダメから緩和)。
+            // 物資(ADR-0002) 疲労: 攻撃が15%で**最終ダメージ半減** (2026-08-09 に 0 ダメから緩和)。
             //   **isCrit は落とさない** ── 会心の成否は判定済みの事実で、 疲労は結果の目減り。
-            float fatigueChance = GameLoop.HopeSystem.GetFatigueChance(GameLoop.GameManager.Instance?.Run);
+            float fatigueChance = GameLoop.ProvisionSystem.GetFatigueChance(GameLoop.GameManager.Instance?.Run);
             if (fatigueChance > 0f && GameLoop.GameRng.Chance(fatigueChance, "combat.fatigue", RngIdx(2)))
             {
-                float fm = GameLoop.HopeSystem.FatigueDamageMultiplier;
+                float fm = GameLoop.ProvisionSystem.FatigueDamageMultiplier;
                 dealtDmg   = dealtDmg   > 0 ? Math.Max(1, Mathf.RoundToInt(dealtDmg   * fm)) : dealtDmg;
                 dealtFixed = dealtFixed > 0 ? Math.Max(1, Mathf.RoundToInt(dealtFixed * fm)) : dealtFixed;
-                Debug.Log($"[希望] 疲労: 最終ダメージ半減 → 主{dealtDmg} 固{dealtFixed}");
+                Debug.Log($"[物資] 疲労: 最終ダメージ半減 → 主{dealtDmg} 固{dealtFixed}");
             }
 
             result.mainDamage = atkBase;
@@ -4217,7 +4217,7 @@ namespace CombatSystem
         /// これがヨットの「何を残すか」をコスト面からも支える。
         ///
         /// 振り直す対象は <see cref="RerollPolicy"/> が決める (BOT / UI が差す)。
-        /// null なら振り直さない ── 旧実装は希望消費の自動ポリシーだったが、
+        /// null なら振り直さない ── 旧実装は物資消費の自動ポリシーだったが、
         /// リロールのたびに発狂へ近づく形だとヨットの中核が経済ペナルティに潰される (§design-yacht)。
         /// </summary>
         private void RerollPhase(CombatContext ctx, int[] playerDice, int[] enemyDice, int playerDiceMax,
