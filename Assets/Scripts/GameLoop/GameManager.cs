@@ -537,8 +537,10 @@ namespace GameLoop
                     Log("救済発動: マップへ戻る");
                     // 徘徊エネミーの連戦の途中なら、 連戦から抜けた扱い (逃げた時と同じく 2 手番後から追跡)。
                     //   代償は取らない ── 救済そのものが代償 (灯火を失う)。
-                    if (InGauntletCombat) EndGauntletAsFled(payCost: false);
+                    bool wasGauntlet = InGauntletCombat;
+                    if (wasGauntlet) EndGauntletAsFled(payCost: false);
                     SetPhase(GamePhase.MapNavigation);
+                    if (wasGauntlet) FlushPendingArrival();
                     return;
                 }
                 if (isBossFight)
