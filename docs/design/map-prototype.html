@@ -88,7 +88,7 @@
         <button id="tFast" type="button" title="押している間だけ早送り（スペースを 0.5 秒以上押し続けても同じ）">⏩ 早送り（長押し）</button>
       </div>
       <div class="btns" style="margin-top:6px" role="group" aria-label="移動の速さ">
-        <button id="spSneak" type="button" title="時間が2倍かかる。道の上でも気配0">忍び足</button>
+        <button id="spSneak" type="button" title="時間が2倍かかる。気配0">忍び足</button>
         <button id="spNormal" type="button">通常</button>
         <button id="spHurry" type="button" title="時間は半分。物資1.5倍・気配+1">急ぐ</button>
       </div>
@@ -137,12 +137,12 @@ const P = {
   supMax: 1000, costRoad: 10, costOff: 20, costFlare: 5,          // 物資 / 距離
   hpPayRoad: 1, hpPayOff: 2,                                       // 払底中の HP / 距離
   visNone: 1, visFlare: 5, visStone: 4, visScout: 3, scoutTurns: 2,
-  kehaiRoad: 2, kehaiBattle: 2, battleKehaiTurns: 2, detectBase: 2,
+  kehaiMove: 1, detectBase: 2,                                    // 2026-10-03: 気配は移動だけ (道の上の +2・戦闘の +2 を廃止)
   detectCap: 4,                                                   // 最大察知距離: 照明なしは魔石の範囲 (4) を超えない
   cacheNoise: 3,                                                  // 補給庫を漁った物音（気配は上げない）
   enemyPatrol: 0.5, enemyChase: 1.0, lostTurns: 5, catchDist: 0.45,
   chaseDetectBonus: 1.5,                                          // 追跡中だけ察知距離に足す (2026-09-28: 道の外へ出れば必ず振り切れた)
-  trackRoad: 3, trackOff: 1, battleNoise: 4,                       // C: 物音 6 → 4
+  trackRoad: 3, trackOff: 1,                                      // 戦闘の物音 (半径 4) は 2026-10-03 に「戦闘がバレる」へ
   fleeSup: 100, fleeFreezeTurns: 2,
   rewSup: { battle: 30, elite: 80, gauntlet: 300, base: 150 }, hpLoss: [40, 50, 70, 100],
   shopSupPrice: 10, shopSupPack: 100, shopSupStock: 3, shopHealPrice: 8, shopHeal: 10,
@@ -158,13 +158,13 @@ const P = {
 };
 // 徘徊エネミーの性質 (2026-09-28)。 数値は全部仮置き。 docs/GAME.md §5-9
 const PROFILES = {
-  standard:   { name: "徘徊者",     desc: "基準" },
-  shadow:     { name: "影",         desc: "追跡中は魔石に一切反応しない・察知の合図も出ない", chase: 1.2, silent: true },
-  altar:      { name: "祭壇",       desc: "補給庫の上に据わり一歩も動かない。察知距離 +2。察知している間は 2 手番ごとに使い魔を放つ（同時 3 体まで）。触れれば壊せる（連戦）", stationary: true, sense: 2, famMax: 3, famCooldown: 2 },
-  pouncer:    { name: "飛び掛かり", desc: "追跡中、距離 2.5 以内なら道を外れて直進する", chase: 1.4, lunge: 2.5 },
-  echo:       { name: "木霊",       desc: "魔石の方角が 2 つ出る（片方は木霊の偽物で、2 手番ごとに飛ぶ。本物は敵の動きに付いてくる）", echo: 2 },
-  blind:      { name: "盲目",       desc: "目が無い（気配で察知しない）。物音 2 倍の範囲（最低でも半径 6）・急ぐ足音（半径 2）・痕跡で追う。痕跡を辿る間だけ 1.5 倍速い", blind: true, hearMul: 2, hear: 6, trackMul: 1.5 },
-  weaver:     { name: "網張り",     desc: "巡回路に見えない網を撒く（踏むと 1 手番動けない・偵察/照明で見える）", webs: true },
+  standard:   { name: "徘徊者",     desc: "基準。戦闘に気づくと調べに来る", onBattle: "investigate" },
+  shadow:     { name: "影",         desc: "追跡中は魔石に一切反応しない・察知の合図も出ない。戦闘に気づくと調べに来る", chase: 1.2, silent: true, onBattle: "investigate" },
+  altar:      { name: "祭壇",       desc: "補給庫の上に据わり一歩も動かない。察知距離 +2。察知している間は 2 手番ごとに使い魔を放つ（同時 3 体まで）。触れれば壊せる（連戦）。戦闘に気づくと、その場所へ使い魔を放つ", onBattle: "familiar", stationary: true, sense: 2, famMax: 3, famCooldown: 2 },
+  pouncer:    { name: "飛び掛かり", desc: "追跡中、距離 2.5 以内なら道を外れて直進する。戦闘に気づくと調べに来る", chase: 1.4, lunge: 2.5, onBattle: "investigate" },
+  echo:       { name: "木霊",       desc: "魔石の方角が 2 つ出る（片方は木霊の偽物で、2 手番ごとに飛ぶ。本物は敵の動きに付いてくる）。戦闘に気づくと調べに来る", echo: 2, onBattle: "investigate" },
+  blind:      { name: "盲目",       desc: "目が無い（気配で察知しない）。物音 2 倍の範囲（最低でも半径 6）・急ぐ足音（半径 2）・痕跡で追う。痕跡を辿る間だけ 1.5 倍速い。戦闘に気づくと調べに来る", onBattle: "investigate", blind: true, hearMul: 2, hear: 6, trackMul: 1.5 },
+  weaver:     { name: "網張り",     desc: "巡回路に見えない網を撒く（踏むと 1 手番動けない・偵察/照明で見える）。戦闘に気づいても巡回を続ける", webs: true, onBattle: "ignore" },
 };
 const FAMILIARS = {
   none:    { name: "なし" },
@@ -175,8 +175,8 @@ const FAMILIARS = {
 };
 // 移動の速さ: 時間の倍率 / 物資の倍率 / 気配（道の上の +2 を置き換える）
 const SPEED = { sneak: { name: "忍び足", time: 2, cost: 1, kehai: () => 0 },
-                normal: { name: "通常", time: 1, cost: 1, kehai: road => road ? 2 : 0 },
-                hurry: { name: "急ぐ", time: 0.5, cost: 1.5, kehai: road => (road ? 2 : 0) + 1 } };
+                normal: { name: "通常", time: 1, cost: 1, kehai: () => P.kehaiMove },
+                hurry: { name: "急ぐ", time: 0.5, cost: 1.5, kehai: () => P.kehaiMove + 1 } };
 const STAGES = [ [751, "充足", 1.0], [451, "目減り", 1.1], [201, "枯渇し始める", 1.25], [1, "枯渇寸前", 1.5], [0, "払底", 1.5] ];
 const SCALE = 58, OX = 24, OY = 24;           // 距離1 = 58px
 const W = 16.4, H = 9.4;                       // 層の広さ（距離）── 2026-09-28 に 11.6×6.6 から広げた
@@ -308,7 +308,7 @@ function newGame() {
   S = {
     seed, time: 0, turnAcc: 0, sup: P.supMax, hp: P.hpMax, gold: P.gold0,
     me: { x: N[0].x, y: N[0].y, node: 0, seg: null }, prevNode: 0,
-    move: null, scout: 0, flare: false, battleHeat: 0, tracks: [], trackAcc: 0,
+    move: null, scout: 0, flare: false, tracks: [], trackAcc: 0,
     speed: "normal", decoys: [], traps: [], nDecoy: P.decoy0, nTrap: P.trap0,
     foes, prof: profKey, famKey: document.getElementById("fam").value, familiars: [], webs: [], stuck: 0, famSightPrev: false,
     stoneBearing: -1, stoneGhost: -1, echoOff: 0, echoT: 0,
@@ -325,7 +325,7 @@ const foePos = f => f.lunge ? f.lunge : { x: N[f.a].x + (N[f.b].x - N[f.a].x) * 
 const aliveFoes = () => S.foes.filter(f => f.alive);
 const onRoad = () => S.me.node !== null || S.me.seg !== null;
 const movingOnRoad = () => !!S.move && S.move.rate === "road";
-const kehai = () => (S.move && !S.stuck ? SPEED[S.speed].kehai(movingOnRoad()) : 0) + (S.battleHeat > 0 ? P.kehaiBattle : 0);
+const kehai = () => (S.move && !S.stuck ? SPEED[S.speed].kehai() : 0);
 // 照明中は「こちらが見える範囲 ＝ 敵から見られる範囲」で固定。 灯喰いは照明中 7
 const detectR = () => S.flare ? P.visFlare : Math.min(P.detectCap, P.detectBase + kehai());
 const chaseSpeed = () => PR().chase || P.enemyChase;
@@ -451,7 +451,7 @@ function famContact(m) {
   modal("使い魔に捕捉された", `<p>${FAMILIARS[m.kind].name}の使い魔との交戦（簡略版: 通常の戦闘より少し重い）。</p><p class="k">予想される被害: HP ${Math.round(3 * st[2])}〜${Math.round(18 * st[2])}。勝てば物資 +${P.rewSup.battle}。</p>`, [
     ["戦う", () => { const loss = Math.round(hpLossRoll(3, 0) * st[2]); S.hp -= loss;
       if (S.hp <= 0) { S.hp = 0; return end(false, "使い魔との交戦で倒れた。"); }
-      S.sup = Math.min(P.supMax, S.sup + P.rewSup.battle); S.battleHeat = P.battleKehaiTurns; noise();
+      S.sup = Math.min(P.supMax, S.sup + P.rewSup.battle); battleKnown();
       log(`使い魔を退けた。HP −${loss}、物資 +${P.rewSup.battle}`); ui(); }],
     ["逃げる", () => { S.sup = Math.max(0, S.sup - P.fleeSup); S.gold = Math.floor(S.gold / 2);
       log(`使い魔から逃げた。物資 −${P.fleeSup}、ゴールド半減。`); ui(); }],
@@ -518,7 +518,6 @@ function pay(supCost, hpPerDistUnit) {
 }
 function turn() {
   S.tracks.forEach(t => t.s--); S.tracks = S.tracks.filter(t => t.s > 0);
-  if (S.battleHeat > 0) S.battleHeat--;
   if (S.flare && !S.move) pay(P.costFlare, 0);
   const pr = PR();
   // 木霊: 魔石の方角のずれを手番ごとに振り直す
@@ -632,7 +631,15 @@ function noiseAt(r, what) {
   for (const f of aliveFoes()) { if (f.state === "追跡") continue; const d = dist(foePos(f), S.me);
     if (d <= hearR(r)) { f.state = "警戒"; f.lastKnown = { x: S.me.x, y: S.me.y }; planFoe(f); } }
 }
-function noise(r = P.battleNoise) { noiseAt(r, "物音"); }
+/* 戦闘がバレる (2026-10-03): 戦闘が終わると、 層の徘徊エネミー全員に「ここで戦闘があった」と伝わる (距離によらない)。
+   どう動くかは性質の onBattle で決まる: investigate = 警戒して調べに来る / familiar = 使い魔を放つ / ignore = 無視して巡回を続ける。
+   追跡中の敵はもともと居場所を知っているので変わらない */
+function battleKnown() {
+  const pol = PR().onBattle || "investigate"; let any = false;
+  for (const f of aliveFoes()) { if (f.state === "追跡") continue;
+    if (pol === "investigate") { f.state = "警戒"; f.lastKnown = { x: S.me.x, y: S.me.y }; planFoe(f); any = true; }
+    else if (pol === "familiar") { launchFamiliar(f); any = true; } }
+  if (any) log("（戦いの物音が層に響いた。何かが気づいたかもしれない）"); }
 function hpLossRoll(nd, minus) { let s = 0; for (let i = 0; i < nd; i++) s += d6(); return Math.max(0, s - minus); }
 function battle(j, name, nd, minus, sup, gold) {
   const st = stageOf(S.sup), lo = Math.max(0, nd - minus), hi = nd * 6 - minus;
@@ -640,7 +647,7 @@ function battle(j, name, nd, minus, sup, gold) {
     ["戦う", () => { const loss = Math.round(hpLossRoll(nd, minus) * st[2]); S.hp -= loss;
       if (S.hp <= 0) { S.hp = 0; return end(false, `${name}で倒れた。`); }
       if (loss > 0) S.sup = Math.max(0, S.sup - P.hpLoss[Math.min(3, STAGES.indexOf(st))]);
-      S.sup = Math.min(P.supMax, S.sup + sup); S.gold += gold; N[j].done = true; S.battleHeat = P.battleKehaiTurns; noise();
+      S.sup = Math.min(P.supMax, S.sup + sup); S.gold += gold; N[j].done = true; battleKnown();
       log(`${name}に勝った。HP −${loss}、物資 +${sup}、ゴールド +${gold}`); ui(); }],
     ["逃げる", () => flee(j, name)],
   ]);
@@ -679,7 +686,7 @@ function caught(f) {
     if (S.hp <= 0) { S.hp = 0; ui(); return end(false, "徘徊エネミーの連戦で倒れた。"); }
     ui();
     if (fight >= f.fights) { f.alive = false; const rew = P.rewSup.gauntlet;
-      S.sup = Math.min(P.supMax, S.sup + rew); S.battleHeat = P.battleKehaiTurns;
+      S.sup = Math.min(P.supMax, S.sup + rew); battleKnown();
       log(`徘徊エネミーを退けた。物資 +${rew}${aliveFoes().length ? `（残り ${aliveFoes().length} 体）` : ""}`); updateStone(); return ui(); }
     fight++;
     modal("連戦の途中", `<p>${fight - 1} 戦目を切り抜けた。HP ${S.hp}/${P.hpMax}。</p>`, [["続ける", round], ["逃げる", gauntletFlee]]);

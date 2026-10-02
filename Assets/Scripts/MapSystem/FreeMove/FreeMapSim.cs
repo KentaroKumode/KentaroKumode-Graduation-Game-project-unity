@@ -123,8 +123,6 @@ namespace MapSystem.FreeMove
         public bool FlareOn { get; private set; }
         public int ScoutTicksLeft { get; private set; }
         public bool IsScouting => ScoutTicksLeft > 0;
-        /// <summary>戦闘の後の気配が残る手番。</summary>
-        public int BattleHeatTurns { get; private set; }
         public int LastArrived { get; private set; } = -1;
         /// <summary>着いた刻みに捕まった点。 連戦が終わった次の刻みで Arrived を出す (新しい行き先を決めたら捨てる)。</summary>
         private int _pendingArrival = -1;
@@ -240,9 +238,9 @@ namespace MapSystem.FreeMove
 
         public double FoeDistance => FoeAlive ? Vec2.Dist(FoePos, Me) : double.PositiveInfinity;
 
-        /// <summary>気配。 道を移動中 +2 (速さで置換) / 戦闘の後 +2。 点に止まっている時・道の外は 0。</summary>
+        /// <summary>気配。 移動中だけ: 通常 1・急ぐ 2・忍び足 0 (道の上か外かでは変わらない)。 止まっている時は 0。</summary>
         public int Kehai
-            => (IsMoving ? Speed.Kehai(MoveOnRoad) : 0) + (BattleHeatTurns > 0 ? FreeMapParams.KehaiBattle : 0);
+            => IsMoving ? Speed.Kehai() : 0;
 
         /// <summary>察知距離。 照明なし: 2 ＋ 気配 (最大 4)。 照明中: 照明で見える範囲 5 で固定。</summary>
         public double DetectRadius
@@ -344,11 +342,19 @@ namespace MapSystem.FreeMove
             PlanFoe();
         }
 
-        /// <summary>戦闘が終わった: 2 手番の気配 +2 と、 半径 4 の物音。</summary>
+        /// <summary>戦闘が終わった: 徘徊エネミーに「ここで戦闘があった」と伝わる (距離によらない・2026-10-03)。
+        /// どう動くかは性質の <see cref="FoeProfile.onBattle"/> 次第。 追跡中ならもともと居場所を知っているので変わらない。
+        /// (旧: 2 手番の気配 +2 と半径 4 の物音)</summary>
         public void NoteBattleEnded()
         {
-            BattleHeatTurns = FreeMapParams.BattleKehaiTurns;
-            MakeNoise(FreeMapParams.BattleNoise);
+            if (!FoeAlive || FoeState == FoeState.Chase) return;
+            switch (Profile.onBattle)
+            {
+                case BattleReaction.Investigate:
+                    FoeState = FoeState.Alert; _lastKnown = Me; PlanFoe(); break;
+                case BattleReaction.Familiar:
+                    LaunchFamiliar(Me); break;
+            }
         }
 
         /// <summary>補給庫を漁った物音 (半径 3・気配は上げない)。</summary>
@@ -370,7 +376,6 @@ namespace MapSystem.FreeMove
         {
             InGauntlet = false;
             FoeAlive = false;
-            BattleHeatTurns = FreeMapParams.BattleKehaiTurns;
             StoneLevel = 0;
             StoneBearing = -1;
         }
@@ -562,7 +567,6 @@ namespace MapSystem.FreeMove
                 var t = Tracks[i]; t.strength--;
                 if (t.strength <= 0) Tracks.RemoveAt(i); else Tracks[i] = t;
             }
-            if (BattleHeatTurns > 0) BattleHeatTurns--;
             if (FlareOn && !IsMoving) { Pay(FreeMapParams.CostFlare, 0); if (Dead) return ev; }
             if (!FoeAlive) return ev;
 
