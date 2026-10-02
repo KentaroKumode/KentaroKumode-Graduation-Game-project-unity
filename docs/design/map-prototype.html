@@ -10,7 +10,7 @@
   h1 { font-size:16px; margin:0 0 4px; } .sub { color:var(--ink3); font-size:11px; margin-bottom:10px; }
   .wrap { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
   .mapbox { position:relative; border:1px solid var(--line); background:#0b0d0f; max-width:100%; overflow:auto; }
-  canvas { display:block; }
+  canvas { display:block; image-rendering:pixelated; }
   .side { width:300px; max-width:100%; display:flex; flex-direction:column; gap:10px; }
   .card { background:var(--panel); border:1px solid var(--line); padding:10px 12px; }
   .row { display:flex; justify-content:space-between; gap:8px; font-variant-numeric:tabular-nums; }
@@ -94,6 +94,7 @@
       <div id="profDesc" class="k" style="font-size:11px;margin-top:4px"></div>
       <label style="display:block;margin-top:6px"><input type="checkbox" id="dbg"> 敵と痕跡を常に表示（デバッグ）</label>
       <label style="display:block;margin-top:6px"><input type="checkbox" id="lcd" checked> 液晶の表示（切ると旧表示）</label>
+      <label style="display:block;margin-top:2px"><input type="checkbox" id="scanl"> 走査線（中間色が出る）</label>
       <div class="btns" style="align-items:center;margin-top:6px">
         <label>物資の上限 <input type="number" id="cap" value="1000" step="50" min="100"></label>
         <label>BINGO の余裕 <select id="bingoMargin"><option value="pct">必要量の 1 割</option><option value="move">1 回の移動ぶん（道の外 1.5 距離）</option></select></label>
@@ -786,6 +787,7 @@ document.getElementById("bNew").onclick = newGame;
   document.getElementById("showProf").onchange = () => draw(); }
 document.getElementById("dbg").onchange = () => draw();
 document.getElementById("lcd").onchange = () => draw();
+document.getElementById("scanl").onchange = () => draw();
 document.getElementById("bingoMargin").onchange = () => ui();
 
 // ═══ 燃料計と BINGO 警告（2026-10-02・docs/design/supply-weather.md §5） ═══════════════
@@ -845,7 +847,8 @@ function outpost(j) {
 const LW = 256, LH = 139, LK = 4;                       // 液晶のドット数と拡大率
 const LS = Math.min((LW - 12) / W, (LH - 12) / H);      // 距離 1 = LS ドット（≒ 13.5）
 const LOX = Math.round((LW - W * LS) / 2), LOY = Math.round((LH - H * LS) / 2);
-const LC = { bg: "#0d0803", grid: "#2a1a08", dim: "#5e3e14", mid: "#a26c1f", hi: "#f0aa42", hot: "#ffe0a0", red: "#ff4a2c", redDim: "#7a2414" };
+// 色はこの表の 11 色だけ（中間色・半透明は使わない。 どの描画もこの中から選ぶ）
+const LC = { bg: "#0d0803", fill: "#160d04", fill2: "#24170a", fillR: "#2e0d06", grid: "#2a1a08", dim: "#5e3e14", mid: "#a26c1f", hi: "#f0aa42", hot: "#ffe0a0", red: "#ff4a2c", redDim: "#7a2414" };
 const off = document.createElement("canvas"); off.width = LW; off.height = LH; const ox = off.getContext("2d");
 const scan = (() => { const c = document.createElement("canvas"); c.width = 1; c.height = LK; const g = c.getContext("2d"); g.fillStyle = "rgba(0,0,0,.35)"; g.fillRect(0, LK - 1, 1, 1); return c; })();
 const sp = p => ({ x: Math.round(LOX + p.x * LS) + 0.5, y: Math.round(LOY + p.y * LS) + 0.5 });
@@ -877,8 +880,25 @@ const GLYPH = {
 };
 function glyph(rows, x, y, col) { const h = rows.length, w = rows[0].length, x0 = Math.round(x - 0.5 - (w - 1) / 2), y0 = Math.round(y - 0.5 - (h - 1) / 2); ox.fillStyle = col;
   for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) if (rows[r][c] === "1") ox.fillRect(x0 + c, y0 + r, 1, 1); }
-function lline(a, b, col, dash) { ox.strokeStyle = col; ox.lineWidth = 1; ox.setLineDash(dash || []); ox.beginPath(); ox.moveTo(a.x, a.y); ox.lineTo(b.x, b.y); ox.stroke(); ox.setLineDash([]); }
-function lring(p, r, col, dash) { const q = sp(p); ox.strokeStyle = col; ox.lineWidth = 1; ox.setLineDash(dash || []); ox.beginPath(); ox.arc(q.x, q.y, r * LS, 0, 7); ox.stroke(); ox.setLineDash([]); }
+// 線・円・塗りはすべて 1 ドット単位で打つ（キャンバスの線描画はアンチエイリアスが外せないので使わない）
+function dashOn(i, dash) { if (!dash || !dash.length) return true; const per = dash.reduce((a, b) => a + b, 0); let k = i % per;
+  for (let d = 0; d < dash.length; d++) { if (k < dash[d]) return d % 2 === 0; k -= dash[d]; } return true; }
+function lline(a, b, col, dash) { ox.fillStyle = col;
+  let x0 = Math.floor(a.x), y0 = Math.floor(a.y); const x1 = Math.floor(b.x), y1 = Math.floor(b.y);
+  const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let err = dx + dy, i = 0;
+  for (;;) { if (dashOn(i++, dash)) ox.fillRect(x0, y0, 1, 1); if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * err; if (e2 >= dy) { err += dy; x0 += sx; } if (e2 <= dx) { err += dx; y0 += sy; } } }
+// 中心 c・半径 (ra, rb)・回転 rot の楕円の輪郭を、 隣り合うドットが途切れないよう角度を細かく刻んで打つ
+function lellipse(c, ra, rb, rot, col, dash) { ox.fillStyle = col; const n = Math.max(24, Math.ceil(Math.PI * 2 * Math.max(ra, rb) * 2)), co = Math.cos(rot), si = Math.sin(rot);
+  let last = null, i = 0;
+  for (let k = 0; k < n; k++) { const t = k / n * Math.PI * 2, ex = Math.cos(t) * ra, ey = Math.sin(t) * rb;
+    const x = Math.floor(c.x + ex * co - ey * si), y = Math.floor(c.y + ex * si + ey * co);
+    if (last && last[0] === x && last[1] === y) continue; last = [x, y]; if (dashOn(i++, dash)) ox.fillRect(x, y, 1, 1); } }
+function lring(p, r, col, dash) { lellipse(sp(p), r * LS, r * LS, 0, col, dash); }
+// 塗り: 判定関数が真のドットを 1 色で塗る（境界はぼかさない）
+function lfill(x0, y0, x1, y1, inside, col) { ox.fillStyle = col;
+  for (let y = Math.max(0, Math.floor(y0)); y <= Math.min(LH - 1, Math.ceil(y1)); y++) for (let x = Math.max(0, Math.floor(x0)); x <= Math.min(LW - 1, Math.ceil(x1)); x++)
+    if (inside(x + 0.5, y + 0.5)) ox.fillRect(x, y, 1, 1); }
 function bracket(q, s, col) { ox.fillStyle = col; const L = 2;
   for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const x = Math.floor(q.x + sx * s), y = Math.floor(q.y + sy * s);
     ox.fillRect(sx < 0 ? x : x - L + 1, y, L, 1); ox.fillRect(x, sy < 0 ? y : y - L + 1, 1, L); } }
@@ -894,22 +914,22 @@ function drawLCD() {
   for (let gx = 0; gx <= Math.floor(W); gx += 2) ltext(String.fromCharCode(65 + gx / 2), sp({ x: gx, y: 0 }).x, 3, LC.dim);
   for (let gy = 2; gy <= Math.floor(H); gy += 2) ltext(String(gy / 2), 2, sp({ x: 0, y: gy }).y, LC.dim, "left");
   // 山岳: 等高線
-  for (const m of MTS) { const q = sp(m);
-    for (const [k, dash] of [[1, []], [0.66, [1, 1]], [0.33, [1, 2]]]) { ox.save(); ox.translate(q.x, q.y); ox.rotate(m.r); ox.beginPath(); ox.ellipse(0, 0, m.a * k * LS, m.b * k * LS, 0, 0, 7);
-      if (k === 1) { ox.fillStyle = "#160d04"; ox.fill(); } ox.strokeStyle = LC.dim; ox.lineWidth = 1; ox.setLineDash(dash); ox.stroke(); ox.setLineDash([]); ox.restore(); } }
+  for (const m of MTS) { const q = sp(m), R = Math.max(m.a, m.b) * LS + 1, co = Math.cos(m.r), si = Math.sin(m.r);
+    lfill(q.x - R, q.y - R, q.x + R, q.y + R, (x, y) => { const dx = x - q.x, dy = y - q.y, u = (dx * co + dy * si) / (m.a * LS), v = (-dx * si + dy * co) / (m.b * LS); return u * u + v * v <= 1; }, LC.fill);
+    for (const [k, dash] of [[1, []], [0.66, [1, 1]], [0.33, [1, 2]]]) lellipse(q, m.a * k * LS, m.b * k * LS, m.r, LC.dim, dash); }
   // 道
   for (const [a, b] of E) lline(sp(N[a]), sp(N[b]), LC.dim, [1, 1]);
-  if (dbg) for (const t of S.tracks) { const q = sp(t); ox.fillStyle = LC.mid; ox.globalAlpha = Math.min(1, 0.25 * t.s); ox.fillRect(q.x - 0.5, q.y - 0.5, 1, 1); ox.globalAlpha = 1; }
+  if (dbg) for (const t of S.tracks) { const q = sp(t); ox.fillStyle = t.s >= 2 ? LC.mid : LC.dim; ox.fillRect(q.x - 0.5, q.y - 0.5, 1, 1); }
   const meP = lerpP(prevMe, S.me), mq = sp(meP);
   // 範囲
   lring(meP, P.visStone, LC.dim, [1, 2]);
-  if (S.flare) { ox.fillStyle = "rgba(240,170,66,.07)"; ox.beginPath(); ox.arc(mq.x, mq.y, P.visFlare * LS, 0, 7); ox.fill(); lring(meP, P.visFlare, LC.mid, [2, 1]); }
+  if (S.flare) { const R = P.visFlare * LS; lfill(mq.x - R, mq.y - R, mq.x + R, mq.y + R, (x, y) => (x - mq.x) ** 2 + (y - mq.y) ** 2 <= R * R, LC.fill2); lring(meP, P.visFlare, LC.mid, [2, 1]); }
   if (S.scout > 0) lring(meP, P.visScout, LC.hi, [1, 1]);
   lring(meP, detectR(), LC.redDim, [1, 3]);
   // 魔石の方角
   for (const b of [S.stoneBearing, S.stoneGhost]) { if (b < 0) continue; const a0 = b * Math.PI / 3, R = P.visStone * LS;
-    ox.fillStyle = S.stone.startsWith("強く") ? "rgba(255,74,44,.14)" : "rgba(240,170,66,.11)";
-    ox.beginPath(); ox.moveTo(mq.x, mq.y); ox.arc(mq.x, mq.y, R, a0 - Math.PI / 6, a0 + Math.PI / 6); ox.closePath(); ox.fill(); }
+    lfill(mq.x - R, mq.y - R, mq.x + R, mq.y + R, (x, y) => { const dx = x - mq.x, dy = y - mq.y; if (dx * dx + dy * dy > R * R) return false;
+      let d = Math.atan2(dy, dx) - a0; d = Math.atan2(Math.sin(d), Math.cos(d)); return Math.abs(d) <= Math.PI / 6; }, S.stone.startsWith("強く") ? LC.fillR : LC.fill2); }
   // 行き先
   if (S.move) { const q = sp(N[S.move.to]); lline(mq, q, LC.hi, [2, 2]); bracket(q, 5, LC.hi); }
   if (S.target !== null && S.target !== undefined) { const q = sp(N[S.target]), pv = preview(S.target);
@@ -927,10 +947,10 @@ function drawLCD() {
   for (const w of S.webs) { if (!w.seen && !dbg) continue; glyph(["101", "010", "101"], sp(w).x, sp(w).y, w.seen ? LC.mid : LC.dim); }
   // 敵
   if (S.seenFoe && S.time - S.seenFoe.t >= 0.15 && aliveFoes().length) { const q = sp(S.seenFoe), age = S.time - S.seenFoe.t;
-    ox.globalAlpha = Math.max(0.35, 1 - age / 12); glyph(["101", "010", "101"], q.x, q.y, LC.red); ltext(`-${age.toFixed(0)}T`, q.x, q.y - 6, LC.red); ox.globalAlpha = 1; }
+    const c = age < 6 ? LC.red : LC.redDim; glyph(["101", "010", "101"], q.x, q.y, c); ltext(`-${age.toFixed(0)}T`, q.x, q.y - 6, c); }
   const STC = { "巡回": "PTRL", "警戒": "ALRT", "追跡": "CHSE" };
   S.foes.forEach((f, k) => { if (!f.alive) return;
-    if (dbg) { f.terr.forEach(i => { const q = sp(N[i]); ox.strokeStyle = LC.redDim; ox.setLineDash([1, 1]); ox.strokeRect(q.x - 4, q.y - 4, 8, 8); ox.setLineDash([]); });
+    if (dbg) { f.terr.forEach(i => { const q = sp(N[i]); bracket(q, 4, LC.redDim); });
       f.way.forEach((b, wi) => ltext("W" + (wi + 1), sp(N[b]).x, sp(N[b]).y + 7, LC.redDim)); }
     if (!(dbg || S.time - f.seenT < 0.15)) return;
     const q = sp(lerpP(prevFoes[k], foePos(f)));
@@ -949,13 +969,11 @@ function drawLCD() {
   // 自分: 中心 1 ドット＋十字の腕
   ox.fillStyle = LC.hot; const cxp = Math.floor(mq.x), cyp = Math.floor(mq.y);
   ox.fillRect(cxp, cyp, 1, 1); ox.fillRect(cxp - 3, cyp, 2, 1); ox.fillRect(cxp + 2, cyp, 2, 1); ox.fillRect(cxp, cyp - 3, 1, 2); ox.fillRect(cxp, cyp + 2, 1, 2);
-  // 合成: 4 倍に拡大 → 発光 → 走査線 → 周辺減光
+  // 合成: 4 倍に最近傍で拡大するだけ（色は表のまま。 ぼかし・周辺減光は入れない）
   cx.imageSmoothingEnabled = false; cx.fillStyle = LC.bg; cx.fillRect(0, 0, cv.width, cv.height);
   cx.drawImage(off, 0, 0, cv.width, cv.height);
-  cx.save(); cx.globalCompositeOperation = "lighter"; cx.globalAlpha = 0.3; cx.filter = "blur(4px)"; cx.drawImage(off, 0, 0, cv.width, cv.height); cx.restore();
-  cx.fillStyle = cx.createPattern(scan, "repeat"); cx.fillRect(0, 0, cv.width, cv.height);
-  const vg = cx.createRadialGradient(cv.width / 2, cv.height / 2, cv.height * 0.35, cv.width / 2, cv.height / 2, cv.width * 0.62);
-  vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.45)"); cx.fillStyle = vg; cx.fillRect(0, 0, cv.width, cv.height);
+  // 走査線は中間色を作るので既定では切る（設定で入れられる）
+  if (document.getElementById("scanl").checked) { cx.fillStyle = cx.createPattern(scan, "repeat"); cx.fillRect(0, 0, cv.width, cv.height); }
 }
 function draw() { if (lcdOn()) drawLCD(); else { fitCanvas(); drawOld(); } }
 
