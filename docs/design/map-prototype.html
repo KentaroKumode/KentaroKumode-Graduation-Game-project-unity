@@ -993,7 +993,8 @@ function lellipse(c, ra, rb, rot, col, dash) { ox.fillStyle = col; const n = Mat
 function lring(p, r, col, dash) { lellipse(sp(p), r * LS, r * LS, 0, col, dash); }
 /* 気配 (2026-10-03): 察知距離の円を、 外へだけ振れるギザギザの 1 本線にする (回らない)。
    円周を 3 ドットおきに区切り、 各点の高さを乱数で決めて直線でつなぐ。 ときどき高く跳ねる。
-   1 秒に 12 回作り直して、 その場で震える。 気配が増えるほど高く荒く、 色が赤く強くなる。 時間停止中も動く */
+   1 秒に 12 回作り直して、 その場で震える。 気配が増えるほど高く荒くなる。 時間停止中も動く。
+   色は察知距離の 3 段で分ける: 気配 0 = 琥珀 / 1 = 橙 / 2 以上 = 赤 (2 以上は察知距離が上限 4 で同じ) */
 function lnoise(p, r, k, col) { const c = sp(p), R = r * LS, frame = Math.floor(performance.now() / 1000 * 12);
   const amp = 1.5 + k * 2.5, n = Math.max(48, Math.round(Math.PI * 2 * R / 3));
   const rnd = i => { let v = (i * 374761393 + frame * 668265263) | 0; v = Math.imul(v ^ (v >>> 13), 1274126177); return ((v ^ (v >>> 16)) >>> 0) / 4294967296; };
@@ -1032,7 +1033,7 @@ function drawLCD() {
   lring(meP, P.visStone, LC.dim, [1, 2]);
   if (S.flare) { const R = P.visFlare * LS; lfill(mq.x - R, mq.y - R, mq.x + R, mq.y + R, (x, y) => (x - mq.x) ** 2 + (y - mq.y) ** 2 <= R * R, LC.fill2); lring(meP, P.visFlare, LC.mid, [2, 1]); }
   if (S.scout > 0) lring(meP, P.visScout, LC.hi, [1, 1]);
-  { const k = kehai(); lnoise(meP, detectR(), k, k >= 3 ? LC.red : k >= 1 ? LC.redDim : LC.dim); }   /* 気配 = 察知距離の円の波 */
+  { const k = kehai(); lnoise(meP, detectR(), k, k >= 2 ? LC.red : k >= 1 ? "#ff8a1e" : LC.mid); }   /* 気配 = 察知距離の円の波。 色は察知距離の 3 段 (2 / 3 / 4) で分ける */
   // 魔石の方角
   for (const b of [S.stoneBearing, S.stoneGhost]) { if (b < 0) continue; const a0 = b * Math.PI / 3, R = P.visStone * LS;
     lfill(mq.x - R, mq.y - R, mq.x + R, mq.y + R, (x, y) => { const dx = x - mq.x, dy = y - mq.y; if (dx * dx + dy * dy > R * R) return false;
