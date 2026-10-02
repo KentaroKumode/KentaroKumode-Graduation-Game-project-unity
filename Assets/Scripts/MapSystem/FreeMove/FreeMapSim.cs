@@ -56,6 +56,9 @@ namespace MapSystem.FreeMove
     {
         public Vec2 pos;
         public Vec2 target;
+        /// <summary>再誘導を使ったか。 再誘導は 1 度だけで、 向き直す先は「その瞬間の位置」という点 (2026-10-03)。
+        /// 毎刻み向き直すと速さ 3 の純追尾になり、 回避の軌道をとっても必ず捕まっていた。</summary>
+        public bool retargeted;
     }
 
     /// <summary>移動に払う物資と HP の窓口。 素の C# 側は RunState を知らないのでここを通す。</summary>
@@ -805,7 +808,8 @@ namespace MapSystem.FreeMove
             FamiliarsLaunched++;
         }
 
-        /// <summary>使い魔を 1 刻み飛ばす。 探知範囲の内にプレイヤーが居れば向きを変え、 目標地点で見つけられなければ消える。</summary>
+        /// <summary>使い魔を 1 刻み飛ばす。 探知範囲の内にプレイヤーが居れば **1 度だけ** その位置へ向きを変え、
+        /// 目標地点で見つけられなければ消える。</summary>
         private FreeMapEvent AdvanceFamiliars()
         {
             var ev = FreeMapEvent.None;
@@ -816,7 +820,7 @@ namespace MapSystem.FreeMove
             for (int i = Familiars.Count - 1; i >= 0; i--)
             {
                 var f = Familiars[i];
-                if (Vec2.Dist(f.pos, Me) <= FreeMapParams.FamiliarDetectRange) f.target = Me;
+                if (!f.retargeted && Vec2.Dist(f.pos, Me) <= FreeMapParams.FamiliarDetectRange) { f.target = Me; f.retargeted = true; }
                 double rem = Vec2.Dist(f.pos, f.target);
                 if (rem <= step) f.pos = f.target;
                 else f.pos = Vec2.Lerp(f.pos, f.target, step / rem);
@@ -830,7 +834,7 @@ namespace MapSystem.FreeMove
                 }
                 if (Vec2.Dist(f.pos, f.target) <= 1e-9)
                 {
-                    if (Vec2.Dist(f.pos, Me) <= FreeMapParams.FamiliarDetectRange) f.target = Me;
+                    if (!f.retargeted && Vec2.Dist(f.pos, Me) <= FreeMapParams.FamiliarDetectRange) { f.target = Me; f.retargeted = true; }
                     else
                     {
                         Familiars.RemoveAt(i);
