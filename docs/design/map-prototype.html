@@ -150,7 +150,7 @@ const PROFILES = {
 };
 const FAMILIARS = {
   none:    { name: "なし" },
-  cruise:  { name: "巡航",   desc: "察知地点へ直線で速さ 3。探知 1.2。目標で見つからなければ消える" },
+  cruise:  { name: "巡航",   desc: "察知地点へ直線で速さ 3。探知 1.2 で 1 度だけ向き直す。目標で見つからなければ消える" },
   scout:   { name: "斥候",   desc: "交戦しない。触れた地点を本体に知らせる（本体が警戒で来る）" },
   homing:  { name: "追尾",   desc: "遅い（1.5）が探知 3・10 手番こちらを追い続ける" },
   split:   { name: "分裂",   desc: "目標で見つからなければ 2 つに分かれて左右 1 距離を探す" },
@@ -401,13 +401,13 @@ function advanceFamiliars(dt) {
     const speed = homing ? P.famHomingSpeed : P.famSpeed, det = homing ? P.famHomingDetect : P.famDetect;
     if (homing) { m.life -= dt; if (m.life <= 0) { S.familiars.splice(i, 1); if (dist(m, S.me) <= vis) log("（追尾の使い魔が力尽きて消えた）"); continue; }
       if (dist(m, S.me) <= det) { m.tx = S.me.x; m.ty = S.me.y; } }
-    else if (dist(m, S.me) <= det) { m.tx = S.me.x; m.ty = S.me.y; }
+    else if (!m.re && dist(m, S.me) <= det) { m.tx = S.me.x; m.ty = S.me.y; m.re = true; }   /* 再誘導は 1 度だけ (2026-10-03) */
     const rem = Math.hypot(m.tx - m.x, m.ty - m.y), step = speed * dt;
     if (rem > 1e-9) { m.vx = (m.tx - m.x) / rem; m.vy = (m.ty - m.y) / rem; }
     if (rem <= step) { m.x = m.tx; m.y = m.ty; } else { m.x += m.vx * step; m.y += m.vy * step; }
     if (dist(m, S.me) <= P.famCatch) { S.familiars.splice(i, 1); famContact(m); return; }
     if (Math.hypot(m.tx - m.x, m.ty - m.y) <= 1e-9) {
-      if (dist(m, S.me) <= det) { m.tx = S.me.x; m.ty = S.me.y; continue; }
+      if ((homing || !m.re) && dist(m, S.me) <= det) { m.tx = S.me.x; m.ty = S.me.y; m.re = true; continue; }
       if (homing) continue;   // 追尾は寿命まで最後の位置の周りで待つ
       S.familiars.splice(i, 1);
       if (m.kind === "split" && !m.split) {   // 分裂: 飛んできた向きの左右へ 1 距離ずつ
