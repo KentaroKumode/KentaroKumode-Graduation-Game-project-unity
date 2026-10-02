@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace MapSystem.FreeMove
@@ -56,8 +56,9 @@ namespace MapSystem.FreeMove
     {
         public Vec2 pos;
         public Vec2 target;
-        /// <summary>再誘導を使ったか。 再誘導は 1 度だけで、 向き直す先は「その瞬間の位置」という点 (2026-10-03)。
-        /// 毎刻み向き直すと速さ 3 の純追尾になり、 回避の軌道をとっても必ず捕まっていた。</summary>
+        /// <summary>再誘導を使ったか (2026-10-03)。 使い魔は自分では探知しない ── 目標地点まで直進し、
+        /// 着いて外れた時にプレイヤーが<b>母体の察知距離</b>の内に居れば、 1 度だけ「その瞬間の位置」へ向き直す。
+        /// 旧来は探知範囲 1.2 の内で毎刻み向き直す速さ 3 の純追尾で、 回避の軌道をとっても必ず捕まっていた。</summary>
         public bool retargeted;
     }
 
@@ -808,8 +809,8 @@ namespace MapSystem.FreeMove
             FamiliarsLaunched++;
         }
 
-        /// <summary>使い魔を 1 刻み飛ばす。 探知範囲の内にプレイヤーが居れば **1 度だけ** その位置へ向きを変え、
-        /// 目標地点で見つけられなければ消える。</summary>
+        /// <summary>使い魔を 1 刻み飛ばす。 目標地点まで直進し、 途中で触れれば交戦。 着いて外れたら、
+        /// プレイヤーが母体の察知距離の内に居れば <b>1 度だけ</b> その位置へ向き直し、 居なければ (2 度目なら) 消える。</summary>
         private FreeMapEvent AdvanceFamiliars()
         {
             var ev = FreeMapEvent.None;
@@ -820,7 +821,6 @@ namespace MapSystem.FreeMove
             for (int i = Familiars.Count - 1; i >= 0; i--)
             {
                 var f = Familiars[i];
-                if (!f.retargeted && Vec2.Dist(f.pos, Me) <= FreeMapParams.FamiliarDetectRange) { f.target = Me; f.retargeted = true; }
                 double rem = Vec2.Dist(f.pos, f.target);
                 if (rem <= step) f.pos = f.target;
                 else f.pos = Vec2.Lerp(f.pos, f.target, step / rem);
@@ -834,7 +834,7 @@ namespace MapSystem.FreeMove
                 }
                 if (Vec2.Dist(f.pos, f.target) <= 1e-9)
                 {
-                    if (!f.retargeted && Vec2.Dist(f.pos, Me) <= FreeMapParams.FamiliarDetectRange) { f.target = Me; f.retargeted = true; }
+                    if (!f.retargeted && FoeAlive && Vec2.Dist(FoePos, Me) <= DetectRadius) { f.target = Me; f.retargeted = true; }
                     else
                     {
                         Familiars.RemoveAt(i);

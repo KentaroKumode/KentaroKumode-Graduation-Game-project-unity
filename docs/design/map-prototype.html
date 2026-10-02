@@ -133,7 +133,7 @@ const P = {
   msPerTick: { normal: 600, fast: 60 },                            // 時間の速さ: 1 刻み（0.1 手番）あたりの実時間。 順速 1 手番 ≒ 6 秒・早送りはその 10 倍
   shopDecoyPrice: 6, shopTrapPrice: 8, decoy0: 1, trap0: 1, gauntletFights: 2,
   // 使い魔 (巡航ミサイル・2026-09-28): 察知した地点へ直線で飛ぶ。 探知範囲の内に居ればこちらへ向きを変える。 目標で見つからなければ消える
-  famSpeed: 3.0, famDetect: 1.2, famCatch: 0.45, famCooldown: 8, famMax: 1,
+  famSpeed: 3.0, famCatch: 0.45, famCooldown: 8, famMax: 1,
   famHomingSpeed: 1.5, famHomingDetect: 3.0, famHomingTurns: 10, famSplitDist: 1.0,
   webStuck: 1, webHit: 0.35, webEvery: 3, webMax: 6,
   territoryStartClear: 3,
@@ -150,10 +150,10 @@ const PROFILES = {
 };
 const FAMILIARS = {
   none:    { name: "なし" },
-  cruise:  { name: "巡航",   desc: "察知地点へ直線で速さ 3。探知 1.2 で 1 度だけ向き直す。目標で見つからなければ消える" },
+  cruise:  { name: "巡航",   desc: "察知地点へ直線で速さ 3。着いて外れた時、母体の察知距離の内に居れば 1 度だけ向き直す。それ以外は消える" },
   scout:   { name: "斥候",   desc: "交戦しない。触れた地点を本体に知らせる（本体が警戒で来る）" },
   homing:  { name: "追尾",   desc: "遅い（1.5）が探知 3・10 手番こちらを追い続ける" },
-  split:   { name: "分裂",   desc: "目標で見つからなければ 2 つに分かれて左右 1 距離を探す" },
+  split:   { name: "分裂",   desc: "目標で外れたら 2 つに分かれて左右 1 距離を探す（向き直しは分かれる前の 1 度だけ）" },
 };
 // 移動の速さ: 時間の倍率 / 物資の倍率 / 気配（道の上の +2 を置き換える）
 const SPEED = { sneak: { name: "忍び足", time: 2, cost: 1, kehai: () => 0 },
@@ -385,6 +385,8 @@ function advanceFoe(f, amount) {
 }
 
 // ═══ 使い魔 ═══════════════════════════════════════════════════
+/* 母体の察知距離 (追跡中の上乗せ・性質の上乗せ込み)。 察知の判定と使い魔の再誘導が同じ値を読む */
+function foeSenseR(f) { const pr = PR(); return detectR() + (f.state === "追跡" ? P.chaseDetectBonus : 0) + (pr.sense || 0); }
 function launchFamiliar(f) {
   const kind = S.famKey !== "none" ? S.famKey : PR().stationary ? "cruise" : null;   // 祭壇は使い魔が本体なので「なし」でも巡航を撃つ
   if (!kind) return;
@@ -398,20 +400,21 @@ function advanceFamiliars(dt) {
   const vis = S.flare ? P.visFlare : P.visNone;
   for (let i = S.familiars.length - 1; i >= 0; i--) {
     const m = S.familiars[i], homing = m.kind === "homing";
-    const speed = homing ? P.famHomingSpeed : P.famSpeed, det = homing ? P.famHomingDetect : P.famDetect;
+    const speed = homing ? P.famHomingSpeed : P.famSpeed, det = homing ? P.famHomingDetect : 0;
     if (homing) { m.life -= dt; if (m.life <= 0) { S.familiars.splice(i, 1); if (dist(m, S.me) <= vis) log("（追尾の使い魔が力尽きて消えた）"); continue; }
       if (dist(m, S.me) <= det) { m.tx = S.me.x; m.ty = S.me.y; } }
-    else if (!m.re && dist(m, S.me) <= det) { m.tx = S.me.x; m.ty = S.me.y; m.re = true; }   /* 再誘導は 1 度だけ (2026-10-03) */
     const rem = Math.hypot(m.tx - m.x, m.ty - m.y), step = speed * dt;
     if (rem > 1e-9) { m.vx = (m.tx - m.x) / rem; m.vy = (m.ty - m.y) / rem; }
     if (rem <= step) { m.x = m.tx; m.y = m.ty; } else { m.x += m.vx * step; m.y += m.vy * step; }
     if (dist(m, S.me) <= P.famCatch) { S.familiars.splice(i, 1); famContact(m); return; }
     if (Math.hypot(m.tx - m.x, m.ty - m.y) <= 1e-9) {
-      if ((homing || !m.re) && dist(m, S.me) <= det) { m.tx = S.me.x; m.ty = S.me.y; m.re = true; continue; }
+      if (homing && dist(m, S.me) <= det) { m.tx = S.me.x; m.ty = S.me.y; continue; }
+      /* 巡航・分裂は自分では探知しない (2026-10-03)。 着いて外れた時、 母体の察知距離の内に居れば 1 度だけその位置へ向き直す */
+      if (!homing && !m.re && m.owner.alive && dist(foePos(m.owner), S.me) <= foeSenseR(m.owner)) { m.tx = S.me.x; m.ty = S.me.y; m.re = true; continue; }
       if (homing) continue;   // 追尾は寿命まで最後の位置の周りで待つ
       S.familiars.splice(i, 1);
       if (m.kind === "split" && !m.split) {   // 分裂: 飛んできた向きの左右へ 1 距離ずつ
-        for (const sgn of [1, -1]) S.familiars.push({ x: m.x, y: m.y, tx: m.x - (m.vy || 0) * sgn * P.famSplitDist, ty: m.y + (m.vx || 0) * sgn * P.famSplitDist, kind: "split", owner: m.owner, split: true });
+        for (const sgn of [1, -1]) S.familiars.push({ x: m.x, y: m.y, tx: m.x - (m.vy || 0) * sgn * P.famSplitDist, ty: m.y + (m.vx || 0) * sgn * P.famSplitDist, kind: "split", owner: m.owner, split: true, re: true });
         if (dist(m, S.me) <= vis) log("（使い魔が二つに分かれた）");
       } else if (dist(m, S.me) <= vis) log("（使い魔は目標を見失って消えた）");
     }
@@ -518,7 +521,7 @@ function turnFoe(f) {
   const pr = PR(), fp = foePos(f);
   if (pr.stationary && f.state === "警戒") f.state = "巡回";   // 祭壇は探しに行けないので、 見失えばそのまま待つ
   if (pr.webs && f.state === "巡回" && ++f.webTimer >= P.webEvery) { f.webTimer = 0; S.webs.push({ x: fp.x, y: fp.y, seen: false }); if (S.webs.length > P.webMax) S.webs.shift(); }
-  const d = dist(fp, S.me), R = detectR() + (f.state === "追跡" ? P.chaseDetectBonus : 0) + (pr.sense || 0);
+  const d = dist(fp, S.me), R = foeSenseR(f);
   let seen = false;
   if (pr.blind) seen = d <= 0.9;   // 盲目: 触れるほど近ければ分かる
   else if (d <= R) { const roll = d6(), need = Math.min(6, Math.max(1, Math.floor(R - d + 1))); seen = roll <= need; }
