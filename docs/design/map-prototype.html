@@ -991,14 +991,16 @@ function lellipse(c, ra, rb, rot, col, dash) { ox.fillStyle = col; const n = Mat
     const x = Math.floor(c.x + ex * co - ey * si), y = Math.floor(c.y + ex * si + ey * co);
     if (last && last[0] === x && last[1] === y) continue; last = [x, y]; if (dashOn(i++, dash)) ox.fillRect(x, y, 1, 1); } }
 function lring(p, r, col, dash) { lellipse(sp(p), r * LS, r * LS, 0, col, dash); }
-/* 気配 (2026-10-03): 察知距離の円を、 気配の大きさに応じて波打たせる (周波数のようなノイズ)。
-   気配 0 = ほぼ静かな円・気配が増えるほど振れ幅が大きく、 速く、 色が赤く強くなる。 時間停止中も動く */
-function lnoise(p, r, k, col) { const c = sp(p), R = r * LS, t = performance.now() / 1000, sp2 = 0.6 + k * 0.9, amp = 0.5 + k * 2.0;
-  ox.fillStyle = col; const n = Math.max(48, Math.ceil(Math.PI * 2 * R * 2)); let last = null;
+/* 気配 (2026-10-03): 察知距離の円に音声の波形を巻き付ける。 角度ごとに内から外へ線を 1 本引き、 長さを細かく乱す。
+   振れ幅 = ゆっくり動く包絡線 × 毎刻みの乱れ × 気配。 気配 0 でも細かく震え、 増えるほど太く荒く赤くなる。 時間停止中も動く */
+function lnoise(p, r, k, col) { const c = sp(p), R = r * LS, t = performance.now() / 1000, frame = Math.floor(t * 16);
+  const amp = 1.6 + k * 2.6; ox.fillStyle = col; const n = Math.max(64, Math.ceil(Math.PI * 2 * R * 1.5));
+  const rnd = i => { let v = (i * 374761393 + frame * 668265263) | 0; v = Math.imul(v ^ (v >>> 13), 1274126177); return ((v ^ (v >>> 16)) >>> 0) / 4294967296; };
   for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2;
-    const w = Math.sin(a * 7 + t * 3.1 * sp2) * 0.5 + Math.sin(a * 13 - t * 5.3 * sp2) * 0.3 + Math.sin(a * 23 + t * 8.7 * sp2) * 0.2;
-    const rr = R + w * amp, x = Math.floor(c.x + Math.cos(a) * rr), y = Math.floor(c.y + Math.sin(a) * rr);
-    if (last && last[0] === x && last[1] === y) continue; last = [x, y]; ox.fillRect(x, y, 1, 1); } }
+    const env = 0.55 + 0.45 * (Math.sin(a * 3 + t * 1.3) * 0.5 + Math.sin(a * 7 - t * 2.1) * 0.3 + Math.sin(a * 11 + t * 0.7) * 0.2);
+    const s = rnd(i), spike = s > 0.93 ? 1.8 : 1, h = amp * env * (0.15 + 0.85 * s * s) * spike;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    for (let d = -h; d <= h; d += 0.5) ox.fillRect(Math.floor(c.x + ca * (R + d)), Math.floor(c.y + sa * (R + d)), 1, 1); } }
 // 塗り: 判定関数が真のドットを 1 色で塗る（境界はぼかさない）
 function lfill(x0, y0, x1, y1, inside, col) { ox.fillStyle = col;
   for (let y = Math.max(0, Math.floor(y0)); y <= Math.min(LH - 1, Math.ceil(y1)); y++) for (let x = Math.max(0, Math.floor(x0)); x <= Math.min(LW - 1, Math.ceil(x1)); x++)
