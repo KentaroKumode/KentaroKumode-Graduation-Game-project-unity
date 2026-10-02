@@ -1,4 +1,4 @@
-namespace MapSystem.FreeMove
+﻿namespace MapSystem.FreeMove
 {
     /// <summary>
     /// 自由移動マップの数値。 正本は docs/GAME.md §5 (仮置きの由来は §23-21)。
@@ -84,8 +84,6 @@ namespace MapSystem.FreeMove
         // ── 使い魔 (巡航ミサイル・2026-09-28) ───────────────────
         /// <summary>使い魔の速さ (距離 / 手番)。 急ぐ (2) より速い。 山岳の上も飛ぶ。</summary>
         public const float FamiliarSpeed = 3.0f;
-        /// <summary>使い魔の探知範囲。 狭い ── この内に居る時だけプレイヤーへ向きを変える。</summary>
-        public const float FamiliarDetectRange = 1.2f;
         /// <summary>使い魔に接触する距離 (交戦になる)。</summary>
         public const float FamiliarCatchDist = 0.45f;
         /// <summary>使い魔を放ってから次を放てるまでの手番 (既定の性質)。</summary>
