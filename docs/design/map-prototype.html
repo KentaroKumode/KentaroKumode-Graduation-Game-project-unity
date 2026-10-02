@@ -715,7 +715,8 @@ function soundTick(now) {
 
 // ═══ 操作 ═══════════════════════════════════════════════════
 const cv = document.getElementById("cv"), cx = cv.getContext("2d");
-const toPx = p => ({ x: OX + p.x * SCALE, y: OY + p.y * SCALE });
+// 地図の座標 → キャンバスの座標。 液晶の表示中は 256×139 のドット × 4 倍（クリック判定もこれで合わせる）
+const toPx = p => document.getElementById("lcd").checked ? { x: (Math.round(LOX + p.x * LS) + 0.5) * LK, y: (Math.round(LOY + p.y * LS) + 0.5) * LK } : { x: OX + p.x * SCALE, y: OY + p.y * SCALE };
 cv.addEventListener("click", e => {
   if (S.over || S.scout > 0 || !document.getElementById("modal").hidden) return;
   const r = cv.getBoundingClientRect(), mx = (e.clientX - r.left) * cv.width / r.width, my = (e.clientY - r.top) * cv.height / r.height;
@@ -839,107 +840,124 @@ function outpost(j) {
 }
 
 // ═══ 液晶の表示（地形データ風・2026-10-02） ═══════════════════════════
-// 半分の解像度で描いてから最近傍で 2 倍に拡大し、 走査線とわずかな発光を重ねる。 琥珀の単色で、 危険だけ赤
+// 筐体の液晶と同じ 256×139 ドットで描き、 4 倍（1024×556）に最近傍で拡大する。 文字は 3×5 のドット字。
+// 琥珀の単色で、 危険だけ赤。 走査線とわずかな発光を重ねる
+const LW = 256, LH = 139, LK = 4;                       // 液晶のドット数と拡大率
+const LS = Math.min((LW - 12) / W, (LH - 12) / H);      // 距離 1 = LS ドット（≒ 13.5）
+const LOX = Math.round((LW - W * LS) / 2), LOY = Math.round((LH - H * LS) / 2);
 const LC = { bg: "#0d0803", grid: "#2a1a08", dim: "#5e3e14", mid: "#a26c1f", hi: "#f0aa42", hot: "#ffe0a0", red: "#ff4a2c", redDim: "#7a2414" };
-const off = document.createElement("canvas"); off.width = 500; off.height = 298; const ox = off.getContext("2d");
-const scan = (() => { const c = document.createElement("canvas"); c.width = 1; c.height = 2; const g = c.getContext("2d"); g.fillStyle = "rgba(0,0,0,.32)"; g.fillRect(0, 1, 1, 1); return c; })();
-const sp = p => ({ x: Math.round((OX + p.x * SCALE) / 2) + 0.5, y: Math.round((OY + p.y * SCALE) / 2) + 0.5 });
+const off = document.createElement("canvas"); off.width = LW; off.height = LH; const ox = off.getContext("2d");
+const scan = (() => { const c = document.createElement("canvas"); c.width = 1; c.height = LK; const g = c.getContext("2d"); g.fillStyle = "rgba(0,0,0,.35)"; g.fillRect(0, LK - 1, 1, 1); return c; })();
+const sp = p => ({ x: Math.round(LOX + p.x * LS) + 0.5, y: Math.round(LOY + p.y * LS) + 0.5 });
+const lcdOn = () => document.getElementById("lcd").checked;
+// 3×5 のドット字（大文字・数字・記号少し）
+const F35 = { A: "010101111101101", B: "110101110101110", C: "011100100100011", D: "110101101101110", E: "111100110100111", F: "111100110100100",
+  G: "011100101101011", H: "101101111101101", I: "111010010010111", J: "001001001101010", K: "101101110101101", L: "100100100100111",
+  M: "101111111101101", N: "110101101101101", O: "010101101101010", P: "110101110100100", Q: "010101101110011", R: "110101110101101",
+  S: "011100010001110", T: "111010010010010", U: "101101101101111", V: "101101101101010", W: "101101111111101", X: "101101010101101",
+  Y: "101101010010010", Z: "111001010100111", "0": "111101101101111", "1": "010110010010111", "2": "110001010100111", "3": "110001010001110",
+  "4": "101101111001001", "5": "111100110001110", "6": "011100111101111", "7": "111001010010010", "8": "111101111101111", "9": "111101111001110",
+  "-": "000000111000000", "+": "000010111010000", ".": "000000000000010", ":": "000010000010000", "/": "001001010100100", " ": "000000000000000" };
+function ltext(s, x, y, col, align) { s = String(s).toUpperCase(); const w = s.length * 4 - 1;
+  let x0 = Math.round(align === "left" ? x : align === "right" ? x - w : x - w / 2), y0 = Math.round(y - 2); ox.fillStyle = col;
+  for (const ch of s) { const g = F35[ch] || F35[" "]; for (let i = 0; i < 15; i++) if (g[i] === "1") ox.fillRect(x0 + i % 3, y0 + Math.floor(i / 3), 1, 1); x0 += 4; } }
 const GLYPH = {
   "戦": ["10001", "01010", "00100", "01010", "10001"],
-  "精": ["1111111", "1000001", "1010101", "1001001", "1010101", "1000001", "1111111"],
-  "イ": ["00100", "00100", "00100", "00000", "00100"],
+  "精": ["11111", "10101", "11011", "10101", "11111"],
+  "イ": ["010", "010", "010", "000", "010"],
   "店": ["00100", "01110", "11111", "10101", "11111"],
-  "休": ["00100", "00100", "11111", "00100", "00100"],
+  "休": ["010", "111", "010"],
   "宝": ["00100", "01010", "10001", "01010", "00100"],
   "拠": ["11111", "10001", "10101", "10001", "11111"],
-  "前": ["11100", "11111", "11111", "10000", "10000"],
+  "前": ["1110", "1111", "1111", "1000", "1000"],
   "出": ["00100", "00110", "11111", "00110", "00100"],
-  "?": ["010", "101", "010"],
-  "済": ["111", "101", "111"],
-  "敵": ["0001000", "0011100", "0011100", "0111110", "0111110", "1111111"],
+  "?": ["1"],
+  "済": ["11", "11"],
+  "敵": ["00100", "01110", "01110", "11111"],
 };
-function glyph(rows, x, y, col) { const h = rows.length, w = rows[0].length, x0 = Math.round(x - w / 2), y0 = Math.round(y - h / 2); ox.fillStyle = col;
+function glyph(rows, x, y, col) { const h = rows.length, w = rows[0].length, x0 = Math.round(x - 0.5 - (w - 1) / 2), y0 = Math.round(y - 0.5 - (h - 1) / 2); ox.fillStyle = col;
   for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) if (rows[r][c] === "1") ox.fillRect(x0 + c, y0 + r, 1, 1); }
 function lline(a, b, col, dash) { ox.strokeStyle = col; ox.lineWidth = 1; ox.setLineDash(dash || []); ox.beginPath(); ox.moveTo(a.x, a.y); ox.lineTo(b.x, b.y); ox.stroke(); ox.setLineDash([]); }
-function lring(p, r, col, dash) { const q = sp(p); ox.strokeStyle = col; ox.lineWidth = 1; ox.setLineDash(dash || []); ox.beginPath(); ox.arc(q.x, q.y, r * SCALE / 2, 0, 7); ox.stroke(); ox.setLineDash([]); }
-function ltext(s, x, y, col, align) { ox.fillStyle = col; ox.font = "8px monospace"; ox.textAlign = align || "center"; ox.textBaseline = "middle"; ox.fillText(s, Math.round(x), Math.round(y)); }
-function bracket(q, s, col) { ox.fillStyle = col; const L = 3;
-  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const x = Math.round(q.x + sx * s), y = Math.round(q.y + sy * s);
+function lring(p, r, col, dash) { const q = sp(p); ox.strokeStyle = col; ox.lineWidth = 1; ox.setLineDash(dash || []); ox.beginPath(); ox.arc(q.x, q.y, r * LS, 0, 7); ox.stroke(); ox.setLineDash([]); }
+function bracket(q, s, col) { ox.fillStyle = col; const L = 2;
+  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const x = Math.floor(q.x + sx * s), y = Math.floor(q.y + sy * s);
     ox.fillRect(sx < 0 ? x : x - L + 1, y, L, 1); ox.fillRect(x, sy < 0 ? y : y - L + 1, 1, L); } }
+function fitCanvas() { const w = lcdOn() ? LW * LK : 1000, h = lcdOn() ? LH * LK : 596; if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; } }
 function drawLCD() {
+  fitCanvas();
+  ox.imageSmoothingEnabled = false;
   const dbg = document.getElementById("dbg").checked, blink = Math.floor(performance.now() / 400) % 2 === 0;
-  ox.fillStyle = LC.bg; ox.fillRect(0, 0, off.width, off.height);
+  ox.fillStyle = LC.bg; ox.fillRect(0, 0, LW, LH);
   // 格子（距離 1 ごとの点）と座標
   ox.fillStyle = LC.grid;
   for (let gx = 0; gx <= Math.floor(W); gx++) for (let gy = 0; gy <= Math.floor(H); gy++) { const q = sp({ x: gx, y: gy }); ox.fillRect(q.x - 0.5, q.y - 0.5, 1, 1); }
-  for (let gx = 0; gx <= Math.floor(W); gx += 2) ltext(String.fromCharCode(65 + gx / 2), sp({ x: gx, y: 0 }).x, 5, LC.dim);
-  for (let gy = 0; gy <= Math.floor(H); gy += 2) ltext(String(gy / 2), 4, sp({ x: 0, y: gy }).y, LC.dim);
+  for (let gx = 0; gx <= Math.floor(W); gx += 2) ltext(String.fromCharCode(65 + gx / 2), sp({ x: gx, y: 0 }).x, 3, LC.dim);
+  for (let gy = 2; gy <= Math.floor(H); gy += 2) ltext(String(gy / 2), 2, sp({ x: 0, y: gy }).y, LC.dim, "left");
   // 山岳: 等高線
   for (const m of MTS) { const q = sp(m);
-    for (const [k, dash] of [[1, []], [0.7, [2, 2]], [0.42, [1, 2]]]) { ox.save(); ox.translate(q.x, q.y); ox.rotate(m.r); ox.beginPath(); ox.ellipse(0, 0, m.a * k * SCALE / 2, m.b * k * SCALE / 2, 0, 0, 7);
-      if (k === 1) { ox.fillStyle = "#170e05"; ox.fill(); } ox.strokeStyle = LC.dim; ox.lineWidth = 1; ox.setLineDash(dash); ox.stroke(); ox.setLineDash([]); ox.restore(); }
-    glyph(["010", "111"], q.x, q.y, LC.dim); }
+    for (const [k, dash] of [[1, []], [0.66, [1, 1]], [0.33, [1, 2]]]) { ox.save(); ox.translate(q.x, q.y); ox.rotate(m.r); ox.beginPath(); ox.ellipse(0, 0, m.a * k * LS, m.b * k * LS, 0, 0, 7);
+      if (k === 1) { ox.fillStyle = "#160d04"; ox.fill(); } ox.strokeStyle = LC.dim; ox.lineWidth = 1; ox.setLineDash(dash); ox.stroke(); ox.setLineDash([]); ox.restore(); } }
   // 道
-  for (const [a, b] of E) lline(sp(N[a]), sp(N[b]), LC.dim, [2, 2]);
-  if (dbg) for (const t of S.tracks) { const q = sp(t); ox.fillStyle = LC.mid; ox.globalAlpha = Math.min(1, 0.25 * t.s); ox.fillRect(q.x - 1, q.y - 1, 2, 2); ox.globalAlpha = 1; }
+  for (const [a, b] of E) lline(sp(N[a]), sp(N[b]), LC.dim, [1, 1]);
+  if (dbg) for (const t of S.tracks) { const q = sp(t); ox.fillStyle = LC.mid; ox.globalAlpha = Math.min(1, 0.25 * t.s); ox.fillRect(q.x - 0.5, q.y - 0.5, 1, 1); ox.globalAlpha = 1; }
   const meP = lerpP(prevMe, S.me), mq = sp(meP);
   // 範囲
-  lring(meP, P.visStone, LC.dim, [1, 3]);
-  if (S.flare) { ox.fillStyle = "rgba(240,170,66,.07)"; ox.beginPath(); ox.arc(mq.x, mq.y, P.visFlare * SCALE / 2, 0, 7); ox.fill(); lring(meP, P.visFlare, LC.mid, [3, 2]); }
+  lring(meP, P.visStone, LC.dim, [1, 2]);
+  if (S.flare) { ox.fillStyle = "rgba(240,170,66,.07)"; ox.beginPath(); ox.arc(mq.x, mq.y, P.visFlare * LS, 0, 7); ox.fill(); lring(meP, P.visFlare, LC.mid, [2, 1]); }
   if (S.scout > 0) lring(meP, P.visScout, LC.hi, [1, 1]);
-  lring(meP, detectR(), LC.redDim, [1, 4]);
+  lring(meP, detectR(), LC.redDim, [1, 3]);
   // 魔石の方角
-  for (const b of [S.stoneBearing, S.stoneGhost]) { if (b < 0) continue; const a0 = b * Math.PI / 3, R = P.visStone * SCALE / 2;
-    ox.fillStyle = S.stone.startsWith("強く") ? "rgba(255,74,44,.13)" : "rgba(240,170,66,.10)";
+  for (const b of [S.stoneBearing, S.stoneGhost]) { if (b < 0) continue; const a0 = b * Math.PI / 3, R = P.visStone * LS;
+    ox.fillStyle = S.stone.startsWith("強く") ? "rgba(255,74,44,.14)" : "rgba(240,170,66,.11)";
     ox.beginPath(); ox.moveTo(mq.x, mq.y); ox.arc(mq.x, mq.y, R, a0 - Math.PI / 6, a0 + Math.PI / 6); ox.closePath(); ox.fill(); }
   // 行き先
-  if (S.move) { const q = sp(N[S.move.to]); lline(mq, q, LC.hi, [3, 3]); bracket(q, 7, LC.hi); }
+  if (S.move) { const q = sp(N[S.move.to]); lline(mq, q, LC.hi, [2, 2]); bracket(q, 5, LC.hi); }
   if (S.target !== null && S.target !== undefined) { const q = sp(N[S.target]), pv = preview(S.target);
-    lline(mq, q, pv.blocked ? LC.dim : pv.rate === "road" ? LC.hot : LC.red, pv.rate === "road" ? [] : [4, 3]); bracket(q, 8, pv.blocked ? LC.dim : LC.hot); }
+    lline(mq, q, pv.blocked ? LC.dim : pv.rate === "road" ? LC.hot : LC.red, pv.rate === "road" ? [] : [2, 2]); bracket(q, 6, pv.blocked ? LC.dim : LC.hot); }
   // 点
   N.forEach((p, i) => { const q = sp(p), known = p.known || p.type === "出" || p.type === "前";
-    if (!known) return glyph(GLYPH["?"], q.x, q.y, LC.dim);
+    if (!known) return glyph(GLYPH["?"], q.x, q.y, LC.mid);
     if (p.done && p.type !== "店") return glyph(GLYPH["済"], q.x, q.y, LC.dim);
     glyph(GLYPH[p.type], q.x, q.y, p.type === "前" || p.type === "出" ? LC.hot : p.type === "精" ? LC.red : LC.hi);
-    if (p.type === "店" || i === 0) { if (p.stock <= 0) ltext("EMPTY", q.x, q.y + 8, LC.dim); } });
+    if ((p.type === "店" || i === 0) && p.stock <= 0) ltext("0", q.x + 5, q.y - 4, LC.dim); });
   // BINGO: 最寄りの補給点を点滅で示す（経路の線は描かない）
   const bi = S.bingoInfo;
-  if (bi && bi.st && bi.tgt >= 0 && blink) { const q = sp(N[bi.tgt]); bracket(q, 9, LC.red); ltext("RTB", q.x, q.y - 11, LC.red); }
+  if (bi && bi.st && bi.tgt >= 0 && blink) { const q = sp(N[bi.tgt]); bracket(q, 6, LC.red); ltext("RTB", q.x, q.y - 9, LC.red); }
   // 網
-  for (const w of S.webs) { if (!w.seen && !dbg) continue; glyph(["10101", "01110", "11111", "01110", "10101"], sp(w).x, sp(w).y, w.seen ? LC.mid : LC.dim); }
+  for (const w of S.webs) { if (!w.seen && !dbg) continue; glyph(["101", "010", "101"], sp(w).x, sp(w).y, w.seen ? LC.mid : LC.dim); }
   // 敵
   if (S.seenFoe && S.time - S.seenFoe.t >= 0.15 && aliveFoes().length) { const q = sp(S.seenFoe), age = S.time - S.seenFoe.t;
-    ox.globalAlpha = Math.max(0.3, 1 - age / 12); glyph(GLYPH["戦"], q.x, q.y, LC.red); ltext(`LAST -${age.toFixed(0)}T`, q.x, q.y - 9, LC.red); ox.globalAlpha = 1; }
+    ox.globalAlpha = Math.max(0.35, 1 - age / 12); glyph(["101", "010", "101"], q.x, q.y, LC.red); ltext(`-${age.toFixed(0)}T`, q.x, q.y - 6, LC.red); ox.globalAlpha = 1; }
   const STC = { "巡回": "PTRL", "警戒": "ALRT", "追跡": "CHSE" };
   S.foes.forEach((f, k) => { if (!f.alive) return;
-    if (dbg) { f.terr.forEach(i => { const q = sp(N[i]); ox.strokeStyle = LC.redDim; ox.setLineDash([1, 1]); ox.strokeRect(q.x - 5, q.y - 5, 10, 10); ox.setLineDash([]); });
-      f.way.forEach((b, wi) => ltext("W" + (wi + 1), sp(N[b]).x, sp(N[b]).y + 9, LC.redDim)); }
+    if (dbg) { f.terr.forEach(i => { const q = sp(N[i]); ox.strokeStyle = LC.redDim; ox.setLineDash([1, 1]); ox.strokeRect(q.x - 4, q.y - 4, 8, 8); ox.setLineDash([]); });
+      f.way.forEach((b, wi) => ltext("W" + (wi + 1), sp(N[b]).x, sp(N[b]).y + 7, LC.redDim)); }
     if (!(dbg || S.time - f.seenT < 0.15)) return;
     const q = sp(lerpP(prevFoes[k], foePos(f)));
     glyph(GLYPH["敵"], q.x, q.y, LC.red);
-    ltext(`HOSTILE ${f.freeze > 0 ? "HOLD" : f.lunge ? "LNGE" : STC[f.state] || ""}${document.getElementById("showProf").checked ? " " + PR().name : ""}`, q.x, q.y - 10, LC.red); });
+    ltext(f.freeze > 0 ? "HOLD" : f.lunge ? "LNGE" : STC[f.state] || "", q.x, q.y - 6, LC.red); });
   if (S.foeArrow && S.time - S.foeArrow.t < 12) { const a = sp(S.foeArrow.from), b = sp(S.foeArrow.to); lline(a, b, LC.red);
-    const ang = Math.atan2(b.y - a.y, b.x - a.x); lline(b, { x: b.x - Math.cos(ang - 0.5) * 5, y: b.y - Math.sin(ang - 0.5) * 5 }, LC.red); lline(b, { x: b.x - Math.cos(ang + 0.5) * 5, y: b.y - Math.sin(ang + 0.5) * 5 }, LC.red); }
+    const ang = Math.atan2(b.y - a.y, b.x - a.x); lline(b, { x: b.x - Math.cos(ang - 0.6) * 3, y: b.y - Math.sin(ang - 0.6) * 3 }, LC.red); lline(b, { x: b.x - Math.cos(ang + 0.6) * 3, y: b.y - Math.sin(ang + 0.6) * 3 }, LC.red); }
   const famVis = S.flare ? P.visFlare : P.visNone;
   for (const m of S.familiars) { if (!dbg && dist(m, S.me) > famVis + 1e-6) continue; const q = sp(m);
     if (dbg) lline(q, sp({ x: m.tx, y: m.ty }), LC.redDim, [1, 2]);
-    ox.fillStyle = m.kind === "scout" ? LC.hot : LC.red; ox.fillRect(Math.round(q.x) - 1, Math.round(q.y) - 1, 3, 3);
-    if (m.vx !== undefined) lline(q, { x: q.x - m.vx * 6, y: q.y - m.vy * 6 }, ox.fillStyle); }
+    const col = m.kind === "scout" ? LC.hot : LC.red; ox.fillStyle = col; ox.fillRect(Math.floor(q.x), Math.floor(q.y), 1, 1);
+    if (m.vx !== undefined) lline(q, { x: q.x - m.vx * 4, y: q.y - m.vy * 4 }, col); }
   // 囮・罠
   for (const d of S.decoys) if (d.delay > 0 || blink) glyph(["010", "111", "010"], sp(d).x, sp(d).y, d.delay > 0 ? LC.mid : LC.hot);
   for (const t of S.traps) glyph(["101", "010", "101"], sp(t).x, sp(t).y, LC.mid);
-  // 自分
-  ox.fillStyle = LC.hot; ox.fillRect(Math.round(mq.x) - 1, Math.round(mq.y) - 1, 3, 3);
-  for (const [dx, dy] of [[-5, 0], [5, 0], [0, -5], [0, 5]]) ox.fillRect(Math.round(mq.x) + dx - (dx ? Math.sign(dx) : 0), Math.round(mq.y) + dy - (dy ? Math.sign(dy) : 0), dx ? 2 : 1, dy ? 2 : 1);
-  // 合成: 拡大 → 発光 → 走査線 → 周辺減光
+  // 自分: 中心 1 ドット＋十字の腕
+  ox.fillStyle = LC.hot; const cxp = Math.floor(mq.x), cyp = Math.floor(mq.y);
+  ox.fillRect(cxp, cyp, 1, 1); ox.fillRect(cxp - 3, cyp, 2, 1); ox.fillRect(cxp + 2, cyp, 2, 1); ox.fillRect(cxp, cyp - 3, 1, 2); ox.fillRect(cxp, cyp + 2, 1, 2);
+  // 合成: 4 倍に拡大 → 発光 → 走査線 → 周辺減光
   cx.imageSmoothingEnabled = false; cx.fillStyle = LC.bg; cx.fillRect(0, 0, cv.width, cv.height);
   cx.drawImage(off, 0, 0, cv.width, cv.height);
-  cx.save(); cx.globalCompositeOperation = "lighter"; cx.globalAlpha = 0.35; cx.filter = "blur(3px)"; cx.drawImage(off, 0, 0, cv.width, cv.height); cx.restore();
+  cx.save(); cx.globalCompositeOperation = "lighter"; cx.globalAlpha = 0.3; cx.filter = "blur(4px)"; cx.drawImage(off, 0, 0, cv.width, cv.height); cx.restore();
   cx.fillStyle = cx.createPattern(scan, "repeat"); cx.fillRect(0, 0, cv.width, cv.height);
   const vg = cx.createRadialGradient(cv.width / 2, cv.height / 2, cv.height * 0.35, cv.width / 2, cv.height / 2, cv.width * 0.62);
   vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.45)"); cx.fillStyle = vg; cx.fillRect(0, 0, cv.width, cv.height);
 }
-function draw() { if (document.getElementById("lcd").checked) drawLCD(); else drawOld(); }
+function draw() { if (lcdOn()) drawLCD(); else { fitCanvas(); drawOld(); } }
 
 // ═══ 表示（旧） ═══════════════════════════════════════════════
 const COL = { "戦": "#d8544a", "精": "#9a2f2a", "イ": "#6aa4d8", "店": "#a0d646", "休": "#60d6c8", "宝": "#e6c664", "拠": "#b58ad8", "前": "#e6e2d8", "出": "#e6e2d8" };
