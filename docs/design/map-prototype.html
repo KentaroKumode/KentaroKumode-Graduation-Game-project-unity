@@ -924,7 +924,8 @@ function setScreen() {
     const ix = PANEL.x + 10, iy = PANEL.y + 10, iw = PANEL.w - 18, ih = PANEL.h - 20;
     LS = Math.min(iw / W, ih / H) * ZOOM;
     // 拡大中は視点を自分に追従（ドラッグで見回すと追従を止め、 C キーで戻す）。 地図の端より外は見せない
-    if (!CAM.manual && S && S.me) { CAM.x = S.me.x; CAM.y = S.me.y; }
+    /* 追従は描く位置 (刻みの間を補間した位置) に合わせる。 補間前の S.me を追うと 0.1 手番ごとに視点だけが飛んでガクつく */
+    if (!CAM.manual && S && S.me) { const q = lerpP(prevMe, S.me); CAM.x = q.x; CAM.y = q.y; }
     const fit = (lo, len, span, c) => span <= len ? lo + (len - span) / 2 : Math.min(lo, Math.max(lo + len - span, lo + len / 2 - c * LS));
     LOX = Math.round(fit(ix, iw, W * LS, CAM.x)); LOY = Math.round(fit(iy, ih, H * LS, CAM.y));
   } else {
