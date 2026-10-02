@@ -37,6 +37,20 @@
   .dlg h2 { font-size:15px; margin:0 0 8px; color:var(--amber); } .dlg p { margin:6px 0; }
   .legend span { display:inline-block; margin-right:10px; font-size:11px; color:var(--ink2); }
   label { color:var(--ink2); font-size:12px; } input[type=number] { width:80px; background:#0b0d0f; color:var(--ink); border:1px solid #3a4047; padding:3px; }
+  /* 警告ランプ (HALF / CRIT・Tools/lamp_lit.py が作る 37×15 を 4 倍・燃料計のバーとは別物) */
+  .lamps { display:flex; gap:10px; margin:8px 0 4px; flex-wrap:wrap; }
+  .lamp { position:relative; width:148px; height:60px; }
+  .lamp img { position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated; }
+  .lamp .on { opacity:0; }
+  .lamp::after { content:""; position:absolute; inset:-14px -20px; pointer-events:none; opacity:0;
+    background:radial-gradient(ellipse 50% 42% at 50% 50%, var(--glow), transparent 70%); mix-blend-mode:screen; }
+  .lamp.half { --glow: rgba(255,160,50,.55); } .lamp.crit { --glow: rgba(255,60,40,.55); }
+  .lamp.lit .on, .lamp.lit::after { opacity:1; }
+  .lamp.lit.ignite .on, .lamp.lit.ignite::after { animation: ignite .32s steps(1) 1; }
+  .lamp.lit.blink .on, .lamp.lit.blink::after { animation: blink 1s steps(1) infinite; }
+  @keyframes ignite { 0% { opacity:.0 } 20% { opacity:.8 } 40% { opacity:.15 } 60% { opacity:1 } 80% { opacity:.6 } 100% { opacity:1 } }
+  @keyframes blink { 0% { opacity:1 } 50% { opacity:0 } }
+  @media (prefers-reduced-motion: reduce) { .lamp.lit.ignite .on, .lamp.lit.ignite::after { animation:none; } }
 </style></head><body>
 <h1>自由移動マップ 試作（1層完結）</h1>
 <div class="sub">GAME.md §23-21 の仮置き数値で動く手触り確認用。戦闘は簡略版（ダイスで被害を決めるだけ）。<b>時間は流れ続ける（Highfleet 式）</b>── <b>スペースを短く押すと停止⇄順速、0.5 秒以上押し続けると押している間だけ早送り</b>（P キーでも停止⇄順速）。最初は停止。点をクリック → 経路と費用を確認 → もう一度クリックで出発（移動中でも行き先を変えられる）。</div>
@@ -49,6 +63,11 @@
       <div class="row"><span class="k">物資</span><span><b id="sup"></b> / <span id="supmax">1000</span> <b id="gauge" class="gauge"></b> <span id="stage" class="k" style="font-size:11px"></span></span></div>
       <div class="bar"><i id="supbar" style="background:var(--gold)"></i><span id="bingoTick" class="tick" title="BINGO の線（最寄りの補給点まで＋余裕）"></span></div>
       <div id="bingo" class="bingo" hidden></div>
+      <div class="lamps" title="警告ランプ: HALF = 物資が上限の 75% 以下（HALF・LOW の段）／ CRIT = 20% 以下（0 で点滅）">
+        <div class="lamp half" id="lampHalf"><img alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACUAAAAPCAYAAABjqQZTAAABEUlEQVR4nM2Vz0vDMBTHv2nTQbuBIKxs1G6XgeDVq3++1129Dx2OFkRlWWFtjST+StM2RrHE7+XlveS990kCCQGAq8sLjn+i6/UNIeerBR9HIaLAd82DQ1mDHQpQ4YgBotA1EyQHADo9mSB/2uPxmblmQkA9CB7aCPqetOzhXtrx6dzof6hvnSo9R88t65fPWAOqlRC+TTPFz7a3nQ3jJG2sa62BvVrZoqBNgThJpe2CtMlTxYrKDKXqpw1tpNbsAvwWyrb4X4sOcUUm9Z2OEUq/398AZ1rMBNLVz3hSegJTfNOcqY7Npon498TjWVZf74TzxzN/B6oru2vDoKLydyFiuDyb8VEgh051LDk2dzvyCugrfM6L75XpAAAAAElFTkSuQmCC"><img class="on" alt="HALF" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACUAAAAPCAYAAABjqQZTAAACmklEQVR4nM2VO2hUQRSGv7mv7G42uIKGoEFFBMEiCGpjbBULiyDEB8QYQSUqFlZa2AiCCFYi+MaQiFhZ2ElaVxEVwSIgSIKP9ZmXySb7uHNnZGbdjWs2YqPr38ycy8w5351z5owA2LJhneY/0cPnQ0KsXbNCNybiJHy33jzMhhEzszk8Y5gJiXi9mbAcgLd0UZKv37Ksb6l/BtPDYHjsSZW10Rm145Ebt+14+WBXlX3lUBeOIzh8daDKWd+xbhDQc6nf2reOdqPQaAVKg1Ka3uslH7+qHOOZWlL5VgVltCzpVOabd3TiuaJib9+9h1XbOkCY+hMgzFpBz7V7fOw/Dn4StGZr+3JyE2NEkSaUIOXCWTDxPmRV1bd5UK4zB1Ecuo8IBHR0gvBIjD8C35yKy/jdXntqqb03QQjiTQE0pCxUsskn0AFaaVSkcRtT4DWClrw8v49CUZMvKDv+HK8mlAkSi5UXCTad7gfHB8ezUJ65oV7czv2Yh+M6ECyykLFkAMFi0BF+3Afpo6SBUjhmn9sA2qXt1B1QIShJ+swBEAonK0D95qT+VE27DPDfaSNVUKYg8/ly/jVPz3bTEAjaTg6AiJBhBDJXqilTT3Y0tSXIZ4vEihM2fWEuRDlJtK/Rji7tiwo105cvaBt3QSijd1NRZT42KQl8p+SQApmRLzSHUxbmbd8Jm+7W/RctVG66SKowaaFSOy9grx7apvPFuR6a5Yz1OToRUQwVxVCbpfOK3GjuqtXQyHjEq89hxX7yOm9rwUAOPs4wmM6ACRZmeWDmYbZky1mI8qWfUbK074eMP+M3M61qAhkJ8+6Z5tm+Oka9lR7O2+Zp375QKiIp682E63n4nmM6IKxsbdGBP79f/GuZOnvz/pP4Dj3dKfBh/Dr1AAAAAElFTkSuQmCC"></div>
+        <div class="lamp crit" id="lampCrit"><img alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACUAAAAPCAYAAABjqQZTAAABFklEQVR4nM2V3Y6CMBCFT7GaIHsr0U123btNfIZ9fJ/Be2IiBm+8sJosQs00ovwMVeNPPTdM59DpBwOtAIC/yUTjTTSdzYT4/fnWge+jLzquebDVGdRuB0kDCuD7rplgOADIQf8Dq+0G641yzYRuxwPxyErS806xWsSVCcHniM1f8grf5pHSPD/lzhQlcQXUIkbQrTzDVZ5Z2OJxklyBopHh+Mtck2jemMh59VwxvuSpdG+H4hSWChTiQB8ltn23KmSgnw6VRPPGmyEQW3vvUaN95f7eulhSu5/7fmzrtUK1/cIB5UoF6sW44jbPdr+gc482zzQ77xPON8/VESjbt5PjZZLmdBEUjkdD3fNM6FT/uUYUL8UBRVWFxnru3w8AAAAASUVORK5CYII="><img class="on" alt="CRIT" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACUAAAAPCAYAAABjqQZTAAACkklEQVR4nM2VTUhVQRiGnzlz7r9Km0Ct7AdCELctgmhV0SIl+iMogjCpwEW4zWVtgyIwE4koWtSiUolQiRZBgS0iSBCjyN8LFZl67/Hec85MzNyrcdUKIri98DHfDDPf+/LyzYwA2NXQoPlP8GJkRIj6LXU6lUiQFLLcesjqkIzn4ZqJSUgkyq0JqwNw1ycr+JxdoCEiyq2JYQ+MHuvUEuon08t5x1B/yYFLew4ghODiYN+qYlf2N9ux/WnvmmSX9zateW6prsHoxurltRJRBjWOQ8vA6uIdQ/28u3UPpAuOAOGAMKOg/fkgY60tEC+2gNbFUKA0Oyt+3RqGb0apkrVVoqQhKmLg4FHi0mF370OQkuSbV5A4Z/Op1tMIR1Dbc8cKq0wlSF9oQ6OpuXkblGKi5RQqVNQmY4y2teErTWPXDQhDHjcdZjFUJXxrinKEICmdwkQIKlxJQjp8OH8WV0oiEQmxuBW14e59O+KYcEhVxAlmvyMqKyGRtMSxqIv35RvRqEs4N09yXRW4EVs75cqC4Yb3T079DebOHEfNzfOvULSlAKU12bCoWmsWgpD5IGRbZxd1nV34fgi5RRtTJ48xfeIIZBeoutrNooySc2N4Xg68LCx65PIBpFLk8wFZE4GCwIcgIBOEdm74DO9vnZoMw+V836MHhcTPgw8fx9NsNYSOYNbLIRHUZgoOzWc8tnf3FPabNa3ZdO26bfRnzYfIK01+Ik1jsf7XnI+RsrLJVzm18pquXHu54EEYgO/zZGyC/vfj1hETfWM/c+tmPmf3mf3m3OuMx1vjYhHTSq0pyECYf888njuqkpQbw3NZ+3jav88PFWEQlFsT0nWJSMfeSDbXVOuouZ9lhum7TzNp8QMSGCIzHuaTIgAAAABJRU5ErkJggg=="></div>
+      </div>
+      <label class="k" style="font-size:11px"><input type="checkbox" id="lampTest"> ランプ試験（全点灯）</label>
       <div class="row"><span class="k">HP</span><span><b id="hp"></b> / <span id="hpmax"></span></span></div>
       <div class="bar"><i id="hpbar" style="background:var(--red)"></i></div>
       <div class="row"><span class="k">ゴールド</span><span id="gold"></span></div>
@@ -820,6 +839,7 @@ document.getElementById("bNew").onclick = newGame;
   ps.onchange = () => { desc(); newGame(); }; fs.onchange = () => { desc(); newGame(); }; desc();
   document.getElementById("showProf").onchange = () => draw(); }
 document.getElementById("dbg").onchange = () => draw();
+document.getElementById("lampTest").onchange = () => updateLamps();
 document.getElementById("lcd").onchange = () => draw();
 document.getElementById("scanl").onchange = () => draw();
 document.getElementById("screen").onchange = () => draw();
@@ -1158,10 +1178,23 @@ function drawOld() {
   // 自分
   const q = toPx(meP); cx.fillStyle = "#f0aa42"; cx.strokeStyle = "#1a1408"; cx.lineWidth = 2; cx.beginPath(); cx.arc(q.x, q.y, 7, 0, 7); cx.fill(); cx.stroke();
 }
+/* 警告ランプ: HALF は HALF・LOW の段、 CRIT は CRIT の段で点く (同時には点かない)。 物資 0 は CRIT の点滅。
+   消灯→点灯の瞬間だけ短くちらつかせる (白熱灯が点く感じ)。 */
+function setLamp(id, lit, blink) {
+  const el = document.getElementById(id), was = el.classList.contains("lit");
+  el.classList.toggle("lit", lit); el.classList.toggle("blink", lit && blink);
+  if (lit && !was && !blink) { el.classList.remove("ignite"); void el.offsetWidth; el.classList.add("ignite"); }
+}
+function updateLamps() {
+  const test = document.getElementById("lampTest").checked, g = gaugeOf(S.sup);
+  setLamp("lampHalf", test || g === "HALF" || g === "LOW", false);
+  setLamp("lampCrit", test || g === "CRIT", !test && S.sup <= 0);
+}
 function ui() {
   const st = stageOf(S.sup);
   document.getElementById("sup").textContent = S.sup; document.getElementById("supmax").textContent = P.supMax; updateGauge();
   document.getElementById("supbar").style.width = (S.sup / P.supMax * 100) + "%";
+  updateLamps();
   document.getElementById("hp").textContent = S.hp; document.getElementById("hpmax").textContent = P.hpMax;
   document.getElementById("hpbar").style.width = (S.hp / P.hpMax * 100) + "%";
   document.getElementById("gold").textContent = S.gold + " G";
