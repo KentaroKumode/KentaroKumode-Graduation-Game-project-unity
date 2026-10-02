@@ -95,6 +95,7 @@
       <label style="display:block;margin-top:6px"><input type="checkbox" id="dbg"> 敵と痕跡を常に表示（デバッグ）</label>
       <label style="display:block;margin-top:6px"><input type="checkbox" id="lcd" checked> 液晶の表示（切ると旧表示）</label>
       <label style="display:block;margin-top:2px"><input type="checkbox" id="scanl"> 走査線（中間色が出る）</label>
+      <label style="display:block;margin-top:2px">画面 <select id="screen"><option value="plotter">地図の画面（GUI 480×270・右から引き出す）</option><option value="lcd">液晶（256×139）</option></select></label>
       <div class="btns" style="align-items:center;margin-top:6px">
         <label>物資の上限 <input type="number" id="cap" value="1000" step="50" min="100"></label>
         <label>BINGO の余裕 <select id="bingoMargin"><option value="pct">必要量の 1 割</option><option value="move">1 回の移動ぶん（道の外 1.5 距離）</option></select></label>
@@ -788,6 +789,7 @@ document.getElementById("bNew").onclick = newGame;
 document.getElementById("dbg").onchange = () => draw();
 document.getElementById("lcd").onchange = () => draw();
 document.getElementById("scanl").onchange = () => draw();
+document.getElementById("screen").onchange = () => draw();
 document.getElementById("bingoMargin").onchange = () => ui();
 
 // ═══ 燃料計と BINGO 警告（2026-10-02・docs/design/supply-weather.md §5） ═══════════════
@@ -844,12 +846,24 @@ function outpost(j) {
 // ═══ 液晶の表示（地形データ風・2026-10-02） ═══════════════════════════
 // 筐体の液晶と同じ 256×139 ドットで描き、 4 倍（1024×556）に最近傍で拡大する。 文字は 3×5 のドット字。
 // 琥珀の単色で、 危険だけ赤。 走査線とわずかな発光を重ねる
-const LW = 256, LH = 139, LK = 4;                       // 液晶のドット数と拡大率
-const LS = Math.min((LW - 12) / W, (LH - 12) / H);      // 距離 1 = LS ドット（≒ 13.5）
-const LOX = Math.round((LW - W * LS) / 2), LOY = Math.round((LH - H * LS) / 2);
-// 色はこの表の 11 色だけ（中間色・半透明は使わない。 どの描画もこの中から選ぶ）
-const LC = { bg: "#0d0803", fill: "#160d04", fill2: "#24170a", fillR: "#2e0d06", grid: "#2a1a08", dim: "#5e3e14", mid: "#a26c1f", hi: "#f0aa42", hot: "#ffe0a0", red: "#ff4a2c", redDim: "#7a2414" };
-const off = document.createElement("canvas"); off.width = LW; off.height = LH; const ox = off.getContext("2d");
+// 2 つの画面: 液晶（256×139・×4）／地図の画面（GUI の格子 480×270・×2。 2026-10-02）
+// 地図の画面は GUI の層の計器で、 右から引き出した 440×248 の板として描く（全面より少し小さく、 後ろの液晶が覗く）
+let LW = 256, LH = 139, LK = 4, LS = 1, LOX = 0, LOY = 0, PXS = 1, PANEL = null;
+const o = n => n * PXS;                                  // 記号・文字まわりのずらし量（ドットの大きさに合わせる）
+function setScreen() {
+  if (document.getElementById("screen").value === "plotter") {
+    LW = 480; LH = 270; LK = 2; PXS = 2; PANEL = { x: 40, y: 11, w: 440, h: 248 };
+    const ix = PANEL.x + 10, iy = PANEL.y + 10, iw = PANEL.w - 18, ih = PANEL.h - 20;
+    LS = Math.min(iw / W, ih / H); LOX = Math.round(ix + (iw - W * LS) / 2); LOY = Math.round(iy + (ih - H * LS) / 2);
+  } else {
+    LW = 256; LH = 139; LK = 4; PXS = 1; PANEL = null;
+    LS = Math.min((LW - 12) / W, (LH - 12) / H); LOX = Math.round((LW - W * LS) / 2); LOY = Math.round((LH - H * LS) / 2);
+  }
+  if (off.width !== LW || off.height !== LH) { off.width = LW; off.height = LH; }
+}
+// 色はこの表の 14 色だけ（中間色・半透明は使わない。 どの描画もこの中から選ぶ）
+const LC = { bg: "#0d0803", back: "#070502", frame: "#3a2a12", frameHi: "#6e5126", fill: "#160d04", fill2: "#24170a", fillR: "#2e0d06", grid: "#2a1a08", dim: "#5e3e14", mid: "#a26c1f", hi: "#f0aa42", hot: "#ffe0a0", red: "#ff4a2c", redDim: "#7a2414" };
+const off = document.createElement("canvas"); off.width = 256; off.height = 139; const ox = off.getContext("2d");
 const scan = (() => { const c = document.createElement("canvas"); c.width = 1; c.height = LK; const g = c.getContext("2d"); g.fillStyle = "rgba(0,0,0,.35)"; g.fillRect(0, LK - 1, 1, 1); return c; })();
 const sp = p => ({ x: Math.round(LOX + p.x * LS) + 0.5, y: Math.round(LOY + p.y * LS) + 0.5 });
 const lcdOn = () => document.getElementById("lcd").checked;
@@ -861,9 +875,9 @@ const F35 = { A: "010101111101101", B: "110101110101110", C: "011100100100011", 
   Y: "101101010010010", Z: "111001010100111", "0": "111101101101111", "1": "010110010010111", "2": "110001010100111", "3": "110001010001110",
   "4": "101101111001001", "5": "111100110001110", "6": "011100111101111", "7": "111001010010010", "8": "111101111101111", "9": "111101111001110",
   "-": "000000111000000", "+": "000010111010000", ".": "000000000000010", ":": "000010000010000", "/": "001001010100100", " ": "000000000000000" };
-function ltext(s, x, y, col, align) { s = String(s).toUpperCase(); const w = s.length * 4 - 1;
-  let x0 = Math.round(align === "left" ? x : align === "right" ? x - w : x - w / 2), y0 = Math.round(y - 2); ox.fillStyle = col;
-  for (const ch of s) { const g = F35[ch] || F35[" "]; for (let i = 0; i < 15; i++) if (g[i] === "1") ox.fillRect(x0 + i % 3, y0 + Math.floor(i / 3), 1, 1); x0 += 4; } }
+function ltext(s, x, y, col, align) { s = String(s).toUpperCase(); const w = (s.length * 4 - 1) * PXS;
+  let x0 = Math.round(align === "left" ? x : align === "right" ? x - w : x - w / 2), y0 = Math.round(y - 2.5 * PXS); ox.fillStyle = col;
+  for (const ch of s) { const g = F35[ch] || F35[" "]; for (let i = 0; i < 15; i++) if (g[i] === "1") ox.fillRect(x0 + (i % 3) * PXS, y0 + Math.floor(i / 3) * PXS, PXS, PXS); x0 += 4 * PXS; } }
 const GLYPH = {
   "戦": ["10001", "01010", "00100", "01010", "10001"],
   "精": ["11111", "10101", "11011", "10101", "11111"],
@@ -878,8 +892,8 @@ const GLYPH = {
   "済": ["11", "11"],
   "敵": ["00100", "01110", "01110", "11111"],
 };
-function glyph(rows, x, y, col) { const h = rows.length, w = rows[0].length, x0 = Math.round(x - 0.5 - (w - 1) / 2), y0 = Math.round(y - 0.5 - (h - 1) / 2); ox.fillStyle = col;
-  for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) if (rows[r][c] === "1") ox.fillRect(x0 + c, y0 + r, 1, 1); }
+function glyph(rows, x, y, col) { const h = rows.length, w = rows[0].length, x0 = Math.round(x - 0.5 - (w * PXS - 1) / 2), y0 = Math.round(y - 0.5 - (h * PXS - 1) / 2); ox.fillStyle = col;
+  for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) if (rows[r][c] === "1") ox.fillRect(x0 + c * PXS, y0 + r * PXS, PXS, PXS); }
 // 線・円・塗りはすべて 1 ドット単位で打つ（キャンバスの線描画はアンチエイリアスが外せないので使わない）
 function dashOn(i, dash) { if (!dash || !dash.length) return true; const per = dash.reduce((a, b) => a + b, 0); let k = i % per;
   for (let d = 0; d < dash.length; d++) { if (k < dash[d]) return d % 2 === 0; k -= dash[d]; } return true; }
@@ -899,10 +913,10 @@ function lring(p, r, col, dash) { lellipse(sp(p), r * LS, r * LS, 0, col, dash);
 function lfill(x0, y0, x1, y1, inside, col) { ox.fillStyle = col;
   for (let y = Math.max(0, Math.floor(y0)); y <= Math.min(LH - 1, Math.ceil(y1)); y++) for (let x = Math.max(0, Math.floor(x0)); x <= Math.min(LW - 1, Math.ceil(x1)); x++)
     if (inside(x + 0.5, y + 0.5)) ox.fillRect(x, y, 1, 1); }
-function bracket(q, s, col) { ox.fillStyle = col; const L = 2;
+function bracket(q, s, col) { ox.fillStyle = col; const L = 2 * PXS; s *= PXS;
   for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const x = Math.floor(q.x + sx * s), y = Math.floor(q.y + sy * s);
     ox.fillRect(sx < 0 ? x : x - L + 1, y, L, 1); ox.fillRect(x, sy < 0 ? y : y - L + 1, 1, L); } }
-function fitCanvas() { const w = lcdOn() ? LW * LK : 1000, h = lcdOn() ? LH * LK : 596; if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; } }
+function fitCanvas() { if (lcdOn()) setScreen(); const w = lcdOn() ? LW * LK : 1000, h = lcdOn() ? LH * LK : 596; if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; } }
 function drawLCD() {
   fitCanvas();
   ox.imageSmoothingEnabled = false;
@@ -911,8 +925,8 @@ function drawLCD() {
   // 格子（距離 1 ごとの点）と座標
   ox.fillStyle = LC.grid;
   for (let gx = 0; gx <= Math.floor(W); gx++) for (let gy = 0; gy <= Math.floor(H); gy++) { const q = sp({ x: gx, y: gy }); ox.fillRect(q.x - 0.5, q.y - 0.5, 1, 1); }
-  for (let gx = 0; gx <= Math.floor(W); gx += 2) ltext(String.fromCharCode(65 + gx / 2), sp({ x: gx, y: 0 }).x, 3, LC.dim);
-  for (let gy = 2; gy <= Math.floor(H); gy += 2) ltext(String(gy / 2), 2, sp({ x: 0, y: gy }).y, LC.dim, "left");
+  for (let gx = 0; gx <= Math.floor(W); gx += 2) ltext(String.fromCharCode(65 + gx / 2), sp({ x: gx, y: 0 }).x, (PANEL ? PANEL.y + 4 : 0) + o(3), LC.dim);
+  for (let gy = 2; gy <= Math.floor(H); gy += 2) ltext(String(gy / 2), (PANEL ? PANEL.x + 2 : 0) + 2, sp({ x: 0, y: gy }).y, LC.dim, "left");
   // 山岳: 等高線
   for (const m of MTS) { const q = sp(m), R = Math.max(m.a, m.b) * LS + 1, co = Math.cos(m.r), si = Math.sin(m.r);
     lfill(q.x - R, q.y - R, q.x + R, q.y + R, (x, y) => { const dx = x - q.x, dy = y - q.y, u = (dx * co + dy * si) / (m.a * LS), v = (-dx * si + dy * co) / (m.b * LS); return u * u + v * v <= 1; }, LC.fill);
@@ -939,36 +953,45 @@ function drawLCD() {
     if (!known) return glyph(GLYPH["?"], q.x, q.y, LC.mid);
     if (p.done && p.type !== "店") return glyph(GLYPH["済"], q.x, q.y, LC.dim);
     glyph(GLYPH[p.type], q.x, q.y, p.type === "前" || p.type === "出" ? LC.hot : p.type === "精" ? LC.red : LC.hi);
-    if ((p.type === "店" || i === 0) && p.stock <= 0) ltext("0", q.x + 5, q.y - 4, LC.dim); });
+    if ((p.type === "店" || i === 0) && p.stock <= 0) ltext("0", q.x + o(5), q.y - o(4), LC.dim); });
   // BINGO: 最寄りの補給点を点滅で示す（経路の線は描かない）
   const bi = S.bingoInfo;
-  if (bi && bi.st && bi.tgt >= 0 && blink) { const q = sp(N[bi.tgt]); bracket(q, 6, LC.red); ltext("RTB", q.x, q.y - 9, LC.red); }
+  if (bi && bi.st && bi.tgt >= 0 && blink) { const q = sp(N[bi.tgt]); bracket(q, 6, LC.red); ltext("RTB", q.x, q.y - o(9), LC.red); }
   // 網
   for (const w of S.webs) { if (!w.seen && !dbg) continue; glyph(["101", "010", "101"], sp(w).x, sp(w).y, w.seen ? LC.mid : LC.dim); }
   // 敵
   if (S.seenFoe && S.time - S.seenFoe.t >= 0.15 && aliveFoes().length) { const q = sp(S.seenFoe), age = S.time - S.seenFoe.t;
-    const c = age < 6 ? LC.red : LC.redDim; glyph(["101", "010", "101"], q.x, q.y, c); ltext(`-${age.toFixed(0)}T`, q.x, q.y - 6, c); }
+    const c = age < 6 ? LC.red : LC.redDim; glyph(["101", "010", "101"], q.x, q.y, c); ltext(`-${age.toFixed(0)}T`, q.x, q.y - o(6), c); }
   const STC = { "巡回": "PTRL", "警戒": "ALRT", "追跡": "CHSE" };
   S.foes.forEach((f, k) => { if (!f.alive) return;
     if (dbg) { f.terr.forEach(i => { const q = sp(N[i]); bracket(q, 4, LC.redDim); });
-      f.way.forEach((b, wi) => ltext("W" + (wi + 1), sp(N[b]).x, sp(N[b]).y + 7, LC.redDim)); }
+      f.way.forEach((b, wi) => ltext("W" + (wi + 1), sp(N[b]).x, sp(N[b]).y + o(7), LC.redDim)); }
     if (!(dbg || S.time - f.seenT < 0.15)) return;
     const q = sp(lerpP(prevFoes[k], foePos(f)));
     glyph(GLYPH["敵"], q.x, q.y, LC.red);
-    ltext(f.freeze > 0 ? "HOLD" : f.lunge ? "LNGE" : STC[f.state] || "", q.x, q.y - 6, LC.red); });
+    ltext(f.freeze > 0 ? "HOLD" : f.lunge ? "LNGE" : STC[f.state] || "", q.x, q.y - o(6), LC.red); });
   if (S.foeArrow && S.time - S.foeArrow.t < 12) { const a = sp(S.foeArrow.from), b = sp(S.foeArrow.to); lline(a, b, LC.red);
     const ang = Math.atan2(b.y - a.y, b.x - a.x); lline(b, { x: b.x - Math.cos(ang - 0.6) * 3, y: b.y - Math.sin(ang - 0.6) * 3 }, LC.red); lline(b, { x: b.x - Math.cos(ang + 0.6) * 3, y: b.y - Math.sin(ang + 0.6) * 3 }, LC.red); }
   const famVis = S.flare ? P.visFlare : P.visNone;
   for (const m of S.familiars) { if (!dbg && dist(m, S.me) > famVis + 1e-6) continue; const q = sp(m);
     if (dbg) lline(q, sp({ x: m.tx, y: m.ty }), LC.redDim, [1, 2]);
-    const col = m.kind === "scout" ? LC.hot : LC.red; ox.fillStyle = col; ox.fillRect(Math.floor(q.x), Math.floor(q.y), 1, 1);
+    const col = m.kind === "scout" ? LC.hot : LC.red; ox.fillStyle = col; ox.fillRect(Math.floor(q.x) - (PXS - 1), Math.floor(q.y) - (PXS - 1), 2 * PXS - 1, 2 * PXS - 1);
     if (m.vx !== undefined) lline(q, { x: q.x - m.vx * 4, y: q.y - m.vy * 4 }, col); }
   // 囮・罠
   for (const d of S.decoys) if (d.delay > 0 || blink) glyph(["010", "111", "010"], sp(d).x, sp(d).y, d.delay > 0 ? LC.mid : LC.hot);
   for (const t of S.traps) glyph(["101", "010", "101"], sp(t).x, sp(t).y, LC.mid);
   // 自分: 中心 1 ドット＋十字の腕
   ox.fillStyle = LC.hot; const cxp = Math.floor(mq.x), cyp = Math.floor(mq.y);
-  ox.fillRect(cxp, cyp, 1, 1); ox.fillRect(cxp - 3, cyp, 2, 1); ox.fillRect(cxp + 2, cyp, 2, 1); ox.fillRect(cxp, cyp - 3, 1, 2); ox.fillRect(cxp, cyp + 2, 1, 2);
+  const u = PXS; ox.fillRect(cxp - (u - 1), cyp - (u - 1), 2 * u - 1, 2 * u - 1);
+  ox.fillRect(cxp - 4 * u, cyp, 2 * u, 1); ox.fillRect(cxp + 2 * u + 1, cyp, 2 * u, 1); ox.fillRect(cxp, cyp - 4 * u, 1, 2 * u); ox.fillRect(cxp, cyp + 2 * u + 1, 1, 2 * u);
+  // 地図の画面: 板の外を塗り直して切り抜き、 枠と引き出しの取っ手を描く（後ろの液晶は暗い粗いドットで覗かせる）
+  if (PANEL) { const p = PANEL;
+    ox.fillStyle = LC.back; ox.fillRect(0, 0, LW, p.y); ox.fillRect(0, p.y + p.h, LW, LH - p.y - p.h); ox.fillRect(0, p.y, p.x, p.h);
+    ox.fillStyle = LC.grid; for (let y = 1; y < LH; y += 4) for (let x = 1; x < LW; x += 4) if (x < p.x - 6 || y < p.y - 1 || y > p.y + p.h) ox.fillRect(x, y, 2, 2);
+    ox.fillStyle = LC.frame; ox.fillRect(p.x, p.y, p.w, 2); ox.fillRect(p.x, p.y + p.h - 2, p.w, 2); ox.fillRect(p.x, p.y, 2, p.h); ox.fillRect(p.x + p.w - 2, p.y, 2, p.h);
+    ox.fillStyle = LC.frameHi; ox.fillRect(p.x + 2, p.y + 2, p.w - 4, 1); ox.fillRect(p.x + 2, p.y + 2, 1, p.h - 4);
+    ox.fillStyle = LC.frame; ox.fillRect(p.x - 6, p.y + p.h / 2 - 24, 6, 48); ox.fillStyle = LC.frameHi; for (let k = 0; k < 4; k++) ox.fillRect(p.x - 4, p.y + p.h / 2 - 12 + k * 7, 2, 4);
+    ltext("PLOT", p.x + p.w - 8, p.y + p.h - 9, LC.dim, "right"); }
   // 合成: 4 倍に最近傍で拡大するだけ（色は表のまま。 ぼかし・周辺減光は入れない）
   cx.imageSmoothingEnabled = false; cx.fillStyle = LC.bg; cx.fillRect(0, 0, cv.width, cv.height);
   cx.drawImage(off, 0, 0, cv.width, cv.height);
