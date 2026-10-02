@@ -97,7 +97,7 @@
       <label style="display:block;margin-top:6px"><input type="checkbox" id="lcd" checked> 液晶の表示（切ると旧表示）</label>
       <label style="display:block;margin-top:2px"><input type="checkbox" id="scanl"> 走査線（中間色が出る）</label>
       <div class="btns" style="margin-top:4px"><button id="bFs" type="button">全画面（F）</button><button id="bZoom" type="button">拡大の切り替え（Z）</button><button id="bCam" type="button">視点を自分へ（C）</button></div>
-      <div class="k" style="font-size:11px">地図の画面は既定で 2 倍に拡大（層の約半分を表示）。視点は自分に付いてくる。ドラッグで見回せる。</div>
+      <div class="k" style="font-size:11px">地図の画面は既定で 2 倍に拡大（層の約半分を表示）。視点は自分に付いてくる。WASD かドラッグで見回せる。</div>
       <label style="display:block;margin-top:2px">画面 <select id="screen"><option value="plotter">地図の画面（GUI 480×270・右から引き出す）</option><option value="lcd">液晶（256×139）</option></select></label>
       <div class="btns" style="align-items:center;margin-top:6px">
         <label>物資の上限 <input type="number" id="cap" value="1000" step="50" min="100"></label>
@@ -733,7 +733,21 @@ document.addEventListener("fullscreenchange", () => draw());
 window.addEventListener("keydown", e => { if (e.target && /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
   if (e.code === "KeyF") toggleFs();
   else if (e.code === "KeyZ") { ZOOM = ZOOM > 1 ? 1 : 2; CAM.manual = false; draw(); }
-  else if (e.code === "KeyC") { CAM.manual = false; draw(); } });
+  else if (e.code === "KeyC") { CAM.manual = false; draw(); }
+  else if (PAN[e.code] !== undefined) { e.preventDefault(); PAN[e.code] = true; } });
+// WASD で視点を動かす（押している間だけ）。 W で地図が下へ（上を見る）、 A で地図が右へ（左を見る）
+const PAN = { KeyW: false, KeyA: false, KeyS: false, KeyD: false }, PAN_SPEED = 6;   // 距離 / 秒
+window.addEventListener("keyup", e => { if (PAN[e.code] !== undefined) PAN[e.code] = false; });
+window.addEventListener("blur", () => { for (const k in PAN) PAN[k] = false; });
+let panLast = 0;
+(function panLoop(ts) {
+  const dt = panLast ? Math.min(0.05, (ts - panLast) / 1000) : 0; panLast = ts;
+  const vx = (PAN.KeyD ? 1 : 0) - (PAN.KeyA ? 1 : 0), vy = (PAN.KeyS ? 1 : 0) - (PAN.KeyW ? 1 : 0);
+  if ((vx || vy) && lcdOn() && PANEL && ZOOM > 1) {
+    if (!CAM.manual) { CAM.manual = true; CAM.x = S.me.x; CAM.y = S.me.y; }
+    CAM.x = Math.max(0, Math.min(W, CAM.x + vx * PAN_SPEED * dt)); CAM.y = Math.max(0, Math.min(H, CAM.y + vy * PAN_SPEED * dt)); draw(); }
+  requestAnimationFrame(panLoop);
+})(0);
 cv.addEventListener("click", e => {
   if (DRAG.moved) { DRAG.moved = false; return; }
   if (S.over || S.scout > 0 || !document.getElementById("modal").hidden) return;
