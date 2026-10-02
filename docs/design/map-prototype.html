@@ -17,6 +17,10 @@
   .k { color:var(--ink2); }
   .bar { height:8px; background:#23272c; margin:4px 0 2px; position:relative; }
   .bar > i { position:absolute; left:0; top:0; bottom:0; display:block; }
+  .bar > .tick { position:absolute; top:-4px; bottom:-4px; width:2px; margin-left:-1px; background:#ff4a2c; }
+  .gauge { letter-spacing:.12em; } .gauge.full { color:var(--gold); } .gauge.half { color:var(--amber); } .gauge.low { color:#e07a3a; } .gauge.crit { color:#ff4a2c; }
+  .bingo { margin-top:6px; border:1px solid #ff4a2c; color:#ff4a2c; font-weight:700; text-align:center; padding:2px 4px; letter-spacing:.05em; }
+  .blink { animation:blink .8s steps(1) infinite; } @keyframes blink { 50% { opacity:.15; } }
   button { font:inherit; background:#22262b; color:var(--ink); border:1px solid #3a4047; padding:5px 10px; cursor:pointer; }
   button:hover { border-color:var(--amber); } button:disabled { opacity:.4; cursor:default; }
   button:focus-visible, input:focus-visible { outline:2px solid var(--amber); outline-offset:1px; }
@@ -41,8 +45,9 @@
   </div>
   <div class="side">
     <div class="card">
-      <div class="row"><span class="k">物資</span><span><b id="sup"></b> / 1000 <span id="stage" class="k"></span></span></div>
-      <div class="bar"><i id="supbar" style="background:var(--gold)"></i></div>
+      <div class="row"><span class="k">物資</span><span><b id="sup"></b> / <span id="supmax">1000</span> <b id="gauge" class="gauge"></b> <span id="stage" class="k" style="font-size:11px"></span></span></div>
+      <div class="bar"><i id="supbar" style="background:var(--gold)"></i><span id="bingoTick" class="tick" title="BINGO の線（最寄りの補給点まで＋余裕）"></span></div>
+      <div id="bingo" class="bingo" hidden></div>
       <div class="row"><span class="k">HP</span><span><b id="hp"></b> / <span id="hpmax"></span></span></div>
       <div class="bar"><i id="hpbar" style="background:var(--red)"></i></div>
       <div class="row"><span class="k">ゴールド</span><span id="gold"></span></div>
@@ -88,10 +93,17 @@
       <label style="display:block;margin-top:6px"><input type="checkbox" id="showProf" checked> 性質を明かす（切ると伏せたまま遊ぶ）</label>
       <div id="profDesc" class="k" style="font-size:11px;margin-top:4px"></div>
       <label style="display:block;margin-top:6px"><input type="checkbox" id="dbg"> 敵と痕跡を常に表示（デバッグ）</label>
+      <label style="display:block;margin-top:6px"><input type="checkbox" id="lcd" checked> 液晶の表示（切ると旧表示）</label>
+      <div class="btns" style="align-items:center;margin-top:6px">
+        <label>物資の上限 <input type="number" id="cap" value="1000" step="50" min="100"></label>
+        <label>BINGO の余裕 <select id="bingoMargin"><option value="pct">必要量の 1 割</option><option value="move">1 回の移動ぶん（道の外 1.5 距離）</option></select></label>
+      </div>
+      <div class="k" style="font-size:11px">物資の上限は「新しい層」で反映。燃料計は上限に対する割合で FULL / HALF / LOW / CRIT。前哨基地で物資を買える（補給点）。</div>
       <div class="btns" style="align-items:center;margin-top:6px"><label><input type="checkbox" id="snd" checked> 効果音</label>
         <label>音量 <input type="range" id="vol" min="0" max="100" value="60" style="width:110px;vertical-align:middle"></label></div>
       <div class="k" style="font-size:11px">最初に画面を一度クリックすると音が出る（ブラウザの決まり）</div>
       <div class="legend" style="margin-top:6px"><span>戦=戦闘</span><span>精=エリート</span><span>イ=イベント</span><span>店=ショップ</span><span>休=休憩</span><span>宝=秘宝</span><span>拠=補給庫（敵の縄張りの中）</span><span>?=未確認</span><span>茶の塊=山岳（通行不可）</span><span>炎=囮</span><span>×=罠</span><span>桃の点=使い魔</span><span>青緑の点=斥候の使い魔</span><span>放射線=網</span><span>扇=魔石の方角</span></div>
+      <div class="legend" style="margin-top:4px"><span>液晶表示:</span><span>✕=戦闘</span><span>赤い枠=エリート</span><span>!=イベント</span><span>家=ショップ</span><span>＋=休憩</span><span>◇=秘宝</span><span>□=補給庫</span><span>旗=前哨基地</span><span>→=出口</span><span>小さな◇=未確認</span><span>小さな□=済み</span><span>等高線=山岳</span><span>赤い三角=敵</span><span>RTB=BINGO 時の最寄りの補給点</span></div>
     </div>
   </div>
 </div>
@@ -264,7 +276,9 @@ function makeFoe(id, prof, startNode, terr, way, fights) {
 function newGame() {
   const seed = parseInt(document.getElementById("seed").value, 10) || 1;
   rnd = mulberry(seed);
+  P.supMax = Math.max(100, parseInt(document.getElementById("cap").value, 10) || 1000);
   const { terr, way, caches } = genMap();
+  mountBlockTable();
   const profKey = pickProfile(), prof = PROFILES[profKey];
   // 祭壇は補給庫の上に据える (補給庫を取りたければ祭壇と向き合う)
   const foes = [prof.stationary ? makeFoe(0, prof, caches[0], terr, [caches[0]], P.gauntletFights) : makeFoe(0, prof, way[0], terr, way, P.gauntletFights)];
@@ -283,7 +297,7 @@ function newGame() {
 }
 function log(s) { S.log.unshift(`[${S.time.toFixed(1)}] ${s}`); S.log.length = Math.min(S.log.length, 80);
   document.getElementById("log").innerHTML = S.log.map(x => `<div>${x}</div>`).join(""); }
-const stageOf = v => STAGES.find(s => v >= s[0]);
+const stageOf = v => { const r = v / P.supMax; return v <= 0 ? STAGES[4] : r >= 0.751 ? STAGES[0] : r >= 0.451 ? STAGES[1] : r >= 0.201 ? STAGES[2] : STAGES[3]; };
 const foePos = f => f.lunge ? f.lunge : { x: N[f.a].x + (N[f.b].x - N[f.a].x) * f.t, y: N[f.a].y + (N[f.b].y - N[f.a].y) * f.t };
 const aliveFoes = () => S.foes.filter(f => f.alive);
 const onRoad = () => S.me.node !== null || S.me.seg !== null;
@@ -578,6 +592,7 @@ function arrive(j) {
     case "精": return battle(j, "エリート", 3, 0, P.rewSup.elite, 12 + d6());
     case "イ": return eventTile(j);
     case "店": return shop(j);
+    case "前": return outpost(j);
     case "休": { const h = Math.round(P.hpMax * 0.4); S.hp = Math.min(P.hpMax, S.hp + h); p.done = true; log(`休憩した。HP +${h}`); return ui(); }
     case "宝": { const g = 20 + d6() * 2; S.gold += g; p.done = true; log(`秘宝を見つけた。ゴールド +${g}`); return ui(); }
     case "拠": { S.sup = Math.min(P.supMax, S.sup + P.rewSup.base); p.done = true; log(`補給庫を漁った。物資 +${P.rewSup.base}（物音を立てた）`); noise(P.cacheNoise); return ui(); }
@@ -769,14 +784,170 @@ document.getElementById("bNew").onclick = newGame;
   ps.onchange = () => { desc(); newGame(); }; fs.onchange = () => { desc(); newGame(); }; desc();
   document.getElementById("showProf").onchange = () => draw(); }
 document.getElementById("dbg").onchange = () => draw();
+document.getElementById("lcd").onchange = () => draw();
+document.getElementById("bingoMargin").onchange = () => ui();
 
-// ═══ 表示 ═══════════════════════════════════════════════════
+// ═══ 燃料計と BINGO 警告（2026-10-02・docs/design/supply-weather.md §5） ═══════════════
+// 表示は 4 段: FULL / HALF / LOW / CRIT（物資 0 は CRIT の点滅）。 閾値は上限に対する割合 (上限 1000 なら 751 / 451 / 201)
+const GAUGE = [[0.751, "FULL"], [0.451, "HALF"], [0.201, "LOW"], [0, "CRIT"]];
+const gaugeOf = v => v <= 0 ? "CRIT" : GAUGE.find(g => v >= Math.ceil(g[0] * P.supMax) || g[0] === 0)[1];
+let MB = null;   // 点どうしの直線が山を横切るか（層ごとに 1 回だけ調べる）
+function mountBlockTable() { MB = N.map(() => new Array(N.length).fill(false));
+  for (let i = 0; i < N.length; i++) for (let j = i + 1; j < N.length; j++) { const b = segHitsMount(N[i], N[j]); MB[i][j] = MB[j][i] = b; } }
+// 補給点: 物資の在庫が残っている前哨基地と、見えている店。 補給庫（拠）は含めない（縄張りの中への撤退を指してしまう）
+const isRefuel = i => N[i].stock > 0 && (i === 0 || (N[i].type === "店" && N[i].known));
+// 経由してよい点: 片付け済み・前哨基地・見えている店（着いても戦闘が起きない）
+const isSafe = i => i === 0 || N[i].done || (N[i].type === "店" && N[i].known);
+const perDist = rate => ((rate === "road" ? P.costRoad : P.costOff) + (S.flare ? P.costFlare : 0)) * SPEED[S.speed].cost;
+function bingoCalc() {
+  const n = N.length, D = new Array(n).fill(Infinity), src = new Array(n).fill(-1), used = new Array(n).fill(false);
+  for (let i = 0; i < n; i++) if (isRefuel(i)) { D[i] = 0; src[i] = i; }
+  for (;;) { let u = -1; for (let i = 0; i < n; i++) if (!used[i] && isSafe(i) && D[i] < Infinity && (u < 0 || D[i] < D[u])) u = i;
+    if (u < 0) break; used[u] = true;
+    for (let v = 0; v < n; v++) { if (v === u || !isSafe(v)) continue; const road = roadBetween(u, v); if (!road && MB[u][v]) continue;
+      const c = D[u] + dist(N[u], N[v]) * perDist(road ? "road" : "off"); if (c < D[v]) { D[v] = c; src[v] = src[u]; } } }
+  let need = Infinity, tgt = -1;
+  for (let k = 0; k < n; k++) { if (!isSafe(k) || D[k] === Infinity) continue;
+    let c = 0;
+    if (S.me.node !== k) { const rate = moveRate(k); if (rate !== "road" && segHitsMount(S.me, N[k])) continue; c = dist(S.me, N[k]) * perDist(rate); }
+    if (c + D[k] < need) { need = c + D[k]; tgt = src[k]; } }
+  const mode = document.getElementById("bingoMargin").value;
+  const margin = need === Infinity ? 0 : mode === "move" ? perDist("off") * 1.5 : need * 0.1;
+  const st = need === Infinity || S.sup < need ? "NORET" : S.sup <= need + margin ? "BINGO" : "";
+  return { need: Math.round(need), line: Math.round(need + margin), tgt, st };
+}
+function updateGauge() {
+  const g = gaugeOf(S.sup), el = document.getElementById("gauge");
+  el.textContent = g; el.className = "gauge " + g.toLowerCase() + (S.sup <= 0 ? " blink" : "");
+  document.getElementById("stage").textContent = `（${stageOf(S.sup)[1]}）`;
+  const b = S.bingoInfo = bingoCalc(), tick = document.getElementById("bingoTick"), box = document.getElementById("bingo");
+  tick.hidden = b.need === Infinity || b.line > P.supMax * 1.5; tick.style.left = Math.min(100, b.line / P.supMax * 100) + "%";
+  box.hidden = !b.st;
+  if (b.st === "BINGO") { box.className = "bingo"; box.textContent = `BINGO ── 最寄りの補給点まで 物資 ${b.need}`; }
+  if (b.st === "NORET") { box.className = "bingo blink"; box.textContent = b.tgt < 0 ? "NO RETURN ── 戻れる補給点が無い" : `NO RETURN ── 補給点まで 物資 ${b.need}（${b.need - S.sup} 足りない）`; }
+  if (b.st !== (S.bingoPrev || "")) {
+    if (b.st === "BINGO") { log("BINGO ── これ以上進むと最寄りの補給点へ戻れなくなる。"); sfxNear(); cancelFast("BINGO"); }
+    if (b.st === "NORET") { log("NO RETURN ── 物資では補給点まで戻れない。"); sfxNear(); cancelFast("NO RETURN"); }
+    S.bingoPrev = b.st;
+  }
+}
+function outpost(j) {
+  const p = N[j];
+  const buy = () => { if (p.stock > 0 && S.gold >= P.shopSupPrice) { S.gold -= P.shopSupPrice; p.stock--; S.sup = Math.min(P.supMax, S.sup + P.shopSupPack); log(`前哨基地で物資を買った（+${P.shopSupPack}）`); } outpost(j); ui(); };
+  modal("前哨基地", `<p>物資 ${P.shopSupPack} = ${P.shopSupPrice}G（在庫 ${p.stock}）</p><p class="k">所持 ${S.gold}G・物資 ${S.sup}/${P.supMax}</p>`,
+    [["物資を買う", buy, p.stock <= 0 || S.gold < P.shopSupPrice], ["出る", () => {}]]);
+}
+
+// ═══ 液晶の表示（地形データ風・2026-10-02） ═══════════════════════════
+// 半分の解像度で描いてから最近傍で 2 倍に拡大し、 走査線とわずかな発光を重ねる。 琥珀の単色で、 危険だけ赤
+const LC = { bg: "#0d0803", grid: "#2a1a08", dim: "#5e3e14", mid: "#a26c1f", hi: "#f0aa42", hot: "#ffe0a0", red: "#ff4a2c", redDim: "#7a2414" };
+const off = document.createElement("canvas"); off.width = 500; off.height = 298; const ox = off.getContext("2d");
+const scan = (() => { const c = document.createElement("canvas"); c.width = 1; c.height = 2; const g = c.getContext("2d"); g.fillStyle = "rgba(0,0,0,.32)"; g.fillRect(0, 1, 1, 1); return c; })();
+const sp = p => ({ x: Math.round((OX + p.x * SCALE) / 2) + 0.5, y: Math.round((OY + p.y * SCALE) / 2) + 0.5 });
+const GLYPH = {
+  "戦": ["10001", "01010", "00100", "01010", "10001"],
+  "精": ["1111111", "1000001", "1010101", "1001001", "1010101", "1000001", "1111111"],
+  "イ": ["00100", "00100", "00100", "00000", "00100"],
+  "店": ["00100", "01110", "11111", "10101", "11111"],
+  "休": ["00100", "00100", "11111", "00100", "00100"],
+  "宝": ["00100", "01010", "10001", "01010", "00100"],
+  "拠": ["11111", "10001", "10101", "10001", "11111"],
+  "前": ["11100", "11111", "11111", "10000", "10000"],
+  "出": ["00100", "00110", "11111", "00110", "00100"],
+  "?": ["010", "101", "010"],
+  "済": ["111", "101", "111"],
+  "敵": ["0001000", "0011100", "0011100", "0111110", "0111110", "1111111"],
+};
+function glyph(rows, x, y, col) { const h = rows.length, w = rows[0].length, x0 = Math.round(x - w / 2), y0 = Math.round(y - h / 2); ox.fillStyle = col;
+  for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) if (rows[r][c] === "1") ox.fillRect(x0 + c, y0 + r, 1, 1); }
+function lline(a, b, col, dash) { ox.strokeStyle = col; ox.lineWidth = 1; ox.setLineDash(dash || []); ox.beginPath(); ox.moveTo(a.x, a.y); ox.lineTo(b.x, b.y); ox.stroke(); ox.setLineDash([]); }
+function lring(p, r, col, dash) { const q = sp(p); ox.strokeStyle = col; ox.lineWidth = 1; ox.setLineDash(dash || []); ox.beginPath(); ox.arc(q.x, q.y, r * SCALE / 2, 0, 7); ox.stroke(); ox.setLineDash([]); }
+function ltext(s, x, y, col, align) { ox.fillStyle = col; ox.font = "8px monospace"; ox.textAlign = align || "center"; ox.textBaseline = "middle"; ox.fillText(s, Math.round(x), Math.round(y)); }
+function bracket(q, s, col) { ox.fillStyle = col; const L = 3;
+  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const x = Math.round(q.x + sx * s), y = Math.round(q.y + sy * s);
+    ox.fillRect(sx < 0 ? x : x - L + 1, y, L, 1); ox.fillRect(x, sy < 0 ? y : y - L + 1, 1, L); } }
+function drawLCD() {
+  const dbg = document.getElementById("dbg").checked, blink = Math.floor(performance.now() / 400) % 2 === 0;
+  ox.fillStyle = LC.bg; ox.fillRect(0, 0, off.width, off.height);
+  // 格子（距離 1 ごとの点）と座標
+  ox.fillStyle = LC.grid;
+  for (let gx = 0; gx <= Math.floor(W); gx++) for (let gy = 0; gy <= Math.floor(H); gy++) { const q = sp({ x: gx, y: gy }); ox.fillRect(q.x - 0.5, q.y - 0.5, 1, 1); }
+  for (let gx = 0; gx <= Math.floor(W); gx += 2) ltext(String.fromCharCode(65 + gx / 2), sp({ x: gx, y: 0 }).x, 5, LC.dim);
+  for (let gy = 0; gy <= Math.floor(H); gy += 2) ltext(String(gy / 2), 4, sp({ x: 0, y: gy }).y, LC.dim);
+  // 山岳: 等高線
+  for (const m of MTS) { const q = sp(m);
+    for (const [k, dash] of [[1, []], [0.7, [2, 2]], [0.42, [1, 2]]]) { ox.save(); ox.translate(q.x, q.y); ox.rotate(m.r); ox.beginPath(); ox.ellipse(0, 0, m.a * k * SCALE / 2, m.b * k * SCALE / 2, 0, 0, 7);
+      if (k === 1) { ox.fillStyle = "#170e05"; ox.fill(); } ox.strokeStyle = LC.dim; ox.lineWidth = 1; ox.setLineDash(dash); ox.stroke(); ox.setLineDash([]); ox.restore(); }
+    glyph(["010", "111"], q.x, q.y, LC.dim); }
+  // 道
+  for (const [a, b] of E) lline(sp(N[a]), sp(N[b]), LC.dim, [2, 2]);
+  if (dbg) for (const t of S.tracks) { const q = sp(t); ox.fillStyle = LC.mid; ox.globalAlpha = Math.min(1, 0.25 * t.s); ox.fillRect(q.x - 1, q.y - 1, 2, 2); ox.globalAlpha = 1; }
+  const meP = lerpP(prevMe, S.me), mq = sp(meP);
+  // 範囲
+  lring(meP, P.visStone, LC.dim, [1, 3]);
+  if (S.flare) { ox.fillStyle = "rgba(240,170,66,.07)"; ox.beginPath(); ox.arc(mq.x, mq.y, P.visFlare * SCALE / 2, 0, 7); ox.fill(); lring(meP, P.visFlare, LC.mid, [3, 2]); }
+  if (S.scout > 0) lring(meP, P.visScout, LC.hi, [1, 1]);
+  lring(meP, detectR(), LC.redDim, [1, 4]);
+  // 魔石の方角
+  for (const b of [S.stoneBearing, S.stoneGhost]) { if (b < 0) continue; const a0 = b * Math.PI / 3, R = P.visStone * SCALE / 2;
+    ox.fillStyle = S.stone.startsWith("強く") ? "rgba(255,74,44,.13)" : "rgba(240,170,66,.10)";
+    ox.beginPath(); ox.moveTo(mq.x, mq.y); ox.arc(mq.x, mq.y, R, a0 - Math.PI / 6, a0 + Math.PI / 6); ox.closePath(); ox.fill(); }
+  // 行き先
+  if (S.move) { const q = sp(N[S.move.to]); lline(mq, q, LC.hi, [3, 3]); bracket(q, 7, LC.hi); }
+  if (S.target !== null && S.target !== undefined) { const q = sp(N[S.target]), pv = preview(S.target);
+    lline(mq, q, pv.blocked ? LC.dim : pv.rate === "road" ? LC.hot : LC.red, pv.rate === "road" ? [] : [4, 3]); bracket(q, 8, pv.blocked ? LC.dim : LC.hot); }
+  // 点
+  N.forEach((p, i) => { const q = sp(p), known = p.known || p.type === "出" || p.type === "前";
+    if (!known) return glyph(GLYPH["?"], q.x, q.y, LC.dim);
+    if (p.done && p.type !== "店") return glyph(GLYPH["済"], q.x, q.y, LC.dim);
+    glyph(GLYPH[p.type], q.x, q.y, p.type === "前" || p.type === "出" ? LC.hot : p.type === "精" ? LC.red : LC.hi);
+    if (p.type === "店" || i === 0) { if (p.stock <= 0) ltext("EMPTY", q.x, q.y + 8, LC.dim); } });
+  // BINGO: 最寄りの補給点を点滅で示す（経路の線は描かない）
+  const bi = S.bingoInfo;
+  if (bi && bi.st && bi.tgt >= 0 && blink) { const q = sp(N[bi.tgt]); bracket(q, 9, LC.red); ltext("RTB", q.x, q.y - 11, LC.red); }
+  // 網
+  for (const w of S.webs) { if (!w.seen && !dbg) continue; glyph(["10101", "01110", "11111", "01110", "10101"], sp(w).x, sp(w).y, w.seen ? LC.mid : LC.dim); }
+  // 敵
+  if (S.seenFoe && S.time - S.seenFoe.t >= 0.15 && aliveFoes().length) { const q = sp(S.seenFoe), age = S.time - S.seenFoe.t;
+    ox.globalAlpha = Math.max(0.3, 1 - age / 12); glyph(GLYPH["戦"], q.x, q.y, LC.red); ltext(`LAST -${age.toFixed(0)}T`, q.x, q.y - 9, LC.red); ox.globalAlpha = 1; }
+  const STC = { "巡回": "PTRL", "警戒": "ALRT", "追跡": "CHSE" };
+  S.foes.forEach((f, k) => { if (!f.alive) return;
+    if (dbg) { f.terr.forEach(i => { const q = sp(N[i]); ox.strokeStyle = LC.redDim; ox.setLineDash([1, 1]); ox.strokeRect(q.x - 5, q.y - 5, 10, 10); ox.setLineDash([]); });
+      f.way.forEach((b, wi) => ltext("W" + (wi + 1), sp(N[b]).x, sp(N[b]).y + 9, LC.redDim)); }
+    if (!(dbg || S.time - f.seenT < 0.15)) return;
+    const q = sp(lerpP(prevFoes[k], foePos(f)));
+    glyph(GLYPH["敵"], q.x, q.y, LC.red);
+    ltext(`HOSTILE ${f.freeze > 0 ? "HOLD" : f.lunge ? "LNGE" : STC[f.state] || ""}${document.getElementById("showProf").checked ? " " + PR().name : ""}`, q.x, q.y - 10, LC.red); });
+  if (S.foeArrow && S.time - S.foeArrow.t < 12) { const a = sp(S.foeArrow.from), b = sp(S.foeArrow.to); lline(a, b, LC.red);
+    const ang = Math.atan2(b.y - a.y, b.x - a.x); lline(b, { x: b.x - Math.cos(ang - 0.5) * 5, y: b.y - Math.sin(ang - 0.5) * 5 }, LC.red); lline(b, { x: b.x - Math.cos(ang + 0.5) * 5, y: b.y - Math.sin(ang + 0.5) * 5 }, LC.red); }
+  const famVis = S.flare ? P.visFlare : P.visNone;
+  for (const m of S.familiars) { if (!dbg && dist(m, S.me) > famVis + 1e-6) continue; const q = sp(m);
+    if (dbg) lline(q, sp({ x: m.tx, y: m.ty }), LC.redDim, [1, 2]);
+    ox.fillStyle = m.kind === "scout" ? LC.hot : LC.red; ox.fillRect(Math.round(q.x) - 1, Math.round(q.y) - 1, 3, 3);
+    if (m.vx !== undefined) lline(q, { x: q.x - m.vx * 6, y: q.y - m.vy * 6 }, ox.fillStyle); }
+  // 囮・罠
+  for (const d of S.decoys) if (d.delay > 0 || blink) glyph(["010", "111", "010"], sp(d).x, sp(d).y, d.delay > 0 ? LC.mid : LC.hot);
+  for (const t of S.traps) glyph(["101", "010", "101"], sp(t).x, sp(t).y, LC.mid);
+  // 自分
+  ox.fillStyle = LC.hot; ox.fillRect(Math.round(mq.x) - 1, Math.round(mq.y) - 1, 3, 3);
+  for (const [dx, dy] of [[-5, 0], [5, 0], [0, -5], [0, 5]]) ox.fillRect(Math.round(mq.x) + dx - (dx ? Math.sign(dx) : 0), Math.round(mq.y) + dy - (dy ? Math.sign(dy) : 0), dx ? 2 : 1, dy ? 2 : 1);
+  // 合成: 拡大 → 発光 → 走査線 → 周辺減光
+  cx.imageSmoothingEnabled = false; cx.fillStyle = LC.bg; cx.fillRect(0, 0, cv.width, cv.height);
+  cx.drawImage(off, 0, 0, cv.width, cv.height);
+  cx.save(); cx.globalCompositeOperation = "lighter"; cx.globalAlpha = 0.35; cx.filter = "blur(3px)"; cx.drawImage(off, 0, 0, cv.width, cv.height); cx.restore();
+  cx.fillStyle = cx.createPattern(scan, "repeat"); cx.fillRect(0, 0, cv.width, cv.height);
+  const vg = cx.createRadialGradient(cv.width / 2, cv.height / 2, cv.height * 0.35, cv.width / 2, cv.height / 2, cv.width * 0.62);
+  vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.45)"); cx.fillStyle = vg; cx.fillRect(0, 0, cv.width, cv.height);
+}
+function draw() { if (document.getElementById("lcd").checked) drawLCD(); else drawOld(); }
+
+// ═══ 表示（旧） ═══════════════════════════════════════════════
 const COL = { "戦": "#d8544a", "精": "#9a2f2a", "イ": "#6aa4d8", "店": "#a0d646", "休": "#60d6c8", "宝": "#e6c664", "拠": "#b58ad8", "前": "#e6e2d8", "出": "#e6e2d8" };
 let renderAlpha = 1, prevMe = null, prevFoes = [];
 function lerpP(prev, cur) { if (!prev || renderAlpha >= 1) return cur; const a = Math.max(0, renderAlpha);
   return { x: prev.x + (cur.x - prev.x) * a, y: prev.y + (cur.y - prev.y) * a }; }
 function circle(p, r, stroke, dash) { const q = toPx(p); cx.beginPath(); cx.setLineDash(dash || []); cx.strokeStyle = stroke; cx.arc(q.x, q.y, r * SCALE, 0, 7); cx.stroke(); cx.setLineDash([]); }
-function draw() {
+function drawOld() {
   cx.fillStyle = "#0b0d0f"; cx.fillRect(0, 0, cv.width, cv.height);
   const dbg = document.getElementById("dbg").checked;
   for (const m of MTS) {                                           // 山岳（通行不可）
@@ -859,12 +1030,14 @@ function draw() {
     if (d.delay <= 0) circle(d, P.decoyNoise, "rgba(240,138,50,.25)", [3, 6]); }
   for (const t of S.traps) { const q = toPx(t); cx.strokeStyle = "#a9a498"; cx.lineWidth = 2;   // 罠
     cx.beginPath(); cx.moveTo(q.x - 5, q.y - 5); cx.lineTo(q.x + 5, q.y + 5); cx.moveTo(q.x + 5, q.y - 5); cx.lineTo(q.x - 5, q.y + 5); cx.stroke(); }
+  if (S.bingoInfo && S.bingoInfo.st && S.bingoInfo.tgt >= 0 && Math.floor(performance.now() / 400) % 2 === 0) { const b = toPx(N[S.bingoInfo.tgt]);
+    cx.strokeStyle = "#ff4a2c"; cx.lineWidth = 2; cx.strokeRect(b.x - 18, b.y - 18, 36, 36); cx.fillStyle = "#ff4a2c"; cx.font = "11px Consolas, monospace"; cx.fillText("RTB", b.x, b.y - 26); }
   // 自分
   const q = toPx(meP); cx.fillStyle = "#f0aa42"; cx.strokeStyle = "#1a1408"; cx.lineWidth = 2; cx.beginPath(); cx.arc(q.x, q.y, 7, 0, 7); cx.fill(); cx.stroke();
 }
 function ui() {
   const st = stageOf(S.sup);
-  document.getElementById("sup").textContent = S.sup; document.getElementById("stage").textContent = `【${st[1]}】`;
+  document.getElementById("sup").textContent = S.sup; document.getElementById("supmax").textContent = P.supMax; updateGauge();
   document.getElementById("supbar").style.width = (S.sup / P.supMax * 100) + "%";
   document.getElementById("hp").textContent = S.hp; document.getElementById("hpmax").textContent = P.hpMax;
   document.getElementById("hpbar").style.width = (S.hp / P.hpMax * 100) + "%";
