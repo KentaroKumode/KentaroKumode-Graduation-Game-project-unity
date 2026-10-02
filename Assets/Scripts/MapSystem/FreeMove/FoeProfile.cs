@@ -1,5 +1,16 @@
-namespace MapSystem.FreeMove
+﻿namespace MapSystem.FreeMove
 {
+    /// <summary>戦闘がバレた時の動き (2026-10-03)。 戦闘が終わると徘徊エネミーに場所が伝わる。</summary>
+    public enum BattleReaction
+    {
+        /// <summary>警戒して戦闘の場所を調べに来る。</summary>
+        Investigate,
+        /// <summary>戦闘の場所へ使い魔を放つ (冷却中なら放たない)。</summary>
+        Familiar,
+        /// <summary>無視して巡回を続ける。</summary>
+        Ignore,
+    }
+
     /// <summary>
     /// 徘徊エネミーの性質 (2026-09-28)。 層ごとに 1 つ引く。 正本は docs/GAME.md §5-9。
     ///
@@ -28,6 +39,8 @@ namespace MapSystem.FreeMove
         public int familiarMax;
         /// <summary>使い魔を放ってから次を放てるまでの手番。</summary>
         public int familiarCooldownTurns = FreeMapParams.FamiliarCooldownTurns;
+        /// <summary>戦闘がバレた時の動き。 既定は調べに来る。</summary>
+        public BattleReaction onBattle = BattleReaction.Investigate;
 
         public bool LaunchesFamiliars => familiarMax > 0;
 
@@ -43,9 +56,10 @@ namespace MapSystem.FreeMove
         /// <summary>影: 追跡中は魔石に反応しない (察知された合図も出ない)。 追われていると気づいた時には近い。</summary>
         public static FoeProfile Stalker => new FoeProfile { id = "stalker", displayName = "影", chaseSpeed = 1.2f, silentWhileChasing = true };
 
-        /// <summary>使役者: 使い魔を 2 体まで・4 手番ごとに放つ。 本体は遅い。</summary>
+        /// <summary>使役者: 使い魔を 2 体まで・4 手番ごとに放つ。 本体は遅い。 戦闘に気づくとその場所へ使い魔を放つ。</summary>
         public static FoeProfile Summoner => new FoeProfile
-        { id = "summoner", displayName = "使役者", chaseSpeed = 0.8f, familiarMax = 2, familiarCooldownTurns = 4 };
+        { id = "summoner", displayName = "使役者", chaseSpeed = 0.8f, familiarMax = 2, familiarCooldownTurns = 4,
+          onBattle = BattleReaction.Familiar };
 
         /// <summary>飛び掛かり: 追跡中、 距離 2.5 以内なら道を外れて直進する。 道の外へ逃げても詰められる。</summary>
         public static FoeProfile Pouncer => new FoeProfile { id = "pouncer", displayName = "飛び掛かり", chaseSpeed = 1.4f, lungeRange = 2.5f };

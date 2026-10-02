@@ -55,13 +55,12 @@
         public const float StoneNearDist = 2f;
 
         // ── 気配と察知 ─────────────────────────────────────────
-        public const int KehaiRoad = 2;
-        public const int KehaiBattle = 2;
-        public const int BattleKehaiTurns = 2;
+        /// <summary>移動の気配 (通常 1・急ぐ 2・忍び足 0)。 2026-10-03: 道の上の +2 と戦闘の後の +2 を廃止し、
+        /// 移動そのものを +1 にした。 戦闘は気配ではなく「戦闘がバレる」(<see cref="FoeProfile.onBattle"/>)。</summary>
+        public const int KehaiMove = 1;
         public const int DetectBase = 2;
         /// <summary>照明なしの察知距離の上限 (＝魔石の範囲。 予兆なしに見つかることがない)。</summary>
         public const int DetectCap = 4;
-        public const float BattleNoise = 4f;
         public const float CacheNoise = 3f;
 
         // ── 徘徊エネミー ───────────────────────────────────────
@@ -143,13 +142,9 @@
         /// <summary>物資の倍率。</summary>
         public static float CostMul(this MoveSpeed s) => s == MoveSpeed.Hurry ? 1.5f : 1f;
 
-        /// <summary>移動中の気配 (道の上の +2 を置き換える)。</summary>
-        public static int Kehai(this MoveSpeed s, bool onRoad)
-        {
-            if (s == MoveSpeed.Sneak) return 0;
-            int k = onRoad ? FreeMapParams.KehaiRoad : 0;
-            return s == MoveSpeed.Hurry ? k + 1 : k;
-        }
+        /// <summary>移動中の気配。 道の上か外かでは変わらない (2026-10-03)。</summary>
+        public static int Kehai(this MoveSpeed s)
+            => s == MoveSpeed.Sneak ? 0 : s == MoveSpeed.Hurry ? FreeMapParams.KehaiMove + 1 : FreeMapParams.KehaiMove;
 
         /// <summary>1 刻みで進む距離。 順速 0.1・忍び足 0.05・急ぐ 0.2。</summary>
         public static double StepPerTick(this MoveSpeed s) => (double)FreeMapParams.Tick / s.TimeMul();
