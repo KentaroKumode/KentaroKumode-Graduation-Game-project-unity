@@ -135,7 +135,7 @@
 // ═══ 数値（§23-21 の仮置き） ═══════════════════════════════════
 const P = {
   supMax: 1000, costRoad: 10, costOff: 20, costFlare: 50,         // 物資 / 距離 (照明は 1 回ぶん・2026-10-03 に点けっぱなしから 1 回ずつへ)
-  flareShow: 0.5,                                                 // 照明が光っている手番 (この間だけ使い魔も半径 5 で見える)
+  flareShow: 0.5, exposedShow: 3,                                 // exposedShow: 位置がバレた印を残す手番                                                 // 照明が光っている手番 (この間だけ使い魔も半径 5 で見える)
   hpPayRoad: 1, hpPayOff: 2,                                       // 払底中の HP / 距離
   visNone: 1, visFlare: 5, visStone: 4, visScout: 3, scoutTurns: 2,
   kehaiMove: 1, detectBase: 2,                                    // 2026-10-03: 気配は移動だけ (道の上の +2・戦闘の +2 を廃止)
@@ -638,11 +638,13 @@ function noiseAt(r, what) {
 function battleKnown() { positionKnown("（戦いの物音が層に響いた。何かが気づいたかもしれない）"); }
 /* 位置が伝わる: 戦闘と照明で共用。 動き方は性質の onBattle */
 function positionKnown(msg) {
+  /* バレた場所の印 (2026-10-03): 敵が反応したかどうかに関係なく必ず出す (出し分けると性質が漏れる) */
+  S.exposed = { x: S.me.x, y: S.me.y, t: S.time, rt: performance.now() };
   const pol = PR().onBattle || "investigate"; let any = false;
   for (const f of aliveFoes()) { if (f.state === "追跡") continue;
     if (pol === "investigate") { f.state = "警戒"; f.lastKnown = { x: S.me.x, y: S.me.y }; planFoe(f); any = true; }
     else if (pol === "familiar") { launchFamiliar(f); any = true; } }
-  if (any) log(msg); }
+  log(msg); }
 function hpLossRoll(nd, minus) { let s = 0; for (let i = 0; i < nd; i++) s += d6(); return Math.max(0, s - minus); }
 function battle(j, name, nd, minus, sup, gold) {
   const st = stageOf(S.sup), lo = Math.max(0, nd - minus), hi = nd * 6 - minus;
@@ -990,6 +992,7 @@ const ICON9 = {
   "敵": ["000010000", "000111000", "000111000", "001111100", "001101100", "011111110", "011111110", "111111111"],
 };
 const icon = k => PANEL ? ICON9[k] : GLYPH[k];
+const EXCL = ["01110", "11011", "11011", "11011", "11111", "11011", "01110"];   /* 位置がバレた印「!」(白抜きの丸い札) */
 // scale: 1 ドットを何ドットで描くか（点のアイコンは 1、 小物は文字と同じ PXS）
 function glyph(rows, x, y, col, scale) { const u = scale || 1, h = rows.length, w = rows[0].length, x0 = Math.round(x - 0.5 - (w * u - 1) / 2), y0 = Math.round(y - 0.5 - (h * u - 1) / 2); ox.fillStyle = col;
   for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) if (rows[r][c] === "1") ox.fillRect(x0 + c * u, y0 + r * u, u, u); }
@@ -1059,6 +1062,11 @@ function drawLCD() {
       let d = Math.atan2(dy, dx) - a0; d = Math.atan2(Math.sin(d), Math.cos(d)); return Math.abs(d) <= Math.PI / 4; }, S.stone.startsWith("強く") ? LCA.stoneHot : LCA.stone); }
   // 行き先
   if (S.move) { const q = sp(N[S.move.to]); lline(mq, q, LC.hi, [2, 2]); bracket(q, 5, LC.hi); }
+  // 位置がバレた場所: 瞬間に波紋が広がり、 その後 exposedShow 手番「!」が点滅して残る (後半は暗く)
+  if (S.exposed && S.time - S.exposed.t < P.exposedShow) { const q = sp(S.exposed), age = (performance.now() - S.exposed.rt) / 1000;
+    if (age < 1.2) for (const k of [0, 0.35]) { const r = (age - k) / 0.85; if (r > 0 && r < 1) lring(S.exposed, r * 2.5, LC.red, [2, 1]); }
+    const late = S.time - S.exposed.t > P.exposedShow / 2;
+    if (!late || blink) glyph(EXCL, q.x, q.y - o(7), late ? LC.redDim : LC.red, PXS); }
   if (S.target !== null && S.target !== undefined) { const q = sp(N[S.target]), pv = preview(S.target);
     lline(mq, q, pv.blocked ? LC.dim : pv.rate === "road" ? LC.hot : LC.red, pv.rate === "road" ? [] : [2, 2]); bracket(q, 6, pv.blocked ? LC.dim : LC.hot); }
   // 点
@@ -1201,6 +1209,9 @@ function drawOld() {
   for (const b of [S.stoneBearing, S.stoneGhost]) { if (b < 0) continue; const c = toPx(meP), a0 = b * Math.PI / 2;
     cx.fillStyle = S.stone.startsWith("強く") ? "rgba(216,84,74,.16)" : "rgba(181,138,216,.16)";
     cx.beginPath(); cx.moveTo(c.x, c.y); cx.arc(c.x, c.y, P.visStone * SCALE, a0 - Math.PI / 4, a0 + Math.PI / 4); cx.closePath(); cx.fill(); }
+  if (S.exposed && S.time - S.exposed.t < P.exposedShow) { const q = toPx(S.exposed);   // 位置がバレた場所
+    cx.fillStyle = "#ff4a2c"; cx.beginPath(); cx.arc(q.x, q.y - 16, 8, 0, 7); cx.fill();
+    cx.fillStyle = "#1a0d06"; cx.font = "bold 12px sans-serif"; cx.textAlign = "center"; cx.fillText("!", q.x, q.y - 12); cx.textAlign = "start"; }
   for (const d of S.decoys) { const q = toPx(d); cx.fillStyle = d.delay > 0 ? "#8a6a3a" : "#f08a32";   // 囮（炎）
     cx.beginPath(); cx.moveTo(q.x, q.y - 9); cx.quadraticCurveTo(q.x + 7, q.y, q.x, q.y + 5); cx.quadraticCurveTo(q.x - 7, q.y, q.x, q.y - 9); cx.fill();
     if (d.delay <= 0) circle(d, P.decoyNoise, "rgba(240,138,50,.25)", [3, 6]); }

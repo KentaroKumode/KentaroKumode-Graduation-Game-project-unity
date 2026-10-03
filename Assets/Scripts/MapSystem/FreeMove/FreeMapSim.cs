@@ -355,9 +355,15 @@ namespace MapSystem.FreeMove
         /// (旧: 2 手番の気配 +2 と半径 4 の物音)</summary>
         public void NoteBattleEnded() => NotifyPositionKnown();
 
+        /// <summary>最後に位置がバレた場所と時刻 (手番)。 画面の「!」と波紋の印に使う。 敵が反応したかどうかに関係なく立つ
+        /// (出し分けると性質が漏れる)。 null = まだバレていない。</summary>
+        public Vec2? LastExposedAt { get; private set; }
+        public double LastExposedTime { get; private set; } = -1;
+
         /// <summary>位置が伝わる (戦闘・照明で共用)。 動き方は性質の <see cref="FoeProfile.onBattle"/>。</summary>
         private void NotifyPositionKnown()
         {
+            LastExposedAt = Me; LastExposedTime = TimeTurns;
             if (!FoeAlive || FoeState == FoeState.Chase) return;
             switch (Profile.onBattle)
             {
