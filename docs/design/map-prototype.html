@@ -559,7 +559,7 @@ function turnFoe(f) {
   }
 }
 // 魔石の方角 (60° ずつ 6 方向)。 画面は y が下向き
-/* 魔石の方角 (2026-10-03 案 A): 4 方向 (90°)。 遠い (3〜4) は方角を出さず、 近い (1〜2) と察知されている時だけ出す */
+/* 魔石の方角 (2026-10-03): 4 方向 (90°)。 反応している間は常に出す (距離で絞ると見つけられなかった) */
 const BEARING = ["→ 東", "↓ 南", "← 西", "↑ 北"];
 function bearingOf(p) { const a = Math.atan2(p.y - S.me.y, p.x - S.me.x); return ((Math.round(a / (Math.PI / 2)) % 4) + 4) % 4; }
 function updateStone() {
@@ -570,7 +570,6 @@ function updateStone() {
     if (hunting && PR().silent) continue;   // 影: 追跡中は一切反応しない
     const l = hunting ? 3 : d <= 2 ? 2 : 1;
     if (l > lv || (l === lv && d < bestD)) { lv = l; bestD = d; bearing = bearingOf(foePos(f)); } }
-  if (lv < 2) bearing = -1;               // 遠い時は方角を出さない
   S.stoneBearing = bearing;
   S.stoneGhost = bearing >= 0 && PR().echo ? (bearing + S.echoOff) % 4 : -1;
   // 2 つ出る時は方角の番号順に並べる (並び順で本物が分からないように)

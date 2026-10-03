@@ -141,8 +141,8 @@ namespace MapSystem.FreeMove
         /// <summary>マスの種別が判明している点。 点と道の配置は層全体が見える。</summary>
         public readonly bool[] Known;
         public int StoneLevel { get; private set; }
-        /// <summary>魔石が指す方角: 徘徊エネミーの居る向きを 90° ずつ 4 つに分けた番号 (0〜3・2026-10-03 案 A で 6 → 4)。
-        /// 方角が出るのは「かなり近い」と「察知されている」の時だけで、 遠い・反応なしの時は -1。
+        /// <summary>魔石が指す方角: 徘徊エネミーの居る向きを 90° ずつ 4 つに分けた番号 (0〜3・2026-10-03 に 6 → 4)。
+        /// 反応なし (段 0) の時は -1。
         /// 0 は +x (右) を中心に ±45°、 以後 +y へ回る (<see cref="BearingVector"/>)。</summary>
         public int StoneBearing { get; private set; } = -1;
         /// <summary>徘徊エネミーの最後に分かった位置 (目視・照明・偵察・罠)。</summary>
@@ -647,7 +647,7 @@ namespace MapSystem.FreeMove
             return ev;
         }
 
-        // 方角は 4 つ (2026-10-03 案 A): 0 = +x (右)・1 = +y・2 = -x・3 = -y を中心に ±45°。 境目は斜め。
+        // 方角は 4 つ (2026-10-03): 0 = +x (右)・1 = +y・2 = -x・3 = -y を中心に ±45°。 境目は斜め。
         // 三角関数を使わず成分の大小だけで決める ── 実装差で境目が揺れない (斜めちょうどは x の側)
         private static readonly Vec2[] BearingCenters = { new Vec2(1, 0), new Vec2(0, 1), new Vec2(-1, 0), new Vec2(0, -1) };
 
@@ -661,9 +661,8 @@ namespace MapSystem.FreeMove
         /// <summary>方角の中心の単位ベクトル。</summary>
         public static Vec2 BearingVector(int sector) => BearingCenters[((sector % 4) + 4) % 4];
 
-        /// <summary>魔石が方角を出すのは「かなり近い」(段 2) と「察知されている」(段 3) だけ。 遠い (段 1) は方角なし。</summary>
-        private Vec2 FoeOffset => FoePos - Me;
-        private int BearingFor(int level) => level >= 2 ? BearingOf(FoeOffset) : -1;
+        /// <summary>魔石は反応している間 (段 1〜3) は方角を出す。 (2026-10-03 に一度「近い時だけ」にしたが、 見つけられなくなったので戻した)</summary>
+        private int BearingFor(int level) => level > 0 ? BearingOf(FoePos - Me) : -1;
 
         private static double Cross(Vec2 a, Vec2 b) => a.x * b.y - a.y * b.x;
 
