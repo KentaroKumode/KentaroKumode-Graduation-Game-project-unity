@@ -318,11 +318,11 @@ namespace GameLoop
             FlushPendingArrival();
         }
 
-        /// <summary>使い魔に勝った: 通常の戦闘と同じ物資 (+30) と戦闘の物音。</summary>
+        /// <summary>使い魔に勝った: 通常の戦闘と同じ物資 (+30)。 戦闘と同じく、 長引けば位置がバレる。</summary>
         private void HandleFamiliarFightWon()
         {
             ProvisionSystem.Supply(Run, FreeMapParams.RewardBattle);
-            FreeMap?.NoteBattleEnded();
+            FreeMap?.NoteBattleEnded(LastCombatResult?.totalTurns ?? int.MaxValue);
             Log("使い魔を退けた");
             EndFamiliarFight(fled: false);
         }
@@ -351,7 +351,7 @@ namespace GameLoop
             var sim = FreeMap;
             if (sim != null)
             {
-                sim.NoteBattleEnded();                    // 戦闘の物音は立った
+                sim.NoteBattleEnded();                    // 逃げた戦闘は必ずバレる
                 sim.FleeToPrevious();
                 mm.SyncCurrentNodeFromSim();
             }
