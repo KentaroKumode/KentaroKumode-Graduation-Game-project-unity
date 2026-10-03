@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Codex;
@@ -704,8 +704,8 @@ namespace GameLoop
             //   (Highfleet の「追ってきた敵から燃料を奪う」)。 Λ 環状線にも同じ額が乗る。
             ProvisionSystem.Supply(Run, eliteNodeReward
                 ? MapSystem.FreeMove.FreeMapParams.RewardElite : MapSystem.FreeMove.FreeMapParams.RewardBattle);
-            // 戦闘の物音と気配 (半径 4 の敵を呼ぶ・2 手番 気配 +2)
-            mm.Sim?.NoteBattleEnded();
+            // 戦闘がバレる (2026-10-03): 速く終えた戦闘 (QuietBattleTurns 以内) は静かでバレない
+            mm.Sim?.NoteBattleEnded(LastCombatResult?.totalTurns ?? int.MaxValue);
 
             // 戦闘勝利報酬: **エリートは確定 1 個 / 通常は 15%** (2026-09-09 変更)。
             //

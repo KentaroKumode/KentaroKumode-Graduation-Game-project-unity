@@ -353,7 +353,13 @@ namespace MapSystem.FreeMove
         /// <summary>戦闘が終わった: 徘徊エネミーに「ここで戦闘があった」と伝わる (距離によらない・2026-10-03)。
         /// どう動くかは性質の <see cref="FoeProfile.onBattle"/> 次第。 追跡中ならもともと居場所を知っているので変わらない。
         /// (旧: 2 手番の気配 +2 と半径 4 の物音)</summary>
-        public void NoteBattleEnded() => NotifyPositionKnown();
+        /// <param name="combatTurns">戦闘にかかったターン数。 <see cref="FreeMapParams.QuietBattleTurns"/> 以内なら静かでバレない
+        /// (速く終えた戦闘は静か・2026-10-03)。 逃げた時など数えられない時は既定 (int.MaxValue = 必ずバレる)。</param>
+        public void NoteBattleEnded(int combatTurns = int.MaxValue)
+        {
+            if (combatTurns <= FreeMapParams.QuietBattleTurns) return;
+            NotifyPositionKnown();
+        }
 
         /// <summary>最後に位置がバレた場所と時刻 (手番)。 画面の「!」と波紋の印に使う。 敵が反応したかどうかに関係なく立つ
         /// (出し分けると性質が漏れる)。 null = まだバレていない。</summary>

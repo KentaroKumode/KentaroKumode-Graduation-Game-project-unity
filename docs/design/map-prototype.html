@@ -135,7 +135,7 @@
 // ═══ 数値（§23-21 の仮置き） ═══════════════════════════════════
 const P = {
   supMax: 1000, costRoad: 10, costOff: 20, costFlare: 50,         // 物資 / 距離 (照明は 1 回ぶん・2026-10-03 に点けっぱなしから 1 回ずつへ)
-  flareShow: 0.5, exposedShow: 3,                                 // exposedShow: 位置がバレた印を残す手番                                                 // 照明が光っている手番 (この間だけ使い魔も半径 5 で見える)
+  flareShow: 0.5, exposedShow: 3, quietTurns: 3,                 // quietTurns: このターン数以内で終えた戦闘は静か (バレない)                                 // exposedShow: 位置がバレた印を残す手番                                                 // 照明が光っている手番 (この間だけ使い魔も半径 5 で見える)
   hpPayRoad: 1, hpPayOff: 2,                                       // 払底中の HP / 距離
   visNone: 1, visFlare: 5, visStone: 4, visScout: 3, scoutTurns: 2,
   kehaiMove: 1, detectBase: 2,                                    // 2026-10-03: 気配は移動だけ (道の上の +2・戦闘の +2 を廃止)
@@ -452,7 +452,7 @@ function famContact(m) {
   modal("使い魔に捕捉された", `<p>${FAMILIARS[m.kind].name}の使い魔との交戦（簡略版: 通常の戦闘より少し重い）。</p><p class="k">予想される被害: HP ${Math.round(3 * st[2])}〜${Math.round(18 * st[2])}。勝てば物資 +${P.rewSup.battle}。</p>`, [
     ["戦う", () => { const loss = Math.round(hpLossRoll(3, 0) * st[2]); S.hp -= loss;
       if (S.hp <= 0) { S.hp = 0; return end(false, "使い魔との交戦で倒れた。"); }
-      S.sup = Math.min(P.supMax, S.sup + P.rewSup.battle); battleKnown();
+      S.sup = Math.min(P.supMax, S.sup + P.rewSup.battle); battleKnown(battleTurns(3));
       log(`使い魔を退けた。HP −${loss}、物資 +${P.rewSup.battle}`); ui(); }],
     ["逃げる", () => { S.sup = Math.max(0, S.sup - P.fleeSup); S.gold = Math.floor(S.gold / 2);
       log(`使い魔から逃げた。物資 −${P.fleeSup}、ゴールド半減。`); ui(); }],
@@ -635,7 +635,12 @@ function noiseAt(r, what) {
 /* 戦闘がバレる (2026-10-03): 戦闘が終わると、 層の徘徊エネミー全員に「ここで戦闘があった」と伝わる (距離によらない)。
    どう動くかは性質の onBattle で決まる: investigate = 警戒して調べに来る / familiar = 使い魔を放つ / ignore = 無視して巡回を続ける。
    追跡中の敵はもともと居場所を知っているので変わらない */
-function battleKnown() { positionKnown("（戦いの物音が層に響いた。何かが気づいたかもしれない）"); }
+/* 速く終えた戦闘は静か (2026-10-03): quietTurns 以内ならバレない。 試作の戦闘にはターンが無いので、 重さ (振るダイスの数) から仮に振る */
+const battleTurns = nd => 1 + Math.floor(rnd() * (nd + 2));    /* 戦闘 (2 個) 1〜4 / エリート (3 個) 1〜5 / 使い魔 (3 個) 1〜5 */
+function battleKnown(turns) {
+  if (turns !== undefined && turns <= P.quietTurns) { log(`戦闘は ${turns} ターンで片付いた。静かに済んだ。`); return; }
+  if (turns !== undefined) log(`戦闘は ${turns} ターンかかった。`);
+  positionKnown("（戦いの物音が層に響いた。何かが気づいたかもしれない）"); }
 /* 位置が伝わる: 戦闘と照明で共用。 動き方は性質の onBattle */
 function positionKnown(msg) {
   /* バレた場所の印 (2026-10-03): 敵が反応したかどうかに関係なく必ず出す (出し分けると性質が漏れる) */
@@ -652,7 +657,7 @@ function battle(j, name, nd, minus, sup, gold) {
     ["戦う", () => { const loss = Math.round(hpLossRoll(nd, minus) * st[2]); S.hp -= loss;
       if (S.hp <= 0) { S.hp = 0; return end(false, `${name}で倒れた。`); }
       if (loss > 0) S.sup = Math.max(0, S.sup - P.hpLoss[Math.min(3, STAGES.indexOf(st))]);
-      S.sup = Math.min(P.supMax, S.sup + sup); S.gold += gold; N[j].done = true; battleKnown();
+      S.sup = Math.min(P.supMax, S.sup + sup); S.gold += gold; N[j].done = true; battleKnown(battleTurns(nd));
       log(`${name}に勝った。HP −${loss}、物資 +${sup}、ゴールド +${gold}`); ui(); }],
     ["逃げる", () => flee(j, name)],
   ]);

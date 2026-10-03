@@ -65,6 +65,8 @@
         /// <summary>照明なしの察知距離の上限 (＝魔石の範囲。 予兆なしに見つかることがない)。</summary>
         public const int DetectCap = 4;
         public const float CacheNoise = 3f;
+        /// <summary>このターン数以内で終えた戦闘は静かで、 位置がバレない (2026-10-03・仮)。 4 ターン以上はバレる。</summary>
+        public const int QuietBattleTurns = 3;
 
         // ── 徘徊エネミー ───────────────────────────────────────
         public const float FoePatrolSpeed = 0.5f;
