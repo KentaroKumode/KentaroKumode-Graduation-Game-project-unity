@@ -78,7 +78,7 @@
     </div>
     <div class="card">
       <div class="btns">
-        <button id="bFlare" type="button" title="点灯中は物資を毎手番 +5 消費。半径5のマス・敵が見えるが、敵からも半径5で見られる（察知距離 5 で固定）">照明</button>
+        <button id="bFlare" type="button" title="1 回ごとに物資を払って打ち上げる。その瞬間、半径5のマス・敵・使い魔・網が見えるが、徘徊エネミーに位置が伝わる（追跡にはならない）">照明</button>
         <button id="bScout" type="button" title="2手番その場で動けない。半径3のマス・敵が見える。気配は上がらない">偵察</button>
         <button id="bStop" type="button" disabled>移動をやめる</button>
       </div>
@@ -134,7 +134,8 @@
 "use strict";
 // ═══ 数値（§23-21 の仮置き） ═══════════════════════════════════
 const P = {
-  supMax: 1000, costRoad: 10, costOff: 20, costFlare: 5,          // 物資 / 距離
+  supMax: 1000, costRoad: 10, costOff: 20, costFlare: 50,         // 物資 / 距離 (照明は 1 回ぶん・2026-10-03 に点けっぱなしから 1 回ずつへ)
+  flareShow: 0.5,                                                 // 照明が光っている手番 (この間だけ使い魔も半径 5 で見える)
   hpPayRoad: 1, hpPayOff: 2,                                       // 払底中の HP / 距離
   visNone: 1, visFlare: 5, visStone: 4, visScout: 3, scoutTurns: 2,
   kehaiMove: 1, detectBase: 2,                                    // 2026-10-03: 気配は移動だけ (道の上の +2・戦闘の +2 を廃止)
@@ -308,7 +309,7 @@ function newGame() {
   S = {
     seed, time: 0, turnAcc: 0, sup: P.supMax, hp: P.hpMax, gold: P.gold0,
     me: { x: N[0].x, y: N[0].y, node: 0, seg: null }, prevNode: 0,
-    move: null, scout: 0, flare: false, tracks: [], trackAcc: 0,
+    move: null, scout: 0, flare: false, flareAt: -99, tracks: [], trackAcc: 0,
     speed: "normal", decoys: [], traps: [], nDecoy: P.decoy0, nTrap: P.trap0,
     foes, prof: profKey, famKey: document.getElementById("fam").value, familiars: [], webs: [], stuck: 0, famSightPrev: false,
     stoneBearing: -1, stoneGhost: -1, echoOff: 0, echoT: 0,
@@ -327,7 +328,7 @@ const onRoad = () => S.me.node !== null || S.me.seg !== null;
 const movingOnRoad = () => !!S.move && S.move.rate === "road";
 const kehai = () => (S.move && !S.stuck ? SPEED[S.speed].kehai() : 0);
 // 照明中は「こちらが見える範囲 ＝ 敵から見られる範囲」で固定。 灯喰いは照明中 7
-const detectR = () => S.flare ? P.visFlare : Math.min(P.detectCap, P.detectBase + kehai());
+const detectR = () => Math.min(P.detectCap, P.detectBase + kehai());
 const chaseSpeed = () => PR().chase || P.enemyChase;
 const patrolSpeed = () => PR().patrol || P.enemyPatrol;
 const lostTurns = () => P.lostTurns;
@@ -345,7 +346,7 @@ function moveRate(j) {
 }
 function preview(j) {
   const sp = SPEED[S.speed], d = dist(S.me, N[j]), rate = moveRate(j);
-  const per = ((rate === "road" ? P.costRoad : P.costOff) + (S.flare ? P.costFlare : 0)) * sp.cost * drain();
+  const per = (rate === "road" ? P.costRoad : P.costOff) * sp.cost * drain();
   const cost = Math.round(d * per), short = Math.max(0, cost - S.sup);
   const hpPay = short > 0 ? Math.ceil(short / per * (rate === "road" ? P.hpPayRoad : P.hpPayOff) * sp.cost) : 0;
   const blocked = rate !== "road" && segHitsMount(S.me, N[j]);
@@ -488,14 +489,14 @@ function tick() {
   if (S.scoutDone) { S.scoutDone = false; finishScout(); }
   S.turnAcc += dt;
   while (S.turnAcc >= 1 - 1e-9) { S.turnAcc -= 1; turn(); if (S.over) return; }
-  if (S.flare) { reveal(P.visFlare); snapshotFoe(P.visFlare); }
   reveal(P.visNone); snapshotFoe(P.visNone);
   for (const f of S.foes) if (f.alive && f.freeze <= 0 && dist(foePos(f), S.me) <= P.catchDist) { caught(f); return; }
   if (S.move === null && S.pendingArrive !== undefined) { const j = S.pendingArrive; S.pendingArrive = undefined; arrive(j); }
+  S.flare = S.time - S.flareAt < P.flareShow - 1e-9;   /* 照明は打ち上げてから flareShow 手番だけ光る */
 }
 function stepMove() {
   const sp = SPEED[S.speed], m = S.move, rem = dist(S.me, N[m.to]), step = Math.min(TICK / sp.time, rem);
-  const per = ((m.rate === "road" ? P.costRoad : P.costOff) + (S.flare ? P.costFlare : 0)) * sp.cost;
+  const per = (m.rate === "road" ? P.costRoad : P.costOff) * sp.cost;
   pay(step * per, step * (m.rate === "road" ? P.hpPayRoad : P.hpPayOff) * sp.cost);
   if (S.over) return 0;
   const k = step / rem; S.me.x += (N[m.to].x - S.me.x) * k; S.me.y += (N[m.to].y - S.me.y) * k;
@@ -518,7 +519,6 @@ function pay(supCost, hpPerDistUnit) {
 }
 function turn() {
   S.tracks.forEach(t => t.s--); S.tracks = S.tracks.filter(t => t.s > 0);
-  if (S.flare && !S.move) pay(P.costFlare, 0);
   const pr = PR();
   // 木霊: 魔石の方角のずれを手番ごとに振り直す
   // 木霊: 偽の方角は本物から 2〜3 方角ずれた所に出て、 2 手番ごとに飛ぶ (本物は敵の動きに付いてくるので、 見比べれば分かる)
@@ -635,12 +635,14 @@ function noiseAt(r, what) {
 /* 戦闘がバレる (2026-10-03): 戦闘が終わると、 層の徘徊エネミー全員に「ここで戦闘があった」と伝わる (距離によらない)。
    どう動くかは性質の onBattle で決まる: investigate = 警戒して調べに来る / familiar = 使い魔を放つ / ignore = 無視して巡回を続ける。
    追跡中の敵はもともと居場所を知っているので変わらない */
-function battleKnown() {
+function battleKnown() { positionKnown("（戦いの物音が層に響いた。何かが気づいたかもしれない）"); }
+/* 位置が伝わる: 戦闘と照明で共用。 動き方は性質の onBattle */
+function positionKnown(msg) {
   const pol = PR().onBattle || "investigate"; let any = false;
   for (const f of aliveFoes()) { if (f.state === "追跡") continue;
     if (pol === "investigate") { f.state = "警戒"; f.lastKnown = { x: S.me.x, y: S.me.y }; planFoe(f); any = true; }
     else if (pol === "familiar") { launchFamiliar(f); any = true; } }
-  if (any) log("（戦いの物音が層に響いた。何かが気づいたかもしれない）"); }
+  if (any) log(msg); }
 function hpLossRoll(nd, minus) { let s = 0; for (let i = 0; i < nd; i++) s += d6(); return Math.max(0, s - minus); }
 function battle(j, name, nd, minus, sup, gold) {
   const st = stageOf(S.sup), lo = Math.max(0, nd - minus), hi = nd * 6 - minus;
@@ -796,7 +798,11 @@ cv.addEventListener("click", e => {
   } else S.target = hit;
   ui();
 });
-document.getElementById("bFlare").onclick = () => { S.flare = !S.flare; log(S.flare ? "照明を打ち上げた。" : "照明を消した。"); if (S.flare) { reveal(P.visFlare); snapshotFoe(P.visFlare); } ui(); };
+/* 照明 (2026-10-03): 1 回ずつ打ち上げる。 物資を払い、 その瞬間に半径 5 を見て、 徘徊エネミーに位置が伝わる (戦闘と同じ・追跡にはならない) */
+document.getElementById("bFlare").onclick = () => { if (S.over || S.flare) return;
+  S.sup = Math.max(0, S.sup - P.costFlare); S.flareAt = S.time; S.flare = true;
+  reveal(P.visFlare); snapshotFoe(P.visFlare); log(`照明を打ち上げた（物資 −${P.costFlare}）。`);
+  positionKnown("（照明の光が層に見えた。何かが気づいたかもしれない）"); updateStone(); ui(); };
 document.getElementById("bScout").onclick = () => { if (S.move || S.scout > 0) return; S.scout = P.scoutTurns; S.scoutObs = []; scoutObserve(false); log(`偵察を始めた（${P.scoutTurns} 手番動けない）。`); ui(); };
 document.getElementById("bStop").onclick = () => {
   if (S.move) { const m = S.move; S.move = null; S.me.node = null; S.me.seg = m.rate === "road" && m.from !== null ? [m.from, m.to] : null; log("その場で止まった（時間は流れ続ける）。"); }
@@ -869,7 +875,7 @@ function mountBlockTable() { MB = N.map(() => new Array(N.length).fill(false));
 const isRefuel = i => N[i].stock > 0 && (i === 0 || (N[i].type === "店" && N[i].known));
 // 経由してよい点: 片付け済み・前哨基地・見えている店（着いても戦闘が起きない）
 const isSafe = i => i === 0 || N[i].done || (N[i].type === "店" && N[i].known);
-const perDist = rate => ((rate === "road" ? P.costRoad : P.costOff) + (S.flare ? P.costFlare : 0)) * SPEED[S.speed].cost * drain();
+const perDist = rate => (rate === "road" ? P.costRoad : P.costOff) * SPEED[S.speed].cost * drain();
 function bingoCalc() {
   const n = N.length, D = new Array(n).fill(Infinity), src = new Array(n).fill(-1), used = new Array(n).fill(false);
   for (let i = 0; i < n; i++) if (isRefuel(i)) { D[i] = 0; src[i] = i; }
@@ -1226,11 +1232,11 @@ function ui() {
   document.getElementById("hpbar").style.width = (S.hp / P.hpMax * 100) + "%";
   document.getElementById("gold").textContent = S.gold + " G";
   document.getElementById("turn").textContent = S.time.toFixed(1) + " 手番";
-  document.getElementById("kehai").textContent = S.flare ? `照明中 / ${detectR()}` : `${kehai()} / ${detectR()}${S.move ? (S.move.rate === "road" ? "（道を" : "（道の外を") + SPEED[S.speed].name + "）" : "（静止）"}`;
+  document.getElementById("kehai").textContent = `${kehai()} / ${detectR()}${S.move ? (S.move.rate === "road" ? "（道を" : "（道の外を") + SPEED[S.speed].name + "）" : "（静止）"}`;
   for (const [id, sp] of [["spSneak", "sneak"], ["spNormal", "normal"], ["spHurry", "hurry"]]) { const b = document.getElementById(id); b.classList.toggle("on", S.speed === sp); b.setAttribute("aria-pressed", S.speed === sp); }
   const bD = document.getElementById("bDecoy"); bD.textContent = `囮を置く（${S.nDecoy}）`; bD.disabled = S.nDecoy <= 0 || S.over;
   const bT = document.getElementById("bTrap"); bT.textContent = `罠を置く（${S.nTrap}）`; bT.disabled = S.nTrap <= 0 || S.over;
-  const bF = document.getElementById("bFlare"); bF.classList.toggle("on", S.flare); bF.setAttribute("aria-pressed", S.flare);
+  const bF = document.getElementById("bFlare"); bF.classList.toggle("on", S.flare); bF.disabled = S.over || S.flare; bF.textContent = `照明（物資 ${P.costFlare}）`;
   document.getElementById("bScout").disabled = !!S.move || S.scout > 0 || S.over;
   const bS = document.getElementById("bStop"); bS.disabled = !S.move;
   const tm = S.timeMode === "pause" ? "pause" : S.fastHeld ? "fast" : "normal";

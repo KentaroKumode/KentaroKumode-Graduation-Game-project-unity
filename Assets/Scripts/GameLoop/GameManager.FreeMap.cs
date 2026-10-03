@@ -1,4 +1,4 @@
-using CombatSystem;
+﻿using CombatSystem;
 using MapSystem;
 using MapSystem.FreeMove;
 using UnityEngine;
@@ -141,8 +141,8 @@ namespace GameLoop
             if (sim != null) sim.Speed = speed;
         }
 
-        /// <summary>照明の点灯・消灯。 点灯中は物資を消費し続け、 察知距離は 5 で固定。</summary>
-        public void SetFlare(bool on) => FreeMap?.SetFlare(on);
+        /// <summary>照明を打ち上げる (1 回ずつ・物資 50・0.5 手番だけ半径 5 が見える・徘徊エネミーに位置が伝わる)。</summary>
+        public bool UseFlare() => FreeMap != null && CurrentPhase == GamePhase.MapNavigation && FreeMap.UseFlare();
 
         /// <summary>偵察 (止まっている時だけ)。 2 手番動けない。</summary>
         public bool StartScout() => FreeMap != null && CurrentPhase == GamePhase.MapNavigation && FreeMap.StartScout();
