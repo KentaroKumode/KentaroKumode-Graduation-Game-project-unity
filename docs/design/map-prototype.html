@@ -77,6 +77,11 @@
       <div id="stone" class="stone cold" aria-live="polite">反応なし</div>
     </div>
     <div class="card">
+      <div class="row"><span class="k">天候（気圧計）</span><span id="wxStage"></span></div>
+      <div id="wxNow" style="font-size:12px;line-height:1.5"></div>
+      <div id="wxNext" class="k" style="font-size:12px;margin-top:4px" title="予報の精度は物資の段階で変わる（充足 = 名前と手番 / 目減り = 種類と幅 / 枯渇し始める = 近い・遠い / それ以下 = 読めない）"></div>
+    </div>
+    <div class="card">
       <div class="btns">
         <button id="bFlare" type="button" title="1 回ごとに物資を払って打ち上げる。その瞬間、半径5のマス・敵・使い魔・網が見えるが、徘徊エネミーに位置が伝わる（追跡にはならない）">照明</button>
         <button id="bScout" type="button" title="2手番その場で動けない。半径3のマス・敵が見える。気配は上がらない">偵察</button>
@@ -135,6 +140,7 @@
 // ═══ 数値（§23-21 の仮置き） ═══════════════════════════════════
 const P = {
   supMax: 1000, costRoad: 10, costOff: 20, costFlare: 50,         // 物資 / 距離 (照明は 1 回ぶん・2026-10-03 に点けっぱなしから 1 回ずつへ)
+  wxEvery: 6, wxJitter: 2, wxMax: 3, hailHp: 1,                   // 天候: 段が進む間隔 (手番 ± ゆらぎ)・最大の段・雹の HP / 距離
   flareShow: 0.5, exposedShow: 3, quietTurns: 3,                 // quietTurns: このターン数以内で終えた戦闘は静か (バレない)                                 // exposedShow: 位置がバレた印を残す手番                                                 // 照明が光っている手番 (この間だけ使い魔も半径 5 で見える)
   hpPayRoad: 1, hpPayOff: 2,                                       // 払底中の HP / 距離
   visNone: 1, visFlare: 5, visStone: 4, visScout: 3, scoutTurns: 2,
@@ -307,7 +313,7 @@ function newGame() {
   // 祭壇は補給庫の上に据える (補給庫を取りたければ祭壇と向き合う)
   const foes = [prof.stationary ? makeFoe(0, prof, caches[0], terr, [caches[0]], P.gauntletFights) : makeFoe(0, prof, way[0], terr, way, P.gauntletFights)];
   S = {
-    seed, time: 0, turnAcc: 0, sup: P.supMax, hp: P.hpMax, gold: P.gold0,
+    seed, time: 0, turnAcc: 0, sup: P.supMax, hp: P.hpMax, gold: P.gold0, wx: newWeather(seed),
     me: { x: N[0].x, y: N[0].y, node: 0, seg: null }, prevNode: 0,
     move: null, scout: 0, flare: false, flareAt: -99, tracks: [], trackAcc: 0,
     speed: "normal", decoys: [], traps: [], nDecoy: P.decoy0, nTrap: P.trap0,
@@ -332,8 +338,8 @@ const detectR = () => Math.min(P.detectCap, P.detectBase + kehai());
 const chaseSpeed = () => PR().chase || P.enemyChase;
 const patrolSpeed = () => PR().patrol || P.enemyPatrol;
 const lostTurns = () => P.lostTurns;
-const hearR = base => { const pr = PR(); let r = base; if (pr.hear) r = Math.max(r, pr.hear); if (pr.hearMul) r *= pr.hearMul; return r; };
-function reveal(r) { N.forEach(p => { if (dist(p, S.me) <= r + 1e-6) p.known = true; });
+const hearR = base => { const pr = PR(); let r = base; if (pr.hear) r = Math.max(r, pr.hear); if (pr.hearMul) r *= pr.hearMul; return r * (wxOn("still") ? 2 : 1); };
+function reveal(r) { N.forEach(p => { if (p.sunk) return; if (dist(p, S.me) <= r + 1e-6) p.known = true; });
   S.webs.forEach(w => { if (r >= P.visScout && dist(w, S.me) <= r + 1e-6) w.seen = true; }); }   // 網は照明・偵察でだけ見える
 function roadBetween(i, j) { return adj[i].includes(j); }
 
@@ -346,15 +352,70 @@ function moveRate(j) {
 }
 function preview(j) {
   const sp = SPEED[S.speed], d = dist(S.me, N[j]), rate = moveRate(j);
-  const per = (rate === "road" ? P.costRoad : P.costOff) * sp.cost * drain();
+  const per = (rate === "road" ? P.costRoad : costOff()) * sp.cost * drain();
   const cost = Math.round(d * per), short = Math.max(0, cost - S.sup);
   const hpPay = short > 0 ? Math.ceil(short / per * (rate === "road" ? P.hpPayRoad : P.hpPayOff) * sp.cost) : 0;
   const blocked = rate !== "road" && segHitsMount(S.me, N[j]);
-  return { d, rate, per, cost, hpPay, time: d * sp.time, blocked };
+  return { d, rate, per, cost, hpPay, time: d * sp.time * timeMul(), blocked };
 }
 
+// ═══ 天候 (2026-10-03 試作・docs/design/supply-weather.md §5) ═══════════════
+// 層に入った直後は穏やか。 wxEvery ± wxJitter 手番ごとに段が 1 つ進み、 現象が 1 つ重なる (最大 wxMax 段)。 層ごとにリセット。
+// 予報 (次の変化) の精度は物資の段階で変わる: 充足 = 現象の名前と手番 / 目減り = 種類と幅 / 枯渇し始める = 近い・遠い / それ以下 = 読めない。
+// 乱数はゲームの乱数と別 (天候を足しても他の抽選の並びを変えない)
+const WEATHER = {
+  fog:     { name: "霧",            code: "FOG",   kind: "視界", desc: "見える範囲と魔石の範囲が縮む（照明 5→3.5・魔石 4→3）" },
+  still:   { name: "沈む静寂",      code: "STILL", kind: "音",   desc: "物音が 2 倍遠くまで届く。戦闘は 1 ターンで終えないと静かにならない" },
+  sand:    { name: "削る砂",        code: "SAND",  kind: "足場", desc: "道の外の物資 ×1.5。代わりに痕跡が 2 倍速く消える" },
+  snow:    { name: "朱の雪",        code: "SNOW",  kind: "足場", desc: "移動に 1.5 倍の時間がかかる" },
+  hail:    { name: "落石のような雹", code: "HAIL",  kind: "足場", desc: "道の外を歩くと距離 1 ごとに HP −1" },
+  crumble: { name: "崩れる地平",    code: "CRMB",  kind: "地形", desc: "手番ごとに道が 1 本崩れて消える（縄張りの中と足元は崩れない）" },
+  sink:    { name: "沈み続ける湖面", code: "SINK",  kind: "地形", desc: "2 手番ごとに未使用の点が 1 つ沈んで消える（縄張り・始点・出口・行き先は沈まない）" },
+};
+const wxOn = k => !!(S && S.wx && S.wx.active.includes(k));
+const stoneR = () => P.visStone * (wxOn("fog") ? 0.75 : 1);
+const flareR = () => P.visFlare * (wxOn("fog") ? 0.7 : 1);
+const costOff = () => P.costOff * (wxOn("sand") ? 1.5 : 1);
+const timeMul = () => wxOn("snow") ? 1.5 : 1;
+const quietT = () => wxOn("still") ? 1 : P.quietTurns;
+function newWeather(seed) {
+  const wr = mulberry((seed * 7919 + 13) >>> 0), keys = Object.keys(WEATHER);
+  for (let i = keys.length - 1; i > 0; i--) { const j = Math.floor(wr() * (i + 1)); [keys[i], keys[j]] = [keys[j], keys[i]]; }
+  const times = []; let t = 0;
+  for (let k = 0; k < P.wxMax; k++) { t += P.wxEvery + Math.floor(wr() * (2 * P.wxJitter + 1)) - P.wxJitter; times.push(t); }
+  return { stage: 0, active: [], order: keys.slice(0, P.wxMax), times, sinkT: 0, rnd: wr };
+}
+function weatherTick() {
+  while (S.wx.stage < P.wxMax && S.time >= S.wx.times[S.wx.stage] - 1e-9) {
+    const k = S.wx.order[S.wx.stage++]; S.wx.active.push(k);
+    pauseTime(`天候が変わった（${S.wx.stage} 段目）: ${WEATHER[k].name} ── ${WEATHER[k].desc}`); sfxStop(); }
+}
+function forecast() {
+  if (S.wx.stage >= P.wxMax) return "これ以上は崩れない（層を出るまでこのまま）";
+  const rem = S.wx.times[S.wx.stage] - S.time, w = WEATHER[S.wx.order[S.wx.stage]], st = STAGES.indexOf(stageOf(S.sup));
+  if (st === 0) return `次: ${w.name} ── あと ${rem.toFixed(1)} 手番`;
+  if (st === 1) return `次: ${w.kind}の変化 ── ${Math.max(0, Math.floor(rem) - 1)}〜${Math.ceil(rem) + 1} 手番後`;
+  if (st === 2) return rem < 3 ? "次の変化は近い" : "次の変化はまだ遠い";
+  return "針が暴れて読めない";
+}
+const footholds = () => { const s = new Set([0, 1]); for (const f of S.foes) for (const i of f.terr) s.add(i); return s; };
+function crumbleRoad() {   /* 崩れる地平: 縄張りの中・敵の足元・自分の足元は崩れない */
+  const keep = footholds(), cand = [];
+  E.forEach(([a, b], k) => { if (keep.has(a) && keep.has(b)) return;
+    if (S.me.seg && ((S.me.seg[0] === a && S.me.seg[1] === b) || (S.me.seg[0] === b && S.me.seg[1] === a))) return;
+    if (S.foes.some(f => (f.a === a && f.b === b) || (f.a === b && f.b === a))) return; cand.push(k); });
+  if (!cand.length) return; const k = cand[Math.floor(S.wx.rnd() * cand.length)], [a, b] = E[k];
+  E.splice(k, 1); adj[a] = adj[a].filter(v => v !== b); adj[b] = adj[b].filter(v => v !== a);
+  log("（どこかで道が崩れ落ちた）"); }
+function sinkNode() {   /* 沈み続ける湖面: 未使用の点だけ (縄張り・始点・出口・今いる点・行き先は沈まない) */
+  const keep = footholds(), cand = [];
+  N.forEach((p, i) => { if (p.sunk || p.done || keep.has(i) || i === S.me.node || (S.move && S.move.to === i) || i === S.target) return; cand.push(i); });
+  if (!cand.length) return; const i = cand[Math.floor(S.wx.rnd() * cand.length)]; N[i].sunk = true;
+  for (const v of adj[i]) adj[v] = adj[v].filter(u => u !== i); adj[i] = []; E = E.filter(([a, b]) => a !== i && b !== i);
+  log(`（${N[i].known ? N[i].type + "の点" : "どこかの点"}が沈んで消えた）`); }
+
 // ═══ 敵（道の上しか動けない ── 飛び掛かりだけ例外） ═══════════════
-function nearestNode(p) { let b = 0, bd = 1e9; N.forEach((q, i) => { const d = dist(p, q); if (d < bd) { bd = d; b = i; } }); return b; }
+function nearestNode(p) { let b = 0, bd = 1e9; N.forEach((q, i) => { if (q.sunk) return; const d = dist(p, q); if (d < bd) { bd = d; b = i; } }); return b; }
 function shortest(from, to, allowed = null) {
   const d = N.map(() => 1e9), pr = N.map(() => -1), used = N.map(() => false); d[from] = 0;
   for (;;) { let u = -1; for (let i = 0; i < N.length; i++) if (!used[i] && (u < 0 || d[i] < d[u])) u = i;
@@ -416,7 +477,7 @@ function launchFamiliar(f) {
   f.famCd = cd;
 }
 function advanceFamiliars(dt) {
-  const vis = S.flare ? P.visFlare : P.visNone;
+  const vis = S.flare ? flareR() : P.visNone;
   for (let i = S.familiars.length - 1; i >= 0; i--) {
     const m = S.familiars[i], homing = m.kind === "homing";
     const speed = homing ? P.famHomingSpeed : P.famSpeed, det = homing ? P.famHomingDetect : 0;
@@ -471,6 +532,7 @@ function tick() {
   else if (S.scout > 0) { S.scout -= TICK; if (S.scout <= 1e-9) { S.scout = 0; S.scoutDone = true; } }
   if (dt <= 0) return;
   S.time += dt;
+  weatherTick();
   for (const f of S.foes) {
     if (!f.alive || f.freeze > 0) continue;
     if (f.state !== "警戒") f.tracking = false;
@@ -495,16 +557,18 @@ function tick() {
   S.flare = S.time - S.flareAt < P.flareShow - 1e-9;   /* 照明は打ち上げてから flareShow 手番だけ光る */
 }
 function stepMove() {
-  const sp = SPEED[S.speed], m = S.move, rem = dist(S.me, N[m.to]), step = Math.min(TICK / sp.time, rem);
-  const per = (m.rate === "road" ? P.costRoad : P.costOff) * sp.cost;
+  const sp = SPEED[S.speed], m = S.move, rem = dist(S.me, N[m.to]), step = Math.min(TICK / (sp.time * timeMul()), rem);
+  const per = (m.rate === "road" ? P.costRoad : costOff()) * sp.cost;
   pay(step * per, step * (m.rate === "road" ? P.hpPayRoad : P.hpPayOff) * sp.cost);
   if (S.over) return 0;
+  if (m.rate !== "road" && wxOn("hail")) { S.hpFrac = (S.hpFrac || 0) + step * P.hailHp; const w = Math.floor(S.hpFrac);   /* 雹: 道の外は HP を削る */
+    if (w > 0) { S.hp -= w; S.hpFrac -= w; } if (S.hp <= 0) { S.hp = 0; end(false, "雹に打たれ続けて倒れた。"); return 0; } }
   const k = step / rem; S.me.x += (N[m.to].x - S.me.x) * k; S.me.y += (N[m.to].y - S.me.y) * k;
   S.me.node = null; S.me.seg = m.rate === "road" && m.from !== null ? [m.from, m.to] : null;
   S.trackAcc += step;
   if (S.trackAcc >= 1) { S.trackAcc -= 1; S.tracks.push({ x: S.me.x, y: S.me.y, s: m.rate === "road" ? P.trackRoad : P.trackOff }); }
   if (rem - step <= 1e-6) { S.me.x = N[m.to].x; S.me.y = N[m.to].y; S.me.node = m.to; S.me.seg = null; S.pendingArrive = m.to; S.move = null; ui(); }
-  return step * sp.time;
+  return step * sp.time * timeMul();
 }
 let supFrac = 0;
 /* テスター用: 物資の減りの倍率 (移動と照明だけ・ランプの確認用に既定 ×5)。 戦闘・逃げるなどの固定の損は掛けない */
@@ -518,7 +582,9 @@ function pay(supCost, hpPerDistUnit) {
   if (S.hp <= 0) { S.hp = 0; end(false, "物資が尽き、歩き続けた末に倒れた。"); }
 }
 function turn() {
-  S.tracks.forEach(t => t.s--); S.tracks = S.tracks.filter(t => t.s > 0);
+  S.tracks.forEach(t => t.s -= wxOn("sand") ? 2 : 1); S.tracks = S.tracks.filter(t => t.s > 0);
+  if (wxOn("crumble")) crumbleRoad();
+  if (wxOn("sink") && ++S.wx.sinkT % 2 === 0) sinkNode();
   const pr = PR();
   // 木霊: 魔石の方角のずれを手番ごとに振り直す
   // 木霊: 偽の方角は本物から 2〜3 方角ずれた所に出て、 2 手番ごとに飛ぶ (本物は敵の動きに付いてくるので、 見比べれば分かる)
@@ -565,7 +631,7 @@ function bearingOf(p) { const a = Math.atan2(p.y - S.me.y, p.x - S.me.x); return
 function updateStone() {
   const el = document.getElementById("stone");
   let lv = 0, bearing = -1, bestD = 1e9;
-  for (const f of aliveFoes()) { const d = dist(foePos(f), S.me); if (d > P.visStone) continue;
+  for (const f of aliveFoes()) { const d = dist(foePos(f), S.me); if (d > stoneR()) continue;
     const hunting = f.state === "追跡" || f.freeze > 0;
     if (hunting && PR().silent) continue;   // 影: 追跡中は一切反応しない
     const l = hunting ? 3 : d <= 2 ? 2 : 1;
@@ -638,7 +704,7 @@ function noiseAt(r, what) {
 /* 速く終えた戦闘は静か (2026-10-03): quietTurns 以内ならバレない。 試作の戦闘にはターンが無いので、 重さ (振るダイスの数) から仮に振る */
 const battleTurns = nd => 1 + Math.floor(rnd() * (nd + 2));    /* 戦闘 (2 個) 1〜4 / エリート (3 個) 1〜5 / 使い魔 (3 個) 1〜5 */
 function battleKnown(turns) {
-  if (turns !== undefined && turns <= P.quietTurns) { log(`戦闘は ${turns} ターンで片付いた。静かに済んだ。`); return; }
+  if (turns !== undefined && turns <= quietT()) { log(`戦闘は ${turns} ターンで片付いた。静かに済んだ。`); return; }
   if (turns !== undefined) log(`戦闘は ${turns} ターンかかった。`);
   positionKnown("（戦いの物音が層に響いた。何かが気づいたかもしれない）"); }
 /* 位置が伝わる: 戦闘と照明で共用。 動き方は性質の onBattle */
@@ -793,7 +859,7 @@ cv.addEventListener("click", e => {
   if (DRAG.moved) { DRAG.moved = false; return; }
   if (S.over || S.scout > 0 || !document.getElementById("modal").hidden) return;
   const r = cv.getBoundingClientRect(), mx = (e.clientX - r.left) * cv.width / r.width, my = (e.clientY - r.top) * cv.height / r.height;
-  let hit = -1; N.forEach((p, i) => { const q = toPx(p); if (Math.hypot(q.x - mx, q.y - my) < 14) hit = i; });
+  let hit = -1; N.forEach((p, i) => { if (p.sunk) return; const q = toPx(p); if (Math.hypot(q.x - mx, q.y - my) < 14) hit = i; });
   if (hit < 0 || hit === S.me.node || (S.move && hit === S.move.to)) { S.target = null; return ui(); }
   if (S.target === hit) {                                            // 2 回目のクリックで出発
     const pv = preview(hit);
@@ -808,7 +874,7 @@ cv.addEventListener("click", e => {
 /* 照明 (2026-10-03): 1 回ずつ打ち上げる。 物資を払い、 その瞬間に半径 5 を見て、 徘徊エネミーに位置が伝わる (戦闘と同じ・追跡にはならない) */
 document.getElementById("bFlare").onclick = () => { if (S.over || S.flare) return;
   S.sup = Math.max(0, S.sup - P.costFlare); S.flareAt = S.time; S.flare = true;
-  reveal(P.visFlare); snapshotFoe(P.visFlare); log(`照明を打ち上げた（物資 −${P.costFlare}）。`);
+  reveal(flareR()); snapshotFoe(flareR()); log(`照明を打ち上げた（物資 −${P.costFlare}）。`);
   positionKnown("（照明の光が層に見えた。何かが気づいたかもしれない）"); updateStone(); ui(); };
 document.getElementById("bScout").onclick = () => { if (S.move || S.scout > 0) return; S.scout = P.scoutTurns; S.scoutObs = []; scoutObserve(false); log(`偵察を始めた（${P.scoutTurns} 手番動けない）。`); ui(); };
 document.getElementById("bStop").onclick = () => {
@@ -882,7 +948,7 @@ function mountBlockTable() { MB = N.map(() => new Array(N.length).fill(false));
 const isRefuel = i => N[i].stock > 0 && (i === 0 || (N[i].type === "店" && N[i].known));
 // 経由してよい点: 片付け済み・前哨基地・見えている店（着いても戦闘が起きない）
 const isSafe = i => i === 0 || N[i].done || (N[i].type === "店" && N[i].known);
-const perDist = rate => (rate === "road" ? P.costRoad : P.costOff) * SPEED[S.speed].cost * drain();
+const perDist = rate => (rate === "road" ? P.costRoad : costOff()) * SPEED[S.speed].cost * drain();
 function bingoCalc() {
   const n = N.length, D = new Array(n).fill(Infinity), src = new Array(n).fill(-1), used = new Array(n).fill(false);
   for (let i = 0; i < n; i++) if (isRefuel(i)) { D[i] = 0; src[i] = i; }
@@ -1056,13 +1122,14 @@ function drawLCD() {
   if (dbg) for (const t of S.tracks) { const q = sp(t); ox.fillStyle = t.s >= 2 ? LC.mid : LC.dim; ox.fillRect(q.x - 0.5, q.y - 0.5, 1, 1); }
   const meP = lerpP(prevMe, S.me), mq = sp(meP);
   // 範囲
-  lring(meP, P.visStone, LC.dim, [1, 2]);
-  if (S.flare) { const R = P.visFlare * LS; lfill(mq.x - R, mq.y - R, mq.x + R, mq.y + R, (x, y) => (x - mq.x) ** 2 + (y - mq.y) ** 2 <= R * R, LCA.flare); lring(meP, P.visFlare, LC.mid, [2, 1]); }
+  lring(meP, stoneR(), LC.dim, [1, 2]);
+  if (wxOn("fog")) { ox.fillStyle = "rgba(150,130,100,.08)"; ox.fillRect(0, 0, LW, LH); }   /* 霧: 液晶全体がかすむ */
+  if (S.flare) { const R = flareR() * LS; lfill(mq.x - R, mq.y - R, mq.x + R, mq.y + R, (x, y) => (x - mq.x) ** 2 + (y - mq.y) ** 2 <= R * R, LCA.flare); lring(meP, flareR(), LC.mid, [2, 1]); }
   if (S.scout > 0) lring(meP, P.visScout, LC.hi, [1, 1]);
   { const R = detectR(), L = Math.max(0, Math.min(2, R - 2)); lnoise(meP, R, L, L >= 2 ? LC.red : L >= 1 ? "#ff8a1e" : LC.mid); }
   /* 気配 = 察知距離の円の波。 段と色は気配ではなく察知距離で決める (2 / 3 / 4 以上)。 照明中は察知距離 5 なので一番激しい段 */
   // 魔石の方角
-  for (const b of [S.stoneBearing, S.stoneGhost]) { if (b < 0) continue; const a0 = b * Math.PI / 2, R = P.visStone * LS;
+  for (const b of [S.stoneBearing, S.stoneGhost]) { if (b < 0) continue; const a0 = b * Math.PI / 2, R = stoneR() * LS;
     lfill(mq.x - R, mq.y - R, mq.x + R, mq.y + R, (x, y) => { const dx = x - mq.x, dy = y - mq.y; if (dx * dx + dy * dy > R * R) return false;
       let d = Math.atan2(dy, dx) - a0; d = Math.atan2(Math.sin(d), Math.cos(d)); return Math.abs(d) <= Math.PI / 4; }, S.stone.startsWith("強く") ? LCA.stoneHot : LCA.stone); }
   // 行き先
@@ -1075,7 +1142,7 @@ function drawLCD() {
   if (S.target !== null && S.target !== undefined) { const q = sp(N[S.target]), pv = preview(S.target);
     lline(mq, q, pv.blocked ? LC.dim : pv.rate === "road" ? LC.hot : LC.red, pv.rate === "road" ? [] : [2, 2]); bracket(q, 6, pv.blocked ? LC.dim : LC.hot); }
   // 点
-  N.forEach((p, i) => { const q = sp(p), known = p.known || p.type === "出" || p.type === "前";
+  N.forEach((p, i) => { if (p.sunk) return; const q = sp(p), known = p.known || p.type === "出" || p.type === "前";
     if (!known) return glyph(icon("?"), q.x, q.y, LC.mid);
     if (p.done && p.type !== "店") return glyph(icon("済"), q.x, q.y, LC.dim);
     glyph(icon(p.type), q.x, q.y, p.type === "前" || p.type === "出" ? LC.hot : p.type === "精" ? LC.red : LC.hi);
@@ -1098,7 +1165,7 @@ function drawLCD() {
     ltext(f.freeze > 0 ? "HOLD" : f.lunge ? "LNGE" : STC[f.state] || "", q.x, q.y - o(6), LC.red); });
   if (S.foeArrow && S.time - S.foeArrow.t < 12) { const a = sp(S.foeArrow.from), b = sp(S.foeArrow.to); lline(a, b, LC.red);
     const ang = Math.atan2(b.y - a.y, b.x - a.x); lline(b, { x: b.x - Math.cos(ang - 0.6) * 3, y: b.y - Math.sin(ang - 0.6) * 3 }, LC.red); lline(b, { x: b.x - Math.cos(ang + 0.6) * 3, y: b.y - Math.sin(ang + 0.6) * 3 }, LC.red); }
-  const famVis = S.flare ? P.visFlare : P.visNone;
+  const famVis = S.flare ? flareR() : P.visNone;
   for (const m of S.familiars) { if (!dbg && dist(m, S.me) > famVis + 1e-6) continue; const q = sp(m);
     if (dbg) lline(q, sp({ x: m.tx, y: m.ty }), LC.redDim, [1, 2]);
     const col = m.kind === "scout" ? LC.hot : LC.red; ox.fillStyle = col; ox.fillRect(Math.floor(q.x) - (PXS - 1), Math.floor(q.y) - (PXS - 1), 2 * PXS - 1, 2 * PXS - 1);
@@ -1118,6 +1185,7 @@ function drawLCD() {
     ox.fillStyle = LC.frameHi; ox.fillRect(p.x + 2, p.y + 2, p.w - 4, 1); ox.fillRect(p.x + 2, p.y + 2, 1, p.h - 4);
     ox.fillStyle = LC.frame; ox.fillRect(p.x - 6, p.y + p.h / 2 - 24, 6, 48); ox.fillStyle = LC.frameHi; for (let k = 0; k < 4; k++) ox.fillRect(p.x - 4, p.y + p.h / 2 - 12 + k * 7, 2, 4);
     ltext("PLOT" + (ZOOM > 1 ? " X2" : ""), p.x + p.w - 8, p.y + p.h - 9, LC.dim, "right");
+    ltext("WX " + (S.wx.active.length ? S.wx.active.map(k => WEATHER[k].code).join("+") : "CALM"), p.x + p.w - 8, p.y + 6, S.wx.active.length ? LC.hi : LC.dim, "right");
     const g = gaugeOf(S.sup), BD = ["E", "S", "W", "N"], lv = S.stone.startsWith("強く") ? "HOT" : S.stone.startsWith("反応 ──") ? "NEAR" : S.stone.startsWith("微か") ? "FAR" : "--";
     ltext(`FUEL ${String(S.sup).padStart(4, "0")} ${g}`, p.x + 10, p.y + p.h - 9, g === "CRIT" ? LC.red : LC.hi, "left");
     ltext(`STONE ${lv}${S.stoneBearing >= 0 ? " " + BD[S.stoneBearing] : ""}`, p.x + 140, p.y + p.h - 9, lv === "HOT" ? LC.red : LC.mid, "left");
@@ -1152,10 +1220,10 @@ function drawOld() {
   // 索敵の範囲（表示上の自分の位置は刻みの間を補間する）
   const meP = lerpP(prevMe, S.me);
   cx.lineWidth = 1;
-  circle(meP, P.visStone, "rgba(181,138,216,.35)", [4, 5]);
-  if (S.flare) { const q = toPx(meP); const g = cx.createRadialGradient(q.x, q.y, 0, q.x, q.y, P.visFlare * SCALE);
-    g.addColorStop(0, "rgba(240,170,66,.10)"); g.addColorStop(1, "rgba(240,170,66,0)"); cx.fillStyle = g; cx.beginPath(); cx.arc(q.x, q.y, P.visFlare * SCALE, 0, 7); cx.fill();
-    circle(meP, P.visFlare, "rgba(240,170,66,.45)"); }
+  circle(meP, stoneR(), "rgba(181,138,216,.35)", [4, 5]);
+  if (S.flare) { const q = toPx(meP); const g = cx.createRadialGradient(q.x, q.y, 0, q.x, q.y, flareR() * SCALE);
+    g.addColorStop(0, "rgba(240,170,66,.10)"); g.addColorStop(1, "rgba(240,170,66,0)"); cx.fillStyle = g; cx.beginPath(); cx.arc(q.x, q.y, flareR() * SCALE, 0, 7); cx.fill();
+    circle(meP, flareR(), "rgba(240,170,66,.45)"); }
   if (S.scout > 0) circle(meP, P.visScout, "rgba(96,214,200,.6)", [2, 3]);
   circle(meP, detectR(), "rgba(216,84,74,.25)", [1, 6]);
   // 行き先の予告
@@ -1169,7 +1237,7 @@ function drawOld() {
     cx.beginPath(); cx.moveTo(p.x, p.y); cx.lineTo(q.x, q.y); cx.stroke(); cx.setLineDash([]); }
   // 点
   cx.font = "bold 13px Consolas, 'Yu Gothic', monospace"; cx.textAlign = "center"; cx.textBaseline = "middle";
-  N.forEach((p, i) => { const q = toPx(p), known = p.known || p.type === "出" || p.type === "前";
+  N.forEach((p, i) => { if (p.sunk) return; const q = toPx(p), known = p.known || p.type === "出" || p.type === "前";
     cx.fillStyle = p.done ? "#23272c" : "#16191c"; cx.strokeStyle = known ? (p.done ? "#454b52" : COL[p.type]) : "#454b52"; cx.lineWidth = 2;
     cx.beginPath(); cx.arc(q.x, q.y, 11, 0, 7); cx.fill(); cx.stroke();
     cx.fillStyle = known ? (p.done ? "#6f6b62" : COL[p.type]) : "#6f6b62"; cx.fillText(known ? p.type : "?", q.x, q.y + 1); });
@@ -1202,7 +1270,7 @@ function drawOld() {
       cx.lineTo(tip.x - Math.cos(ang - 0.5) * 12, tip.y - Math.sin(ang - 0.5) * 12); cx.lineTo(tip.x - Math.cos(ang + 0.5) * 12, tip.y - Math.sin(ang + 0.5) * 12); cx.closePath(); cx.fill();
       cx.globalAlpha = 1; } }
   // 使い魔（見える範囲だけ。 デバッグ時は目標地点も）
-  const famVis = S.flare ? P.visFlare : P.visNone;
+  const famVis = S.flare ? flareR() : P.visNone;
   for (const m of S.familiars) {
     if (!dbg && dist(m, S.me) > famVis + 1e-6) continue;
     const q = toPx(m), t = toPx({ x: m.tx, y: m.ty });
@@ -1213,7 +1281,7 @@ function drawOld() {
   // 魔石の方角: 90° の扇を自分の周りに描く
   for (const b of [S.stoneBearing, S.stoneGhost]) { if (b < 0) continue; const c = toPx(meP), a0 = b * Math.PI / 2;
     cx.fillStyle = S.stone.startsWith("強く") ? "rgba(216,84,74,.16)" : "rgba(181,138,216,.16)";
-    cx.beginPath(); cx.moveTo(c.x, c.y); cx.arc(c.x, c.y, P.visStone * SCALE, a0 - Math.PI / 4, a0 + Math.PI / 4); cx.closePath(); cx.fill(); }
+    cx.beginPath(); cx.moveTo(c.x, c.y); cx.arc(c.x, c.y, stoneR() * SCALE, a0 - Math.PI / 4, a0 + Math.PI / 4); cx.closePath(); cx.fill(); }
   if (S.exposed && S.time - S.exposed.t < P.exposedShow) { const q = toPx(S.exposed);   // 位置がバレた場所
     cx.fillStyle = "#ff4a2c"; cx.beginPath(); cx.arc(q.x, q.y - 16, 8, 0, 7); cx.fill();
     cx.fillStyle = "#1a0d06"; cx.font = "bold 12px sans-serif"; cx.textAlign = "center"; cx.fillText("!", q.x, q.y - 12); cx.textAlign = "start"; }
@@ -1248,6 +1316,9 @@ function ui() {
   document.getElementById("hpbar").style.width = (S.hp / P.hpMax * 100) + "%";
   document.getElementById("gold").textContent = S.gold + " G";
   document.getElementById("turn").textContent = S.time.toFixed(1) + " 手番";
+  document.getElementById("wxStage").textContent = `${S.wx.stage} / ${P.wxMax} 段`;
+  document.getElementById("wxNow").innerHTML = S.wx.active.length ? S.wx.active.map(k => `<b>${WEATHER[k].name}</b> ── ${WEATHER[k].desc}`).join("<br>") : "穏やか";
+  document.getElementById("wxNext").textContent = "予報: " + forecast();
   document.getElementById("kehai").textContent = `${kehai()} / ${detectR()}${S.move ? (S.move.rate === "road" ? "（道を" : "（道の外を") + SPEED[S.speed].name + "）" : "（静止）"}`;
   for (const [id, sp] of [["spSneak", "sneak"], ["spNormal", "normal"], ["spHurry", "hurry"]]) { const b = document.getElementById(id); b.classList.toggle("on", S.speed === sp); b.setAttribute("aria-pressed", S.speed === sp); }
   const bD = document.getElementById("bDecoy"); bD.textContent = `囮を置く（${S.nDecoy}）`; bD.disabled = S.nDecoy <= 0 || S.over;
