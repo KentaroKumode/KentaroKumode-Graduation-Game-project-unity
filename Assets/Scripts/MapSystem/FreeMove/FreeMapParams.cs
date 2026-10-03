@@ -40,7 +40,10 @@
         // ── 移動の費用 (物資 / 距離) ──────────────────────────
         public const int CostRoad = 10;
         public const int CostOffRoad = 20;
-        public const int CostFlare = 5;
+        /// <summary>照明 1 回の物資 (2026-10-03: 点けっぱなしの 5 / 距離・5 / 手番から 1 回ずつへ)。</summary>
+        public const int CostFlare = 50;
+        /// <summary>照明が光っている刻み (0.5 手番)。 この間だけ半径 5 が見える (使い魔も)。</summary>
+        public const int FlareShowTicks = 5;
         /// <summary>払底中 (物資 0) の HP / 距離。 道の外は 2。</summary>
         public const int HpPayRoad = 1;
         public const int HpPayOffRoad = 2;

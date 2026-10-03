@@ -120,7 +120,9 @@ namespace MapSystem.FreeMove
         private int _moveFrom = -1;
         public bool IsMoving => MoveTarget >= 0;
         public MoveSpeed Speed { get; set; } = MoveSpeed.Normal;
-        public bool FlareOn { get; private set; }
+        /// <summary>照明が光っている残りの刻み。</summary>
+        private int _flareTicks;
+        public bool FlareOn => _flareTicks > 0;
         public int ScoutTicksLeft { get; private set; }
         public bool IsScouting => ScoutTicksLeft > 0;
         public int LastArrived { get; private set; } = -1;
@@ -245,8 +247,7 @@ namespace MapSystem.FreeMove
 
         /// <summary>察知距離。 照明なし: 2 ＋ 気配 (最大 4)。 照明中: 照明で見える範囲 5 で固定。</summary>
         public double DetectRadius
-            => FlareOn ? FreeMapParams.VisionFlare
-                       : Math.Min(FreeMapParams.DetectCap, FreeMapParams.DetectBase + Kehai);
+            => Math.Min(FreeMapParams.DetectCap, FreeMapParams.DetectBase + Kehai);
 
         /// <summary>1 手番あたりの察知確率 (距離 d・察知距離 R)。 d ≦ R なら 1d6 ≦ max(1, ⌊R − d + 1⌋)。</summary>
         public static double DetectChance(double d, double R)
@@ -285,8 +286,7 @@ namespace MapSystem.FreeMove
         }
 
         private double PerDistance(bool road)
-            => ((road ? FreeMapParams.CostRoad : FreeMapParams.CostOffRoad) + (FlareOn ? FreeMapParams.CostFlare : 0))
-               * (double)Speed.CostMul();
+            => (road ? FreeMapParams.CostRoad : FreeMapParams.CostOffRoad) * (double)Speed.CostMul();
 
         private static int HpRate(bool road) => road ? FreeMapParams.HpPayRoad : FreeMapParams.HpPayOffRoad;
 
@@ -308,10 +308,17 @@ namespace MapSystem.FreeMove
             return true;
         }
 
-        public void SetFlare(bool on)
+        /// <summary>照明を打ち上げる (2026-10-03: 点けっぱなしから 1 回ずつへ)。 物資を払い、 その瞬間から 0.5 手番だけ
+        /// 半径 5 が見える。 徘徊エネミーに位置が伝わる (戦闘と同じ・追跡にはならない ── <see cref="NotifyPositionKnown"/>)。
+        /// 光っている間・連戦中・倒れた後は打てない。</summary>
+        public bool UseFlare()
         {
-            FlareOn = on;
-            if (on) { Reveal(FreeMapParams.VisionFlare); SnapshotFoe(FreeMapParams.VisionFlare); }
+            if (FlareOn || InGauntlet || Dead) return false;
+            Pay(FreeMapParams.CostFlare, 0);
+            _flareTicks = FreeMapParams.FlareShowTicks;
+            Reveal(FreeMapParams.VisionFlare); SnapshotFoe(FreeMapParams.VisionFlare);
+            NotifyPositionKnown();
+            return true;
         }
 
         /// <summary>偵察を始める (止まっている時だけ)。 ScoutTurns 手番動けない。</summary>
@@ -346,7 +353,10 @@ namespace MapSystem.FreeMove
         /// <summary>戦闘が終わった: 徘徊エネミーに「ここで戦闘があった」と伝わる (距離によらない・2026-10-03)。
         /// どう動くかは性質の <see cref="FoeProfile.onBattle"/> 次第。 追跡中ならもともと居場所を知っているので変わらない。
         /// (旧: 2 手番の気配 +2 と半径 4 の物音)</summary>
-        public void NoteBattleEnded()
+        public void NoteBattleEnded() => NotifyPositionKnown();
+
+        /// <summary>位置が伝わる (戦闘・照明で共用)。 動き方は性質の <see cref="FoeProfile.onBattle"/>。</summary>
+        private void NotifyPositionKnown()
         {
             if (!FoeAlive || FoeState == FoeState.Chase) return;
             switch (Profile.onBattle)
@@ -470,7 +480,7 @@ namespace MapSystem.FreeMove
                 if (Dead) return ev | FreeMapEvent.Died;
             }
 
-            if (FlareOn) { Reveal(FreeMapParams.VisionFlare); SnapshotFoe(FreeMapParams.VisionFlare); }
+            if (FlareOn) { Reveal(FreeMapParams.VisionFlare); SnapshotFoe(FreeMapParams.VisionFlare); _flareTicks--; }
             Reveal(FreeMapParams.VisionNone);
             // 目視: 視界 1 に入った瞬間だけ (居続けても毎刻みは出さない)
             bool inSight = FoeAlive && Vec2.Dist(FoePos, Me) <= FreeMapParams.VisionNone + 1e-6;
@@ -558,7 +568,7 @@ namespace MapSystem.FreeMove
             }
         }
 
-        /// <summary>手番ごと: 痕跡が薄れる / 戦闘の気配が冷める / 照明の消費 (止まっている時) / 囮 / 敵の察知。</summary>
+        /// <summary>手番ごと: 痕跡が薄れる / 囮 / 敵の察知。</summary>
         private FreeMapEvent Turn()
         {
             var ev = FreeMapEvent.TurnPassed;
@@ -568,7 +578,6 @@ namespace MapSystem.FreeMove
                 var t = Tracks[i]; t.strength--;
                 if (t.strength <= 0) Tracks.RemoveAt(i); else Tracks[i] = t;
             }
-            if (FlareOn && !IsMoving) { Pay(FreeMapParams.CostFlare, 0); if (Dead) return ev; }
             if (!FoeAlive) return ev;
 
             if (FoeFreezeTicks > 0) return ev;   // 足止め中は察知も囮も無い (解除は Tick が刻みで数える)
