@@ -1105,7 +1105,7 @@ function drawLCD() {
     ox.fillStyle = LC.frameHi; ox.fillRect(p.x + 2, p.y + 2, p.w - 4, 1); ox.fillRect(p.x + 2, p.y + 2, 1, p.h - 4);
     ox.fillStyle = LC.frame; ox.fillRect(p.x - 6, p.y + p.h / 2 - 24, 6, 48); ox.fillStyle = LC.frameHi; for (let k = 0; k < 4; k++) ox.fillRect(p.x - 4, p.y + p.h / 2 - 12 + k * 7, 2, 4);
     ltext("PLOT" + (ZOOM > 1 ? " X2" : ""), p.x + p.w - 8, p.y + p.h - 9, LC.dim, "right");
-    const g = gaugeOf(S.sup), BD = ["E", "S", "W", "N"], lv = S.stone.startsWith("強く") ? "HOT" : S.stone.startsWith("反応") ? "NEAR" : S.stone.startsWith("微か") ? "FAR" : "--";
+    const g = gaugeOf(S.sup), BD = ["E", "S", "W", "N"], lv = S.stone.startsWith("強く") ? "HOT" : S.stone.startsWith("反応 ──") ? "NEAR" : S.stone.startsWith("微か") ? "FAR" : "--";
     ltext(`FUEL ${String(S.sup).padStart(4, "0")} ${g}`, p.x + 10, p.y + p.h - 9, g === "CRIT" ? LC.red : LC.hi, "left");
     ltext(`STONE ${lv}${S.stoneBearing >= 0 ? " " + BD[S.stoneBearing] : ""}`, p.x + 140, p.y + p.h - 9, lv === "HOT" ? LC.red : LC.mid, "left");
     if (bi && bi.st && blink) ltext(bi.st === "NORET" ? "NO RETURN" : "BINGO", p.x + 260, p.y + p.h - 9, LC.red, "left"); }
