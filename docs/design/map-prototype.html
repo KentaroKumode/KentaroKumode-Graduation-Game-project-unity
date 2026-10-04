@@ -10,6 +10,9 @@
   h1 { font-size:16px; margin:0 0 4px; } .sub { color:var(--ink3); font-size:11px; margin-bottom:10px; }
   .wrap { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
   .mapbox { position:relative; border:1px solid var(--line); background:#0b0d0f; max-width:100%; overflow:auto; }
+  .mapcol { display:flex; flex-direction:column; gap:6px; max-width:100%; }
+  /* 物資の帯 (2026-10-05): 地図の下に、 バー (272×20) とランプ (3 倍) を 1 本に並べる */
+  .supplyRow { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:6px 8px; background:#0b0d0f; border:1px solid var(--line); }
   .mapbox:fullscreen { display:flex; align-items:center; justify-content:center; background:#000; border:0; }
   canvas { display:block; image-rendering:pixelated; }
   .side { width:300px; max-width:100%; display:flex; flex-direction:column; gap:10px; }
@@ -39,7 +42,7 @@
   label { color:var(--ink2); font-size:12px; } input[type=number] { width:80px; background:#0b0d0f; color:var(--ink); border:1px solid #3a4047; padding:3px; }
   /* 警告ランプ (HALF / CRIT・燃料計のバーとは別物)。 Tools/lamp_lit.py が書き出す *_lamp_on_full / *_lamp_off_full
      (43×21・光を四方 3 ドットまで焼き込み済み・点灯と消灯は同じ大きさ) を 4 倍で差し替えるだけ */
-  .lamps { display:flex; flex-direction:row; justify-content:space-between; width:272px; max-width:100%; margin:2px 0 4px; padding:0; background:#2a2620; border-radius:3px; }   /* バーと同じ幅の 1 本の帯に、 ランプを横に並べる */
+  .lamps { display:flex; flex-direction:row; gap:8px; margin:0; padding:0; background:#2a2620; border-radius:3px; }   /* バーと同じ幅の 1 本の帯に、 ランプを横に並べる */
   .lamp { position:relative; width:129px; height:63px; }   /* 43×21 の 3 倍 */
   .lamp img { position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated; }
   .lamp .on { opacity:0; }
@@ -50,29 +53,33 @@
   @keyframes blink { 0% { opacity:1 } 50% { opacity:0 } }
   @media (prefers-reduced-motion: reduce) { .lamp.lit.ignite .on { animation:none; } }
   /* 物資バー (2026-10-05): 枠 272×20 の窓 (x5〜266・y6〜13 = 262×8) に中身を描く。 1 ドット = 1 ドット・拡大は CSS だけ */
-  .supply { position:relative; width:272px; height:20px; margin:6px 0 4px; max-width:100%; }
+  .supply { position:relative; width:272px; height:20px; margin:0; flex:none; }
   .supply canvas { position:absolute; left:0; top:0; width:272px; height:20px; image-rendering:pixelated; display:block; }
   @media (prefers-reduced-motion: reduce) { .supply { } }
 </style></head><body>
 <h1>自由移動マップ 試作（1層完結）</h1>
 <div class="sub">GAME.md §23-21 の仮置き数値で動く手触り確認用。戦闘は簡略版（ダイスで被害を決めるだけ）。<b>時間は流れ続ける（Highfleet 式）</b>── <b>スペースを短く押すと停止⇄順速、0.5 秒以上押し続けると押している間だけ早送り</b>（P キーでも停止⇄順速）。最初は停止。点をクリック → 経路と費用を確認 → もう一度クリックで出発（移動中でも行き先を変えられる）。</div>
 <div class="wrap">
+  <div class="mapcol">
   <div class="mapbox" id="mapbox"><canvas id="cv" width="1000" height="596"></canvas>
     <div class="modal" id="modal" hidden><div class="dlg" role="dialog" aria-modal="true"><h2 id="mt"></h2><div id="mb"></div><div class="btns" id="mbtn" style="margin-top:12px"></div></div></div>
+  </div>
+    <div class="supplyRow">
+  <div class="supply" title="物資: 減るたびに中身が 1 ドット左へ寄り、 減った分が光りながら下へ崩れて消える">
+    <canvas id="supCv" width="272" height="20" aria-label="物資のバー"></canvas>
+  </div>
+  <div class="lamps" title="警告ランプ: HALF = 物資が上限の 75% 以下（HALF・LOW の段）／ CRIT = 20% 以下（0 で点滅）">
+    <div class="lamp half" id="lampHalf"><img alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAVCAYAAADfLRcdAAABHElEQVR4nO2WT2+CMBiHf2ohxB10icZ42tnv/2F23smDJu7CbAqFBUodvLRdK9kwkefSvO3b8vSl/AEmJjCjNTi8bcpHqcv7x7njN28H+92q5AUeAl4on3Yf6yWJDIgjjA2vPAgd2XUS4ZNnSK/9xP9msVA+R1dlb8nNaWEFr9t8njhjjS2vDZ2j0bnS8tRYZSnLWLWC/8SCc6NInCSdPIoeC8Upq4R+X6SSUxJhFnEz7xYD+BL2fO/KhoqErknFB8n6XvQvYb6J995qFz7V9Jatzg8buBFB+lyCrvMaVFm9EDNsxDVGMc3zxSqr33Vy1lTCEHuNUQzz7pKtvl5SAqXMMTYSrPZx/nVtX1/KaPxfA2QZcLqkPb+Jp+cbeE971m6X0QcAAAAASUVORK5CYII="><img class="on" alt="HALF" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAVCAYAAADfLRcdAAADZ0lEQVR4nNWXX2gcRRzHP/vn9u64Rmua5NpE25QmxdS/2ICg9TC+iIj6oO9FDH0QBFFSaPtgH/xHW6VPQiWCvutLBX0UIoJiK4jSSEwbo1yaNGmsza13+3fKzN5dbi8XupGcpV9umP3Nzux8bvY38/st3EbSknQSH93b23aQV3+bu2mfDcLtYPN1OSn8GthXnrlf9OW38sg9Vqx9V2eKdml22YvZP/3lUly4xidf/xrjixmvv7RfrNgOw3u71gXc07150BcXvXXBz00t0ZFLc/rz83VGrfHVj35pFvf25pDAErQZbGh7mnZoct6J/QEJLEGn5mzGn/P7ai5hNg56YuhOpudsXnw0r0A72gTXrO2Dq9fD844C/uKHBcUDV+v3YrBStRU9d3ZC2SPvfqjqb46+EbePvYmmaTz59qnY+InjY6ouHD8Z2W+NIYQA+VNFMPLOB2uAG+cYfr7Q0gXXwErVVrS/c/X2nryFYep1+4GBHF2j74GWAt0ALSqF9z+l/NUJyHQDIfsfGyS0S4S+R+BUCP2gJWhtvj+W/XXfaEvYmjR9df9ltqQwTQNSOTAydAwOQa4PdAv/uzNgWpiPvwboWLsfgi27FGy6/z5EpQRuBeGWo1XObIOgwvL4GL4fEHihKo3zJYKtbypNw0zVVlKj59AJMLNgZMHMYGztBusu0NNoXTvRrCxketTq6jv2QTYPIkDv2Y349zo4NsKxIXDBugN8i85Dp8Evq7b5M0fr8yaG/S8yHn45coc2y2xukDtxRF4Ige+F1VbBlY8PKzfoHD0JoUtwbRHT/Vu5AXoKNDPyW3TCyxcw7j6g3CC8MgO+C14F4TmEThnTvd7SDdR80k2SwkqtVM+9mSWP/mpbpeRhmAF4tiorv0+StotqRUtnT6EZJrkXjihYd+ZnskOzCtZ88FnlDoQBCI+l8SOkD0THUbnkEvgRqJTcXI3zJ4JtpYsLrqr7qvYv0zYjgYw2Hue/v6SOscLTEcSPExcoPLXY8jlqXPV6qlhhI4pFsM+mtxVvRVBo1EpDUBjozXFw4GrrCPbt5D/IcCs7/l/hdrIp1ErVwq3kOTiw2jd2TtTyg535CKo5imxmEtMqkWnMvv5ccGJ5gZSWIJdNksPKCHAzzW40t23OabVb/YVAk5J8MdwWugFztHBJ+EWO6AAAAABJRU5ErkJggg=="></div>
+    <div class="lamp crit" id="lampCrit"><img alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAVCAYAAADfLRcdAAABJUlEQVR4nO2W0W6CQBBFb2VFQ2vaJvrgJ/j/H9NP8KE+mLTqFlgwI12zDOOgthWTcp7YuTPs3XEEgJ4ePPAeLKbT8l768rZa1fwNwsX89bm0BneBNZWfMNawZr8yYDRE11jywaiZfYmGWLsMm10z8dZEg8rPMogZLfmYtLU1LU/GYrxN87qmEa4Q5frMSkg3plhyolLTCE1rQ/070Y3T7+v4qTp1+tk0L2kxi/m1psUAtsWVZiXCTT3SAf6CH/wo5x+mM7PURd5JMqiNyW+hjgHNj0+41ETK8qXZlfbTaJ1Z6VFDsTw4iN8kXJszDPH6Nk6aDZ91bsy6UbC4sHa8htVK9ReZpbcXmSyLHF3jYLBGpn91zSaPZfdfBjjYfP/YNPz1/Hv2Iz97LjB1mf8AAAAASUVORK5CYII="><img class="on" alt="CRIT" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAVCAYAAADfLRcdAAADWElEQVR4nNWXW0gUURjH/7POzM6qsytq3hYUrKQLJpmJCT0U9B75YA+JkD0FmQZhVC+99GimUYEZWRD0IESvUj4EIRaWiBmhgdZqWSvufZ1rnLM7urO75ipu4n9Z5lzn/PjOd873DbCDxKQySK8tLUk7yMjs3LpjNghXjPRoPhX4BNiWqoO6MzcH1QJnai/jWaRLM5Jiqo+GZbgWl9A3NmHiM1Xa6qp1X2gZNYV5SSF3C1sPPB1WkoJ/+OWGaLOia3h0hZGJ3foLy6Krwp4JAmxAGoD74yy9lZoMyyZ4AkxAv3qDeGT1OQ2XMJnqeJ4dU94AGpwFFFJMI2CsimLKNWGZAg+4FigP/L6VvoR9JRYloC/fvFtpa+rvNo151txKN6Wp/278dLxoaafPxr47CX2RuZeTzlt9L3D6ZH3SM2JJNsmwaDnHJoAa8HV52QDLAoINyBIBMQew56Jx4ClO1VYCOXm0TttJPxnHspF5a4isF7t+vP55YizM6vn70nYdPJeB8nudAG9FQdUBYJcT4DiEn/QCPA+h5SLAWJB99DCk14PQFQXWc+cBVUWwpxN6MIj8inL8edAL2R9EcUc7oGkYv3QNkqKa1ksJ1jhQDMPAymZEGhkGtkwBgl2E5/5DsGI2+JIiQHQAHA/hyg2A5SOWtmSAO1QJXZIoLBz5gCKBKyuF6l6EVbBB83jBCULE4uEwXYdgMuQnm2+HlC27GWlDr8DoOtKhBFhyEk+Qq0zXsayokUZdRygYhirLKLx1k7qBp7sHNp8nwQ0sVXWQnj+mc4hlM47UUzeQZ2apG0juJciBAFRNhyPgo25A1iFuICkaXTdlWCJf9N6bkmQci7bt67odKYQC9L8w9hmO3y6A5eD5NAELz0GY/04cHf73H5HbcRXQdODnD0BTkdlwBlBkzLV2UFBZ1VCsafSV3pBEn9+iLmCsnxJs/HWy1tW1l/ikomBofJqGl7PeRdo/ODKOxiV30vcNu/1kq2i5MtpmQK4nUwTrz3a6tiMoxMoXExT22LPQ7Hclj2Bv3V6QcEsG/q9wOxkXaomMcEt4mq2rY00Xm5EflIo8rcdHka1OZKbXSGKIZn2SKS9IgDWAN5HDlqUwZmajeW18Tsts9xcC4pTKF8OO0F9mCmtoPXjedAAAAABJRU5ErkJggg=="></div>
+  </div>
+  <label class="k" style="font-size:11px"><input type="checkbox" id="lampTest"> ランプ試験（全点灯）</label>
+    </div>
   </div>
   <div class="side">
     <div class="card">
       <div class="row"><span class="k">物資</span><span><b id="sup"></b> / <span id="supmax">1000</span> <b id="gauge" class="gauge"></b> <span id="stage" class="k" style="font-size:11px"></span></span></div>
-      <div class="supply" title="物資: 減るたびに中身が 1 ドット左へ寄り、 減った分が光りながら下へ崩れて消える">
-        <canvas id="supCv" width="272" height="20" aria-label="物資のバー"></canvas>
-      </div>
       <div class="bar" hidden><i id="supbar" style="background:var(--gold)"></i><span id="bingoTick" class="tick" title="BINGO の線（最寄りの補給点まで＋余裕）"></span></div>
       <div id="bingo" class="bingo" hidden></div>
-      <div class="lamps" title="警告ランプ: HALF = 物資が上限の 75% 以下（HALF・LOW の段）／ CRIT = 20% 以下（0 で点滅）">
-        <div class="lamp half" id="lampHalf"><img alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAVCAYAAADfLRcdAAABHElEQVR4nO2WT2+CMBiHf2ohxB10icZ42tnv/2F23smDJu7CbAqFBUodvLRdK9kwkefSvO3b8vSl/AEmJjCjNTi8bcpHqcv7x7njN28H+92q5AUeAl4on3Yf6yWJDIgjjA2vPAgd2XUS4ZNnSK/9xP9msVA+R1dlb8nNaWEFr9t8njhjjS2vDZ2j0bnS8tRYZSnLWLWC/8SCc6NInCSdPIoeC8Upq4R+X6SSUxJhFnEz7xYD+BL2fO/KhoqErknFB8n6XvQvYb6J995qFz7V9Jatzg8buBFB+lyCrvMaVFm9EDNsxDVGMc3zxSqr33Vy1lTCEHuNUQzz7pKtvl5SAqXMMTYSrPZx/nVtX1/KaPxfA2QZcLqkPb+Jp+cbeE971m6X0QcAAAAASUVORK5CYII="><img class="on" alt="HALF" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAVCAYAAADfLRcdAAADZ0lEQVR4nNWXX2gcRRzHP/vn9u64Rmua5NpE25QmxdS/2ICg9TC+iIj6oO9FDH0QBFFSaPtgH/xHW6VPQiWCvutLBX0UIoJiK4jSSEwbo1yaNGmsza13+3fKzN5dbi8XupGcpV9umP3Nzux8bvY38/st3EbSknQSH93b23aQV3+bu2mfDcLtYPN1OSn8GthXnrlf9OW38sg9Vqx9V2eKdml22YvZP/3lUly4xidf/xrjixmvv7RfrNgOw3u71gXc07150BcXvXXBz00t0ZFLc/rz83VGrfHVj35pFvf25pDAErQZbGh7mnZoct6J/QEJLEGn5mzGn/P7ai5hNg56YuhOpudsXnw0r0A72gTXrO2Dq9fD844C/uKHBcUDV+v3YrBStRU9d3ZC2SPvfqjqb46+EbePvYmmaTz59qnY+InjY6ouHD8Z2W+NIYQA+VNFMPLOB2uAG+cYfr7Q0gXXwErVVrS/c/X2nryFYep1+4GBHF2j74GWAt0ALSqF9z+l/NUJyHQDIfsfGyS0S4S+R+BUCP2gJWhtvj+W/XXfaEvYmjR9df9ltqQwTQNSOTAydAwOQa4PdAv/uzNgWpiPvwboWLsfgi27FGy6/z5EpQRuBeGWo1XObIOgwvL4GL4fEHihKo3zJYKtbypNw0zVVlKj59AJMLNgZMHMYGztBusu0NNoXTvRrCxketTq6jv2QTYPIkDv2Y349zo4NsKxIXDBugN8i85Dp8Evq7b5M0fr8yaG/S8yHn45coc2y2xukDtxRF4Ige+F1VbBlY8PKzfoHD0JoUtwbRHT/Vu5AXoKNDPyW3TCyxcw7j6g3CC8MgO+C14F4TmEThnTvd7SDdR80k2SwkqtVM+9mSWP/mpbpeRhmAF4tiorv0+StotqRUtnT6EZJrkXjihYd+ZnskOzCtZ88FnlDoQBCI+l8SOkD0THUbnkEvgRqJTcXI3zJ4JtpYsLrqr7qvYv0zYjgYw2Hue/v6SOscLTEcSPExcoPLXY8jlqXPV6qlhhI4pFsM+mtxVvRVBo1EpDUBjozXFw4GrrCPbt5D/IcCs7/l/hdrIp1ErVwq3kOTiw2jd2TtTyg535CKo5imxmEtMqkWnMvv5ccGJ5gZSWIJdNksPKCHAzzW40t23OabVb/YVAk5J8MdwWugFztHBJ+EWO6AAAAABJRU5ErkJggg=="></div>
-        <div class="lamp crit" id="lampCrit"><img alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAVCAYAAADfLRcdAAABJUlEQVR4nO2W0W6CQBBFb2VFQ2vaJvrgJ/j/H9NP8KE+mLTqFlgwI12zDOOgthWTcp7YuTPs3XEEgJ4ePPAeLKbT8l768rZa1fwNwsX89bm0BneBNZWfMNawZr8yYDRE11jywaiZfYmGWLsMm10z8dZEg8rPMogZLfmYtLU1LU/GYrxN87qmEa4Q5frMSkg3plhyolLTCE1rQ/070Y3T7+v4qTp1+tk0L2kxi/m1psUAtsWVZiXCTT3SAf6CH/wo5x+mM7PURd5JMqiNyW+hjgHNj0+41ETK8qXZlfbTaJ1Z6VFDsTw4iN8kXJszDPH6Nk6aDZ91bsy6UbC4sHa8htVK9ReZpbcXmSyLHF3jYLBGpn91zSaPZfdfBjjYfP/YNPz1/Hv2Iz97LjB1mf8AAAAASUVORK5CYII="><img class="on" alt="CRIT" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAVCAYAAADfLRcdAAADWElEQVR4nNWXW0gUURjH/7POzM6qsytq3hYUrKQLJpmJCT0U9B75YA+JkD0FmQZhVC+99GimUYEZWRD0IESvUj4EIRaWiBmhgdZqWSvufZ1rnLM7urO75ipu4n9Z5lzn/PjOd873DbCDxKQySK8tLUk7yMjs3LpjNghXjPRoPhX4BNiWqoO6MzcH1QJnai/jWaRLM5Jiqo+GZbgWl9A3NmHiM1Xa6qp1X2gZNYV5SSF3C1sPPB1WkoJ/+OWGaLOia3h0hZGJ3foLy6Krwp4JAmxAGoD74yy9lZoMyyZ4AkxAv3qDeGT1OQ2XMJnqeJ4dU94AGpwFFFJMI2CsimLKNWGZAg+4FigP/L6VvoR9JRYloC/fvFtpa+rvNo151txKN6Wp/278dLxoaafPxr47CX2RuZeTzlt9L3D6ZH3SM2JJNsmwaDnHJoAa8HV52QDLAoINyBIBMQew56Jx4ClO1VYCOXm0TttJPxnHspF5a4isF7t+vP55YizM6vn70nYdPJeB8nudAG9FQdUBYJcT4DiEn/QCPA+h5SLAWJB99DCk14PQFQXWc+cBVUWwpxN6MIj8inL8edAL2R9EcUc7oGkYv3QNkqKa1ksJ1jhQDMPAymZEGhkGtkwBgl2E5/5DsGI2+JIiQHQAHA/hyg2A5SOWtmSAO1QJXZIoLBz5gCKBKyuF6l6EVbBB83jBCULE4uEwXYdgMuQnm2+HlC27GWlDr8DoOtKhBFhyEk+Qq0zXsayokUZdRygYhirLKLx1k7qBp7sHNp8nwQ0sVXWQnj+mc4hlM47UUzeQZ2apG0juJciBAFRNhyPgo25A1iFuICkaXTdlWCJf9N6bkmQci7bt67odKYQC9L8w9hmO3y6A5eD5NAELz0GY/04cHf73H5HbcRXQdODnD0BTkdlwBlBkzLV2UFBZ1VCsafSV3pBEn9+iLmCsnxJs/HWy1tW1l/ikomBofJqGl7PeRdo/ODKOxiV30vcNu/1kq2i5MtpmQK4nUwTrz3a6tiMoxMoXExT22LPQ7Hclj2Bv3V6QcEsG/q9wOxkXaomMcEt4mq2rY00Xm5EflIo8rcdHka1OZKbXSGKIZn2SKS9IgDWAN5HDlqUwZmajeW18Tsts9xcC4pTKF8OO0F9mCmtoPXjedAAAAABJRU5ErkJggg=="></div>
-      </div>
-      <label class="k" style="font-size:11px"><input type="checkbox" id="lampTest"> ランプ試験（全点灯）</label>
       <div class="row"><span class="k">HP</span><span><b id="hp"></b> / <span id="hpmax"></span></span></div>
       <div class="bar"><i id="hpbar" style="background:var(--red)"></i></div>
       <div class="row"><span class="k">ゴールド</span><span id="gold"></span></div>
