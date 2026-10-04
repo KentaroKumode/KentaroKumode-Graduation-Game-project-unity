@@ -1349,7 +1349,7 @@ function supBarSpillColumn() {
   bx.drawImage(SB.bar, 0, 0);
   for (let r = 0; r < SB.WH; r++) {
     const d = bx.getImageData(sx, r, 1, 1).data; if (d[3] < 8) continue;
-    SB.parts.push({ x: SB.WX + col, y: SB.WY + r, vy: 0, col: [d[0], d[1], d[2]], glow: 1, delay: (SB.WH - 1 - r) * 2 + 1, life: 0 }); }
+    SB.parts.push({ x: SB.WX + col, y: SB.WY + r, vy: 0, col: [d[0], d[1], d[2]], glow: 1, delay: 1 + Math.floor(Math.random() * 4), life: 0 }); }
   SB.shown--; SB.off = (SB.off + 1) % SB.WW;
 }
 function supBarLoop() {
@@ -1357,9 +1357,9 @@ function supBarLoop() {
   if (SB.shown > SB.target) supBarSpillColumn();      // 1 フレームに 1 列
   for (const p of SB.parts) {
     if (p.delay > 0) { p.delay--; continue; }
-    p.life++; p.vy += 0.16; p.y += p.vy; p.glow = Math.max(0, p.glow - 0.05);
+    p.life++; p.vy += 0.20; p.y += p.vy; p.glow = Math.max(0, p.glow - 0.028);
   }
-  SB.parts = SB.parts.filter(p => p.y < SB.WY + SB.WH);   // 窓の下端で消える
+  SB.parts = SB.parts.filter(p => p.y < 20 && p.life < 70);   // 窓の下の枠を越えて落ち、 キャンバスの下端で消える (横へは出ない)
   supBarDraw();
   if (SB.parts.length || SB.shown > SB.target) SB.raf = requestAnimationFrame(supBarLoop);
 }
@@ -1376,14 +1376,20 @@ function supBarDraw() {
   // ② 枠: 画像の窓は黒塗りなので、 窓の長方形を除いて 4 つの帯に分けて描く
   const fr = (sx, sy, sw, sh) => cx.drawImage(SB.frame, sx, sy, sw, sh, sx, sy, sw, sh);
   fr(0, 0, 272, SB.WY); fr(0, SB.WY + SB.WH, 272, 20 - SB.WY - SB.WH); fr(0, SB.WY, SB.WX, SB.WH); fr(SB.WX + SB.WW, SB.WY, 272 - SB.WX - SB.WW, SB.WH);
-  // ③ 崩れる粒: 窓の中だけに描く。 待っている間は元の場所に元の色。 光る間は暖色寄りに明るく、 落ちるほど元の色へ戻って暗くなる (横には広げない)
-  cx.save(); cx.beginPath(); cx.rect(SB.WX, SB.WY, SB.WW, SB.WH); cx.clip();
+  // ③ 崩れる粒 (2026-10-05 改): 消費された列は**白熱色に強く光る** (待っている間も)。 落ち始めが一番明るく、 落ちるほど元の色へ戻って暗くなる。
+  //    落ちる粒の真上に短い縦の尾を引く (下へ落ちていることが分かる)。 窓の下の枠の上も通り、 キャンバスの下端で消える。 横 (列の外) には描かない
+  const hot = (col, g) => `rgb(${Math.round(col[0] + (255 - col[0]) * g)},${Math.round(col[1] + (236 - col[1]) * g)},${Math.round(col[2] + (190 - col[2]) * g)})`;
+  cx.save(); cx.beginPath(); cx.rect(SB.WX, SB.WY, SB.WW, 20 - SB.WY); cx.clip();      // 窓の上端から下 (枠の下側も含む)
   for (const p of SB.parts) {
-    if (p.delay > 0) { cx.fillStyle = `rgb(${p.col[0]},${p.col[1]},${p.col[2]})`; cx.fillRect(p.x, Math.round(p.y), 1, 1); continue; }
-    const a = Math.max(0, 1 - p.life / 40), g = p.glow * 0.7;
-    const r = Math.round(p.col[0] + (255 - p.col[0]) * g), gr = Math.round(p.col[1] + (214 - p.col[1]) * g), b = Math.round(p.col[2] + (150 - p.col[2]) * g);
-    cx.fillStyle = `rgba(${r},${gr},${b},${a})`; cx.fillRect(p.x, Math.round(p.y), 1, 1);
+    const falling = p.delay <= 0, g = falling ? 0.35 + 0.65 * p.glow : 1;              // 待っている間は最大の光、 落ち始めも強い
+    if (falling) {                                                                       // 尾: 真上に 1〜4 ドット、 上ほど暗い
+      const len = Math.max(1, Math.min(4, Math.round(p.vy * 2.2)));
+      for (let k = 1; k <= len; k++) { const ty = Math.round(p.y) - k; if (ty < SB.WY) break;
+        cx.globalAlpha = Math.max(0, (1 - k / (len + 1)) * 0.65 * (1 - p.life / 70)); cx.fillStyle = hot(p.col, Math.min(1, g)); cx.fillRect(p.x, ty, 1, 1); } }
+    cx.globalAlpha = falling ? Math.max(0, 1 - p.life / 70) : 1;
+    cx.fillStyle = hot(p.col, g); cx.fillRect(p.x, Math.round(p.y), 1, 1);
   }
+  cx.globalAlpha = 1;
   cx.restore();
 }
 
