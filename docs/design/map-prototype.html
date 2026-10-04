@@ -1330,20 +1330,25 @@ function updateLamps() {
 // 粒はその列の外へ出ない (左右に動かず、 光のにじみも横へ広げない)。 窓の外 (枠の上) には描かず、 窓の下端で消える
 // 増えた (補給) 時は右端から絵が現れるだけで、 崩れは出さない
 const SB = { WX: 5, WY: 6, WW: 262, WH: 8, frame: new Image(), bar: new Image(), ready: 0,
-  shown: -1, disp: -1, target: -1, off: 0, parts: [], raf: 0 };
-// 表示する物資 (disp) は実際の物資 (target) を 1 単位ずつ数え追う (2026-10-05): 実際の減りは 1 刻みで 1〜6 まとめて起きるが、
-// 画面の数字とバーは 1 単位ずつ滑らかに動く。 大きく減った時だけ 1 フレームの歩幅を広げる (最大 3・増える時は最大 40)。
+  shown: -1, disp: -1, a: 0, b: 0, t0: 0, dur: 1, ticking: 0, clock: null, off: 0, parts: [], raf: 0 };
+const supNow = () => (SB.clock ? SB.clock() : performance.now());
+const supExact = () => S.sup - supFrac;                 // 物資の小数部分 (刻みごとの端数の持ち越し) まで含めた値
+// 表示する物資 (disp) は、 刻みの間を**直線で補間**する (2026-10-05): 実際の値は 0.1 手番の刻みの終わりにしか変わらないが、
+// 地図の自分の位置と同じように、 前の刻みの値から今の値まで、 刻みの長さをかけて一定の速さで動かす。 刻みの外の変化 (戦闘・補給・照明など) は、
+// 大きさに応じた短い時間 (150〜700ms) で直線に動かす。 消費そのものは変えない (距離 × 単価・時間当たりの量は同じ)。
 // バーは 1 ドット = 物資 supMax / 262 (上限 1000 なら約 3.82) の計算で列を数える。 表示の物資が 1 ドット分 (約 3.82) 減るたびに、 右端の 1 ドット幅の列が 1 本崩れ、
 // 絵が 1 ドット左へ流れる。 1 フレームの歩幅は最大 3 なので、 1 フレームに崩れる列は最大 1 本
 const supBandX = n => n;
 const supBandsOf = v => Math.max(0, Math.min(SB.WW, Math.ceil(v * SB.WW / P.supMax)));
-SB.frame.onload = SB.bar.onload = () => { if (++SB.ready === 2) { if (S) { SB.disp = SB.target = S.sup; SB.shown = supBandX(supBandsOf(S.sup)); } supBarDraw(); } };
+SB.frame.onload = SB.bar.onload = () => { if (++SB.ready === 2) { if (S) { SB.disp = SB.a = SB.b = supExact(); SB.shown = supBandX(supBandsOf(SB.disp)); } supBarDraw(); } };
 SB.frame.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAARAAAAAUCAIAAADKjvXgAAADx0lEQVR4AeyaS2/TUBCFbTeQp/NqHvwdxLoFIVaoQqViw4INYoNQd/wMQAgQK4Raukb8ndK84ySFTcJn38Rx4sR1XAep0kSnN3Ov586cOdVpqyqG5rz2D44EooAoEKCAYxTNNszhy9fZfCGTMwWigCiwUoHbyRRewjPGi+O3txKJVDqdzmYFooAosFKBXKFgFktHr94YOTN/O5nEOgJRQBRYp4Cu68VSqVatGbx03f7DjNTJZPL3cvRnNHRxORz2ux1WQDAaDHqddq/dmqLT5txNDh9wa6GOWzDeIAQ9mDAXqyJPwHY0WBwzXlbbq9ZpjwYD+DOFGmdp5Zyn5PwP8bc3ZoyVZ4qhCcqgj1cxtla3OxmPsQbAJjs7O0YynU4kdthPxuNeqzm0LPJcjAZWt9lgBXZg9TuNi06zMUXjgnM3OXzArYU6bsF4gxD0YGLPNZhOPd0ujRkvq+1VY16r7x1n6Ttys6fbhm6uYqt0Q67WxXnz97nyDDbBLIZuGJquYxir3+u2W6ef3598eufix5cPP0+/sQKCs68ff51994LzE09+yJhb3iLbi2kUTIkE5mJVaQRs/WNuj2G8lWEOf6ZQ4yytnPOUnHib3uhqqKE0YUUfr2Js8cXQ6mMNAmyCWQw7cr6UjZxQFlFAFLAV4GcBb15rzA3DA4EoIAoEKyCGCdZHnooCCwqsNsxCimxEAVFgpoAYZqaEvIsCIRQQw4QQSVJEgZkCc8PwLzMO7+49ZBWIAqIACig7KGuwBXPDmPlC1sxzRNL+wdGDJ88Awb37j/YeH3IYGVynCKWACqjsB08jtKC4usV1f01OOKepm6aSr7+6BalPl2CQAwdWcP3WVIjQ3b3C9bhATTVX8PjqKbOrZIK4CESo4+V8JRPsgCmwBoHC3DDYqFK/U67VS9VaJmeqj6BlcmaxUs2YeQ5LlWoUUM3M20WcT0OrQBVfWmm6cRenuH2LYMbZX9Zual5jBP/gtFMFCdb09dJgNJuDo4DN1l9woxOaRuiurmzUKDjZoaHm8g67Lo5ZhGBu654ucoZS8LcDO2AKrKHcwjo3DBse5IulQqnMzKlMFhBwksnlOCyUd6OgVOY6RSgFVEBlP3i6cRenuH3Lw3mpMmVpCgc7LdoI/lsh+nppKA6sIAYakbrHrACaODTQlqG8w66LSVPJBDGIAIEIWOR8JRMIYwqs4cI2TDKZ0jT70zGavEQBUWC1ArpjE804fv40Z5q1er1QLApEAVFgpQIYBJtgFvs3DG9sditVgSggCqxUAINgE03T/gEAAP//azzQNQAAAAZJREFUAwDlCzR6UGxeUAAAAABJRU5ErkJggg=="; SB.bar.src = "data:image/png;base64,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";
 const supCx = () => document.getElementById("supCv").getContext("2d", { willReadFrequently: true });
 function supBarSet(sup) {
   if (SB.ready < 2) return;                          // 画像の読み込み前は何もしない (読み込み後に今の物資で初期化する)
-  if (SB.disp < 0) { SB.disp = SB.target = sup; SB.shown = supBandX(supBandsOf(sup)); supBarDraw(); return; }
-  SB.target = sup;
+  if (SB.disp < 0) { SB.disp = SB.a = SB.b = sup; SB.shown = supBandX(supBandsOf(sup)); supBarDraw(); return; }
+  if (Math.abs(sup - SB.b) < 1e-9) return;
+  SB.a = SB.disp; SB.b = sup; SB.t0 = supNow();
+  SB.dur = SB.ticking > 0 ? SB.ticking : Math.max(150, Math.min(700, 80 + Math.abs(sup - SB.disp) * 6));   // 刻みの更新は刻みの長さ・それ以外は変化の大きさで
   if (!SB.raf) SB.raf = requestAnimationFrame(supBarLoop);
 }
 // 列 nNew〜nOld-1 (1 ドット幅の列) を粒にして、 絵をその幅だけ左へ流す
@@ -1362,12 +1367,12 @@ function supBarSpillBands(nOld, nNew) {
 }
 function supBarLoop() {
   SB.raf = 0;
-  const diff = SB.target - SB.disp;
-  if (diff !== 0) {
-    const mag = diff < 0 ? Math.min(-diff, 3, Math.max(1, Math.ceil(-diff / 20))) : Math.min(diff, 40, Math.max(1, Math.ceil(diff / 20)));
-    const nOld = supBandsOf(SB.disp); SB.disp += diff < 0 ? -mag : mag; const nNew = supBandsOf(SB.disp);
-    if (nNew < nOld) supBarSpillBands(nOld, nNew);                 // 1 ドット分 (約 3.82) 減って列が減った: その列を崩す (歩幅 ≤ 3 なので最大 1 列)
-    else if (nNew > nOld) SB.shown = supBandX(nNew);   // 増えた (補給): 右端から絵が現れるだけ
+  const k = Math.max(0, Math.min(1, (supNow() - SB.t0) / SB.dur));
+  const nextDisp = SB.a + (SB.b - SB.a) * k;                       // 直線補間
+  if (nextDisp !== SB.disp) {
+    const nOld = supBandsOf(SB.disp); SB.disp = nextDisp; const nNew = supBandsOf(SB.disp);
+    if (nNew < nOld) supBarSpillBands(nOld, nNew);                 // 1 ドット分 (約 3.82) 減って列が減った: その列を崩す
+    else if (nNew > nOld) SB.shown = supBandX(nNew);               // 増えた (補給): 右端から絵が現れるだけ
     const el = document.getElementById("sup"); if (el) el.textContent = Math.round(SB.disp);
   }
   for (const p of SB.parts) {
@@ -1376,7 +1381,7 @@ function supBarLoop() {
   }
   SB.parts = SB.parts.filter(p => p.y < 20 && p.life < 70);   // 窓の下の枠を越えて落ち、 キャンバスの下端で消える (横へは出ない)
   supBarDraw();
-  if (SB.parts.length || SB.target !== SB.disp) SB.raf = requestAnimationFrame(supBarLoop);
+  if (SB.parts.length || k < 1) SB.raf = requestAnimationFrame(supBarLoop);
 }
 function supBarDraw() {
   if (SB.ready < 2) return;
@@ -1412,7 +1417,7 @@ function ui() {
   const st = stageOf(S.sup);
   document.getElementById("sup").textContent = (typeof SB !== "undefined" && SB.disp >= 0) ? Math.round(SB.disp) : S.sup; document.getElementById("supmax").textContent = P.supMax; updateGauge();
   document.getElementById("supbar").style.width = (S.sup / P.supMax * 100) + "%";
-  supBarSet(S.sup);
+  supBarSet(supExact());
   updateLamps();
   document.getElementById("hp").textContent = S.hp; document.getElementById("hpmax").textContent = P.hpMax;
   document.getElementById("hpbar").style.width = (S.hp / P.hpMax * 100) + "%";
@@ -1448,7 +1453,7 @@ function loop(ts) {
     if (ts - last >= per) {
       const n = Math.min(5, Math.floor((ts - last) / per)); last = ts;
       prevMe = { x: S.me.x, y: S.me.y }; prevFoes = S.foes.map(f => f.alive ? foePos(f) : null);
-      for (let i = 0; i < n; i++) tick(); renderAlpha = 0; ui();
+      SB.ticking = n * per; for (let i = 0; i < n; i++) tick(); renderAlpha = 0; ui(); SB.ticking = 0;   // 刻みの更新: バーは刻みの長さで直線に動く
     } else { renderAlpha = (ts - last) / per; draw(); }
   } else { last = ts; renderAlpha = 1; if (lcdOn() && ts - (loop.idle || 0) > 40) { loop.idle = ts; draw(); } }   /* 停止中も気配の波を動かす */
   requestAnimationFrame(loop);
