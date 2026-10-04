@@ -1355,6 +1355,7 @@ function supBarSet(sup) {
 // 列 nNew〜nOld-1 (1 ドット幅の列) を粒にして、 絵をその幅だけ左へ流す
 function supBarSpillBands(nOld, nNew) {
   const x0 = supBandX(nNew), x1 = supBandX(nOld);
+  const gT = 8 + Math.floor(Math.random() * 7), bT = 12 + Math.floor(Math.random() * 7);   // ① 発光 ② 点滅の長さは、 この崩れの粒で共有 (列がそろって光り・点滅する)
   const bc = document.createElement("canvas"); bc.width = SB.WW; bc.height = SB.WH; const bx = bc.getContext("2d");
   bx.drawImage(SB.bar, 0, 0);
   for (let c = x0; c < x1; c++) {
@@ -1362,7 +1363,10 @@ function supBarSpillBands(nOld, nNew) {
     for (let r = 0; r < SB.WH; r++) {
       const d = bx.getImageData(sx, r, 1, 1).data; if (d[3] < 8) continue;
       SB.parts.push({ x: SB.WX + c, y: SB.WY + r, vy: Math.random() * 0.5, grav: 0.07 + Math.random() * 0.36,        // 粒ごとに初速と重さ (落ちる速さ) を変える
-        col: [d[0], d[1], d[2]], glow: 1, delay: 1 + Math.floor(Math.random() * Math.random() * 9), life: 0 }); }
+        col: [d[0], d[1], d[2]], glow: 1, life: 0, age: 0,
+        glowT: gT,                                                                 // ① 発光: 白熱色で光り続ける (8〜14 フレーム)
+        blinkT: bT,                                                                // ② 点滅: 明るい色と暗い色を交互に (崩れる直前ほど速い・12〜18 フレーム)
+        delay: 0 }); }
   }
   SB.shown = x0; SB.off = (SB.off + (x1 - x0)) % SB.WW;
 }
@@ -1377,7 +1381,8 @@ function supBarLoop() {
     const el = document.getElementById("sup"); if (el) el.textContent = Math.round(SB.disp);
   }
   for (const p of SB.parts) {
-    if (p.delay > 0) { p.delay--; continue; }
+    if (p.delay === 0 && p.age === 0) p.delay = p.glowT + p.blinkT + Math.floor(Math.random() * Math.random() * 8);   // ③ 崩れの開始 (最初の 1 フレームで決める)
+    if (p.delay > 0) { p.delay--; p.age++; continue; }
     p.life++; p.vy += p.grav; p.y += p.vy; p.glow = Math.max(0, p.glow - 0.028);
   }
   SB.parts = SB.parts.filter(p => p.y < 20 && p.life < 70);   // 窓の下の枠を越えて落ち、 キャンバスの下端で消える (横へは出ない)
@@ -1402,7 +1407,13 @@ function supBarDraw() {
   const hot = (col, g) => `rgb(${Math.round(col[0] + (255 - col[0]) * g)},${Math.round(col[1] + (236 - col[1]) * g)},${Math.round(col[2] + (190 - col[2]) * g)})`;
   cx.save(); cx.beginPath(); cx.rect(SB.WX, SB.WY, SB.WW, 20 - SB.WY); cx.clip();      // 窓の上端から下 (枠の下側も含む)
   for (const p of SB.parts) {
-    const falling = p.delay <= 0, g = falling ? 0.35 + 0.65 * p.glow : 1;              // 待っている間は最大の光、 落ち始めも強い
+    const falling = p.delay <= 0 && p.age > 0, g0 = falling ? 0.35 + 0.65 * p.glow : 1;      // 落ち始めは強く光る
+    let g = g0;
+    if (!falling) {                                                                     // 待っている間: ① 発光 (一定の明るさ) → ② 点滅 (明るい / 暗いを交互に・だんだん速く)
+      const t = p.age - p.glowT;
+      if (t > 0) { let acc = 0, per = 4, on = true; while (acc + per <= t) { acc += per; on = !on; per = Math.max(1, per - 1); }
+        if (!on) { g = 0.0; cx.globalAlpha = 1; cx.fillStyle = `rgb(${Math.round(p.col[0] * 0.55)},${Math.round(p.col[1] * 0.55)},${Math.round(p.col[2] * 0.55)})`; cx.fillRect(p.x, Math.round(p.y), 1, 1); continue; } }
+    }
     if (falling) {                                                                       // 尾: 真上に 1〜4 ドット、 上ほど暗い
       const len = Math.max(1, Math.min(4, Math.round(p.vy * 2.2)));
       for (let k = 1; k <= len; k++) { const ty = Math.round(p.y) - k; if (ty < SB.WY) break;
