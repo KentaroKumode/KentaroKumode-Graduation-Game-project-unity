@@ -1349,7 +1349,8 @@ function supBarSpillColumn() {
   bx.drawImage(SB.bar, 0, 0);
   for (let r = 0; r < SB.WH; r++) {
     const d = bx.getImageData(sx, r, 1, 1).data; if (d[3] < 8) continue;
-    SB.parts.push({ x: SB.WX + col, y: SB.WY + r, vy: 0, col: [d[0], d[1], d[2]], glow: 1, delay: 1 + Math.floor(Math.random() * 4), life: 0 }); }
+    SB.parts.push({ x: SB.WX + col, y: SB.WY + r, vy: Math.random() * 0.5, grav: 0.07 + Math.random() * 0.36,        // 粒ごとに初速と重さ (落ちる速さ) を変える ── 帯のように揃って落ちないように
+      col: [d[0], d[1], d[2]], glow: 1, delay: 1 + Math.floor(Math.random() * Math.random() * 14), life: 0 }); }
   SB.shown--; SB.off = (SB.off + 1) % SB.WW;
 }
 function supBarLoop() {
@@ -1357,7 +1358,7 @@ function supBarLoop() {
   if (SB.shown > SB.target) supBarSpillColumn();      // 1 フレームに 1 列
   for (const p of SB.parts) {
     if (p.delay > 0) { p.delay--; continue; }
-    p.life++; p.vy += 0.20; p.y += p.vy; p.glow = Math.max(0, p.glow - 0.028);
+    p.life++; p.vy += p.grav; p.y += p.vy; p.glow = Math.max(0, p.glow - 0.028);
   }
   SB.parts = SB.parts.filter(p => p.y < 20 && p.life < 70);   // 窓の下の枠を越えて落ち、 キャンバスの下端で消える (横へは出ない)
   supBarDraw();
