@@ -299,9 +299,8 @@ namespace InventorySystem.PassiveSkills.Effects
                         ctx.finalDamage = System.Math.Max(0, UnityEngine.Mathf.CeilToInt(ctx.finalDamage * v));
                     break;
                 case StatKeys.ShieldStart:
-                    ctx.consShield += (int)v;
+                    ctx.GainShield((int)v);
                     CombatSystem.ShieldDiag.Note("開幕シールド(ステータス)", (int)v);
-                    ctx.shieldGainedTotal += (int)v;
                     break;
                 case StatKeys.Regen:
                     ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + (int)v);

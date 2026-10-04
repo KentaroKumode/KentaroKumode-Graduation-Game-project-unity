@@ -452,6 +452,20 @@ namespace CombatSystem
             if (ctx != null) ctx.playerCurrentHP = playerHP;
         }
 
+        /// <summary>自傷: HP を amount 減らす。 **HP 1 を床にする**ので自傷では死なない (〈血契の釘〉)。
+        /// <see cref="DamagePlayerDirect"/> と違い「審判」の被ダメ増加 (挑戦デバフ) は通さない
+        /// ── 自分で払う代償に増幅を掛けると床を割れるため。 戻り値は実際に減った量。</summary>
+        public int LoseHpKeepOne(int amount)
+        {
+            if (amount <= 0 || !isCombatActive) return 0;
+            int loss = Math.Min(amount, Math.Max(0, playerHP - 1));
+            if (loss <= 0) return 0;
+            playerHP -= loss;
+            var ctx = PassiveSkillManager.Instance?.Context;
+            if (ctx != null) ctx.playerCurrentHP = playerHP;
+            return loss;
+        }
+
         /// <summary>戦闘中、敵に軽減不可ダメージを直接与える（記憶の砂時計・各種パッシブ用）。</summary>
         public void DealFixedDamageToEnemy(int amount)
         {
@@ -1009,9 +1023,8 @@ namespace CombatSystem
                 if (openingShield > 0)
                 {
                     int gained = Math.Max(0, openingShield - ctx.healShieldReduction); // 天衣無縫減衰
-                    ctx.consShield += gained;
+                    ctx.GainShield(gained);
                     ShieldDiag.Note("遺物・防御r10持ち越し", gained);
-                    ctx.shieldGainedTotal += gained;
                     // 開幕シールドは戦闘中持続
                     if (ctx.consShieldExpireTurn == 0) ctx.consShieldExpireTurn = -1;
                     Debug.Log($"[MetaBuff] 開幕シールド +{gained} (遺物+持ち越し)");
@@ -1681,7 +1694,7 @@ namespace CombatSystem
                     // 出血ダメージ
                     if (ctx.enemyBleedStacks > 0)
                     {
-                        int bleedDmg = BattleModifierManager.ApplyBleedModifiers(ctx, ctx.enemyBleedStacks);
+                        int bleedDmg = BleedTickDamage(ctx);
                         enemyHP = Math.Max(0, enemyHP - bleedDmg);
                     }
 
@@ -1710,8 +1723,7 @@ namespace CombatSystem
                         int sh = Mathf.CeilToInt(totalDmg * ctx.shieldOnWinPct) - ctx.healShieldReduction;
                         if (sh > 0)
                         {
-                            ctx.consShield += sh;
-                            ctx.shieldGainedTotal += sh;
+                            ctx.GainShield(sh);
                         }
                     }
 
@@ -1797,7 +1809,7 @@ namespace CombatSystem
                     // 出血ダメージ（敗北時も適用）
                     if (ctx.enemyBleedStacks > 0)
                     {
-                        int bleedDmg = BattleModifierManager.ApplyBleedModifiers(ctx, ctx.enemyBleedStacks);
+                        int bleedDmg = BleedTickDamage(ctx);
                         enemyHP = Math.Max(0, enemyHP - bleedDmg);
                     }
 
@@ -1835,7 +1847,7 @@ namespace CombatSystem
                 // 出血ダメージ（引き分け時も適用）。停戦協定ターンは他効果を抑止するためスキップ。
                 if (!ctx.truceThisTurn && ctx.enemyBleedStacks > 0)
                 {
-                    int bleedDmg = BattleModifierManager.ApplyBleedModifiers(ctx, ctx.enemyBleedStacks);
+                    int bleedDmg = BleedTickDamage(ctx);
                     enemyHP = Math.Max(0, enemyHP - bleedDmg);
                 }
             }
@@ -2434,6 +2446,7 @@ namespace CombatSystem
             enemyAtkValue = Math.Max(0, enemyAtkValue - ctx.mutualEnemyAttackReduction);
             // 2026-07-25 v6: 出血 r2 失血衰弱 (敵の出血 3 以上で攻撃 -2)
             enemyAtkValue = Math.Max(0, enemyAtkValue - MetaProgression.MetaBuffApplicator.GetBleedWeakenAttack(ctx.enemyBleedStacks));
+            ctx.telegraphedEnemyAttack = enemyAtkValue;   // 〈開き直りの胸当て〉が読む (予告で開示される値)
 
             // 2 体戦: 2 体目の攻撃も**配線前に**確定させて予告へ載せる (柱3 完全情報テレグラフ)。
             //   解決時に振ると「見えていない一撃」ができ、 ADR-0009 の思想に正面から反する。
@@ -2736,6 +2749,7 @@ namespace CombatSystem
                                ? Mathf.FloorToInt(ctx.enemyCurrentHP * rinPct) : 0;
                 if (relicBurst > 0) ctx.fixedDamageToEnemy += relicBurst;
                 ctx.rinkaiBurstActive = false;
+                ctx.rinkaiBurstedThisTurn = true;   // 〈共鳴する炉心〉が読む
                 Debug.Log($"[臨界爆発] 固定ダメ +{ctx.rinkaiBurstDamage}"
                     + (relicBurst > 0 ? $" ＋遺物 {relicBurst} (現在HP {ctx.enemyCurrentHP} の {rinPct:P0})" : "")
                     + (ctx.rinkaiCritOnBurst ? " ＋会心確定" : ""));
@@ -2746,6 +2760,7 @@ namespace CombatSystem
                 atkBase, ctx.pursuitDamage, playerCritBaseRate);
             int lbStage = GameLoop.GameManager.Instance?.Run?.limitBreakStage ?? 0;
             dealtDmg = ApplyWinDamageModifiers(dealtDmg, ref dealtFixed, ref isCrit, lbStage, psm, ctx);
+            if (isCrit) ctx.playerCritThisTurn = true;
             ctx.lastPlayerDamage = dealtDmg + dealtFixed;
             DiagWinAttack = false;
             // [計装] 与ダメ出どころ別の発動率。 攻撃した回だけ数える。
@@ -2909,7 +2924,7 @@ namespace CombatSystem
             // 出血
             if (ctx.enemyBleedStacks > 0)
             {
-                int bleedDmg = BattleModifierManager.ApplyBleedModifiers(ctx, ctx.enemyBleedStacks);
+                int bleedDmg = BleedTickDamage(ctx);
                 if (_diagKind == SkillDiag.Boss && currentEnemy != null)
                     SkillDiag.BossDmgOf(currentEnemy.id)[5] += Math.Min(bleedDmg, enemyHP);
                 enemyHP = Math.Max(0, enemyHP - bleedDmg);
@@ -2948,8 +2963,7 @@ namespace CombatSystem
                 if (sh > 0)
                 {
                     ShieldDiag.Note("与ダメのシールド化", sh);
-                    ctx.consShield += sh;
-                    ctx.shieldGainedTotal += sh;
+                    ctx.GainShield(sh);
                 }
             }
 
@@ -4268,6 +4282,20 @@ namespace CombatSystem
         /// null なら振り直さない ── 旧実装は物資消費の自動ポリシーだったが、
         /// リロールのたびに発狂へ近づく形だとヨットの中核が経済ペナルティに潰される (§design-yacht)。
         /// </summary>
+        /// <summary>このターンの出血ダメージ。 〈血の祝祭〉(<see cref="CombatContext.bleedEchoOnCrit"/>) を持ち、
+        /// このターン会心していたら**もう 1 回適用**する (= 倍)。 出血の解決点は新旧パイプラインで 4 か所に散っているので
+        /// 1 つの関数へ寄せた。 出血が無ければ 0。</summary>
+        private static int BleedTickDamage(CombatContext ctx)
+        {
+            int dmg = BattleModifierManager.ApplyBleedModifiers(ctx, ctx.enemyBleedStacks);
+            if (ctx.bleedEchoOnCrit && ctx.playerCritThisTurn && dmg > 0)
+            {
+                dmg += BattleModifierManager.ApplyBleedModifiers(ctx, ctx.enemyBleedStacks);
+                Debug.Log($"[血の祝祭] 会心ターン → 出血ダメージをもう 1 回 (計 {dmg})");
+            }
+            return dmg;
+        }
+
         private void RerollPhase(CombatContext ctx, int[] playerDice, int[] enemyDice, int playerDiceMax,
                                  int[] playerFaceIdx = null)
         {
@@ -4306,6 +4334,8 @@ namespace CombatSystem
                 int cost = pick.Length * attempt;
                 if (freeReroll) { cost = 0; freeReroll = false; }
                 if (!ctx.ConsumeCharge(cost)) break;   // 払えなければそこで打ち切り
+                // コンボピック〈振り直しの毒針〉: リロールするたび敵に毒 (無料リロールも 1 回に数える)
+                if (ctx.poisonPerReroll > 0) ctx.AddStatus(InventorySystem.PassiveSkills.StatusTarget.Enemy, "poison", ctx.poisonPerReroll);
 
                 for (int k = 0; k < pick.Length; k++)
                 {
@@ -4661,7 +4691,7 @@ namespace CombatSystem
                 }
                 case SpecialTerminalKind.Bleed:
                 {
-                    ctx.enemyBleedStacks += sum;
+                    ctx.AddEnemyBleed(sum);   // 付与は必ず入口を通す (〈血の帳簿〉が数える)
                     // 接続**本数**ぶんだけ即時に発動させる (合計値ではない ── 制限Ⅱなので最大 2 回)
                     for (int k = 0; k < count && ctx.enemyBleedStacks > 0; k++)
                     {

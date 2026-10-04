@@ -334,14 +334,12 @@ namespace InventorySystem.PassiveSkills.Effects
         {
             if (trigger == PassiveSkillTrigger.OnBattleStart)
             {
-                ctx.consShield += OpeningShield; CombatSystem.ShieldDiag.Note("衛士の慣い(開幕)", OpeningShield);
-                ctx.shieldGainedTotal += OpeningShield;
+                ctx.GainShield(OpeningShield); CombatSystem.ShieldDiag.Note("衛士の慣い(開幕)", OpeningShield);
                 return;
             }
             if (ctx.consShield < RefillBelow)
             {
-                ctx.consShield += RefillAmount; CombatSystem.ShieldDiag.Note("衛士の慣い(補充)", RefillAmount);
-                ctx.shieldGainedTotal += RefillAmount;
+                ctx.GainShield(RefillAmount); CombatSystem.ShieldDiag.Note("衛士の慣い(補充)", RefillAmount);
             }
         }
     }
@@ -647,8 +645,7 @@ namespace InventorySystem.PassiveSkills.Effects
         {
             if (ctx.finalDamage <= 0) return;
             ShieldBashHelper.OnDeal(ctx, 0.80f); // 残存シールドの80% を攻撃力に (加算前に算出)
-            CombatSystem.ShieldDiag.Note("シールドバッシュIV", 5); ctx.consShield += 5;                  // 攻撃後 (加算後) にシールド補充
-            ctx.shieldGainedTotal += 5;
+            CombatSystem.ShieldDiag.Note("シールドバッシュIV", 5); ctx.GainShield(5);                  // 攻撃後 (加算後) にシールド補充
         }
     }
 
@@ -858,7 +855,7 @@ namespace InventorySystem.PassiveSkills.Effects
             // OnCriticalDamage は ×criticalMultiplier 適用前に発火するため、会心後ダメを自前で算出。
             int critDmg = UnityEngine.Mathf.CeilToInt((ctx.finalDamage + ctx.pursuitDamage) * ctx.criticalMultiplier);
             int shield = UnityEngine.Mathf.CeilToInt(critDmg * 0.05f);
-            if (shield > 0) { ctx.consShield += shield; ctx.shieldGainedTotal += shield; CombatSystem.ShieldDiag.Note("鏡返しの小盾", shield); }
+            if (shield > 0) { ctx.GainShield(shield); CombatSystem.ShieldDiag.Note("鏡返しの小盾", shield); }
         }
     }
 
@@ -1119,9 +1116,8 @@ namespace InventorySystem.PassiveSkills.Effects
             if (ctx.playerCurrentHP * 100 > ctx.playerMaxHP * 50) return;
             ctx.accumulatedValues[UsedKey] = 1;
             int shield = UnityEngine.Mathf.CeilToInt(ctx.playerMaxHP * 0.50f);
-            ctx.consShield += shield;
+            ctx.GainShield(shield);
             CombatSystem.ShieldDiag.Note("二拍目の心臓", shield);
-            ctx.shieldGainedTotal += shield;
             UnityEngine.Debug.Log($"[命脈] HP50%割れ → シールド+{shield}");
         }
     }
@@ -1429,11 +1425,27 @@ namespace InventorySystem.PassiveSkills.Effects
         public string SkillId => "石抜きの毒指輪";
         private const string UsedKey = "assassin_toxin_used";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
+        /// <summary>〈脱皮する毒壺〉(<see cref="CombatContext.assassinRearm"/>) 中のボスへの割合。 隠し倍率にしない (実数で書く)。</summary>
+        public const float RearmBossPct = 0.10f;
+
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (ctx.GetAccumulated(UsedKey) > 0) return;
-            if (ctx.GetStatus(StatusTarget.Enemy, "poison") < 5) return;
+            bool rearm = ctx.assassinRearm;
+            if (!rearm && ctx.GetAccumulated(UsedKey) > 0) return;
+            int poison = ctx.GetStatus(StatusTarget.Enemy, "poison");
+            if (poison < 5) return;
             if (ctx.enemyCurrentHP <= 0 || ctx.enemyMaxHP <= 0) return;
+            if (rearm)
+            {
+                // 脱皮する毒壺: 毎ターン撃てる代わりに**現在 HP 基準** (自己減衰し、 これ単独では倒し切れない)・
+                //   ボスは割合を半分にし、 撃つたびに毒を半分に戻す (また倍にして 5 を超える → 再発動の輪)
+                float pct = string.IsNullOrEmpty(ctx.bossId) ? 0.20f : RearmBossPct;
+                int rdmg = ctx.CurrentHpRatioDamageToEnemy(pct);
+                ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - rdmg);
+                ctx.enemyStatusStacks["poison"] = poison / 2;
+                UnityEngine.Debug.Log($"[毒殺者・脱皮] 毒{poison} → 現在HP×{pct:P0} = {rdmg} 軽減不能 → 敵HP={ctx.enemyCurrentHP}・毒を {poison / 2} へ");
+                return;
+            }
             int dmg = ctx.RatioDamageToEnemy(0.20f);
             ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - dmg);
             ctx.accumulatedValues[UsedKey] = 1;

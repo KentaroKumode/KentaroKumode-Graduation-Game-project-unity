@@ -104,7 +104,7 @@ namespace CombatSystem
                     {
                         int excess = Mathf.Max(0, blockSum - enemyAttackValue);
                         int shield = excess / 2;
-                        if (shield > 0) { ctx.consShield += shield; ctx.shieldGainedTotal += shield; ShieldDiag.Note("役〈偶〉", shield); }
+                        if (shield > 0) { ctx.GainShield(shield); ShieldDiag.Note("役〈偶〉", shield); }
                     }
                     break;
 
