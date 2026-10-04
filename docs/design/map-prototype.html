@@ -49,6 +49,10 @@
   @keyframes ignite { 0% { opacity:0 } 20% { opacity:.8 } 40% { opacity:.15 } 60% { opacity:1 } 80% { opacity:.6 } 100% { opacity:1 } }
   @keyframes blink { 0% { opacity:1 } 50% { opacity:0 } }
   @media (prefers-reduced-motion: reduce) { .lamp.lit.ignite .on { animation:none; } }
+  /* 物資バー (2026-10-05): 枠 272×20 の窓 (x5〜266・y6〜13 = 262×8) に中身を描く。 1 ドット = 1 ドット・拡大は CSS だけ */
+  .supply { position:relative; width:calc(272px * 2); height:calc(20px * 2); margin:6px 0 4px; }
+  .supply canvas { position:absolute; left:0; top:0; width:100%; height:100%; image-rendering:pixelated; }
+  @media (prefers-reduced-motion: reduce) { .supply { } }
 </style></head><body>
 <h1>自由移動マップ 試作（1層完結）</h1>
 <div class="sub">GAME.md §23-21 の仮置き数値で動く手触り確認用。戦闘は簡略版（ダイスで被害を決めるだけ）。<b>時間は流れ続ける（Highfleet 式）</b>── <b>スペースを短く押すと停止⇄順速、0.5 秒以上押し続けると押している間だけ早送り</b>（P キーでも停止⇄順速）。最初は停止。点をクリック → 経路と費用を確認 → もう一度クリックで出発（移動中でも行き先を変えられる）。</div>
@@ -59,7 +63,10 @@
   <div class="side">
     <div class="card">
       <div class="row"><span class="k">物資</span><span><b id="sup"></b> / <span id="supmax">1000</span> <b id="gauge" class="gauge"></b> <span id="stage" class="k" style="font-size:11px"></span></span></div>
-      <div class="bar"><i id="supbar" style="background:var(--gold)"></i><span id="bingoTick" class="tick" title="BINGO の線（最寄りの補給点まで＋余裕）"></span></div>
+      <div class="supply" title="物資: 減るたびに中身が 1 ドット左へ寄り、 減った分が光りながら下へ崩れて消える">
+        <canvas id="supCv" width="272" height="20" aria-label="物資のバー"></canvas>
+      </div>
+      <div class="bar" hidden><i id="supbar" style="background:var(--gold)"></i><span id="bingoTick" class="tick" title="BINGO の線（最寄りの補給点まで＋余裕）"></span></div>
       <div id="bingo" class="bingo" hidden></div>
       <div class="lamps" title="警告ランプ: HALF = 物資が上限の 75% 以下（HALF・LOW の段）／ CRIT = 20% 以下（0 で点滅）">
         <div class="lamp half" id="lampHalf"><img alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAVCAYAAADfLRcdAAABHElEQVR4nO2WT2+CMBiHf2ohxB10icZ42tnv/2F23smDJu7CbAqFBUodvLRdK9kwkefSvO3b8vSl/AEmJjCjNTi8bcpHqcv7x7njN28H+92q5AUeAl4on3Yf6yWJDIgjjA2vPAgd2XUS4ZNnSK/9xP9msVA+R1dlb8nNaWEFr9t8njhjjS2vDZ2j0bnS8tRYZSnLWLWC/8SCc6NInCSdPIoeC8Upq4R+X6SSUxJhFnEz7xYD+BL2fO/KhoqErknFB8n6XvQvYb6J995qFz7V9Jatzg8buBFB+lyCrvMaVFm9EDNsxDVGMc3zxSqr33Vy1lTCEHuNUQzz7pKtvl5SAqXMMTYSrPZx/nVtX1/KaPxfA2QZcLqkPb+Jp+cbeE971m6X0QcAAAAASUVORK5CYII="><img class="on" alt="HALF" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAVCAYAAADfLRcdAAADZ0lEQVR4nNWXX2gcRRzHP/vn9u64Rmua5NpE25QmxdS/2ICg9TC+iIj6oO9FDH0QBFFSaPtgH/xHW6VPQiWCvutLBX0UIoJiK4jSSEwbo1yaNGmsza13+3fKzN5dbi8XupGcpV9umP3Nzux8bvY38/st3EbSknQSH93b23aQV3+bu2mfDcLtYPN1OSn8GthXnrlf9OW38sg9Vqx9V2eKdml22YvZP/3lUly4xidf/xrjixmvv7RfrNgOw3u71gXc07150BcXvXXBz00t0ZFLc/rz83VGrfHVj35pFvf25pDAErQZbGh7mnZoct6J/QEJLEGn5mzGn/P7ai5hNg56YuhOpudsXnw0r0A72gTXrO2Dq9fD844C/uKHBcUDV+v3YrBStRU9d3ZC2SPvfqjqb46+EbePvYmmaTz59qnY+InjY6ouHD8Z2W+NIYQA+VNFMPLOB2uAG+cYfr7Q0gXXwErVVrS/c/X2nryFYep1+4GBHF2j74GWAt0ALSqF9z+l/NUJyHQDIfsfGyS0S4S+R+BUCP2gJWhtvj+W/XXfaEvYmjR9df9ltqQwTQNSOTAydAwOQa4PdAv/uzNgWpiPvwboWLsfgi27FGy6/z5EpQRuBeGWo1XObIOgwvL4GL4fEHihKo3zJYKtbypNw0zVVlKj59AJMLNgZMHMYGztBusu0NNoXTvRrCxketTq6jv2QTYPIkDv2Y349zo4NsKxIXDBugN8i85Dp8Evq7b5M0fr8yaG/S8yHn45coc2y2xukDtxRF4Ige+F1VbBlY8PKzfoHD0JoUtwbRHT/Vu5AXoKNDPyW3TCyxcw7j6g3CC8MgO+C14F4TmEThnTvd7SDdR80k2SwkqtVM+9mSWP/mpbpeRhmAF4tiorv0+StotqRUtnT6EZJrkXjihYd+ZnskOzCtZ88FnlDoQBCI+l8SOkD0THUbnkEvgRqJTcXI3zJ4JtpYsLrqr7qvYv0zYjgYw2Hue/v6SOscLTEcSPExcoPLXY8jlqXPV6qlhhI4pFsM+mtxVvRVBo1EpDUBjozXFw4GrrCPbt5D/IcCs7/l/hdrIp1ErVwq3kOTiw2jd2TtTyg535CKo5imxmEtMqkWnMvv5ccGJ5gZSWIJdNksPKCHAzzW40t23OabVb/YVAk5J8MdwWugFztHBJ+EWO6AAAAABJRU5ErkJggg=="></div>
@@ -1307,10 +1314,79 @@ function updateLamps() {
   setLamp("lampHalf", test || g === "HALF" || g === "LOW", false);
   setLamp("lampCrit", test || g === "CRIT", !test && S.sup <= 0);
 }
+
+// ═══ 物資バー (2026-10-05) ═══════════════════════════════════════════
+// 枠 (272×20) の窓 (x5〜266・y6〜13 = 262×8) に、 バーの絵を物資の割合の幅だけ見せる。 窓の残りは暗い空。
+// 物資が減るたび: ① 中身が減った幅だけ左へ流れる (絵は 1 ドット単位で動く) ② 減った分のドットが、 光りながら下へ崩れて消える。
+// 増えた (補給) 時は右端から絵が現れるだけで、 崩れは出さない。 表示は 1 ドット = 1 ドット (拡大は CSS)
+const SB = { WX: 5, WY: 6, WW: 262, WH: 8, frame: new Image(), bar: new Image(), ready: 0,
+  shown: -1, off: 0, parts: [], last: null, raf: 0 };
+SB.frame.onload = SB.bar.onload = () => { if (++SB.ready === 2) { if (S) { SB.shown = Math.round(SB.WW * S.sup / P.supMax); SB.last = S.sup; } supBarDraw(true); } };
+SB.frame.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAARAAAAAUCAIAAADKjvXgAAADx0lEQVR4AeyaS2/TUBCFbTeQp/NqHvwdxLoFIVaoQqViw4INYoNQd/wMQAgQK4Raukb8ndK84ySFTcJn38Rx4sR1XAep0kSnN3Ov586cOdVpqyqG5rz2D44EooAoEKCAYxTNNszhy9fZfCGTMwWigCiwUoHbyRRewjPGi+O3txKJVDqdzmYFooAosFKBXKFgFktHr94YOTN/O5nEOgJRQBRYp4Cu68VSqVatGbx03f7DjNTJZPL3cvRnNHRxORz2ux1WQDAaDHqddq/dmqLT5txNDh9wa6GOWzDeIAQ9mDAXqyJPwHY0WBwzXlbbq9ZpjwYD+DOFGmdp5Zyn5PwP8bc3ZoyVZ4qhCcqgj1cxtla3OxmPsQbAJjs7O0YynU4kdthPxuNeqzm0LPJcjAZWt9lgBXZg9TuNi06zMUXjgnM3OXzArYU6bsF4gxD0YGLPNZhOPd0ujRkvq+1VY16r7x1n6Ttys6fbhm6uYqt0Q67WxXnz97nyDDbBLIZuGJquYxir3+u2W6ef3598eufix5cPP0+/sQKCs68ff51994LzE09+yJhb3iLbi2kUTIkE5mJVaQRs/WNuj2G8lWEOf6ZQ4yytnPOUnHib3uhqqKE0YUUfr2Js8cXQ6mMNAmyCWQw7cr6UjZxQFlFAFLAV4GcBb15rzA3DA4EoIAoEKyCGCdZHnooCCwqsNsxCimxEAVFgpoAYZqaEvIsCIRQQw4QQSVJEgZkCc8PwLzMO7+49ZBWIAqIACig7KGuwBXPDmPlC1sxzRNL+wdGDJ88Awb37j/YeH3IYGVynCKWACqjsB08jtKC4usV1f01OOKepm6aSr7+6BalPl2CQAwdWcP3WVIjQ3b3C9bhATTVX8PjqKbOrZIK4CESo4+V8JRPsgCmwBoHC3DDYqFK/U67VS9VaJmeqj6BlcmaxUs2YeQ5LlWoUUM3M20WcT0OrQBVfWmm6cRenuH2LYMbZX9Zual5jBP/gtFMFCdb09dJgNJuDo4DN1l9woxOaRuiurmzUKDjZoaHm8g67Lo5ZhGBu654ucoZS8LcDO2AKrKHcwjo3DBse5IulQqnMzKlMFhBwksnlOCyUd6OgVOY6RSgFVEBlP3i6cRenuH3Lw3mpMmVpCgc7LdoI/lsh+nppKA6sIAYakbrHrACaODTQlqG8w66LSVPJBDGIAIEIWOR8JRMIYwqs4cI2TDKZ0jT70zGavEQBUWC1ArpjE804fv40Z5q1er1QLApEAVFgpQIYBJtgFvs3DG9sditVgSggCqxUAINgE03T/gEAAP//azzQNQAAAAZJREFUAwDlCzR6UGxeUAAAAABJRU5ErkJggg=="; SB.bar.src = "data:image/png;base64,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";
+const supCx = () => document.getElementById("supCv").getContext("2d", { willReadFrequently: true });
+function supBarSet(sup) {
+  if (SB.ready < 2) return;                          // 画像の読み込み前は何もしない (読み込み後に今の物資で初期化する)
+  const w = Math.round(SB.WW * Math.max(0, Math.min(1, sup / P.supMax)));
+  if (SB.shown < 0) { SB.shown = w; SB.last = sup; supBarDraw(true); return; }
+  if (w < SB.shown) supBarSpill(w, SB.shown);          // 減った: 減った幅ぶんを崩す
+  SB.off = (SB.off + (SB.shown - w)) % SB.WW;          // 絵が減った幅だけ左へ流れる
+  SB.shown = w; SB.last = sup;
+  if (!SB.raf) SB.raf = requestAnimationFrame(supBarLoop);
+  supBarDraw();
+}
+// 減った列 (w0〜w1) のドットを粒にする。 粒は光って (白く) から暗くなり、 下へ加速しながら落ちて窓の下で消える
+function supBarSpill(w0, w1) {
+  const bc = document.createElement("canvas"); bc.width = SB.WW; bc.height = SB.WH; const bx = bc.getContext("2d");
+  const x = n => ((n + SB.off) % SB.WW + SB.WW) % SB.WW;
+  bx.drawImage(SB.bar, 0, 0);
+  for (let c = w0; c < w1; c++) for (let r = 0; r < SB.WH; r++) {
+    const d = bx.getImageData(x(c), r, 1, 1).data; if (d[3] < 8) continue;
+    SB.parts.push({ x: SB.WX + c, y: SB.WY + r, vy: 0, vx: (Math.random() - 0.5) * 0.25, col: [d[0], d[1], d[2]],
+      glow: 1, delay: Math.floor(Math.random() * 6) + (SB.WH - r) * 0.4, life: 0 }); }
+  if (!SB.raf) SB.raf = requestAnimationFrame(supBarLoop);
+}
+function supBarLoop() {
+  SB.raf = 0;
+  for (const p of SB.parts) {
+    if (p.delay > 0) { p.delay--; continue; }
+    p.life++; p.vy += 0.18; p.y += p.vy; p.x += p.vx; p.glow = Math.max(0, p.glow - 0.035);
+  }
+  SB.parts = SB.parts.filter(p => p.y < SB.WY + SB.WH + 14 && p.life < 70);
+  supBarDraw();
+  if (SB.parts.length) SB.raf = requestAnimationFrame(supBarLoop);
+}
+function supBarDraw(first) {
+  if (SB.ready < 2) return;
+  const cx = supCx(); cx.clearRect(0, 0, 272, 20);
+  // ① 窓の中: 空の暗さ → バーの絵 (左へ流れた分だけずらして、 見せる幅まで)
+  cx.fillStyle = "#050607"; cx.fillRect(SB.WX, SB.WY, SB.WW, SB.WH);
+  const w = SB.shown < 0 ? SB.WW : SB.shown, o = SB.off;
+  if (w > 0) {                                                        // 絵は輪になっている (左へ流れて右端から戻る)
+    const src = (sx, sw, dx) => { if (sw > 0) cx.drawImage(SB.bar, sx, 0, sw, SB.WH, SB.WX + dx, SB.WY, sw, SB.WH); };
+    const a = Math.min(w, SB.WW - o); src(o, a, 0); src(0, w - a, a);
+  }
+  // ② 枠 (窓の部分は透明に抜けている): 絵の上に重ねる
+  /* 枠の画像は窓が黒く塗りつぶされている: 窓の長方形 (x5〜266・y6〜13) を除いて 4 つの帯に分けて描く */
+  const fr = (sx, sy, sw, sh) => cx.drawImage(SB.frame, sx, sy, sw, sh, sx, sy, sw, sh);
+  fr(0, 0, 272, SB.WY); fr(0, SB.WY + SB.WH, 272, 20 - SB.WY - SB.WH); fr(0, SB.WY, SB.WX, SB.WH); fr(SB.WX + SB.WW, SB.WY, 272 - SB.WX - SB.WW, SB.WH);
+  // ③ 崩れる粒 (枠より手前に描く): 光る間は白に近く加算、 落ちるほど元の色へ戻って暗くなる
+  cx.save();
+  for (const p of SB.parts) {
+    if (p.delay > 0) { cx.fillStyle = `rgb(${p.col[0]},${p.col[1]},${p.col[2]})`; cx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1); continue; }   // 遅延中は元の場所に元の色のまま
+    const a = Math.max(0, 1 - p.life / 60), g = p.glow * 0.7;                // 光は 70% まで (白飛びさせず、 茶の面影を残す)
+    const r = Math.round(p.col[0] + (255 - p.col[0]) * g), gr = Math.round(p.col[1] + (214 - p.col[1]) * g), b = Math.round(p.col[2] + (150 - p.col[2]) * g);
+    cx.fillStyle = `rgba(${r},${gr},${b},${a})`;
+    cx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1);
+    if (g > 0.4) { cx.globalCompositeOperation = "lighter"; cx.fillStyle = `rgba(255,200,120,${g * 0.35 * a})`; cx.fillRect(Math.round(p.x) - 1, Math.round(p.y), 3, 1); cx.globalCompositeOperation = "source-over"; }
+  }
+  cx.restore();
+}
+
 function ui() {
   const st = stageOf(S.sup);
   document.getElementById("sup").textContent = S.sup; document.getElementById("supmax").textContent = P.supMax; updateGauge();
   document.getElementById("supbar").style.width = (S.sup / P.supMax * 100) + "%";
+  supBarSet(S.sup);
   updateLamps();
   document.getElementById("hp").textContent = S.hp; document.getElementById("hpmax").textContent = P.hpMax;
   document.getElementById("hpbar").style.width = (S.hp / P.hpMax * 100) + "%";
