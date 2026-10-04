@@ -293,9 +293,8 @@ namespace InventorySystem.PassiveItems.Effects
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
             if (ctx == null) return;
-            ctx.consShield += Shield;
+            ctx.GainShield(Shield);
             CombatSystem.ShieldDiag.Note("相棒の魂", Shield);
-            ctx.shieldGainedTotal += Shield;
         }
     }
 

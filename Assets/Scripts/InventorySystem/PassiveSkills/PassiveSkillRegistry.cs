@@ -172,6 +172,26 @@ namespace InventorySystem.PassiveSkills
         /// 全スキルを登録
         /// ★ 新スキル追加時はここに1行追加するだけ ★
         /// </summary>
+        /// <summary>コンボピック (2026-10-04)。 RegisterAll の本体が長いので別の関数に分けた。</summary>
+        private static void RegisterComboPicks()
+        {
+            Register(new DullFile());              // 刃毀れの鑢
+            Register(new BleedLedger());           // 血の帳簿
+            Register(new PoisonCapacitor());       // 毒の蓄電器
+            Register(new RerollNeedle());          // 振り直しの毒針
+            Register(new RustyClasp());            // 錆びた留め金
+            Register(new BloodPactNail());         // 血契の釘
+            Register(new DeathAbacus());           // 死に際の算盤
+            Register(new DesperateBreastplate());  // 開き直りの胸当て
+            Register(new ClearTuningFork());       // 澄んだ音叉
+            Register(new BoiledVenomGlue());       // 煮詰めた毒の膠
+            Register(new DiceSavingsBox());        // 賽の貯金箱
+            Register(new CatalystCrucible());      // 触媒の坩堝
+            Register(new MoltingVenomJar());       // 脱皮する毒壺
+            Register(new ResonantCore());          // 共鳴する炉心
+            Register(new BloodFeast());            // 血の祝祭
+        }
+
         private static void RegisterAll()
         {
             // ============================
@@ -335,6 +355,7 @@ namespace InventorySystem.PassiveSkills
             Register(new SerpentBlood());     // 蛇の血 (会心で毒+2)
             Register(new VenomFog());         // 毒の霧 (3T毎に毒+1)
             Register(new AssassinToxin());    // 毒殺者 (毒=5でHP×20%削り 1戦1回)
+            RegisterComboPicks();             // コンボピック 15 品 (2026-10-04・docs/design/combo-picks.md)
             Register(new VenomBurst());       // 毒液噴射 (毒2消費で+10軽減不能)
             Register(new Paralysis());        // 麻痺毒 (毒スタック分 敵攻撃-N・拘束中核)
             // VenomBlade はステータス化
