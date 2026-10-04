@@ -43,7 +43,7 @@
   /* 警告ランプ (HALF / CRIT・燃料計のバーとは別物)。 Tools/lamp_lit.py が書き出す *_lamp_on_full / *_lamp_off_full
      (43×21・光を四方 3 ドットまで焼き込み済み・点灯と消灯は同じ大きさ) を 4 倍で差し替えるだけ */
   .lamps { display:flex; flex-direction:row; gap:8px; margin:0; padding:0; background:#2a2620; border-radius:3px; }   /* バーと同じ幅の 1 本の帯に、 ランプを横に並べる */
-  .lamp { position:relative; width:129px; height:63px; }   /* 43×21 の 3 倍 */
+  .lamp { position:relative; width:86px; height:42px; }   /* 43×21 の 2 倍 */
   .lamp img { position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated; }
   .lamp .on { opacity:0; }
   .lamp.lit .on { opacity:1; }
@@ -53,8 +53,9 @@
   @keyframes blink { 0% { opacity:1 } 50% { opacity:0 } }
   @media (prefers-reduced-motion: reduce) { .lamp.lit.ignite .on { animation:none; } }
   /* 物資バー (2026-10-05): 枠 272×20 の窓 (x5〜266・y6〜13 = 262×8) に中身を描く。 1 ドット = 1 ドット・拡大は CSS だけ */
-  .supply { position:relative; width:272px; height:20px; margin:0; flex:none; }
-  .supply canvas { position:absolute; left:0; top:0; width:272px; height:20px; image-rendering:pixelated; display:block; }
+  /* バー・ランプ・地図は同じ密度: 地図は 480×270 を 2 倍で出しているので (GUI 1 ドット = 2px)、 バーもランプも 2 倍 */
+  .supply { position:relative; width:544px; height:40px; margin:0; flex:none; }
+  .supply canvas { position:absolute; left:0; top:0; width:544px; height:40px; image-rendering:pixelated; display:block; }
   @media (prefers-reduced-motion: reduce) { .supply { } }
 </style></head><body>
 <h1>自由移動マップ 試作（1層完結）</h1>
