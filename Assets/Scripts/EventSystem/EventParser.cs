@@ -307,7 +307,7 @@ namespace EventSystem
         private static readonly Regex maxHp        = new Regex(@"^最大HP([+\-])(\d+)$");
         private static readonly Regex gold         = new Regex(@"^ゴールド([+\-])(\d+)$");
         private static readonly Regex hunger       = new Regex(@"^空腹度([+\-])(\d+)$");
-        private static readonly Regex hope         = new Regex(@"^希望([+\-])(\d+)$");
+        private static readonly Regex provision         = new Regex(@"^物資([+\-])(\d+)$");
         private static readonly Regex material     = new Regex(@"^武器強化素材([+\-])(\d+)$");
         private static readonly Regex tBuff        = new Regex(@"^時限バフ\[(.+?)\](?:を獲得)?$");
         private static readonly Regex tDebuff      = new Regex(@"^時限デバフ\[(.+?)\](?:を獲得)?$");
@@ -355,7 +355,7 @@ namespace EventSystem
             m = maxHp.Match(t);      if (m.Success) return Eff(EventEffectType.MaxHpDelta, amount: SignedInt(m, 1, 2), postCombat: postCombat);
             m = gold.Match(t);       if (m.Success) return Eff(EventEffectType.GoldDelta, amount: SignedInt(m, 1, 2), postCombat: postCombat);
             m = hunger.Match(t);     if (m.Success) return Eff(EventEffectType.HungerDelta, amount: SignedInt(m, 1, 2), postCombat: postCombat);
-            m = hope.Match(t);       if (m.Success) return Eff(EventEffectType.HopeDelta, amount: SignedInt(m, 1, 2), postCombat: postCombat);
+            m = provision.Match(t);       if (m.Success) return Eff(EventEffectType.ProvisionDelta, amount: SignedInt(m, 1, 2), postCombat: postCombat);
             m = material.Match(t);   if (m.Success) return Eff(EventEffectType.MaterialDelta, amount: SignedInt(m, 1, 2), postCombat: postCombat);
             m = tBuff.Match(t);      if (m.Success) return Eff(EventEffectType.TimedBuff, param: m.Groups[1].Value, postCombat: postCombat);
             m = tDebuff.Match(t);    if (m.Success) return Eff(EventEffectType.TimedDebuff, param: m.Groups[1].Value, postCombat: postCombat);

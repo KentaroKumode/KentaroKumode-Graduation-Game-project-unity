@@ -12,11 +12,32 @@ namespace MapSystem
         public string startNodeId;
         public string bossNodeId;
 
+        /// <summary>自由移動の層の形 (点・道・山岳・縄張り)。 Λ 環状線・8 層 (ボス戦だけ) では null。</summary>
+        public FreeMove.FreeMapLayout layout;
+        public bool IsFreeMap => layout != null;
+
+        private readonly List<string> _idByIndex = new List<string>();
+
         private Dictionary<string, MapNode> nodes = new Dictionary<string, MapNode>();
 
         public void AddNode(MapNode node)
         {
             nodes[node.id] = node;
+            if (node.index >= 0)
+            {
+                while (_idByIndex.Count <= node.index) _idByIndex.Add(null);
+                _idByIndex[node.index] = node.id;
+            }
+        }
+
+        /// <summary>自由移動の層の点の添字 → ノード ID。</summary>
+        public string NodeIdAt(int index)
+            => index >= 0 && index < _idByIndex.Count ? _idByIndex[index] : null;
+
+        public MapNode GetNodeByIndex(int index)
+        {
+            string id = NodeIdAt(index);
+            return id != null ? GetNode(id) : null;
         }
 
         /// <summary>接続を追加（デフォルトは前方向のみ、bidirectional=true で双方向）</summary>
@@ -53,17 +74,8 @@ namespace MapSystem
                 .ToList();
         }
 
-        /// <summary>到達先を前進（斜め含む）と横移動に分類</summary>
-        public (List<MapNode> forward, List<MapNode> lateral) CategorizeMovesFrom(string nodeId)
-        {
-            var current = GetNode(nodeId);
-            if (current == null) return (new List<MapNode>(), new List<MapNode>());
-
-            var reachable = GetReachableFrom(nodeId);
-            var forward = reachable.Where(n => n.row > current.row).ToList();
-            var lateral = reachable.Where(n => n.row == current.row).ToList();
-            return (forward, lateral);
-        }
+        // 2026-09-28: CategorizeMovesFrom（前進 / 横移動の分類）は 3 列マップと一緒に削除した。
+        //   自由移動には「前」も「横」も無い (docs/GAME.md §24)。
 
         public int MaxRow => nodes.Count > 0 ? nodes.Values.Max(n => n.row) : 0;
     }

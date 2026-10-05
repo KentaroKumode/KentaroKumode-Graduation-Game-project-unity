@@ -81,7 +81,7 @@ namespace MapSystem.AbyssPhenomena
             { AbyssPhenomenon.FadingPerson, new AbyssPhenomenonDef {
                 id = AbyssPhenomenon.FadingPerson, kind = AbyssPhenomenonKind.Debuff,
                 displayName = "薄れる人",
-                description = "〈希望〉 が減少するたび、 追加で -1。",
+                description = "〈物資〉 が減少するたび、 追加で -10。",
             } },
         };
 

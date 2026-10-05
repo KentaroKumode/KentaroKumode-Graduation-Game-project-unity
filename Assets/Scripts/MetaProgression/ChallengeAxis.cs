@@ -52,7 +52,7 @@ namespace MetaProgression
         宿屋連合     = 13,
 
         // ---------- E. 崩壊 (6pt) ----------
-        /// <summary>3段 1/2/3pt — 希望上限 −5 / −10 / −15</summary>
+        /// <summary>3段 1/2/3pt — 物資上限 −5 / −10 / −15</summary>
         絶望的な戦闘 = 9,
         /// <summary>1段 3pt — エスカレーション閾値を 2T 前倒し</summary>
         天変地異     = 10,

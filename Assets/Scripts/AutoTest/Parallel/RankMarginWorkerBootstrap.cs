@@ -117,7 +117,7 @@ namespace AutoTest.ParallelSweep
                 runner.RankMarginArmProgress += done => WriteProgress(done, "running");
 
                 GameLoop.LastStand.ResetStats();
-                GameLoop.HopePayment.ResetStats();
+                GameLoop.ProvisionPayment.ResetStats();
                 MetaProgression.VaultBank.ResetStats();
                 CombatSystem.GuardDiag.Reset();
                 CombatSystem.SkillDiag.Reset();
@@ -266,8 +266,8 @@ namespace AutoTest.ParallelSweep
                         lastStandRevivals = GameLoop.LastStand.RevivalCount[1],
                         fleuretRevivals = GameLoop.LastStand.RevivalCount[2],
                         revivalHpRestored = GameLoop.LastStand.RevivalHpRestored,
-                        hopePayments = GameLoop.HopePayment.PaymentCount,
-                        hopeSpent = GameLoop.HopePayment.HopeSpentTotal,
+                        provisionPayments = GameLoop.ProvisionPayment.PaymentCount,
+                        provisionSpent = GameLoop.ProvisionPayment.ProvisionSpentTotal,
                         vaultDoublings = MetaProgression.VaultBank.Doublings,
                         vaultGoldGained = MetaProgression.VaultBank.GoldGainedTotal,
                         vaultCapHits = MetaProgression.VaultBank.CapHits,
@@ -290,8 +290,8 @@ namespace AutoTest.ParallelSweep
                         robberyLootTotal = GameLoop.GameManager.RobberyLootTotal,
                         robberyByFloor = (long[])InventorySystem.Shop.ShopManager.RobberyByFloor.Clone(),
                         bossEntryCount = (long[])GameLoop.GameManager.BossEntryCount.Clone(),
-                        bossEntryHope = (long[])GameLoop.GameManager.BossEntryHope.Clone(),
-                        bossEntryHopeTier = (long[])GameLoop.GameManager.BossEntryHopeTierSum.Clone(),
+                        bossEntryProvision = (long[])GameLoop.GameManager.BossEntryProvision.Clone(),
+                        bossEntryProvisionTier = (long[])GameLoop.GameManager.BossEntryProvisionTierSum.Clone(),
                         bossEntryConsumables = (long[])GameLoop.GameManager.BossEntryConsumables.Clone(),
                         bossEntryHpPct = (long[])GameLoop.GameManager.BossEntryHpPct.Clone(),
                         bossEntryPassives = (long[])GameLoop.GameManager.BossEntryPassives.Clone(),
@@ -301,8 +301,8 @@ namespace AutoTest.ParallelSweep
                         gateBloodPaid = GameLoop.GameManager.GateBloodPaid,
                         gateRelicsPaid = GameLoop.GameManager.GateRelicsPaid,
                         gateTransferPaid = GameLoop.GameManager.GateTransferPaid,
-                        gateHopeBefore = GameLoop.GameManager.GateHopeBefore,
-                        gateHopeAfter = GameLoop.GameManager.GateHopeAfter,
+                        gateProvisionBefore = GameLoop.GameManager.GateProvisionBefore,
+                        gateProvisionAfter = GameLoop.GameManager.GateProvisionAfter,
                         gateMaxHpPaid = GameLoop.GameManager.GateMaxHpPaid,
                         gateRelicsBurned = GameLoop.GameManager.GateRelicsBurned,
                         // [計装] atkBase の「パッシブ加算」を誰が積んだか。 key=SkillId。
