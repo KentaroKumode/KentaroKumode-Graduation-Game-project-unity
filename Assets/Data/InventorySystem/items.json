@@ -1990,6 +1990,156 @@
       "category": "Passive",
       "rarity": "LEGENDARY",
       "basePrice": 10
+    },
+    {
+      "id": "刃毀れの鑢",
+      "name": "刃毀れの鑢",
+      "description": "被ダメージ時と攻撃時に、敵に出血+1。",
+      "flavorText": "研ぎ師は鑢を持ち込み、刃を削るほど切れ味が増すと言い張った。師の工房の床は、削れた刃の鉄粉で赤く錆びていた。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "刃毀れの鑢"
+    },
+    {
+      "id": "血の帳簿",
+      "name": "血の帳簿",
+      "description": "敵に出血が新たに付くたび、この戦闘中の攻撃+1（上限+10）。",
+      "flavorText": "血が流れるたびに一行ずつ書き足す帳簿。最後の頁の合計欄だけが、いつも空白のまま残っている。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "血の帳簿"
+    },
+    {
+      "id": "毒の蓄電器",
+      "name": "毒の蓄電器",
+      "description": "敵の毒が増えるたび、充電+1。",
+      "flavorText": "毒を注いだ瓶の底に銅板を沈めると、微かに電気が起こる。誰が最初に試したのかは、瓶の側が覚えている。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "毒の蓄電器"
+    },
+    {
+      "id": "振り直しの毒針",
+      "name": "振り直しの毒針",
+      "description": "リロールするたび、敵に毒+1。",
+      "flavorText": "賽を振り直すたびに、見えない針が一本ずつ相手の袖口へ吸われていく。賭場の主は、針の数を数えるのをやめた。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "振り直しの毒針"
+    },
+    {
+      "id": "錆びた留め金",
+      "name": "錆びた留め金",
+      "description": "シールドが減ったターンの次のターン開始時、減った量の半分を取り戻す。",
+      "flavorText": "錆びた留め金は一度外れても、翌朝には元の穴へ戻っている。留めた覚えのある者は、誰もいない。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "錆びた留め金"
+    },
+    {
+      "id": "血契の釘",
+      "name": "血契の釘",
+      "description": "攻撃を配線したターン、HPを2失い、攻撃+5。HPは1より下がらず、払えないときは攻撃も上がらない。",
+      "flavorText": "契約書に血判を押す代わりに、掌へ直接釘を打つ。傷が塞がる前に次の契約が来るので、釘は抜かれたことがない。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "血契の釘"
+    },
+    {
+      "id": "死に際の算盤",
+      "name": "死に際の算盤",
+      "description": "HPが減るたび（敵の攻撃での被ダメージ・自傷）、敵に出血+1。",
+      "flavorText": "算盤の珠は持ち主の脈に合わせて弾かれる。止まるまでの勘定が合っていたかは、帳簿を引き継いだ者だけが知っている。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "死に際の算盤"
+    },
+    {
+      "id": "開き直りの胸当て",
+      "name": "開き直りの胸当て",
+      "description": "敵の予告攻撃が自分の現在HPの半分以上のターン、攻撃+6。",
+      "flavorText": "割れた胸当ては、着けた者に二度目の怯えを許さない。怯える前に、胸が先に開き直るからだ。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "開き直りの胸当て"
+    },
+    {
+      "id": "澄んだ音叉",
+      "name": "澄んだ音叉",
+      "description": "会心したターンの次のターン、1回目のリロールが無料になる。",
+      "flavorText": "会心の余韻が鳴り止まぬうちに叩くと、澄んだ音叉は賽の重心をわずかにずらす。調律師はその音を『二度目の機会』と呼んだ。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "澄んだ音叉"
+    },
+    {
+      "id": "煮詰めた毒の膠",
+      "name": "煮詰めた毒の膠",
+      "description": "敵に毒が乗っている間、シールドの獲得+25%。",
+      "flavorText": "毒を煮詰めた膠は、乾くほど盾に粘りつく。盾職人の組合はこの膠を禁じたが、禁じた翌年から組合員は全員これで盾を継いでいる。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "煮詰めた毒の膠"
+    },
+    {
+      "id": "賽の貯金箱",
+      "name": "賽の貯金箱",
+      "description": "役を切ったターン、充電+2。",
+      "flavorText": "役が揃うたびに硬貨が一枚、貯金箱の中で鳴る。割って中身を数えた者は、一人もいない。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8,
+      "skill": "賽の貯金箱"
+    },
+    {
+      "id": "触媒の坩堝",
+      "name": "触媒の坩堝",
+      "description": "ターン終了時、敵の毒を2倍にする（毒の上限まで）。",
+      "flavorText": "坩堝の底には前の持ち主の毒が薄く残っている。火にかけるたびに倍になるのは、坩堝が毒を覚えているからだと、錬金術師は結論した。",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "skill": "触媒の坩堝"
+    },
+    {
+      "id": "脱皮する毒壺",
+      "name": "脱皮する毒壺",
+      "description": "〈石抜きの毒指輪〉の毒殺を何度でも撃てるようにする。撃つたびに毒が半分になり、割合は敵の現在HP基準（ボスは10%）。",
+      "flavorText": "壺の蛇は毒を吐くたびに皮を脱ぐ。脱いだ皮を拾えば、その毒はもう一度使えるという言い伝えがある。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "脱皮する毒壺"
+    },
+    {
+      "id": "共鳴する炉心",
+      "name": "共鳴する炉心",
+      "description": "臨界爆発を撃ったターンに会心したら、充電を6払って次ターンの爆発を再び予約する。",
+      "flavorText": "炉心は爆ぜるたびに自分の音を聞き、同じ音をもう一度鳴らそうとする。その間、窓は開けないでほしいと、管理人は頼んだ。",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10,
+      "skill": "共鳴する炉心"
+    },
+    {
+      "id": "血の祝祭",
+      "name": "血の祝祭",
+      "description": "会心したターンは、敵の出血ダメージをもう1回適用する。",
+      "flavorText": "会心の夜だけ、祝祭は二度行われる。二度目の杯が空くまで、誰も席を立たない決まりだ。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "skill": "血の祝祭"
     }
   ]
 }

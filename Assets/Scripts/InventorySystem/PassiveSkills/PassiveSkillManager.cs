@@ -675,6 +675,9 @@ namespace InventorySystem.PassiveSkills
             //   鈍器ビルドは生き残る ── 会心ビルドだけを止める。
             if (context.lambdaNoCritBranch && !attackerIsEnemy) context.isCritical = false;
 
+            // コンボピック: 「このターン会心したか」を残す。 isCritical は同ターンの敵の攻撃で false に上書きされる
+            if (context.isCritical && !attackerIsEnemy) context.playerCritThisTurn = true;
+
             if (context.isCritical && totalDamage > 0)
             {
                 FireTrigger(PassiveSkillTrigger.OnCriticalDamage);
@@ -722,7 +725,11 @@ namespace InventorySystem.PassiveSkills
             if (context.playerWonRoll)
                 FireTrigger(PassiveSkillTrigger.OnPostDealDamage);
             else
+            {
+                // コンボピック: 敵の攻撃で実際に被ダメージが出た回 = 「HP が減った出来事」 (〈死に際の算盤〉)
+                if (attackerIsEnemy && totalDamage > 0) context.hpLossEventsThisTurn++;
                 FireTrigger(PassiveSkillTrigger.OnPostReceiveDamage);
+            }
 
             // 蒼白の槍騎士: 軽減無視ダメージ(fixedDamageToEnemy)を増幅
             if (context.fixedDamageMultiplier > 1f && context.fixedDamageToEnemy > 0)

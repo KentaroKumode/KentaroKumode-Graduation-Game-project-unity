@@ -277,9 +277,8 @@ namespace GameLoop
             if (ctx != null)
             {
                 int gained = Mathf.Max(0, amount - ctx.healShieldReduction);
-                ctx.consShield += gained;
+                ctx.GainShield(gained);
                 CombatSystem.ShieldDiag.Note("消耗品", gained);
-                ctx.shieldGainedTotal += gained;
                 ctx.consShieldExpireTurn = -1;
             }
             else if (run != null)

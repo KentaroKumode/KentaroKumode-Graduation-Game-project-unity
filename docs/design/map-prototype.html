@@ -12,6 +12,7 @@
   .mapbox { position:relative; border:1px solid var(--line); background:#0b0d0f; max-width:100%; overflow:auto; }
   .mapcol { display:flex; flex-direction:column; gap:6px; max-width:100%; }
   /* 物資の帯 (2026-10-05): 地図の下に、 バー (272×20) とランプ (3 倍) を 1 本に並べる */
+  .supplyRow[hidden] { display:none; }
   .supplyRow { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:6px 8px; background:#0b0d0f; border:1px solid var(--line); }
   .mapbox:fullscreen { display:flex; align-items:center; justify-content:center; background:#000; border:0; }
   canvas { display:block; image-rendering:pixelated; }
@@ -133,6 +134,7 @@
       <label style="display:block;margin-top:6px"><input type="checkbox" id="dbg"> 敵と痕跡を常に表示（デバッグ）</label>
       <label style="display:block;margin-top:6px"><input type="checkbox" id="lcd" checked> 液晶の表示（切ると旧表示）</label>
       <label style="display:block;margin-top:2px"><input type="checkbox" id="scanl"> 走査線（中間色が出る）</label>
+      <label style="display:block;margin-top:2px"><input type="checkbox" id="bandShow" checked> 物資の帯（地図の下・金属のバー）を表示</label>
       <label style="display:block;margin-top:2px"><input type="checkbox" id="drain5" checked> 物資の減り ×5（移動・照明・テスト用）</label>
       <div class="btns" style="margin-top:4px"><button id="bFs" type="button">全画面（F）</button><button id="bZoom" type="button">拡大の切り替え（Z）</button><button id="bCam" type="button">視点を自分へ（C）</button></div>
       <div class="k" style="font-size:11px">地図の画面は既定で 2 倍に拡大（層の約半分を表示）。視点は自分に付いてくる。WASD かドラッグで見回せる。</div>
@@ -944,6 +946,7 @@ document.getElementById("bNew").onclick = newGame;
   document.getElementById("showProf").onchange = () => draw(); }
 document.getElementById("dbg").onchange = () => draw();
 document.getElementById("lampTest").onchange = () => updateLamps();
+document.getElementById("bandShow").onchange = e => { document.querySelector(".supplyRow").hidden = !e.target.checked; };   /* 地図の中の外枠 GUI (SG) と二重に出るので切り替えられる */
 document.getElementById("lcd").onchange = () => draw();
 document.getElementById("scanl").onchange = () => draw();
 document.getElementById("screen").onchange = () => draw();
@@ -951,6 +954,25 @@ document.getElementById("bFs").onclick = toggleFs;
 document.getElementById("bZoom").onclick = () => { ZOOM = ZOOM > 1 ? 1 : 2; CAM.manual = false; draw(); };
 document.getElementById("bCam").onclick = () => { CAM.manual = false; draw(); };
 document.getElementById("bingoMargin").onchange = () => ui();
+
+// ═══ 物資 GUI（PNG 4 枚・480×270 のレイアウトそのまま。 2026-10-05） ═══════════════════
+// supply_bar_gui = 外枠 / _bar_background = バーの裏地 / supply_bar = バー本体（左から割合ぶんだけ見せる）/ _number = 数字アトラス（5×7・1,2,…,9,0）
+// 外枠の赤ベタ = CRIT ランプ、 橙ベタ = HALF ランプ、 緑 4 つ = 数字の位置。 バーの色帯は 左から CRIT(20%) / HALF(30%) / FULL(50%)
+const SG = {};
+for (const [k, u] of Object.entries({ gui: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAeAAAAEOCAYAAABRmsRnAAAACXBIWXMAADXUAAA11AFeZeUIAAAFg0lEQVR4nO3dsU5bVxgH8JMQiWJsaBNHARRRkYUqErKiiIiqEw/AwtAH6BN0jzpm79Sp6tCxQ1WpW5d2qYpgqKy8QRQRktKoQKBLZbr0ImzsUAf7nnPs3288Er6f79E9f2zf+50QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIGfXYhfAu1tZbZzGroH+Pd1puu4AAZwr4Zs3IQxYBDJ0Pnx3n+3FLKXNwuLchbHU64tJCMN4uxG7APrTGb77L9NZw+thry3kdp/thf0nLyNW1K7+uD2E67frpdew/8d+6ccE0pTO6s2lUg7fQv3OaVhYnEsufAv1x3fCwuJcqN+uRwnDw9cHYebmbAjBJ2AYdz4BZ8JvvsNz+Ppg6McoQhegIIAzIHyHZ7pSCa+e/zn048zfrYTjk5OhHwfIhwBOnPAtxz+7zy+MLTxYDbu/71x5/MbC3cEUCYyU67ELoDfhG9fax58MZBygGwGcKOELMNoEcIKEL8DoE8CJEb4A40EAQw9bv/0auwRghAlg6FOvYO43sH3bAePNY0gQuj8q9Cq8GMj426ysNk51xILxJIAZa1PTlXD/wXIpx+rViEMIw3gSwIy1VDZHEMIwflzwiennd8HUNmQoNmIopLYhQ7ERQ6GMHtCd9ISmbP6xS5eJSUy/N+akvt9u6vXBOBDCaTIpiXFnLDAMQjg9JiQxvQJ4/8Xwd+wBRkd9/taFMSGcFjdhZWBp+WFYKudGXWBE7PzyU9cQJh0COHFLyw/DveWPYpcBZEgIp00nrMR9uHQvdglAhu6vNGKXwCUEcOKqtZnYJQAwBAI4cdevmyKgfxMTE7FL4BJ+A07c5NRUOP67vYVhc3srzH5ws22s1WqF46PDMP3fJ+bjo8NQma6GN0eHF16zNvv+QIK91WqFo4O/rvw6g9DPezp/roq/KcZ6nbNRV63NhJPjN23npJtxP09lK+alMl3tOT/Fddh4tNY2Pjk1VWapvAMBnLhrHRdbc3srhBDCD99+7XECIIQQwvrG5mlze6sthDvXDtJjhjL084/fC1/gjDUhTwIYACIQwAAQgQAGgAgEMABEIIABIAIBnKH1jU1bFgJnrAl58hxwZhqP1kJzeyusb2yenm8+McwGCeebNIQQLjSx6GZQTTqqtZmz93NZs40YTSL6qa9TZ/OUYTY1GUSdZTff+L/NQbop89wOSuf77fca6mzEQfoEcIZcaAD58xU0AEQggDMwOfle7BKAjFgz8iCAE/fdN1+Gaq0WuwwgI9VaLXz15ItQn78VuxTeQv/QxKysNrrezfjpZ5+XXQqQqV7h+3Snac1PiMlITK8ABrgqAZwWX0EDQAQCGAAi+BeKzF9D7SUomgAAAABJRU5ErkJggg==", back: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAeAAAAEOCAYAAABRmsRnAAAACXBIWXMAADXUAAA11AFeZeUIAAACaElEQVR4nO3bMQrCQBCG0VHCFrEQQgojiPc/VhBUUIScYD2DNpPV907wVfM3uxEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMBP2GQH8J39MNbsBmAdltfTLW9Qlx3A58bDsfb9LjsDWIlSSn3cr0a4MdvsAAD4RwYYABIYYABIYIABIIEBBoAEXs01ajqdfUMCIiLidpndcgAAAAAAAAAAAAAAAAAAAACgTW8Ldg1ADM+Z6gAAAABJRU5ErkJggg==", bar: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAeAAAAEOCAYAAABRmsRnAAAACXBIWXMAADXUAAA11AFeZeUIAAADAUlEQVR4nO3bMTIEQRQA0KZcQO4ANrVnUHIEYpFchAO4BaFNuIAziJVTOAJRq5mvd9m1qqdn34v6/52Z+tH++tPTKQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKOwVbsAlvdwsP9Ru4Z1O7rZq11Cky7fLmqXwEDcX5/6P2/MTu0CWM3Zy2svnk0nxdyy19a0e/ycUkrp/emwt+7+VsrlOD4nXj9Wd1cnvfj89vErt2hdekbMA/9nu3YB8JPYUGMM0CINuHGz6eTb9LoozutSbijmNdhVJtmxT7+RCRbaoQGPUH69HF8zt87kC4yJPeDG5SYbJ9pu843roU28UXcP+DdK+8NxvQlK02/cHy7lu/fNywPrZwKmGZvWUP8iNk/NFIbHZ+sNcgyJzDEkMseQAAAAAAAAAAAAAAAAAAAAAIAmfQKkYWvlt0pU2QAAAABJRU5ErkJggg==", num: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAeAAAAEOCAYAAABRmsRnAAAACXBIWXMAADXUAAA11AFeZeUIAAACzElEQVR4nO3aUWqEMBAG4LH0NPEee2jvodeZPmyzpGqrlgUVvu9Jf5MxLIQxsBEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcK7u7AXAFTwejzx7De8wDIM9DcB9lFIyIjIzMyKylJKllGxtZXX+f+a+Kzv5ZwQO8LUMT989NKLrltsiMxd5m9XrtWxvnb31NjJ7Gm7i8+wFwFXURtaa3/+WbY1tm+48W2v4R98N3M/H2QuAq+u67keTnN8fyWq+97176gH35AQMEVFKiXEcI+J5yuz7/vWsnjprVsfVeRER0zQtsrVxbb2/5q6N21OvrQVcm89pCP+CBgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADvkC8uMAbdgZnnoAAAAASUVORK5CYII=" })) { const im = new Image(); im.onload = () => { if (Object.values(SG).every(i => i.complete)) draw(); }; im.src = u; SG[k] = im; }
+const SGR = { bar: { x: 109, y: 253, w: 262, h: 8 }, crit: { x: 111, y: 229, w: 37, h: 15 }, half: { x: 151, y: 229, w: 37, h: 15 }, digits: [194, 200, 206, 212], dy: 233, atlas: { x: 194, y: 212 } };
+function drawSupplyGui(blink) {
+  if (!Object.values(SG).every(i => i.complete && i.naturalWidth)) return;
+  const r = Math.max(0, Math.min(1, S.sup / P.supMax));
+  ox.drawImage(SG.gui, 0, 0); ox.drawImage(SG.back, 0, 0);
+  const b = SGR.bar, w = Math.ceil(b.w * r);
+  if (w > 0) ox.drawImage(SG.bar, b.x, b.y, w, b.h, b.x, b.y, w, b.h);
+  // ランプ: 点いていない方は暗く塗る。 CRIT = 20% 未満（0 は点滅）、 HALF = 50% 未満
+  const lamp = (L, lit) => { if (lit) return; ox.fillStyle = "rgba(0,0,0,.7)"; ox.fillRect(L.x, L.y, L.w, L.h); };
+  lamp(SGR.crit, r < 0.2 && (S.sup > 0 || blink)); lamp(SGR.half, r < 0.5);
+  const s = String(Math.min(9999, Math.max(0, S.sup))).padStart(4, "0");
+  for (let i = 0; i < 4; i++) { const d = +s[i], a = (d + 9) % 10; ox.drawImage(SG.num, SGR.atlas.x + a * 5, SGR.atlas.y, 5, 7, SGR.digits[i], SGR.dy, 5, 7); }
+}
 
 // ═══ 燃料計と BINGO 警告（2026-10-02・docs/design/supply-weather.md §5） ═══════════════
 // 表示は 4 段: FULL / HALF / LOW / CRIT（物資 0 は CRIT の点滅）。 閾値は上限に対する割合 (上限 1000 なら 751 / 451 / 201)
@@ -1202,9 +1224,8 @@ function drawLCD() {
     ltext("PLOT" + (ZOOM > 1 ? " X2" : ""), p.x + p.w - 8, p.y + p.h - 9, LC.dim, "right");
     ltext("WX " + (S.wx.active.length ? S.wx.active.map(k => WEATHER[k].code).join("+") : "CALM"), p.x + p.w - 8, p.y + 6, S.wx.active.length ? LC.hi : LC.dim, "right");
     const g = gaugeOf(S.sup), BD = ["E", "S", "W", "N"], lv = S.stone.startsWith("強く") ? "HOT" : S.stone.startsWith("反応 ──") ? "NEAR" : S.stone.startsWith("微か") ? "FAR" : "--";
-    ltext(`FUEL ${String(S.sup).padStart(4, "0")} ${g}`, p.x + 10, p.y + p.h - 9, g === "CRIT" ? LC.red : LC.hi, "left");
     ltext(`STONE ${lv}${S.stoneBearing >= 0 ? " " + BD[S.stoneBearing] : ""}`, p.x + 140, p.y + p.h - 9, lv === "HOT" ? LC.red : LC.mid, "left");
-    if (bi && bi.st && blink) ltext(bi.st === "NORET" ? "NO RETURN" : "BINGO", p.x + 260, p.y + p.h - 9, LC.red, "left"); }
+    if (bi && bi.st && blink) ltext(bi.st === "NORET" ? "NO RETURN" : "BINGO", p.x + 260, p.y + p.h - 9, LC.red, "left"); drawSupplyGui(blink); }
   // 合成: 4 倍に最近傍で拡大するだけ（色は表のまま。 ぼかし・周辺減光は入れない）
   cx.imageSmoothingEnabled = false; cx.fillStyle = LC.bg; cx.fillRect(0, 0, cv.width, cv.height);
   cx.drawImage(off, 0, 0, cv.width, cv.height);

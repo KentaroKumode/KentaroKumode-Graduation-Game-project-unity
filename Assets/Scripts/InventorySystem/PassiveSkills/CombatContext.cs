@@ -317,6 +317,72 @@ namespace InventorySystem.PassiveSkills
         /// AutoRunner が6/7層ボス戦で集計しサマリに記載する。戦闘ごとに新規生成でリセット。</summary>
         public int healAppliedTotal;
         public int shieldGainedTotal;
+
+        // ===== コンボピック (2026-10-04) =====
+        // 「〜が付くたび」「〜するたび」の連鎖を、 効果クラスが入口を読みに行かなくて済むように
+        // ctx に数えておく。 新フィールドは 3 区分 (perTurn / decay / persistent) を明記する (CLAUDE.md)。
+
+        /// <summary>[persistent] この戦闘で敵に出血が付いた回数 (<see cref="AddEnemyBleed"/> 経由・1 回の付与 = 1)。
+        /// 〈血の帳簿〉が攻撃力へ換える。 戦闘ごとに新規生成でリセットされる。</summary>
+        public int bleedApplications;
+
+        /// <summary>[persistent] 敵の毒が**実際に増えた**回数。 上限 (10) で付かなかった分は数えない。
+        /// 数えるのを「付与しようとした回数」にすると、 上限に張り付いた毒が充電を生み続けて輪が止まらなくなる。</summary>
+        public int poisonIncreases;
+
+        /// <summary>[persistent] 〈毒の蓄電器〉: 毒が実際に増えるたびの充電。 0 = 無効。 戦闘開始時に **代入** で設定する (加算しない)。</summary>
+        public int chargePerPoisonIncrease;
+
+        /// <summary>[persistent] 〈振り直しの毒針〉: リロールするたびに敵へ付ける毒。 0 = 無効。 戦闘開始時に代入で設定する。</summary>
+        public int poisonPerReroll;
+
+        /// <summary>[persistent] 〈毒の護り〉: 敵に毒が乗っている間のシールド獲得への上乗せ (0.25 = +25%)。 0 = 無効。</summary>
+        public float shieldGainPoisonPct;
+
+        /// <summary>[persistent] 〈脱皮する毒壺〉: 毒殺 (石抜きの毒指輪) を何度でも撃てるようにし、 撃つたびに毒を半分にする。</summary>
+        public bool assassinRearm;
+
+        /// <summary>[persistent] 〈血の祝祭〉: 会心したターンは敵の出血ダメージをもう 1 回適用する。</summary>
+        public bool bleedEchoOnCrit;
+
+        /// <summary>[perTurn] このターン、 プレイヤーの攻撃が会心したか。 <see cref="isCritical"/> は同ターンの敵の攻撃
+        /// (ProcessDamage の attackerIsEnemy) で false に上書きされるので、 ターン終端や出血の解決では読めない。
+        /// BeginNewTurn Phase B でリセット。</summary>
+        public bool playerCritThisTurn;
+
+        /// <summary>[perTurn] このターン、 臨界爆発が撃たれたか (爆発ボーナスを固定ダメ枠へ積んだ瞬間に true)。</summary>
+        public bool rinkaiBurstedThisTurn;
+
+        /// <summary>[perTurn] このターン HP が減った出来事の数 (敵の攻撃で実際に被ダメージが出た回 + 自傷)。 〈死に際の算盤〉が読む。</summary>
+        public int hpLossEventsThisTurn;
+
+        /// <summary>[perTurn] 予告された敵の攻撃値 (配線の時点で確定している値)。 〈開き直りの胸当て〉が読む。</summary>
+        public int telegraphedEnemyAttack;
+
+        /// <summary>シールドを得る**唯一の入口にする**。 <see cref="consShield"/> と <see cref="shieldGainedTotal"/> を一緒に動かし、
+        /// 〈毒の護り〉の上乗せもここで掛ける (獲得の経路が 12 本に散っていたので、 個別に足すと取りこぼす)。
+        /// 上乗せ後の実獲得量を返す。</summary>
+        public int GainShield(int amount)
+        {
+            if (amount <= 0) return 0;
+            if (shieldGainPoisonPct > 0f && GetStatus(StatusTarget.Enemy, "poison") > 0)
+                amount += UnityEngine.Mathf.CeilToInt(amount * shieldGainPoisonPct);
+            consShield += amount;
+            shieldGainedTotal += amount;
+            return amount;
+        }
+
+        /// <summary>自傷 (〈血契の釘〉など)。 HP 1 を床にして減らし、 「HP が減った出来事」として数える。
+        /// 戻り値は実際に減った量。 HP は CombatManager 側が持つので <see cref="CombatSystem.CombatManager.LoseHpKeepOne"/> を通す。</summary>
+        public int SelfInflictHpLoss(int amount)
+        {
+            if (amount <= 0) return 0;
+            var cm = CombatSystem.CombatManager.Instance;
+            if (cm == null) return 0;
+            int loss = cm.LoseHpKeepOne(amount);
+            if (loss > 0) hpLossEventsThisTurn++;
+            return loss;
+        }
         /// <summary>希望の灯片: この戦闘で1度でもロール敗北したか。
         /// CombatStart 時にリセットし、 PassiveSkillManager の敗北ターン処理で true にする。
         /// CombatEnd で勝利かつ false なら最大HPボーナス発動。</summary>
@@ -775,7 +841,14 @@ namespace InventorySystem.PassiveSkills
             var dict = target == StatusTarget.Enemy ? enemyStatusStacks : playerStatusStacks;
             int cur = dict.TryGetValue(id, out var v) ? v : 0;
             int max = StatusRegistry.Defs.TryGetValue(id, out var def) ? def.maxStacks : int.MaxValue;
-            dict[id] = System.Math.Max(0, System.Math.Min(max, cur + stacks));
+            int next = System.Math.Max(0, System.Math.Min(max, cur + stacks));
+            dict[id] = next;
+            // コンボピック: 毒が**実際に増えた**時だけ数える (上限 10 に張り付いた分では輪を回さない)
+            if (target == StatusTarget.Enemy && id == "poison" && next > cur)
+            {
+                poisonIncreases++;
+                if (chargePerPoisonIncrease > 0) AddCharge(chargePerPoisonIncrease);
+            }
         }
 
         /// <summary>敵へ出血スタックを付与する。
@@ -786,6 +859,7 @@ namespace InventorySystem.PassiveSkills
         {
             if (stacks <= 0) return;
             enemyBleedStacks += stacks;
+            bleedApplications++;
         }
 
         /// <summary>〈回帰性真理〉: 敵に乗っている毒・出血の**蓄積を半減**する (切り捨て)。
@@ -804,6 +878,22 @@ namespace InventorySystem.PassiveSkills
         }
 
         /// <summary>現在スタック数（未付与は0）。</summary>
+        /// <summary>敵の毒を mul 倍にする (上限でクランプ)。 〈触媒の坩堝〉用。 <see cref="AddStatus"/> を通さないのは、
+        /// AddStatus が毒の付与に「メタ・毒 r2 濃縮」の +N を足すため (倍化に上乗せさせない)。
+        /// 実際に増えた時だけ「毒が増えた」として数える。 戻り値は増えた量。</summary>
+        public int MultiplyEnemyPoison(int mul)
+        {
+            int cur = GetStatus(StatusTarget.Enemy, "poison");
+            if (cur <= 0 || mul <= 1) return 0;
+            int max = StatusRegistry.Defs.TryGetValue("poison", out var def) ? def.maxStacks : int.MaxValue;
+            int next = System.Math.Min(max, cur * mul);
+            if (next <= cur) return 0;
+            enemyStatusStacks["poison"] = next;
+            poisonIncreases++;
+            if (chargePerPoisonIncrease > 0) AddCharge(chargePerPoisonIncrease);
+            return next - cur;
+        }
+
         public int GetStatus(StatusTarget target, string id)
         {
             var dict = target == StatusTarget.Enemy ? enemyStatusStacks : playerStatusStacks;
@@ -908,6 +998,11 @@ namespace InventorySystem.PassiveSkills
             lightningRodArmed = false;
             vescaBleedOnHit = 0;
             vescaMaxHpBiteOnHit = 0;
+            // コンボピック (2026-10-04) の perTurn 分
+            playerCritThisTurn = false;
+            rinkaiBurstedThisTurn = false;
+            hpLossEventsThisTurn = 0;
+            telegraphedEnemyAttack = 0;
             vescaExecuteArmed = false;
 
             // 会心系
