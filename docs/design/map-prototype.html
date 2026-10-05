@@ -11,9 +11,6 @@
   .wrap { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
   .mapbox { position:relative; border:1px solid var(--line); background:#0b0d0f; max-width:100%; overflow:auto; }
   .mapcol { display:flex; flex-direction:column; gap:6px; max-width:100%; }
-  /* 物資の帯 (2026-10-05): 地図の下に、 バー (272×20) とランプ (3 倍) を 1 本に並べる */
-  .supplyRow[hidden] { display:none; }
-  .supplyRow { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:6px 8px; background:#0b0d0f; border:1px solid var(--line); }
   .mapbox:fullscreen { display:flex; align-items:center; justify-content:center; background:#000; border:0; }
   canvas { display:block; image-rendering:pixelated; }
   .side { width:300px; max-width:100%; display:flex; flex-direction:column; gap:10px; }
@@ -41,22 +38,6 @@
   .dlg h2 { font-size:15px; margin:0 0 8px; color:var(--amber); } .dlg p { margin:6px 0; }
   .legend span { display:inline-block; margin-right:10px; font-size:11px; color:var(--ink2); }
   label { color:var(--ink2); font-size:12px; } input[type=number] { width:80px; background:#0b0d0f; color:var(--ink); border:1px solid #3a4047; padding:3px; }
-  /* 警告ランプ (HALF / CRIT・燃料計のバーとは別物)。 Tools/lamp_lit.py が書き出す *_lamp_on_full / *_lamp_off_full
-     (43×21・光を四方 3 ドットまで焼き込み済み・点灯と消灯は同じ大きさ) を 4 倍で差し替えるだけ */
-  .lamps { display:flex; flex-direction:row; gap:8px; margin:0; padding:0; background:#2a2620; border-radius:3px; }   /* バーと同じ幅の 1 本の帯に、 ランプを横に並べる */
-  .lamp { position:relative; width:86px; height:42px; }   /* 43×21 の 2 倍 */
-  .lamp img { position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated; }
-  .lamp .on { opacity:0; }
-  .lamp.lit .on { opacity:1; }
-  .lamp.lit.ignite .on { animation: ignite .32s steps(1) 1; }
-  .lamp.lit.blink .on { animation: blink 1s steps(1) infinite; }
-  @keyframes ignite { 0% { opacity:0 } 20% { opacity:.8 } 40% { opacity:.15 } 60% { opacity:1 } 80% { opacity:.6 } 100% { opacity:1 } }
-  @keyframes blink { 0% { opacity:1 } 50% { opacity:0 } }
-  @media (prefers-reduced-motion: reduce) { .lamp.lit.ignite .on { animation:none; } }
-  /* 物資バー (2026-10-05): 枠 272×20 の窓 (x5〜266・y6〜13 = 262×8) に中身を描く。 1 ドット = 1 ドット・拡大は CSS だけ */
-  /* バー・ランプ・地図は同じ密度: 地図は 480×270 を 2 倍で出しているので (GUI 1 ドット = 2px)、 バーもランプも 2 倍 */
-  .supply { position:relative; width:544px; height:40px; margin:0; flex:none; }
-  .supply canvas { position:absolute; left:0; top:0; width:544px; height:40px; image-rendering:pixelated; display:block; }
   @media (prefers-reduced-motion: reduce) { .supply { } }
 </style></head><body>
 <h1>自由移動マップ 試作（1層完結）</h1>
@@ -66,16 +47,6 @@
   <div class="mapbox" id="mapbox"><canvas id="cv" width="1000" height="596"></canvas>
     <div class="modal" id="modal" hidden><div class="dlg" role="dialog" aria-modal="true"><h2 id="mt"></h2><div id="mb"></div><div class="btns" id="mbtn" style="margin-top:12px"></div></div></div>
   </div>
-    <div class="supplyRow">
-  <div class="supply" title="物資: 減るたびに中身が 1 ドット左へ寄り、 減った分が光りながら下へ崩れて消える">
-    <canvas id="supCv" width="272" height="20" aria-label="物資のバー"></canvas>
-  </div>
-  <div class="lamps" title="警告ランプ: HALF = 物資が上限の 75% 以下（HALF・LOW の段）／ CRIT = 20% 以下（0 で点滅）">
-    <div class="lamp half" id="lampHalf"><img alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAVCAYAAADfLRcdAAABHElEQVR4nO2WT2+CMBiHf2ohxB10icZ42tnv/2F23smDJu7CbAqFBUodvLRdK9kwkefSvO3b8vSl/AEmJjCjNTi8bcpHqcv7x7njN28H+92q5AUeAl4on3Yf6yWJDIgjjA2vPAgd2XUS4ZNnSK/9xP9msVA+R1dlb8nNaWEFr9t8njhjjS2vDZ2j0bnS8tRYZSnLWLWC/8SCc6NInCSdPIoeC8Upq4R+X6SSUxJhFnEz7xYD+BL2fO/KhoqErknFB8n6XvQvYb6J995qFz7V9Jatzg8buBFB+lyCrvMaVFm9EDNsxDVGMc3zxSqr33Vy1lTCEHuNUQzz7pKtvl5SAqXMMTYSrPZx/nVtX1/KaPxfA2QZcLqkPb+Jp+cbeE971m6X0QcAAAAASUVORK5CYII="><img class="on" alt="HALF" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAVCAYAAADfLRcdAAADZ0lEQVR4nNWXX2gcRRzHP/vn9u64Rmua5NpE25QmxdS/2ICg9TC+iIj6oO9FDH0QBFFSaPtgH/xHW6VPQiWCvutLBX0UIoJiK4jSSEwbo1yaNGmsza13+3fKzN5dbi8XupGcpV9umP3Nzux8bvY38/st3EbSknQSH93b23aQV3+bu2mfDcLtYPN1OSn8GthXnrlf9OW38sg9Vqx9V2eKdml22YvZP/3lUly4xidf/xrjixmvv7RfrNgOw3u71gXc07150BcXvXXBz00t0ZFLc/rz83VGrfHVj35pFvf25pDAErQZbGh7mnZoct6J/QEJLEGn5mzGn/P7ai5hNg56YuhOpudsXnw0r0A72gTXrO2Dq9fD844C/uKHBcUDV+v3YrBStRU9d3ZC2SPvfqjqb46+EbePvYmmaTz59qnY+InjY6ouHD8Z2W+NIYQA+VNFMPLOB2uAG+cYfr7Q0gXXwErVVrS/c/X2nryFYep1+4GBHF2j74GWAt0ALSqF9z+l/NUJyHQDIfsfGyS0S4S+R+BUCP2gJWhtvj+W/XXfaEvYmjR9df9ltqQwTQNSOTAydAwOQa4PdAv/uzNgWpiPvwboWLsfgi27FGy6/z5EpQRuBeGWo1XObIOgwvL4GL4fEHihKo3zJYKtbypNw0zVVlKj59AJMLNgZMHMYGztBusu0NNoXTvRrCxketTq6jv2QTYPIkDv2Y349zo4NsKxIXDBugN8i85Dp8Evq7b5M0fr8yaG/S8yHn45coc2y2xukDtxRF4Ige+F1VbBlY8PKzfoHD0JoUtwbRHT/Vu5AXoKNDPyW3TCyxcw7j6g3CC8MgO+C14F4TmEThnTvd7SDdR80k2SwkqtVM+9mSWP/mpbpeRhmAF4tiorv0+StotqRUtnT6EZJrkXjihYd+ZnskOzCtZ88FnlDoQBCI+l8SOkD0THUbnkEvgRqJTcXI3zJ4JtpYsLrqr7qvYv0zYjgYw2Hue/v6SOscLTEcSPExcoPLXY8jlqXPV6qlhhI4pFsM+mtxVvRVBo1EpDUBjozXFw4GrrCPbt5D/IcCs7/l/hdrIp1ErVwq3kOTiw2jd2TtTyg535CKo5imxmEtMqkWnMvv5ccGJ5gZSWIJdNksPKCHAzzW40t23OabVb/YVAk5J8MdwWugFztHBJ+EWO6AAAAABJRU5ErkJggg=="></div>
-    <div class="lamp crit" id="lampCrit"><img alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAVCAYAAADfLRcdAAABJUlEQVR4nO2W0W6CQBBFb2VFQ2vaJvrgJ/j/H9NP8KE+mLTqFlgwI12zDOOgthWTcp7YuTPs3XEEgJ4ePPAeLKbT8l768rZa1fwNwsX89bm0BneBNZWfMNawZr8yYDRE11jywaiZfYmGWLsMm10z8dZEg8rPMogZLfmYtLU1LU/GYrxN87qmEa4Q5frMSkg3plhyolLTCE1rQ/070Y3T7+v4qTp1+tk0L2kxi/m1psUAtsWVZiXCTT3SAf6CH/wo5x+mM7PURd5JMqiNyW+hjgHNj0+41ETK8qXZlfbTaJ1Z6VFDsTw4iN8kXJszDPH6Nk6aDZ91bsy6UbC4sHa8htVK9ReZpbcXmSyLHF3jYLBGpn91zSaPZfdfBjjYfP/YNPz1/Hv2Iz97LjB1mf8AAAAASUVORK5CYII="><img class="on" alt="CRIT" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAVCAYAAADfLRcdAAADWElEQVR4nNWXW0gUURjH/7POzM6qsytq3hYUrKQLJpmJCT0U9B75YA+JkD0FmQZhVC+99GimUYEZWRD0IESvUj4EIRaWiBmhgdZqWSvufZ1rnLM7urO75ipu4n9Z5lzn/PjOd873DbCDxKQySK8tLUk7yMjs3LpjNghXjPRoPhX4BNiWqoO6MzcH1QJnai/jWaRLM5Jiqo+GZbgWl9A3NmHiM1Xa6qp1X2gZNYV5SSF3C1sPPB1WkoJ/+OWGaLOia3h0hZGJ3foLy6Krwp4JAmxAGoD74yy9lZoMyyZ4AkxAv3qDeGT1OQ2XMJnqeJ4dU94AGpwFFFJMI2CsimLKNWGZAg+4FigP/L6VvoR9JRYloC/fvFtpa+rvNo151txKN6Wp/278dLxoaafPxr47CX2RuZeTzlt9L3D6ZH3SM2JJNsmwaDnHJoAa8HV52QDLAoINyBIBMQew56Jx4ClO1VYCOXm0TttJPxnHspF5a4isF7t+vP55YizM6vn70nYdPJeB8nudAG9FQdUBYJcT4DiEn/QCPA+h5SLAWJB99DCk14PQFQXWc+cBVUWwpxN6MIj8inL8edAL2R9EcUc7oGkYv3QNkqKa1ksJ1jhQDMPAymZEGhkGtkwBgl2E5/5DsGI2+JIiQHQAHA/hyg2A5SOWtmSAO1QJXZIoLBz5gCKBKyuF6l6EVbBB83jBCULE4uEwXYdgMuQnm2+HlC27GWlDr8DoOtKhBFhyEk+Qq0zXsayokUZdRygYhirLKLx1k7qBp7sHNp8nwQ0sVXWQnj+mc4hlM47UUzeQZ2apG0juJciBAFRNhyPgo25A1iFuICkaXTdlWCJf9N6bkmQci7bt67odKYQC9L8w9hmO3y6A5eD5NAELz0GY/04cHf73H5HbcRXQdODnD0BTkdlwBlBkzLV2UFBZ1VCsafSV3pBEn9+iLmCsnxJs/HWy1tW1l/ikomBofJqGl7PeRdo/ODKOxiV30vcNu/1kq2i5MtpmQK4nUwTrz3a6tiMoxMoXExT22LPQ7Hclj2Bv3V6QcEsG/q9wOxkXaomMcEt4mq2rY00Xm5EflIo8rcdHka1OZKbXSGKIZn2SKS9IgDWAN5HDlqUwZmajeW18Tsts9xcC4pTKF8OO0F9mCmtoPXjedAAAAABJRU5ErkJggg=="></div>
-  </div>
-  <label class="k" style="font-size:11px"><input type="checkbox" id="lampTest"> ランプ試験（全点灯）</label>
-    </div>
   </div>
   <div class="side">
     <div class="card">
@@ -134,7 +105,6 @@
       <label style="display:block;margin-top:6px"><input type="checkbox" id="dbg"> 敵と痕跡を常に表示（デバッグ）</label>
       <label style="display:block;margin-top:6px"><input type="checkbox" id="lcd" checked> 液晶の表示（切ると旧表示）</label>
       <label style="display:block;margin-top:2px"><input type="checkbox" id="scanl"> 走査線（中間色が出る）</label>
-      <label style="display:block;margin-top:2px"><input type="checkbox" id="bandShow" checked> 物資の帯（地図の下・金属のバー）を表示</label>
       <label style="display:block;margin-top:2px"><input type="checkbox" id="drain5" checked> 物資の減り ×5（移動・照明・テスト用）</label>
       <div class="btns" style="margin-top:4px"><button id="bFs" type="button">全画面（F）</button><button id="bZoom" type="button">拡大の切り替え（Z）</button><button id="bCam" type="button">視点を自分へ（C）</button></div>
       <div class="k" style="font-size:11px">地図の画面は既定で 2 倍に拡大（層の約半分を表示）。視点は自分に付いてくる。WASD かドラッグで見回せる。</div>
@@ -945,8 +915,6 @@ document.getElementById("bNew").onclick = newGame;
   ps.onchange = () => { desc(); newGame(); }; fs.onchange = () => { desc(); newGame(); }; desc();
   document.getElementById("showProf").onchange = () => draw(); }
 document.getElementById("dbg").onchange = () => draw();
-document.getElementById("lampTest").onchange = () => updateLamps();
-document.getElementById("bandShow").onchange = e => { document.querySelector(".supplyRow").hidden = !e.target.checked; };   /* 地図の中の外枠 GUI (SG) と二重に出るので切り替えられる */
 document.getElementById("lcd").onchange = () => draw();
 document.getElementById("scanl").onchange = () => draw();
 document.getElementById("screen").onchange = () => draw();
@@ -961,15 +929,32 @@ document.getElementById("bingoMargin").onchange = () => ui();
 const SG = {};
 for (const [k, u] of Object.entries({ gui: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAeAAAAEOCAYAAABRmsRnAAAACXBIWXMAADXUAAA11AFeZeUIAAAFg0lEQVR4nO3dsU5bVxgH8JMQiWJsaBNHARRRkYUqErKiiIiqEw/AwtAH6BN0jzpm79Sp6tCxQ1WpW5d2qYpgqKy8QRQRktKoQKBLZbr0ImzsUAf7nnPs3288Er6f79E9f2zf+50QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIGfXYhfAu1tZbZzGroH+Pd1puu4AAZwr4Zs3IQxYBDJ0Pnx3n+3FLKXNwuLchbHU64tJCMN4uxG7APrTGb77L9NZw+thry3kdp/thf0nLyNW1K7+uD2E67frpdew/8d+6ccE0pTO6s2lUg7fQv3OaVhYnEsufAv1x3fCwuJcqN+uRwnDw9cHYebmbAjBJ2AYdz4BZ8JvvsNz+Ppg6McoQhegIIAzIHyHZ7pSCa+e/zn048zfrYTjk5OhHwfIhwBOnPAtxz+7zy+MLTxYDbu/71x5/MbC3cEUCYyU67ELoDfhG9fax58MZBygGwGcKOELMNoEcIKEL8DoE8CJEb4A40EAQw9bv/0auwRghAlg6FOvYO43sH3bAePNY0gQuj8q9Cq8GMj426ysNk51xILxJIAZa1PTlXD/wXIpx+rViEMIw3gSwIy1VDZHEMIwflzwiennd8HUNmQoNmIopLYhQ7ERQ6GMHtCd9ISmbP6xS5eJSUy/N+akvt9u6vXBOBDCaTIpiXFnLDAMQjg9JiQxvQJ4/8Xwd+wBRkd9/taFMSGcFjdhZWBp+WFYKudGXWBE7PzyU9cQJh0COHFLyw/DveWPYpcBZEgIp00nrMR9uHQvdglAhu6vNGKXwCUEcOKqtZnYJQAwBAI4cdevmyKgfxMTE7FL4BJ+A07c5NRUOP67vYVhc3srzH5ws22s1WqF46PDMP3fJ+bjo8NQma6GN0eHF16zNvv+QIK91WqFo4O/rvw6g9DPezp/roq/KcZ6nbNRV63NhJPjN23npJtxP09lK+alMl3tOT/Fddh4tNY2Pjk1VWapvAMBnLhrHRdbc3srhBDCD99+7XECIIQQwvrG5mlze6sthDvXDtJjhjL084/fC1/gjDUhTwIYACIQwAAQgQAGgAgEMABEIIABIAIBnKH1jU1bFgJnrAl58hxwZhqP1kJzeyusb2yenm8+McwGCeebNIQQLjSx6GZQTTqqtZmz93NZs40YTSL6qa9TZ/OUYTY1GUSdZTff+L/NQbop89wOSuf77fca6mzEQfoEcIZcaAD58xU0AEQggDMwOfle7BKAjFgz8iCAE/fdN1+Gaq0WuwwgI9VaLXz15ItQn78VuxTeQv/QxKysNrrezfjpZ5+XXQqQqV7h+3Snac1PiMlITK8ABrgqAZwWX0EDQAQCGAAi+BeKzF9D7SUomgAAAABJRU5ErkJggg==", back: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAeAAAAEOCAYAAABRmsRnAAAACXBIWXMAADXUAAA11AFeZeUIAAACaElEQVR4nO3bMQrCQBCG0VHCFrEQQgojiPc/VhBUUIScYD2DNpPV907wVfM3uxEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMBP2GQH8J39MNbsBmAdltfTLW9Qlx3A58bDsfb9LjsDWIlSSn3cr0a4MdvsAAD4RwYYABIYYABIYIABIIEBBoAEXs01ajqdfUMCIiLidpndcgAAAAAAAAAAAAAAAAAAAACgTW8Ldg1ADM+Z6gAAAABJRU5ErkJggg==", bar: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAeAAAAEOCAYAAABRmsRnAAAACXBIWXMAADXUAAA11AFeZeUIAAADAUlEQVR4nO3bMTIEQRQA0KZcQO4ANrVnUHIEYpFchAO4BaFNuIAziJVTOAJRq5mvd9m1qqdn34v6/52Z+tH++tPTKQEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKOwVbsAlvdwsP9Ru4Z1O7rZq11Cky7fLmqXwEDcX5/6P2/MTu0CWM3Zy2svnk0nxdyy19a0e/ycUkrp/emwt+7+VsrlOD4nXj9Wd1cnvfj89vErt2hdekbMA/9nu3YB8JPYUGMM0CINuHGz6eTb9LoozutSbijmNdhVJtmxT7+RCRbaoQGPUH69HF8zt87kC4yJPeDG5SYbJ9pu843roU28UXcP+DdK+8NxvQlK02/cHy7lu/fNywPrZwKmGZvWUP8iNk/NFIbHZ+sNcgyJzDEkMseQAAAAAAAAAAAAAAAAAAAAAIAmfQKkYWvlt0pU2QAAAABJRU5ErkJggg==", num: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAeAAAAEOCAYAAABRmsRnAAAACXBIWXMAADXUAAA11AFeZeUIAAACzElEQVR4nO3aUWqEMBAG4LH0NPEee2jvodeZPmyzpGqrlgUVvu9Jf5MxLIQxsBEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcK7u7AXAFTwejzx7De8wDIM9DcB9lFIyIjIzMyKylJKllGxtZXX+f+a+Kzv5ZwQO8LUMT989NKLrltsiMxd5m9XrtWxvnb31NjJ7Gm7i8+wFwFXURtaa3/+WbY1tm+48W2v4R98N3M/H2QuAq+u67keTnN8fyWq+97176gH35AQMEVFKiXEcI+J5yuz7/vWsnjprVsfVeRER0zQtsrVxbb2/5q6N21OvrQVcm89pCP+CBgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADvkC8uMAbdgZnnoAAAAASUVORK5CYII=" })) { const im = new Image(); im.onload = () => { if (Object.values(SG).every(i => i.complete)) draw(); }; im.src = u; SG[k] = im; }
 const SGR = { bar: { x: 109, y: 253, w: 262, h: 8 }, crit: { x: 111, y: 229, w: 37, h: 15 }, half: { x: 151, y: 229, w: 37, h: 15 }, digits: [194, 200, 206, 212], dy: 233, atlas: { x: 194, y: 212 } };
+// 警告ランプ (2026-10-05): 外枠の赤ベタ = CRIT・橙ベタ = HALF のエリア (各 37×15) に、 点灯 / 消灯のランプの絵 (43×21・光を四方 3 ドットまで焼き込み済み) を描く。
+// 点灯の条件は外枠 GUI の定義のまま: CRIT = 20% 未満 (0 は点滅)・HALF = 50% 未満。 消灯→点灯の瞬間だけ短くちらつく (白熱灯が点く感じ)
+const LMP = {};
+for (const [k, u] of Object.entries({ halfOff: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAVCAYAAADfLRcdAAABHElEQVR4nO2WT2+CMBiHf2ohxB10icZ42tnv/2F23smDJu7CbAqFBUodvLRdK9kwkefSvO3b8vSl/AEmJjCjNTi8bcpHqcv7x7njN28H+92q5AUeAl4on3Yf6yWJDIgjjA2vPAgd2XUS4ZNnSK/9xP9msVA+R1dlb8nNaWEFr9t8njhjjS2vDZ2j0bnS8tRYZSnLWLWC/8SCc6NInCSdPIoeC8Upq4R+X6SSUxJhFnEz7xYD+BL2fO/KhoqErknFB8n6XvQvYb6J995qFz7V9Jatzg8buBFB+lyCrvMaVFm9EDNsxDVGMc3zxSqr33Vy1lTCEHuNUQzz7pKtvl5SAqXMMTYSrPZx/nVtX1/KaPxfA2QZcLqkPb+Jp+cbeE971m6X0QcAAAAASUVORK5CYII=", halfOn: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAVCAYAAADfLRcdAAADZ0lEQVR4nNWXX2gcRRzHP/vn9u64Rmua5NpE25QmxdS/2ICg9TC+iIj6oO9FDH0QBFFSaPtgH/xHW6VPQiWCvutLBX0UIoJiK4jSSEwbo1yaNGmsza13+3fKzN5dbi8XupGcpV9umP3Nzux8bvY38/st3EbSknQSH93b23aQV3+bu2mfDcLtYPN1OSn8GthXnrlf9OW38sg9Vqx9V2eKdml22YvZP/3lUly4xidf/xrjixmvv7RfrNgOw3u71gXc07150BcXvXXBz00t0ZFLc/rz83VGrfHVj35pFvf25pDAErQZbGh7mnZoct6J/QEJLEGn5mzGn/P7ai5hNg56YuhOpudsXnw0r0A72gTXrO2Dq9fD844C/uKHBcUDV+v3YrBStRU9d3ZC2SPvfqjqb46+EbePvYmmaTz59qnY+InjY6ouHD8Z2W+NIYQA+VNFMPLOB2uAG+cYfr7Q0gXXwErVVrS/c/X2nryFYep1+4GBHF2j74GWAt0ALSqF9z+l/NUJyHQDIfsfGyS0S4S+R+BUCP2gJWhtvj+W/XXfaEvYmjR9df9ltqQwTQNSOTAydAwOQa4PdAv/uzNgWpiPvwboWLsfgi27FGy6/z5EpQRuBeGWo1XObIOgwvL4GL4fEHihKo3zJYKtbypNw0zVVlKj59AJMLNgZMHMYGztBusu0NNoXTvRrCxketTq6jv2QTYPIkDv2Y349zo4NsKxIXDBugN8i85Dp8Evq7b5M0fr8yaG/S8yHn45coc2y2xukDtxRF4Ige+F1VbBlY8PKzfoHD0JoUtwbRHT/Vu5AXoKNDPyW3TCyxcw7j6g3CC8MgO+C14F4TmEThnTvd7SDdR80k2SwkqtVM+9mSWP/mpbpeRhmAF4tiorv0+StotqRUtnT6EZJrkXjihYd+ZnskOzCtZ88FnlDoQBCI+l8SOkD0THUbnkEvgRqJTcXI3zJ4JtpYsLrqr7qvYv0zYjgYw2Hue/v6SOscLTEcSPExcoPLXY8jlqXPV6qlhhI4pFsM+mtxVvRVBo1EpDUBjozXFw4GrrCPbt5D/IcCs7/l/hdrIp1ErVwq3kOTiw2jd2TtTyg535CKo5imxmEtMqkWnMvv5ccGJ5gZSWIJdNksPKCHAzzW40t23OabVb/YVAk5J8MdwWugFztHBJ+EWO6AAAAABJRU5ErkJggg==", critOff: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAVCAYAAADfLRcdAAABJUlEQVR4nO2W0W6CQBBFb2VFQ2vaJvrgJ/j/H9NP8KE+mLTqFlgwI12zDOOgthWTcp7YuTPs3XEEgJ4ePPAeLKbT8l768rZa1fwNwsX89bm0BneBNZWfMNawZr8yYDRE11jywaiZfYmGWLsMm10z8dZEg8rPMogZLfmYtLU1LU/GYrxN87qmEa4Q5frMSkg3plhyolLTCE1rQ/070Y3T7+v4qTp1+tk0L2kxi/m1psUAtsWVZiXCTT3SAf6CH/wo5x+mM7PURd5JMqiNyW+hjgHNj0+41ETK8qXZlfbTaJ1Z6VFDsTw4iN8kXJszDPH6Nk6aDZ91bsy6UbC4sHa8htVK9ReZpbcXmSyLHF3jYLBGpn91zSaPZfdfBjjYfP/YNPz1/Hv2Iz97LjB1mf8AAAAASUVORK5CYII=", critOn: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAVCAYAAADfLRcdAAADWElEQVR4nNWXW0gUURjH/7POzM6qsytq3hYUrKQLJpmJCT0U9B75YA+JkD0FmQZhVC+99GimUYEZWRD0IESvUj4EIRaWiBmhgdZqWSvufZ1rnLM7urO75ipu4n9Z5lzn/PjOd873DbCDxKQySK8tLUk7yMjs3LpjNghXjPRoPhX4BNiWqoO6MzcH1QJnai/jWaRLM5Jiqo+GZbgWl9A3NmHiM1Xa6qp1X2gZNYV5SSF3C1sPPB1WkoJ/+OWGaLOia3h0hZGJ3foLy6Krwp4JAmxAGoD74yy9lZoMyyZ4AkxAv3qDeGT1OQ2XMJnqeJ4dU94AGpwFFFJMI2CsimLKNWGZAg+4FigP/L6VvoR9JRYloC/fvFtpa+rvNo151txKN6Wp/278dLxoaafPxr47CX2RuZeTzlt9L3D6ZH3SM2JJNsmwaDnHJoAa8HV52QDLAoINyBIBMQew56Jx4ClO1VYCOXm0TttJPxnHspF5a4isF7t+vP55YizM6vn70nYdPJeB8nudAG9FQdUBYJcT4DiEn/QCPA+h5SLAWJB99DCk14PQFQXWc+cBVUWwpxN6MIj8inL8edAL2R9EcUc7oGkYv3QNkqKa1ksJ1jhQDMPAymZEGhkGtkwBgl2E5/5DsGI2+JIiQHQAHA/hyg2A5SOWtmSAO1QJXZIoLBz5gCKBKyuF6l6EVbBB83jBCULE4uEwXYdgMuQnm2+HlC27GWlDr8DoOtKhBFhyEk+Qq0zXsayokUZdRygYhirLKLx1k7qBp7sHNp8nwQ0sVXWQnj+mc4hlM47UUzeQZ2apG0juJciBAFRNhyPgo25A1iFuICkaXTdlWCJf9N6bkmQci7bt67odKYQC9L8w9hmO3y6A5eD5NAELz0GY/04cHf73H5HbcRXQdODnD0BTkdlwBlBkzLV2UFBZ1VCsafSV3pBEn9+iLmCsnxJs/HWy1tW1l/ikomBofJqGl7PeRdo/ODKOxiV30vcNu/1kq2i5MtpmQK4nUwTrz3a6tiMoxMoXExT22LPQ7Hclj2Bv3V6QcEsG/q9wOxkXaomMcEt4mq2rY00Xm5EflIo8rcdHka1OZKbXSGKIZn2SKS9IgDWAN5HDlqUwZmajeW18Tsts9xcC4pTKF8OO0F9mCmtoPXjedAAAAABJRU5ErkJggg==" })) { const im = new Image(); im.src = u; LMP[k] = im; }
+const LMP_ST = { half: { lit: false, since: 0 }, crit: { lit: false, since: 0 } };
+const LMP_IGNITE = [0, 0.8, 0.15, 1, 0.6, 1];                       // 点き始めの明るさの段 (64ms ごと)
+function drawLamp(name, L, lit) {
+  const st = LMP_ST[name], now = performance.now();
+  if (lit && !st.lit) st.since = now;
+  st.lit = lit;
+  const off = LMP[name + "Off"], on = LMP[name + "On"];
+  if (!(off.complete && off.naturalWidth && on.complete && on.naturalWidth)) return;
+  const x = L.x - 3, y = L.y - 3;
+  ox.drawImage(off, x, y);
+  if (!lit) return;
+  const t = now - st.since, a = t < 64 * LMP_IGNITE.length ? LMP_IGNITE[Math.floor(t / 64)] : 1;
+  ox.globalAlpha = a; ox.drawImage(on, x, y); ox.globalAlpha = 1;
+}
 function drawSupplyGui(blink) {
   if (!Object.values(SG).every(i => i.complete && i.naturalWidth)) return;
   const r = Math.max(0, Math.min(1, S.sup / P.supMax));
   ox.drawImage(SG.gui, 0, 0); ox.drawImage(SG.back, 0, 0);
   const b = SGR.bar, w = Math.ceil(b.w * r);
   if (w > 0) ox.drawImage(SG.bar, b.x, b.y, w, b.h, b.x, b.y, w, b.h);
-  // ランプ: 点いていない方は暗く塗る。 CRIT = 20% 未満（0 は点滅）、 HALF = 50% 未満
-  const lamp = (L, lit) => { if (lit) return; ox.fillStyle = "rgba(0,0,0,.7)"; ox.fillRect(L.x, L.y, L.w, L.h); };
-  lamp(SGR.crit, r < 0.2 && (S.sup > 0 || blink)); lamp(SGR.half, r < 0.5);
+  // ランプ: CRIT = 20% 未満（0 は点滅）、 HALF = 50% 未満 (外枠 GUI の定義のまま)。 絵は私のランプ (上の drawLamp)
+  drawLamp("crit", SGR.crit, r < 0.2 && (S.sup > 0 || blink)); drawLamp("half", SGR.half, r < 0.5);
   const s = String(Math.min(9999, Math.max(0, S.sup))).padStart(4, "0");
   for (let i = 0; i < 4; i++) { const d = +s[i], a = (d + 9) % 10; ox.drawImage(SG.num, SGR.atlas.x + a * 5, SGR.atlas.y, 5, 7, SGR.digits[i], SGR.dy, 5, 7); }
 }
@@ -1331,139 +1316,10 @@ function drawOld() {
   // 自分
   const q = toPx(meP); cx.fillStyle = "#f0aa42"; cx.strokeStyle = "#1a1408"; cx.lineWidth = 2; cx.beginPath(); cx.arc(q.x, q.y, 7, 0, 7); cx.fill(); cx.stroke();
 }
-/* 警告ランプ: HALF は HALF・LOW の段、 CRIT は CRIT の段で点く (同時には点かない)。 物資 0 は CRIT の点滅。
-   消灯→点灯の瞬間だけ短くちらつかせる (白熱灯が点く感じ)。 */
-function setLamp(id, lit, blink) {
-  const el = document.getElementById(id), was = el.classList.contains("lit");
-  el.classList.toggle("lit", lit); el.classList.toggle("blink", lit && blink);
-  if (lit && !was && !blink) { el.classList.remove("ignite"); void el.offsetWidth; el.classList.add("ignite"); }
-}
-function updateLamps() {
-  const test = document.getElementById("lampTest").checked, g = gaugeOf(S.sup);
-  setLamp("lampHalf", test || g === "HALF" || g === "LOW", false);
-  setLamp("lampCrit", test || g === "CRIT", !test && S.sup <= 0);
-}
-
-// ═══ 物資バー (2026-10-05) ═══════════════════════════════════════════
-// 枠 (272×20) の窓 (x5〜266・y6〜13 = 262×8) に、 バーの絵を物資の割合の幅だけ見せる。 窓の残りは暗い空。 表示は等倍 (1 ドット = 1 画素)
-// 物資 1000 を窓の幅 262 ドットで表すので、 1 ドット ≒ 3.8。 減った幅は**1 フレームに 1 列ずつ**順番に崩す (大きく減っても列は同時に落ちない):
-//   その列の絵が 1 ドット分右端から外れ (全体が 1 ドット左へ流れ)、 外れた列の 8 ドットが光って真下へ落ちる。
-// 粒はその列の外へ出ない (左右に動かず、 光のにじみも横へ広げない)。 窓の外 (枠の上) には描かず、 窓の下端で消える
-// 増えた (補給) 時は右端から絵が現れるだけで、 崩れは出さない
-const SB = { WX: 5, WY: 6, WW: 262, WH: 8, frame: new Image(), bar: new Image(), lining: new Image(), ready: 0,
-  shown: -1, disp: -1, a: 0, b: 0, t0: 0, dur: 1, ticking: 0, clock: null, off: 0, parts: [], raf: 0 };
-const supNow = () => (SB.clock ? SB.clock() : performance.now());
-const supExact = () => S.sup - supFrac;                 // 物資の小数部分 (刻みごとの端数の持ち越し) まで含めた値
-// 表示する物資 (disp) は、 刻みの間を**直線で補間**する (2026-10-05): 実際の値は 0.1 手番の刻みの終わりにしか変わらないが、
-// 地図の自分の位置と同じように、 前の刻みの値から今の値まで、 刻みの長さをかけて一定の速さで動かす。 刻みの外の変化 (戦闘・補給・照明など) は、
-// 大きさに応じた短い時間 (150〜700ms) で直線に動かす。 消費そのものは変えない (距離 × 単価・時間当たりの量は同じ)。
-// バーは 1 ドット = 物資 supMax / 262 (上限 1000 なら約 3.82) の計算で列を数える。 表示の物資が 1 ドット分 (約 3.82) 減るたびに、 右端の 1 ドット幅の列が 1 本崩れ、
-// 絵が 1 ドット左へ流れる。 1 フレームの歩幅は最大 3 なので、 1 フレームに崩れる列は最大 1 本
-const supBandX = n => n;
-const supBandsOf = v => Math.max(0, Math.min(SB.WW, Math.ceil(v * SB.WW / P.supMax)));
-SB.frame.onload = SB.bar.onload = SB.lining.onload = () => { if (++SB.ready === 3) { if (S) { SB.disp = SB.a = SB.b = supExact(); SB.shown = supBandX(supBandsOf(SB.disp)); } supBarDraw(); } };
-SB.lining.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQYAAAAICAYAAAAbSFH4AAAENUlEQVR4nO1Z25LaMAyVLzGwu91Op1/Ql07//9soudlO58h2cAwkYbfstgxnBjDBkSVZOpKD+PHz1+C9pwceeOABQClFGoPBD3RvEES0e9rRMAzU1A1dslDHuRURSYwF0TAQOfiFiGx83QsUBduAXbSxKa5/JqQg2u6gGVFT13SHoTlCxZfMXsC+iE+U7Q8t3SqsexvZlSbXh5SSSpJ3H9uVIJ4Oh5qUkvT88kJCSmrqA/VRp5EA4icp0MNAWleEDspZRwS98duNdBdSjKScj9cLiIamMbAgIk/++sL1c+ugijjnSMqwl0or9pOuDDlnyVsXfLpChznABdg3rRW9vH7la4fDnmz/ftpKOsPP8Ddc5m/APCLuJfyBt7QePjkX0KFnxYfvicTAoRivpcL0GRA4SnASvNHRMIkdQIJs35M2qL3B6dOVoqVhMnlnSQjJCesszB9I6YoG78l7x+M0T6rAX/iNRUk5zuMgrTR5a/k6E5CIjlaa50D20/MX2my3fF/X99S17aha37ZUbTarbHa25y4kJIhjUhFxR3mMtaMeCAYkzuAxD0GxgoeTkMJ2Hks1Mlpw5YmXJzZhLxCM8C8nhXOsG+5HQrCuQoTkiMmfjpXQu9Rnrb/gc0QA1rJ9xzJklD0mR9wn+FEpzeQCXUZ7PUhIkdlsyBjD85qmYXLnfJPqJFZyveBvyLtmb8N+el4X+oSEPu7thMAFkdaa18Er6XDOR8cxBGVbHd8Ru/AxfOR6xNeUxKSMexTTZ9yzojaU31PxK8dL0JVeJoakCAapUhzJ4OhQGAUgCNMGI5iBMcmx2WuS4wqUG78YCN7S67fvPDzs99R1Levk+o6QbkpVHBxcDaE323207xScopNgXNJjmvAhWdN9WBuEeQ1SEuXj84G5jHJuLhs+SgGMYB4SmSM5vD9JjmvWmQPkg9S32y1/B0HkxJ7kAaPMjNCYQAbPBARZ8P+x8Mzt7RGQwaS6AMQ/iM92/aQrwTWsratEYh1VxmRRFLM2tlyYG77HX+ay+lyB4PmQs54QFokhZyW04gh8OBCAge69rXVGa/kxI2+zkq3nGK9su5MMbLDSmmzXsv6qMlyxMDdVzCTDmIqrEdA2zXjEmFU7qxaV2XAnAJlYJ3UTCD4oi0CFzlwFru3IijIwtR1Bep04DkpUnwGJY2J3141dAfQGkCwpwd50tCmQfA5oswkdnrU8Bsl4dBKRaGw6dmbVsQT8gKDd7Z6YWA+/99S13amuZRldgdzHlTFB13hUKsmc/YUuAfHVteG+N6xZIrd9zg+3xqqOQWUP6JLtiEts4738l7HboRINVNfTKvQ3AN+FHut4ZvwXHvL97wgPKbeclCD2czlU+t7d2YPkWxIDU2CoIpfhZ56o3gNsPFcv+eGtyP2XP31+4H3oY6epjLkYi7nv079PD9As0F3+ARIbw0SueQb+AAAAAElFTkSuQmCC";
-SB.frame.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAARAAAAAUCAIAAADKjvXgAAADx0lEQVR4AeyaS2/TUBCFbTeQp/NqHvwdxLoFIVaoQqViw4INYoNQd/wMQAgQK4Raukb8ndK84ySFTcJn38Rx4sR1XAep0kSnN3Ov586cOdVpqyqG5rz2D44EooAoEKCAYxTNNszhy9fZfCGTMwWigCiwUoHbyRRewjPGi+O3txKJVDqdzmYFooAosFKBXKFgFktHr94YOTN/O5nEOgJRQBRYp4Cu68VSqVatGbx03f7DjNTJZPL3cvRnNHRxORz2ux1WQDAaDHqddq/dmqLT5txNDh9wa6GOWzDeIAQ9mDAXqyJPwHY0WBwzXlbbq9ZpjwYD+DOFGmdp5Zyn5PwP8bc3ZoyVZ4qhCcqgj1cxtla3OxmPsQbAJjs7O0YynU4kdthPxuNeqzm0LPJcjAZWt9lgBXZg9TuNi06zMUXjgnM3OXzArYU6bsF4gxD0YGLPNZhOPd0ujRkvq+1VY16r7x1n6Ttys6fbhm6uYqt0Q67WxXnz97nyDDbBLIZuGJquYxir3+u2W6ef3598eufix5cPP0+/sQKCs68ff51994LzE09+yJhb3iLbi2kUTIkE5mJVaQRs/WNuj2G8lWEOf6ZQ4yytnPOUnHib3uhqqKE0YUUfr2Js8cXQ6mMNAmyCWQw7cr6UjZxQFlFAFLAV4GcBb15rzA3DA4EoIAoEKyCGCdZHnooCCwqsNsxCimxEAVFgpoAYZqaEvIsCIRQQw4QQSVJEgZkCc8PwLzMO7+49ZBWIAqIACig7KGuwBXPDmPlC1sxzRNL+wdGDJ88Awb37j/YeH3IYGVynCKWACqjsB08jtKC4usV1f01OOKepm6aSr7+6BalPl2CQAwdWcP3WVIjQ3b3C9bhATTVX8PjqKbOrZIK4CESo4+V8JRPsgCmwBoHC3DDYqFK/U67VS9VaJmeqj6BlcmaxUs2YeQ5LlWoUUM3M20WcT0OrQBVfWmm6cRenuH2LYMbZX9Zual5jBP/gtFMFCdb09dJgNJuDo4DN1l9woxOaRuiurmzUKDjZoaHm8g67Lo5ZhGBu654ucoZS8LcDO2AKrKHcwjo3DBse5IulQqnMzKlMFhBwksnlOCyUd6OgVOY6RSgFVEBlP3i6cRenuH3Lw3mpMmVpCgc7LdoI/lsh+nppKA6sIAYakbrHrACaODTQlqG8w66LSVPJBDGIAIEIWOR8JRMIYwqs4cI2TDKZ0jT70zGavEQBUWC1ArpjE804fv40Z5q1er1QLApEAVFgpQIYBJtgFvs3DG9sditVgSggCqxUAINgE03T/gEAAP//azzQNQAAAAZJREFUAwDlCzR6UGxeUAAAAABJRU5ErkJggg=="; SB.bar.src = "data:image/png;base64,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";
-const supCx = () => document.getElementById("supCv").getContext("2d", { willReadFrequently: true });
-function supBarSet(sup) {
-  if (SB.ready < 3) return;                          // 画像の読み込み前は何もしない (読み込み後に今の物資で初期化する)
-  if (SB.disp < 0) { SB.disp = SB.a = SB.b = sup; SB.shown = supBandX(supBandsOf(sup)); supBarDraw(); return; }
-  if (Math.abs(sup - SB.b) < 1e-9) return;
-  SB.a = SB.disp; SB.b = sup; SB.t0 = supNow();
-  SB.dur = SB.ticking > 0 ? SB.ticking : Math.max(150, Math.min(700, 80 + Math.abs(sup - SB.disp) * 6));   // 刻みの更新は刻みの長さ・それ以外は変化の大きさで
-  if (!SB.raf) SB.raf = requestAnimationFrame(supBarLoop);
-}
-// 列 nNew〜nOld-1 (1 ドット幅の列) を粒にして、 絵をその幅だけ左へ流す
-function supBarSpillBands(nOld, nNew) {
-  const x0 = supBandX(nNew), x1 = supBandX(nOld);
-  const gT = 8 + Math.floor(Math.random() * 7), bT = 12 + Math.floor(Math.random() * 7);   // ① 発光 ② 点滅の長さは、 この崩れの粒で共有 (列がそろって光り・点滅する)
-  const bc = document.createElement("canvas"); bc.width = SB.WW; bc.height = SB.WH; const bx = bc.getContext("2d");
-  bx.drawImage(SB.bar, 0, 0);
-  for (let c = x0; c < x1; c++) {
-    const sx = ((c + SB.off) % SB.WW + SB.WW) % SB.WW;
-    for (let r = 0; r < SB.WH; r++) {
-      const d = bx.getImageData(sx, r, 1, 1).data; if (d[3] < 8) continue;
-      SB.parts.push({ x: SB.WX + c, y: SB.WY + r, vy: Math.random() * 0.5, grav: 0.07 + Math.random() * 0.36,        // 粒ごとに初速と重さ (落ちる速さ) を変える
-        col: [d[0], d[1], d[2]], glow: 1, life: 0, age: 0,
-        glowT: gT,                                                                 // ① 発光: 白熱色で光り続ける (8〜14 フレーム)
-        blinkT: bT,                                                                // ② 点滅: 明るい色と暗い色を交互に (崩れる直前ほど速い・12〜18 フレーム)
-        delay: 0 }); }
-  }
-  SB.shown = x0; SB.off = (SB.off + (x1 - x0)) % SB.WW;
-}
-function supBarLoop() {
-  SB.raf = 0;
-  const k = Math.max(0, Math.min(1, (supNow() - SB.t0) / SB.dur));
-  const nextDisp = SB.a + (SB.b - SB.a) * k;                       // 直線補間
-  if (nextDisp !== SB.disp) {
-    const nOld = supBandsOf(SB.disp); SB.disp = nextDisp; const nNew = supBandsOf(SB.disp);
-    if (nNew < nOld) supBarSpillBands(nOld, nNew);                 // 1 ドット分 (約 3.82) 減って列が減った: その列を崩す
-    else if (nNew > nOld) SB.shown = supBandX(nNew);               // 増えた (補給): 右端から絵が現れるだけ
-    const el = document.getElementById("sup"); if (el) el.textContent = Math.round(SB.disp);
-  }
-  for (const p of SB.parts) {
-    if (p.delay === 0 && p.age === 0) p.delay = p.glowT + p.blinkT + Math.floor(Math.random() * Math.random() * 8);   // ③ 崩れの開始 (最初の 1 フレームで決める)
-    if (p.delay > 0) { p.delay--; p.age++; continue; }
-    p.life++; p.vy += p.grav; p.y += p.vy; p.glow = Math.max(0, p.glow - 0.028);
-  }
-  SB.parts = SB.parts.filter(p => p.y < 20 && p.life < 70);   // 窓の下の枠を越えて落ち、 キャンバスの下端で消える (横へは出ない)
-  supBarDraw();
-  if (SB.parts.length || k < 1) SB.raf = requestAnimationFrame(supBarLoop);
-}
-function supBarDraw() {
-  if (SB.ready < 3) return;
-  const cx = supCx(); cx.clearRect(0, 0, 272, 20);
-  // ① 窓の中: 空の暗さ → バーの絵 (左へ流れた分だけずらして、 見せる幅まで)
-  cx.drawImage(SB.lining, SB.WX, SB.WY);                              // 空の部分は裏地 (汚した板・窓の全面に敷く)
-  const w = SB.shown < 0 ? SB.WW : SB.shown, o = SB.off;
-  if (w > 0) {                                                        // 絵は輪になっている (左へ流れて右端から戻る)
-    const src = (sx, sw, dx) => { if (sw > 0) cx.drawImage(SB.bar, sx, 0, sw, SB.WH, SB.WX + dx, SB.WY, sw, SB.WH); };
-    const a = Math.min(w, SB.WW - o); src(o, a, 0); src(0, w - a, a);
-  }
-  // ② 枠: 画像の窓は黒塗りなので、 窓の長方形を除いて 4 つの帯に分けて描く
-  const fr = (sx, sy, sw, sh) => cx.drawImage(SB.frame, sx, sy, sw, sh, sx, sy, sw, sh);
-  fr(0, 0, 272, SB.WY); fr(0, SB.WY + SB.WH, 272, 20 - SB.WY - SB.WH); fr(0, SB.WY, SB.WX, SB.WH); fr(SB.WX + SB.WW, SB.WY, 272 - SB.WX - SB.WW, SB.WH);
-  // ②b 区間の目印 (2026-10-05): 窓の下の枠の縁に、 区間ごとの色の細い帯 (2 行)。 CRIT = 赤 (物資 0〜200)・HALF = 黄 (201〜750・HALF ランプの範囲)・FULL = 青 (751〜)。
-  //     今いる区間は明るく、 ほかは枠になじむ暗さ。 境目には暗い縦の仕切り。 区間の幅は物資の上限に対する割合 (バーの列と同じ計算)
-  {
-    const zs = [[0, supBandsOf(200), [232, 70, 56]], [supBandsOf(200), supBandsOf(750), [246, 208, 70]], [supBandsOf(750), SB.WW, [96, 160, 240]]];
-    const cur = SB.disp < 0 ? -1 : SB.disp <= 200 ? 0 : SB.disp <= 750 ? 1 : 2;
-    zs.forEach(([x0, x1, c], i) => {
-      const k = i === cur ? 1 : 0.42, mixc = (v, f) => Math.round(f + (v - f) * k);
-      for (let y = 15; y <= 16; y++) { const b = y === 15 ? 1 : 0.72;
-        cx.fillStyle = `rgb(${mixc(c[0] * b, 97)},${mixc(c[1] * b, 115)},${mixc(c[2] * b, 122)})`; cx.fillRect(SB.WX + x0, y, x1 - x0, 1); }
-      if (i > 0) { cx.fillStyle = "#1c2024"; cx.fillRect(SB.WX + x0, 14, 1, 4); }
-    });
-  }
-  // ③ 崩れる粒 (2026-10-05 改): 消費された列は**白熱色に強く光る** (待っている間も)。 落ち始めが一番明るく、 落ちるほど元の色へ戻って暗くなる。
-  //    落ちる粒の真上に短い縦の尾を引く (下へ落ちていることが分かる)。 窓の下の枠の上も通り、 キャンバスの下端で消える。 横 (列の外) には描かない
-  const hot = (col, g) => `rgb(${Math.round(col[0] + (255 - col[0]) * g)},${Math.round(col[1] + (236 - col[1]) * g)},${Math.round(col[2] + (190 - col[2]) * g)})`;
-  cx.save(); cx.beginPath(); cx.rect(SB.WX, SB.WY, SB.WW, 20 - SB.WY); cx.clip();      // 窓の上端から下 (枠の下側も含む)
-  for (const p of SB.parts) {
-    const falling = p.delay <= 0 && p.age > 0, g0 = falling ? 0.35 + 0.65 * p.glow : 1;      // 落ち始めは強く光る
-    let g = g0;
-    if (!falling) {                                                                     // 待っている間: ① 発光 (一定の明るさ) → ② 点滅 (明るい / 暗いを交互に・だんだん速く)
-      const t = p.age - p.glowT;
-      if (t > 0) { let acc = 0, per = 4, on = true; while (acc + per <= t) { acc += per; on = !on; per = Math.max(1, per - 1); }
-        if (!on) { g = 0.0; cx.globalAlpha = 1; cx.fillStyle = `rgb(${Math.round(p.col[0] * 0.55)},${Math.round(p.col[1] * 0.55)},${Math.round(p.col[2] * 0.55)})`; cx.fillRect(p.x, Math.round(p.y), 1, 1); continue; } }
-    }
-    if (falling) {                                                                       // 尾: 真上に 1〜4 ドット、 上ほど暗い
-      const len = Math.max(1, Math.min(4, Math.round(p.vy * 2.2)));
-      for (let k = 1; k <= len; k++) { const ty = Math.round(p.y) - k; if (ty < SB.WY) break;
-        cx.globalAlpha = Math.max(0, (1 - k / (len + 1)) * 0.65 * (1 - p.life / 70)); cx.fillStyle = hot(p.col, Math.min(1, g)); cx.fillRect(p.x, ty, 1, 1); } }
-    cx.globalAlpha = falling ? Math.max(0, 1 - p.life / 70) : 1;
-    cx.fillStyle = hot(p.col, g); cx.fillRect(p.x, Math.round(p.y), 1, 1);
-  }
-  cx.globalAlpha = 1;
-  cx.restore();
-}
-
 function ui() {
   const st = stageOf(S.sup);
-  document.getElementById("sup").textContent = (typeof SB !== "undefined" && SB.disp >= 0) ? Math.round(SB.disp) : S.sup; document.getElementById("supmax").textContent = P.supMax; updateGauge();
+  document.getElementById("sup").textContent = S.sup; document.getElementById("supmax").textContent = P.supMax; updateGauge();
   document.getElementById("supbar").style.width = (S.sup / P.supMax * 100) + "%";
-  supBarSet(supExact());
-  updateLamps();
   document.getElementById("hp").textContent = S.hp; document.getElementById("hpmax").textContent = P.hpMax;
   document.getElementById("hpbar").style.width = (S.hp / P.hpMax * 100) + "%";
   document.getElementById("gold").textContent = S.gold + " G";
@@ -1498,7 +1354,7 @@ function loop(ts) {
     if (ts - last >= per) {
       const n = Math.min(5, Math.floor((ts - last) / per)); last = ts;
       prevMe = { x: S.me.x, y: S.me.y }; prevFoes = S.foes.map(f => f.alive ? foePos(f) : null);
-      SB.ticking = n * per; for (let i = 0; i < n; i++) tick(); renderAlpha = 0; ui(); SB.ticking = 0;   // 刻みの更新: バーは刻みの長さで直線に動く
+      for (let i = 0; i < n; i++) tick(); renderAlpha = 0; ui();
     } else { renderAlpha = (ts - last) / per; draw(); }
   } else { last = ts; renderAlpha = 1; if (lcdOn() && ts - (loop.idle || 0) > 40) { loop.idle = ts; draw(); } }   /* 停止中も気配の波を動かす */
   requestAnimationFrame(loop);
