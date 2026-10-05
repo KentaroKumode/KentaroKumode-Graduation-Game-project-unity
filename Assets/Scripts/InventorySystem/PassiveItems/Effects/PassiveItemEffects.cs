@@ -162,7 +162,7 @@ namespace InventorySystem.PassiveItems.Effects
     /// 旧+2/+10 → +3/+15 で 1.5倍化。</summary>
     public class CalamityRingEffect : ITimedEffect
     {
-        public string Id => "傷覚えの災環";
+        public string Id => "血脈の災環";
         public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
         private const string Stack = "calamity_stack";
         private const string LastHP = "calamity_last_hp";
