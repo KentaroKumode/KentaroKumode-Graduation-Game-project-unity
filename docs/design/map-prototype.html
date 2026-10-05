@@ -1402,6 +1402,18 @@ function supBarDraw() {
   // ② 枠: 画像の窓は黒塗りなので、 窓の長方形を除いて 4 つの帯に分けて描く
   const fr = (sx, sy, sw, sh) => cx.drawImage(SB.frame, sx, sy, sw, sh, sx, sy, sw, sh);
   fr(0, 0, 272, SB.WY); fr(0, SB.WY + SB.WH, 272, 20 - SB.WY - SB.WH); fr(0, SB.WY, SB.WX, SB.WH); fr(SB.WX + SB.WW, SB.WY, 272 - SB.WX - SB.WW, SB.WH);
+  // ②b 区間の目印 (2026-10-05): 窓の下の枠の縁に、 区間ごとの色の細い帯 (2 行)。 CRIT = 赤 (物資 0〜200)・HALF = 黄 (201〜750・HALF ランプの範囲)・FULL = 青 (751〜)。
+  //     今いる区間は明るく、 ほかは枠になじむ暗さ。 境目には暗い縦の仕切り。 区間の幅は物資の上限に対する割合 (バーの列と同じ計算)
+  {
+    const zs = [[0, supBandsOf(200), [232, 70, 56]], [supBandsOf(200), supBandsOf(750), [246, 208, 70]], [supBandsOf(750), SB.WW, [96, 160, 240]]];
+    const cur = SB.disp < 0 ? -1 : SB.disp <= 200 ? 0 : SB.disp <= 750 ? 1 : 2;
+    zs.forEach(([x0, x1, c], i) => {
+      const k = i === cur ? 1 : 0.42, mixc = (v, f) => Math.round(f + (v - f) * k);
+      for (let y = 15; y <= 16; y++) { const b = y === 15 ? 1 : 0.72;
+        cx.fillStyle = `rgb(${mixc(c[0] * b, 97)},${mixc(c[1] * b, 115)},${mixc(c[2] * b, 122)})`; cx.fillRect(SB.WX + x0, y, x1 - x0, 1); }
+      if (i > 0) { cx.fillStyle = "#1c2024"; cx.fillRect(SB.WX + x0, 14, 1, 4); }
+    });
+  }
   // ③ 崩れる粒 (2026-10-05 改): 消費された列は**白熱色に強く光る** (待っている間も)。 落ち始めが一番明るく、 落ちるほど元の色へ戻って暗くなる。
   //    落ちる粒の真上に短い縦の尾を引く (下へ落ちていることが分かる)。 窓の下の枠の上も通り、 キャンバスの下端で消える。 横 (列の外) には描かない
   const hot = (col, g) => `rgb(${Math.round(col[0] + (255 - col[0]) * g)},${Math.round(col[1] + (236 - col[1]) * g)},${Math.round(col[2] + (190 - col[2]) * g)})`;
