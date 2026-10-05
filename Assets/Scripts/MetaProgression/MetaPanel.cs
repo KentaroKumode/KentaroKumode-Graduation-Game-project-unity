@@ -109,8 +109,8 @@ namespace MetaProgression
         /// +50〜76% 乗っているので、 <b>死ぬ場所に効く形</b>になる。</para>
         ///
         /// <para><b>旧〈オーバーロード〉の撤去 (2026-09-13)。</b> 「1戦闘1回・与ダメ2倍・反動」は
-        /// 反動を HP (15%→5%) でも 希望 (−5) でも機能しなかった
-        /// ── HP は「HP を払って HP を守る」で釣り合わず、 希望は回復源ゼロで
+        /// 反動を HP (15%→5%) でも 物資 (−5) でも機能しなかった
+        /// ── HP は「HP を払って HP を守る」で釣り合わず、 物資は回復源ゼロで
         /// <b>クリア率 7.92% (Balanced −39.66pt)</b> の大惨事。 床を入れて中立 (+0.19pt) に
         /// 戻したが r10−r9 が +0.89pt で極点として死んでいた。
         /// <b>資源にコストを置く設計を諦め、 コスト無しの累積成長へ振り替える。</b></para></summary>
@@ -125,7 +125,7 @@ namespace MetaProgression
         /// 与ダメ% の合成は整数 pool なので、 勝利ごとに四捨五入すると 2%/勝 に戻ってしまう。</para></summary>
         public const float BattleSpiritPctPerWin = 1.5f;
 
-        // [撤去 2026-09-13] OverloadHopeCost / OverloadHopeFloor ── 旧〈オーバーロード〉の調整つまみ。
+        // [撤去 2026-09-13] OverloadProvisionCost / OverloadProvisionFloor ── 旧〈オーバーロード〉の調整つまみ。
         //   経緯は BattleSpiritUnlocked を参照。
 
         // [削除 2026-09-13] GuardShield / GuardDamageReduce ── どちらも呼び出し元が無い、
@@ -350,67 +350,67 @@ namespace MetaProgression
         /// <summary>互換: 開幕パッシブが 1 本でも付くか。</summary>
         public static bool SupplyStartingPassiveUnlocked(int rank) => SupplyStartingPassives(rank) > 0;
 
-        /// <summary>燈火: 戦闘後の希望減少軽減。 <b>2026-09-12 廃止 (常に 0)</b> ──
-        /// 効果を <see cref="LanternHopeCapBonus"/> (希望上限) へ移した。
+        /// <summary>燈火: 戦闘後の物資減少軽減。 <b>2026-09-12 廃止 (常に 0)</b> ──
+        /// 効果を <see cref="LanternProvisionCapBonus"/> (物資上限) へ移した。
         /// r9 で −3 軽減まで積んでも Balanced −5.06pt で、 戦闘 1 回あたりの損 (4〜10) を
         /// 削っても効いていなかった。</summary>
-        public static int LanternHopeLossReduce(int rank) => 0;
+        public static int LanternProvisionLossReduce(int rank) => 0;
 
-        /// <summary><b>燈火: 希望上限 +15/段。</b> r9 で 235、 r10 で 250。
+        /// <summary><b>燈火: 物資上限 +15/段。</b> r9 で 235、 r10 で 250。
         ///
-        /// <para><b>効いていない。</b> 上限を上げても<b>希望には収入が無い</b>ので、
-        /// タンクが空のまま大きくなるだけだった ── 実測で r9 の 6 層突入時の希望が
+        /// <para><b>効いていない。</b> 上限を上げても<b>物資には収入が無い</b>ので、
+        /// タンクが空のまま大きくなるだけだった ── 実測で r9 の 6 層突入時の物資が
         /// <b>170 (未使用)</b>、 全軸 10,000 ラン で r9 が Bal比 <b>−11.12pt と全アーム最下位</b>。
         /// 減少軽減 (2026-09-12 廃止・−5.06pt) に続き、 <b>上限も効かない</b>ことが確定した。
         /// <b>未解決</b> ── 使い道へ移す案 (2026-09-14 案C) は BOT の方策が追随せず撤回した。</para></summary>
-        public static int LanternHopeCapBonus(int rank) => Mathf.Clamp(rank, 0, 10) * 15;
+        public static int LanternProvisionCapBonus(int rank) => Mathf.Clamp(rank, 0, 10) * 150;   // 2026-09-28: 物資 ×10
 
-        /// <summary><b>燈火: 希望で支払える下限 (段効果)。</b> 段が上がるほど深く払える。
+        /// <summary><b>燈火: 物資で支払える下限 (段効果)。</b> 段が上がるほど深く払える。
         ///
-        /// <para><b>2026-09-14 新設 (案C)。</b> 旧構成は「希望払い」を r10 の極点だけの特権にしていたが、
+        /// <para><b>2026-09-14 新設 (案C)。</b> 旧構成は「物資払い」を r10 の極点だけの特権にしていたが、
         /// 極点は実測で <b>95,283 回発動</b>しており<b>機構は確実に動く</b>。
         /// これを段効果へ降ろせば、 上限 +N がそのまま購買力になり
         /// 「タンクが空」問題が構造的に消える ── 上限と使い道が同じ方向を向く。</para>
         ///
-        /// <para>返すのは<b>「ここまで希望を減らしてよい」という床</b>。 rank 0 は解禁前なので
+        /// <para>返すのは<b>「ここまで物資を減らしてよい」という床</b>。 rank 0 は解禁前なので
         /// <see cref="int.MaxValue"/> 相当 (＝1 も払えない) を意味する大きな値を返す。
         /// r1 で 悲観帯 (45)、 段ごとに 3 ずつ下がり、 r9 で 21、
-        /// r10 で <see cref="GameLoop.HopeSystem.FloorDespair"/> (20) ＝ 規則上の最深。</para></summary>
-        /// <summary>燈火: 希望払いの<b>規則としての</b>下限。 ここを割る支払いはできない。
+        /// r10 で <see cref="GameLoop.ProvisionSystem.FloorScarce"/> (20) ＝ 規則上の最深。</para></summary>
+        /// <summary>燈火: 物資払いの<b>規則としての</b>下限。 ここを割る支払いはできない。
         ///
-        /// <para><b>規則は緩い。</b> 絶望帯 (20) の手前まで払える ── 希望 0 は発狂＝ラン終了なので
+        /// <para><b>規則は緩い。</b> 絶望帯 (20) の手前まで払える ── 物資 0 は発狂＝ラン終了なので
         /// そこだけは止めるが、 <b>残り少なくても払えること自体は許す</b>。
         /// 人間が「ここで押し切る」と決めた手を規則で禁じない。</para>
         ///
         /// <para><b>「どこまで払うのが賢いか」は方策の側</b>
-        /// (<see cref="GameLoop.HopePayment.PolicyFloorNow"/>) が決める。 規則と方策を同じ数字にすると、
+        /// (<see cref="GameLoop.ProvisionPayment.PolicyFloorNow"/>) が決める。 規則と方策を同じ数字にすると、
         /// 規則を緩めた瞬間に方策まで無謀になる。 実際 案C 初版でそれを踏んだ
         /// ── 床を段で 45→20 まで下げたら BOT が使い切り、 Balanced が 24.60% → 12.29% へ崩れた。</para>
         ///
-        /// <para><b>段効果は上限が担う。</b> 希望上限 +15/段 で r9 なら 235。
+        /// <para><b>段効果は上限が担う。</b> 物資上限 +15/段 で r9 なら 235。
         /// 方策側の閾値 100 (= 素の上限) を超えた分がそのまま購買力になるので、
         /// <b>燈火で伸ばした分しか実際には使われない</b> ── 上限と使い道が直結する。</para></summary>
-        public static int LanternHopeSpendFloor(int rank)
-            => Mathf.Clamp(rank, 0, 10) >= 1 ? GameLoop.HopeSystem.FloorDespair : int.MaxValue;
+        public static int LanternProvisionSpendFloor(int rank)
+            => Mathf.Clamp(rank, 0, 10) >= 1 ? GameLoop.ProvisionSystem.FloorScarce : int.MaxValue;
 
-        /// <summary><b>[方策] BOT が希望を使い始める水位。</b> 規則ではない ──
-        /// 規則上は <see cref="LanternHopeSpendFloor"/> (絶望帯の手前) まで払える。
+        /// <summary><b>[方策] BOT が物資を使い始める水位。</b> 規則ではない ──
+        /// 規則上は <see cref="LanternProvisionSpendFloor"/> (絶望帯の手前) まで払える。
         ///
-        /// <para>素の希望上限 (<see cref="GameLoop.HopeSystem.HopeMax"/> = 100) と同じ値。
+        /// <para>素の物資上限 (<see cref="GameLoop.ProvisionSystem.ProvisionMax"/> = 100) と同じ値。
         /// <b>燈火で上限を伸ばした分しか BOT は使わない</b>。
         /// 80 で測ると Balanced でも 3.39 回/ラン 発動してクリア率が 24.60% → 21.56% へ落ちた
         /// ── 平穏ギリギリまで使い切った後、 通常の戦闘損で焦燥へ落ちるため。</para></summary>
-        public const int HopeSpendThreshold = GameLoop.HopeSystem.HopeMax;
+        public const int ProvisionSpendThreshold = GameLoop.ProvisionSystem.ProvisionMax;
 
-        /// <summary><b>燈火 r10 (極点): ゴールド不足分を希望で 1:1 で払える。</b> 2026-09-13。
+        /// <summary><b>燈火 r10 (極点): ゴールド不足分を物資で 1:1 で払える。</b> 2026-09-13。
         ///
         /// <para>旧極点「横移動を無税にする」を差し替えた。 無税は r10−r9 +1.07pt で
         /// 目標 (+3pt) に届かず、 かつ<b>トラックの段効果と噛み合っていなかった</b> ──
-        /// 希望上限 +15/段 を積んでも、 回復源が無い希望は余ればランの終わりに捨てられる。
+        /// 物資上限 +15/段 を積んでも、 回復源が無い物資は余ればランの終わりに捨てられる。
         /// 支払いに使えるなら上限がそのまま購買力になる。</para>
         ///
-        /// <para>規則の本体は <see cref="GameLoop.HopePayment"/>。</para></summary>
-        public static bool LanternHopePaymentUnlocked(int rank) => rank >= 10;
+        /// <para>規則の本体は <see cref="GameLoop.ProvisionPayment"/>。</para></summary>
+        public static bool LanternProvisionPaymentUnlocked(int rank) => rank >= 10;
 
         /// <summary>【廃止】精密の「会心ダイス」補正。 常に 0。
         ///

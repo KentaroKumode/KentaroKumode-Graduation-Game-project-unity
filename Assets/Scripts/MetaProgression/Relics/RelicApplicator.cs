@@ -77,7 +77,7 @@ namespace MetaProgression.Relics
         /// 〈渇き〉〈刻限〉分を含む（軸は重複しないので同時に載ることは無い）。</summary>
         public static float GetOutgoingPct(RunState run, CombatContext ctx)
             => ValueOf(RelicAxis.DamagePct, run, ctx) * 0.01f
-             + GetHopeBurnPct(run, ctx)
+             + GetProvisionBurnPct(run, ctx)
              + GetLongBattlePct(run, ctx);
 
         /// <summary>会心率+N%。 0.0〜0.28 を返す（ctx.critRatePctAdd へ加算）。</summary>
@@ -106,51 +106,51 @@ namespace MetaProgression.Relics
             return run.lambdaCombatsFinished * perCombat * 0.01f * 2.0f;
         }
 
-        /// <summary>〈渇き〉希望が <see cref="RelicAxisCatalog.HopeBurnThreshold"/> 以下の間の
+        /// <summary>〈渇き〉物資が <see cref="RelicAxisCatalog.ProvisionBurnThreshold"/> 以下の間の
         /// 与ダメージ +N%。 条件を外れていれば 0。
         ///
-        /// **絶対値で判定する。** hopeCap は一方向のラチェット（希望 45 以下で上限 45、
+        /// **絶対値で判定する。** provisionCap は一方向のラチェット（物資 45 以下で上限 45、
         /// 20 以下で上限 20 に固定＝それ以上回復できない）なので、 比にすると閾値も
-        /// 40→18→8 と一緒に下がり、 希望が閾値へ永久に追いつかない。
+        /// 40→18→8 と一緒に下がり、 物資が閾値へ永久に追いつかない。
         /// 実測 (計装 33,864 判定): 比だった頃の発動率は **6.6%** しかなかった。</summary>
-        public static float GetHopeBurnPct(RunState run, CombatContext ctx)
+        public static float GetProvisionBurnPct(RunState run, CombatContext ctx)
         {
             if (run == null) return 0f;
-            int step = StepOf(RelicAxis.HopeBurn, run, ctx);
+            int step = StepOf(RelicAxis.ProvisionBurn, run, ctx);
             if (step <= 0) return 0f;
             // [計装] 「弱い」のか「そもそも発動していない」のかを数字で分けるための計数。
             //   実測では倍率を 3 回上げても与ダメが動かず、 原因の切り分けができなかった。
-            HopeBurnChecks++;
-            HopeBurnHopeSum += run.hope;
-            HopeBurnCapSum  += Mathf.Max(1, run.hopeCap);
-            // **絶対値で判定する。** hopeCap 比にすると、 希望が 45 を割った時の cap ロック
+            ProvisionBurnChecks++;
+            ProvisionBurnProvisionSum += run.provision;
+            ProvisionBurnCapSum  += Mathf.Max(1, run.provisionCap);
+            // **絶対値で判定する。** provisionCap 比にすると、 物資が 45 を割った時の cap ロック
             //   (45以下で上限45 / 20以下で上限20) で閾値まで一緒に下がり、 永久に条件を
-            //   満たさない (RelicAxis の HopeBurnThreshold 参照)。
-            if (run.hope > RelicAxisCatalog.HopeBurnThreshold) return 0f;
-            HopeBurnActive++;
-            return RelicAxisCatalog.ValueOf(RelicAxis.HopeBurn, step) * 0.01f;
+            //   満たさない (RelicAxis の ProvisionBurnThreshold 参照)。
+            if (run.provision > RelicAxisCatalog.ProvisionBurnThreshold) return 0f;
+            ProvisionBurnActive++;
+            return RelicAxisCatalog.ValueOf(RelicAxis.ProvisionBurn, step) * 0.01f;
         }
 
-        // ── 〈渇き〉の計装。 スイープが読んでレポートへ出す。 ResetHopeBurnStats で 0 に戻す ──
+        // ── 〈渇き〉の計装。 スイープが読んでレポートへ出す。 ResetProvisionBurnStats で 0 に戻す ──
         /// <summary>〈渇き〉を載せた状態で与ダメ計算が走った回数。</summary>
-        public static long HopeBurnChecks;
-        /// <summary>そのうち条件 (希望 ≤ hopeCap×閾値) を満たしていた回数。</summary>
-        public static long HopeBurnActive;
-        /// <summary>判定時の希望の合計 (平均を出すため)。</summary>
-        public static long HopeBurnHopeSum;
-        /// <summary>判定時の hopeCap の合計 (平均を出すため)。</summary>
-        public static long HopeBurnCapSum;
+        public static long ProvisionBurnChecks;
+        /// <summary>そのうち条件 (物資 ≤ provisionCap×閾値) を満たしていた回数。</summary>
+        public static long ProvisionBurnActive;
+        /// <summary>判定時の物資の合計 (平均を出すため)。</summary>
+        public static long ProvisionBurnProvisionSum;
+        /// <summary>判定時の provisionCap の合計 (平均を出すため)。</summary>
+        public static long ProvisionBurnCapSum;
 
-        public static void ResetHopeBurnStats()
-        { HopeBurnChecks = HopeBurnActive = HopeBurnHopeSum = HopeBurnCapSum = 0; }
+        public static void ResetProvisionBurnStats()
+        { ProvisionBurnChecks = ProvisionBurnActive = ProvisionBurnProvisionSum = ProvisionBurnCapSum = 0; }
 
-        /// <summary>「発動率 x% / 判定時の平均希望 y (上限 z)」の 1 行。</summary>
-        public static string DescribeHopeBurnStats()
-            => HopeBurnChecks == 0 ? "〈渇き〉判定なし"
-             : $"〈渇き〉発動率 {HopeBurnActive * 100.0 / HopeBurnChecks:F1}% "
-             + $"({HopeBurnActive}/{HopeBurnChecks}) / 判定時の平均希望 "
-             + $"{HopeBurnHopeSum / (double)HopeBurnChecks:F1} (上限 {HopeBurnCapSum / (double)HopeBurnChecks:F1}, "
-             + $"閾値 {RelicAxisCatalog.HopeBurnThreshold} 固定)";
+        /// <summary>「発動率 x% / 判定時の平均物資 y (上限 z)」の 1 行。</summary>
+        public static string DescribeProvisionBurnStats()
+            => ProvisionBurnChecks == 0 ? "〈渇き〉判定なし"
+             : $"〈渇き〉発動率 {ProvisionBurnActive * 100.0 / ProvisionBurnChecks:F1}% "
+             + $"({ProvisionBurnActive}/{ProvisionBurnChecks}) / 判定時の平均物資 "
+             + $"{ProvisionBurnProvisionSum / (double)ProvisionBurnChecks:F1} (上限 {ProvisionBurnCapSum / (double)ProvisionBurnChecks:F1}, "
+             + $"閾値 {RelicAxisCatalog.ProvisionBurnThreshold} 固定)";
 
         /// <summary>〈刻限〉経過ターン数 × N% の与ダメージ加算。 ctx が無ければ 0。
         ///
@@ -250,25 +250,25 @@ namespace MetaProgression.Relics
         public static int GetMaxHpBonus(RunState run)
             => ValueOf(RelicAxis.MaxHp, run, null);
 
-        /// <summary>〈渇き〉を装備しているときの**開幕希望の上限**。 非装備なら 0（＝制限なし）。
+        /// <summary>〈渇き〉を装備しているときの**開幕物資の上限**。 非装備なら 0（＝制限なし）。
         ///
-        /// この軸は「希望 ≤ hopeCap×40% の間だけ与ダメ+N%」という条件付きだが、
+        /// この軸は「物資 ≤ provisionCap×40% の間だけ与ダメ+N%」という条件付きだが、
         /// 開幕 100 のままだと序盤に一度も条件を満たさない ── 実測で 1〜3層の 1攻撃与ダメが
         /// 遺物なし (52.1) に対し 53.6 ＝ **+2.5% しか動かず、ほぼ発動していなかった**。
         /// 倍率を +63%→+126% に倍化しても結果は変わらなかった（発動しない区間では 0 のため）。
         ///
         /// そこで**軸自身が発動条件を作る**。 開幕から発動圏に居る代わりに、
-        /// 希望という資源を丸ごと前借りする（横移動の自由度・発狂までの余裕を失う）。
+        /// 物資という資源を丸ごと前借りする（横移動の自由度・発狂までの余裕を失う）。
         /// 賭けとして自己完結し、 他のバランスには一切影響しない。</summary>
-        public static int GetHopeBurnStartHope(RunState run)
+        public static int GetProvisionBurnStartProvision(RunState run)
         {
             // ctx が無い文脈なので刻印は成立扱い（RelicApplicator の規約）。
-            int step = StepOf(RelicAxis.HopeBurn, run, null);
-            return step > 0 ? RelicAxisCatalog.HopeBurnStartHope : 0;
+            int step = StepOf(RelicAxis.ProvisionBurn, run, null);
+            return step > 0 ? RelicAxisCatalog.ProvisionBurnStartProvision : 0;
         }
 
         /// <summary>run を持たない呼び出し口（RunState.Initialize の途中）用。</summary>
-        public static int GetHopeBurnStartHope() => GetHopeBurnStartHope(null);
+        public static int GetProvisionBurnStartProvision() => GetProvisionBurnStartProvision(null);
 
         // ============================================================
         //  デバッグ表示

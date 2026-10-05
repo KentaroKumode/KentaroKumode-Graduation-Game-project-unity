@@ -9,7 +9,7 @@ namespace CombatSystem
     /// <summary><b>特定の層のボス戦だけをターン単位で記録する。</b> 2026-09-13。
     ///
     /// <para><b>なぜ集計ではなく生ログか。</b> 強奪 r10 は 6 層ボス突入時点で
-    /// 希望・消耗品・HP が r9 と同等、 パッシブ +3・装備力 +4 と<b>優位</b>なのに、
+    /// 物資・消耗品・HP が r9 と同等、 パッシブ +3・装備力 +4 と<b>優位</b>なのに、
     /// 6 層ボス突破率だけが 94.9% → 76.3% と 18.6pt 落ちる。 突入時の指標を
     /// 8 通り潰して全部空振りだったので、 差は戦闘の内部にしかない。</para>
     ///
@@ -36,14 +36,14 @@ namespace CombatSystem
 
         /// <summary>ボス戦の開始時に呼ぶ。 対象層でなければ以降の Note は無視される。</summary>
         public static void BeginFight(int floor, int runIdx, string enemyId,
-            int playerHp, int playerMaxHp, int enemyHp, int hope, int passives)
+            int playerHp, int playerMaxHp, int enemyHp, int provision, int passives)
         {
             _active = Enabled && floor == TargetFloor;
             if (!_active) return;
             _runIdx = runIdx;
             _lines.Add($"#FIGHT\t{Label}\t{runIdx}\tF{floor}\t{enemyId}"
                      + $"\thp={playerHp}/{playerMaxHp}\tenemyHp={enemyHp}"
-                     + $"\thope={hope}\tpassives={passives}");
+                     + $"\tprovision={provision}\tpassives={passives}");
         }
 
         public static void NoteTurn(int turn, int enemyAtk, int blockSum, int lossBase,

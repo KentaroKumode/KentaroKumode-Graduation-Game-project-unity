@@ -56,7 +56,7 @@ namespace MetaProgression
 
             // ===== ミッド (Lv 21-40) =====
             Hp(); Hp();                                                  // 21-22
-            Major(MetaBuffKind.HopeLossReduce, 3);                       // 23 (戦闘後の希望減少 -3 一括)
+            Major(MetaBuffKind.ProvisionLossReduce, 30);                      // 23 (戦闘後の物資減少 -30 一括・2026-09-28 に ×10)
             Hp(); Hp();                                                  // 24-25
             Major(MetaBuffKind.StartingPassiveItem);                     // 26 (開幕パッシブ ノーマル)
             Major(MetaBuffKind.ShopRobberyUnlock);                       // 27

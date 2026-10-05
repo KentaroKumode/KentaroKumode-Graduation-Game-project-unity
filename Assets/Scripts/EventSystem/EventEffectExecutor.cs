@@ -113,21 +113,21 @@ namespace EventSystem
 
                 case EventEffectType.HungerDelta:
                 {
-                    // 飢餓→希望統合(ADR-0002): 旧「空腹度±N」を希望±N へ。
+                    // 飢餓→物資統合(ADR-0002): 旧「空腹度±N」を物資±N へ。
                     // (食通の懐刀 +1 フックは 2026-07-18 アイテム削除に伴い除去)
                     int amount = eff.amount;
-                    if (amount > 0) GameLoop.HopeSystem.Recover(run, amount);
-                    else if (amount < 0) GameLoop.HopeSystem.Reduce(run, -amount);
-                    result.log.Add($"希望{amount:+0;-0} (現在 {run.hope}/{run.hopeCap})");
+                    if (amount > 0) GameLoop.ProvisionSystem.Recover(run, amount);
+                    else if (amount < 0) GameLoop.ProvisionSystem.Reduce(run, -amount);
+                    result.log.Add($"物資{amount:+0;-0} (現在 {run.provision}/{run.provisionCap})");
                     break;
                 }
 
-                case EventEffectType.HopeDelta:
+                case EventEffectType.ProvisionDelta:
                 {
                     int amount = eff.amount;
-                    if (amount > 0) GameLoop.HopeSystem.Recover(run, amount);
-                    else if (amount < 0) GameLoop.HopeSystem.Reduce(run, -amount);
-                    result.log.Add($"希望{amount:+0;-0} (現在 {run.hope}/{run.hopeCap})");
+                    if (amount > 0) GameLoop.ProvisionSystem.Recover(run, amount);
+                    else if (amount < 0) GameLoop.ProvisionSystem.Reduce(run, -amount);
+                    result.log.Add($"物資{amount:+0;-0} (現在 {run.provision}/{run.provisionCap})");
                     break;
                 }
 

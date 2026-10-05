@@ -49,14 +49,14 @@ namespace InventorySystem
         public int  nonCritStreakMin; // N 回連続で非会心 (会心でリセット)
         public bool hit;              // この攻撃が当たる (与ダメが 0 より大きい)
         public bool strongFoe;        // エリート戦・ボス戦
-        public string hopeTierMin;    // 希望が この段階以下 (HopeTier 名: "Pessimism" / "Despair" …)
-        public string hopeTierBelow;  // 希望が この段階より上 (段階を排他にする上限)
+        [UnityEngine.Serialization.FormerlySerializedAs("hopeTierMin")] public string provisionTierMin;    // 物資が この段階以下 (ProvisionTier 名: "Depleting" / "Scarce" …)
+        [UnityEngine.Serialization.FormerlySerializedAs("hopeTierBelow")] public string provisionTierBelow;  // 物資が この段階より上 (段階を排他にする上限)
 
         public bool IsEmpty =>
             !solo && turnMax == 0 && !firstRoll && hpPctMax == 0 && hpPctAbove == 0 && enemyHpPctMax == 0
             && !behind && !hitLastTurn && !enemyPoisoned && enemyBleedMin == 0 && !overcharged
             && !allEven && !kaleido && weaponPlusMin == 0 && nonCritStreakMin == 0 && !hit
-            && !strongFoe && string.IsNullOrEmpty(hopeTierMin) && string.IsNullOrEmpty(hopeTierBelow);
+            && !strongFoe && string.IsNullOrEmpty(provisionTierMin) && string.IsNullOrEmpty(provisionTierBelow);
     }
 
     /// <summary>
@@ -111,7 +111,7 @@ namespace InventorySystem
         public string family;
         /// <summary>段。 武器は 2〜4、 消費アイテムは 1〜4。 持たない品は 0。</summary>
         public int tier;
-        /// <summary>消費アイテムの系統。 heal / def / dmg / hope。 それ以外は空。</summary>
+        /// <summary>消費アイテムの系統。 heal / def / dmg / provision。 それ以外は空。</summary>
         public string consFamily;
         /// <summary>ユニーク品 (旧 <c>uniq_</c> 接頭辞)。 <b>昇華の対象外</b>
         /// (<see cref="GameLoop.SublimationSystem.CanSublimate"/>)。</summary>

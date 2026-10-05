@@ -236,7 +236,7 @@ namespace InventorySystem.PassiveSkills
             skillDisplayNames.Clear();
         }
 
-        /// <summary>希望「迷妄」(絶望帯・ADR-0002): 戦闘開始時にプレイヤーのパッシブスキルを count 個
+        /// <summary>物資「迷妄」(絶望帯・ADR-0002): 戦闘開始時にプレイヤーのパッシブスキルを count 個
         /// ランダムで無効化する。PassiveItem(佯狂者・記憶の砂時計 等)は別系統(PassiveItemManager)のため
         /// activeSkillNames に含まれず、自動的に対象外。スキルは戦闘ごとに再登録されるため復元は不要。</summary>
         public void DisableRandomPlayerSkills(int count)
@@ -680,7 +680,7 @@ namespace InventorySystem.PassiveSkills
                 FireTrigger(PassiveSkillTrigger.OnCriticalDamage);
                 // 敵側の会心耐性 (〈回帰性真理〉= 倍率 −0.5)。 **会心倍率が実際に乗る唯一の地点**なので
                 //   ここで引く。 criticalMultiplier 自体を下げると BeginNewTurn の再構築と
-                //   その後の加算 (メタ精密 r10 還元・希望系) に押し流される。
+                //   その後の加算 (メタ精密 r10 還元・物資系) に押し流される。
                 //   下限 1.0 ── 会心が通常攻撃より弱くなるのは倒錯するため。
                 float effCritMul = context.criticalMultiplier;
                 if (!attackerIsEnemy && context.enemyCritMultReduction > 0f)

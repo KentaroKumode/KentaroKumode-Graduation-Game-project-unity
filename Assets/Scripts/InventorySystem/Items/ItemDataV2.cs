@@ -200,7 +200,7 @@ namespace InventorySystem
         public string family = "";
         /// <summary>段。 武器 2〜4 / 消費 1〜4 / 持たない品は 0。</summary>
         public int tier;
-        /// <summary>消費アイテムの系統 (heal/def/dmg/hope)。 それ以外は空。</summary>
+        /// <summary>消費アイテムの系統 (heal/def/dmg/provision)。 それ以外は空。</summary>
         public string consFamily = "";
         /// <summary>ユニーク品 (旧 uniq_ 接頭辞)。 昇華の対象外。</summary>
         public bool unique;

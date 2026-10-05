@@ -11,7 +11,7 @@ namespace MetaProgression
     ///   ・旧 State フィールド (hpBonus/goldBonus 等) は撤廃。 現在値は都度計算。
     ///   ・削除された機能: FloorClearHeal / LastStandHpLossDisable / BossRestHealAndUpgrade /
     ///     CritDamageBonus / BossExtraRare (Rare 昇格) / DiceTotalBonus (ダイス合計概念自体が消滅)。
-    ///   ・追加された getter: GuardShield / HopeCapBonus / CritDenominatorReduce / 種火 4 系 / 端子 2 系。
+    ///   ・追加された getter: GuardShield / ProvisionCapBonus / CritDenominatorReduce / 種火 4 系 / 端子 2 系。
     /// </summary>
     public static class MetaBuffApplicator
     {
@@ -119,17 +119,17 @@ namespace MetaProgression
         public static int GetDiceTotalBonus() => 0;
 
         // ============================================================
-        //  希望ゲージ減少の軽減 (ADR-0002)
+        //  物資ゲージ減少の軽減 (ADR-0002)
         // ============================================================
 
-        /// <summary>戦闘後の希望ゲージ減少の軽減量。 <b>2026-09-12 以降 常に 0</b>
-        /// (燈火の効果を希望上限へ移したため)。 呼び出し側の互換のため残置。</summary>
-        public static int GetHopeLossReduction()
-            => MetaPanel.LanternHopeLossReduce(Rank(MetaPanelKind.Lantern));
+        /// <summary>戦闘後の物資ゲージ減少の軽減量。 <b>2026-09-12 以降 常に 0</b>
+        /// (燈火の効果を物資上限へ移したため)。 呼び出し側の互換のため残置。</summary>
+        public static int GetProvisionLossReduction()
+            => MetaPanel.LanternProvisionLossReduce(Rank(MetaPanelKind.Lantern));
 
-        /// <summary>燈火: 希望上限 +10/段 (0..100)。</summary>
-        public static int GetHopeCapBonus()
-            => MetaPanel.LanternHopeCapBonus(Rank(MetaPanelKind.Lantern));
+        /// <summary>燈火: 物資上限 +10/段 (0..100)。</summary>
+        public static int GetProvisionCapBonus()
+            => MetaPanel.LanternProvisionCapBonus(Rank(MetaPanelKind.Lantern));
 
         // ============================================================
         //  ショップ
@@ -210,17 +210,13 @@ namespace MetaProgression
         public static int GetStartingPassiveOffers(int itemIndex)
             => MetaPanel.SupplyStartingOffers(Rank(MetaPanelKind.Supply), itemIndex);
 
-        /// <summary>燈火 r10: ゴールド不足分を希望で 1:1 で払えるか。</summary>
-        /// <summary>燈火: 希望で支払える下限 (段効果)。 未解禁なら int.MaxValue。</summary>
-        public static int GetHopeSpendFloor()
-            => MetaPanel.LanternHopeSpendFloor(Rank(MetaPanelKind.Lantern));
+        /// <summary>燈火 r10: ゴールド不足分を物資で 1:1 で払えるか。</summary>
+        /// <summary>燈火: 物資で支払える下限 (段効果)。 未解禁なら int.MaxValue。</summary>
+        public static int GetProvisionSpendFloor()
+            => MetaPanel.LanternProvisionSpendFloor(Rank(MetaPanelKind.Lantern));
 
-        public static bool IsHopePaymentUnlocked()
-            => MetaPanel.LanternHopePaymentUnlocked(Rank(MetaPanelKind.Lantern));
-
-        /// <summary>横移動 1 回あたりの希望消費。 現状は常に既定値
-        /// (2026-09-13 に燈火 r10 の無税化を廃し、 希望払いへ差し替えた)。</summary>
-        public static int GetLateralHopeCost() => GameLoop.HopeSystem.LateralCost;
+        public static bool IsProvisionPaymentUnlocked()
+            => MetaPanel.LanternProvisionPaymentUnlocked(Rank(MetaPanelKind.Lantern));
 
         /// <summary>金庫 r10: 貸金庫 (ランを跨ぐ預金) を使えるか。</summary>
         public static bool IsVaultBankUnlocked()

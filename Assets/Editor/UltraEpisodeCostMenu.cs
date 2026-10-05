@@ -162,7 +162,7 @@ namespace AutoTest.EditorTools
             failure = null;
 
             // **Captured from a real run, not synthesised.** A hand-built RunState has no
-            // weapon, no dice and default hope, so the worker resumes and immediately stalls in
+            // weapon, no dice and default provision, so the worker resumes and immediately stalls in
             // combat — the first attempt at this measured deadlocks rather than rollouts.
             string path = AutoRunMenu.UltraCheckpointFile;
             if (!File.Exists(path))

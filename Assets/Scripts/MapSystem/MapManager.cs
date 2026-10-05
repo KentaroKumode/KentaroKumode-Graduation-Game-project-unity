@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using MapSystem.FreeMove;
 using UnityEngine;
 
 namespace MapSystem
@@ -7,6 +8,11 @@ namespace MapSystem
     /// <summary>
     /// マップの生成・ナビゲーション・タイル起動を管理するシングルトン。
     /// GameManager から呼ばれ、移動・空腹度・?マス解決を処理する。
+    ///
+    /// <para><b>2026-09-28: 自由移動の層</b>（1/3/5/6/7）では動く中身を素の C# の <see cref="FreeMapSim"/> が持ち、
+    /// ここはその窓口になる（物資と HP の支払いを RunState へ橋渡しする・着いた点を <see cref="CurrentNode"/> に写す）。
+    /// 時間を進めるのは GameManager（<c>AdvanceFreeMap</c>）で、 人の時計は <c>FreeMapClock</c>。
+    /// Λ 環状線と 8 層（ボス戦だけ）は離散のまま <see cref="MoveTo"/> で動く。</para>
     /// </summary>
     public class MapManager : MonoBehaviour
     {
@@ -44,6 +50,9 @@ namespace MapSystem
         public FloorMap CurrentMap { get; private set; }
         public MapNode CurrentNode { get; private set; }
         public HungerSystem Hunger { get; private set; }
+        /// <summary>自由移動の層の中身。 離散マップ（Λ・8 層）では null。</summary>
+        public FreeMapSim Sim { get; private set; }
+        public bool IsFreeMap => Sim != null && CurrentMap != null && CurrentMap.IsFreeMap;
 
         // === イベント ===
         public event Action<FloorMap> OnMapGenerated;
@@ -89,8 +98,17 @@ namespace MapSystem
             int hunger = (floor == 6) ? 3 : hungerPerFloor;
             Hunger.Initialize(hunger);
 
-            // メタデバフ Lv4: 初期位置で視界を反映
-            ApplyMetaSightLimit();
+            if (CurrentMap.IsFreeMap)
+            {
+                Sim = new FreeMapSim(CurrentMap.layout, new RunWallet(), FloorPlan.HasWanderer(floor));
+                SyncFreeKnowledge();
+            }
+            else
+            {
+                Sim = null;
+                // メタデバフ Lv4: 初期位置で視界を反映 (離散マップのみ。 自由移動の層は視界そのものが距離 1)
+                ApplyMetaSightLimit();
+            }
 
             OnMapGenerated?.Invoke(CurrentMap);
         }
@@ -100,6 +118,7 @@ namespace MapSystem
         public void GenerateLambda()
         {
             CurrentMap = MapGenerator.GenerateLambda();
+            Sim = null;
             CurrentNode = CurrentMap.GetNode(CurrentMap.startNodeId);
             CurrentNode.visited = true;
 
@@ -124,6 +143,13 @@ namespace MapSystem
         public void RestoreState(FloorMap map, string currentNodeId, int hungerCurrent, int hungerMax)
         {
             if (map == null) throw new System.ArgumentNullException(nameof(map));
+            // 自由移動の層は位置・時間・徘徊エネミーの状態を持つが、 snapshot はノードしか保存しない。
+            //   座標まで保存する口は作っていない ── Ultra は自由移動の層では無効
+            //   (AutoRunner.DoNavigateFree は Ultra の決定点を通らない・UltraMapSnapshot.Capture も拒否する)。
+            //   ここへ来たら取り違え。
+            if (map.IsFreeMap)
+                throw new System.NotSupportedException("自由移動の層は Ultra の盤面復元に対応しない");
+            Sim = null;
 
             CurrentMap = map;
             CurrentNode = map.GetNode(currentNodeId) ?? map.GetNode(map.startNodeId);
@@ -146,14 +172,6 @@ namespace MapSystem
             return CurrentMap.GetReachableFrom(CurrentNode.id);
         }
 
-        /// <summary>前進と横移動を分類して返す</summary>
-        public (List<MapNode> forward, List<MapNode> lateral) GetCategorizedMoves()
-        {
-            if (CurrentMap == null || CurrentNode == null)
-                return (new List<MapNode>(), new List<MapNode>());
-            return CurrentMap.CategorizeMovesFrom(CurrentNode.id);
-        }
-
         /// <summary>
         /// 指定ノードへ移動。空腹ダメージを返す。
         /// Mystery タイルは自動解決される。
@@ -164,6 +182,11 @@ namespace MapSystem
             if (target == null)
             {
                 Debug.LogWarning($"[MapManager] ノード '{nodeId}' が存在しません");
+                return 0;
+            }
+            if (IsFreeMap)
+            {
+                Debug.LogWarning($"[MapManager] 自由移動の層では MoveTo は使えない (BeginTravel / GameManager.AdvanceFreeMap)");
                 return 0;
             }
 
@@ -228,6 +251,74 @@ namespace MapSystem
                 if (n == null) continue;
                 bool inSight = dist.ContainsKey(n.id) || n.visited; // 訪問済みは見える
                 n.revealed = inSight;
+            }
+        }
+
+        // ================================================================
+        //  自由移動の層 (2026-09-28)
+        // ================================================================
+
+        /// <summary>行き先を決める (移動中なら行き先を変える)。 山岳を横切る・偵察中・連戦中は false。
+        /// 時間は進めない ── 進めるのは GameManager.AdvanceFreeMap。</summary>
+        public bool BeginTravel(string nodeId)
+        {
+            if (!IsFreeMap) return false;
+            var node = CurrentMap.GetNode(nodeId);
+            if (node == null || node.index < 0) return false;
+            return Sim.SetDestination(node.index);
+        }
+
+        /// <summary>点に着いた: <see cref="CurrentNode"/> を写して OnNodeEntered を鳴らす。
+        /// タイルの起動は呼び出し側 (GameManager) が行う。</summary>
+        public MapNode NoteFreeArrival(int index)
+        {
+            var node = CurrentMap?.GetNodeByIndex(index);
+            if (node == null) return null;
+            CurrentNode = node;
+            node.visited = true;
+            SyncFreeKnowledge();
+            OnNodeEntered?.Invoke(node);
+            return node;
+        }
+
+        /// <summary>逃げた後など、 中身の位置が点に戻った時に <see cref="CurrentNode"/> を合わせる。
+        /// 移動中 (点の上に居ない) は直前に居た点のまま。</summary>
+        public void SyncCurrentNodeFromSim()
+        {
+            if (!IsFreeMap || Sim.AtNode < 0) return;
+            var node = CurrentMap.GetNodeByIndex(Sim.AtNode);
+            if (node != null) CurrentNode = node;
+        }
+
+        /// <summary>マスの種別が判明した点を <see cref="MapNode.revealed"/> へ写す (一度見えたら隠さない)。
+        /// 戦闘名も同時に開示する ── 照明・偵察で「マス・敵の種別」が分かる (§23-21 の索敵の表)。</summary>
+        public void SyncFreeKnowledge()
+        {
+            if (!IsFreeMap) return;
+            foreach (var n in CurrentMap.GetAllNodes())
+            {
+                if (n.index < 0 || n.index >= Sim.Known.Length || !Sim.Known[n.index] || n.revealed) continue;
+                n.revealed = true;
+                GameLoop.FloorManager.EnsureEncounter(CurrentMap.floor, n);
+                n.encounterRevealed = true;
+            }
+        }
+
+        /// <summary>移動の支払いを RunState へ橋渡しする。 物資は ProvisionSystem.SpendTravel、
+        /// 払底中の HP は直接減らす (死ぬ移動も許す ── §23-21)。</summary>
+        private sealed class RunWallet : IFreeMapWallet
+        {
+            private static GameLoop.RunState Run => GameLoop.GameManager.Instance?.Run;
+            public int Provision => Run?.provision ?? 0;
+            public void SpendProvision(int amount) => GameLoop.ProvisionSystem.SpendTravel(Run, amount);
+            public bool PayHp(int amount)
+            {
+                var run = Run;
+                if (run == null) return false;
+                int before = run.playerHP;
+                run.playerHP = Mathf.Max(0, run.playerHP - amount);
+                MetaProgression.Achievements.AchievementService.NoteExternalHpDamage(before - run.playerHP);
+                return run.playerHP <= 0;
             }
         }
 

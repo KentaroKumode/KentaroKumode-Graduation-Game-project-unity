@@ -18,12 +18,12 @@ namespace InventorySystem.PassiveItems.Effects
 
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
-            // 飢餓→希望統合(ADR-0002): 旧「空腹度+1」を希望+1へ
+            // 飢餓→物資統合(ADR-0002): 旧「空腹度+1」を物資+1へ
             // 2026-09-05: **50% 抽選を廃止して常時発動**。 期待値 +0.5/戦闘 では
-            //   希望の減り (戦闘あたり -4〜-6) に対して桁が合わず、 準パワー -1.60 だった。
+            //   物資の減り (戦闘あたり -4〜-6) に対して桁が合わず、 準パワー -1.60 だった。
             if (run == null) return;
-            GameLoop.HopeSystem.ApplyFood(run, 1);
-            Debug.Log($"[PassiveItem] 巡礼者の杖発動: 希望+1 ({run.hope}/{run.hopeCap})");
+            GameLoop.ProvisionSystem.ApplyFood(run, 10);   // 2026-09-28: 物資 ×10
+            Debug.Log($"[PassiveItem] 巡礼者の杖発動: 物資+10 ({run.provision}/{run.provisionCap})");
         }
     }
 
@@ -222,7 +222,7 @@ namespace InventorySystem.PassiveItems.Effects
         public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
-            if (ctx == null || run == null || !HopeSystem.IsMadness(run)) return;
+            if (ctx == null || run == null || !ProvisionSystem.IsExhausted(run)) return;
             int n = YokyoSet.OtherCount(run, Id);
             if (n <= 0) return;
             ctx.playerDiceTotal += n;
@@ -237,7 +237,7 @@ namespace InventorySystem.PassiveItems.Effects
         public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
-            if (ctx == null || run == null || !HopeSystem.IsMadness(run)) return;
+            if (ctx == null || run == null || !ProvisionSystem.IsExhausted(run)) return;
             int n = YokyoSet.OtherCount(run, Id);
             if (n <= 0) return;
             if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
@@ -247,14 +247,14 @@ namespace InventorySystem.PassiveItems.Effects
     }
 
     /// <summary>佯狂者の冠（与ダメ部分）: フルセット時のみ、狂気スタック×4% の与ダメージ増加。
-    /// 希望0固定・燃え尽き終了・スタック蓄積は HopeSystem 側で処理する。</summary>
+    /// 物資0固定・燃え尽き終了・スタック蓄積は ProvisionSystem 側で処理する。</summary>
     public class YokyoCrownEffect : ITimedEffect
     {
         public string Id => YokyoSet.Crown;
         public TimedEffectTrigger Trigger => TimedEffectTrigger.OnRoll;
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
-            if (ctx == null || run == null || !HopeSystem.IsMadness(run)) return;
+            if (ctx == null || run == null || !ProvisionSystem.IsExhausted(run)) return;
             if (!YokyoSet.IsFullSet(run)) return;     // 与ダメスケールはフルセット限定
             int stack = run.madnessStack;
             if (stack <= 0) return;
