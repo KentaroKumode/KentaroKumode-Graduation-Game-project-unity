@@ -31,10 +31,10 @@ namespace EventSystem.TimedEffects.Effects
 
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
-            var hunger = MapManager.Instance?.Hunger;
-            if (hunger == null) return;
-            hunger.Restore(1);
-            Debug.Log($"[TimedEffect] 芽吹きの祈り: 空腹度+1 ({hunger.Current}/{hunger.Max})");
+            // 2026-10-17: 空腹の削除に伴い、 旧「空腹度 +1」を物資 +10 へ（物資は旧単位の ×10・GAME.md §10）
+            if (run == null) return;
+            GameLoop.ProvisionSystem.Recover(run, 10);
+            Debug.Log($"[TimedEffect] 芽吹きの祈り: 物資+10 ({run.provision}/{run.provisionCap})");
         }
     }
 }

@@ -467,7 +467,7 @@ namespace InventorySystem.PassiveSkills
             Register(new RecurrentTruth());      // 回帰性真理（割合ダメ/処刑/最大HP変更/デバフを無効化）
             Register(new ContinuousExperiment()); // 連続実験（HP0で死なず次フェーズへ。最終段は非所持）
             Register(new DivineTalent());        // 天与の才（段4のみ 2枚抽選）
-            Register(new FlawlessRobe());        // 天衣無縫（回復/シールド獲得の減衰。 ヴェスカでも流用可）
+            // [削除 2026-10-17] FlawlessRobe (天衣無縫) ── 覚者専用・使う敵なし        // 天衣無縫（回復/シールド獲得の減衰。 ヴェスカでも流用可）
 
             // [廃止] 覚者×7形態連戦 (AwakenedP1..P7 / TrueSelf)。
             //   旧ロール勝負モデル専用の機構で ADR-0009 既定 true 下では発火経路が成立しない。

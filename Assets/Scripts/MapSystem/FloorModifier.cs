@@ -13,10 +13,6 @@ namespace MapSystem
         public string displayName;
         public string description;
 
-        // === 空腹度 ===
-        public int hungerMaxBonus;              // 空腹上限加算（正=バフ）
-        public float starvationDamageOverride;  // -1=変更なし、0以上=上書き
-
         // === 経済 ===
         public float coinRewardMultiplier = 1f; // 報酬コイン倍率
         public float shopPriceMultiplier = 1f;  // ショップ価格倍率
@@ -46,36 +42,14 @@ namespace MapSystem
 
         static FloorModifierDatabase()
         {
-            // ============================================================
-            //  1層 — 黄昏の口「残光の加護」
-            //  探索の余裕。空腹10→13で横移動3回まで安全。
-            // ============================================================
-            Register(new FloorModifier
-            {
-                id = "twilight_gate",
-                displayName = "残光の加護",
-                description = "空腹度上限+3",
-                hungerMaxBonus = 3,
-            });
-
-            // ============================================================
-            //  2層 — 嘆きの共鳴
-            //  ガラスキャノン化。crit+2は短剣/斧に恩恵、MaxHP-5は盾に痛い。
-            // ============================================================
-            Register(new FloorModifier
-            {
-                id = "wailing_echo",
-                displayName = "嘆きの共鳴",
-                description = "会心率+10% / MaxHP-5",
-                critRatePctBonus = 10f,
-                maxHPBonus = -5,
-            });
+            // [削除 2026-10-17] 1 層〈残光の加護〉（空腹度上限 +3 だけ）・2 層〈嘆きの共鳴〉・4 層〈煉獄の刻印〉。
+            //   空腹は廃止、 2 層と 4 層は層ごと削除済み (GAME.md §4-1)。 層番号は登録の順番ではなく明示で渡す。
 
             // ============================================================
             //  3層 — 瘴気侵蝕
             //  勝っても削られる。休憩の価値が上がる。
             // ============================================================
-            Register(new FloorModifier
+            Register(3, new FloorModifier
             {
                 id = "miasma_erosion",
                 displayName = "瘴気侵蝕",
@@ -85,25 +59,10 @@ namespace MapSystem
             });
 
             // ============================================================
-            //  4層 — 煉獄の刻印
-            //  飢餓地獄。空腹10→7、飢餓ダメ2倍。直進でも3マス飢える。
-            // ============================================================
-            Register(new FloorModifier
-            {
-                id = "purgatory_brand",
-                displayName = "煉獄の刻印",
-                description = "空腹度上限-3 / 空腹時ダメージ最大HP12% / 戦闘後3ダメージ / ショップ価格+20%",
-                hungerMaxBonus = -3,
-                starvationDamageOverride = 0.12f,
-                postCombatDamage = 3,
-                shopPriceMultiplier = 1.2f,
-            });
-
-            // ============================================================
             //  5層 — 地獄門
             //  出力低下。ダイス最大値9→8はゾロ目確率微増(BloodDecree追い風)。
             // ============================================================
-            Register(new FloorModifier
+            Register(5, new FloorModifier
             {
                 id = "hell_gate",
                 displayName = "地獄門",
@@ -118,7 +77,7 @@ namespace MapSystem
             //  前哨基地: HP全回復+MaxHP+5
             //  デバフマス「深淵の洗礼」: 毎ターン自傷1/会心-3/敵毎ターンHP+3
             // ============================================================
-            Register(new FloorModifier
+            Register(6, new FloorModifier
             {
                 id = "abyss_floor",
                 displayName = "深淵の洗礼",
@@ -130,9 +89,8 @@ namespace MapSystem
             });
         }
 
-        private static void Register(FloorModifier mod)
+        private static void Register(int floor, FloorModifier mod)
         {
-            int floor = modifiers.Count + 1;
             modifiers[floor] = mod;
         }
 

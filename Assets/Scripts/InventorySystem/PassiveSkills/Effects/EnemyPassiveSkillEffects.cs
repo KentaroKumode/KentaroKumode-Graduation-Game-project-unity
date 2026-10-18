@@ -642,24 +642,7 @@ namespace InventorySystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>天衣無縫: ボスがロール勝利するたび、
-    /// プレイヤーが以降獲得する回復量・シールド量を-1（上限10スタック）。
-    /// 長期戦＝タンク戦術を覚者連戦を通じて逓減させる。敵視点 OnRollWin = 覚者がロール勝利。
-    /// ※上限20は7形態1020HPの長期戦で持続力を完全枯渇させ0%クリアの主因だったため10へ緩和。</summary>
-    public class FlawlessRobe : IPassiveSkillEffect
-    {
-        public const int MaxStacks = 10;
-        public string SkillId => "FlawlessRobe";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollWin };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            // ボス難易度オートチューナー: 天衣無縫の上限スタックを直接調整 (低い=回復封じ弱化=ジリ貧緩和)
-            int maxStacks = UnityEngine.Mathf.Max(1, AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.RobeStacks));
-            if (ctx.healShieldReduction >= maxStacks) return;
-            ctx.healShieldReduction++;
-            UnityEngine.Debug.Log($"[天衣無縫] 回復/シールド減衰 +1 → -{ctx.healShieldReduction}(上限{maxStacks})");
-        }
-    }
+    // [削除 2026-10-17] 天衣無縫 (FlawlessRobe) ── 覚者の固有スキル。 覚者の廃止後、 どの敵も持っていなかった。
 
     // [廃止 2026-09-14] 旧 SinAltar 儀式 (血/貪欲/遺品) の敵専用パッシブ 3 種
     //   ── Boss6Golgotha / Boss6SeveredTime / Boss6Ashen。

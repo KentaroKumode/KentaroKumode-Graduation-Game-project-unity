@@ -36,8 +36,6 @@ namespace GameLoop
             if (ctx == null) { Debug.Log("[レイピア] 戦闘外では使用不可"); return false; }
             if (ctx.consumablesLocked) { Debug.Log("[レイピア] 死翔により使用不可"); return false; }
 
-            // 覚者用アクションマーク（レイピア起動も観想中断とみなす）
-            ctx.consumablesUsedThisTurn = true;
 
             if (ctx.GetAccumulated("player_contre") <= 0)
             {
@@ -99,9 +97,6 @@ namespace GameLoop
             {
                 run.ownedConsumables.Remove(id);
                 MetaProgression.Achievements.AchievementService.NoteConsumableUsed();
-                // 覚者「悟達の試練」用: 当ターン アクション発生をマーク
-                var actCtx = ActiveCtx();
-                if (actCtx != null) actCtx.consumablesUsedThisTurn = true;
                 NoteVescaPhaseUse();
                 Debug.Log($"[Consumables] 使用: {id}");
             }

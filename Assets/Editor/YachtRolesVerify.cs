@@ -1,95 +1,60 @@
-using System.Collections.Generic;
 using System.Text;
+using System.Collections.Generic;
 using CombatSystem;
+using GameLoop;
 using UnityEditor;
 using UnityEngine;
 
 namespace GameEditor
 {
     /// <summary>
-    /// ADR-0010 Phase 1 の検算。 <see cref="YachtRoles"/> が
-    /// docs/design-yacht.md のダイス表を再現するかを全数列挙で確かめる。
+    /// ADR-0011 の検算。 <see cref="YachtRoles.Evaluate"/> が、 ADR の確率表
+    /// (面数 n に対する 2 個そろい・ゾロ目の成立率) を全数列挙で再現するかを確かめる。
     ///
-    /// **設計表は Python で先に計算した値**なので、 C# 実装がそれと一致しなければ
-    /// どちらかが間違っている。 数値をいじる前に「実装が設計どおりか」を先に固定する。
+    /// 設計表は先に計算した値なので、 C# 実装がそれと一致しなければどちらかが間違っている。
+    /// 数値をいじる前に「実装が設計どおりか」を先に固定する。 全ての面を T4 として評価する
+    /// (Tier による成立可否は <see cref="YachtRoles.Evaluate"/> の別の話で、 ここは確率の検算)。
     /// </summary>
     public static class YachtRolesVerify
     {
-        private struct DiceDef
-        {
-            public string name;
-            public int tier;
-            public int[] faces;
-            public DiceDef(string n, int t, int[] f) { name = n; tier = t; faces = f; }
-        }
+        private const int DiceCount = 3;
 
-        // ADR-0010 柱5 のダイス 10 種
-        private static readonly DiceDef[] Dice =
-        {
-            new DiceDef("木",   1, new[] { 1, 2, 3, 4, 5, 6 }),
-            new DiceDef("拾",   1, new[] { 1, 2, 3, 4, 5 }),
-            new DiceDef("鉄",   2, new[] { 2, 3, 4, 5, 6, 7 }),
-            new DiceDef("奇",   2, new[] { 1, 3, 5, 7, 9 }),
-            new DiceDef("磐",   2, new[] { 3, 4, 5, 6, 7 }),
-            new DiceDef("星",   3, new[] { 3, 4, 5, 6, 7, 8 }),
-            new DiceDef("偶",   3, new[] { 2, 4, 6, 8, 10 }),
-            new DiceDef("無銘", 3, new[] { 4, 5, 6, 7, 8, 9 }),
-            new DiceDef("竜",   4, new[] { 5, 6, 7, 8, 9, 10 }),
-            new DiceDef("天",   4, new[] { 2, 4, 6, 8, 10, 12, 14 }),
-        };
-
-        private const int DiceCount = 5;
-
-        [MenuItem("Tools/AutoRun/検算: 役の成立率 (ADR-0010 Phase1)", priority = 15)]
+        [MenuItem("Tools/AutoRun/検算: 役の成立率 (ADR-0011)", priority = 15)]
         public static void Verify()
         {
             var sb = new StringBuilder();
-            sb.AppendLine("=== 役の成立率 検算 (ADR-0010 Phase 1) ===");
-            sb.AppendLine($"{DiceCount} 個・全数列挙。 docs/design-yacht.md のダイス表と突き合わせること。");
+            sb.AppendLine("=== 役の成立率 検算 (ADR-0011) ===");
+            sb.AppendLine($"{DiceCount} 個・全数列挙。 全ての面を T4 として評価。 振り直しは全部振り直しを 2 回まで (計 3 回振る)。");
             sb.AppendLine();
-            sb.AppendLine("| T | 名 | 平均 | 対 | 二対 | 束 | 大束 | 極 | 満 | 散 | 小階 | 中階 | 大階 | 飛階 | 偶 | 奇 |");
-            sb.AppendLine("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+            sb.AppendLine("| 面数 n | 何かそろう | ゾロ目(どれか) | 特定の目の2個そろい | 特定の目のゾロ目 | 2個そろい(3回) | ゾロ目(3回) |");
+            sb.AppendLine("|---:|---:|---:|---:|---:|---:|---:|");
 
-            var order = new[]
+            for (int n = 2; n <= 9; n++)
             {
-                RoleKind.Pair, RoleKind.TwoPair, RoleKind.Triple, RoleKind.Quad, RoleKind.Yacht,
-                RoleKind.FullHouse, RoleKind.AllDifferent, RoleKind.SmallRun, RoleKind.MediumRun,
-                RoleKind.LargeRun, RoleKind.SkipRun, RoleKind.AllEven, RoleKind.AllOdd,
-            };
+                // 面は先頭 n 個 (2,3,4,5,1,6,7,8,9 の順)。 確率は面数だけで決まるので並びは検算に影響しない。
+                var order = new[] { 2, 3, 4, 5, 1, 6, 7, 8, 9 };
+                var parts = new List<DiceFaceParts.Part>(n);
+                for (int i = 0; i < n; i++) parts.Add(new DiceFaceParts.Part(order[i], DiceFaceParts.Tier.T4));
+                DiceFaceParts.Build(parts, out int[] faces, out DiceFaceParts.Tier[] tiers);
 
-            foreach (var d in Dice)
-            {
-                var hit = new Dictionary<RoleKind, long>();
-                foreach (var k in order) hit[k] = 0;
-                long total = 0, sum = 0;
-
+                long total = 0, any = 0, anyTriple = 0, pairOfFirst = 0, tripleOfFirst = 0;
                 var hand = new int[DiceCount];
-                var found = new List<RoleKind>(8);
-                Enumerate(d.faces, hand, 0, ref total, ref sum, hit, found);
+                var idx = new int[DiceCount];
+                var found = new List<RoleKind>(4);
+                int first = faces[0];
+                Enumerate(faces, tiers, hand, idx, 0, found, ref total, ref any, ref anyTriple, ref pairOfFirst, ref tripleOfFirst, first);
 
-                sb.Append($"| T{d.tier} | **{d.name}** | {(double)sum / total / DiceCount:F1} |");
-                foreach (var k in order)
-                {
-                    double pct = 100.0 * hit[k] / total;
-                    // 極だけ 3 桁 (0.077% の桁を落とさないため)
-                    sb.Append(k == RoleKind.Yacht ? $" {pct:F3} |"
-                            : k == RoleKind.Quad || k == RoleKind.LargeRun ? $" {pct:F2} |"
-                            : $" {pct:F1} |");
-                }
-                sb.AppendLine();
+                double pAny = (double)any / total, pTriple = (double)anyTriple / total;
+                double pPair1 = (double)pairOfFirst / total, pTri1 = (double)tripleOfFirst / total;
+                double r3(double p) => 1.0 - System.Math.Pow(1.0 - p, 3);
+                sb.AppendLine($"| {n} | {100 * pAny:F1}% | {100 * pTriple:F2}% | {100 * pPair1:F1}% | {100 * pTri1:F2}% "
+                            + $"| {100 * r3(pPair1):F1}% | {100 * r3(pTri1):F1}% |");
             }
 
             sb.AppendLine();
-            sb.AppendLine("※ 端子役 (対/束/小階/飛階/偶/奇/散) は **「作れるか」** で測っている ──");
-            sb.AppendLine("   プレイヤーはどのダイスを同じ端子へ置くか選べるので、 部分集合を全走査して");
-            sb.AppendLine("   1 つでも成立するなら成立とする。 「5個すべてを 1 端子」で測ると");
-            sb.AppendLine("   〈偶〉が 3.1% になり、 実際に狙える頻度 (50%) と 16 倍ずれる。");
-            sb.AppendLine("※ 手札役 (二対/大束/極/満/中階/大階) は 5 個全体で判定。 配線に依存しない。");
-            sb.AppendLine("※ 配線役 (均/相殺/拮抗) は敵の数値に依存するのでここでは測れない。");
-            sb.AppendLine("※ 〈無銘〉は端子役が成立しない設定だが、 ここでは面の素の確率を出している。");
+            sb.AppendLine("※ 期待値: ゾロ目(どれか) = 1/n²、 特定の目のゾロ目 = 1/n³、 特定の目のちょうど 2 個 = 3(1/n)²(1−1/n)。");
+            sb.AppendLine("※ 2 個そろいは「ちょうど 2 個」。 3 個そろった手は T3 以上ならゾロ目、 T2 のままなら 2 個そろい扱い。");
 
-            // **ファイルへ出す。** Unity のコンソールは複数行ログの 1 行目しか
-            // MCP 経由で取り出せず、 表の照合ができないため。
             string dir = System.IO.Path.Combine(Application.dataPath, "..", "AutoRunLogs");
             System.IO.Directory.CreateDirectory(dir);
             string path = System.IO.Path.Combine(dir, "yacht_roles_verify.txt");
@@ -97,57 +62,30 @@ namespace GameEditor
             Debug.Log($"[役の検算] 出力: {path}");
         }
 
-        /// <summary>faces^DiceCount を全数列挙して各役の成立数を数える。</summary>
-        private static void Enumerate(int[] faces, int[] hand, int depth,
-                                      ref long total, ref long sum,
-                                      Dictionary<RoleKind, long> hit, List<RoleKind> found)
+        private static void Enumerate(int[] faces, DiceFaceParts.Tier[] tiers, int[] hand, int[] idx, int depth,
+                                      List<RoleKind> found, ref long total, ref long any, ref long anyTriple,
+                                      ref long pairOfFirst, ref long tripleOfFirst, int firstFace)
         {
             if (depth == hand.Length)
             {
                 total++;
-                for (int i = 0; i < hand.Length; i++) sum += hand[i];
-
                 found.Clear();
-                YachtRoles.EvaluateHand(hand, found);
-
-                // **端子役は「作れるか」で測る。** プレイヤーはどのダイスを同じ端子へ置くかを
-                //   選べるので、 手札に偶数が 3 個あれば その 3 個を 1 端子に集めて〈偶〉を作れる。
-                //   「5個すべてを 1 端子に置いた場合」で測ると〈偶〉が 3.1% になり、
-                //   実際に狙える頻度 (50%) と 16 倍ずれる。 部分集合の全走査で判定する。
-                CollectFormableTerminalRoles(hand, found);
-
+                YachtRoles.Evaluate(hand, idx, tiers, found);
+                if (found.Count > 0) any++;
                 for (int i = 0; i < found.Count; i++)
-                    if (hit.ContainsKey(found[i])) hit[found[i]]++;
+                {
+                    if (YachtRoles.IsTriple(found[i])) anyTriple++;
+                    if (found[i] == YachtRoles.Of(firstFace, false)) pairOfFirst++;
+                    if (found[i] == YachtRoles.Of(firstFace, true)) tripleOfFirst++;
+                }
                 return;
             }
             for (int f = 0; f < faces.Length; f++)
             {
                 hand[depth] = faces[f];
-                Enumerate(faces, hand, depth + 1, ref total, ref sum, hit, found);
-            }
-        }
-
-        /// <summary>手札の**部分集合を全走査**して、 1 端子に集めれば成立させられる端子役を集める。
-        /// 5 個なら 32 通りなので全探索で足りる。</summary>
-        private static void CollectFormableTerminalRoles(int[] hand, List<RoleKind> into)
-        {
-            int n = hand.Length;
-            var buf = new int[n];
-            var sub = new List<RoleKind>(8);
-
-            for (int mask = 1; mask < (1 << n); mask++)
-            {
-                int m = 0;
-                for (int i = 0; i < n; i++)
-                    if ((mask & (1 << i)) != 0) buf[m++] = hand[i];
-
-                var group = new int[m];
-                System.Array.Copy(buf, group, m);
-
-                sub.Clear();
-                YachtRoles.EvaluateTerminal(group, sub);
-                for (int i = 0; i < sub.Count; i++)
-                    if (!into.Contains(sub[i])) into.Add(sub[i]);
+                idx[depth] = f;
+                Enumerate(faces, tiers, hand, idx, depth + 1, found, ref total, ref any, ref anyTriple,
+                          ref pairOfFirst, ref tripleOfFirst, firstFace);
             }
         }
     }

@@ -8,7 +8,7 @@ using MapSystem;
 namespace EventSystem
 {
     /// <summary>
-    /// 効果命令を RunState / HungerSystem に適用する。
+    /// 効果命令を RunState / ProvisionSystem に適用する。
     /// 戦闘トリガなど即時に解決できない効果は ExecutionResult に集約して返す。
     /// </summary>
     public static class EventEffectExecutor
@@ -27,7 +27,7 @@ namespace EventSystem
         /// <summary>
         /// 効果リストを実行する。
         /// </summary>
-        public static ExecutionResult Execute(List<EventEffect> effects, RunState run, HungerSystem hunger)
+        public static ExecutionResult Execute(List<EventEffect> effects, RunState run)
         {
             var result = new ExecutionResult();
             if (effects == null || run == null) return result;
@@ -43,12 +43,12 @@ namespace EventSystem
                     continue;
                 }
 
-                ExecuteOne(eff, run, hunger, result);
+                ExecuteOne(eff, run, result);
             }
             return result;
         }
 
-        private static void ExecuteOne(EventEffect eff, RunState run, HungerSystem hunger, ExecutionResult result)
+        private static void ExecuteOne(EventEffect eff, RunState run, ExecutionResult result)
         {
             switch (eff.type)
             {
@@ -240,7 +240,7 @@ namespace EventSystem
                     break;
 
                 case EventEffectType.Probability:
-                    ExecuteProbability(eff, run, hunger, result);
+                    ExecuteProbability(eff, run, result);
                     break;
 
                 case EventEffectType.CircusHandover:
@@ -257,7 +257,7 @@ namespace EventSystem
             result.log.Add("→ (廃止) サーカス団引渡し");
         }
 
-        private static void ExecuteProbability(EventEffect eff, RunState run, HungerSystem hunger, ExecutionResult result)
+        private static void ExecuteProbability(EventEffect eff, RunState run, ExecutionResult result)
         {
             if (eff.branches == null || eff.branchWeights == null) return;
             if (eff.branches.Count == 0) return;
@@ -277,7 +277,7 @@ namespace EventSystem
             result.log.Add($"確率分岐: {pct}% 抽選");
 
             foreach (var sub in eff.branches[picked])
-                ExecuteOne(sub, run, hunger, result);
+                ExecuteOne(sub, run, result);
         }
 
         private static void AddOrIncrement(Dictionary<string, int> dict, string key, int delta)

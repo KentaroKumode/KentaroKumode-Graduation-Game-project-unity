@@ -121,8 +121,7 @@ namespace AutoTest
         /// <para><b>一度も掃引していない手置き値 (2026-08-22 時点)。</b> 効用は
         /// <c>p × (1 + winHpWeight × HP率)</c> で、 0.5 だと満タン勝利 1.5 対 瀕死勝利 1.0 ＝
         /// **わずか 1.5 倍の開き**しかない。 7層は 4 連戦で、 しかも役札の連戦持ち越しを
-        /// 採用した (<see cref="CombatSystem.CombatManager.VescaKeepRolesAcrossPhases"/>) ので、
-        /// **HP は形態を跨いで効くのに役札は跨いで減る** ── 残 HP の価値は明確に非線形寄りのはず。</para></summary>
+        /// HP は形態を跨いで効くので、 残 HP の価値は明確に非線形寄りのはず。</para></summary>
         public float winHpWeight = 0.5f;
         /// <summary>現在ランの外部観測用カウンタ。長い判断が実際に前進しているかを確認する。</summary>
         [NonSerialized] public long wiringDecisions, rerollDecisions, rolloutEvaluations;
@@ -445,8 +444,7 @@ namespace AutoTest
         /// <summary>1 周期の平均倍率 (静的評価用)。</summary>
         private float HeavyAvg => _heavyPeriod <= 0 ? 1f
             : ((_heavyPeriod - 1) * _heavyWindupMul + _heavyMul) / _heavyPeriod;
-        private bool _suppressTerm, _isBoss;
-        private int _sealedRoles;             // 〈凶運〉封印された役のビットマスク
+        private bool _isBoss;
         private int _termCap, _specialLimit, _chargeMax, _chargePerTurn;
         private SpecialTerminalDef _spec;
         private int _pierceMul;               // 〈貫きの錐〉: 敵攻撃値 1 につきブロックを削る量
@@ -484,8 +482,6 @@ namespace AutoTest
             _heavyPeriod = enemy.heavyPeriod;
             _heavyMul = enemy.heavyMul > 0f ? enemy.heavyMul : 1f;
             _heavyWindupMul = enemy.heavyWindupMul > 0f ? enemy.heavyWindupMul : 1f;
-            _suppressTerm = ctx.suppressTerminalRoles;
-            _sealedRoles = ctx.sealedRoleMask;   // T4-C〈凶運〉ラン単位の封印
             var run = GameLoop.GameManager.Instance?.Run;
             _isBoss = !string.IsNullOrEmpty(ctx.bossId);
             _spec = SpecialTerminals.Equipped(run);
@@ -509,9 +505,6 @@ namespace AutoTest
         private struct SimState
         {
             public int pHp, eHp, turn, charge;
-            public int usedMask;          // 使用済み役のビットマスク (RoleKind は 16 種)
-            public bool stunNext;         // 〈大束〉: 次ターン敵は攻撃しない
-            public bool freeRerollNext;   // 〈中階〉: 次ターンのリロール 1 回無料
             public int blazeStacks;       // 烈炎: ターン開始時に受ける軽減無視ダメージ
         }
 
@@ -606,8 +599,6 @@ namespace AutoTest
         private int[] _grpA, _grpB, _simDice, _sortIdx, _keyBuf, _trialBuf;
         /// <summary><see cref="TurnValue"/> のメモ。 <see cref="ChooseReroll"/> の 1 呼び出しで閉じる。</summary>
         private readonly Dictionary<long, float> _tvMemo = new Dictionary<long, float>(512);
-        private readonly List<RoleKind> _roleBuf = new List<RoleKind>(24);
-        private readonly List<RoleKind> _handBuf = new List<RoleKind>(8);
         private readonly bool[] _termSeen = new bool[4];
         private float[] _candScore;
         private DiceTerminal[][] _candW;
@@ -649,25 +640,10 @@ namespace AutoTest
         // ============================================================
 
         /// <summary><see cref="CombatManager.WiringPolicy"/> へ差す。</summary>
-        /// <summary>ゴースト (出目パーツ T3/T4) の接続先。 **貪欲パス中だけ非 null**。
-        /// 列挙とロールアウトでは null なので、 探索の計算量に一切影響しない。</summary>
-        private int[] _ghostNow;
-
-        /// <summary>実体を決めてから、 ゴーストを**浅い評価だけ**で貪欲に足す。
-        ///
-        /// <para><b>ロールアウトは回さない。</b> コストは 端子数 × ゴースト可能なダイス数 の線形で、
-        /// 上限 20 回の <see cref="ApplyTurn"/> ── 候補 12 本 × ロールアウト n 回に比べれば無視できる。
-        /// **ゴースト可能なダイスが 0 本なら入口で return** するので、
-        /// パーツ未取得の間は追加コストが厳密に 0。</para>
-        ///
-        /// <para><b>近似であることを明記しておく。</b> 実体の選択はゴーストを知らないまま行われる
-        /// (ロールアウトが素の配線しか見ない)。 ゴーストは純粋な加算で、 どの実体配線を選んでも
-        /// 「余った接続を一番効く端子へ流す」形になるので、 実体の順位はほぼ動かないと踏んでいる。
-        /// 外れていた場合は**ゴースト込みで列挙し直す**しかないが、 それは速度制約に触る。</para></summary>
         public WiringPlan ChooseWiringPlan(int[] rolls, MutualTurnTelegraph tele)
         {
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
-            try { return ChooseWiringPlanCore(rolls, tele); }
+            try { return WiringPlan.Of(ChooseWiring(rolls, tele)); }
             finally { ProfWiringTicks += System.Diagnostics.Stopwatch.GetTimestamp() - t0; ProfWiringCalls++; }
         }
 
@@ -680,71 +656,6 @@ namespace AutoTest
             return $"[Super計装] 配線 {ProfWiringCalls} 回 計 {ProfWiringTicks / f:F1}s (平均 {1000 * ProfWiringTicks / f / Math.Max(1, ProfWiringCalls):F2}ms)"
                  + $" / リロール {ProfRerollCalls} 回 計 {ProfRerollTicks / f:F1}s (平均 {1000 * ProfRerollTicks / f / Math.Max(1, ProfRerollCalls):F2}ms)"
                  + $" / ApplyTurn {ProfApplyTurn:N0} 回";
-        }
-
-        private WiringPlan ChooseWiringPlanCore(int[] rolls, MutualTurnTelegraph tele)
-        {
-            var main = ChooseWiring(rolls, tele);
-            if (main == null) return WiringPlan.Of(null);
-
-            var ctx = PassiveSkillManager.Instance?.Context;
-            var tiers = ctx?.equippedFaceTiers;
-            var fidx = ctx?.playerDiceFaceIdx;
-            if (tiers == null || fidx == null) return WiringPlan.Of(main);
-
-            int[] order = null, cand = null;
-            int cnt = 0;
-            for (int i = 0; i < _k && i < fidx.Length; i++)
-                if (GameLoop.DiceFaceParts.AllowsDualLink(tiers, fidx[i])) cnt++;
-            if (cnt == 0) return WiringPlan.Of(main);   // 0 本 = 何もしない
-
-            cand = new int[_k];
-            for (int i = 0; i < _k; i++) cand[i] = WiringPlan.NoGhost;
-            order = new int[cnt];
-            int oi = 0;
-            for (int i = 0; i < _k && i < fidx.Length; i++)
-                if (GameLoop.DiceFaceParts.AllowsDualLink(tiers, fidx[i])) order[oi++] = i;
-            // 出目の大きい順 (頭打ちのある評価では大きい寄与から埋める方が取りこぼしが小さい)
-            Array.Sort(order, (x, y) => rolls[y].CompareTo(rolls[x]));
-
-            var cm = CombatManager.Instance;
-            var s0 = new SimState
-            {
-                pHp = cm.PlayerHP, eHp = cm.EnemyHP, turn = tele.turn,
-                charge = ctx.GetCharge(), usedMask = MaskOf(ctx.usedRoles),
-                stunNext = false, freeRerollNext = false,
-            };
-            int enemyAtk = Math.Max(0, tele.enemyAttackValue);
-            // 2 体戦の 2 パケット目。 予告 (柱3) で開示済みなので、 方策はこれを見て配線できる。
-            _secondAtk = Math.Max(0, tele.secondaryAttackValue);
-            int atkBase = Math.Max(0, _pAtkPower - Math.Max(0, tele.playerAttackPenalty));
-            int termKinds = _spec != null ? 4 : 3;
-
-            float Shallow()
-            {
-                var s = s0;
-                int outcome = ApplyTurn(ref s, rolls, enemyAtk, main, atkBase, _nowMods);
-                return outcome == Ongoing ? StaticValue(s) : Terminal(outcome, s);
-            }
-
-            _ghostNow = cand;
-            foreach (int i in order)
-            {
-                bool canStack = GameLoop.DiceFaceParts.AllowsSameTerminalStack(tiers, fidx[i]);
-                int bestG = WiringPlan.NoGhost;
-                float bestV = Shallow();
-                for (int t = 0; t < termKinds; t++)
-                {
-                    if ((int)main[i] == t && !canStack) continue;   // T3 は同一端子へ重ねられない
-                    cand[i] = t;
-                    float v = Shallow();
-                    if (v > bestV) { bestV = v; bestG = t; }
-                }
-                cand[i] = bestG;
-            }
-            _ghostNow = null;
-
-            return new WiringPlan { main = main, ghost = cand };
         }
 
         public DiceTerminal[] ChooseWiring(int[] rolls, MutualTurnTelegraph tele)
@@ -765,9 +676,6 @@ namespace AutoTest
                 eHp = cm.EnemyHP,
                 turn = tele.turn,
                 charge = ctx.GetCharge(),
-                usedMask = MaskOf(ctx.usedRoles),
-                stunNext = false,
-                freeRerollNext = false,
             };
 
             int enemyAtk = Math.Max(0, tele.enemyAttackValue);
@@ -1057,13 +965,14 @@ namespace AutoTest
             rerollDecisions++;
             if (dice == null || dice.Length == 0) return null;
             System.Threading.Interlocked.Increment(ref RrCalls);
-            if (attempt > Math.Max(1, rerollMaxAttempts))
-            { System.Threading.Interlocked.Increment(ref RrDeclineAttempt); return null; }
             var cm = CombatManager.Instance;
             if (cm == null || !Snapshot(cm, dice.Length)) return null;
             _nowMods = ModsFromTelegraph(tele);
             _sealedNow = tele.sealedTerminal;
             var ctx = PassiveSkillManager.Instance.Context;
+            // 2026-10-17: attempt は「この戦闘で何回目か」(費用の倍率) になった。 1 ターンの上限は ctx の回数で見る。
+            if (ctx.rerollsThisTurn >= Math.Max(1, rerollMaxAttempts))
+            { System.Threading.Interlocked.Increment(ref RrDeclineAttempt); return null; }
 
             int charge = ctx.GetCharge();
             bool free = ctx.currentBuffs.TryGetValue(YachtRoleEffects.FreeRerollKey, out float f) && f > 0f;
@@ -1079,7 +988,6 @@ namespace AutoTest
                 eHp = cm.EnemyHP,
                 turn = tele.turn,
                 charge = charge,
-                usedMask = MaskOf(ctx.usedRoles),
             };
             int enemyAtk = Math.Max(0, tele.enemyAttackValue);
             // 2 体戦の 2 パケット目。 予告 (柱3) で開示済みなので、 方策はこれを見て配線できる。
@@ -1104,7 +1012,11 @@ namespace AutoTest
             //   撃破したかどうかは TurnValue が事実として持っている。 それを見る。
             if (_tvWon) { System.Threading.Interlocked.Increment(ref RrDeclineLethal); return null; }
 
-            // 全部分集合 (2^k = 32) を試す。 k は 5 なので総当たりで足りる。
+            // 2026-10-17: リロールは**全部振り直し**。 比べるのは「振らない」と「全部振る」の 2 つだけ。
+            //   下の部分集合の仕組み (同値マスクの写し・並列) はそのまま使い、 全部のマスク以外は評価しない。
+            //   (ADR-0011: 振り直せない面は無い。)
+            int allMask = (1 << _k) - 1;
+            if (allMask == 0) return null;
             int subsets = 1 << _k;
             int bestMask = 0; float bestV = baseV;
             int samples = Math.Max(1, rerollSamples);
@@ -1119,7 +1031,6 @@ namespace AutoTest
             //       (全割り当てを列挙する)、 各マスクは同じ種から引き直す (共通乱数) ので、
             //       振り直す目の多重集合が同じマスクは maskV が完全に一致する。 最初の 1 つだけ評価して
             //       後で写す。 選択は「厳密に大きい最初のマスク」なので、 写しが選ばれることはない。
-            //       位置に依存する要素 (_ghostNow) は配線の仕上げ段でしか立たないので、 ここでは常に空。
             //   (2) **手札メモをマスクをまたいで使う** (逐次のときだけ)。 s0 / enemyAtk / atkBase は
             //       この呼び出しの間固定で、 充電はメモの鍵に入っている。 並列時はワーカーごとの
             //       メモなので従来どおり毎回クリアする (スレッド安全のため)。
@@ -1149,6 +1060,7 @@ namespace AutoTest
             System.Action<int> evalMask = mask =>
                 {
                     maskV[mask] = float.NegativeInfinity;
+                    if (mask != allMask) return;     // 全部振り直しだけを評価する (2026-10-17)
                     if (rep[mask] != mask) return;   // 同値マスク: 後で写す
                     int cnt = 0; for (int i = 0; i < _k; i++) if ((mask & (1 << i)) != 0) cnt++;
                     int cost = free ? 0 : cnt * attempt;
@@ -1270,61 +1182,9 @@ namespace AutoTest
             return best;
         }
 
-        // ============================================================
-        //  ③ 役: 「空振りする役だけ見送る」を価値で判定する
-        // ============================================================
-
-        /// <summary><see cref="CombatManager.RolePolicy"/> へ差す。
-        ///
-        /// 配線探索 (<see cref="ApplyTurn"/>) が <see cref="WouldFire"/> で見積もっているので、
-        /// **ここも同じ述語を使う**。 両者がずれると探索が選んだ配線と実際の発動が食い違う。</summary>
-        public List<RoleKind> ChooseRoles(List<RoleKind> candidates, MutualTurnTelegraph tele,
-                                          HashSet<RoleKind> used)
-        {
-            if (candidates == null || candidates.Count == 0) return null;
-            var cm = CombatManager.Instance;
-            int eHp = cm?.EnemyHP ?? 1;
-            int enemyAtk = Math.Max(0, tele.enemyAttackValue);
-            // 2 体戦の 2 パケット目。 予告 (柱3) で開示済みなので、 方策はこれを見て配線できる。
-            _secondAtk = Math.Max(0, tele.secondaryAttackValue);
-            // 今ターンの攻撃で倒し切るかは配線後に確定している。 予測は Remember が持っている値を使う。
-            int predDmg = _pendingPredAtk > 0 ? (int)(_pendingPredAtk * _dmgMul) : 0;
-            bool lethalAlready = predDmg >= eHp;
-
-            var fire = new List<RoleKind>(candidates.Count);
-            for (int i = 0; i < candidates.Count; i++)
-                if (WouldFire(candidates[i], enemyAtk, lethalAlready, _isBoss)) fire.Add(candidates[i]);
-            // 〈綻び〉は末尾から切り捨てるので、 **切り捨てられて惜しい順**に並べる。
-            fire.Sort((a, b) => AutoRunner.RolePriorityOf(b).CompareTo(AutoRunner.RolePriorityOf(a)));
-            return fire;
-        }
-
-        /// <summary>その役を今ターン切る価値があるか。 **1 戦闘 1 回**なので、
-        /// 効果が丸ごと空振りする局面でだけ温存する。
-        ///
-        /// 温存を増やしすぎない: 見送れば必ずそのターンぶんの被弾を払う。 ここで弾くのは
-        /// 「効果が定義上 0 になる」ケースだけに限る。</summary>
-        private static bool WouldFire(RoleKind rk, int enemyAtk, bool lethalAlready, bool isBoss)
-        {
-            switch (rk)
-            {
-                // 敵が殴ってこないターンに被ダメ 0 / 半減 / 反射を切っても何も起きない
-                case RoleKind.LargeRun:
-                case RoleKind.Offset:
-                    return enemyAtk > 0;
-                // 今ターン倒し切るなら、 撃破系・妨害系はすべて無駄打ち
-                case RoleKind.Yacht:
-                    // 出目依存の割合削りになったので、 ボスでは重ねる価値がある (最大 60%)。
-                    //   通常敵も即勝利ではなくなったが、 6 揃いなら 120% で結果的に確殺。
-                    return !lethalAlready || isBoss;
-                case RoleKind.MatchedStrike:
-                    return !lethalAlready;   // 与ダメ+50% は撃破確定なら無駄打ち
-                case RoleKind.Quad:
-                    return !lethalAlready && enemyAtk > 0;
-                default:
-                    return true;
-            }
-        }
+        // (ADR-0011: 役は成立すれば自動で効くので、 発動方策 ChooseRoles / WouldFire は廃止した。
+        //  役の効果は先読みに入れていない ── 配線は役の成立に影響せず、 成立は振った出目だけで決まる。
+        //  リロールの価値判断に「役が出る見込み」を入れていないのは既知の限界。)
 
         // ============================================================
         //  前向きシミュレーション本体
@@ -1353,25 +1213,6 @@ namespace AutoTest
                 }
             }
 
-            // --- ゴースト接続 (出目パーツ T3/T4) ---
-            //   **合計値にだけ乗せ、 役判定の組 (_grpA/_grpB) には入れない。**
-            //   _ghostNow が非 null なのは貪欲パス中だけ ── 列挙とロールアウトでは
-            //   null なので、 **探索の計算量は 1 命令も増えない**。
-            if (_ghostNow != null)
-            {
-                for (int i = 0; i < _k && i < _ghostNow.Length; i++)
-                {
-                    int g = _ghostNow[i];
-                    if (g == WiringPlan.NoGhost) continue;
-                    int add = dice[i];
-                    if ((int)w[i] == g) add += GameLoop.DiceFaceParts.T4StackBonus;
-                    if (g == (int)DiceTerminal.Attack) aSum += add;
-                    else if (g == (int)DiceTerminal.Block) bSum += add;
-                    else if (g == (int)DiceTerminal.Special) sSum += add;
-                    else cSum += add;
-                }
-            }
-
             // --- 特殊端子 (§6-5) ---
             //   軽減無視の追加ダメージ相当 (出血・反撃・工房) と回復に畳んで扱う。
             int specDmg = 0, specHeal = 0;
@@ -1382,94 +1223,12 @@ namespace AutoTest
             // --- 〈貫きの錐〉 ---
             if (m.pierce > 0 && bSum > 0) bSum = Math.Max(0, bSum - enemyAtk * m.pierce);
 
-            // --- 役 ---
-            bool zero = false, half = false, kill = false, stun = false, freeRr = false;
-            bool forceCrit = false;
-            int fixedDmg = 0;
-            float critAdd = 0f, penAdd = 0f;
-            float outMul = 1f;              // 〈拮抗〉: 与ダメ倍率 (本体の outgoingDamageMultiplier 相当)
-            _roleBuf.Clear();
-            EnsureHandRoles(dice);                       // 手札役は配線に依存しない (下記)
-            for (int i = 0; i < _handBuf.Count; i++) _roleBuf.Add(_handBuf[i]);
-            int handEnd = _roleBuf.Count;
-            int atkEnd = handEnd;
-            if (!_suppressTerm)
-            {
-                CopyInto(_grpA, aCount, out var ga);
-                CopyInto(_grpB, bCount, out var gb);
-                YachtRoles.EvaluateTerminal(ga, _roleBuf);
-                atkEnd = _roleBuf.Count;
-                YachtRoles.EvaluateTerminal(gb, _roleBuf);
-            }
-            YachtRoles.EvaluateWiring(aSum, bSum, enemyAtk, s.eHp, _roleBuf);
-
-            int firedMask = 0;
-            bool lethalGuess = (atkBase + aSum) * _dmgMul >= s.eHp && aCount > 0;
-            for (int i = 0; i < _roleBuf.Count; i++)
-            {
-                var rk = _roleBuf[i];
-                int bit = 1 << (int)rk;
-                if ((s.usedMask & bit) != 0 || (firedMask & bit) != 0) continue;
-                if ((_sealedRoles & bit) != 0) continue;   // 〈凶運〉封印
-                if (!WouldFire(rk, enemyAtk, lethalGuess, _isBoss)) continue;
-                firedMask |= bit;
-
-                // 挿入順が 手札 → 攻撃端子 → ブロック端子 → 配線 なので、
-                // atkEnd 以降の端子役だけがブロック側で成立したもの。
-                // 手札役・配線役は onAttack を見ないので、 どちらに転んでも影響しない。
-                bool onAttack = i < atkEnd;
-                int n = onAttack ? aCount : bCount;
-                switch (rk)
-                {
-                    case RoleKind.AllDifferent: if (onAttack) aSum += n * 2; else bSum += n * 2; break;
-                    case RoleKind.Pair: { int b = PairBonus(onAttack ? _grpA : _grpB, n); if (onAttack) aSum += b; else bSum += b; break; }   // 出目合計÷2
-                    case RoleKind.AllEven:
-                        if (onAttack) aSum += (int)Math.Round(SumOf(_grpA, aCount) * 0.3f);
-                        else bSum += Math.Max(0, bSum - enemyAtk) / 2;   // 余剰の半分がシールド ≒ ブロック増
-                        break;
-                    case RoleKind.AllOdd: if (onAttack) critAdd += 0.25f; break;
-                    case RoleKind.SmallRun: if (onAttack) penAdd += 0.30f; else bSum += 3; break;
-                    case RoleKind.Triple: if (onAttack) forceCrit = true; else half = true; break;
-                    case RoleKind.SkipRun: if (onAttack) fixedDmg += n * 3; break;
-                    case RoleKind.TwoPair: s.charge += 8; break;
-                    case RoleKind.MediumRun: s.charge += 12; freeRr = true; break;
-                    case RoleKind.FullHouse:
-                    {
-                        int fh = (SumOf(dice, _k) + 1) / 2;    // 手札合計÷2 (正本と同じ)
-                        if (aSum > 0) aSum += fh;
-                        if (bSum > 0) bSum += fh;
-                        break;
-                    }
-                    case RoleKind.LargeRun: zero = true; break;
-                    case RoleKind.Quad: stun = true; break;
-                    case RoleKind.Yacht:
-                    {
-                        // 出目依存の割合削り (正本と同じ)。 通常敵でも即勝利ではなくなった
-                        //   ── 6 揃いなら 120% で結果的に確殺、 1 揃いなら 20% の削り。
-                        int pct = SumOf(dice, _k)
-                                * (_isBoss ? YachtRoleEffects.YachtPctPerPipBoss
-                                           : YachtRoleEffects.YachtPctPerPipNormal);
-                        fixedDmg += (int)Math.Ceiling(_eMaxHp * (pct / 100f));
-                        break;
-                    }
-                    case RoleKind.Balance: aSum += 5; bSum += 5; break;
-                    case RoleKind.Offset: zero = true; s.charge += 10; break;
-                    case RoleKind.MatchedStrike: outMul += 0.5f; break;   // 拮抗: 与ダメ+50%
-                }
-            }
-            s.usedMask |= firedMask;
-
             // --- 自攻撃 ---
             //   攻撃端子が 0 本なら **攻撃そのものを行わない** (素火力もパッシブ加算も出ない)。
             int dealt = 0;
             if (aCount > 0)
             {
-                float p = forceCrit ? 1f : Clamp(_critBase + critAdd, 0f, 1f);
-                float critFactor = 1f + (_critMul - 1f) * p;
-                // 較正倍率には平均的な会心ぶんが既に入っているので、 素の分を割り戻してから掛ける。
-                float baseCrit = 1f + (_critMul - 1f) * _critBase;
-                dealt = (int)((atkBase + aSum) * _dmgMul * (critFactor / Math.Max(0.01f, baseCrit))
-                              * (1f + penAdd * 0.5f) * outMul);
+                dealt = (int)((atkBase + aSum) * _dmgMul);
             }
             // === 7層ヴェスカ〈遺物学者〉の抽選 (§13-4) ===
             //   すべて予告に開示されている性質なので、 先読みに使うのは完全情報の範囲内。
@@ -1488,15 +1247,13 @@ namespace AutoTest
                     if (m.shieldReflectRate > 0f) reflectBack += (int)(absorbed * m.shieldReflectRate);
                 }
             }
-            dealt += fixedDmg + specDmg;
-            if (kill) dealt = Math.Max(dealt, s.eHp);
+            dealt += specDmg;
             s.eHp -= dealt;
             if (s.eHp <= 0) return Win;
             if (specHeal > 0) s.pHp = Math.Min(_pMaxHp, s.pHp + specHeal);
 
             // --- 敵攻撃 ---
             int taken = reflectBack;
-            if (!s.stunNext)
             {
                 taken += (int)(Math.Max(0, enemyAtk - bSum) * _takenMul);
                 // 2 体戦 (2026-08-28): 2 体目は**独立したパケット**で、 ブロックは各パケットから
@@ -1504,8 +1261,6 @@ namespace AutoTest
                 //   ── 畳むと「ブロックがどちらか一方に届く」帯の評価が丸ごと消える。
                 if (_secondAtk > 0)
                     taken += (int)(Math.Max(0, _secondAtk - bSum) * _takenMul);
-                if (zero) taken = reflectBack;
-                else if (half) taken = reflectBack + Math.Max(1, (taken - reflectBack) / 2);
             }
             // 烈炎: 前ターンまでに積んだスタック分を軽減無視で受ける。 ブロックへ厚く挿すと更に積む。
             //   **配線側がこれを見られないと一方的な税になる** ので、 積む/積まないを盤面に出す。
@@ -1522,8 +1277,6 @@ namespace AutoTest
 
             // --- 充電と持ち越し ---
             s.charge = Math.Min(_chargeMax, s.charge + cSum + _chargePerTurn);
-            s.stunNext = stun;
-            s.freeRerollNext = freeRr;
             s.turn++;
             return Ongoing;
         }
@@ -1820,7 +1573,7 @@ namespace AutoTest
             w._eBaseAtk = _eBaseAtk; w._eDiceCount = _eDiceCount; w._eRollMax = _eRollMax;
             w._eMaxHp = _eMaxHp; w._escProfile = _escProfile;
             w._heavyPeriod = _heavyPeriod; w._heavyMul = _heavyMul; w._heavyWindupMul = _heavyWindupMul;
-            w._suppressTerm = _suppressTerm; w._isBoss = _isBoss; w._sealedRoles = _sealedRoles;
+            w._isBoss = _isBoss;
             w._termCap = _termCap; w._specialLimit = _specialLimit;
             w._chargeMax = _chargeMax; w._chargePerTurn = _chargePerTurn;
             w._spec = _spec; w._pierceMul = _pierceMul;
@@ -1922,14 +1675,8 @@ namespace AutoTest
             }
         }
 
-        /// <summary>手札役を <see cref="_handBuf"/> へ用意する。 **手札が変わった時だけ**評価し直す。
-        ///
-        /// 手札役は配線に一切依存しないのに、 初版は 243 通りの割り当てごとに評価し直していた。
-        /// 役判定の計算量の約 6 割が手札役 (<c>MaxSameCount</c> 2 回 + <c>LongestRun</c> 2 回) なので、
-        /// ここだけで探索が 2 倍以上速くなる。 **結果は 1 ビットも変わらない。**
-        ///
-        /// 呼び出し側の規律に頼らず、 手札そのものを鍵にして自動判定する ──
-        /// 「呼び忘れると手札役が静かに消える」形にすると、 いつか必ず踏む。</summary>
+        /// <summary>手札の鍵 (<see cref="_handKey"/>) を更新する。 **手札が変わった時だけ**作り直す。
+        /// 評価の並べ替えキャッシュ (<see cref="_valSortKey"/>) が使う。</summary>
         private void EnsureHandRoles(int[] dice)
         {
             // 出目は高々 2 桁なので 5 ビットずつ詰める。 k が大きい時は諦めて毎回評価する。
@@ -1941,8 +1688,6 @@ namespace AutoTest
                 if (key == _handKey) return;
             }
             _handKey = key;
-            _handBuf.Clear();
-            YachtRoles.EvaluateHand(dice, _handBuf);
         }
         private long _handKey;
         /// <summary><see cref="TurnValue"/> の最良手が今ターン撃破したか。 メモ命中時は false (安全側)。</summary>
@@ -1956,42 +1701,11 @@ namespace AutoTest
 
         private int NextSeed() => _rolloutSeed = (_rolloutSeed * 1103515245 + 12345) & 0x7FFFFFFF;
 
-        private static int MaskOf(HashSet<RoleKind> used)
-        {
-            int m = 0;
-            if (used != null) foreach (var r in used) m |= 1 << (int)r;
-            return m;
-        }
-
         private static int SumOf(int[] v, int n)
         {
             int s = 0; for (int i = 0; i < n; i++) s += v[i];
             return s;
         }
 
-        /// <summary>〈対〉の底上げ量。 **正本は <see cref="YachtRoleEffects"/>.PairBonus** ──
-        /// ここはロールアウト用の写しなので、 向こうを変えたら必ずこちらも変える。
-        /// ずれると探索が実際と違う効果を最大化する (全ターンで目的関数が狂う)。</summary>
-        private static int PairBonus(int[] group, int n)
-        {
-            int sum = 0;
-            for (int i = 0; i < n; i++)
-            {
-                int c = 0;
-                for (int j = 0; j < n; j++) if (group[j] == group[i]) c++;
-                if (c >= 2) sum += group[i];
-            }
-            return (sum + 1) / 2;
-        }
-
-        // 端子役の判定へ渡す「ちょうどその本数の配列」。 長さで判定が変わる (分布系の最小本数) ため、
-        // 使い回しの固定長バッファをそのまま渡すことはできない。
-        private readonly int[][] _grpCache = new int[16][];
-        private void CopyInto(int[] src, int n, out int[] dst)
-        {
-            if (_grpCache[n] == null) _grpCache[n] = new int[n];
-            dst = _grpCache[n];
-            Array.Copy(src, dst, n);
-        }
     }
 }

@@ -196,8 +196,7 @@ namespace AutoTest.EditorTools
             try
             {
                 var manager = go.AddComponent<MapManager>();
-                manager.RestoreState(captured.map.BuildMap(), captured.map.currentNodeId,
-                                     captured.map.hungerCurrent, captured.map.hungerMax);
+                manager.RestoreState(captured.map.BuildMap(), captured.map.currentNodeId);
 
                 var run = new GameLoop.RunState();
                 captured.run.RestoreInto(run);

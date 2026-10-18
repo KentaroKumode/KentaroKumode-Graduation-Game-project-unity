@@ -3,35 +3,24 @@ using System.Collections.Generic;
 namespace GameLoop
 {
     /// <summary>
-    /// ダイスの**出目パーツ**（2026-08-17 リワーク）。 面を 1 枚**追加**する。
+    /// ダイスの**面**（出目パーツ）。 ADR-0011 (2026-10-18) で作り直した。
     ///
-    /// <para><b>面は値ではなく個体。</b> 素の <c>1</c> とパーツの <c>1</c> は別物で、
-    /// 効果はパーツの面に止まったときだけ働く。 そのためロールは
-    /// 「値」ではなく**どの面に止まったか (添字)** を持ち回る必要がある
-    /// （<see cref="CombatSystem.CombatManager"/> のロール地点を参照）。</para>
-    ///
-    /// <para><b>36 種。</b> 出目 1〜9 × Tier 1〜4。 ラン中に同じ (出目, Tier) は 1 回しか出現しない。</para>
+    /// <para><b>役はパーツが持つ。</b> 旧設計は役を全員が無料で持ち、パーツは端子の置き方を変えていた。
+    /// いまは役の効果そのものをパーツ（＝カスタム面）に紐づける。 T1 は素の面で何も起きない。</para>
     ///
     /// <list type="table">
-    ///   <item><term>T1</term><description>そのダイスは**振り直せない**</description></item>
-    ///   <item><term>T2</term><description>なし（面が 1 枚増えるだけ）</description></item>
-    ///   <item><term>T3</term><description>**異なる 2 端子**へ同時接続できる</description></item>
-    ///   <item><term>T4</term><description>T3 に加え**同一端子へ重ねられ**、重ねたとき その端子に +3</description></item>
+    ///   <item><term>T1</term><description>無能力（素の面）。 出目の数字だけを持つ</description></item>
+    ///   <item><term>T2</term><description>その目の<b>2 個そろい</b>の効果が発動する</description></item>
+    ///   <item><term>T3</term><description>T2 に加えて、その目の<b>ゾロ目</b>の効果も発動する</description></item>
+    ///   <item><term>T4</term><description>T3 に加えて、その目<b>固有の追加効果</b>が付く</description></item>
     /// </list>
     ///
-    /// <para><b>実体ダイスとゴーストダイス。</b> 2 接続のうち片方が実体、もう片方がゴースト。
-    /// 合計値には両方が乗るが、<b>端子役の判定に参加するのは実体だけ</b>。
-    /// これが無いと 1 個のダイスが 2 個ぶんとして数えられ、 同一端子へ重ねた瞬間に
-    /// 〈対〉が確定成立する（端子役は 対 / 束 / 小階 / 飛階）。
-    /// 手札役（二対・中階・大階・満・極）は 5 個の出目そのものを見るので配線の影響を受けない。</para>
+    /// <para><b>同じ目の面は 1 枚まで。</b> 面は {1…9} の部分集合になる。 すでに持つ目のパーツを買うと
+    /// <b>差し替え</b>（Tier が上がる時だけ。同じか下がる品は並ばない）。
+    /// 面の状態は <see cref="RunState.diceFaceParts"/> が全部持つ（素の面 {2,3,4,5} もここに入る）。</para>
     ///
-    /// <para><b>面の重複は許す。</b> 廃止したダイス強化は「最も低い 2 面に +1」で面を潰して
-    /// <c>1 2 3 4 5 6</c> を Lv3 で <c>4 4 4 4 5 6</c> にし、〈極〉を 1 ラン 12.7 回
-    /// （想定 0.12 回）まで暴走させた。 <b>あれが壊れたのは素材を払えば確実に潰せたから</b>で、
-    /// こちらは 36 種から特定の数枚を引き当てる必要がある。 実測（機会費用込み）:
-    /// 特定の 1 出目を 3 枚集めるには陳列を 24 個見て 59%、 その間ほかのパーツを全部見送るので
-    /// 面数 30 → 9・効果ゼロという代償を払う。 素直に集めると面が増えて分母が伸びるため、
-    /// 12 枚あたりで〈極〉はむしろ**基準を下回る** (0.93 倍)。</para>
+    /// <para><b>面は値ではなく個体。</b> ロールは値ではなく<b>どの面に止まったか (添字)</b> を持ち回る。
+    /// 効果は止まった面の Tier で引く。</para>
     ///
     /// <para><b>効果は出目が確定した後にだけ働く。</b>「この面はワイルド」「別の目として扱う」は禁止。
     /// 確率層に触った瞬間、 廃止したダイス強化と同じ事故が別の形で再発する。</para>
@@ -42,16 +31,16 @@ namespace GameLoop
         public const int MinFace = 1;
         public const int MaxFace = 9;
 
-        /// <summary>Tier。 <see cref="Tier.None"/> は「パーツではない素の面」を表す番兵。</summary>
-        public enum Tier { None = 0, T1 = 1, T2 = 2, T3 = 3, T4 = 4 }
+        /// <summary>面の最少枚数。 これ以下には外せない。</summary>
+        public const int MinFaceCount = 2;
 
-        /// <summary>T4 が同一端子へ重ねたときに、その端子の合計値へ足す量。</summary>
-        public const int T4StackBonus = 3;
+        /// <summary>Tier。 <see cref="Tier.None"/> は「面を持たない」番兵（配列の既定値）。</summary>
+        public enum Tier { None = 0, T1 = 1, T2 = 2, T3 = 3, T4 = 4 }
 
         /// <summary>ラン中に存在するパーツの総数（出目 9 × Tier 4）。</summary>
         public const int TotalKinds = (MaxFace - MinFace + 1) * 4;
 
-        /// <summary>装着済みパーツ 1 枚 ＝ 追加される面 1 枚。</summary>
+        /// <summary>装着済みパーツ 1 枚 ＝ 面 1 枚。</summary>
         [System.Serializable]
         public struct Part
         {
@@ -62,7 +51,7 @@ namespace GameLoop
 
             public Part(int face, Tier tier) { this.face = face; this.tier = tier; }
 
-            /// <summary>(出目, Tier) を 1 つの int に詰めた識別子。 重複出現の判定に使う。</summary>
+            /// <summary>(出目, Tier) を 1 つの int に詰めた識別子。</summary>
             public int Key => face * 10 + (int)tier;
         }
 
@@ -74,92 +63,107 @@ namespace GameLoop
                     yield return new Part(f, (Tier)t);
         }
 
-        /// <summary>**素のサイコロ。** 2026-08-17 にダイスというアイテム種別を廃止し、
-        /// 全員が同じ 6 面から始まる形にした。 個性はすべて出目パーツで付ける。
-        ///
-        /// <para>旧構成はダイス 10 種に固有の面表 (木 1-6 / 竜 5-10 / 天 2..14 等) を与える設計だったが、
-        /// **実装されないまま 10 種すべてが <c>[1,2,3,4,5,6]</c> で同一**になっていた。
-        /// 面が同じでは <see cref="Loadout"/> の更新判定が常に false を返し、
-        /// ショップのダイス枠は BOT が 1 個も買わない死に枠だった。
-        /// 「面構成で個性を出す」役割はパーツが引き継ぐ。</para></summary>
-        public static readonly int[] BaseFaces = { 1, 2, 3, 4, 5, 6 };
+        /// <summary>**素の面。** 全員が {2,3,4,5} の 4 面（すべて T1）から始まる。
+        /// 6 面である必要は無い（ADR-0011）。</summary>
+        public static readonly int[] StartingFaces = { 2, 3, 4, 5 };
 
-        /// <summary>まだ所持していない種類を列挙する。 ショップの抽選プール。
+        /// <summary>ラン開始時の面の一覧（素の面を T1 のパーツとして並べたもの）。</summary>
+        public static List<Part> StartingParts()
+        {
+            var list = new List<Part>(StartingFaces.Length);
+            for (int i = 0; i < StartingFaces.Length; i++)
+                list.Add(new Part(StartingFaces[i], Tier.T1));
+            return list;
+        }
+
+        /// <summary>その目の面を持っていれば Tier、 無ければ <see cref="Tier.None"/>。</summary>
+        public static Tier TierOfFace(IList<Part> owned, int face)
+        {
+            if (owned == null) return Tier.None;
+            for (int i = 0; i < owned.Count; i++)
+                if (owned[i].face == face) return owned[i].tier;
+            return Tier.None;
+        }
+
+        /// <summary>まだ手に入る種類を列挙する。 ショップの抽選プール。
         ///
-        /// <para><b>「出現済み」ではなく「所持済み」で弾く。</b> 序盤に見送った品が
-        /// 二度と出ないと、 買わない判断がそのままランを縛ってしまう。
-        /// 見送ったものは何度でも並ぶ。</para></summary>
+        /// <para><b>同じ目は 1 枚まで</b>なので、 すでに持つ目は<b>より高い Tier</b>だけが並ぶ（差し替え）。
+        /// 「出現済み」ではなく「所持状態」で弾く ── 見送った品は何度でも並ぶ。</para></summary>
         public static List<Part> RemainingKinds(IList<Part> owned)
         {
             var list = new List<Part>(TotalKinds);
             foreach (var p in AllKinds())
-            {
-                bool has = false;
-                if (owned != null)
-                    for (int i = 0; i < owned.Count && !has; i++)
-                        if (owned[i].Key == p.Key) has = true;
-                if (!has) list.Add(p);
-            }
+                if ((int)p.tier > (int)TierOfFace(owned, p.face)) list.Add(p);
             return list;
         }
 
-        /// <summary>面配列にパーツを**追加**する。 純関数。
-        /// <b>差し替えではない</b> ── 面数は 6 → 6+パーツ枚数 に増える。</summary>
-        public static int[] Apply(int[] baseFaces, IList<Part> parts)
+        /// <summary>パーツを装着する。 同じ目の面があれば<b>差し替え</b>、 無ければ追加。
+        /// 戻り値: 実際に変わったか（同じか低い Tier なら false）。</summary>
+        public static bool AddOrReplace(IList<Part> owned, Part add)
         {
-            if (baseFaces == null || baseFaces.Length == 0) return baseFaces;
-            if (parts == null || parts.Count == 0) return baseFaces;
-
-            var arr = new int[baseFaces.Length + parts.Count];
-            System.Array.Copy(baseFaces, arr, baseFaces.Length);
-            for (int i = 0; i < parts.Count; i++)
-                arr[baseFaces.Length + i] = parts[i].face;
-            return arr;
+            if (owned == null) return false;
+            for (int i = 0; i < owned.Count; i++)
+            {
+                if (owned[i].face != add.face) continue;
+                if ((int)add.tier <= (int)owned[i].tier) return false;
+                owned[i] = add;
+                return true;
+            }
+            owned.Add(add);
+            return true;
         }
 
         /// <summary>面配列と、**面添字ごとの Tier** を同時に組む。
         ///
         /// <para>ロールは <c>faces[idx]</c> で値を取り、 同じ <paramref name="tiers"/><c>[idx]</c> で
         /// 効果を引く。 添字が一致していることがこの仕組みの前提なので、
-        /// <b>faces と tiers は必ずこの関数から対で受け取ること</b>
-        /// （別々に組むと素の面とパーツ面がずれ、 効果が別の面に付く）。</para>
+        /// <b>faces と tiers は必ずこの関数から対で受け取ること</b>。</para>
         ///
-        /// <para>素の面は <see cref="Tier.None"/>。 T2 も効果は無いが
-        /// <c>Tier.T2</c> として区別する ── 「パーツで増えた面か」は
-        /// UI 表示と計装で必要になる。</para></summary>
-        public static void Build(int[] baseFaces, IList<Part> parts, out int[] faces, out Tier[] tiers)
+        /// <para>面が空（テストや Run の無い文脈）なら素の面 {2,3,4,5} を使う。</para></summary>
+        public static void Build(IList<Part> parts, out int[] faces, out Tier[] tiers)
         {
-            int baseLen = baseFaces?.Length ?? 0;
-            int extra = parts?.Count ?? 0;
-
-            faces = new int[baseLen + extra];
-            tiers = new Tier[baseLen + extra];
-            if (baseLen > 0) System.Array.Copy(baseFaces, faces, baseLen);
-            // 素の面は Tier.None のまま (配列の既定値 0)。
-            for (int i = 0; i < extra; i++)
+            if (parts == null || parts.Count == 0) parts = StartingParts();
+            faces = new int[parts.Count];
+            tiers = new Tier[parts.Count];
+            for (int i = 0; i < parts.Count; i++)
             {
-                faces[baseLen + i] = parts[i].face;
-                tiers[baseLen + i] = parts[i].tier;
+                faces[i] = parts[i].face;
+                tiers[i] = parts[i].tier;
             }
         }
 
-        /// <summary>その面添字が「振り直せない」(T1) か。</summary>
-        public static bool IsLocked(Tier[] tiers, int faceIndex)
-            => tiers != null && faceIndex >= 0 && faceIndex < tiers.Length
-               && tiers[faceIndex] == Tier.T1;
+        // ============================================================
+        //  面を外す (休憩エリアの強化・ADR-0011)
+        // ============================================================
 
-        /// <summary>その面添字が 2 接続を許すか (T3 / T4)。</summary>
-        public static bool AllowsDualLink(Tier[] tiers, int faceIndex)
+        /// <summary>外す価格の基礎（ゴールド換算）。</summary>
+        public const int RemovalBasePrice = 30;
+        /// <summary>外すたびに足す額。</summary>
+        public const int RemovalStep = 30;
+        /// <summary>価格のうち強化素材で払う割合。</summary>
+        public const float RemovalMaterialShare = 0.40f;
+        /// <summary>素材 1 個のゴールド換算（ショップの基準価格）。</summary>
+        public const int MaterialGoldValue = 15;
+
+        /// <summary>外す価格。 <paramref name="removalsDone"/> = これまでに外した回数、
+        /// <paramref name="faceCountBefore"/> = 外す前の面の枚数。
+        /// 外した結果が素の面数 (4) を下回る時は倍率が掛かる: 4→3 は 2 倍、3→2 は 3 倍。
+        /// 倍率は素材にも掛かる。 戻り値: 外せるか（最少枚数以下は false）。</summary>
+        public static bool RemovalCost(int removalsDone, int faceCountBefore, out int gold, out int materials)
         {
-            if (tiers == null || faceIndex < 0 || faceIndex >= tiers.Length) return false;
-            var t = tiers[faceIndex];
-            return t == Tier.T3 || t == Tier.T4;
-        }
+            gold = 0; materials = 0;
+            if (faceCountBefore <= MinFaceCount) return false;
 
-        /// <summary>その面添字が**同一端子への重ね**を許すか (T4 のみ)。</summary>
-        public static bool AllowsSameTerminalStack(Tier[] tiers, int faceIndex)
-            => tiers != null && faceIndex >= 0 && faceIndex < tiers.Length
-               && tiers[faceIndex] == Tier.T4;
+            int price = RemovalBasePrice + RemovalStep * removalsDone;
+            if (faceCountBefore == 4) price *= 2;
+            else if (faceCountBefore == 3) price *= 3;
+
+            materials = (int)System.Math.Round(price * RemovalMaterialShare / MaterialGoldValue,
+                                               System.MidpointRounding.AwayFromZero);
+            gold = (int)System.Math.Round(price * (1f - RemovalMaterialShare),
+                                          System.MidpointRounding.AwayFromZero);
+            return true;
+        }
 
         // ============================================================
         //  ID (2026-08-17)
@@ -214,10 +218,10 @@ namespace GameLoop
         {
             switch (t)
             {
-                case Tier.T1: return "この面が出たダイスは振り直せない";
-                case Tier.T2: return "効果なし";
-                case Tier.T3: return "この面が出たダイスは異なる2端子へ同時接続できる（実体1・ゴースト1）";
-                case Tier.T4: return $"この面が出たダイスは2端子へ同時接続でき、同じ端子に重ねるとその端子に+{T4StackBonus}";
+                case Tier.T1: return "効果なし（素の面）";
+                case Tier.T2: return "この目の2個そろいの効果が発動する";
+                case Tier.T3: return "この目の2個そろいとゾロ目の効果が発動する";
+                case Tier.T4: return "2個そろい・ゾロ目に加えて、この目固有の追加効果が付く";
                 default:      return "";
             }
         }

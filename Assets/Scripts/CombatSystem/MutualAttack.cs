@@ -15,29 +15,16 @@ namespace CombatSystem
         Special = 3,
     }
 
-    /// <summary>1 ターンぶんの配線。 **実体とゴーストを対で持つ。**
+    /// <summary>1 ターンぶんの配線。 添字 = ダイス番号、 値 = 接続先の端子。
     ///
-    /// <para>出目パーツ T3/T4 (2026-08-17) は 1 個のダイスを 2 端子へ接続できる。
-    /// 片方が<b>実体</b>、 もう片方が<b>ゴースト</b>で、
-    /// <b>合計値には両方が乗るが、端子役の判定に参加するのは実体だけ</b>。
-    /// これが無いと 1 個が 2 個ぶんとして数えられ、 同一端子へ重ねた瞬間に
-    /// 〈対〉が確定成立する (端子役は 対 / 束 / 小階 / 飛階)。</para>
-    ///
-    /// <para><b>実体とゴーストは必ずこの型で一緒に受け渡す。</b> 別々のデリゲートで
-    /// 取ると、 方策が片方だけ更新したときに不整合が静かに通る。</para></summary>
+    /// <para>(2026-10-18 ADR-0011: 出目パーツ T3/T4 の「2 端子へ同時接続」＝ゴーストは廃止した。
+    /// 役は端子の置き方を条件にしないので、 配線は合計値の割り振りだけを決める。)</para></summary>
     public struct WiringPlan
     {
-        /// <summary>実体の接続先。 添字 = ダイス番号。 合計値にも役判定にも乗る。</summary>
+        /// <summary>接続先。 添字 = ダイス番号。</summary>
         public DiceTerminal[] main;
 
-        /// <summary>ゴーストの接続先。 添字 = ダイス番号。 <b>-1 は「ゴースト無し」</b>。
-        /// 合計値にだけ乗る。 null なら全ダイスがゴースト無し。</summary>
-        public int[] ghost;
-
-        public static WiringPlan Of(DiceTerminal[] main) => new WiringPlan { main = main, ghost = null };
-
-        /// <summary>ゴースト無しを表す番兵。</summary>
-        public const int NoGhost = -1;
+        public static WiringPlan Of(DiceTerminal[] main) => new WiringPlan { main = main };
     }
 
     /// <summary>

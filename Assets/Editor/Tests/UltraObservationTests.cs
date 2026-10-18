@@ -48,7 +48,7 @@ namespace AutoTest.EditorTests.Ultra
             "equippedWeaponId", "equippedDiceId", "equippedSpecialTerminalId", "weaponPlus",
             "playerClass", "limitBreakStage", "sublimationCount",
             "ownedPassiveItems", "ownedConsumables", "ownedFlags",
-            "ascendedPassiveIds", "diceFaceParts",
+            "ascendedPassiveIds", "diceFaceParts", "faceRemovals", "roleGoldBonusPct",
             "diceEnhanceKeys", "diceEnhanceLevels", "diceEnhanceValues",
             // knowledge the player has accumulated
             "seenOnceEvents", "seenPassiveItemIds", "shopPurchasedCounts",

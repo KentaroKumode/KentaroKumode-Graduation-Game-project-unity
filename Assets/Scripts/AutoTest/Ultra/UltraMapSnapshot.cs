@@ -33,7 +33,7 @@ namespace AutoTest.Ultra
     [Serializable]
     public sealed class UltraMapSnapshot
     {
-        public const int CurrentVersion = 1;
+        public const int CurrentVersion = 2;   // 2: 空腹 (hungerCurrent/hungerMax) を削除 (2026-10-17)
 
         public int version = CurrentVersion;
         public int floor;
@@ -44,10 +44,6 @@ namespace AutoTest.Ultra
         public string currentNodeId = "";
         public UltraMapNodeSnapshot[] nodes = new UltraMapNodeSnapshot[0];
 
-        /// <summary>Hunger lives on <see cref="MapManager"/> rather than in the run, so it
-        /// would be lost if the map snapshot did not carry it.</summary>
-        public int hungerCurrent;
-        public int hungerMax;
 
         public static UltraMapSnapshot Capture(MapManager manager)
         {
@@ -68,8 +64,6 @@ namespace AutoTest.Ultra
                 startNodeId = map.startNodeId ?? "",
                 bossNodeId = map.bossNodeId ?? "",
                 currentNodeId = manager.CurrentNode?.id ?? "",
-                hungerCurrent = manager.Hunger != null ? manager.Hunger.Current : 0,
-                hungerMax = manager.Hunger != null ? manager.Hunger.Max : 0,
             };
 
             List<MapNode> all = map.GetAllNodes();
@@ -148,8 +142,7 @@ namespace AutoTest.Ultra
             sb.Append("ultra-map-snapshot-v").Append(version).Append('\n')
               .Append(floor).Append(sep).Append(laneCount).Append(sep).Append(rowCount).Append(sep)
               .Append(startNodeId ?? "").Append(sep).Append(bossNodeId ?? "").Append(sep)
-              .Append(currentNodeId ?? "").Append(sep)
-              .Append(hungerCurrent).Append(sep).Append(hungerMax).Append('\n');
+              .Append(currentNodeId ?? "").Append('\n');
 
             for (int i = 0; i < (nodes?.Length ?? 0); i++)
             {

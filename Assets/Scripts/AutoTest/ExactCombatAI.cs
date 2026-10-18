@@ -24,8 +24,6 @@ namespace AutoTest
     ///         メモ化する。 木が DAG に畳まれ、 指数から多項式になる</item>
     ///   <item>決定は「割り当て 3^k」ではなく**相異なるクリップ済み合計組の Pareto フロンティア**を
     ///         列挙する。 <c>ApplyTurn</c> が端子ごとの合計しか見ないので、 これで現行モデル内では厳密</item>
-    ///   <item>ゴーストは**今ターン内の閉じた式**で置く。 端子役の判定に参加しないので
-    ///         主配線と組み合わせ爆発を起こさない</item>
     ///   <item>止めるのは深さではなく <see cref="NodeBudget"/>（展開した状態数）</item>
     /// </list></para>
     ///
@@ -298,34 +296,29 @@ namespace AutoTest
             _secondAtk = Math.Max(0, tele.secondaryAttackValue);
             int atkBase = Math.Max(0, _pAtkPower - Math.Max(0, tele.playerAttackPenalty));
 
-            CollectDual(fidx);
             _nodesUsed = 0; _budget = NodeBudget;
             StatDecisions++;
 
             var cands = Candidates(s0, rolls, enemyAtk, atkBase);
             var bestMain = FallbackMain(rolls);
-            int[] bestGhost = NoGhostArray();
             float bestV = float.NegativeInfinity;
-            var ghost = new int[_k];
 
             foreach (var c in cands)
             {
                 if (_nodesUsed >= _budget) { StatBudgetHits++; break; }
-                PlaceGhosts(c.main, ghost, rolls, s0, enemyAtk, atkBase);
-                float v = TurnThenFuture(s0, rolls, enemyAtk,
-                                         new WiringPlan { main = c.main, ghost = ghost }, atkBase);
+                float v = TurnThenFuture(s0, rolls, enemyAtk, WiringPlan.Of(c.main), atkBase);
                 if (v > bestV)
                 {
                     bestV = v;
                     bestMain = (DiceTerminal[])c.main.Clone();
-                    bestGhost = (int[])ghost.Clone();
                 }
             }
-            return new WiringPlan { main = bestMain, ghost = bestGhost };
+            return new WiringPlan { main = bestMain };
         }
 
-        /// <summary>リロールする添字集合を選ぶ。 部分集合を決定ノードとして開く。
-        /// T1（振り直せない）面のダイスは候補から除く。</summary>
+        /// <summary>リロールするかを選ぶ（2026-10-17〜 全部振り直し）。 比べるのは「振らない」と
+        /// 「全部振る」の 2 つだけ（ADR-0011: 振り直せない面は無い）。
+        /// attempt は「この戦闘で何回目か」(費用の倍率)。</summary>
         public int[] ChooseReroll(int[] dice, MutualTurnTelegraph tele, int attempt)
         {
             var cm = CombatManager.Instance;
@@ -334,15 +327,9 @@ namespace AutoTest
             var ctx = PassiveSkillManager.Instance?.Context;
             var fidx = ctx?.playerDiceFaceIdx;
             int charge = ctx != null ? ctx.GetCharge() : 0;
-            CollectDual(fidx);
 
             var free = new List<int>();
-            for (int i = 0; i < _k; i++)
-            {
-                if (_tiers != null && fidx != null && i < fidx.Length
-                    && DiceFaceParts.IsLocked(_tiers, fidx[i])) continue;
-                free.Add(i);
-            }
+            for (int i = 0; i < _k; i++) free.Add(i);
             if (free.Count == 0) return Array.Empty<int>();
 
             var s0 = new S
@@ -363,7 +350,7 @@ namespace AutoTest
 
             int subsets = 1 << free.Count;
             var buf = new int[_k];
-            for (int mask = 1; mask < subsets; mask++)
+            for (int mask = subsets - 1; mask < subsets; mask++)   // 全部振り直しのマスクだけ (2026-10-17)
             {
                 var pick = new List<int>();
                 for (int b = 0; b < free.Count; b++) if ((mask & (1 << b)) != 0) pick.Add(free[b]);
@@ -472,86 +459,6 @@ namespace AutoTest
             return keep;
         }
 
-        // ============================================================
-        //  ゴースト: 今ターン内の閉じた式（design R9/R10）
-        // ============================================================
-
-        private readonly List<int> _dual = new List<int>();
-        private readonly HashSet<int> _stackable = new HashSet<int>();
-
-        private void CollectDual(int[] fidx)
-        {
-            _dual.Clear(); _stackable.Clear();
-            if (_tiers == null || fidx == null) return;
-            for (int i = 0; i < _k && i < fidx.Length; i++)
-            {
-                if (DiceFaceParts.AllowsDualLink(_tiers, fidx[i])) _dual.Add(i);
-                if (DiceFaceParts.AllowsSameTerminalStack(_tiers, fidx[i])) _stackable.Add(i);
-            }
-        }
-
-        /// <summary>ゴーストを**今ターン内の閉じた式**で置く。 探索しない。
-        ///
-        /// <para>ゴーストは端子の合計値へスカラを足すだけで**端子役の判定に参加しない**
-        /// （<see cref="DiceFaceParts"/> の doc: 「参加するのは実体だけ」）。 役の成立構造は
-        /// 主配線だけで決まるので、 主配線と組み合わせ爆発を起こさない。
-        /// さらに完全情報テレグラフで今ターンの敵攻撃値が既知なので、 +X の利得は
-        /// 飽和関数として確定する。 出目の大きい順に確定させ、 都度合計を更新する。</para></summary>
-        private void PlaceGhosts(DiceTerminal[] main, int[] ghost, int[] dice,
-                                 S s, int enemyAtk, int atkBase)
-        {
-            for (int i = 0; i < _k; i++) ghost[i] = WiringPlan.NoGhost;
-            if (_dual.Count == 0) return;
-
-            int aSum = 0, bSum = 0, cSum = 0;
-            for (int i = 0; i < _k; i++)
-                switch (main[i])
-                {
-                    case DiceTerminal.Attack: aSum += dice[i]; break;
-                    case DiceTerminal.Block:  bSum += dice[i]; break;
-                    default:                  cSum += dice[i]; break;
-                }
-
-            var order = new List<int>(_dual);
-            order.Sort((x, y) => dice[y].CompareTo(dice[x]));
-            float defMul = 1f - _eDefRate;
-
-            foreach (int die in order)
-            {
-                int bestT = WiringPlan.NoGhost; float bestGain = 0f;
-                for (int t = 0; t < TermKinds; t++)
-                {
-                    bool same = (int)main[die] == t;
-                    if (same && !_stackable.Contains(die)) continue;   // T3 は重ねられない
-                    int add = dice[die] + (same ? DiceFaceParts.T4StackBonus : 0);
-                    float gain;
-                    switch ((DiceTerminal)t)
-                    {
-                        case DiceTerminal.Attack:
-                            gain = Math.Min(add * defMul,
-                                   Math.Max(0f, s.eHp - (atkBase + aSum) * defMul));
-                            break;
-                        case DiceTerminal.Block:
-                            gain = Math.Min(add, Math.Max(0, enemyAtk - bSum))
-                                 + (_secondAtk > 0 ? Math.Min(add, Math.Max(0, _secondAtk - bSum)) : 0);
-                            break;
-                        default:
-                            gain = Math.Min(add, Math.Max(0, _chargeMax - (s.charge + cSum))) * ChargeWeight;
-                            break;
-                    }
-                    if (gain > bestGain) { bestGain = gain; bestT = t; }
-                }
-                if (bestT == WiringPlan.NoGhost) continue;
-                ghost[die] = bestT;
-                int applied = dice[die] + ((int)main[die] == bestT ? DiceFaceParts.T4StackBonus : 0);
-                switch ((DiceTerminal)bestT)
-                {
-                    case DiceTerminal.Attack: aSum += applied; break;
-                    case DiceTerminal.Block:  bSum += applied; break;
-                    default:                  cSum += applied; break;
-                }
-            }
-        }
 
         // ============================================================
         //  価値関数（V/Q の 2 段分割 + 状態のみのメモ化）
@@ -627,17 +534,6 @@ namespace AutoTest
                     case DiceTerminal.Block:  bSum += v; break;
                     default:                  cSum += v; break;
                 }
-                int g = plan.ghost != null ? plan.ghost[i] : WiringPlan.NoGhost;
-                if (g != WiringPlan.NoGhost)
-                {
-                    int add = v + ((int)plan.main[i] == g ? DiceFaceParts.T4StackBonus : 0);
-                    switch ((DiceTerminal)g)
-                    {
-                        case DiceTerminal.Attack: aSum += add; break;
-                        case DiceTerminal.Block:  bSum += add; break;
-                        default:                  cSum += add; break;
-                    }
-                }
             }
 
             // **敵の被ダメ軽減を必ず引く。** 抜けると火力を 1/(1−r) 倍に過大評価する。
@@ -712,13 +608,6 @@ namespace AutoTest
             var w = new DiceTerminal[n];
             for (int i = 0; i < n; i++) w[i] = DiceTerminal.Attack;
             return w;
-        }
-
-        private int[] NoGhostArray()
-        {
-            var g = new int[_k];
-            for (int i = 0; i < _k; i++) g[i] = WiringPlan.NoGhost;
-            return g;
         }
     }
 }

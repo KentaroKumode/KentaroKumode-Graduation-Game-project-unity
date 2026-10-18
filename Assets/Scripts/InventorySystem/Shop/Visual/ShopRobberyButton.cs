@@ -6,7 +6,7 @@ namespace InventorySystem.Shop.Visual
     /// <summary>
     /// 「値下げを願う」ボタン。
     /// メタバフ〈値下げ交渉〉アンロック時のみショップ画面に表示される。
-    /// クリック=GameManager.ShopRobbery() を呼ぶ → 内部的には強盗判定(カルマ+1, shopsBlocked, 戦闘突入)。
+    /// クリック=GameManager.ShopRobbery() を呼ぶ → 内部的には強盗判定(物資コスト, shopRobberyDone → 以降のショップ価格を割増, 戦闘突入)。
     /// 自身(Quad)に BoxCollider を付けてクリック検出する。
     /// </summary>
     [RequireComponent(typeof(BoxCollider))]

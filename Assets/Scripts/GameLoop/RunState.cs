@@ -387,10 +387,16 @@ namespace GameLoop
         /// **ラン中ずっと固定**。 どの役が死ぬかでそのランの組み立てが変わるので、
         /// 戦闘ごとに引き直さない (引き直すと「運が悪い戦闘」の集合になり、 判断が生まれない)。</summary>
         public int sealedRoleMask;
-        /// <summary>装備ダイスに差し込んだ面パーツ（<see cref="DiceFaceParts"/>）。
-        /// 廃止したダイス強化と違い**面の重複を作らない**ので、〈極〉の確率は 1/1296 のまま動かない。
+        /// <summary>サイコロの**面の全部**（<see cref="DiceFaceParts"/>）。 素の面 {2,3,4,5} も T1 としてここに入る
+        /// （ADR-0011・2026-10-18）。 同じ目は 1 枚まで。 面を外すと減る。
         /// セーブ対象。 適用は GameManager の戦闘開始時（面配列の解決地点）。</summary>
-        public List<DiceFaceParts.Part> diceFaceParts = new List<DiceFaceParts.Part>();
+        public List<DiceFaceParts.Part> diceFaceParts = DiceFaceParts.StartingParts();
+        /// <summary>このランで面を外した回数。 外す価格が回数で上がる（ラン通算・ADR-0011）。
+        /// [persistent]</summary>
+        public int faceRemovals;
+        /// <summary>〈富〉(目 9) の役で積んだ、 この戦闘のゴールド報酬への加算 (%)。
+        /// 戦闘開始時に 0 へ戻し、 勝利報酬の計算で使い切る。 [perCombat]</summary>
+        public int roleGoldBonusPct;
 
         /// <summary>ヴェスカ撃破後の選択 (2026-08-17)。 **true = 裂け目を閉じなかった**。
         ///
@@ -631,7 +637,9 @@ namespace GameLoop
             lingeringWoundDamageAccum = 0;
             sealedRoleMask = 0;
             if (chronicle == null) chronicle = new List<string>(); else chronicle.Clear();
-            if (diceFaceParts == null) diceFaceParts = new List<DiceFaceParts.Part>(); else diceFaceParts.Clear();
+            diceFaceParts = DiceFaceParts.StartingParts();
+            faceRemovals = 0;
+            roleGoldBonusPct = 0;
             riftLeftOpen = false;
             totalCombatTurns = 0;
             judgmentPostDamage = judgmentHealRequested = judgmentHealActual = judgmentHealPrevented = 0;

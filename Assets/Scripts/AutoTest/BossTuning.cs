@@ -22,7 +22,7 @@ namespace AutoTest
     {
         JudgmentDice,      // 灰燼/業火・断罪ターンの敵ダイス上乗せ (見切りロール難度)。 基準10
         JudgmentCoefBase,  // 業火の断罪の係数基礎。 係数 = base + 2n。 基準2 (1回目=4)
-        RobeStacks,        // 天衣無縫 (FlawlessRobe) の回復/シールド減衰の上限スタック。 基準10
+        RobeStacks,        // [死にパラメータ・2026-10-17] 天衣無縫 (FlawlessRobe) を削除したので読む側が無い。 並びを保つため残置
                            //   現在どの敵も未装備だが Registry には流用可として登録済み
         ChipCap,           // 業火の審判官・審判の炎の毎ターン継続ダメ上限。 基準13
         RegenReduction,    // 灰燼・灰塵の鎧の被ダメ軽減量 (タンク性/ジリ貧)。 基準9

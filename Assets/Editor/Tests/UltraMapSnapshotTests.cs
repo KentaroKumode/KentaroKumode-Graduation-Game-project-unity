@@ -55,12 +55,11 @@ namespace AutoTest.EditorTests.Ultra
             return map;
         }
 
-        private static MapManager Manager(FloorMap map, string currentNodeId,
-                                          int hungerCurrent = 4, int hungerMax = 6)
+        private static MapManager Manager(FloorMap map, string currentNodeId)
         {
             var go = new GameObject("[Ultra map snapshot test]");
             var manager = go.AddComponent<MapManager>();
-            manager.RestoreState(map, currentNodeId, hungerCurrent, hungerMax);
+            manager.RestoreState(map, currentNodeId);
             return manager;
         }
 
@@ -77,14 +76,11 @@ namespace AutoTest.EditorTests.Ultra
             try
             {
                 UltraMapSnapshot snapshot = UltraMapSnapshot.Capture(source);
-                target = Manager(snapshot.BuildMap(), snapshot.currentNodeId,
-                                 snapshot.hungerCurrent, snapshot.hungerMax);
+                target = Manager(snapshot.BuildMap(), snapshot.currentNodeId);
 
                 Assert.That(UltraMapSnapshot.Capture(target).ContentHash(),
                     Is.EqualTo(snapshot.ContentHash()));
                 Assert.That(target.CurrentNode.id, Is.EqualTo("shop"));
-                Assert.That(target.Hunger.Current, Is.EqualTo(4));
-                Assert.That(target.Hunger.Max, Is.EqualTo(6));
             }
             finally { Destroy(source); Destroy(target); }
         }
@@ -215,8 +211,7 @@ namespace AutoTest.EditorTests.Ultra
             try
             {
                 UltraMapSnapshot snapshot = UltraMapSnapshot.Capture(source);
-                target = Manager(snapshot.BuildMap(), snapshot.currentNodeId,
-                                 snapshot.hungerCurrent, snapshot.hungerMax);
+                target = Manager(snapshot.BuildMap(), snapshot.currentNodeId);
 
                 Assert.That(target.CurrentMap.GetNode("fight").revealed, Is.False,
                     "a tile recorded as unseen must stay unseen after restore");
