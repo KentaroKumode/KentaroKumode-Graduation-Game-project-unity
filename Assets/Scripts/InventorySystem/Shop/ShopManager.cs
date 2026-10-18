@@ -523,8 +523,9 @@ namespace InventorySystem.Shop
             int basePrice;
             switch (part.tier)
             {
-                case GameLoop.DiceFaceParts.Tier.T1: basePrice =  8; break;   // 代償 (振り直せない) 込み
-                case GameLoop.DiceFaceParts.Tier.T2: basePrice = 11; break;   // 素の増設 = カタログ中央値
+                // ADR-0011: 価格は据え置き (8/11/14/17)。 T1 は無能力の素の面になった。
+                case GameLoop.DiceFaceParts.Tier.T1: basePrice =  8; break;
+                case GameLoop.DiceFaceParts.Tier.T2: basePrice = 11; break;   // 2個そろいの解放
                 case GameLoop.DiceFaceParts.Tier.T3: basePrice = 14; break;
                 default:                             basePrice = 17; break;
             }
@@ -794,8 +795,8 @@ namespace InventorySystem.Shop
                     GameLoop.Loadout.TryAutoEquip(run, slot.itemId);
                     break;
                 case ShopSlotKind.FacePart:
-                    // **所持リストがそのまま抽選プールの除外集合**になる (追加の状態を持たない)。
-                    run.diceFaceParts.Add(slot.facePart);
+                    // 同じ目の面があれば差し替え (Tier が上がる時だけ並ぶ)、 無ければ追加。
+                    GameLoop.DiceFaceParts.AddOrReplace(run.diceFaceParts, slot.facePart);
                     Debug.Log($"[ShopManager] 出目パーツ装着: {GameLoop.DiceFaceParts.Label(slot.facePart)}"
                             + $" ({GameLoop.DiceFaceParts.Describe(slot.facePart.tier)})");
                     break;
@@ -936,7 +937,7 @@ namespace InventorySystem.Shop
         /// <summary>
         /// 値下げ交渉を試みる(実態は強盗)。
         /// ・現在ショップの未売却アイテムIDをスナップショットして run.robberyPendingItems に格納
-        /// ・物資コスト適用、shopsBlocked = true (以降ショップ進入不可)
+        /// ・物資コスト適用、shopRobberyDone = true (1 ラン 1 回。 以降のショップ価格は RobberySurcharge で割増)
         /// ・shopRobberyInProgress = true
         /// ・ショップを閉じ、戻り値 true なら呼び出し側が「怪しい商人」戦闘を開始する
         /// </summary>

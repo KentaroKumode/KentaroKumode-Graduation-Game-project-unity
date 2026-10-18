@@ -118,7 +118,7 @@ namespace AutoTest
             public double acqDamageTakenSum;
             public double acqHealedSum;
             public double acqShieldSum;
-            public int acqFullClear;        // R11+R12
+            public int acqFullClear;        // R11 (完全クリア)
             public int acqReachedFloor7;    // 7F到達
             public int acqAwakenedFormsKilledSum; // ヴェスカ撃破段数の合計
             // ---- 全ラン: 未取得 ----

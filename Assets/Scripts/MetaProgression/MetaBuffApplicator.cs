@@ -267,9 +267,6 @@ namespace MetaProgression
         public static bool IsLastStandUnlocked()
             => MetaPanel.ShellLastStandUnlocked(Rank(MetaPanelKind.Shell));
 
-        /// <summary>【v6 廃止】ボス前休憩の回復+強化同時。 常に false。</summary>
-        public static bool IsBossRestHealAndUpgradeUnlocked() => false;
-
         /// <summary>【v6 廃止】会心ダメージ加算。 常に 0 (メタからは付与しない)。</summary>
         public static float GetCritDamageBonus() => 0f;
 

@@ -38,6 +38,9 @@
 *.jpeg
 *.tga
 *.bmp
+# GUI の元素材 (docs/design/gui/) だけは追跡する。 生成物の画像 (docs/design/supply・gold など) は従来どおり無視
+!docs/design/gui/
+!docs/design/gui/*.png
 *.psd
 *.ai
 *.exr

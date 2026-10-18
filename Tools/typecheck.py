@@ -75,7 +75,7 @@ def run(name, rsp):
     lines = [l for l in (p.stdout + p.stderr).splitlines() if 'error CS' in l]
     if lines:
         print('%s: %d error(s)' % (name, len(lines)))
-        for l in lines[:40]:
+        for l in lines[:int(os.environ.get("TYPECHECK_MAX", "40"))]:
             print('  ' + l)
     else:
         print('%s: OK' % name)

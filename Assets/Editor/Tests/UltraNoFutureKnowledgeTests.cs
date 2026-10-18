@@ -188,7 +188,7 @@ namespace AutoTest.EditorTests.Ultra
             try
             {
                 var manager = go.AddComponent<MapManager>();
-                manager.RestoreState(map, "n0", 3, 5);
+                manager.RestoreState(map, "n0");
                 var run = new RunState { currentFloor = 2, playerHP = 30, playerMaxHP = 60 };
 
                 long before = GameRng.TotalDraws;

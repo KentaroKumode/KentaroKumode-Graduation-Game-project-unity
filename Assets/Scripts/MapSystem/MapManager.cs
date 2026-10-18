@@ -49,7 +49,6 @@ namespace MapSystem
         // === 状態 ===
         public FloorMap CurrentMap { get; private set; }
         public MapNode CurrentNode { get; private set; }
-        public HungerSystem Hunger { get; private set; }
         /// <summary>自由移動の層の中身。 離散マップ（Λ・8 層）では null。</summary>
         public FreeMapSim Sim { get; private set; }
         public bool IsFreeMap => Sim != null && CurrentMap != null && CurrentMap.IsFreeMap;
@@ -58,11 +57,6 @@ namespace MapSystem
         public event Action<FloorMap> OnMapGenerated;
         public event Action<MapNode> OnNodeEntered;
         public event Action<MapNode, TileType> OnMysteryResolved;
-
-        // === 設定 ===
-        [Header("空腹度")]
-        [SerializeField] private int hungerPerFloor = 10;
-        [SerializeField] private float starvationDamageRatio = 0.08f;
 
         void Awake()
         {
@@ -94,10 +88,6 @@ namespace MapSystem
             CurrentNode = CurrentMap.GetNode(CurrentMap.startNodeId);
             CurrentNode.visited = true;
 
-            Hunger = new HungerSystem { starvationDamageRatio = starvationDamageRatio };
-            int hunger = (floor == 6) ? 3 : hungerPerFloor;
-            Hunger.Initialize(hunger);
-
             if (CurrentMap.IsFreeMap)
             {
                 Sim = new FreeMapSim(CurrentMap.layout, new RunWallet(), FloorPlan.HasWanderer(floor));
@@ -113,18 +103,13 @@ namespace MapSystem
             OnMapGenerated?.Invoke(CurrentMap);
         }
 
-        /// <summary>Λ層（時間の狭間）の環状線マップを生成し、スポーク(S)に配置。
-        /// 空腹/飢餓は発生しないため Hunger は十分大きい値で初期化する。</summary>
+        /// <summary>Λ層（時間の狭間）の環状線マップを生成し、スポーク(S)に配置。</summary>
         public void GenerateLambda()
         {
             CurrentMap = MapGenerator.GenerateLambda();
             Sim = null;
             CurrentNode = CurrentMap.GetNode(CurrentMap.startNodeId);
             CurrentNode.visited = true;
-
-            // Λ層では移動による空腹/飢餓は無いため、枯渇しない大きな値で初期化
-            Hunger = new HungerSystem { starvationDamageRatio = 0f };
-            Hunger.Initialize(99999);
 
             OnMapGenerated?.Invoke(CurrentMap);
         }
@@ -136,11 +121,8 @@ namespace MapSystem
         /// そして <b>視界を再計算しないこと</b> ── snapshot の <c>revealed</c> は
         /// 「その時点でプレイヤーが何を見えていたか」の記録なので、 復元後に
         /// <see cref="ApplyMetaSightLimit"/> を掛け直すと、 記録した可視状態を
-        /// 現在のデバフ状態で塗り替えてしまう。</para>
-        ///
-        /// <para>Hunger は <see cref="HungerSystem.SetCurrentForTest"/> で据える。 名前は test 向けだが、
-        /// 「現在値を直接置く」以外の用途がここには無い。</para></summary>
-        public void RestoreState(FloorMap map, string currentNodeId, int hungerCurrent, int hungerMax)
+        /// 現在のデバフ状態で塗り替えてしまう。</para></summary>
+        public void RestoreState(FloorMap map, string currentNodeId)
         {
             if (map == null) throw new System.ArgumentNullException(nameof(map));
             // 自由移動の層は位置・時間・徘徊エネミーの状態を持つが、 snapshot はノードしか保存しない。
@@ -157,10 +139,6 @@ namespace MapSystem
                 throw new System.InvalidOperationException(
                     "restored map has neither the requested node nor a start node");
 
-            Hunger = new HungerSystem { starvationDamageRatio = starvationDamageRatio };
-            Hunger.Initialize(System.Math.Max(1, hungerMax));
-            Hunger.SetCurrentForTest(hungerCurrent);
-
             OnMapGenerated?.Invoke(CurrentMap);
         }
 
@@ -173,7 +151,7 @@ namespace MapSystem
         }
 
         /// <summary>
-        /// 指定ノードへ移動。空腹ダメージを返す。
+        /// 指定ノードへ移動。 戻り値は常に 0（旧: 空腹ダメージ。 空腹は 2026-10-17 に削除。 呼び出し側の互換のため int のまま）。
         /// Mystery タイルは自動解決される。
         /// </summary>
         public int MoveTo(string nodeId, int playerMaxHP)
@@ -196,9 +174,6 @@ namespace MapSystem
                 return 0;
             }
 
-            // 空腹度処理
-            int starvationDmg = Hunger.OnMove(playerMaxHP);
-
             // 位置更新
             CurrentNode = target;
             target.visited = true;
@@ -215,7 +190,7 @@ namespace MapSystem
 
             OnNodeEntered?.Invoke(target);
 
-            return starvationDmg;
+            return 0;
         }
 
         /// <summary>挑戦デバフ 軸13〈戦場の霧〉/ T4-C〈暗夜〉: 現在地から N ホップ先まで以外を unrevealed に。
@@ -320,12 +295,6 @@ namespace MapSystem
                 MetaProgression.Achievements.AchievementService.NoteExternalHpDamage(before - run.playerHP);
                 return run.playerHP <= 0;
             }
-        }
-
-        /// <summary>前哨基地効果: 空腹度全回復</summary>
-        public void ProcessOutpost()
-        {
-            Hunger?.RestoreFull();
         }
 
         /// <summary>現在位置がボスかどうか</summary>

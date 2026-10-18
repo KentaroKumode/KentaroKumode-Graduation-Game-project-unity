@@ -57,6 +57,7 @@ namespace AutoTest.EditorTests.Ultra
             run.timedDebuffs["debuff_bleed"] = 2;
             run.lambdaDebuffs["lambda_slow"] = 1;
             run.shopPurchasedCounts["血塗りの戦斧"] = 1;
+            run.diceFaceParts.Clear();   // 新しい RunState は素の面 {2,3,4,5} を持つ (ADR-0011)。 1 枚だけにして往復を見る
             run.diceFaceParts.Add(new DiceFaceParts.Part
             { face = 9, tier = DiceFaceParts.Tier.T4 });
             run.chronicle.Add("floor 4 entered");

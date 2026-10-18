@@ -197,8 +197,8 @@ namespace AutoTest.EditorTests.Ultra
         [Test]
         public void RoleMaskRoundTrips_AndZeroMeansDeferEverything()
         {
-            var candidates = new List<RoleKind> { RoleKind.Pair, RoleKind.Triple };
-            int mask = (1 << (int)RoleKind.Pair) | (1 << (int)RoleKind.Triple);
+            var candidates = new List<RoleKind> { RoleKind.Pair2, RoleKind.Triple2 };
+            int mask = (1 << (int)RoleKind.Pair2) | (1 << (int)RoleKind.Triple2);
 
             Assert.That(UltraCombatActions.TryDecodeRoles(
                 UltraCombatActions.EncodeRoles(mask), candidates, out List<RoleKind> fire), Is.True);
@@ -215,8 +215,8 @@ namespace AutoTest.EditorTests.Ultra
         [Test]
         public void ARoleMaskNamingAnUnofferedRole_IsRefused()
         {
-            var candidates = new List<RoleKind> { RoleKind.Pair };
-            int mask = (1 << (int)RoleKind.Pair) | (1 << (int)RoleKind.Yacht);
+            var candidates = new List<RoleKind> { RoleKind.Pair2 };
+            int mask = (1 << (int)RoleKind.Pair2) | (1 << (int)RoleKind.Triple1);
 
             Assert.That(UltraCombatActions.TryDecodeRoles(
                 UltraCombatActions.EncodeRoles(mask), candidates, out _), Is.False);

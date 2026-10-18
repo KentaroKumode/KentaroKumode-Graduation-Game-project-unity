@@ -18,7 +18,6 @@ using MapSystem.Visual;
 ///   1-6  : フロア番号を選んでマップ再生成
 ///   R    : 同じフロアを再生成（シード変わる）
 ///   Space: Reachable ノードへ自動移動（ランダム1つ）
-///   H    : 空腹度を強制的に0にする（飢餓テスト）
 ///   S    : 現在の状態をコンソールに出力
 /// </summary>
 public class MapVisualTestDriver : MonoBehaviour
@@ -77,8 +76,6 @@ public class MapVisualTestDriver : MonoBehaviour
         // Space: ランダム自動移動
         if (Input.GetKeyDown(KeyCode.Space)) { AutoMove(); return; }
 
-        // H: 飢餓テスト（空腹度を0に）
-        if (Input.GetKeyDown(KeyCode.H)) { ForceFamine(); return; }
 
         // S: ステータスダンプ
         if (Input.GetKeyDown(KeyCode.S)) { DumpStatus(); return; }
@@ -108,20 +105,10 @@ public class MapVisualTestDriver : MonoBehaviour
 
         // ランダムに1つ選んで移動（playerMaxHP=30 固定）
         var target = moves[Random.Range(0, moves.Count)];
-        int starvDmg = mapManager.MoveTo(target.id, 30);
+        mapManager.MoveTo(target.id, 30);
 
         string tileLabel = target.EffectiveType.ToString();
-        string dmgText = starvDmg > 0 ? $" ⚠飢餓{starvDmg}dmg" : "";
-        Debug.Log($"[MapVisualTest] → {target.id} ({tileLabel}){dmgText}" +
-                  $" 空腹:{mapManager.Hunger.Current}/{mapManager.Hunger.Max}");
-    }
-
-    private void ForceFamine()
-    {
-        if (mapManager.Hunger == null) return;
-        // Initialize(0) では Max も変わってしまうので、SetCurrentForTest を使う
-        mapManager.Hunger.SetCurrentForTest(0);
-        Debug.Log("[MapVisualTest] 空腹度を強制 0 にしました");
+        Debug.Log($"[MapVisualTest] → {target.id} ({tileLabel})");
     }
 
     private void DumpStatus()
@@ -130,13 +117,11 @@ public class MapVisualTestDriver : MonoBehaviour
 
         var node = mapManager.CurrentNode;
         var map  = mapManager.CurrentMap;
-        var hungry = mapManager.Hunger;
 
         var sb = new System.Text.StringBuilder();
         sb.AppendLine($"=== MapVisual Test Status ===");
         sb.AppendLine($"  Floor     : {map.floor}");
         sb.AppendLine($"  Node      : {node?.id} ({node?.EffectiveType})");
-        sb.AppendLine($"  Hunger    : {hungry?.Current}/{hungry?.Max}");
         sb.AppendLine($"  Moves     : {string.Join(", ", mapManager.GetAvailableMoves().ConvertAll(n => n.id))}");
 
         // タイルタイプ内訳
@@ -172,14 +157,12 @@ public class MapVisualTestDriver : MonoBehaviour
                       "  1-6  : フロア再生成\n" +
                       "  R    : 同フロア再生成\n" +
                       "  Space: ランダム自動移動\n" +
-                      "  H    : 飢餓テスト（空腹度0）\n" +
                       "  S    : ステータスダンプ\n";
 
         if (mapManager?.CurrentNode != null)
         {
             info += $"\n現在 : {mapManager.CurrentNode.id}\n";
-            info += $"タイル: {mapManager.CurrentNode.EffectiveType}\n";
-            info += $"空腹 : {mapManager.Hunger?.Current}/{mapManager.Hunger?.Max}";
+            info += $"タイル: {mapManager.CurrentNode.EffectiveType}";
         }
 
         GUI.Box(new Rect(x, y, w, h), info, style);

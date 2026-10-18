@@ -130,7 +130,7 @@ namespace GameLoop
         public event Action<GamePhase> OnPhaseChanged;
         public event Action<RunState> OnRunStarted;
         public event Action<EnemyData> OnEnemyEncountered;
-        /// <summary>覚者連戦などのチェーン swap で次フォームへ切り替わったことを通知する。
+        /// <summary>ヴェスカ連戦のチェーン swap で次フォームへ切り替わったことを通知する。
         /// 戦闘自体は継続中だが、計測上は新エネミーとの戦闘扱いにしたい AutoRunner 等が拾う。</summary>
         public void RaiseEnemyEncountered(EnemyData e) => OnEnemyEncountered?.Invoke(e);
         public event Action<CombatResult> OnBattleEnded;
@@ -376,8 +376,6 @@ namespace GameLoop
 
             BeforeNodeEntered();
 
-            // 飢餓→物資統合(ADR-0002): 旧・空腹HPダメージは廃止。
-            // Hunger ゲージ更新は MoveTo 内で行われるが無害。
             mm.MoveTo(nodeId, Run.playerMaxHP);
 
             AfterNodeEntered();
@@ -646,6 +644,8 @@ namespace GameLoop
                 // 傲慢: ボスはエリート以上扱いで報酬2倍（割合先）
                 if (prideActive) rewardBase *= 2;
                 // パッシブ刻印〈守銭〉: 発動分 × 1G/ボス
+                // ADR-0011 〈富〉(目 9): 戦闘中に積んだ報酬加算 (%)。 割合先 (メタの定額 +N の前)。
+                rewardBase = ApplyRoleGoldBonus(rewardBase);
                 int reward = GoldIncome.Gain(Run, rewardBase + metaWinGold, "ボス報酬");
                 // 物資の補給 (2026-09-28): ボス +150
                 ProvisionSystem.Supply(Run, MapSystem.FreeMove.FreeMapParams.RewardBoss);
@@ -696,6 +696,8 @@ namespace GameLoop
                 if (Run.OwnsPassive(ItemIds.EliteBountyReceipt)) coins += 4;
             }
 
+            // ADR-0011 〈富〉(目 9): 戦闘中に積んだ報酬加算 (%)。 割合先 (メタの定額 +N の前)。
+            coins = ApplyRoleGoldBonus(coins);
             coins += metaWinGold;
             coins = GoldIncome.Gain(Run, coins, "戦闘報酬");
             IsEliteSecondFight = false;
@@ -863,7 +865,7 @@ namespace GameLoop
             SetPhase(GamePhase.MapNavigation);
         }
 
-        /// <summary>休憩でHP回復を選択。 メタ〈ボス前休憩 回復+強化〉解放時は強化も同時に試みる。</summary>
+        /// <summary>休憩でHP回復を選択（回復と強化は択一）。</summary>
         public void RestHeal()
         {
             if (CurrentPhase != GamePhase.RestStop) return;
@@ -879,20 +881,6 @@ namespace GameLoop
             MetaProgression.MetaDebuffApplicator.NoteHeal(heal, Run.playerHP - beforeRestHP, Run);
             RunChronicle.Rest(Run, Run.playerHP - beforeRestHP, beforeRestHP, Run.playerMaxHP);
             Log($"休憩回復: +{Run.playerHP - beforeRestHP}HP ({(int)(ratio*100)}%) (現在: {Run.playerHP}/{Run.playerMaxHP})");
-            // メタ Lv51: 同じ休憩マスで武器強化も同時に試みる（素材不足なら無視・回復は通る）
-            if (MetaProgression.MetaBuffApplicator.IsBossRestHealAndUpgradeUnlocked())
-                TryAutoUpgradeAtRest();
-            ReturnToMapOrClearFloor();
-        }
-
-        /// <summary>休憩で食事を選択（空腹を全回復）。HP回復・武器強化と並ぶ独立選択肢。</summary>
-        public void RestEat()
-        {
-            if (CurrentPhase != GamePhase.RestStop) return;
-            var h = MapManager.Instance?.Hunger;
-            int before = h?.Current ?? 0;
-            h?.RestoreFull();
-            Log($"休憩食事: 空腹 {before} → {h?.Current ?? 0}/{h?.Max ?? 0}（全回復）");
             ReturnToMapOrClearFloor();
         }
 
@@ -1094,40 +1082,39 @@ namespace GameLoop
                     Log($"武器強化 ×1: {Run.equippedWeaponId}{(Run.weaponPlus > 0 ? "+" : "")} 業物Lv{Run.limitBreakStage} (素材-{used}, 残{Run.weaponMaterials})");
                 }
             }
-            // メタ Lv51: 同じ休憩マスで HP 回復も同時に実行
-            if (MetaProgression.MetaBuffApplicator.IsBossRestHealAndUpgradeUnlocked())
-            {
-                float ratio = ActiveModifier?.restHealMultiplier ?? 0.3f;
-                // 〈遅い回復〉: **あらゆる回復に掛かる**ので休憩地点にも適用する。
-            int heal = Mathf.CeilToInt(Run.playerMaxHP * ratio
-                                       * MetaProgression.MetaDebuffApplicator.GetHealMultiplier());
-                heal = MetaProgression.MetaDebuffApplicator.ApplyJudgmentHealReduction(heal, Run);
-                int beforeHP = Run.playerHP;
-                Run.playerHP = Mathf.Min(Run.playerMaxHP, Run.playerHP + heal);
-                MetaProgression.MetaDebuffApplicator.NoteHeal(heal, Run.playerHP - beforeHP, Run);
-                Log($"[メタLv51] 同時回復: +{heal}HP ({(int)(ratio*100)}%) (現在: {Run.playerHP}/{Run.playerMaxHP})");
-            }
             SetPhase(GamePhase.MapNavigation);
         }
 
-        /// <summary>RestHeal 経由で呼ばれる、 素材があれば武器強化を1回試みるヘルパー（メタ Lv51 用）。
-        /// 2026-07-18: 武器強化不可ならダイス強化にフォールバック。</summary>
-        private void TryAutoUpgradeAtRest()
+        /// <summary>ADR-0011: 面を 1 枚外す価格。 外せない (最少枚数) なら false。</summary>
+        public bool TryGetFaceRemovalCost(out int gold, out int materials)
         {
-            int cost = WeaponUpgradeCost(Run);
-            if (cost != int.MaxValue && Run.weaponMaterials >= cost)
-            {
-                int before = Run.weaponMaterials;
-                if (TryUpgradeWeapon(Run))
-                {
-                    int used = before - Run.weaponMaterials;
-                    Log($"[メタLv51] 同時強化 ×1: {Run.equippedWeaponId}{(Run.weaponPlus > 0 ? "+" : "")} 業物Lv{Run.limitBreakStage} (素材-{used}, 残{Run.weaponMaterials})");
-                }
-            }
-            else if (DiceEnhance.TryUpgradeEquipped(Run))
-            {
-                Log($"[メタLv51] 同時強化 (ダイス): {Run.equippedDiceId} Lv{DiceEnhance.GetLevel(Run, Run.equippedDiceId)}");
-            }
+            gold = 0; materials = 0;
+            if (Run == null || Run.diceFaceParts == null) return false;
+            return DiceFaceParts.RemovalCost(Run.faceRemovals, Run.diceFaceParts.Count, out gold, out materials);
+        }
+
+        /// <summary>ADR-0011: 休憩の「強化」の一つとして、 ゴールドと強化素材を払って面を 1 枚外す。
+        /// **回復・武器強化と択一** ── 1 回の休憩で外せるのは 1 枚で、 休憩の行動を消費する。
+        /// 外すと出目の合計と、 その目の役 (T2 以上のパーツ) を失う。 払えない / 最少枚数なら何も起きない。</summary>
+        public bool RestRemoveFace(int face)
+        {
+            if (CurrentPhase != GamePhase.RestStop || Run == null || Run.diceFaceParts == null) return false;
+            if (!TryGetFaceRemovalCost(out int gold, out int materials)) { Log("面はこれ以上外せない"); return false; }
+
+            int at = -1;
+            for (int i = 0; i < Run.diceFaceParts.Count; i++)
+                if (Run.diceFaceParts[i].face == face) { at = i; break; }
+            if (at < 0) { Log($"出目 {face} の面を持っていない"); return false; }
+            if (Run.weaponMaterials < materials) { Log($"強化素材不足 (必要{materials}/所持{Run.weaponMaterials})"); return false; }
+            if (!ProvisionPayment.TryPay(Run, gold, "面を外す")) { Log("ゴールド不足"); return false; }
+
+            Run.weaponMaterials -= materials;
+            var removed = Run.diceFaceParts[at];
+            Run.diceFaceParts.RemoveAt(at);
+            Run.faceRemovals++;
+            Log($"面を外した: {DiceFaceParts.Label(removed)} (-{gold}G, 素材-{materials}, 残り{Run.diceFaceParts.Count}面, 通算{Run.faceRemovals}回目)");
+            ReturnToMapOrClearFloor();
+            return true;
         }
 
         /// <summary>前哨基地強化 (2026-05-31 新規): 各層 (Outpost マス) で 1 回のみ実行可能な武器強化。
@@ -1415,21 +1402,6 @@ namespace GameLoop
             Log($"=== {layerIntro.title} ===　{layerIntro.subtitle}");
             LayerTitles.Raise(layerIntro);
 
-            // 空腹度ボーナス適用
-            if (ActiveModifier != null && ActiveModifier.hungerMaxBonus != 0)
-            {
-                int newMax = mm.Hunger.Max + ActiveModifier.hungerMaxBonus;
-                mm.Hunger.Initialize(Mathf.Max(1, newMax));
-            }
-
-            // 2026-05-31: メタデバフ Lv8 はハンガー初期値減算→飢餓ダメ×2 に変更 (前哨基地全回復で旧効果失効のため)。
-            //             → 倍率適用は MoveTo 後の starvDmg 計算で行うので、 ここでの初期値操作は廃止。
-
-            // 飢餓ダメージ倍率上書き
-            if (ActiveModifier != null && ActiveModifier.starvationDamageOverride >= 0)
-                mm.Hunger.starvationDamageRatio = ActiveModifier.starvationDamageOverride;
-
-            mm.ProcessOutpost();
 
             // 前哨基地は開始ノードのため OnTileActivated イベントが ActivateTile 経由で発火しない。
             // 旅団契約 AI (AutoRunner) 等のリスナーへ明示的に通知する。
@@ -2537,7 +2509,7 @@ namespace GameLoop
 
         /// <summary>
         /// 値下げ交渉 (=強盗) を実行。
-        /// 1. ShopManager.TryRobbery: 在庫スナップ・物資コスト・shopsBlocked, ショップを閉じる
+        /// 1. ShopManager.TryRobbery: 在庫スナップ・物資コスト・shopRobberyDone (以降の価格割増), ショップを閉じる
         /// 2. 「怪しい商人」(shady_merchant) との特殊エリート戦に突入
         /// 3. HandleCombatEnd 内で勝利時=報酬付与/敗北時=HP1脱出 を分岐
         /// </summary>
@@ -3111,7 +3083,7 @@ namespace GameLoop
                     Run.EndRun();
                     SetPhase(GamePhase.RunClear);
                     OnRunCleared?.Invoke(Run);
-                    Log("=== 6層クリア === 〈真理〉が無いためここで覚者の門は閉ざされた");
+                    Log("=== 6層クリア === 〈真理〉が無いためここで〈門〉への道は閉ざされた");
                     var ending6f = Endings.Resolve(Run);
                     Log(ending6f.Display);
                     VignetteUnlockState.OnRunClear(Run, ending6f.id, VignetteUnlockState.IsMaxDifficultyRun(Run));
@@ -3121,6 +3093,16 @@ namespace GameLoop
                 OnFloorAdvanced?.Invoke(MapSystem.FreeMove.FloorPlan.Next(Run.currentFloor));
                 Log($"フロア{Run.currentFloor}クリア → 次へ");
             }
+        }
+
+        /// <summary>ADR-0011 〈富〉(目 9) の報酬加算を適用して使い切る。 戦闘開始時にも 0 へ戻す。</summary>
+        private int ApplyRoleGoldBonus(int coins)
+        {
+            if (Run == null || Run.roleGoldBonusPct <= 0) return coins;
+            int boosted = Mathf.RoundToInt(coins * (1f + Run.roleGoldBonusPct / 100f));
+            Log($"役〈富〉: 報酬 {coins} → {boosted} (+{Run.roleGoldBonusPct}%)");
+            Run.roleGoldBonusPct = 0;
+            return boosted;
         }
 
         /// <summary>武器の会心率 + 層補正の上限 (%)。</summary>
@@ -3174,8 +3156,7 @@ namespace GameLoop
             //   素の 6 面は全員共通。 個性は出目パーツだけで付く。
             //   faces と tiers は **必ず Build で対に組む** ── 別々に作ると
             //   素の面とパーツ面で添字がずれ、 効果が別の面に付く。
-            DiceFaceParts.Build(DiceFaceParts.BaseFaces,
-                                Run != null ? Run.diceFaceParts : null,
+            DiceFaceParts.Build(Run != null ? Run.diceFaceParts : null,
                                 out diceFaces, out faceTiers);
 
             // 面/最大出目は装備ダイス由来。diceMax は面の最大値から導出（RollDice・メタ補正・運命等が参照）。

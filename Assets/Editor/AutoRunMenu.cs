@@ -97,7 +97,6 @@ namespace AutoTest.EditorTools
         /// <summary>chargeRerollGain ×100 (0 = 既定 0.30 のまま触らない)。</summary>
         private const string RerollGainKey = "AutoRun.ChargeRerollGainPct";
         /// <summary>7層の役札持ち越しを**切る** (既定は持ち越し ON なので、これは旧仕様の対照用)。</summary>
-        private const string VescaKeepRolesKey = "AutoRun.VescaKeepRolesOff";
         /// <summary>リロールを全列挙する最大個数 (0 = 既定の標本抽出のまま)。</summary>
         private const string ExactRerollKey = "AutoRun.ExactRerollMaxDice";
         /// <summary>winHpWeight ×100 (0 = 既定 0.5 のまま触らない)。</summary>
@@ -1386,29 +1385,7 @@ namespace AutoTest.EditorTools
             Launch(1);
         }
 
-        // ---- 7層 役札の連戦持ち越し (2026-08-22) ----
-        //  現行は形態ごとに usedRoles をクリアする。 1 形態 ≒ 10 ターンでは
-        //  「見送ると 8〜9 割の確率で二度と成立しない」ので温存が成立しない。
-        //  持ち越すと 16 枚を 40 ターン級へ配分する問題になり、 温存が技量軸として立つ。
-        //  **7層でしかクリア判定に届かないので、 遺物ありで測る** (遺物なしの 7層到達は薄い)。
-        [MenuItem("Tools/AutoRun/7層役札持ち越し: 現行(持ち越しON) 遺物あり (0pt・1000ラン)", priority = 85)]
-        public static void RunVescaKeepRoles() => LaunchVescaKeepRoles(false);
-
-        [MenuItem("Tools/AutoRun/7層役札持ち越し: 旧仕様(OFF) 遺物あり (0pt・1000ラン)", priority = 86)]
-        public static void RunVescaKeepRolesBase() => LaunchVescaKeepRoles(true);
-
-        /// <summary><paramref name="forceOff"/> で旧仕様 (形態ごとリセット) の対照アームになる。</summary>
-        private static void LaunchVescaKeepRoles(bool forceOff)
-        {
-            ClearBatchModeSessionState();
-            EditorPrefs.SetBool(NoRelicKey, false);
-            Skill = AutoRunner.WiringSkill.Super;
-            if (forceOff) SessionState.SetBool(VescaKeepRolesKey, true);
-            SessionState.SetInt(ChalOneScoreKey, 0);
-            SessionState.SetInt(ChalOneRunsKey, 1000);
-            SessionState.SetBool(ChalSweepKey, true);
-            Launch(1);
-        }
+        // (7層 役札の連戦持ち越しの A/B メニューは ADR-0011 で規則ごと廃止した。 役は自動で効き、 使用済みの管理が無い。)
 
         // 遺物ありでも同じ向きに効くか。 **階層DP はここで符号が反転した** (0pt遺物なし +2.3pt /
         //   0pt遺物あり −3.3pt、 どちらも有意)。 1 条件の有意は一般化ではない。
@@ -1549,7 +1526,6 @@ namespace AutoTest.EditorTools
             SessionState.EraseInt(TieExpandKey);
             SessionState.EraseBool(SatCensusKey);
             SessionState.EraseInt(RerollGainKey);
-            SessionState.EraseBool(VescaKeepRolesKey);
             SessionState.EraseInt(ExactRerollKey);
             SessionState.EraseInt(WinHpWeightKey);
             SessionState.EraseInt(TtkWeightKey);
@@ -2794,8 +2770,6 @@ namespace AutoTest.EditorTools
             SessionState.EraseBool(SatCensusKey);
             int rerollGainPct = SessionState.GetInt(RerollGainKey, 0);
             SessionState.EraseInt(RerollGainKey);
-            bool vescaKeepRolesOff = SessionState.GetBool(VescaKeepRolesKey, false);
-            SessionState.EraseBool(VescaKeepRolesKey);
             int exactReroll = SessionState.GetInt(ExactRerollKey, 0);
             SessionState.EraseInt(ExactRerollKey);
             int winHpPct = SessionState.GetInt(WinHpWeightKey, 0);
@@ -3209,13 +3183,6 @@ namespace AutoTest.EditorTools
                     + " (既定 0.30) ── **Super の戦闘方策が変わる。 既存の基準値と混ぜないこと**");
             }
 
-            // 7層の役札持ち越し。 **2026-08-22 に既定 true で確定済み。**
-            //   static なので前バッチから残る ── 毎回明示的に書き込むが、
-            //   **キーが無いときは false ではなく「既定」を書く**。 false を書くと
-            //   採用済みの仕様が黙って無効になる (null=「触らない」の取り違え)。
-            CombatSystem.CombatManager.VescaKeepRolesAcrossPhases = !vescaKeepRolesOff;
-            if (vescaKeepRolesOff)
-                Debug.LogWarning("[AutoRunMenu] 7層 役札の連戦持ち越し **OFF** (旧仕様の対照アーム)");
 
             // リロールの全列挙。 **キーが無ければ従来の標本抽出のまま。**
             if (exactReroll > 0)

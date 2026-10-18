@@ -98,7 +98,6 @@ namespace EventSystem
             if (index < 0 || index >= Current.choices.Count) return null;
 
             var choice = Current.choices[index];
-            var hunger = MapManager.Instance?.Hunger;
             var run = GameManager.Instance?.Run;
 
             // 行動台帳: 効果の**種別を解釈せず**、 実行前後の差分で「代償を払ったか」を決める。
@@ -107,7 +106,7 @@ namespace EventSystem
             int chGold = run != null ? run.coins : 0;
             int chHp   = run != null ? run.playerHP : 0;
 
-            var execResult = EventEffectExecutor.Execute(choice.effects, run, hunger);
+            var execResult = EventEffectExecutor.Execute(choice.effects, run);
 
             if (run != null)
             {
@@ -139,7 +138,6 @@ namespace EventSystem
         {
             if (PendingPostCombatEffects == null || PendingPostCombatEffects.Count == 0) return;
 
-            var hunger = MapManager.Instance?.Hunger;
             var run = GameManager.Instance?.Run;
 
             // postCombat フラグを外して通常実行
@@ -147,7 +145,7 @@ namespace EventSystem
             foreach (var e in PendingPostCombatEffects)
                 clones.Add(new EventEffect { type = e.type, param = e.param, amount = e.amount, branches = e.branches, branchWeights = e.branchWeights });
 
-            EventEffectExecutor.Execute(clones, run, hunger);
+            EventEffectExecutor.Execute(clones, run);
             PendingPostCombatEffects.Clear();
             Debug.Log("[EventEncounter] 戦闘後効果適用");
         }

@@ -7,15 +7,15 @@ namespace InventorySystem.PassiveSkills
     {
         Normal,       // 通常ロール敗北の被ダメ
         Judgment,     // 灰燼: 業火の断罪
-        Reflect,      // 覚者・無相: 鏡映反射
+        Reflect,      // 鏡の双子: 鏡映の応答 (旧: 覚者・無相)
         Burst,        // 業火・残響: 爆ぜ火 (敗北時固定ダメ)
         Chip,         // 業火の審判官: 審判の炎 (継続ダメ)
         SuddenDeath,  // サドンデス (灰燼の烙印)
         Other,
         // **末尾に足すこと。** runs.jsonl へ int で載るので、 既存の並びを動かすと
         //   過去バッチと突き合わせたときに黙って別の死因へすり替わる。
-        MassiveBleed, // 覚者・天与: 大出血 (スタック累積・解除不可・4連戦を跨ぐ)
-        Rift,         // 覚者: 裂け目 (双方の最大HP 2%/T)
+        MassiveBleed, // ヴェスカ・天与: 大出血 (スタック累積・解除不可・4連戦を跨ぐ)
+        Rift,         // ヴェスカ: 裂け目 (双方の最大HP 2%/T)
     }
 
     /// <summary>
@@ -60,9 +60,9 @@ namespace InventorySystem.PassiveSkills
         public int[] equippedDiceFaces;
 
         /// <summary>[persistent] <see cref="equippedDiceFaces"/> と**添字が 1 対 1 で対応する** Tier 配列。
-        /// 素の面は <c>Tier.None</c>、 出目パーツで増えた面はその Tier。
+        /// 素の面 {2,3,4,5} は T1 (無能力)、 出目パーツで得た面はその Tier (T2 = 2 個そろい、 T3 = ゾロ目、 T4 = 固有効果)。
         /// <see cref="GameLoop.DiceFaceParts.Build"/> が faces と対で組む ── 別々に作らないこと。
-        /// null なら「パーツ無し」＝ 全面が素。</summary>
+        /// null なら役は何も成立しない。</summary>
         public GameLoop.DiceFaceParts.Tier[] equippedFaceTiers;
 
         /// <summary>[perTurn] このターン、 各ダイスが**どの面に止まったか** (equippedDiceFaces の添字)。
@@ -85,14 +85,7 @@ namespace InventorySystem.PassiveSkills
         /// RunState.sealedRoleMask を BeginCombat で写す。</summary>
         public int sealedRoleMask;
 
-        /// <summary>[persistent] ADR-0010: この戦闘で**既に切った役**。 1 役 1 回まで。
-        ///
-        /// ヨットのスコアカードに相当する。 戦闘単位でリセットする ──
-        /// **4 連戦 (7層ヴェスカ) は跨がない**。 跨ぐと後半の形態で手札が空になり、
-        /// エスカレーションとの二重の締め付けになるため。</summary>
-        public readonly HashSet<CombatSystem.RoleKind> usedRoles = new HashSet<CombatSystem.RoleKind>();
-
-        /// <summary>[perTurn] ADR-0010: このターン切った役 (ログ・計装用)。
+        /// <summary>[perTurn] ADR-0011: このターン効いた役 (ログ・計装用。 使用済みの管理は持たない)。
         /// BeginNewTurn Phase B でクリアする。</summary>
         public readonly List<CombatSystem.RoleKind> firedRolesThisTurn = new List<CombatSystem.RoleKind>();
 
@@ -227,8 +220,8 @@ namespace InventorySystem.PassiveSkills
         public bool healBlocked;
         /// <summary>狂暴化(ボス50T後): エネミーが受けるダメージ倍率（1.0=等倍, 狂暴化中3.0）。BeginNewTurn でリセット。</summary>
         public float enemyDamageTakenMultiplier = 1f;
-        /// <summary>覚者〈天衣無縫〉: 覚者がロール勝利するたび+1（上限20）。プレイヤーが獲得する回復量・シールド量を
-        /// このスタック分だけ減少させる。戦闘（覚者連戦）を通じて持続するため BeginNewTurn ではリセットしない。</summary>
+        /// <summary>プレイヤーが獲得する回復量・シールド量の減衰 (スタック分だけ減らす)。 戦闘を通じて持続。
+        /// <b>2026-10-17 時点で書き込む敵はいない</b> ── 唯一の書き手だった覚者〈天衣無縫〉を削除した。 機構だけ残してある。</summary>
         public int healShieldReduction;
 
         // ===== 7層 ヴェスカ（遺物学者）。 正本: docs/GAME.md §13-4 =====
@@ -630,9 +623,6 @@ namespace InventorySystem.PassiveSkills
             return (int)(heal * (1f - enemyHealReductionPct));
         }
 
-        /// <summary>当ターン中にプレイヤーが消費品/レイピアを使用したか。
-        /// BeginNewTurn でリセット。覚者の「悟達の試練」が観想中断判定に使う。</summary>
-        public bool consumablesUsedThisTurn;
 
         // === 2026-06-28: 職業スターター消耗品の状態フラグ ===
         /// <summary>[perTurn 相当・消費で armed] 瞬間研磨剤 (剣士): 次の 1 撃だけ 与ダメージ+150%。
@@ -655,7 +645,7 @@ namespace InventorySystem.PassiveSkills
         /// <summary>ボス連戦 (ヴェスカ 4段): 次段の enemy id。敵パッシブ OnTurnEnd で設定され、
         /// CombatManager が perspective 復帰後に SwapEnemy で消費 → null クリア。</summary>
         public string pendingEnemySwapId;
-        /// <summary>覚者連戦: 遷移ログラベル</summary>
+        /// <summary>ヴェスカ連戦: 遷移ログラベル</summary>
         public string pendingEnemySwapLabel;
 
         // ===== 消費アイテム由来（この1戦闘のみ。ctxは戦闘毎に生成→破棄で自動消去） =====
@@ -664,7 +654,14 @@ namespace InventorySystem.PassiveSkills
         /// <summary>[decay] cons_atk 効果の残ターン数。0=無効, -1=戦闘中永続, N=残 N ターン。
         /// EndTurn で decrement し 0 になった瞬間 consDiceRoll を 0 化する。2026-07-21 追加。</summary>
         public int consDiceRollTurnsLeft;
-        public int consShield;            // 残シールド吸収量
+        /// <summary>[persistent] この戦闘で払ったリロールの回数（2026-10-17〜）。 費用 = 振り直す個数 × (この値 + 1)。
+        /// <b>ターンでは戻らない</b> ── 同じ戦闘で振り直すほど高くつく（続けるとジリ貧）。 ctx は戦闘ごとに作り直すので、
+        /// 戦闘の頭で 0。 〈中階〉の無料リロールは数えない。</summary>
+        public int rerollsThisCombat;
+        /// <summary>[perTurn] このターンに振り直した回数（無料を含む）。 BOT の 1 ターンあたりの上限判定に使う。
+        /// BeginNewTurn の Phase B で 0。</summary>
+        public int rerollsThisTurn;
+        public int consShield;            // [decay] 残シールド吸収量。 毎ターン頭 (T2 以降) に半減 (BeginNewTurn の Phase C)
         public int consShieldExpireTurn;  // この番号を超えるターンで失効。-1=無制限/0=無
         public int consRegen;             // 毎ターン終了時 +consRegen 回復し consRegen--
         public float consCritPct;         // 会心率 (小数) 永続（毎ターン critRatePctAdd へ再適用）
@@ -896,6 +893,7 @@ namespace InventorySystem.PassiveSkills
             damageReduced = false;
             pursuitDamage = 0;
             playerDamageThisTurn = 0;   // 焦土用の被ダメ計測
+            rerollsThisTurn = 0;        // リロール: このターンの回数 (戦闘の回数 rerollsThisCombat は戻さない)
             lastDamageCause = DeathCause.Normal; // 断罪等の増幅タグが翌ターンへ残留しないように
 
             // 7層ヴェスカ (§13-4) の perTurn 分。 persistent 側 (vescaShield / massiveBleedStacks /
@@ -957,7 +955,6 @@ namespace InventorySystem.PassiveSkills
             // その他 単ターンフラグ
             truceThisTurn = false;
             lentTimePaidThisTurn = false;
-            consumablesUsedThisTurn = false;
             garyoProc = false;              // 画竜点睛は毎ターン判定（rollPurity は戦闘中持続）
             garyoDieValue = 0;
 
@@ -978,6 +975,9 @@ namespace InventorySystem.PassiveSkills
 
             if (enemyBleedStacks > 0 && !bleedDecayDisabled) enemyBleedStacks--; // 出血スタック (止血阻害で減衰無効化)
             if (enemyPassivesDisabledTurns > 0) enemyPassivesDisabledTurns--; // 敵パッシブ無効化 残ターン
+            // プレイヤーのシールドは毎ターン半減 (切り捨て。 1 → 0 で確実に消える)。 ヴェスカのシールド規約と同じ (GAME.md §13-4)。
+            // T1 は戦闘開始時の付与 (開幕シールド等) をそのまま使うので半減しない。 そのターンの付与は OnTurnStart 以降なので「半減 → 付与」の順になる。
+            if (currentTurn > 1 && consShield > 0) consShield /= 2;
             // 軸10〈反響〉: 溜まった反射分は CombatManager がターン頭で適用して 0 に戻す。
             // ここでは触らない (適用前にクリアすると効果が消えるため)。
         }

@@ -705,6 +705,8 @@ namespace CombatSystem
             //   ここで必ず落としておかないと前の戦闘の 2 体目が居座る。
             secondaryEnemy = null;
             secondaryHP = 0;
+            // ADR-0011 〈富〉(目 9) の報酬加算は戦闘ごと。 持ち越さない。
+            { var goldRun = GameLoop.GameManager.Instance?.Run; if (goldRun != null) goldRun.roleGoldBonusPct = 0; }
 
             // ボス難易度オートチューナー: hpMul を maxHP に適用 (非ボスは素通り)
             enemy = AutoTest.BossTuning.Apply(enemy);
@@ -1125,11 +1127,11 @@ namespace CombatSystem
             Debug.Log($"  Enemy  HP: {enemyHP}/{enemy.maxHP}, Dice: {enemy.DiceNotation}, Threat: {enemy.threat}");
         }
 
-        /// <summary>戦闘中にエネミーを差し替える（覚者の連戦などで使用）。
+        /// <summary>戦闘中にエネミーを差し替える（ヴェスカの 4 連戦で使用）。
         /// プレイヤー状態(HP/ダイス/buffs/currentTurn) は完全保持。
         /// 敵側パッシブと敵固有の accumulatedValues キーは新エネミーのものに置換。</summary>
         /// <param name="newEnemyId">enemies.json の id</param>
-        /// <param name="logLabel">遷移ログに使うラベル(例:"覚者第二形態へ")</param>
+        /// <param name="logLabel">遷移ログに使うラベル(例:"ヴェスカ第二形態へ")</param>
         /// <returns>差し替え成功なら true</returns>
         public bool SwapEnemy(string newEnemyId, string logLabel = null)
         {
@@ -1146,7 +1148,7 @@ namespace CombatSystem
             if (!isCombatActive) { Debug.LogWarning("[CombatManager.SwapEnemy] 戦闘中でない"); return false; }
             var newEnemy = EnemyDatabase.Get(newEnemyId);
             if (newEnemy == null) { Debug.LogError($"[CombatManager.SwapEnemy] enemy not found: {newEnemyId}"); return false; }
-            // ボス難易度オートチューナー: 覚者連戦の各形態にも hpMul を適用
+            // ボス難易度オートチューナー: ヴェスカ連戦の各形態にも hpMul を適用
             newEnemy = AutoTest.BossTuning.Apply(newEnemy);
 
             string prevName = currentEnemy?.displayName ?? "?";
@@ -1157,7 +1159,7 @@ namespace CombatSystem
             if (psm == null) { Debug.LogError("[CombatManager.SwapEnemy] PSM null"); return false; }
 
             // 敵側パッシブを差し替え（プレイヤー側パッシブは保持）。
-            // ボス連戦(覚者等)でも狂暴化を維持する。
+            // ボス連戦(ヴェスカ)でも狂暴化を維持する。
             var swapSkills = newEnemy.passiveSkills != null
                 ? new List<EnemyPassiveEntry>(newEnemy.passiveSkills)
                 : new List<EnemyPassiveEntry>();
@@ -1210,25 +1212,7 @@ namespace CombatSystem
                 ctx.phaseStartTurn = ctx.currentTurn + 1;
                 ctx.bossId = AutoTest.BossTuning.IsBoss(newEnemy.id) ? newEnemy.id : "";
                 ctx.lastDamageCause = InventorySystem.PassiveSkills.DeathCause.Normal; // 形態swapで死因タグをリセット (前形態の残留防止)
-                // ADR-0010: 役札は**形態ごとに戻す**。 4 連戦を通して 1 枚も戻らないと、
-                //   後半の形態で手札が空のままエスカレーション段階だけが上がり、
-                //   「敵が強くなるほど手段が減る」二重の締め付けになる。
-                //
-                // [検討中 2026-08-22] **7層だけ持ち越す**規則を A/B できるようにした
-                //   (<see cref="VescaKeepRolesAcrossPhases"/>、 既定 false = 従来どおり)。
-                //   持ち越すと 16 枚を 40 ターン級へ配分する問題になり、 温存が技量軸として立つ
-                //   ── 上の「二重の締め付け」は、 裏返せば**配分の難しさ**そのものでもある。
-                //   どちらが良いかは実測で決める。
-                bool keepAcross = VescaKeepRolesAcrossPhases
-                               && !string.IsNullOrEmpty(ctx.bossId)
-                               && ctx.bossId.StartsWith(GameLoop.BossIds.Layer7Prefix);
-                if (!keepAcross)
-                {
-                    // 役エポックの終端。 **クリアする時だけ締める** ── 持ち越すなら
-                    //   判断の地平は続いているので、 計装の単位も伸ばさなければ嘘になる。
-                    YachtRoleEffects.FlushRoleEpoch();
-                    ctx.usedRoles.Clear();
-                }
+                // (ADR-0011: 役は毎ターン自動で効き、 使用済みの管理を持たないので、 形態交代で戻すものは無い。)
             }
 
             // 新エネミーの OnBattleStart 発火
@@ -1270,30 +1254,9 @@ namespace CombatSystem
         /// 供給 (充電端子 2 本で +7/ターン程度) に対して 10 では窮屈すぎるため。</summary>
         public const int ChargeMax = 30;
 
-        /// <summary>[検討中 2026-08-22] **7層ヴェスカの 4 連戦で役札を持ち越す** (既定 false)。
-        ///
-        /// <para>true にすると形態交代で <c>usedRoles</c> をクリアしない ── 16 枚を
-        /// 40 ターン級の連戦へ**配分する**問題になり、 「いつ切るか」が初めて技量軸として立つ。
-        /// 現行 (false) は形態ごとに戻すので、 1 形態 ≒ 10 ターンでは温存の余地がほとんど無い
-        /// （実測: 見送ると 8〜9 割の確率で二度と成立しない）。</para>
-        ///
-        /// <para><b>2026-08-22 に true で確定 (設計判断)。</b> 実測では BOT のクリア率が
-        /// 57.5% → 52.0% (McNemar p&lt;0.0001) と**下がる**。 だがこれは
-        /// 「持ち越し規則 × 貪欲方策」の測定であって規則の評価ではない ──
-        /// <see cref="AutoTest.SuperCombatAI"/> の <c>WouldFire</c> は 16役中11役が「成立即発動」で
-        /// **配分をする方策を持たない**ため、 p1 で 16 枚を使い切って p2〜p4 を空で戦う。
-        /// 規則が作った技量軸を登れる主体がいない状態での数字である。
-        ///
-        /// <para><b>この採用で 0pt 遺物あり 57.5% は基準値として無効。</b>
-        /// また BOT 側に温存判断を入れる価値がここで初めて生じる ── 地平が 1 形態 (≒10T) から
-        /// 連戦全体 (≒40T) へ伸び、 「見送っても取り返せる」確率が跳ね上がるため。</para></summary>
-        public static bool VescaKeepRolesAcrossPhases = true;
-
-        /// <summary>配線ポリシー注入点 (完全情報: 自出目+テレグラフ → 実体とゴーストの対)。
+        /// <summary>配線ポリシー注入点 (完全情報: 自出目+テレグラフ → 配線)。
         /// null なら前ターン配線を維持 (初期値は全ダイス攻撃 = 未配置の自動合流)。
-        /// AutoRunner / 配線 UI (ADR-0008 W5) がここへ差す。
-        /// <b>戻り値が <see cref="WiringPlan"/> なのは実体とゴーストを原子的に受け取るため</b>
-        /// (別々に取ると片方だけ更新された不整合が静かに通る)。</summary>
+        /// AutoRunner / 配線 UI (ADR-0008 W5) がここへ差す。</summary>
         public Func<int[], MutualTurnTelegraph, WiringPlan> WiringPolicy;
 
         /// <summary>ADR-0010: リロール方策の注入点。
@@ -1304,13 +1267,7 @@ namespace CombatSystem
         /// 「全部振り直しを 2 回」は上限 30 では不可能 ── 狙った少数を刻む方が効率的になる。</summary>
         public Func<int[], MutualTurnTelegraph, int, int[]> RerollPolicy;
 
-        /// <summary>ADR-0010: 役の発動方策の注入点。
-        /// 引数 = (成立している役, テレグラフ, 使用済みの役)。 戻り値 = **今ターン切る役**。
-        ///
-        /// **発動は完全任意** ── 成立しても切らない自由が無いと、 1戦闘1回の希少性が
-        /// 「最良の役が勝手に発火して勝手に消える」だけになり選択が消える。
-        /// null なら何も切らない (見送り)。</summary>
-        public Func<List<RoleKind>, MutualTurnTelegraph, HashSet<RoleKind>, List<RoleKind>> RolePolicy;
+        // (ADR-0011: 役は成立すれば自動で効く。 発動方策の注入点 RolePolicy は廃止した。)
 
         /// <summary>現在の配線 (ダイス index → 端子)。「配線は残る」= 戦闘中は自動適用。
         /// TODO(W7): ラン跨ぎの既定値保存は RunState へ (ADR-0008 残タスク #5)。</summary>
@@ -1892,7 +1849,7 @@ namespace CombatSystem
             psm.FireTrigger(PassiveSkillTrigger.OnTurnEnd);
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnTurnEnd);
 
-            // 覚者連戦: 敵パッシブが予約した SwapEnemy を perspective 復帰後に実行
+            // ヴェスカ連戦: 敵パッシブが予約した SwapEnemy を perspective 復帰後に実行
             if (!string.IsNullOrEmpty(ctx.pendingEnemySwapId))
             {
                 string swapId = ctx.pendingEnemySwapId;
@@ -2432,6 +2389,9 @@ namespace CombatSystem
             int enemyAtkValue = Escalation.EnemyAttackValue(currentEnemy, escTurn, ctx.enemyDiceTotal, ctx.currentTurn);
             // ADR-0009 D群: 敵攻撃値-N (呪縛 等の敵ダイス弱化系の転生先)
             enemyAtkValue = Math.Max(0, enemyAtkValue - ctx.mutualEnemyAttackReduction);
+            // ADR-0011 〈封じ・対〉(前ターン成立): 敵の攻撃を N% 減らす。 予告にもそのまま出る (完全情報)。
+            if (ctx.currentBuffs.TryGetValue(YachtRoleEffects.EnemyAtkCutKey, out float roleAtkCut) && roleAtkCut > 0f)
+                enemyAtkValue = Math.Max(0, Mathf.RoundToInt(enemyAtkValue * (1f - roleAtkCut / 100f)));
             // 2026-07-25 v6: 出血 r2 失血衰弱 (敵の出血 3 以上で攻撃 -2)
             enemyAtkValue = Math.Max(0, enemyAtkValue - MetaProgression.MetaBuffApplicator.GetBleedWeakenAttack(ctx.enemyBleedStacks));
 
@@ -2509,22 +2469,16 @@ namespace CombatSystem
                         ? mutualWiring[i] : DiceTerminal.Attack; // 未配置は攻撃へ自動合流
                 mutualWiring = next;
             }
-            int[] mutualGhost = null;
             if (WiringPolicy != null)
             {
                 var plan = WiringPolicy(playerDice, tele);
                 if (plan.main != null && plan.main.Length == playerDice.Length)
-                {
                     mutualWiring = plan.main;
-                    mutualGhost = plan.ghost;
-                }
             }
 
             // 特殊端子 (§6-5) の接続制限と、 挑戦デバフ〈不器用〉の端子上限を強制する。
             // **方策/UI を信用しない** ── 制限を破った配線が来たら攻撃へ落とす。
             SanitizeWiring(mutualWiring, playerDice.Length);
-            // ゴーストも同様に検算する。 T3/T4 の面に止まっていないダイスのゴーストは剥がす。
-            SanitizeGhost(ctx, mutualGhost, playerFaceIdx, playerDice.Length);
 
             int attackSum = 0, blockSum = 0, chargeDiceCount = 0;
             int attackDiceCount = 0, blockDiceCount = 0, chargeSum = 0;
@@ -2541,36 +2495,10 @@ namespace CombatSystem
             }
             int _diagAtkRaw = attackSum;
 
-            // --- ゴースト接続 (出目パーツ T3/T4) ---
-            //   **合計値にだけ乗せる。** 役判定に使う組は実体だけで作るので、
-            //   ここで DiceCount を増やさない ── 増やすと端子調律メタの本数ボーナスや
-            //   充電の本数系が二重取りになる。
-            //   T4 が実体と同じ端子へ重ねたときだけ、 その端子に +3。
-            if (mutualGhost != null)
-            {
-                for (int i = 0; i < playerDice.Length && i < mutualGhost.Length; i++)
-                {
-                    int g = mutualGhost[i];
-                    if (g == WiringPlan.NoGhost) continue;
-                    int add = playerDice[i];
-                    bool stacked = i < mutualWiring.Length && (int)mutualWiring[i] == g;
-                    if (stacked) add += GameLoop.DiceFaceParts.T4StackBonus;
-                    switch ((DiceTerminal)g)
-                    {
-                        case DiceTerminal.Block:   blockSum   += add; break;
-                        case DiceTerminal.Charge:  chargeSum  += add; break;
-                        case DiceTerminal.Special: specialSum += add; break;
-                        default:                   attackSum  += add; break;
-                    }
-                    if (stacked)
-                        Debug.Log($"[出目パーツ T4] ダイス{i + 1} を同一端子へ重ね: "
-                                + $"{(DiceTerminal)g} に +{playerDice[i]}+{GameLoop.DiceFaceParts.T4StackBonus}");
-                }
-            }
             // 端子調律メタバフ: **接続したダイス 1 本あたり** +N (2026-07-28 に「合計 +N」から変更)。
             // r3 で 3 本挿せば +9 ── 端子へ厚く配線するほど伸びるので、 §6-4 の配線判断と噛む。
             // 本数ベースなので「0 配線の端子に架空の加算が乗る」問題は構造的に起きない。
-            int _diagAtkGhost = attackSum - _diagAtkRaw;
+            int _diagAtkGhost = 0;   // (ゴースト接続は ADR-0011 で廃止)
             attackSum += attackDiceCount * MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice();
             blockSum  += blockDiceCount  * MetaProgression.MetaBuffApplicator.GetBlockTerminalPerDice();
 
@@ -2631,11 +2559,21 @@ namespace CombatSystem
             // --- 5b. 役 (ADR-0010) ---
             //   手札役 / 端子役 / 配線役 を判定し、 方策が「切る」と決めた役だけを適用する。
             //   **1 戦闘 1 役 1 回・発動は任意**。 オーバーロード (タイミング判定) の後継。
-            var roleOutcome = ResolveRoles(ctx, playerDice, mutualWiring, tele,
-                                           ref attackSum, ref blockSum, enemyAtkValue);
-            // 次ターンへ持ち越す分は nextTurnBuffs へ (BeginNewTurn が currentBuffs へ移す)。
-            if (roleOutcome.freeRerollNextTurn) ctx.nextTurnBuffs[YachtRoleEffects.FreeRerollKey] = 1f;
-            if (roleOutcome.enemyStunned)       ctx.nextTurnBuffs[YachtRoleEffects.EnemyStunKey]  = 1f;
+            var roleOutcome = ResolveRoles(ctx, playerDice, playerFaceIdx);
+            // 次ターンへ持ち越す分 (無料リロール・敵の攻撃減・行動不能) は Apply が nextTurnBuffs へ積み済み。
+            // 〈癒し〉: 回復する。 T4 は HP 上限を超えた分をシールドに変える。
+            if (roleOutcome.healAmount > 0)
+            {
+                int missing = Math.Max(0, playerMaxHP - playerHP);
+                HealPlayer(roleOutcome.healAmount);
+                int over = Math.Max(0, roleOutcome.healAmount - missing);
+                if (roleOutcome.healOverflowToShield && over > 0)
+                {
+                    ctx.consShield += over;
+                    ctx.shieldGainedTotal += over;
+                    ShieldDiag.Note("役〈癒し〉", over);
+                }
+            }
 
             // 配線結果をパッシブから参照可能に (虚空 等が「攻撃端子接続0」を判定する)
             ctx.accumulatedValues["mutualAttackDiceCount"] = attackDiceCount;
@@ -2746,6 +2684,7 @@ namespace CombatSystem
                 atkBase, ctx.pursuitDamage, playerCritBaseRate);
             int lbStage = GameLoop.GameManager.Instance?.Run?.limitBreakStage ?? 0;
             dealtDmg = ApplyWinDamageModifiers(dealtDmg, ref dealtFixed, ref isCrit, lbStage, psm, ctx);
+            ApplyRoleExtraDamage(ctx, ref dealtDmg, ref dealtFixed, roleOutcome);
             ctx.lastPlayerDamage = dealtDmg + dealtFixed;
             DiagWinAttack = false;
             // [計装] 与ダメ出どころ別の発動率。 攻撃した回だけ数える。
@@ -2891,18 +2830,15 @@ namespace CombatSystem
             // --- 役 (ADR-0010) の撃破系。 **メタデバフ〈鋼の皮膚〉より後に置く** ---
             //   どちらも「即勝利」「確定キル」を謳う役なので、 1HP 踏みとどまりに吸われると
             //   役の文面が嘘になる。 1 戦闘 1 回・極は 1/1296 級の頻度なので上書きを許す。
-            if (roleOutcome.instantWin && enemyHP > 0)
+            if (roleOutcome.yachtFired && enemyHP > 0)
             {
-                // [2026-08-22] **通常敵の即勝利を廃し、 出目依存の割合削りへ一本化**。
-                //   旧仕様は 1,1,1,1,1 でも 6,6,6,6,6 でも即勝利で、 出目の大小が無意味だった
-                //   ── BOT が期待値を捨てて低い目で揃えに行き、 発動が想定の 21 倍になっていた。
-                //   いまは 6 揃いなら通常敵の 120% ＝ 実質確殺、 1 揃いなら 20% の削りに留まる。
-                //   ボスは係数が半分 (60%/10%) ── 「引けたら勝ち」の宝くじにはしない。
+                // ADR-0011: 〈極〉(1・1・1) は敵の最大HP の (面数 × 30%) を軽減無視で削る。
+                //   ボス・ヴェスカの各形態は面数 × 15%。 即勝利は持たない ── 面が多いほど出にくく、 出れば強い。
                 int chunk = Mathf.CeilToInt(ctx.enemyMaxHP * (roleOutcome.yachtChunkPct / 100f));
                 if (_diagKind == SkillDiag.Boss && currentEnemy != null)
                     SkillDiag.BossDmgOf(currentEnemy.id)[4] += Math.Min(chunk, enemyHP);
                 enemyHP = Math.Max(0, enemyHP - chunk);
-                Debug.Log($"[役] 極: 最大HP {ctx.enemyMaxHP} の {roleOutcome.yachtChunkPct}% "
+                Debug.Log($"[役] 極: 最大HP {ctx.enemyMaxHP} の {roleOutcome.yachtChunkPct:F1}% "
                         + $"= {chunk} を軽減無視で削る → 残 {enemyHP}");
             }
 
@@ -2926,7 +2862,7 @@ namespace CombatSystem
             //   **致死打も止める。** `enemyHP > 0` で条件を切ってはいけない ──
             //   「閾値を割る一撃」を素通しすると、 火力が高いほど踏みとどまりが起きなくなり、
             //   この仕組みそのものが無意味になる。
-            if (!roleOutcome.instantWin)
+            if (!roleOutcome.yachtFired)
             {
                 enemyHP = InventorySystem.PassiveSkills.Effects.DivineTalent.ClampToThreshold(
                     ctx, enemyHP, currentEnemy != null ? currentEnemy.maxHP : ctx.enemyMaxHP);
@@ -2955,14 +2891,14 @@ namespace CombatSystem
 
             int takenApplied = 0;
 
-            // 〈大束〉(前ターン成立) — このターン敵は攻撃しない。 予告は既に出ているので
+            // 〈封じ・揃〉(前ターン成立) — このターン敵は攻撃しない。 予告は既に出ているので
             // 「見えている一撃を丸ごと踏み倒す」形になり、 予告の価値を壊さない。
             bool enemyStunnedThisTurn =
                 ctx.currentBuffs.TryGetValue(YachtRoleEffects.EnemyStunKey, out float stunFlag) && stunFlag > 0f;
 
             if (enemyHP > 0 && enemyStunnedThisTurn)
             {
-                Debug.Log($"[役] 大束: 敵は行動不能 (予告されていた攻撃 {enemyAtkValue} は不発)");
+                Debug.Log($"[役] 封じ・揃: 敵は行動不能 (予告されていた攻撃 {enemyAtkValue} は不発)");
                 ctx.daggerArmed = false;   // 仕込み刃はこのターン限り ── 攻撃が来なくても失効
             }
             else if (enemyHP > 0)
@@ -3010,17 +2946,7 @@ namespace CombatSystem
                 // 役 (ADR-0010) の被ダメ側。 〈虚空〉と**同じ位置・同じ対象**（敵の直接攻撃パケット）に置く。
                 //   fixedDamageToPlayer (毒・出血・反射) は別チャネルなので触らない ──
                 //   ここを含めると「攻撃していない敵の継続ダメージまで役で消える」ことになる。
-                if (roleOutcome.damageZero)
-                {
-                    if (takenDmg > 0) Debug.Log($"[役] 大階/相殺: 被ダメ {takenDmg} → 0");
-                    takenDmg = 0;
-                }
-                else if (roleOutcome.damageHalf && takenDmg > 0)
-                {
-                    int before = takenDmg;
-                    takenDmg = Math.Max(1, Mathf.RoundToInt(takenDmg * YachtRoleEffects.BlockTripleDamageMultiplier));
-                    Debug.Log($"[役] 束(防): 被ダメ {before} → {takenDmg}");
-                }
+                takenDmg = ApplyRoleGuard(ctx, takenDmg, roleOutcome);
 
                 // 仕込み刃 (暗殺者): **使ったターンの被ダメを 0 にし、 その 5 倍を軽減不可で返す** (2026-09-22)。
                 //   旧仕様は「被弾するまで持ち越し・同値で返す」だった。 **効くのはこのターンだけ** ──
@@ -3138,10 +3064,8 @@ namespace CombatSystem
                     if (ctx.nullifyAllDamage) secTaken = 0;
 
                     // 役の被ダメ側は 1 体目と**同じ扱い**にする。 片方にしか効かないと
-                    //   〈大階/相殺〉〈束(防)〉の価値が 2 体戦でだけ半減してしまう。
-                    if (roleOutcome.damageZero) secTaken = 0;
-                    else if (roleOutcome.damageHalf && secTaken > 0)
-                        secTaken = Math.Max(1, Mathf.RoundToInt(secTaken * YachtRoleEffects.BlockTripleDamageMultiplier));
+                    //   〈守り〉の価値が 2 体戦でだけ半減してしまう。
+                    secTaken = ApplyRoleGuard(ctx, secTaken, roleOutcome);
 
                     secTaken = MetaProgression.MetaDebuffApplicator.ApplyJudgmentDamageIncrease(
                         secTaken, GameLoop.GameManager.Instance?.Run, playerHP);
@@ -3164,7 +3088,7 @@ namespace CombatSystem
             //   1 回目を敵攻撃より前に置くのは、 致死打で `enemyHP > 0` が落ちて
             //   **ヴェスカがその手番を丸ごと飛ばす**のを防ぐため (踏みとどまった以上は殴り返す)。
             //   よってこの 2 点セットで 1 ターン分を覆う。 ClampToThreshold は冪等。
-            if (!roleOutcome.instantWin)
+            if (!roleOutcome.yachtFired)
             {
                 enemyHP = InventorySystem.PassiveSkills.Effects.DivineTalent.ClampToThreshold(
                     ctx, enemyHP, currentEnemy != null ? currentEnemy.maxHP : ctx.enemyMaxHP);
@@ -4155,7 +4079,7 @@ namespace CombatSystem
                 case "boss_layer7_p3": next = "boss_layer7_p4"; label = "第四段：天与";     break;
                 default: return false;   // p4 または非ヴェスカ
             }
-            Debug.Log($"[覚者連戦] {id} 撃破 → {label} へ移行 (戦闘終了前に確定)");
+            Debug.Log($"[ヴェスカ連戦] {id} 撃破 → {label} へ移行 (戦闘終了前に確定)");
             var ctx = PassiveSkillManager.Instance?.Context;
             // 計測は SwapEnemy 側で一元化 (ここで重ねると二重計上になる)
             SwapEnemy(next, label);
@@ -4210,20 +4134,11 @@ namespace CombatSystem
                 foreach (var v in dice)
                     if (v >= 0 && v < FirstRollFaceHist.Length) FirstRollFaceHist[v]++;
 
-            if (YachtRoles.MaxSameCount(dice, out _, out _) >= 5)
+            if (YachtRoles.MaxSameCount(dice) >= 3)
             {
                 FirstRollYacht++;
                 if (count >= 0 && count < FirstRollYachtByDiceCount.Length) FirstRollYachtByDiceCount[count]++;
             }
-        }
-
-        /// <summary>出目パーツ T1: そのダイスが止まっている面が「振り直せない」面か。
-        /// 面添字が無い (パーツ未実装経路・素のロール) なら常に false。</summary>
-        private static bool IsLockedDie(CombatContext ctx, int[] faceIdx, int die)
-        {
-            if (ctx?.equippedFaceTiers == null || faceIdx == null) return false;
-            if (die < 0 || die >= faceIdx.Length) return false;
-            return GameLoop.DiceFaceParts.IsLocked(ctx.equippedFaceTiers, faceIdx[die]);
         }
 
         private int[] RollDice(int count, int maxValue, int[] diceFaces = null)
@@ -4291,29 +4206,36 @@ namespace CombatSystem
                 enemyDiceTotal = rawEnemyTotal,
             };
 
-            // 〈中階〉(前ターン成立): 1 回目のリロールを無料にする。 **個数に上限を付けない** ──
-            // 「何個振り直すか」の判断はそのままコストで効かせたいので、 免除するのは 1 回目だけ。
-            bool freeReroll =
-                ctx.currentBuffs.TryGetValue(YachtRoleEffects.FreeRerollKey, out float freeFlag) && freeFlag > 0f;
+            // 〈特別・対〉(前ターン成立): 次のリロール N 回 (既定 2) を無料にする。
+            int freeRerolls = ctx.currentBuffs.TryGetValue(YachtRoleEffects.FreeRerollKey, out float freeFlag)
+                ? Mathf.Max(0, (int)freeFlag) : 0;
 
-            int attempt = 1;
-            int guard = 16;   // 方策が空でない配列を返し続けても止まるようにする
+            // **全部振り直し・費用は戦闘の中で上がる (2026-10-17)。**
+            //   旧規則は「選んだダイスだけ・費用 = 個数 × そのターンで何回目か」で、 回目がターンごとに戻るうえ
+            //   1〜2 個を刻んで追えたので、 充電さえあれば役がほぼ任意に作れた (〈極〉が設計 0.077%/T → 充電 12 で約 10%)。
+            //   いまは (1) 方策の pick は「振るかどうか」だけを表し、 中身は読まない ── 振り直せない面以外を全部振る
+            //   (2) 費用 = 振り直す個数 × (この戦闘で払った回数 + 1)。 ターンでは戻らない。 docs/GAME.md §6-3。
+            int attempt = 1;   // このターンの何回目か (乱数の添字にだけ使う)
+            int guard = 16;    // 方策が空でない配列を返し続けても止まるようにする
+            var rerollIdx = new List<int>(playerDice.Length);
             while (guard-- > 0)
             {
-                var pick = RerollPolicy(playerDice, tele, attempt);
+                int nth = ctx.rerollsThisCombat + 1;
+                var pick = RerollPolicy(playerDice, tele, nth);
                 if (pick == null || pick.Length == 0) break;
 
-                int cost = pick.Length * attempt;
-                if (freeReroll) { cost = 0; freeReroll = false; }
+                // ADR-0011: 振り直せない面は無い。 常に全ダイスを振り直す。
+                rerollIdx.Clear();
+                for (int i = 0; i < playerDice.Length; i++) rerollIdx.Add(i);
+
+                int cost = rerollIdx.Count * nth;
+                bool usedFree = false;
+                if (freeRerolls > 0) { cost = 0; freeRerolls--; usedFree = true; }
                 if (!ctx.ConsumeCharge(cost)) break;   // 払えなければそこで打ち切り
 
-                for (int k = 0; k < pick.Length; k++)
+                for (int k = 0; k < rerollIdx.Count; k++)
                 {
-                    int i = pick[k];
-                    if (i < 0 || i >= playerDice.Length) continue;
-                    // 出目パーツ T1〈振り直せない〉: 方策が誤って指してきても、 ここで最終的に弾く。
-                    //   方策側 (BOT / UI) にも同じ判定を置くが、 **規則の強制点はこの 1 箇所**。
-                    if (IsLockedDie(ctx, playerFaceIdx, i)) continue;
+                    int i = rerollIdx[k];
                     if (ctx.equippedDiceFaces != null && ctx.equippedDiceFaces.Length > 0)
                     {
                         int idx = GameLoop.GameRng.Range(
@@ -4327,9 +4249,11 @@ namespace CombatSystem
                         if (playerFaceIdx != null && i < playerFaceIdx.Length) playerFaceIdx[i] = -1;
                     }
                 }
-                RerollStats[0]++; RerollStats[1] += pick.Length; RerollStats[2] += cost;
+                if (!usedFree) ctx.rerollsThisCombat++;
+                ctx.rerollsThisTurn++;
+                RerollStats[0]++; RerollStats[1] += rerollIdx.Count; RerollStats[2] += cost;
                 MetaProgression.Achievements.AchievementService.NoteReroll();
-                Debug.Log($"[リロール] {attempt}回目 {pick.Length}個 / 充電-{cost} → 残{ctx.GetCharge()}");
+                Debug.Log($"[リロール] 戦闘{ctx.rerollsThisCombat}回目 {rerollIdx.Count}個 (全部) / 充電-{cost} → 残{ctx.GetCharge()}");
                 attempt++;
             }
 
@@ -4338,7 +4262,7 @@ namespace CombatSystem
             RerollPerTurn[Math.Min(8, did)]++;
             // 〈極〉が成立している手なら、 極側の分布にも積む
             // （振り直しが極の追跡に使われているかを、 全体分布との形の差で見る）。
-            if (YachtRoles.MaxSameCount(playerDice, out _, out _) >= 5)
+            if (YachtRoles.MaxSameCount(playerDice) >= 3)
                 RerollPerTurnYacht[Math.Min(8, did)]++;
         }
 
@@ -4442,108 +4366,51 @@ namespace CombatSystem
         public static readonly long[] RerollPerTurnYacht = new long[9];
 
         // 役の判定で使う一時バッファ。 毎ターン new すると GC を踏むので使い回す。
-        private readonly List<RoleKind> _formedRoles = new List<RoleKind>(16);
-        private readonly List<int> _groupBuf = new List<int>(8);
+        private readonly List<RoleKind> _formedRoles = new List<RoleKind>(4);
 
-        /// <summary>ADR-0010: 役を判定し、 方策が切ると決めたものを適用する。
+        /// <summary>ADR-0011: 役を判定し、 成立したものを<b>自動で</b>適用する。
         ///
-        /// 手順:
-        ///   1. 手札役 (5個全体) / 端子役 (攻撃・ブロックの各組) / 配線役 (盤面) を集める
-        ///   2. **既に使った役を除く** (1 戦闘 1 回)
-        ///   3. <see cref="RolePolicy"/> に「どれを切るか」を決めさせる (**任意・見送り自由**)
-        ///   4. 切った役の効果を適用し、 usedRoles へ記録する
-        ///
-        /// 同じ役が 2 端子で同時成立したら **1 回消費で両方発動**する (択一にしない)。
-        /// 分割で二重取りするのは配線という行為そのものへの報酬なので、 罰する理由がない。</summary>
-        private RoleOutcome ResolveRoles(CombatContext ctx, int[] playerDice, DiceTerminal[] wiring,
-                                         MutualTurnTelegraph tele,
-                                         ref int attackSum, ref int blockSum, int enemyAttackValue)
+        /// 役は振った時点の 3 個で判定し、 端子への置き方は条件にしない。 1 戦闘 1 回の制限も、
+        /// 発動の任意選択も、 使用済みの管理も持たない (ADR-0011 決定 2)。
+        /// 成立するかどうかは「その目の面を持っているか」(出目パーツの Tier) で決まる ──
+        /// T2 以上で 2 個そろい、 T3 以上でゾロ目。 T1 (素の面) は何も起きない。
+        /// 3 個では 2 つの役を同時に作れないので、 効くのは 1 ターンに高々 1 つ。</summary>
+        private RoleOutcome ResolveRoles(CombatContext ctx, int[] playerDice, int[] playerFaceIdx)
         {
             var outcome = new RoleOutcome();
             if (ctx == null || playerDice == null || playerDice.Length == 0) return outcome;
 
             YachtRoleEffects.TurnsEvaluated++;
-            YachtRoleEffects.NoteTurn(tele.turn, enemyAttackValue);
-
-            // 端子ごとの組を作る
-            var attackGroup = CollectGroup(playerDice, wiring, DiceTerminal.Attack);
-            var blockGroup  = CollectGroup(playerDice, wiring, DiceTerminal.Block);
-
             _formedRoles.Clear();
-            YachtRoles.EvaluateHand(playerDice, _formedRoles);
-            // 〈無銘の賽〉は端子役を成立させない
-            if (!ctx.suppressTerminalRoles)
-            {
-                YachtRoles.EvaluateTerminal(attackGroup, _formedRoles);
-                YachtRoles.EvaluateTerminal(blockGroup, _formedRoles);
-            }
-            YachtRoles.EvaluateWiring(attackSum, blockSum, enemyAttackValue,
-                                      ctx.enemyCurrentHP, _formedRoles);
+            YachtRoles.Evaluate(playerDice, playerFaceIdx, ctx.equippedFaceTiers, _formedRoles);
 
-            // 重複を潰しつつ、 使用済みと**封印された役**を除く
-            var candidates = new List<RoleKind>(_formedRoles.Count);
             for (int i = 0; i < _formedRoles.Count; i++)
             {
                 var k = _formedRoles[i];
-                if (candidates.Contains(k)) continue;
                 YachtRoleEffects.FormedCount[(int)k]++;
-                // 発動後の再成立を数える (温存の余地の直接測定)。 使用済みでも呼ぶ。
-                YachtRoleEffects.NoteFormed(k, tele.turn, enemyAttackValue);
-                if (ctx.usedRoles.Contains(k)) continue;
-                // T4-C〈凶運〉: このランで封印されている役は成立しても切れない。
+                // T4-C〈凶運〉: このランで封印されている役は成立しても効かない。
                 if ((ctx.sealedRoleMask & (1 << (int)k)) != 0) continue;
-                candidates.Add(k);
-            }
-            if (candidates.Count == 0) return outcome;
 
-            var fire = RolePolicy?.Invoke(candidates, tele, ctx.usedRoles);
-            if (fire == null || fire.Count == 0) return outcome;
+                // その目の面の Tier (同じ目の面は 1 枚までなので、 同じ出目なら同じ Tier)。
+                int face = YachtRoles.FaceOf(k);
+                var tier = GameLoop.DiceFaceParts.Tier.None;
+                for (int d = 0; d < playerDice.Length; d++)
+                    if (playerDice[d] == face) { tier = YachtRoles.TierAt(ctx.equippedFaceTiers, playerFaceIdx, d); break; }
 
-            for (int i = 0; i < fire.Count; i++)
-            {
-                var k = fire[i];
-                if (!candidates.Contains(k)) continue;   // 成立していない / 使用済みは弾く
-                if (ctx.usedRoles.Contains(k)) continue;
-
-                var scope = YachtRoles.ScopeOf(k);
-                if (scope == RoleScope.Terminal)
-                {
-                    // **2 端子で成立していれば両方発動** (消費は 1 回)
-                    if (TerminalHas(attackGroup, k))
-                        YachtRoleEffects.Apply(k, DiceTerminal.Attack, ctx, attackGroup,
-                                               attackSum, blockSum, enemyAttackValue, ref outcome);
-                    if (TerminalHas(blockGroup, k))
-                        YachtRoleEffects.Apply(k, DiceTerminal.Block, ctx, blockGroup,
-                                               attackSum, blockSum, enemyAttackValue, ref outcome);
-                }
-                else
-                {
-                    YachtRoleEffects.Apply(k, DiceTerminal.Attack, ctx, playerDice,
-                                           attackSum, blockSum, enemyAttackValue, ref outcome);
-                }
-
-                ctx.usedRoles.Add(k);
+                YachtRoleEffects.Apply(k, tier, ctx, ref outcome);
                 ctx.firedRolesThisTurn.Add(k);
                 YachtRoleEffects.FiredCount[(int)k]++;
-                // [計装 2026-08-15] 〈極〉のダイス別発動は**ここで採らない**。
-                //   役の発動はホットパスで、 ここから GameManager.Instance を引くと
-                //   1 ラン 8.7 回 × ラン数だけシングルトン解決が走る。
-                //   装備ダイスは戦闘中に変わらないので、 FinishCombat で戦闘単位に数える
-                //   （呼び出しが 8.7 万 → 3.3 万 に減り、 既存の run 参照を使い回せる）。
+                // [計装 2026-08-15] ダイス別の発動は戦闘単位で FinishCombat が積む
+                //   (役の発動地点から GameManager.Instance を引かないため)。
                 YachtRoleEffects.FiredThisCombat[(int)k]++;
-                YachtRoleEffects.NoteFireTiming(k, tele.turn, enemyAttackValue);
                 MetaProgression.Achievements.AchievementService.NoteRoleFired(k);
             }
-
-            attackSum = Math.Max(0, attackSum + outcome.attackSumDelta);
-            blockSum  = Math.Max(0, blockSum  + outcome.blockSumDelta);
 
             if (ctx.firedRolesThisTurn.Count > 0)
             {
                 var names = new string[ctx.firedRolesThisTurn.Count];
                 for (int i = 0; i < names.Length; i++) names[i] = YachtRoles.NameOf(ctx.firedRolesThisTurn[i]);
-                Debug.Log($"[役] T{ctx.currentTurn} 発動: {string.Join("/", names)}"
-                        + $"  攻{attackSum} 防{blockSum}");
+                Debug.Log($"[役] T{ctx.currentTurn} 発動: {string.Join("/", names)}");
             }
             return outcome;
         }
@@ -4556,39 +4423,6 @@ namespace CombatSystem
         /// ② は **使う端子を減らす**ので、 どれを捨てるかで結果が変わる。
         /// 上限に収まらなかった端子のうち **本数の少ない方から**畳んで攻撃へ寄せる ──
         /// 厚く挿した端子ほどプレイヤーの意図が強いとみなす。</summary>
-        /// <summary>ゴースト接続の検算。 **方策/UI を信用しない。**
-        ///
-        /// <para>規則は 2 つだけ。
-        /// ① ゴーストを持てるのは <b>T3 / T4 の面に止まったダイス</b>だけ。
-        /// ② <b>同一端子への重ねは T4 だけ</b> ── T3 は「異なる 2 端子」なので、
-        ///    実体と同じ端子を指してきたらゴーストを剥がす。</para>
-        ///
-        /// <para>違反は握り潰さずログに出す。 方策のバグが黙って通ると、
-        /// 「なぜか合計値が合わない」だけが残って原因に辿り着けない。</para></summary>
-        private void SanitizeGhost(CombatContext ctx, int[] ghost, int[] faceIdx, int diceCount)
-        {
-            if (ghost == null) return;
-            var tiers = ctx?.equippedFaceTiers;
-            for (int i = 0; i < ghost.Length && i < diceCount; i++)
-            {
-                if (ghost[i] == WiringPlan.NoGhost) continue;
-
-                int fi = (faceIdx != null && i < faceIdx.Length) ? faceIdx[i] : -1;
-                if (!GameLoop.DiceFaceParts.AllowsDualLink(tiers, fi))
-                {
-                    Debug.LogWarning($"[配線] ダイス{i + 1} は 2 接続できない面なのにゴーストが来た → 剥がす");
-                    ghost[i] = WiringPlan.NoGhost;
-                    continue;
-                }
-                bool sameTerminal = i < mutualWiring.Length && (int)mutualWiring[i] == ghost[i];
-                if (sameTerminal && !GameLoop.DiceFaceParts.AllowsSameTerminalStack(tiers, fi))
-                {
-                    Debug.LogWarning($"[配線] ダイス{i + 1} は T3 なので同一端子へ重ねられない → ゴーストを剥がす");
-                    ghost[i] = WiringPlan.NoGhost;
-                }
-            }
-        }
-
         private void SanitizeWiring(DiceTerminal[] wiring, int diceCount)
         {
             if (wiring == null) return;
@@ -4761,13 +4595,55 @@ namespace CombatSystem
         /// <summary>特殊端子が accumulatedValues に置くキー。 **フィールドを増やさない**
         /// (CombatContext の 3 区分規約: set/read が 1〜2 箇所なら辞書へ)。</summary>
         private const string CoolantAccKey   = "termCoolantAcc";
-        private const string CoolantDelayKey = "termCoolantDelay";
+        /// <summary>エスカレーションの遅延ターン数のキー。 〈冷却材〉と役〈時間〉(目 6) が共有する。</summary>
+        public const string CoolantDelayKey = "termCoolantDelay";
         private const string FoundryAccKey   = "termFoundryAcc";
         private const string FoundryBonusKey = "termFoundryBonus";
         private const string RiposteKey      = "termRiposteCap";
 
         /// <summary>端子上限の畳み込みで使う本数バッファ。 毎ターン new しないため使い回す。</summary>
         private readonly int[] _termCountBuf = new int[4];
+
+        /// <summary>ADR-0011 〈守り〉(目 5): このターンの被ダメを N% 減らす。 T4 は減らした分の半分をシールドにする。
+        /// 〈虚空〉と同じ位置・同じ対象 (敵の直接攻撃パケット) に置く ── fixedDamageToPlayer は別チャネルなので触らない。</summary>
+        private int ApplyRoleGuard(CombatContext ctx, int takenDmg, RoleOutcome outcome)
+        {
+            if (outcome.damageTakenCutPct <= 0 || takenDmg <= 0) return takenDmg;
+            int before = takenDmg;
+            takenDmg = Mathf.Max(0, Mathf.RoundToInt(takenDmg * (1f - outcome.damageTakenCutPct / 100f)));
+            int saved = before - takenDmg;
+            Debug.Log($"[役] 守り: 被ダメ {before} → {takenDmg} (-{outcome.damageTakenCutPct}%)");
+            if (outcome.guardToShield && saved / 2 > 0 && ctx != null)
+            {
+                int sh = saved / 2;
+                ctx.consShield += sh;
+                ctx.shieldGainedTotal += sh;
+                ShieldDiag.Note("役〈守り〉", sh);
+            }
+            return takenDmg;
+        }
+
+        /// <summary>ADR-0011 〈追撃〉(目 3): 与えたダメージの 30% (2 個そろい) / 100% (ゾロ目) を追加で与える。
+        /// ゾロ目は<b>確定</b>ダメージ (固定ダメ枠・軽減無視)、 2 個そろいは通常ダメージへの上乗せ。
+        /// T4 は追加分が会心判定を持つ (会心率 = 武器の会心率 + このターンの会心率加算)。</summary>
+        private void ApplyRoleExtraDamage(CombatContext ctx, ref int dealtDmg, ref int dealtFixed, RoleOutcome outcome)
+        {
+            if (outcome.extraDamageRatio <= 0f) return;
+            int basis = dealtDmg + dealtFixed;
+            if (basis <= 0) return;
+            float extra = basis * outcome.extraDamageRatio;
+            bool crit = false;
+            if (outcome.extraDamageCanCrit)
+            {
+                float rate = Mathf.Clamp01(playerCritBaseRate + ctx.critRatePctAdd / 100f);
+                crit = ctx.forceCritical || GameLoop.GameRng.Chance(rate, "combat.roleExtraCrit", RngIdx(3));
+                if (crit) extra *= ctx.criticalMultiplier;
+            }
+            int add = Mathf.Max(1, Mathf.RoundToInt(extra));
+            if (outcome.extraDamageTrue) dealtFixed += add; else dealtDmg += add;
+            Debug.Log($"[役] 追撃: 与ダメ {basis} の {outcome.extraDamageRatio:P0} = +{add}"
+                    + (outcome.extraDamageTrue ? " (確定)" : "") + (crit ? " 会心" : ""));
+        }
 
         /// <summary>エスカレーション判定に使うターン。 〈冷却材〉の遅延を差し引く。
         /// **1 を下回らせない** ── 段階 0 より前は存在しない。</summary>
@@ -4776,27 +4652,6 @@ namespace CombatSystem
             if (ctx == null) return 1;
             int delay = (int)ctx.GetAccumulated(CoolantDelayKey);
             return Math.Max(1, ctx.currentTurn - delay);
-        }
-
-        /// <summary>指定端子へ配線されたダイスの組を返す。</summary>
-        private int[] CollectGroup(int[] dice, DiceTerminal[] wiring, DiceTerminal want)
-        {
-            _groupBuf.Clear();
-            for (int i = 0; i < dice.Length; i++)
-            {
-                var t = (wiring != null && i < wiring.Length) ? wiring[i] : DiceTerminal.Attack;
-                if (t == want) _groupBuf.Add(dice[i]);
-            }
-            return _groupBuf.ToArray();
-        }
-
-        /// <summary>その組で当該の端子役が成立しているか。</summary>
-        private static bool TerminalHas(int[] group, RoleKind k)
-        {
-            if (group == null || group.Length == 0) return false;
-            var tmp = new List<RoleKind>(8);
-            YachtRoles.EvaluateTerminal(group, tmp);
-            return tmp.Contains(k);
         }
 
         /// <summary>ロール前の推定勝率（正規近似・ADR-0006）。P(自合計 > 敵合計) を、両者のダイス期待値・分散から

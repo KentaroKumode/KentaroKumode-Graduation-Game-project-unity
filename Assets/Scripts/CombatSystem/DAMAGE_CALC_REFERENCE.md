@@ -158,11 +158,11 @@ total = ProcessDamage結果
 ÷2 halveFirstEnemyAttack(共助・T1のみ)
 playerDamageNegateCharges>0 → total=0(獣の絆)
 コントラタック(player_contre): total半減 + 軽減量×2を敵へ反射
-− consShield(消費シールド吸収)
+− consShield(消費シールド吸収。 盾は T2 以降のターン頭に半減 ── ③-D)
 consReflect(鏡写し): 吸収後の被ダメ同量を敵へ反射
 プレイヤー防御スタンス(ADR-0006): 防御時 total ×=0.5（受け最終-50%・全軽減/シールドの後。反撃等の固定反射は対象外）
 痛覚遮断剤【職業/狂戦士 2026-06-28】: painkillerArmedThisTurn && total≥playerHP → total=playerHP−1（HP=1踏みとどまり・チェーン**最後**）
-→ (ダメージ適用直前) 仕込み刃【職業/暗殺者 2026-06-28】: daggerArmed && total>0 → total=0 ＋ 同値を enemyHP へ軽減不能反射、daggerArmed=false（1ロール限り）
+→ (ダメージ適用直前) 仕込み刃【職業/暗殺者 2026-06-28・2026-09-22 に倍率 1→5】: daggerArmed && total>0 → total=0 ＋ **その 5 倍**を enemyHP へ軽減不能で返す（`CombatManager` の仕込み刃の反撃倍率）。使ったターン限りで、被弾しなくても失効
 → playerHP −= total (+ fixedDamageToPlayer)
   fixedDamageToEnemy>0 は敗北時も敵へ(反撃/Counter/Riposte) / 出血
   痛覚遮断剤 post-clamp: メイン+固定ダメ適用後も painkillerArmedThisTurn 中は playerHP≤0 → 1 に復帰
@@ -176,7 +176,7 @@ fixedDamageToPlayer ≥ 999 → playerHP = 0（死の宣告）
 | 瞬間研磨剤 | 剣士 | 次の 1 撃だけ `outgoingDamageMultiplier += 1.5`（与ダメージ+150%）。`ApplyWinDamageModifiers` 内・rollPurity 中は無効・適用後 disarm。**2026-07-27 リワーク**（旧 playerDiceTotal 加算は相互攻撃モデルで無効だった） |
 | 不抜の聖紋 | 騎士 | 上記 ③-B チェーン参照。HP80% 維持中のみ被ダメ −40%、一度割れたら戦闘中永久無効 |
 | 痛覚遮断剤 | 狂戦士 | 使用ターン致命ダメを HP=1 に clamp（2 経路）。次ターン開始時 (`CombatContext.BeginNewTurn` Phase A) HP=1 なら consDiceRoll+10 / consAtkBurst+10、そのターン終了時に死亡確定 (`ExecuteTurn` 終端) |
-| 仕込み刃 | 暗殺者 | 次のロール敗北時、被ダメ 0 化＋同値を enemyHP へ直接減算（軽減不能）。発火後 disarm |
+| 仕込み刃 | 暗殺者 | 使ったターンの被ダメを 0 化＋**その 5 倍**を enemyHP へ直接減算（軽減不能・2026-09-22 に 1→5 倍）。このターン限りで、被弾しなくても失効 |
 
 ### ③-C 「軽減無視」ダメージとシールドの関係【2026-08-15 確定】
 
@@ -203,6 +203,19 @@ ShieldBash の空振り（盾 0）が 34.2% → 66.1%、1 機会あたりの攻�
 7層クリア率は 72 → 71 で変化なし (p=1.000)。
 **盾の「使い残し」は余剰ではなく火力**という構造を踏まえずに盾の消費先を増やすと、
 必ず火力側に跳ね返る。〈盾解放〉が謳う「防御か火力かの二相性」はこの変更で初めて成立した。
+
+### ③-D プレイヤーのシールドは毎ターン半減【2026-10-16 確定】
+
+`consShield` は **T2 以降のターン頭に半分（切り捨て）** になる。1 → 0 で確実に消える。
+実体は `CombatContext.BeginNewTurn` の Phase C（`if (currentTurn > 1 && consShield > 0) consShield /= 2;`）。
+
+- **順番は「半減 → 付与」**。`PassiveSkillManager.BeginTurn` は `BeginNewTurn` のあとに `OnTurnStart` を撃つので、
+  そのターンに入る盾（ターン頭の付与）は半減されない。ヴェスカのシールド規約（GAME.md §13-4）と同じ。
+- **T1 は半減しない**。戦闘開始時の付与（開幕シールド・持ち越し `carriedShield`・消費アイテムの持ち込み）は、最初のターンにそのまま使える。
+- 期限付きの盾（`consShieldExpireTurn`）の失効は従来どおり（ターン終了時に残ターンを減らし、0 で `consShield = 0`）。
+- 整備パネル Guard（〈剛胆〉）r10 の持ち越しは従来どおり「**勝った**戦闘の終了時の残量 × 30%（切り上げ）」（`CombatManager` の戦闘終了処理・2026-09-13 に 50% → 30%）。
+- 波及: `ShieldBash` の弾（残存量の 20〜80%）が毎ターン目減りする / `HolyShield` の「ターン終了時に 3 未満なら +4」が発動しやすくなる /
+  `Lifeline` の大きな盾は翌ターンから半減する。**バランスは未測定**（2026-10-16 時点。測定は回さない判断）。
 
 ### ④ 引き分け（`CombatManager` L1134-1155）
 メイン/scratchなし。`fixedDamageToEnemy` / `fixedDamageToPlayer` / 出血のみ適用。
@@ -667,7 +680,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
 2. 予告             : Escalation.EnemyAttackValue(currentEnemy, turn, ctx.enemyDiceTotal)
 5. 配線             : WiringPolicy(playerDice, tele) → ダイス index → 端子（Attack/Block/Charge）
    未配置は Attack へ自動合流（`mutualWiring[i] = Attack` 初期化）
-   SanitizeWiring: ①特殊端子の接続制限 ②〈綻び〉の封印端子 ③〈不完全な起動〉の 1 端子 2 本上限
+   SanitizeWiring: ①特殊端子の接続制限 ②〈綻び〉の封印端子
    （**方策/UI を信用しない**。制約を破った配線が来たら本体側で移す）
 6. 解決             : 下記 9.2（自先制・撃破時は敵攻撃なし）
    収支トリガー     : balance = 与ダメ − 被ダメ → OnRollWin/Lose/Draw を再発火
@@ -677,25 +690,29 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
 ### 9.2 ダメージ計算（`ExecuteTurnMutual`）
 
 ```
-リロール (ADR-0010・配線より**前**)
-         RerollPhase: 充電を払ってダイスを振り直す。 コスト = 振り直す個数 × そのターンで何回目か。
-         対象は RerollPolicy が決める (null なら振り直さない)。 予告は素の敵ダイス合計から
-         仮組みして渡すので、 **完全情報のまま**判断できる (ADR-0009 柱3)。
-         〈中階〉が前ターンに成立していれば 1 回目が無料 (currentBuffs["roleFreeReroll"])。
+リロール (ADR-0010 / ADR-0011・配線より**前**)
+         RerollPhase: 充電を払って**ダイスを全部**振り直す。 コスト = 個数 × この戦闘で何回目か
+         (回目はターンでは戻らず戦闘の中で上がる)。 振るかどうかは RerollPolicy が決める (null なら振り直さない)。
+         予告は素の敵ダイス合計から仮組みして渡すので、 **完全情報のまま**判断できる (ADR-0009 柱3)。
+         〈特別・対〉が前ターンに成立していれば次の N 回 (既定 2) が無料 (currentBuffs["roleFreeReroll"] = 回数)。
 
-役 (ADR-0010・配線集計の直後 / 攻防の解決より**前**)
-         ResolveRoles: 手札役 (5個全体) / 端子役 (攻撃・ブロックの各組) / 配線役 (盤面) を判定し、
-         **既に使った役を除いて** RolePolicy に切るものを選ばせる。 **1 戦闘 1 役 1 回・発動は任意**。
-         同じ役が 2 端子で成立したら **1 回消費で両方発動**する。
+役 (ADR-0011・配線集計の直後 / 攻防の解決より**前**)
+         ResolveRoles: 振った 3 個から **目 × {2 個そろい, ゾロ目}** の 18 種を判定する。
+         端子の置き方は条件にしない。 **成立すれば自動で効く** (1 戦闘 1 回・任意発動・使用済み管理は無い)。
+         成立するかはその目の面の Tier で決まる: T2 以上で 2 個そろい、 T3 以上でゾロ目。 T1 は何も起きない。
          効果は既存フィールドへ加算する形に寄せてある (正本は YachtRoleEffects.Apply)。
-           attackSum / blockSum への加算 … 散・対・偶(攻)・満・均
-           ctx への加算                  … 奇(会心率+25%) / 小階(貫通+30%, 敵次T攻撃-3) /
-                                            束(攻=forceCritical) / 飛階(攻=fixedDamageToEnemy) /
-                                            偶(防=consShield) / 飛階・奇(防=vescaShieldReflectRate) /
-                                            二対・中階・相殺(AddCharge) / 拮抗(outgoingDamageMultiplier +0.5)
-           盤面フラグ (RoleOutcome)      … 極(最大HP の 出目合計×N% ・通常 N=4 / ボス N=2) /
-                                            大階・相殺(被ダメ0) / 束(防)(被ダメ半減) /
-                                            大束(敵が次T行動不能) / 中階(次Tリロール1回無料)
+           ctx への加算   … 攻め: outgoingDamageMultiplier +0.25 / +0.5 (ゾロ目は forceCritical) ・T4 armorPenPct +1 /
+                            充電: AddCharge(+3 / 上限まで) ・T4 超過分を mutualAttackBonus /
+                            時間: エスカレーションの遅延 (term Coolant と同じキー) +2 / 1 段戻す ・T4 現在段階×2 を mutualAttackBonus /
+                            封じ T4: enemyPassivesDisabledTurns / 富 T4: 所持ゴールド 5% (最大 10) を mutualAttackBonus
+           次ターンへ     … 封じ: currentBuffs["roleEnemyAtkCut"] (敵攻撃 −40%) / ["roleEnemyStun"] (敵が行動しない) /
+                            特別: ["roleFreeReroll"] (無料リロール 2 回)
+           盤面フラグ (RoleOutcome)
+                          … 極 (yachtFired + yachtChunkPct: 敵最大HP の 面数×30% (ボス・ヴェスカは ×15%) を軽減無視) /
+                            追撃 (extraDamageRatio 0.3 / 1.0・ゾロ目は確定ダメージ・T4 は会心判定) /
+                            守り (damageTakenCutPct 25 / 75・T4 は軽減分の半分をシールド) /
+                            癒し (healAmount 2 / 6・T4 は HP 上限超過分をシールド)
+           富             … RunState.roleGoldBonusPct (+5% / +30%) を勝利報酬の割合先に掛ける
 
 自攻撃   atkBase   = playerAttackPower + Σ(attack 端子の出目) + ctx.mutualAttackBonus
          → 臨界爆発 (予約消費): rinkaiBurstActive なら fixedDamageToEnemy += rinkaiBurstDamage
@@ -705,14 +722,17 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          → 物資の疲労（15% で**最終ダメージ半減**。 isCrit は落とさない）
          → 敵HP -= dealtDmg + dealtFixed
          → 鋼の皮膚
-         → **役の削り**: 極(instantWin フラグ + yachtChunkPct)。 **鋼の皮膚より後**に置く
+         → **役の追撃**: ApplyWinDamageModifiers の直後に ApplyRoleExtraDamage (与ダメ内訳の算出後)
+         → **役の削り**: 極(yachtFired フラグ + yachtChunkPct)。 **鋼の皮膚より後**に置く
            ── 「軽減・シールドを無視して削る」を謳う役なので 1HP 踏みとどまりに吸われると文面が嘘になる
            ※〈過不足なし〉(exactLethal) は 2026-08-22 に〈拮抗〉(与ダメ+50%) へリワークされ廃止。
              成立条件が「攻撃合計 = 敵残HP」でスケールが合わず、実測 1000ラン で 発動 0 だったため。
          → 出血 / 吸血 / シールドバッシュ（旧勝利分岐と同一）
 
-敵攻撃   〈大束〉が前ターンに成立していれば **このターンの敵攻撃は丸ごと不発**
+敵攻撃   〈封じ・揃〉が前ターンに成立していれば **このターンの敵攻撃は丸ごと不発**
          (currentBuffs["roleEnemyStun"])。 予告は既に出ているので「見えている一撃を踏み倒す」形。
+         〈封じ・対〉は予告値そのものを −40% する (currentBuffs["roleEnemyAtkCut"]・予告にも反映される)。
+         被ダメ側の役は〈守り〉(ApplyRoleGuard)。 〈虚空〉と同じ位置・同じ対象 (敵の直接攻撃パケット) に置く。
 
          enemyAtk  = Escalation.EnemyAttackValue(e, escTurn, enemyDiceTotal, currentTurn)
                     = round(段階倍率(escTurn) × (baseAttack + enemyDiceTotal) × 大技倍率(currentTurn) × ボス倍率)
