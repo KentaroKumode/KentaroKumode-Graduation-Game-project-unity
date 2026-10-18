@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>バーのユニット（HP と物資）</title>
+<style>
+  :root { --bg: #14161a; --ink: #e6e4de; --ink2: #9a9ca0; --line: #33373d; --panel: #1c1f24; }
+  @media (prefers-color-scheme: light) { :root { --bg: #f4f3ef; --ink: #1d1f22; --ink2: #5a5d62; --line: #c9c5ba; --panel: #fff; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.6 "BIZ UDPGothic","Yu Gothic","Meiryo",sans-serif; padding: 24px 20px 60px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--ink2); font-size: 13px; max-width: 960px; }
+  canvas { image-rendering: pixelated; display: block; background: #0c0e12; border: 1px solid var(--line); max-width: 100%; height: auto; }
+  .bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 14px 0 10px; }
+  button { font: inherit; padding: 5px 12px; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+  button.on { outline: 2px solid #d2691e; }
+  label { display: inline-flex; gap: 6px; align-items: center; }
+  table { border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+  th, td { border: 1px solid var(--line); padding: 3px 10px; text-align: left; }
+</style>
+</head>
+<body>
+<h1>バーのユニット — HP と物資（左・右のパーツで組み立て）</h1>
+<div class="sub">右のユニットを軸にして、バーの本体が<b>左へバネの動きで飛び出す</b>（GOLD の入れ物と同じ、壁にぶつかって跳ね返る動き）。<b>戦闘</b>は、HP を画面の<b>中央下</b>に全長で出し、物資は<b>下へ下げて画面の外</b>に出す（物資は見えない）。<b>航行</b>は、<b>右下ぞろえ</b>で、一番下が物資（全長・強調）・その上が HP（半分）。場面が変わると、<b>縮む（バネなし）→ 右のユニットが移る（左右と上下は別々に、1 軸ずつ）→ 伸びる（バネ）</b>。長さは、セグメントの大きさを変えずに、中央のタイルの繰り返しと、窓の中のセグメント数で作る（拡大はしない）。パーツ: <code>hp_bar_left/right.png</code>、<code>supply_bar_left/right.png</code>（<code>docs/design/gui/</code>）。</div>
+<div class="bar">
+  <span>場面:</span><button id="sBattle" class="on">戦闘（HP が中央下・物資は画面外）</button><button id="sNav">航行（物資が下・強調 / HP が上）</button><button id="sStow">格納（どちらも引っ込む）</button><label><input id="auto" type="checkbox"> 2.5 秒ごとに自動で切り替える</label>
+  <span style="margin-left:14px">HP</span><input id="vHp" type="range" min="0" max="100" value="62"><span>物資</span><input id="vSup" type="range" min="0" max="100" value="78">
+</div>
+<canvas id="cv" width="480" height="130" style="width:960px"></canvas>
+<table id="tbl"></table>
+
+<script>
+const SRC = { hl: "data:image/png;base64,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", hr: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAAoCAYAAAAR+iSJAAAACXBIWXMAADXUAAA11AFeZeUIAAACP0lEQVR4nO3cz0sUYRzH8fcutkQ7W+uaq6QRaIdEhS6REQSBda1OXTt06hRYB9FbiocuQX9Af0WQP8IOicpeiqwuSiCs5vprwRXEYLeDOboH6aTg7PsFA898Hwbm8nyY+c7DxJB06sXj8cr+uFIuh/VYPH7kNeVyOVZ3vLcl6SQ01Kd5++YVS2s7VfWVuQkA5hd+A3C1vZmmrl5W5iZ4/W60YgBIEbG0tkNueio8L5W2DybPZSnkF9ldLgMTNHX1AqMc/Xwg6VTJTU9x49bt8DwIkgRBEoCf37/x+MlT3n8Y58fywSuCASBFwOr6Rmzi4yeAqhA47EXfSx49fEAhv8ili2eplMsGgBQVq+sbsZGh4SPn2y43k6iLkUjVh70CA0CKoFJpOzyCIMmz531hPX0+xeT4GGAASJFXKm3v9Qdu9oQ9gbv37gMGgFST9r8WGABSjQmCJLuFX4ABINWMw/sCCptbgAEg1YSqTUFAtj5FLB7HnYBSjZiZzXEhOEtHZzeJfzWfAKSIKuYXwvHMbI7+wQFgb1dgYXPLjUBSlDQ2ZCr9gwNMjo9VLX6Aa60ZRoaG6ejsrqrHTvIGJR2PxoZM5U73lbC5l25pr5qfmc2F47bWJhL84fPXeXsAUpSk2YKW6weF/BcAelrPUCADQJYNiqQADAApCtY3ixQ2M6QhXPSHFciQZQOAIqm9oMBXACkSDv8R6H/2/xhUcf1LkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJJ+8vImOos+DqtQUAAAAASUVORK5CYII=", sl: "data:image/png;base64,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", sr: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAAoCAYAAAAR+iSJAAAACXBIWXMAADXUAAA11AFeZeUIAAACK0lEQVR4nO3cMUiUYRzH8e972CH5WueZp6QRaENiQktkBE3t1dTa0NQUqIPoluIaNLQ0uDY1BZFGDYnKLUVFiy6BVqfeHXiCFLzXYL7eEbZERu99P3DwvP/nDt7l+fHcw/99QZIkSZIkSZIkSZIkSZIkSZIkSZIkSZIkSZIkSZIkSdKhCv71DUj6c6lUqro3rkZRXA9SqQN/E0VR0PR3b0vSYWhvy/Dg/j3WNnbq6l/fzwGwvPIFgDN9XXSeuwrAyPBo1QCQEmJtY4f8wnx8Xals708ezVFY/cS3zxEwF4fAwfsDSf+V/MI8Fy5djq/DsIUwbAHg44d33Lx1m6fPZuPFDwaAlAjrm8Vg7sUrgLoQqDUyPMqN69d4PPOIkyeaqUaRASAlxfpmMZienDpwvvdUF+mmgHRrW3xWYABICVSpbMefMGzhzt3huJ451hp/zwCQEq5S2d49H7g4FJ8J7DEApAZmAEgNpnYXYABIDaK2L+DJzEPAAJAaQl1TEJBrayVIpbATUGoQi0t5jofN9A8Mkv5ZcwcgJVR5dSUeLy7lGZsYB3a7AgulLRuBpCTpaM9WxybGeTn7vG7xA5ztyTI9OUX/wGBd3ceBpQToaM9WrwyeplDaAiDT3Vc3v7iUj8e9PZ2k+c7rt8ueAUhJkmELus/vF1bfADDUc4QCWQByFCmz2w1oAEgJsFkqUyhlyUC86GsVyJKj+EvdvwBSAtS+Eeh3at8WVIXgB4/dlvpDhkifAAAAAElFTkSuQmCC" };
+const W = 480, H = 130, XR = 480, BH = 19;                          // 画面 / 右端 (右のユニットの右端) / バーの高さ
+const ROWY = [0, 21], PAIRY = 40;                                   // 各ファイルの中のバーの行 (HP = 0 / 物資 = 21) / 画面での上端
+const LEFTW = 44, TILE_X = 100, TILE_W = 40, RIGHTW = 30, FULL = 256;       // 3 分割: 左 44 列 + タイル (100〜139 を繰り返す) + 右 30 列。 全長 256
+const LITCOL = [[240, 92, 52], [244, 182, 70]], OFFCOL = [58, 50, 46];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const imgs = {}; let left = 4;
+for (const k in SRC) { const i = new Image(); i.onload = () => { if (--left === 0) start(); }; i.src = SRC[k]; imgs[k] = i; }
+
+let FR = [], WIN = null;                                            // FR[r] = { lit, dim } (全長に組んだバーの絵) / WIN = 窓の内側 (透明な範囲) を絵から読む
+function compose(l, r, y0) {                                         // 左のパーツ + 右の端を、 全長の 1 枚に組む (行 y0 から 19 行)
+  const c = document.createElement("canvas"); c.width = FULL; c.height = BH; const g = c.getContext("2d");
+  g.drawImage(l, 0, y0, FULL, BH, 0, 0, FULL, BH); g.drawImage(r, 0, y0, FULL, BH, 0, 0, FULL, BH); return c;
+}
+function tint(src, color, k) {                                       // 緑のマーカー (アイコン) を、 点灯色に置き換える。 k = 明るさ (消灯寄りは暗く)
+  const c = document.createElement("canvas"); c.width = src.width; c.height = src.height; const g = c.getContext("2d"); g.drawImage(src, 0, 0);
+  const im = g.getImageData(0, 0, c.width, c.height), d = im.data;
+  for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 0 && d[i + 1] > 200 && d[i] < 90 && d[i + 2] < 90) { d[i] = color[0] * k; d[i + 1] = color[1] * k; d[i + 2] = color[2] * k; }
+  g.putImageData(im, 0, 0); return c;
+}
+function readWindow(c) {                                             // 窓の内側 = 全長の絵で、 中ほどの行・列の透明な範囲 (座標は書かず、 絵から読む)
+  const a = c.getContext("2d").getImageData(0, 0, FULL, BH).data, tr = (x, y) => a[(y * FULL + x) * 4 + 3] === 0;
+  let y0 = -1, y1 = -1; for (let y = 1; y < BH - 1; y++) if (tr(120, y)) { if (y0 < 0) y0 = y; y1 = y; }
+  let x0 = -1, x1 = -1; const ym = (y0 + y1) >> 1; for (let x = 28; x < 242; x++) if (tr(x, ym)) { if (x0 < 0) x0 = x; x1 = x; }
+  return { x0, x1, y0, y1 };
+}
+function start() {
+  const raw = [compose(imgs.hl, imgs.hr, ROWY[0]), compose(imgs.sl, imgs.sr, ROWY[1])];
+  FR = raw.map((c, r) => ({ lit: tint(c, LITCOL[r], 1), dim: tint(c, LITCOL[r], 0.35) })); WIN = readWindow(raw[0]);
+  document.getElementById("tbl").innerHTML = `<tr><th>全長</th><td>${FULL} dot</td><th>窓の内側</th><td>x ${WIN.x0}〜${WIN.x1}（幅 ${WIN.x1 - WIN.x0 + 1}）・y ${WIN.y0}〜${WIN.y1}（高さ ${WIN.y1 - WIN.y0 + 1}）。絵の透明な範囲から読み取り</td></tr>`;
+  requestAnimationFrame(loop);
+}
+// 長さ L の板を描く: 左 44 列 + タイルの繰り返し + 右 30 列 (右端 = XR にそろえる)
+function drawBar(g, r, L, f, y, xr = XR) {
+  L = Math.max(LEFTW + RIGHTW, Math.round(L)); const x = Math.round(xr) - L; y = Math.round(y); const midW = L - LEFTW - RIGHTW;
+  // 窓の中: セグメント (絵の窓は透明なので、 先に描いて、 絵を上に重ねる)
+  const ix = x + WIN.x0, iw = L - (FULL - (WIN.x1 - WIN.x0 + 1)), ih = WIN.y1 - WIN.y0 + 1, SEG = 5, STEP = 6, n = Math.max(1, Math.floor((iw + 1) / STEP)), lit = Math.round(st.v[r] * n);
+  for (let i = 0; i < n; i++) { g.fillStyle = i < lit ? `rgb(${LITCOL[r].join(",")})` : `rgb(${OFFCOL.join(",")})`; g.fillRect(ix + i * STEP, y + WIN.y0, SEG, ih); if (i < lit) { g.fillStyle = "rgba(255,240,200,0.35)"; g.fillRect(ix + i * STEP, y + WIN.y0, SEG, 1); } }
+  const draw = (img, alpha) => { g.globalAlpha = alpha;
+    g.drawImage(img, 0, 0, LEFTW, BH, x, y, LEFTW, BH);
+    for (let o = 0; o < midW; o += TILE_W) { const w = Math.min(TILE_W, midW - o); g.drawImage(img, TILE_X, 0, w, BH, x + LEFTW + o, y, w, BH); }
+    g.drawImage(img, FULL - RIGHTW, 0, RIGHTW, BH, x + L - RIGHTW, y, RIGHTW, BH); g.globalAlpha = 1; };
+  draw(FR[r].dim, 1); if (f > 0.02) draw(FR[r].lit, clamp(f, 0, 1));            // アイコンは、 強調されている程度に応じて点灯 (暗い → 点灯色)
+}
+// ── 動き ──────────────────────────────────────────────
+// 場面ごとに、 各バーの「置き場 (右のユニットの位置)」と「伸びの目標」が決まっている。
+//   戦闘 = HP を画面の中央下へ (全長・強調)。 物資は下へ下げて画面の外へ (見えない)
+//   航行 = 右下ぞろえ。 下 = 物資 (全長・強調) / その上 = HP (半分)
+// 置き場が変わるときは、 1. 縮む (バネなし) → 2. 右のユニットが移る (左右と上下は別々に 1 軸ずつ) → 3. 伸びる (バネ。 全長は壁へ跳ね返る・半分は少し揺れて止まる)
+const K = 190, C = 8, BOUNCE = 0.6;                                 // 伸びるときのスプリング (GOLD の入れ物より少し速い)
+const FULLE = 1, HALFE = 0.5;
+const lerp = (a, b, t) => a + (b - a) * t, ease = t => t * t * (3 - 2 * t);
+const Lof = e => lerp(RIGHTW + LEFTW + 14, FULL, e);                // 伸び e (0〜1) → 板の長さ。 e = 0 でも、 右のユニットと左端のアイコン部分は見える
+const CENTER_XR = W / 2 + FULL / 2, BOTTOM_Y = H - BH;           // 画面の中央に全長のバーを置いた時の右端 / 画面の下
+const ANCH = [                                                      // [場面][バー 0 = HP / 1 = 物資] = { 右のユニットの右端 xr, 上端 y, 伸びの目標 e }
+  [{ xr: CENTER_XR, y: BOTTOM_Y, e: FULLE }, { xr: CENTER_XR, y: H + 8, e: 0 }],
+  [{ xr: XR, y: BOTTOM_Y - BH, e: HALFE }, { xr: XR, y: BOTTOM_Y, e: FULLE }],          // 航行: 右下ぞろえ (物資が一番下・HP がその上)
+];
+let scene = 0, last = 0, autoT = 0;
+const at = (sc, r) => ANCH[sc][r];
+let st = { v: [0.62, 0.78], e: [0, 0], vel: [0, 0], pos: [{ xr: at(0, 0).xr, y: at(0, 0).y }, { xr: at(0, 1).xr, y: at(0, 1).y }], from: null, tw: [null, null], mv: null, axis: null, phase: "extend" };
+function anchorOf(r) { return scene === 2 ? { xr: st.pos[r].xr, y: st.pos[r].y, e: 0 } : at(scene, r); }          // 格納 = その場で縮む
+const samePos = r => { const a = anchorOf(r); return Math.abs(st.pos[r].xr - a.xr) < 0.5 && Math.abs(st.pos[r].y - a.y) < 0.5; };
+/* 動きは、 一定の速さ (リニア) にしない。 重さのある機械のように、 ゆっくり動き出して、 加速して、 減速して止まる (ease-in-out の 3 次)。
+   縮む: バネなし。 距離に応じて時間が変わる / 移る: 左右 → 上下の各 1 軸 (距離の平方根に比例した時間) / 伸びる: バネ */
+const eio = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const shrinkTime = d => 0.07 + 0.24 * d;                            // 縮む距離 d (0〜1) → 秒
+const legTime = d => d < 0.5 ? 0 : 0.10 + 0.20 * Math.sqrt(d / 200);     // 1 軸の移動距離 d [dot] → 秒 (動かない軸は 0 秒)
+function startShrink(r, e1) { st.tw[r] = { e0: st.e[r], e1, t: 0, T: shrinkTime(Math.max(0.0001, st.e[r] - e1)) }; }
+function stepShrink(r, dt) { const w = st.tw[r]; w.t = Math.min(w.T, w.t + dt); st.e[r] = lerp(w.e0, w.e1, eio(w.t / w.T)); st.vel[r] = 0; if (w.t >= w.T) { st.e[r] = w.e1; st.tw[r] = null; return true; } return false; }
+function step(dt) {
+  if (document.getElementById("auto").checked) { autoT += dt; if (autoT > 2.5) { autoT = 0; setScene(scene === 0 ? 1 : 0); } }
+  if (st.phase === "extend" && !(samePos(0) && samePos(1))) { st.phase = "retract"; for (let r = 0; r < 2; r++) startShrink(r, 0); }          // 置き場が変わるなら、 まず縮む
+  if (st.phase === "retract") { let done = true; for (let r = 0; r < 2; r++) { if (st.tw[r] && !stepShrink(r, dt)) done = false; }
+    if (done) { st.phase = "move"; st.from = st.pos.map(p => ({ xr: p.xr, y: p.y }));
+      st.axis = [0, 1].map(r => { const a = anchorOf(r), f = st.from[r]; return a.y > f.y + 0.5 ? "y" : "x"; });                    // 左右移動と上下移動は分ける。 下へ動く時は 上下 → 左右 (下移動が先。 画面から出る時を含む)、 上へ動く時・同じ高さの時は 左右 → 上下 (入る時は、 隠れている間に横へ動いてから上がる)
+      st.mv = [0, 1].map(r => { const a = anchorOf(r), f = st.from[r], dx = Math.abs(a.xr - f.xr), dy = Math.abs(a.y - f.y), first = st.axis[r] === "x" ? legTime(dx) : legTime(dy), second = st.axis[r] === "x" ? legTime(dy) : legTime(dx); return { t: 0, t1: first, t2: second }; }); }
+    return; }
+  if (st.phase === "move") { let done = true;
+    for (let r = 0; r < 2; r++) { const m = st.mv[r], a = anchorOf(r), f = st.from[r]; m.t += dt; const k1 = m.t1 > 0 ? eio(clamp(m.t / m.t1, 0, 1)) : 1, k2 = m.t2 > 0 ? eio(clamp((m.t - m.t1) / m.t2, 0, 1)) : 1;
+      if (st.axis[r] === "x") { st.pos[r].xr = lerp(f.xr, a.xr, k1); st.pos[r].y = lerp(f.y, a.y, k2); } else { st.pos[r].y = lerp(f.y, a.y, k1); st.pos[r].xr = lerp(f.xr, a.xr, k2); }
+      if (m.t < m.t1 + m.t2) done = false; }
+    if (done) { for (let r = 0; r < 2; r++) { const a = anchorOf(r); st.pos[r].xr = a.xr; st.pos[r].y = a.y; } st.phase = "extend"; } return; }
+  const h = dt / 4;                                                                                   // 伸びる / 止まる: 目標より長ければ、 バネなしで縮む (ease)。 短ければ、 バネで伸びる (全長は壁へ引っぱって跳ね返る)
+  for (let r = 0; r < 2; r++) { const target = anchorOf(r).e;
+    if (st.tw[r] || (st.e[r] > target + 0.001 && st.vel[r] <= 0.001)) { if (!st.tw[r]) startShrink(r, target); stepShrink(r, dt); continue; }
+    const pull = target >= FULLE ? FULLE + 0.08 : target;
+    for (let i = 0; i < 4; i++) { st.vel[r] += (K * (pull - st.e[r]) - C * st.vel[r]) * h; st.e[r] += st.vel[r] * h;
+      if (st.e[r] > 1) { st.e[r] = 1; st.vel[r] = -st.vel[r] * BOUNCE; } else if (st.e[r] < 0) { st.e[r] = 0; st.vel[r] = 0; }
+      if (st.e[r] === 1 && Math.abs(st.vel[r]) < 0.12) st.vel[r] = 0; } }
+}
+const cv = document.getElementById("cv"), g = cv.getContext("2d"); g.imageSmoothingEnabled = false;
+function setScene(s) { scene = s; ["sBattle", "sNav", "sStow"].forEach((id, i) => document.getElementById(id).classList.toggle("on", i === s)); }
+document.getElementById("sBattle").onclick = () => setScene(0); document.getElementById("sNav").onclick = () => setScene(1); document.getElementById("sStow").onclick = () => setScene(2);
+function render() {
+  g.clearRect(0, 0, W, H); g.fillStyle = "#1a1917"; g.fillRect(0, 0, W, H);
+  st.v = [+document.getElementById("vHp").value / 100, +document.getElementById("vSup").value / 100];
+  const order = [0, 1].sort((a, b) => st.pos[a].y - st.pos[b].y);                                    // 上にある方を先に描く
+  for (const r of order) drawBar(g, r, Lof(clamp(st.e[r], 0, 1)), scene === 2 ? 0 : anchorOf(r).e >= FULLE ? 1 : 0.15, st.pos[r].y, st.pos[r].xr);
+}
+function loop(ts) { const dt = last ? Math.min(0.05, (ts - last) / 1000) : 0.016; last = ts; step(dt); render(); requestAnimationFrame(loop); }
+window.__step = n => { for (let i = 0; i < n; i++) step(1 / 60); render(); };
+window.__set = s => { setScene(s); };
+</script>
+</body>
+</html>

@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>手番制の航行マップ</title>
+<style>
+  :root { --bg:#15171a; --panel:#1e2125; --ink:#dcd9cf; --dim:#8b8e88; --line:#33373d; --acc:#e0b050; }
+  * { box-sizing:border-box; }
+  [hidden] { display:none !important; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.6 system-ui,"Yu Gothic",sans-serif; padding:18px 16px 40px; }
+  main { max-width:1180px; margin:0 auto; display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:16px; }
+  @media (max-width:900px) { main { grid-template-columns:1fr; } }
+  h1 { font-size:18px; margin:0 0 4px; grid-column:1/-1; }
+  .lead { margin:0; color:var(--dim); font-size:13px; grid-column:1/-1; }
+  .stage { background:#0f1a24; border:1px solid var(--line); overflow:auto; }
+  canvas { display:block; max-width:100%; height:auto; cursor:pointer; }
+  aside { display:grid; gap:12px; align-content:start; }
+  .card { background:var(--panel); border:1px solid var(--line); padding:12px; display:grid; gap:8px; }
+  .card h2 { margin:0; font-size:13px; color:var(--dim); font-weight:600; letter-spacing:.06em; }
+  label { display:grid; grid-template-columns:96px 1fr 44px; gap:8px; align-items:center; font-size:12px; color:var(--dim); }
+  input[type=range] { width:100%; }
+  .v { font-variant-numeric:tabular-nums; text-align:right; color:var(--ink); }
+  button { font:inherit; color:var(--ink); background:#2a2d32; border:1px solid #474b52; padding:6px 10px; cursor:pointer; }
+  button:hover { border-color:var(--dim); }
+  button:focus-visible, input:focus-visible { outline:2px solid var(--acc); outline-offset:1px; }
+  .row { display:flex; flex-wrap:wrap; gap:6px; }
+  .stat { font-variant-numeric:tabular-nums; font-size:13px; display:grid; grid-template-columns:auto 1fr; gap:2px 10px; }
+  .stat span:nth-child(odd) { color:var(--dim); }
+  .log { font:12px/1.5 ui-monospace,Consolas,monospace; color:var(--dim); max-height:220px; overflow:auto; white-space:pre-wrap; }
+  .warn { color:#ff8a6a; font-weight:700; min-height:1.4em; font-size:13px; }
+  .legend { font-size:12px; color:var(--dim); display:grid; grid-template-columns:auto 1fr; gap:3px 8px; }
+  .chip { display:inline-block; width:18px; text-align:center; font-weight:700; }
+</style>
+</head>
+<body>
+<main>
+  <h1>手番制の航行マップ</h1>
+  <p class="lead">点と道の生成は旧式の自由移動と同じ（最小全域木＋近い組・山岳・行き止まりを潰す）。移動は道でつながった隣の点だけ。隣の点をクリックして 1 手動くと、追跡者も 1 手動く。物資は 1 手ごとに一定。戦闘・イベントは手番を使わない。
+    前線は、その層の天候の現象が届く範囲（前線そのものに罰は無い）。</p>
+
+  <div class="stage"><canvas id="cv" width="900" height="540" aria-label="航行マップ"></canvas></div>
+
+  <aside>
+    <div class="card">
+      <h2>生成</h2>
+      <label>シード <input type="range" id="seed" min="1" max="200" value="1"><span class="v" id="seedV"></span></label>
+      <label>点の数 <input type="range" id="count" min="20" max="60" value="50"><span class="v" id="countV"></span></label>
+      <label style="grid-template-columns:96px 1fr">追跡者の性質 <select id="prof" style="font:inherit;color:var(--ink);background:#2a2d32;border:1px solid #474b52;padding:4px">
+        <option value="auto">シードで抽選</option><option value="summoner">召喚者</option><option value="hound">猟犬使い</option><option value="sprinter">疾走者</option><option value="brute">重装</option></select></label>
+      <label style="grid-template-columns:96px 1fr">天候 <select id="wx" style="font:inherit;color:var(--ink);background:#2a2d32;border:1px solid #474b52;padding:4px">
+        <option value="auto">シードで抽選</option><option value="none">なし</option><option value="fog">霧</option><option value="still">沈む静寂（仮）</option><option value="sand">削る砂</option>
+        <option value="snow">朱の雪</option><option value="hail">落石のような雹</option><option value="crumble">崩れる地平</option><option value="sink">沈み続ける湖面</option></select></label>
+      <label style="grid-template-columns:auto 1fr"><input type="checkbox" id="peek"> 敵を常に表示（確認用）</label>
+      <div class="row"><button id="regen">作り直す</button><button id="next">次のシード</button></div>
+    </div>
+    <div class="card">
+      <h2>状況</h2>
+      <div class="stat">
+        <span>手番</span><span id="turn"></span>
+        <span>物資</span><span id="sup"></span>
+        <span>HP</span><span id="hp"></span>
+        <span>魔石</span><span id="stone"></span>
+        <span>点 / 道</span><span id="cnt"></span>
+        <span>終点まで</span><span id="dist"></span>
+        <span>追跡者</span><span id="profV"></span>
+        <span>天候</span><span id="wxV"></span>
+        <span>前線</span><span id="frontV"></span>
+      </div>
+      <div class="warn" id="warn"></div>
+      <div class="row" id="restBox" hidden><button id="restA">休憩: 回復（0 手番）</button><button id="restB">休憩: 多めに回復（1 手番）</button></div>
+      <div class="row"><button id="flare">照明（0 手番）</button><button id="recon">偵察（1 手番）</button><button id="wait">待つ（1 手番）</button></div>
+    </div>
+    <div class="card">
+      <h2>記号</h2>
+      <div class="legend">
+        <span class="chip" style="color:#e6e2d8">拠</span><span>始点（前哨基地）</span>
+        <span class="chip" style="color:#d8544a">王</span><span>終点（ボス）</span>
+        <span class="chip" style="color:#d8544a">戦</span><span>戦闘</span>
+        <span class="chip" style="color:#9a2f2a">精</span><span>エリート</span>
+        <span class="chip" style="color:#6aa4d8">イ</span><span>イベント</span>
+        <span class="chip" style="color:#a0d646">店</span><span>ショップ</span>
+        <span class="chip" style="color:#60d6c8">休</span><span>休憩</span>
+        <span class="chip" style="color:#ff6a3a">◆</span><span>追跡者（縄張りを巡回、察知すると追う）</span>
+        <span class="chip" style="color:#ffb070">●</span><span>使い魔（点を渡って、最後に分かった位置へ）</span>
+        <span class="chip" style="color:#ff6a3a">⋯</span><span>追跡者の次の一手（見えている時だけ）</span>
+        <span class="chip" style="color:#c8c8dc">▪</span><span>自分の痕跡（数手で消える。巡回中の追跡者が踏むとたどって来る）</span>
+      </div>
+    </div>
+    <div class="card"><h2>記録</h2><div class="log" id="log"></div></div>
+  </aside>
+</main>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const cv = $("cv"), cx = cv.getContext("2d");
+
+// ---- 乱数 (種つき) ----
+function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+// ============================================================
+//  規則 (値はすべて仮)
+// ============================================================
+const P = {
+  supMove: 10, supStart: 300, hpMax: 30,
+  vis: 1, flareR: 3, flareTurns: 3, flareSup: 50, reconR: 2,
+  detectR: 2, quietLose: 3, famSee: 1, summonEvery: 3,
+  traceLife: 4,                 // 痕跡が残る手番
+  frontEvery: 5, frontStep: 2.4, // 前線が進む間隔 (手番) と 1 回に進む距離 (層の広さ 16.4 のうち)
+  restNormal: 0.3, restMore: 0.6,
+};
+// 追跡者の性質 (層ごとに 1 つ・味変)
+const PROFILES = {
+  summoner: { name: "召喚者", desc: "動かない。察知すると数手ごとに使い魔を放つ", foeSteps: 0, famSteps: 1, summon: true, hound: false, fight: "普通" },
+  hound:    { name: "猟犬使い", desc: "足の速い使い魔 (1 手 2 歩) と 2 体で最短距離から追う", foeSteps: 1, famSteps: 2, summon: false, hound: true, fight: "普通" },
+  sprinter: { name: "疾走者", desc: "使い魔なし。1 手に 2 歩", foeSteps: 2, famSteps: 0, summon: false, hound: false, fight: "普通" },
+  brute:    { name: "重装", desc: "使い魔なし。1 手 1 歩だが、捕まった時の戦闘が重い", foeSteps: 1, famSteps: 0, summon: false, hound: false, fight: "重い" },
+};
+// 天候 (層ごとに 1 つ・味変)。 前線は「その現象が届く範囲」── 前線そのものに罰は無い
+const WEATHERS = {
+  none:    { name: "なし", desc: "" },
+  fog:     { name: "霧", desc: "前線の中では、道で 2 手以上離れた点が「?」に戻る（近づけば戻る・中身は引き直さない）" },
+  still:   { name: "沈む静寂（仮）", desc: "前線の中では、痕跡が 2 倍長く残る（物音が無くなったので作り直し中の仮の効果）" },
+  sand:    { name: "削る砂", desc: "前線の中では、1 手の物資が 1.5 倍。痕跡は 2 倍早く消える" },
+  snow:    { name: "朱の雪", desc: "前線の中では、移動に 2 手番かかる（追跡者は 2 回動く）" },
+  hail:    { name: "落石のような雹", desc: "前線の中では、移動ごとに HP −1" },
+  crumble: { name: "崩れる地平", desc: "前線が進むたび、前線の中の道が 1 本崩れる（終点へは必ずつながったまま）" },
+  sink:    { name: "沈み続ける湖面", desc: "前線が進むたび、前線の中の未使用の点が 1 つ沈む（終点へは必ずつながったまま）" },
+};
+const TYPES = [["戦", 29], ["イ", 25], ["精", 14], ["店", 7], ["休", 3]];
+const COL = { "拠": "#e6e2d8", "王": "#d8544a", "戦": "#d8544a", "精": "#9a2f2a", "イ": "#6aa4d8", "店": "#a0d646", "休": "#60d6c8" };
+
+let M = null, S = null;   // 地図 / 状態
+
+// ============================================================
+//  生成: 旧式の自由移動と同じ (docs/design/map-prototype.html の genMapOnce を移植)
+//    山岳 (通れない楕円) を置き、 点を最小間隔 1.15 で撒く。 道 = 最小全域木 + 長さ 1.9 未満の組を 45% (交差しない)
+//    行き止まり (道 1 本) は、 距離 2.6 以内の交差しない点とつなぐ。 道だと 2 倍以上遠回りになる近い組に近道を足す
+// ============================================================
+const WW = 16.4, HH = 9.4, MOUNT_MIN = 3, MOUNT_EXTRA = 3, TERR_MIN = 7, TERR_MAX = 11, TERR_CLEAR = 3;
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+function segCross(a, b, c, d) { const o = (p, q, r) => Math.sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x));
+  if (a === c || a === d || b === c || b === d) return false; return o(a, b, c) !== o(a, b, d) && o(c, d, a) !== o(c, d, b); }
+function inMount(mts, p, m = 0) { return mts.some(k => { const dx = p.x - k.x, dy = p.y - k.y, c = Math.cos(k.r), s2 = Math.sin(k.r);
+  const u = (dx * c + dy * s2) / (k.a + m), v = (-dx * s2 + dy * c) / (k.b + m); return u * u + v * v <= 1; }); }
+function segHitsMount(mts, p, q) { for (let t = 0; t <= 1.0001; t += 0.03) if (inMount(mts, { x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t }, 0.04)) return true; return false; }
+function generate(seed, count) {
+  const rnd = mulberry(seed * 9973 + 17);
+  for (let attempt = 0; attempt < 40; attempt++) { const r = genOnce(rnd, count, true); if (r) return r; }
+  return genOnce(rnd, count, false);
+}
+function genOnce(rnd, count, withMounts) {
+  const mts = [];
+  const nm = withMounts ? MOUNT_MIN + Math.floor(rnd() * MOUNT_EXTRA) : 0;
+  for (let k = 0, guard = 0; k < nm && guard < 200; guard++) {
+    const m = { x: 2.4 + rnd() * (WW - 4.8), y: 0.9 + rnd() * (HH - 1.8), a: 0.7 + rnd() * 0.7, b: 0.45 + rnd() * 0.5, r: rnd() * Math.PI };
+    if (dist(m, { x: 0.5, y: HH / 2 }) < 2 || dist(m, { x: WW - 0.5, y: HH / 2 }) < 1.8) continue;
+    mts.push(m); k++;
+  }
+  const nodes = [{ x: 0.5, y: HH / 2 }, { x: WW - 0.5, y: 1 + rnd() * (HH - 2) }];
+  if (inMount(mts, nodes[1], 0.4)) return null;
+  for (let tries = 0; nodes.length < count && tries < 8000; tries++) {
+    const p = { x: 0.3 + rnd() * (WW - 0.6), y: 0.3 + rnd() * (HH - 0.6) };
+    if (!inMount(mts, p, 0.35) && nodes.every(q => dist(p, q) >= 1.15)) nodes.push(p);
+  }
+  const pairs = [];
+  for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) pairs.push([dist(nodes[i], nodes[j]), i, j]);
+  pairs.sort((a, b) => a[0] - b[0]);
+  const par = nodes.map((_, i) => i), f = i => par[i] === i ? i : (par[i] = f(par[i]));
+  const E = [], ok = (i, j) => !segHitsMount(mts, nodes[i], nodes[j]) && E.every(([a, b]) => !segCross(nodes[i], nodes[j], nodes[a], nodes[b]));
+  for (const [, i, j] of pairs) if (f(i) !== f(j) && ok(i, j)) { par[f(i)] = f(j); E.push([i, j]); }
+  for (const [d, i, j] of pairs) if (d < 1.9 && rnd() < 0.45 && ok(i, j) && !E.some(([a, b]) => a === i && b === j)) E.push([i, j]);
+  const nbr = nodes.map(() => []); for (const [a, b] of E) { nbr[a].push(b); nbr[b].push(a); }
+  const link = (i, j) => { E.push([i, j]); nbr[i].push(j); nbr[j].push(i); };
+  // 行き止まりを潰す: どの点からも道は 2 本以上。 旧式は距離 2.6 以内で諦めていたので、 4.0 まで広げる 2 段目を足した
+  for (const reach of [2.6, 4.0]) for (let i = 0; i < nodes.length; i++) {
+    if (nbr[i].length !== 1) continue;
+    const cand = nodes.map((_, j) => j).filter(j => j !== i && !nbr[i].includes(j) && dist(nodes[i], nodes[j]) <= reach && ok(i, j)).sort((a, b) => dist(nodes[i], nodes[a]) - dist(nodes[i], nodes[b]));
+    if (cand.length) link(i, cand[0]);
+  }
+  if (nbr.some(ns => ns.length < 2)) return null;   // それでも残ったら引き直す
+  const plain = (from, to) => { const d = nodes.map(() => 1e9), used = nodes.map(() => false); d[from] = 0;
+    for (;;) { let u = -1; for (let i = 0; i < nodes.length; i++) if (!used[i] && (u < 0 || d[i] < d[u])) u = i; if (u < 0 || d[u] >= 1e9 || u === to) break; used[u] = true;
+      for (const v of nbr[u]) { const nd = d[u] + dist(nodes[u], nodes[v]); if (nd < d[v]) d[v] = nd; } } return d[to]; };
+  for (const [d, i, j] of pairs) { if (d > 2.2) break; if (nbr[i].includes(j) || !ok(i, j)) continue; if (plain(i, j) > d * 2) link(i, j); }
+  if (bfs(nbr, 0).some(v => v === Infinity)) return null;   // 山岳で分断されたら引き直す
+  // 種別
+  const sIdx = 0, gIdx = 1, ds = bfs(nbr, sIdx), wsum = TYPES.reduce((s2, t) => s2 + t[1], 0);
+  function pick() { let r = rnd() * wsum; for (const [t, w] of TYPES) { if ((r -= w) < 0) return t; } return "戦"; }
+  nodes.forEach((n, i) => { n.type = i === sIdx ? "拠" : i === gIdx ? "王" : pick(); n.done = false; n.known = i === sIdx || i === gIdx; n.sunk = false; });
+  for (const need of ["店", "休"]) if (!nodes.some(n => n.type === need)) { const cand = nodes.map((n, i) => i).filter(i => i > 1 && ds[i] >= 2); if (cand.length) nodes[cand[Math.floor(rnd() * cand.length)]].type = need; }
+  // 縄張り: 層の中ほどの一角。 中心から道で広げて 7〜11 点
+  const mids = nodes.map((n, i) => i).filter(i => i > 1 && nodes[i].x > 3.2 && nodes[i].x < WW - 2.8 && dist(nodes[i], nodes[0]) >= TERR_CLEAR);
+  if (!mids.length) return null;
+  const home = mids[Math.floor(rnd() * mids.length)];
+  let terr = [home];
+  for (let k = 0; k <= 8; k++) { const r = 2.2 + 0.4 * k; terr = [home]; const q = [home];
+    while (q.length) { const u = q.shift(); for (const v of nbr[u]) if (v > 1 && !terr.includes(v) && dist(nodes[v], nodes[home]) <= r && dist(nodes[v], nodes[0]) >= TERR_CLEAR) { terr.push(v); q.push(v); } }
+    if (terr.length >= TERR_MIN) break; }
+  terr = terr.slice(0, TERR_MAX);
+  if (terr.length < 3) return null;
+  terr.sort((a, b) => Math.atan2(nodes[a].y - nodes[home].y, nodes[a].x - nodes[home].x) - Math.atan2(nodes[b].y - nodes[home].y, nodes[b].x - nodes[home].x));   // 巡回は角度順
+  return { nodes, nbr, sIdx, gIdx, terr, home, rnd, mts };
+}
+function bfs(nbr, s) { const d = nbr.map(() => Infinity); d[s] = 0; const q = [s]; while (q.length) { const u = q.shift(); for (const v of nbr[u]) if (d[v] === Infinity) { d[v] = d[u] + 1; q.push(v); } } return d; }
+function stepToward(nbr, from, to) { if (from === to) return from; const d = bfs(nbr, to); let best = from; for (const v of nbr[from]) if (d[v] < d[best]) best = v; return best; }
+function edgesOf() { const e = []; M.nbr.forEach((ns, i) => { for (const b of ns) if (b > i) e.push([i, b]); }); return e; }
+function unlink(a, b) { M.nbr[a] = M.nbr[a].filter(v => v !== b); M.nbr[b] = M.nbr[b].filter(v => v !== a); }
+
+// ============================================================
+//  状態
+// ============================================================
+function newGame() {
+  M = generate(+$("seed").value, +$("count").value);
+  const pk = $("prof").value, pkeys = Object.keys(PROFILES);
+  const prof = pk === "auto" ? pkeys[Math.floor(M.rnd() * pkeys.length)] : pk;
+  const wk = $("wx").value, wkeys = Object.keys(WEATHERS).filter(k => k !== "none");
+  const wx = wk === "auto" ? wkeys[Math.floor(M.rnd() * wkeys.length)] : wk;
+  S = { me: M.sIdx, turn: 0, sup: P.supStart, hp: P.hpMax, foe: M.home, foeMode: "巡回", lastSeen: null, lose: 0, patrol: 0,
+        flare: 0, log: [], prof, wx, fams: [], sinceSummon: 99, trace: {}, front: -Infinity, resting: false };
+  if (PROFILES[prof].hound) S.fams.push({ pos: M.home, target: null, hound: true });
+  reveal(M.sIdx, P.vis); S.trace[M.sIdx] = 0;
+  log(`生成: 点 ${M.nodes.length}・道 ${edgesOf().length}。 終点まで最短 ${bfs(M.nbr, M.sIdx)[M.gIdx]} 手。 追跡者〈${PROFILES[prof].name}〉・天候〈${WEATHERS[wx].name}〉`);
+  refresh();
+}
+function reveal(c, r) { const d = bfs(M.nbr, c); M.nodes.forEach((n, i) => { if (d[i] <= r) n.known = true; }); }
+function log(s) { S.log.unshift(`[${S.turn}] ${s}`); $("log").textContent = S.log.slice(0, 50).join("\n"); }
+const inFront = (i) => M.nodes[i].x <= S.front;   // 前線 = 左からの距離
+const wxAt = (i, k) => S.wx === k && inFront(i);
+const visR = () => S.flare > 0 ? P.flareR : P.vis;
+function traceLife(i) { return P.traceLife * (wxAt(i, "still") ? 2 : 1) / (wxAt(i, "sand") ? 2 : 1); }
+const traceAge = (i) => S.trace[i] == null ? Infinity : S.turn - S.trace[i];
+const hasTrace = (i) => traceAge(i) <= traceLife(i);
+
+// ============================================================
+//  敵の手番
+// ============================================================
+/** 本体の次の 1 歩 (予告と実際の移動が同じ関数を通る) */
+function foeNextStep() {
+  if (S.foeMode === "追跡") return stepToward(M.nbr, S.foe, S.lastSeen);
+  if (S.foeMode === "警戒") {   // 痕跡をたどる: いまの点より新しい痕跡のある隣へ
+    let best = -1, bt = S.trace[S.foe] ?? -Infinity;
+    for (const v of M.nbr[S.foe]) if (hasTrace(v) && S.trace[v] > bt) { bt = S.trace[v]; best = v; }
+    if (best >= 0) return best;
+    S.foeMode = "巡回";
+  }
+  const t = M.terr.length ? M.terr[S.patrol % M.terr.length] : M.home;
+  if (S.foe === t) { S.patrol++; return stepToward(M.nbr, S.foe, M.terr[S.patrol % M.terr.length] ?? M.home); }
+  return stepToward(M.nbr, S.foe, t);
+}
+function foeTurn() {
+  const pf = PROFILES[S.prof], dMe = bfs(M.nbr, S.me);
+  const detectR = S.flare > 0 ? P.flareR : P.detectR;
+  if (dMe[S.foe] <= detectR) { if (S.foeMode !== "追跡") log(`〈${pf.name}〉に補足された`); S.foeMode = "追跡"; S.lastSeen = S.me; S.lose = 0; }
+  else if (S.foeMode === "追跡" && ++S.lose > P.quietLose) { S.foeMode = "巡回"; log(`〈${pf.name}〉は見失った`); }
+  else if (S.foeMode === "巡回" && hasTrace(S.foe)) { S.foeMode = "警戒"; log(`〈${pf.name}〉が痕跡を見つけた`); }
+  for (let k = 0; k < pf.foeSteps; k++) { S.foe = foeNextStep(); if (S.foe === S.me) break; }
+  if (pf.summon && S.foeMode === "追跡" && ++S.sinceSummon >= P.summonEvery) { S.sinceSummon = 0; S.fams.push({ pos: S.foe, target: S.lastSeen, hound: false }); log("使い魔が放たれた"); }
+  for (const f of S.fams) {
+    if (f.hound) f.target = S.foeMode === "追跡" ? S.lastSeen : S.foe;
+    for (let k = 0; k < pf.famSteps; k++) {
+      if (bfs(M.nbr, f.pos)[S.me] <= P.famSee) f.target = S.me;
+      if (f.target == null) break;
+      f.pos = stepToward(M.nbr, f.pos, f.target); if (f.pos === S.me) break;
+    }
+    if (!f.hound && f.pos === f.target && f.pos !== S.me && bfs(M.nbr, f.pos)[S.me] > P.famSee) f.gone = true;
+  }
+  if (S.fams.some(f => f.gone)) { S.fams = S.fams.filter(f => !f.gone); log("使い魔は見失って消えた"); }
+  if (S.flare > 0) S.flare--;
+}
+
+// ============================================================
+//  前線と天候
+// ============================================================
+function advanceFront() {
+  if (S.wx === "none" || S.front >= WW) return;
+  S.front = S.front === -Infinity ? P.frontStep : S.front + P.frontStep; log(`前線が左から ${S.front.toFixed(1)} まで届いた（${WEATHERS[S.wx].name}）`);
+  const keepsGoal = () => bfs(M.nbr, S.me)[M.gIdx] < Infinity;
+  if (S.wx === "crumble") {
+    const cand = edgesOf().filter(([a, b]) => inFront(a) && inFront(b) && a !== S.me && b !== S.me);
+    for (let tries = 0; tries < 20 && cand.length; tries++) {
+      const [a, b] = cand.splice(Math.floor(M.rnd() * cand.length), 1)[0];
+      unlink(a, b); if (keepsGoal() && M.nbr[a].length && M.nbr[b].length) { log("（道が 1 本崩れた）"); break; }
+      M.nbr[a].push(b); M.nbr[b].push(a);
+    }
+  }
+  if (S.wx === "sink") {
+    const cand = M.nodes.map((n, i) => i).filter(i => inFront(i) && !M.nodes[i].done && !M.nodes[i].sunk && i !== S.me && i !== S.foe && i !== M.gIdx && i !== M.sIdx);
+    for (let tries = 0; tries < 20 && cand.length; tries++) {
+      const i = cand.splice(Math.floor(M.rnd() * cand.length), 1)[0], saved = [...M.nbr[i]];
+      for (const v of saved) unlink(i, v);
+      if (keepsGoal()) { M.nodes[i].sunk = true; log("（点が 1 つ沈んだ）"); break; }
+      for (const v of saved) { M.nbr[i].push(v); M.nbr[v].push(i); }
+    }
+  }
+}
+
+// ============================================================
+//  手番
+// ============================================================
+function passTurn(n, why) {
+  for (let k = 0; k < n; k++) {
+    S.turn++; foeTurn();
+    if (S.turn % P.frontEvery === 0) advanceFront();
+    if (S.foe === S.me || S.fams.some(f => f.pos === S.me)) break;
+  }
+  reveal(S.me, visR());
+  const pf = PROFILES[S.prof];
+  if (S.foe === S.me) { log(`捕まった ── 〈${pf.name}〉との戦闘（${pf.fight}）`); }
+  else if (S.fams.some(f => f.pos === S.me)) {
+    const hound = S.fams.find(f => f.pos === S.me && f.hound);
+    log(hound ? "猟犬と接触（戦闘）── 猟犬は本体の元へ戻る" : "使い魔と接触（戦闘）");
+    S.fams = S.fams.filter(f => f.pos !== S.me || f.hound);
+    if (hound) hound.pos = S.foe;   // 猟犬は倒しても消えず、 本体の元へ戻る (仮)
+    S.lastContact = S.turn; }
+  refresh();
+}
+function moveTo(i) {
+  if (S.resting || !M.nbr[S.me].includes(i)) return;
+  const sandMul = wxAt(i, "sand") || wxAt(S.me, "sand") ? 1.5 : 1, cost = Math.round(P.supMove * sandMul);
+  const turns = wxAt(i, "snow") || wxAt(S.me, "snow") ? 2 : 1;
+  S.me = i; S.sup -= cost; S.trace[i] = S.turn + turns;
+  if (wxAt(i, "hail")) S.hp -= 1;
+  const n = M.nodes[i]; n.known = true;
+  log(`${n.type} の点へ（物資 −${cost}${turns > 1 ? "・2 手番" : ""}${wxAt(i, "hail") ? "・HP −1" : ""}）`);
+  if (!n.done && n.type !== "拠") {
+    n.done = true;
+    if (n.type === "王") log("終点に着いた（ボス戦）");
+    if (n.type === "休") { S.resting = true; log("休憩所: 回復の仕方を選ぶ"); }
+  }
+  passTurn(turns, "move");
+}
+
+// ============================================================
+//  表示
+// ============================================================
+function etaToCatch() {   // 補足されている時: 最短で何手で捕まるか (こちらがその場に留まった場合)
+  const pf = PROFILES[S.prof], d = bfs(M.nbr, S.me); let best = Infinity, who = "";
+  if (S.foeMode === "追跡" && pf.foeSteps > 0) { const t = Math.ceil(d[S.foe] / pf.foeSteps); if (t < best) { best = t; who = "本体"; } }
+  for (const f of S.fams) { if (!pf.famSteps) continue; const chasing = f.hound ? S.foeMode === "追跡" : f.target != null;
+    if (!chasing) continue; const t = Math.ceil(d[f.pos] / pf.famSteps); if (t < best) { best = t; who = f.hound ? "猟犬" : "使い魔"; } }
+  return { best, who };
+}
+function stoneText() {   // 魔石: 距離の段と方角 (使い魔には反応しない)
+  const d = bfs(M.nbr, S.me)[S.foe];
+  if (S.foeMode === "追跡") return `察知されている（${dirOf(S.foe)}）`;
+  if (d <= 2) return `かなり近い（${dirOf(S.foe)}）`;
+  if (d <= 4) return `遠い（${dirOf(S.foe)}）`;
+  return "反応なし";
+}
+function dirOf(i) { const a = M.nodes[S.me], b = M.nodes[i], dx = b.x - a.x, dy = a.y - b.y; if (!dx && !dy) return "ここ";
+  const names = ["東", "北東", "北", "北西", "西", "南西", "南", "南東"]; const k = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)); return names[(k + 8) % 8]; }
+function refresh() {
+  const pf = PROFILES[S.prof], eta = etaToCatch();
+  let w = "";
+  if (S.foe === S.me) w = `捕まった ── 〈${pf.name}〉との戦闘（${pf.fight}）`;
+  else if (S.lastContact === S.turn) w = "使い魔と接触した（戦闘）";
+  else if (isFinite(eta.best)) w = `補足されている ── 最短 ${eta.best} 手で捕まる（${eta.who}）`;
+  else if (S.foeMode === "警戒") w = "警告: 痕跡をたどられている";
+  $("warn").textContent = w;
+  $("turn").textContent = S.turn; $("sup").textContent = `${S.sup}（1 手 −${P.supMove}）`; $("hp").textContent = `${S.hp} / ${P.hpMax}`;
+  $("stone").textContent = stoneText();
+  $("profV").textContent = `〈${pf.name}〉${pf.desc}`;
+  $("wxV").textContent = `〈${WEATHERS[S.wx].name}〉${WEATHERS[S.wx].desc}`;
+  $("frontV").textContent = S.wx === "none" ? "―" : S.front === -Infinity ? `まだ届いていない（${P.frontEvery} 手番ごとに ${P.frontStep} 進む）` : `左から ${Math.min(S.front, WW).toFixed(1)} / ${WW}`;
+  $("dist").textContent = `${bfs(M.nbr, S.me)[M.gIdx]} 手`;
+  $("cnt").textContent = `${M.nodes.filter(n => !n.sunk).length} / ${edgesOf().length}`;
+  $("restBox").hidden = !S.resting;
+  for (const k of ["seed", "count"]) $(k + "V").textContent = $(k).value;
+  draw();
+}
+
+let geo = null;
+function draw() {
+  const pad = 30, W = cv.width, H = cv.height, g = Math.min((W - pad * 2) / WW, (H - pad * 2) / HH);
+  const ox = (W - g * WW) / 2, oy = (H - g * HH) / 2, X = v => ox + v * g, Y = v => oy + v * g;
+  const NX = n => X(n.x), NY = n => Y(n.y); geo = { NX, NY, g };
+  cx.fillStyle = "#0f1a24"; cx.fillRect(0, 0, W, H);
+  if (S.front > -Infinity) { const fx = X(Math.min(S.front, WW));
+    cx.fillStyle = "rgba(140,170,220,.10)"; cx.fillRect(0, 0, fx, H);
+    cx.strokeStyle = "rgba(140,170,220,.45)"; cx.setLineDash([6, 5]); cx.beginPath(); cx.moveTo(fx, 0); cx.lineTo(fx, H); cx.stroke(); cx.setLineDash([]); }
+  for (const m of M.mts) { cx.save(); cx.translate(X(m.x), Y(m.y)); cx.rotate(m.r); cx.fillStyle = "#231f1b"; cx.strokeStyle = "#4a4036"; cx.lineWidth = 2;
+    cx.beginPath(); cx.ellipse(0, 0, m.a * g, m.b * g, 0, 0, 7); cx.fill(); cx.stroke(); cx.restore(); }
+  // 縄張り: やわらかい円
+  for (const i of M.terr) { const n = M.nodes[i]; const gr = cx.createRadialGradient(NX(n), NY(n), 0, NX(n), NY(n), g * 0.7);
+    gr.addColorStop(0, "rgba(255,106,58,.10)"); gr.addColorStop(1, "rgba(255,106,58,0)"); cx.fillStyle = gr; cx.beginPath(); cx.arc(NX(n), NY(n), g * 0.7, 0, 7); cx.fill(); }
+  for (const [a, b] of edgesOf()) { const p = M.nodes[a], q = M.nodes[b], hot = a === S.me || b === S.me;
+    cx.strokeStyle = hot ? "#c9b88a" : "#6d6658"; cx.lineWidth = hot ? 3 : 2; cx.beginPath(); cx.moveTo(NX(p), NY(p)); cx.lineTo(NX(q), NY(q)); cx.stroke(); }
+  const dv = bfs(M.nbr, S.me), peek = $("peek").checked;
+  cx.textAlign = "center"; cx.textBaseline = "middle"; cx.font = "bold 13px system-ui,'Yu Gothic',sans-serif";
+  M.nodes.forEach((n, i) => {
+    if (n.sunk) { cx.strokeStyle = "#2a3644"; cx.setLineDash([3, 3]); cx.beginPath(); cx.arc(NX(n), NY(n), g * 0.16, 0, 7); cx.stroke(); cx.setLineDash([]); return; }
+    const r = Math.max(9, g * 0.2), near = M.nbr[S.me].includes(i);
+    const fogHide = wxAt(i, "fog") && dv[i] >= 2 && i !== M.gIdx && i !== M.sIdx;
+    const shown = n.known && !fogHide;
+    cx.fillStyle = n.done ? "#23272c" : "#16191c"; cx.beginPath(); cx.arc(NX(n), NY(n), r, 0, 7); cx.fill();
+    cx.lineWidth = near ? 3 : 2; cx.strokeStyle = near ? "#e0b050" : shown ? (COL[n.type] || "#888") : "#454b52"; cx.stroke();
+    cx.fillStyle = shown ? (n.done ? "#6f6b62" : COL[n.type] || "#ccc") : "#6f6b62"; cx.fillText(shown ? n.type : "?", NX(n), NY(n) + 1);
+    if (hasTrace(i)) { const a = 1 - traceAge(i) / (traceLife(i) + 1); cx.fillStyle = `rgba(200,200,220,${0.25 + 0.5 * a})`; cx.fillRect(NX(n) - 2, NY(n) + r + 3, 4, 4); }
+  });
+  for (const fm of S.fams) { if (!peek && dv[fm.pos] > visR()) continue; const n = M.nodes[fm.pos];
+    cx.fillStyle = fm.hound ? "#ffd070" : "#ffb070"; cx.beginPath(); cx.arc(NX(n) + g * 0.18, NY(n) + g * 0.18, fm.hound ? 7 : 5, 0, 7); cx.fill(); }
+  const f = M.nodes[S.foe], seeFoe = peek || dv[S.foe] <= visR();
+  if (seeFoe) {
+    if (PROFILES[S.prof].foeSteps > 0) { const save = { mode: S.foeMode, patrol: S.patrol }; const nx = foeNextStep(); S.foeMode = save.mode; S.patrol = save.patrol;
+      if (nx !== S.foe) { const q = M.nodes[nx]; cx.strokeStyle = "#ff6a3a"; cx.lineWidth = 2; cx.setLineDash([4, 3]); cx.beginPath(); cx.moveTo(NX(f), NY(f)); cx.lineTo(NX(q), NY(q)); cx.stroke(); cx.setLineDash([]);
+        cx.beginPath(); cx.arc(NX(q), NY(q), g * 0.27, 0, 7); cx.stroke(); } }
+    cx.fillStyle = "#ff6a3a"; cx.save(); cx.translate(NX(f) + g * 0.18, NY(f) - g * 0.18); cx.rotate(Math.PI / 4); cx.fillRect(-7, -7, 14, 14); cx.restore();
+  }
+  const me = M.nodes[S.me]; cx.fillStyle = "#f2efe6"; cx.beginPath(); cx.arc(NX(me) - g * 0.18, NY(me) - g * 0.18, 7, 0, 7); cx.fill();
+  if (S.flare > 0) { cx.strokeStyle = "rgba(240,170,66,.5)"; cx.setLineDash([4, 4]); cx.beginPath(); cx.arc(NX(me), NY(me), g * P.flareR, 0, 7); cx.stroke(); cx.setLineDash([]); }
+}
+
+cv.addEventListener("click", (e) => {
+  const r = cv.getBoundingClientRect(), mx = (e.clientX - r.left) * cv.width / r.width, my = (e.clientY - r.top) * cv.height / r.height;
+  let best = -1, bd = 1e9; M.nodes.forEach((n, i) => { if (n.sunk) return; const d = Math.hypot(geo.NX(n) - mx, geo.NY(n) - my); if (d < bd) { bd = d; best = i; } });
+  if (best >= 0 && bd < geo.g * 0.45) moveTo(best);
+});
+$("flare").onclick = () => { S.flare = P.flareTurns; S.sup -= P.flareSup; reveal(S.me, P.flareR); log(`照明（物資 −${P.flareSup}・手番は使わない・${P.flareTurns} 手番のあいだ見える）`); refresh(); };
+$("recon").onclick = () => { if (S.resting) return; reveal(S.me, P.reconR); log("偵察（1 手番）"); passTurn(1, "recon"); };
+$("wait").onclick = () => { if (S.resting) return; log("待つ（1 手番）"); passTurn(1, "wait"); };
+$("restA").onclick = () => { const h = Math.round(P.hpMax * P.restNormal); S.hp = Math.min(P.hpMax, S.hp + h); S.resting = false; log(`休憩: 回復 +${h}（手番は使わない）`); refresh(); };
+$("restB").onclick = () => { const h = Math.round(P.hpMax * P.restMore); S.hp = Math.min(P.hpMax, S.hp + h); S.resting = false; log(`休憩: 多めに回復 +${h}（1 手番）`); passTurn(1, "rest"); };
+for (const k of ["seed", "count"]) $(k).oninput = newGame;
+$("prof").onchange = newGame; $("wx").onchange = newGame; $("peek").onchange = () => draw();
+$("regen").onclick = newGame;
+$("next").onclick = () => { $("seed").value = +$("seed").value + 1; newGame(); };
+newGame();
+</script>
+</body>
+</html>

@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>アナログカウンター</title>
+<style>
+  :root { --bg:#16171a; --panel:#1f2024; --ink:#d9d6c8; --dim:#8a8c84; --line:#34363c; --acc:#e4dec1; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.6 system-ui,"Yu Gothic",sans-serif; padding:24px 16px 48px; }
+  main { max-width:760px; margin:0 auto; display:grid; gap:20px; }
+  h1 { font-size:18px; margin:0; font-weight:600; }
+  p.note { margin:0; color:var(--dim); font-size:13px; }
+  .stage { background:var(--panel); border:1px solid var(--line); padding:28px 12px; display:grid; place-items:center; overflow-x:auto; }
+  canvas { image-rendering:pixelated; display:block; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  button, input, select { font:inherit; color:var(--ink); background:var(--panel); border:1px solid var(--line); padding:6px 12px; }
+  button { cursor:pointer; } button:hover { border-color:var(--dim); } button:active { background:var(--line); }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline:2px solid var(--acc); outline-offset:1px; }
+  label { display:flex; align-items:center; gap:6px; color:var(--dim); font-size:13px; }
+  input[type=number] { width:96px; } input[type=range] { padding:0; width:140px; }
+  .val { font-variant-numeric:tabular-nums; color:var(--dim); font-size:13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>アナログカウンター</h1>
+  <p class="note">0 が一番下、9 が一番上の連番シート（<code>gui/counter_strip.png</code>・8×90）を、桁ごとの回転ドラムとして上下に動かします。値は連続で、桁上がりの瞬間だけ上の桁が一緒に回ります。</p>
+
+  <div class="stage"><canvas id="cv" aria-label="カウンター"></canvas></div>
+
+  <div class="row">
+    <button data-add="1">+1</button><button data-add="10">+10</button><button data-add="100">+100</button><button data-add="-1">−1</button><button data-add="-10">−10</button>
+    <button id="rnd">ランダム</button><button id="zero">0 に戻す</button>
+  </div>
+  <div class="row">
+    <label>値 <input id="num" type="number" value="1234" min="0"></label><button id="set">セット</button>
+    <label><input id="auto" type="checkbox"> 自動カウント</label>
+    <label>速さ <input id="spd" type="range" min="1" max="60" value="8"></label><span class="val" id="spdv"></span>
+  </div>
+  <div class="row">
+    <label>桁数 <select id="dig"><option>3</option><option>4</option><option selected>5</option><option>6</option></select></label>
+    <label><input id="lit" type="checkbox" checked> 光の当たり方（背景だけ明るく）</label>
+    <label>倍率 <select id="scale"><option>6</option><option selected>10</option><option>14</option></select></label>
+  </div>
+  <div class="val" id="info"></div>
+</main>
+
+<script>
+"use strict";
+const CELL_W = 8, CELL_H = 9, STRIP_H = 90, GLYPH_H = 8, MARGIN = 3, WIN_H = GLYPH_H + MARGIN * 2;   // 字 8 行 + 上下に 3 行ずつ (隣の数字の端が見える)           // シート: 8×90、 9 が上 (y 0)・0 が下 (y 81)
+// 元シート上の、 各数字 (0〜9) の字の上端の行。 字は 8 行・間隔は 9 で等間隔。 10 は 9 の上に続く 0 (シートを 1 枚上に重ねた位置)
+const BG = [29, 29, 32], LIT_COLORS = [[64, 67, 58]];   // 光: 背景の地 (シートの地色) だけ、 中央 → 外側の順にこの色へ。 字・灰・黒は変えない (参考画像の読み取り値)
+const GLYPH_TOP = [81, 72, 63, 54, 45, 36, 27, 18, 9, 0, 81 - STRIP_H];
+const FRAME = "#000000";
+const $ = (id) => document.getElementById(id);
+const cv = $("cv"), cx = cv.getContext("2d");
+cx.imageSmoothingEnabled = false;
+
+const strip = new Image(); let ready = false;
+const EDGE_DARK = 0.30;   // 端 (光の弱い所) を、 地も字もさらに黒へ寄せる強さ
+const DIM_TINT = [120, 136, 128];   // 隣の数字の端の色 = 元のクリーム × この比 (参考画像の 128,140,116 に合わせた)
+const GLYPH_GAIN = 0;   // 字の明るさの上げ幅 (0 = 字の中央は元の明るさのまま。 上げるなら 0.1 前後)。 加算なので元の色の比で上がる
+let dimSheet = null, glyphSheet = null;  // 字だけを暗くしたシート (地の色はそのまま)
+const litMask = [];   // 段ごとの「地の色の画素だけ足す色」のシート (加算用)
+strip.onload = () => {
+  // 地の色の画素だけを抜き出す (ピクセルを読まずに合成だけで行うので、 file:// で開いても動く): 地色との差 → 明るさを上げて 0/255 に → 反転 = 地が白
+  const mk = () => { const c = document.createElement("canvas"); c.width = CELL_W; c.height = STRIP_H; const g = c.getContext("2d"); g.imageSmoothingEnabled = false; return [c, g]; };
+  const [a, ga] = mk(); ga.drawImage(strip, 0, 0); ga.globalCompositeOperation = "difference"; ga.fillStyle = "rgb(" + BG + ")"; ga.fillRect(0, 0, CELL_W, STRIP_H);
+  const [b, gb] = mk(); gb.filter = "brightness(60)"; gb.drawImage(a, 0, 0);
+  const [m, gm] = mk(); gm.filter = "invert(1)"; gm.drawImage(b, 0, 0);
+  // 字だけ暗くしたシート = (字だけ残した絵 × DIM) + (地の色だけ残した絵)。 端の行ではこれで置き換える
+  const [nb, gnb] = mk(); gnb.filter = "invert(1)"; gnb.drawImage(m, 0, 0);                    // 字 = 白
+  const [gl, ggl] = mk(); ggl.drawImage(strip, 0, 0); ggl.globalCompositeOperation = "multiply"; ggl.drawImage(nb, 0, 0);
+  const [ds, gds] = mk(); gds.drawImage(gl, 0, 0); gds.globalCompositeOperation = "multiply"; gds.fillStyle = "rgb(" + DIM_TINT + ")"; gds.fillRect(0, 0, CELL_W, STRIP_H);   // 隣の字の色 (参考画像: 128,140,116)
+  const [bgp, gbgp] = mk(); gbgp.fillStyle = "rgb(" + BG + ")"; gbgp.fillRect(0, 0, CELL_W, STRIP_H); gbgp.globalCompositeOperation = "multiply"; gbgp.drawImage(m, 0, 0);
+  gds.globalCompositeOperation = "lighter"; gds.drawImage(bgp, 0, 0); dimSheet = ds; glyphSheet = gl;
+  for (const col of LIT_COLORS) {
+    const [t, gt] = mk(); gt.fillStyle = "rgb(" + col.map((v, k) => v - BG[k]) + ")"; gt.fillRect(0, 0, CELL_W, STRIP_H);
+    gt.globalCompositeOperation = "multiply"; gt.drawImage(m, 0, 0); litMask.push(t);
+  }
+  ready = true;
+}; strip.src = "gui/counter_strip.png";
+
+let lit = true, digits = 5, scale = 10, target = 1234, v = 1234, speed = 8, auto = false;
+const smooth = (t) => { t = Math.min(1, Math.max(0, t)); return t * t * (3 - 2 * t); };
+
+// 桁 i の位置 (0〜10)。 下の桁が 9 → 0 に回る時だけ、 上の桁も一緒に回る
+function drumPos(val, i) {
+  const t = val / Math.pow(10, i), fl = Math.floor(t), fr = t - fl;
+  const w = 0.35 / Math.pow(10, i);                    // 回る幅は 1 の位の 0.35 ぶん。 上の桁は、 下の桁が 9 → 0 に回る間だけ一緒に回る
+  return (fl % 10) + smooth((fr - (1 - w)) / w);
+}
+
+function resize() {
+  cv.width = digits * CELL_W + (digits + 1) + 2;        // 桁の間 1px の仕切り + 外枠
+  cv.height = WIN_H + 6;
+  cv.style.width = cv.width * scale + "px"; cv.style.height = cv.height * scale + "px";
+  cx.imageSmoothingEnabled = false;
+}
+
+// ---- 光の画素マップ ----
+// 参考画像は、 横一列ずつの等間隔の帯ではなく、 手で打った明るい塊 (中央が広く・縁がギザギザ・左右も違う)。 そこで窓の中心を光源にした楕円の場 f(x,y) を作り、 4×4 の誤差拡散 (Bayer) で段に切る。 縁の位置が行ごとに揃わず、 ドット絵の「打ち分け」になる
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const LIGHT = { cy: 6.2, rx: 5.0, ry: 7.6, jitter: 0.06, xw: 0.22, hiAt: 0.60, midAt: 0.28, dimAt: 0.20, dimHalfAt: 0.36 };
+const lightMaps = (() => {
+  const mk = () => { const c = document.createElement("canvas"); c.width = CELL_W; c.height = WIN_H; return [c, c.getContext("2d")]; };
+  const [la, gla] = mk(), [da, gda] = mk();
+  for (let yy = 0; yy < WIN_H; yy++) for (let xx = 0; xx < CELL_W; xx++) {
+    const dx = (xx - (CELL_W - 1) / 2) / LIGHT.rx, dy = (yy - LIGHT.cy) / LIGHT.ry;
+    const f = 1 - Math.sqrt(dx * dx * LIGHT.xw + dy * dy), v = f + (BAYER[(yy & 3) * 4 + (xx & 3)] / 15 - 0.5) * LIGHT.jitter;
+    const lv = v > LIGHT.hiAt ? 1 : v > LIGHT.midAt ? 0.5 : 0;                       // 地: 0 = 元の色・0.5 = 中間 (46,52,44)・1 = 中央 (64,67,58)
+    if (lv > 0) { gla.fillStyle = "rgba(0,0,0," + lv + ")"; gla.fillRect(xx, yy, 1, 1); }
+    const dm = v < LIGHT.dimAt ? 1 : v < LIGHT.dimHalfAt ? 0.5 : 0;                  // 字: 1 = 隣の字の色・0.5 = 半分
+    if (dm > 0) { gda.fillStyle = "rgba(0,0,0," + dm + ")"; gda.fillRect(xx, yy, 1, 1); }
+  }
+  return { lit: la, dim: da };
+})();
+const tmp = document.createElement("canvas"); tmp.width = CELL_W; tmp.height = WIN_H;
+const gt = tmp.getContext("2d"); gt.imageSmoothingEnabled = false;
+function drawLight(x, y, oy) {
+  const rel = oy - y;
+  gt.globalCompositeOperation = "source-over"; gt.clearRect(0, 0, CELL_W, WIN_H);                      // 字の暗い絵を、 マップのある画素にだけ重ねる
+  for (const dy of [-STRIP_H, 0, STRIP_H]) gt.drawImage(dimSheet, 0, 0, CELL_W, STRIP_H, 0, rel + dy, CELL_W, STRIP_H);
+  gt.globalCompositeOperation = "destination-in"; gt.drawImage(lightMaps.dim, 0, 0);
+  cx.drawImage(tmp, x, y);
+  cx.save(); cx.globalAlpha = EDGE_DARK; cx.drawImage(lightMaps.dim, x, y); cx.restore();            // 端を黒へ寄せる (マップの濃さ × EDGE_DARK)
+  gt.globalCompositeOperation = "source-over"; gt.clearRect(0, 0, CELL_W, WIN_H);                      // 地を明るくする足し分 (地の画素だけ)
+  for (const dy of [-STRIP_H, 0, STRIP_H]) gt.drawImage(litMask[0], 0, 0, CELL_W, STRIP_H, 0, rel + dy, CELL_W, STRIP_H);
+  gt.globalCompositeOperation = "destination-in"; gt.drawImage(lightMaps.lit, 0, 0);
+  cx.save(); cx.globalCompositeOperation = "lighter"; cx.drawImage(tmp, x, y);
+  gt.globalCompositeOperation = "source-over"; gt.clearRect(0, 0, CELL_W, WIN_H);                      // 字そのものも、 同じ光のマップで明るくする
+  for (const dy of [-STRIP_H, 0, STRIP_H]) gt.drawImage(glyphSheet, 0, 0, CELL_W, STRIP_H, 0, rel + dy, CELL_W, STRIP_H);
+  gt.globalCompositeOperation = "destination-in"; gt.drawImage(lightMaps.lit, 0, 0);
+  cx.globalAlpha = GLYPH_GAIN; cx.drawImage(tmp, x, y); cx.restore();
+}
+function drawDrum(x, y, p) {
+  cx.save(); cx.beginPath(); cx.rect(x, y, CELL_W, WIN_H); cx.clip();
+  const fl = Math.min(9, Math.floor(p)), fr = p - fl;
+  const oy = Math.round(y + MARGIN - (GLYPH_TOP[fl] + (GLYPH_TOP[fl + 1] - GLYPH_TOP[fl]) * fr));   // 元のシートをそのまま使う。 止まった時は、 その数字の字の上端が窓の上から MARGIN+1 行目に来る (字 8 行・上下の余白 MARGIN 行)
+  cx.drawImage(strip, 0, 0, CELL_W, STRIP_H, x, oy, CELL_W, STRIP_H);
+  cx.drawImage(strip, 0, 0, CELL_W, STRIP_H, x, oy - STRIP_H, CELL_W, STRIP_H);   // 9 の上に 0、 0 の下に 9 が続くよう、 上下にもう 1 枚ずつ
+  cx.drawImage(strip, 0, 0, CELL_W, STRIP_H, x, oy + STRIP_H, CELL_W, STRIP_H);
+  cx.restore();
+  if (lit && litMask.length) drawLight(x, y, oy);
+}
+
+function render() {
+  cx.fillStyle = FRAME; cx.fillRect(0, 0, cv.width, cv.height);
+  for (let k = 0; k < digits; k++) {
+    const i = digits - 1 - k, x = 2 + k * (CELL_W + 1);
+    if (ready) drawDrum(x, 3, drumPos(v, i));
+  }
+}
+
+let last = performance.now(), acc = 0;
+function tick(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  const max = Math.pow(10, digits);
+  if (auto) { acc += dt * speed; if (acc >= 1) { target += Math.floor(acc); acc -= Math.floor(acc); } }
+  target = ((target % max) + max) % max;
+  let d = target - v; if (Math.abs(d) > max / 2) d -= Math.sign(d) * max;     // 最大値から 0 へは、 回り込む向きに進む
+  const rate = Math.max(speed, Math.abs(d) * 6);                              // 遠いほど速く回る
+  v += Math.sign(d) * Math.min(Math.abs(d), rate * dt);
+  v = ((v % max) + max) % max;
+  render();
+  $("info").textContent = "表示 " + v.toFixed(2) + " / 目標 " + target;
+  requestAnimationFrame(tick);
+}
+
+document.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", () => { target += +b.dataset.add; }));
+$("rnd").onclick = () => { target = Math.floor(Math.random() * Math.pow(10, digits)); };
+$("zero").onclick = () => { target = 0; };
+$("set").onclick = () => { target = Math.max(0, Math.floor(+$("num").value || 0)); };
+$("auto").onchange = (e) => { auto = e.target.checked; acc = 0; };
+$("spd").oninput = (e) => { speed = +e.target.value; $("spdv").textContent = speed + " /秒"; };
+$("dig").onchange = (e) => { digits = +e.target.value; target %= Math.pow(10, digits); v %= Math.pow(10, digits); resize(); };
+$("lit").onchange = (e) => { lit = e.target.checked; };
+$("scale").onchange = (e) => { scale = +e.target.value; resize(); };
+$("spdv").textContent = speed + " /秒";
+resize(); requestAnimationFrame(tick);
+</script>
+</body>
+</html>

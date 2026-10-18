@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>資源バーのレイアウト設計</title>
+<style>
+  :root { --bg:#0d1014; --panel:#161b21; --ink:#d9dde2; --ink2:#8f98a3; --amber:#d99a3a; --line:#2a323b; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:14px 18px 40px; background:var(--bg); color:var(--ink); font:13px/1.55 "BIZ UDPGothic","Yu Gothic","Meiryo",sans-serif; }
+  h1 { font-size:17px; margin:0 0 4px; } .sub { color:var(--ink2); font-size:12px; margin-bottom:10px; max-width:1200px; }
+  .wrap { display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap; }
+  .scr { border:1px solid var(--line); background:#05070a; line-height:0; }
+  canvas { image-rendering:pixelated; width:960px; height:540px; display:block; max-width:100%; }
+  .side { width:360px; display:flex; flex-direction:column; gap:10px; }
+  .card { background:var(--panel); border:1px solid var(--line); padding:10px 12px; }
+  .card h2 { font-size:12px; margin:0 0 6px; color:var(--amber); letter-spacing:.04em; }
+  .row { display:flex; align-items:center; gap:8px; margin:5px 0; flex-wrap:wrap; }
+  .row > label { min-width:84px; color:var(--ink2); font-size:12px; }
+  input[type=range] { flex:1; min-width:120px; } .val { min-width:64px; text-align:right; font-variant-numeric:tabular-nums; }
+  button, select { background:#10151a; color:var(--ink); border:1px solid #39424c; padding:4px 9px; font:inherit; cursor:pointer; }
+  button:hover { border-color:var(--amber); } button.on { background:var(--amber); color:#111; border-color:var(--amber); }
+  .k { color:var(--ink2); font-size:12px; } .occ { font-variant-numeric:tabular-nums; }
+  .legend { display:flex; gap:12px; flex-wrap:wrap; font-size:11px; color:var(--ink2); margin-top:6px; }
+  .legend i { display:inline-block; width:10px; height:10px; margin-right:4px; vertical-align:-1px; }
+</style></head><body>
+<h1>HP・物資バーのレイアウト設計（すり合わせ用）</h1>
+<div class="sub">480×270 の液晶を 2 倍で表示。バーの絵は仮（コードで描いた板）。ここで決めるのは、<b>何を・どこに・どの大きさで・どう動かすか</b>。右の欄で、モード・最大値・現在値・表示の仕方を変えて、占有面積と見え方を確かめる。灰色の箱は「他の GUI が占める場所」。</div>
+<div class="wrap">
+  <div class="scr"><canvas id="cv" width="480" height="270"></canvas></div>
+  <div class="side">
+    <div class="card"><h2>デザイン</h2>
+      <div class="row"><select id="design"><option value="led" selected>A: LED メーター（計器）</option><option value="dial">B: 針のメーター（計器）</option><option value="game">C: ゲーム風のバー（比較用）</option></select></div>
+      <div class="k">A・B は、筐体の計器として作った案（アイコン・派手な塗りなし）。C は、前のゲーム風。</div>
+    </div>
+    <div class="card"><h2>モード</h2>
+      <div class="row"><button id="mNav" class="on">航行</button><button id="mBat">戦闘</button><span class="k">切り替えは 0.5 秒（縮む → 動く → 伸びる）</span></div>
+    </div>
+    <div class="card"><h2>物資</h2>
+      <div class="row"><label>最大値</label><select id="supMax"><option>500</option><option selected>1000</option><option>2000</option><option>3000</option></select><span class="k" id="supTick"></span></div>
+      <div class="row"><label>現在値</label><input type="range" id="sup" min="0" max="1000" value="720"><span class="val" id="supV"></span></div>
+      <div class="row"><label>使う予定</label><input type="range" id="pre" min="0" max="1000" value="0"><span class="val" id="preV"></span></div>
+      <div class="row"><button id="bSpend">−100 使う</button><button id="bBuy">＋100 買う</button></div>
+    </div>
+    <div class="card"><h2>HP</h2>
+      <div class="row"><label>最大値</label><input type="range" id="hpMax" min="10" max="150" value="40"><span class="val" id="hpMaxV"></span></div>
+      <div class="row"><label>現在値</label><input type="range" id="hp" min="0" max="40" value="34"><span class="val" id="hpV"></span></div>
+      <div class="row"><button id="bHit">−5 被ダメ</button><button id="bHeal">＋5 回復</button><span class="k" id="hpTick"></span></div>
+    </div>
+    <div class="card"><h2>表示の仕方</h2>
+      <div class="row"><label>HP の数値</label><select id="hpNumPos"><option value="inside">バーの窓の右端（台つき）</option><option value="left">バーの左の小窓</option></select></div>
+      <div class="row"><label>物資の数値</label><select id="supNum"><option value="always">常時</option><option value="change">変化した時とカーソル時のみ</option></select></div>
+      <div class="row"><label>戦闘の物資</label><select id="batSup"><option value="lamp">段階のランプだけ</option><option value="none">出さない</option></select></div>
+    </div>
+    <div class="card"><h2>占有</h2>
+      <div class="occ" id="occ"></div>
+      <div class="legend"><span><i style="background:#3a4048"></i>他の GUI（仮）</span><span><i style="background:#c8553f"></i>HP</span><span><i style="background:#e0b84a"></i>物資</span></div>
+    </div>
+  </div>
+</div>
+<script>
+"use strict";
+const W = 480, H = 270, cv = document.getElementById("cv"), g = cv.getContext("2d");
+const C = { bg:"#0a0e15", lite:"#161e2b", plate:"#2b3138", plateHi:"#5b636c", plateLo:"#15191e", out:"#07090c", win:"#0b0d10", off:"#3a322e", hp:"#e0623e", hpHi:"#ff9a78", sup:"#e8b73c", supHi:"#ffe08a", flash:"#fff2c8", ink:"#e2dcc6", dim:"#6f7480", red:"#c8553f", other:"#3a4048" };
+const F35 = { "0":"111101101101111","1":"010110010010111","2":"110001010100111","3":"110001010001110","4":"101101111001001","5":"111100110001110","6":"011100111101111","7":"111001010010010","8":"111101111101111","9":"111101111001110","-":"000000111000000","/":"001001010100100","H":"101101111101101","P":"110101110100100","S":"011100010001110","U":"101101101101111","x":"000101010101000","X":"101101010101101"," ":"000000000000000" };
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v)), lerp = (a, b, t) => a + (b - a) * t, ease = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+
+// ---- 状態 ----
+const S = { mode: 0, modeT: 0, supMax: 1000, sup: 720, pre: 0, hpMax: 40, hp: 34, supNumT: -1e9, hpNumT: -1e9, hover: false };
+const TK = { sup: { n: 40, cells: [], last: 720 }, hp: { n: 40, cells: [], last: 34 } };      // 目盛りごとの動き (cells[i] = { st: "on"|"flash"|"off"|"fade"|"sweep", t })
+const DISP = { sup: 720, hp: 34 };                                                              // 数字の表示値 (実際の値へ遅れて追いつく)
+
+// ---- 寸法の規則 ----
+const G = {
+  supW: 262, supH: 19, supTicks: 40, supStep: 6,                       // 物資: 長さ固定・目盛り 40 本 (1 本 = 最大値 ÷ 40)
+  hpNavH: 14, hpBatH: 19, pxPerHpNav: 4, pxPerHpBat: 6, hpCap: 40,    // HP: 40 以下は 1 目盛り = 1 HP で長さが伸びる / 40 超は目盛り 40 本・1 本 = 最大 ÷ 40
+  iconW: 16, endW: 4,
+};
+const hpTicks = () => Math.min(S.hpMax, G.hpCap), hpTickVal = () => S.hpMax / hpTicks(), supTickVal = () => S.supMax / G.supTicks;
+const hpInner = bat => hpTicks() * (bat ? G.pxPerHpBat : G.pxPerHpNav);
+
+// ---- 描く道具 ----
+const rect = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), w, h); };
+function text(s, x, y, c, sc = 1, align = "left") { s = String(s).toUpperCase(); const w = (s.length * 4 - 1) * sc; let x0 = Math.round(align === "right" ? x - w : align === "center" ? x - w / 2 : x); g.fillStyle = c;
+  for (const ch of s) { const gl = F35[ch] || F35[" "]; for (let i = 0; i < 15; i++) if (gl[i] === "1") g.fillRect(x0 + (i % 3) * sc, Math.round(y) + Math.floor(i / 3) * sc, sc, sc); x0 += 4 * sc; } return w; }
+function plate(x, y, w, h) { rect(x, y, w, h, C.out); rect(x + 1, y + 1, w - 2, h - 2, C.plate); rect(x + 1, y + 1, w - 2, 1, C.plateHi); rect(x + 1, y + h - 2, w - 2, 1, C.plateLo); for (const [rx, ry] of [[2, 2], [w - 4, 2], [2, h - 4], [w - 4, h - 4]]) rect(x + rx, y + ry, 1, 1, C.plateLo); }
+const ICON_HEART = ["01010", "11111", "11111", "01110", "00100"], ICON_CAN = ["01110", "10001", "11111", "10001", "11111"];
+function icon(rows, x, y, c) { g.fillStyle = c; rows.forEach((r, j) => [...r].forEach((v, i) => { if (v === "1") g.fillRect(x + i, y + j, 1, 1); })); }
+
+// ---- 目盛りの動き ----
+function syncTicks(k, n, lit, now) {                        // lit = 点灯する目盛りの数 (小数: 最後の 1 本は一部だけ)
+  const T = TK[k]; if (T.cells.length !== n) { T.cells = Array.from({ length: n }, (_, i) => ({ st: i < Math.floor(lit) ? "on" : "off", t: 0 })); T.last = lit; }
+  const a = Math.floor(T.last), b = Math.floor(lit);
+  if (b < a) for (let i = a - 1; i >= b; i--) { const c = T.cells[i]; if (c && c.st !== "off") { c.st = "flash"; c.t = now + (a - 1 - i) * 30; } }          // 減る: 右から左へ、 30ms おきに白く光って暗くなる
+  if (b > a) for (let i = a; i < b; i++) { const c = T.cells[i]; if (c) { c.st = "sweep"; c.t = now + (i - a) * 22; } }                                      // 増える: 左から右へ、 22ms おきに点く
+  T.last = lit;
+}
+function cellState(k, i, now, lit) {
+  const c = TK[k].cells[i]; if (!c) return "off";
+  if (c.st === "flash") { const dt = now - c.t; if (dt < 0) return "on"; if (dt < 130) return "flash"; if (dt < 330) return "fade"; c.st = "off"; return "off"; }
+  if (c.st === "sweep") { const dt = now - c.t; if (dt < 0) return "off"; if (dt < 90) return "flash"; c.st = "on"; return "on"; }
+  return i < Math.floor(lit) ? "on" : "off";
+}
+
+// ---- バー ----
+// 1 本のバー: icon + 窓 (目盛り) + 端。 値の数字は 窓の右端 (台つき) か、 バーの左の小窓
+function bar(k, x, y, h, inner, step, frac, col, colHi, ic, numStr, numPos, preFrac, lamp, markers, now) {
+  const wH = h - 8, wy = y + 4, tw = step, nT = Math.round(inner / step), lit = frac * nT;
+  const left = numPos === "left" ? (String(numStr).length * 8 + 6) : 0;
+  const total = left + G.iconW + inner + 4 + G.endW, X = Math.round(x - total);                                      // x = 右端 (画面右端にそろえる場合は W)
+  plate(X + left, y, total - left, h);
+  if (left) { plate(X, y + 1, left, h - 2); rect(X + 3, y + 4, left - 6, h - 10, C.win); text(numStr, X + 4, y + h / 2 - 3, C.ink, 1); }
+  icon(ic, X + left + 5, y + Math.floor(h / 2) - 2, colHi);
+  const wx = X + left + G.iconW + 2; rect(wx - 1, wy - 1, inner + 2, wH + 2, C.out); rect(wx, wy, inner, wH, C.win);
+  syncTicks(k, nT, lit, now);
+  const partial = lit - Math.floor(lit), lose = preFrac > 0 ? Math.min(Math.floor(lit), Math.ceil(preFrac * nT)) : 0, blink = Math.floor(now / 180) % 2 === 0;
+  for (let i = 0; i < nT; i++) { const sx = wx + i * step, st = cellState(k, i, now, lit); let c = C.off;
+    if (st === "on") c = col; else if (st === "flash") c = C.flash; else if (st === "fade") c = "#7a5a40";
+    if (lose && i >= Math.floor(lit) - lose && i < Math.floor(lit)) c = blink ? C.flash : C.off;
+    rect(sx, wy + 1, tw - 1, wH - 2, c); if (c === col) rect(sx, wy + 1, tw - 1, 1, colHi);
+    if (i === Math.floor(lit) && partial > 0.01 && st === "off") for (let yy = 0; yy < wH - 2; yy++) for (let xx = 0; xx < tw - 1; xx++) if (partial * 16 > BAYER[(yy & 3) * 4 + (xx & 3)]) rect(sx + xx, wy + 1 + yy, 1, 1, col);       // 最後の 1 本の一部: ディザ
+  }
+  for (const m of markers) rect(wx + Math.round(inner * m.at), y + 1, 1, 3, m.col);                                // 段階の境の印 (窓の上)
+  if (numPos === "inside") { const tw2 = (String(numStr).length * 4 - 1) * (wH >= 10 ? 2 : 1), sc = wH >= 10 ? 2 : 1; rect(wx + inner - tw2 - 5, wy + 1, tw2 + 4, wH - 2, "#0d0f12"); text(numStr, wx + inner - tw2 - 3, wy + Math.floor((wH - 5 * sc) / 2), C.ink, sc); }
+  if (lamp) rect(X + total - G.endW - 1, y + Math.floor(h / 2) - 1, 3, 3, lamp);
+  return { x: X, y, w: total, h };
+}
+
+
+// ================= 計器の案 (A: LED メーター / B: 針のメーター) =================
+/* 筐体の計器として作る: アイコン・派手な塗り・ゲーム風の枠は使わない。 板の上に、 刻印の文字 (HP / SUP)・目盛り・LED・針・7 セグの数字だけを置く。 色は琥珀の 1 色 (光る色) と、 暗い消灯の色。 段階 (CRIT / HALF) は、 板に印刷した帯で示す。 */
+const LED = { on: "#f2b441", hi: "#ffd98a", off: "#211c17", engr: "#8c939b", engrSh: "#0d1013", zoneRed: "#9c3b2b", zoneAmb: "#8a6a24", ghost: "#2a2119", seg: "#ffcf6a" };
+const NEEDLE = { sup: { a: Math.PI * 0.28, v: 0 }, hp: { a: Math.PI * 0.15, v: 0 } };
+const px = (x, y, c) => rect(x, y, 1, 1, c);
+function line(x0, y0, x1, y1, c) { x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1); const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let er = dx + dy; for (;;) { px(x0, y0, c); if (x0 === x1 && y0 === y1) break; const e2 = 2 * er; if (e2 >= dy) { er += dy; x0 += sx; } if (e2 <= dx) { er += dx; y0 += sy; } } }
+function engrave(s, x, y, sc = 1) { text(s, x + 1, y + 1, LED.engrSh, sc); return text(s, x, y, LED.engr, sc); }
+function seg7(str, x, y, nDigits, sc = 2) {                                 // 7 セグ風: 消灯の桁 (8) を薄く、 点灯の桁を明るく。 右ぞろえ
+  const w = 4 * sc; const s2 = String(str).padStart(nDigits, " ");
+  for (let i = 0; i < nDigits; i++) { text("8", x + i * w, y, LED.ghost, sc); if (s2[i] !== " ") text(s2[i], x + i * w, y, LED.seg, sc); }
+  return nDigits * w - sc;
+}
+function ledStrip(k, x, y, nT, step, h, frac, now, preFrac) {                     // LED の窓。 点灯の目盛りは、 減る時に右から白く光って消える
+  rect(x - 1, y - 1, nT * step + 1, h + 2, C.out); rect(x, y, nT * step - 1, h, "#0b0a09");
+  const lit = frac * nT; syncTicks(k, nT, lit, now);
+  const partial = lit - Math.floor(lit), lose = preFrac > 0 ? Math.min(Math.floor(lit), Math.ceil(preFrac * nT)) : 0, blink = Math.floor(now / 180) % 2 === 0;
+  for (let i = 0; i < nT; i++) { const sx = x + i * step, st = cellState(k, i, now, lit); let c = LED.off;
+    if (st === "on") c = LED.on; else if (st === "flash") c = C.flash; else if (st === "fade") c = "#6a4a28";
+    if (lose && i >= Math.floor(lit) - lose && i < Math.floor(lit)) c = blink ? C.flash : LED.off;
+    rect(sx, y + 1, step - 1, h - 2, c); if (c === LED.on) rect(sx, y + 1, step - 1, 1, LED.hi);
+    if (i === Math.floor(lit) && partial > 0.01 && st === "off") for (let yy = 0; yy < h - 2; yy++) for (let xx = 0; xx < step - 1; xx++) if (partial * 16 > BAYER[(yy & 3) * 4 + (xx & 3)]) px(sx + xx, y + 1 + yy, LED.on);
+  }
+}
+function zoneBand(x, y, w) { rect(x, y, Math.round(w * .2), 2, LED.zoneRed); rect(x + Math.round(w * .2), y, Math.round(w * .3), 2, LED.zoneAmb); }       // 板に印刷した帯: 赤 = CRIT (20% 未満)・琥珀 = HALF (50% 未満)
+function ledBlock(k, xr, y, label, nT, step, h, frac, now, numStr, nDig, preFrac, scale, suffix, withZones, lamp) {
+  const labW = (label.length * 4 - 1) + 8, sc = 2, numW = nDig * 4 * sc + (suffix ? suffix.length * 4 : 0) + 8, inner = nT * step, plateH = h + 12 + (scale ? 8 : 0);
+  const total = labW + inner + 8 + numW, X = Math.round(xr - total), wy = y + 6;
+  plate(X, y, total, plateH); engrave(label, X + 4, y + Math.floor((plateH - (scale ? 8 : 0)) / 2) - 2);
+  const wx = X + labW + 3; if (withZones) zoneBand(wx, y + 3, inner);
+  ledStrip(k, wx, wy, nT, step, h, frac, now, preFrac);
+  if (scale) { for (const [f, lab] of scale) { const tx = wx + Math.round(inner * f); rect(tx, wy + h + 2, 1, 2, LED.engr); text(lab, Math.min(Math.max(tx - Math.floor((lab.length * 4 - 1) / 2), wx - 2), wx + inner - (lab.length * 4 - 1) + 2), wy + h + 5, LED.engr, 1); } }
+  const nx = wx + inner + 5; rect(nx - 2, y + 3, numW - 2, plateH - 6 - (scale ? 6 : 0), "#0c0a08"); const ww = seg7(numStr, nx, wy + Math.floor((h - 10) / 2) + 0, nDig, sc); if (suffix) engrave(suffix, nx + ww + 3, wy + Math.floor((h - 5) / 2) + 2);
+  if (lamp) rect(X + total - 5, y + 3, 3, 3, lamp);
+  return { x: X, y, w: total, h: plateH };
+}
+function dial(k, cx, cy, R, frac, label, numStr, nDig, now, dt, withZones, lamp, plateW, plateH) {        // 針のメーター: 半円の文字盤・目盛り・針 (ばね + 少し行き過ぎる)・7 セグの数字
+  const N = NEEDLE[k], target = Math.PI * (1 - clamp(frac, 0, 1)), K = 150, Cd = 13, h2 = dt / 3;
+  for (let i = 0; i < 3; i++) { N.v += (K * (target - N.a) - Cd * N.v) * h2; N.a += N.v * h2; }
+  const px0 = Math.round(cx - plateW / 2), py0 = Math.round(cy - R - 8);
+  plate(px0, py0, plateW, plateH);
+  if (withZones) for (let t = 0; t <= 50; t++) { const f = t / 100, a = Math.PI * (1 - f); px(cx + Math.cos(a) * (R + 1), cy - Math.sin(a) * (R + 1), f < .2 ? LED.zoneRed : LED.zoneAmb); px(cx + Math.cos(a) * (R + 2), cy - Math.sin(a) * (R + 2), f < .2 ? LED.zoneRed : LED.zoneAmb); }
+  for (let i = 0; i <= 10; i++) { const a = Math.PI * (1 - i / 10), r0 = R, r1 = R - (i % 5 === 0 ? 6 : 3); line(cx + Math.cos(a) * r0, cy - Math.sin(a) * r0, cx + Math.cos(a) * r1, cy - Math.sin(a) * r1, LED.engr); }
+  engrave(label, cx - Math.floor((label.length * 4 - 1) / 2), cy - Math.round(R * .55) - 3);
+  const wob = frac < .2 ? Math.sin(now / 25) * 0.025 : 0, a = clamp(N.a + wob, -0.12, Math.PI + 0.12);
+  line(cx, cy, cx + Math.cos(a) * (R - 2), cy - Math.sin(a) * (R - 2), LED.hi); line(cx + 1, cy, cx + 1 + Math.cos(a) * (R - 4), cy - Math.sin(a) * (R - 5), LED.on);
+  rect(cx - 2, cy - 1, 5, 3, C.out); rect(cx - 1, cy - 1, 3, 2, C.plateHi);                                           // 軸
+  rect(cx - Math.floor(nDig * 4 + 1), cy + 3, nDig * 8 + 3, 12, "#0c0a08"); seg7(numStr, cx - Math.floor(nDig * 4 - 1), cy + 4, nDig, 2);
+  if (lamp) rect(px0 + plateW - 6, py0 + 3, 3, 3, lamp);
+  return { x: px0, y: py0, w: plateW, h: plateH };
+}
+function stageLamp(lx, ly, supStage) { plate(lx, ly, 30, 22); engrave("SUP", lx + 4, ly + 3); for (let i = 0; i < 3; i++) rect(lx + 5 + i * 8, ly + 12, 6, 5, i <= supStage ? [C.red, LED.zoneAmb, LED.on][supStage] : LED.off); return { x: lx, y: ly, w: 30, h: 22 }; }
+function layoutAlt(DSN, now, e, supLit, hpLit, supStage, blink2, supNumVisible, dt) {
+  const lampSup = supStage === 0 ? (blink2 ? C.red : C.plateLo) : null, lampHp = hpLit < .25 ? (blink2 ? C.red : C.plateLo) : null, preF = S.pre / S.supMax;
+  const hpN = hpTicks(), supNum = Math.round(DISP.sup), hpNum = Math.round(DISP.hp), digSup = String(S.supMax).length, digHp = String(S.hpMax).length;
+  const supScale = [[0, "0"], [.5, String(S.supMax / 2)], [1, String(S.supMax)]];
+  if (e < 1) {
+    const off = Math.round(e * 52);
+    if (DSN === "led") {
+      const sup = ledBlock("sup", W, H - 28 + off, "SUP", G.supTicks, 4, 9, supLit, now, supNum, digSup, preF, supScale, "", true, lampSup);
+      const hp = ledBlock("hp", W, H - 28 - 20 + off, "HP", hpN, 3, 7, hpLit, now, hpNum, digHp, 0, null, "/" + S.hpMax, false, lampHp);
+      if (off < 40) boxes.push(["物資", sup], ["HP", hp]);
+      if (S.pre > 0) text("-" + S.pre, sup.x + sup.w - 6, sup.y - 8, C.flash, 1, "right");
+    } else {
+      const sup = dial("sup", W - 34, H - 28 + off, 26, supLit, "SUP", supNum, digSup, now, dt, true, lampSup, 66, 49);
+      const hp = dial("hp", sup.x - 28, H - 24 + off, 20, hpLit, "HP", hpNum, digHp, now, dt, false, lampHp, 52, 43);
+      if (off < 40) boxes.push(["物資", sup], ["HP", hp]);
+      if (S.pre > 0) text("-" + S.pre, sup.x + sup.w / 2, sup.y - 8, C.flash, 1, "center");
+    }
+  }
+  if (e > 0) {
+    const off = Math.round((1 - e) * 52);
+    if (DSN === "led") {
+      const hp = ledBlock("hp", W / 2 + 100, H - 30 + off, "HP", hpN, 5, 11, hpLit, now, hpNum, digHp, 0, [[0, "0"], [1, String(S.hpMax)]], "/" + S.hpMax, false, lampHp);
+      boxes.push(["HP", hp]); if ($("batSup").value === "lamp") boxes.push(["段階ランプ", stageLamp(hp.x + hp.w + 3, H - 22 + off, supStage)]);
+    } else {
+      const hp = dial("hp", W / 2 - 18, H - 26 + off, 32, hpLit, "HP", hpNum, digHp, now, dt, false, lampHp, 80, 56);
+      boxes.push(["HP", hp]); if ($("batSup").value === "lamp") boxes.push(["段階ランプ", stageLamp(hp.x + hp.w + 3, H - 22 + off, supStage)]);
+    }
+  }
+}
+// ---- 画面 ----
+let boxes = [];
+function frame(now) {
+  const dt = Math.min(0.05, (now - (frame.last || now)) / 1000); frame.last = now;
+  S.modeT = clamp(S.modeT + (S.mode ? 1 : -1) * dt / 0.5, 0, 1); const e = ease(S.modeT);
+  DISP.sup += (S.sup - DISP.sup) * (1 - Math.exp(-dt / 0.09)); DISP.hp += (S.hp - DISP.hp) * (1 - Math.exp(-dt / 0.09));
+  g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
+  for (let y = 0; y < H; y += 6) for (let x = (y / 6 & 1) * 3; x < W; x += 6) rect(x, y, 1, 1, "#111a24");
+  // 他の GUI (仮)
+  const lab = (s, x, y) => { g.font = "9px monospace"; g.fillStyle = "#7d8691"; g.textAlign = "center"; g.fillText(s, x, y); g.textAlign = "left"; };
+  rect(0, 0, 90, 176, C.other); lab("GOLD / PANEL", 45, 88); rect(391, 0, 89, 89, C.other); lab("RADAR", 435, 46);
+  if (S.mode || S.modeT > 0) { const a = 1 - (1 - e); rect(110, 40, 260, 160, "#20262e"); lab("BATTLE BOARD", 240, 124); }
+  boxes = []; const now2 = now;
+  const supLit = S.sup / S.supMax, hpLit = S.hp / S.hpMax, supStage = supLit < .2 ? 0 : supLit < .5 ? 1 : 2;
+  const blink2 = Math.floor(now / 350) % 2 === 0;
+  const supNumVisible = $("supNum").value === "always" || (now - S.supNumT < 1800) || S.hover;
+  const markers = [{ at: .2, col: C.red }, { at: .5, col: C.sup }];
+  const DSN = $("design").value;
+  if (DSN !== "game") layoutAlt(DSN, now, e, supLit, hpLit, supStage, blink2, supNumVisible, dt);
+  // 航行: 物資 (右下ぞろえ・一番下)・ HP (その上)。 戦闘へ行く時は、 下へ引っ込む
+  if (DSN === "game" && e < 1) {
+    const off = Math.round(e * 44);
+    const sup = bar("sup", W, H - G.supH + off, G.supH, G.supTicks * G.supStep, G.supStep, supLit, C.sup, C.supHi, ICON_CAN, Math.round(DISP.sup), "inside", S.pre / S.supMax, supStage === 0 && blink2 ? C.red : supStage === 0 ? C.plateLo : null, markers, now2);
+    if (!supNumVisible) { /* 数字を出さない時は台ごと消す代わりに、 窓の右端だけ暗くする (仮) */ }
+    const hpIn = hpInner(false), hp = bar("hp", W, H - G.supH - G.hpNavH + off, G.hpNavH, hpIn, G.pxPerHpNav, hpLit, C.hp, C.hpHi, ICON_HEART, Math.round(DISP.hp) + "/" + S.hpMax, $("hpNumPos").value, 0, hpLit < .25 && blink2 ? C.red : null, [], now2);
+    if (off < 40) boxes.push(["物資", sup], ["HP", hp]);
+  }
+  // 戦闘: HP は中央下・物資は段階のランプだけ
+  if (DSN === "game" && e > 0) {
+    const off = Math.round((1 - e) * 44), hpIn = hpInner(true), numStr = Math.round(DISP.hp) + "/" + S.hpMax;
+    const cx = W / 2 + (($("batSup").value === "lamp") ? -14 : 0);
+    const hp = bar("hp", Math.round(cx + (G.iconW + hpIn + 4 + G.endW + ($("hpNumPos").value === "left" ? numStr.length * 8 + 6 : 0)) / 2), H - G.hpBatH + off, G.hpBatH, hpIn, G.pxPerHpBat, hpLit, C.hp, C.hpHi, ICON_HEART, numStr, $("hpNumPos").value, 0, hpLit < .25 && blink2 ? C.red : null, [], now2);
+    boxes.push(["HP", hp]);
+    if ($("batSup").value === "lamp") { const lx = hp.x + hp.w + 3, ly = H - G.hpBatH + off; plate(lx, ly, 26, G.hpBatH); icon(ICON_CAN, lx + 3, ly + 7, C.supHi);
+      const lc = [C.red, C.sup, "#7fd06a"][supStage]; for (let i = 0; i < 3; i++) rect(lx + 12 + i * 4, ly + 7, 3, 5, i <= supStage ? (supStage === 0 && !blink2 ? C.plateLo : lc) : C.plateLo); boxes.push(["段階ランプ", { x: lx, y: ly, w: 26, h: G.hpBatH }]); }
+  }
+  // 見込みの数字 (物資)
+  if (DSN === "game" && S.pre > 0 && e < 1) text("-" + S.pre, W - 36, H - G.supH - G.hpNavH - 9 + Math.round(e * 44), C.flash, 1, "right");
+  let a = 0; for (const [, b] of boxes) a += b.w * b.h;
+  const mine = boxes.map(([n, b]) => `${n} ${b.w}×${b.h} = ${b.w * b.h}px`).join("<br>");
+  $("occ").innerHTML = `${mine}<br><b>合計 ${a} px = 画面の ${(a / (W * H) * 100).toFixed(1)}%</b>`;
+  $("supTick").textContent = `1 目盛り = ${supTickVal()}`; $("hpTick").textContent = hpTickVal() === 1 ? "1 目盛り = 1 HP" : `1 目盛り = ${hpTickVal().toFixed(2)} HP（目盛り 40 本・長さ固定）`;
+  requestAnimationFrame(frame);
+}
+// ---- 操作 ----
+const syncRanges = () => { $("sup").max = S.supMax; $("pre").max = S.supMax; $("hp").max = S.hpMax; $("supV").textContent = S.sup + " / " + S.supMax; $("preV").textContent = S.pre; $("hpMaxV").textContent = S.hpMax; $("hpV").textContent = S.hp + " / " + S.hpMax; };
+const setSup = v => { const o = S.sup; S.sup = clamp(Math.round(v), 0, S.supMax); if (S.sup !== o) S.supNumT = performance.now(); $("sup").value = S.sup; syncRanges(); };
+const setHp = v => { const o = S.hp; S.hp = clamp(Math.round(v), 0, S.hpMax); if (S.hp !== o) S.hpNumT = performance.now(); $("hp").value = S.hp; syncRanges(); };
+$("mNav").onclick = () => { S.mode = 0; $("mNav").classList.add("on"); $("mBat").classList.remove("on"); };
+$("mBat").onclick = () => { S.mode = 1; $("mBat").classList.add("on"); $("mNav").classList.remove("on"); };
+$("supMax").onchange = e => { const r = S.sup / S.supMax; S.supMax = +e.target.value; S.sup = Math.round(r * S.supMax); S.pre = 0; $("pre").value = 0; TK.sup.cells = []; $("sup").value = S.sup; syncRanges(); };
+$("sup").oninput = e => setSup(+e.target.value); $("pre").oninput = e => { S.pre = Math.min(+e.target.value, S.sup); syncRanges(); };
+$("hpMax").oninput = e => { S.hpMax = +e.target.value; if (S.hp > S.hpMax) S.hp = S.hpMax; TK.hp.cells = []; $("hp").value = S.hp; syncRanges(); };
+$("hp").oninput = e => setHp(+e.target.value);
+$("bSpend").onclick = () => setSup(S.sup - 100); $("bBuy").onclick = () => setSup(S.sup + 100);
+$("bHit").onclick = () => setHp(S.hp - 5); $("bHeal").onclick = () => setHp(S.hp + 5);
+cv.onpointerenter = () => { S.hover = true; }; cv.onpointerleave = () => { S.hover = false; };
+syncRanges(); requestAnimationFrame(frame);
+</script></body></html>

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>魔石探知の描画案</title>
+<style>
+  :root { --bg: #14161a; --ink: #e6e4de; --ink2: #9a9ca0; --line: #33373d; }
+  @media (prefers-color-scheme: light) { :root { --bg: #f4f3ef; --ink: #1d1f22; --ink2: #5a5d62; --line: #c9c5ba; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.6 "BIZ UDPGothic","Yu Gothic","Meiryo",sans-serif; padding: 24px 20px 60px; }
+  h1 { font-size: 22px; margin: 0 0 4px; } h2 { font-size: 16px; margin: 0 0 2px; }
+  .sub, .d { color: var(--ink2); font-size: 13px; max-width: 900px; }
+  .pat { margin: 26px 0 0; padding-top: 14px; border-top: 1px solid var(--line); }
+  .row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
+  .cell { font-size: 12px; color: var(--ink2); text-align: center; }
+  canvas { image-rendering: pixelated; display: block; width: 356px; height: 356px; margin-bottom: 4px; background: #14141a; }
+</style>
+</head>
+<body>
+<h1>魔石探知の描画案</h1>
+<div class="sub">今は「方角の 2 本の輪の弧が、明るいか暗いか」だけ。光る領域は輪に縛られなくてよいので、<b>輪と無関係な形</b>も含めて 6 案を、同じ画像（rader.png / rader_line.png / rader_stone.png）の上に並べた。どれも<b>静止画</b>（アニメーションなし）で、強弱の 2 段階だけを表す。各行は左から「弱（遠い）」「強（近い・察知されている）」「強 ＋ 木霊の偽物（別の方角にもう 1 つ）」。</div>
+<div id="root"></div>
+<script>
+const SRC = { bg: "data:image/png;base64,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", line: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAeAAAAEOCAYAAABRmsRnAAAACXBIWXMAADXUAAA11AFeZeUIAAAEIElEQVR4nO3dQXIiMQwFUDOVk3EWjpWz5GrMihmGSoam28aS/N6OqrSRVr/kDnZrAAAAAAAAAAAAAAAAAAAAAAAAMMNpdgH/c72089a/PX22r5G1AEBPoQL4MXBfCdUjzwLAu00P4Pvg7Bmao9YFgNSul3Z+ZYs5y3cBQEgzw1AQA7CkKOEXpQ4AGCri5BmxJgDoJnrIRa8PAF6SacLMVCsA/ChrmGWtGwDSh1j2+gFYUJXwqtIHAAuoFlrV+gEglo/ZBTyzJQgdNQlANl3Ogr5e2rlXCO65VGHURQw9+wKArnpt1fb8KVDvtXqsAwD3pm9B3wKu56R5W2vE2gAw3dHp8J23Ic18HgC6yRZq2eoFgG8dCaSZ1xHOeBYAusgcZJlrB2Bxe4MoSoBlrx+ABVWYICv0AMBiqkyPVfoAYBF7AihqaFXqBYDCqk2N1foBoKiKE2PFngCI79fsAgBgRQIYACKr+r60al8AFFH5XWnl3gCIyRY0AEwggAFgAgEMABMIYACYQAADwAQCGAAmEMAAMIEABoDIqp4YVbUvAAqpeGJUxZ4AiM8WNABMIIABILpq70ur9QNAYZXemVbqBYDiqkyNVfoAYBFHAihKeFXoAYAFZZ8es9cPwKIyT5CZaweAlEGWsWYA+MfRQHp3oGWrFwB+lCXUstQJAJv1CLdRAddjbeELwAgfsws4fbav1v4G3e3zET3XAoARTj0WuV7auVfYPU6cW9bd88zWWoQ4ACN0CeDWxoXVli3gUd8rfAEYZfoW9DNCEACeqPIPS1X6AGAh2cMre/0ALCxriGWtGwD+GPn73t4y1QoAm0QPtuj1AcBuESfMiDUBwBBRAi9KHQDwNjMnT1MvAMt7ZxgKXgCi6XYU5V73wdjz1KtR6wJAD9MD+N6RSxVGXcgAACOECuBHr2wbC1wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKCY30JEVigYF52rAAAAAElFTkSuQmCC", stone: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAeAAAAEOCAYAAABRmsRnAAAACXBIWXMAADXUAAA11AFeZeUIAAACyklEQVR4nO3dOw7CMBBF0YGSdbIs1kkbGpAMQhA+iv2sc7p8iumuLE2UKgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADYwnKspfcMAPCrXe8BPtHGd3fKmh0AWvveA6y1HGu5Rvd8u+48EgB8LSLATXyrqg7t/U4jAcBPhg/wQ3yfPt9yHgD4h6ED/C6+7XtbzAMA/zJ0gNewjAVAougAiy8AqWIDLL4AJIsMsPgCkC4uwOILwAziAmzjGYAZDB/gx+A6AQMwg+EDXHUfYSdgAGYQEeAq4QVgLjEBrhJhAOYRFWAAmIUAA0AHQwd47Y8YbEYDkGboAFe9jrD4ApBq+ABXPY+w+AKQLCpg7Ra0+ALAhnyKBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAKxzAUVXPk+th2YxAAAAAElFTkSuQmCC" };
+const N = 89, CX = 44, CY = 44, LIT = [224, 98, 30];
+const imgs = {}; let left = 3;
+for (const k in SRC) { const i = new Image(); i.onload = () => { if (--left === 0) start(); }; i.src = SRC[k]; imgs[k] = i; }
+function data(im) { const c = document.createElement("canvas"); c.width = im.naturalWidth; c.height = im.naturalHeight; const g = c.getContext("2d"); g.drawImage(im, 0, 0); return g.getImageData(0, 0, N, N).data; }
+function start() {
+  const bg = data(imgs.bg), ln = data(imgs.line), st = data(imgs.stone);
+  const isScreen = (x, y) => { if (x < 0 || y < 0 || x >= N || y >= N) return false; const i = (y * N + x) * 4; return bg[i] === 20 && bg[i + 1] === 20 && bg[i + 2] === 23; };
+  const ring = [], stone = [], own = new Set();
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const i = (y * N + x) * 4;
+    if (ln[i + 3] > 0) { const dx = x - CX, dy = y - CY; ring.push({ x, y, r: Math.hypot(dx, dy) < 28 ? 0 : 1, a: Math.atan2(dy, dx) }); own.add(y * N + x); }
+    if (st[i + 3] > 0) { stone.push({ x, y }); own.add(y * N + x); } }
+  const adiff = (a, b) => { let d = a - b; d = Math.atan2(Math.sin(d), Math.cos(d)); return Math.abs(d); };
+  const A0 = b => b * Math.PI / 2;                                      // 0 東 1 南 2 西 3 北 (画面は y が下向き)
+  const rgba = a => `rgba(${LIT},${a})`;
+  const dot = (g, x, y, col) => { g.fillStyle = col; g.fillRect(x, y, 1, 1); };
+  const halo = (g, list, a) => { const seen = new Set(); for (const p of list) for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const qx = p.x + ax, qy = p.y + ay, k = qy * N + qx; if (isScreen(qx, qy) && !own.has(k) && !seen.has(k)) { seen.add(k); dot(g, qx, qy, rgba(a)); } } };
+  const base = g => g.drawImage(imgs.bg, 0, 0, N, N, 0, 0, N, N);
+  const dimRings = (g, skip) => { for (const p of ring) if (!skip || !skip(p)) dot(g, p.x, p.y, "rgba(255,100,0,0.2588)"); };
+  const stoneOn = g => { halo(g, stone, 0.22); for (const p of stone) dot(g, p.x, p.y, rgba(1)); };
+  const lit = (g, list, a = 1, withHalo = true) => { if (withHalo) halo(g, list, 0.22 * a); for (const p of list) dot(g, p.x, p.y, rgba(a)); };
+  // 方角 b を向いた座標系: along = 方角へ進んだ距離 / lat = 横のずれ
+  const coord = (x, y, b) => { const dx = x - CX, dy = y - CY, a = A0(b), ux = Math.cos(a), uy = Math.sin(a); return { along: dx * ux + dy * uy, lat: -dx * uy + dy * ux }; };
+  const eachScreen = fn => { for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (isScreen(x, y) && !own.has(y * N + x)) fn(x, y); };
+
+  const PATS = [
+    { t: "A. 現行（輪の弧が光る）", d: "比較用。方角の 90° の弧が光る。弱 = 内側の輪だけ、強 = 内側と外側の輪。",
+      draw(g, s) { base(g); const on = p => s.dirs.some(b => adiff(p.a, A0(b)) <= Math.PI / 4 + 1e-6) && (p.r === 0 || s.strong); dimRings(g, on); lit(g, ring.filter(on)); stoneOn(g); } },
+    { t: "B. 画面の縁の帯", d: "方角側の画面の縁が帯状に光る。弱 = 細い 2 ドットの帯、強 = 太い 5 ドットの帯で、縁から内側へ向かって薄くなる。輪は関係なし。",
+      draw(g, s) { base(g); dimRings(g); const w = s.strong ? 5 : 2;
+        for (const b of s.dirs) eachScreen((x, y) => { const c = coord(x, y, b); if (Math.abs(c.lat) > 31 || c.along < 0) return; const edge = 36, d = edge - c.along; if (d <= w && d >= -3) dot(g, x, y, rgba(s.strong ? 0.95 - Math.max(0, d) * 0.15 : 0.9)); });
+        stoneOn(g); } },
+    { t: "C. 矢じり（シェブロン）", d: "方角へ向いた「＜」型の矢じりが、石と画面の縁の間に並ぶ。弱 = 1 つ（外寄り）、強 = 3 つ。数で強弱を示す。",
+      draw(g, s) { base(g); dimRings(g); const radii = s.strong ? [20, 26, 32] : [32], list = [];
+        for (const b of s.dirs) { const a = A0(b), ux = Math.cos(a), uy = Math.sin(a);
+          for (const r of radii) for (let k = -6; k <= 6; k++) { const al = r - Math.abs(k), x = Math.round(CX + ux * al - uy * k), y = Math.round(CY + uy * al + ux * k); list.push({ x, y }); } }
+        lit(g, list); stoneOn(g); } },
+    { t: "D. 1 本目と 2 本目の輪の間の扇（固定の範囲）", d: "範囲は、内側の輪と外側の輪の間の、方角の 90° の扇形（環の一部）に固定。弱 = 市松の網点（半分）、強 = ベタ塗り。強のときは、扇の両端の輪の弧も光らせる。",
+      draw(g, s) { base(g); const inBand = (x, y) => { const r = Math.hypot(x - CX, y - CY); return r > 22.5 && r < 32.5; };
+        const arc = p => s.strong && s.dirs.some(b => adiff(p.a, A0(b)) <= Math.PI / 4 + 1e-6);
+        dimRings(g, arc);
+        eachScreen((x, y) => { if (!inBand(x, y)) return; const dx = x - CX, dy = y - CY; if (!s.dirs.some(b => adiff(Math.atan2(dy, dx), A0(b)) <= Math.PI / 4)) return;
+          if (s.strong || (x + y) % 2 === 0) dot(g, x, y, rgba(s.strong ? 0.85 : 0.7)); });
+        if (s.strong) lit(g, ring.filter(arc), 1, false);
+        stoneOn(g); } },
+    { t: "E. 石から伸びるくさび（ビーム）", d: "石から方角へ、先が広がるくさび形が伸びる。弱 = 途中まで（短い）、強 = 画面の縁まで届く。中心の線だけ明るく、中は淡く塗る。",
+      draw(g, s) { base(g); dimRings(g); const reach = s.strong ? 36 : 23;
+        for (const b of s.dirs) eachScreen((x, y) => { const c = coord(x, y, b), lim = (c.along - 12) * 0.42; if (c.along < 12 || c.along > reach || Math.abs(c.lat) > lim) return;
+          const edge = Math.abs(c.lat) > lim - 1, mid = Math.abs(c.lat) < 0.6; dot(g, x, y, rgba(mid || edge ? 0.95 : 0.3)); });
+        stoneOn(g); } },
+    { t: "F. 反応の点（ブリップ）", d: "方角の軸の上に、小さな十字の点が 1 つ出る。距離が位置になる: 弱 = 外寄り（遠い）、強 = 石の近く。輪は背景のまま。",
+      draw(g, s) { base(g); dimRings(g); const R = s.strong ? 17 : 30, list = [];
+        for (const b of s.dirs) { const x = Math.round(CX + Math.cos(A0(b)) * R), y = Math.round(CY + Math.sin(A0(b)) * R); for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) list.push({ x: x + dx, y: y + dy }); }
+        lit(g, list); stoneOn(g); } },
+  ];
+  const STATES = [{ n: "弱（遠い）", dirs: [1], strong: false }, { n: "強（近い・察知）", dirs: [3], strong: true }, { n: "強 ＋ 木霊の偽物", dirs: [3, 0], strong: true }];
+  const root = document.getElementById("root");
+  for (const p of PATS) {
+    const sec = document.createElement("div"); sec.className = "pat"; sec.innerHTML = `<h2>${p.t}</h2><div class="d">${p.d}</div>`;
+    const row = document.createElement("div"); row.className = "row";
+    for (const s of STATES) { const cell = document.createElement("div"); cell.className = "cell"; const cv = document.createElement("canvas"); cv.width = N; cv.height = N; p.draw(cv.getContext("2d"), s); cell.appendChild(cv); cell.appendChild(document.createTextNode(s.n)); row.appendChild(cell); }
+    sec.appendChild(row); root.appendChild(sec);
+  }
+}
+</script>
+</body>
+</html>

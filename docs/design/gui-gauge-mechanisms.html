@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ゲージ切替の機構案</title>
+<style>
+  /* 色は仮 (灰色の段階だけ)。 見るのは「部品のつながり」と「切り替えの動き」。
+     条件: 隠す側は、 その場で覆ったり消したりしない。 必ず画面の外 (下の破線より外) へ出ていく */
+  :root { --bg:#1b1c1e; --ink:#d8d8d4; --dim:#8c8d88; --plate:#55574f; --plateHi:#6c6e66; --plateLo:#3c3d38; --deep:#151617; --win:#0e0f10; --fill:#c9c6b4; --fill2:#9fa39a; --lamp:#d9d26a; --off:#2b2c28; --line:#34363a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.6 system-ui,"Yu Gothic",sans-serif; padding:20px 16px 60px; }
+  main { max-width:980px; margin:0 auto; display:grid; gap:22px; }
+  h1 { font-size:19px; margin:0; } .lead { margin:0; color:var(--dim); font-size:13px; }
+  .bar { position:sticky; top:0; z-index:50; background:var(--bg); padding:10px 0; display:flex; flex-wrap:wrap; gap:10px; align-items:center; border-bottom:1px solid var(--line); }
+  button, input { font:inherit; color:var(--ink); }
+  button { background:#2a2b2e; border:1px solid #4a4c50; padding:7px 14px; cursor:pointer; }
+  button:focus-visible, input:focus-visible { outline:2px solid var(--lamp); outline-offset:2px; }
+  .mode { font-weight:700; letter-spacing:.08em; min-width:120px; }
+  label { display:flex; gap:6px; align-items:center; color:var(--dim); font-size:13px; }
+  .card { border:1px solid var(--line); background:#202124; padding:16px; display:grid; gap:12px; }
+  .card h2 { margin:0; font-size:16px; } .card h2 small { color:var(--dim); font-weight:400; margin-left:8px; }
+  .stageWrap { overflow-x:auto; }
+  /* 舞台 = 画面の下の帯。 下端と左右の端の外は「画面の外」 (薄く見せるだけで、 本番では見えない) */
+  .outer { position:relative; width:900px; height:260px; margin:0 auto; background: repeating-linear-gradient(45deg, #17181a 0 6px, #1c1d20 6px 12px); }
+  .stage { position:absolute; left:40px; top:10px; width:820px; height:170px; background:#0f1a24; outline:1px dashed #7a8a9a; overflow:visible; }
+  .stage::after { content:"画面の端"; position:absolute; right:4px; bottom:-16px; font-size:11px; color:#7a8a9a; }
+  .offlabel { position:absolute; left:44px; bottom:6px; font-size:11px; color:#6c6e72; }
+  .clipOff { position:absolute; inset:0; overflow:hidden; }          /* 見え方の確認用: 画面の外を隠したい時に使う */
+  .outer.clip .stage { overflow:hidden; }
+  .notes { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:10px 18px; font-size:13px; }
+  .notes b { color:var(--ink); } .notes p { margin:0; color:var(--dim); }
+  /* ---- 部品 ---- */
+  .plate { position:absolute; background:var(--plate); border:2px solid #111; box-shadow: inset 2px 2px 0 var(--plateHi), inset -2px -2px 0 var(--plateLo); }
+  .bolt { position:absolute; width:8px; height:8px; border-radius:50%; background:#3a3b36; box-shadow: inset 1px 1px 0 #7a7c74; }
+  .win { position:absolute; background:var(--win); border:2px solid #0a0a0a; box-shadow: inset 0 2px 0 #000; overflow:hidden; }
+  .fill { position:absolute; left:0; top:0; bottom:0; background:var(--fill); transition: width .6s cubic-bezier(.3,.7,.3,1); }
+  .fill.hp { background:var(--fill2); }
+  .ticks { position:absolute; left:0; right:0; bottom:0; height:6px; background: repeating-linear-gradient(90deg, #555 0 1px, transparent 1px 10%); }
+  .scale { position:absolute; display:flex; justify-content:space-between; font:10px/1 ui-monospace,Consolas,monospace; color:#e2e0d4; }
+  .eng { position:absolute; font:700 11px/1 ui-monospace,Consolas,monospace; letter-spacing:.12em; color:#c8c9c2; text-shadow:1px 1px 0 #111; white-space:nowrap; }
+  .note { position:absolute; font:11px/1.3 system-ui,"Yu Gothic",sans-serif; color:#9fb0c0; white-space:nowrap; }
+  .ctr { position:absolute; display:flex; gap:2px; padding:3px; background:#0b0b0c; border:2px solid #000; box-shadow: 0 0 0 2px var(--plateLo); }
+  .ctr span { width:14px; height:20px; display:grid; place-items:center; font:700 15px/1 ui-monospace,Consolas,monospace; color:#ecead8; background: linear-gradient(#202120, #3d3e3a 45%, #3d3e3a 55%, #1a1b19); }
+  .ctr.big span { width:20px; height:28px; font-size:21px; }
+  .mini { position:absolute; background:var(--win); border:1px solid #0a0a0a; overflow:hidden; } .mini .fill { transition-duration:.4s; }
+  .lampBox { position:absolute; display:grid; place-items:center; font:700 9px/1 ui-monospace,monospace; letter-spacing:.06em; color:#222; border:2px solid #111; background:var(--off); transition: background .2s; }
+  .lampBox.on { background:var(--lamp); color:#2b2a10; box-shadow: 0 0 10px rgba(217,210,106,.5); }
+  .rail { position:absolute; background:#0b0c0d; border-top:2px solid #000; border-bottom:2px solid #2c2d2a; }
+  .mv { transition: transform .55s cubic-bezier(.55,0,.35,1.15); }
+  .knob { position:absolute; width:44px; height:44px; border-radius:50%; background: radial-gradient(circle at 35% 35%, #8b8d84, #3e3f3a 70%); border:2px solid #111; transition: transform .3s cubic-bezier(.5,1.8,.5,1); }
+  .knob::after { content:""; position:absolute; left:50%; top:3px; width:4px; height:16px; margin-left:-2px; background:#e8e6d6; }
+  .combat .knob { transform: rotate(70deg); }
+  .flip { position:absolute; left:0; right:0; top:0; transition: transform .45s cubic-bezier(.5,0,.5,1); }
+  .combat .flip { transform: translateY(-50%); }
+  .arm { position:absolute; perspective:800px; }
+  .armBar { position:absolute; top:58px; width:10px; height:200px; background:#3a3b36; border:1px solid #111; }
+  .axle { position:absolute; left:-14px; right:-14px; top:56px; height:8px; background:#8a8c84; border:1px solid #111; }
+  .flap { position:absolute; inset:0; transform-style:preserve-3d; }
+  .side { position:absolute; inset:0; backface-visibility:hidden; }
+  .side.back { transform: rotateX(180deg); }
+  @media (prefers-reduced-motion: reduce) { * { transition-duration: .01s !important; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>ゲージ切替の機構案</h1>
+  <p class="lead">航行（物資のゲージが主役・HP のゲージは控えめに併記）と、戦闘（HP のゲージだけ）の切り替え。隠す側は、その場で覆わずに<b>画面の外へ出ていく</b>。破線の枠が画面の下の帯で、その外（斜線）は本番では見えない部分です。色は仮です。</p>
+
+  <div class="bar">
+    <button id="tog" class="mode">航行 → 戦闘</button>
+    <label><input type="checkbox" id="auto"> 自動で切り替え（3.5 秒ごと）</label>
+    <label><input type="checkbox" id="clip"> 画面の外を隠す（本番の見え方）</label>
+    <label>HP <input type="range" id="hp" min="0" max="120" value="86"></label>
+    <label>物資 <input type="range" id="sup" min="0" max="1000" value="864"></label>
+    <span id="state" class="lead"></span>
+  </div>
+
+  <!-- 案 A: せり (昇降台) -->
+  <section class="card">
+    <h2>案 A: せり（昇降台）で盤を載せ替える<small>台が画面の下へ沈み、奈落で盤を差し替えて上がってくる</small></h2>
+    <div class="stageWrap"><div class="outer">
+      <div class="stage">
+        <div class="note" style="left:8px;top:6px">画面の下端に「せり」の開口（台 1 基）</div>
+        <div class="plate mv" data-a="nav" style="left:150px;top:62px;width:520px;height:96px">
+          <div class="bolt" style="left:8px;top:8px"></div><div class="bolt" style="right:8px;top:8px"></div>
+          <div class="eng" style="left:20px;top:14px">HP</div><div class="ctr" data-ctr="hp" data-n="3" style="left:20px;top:30px"></div>
+          <div class="mini" style="left:20px;top:64px;width:76px;height:8px"><div class="fill hp" data-fill="hp"></div></div>
+          <div class="eng" style="left:120px;top:14px">SUPPLY</div>
+          <div class="win" style="left:120px;top:30px;width:290px;height:26px"><div class="fill" data-fill="sup"></div><div class="ticks"></div></div>
+          <div class="ctr" data-ctr="sup" data-n="4" style="left:420px;top:30px"></div>
+          <div class="lampBox" data-lamp="crit" style="left:120px;top:64px;width:50px;height:20px">CRIT</div>
+          <div class="lampBox" data-lamp="half" style="left:176px;top:64px;width:50px;height:20px">HALF</div>
+        </div>
+        <div class="plate mv" data-a="bat" style="left:150px;top:62px;width:520px;height:96px">
+          <div class="bolt" style="left:8px;top:8px"></div><div class="bolt" style="right:8px;top:8px"></div>
+          <div class="eng" style="left:20px;top:14px">HULL</div>
+          <div class="win" style="left:20px;top:30px;width:360px;height:36px"><div class="fill hp" data-fill="hp"></div><div class="ticks"></div></div>
+          <div class="scale" style="left:20px;width:360px;top:72px"><span>0</span><span>30</span><span>60</span><span>90</span><span>120</span></div>
+          <div class="ctr big" data-ctr="hp" data-n="3" style="left:398px;top:30px"></div>
+          <div class="lampBox" data-lamp="hpcrit" style="left:398px;top:70px;width:72px;height:18px">CRIT</div>
+        </div>
+        <div style="position:absolute;left:144px;top:168px;width:532px;height:4px;background:#000"></div>
+      </div>
+      <div class="offlabel">画面の外（奈落）: ここで盤を差し替える</div>
+    </div></div>
+    <div class="notes">
+      <div><b>つながり</b><p>画面の下端に昇降台が 1 基。台には盤が 1 枚しか載らない。航行用の盤（物資の大きなゲージ＋HP の数字と細いゲージ）と、戦闘用の盤（HP の大きなゲージ）は、画面の外の奈落に置いてある。</p></div>
+      <div><b>切り替え</b><p>台が沈みきる（航行の盤が画面の外へ）→ 奈落で盤が入れ替わる → 台が上がる（戦闘の盤が下から出てくる）。行きも帰りも同じ順番。</p></div>
+      <div><b>強調</b><p>上がってきた盤が、その場面のすべて。戦闘の盤は物資の部品を持っていない。</p></div>
+    </div>
+  </section>
+
+  <!-- 案 B: 通り抜けのレール -->
+  <section class="card">
+    <h2>案 B: 画面を横切るレールと台車<small>物資の台車は右の端から出ていき、HP の台車が左の端から入ってくる</small></h2>
+    <div class="stageWrap"><div class="outer">
+      <div class="stage">
+        <div class="rail" style="left:-40px;top:96px;width:900px;height:14px"></div>
+        <div class="note" style="left:8px;top:6px">レールは画面の左右の端を突き抜けている（1 本）</div>
+        <div class="plate mv" data-b="sup" style="left:60px;top:56px;width:470px;height:66px;z-index:2">
+          <div class="lampBox" data-lamp="crit" style="left:12px;top:18px;width:46px;height:24px">CRIT</div>
+          <div class="lampBox" data-lamp="half" style="left:62px;top:18px;width:46px;height:24px">HALF</div>
+          <div class="eng" style="left:118px;top:6px">SUPPLY</div>
+          <div class="win" style="left:118px;top:20px;width:250px;height:28px"><div class="fill" data-fill="sup"></div><div class="ticks"></div></div>
+          <div class="ctr" data-ctr="sup" data-n="4" style="left:378px;top:20px"></div>
+          <div class="eng" style="left:118px;top:52px;font-size:9px">HULL</div><div class="mini" style="left:158px;top:52px;width:210px;height:8px"><div class="fill hp" data-fill="hp"></div></div>
+        </div>
+        <div class="plate mv" data-b="hp" style="left:60px;top:56px;width:470px;height:66px;z-index:1">
+          <div class="eng" style="left:14px;top:6px">HULL</div>
+          <div class="win" style="left:14px;top:20px;width:440px;height:28px"><div class="fill hp" data-fill="hp"></div><div class="ticks"></div></div>
+          <div class="scale" style="left:14px;width:440px;top:52px"><span>0</span><span>60</span><span>120</span></div>
+        </div>
+        <div class="plate" style="left:600px;top:40px;width:180px;height:100px;z-index:5">
+          <div class="bolt" style="left:8px;top:8px"></div><div class="bolt" style="right:8px;top:8px"></div><div class="bolt" style="left:8px;bottom:8px"></div><div class="bolt" style="right:8px;bottom:8px"></div>
+          <div class="eng" style="left:22px;top:24px">HP</div>
+          <div class="ctr big" data-ctr="hp" data-n="3" style="left:22px;top:40px"></div>
+          <div class="note" style="left:20px;top:80px;color:#c8c9c2">固定の計器箱</div>
+        </div>
+      </div>
+      <div class="offlabel">左右の画面の外: 台車の待機場所</div>
+    </div></div>
+    <div class="notes">
+      <div><b>つながり</b><p>右に固定の計器箱（HP の数字）。画面の下の帯を、1 本のレールが左右に突き抜けている。台車は 2 両。航行の台車は物資のゲージに HP の細いゲージが相乗り、戦闘の台車は HP の大きなゲージだけ、画面の中にいられるのは 1 両だけ。</p></div>
+      <div><b>切り替え</b><p>物資の台車が右へ走り、計器箱の裏を通って画面の外へ抜ける → 左の画面の外から HP の台車が入ってきて止まる。戻る時は逆向き。</p></div>
+      <div><b>強調</b><p>画面にいる台車がその場面の主役。HP の数字は固定の箱にあるので、航行中も読める。</p></div>
+    </div>
+  </section>
+
+  <!-- 案 C: 切替つまみ + 物資の部品が抜け落ちる -->
+  <section class="card">
+    <h2>案 C: 切替つまみと、抜けて落ちる補助パック<small>主ゲージが測らない方を補うパック。つまみを HP へ回すと主ゲージが HP を測り直し、要らなくなったパックが落ちる</small></h2>
+    <div class="stageWrap"><div class="outer">
+      <div class="stage">
+        <div class="plate" style="left:30px;top:30px;width:600px;height:118px">
+          <div class="bolt" style="left:8px;top:8px"></div><div class="bolt" style="left:8px;bottom:8px"></div>
+          <div class="knob" style="left:30px;top:30px"></div>
+          <div class="eng" style="left:20px;top:84px">SUP&nbsp;&nbsp;HP</div>
+          <div class="eng" style="left:22px;top:14px;color:#9a9b94">SELECT</div>
+          <div class="win" style="left:110px;top:16px;width:400px;height:22px;background:#3a3b36">
+            <div class="flip"><div class="scale" style="position:relative;height:22px;padding:5px 6px"><span>0</span><span>SUPPLY</span><span>500</span><span>1000</span></div>
+                              <div class="scale" style="position:relative;height:22px;padding:5px 6px"><span>0</span><span>HULL</span><span>60</span><span>120</span></div></div>
+          </div>
+          <div class="win" style="left:110px;top:42px;width:400px;height:34px"><div class="fill" id="cFill"></div><div class="ticks"></div></div>
+          <div class="eng" style="left:528px;top:18px">HP</div>
+          <div class="ctr" data-ctr="hp" data-n="3" style="left:524px;top:34px"></div>
+          <div class="note" style="left:110px;top:88px;color:#c8c9c2">右の差し込み口 →</div>
+        </div>
+        <div class="plate mv" data-c="cart" style="left:632px;top:30px;width:150px;height:118px">
+          <div class="note" style="left:10px;top:6px;color:#c8c9c2">補助パック（差し込み）</div>
+          <div class="eng" style="left:14px;top:24px;font-size:9px">HULL</div><div class="mini" style="left:52px;top:24px;width:84px;height:8px"><div class="fill hp" data-fill="hp"></div></div>
+          <div class="eng" style="left:14px;top:42px">SUP</div>
+          <div class="ctr" data-ctr="sup" data-n="4" style="left:14px;top:56px"></div>
+          <div class="lampBox" data-lamp="half" style="left:14px;top:90px;width:56px;height:18px">HALF</div>
+          <div class="lampBox" data-lamp="crit" style="left:76px;top:90px;width:56px;height:18px">CRIT</div>
+        </div>
+      </div>
+      <div class="offlabel">画面の下の外: 補助パックの受け皿</div>
+    </div></div>
+    <div class="notes">
+      <div><b>つながり</b><p>主盤（つまみ・主ゲージ 1 本・HP の数字）の右に、補助パック（物資の数字とランプ・HP の細いゲージ）が差し込まれている。航行中は主ゲージが物資を測るので、HP はパックの細いゲージで補う。</p></div>
+      <div><b>切り替え</b><p>つまみが HP 側へ → 主ゲージが HP を測るので補助パックは要らなくなり、差し込みが外れて画面の下へ落ちる → テープが 0 へ戻り、目盛り板がめくれて HP 用に → HP の量まで伸び直す。戻す時は、パックが下から押し上がって差し込まれる。</p></div>
+      <div><b>強調</b><p>ゲージは常に「いま選んでいる方」。パックごと画面から消えるので、戦闘中の画面には物資の情報が一切残らない。</p></div>
+    </div>
+  </section>
+
+  <!-- 案 D: 表裏の板を、 画面の下の外で裏返す -->
+  <section class="card">
+    <h2>案 D: 表と裏を持つ 1 枚の板<small>表 = 物資の盤・裏 = HP の大きな盤。腕が板を画面の下の外へ降ろし、そこで裏返して上げてくる</small></h2>
+    <div class="stageWrap"><div class="outer">
+      <div class="stage">
+        <div class="plate mv" data-d="hp" style="left:20px;top:56px;width:190px;height:96px">
+          <div class="bolt" style="left:8px;top:8px"></div><div class="bolt" style="right:8px;top:8px"></div>
+          <div class="eng" style="left:14px;top:14px">HULL</div>
+          <div class="ctr" data-ctr="hp" data-n="3" style="left:14px;top:30px"></div>
+          <div class="mini" style="left:14px;top:64px;width:160px;height:8px"><div class="fill hp" data-fill="hp"></div></div>
+          <div class="note" style="left:76px;top:30px;color:#c8c9c2">小さな HP の板<br>（左のレールで出入り）</div>
+        </div>
+        <div class="arm mv" data-d="arm" style="left:236px;top:40px;width:560px;height:122px">
+          <div class="armBar" style="left:-10px"></div><div class="armBar" style="right:-10px"></div>
+          <div class="axle"></div>
+          <div class="flap" data-d="flap">
+            <div class="side plate">
+              <div class="eng" style="left:16px;top:14px">SUPPLY</div>
+              <div class="win" style="left:16px;top:30px;width:380px;height:32px"><div class="fill" data-fill="sup"></div><div class="ticks"></div></div>
+              <div class="scale" style="left:16px;width:380px;top:68px"><span>0</span><span>500</span><span>1000</span></div>
+              <div class="ctr" data-ctr="sup" data-n="4" style="left:410px;top:30px"></div>
+              <div class="lampBox" data-lamp="crit" style="left:410px;top:72px;width:56px;height:20px">CRIT</div>
+              <div class="lampBox" data-lamp="half" style="left:472px;top:72px;width:56px;height:20px">HALF</div>
+            </div>
+            <div class="side plate back">
+              <div class="eng" style="left:16px;top:14px">HULL</div>
+              <div class="win" style="left:16px;top:30px;width:420px;height:40px"><div class="fill hp" data-fill="hp"></div><div class="ticks"></div></div>
+              <div class="scale" style="left:16px;width:420px;top:76px"><span>0</span><span>30</span><span>60</span><span>90</span><span>120</span></div>
+              <div class="ctr big" data-ctr="hp" data-n="3" style="left:450px;top:30px"></div>
+              <div class="lampBox" data-lamp="hpcrit" style="left:450px;top:74px;width:76px;height:20px">CRIT</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="offlabel">画面の下の外: 板を裏返す場所</div>
+    </div></div>
+    <div class="notes">
+      <div><b>つながり</b><p>左に小さな HP の板（数字＋細いゲージ）。右の大きな板は表と裏を持ち、中心の軸を、左右の 2 本の腕が支える。表 = 物資の盤、裏 = HP の大きな盤。</p></div>
+      <div><b>切り替え</b><p>腕が板を画面の下の外まで降ろす → 外で板が軸ごと半回転して裏を向く → 腕が上がって、HP の盤が出てくる。同時に、小さな HP の板は左の画面の外へ退く（大きな盤と重複するので）。</p></div>
+      <div><b>強調</b><p>航行中は、物資が大きく・HP は左の小さな板で控えめに。戦闘中は、HP の大きな盤だけが画面に残る。</p></div>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+let combat = false, hp = 86, sup = 864, timer = null;
+const q = (sel) => document.querySelector(sel);
+
+function digits(el, v, n) {
+  const s = String(Math.round(v)).padStart(n, "0").slice(-n);
+  if (el.children.length !== n) { el.innerHTML = ""; for (let i = 0; i < n; i++) el.appendChild(document.createElement("span")); }
+  [...el.children].forEach((sp, i) => { sp.textContent = s[i]; });
+}
+function update() {
+  document.querySelectorAll("[data-ctr]").forEach((el) => digits(el, el.dataset.ctr === "hp" ? hp : sup, +el.dataset.n));
+  document.querySelectorAll("[data-fill]").forEach((el) => { el.style.width = ((el.dataset.fill === "hp" ? hp / 120 : sup / 1000) * 100).toFixed(1) + "%"; });
+  document.querySelectorAll("[data-lamp]").forEach((el) => {
+    const k = el.dataset.lamp, on = k === "crit" ? sup / 1000 < 0.2 : k === "half" ? sup / 1000 < 0.5 : k === "hpcrit" ? hp / 120 < 0.25 : false;
+    el.classList.toggle("on", on);
+  });
+}
+// 動きの順番: 隠す側が画面の外へ出きってから、 出す側が入ってくる
+function move(el, tr, delay) { el.style.transitionDelay = delay + "s"; el.style.transform = tr; }
+function mechA() {   // せり: 台が沈む → 奈落で入れ替え → 上がる
+  const nav = q('[data-a="nav"]'), bat = q('[data-a="bat"]'), DOWN = "translateY(200px)", UP = "translateY(0)";
+  if (combat) { move(nav, DOWN, 0); move(bat, UP, 0.75); } else { move(bat, DOWN, 0); move(nav, UP, 0.75); }
+}
+function mechB() {   // レール: 物資は右の画面の外へ、 HP は左の画面の外から
+  const s = q('[data-b="sup"]'), h = q('[data-b="hp"]');
+  if (combat) { move(s, "translateX(820px)", 0); move(h, "translateX(0)", 0.6); }
+  else { move(h, "translateX(-560px)", 0); move(s, "translateX(0)", 0.6); }
+}
+function mechC() {   // つまみ → 物資の部品が落ちる (戻す時は押し上がる)
+  const c = q('[data-c="cart"]');
+  if (combat) { c.style.transition = "transform .5s cubic-bezier(.55,0,.9,.6)"; move(c, "translate(6px, 230px) rotate(4deg)", 0.25); }
+  else { c.style.transition = "transform .45s cubic-bezier(.2,1.2,.4,1)"; move(c, "translate(0,0)", 0.1); }
+}
+function mechD(first) {   // 腕が降ろす → 画面の外で裏返す → 上げる。 小さな HP の板は、 戦闘では左の画面の外へ
+  const arm = q('[data-d="arm"]'), flap = q('[data-d="flap"]'), h = q('[data-d="hp"]');
+  const from = combat ? 0 : 180, to = combat ? 180 : 0;
+  if (first) { flap.style.transform = `rotateX(${to}deg)`; return; }
+  arm.style.transition = "none"; flap.style.transition = "none";
+  arm.animate([{ transform: "translateY(0)" }, { transform: "translateY(190px)", offset: 0.35 }, { transform: "translateY(190px)", offset: 0.65 }, { transform: "translateY(0)" }], { duration: 1500, easing: "ease-in-out", fill: "forwards" });
+  flap.animate([{ transform: `rotateX(${from}deg)` }, { transform: `rotateX(${from}deg)`, offset: 0.36 }, { transform: `rotateX(${to}deg)`, offset: 0.64 }, { transform: `rotateX(${to}deg)` }], { duration: 1500, fill: "forwards" });
+  move(h, combat ? "translateX(-260px)" : "translateX(0)", combat ? 0.1 : 0.9);
+}
+let cStep = 0;
+function cGauge(first) {
+  const f = $("cFill"), target = () => ((combat ? hp / 120 : sup / 1000) * 100).toFixed(1) + "%";
+  if (first) { f.style.width = target(); return; }
+  const my = ++cStep; f.style.width = "0%";
+  setTimeout(() => { if (my === cStep) f.style.width = target(); }, 750);
+}
+function setMode(c, first) {
+  combat = c;
+  document.querySelectorAll(".card").forEach((el) => el.classList.toggle("combat", combat));
+  $("tog").textContent = combat ? "戦闘 → 航行" : "航行 → 戦闘";
+  $("state").textContent = combat ? "いま: 戦闘（HP のみ）" : "いま: 航行（HP＋物資）";
+  mechA(); mechB(); mechC(); mechD(first); cGauge(first); update();
+}
+$("tog").onclick = () => setMode(!combat);
+$("auto").onchange = (e) => { clearInterval(timer); if (e.target.checked) timer = setInterval(() => setMode(!combat), 3500); };
+$("clip").onchange = (e) => document.querySelectorAll(".outer").forEach((el) => el.classList.toggle("clip", e.target.checked));
+$("hp").oninput = (e) => { hp = +e.target.value; update(); cGauge(true); };
+$("sup").oninput = (e) => { sup = +e.target.value; update(); cGauge(true); };
+// 初期位置 (航行): 戦闘用の部品は画面の外で待つ
+q('[data-a="bat"]').style.transform = "translateY(200px)";
+q('[data-b="hp"]').style.transform = "translateX(-560px)";
+setMode(false, true);
+</script>
+</body>
+</html>

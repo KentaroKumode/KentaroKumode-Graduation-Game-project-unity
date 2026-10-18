@@ -1,0 +1,16 @@
+{
+ "sup": 1000,
+ "supMax": 1000,
+ "hp": 40,
+ "gold": 30,
+ "zoom": 2,
+ "lcdScale": 2,
+ "seed": "1",
+ "timeMode": "pause",
+ "counter": [
+  48,
+  20,
+  1234
+ ],
+ "git_head": "d021704"
+}
