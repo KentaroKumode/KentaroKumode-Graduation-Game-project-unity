@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>伸縮する HP ゲージ</title>
+<style>
+  /* 色は仮。 見るのは機構: 右の可動箱が溝 (目盛りとバー) を巻き込んで縮め、 空いた所に物資のバーが入る。
+     戦闘: 物資のバーが下へ抜けて画面の外へ → 空いたレールを可動箱が右へ走り、 HP の溝が全長まで伸びる */
+  :root { --bg:#1b1c1e; --ink:#d8d8d4; --dim:#8c8d88; --line:#34363a;
+          --hi:#5d6b5c; --hiL:#75836f; --hiD:#3f4a3f;          /* 高い箱 (左・可動) */
+          --lo:#46514a; --loL:#5a665d; --loD:#2f3832;          /* 低い溝の土台 */
+          --scale:#b8893c; --scaleD:#7d5a22; --win:#101213; --fillHP:#7fb4c0; --fillSup:#c9c6b4; --lamp:#e0a040; --lampOff:#3a2a1c; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.6 system-ui,"Yu Gothic",sans-serif; padding:20px 16px 60px; }
+  main { max-width:980px; margin:0 auto; display:grid; gap:18px; }
+  h1 { font-size:19px; margin:0; } .lead { margin:0; color:var(--dim); font-size:13px; }
+  .bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  button, input { font:inherit; color:var(--ink); }
+  button { background:#2a2b2e; border:1px solid #4a4c50; padding:7px 14px; cursor:pointer; }
+  button:focus-visible, input:focus-visible { outline:2px solid var(--lamp); outline-offset:2px; }
+  .mode { font-weight:700; min-width:130px; }
+  label { display:flex; gap:6px; align-items:center; color:var(--dim); font-size:13px; }
+  .wrap { overflow-x:auto; }
+  .outer { position:relative; width:940px; height:300px; margin:0 auto; background: repeating-linear-gradient(45deg, #17181a 0 6px, #1c1d20 6px 12px); }
+  .screen { position:absolute; left:20px; top:20px; width:900px; height:190px; background:#0f1a24; outline:1px dashed #7a8a9a; }
+  .outer.clip .screen { overflow:hidden; }
+  .tag { position:absolute; font-size:11px; color:#7a8a9a; }
+  /* 部品 */
+  .box { position:absolute; border:2px solid #0c0d0c; background:var(--hi); box-shadow: inset 2px 2px 0 var(--hiL), inset -2px -2px 0 var(--hiD), 0 4px 0 rgba(0,0,0,.45); }
+  .groove { position:absolute; border:2px solid #0c0d0c; background:var(--lo); box-shadow: inset 2px 2px 0 var(--loL), inset -2px -2px 0 var(--loD); overflow:hidden; }
+  .bolt { position:absolute; width:9px; height:9px; border-radius:50%; background:#2c3229; box-shadow: inset 1px 1px 0 #8a9584; }
+  .eng { position:absolute; font:800 12px/1.05 ui-monospace,Consolas,monospace; letter-spacing:.14em; color:#e6e6dc; text-shadow:1px 1px 0 #111; white-space:nowrap; }
+  .eng.s { font-size:9px; font-weight:700; letter-spacing:.1em; color:#cfd2c8; }
+  .ctr { position:absolute; display:flex; gap:3px; padding:4px 6px; background:#0b0c0b; border:2px solid #000; border-radius:4px; box-shadow: 0 0 0 3px var(--hiD), 0 0 0 5px #0c0d0c; }
+  .dg { width:16px; height:22px; overflow:hidden; background: linear-gradient(#141514, #2e302d 45%, #2e302d 55%, #121312); position:relative; }
+  .dg .col { position:absolute; left:0; top:0; width:100%; transition: transform .35s cubic-bezier(.3,1.4,.5,1); }
+  .dg .col div { height:22px; display:grid; place-items:center; font:800 16px/1 ui-monospace,Consolas,monospace; color:#efeddc; }
+  .unit { position:absolute; font:800 14px/1 ui-monospace,monospace; color:#efeddc; }
+  .scaleStrip { position:absolute; left:0; top:0; height:20px; background:var(--scale); border-bottom:2px solid var(--scaleD); }
+  .tick { position:absolute; bottom:0; width:2px; background:#3a2a10; }
+  .tl { position:absolute; top:2px; font:800 10px/1 ui-monospace,monospace; color:#2a1d08; transform:translateX(-2px); }
+  .win { position:absolute; background:var(--win); border:2px solid #000; box-shadow: inset 0 2px 0 #000; }
+  .fill { position:absolute; left:0; top:0; bottom:0; transition: width .5s cubic-bezier(.3,.8,.3,1); }
+  .lampBtn { position:absolute; display:grid; place-items:center; font:800 9px/1 ui-monospace,monospace; letter-spacing:.08em; color:#8a6a40; background:var(--lampOff); border:3px solid #0c0d0c; box-shadow: 0 0 0 2px #556; }
+  .lampBtn.on { background:var(--lamp); color:#3a2408; box-shadow: 0 0 0 2px #556, 0 0 12px rgba(224,160,64,.55); }
+  .rail { position:absolute; height:6px; background:#0a0b0a; border-top:1px solid #000; border-bottom:1px solid #2c2f2a; }
+  .notes { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:10px 18px; font-size:13px; }
+  .notes b { color:var(--ink); } .notes p { margin:0; color:var(--dim); }
+  .log { font:12px/1.5 ui-monospace,Consolas,monospace; color:var(--dim); min-height:1.5em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>伸縮する HP ゲージ</h1>
+  <p class="lead">表示の強さ: HP = 航行 0.5（弱表示）／戦闘 1.0（強調）。物資 = 航行 1.0（強調）／戦闘 0（画面の外）。<br>航行: 右の可動箱が左へ寄って HP の溝を巻き込み、HP のバーは 0 に近い側だけが見える。空いた右側に物資のバー。<br>
+    戦闘: 物資のバーが下へ抜けて画面の外へ → 空いたレールを可動箱が右へ走り、HP の溝が全長まで伸びる。色は仮。</p>
+
+  <div class="bar">
+    <button id="tog" class="mode">航行 → 戦闘</button>
+    <button id="dmg">被弾（HP −15）</button>
+    <button id="heal">修理（HP ＋30）</button>
+    <label>HP <input type="range" id="hp" min="0" max="120" value="96"></label>
+    <label>物資 <input type="range" id="sup" min="0" max="1000" value="864"></label>
+    <label><input type="checkbox" id="clip"> 画面の外を隠す（本番の見え方）</label>
+    <label><input type="checkbox" id="auto"> 自動で切り替え</label>
+    <label>航行中の HP の長さ <input type="range" id="ratio" min="0.2" max="0.7" step="0.05" value="0.5"></label><span id="ratioV" class="lead">0.5</span>
+  </div>
+
+  <div class="wrap"><div class="outer" id="outer">
+    <div class="screen" id="scr">
+      <!-- レール (可動箱と物資のバーが共有する) -->
+      <div class="rail" style="left:150px;top:172px;width:750px"></div>
+      <!-- HP の溝: 左の箱から伸び、 可動箱の中へ巻き込まれる。 目盛りは溝に印刷 (伸び縮みで目盛りの間隔は変わらない) -->
+      <div class="groove" id="groove" style="left:150px;top:96px;height:74px">
+        <div class="scaleStrip" id="scale" style="top:8px"></div>
+        <div class="win" id="hpWin" style="left:10px;top:34px;height:26px"><div class="fill" id="hpFill" style="background:var(--fillHP)"></div></div>
+        <div class="eng s" id="hpTag" style="top:41px;color:#0f2a30;text-shadow:none">HULL INTEGRITY</div>
+      </div>
+      <!-- 左の高い箱 (固定): HP の数字 -->
+      <div class="box" style="left:0;top:40px;width:166px;height:132px">
+        <div class="bolt" style="left:8px;top:8px"></div><div class="bolt" style="right:8px;top:8px"></div><div class="bolt" style="left:8px;bottom:8px"></div><div class="bolt" style="right:8px;bottom:8px"></div>
+        <div class="ctr" data-ctr="hp" data-n="3" style="left:22px;top:24px"></div>
+        <div class="unit" style="left:104px;top:34px">HP</div>
+        <div class="eng s" style="left:22px;top:66px">HULL</div>
+        <div style="position:absolute;left:22px;top:80px;width:120px;height:2px;background:#cfd2c8"></div>
+        <div class="eng s" style="left:22px;top:88px">MAX</div>
+        <div class="ctr" data-ctr="hpMax" data-n="3" style="left:62px;top:84px;transform:scale(.75);transform-origin:left top"></div>
+      </div>
+      <!-- 可動箱: HP の割合と警告ランプ。 レールの上を走る -->
+      <div class="box" id="mover" style="top:20px;width:210px;height:152px;z-index:5">
+        <div class="bolt" style="left:8px;top:8px"></div><div class="bolt" style="right:8px;top:8px"></div><div class="bolt" style="left:8px;bottom:8px"></div><div class="bolt" style="right:8px;bottom:8px"></div>
+        <div class="eng" style="left:20px;top:22px">HULL<br>STOCK</div>
+        <div class="ctr" data-ctr="hpPct" data-n="3" style="left:100px;top:20px"></div>
+        <div class="eng s" style="left:104px;top:56px">INTEGRITY %</div>
+        <div class="lampBtn" id="lampHalf" style="left:18px;top:86px;width:80px;height:40px">HALF</div>
+        <div class="lampBtn" id="lampCrit" style="left:110px;top:86px;width:80px;height:40px">CRIT</div>
+      </div>
+      <!-- 物資のバー: 航行中は可動箱の右。 戦闘では下へ抜けて画面の外へ -->
+      <div class="box" id="supMod" style="left:470px;top:58px;width:430px;height:114px;z-index:3">
+        <div class="bolt" style="left:8px;top:8px"></div><div class="bolt" style="right:8px;top:8px"></div>
+        <div class="eng" style="left:22px;top:16px">SUPPLY</div>
+        <div class="ctr" data-ctr="sup" data-n="4" style="left:300px;top:10px"></div>
+        <div class="win" style="left:22px;top:44px;width:386px;height:26px"><div class="fill" id="supFill" style="background:var(--fillSup)"></div></div>
+        <div class="lampBtn" id="lampSupLow" style="left:22px;top:78px;width:90px;height:24px">LOW SUPPLY</div>
+      </div>
+    </div>
+    <div class="tag" style="left:24px;bottom:58px">画面の下の外（物資のバーが抜ける先）</div>
+    <div class="tag" style="right:24px;top:2px">画面の端（破線）</div>
+  </div></div>
+  <div class="log" id="log"></div>
+
+  <div class="notes">
+    <div><b>つながり</b><p>左の高い箱（HP の数字）から低い溝が伸び、溝の先は右の可動箱の中に巻き込まれている。可動箱と物資のバーは、同じレールに乗っている。</p></div>
+    <div><b>航行</b><p>可動箱は左寄り。溝は短く、HP のバーは 0 に近い側だけが見える。HP が多い間はバーが箱の中まで続き、減ってくると先端が見えてくる。可動箱の割合と警告ランプで、HP は控えめに読める。</p></div>
+    <div><b>戦闘</b><p>物資のバーがレールから外れて下へ抜ける → 空いたレールを可動箱が右端まで走る → 溝が全長まで引き出され、HP のバーが全部見える。戻る時は逆の順番。</p></div>
+  </div>
+</main>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const HPMAX = 120, SUPMAX = 1000;
+let hp = 96, sup = 864, combat = false, autoT = null;
+// 寸法 (画面の座標)
+const CH_X0 = 150, BOX_W = 210, BAT_X = 900 - BOX_W;
+let navRatio = 0.5, NAV_X = 0;                       // 航行中の HP の溝の長さ = 戦闘の長さ × navRatio (弱表示 0.5 / 強調 1.0)
+const SCALE_LEN = BAT_X - CH_X0 - 40;   // 目盛りの全長 = 戦闘で見える溝の長さ
+const SUP_IN = 0, SUP_OUT = 230;
+// 物理: 可動箱はばね (少し行き過ぎて止まる)・物資は落下 (重力) / 戻りはばね
+function layoutNav() { NAV_X = Math.round(CH_X0 + navRatio * (BAT_X - CH_X0)); const L = NAV_X + BOX_W, sm = $("supMod"); sm.style.left = L + "px"; sm.style.width = (900 - L) + "px";
+  sm.querySelector(".win").style.width = (900 - L - 44) + "px"; sm.querySelector(".ctr").style.left = (900 - L - 130) + "px"; if (!combat) st.tx = NAV_X; }
+const st = { x: 0, vx: 0, tx: 0, y: SUP_IN, vy: 0, ty: SUP_IN, phase: "idle" };
+
+function buildCounter(el, n) {
+  el.innerHTML = "";
+  for (let i = 0; i < n; i++) { const d = document.createElement("div"); d.className = "dg"; const c = document.createElement("div"); c.className = "col";
+    for (let k = 0; k <= 9; k++) { const v = document.createElement("div"); v.textContent = k; c.appendChild(v); } d.appendChild(c); el.appendChild(d); }
+}
+function setCounter(el, val) { const n = el.children.length, s = String(Math.max(0, Math.round(val))).padStart(n, "0").slice(-n);
+  [...el.children].forEach((d, i) => { d.firstChild.style.transform = `translateY(${-22 * +s[i]}px)`; }); }
+document.querySelectorAll("[data-ctr]").forEach((el) => buildCounter(el, +el.dataset.n));
+
+// 目盛り (溝に印刷: 0〜120、 10 ごとに目盛り・ 20 ごとに数字)
+(function scale() {
+  const sc = $("scale"); sc.style.width = (SCALE_LEN + 20) + "px";
+  for (let v = 0; v <= HPMAX; v += 10) { const x = 12 + (v / HPMAX) * SCALE_LEN, t = document.createElement("div"); t.className = "tick"; t.style.left = x + "px"; t.style.height = v % 20 === 0 ? "9px" : "5px"; sc.appendChild(t);
+    if (v % 20 === 0) { const l = document.createElement("div"); l.className = "tl"; l.style.left = x + "px"; l.textContent = v; sc.appendChild(l); } }
+  $("hpWin").style.width = (SCALE_LEN + 4) + "px";
+})();
+
+function values() {
+  setCounter(document.querySelector('[data-ctr="hp"]'), hp);
+  setCounter(document.querySelector('[data-ctr="hpMax"]'), HPMAX);
+  setCounter(document.querySelector('[data-ctr="hpPct"]'), hp / HPMAX * 100);
+  setCounter(document.querySelector('[data-ctr="sup"]'), sup);
+  $("hpFill").style.width = (hp / HPMAX * SCALE_LEN) + "px";
+  $("supFill").style.width = (sup / SUPMAX * 100) + "%";
+  $("lampHalf").classList.toggle("on", hp / HPMAX < 0.5 && hp / HPMAX >= 0.2);
+  $("lampCrit").classList.toggle("on", hp / HPMAX < 0.2);
+  $("lampSupLow").classList.toggle("on", sup / SUPMAX < 0.25);
+}
+
+function setMode(c) {
+  combat = c; $("tog").textContent = combat ? "戦闘 → 航行" : "航行 → 戦闘";
+  if (combat) { st.phase = "dropSup"; st.ty = SUP_OUT; log("物資のバーがレールから外れる"); }
+  else { st.phase = "boxLeft"; st.tx = NAV_X; log("可動箱が左へ戻り、溝を巻き込む"); }
+}
+function log(t) { $("log").textContent = "▶ " + t; }
+
+let last = performance.now(), shake = 0;
+function tick(now) {
+  const dt = Math.min(0.033, (now - last) / 1000); last = now;
+  // 物資のバー
+  if (st.phase === "dropSup") { st.vy += 2600 * dt; st.y += st.vy * dt;                 // 落下
+    if (st.y >= SUP_OUT) { st.y = SUP_OUT; st.vy = 0; st.phase = "boxRight"; st.tx = BAT_X; log("空いたレールを、可動箱が右端まで走る"); } }
+  else if (st.phase === "riseSup") { const k = 260, c = 22; st.vy += (k * (SUP_IN - st.y) - c * st.vy) * dt; st.y += st.vy * dt;   // 戻りはばねで押し上がる
+    if (Math.abs(st.y - SUP_IN) < 0.5 && Math.abs(st.vy) < 8) { st.y = SUP_IN; st.vy = 0; st.phase = "idle"; shake = 1; log("物資のバーがレールに戻った（航行）"); } }
+  // 可動箱 (ばね: 少し行き過ぎて止まる)
+  if (st.phase === "boxRight" || st.phase === "boxLeft" || st.phase === "idle") {
+    const k = 120, c = 15; st.vx += (k * (st.tx - st.x) - c * st.vx) * dt; st.x += st.vx * dt;
+    if ((st.phase === "boxRight" || st.phase === "boxLeft") && Math.abs(st.tx - st.x) < 0.6 && Math.abs(st.vx) < 6) {
+      st.x = st.tx; st.vx = 0; shake = 1;
+      if (st.phase === "boxRight") { st.phase = "idle"; log("溝が全長まで伸びた（戦闘: HP のみ）"); }
+      else { st.phase = "riseSup"; log("空いた右側へ、物資のバーが下から戻る"); } }
+  }
+  // 停止の衝撃: 1〜2 ピクセルの揺れ
+  shake = Math.max(0, shake - dt * 6); const j = shake > 0 ? Math.round(Math.sin(now / 18) * 2 * shake) : 0;
+  const m = $("mover"); m.style.left = Math.round(st.x) + "px"; m.style.transform = `translateY(${j}px)`;
+  $("supMod").style.transform = `translateY(${Math.round(st.y)}px)`;
+  // 溝: 左の箱から、 可動箱の右端まで (可動箱の下にもぐる部分は箱に隠れる)
+  const gw = Math.round(st.x) - CH_X0 + BOX_W; $("groove").style.width = gw + "px";
+  $("hpTag").style.left = "18px";
+  requestAnimationFrame(tick);
+}
+
+$("tog").onclick = () => setMode(!combat);
+$("dmg").onclick = () => { hp = Math.max(0, hp - 15); $("hp").value = hp; values(); };
+$("heal").onclick = () => { hp = Math.min(HPMAX, hp + 30); $("hp").value = hp; values(); };
+$("hp").oninput = (e) => { hp = +e.target.value; values(); };
+$("sup").oninput = (e) => { sup = +e.target.value; values(); };
+$("ratio").oninput = (e) => { navRatio = +e.target.value; $("ratioV").textContent = navRatio.toFixed(2); layoutNav(); };
+$("clip").onchange = (e) => $("outer").classList.toggle("clip", e.target.checked);
+$("auto").onchange = (e) => { clearInterval(autoT); if (e.target.checked) autoT = setInterval(() => setMode(!combat), 4000); };
+layoutNav(); st.x = NAV_X; values(); log("航行: HP は弱表示（0.5）、物資は強調（1.0）"); requestAnimationFrame(tick);
+</script>
+</body>
+</html>

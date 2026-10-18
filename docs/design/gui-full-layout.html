@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GUI 全配置の予想図</title>
+<style>
+  :root { --bg: #14161a; --ink: #e6e4de; --ink2: #9a9ca0; --line: #33373d; --panel: #1c1f24; }
+  @media (prefers-color-scheme: light) { :root { --bg: #f4f3ef; --ink: #1d1f22; --ink2: #5a5d62; --line: #c9c5ba; --panel: #fff; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.6 "BIZ UDPGothic","Yu Gothic","Meiryo",sans-serif; padding: 24px 20px 60px; }
+  h1 { font-size: 22px; margin: 0 0 4px; } h2 { font-size: 16px; margin: 28px 0 8px; }
+  .sub { color: var(--ink2); font-size: 13px; max-width: 980px; }
+  canvas { image-rendering: pixelated; display: block; background: #0c0e12; border: 1px solid var(--line); max-width: 100%; height: auto; }
+  .row { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
+  table { border-collapse: collapse; font-size: 13px; }
+  th, td { border: 1px solid var(--line); padding: 2px 9px; text-align: left; white-space: nowrap; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .key { display: inline-flex; align-items: center; gap: 6px; margin-right: 14px; font-size: 13px; }
+  .sw { width: 18px; height: 12px; border: 2px solid; display: inline-block; }
+  button { font: inherit; padding: 4px 12px; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--ink); } button.on { outline: 2px solid #d2691e; }
+  .note { color: var(--ink2); font-size: 13px; max-width: 980px; }
+</style>
+</head>
+<body>
+<h1>GUI 全配置の予想図（占有面積つき）</h1>
+<div class="sub">画面 480×270 dot（129,600 dot²）に、<b>今の実装</b>と、<b>これまでに決めた案</b>、<b>未議論の要素の仮置き</b>を全部置いたもの。位置と大きさだけ（絵なし）。寸法は、実際の素材の大きさ（GOLD の入れ物 76×96・レーダー 89×89・バー 高さ 19）を基準に、未実装の要素は<b>「操作できる大きさ（ボタン 24×24 前後）・読める大きさ（数字は 1 桁 6×10 以上・アイコンは 12×12 以上）+ 筐体の枠（各辺 3〜4 dot）」</b>で見積もり直しています（前回は、枠なしの最小の大きさで、過小でした）。</div>
+<div class="bar" style="margin:14px 0">
+  <span class="key"><span class="sw" style="border-color:#6dbf6d;background:#2c4a2c"></span>実装済み</span>
+  <span class="key"><span class="sw" style="border-color:#d9b44a;background:#4a3f1c"></span>案（合意した形）</span>
+  <span class="key"><span class="sw" style="border-color:#8a8fa0;background:#33363e"></span>仮置き（未議論）</span>
+  <button id="bNav" class="on">航行</button> <button id="bBat">戦闘</button> <button id="bMap">地図の見える領域だけ</button>
+</div>
+<div class="row">
+  <div><canvas id="cv" width="480" height="270" style="width:960px"></canvas></div>
+  <div><table id="tbl"></table></div>
+</div>
+<div class="note" id="sum"></div>
+
+<script>
+const W = 480, H = 270;
+const COL = { done: ["#6dbf6d", "#2c4a2c"], plan: ["#d9b44a", "#4a3f1c"], tmp: ["#8a8fa0", "#33363e"] };
+const FONT = { A: "010101111101101", B: "110101110101110", C: "011100100100011", D: "110101101101110", E: "111100110100111", F: "111100110100100", G: "011100101101011", H: "101101111101101", I: "111010010010111", K: "101101110101101", L: "100100100100111", M: "101111111101101", N: "110101101101101", O: "010101101101010", P: "110101110100100", R: "110101110101101", S: "011100010001110", T: "111010010010010", U: "101101101101111", W: "101101111111101", X: "101101010101101", Y: "101101010010010", Z: "111001010100111",
+  0: "111101101101111", 1: "010110010010111", 2: "110001010100111", 3: "110001010001110", 4: "101101111001001", 5: "111100110001110", 6: "011100111101111", 7: "111001010010010", 8: "111101111101111", 9: "111101111001110", "+": "000010111010000", "-": "000000111000000", ".": "000000000000010", "/": "001001010100100", " ": "000000000000000" };
+// 航行の配置 (実装済みの 4 つの位置は、 map-prototype.html のとおり)
+const NAV = [                                                       // o = 前回の見積もりの [幅, 高さ] (なければ新規に追加した要素)
+  { n: "GOLD", md: "5", full: "GOLD の入れ物", x: 0, y: 0, w: 76, h: 96, s: "done", o: [76, 96] },
+  { n: "RADAR", md: "9", full: "魔石のレーダー", x: 391, y: 0, w: 89, h: 89, s: "done", o: [89, 89] },
+  { n: "SUPPLY", md: "1・2・3", full: "物資バー（強調・全長）", x: 224, y: 251, w: 256, h: 19, s: "done", o: [256, 19] },
+  { n: "HP", md: "4・23", full: "HP バー（半分）", x: 352, y: 232, w: 128, h: 19, s: "done", o: [128, 19] },
+  { n: "WX", md: "6・7・8", full: "天気の予報（帯型・アイコン 3 つ + 目盛り）", x: 212, y: 219, w: 140, h: 32, s: "plan", o: [128, 28] },
+  { n: "TIME", md: "13・14・15", full: "時間・手番・速度（ボタン 3 つ + 4 桁の表示）", x: 96, y: 0, w: 100, h: 22, s: "tmp", o: [110, 14] },
+  { n: "LAYER", md: "37", full: "層・進行（2 桁の表示 + ランプ）", x: 200, y: 0, w: 44, h: 22, s: "tmp", o: [40, 14] },
+  { n: "ALERT", md: "16・18", full: "気配・追跡の警告（3 段の計器 + ランプ）", x: 248, y: 0, w: 60, h: 22, s: "tmp", o: [36, 14] },
+  { n: "WAIT", md: "21", full: "補給待ち（待ち時間の表示）", x: 312, y: 0, w: 60, h: 22, s: "tmp", o: null },
+  { n: "FLR SCT TRP", md: "10・11・12", full: "照明・偵察・囮と罠（ボタン 3 つ + 残数）", x: 0, y: 98, w: 90, h: 30, s: "tmp", o: [76, 24] },
+  { n: "STATUS", md: "36", full: "状態異常（アイコン 8 つ + 層数）", x: 0, y: 130, w: 128, h: 18, s: "tmp", o: [76, 14] },
+  { n: "CLASS", md: "38", full: "契約・職業（アイコン 2 つ + 枠）", x: 0, y: 150, w: 76, h: 22, s: "tmp", o: [76, 14] },
+  { n: "ITEMS", md: "20", full: "航行アイテム 13 品の使用スロット（2×3）", x: 430, y: 92, w: 50, h: 70, s: "tmp", o: [38, 58] },
+  { n: "EXIT", md: "19", full: "脱出ボタン", x: 440, y: 164, w: 40, h: 24, s: "tmp", o: [38, 14] },
+  { n: "LEGEND", md: "22", full: "地図の凡例・ズーム", x: 440, y: 190, w: 40, h: 20, s: "tmp", o: [38, 14] },
+  { n: "PASSIVE", md: "30", full: "パッシブのアイコン列（直近 12 個）", x: 0, y: 252, w: 192, h: 18, s: "tmp", o: null },
+  { n: "CONSUME", md: "31", full: "消耗品（5 スロット）", x: 0, y: 228, w: 100, h: 22, s: "tmp", o: null },
+  { n: "WPN DICE", md: "32", full: "武器・ダイス（2 スロット）", x: 104, y: 228, w: 44, h: 22, s: "tmp", o: null },
+];
+// 戦闘の配置 (HP を中央下・物資と天気は画面の外・戦闘の計器は別設計なので、 ここでは帯だけ仮置き)
+const BAT = [
+  { n: "GOLD", md: "5", full: "GOLD の入れ物", x: 0, y: 0, w: 76, h: 96, s: "done" },
+  { n: "RADAR", md: "9", full: "魔石のレーダー", x: 391, y: 0, w: 89, h: 89, s: "done" },
+  { n: "HP", md: "4・23", full: "HP バー（中央下・全長）", x: 112, y: 251, w: 256, h: 19, s: "done" },
+  { n: "CHARGE", md: "25", full: "充電ゲージ", x: 96, y: 0, w: 120, h: 12, s: "tmp" },
+  { n: "ESCALATE", md: "26", full: "エスカレーション", x: 220, y: 0, w: 120, h: 12, s: "tmp" },
+  { n: "ENEMY HP", md: "—", full: "敵の HP（上の横バー）", x: 96, y: 16, w: 240, h: 10, s: "tmp" },
+  { n: "STATUS", md: "36", full: "状態異常", x: 0, y: 100, w: 76, h: 14, s: "tmp" },
+];
+let mode = "nav", mapOnly = false, hl = -1;
+const cv = document.getElementById("cv"), g = cv.getContext("2d"); g.imageSmoothingEnabled = false;
+function txt(s, x, y, c, k = 1) { s = String(s).toUpperCase(); g.fillStyle = c; for (let n = 0; n < s.length; n++) { const gl = FONT[s[n]] || FONT[" "]; for (let i = 0; i < 15; i++) if (gl[i] === "1") g.fillRect(x + n * 4 * k + (i % 3) * k, y + Math.floor(i / 3) * k, k, k); } }
+function overlaps(L) { const out = []; for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) { const a = L[i], b = L[j]; if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h) out.push(a.n + " × " + b.n); } return out; }
+function render() {
+  const L = mode === "nav" ? NAV : BAT;
+  g.clearRect(0, 0, W, H); g.fillStyle = "#1a1917"; g.fillRect(0, 0, W, H);
+  if (!mapOnly) {
+    g.fillStyle = "#0d0803"; g.fillRect(0, 0, W, H);
+    for (let x = 0; x < W; x += 20) { g.fillStyle = "#1a1208"; g.fillRect(x, 0, 1, H); } for (let y = 0; y < H; y += 20) { g.fillStyle = "#1a1208"; g.fillRect(0, y, W, 1); }
+    txt("MAP", 200, 120, "#5a4020", 4);
+  }
+  for (const e of L) { const c = COL[e.s];
+    g.fillStyle = mapOnly ? "#000" : c[1]; g.fillRect(e.x, e.y, e.w, e.h);
+    if (!mapOnly) { g.fillStyle = c[0]; g.fillRect(e.x, e.y, e.w, 1); g.fillRect(e.x, e.y + e.h - 1, e.w, 1); g.fillRect(e.x, e.y, 1, e.h); g.fillRect(e.x + e.w - 1, e.y, 1, e.h);
+      if (e.w > 28 && e.h > 9) txt(e.n.length * 4 > e.w - 12 ? e.n.split(" ")[0] : e.n, e.x + 3, e.y + 3, c[0], 1); }
+  }
+  if (!mapOnly) L.forEach((e, i) => { const no = String(i + 1), k = 2, bw = no.length * 4 * k + 1, bh = 5 * k + 4, bx = e.x + e.w - bw - 2, by = e.y + 2;     // 番号 (右の表の # と同じ)
+    g.fillStyle = "#000"; g.fillRect(bx - 1, by - 1, bw + 2, bh + 1); g.fillStyle = hl === i ? "#fff" : "#f0e0b0"; g.fillRect(bx, by, bw, bh - 1); txt(no, bx + 1, by + 2, "#111", k); });
+  if (hl >= 0 && !mapOnly) { const e = L[hl]; g.fillStyle = "#fff"; g.fillRect(e.x - 1, e.y - 1, e.w + 2, 1); g.fillRect(e.x - 1, e.y + e.h, e.w + 2, 1); g.fillRect(e.x - 1, e.y - 1, 1, e.h + 2); g.fillRect(e.x + e.w, e.y - 1, 1, e.h + 2); }
+  // 表
+  const tbl = document.getElementById("tbl"); let rows = `<tr><th>#</th><th>要素</th><th>gui-needed.md の番号</th><th>位置 x,y</th><th>大きさ</th><th>面積</th><th>割合</th><th>前回の見積もり</th></tr>`, tot = 0, oldTot = 0;
+  L.forEach((e, i) => { const a = e.w * e.h, oa = e.o ? e.o[0] * e.o[1] : 0; tot += a; oldTot += oa; rows += `<tr data-i="${i}"><td class="n"><b>${i + 1}</b></td><td>${e.full}</td><td>${e.md || "—"}</td><td class="n">${e.x}, ${e.y}</td><td class="n">${e.w} × ${e.h}</td><td class="n">${a.toLocaleString()}</td><td class="n">${(a / (W * H) * 100).toFixed(1)}%</td><td class="n">${e.o ? e.o[0] + " × " + e.o[1] : "（なし）"}</td></tr>`; });
+  rows += `<tr><th></th><th>合計</th><td></td><td></td><td></td><td class="n"><b>${tot.toLocaleString()}</b></td><td class="n"><b>${(tot / (W * H) * 100).toFixed(1)}%</b></td><td class="n">${oldTot.toLocaleString()}（${(oldTot / (W * H) * 100).toFixed(1)}%）</td></tr>`;
+  tbl.innerHTML = rows;
+  tbl.querySelectorAll("tr[data-i]").forEach(tr => { tr.onmouseenter = () => { hl = +tr.dataset.i; render2(); }; tr.onmouseleave = () => { hl = -1; render2(); }; if (+tr.dataset.i === hl) tr.style.background = "rgba(210,105,30,.25)"; });
+  const ov = overlaps(L), mapArea = W * H - tot;
+  document.getElementById("sum").innerHTML = `地図が見える面積（GUI を除いた分）: <b>${mapArea.toLocaleString()} dot²（${(mapArea / (W * H) * 100).toFixed(1)}%）</b>。` + (ov.length ? ` <span style="color:#d9694a">重なり: ${ov.join(" / ")}</span>` : " 要素どうしの重なりは、ありません。") +
+    (mode === "bat" ? "<br>戦闘の計器（配線盤など）は、別の設計で、ここでは仮置きの帯だけです。配線盤（336×66 = 22,176 dot²・画面の 17%）が加わると、戦闘では、地図を隠す前提になります。" : "");
+}
+function render2() { const t = document.getElementById("tbl").innerHTML; render(); }
+cv.addEventListener("mousemove", ev => { const rc = cv.getBoundingClientRect(), x = (ev.clientX - rc.left) * W / rc.width, y = (ev.clientY - rc.top) * H / rc.height, L = mode === "nav" ? NAV : BAT; let h = -1; L.forEach((e, i) => { if (x >= e.x && x < e.x + e.w && y >= e.y && y < e.y + e.h) h = i; }); if (h !== hl) { hl = h; render(); } });
+cv.addEventListener("mouseleave", () => { hl = -1; render(); });
+document.getElementById("bNav").onclick = () => { mode = "nav"; sync(); }; document.getElementById("bBat").onclick = () => { mode = "bat"; sync(); }; document.getElementById("bMap").onclick = () => { mapOnly = !mapOnly; sync(); };
+function sync() { document.getElementById("bNav").classList.toggle("on", mode === "nav"); document.getElementById("bBat").classList.toggle("on", mode === "bat"); document.getElementById("bMap").classList.toggle("on", mapOnly); render(); }
+render();
+</script>
+</body>
+</html>

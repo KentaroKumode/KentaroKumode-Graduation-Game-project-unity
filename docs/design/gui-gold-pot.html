@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GOLD の入れ物</title>
+<style>
+  :root { --bg: #14161a; --ink: #e6e4de; --ink2: #9a9ca0; --line: #33373d; --panel: #1c1f24; }
+  @media (prefers-color-scheme: light) { :root { --bg: #f4f3ef; --ink: #1d1f22; --ink2: #5a5d62; --line: #c9c5ba; --panel: #fff; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.6 "BIZ UDPGothic","Yu Gothic","Meiryo",sans-serif; padding: 24px 20px 60px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--ink2); font-size: 13px; max-width: 880px; }
+  .main { display: flex; gap: 32px; flex-wrap: wrap; align-items: flex-start; margin-top: 18px; }
+  canvas { image-rendering: pixelated; display: block; background: #0c0e12; border: 1px solid var(--line); }
+  .ctl { display: grid; gap: 12px; min-width: 300px; max-width: 420px; }
+  .ctl label { display: flex; gap: 10px; align-items: center; }
+  .ctl input[type=range] { flex: 1; }
+  .ctl input[type=number] { width: 90px; font: inherit; }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  button { font: inherit; padding: 4px 12px; cursor: pointer; }
+  table { border-collapse: collapse; font-size: 13px; }
+  th, td { border: 1px solid var(--line); padding: 3px 10px; text-align: left; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 26px; }
+  .cell { font-size: 12px; color: var(--ink2); text-align: center; }
+  .cell canvas { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<h1>GOLD の入れ物</h1>
+<div class="sub">gold_pot_layer1〜5.png（76×96）を、上から 4・2・5・3・1 の順で重ねる（下から 1・5・2・3・4）。層 3（金貨の山）が「満杯」の位置で、GOLD が減るほど層 3 だけを下へ下げる（1 ドット単位）。下げた分は、手前の層 4・5 が隠す。閉じるときは、層 5・4・3・1 を上へ上げる（層 2 は動かさない）。試作テスター（map-prototype.html）とは別のファイル。</div>
+
+<div class="main">
+  <canvas id="pot" width="132" height="152" style="width:528px;height:608px"></canvas>
+  <div class="ctl">
+    <label>GOLD <input id="g" type="range" min="0" max="200" value="120"> <input id="gn" type="number" min="0" value="120"></label>
+    <label>満杯の GOLD <input id="full" type="number" min="1" value="200"></label>
+    <label>閉じ具合 <input id="cl" type="range" min="0" max="100" value="0"> <span id="clv">0</span> %</label>
+    <div class="btns"><button id="tog">閉じる</button></div>
+    <div class="btns"><button data-d="-50">−50</button><button data-d="-10">−10</button><button data-d="-1">−1</button><button data-d="1">+1</button><button data-d="10">+10</button><button data-d="50">+50</button><button data-s="0">空にする</button><button data-s="max">満杯にする</button></div>
+    <table>
+      <tr><th>層</th><th>中身</th></tr>
+      <tr><td>4（一番上）</td><td>手前のパネル</td></tr>
+      <tr><td>3</td><td>金貨の山（GOLD で上下に動く）</td></tr>
+      <tr><td>2</td><td>上のフレーム（動かない）</td></tr>
+      <tr><td>5</td><td>開口の下縁</td></tr>
+      <tr><td>1（一番下）</td><td>奥の壁</td></tr>
+    </table>
+    <div class="sub">表示は実際の値へ約 0.25 秒の時定数で追いつく（ゆっくり沈む・積もる）。閉じるときはスプリングなし（加速して全閉で止まる）、開くときはスプリング（端にぶつかって跳ね返る）。金貨がフレームにかぶっている GOLD（164 以上）で全閉にぶつかると、フレームに重なっている部分の金貨が粒になって周囲へ散らばる（開き始めで元に戻る）。1G で山の頂上が見え始め、満杯までは線形。</div>
+  </div>
+</div>
+
+<div class="sub" style="margin-top:26px" id="thr"></div>
+<div class="sub" style="margin-top:6px">GOLD ごとの見え方（満杯 = 200）</div>
+<div class="row" id="row"></div>
+<div class="sub" style="margin-top:26px">閉じる途中（GOLD 120。上げ幅 0 / 10 / 20 / 30 / 42 ドット）</div>
+<div class="row" id="row2"></div>
+
+<script>
+const URIS = ["data:image/png;base64,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", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEwAAABgCAYAAAC3+ZRmAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAF/0lEQVR4nO3a3W9TZRzA8e9T2q4tLWs76AbihtkKM2zeoMGBGi+ML6gR4cJEb7jgv/CFC69FlERjwqWamJiIiRIjJqjsRYIxik4BHe/bWGFj46Xn9HT08eLsnPXltGwFBNzvc7GcPW97zu88z7PzPK0C8PmUpgpdKM1SPmWn66pViirfuMjdxLm3agoFrZTPp/SrG9McmVgEQM7KA7A63U4wFLntnbwbWWaW438PAdAQDADQ1tbK1998i88p1NbW6haIN8Z47oWXAAj6S6Ne/nu9MpkxMpmxW9LWrbbhsceB2WAV8xf/0tbWipUzmZy6jJkzCPoVJ06cdPNXtq66ZZ1KpZrnXDaTGata3isvGY8xMXllTm2fO3MKAMMwSa/pdNO9ggXMjjBHsCHkXg8O/sXmLVvZvGWrm2ZN39zCZJnZedepFVyvvPJgVRvJ586cwjBMNm/Zyrbt2wHvGeTMPvAImCNnGITDIXa8tYMdb+1g85atWGb2pqZkJjP2n6+LtUanYZhs276dne/spO9g75zaqx6w7FUMw2TX+7vZ9f5uXn/jTQBaY0Yd3bY5Hb8da1f5gzx35hTJeIyVK1pu+Pd273qbL/burTq68uNnmRweoqDBX/56MHn5CoZh0rnmfgDee3cn160szz/79E3e0qz5rF/zUXzDDz3UjTl6HGIr3Lzy5SS9ppOPPvgQgI0betz0xnjSvc6Pn3WvFbpyhMWXxAj7YeSiSWMiwarW+2jvSGPlTOJ6ipGRS3XfUMQYrbtuLV4j4+zgz7SvexKwH1A0GvUs19XdzarW+4g0eC/yjgdbQiil8NV6udy0aRPRxiTRxmTJP4ObUc+iP9+2cqePEDDHObL/c/xXRogYo5ijxytGWNCvCPoVyaYmkk1NbrqZs5edRdblirb95QmTw0MEgRXL7aHsDE+nEcfYH9/VvJm2dS8CkIzVeCKBZPW8YvmJmtlHj9nTZuTwVyRW3g9daYaPDxGJBEmsSADQ3PWU22/nOtQQLmknmUy418XBimAB9oBRCvRrj69mKvYAk8NDbHg4TXPXU3z2yccEQ2Es0w5UYlHOrRwJls5kY9FiAMLXr7lpFy0/1wLxOUSjPk6/iq1e1uBeZ6yGkrxsLj/ntpz/nocH+rh0+igArXEfe/YP2gF7eX0HF0zY9Mo2APbt2wfgzuvo9ctow363KQ8W2AFz8t0OEkRHl9XsaL2K15tU0H6QWSNHJGwHaS7Bctqo1j/LNHju2WdoiET54ctPKwOW7krz/W/nAQiGwhz66RAAgYCffH563jcVCFTM9tsqElnsXmez12qU9FZ+j+sfXW+32xCgp6eHkcNfsWf/oL2GXQikGJ4JFkBf/wCPdHdiTENjIsFC4UxNwzDp6x9wXzUGBgaAJrTWlYv+iZOneaS7EwIhli9dwv4DPwL2MU+9myI180PrmesiXm0qj82EU1d7lJvLSVN5fzSlfXGOdjZu6CHeuIRwOMTo2VO0d6TJ5vLuFPYX1zIME4D40hS9/T+RNXNoXXGP86bdH3M7IqsWgPLk+QaqvJ3i6s65X1//gG5KJHiiu43xCzB6PsPylpRbzl3Bg6Ew2atTrOto4Zdff79lwbrXFApajV+6xDeH/qS9Iw3YQQP7AbkvrqlUMx0tcQ4eGeLixMSCDJajUNDKyFkc+KGXtWsfLMmbHWEz2wYjZy3oYDkKBa2mC4WKdDdgxQeFwub1uYUP7A23YZgzWwBRS9XzMGFztkYAKIWveLXKEqz4WG2hK5519nmYBitnVmQKPF8aK0aYqK3mAaIopSlbw3R0mcSvmAIVjrnfBlBofGpmBzubKKpRSuEvaPsQLdWcui2HffcyrSEzHSbVHCaby1Ow95JaHeztv9N9uysVHzMd7O0HrZV7HpYZyxBvjFUeOi1wlmkwOTV7/O686atj/wzdmR7dA2Zi47G8K6WVkvHlUAqNqv5lw9lCAvCORcXmW3kdqC9Q9R6BCyGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBD/J/8CUkU5Fw2IfyAAAAAASUVORK5CYII=", "data:image/png;base64,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", "data:image/png;base64,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", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEwAAABgCAYAAAC3+ZRmAAAACXBIWXMAAA7EAAAOxAGVKw4bAAABBklEQVR4nO3UvS6DURwH4B8pRQxIfBUx+IxbMBgMbkAirlBicA0STScGA5vJ0M0klUbSWhheoe0rxfI8w5uc//n4nfck5yQAAAAAAAAAAAAAAAAAAABDM1JyfLfXQt92/qKPHyiTPfL+6XaLpUFUSuRkZ2szSVIdH0uSLC8tlJne13h14udzJ6a+rlf6n8XZ+cXAOaUO7PTkuGf/S/M2SfLUnc9KrZbq1HSSpN16Lox7uLnMZKdYm11dy8zG/sB7+bzmR1aSNOpX2VsezX2zk7mlxSTJ4911MW99N0mys709cGZS8koeHR78x60bulb7tdC+qjfKPk0AAAAAAAAAAAAAAAB/7w2YhSkJriWhdgAAAABJRU5ErkJggg=="];
+const W = 76, H = 96, DROP = 48, VIS = DROP - 7;   // 空 = 48 (山の頂上が隠れきる) / 1G で頂上が窓に見え始める = 41
+const imgs = URIS.map(u => { const i = new Image(); i.src = u; return i; });
+const ready = () => imgs.every(i => i.complete && i.naturalWidth);
+function offsetFor(v, full) { const f = Math.min(1, v / full); return v < 1 ? Math.round(DROP - 7 * v) : Math.round(VIS * (1 - f)); }
+/* 閉じる (2026-10-11): 層 5・4・3・1 の y 座標を上へ上げる。 層 2 (上のフレーム) だけ動かさない。 重ね順は 上から 4・3・2・5・1 (描画は 1→5→2→3→4)。 層 3 だけは層 5 の画素の位置を抜いて描く (下げた時に層 5 が金貨の上に見える)。 閉じる時、 層 3 は既定位置 (GOLD 100%) より上へ行かない (他の層に対して相対的に下がる)。
+   層 4 (手前のパネル) の上端が層 2 の下端に触れる所 (39 ドット) から、 さらに 3 ドット上げた所が全閉 = 42 ドット */
+const CLOSE_ACC = 60, SPRING_K = 140, SPRING_C = 6, BOUNCE = 0.6;   // 閉じる加速 (約 0.18 秒で全閉) / 開くスプリングの強さ・減衰・反発        // スプリングの強さ / 減衰 / 端でぶつかった時の反発 (1 に近いほどよく跳ねる)
+const HOOD = 16, CLOSE = 55 - HOOD + 3;                      // 層 2 の下端の次の行 / 全閉の上げ幅 (層 4 の上端 y55 − 16)
+/* 層 3 (金貨) が層 2 (上のフレーム) の「見える」画素に重なるか (2026-10-11): 閉じる時、 重なっていない GOLD (開いた状態で金貨がフレームにかぶっていない) だけ、
+   上がってくる金貨のフレームにかぶる部分を切る (層 2 の画素の位置を抜いて描く)。 重なっている GOLD では切らない。
+   判定は画素で行う (しきい値の GOLD は書かない): 層 3 を開いた位置 (offsetFor) に置き、 層 2 の不透明で暗くない画素 (輝度 > 8。 黒い縁取りは見えないので数えない) と 1 画素でも重なれば「重なる」。 */
+let MASK = null;
+function masks() {
+  if (MASK) return MASK;
+  const rd = im => { const c = document.createElement("canvas"); c.width = W; c.height = H; const g = c.getContext("2d"); g.drawImage(im, 0, 0); return g.getImageData(0, 0, W, H).data; };
+  const a5 = rd(imgs[4]); let x5a = W, x5b = -1; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (a5[(y * W + x) * 4 + 3] > 0) { x5a = Math.min(x5a, x); x5b = Math.max(x5b, x); }       // 層 5 (開口の下縁) の横の範囲 = 金貨が見えてよい横の範囲
+  const a3 = rd(imgs[2]), a2 = rd(imgs[1]), vis2 = new Uint8Array(W * H), g3 = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) { g3[i] = a3[i * 4 + 3] > 0 ? 1 : 0; vis2[i] = a2[i * 4 + 3] > 0 && 0.299 * a2[i * 4] + 0.587 * a2[i * 4 + 1] + 0.114 * a2[i * 4 + 2] > 8 ? 1 : 0; }
+  const colTop = new Int16Array(W).fill(-1); let xMin = W, xMax = -1;          // 層 3 の各列で、 最初に不透明になる行 (その列の山の表面)
+  for (let x = 0; x < W; x++) for (let y = 0; y < H; y++) if (g3[y * W + x]) { colTop[x] = y; xMin = Math.min(xMin, x); xMax = Math.max(xMax, x); break; }
+  MASK = { g3, vis2, colTop, xMin, xMax, x5a, x5b, cache: new Map() };
+  return MASK;
+}
+function overlapsHood(dy) {
+  const M = masks(); if (M.cache.has(dy)) return M.cache.get(dy);
+  let hit = false;
+  for (let y = 0; y < H && !hit; y++) { const yy = y + dy; if (yy < 0 || yy >= H) continue; for (let x = 0; x < W; x++) if (M.g3[y * W + x] && M.vis2[yy * W + x]) { hit = true; break; } }
+  M.cache.set(dy, hit); return hit;
+}
+function firstOverlapGold(full) { for (let v = 0; v <= full; v++) if (overlapsHood(offsetFor(v, full))) return v; return null; }
+const PUNCH = (() => { const c = document.createElement("canvas"); c.width = W; c.height = H; return c.getContext("2d"); })();
+/* 散らばる金貨 (2026-10-11): 開いた状態で金貨がフレームにかぶっている GOLD (画素判定) で全閉にぶつかった瞬間、 層 3 のうちフレームの見える画素に重なっている領域を抜き出し、
+   その領域に「コインの形の粒」を敷き詰めて、 周囲へ弾けさせる。 抜き出した領域は層 3 から消す (EAT マスク)。 開き始めで元に戻る。
+   ── Unity (C#) への移植を前提にした作り ──
+   「GoldBurstCore」の関数 (Rng / otsu / estimateCoin / pickPoints / spriteMean / spriteGold / coinFrame) は DOM も canvas も使わない: 入力は RGBA の byte 配列 (w×h×4) とマスク、 出力は数値と配列だけ。
+   乱数は種つきの自前 (xorshift32) で、 C# の同じ式で同じ結果になる。
+   画像ごとの値 (コインの大きさ・位置) は一切書かない: コインの大きさは層 3 の画像から推定し、 絵と色は基本スプライト (coin_gui.png) から取り、 位置は領域から間引いて決める。
+   動きの数値は BURST にまとめてある (インスペクターの項目にする想定)。 描画 (drawParts) だけが HTML 固有。 */
+const BURST = { seed: 20261011, spacing: 1.0, spreadX: 1.2, jitterX: 24, upMin: 28, upMax: 70, gravity: 150, lifeMin: 0.9, lifeMax: 1.6, fadeFrac: 0.35, minWidth: 0.18, radiusJitter: 0, radiusScale: 1.3, spinHzMin: 0.8, spinHzMax: 3.4, tiltVelMax: 2.5, contrastMin: 0.85, contrastMax: 1.6, glintPower: 4, thickness: 0.18, saturation: 1.35, dropSpread: 0.5, dropFull: 10, dropRatio: 3, dropDelayMax: 0.5, dropVx: 8, dropVyMin: 20, dropVyMax: 60 };
+const M = 28;                                            // メインキャンバスの余白 (粒が飛ぶ分)
+const EAT = (() => { const c = document.createElement("canvas"); c.width = W; c.height = H; return c.getContext("2d"); })();
+let parts = [];
+function draw(cv, v, full, up = 0, o = 0, eat = false) {
+  const g = cv.getContext("2d"); g.imageSmoothingEnabled = false; g.clearRect(0, 0, cv.width, cv.height);
+  // 層 3 は他の層と一緒に上がるが、 既定位置 (GOLD 100% の位置 = 絶対 0) より上へは行かせない。 上がる分が足りない時は、 他の層に対して相対的に下がる
+  const dy = Math.max(0, offsetFor(v, full) - up);
+  /* 重ね順 (2026-10-13 修正): 上から 4・2・5・3・1 = 下から 1・3・5・2・4。 層 3 (金貨) は、 開口の下縁 (層 5) とフレーム (層 2) の「後ろ」 (層 1 の裏地の手前) に描く。
+     以前は 上から 4・3・2・5・1 で金貨が層 5・層 2 より手前に来ていたため、 層 5 の不透明な画素を抜く・フレームにかぶる分を切る、 という補正が要った。 正しい前後にすれば補正は要らず、
+     金貨が下がれば縁が手前に見え、 上がればフレームの陰に隠れる。 粒になった画素だけは、 層 3 から消す */
+  PUNCH.clearRect(0, 0, W, H); PUNCH.globalCompositeOperation = "source-over"; PUNCH.drawImage(imgs[2], 0, dy);
+  if (eat) { PUNCH.globalCompositeOperation = "destination-out"; PUNCH.drawImage(EAT.canvas, 0, dy); PUNCH.globalCompositeOperation = "source-over"; }       // 粒になった画素は層 3 から消す (EAT は不透明な画素の印)
+  g.drawImage(imgs[0], o, o - up); { const Mk5 = masks(); g.save(); g.beginPath(); g.rect(o + Mk5.x5a, o - 400, Mk5.x5b - Mk5.x5a + 1, 800); g.clip(); g.drawImage(PUNCH.canvas, o, o); g.restore(); } g.drawImage(imgs[4], o, o - up); g.drawImage(imgs[1], o, o); g.drawImage(imgs[3], o, o - up);      // 下から 層 1・層 3・層 5・層 2・層 4
+  drawDisplay(g, o, o - up, v);                                                          // 層 4 の数字表示 (GOLD) を光らせる
+}
+// ---- GoldBurstCore (DOM 非依存 / C# へ 1:1 で移せる) ----
+class Rng { constructor(seed) { this.s = (seed >>> 0) || 1; } next() { let x = this.s; x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0; this.s = x; return x / 4294967296; } }   // xorshift32
+function lumaAt(rgba, i) { return 0.299 * rgba[i * 4] + 0.587 * rgba[i * 4 + 1] + 0.114 * rgba[i * 4 + 2]; }
+function otsu(values) {                                                   // 輝度の 2 値化のしきい値 (大津)
+  let best = 0, bt = 128; for (let t = 1; t < 255; t++) { let n0 = 0, n1 = 0, s0 = 0, s1 = 0; for (const v of values) { if (v < t) { n0++; s0 += v; } else { n1++; s1 += v; } }
+    if (n0 < 5 || n1 < 5) continue; const d = s0 / n0 - s1 / n1, sc = n0 * n1 * d * d; if (sc > best) { best = sc; bt = t; } } return bt;
+}
+// コイン 1 枚の大きさと、 面の色を取る輝度のしきい値: 画像の「明るい面」の連結成分のうち、 大きい方の半分の面積の中央値から半径を出す (輪郭で割れた小片は数えない)
+function estimateCoin(rgba, w, h) {
+  const vals = []; for (let i = 0; i < w * h; i++) if (rgba[i * 4 + 3] > 0) vals.push(lumaAt(rgba, i));
+  const t = otsu(vals), face = new Uint8Array(w * h), seen = new Uint8Array(w * h), areas = [];
+  for (let i = 0; i < w * h; i++) face[i] = rgba[i * 4 + 3] > 0 && lumaAt(rgba, i) >= t ? 1 : 0;
+  for (let i = 0; i < w * h; i++) { if (!face[i] || seen[i]) continue; const st = [i]; seen[i] = 1; let n = 0;
+    while (st.length) { const c = st.pop(); n++; const x = c % w, y = (c / w) | 0; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue; const j = ny * w + nx; if (face[j] && !seen[j]) { seen[j] = 1; st.push(j); } } }
+    areas.push(n); }
+  areas.sort((a, b) => b - a); const top = areas.slice(0, Math.max(1, areas.length >> 1)); return { radius: Math.sqrt(top[top.length >> 1] / Math.PI), threshold: t };   // threshold = 面と影・輪郭を分ける輝度
+}
+// 領域 (mask) から、 コインの直径に近い間隔で点を間引く (ランダムな順に見て、 近すぎる点は捨てる)
+function pickPoints(mask, w, h, minDist, rng) {
+  const idx = []; for (let i = 0; i < w * h; i++) if (mask[i]) idx.push(i);
+  for (let i = idx.length - 1; i > 0; i--) { const j = (rng.next() * (i + 1)) | 0; [idx[i], idx[j]] = [idx[j], idx[i]]; }
+  const pts = [], d2 = minDist * minDist;
+  for (const i of idx) { const x = i % w, y = (i / w) | 0; if (pts.every(p => (p.x - x) ** 2 + (p.y - y) ** 2 >= d2)) pts.push({ x, y }); }
+  return pts;
+}
+// コインの基本スプライト (RGBA の byte 配列 sp, 幅 sw, 高さ sh) の平均色。 コントラストの中心に使う
+function spriteMean(sp, sw, sh) { let n = 0, r = 0, g = 0, b = 0; for (let i = 0; i < sw * sh; i++) if (sp[i * 4 + 3] > 0) { n++; r += sp[i * 4]; g += sp[i * 4 + 1]; b += sp[i * 4 + 2]; } n = Math.max(1, n); return [r / n, g / n, b / n]; }
+// 側面の基本色: スプライトの不透明な画素のうち、 輝度が平均以上で最も彩度が高い色 (くすんだ平均色ではなく、 金色そのもの)
+function spriteGold(sp, sw, sh) {
+  let ml = 0, n = 0; for (let i = 0; i < sw * sh; i++) if (sp[i * 4 + 3] > 0) { ml += lumaAt(sp, i); n++; } ml /= Math.max(1, n);
+  let best = null, bs = -1; for (let i = 0; i < sw * sh; i++) { if (sp[i * 4 + 3] === 0 || lumaAt(sp, i) < ml) continue; const c = [sp[i * 4], sp[i * 4 + 1], sp[i * 4 + 2]], mx = Math.max(...c), s = (mx - Math.min(...c)) / Math.max(1, mx); if (s > bs) { bs = s; best = c; } }
+  return best || [200, 160, 60];
+}
+// コイン 1 枚の、 今この瞬間の絵: 基本スプライトを scale 倍して、 向き theta・開き wd (0〜1。 1 = 正面 / 0 = 真横) で回している楕円に写す (最近傍で引き戻す)。
+//   back = 裏面: スプライトを左右反転して少し暗く。
+//   厚み (thick = コインの厚さ [画素]): 回転で面が傾くと側面 (縁) が見える。 見える側面の幅は thick × |sin| で、 真横で最大。 面を短軸方向 (u) へ ±thick/2 × lean ずらした 2 枚の円盤の間を、
+//   縁の色 (金色の 0.62 倍・いちばん奥は 0.5 倍) で埋めて表す。 lean = sin(位相) × cos の符号 (どちらへ傾いているか。 −1〜1)。
+//   sat = 彩度の倍率 (1 = 元のまま。 輝度は保ったまま色の差を広げる)。
+//   contrast = 色の中心 (mean) からの離れ具合の倍率: 大きいと明暗が強く (反射がきらっと光る)、 小さいと平らな色になる。 戻り値 = [dx, dy, [r, g, b]] の配列 (後ろに書いたものが手前)
+function coinFrame(sp, sw, sh, mean, gold, scale, wd, theta, back, contrast, thick, lean, sat) {
+  const ri = Math.ceil(Math.max(sw, sh) * scale / 2 + thick) + 1, ct = Math.cos(-theta), st = Math.sin(-theta), ux = Math.cos(theta), uy = Math.sin(theta), cx = (sw - 1) / 2, cy = (sh - 1) / 2;
+  const cc = v => Math.max(0, Math.min(255, Math.round(v))), adj0 = (c, k) => c.map((v, i) => cc(mean[i] + (v - mean[i]) * k)), adj = (c, k) => { const a = adj0(c, k), l = 0.299 * a[0] + 0.587 * a[1] + 0.114 * a[2]; return a.map(v => cc(l + (v - l) * sat)); };   // コントラストの後に彩度 (輝度は保って、 色の差を sat 倍)
+  const face = [];
+  for (let dy = -ri; dy <= ri; dy++) for (let dx = -ri; dx <= ri; dx++) {
+    const u = dx * ct - dy * st, v = dx * st + dy * ct;                                                  // u = 短軸方向 (ここを wd で縮める)
+    const sx = Math.round(cx + (back ? -1 : 1) * u / (wd * scale)), sy = Math.round(cy + v / scale);
+    if (sx < 0 || sy < 0 || sx >= sw || sy >= sh) continue; const i = (sy * sw + sx) * 4; if (sp[i + 3] === 0) continue;
+    let col = [sp[i], sp[i + 1], sp[i + 2]]; if (back) col = col.map(x => cc(x * 0.85)); face.push([dx, dy, adj(col, contrast)]); }
+  const out = [], o = thick / 2 * lean, span = 2 * Math.abs(o), K = Math.ceil(span), sgn = o >= 0 ? 1 : -1;     // o = 見えている面の位置 (u 方向のずれ) / span = 見える側面の幅
+  const put = (f, off, col) => out.push([Math.round(f[0] + ux * off), Math.round(f[1] + uy * off), col]);
+  for (let k = K; k >= 1; k--) { const off = o - sgn * Math.min(span, k), shade = k === K ? 0.5 : 0.62, rim = adj(gold.map(x => x * shade), contrast); for (const f of face) put(f, off, rim); }   // 側面 (奥から手前へ)
+  for (const f of face) put(f, o, f[2]);                                                                // 見えている面
+  return out;
+}
+// ---- 数字表示 (GoldDisplayCore: DOM 非依存 / C# へ 1:1 で移せる) ----
+// 入力は「点灯する位置のマーカー画像」(RGBA の byte 配列。 不透明な画素 = 光る位置)。 左から 数字の桁 ×N と、 最後の 1 つ (常時点灯の記号 = G)。 座標や桁数は画像から読む (書かない)。
+// 数字 1 桁の 7 セグメント (a 上 / b 右上 / c 右下 / d 下 / e 左下 / f 左上 / g 中) は、 マーカー上の連結成分 (4 近傍) として分かれている前提で、 桁の外接矩形の中での位置と縦横で割り当てる。
+const SEG7_DIGITS = ["abcdef", "bc", "abdeg", "abcdg", "bcfg", "acdfg", "acdefg", "abc", "abcdefg", "abcdfg"];     // 0〜9 で光るセグメント (7 セグメント表示の定義)
+function parseDisplay(rgba, w, h) {
+  const seen = new Uint8Array(w * h), comps = [];
+  for (let i = 0; i < w * h; i++) { if (rgba[i * 4 + 3] === 0 || seen[i]) continue; const st = [i], pts = []; seen[i] = 1;
+    while (st.length) { const c = st.pop(), x = c % w, y = (c / w) | 0; pts.push([x, y]); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue; const j = ny * w + nx; if (rgba[j * 4 + 3] > 0 && !seen[j]) { seen[j] = 1; st.push(j); } } }
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]); comps.push({ pts, x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) }); }
+  comps.sort((a, b) => a.x0 - b.x0);
+  const glyphs = []; for (const c of comps) { const g = glyphs[glyphs.length - 1]; if (g && c.x0 <= g.x1 + 1) { g.comps.push(c); g.x1 = Math.max(g.x1, c.x1); g.y0 = Math.min(g.y0, c.y0); g.y1 = Math.max(g.y1, c.y1); } else glyphs.push({ comps: [c], x0: c.x0, x1: c.x1, y0: c.y0, y1: c.y1 }); }   // x が 1 列以上あいたら別の桁
+  const digits = glyphs.slice(0, -1).map(g => { const seg = {}; for (const c of g.comps) { const wide = c.x1 - c.x0 + 1 > c.y1 - c.y0 + 1, rx = ((c.x0 + c.x1) / 2 - g.x0) / Math.max(1, g.x1 - g.x0), ry = ((c.y0 + c.y1) / 2 - g.y0) / Math.max(1, g.y1 - g.y0);
+      const name = wide ? (ry < 0.25 ? "a" : ry > 0.75 ? "d" : "g") : (rx < 0.5 ? (ry < 0.5 ? "f" : "e") : (ry < 0.5 ? "b" : "c")); seg[name] = (seg[name] || []).concat(c.pts); } return seg; });
+  const tail = glyphs.length ? glyphs[glyphs.length - 1].comps.flatMap(c => c.pts) : [];
+  return { digits, always: tail };
+}
+// value を表示した時に光る位置の一覧 [[x, y], ...]。 桁は左から。 上位の 0 は消す (一の位は 0 でも出す)。 桁に入りきらない値は最大値 (99…9) にそろえる。 常時点灯の記号は必ず含む
+function displayLit(disp, value) {
+  const n = disp.digits.length, v = Math.max(0, Math.min(Math.pow(10, n) - 1, Math.round(value))), s = String(v), out = disp.always.slice();
+  for (let k = 0; k < n; k++) { const idx = k - (n - s.length); if (idx < 0) continue; for (const ch of SEG7_DIGITS[+s[idx]]) if (disp.digits[k][ch]) out.push(...disp.digits[k][ch]); }
+  return out;
+}
+// 光る画素の上下左右に隣り合う 1 マス (斜めは含めない) のうち、 光っていない位置 (ブルーム) とその強さ [[x, y, w], ...]。 強さ w (0〜1) = 隣り合う光る画素からの寄与の合計 (1 画素につき 1)。
+// 光る棒に沿った所・角の内側は寄与が重なって強く、 棒の端や外側は弱くなる (ベタ塗りの縁取りにならない)
+function bloomOf(lit, w, h) {
+  const on = new Set(lit.map(p => p[1] * w + p[0])), acc = new Map();
+  for (const [x, y] of lit) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= w || ny >= h || on.has(ny * w + nx)) continue;
+    const k = ny * w + nx, e = acc.get(k) || [nx, ny, 0]; e[2] += 1; acc.set(k, e); }
+  return [...acc.values()].map(e => [e[0], e[1], Math.min(1, e[2] * 0.5)]);
+}
+// ---- ここまで GoldBurstCore ----
+const COIN_IMG = new Image(); COIN_IMG.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAcAAAAHCAYAAADEUlfTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAl0lEQVQImVWOoQrCYACEvw1ZsBiG5TcOwWKxrAkaxpLv4Sus7wUsvsww2JZXJoJpZZgsIhv7zzA38NIdB9+dw0/75VSDv9zfzuDZLVypq6Sukm0zbYynv8K2mT63g+oilW0zJZHRBEC2pHmcAJh5Oc+yJ7oD+tWE48x8FRIHfh+SyKgu0hF5Pa4FML5KIiOAOPDZngsH4AsDvkRcKrG4KAAAAABJRU5ErkJggg==";        // coin_gui.png (7×7): パーティクルの基本スプライト
+const DISPLAY_CFG = { color: [255, 132, 28], bloom: 0.2 };      // 点灯の色 (オレンジ) / ブルーム (まわり 1 マス) の最大の濃さ (加算。 上下左右に隣り合う 1 マスだけ)
+const DISP_IMG = new Image(); DISP_IMG.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEwAAABgCAYAAAC3+ZRmAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAY0lEQVR4nO3VsQ2AMAwEQIdlsv84TGMqJAbgiRTuKseN7eKVKgAAAAAAAAAAAAAAAAAAAAAAAABYZnb17OpUfyvPAxN12vHVoKRz1Fi9Q9Qb0bvf28dSJMnzSwIAAAAAAMCvXBtpWM3LRyniAAAAAElFTkSuQmCC";           // gold_pot_display_marker.png: 数字表示の点灯位置のマーカー (緑の画素 = 光る位置)
+let DISP = null;
+function displayData() { if (DISP) return DISP; if (!(DISP_IMG.complete && DISP_IMG.naturalWidth)) return null; const c = document.createElement("canvas"); c.width = DISP_IMG.naturalWidth; c.height = DISP_IMG.naturalHeight;
+  const g = c.getContext("2d"); g.drawImage(DISP_IMG, 0, 0); DISP = parseDisplay(g.getImageData(0, 0, c.width, c.height).data, c.width, c.height); DISP.w = c.width; DISP.h = c.height; return DISP; }
+const DISP_CACHE = new Map();                                      // 表示する値 → { bloom, lit } (小さなキャンバス)。 値が変わった時だけ 1 画素ずつ描き、 あとは drawImage 2 回で済ませる (毎フレームの fillRect を避ける)
+function displayCanvases(d, value) {
+  const key = Math.max(0, Math.min(Math.pow(10, d.digits.length) - 1, Math.round(value))); let e = DISP_CACHE.get(key); if (e) return e;
+  const lit = displayLit(d, key), col = DISPLAY_CFG.color, mk = () => { const c = document.createElement("canvas"); c.width = d.w; c.height = d.h; return c; }, bc = mk(), lc = mk(), bg = bc.getContext("2d"), lg = lc.getContext("2d");
+  for (const [x, y, w] of bloomOf(lit, d.w, d.h)) { bg.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${DISPLAY_CFG.bloom * w})`; bg.fillRect(x, y, 1, 1); }
+  lg.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`; for (const [x, y] of lit) lg.fillRect(x, y, 1, 1);
+  e = { bloom: bc, lit: lc }; DISP_CACHE.set(key, e); return e;
+}
+function drawDisplay(g, X, Y, value) {                             // 層 4 の数字表示を光らせる (層 4 と一緒に動く)
+  const d = displayData(); if (!d) return; const e = displayCanvases(d, value);
+  g.save(); g.globalCompositeOperation = "lighter"; g.drawImage(e.bloom, X, Y); g.restore();   // ブルームは加算で重ねる (下の絵を覆わず、 明るくする)
+  g.drawImage(e.lit, X, Y);
+}
+let COIN = null;
+function coinSprite() { if (COIN) return COIN; if (!(COIN_IMG.complete && COIN_IMG.naturalWidth)) return null; const w = COIN_IMG.naturalWidth, h = COIN_IMG.naturalHeight, c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d"); g.drawImage(COIN_IMG, 0, 0); const d = g.getImageData(0, 0, w, h).data; COIN = { d, w, h, mean: spriteMean(d, w, h), gold: spriteGold(d, w, h) }; return COIN; }
+let coin = null, burstRng = new Rng(BURST.seed);
+function burst(v, full, up) {                            // 全閉にぶつかった瞬間: 層 3 のうち、 フレームの見える画素に重なる領域を、 コインの形の粒にする
+  const dy = Math.max(0, offsetFor(v, full) - up), Mk = masks(), c = document.createElement("canvas"); c.width = W; c.height = H;
+  const cg = c.getContext("2d"); cg.drawImage(imgs[2], 0, 0); const px = cg.getImageData(0, 0, W, H).data, mark = EAT.getImageData(0, 0, W, H);
+  if (coin === null) coin = estimateCoin(px, W, H);
+  if (!coinSprite()) return 0;
+  const region = new Uint8Array(W * H);                  // 層 3 の座標で、 フレームにかぶっている (まだ食われていない) 画素
+  for (let y = 0; y < H; y++) { const yy = y + dy; if (yy < 0 || yy >= H) continue; for (let x = 0; x < W; x++) { const i = y * W + x; if (Mk.g3[i] && Mk.vis2[yy * W + x] && !mark.data[i * 4 + 3]) region[i] = 1; } }
+  const rBase = coin.radius * BURST.radiusScale, pts = pickPoints(region, W, H, (rBase * 2 + 1) * BURST.spacing, burstRng);
+  for (const pt of pts) {
+    const R = burstRng, rr = rBase * (1 + (R.next() - 0.5) * 2 * BURST.radiusJitter);          // rr = このコインの半径 (層 3 から推定した大きさ ± ばらつき)
+    parts.push({ x: pt.x, y: pt.y + dy, vx: (pt.x - W / 2) * BURST.spreadX + (R.next() - 0.5) * BURST.jitterX, vy: -(BURST.upMin + R.next() * (BURST.upMax - BURST.upMin)),
+      scale: 2 * rr / Math.max(COIN.w, COIN.h), gl: R.next() * Math.PI * 2, life: 0, max: BURST.lifeMin + R.next() * (BURST.lifeMax - BURST.lifeMin),
+      ph: R.next() * Math.PI * 2, spin: (BURST.spinHzMin + R.next() * (BURST.spinHzMax - BURST.spinHzMin)) * (R.next() < 0.5 ? -1 : 1),   // 回転の位相・速さ・向きはコインごとにばらばら
+      th: R.next() * Math.PI, thv: (R.next() - 0.5) * 2 * BURST.tiltVelMax });                                                      // 回転軸の向きと、 その軸が回る速さもばらばら
+  }
+  for (let i = 0; i < W * H; i++) if (region[i]) { mark.data[i * 4] = 255; mark.data[i * 4 + 3] = 255; }
+  EAT.putImageData(mark, 0, 0); return pts.length;
+}
+/* GOLD が増えた時 (2026-10-11): 同じコインの粒を、 上から降らせる。 枚数 = 増えた GOLD (1 G = 1 枚)。 ただし dropFull (10) 枚を超えた分は dropRatio (3) 枚につき 1 枚だけ足す。
+   降る位置 (x) は金貨の山の範囲 (層 3 の画像から取る) の中央を中心に、 幅の dropSpread 倍の範囲でばらつかせ、 上の余白から時間差で落とす。 山の表面 (層 3 の列ごとの最上端 + 今の下がり量) に着くと消える (山は GOLD の表示値へ追いついて高くなる)。 */
+function dropCount(delta) { return delta <= BURST.dropFull ? delta : BURST.dropFull + Math.floor((delta - BURST.dropFull) / BURST.dropRatio); }
+function dropCoins(delta) {
+  const Mk = masks(); if (!coin) { /* コイン 1 枚の大きさは burst と共通 (層 3 から推定) */ const c = document.createElement("canvas"); c.width = W; c.height = H; const cg = c.getContext("2d"); cg.drawImage(imgs[2], 0, 0); coin = estimateCoin(cg.getImageData(0, 0, W, H).data, W, H); }
+  if (!coinSprite()) return 0; const R = burstRng, n = dropCount(delta), rBase = coin.radius * BURST.radiusScale;
+  for (let i = 0; i < n; i++) { const rr = rBase * (1 + (R.next() - 0.5) * 2 * BURST.radiusJitter);
+    parts.push({ drop: true, delay: R.next() * BURST.dropDelayMax, x: (Mk.xMin + Mk.xMax) / 2 + (R.next() - 0.5) * (Mk.xMax - Mk.xMin) * BURST.dropSpread, y: -(M - 4) + R.next() * 6, vx: (R.next() - 0.5) * 2 * BURST.dropVx, vy: BURST.dropVyMin + R.next() * (BURST.dropVyMax - BURST.dropVyMin),
+      scale: 2 * rr / Math.max(COIN.w, COIN.h), gl: R.next() * Math.PI * 2, life: 0, max: Infinity, ph: R.next() * Math.PI * 2, spin: (BURST.spinHzMin + R.next() * (BURST.spinHzMax - BURST.spinHzMin)) * (R.next() < 0.5 ? -1 : 1),
+      th: R.next() * Math.PI, thv: (R.next() - 0.5) * 2 * BURST.tiltVelMax }); }
+  return n;
+}
+let landFn = x => H;                                     // 山の表面の高さ (描画のたびに更新)
+function stepParts(dt) {
+  const keep = [];
+  for (const p of parts) {
+    if (p.drop) { if (p.delay > 0) { p.delay -= dt; keep.push(p); continue; } p.life += dt; p.vy += BURST.gravity * dt; p.x += p.vx * dt; p.y += p.vy * dt; if (p.y < landFn(p.x)) keep.push(p); continue; }      // 山に着いたら消える
+    p.life += dt; p.vy += BURST.gravity * dt; p.x += p.vx * dt; p.y += p.vy * dt; if (p.life < p.max) keep.push(p); }
+  parts = keep;
+}
+function drawParts(g) {                                  // 描画は HTML 固有 (画素の一覧は coinFrame が返す)
+  const sp = coinSprite(); if (!sp) return;
+  for (const p of parts) { if (p.drop && p.delay > 0) continue; const a = p.drop ? 1 : Math.min(1, (p.max - p.life) / (p.max * BURST.fadeFrac)), ph = p.ph + p.life * p.spin * Math.PI * 2, c = Math.cos(ph), wd = Math.max(BURST.minWidth, Math.abs(c));
+    // 反射: 回転の位相に応じてコントラストを変える。 面が光源へ向く瞬間 (半周ごとに 1 回・コインごとに位相がずれる) だけ大きく上げて、 きらっと光らせる
+    const glint = Math.pow(0.5 + 0.5 * Math.cos(2 * ph + p.gl), BURST.glintPower), k = BURST.contrastMin + (BURST.contrastMax - BURST.contrastMin) * glint;
+    const lean = Math.sin(ph) * (c < 0 ? -1 : 1), thick = BURST.thickness * Math.max(sp.w, sp.h) * p.scale;      // 厚み = コインの直径の thickness 倍
+    for (const [dx, dy, col] of coinFrame(sp.d, sp.w, sp.h, sp.mean, sp.gold, p.scale, wd, p.th + p.thv * p.life, c < 0, k, thick, lean, BURST.saturation)) { g.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${a})`; g.fillRect(Math.round(p.x + dx) + M, Math.round(p.y + dy) + M, 1, 1); } }
+}
+const pot = document.getElementById("pot"), gr = document.getElementById("g"), gn = document.getElementById("gn"), fullEl = document.getElementById("full");
+let prevTarget = null, shown = +gr.value, last = 0, closeT = 0, closeV = 0, closeGoal = 0, hold = false;   // closeT = 閉じ具合 (0 開 〜 1 閉) / closeV = 速度 / closeGoal = 目標 (0 or 1) / hold = スライダーで手動中
+const target = () => Math.max(0, +gn.value || 0), fullV = () => Math.max(1, +fullEl.value || 1);
+function setG(v) { v = Math.max(0, Math.round(v)); gn.value = v; gr.max = Math.max(fullV(), v); gr.value = v; }
+gr.oninput = () => { gn.value = gr.value; };
+gn.oninput = () => { gr.max = Math.max(fullV(), target()); gr.value = target(); };
+fullEl.oninput = () => { gr.max = Math.max(fullV(), target()); };
+const cl = document.getElementById("cl"), clv = document.getElementById("clv"), tog = document.getElementById("tog");
+cl.oninput = () => { if (cl.value / 100 < 0.5) EAT.clearRect(0, 0, W, H); hold = true; closeT = cl.value / 100; closeV = 0; closeGoal = closeT >= 0.5 ? 1 : 0; clv.textContent = cl.value; tog.textContent = closeGoal > 0.5 ? "開く" : "閉じる"; };
+tog.onclick = () => { if (closeGoal > 0.5) { EAT.clearRect(0, 0, W, H); } hold = false; closeGoal = closeGoal > 0.5 ? 0 : 1; tog.textContent = closeGoal > 0.5 ? "開く" : "閉じる"; };
+for (const b of document.querySelectorAll("button[data-d], button[data-s]")) b.onclick = () => { if (b.dataset.d) setG(target() + +b.dataset.d); else setG(b.dataset.s === "max" ? fullV() : 0); };
+function loop(ts) {
+  if (ready()) {
+    const dt = last ? Math.min(0.25, (ts - last) / 1000) : 0; last = ts;
+    if (prevTarget === null) prevTarget = target();
+    if (target() > prevTarget && closeT < 0.5) dropCoins(target() - prevTarget);                    // GOLD が増えたら、 増えた分のコインを上から降らせる (閉じている間は降らせない)
+    prevTarget = target();
+    shown += (target() - shown) * (1 - Math.exp(-dt / 0.25)); if (Math.abs(target() - shown) < 0.05) shown = target();
+    /* 開け閉め (2026-10-11): 閉じる = スプリングなし (一定の加速で閉まり、 全閉で止まる) / 開く = スプリング (端の壁にぶつかって跳ね返り、 何度か小さく跳ねて止まる) */
+    if (!hold) {
+      if (closeGoal > 0.5) {                                                                      // 閉じる: スプリングなし。 一定の加速で閉まり、 全閉で止まる (跳ね返らない)
+        if (closeT < 1) { closeV = Math.max(0, closeV) + CLOSE_ACC * dt; closeT += closeV * dt; if (closeT >= 1) { if (closeV > 0.3 && overlapsHood(offsetFor(shown, fullV()))) burst(shown, fullV(), CLOSE); closeT = 1; closeV = 0; } } }
+      else { const h = dt / 4, pull = -0.08;                                                      // 開く: スプリング (端の壁にぶつかって跳ね返る)
+        for (let i = 0; i < 4; i++) { closeV += (SPRING_K * (pull - closeT) - SPRING_C * closeV) * h; closeT += closeV * h;
+          if (closeT < 0) { closeT = 0; closeV = -closeV * BOUNCE; } else if (closeT > 1) { closeT = 1; closeV = -closeV * BOUNCE; }
+          if ((closeT === 1 || closeT === 0) && Math.abs(closeV) < 0.12) closeV = 0; } } }
+    cl.value = Math.round(closeT * 100); clv.textContent = cl.value;
+    { const Mk = masks(), up = Math.round(CLOSE * closeT), dyAbs = Math.max(0, offsetFor(shown, fullV()) - up), winBottom = 55 - up - 1;   // 山の表面 = 列の最上端 + 今の下がり量 (窓の下端より下には行かない)
+      landFn = x => { const c = Mk.colTop[Math.max(0, Math.min(W - 1, Math.round(x)))]; return Math.min(winBottom, (c < 0 ? H : c) + dyAbs); }; }
+    draw(pot, shown, fullV(), Math.round(CLOSE * closeT), M, true); stepParts(dt); drawParts(pot.getContext("2d"));
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+const row = document.getElementById("row");
+Promise.all(imgs.map(i => i.decode ? i.decode().catch(() => {}) : null)).then(() => {
+  const t = firstOverlapGold(200); document.getElementById("thr").textContent = "開いた状態で金貨がフレーム（層 2）にかぶり始める GOLD（満杯 200 のとき・画素で判定）: " + t + "。これ未満では、閉じるときにフレームにかぶる部分を切る。";
+  const row2 = document.getElementById("row2");
+  for (const up of [0, 10, 20, 30, CLOSE]) { const c = document.createElement("canvas"); c.width = W; c.height = H; c.style.width = W * 2 + "px"; c.style.height = H * 2 + "px"; draw(c, 120, 200, up);
+    const cell = document.createElement("div"); cell.className = "cell"; cell.appendChild(c); cell.appendChild(document.createTextNode("上げ幅 " + up)); row2.appendChild(cell); }
+  for (const v of [0, 1, 20, 60, 120, 200]) { const c = document.createElement("canvas"); c.width = W; c.height = H; c.style.width = W * 2 + "px"; c.style.height = H * 2 + "px"; draw(c, v, 200);
+    const cell = document.createElement("div"); cell.className = "cell"; cell.appendChild(c); cell.appendChild(document.createTextNode(v + " G")); row.appendChild(cell); }
+});
+</script>
+</body>
+</html>

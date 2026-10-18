@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>バーの入れ替え テストパターン</title>
+<style>
+  :root { --bg: #14161a; --ink: #e6e4de; --ink2: #9a9ca0; --line: #33373d; --panel: #1c1f24; }
+  @media (prefers-color-scheme: light) { :root { --bg: #f4f3ef; --ink: #1d1f22; --ink2: #5a5d62; --line: #c9c5ba; --panel: #fff; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.6 "BIZ UDPGothic","Yu Gothic","Meiryo",sans-serif; padding: 24px 20px 60px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--ink2); font-size: 13px; max-width: 960px; }
+  canvas { image-rendering: pixelated; display: block; background: #0c0e12; border: 1px solid var(--line); max-width: 100%; height: auto; }
+  .bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 14px 0 10px; }
+  button { font: inherit; padding: 5px 12px; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+  button.on { outline: 2px solid #d2691e; }
+  label { display: inline-flex; gap: 6px; align-items: center; }
+  .desc { margin-top: 10px; max-width: 960px; }
+  .grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 26px; }
+  .cell h3 { font-size: 14px; margin: 0 0 4px; } .cell p { margin: 4px 0 0; font-size: 12px; color: var(--ink2); }
+  .cell canvas { display: inline-block; margin-right: 6px; }
+</style>
+</head>
+<body>
+<h1>バーの入れ替え — テストパターン（見た目なし・動きとレイアウトだけ）</h1>
+<div class="sub">レイアウトは、<b>全幅のバー</b>（後ろ・主役）と、<b>半幅のバー</b>（右上・手前に重なる）の 2 つの枠。どちらも見えたまま、<b>主役が全幅の枠に入る</b>（戦闘は HP・赤、航行は物資・橙）。場面が変わると、2 本が枠を入れ替える。バーの長さが変わるときは、セグメントの大きさは同じで、<b>数が増減する</b>（伸縮）。入れ替えの動きの見せ方を 3 通り比べる。切り替えは少し勢いのあるスプリング。</div>
+<div class="bar">
+  <span>場面:</span><button id="sBattle" class="on">戦闘（HP が主役）</button><button id="sNav">航行（物資が主役）</button><label><input id="auto" type="checkbox"> 2.5 秒ごとに自動で切り替える</label>
+  <span style="margin-left:14px">HP</span><input id="vHp" type="range" min="0" max="100" value="62"><span>物資</span><input id="vSup" type="range" min="0" max="100" value="78">
+</div>
+<div class="bar" id="pBtns"></div>
+<canvas id="cv" width="480" height="200" style="width:960px"></canvas>
+<div class="desc" id="desc"></div>
+<div class="grid" id="grid"></div>
+
+<script>
+const W = 480, H = 200;
+const C = { bg: [26, 25, 23], plate: [74, 79, 88], plate2: [58, 62, 70], edge: [150, 156, 168], dark: [18, 18, 20], off: [58, 50, 46], hp: [240, 92, 52], sup: [244, 182, 70], white: [236, 232, 224] };
+const LIT = [C.hp, C.sup], NAME = ["HP", "SP"];
+const css = c => `rgb(${c[0]},${c[1]},${c[2]})`;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const ease = t => t * t * (3 - 2 * t);
+const rect = (g, x, y, w, h, c, a = 1) => { if (w <= 0 || h <= 0) return; g.fillStyle = a < 1 ? `rgba(${c[0]},${c[1]},${c[2]},${a})` : css(c); g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); };
+const G35 = { H: "101101111101101", P: "110101110100100", S: "011100010001110", 0: "111101101101111", 1: "010110010010111", 2: "110001010100111", 3: "110001010001110", 4: "101101111001001", 5: "111100110001110", 6: "011100111101111", 7: "111001010010010", 8: "111101111101111", 9: "111101111001110" };
+function txt(g, s, x, y, c, k = 1) { s = String(s); for (let n = 0; n < s.length; n++) { const gl = G35[s[n]]; if (!gl) continue; for (let i = 0; i < 15; i++) if (gl[i] === "1") rect(g, x + n * 4 * k + (i % 3) * k, y + Math.floor(i / 3) * k, k, k, c); } }
+function box(g, x, y, w, h, fill = C.plate, edge = C.edge) { rect(g, x, y, w, h, edge); rect(g, x + 1, y + 1, w - 2, h - 2, fill); }
+
+// ── 2 つの枠 (右端をそろえる。 長さはセグメント数で決まる = 伸縮) ──
+const SEG = 5, STEP = 6, HEAD = 56, TAIL = 6, BH = 26;               // セグメントの大きさと間隔 (どの場面でも同じ) / 左のラベル部 / 右の余白 / バーの高さ
+const XR = 456;                                                      // 右端
+const SLOT = { full: { n: 62, y: 124 }, half: { n: 28, y: 104 } };    // 全幅の枠 (後ろ・下) / 半幅の枠 (右上・手前)
+const lenOf = n => HEAD + n * STEP + TAIL;
+// 1 本のバーを描く。 n = セグメント数 (長さ)・x は右端から決まる。 lift = 持ち上がり (影と側面)
+function bar(g, r, y, n, v, lift = 0, tone = 0) {
+  const len = lenOf(Math.round(n)), x = XR - len, per = Math.round(n), lit = Math.round(v * per);
+  if (lift > 0.5) { rect(g, x + lift + 2, y + lift + 3, len, BH, [0, 0, 0], 0.5); rect(g, x, y - Math.round(lift) + BH - 1, len, Math.round(lift) + 2, C.plate2); }
+  const yy = y - Math.round(lift);
+  box(g, x, yy, len, BH, C.plate.map(c => c + tone)); box(g, x + 4, yy + 4, 44, BH - 8, C.plate2);
+  txt(g, NAME[r], x + 8, yy + 9, LIT[r], 1); txt(g, String(Math.round(v * 100)), x + 8 + 12, yy + 9, C.white, 1);
+  rect(g, x + HEAD - 4, yy + 4, per * STEP + 4, BH - 8, C.dark);
+  for (let i = 0; i < per; i++) rect(g, x + HEAD - 2 + i * STEP, yy + 7, SEG, BH - 14, i < lit ? LIT[r] : C.off);
+  return { x, y: yy, len };
+}
+const PAT = [];
+// u = そのバーの「全幅の枠に入っている度合い」 0 = 半幅の枠 / 1 = 全幅の枠
+const uOf = f => clamp(f, 0, 1);
+const nOf = u => lerp(SLOT.half.n, SLOT.full.n, ease(u)), yOf = u => lerp(SLOT.half.y, SLOT.full.y, ease(u));
+// 0. 静止: 2 つの枠のレイアウトだけ (動かさない。 主役 = 全幅 / もう一方 = 半幅で手前に重なる)
+PAT.push({ name: "0. レイアウト（静止）", desc: "全幅の枠（後ろ）と半幅の枠（右上・手前に少し重なる）。主役が全幅の枠に入る。場面を切り替えると、瞬時に入れ替わるだけ。",
+  draw(g, st) { const big = st.f[0] > st.f[1] ? 0 : 1, small = 1 - big; bar(g, big, SLOT.full.y, SLOT.full.n, st.v[big]); bar(g, small, SLOT.half.y, SLOT.half.n, st.v[small]); } });
+// 1. スライド交差: 2 本が、 上下にずれながらすれ違って、 枠を入れ替える。 前後 (描く順) は、 途中で入れ替わる
+PAT.push({ name: "1. スライド交差", desc: "2 本が、レールに沿って上下にずれながらすれ違って、枠を入れ替える。すれ違うとき、主役になる方が手前を通り、前後が入れ替わる。長さはセグメントの数が増減して伸縮する（右端は固定）。",
+  draw(g, st) { const us = [uOf(st.f[0]), uOf(st.f[1])], order = [0, 1].sort((a, b) => us[a] - us[b]);               // u の小さい方 (半幅の枠に近い方) を、 あとから (手前に) 描く
+    for (const r of order.slice().reverse()) { const u = us[r], bump = Math.sin(Math.PI * clamp(u, 0, 1)) * (r === 0 ? -1 : 1) * 12; bar(g, r, yOf(u) + bump, nOf(u), st.v[r]); } } });
+// 2. せり上がり交差: 主役になる方が、 持ち上がって他方を越えて入る
+PAT.push({ name: "2. せり上がり交差", desc: "主役になる方のバーが、ピストンで持ち上がり（影と側面が見える）、もう一方の上を越えて全幅の枠へ降りる。もう一方は、押し出されるように半幅の枠へ縮む。越える間だけ、最前面に出る。",
+  draw(g, st) { const us = [uOf(st.f[0]), uOf(st.f[1])], mover = us[0] > us[1] ? 0 : 1, other = 1 - mover, um = us[mover], lift = Math.sin(Math.PI * clamp(um, 0, 1)) * 10;
+    bar(g, other, yOf(us[other]), nOf(us[other]), st.v[other]); bar(g, mover, yOf(um), nOf(um), st.v[mover], lift); } });
+// 3. 引き込み交代: 全幅の枠の中へ半幅の枠のバーが滑り込み、 もう一方は手前の枠へ引き込まれる (上下は動かさず、 長さだけが入れ替わる)
+PAT.push({ name: "3. 伸縮の交代", desc: "上下の動きは、枠の高さの差だけ（すれ違わない）。主役になる方は、左へセグメントを継ぎ足して全幅まで伸び、もう一方は左から縮んで半幅になる。前後は、伸びてきた方が後ろ、縮んだ方が手前（重なる）に入れ替わる。部品の移動がなく、いちばん素朴な形。",
+  draw(g, st) { const us = [uOf(st.f[0]), uOf(st.f[1])], order = [0, 1].sort((a, b) => us[b] - us[a]);                  // u の大きい方 (全幅の枠) を先に (後ろに) 描く
+    for (const r of order) bar(g, r, yOf(us[r]), nOf(us[r]), st.v[r]); } });
+
+// ── 実行 ──────────────────────────────────────────────
+const cv = document.getElementById("cv"), g = cv.getContext("2d"); g.imageSmoothingEnabled = false;
+let pat = 1, scene = 0, spring = [{ x: 1, v: 0 }, { x: 0, v: 0 }], last = 0, autoT = 0;
+function setScene(s) { scene = s; document.getElementById("sBattle").classList.toggle("on", s === 0); document.getElementById("sNav").classList.toggle("on", s === 1); }
+document.getElementById("sBattle").onclick = () => setScene(0); document.getElementById("sNav").onclick = () => setScene(1);
+const btns = document.getElementById("pBtns"), desc = document.getElementById("desc");
+PAT.forEach((p, i) => { const b = document.createElement("button"); b.textContent = p.name; b.onclick = () => { pat = i; refresh(); }; btns.appendChild(b); });
+function refresh() { [...btns.children].forEach((b, i) => b.classList.toggle("on", i === pat)); desc.textContent = PAT[pat].desc; }
+function stepSim(dt) {
+  if (document.getElementById("auto").checked) { autoT += dt; if (autoT > 2.5) { autoT = 0; setScene(1 - scene); } }
+  const goal = [scene === 0 ? 1 : 0, scene === 1 ? 1 : 0];
+  for (let i = 0; i < 2; i++) { const s = spring[i], a = 120 * (goal[i] - s.x) - 13 * s.v; s.v += a * dt; s.x += s.v * dt; s.x = clamp(s.x, -0.04, 1.06); }    // 入れ替えは、 少し勢いのあるスプリング
+}
+function render(target = g, fOverride = null) {
+  target.clearRect(0, 0, W, H); rect(target, 0, 0, W, H, C.bg);
+  const st = { f: fOverride || [clamp(spring[0].x, 0, 1.05), clamp(spring[1].x, 0, 1.05)], v: [+document.getElementById("vHp").value / 100, +document.getElementById("vSup").value / 100] };
+  PAT[pat].draw(target, st);
+}
+function loop(ts) { const dt = last ? Math.min(0.05, (ts - last) / 1000) : 0.016; last = ts; stepSim(dt); render(); requestAnimationFrame(loop); }
+window.__step = n => { for (let i = 0; i < n; i++) stepSim(1 / 60); render(); };
+window.__set = (p, s) => { pat = p; setScene(s); spring = [{ x: s === 0 ? 1 : 0, v: 0 }, { x: s === 1 ? 1 : 0, v: 0 }]; refresh(); };
+(function init() {
+  const grid = document.getElementById("grid"), save = pat;
+  PAT.forEach((p, i) => { const cell = document.createElement("div"); cell.className = "cell"; cell.innerHTML = `<h3>${p.name}</h3>`;
+    for (const f of [[1, 0], [0.7, 0.3], [0.5, 0.5], [0.3, 0.7], [0, 1]]) { const c = document.createElement("canvas"); c.width = W; c.height = H; c.style.width = "300px"; const gg = c.getContext("2d"); gg.imageSmoothingEnabled = false; pat = i; render(gg, f); cell.appendChild(c); }
+    const q = document.createElement("p"); q.textContent = "左から: 戦闘（HP が主役）→ 途中 3 コマ → 航行（物資が主役）"; cell.appendChild(q); grid.appendChild(cell); });
+  pat = save; refresh(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
