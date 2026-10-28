@@ -58,38 +58,6 @@ namespace CombatSystem
         };
 
         /// <summary>
-        /// 戦闘開始時にランダムで修飾子を選出し、CombatContextに適用
-        /// </summary>
-        /// <param name="ctx">戦闘コンテキスト</param>
-        /// <param name="count">選出する修飾子数（デフォルト1）</param>
-        public void RollModifiers(CombatContext ctx, int count = 1)
-        {
-            if (ctx == null) return;
-            ctx.activeModifiers.Clear();
-
-            // Fisher-Yatesでシャッフルしてcount個選出
-            var pool = new List<BattleModifier>(modifierPool);
-            int selectCount = Mathf.Min(count, pool.Count);
-
-            for (int i = pool.Count - 1; i > 0; i--)
-            {
-                int j = GameLoop.GameRng.RangeAuto("BattleModifierManager.1", 0, i + 1);
-                var tmp = pool[i];
-                pool[i] = pool[j];
-                pool[j] = tmp;
-            }
-
-            for (int i = 0; i < selectCount; i++)
-            {
-                ctx.activeModifiers.Add(pool[i]);
-                Debug.Log($"[BattleModifier] 戦場修飾子: {pool[i].displayName} — {pool[i].description}");
-            }
-
-            // 即時適用が必要な修飾子を処理
-            ApplyImmediateEffects(ctx);
-        }
-
-        /// <summary>
         /// 修飾子の即時効果を適用
         /// </summary>
         private void ApplyImmediateEffects(CombatContext ctx)
@@ -144,20 +112,6 @@ namespace CombatSystem
                 baseBleed *= 2;
 
             return baseBleed;
-        }
-
-        /// <summary>
-        /// 受けるダメージに上限を適用（鉄壁）
-        /// </summary>
-        public static int ApplyDamageCap(CombatContext ctx, int damage)
-        {
-            if (ctx == null) return damage;
-
-            // 鉄壁: 被ダメ上限5
-            if (ctx.HasModifier(BattleModifierId.IronCurtain))
-                damage = System.Math.Min(5, damage);
-
-            return damage;
         }
 
         void OnDestroy() { if (instance == this) instance = null; }

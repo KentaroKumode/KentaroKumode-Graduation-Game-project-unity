@@ -252,15 +252,5 @@ namespace GameLoop
             return baseReward;
         }
 
-        /// <summary>
-        /// フロアに応じたHP回復量を計算（戦闘間）
-        /// </summary>
-        public static int CalculateHealAmount(int floor)
-        {
-            // 基本: 5HP回復、後半フロアは少なめ
-            if (floor <= 3) return 5;
-            if (floor <= 5) return 3;
-            return 2;
-        }
     }
 }

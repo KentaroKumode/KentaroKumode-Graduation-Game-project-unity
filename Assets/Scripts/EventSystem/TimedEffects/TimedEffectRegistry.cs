@@ -38,14 +38,6 @@ namespace EventSystem.TimedEffects
             return registry.TryGetValue(id, out var v) ? v : null;
         }
 
-        public static IEnumerable<ITimedEffect> GetByTrigger(TimedEffectTrigger trigger)
-        {
-            EnsureInitialized();
-            foreach (var kvp in registry)
-                if (kvp.Value.Trigger == trigger)
-                    yield return kvp.Value;
-        }
-
         /// <summary>このバフを獲得した際の初期チャージ数。未定義なら1。</summary>
         public static int GetDefaultCharges(string id)
         {

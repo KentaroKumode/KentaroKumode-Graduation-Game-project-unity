@@ -85,15 +85,6 @@ namespace ItemSystem.PassiveSkills
         }
 
         /// <summary>
-        /// 全登録済みスキルを取得
-        /// </summary>
-        public static IEnumerable<IPassiveSkillEffect> GetAll()
-        {
-            EnsureInitialized();
-            return registry.Values;
-        }
-
-        /// <summary>
         /// スキルが登録されているか確認
         /// </summary>
         public static bool Contains(string internalName)

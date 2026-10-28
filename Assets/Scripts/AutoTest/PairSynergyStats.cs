@@ -53,8 +53,6 @@ namespace AutoTest
 
             public int Total => n[0] + n[1] + n[2] + n[3];
             public bool AllCells(int min) => n[0] >= min && n[1] >= min && n[2] >= min && n[3] >= min;
-            /// <summary>4セルの最小サンプル数。</summary>
-            public int MinCell() => System.Math.Min(System.Math.Min(n[0], n[1]), System.Math.Min(n[2], n[3]));
 
             public double Avg(int i) => n[i] > 0 ? band[i] / n[i] : 0;
             /// <summary>差分の差分（純粋相互作用）。</summary>
@@ -78,8 +76,6 @@ namespace AutoTest
                 return System.Math.Sqrt(s);
             }
 
-            /// <summary>2σ有意か（|interaction| ≥ 2·SE）。</summary>
-            public bool Significant() => System.Math.Abs(Interaction()) >= 2.0 * SE();
         }
 
         [Serializable]

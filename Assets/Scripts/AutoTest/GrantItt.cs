@@ -65,12 +65,6 @@ namespace AutoTest
         public static bool IsTrusted(string id) =>
             !string.IsNullOrEmpty(id) && _coefs.TryGetValue(id, out var c) && c.treated >= MinTreatedRuns;
 
-        /// <summary>ITT がその品について<b>意見を持っているか</b>（＝付与プールに入っていたか）。
-        /// 武器・消耗品・出目パーツ・イベント専用品は列そのものが無い ── 標本不足とは別物なので、
-        /// 呼び出し側は「落とす」ではなく「別の推定量へ回す」こと。</summary>
-        public static bool HasColumn(string id) =>
-            !string.IsNullOrEmpty(id) && _coefs.ContainsKey(id);
-
         public static int TreatedRuns(string id) =>
             !string.IsNullOrEmpty(id) && _coefs.TryGetValue(id, out var c) ? c.treated : 0;
 
@@ -350,14 +344,6 @@ namespace AutoTest
             if (string.IsNullOrEmpty(id) || !_clearEffect.TryGetValue(id, out deltaPt)) return false;
             _clearSe.TryGetValue(id, out sePt);
             return true;
-        }
-
-        /// <summary>指定した層で配られた場合の Δクリア率 (pt)。 層は 1〜5。</summary>
-        public static double ClearEffectAtFloor(string id, int floor)
-        {
-            if (string.IsNullOrEmpty(id) || !_clearByFloor.TryGetValue(id, out var arr)) return 0;
-            int i = Mathf.Clamp(floor, 1, 5) - 1;
-            return arr[i];
         }
 
         private sealed class Run

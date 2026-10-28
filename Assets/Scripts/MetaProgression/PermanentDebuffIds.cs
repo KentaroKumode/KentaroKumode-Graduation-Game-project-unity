@@ -141,7 +141,6 @@ namespace MetaProgression
         public static bool HasEnvy(RunState run)     => Has(run, PermanentDebuffIds.Envy);
         public static bool HasGreed(RunState run)    => Has(run, PermanentDebuffIds.Greed);
         public static bool HasWrath(RunState run)    => Has(run, PermanentDebuffIds.Wrath);
-        public static bool HasSloth(RunState run)    => Has(run, PermanentDebuffIds.Sloth);
         public static bool HasGluttony(RunState run) => Has(run, PermanentDebuffIds.Gluttony);
         public static bool HasLust(RunState run)     => Has(run, PermanentDebuffIds.Lust);
     }

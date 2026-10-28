@@ -214,15 +214,6 @@ namespace CombatSystem
         }
 
         /// <summary>
-        /// 全敵データ
-        /// </summary>
-        public static IEnumerable<EnemyData> GetAll()
-        {
-            EnsureInitialized();
-            return database.Values;
-        }
-
-        /// <summary>
         /// ランダムに敵を1体取得
         /// </summary>
         public static EnemyData GetRandom()

@@ -94,19 +94,6 @@ namespace MetaProgression
             OnStateChanged?.Invoke();
         }
 
-        /// <summary>整備パネルの全トラックを max 状態にする (bot / AutoRunner 用)。
-        /// PlayerPrefs には保存しない (テスト専用)。</summary>
-        public void MaxAllForTesting()
-        {
-            State = new MetaProgressState();
-            State.EnsurePanelInitialized();
-            // 上限までポイント購入・全トラックを max に
-            State.panelPointsPurchased = MetaPanel.MaxPoints;
-            foreach (MetaPanelKind k in System.Enum.GetValues(typeof(MetaPanelKind)))
-                State.SetRank(k, k.MaxRank());
-            OnStateChanged?.Invoke();
-        }
-
         // ============================================================
         //  トークン
         // ============================================================

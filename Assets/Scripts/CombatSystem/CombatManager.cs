@@ -63,24 +63,6 @@ namespace CombatSystem
         }
         public static void ResetPhaseEntry() { _phaseN.Clear(); _phaseHp.Clear(); _phaseHpMin.Clear(); }
 
-        public static string DumpPhaseEntry()
-        {
-            if (_phaseN.Count == 0) return "PHASE: 記録なし";
-            string nl = System.Environment.NewLine;
-            var sb = new System.Text.StringBuilder();
-            sb.Append($"{"段",-16}{"突入数",8}{"残HP平均",11}{"残HP最小",11}").Append(nl);
-            sb.Append(new string('-', 46)).Append(nl);
-            foreach (var id in new[]{ "boss_layer7", "boss_layer7_p2", "boss_layer7_p3", "boss_layer7_p4" })
-            {
-                if (!_phaseN.TryGetValue(id, out var n) || n == 0) continue;
-                var e = CombatSystem.EnemyDatabase.Get(id);
-                string nm = e != null ? e.displayName : id;
-                if (nm.Length > 14) nm = nm.Substring(0, 14);
-                sb.Append($"{nm,-16}{n,8}{_phaseHp[id] / n,10:P1}{_phaseHpMin[id],11:P1}").Append(nl);
-            }
-            return sb.ToString();
-        }
-
         // ---- 7層 全段: 遺物の「出現数」と「その遺物が出ていたターンでプレイヤーが死んだ数」 ----
         private static readonly System.Collections.Generic.Dictionary<string,int> _relicSeen
             = new System.Collections.Generic.Dictionary<string,int>();
@@ -104,33 +86,6 @@ namespace CombatSystem
             foreach (var r in relics) { _relicFatal.TryGetValue(r, out var c); _relicFatal[r] = c + 1; }
         }
 
-        /// <summary>致死率 = その遺物が出ていたターンのうち、 プレイヤーが死んだ割合。
-        /// 出現数で割るので「よく出るから多い」だけの札は上位に来ない。</summary>
-        public static string DumpLethal()
-        {
-            if (v7Turns == 0) return "V7: 記録なし";
-            string nl = System.Environment.NewLine;
-            var sb = new System.Text.StringBuilder();
-            double baseRate = v7Deaths / (double)v7Turns;
-            sb.Append($"7層 総ターン {v7Turns} / プレイヤー死亡ターン {v7Deaths} (基準致死率 {baseRate:P2})").Append(nl);
-            sb.Append($"{"遺物",-16}{"出現",7}{"致死",7}{"致死率",9}{"基準比",8}").Append(nl);
-            sb.Append(new string('-', 48)).Append(nl);
-            var keys = new System.Collections.Generic.List<string>(_relicSeen.Keys);
-            keys.Sort((x, y) =>
-            {
-                _relicFatal.TryGetValue(x, out var fx); _relicFatal.TryGetValue(y, out var fy);
-                double rx = fx / (double)_relicSeen[x], ry = fy / (double)_relicSeen[y];
-                return ry.CompareTo(rx);
-            });
-            foreach (var k in keys)
-            {
-                _relicFatal.TryGetValue(k, out var f);
-                int seen = _relicSeen[k];
-                double rate = f / (double)seen;
-                sb.Append($"{k,-16}{seen,7}{f,7}{rate,9:P2}{(baseRate > 0 ? rate / baseRate : 0),7:F2}x").Append(nl);
-            }
-            return sb.ToString();
-        }
         public static void P4Turn(bool blocked, bool execArmed, int bite,
                                   System.Collections.Generic.List<string> relics)
         {
@@ -141,23 +96,6 @@ namespace CombatSystem
             if (relics != null)
                 foreach (var r in relics)
                 { _relic.TryGetValue(r, out var c); _relic[r] = c + 1; }
-        }
-        public static string DumpP4()
-        {
-            if (p4Turns == 0) return "P4: 記録なし";
-            string nl = System.Environment.NewLine;
-            var sb = new System.Text.StringBuilder();
-            sb.Append($"p4 戦闘数 {p4Fights} / 総ターン {p4Turns}").Append(nl);
-            sb.Append($"  突入時の残HP    平均 {(p4Fights > 0 ? p4EntryHpPct / p4Fights : 0):P1}").Append(nl);
-            sb.Append($"  出目潰しターン  {p4Blocked} ({p4Blocked * 100.0 / p4Turns:F1}%)  ← 天与の指輪").Append(nl);
-            sb.Append($"  処刑 armed      {p4Execute} ({p4Execute * 100.0 / p4Turns:F1}%)").Append(nl);
-            sb.Append($"  最大HP削り合計  {p4MaxHpBite} (1戦あたり {(p4Fights > 0 ? p4MaxHpBite / (double)p4Fights : 0):F1})").Append(nl);
-            sb.Append("  遺物の出現数:").Append(nl);
-            var keys = new System.Collections.Generic.List<string>(_relic.Keys);
-            keys.Sort((x, y) => _relic[y].CompareTo(_relic[x]));
-            foreach (var k in keys)
-                sb.Append($"    {k,-16} {_relic[k],5} ({_relic[k] * 100.0 / p4Turns:F1}%)").Append(nl);
-            return sb.ToString();
         }
 
         /// <summary>そのボス戦で経過した「全ターン」を数える (攻撃が発生しなかったターンも含む)。
@@ -188,11 +126,6 @@ namespace CombatSystem
 
         public static bool WantSpike(int dmg) => dmg >= SpikeThreshold && _spikes.Count < MaxSpikes;
         public static void AddSpike(string line) { if (_spikes.Count < MaxSpikes) _spikes.Add(line); }
-        public static string DumpSpikes()
-        {
-            if (_spikes.Count == 0) return $"SPIKE: {SpikeThreshold} 以上のヒットは記録なし";
-            return string.Join(System.Environment.NewLine, _spikes);
-        }
 
         public static string Dump()
         {
@@ -454,15 +387,6 @@ namespace CombatSystem
             if (ctx != null) ctx.playerCurrentHP = playerHP;
         }
 
-        /// <summary>戦闘中、敵に軽減不可ダメージを直接与える（記憶の砂時計・各種パッシブ用）。</summary>
-        public void DealFixedDamageToEnemy(int amount)
-        {
-            if (amount <= 0 || !isCombatActive) return;
-            enemyHP = Math.Max(0, enemyHP - amount);
-            var ctx = PassiveSkillManager.Instance?.Context;
-            if (ctx != null) ctx.enemyCurrentHP = enemyHP;
-        }
-
         /// <summary>前ターンの配線 (今ターンの起点)。 〈不器用〉の変更本数制限を
         /// 方策側が守るために要る。 配列は内部のものなので**書き換えないこと**。</summary>
         public DiceTerminal[] CurrentWiring => mutualWiring;
@@ -550,30 +474,6 @@ namespace CombatSystem
 
             Debug.Log($"[CombatManager] Player healed: {actualHealed} HP ({oldHP} → {playerHP})");
             return actualHealed;
-        }
-
-        /// <summary>
-        /// プレイヤーの最大HPを一時的に増加（戦闘中のみ）
-        /// </summary>
-        /// <param name="amount">増加量</param>
-        public void BoostPlayerMaxHP(int amount)
-        {
-            if (amount <= 0 || !isCombatActive) return;
-            
-            int oldMaxHP = playerMaxHP;
-            playerMaxHP += amount;
-            playerHP += amount; // 増加分は即回復
-            
-            // CombatContextも更新
-            var psm = PassiveSkillManager.Instance;
-            if (psm != null && psm.Context != null)
-            {
-                var ctx = psm.Context;
-                ctx.playerMaxHP = playerMaxHP;
-                ctx.playerCurrentHP = playerHP;
-            }
-            
-            Debug.Log($"[CombatManager] Player MaxHP boosted: {oldMaxHP} → {playerMaxHP} (+{amount})");
         }
 
         void Awake()

@@ -93,11 +93,6 @@ namespace AutoTest
         public static bool IsARank(string id) => !string.IsNullOrEmpty(id) && ARank.Contains(id);
         public static bool IsPriority(string id) => IsSRank(id) || IsARank(id);
 
-        public static bool IsWeaponS(string id) => !string.IsNullOrEmpty(id) && WeaponSRank.Contains(id);
-        public static bool IsWeaponA(string id) => !string.IsNullOrEmpty(id) && WeaponARank.Contains(id);
-        public static bool IsItemS(string id)   => !string.IsNullOrEmpty(id) && ItemSRank.Contains(id);
-        public static bool IsItemA(string id)   => !string.IsNullOrEmpty(id) && ItemARank.Contains(id);
-
         /// <summary>S=2, A=1, それ以外=0 のスコア（同枠比較に使う）。</summary>
         public static int Score(string id)
         {

@@ -379,9 +379,6 @@ namespace AutoTest
         /// <summary>較正済みの与ダメ倍率。 ラン全体の戦力見積もり (<see cref="RunPowerBudget"/>) が使う。</summary>
         public float DmgMul => _dmgMul;
 
-        public string DescribeCalibration()
-            => $"与ダメ倍率 {_dmgMul:F2} / 被ダメ倍率 {_takenMul:F2} (標本 {_calSamples})";
-
         /// <summary>前ターンの予測と実測を突き合わせて倍率を更新する。 配線判断の冒頭で呼ぶ。
         ///
         /// 出血・毒・反射のような「攻撃値に乗らないチャネル」もまとめて倍率へ吸わせている。

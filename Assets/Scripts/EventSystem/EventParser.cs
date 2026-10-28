@@ -239,8 +239,6 @@ namespace EventSystem
         public static int ChoicesParsed;
         public static int ChoicesWithDigest;
 
-        public static void ResetDigestAudit() { ChoicesParsed = ChoicesWithDigest = 0; }
-
         // ============================================================
         //  効果パース
         // ============================================================

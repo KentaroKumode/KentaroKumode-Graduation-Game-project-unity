@@ -59,9 +59,6 @@ namespace MetaProgression
         public static float GetMaxHpMultiplier()
             => 1f;   // v4.0: 最大HP 乗算は廃止 (〈長引く負傷〉へ差し替え)
 
-        /// <summary>[廃止] v1 の定数減算。 v3.0 は <see cref="GetMaxHpMultiplier"/> が本体なので常に 0。</summary>
-        public static int GetMaxHpDelta() => 0;
-
         /// <summary>プレイヤー与ダメージ倍率。 T1 ×0.94 / T2 ×0.91 / T3 ×0.89。
         /// 2026-08-05: 10/20/30 → 10/15/20 へ圧縮。 2026-08-09: さらに緩和 (下記)。
         /// **T1 をほぼ据え置く**ので低スコア帯の階段は変わらず、 高スコア帯だけが緩む。        ///
@@ -70,9 +67,6 @@ namespace MetaProgression
         /// **技量帯を閉じてしまう**。 難易度は配線・役・リロールで対処できる圧へ寄せる (§15-2)。</summary>
         public static float GetPlayerDamageMultiplier()
             => 1f;   // v4.0: 与ダメ 乗算は廃止 (〈不器用〉〈穴の空いた鞄〉へ差し替え)
-
-        /// <summary>[廃止] 旧経路の互換。 % 乗算が本体なので常に 0。</summary>
-        public static int GetPlayerDamageReduction() => 0;
 
         // ============================================================
         //  v4.0 で新設した「数える制約」(2026-08-10)
@@ -353,8 +347,6 @@ namespace MetaProgression
         /// <summary>[計装] 回復スポットの利用実績。 0=呼ばれた回数 / 1=実際に戻した HP /
         /// 2=上限で削られた回数 / 3=上限で削られた HP。 レポートで浅い眠りの効き方を見る。</summary>
         public static long HealSpotCalls, HealSpotRawHeal, HealSpotCapped, HealSpotLostHeal;
-        public static void ResetHealSpotStats()
-            => HealSpotCalls = HealSpotRawHeal = HealSpotCapped = HealSpotLostHeal = 0;
 
         /// <summary>T4-D 破産: 開幕 GOLD から10差し引く (下限 0)。
         /// 2026-08-11: 「0 にする」→「20 差し引く」→ **12**。
@@ -362,10 +354,6 @@ namespace MetaProgression
         /// 全カテゴリ中で最も重く、 T4 側で薄く削って揃える。 **金庫に振った点が
         /// 完全な捨て点にならない**という破産の設計意図は、 額を減らしても保たれる。</summary>
         public static int GetStartingGoldPenalty() => C.Has(ChallengeT4.破産) ? 10 : 0;
-
-        /// <summary>[互換] 旧 API。 開幕 GOLD を 0 にするか ── 現在は常に false
-        /// (差し引き方式へ移行済み。 <see cref="GetStartingGoldPenalty"/> を使うこと)。</summary>
-        public static bool IsStartingGoldZero() => false;
 
         /// <summary>T4-D 破産: 売却額 −10%。
         /// 2026-08-17: −20% → −10%。 T4 単独診断で 4pt −7.2pt (1pt当り −1.80) と、
@@ -438,19 +426,6 @@ namespace MetaProgression
             return 1f + per * System.Math.Max(0, turn - 1);
         }
 
-        /// <summary>[廃止: 天変地異のボス初撃強化] 常に 0。 エスカレーション前倒しへ差し替え済み。</summary>
-        public static int GetBossBoostedStrikeCount() => 0;
-
-        /// <summary>強化対象の撃に掛かる倍率 (×1.50 固定)。</summary>
-        public const float BossBoostedStrikeMultiplier = 1.50f;
-
-        /// <summary>ボス戦でのみ上乗せする敵ダメージ倍率の加算分。
-        /// **v3.0 では撃数制限つき**なので、 恒常加算ではなく
-        /// <see cref="GetBossBoostedStrikeCount"/> と併用して撃ごとに判定する。
-        /// 互換のため「強化対象の撃であれば」の加算値を返す。</summary>
-        public static float GetBossDamageBonus()
-            => GetBossBoostedStrikeCount() > 0 ? (BossBoostedStrikeMultiplier - 1f) : 0f;
-
         /// <summary>[廃止: 天変地異のラストスタンド封印] 常に false。
         /// ラストスタンドは外殻ノードを取らないペルソナでは一度も発動せず (使用率 0%)、
         /// 封印しても効果が測定不能だった。 差し替え後は封印しない。</summary>
@@ -471,9 +446,6 @@ namespace MetaProgression
         /// 300T ならクリアランの 39% にしか掛からず、 設計意図どおりの分岐になる
         /// (参考: 260T→65% / 340T→19%)。</summary>
         public static int GetJudgmentTurnThreshold() => C.Has(ChallengeT4.最後の審判) ? 300 : 0;
-
-        /// <summary>[互換用] 〈最後の審判〉は回復を阻害しない。</summary>
-        public static float GetJudgmentHealMultiplier(RunState run) => 1f;
 
         /// <summary>[互換用] 旧・刻限後の回復阻害。現仕様では常に素通し。</summary>
         public static int ApplyJudgmentHealReduction(int amount, RunState run)
@@ -588,19 +560,6 @@ namespace MetaProgression
             }
         }
 
-        public static void ResetT4Stats()
-        {
-            JudgmentTurnsTotal = JudgmentRunsOverThreshold = 0;
-            JudgmentTicks = JudgmentHpLost = JudgmentHealPrevented = BreakdownTriggers = 0;
-            JudgmentMaxLoss = 0;
-            VoidTileChecks = VoidTileTriggers = 0;
-            JudgmentKills = JudgmentPostDamageTaken = JudgmentPostHeal = 0;
-            JudgmentDeadlineDeaths = JudgmentDeadlineSurvivors = 0;
-            JudgmentDeathDamage = JudgmentDeathHealRequested = JudgmentDeathHealActual = 0;
-            JudgmentSurvivorDamage = JudgmentSurvivorHealRequested = JudgmentSurvivorHealActual = 0;
-            for (int i = 0; i < JudgmentReachByFloor.Length; i++) JudgmentReachByFloor[i] = 0;
-        }
-
         /// <summary>3 層突入時に呼ぶ。 T4-E 最後の審判 なら大罪を 1 つ付与。
         /// **本来は「未所持の 3 候補から選択」させる** (plan Tier4-E)。 UI 未実装のため
         /// 現状は抽選で 1 個付与する。 UI 実装時にここを差し替える。</summary>
@@ -616,9 +575,6 @@ namespace MetaProgression
             if (!HasFinalJudgment()) return;
             GrantPermanent(run, "最後の審判(5層)");
         }
-
-        /// <summary>[廃止] v1 の「1 層で追加付与」。 v3.0 は 3 層・5 層なので何もしない。</summary>
-        public static void TryGrantOnFloor1(RunState run) { }
 
         private static void GrantPermanent(RunState run, string source)
         {
@@ -647,20 +603,9 @@ namespace MetaProgression
         /// <summary>[廃止: 空箱] 宝箱は消さない (plan §3)。 常に false。</summary>
         public static bool IsTreasureGone() => false;
 
-        /// <summary>[廃止: 補給断絶 T3 の消失] 前哨基地は消さない (plan §3)。 常に false。</summary>
-        public static bool IsForwardBaseDisabled() => false;
-
         /// <summary>[廃止: 焦燥] 常に 0 (無効)。</summary>
         public static int GetImpatienceTileThreshold() => 0;
         public const int ImpatienceProvisionLoss = 50;   // 2026-09-28: 物資 ×10
-
-        /// <summary>[廃止: 反響] 常に 0。</summary>
-        public static float GetEchoReflectRate() => 0f;
-
-        /// <summary>[廃止: 組織的行動] マップ構成は変えない。 常に 0。</summary>
-        public static float GetBattleTileWeightBonus() => 0f;
-        /// <summary>[廃止: 組織的行動] 常に 0。</summary>
-        public static float GetEliteTileWeightBonus() => 0f;
 
         /// <summary>[廃止: 絶望的な進軍] 配点方式に無い。 常に false。</summary>
         public static bool IsDespairMarchActive() => false;

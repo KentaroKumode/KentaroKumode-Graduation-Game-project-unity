@@ -386,21 +386,6 @@ namespace AutoTest.Ultra
             return true;
         }
 
-        public static bool TryResponseToJson(
-            UltraPortfolioWorkerResponse response,
-            UltraPortfolioWorkerRequest request,
-            out string json,
-            out string failure)
-        {
-            json = null;
-            if (!TryValidateResponse(response, request, out failure)) return false;
-            try { json = JsonUtility.ToJson(response, false); }
-            catch (Exception ex) { return Fail("response_serialize:" + ex.GetType().Name, out failure); }
-            if (!UltraWorkerProtocol.IsUtf8SizeWithin(json, MaxJsonBytes))
-            { json = null; return Fail("response_size", out failure); }
-            return true;
-        }
-
         public static bool TryResponseFromJson(
             string json,
             UltraPortfolioWorkerRequest request,

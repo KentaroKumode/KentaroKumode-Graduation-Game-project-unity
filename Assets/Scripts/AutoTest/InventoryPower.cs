@@ -22,17 +22,6 @@ namespace AutoTest
     {
         // 2026-06-22: TierWeight 関数は未使用化 (Compute から呼び出していたデッドコード一掃で削除)
 
-        /// <summary>2026-06-23: Power 帯表示。 BOT/UI 双方で「現在どの段階か」 を即座に把握する用。
-        /// 帯境界は実測 (前回バッチで 5F到達=43.3 / 6F到達=54.1 / 7F到達=79.8) から逆算。</summary>
-        public static string GetPowerBand(int power)
-        {
-            if (power < 10) return "Weak (雑魚装備)";
-            if (power < 25) return "Early (序盤)";
-            if (power < 50) return "Mid (中盤)";
-            if (power < 80) return "Late (終盤入口)";
-            return "Apex (高みに至る)";
-        }
-
         /// <summary>数値帯のみ (BOT 判断用、 文字列より高速)。 0=Weak/1=Early/2=Mid/3=Late/4=Apex。</summary>
         public static int GetPowerBandRank(int power)
         {
@@ -248,11 +237,6 @@ namespace AutoTest
             if (goldCost <= 0) return deltaPower * 100f;
             return (float)deltaPower / goldCost;
         }
-
-        /// <summary>実際に発動するパッシブ ID 集合 (同名/下位互換抑制適用後)。
-        /// PassiveSkillManager.RefreshActiveSkills と同じロジックでオフライン算出。</summary>
-        public static HashSet<string> CollectFiringSkillIds(RunState run, ItemDatabase db)
-            => CollectFiringSkillIdsExcluding(run, db, null);
 
         /// <summary>2026-06-22b: 指定 itemId を 1 個分除外した上で発動するパッシブ ID 集合を返す。
         /// 「この id が無い世界線」 を仮想的に作る。 重複ペナルティ判定 (自分自身で発動中の循環参照防止) に使う。</summary>

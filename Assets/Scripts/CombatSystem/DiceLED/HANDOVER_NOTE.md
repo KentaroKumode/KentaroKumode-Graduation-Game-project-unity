@@ -19,7 +19,6 @@
 
 **主要ファイル:**
 - `Assets/Scripts/CombatSystem/CombatManager.cs` (634行) - 戦闘制御シングルトン
-- `Assets/Scripts/CombatSystem/CombatTestController.cs` (359行) - F1-F4キーテスト用
 - `Assets/Scripts/CombatSystem/EnemyData.cs`, `EnemyDatabase.cs` - 敵データ
 
 ### 2. インベントリ・パッシブスキルシステム (InventorySystem)

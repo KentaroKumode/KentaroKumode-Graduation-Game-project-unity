@@ -238,11 +238,6 @@ namespace MapSystem.Visual
             }
         }
 
-        private static Color Blend(Color a, Color b, float t)
-        {
-            return Color.Lerp(a, b, t);
-        }
-
         /// <summary>RGB だけ係数倍して明度を変える (アルファは不変)</summary>
         private static Color ScaleRgb(Color c, float k)
         {
