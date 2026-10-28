@@ -186,8 +186,6 @@ namespace ItemSystem.PassiveSkills
         /// CombatManager が弱ロール時の WeakRollMax/WeakRollFaces に渡す。毎ターン0.65リセット。</summary>
         public float enemyStanceWeakRollRatio = 0.65f;
 
-        /// <summary>プレイヤー防御スタンス（ADR-0006）。true=防御優先（与ダメ-90%・受け最終-50%）。毎ターンfalseリセット。</summary>
-        public bool playerStanceDefense;
 
         // ===== 勝敗フラグ =====
         public bool playerWonRoll;
@@ -874,7 +872,6 @@ namespace ItemSystem.PassiveSkills
             enemyStanceDamageMult = 1f;
             enemyStanceKind = 0;
             enemyStanceWeakRollRatio = 0.65f;
-            playerStanceDefense = false;
 
             // ダメージ処理の単ターンフラグ
             nullifyAllDamage = false;
@@ -961,7 +958,7 @@ namespace ItemSystem.PassiveSkills
             // ADR-0010: このターン切った役の記録。 usedRoles は [persistent] なのでここでは触らない。
             firedRolesThisTurn.Clear();
 
-            // ADR-0009 相互攻撃モデル用の一時ボーナス (旧パイプラインでは未使用)
+            // ADR-0009 相互攻撃モデル用の一時ボーナス
             mutualAttackBonus = 0;
             mutualEnemyAttackReduction = 0;
             nonCritOutgoingMultiplier = 0f;
@@ -978,15 +975,13 @@ namespace ItemSystem.PassiveSkills
         }
 
         // ============================================================
-        //  ADR-0009 相互攻撃モデル ブリッジ (perTurn)
-        //  旧パイプライン: 「ダイス合計 +N」効果は playerDiceTotal に直加算 (ロール勝負を有利化)
-        //  新パイプライン: ダイス合計はロール比較で使われない (収支トリガーは解決後の与被ダメで判定)。
-        //                  「+N」は配線後の自攻撃値へ加算 = mutualAttackBonus。
-        //  Helper AddPlayerAttackOrDiceBonus() が UseMutualAttackPipeline で自動分岐する。
+        //  ADR-0009 相互攻撃モデル (perTurn)
+        //  ダイス合計はロール比較で使われない (収支トリガーは解決後の与被ダメで判定)。
+        //  「攻撃+N」は配線後の自攻撃値へ加算 = mutualAttackBonus (AddPlayerAttackOrDiceBonus 経由)。
         // ============================================================
 
         /// <summary>ADR-0009 [perTurn]: 配線後の自攻撃値に加算されるボーナス。
-        /// ExecuteTurnMutual が atkBase に加える。旧パイプラインでは未使用。</summary>
+        /// ExecuteTurnMutual が atkBase に加える。</summary>
         public int mutualAttackBonus;
 
         /// <summary>[decay] 挑戦デバフ 軸10〈反響〉: **次のターン開始時に**プレイヤーへ入る反射ダメージ。
@@ -1003,9 +998,6 @@ namespace ItemSystem.PassiveSkills
         /// 鈍器 (Bludgeon) キーワードの主フィールド。会心を犠牲に非会心火力を高めるビルドの経路。</summary>
         public float nonCritOutgoingMultiplier;
 
-        /// <summary>「自ダイス合計 +N 相当」のパッシブ効果の書き先を新旧パイプラインで自動分岐する。
-        /// 新パイプラインでは playerDiceTotal は配線でしか実効化しないため、
-        /// 攻撃力ボーナス (mutualAttackBonus) として積む。</summary>
         /// <summary>[計装 2026-09-14] atkBase の <c>パッシブ加算</c> を<b>誰が積んだか</b>で分解する。
         /// 実測で atkBase 61 のうち 36.9 がここ由来 (攻撃端子出目は 19.4) で、
         /// <b>配線より 2 倍大きい</b>。 内訳を逆算で当てにいって 3 回外したので直接記録する
@@ -1069,10 +1061,7 @@ namespace ItemSystem.PassiveSkills
                     AttackBonusCalls7F[key] = c7 + 1;
                 }
             }
-            if (CombatSystem.CombatManager.UseMutualAttackPipeline)
-                mutualAttackBonus += n;
-            else
-                playerDiceTotal += n;
+            mutualAttackBonus += n;
         }
 
         // ============================================================
@@ -1100,7 +1089,7 @@ namespace ItemSystem.PassiveSkills
         }
 
         /// <summary>[計装] 充電の収支。 Gained=実際に入った / Wasted=上限で捨てた /
-        /// SpentTotal=ConsumeCharge 経由の消費 (リロール分は CombatManager.RerollStats[2] と重複)。</summary>
+        /// SpentTotal=ConsumeCharge 経由の消費 (リロール分は CombatStats.RerollStats[2] と重複)。</summary>
         public static long ChargeGained, ChargeWasted, ChargeSpentTotal, ChargeSpendCalls;
         public static void ResetChargeStats()
             => ChargeGained = ChargeWasted = ChargeSpentTotal = ChargeSpendCalls = 0;

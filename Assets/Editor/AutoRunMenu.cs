@@ -8,7 +8,7 @@ using AutoTest.Ultra;
 namespace AutoTest.EditorTools
 {
     /// <summary>
-    /// Tools > AutoRun メニュー。SampleScene を開いて PlayMode に入り、
+    /// Tools > AutoRun メニュー。SampleScene2 (BOT 用の最小シーン) を開いて PlayMode に入り、
     /// AutoRunner を自動生成して N ラン連続実行 → ログ出力 → PlayMode を抜ける。
     /// </summary>
     [InitializeOnLoad]
@@ -18,7 +18,6 @@ namespace AutoTest.EditorTools
         private const string PendingKey = "AutoRun.PendingCount";
         private const string SweepKey   = "AutoRun.Boss5Sweep";      // SessionState
         private const string LoopKey    = "AutoRun.AutoLoopBatches"; // SessionState
-        private const string MutualKey  = "AutoRun.UseMutualAttack"; // EditorPrefs
         private const string ChalSweepKey  = "AutoRun.ChalSweep";  // SessionState (固定難易度スイープ)
         private const string SkillCmpKey     = "AutoRun.SkillCmp";     // 技量帯スイープ
         private const string SkillCmp3Key    = "AutoRun.SkillCmp3";    // 素朴を含める
@@ -345,15 +344,6 @@ namespace AutoTest.EditorTools
             Launch(3);
         }
 
-
-        // ===== ADR-0009 相互攻撃パイプライン (トグル) =====
-
-        private const string MenuMutual = "Tools/AutoRun/ADR-0009 相互攻撃パイプライン (トグル)";
-        [MenuItem(MenuMutual, priority = 40)]
-        private static void ToggleMutual() { EditorPrefs.SetBool(MutualKey, !EditorPrefs.GetBool(MutualKey, false)); }
-        [MenuItem(MenuMutual, validate = true)]
-        private static bool ToggleMutualValidate()
-        { Menu.SetChecked(MenuMutual, EditorPrefs.GetBool(MutualKey, false)); return true; }
 
         // ===== ラン起動 =====
 
@@ -3082,8 +3072,6 @@ namespace AutoTest.EditorTools
                 runner.relicAxisSweepChallengeScore = 30;
             }
             runner.autoLoopBatches = loopBatches;
-            // 2026-07-15: ADR-0009 相互攻撃 + ビルド軸ペルソナ
-            runner.useMutualAttackPipeline = EditorPrefs.GetBool(MutualKey, false);
             runner.rawTierRatio = EditorPrefs.GetInt(RatioKey, 50) / 100f;
             // 周回モード (遺物 §15-5)。 通常バッチの後段で 10 ペルソナぶんのラインが走る。
             if (SessionState.GetBool(AscendKey, false))

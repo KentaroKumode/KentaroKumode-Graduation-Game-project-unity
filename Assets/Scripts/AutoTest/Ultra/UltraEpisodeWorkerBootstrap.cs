@@ -147,8 +147,7 @@ namespace AutoTest.Ultra
                     + " 現在地=" + resume.map.currentNodeId
                     + " ノード=" + resume.map.nodes.Length
                     + " seed=" + episode.scenarioStartSeedHex
-                    + " 技量=" + _runner.wiringSkill
-                    + " 相互攻撃=" + _runner.useMutualAttackPipeline);
+                    + " 技量=" + _runner.wiringSkill);
 
                 _runner.UltraProductionRunCompleted += OnRunCompleted;
                 _runner.UltraProductionBatchCompleted += OnBatchCompleted;

@@ -124,18 +124,18 @@ namespace AutoTest.ParallelSweep
                 CombatSystem.ShieldDiag.Reset();
                 CombatSystem.DmgSourceDiag.Reset();
                 AutoTest.SuperCombatAI.ResetProf();
-                GameLoop.GameManager.PlunderDrops = 0;
-                GameLoop.GameManager.ValorEliteDrops = 0;
-                GameLoop.GameManager.ValorEliteFights = 0;
+                GameLoop.RunStats.PlunderDrops = 0;
+                GameLoop.RunStats.ValorEliteDrops = 0;
+                GameLoop.RunStats.ValorEliteFights = 0;
                 ItemSystem.Shop.ShopManager.RobberyAttempts = 0;
                 Array.Clear(ItemSystem.Shop.ShopManager.RobberyByFloor, 0,
                     ItemSystem.Shop.ShopManager.RobberyByFloor.Length);
-                GameLoop.GameManager.RobberyWins = 0;
-                GameLoop.GameManager.RobberyLosses = 0;
-                GameLoop.GameManager.RobberyLootTotal = 0;
-                GameLoop.GameManager.RobberyLootApplied = 0;
-                GameLoop.GameManager.ResetBossEntryStats();
-                GameLoop.GameManager.ResetGateStats();
+                GameLoop.RunStats.RobberyWins = 0;
+                GameLoop.RunStats.RobberyLosses = 0;
+                GameLoop.RunStats.RobberyLootTotal = 0;
+                GameLoop.RunStats.RobberyLootApplied = 0;
+                GameLoop.RunStats.ResetBossEntryStats();
+                GameLoop.RunStats.ResetGateStats();
                 ItemSystem.PassiveSkills.CombatContext.ResetAttackBonusStats();
                 GameLoop.SwordDanceSet.ResetStats();
                 GameLoop.CombatRewards.ResetStats();
@@ -146,7 +146,7 @@ namespace AutoTest.ParallelSweep
                 AutoTest.AutoRunner.ResetRerollPathStats();
                 AutoTest.AutoRunner.ResetRerollRuleStats();
                 AutoTest.AutoRunner.ResetShopExitStats();
-                GameLoop.GameManager.ResetRerollOutcome();
+                GameLoop.RunStats.ResetRerollOutcome();
                 ItemSystem.Shop.ShopManager.ResetRerollFailStats();
                 GameLoop.GoldIncome.ResetStats();
                 GameLoop.RunState.ResetConsumableStats();
@@ -280,33 +280,33 @@ namespace AutoTest.ParallelSweep
                         skillDeaths = (long[])CombatSystem.SkillDiag.Deaths.Clone(),
                         skillTurns = (long[])CombatSystem.SkillDiag.Turns.Clone(),
                         skillHpLostPct = (double[])CombatSystem.SkillDiag.HpLostPct.Clone(),
-                        valorEliteDrops = GameLoop.GameManager.ValorEliteDrops,
-                        valorEliteFights = GameLoop.GameManager.ValorEliteFights,
-                        plunderDrops = GameLoop.GameManager.PlunderDrops,
+                        valorEliteDrops = GameLoop.RunStats.ValorEliteDrops,
+                        valorEliteFights = GameLoop.RunStats.ValorEliteFights,
+                        plunderDrops = GameLoop.RunStats.PlunderDrops,
                         robberyAttempts = ItemSystem.Shop.ShopManager.RobberyAttempts,
-                        robberyWins = GameLoop.GameManager.RobberyWins,
-                        robberyLosses = GameLoop.GameManager.RobberyLosses,
-                        robberyLootTotal = GameLoop.GameManager.RobberyLootTotal,
+                        robberyWins = GameLoop.RunStats.RobberyWins,
+                        robberyLosses = GameLoop.RunStats.RobberyLosses,
+                        robberyLootTotal = GameLoop.RunStats.RobberyLootTotal,
                         robberyByFloor = (long[])ItemSystem.Shop.ShopManager.RobberyByFloor.Clone(),
-                        bossEntryCount = (long[])GameLoop.GameManager.BossEntryCount.Clone(),
-                        bossEntryProvision = (long[])GameLoop.GameManager.BossEntryProvision.Clone(),
-                        bossEntryProvisionTier = (long[])GameLoop.GameManager.BossEntryProvisionTierSum.Clone(),
-                        bossEntryConsumables = (long[])GameLoop.GameManager.BossEntryConsumables.Clone(),
-                        bossEntryHpPct = (long[])GameLoop.GameManager.BossEntryHpPct.Clone(),
-                        bossEntryPassives = (long[])GameLoop.GameManager.BossEntryPassives.Clone(),
-                        bossEntryPower = (long[])GameLoop.GameManager.BossEntryPower.Clone(),
-                        robberyLootApplied = GameLoop.GameManager.RobberyLootApplied,
-                        gateReached = GameLoop.GameManager.GateReached,
-                        gateBloodPaid = GameLoop.GameManager.GateBloodPaid,
-                        gateRelicsPaid = GameLoop.GameManager.GateRelicsPaid,
-                        gateTransferPaid = GameLoop.GameManager.GateTransferPaid,
-                        gateProvisionBefore = GameLoop.GameManager.GateProvisionBefore,
-                        gateProvisionAfter = GameLoop.GameManager.GateProvisionAfter,
-                        gateMaxHpPaid = GameLoop.GameManager.GateMaxHpPaid,
-                        gateRelicsBurned = GameLoop.GameManager.GateRelicsBurned,
+                        bossEntryCount = (long[])GameLoop.RunStats.BossEntryCount.Clone(),
+                        bossEntryProvision = (long[])GameLoop.RunStats.BossEntryProvision.Clone(),
+                        bossEntryProvisionTier = (long[])GameLoop.RunStats.BossEntryProvisionTierSum.Clone(),
+                        bossEntryConsumables = (long[])GameLoop.RunStats.BossEntryConsumables.Clone(),
+                        bossEntryHpPct = (long[])GameLoop.RunStats.BossEntryHpPct.Clone(),
+                        bossEntryPassives = (long[])GameLoop.RunStats.BossEntryPassives.Clone(),
+                        bossEntryPower = (long[])GameLoop.RunStats.BossEntryPower.Clone(),
+                        robberyLootApplied = GameLoop.RunStats.RobberyLootApplied,
+                        gateReached = GameLoop.RunStats.GateReached,
+                        gateBloodPaid = GameLoop.RunStats.GateBloodPaid,
+                        gateRelicsPaid = GameLoop.RunStats.GateRelicsPaid,
+                        gateTransferPaid = GameLoop.RunStats.GateTransferPaid,
+                        gateProvisionBefore = GameLoop.RunStats.GateProvisionBefore,
+                        gateProvisionAfter = GameLoop.RunStats.GateProvisionAfter,
+                        gateMaxHpPaid = GameLoop.RunStats.GateMaxHpPaid,
+                        gateRelicsBurned = GameLoop.RunStats.GateRelicsBurned,
                         // [計装] atkBase の「パッシブ加算」を誰が積んだか。 key=SkillId。
-                        damageBreakdown = (double[])CombatSystem.CombatManager.DamageBreakdown.Clone(),
-                        damageBreakdown7F = (double[])CombatSystem.CombatManager.DamageBreakdown7F.Clone(),
+                        damageBreakdown = (double[])CombatSystem.CombatStats.DamageBreakdown.Clone(),
+                        damageBreakdown7F = (double[])CombatSystem.CombatStats.DamageBreakdown7F.Clone(),
                         attackBonus7FSkills = System.Linq.Enumerable.ToArray(
                             ItemSystem.PassiveSkills.CombatContext.AttackBonusBySkill7F.Keys),
                         attackBonus7FAmounts = System.Linq.Enumerable.ToArray(

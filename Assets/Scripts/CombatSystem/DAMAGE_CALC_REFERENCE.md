@@ -7,12 +7,11 @@
 > 最終確認: 2026-07-26（会心システム リバランス — §2-B 追加）
 > 2026-10-28: 防御値と貫通（ADR-0013）── ③-A の敵の防御・§9 の予告・フィールド表・武器ラダー・敵パッシブ表を更新
 >
-> **2026-07-15 追記 — ADR-0009 相互攻撃パイプラインの併存について**
-> [ADR-0009](../../../docs/adr/0009-mutual-attack-combat.md) が Accepted になり、
-> `CombatManager.UseMutualAttackPipeline` で `ExecuteTurnMutual()` に切り替わる。
-> **2026-07-27 に既定 true 化（ADR-0009 が現行実装）**。false は新旧比較スイープ用の退避経路。
-> 本 §1 は**旧パイプラインの記録**として残す ── 現行の正本は **§9**。
-> 新パイプラインの計算経路は **§9** に別建てで記載（v1・W7 進行中の暫定）。
+> **戦闘の経路は ADR-0009 相互攻撃パイプライン（§9）だけ**。旧ロール勝負の経路
+> (`UseMutualAttackPipeline=false`) は **2026-10-29 に削除**した。
+> 本 §1 にはロール勝負時代の記述（⓪ の物資リロール・ロール比較・勝敗分岐）が残っているが、
+> 与ダメ／被ダメの補正チェーン（`ProcessDamage` / `ApplyWinDamageModifiers` / `ApplyLossDamageModifiers`）は
+> §9 から呼ばれる現役の段。**順序の正本は §9**、各段の中身は §1 を参照する。
 >
 > 【最適化リファクタ済み（2026-05-29）】
 > - `diceDifference` は `playerDiceTotal − enemyDiceTotal` の**読み取り専用プロパティ**（手動代入は全廃。視点スワップ時も両合計入替で符号が自動反転）。
@@ -139,7 +138,6 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
 ↑ 勝利時最低保証【新】: total = max(total, winMinDamage[既定1, 利刃で1〜4])
 × enemyDamageTakenMultiplier       ← 狂暴化(50T後 ×3)
 メタデバフ俊敏: 各戦闘の初撃を total=0,fixedDmg=0
-プレイヤー防御スタンス(ADR-0006): 防御時 total ×=0.1（与ダメ-90%・末尾。fixedDmgは対象外）
 → enemyHP −= total + fixedDamageToEnemy
   鋼の皮膚(メタデバフ): 敵初回致命を1HPで耐える
   出血(enemyBleedStacks) / 貪欲lifesteal(HealPlayer) / fixedDamageToPlayer
@@ -164,7 +162,6 @@ playerDamageNegateCharges>0 → total=0(獣の絆)
 コントラタック(player_contre): total半減 + 軽減量×2を敵へ反射
 − consShield(消費シールド吸収。 盾は T2 以降のターン頭に半減 ── ③-D)
 consReflect(鏡写し): 吸収後の被ダメ同量を敵へ反射
-プレイヤー防御スタンス(ADR-0006): 防御時 total ×=0.5（受け最終-50%・全軽減/シールドの後。反撃等の固定反射は対象外）
 痛覚遮断剤【職業/狂戦士 2026-06-28】: painkillerArmedThisTurn && total≥playerHP → total=playerHP−1（HP=1踏みとどまり・チェーン**最後**）
 → (ダメージ適用直前) 仕込み刃【職業/暗殺者 2026-06-28・2026-09-22 に倍率 1→5】: daggerArmed && total>0 → total=0 ＋ **その 5 倍**を enemyHP へ軽減不能で返す（`CombatManager` の仕込み刃の反撃倍率）。使ったターン限りで、被弾しなくても失効
 → playerHP −= total (+ fixedDamageToPlayer)
@@ -248,7 +245,6 @@ ShieldBash の空振り（盾 0）が 34.2% → 66.1%、1 機会あたりの攻�
 | `enemyDiceTotalPenalty`【新】 | 敵合計への床なし減算（負値許容＝大差勝ち）。沈黙の剣帯=1T目99 | BeginNewTurnで0 |
 | `enemyStanceDamageMult`【新】 | 敵スタンスの被ダメ倍率(高火力>1/低火力<1)。ApplyLossDamageModifiersで乗算 | BeginNewTurnで1.0 |
 | `enemyStanceKind`【新】 | 0なし/1強ロール低火力/2弱ロール高火力。弱(=2)は RollDice時に敵ダイス最大出目を`EnemyStance.WeakRollMax`へ縮小。`OnTelegraph`でUI後付け | BeginNewTurnで0 |
-| `playerStanceDefense`【新】 | プレイヤー防御スタンス(ADR-0006)。与ダメ×0.1(ApplyWin末尾)/受け最終×0.5(ApplyLoss末尾)。反撃等の固定反射は対象外 | BeginNewTurnでfalse |
 | `bossDiceBonus` | 強者/玉座/刹那(現在未使用) | swapで0 |
 | `enemyDefense`【2026-10-28】 | 敵の防御値。EnemyData.defense + 精鋭+2 / 硬鱗+4 / 重甲+4 (OnBattleStart) | **戦闘保持**(start/swapで設定) |
 | `enemyArmorPen`【2026-10-28】 | 敵がプレイヤーの防御を固定で削る量。EnemyData.armorPen | **戦闘保持**(start/swapで設定) |
@@ -361,7 +357,7 @@ SwordReachII・III / BulwarkII・III。 置き換え前と同一シード 10,000
 | `behind` | 両 maxHP > 0 かつ `cur/max < enemyCur/enemyMax`（float） |
 | `hitLastTurn` | 前ターンの OnPreReceiveDamage で `finalDamage > 0` だった（`nextTurnBuffs["hitArmed:<ID>"]`、自分の軽減より前の値で判定） |
 | `enemyPoisoned` / `enemyBleedMin: N` | 敵の毒 > 0 / `enemyBleedStacks ≥ N` |
-| `overcharged` | `UseMutualAttackPipeline && IsOvercharged()` |
+| `overcharged` | `IsOvercharged()` |
 | `allEven` / `kaleido` | 出目が全て偶数（1 個以上）/ 全同値・全て異なる・連続 3 個以上 のいずれか（2 個以上） |
 | `weaponPlusMin: N` | `run.weaponPlus ≥ N` |
 | `strongFoe` | `MapManager.CurrentNode.type` が EliteBattle か Boss |
@@ -673,10 +669,8 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
 
 ## 9. ADR-0009 相互攻撃パイプライン（v1・W7 進行中）
 
-**切替**: `CombatManager.UseMutualAttackPipeline` で `ExecuteTurnMutual()` に分岐する。
-**既定 true（2026-07-27〜）** ── 本節が現行の正本。false にすると §1 の旧パイプラインに戻る
-（AutoRunner の `useMutualAttackPipeline` トグルで新旧比較スイープに使う）。
-`ExecuteTurn()` と `ExecuteTurnMutual()` は終端処理を `FinishTurnCommon()` で共有する。
+**本節が現行の正本**。`ExecuteTurn()` は `ExecuteTurnMutual()` を呼ぶだけ（旧ロール勝負の経路は 2026-10-29 に削除）。
+終端処理は `FinishTurnCommon()`。
 
 ### 9.1 ターン構造（ADR-0009 柱2）
 
@@ -756,7 +750,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                      ボス倍率 = 挑戦〈天変地異〉(ボスのみ)
                      → 呪縛等 (mutualEnemyAttackReduction) / 〈封じ・対〉 / 失血衰弱 の減算
                      → **プレイヤーの防御** (ADR-0013・2026-10-28): DefenseFormula.Apply(enemyAtk, max(0, playerDefense − max(0, enemyArmorPen − enemyArmorPenNegate)))
-                       ここまでが予告値。 旧経路 (UseMutualAttackPipeline=false) には入れていない
+                       ここまでが予告値。
                        (剣〈間合〉が enemyArmorPenNegate を足す / 斧〈血令〉は防御 0 = 掛からない)
          配線確定  → accumulatedValues に端子ごとの本数・予告の敵攻撃を書いて **OnWired** (2026-10-28)
                        ── 剣〈切り返し〉〈不滅の刃〉・盾〈シールドバッシュ〉〈堅守の構え〉が読む。 atkBase の確定より前
@@ -823,14 +817,14 @@ enemies.json が未指定なら既定: `baseAttack = max(1, threat)` /
 - 特殊端子 11 種（重攻撃/完全防御/出血/治癒/決死/急所/照準/蓄電池/冷却材/鋳造口/反攻）
 - ~~電力経済の消費/停電~~ → 充電の消費先は **ADR-0010 のリロール**（§9.2）。
   オーバーロードは 2026-08-09 に**廃止**（GAME.md §24）。停電（充電切れのペナルティ）は未実装のまま
-- ダイス改変系（鐘/正午/蝕夜/影の代償/コルヴェンの憤怒）
+- ダイス改変系（影の代償/コルヴェンの憤怒。 大穴の異常現象の鐘/正午/蝕夜は 2026-10-29 に仕組みごと削除）
 - ボス固有機構（サドンデス/コントラタック/妙覚）— boss6/7 は当面旧法で計測
 - 収支確定前の `playerWonRoll` を参照する効果の棚卸し（AllPassiveSkillEffects 側）
 
 ### 9.6 パッシブリワーク一覧 (2026-07-15)
 
-ADR-0009 パイプラインでのパッシブ挙動を、UseMutualAttackPipeline トグルで自動分岐する
-ブリッジ方式でリワーク済み。`ctx.AddPlayerAttackOrDiceBonus(n)` helper が新旧の書き先を切替。
+ADR-0009 パイプラインでのパッシブ挙動のリワーク記録 (2026-07-15)。当時は新旧の経路をトグルで切り替える
+ブリッジ方式だった (旧経路は 2026-10-29 に削除)。「攻撃+N」は `ctx.AddPlayerAttackOrDiceBonus(n)` で `mutualAttackBonus` へ積む。
 
 **追加フィールド (CombatContext, [perTurn])**:
 - `mutualAttackBonus` — ExecuteTurnMutual が atkBase に加算 (ダイス合計+N の転生先)

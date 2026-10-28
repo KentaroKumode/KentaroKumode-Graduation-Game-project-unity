@@ -631,19 +631,6 @@ namespace AutoTest
             try { EnemyDatabase.EnsureInitialized(); } catch (Exception e) { Debug.LogWarning($"[AutoRunner] EnemyDatabase: {e.Message}"); }
         }
 
-        private void DisableMapTransition()
-        {
-            try
-            {
-                var t = MapSystem.Visual.MapTransitionController.Instance;
-                if (t != null)
-                {
-                    Destroy(t.gameObject);
-                    Debug.Log("[AutoRunner] MapTransitionController を無効化(同期ショップ遷移)");
-                }
-            }
-            catch { /* 型が無い/未配置なら無視 */ }
-        }
 
         // ===== ログ出力 =====
 

@@ -174,7 +174,7 @@ namespace UI.ClassSelect
 
         private void Awake()
         {
-            // カメラ未指定なら LCD コンテンツカメラへフォールバック (BattleVisualRig と同型)
+            // カメラ未指定なら LCD コンテンツカメラへフォールバック
             if (pointerCamera == null)
             {
                 var lcd = FindObjectOfType<UI.Lcd.LcdScreen>();

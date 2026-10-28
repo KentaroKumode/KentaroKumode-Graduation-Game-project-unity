@@ -586,8 +586,8 @@ namespace ItemSystem.PassiveSkills
             }
 
             // [診断] 段 B: damageBonus + OnPreDealDamage の通過後
-            bool diag = CombatSystem.CombatManager.DiagWinAttack;
-            var stg = CombatSystem.CombatManager.DamageStages;
+            bool diag = CombatSystem.CombatStats.DiagWinAttack;
+            var stg = CombatSystem.CombatStats.DamageStages;
             if (diag) { stg[0]++; stg[1] += baseDamage; stg[2] += context.finalDamage; }
 
             // 5. 全ダメージ合算（メイン＋追撃）
@@ -630,7 +630,7 @@ namespace ItemSystem.PassiveSkills
 
                 // 逓減撤去後は実質クランプのみ。 加算した分がそのまま実効会心率になる。
                 float critRate = CombatContext.ResolveCritRate(critAdd);
-                AutoTest.CritRateCensus.Note(critAdd, critRate);
+                GameLoop.GameHooks.OnCritRateResolved?.Invoke(critAdd, critRate);
 
                 context.isCritical = critRate > 0f && GameLoop.GameRng.Value("PassiveSkillManager.2") < critRate;
             }
@@ -675,8 +675,7 @@ namespace ItemSystem.PassiveSkills
                 //     Bludgeon_4(+120%)  band -0.365  被ダメ/戦 +0.66
                 //   **倍率が上がるほど被ダメが増える**という、効果の向きと逆の並びが出ていた。
                 //   会心との衝突を疑ったが交互作用は +0.024 ± 0.036 で、 原因はこちらだった。
-                //   旧パイプラインは 1 ターンに片側しか攻撃しないので発現しない
-                //   ── 相互攻撃モデルが既定になった 2026-07-27 に生まれたはず。
+                //   相互攻撃モデルが既定になった 2026-07-27 に生まれたはず (両側が毎ターン攻撃するため)。
                 totalDamage = (int)(totalDamage * (1f + context.nonCritOutgoingMultiplier));
                 if (diag) stg[18]++;
             }
@@ -809,34 +808,6 @@ namespace ItemSystem.PassiveSkills
                     enemyDice[i] = GameLoop.GameRng.RangeAuto("PassiveSkillManager.8", 1, eMax + 1);
             }
         }
-
-        /// <summary>
-        /// 内部名からスキルの日本語表示名を取得
-        /// </summary>
-        public string GetSkillDisplayName(string internalName)
-        {
-            if (skillDisplayNames.TryGetValue(internalName, out var displayName))
-                return displayName;
-            return internalName; // フォールバック
-        }
-
-        /// <summary>現在アクティブなプレイヤースキル名一覧を取得</summary>
-        public IReadOnlyList<string> GetActiveSkillNames() => activeSkillNames;
-
-        /// <summary>現在アクティブな敵スキル名一覧を取得</summary>
-        public IReadOnlyList<string> GetEnemySkillNames() => enemySkillNames;
-
-        /// <summary>今ターン中に発動したプレイヤースキルのID一覧</summary>
-        public IReadOnlyCollection<string> GetTriggeredPlayerSkills() => triggeredPlayerSkills;
-
-        /// <summary>今ターン中に発動した敵スキルのID一覧</summary>
-        public IReadOnlyCollection<string> GetTriggeredEnemySkills() => triggeredEnemySkills;
-
-        /// <summary>指定スキルが今ターン中に発動したか</summary>
-        public bool IsPlayerSkillTriggered(string skillId) => triggeredPlayerSkills.Contains(skillId);
-
-        /// <summary>指定敵スキルが今ターン中に発動したか</summary>
-        public bool IsEnemySkillTriggered(string skillId) => triggeredEnemySkills.Contains(skillId);
 
         /// <summary>戦闘中かどうか</summary>
         public bool IsInCombat => context != null;

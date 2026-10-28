@@ -222,7 +222,7 @@ namespace ItemSystem.PassiveSkills.Effects
                 return false;
             if (w.enemyPoisoned && ctx.GetStatus(StatusTarget.Enemy, "poison") <= 0) return false;
             if (w.enemyBleedMin > 0 && ctx.enemyBleedStacks < w.enemyBleedMin) return false;
-            if (w.overcharged && !(CombatSystem.CombatManager.UseMutualAttackPipeline && ctx.IsOvercharged())) return false;
+            if (w.overcharged && !ctx.IsOvercharged()) return false;
             if (w.allEven && !AllEven(ctx.playerDice)) return false;
             if (w.kaleido && !Kaleido(ctx.playerDice)) return false;
             if (w.weaponPlusMin > 0 && (GameLoop.GameManager.Instance?.Run?.weaponPlus ?? 0) < w.weaponPlusMin) return false;

@@ -387,7 +387,7 @@ namespace ItemSystem.PassiveSkills.Effects
         /// <summary>チューナー調整後の 1 スタックあたり敵出目ボーナス。</summary>
         public static int DicePerStack(CombatContext ctx)
         {
-            int v = AutoTest.BossTuning.ParamInt(ctx?.bossId, AutoTest.BossParam.Stagnation);
+            int v = CombatSystem.BossParams.ParamInt(ctx?.bossId, CombatSystem.BossParam.Stagnation);
             return v > 0 ? v : DicePerStackBase;
         }
 

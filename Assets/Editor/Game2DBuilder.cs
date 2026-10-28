@@ -123,9 +123,6 @@ public static class Game2DBuilder
         mapView.plotQuad = plotRenderer;
         mapView.lcdQuad = quadGo != null ? quadGo.transform : null;
 
-        // 旧来の地図のクリック (スプライトの当たり判定) は、 液晶の作図が受け持つので外す
-        foreach (var h in Object.FindObjectsOfType<MapSystem.Visual.MapClickHandler>(true)) Object.DestroyImmediate(h);
-
         var hudRoot = Node("Hud", gridRt, 0, 0, Game2DLayout.Width, Game2DLayout.Height);
         hudRoot.anchorMin = Vector2.zero; hudRoot.anchorMax = Vector2.one; hudRoot.offsetMin = hudRoot.offsetMax = Vector2.zero;
 
@@ -269,7 +266,7 @@ public static class Game2DBuilder
         screen.screenCamera = cam; screen.lcdQuad = quad; screen.canvas = canvas; screen.gridRoot = presentGrid; screen.fxMaterial = fxMat; mapView.screen = screen; navPanel.screen = screen; battleHud.screen = screen; modal.screen = screen; extras.screen = screen;
         screen.Apply();
 
-        // 開発用のデバッグ表示 (左上の文字) は、 液晶の作図と重なるので切る (キー操作はそのまま)
+        // 開発用のデバッグ表示 (左上の文字) は、 液晶の作図と重なるので切る (キー操作は GameManager 側)
         foreach (var dbg in Object.FindObjectsOfType<GameLoop.GameDebugHUD>(true))
         {
             var so = new SerializedObject(dbg); var pr = so.FindProperty("showHUD");

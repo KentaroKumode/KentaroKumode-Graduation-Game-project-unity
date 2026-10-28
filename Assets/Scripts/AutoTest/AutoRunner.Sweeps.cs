@@ -570,7 +570,7 @@ namespace AutoTest
                 int recBase = _records.Count;
                 var thisC5 = new bool[runs];
                 var thisC7 = new bool[runs];
-                CombatSystem.CombatManager.ResetFloorDamage();
+                CombatStats.ResetFloorDamage();
                 MetaProgression.Relics.RelicApplicator.ResetProvisionBurnStats();
 
                 for (int i = 0; i < runs; i++)
@@ -635,7 +635,7 @@ namespace AutoTest
                 //   FloorDamage の第3添字は 0=攻撃回数 / 1=与ダメ合計 / 2=最小 / 3=最大 /
                 //   4=敵maxHP合計 / 5=ターン合計 / 6=戦闘数。 **被ダメは入っていない**ので
                 //   そちらは _records の戦闘明細から拾う。
-                var fd = CombatSystem.CombatManager.FloorDamage;
+                var fd = CombatStats.FloorDamage;
                 double atk = 0, dmgOut = 0;
                 for (int f = 1; f <= 3; f++)
                     for (int k = 0; k < 2; k++)
@@ -732,7 +732,7 @@ namespace AutoTest
                 arms.Add(($"{f} r10", d));
             }
 
-            GameManager.PlunderDrops = 0;
+            RunStats.PlunderDrops = 0;
             ResetScreenProgress(arms.Count * runs, "極点比較");
             var sb = new StringBuilder();
             sb.AppendLine("=== 極点 (r10) 比較 ===");
@@ -785,13 +785,13 @@ namespace AutoTest
             sb.AppendLine();
             sb.AppendLine($"※ 1 アーム {runs} ラン。 クリア率 {baseClear:F0}% 帯の MDE は概ね "
                         + $"{2.8 * Math.Sqrt(2 * baseClear * (100 - baseClear) / runs):F2}pt。 これ未満の差は読まないこと。");
-            sb.AppendLine($"※ 強奪の道中パッシブドロップ (全アーム累積): {GameManager.PlunderDrops:N0} 件");
+            sb.AppendLine($"※ 強奪の道中パッシブドロップ (全アーム累積): {RunStats.PlunderDrops:N0} 件");
             {
                 long ra = ItemSystem.Shop.ShopManager.RobberyAttempts;
-                long rw = GameManager.RobberyWins, rl = GameManager.RobberyLosses;
+                long rw = RunStats.RobberyWins, rl = RunStats.RobberyLosses;
                 sb.AppendLine($"※ 強盗の罰: {(robberyBlocksShops ? "出禁 (旧仕様・切り分け用)" : "以降のショップ価格 ×2")}"
                             + $" / 発動 {ra:N0} 回 (勝 {rw:N0} 敗 {rl:N0}"
-                            + $" 平均戦利品 {(rw > 0 ? GameManager.RobberyLootTotal / (double)rw : 0):F1} 件)");
+                            + $" 平均戦利品 {(rw > 0 ? RunStats.RobberyLootTotal / (double)rw : 0):F1} 件)");
                 sb.AppendLine("   ↑ 発動 0 なら 商才 r10 の差は強盗以外 (割引下限40%) の取り分。 先にここを読むこと。");
             }
             sb.AppendLine("※ Balanced 比が正 = 「1 本振り切る」ほうが「薄く広く」より良い ＝ 極点に価値がある。");
@@ -908,9 +908,9 @@ namespace AutoTest
             foreach (var t in tracks)
                 foreach (int r in ranks) arms.Add(($"{t} r{r}", BuildRankMarginArmSpec(t, r)));
 
-            GameManager.PlunderDrops = 0;
+            RunStats.PlunderDrops = 0;
             ItemSystem.Shop.ShopManager.RobberyAttempts = 0;
-            GameManager.RobberyWins = GameManager.RobberyLosses = GameManager.RobberyLootTotal = 0;
+            RunStats.RobberyWins = RunStats.RobberyLosses = RunStats.RobberyLootTotal = 0;
             ResetScreenProgress(arms.Count * runs, "全軸 r9/r10");
             var sb = new StringBuilder();
             sb.AppendLine("=== 全軸 r9 / r10 (Balanced 同梱) ===");
@@ -962,12 +962,12 @@ namespace AutoTest
             sb.AppendLine("※ 判定  ○=基準内 / 強=上振れ / 弱=下振れ / 極点×= r10 が r9 以下 (極点が無価値か有害)。");
             sb.AppendLine("※ r9 が弱い → 1 段あたりの増加量を上げるか内容を変える。");
             sb.AppendLine("※ r10 が未達 → 極点をリワークかバフ。 r9 は基準内なのに r10 が外れているなら原因は極点だけ。");
-            sb.AppendLine($"※ 強奪の道中パッシブドロップ: {GameManager.PlunderDrops:N0} 件");
+            sb.AppendLine($"※ 強奪の道中パッシブドロップ: {RunStats.PlunderDrops:N0} 件");
             {
                 long ra = ItemSystem.Shop.ShopManager.RobberyAttempts;
-                sb.AppendLine($"※ 強盗 (強奪r10 へ移設): 発動 {ra:N0} 回 / 勝 {GameManager.RobberyWins:N0}"
-                            + $" 敗 {GameManager.RobberyLosses:N0} / 平均戦利品 "
-                            + $"{(GameManager.RobberyWins > 0 ? GameManager.RobberyLootTotal / (double)GameManager.RobberyWins : 0):F1} 件");
+                sb.AppendLine($"※ 強盗 (強奪r10 へ移設): 発動 {ra:N0} 回 / 勝 {RunStats.RobberyWins:N0}"
+                            + $" 敗 {RunStats.RobberyLosses:N0} / 平均戦利品 "
+                            + $"{(RunStats.RobberyWins > 0 ? RunStats.RobberyLootTotal / (double)RunStats.RobberyWins : 0):F1} 件");
             }
             _metaAblationReport = sb.ToString();
             Debug.Log("[AutoRunner] 全軸 r9/r10 比較 完了\n" + _metaAblationReport);
@@ -2151,7 +2151,7 @@ namespace AutoTest
                 // **序盤ファーム効率**をプリセットごとに切り出す。 生存だけでは
                 // 「強い遺物で序盤を効率よく回せるのか」に答えられない。
                 int recBase = _records.Count;
-                CombatSystem.CombatManager.ResetFloorDamage();
+                CombatStats.ResetFloorDamage();
 
                 for (int i = 0; i < runs; i++)
                 {
@@ -2188,7 +2188,7 @@ namespace AutoTest
                 double gold = 0, buys = 0; int n = 0;
                 for (int r = recBase; r < _records.Count; r++)
                 { gold += _records[r].totalGoldGained; buys += _records[r].shopPurchases; n++; }
-                var fd = CombatSystem.CombatManager.FloorDamage;
+                var fd = CombatStats.FloorDamage;
                 // 1〜3F の通常+エリート戦だけを見る (ボスは長さの性質が違うので除く)
                 double atk = 0, fights = 0, dmgSum = 0;
                 for (int f = 1; f <= 3; f++)
@@ -2234,13 +2234,13 @@ namespace AutoTest
             CombatSystem.YachtRoleEffects.ResetStats();
             GameLoop.RunChronicle.ResetCounts();
             ItemSystem.PassiveSkills.CombatContext.ResetChargeStats();
-            CombatSystem.CombatManager.PassiveUpkeepDue = CombatSystem.CombatManager.PassiveUpkeepPaid = 0;
-            System.Array.Clear(CombatSystem.CombatManager.RerollPerTurn, 0, CombatSystem.CombatManager.RerollPerTurn.Length);
-            System.Array.Clear(CombatSystem.CombatManager.RerollPerTurnYacht, 0, CombatSystem.CombatManager.RerollPerTurnYacht.Length);
-            CombatSystem.CombatManager.ResetFirstRollStats();
-            System.Array.Clear(CombatSystem.CombatManager.RerollStats, 0,
-                               CombatSystem.CombatManager.RerollStats.Length);
-            CombatSystem.CombatManager.ResetDamageBreakdown();
+            CombatStats.PassiveUpkeepDue = CombatStats.PassiveUpkeepPaid = 0;
+            System.Array.Clear(CombatStats.RerollPerTurn, 0, CombatStats.RerollPerTurn.Length);
+            System.Array.Clear(CombatStats.RerollPerTurnYacht, 0, CombatStats.RerollPerTurnYacht.Length);
+            CombatStats.ResetFirstRollStats();
+            System.Array.Clear(CombatStats.RerollStats, 0,
+                               CombatStats.RerollStats.Length);
+            CombatStats.ResetDamageBreakdown();
             SuperCombatAI.ResetSearchStats();
             ResetNavStats();
             AutoTest.FamilyTierStats.Reset();

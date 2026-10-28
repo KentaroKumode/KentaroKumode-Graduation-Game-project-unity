@@ -65,7 +65,6 @@ namespace AutoTest.EditorTests.Ultra
 
                 // Dirty the runner the way a leftover menu action would, so the test proves
                 // ApplyTo overrides inherited state instead of merely agreeing with defaults.
-                runner.useMutualAttackPipeline = false;
                 runner.suppressFacePartOffers = true;
                 runner.shieldAbsorbsUnmitigable = false;
                 runner.enableAllDebuffs = true;
@@ -88,7 +87,6 @@ namespace AutoTest.EditorTests.Ultra
                 Assert.That(runner.tuneBosses || runner.learnTier || runner.learnBotAi, Is.False,
                     "a benchmark must not mutate learning or balance data");
 
-                Assert.That(runner.useMutualAttackPipeline, Is.True);
                 Assert.That(runner.suppressFacePartOffers, Is.False);
                 Assert.That(runner.shieldAbsorbsUnmitigable, Is.True);
                 Assert.That(runner.enableAllDebuffs, Is.False);

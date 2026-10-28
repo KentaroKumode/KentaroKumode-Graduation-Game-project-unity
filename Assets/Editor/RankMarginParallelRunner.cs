@@ -118,7 +118,6 @@ namespace AutoTest.EditorTools
         private const string ChalTargetKey = "AutoRun.ChallengeTarget";
         private const string RankSpecKey   = "AutoRun.MetaRankSpec";
         private const string RobBlockKey   = "AutoRun.RobberyBlocksShops";
-        private const string MutualKey     = "AutoRun.UseMutualAttack";
         private const string RatioKey      = "AutoRun.PersonaRawTierRatio";
         private const string NoPartsKey    = "AutoRun.SuppressFaceParts";
 
@@ -399,13 +398,8 @@ namespace AutoTest.EditorTools
             Add("gateBotPaysTransfer",
                 EditorPrefs.GetBool("AutoRun.GateBotPaysTransfer", true).ToString());
 
-            // **2026-09-13: 運び漏れで 170,000 ラン を捨てた 3 件。**
-            //   useMutualAttackPipeline は AutoRunner のフィールド既定が false で、
-            //   Begin() が CombatManager の static (既定 true) を**それで上書きする**。
-            //   運ばないとワーカーだけ旧戦闘経路で走り、 エディタと別のゲームを測る。
-            //   **ここに足し忘れたキーは黙って既定値になる** ── だから下の
-            //   DescribeEffectiveState で毎回サマリーへ印字する。
-            Add("useMutualAttackPipeline", EditorPrefs.GetBool(MutualKey, false).ToString());
+            // **ここに足し忘れたキーは黙って既定値になる** (2026-09-13 に運び漏れで 170,000 ラン を捨てた)。
+            //   だから下の DescribeEffectiveState で毎回サマリーへ印字する。
             Add("rawTierRatio", (EditorPrefs.GetInt(RatioKey, 50) / 100f)
                 .ToString(CultureInfo.InvariantCulture));
             Add("suppressFacePartOffers", EditorPrefs.GetBool(NoPartsKey, false).ToString());

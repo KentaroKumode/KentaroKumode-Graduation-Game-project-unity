@@ -173,7 +173,6 @@ namespace AutoTest
             sb.AppendLine($"メタデバフ: {(enableAllDebuffs ? "全ON (Lv1-10, 最高難易度)" : "全OFF")}");
             sb.AppendLine($"実行設定  : メタ={metaBuffMode} / 軸={(sweepAllMetaAxes ? "全軸走査" : metaAllocation.ToString())} / アイテム={itemPickMode}");
             sb.AppendLine($"配線AI    : {wiringSkill}");
-            sb.AppendLine($"戦闘経路  : {(useMutualAttackPipeline ? "ADR-0009 相互攻撃" : "旧戦闘経路")} / 役=ADR-0010");
             // **実効状態を必ず印字する。** EditorPrefs 由来のトグルは黙って持ち越されるので、
             //   サマリを後から読んだときに条件が復元できないと測定が丸ごと無駄になる。
             //   (技量帯が別メニューの設定を持ち越したまま走った事故が実際に起きている)
@@ -204,8 +203,7 @@ namespace AutoTest
                 //   「id が辞書順で先の手」。 差がついた件数を必ず並べて出す。
                 sb.AppendLine("Ultra評価  : " + AutoTest.Ultra.UltraRolloutEvaluator.DescribeCounters());
             }
-            sb.AppendLine($"実効トグル: 相互攻撃={useMutualAttackPipeline}"
-                        + $" / パーツ陳列抑止={suppressFacePartOffers}"
+            sb.AppendLine($"実効トグル: パーツ陳列抑止={suppressFacePartOffers}"
                         + $" / 盾肩代わり={shieldAbsorbsUnmitigable}"
                         + $" / メタデバフ全ON={enableAllDebuffs}"
                         + $" / 全軸走査={sweepAllMetaAxes}"
@@ -339,7 +337,7 @@ namespace AutoTest
                 long g = ItemSystem.PassiveSkills.CombatContext.ChargeGained;
                 long w = ItemSystem.PassiveSkills.CombatContext.ChargeWasted;
                 long s = ItemSystem.PassiveSkills.CombatContext.ChargeSpentTotal;
-                long rrC = CombatSystem.CombatManager.RerollStats[2];
+                long rrC = CombatStats.RerollStats[2];
                 double t = System.Math.Max(1, CombatSystem.YachtRoleEffects.TurnsEvaluated);
                 sb.Append(AutoTest.FamilyTierStats.Dump());
                 sb.AppendLine("【充電経済】");
@@ -348,34 +346,34 @@ namespace AutoTest
                 sb.AppendLine($"  支出 {s:N0} (1ターン {s / t:F2}) / うちリロール {rrC:N0}"
                             + $" ({(s > 0 ? 100.0 * rrC / s : 0):F1}%)");
                 sb.AppendLine($"  収支 {(g - s):N0} (1ターン {(g - s) / t:F2})  ※プラスなら使い切れていない");
-                long ud = CombatSystem.CombatManager.PassiveUpkeepDue;
-                long up = CombatSystem.CombatManager.PassiveUpkeepPaid;
+                long ud = CombatStats.PassiveUpkeepDue;
+                long up = CombatStats.PassiveUpkeepPaid;
                 sb.AppendLine($"  装備維持費 請求 {ud:N0} (1ターン {ud / t:F2}) / 実収 {up:N0}"
                             + $" (踏み倒し {(ud > 0 ? 100.0 * (ud - up) / ud : 0):F1}%)");
 
                 {
-                    long fc = CombatSystem.CombatManager.FirstRollCount;
-                    long fy = CombatSystem.CombatManager.FirstRollYacht;
+                    long fc = CombatStats.FirstRollCount;
+                    long fy = CombatStats.FirstRollYacht;
                     sb.AppendLine("  初回ロール (振り直し前)");
                     sb.AppendLine($"    回数 {fc:N0} / 5個同値 {fy:N0} = {(fc > 0 ? 100.0 * fy / fc : 0):F3}%"
                                 + "   ※5個の d6 の理論値 0.077%");
-                    sb.AppendLine($"    平均ダイス本数 {(fc > 0 ? CombatSystem.CombatManager.FirstRollDiceCountSum / (double)fc : 0):F2}"
-                                + $" / 平均面数 {(fc > 0 ? CombatSystem.CombatManager.FirstRollFaceLenSum / (double)fc : 0):F2}"
-                                + $" / 面配列なし {CombatSystem.CombatManager.FirstRollNoFaces:N0}");
-                    var bc = CombatSystem.CombatManager.FirstRollByDiceCount;
-                    var by = CombatSystem.CombatManager.FirstRollYachtByDiceCount;
+                    sb.AppendLine($"    平均ダイス本数 {(fc > 0 ? CombatStats.FirstRollDiceCountSum / (double)fc : 0):F2}"
+                                + $" / 平均面数 {(fc > 0 ? CombatStats.FirstRollFaceLenSum / (double)fc : 0):F2}"
+                                + $" / 面配列なし {CombatStats.FirstRollNoFaces:N0}");
+                    var bc = CombatStats.FirstRollByDiceCount;
+                    var by = CombatStats.FirstRollYachtByDiceCount;
                     for (int i = 0; i < bc.Length; i++)
                         if (bc[i] > 0)
                             sb.AppendLine($"    {i}本: {bc[i],9} 回 / 極 {by[i],7} = {(100.0 * by[i] / bc[i]),6:F3}%");
-                    var fh = CombatSystem.CombatManager.FirstRollFaceHist;
+                    var fh = CombatStats.FirstRollFaceHist;
                     long fhTot = 0; foreach (var v in fh) fhTot += v;
                     sb.Append("    出目分布:");
                     for (int i = 0; i < fh.Length; i++)
                         if (fh[i] > 0) sb.Append($" {i}={(fhTot > 0 ? 100.0 * fh[i] / fhTot : 0):F1}%");
                     sb.AppendLine();
                 }
-                var rpt = CombatSystem.CombatManager.RerollPerTurn;
-                var rpy = CombatSystem.CombatManager.RerollPerTurnYacht;
+                var rpt = CombatStats.RerollPerTurn;
+                var rpy = CombatStats.RerollPerTurnYacht;
                 long rptTot = 0, rpyTot = 0;
                 for (int i = 0; i < rpt.Length; i++) { rptTot += rpt[i]; rpyTot += rpy[i]; }
                 sb.AppendLine("  リロール回数の分布 (全ターン / 〈極〉成立ターン)");
@@ -393,7 +391,7 @@ namespace AutoTest
             sb.AppendLine(GameLoop.RunChronicle.DescribeP4());
             sb.AppendLine(GameLoop.RunChronicle.DescribePhaseDuration());
             sb.AppendLine(GameLoop.RunChronicle.DescribePhaseWiring());
-            var rr = CombatSystem.CombatManager.RerollStats;
+            var rr = CombatStats.RerollStats;
             sb.AppendLine($"  リロール: {rr[0]:N0} 回 / {rr[1]:N0} 個 / 充電 {rr[2]:N0}"
                         + (rr[0] > 0 ? $"  (1回あたり {rr[1] / (double)rr[0]:F2}個 / {rr[2] / (double)rr[0]:F2}充電)" : ""));
             // 先読みが順位を変えているか。 Super 以外の技量では 0 件なので何も出ない。
@@ -1323,11 +1321,11 @@ namespace AutoTest
             // 値下げ交渉(=強盗)。 1 ラン 1 回までなので 試行数 = 実行したラン数。
             {
                 long ra = ItemSystem.Shop.ShopManager.RobberyAttempts;
-                long rw = GameManager.RobberyWins, rl = GameManager.RobberyLosses;
+                long rw = RunStats.RobberyWins, rl = RunStats.RobberyLosses;
                 sb.AppendLine($"  {PadR("値下げ交渉", 20)}: 実行 {ra}/{n} ラン ({Pct((int)ra, n)})"
                             + (ra > 0
                                ? $"  勝 {rw} / 敗 {rl} (勝率 {Pct((int)rw, (int)(rw + rl))})"
-                                 + $"  平均戦利品 {(rw > 0 ? GameManager.RobberyLootTotal / (double)rw : 0):F1} 件"
+                                 + $"  平均戦利品 {(rw > 0 ? RunStats.RobberyLootTotal / (double)rw : 0):F1} 件"
                                : "  ※未発動"));
             }
             sb.AppendLine($"  {PadR("平均最終物資", 20)}: {(sFinalProvision/dn):F1}");
@@ -1368,7 +1366,7 @@ namespace AutoTest
                         + $"  期待比 {(nr > 0 && nd > 0 ? (ed / (double)er) / (nd / (double)nr) : 0):F1} 倍");
             }
             {
-                var RO = GameLoop.GameManager.RerollOutcome;
+                var RO = RunStats.RerollOutcome;
                 long rtot = 0; foreach (var v in RO) rtot += v;
                 if (rtot > 0)
                     sb.AppendLine($"  {PadR("リロール要求の結果", 20)}: 成功 {100.0*RO[3]/rtot:F1}%"

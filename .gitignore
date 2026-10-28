@@ -51,6 +51,8 @@
 *.mat
 *.asset
 *.unity
+# 遊ぶシーン (Game2D) だけは追跡する (2026-10-29。 旧 SampleScene は削除)
+!Assets/Scenes/Game2D.unity
 *.spriteatlas
 *.playable
 *.signal

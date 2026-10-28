@@ -36,8 +36,8 @@ My project — Unity 3D ローグライク（ボードゲーム調・ダイス�
 
 - ピクセル要素（PPU=32）の状態表現に `transform.localScale` 倍率を使わない（色/明度/別スプライト）。
 - ボス自動チューナー(L3)は隠し倍率禁止・実数値を直接調整（[docs/GAME.md](docs/GAME.md) §13-3）。
-- 戦闘は **ADR-0009 相互攻撃モデル**（GAME.md §6）。`UseMutualAttackPipeline` は
-  **既定 true**（2026-07-27〜）。false は新旧比較スイープ用の退避経路。
+- 戦闘は **ADR-0009 相互攻撃モデル**（GAME.md §6）だけ。旧ロール勝負の経路と `UseMutualAttackPipeline` は
+  2026-10-29 に削除（GAME.md §24）。
 - 用語: 「ダイス合計+N」は**禁止語彙**。攻撃+N / 出目+N / 端子配線合計+N を使う（GAME.md §2-7）。
 - シングルトンは `_shuttingDown` + `[RuntimeInitializeOnLoadMethod]` パターンを守る。
 - **アイテム・スキルの id = 表示名**（2026-09-22〜）。**id から構造を読み取らない** ──
@@ -47,6 +47,9 @@ My project — Unity 3D ローグライク（ボードゲーム調・ダイス�
 - **ID 文字列を直書きしない**: 複数ファイルから参照する ID・日本語 ID・ロジック分岐に使う ID/prefix は
   [Assets/Scripts/GameLoop/Ids.cs](Assets/Scripts/GameLoop/Ids.cs)（`ItemIds` / `BossIds`）か `ClassStarter` の定数を経由する。
   ボス判定は `BossIds.IsBoss(id)`。新しい ID を跨ファイル参照する時は先に定数を足す。
+- **本体は AutoTest を参照しない**（2026-10-29〜）。BOT に判断・計測・ボス調整値を渡す口は
+  [GameHooks.cs](Assets/Scripts/GameLoop/GameHooks.cs) と `BossParams.Overrides` だけで、BOT は AutoRunner の生成時に差し込む（`AutoTest.BotHooks`）。
+  ゲームのデータ（ボスの数値など）を AutoTest に置かない。
 - **CombatContext に新フィールドを足す時**: `perTurn` / `decay` / `persistent` の 3 区分
   （[CombatContext.cs](Assets/Scripts/ItemSystem/PassiveSkills/CombatContext.cs) の BeginNewTurn 直上の規約コメント参照）を
   XML コメントに明記し、perTurn/decay は BeginNewTurn の該当 Phase に必ずリセットを追加。

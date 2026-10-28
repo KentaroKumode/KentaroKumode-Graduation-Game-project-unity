@@ -4,22 +4,15 @@ namespace ItemSystem.PassiveSkills.Effects
     //  汎用パッシブ — 追撃（Pursuit）: 与ダメージ追加
     // ============================================================
 
-    // 追撃 I-IV: 旧=与ダメ+固定 (筋力と役割被り) / 新=与ダメの N% を追加 (乗算・筋力=加算と分離)
+    // 追撃 I-IV: 与ダメの N% を追加 (乗算・筋力=加算と分離)
     // 数値: I=+15% / II=+30% / III=+50% / IV=+100% (LEG は完全/万華等の outgoing+1.0 と同格)
-    // 実装: 新モードでは outgoingDamageMultiplier に加算 = 与ダメチェーン末端で乗算される
+    // 実装: outgoingDamageMultiplier に加算 = 与ダメチェーン末端で乗算される
     internal static class PursuitHelper
     {
-        public static void Apply(CombatContext ctx, int flatOld, float pctNew)
+        public static void Apply(CombatContext ctx, float pctNew)
         {
-            if (CombatSystem.CombatManager.UseMutualAttackPipeline)
-            {
-                if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
-                ctx.outgoingDamageMultiplier += pctNew;
-            }
-            else
-            {
-                ctx.finalDamage += flatOld;
-            }
+            if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
+            ctx.outgoingDamageMultiplier += pctNew;
         }
     }
 
@@ -28,7 +21,7 @@ namespace ItemSystem.PassiveSkills.Effects
     {
         public string SkillId => "PursuitI";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => PursuitHelper.Apply(ctx, 2, 0.15f);
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => PursuitHelper.Apply(ctx, 0.15f);
     }
 
     /// <summary>追撃II — 新: 与ダメ+30% (旧: +4 固定)</summary>
@@ -36,7 +29,7 @@ namespace ItemSystem.PassiveSkills.Effects
     {
         public string SkillId => "PursuitII";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => PursuitHelper.Apply(ctx, 4, 0.30f);
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => PursuitHelper.Apply(ctx, 0.30f);
     }
 
     /// <summary>追撃III — 新: 与ダメ+50% (旧: +6 固定)</summary>
@@ -44,7 +37,7 @@ namespace ItemSystem.PassiveSkills.Effects
     {
         public string SkillId => "PursuitIII";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => PursuitHelper.Apply(ctx, 6, 0.50f);
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => PursuitHelper.Apply(ctx, 0.50f);
     }
 
     /// <summary>追撃IV — 新: 与ダメ+40% (2026-09-20: +100% から) (旧: +8 固定)</summary>
@@ -53,31 +46,23 @@ namespace ItemSystem.PassiveSkills.Effects
         public string SkillId => "烈刃";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
         // 2026-09-20: +100% → +40%。 無条件で常時乗るため実効も +100% で、 条件付きの札と釣り合わなかった。
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => PursuitHelper.Apply(ctx, 8, 0.40f);
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => PursuitHelper.Apply(ctx, 0.40f);
     }
 
     // ============================================================
     //  汎用パッシブ — 反撃（Counter）
     // ============================================================
 
-    // 反撃 I-IV: 旧=ロール敗北時発火 / 新=被ダメ発生時発火 (収支トリガーではなく被弾で発火)。
-    // 新法 OnPreReceiveDamage は ProcessDamage 内で発火し、fixedDamageToEnemy に積むと
+    // 反撃 I-IV: 被ダメ発生時に発火 (収支トリガーではなく被弾で発火)。
+    // OnPreReceiveDamage は ProcessDamage 内で発火し、fixedDamageToEnemy に積むと
     // counterFixed として ExecuteTurnMutual が敵HPへ反射する。ctx.finalDamage > 0 の被ダメ発生時のみ発火
     // (完全防御・シールド吸収で被ダメ0の時は反撃なし)。
     internal static class CounterHelper
     {
         public static void Apply(PassiveSkillTrigger t, CombatContext ctx, int dmg)
         {
-            if (CombatSystem.CombatManager.UseMutualAttackPipeline)
-            {
-                if (t == PassiveSkillTrigger.OnPreReceiveDamage && ctx.finalDamage > 0)
-                    ctx.fixedDamageToEnemy += dmg;
-            }
-            else
-            {
-                if (t == PassiveSkillTrigger.OnRollLose)
-                    ctx.fixedDamageToEnemy += dmg;
-            }
+            if (t == PassiveSkillTrigger.OnPreReceiveDamage && ctx.finalDamage > 0)
+                ctx.fixedDamageToEnemy += dmg;
         }
     }
 
@@ -117,8 +102,7 @@ namespace ItemSystem.PassiveSkills.Effects
     //  汎用パッシブ — 筋力（Might）: 各ダイス出目+N
     // ============================================================
 
-    // 筋力I-IV: 旧=ダイス合計+N (ロール勝負を有利化) / 新=攻撃力+N (配線後の atkBase に加算)。
-    // AddPlayerAttackOrDiceBonus が UseMutualAttackPipeline で自動分岐する。
+    // 筋力I-IV: 攻撃力+N (配線後の atkBase に加算・AddPlayerAttackOrDiceBonus 経由)。
 
     /// <summary>筋力II — 攻撃+3 (旧: ダイス合計+3)</summary>
     public class MightII : IPassiveSkillEffect
@@ -323,36 +307,24 @@ namespace ItemSystem.PassiveSkills.Effects
         public string SkillId => "VoidStance";
         public PassiveSkillTrigger[] Triggers => new[]
         {
-            PassiveSkillTrigger.OnPreDealDamage,   // 新: 配線集計後・自攻撃前
-            PassiveSkillTrigger.OnPostRoll,        // 旧: ロール直後
+            PassiveSkillTrigger.OnPreDealDamage,   // 配線集計後・自攻撃前
         };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            if (CombatSystem.CombatManager.UseMutualAttackPipeline)
-            {
-                if (trigger != PassiveSkillTrigger.OnPreDealDamage) return;
-                int atkDice = (int)ctx.GetAccumulated("mutualAttackDiceCount");
-                if (atkDice != 0) return;
+            if (trigger != PassiveSkillTrigger.OnPreDealDamage) return;
+            int atkDice = (int)ctx.GetAccumulated("mutualAttackDiceCount");
+            if (atkDice != 0) return;
 
-                int n = System.Math.Min(StackCap, ctx.voidStanceStacks);
-                // 殻: 積むほど薄くなる。 **0 にはできない**ので完全無敵は成立しない。
-                ctx.voidStanceDamageMul = System.Math.Max(0f, 90 - ReducePerStack * n) / 100f;
-                // 刻み: 積むほど増えるが **現在 HP 基準**なので漸近するだけ。 単独では倒し切れない。
-                int chip = ctx.CurrentHpRatioDamageToEnemy((ChipBase + ChipPerStack * n) / 100f);
-                ctx.fixedDamageToEnemy += chip;
-                if (ctx.voidStanceStacks < StackCap) ctx.voidStanceStacks++;
-                UnityEngine.Debug.Log($"[虚空] 攻撃端子0 → 殻{n}枚目: 被ダメ×{ctx.voidStanceDamageMul:F2} "
-                                    + $"/ 現在HP{ChipBase + ChipPerStack * n}% = {chip} 軽減不能 "
-                                    + $"(次スタック {ctx.voidStanceStacks})");
-                return;
-            }
-            // 旧: OnPostRoll 中は diceDifference 未確定 → 合計から自前で差を取る
-            if (trigger != PassiveSkillTrigger.OnPostRoll) return;
-            if (System.Math.Abs(ctx.playerDiceTotal - ctx.enemyDiceTotal) <= 3)
-            {
-                ctx.nullifyAllDamage = true;
-                ctx.fixedDamageToEnemy += 3;
-            }
+            int n = System.Math.Min(StackCap, ctx.voidStanceStacks);
+            // 殻: 積むほど薄くなる。 **0 にはできない**ので完全無敵は成立しない。
+            ctx.voidStanceDamageMul = System.Math.Max(0f, 90 - ReducePerStack * n) / 100f;
+            // 刻み: 積むほど増えるが **現在 HP 基準**なので漸近するだけ。 単独では倒し切れない。
+            int chip = ctx.CurrentHpRatioDamageToEnemy((ChipBase + ChipPerStack * n) / 100f);
+            ctx.fixedDamageToEnemy += chip;
+            if (ctx.voidStanceStacks < StackCap) ctx.voidStanceStacks++;
+            UnityEngine.Debug.Log($"[虚空] 攻撃端子0 → 殻{n}枚目: 被ダメ×{ctx.voidStanceDamageMul:F2} "
+                                + $"/ 現在HP{ChipBase + ChipPerStack * n}% = {chip} 軽減不能 "
+                                + $"(次スタック {ctx.voidStanceStacks})");
         }
     }
 
@@ -1007,23 +979,14 @@ namespace ItemSystem.PassiveSkills.Effects
 
             if (hit > 0)
             {
-                if (CombatSystem.CombatManager.UseMutualAttackPipeline)
-                {
-                    // 新: 攻撃+(出目+10) + 会心確定 (即勝利は消失。バースト火力のみ保持)
-                    //   **ヘルパーを通す (2026-09-14 修正)。** 直接 mutualAttackBonus を叩いていたため
-                    //   SkillId 別の計装 (CombatContext.AttackBonusBySkill) から漏れており、
-                    //   atkBase の「パッシブ加算」36.9 の内訳を読み違えた。
-                    //   加算先は同じなので挙動は変わらない。
-                    ctx.AddPlayerAttackOrDiceBonus(hit + 10);
-                    ctx.forceCritical = true;
-                    UnityEngine.Debug.Log($"[画竜点睛] 出目{hit}=最大 → 攻撃+{hit + 10} + 会心確定");
-                }
-                else
-                {
-                    ctx.garyoProc = true;
-                    ctx.garyoDieValue = hit;
-                    UnityEngine.Debug.Log($"[画竜点睛] 発動 出目{hit}=最大 → 即勝利＋({hit}+10)会心");
-                }
+                // 攻撃+(出目+10) + 会心確定 (即勝利は消失。バースト火力のみ保持)
+                //   **ヘルパーを通す (2026-09-14 修正)。** 直接 mutualAttackBonus を叩いていたため
+                //   SkillId 別の計装 (CombatContext.AttackBonusBySkill) から漏れており、
+                //   atkBase の「パッシブ加算」36.9 の内訳を読み違えた。
+                //   加算先は同じなので挙動は変わらない。
+                ctx.AddPlayerAttackOrDiceBonus(hit + 10);
+                ctx.forceCritical = true;
+                UnityEngine.Debug.Log($"[画竜点睛] 出目{hit}=最大 → 攻撃+{hit + 10} + 会心確定");
             }
         }
     }
@@ -1078,8 +1041,6 @@ namespace ItemSystem.PassiveSkills.Effects
                 // 旧: 自他ダイス合計+5 (差分不変で「合計」参照系と相乗) / 新: 自攻撃+5 のみ
                 // (敵ダイス合計+5 は新モデルではロール勝負がないため機能喪失 = 廃止)
                 ctx.AddPlayerAttackOrDiceBonus(5);
-                if (!CombatSystem.CombatManager.UseMutualAttackPipeline)
-                    ctx.enemyDiceTotal += 5;
                 if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
                 ctx.outgoingDamageMultiplier += 0.2f; // 与ダメ+20%（毎ターンリセット→再適用）
                 return;
@@ -1408,7 +1369,6 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (!CombatSystem.CombatManager.UseMutualAttackPipeline) return;
             ctx.AddCharge(3);
         }
     }
@@ -1420,7 +1380,6 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (!CombatSystem.CombatManager.UseMutualAttackPipeline) return;
             if (ctx.finalDamage > 0) ctx.AddCharge(1);
         }
     }
@@ -1432,7 +1391,6 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (!CombatSystem.CombatManager.UseMutualAttackPipeline) return;
             if (ctx.finalDamage > 0) ctx.AddCharge(1);
         }
     }
@@ -1444,7 +1402,6 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (!CombatSystem.CombatManager.UseMutualAttackPipeline) return;
             if (GameLoop.GameRng.Value("passive.chargeProc") < 0.25f) ctx.AddCharge(1);
         }
     }
@@ -1456,7 +1413,6 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (!CombatSystem.CombatManager.UseMutualAttackPipeline) return;
             if (ctx.finalDamage <= 0) return;
             if (ctx.ConsumeCharge(1)) ctx.finalDamage += 5;
         }
@@ -1469,7 +1425,6 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (!CombatSystem.CombatManager.UseMutualAttackPipeline) return;
             if (ctx.finalDamage <= 0) return;
             if (!ctx.ConsumeCharge(3)) return;
             if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
@@ -1523,7 +1478,6 @@ namespace ItemSystem.PassiveSkills.Effects
         };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (!CombatSystem.CombatManager.UseMutualAttackPipeline) return;
             if (ctx.GetAccumulated(UsedKey) > 0) return;
             if (ctx.GetCharge() > 0) return;
             ctx.AddCharge(CombatSystem.CombatManager.ChargeMax); // 全回復 (=最大)

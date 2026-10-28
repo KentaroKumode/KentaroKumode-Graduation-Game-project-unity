@@ -212,17 +212,6 @@ namespace GameLoop
                 ? w.weaponDice.maxValue : DefWeaponDiceMax;
         }
 
-        /// <summary>学習済み準パワーを攻撃力スケールへ換算する係数。
-        ///
-        /// <para><b>大きく取る。</b> 素の attackPower(1〜8) / 会心率(5〜40%) は合計 13 点ぶんの
-        /// 幅があるのに対し、 武器間の準パワー差は 1.3 程度しかない。 係数が小さいと
-        /// <b>生のステータスが学習値を 5:1 で押し潰す</b> ── そして生の数値は
-        /// <b>防御とパッシブの価値を一切表現できない</b> (盾は攻撃1〜4/会心1〜2 で必ず負ける)。
-        /// 学習値は実測された寄与そのものなので、 代理指標に劣後させる理由がない。</para>
-        ///
-        /// <para>0 にすると旧来の「ステータスだけ」に戻る。 <b>暫定値・要測定</b>。</para></summary>
-        private const float LearnedWeaponWeight = 6.0f;
-
         /// <summary><b>家系の乗り換えを禁じる</b> (既定 OFF)。 計測用。
         ///
         /// <para>職業は 4 種均等配分なので、 これを立てると各家系が約 25% のランで最後まで
@@ -244,27 +233,8 @@ namespace GameLoop
             float perDie = System.Math.Max(BaseFaceMean, EquippedDiceMean(run));
             // 会心は 5% = 1 点で評価する (旧「分子」1 点と同じ桁)。
             float statEv = w.weaponDice.count * perDie + w.attackPower + w.critRatePct / 5f;
-            return statEv + LearnedWeaponBonus(w.id);
-        }
-
-        /// <summary>家系パッシブの価値。 素のステータスには現れないので学習値から引く。
-        ///
-        /// <para><b>家系の終端 (T4) の学習値で代表させる。</b> T1 の盾を拾うことは
-        /// 「盾の家系に乗る」ことであり、 判断すべきはチェーン全体の価値だから ──
-        /// 上の段ルール (同家系なら上位段へ自動で乗る) と同じ理屈である。
-        /// T1〜T3 は <c>ExcludedFromLift</c> で学習値を持たない (チェーン下流の効果が
-        /// lift に流れ込むため) ので、 終端を見ないと<b>家系パッシブが評価に一切入らない</b>。</para>
-        ///
-        /// <para>**未学習なら 0** ── 学習ゼロのバッチでは素の EV だけで比較する
-        /// (<c>PowerScore</c> は未学習に <c>Unlearned</c> を返すので、 そのまま足すと
-        /// 全武器に同じ下駄を履かせることになり比較の役に立たない)。</para></summary>
-        private static float LearnedWeaponBonus(string id)
-        {
-            if (string.IsNullOrEmpty(id)) return 0f;
-            string fam = WeaponFamily(id);
-            string key = fam != null ? fam + "_t4" : id;   // 家系の終端で代表
-            if (!AutoTest.LearnedPriorityProvider.HasLearned(key)) return 0f;
-            return AutoTest.LearnedPriorityProvider.PowerScore(key) * LearnedWeaponWeight;
+            // 家系パッシブの価値は素のステータスに現れない。 BOT は学習値をここへ足す (GameHooks.WeaponEvBonus)。
+            return statEv + (GameHooks.WeaponEvBonus?.Invoke(w.id) ?? 0f);
         }
 
         private static float CurrentWeaponEV(RunState run)

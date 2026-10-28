@@ -73,7 +73,7 @@ public static class ClassSelectAutoSetup
         if (lcd == null || lcd.contentCamera == null)
         {
             EditorUtility.DisplayDialog("ClassSelect Setup",
-                "LcdScreen (contentCamera 付き) が見つかりません。\nタイトルシーン (SampleScene) を開いてから実行してください。", "OK");
+                "LcdScreen (contentCamera 付き) が見つかりません。\nタイトルシーン (Game2D) を開いてから実行してください。", "OK");
             return;
         }
 

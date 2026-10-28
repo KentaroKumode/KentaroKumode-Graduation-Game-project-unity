@@ -23,7 +23,6 @@ namespace AutoTest.Ultra
             runner.forceNoRelic = !profile.theoreticalBestCursedRelic;
 
             // ---- mechanical rules: from the request, never from defaults ----
-            runner.useMutualAttackPipeline = profile.useMutualAttackPipeline;
             runner.suppressFacePartOffers = profile.suppressFacePartOffers;
             runner.shieldAbsorbsUnmitigable = profile.shieldAbsorbsUnmitigable;
             runner.enableAllDebuffs = profile.enableAllDebuffs;
