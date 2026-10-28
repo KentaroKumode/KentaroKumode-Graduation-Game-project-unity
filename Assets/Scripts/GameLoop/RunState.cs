@@ -84,10 +84,17 @@ namespace GameLoop
     public class RunState
     {
         // === 進行 ===
+        /// <summary>層の番号 (1〜5・<b>プレイヤーに見せる番号</b>)。 2026-10-20 に 1/3/5/6/7/8 から詰めた。
+        /// 旧 7 層 (〈門〉) と 8 層 (ヴェスカ戦) は 5 層に統合した (直線の 1 本道・終点がヴェスカ)。
+        /// <b>敵・報酬・層デバフ・学習など深さ基準のデータは <see cref="Depth"/> で引く</b>
+        /// (中身は旧い層番号 1/3/5/6/7/8 のまま ── 詰めるとデータが全部ずれる)。</summary>
         public int currentFloor = 1;
+        /// <summary>深さ (旧い層番号 1/3/5/6/7/8)。 敵プール・ボス ID・層デバフ・報酬・層タイトル・学習ファイルなど、
+        /// 深さで書かれたものはこちらで引く。 正本は <see cref="MapSystem.FreeMove.FloorPlan.DepthOf"/>。</summary>
+        public int Depth => MapSystem.FreeMove.FloorPlan.DepthOf(currentFloor);
         /// <summary>最深層。 <b>2026-09-14: 7 → 8。</b> 7 層の終端が〈門〉になり、
         /// ヴェスカは門の転移先 = 8 層 (Null Point) へ移った。</summary>
-        public int maxFloor = 8;
+        public int maxFloor = 7;
         public int normalClearFloor = 5;
         public bool bossDefeatedThisFloor;
 
@@ -97,7 +104,7 @@ namespace GameLoop
 
         // === 値下げ交渉(=強盗) ===
         /// <summary>強盗を既に実行したか。 <b>1 ラン 1 回まで</b>の門番と、
-        /// 以降のショップ価格割増 (<see cref="InventorySystem.Shop.ShopManager.RobberySurcharge"/>) の条件を兼ねる。
+        /// 以降のショップ価格割増 (<see cref="ItemSystem.Shop.ShopManager.RobberySurcharge"/>) の条件を兼ねる。
         ///
         /// <para><b>旧 shopsBlocked からの改称 (2026-09-12)。</b> 以前は「以降のショップマスを全て素通り」
         /// という出禁だったが、 <b>強盗報酬の 90〜180G と罰が同じ資源を指して打ち消し合っていた</b>
@@ -229,44 +236,6 @@ namespace GameLoop
         /// 商人の符牒は別途 ShopManager.TrySell 内で売却を全面阻止する。</summary>
         public Dictionary<string, int> shopPurchasedCounts = new Dictionary<string, int>();
 
-        // 2026-06-22d: Λ 保護バイアス撤廃に伴い lambdaProtectedItemIds は write-only と化したため
-        // 2026-06-23c に削除。 取得カウンタのみ計測用途で残存。
-        // 2026-09-11: 対になっていた lambdaItemsDiscardedDuringLambda (容量圧迫ロス) も削除 ──
-        //   容量撤廃後は discard が発生しないので恒久的に 0 だった。
-
-        /// <summary>Λ 層滞在中に追加されたアイテムの総数 (取得数)。</summary>
-        public int lambdaItemsAcquiredGross;
-
-        /// <summary>**計装 (2026-08-08)**: Λ で最後に戦利品を引いた時点の、 抽選候補の残数。
-        /// 「潜るほど取得が減るのは候補が枯れるからか」を入力側で確かめるために記録する。
-        /// <see cref="lambdaPoolRemainingAll"/> = 重複排除・除外フィルタ後の全候補数、
-        /// <see cref="lambdaPoolRemainingFloored"/> = そこへ深度連動のレア度下限を掛けた数。
-        /// 枯渇が原因なら踏破が伸びるほど 0 に近づくはず。 減らないなら原因は別 (取得機会側)。</summary>
-        public int lambdaPoolRemainingAll = -1;
-        public int lambdaPoolRemainingFloored = -1;
-
-        /// <summary>**計装 (2026-08-08)**: Λ 環状線マスの解決内訳。
-        /// 踏破を 2 倍にしても取得アイテムが 7.9 個で動かず、 枠・プール枯渇は共に否定された
-        /// (候補は 126 種残存)。 残る仮説は「抽選の機会自体が増えていない」なので、
-        /// **マスを踏んでから報酬に至るまでの各段を数える**。
-        ///   Rings   : 環状線マスを踏んだ回数 (= dimensionalDisturbance と一致するはず)
-        ///   Elite   : エリート戦へ振れた回数
-        ///   Event   : 固有イベントへ振れた回数
-        ///   EventHeal : うち HP 低下で回復へ化けた回数 (アイテム抽選に到達しない)
-        ///   EventItem : うち実際にアイテム抽選へ到達した回数
-        /// Rings ≫ Elite+Event なら踏破がマス起動に繋がっていない。
-        /// Event ≫ EventItem なら回復への化けが原因。</summary>
-        /// <summary>遺物軸〈Λ共鳴〉のカウンタ: Λ層で**終えた戦闘**の回数。
-        /// 会心倍率の加算量 = この回数 × 段の値%。 ラン中ずっと持続する。
-        /// Λ を出た後も効き続けるので、 6〜7 層で回収する設計。</summary>
-        public int lambdaCombatsFinished;
-
-        public int lambdaRingsEntered;
-        public int lambdaRingElite;
-        public int lambdaRingEvent;
-        public int lambdaRingEventHeal;
-        public int lambdaRingEventItem;
-
         /// <summary>時限バフ: ID → 残り適用回数（次戦闘で1減算する想定）。</summary>
         public Dictionary<string, int> timedBuffs = new Dictionary<string, int>();
 
@@ -318,20 +287,6 @@ namespace GameLoop
         /// boss_layer5=審判官 / boss_layer5_hidden=剣聖 / boss_layer6=灰燼の王 / boss_layer7=ヴェスカ。</summary>
         public string lastBossId = "";
 
-        // === Λ層（時間の狭間） ===
-
-        /// <summary>Λ層（時間の狭間）に滞在中か。5層ボス撃破後、〈決意〉以上所持で強制突入し、
-        /// 中央マス踏破で 6F 前哨基地へ着地する。滞在中は currentFloor は 5 のまま。</summary>
-        public bool inLambda;
-
-        /// <summary>Λ層で踏んだマスの累積数（=次元の乱れスタック）。
-        /// 3 毎に <see cref="lambdaDebuffs"/> へランダムデバフを付与/段階上昇させる。</summary>
-        public int dimensionalDisturbance;
-
-        /// <summary>Λ層由来の恒久デバフ: ID → 段階(1〜3)。ラン中ずっと戦闘へ影響する。
-        /// 同IDを再付与すると段階+1（最大3）。</summary>
-        public Dictionary<string, int> lambdaDebuffs = new Dictionary<string, int>();
-
         // === 大穴の異常現象 (層モディファイア) ===
 
         /// <summary>現在層で発動中の異常現象 (層突入時に抽選、 AdvanceFloor でクリア)。
@@ -350,10 +305,6 @@ namespace GameLoop
 
         public bool HasPhenomenon(MapSystem.AbyssPhenomena.AbyssPhenomenon p)
             => activePhenomena != null && activePhenomena.Contains(p);
-
-        /// <summary>指定 Λ デバフの段階(0=未所持,1〜3)。</summary>
-        public int GetLambdaDebuffLevel(string id)
-            => lambdaDebuffs != null && lambdaDebuffs.TryGetValue(id, out int lv) ? lv : 0;
 
         /// <summary>確信の強さ。災厄の予兆で1になり、以降エリート戦勝利毎に+1。
         /// 層ゲートは layer6Unlocked / layer7Unlocked へ分離されている。</summary>
@@ -598,15 +549,6 @@ namespace GameLoop
             ownedPassiveItems = new List<string>();
             ownedConsumables = new List<string>();
             shopPurchasedCounts = new Dictionary<string, int>();
-            lambdaItemsAcquiredGross = 0;
-            lambdaPoolRemainingAll = -1;
-            lambdaPoolRemainingFloored = -1;
-            lambdaCombatsFinished = 0;
-            lambdaRingsEntered = 0;
-            lambdaRingElite = 0;
-            lambdaRingEvent = 0;
-            lambdaRingEventHeal = 0;
-            lambdaRingEventItem = 0;
             timedBuffs = new Dictionary<string, int>();
             timedDebuffs = new Dictionary<string, int>();
             permanentDebuffs = new HashSet<string>();
@@ -619,9 +561,6 @@ namespace GameLoop
             defeatedSaintGeorges = false;
             lostAtLayer7 = false;
             lastBossId = "";
-            inLambda = false;
-            dimensionalDisturbance = 0;
-            lambdaDebuffs = new Dictionary<string, int>();
             activePhenomena = new List<MapSystem.AbyssPhenomena.AbyssPhenomenon>();
             reverseFallsUsed = false;
             eclipsedNightTriggered = false;
@@ -685,12 +624,11 @@ namespace GameLoop
                 totalWins++;
         }
 
-        /// <summary>フロアを進める。 **2 層と 4 層は削除済み**で 1 → 3 → 5 → 6 → 7 → 8 と飛ぶ
-        /// (2026-09-28・正本は <see cref="MapSystem.FreeMove.FloorPlan"/>)。 内部の層番号は深さのまま。</summary>
+        /// <summary>フロアを進める。 層は 1 → 2 → 3 → 4 → 5 (2026-10-20・正本は <see cref="MapSystem.FreeMove.FloorPlan"/>)。 5 層が最終。</summary>
         public bool AdvanceFloor()
         {
-            if (currentFloor >= maxFloor) return false;
-            currentFloor = MapSystem.FreeMove.FloorPlan.Next(currentFloor);
+            if (Depth >= maxFloor) return false;
+            currentFloor++;
             bossDefeatedThisFloor = false;
             outpostUpgradeUsedThisFloor = false; // 層が変わるたびに前哨基地強化を再解禁
             return true;
@@ -701,10 +639,10 @@ namespace GameLoop
         public bool outpostUpgradeUsedThisFloor;
 
         /// <summary>通常クリア（5層ボス撃破）</summary>
-        public bool IsNormalClear => currentFloor >= normalClearFloor && bossDefeatedThisFloor && playerHP > 0;
+        public bool IsNormalClear => Depth >= normalClearFloor && bossDefeatedThisFloor && playerHP > 0;
 
         /// <summary>完全クリア（8層 Null Point でヴェスカ撃破）</summary>
-        public bool IsFullClear => currentFloor >= maxFloor && bossDefeatedThisFloor && playerHP > 0;
+        public bool IsFullClear => Depth >= maxFloor && bossDefeatedThisFloor && playerHP > 0;
 
         /// <summary>ランが終了したか</summary>
         public bool IsRunOver => !isRunActive || playerHP <= 0;
@@ -719,7 +657,7 @@ namespace GameLoop
         {
             if (!isRunActive) return;   // 二重終了で遺物が 2 個出るのを防ぐ
             isRunActive = false;
-            MetaProgression.MetaBuffApplicator.GrantRelicOnRunEnd(currentFloor, bossDefeatedThisFloor);
+            MetaProgression.MetaBuffApplicator.GrantRelicOnRunEnd(Depth, bossDefeatedThisFloor);
         }
     }
 }

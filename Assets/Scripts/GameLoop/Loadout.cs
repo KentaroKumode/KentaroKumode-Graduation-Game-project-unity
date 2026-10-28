@@ -1,4 +1,4 @@
-using InventorySystem;
+using ItemSystem;
 
 namespace GameLoop
 {
@@ -180,7 +180,7 @@ namespace GameLoop
         private static int WeaponStage(string weaponId, int plus)
         {
             if (string.IsNullOrEmpty(weaponId)) return -1;
-            var d = InventorySystem.ItemDatabase.Instance?.GetItem(weaponId);
+            var d = ItemSystem.ItemDatabase.Instance?.GetItem(weaponId);
             if (d == null || d.tier <= 0) return -1;
             return (d.tier - 1) * 2 + (plus > 0 ? 1 : 0);
         }
@@ -284,7 +284,7 @@ namespace GameLoop
         private static string WeaponFamily(string weaponId)
         {
             if (string.IsNullOrEmpty(weaponId)) return null;
-            var d = InventorySystem.ItemDatabase.Instance?.GetItem(weaponId);
+            var d = ItemSystem.ItemDatabase.Instance?.GetItem(weaponId);
             return string.IsNullOrEmpty(d?.family) ? null : d.family;
         }
 

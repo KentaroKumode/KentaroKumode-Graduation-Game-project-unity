@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using InventorySystem.PassiveSkills;
+using ItemSystem.PassiveSkills;
 
 namespace CombatSystem
 {
@@ -56,7 +56,7 @@ namespace CombatSystem
         {
             o = c.outgoingDamageMultiplier <= 0f ? 1f : c.outgoingDamageMultiplier,
             cm = c.criticalMultiplier, nc = c.nonCritOutgoingMultiplier,
-            cr = c.critRatePctAdd, pen = c.armorPenPct, fc = c.forceCritical,
+            cr = c.critRatePctAdd, pen = c.playerArmorPen, fc = c.forceCritical,
         };
 
         /// <summary>前後の差分を出どころへ積む。 変化が無ければ何もしない。</summary>

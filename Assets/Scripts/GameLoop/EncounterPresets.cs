@@ -72,11 +72,7 @@ namespace GameLoop
     /// <c>accumulatedValues</c> の <c>sg_</c>・<c>ashen_</c>・<c>berserk_</c> 等) なので、
     /// 同名を 2 回登録すると同じキーへ二重に積んで<b>静かに 2 倍の効果になる</b>。
     /// <b>だからペアは効果の重ならない 2 体で組む</b> ── 同じパッシブを持つ 2 体を並べても、
-    /// 濃くならず「片方が数値だけの同伴者」になるだけで、 組み合わせの意味が消える。</para>
-    ///
-    /// <para><b>Λ 環状線は 2 体戦から除外する</b> (<c>FloorManager.EnsureEncounter</c>)。
-    /// Λ は 6 層への強制通過点で「このノードを避ける」選択肢が無く、
-    /// 選べない場所に置いた賭けは賭けではなく固定の税になるため。</para></summary>
+    /// 濃くならず「片方が数値だけの同伴者」になるだけで、 組み合わせの意味が消える。</para></summary>
     public static class EncounterPresets
     {
         /// <summary>従来動作 (その層の通常抽選・単体・タイトルなし)。</summary>

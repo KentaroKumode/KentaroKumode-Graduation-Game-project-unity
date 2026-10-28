@@ -303,7 +303,7 @@
         {
           "internalName": "HardScales",
           "skillName": "硬鱗",
-          "description": "受けるダメージを-2（最低0）",
+          "description": "防御+4",
           "flavorText": "「またこの深さで止まってる。刃のせいじゃないですよ、これ」"
         },
         {
@@ -330,7 +330,7 @@
         {
           "internalName": "HardScales",
           "skillName": "硬鱗",
-          "description": "受けるダメージを-2（最低0）",
+          "description": "防御+4",
           "flavorText": "「またこの深さで止まってる。刃のせいじゃないですよ、これ」"
         },
         {
@@ -342,7 +342,7 @@
         {
           "internalName": "EliteLizard",
           "skillName": "重甲",
-          "description": "被弾時さらに-2軽減（硬鱗と累積）、敗北時に固定1反射"
+          "description": "防御さらに+4（硬鱗と合わせて8）、敗北時に固定1反射"
         }
       ],
       "baseAttack": 15,
@@ -489,7 +489,7 @@
         {
           "internalName": "HardScales",
           "skillName": "硬鱗",
-          "description": "受けるダメージを-2（最低0）",
+          "description": "防御+4",
           "flavorText": "「またこの深さで止まってる。刃のせいじゃないですよ、これ」"
         },
         {
@@ -522,7 +522,7 @@
         {
           "internalName": "HardScales",
           "skillName": "硬鱗",
-          "description": "受けるダメージを-2（最低0）",
+          "description": "防御+4",
           "flavorText": "「またこの深さで止まってる。刃のせいじゃないですよ、これ」"
         },
         {
@@ -680,7 +680,7 @@
         {
           "internalName": "EliteVigor",
           "skillName": "精鋭",
-          "description": "被ダメ-10%／3ターンごとに攻撃+1（累積）"
+          "description": "防御+2／3ターンごとに攻撃+1（累積）"
         }
       ],
       "baseAttack": 14,
@@ -738,7 +738,7 @@
         {
           "internalName": "EliteVigor",
           "skillName": "精鋭",
-          "description": "被ダメ-10%／3ターンごとに攻撃+1（累積）"
+          "description": "防御+2／3ターンごとに攻撃+1（累積）"
         }
       ],
       "baseAttack": 10,
@@ -808,7 +808,7 @@
         {
           "internalName": "EliteVigor",
           "skillName": "精鋭",
-          "description": "被ダメ-10%／3ターンごとに攻撃+1（累積）"
+          "description": "防御+2／3ターンごとに攻撃+1（累積）"
         }
       ],
       "baseAttack": 31,
@@ -878,7 +878,7 @@
         {
           "internalName": "EliteVigor",
           "skillName": "精鋭",
-          "description": "被ダメ-10%／3ターンごとに攻撃+1（累積）"
+          "description": "防御+2／3ターンごとに攻撃+1（累積）"
         }
       ],
       "baseAttack": 33,
@@ -1036,7 +1036,7 @@
     },
     {
       "id": "boss_layer5",
-      "baseDefenseRate": 0.15,
+      "defense": 3,
       "displayName": "業火の審判官",
       "description": "罪人を裁く炎の審判官。罪深きほどその業火は強く燃え盛る。",
       "floor": 5,
@@ -1067,7 +1067,7 @@
     },
     {
       "id": "boss_layer5_hidden",
-      "baseDefenseRate": 0.15,
+      "defense": 3,
       "displayName": "シュヴァリエ・サン=ジョリオラ",
       "description": "失われた決闘術の継承者。構えと切り返しを交互に繰り出す剣聖。挑む資格を持つ者だけが見える幻。",
       "floor": 5,
@@ -1098,7 +1098,7 @@
     },
     {
       "id": "boss_layer6",
-      "baseDefenseRate": 0.15,
+      "defense": 3,
       "displayName": "灰燼の王",
       "description": "灰と燃え残りで形を成す古き王。半身を焼かれてなお燃え上がり、削れば削るほど残り火が荒れ狂う。",
       "floor": 6,
@@ -1151,7 +1151,7 @@
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 10,
-      "baseDefenseRate": 0.35,
+      "defense": 14,
       "passiveSkills": [
         {
           "internalName": "ContinuousExperiment",
@@ -1200,7 +1200,7 @@
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 10,
-      "baseDefenseRate": 0.35,
+      "defense": 14,
       "passiveSkills": [
         {
           "internalName": "ContinuousExperiment",
@@ -1249,7 +1249,7 @@
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 12,
-      "baseDefenseRate": 0.35,
+      "defense": 14,
       "passiveSkills": [
         {
           "internalName": "ContinuousExperiment",
@@ -1298,7 +1298,7 @@
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 12,
-      "baseDefenseRate": 0.35,
+      "defense": 14,
       "passiveSkills": [
         {
           "internalName": "RecurrentTruth",

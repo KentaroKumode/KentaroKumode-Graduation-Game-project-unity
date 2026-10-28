@@ -74,7 +74,7 @@ namespace GameLoop
             if (run == null) return false;
 
             // 1. ちいさな灯火（一度きり全回復）
-            if (!isBossFight && InventorySystem.PassiveItems.TorchRevival.TryConsume(run))
+            if (!isBossFight && ItemSystem.PassiveItems.TorchRevival.TryConsume(run))
             {
                 RevivalCount[0]++;
                 RevivalHpRestored += run.playerHP;
@@ -88,7 +88,7 @@ namespace GameLoop
                 && run.ownedPassiveItems.Contains(SwordDanceSet.FleuretBallet))
             {
                 int idx = run.ownedPassiveItems.IndexOf(SwordDanceSet.FleuretBallet);
-                InventorySystem.Helpers.PassiveAddHelper.RemoveAt(run, idx);
+                ItemSystem.Helpers.PassiveAddHelper.RemoveAt(run, idx);
                 run.playerMaxHP = 1;
                 run.playerHP = 1;
                 RevivalCount[2]++;
@@ -119,7 +119,7 @@ namespace GameLoop
             // 灯火が先。 ボス戦では灯火が発動しないので、 そのときは譲らない。
             if (!isBossFight && run.ownedPassiveItems != null
                 && run.ownedPassiveItems.Contains(
-                    InventorySystem.PassiveItems.TorchRevival.TorchId))
+                    ItemSystem.PassiveItems.TorchRevival.TorchId))
                 return false;
 
             run.lastStandActive = true;

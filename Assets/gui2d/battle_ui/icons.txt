@@ -1,0 +1,1 @@
+bleed,poison,slow,fog,still,sand,snow,hail,crumble,sink,swordsman,knight,berserker,assassin,flare,decoy,supply,relic,anvil,gate,coin,heart,bolt,shield,close,check

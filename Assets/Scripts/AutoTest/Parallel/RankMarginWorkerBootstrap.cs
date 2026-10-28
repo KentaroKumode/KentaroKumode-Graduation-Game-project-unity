@@ -127,16 +127,16 @@ namespace AutoTest.ParallelSweep
                 GameLoop.GameManager.PlunderDrops = 0;
                 GameLoop.GameManager.ValorEliteDrops = 0;
                 GameLoop.GameManager.ValorEliteFights = 0;
-                InventorySystem.Shop.ShopManager.RobberyAttempts = 0;
-                Array.Clear(InventorySystem.Shop.ShopManager.RobberyByFloor, 0,
-                    InventorySystem.Shop.ShopManager.RobberyByFloor.Length);
+                ItemSystem.Shop.ShopManager.RobberyAttempts = 0;
+                Array.Clear(ItemSystem.Shop.ShopManager.RobberyByFloor, 0,
+                    ItemSystem.Shop.ShopManager.RobberyByFloor.Length);
                 GameLoop.GameManager.RobberyWins = 0;
                 GameLoop.GameManager.RobberyLosses = 0;
                 GameLoop.GameManager.RobberyLootTotal = 0;
                 GameLoop.GameManager.RobberyLootApplied = 0;
                 GameLoop.GameManager.ResetBossEntryStats();
                 GameLoop.GameManager.ResetGateStats();
-                InventorySystem.PassiveSkills.CombatContext.ResetAttackBonusStats();
+                ItemSystem.PassiveSkills.CombatContext.ResetAttackBonusStats();
                 GameLoop.SwordDanceSet.ResetStats();
                 GameLoop.CombatRewards.ResetStats();
                 AutoTest.AutoRunner.ResetGoldPressureStats();
@@ -147,13 +147,13 @@ namespace AutoTest.ParallelSweep
                 AutoTest.AutoRunner.ResetRerollRuleStats();
                 AutoTest.AutoRunner.ResetShopExitStats();
                 GameLoop.GameManager.ResetRerollOutcome();
-                InventorySystem.Shop.ShopManager.ResetRerollFailStats();
+                ItemSystem.Shop.ShopManager.ResetRerollFailStats();
                 GameLoop.GoldIncome.ResetStats();
                 GameLoop.RunState.ResetConsumableStats();
-                InventorySystem.Helpers.PassiveSourceAudit.Reset();
-                InventorySystem.Shop.ShopManager.ResetSlotStats();
-                InventorySystem.Shop.ShopManager.ResetSaleStats();
-                InventorySystem.Helpers.PassiveAddHelper.ResetAcquiredStats();
+                ItemSystem.Helpers.PassiveSourceAudit.Reset();
+                ItemSystem.Shop.ShopManager.ResetSlotStats();
+                ItemSystem.Shop.ShopManager.ResetSaleStats();
+                ItemSystem.Helpers.PassiveAddHelper.ResetAcquiredStats();
                 GameLoop.Consumables.ResetVescaPhaseStats();
                 CombatSystem.BossDmgDiag.ResetPhaseEntry();
 
@@ -256,7 +256,6 @@ namespace AutoTest.ParallelSweep
                         clears = tally.clears,
                         stageSum = tally.stageSum,
                         bandScores = tally.bandScores.ToArray(),
-                        lambdaRunDeaths = tally.lambdaRunDeaths,
                         digests = tally.digests.ToArray(),
                         completedNormally = true,
                         failureCode = "",
@@ -284,11 +283,11 @@ namespace AutoTest.ParallelSweep
                         valorEliteDrops = GameLoop.GameManager.ValorEliteDrops,
                         valorEliteFights = GameLoop.GameManager.ValorEliteFights,
                         plunderDrops = GameLoop.GameManager.PlunderDrops,
-                        robberyAttempts = InventorySystem.Shop.ShopManager.RobberyAttempts,
+                        robberyAttempts = ItemSystem.Shop.ShopManager.RobberyAttempts,
                         robberyWins = GameLoop.GameManager.RobberyWins,
                         robberyLosses = GameLoop.GameManager.RobberyLosses,
                         robberyLootTotal = GameLoop.GameManager.RobberyLootTotal,
-                        robberyByFloor = (long[])InventorySystem.Shop.ShopManager.RobberyByFloor.Clone(),
+                        robberyByFloor = (long[])ItemSystem.Shop.ShopManager.RobberyByFloor.Clone(),
                         bossEntryCount = (long[])GameLoop.GameManager.BossEntryCount.Clone(),
                         bossEntryProvision = (long[])GameLoop.GameManager.BossEntryProvision.Clone(),
                         bossEntryProvisionTier = (long[])GameLoop.GameManager.BossEntryProvisionTierSum.Clone(),
@@ -309,40 +308,40 @@ namespace AutoTest.ParallelSweep
                         damageBreakdown = (double[])CombatSystem.CombatManager.DamageBreakdown.Clone(),
                         damageBreakdown7F = (double[])CombatSystem.CombatManager.DamageBreakdown7F.Clone(),
                         attackBonus7FSkills = System.Linq.Enumerable.ToArray(
-                            InventorySystem.PassiveSkills.CombatContext.AttackBonusBySkill7F.Keys),
+                            ItemSystem.PassiveSkills.CombatContext.AttackBonusBySkill7F.Keys),
                         attackBonus7FAmounts = System.Linq.Enumerable.ToArray(
-                            InventorySystem.PassiveSkills.CombatContext.AttackBonusBySkill7F.Values),
+                            ItemSystem.PassiveSkills.CombatContext.AttackBonusBySkill7F.Values),
                         attackBonus7FCalls = System.Linq.Enumerable.ToArray(
                             System.Linq.Enumerable.Select(
-                                InventorySystem.PassiveSkills.CombatContext.AttackBonusBySkill7F.Keys,
-                                k => InventorySystem.PassiveSkills.CombatContext.AttackBonusCalls7F[k])),
+                                ItemSystem.PassiveSkills.CombatContext.AttackBonusBySkill7F.Keys,
+                                k => ItemSystem.PassiveSkills.CombatContext.AttackBonusCalls7F[k])),
                         goldGained = GameLoop.GoldIncome.GainedTotal,
                         consumablesAcquired = GameLoop.RunState.ConsumablesAcquired,
                         combatTurnsTotal = 0,   // 総ターンは tally に無い。 今回の切り分けには不要
                         passiveSourceNames = System.Linq.Enumerable.ToArray(
-                            InventorySystem.Helpers.PassiveSourceAudit.Counts.Keys),
+                            ItemSystem.Helpers.PassiveSourceAudit.Counts.Keys),
                         passiveSourceCounts = System.Linq.Enumerable.ToArray(
                             System.Linq.Enumerable.Select(
-                                InventorySystem.Helpers.PassiveSourceAudit.Counts.Values, v => (long)v)),
+                                ItemSystem.Helpers.PassiveSourceAudit.Counts.Values, v => (long)v)),
                         swordDanceTransforms = GameLoop.SwordDanceSet.Transforms,
-                        passiveSlotsRolled = InventorySystem.Shop.ShopManager.PassiveSlotsRolled,
-                        passiveSlotsLegendary = InventorySystem.Shop.ShopManager.PassiveSlotsLegendary,
-                        danceSwaps = InventorySystem.Shop.ShopManager.DanceSwaps,
-                        danceOffered = InventorySystem.Shop.ShopManager.DanceOffered,
+                        passiveSlotsRolled = ItemSystem.Shop.ShopManager.PassiveSlotsRolled,
+                        passiveSlotsLegendary = ItemSystem.Shop.ShopManager.PassiveSlotsLegendary,
+                        danceSwaps = ItemSystem.Shop.ShopManager.DanceSwaps,
+                        danceOffered = ItemSystem.Shop.ShopManager.DanceOffered,
                         danceAcquired = GameLoop.SwordDanceSet.Acquired,
-                        offeredByRarity = (long[])InventorySystem.Shop.ShopManager.OfferedByRarity.Clone(),
-                        acquiredByRarity = (long[])InventorySystem.Helpers.PassiveAddHelper.AcquiredByRarity.Clone(),
+                        offeredByRarity = (long[])ItemSystem.Shop.ShopManager.OfferedByRarity.Clone(),
+                        acquiredByRarity = (long[])ItemSystem.Helpers.PassiveAddHelper.AcquiredByRarity.Clone(),
                         vescaPhaseConsumables = (long[])GameLoop.Consumables.VescaPhaseConsumables.Clone(),
                         vescaPhaseEntries = _phaseN, vescaPhaseHpSum = _phaseHp,
                         swordDanceByFloor = (long[])GameLoop.SwordDanceSet.TransformsByFloor.Clone(),
                         attackBonusSkills = System.Linq.Enumerable.ToArray(
-                            InventorySystem.PassiveSkills.CombatContext.AttackBonusBySkill.Keys),
+                            ItemSystem.PassiveSkills.CombatContext.AttackBonusBySkill.Keys),
                         attackBonusAmounts = System.Linq.Enumerable.ToArray(
-                            InventorySystem.PassiveSkills.CombatContext.AttackBonusBySkill.Values),
+                            ItemSystem.PassiveSkills.CombatContext.AttackBonusBySkill.Values),
                         attackBonusCalls = System.Linq.Enumerable.ToArray(
                             System.Linq.Enumerable.Select(
-                                InventorySystem.PassiveSkills.CombatContext.AttackBonusBySkill.Keys,
-                                k => InventorySystem.PassiveSkills.CombatContext.AttackBonusCalls[k])),
+                                ItemSystem.PassiveSkills.CombatContext.AttackBonusBySkill.Keys,
+                                k => ItemSystem.PassiveSkills.CombatContext.AttackBonusCalls[k])),
                     };
                 CombatSystem.BossCombatTrace.Flush();
                 CombatSystem.ShieldDiag.Export(out response.shieldSrcNames,

@@ -20,11 +20,11 @@ namespace AutoTest
             if (run == null || run.ownedPassiveItems == null) return false;
             if (passiveIndex < 0 || passiveIndex >= run.ownedPassiveItems.Count) return false;
             // ショップ滞在中でなければ売却不可 (= ショップに行かないと売れない、 自然な仕様)
-            var sm = InventorySystem.Shop.ShopManager.Instance;
+            var sm = ItemSystem.Shop.ShopManager.Instance;
             if (sm == null || sm.Current == null) return false;
             // (商人の符牒 売却阻止フックは 2026-07-18 アイテム削除に伴い除去)
             // ShopManager.TrySell を呼ぶ (在庫減算・コイン加算を委譲、 由来問わず)
-            return sm.TrySell(InventorySystem.Shop.ShopManager.SellSource.Passive, passiveIndex, run);
+            return sm.TrySell(ItemSystem.Shop.ShopManager.SellSource.Passive, passiveIndex, run);
         }
     }
 }

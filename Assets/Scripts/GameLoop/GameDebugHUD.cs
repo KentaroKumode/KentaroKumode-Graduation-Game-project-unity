@@ -2,8 +2,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using CombatSystem;
 using EventSystem;
-using InventorySystem;
-using InventorySystem.Shop;
+using ItemSystem;
+using ItemSystem.Shop;
 using MapSystem;
 using MapSystem.FreeMove;
 
@@ -319,7 +319,7 @@ namespace GameLoop
             string madness = run.crownProvisionLocked ? $" 狂気x{run.madnessStack}" : "";
             string provision = $"  <color={provisionColor}>物資: {run.provision}/{run.provisionCap} [{ProvisionSystem.TierName(tier)}]{madness}</color>";
 
-            return $"Floor: {run.currentFloor}/{run.maxFloor}  " +
+            return $"Floor: {run.currentFloor}/{MapSystem.FreeMove.FloorPlan.LastOrdinal}  " +
                    $"HP: {run.playerHP}/{run.playerMaxHP}{provision}  " +
                    $"コイン: {run.coins}";
         }
@@ -336,15 +336,19 @@ namespace GameLoop
             var sb = new System.Text.StringBuilder();
             var sim = mm.Sim;
             if (sim != null)
-                sb.AppendLine($"時間 {sim.TimeTurns:0.0} 手番 / {sim.Speed.DisplayName()} / 魔石 {sim.StoneLevel}"
-                            + (sim.FlareOn ? " / 照明中" : "") + (sim.IsMoving ? " / 移動中" : ""));
+            {
+                sb.AppendLine($"手番 {sim.Turn} / 魔石 {sim.Stone().Text} / 天候 {sim.Weather.DisplayName()}"
+                            + (sim.FlareOn ? " / 照明中" : ""));
+                var eta = sim.Eta();
+                if (eta.Valid) sb.AppendLine($"補足されている ── 最短 {eta.turns} 手で捕まる（{eta.WhoName}）");
+                sb.AppendLine("[W] 待つ  [R] 偵察  [F] 照明  [L] 囮罠");
+            }
             sb.AppendLine("移動先 (道):");
             for (int i = 0; i < all.Count; i++)
             {
                 var n = all[i];
-                string tName = n.revealed ? GameManager.TileToJapanese(n.EffectiveType) : "？";
-                string dist = sim != null && n.index >= 0 ? $" 距離{sim.Preview(n.index).distance:0.0}" : "";
-                sb.AppendLine($"  {i + 1}. [{tName}]{dist}");
+                string tName = n.revealed && !(sim != null && sim.FogHidden(n.index)) ? GameManager.TileToJapanese(n.EffectiveType) : "？";
+                sb.AppendLine($"  {i + 1}. [{tName}]");
             }
             moveText = sb.ToString();
         }
@@ -438,7 +442,7 @@ namespace GameLoop
                     if (GameManager.Instance != null && GameManager.Instance.HasPendingRewardChoice)
                     {
                         var (rcA, rcB) = GameManager.Instance.CurrentRewardChoice;
-                        var idb = InventorySystem.ItemDatabase.Instance;
+                        var idb = ItemSystem.ItemDatabase.Instance;
                         string nA = idb?.GetItem(rcA)?.displayName ?? rcA;
                         string nB = idb?.GetItem(rcB)?.displayName ?? rcB;
                         helpText = $"報酬を選択 (同Tier):\n[1] {nA}\n[2] {nB}";

@@ -48,6 +48,6 @@ My project — Unity 3D ローグライク（ボードゲーム調・ダイス�
   [Assets/Scripts/GameLoop/Ids.cs](Assets/Scripts/GameLoop/Ids.cs)（`ItemIds` / `BossIds`）か `ClassStarter` の定数を経由する。
   ボス判定は `BossIds.IsBoss(id)`。新しい ID を跨ファイル参照する時は先に定数を足す。
 - **CombatContext に新フィールドを足す時**: `perTurn` / `decay` / `persistent` の 3 区分
-  （[CombatContext.cs](Assets/Scripts/InventorySystem/PassiveSkills/CombatContext.cs) の BeginNewTurn 直上の規約コメント参照）を
+  （[CombatContext.cs](Assets/Scripts/ItemSystem/PassiveSkills/CombatContext.cs) の BeginNewTurn 直上の規約コメント参照）を
   XML コメントに明記し、perTurn/decay は BeginNewTurn の該当 Phase に必ずリセットを追加。
   1〜2 箇所しか触らない一時値はフィールドではなく `accumulatedValues` / `nextTurnBuffs` 辞書へ。

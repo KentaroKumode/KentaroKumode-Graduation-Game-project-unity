@@ -10,21 +10,19 @@
 救済され 6 層で力尽きたランは、 左では 6 層、 右では 4 層に出る。 左だけを見て
 敵を調整すると、 押し流した側の層 (4 層) を強いまま残すことになる。
 
-帯 (bandScore): 1=1〜2F / 2=3F道中 / 3=3Fボス / 4,5=4F / 6=5F道中とΛ / 7=5Fボス
+帯 (bandScore): 1=1〜2F / 2=3F道中 / 3=3Fボス / 4,5=4F / 6=5F道中 / 7=5Fボス
 / 8=5F・6Fクリア(門不通過) / 9=6F / 10=Null Point(ヴェスカ) / 11=完全クリア。
 1F と 2F は帯では分かれないので 1F ボス到達数 (bossEntryCount[1]) で割る。
-Λ と 5F道中 は帯 6 に同居するので `lambdaRunDeaths` (ラン単位) で切り出す
-── **戦闘側の計装で引いてはいけない** (救済ぶんだけ引きすぎて 5F道中 が 0 になる)。
 
 使い方: python Tools/floor_death_report.py <session>[#<arm>] ...
 """
 import collections, glob, io, json, os, sys
 
-# 表示名 → (SkillDiag の層添字, 種類の並び)。 層 0 = Λ、 8 = ヴェスカ。
+# 表示名 → (SkillDiag の層添字, 種類の並び)。 8 = ヴェスカ。
 HP0_MAP = {
     "1層 道中": (1, (0, 1)), "1層 ボス": (1, (2,)), "2層": (2, (0, 1)),
     "3層 道中": (3, (0, 1)), "3層 ボス": (3, (2,)), "4層": (4, (0, 1)),
-    "5層 道中": (5, (0, 1)), "Λ層 (時間の狭間)": (0, (0, 1, 2)), "5層 ボス": (5, (2,)),
+    "5層 道中": (5, (0, 1)), "5層 ボス": (5, (2,)),
     "6層": (6, (0, 1, 2)), "7層 決戦(ヴェスカ)": (8, (0, 1, 2)),
 }
 # GAME.md §13-5 の到達者あたり死亡率の目標 (下限, 上限)。
@@ -36,7 +34,6 @@ GROUPS = [
     ("3層", ["3層 道中", "3層 ボス"], (.12, .15)),
     ("4層", ["4層"], (.03, .05)),
     ("5層", ["5層 道中", "5層 ボス"], (.20, .25)),
-    ("Λ層", ["Λ層 (時間の狭間)"], None),          # 深さはプレイヤーの選択なので目標を置かない
     ("(門の鍵なし)", ["5・6層で打ち切り(門の鍵なし)"], None),
     ("6層", ["6層"], (.25, .30)),
     ("7層", ["7層 決戦(ヴェスカ)"], (.45, .50)),
@@ -46,7 +43,7 @@ GROUPS = [
 def load(sess):
     band = collections.Counter(); boss = [0] * 9; n = 0
     bstats = collections.defaultdict(lambda: [0] * 4)
-    fk = [0] * 270; lam_runs = 0; rev = [0, 0, 0]; reentry = 0
+    fk = [0] * 270; rev = [0, 0, 0]; reentry = 0
     pat = (sess.split("#")[1] if "#" in sess else "*") + "_c*"
     for f in glob.glob(os.path.join(sess.split("#")[0], pat, "response.json")):
         j = json.load(io.open(f, encoding="utf-8"))
@@ -54,13 +51,12 @@ def load(sess):
             if b >= 0: band[b] += 1; n += 1
         for i, v in enumerate(j.get("bossEntryCount", [])): boss[i] += v
         for i, v in enumerate(j.get("floorKind", [])): fk[i] += v
-        lam_runs += j.get("lambdaRunDeaths", 0)
         rev[0] += j.get("torchRevivals", 0); rev[1] += j.get("lastStandRevivals", 0)
         rev[2] += j.get("fleuretRevivals", 0)
         reentry += j.get("finishCombatReentry", 0)
         for i, nm in enumerate(j.get("bossNames", [])):
             for k in range(4): bstats[nm][k] += j["bossStats"][i * 4 + k]
-    return n, band, boss, bstats, fk, lam_runs, rev, reentry
+    return n, band, boss, bstats, fk, rev, reentry
 
 
 def hp0(fk, name):
@@ -71,7 +67,7 @@ def hp0(fk, name):
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     for sess in sys.argv[1:]:
-        n, band, boss, bs, fk, lam, rev, reentry = load(sess)
+        n, band, boss, bs, fk, rev, reentry = load(sess)
         if n == 0:
             print("\n[{}]  該当なし".format(sess)); continue
         f1boss_death = bs["boss_layer1"][3]
@@ -80,7 +76,7 @@ def main():
             ("1層 道中", d_f1_road), ("1層 ボス", f1boss_death),
             ("2層", band[1] - d_f1_road - f1boss_death),
             ("3層 道中", band[2]), ("3層 ボス", band[3]), ("4層", band[4] + band[5]),
-            ("5層 道中", band[6] - lam), ("Λ層 (時間の狭間)", lam), ("5層 ボス", band[7]),
+            ("5層 道中", band[6]), ("5層 ボス", band[7]),
             ("5・6層で打ち切り(門の鍵なし)", band[8]),
             ("6層", band[9]), ("7層 決戦(ヴェスカ)", band[10]), ("完全クリア", band[11]),
         ]

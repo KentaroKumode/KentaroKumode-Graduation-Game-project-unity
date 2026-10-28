@@ -26,12 +26,12 @@
 4武器種（盾/剣/斧/短剣）× Lv1-5、各武器に累積パッシブスキル。
 
 **主要ファイル:**
-- `Assets/Scripts/InventorySystem/PassiveSkills/PassiveSkillManager.cs` (606行)
-- `Assets/Scripts/InventorySystem/PassiveSkills/Effects/AllPassiveSkillEffects.cs` (411行)
-- `Assets/Scripts/InventorySystem/PassiveSkills/CombatContext.cs` (190行)
-- `Assets/Scripts/InventorySystem/Items/ItemData.cs` - JSON逆シリアライズ
-- `Assets/Scripts/InventorySystem/Items/ItemDataV2.cs` - ランタイムデータ(roleName/roleDescription付き)
-- `Assets/Scripts/InventorySystem/Items/ItemDatabase.cs` (340行) - ScriptableObject+JSON
+- `Assets/Scripts/ItemSystem/PassiveSkills/PassiveSkillManager.cs` (606行)
+- `Assets/Scripts/ItemSystem/PassiveSkills/Effects/AllPassiveSkillEffects.cs` (411行)
+- `Assets/Scripts/ItemSystem/PassiveSkills/CombatContext.cs` (190行)
+- `Assets/Scripts/ItemSystem/Items/ItemData.cs` - JSON逆シリアライズ
+- `Assets/Scripts/ItemSystem/Items/ItemDataV2.cs` - ランタイムデータ(roleName/roleDescription付き)
+- `Assets/Scripts/ItemSystem/Items/ItemDatabase.cs` (340行) - ScriptableObject+JSON
 - `Assets/Data/InventorySystem/items.json` (410行) - 全武器・アイテムデータ
 
 ### 3. DiceLED システム (CombatSystem/DiceLED) ← 今回作成

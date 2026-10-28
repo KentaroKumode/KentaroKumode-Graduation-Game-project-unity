@@ -1,4 +1,4 @@
-using InventorySystem.PassiveSkills;
+using ItemSystem.PassiveSkills;
 
 namespace CombatSystem
 {

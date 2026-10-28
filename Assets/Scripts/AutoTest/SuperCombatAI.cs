@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using CombatSystem;
-using InventorySystem.PassiveSkills;
+using ItemSystem.PassiveSkills;
 
 namespace AutoTest
 {
@@ -409,12 +409,6 @@ namespace AutoTest
         }
 
         private static float Clamp(float v, float lo, float hi) => v < lo ? lo : (v > hi ? hi : v);
-
-        private static int PopCount(int v)
-        {
-            int n = 0; while (v != 0) { v &= v - 1; n++; }
-            return n;
-        }
 
         // ============================================================
         //  盤面スナップショット (読み取り専用・毎ターン更新)
@@ -1266,7 +1260,7 @@ namespace AutoTest
             //   **配線側がこれを見られないと一方的な税になる** ので、 積む/積まないを盤面に出す。
             if (s.blazeStacks > 0) taken += s.blazeStacks;
             if (m.blazePenalizesBlock
-                && bCount >= InventorySystem.PassiveSkills.Effects.BlazeBrand.BlockDiceThreshold)
+                && bCount >= ItemSystem.PassiveSkills.Effects.BlazeBrand.BlockDiceThreshold)
                 s.blazeStacks++;
             // 処刑人の烙印: 攻撃終了時に HP が最大の 20% 以下なら 9999。 **予告されている。**
             if (m.executeArmed && (s.pHp - taken) <= (int)Math.Ceiling(_pMaxHp * 0.20f))

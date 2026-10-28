@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using GameLoop;
-using InventorySystem;
-using InventorySystem.PassiveSkills;
+using ItemSystem;
+using ItemSystem.PassiveSkills;
 
 namespace AutoTest
 {

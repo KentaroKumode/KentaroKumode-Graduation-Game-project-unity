@@ -94,7 +94,7 @@ namespace UI.ClassSelect
             itemDesc = e.starterDescFallback;
             flavor   = e.flavorFallback;
 
-            var db = InventorySystem.ItemDatabase.Instance;
+            var db = ItemSystem.ItemDatabase.Instance;
             var data = db != null ? db.GetItem(e.starterId) : null;
             if (data == null) return;
             if (!string.IsNullOrEmpty(data.displayName)) itemName = data.displayName;
@@ -105,7 +105,7 @@ namespace UI.ClassSelect
         /// <summary>メイン武器の表示名 (正本: ClassStarter.GetWeaponId + ItemDatabase)。</summary>
         public static string ResolveWeaponName(in Entry e)
         {
-            var db = InventorySystem.ItemDatabase.Instance;
+            var db = ItemSystem.ItemDatabase.Instance;
             var data = db != null ? db.GetItem(GameLoop.ClassStarter.GetWeaponId(e.type)) : null;
             return (data != null && !string.IsNullOrEmpty(data.displayName))
                    ? data.displayName : e.weaponNameFallback;

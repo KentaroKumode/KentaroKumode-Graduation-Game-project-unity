@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Text;
 using UnityEngine;
 using CombatSystem;
-using DeathCause = InventorySystem.PassiveSkills.DeathCause;
+using DeathCause = ItemSystem.PassiveSkills.DeathCause;
 
 namespace AutoTest
 {

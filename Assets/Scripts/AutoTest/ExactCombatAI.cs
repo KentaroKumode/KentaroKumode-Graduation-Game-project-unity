@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using CombatSystem;
 using GameLoop;
-using InventorySystem.PassiveSkills;
+using ItemSystem.PassiveSkills;
 
 namespace AutoTest
 {
@@ -84,8 +84,9 @@ namespace AutoTest
         private DiceFaceParts.Tier[] _tiers;
         private int _eBaseAtk, _eDiceCount, _eRollMax, _eMaxHp;
         /// <summary>敵の被ダメ軽減 (0〜1)。 **抜けていると自分の火力を 1/(1−r) 倍に過大評価する。**
-        /// 7層ボスは全段 0.35 なので 1.54 倍。 <see cref="EnemyData.baseDefenseRate"/> を
-        /// そのまま読むので値の二重管理は無い。</summary>
+        /// 7層ボスは防御 14 で 0.35 なので 1.54 倍。 ctx の敵の防御値と自分の貫通から
+        /// <see cref="DefenseFormula"/> で引くので値の二重管理は無い (ADR-0013)。
+        /// 貫通は毎ターン変わり得るが、 スナップショットの時点の値で 1 戦を読み切る近似。</summary>
         private float _eDefRate;
 
         /// <summary>2 体戦 (2026-08-28) の 2 体目の攻撃値。 0 = 単体戦 or 撃破済み。</summary>
@@ -147,7 +148,7 @@ namespace AutoTest
             _eDiceCount = Math.Max(0, enemy.EffectiveRollCount);
             _eRollMax = Math.Max(1, enemy.EffectiveRollMax);
             _eMaxHp = Math.Max(1, enemy.maxHP);
-            _eDefRate = Math.Min(0.95f, Math.Max(0f, enemy.baseDefenseRate));
+            _eDefRate = DefenseFormula.Reduction(DefenseFormula.Effective(ctx.enemyDefense, ctx.playerArmorPen));
             _escProfile = enemy.id;
             _chargeMax = CombatManager.ChargeMax;
             // 多段連戦（ヴェスカ 4 段）。 prefix 判定は Ids.cs の定数を経由する。

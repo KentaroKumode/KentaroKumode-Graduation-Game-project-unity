@@ -1,6 +1,6 @@
 using UnityEngine;
 using GameLoop;
-using InventorySystem.PassiveSkills;
+using ItemSystem.PassiveSkills;
 using MapSystem;
 
 namespace EventSystem.TimedEffects.Effects

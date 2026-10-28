@@ -3,59 +3,57 @@ using System.Collections.Generic;
 
 namespace MapSystem.FreeMove
 {
-    /// <summary>徘徊エネミーの状態。 §23-21「巡回 → 警戒 → 追跡 → 見失う」。</summary>
-    public enum FoeState
+    /// <summary>追跡者の状態。 「巡回 → 警戒 → 追跡 → 見失う」。</summary>
+    public enum FoeMode
     {
-        /// <summary>縄張りの巡回点を毎回同じ順で回る。 縄張りの外へは出ない。</summary>
+        /// <summary>縄張りの巡回の輪を毎回同じ順で回る。</summary>
         Patrol = 0,
-        /// <summary>物音・新しい痕跡・囮に気づき、 最後に分かった位置へ向かう。</summary>
+        /// <summary>プレイヤーの新しい痕跡、 または置かれた囮罠に気づいて、 そちらへ向かう。</summary>
         Alert = 1,
-        /// <summary>察知したプレイヤーを追う。</summary>
+        /// <summary>補足したプレイヤーを追う。</summary>
         Chase = 2,
     }
 
-    /// <summary><see cref="FreeMapSim.Tick"/> が 1 刻みの間に起きたことを返すフラグ。
-    /// 時間の自動停止・早送りの解除はこれを見て決める (<see cref="FreeMapClockPolicy"/>)。</summary>
+    /// <summary><see cref="FreeMapSim"/> の操作 1 回の間に起きたことを返すフラグ。</summary>
     [Flags]
     public enum FreeMapEvent
     {
         None = 0,
-        /// <summary>点に着いた (<see cref="FreeMapSim.LastArrived"/>)。 着いた点だけが発動する ── 途中の点は通過するだけ。</summary>
+        /// <summary>点に着いた (<see cref="FreeMapSim.LastArrived"/>)。</summary>
         Arrived = 1 << 0,
-        /// <summary>察知された (敵が追跡に入った瞬間)。</summary>
+        /// <summary>補足された (追跡者が追跡に入った瞬間)。</summary>
         Detected = 1 << 1,
-        /// <summary>徘徊エネミーが目の前 (視界 1) に見えた瞬間。</summary>
-        FoeSighted = 1 << 2,
-        /// <summary>魔石の反応が一段上がった。</summary>
-        StoneRaised = 1 << 3,
-        /// <summary>魔石が「察知されている」に入った。</summary>
-        StoneHot = 1 << 4,
-        /// <summary>徘徊エネミーに捕まった。 連戦の決着まで時間は進まない。</summary>
-        Caught = 1 << 5,
-        /// <summary>罠が作動した (敵の位置が判明・足止め)。</summary>
-        TrapTriggered = 1 << 6,
-        /// <summary>偵察が終わった。</summary>
-        ScoutFinished = 1 << 7,
-        /// <summary>払底中の移動で HP が尽きた。</summary>
-        Died = 1 << 8,
-        /// <summary>囮が壊された。</summary>
-        DecoyBroken = 1 << 9,
-        /// <summary>手番が 1 つ進んだ (察知の判定・痕跡の減衰が走った)。</summary>
-        TurnPassed = 1 << 10,
-        /// <summary>使い魔が見えた瞬間 (視界 1・照明中は 5)。</summary>
-        FamiliarSighted = 1 << 11,
-        /// <summary>使い魔に接触した。 交戦の決着まで時間は進まない。</summary>
-        FamiliarContact = 1 << 12,
+        /// <summary>追跡者が見失った。</summary>
+        FoeLost = 1 << 2,
+        /// <summary>追跡者がプレイヤーの痕跡に気づいた / 囮罠に気を引かれた。</summary>
+        FoeAlerted = 1 << 3,
+        /// <summary>追跡者に捕まった。 戦闘の決着まで手番は進まない。</summary>
+        Caught = 1 << 4,
+        /// <summary>使い魔に接触した。 戦闘の決着まで手番は進まない。</summary>
+        FamiliarContact = 1 << 5,
+        /// <summary>使い魔が放たれた。</summary>
+        FamiliarLaunched = 1 << 6,
         /// <summary>見えている使い魔が消えた (目標地点でプレイヤーを見つけられなかった)。</summary>
-        FamiliarVanished = 1 << 13,
+        FamiliarVanished = 1 << 7,
+        /// <summary>追跡者が囮罠を踏んで足止めされた。</summary>
+        LureTriggered = 1 << 8,
+        /// <summary>手番が 1 つ以上進んだ。</summary>
+        TurnPassed = 1 << 9,
+        /// <summary>前線が進んだ。</summary>
+        FrontAdvanced = 1 << 10,
+        /// <summary>前線の天候で道が崩れた / 点が沈んだ (地図の形が変わった)。</summary>
+        MapChanged = 1 << 11,
+        /// <summary>物資が尽き、 HP も尽きた。</summary>
+        Died = 1 << 12,
     }
 
-    /// <summary>使い魔 (巡航ミサイル)。 察知された地点へ直線で飛び、 狭い探知範囲の内にプレイヤーが居れば向きを変える。
-    /// 目標地点に着いてもプレイヤーを探知できなければ消える。 接触すると交戦。</summary>
+    /// <summary>使い魔。 本体の手先で、 プレイヤーの最後に分かった位置へ向かう。 猟犬は倒しても消えず本体の元へ戻る。</summary>
     public struct Familiar
     {
-        public Vec2 pos;
-        public Vec2 target;
+        public int pos;
+        /// <summary>向かう点。 -1 = まだ目標が無い。</summary>
+        public int target;
+        public bool hound;
     }
 
     /// <summary>移動に払う物資と HP の窓口。 素の C# 側は RunState を知らないのでここを通す。</summary>
@@ -67,814 +65,669 @@ namespace MapSystem.FreeMove
         bool PayHp(int amount);
     }
 
-    /// <summary>行き先の見積もり。</summary>
-    public struct MovePreview
+    /// <summary>魔石の読み。 追跡者への距離の段と方角 (使い魔には反応しない)。</summary>
+    public struct StoneReading
     {
-        public bool valid;
-        /// <summary>道の外で山岳を横切る ＝ 行けない。</summary>
-        public bool blocked;
-        public double distance;
-        public bool road;
-        /// <summary>距離 1 あたりの物資 (照明・速さ込み)。</summary>
-        public double perDistance;
-        public int provisionCost;
-        /// <summary>物資が足りない分を HP で払う見込み。</summary>
-        public int hpCost;
-        public double turns;
+        /// <summary>0 = 反応なし / 1 = 遠い (≤4 歩) / 2 = かなり近い (≤2 歩) / 3 = 察知されている (追跡中)。</summary>
+        public int level;
+        /// <summary>方角 0..7 = 東・北東・北・北西・西・南西・南・南東 (画面で上 = 北 = y が小さい側)。 level 0 では -1。</summary>
+        public int bearing;
+        public static readonly string[] BearingNames = { "東", "北東", "北", "北西", "西", "南西", "南", "南東" };
+        public string Text
+        {
+            get
+            {
+                if (level <= 0) return "反応なし";
+                string dir = bearing >= 0 ? BearingNames[bearing] : "";
+                return level == 3 ? $"察知されている（{dir}）" : level == 2 ? $"かなり近い（{dir}）" : $"遠い（{dir}）";
+            }
+        }
+    }
+
+    /// <summary>補足されている時の「最短で何手で捕まるか」(こちらがその場に留まった場合)。</summary>
+    public struct CatchEta
+    {
+        public int turns;
+        /// <summary>0 = 本体 / 1 = 猟犬 / 2 = 使い魔。 turns が int.MaxValue なら意味を持たない。</summary>
+        public int who;
+        public bool Valid => turns != int.MaxValue;
+        public static readonly CatchEta None = new CatchEta { turns = int.MaxValue, who = -1 };
+        public string WhoName => who == 0 ? "本体" : who == 1 ? "猟犬" : "使い魔";
     }
 
     /// <summary>
-    /// 自由移動の層の動く中身。 参照実装は docs/design/map-prototype.html (tick / turn / advanceFoe ほか)。
+    /// 航行マップの動く中身 (手番制・2026-10-18)。 参照実装は docs/design/map-grid-prototype.html。
     ///
-    /// <para><b>時間は 0.1 手番刻みでしか進まない。</b> 人は <c>FreeMapClock</c> (停止 / 順速 / 早送り) が
-    /// 実時間に合わせて <see cref="Tick"/> を呼び、 BOT は <see cref="RunUntil"/> で同期的に進める。
-    /// どちらも同じ刻みを踏むので、 同じ操作なら同じ結果になる。</para>
+    /// <para><b>移動は道でつながった隣の点へ 1 歩</b>。 自分が 1 歩動く (または待つ・偵察する) ごとに 1 手番が進み、
+    /// 追跡者が 1 度動く。 戦闘・イベント・照明・囮罠は手番を使わない。 物資は距離によらず 1 歩ごとに一定。</para>
     ///
-    /// <para>1 刻みは常にちょうど 0.1 手番 (試作は到着の刻みだけ端数だった)。 時間を整数の刻みで数えて、
-    /// 浮動小数の累積誤差で手番の境目がずれないようにしてある。</para>
+    /// <para>乱数は前線の天候 (道が崩れる・点が沈む) の選択だけで、
+    /// <c>GameRng.Range(.., "map.free.weather", 層 × 100000 + 手番 × 10 + 試行)</c> ── 同じ操作なら同じ結果になる。</para>
     ///
-    /// <para>乱数は察知の 1d6 だけで、 <c>GameRng.Range(1, 7, "map.free.detect", 層 × 100000 + 手番)</c>。</para>
+    /// <para>UnityEngine に依存しない (BOT が同期的に回す・単体で検算できる)。</para>
     /// </summary>
     public sealed class FreeMapSim
     {
-        public const string DetectRngKey = "map.free.detect";
-
         public readonly FreeMapLayout Layout;
         public readonly int Floor;
         private readonly IFreeMapWallet _wallet;
 
-        // ── 自分 ──
-        public Vec2 Me { get; private set; }
-        /// <summary>今いる点。 移動中は -1。</summary>
-        public int AtNode { get; private set; }
-        /// <summary>道の上を移動中ならその道の両端。 道の外・点の上では (-1,-1)。</summary>
-        public (int a, int b) Segment { get; private set; } = (-1, -1);
-        /// <summary>直前に出発した点 (逃げた時に戻る先)。</summary>
-        public int PrevNode { get; private set; }
-        public int MoveTarget { get; private set; } = -1;
-        public bool MoveOnRoad { get; private set; }
-        private int _moveFrom = -1;
-        public bool IsMoving => MoveTarget >= 0;
-        public MoveSpeed Speed { get; set; } = MoveSpeed.Normal;
-        public bool FlareOn { get; private set; }
-        public int ScoutTicksLeft { get; private set; }
-        public bool IsScouting => ScoutTicksLeft > 0;
-        /// <summary>戦闘の後の気配が残る手番。</summary>
-        public int BattleHeatTurns { get; private set; }
-        public int LastArrived { get; private set; } = -1;
-        /// <summary>着いた刻みに捕まった点。 連戦が終わった次の刻みで Arrived を出す (新しい行き先を決めたら捨てる)。</summary>
-        private int _pendingArrival = -1;
-        /// <summary>着いた刻みに捕まった点が、 連戦の後の発動を待っているか。</summary>
-        public bool HasPendingArrival => _pendingArrival >= 0 && !IsMoving && AtNode == _pendingArrival;
-        public bool InGauntlet { get; private set; }
-        public bool Dead { get; private set; }
+        // ── 地図 (前線の天候で崩れる) ──
+        private readonly List<int>[] _adj;
+        private readonly bool[] _sunk;
 
-        // ── 時間 ──
-        public long Ticks { get; private set; }
-        public double TimeTurns => Ticks * (double)FreeMapParams.Tick;
-        public int TurnIndex { get; private set; }
-        private int _tickInTurn;
+        // ── 自分 ──
+        public int Me { get; private set; }
+        /// <summary>直前に居た点 (追跡者の戦闘から逃げた時に戻る先)。</summary>
+        public int PrevNode { get; private set; }
+        public int LastArrived { get; private set; } = -1;
+        public bool Dead { get; private set; }
+        public int Turn { get; private set; }
+        /// <summary>状態が変わるたびに増える番号。 表示が「描き直すか」を安く判定するために読む。</summary>
+        public int Version { get; private set; }
+        /// <summary>照明が点いている残り手番。</summary>
+        public int FlareTurnsLeft { get; private set; }
+        public bool FlareOn => FlareTurnsLeft > 0;
 
         // ── 見えているもの ──
         /// <summary>マスの種別が判明している点。 点と道の配置は層全体が見える。</summary>
         public readonly bool[] Known;
-        public int StoneLevel { get; private set; }
-        /// <summary>魔石が指す方角 (2026-09-28): 徘徊エネミーの居る向きを 60° ずつ 6 つに分けた番号 (0〜5)。
-        /// 反応なし (段 0) の時は -1。 0 は +x (右) を中心に ±30°、 以後 +y へ回る (<see cref="BearingVector"/>)。</summary>
-        public int StoneBearing { get; private set; } = -1;
-        /// <summary>徘徊エネミーの最後に分かった位置 (目視・照明・偵察・罠)。</summary>
-        public Vec2? LastSeenFoe { get; private set; }
-        public double LastSeenFoeTime { get; private set; } = -1;
-        /// <summary>偵察で分かった移動方向 (始点→終点)。</summary>
-        public (Vec2 from, Vec2 to)? FoeArrow { get; private set; }
-        private bool _foeInSightPrev;
-        private readonly List<Vec2> _scoutObs = new List<Vec2>();
-        private int _scoutObsTurn = -1;
-        private bool _scoutActive;
+        /// <summary>使い切った (起動済みの) 点。 沈める点の候補から外す。 MapManager が写す。</summary>
+        public readonly bool[] Done;
 
-        // ── 痕跡・囮・罠 ──
-        public struct Track { public Vec2 p; public int strength; }
-        public struct Decoy { public Vec2 p; public int turns; public int delay; }
-        public readonly List<Track> Tracks = new List<Track>();
-        public readonly List<Decoy> Decoys = new List<Decoy>();
-        public readonly List<Vec2> Traps = new List<Vec2>();
-        private double _trackAcc;
+        // ── 痕跡 ──
+        private readonly int[] _trace;
+        private const int NoTrace = int.MinValue;
 
-        // ── 支払いの端数 ──
-        private double _provFrac, _hpFrac;
-
-        // ── 徘徊エネミー ──
+        // ── 追跡者 ──
+        public FoeProfile Profile { get; private set; }
         public bool HasFoe { get; private set; }
         public bool FoeAlive { get; private set; }
-        public FoeState FoeState { get; private set; }
-        /// <summary>足止めの残り刻み。 手番の境目ではなく刻みで数える ── 境目で数えると
-        /// 「1 手番の足止め」が 0.1〜1 手番のどれにもなり得る。</summary>
-        public int FoeFreezeTicks { get; private set; }
-        public int FoeFreezeTurns => (FoeFreezeTicks + FreeMapParams.TicksPerTurn - 1) / FreeMapParams.TicksPerTurn;
-        private FoeState _freezeResume = FoeState.Chase;
-        private int _fa, _fb;
-        private double _ft;
-        private readonly List<int> _foePath = new List<int>();
-        private int _baseIdx;
-        private Vec2? _lastKnown;
-        private int _lost;
-        public int GauntletFights { get; private set; }
-
-        /// <summary>この層の徘徊エネミーの性質。 <b>プレイヤーには明かさない</b> (BOT も読まない)。</summary>
-        public FoeProfile Profile { get; private set; }
-        /// <summary>道を外れて飛び掛かっている最中の位置 (飛び掛かりの性質)。 道の上なら null。</summary>
-        private Vec2? _lungePos;
-
-        // ── 使い魔 ──
+        public int FoeNode { get; private set; }
+        public FoeMode FoeMode { get; private set; }
+        /// <summary>追跡者が最後にプレイヤーを補足した点。</summary>
+        public int LastSeen { get; private set; } = -1;
+        private int _lose;
+        private int _patrol;
+        private int _sinceSummon = 99;
+        /// <summary>足止めの残り手番 (囮罠・逃げた直後)。</summary>
+        public int FoeFreezeTurns { get; private set; }
+        private int _alertLure = -1;
         public readonly List<Familiar> Familiars = new List<Familiar>();
-        private int _familiarCooldownTicks;
-        private bool _familiarInSightPrev;
-        /// <summary>使い魔と交戦中 (時間は進まない)。</summary>
-        public bool InFamiliarFight { get; private set; }
-        /// <summary>[計装] 放った使い魔の数・接触した数。</summary>
-        public int FamiliarsLaunched { get; private set; }
-        public int FamiliarContacts { get; private set; }
 
-        public FreeMapSim(FreeMapLayout layout, IFreeMapWallet wallet, bool withFoe, FoeProfile profile = null)
+        // ── 囮罠 ──
+        public struct Lure { public int node; public int turnsLeft; }
+        public readonly List<Lure> Lures = new List<Lure>();
+
+        // ── 接触 (戦闘の決着待ち) ──
+        public enum ContactKind { None = 0, Body = 1, Familiar = 2 }
+        public ContactKind Contact { get; private set; }
+        public bool InFight => Contact != ContactKind.None;
+        /// <summary>着いた点に接触して戦闘に入った時、 戦闘の後に発動させる点。</summary>
+        public int PendingArrival { get; private set; } = -1;
+
+        // ── 天候 ──
+        public WeatherKind Weather { get; private set; }
+        /// <summary>前線の x (左端からの距離)。 まだ届いていなければ負の無限大。</summary>
+        public double Front { get; private set; } = double.NegativeInfinity;
+
+        public FreeMapSim(FreeMapLayout layout, IFreeMapWallet wallet, bool withFoe,
+                          FoeProfile profile = null, WeatherKind? weather = null)
         {
             Layout = layout ?? throw new ArgumentNullException(nameof(layout));
             Floor = layout.floor;
             _wallet = wallet ?? throw new ArgumentNullException(nameof(wallet));
-            Known = new bool[layout.Count];
-            AtNode = layout.start;
-            PrevNode = layout.start;
-            Me = layout.pos[layout.start];
+            int n = layout.Count;
+            _adj = new List<int>[n];
+            for (int i = 0; i < n; i++) _adj[i] = new List<int>(layout.adj[i]);
+            _sunk = new bool[n];
+            Known = new bool[n];
+            Done = new bool[n];
+            _trace = new int[n];
+            for (int i = 0; i < n; i++) _trace[i] = NoTrace;
+
+            Me = PrevNode = layout.start;
+            Known[layout.start] = true;
+            Known[layout.goal] = true;
+            Done[layout.start] = true;
+            _trace[Me] = 0;
+            Weather = weather ?? WeatherInfo.ForFloor(Floor);
+
             HasFoe = withFoe && layout.waypoints.Count > 0;
             FoeAlive = HasFoe;
-            GauntletFights = FloorPlan.GauntletFights(Floor);
-            Profile = profile ?? (HasFoe ? FoeProfile.ForFloor(Floor) : FoeProfile.Standard);
-            if (HasFoe)
-            {
-                _fa = _fb = layout.waypoints[0];
-                _ft = 0;
-                FoeState = FoeState.Patrol;
-                PlanFoe();
-            }
-            Reveal(FreeMapParams.VisionNone);
-            _foeInSightPrev = FoeAlive && Vec2.Dist(FoePos, Me) <= FreeMapParams.VisionNone + 1e-6;
-            StoneLevel = ComputeStoneLevel();
-            StoneBearing = StoneLevel > 0 ? BearingOf(FoePos - Me) : -1;
+            Profile = profile ?? (HasFoe ? FoeProfile.ForFloor(Floor) : FoeProfile.Brute);
+            FoeNode = layout.home;
+            FoeMode = FoeMode.Patrol;
+            if (HasFoe && Profile.hound)
+                Familiars.Add(new Familiar { pos = FoeNode, target = -1, hound = true });
+            Reveal(Me, FreeMapParams.Vision);
         }
 
         // =====================================================================
         //  読み取り
         // =====================================================================
 
-        public Vec2 FoePos => _lungePos ?? Vec2.Lerp(Layout.pos[_fa], Layout.pos[_fb], _ft);
+        /// <summary>隣の点 (崩れた道・沈んだ点は含まない)。</summary>
+        public IReadOnlyList<int> Neighbors(int i) => _adj[i];
 
-        /// <summary>いま見えている使い魔 (視界 1・照明中は 5)。 見えていないものは返さない。</summary>
-        public IEnumerable<Vec2> VisibleFamiliars()
+        public bool HasRoad(int a, int b) => a >= 0 && b >= 0 && _adj[a].Contains(b);
+
+        public bool IsSunk(int i) => _sunk[i];
+
+        /// <summary>崩れずに残っている道 (a &lt; b)。</summary>
+        public IEnumerable<(int a, int b)> Roads()
         {
-            double r = FlareOn ? FreeMapParams.VisionFlare : FreeMapParams.VisionNone;
-            foreach (var f in Familiars) if (Vec2.Dist(f.pos, Me) <= r + 1e-6) yield return f.pos;
+            for (int a = 0; a < _adj.Length; a++)
+                foreach (int b in _adj[a]) if (b > a) yield return (a, b);
         }
 
-        public double FoeDistance => FoeAlive ? Vec2.Dist(FoePos, Me) : double.PositiveInfinity;
+        /// <summary>道だけを通る歩数 (全点)。 つながっていなければ int.MaxValue。</summary>
+        public int[] HopsFrom(int from) => FreeMapLayout.Hops(_adj, from);
 
-        /// <summary>気配。 道を移動中 +2 (速さで置換) / 戦闘の後 +2。 点に止まっている時・道の外は 0。</summary>
-        public int Kehai
-            => (IsMoving ? Speed.Kehai(MoveOnRoad) : 0) + (BattleHeatTurns > 0 ? FreeMapParams.KehaiBattle : 0);
+        public int HopsBetween(int from, int to) => HopsFrom(from)[to];
 
-        /// <summary>察知距離。 照明なし: 2 ＋ 気配 (最大 4)。 照明中: 照明で見える範囲 5 で固定。</summary>
-        public double DetectRadius
-            => FlareOn ? FreeMapParams.VisionFlare
-                       : Math.Min(FreeMapParams.DetectCap, FreeMapParams.DetectBase + Kehai);
+        /// <summary>from から to へ向かう次の 1 歩 (最短の道・崩れた道は通らない)。 着いている / 行けないなら from。</summary>
+        public int StepToward(int from, int to) => FreeMapLayout.StepToward(_adj, from, to);
 
-        /// <summary>1 手番あたりの察知確率 (距離 d・察知距離 R)。 d ≦ R なら 1d6 ≦ max(1, ⌊R − d + 1⌋)。</summary>
-        public static double DetectChance(double d, double R)
+        /// <summary>いま見える範囲 (道で何歩先まで)。 照明中は <see cref="FreeMapParams.FlareRange"/>。</summary>
+        public int VisionRange => FlareOn ? FreeMapParams.FlareRange : FreeMapParams.Vision;
+
+        /// <summary>点 i が前線の内側か。</summary>
+        public bool InFront(int i) => Layout.pos[i].x <= Front;
+
+        /// <summary>点 i で天候 k の効果が働いているか (前線の内側だけ)。</summary>
+        public bool WeatherAt(int i, WeatherKind k) => Weather == k && InFront(i);
+
+        /// <summary>霧で「?」に戻っている点か (道で 2 歩以上離れた点。 始点と終点は隠れない)。</summary>
+        public bool FogHidden(int i, int[] hopsFromMe = null)
         {
-            if (d > R) return 0;
-            return DetectNeed(d, R) / 6.0;
+            if (!WeatherAt(i, WeatherKind.Fog) || i == Layout.goal || i == Layout.start) return false;
+            return (hopsFromMe ?? HopsFrom(Me))[i] >= 2;
         }
 
-        /// <summary>察知に要る出目の上限 (1〜6)。</summary>
-        public static int DetectNeed(double d, double R)
-            => Math.Min(6, Math.Max(1, (int)Math.Floor(R - d + 1)));
-
-        /// <summary>今いる場所から点 j へ道で行けるか (点から隣へ・道の途中から両端へ)。</summary>
-        public bool IsRoadTo(int j)
+        /// <summary>点 i に痕跡があるか (痕跡の寿命は天候で伸び縮みする)。</summary>
+        public bool HasTrace(int i)
         {
-            if (AtNode >= 0) return Layout.HasRoad(AtNode, j);
-            return Segment.a == j || Segment.b == j;
+            if (_trace[i] == NoTrace) return false;
+            return Turn - _trace[i] <= TraceLife(i);
         }
 
-        public MovePreview Preview(int j)
+        /// <summary>痕跡の鮮度 0..1 (1 = いま付いた)。 痕跡が無ければ 0。</summary>
+        public double TraceFreshness(int i)
         {
-            var pv = new MovePreview();
-            if (j < 0 || j >= Layout.Count || j == AtNode) return pv;
-            pv.valid = true;
-            pv.road = IsRoadTo(j);
-            pv.distance = Vec2.Dist(Me, Layout.pos[j]);
-            pv.perDistance = PerDistance(pv.road);
-            pv.provisionCost = (int)Math.Round(pv.distance * pv.perDistance);
-            int shortfall = Math.Max(0, pv.provisionCost - _wallet.Provision);
-            pv.hpCost = shortfall > 0
-                ? (int)Math.Ceiling(shortfall / pv.perDistance * HpRate(pv.road) * Speed.CostMul())
-                : 0;
-            pv.turns = pv.distance * Speed.TimeMul();
-            pv.blocked = !pv.road && Layout.SegmentHitsMountain(Me, Layout.pos[j]);
-            return pv;
+            if (!HasTrace(i)) return 0;
+            double a = 1.0 - (double)(Turn - _trace[i]) / (TraceLife(i) + 1);
+            return a < 0 ? 0 : a;
         }
 
-        private double PerDistance(bool road)
-            => ((road ? FreeMapParams.CostRoad : FreeMapParams.CostOffRoad) + (FlareOn ? FreeMapParams.CostFlare : 0))
-               * (double)Speed.CostMul();
+        private double TraceLife(int i)
+        {
+            double life = FreeMapParams.TraceLife;
+            if (WeatherAt(i, WeatherKind.Still)) life *= 2;
+            if (WeatherAt(i, WeatherKind.Sand)) life /= 2;
+            return life;
+        }
 
-        private static int HpRate(bool road) => road ? FreeMapParams.HpPayRoad : FreeMapParams.HpPayOffRoad;
+        /// <summary>点 j へ 1 歩動く物資 (砂の前線の内側は 1.5 倍)。</summary>
+        public int SupplyFor(int j)
+            => (int)Math.Round(FreeMapParams.MoveSupply * (WeatherAt(j, WeatherKind.Sand) || WeatherAt(Me, WeatherKind.Sand) ? 1.5 : 1.0),
+                               MidpointRounding.AwayFromZero);
+
+        /// <summary>点 j へ 1 歩動くのに進む手番 (雪の前線の内側は 2)。</summary>
+        public int TurnsFor(int j) => WeatherAt(j, WeatherKind.Snow) || WeatherAt(Me, WeatherKind.Snow) ? 2 : 1;
+
+        /// <summary>点 j へ 1 歩動いた時の HP の損 (雹の前線の内側)。</summary>
+        public int HpLossFor(int j) => WeatherAt(j, WeatherKind.Hail) ? 1 : 0;
+
+        /// <summary>追跡者がいま見えているか (視界の内側)。</summary>
+        public bool FoeVisible => FoeAlive && HopsFrom(Me)[FoeNode] <= VisionRange;
+
+        /// <summary>いま見えている使い魔。</summary>
+        public IEnumerable<Familiar> VisibleFamiliars()
+        {
+            var d = HopsFrom(Me);
+            foreach (var f in Familiars) if (d[f.pos] <= VisionRange) yield return f;
+        }
+
+        /// <summary>追跡者の次の 1 歩 (予告用・状態は変えない)。 動かない性質・居ない時は <see cref="FoeNode"/> のまま。</summary>
+        public int PeekFoeStep()
+        {
+            if (!FoeAlive || Profile.foeSteps <= 0 || FoeFreezeTurns > 0) return FoeNode;
+            int patrol = _patrol; var mode = FoeMode;
+            return ComputeFoeStep(ref mode, ref patrol);
+        }
+
+        /// <summary>魔石の読み。 追跡者への歩数と方角 (使い魔には反応しない)。</summary>
+        public StoneReading Stone()
+        {
+            if (!FoeAlive) return new StoneReading { level = 0, bearing = -1 };
+            int d = HopsFrom(Me)[FoeNode];
+            int level = FoeMode == FoeMode.Chase ? 3
+                      : d <= FreeMapParams.StoneNear ? 2
+                      : d <= FreeMapParams.StoneFar ? 1 : 0;
+            return new StoneReading { level = level, bearing = level > 0 ? Bearing(Me, FoeNode) : -1 };
+        }
+
+        /// <summary>from から見た to の方角 0..7 (東から反時計回り・上 = 北 = y が小さい側)。
+        /// 三角関数を使わず、 傾きの比較だけで 45° ずつの 8 方位に分ける。</summary>
+        public int Bearing(int from, int to)
+        {
+            double dx = Layout.pos[to].x - Layout.pos[from].x;
+            double dy = Layout.pos[from].y - Layout.pos[to].y;   // 上 (y が小さい側) を正にする
+            if (dx == 0 && dy == 0) return 0;
+            double ax = Math.Abs(dx), ay = Math.Abs(dy);
+            const double T = 0.41421356237;                       // tan(22.5°)
+            int sector;                                           // 第 1 象限基準で 0..2 (東 / 北東 / 北)
+            if (ay <= T * ax) sector = 0;
+            else if (ax <= T * ay) sector = 2;
+            else sector = 1;
+            if (dx >= 0 && dy >= 0) return sector == 0 ? 0 : sector == 1 ? 1 : 2;
+            if (dx < 0 && dy >= 0) return sector == 0 ? 4 : sector == 1 ? 3 : 2;
+            if (dx < 0 && dy < 0) return sector == 0 ? 4 : sector == 1 ? 5 : 6;
+            return sector == 0 ? 0 : sector == 1 ? 7 : 6;
+        }
+
+        /// <summary>補足されている時の「最短で何手で捕まるか」(こちらが留まった場合)。</summary>
+        public CatchEta Eta()
+        {
+            var best = CatchEta.None;
+            if (!FoeAlive || Contact != ContactKind.None) return best;
+            var d = HopsFrom(Me);
+            if (FoeMode == FoeMode.Chase && Profile.foeSteps > 0 && d[FoeNode] != int.MaxValue)
+            {
+                int t = Ceil(d[FoeNode], Profile.foeSteps);
+                if (FoeFreezeTurns > 0) t += FoeFreezeTurns;
+                if (t < best.turns) best = new CatchEta { turns = t, who = 0 };
+            }
+            foreach (var f in Familiars)
+            {
+                if (Profile.familiarSteps <= 0 || d[f.pos] == int.MaxValue) continue;
+                bool chasing = f.hound ? FoeMode == FoeMode.Chase : f.target >= 0;
+                if (!chasing) continue;
+                int t = Ceil(d[f.pos], Profile.familiarSteps);
+                if (t < best.turns) best = new CatchEta { turns = t, who = f.hound ? 1 : 2 };
+            }
+            return best;
+        }
+
+        private static int Ceil(int a, int b) => (a + b - 1) / b;
 
         // =====================================================================
         //  操作
         // =====================================================================
 
-        /// <summary>行き先を決める (移動中なら行き先を変える)。 山岳を横切る・偵察中・連戦中は false。</summary>
-        public bool SetDestination(int j)
+        public bool CanMoveTo(int j)
+            => !Dead && !InFight && j >= 0 && j < _adj.Length && !_sunk[j] && _adj[Me].Contains(j);
+
+        /// <summary>隣の点 j へ 1 歩。 物資を払い、 痕跡を残し、 追跡者が動く。</summary>
+        public FreeMapEvent MoveTo(int j)
         {
-            if (Dead || InGauntlet || InFamiliarFight || IsScouting) return false;
-            var pv = Preview(j);
-            if (!pv.valid || pv.blocked) return false;
-            if (!IsMoving) PrevNode = AtNode >= 0 ? AtNode : Layout.NearestNode(Me);
-            _pendingArrival = -1;
-            MoveOnRoad = pv.road;
-            _moveFrom = AtNode >= 0 ? AtNode : (Segment.a >= 0 ? (Segment.a == j ? Segment.b : Segment.a) : -1);
-            MoveTarget = j;
-            return true;
+            if (!CanMoveTo(j)) return FreeMapEvent.None;
+            int cost = SupplyFor(j), turns = TurnsFor(j), hail = HpLossFor(j);
+            var ev = FreeMapEvent.None;
+            if (Pay(cost)) ev |= FreeMapEvent.Died;
+            if (hail > 0 && _wallet.PayHp(hail)) ev |= FreeMapEvent.Died;
+            PrevNode = Me;
+            Me = j;
+            Version++;
+            _trace[j] = Turn + turns;
+            Known[j] = true;
+            LastArrived = j;
+            ev |= FreeMapEvent.Arrived;
+            if ((ev & FreeMapEvent.Died) != 0) { Dead = true; return ev; }
+            ev |= PassTurns(turns);
+            if ((ev & (FreeMapEvent.Caught | FreeMapEvent.FamiliarContact)) != 0) PendingArrival = j;
+            return ev;
         }
 
-        public void SetFlare(bool on)
+        /// <summary>待つ (1 手番)。</summary>
+        public FreeMapEvent Wait() => Dead || InFight ? FreeMapEvent.None : PassTurns(1);
+
+        /// <summary>偵察 (1 手番): 道で <see cref="FreeMapParams.ReconRange"/> 歩先まで見える。</summary>
+        public FreeMapEvent Recon()
         {
-            FlareOn = on;
-            if (on) { Reveal(FreeMapParams.VisionFlare); SnapshotFoe(FreeMapParams.VisionFlare); }
+            if (Dead || InFight) return FreeMapEvent.None;
+            Reveal(Me, FreeMapParams.ReconRange);
+            return PassTurns(1);
         }
 
-        /// <summary>偵察を始める (止まっている時だけ)。 ScoutTurns 手番動けない。</summary>
-        public bool StartScout()
+        /// <summary>照明 (手番は使わない): 物資を払い、 <see cref="FreeMapParams.FlareTurns"/> 手番のあいだ
+        /// 道で <see cref="FreeMapParams.FlareRange"/> 歩先まで見える。 追跡者の補足の歩数も同じだけ伸びる。</summary>
+        public FreeMapEvent UseFlare()
         {
-            if (IsMoving || IsScouting || InGauntlet || Dead) return false;
-            ScoutTicksLeft = FreeMapParams.ScoutTurns * FreeMapParams.TicksPerTurn;
-            _scoutActive = true;
-            _scoutObs.Clear();
-            _scoutObsTurn = -1;
-            ScoutObserve(false);
-            return true;
+            if (Dead || InFight) return FreeMapEvent.None;
+            var ev = Pay(FreeMapParams.FlareSupply) ? FreeMapEvent.Died : FreeMapEvent.None;
+            if ((ev & FreeMapEvent.Died) != 0) { Dead = true; return ev; }
+            FlareTurnsLeft = FreeMapParams.FlareTurns;
+            Reveal(Me, FreeMapParams.FlareRange);
+            Version++;
+            return ev;
         }
 
-        /// <summary>囮を今いる場所に置く (所持数の管理は呼び出し側)。</summary>
-        public void PlaceDecoy()
-            => Decoys.Add(new Decoy { p = Me, turns = FreeMapParams.DecoyTurns, delay = FreeMapParams.DecoyDelay });
-
-        /// <summary>罠を今いる場所に置く (所持数の管理は呼び出し側)。 道の外に置いても敵はまず踏まない。</summary>
-        public void PlaceTrap() => Traps.Add(Me);
-
-        /// <summary>物音: 半径 r の (追跡中でない) 敵を警戒させ、 今の位置へ呼ぶ。</summary>
-        public void MakeNoise(double r)
-        {
-            if (!FoeAlive || FoeState == FoeState.Chase) return;
-            if (Vec2.Dist(FoePos, Me) > r) return;
-            FoeState = FoeState.Alert;
-            _lastKnown = Me;
-            PlanFoe();
-        }
-
-        /// <summary>戦闘が終わった: 2 手番の気配 +2 と、 半径 4 の物音。</summary>
-        public void NoteBattleEnded()
-        {
-            BattleHeatTurns = FreeMapParams.BattleKehaiTurns;
-            MakeNoise(FreeMapParams.BattleNoise);
-        }
-
-        /// <summary>補給庫を漁った物音 (半径 3・気配は上げない)。</summary>
-        public void NoteCacheLooted() => MakeNoise(FreeMapParams.CacheNoise);
-
-        /// <summary>通常の戦闘から逃げた: 直前の点へ戻る (そのマスは使い切りにならない ── 呼び出し側の責務)。</summary>
+        /// <summary>通常の戦闘から逃げた: 直前の点へ戻る (手番は使わない)。</summary>
         public void FleeToPrevious()
         {
-            int to = PrevNode >= 0 ? PrevNode : Layout.start;
-            MoveTarget = -1;
-            _pendingArrival = -1;
-            Me = Layout.pos[to];
-            AtNode = to;
-            Segment = (-1, -1);
+            Version++;
+            if (Me != PrevNode && _adj[Me].Contains(PrevNode)) Me = PrevNode;
+            PendingArrival = -1;
+            Reveal(Me, VisionRange);
         }
 
-        /// <summary>連戦に勝ち切った: 徘徊エネミーは倒れる。</summary>
-        public void ResolveGauntletWon()
+        /// <summary>多めに回復する休憩など、 手番だけを進める。</summary>
+        public FreeMapEvent PassTurnsExternal(int n) => Dead || InFight ? FreeMapEvent.None : PassTurns(n);
+
+        /// <summary>囮罠を今いる点に置く (手番は使わない)。 近くの追跡者は気を引かれて向かい、 踏むと足止めされる。</summary>
+        public FreeMapEvent PlaceLure()
         {
-            InGauntlet = false;
+            if (Dead || InFight) return FreeMapEvent.None;
+            Lures.RemoveAll(l => l.node == Me);
+            Lures.Add(new Lure { node = Me, turnsLeft = FreeMapParams.LureLife });
+            Version++;
+            if (FoeAlive && FoeMode != FoeMode.Chase && FoeNotices(Me))
+            {
+                FoeMode = FoeMode.Alert; _alertLure = Me;
+                return FreeMapEvent.FoeAlerted;
+            }
+            return FreeMapEvent.None;
+        }
+
+        /// <summary>点 i に有効な囮罠が置かれているか。</summary>
+        public bool HasLureAt(int i)
+        {
+            foreach (var l in Lures) if (l.node == i) return true;
+            return false;
+        }
+
+        private bool FoeNotices(int lureNode) => HopsFrom(FoeNode)[lureNode] <= FreeMapParams.LureNotice;
+
+        /// <summary>マスを起動した (使い切り)。 沈める点の候補から外す。</summary>
+        public void MarkDone(int i) { if (i >= 0 && i < Done.Length) { Done[i] = true; Version++; } }
+
+        /// <summary>着いた点が戦闘の後の発動を待っているなら、 その点を返して待ちを解く。 無ければ -1。</summary>
+        public int TakePendingArrival()
+        {
+            int p = PendingArrival;
+            if (p < 0 || p != Me) { PendingArrival = -1; return -1; }
+            PendingArrival = -1;
+            return p;
+        }
+
+        // ── 戦闘の決着 ──
+
+        /// <summary>追跡者に勝った: 追跡者は倒れ、 使い魔も消える。</summary>
+        public void ResolveBodyWon()
+        {
+            Version++;
+            Contact = ContactKind.None;
             FoeAlive = false;
-            BattleHeatTurns = FreeMapParams.BattleKehaiTurns;
-            StoneLevel = 0;
-            StoneBearing = -1;
+            Familiars.Clear();
         }
 
-        /// <summary>連戦から逃げた: 2 手番後から追跡。 移動中に捕まったなら出発した点へ戻る
-        /// (点に居て捕まったならその場に留まる ── そこが「直前の点」)。</summary>
-        public void ResolveGauntletFled()
+        /// <summary>追跡者の戦闘から逃げた: 直前の点へ戻り、 追跡者は <see cref="FreeMapParams.FleeFreezeTurns"/> 手番足止めされる。</summary>
+        public void ResolveBodyFled()
         {
-            InGauntlet = false;
-            if (AtNode < 0) FleeToPrevious();
-            MoveTarget = -1;
-            FoeState = FoeState.Chase;
-            _freezeResume = FoeState.Chase;
-            FoeFreezeTicks = FreeMapParams.FleeFreezeTurns * FreeMapParams.TicksPerTurn;
-            _lost = 0;
+            Version++;
+            Contact = ContactKind.None;
+            PendingArrival = -1;
+            if (Me != PrevNode && _adj[Me].Contains(PrevNode)) Me = PrevNode;
+            FoeFreezeTurns = Math.Max(FoeFreezeTurns, FreeMapParams.FleeFreezeTurns);
+            Reveal(Me, VisionRange);
         }
 
-        // =====================================================================
-        //  時間
-        // =====================================================================
-
-        /// <summary>stopMask のどれかが起きるか、 maxTicks 刻み進むか、 止まる理由 (死亡・連戦・何もすることが無い) が
-        /// 生じるまで同期的に進める。 BOT 用。 起きたことの和を返す。</summary>
-        public FreeMapEvent RunUntil(FreeMapEvent stopMask, int maxTicks)
+        /// <summary>使い魔との戦闘が終わった (勝っても逃げても使い魔は消える。 猟犬は本体の元へ戻る)。</summary>
+        public void ResolveFamiliarFight(bool fled)
         {
-            var acc = FreeMapEvent.None;
-            for (int i = 0; i < maxTicks; i++)
-            {
-                var ev = Tick();
-                acc |= ev;
-                if ((ev & stopMask) != 0 || Dead || InGauntlet || InFamiliarFight) break;
-            }
-            return acc;
-        }
-
-        /// <summary>0.1 手番進める。</summary>
-        public FreeMapEvent Tick()
-        {
-            if (Dead || InGauntlet || InFamiliarFight) return FreeMapEvent.None;
-            var ev = FreeMapEvent.None;
-            int arrivedAt = -1;
-            if (_pendingArrival >= 0 && !IsMoving && AtNode == _pendingArrival) arrivedAt = _pendingArrival;
-            _pendingArrival = -1;
-
-            if (IsMoving)
-            {
-                arrivedAt = StepMove(ref ev);
-                if (Dead) return ev | FreeMapEvent.Died;
-            }
-            else if (IsScouting)
-            {
-                ScoutTicksLeft--;
-            }
-            Ticks++;
-
-            if (FoeAlive && FoeFreezeTicks > 0 && --FoeFreezeTicks == 0)
-            {
-                FoeState = _freezeResume; _lost = 0; PlanFoe();
-                _freezeResume = FoeState.Chase;
-            }
-            else if (FoeAlive && FoeFreezeTicks <= 0)
-            {
-                AdvanceFoe(FreeMapParams.Tick * (FoeState == FoeState.Patrol ? Profile.patrolSpeed : Profile.chaseSpeed));
-                var fp = FoePos;
-                int k = Traps.FindIndex(t => Vec2.Dist(t, fp) <= FreeMapParams.TrapHitDist);
-                if (k >= 0)
-                {
-                    Traps.RemoveAt(k);
-                    _freezeResume = FoeState == FoeState.Chase ? FoeState.Chase : FoeState.Patrol;
-                    FoeFreezeTicks = FreeMapParams.TrapFreezeTurns * FreeMapParams.TicksPerTurn;
-                    LastSeenFoe = fp; LastSeenFoeTime = TimeTurns;   // 罠が作動した場所 ＝ 敵の位置
-                    ev |= FreeMapEvent.TrapTriggered;
-                }
-            }
-
-            if (_scoutActive)
-            {
-                ScoutObserve(ScoutTicksLeft == 0);
-                if (ScoutTicksLeft == 0)
-                {
-                    _scoutActive = false;
-                    FinishScout();
-                    ev |= FreeMapEvent.ScoutFinished;
-                }
-            }
-
-            if (++_tickInTurn >= FreeMapParams.TicksPerTurn)
-            {
-                _tickInTurn = 0;
-                ev |= Turn();
-                if (Dead) return ev | FreeMapEvent.Died;
-            }
-
-            if (FlareOn) { Reveal(FreeMapParams.VisionFlare); SnapshotFoe(FreeMapParams.VisionFlare); }
-            Reveal(FreeMapParams.VisionNone);
-            // 目視: 視界 1 に入った瞬間だけ (居続けても毎刻みは出さない)
-            bool inSight = FoeAlive && Vec2.Dist(FoePos, Me) <= FreeMapParams.VisionNone + 1e-6;
-            if (inSight) { LastSeenFoe = FoePos; LastSeenFoeTime = TimeTurns; }
-            if (inSight && !_foeInSightPrev) ev |= FreeMapEvent.FoeSighted;
-            _foeInSightPrev = inSight;
-
-            ev |= UpdateStone();
-
-            if (_familiarCooldownTicks > 0) _familiarCooldownTicks--;
-            ev |= AdvanceFamiliars();
-            if (InFamiliarFight)
-            {
-                MoveTarget = -1;
-                _pendingArrival = arrivedAt;         // 着いた点は交戦の後で発動する
-                return ev | FreeMapEvent.FamiliarContact;
-            }
-
-            if (FoeAlive && FoeFreezeTicks <= 0 && Vec2.Dist(FoePos, Me) <= FreeMapParams.CatchDist)
-            {
-                InGauntlet = true;
-                MoveTarget = -1;
-                _pendingArrival = arrivedAt;         // 着いた点は連戦の後で発動する (捕まった方が先)
-                return ev | FreeMapEvent.Caught;
-            }
-
-            if (arrivedAt >= 0)
-            {
-                LastArrived = arrivedAt;
-                ev |= FreeMapEvent.Arrived;
-            }
-            return ev;
-        }
-
-        private int StepMove(ref FreeMapEvent ev)
-        {
-            var to = Layout.pos[MoveTarget];
-            double rem = Vec2.Dist(Me, to);
-            double step = Math.Min(Speed.StepPerTick(), rem);
-            double per = PerDistance(MoveOnRoad);
-            Pay(step * per, step * HpRate(MoveOnRoad) * Speed.CostMul());
-            if (Dead) return -1;
-
-            double k = rem > 0 ? step / rem : 1;
-            Me = new Vec2(Me.x + (to.x - Me.x) * k, Me.y + (to.y - Me.y) * k);
-            AtNode = -1;
-            Segment = MoveOnRoad && _moveFrom >= 0 ? (_moveFrom, MoveTarget) : (-1, -1);
-            _trackAcc += step;
-            if (_trackAcc >= 1)
-            {
-                _trackAcc -= 1;
-                Tracks.Add(new Track { p = Me, strength = MoveOnRoad ? FreeMapParams.TrackRoad : FreeMapParams.TrackOffRoad });
-            }
-            if (rem - step <= 1e-6)
-            {
-                int j = MoveTarget;
-                Me = to; AtNode = j; Segment = (-1, -1); MoveTarget = -1;
-                return j;
-            }
-            return -1;
-        }
-
-        /// <summary>物資で払えない分は HP で払う (払底)。 死ぬ移動も許す。</summary>
-        private void Pay(double provCost, double hpCost)
-        {
-            int have = _wallet.Provision;
-            if (have >= provCost)
-            {
-                _provFrac += provCost;
-                int whole = (int)Math.Floor(_provFrac);
-                if (whole > have) whole = have;
-                if (whole > 0) _wallet.SpendProvision(whole);
-                _provFrac -= whole;
-                return;
-            }
-            double covered = provCost > 0 ? have / provCost : 1;
-            if (have > 0) _wallet.SpendProvision(have);
-            _provFrac = 0;
-            _hpFrac += hpCost * (1 - covered);
-            int hp = (int)Math.Floor(_hpFrac);
-            if (hp > 0)
-            {
-                _hpFrac -= hp;
-                if (_wallet.PayHp(hp)) Dead = true;
-            }
-        }
-
-        /// <summary>手番ごと: 痕跡が薄れる / 戦闘の気配が冷める / 照明の消費 (止まっている時) / 囮 / 敵の察知。</summary>
-        private FreeMapEvent Turn()
-        {
-            var ev = FreeMapEvent.TurnPassed;
-            int turn = TurnIndex++;
-            for (int i = Tracks.Count - 1; i >= 0; i--)
-            {
-                var t = Tracks[i]; t.strength--;
-                if (t.strength <= 0) Tracks.RemoveAt(i); else Tracks[i] = t;
-            }
-            if (BattleHeatTurns > 0) BattleHeatTurns--;
-            if (FlareOn && !IsMoving) { Pay(FreeMapParams.CostFlare, 0); if (Dead) return ev; }
-            if (!FoeAlive) return ev;
-
-            if (FoeFreezeTicks > 0) return ev;   // 足止め中は察知も囮も無い (解除は Tick が刻みで数える)
-
-            // 囮: 置いてから DecoyDelay 手番後に鳴り始め、 追跡中でない近くの敵を呼ぶ。 敵が着くと壊れる
-            for (int i = 0; i < Decoys.Count; i++)
-            {
-                var d = Decoys[i]; d.turns--;
-                if (d.delay > 0) { d.delay--; Decoys[i] = d; continue; }
-                var fp = FoePos;
-                if (FoeState != FoeState.Chase && Vec2.Dist(fp, d.p) <= FreeMapParams.DecoyNoise)
-                {
-                    if (FoeState != FoeState.Alert || _lastKnown == null || Vec2.Dist(_lastKnown.Value, d.p) > 0.1)
-                    { FoeState = FoeState.Alert; _lastKnown = d.p; PlanFoe(); }
-                }
-                if (Vec2.Dist(FoePos, d.p) <= FreeMapParams.DecoyBreak) { d.turns = 0; ev |= FreeMapEvent.DecoyBroken; }
-                Decoys[i] = d;
-            }
-            Decoys.RemoveAll(x => x.turns <= 0);
-
-            double dist = Vec2.Dist(FoePos, Me), R = DetectRadius;
-            bool seen = false;
-            if (dist <= R)
-            {
-                int roll = GameLoop.GameRng.Range(1, 7, DetectRngKey, Floor * 100000 + turn);
-                seen = roll <= DetectNeed(dist, R);
-            }
-            if (seen)
-            {
-                if (FoeState != FoeState.Chase)
-                {
-                    // 影の性質は察知した合図を出さない (魔石にも反応しない)
-                    if (!Profile.silentWhileChasing) ev |= FreeMapEvent.Detected;
-                    LaunchFamiliar(Me);   // 察知した地点へ使い魔を放つ
-                }
-                FoeState = FoeState.Chase; _lost = 0; _lastKnown = Me; PlanFoe();
-            }
-            else if (FoeState == FoeState.Chase)
-            {
-                if (++_lost >= Profile.lostTurns)
-                {
-                    FoeState = FoeState.Alert;
-                    if (_lastKnown == null) _lastKnown = Me;
-                }
-                PlanFoe();
-            }
-            else if (FoeState == FoeState.Patrol)
-            {
-                var fp = FoePos;
-                foreach (var t in Tracks)
-                    if (Vec2.Dist(t.p, fp) <= FreeMapParams.TrackNoticeDist)
-                    { FoeState = FoeState.Alert; _lastKnown = t.p; PlanFoe(); break; }
-            }
-            return ev;
-        }
-
-        private int ComputeStoneLevel()
-        {
-            if (!FoeAlive) return 0;
-            double d = Vec2.Dist(FoePos, Me);
-            if (d > FreeMapParams.VisionStone) return 0;
-            bool hunting = FoeState == FoeState.Chase || FoeFreezeTicks > 0;
-            if (hunting && Profile.silentWhileChasing) return 0;              // 影: 追跡中は一切反応しない
-            if (hunting) return 3;                                              // 察知されている
-            return d <= FreeMapParams.StoneNearDist ? 2 : 1;                    // かなり近い / 遠い
-        }
-
-        private FreeMapEvent UpdateStone()
-        {
-            int lv = ComputeStoneLevel();
-            var ev = FreeMapEvent.None;
-            if (lv > StoneLevel) ev |= FreeMapEvent.StoneRaised;
-            if (lv == 3 && StoneLevel != 3) ev |= FreeMapEvent.StoneHot;
-            StoneLevel = lv;
-            StoneBearing = lv > 0 ? BearingOf(FoePos - Me) : -1;
-            return ev;
-        }
-
-        // 方角の境目 (30° + 60°k の単位ベクトル)。 三角関数を使わず √3 の定数だけで決める ── 実装差で境目が揺れない
-        private const double H3 = 0.8660254037844386;   // √3 / 2
-        private static readonly Vec2[] BearingEdges =
-        {
-            new Vec2(H3, 0.5), new Vec2(0, 1), new Vec2(-H3, 0.5), new Vec2(-H3, -0.5), new Vec2(0, -1), new Vec2(H3, -0.5),
-        };
-        private static readonly Vec2[] BearingCenters =
-        {
-            new Vec2(1, 0), new Vec2(0.5, H3), new Vec2(-0.5, H3), new Vec2(-1, 0), new Vec2(-0.5, -H3), new Vec2(0.5, -H3),
-        };
-
-        /// <summary>向き d が 6 つの方角のどれか (0〜5)。 0 は +x を中心に ±30°。</summary>
-        public static int BearingOf(Vec2 d)
-        {
-            if (d.x == 0 && d.y == 0) return 0;
-            for (int k = 0; k < 6; k++)
-            {
-                var a = BearingEdges[(k + 5) % 6]; var b = BearingEdges[k];   // 方角 k は境目 k-1 から境目 k まで
-                if (Cross(a, d) >= 0 && Cross(d, b) > 0) return k;
-            }
-            return 0;
-        }
-
-        /// <summary>方角の中心の単位ベクトル。</summary>
-        public static Vec2 BearingVector(int sector) => BearingCenters[((sector % 6) + 6) % 6];
-
-        private static double Cross(Vec2 a, Vec2 b) => a.x * b.y - a.y * b.x;
-
-        private void Reveal(double r)
-        {
-            for (int i = 0; i < Layout.Count; i++)
-                if (!Known[i] && Vec2.Dist(Layout.pos[i], Me) <= r + 1e-6) Known[i] = true;
-        }
-
-        private void SnapshotFoe(double r)
-        {
-            if (!FoeAlive) return;
-            var p = FoePos;
-            if (Vec2.Dist(p, Me) <= r + 1e-6) { LastSeenFoe = p; LastSeenFoeTime = TimeTurns; }
-        }
-
-        // 偵察: 範囲内の敵の位置を手番ごとに記録し、 終わった時にまとめて出す
-        private void ScoutObserve(bool final)
-        {
-            if (!FoeAlive) return;
-            var p = FoePos;
-            if (Vec2.Dist(p, Me) > FreeMapParams.VisionScout) return;
-            if (_scoutObs.Count == 0 || final || TurnIndex != _scoutObsTurn)
-            {
-                _scoutObs.Add(p);
-                _scoutObsTurn = TurnIndex;
-            }
-        }
-
-        private void FinishScout()
-        {
-            Reveal(FreeMapParams.VisionScout);
-            if (_scoutObs.Count > 0)
-            {
-                var a = _scoutObs[0]; var b = _scoutObs[_scoutObs.Count - 1];
-                LastSeenFoe = b; LastSeenFoeTime = TimeTurns;
-                FoeArrow = _scoutObs.Count >= 2 && Vec2.Dist(a, b) > 0.15 ? (a, b) : ((Vec2, Vec2)?)null;
-            }
-            _scoutObs.Clear();
-            _scoutObsTurn = -1;
-        }
-
-        // =====================================================================
-        //  徘徊エネミー (道の上しか動けない)
-        // =====================================================================
-
-        private int FoeTargetNode()
-        {
-            if (FoeState == FoeState.Chase) return Layout.NearestNode(Me);
-            if (FoeState == FoeState.Alert && _lastKnown != null) return Layout.NearestNode(_lastKnown.Value);
-            return Layout.waypoints[_baseIdx];
-        }
-
-        private void PlanFoe()
-        {
-            if (!FoeAlive) return;
-            var allowed = FoeState == FoeState.Patrol ? Layout.territory : null;
-            _foePath.Clear();
-            if (_fa != _fb && _ft > 0 && _ft < 1)
-            {   // 道の途中: 向かっている端まで行ってから経路に乗る
-                _foePath.AddRange(Layout.ShortestRoadPath(_fb, FoeTargetNode(), allowed));
-                return;
-            }
-            int here = _ft < 0.5 ? _fa : _fb;
-            _fa = _fb = here; _ft = 0;
-            _foePath.AddRange(Layout.ShortestRoadPath(here, FoeTargetNode(), allowed));
-        }
-
-        private void AdvanceFoe(double amount)
-        {
-            // 飛び掛かり: 追跡中で近ければ道を外れて直進。 離れたら最寄りの点から道へ戻る
-            if (Profile.lungeRange > 0)
-            {
-                if (FoeState == FoeState.Chase)
-                {
-                    var fp = FoePos; double d = Vec2.Dist(fp, Me);
-                    if (d <= Profile.lungeRange || (_lungePos.HasValue && d <= Profile.lungeRange + 1.0))
-                    {
-                        double k = Math.Min(1, amount / Math.Max(1e-9, d));
-                        _lungePos = Vec2.Lerp(fp, Me, k);
-                        return;
-                    }
-                }
-                if (_lungePos.HasValue) ReturnToRoad();
-            }
-            int guard = 0;
-            while (amount > 1e-9 && guard++ < 64)
-            {
-                if (_fa == _fb)
-                {
-                    if (_foePath.Count == 0)
-                    {   // 目的地に着いた
-                        if (FoeState == FoeState.Patrol)
-                        {
-                            _baseIdx = (_baseIdx + 1) % Layout.waypoints.Count;
-                            _foePath.AddRange(Layout.ShortestRoadPath(_fa, Layout.waypoints[_baseIdx], Layout.territory));
-                            if (_foePath.Count == 0) return;
-                        }
-                        else if (FoeState == FoeState.Alert)
-                        {   // 何も無かった: 最寄りの巡回点へ戻り、 縄張りの巡回を再開
-                            FoeState = FoeState.Patrol; _lastKnown = null;
-                            int bi = 0;
-                            for (int i = 1; i < Layout.waypoints.Count; i++)
-                                if (Layout.Dist(Layout.waypoints[i], _fa) < Layout.Dist(Layout.waypoints[bi], _fa)) bi = i;
-                            _baseIdx = bi;
-                            PlanFoe();
-                            if (_foePath.Count == 0) return;
-                        }
-                        else return;   // 追跡: 道の端で待つ (道の外へは出られない)
-                    }
-                    _fb = _foePath[0]; _foePath.RemoveAt(0); _ft = 0;
-                }
-                double len = Layout.Dist(_fa, _fb);
-                if (len < 1e-6) len = 1e-6;
-                double rest = (1 - _ft) * len, step = Math.Min(rest, amount);
-                _ft += step / len; amount -= step;
-                if (_ft >= 1 - 1e-9) { _fa = _fb; _ft = 0; }
-            }
-        }
-
-        /// <summary>飛び掛かりの後、 最寄りの点へ戻って道の上の動きに戻る。</summary>
-        private void ReturnToRoad()
-        {
-            var p = _lungePos.Value;
-            _lungePos = null;
-            _fa = _fb = Layout.NearestNode(p); _ft = 0;
-            PlanFoe();
-        }
-
-        // =====================================================================
-        //  使い魔 (巡航ミサイル)
-        // =====================================================================
-
-        private void LaunchFamiliar(Vec2 target)
-        {
-            if (!FoeAlive || !Profile.LaunchesFamiliars) return;
-            if (_familiarCooldownTicks > 0 || Familiars.Count >= Profile.familiarMax) return;
-            Familiars.Add(new Familiar { pos = FoePos, target = target });
-            _familiarCooldownTicks = Profile.familiarCooldownTurns * FreeMapParams.TicksPerTurn;
-            FamiliarsLaunched++;
-        }
-
-        /// <summary>使い魔を 1 刻み飛ばす。 探知範囲の内にプレイヤーが居れば向きを変え、 目標地点で見つけられなければ消える。</summary>
-        private FreeMapEvent AdvanceFamiliars()
-        {
-            var ev = FreeMapEvent.None;
-            if (Familiars.Count == 0) { _familiarInSightPrev = false; return ev; }
-            double step = FreeMapParams.FamiliarSpeed * FreeMapParams.Tick;
-            double vis = FlareOn ? FreeMapParams.VisionFlare : FreeMapParams.VisionNone;
-            bool anyInSight = false;
+            Version++;
+            Contact = ContactKind.None;
             for (int i = Familiars.Count - 1; i >= 0; i--)
             {
                 var f = Familiars[i];
-                if (Vec2.Dist(f.pos, Me) <= FreeMapParams.FamiliarDetectRange) f.target = Me;
-                double rem = Vec2.Dist(f.pos, f.target);
-                if (rem <= step) f.pos = f.target;
-                else f.pos = Vec2.Lerp(f.pos, f.target, step / rem);
-                bool visible = Vec2.Dist(f.pos, Me) <= vis + 1e-6;
-                if (Vec2.Dist(f.pos, Me) <= FreeMapParams.FamiliarCatchDist)
-                {
-                    Familiars.RemoveAt(i);
-                    InFamiliarFight = true;
-                    FamiliarContacts++;
-                    return ev;
-                }
-                if (Vec2.Dist(f.pos, f.target) <= 1e-9)
-                {
-                    if (Vec2.Dist(f.pos, Me) <= FreeMapParams.FamiliarDetectRange) f.target = Me;
-                    else
-                    {
-                        Familiars.RemoveAt(i);
-                        if (visible) ev |= FreeMapEvent.FamiliarVanished;
-                        continue;
-                    }
-                }
-                Familiars[i] = f;
-                anyInSight |= visible;
+                if (f.pos != Me) continue;
+                if (f.hound) { f.pos = FoeNode; f.target = -1; Familiars[i] = f; }
+                else Familiars.RemoveAt(i);
             }
-            if (anyInSight && !_familiarInSightPrev) ev |= FreeMapEvent.FamiliarSighted;
-            _familiarInSightPrev = anyInSight;
+            if (fled)
+            {
+                PendingArrival = -1;
+                if (Me != PrevNode && _adj[Me].Contains(PrevNode)) Me = PrevNode;
+                Reveal(Me, VisionRange);
+            }
+        }
+
+        // =====================================================================
+        //  手番
+        // =====================================================================
+
+        private bool Pay(int cost)
+        {
+            int pay = Math.Min(cost, Math.Max(0, _wallet.Provision));
+            if (pay > 0) _wallet.SpendProvision(pay);
+            int short_ = cost - pay;
+            if (short_ <= 0) return false;
+            return _wallet.PayHp((short_ + FreeMapParams.SupplyPerHp - 1) / FreeMapParams.SupplyPerHp);
+        }
+
+        private void Reveal(int center, int range)
+        {
+            var d = HopsFrom(center);
+            for (int i = 0; i < d.Length; i++) if (d[i] <= range) Known[i] = true;
+        }
+
+        private FreeMapEvent PassTurns(int n)
+        {
+            var ev = FreeMapEvent.None;
+            Version++;
+            for (int k = 0; k < n; k++)
+            {
+                Turn++;
+                ev |= FreeMapEvent.TurnPassed;
+                ev |= FoeTurn();
+                TickLures();
+                if (Turn % FreeMapParams.FrontEvery == 0) ev |= AdvanceFront();
+                if (Contact != ContactKind.None) break;
+            }
+            Reveal(Me, VisionRange);
             return ev;
         }
 
-        /// <summary>使い魔との交戦が終わった (勝っても逃げても使い魔は消える)。 逃げたなら移動中は出発した点へ戻る。</summary>
-        public void ResolveFamiliarFight(bool fled)
+        private void TickLures()
         {
-            InFamiliarFight = false;
-            if (fled && AtNode < 0) FleeToPrevious();
-            MoveTarget = -1;
+            for (int i = Lures.Count - 1; i >= 0; i--)
+            {
+                var l = Lures[i]; l.turnsLeft--;
+                if (l.turnsLeft <= 0) Lures.RemoveAt(i); else Lures[i] = l;
+            }
         }
 
-        /// <summary>テスト・デバッグ用: 徘徊エネミーが今いる道の両端 (点の上なら同じ値)。</summary>
-        public (int a, int b) FoeEdge => (_fa, _fb);
-    }
+        private FreeMapEvent FoeTurn()
+        {
+            var ev = FreeMapEvent.None;
+            if (FoeAlive)
+            {
+                var dMe = HopsFrom(Me);
+                int detect = FlareOn ? FreeMapParams.FlareRange : FreeMapParams.DetectRange;
+                if (dMe[FoeNode] <= detect)
+                {
+                    if (FoeMode != FoeMode.Chase) ev |= FreeMapEvent.Detected;
+                    FoeMode = FoeMode.Chase; LastSeen = Me; _lose = 0;
+                }
+                else if (FoeMode == FoeMode.Chase && ++_lose > FreeMapParams.QuietLose)
+                {
+                    FoeMode = FoeMode.Patrol; ev |= FreeMapEvent.FoeLost;
+                }
+                else if (FoeMode == FoeMode.Patrol && HasTrace(FoeNode))
+                {
+                    FoeMode = FoeMode.Alert; ev |= FreeMapEvent.FoeAlerted;
+                }
+                // 囮罠: 追跡していない間、 近くに置かれた囮罠へ気を引かれる (一番近いもの)
+                if (FoeMode != FoeMode.Chase)
+                {
+                    int lure = NearestLureFromFoe();
+                    if (lure >= 0) { if (FoeMode != FoeMode.Alert || _alertLure != lure) ev |= FreeMapEvent.FoeAlerted; FoeMode = FoeMode.Alert; _alertLure = lure; }
+                }
 
-    /// <summary>
-    /// 時間の自動停止と早送りの解除の規則。 §23-21「自動の一時停止（察知・目視）は時間の停止として働く」
-    /// 「早送りは『点に着いた』『察知された』『魔石の反応が一段上がった』で自動解除して順速へ戻る」。
-    /// <b>察知で時間が止まる演出はこのゲームの肝</b>なので、 規則をここ 1 か所に置いて人の時計が必ずこれを読む。
-    /// </summary>
-    public static class FreeMapClockPolicy
-    {
-        /// <summary>時間を止める契機: 察知された・魔石が「察知されている」に入った・敵を目視・使い魔を目視・接触・捕まった・死んだ。</summary>
-        public const FreeMapEvent PauseMask =
-            FreeMapEvent.Detected | FreeMapEvent.StoneHot | FreeMapEvent.FoeSighted
-            | FreeMapEvent.FamiliarSighted | FreeMapEvent.FamiliarContact
-            | FreeMapEvent.Caught | FreeMapEvent.Died;
+                if (FoeFreezeTurns > 0) FoeFreezeTurns--;
+                else
+                {
+                    for (int k = 0; k < Profile.foeSteps; k++)
+                    {
+                        var mode = FoeMode; int patrol = _patrol;
+                        FoeNode = ComputeFoeStep(ref mode, ref patrol);
+                        FoeMode = mode; _patrol = patrol;
+                        if (StepOnLure()) { ev |= FreeMapEvent.LureTriggered; break; }
+                        if (FoeNode == Me) break;
+                    }
+                }
+                if (FoeAlive && FoeNode == Me) { Contact = ContactKind.Body; ev |= FreeMapEvent.Caught; }
 
-        /// <summary>早送りを解除する契機 (止めはしない): 点に着いた・魔石の反応が一段上がった。</summary>
-        public const FreeMapEvent CancelFastMask = FreeMapEvent.Arrived | FreeMapEvent.StoneRaised;
+                if (Profile.summons && FoeMode == FoeMode.Chase && ++_sinceSummon >= FreeMapParams.SummonEvery)
+                {
+                    _sinceSummon = 0;
+                    Familiars.Add(new Familiar { pos = FoeNode, target = LastSeen, hound = false });
+                    ev |= FreeMapEvent.FamiliarLaunched;
+                }
+            }
 
-        public static bool ShouldPause(FreeMapEvent ev) => (ev & PauseMask) != 0;
-        public static bool ShouldCancelFast(FreeMapEvent ev) => (ev & (CancelFastMask | PauseMask)) != 0;
+            ev |= FamiliarsTurn();
+            if (FlareTurnsLeft > 0) FlareTurnsLeft--;
+            return ev;
+        }
+
+        private FreeMapEvent FamiliarsTurn()
+        {
+            var ev = FreeMapEvent.None;
+            if (Familiars.Count == 0) return ev;
+            bool vanished = false;
+            for (int i = 0; i < Familiars.Count; i++)
+            {
+                var f = Familiars[i];
+                if (f.hound) f.target = FoeMode == FoeMode.Chase ? LastSeen : FoeNode;
+                for (int k = 0; k < Profile.familiarSteps; k++)
+                {
+                    if (HopsFrom(f.pos)[Me] <= FreeMapParams.FamiliarSee) f.target = Me;
+                    if (f.target < 0) break;
+                    f.pos = FreeMapLayout.StepToward(_adj, f.pos, f.target);
+                    if (f.pos == Me) break;
+                }
+                if (!f.hound && f.pos == f.target && f.pos != Me && HopsFrom(f.pos)[Me] > FreeMapParams.FamiliarSee)
+                {
+                    f.target = -2;   // 消える印
+                    vanished = true;
+                }
+                Familiars[i] = f;
+            }
+            if (vanished)
+            {
+                Familiars.RemoveAll(f => f.target == -2);
+                ev |= FreeMapEvent.FamiliarVanished;
+            }
+            foreach (var f in Familiars)
+                if (f.pos == Me && Contact == ContactKind.None) { Contact = ContactKind.Familiar; ev |= FreeMapEvent.FamiliarContact; break; }
+            return ev;
+        }
+
+        private int NearestLureFromFoe()
+        {
+            if (Lures.Count == 0) return -1;
+            var d = HopsFrom(FoeNode);
+            int best = -1, bd = int.MaxValue;
+            foreach (var l in Lures)
+                if (d[l.node] <= FreeMapParams.LureNotice && d[l.node] < bd) { bd = d[l.node]; best = l.node; }
+            return best;
+        }
+
+        /// <summary>追跡者が囮罠のある点に居るなら足止めされ、 囮罠は使い切る。</summary>
+        private bool StepOnLure()
+        {
+            for (int i = 0; i < Lures.Count; i++)
+            {
+                if (Lures[i].node != FoeNode) continue;
+                Lures.RemoveAt(i);
+                FoeFreezeTurns = FreeMapParams.LureHoldTurns;
+                if (FoeMode == FoeMode.Alert) FoeMode = FoeMode.Patrol;
+                _alertLure = -1;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>追跡者の次の 1 歩。 予告 (<see cref="PeekFoeStep"/>) と実際の移動が同じ関数を通る。
+        /// 状態は書き換えない (mode / patrol は参照渡しの控えだけが変わる)。 実際の移動は呼び出し側が書き戻す。</summary>
+        private int ComputeFoeStep(ref FoeMode mode, ref int patrol)
+        {
+            if (mode == FoeMode.Chase)
+                return LastSeen >= 0 ? FreeMapLayout.StepToward(_adj, FoeNode, LastSeen) : FoeNode;
+            if (mode == FoeMode.Alert)
+            {
+                if (_alertLure >= 0 && FoeNode != _alertLure)
+                    return FreeMapLayout.StepToward(_adj, FoeNode, _alertLure);
+                // 痕跡をたどる: いまの点より新しい痕跡のある隣へ
+                int best = -1, bt = _trace[FoeNode];
+                foreach (int v in _adj[FoeNode])
+                    if (HasTrace(v) && _trace[v] > bt) { bt = _trace[v]; best = v; }
+                if (best >= 0) return best;
+                mode = FoeMode.Patrol;
+            }
+            var way = Layout.waypoints;
+            int t = way.Count > 0 ? way[patrol % way.Count] : Layout.home;
+            if (FoeNode == t)
+            {
+                patrol++;
+                return FreeMapLayout.StepToward(_adj, FoeNode, way.Count > 0 ? way[patrol % way.Count] : Layout.home);
+            }
+            return FreeMapLayout.StepToward(_adj, FoeNode, t);
+        }
+
+        // =====================================================================
+        //  前線と天候
+        // =====================================================================
+
+        private FreeMapEvent AdvanceFront()
+        {
+            if (Weather == WeatherKind.None || Front >= FreeMapParams.Width) return FreeMapEvent.None;
+            Front = double.IsNegativeInfinity(Front) ? FreeMapParams.FrontStep : Front + FreeMapParams.FrontStep;
+            var ev = FreeMapEvent.FrontAdvanced;
+            int baseIdx = Floor * 100000 + Turn * 10;
+            if (Weather == WeatherKind.Crumble && CrumbleOne(baseIdx)) ev |= FreeMapEvent.MapChanged;
+            if (Weather == WeatherKind.Sink && SinkOne(baseIdx)) ev |= FreeMapEvent.MapChanged;
+            return ev;
+        }
+
+        private bool KeepsGoal() => HopsFrom(Me)[Layout.goal] != int.MaxValue;
+
+        private void Unlink(int a, int b) { _adj[a].Remove(b); _adj[b].Remove(a); }
+
+        private bool CrumbleOne(int baseIdx)
+        {
+            var cand = new List<(int a, int b)>();
+            foreach (var (a, b) in Roads()) if (InFront(a) && InFront(b) && a != Me && b != Me) cand.Add((a, b));
+            for (int tries = 0; tries < 20 && cand.Count > 0; tries++)
+            {
+                int pick = GameLoop.GameRng.Range(0, cand.Count, WeatherInfo.RngKey, baseIdx + tries);
+                var (a, b) = cand[pick]; cand.RemoveAt(pick);
+                Unlink(a, b);
+                if (KeepsGoal() && _adj[a].Count > 0 && _adj[b].Count > 0) return true;
+                _adj[a].Add(b); _adj[b].Add(a);
+            }
+            return false;
+        }
+
+        private bool SinkOne(int baseIdx)
+        {
+            var cand = new List<int>();
+            for (int i = 0; i < _adj.Length; i++)
+                if (InFront(i) && !Done[i] && !_sunk[i] && i != Me && i != FoeNode && i != Layout.goal && i != Layout.start)
+                    cand.Add(i);
+            for (int tries = 0; tries < 20 && cand.Count > 0; tries++)
+            {
+                int pick = GameLoop.GameRng.Range(0, cand.Count, WeatherInfo.RngKey, baseIdx + tries);
+                int i = cand[pick]; cand.RemoveAt(pick);
+                var saved = new List<int>(_adj[i]);
+                foreach (int v in saved) Unlink(i, v);
+                if (KeepsGoal()) { _sunk[i] = true; return true; }
+                foreach (int v in saved) { _adj[i].Add(v); _adj[v].Add(i); }
+            }
+            return false;
+        }
     }
 }

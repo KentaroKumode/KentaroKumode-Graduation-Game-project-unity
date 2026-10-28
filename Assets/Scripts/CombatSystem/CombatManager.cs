@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using InventorySystem;
-using InventorySystem.PassiveSkills;
+using ItemSystem;
+using ItemSystem.PassiveSkills;
 using CombatSystem.DiceLED;
 
 namespace CombatSystem
@@ -271,12 +271,12 @@ namespace CombatSystem
         /// <summary>L1学習: 敵 maxHP（撃破率計算用）。</summary>
         public int enemyMaxHP;
         /// <summary>ボス難易度オートチューナー: プレイヤー敗北時の致死メカニズム分類 (勝利時は Normal)。</summary>
-        public InventorySystem.PassiveSkills.DeathCause deathCause;
+        public ItemSystem.PassiveSkills.DeathCause deathCause;
         /// <summary>ボス難易度オートチューナー: この戦闘のプレイヤーロール合計と回数 (平均出目算出用)。</summary>
         public long playerRollSum;
         public int playerRollCount;
         /// <summary>ボス難易度オートチューナー: この戦闘の総被ダメの **ソース別内訳** (キル時でなく支配率診断用)。</summary>
-        public Dictionary<InventorySystem.PassiveSkills.DeathCause, int> playerDamageBySource;
+        public Dictionary<ItemSystem.PassiveSkills.DeathCause, int> playerDamageBySource;
         /// <summary>ボス難易度オートチューナー: スタンス別の「ボスがロール勝ちしたターン数/総ターン数」(強/弱別レンジ制御用)。</summary>
         public int strongRollTurns, strongRollBossWins, weakRollTurns, weakRollBossWins;
     }
@@ -361,7 +361,7 @@ namespace CombatSystem
         //   代償 (物資 −100・ゴールド半減・報酬なし・直前の点へ戻る) は GameManager 側。
         private bool _fleeRequested;
         /// <summary>この戦闘で逃げられるか。 GameManager が戦闘開始時に立てる
-        /// (自由移動の層の戦闘・エリート・徘徊エネミーの連戦だけ。 層のボス・イベント戦・Λ では false)。</summary>
+        /// (航行マップの層の戦闘・エリート・追跡者／使い魔の戦闘だけ。 層のボス・イベント戦では false)。</summary>
         public bool FleeAllowed { get; set; }
         /// <summary>このターンに逃げると宣言済みか。</summary>
         public bool FleeRequested => _fleeRequested;
@@ -385,6 +385,8 @@ namespace CombatSystem
         private int playerDiceCount;
         private int playerDiceMax;
         private int playerAttackPower = 2;            // #2 案A': 装備武器の素火力（勝利base = attackPower + floor(|差|/3)）
+        /// <summary>装備武器の防御・貫通 (ADR-0013)。 戦闘開始時に解決し、 ctx の土台へ写す。</summary>
+        private int _weaponDefense, _weaponArmorPen;
         private const int WeaponDiffPerBonus = 3;     // #2 案A': 差ボーナス＝floor(|差|/3)（差3ごとに+1）。会心には非干渉
         /// <summary>武器 + 層補正の会心率 (小数)。 パッシブ・メタ分は判定時に足す。</summary>
         private float playerCritBaseRate;
@@ -753,9 +755,7 @@ namespace CombatSystem
             StartCombatEntered = _combatSeq;
 
             // ラン中所持パッシブと装備品を PassiveSkillManager に同期（戦闘ごとに再構築）
-            var equipHandler = UnityEngine.Object.FindObjectOfType<InventorySystem.ItemEquipHandler>();
-            InventorySystem.PassiveSkills.RunPassiveSync.RefreshFromRun(
-                GameLoop.GameManager.Instance?.Run, equipHandler);
+            ItemSystem.PassiveSkills.RunPassiveSync.RefreshFromRun(GameLoop.GameManager.Instance?.Run);
 
             // [廃止 2026-09-14] SinDebuff の敵パッシブ動的注入。
             //   〈門〉リワークで欠陥 3 種はすべて**プレイヤー側の規則**になった
@@ -792,16 +792,21 @@ namespace CombatSystem
             playerDiceMax = pDiceMax;
             playerCritBaseRate = pCritRate;
 
-            // #2 案A': 装備武器の attackPower を解決（equipHandler優先・equippedWeaponId フォールバック・既定2）
+            // #2 案A': 装備武器の attackPower を解決（RunState.equippedWeaponId・既定2）
             playerAttackPower = 2;
+            _weaponDefense = 0; _weaponArmorPen = 0;
             {
-                var apW = equipHandler?.GetCurrentEquipment(InventorySystem.ItemCategory.Weapon);
-                if (apW == null)
-                {
-                    string wid = GameLoop.GameManager.Instance?.Run?.equippedWeaponId;
-                    if (!string.IsNullOrEmpty(wid)) apW = InventorySystem.ItemDatabase.Instance?.GetItem(wid);
-                }
+                ItemSystem.CompleteItemData apW = null;
+                string wid = GameLoop.GameManager.Instance?.Run?.equippedWeaponId;
+                if (!string.IsNullOrEmpty(wid)) apW = ItemSystem.ItemDatabase.Instance?.GetItem(wid);
                 if (apW != null && apW.attackPower > 0) playerAttackPower = apW.attackPower;
+                // 武器の防御・貫通 (ADR-0013)。 "+" 段階で 2 要素目を使う。
+                if (apW != null)
+                {
+                    int plus = GameLoop.GameManager.Instance?.Run?.weaponPlus ?? 0;
+                    _weaponDefense = apW.DefenseAt(plus);
+                    _weaponArmorPen = apW.ArmorPenAt(plus);
+                }
             }
             isCombatActive = true;
             // [計装] 戦闘の種類別の結果 (SkillDiag)。 開始時点の HP と種類を覚えておく。
@@ -872,7 +877,7 @@ namespace CombatSystem
                             + $"パッシブ{(secondaryEnemy.passiveSkills?.Count ?? 0)}件 (同名は1回のみ登録)");
                 }
             }
-            // 剣家系〈一対一〉〈果たし合い〉が読む。 **戦闘中は変わらない [persistent]**。
+            // 剣家系〈一対一〉が読む。 **戦闘中は変わらない [persistent]**。
             //   ctx は下の BeginCombat で作られるので、 set はその後 (下記) で行う。
 
             psm.RegisterEnemySkills(enemySkills);
@@ -906,45 +911,25 @@ namespace CombatSystem
             }
             // ADR-0010〈無銘の賽〉: このダイスでは端子役が成立しない (手札役・配線役は通常どおり)。
             if (ctx != null) ctx.suppressTerminalRoles = suppressTerminalRoles;
-            // 剣家系〈一対一〉〈果たし合い〉の判定材料。 **戦闘開始時に 1 度だけ確定する [persistent]**
+            // 剣家系〈一対一〉の判定材料。 **戦闘開始時に 1 度だけ確定する [persistent]**
             //   ── secondaryEnemy は上で解決済みなので、 ここで写せば戦闘中ぶれない。
             if (ctx != null) ctx.isPairEncounter = secondaryEnemy != null;
-            // 敵の基礎防御（被ダメ%軽減）を反映。エリート(EliteVigor)は OnBattleStart で +0.10 する。
+            // 防御値と貫通 (ADR-0013)。 敵の防御は〈精鋭〉〈硬鱗〉〈重甲〉が OnBattleStart で足す。
+            //   プレイヤーの土台 = 初期値 + 武器。 アイテムの def / pen は毎ターン OnPostRoll で乗る。
             if (ctx != null)
             {
-                ctx.enemyDamageReductionPct = enemy.baseDefenseRate;
+                ctx.enemyDefense = Math.Max(0, enemy.defense);
+                ctx.enemyArmorPen = Math.Max(0, enemy.armorPen);
+                ctx.playerDefenseBase = DefenseFormula.PlayerBaseDefense + _weaponDefense;
+                ctx.playerArmorPenBase = _weaponArmorPen;
+                ctx.playerDefense = ctx.playerDefenseBase;
+                ctx.playerArmorPen = ctx.playerArmorPenBase;
                 // ボス難易度オートチューナー: 軸別係数引き用にボスidを記録 (非ボスは空)
                 ctx.bossId = AutoTest.BossTuning.IsBoss(enemy.id) ? enemy.id : "";
-                ctx.lastDamageCause = InventorySystem.PassiveSkills.DeathCause.Normal;
+                ctx.lastDamageCause = ItemSystem.PassiveSkills.DeathCause.Normal;
 
-                // 物資(ADR-0002) 苦悩: 悲観床(45)以下で会心倍率 -0.5。Λ「注意散漫」(会心分子上限)とは
-                // 効く軸が別(倍率 vs 分子)なので非重複。
+                // 物資(ADR-0002) 苦悩: 悲観床(45)以下で会心倍率 -0.5。
                 ctx.criticalMultiplier += GameLoop.ProvisionSystem.GetCritMultiplierDelta(GameLoop.GameManager.Instance?.Run);
-            }
-
-            // Λ層（時間の狭間）由来の恒久デバフを ctx へ設定（戦闘スコープで保持）
-            if (ctx != null)
-            {
-                var runForLambda = GameLoop.GameManager.Instance?.Run;
-                if (runForLambda != null && runForLambda.lambdaDebuffs != null && runForLambda.lambdaDebuffs.Count > 0)
-                {
-                    ctx.lambdaFirstTurnDiceDelta     = GameLoop.Lambda.LambdaDebuffEffects.GetFirstTurnDiceDelta(runForLambda);
-                    ctx.lambdaHeavyStepsTurns        = GameLoop.Lambda.LambdaDebuffEffects.GetHeavyStepsTurns(runForLambda);
-                    ctx.lambdaIrritatingInterval     = GameLoop.Lambda.LambdaDebuffEffects.GetIrritatingInterval(runForLambda);
-                    ctx.lambdaDamageDealtMult        = GameLoop.Lambda.LambdaDebuffEffects.GetDamageDealtMult(runForLambda);
-                    ctx.lambdaCritRateCap            = GameLoop.Lambda.LambdaDebuffEffects.GetCritRateCap(runForLambda);
-                    ctx.lambdaNoCritBranch           = GameLoop.Lambda.LambdaDebuffEffects.NoCritBranch(runForLambda);
-                    ctx.lambdaMercifulExecThreshold  = GameLoop.Lambda.LambdaDebuffEffects.GetMercifulExecThreshold(runForLambda);
-                    ctx.lambdaConsumableLockUntilTurn= GameLoop.Lambda.LambdaDebuffEffects.GetConsumableLockUntilTurn(runForLambda);
-
-                    // 迫りくる死(lv3): 戦闘開始時に HP を 1 にする（割合計算が先・ボス含む全戦闘）
-                    if (GameLoop.Lambda.LambdaDebuffEffects.ImpendingDeathActive(runForLambda))
-                    {
-                        playerHP = 1;
-                        ctx.playerCurrentHP = 1;
-                        Debug.Log("[CombatManager] Λデバフ 迫りくる死(lv3): 戦闘開始時 HP=1");
-                    }
-                }
             }
 
             // 消費アイテム: マップで使用した「次戦闘バフ」を ctx へコピーし RunState 側をクリア
@@ -1030,7 +1015,7 @@ namespace CombatSystem
                 int rp = MetaProgression.Relics.RelicApplicator.GetOpeningPoison(relicRun);
                 if (rp > 0)
                 {
-                    ctx.AddStatus(InventorySystem.PassiveSkills.StatusTarget.Enemy, "poison", rp);
+                    ctx.AddStatus(ItemSystem.PassiveSkills.StatusTarget.Enemy, "poison", rp);
                     Debug.Log($"[遺物] 開幕毒 +{rp}");
                 }
             }
@@ -1085,7 +1070,7 @@ namespace CombatSystem
                 ctx, GameLoop.GameManager.Instance?.Run, this);
 
             // 名前付き固有パッシブアイテム（戦闘開始時系）
-            InventorySystem.PassiveItems.PassiveItemManager.OnCombatStart(
+            ItemSystem.PassiveItems.PassiveItemManager.OnCombatStart(
                 ctx, GameLoop.GameManager.Instance?.Run, this);
 
             OnCombatStart?.Invoke(enemy.id);
@@ -1198,7 +1183,8 @@ namespace CombatSystem
                 ctx.enemyDiceMax = newEnemy.EffectiveRollMax;
                 ctx.enemyDiceTotalBonus = 0;
                 ctx.bossDiceBonus = 0; // swapで一旦クリア。新形態の OnBattleStart パッシブ(刹那等)が再設定する
-                ctx.enemyDamageReductionPct = newEnemy.baseDefenseRate; // 新形態の基礎防御%を反映
+                ctx.enemyDefense = Math.Max(0, newEnemy.defense);   // 新形態の防御値を反映 (ADR-0013)
+                ctx.enemyArmorPen = Math.Max(0, newEnemy.armorPen);
                 // [計装] 出ていく段の実長を締める。 currentTurn は連戦で通算なので、
                 //   開始点 (phaseStartTurn) との差でしか段の長さは出せない。
                 if (!string.IsNullOrEmpty(ctx.bossId)
@@ -1211,7 +1197,7 @@ namespace CombatSystem
                 }
                 ctx.phaseStartTurn = ctx.currentTurn + 1;
                 ctx.bossId = AutoTest.BossTuning.IsBoss(newEnemy.id) ? newEnemy.id : "";
-                ctx.lastDamageCause = InventorySystem.PassiveSkills.DeathCause.Normal; // 形態swapで死因タグをリセット (前形態の残留防止)
+                ctx.lastDamageCause = ItemSystem.PassiveSkills.DeathCause.Normal; // 形態swapで死因タグをリセット (前形態の残留防止)
                 // (ADR-0011: 役は毎ターン自動で効き、 使用済みの管理を持たないので、 形態交代で戻すものは無い。)
             }
 
@@ -1360,7 +1346,7 @@ namespace CombatSystem
                 if (ctx.consFlatReduce > 0) ctx.playerFlatDamageReduction += ctx.consFlatReduce;
                 // 死因タグをターン頭でリセット。 このターンに致死スキルが発動すればそれが死因、
                 // 何も無ければ通常ロール敗北(Normal) → ターン単位で正確に死因を帰属できる。
-                ctx.lastDamageCause = InventorySystem.PassiveSkills.DeathCause.Normal;
+                ctx.lastDamageCause = ItemSystem.PassiveSkills.DeathCause.Normal;
             }
 
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnTurnStart);
@@ -1464,7 +1450,7 @@ namespace CombatSystem
             // 影の代償: 5層ボス戦中、毎ロール50%でプレイヤーダイス全出目-1
             var run = GameLoop.GameManager.Instance?.Run;
             if (run != null
-                && run.currentFloor == run.normalClearFloor
+                && run.Depth == run.normalClearFloor
                 && currentEnemy != null
                 && MapSystem.MapManager.Instance?.CurrentNode != null
                 && MapSystem.MapManager.Instance.CurrentNode.type == MapSystem.TileType.Boss
@@ -1489,7 +1475,7 @@ namespace CombatSystem
                 ctx, GameLoop.GameManager.Instance?.Run, this);
 
             // 名前付き固有パッシブ（ロール時系）
-            InventorySystem.PassiveItems.PassiveItemManager.OnRoll(
+            ItemSystem.PassiveItems.PassiveItemManager.OnRoll(
                 ctx, GameLoop.GameManager.Instance?.Run, this);
 
             // 恒久デバフ「コルヴェンの憤怒」: ボス戦1T目に自ダイスを全て最大値化
@@ -1816,20 +1802,6 @@ namespace CombatSystem
             if (ctx.fixedDamageToPlayer >= 999)
                 playerHP = 0;
 
-            // Λデバフ「慈悲の処刑」: 被弾後、HPが最大の5/10/15%以下なら即死。
-            // combatLethalThisTurn 確定の前に処理し、ターン終了回復での蘇生を防ぐ。
-            if (ctx.lambdaMercifulExecThreshold > 0f && playerHP > 0)
-            {
-                bool tookHit = ctx.playerDamageThisTurn > 0
-                             || (ctx.scratchDamage > 0 && !ctx.nullifyScratchDamage)
-                             || ctx.fixedDamageToPlayer > 0;
-                if (tookHit && playerHP <= playerMaxHP * ctx.lambdaMercifulExecThreshold)
-                {
-                    Debug.Log($"[Λ] 慈悲の処刑: HP{playerHP}/{playerMaxHP} ≤ {ctx.lambdaMercifulExecThreshold:P0} → 即死");
-                    playerHP = 0;
-                }
-            }
-
             // コンテキストにHP同期
             ctx.playerCurrentHP = playerHP;
             ctx.playerMaxHP = playerMaxHP;
@@ -1871,7 +1843,7 @@ namespace CombatSystem
                 ctx, GameLoop.GameManager.Instance?.Run, this);
 
             // 名前付き固有パッシブ（ターン終了時系。現状は該当なし、フック確保のため呼び出し）
-            InventorySystem.PassiveItems.PassiveItemManager.OnTurnEnd(
+            ItemSystem.PassiveItems.PassiveItemManager.OnTurnEnd(
                 ctx, GameLoop.GameManager.Instance?.Run, this);
 
             // 〈不完全な修復〉(門・2026-09-14): 縁の直っていない身体は長く保たない。
@@ -2024,7 +1996,7 @@ namespace CombatSystem
         ///   - シールドは通常ダメージから先に吸い、 余れば固定ダメージも吸う。
         ///     吸収量は反射（返しの盾/不落の城盾）の原資として記録する。
         /// </summary>
-        private void ApplyVescaDefense(InventorySystem.PassiveSkills.CombatContext ctx,
+        private void ApplyVescaDefense(ItemSystem.PassiveSkills.CombatContext ctx,
                                        ref int dealtDmg, ref int dealtFixed)
         {
             if (ctx == null) return;
@@ -2075,7 +2047,7 @@ namespace CombatSystem
         ///   - 〈天与の剣〉最大 HP の削り。
         ///   - 〈処刑人の烙印〉攻撃終了時に HP が最大の 20% 以下なら 9999 の軽減不可ダメージ。
         /// </summary>
-        private void ApplyVescaOnHitEffects(InventorySystem.PassiveSkills.CombatContext ctx, int takenApplied)
+        private void ApplyVescaOnHitEffects(ItemSystem.PassiveSkills.CombatContext ctx, int takenApplied)
         {
             if (ctx == null) return;
 
@@ -2110,7 +2082,7 @@ namespace CombatSystem
                 ctx.playerCurrentHP = 0;
                 // 通常被ダメと区別する (§13-3 の死因診断は「総被ダメに占める支配率」で本命レバーを選ぶため、
                 // 処刑を Normal に混ぜると敵攻撃値のレバーへ誤誘導される)
-                ctx.lastDamageCause = InventorySystem.PassiveSkills.DeathCause.Other;
+                ctx.lastDamageCause = ItemSystem.PassiveSkills.DeathCause.Other;
             }
         }
 
@@ -2224,7 +2196,7 @@ namespace CombatSystem
                     DmgSourceDiag.Note("消費〈会心率〉", DmgSourceDiag.CritRate, ctx.consCritPct);
                 }
                 if (ctx.consFlatReduce > 0) ctx.playerFlatDamageReduction += ctx.consFlatReduce;
-                ctx.lastDamageCause = InventorySystem.PassiveSkills.DeathCause.Normal;
+                ctx.lastDamageCause = ItemSystem.PassiveSkills.DeathCause.Normal;
             }
 
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnTurnStart);
@@ -2349,7 +2321,7 @@ namespace CombatSystem
             ctx.playerDiceMax = playerDiceMax;
             EventSystem.TimedEffects.TimedEffectManager.OnRoll(
                 ctx, GameLoop.GameManager.Instance?.Run, this);
-            InventorySystem.PassiveItems.PassiveItemManager.OnRoll(
+            ItemSystem.PassiveItems.PassiveItemManager.OnRoll(
                 ctx, GameLoop.GameManager.Instance?.Run, this);
 
             // メタバフ: ダイス合計値補正 (旧法と同一)
@@ -2378,6 +2350,8 @@ namespace CombatSystem
             // パターン系パッシブ (ゾロ目/階段/全相異) + 合計確定
             psm.ProcessPostRoll(playerDice, enemyDice);
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnPostRoll);
+            // 斧〈血令〉: 防御を貫通へ換える。 防御の加算 (OnPostRoll) が全部済んだ後・予告より前でなければならない。
+            ItemSystem.PassiveSkills.Effects.BloodEdict.ConvertDefenseToPen(ctx);
 
             _fightPlayerRollSum += ctx.playerDiceTotal;
             _fightPlayerRollCount++;
@@ -2394,18 +2368,25 @@ namespace CombatSystem
                 enemyAtkValue = Math.Max(0, Mathf.RoundToInt(enemyAtkValue * (1f - roleAtkCut / 100f)));
             // 2026-07-25 v6: 出血 r2 失血衰弱 (敵の出血 3 以上で攻撃 -2)
             enemyAtkValue = Math.Max(0, enemyAtkValue - MetaProgression.MetaBuffApplicator.GetBleedWeakenAttack(ctx.enemyBleedStacks));
+            // ADR-0013: プレイヤーの防御は**ブロックの前**に敵の攻撃値へ掛ける。 予告にもこの値が出る (柱3)。
+            //   〈貫きの錐〉は敵の攻撃値に比例してブロックを削るので、 防御で減った後の値を使う。
+            int enemyAtkBeforeDefense = enemyAtkValue;
+            enemyAtkValue = ApplyPlayerDefense(ctx, enemyAtkValue, ctx.enemyArmorPen);
 
             // 2 体戦: 2 体目の攻撃も**配線前に**確定させて予告へ載せる (柱3 完全情報テレグラフ)。
             //   解決時に振ると「見えていない一撃」ができ、 ADR-0009 の思想に正面から反する。
             //   ここで振った値を解決でもそのまま使う (二度振らない)。
             _secondaryAtkThisTurn = 0;
+            int secondaryAtkBeforeDefense = 0;
             if (secondaryEnemy != null && secondaryHP > 0)
             {
                 var secDiceTele = RollEnemyAttack(secondaryEnemy, 0, false, 0f);
                 int secTotalTele = 0;
                 for (int i = 0; i < secDiceTele.Length; i++) secTotalTele += secDiceTele[i];
-                _secondaryAtkThisTurn =
+                secondaryAtkBeforeDefense =
                     Math.Max(0, Escalation.EnemyAttackValue(secondaryEnemy, escTurn, secTotalTele, ctx.currentTurn));
+                _secondaryAtkThisTurn = ApplyPlayerDefense(ctx, secondaryAtkBeforeDefense,
+                    Math.Max(0, secondaryEnemy.armorPen));
             }
 
             var tele = new MutualTurnTelegraph
@@ -2433,10 +2414,10 @@ namespace CombatSystem
                 playerHighDiceCrushed = ctx.playerHighDiceCrushed,
                 playerBlockIgnored = ctx.playerBlockIgnored,
                 blazeStacks = ctx.accumulatedValues.TryGetValue(
-                        InventorySystem.PassiveSkills.Effects.BlazeBrand.StackKey, out var _bz)
+                        ItemSystem.PassiveSkills.Effects.BlazeBrand.StackKey, out var _bz)
                     ? (int)_bz : 0,
                 blazePenalizesBlock = ctx.accumulatedValues.TryGetValue(
-                        InventorySystem.PassiveSkills.Effects.BlazeBrand.ActiveKey, out var _bza)
+                        ItemSystem.PassiveSkills.Effects.BlazeBrand.ActiveKey, out var _bza)
                     && _bza > 0f,
                 executeArmed = ctx.vescaExecuteArmed,
                 // 〈綻び〉: このターン封印される端子。 **配線前に開示する** (柱3)。
@@ -2449,7 +2430,8 @@ namespace CombatSystem
             if (!string.IsNullOrEmpty(ctx.bossId) && ctx.bossId.StartsWith("boss_layer7"))
                 BossDmgDiag.V7Turn(ctx.vescaDrawnRelics);
             Debug.Log($"[相互攻撃] T{tele.turn} 予告: 敵攻撃 {enemyAtkValue} (段階{tele.escalationStage}" +
-                      $"{(tele.nextThresholdTurn > 0 ? $"・次段階T{tele.nextThresholdTurn}" : "・最終段階")})");
+                      $"{(tele.nextThresholdTurn > 0 ? $"・次段階T{tele.nextThresholdTurn}" : "・最終段階")})" +
+                      $" 防御前{enemyAtkBeforeDefense}・自防御{ctx.playerDefense}−削り{ctx.enemyArmorPen}");
             if (tele.drawnRelics != null && tele.drawnRelics.Length > 0)
                 Debug.Log($"[予告] 遺物学者: {string.Join(" / ", tele.drawnRelics)}"
                         + (tele.enemyShield > 0 ? $"  シールド{tele.enemyShield}" : "")
@@ -2543,9 +2525,9 @@ namespace CombatSystem
 
             // 遺物 (§15-5): 刻印〈ブロック端子に未配線〉の判定材料。 **配線集計の直後に確定させる**。
             ctx.blockWiredThisTurn = blockDiceCount > 0;
-            // 盾家系〈反攻〉が読む「守った量」。 **貫通 (playerBlockIgnored) を差し引いた後の値**を渡す
-            //   ── 実際に受け止めた分だけが反撃になる。 ここは解決 (step6) より前なので
-            //   OnPostRoll / OnPreDealDamage の両方から安全に読める。
+            // 剣〈切り返し〉・盾〈城壁〉が読む「守った量」。 **貫通 (playerBlockIgnored) を差し引いた後の値**を渡す
+            //   ── 実際に受け止めた分だけを数える。 ここは解決 (step6) より前なので
+            //   OnWired / OnPreDealDamage から読める (OnPostRoll は配線より前なので読めない)。
             ctx.blockSumThisTurn = blockSum;
 
             // 遺物 (§15-5) 充電の毎ターン成分 (段4 以上)。 開幕成分は通常戦・毎ターン成分はボス戦で効く。
@@ -2581,6 +2563,17 @@ namespace CombatSystem
             // 「守りに寄せたか (攻撃 ≦ ブロック)」で判定できるようにするため。
             // 攻撃に 1 本だけ挿して残りを全部ブロックへ回す ガン守りが、 旧条件では素通りしていた。
             ctx.accumulatedValues["mutualBlockDiceCount"] = blockDiceCount;
+            // 2026-10-28: 充電・特殊端子の本数と予告の敵攻撃も載せ、 配線を条件にするパッシブ
+            //   (剣〈切り返し〉〈不滅の刃〉・盾〈シールドバッシュ〉〈堅守の構え〉〈城壁〉) を OnWired で焚く。
+            //   **atkBase の確定より前** ── ここで足した攻撃はこのターンの攻撃に乗る。
+            ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.ChargeDiceCount]  = chargeDiceCount;
+            ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.SpecialDiceCount] = specialCount;
+            ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.EnemyAtk] =
+                Math.Max(enemyAtkValue, _secondaryAtkThisTurn);
+            // 盾〈黎明〉が読む。 敵の攻撃の解決後に上書きする (行動しなかったら 0 のまま)。
+            ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.EnemyAtkPreDefense] = 0f;
+            ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.HpLossFromEnemy] = 0f;
+            psm.FireTrigger(PassiveSkillTrigger.OnWired);
 
             var result = new TurnResult
             {
@@ -2743,7 +2736,7 @@ namespace CombatSystem
                       + $"主{dealtDmg} 固{dealtFixed} | crit={isCrit} critMul={ctx.criticalMultiplier:F2} "
                       + $"outMul={ctx.outgoingDamageMultiplier:F2} 臨界burst={ctx.rinkaiBurstActive} "
                       + $"burstDmg={ctx.rinkaiBurstDamage} 脆弱={ctx.enemyVulnerabilityMultiplier:F2} "
-                      + $"armorPen={ctx.armorPenPct:F2} 画竜={ctx.garyoProc} "
+                      + $"armorPen={ctx.playerArmorPen} 敵防御={ctx.enemyDefense} 画竜={ctx.garyoProc} "
                       + $"atkDice={(int)ctx.GetAccumulated("mutualAttackDiceCount")} "
                       + $"pRoll={ctx.playerDiceTotal} 武器={GameLoop.GameManager.Instance?.Run?.equippedWeaponId}");
                 }
@@ -2864,7 +2857,7 @@ namespace CombatSystem
             //   この仕組みそのものが無意味になる。
             if (!roleOutcome.yachtFired)
             {
-                enemyHP = InventorySystem.PassiveSkills.Effects.DivineTalent.ClampToThreshold(
+                enemyHP = ItemSystem.PassiveSkills.Effects.DivineTalent.ClampToThreshold(
                     ctx, enemyHP, currentEnemy != null ? currentEnemy.maxHP : ctx.enemyMaxHP);
                 ctx.enemyCurrentHP = enemyHP;
             }
@@ -2890,6 +2883,7 @@ namespace CombatSystem
             }
 
             int takenApplied = 0;
+            bool primaryAttacked = false, secondaryAttacked = false;   // 盾〈黎明〉の「敵が放った攻撃」
 
             // 〈封じ・揃〉(前ターン成立) — このターン敵は攻撃しない。 予告は既に出ているので
             // 「見えている一撃を丸ごと踏み倒す」形になり、 予告の価値を壊さない。
@@ -2903,6 +2897,7 @@ namespace CombatSystem
             }
             else if (enemyHP > 0)
             {
+                primaryAttacked = true;
                 // --- 敵攻撃: 基礎×段階倍率 + β×ロール − ブロック (下限0) → 被ダメ修飾チェーン ---
                 psm.FireEnemyTrigger(PassiveSkillTrigger.OnPreDealDamage);
                 if (ctx != null && !string.IsNullOrEmpty(ctx.bossId))
@@ -2931,8 +2926,8 @@ namespace CombatSystem
                         ctx.currentTurn,
                         currentEnemy != null ? currentEnemy.EffectiveBaseAttack : 0,
                         ctx.enemyDiceTotal,
-                        ctx.stagnationStacks * InventorySystem.PassiveSkills.Effects.StagnantTime.DicePerStack(ctx),
-                        (int)ctx.GetAccumulated(InventorySystem.PassiveSkills.Effects.VescaRelicPool.KeyDiceBonusThisTurn),
+                        ctx.stagnationStacks * ItemSystem.PassiveSkills.Effects.StagnantTime.DicePerStack(ctx),
+                        (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.VescaRelicPool.KeyDiceBonusThisTurn),
                         enemyAtkValue, blockSum, lossBase, ctx.massiveBleedStacks);
                 ctx.playerWonRoll = false; ctx.playerLostRoll = true; // ProcessDamage 内で OnPreReceiveDamage を発火させる
                 // attackerIsEnemy: true ＝ 会心判定を飛ばす。 これが無いと敵の攻撃が
@@ -3053,6 +3048,7 @@ namespace CombatSystem
                 //   防御配線が成立しなくなるため、 2 回引く形を採る (2026-08-28 決定)。
                 if (secondaryHP > 0 && playerHP > 0 && !enemyStunnedThisTurn)
                 {
+                    secondaryAttacked = true;
                     // 予告で開示済みの値をそのまま使う (ここで振り直さない)。
                     int secAtkValue = _secondaryAtkThisTurn;
                     int secLossBase = Math.Max(0, secAtkValue - blockSum);
@@ -3083,6 +3079,12 @@ namespace CombatSystem
                 }
             }
 
+            // 盾〈黎明〉(OnTurnEnd) が読む: 敵が放った直接攻撃の防御前の合計と、 敵の攻撃で減った HP。
+            //   パッシブ由来のダメージ (審判の炎等) は軽減前の側には数えないが、 HP が減っていれば不成立になる。
+            ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.EnemyAtkPreDefense] =
+                (primaryAttacked ? enemyAtkBeforeDefense : 0) + (secondaryAttacked ? secondaryAtkBeforeDefense : 0);
+            ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.HpLossFromEnemy] = takenApplied;
+
             // 踏みとどまり 2 回目 ── 反射 (返しの盾/コントラタック/鏡写し) と反撃固定ダメは
             //   敵の攻撃解決の**中**でヴェスカの HP を削るため、 1 回目の clamp より後に走る。
             //   1 回目を敵攻撃より前に置くのは、 致死打で `enemyHP > 0` が落ちて
@@ -3090,7 +3092,7 @@ namespace CombatSystem
             //   よってこの 2 点セットで 1 ターン分を覆う。 ClampToThreshold は冪等。
             if (!roleOutcome.yachtFired)
             {
-                enemyHP = InventorySystem.PassiveSkills.Effects.DivineTalent.ClampToThreshold(
+                enemyHP = ItemSystem.PassiveSkills.Effects.DivineTalent.ClampToThreshold(
                     ctx, enemyHP, currentEnemy != null ? currentEnemy.maxHP : ctx.enemyMaxHP);
             }
             ctx.enemyCurrentHP = enemyHP;
@@ -3198,13 +3200,13 @@ namespace CombatSystem
         /// [3]C 追撃加算後              [4]D 会心/鈍器 後 (ProcessDamage の返り値)
         /// [5]E outgoing 乗算後         [6]F 鬼火の油+攻撃バースト後
         /// [7]G 練度不足後              [8]H 敵軽減パッシブ後
-        /// [9]I 基礎防御後              [10]J 利刃 余剰貫通後
-        /// [11]K Λ微妙な手応え後        [12]L 脆弱後
+        /// [9]I 敵の防御値後            [10]J (旧 利刃 余剰貫通・2026-10-28 撤去。添字維持のため I と同値)
+        /// [11]K (撤去済み。添字維持のため J と同値) [12]L 脆弱後
         /// [13]M 最低保証後             [14]N 狂暴化後
         /// [15]O 俊敏/防御スタンス後 (最終)
         /// [16]会心倍率の合計(会心時のみ) [17]会心回数
         /// [18]鈍器発動 [19]研磨剤発動 [20]脆弱発動 [21]狂暴化発動
-        /// [22]乗算時点の outgoing 合計 (研磨剤込み) [23]余剰貫通率の合計</summary>
+        /// [22]乗算時点の outgoing 合計 (研磨剤込み) [23](旧 余剰貫通率の合計・未使用)</summary>
         public static readonly double[] DamageStages = new double[24];
 
         /// <summary>ProcessDamage は勝敗・引分・敵側でも呼ばれるので、
@@ -3241,18 +3243,11 @@ namespace CombatSystem
         ///    切り分けるため (2026-08-04)。</summary>
         public static readonly double[,,] TurnStats = new double[8, 3, 11];
 
-        /// <summary>計装用の層添字。 **Λ層は 0 へ振り分ける** (2026-08-04)。
-        ///
-        /// §14-1 の通り Λ 滞在中は `currentFloor` が 5 のままで、 `LambdaRing` は
-        /// `EnemyKind.Elite` として記録され**再訪で再発火**する。 そのまま 5 に混ぜると
-        /// 5F エリートのバケツが Λ の周回で膨らみ、 5 層そのものの難度が読めなくなる
-        /// (実測で 5F エリのターン数が 5F 通常の 1.8 倍 = 1 ラン 5 戦相当になっていた)。
-        /// 添字 0 はどのレポートも 1..7 でしか回していなかったので空いている。</summary>
+        /// <summary>計装用の層添字 (1..7)。 添字 0 は旧 Λ層 (2026-10-28 廃止) の枠で、 いまは使わない。</summary>
         private static int StatFloorIndex()
         {
             var run = GameLoop.GameManager.Instance?.Run;
-            if (run != null && run.inLambda) return 0;
-            return Mathf.Clamp(run?.currentFloor ?? 1, 1, 7);
+            return Mathf.Clamp(run?.Depth ?? 1, 1, 7);
         }
 
         private void RecordTurnStats(CombatContext ctx, int atkDice, int blkDice, int chgDice,
@@ -3315,13 +3310,11 @@ namespace CombatSystem
         /// → 敵被ダメ軽減(灰塵等の OnPreReceiveDamage) → 基礎防御%(利刃で相殺) → 勝利時最低保証
         /// → 狂暴化 → メタ俊敏回避。
         /// </summary>
-        /// <summary>[計装] 層別集計の添字。 <b>Λ層 (時間の狭間) は 0 番に分ける</b> ──
-        /// Λ中も currentFloor は 5 のままなので、 混ぜると 5 層道中の数字が Λ の周回で汚れる。</summary>
-        private static int LambdaAwareFloorIndex()
+        /// <summary>[計装] 層別集計の添字 (= 深さ)。 0 は旧 Λ層 (2026-10-28 廃止) の枠でいまは使わない。</summary>
+        private static int FloorStatIndex()
         {
             var run = GameLoop.GameManager.Instance?.Run;
-            if (run == null) return 0;
-            return run.inLambda ? 0 : run.currentFloor;
+            return run == null ? 0 : run.Depth;
         }
 
         /// <summary>[計装] 武器 ID が所持パッシブ (ownedPassiveItems) にも入っているか。
@@ -3332,10 +3325,10 @@ namespace CombatSystem
             if (run?.ownedPassiveItems == null) return null;
             if (!string.IsNullOrEmpty(run.equippedWeaponId) && run.ownedPassiveItems.Contains(run.equippedWeaponId))
                 return "__flag__:装備中の武器が所持パッシブにもある";
-            var db = InventorySystem.ItemDatabase.Instance;
+            var db = ItemSystem.ItemDatabase.Instance;
             if (db != null)
                 foreach (var id in run.ownedPassiveItems)
-                    if (db.GetItem(id)?.category == InventorySystem.ItemCategory.Weapon)
+                    if (db.GetItem(id)?.category == ItemSystem.ItemCategory.Weapon)
                         return "__flag__:別の武器が所持パッシブにある";
             return null;
         }
@@ -3481,17 +3474,8 @@ namespace CombatSystem
             //   高火力ビルドではほぼ無視でき、 低火力ビルドだけを一方的に潰していた。
             //   **最低 1 は残す** ── 0 にすると削りが完全に止まり、 耐久レースが成立しなくなる。
             //
-            // **同種デバフは重ねがけしない (2026-08-09)。**
-            //   〈練度不足〉(挑戦) と〈微妙な手応え〉(Λ) は **どちらも与ダメ低下**で、
-            //   掛け合わせると 0.89 × 0.85 = 0.756 まで落ちていた。 Λ は 6 層へ行くための
-            //   強制通過点なので、 高難易度では必ずこの二重取りを踏む。
-            //   **厳しい方 1 つだけを採る** ── 会心側 (〈俊敏〉と〈注意散漫〉) は
-            //   「減算 → 逓減 → 上限」の順で既に min() 相当になっており、 そちらへ合わせた形。
-            //   なお **合計 (−11% −15% = −26% → 0.74) は乗算より厳しい**ので、
-            //   「乗算をやめて加算に」は緩和にならない。 緩和になるのは max(severity) だけ。
-            float metaDmgMul = Mathf.Min(
-                MetaProgression.MetaDebuffApplicator.GetPlayerDamageMultiplier(),
-                ctx.lambdaDamageDealtMult <= 0f ? 1f : ctx.lambdaDamageDealtMult);
+            //   (同種のデバフを足すときは重ねがけせず厳しい方 1 つを採ること ── 乗算は 0.756 まで落ちた。)
+            float metaDmgMul = MetaProgression.MetaDebuffApplicator.GetPlayerDamageMultiplier();
             if (metaDmgMul < 0.999f && totalDmg > 0)
                 totalDmg = Mathf.Max(1, Mathf.RoundToInt(totalDmg * metaDmgMul));
             if (DiagWinAttack) DamageStages[7] += totalDmg;   // 段 G
@@ -3504,33 +3488,32 @@ namespace CombatSystem
             totalDmg = System.Math.Max(0, ctx.finalDamage);
             if (DiagWinAttack) DamageStages[8] += totalDmg;   // 段 H
 
-            // 基礎防御%軽減（灰塵の鎧の後）。利刃で軽減率(pt)を相殺。倍率が全部乗った最終値に対して%カット。
-            if (ctx.enemyDamageReductionPct > 0f && totalDmg > 0)
+            // 敵の防御値 (ADR-0013)。 敵の軽減パッシブ (灰塵の鎧 等) の後、 倍率が全部乗った最終値に掛ける。
+            //   貫通は防御値を固定値で引く。 余った貫通は何にもならない
+            //   (旧〈利刃〉の余剰貫通→与ダメ%転用は 2026-10-28 に撤去・GAME.md §24)。
+            // 短剣〈急所〉: 会心の一撃は敵の防御を無視する (2026-10-28)。
+            if (ctx.enemyDefense > 0 && totalDmg > 0 && isCrit
+                && ItemSystem.PassiveSkills.Effects.VitalStrike.IgnoresDefense(ctx))
             {
-                float effRate = Mathf.Max(0f, ctx.enemyDamageReductionPct - ctx.armorPenPct);
-                if (effRate > 0f)
+                Debug.Log($"[急所] 会心 → 敵の防御{ctx.enemyDefense} を無視");
+            }
+            else if (ctx.enemyDefense > 0 && totalDmg > 0)
+            {
+                int effDef = DefenseFormula.Effective(ctx.enemyDefense, ctx.playerArmorPen);
+                if (effDef > 0)
                 {
                     int beforeDef = totalDmg;
-                    totalDmg = Mathf.CeilToInt(totalDmg * (1f - effRate));
-                    Debug.Log($"[基礎防御] 軽減{effRate:P0}（防{ctx.enemyDamageReductionPct:P0}/利刃{ctx.armorPenPct:P0}）{beforeDef}→{totalDmg}");
+                    totalDmg = DefenseFormula.Apply(totalDmg, effDef);
+                    Debug.Log($"[敵の防御] 防御{ctx.enemyDefense}−貫通{ctx.playerArmorPen}→{effDef}"
+                            + $"（軽減{DefenseFormula.Reduction(effDef):P0}）{beforeDef}→{totalDmg}");
                 }
             }
             if (DiagWinAttack) DamageStages[9] += totalDmg;   // 段 I
 
-            // 利刃: 敵基礎防御を超えた貫通分(armorPen − 防御率)は腐らせず与ダメ%へ転用。
-            // → 無装甲の敵にも armorPen 分の与ダメ増として常時機能する（対タンク以外でも腐らない）。
-            float wastedPen = Mathf.Max(0f, ctx.armorPenPct - ctx.enemyDamageReductionPct);
-            if (wastedPen > 0f && totalDmg > 0)
-            {
-                int beforePen = totalDmg;
-                totalDmg = Mathf.CeilToInt(totalDmg * (1f + wastedPen));
-                Debug.Log($"[利刃] 余剰貫通 +{wastedPen:P0} {beforePen}→{totalDmg}");
-            }
-            if (DiagWinAttack) { DamageStages[10] += totalDmg; DamageStages[23] += wastedPen; }   // 段 J
+            // 段 J (旧: 余剰貫通の与ダメ転用) は撤去。 段別実測の添字を保つため計測点だけ残す。
+            if (DiagWinAttack) DamageStages[10] += totalDmg;   // 段 J
 
-            // Λデバフ「微妙な手応え」は **段 G で〈練度不足〉と min() を取って適用済み**
-            // (2026-08-09・同種デバフの重ねがけ禁止)。 ここでは何もしない。
-            // 段 K の計測点は残す ── 段別実測の添字がずれると過去の記録と比較できなくなる。
+            // 段 K は撤去。 段別実測の添字を保つため計測点だけ残す。
             if (DiagWinAttack) DamageStages[11] += totalDmg;   // 段 K
 
             // 脆弱 (狩猟旅団契約): armed状態で会心ダメージを与えると最終ダメージに ×(1+0.15/0.30/0.45) 倍率。
@@ -3802,7 +3785,7 @@ namespace CombatSystem
                 PassiveSkillManager.Instance?.Context?.currentTurn ?? 0);
             SkillDiag.Note(_diagKind, playerHP <= 0, PassiveSkillManager.Instance?.Context?.currentTurn ?? 0,
                            _diagStartHp, playerHP, _diagStartMaxHp,
-                           LambdaAwareFloorIndex());
+                           FloorStatIndex());
             if (_diagKind == SkillDiag.Boss)
             {
                 SkillDiag.NoteBoss(currentEnemy?.id, PassiveSkillManager.Instance?.Context?.currentTurn ?? 0, playerHP <= 0);
@@ -3820,7 +3803,7 @@ namespace CombatSystem
                 psmCtx, GameLoop.GameManager.Instance?.Run, this);
 
             // 名前付き固有パッシブ（戦闘終了時系: 巡礼者の杖、希望の灯片）
-            InventorySystem.PassiveItems.PassiveItemManager.OnCombatEnd(
+            ItemSystem.PassiveItems.PassiveItemManager.OnCombatEnd(
                 psmCtx, GameLoop.GameManager.Instance?.Run, this);
 
             // 2026-07-25 v6: 臨界 r2 保温炉 - メーターの N% を次戦闘へ持ち越し
@@ -4007,7 +3990,7 @@ namespace CombatSystem
                 enemyMaxHP = currentEnemy != null ? currentEnemy.maxHP : 0,
                 // プレイヤー敗北時のみ死因を記録 (勝利時は Normal)
                 deathCause = (playerHP <= 0 && ctx != null) ? ctx.lastDamageCause
-                           : InventorySystem.PassiveSkills.DeathCause.Normal,
+                           : ItemSystem.PassiveSkills.DeathCause.Normal,
                 playerRollSum = _fightPlayerRollSum,
                 playerRollCount = _fightPlayerRollCount,
                 playerDamageBySource = BuildDamageBreakdown(ctx),
@@ -4021,9 +4004,9 @@ namespace CombatSystem
         /// <summary>被ダメ ソース別内訳のスナップショット (明示帰属のみ)。 メイン被ダメ(ロール敗北/断罪増幅)と
         /// 特殊スキル(審判の炎/毒/反射/王の業炎)が各自計上済み。 heal 込みのグロスで残差を取ると heal 分が
         /// Normal を過大計上するため、 残差寄せはしない。 ※診断対象の1〜6層は実質これで全被ダメを網羅。</summary>
-        private Dictionary<InventorySystem.PassiveSkills.DeathCause, int> BuildDamageBreakdown(CombatContext ctx)
+        private Dictionary<ItemSystem.PassiveSkills.DeathCause, int> BuildDamageBreakdown(CombatContext ctx)
         {
-            var map = new Dictionary<InventorySystem.PassiveSkills.DeathCause, int>();
+            var map = new Dictionary<ItemSystem.PassiveSkills.DeathCause, int>();
             if (ctx == null) return map;
             foreach (var kv in ctx.playerDamageBySource) map[kv.Key] = kv.Value;
             return map;
@@ -4120,7 +4103,7 @@ namespace CombatSystem
             System.Array.Clear(FirstRollFaceHist, 0, FirstRollFaceHist.Length);
         }
 
-        private static void NoteFirstRoll(int count, InventorySystem.PassiveSkills.CombatContext ctx, int[] dice)
+        private static void NoteFirstRoll(int count, ItemSystem.PassiveSkills.CombatContext ctx, int[] dice)
         {
             FirstRollCount++;
             FirstRollDiceCountSum += count;
@@ -4173,6 +4156,18 @@ namespace CombatSystem
             return results;
         }
 
+        /// <summary>プレイヤーの防御で敵の攻撃値を軽減する (ADR-0013)。 <b>ブロックの前</b>に掛け、 予告にもこの値を出す。
+        /// <paramref name="pen"/> はその攻撃の主がプレイヤーの防御を削る固定値。 剣〈間合〉の打ち消し
+        /// (<c>enemyArmorPenNegate</c>) を先に引く。 斧〈血令〉持ちは防御を貫通へ換えているので掛けない
+        /// (リロール判断用の仮予告は換算より前に組まれるため、 ここでも見る)。</summary>
+        private static int ApplyPlayerDefense(CombatContext ctx, int enemyAtk, int pen)
+        {
+            if (ctx == null || enemyAtk <= 0) return enemyAtk;
+            if (ItemSystem.PassiveSkills.Effects.BloodEdict.IsActive(ctx)) return enemyAtk;
+            int effPen = Math.Max(0, pen - ctx.enemyArmorPenNegate);
+            return DefenseFormula.Apply(enemyAtk, DefenseFormula.Effective(ctx.playerDefense, effPen));
+        }
+
         /// <summary>ADR-0010: リロール段階。 **充電を払ってダイスを振り直す**。
         ///
         /// コストは `振り直す個数 × そのターンで何回目か`。 回数で逓増するので
@@ -4197,7 +4192,9 @@ namespace CombatSystem
             var tele = new MutualTurnTelegraph
             {
                 turn = ctx.currentTurn,
-                enemyAttackValue = Escalation.EnemyAttackValue(currentEnemy, EscalationTurn(ctx), rawEnemyTotal, ctx.currentTurn),
+                enemyAttackValue = ApplyPlayerDefense(ctx,
+                    Escalation.EnemyAttackValue(currentEnemy, EscalationTurn(ctx), rawEnemyTotal, ctx.currentTurn),
+                    ctx.enemyArmorPen),
                 escalationStage = Escalation.StageOf(EscalationTurn(ctx)),
                 nextThresholdTurn = Escalation.NextThresholdTurn(EscalationTurn(ctx)),
                 turnsToHeavy = Escalation.TurnsToHeavy(currentEnemy, ctx.currentTurn),
@@ -4625,7 +4622,8 @@ namespace CombatSystem
 
         /// <summary>ADR-0011 〈追撃〉(目 3): 与えたダメージの 30% (2 個そろい) / 100% (ゾロ目) を追加で与える。
         /// ゾロ目は<b>確定</b>ダメージ (固定ダメ枠・軽減無視)、 2 個そろいは通常ダメージへの上乗せ。
-        /// T4 は追加分が会心判定を持つ (会心率 = 武器の会心率 + このターンの会心率加算)。</summary>
+        /// T4 は追加分が会心判定を持つ。 会心率は本判定 (<c>PassiveSkillManager</c> の会心) と同じ組み立て:
+        /// 武器 + このターンの加算 + 整備パネル − 〈俊敏〉。 <c>critRatePctAdd</c> は割合 (0.15 = 15%) なので 100 で割らない。</summary>
         private void ApplyRoleExtraDamage(CombatContext ctx, ref int dealtDmg, ref int dealtFixed, RoleOutcome outcome)
         {
             if (outcome.extraDamageRatio <= 0f) return;
@@ -4635,8 +4633,13 @@ namespace CombatSystem
             bool crit = false;
             if (outcome.extraDamageCanCrit)
             {
-                float rate = Mathf.Clamp01(playerCritBaseRate + ctx.critRatePctAdd / 100f);
-                crit = ctx.forceCritical || GameLoop.GameRng.Chance(rate, "combat.roleExtraCrit", RngIdx(3));
+                float critAdd = playerCritBaseRate + ctx.critRatePctAdd
+                              + MetaProgression.MetaBuffApplicator.GetCritRatePctBonus();
+                critAdd = Mathf.Max(0f, critAdd - MetaProgression.MetaDebuffApplicator.GetPlayerCritRatePenalty());
+                float rate = ItemSystem.PassiveSkills.CombatContext.ResolveCritRate(critAdd);
+                // 本判定と同じ優先順: 封印 (無心の刃) で外れ、 forceCritical が最後に確定で上書きする。
+                crit = (!ctx.critSuppressed && GameLoop.GameRng.Chance(rate, "combat.roleExtraCrit", RngIdx(3)))
+                    || ctx.forceCritical;
                 if (crit) extra *= ctx.criticalMultiplier;
             }
             int add = Mathf.Max(1, Mathf.RoundToInt(extra));

@@ -6,102 +6,137 @@ using UnityEngine;
 namespace GameLoop
 {
     /// <summary>
-    /// 自由移動の層 (2026-09-28・docs/GAME.md §5) の進行。 動く中身は素の C# の <see cref="FreeMapSim"/>
-    /// (<see cref="MapManager.Sim"/>) で、 ここはゲームの規則 (到着したマスの起動・徘徊エネミーの連戦・
-    /// 逃げる・補給庫・囮/罠) へ橋渡しする。
+    /// 航行マップ (手番制・2026-10-18・docs/GAME.md §5) の進行。 動く中身は素の C# の <see cref="FreeMapSim"/>
+    /// (<see cref="MapManager.Sim"/>) で、 ここはゲームの規則 (到着した点の起動・追跡者との戦闘・
+    /// 逃げる・囮罠・休憩) へ橋渡しする。
     ///
-    /// <para><b>時間を進める口は <see cref="AdvanceFreeMap"/> だけ。</b> 人は <see cref="FreeMapClock"/>
-    /// (停止 / 順速 / 早送り) が実時間に合わせて 1 刻みずつ呼び、 BOT は <see cref="TravelSync"/> で
-    /// 同期的に進める。 どちらも同じ 0.1 手番刻みを踏むので、 同じ操作なら同じ結果になる。</para>
+    /// <para><b>時間を進める口は「1 歩動く」「待つ」「偵察」「休憩で多めに回復」だけ。</b> どれも
+    /// <see cref="FreeMapSim"/> の操作 1 回が 1 手番ぶん (雪の前線の内側は 2 手番) で、
+    /// 戦闘・イベント・照明・囮罠は手番を使わない。 人も BOT も同じ口を同期的に叩く。</para>
     /// </summary>
     public partial class GameManager
     {
-        /// <summary>1 回の同期移動で進める刻みの上限。 層の対角 (約 13) を忍び足 (0.05/刻み) で歩いても 260 刻み。</summary>
-        public const int MaxTravelTicks = 2000;
+        /// <summary>true の間は、 点に着いても戦闘・イベント・ショップなどの旧画面へ入らない (航行だけを試すため)。 2D 画面 (Game2DMapView) が立てる。</summary>
+        public static bool NavOnly;
 
-        /// <summary>自由移動の層の中身。 Λ・8 層・マップ外では null。</summary>
+        /// <summary>航行マップの中身。 8 層・マップ外では null。</summary>
         public FreeMapSim FreeMap => MapManager.Instance != null && MapManager.Instance.IsFreeMap ? MapManager.Instance.Sim : null;
 
-        /// <summary>刻みごとに起きたこと (None は流さない)。 表示・効果音・計器が購読する。</summary>
+        /// <summary>操作ごとに起きたこと (None は流さない)。 表示・効果音・計器が購読する。</summary>
         public event System.Action<FreeMapEvent> OnFreeMapEvent;
 
-        // ── 徘徊エネミーの連戦 ──
-        private bool _inGauntlet;
-        private int _gauntletFightIndex;
-        private int _gauntletCount;
-        /// <summary>徘徊エネミーの連戦の途中か。</summary>
-        public bool InGauntletCombat => _inGauntlet;
+        /// <summary>航行の画面演出の合図 (偵察・照明)。 手番を進めない照明や、 イベントを返さない偵察でも鳴る。 Game2DMapFx が購読する。</summary>
+        public enum NavFx { Recon, Flare }
+        public event System.Action<NavFx> OnNavFx;
 
-        // ── 使い魔との交戦 ──
+        // ── 追跡者との戦闘 ──
+        private bool _inPursuerFight;
+        private int _pursuerFightCount;
+        /// <summary>追跡者 (本体) に捕まって戦闘中か。</summary>
+        public bool InPursuerCombat => _inPursuerFight;
+
+        // ── 使い魔との戦闘 ──
         private bool _inFamiliarFight;
         private int _familiarFightCount;
-        /// <summary>使い魔 (巡航ミサイル) との交戦中か。</summary>
+        /// <summary>使い魔との戦闘中か。</summary>
         public bool InFamiliarCombat => _inFamiliarFight;
-        /// <summary>マスに紐づかない戦闘 (連戦・使い魔) の途中か。 マスの報酬・ボス判定を通さない。</summary>
-        public bool InMapEncounterCombat => _inGauntlet || _inFamiliarFight;
-        /// <summary>連戦の何戦目か (0 起点) と、 全部で何戦か。</summary>
-        public int GauntletFightIndex => _gauntletFightIndex;
-        public int GauntletFightTotal => FreeMap?.GauntletFights ?? 0;
+        /// <summary>マスに紐づかない戦闘 (追跡者・使い魔) の途中か。 マスの報酬・ボス判定を通さない。</summary>
+        public bool InMapEncounterCombat => _inPursuerFight || _inFamiliarFight;
 
         // =====================================================================
-        //  移動
+        //  操作 (手番を進める)
         // =====================================================================
 
-        /// <summary>行き先を決める (移動中なら変える)。 時間は進めない。
-        /// <paramref name="runSyncIfNoClock"/> が true で人の時計が無ければ、 着くまで同期的に進める
-        /// (旧来の UI・デバッグキー向け)。</summary>
-        public bool TravelTo(string nodeId, bool runSyncIfNoClock = false)
+        /// <summary>隣の点へ 1 歩動く。 行けない (道が無い・沈んだ・戦闘中) なら false。</summary>
+        public bool MoveStep(string nodeId)
         {
-            if (CurrentPhase != GamePhase.MapNavigation) return false;
-            var mm = MapManager.Instance;
-            if (mm == null || !mm.IsFreeMap) return false;
-            if (!mm.BeginTravel(nodeId))
+            var sim = FreeMapForAction();
+            if (sim == null) return false;
+            var node = MapManager.Instance.CurrentMap.GetNode(nodeId);
+            if (node == null || node.index < 0 || !sim.CanMoveTo(node.index))
             {
-                Log("そこへは行けない (山岳を横切る・偵察中・連戦中)");
+                Log("そこへは行けない（道がつながっていない）");
                 return false;
             }
-            if (runSyncIfNoClock && FreeMapClock.Active == null)
-                AdvanceFreeMap(MaxTravelTicks, FreeMapEvent.Arrived | FreeMapEvent.Caught | FreeMapEvent.Died);
+            RunFreeMapOp(s => s.MoveTo(node.index));
             return true;
         }
 
-        /// <summary>BOT 用: 行き先を決めて、 着く・捕まる・倒れる・<paramref name="stopMask"/> のどれかまで同期的に進める。
-        /// 行けなければ None。</summary>
-        public FreeMapEvent TravelSync(string nodeId, FreeMapEvent stopMask = FreeMapEvent.None, int maxTicks = MaxTravelTicks)
+        /// <summary>待つ (1 手番)。</summary>
+        public bool WaitTurn()
         {
-            if (!TravelTo(nodeId)) return FreeMapEvent.None;
-            return AdvanceFreeMap(maxTicks, stopMask | FreeMapEvent.Arrived | FreeMapEvent.Caught | FreeMapEvent.Died);
+            var sim = FreeMapForAction();
+            if (sim == null) return false;
+            Log("待つ（1手番）");
+            RunFreeMapOp(s => s.Wait());
+            return true;
         }
 
-        /// <summary>時間を進める唯一の口。 最大 <paramref name="maxTicks"/> 刻み、 <paramref name="stopMask"/> のどれかが
-        /// 起きるか、 フェーズがマップから外れる (マスの起動・連戦・死亡) まで進める。 起きたことの和を返す。</summary>
-        public FreeMapEvent AdvanceFreeMap(int maxTicks, FreeMapEvent stopMask = FreeMapEvent.None)
+        /// <summary>偵察 (1 手番): 道で 2 歩先まで見える。</summary>
+        public bool ReconTurn()
         {
-            var acc = FreeMapEvent.None;
+            var sim = FreeMapForAction();
+            if (sim == null) return false;
+            Log("偵察（1手番）");
+            RunFreeMapOp(s => s.Recon());
+            OnNavFx?.Invoke(NavFx.Recon);
+            return true;
+        }
+
+        /// <summary>照明 (手番は使わない): 物資 −50 で 3 手番のあいだ道で 3 歩先まで見える。</summary>
+        public bool UseFlare()
+        {
+            var sim = FreeMapForAction();
+            if (sim == null || sim.FlareOn) return false;
+            Log($"照明（物資 −{FreeMapParams.FlareSupply}・手番は使わない・{FreeMapParams.FlareTurns}手番のあいだ見える）");
+            RunFreeMapOp(s => s.UseFlare());
+            OnNavFx?.Invoke(NavFx.Flare);
+            return true;
+        }
+
+        /// <summary>囮罠を今いる点に仕掛ける (手番は使わない・消耗品の消費は <see cref="Consumables.Use"/> が行う)。</summary>
+        public bool TryPlaceLure()
+        {
+            var sim = FreeMapForAction();
+            if (sim == null) return false;
+            Log($"囮罠を仕掛けた（{FreeMapParams.LureLife}手番のあいだ有効・踏んだ追跡者は{FreeMapParams.LureHoldTurns}手番足止めされる）");
+            RunFreeMapOp(s => s.PlaceLure());
+            return true;
+        }
+
+        /// <summary>手番を進められる状態の中身 (マップ移動中・戦闘中でない)。 そうでなければ null。</summary>
+        private FreeMapSim FreeMapForAction()
+        {
+            if (CurrentPhase != GamePhase.MapNavigation) return null;
             var sim = FreeMap;
-            if (sim == null) return acc;
-            for (int i = 0; i < maxTicks; i++)
-            {
-                if (CurrentPhase != GamePhase.MapNavigation || sim.Dead || sim.InGauntlet || sim.InFamiliarFight) break;
-                var ev = sim.Tick();
-                acc |= ev;
-                if (ev != FreeMapEvent.None) OnFreeMapEvent?.Invoke(ev);
-                HandleFreeMapEvent(sim, ev);
-                if ((ev & stopMask) != 0) break;
-            }
+            return sim == null || sim.Dead || sim.InFight ? null : sim;
+        }
+
+        /// <summary>操作を 1 回実行し、 起きたことを処理する。</summary>
+        private FreeMapEvent RunFreeMapOp(System.Func<FreeMapSim, FreeMapEvent> op)
+        {
+            var sim = FreeMap;
+            if (sim == null) return FreeMapEvent.None;
+            var ev = op(sim);
             MapManager.Instance?.SyncFreeKnowledge();
-            return acc;
+            if (ev != FreeMapEvent.None) OnFreeMapEvent?.Invoke(ev);
+            HandleFreeMapEvent(sim, ev);
+            return ev;
         }
 
         private void HandleFreeMapEvent(FreeMapSim sim, FreeMapEvent ev)
         {
             if (ev == FreeMapEvent.None) return;
-            if ((ev & FreeMapEvent.Detected) != 0) Log("（どこかで何かがこちらを嗅ぎつけた）");
-            if ((ev & FreeMapEvent.FoeSighted) != 0) Log("徘徊エネミーが目の前に見えた");
-            if ((ev & FreeMapEvent.TrapTriggered) != 0) Log($"（罠が作動した）徘徊エネミーの位置が分かった。{FreeMapParams.TrapFreezeTurns} 手番足止め");
-            if ((ev & FreeMapEvent.DecoyBroken) != 0) Log("（囮が壊された）");
-            if ((ev & FreeMapEvent.FamiliarSighted) != 0) Log("使い魔が飛んでくるのが見えた");
-            if ((ev & FreeMapEvent.FamiliarVanished) != 0) Log("（使い魔は目標を見失って消えた）");
+            var pf = sim.Profile;
+            if ((ev & FreeMapEvent.Detected) != 0) Log($"〈{pf.displayName}〉に補足された");
+            if ((ev & FreeMapEvent.FoeLost) != 0) Log($"〈{pf.displayName}〉は見失った");
+            if ((ev & FreeMapEvent.FoeAlerted) != 0) Log("（追跡者が何かに気づいた）");
+            if ((ev & FreeMapEvent.FamiliarLaunched) != 0) Log("使い魔が放たれた");
+            if ((ev & FreeMapEvent.FamiliarVanished) != 0) Log("（使い魔は見失って消えた）");
+            if ((ev & FreeMapEvent.LureTriggered) != 0) Log($"（囮罠が作動した）追跡者が{FreeMapParams.LureHoldTurns}手番足止めされた");
+            if ((ev & FreeMapEvent.FrontAdvanced) != 0 && sim.Weather != WeatherKind.None)
+                Log($"前線が左から {System.Math.Min(sim.Front, FreeMapParams.Width):0.0} まで届いた（{sim.Weather.DisplayName()}）");
+            if ((ev & FreeMapEvent.MapChanged) != 0) Log(sim.Weather == WeatherKind.Crumble ? "（道が1本崩れた）" : "（点が1つ沈んだ）");
 
             if ((ev & FreeMapEvent.Died) != 0)
             {
@@ -111,108 +146,138 @@ namespace GameLoop
                 OnGameOver?.Invoke(Run);
                 return;
             }
-            if ((ev & FreeMapEvent.FamiliarContact) != 0)
+            if (NavOnly)
             {
-                StartFamiliarFight();
+                // 航行だけを試す (2D 化の途中: 戦闘・イベント・ショップなど旧画面へは入らない)。 接触は無かったことにし、 着いた点は「到着」の記録だけ残す。
+                if ((ev & FreeMapEvent.FamiliarContact) != 0)
+                {
+                    sim.ResolveFamiliarFight(false); MapManager.Instance?.SyncCurrentNodeFromSim(); Log("（航行のみ）使い魔に接触 ── 戦闘は省略した");
+                    // 着いた手番に接触していても、 着いた点はそのまま (終点なら次の層へ進めるように、 到着の処理へ続ける)
+                    if ((ev & FreeMapEvent.Arrived) == 0) return;
+                    if ((ev & FreeMapEvent.Caught) == 0) sim.TakePendingArrival();
+                }
+                if ((ev & FreeMapEvent.Caught) != 0)
+                {
+                    if ((ev & FreeMapEvent.Arrived) != 0 && sim.LastArrived == sim.Layout.goal)
+                    {
+                        // 終点に着いた手番に捕まった: 戦闘は省いて勝ったことにし、 そのまま到着の処理へ (追い返され続けて終点へ入れなくなるのを防ぐ)
+                        sim.ResolveBodyWon(); sim.TakePendingArrival(); Log("（航行のみ）終点で追跡者に捕まった ── 戦闘は省略し、 退けたことにした");
+                    }
+                    else { sim.ResolveBodyFled(); MapManager.Instance?.SyncCurrentNodeFromSim(); Log("（航行のみ）追跡者に捕まった ── 戦闘は省略し、 直前の点へ戻った"); return; }
+                }
+                if ((ev & FreeMapEvent.Arrived) != 0)
+                {
+                    var arrived = MapManager.Instance.NoteFreeArrival(sim.LastArrived);
+                    if (arrived != null) Log($"（航行のみ）到着: {arrived.type}");
+                    // 終点 (ボス / 〈門〉) に着いたら、 戦闘・エンディングを省いて次の層へ進む
+                    if (arrived != null && (arrived.type == TileType.Boss || arrived.type == TileType.Gate)) AdvanceFloorNavOnly();
+                }
                 return;
             }
-            if ((ev & FreeMapEvent.Caught) != 0)
+            if ((ev & FreeMapEvent.FamiliarContact) != 0) { StartFamiliarFight(); return; }
+            if ((ev & FreeMapEvent.Caught) != 0) { BeginPursuerFight(); return; }
+            if ((ev & FreeMapEvent.Arrived) != 0) ActivateArrival(sim.LastArrived);
+        }
+
+        /// <summary>航行だけを試す時 (NavOnly) の層移動: 終点に着いたら次の航行の層へ。 ボス戦・エンディングは省く。
+        /// 次が航行マップを持たない層 (8 層 = ボス戦だけ) なら、 そこで止める。</summary>
+        private void AdvanceFloorNavOnly()
+        {
+            int next = MapSystem.FreeMove.FloorPlan.Next(Run.Depth);
+            if (next == Run.Depth || !MapSystem.FreeMove.FloorPlan.IsFreeMap(next))
             {
-                BeginGauntlet();
+                Log($"（航行のみ）{Run.currentFloor}層の終点に着いた ── 最終層なのでここまで (ボス戦は未接続)");
                 return;
             }
-            if ((ev & FreeMapEvent.Arrived) != 0)
-            {
-                var node = MapManager.Instance.NoteFreeArrival(sim.LastArrived);
-                if (node == null) return;
-                BeforeNodeEntered();
-                AfterNodeEntered();
-            }
+            Log($"（航行のみ）{Run.currentFloor}層の終点 → {MapSystem.FreeMove.FloorPlan.OrdinalOf(next)}層へ");
+            Run.bossDefeatedThisFloor = true;
+            SetPhase(GamePhase.FloorClear);
+            ConfirmFloorClear();
         }
 
-        // =====================================================================
-        //  速さ・索敵・囮/罠
-        // =====================================================================
+        /// <summary>着いた点を起動する。</summary>
+        private void ActivateArrival(int index)
+        {
+            var node = MapManager.Instance.NoteFreeArrival(index);
+            if (node == null) return;
+            BeforeNodeEntered();
+            AfterNodeEntered();
+        }
 
-        /// <summary>移動の速さ (忍び足 / 通常 / 急ぐ)。 移動中も切り替えられる。</summary>
-        public void SetTravelSpeed(MoveSpeed speed)
+        /// <summary>点に着いた手番に捕まっていたら、 戦闘が終わった今その点を発動させる。
+        /// 放っておくと、 着いたのに起動しない点ができる。</summary>
+        private void FlushPendingArrival()
         {
             var sim = FreeMap;
-            if (sim != null) sim.Speed = speed;
+            if (CurrentPhase != GamePhase.MapNavigation || sim == null) return;
+            int p = sim.TakePendingArrival();
+            if (p >= 0) ActivateArrival(p);
         }
 
-        /// <summary>照明の点灯・消灯。 点灯中は物資を消費し続け、 察知距離は 5 で固定。</summary>
-        public void SetFlare(bool on) => FreeMap?.SetFlare(on);
-
-        /// <summary>偵察 (止まっている時だけ)。 2 手番動けない。</summary>
-        public bool StartScout() => FreeMap != null && CurrentPhase == GamePhase.MapNavigation && FreeMap.StartScout();
-
-        /// <summary>囮を今いる場所に置く (消耗品の消費は <see cref="Consumables.Use"/> が行う)。</summary>
-        public bool TryPlaceDecoy()
-        {
-            var sim = FreeMap;
-            if (sim == null || CurrentPhase != GamePhase.MapNavigation || sim.InGauntlet) return false;
-            sim.PlaceDecoy();
-            Log($"囮を置いた（{FreeMapParams.DecoyDelay} 手番後から {FreeMapParams.DecoyTurns} 手番鳴る）");
-            return true;
-        }
-
-        /// <summary>罠を今いる場所に仕掛ける (消耗品の消費は <see cref="Consumables.Use"/> が行う)。</summary>
-        public bool TryPlaceTrap()
-        {
-            var sim = FreeMap;
-            if (sim == null || CurrentPhase != GamePhase.MapNavigation || sim.InGauntlet) return false;
-            sim.PlaceTrap();
-            Log(sim.AtNode >= 0 || sim.Segment.a >= 0 ? "罠を仕掛けた" : "罠を仕掛けた（道の外なので敵が踏むことはまず無い）");
-            return true;
-        }
-
-        /// <summary>開始時の囮・罠 (1 個ずつ)。 StartNewRun から呼ぶ。</summary>
+        /// <summary>開始時の囮罠 (<see cref="FreeMapParams.StartLures"/> 個)。 StartNewRun から呼ぶ。</summary>
         private void GrantStartingMapTools()
         {
-            for (int i = 0; i < FreeMapParams.StartDecoys; i++) Run.TryAddConsumable(ItemIds.Decoy);
-            for (int i = 0; i < FreeMapParams.StartTraps; i++) Run.TryAddConsumable(ItemIds.Trap);
+            for (int i = 0; i < FreeMapParams.StartLures; i++) Run.TryAddConsumable(ItemIds.Lure);
         }
 
         // =====================================================================
-        //  補給庫
+        //  休憩 (多めに回復 = +1 手番)
         // =====================================================================
 
-        /// <summary>補給庫 (拠) を漁る: 物資 +200。 物音 (半径 3) で近くの徘徊エネミーを呼ぶ。 気配は上げない。</summary>
-        private void LootSupplyCache()
+        /// <summary>休憩で多めに回復する: 最大 HP の <see cref="FreeMapParams.RestMoreRatio"/>、 代わりに
+        /// <see cref="FreeMapParams.RestMoreTurns"/> 手番が進む (追跡者が動く)。 通常の回復 (<see cref="RestHeal"/>) は 0 手番。</summary>
+        public void RestHealMore()
         {
-            int before = Run.provision;
-            ProvisionSystem.Supply(Run, FreeMapParams.RewardCache);
-            FreeMap?.NoteCacheLooted();
-            Log($"補給庫を漁った。物資 +{Run.provision - before}（物音を立てた）");
-            SetPhase(GamePhase.MapNavigation);
+            if (CurrentPhase != GamePhase.RestStop) return;
+            int heal = Mathf.CeilToInt(Run.playerMaxHP * FreeMapParams.RestMoreRatio
+                                       * MetaProgression.MetaDebuffApplicator.GetHealMultiplier());
+            heal = MetaProgression.MetaDebuffApplicator.ApplyJudgmentHealReduction(heal, Run);
+            int before = Run.playerHP;
+            Run.playerHP = Mathf.Min(Run.playerMaxHP, Run.playerHP + heal);
+            Run.playerHP = MetaProgression.MetaDebuffApplicator.ApplyHealSpotCap(Run.playerHP, Run.playerMaxHP, before);
+            MetaProgression.MetaDebuffApplicator.NoteHeal(heal, Run.playerHP - before, Run);
+            RunChronicle.Rest(Run, Run.playerHP - before, before, Run.playerMaxHP);
+            Log($"休憩（多めに回復）: +{Run.playerHP - before}HP（{FreeMapParams.RestMoreTurns}手番）");
+
+            // 休憩の画面を閉じてから手番を進める。 捕まれば戦闘へ、 そうでなければ地図 (ボス撃破後は層クリア) へ戻る。
+            ReturnToMapOrClearFloor();
+            if (CurrentPhase == GamePhase.MapNavigation && FreeMap != null)
+                RunFreeMapOp(s => s.PassTurnsExternal(FreeMapParams.RestMoreTurns));
         }
 
         // =====================================================================
-        //  徘徊エネミーの連戦
+        //  追跡者との戦闘
         // =====================================================================
 
-        /// <summary>捕まった: 次の層のエリート (7 層は 7 層のエリート) との連戦。 3 層 2 戦・5 層以降 3 戦。</summary>
-        private void BeginGauntlet()
+        /// <summary>追跡者の専用エネミー (単独の 1 戦)。 その層の次の層のエリート (7 層は 7 層自身) を土台に、
+        /// 追跡者の性質で名前と強さを変える。 「重い」性質は最大 HP が大きい。</summary>
+        private EnemyData BuildPursuerEnemy(FreeMapSim sim)
         {
-            _inGauntlet = true;
-            _gauntletFightIndex = 0;
-            _gauntletCount++;
-            Log($"徘徊エネミーに捕まった ── {GauntletFightTotal} 連戦");
-            StartGauntletFight();
+            int enemyFloor = Run.Depth >= 7 ? 7 : FloorPlan.Next(Run.Depth);
+            // 添字: 層ごとの捕まった回数 × 8。 ノードの添字 (NodeRngIndex) と重ならない帯へ置く。
+            int idx = Run.Depth * 4096 + 2048 + _pursuerFightCount * 8;
+            var template = FloorManager.PickEnemyForNode(enemyFloor, idx, elite: true);
+            if (template == null) return null;
+            var e = template.Clone();
+            e.displayName = $"〈{sim.Profile.displayName}〉{template.displayName}";
+            if (sim.Profile.heavyFight) e.maxHP = Mathf.Max(1, Mathf.RoundToInt(e.maxHP * PursuerHeavyHpMul));
+            return e;
         }
 
-        private void StartGauntletFight()
+        /// <summary>「重い」追跡者の最大 HP 倍率 (仮置き)。</summary>
+        public const float PursuerHeavyHpMul = 1.4f;
+
+        private void BeginPursuerFight()
         {
-            int enemyFloor = FloorPlan.GauntletEnemyFloor(Run.currentFloor);
-            // 添字: 層ごとの連戦の通し番号 × 8 ＋ 何戦目。 ノードの添字 (NodeRngIndex) と重ならない帯へ置く。
-            int idx = Run.currentFloor * 4096 + 2048 + _gauntletCount * 8 + _gauntletFightIndex;
-            var enemy = FloorManager.PickEnemyForNode(enemyFloor, idx, elite: true)?.Clone();
+            var sim = FreeMap;
+            _inPursuerFight = true;
+            _pursuerFightCount++;
+            var enemy = BuildPursuerEnemy(sim);
             if (enemy == null)
             {
-                Debug.LogError("[GameManager] 連戦の敵の選出に失敗 ── 連戦を打ち切る");
-                _inGauntlet = false;
-                FreeMap?.ResolveGauntletWon();
+                Debug.LogError("[GameManager] 追跡者の敵の選出に失敗 ── 戦闘を打ち切る");
+                _inPursuerFight = false;
+                sim?.ResolveBodyWon();
                 SetPhase(GamePhase.MapNavigation);
                 return;
             }
@@ -220,7 +285,7 @@ namespace GameLoop
             CurrentEnemySecondary = null;
             CurrentEncounterRewardMultiplier = 1f;
             OnEnemyEncountered?.Invoke(CurrentEnemy);
-            Log($"連戦 {_gauntletFightIndex + 1}/{GauntletFightTotal}: {CurrentEnemy.displayName}");
+            Log($"追跡者に捕まった ── {CurrentEnemy.displayName}");
 
             var (dc, dm, cr, df, ft_, str_) = GatherPlayerCombatStats();
             SetPhase(GamePhase.Combat);
@@ -228,43 +293,28 @@ namespace GameLoop
             CombatManager.Instance.FleeAllowed = true;
         }
 
-        /// <summary>連戦の 1 戦に勝った: 次の 1 戦へ / 勝ち切ったら物資 +300 とアイテム 1 個。</summary>
-        private void HandleGauntletFightWon()
+        /// <summary>追跡者に勝った: 追跡者は倒れ、 物資 +300 とアイテム 1 個。</summary>
+        private void HandlePursuerWon()
         {
-            _gauntletFightIndex++;
-            if (_gauntletFightIndex < GauntletFightTotal)
-            {
-                Log($"連戦 {_gauntletFightIndex}/{GauntletFightTotal} を切り抜けた (HP {Run.playerHP}/{Run.playerMaxHP})");
-                StartGauntletFight();
-                return;
-            }
-            _inGauntlet = false;
-            FreeMap?.ResolveGauntletWon();
+            _inPursuerFight = false;
+            FreeMap?.ResolveBodyWon();
             int before = Run.provision;
-            ProvisionSystem.Supply(Run, FreeMapParams.RewardGauntlet);
+            ProvisionSystem.Supply(Run, FreeMapParams.RewardPursuer);
             string pid = PickPassiveItemForBossExtra(false);
             if (!string.IsNullOrEmpty(pid)) GrantRewardItem(pid, eliteWin: true);
-            Log($"徘徊エネミーを退けた。物資 +{Run.provision - before}" + (string.IsNullOrEmpty(pid) ? "" : $"、{pid}"));
+            Log($"追跡者を退けた。物資 +{Run.provision - before}" + (string.IsNullOrEmpty(pid) ? "" : $"、{pid}"));
             SetPhase(GamePhase.MapNavigation);
             FlushPendingArrival();
         }
 
-        /// <summary>点に着いた刻みに捕まっていたら、 連戦が終わった今その点を発動させる (1 刻み進める)。
-        /// 放っておくと次の行き先を決めた時点で捨てられ、 着いたのに起動しない点ができる。</summary>
-        private void FlushPendingArrival()
+        /// <summary>追跡者の戦闘から抜けた (逃げた・救済で生き延びた): 直前の点へ戻り、 追跡者は 2 手番足止めされる。</summary>
+        private void EndPursuerFightAsFled(bool payCost)
         {
-            if (CurrentPhase == GamePhase.MapNavigation && FreeMap != null && FreeMap.HasPendingArrival)
-                AdvanceFreeMap(1, FreeMapEvent.Arrived);
-        }
-
-        /// <summary>連戦から抜けた (逃げた・救済で生き延びた): 2 手番後から追跡が始まる。</summary>
-        private void EndGauntletAsFled(bool payCost)
-        {
-            _inGauntlet = false;
+            _inPursuerFight = false;
             if (payCost) PayFleeCost();
-            FreeMap?.ResolveGauntletFled();
+            FreeMap?.ResolveBodyFled();
             MapManager.Instance?.SyncCurrentNodeFromSim();
-            Log($"連戦から逃げた。{FreeMapParams.FleeFreezeTurns} 手番後に追跡が始まる");
+            Log($"追跡者から逃げた。直前の点へ戻った（{FreeMapParams.FleeFreezeTurns}手番は追ってこない）");
         }
 
         // =====================================================================
@@ -281,22 +331,23 @@ namespace GameLoop
         }
 
         // =====================================================================
-        //  使い魔 (巡航ミサイル) との交戦
+        //  使い魔との戦闘
         // =====================================================================
 
-        /// <summary>使い魔に接触した: その層のエリート 1 体との交戦 (仮置き)。 逃げられる。</summary>
+        /// <summary>使い魔に接触した: その層の通常の戦闘相手 1 体との戦闘 (仮置き)。 逃げられる。</summary>
         private void StartFamiliarFight()
         {
             _inFamiliarFight = true;
             _familiarFightCount++;
-            int idx = Run.currentFloor * 4096 + 3072 + _familiarFightCount;
-            var enemy = FloorManager.PickEnemyForNode(Run.currentFloor, idx, elite: true)?.Clone();
+            int idx = Run.Depth * 4096 + 3072 + _familiarFightCount;
+            var enemy = FloorManager.PickEnemyForNode(Run.Depth, idx, elite: false)?.Clone();
             if (enemy == null)
             {
-                Debug.LogError("[GameManager] 使い魔の敵の選出に失敗 ── 交戦を打ち切る");
+                Debug.LogError("[GameManager] 使い魔の敵の選出に失敗 ── 戦闘を打ち切る");
                 EndFamiliarFight(fled: false);
                 return;
             }
+            enemy.displayName = $"使い魔（{enemy.displayName}）";
             CurrentEnemy = enemy;
             CurrentEnemySecondary = null;
             CurrentEncounterRewardMultiplier = 1f;
@@ -308,7 +359,7 @@ namespace GameLoop
             CombatManager.Instance.FleeAllowed = true;
         }
 
-        /// <summary>使い魔との交戦が終わった (勝っても逃げても使い魔は消える)。</summary>
+        /// <summary>使い魔との戦闘が終わった (勝っても逃げても使い魔は消える。 猟犬は本体の元へ戻る)。</summary>
         private void EndFamiliarFight(bool fled)
         {
             _inFamiliarFight = false;
@@ -318,11 +369,10 @@ namespace GameLoop
             FlushPendingArrival();
         }
 
-        /// <summary>使い魔に勝った: 通常の戦闘と同じ物資 (+30) と戦闘の物音。</summary>
+        /// <summary>使い魔に勝った: 通常の戦闘と同じ物資 (+30)。</summary>
         private void HandleFamiliarFightWon()
         {
             ProvisionSystem.Supply(Run, FreeMapParams.RewardBattle);
-            FreeMap?.NoteBattleEnded();
             Log("使い魔を退けた");
             EndFamiliarFight(fled: false);
         }
@@ -337,11 +387,10 @@ namespace GameLoop
                 EndFamiliarFight(fled: true);
                 return;
             }
-            if (_inGauntlet)
+            if (_inPursuerFight)
             {
-                EndGauntletAsFled(payCost: true);
+                EndPursuerFightAsFled(payCost: true);
                 SetPhase(GamePhase.MapNavigation);
-                FlushPendingArrival();
                 return;
             }
             PayFleeCost();
@@ -351,7 +400,6 @@ namespace GameLoop
             var sim = FreeMap;
             if (sim != null)
             {
-                sim.NoteBattleEnded();                    // 戦闘の物音は立った
                 sim.FleeToPrevious();
                 mm.SyncCurrentNodeFromSim();
             }

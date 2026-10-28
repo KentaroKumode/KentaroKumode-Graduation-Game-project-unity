@@ -735,13 +735,13 @@ namespace AutoTest
         /// <para>メソッド自体は残置（将来 Lv 制を再導入するなら参照点になる）。 <b>PowerScore からは外した。</b></para></summary>
         private static float FamilyLvBonus(string id)
         {
-            var data = InventorySystem.ItemDatabase.Instance?.GetItem(id);
+            var data = ItemSystem.ItemDatabase.Instance?.GetItem(id);
             if (data?.passiveSkills == null) return 0f;
             int maxLv = 0;
             foreach (var ps in data.passiveSkills)
             {
                 if (string.IsNullOrEmpty(ps.internalName)) continue;
-                var (_, lv) = InventorySystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(ps.internalName);
+                var (_, lv) = ItemSystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(ps.internalName);
                 if (lv > maxLv) maxLv = lv;
             }
             return maxLv > 0 ? (maxLv - 1) * 0.5f : 0f;
@@ -834,15 +834,6 @@ namespace AutoTest
             return _sampleCount.TryGetValue(id, out int n) ? n : 0;
         }
 
-        /// <summary>探索の上乗せ量。 無効なら 0。</summary>
-        private static float ExplorationBonus(string id)
-        {
-            if (!SampleBonusEnabled || ExplorationWeight <= 0f) return 0f;
-            int n = SampleCount(id);
-            if (n >= ExplorationSatN) return 0f;
-            return ExplorationWeight * (1f - n / (float)ExplorationSatN);
-        }
-
         /// <summary>購入判断に使う準パワー = <see cref="PowerScore"/> − 冗長ペナルティ。
         /// 冗長 1 段につき <see cref="StepPerTier"/> を引く。 0 床は付けない
         /// ── 他がそれ以上にゴミなら「マイナスでも仕方なく買う」。</summary>
@@ -898,7 +889,7 @@ namespace AutoTest
         {
             if (string.IsNullOrEmpty(id)) return 0;
             var run = GameLoop.GameManager.Instance?.Run;
-            var db = InventorySystem.ItemDatabase.Instance;
+            var db = ItemSystem.ItemDatabase.Instance;
             if (run == null || db == null) return 0;
             var data = db.GetItem(id);
             if (data?.passiveSkills == null || data.passiveSkills.Count == 0) return 0;
@@ -912,7 +903,7 @@ namespace AutoTest
                 if (string.IsNullOrEmpty(ps.internalName)) continue;
                 totalSkills++;
                 if (firing.Contains(ps.internalName)) { redundantCount++; continue; }
-                if (InventorySystem.PassiveSkills.PassiveSkillRegistry.IsHigherTierPresent(ps.internalName, firing))
+                if (ItemSystem.PassiveSkills.PassiveSkillRegistry.IsHigherTierPresent(ps.internalName, firing))
                     redundantCount++;
             }
             if (totalSkills == 0) return 0;
@@ -1143,7 +1134,7 @@ namespace AutoTest
         /// <b>id を綴りで切らない</b> (2026-09-22) ── id は表示名。</summary>
         private static bool IsLadderWeapon(string id)
         {
-            var d = string.IsNullOrEmpty(id) ? null : InventorySystem.ItemDatabase.Instance?.GetItem(id);
+            var d = string.IsNullOrEmpty(id) ? null : ItemSystem.ItemDatabase.Instance?.GetItem(id);
             return d != null && !string.IsNullOrEmpty(d.family) && d.tier >= 1 && d.tier <= 4;
         }
         private static readonly Dictionary<string, string> _weaponCatJp = new Dictionary<string, string>
@@ -1384,7 +1375,7 @@ namespace AutoTest
         private static string WeaponLabel(string id)
         {
             if (!IsLadderWeapon(id)) return "";
-            var d = InventorySystem.ItemDatabase.Instance.GetItem(id);
+            var d = ItemSystem.ItemDatabase.Instance.GetItem(id);
             if (!_weaponCatJp.TryGetValue(d.family, out var jp)) return "";
             return $"[{jp}{_tierRomanNum[d.tier]}]";
         }

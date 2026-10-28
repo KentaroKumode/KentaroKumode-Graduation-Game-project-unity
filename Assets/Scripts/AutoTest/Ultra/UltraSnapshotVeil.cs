@@ -185,11 +185,6 @@ namespace AutoTest.Ultra
 
         private static string NeutralValue(string name, string kind)
         {
-            // -1 is the game's own "not yet counted" marker for the Λ pool (RunState resets it
-            // to -1), so the restored run recomputes rather than trusting a stale number.
-            if (name == "lambdaPoolRemainingAll" || name == "lambdaPoolRemainingFloored")
-                return "-1";
-
             switch (kind)
             {
                 case "int":

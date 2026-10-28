@@ -46,7 +46,7 @@ namespace AutoTest
             // 素火力は装備武器から引く。 取れなければ既定 2 (武器なし相当)。
             int atkPower = 2;
             {
-                var w = InventorySystem.ItemDatabase.Instance?.GetItem(run.equippedWeaponId);
+                var w = ItemSystem.ItemDatabase.Instance?.GetItem(run.equippedWeaponId);
                 if (w != null && w.hasWeaponStats) atkPower = Math.Max(1, w.attackPower);
             }
             float curDpt = Mathf.Max(0.5f, (atkPower + 0.6f * diceCount * meanFace) * Mathf.Max(0.1f, dmgMul));

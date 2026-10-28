@@ -161,3 +161,8 @@ __pycache__/
 # 個人のファイル (ポートフォリオ・履歴書)。 このプロジェクトとは無関係なので push しない
 /portfolio/
 /resume/
+Tools/freemap_check/obj/
+
+# HTML / PDF (生成物・資料)
+*.html
+*.pdf

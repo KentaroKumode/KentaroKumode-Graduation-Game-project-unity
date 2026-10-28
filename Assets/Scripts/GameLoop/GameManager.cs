@@ -4,9 +4,9 @@ using UnityEngine;
 using Codex;
 using CombatSystem;
 using EventSystem;
-using InventorySystem;
-using InventorySystem.PassiveSkills;
-using InventorySystem.Shop;
+using ItemSystem;
+using ItemSystem.PassiveSkills;
+using ItemSystem.Shop;
 using MapSystem;
 
 namespace GameLoop
@@ -71,24 +71,6 @@ namespace GameLoop
         /// 通常は 4 枚集約でしか入手できず、高難易度ほど揃う前に死ぬため自然発生を待って測れない。</summary>
         public static bool GrantBladeDanceOnFloor5Clear = false;
 
-        /// <summary>Λ層: 何マスごとに恒久デバフを 1 つ付与するか。
-        ///
-        /// 2026-08-08 に 3 → 5 へ延ばしたが、 **同日 3 へ戻した**。 延ばした根拠は
-        /// 「利得だけが逓減しコストは一定」という観測だったが、 その逓減自体が
-        /// <see cref="ActivateTile"/> の oneShot 判定バグ (Λ環状線ノードが一度エリートを引くと
-        /// 永久に沈黙する) による偽の現象だった。 修正後は利得が踏破に完全比例するため、
-        /// コスト側を寝かせる理由が消えた。
-        /// **中央離脱のスポーク間隔 (3マス) とは別物** ── 混同すると離脱可能地点がずれる。
-        ///
-        /// <para><b>2026-09-08: 3 → 2 へ短縮。</b> 訓練済み BOT (Optimal) の 7層クリアが
-        /// <b>66.9%</b> まで上がり、 <b>band 11 に 66.9% が張り付いて</b>いた
-        /// (設計目標は人間で「2割強」)。 Λ は 1 ラン の所持 67.9 品のうち <b>19.9 品 (29%)</b> と
-        /// 105G を配っており、 難易度と「アイテム選択がゲームを決めない」問題の両方の源になっている。
-        /// 撤退条件 (lv2 が 4 つ) は BOT 方策なので触らず、 <b>同じリスク許容度でより浅くしか
-        /// 潜れないように</b>コスト側を詰める。 踏破 26.9 マス → 18 前後、 Λ 由来 19.9 品 → 13 前後の想定。
-        /// エスカレーション曲線の巻き戻し ([[Escalation.CurveStd]]) と同時に入れている。</para></summary>
-        public const int LambdaDebuffInterval = 2;
-
         // === ゲーム状態 ===
         public enum GamePhase
         {
@@ -136,6 +118,10 @@ namespace GameLoop
         public event Action<CombatResult> OnBattleEnded;
         public event Action<int> OnRewardGranted;
         public event Action<int> OnFloorAdvanced;
+        /// <summary>5 層ボスを〈決意〉付きで倒し、 6 層へ降りる直前に 1 回だけ鳴る (2026-10-28)。
+        /// 大穴の時空のずれが「記録が残らない」域に入る節目として、 GUI 1 枚を出す想定のフック。
+        /// 発火の直後に FloorClear へ進む (待たない)。 UI 側で止めたいときは FloorClear の確定 (ConfirmFloorClear) を遅らせる。</summary>
+        public event Action<RunState> OnDeepDescent;
         public event Action<RunState> OnRunCleared;
         public event Action<RunState> OnGameOver;
         public event Action<int> OnStarvationDamage;
@@ -162,7 +148,6 @@ namespace GameLoop
         [SerializeField] private bool logPhaseChanges = true;
 
         // === 内部参照 ===
-        private ItemEquipHandler equipHandler;
         private EnemyData firstEliteEnemy;
 
         // === GateRitual 状態 (門の 3 工程それぞれが既に決まったか) ===
@@ -202,9 +187,6 @@ namespace GameLoop
         {
             // CombatManager のイベント購読
             CombatManager.Instance.OnCombatEnd += HandleCombatEnd;
-
-            // ItemEquipHandler の参照取得
-            equipHandler = FindObjectOfType<ItemEquipHandler>();
 
             if (autoStartRun)
                 StartNewRun();
@@ -262,7 +244,7 @@ namespace GameLoop
             }
 
             // ラン跨ぎで永続するスキル状態 (Nightfall の蓄積過剰ダメ等) をリセット
-            InventorySystem.PassiveSkills.PassiveSkillRegistry.ResetAllRunState();
+            ItemSystem.PassiveSkills.PassiveSkillRegistry.ResetAllRunState();
 
             // **戦闘乱数の通し番号をラン単位に戻す (2026-08-10)。**
             //   CombatManager はシングルトンなので、 リセットしないとバッチ全体で
@@ -280,7 +262,7 @@ namespace GameLoop
             string starterWeapon = ClassStarter.GetWeaponId(Run.playerClass);
             if (Run.ownedPassiveItems == null)
                 Run.ownedPassiveItems = new System.Collections.Generic.List<string>();
-            InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, starterWeapon);
+            ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, starterWeapon);
             Run.equippedWeaponId = starterWeapon;
             Log($"初期武器: {starterWeapon}");
 
@@ -317,7 +299,7 @@ namespace GameLoop
                     if (string.IsNullOrEmpty(id)) break;   // プール枯渇
                     if (Run.ownedPassiveItems == null)
                         Run.ownedPassiveItems = new System.Collections.Generic.List<string>();
-                    InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
+                    ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
                     Log($"メタ報酬: 開幕パッシブ「{id}」を獲得 ({sp + 1}/{startPassives})");
                 }
             }
@@ -330,7 +312,7 @@ namespace GameLoop
                 if (string.IsNullOrEmpty(id)) continue;
                 if (Run.ownedPassiveItems == null)
                     Run.ownedPassiveItems = new System.Collections.Generic.List<string>();
-                InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
+                ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
                 Log($"メタ報酬: 種火 [{kw}] 開幕パッシブ「{id}」を獲得");
             }
 
@@ -339,12 +321,12 @@ namespace GameLoop
             CurrentEnemy = null;
             IsEliteSecondFight = false;
             inFalseMerchantCombat = false;
-            _inGauntlet = false;
-            _gauntletCount = 0;
+            _inPursuerFight = false;
+            _pursuerFightCount = 0;
             _inFamiliarFight = false;
             _familiarFightCount = 0;
 
-            // 自由移動のマップの消耗品: 囮・罠を 1 個ずつ (2026-09-28)
+            // 航行マップの消耗品: 囮罠 (2026-09-28・2026-10-18 に囮と罠を統合)
             GrantStartingMapTools();
 
             SetPhase(GamePhase.RunStart);
@@ -357,11 +339,10 @@ namespace GameLoop
 
         /// <summary>マップ上のノードへ移動。
         ///
-        /// <para><b>自由移動の層</b>（2026-09-28）では行き先を決めるだけで、 移動は時間とともに進む
-        /// （<see cref="TravelTo"/>）。 人の時計 (<c>FreeMapClock</c>) が無い場面 ── 旧来の UI・デバッグキー・
-        /// テスト ── では、 着く (または捕まる・倒れる) まで同期的に進める。</para>
+        /// <para><b>航行マップの層</b>（手番制・2026-10-18）では道でつながった隣の点へ 1 歩動く
+        /// （<see cref="MoveStep"/>）。 動くと 1 手番が進み、 追跡者が 1 度動く。</para>
         ///
-        /// <para>Λ 環状線と 8 層は離散のまま、 1 手で隣へ動く。</para></summary>
+        /// <para>8 層は離散のまま、 1 手で隣へ動く。</para></summary>
         public void MoveToNode(string nodeId)
         {
             Debug.Log($"[GameManager] MoveToNode: {nodeId} (phase={CurrentPhase})");
@@ -370,7 +351,7 @@ namespace GameLoop
             var mm = MapManager.Instance;
             if (mm != null && mm.IsFreeMap)
             {
-                TravelTo(nodeId, runSyncIfNoClock: true);
+                MoveStep(nodeId);
                 return;
             }
 
@@ -388,14 +369,14 @@ namespace GameLoop
             EventSystem.TimedEffects.TimedEffectManager.OnMapMove(Run);
 
             // 名前付き固有パッシブ（マップ移動時系。現状該当なし、フック確保）
-            InventorySystem.PassiveItems.PassiveItemManager.OnMapMove(Run);
+            ItemSystem.PassiveItems.PassiveItemManager.OnMapMove(Run);
 
             // メタ: ノード踏破トークン
             MetaProgression.MetaTokenEarner.OnNodeVisited();
         }
 
         /// <summary>点に入った後の処理 (離散の 1 手 / 自由移動の到着で共通): 戦闘名の開示・
-        /// 異常現象・Λ の次元の乱れ・〈焦燥〉・絶望的な進軍 → タイル起動。</summary>
+        /// 異常現象・〈焦燥〉・絶望的な進軍 → タイル起動。</summary>
         private void AfterNodeEntered()
         {
             var mm = MapManager.Instance;
@@ -421,19 +402,6 @@ namespace GameLoop
                     SetPhase(GamePhase.GameOver);
                     OnGameOver?.Invoke(Run);
                     return;
-                }
-            }
-
-            // Λ層: 環状線マスを踏むたびに「次元の乱れ」を蓄積。3 毎にランダム恒久デバフを付与/段階上昇。
-            // タイル起動(=その戦闘)より前に付与することで、踏んだマスの戦闘へ即座に反映される。
-            if (Run.inLambda && mm.CurrentNode != null && mm.CurrentNode.type == TileType.LambdaRing)
-            {
-                Run.dimensionalDisturbance++;
-                if (Run.dimensionalDisturbance % LambdaDebuffInterval == 0)
-                {
-                    string granted = GameLoop.Lambda.LambdaDebuffEffects.GrantRandom(Run);
-                    if (granted != null)
-                        Log($"次元の乱れ {Run.dimensionalDisturbance}: Λデバフ「{granted}」lv{Run.GetLambdaDebuffLevel(granted)} 付与");
                 }
             }
 
@@ -482,7 +450,7 @@ namespace GameLoop
                     string id = PickPassiveItemForBossExtra(wantRare: true);
                     if (!string.IsNullOrEmpty(id))
                     {
-                        InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
+                        ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
                         Loadout.TryAutoEquip(Run, id);
                         var dd = ItemDatabase.Instance?.GetItem(id);
                         Log($"偽の商人を討伐 → レア恒久アイテム「{(dd != null ? dd.displayName : id)}」を奪い返した");
@@ -535,13 +503,12 @@ namespace GameLoop
                 if (LastStand.TryConsumeRevival(Run, isBossFight))
                 {
                     Log("救済発動: マップへ戻る");
-                    // 徘徊エネミーの連戦の途中なら、 連戦から抜けた扱い (逃げた時と同じく 2 手番後から追跡)。
+                    // 追跡者の戦闘の途中なら、 逃げた扱い (直前の点へ戻り、 追跡者は 2 手番足止め)。
                     //   代償は取らない ── 救済そのものが代償 (灯火を失う)。
-                    bool wasGauntlet = InGauntletCombat;
+                    bool wasPursuer = InPursuerCombat;
                     if (InFamiliarCombat) { EndFamiliarFight(fled: false); return; }
-                    if (wasGauntlet) EndGauntletAsFled(payCost: false);
+                    if (wasPursuer) EndPursuerFightAsFled(payCost: false);
                     SetPhase(GamePhase.MapNavigation);
-                    if (wasGauntlet) FlushPendingArrival();
                     return;
                 }
                 if (isBossFight)
@@ -576,12 +543,12 @@ namespace GameLoop
                 return;
             }
 
-            // 徘徊エネミーの連戦: 次の 1 戦へ / 勝ち切ったら物資 +300 とアイテム 1 個。
-            //   **マスに紐づく報酬 (下) は通さない** ── 連戦は道の途中で起きるので、
-            //   CurrentNode は「直前に居た点」でしかない。
-            if (InGauntletCombat)
+            // 追跡者の戦闘: 勝ち切ったら物資 +300 とアイテム 1 個。
+            //   **マスに紐づく報酬 (下) は通さない** ── 捕まった点は直前に着いた点で、
+            //   その点の起動は戦闘の後 (FlushPendingArrival) に行う。
+            if (InPursuerCombat)
             {
-                HandleGauntletFightWon();
+                HandlePursuerWon();
                 return;
             }
             if (InFamiliarCombat)
@@ -597,10 +564,6 @@ namespace GameLoop
             // metaWinGold は最大3、全戦闘に加算すると経済を歪める(1/5 デノミ済み環境で +90G/ラン に到達)。
             // ボス撃破時のみ適用し、通常戦闘では 0 とする。
             MetaProgression.MetaTokenEarner.OnEnemyDefeated();
-
-            // 遺物軸〈Λ共鳴〉: Λ層で戦闘を終えるたびに会心倍率が積む。 **勝敗は問わない**
-            // (負ければランが終わるので実質は勝利数だが、 条件を単純に保つ)。
-            if (Run != null && Run.inLambda) Run.lambdaCombatsFinished++;
 
             bool isBossNodeForMeta = node != null && node.type == TileType.Boss;
             int metaWinGold = isBossNodeForMeta
@@ -622,25 +585,25 @@ namespace GameLoop
                     // 2026-06-28: 固有ドロップ「シュヴァリエのレイピア」 (従来は入手経路が未配線だった)
                     if (!Run.OwnsPassive(ItemIds.ChevalierRapier))
                     {
-                        InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, ItemIds.ChevalierRapier);
+                        ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, ItemIds.ChevalierRapier);
                         Log("剣聖の得物「シュヴァリエのレイピア」を手に入れた。");
                     }
                 }
 
                 // 1層ボス（トレジャーゴブリン）: 良質な武器/パッシブを1個ドロップ
-                if (Run.currentFloor == 1)
+                if (Run.Depth == 1)
                 {
                     string dropId = PickTreasureGoblinDrop();
                     if (!string.IsNullOrEmpty(dropId))
                     {
-                        InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, dropId);
+                        ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, dropId);
                         Loadout.TryAutoEquip(Run, dropId);
                         var dd = ItemDatabase.Instance?.GetItem(dropId);
                         Log($"トレジャーゴブリン討伐報酬: {(dd != null ? dd.displayName : dropId)} を獲得");
                     }
                 }
 
-                int rewardBase = FloorManager.CalculateRewardCoins(Run.currentFloor, true, result.totalTurns) * 2;
+                int rewardBase = FloorManager.CalculateRewardCoins(Run.Depth, true, result.totalTurns) * 2;
                 // 傲慢: ボスはエリート以上扱いで報酬2倍（割合先）
                 if (prideActive) rewardBase *= 2;
                 // パッシブ刻印〈守銭〉: 発動分 × 1G/ボス
@@ -661,7 +624,7 @@ namespace GameLoop
 
             // 通常報酬（傲慢: 通常戦闘=0、エリート以上=×2、いずれも割合計算が先）
             // エンカウントプリセットの報酬倍率 (2 体戦 = ×2)。 2 体ぶんの攻撃を受け切った対価。
-            int coins = FloorManager.CalculateRewardCoins(Run.currentFloor, true, result.totalTurns,
+            int coins = FloorManager.CalculateRewardCoins(Run.Depth, true, result.totalTurns,
                                                           CurrentEncounterRewardMultiplier);
             // 精鋭戦の報酬割増 (2026-09-14)。 2 体戦の ×2 より少し下 ── 単体だが危険、 の対価。
             //   [撤去] IsEliteSecondFight による ×1.5 ── **どこからも true にならない死にフラグ**
@@ -703,11 +666,10 @@ namespace GameLoop
             IsEliteSecondFight = false;
 
             // 物資の補給 (2026-09-28): 通常 +30 / エリート +80。 払底したら戦って奪うしかない
-            //   (Highfleet の「追ってきた敵から燃料を奪う」)。 Λ 環状線にも同じ額が乗る。
+            //   (Highfleet の「追ってきた敵から燃料を奪う」)。
             ProvisionSystem.Supply(Run, eliteNodeReward
                 ? MapSystem.FreeMove.FreeMapParams.RewardElite : MapSystem.FreeMove.FreeMapParams.RewardBattle);
-            // 戦闘の物音と気配 (半径 4 の敵を呼ぶ・2 手番 気配 +2)
-            mm.Sim?.NoteBattleEnded();
+            // (手番制の航行マップでは戦闘は手番を使わず、 物音も立てない。)
 
             // 戦闘勝利報酬: **エリートは確定 1 個 / 通常は 15%** (2026-09-09 変更)。
             //
@@ -720,7 +682,6 @@ namespace GameLoop
             //   床のクリア率は 19.8% → 15.3% にしか動かなかった (目標は 1〜5%)。
             //
             // 新: **エリートは期待値そのまま・分散ゼロ** (0.5+0.5 = 期待1.0 → 確定1.0)。
-            //   Λ 環状線のマスは EliteBattle 扱いなので、 Λ の取り分も平均では変わらない。
             //   減らすのは通常戦だけ (0.5 → 0.15)。 代わりに戦闘報酬ゴールドを微増して
             //   「戦闘が経済の主軸」という筋は残す ── 現物ではなく金で払う形に寄せる。
             bool eliteWin = node != null && node.EffectiveType == TileType.EliteBattle;
@@ -778,14 +739,14 @@ namespace GameLoop
             {
                 if (it == null) continue;
                 if (it.category != ItemCategory.Passive) continue;
-                if (!InventorySystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
+                if (!ItemSystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
                 if (dedup.Contains(it.internalName)) continue;
                 pool.Add(it);
             }
             if (pool.Count == 0) return null;
 
             float bias = MetaProgression.MetaBuffApplicator.GetStartingPassiveRarityBias();
-            return InventorySystem.RarityWeightedPicker.Pick(pool, null, bias)?.internalName;
+            return ItemSystem.RarityWeightedPicker.Pick(pool, null, bias)?.internalName;
         }
 
         private string PickPassiveItemForBossExtra(bool wantRare)
@@ -801,18 +762,18 @@ namespace GameLoop
             {
                 if (it == null) continue;
                 if (it.category != ItemCategory.Passive) continue;
-                if (!InventorySystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
+                if (!ItemSystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
                 if (dedup.Contains(it.internalName)) continue;   // ラン重複排除
                 pool.Add(it);
             }
             if (pool.Count == 0) return null;
 
             ItemRarity? minRarity = wantRare ? ItemRarity.GOLD : (ItemRarity?)null;
-            var picked = InventorySystem.RarityWeightedPicker.Pick(pool, minRarity);
+            var picked = ItemSystem.RarityWeightedPicker.Pick(pool, minRarity);
             if (picked == null && wantRare)
             {
                 // フォールバック: レア該当無しなら全プールから
-                picked = InventorySystem.RarityWeightedPicker.Pick(pool);
+                picked = ItemSystem.RarityWeightedPicker.Pick(pool);
             }
             return picked?.internalName;
         }
@@ -831,15 +792,15 @@ namespace GameLoop
             {
                 if (it == null) continue;
                 if (it.category != ItemCategory.Weapon && it.category != ItemCategory.Passive) continue;
-                if (!InventorySystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
+                if (!ItemSystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
                 if (dedup.Contains(it.internalName)) continue;   // ラン重複排除
                 pool.Add(it);
             }
             if (pool.Count == 0) return null;
 
             // 「いい感じ」: SILVER 以上を優先抽選、該当無しなら全プール
-            var picked = InventorySystem.RarityWeightedPicker.Pick(pool, ItemRarity.SILVER)
-                         ?? InventorySystem.RarityWeightedPicker.Pick(pool);
+            var picked = ItemSystem.RarityWeightedPicker.Pick(pool, ItemRarity.SILVER)
+                         ?? ItemSystem.RarityWeightedPicker.Pick(pool);
             return picked?.internalName;
         }
 
@@ -934,7 +895,7 @@ namespace GameLoop
             if (string.IsNullOrEmpty(fam) || n <= 0) return 0;
             // **2026-09-05: T1 廃止で起点が T2 になった** ── WeaponProgression と同じ数え方に揃える。
             //   T2=0 / T2+=1 / T3=2 / T3+=3 / T4=4 / T4+=5
-            if (InventorySystem.PassiveSkills.WeaponProgression.IsProgressionWeapon(run.equippedWeaponId))
+            if (ItemSystem.PassiveSkills.WeaponProgression.IsProgressionWeapon(run.equippedWeaponId))
                 return System.Math.Max(0, (n - 2) * 2 + (run.weaponPlus > 0 ? 1 : 0) + run.limitBreakStage);
             return n - 1;
         }
@@ -959,7 +920,7 @@ namespace GameLoop
         public static int WeaponUpgradeCost(RunState run)
         {
             if (run == null) return int.MaxValue;
-            bool prog = InventorySystem.PassiveSkills.WeaponProgression.IsProgressionWeapon(run.equippedWeaponId);
+            bool prog = ItemSystem.PassiveSkills.WeaponProgression.IsProgressionWeapon(run.equippedWeaponId);
             int stage = OverallStage(run);
             if (stage >= WeaponUpgradeCostTable.Length) return int.MaxValue;
             int cost = WeaponUpgradeCostTable[stage];
@@ -983,7 +944,7 @@ namespace GameLoop
         {
             if (run == null) return false;
             if (WeaponUpgradeCost(run) != int.MaxValue) return true;
-            var d = InventorySystem.ItemDatabase.Instance?.GetItem(run.equippedDiceId);
+            var d = ItemSystem.ItemDatabase.Instance?.GetItem(run.equippedDiceId);
             if (d == null) return false;
             int cur = DiceEnhance.GetLevel(run, run.equippedDiceId);
             return cur < DiceEnhance.MaxLevelForItem(d)
@@ -1007,7 +968,7 @@ namespace GameLoop
             if (!free && run.weaponMaterials < cost) return false;
 
             string prevWeaponId = run.equippedWeaponId;
-            bool prog = InventorySystem.PassiveSkills.WeaponProgression.IsProgressionWeapon(run.equippedWeaponId);
+            bool prog = ItemSystem.PassiveSkills.WeaponProgression.IsProgressionWeapon(run.equippedWeaponId);
             if (prog)
             {
                 if (run.weaponPlus == 0)
@@ -1016,14 +977,11 @@ namespace GameLoop
                 }
                 else
                 {
-                    // **T3+ → T4 は分岐点** (2026-09-05)。 純家系へ深めるか、 別家系と混ぜるか。
-                    //   純   T4 = A-III + B-II + 固有1 + 固有2   (一点特化)
-                    //   複合 T4 = A-III(親1) + A-III(親2) + 複合固有  (2軸)
-                    //   どちらへ進むかは**学習済みの準パワー**で決める ── 手置きの優先順位は入れない。
-                    //   同点なら純を採る (既存挙動の維持)。
+                    // T_n+ → T_{n+1}。 T4+ は WeaponUpgradeCost が int.MaxValue を返すのでここへ来ない
+                    //   (業物は 2026-08-10 に、 純／複合の分岐は 2026-09-21 に複合武器ごと廃止・GAME.md §24)。
                     string next = ChooseUpgradeTarget(run);
-                    if (next != null) { run.equippedWeaponId = next; run.weaponPlus = 0; } // T_n+ → T_{n+1}
-                    else run.limitBreakStage++;          // T4+ → 業物lv++
+                    if (next == null) return false;
+                    run.equippedWeaponId = next; run.weaponPlus = 0;
                 }
             }
             else
@@ -1190,159 +1148,10 @@ namespace GameLoop
         //  内部処理
         // ============================================================
 
-        // ============================================================
-        //  Λ層（時間の狭間）
-        // ============================================================
-
-        /// <summary>Λ層へ強制突入。currentFloor は 5 のまま、環状線マップを生成して周回させる。
-        /// 移動毎に「次元の乱れ」を蓄積し、3 毎にランダム恒久デバフを付与する。</summary>
-        private void EnterLambda()
-        {
-            Run.inLambda = true;
-            Run.dimensionalDisturbance = 0;
-            // 5Fボス撃破フラグを下ろす。これを残すと Λ内エリート報酬の ConfirmReward が
-            // 再び HandleFloorClear→EnterLambda を呼び（IsNormalClear が currentFloor==5 で成立し続けるため）、
-            // 毎報酬でΛへ再突入＝dimensionalDisturbance リセット＆マップ再生成のループになる。
-            Run.bossDefeatedThisFloor = false;
-            if (Run.lambdaDebuffs == null)
-                Run.lambdaDebuffs = new System.Collections.Generic.Dictionary<string, int>();
-
-            // Λ層に層デバフ(ActiveModifier)は適用しない
-            ActiveModifier = null;
-
-            MapManager.Instance.GenerateLambda();
-            RevealAdjacentEncounters();
-
-            SetPhase(GamePhase.FloorIntro);
-            // 層タイトル表示（Λ層。確定文言の正本: docs/GAME.md §5）
-            var lambdaIntro = LayerTitles.ForLambda();
-            Log($"=== {lambdaIntro.title} ===　{lambdaIntro.subtitle}　中央マスを踏むまで周回する");
-            LayerTitles.Raise(lambdaIntro);
-            SetPhase(GamePhase.MapNavigation);
-        }
-
-        /// <summary>Λ層の中央マス踏破 → 離脱。6F へ進む（通常の FloorClear→AdvanceFloor→EnterFloor 経路）。</summary>
-        private void ExitLambda()
-        {
-            Run.inLambda = false;
-            Log($"=== 時間の狭間を離脱 === 踏破マス {Run.dimensionalDisturbance} / Λデバフ {Run.lambdaDebuffs.Count}種 → 6層前哨基地へ");
-            SetPhase(GamePhase.FloorClear);
-            OnFloorAdvanced?.Invoke(MapSystem.FreeMove.FloorPlan.Next(Run.currentFloor));
-        }
-
-        /// <summary>Λ層の環状線マス起動: エリート戦 or 固有イベント(回復/パッシブ)を抽選。</summary>
-        private void ActivateLambdaRing(MapNode node)
-        {
-            Run.lambdaRingsEntered++;   // 計装: マス起動まで到達した回数
-            // 50% エリート / 50% 固有イベント
-            if (GameLoop.GameRng.Value("GameManager.3") < 0.5f)
-            {
-                Run.lambdaRingElite++;
-                // エリート戦: ノードを一時的に EliteBattle 扱いにして既存のエリート抽選/強化を流用。
-                // **StartBattleTile は resolvedType を読まない**ので、 立てた直後に戻して構わない。
-                // 立てっぱなしにすると ActivateTile の oneShot 判定で LambdaRing と見なされなくなる
-                // (上記 2026-08-08 の修正で type 基準にしたが、 ここでも残さないでおく)。
-                node.resolvedType = TileType.EliteBattle;
-                IsEliteSecondFight = false;
-                firstEliteEnemy = null;
-                // 固有イベントと同じ深度補正を戦闘報酬にも効かせる。 片方だけだと
-                // 「エリートを引いた深いマスは無価値」という抜けが残る。
-                ApplyLambdaDepthLootFloor();
-                Log("Λ環状線: エリート戦");
-                StartBattleTile();
-                node.resolvedType = null;   // 次回再訪でまた抽選できるよう戻す
-            }
-            else
-            {
-                Run.lambdaRingEvent++;
-                node.resolvedType = null; // 次回再訪時にまた抽選するため戻す
-                ResolveLambdaEvent();
-            }
-        }
-
-        /// <summary>**Λ は深く潜るほど品質が上がる** (2026-08-05)。 踏破マス数に応じて
-        /// 次の戦利品の最低レア度を引き上げる (6マス SILVER / 12 GOLD / 18 LEGENDARY)。
-        ///
-        /// 実測で Λ は 1 マスあたりのアイテム取得が 0.96 → 0.32、 GOLD が 2.45 → 0.95 と
-        /// 逓減する一方、 デバフ付与は 1 マス 0.33 で一定だった。 浅いマスで良品を取り尽くす
-        /// ため深追いする理由が原理的に無く、 7層クリアは 安全策 34.0% > リスキー 29.0% >
-        /// 現行適応 24.6% と「即撤退が最適」になっていた。 単価を深度で上げて逓減を打ち消す。
-        ///
-        /// **既に nextLootMinRarity が立っている場合は触らない** ── 鑑定の眼鏡など
-        /// 他の保証と競合させず、 先に立っている方を尊重する。</summary>
-        private void ApplyLambdaDepthLootFloor()
-        {
-            if (Run == null || !Run.inLambda) return;
-
-            // [撤回] 深度連動のレア度下限 (6マス SILVER / 12 GOLD / 18 LEGENDARY)。
-            //   2026-08-08 に導入し同日撤回。 導入根拠だった「深いマスほど 1 マスの利得が薄い」は、
-            //   ActivateTile の oneShot 判定バグ (Λ環状線ノードが一度エリートを引くと永久沈黙) が
-            //   生んだ偽の逓減だった。 修正後は利得が踏破に完全比例するため、 質での補正は不要。
-            //   計装 (候補残数) だけは診断価値があるので残す。
-            CountLambdaLootPool(-1, out Run.lambdaPoolRemainingAll, out Run.lambdaPoolRemainingFloored);
-        }
-
-        /// <summary>Λ 戦利品の抽選候補を数える。 **<see cref="PickTreasureChoicePair"/> と同じ絞り込み**を
-        /// 使うこと ── 条件がずれると「枯れているか」の検証にならない。</summary>
-        private void CountLambdaLootPool(int minRarity, out int all, out int floored)
-        {
-            all = 0; floored = 0;
-            var db = ItemDatabase.Instance;
-            if (db == null) return;
-            var items = db.GetAllItems();
-            if (items == null) return;
-            var dedup = BuildDedupExclude();
-            foreach (var it in items)
-            {
-                if (it == null) continue;
-                if (it.category == ItemCategory.Weapon) continue;
-                if (it.category == ItemCategory.Quest) continue;
-                if (!InventorySystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
-                if (dedup.Contains(it.internalName)) continue;
-                all++;
-                if (minRarity < 0 || (int)it.rarity >= minRarity) floored++;
-            }
-        }
-
-        /// <summary>Λ固有イベント: HPが半分未満なら回復、十分なら未所持寄りのパッシブ1つを獲得。
-        /// (ロジック先行のためボット向け自動解決。UI実装時に2択提示へ差し替える)。</summary>
-        private void ResolveLambdaEvent()
-        {
-            bool wantHeal = Run.playerHP * 2 < Run.playerMaxHP;
-            if (wantHeal)
-            {
-                Run.lambdaRingEventHeal++;   // 計装: アイテム抽選に到達しなかった回
-                int heal = Mathf.CeilToInt(Run.playerMaxHP * 0.4f);
-                int before = Run.playerHP;
-                Run.playerHP = Mathf.Min(Run.playerMaxHP, Run.playerHP + heal);
-                Log($"Λ固有イベント: 回復 +{Run.playerHP - before} ({Run.playerHP}/{Run.playerMaxHP})");
-            }
-            else
-            {
-                Run.lambdaRingEventItem++;
-                ApplyLambdaDepthLootFloor();
-                var (a, b) = PickTreasureChoicePair();
-                string pick = !string.IsNullOrEmpty(a) ? a : b;
-                if (!string.IsNullOrEmpty(pick))
-                {
-                    GrantRewardItem(pick, eliteWin: false);
-                    Log("Λ固有イベント: パッシブアイテム獲得");
-                }
-                else
-                {
-                    // 付与候補が尽きた場合は回復にフォールバック
-                    int heal = Mathf.CeilToInt(Run.playerMaxHP * 0.4f);
-                    Run.playerHP = Mathf.Min(Run.playerMaxHP, Run.playerHP + heal);
-                    Log("Λ固有イベント: 候補なし → 回復にフォールバック");
-                }
-            }
-            SetPhase(GamePhase.MapNavigation);
-        }
-
         /// <summary>フロアに入る（マップ生成、前哨基地処理、デバフ適用）</summary>
         private void EnterFloor()
         {
-            MetaProgression.Achievements.AchievementService.NoteFloorEntered(Run?.currentFloor ?? 0);
+            MetaProgression.Achievements.AchievementService.NoteFloorEntered(Run?.Depth ?? 0);
             Run.tilesThisFloor = 0;   // 軸14〈焦燥〉の層別カウンタ
             var mm = MapManager.Instance;
 
@@ -1351,10 +1160,10 @@ namespace GameLoop
             // [廃止] 旅団契約の層フック (2026-08-11 削除)
 
             // メタ: トークン獲得 + 1層/3層で固有恒久デバフ抽選
-            MetaProgression.MetaTokenEarner.OnFloorReached(Run.currentFloor);
+            MetaProgression.MetaTokenEarner.OnFloorReached(Run.Depth);
             // T4-E〈最後の審判〉: 3層・5層で大罪を付与 (§15-2 v3.0)。 v1 の 1層付与は廃止。
-            if (Run.currentFloor == 3) MetaProgression.MetaDebuffApplicator.TryGrantOnFloor3(Run);
-            if (Run.currentFloor == 5) MetaProgression.MetaDebuffApplicator.TryGrantOnFloor5(Run);
+            if (Run.Depth == 3) MetaProgression.MetaDebuffApplicator.TryGrantOnFloor3(Run);
+            if (Run.Depth == 5) MetaProgression.MetaDebuffApplicator.TryGrantOnFloor5(Run);
 
             // T4-A〈破綻〉: 各層突入時、 HP を最大HPの 70% 以下へ切り詰める (§15-2 v3.0)。
             //   既にそれ以下なら何もしない ── 回復ではなく「上限の切り下げ」。
@@ -1370,7 +1179,7 @@ namespace GameLoop
             }
 
             // 恒久デバフ「ムシュファの強欲」: 5層突入時に所持ゴールド0
-            if (Run.currentFloor == 5 && MetaProgression.PermanentDebuffEffects.HasGreed(Run))
+            if (Run.Depth == 5 && MetaProgression.PermanentDebuffEffects.HasGreed(Run))
             {
                 Log($"恒久デバフ {MetaProgression.PermanentDebuffIds.Greed}: 所持ゴールド {Run.coins}→0");
                 Run.coins = 0;
@@ -1378,10 +1187,10 @@ namespace GameLoop
 
             // 層突入のパッシブ (2026-09-15)。 **層デバフより前に鳴らす** ── 〈ムシュファの強欲〉が
             //   5 層で所持金を 0 にするので、 後ろに置くと配ったゴールドが同じ層で消える。
-            InventorySystem.PassiveItems.PassiveItemManager.OnFloorEnter(Run);
+            ItemSystem.PassiveItems.PassiveItemManager.OnFloorEnter(Run);
 
             // 層デバフ取得
-            ActiveModifier = FloorModifierDatabase.Get(Run.currentFloor);
+            ActiveModifier = FloorModifierDatabase.Get(Run.Depth);
 
             // 大穴の異常現象を抽選 (物資連動・1〜2件)
             MapSystem.AbyssPhenomena.AbyssPhenomenonRoller.RollForFloor(Run);
@@ -1392,13 +1201,13 @@ namespace GameLoop
             }
 
             // マップ生成（空腹度上限はModifierで調整）
-            mm.GenerateFloor(Run.currentFloor);
+            mm.GenerateFloor(Run.Depth);
 
             // 前哨基地に立った時点で、 最初の分岐ぶんの戦闘名を開示する。
             RevealAdjacentEncounters();
 
             // 層タイトル表示（確定文言の正本: docs/GAME.md §5。ビジュアルは未実装、OnShow を UI が購読）
-            var layerIntro = LayerTitles.ForFloor(Run.currentFloor);
+            var layerIntro = LayerTitles.ForFloor(Run.Depth);
             Log($"=== {layerIntro.title} ===　{layerIntro.subtitle}");
             LayerTitles.Raise(layerIntro);
 
@@ -1444,7 +1253,7 @@ namespace GameLoop
                 RunChronicle.Rest(Run, Run.playerHP - beforeHP, beforeHP, Run.playerMaxHP);
                 Log($"前哨基地: MaxHP+{ActiveModifier.maxHPBonusFlat} → {Run.playerMaxHP}, HP+{Run.playerHP - beforeHP} → {Run.playerHP}");
             }
-            else if (Run.currentFloor == 8)
+            else if (Run.Depth == 8)
             {
                 // **8層 (Null Point) に前哨基地の回復は無い。** ここは門が転移させた先の一点で、
                 //   野営できる場所ではない。 補給は 7 層 (店 → 休憩 → 門) で終わっている。
@@ -1452,7 +1261,7 @@ namespace GameLoop
                 //   代償が「HP を削られた状態で入るかどうか」に化ける。
                 Log("Null Point: 転移した先に、休める場所は無い");
             }
-            else if (Run.currentFloor == 7)
+            else if (Run.Depth == 7)
             {
                 // 7層前哨基地: 最終戦に挑む者への餞別。HP全回復（挑戦デバフの倍率は乗る）
                 int beforeHP = Run.playerHP;
@@ -1499,7 +1308,7 @@ namespace GameLoop
 
             // 物資の補給 (2026-09-28): 前哨基地 +200。 8 層は転移した先の一点で補給は無い。
             //   1 層は満タンで始まるので足さない ── 足すと遺物〈渇き〉の「開幕物資を下げる」が 1 手目で消える。
-            if (Run.currentFloor != 8 && Run.currentFloor != MapSystem.FreeMove.FloorPlan.FirstFloor)
+            if (Run.Depth != 8 && Run.Depth != MapSystem.FreeMove.FloorPlan.FirstFloor)
                 ProvisionSystem.Supply(Run, MapSystem.FreeMove.FreeMapParams.RewardOutpost);
 
             SetPhase(GamePhase.FloorIntro);
@@ -1509,7 +1318,7 @@ namespace GameLoop
             SetPhase(GamePhase.MapNavigation);
 
             // 8 層 (Null Point) は内部でボス戦だけの層。 マップを挟まず、 そのままヴェスカ戦へ入る。
-            if (Run.currentFloor == 8 && mm.CurrentMap != null && !string.IsNullOrEmpty(mm.CurrentMap.bossNodeId))
+            if (Run.Depth == 8 && mm.CurrentMap != null && !string.IsNullOrEmpty(mm.CurrentMap.bossNodeId))
                 MoveToNode(mm.CurrentMap.bossNodeId);
         }
 
@@ -1549,7 +1358,7 @@ namespace GameLoop
                     string pid = PickPassiveItemForBossExtra(false);
                     if (!string.IsNullOrEmpty(pid))
                     {
-                        InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, pid);
+                        ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, pid);
                         PlunderDrops++;
                         Log($"[強奪] 戦利品: {pid}");
                     }
@@ -1568,7 +1377,7 @@ namespace GameLoop
                     string pid = PickPassiveItemForBossExtra(false);
                     if (!string.IsNullOrEmpty(pid))
                     {
-                        InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, pid);
+                        ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, pid);
                         ValorEliteDrops++;
                         Log($"[剛胆] 精鋭の戦利品: {pid}");
                     }
@@ -1599,7 +1408,7 @@ namespace GameLoop
                             if (data.category == ItemCategory.Consumable)
                                 got = Run.TryAddConsumable(id);
                             else
-                                got = InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
+                                got = ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
                             if (got) Loadout.TryAutoEquip(Run, id);
                             loot++;
                             if (got) RobberyLootApplied++;
@@ -1672,7 +1481,7 @@ namespace GameLoop
             var here = mm?.CurrentNode;
             if (map == null || here == null) return;
 
-            int floor = map.floor > 0 ? map.floor : Run.currentFloor;
+            int floor = map.floor > 0 ? map.floor : Run.Depth;
 
             // 現在地そのものも解いておく (踏んだ瞬間に StartBattleTile が読む)。
             FloorManager.EnsureEncounter(floor, here);
@@ -1713,17 +1522,12 @@ namespace GameLoop
 
             // 収束ノード(Boss/Outpost)以外の一度きりタイルは、再訪時に再発火させない。
             // （イベントの無限ファーム＝同行マス往復によるデッドロックを構造的に防ぐ）
-            // Λ環状線/中央は周回前提のため oneShot から除外（毎回再発火＝再抽選）。
             //
             // **除外判定は EffectiveType ではなく素の type で行う (2026-08-08 修正)。**
-            //   ActivateLambdaRing のエリート枝が node.resolvedType = EliteBattle を立てたまま
-            //   戻さないため、 EffectiveType 基準だとそのノードは以後 LambdaRing と見なされず
-            //   oneShot 扱いになり activated が立って**二度と起動しなくなる**。 環状線はノード数が
-            //   限られるので数周で全ノードが沈黙し、 踏破を 2 倍にしてもマス起動が 5.7 回で頭打ち、
-            //   取得アイテムが 7.9 個で固定される一方、 デバフだけが踏破数に比例して積み続けていた。
+            //   resolvedType を立てたまま戻さない経路があると、 EffectiveType 基準ではノードの種類が
+            //   すり替わって oneShot の判定を誤る (旧 Λ 環状線で全ノードが沈黙した原因・GAME.md §24)。
             var baseType = node.type;
-            bool oneShot = baseType != TileType.Boss && baseType != TileType.Outpost
-                        && baseType != TileType.LambdaRing && baseType != TileType.LambdaExit;
+            bool oneShot = baseType != TileType.Boss && baseType != TileType.Outpost;
             if (oneShot && node.activated)
             {
                 SetPhase(GamePhase.MapNavigation);
@@ -1761,7 +1565,7 @@ namespace GameLoop
                     //   使い道ごと消えて、 報酬と罰が打ち消し合っていた。
                     //   下の分岐は比較スイープ用の退避経路 (ShopManager.RobberyBlocksShops)。
                     if (Run != null && Run.shopRobberyDone
-                        && InventorySystem.Shop.ShopManager.RobberyBlocksShops)
+                        && ItemSystem.Shop.ShopManager.RobberyBlocksShops)
                     {
                         Log("ショップ閉鎖中: 値下げ交渉により商人ギルドから出禁 (旧仕様・比較用)");
                         SetPhase(GamePhase.MapNavigation);
@@ -1782,15 +1586,6 @@ namespace GameLoop
                 case TileType.Gate:
                     BeginGateRitual();
                     break;
-                case TileType.LambdaRing:
-                    ActivateLambdaRing(node);
-                    break;
-                case TileType.LambdaExit:
-                    ExitLambda();
-                    break;
-                case TileType.SupplyCache:
-                    LootSupplyCache();
-                    break;
                 default:
                     SetPhase(GamePhase.MapNavigation);
                     break;
@@ -1806,7 +1601,7 @@ namespace GameLoop
         private void StartBattleTile()
         {
             var node = MapManager.Instance?.CurrentNode;
-            int floor = Run.currentFloor;
+            int floor = Run.Depth;
 
             // 到着時に開示済みのはずだが、 保存ロード直後など未解決で入ることがあるので念のため解く。
             FloorManager.EnsureEncounter(floor, node);
@@ -1862,7 +1657,7 @@ namespace GameLoop
             SetPhase(GamePhase.Combat);
             CombatManager.Instance.StartCombat(CurrentEnemy, Run.playerHP, dc, dm, cr, df, str_, ft_,
                                                CurrentEnemySecondary);
-            // 逃げる (2026-09-28): 自由移動の層の戦闘・エリートだけ。 Λ 環状線は層を抜ける唯一の道なので対象外。
+            // 逃げる (2026-09-28): 自由移動の層の戦闘・エリートだけ。
             CombatManager.Instance.FleeAllowed = MapManager.Instance != null && MapManager.Instance.IsFreeMap;
         }
 
@@ -1955,7 +1750,7 @@ namespace GameLoop
             foreach (var ps in data.passiveSkills)
             {
                 if (string.IsNullOrEmpty(ps.internalName)) continue;
-                var (fam, lv) = InventorySystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(ps.internalName);
+                var (fam, lv) = ItemSystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(ps.internalName);
                 if (lv > maxLv) { maxLv = lv; family = fam; }
             }
             return maxLv;
@@ -2004,8 +1799,8 @@ namespace GameLoop
                 return;
             }
 
-            InventorySystem.Helpers.PassiveAddHelper.RemoveAt(Run, idx);
-            InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, resultId);
+            ItemSystem.Helpers.PassiveAddHelper.RemoveAt(Run, idx);
+            ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, resultId);
             Loadout.TryAutoEquip(Run, resultId);
             var rd = db?.GetItem(resultId);
             Log($"交換マス: 「{given.displayName}」を渡し「{(rd != null ? rd.displayName : resultId)}」を入手");
@@ -2037,7 +1832,7 @@ namespace GameLoop
             foreach (var it in all)
             {
                 if (it == null || it.category != ItemCategory.Passive) continue;
-                if (!InventorySystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
+                if (!ItemSystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
                 if (!tierOk(it.rarity)) continue;
                 if (excl.Contains(it.internalName)) continue;
                 pool.Add(it);
@@ -2047,13 +1842,13 @@ namespace GameLoop
                 foreach (var it in all)
                 {
                     if (it == null || it.category != ItemCategory.Passive) continue;
-                    if (!InventorySystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
+                    if (!ItemSystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
                     if (!tierOk(it.rarity)) continue;
                     pool.Add(it);
                 }
             }
             if (pool.Count == 0) return null;
-            return InventorySystem.RarityWeightedPicker.Pick(pool)?.internalName;
+            return ItemSystem.RarityWeightedPicker.Pick(pool)?.internalName;
         }
 
         /// <summary>所持パッシブからランダムに1つ除去（刻印も同期）。除去した index を返す。無ければ -1。</summary>
@@ -2063,7 +1858,7 @@ namespace GameLoop
             if (owned == null || owned.Count == 0) return -1;
             int idx = GameLoop.GameRng.RangeAuto("GameManager.5", 0, owned.Count);
             string lostId = owned[idx];
-            InventorySystem.Helpers.PassiveAddHelper.RemoveAt(Run, idx);
+            ItemSystem.Helpers.PassiveAddHelper.RemoveAt(Run, idx);
             var dd = ItemDatabase.Instance?.GetItem(lostId);
             Log($"恒久アイテム喪失: {(dd != null ? dd.displayName : lostId)}");
             return idx;
@@ -2108,7 +1903,7 @@ namespace GameLoop
         private bool IsBosslessFloorCleared()
         {
             if (Run == null) return false;
-            if (MapSystem.MapGenerator.HasBoss(Run.currentFloor)) return false;
+            if (MapSystem.MapGenerator.HasBoss(Run.Depth)) return false;
             var mm = MapManager.Instance;
             var node = mm?.CurrentNode;
             if (node == null || mm.CurrentMap == null) return false;
@@ -2173,7 +1968,7 @@ namespace GameLoop
         {
             if (Run != null)
             {
-                int fi = Mathf.Clamp(Run.currentFloor, 1, 8);
+                int fi = Mathf.Clamp(Run.Depth, 1, 8);
                 BossEntryCount[fi]++;
                 BossEntryProvision[fi] += Run.provision;
                 BossEntryProvisionTierSum[fi] += (int)ProvisionSystem.GetTier(Run);
@@ -2182,7 +1977,7 @@ namespace GameLoop
                     ? Mathf.RoundToInt(Run.playerHP * 100f / Run.playerMaxHP) : 0;
                 BossEntryPassives[fi] += Run.ownedPassiveItems?.Count ?? 0;
                 try { BossEntryPower[fi] += AutoTest.InventoryPower.Compute(Run); } catch { }
-                CombatSystem.BossCombatTrace.BeginFight(Run.currentFloor,
+                CombatSystem.BossCombatTrace.BeginFight(Run.Depth,
                     GameLoop.GameRng.RunIndex, "boss", Run.playerHP, Run.playerMaxHP,
                     0, Run.provision, Run.ownedPassiveItems?.Count ?? 0);
             }
@@ -2191,15 +1986,15 @@ namespace GameLoop
             //   2 層のゴブリン王と 4 層の鏡の双子を捨てず 3 層難度へ再調整して流用した) なので、
             //   **ここで引き直すと戦闘名の表示と実物が食い違う**。 焼き付けた値を読む。
             var bossNode = MapManager.Instance?.CurrentNode;
-            FloorManager.EnsureEncounter(Run.currentFloor, bossNode);
+            FloorManager.EnsureEncounter(Run.Depth, bossNode);
             string bossId = bossNode != null && !string.IsNullOrEmpty(bossNode.encounterEnemyA)
                 ? bossNode.encounterEnemyA
-                : FloorManager.BossIdForFloor(Run.currentFloor,
-                                              FloorManager.NodeRngIndex(Run.currentFloor, bossNode));
+                : FloorManager.BossIdForFloor(Run.Depth,
+                                              FloorManager.NodeRngIndex(Run.Depth, bossNode));
 
             // 5F裏ボス置換: シュヴァリエのレイピア所持 → シュヴァリエ・サン=ジョリオラ
             if (!SuppressLayer5HiddenBoss
-                && Run.currentFloor == 5
+                && Run.Depth == 5
                 && Run.ownedPassiveItems != null
                 && Run.ownedPassiveItems.Contains("シュヴァリエのレイピア"))
             {
@@ -2210,14 +2005,14 @@ namespace GameLoop
             CurrentEnemy = CombatSystem.EnemyDatabase.Get(bossId);
             if (CurrentEnemy == null)
             {
-                Debug.LogWarning($"[GameManager] ボス '{bossId}' 未定義 — フロア{Run.currentFloor}のプールから抽選");
-                CurrentEnemy = FloorManager.PickEnemy(Run.currentFloor);
+                Debug.LogWarning($"[GameManager] ボス '{bossId}' 未定義 — フロア{Run.Depth}のプールから抽選");
+                CurrentEnemy = FloorManager.PickEnemy(Run.Depth);
             }
             OnEnemyEncountered?.Invoke(CurrentEnemy);
             Log($"ボス戦: {CurrentEnemy.displayName}");
 
             // 5層ボス戦の清算系デバフ (カルマ系統廃止済み)
-            if (Run.currentFloor == Run.normalClearFloor)
+            if (Run.Depth == Run.normalClearFloor)
             {
                 // 血の負債: 最大HP-15（一度きり、戦闘前に適用）
                 if (Run.permanentDebuffs.Contains("血の負債"))
@@ -2373,7 +2168,7 @@ namespace GameLoop
             foreach (int idx in picked)
             {
                 if (idx >= 0 && owned != null && idx < owned.Count) names.Add(owned[idx]);
-                InventorySystem.Helpers.PassiveAddHelper.RemoveAt(Run, idx);
+                ItemSystem.Helpers.PassiveAddHelper.RemoveAt(Run, idx);
             }
             GateRelicsPaid++; GateRelicsBurned += names.Count;
             Log($"遺物を門に捧げた。〈{string.Join("〉と〈", names)}〉は光を放った後、門の中で塵になって消えた。");
@@ -2432,7 +2227,7 @@ namespace GameLoop
                     Debug.Log("[GameManager] RollUp callback fired");
                     var sm = ShopManager.Instance;
                     if (sm == null) { Debug.LogError("[GameManager] ShopManager.Instance is null!"); return; }
-                    sm.Generate(Run.currentFloor);
+                    sm.Generate(Run.Depth);
                     SetPhase(GamePhase.ShopVisit);
                 });
             }
@@ -2440,7 +2235,7 @@ namespace GameLoop
             {
                 var sm = ShopManager.Instance;
                 if (sm == null) { Debug.LogError("[GameManager] ShopManager.Instance is null!"); return; }
-                sm.Generate(Run.currentFloor);
+                sm.Generate(Run.Depth);
                 SetPhase(GamePhase.ShopVisit);
             }
         }
@@ -2561,7 +2356,7 @@ namespace GameLoop
         /// <summary>宝箱マス到達時。ゴールドランダム + パッシブ/消費アイテム1個。</summary>
         private void OpenTreasure()
         {
-            int floor = Run.currentFloor;
+            int floor = Run.Depth;
 
             // 挑戦デバフ 軸15〈空箱〉T3: 宝箱そのものが空 (1 層から)。
             if (MetaProgression.MetaDebuffApplicator.IsTreasureGone())
@@ -2599,7 +2394,7 @@ namespace GameLoop
             string itemLabel = "（なし）";
             if (!string.IsNullOrEmpty(itemId))
             {
-                InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, itemId);
+                ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, itemId);
                 Loadout.TryAutoEquip(Run, itemId);
                 var data = ItemDatabase.Instance?.GetItem(itemId);
                 itemLabel = data != null ? data.displayName : itemId;
@@ -2625,7 +2420,7 @@ namespace GameLoop
                 if (it == null) continue;
                 if (it.category == ItemCategory.Weapon) continue;
                 if (it.category == ItemCategory.Quest) continue;
-                if (!InventorySystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
+                if (!ItemSystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
                 if (dedup.Contains(it.internalName)) continue;   // ラン重複排除
                 pool.Add(it);
             }
@@ -2637,12 +2432,12 @@ namespace GameLoop
             {
                 var minR = (ItemRarity)Run.nextLootMinRarity;
                 Run.nextLootMinRarity = -1;
-                picked = InventorySystem.RarityWeightedPicker.Pick(pool, minR)
-                         ?? InventorySystem.RarityWeightedPicker.Pick(pool);
+                picked = ItemSystem.RarityWeightedPicker.Pick(pool, minR)
+                         ?? ItemSystem.RarityWeightedPicker.Pick(pool);
             }
             else
             {
-                picked = InventorySystem.RarityWeightedPicker.Pick(pool);
+                picked = ItemSystem.RarityWeightedPicker.Pick(pool);
             }
             return picked?.internalName;
         }
@@ -2663,7 +2458,7 @@ namespace GameLoop
                 if (it == null) continue;
                 if (it.category == ItemCategory.Weapon) continue;
                 if (it.category == ItemCategory.Quest) continue;
-                if (!InventorySystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
+                if (!ItemSystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
                 if (dedup.Contains(it.internalName)) continue;   // ラン重複排除
                 pool.Add(it);
             }
@@ -2674,12 +2469,12 @@ namespace GameLoop
             {
                 var minR = (ItemRarity)Run.nextLootMinRarity;
                 Run.nextLootMinRarity = -1;
-                first = InventorySystem.RarityWeightedPicker.Pick(pool, minR)
-                        ?? InventorySystem.RarityWeightedPicker.Pick(pool);
+                first = ItemSystem.RarityWeightedPicker.Pick(pool, minR)
+                        ?? ItemSystem.RarityWeightedPicker.Pick(pool);
             }
             else
             {
-                first = InventorySystem.RarityWeightedPicker.Pick(pool);
+                first = ItemSystem.RarityWeightedPicker.Pick(pool);
             }
             if (first == null) return (null, null);
 
@@ -2701,17 +2496,10 @@ namespace GameLoop
         private void GrantRewardItem(string itemId, bool eliteWin)
         {
             if (string.IsNullOrEmpty(itemId)) return;
-            // 2026-06-22: Λ 滞在中の取得は保護対象 + gross カウンタ計上
-            bool fromLambda = Run != null && Run.inLambda;
-            InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, itemId);
+            ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, itemId);
             Loadout.TryAutoEquip(Run, itemId);
-            if (fromLambda)
-            {
-                // 2026-06-23c: lambdaProtectedItemIds は撤廃 (Triage 公平判定で参照不要に)。 gross のみ計測継続。
-                Run.lambdaItemsAcquiredGross++;
-            }
             var dd = ItemDatabase.Instance?.GetItem(itemId);
-            Log($"戦闘勝利報酬: {(dd != null ? dd.displayName : itemId)} を獲得{(eliteWin ? "（精鋭）" : "")}{(fromLambda ? " [Λ保護]" : "")}");
+            Log($"戦闘勝利報酬: {(dd != null ? dd.displayName : itemId)} を獲得{(eliteWin ? "（精鋭）" : "")}");
         }
 
         // ---- 戦闘後ドロップ2択: 公開API（UI / Bot から使用）----
@@ -2835,7 +2623,7 @@ namespace GameLoop
             // BeginWith は EventDatabase.Pick を通らないため乱数列を消費しない。
             EventSystem.EventDefinition forced = null;
             var eventNode = MapManager.Instance?.CurrentNode;
-            if (Run != null && Run.currentFloor == 6
+            if (Run != null && Run.Depth == 6
                 && (eventNode == null || !eventNode.freeMap || eventNode.isFixedEvent)
                 && ConvictionSystem.HasResolveOrBetter(Run)
                 && !ConvictionSystem.HasTruth(Run))
@@ -2960,7 +2748,7 @@ namespace GameLoop
         /// <summary>イベントから戦闘を開始する。</summary>
         private void StartEventCombat(bool elite)
         {
-            CurrentEnemy = FloorManager.PickEnemy(Run.currentFloor);
+            CurrentEnemy = FloorManager.PickEnemy(Run.Depth);
             if (CurrentEnemy == null)
             {
                 Debug.LogError("[GameManager] イベント戦闘の敵選出失敗");
@@ -3029,7 +2817,7 @@ namespace GameLoop
             }
 
             // 5層クリア時: 〈決意〉以上未所持なら 5層クリアエンディング(NormalClear) で終了
-            if (Run.IsNormalClear && Run.currentFloor == Run.normalClearFloor)
+            if (Run.IsNormalClear && Run.Depth == Run.normalClearFloor)
             {
                 // 災厄の予兆を受けた事実を、5層ボス撃破によって〈決意〉へ昇格させる。
                 // エリート撃破数は6層ゲートに使わない。
@@ -3041,7 +2829,7 @@ namespace GameLoop
                 if (GrantBladeDanceOnFloor5Clear && Run.ownedPassiveItems != null
                     && !Run.ownedPassiveItems.Contains(SwordDanceSet.Finale))
                 {
-                    InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, SwordDanceSet.Finale);
+                    ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, SwordDanceSet.Finale);
                     Log("[計測] 5層撃破 → 〈ブレイドダンス〉を強制付与");
                 }
 
@@ -3051,15 +2839,18 @@ namespace GameLoop
                     Run.EndRun();
                     SetPhase(GamePhase.RunClear);
                     OnRunCleared?.Invoke(Run);
-                    Log("=== 5層クリア === 〈決意〉が無いためここで運命に背を向けた");
+                    Log("=== 3層クリア === 〈決意〉が無いためここで運命に背を向けた");
                     var ending5f = Endings.Resolve(Run);
                     Log(ending5f.Display);
                     VignetteUnlockState.OnRunClear(Run, ending5f.id, VignetteUnlockState.IsMaxDifficultyRun(Run));
                     return;
                 }
-                // 〈決意〉以上所持 → 6層へ進む前に Λ層（時間の狭間）へ強制突入。
-                // 中央マス踏破で 6F 前哨基地に着地する（= 通常の FloorClear→6F 遷移）。
-                EnterLambda();
+                // 〈決意〉以上所持 → 6 層へ降りる。
+                //   ここが「記録の残らない深さ」へ踏み込む節目なので、 演出だけはフックで出せるようにしておく。
+                OnDeepDescent?.Invoke(Run);
+                SetPhase(GamePhase.FloorClear);
+                OnFloorAdvanced?.Invoke(MapSystem.FreeMove.FloorPlan.Next(Run.Depth));
+                Log($"フロア{Run.currentFloor}クリア → 深部へ");
                 return;
             }
             else if (Run.IsFullClear)
@@ -3077,20 +2868,20 @@ namespace GameLoop
             else
             {
                 // 6層 → 7層: 〈真理〉未所持なら 6層クリアエンディングで終了
-                if (Run.currentFloor == 6 && !ConvictionSystem.HasTruth(Run))
+                if (Run.Depth == 6 && !ConvictionSystem.HasTruth(Run))
                 {
                     MetaProgression.Achievements.AchievementService.CompleteRun(Run);
                     Run.EndRun();
                     SetPhase(GamePhase.RunClear);
                     OnRunCleared?.Invoke(Run);
-                    Log("=== 6層クリア === 〈真理〉が無いためここで〈門〉への道は閉ざされた");
+                    Log("=== 4層クリア === 〈真理〉が無いためここで〈門〉への道は閉ざされた");
                     var ending6f = Endings.Resolve(Run);
                     Log(ending6f.Display);
                     VignetteUnlockState.OnRunClear(Run, ending6f.id, VignetteUnlockState.IsMaxDifficultyRun(Run));
                     return;
                 }
                 SetPhase(GamePhase.FloorClear);
-                OnFloorAdvanced?.Invoke(MapSystem.FreeMove.FloorPlan.Next(Run.currentFloor));
+                OnFloorAdvanced?.Invoke(MapSystem.FreeMove.FloorPlan.Next(Run.Depth));
                 Log($"フロア{Run.currentFloor}クリア → 次へ");
             }
         }
@@ -3113,10 +2904,6 @@ namespace GameLoop
                  DiceFaceParts.Tier[] faceTiers, bool suppressTerminalRoles)
             GatherPlayerCombatStats()
         {
-            // ItemEquipHandler を探す（初回のみ）
-            if (equipHandler == null)
-                equipHandler = FindObjectOfType<ItemEquipHandler>();
-
             int diceCount = 2;
             int diceMax = 6;
             // 会心率は % で持つ (2026-09-19 統一・5% 刻み)。 武器なしの素値は 5%。
@@ -3127,23 +2914,10 @@ namespace GameLoop
             // ADR-0010〈無銘の賽〉: 端子役を成立させないダイスか。 面と同じ経路で解決する。
             bool suppressTerminalRoles = false;
 
-            bool weaponResolved = false;
-
-            // 武器はダイスの「個数」と会心のみ定義する（面/最大値は装備ダイスが供給）。
-            if (equipHandler != null)
-            {
-                var weapon = equipHandler.GetCurrentEquipment(ItemCategory.Weapon);
-                if (weapon != null && weapon.hasWeaponStats)
-                {
-                    diceCount = weapon.weaponDice.count;
-                    critRatePct = weapon.critRatePct;
-                    weaponResolved = true;
-                }
-
-            }
-
-            // ItemEquipHandler が無い/未装備なら RunState の自動装備IDから解決
-            if (!weaponResolved && Run != null && !string.IsNullOrEmpty(Run.equippedWeaponId))
+            // 武器はダイスの「個数」と会心のみ定義する（面/最大値は出目パーツが供給）。
+            //   装備は RunState.equippedWeaponId だけが持つ (旧 ItemEquipHandler は 2026-10-28 削除・
+            //   どのシーンにも載っておらず常に null だった)。
+            if (Run != null && !string.IsNullOrEmpty(Run.equippedWeaponId))
             {
                 var w = ItemDatabase.Instance?.GetItem(Run.equippedWeaponId);
                 if (w != null && w.hasWeaponStats)
@@ -3268,9 +3042,16 @@ namespace GameLoop
                     Debug.LogWarning($"[GameManager] G無視: フェーズが Title でない (現在={CurrentPhase})。/clear や autoStartRun=true で既に走っている可能性あり");
             }
 
-            // マップナビゲーション: 数字キーで移動先選択
+            // マップナビゲーション: 数字キーで移動先選択 (航行マップは Space 待つ (W/A/S/D は視点の移動なので使わない) / R 偵察 / F 照明 / L 囮罠)
             if (CurrentPhase == GamePhase.MapNavigation)
             {
+                if (FreeMap != null)
+                {
+                    if (Input.GetKeyDown(KeyCode.Space)) { WaitTurn(); return; }
+                    if (Input.GetKeyDown(KeyCode.R)) { ReconTurn(); return; }
+                    if (Input.GetKeyDown(KeyCode.F)) { UseFlare(); return; }
+                    if (Input.GetKeyDown(KeyCode.L)) { Consumables.Use(Run, ItemIds.Lure); return; }
+                }
                 var moves = MapManager.Instance?.GetAvailableMoves();
                 if (moves != null)
                 {
@@ -3320,7 +3101,7 @@ namespace GameLoop
             if (CurrentPhase == GamePhase.ShopVisit)
             {
                 // 購入ダイアログ表示中はキー入力をダイアログ側に渡さない
-                var dialog = InventorySystem.Shop.Visual.ShopPurchaseDialog.Instance;
+                var dialog = ItemSystem.Shop.Visual.ShopPurchaseDialog.Instance;
                 if (dialog != null && dialog.IsOpen)
                 {
                     if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Y))

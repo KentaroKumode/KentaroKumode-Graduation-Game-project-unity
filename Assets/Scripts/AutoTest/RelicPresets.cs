@@ -83,7 +83,7 @@ namespace AutoTest
         /// 段は既定で 9 (通常の上限)。 実測では挑戦 25pt 以上のメインは段8・9 が 6 割強を
         /// 占めるので、 **段9 が「その軸を引き当てたときの実際の姿」**に最も近い。
         ///
-        /// 高難易度限定軸 (Λ共鳴/渇き/刻限/背水) もここでは素通しで載る ──
+        /// 高難易度限定軸 (渇き/刻限/背水) もここでは素通しで載る ──
         /// 出現制限は RelicRoller 側の抽選条件であって、 効果側の条件ではない。</summary>
         public static RolledRelic BuildSingleAxis(RelicAxis axis, int step = 9)
         {

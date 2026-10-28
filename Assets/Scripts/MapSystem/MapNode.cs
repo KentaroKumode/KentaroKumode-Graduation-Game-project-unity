@@ -6,8 +6,8 @@ namespace MapSystem
     public class MapNode
     {
         public string id;
-        public int row;            // 離散マップ (Λ) の行。 自由移動の層では x 座標の整数部 (表示コードの互換用)
-        public int lane;           // 離散マップ (Λ) の列。 -1 は収束ノード。 自由移動の層では点の添字 (表示コードの互換用)
+        public int row;            // 離散マップ (8 層) の行。 自由移動の層では x 座標の整数部 (表示コードの互換用)
+        public int lane;           // 離散マップ (8 層) の列。 -1 は収束ノード。 自由移動の層では点の添字 (表示コードの互換用)
         public TileType type;
         public TileType? resolvedType; // Mystery解決後のタイプ
         public bool visited;
@@ -30,7 +30,7 @@ namespace MapSystem
         public bool encounterRevealed;
 
         // ── 自由移動のマップ (2026-09-28) ──
-        /// <summary>自由移動の層の点か。 false は Λ 環状線・8 層 (ボス戦だけ) の離散マップ。</summary>
+        /// <summary>自由移動の層の点か。 false は 8 層 (ボス戦だけ) の離散マップ。</summary>
         public bool freeMap;
         /// <summary>自由移動の層での添字 (<c>FreeMapLayout</c> の点の番号)。 離散マップでは -1。</summary>
         public int index = -1;

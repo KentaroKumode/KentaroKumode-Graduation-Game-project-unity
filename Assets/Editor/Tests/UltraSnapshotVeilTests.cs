@@ -243,8 +243,6 @@ namespace AutoTest.EditorTests.Ultra
         public void HiddenRunFieldsAreNeutralisedBeforeARollout()
         {
             var run = new GameLoop.RunState { coins = 42 };
-            run.lambdaPoolRemainingAll = 17;
-            run.lambdaPoolRemainingFloored = 5;
             run.judgmentPostDamage = 99;
             run.chronicle.Add("secret note");
 
@@ -255,9 +253,6 @@ namespace AutoTest.EditorTests.Ultra
             snapshot.RestoreInto(restored);
 
             Assert.That(neutralised, Is.GreaterThan(0));
-            Assert.That(restored.lambdaPoolRemainingAll, Is.EqualTo(-1),
-                "-1 is the game's own 'not yet counted' marker, so the run recomputes it");
-            Assert.That(restored.lambdaPoolRemainingFloored, Is.EqualTo(-1));
             Assert.That(restored.judgmentPostDamage, Is.EqualTo(0));
             Assert.That(restored.chronicle, Is.Empty);
             Assert.That(restored.coins, Is.EqualTo(42), "public fields must survive untouched");

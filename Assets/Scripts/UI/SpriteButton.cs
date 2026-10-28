@@ -67,8 +67,12 @@ namespace UI
             if (targetRenderer != null) targetRenderer.color = _baseColor;
         }
 
+        /// <summary>true の間は全ボタンが押せない (起動演出 Game2DBoot が、 最初のクリックでボタンを押してしまわないように立てる)。</summary>
+        public static bool InputLocked;
+
         private void Update()
         {
+            if (InputLocked) { _pressedOnThis = false; ApplyColor(false); return; }
             if (cam == null) cam = Camera.main;
             bool over = selfRaycast ? IsPointerOver() : _externalOver;
 

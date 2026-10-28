@@ -18,7 +18,7 @@ related_adrs: [9, 10]
 実装の範囲（2026-10-18）: 役の判定・効果（`YachtRoles` / `YachtRoleEffects`）、面の持ち方（`DiceFaceParts`・`RunState.diceFaceParts`）、
 戦闘への組み込み（`CombatManager`: 役の解決・極・追撃・守り・封じ・無料リロール・癒し）、勝利報酬の〈富〉、
 休憩での面の除去（`GameManager.RestRemoveFace`）、全武器 `diceCount` 5 → 3、BOT 方策（Optimal / Super / Exact）の追随。
-**未実装・未測定**: 休憩の UI（面を外す選択肢。デバッグ HUD の「強化」も未実装のまま）、役の先読み（Super / Exact は役の効果を評価に入れていない）、
+**未実装・未測定**: 休憩の UI（面を外す選択肢。デバッグ HUD の「強化」も未実装のまま）、
 Ultra 層の旧「役の発動」アクション（`UltraCombatActions.Roles` は呼び手が無い残骸）、敵の数値・HP の合わせ直し（Consequences 参照）、
 `InventoryPower.FacePartPower` の Tier 係数（`TierGainPair` / `TierGainTriple` は暫定）。
 数値はすべて**バランス調整前の仮の値**（「バランスは今後調整」で合意済み）。測定はまだ行っていない。

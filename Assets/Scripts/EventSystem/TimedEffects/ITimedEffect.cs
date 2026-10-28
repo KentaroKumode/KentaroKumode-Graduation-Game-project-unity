@@ -1,5 +1,5 @@
 using GameLoop;
-using InventorySystem.PassiveSkills;
+using ItemSystem.PassiveSkills;
 
 namespace EventSystem.TimedEffects
 {

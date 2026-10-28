@@ -5,6 +5,7 @@
 > 出典: `CombatManager.cs` / `PassiveSkillManager.cs` / `CombatContext.cs` /
 > `AllPassiveSkillEffects.cs`（プレイヤー） / `EnemyPassiveSkillEffects.cs`（敵）
 > 最終確認: 2026-07-26（会心システム リバランス — §2-B 追加）
+> 2026-10-28: 防御値と貫通（ADR-0013）── ③-A の敵の防御・§9 の予告・フィールド表・武器ラダー・敵パッシブ表を更新
 >
 > **2026-07-15 追記 — ADR-0009 相互攻撃パイプラインの併存について**
 > [ADR-0009](../../../docs/adr/0009-mutual-attack-combat.md) が Accepted になり、
@@ -36,7 +37,7 @@
 | `ctx.finalDamage` | そのターンの与/被ダメ（文脈による） |
 
 **スワップされない共有フィールド**（敵パッシブが書くと実値に直接効く）:
-`enemyDiceTotalBonus` / `bossDiceBonus` / `enemyDamageReductionPct` / `enemyThreat` /
+`enemyDiceTotalBonus` / `bossDiceBonus` / `enemyDefense` / `enemyArmorPen` / `enemyThreat` /
 `enemyDamageTakenMultiplier` / `healBlocked` / `healShieldReduction` / `accumulatedValues` /
 `ashenSuddenDeath` / `myokakuSuddenDeath` / `pendingEnemySwapId`
 
@@ -98,7 +99,6 @@ total = final + pursuitDamage
        ── 2026-09-19: 会心率を % に統一し 5% 刻みに揃えた（旧「分子 1 = 5.5%」は撤去・§2-B）──
        critAdd  = critBaseRate(武器+層補正) + ctx.critRatePctAdd + メタ
        critRate = ResolveCritRate(critAdd)   ← 加算した分がそのまま (0〜1 クランプのみ・§2-B)
-       critRate = min(critRate, ctx.lambdaCritRateCap)   ← Λ注意散漫(1f=無効)。変換の"後"に効く
        会心成立 = !critSuppressed && Random.value < critRate
        critSuppressed(無心の刃) → 常に false / forceCritical(末那識・天極・短絡・画竜) → 常に true（最終上書き）
        成立かつ total>0 → FireTrigger(OnCriticalDamage); total ×= criticalMultiplier(既定2.0)
@@ -128,10 +128,14 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
 + consAtkBurst                     ← 消費:攻撃バースト(単発)
 + メタ会心ボーナス(会心時)
 − メタデバフ向かい風(最低1)
-─ FireEnemyTrigger(OnPreReceiveDamage): 灰塵の鎧/Ethereal/HardScales/各敵被ダメ軽減
+─ FireEnemyTrigger(OnPreReceiveDamage): 灰塵の鎧/Ethereal/各敵被ダメ軽減
   → total = max(0, ctx.finalDamage)
-× 基礎防御%軽減【新】: effRate = max(0, enemyDamageReductionPct − armorPenPct)
-                       total = ceil(total × (1 − effRate))
+× 敵の防御値【2026-10-28・ADR-0013】: effDef = max(0, enemyDefense − playerArmorPen)
+                       total = DefenseFormula.Apply(total, effDef)   ← ceil(total × (1 − R(effDef)))・整数演算
+                       ※ 短剣〈急所〉持ちの会心ならこの段を丸ごと飛ばす (VitalStrike.IgnoresDefense)
+                       R(D) = Rmax·D/(D+K)  (Rmax = 3/5, K = 10・仮置き)
+  ※ 旧: effRate = max(0, enemyDamageReductionPct − armorPenPct) の割合軽減と、
+    余剰貫通 (armorPen − 防御率) を与ダメ ×(1+余剰) へ転用する段 J。 どちらも撤去
 ↑ 勝利時最低保証【新】: total = max(total, winMinDamage[既定1, 利刃で1〜4])
 × enemyDamageTakenMultiplier       ← 狂暴化(50T後 ×3)
 メタデバフ俊敏: 各戦闘の初撃を total=0,fixedDmg=0
@@ -216,6 +220,8 @@ ShieldBash の空振り（盾 0）が 34.2% → 66.1%、1 機会あたりの攻�
 - 整備パネル Guard（〈剛胆〉）r10 の持ち越しは従来どおり「**勝った**戦闘の終了時の残量 × 30%（切り上げ）」（`CombatManager` の戦闘終了処理・2026-09-13 に 50% → 30%）。
 - 波及: `ShieldBash` の弾（残存量の 20〜80%）が毎ターン目減りする / `HolyShield` の「ターン終了時に 3 未満なら +4」が発動しやすくなる /
   `Lifeline` の大きな盾は翌ターンから半減する。**バランスは未測定**（2026-10-16 時点。測定は回さない判断）。
+- 2026-10-28: `ShieldBash` I〜IV・`HolyShield`（衛士の慣い）・盾解放は削除／リワーク済み。半減は盾家系の
+  〈城壁〉→〈シールドバッシュ〉（溜めて翌ターン以降に放つ）にそのまま効く ── 溜めた分は放つ前に 1 回半分になる。
 
 ### ④ 引き分け（`CombatManager` L1134-1155）
 メイン/scratchなし。`fixedDamageToEnemy` / `fixedDamageToPlayer` / 出血のみ適用。
@@ -244,8 +250,12 @@ ShieldBash の空振り（盾 0）が 34.2% → 66.1%、1 機会あたりの攻�
 | `enemyStanceKind`【新】 | 0なし/1強ロール低火力/2弱ロール高火力。弱(=2)は RollDice時に敵ダイス最大出目を`EnemyStance.WeakRollMax`へ縮小。`OnTelegraph`でUI後付け | BeginNewTurnで0 |
 | `playerStanceDefense`【新】 | プレイヤー防御スタンス(ADR-0006)。与ダメ×0.1(ApplyWin末尾)/受け最終×0.5(ApplyLoss末尾)。反撃等の固定反射は対象外 | BeginNewTurnでfalse |
 | `bossDiceBonus` | 強者/玉座/刹那(現在未使用) | swapで0 |
-| `enemyDamageReductionPct`【新】 | 敵の被ダメ%軽減。EnemyData.baseDefenseRate+EliteVigor0.10 | **戦闘保持**(start/swapで設定) |
-| `armorPenPct`【新】 | 利刃の軽減剥がし(pt) | BeginNewTurnで0 |
+| `enemyDefense`【2026-10-28】 | 敵の防御値。EnemyData.defense + 精鋭+2 / 硬鱗+4 / 重甲+4 (OnBattleStart) | **戦闘保持**(start/swapで設定) |
+| `enemyArmorPen`【2026-10-28】 | 敵がプレイヤーの防御を固定で削る量。EnemyData.armorPen | **戦闘保持**(start/swapで設定) |
+| `playerDefenseBase` / `playerArmorPenBase`【2026-10-28】 | プレイヤーの防御・貫通の土台 = 初期防御 2 + 武器の `defense` / `armorPen`（[無印,+]） | 戦闘保持(start で設定) |
+| `playerDefense`【2026-10-28】 | プレイヤーの防御値。ステータス `def`・一対一 が OnPostRoll で加算。〈血令〉持ちは OnPostRoll の後に 0（貫通 ×2 へ換算） | BeginNewTurnで土台へ |
+| `enemyArmorPenNegate`【2026-10-28】 | 敵の固定削りを打ち消す量。剣〈間合〉（ステータス `penNeg`）が OnPostRoll で加算 | BeginNewTurnで0 |
+| `playerArmorPen`【2026-10-28】 | プレイヤーの貫通。遺物 +N (BeginNewTurn)・ステータス `pen` (OnPostRoll)・役〈攻め〉T4 +999 | BeginNewTurnで土台+遺物へ |
 | `winMinDamage`【新】 | 勝利時与ダメ最低保証(既定1,利刃1〜4) | BeginNewTurnで1 |
 | `enemyHealReductionPct`【新】 | 敵回復の減衰率(治癒阻害0.5/遮断1.0)。`ReduceEnemyHeal()`経由で敵自己回復に適用 | 戦闘保持 |
 | `fixedDamageMultiplier`【新】 | 軽減無視ダメ倍率(蒼白の槍騎士1.5)。ProcessDamage末＆引分分岐で fixedDamageToEnemy に乗算 | 戦闘保持(既定1.0) |
@@ -305,8 +315,7 @@ ResolveCritRate(addTotal):
 > 逓減の撤去で失われた機構も無い。
 > アイテム側の副次ステータス `subCritRatePct` も 2026-09-15 に全廃（GAME.md §24）。
 
-**天井**: Λ注意散漫 `lambdaCritRateCap` は `ResolveCritRate` の**後**に `min` で効く。
-`forceCritical` はこの天井も無視して確定する。
+**天井**: 100%（`ResolveCritRate` のクランプ）だけ。`forceCritical` は率に関係なく確定する。
 
 **UI/ログ表示**: `ItemDataV2.CriticalRateLabel()` が判定と同じ `ResolveCritRate` を通すので、表示と判定は常に一致する。
 ---
@@ -392,10 +401,10 @@ Hermes / Bloodlust / EvenEyes / MasterworkNotes / KaleidoDice。
 | Insight I/II/III/IV(慧眼) | B/S/G/L | OnCriticalCheck | critRatePctAdd += 0.05/0.10/0.15/0.20 |
 | Vitality I/II/III/IV(活力) | B/S/G/L | OnTurnEnd | 自HP +1/2/3/4 |
 | Indomitable I/II/III/IV(不屈) | B/S/G/L | OnPreReceiveDamage | 自HP ≤ 20/30/40/60% で `finalDamage = ceil(finalDamage × 0.7)`（2026-07-15 リワーク。III はステータス化 §2-C） |
-| ShieldBash I/II/III/IV(シールドバッシュ) | B/S/G/L | OnPreDealDamage | **攻撃時 `finalDamage += ceil(consShield × 0.20/0.40/0.60/0.80)`**。IV のみ加算後に `consShield += 5`。※旧仕様 (勝利時に与ダメ%をシールド化＝`shieldOnWinPct`) は 2026-07-15 リワークで廃止。**盾は消費されず「残存量」を読むだけ**なので、盾を持ち続けること自体が火力になる ─ ③-C 参照 |
+| ~~ShieldBash I/II/III/IV~~ | — | — | **2026-10-28 削除**（I〜III はどの品にも付いていなかった・IV＝〈内から落ちた城盾〉は品ごと削除）。シールドを攻撃に変える仕組みは盾家系〈シールドバッシュ〉（§3-B2）へ一本化 |
 | LentTime I/II/III/IV(貸与された時間) | B/S/G/L | OnPreReceiveDamage/OnRollWin | 敗北時 被ダメの15/30/45/60%を肩代わり(finalDamage減)し lentTimeStacks 蓄積。max(maxHP×同%)到達で同値を fixedDamageToPlayer で一括清算＋0。勝利で0クリア |
 | Lifesteal I/II/III/IV(吸血) | B/S/G/L | OnTurnStart | lifestealPct += 0.02/0.04/0.06/0.08（勝利時 totalDmg×pct を HealPlayer 回復・負傷/封印尊重） |
-| BladeEdge I/II/III/IV(利刃) | B/S/G/L | OnPostRoll | armorPenPct=0.15/0.20/0.25/0.30、winMinDamage=max(,1/2/3/4)。防御を上回る貫通分は与ダメ×(1+余剰pen)へ転化(CombatManager) |
+| BladeEdge I/II/III/IV(利刃) | B/S/G/L | OnPreDealDamage | 敵シールド(sg_shield)を −5/−10/−15/−20、IV は会心倍率 +0.2（2026-07-15 リワーク・実コード準拠）。貫通は持たない。items.json には現在なし |
 | BountyHunter I/II/III/IV(賞金首狩り) | B/S/G/L | OnTurnEnd | 敵HP≤8/14/20/28% で enemyCurrentHP=0(処刑)＋最大HP×(lv×3%)回復＋coins +0/0/1/2 |
 | Conqueror I/II/III/IV(重畳) | B/S/G/L | OnRollWin/OnPreDealDamage | 勝利毎に outgoing += 2/4/5/10% (上限 20/40/60/100%) ※2026-05-31 v5 %ベース |
 | Grievous I/II(治癒阻害/治癒遮断) | S/G | OnBattleStart | enemyHealReductionPct = 0.5 / 1.0（敵回復を ReduceEnemyHeal で減衰） |
@@ -405,15 +414,9 @@ Hermes / Bloodlust / EvenEyes / MasterworkNotes / KaleidoDice。
 
 | SkillId(表示) | Trigger | 効果(ctx操作) |
 |---|---|---|
-| Parry(パリィ) | OnPreReceiveDamage | **3ターンに1度 finalDamage=0**（`accumulatedValues["parry_ready_turn"]` でクールダウン管理）。※旧記述「scratch 無効化＝no-op」は**誤り**だった（2026-09-05 実コードで確認・訂正） |
-| HolyShield(衛士の慣い) | OnBattleStart/OnTurnEnd | **2026-09-05 リワーク**: 開幕 consShield +10 / ターン終了時 consShield<3 なら +4。※旧「HP半分を境に 被ダメ−20% / 与ダメ+20%」は廃止 |
-| Riposte(切り返し) | OnPreReceiveDamage/OnPostRoll/OnPreDealDamage | **2026-09-05 リワーク**（ステータス化 §2-C `hitLastTurn`）: 被弾で `nextTurnBuffs["hitArmed:Riposte"]`、次ターン 攻撃+7 / outgoing+20%。※旧「被ダメ50%を反射」は盾家系〈反攻〉へ移管 |
+| ~~パリィ / 衛士の慣い / 復讐 / 果たし合い / 蝕夜~~ | — | **2026-10-28 削除**（武器家系の整理・GAME.md §24）。後継は §3-B2 の〈堅守の構え〉〈黎明〉〈不滅の刃〉。〈切り返し〉〈血令〉〈処刑〉は同名のまま §3-B2 で中身が変わった |
 | VoidStance(虚空) | OnPostRoll | ｜playerDiceTotal−enemyDiceTotal｜≤3 → nullifyAllDamage + fixedDamageToEnemy +=3（自前で差を算出） |
-| Frenzy(復讐) | OnPreReceiveDamage/OnPostRoll | **2026-09-05 リワーク**: 被弾で蓄積+1(上限10)、PostRoll で `AddPlayerAttackOrDiceBonus(蓄積×2)`。※旧 `finalDamage += 蓄積`(最大+10) は桁が合わず実質無効だった |
-| BloodDecree(血令) | OnPreDealDamage/OnPreReceiveDamage | **2026-09-05 リワーク**: 自HP割合 < 敵HP割合 のとき outgoing+50% / 被ダメ×0.85。※旧「ゾロ目で×2.5を軽減不能へ置換」は**発火率 1/1296 で事実上死んでいた** |
-| Destiny(果たし合い) | OnCriticalCheck/OnPreDealDamage/OnPreReceiveDamage | **2026-09-05 リワーク**: `isPairEncounter==false` のとき 会心率+15% / outgoing+25% / 被ダメ×0.85。※旧「全ダイス最大で×2・全ダイス最低で被ダメ0」は**発火率 1/1296 で事実上死んでいた** |
-| Execute(処刑) | OnRollWin/OnPreDealDamage | 勝利時 次ターン敵の**最大**ダイスを1に固定（クラス）。加えて 敵残HP ≤25% で outgoing+80%（2026-09-05 増補・ステータス §2-C） |
-| Nightfall(蝕夜) | OnPostDealDamage/OnBattleStart | overDamage×2を永続蓄積→戦闘開始時 fixedDamageToEnemy |
+| 騎士団の切り札 | OnTurnStart | **2026-10-28 リワーク**: 戦闘に 1 回、ターン頭に HP < 最大の 30% なら `consShield += shieldGainedTotal × 50%`。旧「倒せる攻撃のときシールドを全部使って同じ量を攻撃に加える（盾解放）」は盾家系〈シールドバッシュ〉と重なった |
 | Sting(出血) | OnPostDealDamage | enemyBleedStacks++ |
 | 脆弱(契約・狩猟旅団) | OnBattleStart (Apply) + 防御後最終ダメ | armed状態で会心ダメ時 ×(1+0.15/0.30/0.45) 倍率→consumed / 非会心ロール勝利で再armed。 戦闘終了で剥がれる。 仕様: docs/GAME.md §12 |
 | ApexCrit(天極) | OnCriticalCheck | ゾロ目(全同値)なら **forceCritical=true**(会心確定)＋criticalMultiplier+1.0 |
@@ -428,7 +431,7 @@ Hermes / Bloodlust / EvenEyes / MasterworkNotes / KaleidoDice。
 | MugaMushin(無我無心) | OnBattleStart | rollPurity=true(diceBonus等の補正拒否) |
 | GaryoTensei(画竜点睛) | OnPostRoll | 出目が最大面 → garyoProc=true,garyoDieValue。即勝利+(出目+10)×criticalMultiplier会心確定 |
 
-### 3-B2. 武器家系 専用ラダー（`WeaponFamilyEffects.cs`・2026-09-05）
+### 3-B2. 武器家系 専用ラダー（`WeaponFamilyEffects.cs`・2026-09-05 / 2026-10-28 整理）
 
 **武器の passiveSkills（items.json）は実行時に読まれない。** 進行武器（`sword/axe/dagger/shield_tN`）は
 `RunPassiveSync` が `WeaponProgression.Compute(weaponId, plus)` で算出したものを動的付与する。
@@ -436,34 +439,52 @@ items.json 側は**ツールチップ表示専用**なので、両者を必ず�
 
 旧構成は共通ラダー（筋力/追撃/心眼/頑強/活力）の借用で、剣=筋力+追撃 / 斧=筋力+心眼 と
 **半分が同じ**だった（アイテム側家系システムの名残）。家系ごとに専用ラダー2本へ置換。
+**2026-10-28 整理（ADR-0013）**: 1 段に仕組み 1 つ・家系ごとに防御と貫通の使い方を分けた。設計の経緯は GAME.md §9-4b。
 
-| 家系 | 性格 | ラダーA (T1〜) | ラダーB (T2〜) | 固有1 (T3) | 固有2 (T4) |
+| 家系 | 性格 | ラダーA (T2〜) | ラダーB (T3〜) | 固有1 (T3+〜) | 固有2 (T4〜) |
 |---|---|---|---|---|---|
-| 短剣 | 短期決戦・一撃必殺＋DOT | 疾手 | 毒手 | 処刑 | 蝕夜 |
-| 剣 | タイマン力＋バランス | 間合 | 一対一 | 切り返し | 果たし合い |
-| 盾 | 生存＋カウンター | 城壁 | 反攻 | パリィ | 衛士の慣い |
-| 斧 | 削り合いレース＋自己バフ | 猛り | 大鉈 | 復讐 | 血令 |
+| 短剣 | すり抜ける（開幕から装甲を抜ける） | 疾手 | 毒手 | 急所 | 処刑 |
+| 剣 | 攻防一体（分け続けるほど伸びる） | 間合 | 一対一 | 切り返し | 不滅の刃 |
+| 盾 | 受けて溜め、まとめて放つ | 城壁 | シールドバッシュ | 堅守の構え | 黎明 |
+| 斧 | 叩き割る（殴るほど敵の防御が下がる） | 猛り | 鎧砕き | 捨て身 | 血令 |
 
 | SkillId(表示) | Trigger | 効果(ctx操作) |
 |---|---|---|
 | SwiftHand I/II/III(疾手) | OnPostRoll | `currentTurn ≤ 3` のみ `AddPlayerAttackOrDiceBonus(3/5/8)`。4T目以降は0 |
 | VenomHand I/II/III(毒手) | OnBattleStart/OnPostDealDamage | 開幕 `AddStatus(Enemy,"poison",2/3/4)`。以降 `isCritical` のターンに poison +1 |
-| SwordReach I/II/III(間合) | OnPostRoll/OnPreReceiveDamage | 攻撃 +2/+3/+5 かつ 被ダメ −1/−2/−3（常時） |
-| Duelist I/II/III(一対一) | OnPostRoll/OnPreReceiveDamage | **`isPairEncounter==false` のみ** 攻撃 +3/+5/+8 / 被ダメ −1/−2/−4 |
-| Bulwark I/II/III(城壁) | OnPreReceiveDamage/OnTurnEnd | 被ダメ −2/−4/−7 かつ ターン終了時 自HP +1/+1/+2 |
-| Retaliation I/II/III(反攻) | OnPreDealDamage | `fixedDamageToEnemy += ceil(blockSumThisTurn × 0.4/0.7/1.0)` |
+| VitalStrike(急所) | OnBattleStart / OnCriticalCheck | 開幕に `accumulatedValues["vitalStrikeIgnoresDefense"]=1`。**会心の一撃は敵の防御の段を丸ごと飛ばす**（③-A）。会心率 +10% はステータス |
+| 処刑 | OnPreDealDamage | 敵残HP ≤25% で outgoing+80%（ステータスのみ）。旧「勝利時 次T敵の最大ダイスを1に固定」は 2026-10-28 削除 |
+| SwordReach I/II/III(間合) | OnPostRoll | 攻撃 +2/+3/+5 ／ `enemyArmorPenNegate += 2/4/6`（敵の固定削りを打ち消す・II/III はステータス `penNeg`） |
+| Duelist I/II/III(一対一) | OnPostRoll | **`isPairEncounter==false` のみ** 攻撃 +3/+5/+8 / 防御 +1/+2/+4。単体戦を条件にする段は家系でこれだけ |
+| GuardCut(切り返し) | **OnWired** | 攻撃端子とブロック端子の**両方**に挿したターン `AddPlayerAttackOrDiceBonus(ceil(blockSumThisTurn × 0.5))` |
+| UndyingBlade(不滅の刃) | OnWired / OnPreDealDamage | 両方に挿したターンが続くたび `accumulatedValues["undyingBladeStreak"]++`（崩れたら 0）、outgoing += 0.08 × 連続数 |
+| Bulwark I/II/III(城壁) | OnTurnEnd | `blockSumThisTurn ≥ 予告の敵攻撃`（防御後・2体戦は大きい方）なら `consShield += floor((block − 敵攻撃) × 0.5/0.75/1.0)` |
+| シールドバッシュ I/II/III | **OnWired** | 出目を**全部攻撃端子**に挿したターン、`consShield` を 0 にして `AddPlayerAttackOrDiceBonus(ceil(使った量 × 0.5/1.0/1.5))`。攻撃値なので倍率・会心が乗る |
+| SteadfastStance(堅守の構え) | **OnWired** | 出目を**全部ブロック端子**に挿したターン `consShield += 15`。次の 2 ターンは不発（`steadfastStanceReadyTurn`） |
+| Daybreak(黎明) | OnTurnEnd | `mutualHpLossFromEnemy == 0` なら `floor(mutualEnemyAtkPreDefense / 10) × 5%` × 敵最大HP を `enemyCurrentHP` から引く（〈天与の才〉の踏みとどまりは通す） |
 | Fervor I/II/III(猛り) | OnPostRoll | `AddPlayerAttackOrDiceBonus(min(currentTurn−1, 5/9/14))` |
-| Cleaver I/II/III(大鉈) | OnPreDealDamage | `outgoing += 敵が失ったHP割合 × 0.30/0.50/0.80` |
+| ArmorBreak I/II/III(鎧砕き) | OnTurnEnd | `lastPlayerDamage > 0` なら `enemyDefense = max(0, enemyDefense − 2/3/4)`。戦闘中持続・形態 swap で新形態の値に戻る |
+| 捨て身 | OnPreDealDamage | 自HP割合 < 敵HP割合 のとき outgoing+50%（ステータスのみ・旧〈血令〉の被ダメ −15% は外した） |
+| BloodEdict(血令) | OnBattleStart / OnPostRoll / OnTurnEnd | 開幕に印。OnPostRoll の後に `CombatManager` が `playerArmorPen += playerDefense × 2; playerDefense = 0`（`ApplyPlayerDefense` も印を見て防御を掛けない）。〈血の盟約〉= `min(6, floor(失ったHP% / 15))` をその時点の HP から数え、OnPostRoll で攻撃 +盟約、攻撃したターンの OnTurnEnd で HP +盟約 |
 
-**発火順序の約束（間違えると黙って無効になる）**: 攻撃値への加算は **OnPostRoll** で
+**武器そのものの防御・貫通（2026-10-28・ADR-0013）**: items.json の武器の `defense` / `armorPen`（`[無印, +]`）。
+戦闘開始時に `CombatManager` が `weaponPlus` で要素を選び、`playerDefenseBase` = 2 + 防御、`playerArmorPenBase` = 貫通 へ写す。
+短剣 = 貫通のみ / 斧 = 貫通高・防御低 / 剣 = 中・中 / 盾 = 防御のみ / 竜閃 = 貫通 99。値の表は GAME.md §9-4b。
+
+**発火順序の約束（間違えると黙って無効になる）**: 攻撃値への加算は **OnPostRoll か OnWired** で
 `AddPlayerAttackOrDiceBonus` を使う。`atkBase` は §9.2 step5（配線）の直後に確定するので、
 OnPreDealDamage で `mutualAttackBonus` を足しても**一切乗らない**。
+**配線を条件にする効果は OnWired でしか判定できない**（OnPostRoll は予告より前＝配線より前に走る）。
 与ダメ% は OnPreDealDamage、被ダメ軽減は OnPreReceiveDamage、会心率は OnCriticalCheck。
 
-**新規フィールド**:
+**フィールドとキー**:
 - `ctx.blockSumThisTurn` [perTurn] — そのターン Block 端子へ配線した**出目合計**（本数ではない）。
   CombatManager の配線集計が貫通適用後に set、BeginNewTurn Phase B で 0。
 - `ctx.isPairEncounter` [persistent] — 2体戦か。CombatManager が戦闘開始時に1度だけ set。
+- `ctx.enemyArmorPenNegate` [perTurn] — 敵の固定削りの打ち消し。BeginNewTurn で 0。
+- `accumulatedValues`（キーは `Effects.MutualKeys`）— 配線確定時に `mutualAttack/Block/Charge/SpecialDiceCount`・
+  `mutualEnemyAtk`（予告・防御後）を書いてから **OnWired** を焚く。敵の攻撃の解決後に
+  `mutualEnemyAtkPreDefense`（実際に放たれた直接攻撃の防御前合計）と `mutualHpLossFromEnemy` を書く。
 
 **設計上の禁止事項**: 「全ダイス同値／全ダイス最大」を発火条件にしないこと。
 素の6面×5個で `6/6^5 = 1/1296`、1ラン260ターン前後を回して期待 0.2 回 ＝ **5ランに1回**。
@@ -556,14 +577,14 @@ Passive カテゴリのシナジー武器群。4枚がインベントリに揃�
 | Sprint(疾駆) | OnPostRoll | 初回 自ダイス +2 |
 | BruteForce(剛力) | OnPreDealDamage | 勝利時 finalDamage +2 |
 | Flight(飛翔)/Immovable(不動) | OnPrePursuitDamage | nullifyPursuitDamage=true(追撃無効) |
-| HardScales(硬鱗) | OnPreReceiveDamage | 敗北時 finalDamage −2 (min0) |
+| HardScales(硬鱗) | OnBattleStart | enemyDefense +4（2026-10-28。旧: 被弾時 −2） |
 | TailStrike(尾撃) | OnRollLose | fixedDamageToEnemy +1(→実プレイヤー) |
 | Rampage(暴走) | OnRollLose | 次T 自分 diceBonus +3 |
 | Ethereal(虚体) | OnPreReceiveDamage | 敗北時 finalDamage /2 |
 | Curse(呪縛/敵) | OnRollWin | 次T 相手 enemyDiceDebuff +2 |
 | CounterStance(反撃態勢) | OnRollLose | 次T 自分 damageBonus +3 |
 | HoningDuel(研ぎ澄まし) | OnRollWin | currentBuffs damageBonus += currentTurn/3 |
-| EliteVigor(精鋭・汎用) | OnBattleStart/OnPostRoll | enemyDamageReductionPct +0.10 / 自ダイス += currentTurn/3 |
+| EliteVigor(精鋭・汎用) | OnBattleStart/OnPostRoll | enemyDefense +2（2026-10-28。旧: 被ダメ%軽減 +0.10） / 自ダイス += currentTurn/3 |
 | EliteSlime/EliteGoblin | OnPostRoll | 自ダイス +3 |
 | EliteKobold(早業) | OnPostRoll/OnPreReceiveDamage | GOLD奪取 / 50%で被ダメ0 |
 | EliteSkeleton(不死の軍勢) | OnTurnEnd/OnPostRoll | 致命時2回までHP全回復 / 自ダイス += 3×発動回数 |
@@ -571,7 +592,7 @@ Passive カテゴリのシナジー武器群。4枚がインベントリに揃�
 | EliteHarpy(死翔) | OnBattleStart/OnPostRoll | 消費ロック / 自ダイス += 3+currentTurn |
 | EliteDecree13(死の重圧) | OnPostRoll | 宣告ターン中 自ダイス +13 |
 | EliteOrc(痛恨の一撃) | OnPreDealDamage他 | 勝利+8 / 敗北でダイス数+1(max3,extraDice)・勝利reset |
-| EliteLizard(重甲) | OnPreReceiveDamage/OnRollLose | 敗北時 −2軽減 / fixedDamageToEnemy +1反射 |
+| EliteLizard(重甲) | OnBattleStart/OnRollLose | enemyDefense +4（硬鱗と合わせて 8・2026-10-28。旧: 被弾時 −2） / fixedDamageToEnemy +1反射 |
 | EliteWraith(霊体) | OnTurnStart/OnPreReceiveDamage | 奇数Tダイス+1 / 偶数T(霊体)被ダメ=1 |
 | EliteGolem(巌の意志) | OnTurnEnd | 意志+1、撃破時 意志分を実プレイヤーへ確定ダメ |
 | EliteMinotaur | OnPostRoll | 自ダイス +1 |
@@ -642,22 +663,11 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
 
 ---
 
-## 6. Λ層（時間の狭間）由来の恒久デバフ（`GameLoop.Lambda.LambdaDebuffEffects`）
+## 6. （欠番）旧 Λ層の恒久デバフ
 
-5層ボス撃破後〈決意〉以上で強制突入。環状線を周回するたび「次元の乱れ」+1、3毎に下表からランダムに1つ付与（同種再付与で段階+1、最大3）。`run.lambdaDebuffs`(id→段階)に格納し、戦闘開始時に `CombatManager.StartCombatInternal` で `ctx.lambda*` フィールドへ反映（戦闘スコープで保持・覚者連戦でも維持）。lv1/2/3 = 効果の3段階。
-
-| デバフ | lv1/2/3 | 実装フック | 効果 |
-|---|---|---|---|
-| 重い足取り | -2/-4/-6 | `RecomputeDiceTotals`(currentTurn==1) | 1ターン目のみ playerDiceTotal をデルタ分減算(下限0・無我無心中は無効) |
-| 微妙な手応え | 0.95/0.90/0.85 | `ApplyWinDamageModifiers` **段 G**(挑戦〈練度不足〉と同じ場所) | **2026-08-09: 同種デバフの重ねがけを禁止**。 挑戦〈練度不足〉と `Mathf.Min` を取り、 **厳しい方 1 つだけ**を乗算する。 旧実装は段 G で練度不足・段 K で微妙な手応えを別々に掛けており、 T3×lv3 で 0.89×0.85 = 0.756 まで落ちていた。 Λ は 6 層への強制通過点なので高難易度では必ずこの二重取りを踏む。 なお**合計 (−26% → 0.74) は乗算 (0.756) より厳しい**ので、加算化は緩和にならない |
-| 苛立つ強敵 | 5/4/3 T間隔 | `RecomputeDiceTotals`(末尾) | enemyDiceTotal += floor(currentTurn / interval)（累積・勝敗判定前） |
-| 注意散漫【2026-07-27 改】 | cap 0.30/0.20/0.10 | `ProcessDamage`(`ResolveCritRate` の後) | **実効会心率そのもの**の上限。`ResolveCritRate` の後に効くため レガシー分子/critRatePctAdd のどちら経由でも貫通できない。`forceCritical` は無視して確定。旧「会心分子 8/6/4 clamp」から置換 |
-| 慈悲の処刑 | 0.05/0.10/0.15 | `CombatManager`(被弾後・combatLethalThisTurn確定前) | 被弾したターンに playerHP ≤ playerMaxHP×閾値 なら playerHP=0（回復蘇生を防ぐ） |
-| 神経錯乱 | 3/5/7 | `ItemUseHandler.UseItem` | CurrentCombatTurn < lockUntil の間 消費アイテム使用不可 |
-| 迫りくる死 | -/-/HP=1 | `StartCombatInternal` | lv3 のみ戦闘開始時に playerHP=1（lv1/2は無効＝実質3スタック猶予） |
-
-- ctx フィールド: `lambdaFirstTurnDiceDelta`(0=無効) / `lambdaIrritatingInterval`(0=無効) / `lambdaDamageDealtMult`(1.0=無効) / `lambdaCritRateCap`(1f=無効) / `lambdaMercifulExecThreshold`(0=無効) / `lambdaConsumableLockUntilTurn`(0=無効)。BeginNewTurn ではリセットしない。
-- 即死コンボ（意図通り）: 慈悲の処刑 ＋ 迫りくる死(lv3) = 戦闘開始HP1 → 初回被弾で確定死。
+2026-10-28 に Λ層ごと削除（`LambdaDebuffEffects`・`run.lambdaDebuffs`・`ctx.lambda*` はコードに無い）。
+与ダメの段 K は計測点だけが残り、値は段 J と同じ。7 種の内容と作り直すときの注意は
+[GAME.md §23-23](../../../docs/GAME.md) に保留している。
 
 ---
 
@@ -678,6 +688,9 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
    時限効果 OnRoll / PassiveItemManager.OnRoll / メタバフ +1
    ProcessPostRoll（パターン/ゾロ目・合計確定） + OnPostRoll
 2. 予告             : Escalation.EnemyAttackValue(currentEnemy, turn, ctx.enemyDiceTotal)
+                      → プレイヤーの防御 (ADR-0013): DefenseFormula.Apply(enemyAtk, max(0, playerDefense − max(0, enemyArmorPen − enemyArmorPenNegate)))
+                      予告に出る値はここまで (ブロックの前)。 2 体目は secondaryEnemy.armorPen で同じく掛ける
+                      斧〈血令〉持ちは直前 (OnPostRoll の後) に防御を貫通へ換えているので掛からない
 5. 配線             : WiringPolicy(playerDice, tele) → ダイス index → 端子（Attack/Block/Charge）
    未配置は Attack へ自動合流（`mutualWiring[i] = Attack` 初期化）
    SanitizeWiring: ①特殊端子の接続制限 ②〈綻び〉の封印端子
@@ -701,7 +714,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          端子の置き方は条件にしない。 **成立すれば自動で効く** (1 戦闘 1 回・任意発動・使用済み管理は無い)。
          成立するかはその目の面の Tier で決まる: T2 以上で 2 個そろい、 T3 以上でゾロ目。 T1 は何も起きない。
          効果は既存フィールドへ加算する形に寄せてある (正本は YachtRoleEffects.Apply)。
-           ctx への加算   … 攻め: outgoingDamageMultiplier +0.25 / +0.5 (ゾロ目は forceCritical) ・T4 armorPenPct +1 /
+           ctx への加算   … 攻め: outgoingDamageMultiplier +0.25 / +0.5 (ゾロ目は forceCritical) ・T4 playerArmorPen +999 (防御無視) /
                             充電: AddCharge(+3 / 上限まで) ・T4 超過分を mutualAttackBonus /
                             時間: エスカレーションの遅延 (term Coolant と同じキー) +2 / 1 段戻す ・T4 現在段階×2 を mutualAttackBonus /
                             封じ T4: enemyPassivesDisabledTurns / 富 T4: 所持ゴールド 5% (最大 10) を mutualAttackBonus
@@ -741,8 +754,14 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                        周期は冷却材の遅延を受けない実ターンで数える。 予告に turnsToHeavy / heavyMul を出す。
                        対象: 5 層以降のボス (5 層・5 層裏・ヴェスカ p1〜p4)。 6 層は〈業火の予兆〉が同じ役なので無し。
                      ボス倍率 = 挑戦〈天変地異〉(ボスのみ)
+                     → 呪縛等 (mutualEnemyAttackReduction) / 〈封じ・対〉 / 失血衰弱 の減算
+                     → **プレイヤーの防御** (ADR-0013・2026-10-28): DefenseFormula.Apply(enemyAtk, max(0, playerDefense − max(0, enemyArmorPen − enemyArmorPenNegate)))
+                       ここまでが予告値。 旧経路 (UseMutualAttackPipeline=false) には入れていない
+                       (剣〈間合〉が enemyArmorPenNegate を足す / 斧〈血令〉は防御 0 = 掛からない)
+         配線確定  → accumulatedValues に端子ごとの本数・予告の敵攻撃を書いて **OnWired** (2026-10-28)
+                       ── 剣〈切り返し〉〈不滅の刃〉・盾〈シールドバッシュ〉〈堅守の構え〉が読む。 atkBase の確定より前
          blockSum  = Σ(block 端子の出目) + 端子調律メタ(本数×N) + 特殊端子
-                     → 〈貫きの錐〉: blockSum −= enemyAtk × PierceAwlPerAttack
+                     → 〈貫きの錐〉: blockSum −= enemyAtk × PierceAwlPerAttack   (enemyAtk は防御を引いた後の値)
                      → 〈不完全な転移〉(門・§4-3): blockSum −= floor(blockSum × 0.50)
          lossBase  = max(0, enemyAtk − blockSum)
          → ProcessDamage(lossBase, 0, enemyCriticalNumerator, attackerIsEnemy: true)

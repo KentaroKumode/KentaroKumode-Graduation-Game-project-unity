@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEditor;
 using System.IO;
-using InventorySystem;
+using ItemSystem;
 
 /// <summary>
 /// ItemDatabaseアセットをResourcesフォルダに自動配置するエディタユーティリティ

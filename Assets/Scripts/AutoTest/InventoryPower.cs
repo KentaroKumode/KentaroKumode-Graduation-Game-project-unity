@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using GameLoop;
-using InventorySystem;
+using ItemSystem;
 
 namespace AutoTest
 {
@@ -300,13 +300,13 @@ namespace AutoTest
             var familyMaxLv = new Dictionary<string, int>();
             foreach (var sid in allSkillIds)
             {
-                var (fam, lv) = InventorySystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(sid);
+                var (fam, lv) = ItemSystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(sid);
                 if (lv > 0 && (!familyMaxLv.TryGetValue(fam, out int prev) || lv > prev))
                     familyMaxLv[fam] = lv;
             }
             foreach (var sid in allSkillIds)
             {
-                var (fam, lv) = InventorySystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(sid);
+                var (fam, lv) = ItemSystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(sid);
                 if (lv > 0 && familyMaxLv.TryGetValue(fam, out int maxLv) && maxLv > lv) continue;
                 result.Add(sid);
             }

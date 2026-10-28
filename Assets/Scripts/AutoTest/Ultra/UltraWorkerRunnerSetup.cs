@@ -37,7 +37,6 @@ namespace AutoTest.Ultra
 
             // ---- every competing batch mode off ----
             runner.simBoss5Sweep = false;
-            runner.lambdaFarmSweep = false;
             runner.relicPresetSweep = false;
             runner.relicSweepBaselineOnly = false;
             runner.relicAxisSweep = false;

@@ -581,12 +581,6 @@ namespace UI.ClassSelect
             Debug.Log($"[ClassSelectView] スタンプ {(folded ? "折り畳み" : "展開")}");
         }
 
-        private IEnumerator CoDeferredIn(ClassSelectPanel p, float delay)
-        {
-            yield return new WaitForSecondsRealtime(delay);
-            p.SlideIn();
-        }
-
         private IEnumerator CoSwitch(int index)
         {
             _switching = true;
