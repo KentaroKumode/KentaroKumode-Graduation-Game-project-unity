@@ -94,7 +94,6 @@ namespace AutoTest.Ultra
             //   These decide outcomes, so the worker and the 10K run must agree on them.
             //   Assigning here (Launch calls ApplyTo last) also overrides anything the
             //   menu's SessionState left behind.
-            runner.useMutualAttackPipeline = useMutualAttackPipeline;
             runner.suppressFacePartOffers = suppressFacePartOffers;
             runner.shieldAbsorbsUnmitigable = shieldAbsorbsUnmitigable;
             runner.enableAllDebuffs = enableAllDebuffs;
@@ -171,8 +170,6 @@ namespace AutoTest.Ultra
             // ---- mechanical parity ----
             //   This is the check that the 2026-08-17 session did not have. Without it a
             //   worker and the 10K run can disagree and still both report "started".
-            if (runner.useMutualAttackPipeline != useMutualAttackPipeline)
-                return Fail("runtime mutual attack pipeline mismatch", out reason);
             if (runner.suppressFacePartOffers != suppressFacePartOffers)
                 return Fail("runtime face part suppression mismatch", out reason);
             if (runner.shieldAbsorbsUnmitigable != shieldAbsorbsUnmitigable)

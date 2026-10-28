@@ -724,7 +724,7 @@ namespace AutoTest
         /// アーム間でラン数も到達率も違うので、 合計値では比べられない。</summary>
         private static string DescribeDamageBreakdown7F()
         {
-            var b = CombatSystem.CombatManager.DamageBreakdown7F;
+            var b = CombatStats.DamageBreakdown7F;
             double n = b[0];
             if (n < 1) return "";
             var sb = new StringBuilder();

@@ -52,10 +52,10 @@ namespace CombatSystem
             if (ctx == null) return Kind.None;
             Kind k = GameLoop.GameRng.Value("EnemyStance.1") < 0.5f ? Kind.HighRollLowDmg : Kind.LowRollHighDmg;
             // 高火力スタンスの被ダメ倍率(=ボス攻撃力)・弱ロール比をボス別にチューナーから取得（非ボス/未調整は既定1.6/0.65）。
-            float highMult = AutoTest.BossTuning.Param(ctx.bossId, AutoTest.BossParam.StanceAtkMult);
+            float highMult = CombatSystem.BossParams.Param(ctx.bossId, CombatSystem.BossParam.StanceAtkMult);
             ctx.enemyStanceDamageMult = (k == Kind.HighRollLowDmg) ? LowDamageMult : highMult;
             ctx.enemyStanceKind = (int)k;
-            ctx.enemyStanceWeakRollRatio = AutoTest.BossTuning.Param(ctx.bossId, AutoTest.BossParam.WeakRollRatio);
+            ctx.enemyStanceWeakRollRatio = CombatSystem.BossParams.Param(ctx.bossId, CombatSystem.BossParam.WeakRollRatio);
             OnTelegraph?.Invoke(k);
             return k;
         }

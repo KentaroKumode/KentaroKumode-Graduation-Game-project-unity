@@ -63,9 +63,6 @@ namespace AutoTest.EditorTests.Ultra
             "philStoneUsed", "outpostUpgradeUsedThisFloor",
             // shop
             "shopRobberyDone", "shopRobberyInProgress", "robberyPendingItems", "nextShopHalfPrice",
-            // abyss phenomena
-            "activePhenomena",
-            "reverseFallsUsed", "eclipsedNightTriggered", "ironSunNextTurn",
             // armed consumable effects (the player spent an item for each of these)
             "nextLootMinRarity", "pendingFirstRollTotal", "pendingEnemyStartHpCutPct",
             "pendingGamblerDice", "pendingDaggerArmed", "pendingOathArmed",
@@ -105,7 +102,7 @@ namespace AutoTest.EditorTests.Ultra
             "sublimationCount", "sealedRoleMask",
             "lingeringWoundLost", "equippedWeaponId", "equippedDiceId",
             "ownedPassiveItems", "ownedConsumables", "permanentDebuffs",
-            "activePhenomena", "timedBuffs", "timedDebuffs",
+            "timedBuffs", "timedDebuffs",
             "diceFaceParts",
         };
 

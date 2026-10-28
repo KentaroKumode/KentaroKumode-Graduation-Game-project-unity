@@ -88,12 +88,8 @@ namespace AutoTest
                        read  = p => p.provisionRefillFloor },
             // [削除 2026-09-11] sublimationReserve ── 〈昇華〉の積極度。
             //   昇華そのものが呼ばれていないので、 探索予算を配っても方策が動かない死に軸だった。
-            new Axis { name = "stanceDefendWinProb",      step = 0.05f,
-                       apply = (p, d) => p.stanceDefendWinProb += d,
-                       read  = p => p.stanceDefendWinProb },
-            new Axis { name = "stanceDefendHpBias",       step = 0.05f,
-                       apply = (p, d) => p.stanceDefendHpBias += d,
-                       read  = p => p.stanceDefendHpBias },
+            // [削除 2026-10-29] stanceDefendWinProb / stanceDefendHpBias ── ロール勝負時代の自スタンス (ADR-0006)。
+            //   旧戦闘経路と一緒に機構が消えた。 PolicyParameters の値は保存互換のため残す。
         };
 
         // ===== スタール状態 =====
@@ -322,8 +318,6 @@ namespace AutoTest
                 AppendDiff(sb, "hpCritThreshold",          before.hpCritThreshold,          after.hpCritThreshold);
                 AppendDiff(sb, "lateralProvisionFloor",         before.lateralProvisionFloor,         after.lateralProvisionFloor);
                 AppendDiff(sb, "provisionRefillFloor",          before.provisionRefillFloor,          after.provisionRefillFloor);
-                AppendDiff(sb, "stanceDefendWinProb",      before.stanceDefendWinProb,      after.stanceDefendWinProb);
-                AppendDiff(sb, "stanceDefendHpBias",       before.stanceDefendHpBias,       after.stanceDefendHpBias);
             }
             else sb.AppendLine("- (初回ベスト)");
             sb.AppendLine();

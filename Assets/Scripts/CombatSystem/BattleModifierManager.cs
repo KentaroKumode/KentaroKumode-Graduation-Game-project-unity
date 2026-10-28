@@ -86,21 +86,6 @@ namespace CombatSystem
         }
 
         /// <summary>
-        /// scratchダメージに対する修飾子効果を適用
-        /// CombatManagerのscratch計算後に呼ぶ
-        /// </summary>
-        public static int ApplyScratchModifiers(CombatContext ctx, int baseScratch)
-        {
-            if (ctx == null) return baseScratch;
-
-            // 呪霧: scratch2倍
-            if (ctx.HasModifier(BattleModifierId.CursedFog))
-                baseScratch *= 2;
-
-            return baseScratch;
-        }
-
-        /// <summary>
         /// 出血ダメージに対する修飾子効果を適用
         /// </summary>
         public static int ApplyBleedModifiers(CombatContext ctx, int baseBleed)

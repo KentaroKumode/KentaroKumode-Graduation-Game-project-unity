@@ -138,7 +138,7 @@ namespace AutoTest
             // バッチ中は Debug.Log が抑止されるので、 数字で残さないと検証できない。
             // 与ダメージの内訳。 **実機の火力がどこから来ているか**を数字で残す。
             // §15-5 の遺物単位を机上の参照状態で較正して 5 倍ずれた経緯があるため (2026-08-03)。
-            var db = CombatSystem.CombatManager.DamageBreakdown;
+            var db = CombatStats.DamageBreakdown;
             if (db[0] > 0)
             {
                 double n = db[0];
@@ -162,7 +162,7 @@ namespace AutoTest
 
             // 総倍率の**段別**分解。 会心 × outgoing だけでは総倍率に届かなかったため
             // (残差 ×1.27 の所在不明・2026-08-03)、 修飾チェーンの各段の平均倍率を実測する。
-            var st = CombatSystem.CombatManager.DamageStages;
+            var st = CombatStats.DamageStages;
             if (st[0] > 0)
             {
                 double sn = st[0];
@@ -195,8 +195,8 @@ namespace AutoTest
 
             // 層 × 敵種別の与ダメ分布。 **全層平均の 137 で敵HPを決めると序盤を壊す**ため、
             // 敵HP の再設計は必ずこの表を根拠にする (2026-08-03)。
-            var fd = CombatSystem.CombatManager.FloorDamage;
-            var fh = CombatSystem.CombatManager.FloorDamageHist;
+            var fd = CombatStats.FloorDamage;
+            var fh = CombatStats.FloorDamageHist;
             sb.AppendLine();
             sb.AppendLine("=== 層 × 敵種別の 1 攻撃あたり与ダメ (主+固定) ===");
             sb.AppendLine("層 種別    攻撃数    最小   p10   p50   p90   最大    平均 | 敵maxHP  HP/平均 | 平均T");
@@ -227,7 +227,7 @@ namespace AutoTest
 
             // ターン収支。 **敵が手番を得るようになった影響**と、 BOT がブロック端子へ
             // 配線し始めたか (ADR-0009 のジレンマが起動したか) を同時に見る。
-            var ts = CombatSystem.CombatManager.TurnStats;
+            var ts = CombatStats.TurnStats;
             sb.AppendLine();
             sb.AppendLine("=== 層 × 敵種別の ターン収支 ===");
             sb.AppendLine("層 種別    ターン   被ダメ/T  敵攻撃値  ブロック出目  遮断率 | 配線 攻/防/充  防配線率 | ctxHP runHP  HP残");
@@ -328,7 +328,7 @@ namespace AutoTest
                 sb.AppendLine();
             }
 
-            var rr = CombatSystem.CombatManager.RerollStats;
+            var rr = CombatStats.RerollStats;
             sb.AppendLine();
             sb.AppendLine("=== リロール経済 (ADR-0010) ===");
             sb.AppendLine($"  回数 {rr[0]:N0}  振り直したダイス {rr[1]:N0}  消費充電 {rr[2]:N0}"

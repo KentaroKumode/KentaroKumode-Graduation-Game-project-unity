@@ -416,9 +416,6 @@ namespace AutoTest
              : enableAllDebuffs                 ? MetaProfile.BuffOn_DebuffOn
              :                                    MetaProfile.BuffOn_DebuffOff;
 
-        [Header("ADR-0009 相互攻撃パイプライン検証")]
-        [Tooltip("true でバッチを ADR-0009 相互攻撃パイプラインで実行 (新旧比較用)。配線は交換レート自動ポリシー")]
-        public bool useMutualAttackPipeline = false;
 
         /// <summary>5層裏ボス(シュヴァリエ)を遮断するか。 **既定 true**。
         ///
@@ -1629,6 +1626,10 @@ namespace AutoTest
         /// <summary>現ランのシード値。 ペアテスト時は (i/2) を共有して同一マップ・同一RNGを再現。</summary>
         private int _currentRunSeed;
 
+        /// <summary>本体の差し込み口へ BOT を繋ぐ (学習値による選択・ボス調整値・計測)。
+        /// 通常のプレイには AutoRunner が居ないので、 本体は既定の振る舞いだけで動く。</summary>
+        void Awake() => BotHooks.Install();
+
         void Start()
         {
             if (autoStart) Begin();
@@ -1710,7 +1711,7 @@ namespace AutoTest
             AutoTest.CritRateCensus.Reset();
             // 強盗の計装も static なのでここで 0 へ (ドメインリロードで消えるため毎バッチ必要)。
             ItemSystem.Shop.ShopManager.RobberyAttempts = 0;
-            GameManager.RobberyWins = GameManager.RobberyLosses = GameManager.RobberyLootTotal = 0;
+            RunStats.RobberyWins = RunStats.RobberyLosses = RunStats.RobberyLootTotal = 0;
             // 罰の実体も static。 出禁と価格割増は排他 (両方掛けると二重罰になる)。
             ItemSystem.Shop.ShopManager.RobberyProvisionCost = robberyProvisionCost;
             CombatSystem.BossCombatTrace.TargetFloor = bossTraceFloor;
@@ -1770,11 +1771,9 @@ namespace AutoTest
             if (!shieldAbsorbsUnmitigable)
                 Debug.LogWarning("[AutoRunner] **対照群**: 軽減無視をシールドで肩代わりしない (製品挙動ではない)");
 
-            // ADR-0009: 戦闘パイプラインの切替 (新旧比較スイープ用)
-            CombatManager.UseMutualAttackPipeline = useMutualAttackPipeline;
             // 〈門〉の欠陥の強さ (2026-09-14 較正用)。 負なら触らない = GateFlaws の既定値。
             //   **スイープで倍率を掃くための穴。** static を上書きするので、
-            //   useMutualAttackPipeline と同じ「運び漏れ」事故を起こしうる ──
+            //   旧 useMutualAttackPipeline (2026-09-13) と同じ「運び漏れ」事故を起こしうる ──
             //   だから DescribeEffective に必ず並べてある。
             if (gateRepairDrainPct >= 0f)
                 GameLoop.GateFlaws.RepairHpDrainPerTurnPct = gateRepairDrainPct;
@@ -1797,8 +1796,6 @@ namespace AutoTest
             if (eliteDropRate   >= 0f) GameLoop.CombatRewards.EliteDropRate  = eliteDropRate;
             if (normalDropRate  >= 0f) GameLoop.CombatRewards.NormalDropRate = normalDropRate;
             if (combatGoldScale >  0)  GameLoop.CombatRewards.GoldScale      = combatGoldScale;
-            if (useMutualAttackPipeline)
-                Debug.Log("[AutoRunner] ADR-0009 相互攻撃パイプラインで実行 (配線=交換レート自動ポリシー)");
 
             // プロファイル切替で参照先サブディレクトリが変わるため、 各キャッシュを再読み込み
             try { PolicyParameters.ReloadFromDisk(MetaProfileHelper.LearningRoot()); } catch { }
@@ -2034,6 +2031,7 @@ namespace AutoTest
 
         private void OnDestroy()
         {
+            BotHooks.Uninstall();
             if (!_ultraBatchActive) return;
             const string reason = "Ultra batch cancelled because AutoRunner was destroyed";
             UltraProgressHub.Cancel(_ultraProgressSession, reason);
@@ -2305,7 +2303,6 @@ namespace AutoTest
 
             // DB / 演出の事前準備
             SafeInitDatabases();
-            DisableMapTransition();
 
             // GameManager 出現待ち
             float waited = 0f;
@@ -2318,7 +2315,7 @@ namespace AutoTest
             {
                 // Log抑止を一時解除してエラーを確実に出す
                 if (suppressLogsDuringBatch) Debug.unityLogger.logEnabled = true;
-                Debug.LogError("[AutoRunner] GameManager が見つかりません。SampleScene で実行してください。");
+                Debug.LogError("[AutoRunner] GameManager が見つかりません。SampleScene2 (BOT 用) か Game2D で実行してください。");
                 Application.logMessageReceived -= OnLog;
                 Time.timeScale = prevScale;
                 if (disableVSyncDuringBatch) { QualitySettings.vSyncCount = prevVSync; Application.targetFrameRate = prevTargetFps; }
@@ -2375,10 +2372,6 @@ namespace AutoTest
             if (navBlockCredit  >= 0f) BlockCreditRatio = navBlockCredit;
             if (navSafetyFights >= 0f) SafetyFights     = navSafetyFights;
             Debug.Log($"[AutoRunner] policy: {PolicyParameters.Current.Summary()}");
-            // 攻撃/防御スタンス(ADR-0006): 学習閾値を CombatSystem.PlayerStance へ結線（Current を常時読む）。
-            // ＝CombatSystem は AutoTest に依存せず、BOT が学習値を注入。実プレイヤー時は未結線で既定値。
-            CombatSystem.PlayerStance.DefendWinProbProvider = () => PolicyParameters.Current.stanceDefendWinProb;
-            CombatSystem.PlayerStance.DefendHpBiasProvider  = () => PolicyParameters.Current.stanceDefendHpBias;
             // L3: ボス難易度係数を読み込み (前バッチの自動調整を引き継ぐ)
             BossTuning.Reload();
             if (BossAutoTune) Debug.Log($"[AutoRunner] bossTuning: {BossTuning.Summary()}");

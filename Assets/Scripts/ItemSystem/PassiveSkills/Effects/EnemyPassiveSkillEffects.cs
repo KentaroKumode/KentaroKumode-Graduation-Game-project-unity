@@ -585,7 +585,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
             // ボス難易度オートチューナー: 威圧の脅威加算をボス別に直接調整 (基準3)。
-            int add = UnityEngine.Mathf.Max(0, AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.IntimidateThreat));
+            int add = UnityEngine.Mathf.Max(0, CombatSystem.BossParams.ParamInt(ctx.bossId, CombatSystem.BossParam.IntimidateThreat));
             ctx.enemyThreat += add;
             UnityEngine.Debug.Log($"[威圧+] 脅威 +{add} → {ctx.enemyThreat}");
         }
@@ -667,7 +667,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
             // 敵視点なので playerDiceTotal = ボス自身のダイス合計。 加算量はオートチューナーで調整 (基準3)。
-            ctx.playerDiceTotal += UnityEngine.Mathf.Max(0, AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.GoblinCall));
+            ctx.playerDiceTotal += UnityEngine.Mathf.Max(0, CombatSystem.BossParams.ParamInt(ctx.bossId, CombatSystem.BossParam.GoblinCall));
         }
     }
 
@@ -707,7 +707,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
             // ボス難易度オートチューナー: 毒スタック上限を直接調整 (低い=DOT緩和)。 基準5
-            int cap = UnityEngine.Mathf.Max(1, AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.PoisonStackCap));
+            int cap = UnityEngine.Mathf.Max(1, CombatSystem.BossParams.ParamInt(ctx.bossId, CombatSystem.BossParam.PoisonStackCap));
             ctx.accumulatedValues.TryGetValue(Key, out var stack);
             int s = System.Math.Min(cap, (int)stack + 1);
             ctx.accumulatedValues[Key] = s;
@@ -787,7 +787,7 @@ namespace ItemSystem.PassiveSkills.Effects
                 //   3層ボス 41.9 と 5層ボス 56.7 の間)。 次に動かすときも P30/P50 を見ること。
                 int Thr = UnityEngine.Mathf.Max(12, ctx.playerMaxHP * 4 / 100);
                 // ボス難易度オートチューナー: 反射ダメ上限を直接調整 (低い=反射事故の緩和)。 基準9
-                int reflectCap = UnityEngine.Mathf.Max(0, AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.MirrorReflectCap));
+                int reflectCap = UnityEngine.Mathf.Max(0, CombatSystem.BossParams.ParamInt(ctx.bossId, CombatSystem.BossParam.MirrorReflectCap));
                 int dmg = ctx.finalDamage;
                 if (dmg > 0)
                 {
@@ -834,7 +834,7 @@ namespace ItemSystem.PassiveSkills.Effects
             var run = GameLoop.GameManager.Instance?.Run;
             int sin = System.Math.Min(2, (run?.totalBattles ?? 0) / 8); // 罪: プレイで操作可能
             // ボス難易度オートチューナー: 審判の炎の総ダメ上限を直接調整 (低い=不可避チップ緩和)。 基準13
-            int cap = AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.ChipCap);
+            int cap = CombatSystem.BossParams.ParamInt(ctx.bossId, CombatSystem.BossParam.ChipCap);
             // 2026-08-15: ターン係数を 1/2 → **1/3**。 出現漏れ (怪しい商人) と裏ボス遮断漏れを
             //   直した土俵で測り直したところ、 この敵が単独の主死因 (致命 276 / 主死因 Chip 97%) だった。
             //   平均 14.7 ターンで累積 108 ＝ プレイヤー最大HP (93〜99) を上回り、
@@ -1040,7 +1040,7 @@ namespace ItemSystem.PassiveSkills.Effects
                     {
                         // ボス難易度オートチューナー: 断罪Tの敵ダイス上乗せを直接調整
                         // (低い=見切りロールに勝ちやすく=易化)。 基準+10。
-                        int jdice = AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.JudgmentDice);
+                        int jdice = CombatSystem.BossParams.ParamInt(ctx.bossId, CombatSystem.BossParam.JudgmentDice);
                         ctx.enemyDiceTotalBonus += jdice; // 断罪Tは敵ダイス上乗せ (見切り難度)
                         // 断罪Tの累積回数 (この戦闘で何回目か) をカウント
                         int n = (int)ctx.GetAccumulated("judg_counter") + 1;
@@ -1059,7 +1059,7 @@ namespace ItemSystem.PassiveSkills.Effects
                         if (n < 1) n = 1;
                         // ボス難易度オートチューナー: 断罪係数の基礎を直接調整
                         // (低い=即死性が下がり、 断罪ロールに負けても耐えられる=易化)。 係数 = base + 2n、 基準base=2。
-                        int coefBase = AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.JudgmentCoefBase);
+                        int coefBase = CombatSystem.BossParams.ParamInt(ctx.bossId, CombatSystem.BossParam.JudgmentCoefBase);
                         int coef = UnityEngine.Mathf.Max(1, coefBase + 2 * n); // 基準1回目=4、2回目=6...
                         int before = ctx.finalDamage;
                         ctx.finalDamage = ctx.finalDamage * coef + coef;
@@ -1150,7 +1150,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (ctx.playerLostRoll && ctx.finalDamage > 0)
             {
                 // ボス難易度オートチューナー: 灰塵の鎧の軽減量を直接調整 (低い=タンク性弱化=ジリ貧緩和)。 基準-9
-                int reduction = AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.RegenReduction);
+                int reduction = CombatSystem.BossParams.ParamInt(ctx.bossId, CombatSystem.BossParam.RegenReduction);
                 const int cap = 10; // 軽減後キャップ (固定)
                 int reduced = System.Math.Max(0, ctx.finalDamage - reduction);
                 ctx.finalDamage = System.Math.Min(reduced, cap);
@@ -1333,7 +1333,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            int bonus = AutoTest.BossTuning.ParamInt(ctx.bossId, AutoTest.BossParam.JudgmentDice);
+            int bonus = CombatSystem.BossParams.ParamInt(ctx.bossId, CombatSystem.BossParam.JudgmentDice);
             float hpRatio = ctx.playerMaxHP > 0 ? (float)ctx.playerCurrentHP / ctx.playerMaxHP : 1f;
             // [計装] 発火したかではなく、 **何を計算したか**をそのまま残す。
             CombatSystem.BossCombatTrace.NoteEvent("omen",

@@ -150,7 +150,7 @@ namespace AutoTest.ParallelSweep
         public string[] attackBonus7FSkills = Array.Empty<string>();
         public long[] attackBonus7FAmounts = Array.Empty<long>();
         public long[] attackBonus7FCalls = Array.Empty<long>();
-        /// <summary>[計装] 最終戦だけの atkBase 内訳 (CombatManager.DamageBreakdown7F)。</summary>
+        /// <summary>[計装] 最終戦だけの atkBase 内訳 (CombatStats.DamageBreakdown7F)。</summary>
         public double[] damageBreakdown7F = new double[19];
 
         /// <summary>[計装 2026-09-19] 戦闘の種類別 (0 雑魚 / 1 エリート / 2 ボス) の結果 (CombatSystem.SkillDiag)。
@@ -226,7 +226,7 @@ namespace AutoTest.ParallelSweep
             if (runner == null) return "";
             string[] watched =
             {
-                "useMutualAttackPipeline", "wiringSkill", "metaBuffMode", "itemPickMode",
+                "wiringSkill", "metaBuffMode", "itemPickMode",
                 "enableAllDebuffs", "forceNoRelic", "forceTheoreticalRelic",
                 "shieldAbsorbsUnmitigable", "suppressFacePartOffers", "robberyBlocksShops",
                 "challengeScoreTarget", "masterSeed", "rawTierRatio",

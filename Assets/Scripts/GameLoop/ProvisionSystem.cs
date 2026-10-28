@@ -100,13 +100,11 @@ namespace GameLoop
 
         // === ミューテータ ===
 
-        /// <summary>物資を減少（0でクランプ）。
-        /// 異常現象「薄れる人」 発動中は追加で損 (ただし amount==0 ではトリガしない)。</summary>
+        /// <summary>物資を減少（0でクランプ）。</summary>
         public static void Reduce(RunState run, int amount)
         {
             if (run == null || amount <= 0) return;
-            int extra = MapSystem.AbyssPhenomena.AbyssPhenomenonCombatHooks.OnProvisionReduceExtraLoss(run);
-            run.provision = Mathf.Max(0, run.provision - amount - extra);
+            run.provision = Mathf.Max(0, run.provision - amount);
             UpdateCrownLock(run);
         }
 
@@ -126,9 +124,7 @@ namespace GameLoop
             int b = run.provision; Recover(run, amount); Stats.supplyGain += run.provision - b;
         }
 
-        /// <summary>移動の消費（自由移動マップが距離に応じて払う）。 計測は travelLoss。
-        /// **異常現象「薄れる人」の追加損は乗せない** ── 刻みごとに払うので、 1 回ごとの追加損が
-        /// 移動距離に比例して膨れ上がる。</summary>
+        /// <summary>移動の消費（自由移動マップが距離に応じて払う）。 計測は travelLoss。</summary>
         public static void SpendTravel(RunState run, int amount)
         {
             if (run == null || amount <= 0) return;

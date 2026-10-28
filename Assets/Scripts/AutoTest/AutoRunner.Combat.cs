@@ -78,66 +78,63 @@ namespace AutoTest
             // ADR-0009/0010: 配線・リロール・役の 3 方策を注入 (パイプライン OFF 時は未使用)。
             //   素朴版は **リロールと役を一切使わない** ＝ ADR-0010 以前と同じ打ち方。
             //   最適版との差が「役システムが開けた技量帯の幅」そのものになる (Verification ①)。
-            if (CombatManager.UseMutualAttackPipeline)
+            WiringSkill effectiveSkill = EffectiveWiringSkill;
+            bool useLayer6Routine = effectiveSkill == WiringSkill.Super
+                                 && IsSuperTailMode
+                                 && superLayer6OptimalCombatRoutine
+                                 && e0 != null
+                                 && e0.id == "boss_layer6";
+            // [2026-08-22] **7層でも Optimal 方策へ切り替える** (既定 OFF)。
+            //   下のコメントは「7層は Super が勝つので切り替えない」と書いているが、
+            //   **それは古い測定**。 役の出目依存化・役札の連戦持ち越し・パーツ有りの
+            //   現行条件で測り直すと符号が反転している:
+            //     両AIが7層へ到達した 379 ラン に限定して Optimalだけクリア 71 /
+            //     Superだけクリア 41 (p=0.0059)。 到達時点の状態 (HP率・パッシブ数・
+            //     武器Tier・物資) は Super が僅かに上なので、 選択バイアスでは説明できない。
+            //   IsSuperTailMode で絞らない ── 0pt で観測した差なので難度条件を付けない。
+            bool useLayer7Routine = effectiveSkill == WiringSkill.Super
+                                 && superLayer7OptimalCombatRoutine
+                                 && e0 != null
+                                 && !string.IsNullOrEmpty(e0.id)
+                                 && e0.id.StartsWith(GameLoop.BossIds.Layer7Prefix);
+            bool useOptimalRoutine = useLayer6Routine || useLayer7Routine;
+            if (effectiveSkill == WiringSkill.Exact)
             {
-                WiringSkill effectiveSkill = EffectiveWiringSkill;
-                bool useLayer6Routine = effectiveSkill == WiringSkill.Super
-                                     && IsSuperTailMode
-                                     && superLayer6OptimalCombatRoutine
-                                     && e0 != null
-                                     && e0.id == "boss_layer6";
-                // [2026-08-22] **7層でも Optimal 方策へ切り替える** (既定 OFF)。
-                //   下のコメントは「7層は Super が勝つので切り替えない」と書いているが、
-                //   **それは古い測定**。 役の出目依存化・役札の連戦持ち越し・パーツ有りの
-                //   現行条件で測り直すと符号が反転している:
-                //     両AIが7層へ到達した 379 ラン に限定して Optimalだけクリア 71 /
-                //     Superだけクリア 41 (p=0.0059)。 到達時点の状態 (HP率・パッシブ数・
-                //     武器Tier・物資) は Super が僅かに上なので、 選択バイアスでは説明できない。
-                //   IsSuperTailMode で絞らない ── 0pt で観測した差なので難度条件を付けない。
-                bool useLayer7Routine = effectiveSkill == WiringSkill.Super
-                                     && superLayer7OptimalCombatRoutine
-                                     && e0 != null
-                                     && !string.IsNullOrEmpty(e0.id)
-                                     && e0.id.StartsWith(GameLoop.BossIds.Layer7Prefix);
-                bool useOptimalRoutine = useLayer6Routine || useLayer7Routine;
-                if (effectiveSkill == WiringSkill.Exact)
+                // 厳密版。 (ADR-0011: 役は自動で効くので、 発動方策の注入は無い。 役の効果は先読みしていない。)
+                exactAI.BeginCombat(e0 != null ? e0.id : "");
+                cm.WiringPolicy = exactAI.ChooseWiringPlan;
+                cm.RerollPolicy = exactAI.ChooseReroll;
+            }
+            else if (effectiveSkill == WiringSkill.Super && !useOptimalRoutine)
+            {
+                // 天井版は配線とリロールを一つの価値関数で決める。 **両方差し替える** ──
+                // 配線だけ先読みにしてリロールを貪欲のままにすると、 探索の前提と食い違う。
+                cm.WiringPolicy = logWiringDiff
+                    ? (System.Func<int[], CombatSystem.MutualTurnTelegraph, CombatSystem.WiringPlan>)SuperWiringWithDiff
+                    : superAI.ChooseWiringPlan;
+                // [計測 2026-09-19] Super のリロール判断を軽いものへ差し替えられるようにする。
+                //   Super の所要時間の 98% がリロールの全列挙なので、 近似で強さがどれだけ落ちるかを測る。
+                //   0 = 全列挙 (既定) / 1 = Optimal のリロール方策 / 2 = 全列挙を軽く (標本・厳密範囲を絞る)
+                if (superRerollMode == 2)
                 {
-                    // 厳密版。 (ADR-0011: 役は自動で効くので、 発動方策の注入は無い。 役の効果は先読みしていない。)
-                    exactAI.BeginCombat(e0 != null ? e0.id : "");
-                    cm.WiringPolicy = exactAI.ChooseWiringPlan;
-                    cm.RerollPolicy = exactAI.ChooseReroll;
+                    superAI.rerollSamples = superLightRerollSamples;
+                    superAI.exactRerollMaxDice = superLightExactMaxDice;
                 }
-                else if (effectiveSkill == WiringSkill.Super && !useOptimalRoutine)
-                {
-                    // 天井版は配線とリロールを一つの価値関数で決める。 **両方差し替える** ──
-                    // 配線だけ先読みにしてリロールを貪欲のままにすると、 探索の前提と食い違う。
-                    cm.WiringPolicy = logWiringDiff
-                        ? (System.Func<int[], CombatSystem.MutualTurnTelegraph, CombatSystem.WiringPlan>)SuperWiringWithDiff
-                        : superAI.ChooseWiringPlan;
-                    // [計測 2026-09-19] Super のリロール判断を軽いものへ差し替えられるようにする。
-                    //   Super の所要時間の 98% がリロールの全列挙なので、 近似で強さがどれだけ落ちるかを測る。
-                    //   0 = 全列挙 (既定) / 1 = Optimal のリロール方策 / 2 = 全列挙を軽く (標本・厳密範囲を絞る)
-                    if (superRerollMode == 2)
-                    {
-                        superAI.rerollSamples = superLightRerollSamples;
-                        superAI.exactRerollMaxDice = superLightExactMaxDice;
-                    }
-                    cm.RerollPolicy = superRerollMode == 1
-                        ? (System.Func<int[], CombatSystem.MutualTurnTelegraph, int, int[]>)MutualRerollPolicy
-                        : superAI.ChooseReroll;
-                }
-                else
-                {
-                    // 50pt・同一10000シードで、両AIが6層へ遭遇した2322件に限定すると
-                    // Optimalだけ勝利425 / Superだけ勝利267。Superの未来近似は灰の再生・
-                    // 周期予兆・烈炎の複合戦で局所的に劣るため、ここだけ実測上位方策へ切替える。
-                    // 7層はSuperだけ完全クリア300 / Optimalだけ173なので切り替えない。
-                    //   ↑ **この 7層の判断は 2026-08-22 に覆った** (上の useLayer7Routine 参照)。
-                    if (useOptimalRoutine) superAI.BeginCombat(e0.id);
-                    cm.WiringPolicy = MutualWiringPlanPolicy;
-                    cm.RerollPolicy = effectiveSkill == WiringSkill.Naive ? null
-                                    : (System.Func<int[], CombatSystem.MutualTurnTelegraph, int, int[]>)MutualRerollPolicy;
-                }
+                cm.RerollPolicy = superRerollMode == 1
+                    ? (System.Func<int[], CombatSystem.MutualTurnTelegraph, int, int[]>)MutualRerollPolicy
+                    : superAI.ChooseReroll;
+            }
+            else
+            {
+                // 50pt・同一10000シードで、両AIが6層へ遭遇した2322件に限定すると
+                // Optimalだけ勝利425 / Superだけ勝利267。Superの未来近似は灰の再生・
+                // 周期予兆・烈炎の複合戦で局所的に劣るため、ここだけ実測上位方策へ切替える。
+                // 7層はSuperだけ完全クリア300 / Optimalだけ173なので切り替えない。
+                //   ↑ **この 7層の判断は 2026-08-22 に覆った** (上の useLayer7Routine 参照)。
+                if (useOptimalRoutine) superAI.BeginCombat(e0.id);
+                cm.WiringPolicy = MutualWiringPlanPolicy;
+                cm.RerollPolicy = effectiveSkill == WiringSkill.Naive ? null
+                                : (System.Func<int[], CombatSystem.MutualTurnTelegraph, int, int[]>)MutualRerollPolicy;
             }
 
             int guard = 0;

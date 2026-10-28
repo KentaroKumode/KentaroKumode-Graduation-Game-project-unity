@@ -301,7 +301,7 @@ namespace ItemSystem.Shop
                         var (f, l) = ItemSystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(ps.internalName);
                         if (l > lv) { lv = l; fam = f; }
                     }
-                    if (lv > 0) AutoTest.FamilyTierStats.NoteOffer(fam, lv);
+                    if (lv > 0) GameLoop.GameHooks.OnShopTierOffered?.Invoke(fam, lv);
                 }
             }
 
@@ -383,7 +383,7 @@ namespace ItemSystem.Shop
                 // [計装] 梯子が登られているか (§ FamilyTierStats)。 提示と購入を別に数える ──
                 //   差が「1G なのに見送られた」量で、 そこが大きいなら段は枠の問題ではなく需要の問題。
                 s.upgradeStep = maxStep;
-                AutoTest.FamilyTierStats.NoteUpgradeOffered();
+                GameLoop.GameHooks.OnShopUpgradeOffered?.Invoke();
                 Debug.Log($"[ShopManager] 上位互換アップグレード割引 slot={i} {s.itemId} ({maxStep}段差) {s.originalPrice}G→{s.price}G ({s.discountPct}%off)");
             }
         }
@@ -829,7 +829,7 @@ namespace ItemSystem.Shop
             slot.sold = true;
             // [計装] 1G アップグレードが**成約**した回数 (§ FamilyTierStats ②)。
             //   提示だけ数えても「並んでいた」しか分からない。 梯子を登った回数はこちら。
-            if (slot.upgradeStep > 0) AutoTest.FamilyTierStats.NoteUpgradeBought(slot.upgradeStep);
+            if (slot.upgradeStep > 0) GameLoop.GameHooks.OnShopUpgradeBought?.Invoke(slot.upgradeStep);
 
             var data = ItemDatabase.Instance?.GetItem(slot.itemId);
             // パーツは ItemDatabase に無い ── GetItem は null を返すので表示名は自前で引く。
@@ -924,7 +924,7 @@ namespace ItemSystem.Shop
         /// <see cref="RobberySurcharge"/> と併用しないこと (true のときは割増を 1.0 にする)。</para></summary>
         public static bool RobberyBlocksShops;
 
-        /// <summary>[計装] 強盗の試行回数。 勝敗は <c>GameManager.RobberyWins/RobberyLosses</c>。
+        /// <summary>[計装] 強盗の試行回数。 勝敗は <c>RunStats.RobberyWins/RobberyLosses</c>。
         /// static なのでバッチ開始時に 0 へ戻すこと。</summary>
         public static long RobberyAttempts;
         /// <summary>[計装] 強盗を撃った層の分布 (1..7 を index 0..6)。</summary>

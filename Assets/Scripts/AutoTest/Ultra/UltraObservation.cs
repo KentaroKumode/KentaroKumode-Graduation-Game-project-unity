@@ -85,7 +85,6 @@ namespace AutoTest.Ultra
         public string[] ownedPassiveItems = new string[0];
         public string[] ownedConsumables = new string[0];
         public string[] permanentDebuffs = new string[0];
-        public string[] activePhenomena = new string[0];
         public string[] timedBuffKeys = new string[0];
         public int[] timedBuffTurns = new int[0];
         public string[] timedDebuffKeys = new string[0];
@@ -205,12 +204,6 @@ namespace AutoTest.Ultra
             view.permanentDebuffs = ToArray(run.permanentDebuffs);
             SplitCounts(run.timedBuffs, out view.timedBuffKeys, out view.timedBuffTurns);
             SplitCounts(run.timedDebuffs, out view.timedDebuffKeys, out view.timedDebuffTurns);
-
-            var phenomena = new List<string>();
-            if (run.activePhenomena != null)
-                for (int i = 0; i < run.activePhenomena.Count; i++)
-                    phenomena.Add(run.activePhenomena[i].ToString());
-            view.activePhenomena = phenomena.ToArray();
 
             var parts = new List<string>();
             if (run.diceFaceParts != null)

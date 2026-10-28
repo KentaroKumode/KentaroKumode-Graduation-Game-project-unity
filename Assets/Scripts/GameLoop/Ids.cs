@@ -61,6 +61,28 @@ namespace GameLoop
         /// <summary>囮罠 (items.json の id ＝ 表示名)。 旧〈囮〉〈罠〉は LegacyIdMap が解決する。</summary>
         public const string Lure = "囮罠";
 
+        // === 進行用の品 ===
+        /// <summary>**進行用の品**: 強さではなく進行度や配布条件を表す品。 〈門〉で遺物として捧げられない
+        /// (GameManager.OfferGateRelics)。 BOT の lift 評価もこれを除外する (AutoTest.ItemLearningStats)。</summary>
+        public static readonly System.Collections.Generic.HashSet<string> ProgressionItems =
+            new System.Collections.Generic.HashSet<string>
+        {
+            // 確信チェーン (5F-6F の進路フラグ・アイテム)
+            ConvictionSystem.IdTruth, ConvictionSystem.IdResolve, ConvictionSystem.IdConviction,
+            "苦難の予言", "苦難の確信", "真理の予兆",
+            // デフォルト/初期装備
+            DiceWood,
+            // 起動でしか取れないイベント専用アイテム
+            ItemSystem.PassiveItems.TorchRevival.TorchId,
+            // フラグ系武器 (進路条件で配布)
+            ChevalierRapier,
+            // 武器階梯 T2/T3 (職業配布と進化の途中段)。 T4 は終端なので含めない
+            "鍛鉄の剣",   "銀の長剣",
+            "鉄盾",  "聖騎士の盾",
+            "猛斧",     "血塗りの戦斧",
+            "盗賊の短刀",  "処刑人の曲刀",
+        };
+
         /// <summary>**回復は毎回並ぶ。** 消費枠は 3 で、 1 枠目を回復で固定する。
         /// 回復が並ばない店があると消費で耐久を賄う設計自体が成立しないため (2026-08-04)。</summary>
         public static readonly string ConsumableFixedFamily = ConsHealFamily;

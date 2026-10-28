@@ -287,25 +287,6 @@ namespace GameLoop
         /// boss_layer5=審判官 / boss_layer5_hidden=剣聖 / boss_layer6=灰燼の王 / boss_layer7=ヴェスカ。</summary>
         public string lastBossId = "";
 
-        // === 大穴の異常現象 (層モディファイア) ===
-
-        /// <summary>現在層で発動中の異常現象 (層突入時に抽選、 AdvanceFloor でクリア)。
-        /// 正本: docs/GAME.md §5-7</summary>
-        public List<MapSystem.AbyssPhenomena.AbyssPhenomenon> activePhenomena
-            = new List<MapSystem.AbyssPhenomena.AbyssPhenomenon>();
-
-        /// <summary>逆行する滝: このフロアで「戻り」 を使用済みか。</summary>
-        public bool reverseFallsUsed;
-
-        /// <summary>蝕夜: 現戦闘で発動したか (T1 双方行動不能フラグ)。</summary>
-        public bool eclipsedNightTriggered;
-
-        /// <summary>鉄を溶かす太陽: 次に直射が発生するターン番号 (0 = 非発動／戦闘外)。</summary>
-        public int ironSunNextTurn;
-
-        public bool HasPhenomenon(MapSystem.AbyssPhenomena.AbyssPhenomenon p)
-            => activePhenomena != null && activePhenomena.Contains(p);
-
         /// <summary>確信の強さ。災厄の予兆で1になり、以降エリート戦勝利毎に+1。
         /// 層ゲートは layer6Unlocked / layer7Unlocked へ分離されている。</summary>
         public int convictionStage;
@@ -549,10 +530,6 @@ namespace GameLoop
             defeatedSaintGeorges = false;
             lostAtLayer7 = false;
             lastBossId = "";
-            activePhenomena = new List<MapSystem.AbyssPhenomena.AbyssPhenomenon>();
-            reverseFallsUsed = false;
-            eclipsedNightTriggered = false;
-            ironSunNextTurn = 0;
             convictionStage = 0;
             layer6Unlocked = false;
             layer7Unlocked = false;
