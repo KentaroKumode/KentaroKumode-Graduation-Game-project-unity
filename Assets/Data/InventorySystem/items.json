@@ -3,18 +3,16 @@
     {
       "id": "血令",
       "name": "血令",
-      "description": "自分のHP割合が敵より低いとき 与ダメ+50%／被ダメ-15%",
+      "description": "自分の防御をすべて貫通に換える（防御1→貫通2）／失ったHP15%ごとに血の盟約1（最大6）: 1つにつき攻撃+1・攻撃したターンの終わりにHP+1"
+    },
+    {
+      "id": "捨て身",
+      "name": "捨て身",
+      "description": "自分のHP割合が敵より低いとき 与ダメ+50%",
       "stats": [
         {
           "stat": "dmgPct",
           "value": 50,
-          "when": {
-            "behind": true
-          }
-        },
-        {
-          "stat": "dmgTakenPct",
-          "value": -15,
           "when": {
             "behind": true
           }
@@ -24,75 +22,32 @@
     {
       "id": "城壁II",
       "name": "城壁II",
-      "description": "被ダメ-4／ターン終了時 HP+1",
-      "stats": [
-        {
-          "stat": "dmgTaken",
-          "value": -4
-        },
-        {
-          "stat": "regen",
-          "value": 1
-        }
-      ]
+      "description": "完全に受け止めたターン 余ったブロック×0.75をシールドへ"
     },
     {
       "id": "城壁III",
       "name": "城壁III",
-      "description": "被ダメ-7／ターン終了時 HP+2",
-      "stats": [
-        {
-          "stat": "dmgTaken",
-          "value": -7
-        },
-        {
-          "stat": "regen",
-          "value": 2
-        }
-      ]
+      "description": "完全に受け止めたターン 余ったブロック×1.0をシールドへ"
     },
     {
-      "id": "大鉈I",
-      "name": "大鉈I",
-      "description": "敵の失ったHP割合に比例して 与ダメ+最大30%"
+      "id": "鎧砕きI",
+      "name": "鎧砕きI",
+      "description": "与ダメが通ったターンの終わりに 敵の防御-2（戦闘中持続）"
     },
     {
-      "id": "大鉈II",
-      "name": "大鉈II",
-      "description": "敵の失ったHP割合に比例して 与ダメ+最大50%"
+      "id": "鎧砕きII",
+      "name": "鎧砕きII",
+      "description": "与ダメが通ったターンの終わりに 敵の防御-3（戦闘中持続）"
     },
     {
-      "id": "果たし合い",
-      "name": "果たし合い",
-      "description": "単体戦のみ 会心率+15%／与ダメ+25%／被ダメ-15%",
-      "stats": [
-        {
-          "stat": "critPct",
-          "value": 15,
-          "when": {
-            "solo": true
-          }
-        },
-        {
-          "stat": "dmgPct",
-          "value": 25,
-          "when": {
-            "solo": true
-          }
-        },
-        {
-          "stat": "dmgTakenPct",
-          "value": -15,
-          "when": {
-            "solo": true
-          }
-        }
-      ]
+      "id": "不滅の刃",
+      "name": "不滅の刃",
+      "description": "攻撃とブロックの両方に挿したターンが続くたび 与ダメ+8%（途切れたら0に戻る）"
     },
     {
       "id": "一対一I",
       "name": "一対一I",
-      "description": "単体戦のみ 攻撃+3／被ダメ-1",
+      "description": "単体戦のみ 攻撃+3／防御+1",
       "stats": [
         {
           "stat": "atk",
@@ -102,8 +57,8 @@
           }
         },
         {
-          "stat": "dmgTaken",
-          "value": -1,
+          "stat": "def",
+          "value": 1,
           "when": {
             "solo": true
           }
@@ -113,7 +68,7 @@
     {
       "id": "一対一II",
       "name": "一対一II",
-      "description": "単体戦のみ 攻撃+5／被ダメ-2",
+      "description": "単体戦のみ 攻撃+5／防御+2",
       "stats": [
         {
           "stat": "atk",
@@ -123,8 +78,8 @@
           }
         },
         {
-          "stat": "dmgTaken",
-          "value": -2,
+          "stat": "def",
+          "value": 2,
           "when": {
             "solo": true
           }
@@ -134,7 +89,7 @@
     {
       "id": "処刑",
       "name": "処刑",
-      "description": "勝利時 次T敵の最大ダイスを1に固定／敵残HP25%以下で与ダメ+80%",
+      "description": "敵残HP25%以下で与ダメ+80%",
       "stats": [
         {
           "stat": "dmgPct",
@@ -156,19 +111,14 @@
       "description": "ターン経過ごとに 攻撃+1（上限+14）"
     },
     {
-      "id": "復讐",
-      "name": "復讐",
-      "description": "被弾するたび 攻撃+2 蓄積（上限+20・戦闘中持続）"
-    },
-    {
       "id": "画竜点睛",
       "name": "画竜点睛",
       "description": "ダイスがその時点の最大値なら、攻撃+（出目+10）＋会心確定"
     },
     {
-      "id": "衛士の慣い",
-      "name": "衛士の慣い",
-      "description": "戦闘開始時 シールド+10／ターン終了時 シールドが3未満なら+4"
+      "id": "黎明",
+      "name": "黎明",
+      "description": "敵の攻撃の後HPが減っていなければ このターン敵が放った軽減前ダメージ10につき 敵の最大HPの5%を削る"
     },
     {
       "id": "無我無心",
@@ -176,45 +126,35 @@
       "description": "ロール時、カスタムダイス以外の補正（バフ/メタ/消費/武器強化等）を一切受けない"
     },
     {
-      "id": "蝕夜",
-      "name": "蝕夜",
-      "description": "過剰ダメージ×4を蓄積し 戦闘開始時に軽減無視で放出"
+      "id": "急所",
+      "name": "急所",
+      "description": "会心の一撃は敵の防御を無視／会心率+10%",
+      "stats": [
+        {
+          "stat": "critPct",
+          "value": 10
+        }
+      ]
     },
     {
-      "id": "パリィ",
-      "name": "パリィ",
-      "description": "3ターンに1度 被ダメージを完全無効化"
+      "id": "堅守の構え",
+      "name": "堅守の構え",
+      "description": "出目を全部ブロック端子に挿したターン シールド+15（次の2ターンは発動しない）"
     },
     {
-      "id": "反攻I",
-      "name": "反攻I",
-      "description": "ブロック端子へ配線した出目合計×0.4 を軽減無視で敵へ"
+      "id": "シールドバッシュI",
+      "name": "シールドバッシュI",
+      "description": "出目を全部攻撃端子に挿したターン シールドを使い切り その量×0.5を攻撃に加える"
     },
     {
-      "id": "反攻II",
-      "name": "反攻II",
-      "description": "ブロック端子へ配線した出目合計×0.7 を軽減無視で敵へ"
+      "id": "シールドバッシュII",
+      "name": "シールドバッシュII",
+      "description": "出目を全部攻撃端子に挿したターン シールドを使い切り その量×1.0を攻撃に加える"
     },
     {
       "id": "切り返し",
       "name": "切り返し",
-      "description": "被弾した次のターン 攻撃+7／与ダメ+20%",
-      "stats": [
-        {
-          "stat": "atk",
-          "value": 7,
-          "when": {
-            "hitLastTurn": true
-          }
-        },
-        {
-          "stat": "dmgPct",
-          "value": 20,
-          "when": {
-            "hitLastTurn": true
-          }
-        }
-      ]
+      "description": "攻撃とブロックの両方に挿したターン ブロックした出目合計×0.5を攻撃にも加える"
     },
     {
       "id": "疾手II",
@@ -247,30 +187,30 @@
     {
       "id": "間合II",
       "name": "間合II",
-      "description": "攻撃+3／被ダメ-2",
+      "description": "攻撃+3／敵の固定削り-4",
       "stats": [
         {
           "stat": "atk",
           "value": 3
         },
         {
-          "stat": "dmgTaken",
-          "value": -2
+          "stat": "penNeg",
+          "value": 4
         }
       ]
     },
     {
       "id": "間合III",
       "name": "間合III",
-      "description": "攻撃+5／被ダメ-3",
+      "description": "攻撃+5／敵の固定削り-6",
       "stats": [
         {
           "stat": "atk",
           "value": 5
         },
         {
-          "stat": "dmgTaken",
-          "value": -3
+          "stat": "penNeg",
+          "value": 6
         }
       ]
     },
@@ -290,8 +230,8 @@
       "id": "猛斧",
       "name": "猛斧",
       "roleName": "バーサーカー",
-      "roleDescription": "削り合い型。 ターンが進むほど、 双方が削れるほど、 そして自分が押されているほど強くなる。",
-      "description": "削った分だけ加速する。 先に入れた一撃が次の一撃を重くする。",
+      "roleDescription": "削り合い型。 ターンが進むほど、 敵の装甲が割れるほど、 そして自分が押されているほど強くなる。",
+      "description": "殴るほど敵の装甲が割れる。 長引くほど刃が通る。",
       "flavorText": "故買屋に出所を尋ねると、笑って値を下げた。下げた理由を聞くと、また笑った。",
       "category": "Weapon",
       "rarity": "SILVER",
@@ -299,10 +239,12 @@
       "diceMax": 6,
       "critRatePct": 10,
       "attackPower": 4,
+      "defense": [0, 1],
+      "armorPen": [4, 4],
       "basePrice": 12,
       "skills": [
         "猛りII",
-        "大鉈I"
+        "鎧砕きI"
       ],
       "family": "axe",
       "tier": 2
@@ -311,8 +253,8 @@
       "id": "血塗りの戦斧",
       "name": "血塗りの戦斧",
       "roleName": "バーサーカー",
-      "roleDescription": "削り合い型。 ターンが進むほど、 双方が削れるほど、 そして自分が押されているほど強くなる。",
-      "description": "被弾が力になる。 殴られるほど攻撃が積み上がる。",
+      "roleDescription": "削り合い型。 ターンが進むほど、 敵の装甲が割れるほど、 そして自分が押されているほど強くなる。",
+      "description": "押されているほど深く斬り込む。",
       "flavorText": "敗北の数だけ刃が育つ、と古参は言う。裏を返せば、勝ち続けてきた者にはまだ借りがある。",
       "category": "Weapon",
       "rarity": "GOLD",
@@ -320,11 +262,13 @@
       "diceMax": 6,
       "critRatePct": 15,
       "attackPower": 6,
+      "defense": [1, 1],
+      "armorPen": [6, 8],
       "basePrice": 16,
       "skills": [
         "猛りII",
-        "大鉈II",
-        "復讐"
+        "鎧砕きII",
+        "捨て身"
       ],
       "family": "axe",
       "tier": 3
@@ -333,8 +277,8 @@
       "id": "血帝廻天",
       "name": "血帝廻天",
       "roleName": "バーサーカー",
-      "roleDescription": "削り合い型。 ターンが進むほど、 双方が削れるほど、 そして自分が押されているほど強くなる。",
-      "description": "押されているときにこそ本領。 HP 割合で負けている間、 与ダメが跳ね上がる。",
+      "roleDescription": "削り合い型。 ターンが進むほど、 敵の装甲が割れるほど、 そして自分が押されているほど強くなる。",
+      "description": "守りを捨てて貫きに換える。 血を流すほど刃が重く、 斬るたびに血が戻る。",
       "flavorText": "旧アルフォニアの戦象論に、一撃で山の稜線を変えた戦鬼の項がある。山は今もそこにある。稜線は、確かに歪んでいる。",
       "category": "Weapon",
       "rarity": "LEGENDARY",
@@ -342,11 +286,13 @@
       "diceMax": 6,
       "critRatePct": 15,
       "attackPower": 8,
+      "defense": [2, 2],
+      "armorPen": [8, 10],
       "basePrice": 20,
       "skills": [
         "猛りIII",
-        "大鉈II",
-        "復讐",
+        "鎧砕きII",
+        "捨て身",
         "血令"
       ],
       "family": "axe",
@@ -356,7 +302,7 @@
       "id": "鍛鉄の剣",
       "name": "鍛鉄の剣",
       "roleName": "ソードマン",
-      "roleDescription": "一対一に特化した万能型。 攻防どちらにも穴が無く、 単体戦では明確に格上。 2 体戦では持ち味の半分が死ぬ。",
+      "roleDescription": "攻防一体の型。 出目を攻めと守りに分け続けるほど伸び、 長い戦いほど強い。 単体戦ではさらに上を取る。",
       "description": "一対一のとき、 間合いの分だけ確実に上を取る。",
       "flavorText": "名も刻印もない。打った者の顔も知らない。それでも、鋼は正直だ。",
       "category": "Weapon",
@@ -365,6 +311,8 @@
       "diceMax": 6,
       "critRatePct": 15,
       "attackPower": 3,
+      "defense": [1, 2],
+      "armorPen": [2, 2],
       "basePrice": 12,
       "skills": [
         "間合II",
@@ -377,8 +325,8 @@
       "id": "銀の長剣",
       "name": "銀の長剣",
       "roleName": "ソードマン",
-      "roleDescription": "一対一に特化した万能型。 攻防どちらにも穴が無く、 単体戦では明確に格上。 2 体戦では持ち味の半分が死ぬ。",
-      "description": "受けた次の一手が重い。 撃ち合いの往復で勝つ。",
+      "roleDescription": "攻防一体の型。 出目を攻めと守りに分け続けるほど伸び、 長い戦いほど強い。 単体戦ではさらに上を取る。",
+      "description": "受けながら斬る。 守りに回した目の半分が、 刃にも乗る。",
       "flavorText": "まともな刃に見える。だが拮抗した斬り合いの最中だけ、刀身がわずかに軽くなる。銀が好むのは、勝負が決まる寸前の一瞬らしい。",
       "category": "Weapon",
       "rarity": "GOLD",
@@ -386,6 +334,8 @@
       "diceMax": 6,
       "critRatePct": 25,
       "attackPower": 4,
+      "defense": [2, 3],
+      "armorPen": [4, 4],
       "basePrice": 16,
       "skills": [
         "間合II",
@@ -399,8 +349,8 @@
       "id": "デュランダル",
       "name": "デュランダル",
       "roleName": "ソードマン",
-      "roleDescription": "一対一に特化した万能型。 攻防どちらにも穴が無く、 単体戦では明確に格上。 2 体戦では持ち味の半分が死ぬ。",
-      "description": "単体戦に限れば、 会心も与ダメも被ダメもすべて有利側に傾く。",
+      "roleDescription": "攻防一体の型。 出目を攻めと守りに分け続けるほど伸び、 長い戦いほど強い。 単体戦ではさらに上を取る。",
+      "description": "攻めと守りを両立させ続けるほど、 一太刀ごとに重くなる。",
       "flavorText": "寂照の経に「滅して還らず」と詠われる一振りの図がある。「ここに至れた者なし」と注がある。これがそれだと言う者がいる。",
       "category": "Weapon",
       "rarity": "LEGENDARY",
@@ -408,12 +358,14 @@
       "diceMax": 6,
       "critRatePct": 35,
       "attackPower": 5,
+      "defense": [3, 4],
+      "armorPen": [6, 6],
       "basePrice": 20,
       "skills": [
         "間合III",
         "一対一II",
         "切り返し",
-        "果たし合い"
+        "不滅の刃"
       ],
       "family": "sword",
       "tier": 4
@@ -431,6 +383,8 @@
       "diceMax": 6,
       "critRatePct": 20,
       "attackPower": 2,
+      "defense": [0, 0],
+      "armorPen": [4, 6],
       "basePrice": 12,
       "skills": [
         "疾手II",
@@ -444,7 +398,7 @@
       "name": "処刑人の曲刀",
       "roleName": "アサシン",
       "roleDescription": "短期決戦型。 開幕から押し込み、 毒で削り、 瀕死を一息に断つ。 長引くと何も残らない。",
-      "description": "瀕死の敵に対する決定力を得る。 敵の最強ダイスも潰す。",
+      "description": "会心の一撃は鎧の隙間を抜ける。",
       "flavorText": "振るわれたあとで気づく。気づいた者に、次の一手は残されていない。",
       "category": "Weapon",
       "rarity": "GOLD",
@@ -452,11 +406,13 @@
       "diceMax": 6,
       "critRatePct": 30,
       "attackPower": 3,
+      "defense": [0, 0],
+      "armorPen": [8, 10],
       "basePrice": 16,
       "skills": [
         "疾手II",
         "毒手II",
-        "処刑"
+        "急所"
       ],
       "family": "dagger",
       "tier": 3
@@ -466,7 +422,7 @@
       "name": "ノクタリア",
       "roleName": "アサシン",
       "roleDescription": "短期決戦型。 開幕から押し込み、 毒で削り、 瀕死を一息に断つ。 長引くと何も残らない。",
-      "description": "短期決戦の極致。 過剰に削った分が次の戦闘の開幕へ持ち越される。",
+      "description": "短期決戦の極致。 瀕死の敵を一息に断つ。",
       "flavorText": "「夜」の名を持つ短剣。ある夜盗の手記には、振るうほど次の獲物が軽く感じた、とある。手記はそこで途切れている。",
       "category": "Weapon",
       "rarity": "LEGENDARY",
@@ -474,12 +430,14 @@
       "diceMax": 6,
       "critRatePct": 40,
       "attackPower": 4,
+      "defense": [0, 0],
+      "armorPen": [12, 14],
       "basePrice": 20,
       "skills": [
         "疾手III",
         "毒手II",
-        "処刑",
-        "蝕夜"
+        "急所",
+        "処刑"
       ],
       "family": "dagger",
       "tier": 4
@@ -488,8 +446,8 @@
       "id": "鉄盾",
       "name": "鉄盾",
       "roleName": "ナイト",
-      "roleDescription": "耐久型。 ブロックへ挿した分がそのまま反撃になるので、 守りが手数を兼ねる。",
-      "description": "反撃が重くなる。 守りが手数を兼ねる。",
+      "roleDescription": "受けて溜め、 まとめて放つ型。 全部を守りに回して溜め、 全部を攻めに回して放つ。",
+      "description": "溜めた盾を叩きつける。 全部を攻めに回したターン、 シールドが一撃に変わる。",
       "flavorText": "ヴェイランドの酒場でこの形の盾の話が出ると、たいてい誰かが袖をまくって傷を見せる。助かった傷だ。",
       "category": "Weapon",
       "rarity": "SILVER",
@@ -497,10 +455,12 @@
       "diceMax": 6,
       "critRatePct": 5,
       "attackPower": 2,
+      "defense": [2, 3],
+      "armorPen": [0, 0],
       "basePrice": 12,
       "skills": [
         "城壁II",
-        "反攻I"
+        "シールドバッシュI"
       ],
       "family": "shield",
       "tier": 2
@@ -509,8 +469,8 @@
       "id": "聖騎士の盾",
       "name": "聖騎士の盾",
       "roleName": "ナイト",
-      "roleDescription": "耐久型。 ブロックへ挿した分がそのまま反撃になるので、 守りが手数を兼ねる。",
-      "description": "3 ターンに 1 度、 どんな一撃も通らない。",
+      "roleDescription": "受けて溜め、 まとめて放つ型。 全部を守りに回して溜め、 全部を攻めに回して放つ。",
+      "description": "全部を守りに回したターン、 盾がもう一枚立つ。",
       "flavorText": "祝福を刻んだ守備騎士団は、もうない。それでも盾は祝福を憶えており、持ち手の前に立ち続ける。",
       "category": "Weapon",
       "rarity": "GOLD",
@@ -518,11 +478,13 @@
       "diceMax": 6,
       "critRatePct": 10,
       "attackPower": 3,
+      "defense": [4, 5],
+      "armorPen": [0, 0],
       "basePrice": 16,
       "skills": [
         "城壁II",
-        "反攻II",
-        "パリィ"
+        "シールドバッシュII",
+        "堅守の構え"
       ],
       "family": "shield",
       "tier": 3
@@ -531,8 +493,8 @@
       "id": "ドーンブリンガー",
       "name": "ドーンブリンガー",
       "roleName": "ナイト",
-      "roleDescription": "耐久型。 ブロックへ挿した分がそのまま反撃になるので、 守りが手数を兼ねる。",
-      "description": "尽きないシールド。 軽減を無視するダメージも、 まず盾が受け止める。",
+      "roleDescription": "受けて溜め、 まとめて放つ型。 全部を守りに回して溜め、 全部を攻めに回して放つ。",
+      "description": "一撃も通さずに受けきったとき、 受けた重さがそのまま返る。",
       "flavorText": "三年炎上の最後の夜、夜明けまで西門を守りきった盾がある、と従軍記は伝える。夜明けに何が来たのかは、書かれていない。帝都は、その日のうちに落ちた。",
       "category": "Weapon",
       "rarity": "LEGENDARY",
@@ -540,12 +502,14 @@
       "diceMax": 6,
       "critRatePct": 10,
       "attackPower": 4,
+      "defense": [6, 7],
+      "armorPen": [0, 0],
       "basePrice": 20,
       "skills": [
         "城壁III",
-        "反攻II",
-        "パリィ",
-        "衛士の慣い"
+        "シールドバッシュII",
+        "堅守の構え",
+        "黎明"
       ],
       "family": "shield",
       "tier": 4
@@ -561,6 +525,8 @@
       "diceMax": 6,
       "critRatePct": 0,
       "attackPower": 3,
+      "defense": [0, 0],
+      "armorPen": [99, 99],
       "basePrice": 20,
       "skills": [
         "画竜点睛",
@@ -623,19 +589,9 @@
       ]
     },
     {
-      "id": "内から落ちた城盾",
-      "name": "内から落ちた城盾",
-      "description": "攻撃時、残存シールドの80%を攻撃力に加算＋攻撃後にシールド+5。",
-      "flavorText": "城が落ちた朝も、正門の盾列だけは崩れていなかった。外側に傷はなく、内側には守衛たちの爪痕が幾重にも残っている。",
-      "category": "Passive",
-      "rarity": "LEGENDARY",
-      "basePrice": 10,
-      "skill": "内から落ちた城盾"
-    },
-    {
       "id": "騎士団の切り札",
       "name": "騎士団の切り札",
-      "description": "撃破可能な攻撃時、残存シールドを全て消費し、消費量と同値を攻撃力に加算。",
+      "description": "戦闘に1回、ターン開始時にHPが最大の30%未満なら、この戦闘で得たシールドの合計の50%をシールドとして得る。",
       "flavorText": "重装兵が盾を捨てるはずがない、捨てる時は逃げる時だ。その隙を閃光が穿つ。",
       "category": "Passive",
       "rarity": "GOLD",
@@ -1703,24 +1659,14 @@
       "tier": 4
     },
     {
-      "id": "囮",
-      "name": "囮",
-      "description": "マップで使う。今いる場所に置くと、1手番後から6手番のあいだ鳴り続け、半径4の（追跡中でない）徘徊エネミーを呼び寄せる。敵が着くと壊れる。",
-      "flavorText": "油を吸わせた布を巻いた鈴。火を付けると、風の無い坑道でも勝手に揺れ始める。",
-      "category": "Consumable",
-      "rarity": "BRONZE",
-      "basePrice": 6,
-      "consFamily": "decoy"
-    },
-    {
-      "id": "罠",
-      "name": "罠",
-      "description": "マップで使う。今いる場所に仕掛けると、踏んだ徘徊エネミーを1手番足止めし、その位置が分かる。連戦の数は減らない。",
-      "flavorText": "錆びた顎の鉄罠。噛む力より、鳴る音のほうが役に立つ。",
+      "id": "囮罠",
+      "name": "囮罠",
+      "description": "マップで使う。今いる点に仕掛けると、近くの追跡者の気を引き、踏んだ追跡者を2手番足止めする。8手番で効果が切れる。",
+      "flavorText": "錆びた顎の鉄罠に、油を吸わせた鈴を結ぶ。噛む力より、鳴る音のほうが役に立つ。",
       "category": "Consumable",
       "rarity": "BRONZE",
       "basePrice": 8,
-      "consFamily": "trap"
+      "consFamily": "lure"
     },
     {
       "id": "瞬間研磨剤",

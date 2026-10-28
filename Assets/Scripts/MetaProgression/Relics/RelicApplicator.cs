@@ -1,5 +1,5 @@
 using GameLoop;
-using InventorySystem.PassiveSkills;
+using ItemSystem.PassiveSkills;
 using UnityEngine;
 
 namespace MetaProgression.Relics
@@ -88,24 +88,7 @@ namespace MetaProgression.Relics
         /// 2026-08-03 に基準 3.0→2.0（[MetaBuffApplicator.GetCriticalMultiplier]）。
         /// 基準3.0 のときこの軸は段6 で実効 ×1.53 と 12軸で突出し、 最弱軸との差が 4.2 倍あった。</summary>
         public static float GetCritMultBonus(RunState run, CombatContext ctx)
-            => ValueOf(RelicAxis.CritMultPct, run, ctx) * 0.01f * 2.0f
-             + GetLambdaResonanceBonus(run, ctx);
-
-        /// <summary>〈Λ共鳴〉の会心倍率加算。 **Λ層で終えた戦闘数 × 段の値%** を、
-        /// CritMultPct と同じ「基準 2.0 に対する加算」へ換算して返す。
-        ///
-        /// 難易度 25 以上でしか出ない軸なので、 低難易度では常に 0。 Λ へ潜らなければ 0。
-        /// 賭けに乗った時だけ大きく返る形にしてある (期待値を平坦に薄めない)。
-        /// 例: 段6 (+14%/戦) で Λ を 10 戦こなすと +140% → 基準 2.0 に対し +2.8。</summary>
-        public static float GetLambdaResonanceBonus(RunState run, CombatContext ctx)
-        {
-            if (run == null) return 0f;
-            int step = StepOf(RelicAxis.LambdaResonance, run, ctx);
-            if (step <= 0) return 0f;
-            int perCombat = RelicAxisCatalog.ValueOf(RelicAxis.LambdaResonance, step);
-            return run.lambdaCombatsFinished * perCombat * 0.01f * 2.0f;
-        }
-
+            => ValueOf(RelicAxis.CritMultPct, run, ctx) * 0.01f * 2.0f;
         /// <summary>〈渇き〉物資が <see cref="RelicAxisCatalog.ProvisionBurnThreshold"/> 以下の間の
         /// 与ダメージ +N%。 条件を外れていれば 0。
         ///
@@ -196,9 +179,9 @@ namespace MetaProgression.Relics
             return RelicAxisCatalog.LastBreathLifesteal(step) * 0.01f;
         }
 
-        /// <summary>防御貫通+N%。 0.0〜0.28 を返す（ctx.armorPenPct へ加算）。</summary>
-        public static float GetArmorPenPct(RunState run, CombatContext ctx)
-            => ValueOf(RelicAxis.ArmorPenPct, run, ctx) * 0.01f;
+        /// <summary>防御貫通 +N (ADR-0013・2026-10-28 に % から点へ)。 ctx.playerArmorPen へ加算する。</summary>
+        public static int GetArmorPen(RunState run, CombatContext ctx)
+            => ValueOf(RelicAxis.ArmorPenPct, run, ctx);
 
         /// <summary>被ダメージ−N%。 **割合軽減**であって定額ではない
         /// （定額だと参照被ダメ 7.7/T に対し段6 が 78% 軽減になり序盤を無力化した・§24）。

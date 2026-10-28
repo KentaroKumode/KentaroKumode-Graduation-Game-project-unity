@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using GameLoop;
-using InventorySystem.PassiveSkills;
+using ItemSystem.PassiveSkills;
 using UnityEngine;
 
 namespace CombatSystem
@@ -115,8 +115,8 @@ namespace CombatSystem
                 case 4:   // 攻め: 与ダメ +25% / ×1.5 ＋会心確定
                     ctx.outgoingDamageMultiplier += triple ? AttackMulTriple : AttackMulPair;
                     if (triple) ctx.forceCritical = true;
-                    // T4: 敵の軽減 (防御) を無視する。
-                    if (t4) ctx.armorPenPct += 1f;
+                    // T4: 敵の防御を無視する (ADR-0013: 防御値をすべて剥がす貫通)。
+                    if (t4) ctx.playerArmorPen += DefenseFormula.IgnoreAll;
                     break;
 
                 case 5:   // 守り: 被ダメ −25% / −75%

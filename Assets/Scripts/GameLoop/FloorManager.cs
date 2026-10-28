@@ -80,7 +80,7 @@ namespace GameLoop
         public static int NodeRngIndex(int floor, MapSystem.MapNode node)
         {
             if (node == null) return 0;
-            // 自由移動の層 (2026-09-28): 点の添字で決める。 離散マップ (Λ・8 層) の行×列と重ならない帯へ置く。
+            // 自由移動の層 (2026-09-28): 点の添字で決める。 離散マップ (8 層) の行×列と重ならない帯へ置く。
             if (node.freeMap) return floor * 4096 + 1024 + node.index;
             // lane は収束ノードで -1 を取るので +1 して 0 以上に寄せる。
             return floor * 4096 + node.row * 8 + Mathf.Clamp(node.lane + 1, 0, 7);
@@ -128,18 +128,6 @@ namespace GameLoop
             int idx = NodeRngIndex(floor, node);
             bool elite = t == MapSystem.TileType.EliteBattle;
 
-            // **Λ 環状線は 2 体戦から除外する。** Λ は 6 層への強制通過点で、
-            //   「このノードを避ける」という選択肢が存在しない (§14-1 の環状線構造)。
-            //   選べない場所に賭けを置くと、 報酬 2 倍は賭けではなく固定の税になる。
-            //   判定は **素の node.type** で行う ── EffectiveType はエリート枝で
-            //   EliteBattle を返すので Λ を取りこぼす (§24 の oneShot 判定と同じ罠)。
-            if (node.type == MapSystem.TileType.LambdaRing)
-            {
-                node.encounterId = EncounterPresets.Generic.id;
-                node.encounterEnemyA = PickEnemyForNode(floor, idx, elite)?.id;
-                node.encounterEnemyB = null;
-                return;
-            }
 
             // **エリートは常に単体** (2026-09-14 リワーク)。 2 体戦と精鋭は別種の危険で、
             //   両方乗せると何が効いたか読めない。 2 体戦は通常マスの引き (報酬 ×2 の賭け) として残し、
@@ -183,7 +171,7 @@ namespace GameLoop
             //   7 層からボスを外して門の転移先へ移したが、 <b>ID は据え置く</b> ──
             //   学習ファイル・Tier 表・boss_tuning.json のキーが ID 基準で、
             //   改名すると過去データと切れる (3 層プールの boss_layer2/4 と同じ扱い)。
-            if (floor == 8) return BossIds.Layer7Prefix;
+            if (floor == 7) return BossIds.Layer7Prefix;     // 最終層 (深さ 7 = 5 層) の終点
             if (floor == 1 || floor == 5 || floor == 6)
                 return BossIds.LayerPrefix + floor;
             return null;   // 2 層 / 4 層 / 7 層 にボスマスは無い

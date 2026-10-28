@@ -179,10 +179,6 @@ namespace AutoTest.ParallelSweep
         /// <summary>[計装] FinishCombat の再入回数 (SkillDiag.FinishCombatReentry)。
         /// <b>0 でなければ層別の戦闘数・死亡数が二重に積まれている</b>。</summary>
         public long finishCombatReentry;
-        /// <summary>[計装] Λ 層でランが終わった件数。 bandScore の帯 6 から引いて 5層道中 を出す。
-        /// <b>戦闘側の計装 (SkillDiag) で引いてはいけない</b> ── あちらは救済で生き返ったランも
-        /// 数えるので、 ラン単位の帯から引くと符号が合わない (実測で 5層道中 が 0 になっていた)。</summary>
-        public int lambdaRunDeaths;
         public string[] dmgSrcNames = Array.Empty<string>();
         public double[] dmgSrcAll = Array.Empty<double>();
         public double[] dmgSrcBoss = Array.Empty<double>();
@@ -256,7 +252,7 @@ namespace AutoTest.ParallelSweep
                 "eliteDropRate", "normalDropRate", "combatGoldScale",
 
                 // 低HP 忌避ゲート (2026-09-15)。 BOT が戦闘を踏むかどうかを直接決める。
-                "navBlockCredit", "navSafetyFights", "navGoldComfort", "navTileDanger", "lambdaFarmTiles", "lambdaFarmSweep", "lambdaLv3Risk", "navDangerFloor", "valorSlayerOff", "saleBonusHiPct", "saleBonusLoPct", "rerollKeepsSale", "itemPriceAdd",
+                "navBlockCredit", "navSafetyFights", "navGoldComfort", "navTileDanger", "navDangerFloor", "valorSlayerOff", "saleBonusHiPct", "saleBonusLoPct", "rerollKeepsSale", "itemPriceAdd",
                 // リロールの量と代金 (2026-09-17)。 **上限と価格は別々に運ぶ** ── 棚が 12 枠固定で
                 //   リロールが補給を兼ねているので、 回数を削ると「金が浮く」と「供給が減る」が混ざる。
                 "rerollHardCap", "rerollPriceScale",

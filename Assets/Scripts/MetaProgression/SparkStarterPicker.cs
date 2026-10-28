@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using InventorySystem;
+using ItemSystem;
 using GameLoop;
 
 namespace MetaProgression
@@ -36,7 +36,8 @@ namespace MetaProgression
             ["bleed"] = new HashSet<string>
             {
                 "Sting","末頁の血花太刀","血日に澄む佩玉","退路喰いの狂刃","鋸引き刃の山刀",
-                "医書裏の開き針","GrievousI","GrievousII","先血の腕輪","血令",
+                "医書裏の開き針","GrievousI","GrievousII","先血の腕輪",
+                // 〈血令〉は 2026-10-28 に「防御→貫通＋血の盟約」へ変わり出血と無関係になったので外した。
             },
         };
 

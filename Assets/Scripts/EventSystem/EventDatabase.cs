@@ -70,7 +70,7 @@ namespace EventSystem
             EnsureInitialized();
             if (all.Count == 0 || run == null) return null;
 
-            int floor = run.currentFloor;
+            int floor = run.Depth;
             var available = new List<EventDefinition>();
             foreach (var ev in all)
             {

@@ -105,7 +105,6 @@ namespace AutoTest.Ultra
             //   Each of these replaces the run loop or the loadout. One left on from a
             //   previous menu action would silently measure something else entirely.
             runner.simBoss5Sweep = false;
-            runner.lambdaFarmSweep = false;
             runner.relicPresetSweep = false;
             runner.relicSweepBaselineOnly = false;
             runner.relicAxisSweep = false;
@@ -186,7 +185,7 @@ namespace AutoTest.Ultra
                                challengeSpec ?? string.Empty, StringComparison.Ordinal))
                 return Fail("runtime challenge spec mismatch", out reason);
 
-            if (runner.simBoss5Sweep || runner.lambdaFarmSweep || runner.relicPresetSweep
+            if (runner.simBoss5Sweep || runner.relicPresetSweep
                 || runner.relicSweepBaselineOnly || runner.relicAxisSweep
                 || runner.challengeAxisSweep || runner.challengeCategorySweep
                 || runner.personaSweep || runner.ascensionMode || runner.wiringSkillCompare)

@@ -167,11 +167,7 @@ namespace GameLoop
                 case RunChronicle.EventPrice:   return 70;
                 case RunChronicle.EventTake:    return 60;
                 case RunChronicle.EventRefuse:  return 60;
-
-                case RunChronicle.LambdaEnter:  return 45;
-                case RunChronicle.LambdaLeave:  return 45;
-                case RunChronicle.LambdaSink:   return 95;
-                default:                        return 0;
+                default:                        return 0;   // 旧 Λ層の F1〜F3 もここで読み飛ばす
             }
         }
 
@@ -208,13 +204,6 @@ namespace GameLoop
                 case RunChronicle.EventRefuse:
                 case RunChronicle.EventPrice:
                     return EventDigest(b.item, b.choice);
-
-                case RunChronicle.LambdaEnter:
-                    return "時間の狭間へ踏み込んだ。層の数え方が、そこでは通じなかった。";
-                case RunChronicle.LambdaLeave:
-                    return "時間の狭間から引き返した。持ち出せたものは、背負えるだけだった。";
-                case RunChronicle.LambdaSink:
-                    return "時間の狭間から出る道は、見つからなかった。";
 
                 case RunChronicle.EndDeath:
                     return $"{Kanji(b.floor)}層で、記録はそこで途切れている。";
@@ -309,7 +298,7 @@ namespace GameLoop
             if (string.IsNullOrEmpty(id)) return "それ";
             try
             {
-                var it = InventorySystem.ItemDatabase.Instance?.GetItem(id);
+                var it = ItemSystem.ItemDatabase.Instance?.GetItem(id);
                 if (it != null && !string.IsNullOrEmpty(it.displayName)) return it.displayName;
             }
             catch { }

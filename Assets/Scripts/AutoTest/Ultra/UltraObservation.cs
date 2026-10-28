@@ -13,7 +13,9 @@ namespace AutoTest.Ultra
     {
         Unknown = 0,
         Outpost, Battle, EliteBattle, Rest, Treasure, Shop, Event, Mystery,
-        Exchange, Trap, Boss, Gate, LambdaRing, LambdaExit, Other,
+        Exchange, Trap, Boss, Gate,
+        LambdaRing, LambdaExit,   // 旧 Λ層 (2026-10-28 廃止)。 序数を保つため残す
+        Other,
     }
 
     /// <summary>One tile, reduced to what is on screen.
@@ -70,8 +72,6 @@ namespace AutoTest.Ultra
         public int totalWins;
         public int totalTurns;
         public int totalCombatTurns;
-        public bool inLambda;
-        public int dimensionalDisturbance;
         public int convictionStage;
         public bool layer6Unlocked;
         public bool layer7Unlocked;
@@ -90,8 +90,6 @@ namespace AutoTest.Ultra
         public int[] timedBuffTurns = new int[0];
         public string[] timedDebuffKeys = new string[0];
         public int[] timedDebuffTurns = new int[0];
-        public string[] lambdaDebuffKeys = new string[0];
-        public int[] lambdaDebuffLevels = new int[0];
         public string[] diceFacePartIds = new string[0];
     }
 
@@ -158,10 +156,6 @@ namespace AutoTest.Ultra
                 "live RNG state; reading it is future knowledge"),
             new KeyValuePair<string, string>("RunState.chronicle",
                 "diagnostic log, not a game-visible quantity"),
-            new KeyValuePair<string, string>("RunState.lambdaPoolRemainingAll",
-                "undrawn pool size; the player cannot count the remaining deck"),
-            new KeyValuePair<string, string>("RunState.lambdaPoolRemainingFloored",
-                "same undrawn pool, floored variant"),
         };
     }
 
@@ -183,7 +177,7 @@ namespace AutoTest.Ultra
 
         private static void FillRun(UltraRunView view, GameLoop.RunState run)
         {
-            view.currentFloor = run.currentFloor;
+            view.currentFloor = run.Depth;
             view.maxFloor = run.maxFloor;
             view.normalClearFloor = run.normalClearFloor;
             view.bossDefeatedThisFloor = run.bossDefeatedThisFloor;
@@ -196,8 +190,6 @@ namespace AutoTest.Ultra
             view.totalWins = run.totalWins;
             view.totalTurns = run.totalTurns;
             view.totalCombatTurns = run.totalCombatTurns;
-            view.inLambda = run.inLambda;
-            view.dimensionalDisturbance = run.dimensionalDisturbance;
             view.convictionStage = run.convictionStage;
             view.layer6Unlocked = run.layer6Unlocked;
             view.layer7Unlocked = run.layer7Unlocked;
@@ -213,7 +205,6 @@ namespace AutoTest.Ultra
             view.permanentDebuffs = ToArray(run.permanentDebuffs);
             SplitCounts(run.timedBuffs, out view.timedBuffKeys, out view.timedBuffTurns);
             SplitCounts(run.timedDebuffs, out view.timedDebuffKeys, out view.timedDebuffTurns);
-            SplitCounts(run.lambdaDebuffs, out view.lambdaDebuffKeys, out view.lambdaDebuffLevels);
 
             var phenomena = new List<string>();
             if (run.activePhenomena != null)
@@ -297,8 +288,6 @@ namespace AutoTest.Ultra
                 case TileType.Trap: return UltraTileView.Trap;
                 case TileType.Boss: return UltraTileView.Boss;
                 case TileType.Gate: return UltraTileView.Gate;
-                case TileType.LambdaRing: return UltraTileView.LambdaRing;
-                case TileType.LambdaExit: return UltraTileView.LambdaExit;
                 default: return UltraTileView.Other;
             }
         }

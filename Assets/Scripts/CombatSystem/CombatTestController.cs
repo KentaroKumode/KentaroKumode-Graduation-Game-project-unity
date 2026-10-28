@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
-using InventorySystem;
-using InventorySystem.PassiveSkills;
+using ItemSystem;
+using ItemSystem.PassiveSkills;
 
 namespace CombatSystem
 {
@@ -137,20 +137,9 @@ namespace CombatSystem
                 Debug.LogWarning($"[CombatTest] 武器未装備のためフォールバック値を使用: {diceCount}d{diceMax} Crit:{critRatePct:0.#}%");
             }
 
-            // 装備ダイスの面を取得
-            int[] equippedDiceFaces = null;
-            var equipHandler = FindObjectOfType<ItemEquipHandler>();
-            if (equipHandler != null)
-            {
-                var equippedDice = equipHandler.GetCurrentEquipment(ItemCategory.Dice);
-                if (equippedDice != null && equippedDice.diceFaces != null)
-                {
-                    equippedDiceFaces = equippedDice.diceFaces;
-                }
-            }
-
+            // 面は素の 6 面 (出目パーツはラン側の RunState が持つ・テストでは使わない)
             CombatManager.Instance.StartCombat(
-                enemy, playerMaxHP, diceCount, diceMax, critRatePct / 100f, equippedDiceFaces);
+                enemy, playerMaxHP, diceCount, diceMax, critRatePct / 100f, null);
         }
 
         /// <summary>

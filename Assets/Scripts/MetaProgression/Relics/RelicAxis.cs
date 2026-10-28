@@ -17,7 +17,7 @@ namespace MetaProgression.Relics
         /// 既存セーブに載っている分は従来どおり働く。 経緯は §24。</summary>
         CritRatePct,
         CritMultPct,         // 会心倍率+N%      → ctx.criticalMultiplier (基準2.0・2026-08-03)
-        ArmorPenPct,         // 防御貫通+N%      → ctx.armorPenPct
+        ArmorPenPct,         // 防御貫通+N       → ctx.playerArmorPen (2026-10-28 に % から点へ・名前は int 保存のため据え置き)
         DamageReductionPct,  // 被ダメージ-N%    → 割合軽減 (新設フィールド)
         MaxHp,               // 最大HP+N        → run.playerMaxHP
         OpeningShield,       // 開幕シールド+N   → ctx.consShield
@@ -34,12 +34,12 @@ namespace MetaProgression.Relics
         //    **全て「条件付きで高分散」に揃える。** 期待値を平坦に薄めるのではなく、
         //    賭けに乗った時だけ大きく返る (均して薄める方向は最適方策下では期待値の平行移動に
         //    しかならない・§24)。 4 本それぞれ **賭ける資源が違う**:
-        //      Λ共鳴 = Λ探索 / 渇き = 物資 / 刻限 = 時間 / 背水 = HP
+        //      渇き = 物資 / 刻限 = 時間 / 背水 = HP  (Λ共鳴 = Λ探索 は 2026-10-28 に引退)
         //
         //    追加するときは RelicAxisCatalog.HighDifficultyOnly にも足すこと。
 
-        /// <summary>〈Λ共鳴〉Λ層で戦闘を 1 回終えるたび、 そのラン中ずっと会心倍率 +N%（累積）。
-        /// 賭けるのは **Λ探索** ── 突入には〈決意〉が要り、 潜れば 3 マスごとに恒久デバフを背負う。</summary>
+        /// <summary>〈Λ共鳴〉**2026-10-28 引退・効果 0**（Λ層の廃止に伴う）。 int 保存のため enum からは消さない。
+        /// 旧: Λ層で戦闘を 1 回終えるたび、 そのラン中ずっと会心倍率 +N%（累積）。</summary>
         LambdaResonance,
 
         /// <summary>〈渇き〉物資が上限の 40% 以下の間、 与ダメージ +N%。
@@ -140,7 +140,9 @@ namespace MetaProgression.Relics
         /// 敵会心バグ (§24) を直した後の単軸スイープで、 段9 (旧 +135%) が 5F 84/27・
         /// 7F 95/32 と全 16 軸で最強になり、 物差しの攻撃+9 (65/34) を大きく超えていた。</summary>
         private static readonly int[] CritMult    = { 11, 22, 33, 44, 55, 66,  77,  88,  99, 110 };
-        private static readonly int[] ArmorPen    = {  4,  8, 12, 16, 20, 24,  28,  32,  36,  40 };
+        /// <summary>防御貫通 +N (点)。 2026-10-28 に % (+4n%) から防御値の目盛りへ移した (ADR-0013)。
+        /// 余った貫通の与ダメ転用は撤去したので、 無装甲の敵には 0。 値は仮置き。</summary>
+        private static readonly int[] ArmorPen    = {  1,  2,  3,  4,  5,  6,   7,   8,   9,  10 };
         /// <summary>被ダメージ−N%。 **上限 30%** (2026-08-08 に 50% から引き下げ)。
         /// 単軸スイープ実測で段9 (旧 −45%) が 5層クリア 74.6% ＝ 物差しの攻撃+9 (59.4%) を
         /// 15pt 上回り、 改善/悪化 119/14 と全 16 軸で突出した。 ADR-0009 の相互攻撃モデルでは
@@ -198,7 +200,7 @@ namespace MetaProgression.Relics
         /// 追加したら RelicAxis の enum 末尾へ足し、 ここにも登録すること。</summary>
         public static readonly RelicAxis[] HighDifficultyOnly =
         {
-            RelicAxis.LambdaResonance, RelicAxis.ProvisionBurn,
+            RelicAxis.ProvisionBurn,
             RelicAxis.LongBattle,      RelicAxis.LastBreath,
         };
 
@@ -225,8 +227,10 @@ namespace MetaProgression.Relics
         ///      オーバーキルで捨てられる**。 キル所要ターンがほぼ縮まず敵の攻撃回数も減らない。
         ///      決定的に毎ターン乗る 防御貫通 (80/22) や 与ダメ% と結果が正反対になる。
         /// ②は逓減と無関係に残るので引退は維持するが、 <b>復帰を検討するなら測り直しから</b>
-        /// ── 上の 31/75 は逓減下の測定値で、 現在の条件では無効。 §24 参照。</summary>
-        public static readonly RelicAxis[] Retired = { RelicAxis.CritRatePct };
+        /// ── 上の 31/75 は逓減下の測定値で、 現在の条件では無効。 §24 参照。
+        ///
+        /// **Λ共鳴** (2026-10-28): Λ層の廃止で効果の源 (Λ層の戦闘数) が消えた。 既存セーブの分は効果 0。</summary>
+        public static readonly RelicAxis[] Retired = { RelicAxis.CritRatePct, RelicAxis.LambdaResonance };
 
         public static bool IsRetired(RelicAxis a)
         {
@@ -331,7 +335,7 @@ namespace MetaProgression.Relics
 
                 // ── 高難易度限定軸。 条件が効果の半分なので、 効果文に条件を必ず書く ──
                 case RelicAxis.LambdaResonance:
-                    return $"Λ層の戦闘 1 回ごとに 会心倍率+{ValueOf(axis, step)}%（累積）";
+                    return "（Λ層の廃止により効果なし）";
                 case RelicAxis.ProvisionBurn:
                     return $"物資 {ProvisionBurnThreshold} 以下の間 与ダメージ+{ValueOf(axis, step)}%"
                          + $"（開幕物資 {ProvisionBurnStartProvision}）";
@@ -346,7 +350,6 @@ namespace MetaProgression.Relics
                 case RelicAxis.DamagePct:
                 case RelicAxis.CritRatePct:
                 case RelicAxis.CritMultPct:
-                case RelicAxis.ArmorPenPct:
                     return $"{NameOf(axis)}+{ValueOf(axis, step)}%";
                 default:
                     return $"{NameOf(axis)}+{ValueOf(axis, step)}";

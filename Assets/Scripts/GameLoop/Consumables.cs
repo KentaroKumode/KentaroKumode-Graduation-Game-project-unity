@@ -1,7 +1,7 @@
 using UnityEngine;
 using CombatSystem;
-using InventorySystem;
-using InventorySystem.PassiveSkills;
+using ItemSystem;
+using ItemSystem.PassiveSkills;
 
 namespace GameLoop
 {
@@ -49,7 +49,7 @@ namespace GameLoop
                 // 会心+9 補正は サン=ジョリオラ撃破済みのランでのみ付与
                 if (run.defeatedSaintGeorges)
                 {
-                    ctx.nextTurnBuffs[InventorySystem.PassiveSkills.CombatContext.CritRateBuffKey] = 0.50f;
+                    ctx.nextTurnBuffs[ItemSystem.PassiveSkills.CombatContext.CritRateBuffKey] = 0.50f;
                     Debug.Log("[レイピア] コントラタック解除: 次T ダイス+1 / 会心率+50% (真の決闘術)");
                 }
                 else
@@ -112,11 +112,10 @@ namespace GameLoop
         {
             var ctx = ActiveCtx();
 
-            // 自由移動のマップで使う消耗品 (2026-09-28)。 **系統で判定する** ── id を綴りで読まない。
-            //   戦闘中・自由移動でない層では使えない (false = 消費しない)。
+            // 航行マップで使う消耗品 (2026-09-28)。 **系統で判定する** ── id を綴りで読まない。
+            //   戦闘中・航行マップでない層では使えない (false = 消費しない)。
             string mapFamily = ItemIds.ConsFamilyOf(id);
-            if (mapFamily == ItemIds.ConsDecoyFamily) return GameManager.Instance != null && GameManager.Instance.TryPlaceDecoy();
-            if (mapFamily == ItemIds.ConsTrapFamily)  return GameManager.Instance != null && GameManager.Instance.TryPlaceTrap();
+            if (mapFamily == ItemIds.ConsLureFamily) return GameManager.Instance != null && GameManager.Instance.TryPlaceLure();
 
             switch (id)
             {
@@ -217,25 +216,6 @@ namespace GameLoop
             return true;
         }
 
-        /// <summary>攻撃バフ (cons_atk_*)。 ダイス合計+bonus を turns ターン持続 (-1=戦闘中永続)。
-        /// 既存バフより短ければ turns は延長のみ、 bonus は加算。</summary>
-        private static bool AddTimedDice(RunState run, CombatContext ctx, int bonus, int turns)
-        {
-            if (ctx != null)
-            {
-                ctx.consDiceRoll += bonus;
-                if (turns == -1 || ctx.consDiceRollTurnsLeft == -1) ctx.consDiceRollTurnsLeft = -1;
-                else ctx.consDiceRollTurnsLeft = Mathf.Max(ctx.consDiceRollTurnsLeft, turns);
-            }
-            else if (run != null)
-            {
-                run.pendingConsDiceRoll += bonus;
-                if (turns == -1 || run.pendingConsDiceRollTurns == -1) run.pendingConsDiceRollTurns = -1;
-                else run.pendingConsDiceRollTurns = Mathf.Max(run.pendingConsDiceRollTurns, turns);
-            }
-            return true;
-        }
-
         /// <summary>与ダメ倍率バフ (cons_dmg_*)。 outgoing +pct% を turns ターン持続 (-1=戦闘中永続)。</summary>
         private static bool AddTimedDmgMult(RunState run, CombatContext ctx, int pct, int turns)
         {
@@ -287,44 +267,6 @@ namespace GameLoop
 
         // durationBattles: dice/crit/reduce が次戦闘以降も持続する戦闘数。 1=次戦闘1回のみ（既定）、 2=次戦闘から2回。
         // 戦闘中使用時は当戦闘も1戦としてカウント＝持ち越し戦闘数は durationBattles-1。
-        private static bool AddInt(RunState run, CombatContext ctx, string kind, int v, int durationBattles = 1)
-        {
-            if (ctx != null)
-            {
-                switch (kind)
-                {
-                    case "dice":    ctx.consDiceRoll += v; break;
-                    case "crit":    ctx.consCritPct += v / 100f; break;   // v は % 表記
-                    case "reduce":  ctx.consFlatReduce += v; break;
-                    case "dmgmult": ctx.consDmgMultPct += v; break;
-                }
-                // 戦闘中使用でもマルチバトル系は次戦闘以降にも持ち越す（残戦闘数 = duration - 1、 当戦闘分を控除）
-                if (run != null && durationBattles > 1)
-                {
-                    int carry = durationBattles - 1;
-                    switch (kind)
-                    {
-                        case "dice":   run.pendingConsDiceRoll = v;     run.pendingConsDiceRollBattles    = Mathf.Max(run.pendingConsDiceRollBattles, carry); break;
-                        case "crit":   run.pendingConsCritPct = v / 100f;         run.pendingConsCritBattles        = Mathf.Max(run.pendingConsCritBattles, carry); break;
-                        case "reduce": run.pendingConsFlatReduce = v;   run.pendingConsFlatReduceBattles  = Mathf.Max(run.pendingConsFlatReduceBattles, carry); break;
-                    }
-                }
-            }
-            else
-            {
-                switch (kind)
-                {
-                    case "dice":    run.pendingConsDiceRoll += v;
-                                    run.pendingConsDiceRollBattles    = Mathf.Max(run.pendingConsDiceRollBattles, durationBattles); break;
-                    case "crit":    run.pendingConsCritPct += v / 100f;
-                                    run.pendingConsCritBattles        = Mathf.Max(run.pendingConsCritBattles, durationBattles); break;
-                    case "reduce":  run.pendingConsFlatReduce += v;
-                                    run.pendingConsFlatReduceBattles  = Mathf.Max(run.pendingConsFlatReduceBattles, durationBattles); break;
-                    case "dmgmult": run.pendingConsDmgMultPct += v; break;
-                }
-            }
-            return true;
-        }
 
         // 2026-08-04: RestoreProvision は cons_food_* 専用だったため、 同系統の廃止とあわせて削除。
 

@@ -432,22 +432,21 @@ namespace MetaProgression
         /// 与ダメ +6.9% にしかならない (出力の 46%)。 2026-07-28 の増量は会心倍率 3.0 を
         /// 前提に較正されており、 08-03 の 3.0→2.0 差し戻しで宙に浮いていた。
         /// <b>貫通軸への転換も検討したが棄却</b> ── 実効会心率の分布が P90/P10 = 1.46 倍 と狭く
-        /// (逓減が分散ごと潰している) 倍率化してもビルド条件依存が成立しない。 貫通 (armorPenPct)
+        /// (逓減が分散ごと潰している) 倍率化してもビルド条件依存が成立しない。 貫通 (playerArmorPen)
         /// は敵軽減 0/15/35% に沿って条件依存するが、 「totalDmg に掛かる倍率」という点で
         /// 出力と同種で、 9 本目のトラックを持つ理由にならないと判断した。
         public static float PrecisionCritRatePct(int rank) => 0f;
 
         /// <summary>精密 r10 の極点: **逓減で捨てられた会心率を、会心倍率へ変換する。**
         ///
-        /// 会心率は <see cref="InventorySystem.PassiveSkills.CombatContext.ResolveCritRate"/> で
+        /// 会心率は <see cref="ItemSystem.PassiveSkills.CombatContext.ResolveCritRate"/> で
         /// 双曲線逓減するため、 積むほど「加算したのに実効に乗らない分」が増える。 r10 はその
         /// **捨てられた分 5 ポイントごとに会心倍率 +0.1** を返す (切り捨て)。
         ///
         /// 設計意図: 逓減の壁に当たっているビルドほど見返りが大きい。
         /// 精密を 10 段積み切った時点で壁に届くので、 **最後の 1 点を踏むかどうかが分岐**になる
         /// (他の数値系トラックが r10 に節目を持つのと同じ構造)。
-        /// **注意散漫 (Λ) の天井を適用する前の値で評価してはならない** ── デバフが
-        /// 精密ビルドへのバフに反転する。 呼び出し側は天井適用後の実効率を渡すこと。</summary>
+        /// 呼び出し側は逓減・天井適用後の実効率を渡すこと。</summary>
         /// <param name="critAddTotal">逓減前の会心率加算合計 (1.0 = +100%)。</param>
         /// <param name="effectiveRate">逓減・天井適用後の実効会心率。</param>
         public static float PrecisionOverflowMultiplier(int rank, float critAddTotal, float effectiveRate)

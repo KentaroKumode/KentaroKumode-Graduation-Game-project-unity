@@ -12,8 +12,8 @@ namespace MapSystem
     /// ここはそれを <see cref="FloorMap"/> / <see cref="MapNode"/> へ写して、 ゲーム側の規則
     /// （整備パネル〈剛胆〉の格上げ・挑戦デバフ〈偽の商人〉）を掛けるだけ。</para>
     ///
-    /// <para>層の構成は <see cref="FloorPlan"/>: 1 → 3 → 5 →(Λ)→ 6 → 7 → 8。
-    /// 1/3/5/6/7 層が自由移動（7 層の終点は〈門〉）、 8 層は内部でボス戦だけの層、 Λ 層は環状線のまま。</para>
+    /// <para>層の構成は <see cref="FloorPlan"/>: 1 → 3 → 5 → 6 → 7 → 8。
+    /// 1/3/5/6/7 層が自由移動（7 層の終点は〈門〉）、 8 層は内部でボス戦だけの層。</para>
     /// </summary>
     public static class MapGenerator
     {
@@ -141,38 +141,6 @@ namespace MapSystem
             map.bossNodeId = BossNodeId;
 
             map.AddConnection(StartNodeId, BossNodeId);
-
-            return map;
-        }
-
-        // ================================================================
-        //  Λ層（時間の狭間）— 環状線 + 中央(離脱)スポーク
-        // ================================================================
-        /// <summary>Λ層: 5層ボス撃破後〈決意〉以上で強制突入する周回エリア。
-        /// 環状線(S→A→B→S)の3マス + 中央(離脱)。中央は S からのみ到達可（最低1周を強制）。
-        /// 環状線マスは踏む度にエリート/固有イベントを抽選し、移動毎に「次元の乱れ」を蓄積する。
-        /// 3マス周回ごとに次元の乱れ+3＝デバフ1個の閾値に一致する設計。
-        /// **2026-09-28 の自由移動化の対象外**（Λ 層は今のまま）。</summary>
-        public static FloorMap GenerateLambda()
-        {
-            var map = new FloorMap { floor = 5, laneCount = 1, rowCount = 1 };
-
-            // 環状線3マス（S=スポーク, A, B）
-            map.AddNode(new MapNode("lambda_s", 0, 0, TileType.LambdaRing));
-            map.AddNode(new MapNode("lambda_a", 1, 0, TileType.LambdaRing));
-            map.AddNode(new MapNode("lambda_b", 2, 0, TileType.LambdaRing));
-            // 中央(離脱)
-            map.AddNode(new MapNode("lambda_center", 1, -1, TileType.LambdaExit));
-
-            map.startNodeId = "lambda_s";
-            map.bossNodeId = null;
-
-            // 環状: S→A→B→S（前方向のみの単純サイクル）
-            map.AddConnection("lambda_s", "lambda_a");
-            map.AddConnection("lambda_a", "lambda_b");
-            map.AddConnection("lambda_b", "lambda_s");
-            // スポーク: 中央へは S からのみ
-            map.AddConnection("lambda_s", "lambda_center");
 
             return map;
         }

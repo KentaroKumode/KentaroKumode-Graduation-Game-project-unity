@@ -37,7 +37,6 @@ namespace CombatSystem
         //   ボス前 Shop+Rest 確定配置、 09-06 の罠アイテム 50 品削除 (48%→65%) が積み上がった結果。
         //   上のコメントのとおり後半 3 段は**実質ボス専用** (雑魚戦の 8 割は S0 のまま) なので、
         //   戻しても道中は動かず、 天井に張り付いている **7 層ボスにだけ効く**。
-        //   Λ デバフ間隔の短縮 (GameManager.LambdaDebuffInterval 3→2) と同時に入れている。
         private static readonly float[] CurveStd = { 1.00f, 1.30f, 1.60f, 1.95f, 2.30f };
         private static readonly float[] CurveRush = { 1.00f, 1.40f, 1.80f, 2.20f, 2.60f };
         private static readonly float[] CurveGentle = { 1.00f, 1.15f, 1.30f, 1.45f, 1.60f };

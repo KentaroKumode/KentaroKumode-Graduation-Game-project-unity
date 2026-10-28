@@ -95,13 +95,6 @@ namespace MapSystem.Visual
         }
 
         // 親のワールド回転が「寝かせ」状態 (X ≈ ±90°) のときだけ true。
-        private static bool NeedsFlipY(Transform parent)
-        {
-            if (parent == null) return false;
-            float x = parent.eulerAngles.x;
-            if (x > 180f) x -= 360f;
-            return Mathf.Abs(Mathf.Abs(x) - 90f) < 10f;
-        }
 
         /// <summary>MapClickHandler から呼ばれる。Reachable 時のみ移動を通知する。</summary>
         public void OnClicked()

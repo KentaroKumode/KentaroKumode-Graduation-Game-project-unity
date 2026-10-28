@@ -1,10 +1,11 @@
 namespace MapSystem.FreeMove
 {
     /// <summary>
-    /// 徘徊エネミーの性質 (2026-09-28)。 層ごとに 1 つ引く。 正本は docs/GAME.md §5-9。
+    /// 追跡者の性質 (手番制・2026-10-18)。 層ごとに 1 つ引く。 参照実装は docs/design/map-grid-prototype.html の <c>PROFILES</c>。
     ///
-    /// <para>性質は「特性の組」で持つ ── 追跡中の速さ・見失うまでの手番・追跡中は魔石に反応しない・
-    /// 近ければ道を外れて飛び掛かる・使い魔 (巡航ミサイル) を放つ。 新しい性質は特性の組み合わせで足す。</para>
+    /// <para>追跡者は全員「巡回 → (痕跡に気づいて) 警戒 → (補足して) 追跡 → 見失う」を行い、
+    /// 性質は<b>味変</b>として使い魔の有無・足の速さ・捕まった時の戦闘の重さだけを変える。
+    /// 新しい性質は特性の組み合わせで足す。</para>
     ///
     /// <para><b>プレイヤーには性質が明かされない</b>（見え方から推理する）。 BOT も読まない。</para>
     ///
@@ -14,58 +15,57 @@ namespace MapSystem.FreeMove
     {
         public string id;
         public string displayName;
-        /// <summary>巡回の速さ (距離 / 手番)。</summary>
-        public float patrolSpeed = FreeMapParams.FoePatrolSpeed;
-        /// <summary>警戒・追跡の速さ (距離 / 手番)。</summary>
-        public float chaseSpeed = FreeMapParams.FoeChaseSpeed;
-        /// <summary>この手番数だけ察知できなければ見失う。</summary>
-        public int lostTurns = FreeMapParams.FoeLostTurns;
-        /// <summary>追跡中 (足止め中も) は魔石に一切反応しない。 察知された瞬間の合図 (Detected) も出ない。</summary>
-        public bool silentWhileChasing;
-        /// <summary>追跡中、 プレイヤーがこの距離以内なら道を外れて直進する (0 = しない)。 離れたら最寄りの点から道へ戻る。</summary>
-        public float lungeRange;
-        /// <summary>同時に飛ばせる使い魔の数 (0 = 放たない)。 察知した瞬間に 1 体放つ。</summary>
-        public int familiarMax;
-        /// <summary>使い魔を放ってから次を放てるまでの手番。</summary>
-        public int familiarCooldownTurns = FreeMapParams.FamiliarCooldownTurns;
+        public string description;
+        /// <summary>本体が 1 手番に進む歩数 (0 = 動かない)。</summary>
+        public int foeSteps = 1;
+        /// <summary>使い魔が 1 手番に進む歩数 (0 = 使い魔なし)。</summary>
+        public int familiarSteps;
+        /// <summary>補足している間、 一定間隔で使い魔を放つ。</summary>
+        public bool summons;
+        /// <summary>猟犬: 最初から居る足の速い使い魔。 倒しても消えず本体の元へ戻る。</summary>
+        public bool hound;
+        /// <summary>捕まった時の戦闘が重い。 追跡者の専用エネミーの強さに掛かる。</summary>
+        public bool heavyFight;
 
-        public bool LaunchesFamiliars => familiarMax > 0;
+        public bool HasFamiliars => summons || hound;
 
         public FoeProfile Clone() => (FoeProfile)MemberwiseClone();
 
-        // ── 既定の性質 ────────────────────────────────────────
-        /// <summary>徘徊者: 基準。 5 層以降は使い魔を 1 体放つ (<see cref="ForFloor"/>)。</summary>
-        public static FoeProfile Standard => new FoeProfile { id = "standard", displayName = "徘徊者" };
+        // ── 性質 ──────────────────────────────────────────────
 
-        /// <summary>猟犬: 追跡中の速さ 1.6・見失うまで 5 手番。 振り切るのに急ぐが要る。</summary>
-        public static FoeProfile Hound => new FoeProfile { id = "hound", displayName = "猟犬", chaseSpeed = 1.6f, lostTurns = 5 };
-
-        /// <summary>影: 追跡中は魔石に反応しない (察知された合図も出ない)。 追われていると気づいた時には近い。</summary>
-        public static FoeProfile Stalker => new FoeProfile { id = "stalker", displayName = "影", chaseSpeed = 1.2f, silentWhileChasing = true };
-
-        /// <summary>使役者: 使い魔を 2 体まで・4 手番ごとに放つ。 本体は遅い。</summary>
+        /// <summary>召喚者: 動かない。 補足すると数手ごとに使い魔を放つ。</summary>
         public static FoeProfile Summoner => new FoeProfile
-        { id = "summoner", displayName = "使役者", chaseSpeed = 0.8f, familiarMax = 2, familiarCooldownTurns = 4 };
+        { id = "summoner", displayName = "召喚者", description = "動かない。補足すると数手ごとに使い魔を放つ",
+          foeSteps = 0, familiarSteps = 1, summons = true };
 
-        /// <summary>飛び掛かり: 追跡中、 距離 2.5 以内なら道を外れて直進する。 道の外へ逃げても詰められる。</summary>
-        public static FoeProfile Pouncer => new FoeProfile { id = "pouncer", displayName = "飛び掛かり", chaseSpeed = 1.4f, lungeRange = 2.5f };
+        /// <summary>猟犬使い: 足の速い使い魔 (1 手に 2 歩) と 2 体で最短距離から追う。</summary>
+        public static FoeProfile Houndmaster => new FoeProfile
+        { id = "hound", displayName = "猟犬使い", description = "足の速い使い魔と2体で、最短距離から追ってくる",
+          foeSteps = 1, familiarSteps = 2, hound = true };
 
-        /// <summary>その層で引ける性質。 3 層は穏やかなものだけ (使役者は使い魔の顔見せ)。</summary>
+        /// <summary>疾走者: 使い魔なし。 1 手番に 2 歩。</summary>
+        public static FoeProfile Sprinter => new FoeProfile
+        { id = "sprinter", displayName = "疾走者", description = "使い魔は使わないが、1手に2歩動く",
+          foeSteps = 2 };
+
+        /// <summary>重装: 使い魔なし。 1 手番に 1 歩だが、 捕まった時の戦闘が重い。</summary>
+        public static FoeProfile Brute => new FoeProfile
+        { id = "brute", displayName = "重装", description = "使い魔は使わない。捕まった時の戦闘が重い",
+          foeSteps = 1, heavyFight = true };
+
+        /// <summary>その層で引ける性質。 3 層は疾走者を外す (1 手に 2 歩は初見で振り切れない)。</summary>
         public static FoeProfile[] PoolFor(int floor)
             => floor <= 3
-                ? new[] { Standard, Hound, Stalker, Summoner }
-                : new[] { Standard, Hound, Stalker, Summoner, Pouncer };
+                ? new[] { Summoner, Houndmaster, Brute }
+                : new[] { Summoner, Houndmaster, Sprinter, Brute };
 
         public const string RngKey = "map.free.profile";
 
-        /// <summary>層の性質を引く (GameRng のキー <see cref="RngKey"/>・連番 = 層)。 5 層以降は使い魔を持たない性質にも
-        /// 1 体ぶんの使い魔を持たせる ── 深い層の徘徊エネミーはどれも巡航ミサイルを撃てる。</summary>
+        /// <summary>層の性質を引く (GameRng のキー <see cref="RngKey"/>・連番 = 層)。</summary>
         public static FoeProfile ForFloor(int floor)
         {
             var pool = PoolFor(floor);
-            var p = pool[GameLoop.GameRng.Range(0, pool.Length, RngKey, floor)];
-            if (floor >= 5 && p.familiarMax == 0) p.familiarMax = 1;
-            return p;
+            return pool[GameLoop.GameRng.Range(0, pool.Length, RngKey, floor)];
         }
     }
 }

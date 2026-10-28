@@ -54,15 +54,12 @@ namespace GameLoop
         public const string ConsPowerFamily  = "dmg";    // 攻撃強化: 与ダメ +15/30/50/75% (戦闘中)
         public const string ConsProvisionFamily   = "provision";   // 物資回復: +50/100/150/200 (2026-08-05 追加・2026-09-28 ×10)
 
-        // === 自由移動のマップで使う消耗品 (2026-09-28) ===
-        //   **系統で判定する** (ConsFamilyOf)。 下の id 定数は「開始時に 1 個ずつ配る」「店で買う」の
+        // === 航行マップで使う消耗品 (2026-09-28・2026-10-18 に囮と罠を統合) ===
+        //   **系統で判定する** (ConsFamilyOf)。 下の id 定数は「開始時に配る」「店で買う」の
         //   跨ファイル参照のためだけにあり、 効果の分岐には使わない。
-        public const string ConsDecoyFamily = "decoy";   // 囮: 1 手番後から 6 手番、 半径 4 の敵を呼ぶ
-        public const string ConsTrapFamily  = "trap";    // 罠: 踏んだ徘徊エネミーを 1 手番足止め・位置が判明
-        /// <summary>囮 (items.json の id ＝ 表示名)。</summary>
-        public const string Decoy = "囮";
-        /// <summary>罠 (items.json の id ＝ 表示名)。</summary>
-        public const string Trap = "罠";
+        public const string ConsLureFamily = "lure";   // 囮罠: 近くの追跡者の気を引き、 踏んだ追跡者を足止めする
+        /// <summary>囮罠 (items.json の id ＝ 表示名)。 旧〈囮〉〈罠〉は LegacyIdMap が解決する。</summary>
+        public const string Lure = "囮罠";
 
         /// <summary>**回復は毎回並ぶ。** 消費枠は 3 で、 1 枠目を回復で固定する。
         /// 回復が並ばない店があると消費で耐久を賄う設計自体が成立しないため (2026-08-04)。</summary>
@@ -87,14 +84,14 @@ namespace GameLoop
         /// <para><b>id を組み立てない</b> (2026-09-22)。 id は表示名になったので
         /// prefix + 数字 では作れない。 items.json の <c>consFamily</c> / <c>tier</c> を引く。</para></summary>
         public static string ConsId(string family, int tier)
-            => InventorySystem.ItemDatabase.Instance?.GetConsumable(family, tier)?.id;
+            => ItemSystem.ItemDatabase.Instance?.GetConsumable(family, tier)?.id;
 
         /// <summary>消費アイテム id から Tier(1〜4) を取る。 消費アイテムでなければ 0。
         /// <b>id を綴りで切らない</b> (2026-09-22) ── items.json の tier を読む。</summary>
         public static int ConsTierOf(string itemId)
         {
             if (string.IsNullOrEmpty(itemId)) return 0;
-            var d = InventorySystem.ItemDatabase.Instance?.GetItem(itemId);
+            var d = ItemSystem.ItemDatabase.Instance?.GetItem(itemId);
             if (d == null || string.IsNullOrEmpty(d.consFamily)) return 0;
             return d.tier >= 1 && d.tier <= ConsumableMaxTier ? d.tier : 0;
         }
@@ -102,7 +99,7 @@ namespace GameLoop
         /// <summary>その id が消費アイテム系統 (旧 cons_*) か。</summary>
         public static bool IsConsumableFamilyItem(string itemId)
         {
-            var d = string.IsNullOrEmpty(itemId) ? null : InventorySystem.ItemDatabase.Instance?.GetItem(itemId);
+            var d = string.IsNullOrEmpty(itemId) ? null : ItemSystem.ItemDatabase.Instance?.GetItem(itemId);
             return d != null && !string.IsNullOrEmpty(d.consFamily);
         }
 
@@ -110,14 +107,14 @@ namespace GameLoop
         /// <b>接頭辞では判定しない</b> (2026-09-22)。</summary>
         public static string ConsFamilyOf(string itemId)
         {
-            var d = string.IsNullOrEmpty(itemId) ? null : InventorySystem.ItemDatabase.Instance?.GetItem(itemId);
+            var d = string.IsNullOrEmpty(itemId) ? null : ItemSystem.ItemDatabase.Instance?.GetItem(itemId);
             return string.IsNullOrEmpty(d?.consFamily) ? null : d.consFamily;
         }
 
         /// <summary>その id がユニーク品 (旧 uniq_*) か。 <b>昇華の対象外</b>。</summary>
         public static bool IsUniqueItem(string itemId)
         {
-            var d = string.IsNullOrEmpty(itemId) ? null : InventorySystem.ItemDatabase.Instance?.GetItem(itemId);
+            var d = string.IsNullOrEmpty(itemId) ? null : ItemSystem.ItemDatabase.Instance?.GetItem(itemId);
             return d != null && d.unique;
         }
     }

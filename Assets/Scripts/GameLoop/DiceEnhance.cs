@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using InventorySystem;
+using ItemSystem;
 
 namespace GameLoop
 {
@@ -27,7 +27,7 @@ namespace GameLoop
     public static class DiceEnhance
     {
         /// <summary>レア別の強化上限 Lv (通常ダイス)。</summary>
-        public static int MaxLevelFor(InventorySystem.ItemRarity rarity)
+        public static int MaxLevelFor(ItemSystem.ItemRarity rarity)
         {
             switch (rarity)
             {
@@ -40,7 +40,7 @@ namespace GameLoop
         }
 
         /// <summary>Lv → コスト (1 Lv 分だけ上げるのに必要な素材数)。</summary>
-        public static int CostForLevel(InventorySystem.ItemRarity rarity, int nextLevel)
+        public static int CostForLevel(ItemSystem.ItemRarity rarity, int nextLevel)
         {
             // nextLevel は "1 になるためのコスト" / "2 になるためのコスト" ... (1 始まり)
             switch (rarity)

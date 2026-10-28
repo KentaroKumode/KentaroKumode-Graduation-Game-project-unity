@@ -57,7 +57,11 @@ namespace CombatSystem
         }
         public int criticalNumerator;  // クリティカル確率の分子 (0～9)
         public int threat;              // 脅威値（勝利時でもプレイヤーが受ける削りダメ基準）
-        public float baseDefenseRate;   // 基礎防御（被ダメ%軽減 0～1。利刃で相殺される）
+        /// <summary>防御値 (ADR-0013)。 軽減率は <see cref="DefenseFormula"/>。 プレイヤーの貫通で固定値ずつ削られる。
+        /// 2026-10-28 に割合の <c>baseDefenseRate</c> から置き換えた (0.15 → 3 / 0.35 → 14)。</summary>
+        public int defense;
+        /// <summary>プレイヤーの防御を固定値で削る量 (ADR-0013)。 敵の攻撃値に掛かるプレイヤーの防御から引く。</summary>
+        public int armorPen;
         public List<EnemyPassiveEntry> passiveSkills; // パッシブスキル一覧
 
         // ---- パリィ予兆 ----

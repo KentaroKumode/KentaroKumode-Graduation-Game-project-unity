@@ -388,7 +388,7 @@ namespace MetaProgression
             // 低層から一律に削ると T1 と同じ初段負荷へ偏るため、上位 Tier は
             // 深層でのみ圧を加える。乱数を使わないのでペア比較のシード列も保つ。
             int startFloor = tier >= 3 ? 3 : 4;
-            return run.currentFloor >= startFloor ? 10 : 0;   // 2026-09-28: 物資 ×10
+            return run.Depth >= startFloor ? 10 : 0;   // 2026-09-28: 物資 ×10
         }
 
         /// <summary>物資上限への加算量 (負値)。 T1 −4 / T2 −8 / T3 −12。

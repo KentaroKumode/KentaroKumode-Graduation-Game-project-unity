@@ -1,0 +1,1663 @@
+{
+ "frame_thin": {
+  "attempts": [
+   {
+    "id": "4c6f24de-e03e-4dee-9c3b-d7308a6af56f",
+    "t": "01:24:46",
+    "state": "done",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\frame_thin\\a1\\00.png"
+    ]
+   }
+  ],
+  "crop": "frame_thin",
+  "size": [
+   86,
+   198
+  ],
+  "ctx": "a thin metal panel frame"
+ },
+ "frame_wide": {
+  "attempts": [
+   {
+    "id": "704694b8-1e6b-41a8-8aa7-9686923c434c",
+    "t": "01:25:13",
+    "state": "done",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\frame_wide\\a1\\00.png"
+    ]
+   }
+  ],
+  "crop": "frame_wide",
+  "size": [
+   288,
+   36
+  ],
+  "ctx": "a wide metal status strip frame"
+ },
+ "plate_row": {
+  "attempts": [
+   {
+    "id": "e4bdb10a-d008-41a3-b8e6-99307c7d1a5d",
+    "t": "01:25:28",
+    "state": "done",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_row\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_row\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_row\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_row\\a1\\03.png"
+    ]
+   }
+  ],
+  "crop": "row_plate",
+  "size": [
+   144,
+   24
+  ],
+  "ctx": "a list row plate"
+ },
+ "plate_tab": {
+  "attempts": [
+   {
+    "id": "1997c340-0ef4-4e2d-a608-94e939b06364",
+    "t": "01:25:44",
+    "state": "done",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "tab_plate",
+  "size": [
+   74,
+   24
+  ],
+  "ctx": "a small tab plate"
+ },
+ "plate_chip": {
+  "attempts": [
+   {
+    "id": "3807744d-60bd-42f7-9dec-95b5b5790516",
+    "t": "01:25:55",
+    "state": "done",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "chip",
+  "size": [
+   74,
+   24
+  ],
+  "ctx": "a small status chip plate"
+ },
+ "plate_banner": {
+  "attempts": [
+   {
+    "id": "3780c106-ebf2-4561-b915-70d2b7d1fb46",
+    "t": "01:26:07",
+    "state": "done",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_banner\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_banner\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_banner\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_banner\\a1\\03.png"
+    ]
+   }
+  ],
+  "crop": "banner",
+  "size": [
+   144,
+   24
+  ],
+  "ctx": "a warning banner plate"
+ },
+ "slot_empty": {
+  "attempts": [
+   {
+    "id": "710a8b6d-abff-419f-9539-1e7f2d32c31b",
+    "t": "01:26:13",
+    "state": "done",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\slot_empty\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\slot_empty\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\slot_empty\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\slot_empty\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\slot_empty\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\slot_empty\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\slot_empty\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\slot_empty\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\slot_empty\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\slot_empty\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\slot_empty\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\slot_empty\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\slot_empty\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\slot_empty\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\slot_empty\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\slot_empty\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "slot",
+  "size": [
+   64,
+   64
+  ],
+  "ctx": "an empty item slot"
+ },
+ "gauge_frame": {
+  "attempts": [
+   {
+    "id": "d9997f73-f982-415f-9305-e87533293d4a",
+    "t": "01:26:18",
+    "state": "done",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\gauge_frame\\a1\\00.png"
+    ]
+   }
+  ],
+  "crop": "gauge",
+  "size": [
+   256,
+   24
+  ],
+  "ctx": "a horizontal gauge trough"
+ },
+ "lamp_on": {
+  "attempts": [
+   {
+    "id": "c0f30575-82cb-4ed8-9001-80150a951eba",
+    "t": "01:26:26",
+    "state": "done",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_on\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_on\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_on\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_on\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_on\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_on\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_on\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_on\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_on\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_on\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_on\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_on\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_on\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_on\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_on\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_on\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "lamp",
+  "size": [
+   64,
+   64
+  ],
+  "ctx": "a lit indicator lamp"
+ },
+ "lamp_off": {
+  "attempts": [
+   {
+    "id": "323e6520-8734-46e1-9f33-7727694e201e",
+    "state": "done",
+    "t": "01:29:04",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_off\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_off\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_off\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_off\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_off\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_off\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_off\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_off\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_off\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_off\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_off\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_off\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_off\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_off\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_off\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\lamp_off\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "lamp",
+  "size": [
+   64,
+   64
+  ],
+  "ctx": "an unlit indicator lamp"
+ },
+ "round_btn": {
+  "attempts": [
+   {
+    "id": "e89df6f6-5723-40cb-b8ca-3a1699dc3e67",
+    "state": "done",
+    "t": "01:29:15",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\round_btn\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\round_btn\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\round_btn\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\round_btn\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\round_btn\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\round_btn\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\round_btn\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\round_btn\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\round_btn\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\round_btn\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\round_btn\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\round_btn\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\round_btn\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\round_btn\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\round_btn\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\round_btn\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "round_btn",
+  "size": [
+   64,
+   64
+  ],
+  "ctx": "a round push button"
+ },
+ "dial": {
+  "attempts": [
+   {
+    "id": "e1a5f0b8-0f67-4546-8437-12830c15aaf6",
+    "state": "done",
+    "t": "01:30:51",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\dial\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\dial\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\dial\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\dial\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\dial\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\dial\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\dial\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\dial\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\dial\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\dial\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\dial\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\dial\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\dial\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\dial\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\dial\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\dial\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "dial",
+  "size": [
+   64,
+   64
+  ],
+  "ctx": "a pressure gauge dial"
+ },
+ "die_1": {
+  "attempts": [
+   {
+    "id": "535cfe2b-ad6c-4a25-9a71-4aaa018d78bb",
+    "state": "done",
+    "t": "01:31:05",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_1\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_1\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_1\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_1\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_1\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_1\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_1\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_1\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_1\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_1\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_1\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_1\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_1\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_1\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_1\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_1\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "die",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a die face showing one pip"
+ },
+ "die_2": {
+  "attempts": [
+   {
+    "id": "bb54df0e-908a-4862-9728-f37df75a2402",
+    "state": "done",
+    "t": "01:32:16",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_2\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_2\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_2\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_2\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_2\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_2\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_2\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_2\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_2\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_2\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_2\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_2\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_2\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_2\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_2\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_2\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "die",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a die face showing two pips"
+ },
+ "die_3": {
+  "attempts": [
+   {
+    "id": "97f252fc-de43-442f-b12a-c0ebb266339c",
+    "state": "done",
+    "t": "01:34:31",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_3\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_3\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_3\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_3\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_3\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_3\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_3\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_3\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_3\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_3\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_3\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_3\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_3\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_3\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_3\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_3\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "die",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a die face showing three pips"
+ },
+ "die_4": {
+  "attempts": [
+   {
+    "id": "9935b0be-0c44-4de3-b8ef-1b7251a5a437",
+    "state": "done",
+    "t": "01:34:41",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_4\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_4\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_4\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_4\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_4\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_4\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_4\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_4\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_4\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_4\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_4\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_4\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_4\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_4\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_4\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_4\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "die",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a die face showing four pips"
+ },
+ "die_5": {
+  "attempts": [
+   {
+    "id": "c714a24f-3bab-4e1c-9544-ed36d0690852",
+    "state": "done",
+    "t": "01:35:53",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_5\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_5\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_5\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_5\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_5\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_5\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_5\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_5\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_5\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_5\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_5\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_5\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_5\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_5\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_5\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_5\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "die",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a die face showing five pips"
+ },
+ "die_6": {
+  "attempts": [
+   {
+    "id": "64756e42-16b0-4720-946a-505bbbdf976e",
+    "state": "done",
+    "t": "01:37:25",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_6\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_6\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_6\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_6\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_6\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_6\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_6\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_6\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_6\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_6\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_6\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_6\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_6\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_6\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_6\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\die_6\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "die",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a die face showing six pips"
+ },
+ "ic_bleed": {
+  "attempts": [
+   {
+    "id": "04408538-af5e-493d-a01d-830575c37afd",
+    "state": "done",
+    "t": "01:37:42",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bleed\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bleed\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bleed\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bleed\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bleed\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bleed\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bleed\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bleed\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bleed\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bleed\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bleed\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bleed\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bleed\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bleed\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bleed\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bleed\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a blood drop status icon"
+ },
+ "ic_poison": {
+  "attempts": [
+   {
+    "id": "663b8c18-cb21-46bf-9303-beaf803eed17",
+    "state": "done",
+    "t": "01:37:55",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_poison\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_poison\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_poison\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_poison\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_poison\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_poison\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_poison\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_poison\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_poison\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_poison\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_poison\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_poison\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_poison\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_poison\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_poison\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_poison\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a poison skull status icon"
+ },
+ "ic_slow": {
+  "attempts": [
+   {
+    "id": "39ed403a-b7ef-4adc-876e-fd09dd977c7b",
+    "state": "done",
+    "t": "01:39:53",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_slow\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_slow\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_slow\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_slow\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_slow\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_slow\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_slow\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_slow\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_slow\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_slow\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_slow\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_slow\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_slow\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_slow\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_slow\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_slow\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "an hourglass slow status icon"
+ },
+ "ic_fog": {
+  "attempts": [
+   {
+    "id": "c23e1b5a-ba96-45bc-865e-9a47d0e7b4c5",
+    "state": "done",
+    "t": "01:39:57",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_fog\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_fog\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_fog\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_fog\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_fog\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_fog\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_fog\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_fog\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_fog\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_fog\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_fog\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_fog\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_fog\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_fog\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_fog\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_fog\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a fog weather icon"
+ },
+ "ic_still": {
+  "attempts": [
+   {
+    "id": "504b662f-b4a7-4f96-804b-afbe53f51bca",
+    "state": "done",
+    "t": "01:40:59",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_still\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_still\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_still\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_still\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_still\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_still\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_still\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_still\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_still\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_still\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_still\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_still\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_still\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_still\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_still\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_still\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a calm still air weather icon"
+ },
+ "ic_sand": {
+  "attempts": [
+   {
+    "id": "3e5cd77e-4e29-485a-bf9e-5bc53f83a5e7",
+    "state": "done",
+    "t": "01:42:45",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sand\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sand\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sand\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sand\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sand\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sand\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sand\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sand\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sand\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sand\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sand\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sand\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sand\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sand\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sand\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sand\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a sandstorm weather icon"
+ },
+ "ic_snow": {
+  "attempts": [
+   {
+    "id": "f307c34f-cde2-49c9-b1aa-db1f05848338",
+    "state": "done",
+    "t": "01:46:30",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_snow\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_snow\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_snow\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_snow\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_snow\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_snow\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_snow\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_snow\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_snow\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_snow\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_snow\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_snow\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_snow\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_snow\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_snow\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_snow\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a snow weather icon"
+ },
+ "ic_hail": {
+  "attempts": [
+   {
+    "id": "f8874558-a4c6-46b7-8153-4ec6abd24238",
+    "state": "done",
+    "t": "01:47:32",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_hail\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_hail\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_hail\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_hail\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_hail\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_hail\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_hail\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_hail\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_hail\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_hail\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_hail\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_hail\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_hail\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_hail\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_hail\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_hail\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a hail weather icon"
+ },
+ "ic_crumble": {
+  "attempts": [
+   {
+    "id": "e5cf97ad-f5ba-4252-914e-0d08381b8062",
+    "state": "done",
+    "t": "01:47:45",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_crumble\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_crumble\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_crumble\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_crumble\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_crumble\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_crumble\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_crumble\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_crumble\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_crumble\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_crumble\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_crumble\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_crumble\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_crumble\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_crumble\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_crumble\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_crumble\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a crumbling ground weather icon"
+ },
+ "ic_sink": {
+  "attempts": [
+   {
+    "id": "8941c59d-d6bb-49e5-bb3a-e6062176b110",
+    "state": "done",
+    "t": "01:47:55",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sink\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sink\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sink\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sink\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sink\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sink\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sink\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sink\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sink\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sink\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sink\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sink\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sink\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sink\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sink\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_sink\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a sinking ground weather icon"
+ },
+ "ic_swordsman": {
+  "attempts": [
+   {
+    "id": "d8bcee08-77e9-4f0a-93b3-2931fe6c8df7",
+    "state": "done",
+    "t": "01:48:48",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_swordsman\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_swordsman\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_swordsman\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_swordsman\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_swordsman\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_swordsman\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_swordsman\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_swordsman\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_swordsman\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_swordsman\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_swordsman\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_swordsman\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_swordsman\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_swordsman\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_swordsman\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_swordsman\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a swordsman class emblem icon"
+ },
+ "ic_knight": {
+  "attempts": [
+   {
+    "id": "15fcf7d1-6dd3-4b1e-b284-8c1b305d05ed",
+    "state": "done",
+    "t": "01:48:54",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_knight\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_knight\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_knight\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_knight\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_knight\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_knight\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_knight\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_knight\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_knight\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_knight\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_knight\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_knight\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_knight\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_knight\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_knight\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_knight\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a knight shield class emblem icon"
+ },
+ "ic_berserker": {
+  "attempts": [
+   {
+    "id": "def048cc-cb3c-4da4-a8df-688fca9b5d1c",
+    "state": "done",
+    "t": "01:49:00",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_berserker\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_berserker\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_berserker\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_berserker\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_berserker\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_berserker\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_berserker\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_berserker\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_berserker\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_berserker\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_berserker\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_berserker\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_berserker\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_berserker\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_berserker\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_berserker\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a berserker axe class emblem icon"
+ },
+ "ic_assassin": {
+  "attempts": [
+   {
+    "id": "635f5282-1743-406f-9c81-9dd6916aab6c",
+    "state": "done",
+    "t": "01:49:52",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_assassin\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_assassin\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_assassin\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_assassin\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_assassin\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_assassin\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_assassin\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_assassin\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_assassin\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_assassin\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_assassin\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_assassin\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_assassin\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_assassin\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_assassin\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_assassin\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "an assassin dagger class emblem icon"
+ },
+ "ic_flare": {
+  "attempts": [
+   {
+    "id": "b009bfc5-1778-4d58-bcae-5b539f7a43d5",
+    "state": "done",
+    "t": "01:50:01",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_flare\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_flare\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_flare\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_flare\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_flare\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_flare\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_flare\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_flare\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_flare\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_flare\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_flare\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_flare\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_flare\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_flare\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_flare\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_flare\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a flare item icon"
+ },
+ "ic_decoy": {
+  "attempts": [
+   {
+    "id": "fc45b1a2-1fca-436a-9457-48b018096d07",
+    "state": "failed",
+    "t": "01:53:14"
+   },
+   {
+    "id": "92e4d3c1-ffa1-41d4-89f7-a2b6c1de46a6",
+    "state": "done",
+    "t": "02:09:25",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_decoy\\a2\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_decoy\\a2\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_decoy\\a2\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_decoy\\a2\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_decoy\\a2\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_decoy\\a2\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_decoy\\a2\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_decoy\\a2\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_decoy\\a2\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_decoy\\a2\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_decoy\\a2\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_decoy\\a2\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_decoy\\a2\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_decoy\\a2\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_decoy\\a2\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_decoy\\a2\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a decoy trap item icon"
+ },
+ "ic_supply": {
+  "attempts": [
+   {
+    "id": "cf1cefa6-4940-43a4-87ac-8ef5963d8a6d",
+    "state": "done",
+    "t": "01:53:18",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_supply\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_supply\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_supply\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_supply\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_supply\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_supply\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_supply\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_supply\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_supply\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_supply\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_supply\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_supply\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_supply\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_supply\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_supply\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_supply\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a supply crate item icon"
+ },
+ "ic_relic": {
+  "attempts": [
+   {
+    "id": "22bd3cbb-cdb1-4140-b96d-7f821895b6f1",
+    "state": "done",
+    "t": "01:54:49",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_relic\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_relic\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_relic\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_relic\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_relic\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_relic\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_relic\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_relic\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_relic\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_relic\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_relic\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_relic\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_relic\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_relic\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_relic\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_relic\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a relic gem item icon"
+ },
+ "ic_anvil": {
+  "attempts": [
+   {
+    "id": "237d86c9-b8c5-4403-a7d6-05b57aa2195d",
+    "state": "done",
+    "t": "01:54:57",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_anvil\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_anvil\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_anvil\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_anvil\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_anvil\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_anvil\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_anvil\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_anvil\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_anvil\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_anvil\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_anvil\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_anvil\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_anvil\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_anvil\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_anvil\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_anvil\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "an anvil smith icon"
+ },
+ "ic_gate": {
+  "attempts": [
+   {
+    "id": "264f56bd-1303-4a69-afd7-ffbe3e4fd96e",
+    "state": "done",
+    "t": "01:56:37",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_gate\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_gate\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_gate\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_gate\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_gate\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_gate\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_gate\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_gate\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_gate\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_gate\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_gate\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_gate\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_gate\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_gate\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_gate\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_gate\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a gate icon"
+ },
+ "ic_coin": {
+  "attempts": [
+   {
+    "id": "2ad19022-c95b-49c5-8427-b063fc9c260e",
+    "state": "done",
+    "t": "01:56:47",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_coin\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_coin\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_coin\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_coin\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_coin\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_coin\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_coin\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_coin\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_coin\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_coin\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_coin\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_coin\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_coin\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_coin\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_coin\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_coin\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a gold coin icon"
+ },
+ "ic_heart": {
+  "attempts": [
+   {
+    "id": "3d3fb169-23d2-4c2a-a17f-48d4409d676b",
+    "state": "done",
+    "t": "01:57:29",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_heart\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_heart\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_heart\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_heart\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_heart\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_heart\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_heart\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_heart\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_heart\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_heart\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_heart\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_heart\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_heart\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_heart\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_heart\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_heart\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a heart HP icon"
+ },
+ "ic_bolt": {
+  "attempts": [
+   {
+    "id": "8c3a54a3-6a63-4ca5-b639-76b908359cb4",
+    "state": "done",
+    "t": "01:57:36",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bolt\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bolt\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bolt\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bolt\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bolt\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bolt\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bolt\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bolt\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bolt\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bolt\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bolt\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bolt\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bolt\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bolt\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bolt\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_bolt\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a lightning bolt charge icon"
+ },
+ "ic_shield": {
+  "attempts": [
+   {
+    "id": "a93ad43a-15bb-47f6-85c5-7e05fb6f0a9e",
+    "state": "done",
+    "t": "02:00:29",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_shield\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_shield\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_shield\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_shield\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_shield\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_shield\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_shield\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_shield\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_shield\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_shield\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_shield\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_shield\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_shield\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_shield\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_shield\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_shield\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a block shield icon"
+ },
+ "ic_close": {
+  "attempts": [
+   {
+    "id": "04dcd1dd-9d1f-401e-9380-8ef0b5161dbc",
+    "state": "done",
+    "t": "02:02:46",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_close\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_close\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_close\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_close\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_close\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_close\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_close\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_close\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_close\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_close\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_close\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_close\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_close\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_close\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_close\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_close\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a close cross icon"
+ },
+ "ic_check": {
+  "attempts": [
+   {
+    "id": "9f4499bd-504e-4793-876f-5ec04bdc7615",
+    "state": "done",
+    "t": "02:02:52",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_check\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_check\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_check\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_check\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_check\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_check\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_check\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_check\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_check\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_check\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_check\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_check\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_check\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_check\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_check\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\ic_check\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "icon",
+  "size": [
+   48,
+   48
+  ],
+  "ctx": "a check mark icon"
+ },
+ "plate_row2": {
+  "attempts": [
+   {
+    "id": "2da2302b-2289-49ba-8c00-1b6f7e9dd718",
+    "state": "done",
+    "t": "02:27:53",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_row2\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_row2\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_row2\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_row2\\a1\\03.png"
+    ]
+   }
+  ],
+  "crop": "row_plate",
+  "size": [
+   144,
+   24
+  ],
+  "ctx": "an empty list row plate"
+ },
+ "plate_tab2": {
+  "attempts": [
+   {
+    "id": "b56a1f45-7a69-4b97-8aae-25b8e5f5ab7b",
+    "state": "done",
+    "t": "02:27:58",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab2\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab2\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab2\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab2\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab2\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab2\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab2\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab2\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab2\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab2\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab2\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab2\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab2\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab2\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab2\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_tab2\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "tab_plate",
+  "size": [
+   74,
+   24
+  ],
+  "ctx": "an empty tab plate"
+ },
+ "plate_chip2": {
+  "attempts": [
+   {
+    "id": "8ee3ba9f-e4b7-4893-a159-9385e2ef7530",
+    "state": "done",
+    "t": "02:28:02",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip2\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip2\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip2\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip2\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip2\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip2\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip2\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip2\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip2\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip2\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip2\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip2\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip2\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip2\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip2\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_chip2\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "chip",
+  "size": [
+   74,
+   24
+  ],
+  "ctx": "an empty status chip plate"
+ },
+ "plate_banner2": {
+  "attempts": [
+   {
+    "id": "95541431-655c-4692-a5bf-2772b5435406",
+    "state": "done",
+    "t": "02:28:09",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_banner2\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_banner2\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_banner2\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\plate_banner2\\a1\\03.png"
+    ]
+   }
+  ],
+  "crop": "banner",
+  "size": [
+   144,
+   24
+  ],
+  "ctx": "an empty hazard stripe banner plate"
+ },
+ "btn_plain": {
+  "attempts": [
+   {
+    "id": "cb167a35-2e13-401a-94b2-7edcc46b0340",
+    "state": "done",
+    "t": "03:43:02",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_plain\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_plain\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_plain\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_plain\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_plain\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_plain\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_plain\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_plain\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_plain\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_plain\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_plain\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_plain\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_plain\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_plain\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_plain\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_plain\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "btn",
+  "size": [
+   74,
+   24
+  ],
+  "ctx": "an empty push button"
+ },
+ "btn_go2": {
+  "attempts": [
+   {
+    "id": "245b1f27-465f-4e88-b0de-994d12b91fcf",
+    "state": "done",
+    "t": "03:43:10",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_go2\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_go2\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_go2\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_go2\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_go2\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_go2\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_go2\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_go2\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_go2\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_go2\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_go2\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_go2\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_go2\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_go2\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_go2\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\btn_go2\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "go",
+  "size": [
+   74,
+   24
+  ],
+  "ctx": "an empty confirm button"
+ },
+ "term_atk": {
+  "attempts": [
+   {
+    "id": "354c42dd-70a3-4a79-a06a-fa5e054e0cdc",
+    "state": "done",
+    "t": "03:43:15",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_atk\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_atk\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_atk\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_atk\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_atk\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_atk\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_atk\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_atk\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_atk\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_atk\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_atk\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_atk\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_atk\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_atk\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_atk\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_atk\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "round_btn",
+  "size": [
+   74,
+   24
+  ],
+  "ctx": "an empty attack button"
+ },
+ "term_blk": {
+  "attempts": [
+   {
+    "id": "54bf04d1-6ac3-4b9f-ba08-e4ab058f1783",
+    "state": "done",
+    "t": "03:43:28",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_blk\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_blk\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_blk\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_blk\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_blk\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_blk\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_blk\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_blk\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_blk\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_blk\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_blk\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_blk\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_blk\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_blk\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_blk\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_blk\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "blue",
+  "size": [
+   74,
+   24
+  ],
+  "ctx": "an empty block button"
+ },
+ "term_chg": {
+  "attempts": [
+   {
+    "id": "7d7ca261-463b-4538-89c3-7026ee21076a",
+    "state": "done",
+    "t": "03:43:37",
+    "saved": [
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_chg\\a1\\00.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_chg\\a1\\01.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_chg\\a1\\02.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_chg\\a1\\03.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_chg\\a1\\04.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_chg\\a1\\05.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_chg\\a1\\06.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_chg\\a1\\07.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_chg\\a1\\08.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_chg\\a1\\09.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_chg\\a1\\10.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_chg\\a1\\11.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_chg\\a1\\12.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_chg\\a1\\13.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_chg\\a1\\14.png",
+     "C:\\Users\\kumod\\My project\\Tools\\gui_gen\\out\\term_chg\\a1\\15.png"
+    ]
+   }
+  ],
+  "crop": "amber",
+  "size": [
+   74,
+   24
+  ],
+  "ctx": "an empty charge button"
+ }
+}

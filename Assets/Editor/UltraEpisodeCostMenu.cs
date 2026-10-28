@@ -212,7 +212,7 @@ namespace AutoTest.EditorTools
 
                 Debug.Log(string.Format(
                     "[UltraCost] checkpoint: {0}層 HP {1}/{2} 所持金 {3} / 合法手 {4}",
-                    run.currentFloor, run.playerHP, run.playerMaxHP, run.coins, actions.Count));
+                    run.Depth, run.playerHP, run.playerMaxHP, run.coins, actions.Count));
 
                 // Re-veil per rollout index: each sample must see a differently-believed board.
                 var cache = new Dictionary<int, UltraResumePayload>();

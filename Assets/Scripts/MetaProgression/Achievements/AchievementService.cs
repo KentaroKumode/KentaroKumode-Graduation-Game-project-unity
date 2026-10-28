@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using CombatSystem;
 using GameLoop;
-using InventorySystem.PassiveSkills;
+using ItemSystem.PassiveSkills;
 using MetaProgression.Relics;
 using UnityEngine;
 
@@ -185,7 +185,7 @@ namespace MetaProgression.Achievements
 
             bool boss = !string.IsNullOrEmpty(result.enemyId) && result.enemyId.StartsWith("boss_layer", StringComparison.Ordinal);
             if (!boss) return;
-            int floor = state.currentFloor;
+            int floor = state.Depth;
             if (floor == 1) Unlock(AchievementCatalog.Boss1);
             if (floor == 5)
             {
@@ -201,7 +201,7 @@ namespace MetaProgression.Achievements
                 if (!run.purchased) Unlock(AchievementCatalog.NoPurchaseBoss6);
                 if (!run.rerolled) Unlock(AchievementCatalog.NoRerollBoss6);
                 if (state.coins == 0) Unlock(AchievementCatalog.ZeroGoldBoss6);
-                float blaze = context != null ? context.GetAccumulated(InventorySystem.PassiveSkills.Effects.BlazeBrand.StackKey) : 0f;
+                float blaze = context != null ? context.GetAccumulated(ItemSystem.PassiveSkills.Effects.BlazeBrand.StackKey) : 0f;
                 if (blaze <= 0f) Unlock(AchievementCatalog.HiddenNoBlazeBoss6);
             }
             if (state.totalCombatTurns == 124) Unlock(AchievementCatalog.HiddenTurn124);
@@ -249,7 +249,7 @@ namespace MetaProgression.Achievements
         {
             if (!Ready || state == null || state.playerHP <= 0) return;
             if (run.damageTaken > run.startMaxHp * 10) Unlock(AchievementCatalog.HiddenTheseus);
-            if (state.currentFloor >= 7 && state.bossDefeatedThisFloor)
+            if (state.Depth >= 7 && state.bossDefeatedThisFloor)
             {
                 Unlock(AchievementCatalog.Clear7);
                 if (!run.relicEquipped && !run.usedConsumable) Unlock(AchievementCatalog.NoRelicConsumableClear7);

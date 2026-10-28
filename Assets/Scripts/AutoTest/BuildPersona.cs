@@ -86,14 +86,14 @@ namespace AutoTest
                 {
                     "二拍目の心臓",
                     "IndomitableI", "IndomitableII", "敗残兵の部隊章", "IndomitableIV",
-                    "ShieldBashI", "ShieldBashII", "ShieldBashIII", "内から落ちた城盾",
-                    "鏡返しの小盾", "衛士の慣い", "パリィ",
+                    "シールドバッシュI", "シールドバッシュII", "シールドバッシュIII",   // 2026-10-28: 盾家系へ一本化
+                    "鏡返しの小盾", "黎明", "堅守の構え",
                     "戻り数なき革胸当て", "FortitudeII", "FortitudeIII", "FortitudeIV",
                 },
                 [BuildPersona.Berserk] = new HashSet<string>
                 {
-                    "退路喰いの狂刃", "衛士の慣い",
-                    "直さずの鉢金", "二拍目の心臓", "復讐",
+                    "退路喰いの狂刃",
+                    "直さずの鉢金", "二拍目の心臓", "捨て身", "血令",   // 2026-10-28: 衛士の慣い・復讐は削除
                     "MightIV", "烈刃", "一人抱えの破城槌", // 火力積み合わせ
                     // Abyss は curse_t4 (2026-07-17 削除) 依存で参照消失、除去。
                 },
@@ -132,8 +132,8 @@ namespace AutoTest
             {
                 [BuildPersona.Shield] = new HashSet<string>
                 {
-                    "ShieldBashI", "ShieldBashII", "ShieldBashIII", "内から落ちた城盾",
-                    "騎士団の切り札", // 2026-07-16: 撃破局面のフィニッシャー
+                    "シールドバッシュI", "シールドバッシュII", "シールドバッシュIII",
+                    "騎士団の切り札", // 2026-10-28 リワーク: 低 HP で一度だけシールドを取り戻す
                 },
             };
 
@@ -150,7 +150,7 @@ namespace AutoTest
         /// <summary>アイテム ID からその内部の passive SkillId を列挙 (ItemDatabase 経由・null 安全)。</summary>
         public static IEnumerable<string> GetPassiveIds(string itemId)
         {
-            var db = InventorySystem.ItemDatabase.Instance;
+            var db = ItemSystem.ItemDatabase.Instance;
             var data = db != null ? db.GetItem(itemId) : null;
             if (data?.passiveSkills == null) yield break;
             foreach (var p in data.passiveSkills)

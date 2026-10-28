@@ -42,7 +42,7 @@ namespace AutoTest.EditorTests.Ultra
                 weaponMaterials = 9,
                 equippedWeaponId = "血塗りの戦斧",
                 equippedDiceId = "dice_star",
-                inLambda = true,
+                layer6Unlocked = true,
                 convictionStage = 2,
                 sealedRoleMask = 0b1010,
             };
@@ -55,7 +55,6 @@ namespace AutoTest.EditorTests.Ultra
             run.seenOnceEvents.Add("ev_ghost_duel");
             run.timedBuffs["buff_focus"] = 3;
             run.timedDebuffs["debuff_bleed"] = 2;
-            run.lambdaDebuffs["lambda_slow"] = 1;
             run.shopPurchasedCounts["血塗りの戦斧"] = 1;
             run.diceFaceParts.Clear();   // 新しい RunState は素の面 {2,3,4,5} を持つ (ADR-0011)。 1 枚だけにして往復を見る
             run.diceFaceParts.Add(new DiceFaceParts.Part
@@ -91,7 +90,6 @@ namespace AutoTest.EditorTests.Ultra
             Assert.That(restored.seenOnceEvents, Is.EquivalentTo(original.seenOnceEvents));
             Assert.That(restored.timedBuffs["buff_focus"], Is.EqualTo(3));
             Assert.That(restored.timedDebuffs["debuff_bleed"], Is.EqualTo(2));
-            Assert.That(restored.lambdaDebuffs["lambda_slow"], Is.EqualTo(1));
             Assert.That(restored.shopPurchasedCounts["血塗りの戦斧"], Is.EqualTo(1));
         }
 
@@ -133,7 +131,7 @@ namespace AutoTest.EditorTests.Ultra
             Assert.That(restored.playerHP, Is.EqualTo(51));
             Assert.That(restored.coins, Is.EqualTo(137));
             Assert.That(restored.equippedWeaponId, Is.EqualTo("血塗りの戦斧"));
-            Assert.That(restored.inLambda, Is.True);
+            Assert.That(restored.layer6Unlocked, Is.True);
             Assert.That(restored.sealedRoleMask, Is.EqualTo(0b1010));
             Assert.That(restored.gateFlaws, Is.EqualTo(original.gateFlaws));
         }
@@ -142,7 +140,7 @@ namespace AutoTest.EditorTests.Ultra
         [Test]
         public void RestoringOverADirtyTargetClearsWhatWasThere()
         {
-            var dirty = new RunState { coins = 9999, currentFloor = 7 };
+            var dirty = new RunState { coins = 9999, currentFloor = 5 };
             dirty.ownedFlags.Add("stale_flag");
             dirty.timedBuffs["stale_buff"] = 5;
 

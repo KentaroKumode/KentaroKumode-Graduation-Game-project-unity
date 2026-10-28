@@ -89,19 +89,19 @@ namespace GameLoop
             if (run?.ownedPassiveItems == null) return false;
             if (CountInInventory(run) < All.Length) return false;
             Transforms++;
-            TransformsByFloor[UnityEngine.Mathf.Clamp(run.currentFloor, 0, 8)]++;
+            TransformsByFloor[UnityEngine.Mathf.Clamp(run.Depth, 0, 8)]++;
 
             // 後ろから消して index ズレを防ぐ（刻印リストも PassiveAddHelper.RemoveAt が同期）
             for (int i = run.ownedPassiveItems.Count - 1; i >= 0; i--)
                 if (IsDance(run.ownedPassiveItems[i]))
-                    InventorySystem.Helpers.PassiveAddHelper.RemoveAt(run, i);
+                    ItemSystem.Helpers.PassiveAddHelper.RemoveAt(run, i);
 
-            InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(run, Finale);
+            ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, Finale);
 
             // 取得時シード: 4枚集約完成への報酬として現在層 × 3 スタックを初期付与 (後半取得偏重の救済)
-            var bd = InventorySystem.PassiveSkills.PassiveSkillRegistry.Get("ブレイドダンス")
-                     as InventorySystem.PassiveSkills.Effects.BladeDance;
-            bd?.SeedOnAcquire(run.currentFloor);
+            var bd = ItemSystem.PassiveSkills.PassiveSkillRegistry.Get("ブレイドダンス")
+                     as ItemSystem.PassiveSkills.Effects.BladeDance;
+            bd?.SeedOnAcquire(run.Depth);
 
             UnityEngine.Debug.Log("[剣の舞] インベントリに4枚集約 → 全消滅し〈ブレイドダンス〉に変化");
             return true;

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using EventSystem.TimedEffects;
 using GameLoop;
-using InventorySystem;
+using ItemSystem;
 using MapSystem;
 
 namespace EventSystem
@@ -169,7 +169,7 @@ namespace EventSystem
                         : eff.param;
                     if (!string.IsNullOrEmpty(id))
                     {
-                        InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(run, id);
+                        ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, id);
                         result.log.Add($"パッシブアイテム獲得: {ResolveLabel(id)}");
                         ApplyPassiveAcquisitionBonus(run, id, result);
                     }
@@ -193,7 +193,7 @@ namespace EventSystem
                     // カテゴリ未指定: パッシブ扱い（イベントで [固有名] 指定された場合）
                     if (!string.IsNullOrEmpty(eff.param))
                     {
-                        InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(run, eff.param);
+                        ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, eff.param);
                         result.log.Add($"アイテム獲得: {ResolveLabel(eff.param)}");
                         ApplyPassiveAcquisitionBonus(run, eff.param, result);
                     }
@@ -219,7 +219,7 @@ namespace EventSystem
                     {
                         int idx = run.ownedPassiveItems.IndexOf(eff.param);
                         if (idx >= 0)
-                            InventorySystem.Helpers.PassiveAddHelper.RemoveAt(run, idx);
+                            ItemSystem.Helpers.PassiveAddHelper.RemoveAt(run, idx);
                         result.log.Add($"パッシブアイテム廃棄: {eff.param}");
                     }
                     break;
@@ -306,7 +306,7 @@ namespace EventSystem
             string id = PickRandomItemId(ItemCategory.Passive, run);
             if (!string.IsNullOrEmpty(id))
             {
-                InventorySystem.Helpers.PassiveAddHelper.AddPassiveItem(run, id);
+                ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, id);
                 ApplyPassiveAcquisitionBonus(run, id, result);
             }
             run.weaponMaterials += 8;
@@ -324,7 +324,7 @@ namespace EventSystem
             var pool = db.GetItemsByCategory(category);
             if (pool == null || pool.Count == 0) return null;
 
-            var filtered = pool.FindAll(InventorySystem.Shop.EventOnlyItemFilter.IsAllowed);
+            var filtered = pool.FindAll(ItemSystem.Shop.EventOnlyItemFilter.IsAllowed);
             if (filtered.Count == 0) return null;
 
             // パッシブはラン重複排除（消費は使い切る前提なので重複可）。枯渇時は元プール（重複許可）。
@@ -338,7 +338,7 @@ namespace EventSystem
                 if (dd.Count > 0) filtered = dd;
             }
 
-            var picked = InventorySystem.RarityWeightedPicker.Pick(filtered);
+            var picked = ItemSystem.RarityWeightedPicker.Pick(filtered);
             return picked?.internalName;
         }
 

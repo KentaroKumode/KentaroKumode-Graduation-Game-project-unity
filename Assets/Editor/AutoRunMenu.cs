@@ -17,7 +17,6 @@ namespace AutoTest.EditorTools
         private const string ScenePath = "Assets/Scenes/SampleScene2.unity";
         private const string PendingKey = "AutoRun.PendingCount";
         private const string SweepKey   = "AutoRun.Boss5Sweep";      // SessionState
-        private const string LambdaKey  = "AutoRun.LambdaFarmSweep"; // SessionState
         private const string LoopKey    = "AutoRun.AutoLoopBatches"; // SessionState
         private const string MutualKey  = "AutoRun.UseMutualAttack"; // EditorPrefs
         private const string ChalSweepKey  = "AutoRun.ChalSweep";  // SessionState (固定難易度スイープ)
@@ -594,12 +593,6 @@ namespace AutoTest.EditorTools
 
         [MenuItem("Tools/AutoRun/5Fボス勝率スイープ", priority = 10)]
         public static void RunBoss5Sweep() => Launch(300, sweep: true);
-
-        // Λ突入には〈決意〉が要るため、 分母になるのは全ランの 6 割程度。 さらに 7層クリアは
-        // 3 割前後の低頻度事象なので、 300 ランでは標準誤差 ±3.4pt もあり数ポイントの差が読めない。
-        // 1000 ランなら突入 ~600 で ±1.9pt まで縮む (2026-08-08)。
-        [MenuItem("Tools/AutoRun/Λファーム量スイープ (各1000ラン)", priority = 11)]
-        public static void RunLambdaFarmSweep() => Launch(1000, lambdaSweep: true);
 
         [MenuItem("Tools/AutoRun/固定難易度スイープ (各300ラン)", priority = 13)]
         public static void RunChallengeFixedSweep()
@@ -1908,7 +1901,7 @@ namespace AutoTest.EditorTools
         /// 入れてはいけない ── 購入は処置の下流なので、 経済アイテムの効果が媒介変数に吸われ、
         /// さらにコライダー条件づけで偏りが入る。</para></summary>
         /// <summary><b>難易度の確認 (2026-09-08)。</b> 学習を切って 3,000 ラン 回し、
-        /// 7 層クリア率・所持品数・Λ の配給を見る。
+        /// 7 層クリア率・所持品数を見る。
         ///
         /// <para>訓練済み BOT (Optimal) の 7層クリアが <b>66.9%</b> に達し、 band 11 に張り付いて
         /// アイテムの効果が測れなくなっていた (設計目標は人間で「2割強」)。 緩和が 3 つ積み上がった結果:
@@ -2673,7 +2666,7 @@ namespace AutoTest.EditorTools
             EditorUtility.RevealInFinder(dir);
         }
 
-        private static void Launch(int count, bool sweep = false, bool lambdaSweep = false, int loopBatches = 1)
+        private static void Launch(int count, bool sweep = false, int loopBatches = 1)
         {
             if (EditorApplication.isPlaying)
             {
@@ -2691,10 +2684,8 @@ namespace AutoTest.EditorTools
             EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
             SessionState.SetInt(PendingKey, count);
             SessionState.SetBool(SweepKey, sweep);
-            SessionState.SetBool(LambdaKey, lambdaSweep);
             SessionState.SetInt(LoopKey, loopBatches);
             string modeLabel = sweep ? "5Fボス勝率スイープ"
-                              : lambdaSweep ? "Λファーム量スイープ"
                               : loopBatches >= 2 ? $"自動周回 {count}ラン × {loopBatches}回"
                               : count + " ラン";
             Debug.Log($"[AutoRunMenu] {modeLabel}予約 → PlayMode 開始"
@@ -2714,7 +2705,6 @@ namespace AutoTest.EditorTools
             int count = SessionState.GetInt(PendingKey, 0);
             if (count <= 0) return;
             bool sweep = SessionState.GetBool(SweepKey, false);
-            bool lambdaSweep = SessionState.GetBool(LambdaKey, false);
             bool relicSweep = SessionState.GetBool(RelicSweepKey, false);
             SessionState.EraseBool(RelicSweepKey);
             bool relicBaseline = SessionState.GetBool(RelicBaseKey, false);
@@ -2792,7 +2782,6 @@ namespace AutoTest.EditorTools
             int loopBatches = SessionState.GetInt(LoopKey, 1);
             SessionState.EraseInt(PendingKey);
             SessionState.EraseBool(SweepKey);
-            SessionState.EraseBool(LambdaKey);
             SessionState.EraseInt(LoopKey);
 
             var go = new GameObject("[AutoRunner]");
@@ -2800,7 +2789,7 @@ namespace AutoTest.EditorTools
             runner.runCount = count;
             // 長大バッチは同期ゲームロジックをまとめて進める。乱数・判断結果は不変。
             // 25runごとには描画へ戻し、Editor/MCPが完全に無応答になるのを避ける。
-            if (count >= 3000 && loopBatches <= 1 && !sweep && !lambdaSweep)
+            if (count >= 3000 && loopBatches <= 1 && !sweep)
             {
                 runner.stepsPerYield = 1000;
                 runner.runsPerYield = 25;
@@ -2809,7 +2798,7 @@ namespace AutoTest.EditorTools
             //   1000 ラン で 12.1MB あるので、 25 万ラン 級の蓄積では 3GB に達する。
             //   学習の取り込み (IngestBatch) はメモリ上の _records を使うのでファイルは要らず、
             //   判定に必要な数字は summary と item_stats に入る。
-            if (count >= 3000 && !sweep && !lambdaSweep)
+            if (count >= 3000 && !sweep)
                 runner.writeRunsJsonl = false;
             // 決定論シード: EditorPrefs から。 空ならランダム動作 (従来どおり)。
             runner.masterSeed = EditorPrefs.GetString("AutoRun.MasterSeed", "");
@@ -2910,7 +2899,6 @@ namespace AutoTest.EditorTools
                 runner.runCount = 0;
             }
             runner.simBoss5Sweep = sweep;
-            runner.lambdaFarmSweep = lambdaSweep;
             runner.relicPresetSweep = relicSweep;
             runner.relicSweepBaselineOnly = relicBaseline;
             if (relicBaseline) runner.relicSweepRuns = 500;   // 1 プリセットだけなので厚めに取る
@@ -3088,7 +3076,7 @@ namespace AutoTest.EditorTools
                 runner.writeRunsJsonl = axisDiag;
                 runner.relicAxisSweepOnlyAxis =
                     axisDiag ? (int)MetaProgression.Relics.RelicAxis.CritMultPct : -1;
-                // 2026-08-09: **挑戦 30pt で測る**。 高難易度限定軸 (Λ共鳴/渇き/刻限/背水) は
+                // 2026-08-09: **挑戦 30pt で測る**。 高難易度限定軸 (渇き/刻限/背水) は
                 //   25pt 以上でしか出ないので、 0pt の測定は「出ない軸を出た前提で測る」形だった。
                 //   30pt は RelicBonusCap = 30 ＝ 遺物の見返りが頭打ちになる実用上限でもある。
                 runner.relicAxisSweepChallengeScore = 30;
@@ -3289,7 +3277,6 @@ namespace AutoTest.EditorTools
 
             runner.Begin();
             string startLabel = sweep ? "5Fボス勝率スイープ"
-                              : lambdaSweep ? "Λファーム量スイープ"
                               : loopBatches >= 2 ? $"自動周回 {count}ラン × {loopBatches}回"
                               : count + " ラン";
             Debug.Log($"[AutoRunMenu] AutoRunner 起動 ({startLabel}) ①{runner.metaBuffMode} ②{runner.itemPickMode} ③ボス{runner.tuneBosses}/Tier{runner.learnTier}/BOT{runner.learnBotAi} ④技量{runner.wiringSkill}");

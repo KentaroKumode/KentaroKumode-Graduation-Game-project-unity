@@ -12,7 +12,7 @@ namespace MapSystem
         public string startNodeId;
         public string bossNodeId;
 
-        /// <summary>自由移動の層の形 (点・道・山岳・縄張り)。 Λ 環状線・8 層 (ボス戦だけ) では null。</summary>
+        /// <summary>自由移動の層の形 (点・道・山岳・縄張り)。 8 層 (ボス戦だけ) では null。</summary>
         public FreeMove.FreeMapLayout layout;
         public bool IsFreeMap => layout != null;
 

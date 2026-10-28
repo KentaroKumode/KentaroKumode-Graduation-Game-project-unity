@@ -5,11 +5,13 @@ using System.Linq;
 namespace MapSystem.FreeMove
 {
     /// <summary>
-    /// 自由移動の層の生成。 参照実装は docs/design/map-prototype.html の <c>genMap / genMapOnce</c>。
+    /// 航行マップの生成 (手番制・2026-10-18)。 参照実装は docs/design/map-grid-prototype.html の <c>generate / genOnce</c>。
     ///
-    /// <para>手順: 山岳 2〜3 か所 → 始点・終点 → 点を撒く (最小間隔 1.15・山岳の外) →
-    /// 道 = 最小全域木 (つながりを保証) ＋ 近い組を交差しない範囲で足す → 山岳で分断されたら引き直す →
-    /// 徘徊エネミーの縄張り・巡回点・補給庫 → マスの種別。</para>
+    /// <para>手順: 山岳 3〜5 か所 → 始点・終点 → 点を撒く (最小間隔 1.15・山岳の外) →
+    /// 道 = 最小全域木 (つながりを保証) ＋ 近い組を交差しない範囲で足す →
+    /// 行き止まりを 2 段 (距離 2.6 → 4.0) で潰す → 道だと 2 倍以上遠回りな近い組へ近道 →
+    /// どの点からも道が 2 本以上、 全点がつながっていなければ引き直す →
+    /// 追跡者の縄張り・巡回の輪 → マスの種別。</para>
     ///
     /// <para><b>乱数は <see cref="GameLoop.GameRng"/> のキー "map.free" だけ</b>。 連番は
     /// <c>層 × 1,000,000 + 生成内の通し番号</c> ── 生成の中では順序に依存するが、 生成は層の突入時に
@@ -21,14 +23,12 @@ namespace MapSystem.FreeMove
     {
         public const string RngKey = "map.free";
 
-        /// <summary>マスの抽選重み。 通常層の重みを写し、 休憩だけ試作どおり 3 (旧 2)。
-        /// 補給庫・始点・終点・裂け目の記録は固定配置で、 この表からは引かない。</summary>
+        /// <summary>マスの抽選重み。 通常層の重みを写す。 始点・終点・6 層の「裂け目の記録」は固定配置でこの表からは引かない。</summary>
         public static readonly (TileType type, float weight)[] TileWeights =
         {
             (TileType.Battle,      29f),
             (TileType.Event,       25f),
             (TileType.EliteBattle, 14f),
-            (TileType.Exchange,     7f),
             (TileType.Shop,         7f),
             (TileType.Treasure,     3f),
             (TileType.Rest,         3f),
@@ -47,6 +47,7 @@ namespace MapSystem.FreeMove
         /// <summary>層を生成する。 山岳で分断され続けたら山岳なしで作る (試作と同じ)。</summary>
         public static FreeMapLayout Generate(int floor)
         {
+            if (floor == FloorPlan.LinearFloor) return GenerateLinear(floor);
             var rnd = new Rnd(floor);
             for (int attempt = 0; attempt < FreeMapParams.GenerateAttempts; attempt++)
             {
@@ -61,17 +62,49 @@ namespace MapSystem.FreeMove
             throw new InvalidOperationException($"[FreeMapGenerator] {floor}層の生成に失敗した");
         }
 
+        /// <summary>5 層 (深さ 7) の直線のマップ (2026-10-20)。 乱数を使わない固定の 1 本道:
+        /// 前哨基地 → 補給拠点 → ショップ → 秘宝 → イベント (〈門〉) → エリート戦闘 → 休憩 → ボス。
+        /// 点の添字は始点 = 0・終点 = 1 の約束なので、 道の順とは並びが違う (0, 2, 3, 4, 5, 6, 7, 1)。
+        /// 山岳・追跡者・天候は無い (道が 1 本なので、 崩れたり沈んだりすると進めなくなる)。</summary>
+        private static FreeMapLayout GenerateLinear(int floor)
+        {
+            const double W = FreeMapParams.Width, H = FreeMapParams.Height;
+            var order = new[] { 0, 2, 3, 4, 5, 6, 7, 1 };
+            var types = new[] { TileType.Outpost, TileType.SupplyDepot, TileType.Shop, TileType.Treasure,
+                                TileType.Event, TileType.EliteBattle, TileType.Rest, FloorPlan.GoalType(floor) };
+            int n = order.Length;
+            var L = new FreeMapLayout { floor = floor, start = 0, goal = 1, pos = new Vec2[n], types = new TileType[n], adj = new List<int>[n] };
+            for (int i = 0; i < n; i++) L.adj[i] = new List<int>();
+            double x0 = FreeMapParams.StartX, x1 = W - 0.5;
+            for (int k = 0; k < n; k++)
+            {
+                int idx = order[k];
+                L.pos[idx] = new Vec2(F(x0 + (x1 - x0) * k / (n - 1)), F(H / 2));
+                L.types[idx] = types[k];
+            }
+            for (int k = 0; k + 1 < n; k++)
+            {
+                int a = order[k], b = order[k + 1];
+                L.roads.Add((a, b)); L.adj[a].Add(b); L.adj[b].Add(a);
+            }
+            L.gate = order[4];
+            // 追跡者は居ないが、 縄張りの欄は埋めておく (道の中ほどを中心に)
+            for (int k = 1; k < n - 1; k++) { L.territory.Add(order[k]); L.waypoints.Add(order[k]); }
+            L.home = order[n / 2];
+            return L;
+        }
+
         private static FreeMapLayout GenerateOnce(int floor, Rnd rnd, bool withMountains)
         {
             const double W = FreeMapParams.Width, H = FreeMapParams.Height;
             var L = new FreeMapLayout { floor = floor };
-            var start = new Vec2(FreeMapParams.StartX, FreeMapParams.StartY);
-            var goalRef = new Vec2(W - 0.5, H / 2);
+            var start = new Vec2(FreeMapParams.StartX, F(H / 2));
+            var goalRef = new Vec2(W - 0.5, F(H / 2));
 
             // ── 山岳 ──
             if (withMountains)
             {
-                int nm = 2 + (rnd.Next() < 0.5 ? 1 : 0);
+                int nm = FreeMapParams.MountainMin + (int)Math.Floor(rnd.Next() * FreeMapParams.MountainExtra);
                 for (int k = 0, guard = 0; k < nm && guard < 200; guard++)
                 {
                     double mx = F(2.4 + rnd.Next() * (W - 4.8));
@@ -91,7 +124,7 @@ namespace MapSystem.FreeMove
             // ── 点 ──
             var pts = new List<Vec2> { start, new Vec2(W - 0.5, F(1 + rnd.Next() * (H - 2))) };
             if (L.InMountain(pts[1], 0.4)) return null;
-            for (int tries = 0; pts.Count < FreeMapParams.NodeCount && tries < 5000; tries++)
+            for (int tries = 0; pts.Count < FreeMapParams.NodeCount && tries < 8000; tries++)
             {
                 var p = new Vec2(F(0.3 + rnd.Next() * (W - 0.6)), F(0.3 + rnd.Next() * (H - 0.6)));
                 if (L.InMountain(p, 0.35)) continue;
@@ -126,9 +159,34 @@ namespace MapSystem.FreeMove
                 if (d < FreeMapParams.ExtraRoadMaxLen && rnd.Next() < FreeMapParams.ExtraRoadChance
                     && RoadOk(i, j) && !L.adj[i].Contains(j))
                     AddRoad(i, j);
+
+            // ── 行き止まりを潰す: どの点からも道は 2 本以上。 2 段 (2.6 → 4.0) で近い点とつなぐ ──
+            foreach (float reach in new[] { FreeMapParams.DeadEndReach1, FreeMapParams.DeadEndReach2 })
+                for (int i = 0; i < n; i++)
+                {
+                    if (L.adj[i].Count != 1) continue;
+                    int pick = -1; double bd = double.MaxValue;
+                    for (int j = 0; j < n; j++)
+                    {
+                        if (j == i || L.adj[i].Contains(j)) continue;
+                        double d = L.Dist(i, j);
+                        if (d > reach || !RoadOk(i, j)) continue;
+                        if (d < bd) { bd = d; pick = j; }   // 同点は添字の小さい方 (j の昇順で最初のものを残す)
+                    }
+                    if (pick >= 0) AddRoad(i, pick);
+                }
+            for (int i = 0; i < n; i++) if (L.adj[i].Count < 2) return null;   // それでも残ったら引き直す
+
+            // ── 近道: 直線で近いのに道だと 2 倍以上遠回りな組へ ──
+            foreach (var (d, i, j) in pairs)
+            {
+                if (d > FreeMapParams.ShortcutMaxLen) break;
+                if (L.adj[i].Contains(j) || !RoadOk(i, j)) continue;
+                if (RoadLength(L, i, j) > d * FreeMapParams.ShortcutDetour) AddRoad(i, j);
+            }
             if (!L.IsConnected()) return null;   // 山岳で分断されたら引き直す
 
-            // ── 縄張り: 層の中ほどの一角。 中心から道でつながった 6〜9 点 ──
+            // ── 縄張り: 層の中ほどの一角。 中心から道でつながった 7〜11 点 ──
             var mids = new List<int>();
             for (int i = 2; i < n; i++)
                 if (L.pos[i].x > FreeMapParams.TerritoryCenterMinX && L.pos[i].x < W - FreeMapParams.TerritoryCenterMarginRight
@@ -137,7 +195,7 @@ namespace MapSystem.FreeMove
             if (mids.Count == 0) return null;
             int center = mids[Math.Min(mids.Count - 1, (int)Math.Floor(rnd.Next() * mids.Count))];
             var terr = new List<int> { center };
-            for (int k = 0; k <= 6; k++)
+            for (int k = 0; k <= 8; k++)
             {
                 double radius = 2.2 + 0.4 * k;
                 terr = new List<int> { center };
@@ -155,27 +213,9 @@ namespace MapSystem.FreeMove
             if (terr.Count > FreeMapParams.TerritoryMax) terr = terr.GetRange(0, FreeMapParams.TerritoryMax);
             if (terr.Count < 3) return null;
 
-            // ── 巡回点: 縄張りの外周寄りの 3〜4 点を中心の周りの角度順に並べて輪にする ──
-            int wn = Math.Min(terr.Count >= 7 ? 4 : 3, terr.Count);
-            var way = new List<int>();
-            while (way.Count < wn)
-            {
-                int best = -1; double bd = -1;
-                foreach (int i in terr)
-                {
-                    if (way.Contains(i)) continue;
-                    double dd = L.Dist(i, center) + 0.01;
-                    foreach (int w in way) dd = Math.Min(dd, L.Dist(i, w));
-                    if (dd > bd) { bd = dd; best = i; }
-                }
-                way.Add(best);
-            }
+            // ── 巡回の輪: 縄張りの全点を中心の周りの角度順に並べる (毎回同じ順で回る) ──
             var cpos = L.pos[center];
-            way = way.OrderBy(i => PseudoAngle(L.pos[i].x - cpos.x, L.pos[i].y - cpos.y)).ThenBy(i => i).ToList();
-
-            // ── 補給庫 (拠) は縄張りの中に 2 か所 ──
-            var caches = terr.Where(i => !way.Contains(i)).Take(2).ToList();
-            for (int k = 0; caches.Count < 2 && k < way.Count; k++) if (!caches.Contains(way[k])) caches.Add(way[k]);
+            var way = terr.OrderBy(i => PseudoAngle(L.pos[i].x - cpos.x, L.pos[i].y - cpos.y)).ThenBy(i => i).ToList();
 
             // ── マスの種別 ──
             L.types = new TileType[n];
@@ -184,18 +224,20 @@ namespace MapSystem.FreeMove
             float tot = 0; foreach (var (_, w) in TileWeights) tot += w;
             for (int i = 2; i < n; i++)
             {
-                if (caches.Contains(i)) { L.types[i] = TileType.SupplyCache; continue; }
                 double r = rnd.Next() * tot;
                 L.types[i] = TileWeights[TileWeights.Length - 1].type;
                 foreach (var (t, w) in TileWeights) { if ((r -= w) < 0) { L.types[i] = t; break; } }
             }
+            SpreadTypes(L, rnd);
             var others = new List<int>();
-            for (int i = 2; i < n; i++) if (!caches.Contains(i)) others.Add(i);
-            // 店と休憩は必ず 1 つずつ。 置き換える先は店・休憩以外から選ぶ (試作は店を休憩で上書きし得た)
+            for (int i = 2; i < n; i++) others.Add(i);
+            var ds = L.Hops(L.start);
+            // 店と休憩は必ず 1 つずつ。 置き換える先は店・休憩以外から選ぶ (始点から 2 歩以上の点)
             foreach (var need in new[] { TileType.Shop, TileType.Rest })
             {
                 if (others.Any(i => L.types[i] == need)) continue;
-                var pool = others.Where(i => L.types[i] != TileType.Shop && L.types[i] != TileType.Rest).ToList();
+                var pool = others.Where(i => ds[i] >= 2 && L.types[i] != TileType.Shop && L.types[i] != TileType.Rest).ToList();
+                if (pool.Count == 0) pool = others.Where(i => L.types[i] != TileType.Shop && L.types[i] != TileType.Rest).ToList();
                 if (pool.Count == 0) pool = others;
                 L.types[pool[Math.Min(pool.Count - 1, (int)Math.Floor(rnd.Next() * pool.Count))]] = need;
             }
@@ -218,8 +260,48 @@ namespace MapSystem.FreeMove
 
             L.territory = new HashSet<int>(terr);
             L.waypoints = way;
-            L.caches = caches;
+            L.home = center;
             return L;
+        }
+
+        /// <summary>
+        /// 同じ種別の密集をほぐす (2026-10-20)。 抽選のあと、 道でつながった点どうしが同じ種別なら、 片方 (ランダム) を同じ重みの表から引き直す。
+        /// 引き直しは、 つながっている全ての点と種別が重ならないものだけから選ぶ。 全種別が隣にあって選べない時は、 重なりが今より減る種別だけから選び、
+        /// それも無ければその点は諦める (各回で重なりが必ず減るか、 諦めるかなので、 必ず終わる)。 始点と終点は固定なので動かさない (0 と 1)。
+        /// </summary>
+        private static void SpreadTypes(FreeMapLayout L, Rnd rnd)
+        {
+            int n = L.Count;
+            var giveUp = new HashSet<int>();
+            while (true)
+            {
+                var pairs = new List<(int a, int b)>();
+                for (int i = 2; i < n; i++)
+                    foreach (int j in L.adj[i])
+                        if (j > i && j >= 2 && L.types[i] == L.types[j] && !(giveUp.Contains(i) && giveUp.Contains(j))) pairs.Add((i, j));
+                if (pairs.Count == 0) return;
+                var pr = pairs[Math.Min(pairs.Count - 1, (int)Math.Floor(rnd.Next() * pairs.Count))];
+                int node = rnd.Next() < 0.5 ? pr.a : pr.b;
+                if (giveUp.Contains(node)) node = node == pr.a ? pr.b : pr.a;
+
+                int own = 0; var count = new Dictionary<TileType, int>();
+                foreach (var (t, _) in TileWeights) count[t] = 0;
+                foreach (int nb in L.adj[node])
+                {
+                    var t = L.types[nb];
+                    if (t == L.types[node]) own++;
+                    if (count.ContainsKey(t)) count[t]++;
+                }
+                // 隣と重ならない種別 → 無ければ、 今より重なりが減る種別
+                var cand = new List<(TileType type, float weight)>();
+                foreach (var (t, w) in TileWeights) if (count[t] == 0) cand.Add((t, w));
+                if (cand.Count == 0) foreach (var (t, w) in TileWeights) if (count[t] < own) cand.Add((t, w));
+                if (cand.Count == 0) { giveUp.Add(node); continue; }
+                float tot = 0; foreach (var (_, w) in cand) tot += w;
+                double r = rnd.Next() * tot; var pick = cand[cand.Count - 1].type;
+                foreach (var (t, w) in cand) { if ((r -= w) < 0) { pick = t; break; } }
+                L.types[node] = pick;
+            }
         }
 
         /// <summary>角度と同じ順序を持つ単調な値 ([-2, 2))。 atan2 の代わり ── 実装差の出ない四則だけで並べる。</summary>
@@ -229,6 +311,29 @@ namespace MapSystem.FreeMove
             if (s == 0) return 0;
             double p = dx / s;                 // [-1, 1]
             return dy < 0 ? p - 1 : 1 - p;     // 下半分 [-2, 0) ／ 上半分 [0, 2]
+        }
+
+        /// <summary>道だけを通る最短の長さ (距離の和)。 通れなければ +∞。 近道を足すかの判定にだけ使う。</summary>
+        private static double RoadLength(FreeMapLayout L, int from, int to)
+        {
+            int n = L.Count;
+            var d = new double[n];
+            var used = new bool[n];
+            for (int i = 0; i < n; i++) d[i] = double.MaxValue;
+            d[from] = 0;
+            while (true)
+            {
+                int u = -1;
+                for (int i = 0; i < n; i++) if (!used[i] && (u < 0 || d[i] < d[u])) u = i;
+                if (u < 0 || d[u] == double.MaxValue || u == to) break;
+                used[u] = true;
+                foreach (int v in L.adj[u])
+                {
+                    double nd = d[u] + L.Dist(u, v);
+                    if (nd < d[v]) d[v] = nd;
+                }
+            }
+            return d[to] == double.MaxValue ? double.PositiveInfinity : d[to];
         }
 
         /// <summary>線分 ab と cd が (端点を共有せずに) 交差するか。</summary>

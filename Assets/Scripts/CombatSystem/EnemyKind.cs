@@ -10,7 +10,7 @@ namespace CombatSystem
     public enum EnemyKind
     {
         Normal,  // Battle / Mystery 等の通常戦闘
-        Elite,   // EliteBattle / LambdaRing / 偽商人戦
+        Elite,   // EliteBattle / 偽商人戦
         Boss,    // Boss
     }
 
@@ -24,7 +24,6 @@ namespace CombatSystem
             {
                 case TileType.Battle:       return EnemyKind.Normal;
                 case TileType.EliteBattle:  return EnemyKind.Elite;
-                case TileType.LambdaRing:   return EnemyKind.Elite;
                 case TileType.Boss:         return EnemyKind.Boss;
                 default:                    return EnemyKind.Normal;
             }

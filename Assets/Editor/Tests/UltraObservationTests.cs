@@ -53,7 +53,7 @@ namespace AutoTest.EditorTests.Ultra
             // knowledge the player has accumulated
             "seenOnceEvents", "seenPassiveItemIds", "shopPurchasedCounts",
             // status / debuffs
-            "timedBuffs", "timedDebuffs", "permanentDebuffs", "gateFlaws", "lambdaDebuffs",
+            "timedBuffs", "timedDebuffs", "permanentDebuffs", "gateFlaws",
             "sealedRoleMask", "lastStandActive", "madnessStack",
             "breakdownCount", "lingeringWoundLost", "lingeringWoundTriggers",
             "lingeringWoundDamageAccum",
@@ -63,12 +63,9 @@ namespace AutoTest.EditorTests.Ultra
             "philStoneUsed", "outpostUpgradeUsedThisFloor",
             // shop
             "shopRobberyDone", "shopRobberyInProgress", "robberyPendingItems", "nextShopHalfPrice",
-            // Λ layer
-            "inLambda", "dimensionalDisturbance", "activePhenomena",
+            // abyss phenomena
+            "activePhenomena",
             "reverseFallsUsed", "eclipsedNightTriggered", "ironSunNextTurn",
-            "lambdaRingsEntered", "lambdaRingElite", "lambdaRingEvent",
-            "lambdaRingEventHeal", "lambdaRingEventItem", "lambdaCombatsFinished",
-            "lambdaItemsAcquiredGross",
             // armed consumable effects (the player spent an item for each of these)
             "nextLootMinRarity", "pendingFirstRollTotal", "pendingEnemyStartHpCutPct",
             "pendingGamblerDice", "pendingDaggerArmed", "pendingOathArmed",
@@ -103,12 +100,12 @@ namespace AutoTest.EditorTests.Ultra
             "currentFloor", "maxFloor", "normalClearFloor", "bossDefeatedThisFloor",
             "playerHP", "playerMaxHP", "coins", "weaponMaterials", "tilesThisFloor",
             "totalBattles", "totalWins", "totalTurns", "totalCombatTurns",
-            "inLambda", "dimensionalDisturbance", "convictionStage",
+            "convictionStage",
             "layer6Unlocked", "layer7Unlocked", "shopRobberyDone", "lastStandActive",
             "sublimationCount", "sealedRoleMask",
             "lingeringWoundLost", "equippedWeaponId", "equippedDiceId",
             "ownedPassiveItems", "ownedConsumables", "permanentDebuffs",
-            "activePhenomena", "timedBuffs", "timedDebuffs", "lambdaDebuffs",
+            "activePhenomena", "timedBuffs", "timedDebuffs",
             "diceFaceParts",
         };
 

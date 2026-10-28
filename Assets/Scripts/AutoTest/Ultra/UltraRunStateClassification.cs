@@ -20,10 +20,6 @@ namespace AutoTest.Ultra
         private static readonly Dictionary<string, string> HiddenFields =
             new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            { "lambdaPoolRemainingAll",
-              "undrawn Λ pool size — derivable from owned items, but not shown, so treat as hidden" },
-            { "lambdaPoolRemainingFloored",
-              "same pool with the depth rarity floor applied" },
             { "chronicle",
               "diagnostic log, not a game-visible quantity" },
             { "judgmentHealRequested", "断罪 accounting instrumentation" },

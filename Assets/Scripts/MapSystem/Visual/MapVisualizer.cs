@@ -75,6 +75,9 @@ namespace MapSystem.Visual
         private Transform nodeContainer;
         private Transform lineContainer;
         private Transform backgroundContainer;
+        private Transform overlayContainer;
+        /// <summary>最後に描いた <c>FreeMapSim.Version</c>。 変わったら描き直す。</summary>
+        private int drawnSimVersion = -1;
 
         private Dictionary<string, MapNodeVisual> nodeVisuals = new Dictionary<string, MapNodeVisual>();
         private List<MapLineVisual> lineVisuals = new List<MapLineVisual>();
@@ -88,6 +91,16 @@ namespace MapSystem.Visual
         public Bounds MapBounds => mapBounds;
         public bool HasMapBounds => worldPositions.Count > 0;
         public float RowSpacing => rowSpacing;
+
+        /// <summary>航行マップの座標 (層の配置の単位) → ワールド座標。 画面エフェクト (Game2DMapFx) が使う。 マップ未構築なら false。</summary>
+        public bool TryLayoutToWorld(double x, double y, out Vector3 world)
+        {
+            world = default;
+            if (nodeContainer == null) return false;
+            var local = new Vector3(LayoutToWorldX(x), ((float)y - FreeMove.FreeMapParams.Height / 2f) * rowSpacing * 0.5f, 0f);
+            world = nodeContainer.TransformPoint(local);
+            return true;
+        }
 
         void Awake()
         {
@@ -104,6 +117,14 @@ namespace MapSystem.Visual
             var mm = MapManager.Instance;
             if (mm != null && mm.CurrentMap != null)
                 OnMapGenerated(mm.CurrentMap);
+        }
+
+        void LateUpdate()
+        {
+            // 航行マップは手番を使わない操作 (照明・囮罠) でも状態が変わるので、 版が変わったら描き直す。
+            var sim = MapManager.Instance?.Sim;
+            if (sim != null && currentMap != null && currentMap.IsFreeMap && sim.Version != drawnSimVersion)
+                RefreshVisualStates();
         }
 
         void OnDestroy()
@@ -163,6 +184,7 @@ namespace MapSystem.Visual
             SnapPositionsToPixelGrid();
             CacheMapBounds();
             SpawnBackground();
+            SpawnMountains(map);
             SpawnNodes(map);
             SpawnLines(map);
             FitPixelCamera();
@@ -289,6 +311,7 @@ namespace MapSystem.Visual
         {
             var mm = MapManager.Instance;
             if (mm == null || currentMap == null) return;
+            if (currentMap.IsFreeMap && mm.Sim != null) { RefreshFreeMapStates(mm.Sim); return; }
 
             var currentNode = mm.CurrentNode;
             var reachableIds = new HashSet<string>();
@@ -333,6 +356,188 @@ namespace MapSystem.Visual
                     color = lineReachable;
 
                 line.SetColor(color);
+            }
+        }
+
+        // ================================================================
+        //  航行マップ (手番制・2026-10-18)
+        // ================================================================
+
+        private static readonly Color FrontTint = new Color(0.55f, 0.67f, 0.86f, 0.10f);
+        private static readonly Color FrontEdge = new Color(0.55f, 0.67f, 0.86f, 0.55f);
+        private static readonly Color FoeColor = new Color(1f, 0.42f, 0.23f, 1f);
+        private static readonly Color FamiliarColor = new Color(1f, 0.69f, 0.44f, 1f);
+        private static readonly Color HoundColor = new Color(1f, 0.82f, 0.44f, 1f);
+        private static readonly Color PlayerColor = new Color(0.95f, 0.94f, 0.9f, 1f);
+        private static readonly Color LureColor = new Color(0.42f, 0.84f, 0.9f, 1f);
+        private static readonly Color TraceColor = new Color(0.78f, 0.78f, 0.86f, 1f);
+
+        /// <summary>層の x 座標 (距離の単位) をワールドの x へ。 ノード配置と同じ式。</summary>
+        private float LayoutToWorldX(double x) => ((float)x - FreeMove.FreeMapParams.Width / 2f) * laneSpacing * 0.5f;
+
+        private bool TryNodePos(int index, out Vector3 pos)
+        {
+            pos = default;
+            string id = currentMap.NodeIdAt(index);
+            return id != null && worldPositions.TryGetValue(id, out pos);
+        }
+
+        private void RefreshFreeMapStates(FreeMove.FreeMapSim sim)
+        {
+            drawnSimVersion = sim.Version;
+            var current = currentMap.GetNodeByIndex(sim.Me);
+            var reachable = new HashSet<int>(sim.Neighbors(sim.Me));
+            var hops = sim.HopsFrom(sim.Me);
+
+            foreach (var kvp in nodeVisuals)
+            {
+                var node = currentMap.GetNode(kvp.Key);
+                if (node == null) continue;
+                // 沈んだ点は消える。 それ以外は「?」でも置く (点と道の配置は層全体が見える)。
+                bool sunk = node.index >= 0 && sim.IsSunk(node.index);
+                kvp.Value.gameObject.SetActive(!sunk);
+                if (sunk) continue;
+
+                bool shown = node.revealed && !(node.index >= 0 && sim.FogHidden(node.index, hops));
+                kvp.Value.SetTileType(shown ? node.EffectiveType : TileType.Mystery);
+
+                var state = NodeVisualState.Default;
+                if (node == current) state = NodeVisualState.Current;
+                else if (node.index >= 0 && reachable.Contains(node.index)) state = NodeVisualState.Reachable;
+                else if (node.visited) state = NodeVisualState.Visited;
+                kvp.Value.SetState(state);
+            }
+
+            // 道: 崩れた道・沈んだ点につながる道は消える
+            foreach (var line in lineVisuals)
+            {
+                var a = currentMap.GetNode(line.FromId);
+                var b = currentMap.GetNode(line.ToId);
+                if (a == null || b == null) continue;
+                bool exists = a.index >= 0 && b.index >= 0 && sim.HasRoad(a.index, b.index);
+                line.gameObject.SetActive(exists);
+                if (!exists) continue;
+                Color color = lineDefault;
+                if (a.visited && b.visited) color = lineVisited;
+                else if ((a == current && reachable.Contains(b.index)) || (b == current && reachable.Contains(a.index)))
+                    color = lineReachable;
+                line.SetColor(color);
+            }
+
+            RefreshOverlay(sim);
+        }
+
+        /// <summary>前線・痕跡・囮罠・自分・追跡者とその次の一歩・使い魔を描く。 毎回作り直す。</summary>
+        private void RefreshOverlay(FreeMove.FreeMapSim sim)
+        {
+            EnsureContainers();
+            for (int i = overlayContainer.childCount - 1; i >= 0; i--) Destroy(overlayContainer.GetChild(i).gameObject);
+            float px = 1f / Mathf.Max(1, pixelsPerUnit);
+
+            // 前線: 左側をうっすら染め、境界を点線で引く (前線そのものに罰は無い)
+            if (sim.Weather != FreeMove.WeatherKind.None && !double.IsNegativeInfinity(sim.Front))
+            {
+                float fx = LayoutToWorldX(System.Math.Min(sim.Front, FreeMove.FreeMapParams.Width));
+                float left = mapBounds.min.x - 2f, top = mapBounds.max.y, bottom = mapBounds.min.y;
+                if (fx > left)
+                    Quad(new Vector3((left + fx) / 2f, (top + bottom) / 2f, 0f), new Vector2(fx - left, top - bottom), FrontTint, 2);
+                Dashed(new Vector3(fx, bottom, 0f), new Vector3(fx, top, 0f), FrontEdge, 3, px * 8f);
+            }
+
+            // 痕跡 (ノードの下に小さな四角)
+            for (int i = 0; i < sim.Layout.Count; i++)
+            {
+                if (sim.IsSunk(i) || !sim.HasTrace(i) || !TryNodePos(i, out var p)) continue;
+                var c = TraceColor; c.a = 0.25f + 0.5f * (float)sim.TraceFreshness(i);
+                Pixel(p + new Vector3(0f, -9f * px, 0f), 3, c, 4);
+            }
+
+            // 囮罠
+            foreach (var l in sim.Lures)
+                if (TryNodePos(l.node, out var p))
+                    Pixel(p + new Vector3(9f * px, -9f * px, 0f), 5, LureColor, 6);
+
+            // 追跡者 (見えている時だけ) と次の一歩の予告
+            if (sim.FoeVisible && TryNodePos(sim.FoeNode, out var fp))
+            {
+                int next = sim.PeekFoeStep();
+                if (next != sim.FoeNode && TryNodePos(next, out var np))
+                {
+                    Dashed(fp, np, FoeColor, 5, px * 6f);
+                    Pixel(np, 11, new Color(FoeColor.r, FoeColor.g, FoeColor.b, 0.35f), 4);
+                }
+                Pixel(fp + new Vector3(6f * px, 6f * px, 0f), 7, FoeColor, 7);
+            }
+
+            // 使い魔 (見えているものだけ)
+            foreach (var f in sim.VisibleFamiliars())
+                if (TryNodePos(f.pos, out var p))
+                    Pixel(p + new Vector3(6f * px, -6f * px, 0f), f.hound ? 5 : 3, f.hound ? HoundColor : FamiliarColor, 7);
+
+            // 自分
+            if (TryNodePos(sim.Me, out var mp))
+                Pixel(mp + new Vector3(-6f * px, 6f * px, 0f), 5, PlayerColor, 8);
+        }
+
+        /// <summary>一辺 sizePx の正方形を置く (回転なし・ピクセルに揃える)。</summary>
+        private void Pixel(Vector3 pos, int sizePx, Color color, int order)
+        {
+            float px = 1f / Mathf.Max(1, pixelsPerUnit);
+            Quad(SnapToPixel(pos, px), new Vector2(sizePx * px, sizePx * px), color, order);
+        }
+
+        private void Quad(Vector3 pos, Vector2 size, Color color, int order)
+        {
+            var go = new GameObject("Overlay");
+            go.transform.SetParent(overlayContainer, false);
+            go.transform.localPosition = pos;
+            go.transform.localScale = new Vector3(size.x, size.y, 1f);
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = GetOrCreatePathDotSprite();
+            sr.color = color;
+            sr.sortingOrder = order;
+        }
+
+        /// <summary>a から b へ、 軸に揃った 2px の点を一定間隔で並べた点線。</summary>
+        private void Dashed(Vector3 a, Vector3 b, Color color, int order, float period)
+        {
+            float len = Vector3.Distance(a, b);
+            if (len < 1e-4f) return;
+            for (float d = 0f; d <= len; d += period)
+                Pixel(Vector3.Lerp(a, b, d / len), 2, color, order);
+        }
+
+        /// <summary>山岳 (通れない楕円): 楕円の向きをテクスチャに焼き込む (Transform の回転は使わない)。</summary>
+        private void SpawnMountains(FloorMap map)
+        {
+            if (map?.layout == null || map.layout.mountains.Count == 0) return;
+            float unit = laneSpacing * 0.5f;
+            foreach (var m in map.layout.mountains)
+            {
+                float rad = (float)System.Math.Max(m.a, m.b) * unit;
+                int half = Mathf.CeilToInt(rad * pixelsPerUnit) + 2;
+                int size = half * 2;
+                var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point };
+                var clear = new Color(0f, 0f, 0f, 0f);
+                var fill = new Color(0.14f, 0.12f, 0.105f, 1f);
+                var edge = new Color(0.29f, 0.25f, 0.21f, 1f);
+                for (int y = 0; y < size; y++)
+                    for (int x = 0; x < size; x++)
+                    {
+                        float dx = (x - half + 0.5f) / (pixelsPerUnit * unit);
+                        float dy = (y - half + 0.5f) / (pixelsPerUnit * unit);
+                        float u = (dx * (float)m.cos + dy * (float)m.sin) / (float)m.a;
+                        float v = (-dx * (float)m.sin + dy * (float)m.cos) / (float)m.b;
+                        float q = u * u + v * v;
+                        tex.SetPixel(x, y, q > 1f ? clear : q > 0.86f ? edge : fill);
+                    }
+                tex.Apply();
+                var go = new GameObject("Mountain");
+                go.transform.SetParent(backgroundContainer, false);
+                go.transform.localPosition = new Vector3(LayoutToWorldX(m.x), ((float)m.y - FreeMove.FreeMapParams.Height / 2f) * rowSpacing * 0.5f, 0.005f);
+                var sr = go.AddComponent<SpriteRenderer>();
+                sr.sprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), pixelsPerUnit);
+                sr.sortingOrder = backgroundSortingOrder + 1;
             }
         }
 
@@ -591,6 +796,13 @@ namespace MapSystem.Visual
                 go.transform.SetParent(scrollRoot, false);
                 lineContainer = go.transform;
             }
+
+            if (overlayContainer == null)
+            {
+                var go = new GameObject("OverlayContainer");
+                go.transform.SetParent(scrollRoot, false);
+                overlayContainer = go.transform;
+            }
         }
 
         /// <summary>
@@ -681,6 +893,8 @@ namespace MapSystem.Visual
             nodeContainer = null;
             lineContainer = null;
             backgroundContainer = null;
+            overlayContainer = null;
+            drawnSimVersion = -1;
             nodeVisuals.Clear();
             lineVisuals.Clear();
             worldPositions.Clear();

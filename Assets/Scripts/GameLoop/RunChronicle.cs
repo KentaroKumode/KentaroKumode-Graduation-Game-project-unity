@@ -54,10 +54,9 @@ namespace GameLoop
         public const string RestHeal       = "E1"; // 癒えた
         public const string RestHollow     = "E2"; // 空振り — 回復量がほぼ入らなかった
 
-        // ── F: Λ層 ────────────────────────────────────────────────
-        public const string LambdaEnter    = "F1"; // 踏み込み
-        public const string LambdaLeave    = "F2"; // 離脱
-        public const string LambdaSink     = "F3"; // 沈む — Λ 内で死亡
+        // ── F: (旧 Λ層・2026-10-28 削除) ──────────────────────────
+        //   F1 踏み込み / F2 離脱 / F3 沈む。 コードは再利用しない (古いセーブの台帳に残っている)。
+        //   ダイジェストは未知のコードを重み 0 で読み飛ばす。
 
         // ── G: 決着 ────────────────────────────────────────────────
         public const string EndKill        = "G1"; // 撃破 (ボス)
@@ -245,18 +244,6 @@ namespace GameLoop
         public static readonly long[] BashBonus = new long[2];
         public static readonly long[] BashProcs = new long[2];
         public static readonly long[] BashDry = new long[2];
-
-        public static void NoteShieldBash(InventorySystem.PassiveSkills.CombatContext ctx, int bonus)
-        {
-            bool b5 = ctx != null && ctx.bossId == BossIds.Layer5Judgment;
-            for (int i = 0; i < 2; i++)
-            {
-                if (i == 1 && !b5) continue;
-                BashProcs[i]++;
-                BashBonus[i] += bonus;
-                if (bonus <= 0) BashDry[i]++;
-            }
-        }
 
         /// <summary>[計装 2026-08-16] 7層 p4 の被ダメを**ターン帯 × 発生源**で割る。
         ///
@@ -446,15 +433,6 @@ namespace GameLoop
             return sb.ToString();
         }
 
-        public static void Lambda(RunState run, string code, int tiles, int gold)
-        {
-            var sb = Begin(run, code);
-            if (sb == null) return;
-            Arg(sb, "n", tiles);
-            Arg(sb, "g", gold);
-            Commit(run, sb);
-        }
-
         public static void End(RunState run, string code, string enemyId)
         {
             var sb = Begin(run, code);
@@ -496,7 +474,7 @@ namespace GameLoop
 
             var sb = new StringBuilder(48);
             sb.Append(code);
-            Arg(sb, "f", run.currentFloor);
+            Arg(sb, "f", run.Depth);
             return sb;
         }
 
@@ -547,7 +525,6 @@ namespace GameLoop
             EventTake, EventRefuse, EventPrice,
             ForgeUpgrade, ForgeApex,
             RestHeal, RestHollow,
-            LambdaEnter, LambdaLeave, LambdaSink,
             EndKill, EndDeath, EndClear,
         };
 
@@ -575,9 +552,6 @@ namespace GameLoop
                 case ForgeApex:     return "鍛え/到達";
                 case RestHeal:      return "憩い/癒えた";
                 case RestHollow:    return "憩い/空振り";
-                case LambdaEnter:   return "Λ/踏み込み";
-                case LambdaLeave:   return "Λ/離脱";
-                case LambdaSink:    return "Λ/沈む";
                 case EndKill:       return "決着/撃破";
                 case EndDeath:      return "決着/敗北";
                 case EndClear:      return "決着/踏破";

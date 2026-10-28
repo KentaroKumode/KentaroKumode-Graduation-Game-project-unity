@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
-using InventorySystem.PassiveSkills;
+using ItemSystem.PassiveSkills;
 
 namespace CombatSystem
 {

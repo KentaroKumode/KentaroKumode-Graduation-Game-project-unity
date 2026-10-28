@@ -245,7 +245,7 @@ namespace Battle.Visual
         {
             if (string.IsNullOrEmpty(id)) return 1;
             // **id を綴りで切らない** (2026-09-22)。 id は表示名なので tier フィールドを読む。
-            var d = InventorySystem.ItemDatabase.Instance?.GetItem(id);
+            var d = ItemSystem.ItemDatabase.Instance?.GetItem(id);
             return d != null && d.tier >= 1 ? d.tier : 1;
         }
 
