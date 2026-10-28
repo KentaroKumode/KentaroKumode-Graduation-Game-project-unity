@@ -224,8 +224,6 @@ namespace MapSystem.FreeMove
         /// <summary>道だけを通る歩数 (全点)。 つながっていなければ int.MaxValue。</summary>
         public int[] HopsFrom(int from) => FreeMapLayout.Hops(_adj, from);
 
-        public int HopsBetween(int from, int to) => HopsFrom(from)[to];
-
         /// <summary>from から to へ向かう次の 1 歩 (最短の道・崩れた道は通らない)。 着いている / 行けないなら from。</summary>
         public int StepToward(int from, int to) => FreeMapLayout.StepToward(_adj, from, to);
 

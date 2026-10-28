@@ -220,12 +220,5 @@ namespace GameLoop
             return Generic;
         }
 
-        /// <summary>プリセットが 2 体目に使う敵の実体。 未登録 ID なら null (単体戦へ縮退)。</summary>
-        public static EnemyData ResolveSecondary(EncounterPreset p)
-        {
-            if (p == null || !p.IsPair) return null;
-            var e = EnemyDatabase.Get(p.enemyB);
-            return e != null ? e.Clone() : null;
-        }
     }
 }

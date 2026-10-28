@@ -70,16 +70,6 @@ namespace AutoTest.Ultra
             _calls.Clear();
         }
 
-        public static double MillisOf(string name)
-        {
-            return _millis.TryGetValue(name, out double ms) ? ms : 0.0;
-        }
-
-        public static int CallsOf(string name)
-        {
-            return _calls.TryGetValue(name, out int n) ? n : 0;
-        }
-
         /// <summary>One block, ready to paste into a handoff. <paramref name="totalMillis"/> is
         /// the whole process wall time, supplied by the caller — the clock cannot know it,
         /// because the interesting part starts before the first span.</summary>

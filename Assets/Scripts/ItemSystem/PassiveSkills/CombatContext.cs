@@ -1118,14 +1118,6 @@ namespace ItemSystem.PassiveSkills
             return true;
         }
 
-        /// <summary>充電を全消費し、消費した量を返す。</summary>
-        public int ConsumeAllCharge()
-        {
-            int cur = GetCharge();
-            if (cur > 0) { accumulatedValues["mutualCharge"] = 0; NoteChargeSpent(cur); }
-            return cur;
-        }
-
         /// <summary>[perTurn] このターンに消費した充電の合計を積む。 〈短絡〉が読む。
         ///
         /// <para>充電の消費 (リロール = ADR-0010) は<b>配線より前</b>のフェーズで起きるので、

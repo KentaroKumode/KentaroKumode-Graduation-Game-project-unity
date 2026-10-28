@@ -747,32 +747,6 @@ namespace AutoTest
             return maxLv > 0 ? (maxLv - 1) * 0.5f : 0f;
         }
 
-        /// <summary><b>準パワー</b> ── アイテムの価値を表す唯一の連続値。
-        /// z-score 加重和 × 信頼度 (概ね -2.0 〜 +3.0) に家系内 Lv 補正を足したもの。
-        /// <b>学習値が無ければ <see cref="Unlearned"/></b>。
-        /// 手書きフォールバック中は PriorityItemList の S/A をしきい値の位置へ写す。</summary>
-        /// <summary><b>regβ そのもの</b>（band 単位）。 信用できなければ NaN。
-        ///
-        /// <para>準パワーには lift6F / offL6F が混ざっている。 <b>武器では lift が
-        /// 「選ばれやすさ」そのものになる</b> ── 1 ラン に武器は 1 本しかないので、
-        /// 取得群 vs 非取得群の差が「その分岐を選んだラン vs 選ばなかったラン」に等しい。
-        /// 結果、 選ばれない → サンプルが薄い → 準パワーが動かない、 の自己強化ループになる。
-        /// 実測 (2026-09-06): 純 shield_t4 は <b>regβ +0.576 で全武器 1 位</b>なのに担ぎ手 1,571 ラン、
-        /// 最終武器としては 0.1% ── 当時存在した複合 T4 の 1 つが 61,467 ラン 担がれて
-        /// regβ +0.252 で、 <b>評価が低いほうへサンプルが集まっていた</b>。</para>
-        ///
-        /// <para><b>2026-09-21: 複合武器を廃止したので、 武器の分岐そのものが無くなった</b>
-        /// (<c>GameManager.ChooseUpgradeTarget</c> は純ラダーを 1 段上がるだけ)。
-        /// ここは武器以外の判断で引き続き使う ── 自己強化ループの理屈は
-        /// 「1 ランに 1 本しか持てない」全ての枠に当てはまる。</para></summary>
-        public static float RegBetaOnly(string id)
-        {
-            if (string.IsNullOrEmpty(id)) return float.NaN;
-            EnsureLoaded();
-            if (!ItemRegression.IsTrusted(id)) return float.NaN;
-            return ItemRegression.TryGetCoef(id, out double b, out _) ? (float)b : float.NaN;
-        }
-
         public static float PowerScore(string id)
         {
             if (string.IsNullOrEmpty(id)) return Unlearned;
@@ -825,14 +799,6 @@ namespace AutoTest
         public static float ExplorationWeight = 0.45f;
         /// <summary>この acq6F に達したら上乗せ 0。 これ未満は線形に減衰する。</summary>
         public static int ExplorationSatN = 200;
-
-        /// <summary>その id の acq6F (現在の帯)。 学習に載っていなければ 0。</summary>
-        public static int SampleCount(string id)
-        {
-            if (string.IsNullOrEmpty(id)) return 0;
-            EnsureLoaded();
-            return _sampleCount.TryGetValue(id, out int n) ? n : 0;
-        }
 
         /// <summary>購入判断に使う準パワー = <see cref="PowerScore"/> − 冗長ペナルティ。
         /// 冗長 1 段につき <see cref="StepPerTier"/> を引く。 0 床は付けない

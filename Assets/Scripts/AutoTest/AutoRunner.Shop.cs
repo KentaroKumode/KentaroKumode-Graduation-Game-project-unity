@@ -138,7 +138,6 @@ namespace AutoTest
         public static float EliteReserve = 0.30f;
         /// <summary>[計装] 見積りで精鋭を避けた回数 / 見積りを行った回数 / 実績なしで避けた回数。</summary>
         public static long EliteCostChecks, EliteCostAvoided, EliteCostNoData;
-        public static void ResetEliteCostStats() { EliteCostChecks = EliteCostAvoided = EliteCostNoData = 0; }
 
         /// <summary>この精鋭マスで失う HP の見積り。 実績が無ければ負を返す。</summary>
         private static float EliteFightLoss(MapNode node, GameLoop.RunState run)

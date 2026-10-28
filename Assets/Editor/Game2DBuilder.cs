@@ -307,15 +307,6 @@ public static class Game2DBuilder
         return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
     }
 
-    private static Game2DBar MakeBar(string name, Transform parent, int x, int y, string left, string right, int rowY)
-    {
-        var rt = Node(name, parent, x, y, 256, 19);
-        var raw = rt.gameObject.AddComponent<RawImage>(); raw.raycastTarget = false;
-        var bar = rt.gameObject.AddComponent<Game2DBar>();
-        bar.leftTex = T(left); bar.rightTex = T(right); bar.rowY = rowY;
-        return bar;
-    }
-
     /// <summary>テクスチャを (0,0) に等倍で置く RawImage (当たり判定は使わず、 部品が画素で判定する)。</summary>
     private static RawImage FullRaw(string name, Transform parent, Texture2D tex, int w, int h)
     {

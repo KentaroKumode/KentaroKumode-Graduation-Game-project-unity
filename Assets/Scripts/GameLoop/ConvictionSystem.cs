@@ -73,14 +73,6 @@ namespace GameLoop
             }
         }
 
-        /// <summary>段階番号から表示すべきアイテムIDを返す。</summary>
-        public static string StageToItemId(int stage)
-        {
-            if (stage >= StageTruth)   return IdTruth;
-            if (stage >= StageResolve) return IdResolve;
-            return IdConviction;
-        }
-
         /// <summary>所持リストから 根拠のない確信/決意/真理 のいずれかの index を返す。なければ -1。</summary>
         private static int FindAnyConvictionIndex(RunState run)
         {

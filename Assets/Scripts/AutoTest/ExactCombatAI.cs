@@ -69,10 +69,6 @@ namespace AutoTest
 
         public static long StatDecisions, StatNodes, StatBudgetHits, StatTuplesEvaluated;
         public static void ResetStats() { StatDecisions = StatNodes = StatBudgetHits = StatTuplesEvaluated = 0; }
-        public static string Diag()
-            => $"決定 {StatDecisions} / 展開ノード {StatNodes} / 予算切れ {StatBudgetHits}"
-             + $" ({(StatDecisions > 0 ? StatBudgetHits * 100.0 / StatDecisions : 0):F1}%)"
-             + $" / 評価した合計組 {StatTuplesEvaluated}";
 
         // ============================================================
         //  盤面スナップショット

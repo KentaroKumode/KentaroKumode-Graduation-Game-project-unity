@@ -93,15 +93,6 @@ namespace AutoTest
             beta = 0; se = 0; return false;
         }
 
-        /// <summary>6F 到達限定モデルの係数 (終盤性能)。 <b>表示専用</b> ── 準パワーには
-        /// 入れない。 無作為化基準との一致度が全ラン版に劣り、 混ぜると合成スコアが悪化する
-        /// (順位相関 0.669 → 0.658、 2026-09-04 実測)。</summary>
-        public static bool TryGetCoef6F(string id, out double beta, out double se)
-        {
-            if (_coefs6F.TryGetValue(id, out var c)) { beta = c.beta; se = c.se; return true; }
-            beta = 0; se = 0; return false;
-        }
-
         /// <summary>この品の β を信用してよいか (取得数がしきい値以上)。
         /// false の品は係数自体は返るが、 準パワーでは regβ の重みを lift6F へ転送する。</summary>
         public static bool IsTrusted(string id) => _trusted.Contains(id);

@@ -135,26 +135,6 @@ namespace AutoTest
         public const float RollTarget_Layer7P3     = 0.90f;  // 段3 神話
         public const float RollTarget_Layer7P4     = 0.90f;  // 段4 天与
 
-        /// <summary>このボスの目標ロール勝率 (レポート表示用の基準)。</summary>
-        public static float TargetRollWinRate(string id)
-        {
-            switch (id)
-            {
-                case "boss_layer1":         return RollTarget_Layer1;
-                case "boss_layer2":         return RollTarget_Layer2;
-                case "boss_layer3":         return RollTarget_Layer3;
-                case "boss_layer4":         return RollTarget_Layer4;
-                case "boss_layer5":         return RollTarget_Layer5;
-                case "boss_layer5_hidden":  return RollTarget_Layer5Hidden;
-                case "boss_layer6":         return RollTarget_Layer6;
-                case "boss_layer7":         return RollTarget_Layer7;
-                case "boss_layer7_p2":      return RollTarget_Layer7P2;
-                case "boss_layer7_p3":      return RollTarget_Layer7P3;
-                case "boss_layer7_p4":      return RollTarget_Layer7P4;
-                default:                    return 0.90f;
-            }
-        }
-
         // ===== ボスのスタンス別 ロール勝率レンジ (設定可能・1〜6層) =====
         //  ボスが opposed ロールで「勝つ」割合(=プレイヤー敗北割合)を、 強ロール/弱ロールスタンス別に帯で管理する。
         //  ・強ロール時の roll-win → ダイス/固有面で [Floor,Ceil] に収める。

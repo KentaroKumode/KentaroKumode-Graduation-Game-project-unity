@@ -110,10 +110,6 @@ namespace MetaProgression
         public static float GetPlunderPassiveDropPct()
             => MetaPanel.PlunderPassiveDropPct(Rank(MetaPanelKind.Plunder));
 
-        /// <summary>会心ダイスへの追加補正値 (0/1/2/3, 精密トラック r3/6/9)。</summary>
-        public static int GetCritBonus()
-            => MetaPanel.PrecisionCritBonus(Rank(MetaPanelKind.Precision));
-
         /// <summary>【v6 廃止】ダイス合計値補正。 相互攻撃モデルで「ダイス合計」概念自体が消滅したため常に 0。
         /// 互換のため残置 (CombatManager 側の呼び出しはブランチガード込みで維持)。</summary>
         public static int GetDiceTotalBonus() => 0;
@@ -172,8 +168,6 @@ namespace MetaProgression
 
         /// <summary>互換用: 旧 RollRefund は no-op (特売機構へ移行済)。</summary>
         public static int RollRefund(int paidAmount, RunState run) => 0;
-        /// <summary>互換用: 旧 GetRefundChance は 0 を返す (特売機構へ移行済)。</summary>
-        public static float GetRefundChance() => 0f;
 
         // [廃止 2026-09-12] ボス追加報酬 (旧 強奪 r10)。
         //   単体で r10−r9 = +7.02pt と目標帯 (±3pt) の倍以上あり、
@@ -186,9 +180,6 @@ namespace MetaProgression
         /// <summary>兵站: 開幕で獲得するパッシブスティックの本数 (r2/5/8/10 で +1 ずつ)。</summary>
         public static int GetStartingPassiveCount()
             => MetaPanel.SupplyStartingPassives(Rank(MetaPanelKind.Supply));
-
-        /// <summary>互換: 開幕パッシブが 1 本でも付くか。</summary>
-        public static bool IsStartingPassiveItemUnlocked() => GetStartingPassiveCount() > 0;
 
         /// <summary>【v6 廃止】フロアクリア時の追加回復。 常に 0。</summary>
         public static int GetFloorClearHeal() => 0;
@@ -214,9 +205,6 @@ namespace MetaProgression
         /// <summary>燈火: 物資で支払える下限 (段効果)。 未解禁なら int.MaxValue。</summary>
         public static int GetProvisionSpendFloor()
             => MetaPanel.LanternProvisionSpendFloor(Rank(MetaPanelKind.Lantern));
-
-        public static bool IsProvisionPaymentUnlocked()
-            => MetaPanel.LanternProvisionPaymentUnlocked(Rank(MetaPanelKind.Lantern));
 
         /// <summary>金庫 r10: 貸金庫 (ランを跨ぐ預金) を使えるか。</summary>
         public static bool IsVaultBankUnlocked()
@@ -259,10 +247,6 @@ namespace MetaProgression
         //  【v6 廃止】互換 stub
         // ============================================================
 
-        /// <summary>【廃止】ラストスタンド HP 半減無効化。 2026-08-04 に半減そのものを廃止したため常に true 相当。
-        /// 呼び出し箇所を壊さないための残置。</summary>
-        public static bool IsLastStandHpLossDisabled() => true;
-
         /// <summary>ラストスタンドが解禁されているか (メタ〈外殻〉r10 の特典・2026-08-04)。</summary>
         public static bool IsLastStandUnlocked()
             => MetaPanel.ShellLastStandUnlocked(Rank(MetaPanelKind.Shell));
@@ -289,26 +273,6 @@ namespace MetaProgression
         /// 71.9%、 うち満タンが 35.8% ＝ **回復地点が機能しない**状態を作っていた。
         /// 戦闘数に比例して総軽減が増える (踏むほど無償で硬くなる) 点も構造的に逆。</para></summary>
         // [削除 2026-09-13] GetOpeningShield ── 0 を返すだけの残骸。 呼び出し側の合算からも外した。
-
-        /// <summary>防御 r1〜r10: 被ダメージ **割合軽減** (1 段につき <b>4%</b>、 r10 で 40%)。
-        /// 開幕シールドの跡地（2026-08-15）。
-        ///
-        /// <para><b>定額ではなく割合にするのが要点。</b> 廃止した開幕シールドは定額 30 で、
-        /// 道中の 9.2 HP を丸ごと消す一方ヴェスカの 45.2 HP には効かない ──
-        /// **危険でない戦闘だけを無効化する**形だった。割合軽減は強敵にも弱敵にも同じ比率で効くので、
-        /// 難易度曲線を反転させない。戦闘数に比例して総軽減が積み上がることも無い。</para>
-        ///
-        /// <para><b>遺物側と合算しない。</b> 適用は CombatManager の**独立した乗算段**
-        /// （遺物の割合軽減を掛けた後に、もう一段 ×(1−N)）。加算にすると実効値が遺物の引き次第で変わり、
-        /// 共有上限 0.85 に近いほどメタ分が食われて**整備パネルへ振ったポイントが捨て点になりうる**
-        /// ── 破産の設計で決めた「割り振ったポイントがいかなる場合でも完全に捨て点にならない」に反する。
-        /// 乗算なら逓減はするが 0 にはならない。</para>
-        ///
-        /// <para>なお <c>GetDamageReductionPct</c> の <c>0.85</c> は**到達する上限ではなく事故防止のガード**。
-        /// 遺物の同軸は段10 でも 30%、理論値遺物のサブ 5 段なら 15% にしかならない。</para></summary>
-        /// <para><b>【2026-09-13 廃止】常に 0。</b> 旧〈防御〉はリスク軸〈剛胆〉へ
-        /// 完全リワークした (Valor 系)。</para>
-        public static float GetGuardDamageReductionPct() => 0f;
 
         // ---- 〈剛胆〉リスク軸 (enum キーは互換のため Guard のまま) ----
 
@@ -347,15 +311,6 @@ namespace MetaProgression
         /// 較正段規約 (r1/2/4/5/7/8 は効果なし) を破っていたため撤去。 詳細は MetaPanel 側。</summary>
         public static float GetCritRatePctBonus()
             => MetaPanel.PrecisionCritRatePct(Rank(MetaPanelKind.Precision));
-
-        /// <summary>精密 r10: 逓減で捨てられた会心率を会心倍率へ変換した値 (0 なら極点未到達)。
-        /// **天井 (注意散漫) 適用後の実効率を渡すこと。**</summary>
-        public static float GetPrecisionOverflowMultiplier(float critAddTotal, float effectiveRate)
-            => MetaPanel.PrecisionOverflowMultiplier(
-                   Rank(MetaPanelKind.Precision), critAddTotal, effectiveRate);
-
-        /// <summary>【2026-07-26 廃止】会心分母縮小。 分子/分母モデル自体が消滅したため常に 0。</summary>
-        public static int GetCritDenominatorReduce() => 0;
 
         /// <summary>攻撃端子 配線合計への加算 (0..3)。</summary>
         /// <summary>攻撃端子: 接続ダイス 1 本あたりの加算 (0..3)。 呼び出し側で本数を掛けること。</summary>

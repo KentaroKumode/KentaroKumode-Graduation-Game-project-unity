@@ -218,32 +218,6 @@ namespace AutoTest.Ultra
             "payloadChecksum",
         };
 
-        public static bool TryCreateHandshakeRequest(
-            string requestId,
-            UltraBuildManifest expectedManifest,
-            out UltraWorkerRequest request,
-            out UltraWorkerFailure failure)
-        {
-            request = null;
-            if (!UltraBuildManifestValidation.TryValidate(
-                    expectedManifest,
-                    out string code,
-                    out string detail))
-            {
-                failure = NewFailure(code, detail);
-                return false;
-            }
-
-            request = new UltraWorkerRequest
-            {
-                kind = HandshakeRequestKind,
-                requestId = requestId,
-                expectedFingerprints = expectedManifest.fingerprints.Clone(),
-                episode = null,
-            };
-            return TryValidateRequest(request, expectedManifest, out failure);
-        }
-
         /// <summary>
         /// Adapts the existing production-oracle request to the worker wire contract.
         /// legacyRequest.scenarioStartSeedHex is solely the synthetic episode start seed.
@@ -399,33 +373,6 @@ namespace AutoTest.Ultra
             return TryValidateEpisodePayload(request.episode, out failure);
         }
 
-        public static bool TryCreateHandshakeResponse(
-            UltraWorkerRequest request,
-            UltraBuildManifest workerManifest,
-            out UltraWorkerResponse response,
-            out UltraWorkerFailure failure)
-        {
-            response = null;
-            if (!TryValidateRequest(request, workerManifest, out failure)) return false;
-            if (!string.Equals(request.kind, HandshakeRequestKind, StringComparison.Ordinal))
-            {
-                failure = NewFailure("request_kind", "request is not a handshake request");
-                return false;
-            }
-
-            response = new UltraWorkerResponse
-            {
-                kind = HandshakeResponseKind,
-                requestId = request.requestId,
-                accepted = true,
-                workerFingerprints = workerManifest.fingerprints.Clone(),
-                workerManifest = workerManifest,
-                episodeResult = null,
-                failure = null,
-            };
-            return true;
-        }
-
         public static bool TryCreateEpisodeResponse(
             UltraWorkerRequest request,
             UltraBuildManifest workerManifest,
@@ -553,24 +500,6 @@ namespace AutoTest.Ultra
             return TryValidateEpisodeResult(response.episodeResult, request.episode.maxProductionSteps, out failure);
         }
 
-        public static bool TryReadOracleResult(
-            UltraWorkerResponse response,
-            UltraWorkerRequest request,
-            UltraBuildManifest expectedManifest,
-            out UltraEpisodeResult result,
-            out UltraWorkerFailure failure)
-        {
-            result = null;
-            if (!TryValidateResponse(response, request, expectedManifest, out failure)) return false;
-            if (!string.Equals(request.kind, EpisodeRequestKind, StringComparison.Ordinal))
-            {
-                failure = NewFailure("request_kind", "request is not an episode request");
-                return false;
-            }
-            result = CloneResult(response.episodeResult);
-            return true;
-        }
-
         public static UltraWorkerResponse CreateRejectedResponse(
             string requestId,
             string responseKind,
@@ -649,33 +578,6 @@ namespace AutoTest.Ultra
             if (!TryValidateRequest(request, localManifest, out failure))
             {
                 request = null;
-                return false;
-            }
-            return true;
-        }
-
-        public static bool TryResponseToJson(
-            UltraWorkerResponse response,
-            UltraWorkerRequest request,
-            UltraBuildManifest expectedManifest,
-            out string json,
-            out UltraWorkerFailure failure)
-        {
-            json = null;
-            if (!TryValidateResponse(response, request, expectedManifest, out failure)) return false;
-            try
-            {
-                json = JsonUtility.ToJson(response, false);
-            }
-            catch (Exception ex)
-            {
-                failure = NewFailure("response_serialize", ex.GetType().Name);
-                return false;
-            }
-            if (!IsUtf8SizeWithin(json, MaxResponseJsonBytes))
-            {
-                json = null;
-                failure = NewFailure("response_size", "serialized response exceeds the hard cap");
                 return false;
             }
             return true;
@@ -941,30 +843,6 @@ namespace AutoTest.Ultra
             return true;
         }
 
-        public static bool TryVerifyResponseChecksum(
-            UltraWorkerResponse response, out UltraWorkerFailure failure)
-        {
-            failure = null;
-            if (response == null)
-            {
-                failure = NewFailure("response_missing", "worker response is null");
-                return false;
-            }
-            if (string.IsNullOrEmpty(response.payloadChecksum))
-            {
-                failure = NewFailure(FailureChecksumMissing, "response carries no payload checksum");
-                return false;
-            }
-            if (!string.Equals(response.payloadChecksum, ComputeResponseChecksum(response),
-                    StringComparison.Ordinal))
-            {
-                failure = NewFailure(FailureChecksumMismatch,
-                    "response payload checksum does not match its content");
-                return false;
-            }
-            return true;
-        }
-
         // ==================================================================
         //  control messages
         // ==================================================================
@@ -1075,40 +953,6 @@ namespace AutoTest.Ultra
                 failure = NewFailure("epoch", "epoch must not be negative");
                 return false;
             }
-            return true;
-        }
-
-        public static bool TryCreateControlResponse(
-            UltraWorkerRequest request, UltraBuildManifest workerManifest,
-            UltraWorkerControlResult result,
-            out UltraWorkerResponse response, out UltraWorkerFailure failure)
-        {
-            response = null;
-            if (!TryValidateRequest(request, workerManifest, out failure)) return false;
-            if (!TryValidateControlRequest(request, out failure)) return false;
-            if (result == null)
-            {
-                failure = NewFailure("control_result", "control result is null");
-                return false;
-            }
-            if ((result.legalActionIds?.Length ?? 0) > MaxLegalActionCount)
-            {
-                failure = NewFailure("control_result", "legal action list is too large");
-                return false;
-            }
-
-            response = new UltraWorkerResponse
-            {
-                kind = ResponseKindFor(request.kind),
-                requestId = request.requestId,
-                accepted = true,
-                workerFingerprints = workerManifest.fingerprints.Clone(),
-                workerManifest = null,
-                episodeResult = null,
-                controlResult = result,
-                failure = null,
-            };
-            SealResponse(response);
             return true;
         }
 

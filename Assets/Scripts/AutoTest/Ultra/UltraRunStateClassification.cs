@@ -35,12 +35,6 @@ namespace AutoTest.Ultra
             return fieldName != null && HiddenFields.ContainsKey(fieldName);
         }
 
-        public static bool TryGetReason(string fieldName, out string reason)
-        {
-            reason = null;
-            return fieldName != null && HiddenFields.TryGetValue(fieldName, out reason);
-        }
-
         /// <summary>Every public instance field of <c>RunState</c>. Used by the coverage tests
         /// so a newly added field has to be classified before it ships.</summary>
         public static IEnumerable<string> AllRunStateFieldNames()

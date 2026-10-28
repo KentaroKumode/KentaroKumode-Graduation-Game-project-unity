@@ -148,8 +148,6 @@ namespace AutoTest
         public static readonly long[] GrantOk = new long[4];
         public static readonly long[] GrantNg = new long[4];
         public static readonly string[] GrantKindName = { "出目パーツ", "消耗品", "武器", "パッシブ" };
-        public static void ResetGrantStats()
-        { System.Array.Clear(GrantOk, 0, 4); System.Array.Clear(GrantNg, 0, 4); }
         private static void NoteGrant(int kind, bool ok)
         { if (kind < 0 || kind > 3) return; if (ok) GrantOk[kind]++; else GrantNg[kind]++; }
 

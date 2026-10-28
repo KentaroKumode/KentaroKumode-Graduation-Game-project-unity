@@ -1012,11 +1012,6 @@ namespace AutoTest
         private float ProvisionRefillFloorEffective()
             => AutoTest.PolicyParameters.Current.provisionRefillFloor + GateProvisionReserve();
 
-        /// <summary>寄り道を許す物資の下限。 取り置きぶんだけ底上げする。
-        /// (6/7 層は一本道なので実効は無いが、 <b>規則を 1 か所に閉じる</b>ために揃えておく。)</summary>
-        private float LateralProvisionFloorEffective()
-            => AutoTest.PolicyParameters.Current.lateralProvisionFloor + GateProvisionReserve();
-
         /// <summary><b>通常バッチを固定の挑戦スコアで走らせる (2026-09-10)。</b> 0 = 触らない。
         ///
         /// <para>従来、 挑戦ptを固定する経路は<b>スイープ専用</b>だった

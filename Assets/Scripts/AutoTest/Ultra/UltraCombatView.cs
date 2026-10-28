@@ -169,11 +169,6 @@ namespace AutoTest.Ultra
             return true;
         }
 
-        public static UltraLegalAction Wiring(DiceTerminal[] plan)
-        {
-            return UltraLegalAction.Of(UltraActionKind.CombatWiring, EncodeWiring(plan));
-        }
-
         public static UltraLegalAction Reroll(int mask)
         {
             return UltraLegalAction.Of(UltraActionKind.CombatReroll, EncodeReroll(mask), -1,

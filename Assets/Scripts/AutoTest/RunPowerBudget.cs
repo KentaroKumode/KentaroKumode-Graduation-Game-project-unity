@@ -74,15 +74,5 @@ namespace AutoTest
             return 1.5f;                     // 余裕: 貯めてより良い買い物へ
         }
 
-        /// <summary>エリートを踏むか。 足りないなら危険を冒して稼ぐ、 足りているなら避ける。</summary>
-        public static bool ShouldTakeElite(float gap, int hp, int maxHp)
-        {
-            if (gap < 0.7f) return true;                       // 大幅不足: 常に踏む
-            if (gap < 1.0f) return maxHp > 0 && hp * 10 >= maxHp * 6;  // 不足: HP 60% 以上なら
-            return gap <= 1.3f;                                 // 余裕なら避ける
-        }
-
-        /// <summary>休憩を優先するか。 余裕があるうちに HP を貯金しておく。</summary>
-        public static bool ShouldPreferRest(float gap) => gap > 1.3f;
     }
 }

@@ -272,18 +272,6 @@ namespace GameLoop
 
         // ===== ボット支援: 種別判定 =====
 
-        /// <summary>戦闘開始直後に使うべきバフ系（攻撃/防御/与ダメ倍率）か。</summary>
-        public static bool IsCombatBuff(string id)
-        {
-            if (string.IsNullOrEmpty(id)) return false;
-            // cons_atk_* は 2026-08-04 の再編で廃止 (与ダメ% の cons_dmg_* へ統合)。
-            var fam = ItemIds.ConsFamilyOf(id);
-            return fam == ItemIds.ConsShieldFamily || fam == ItemIds.ConsPowerFamily;
-        }
-
-        /// <summary>緊急回復に使える即時回復系か。</summary>
-        public static bool IsHeal(string id) => ItemIds.ConsFamilyOf(id) == ItemIds.ConsHealFamily;
-
         /// <summary>id の即時回復割合（heal系以外は0）。</summary>
         public static float HealRatio(string id)
         {

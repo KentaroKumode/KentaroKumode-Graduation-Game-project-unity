@@ -53,15 +53,6 @@ namespace MetaProgression
         public static int CostOf(MetaPanelKind kind, int rank)
             => System.Math.Max(0, rank) * RankCost(kind);
 
-        /// <summary>全トラックの max 段数の合計 (= 枠総数 98)。</summary>
-        public static int TotalSlots()
-        {
-            int total = 0;
-            foreach (MetaPanelKind k in System.Enum.GetValues(typeof(MetaPanelKind)))
-                total += k.MaxRank();
-            return total;
-        }
-
         // ============================================================
         //  段効果ゲッタ (rank 0..MaxRank に対する各種効果値)
         //  意味論: 「rank 段まで購入した状態の現在値」
@@ -329,15 +320,6 @@ namespace MetaProgression
             return 0f;
         }
 
-        /// <summary><b>兵站 r10 (極点): 開幕パッシブが「2 つ提示 → 1 つ選ぶ」になる。</b>
-        /// 2026-09-10 新設。 本数は増やさず<b>選択肢に変える</b>。
-        ///
-        /// <para><b>強度の実測 (ITT 効果量分布 n=89 / 平均 4.65pt)</b>:
-        /// ランダム 1 本 4.65pt / <b>2 択 7.38pt (1.59 倍)</b> / 3 択 9.33pt (2.01 倍)。
-        /// 分布が右に大きく裾を引く (max 33.17) ため、 選択肢が増えるほど裾を掴める。
-        /// 3 択は r10 の限界価値が +0.52 対数オッズ (パネル平均の 7 倍) と浮くので 2 択を採用。</para></summary>
-        public static bool SupplyStartingChoiceUnlocked(int rank) => rank >= 10;
-
         /// <summary>開幕パッシブ <paramref name="itemIndex"/> 本目 (0 起点) の提示数。
         ///
         /// <para>r10 未満は常に 1 ＝ ランダム。 <b>r10 は 1 本目 1 択 / 2 本目 2 択 / 3 本目 3 択</b>
@@ -346,9 +328,6 @@ namespace MetaProgression
         /// 後の本ほど選択肢が増えるので、 <b>最初の 1 本は運、 最後の 1 本は選択</b>になる。</para></summary>
         public static int SupplyStartingOffers(int rank, int itemIndex)
             => rank >= 10 ? Mathf.Clamp(itemIndex + 1, 1, 3) : 1;
-
-        /// <summary>互換: 開幕パッシブが 1 本でも付くか。</summary>
-        public static bool SupplyStartingPassiveUnlocked(int rank) => SupplyStartingPassives(rank) > 0;
 
         /// <summary>燈火: 戦闘後の物資減少軽減。 <b>2026-09-12 廃止 (常に 0)</b> ──
         /// 効果を <see cref="LanternProvisionCapBonus"/> (物資上限) へ移した。

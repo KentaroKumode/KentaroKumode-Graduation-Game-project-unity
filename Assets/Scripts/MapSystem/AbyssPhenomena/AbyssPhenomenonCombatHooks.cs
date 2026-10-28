@@ -115,10 +115,6 @@ namespace MapSystem.AbyssPhenomena
             return (pDelta, eDelta);
         }
 
-        /// <summary>沈む静寂が発動中か (CombatManager の他スリップ系の抑止判定用)。</summary>
-        public static bool IsSilenced(RunState run)
-            => run != null && run.HasPhenomenon(AbyssPhenomenon.SinkingSilence);
-
         /// <summary>マップノード移動時の HP 損 (落石のような雹: -1)。</summary>
         public static int OnNodeMove(RunState run)
             => (run != null && run.HasPhenomenon(AbyssPhenomenon.BoulderHail)) ? 1 : 0;

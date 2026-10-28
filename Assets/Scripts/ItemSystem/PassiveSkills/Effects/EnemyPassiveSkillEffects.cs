@@ -694,11 +694,6 @@ namespace ItemSystem.PassiveSkills.Effects
                 if (bonus > 0) ctx.playerDiceTotal += bonus; // 敵視点で自分のダイス合計加算
             }
         }
-        public static void ResetStreak(CombatContext ctx)
-        {
-            if (ctx == null) return;
-            ctx.accumulatedValues[Key] = 0f;
-        }
     }
 
     /// <summary>毒沼の主 — 毒の侵蝕: 毎ターン終了時に毒スタック+1（上限5）、

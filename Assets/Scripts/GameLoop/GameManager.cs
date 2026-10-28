@@ -858,13 +858,6 @@ namespace GameLoop
             return d == null ? (null, 0) : (d.family, d.tier);
         }
 
-        /// <summary>装備武器が家系の進行武器か。</summary>
-        public static bool IsTierWeapon(string weaponId)
-        {
-            var (f, t) = FamilyTierOf(weaponId);
-            return !string.IsNullOrEmpty(f) && t > 0;
-        }
-
         /// <summary>同家系の次に存在するTier武器ID。無ければ null（=最上位Tier）。</summary>
         public static string NextTierWeaponId(string weaponId)
         {

@@ -50,7 +50,5 @@ namespace MetaProgression
             _ => 3,
         };
 
-        /// <summary>数値系 (max 10) か否か。false = 宣言系 (max 3)。</summary>
-        public static bool IsNumeric(this MetaPanelKind k) => k.MaxRank() == 10;
     }
 }

@@ -507,18 +507,6 @@ namespace GameLoop
 
         // === 時限バフ・デバフ用ヘルパー ===
 
-        public bool HasTimedBuff(string id)
-            => timedBuffs != null && timedBuffs.TryGetValue(id, out int n) && n > 0;
-
-        public bool HasTimedDebuff(string id)
-            => timedDebuffs != null && timedDebuffs.TryGetValue(id, out int n) && n > 0;
-
-        public int GetTimedBuffCharges(string id)
-            => timedBuffs != null && timedBuffs.TryGetValue(id, out int n) ? n : 0;
-
-        public int GetTimedDebuffCharges(string id)
-            => timedDebuffs != null && timedDebuffs.TryGetValue(id, out int n) ? n : 0;
-
         /// <summary>新規ランの初期化</summary>
         /// <param name="startHP">プレイヤーの基礎最大HP。
         /// **正本は [GameManager.BaseStartingHP]。** ここの既定値は直接 Initialize を呼ぶ

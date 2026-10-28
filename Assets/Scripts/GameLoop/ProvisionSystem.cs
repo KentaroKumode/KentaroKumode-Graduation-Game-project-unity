@@ -198,15 +198,6 @@ namespace GameLoop
             int b = run.provision; Recover(run, amount); Stats.foodGain += run.provision - b;
         }
 
-        /// <summary>ダイス振り直しの物資コスト(RerollCost)を支払えるか試みる。
-        /// 払えたら物資を減算して true。払えなければ何もせず false（＝振り直し不可）。</summary>
-        public static bool TryPayReroll(RunState run)
-        {
-            if (run == null || run.provision < RerollCost) return false;
-            int b = run.provision; Reduce(run, RerollCost); Stats.rerollLoss += b - run.provision;
-            return true;
-        }
-
         // === 内部 ===
 
         /// <summary>佯狂者の冠: 払底したらこのラン物資0固定。</summary>
