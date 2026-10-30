@@ -73,21 +73,7 @@ namespace AutoTest
             float healTarget = dangerTarget;
             while (Consumables.TryUseBestHeal(gm.Run, healTarget)) { }
 
-            // 物資の補充 (2026-08-05: cons_hope_* 新設で復活)。
-            //   学習軸 provisionRefillFloor 以下に落ちたら手持ちの物資回復を使う。
-            //   **溢れさせない** ── 不足分を超える Tier は温存し、 小さい方から充てる。
-            //
-            //   戻す先は provisionCap ではなく **provisionCap × provisionBandCeilRatio** (既定 1.0 = 従来どおり上限)。
-            //   1 未満なら「補充はするが上へ戻し切らない」＝ 物資を帯の中に留める。
-            //   〈渇き〉のような低物資発動の効果を維持したまま発狂を避けるために要る。
-            if (gm.Run.provision <= ProvisionRefillFloorEffective())
-            {
-                int provisionCeil = Mathf.RoundToInt(
-                    gm.Run.provisionCap * AutoTest.PolicyParameters.Current.provisionBandCeilRatio);
-                int guardProvision = 0;
-                while (gm.Run.provision < provisionCeil && guardProvision++ < 8
-                       && UseFirst(gm.Run, "湯気の立つ椀", "古い手紙", "凱旋の記憶", "希望の欠片")) { }
-            }
+            // 物資の補充は店の「物資の包」だけ (DoShop)。 物資を回復する消耗品は 2026-10-31 に廃止した。
 
             // 休憩を強く優先すべき状況:
             //  - 貪欲がボス接近かつHPが8割未満（スケールしたbuildをボスへ生存させる）

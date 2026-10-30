@@ -536,7 +536,7 @@
     {
       "id": "百一人切りの鉈",
       "name": "百一人切りの鉈",
-      "description": "ターン終了時、敵HPが最大の30%以下（ボスは15%）なら即処刑＋最大HP9%回復＋3G。",
+      "description": "ターン終了時、敵 HP が「毒 × 2」% 以下なら倒す（ボスはその半分）",
       "flavorText": "柄には百本の刻み傷がある。刃元には、それより新しい一本だけが深く入っている。誰が最後の一本を刻んだか、鉈の売り手は答えない。",
       "category": "Passive",
       "rarity": "GOLD",
@@ -544,54 +544,39 @@
       "skill": "百一人切りの鉈"
     },
     {
-      "id": "征服者の戦旗",
-      "name": "征服者の戦旗",
-      "description": "収支プラスのターン毎に与ダメージ倍率+5%（戦闘中累積・上限+60%）。",
-      "flavorText": "北方戦役の先鋒を担った将が掲げた戦旗。相手を踏み潰し、征服するほどに士気が高まる。",
+      "id": "力みの籠手",
+      "name": "力みの籠手",
+      "description": "シールドを合計 10 得るたび、この戦闘中の攻撃 +1",
+      "flavorText": "守りの型を千回繰り返した拳は、開こうとしても開かない。この籠手は、その形のまま鋳られた。",
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "skill": "征服者の戦旗"
+      "skill": "力みの籠手"
     },
     {
       "id": "魂喰らいの血石",
       "name": "魂喰らいの血石",
-      "description": "与ダメージ時、最終与ダメージの4%を回復。",
+      "description": "出血を消費・減衰で失うたび、失った分だけシールド",
       "flavorText": "鑑定書に『夜明け前に外すこと』と記載されている。売りに来た前の持ち主は、黒い日傘を店内まで持ち込んだらしい。",
       "category": "Passive",
       "rarity": "SILVER",
       "basePrice": 8,
-      "skill": "魂喰らいの血石",
-      "stats": [
-        {
-          "stat": "lifesteal",
-          "value": 4
-        }
-      ]
+      "skill": "魂喰らいの血石"
     },
     {
       "id": "敗残兵の部隊章",
       "name": "敗残兵の部隊章",
-      "description": "HP40%以下のとき被ダメージ-30%。",
+      "description": "シールドを 5 失うたび（吸収・半減とも）、この戦闘中の攻撃 +1",
       "flavorText": "敗走した部隊の軍旗から切り取られた部隊章。旗竿は折れ、隊列も崩れたが、この布だけは殿に散った兵の肩に残った。",
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "skill": "敗残兵の部隊章",
-      "stats": [
-        {
-          "stat": "dmgTakenPct",
-          "value": -30,
-          "when": {
-            "hpPctMax": 40
-          }
-        }
-      ]
+      "skill": "敗残兵の部隊章"
     },
     {
       "id": "騎士団の切り札",
       "name": "騎士団の切り札",
-      "description": "戦闘に1回、ターン開始時にHPが最大の30%未満なら、この戦闘で得たシールドの合計の50%をシールドとして得る。",
+      "description": "敵の HP が 30% 以下になったターン、シールドを全部使い、使った量 × 2 を攻撃に加える（1 戦闘 1 回）",
       "flavorText": "重装兵が盾を捨てるはずがない、捨てる時は逃げる時だ。その隙を閃光が穿つ。",
       "category": "Passive",
       "rarity": "GOLD",
@@ -601,7 +586,7 @@
     {
       "id": "工廠の材料箱",
       "name": "工廠の材料箱",
-      "description": "戦闘開始時、充電+3。",
+      "description": "爆発のたび、この戦闘中の自分の防御 +2（熱で鎧を打ち直す）",
       "flavorText": "たまに中身が増える。",
       "category": "Passive",
       "rarity": "BRONZE",
@@ -611,7 +596,7 @@
     {
       "id": "無限モーター",
       "name": "無限モーター",
-      "description": "被ダメージ時、充電+1（完全防御時は不発）。",
+      "description": "ブロックで敵の攻撃を完全に止めたターン、止めて余ったブロックを充電にする",
       "flavorText": "「先輩！永久機関できちゃいました！」「バカなこと言ってないで巻金買ってこい！」",
       "category": "Passive",
       "rarity": "BRONZE",
@@ -621,7 +606,7 @@
     {
       "id": "呼雷粉",
       "name": "呼雷粉",
-      "description": "与ダメージ時、充電+1。",
+      "description": "会心のたび充電 +3",
       "flavorText": "「あのジイさん、大丈夫かね？手が震えてるぜ。」「大丈夫だろう、そもそも、あのジイさんがドジこいたら全員黒焦げだよ」",
       "category": "Passive",
       "rarity": "BRONZE",
@@ -631,7 +616,7 @@
     {
       "id": "焦げ柄の点火スパナ",
       "name": "焦げ柄の点火スパナ",
-      "description": "攻撃時、充電1消費で与ダメージ+5（足りなければ不発）。",
+      "description": "爆発のたび充電 +5",
       "flavorText": "「先輩！どうですかこれ！スパナとしてだけじゃなく、スターターとしても使えますよ！」「お前が感電しないことを願うよ。」",
       "category": "Passive",
       "rarity": "SILVER",
@@ -641,7 +626,7 @@
     {
       "id": "逆さ避雷針",
       "name": "逆さ避雷針",
-      "description": "攻撃時、充電3消費で与ダメージ+30%（足りなければ不発）。",
+      "description": "敵の攻撃を受けるとき、充電を 5 使って被ダメ −5（1 ターン 1 回）",
       "flavorText": "「名付けて！逆さ避雷針！」「お前、それ間違っても工廠の玄関に置くなよ。」",
       "category": "Passive",
       "rarity": "GOLD",
@@ -671,7 +656,7 @@
     {
       "id": "雷壺",
       "name": "雷壺",
-      "description": "戦闘中、充電が0になった時、一度だけ充電を全回復。",
+      "description": "【規則】充電の上限 30 が無くなる。代わりにターン開始時、30 を超えている分の半分が捨てられる",
       "flavorText": "「先輩！これ即時の予備電源になりませんかね？」「う～ん......」",
       "category": "Passive",
       "rarity": "GOLD",
@@ -679,29 +664,29 @@
       "skill": "雷壺"
     },
     {
-      "id": "余分に乾いた火口箱",
-      "name": "余分に乾いた火口箱",
-      "description": "戦闘開始時、臨界メーター+15。",
+      "id": "乾き火口箱",
+      "name": "乾き火口箱",
+      "description": "戦闘開始時 臨界 +12",
       "flavorText": "箱を閉じても、夜ごと中の火口が一つ増える。朝に灰が減り、蓋の裏側には煤が付かない。",
       "category": "Passive",
       "rarity": "BRONZE",
       "basePrice": 7,
-      "skill": "余分に乾いた火口箱"
+      "skill": "乾き火口箱"
     },
     {
-      "id": "炉番の火床外套",
-      "name": "炉番の火床外套",
-      "description": "被ダメージ量を臨界メーターに追加加算。",
+      "id": "炉番の外套",
+      "name": "炉番の外套",
+      "description": "受けた被ダメージの半分を臨界にする",
       "flavorText": "炉番は外套の焦げ穴を繕わなかった。穴が増えるほど炉の具合がよく分かる、と言い、最後には袖だけを着ていた。",
       "category": "Passive",
       "rarity": "BRONZE",
       "basePrice": 7,
-      "skill": "炉番の火床外套"
+      "skill": "炉番の外套"
     },
     {
       "id": "過熱石",
       "name": "過熱石",
-      "description": "攻撃配線したターン、臨界メーターに+5追加。",
+      "description": "3 個とも攻撃端子に挿したターン、臨界 +15",
       "flavorText": "１つ放り込めば一晩燃え続け、２つ放り込めば炉ごと燃える。",
       "category": "Passive",
       "rarity": "BRONZE",
@@ -709,29 +694,29 @@
       "skill": "過熱石"
     },
     {
-      "id": "溢れを取る鋳型",
-      "name": "溢れを取る鋳型",
-      "description": "臨界爆発時の追加ダメージを50→80に強化。",
+      "id": "溢れ取りの鋳型",
+      "name": "溢れ取りの鋳型",
+      "description": "爆発のとき、閾値を超えて溜まっていた臨界 1 につき追加ダメージ +2",
       "flavorText": "小刀にもならない小さな鋳型なのに、固まった品は必ず型より大きい。余剰分の請求先を巡り、工房と依頼主が今も争っている。",
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "skill": "溢れを取る鋳型"
+      "skill": "溢れ取りの鋳型"
     },
     {
-      "id": "帳簿外の連鎖爆発",
-      "name": "帳簿外の連鎖爆発",
-      "description": "臨界爆発発動ターンの攻撃は会心確定。",
+      "id": "帳簿外の連爆",
+      "name": "帳簿外の連爆",
+      "description": "【規則】爆発で臨界を 0 にせず閾値ぶんだけ減らす。溜まっていれば同じターンに何度でも爆発する",
       "flavorText": "申請書には一発分、購入リストにも一発分、吹っ飛んだのは、鉱床と陰湿な監査官の家。",
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "skill": "帳簿外の連鎖爆発"
+      "skill": "帳簿外の連爆"
     },
     {
       "id": "朝にも熱い竈",
       "name": "朝にも熱い竈",
-      "description": "臨界爆発後、メーターに20残る。",
+      "description": "戦闘開始時、前の戦闘の終わりに残っていた臨界の半分から始まる",
       "flavorText": "廃屋から運び出された竈石。パンを置けば焼けるが、薪を足すと逆に温度が下がる。",
       "category": "Passive",
       "rarity": "SILVER",
@@ -739,19 +724,19 @@
       "skill": "朝にも熱い竈"
     },
     {
-      "id": "気短な早沸かし釜",
-      "name": "気短な早沸かし釜",
-      "description": "臨界爆発の閾値を50→35に低下。",
+      "id": "早沸かし釜",
+      "name": "早沸かし釜",
+      "description": "【規則】爆発の閾値が 50 から 35 に下がる",
       "flavorText": "水を入れる前から蓋が鳴る。沸いた後に注ぐのだ、と売り手は説明したが、誰も二度目を試していない。",
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "skill": "気短な早沸かし釜"
+      "skill": "早沸かし釜"
     },
     {
       "id": "恒熱の炉壁",
       "name": "恒熱の炉壁",
-      "description": "臨界爆発後、メーターが半分残る。",
+      "description": "爆発のたび、消えた臨界の 20% をシールドにする",
       "flavorText": "解体された炉から壁一枚だけが切り出された。冬営地では寝床として奪い合われたが、最終的には猫に奪われた。",
       "category": "Passive",
       "rarity": "SILVER",
@@ -771,122 +756,82 @@
     {
       "id": "鉛入りの握斧",
       "name": "鉛入りの握斧",
-      "description": "非会心攻撃時、与ダメージ+20%。",
+      "description": "非会心の攻撃が通るたび敵に出血 +2（重い刃の傷）",
       "flavorText": "斧としてはなまくらだが、鈍器としては逸品。",
       "category": "Passive",
       "rarity": "BRONZE",
       "basePrice": 7,
-      "skill": "鉛入りの握斧",
-      "stats": [
-        {
-          "stat": "nonCritPct",
-          "value": 20
-        }
-      ]
+      "skill": "鉛入りの握斧"
     },
     {
-      "id": "一人抱えの破城槌",
-      "name": "一人抱えの破城槌",
-      "description": "非会心攻撃時、与ダメージ+60%。",
+      "id": "一人抱えの破城斧",
+      "name": "一人抱えの破城斧",
+      "description": "シールドが 10 以上あるターン、シールドを 10 使って、その攻撃は敵の防御を無視する",
       "flavorText": "運搬命令書には八名、戦闘報告書には一名とある。残る七名の欄には、門を支えたと追記されている。",
       "category": "Passive",
       "rarity": "LEGENDARY",
       "basePrice": 10,
-      "skill": "一人抱えの破城槌",
-      "stats": [
-        {
-          "stat": "nonCritPct",
-          "value": 60
-        }
-      ]
+      "skill": "一人抱えの破城斧"
     },
     {
       "id": "研ぎ知らずの銑鉄棍",
       "name": "研ぎ知らずの銑鉄棍",
-      "description": "会心倍率-0.5、非会心ダメージ+40%。",
+      "description": "【規則】会心が出なくなる。代わりに、会心になるはずだった攻撃は敵の防御を無視し、この戦闘中の敵の防御を 1 下げる",
       "flavorText": "鍛冶屋は刃を付け忘れたのではない。注文書の用途欄を読んで、必要ないと判断した。",
       "category": "Passive",
       "rarity": "SILVER",
       "basePrice": 8,
-      "skill": "研ぎ知らずの銑鉄棍",
-      "stats": [
-        {
-          "stat": "critMul",
-          "value": -0.5
-        },
-        {
-          "stat": "nonCritPct",
-          "value": 40
-        }
-      ]
+      "skill": "研ぎ知らずの銑鉄棍"
     },
     {
-      "id": "読めずの無心刃",
-      "name": "読めずの無心刃",
-      "description": "会心を発生させない、非会心ダメージ+30%。",
-      "flavorText": "刃には目釘も銘もなく、持つ向きすら定まらない。道場では型破りの見本として保管され、誰も型を見せられなかった。",
+      "id": "毒棘の小盾",
+      "name": "毒棘の小盾",
+      "description": "シールドが攻撃を吸収するたび敵に毒 +1",
+      "flavorText": "棘の一本一本に、獣脂と何かを練った黒い膏が詰めてある。受け止めた刃の持ち主は、たいてい翌朝まで気づかない。",
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "skill": "読めずの無心刃"
+      "skill": "毒棘の小盾"
     },
     {
-      "id": "千日振りの鉢巻",
-      "name": "千日振りの鉢巻",
-      "description": "3ターン連続で非会心攻撃した場合、非会心ダメージ+50%（会心発生でリセット）。",
-      "flavorText": "千日目に鉢巻を解くよう教えられる。解いた者は翌朝、また一日目と書いて巻き直した。",
+      "id": "焦げ導線",
+      "name": "焦げ導線",
+      "description": "充電を使うたび（リロールを含む）、使った量 × 2 の臨界",
+      "flavorText": "工廠の配線図では、この一本だけが赤鉛筆でなぞられている。触るなという注意書きは、焦げ跡の上に三度書き直されていた。",
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "skill": "千日振りの鉢巻",
-      "stats": [
-        {
-          "stat": "nonCritPct",
-          "value": 50,
-          "when": {
-            "nonCritStreakMin": 3
-          }
-        }
-      ]
+      "skill": "焦げ導線"
     },
     {
-      "id": "重さを増す拳套",
-      "name": "重さを増す拳套",
-      "description": "攻撃時+1蓄積（上限10）、非会心攻撃時 蓄積×10%ダメージ、会心発生でリセット。",
+      "id": "重増しの拳套",
+      "name": "重増しの拳套",
+      "description": "敵の毒が増えるたび、この戦闘中の攻撃 +1",
       "flavorText": "拳套の留め紐は、一撃ごとに長くなる。外した後で測ると元へ戻るため、修繕依頼は一度も受理されない。",
       "category": "Passive",
       "rarity": "SILVER",
       "basePrice": 8,
-      "skill": "重さを増す拳套"
+      "skill": "重増しの拳套"
     },
     {
-      "id": "直さずの鉢金",
-      "name": "直さずの鉢金",
-      "description": "HP50%以下のとき非会心ダメージ+40%。",
+      "id": "避雷の鉢金",
+      "name": "避雷の鉢金",
+      "description": "シールドが吸収したダメージ 3 につき充電 +1",
       "flavorText": "へこみの数だけ所有者が変わった。どの持ち主も直さず、次は自分の番だと一つ増やして手放した。",
       "category": "Passive",
       "rarity": "SILVER",
       "basePrice": 8,
-      "skill": "直さずの鉢金",
-      "stats": [
-        {
-          "stat": "nonCritPct",
-          "value": 40,
-          "when": {
-            "hpPctMax": 50
-          }
-        }
-      ]
+      "skill": "避雷の鉢金"
     },
     {
-      "id": "緑染みの下拵え小刀",
-      "name": "緑染みの下拵え小刀",
-      "description": "戦闘開始時、敵に毒+1。",
+      "id": "緑染みの小刀",
+      "name": "緑染みの小刀",
+      "description": "戦闘開始時 毒 +2",
       "flavorText": "刃の緑染みは、酢でも灰でも落ちない。露店商は果物用だと言い張り、試食だけは頑として断った。",
       "category": "Passive",
       "rarity": "BRONZE",
       "basePrice": 7,
-      "skill": "緑染みの下拵え小刀"
+      "skill": "緑染みの小刀"
     },
     {
       "id": "素手禁じの蛇血瓶",
@@ -901,7 +846,7 @@
     {
       "id": "主より長い香炉",
       "name": "主より長い香炉",
-      "description": "3ターン毎に敵に毒+1。",
+      "description": "毒のダメージが入るたび、その量の臨界",
       "flavorText": "香炉を焚いた館では、翌朝から虫の声が消えた。館主は静けさを気に入り、窓を開けることを禁じた。",
       "category": "Passive",
       "rarity": "SILVER",
@@ -911,7 +856,7 @@
     {
       "id": "石抜きの毒指輪",
       "name": "石抜きの毒指輪",
-      "description": "敵毒5到達時、敵HP×20%を軽減不可で削る（1戦闘1回）。",
+      "description": "毒が 10 に達したとき、敵の最大 HP の 15% を軽減不可で削り、毒を 5 に戻す（何度でも）",
       "flavorText": "宴席では右手に嵌め、乾杯の前に一度だけ左手へ移す。古い礼法書はそう記すが、その理由の頁は切り取られている。",
       "category": "Passive",
       "rarity": "GOLD",
@@ -919,73 +864,54 @@
       "skill": "石抜きの毒指輪"
     },
     {
-      "id": "跡地庭師の霧吹き",
-      "name": "跡地庭師の霧吹き",
-      "description": "攻撃時、敵の毒スタック×2 の軽減不可ダメージを追加（毒は消費しない）。",
+      "id": "廃庭の霧吹き",
+      "name": "廃庭の霧吹き",
+      "description": "【規則】毒のダメージが、ターン開始に加えて敵が攻撃するたびにも入る",
       "flavorText": "噴口には花弁の意匠がある。旧庭園の区画図で同じ印を探すと、そこだけ植生欄が空白になっている。",
       "category": "Passive",
       "rarity": "SILVER",
       "basePrice": 8,
-      "skill": "跡地庭師の霧吹き"
+      "skill": "廃庭の霧吹き"
     },
     {
-      "id": "岸上げ用の麻痺瓶",
-      "name": "岸上げ用の麻痺瓶",
-      "description": "敵毒スタック分、敵攻撃-N。",
+      "id": "岸上げの麻痺瓶",
+      "name": "岸上げの麻痺瓶",
+      "description": "毒の数だけ敵の攻撃 −N（最大 −5）",
       "flavorText": "漁協の台帳では漁具に分類され、医務所の台帳では劇薬に分類される。双方とも、保管責任は相手にあると主張している。",
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "skill": "岸上げ用の麻痺瓶"
+      "skill": "岸上げの麻痺瓶"
     },
     {
-      "id": "抜かずの控え脇差",
-      "name": "抜かずの控え脇差",
-      "description": "敵毒0超のとき、与ダメージ+15%。",
-      "flavorText": "鞘口は蜜蝋で塞がれ、封には『抜刀不要』とある。刀身だけは毎晩、内側で向きを変えている。",
+      "id": "雷鯰の棘",
+      "name": "雷鯰の棘",
+      "description": "充電 7 以上の間、攻撃が通るたび敵に毒 +1",
+      "flavorText": "河口の漁師は、雷の夜にだけ網へかかる鯰を「旦那」と呼んで逃がしていた。この棘は、逃がさなかった年の分である。",
       "category": "Passive",
       "rarity": "SILVER",
       "basePrice": 8,
-      "skill": "抜かずの控え脇差",
-      "stats": [
-        {
-          "stat": "dmgPct",
-          "value": 15,
-          "when": {
-            "hit": true,
-            "enemyPoisoned": true
-          }
-        }
-      ]
+      "skill": "雷鯰の棘"
     },
     {
       "id": "血日に澄む佩玉",
       "name": "血日に澄む佩玉",
-      "description": "敵出血スタック3以上のとき、会心率+5%。",
+      "description": "敵の出血 1 につき会心率 +2%",
       "flavorText": "普段は濁った赤玉だが、狩りの帰りだけ向こう側が透ける。そこに映る獲物は、いつも一頭多い。",
       "category": "Passive",
       "rarity": "BRONZE",
       "basePrice": 7,
-      "skill": "血日に澄む佩玉",
-      "stats": [
-        {
-          "stat": "critPct",
-          "value": 5,
-          "when": {
-            "enemyBleedMin": 3
-          }
-        }
-      ]
+      "skill": "血日に澄む佩玉"
     },
     {
-      "id": "鋸引き刃の山刀",
-      "name": "鋸引き刃の山刀",
+      "id": "鋸刃の山刀",
+      "name": "鋸刃の山刀",
       "description": "与ダメージ時、敵HP割合で出血付与（≥50%: +1 / <50%: +2 / <25%: +3）。",
       "flavorText": "刃元の刻みは仕留めた数ではなく、逃がした数だという。深い傷ほど刻みが浅く、最後の一本だけ見えない。",
       "category": "Passive",
       "rarity": "SILVER",
       "basePrice": 8,
-      "skill": "鋸引き刃の山刀"
+      "skill": "鋸刃の山刀"
     },
     {
       "id": "逆綴じの止血帯",
@@ -1040,7 +966,7 @@
     {
       "id": "貸与された時間",
       "name": "貸与された時間",
-      "description": "被ダメージの60%を肩代わり蓄積。最大HPの60%到達で 6ターン分割の軽減不可ダメージで返済開始。 返済中に収支プラスのターンを出せば残債務消失。",
+      "description": "【規則】充電を 10 使うたび、エスカレーションの段階が上がるのを 1 ターン遅らせる",
       "flavorText": "中々砂が落ち切らない砂時計。上に砂が残っているなら、まだ勝負は終わっていない。",
       "category": "Passive",
       "rarity": "LEGENDARY",
@@ -1050,7 +976,7 @@
     {
       "id": "烈刃",
       "name": "烈刃",
-      "description": "与ダメージ+40%。",
+      "description": "臨界 2 につき会心率 +1%（臨界 40 で +20%）",
       "flavorText": "太陽の神が鍛えたとうたわれる片手剣。鋭さではなく、熱ですべてを溶断する。",
       "category": "Passive",
       "rarity": "LEGENDARY",
@@ -1058,73 +984,49 @@
       "skill": "烈刃"
     },
     {
-      "id": "半歩深めの力帯",
-      "name": "半歩深めの力帯",
-      "description": "攻撃+2。",
-      "flavorText": "帯の裏へ半歩分の目盛りが縫われている。戦場から戻った者の帯だけ、目盛りが一つ先まで伸びていた。",
+      "id": "帯電の胸甲",
+      "name": "帯電の胸甲",
+      "description": "充電を 3 得るたびシールド +2",
+      "flavorText": "着た者の髪が逆立つので、遠目にも誰が着ているか分かった。冬の点呼では、名を呼ぶより先に返事のような音が鳴った。",
       "category": "Passive",
       "rarity": "BRONZE",
       "basePrice": 7,
-      "skill": "半歩深めの力帯",
-      "stats": [
-        {
-          "stat": "atk",
-          "value": 2
-        }
-      ]
+      "skill": "帯電の胸甲"
     },
     {
-      "id": "戻り数なき革胸当て",
-      "name": "戻り数なき革胸当て",
-      "description": "被ダメージ-1。",
+      "id": "燻りの革胸当て",
+      "name": "燻りの革胸当て",
+      "description": "ターン開始の半減で失ったシールドを臨界にする",
       "flavorText": "表には浅い刃傷、裏には深い爪痕がある。前の持ち主は、助かった日にだけ裏側へ印を付けた。",
       "category": "Passive",
       "rarity": "BRONZE",
       "basePrice": 7,
-      "skill": "戻り数なき革胸当て",
-      "stats": [
-        {
-          "stat": "dmgTaken",
-          "value": -1
-        }
-      ]
+      "skill": "燻りの革胸当て"
     },
     {
       "id": "測量師の片眼鏡",
       "name": "測量師の片眼鏡",
-      "description": "会心率+10%。",
+      "description": "マップを 1 歩進むごとに、次の戦闘の会心率 +1%（その戦闘の間）",
       "flavorText": "大穴の縁を測る測量師が用いた片眼鏡。距離目盛りは途中で増設され、その先は手書きになっている。",
       "category": "Passive",
       "rarity": "SILVER",
       "basePrice": 8,
-      "skill": "測量師の片眼鏡",
-      "stats": [
-        {
-          "stat": "critPct",
-          "value": 10
-        }
-      ]
+      "skill": "測量師の片眼鏡"
     },
     {
-      "id": "黙働きの治癒環",
-      "name": "黙働きの治癒環",
-      "description": "ターン終了時HP+1回復。",
-      "flavorText": "傷が塞がるたび、環の内側に細い筋が一本増える。数えた治療師は、途中から患者の傷より指輪を診るようになった。",
+      "id": "毒固めの腕環",
+      "name": "毒固めの腕環",
+      "description": "ターン開始時、敵の毒 2 につきシールド +1",
+      "flavorText": "毒沼の渡し守が代々はめてきた銅の環。瘴気の濃い日ほど、腕の皮が石のように固くなる。息子は継ぐのを断った。",
       "category": "Passive",
       "rarity": "BRONZE",
       "basePrice": 7,
-      "skill": "黙働きの治癒環",
-      "stats": [
-        {
-          "stat": "regen",
-          "value": 1
-        }
-      ]
+      "skill": "毒固めの腕環"
     },
     {
       "id": "継ぎ革の旅靴",
       "name": "継ぎ革の旅靴",
-      "description": "マップ移動時、HP+1。",
+      "description": "マップを 1 歩進むごとに、次の戦闘の開始時の臨界 +3（歩いて体が温まる）",
       "flavorText": "底を三度張り替えた旅靴。どの革も持ち主より長く道を覚えている。",
       "category": "Passive",
       "rarity": "BRONZE",
@@ -1134,7 +1036,7 @@
     {
       "id": "聖路の白靴",
       "name": "聖路の白靴",
-      "description": "マップ移動時、HP+3。",
+      "description": "マップを 1 歩進むごとに、次の戦闘の開始時のシールド +2",
       "flavorText": "寂照の巡礼路を踏破した者へ渡される白靴。白いまま帰った者はいない。それでも教会は毎年、新しい一足を用意する。",
       "category": "Passive",
       "rarity": "GOLD",
@@ -1142,67 +1044,39 @@
       "skill": "聖路の白靴"
     },
     {
-      "id": "帝国伝令の三日靴",
-      "name": "帝国伝令の三日靴",
-      "description": "各戦闘の初回ロールで攻撃+5。",
-      "flavorText": "『全ての道はヴァスタリオンに通ず』と詠われた頃、帝国街道を三日で駆けた伝令の靴。道は千年前に途切れたが、靴は今も最初の一歩だけを急がせる。",
+      "id": "血車",
+      "name": "血車",
+      "description": "敵の出血が 0 になったとき、その戦闘の出血の最大値だけ充電",
+      "flavorText": "水車小屋の主は、川が涸れた年から別のもので輪を回し始めた。村の医者が首を傾げるほど、その年は粉がよく挽けた。",
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "skill": "帝国伝令の三日靴",
-      "stats": [
-        {
-          "stat": "atk",
-          "value": 5,
-          "when": {
-            "firstRoll": true
-          }
-        }
-      ]
+      "skill": "血車"
     },
     {
-      "id": "退路喰いの狂刃",
-      "name": "退路喰いの狂刃",
-      "description": "HPが最大の50%以下で与ダメージ倍率+0.3、25%以下で+0.8。",
+      "id": "腐し刃",
+      "name": "腐し刃",
+      "description": "毒のダメージが入るたび敵に出血 +1",
       "flavorText": "何の変哲もない折れた剣だが、この刃の持ち主たちは皆、退却命令を無視し続け、最後には包囲の中落命したらしい。",
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "skill": "退路喰いの狂刃",
-      "stats": [
-        {
-          "stat": "dmgPct",
-          "value": 80,
-          "when": {
-            "hit": true,
-            "hpPctMax": 25
-          }
-        },
-        {
-          "stat": "dmgPct",
-          "value": 30,
-          "when": {
-            "hit": true,
-            "hpPctMax": 50,
-            "hpPctAbove": 25
-          }
-        }
-      ]
+      "skill": "腐し刃"
     },
     {
-      "id": "溶かし金の領主剣",
-      "name": "溶かし金の領主剣",
+      "id": "溶金の領主剣",
+      "name": "溶金の領主剣",
       "description": "消費したゴールド累計×0.01 を与ダメージ倍率に加算（100Gで実質×2）。",
       "flavorText": "領主は貨幣を炉へ投じるたび、剣へ新しい都市名を刻ませた。最後の銘は彼自身の領地で、そこだけ金が剥がれている。",
       "category": "Passive",
       "rarity": "LEGENDARY",
       "basePrice": 10,
-      "skill": "溶かし金の領主剣"
+      "skill": "溶金の領主剣"
     },
     {
       "id": "天工開物",
       "name": "天工開物",
-      "description": "武器を強化するたび、強化素材を1つ返還する。",
+      "description": "武器を強化するたび、以後の戦闘の開始時の臨界 +5（累積）",
       "flavorText": "旧い時代、東方の技術者によって書かれた産業技術書。",
       "category": "Passive",
       "rarity": "GOLD",
@@ -1212,7 +1086,7 @@
     {
       "id": "二拍目の心臓",
       "name": "二拍目の心臓",
-      "description": "1戦闘1回、HPが最大の50%を下回った瞬間にシールド（最大HP×50%）を獲得＋戦闘開始時に最大HPの10%回復。",
+      "description": "HP が 50% を下回った瞬間にシールド（最大 HP の 50%）（1 戦闘 1 回）",
       "flavorText": "脈を取ると、必ず一拍遅れてもう一つの鼓動が返る。鑑定医は二人分ではないと断じた。では何人分か、とは書かなかった。",
       "category": "Passive",
       "rarity": "LEGENDARY",
@@ -1220,65 +1094,49 @@
       "skill": "二拍目の心臓"
     },
     {
-      "id": "百鳴りの共振箱",
-      "name": "百鳴りの共振箱",
-      "description": "発動中のパッシブ1個につき与ダメージ+1%。",
-      "flavorText": "中身のない木箱。奇物を近くへ置くたび別の音で鳴り、六つ目からは置いていない品の音まで混じり始める。",
+      "id": "灼線鞭",
+      "name": "灼線鞭",
+      "description": "充電を得るたび、得た量だけ臨界",
+      "flavorText": "工廠の事故報告書、第十二号。原因の欄には「鞭」とだけあり、再発防止策の欄は焼けて読めない。",
       "category": "Passive",
       "rarity": "LEGENDARY",
       "basePrice": 10,
-      "skill": "百鳴りの共振箱"
+      "skill": "灼線鞭"
     },
     {
-      "id": "心軽めの巡礼杖",
-      "name": "心軽めの巡礼杖",
-      "description": "戦闘終了時、物資+10。",
+      "id": "毒草摘みの杖",
+      "name": "毒草摘みの杖",
+      "description": "マップを 2 歩進むごとに、次の戦闘の開始時の毒 +1",
       "flavorText": "杖には巡礼路の距離ではなく、捨てた荷物の名が刻まれている。終点近くの刻みほど小さく、最後には持ち主の名だけが残る。",
       "category": "Passive",
       "rarity": "SILVER",
       "basePrice": 8,
-      "skill": "心軽めの巡礼杖"
+      "skill": "毒草摘みの杖"
     },
     {
-      "id": "末那識の仮面",
-      "name": "末那識の仮面",
-      "description": "HPが最大値の35%以下のとき、会心が確定し与ダメージ+60%。",
-      "flavorText": "寂照の禁庫に収められていた、目穴のない仮面。息が浅くなるほど視界は澄む。何を使って見ているのかは教義にもない。",
+      "id": "寸鉄",
+      "name": "寸鉄",
+      "description": "【規則】会心率が 100% を超えた分が会心ダメージの倍率になる（超えた 10% につき +0.1）",
+      "flavorText": "掌に隠れるほど短い鉄片。持ち主の師は「急所は一つ、刺す深さは一寸で足りる」と教え、残りの手間を全部、研ぎに回した。",
       "category": "Passive",
       "rarity": "LEGENDARY",
       "basePrice": 10,
-      "skill": "末那識の仮面",
-      "stats": [
-        {
-          "stat": "critSure",
-          "value": 1,
-          "when": {
-            "hpPctMax": 35
-          }
-        },
-        {
-          "stat": "dmgPct",
-          "value": 60,
-          "when": {
-            "hpPctMax": 35
-          }
-        }
-      ]
+      "skill": "寸鉄"
     },
     {
-      "id": "戦果で傾く天秤",
-      "name": "戦果で傾く天秤",
-      "description": "戦闘勝利時、+10ゴールド。",
+      "id": "戦果の天秤",
+      "name": "戦果の天秤",
+      "description": "戦闘に勝ったとき、その戦闘で出した会心の回数だけゴールド",
       "flavorText": "片皿には金貨、もう片皿には戦場の土を載せる。勝者が帰るたび土の皿が上がり、金貨の枚数は変わらない。",
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "skill": "戦果で傾く天秤"
+      "skill": "戦果の天秤"
     },
     {
       "id": "脈なしの鋼心臓",
       "name": "脈なしの鋼心臓",
-      "description": "獲得時、最大HP+20。戦闘終了時、HP+5。",
+      "description": "【規則】シールドがターン開始時に半減しなくなる",
       "flavorText": "胸へ収める前から一定の間隔で鳴っている。持ち主が眠ると音は二つに増え、片方だけが朝まで続く。",
       "category": "Passive",
       "rarity": "LEGENDARY",
@@ -1288,7 +1146,7 @@
     {
       "id": "血脈の災環",
       "name": "血脈の災環",
-      "description": "被弾するたび次の与ダメージ+3累積（上限+15、戦闘終了でリセット）。",
+      "description": "出血が自然に 1 減るたび、軽減不可ダメージ 3",
       "flavorText": "常に虐げられてきた血筋に伝わる腕輪。最早彼らを虐げる者はいない。そして、彼ら自身も。",
       "category": "Passive",
       "rarity": "LEGENDARY",
@@ -1296,101 +1154,54 @@
       "skill": "血脈の災環"
     },
     {
-      "id": "鑑定済みの無害灯",
-      "name": "鑑定済みの無害灯",
-      "description": "戦闘終了時、 HP残量が最大の25%以下なら最大HP×50%まで回復。",
+      "id": "無害灯",
+      "name": "無害灯",
+      "description": "臨界が 10 以上の間、受けるダメージ −2",
       "flavorText": "鑑定所は百年燃焼試験の終了を待たず、安全証を発行した。証書は黄ばんだが、燈の影だけは初日の位置にある。",
       "category": "Passive",
       "rarity": "LEGENDARY",
       "basePrice": 10,
-      "skill": "鑑定済みの無害灯"
+      "skill": "無害灯"
     },
     {
-      "id": "二分刀",
-      "name": "二分刀",
-      "description": "このターンの出目が全て偶数なら与ダメージ+15%。",
-      "flavorText": "等分、両断、半割、折半。この小刀はすべてを二等分すると言われるが、世の中そんなに割り切れることばかりではない。",
+      "id": "毒塗りの楔",
+      "name": "毒塗りの楔",
+      "description": "ブロック端子に 2 個以上挿したターン、敵が攻撃してきたら毒 +2",
+      "flavorText": "城門の蝶番に打ち込まれていた楔。抜いた工兵の指先は、その晩から緑に変わった。門は今も閉じたままだ。",
       "category": "Passive",
       "rarity": "BRONZE",
       "basePrice": 7,
-      "skill": "二分刀",
-      "stats": [
-        {
-          "stat": "dmgPct",
-          "value": 15,
-          "when": {
-            "hit": true,
-            "allEven": true
-          }
-        }
-      ]
+      "skill": "毒塗りの楔"
     },
     {
-      "id": "笑い主不明の仮面",
-      "name": "笑い主不明の仮面",
-      "description": "物資[枯渇し始める]以下で与ダメージ+10%、[枯渇寸前]以下なら+25%。",
-      "flavorText": "宴の出席簿に仮面の席が一つ設けられていた。酒杯は毎回空になり、翌朝には参加者が一人ずつ多く記帳されている。",
+      "id": "口縫いの毒糸",
+      "name": "口縫いの毒糸",
+      "description": "〈封じ〉の役が成立したとき毒 +3",
+      "flavorText": "仕立屋組合の禁制品。布ではなく、口を縫うために撚られた糸だという。最後の検品記録には「縫い目、異常なし」とだけ残る。",
       "category": "Passive",
       "rarity": "SILVER",
       "basePrice": 8,
-      "skill": "笑い主不明の仮面",
-      "stats": [
-        {
-          "stat": "dmgPct",
-          "value": 25,
-          "when": {
-            "provisionTierMin": "Scarce"
-          }
-        },
-        {
-          "stat": "dmgPct",
-          "value": 10,
-          "when": {
-            "provisionTierMin": "Depleting",
-            "provisionTierBelow": "Scarce"
-          }
-        }
-      ]
+      "skill": "口縫いの毒糸"
     },
     {
       "id": "瑠璃砥石",
       "name": "瑠璃砥石",
-      "description": "武器強化が3段階以上で与ダメージ+12%。",
+      "description": "役が成立したターン、会心率 +15%",
       "flavorText": "高度な研ぎに使用される瑠璃を原材料にした粒度の細かい砥石。より鋭く、より激しく、すべては一人が生き残るために。",
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "skill": "瑠璃砥石",
-      "stats": [
-        {
-          "stat": "dmgPct",
-          "value": 12,
-          "when": {
-            "hit": true,
-            "weaponPlusMin": 3
-          }
-        }
-      ]
+      "skill": "瑠璃砥石"
     },
     {
-      "id": "遅れて応える万華賽",
-      "name": "遅れて応える万華賽",
-      "description": "出目が「全て同値」「全て異なる」「連続昇順（階段）」のいずれかなら与ダメージ×2。",
-      "flavorText": "振る前に望んだ目は、必ず一投遅れて現れる。賭場では不正に使えないため合法とされ、勝者だけが異議を唱えた。",
+      "id": "遅効の毒刃",
+      "name": "遅効の毒刃",
+      "description": "敵の毒が増えた次のターン、増えた毒 1 につき会心率 +5%",
+      "flavorText": "斬られた者は礼を言って帰っていく。この短剣の噂が広まらないのは、礼を言った者が翌日には口をきけないからだ。",
       "category": "Passive",
       "rarity": "LEGENDARY",
       "basePrice": 10,
-      "skill": "遅れて応える万華賽",
-      "stats": [
-        {
-          "stat": "dmgPct",
-          "value": 100,
-          "when": {
-            "hit": true,
-            "kaleido": true
-          }
-        }
-      ]
+      "skill": "遅効の毒刃"
     },
     {
       "id": "医家の反り刃",
@@ -1405,7 +1216,7 @@
     {
       "id": "鏡返しの小盾",
       "name": "鏡返しの小盾",
-      "description": "会心時、その会心ダメージの5%をシールド化。",
+      "description": "シールドが攻撃を吸収するたび、吸収した量の 30% を敵に返す",
       "flavorText": "鏡面は攻撃を受けた瞬間だけ曇る。次に晴れた時、映っているのは持ち主ではなく、先ほどの刃を構えた誰かだ。",
       "category": "Passive",
       "rarity": "BRONZE",
@@ -1415,7 +1226,7 @@
     {
       "id": "鎧縫いの針",
       "name": "鎧縫いの針",
-      "description": "会心時、軽減不可ダメージ+5を追加で与える。",
+      "description": "敵の出血 1 につき、敵の防御を 1 無視する",
       "flavorText": "鎧師の採寸帳と共に発見された長針。寸法欄には胸囲ではなく、各甲冑の縫い目から心臓までの距離がある。",
       "category": "Passive",
       "rarity": "SILVER",
@@ -1423,14 +1234,14 @@
       "skill": "鎧縫いの針"
     },
     {
-      "id": "連環の指輪",
-      "name": "連環の指輪",
-      "description": "会心するたび会心倍率+0.2（戦闘中累積）。",
-      "flavorText": "内側の輪を数えるたび一つ多い。鑑定士は数え間違いとして七度訂正し、八度目には自分の指輪を外した。",
+      "id": "燧石の指輪",
+      "name": "燧石の指輪",
+      "description": "会心のたび臨界 +8",
+      "flavorText": "嵌まっている石は宝石ではなく火打ち石だ。強く握り込むたびに火花が散り、持ち主の手袋はいつも指先から焦げていった。",
       "category": "Passive",
       "rarity": "LEGENDARY",
       "basePrice": 10,
-      "skill": "連環の指輪"
+      "skill": "燧石の指輪"
     },
     {
       "id": "剣舞譜「円舞」",
@@ -1615,48 +1426,13 @@
       "tier": 4
     },
     {
-      "id": "湯気の立つ椀",
-      "name": "湯気の立つ椀",
-      "description": "物資を 50 回復する。",
-      "flavorText": "塩気だけの汁物。名を持たないが、名がなくても腹には落ちる。",
-      "category": "Consumable",
-      "rarity": "BRONZE",
-      "basePrice": 4,
-      "consFamily": "provision",
-      "tier": 1
-    },
-    {
       "id": "古い手紙",
       "name": "古い手紙",
-      "description": "物資を 100 回復する。",
+      "description": "次のターンに受けるダメージを0にする。3回まで使える。",
       "flavorText": "とうに返せぬ相手からのもの。読み返すたび、送り主の声を忘れていく。",
       "category": "Consumable",
-      "rarity": "SILVER",
-      "basePrice": 6,
-      "consFamily": "provision",
-      "tier": 2
-    },
-    {
-      "id": "凱旋の記憶",
-      "name": "凱旋の記憶",
-      "description": "物資を 150 回復する。",
-      "flavorText": "誰の凱旋だったかは思い出せない。歓声の輪郭だけが、まだ胸のあたりに残っている。",
-      "category": "Consumable",
-      "rarity": "GOLD",
-      "basePrice": 9,
-      "consFamily": "provision",
-      "tier": 3
-    },
-    {
-      "id": "希望の欠片",
-      "name": "希望の欠片",
-      "description": "物資を 200 回復する。",
-      "flavorText": "希望とは名ばかりの劇薬。ただ折れぬように、次も立てるように、笑って死を迎えられるように。",
-      "category": "Consumable",
       "rarity": "LEGENDARY",
-      "basePrice": 13,
-      "consFamily": "provision",
-      "tier": 4
+      "basePrice": 7
     },
     {
       "id": "囮罠",
@@ -1720,82 +1496,52 @@
     {
       "id": "十五年目の計測器",
       "name": "十五年目の計測器",
-      "description": "会心率+5%。",
+      "description": "過充電になったとき、過充電で失った充電 1 につき次の攻撃 +2（針が振り切れる）",
       "flavorText": "針は十五年間、空の椅子を指し続けた。解析者が席を立った瞬間だけ中央へ戻り、彼が座り直すとまた同じ椅子を指した。",
       "category": "Passive",
       "rarity": "BRONZE",
       "basePrice": 7,
-      "skill": "十五年目の計測器",
-      "stats": [
-        {
-          "stat": "critPct",
-          "value": 5
-        }
-      ]
+      "skill": "十五年目の計測器"
     },
     {
       "id": "荒砥",
       "name": "荒砥",
-      "description": "与ダメージ+5%。",
+      "description": "爆発した攻撃が通ると敵に出血 +4",
       "flavorText": "刃こぼれを直すためだけの荒い研石。切れ味は多少落ちるが、刃こぼれした剣よりは幾分かマシだろう。",
       "category": "Passive",
       "rarity": "BRONZE",
       "basePrice": 7,
-      "skill": "荒砥",
-      "stats": [
-        {
-          "stat": "dmgPct",
-          "value": 5
-        }
-      ]
+      "skill": "荒砥"
     },
     {
       "id": "肩当て",
       "name": "肩当て",
-      "description": "戦闘開始時、シールド+1。",
+      "description": "3 個ともブロック端子に挿したターン、シールド +8",
       "flavorText": "ありふれた革製の肩当て。ないよりマシだが、これに命を預けるのはどうかと思う。",
       "category": "Passive",
       "rarity": "BRONZE",
       "basePrice": 7,
-      "skill": "肩当て",
-      "stats": [
-        {
-          "stat": "shieldStart",
-          "value": 1
-        }
-      ]
+      "skill": "肩当て"
     },
     {
       "id": "二度目の打金",
       "name": "二度目の打金",
-      "description": "与ダメージ+10%。",
+      "description": "爆発した次のターンも、追加ダメージの半分が乗る",
       "flavorText": "同じ位置を二度叩いた跡が並ぶ。二度目は要らない工程だが、この工房では誰も省かない。",
       "category": "Passive",
       "rarity": "SILVER",
       "basePrice": 8,
-      "skill": "二度目の打金",
-      "stats": [
-        {
-          "stat": "dmgPct",
-          "value": 10
-        }
-      ]
+      "skill": "二度目の打金"
     },
     {
       "id": "擦り減った小盾",
       "name": "擦り減った小盾",
-      "description": "戦闘開始時、シールド+2。",
+      "description": "ブロック端子に挿したダイス 1 個につきシールド +2",
       "flavorText": "関所で三十年使われた小盾。打痕は正面ではなく縁にばかり残っていて、受けた回数だけ退いた記録になっている。",
       "category": "Passive",
       "rarity": "SILVER",
       "basePrice": 8,
-      "skill": "擦り減った小盾",
-      "stats": [
-        {
-          "stat": "shieldStart",
-          "value": 2
-        }
-      ]
+      "skill": "擦り減った小盾"
     },
     {
       "id": "切り分けた帯封",
@@ -1809,7 +1555,7 @@
     {
       "id": "合札",
       "name": "合札",
-      "description": "各ショップで最初のリロールが無料。",
+      "description": "同じショップで 2 品目以降を買うとき 10G 安い",
       "flavorText": "常連にだけ渡される木札。一度目は勘定に入れないという符牒だが、二度目からは端数まで取られる。",
       "category": "Passive",
       "rarity": "SILVER",
@@ -1818,20 +1564,22 @@
     {
       "id": "銭皿",
       "name": "銭皿",
-      "description": "ショップで買うたび、物資+10。",
+      "description": "戦闘終了時、残っているシールド 3 につき 1G",
       "flavorText": "縁の欠けた木皿。釣りを手渡ししない店の作法で、客と店主は最後まで指を合わせない。",
       "category": "Passive",
       "rarity": "SILVER",
-      "basePrice": 8
+      "basePrice": 8,
+      "skill": "銭皿"
     },
     {
-      "id": "首級控え",
-      "name": "首級控え",
-      "description": "エリート戦に勝利時、ゴールド+4。",
-      "flavorText": "首級の受取を認める控え。等級の欄は狩る側ではなく、狩られた側の格で埋められている。",
+      "id": "爆破コンテストの賞金",
+      "name": "爆破コンテストの賞金",
+      "description": "臨界の爆発でとどめを刺すたび +4G",
+      "flavorText": "鉱山町の祭りの景品券。審査の欄には「音の大きさ」「煙の高さ」とあり、三位までの名前はいずれも欠席と書かれている。",
       "category": "Passive",
       "rarity": "SILVER",
-      "basePrice": 8
+      "basePrice": 8,
+      "skill": "爆破コンテストの賞金"
     },
     {
       "id": "ちいさな灯火",
@@ -1845,7 +1593,7 @@
     {
       "id": "希望の灯片",
       "name": "希望の灯片",
-      "description": "ロール敗北を一度もせずに戦闘に勝つたび、最大HP+2（永続）。",
+      "description": "戦闘終了時に臨界が 25 以上残っていれば、最大 HP +2（永続）",
       "flavorText": "ランタンの火屋の欠片。割れ口はとうに冷えているのに、握ると指先だけが温かい。",
       "category": "Passive",
       "rarity": "GOLD",
@@ -1855,7 +1603,7 @@
     {
       "id": "幸運の硬貨",
       "name": "幸運の硬貨",
-      "description": "戦闘勝利時、+3ゴールド。",
+      "description": "同じ目が 2 個以上出たターン、2G",
       "flavorText": "行商人の帳面には『贈答品』とだけある。同じ硬貨が同じ行に、日付を変えて何度も書かれている。",
       "category": "Passive",
       "rarity": "BRONZE",
@@ -1865,7 +1613,7 @@
     {
       "id": "英雄の意志",
       "name": "英雄の意志",
-      "description": "エリート戦・ボス戦の開始時、シールド+4。",
+      "description": "エリート戦・ボス戦の開始時シールド +6",
       "flavorText": "像の土台から出てきた銀の徽章。裏の番号は、同じ隊の名簿のどこにも載っていない。",
       "category": "Passive",
       "rarity": "SILVER",
@@ -1874,7 +1622,7 @@
       "stats": [
         {
           "stat": "shieldStart",
-          "value": 4,
+          "value": 6,
           "when": {
             "strongFoe": true
           }
@@ -1884,26 +1632,17 @@
     {
       "id": "激情の刃",
       "name": "激情の刃",
-      "description": "HPが最大の50%以下のとき、与ダメージ+20%。",
+      "description": "HP が 50% 以下の間、攻撃が通るたび敵に出血 +2",
       "flavorText": "柄に巻いた布は何度も替えられている。どの布も同じ位置だけが黒い。",
       "category": "Passive",
       "rarity": "GOLD",
       "basePrice": 9,
-      "skill": "激情の刃",
-      "stats": [
-        {
-          "stat": "dmgPct",
-          "value": 20,
-          "when": {
-            "hpPctMax": 50
-          }
-        }
-      ]
+      "skill": "激情の刃"
     },
     {
       "id": "相棒の魂",
       "name": "相棒の魂",
-      "description": "戦闘開始時、シールド+3。",
+      "description": "シールドが割られて 0 になったとき、割られる前の量の半分で張り直す（1 戦闘 1 回）",
       "flavorText": "首輪の金具だけが残った。泥を拭った名前の刻みは、そこだけ新しい。",
       "category": "Passive",
       "rarity": "GOLD",

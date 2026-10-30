@@ -368,17 +368,6 @@ namespace EventSystem
                     result.log.Add("根拠のない確信が芽吹いた (確信段階1)。エリート撃破毎に成長する。");
                     break;
                 }
-                case "脈なしの鋼心臓":
-                {
-                    int gain = GameLoop.LastStand.FilterMaxHPGain(run, 20);
-                    if (gain > 0)
-                    {
-                        run.playerMaxHP += gain;
-                        run.playerHP = UnityEngine.Mathf.Min(run.playerMaxHP, run.playerHP + gain);
-                        result.log.Add($"鋼の心臓: 最大HP+{gain} → {run.playerMaxHP}");
-                    }
-                    break;
-                }
             }
         }
     }

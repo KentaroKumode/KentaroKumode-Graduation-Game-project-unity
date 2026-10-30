@@ -99,11 +99,11 @@ namespace GameLoop
             if (!free) run.weaponMaterials -= cost;
             SetLevel(run, run.equippedDiceId, cur + 1);
             UnityEngine.Debug.Log($"[DiceEnhance] {run.equippedDiceId} Lv{cur}→{cur+1} (残素材 {run.weaponMaterials})");
-            // 天工開物: 強化で素材1返還 (武器強化と対称)
+            // 天工開物 (2026-10-31): 強化するたび、 以後の戦闘の開始時の臨界 +5 (武器強化と対称)
             if (!free && run.OwnsPassive(ItemIds.HeavenlyCraft))
             {
-                run.weaponMaterials += 1;
-                UnityEngine.Debug.Log("[天工開物] ダイス強化で素材+1 返還");
+                run.heavenlyCraftUpgrades++;
+                UnityEngine.Debug.Log($"[天工開物] ダイス強化 → 以後の戦闘の開始時 臨界 +{5 * run.heavenlyCraftUpgrades}");
             }
             return true;
 #pragma warning restore 0162

@@ -40,14 +40,6 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => PursuitHelper.Apply(ctx, 0.50f);
     }
 
-    /// <summary>追撃IV — 新: 与ダメ+40% (2026-09-20: +100% から) (旧: +8 固定)</summary>
-    public class PursuitIV : IPassiveSkillEffect
-    {
-        public string SkillId => "烈刃";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
-        // 2026-09-20: +100% → +40%。 無条件で常時乗るため実効も +100% で、 条件付きの札と釣り合わなかった。
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => PursuitHelper.Apply(ctx, 0.40f);
-    }
 
     // ============================================================
     //  汎用パッシブ — 反撃（Counter）
@@ -66,37 +58,9 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>反撃I — 新: 被ダメ時に敵へ軽減不可2ダメ (旧: ロール敗北時)</summary>
-    public class CounterI : IPassiveSkillEffect
-    {
-        public string SkillId => "CounterI";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollLose, PassiveSkillTrigger.OnPreReceiveDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => CounterHelper.Apply(t, ctx, 2);
-    }
 
-    /// <summary>反撃II — 新: 被ダメ時に敵へ軽減不可4ダメ (旧: ロール敗北時)</summary>
-    public class CounterII : IPassiveSkillEffect
-    {
-        public string SkillId => "CounterII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollLose, PassiveSkillTrigger.OnPreReceiveDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => CounterHelper.Apply(t, ctx, 4);
-    }
 
-    /// <summary>反撃III — 新: 被ダメ時に敵へ軽減不可6ダメ (旧: ロール敗北時)</summary>
-    public class CounterIII : IPassiveSkillEffect
-    {
-        public string SkillId => "CounterIII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollLose, PassiveSkillTrigger.OnPreReceiveDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => CounterHelper.Apply(t, ctx, 6);
-    }
 
-    /// <summary>反撃IV — 新: 被ダメ時に敵へ軽減不可8ダメ (旧: ロール敗北時)</summary>
-    public class CounterIV : IPassiveSkillEffect
-    {
-        public string SkillId => "CounterIV";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollLose, PassiveSkillTrigger.OnPreReceiveDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => CounterHelper.Apply(t, ctx, 8);
-    }
 
     // ============================================================
     //  汎用パッシブ — 筋力（Might）: 各ダイス出目+N
@@ -234,38 +198,8 @@ namespace ItemSystem.PassiveSkills.Effects
     // ============================================================
 
 
-    /// <summary>活力II — ターン終了時HP+2回復</summary>
-    public class VitalityII : IPassiveSkillEffect
-    {
-        public string SkillId => "VitalityII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + 2);
-        }
-    }
 
-    /// <summary>活力III — ターン終了時HP+3回復</summary>
-    public class VitalityIII : IPassiveSkillEffect
-    {
-        public string SkillId => "VitalityIII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + 3);
-        }
-    }
 
-    /// <summary>活力IV (2026-05-30 LEG1.3倍化: +4 → +5) — ターン終了時HP+5回復</summary>
-    public class VitalityIV : IPassiveSkillEffect
-    {
-        public string SkillId => "VitalityIV";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + 5);
-        }
-    }
 
     // ============================================================
     //  ユニークパッシブ — 盾系
@@ -370,25 +304,6 @@ namespace ItemSystem.PassiveSkills.Effects
     //  ctx.lifestealPct に加算し、CombatManager 勝利分岐が totalDmg×pct を HealPlayer で回復
     //  （負傷/回復封印/天衣無縫を尊重）。毎ターン0リセットのため OnTurnStart で再適用。
     // ============================================================
-    public class LifestealI : IPassiveSkillEffect
-    {
-        public string SkillId => "LifestealI";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { ctx.lifestealPct += 0.02f; }
-    }
-    public class LifestealIII : IPassiveSkillEffect
-    {
-        public string SkillId => "LifestealIII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { ctx.lifestealPct += 0.06f; }
-    }
-    public class LifestealIV : IPassiveSkillEffect
-    {
-        // 2026-05-30 LEG 1.3倍化: 8% → 10%
-        public string SkillId => "LifestealIV";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { ctx.lifestealPct += 0.10f; }
-    }
 
     // ============================================================
     //  汎用パッシブ — 不屈（Indomitable）リワーク 2026-07-15:
@@ -429,142 +344,9 @@ namespace ItemSystem.PassiveSkills.Effects
     // ShieldBashI〜IV (IV = 旧〈内から落ちた城盾〉) は 2026-10-28 削除。 I〜III はどの品にも付いていなかった。
     //   「シールドを攻撃に変える」は盾家系の〈シールドバッシュ〉(WeaponFamilyEffects.cs) へ一本化した。
 
-    /// <summary>騎士団の切り札 (2026-10-28 リワーク) — <b>戦闘に 1 回</b>、 ターン頭に HP が最大の 30% 未満なら、
-    /// この戦闘で得たシールドの合計の 50% をシールドとして取り戻す。
-    ///
-    /// <para>旧: 倒せる攻撃のときシールドを全部使って同じ量を攻撃に加える (盾解放)。 盾家系の〈シールドバッシュ〉と
-    /// ほぼ同じ仕組みになったので、 名前どおりの一度きりの逆転札へ変えた。 シールドを多く回したほど厚くなる。</para>
-    ///
-    /// <para>ターン頭 (OnTurnStart) で判定する ── シールドの半減 (BeginNewTurn) より後なので、 取り戻した分は
-    /// そのターン丸ごと使える。 ターン終了時に入れると次のターン頭で即座に半分になる。</para></summary>
-    public class KnightsTrumpCard : IPassiveSkillEffect
-    {
-        public const int HpPctBelow = 30;
-        public const int RefundPct = 50;
-        private const string UsedKey = "knightsTrumpCardUsed";
-        public string SkillId => "騎士団の切り札";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (ctx.GetAccumulated(UsedKey) > 0f) return;
-            if (ctx.playerMaxHP <= 0 || ctx.playerCurrentHP <= 0) return;
-            if (ctx.playerCurrentHP * 100 >= ctx.playerMaxHP * HpPctBelow) return;
-            ctx.accumulatedValues[UsedKey] = 1f;
-            int refund = ctx.shieldGainedTotal * RefundPct / 100;
-            if (refund <= 0) return;
-            ctx.consShield += refund;
-            ctx.shieldGainedTotal += refund;
-            CombatSystem.ShieldDiag.Note("騎士団の切り札", refund);
-            UnityEngine.Debug.Log($"[騎士団の切り札] HP {ctx.playerCurrentHP}/{ctx.playerMaxHP} → シールド +{refund}");
-        }
-    }
 
-    // ============================================================
-    //  汎用パッシブ — 貸与された時間（LentTime）リワーク版:
-    //   敗北時、 被ダメの 15/30/45/60% を「貸与時間」として肩代わり (軽減) し蓄積。
-    //   蓄積が最大HP×同割合に達すると、 一括清算ではなく Tier別 3/4/5/6ターンに分割して
-    //   毎ターン終了時 軽減不可ダメを支払う。 分割中にロール勝利1回で残債務帳消し (返済免除)。
-    //   上限到達中にさらに被弾しても新規借入は受け付けない (返済中ロック)。
-    // ============================================================
-    internal static class LentTimeHelper
-    {
-        // Tier別 分割ターン数
-        public static int PaybackTurns(int tier)
-        {
-            switch (tier) { case 1: return 3; case 2: return 4; case 3: return 5; case 4: return 6; default: return 4; }
-        }
-        // OnRollWin: 分割返済中なら帳消し / 蓄積中なら帳消し
-        public static void OnWin(CombatContext ctx)
-        {
-            if (ctx.lentTimePaybackRemainTurns > 0 || ctx.lentTimeStacks > 0)
-                UnityEngine.Debug.Log($"[貸与された時間] 勝利→ 帳消し ({ctx.lentTimeStacks + ctx.lentTimePaybackTotal} ダメ免除)");
-            ctx.lentTimeStacks = 0;
-            ctx.lentTimePaybackRemainTurns = 0;
-            ctx.lentTimePaybackTotal = 0;
-        }
-        // OnPreReceiveDamage: 被ダメの pct を肩代わり蓄積、 上限到達で分割返済モードへ移行
-        // ユーザー指定: 返済支払いがあったターンは新規借入を行わない
-        public static void OnReceive(CombatContext ctx, float pct, int tier)
-        {
-            if (ctx.lentTimePaybackRemainTurns > 0) return; // 返済中は借入ロック
-            if (ctx.lentTimePaidThisTurn) return;            // 同ターンに支払い済みなら借入もしない
-            int dmg = ctx.finalDamage;
-            if (dmg <= 0) return;
-            int portion = UnityEngine.Mathf.CeilToInt(dmg * pct);
-            ctx.finalDamage = System.Math.Max(0, dmg - portion);
-            ctx.lentTimeStacks += portion;
-            ctx.lentTimeTier = tier;
-            int cap = UnityEngine.Mathf.CeilToInt(ctx.playerMaxHP * pct);
-            if (ctx.lentTimeStacks >= cap)
-            {
-                ctx.lentTimePaybackTotal = ctx.lentTimeStacks;
-                ctx.lentTimePaybackRemainTurns = PaybackTurns(tier);
-                ctx.lentTimeStacks = 0;
-                UnityEngine.Debug.Log($"[貸与された時間] 上限到達 → {ctx.lentTimePaybackRemainTurns}T 分割返済開始 (総債務{ctx.lentTimePaybackTotal})");
-            }
-        }
-        // OnTurnEnd: 分割返済の1回分を支払い (HP下限1ガード + 蓄積停止フラグセット)
-        public static void OnTurnEnd(CombatContext ctx)
-        {
-            if (ctx.lentTimePaybackRemainTurns <= 0) return;
-            int payment = UnityEngine.Mathf.CeilToInt((float)ctx.lentTimePaybackTotal / ctx.lentTimePaybackRemainTurns);
-            // HP下限保護: 現HP > 1 でないと支払いしない、 また支払い量を HP-1 まで丸める
-            int hpFloor = System.Math.Max(0, ctx.playerCurrentHP - 1);
-            int actualPay = System.Math.Min(payment, hpFloor);
-            if (actualPay > 0)
-            {
-                ctx.fixedDamageToPlayer += actualPay;
-                ctx.lentTimePaidThisTurn = true; // このターン新規借入禁止
-            }
-            ctx.lentTimePaybackTotal = System.Math.Max(0, ctx.lentTimePaybackTotal - payment); // 元本は予定通り減らす
-            ctx.lentTimePaybackRemainTurns--;
-            UnityEngine.Debug.Log($"[貸与された時間] T終了支払 -{actualPay} (予定{payment}, HP1下限保護, 残債{ctx.lentTimePaybackTotal} / 残{ctx.lentTimePaybackRemainTurns}T)");
-        }
-    }
-    public class LentTimeI : IPassiveSkillEffect
-    {
-        public string SkillId => "LentTimeI";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage, PassiveSkillTrigger.OnRollWin, PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (t == PassiveSkillTrigger.OnRollWin) LentTimeHelper.OnWin(ctx);
-            else if (t == PassiveSkillTrigger.OnTurnEnd) LentTimeHelper.OnTurnEnd(ctx);
-            else LentTimeHelper.OnReceive(ctx, 0.15f, 1);
-        }
-    }
-    public class LentTimeII : IPassiveSkillEffect
-    {
-        public string SkillId => "LentTimeII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage, PassiveSkillTrigger.OnRollWin, PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (t == PassiveSkillTrigger.OnRollWin) LentTimeHelper.OnWin(ctx);
-            else if (t == PassiveSkillTrigger.OnTurnEnd) LentTimeHelper.OnTurnEnd(ctx);
-            else LentTimeHelper.OnReceive(ctx, 0.30f, 2);
-        }
-    }
-    public class LentTimeIII : IPassiveSkillEffect
-    {
-        public string SkillId => "LentTimeIII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage, PassiveSkillTrigger.OnRollWin, PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (t == PassiveSkillTrigger.OnRollWin) LentTimeHelper.OnWin(ctx);
-            else if (t == PassiveSkillTrigger.OnTurnEnd) LentTimeHelper.OnTurnEnd(ctx);
-            else LentTimeHelper.OnReceive(ctx, 0.45f, 3);
-        }
-    }
-    public class LentTimeIV : IPassiveSkillEffect
-    {
-        public string SkillId => "貸与された時間";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage, PassiveSkillTrigger.OnRollWin, PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (t == PassiveSkillTrigger.OnRollWin) LentTimeHelper.OnWin(ctx);
-            else if (t == PassiveSkillTrigger.OnTurnEnd) LentTimeHelper.OnTurnEnd(ctx);
-            else LentTimeHelper.OnReceive(ctx, 0.60f, 4);
-        }
-    }
+    // 旧〈貸与された時間〉(被ダメの肩代わりと分割返済・LentTimeI〜IV) と、 品の付いていない段階クラス
+    //   (Counter / Vitality / BladeEdge / BountyHunter / Conqueror / Lifesteal の I〜IV) は 2026-10-31 のアイテム再編で削除。
 
 
 
@@ -579,14 +361,6 @@ namespace ItemSystem.PassiveSkills.Effects
     // ============================
 
 
-    /// <summary>天工開物 — 武器強化のたび強化素材を1つ返還（実効果は GameManager.TryUpgradeWeapon の所持判定）。
-    /// 戦闘パッシブとしては何もしない no-op（表示名解決＋未登録警告の抑止用に登録する）。</summary>
-    public class TenkouKaibutsu : IPassiveSkillEffect
-    {
-        public string SkillId => "天工開物";
-        public PassiveSkillTrigger[] Triggers => System.Array.Empty<PassiveSkillTrigger>();
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { }
-    }
 
 
     /// <summary>黄金卿の剣 (2026-05-31 v3 消費Gold基準) — 消費した累積ゴールド×0.002 を outgoing に加算。
@@ -598,7 +372,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// このアイテムの強弱を変える意図ではない。</summary>
     public class GoldKingBlade : IPassiveSkillEffect
     {
-        public string SkillId => "溶かし金の領主剣";
+        public string SkillId => "溶金の領主剣";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
@@ -633,47 +407,10 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>防殻の一閃 (BRONZE) — 会心時、その会心ダメージの5%をシールド化（攻めの会心がわずかな守りになる）。</summary>
-    public class GuardFlash : IPassiveSkillEffect
-    {
-        public string SkillId => "鏡返しの小盾";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            // OnCriticalDamage は ×criticalMultiplier 適用前に発火するため、会心後ダメを自前で算出。
-            int critDmg = UnityEngine.Mathf.CeilToInt((ctx.finalDamage + ctx.pursuitDamage) * ctx.criticalMultiplier);
-            int shield = UnityEngine.Mathf.CeilToInt(critDmg * 0.05f);
-            if (shield > 0) { ctx.consShield += shield; ctx.shieldGainedTotal += shield; CombatSystem.ShieldDiag.Note("鏡返しの小盾", shield); }
-        }
-    }
-
-    /// <summary>急所穿ち (SILVER) — 会心時、軽減無視ダメージ+5を追加で与える（硬い敵に刺さる防御貫通の追い打ち）。</summary>
-    public class VitalPierce : IPassiveSkillEffect
-    {
-        public string SkillId => "鎧縫いの針";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            ctx.fixedDamageToEnemy += 5;
-        }
-    }
 
 
 
-    /// <summary>連環の極み (LEGENDARY) — 会心するたび会心倍率+0.2（戦闘中累積）。会心スノーボール。</summary>
-    public class ChainApex : IPassiveSkillEffect
-    {
-        public string SkillId => "連環の指輪";
-        private const string StackKey = "chainApexStacks"; // 戦闘中持続（accumulatedValues は戦闘開始でのみリセット）
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalCheck, PassiveSkillTrigger.OnCriticalDamage };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            if (trigger == PassiveSkillTrigger.OnCriticalCheck)
-                ctx.criticalMultiplier += 0.2f * ctx.GetAccumulated(StackKey); // 毎ターン再取得される倍率へ累積分を再適用
-            else
-                ctx.AddAccumulated(StackKey, 1f); // 会心成立ごとに+1スタック
-        }
-    }
+
 
     // 武器Tier段階補正 (旧: ダイス合計 / 新: 攻撃力・自動分岐)
 
@@ -694,38 +431,6 @@ namespace ItemSystem.PassiveSkills.Effects
             float after = System.Math.Max(0f, cur - amount);
             ctx.accumulatedValues[EnemyShieldKey] = after;
             UnityEngine.Debug.Log($"[利刃] 敵シールド -{amount} ({cur:F0}→{after:F0})");
-        }
-    }
-    /// <summary>利刃I — 攻撃時、敵シールドを-5</summary>
-    public class BladeEdgeI : IPassiveSkillEffect
-    {
-        public string SkillId => "BladeEdgeI";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => BladeEdgeHelper.Strip(ctx, 5);
-    }
-    /// <summary>利刃II — 攻撃時、敵シールドを-10</summary>
-    public class BladeEdgeII : IPassiveSkillEffect
-    {
-        public string SkillId => "BladeEdgeII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => BladeEdgeHelper.Strip(ctx, 10);
-    }
-    /// <summary>利刃III — 攻撃時、敵シールドを-15</summary>
-    public class BladeEdgeIII : IPassiveSkillEffect
-    {
-        public string SkillId => "BladeEdgeIII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => BladeEdgeHelper.Strip(ctx, 15);
-    }
-    /// <summary>利刃IV — 攻撃時、敵シールドを-20 + 会心ダメージ+20%</summary>
-    public class BladeEdgeIV : IPassiveSkillEffect
-    {
-        public string SkillId => "BladeEdgeIV";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage, PassiveSkillTrigger.OnCriticalCheck };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (t == PassiveSkillTrigger.OnPreDealDamage) BladeEdgeHelper.Strip(ctx, 20);
-            else ctx.criticalMultiplier += 0.2f; // 会心ダメージ+20%
         }
     }
 
@@ -765,30 +470,6 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    public class BountyHunterI : IPassiveSkillEffect
-    {
-        public string SkillId => "BountyHunterI";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { BountyHunterHelper.Try(ctx, 10, 5, 1); }
-    }
-    public class BountyHunterII : IPassiveSkillEffect
-    {
-        public string SkillId => "BountyHunterII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { BountyHunterHelper.Try(ctx, 20, 10, 2); }
-    }
-    public class BountyHunterIII : IPassiveSkillEffect
-    {
-        public string SkillId => "百一人切りの鉈";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { BountyHunterHelper.Try(ctx, 30, 15, 3); }
-    }
-    public class BountyHunterIV : IPassiveSkillEffect
-    {
-        public string SkillId => "BountyHunterIV";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { BountyHunterHelper.Try(ctx, 40, 20, 4); }
-    }
 
     /// <summary>治癒阻害（Silver）— 敵が得る回復量を50%減少。</summary>
     public class GrievousI : IPassiveSkillEffect
@@ -851,85 +532,9 @@ namespace ItemSystem.PassiveSkills.Effects
             ctx.outgoingDamageMultiplier += pct / 100f;
         }
     }
-    public class ConquerorI : IPassiveSkillEffect
-    {
-        public string SkillId => "ConquerorI";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollWin, PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        { if (t == PassiveSkillTrigger.OnRollWin) ConquerorHelper.OnWin(ctx, 2, 20); else ConquerorHelper.OnDeal(ctx); }
-    }
-    public class ConquerorII : IPassiveSkillEffect
-    {
-        public string SkillId => "ConquerorII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollWin, PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        { if (t == PassiveSkillTrigger.OnRollWin) ConquerorHelper.OnWin(ctx, 4, 40); else ConquerorHelper.OnDeal(ctx); }
-    }
-    public class ConquerorIII : IPassiveSkillEffect
-    {
-        public string SkillId => "征服者の戦旗";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollWin, PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        { if (t == PassiveSkillTrigger.OnRollWin) ConquerorHelper.OnWin(ctx, 5, 60); else ConquerorHelper.OnDeal(ctx); }
-    }
-    public class ConquerorIV : IPassiveSkillEffect
-    {
-        public string SkillId => "ConquerorIV";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollWin, PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        { if (t == PassiveSkillTrigger.OnRollWin) ConquerorHelper.OnWin(ctx, 10, 100); else ConquerorHelper.OnDeal(ctx); }
-    }
-
-    /// <summary>命脈 (再強化 2026-05-30 v2): 戦闘開始時 max HP×10% 回復 + HP50% 割れ瞬間に
-    /// シールド (max HP×50%) を獲得 (1戦闘1回)。 LEG責任ある量に底上げ。</summary>
-    public class Lifeline : IPassiveSkillEffect
-    {
-        public string SkillId => "二拍目の心臓";
-        private const string UsedKey = "lifeline_used";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnPostReceiveDamage };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            if (ctx.playerMaxHP <= 0) return;
-            if (trigger == PassiveSkillTrigger.OnBattleStart)
-            {
-                int heal = UnityEngine.Mathf.CeilToInt(ctx.playerMaxHP * 0.10f);
-                int before = ctx.playerCurrentHP;
-                ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + heal);
-                int gained = ctx.playerCurrentHP - before;
-                if (gained > 0) UnityEngine.Debug.Log($"[命脈] 戦闘開始時 +{gained} HP");
-                return;
-            }
-            if (ctx.GetAccumulated(UsedKey) > 0) return;
-            if (ctx.playerCurrentHP <= 0) return;
-            if (ctx.playerCurrentHP * 100 > ctx.playerMaxHP * 50) return;
-            ctx.accumulatedValues[UsedKey] = 1;
-            int shield = UnityEngine.Mathf.CeilToInt(ctx.playerMaxHP * 0.50f);
-            ctx.consShield += shield;
-            CombatSystem.ShieldDiag.Note("二拍目の心臓", shield);
-            ctx.shieldGainedTotal += shield;
-            UnityEngine.Debug.Log($"[命脈] HP50%割れ → シールド+{shield}");
-        }
-    }
 
 
-    /// <summary>共鳴 — 発動中パッシブ 1 個につき与ダメ +1% (outgoing に加算)。
-    ///
-    /// <para><b>2026-09-20: 「5 個を超えた分 × 5%」から「全数 × 1%」へ。</b> 実測で発動中パッシブが
-    /// 平均 44 個あり、 実効 +196% (ボス戦 +239%) と全出どころで突出していた。 閾値を外して係数を 1/5 に。</para></summary>
-    public class Resonance : IPassiveSkillEffect
-    {
-        public const float PctPerSkill = 0.01f;
-        public string SkillId => "百鳴りの共振箱";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            if (ctx.finalDamage <= 0) return;
-            int n = PassiveSkillManager.Instance?.ActivePlayerSkillCount ?? 0;
-            if (n <= 0) return;
-            if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
-            ctx.outgoingDamageMultiplier += PctPerSkill * n;
-        }
-    }
+
 
 
     // ============================================================
@@ -1097,50 +702,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
 
 
-    /// <summary>無心の刃 (MindlessBlade) — 会心を発生させない (critSuppressed)、非会心ダメ+30% (2026-09-20: +80% から)。
-    /// 会心確率を完全に潰す代わりに、非会心火力を大幅増。純粋鈍器ビルドの核。</summary>
-    public class MindlessBlade : IPassiveSkillEffect
-    {
-        public string SkillId => "読めずの無心刃";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalCheck, PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (t == PassiveSkillTrigger.OnCriticalCheck) ctx.critSuppressed = true; // 会心封印 (2026-07-26: -99 から移行)
-            else if (ctx.finalDamage > 0) ctx.nonCritOutgoingMultiplier += 0.30f;   // 2026-09-20: +80% → +30%
-        }
-    }
 
-    /// <summary>溜め打ち (Windup) — 攻撃時+1蓄積 (上限10)、非会心攻撃時 蓄積×10% outgoing、会心発生でリセット。
-    /// 「非会心を積むほど強くなり、会心事故で崩れる」蓄積型。</summary>
-    public class Windup : IPassiveSkillEffect
-    {
-        public string SkillId => "重さを増す拳套";
-        private const string StackKey = "windup_stack";
-        private const int MaxStack = 10;
-        public PassiveSkillTrigger[] Triggers => new[]
-        {
-            PassiveSkillTrigger.OnPreDealDamage,   // 蓄積を適用
-            PassiveSkillTrigger.OnPostDealDamage,  // 蓄積++ or リセット
-        };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (t == PassiveSkillTrigger.OnPreDealDamage)
-            {
-                if (ctx.finalDamage <= 0) return;
-                int stacks = (int)ctx.GetAccumulated(StackKey);
-                if (stacks > 0) ctx.nonCritOutgoingMultiplier += 0.10f * stacks;
-            }
-            else // OnPostDealDamage
-            {
-                if (ctx.isCritical) ctx.accumulatedValues[StackKey] = 0;
-                else
-                {
-                    int cur = (int)ctx.GetAccumulated(StackKey);
-                    if (cur < MaxStack) ctx.accumulatedValues[StackKey] = cur + 1;
-                }
-            }
-        }
-    }
 
     // ============================================================
     //  毒系 (2026-07-15 新規・4-2-2-1 テンプレで 9 種)
@@ -1149,16 +711,6 @@ namespace ItemSystem.PassiveSkills.Effects
     //  炎上 (短期爆発) / 出血 (継戦積み) / 毒 (拘束) で三役分離。
     // ============================================================
 
-    /// <summary>毒塗り (PoisonCoat) — 戦闘開始時、敵に毒+1。最遅の起爆剤。</summary>
-    public class PoisonCoat : IPassiveSkillEffect
-    {
-        public string SkillId => "緑染みの下拵え小刀";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            ctx.AddStatus(StatusTarget.Enemy, "poison", 1);
-        }
-    }
 
     /// <summary>腐蝕の一撃 (CorrosiveStrike) — 攻撃時、10% で敵毒+1。稀だが継続で必ず積む。</summary>
     public class CorrosiveStrike : IPassiveSkillEffect
@@ -1184,75 +736,23 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>毒の霧 (VenomFog) — 3ターン毎に敵毒+1 (時間が味方)。ターンレース系との相剋を狙う。</summary>
-    public class VenomFog : IPassiveSkillEffect
-    {
-        public string SkillId => "主より長い香炉";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (ctx.currentTurn <= 0 || ctx.currentTurn % 3 != 0) return;
-            ctx.AddStatus(StatusTarget.Enemy, "poison", 1);
-        }
-    }
 
-    /// <summary>毒殺者 (AssassinToxin) — 敵毒=5 (上限) に到達したら、敵HP×20% を軽減不能で削る (1戦闘1回)。
-    /// キル手段としての "5到達即死判定" (実際は 20% 削り = 実質瀕死化)。</summary>
-    public class AssassinToxin : IPassiveSkillEffect
-    {
-        public string SkillId => "石抜きの毒指輪";
-        private const string UsedKey = "assassin_toxin_used";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (ctx.GetAccumulated(UsedKey) > 0) return;
-            if (ctx.GetStatus(StatusTarget.Enemy, "poison") < 5) return;
-            if (ctx.enemyCurrentHP <= 0 || ctx.enemyMaxHP <= 0) return;
-            int dmg = ctx.RatioDamageToEnemy(0.20f);
-            ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - dmg);
-            ctx.accumulatedValues[UsedKey] = 1;
-            UnityEngine.Debug.Log($"[毒殺者] 敵毒=5到達 → HP×20% = {dmg} 軽減不能ダメ → 敵HP={ctx.enemyCurrentHP}");
-        }
-    }
 
-    /// <summary>毒液噴射 (VenomBurst) — 攻撃時、敵毒2消費で 消費数×5 の軽減不能ダメ (2消費=10)。
-    /// 積んだ毒を火力に変換 (BloodStrike の毒版・小型)。</summary>
-    /// <summary>毒液噴射 (2026-09-05 リワーク) — 攻撃時、 <b>敵の毒スタック × 2</b> を軽減無視で追加。
-    /// <b>毒は消費しない。</b>
-    ///
-    /// <para>旧: 毒を 2 消費して固定 10 ダメージ。 毒は減衰なし・上限10・stacks×1 の DOT なので、
-    /// <b>消費する設計だと毒そのものと食い合う</b> ── 2 スタック (=2ダメ/T が永続) を
-    /// 10 ダメージ 1 回に替える取引は、 3 ターン以上続く戦闘では損になる。</para>
-    ///
-    /// <para>シールドバッシュが「盾を消費せず残存量を読む」ことで<b>盾を持ち続けること自体を火力にした</b>
-    /// (§3-A・2026-07-15 リワーク) のと同じ形へ揃えた。 毒を積む動きとペイオフが同じ方向を向く。</para></summary>
-    public class VenomBurst : IPassiveSkillEffect
-    {
-        /// <summary>毒 1 スタックあたりの追加ダメージ。 上限 10 スタックで +20。</summary>
-        private const int PerStack = 2;
-
-        public string SkillId => "跡地庭師の霧吹き";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (ctx.finalDamage <= 0) return;
-            int p = ctx.GetStatus(StatusTarget.Enemy, "poison");
-            if (p <= 0) return;
-            ctx.fixedDamageToEnemy += p * PerStack;
-        }
-    }
 
     /// <summary>麻痺毒 (Paralysis) — 敵毒スタック分、敵攻撃-N (拘束の中核)。
     /// 5スタックで敵攻撃-5 = 拘束ビルドの主効果。CurseBind と重ねられる。</summary>
     public class Paralysis : IPassiveSkillEffect
     {
-        public string SkillId => "岸上げ用の麻痺瓶";
+        public string SkillId => "岸上げの麻痺瓶";
+        /// <summary>敵の攻撃を下げる上限 (2026-10-31)。</summary>
+        public const int MaxCut = 5;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             int stacks = ctx.GetStatus(StatusTarget.Enemy, "poison");
             if (stacks <= 0) return;
-            ctx.mutualEnemyAttackReduction += stacks;
+            // 2026-10-31: 最大 −5。 毒が深くなるほど敵が無力化され、 伸ばすほど安全になる形を止める。
+            ctx.mutualEnemyAttackReduction += System.Math.Min(stacks, MaxCut);
         }
     }
 
@@ -1282,7 +782,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// (≥50%: +1 / <50%: +2 / <25%: +3)。追い込み時ほど加速する出血ジェネレータ。</summary>
     public class CrimsonBlade : IPassiveSkillEffect
     {
-        public string SkillId => "鋸引き刃の山刀";
+        public string SkillId => "鋸刃の山刀";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -1320,7 +820,7 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             if (ctx.finalDamage <= 0 || ctx.enemyBleedStacks <= 0) return;
             int stacks = ctx.enemyBleedStacks; // 消費前の値で計算
-            ctx.enemyBleedStacks--;
+            Keywords.Kw.ConsumeBleed(ctx, 1);   // 出血を使った出来事を配る (〈魂喰らいの血石〉など・2026-10-31)
             int bonus = stacks * 3;
             ctx.finalDamage += bonus;
             UnityEngine.Debug.Log($"[血の一撃] 出血-1 (残{ctx.enemyBleedStacks}) → 与ダメ+{bonus} (基{stacks}×3)");
@@ -1362,38 +862,8 @@ namespace ItemSystem.PassiveSkills.Effects
     //  過充電 = charge >= ChargeMax (10)。新パイプライン専用 (旧では no-op)。
     // ============================================================
 
-    /// <summary>蓄電池 — 戦闘開始時、充電+3。</summary>
-    public class Battery : IPassiveSkillEffect
-    {
-        public string SkillId => "工廠の材料箱";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            ctx.AddCharge(3);
-        }
-    }
 
-    /// <summary>発電機 — 被ダメージ時、充電+1 (完全防御時は不発)。</summary>
-    public class Generator : IPassiveSkillEffect
-    {
-        public string SkillId => "無限モーター";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (ctx.finalDamage > 0) ctx.AddCharge(1);
-        }
-    }
 
-    /// <summary>触媒 — 与ダメージ時、充電+1。</summary>
-    public class Catalyst : IPassiveSkillEffect
-    {
-        public string SkillId => "呼雷粉";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (ctx.finalDamage > 0) ctx.AddCharge(1);
-        }
-    }
 
     /// <summary>雷雲 — ロール後、25% で充電+1 (自ロール毎に判定)。</summary>
     public class Thundercloud : IPassiveSkillEffect
@@ -1406,31 +876,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>火花 — 攻撃時、充電1消費で与ダメ+5 (足りなければ不発)。</summary>
-    public class Spark : IPassiveSkillEffect
-    {
-        public string SkillId => "焦げ柄の点火スパナ";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (ctx.finalDamage <= 0) return;
-            if (ctx.ConsumeCharge(1)) ctx.finalDamage += 5;
-        }
-    }
 
-    /// <summary>雷撃 — 攻撃時、充電3消費で与ダメ +30% (足りなければ不発)。 2026-09-20: +50% → +30%。</summary>
-    public class LightningStrike : IPassiveSkillEffect
-    {
-        public string SkillId => "逆さ避雷針";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (ctx.finalDamage <= 0) return;
-            if (!ctx.ConsumeCharge(3)) return;
-            if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
-            ctx.outgoingDamageMultiplier += 0.3f;
-        }
-    }
 
     /// <summary>短絡 (2026-07-16 改名: 旧 Criticality → ShortCircuit)。
     /// 過充電状態 (charge≥7) が3ターン続いたら会心確定、充電を全消費してクールダウン。
@@ -1465,26 +911,6 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>予備電源 — 戦闘中、充電が0になった時、一度だけ充電を全回復。
-    /// OnTurnStart / OnTurnEnd で判定 (消費機構が動くフェーズを両方カバー)。</summary>
-    public class BackupPower : IPassiveSkillEffect
-    {
-        public string SkillId => "雷壺";
-        private const string UsedKey = "backup_power_used";
-        public PassiveSkillTrigger[] Triggers => new[]
-        {
-            PassiveSkillTrigger.OnTurnStart,
-            PassiveSkillTrigger.OnTurnEnd,
-        };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (ctx.GetAccumulated(UsedKey) > 0) return;
-            if (ctx.GetCharge() > 0) return;
-            ctx.AddCharge(CombatSystem.CombatManager.ChargeMax); // 全回復 (=最大)
-            ctx.accumulatedValues[UsedKey] = 1;
-            UnityEngine.Debug.Log($"[予備電源] 充電0検知 → 充電満タン ({CombatSystem.CombatManager.ChargeMax}) に復旧");
-        }
-    }
 
     // ============================================================
     //  臨界系 (Rinkai) 2026-07-16 追加: メーター蓄積型 (Burn 削除後の新軸)
@@ -1492,7 +918,8 @@ namespace ItemSystem.PassiveSkills.Effects
     //  ヘルパー: ctx.rinkaiThreshold/rinkaiBurstDamage/rinkaiAfterglow/rinkaiRadiationBonus 経由。
     //  「基礎値」を確立する起点パッシブ = 発火 (Ignition) — 開始時 threshold=50, burstDamage=50 に initialise。
     //  他パッシブは基礎値を修飾 (LowerThreshold で 35 に等)。
-    //  9種: Ignition/Conduction/Radiation/CriticalPressure/ChainCombustion/Afterglow/LowerThreshold/NoCooldown/UnyieldingHeat
+    //  2026-10-31 アイテム再編で臨界の品は ReworkItemEffects.cs (出来事は Keywords.Kw) へ移った。 ここに残るのは
+    //  基礎値 (RinkaiInit) と、 効果を据え置いた〈八日目の灰燼〉(UnyieldingHeat) だけ。
     // ============================================================
 
     /// <summary>臨界の基礎値を初期化 (どの Rinkai パッシブでも1度呼ばれれば有効化される)。</summary>
@@ -1507,110 +934,13 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>発火 (Ignition) — 戦闘開始時、臨界メーター +15 (初速ジャンプ・軸の起点パッシブ)。</summary>
-    public class Ignition : IPassiveSkillEffect
-    {
-        public string SkillId => "余分に乾いた火口箱";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            RinkaiInit.EnsureEnabled(ctx);
-            ctx.rinkaiMeter += 15;
-            UnityEngine.Debug.Log($"[発火] 開幕 メーター+15 (現{ctx.rinkaiMeter}/{ctx.rinkaiThreshold})");
-        }
-    }
 
-    /// <summary>熱伝導 (Conduction) — 被ダメ時、その量だけ臨界メーターに加算 (受けても積む)。</summary>
-    public class Conduction : IPassiveSkillEffect
-    {
-        public string SkillId => "炉番の火床外套";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            RinkaiInit.EnsureEnabled(ctx);
-            ctx.rinkaiConductionEnabled = true;
-            UnityEngine.Debug.Log("[熱伝導] 被ダメ量を臨界メーターに追加加算");
-        }
-    }
 
-    /// <summary>輻射 (Radiation) — 攻撃配線した T、臨界メーターに +5 追加 (通常加算に上乗せ)。</summary>
-    public class Radiation : IPassiveSkillEffect
-    {
-        public string SkillId => "過熱石";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            RinkaiInit.EnsureEnabled(ctx);
-            ctx.rinkaiRadiationBonus += 5;
-            UnityEngine.Debug.Log($"[輻射] 攻撃配線Tのメーター追加+{ctx.rinkaiRadiationBonus}");
-        }
-    }
 
-    /// <summary>臨界圧 (CriticalPressure) — 臨界爆発時の flat damage を 50→80 に強化。</summary>
-    public class CriticalPressure : IPassiveSkillEffect
-    {
-        public string SkillId => "溢れを取る鋳型";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            RinkaiInit.EnsureEnabled(ctx);
-            ctx.rinkaiBurstDamage = System.Math.Max(ctx.rinkaiBurstDamage, 80);
-            UnityEngine.Debug.Log($"[臨界圧] 爆発ダメ強化 → {ctx.rinkaiBurstDamage}");
-        }
-    }
 
-    /// <summary>連鎖爆発 (ChainCombustion) — 臨界爆発発動T の攻撃は会心確定。</summary>
-    public class ChainCombustion : IPassiveSkillEffect
-    {
-        public string SkillId => "帳簿外の連鎖爆発";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            RinkaiInit.EnsureEnabled(ctx);
-            ctx.rinkaiCritOnBurst = true;
-            UnityEngine.Debug.Log("[連鎖爆発] 臨界爆発時 会心確定");
-        }
-    }
 
-    /// <summary>余熱 (Afterglow) — 臨界爆発後、meter が 0 でなく 20 残る (連続爆発容易)。</summary>
-    public class Afterglow : IPassiveSkillEffect
-    {
-        public string SkillId => "朝にも熱い竈";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            RinkaiInit.EnsureEnabled(ctx);
-            ctx.rinkaiAfterglow = System.Math.Max(ctx.rinkaiAfterglow, 20);
-            UnityEngine.Debug.Log($"[余熱] 爆発後 meter 残置 → {ctx.rinkaiAfterglow}");
-        }
-    }
 
-    /// <summary>降下閾値 (LowerThreshold) — 臨界爆発の閾値を 50→35 に。 到達速度アップ。</summary>
-    public class LowerThreshold : IPassiveSkillEffect
-    {
-        public string SkillId => "気短な早沸かし釜";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            RinkaiInit.EnsureEnabled(ctx);
-            ctx.rinkaiThreshold = System.Math.Min(ctx.rinkaiThreshold, 35);
-            UnityEngine.Debug.Log($"[降下閾値] 閾値 → {ctx.rinkaiThreshold}");
-        }
-    }
 
-    /// <summary>不冷却 (NoCooldown) — 爆発後 meter が 0/afterglow でなく half (threshold/2) 残る。爆発連鎖強化。</summary>
-    public class NoCooldown : IPassiveSkillEffect
-    {
-        public string SkillId => "恒熱の炉壁";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            RinkaiInit.EnsureEnabled(ctx);
-            int half = ctx.rinkaiThreshold / 2;
-            ctx.rinkaiAfterglow = System.Math.Max(ctx.rinkaiAfterglow, half);
-            UnityEngine.Debug.Log($"[不冷却] 爆発後 meter 残置 → {ctx.rinkaiAfterglow} (threshold {ctx.rinkaiThreshold} の半分)");
-        }
-    }
 
     /// <summary>不朽の熱 (UnyieldingHeat) — 臨界メーター≥40 の間に致命ダメを受けた時、
     /// HP=1 で踏みとどまり meter を全消費 (Burn Immortalflame の遺伝子継承)。 1戦闘1回。</summary>

@@ -40,22 +40,13 @@ namespace ItemSystem.PassiveItems
             // 名前付き固有パッシブの効果実装
             // (2026-07-18 死コード掃除: 記憶の砂時計/死神の数珠/嵐の徽章/沈黙の剣帯/狂乱のメダリオン/
             //  静寂のローブ/黒煙の符/蒼穹の眼/守護天使の鈴 の 9 effect はアイテム削除に伴い class ごと削除)
-            Register(new Effects.PilgrimStaffEffect());
-            Register(new Effects.HopeEmberEffect());
 
             // HP閾値発動系
             // 末那識 はパッシブスキル側のステータスへ移した (2026-09-19・与ダメ%を他と同じタイミングで加算)
 
             // 歩行HP回復
-            Register(new Effects.CalmShoesEffect());
-            Register(new Effects.HealingShoesEffect());
-            Register(new Effects.HolyShoesEffect());
 
             // その他高レア
-            Register(new Effects.GoldenScaleEffect());
-            Register(new Effects.IronHeartEffect());
-            Register(new Effects.CalamityRingEffect());
-            Register(new Effects.EternalLanternEffect());
 
             // 佯狂者シリーズ（発狂連動）。鈴は店フックのため非登録（商人の符牒と同型）。
             Register(new Effects.YokyoStaffEffect());
@@ -71,10 +62,8 @@ namespace ItemSystem.PassiveItems
             // イベント入手の名前付きパッシブ (2026-09-18 に items.json へ登録し効果を付与)。
             //   ちいさな灯火は TorchRevival (救済チェーン)、 希望の灯片は上で登録済み、
             //   根拠のない確信/決意/真理は ConvictionSystem が扱う ── ここには来ない。
-            Register(new Effects.LuckyCoinEffect());     // 幸運の硬貨（勝利時+3G）
             // 英雄の意志 はパッシブスキル側のステータスへ移した (2026-09-19・与ダメ%を他と同じタイミングで加算)
             // 激情の刃 はパッシブスキル側のステータスへ移した (2026-09-19・与ダメ%を他と同じタイミングで加算)
-            Register(new Effects.CompanionSoulEffect()); // 相棒の魂（開幕シールド+3）
         }
     }
 }

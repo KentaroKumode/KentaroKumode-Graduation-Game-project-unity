@@ -375,6 +375,9 @@ namespace GameLoop
             // 名前付き固有パッシブ（マップ移動時系。現状該当なし、フック確保）
             ItemSystem.PassiveItems.PassiveItemManager.OnMapMove(Run);
 
+            // 移動で貯まる品が次の戦闘の開始時に読む歩数 (2026-10-31)
+            if (Run != null) Run.stepsSinceBattle++;
+
             // メタ: ノード踏破トークン
             MetaProgression.MetaTokenEarner.OnNodeVisited();
         }

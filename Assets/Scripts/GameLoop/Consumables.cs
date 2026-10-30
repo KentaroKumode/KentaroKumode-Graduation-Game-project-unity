@@ -17,6 +17,9 @@ namespace GameLoop
     /// </summary>
     public static class Consumables
     {
+        /// <summary>古い手紙を使ったターンの印 (ctx.accumulatedValues)。 CombatManager が敵攻撃の解決で読んで消す。</summary>
+        public const string OldLetterGuardKey = "oldLetterGuard";
+
         private static CombatContext ActiveCtx()
         {
             var cm = CombatManager.Instance;
@@ -95,7 +98,15 @@ namespace GameLoop
             bool ok = Apply(run, id);
             if (ok)
             {
-                run.ownedConsumables.Remove(id);
+                // 古い手紙は 1 枚で OldLetterUses 回使える。 使い切ったときだけ手放す。
+                bool keep = false;
+                if (id == ItemIds.OldLetter)
+                {
+                    run.oldLetterUsesSpent++;
+                    keep = run.oldLetterUsesSpent < ItemIds.OldLetterUses;
+                    if (!keep) run.oldLetterUsesSpent = 0;
+                }
+                if (!keep) run.ownedConsumables.Remove(id);
                 MetaProgression.Achievements.AchievementService.NoteConsumableUsed();
                 NoteVescaPhaseUse();
                 Debug.Log($"[Consumables] 使用: {id}");
@@ -144,14 +155,13 @@ namespace GameLoop
                 case "業火の膏薬": return AddTimedDmgMult(run, ctx, 50, -1);
                 case "天火の膏薬": return AddTimedDmgMult(run, ctx, 75, -1);
 
-                // 物資回復: +50/100/150/200 (2026-08-05 追加・2026-09-28 に ×10)。 **上限は伸びず、 現在値だけ戻す。**
-                //   物資は横移動 -5 / 戦闘 -N と一方的に減るだけで回復源が無かった。
-                //   前哨基地での自動回復 (減少分の20%) は毎層リセットになり、 発狂到達率が
-                //   15.6% → 0.4% と資源性を失ったので棄却。 **ゴールドを払う形**に置き換えた。
-                case "湯気の立つ椀": return RecoverProvision(run, 50);
-                case "古い手紙": return RecoverProvision(run, 100);
-                case "凱旋の記憶": return RecoverProvision(run, 150);
-                case "希望の欠片": return RecoverProvision(run, 200);
+                // 古い手紙 (2026-10-31): 次のターンの被ダメを 0 にする。 戦闘中だけ使える。
+                //   仕込み刃と同じ位置 (CombatManager の敵攻撃の解決) で消す。 反撃は無い。
+                //   旧効果の物資回復は、 物資回復の系統ごと廃止した (物資はショップの包で買う)。
+                case ItemIds.OldLetter:
+                    if (ctx == null) { Debug.Log("[古い手紙] 戦闘外では使用不可"); return false; }
+                    ctx.accumulatedValues[OldLetterGuardKey] = 1;
+                    return true;
 
                 // ===== 賢者の石: 10ゴールドを武器強化素材1に変換 (最大5回/ラン) =====
                 case ItemIds.PhilStone:
@@ -234,18 +244,6 @@ namespace GameLoop
             return true;
         }
 
-        /// <summary>物資回復 (cons_hope_*)。 **上限 provisionCap でクランプされ、 上限自体は伸びない。**
-        /// 佯狂者の冠で物資0固定中は <see cref="ProvisionSystem.Recover"/> 側が弾く。
-        /// 既に満タンなら消費させない (false を返す) ── 無駄撃ちを防ぐ。</summary>
-        private static bool RecoverProvision(RunState run, int amount)
-        {
-            if (run == null) return false;
-            if (run.provision >= run.provisionCap) return false;
-            int before = run.provision;
-            ProvisionSystem.Recover(run, amount);
-            return run.provision > before;
-        }
-
         /// <summary>開幕シールド (cons_def_*)。 戦闘中持続 (expireTurn=-1)、 天衣無縫減衰を適用。</summary>
         private static bool AddShield(RunState run, CombatContext ctx, int amount)
         {
@@ -311,8 +309,6 @@ namespace GameLoop
             return pick != null && Use(run, pick);
         }
 
-        // 2026-08-04: 食料 (物資回復) 系 cons_food_* を廃止。 消費アイテムを
-        //   回復 / シールド / 攻撃強化 の 3 系統に絞ったため、 IsFood / FoodProvisionAmount /
-        //   TryUseBestFood もここで削除した。 物資の回復手段はイベント・報酬側に残っている。
+        // 物資を回復する消耗品は 2026-10-31 に廃止 (2 度目)。 物資はショップの「物資の包」で買う。
     }
 }
