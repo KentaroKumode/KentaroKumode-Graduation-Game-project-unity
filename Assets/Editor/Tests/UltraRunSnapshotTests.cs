@@ -46,7 +46,7 @@ namespace AutoTest.EditorTests.Ultra
                 convictionStage = 2,
                 sealedRoleMask = 0b1010,
             };
-            run.ownedPassiveItems.Add("百鳴りの共振箱");
+            run.ownedPassiveItems.Add("灼線鞭");
             run.ownedPassiveItems.Add("ブレイドダンス");
             run.ownedConsumables.Add("回復薬");
             run.ownedFlags.Add("flag_duel_won");

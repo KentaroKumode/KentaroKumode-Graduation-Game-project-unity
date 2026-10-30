@@ -124,6 +124,12 @@ namespace ItemSystem.Shop
         /// <summary>物資 1 包の量と値段 (1G ＝ 10 物資)。</summary>
         public const int ProvisionPackAmount = 100;
         public static int ProvisionPackPrice => ProvisionPackAmount / MapSystem.FreeMove.FreeMapParams.ProvisionPerGold;
+        /// <summary>〈合札〉: 同じショップで 2 品目以降を買うときの値引き (G)。</summary>
+        public const int TallyDiscount = 10;
+
+        /// <summary>シールド枠の LEGENDARY が〈古い手紙〉に替わる確率 (%・2026-10-31 仮置き)。</summary>
+        public const int OldLetterShopChancePct = 50;
+
         /// <summary>1 つの店で買える物資の包の数。</summary>
         public const int ProvisionPackStock = 3;
         /// <summary>この店に残っている物資の包。 <see cref="Generate"/> で戻る。</summary>
@@ -203,10 +209,9 @@ namespace ItemSystem.Shop
             for (int i = 0; i < 5; i++)
                 inv.slots.Add(BuildSlot(ShopSlotKind.Passive, inv.priceMultiplier));
 
-            // 消費 ×3 ── **回復は固定、 残り 2 枠は他 3 系統から重複なしで抽選** (2026-08-05)。
+            // 消費 ×3 ── **回復は固定、 残り 2 枠はシールドと攻撃強化** (2026-08-05・2026-10-31 に物資回復の系統を廃止)。
             //   回復が並ばない店があると消費で耐久を賄う設計が成立しないので 1 枠目は固定。
-            //   物資回復を 4 系統目に足したため全系統は並べきれず、 残り 2 枠を
-            //   シールド / 攻撃強化 / 物資 から引く。 Tier は T1〜4 から一様。
+            //   Tier は T1〜4 から一様。 物資は棚ではなく「物資の包」で買う。
             {
                 int tier0 = GameLoop.GameRng.Range(1, GameLoop.ItemIds.ConsumableMaxTier + 1, "shop.consTier");
                 inv.slots.Add(BuildConsumableSlot(
@@ -222,7 +227,13 @@ namespace ItemSystem.Shop
                 for (int i = 0; i < 2 && i < pool.Length; i++)
                 {
                     int tier = GameLoop.GameRng.Range(1, GameLoop.ItemIds.ConsumableMaxTier + 1, "shop.consTier");
-                    inv.slots.Add(BuildConsumableSlot(GameLoop.ItemIds.ConsId(pool[i], tier), inv.priceMultiplier));
+                    string consId = GameLoop.ItemIds.ConsId(pool[i], tier);
+                    // 古い手紙 (2026-10-31): シールド枠で LEGENDARY を引いたとき、 OldLetterShopChance で〈惜別の護符〉と入れ替わる。
+                    //   系統を持たない単品なので、 抽選に入る道はここだけ。 乱数は専用キー (他の抽選の並びを動かさない)。
+                    if (pool[i] == GameLoop.ItemIds.ConsShieldFamily && tier == GameLoop.ItemIds.ConsumableMaxTier
+                        && GameLoop.GameRng.Range(0, 100, "shop.oldLetter") < OldLetterShopChancePct)
+                        consId = GameLoop.ItemIds.OldLetter;
+                    inv.slots.Add(BuildConsumableSlot(consId, inv.priceMultiplier));
                 }
             }
 
@@ -434,9 +445,9 @@ namespace ItemSystem.Shop
         }
 
         /// <summary>[計装] TryReroll が false を返した理由の内訳。</summary>
-        public static long RerollFailNoShop, RerollFailNoGold, FreeRolls, RerollFailCapped;
+        public static long RerollFailNoShop, RerollFailNoGold, TallyDiscounts, RerollFailCapped;
         public static void ResetRerollFailStats()
-        { RerollFailNoShop = RerollFailNoGold = FreeRolls = RerollFailCapped = 0; }
+        { RerollFailNoShop = RerollFailNoGold = TallyDiscounts = RerollFailCapped = 0; }
 
         /// <summary>[A/B 用ノブ] <b>1 店あたりのリロール上限。 -1 = 無制限 (製品)</b> (2026-09-17)。
         ///
@@ -756,12 +767,16 @@ namespace ItemSystem.Shop
 
             if (slot.sold) { Log("売り切れ"); return false; }
             if (string.IsNullOrEmpty(slot.itemId)) { Log("空スロット"); return false; }
+            // 〈合札〉(2026-10-31): 同じショップで 2 品目以降を買うとき 10G 安い。
+            int pay = slot.price;
+            bool tally = Current.purchaseCount >= 1 && run.OwnsPassive(ItemIds.TrialTossToken);
+            if (tally) pay = Mathf.Max(0, pay - TallyDiscount);
             // 燈火 r10 を含めた支払い可能額で判定する。 未解禁なら run.coins と同じ。
-            if (GameLoop.ProvisionPayment.Affordable(run) < slot.price)
+            if (GameLoop.ProvisionPayment.Affordable(run) < pay)
             {
                 // 行動台帳〈見送り〉: **買おうとして届かなかった**ときだけ積む。
                 //   棚を眺めただけの回は通らない ── ここまで来たのは購入の意思があった証拠。
-                GameLoop.RunChronicle.Buy(run, GameLoop.RunChronicle.BuyForgo, slot.itemId, slot.price);
+                GameLoop.RunChronicle.Buy(run, GameLoop.RunChronicle.BuyForgo, slot.itemId, pay);
                 Log("ゴールド不足"); return false;
             }
 
@@ -772,16 +787,13 @@ namespace ItemSystem.Shop
                 return false;
             }
 
-            if (!GameLoop.ProvisionPayment.TryPay(run, slot.price, slot.itemId))
+            if (!GameLoop.ProvisionPayment.TryPay(run, pay, slot.itemId))
             { Log("支払いに失敗"); return false; }
             MetaProgression.Achievements.AchievementService.NoteShopPurchase(run.coins);
             Current.purchaseCount++;
+            if (tally && pay < slot.price) { TallyDiscounts++; Log($"〈合札〉: 2 品目以降 {slot.price - pay}G 引き"); }
 
-            // 〈釣り銭の受け皿〉: 買うたび 物資+10 (2026-09-15)。 **払った直後に鳴らす** ──
-            //   物資払い (ProvisionPayment) で物資を使った場合でも、 買い物そのものへの見返りは出す。
-            //   1 ラン の購入は 24.6 件、 戦闘損は −38.2/ラン なので実質の回復源になる。
-            if (run.OwnsPassive(ItemIds.ChangeTray))
-                GameLoop.ProvisionSystem.ApplyFood(run, 10);   // 2026-09-28: 物資 ×10
+            // 〈銭皿〉の「買うたび物資 +10」は 2026-10-31 に「戦闘終了時、 残っているシールド 3 につき 1G」へ作り替えた (ReworkItemEffects)。
 
             switch (slot.kind)
             {
@@ -816,7 +828,7 @@ namespace ItemSystem.Shop
                     GameLoop.RunChronicle.Buy(run, code,
                         slot.kind == ShopSlotKind.FacePart
                             ? GameLoop.DiceFaceParts.Label(slot.facePart) : slot.itemId,
-                        slot.price);
+                        pay);
             }
 
             // ショップ購入記録 (BOT 売却判定で「ショップ由来」 のみ売却可)
@@ -857,15 +869,8 @@ namespace ItemSystem.Shop
             { RerollFailCapped++; return false; }
             int price = Current.CurrentRerollPrice;
 
-            // 〈試し振りの符牒〉: **各ショップの最初の 1 回だけ**リロードが無料 (2026-09-15)。
-            //   店ごとにリセットされる (rerollCount は Generate で 0 に戻る)。
-            //   1 ラン のリロールは 5.56 回・86G なので、 店数ぶん ≒ 30G 相当。
-            bool freeRoll = price > 0 && Current.rerollCount == 0
-                            && run.OwnsPassive(ItemIds.TrialTossToken);
-            if (freeRoll) { price = 0; FreeRolls++; }
-
+            // 〈合札〉の初回リロール無料は 2026-10-31 に「2 品目以降 10G 引き」へ作り替えた (TryBuy)。
             if (run.coins < price) { RerollFailNoGold++; Log($"リロール: ゴールド不足 ({price}G 必要)"); return false; }
-            if (freeRoll) Log("〈試し振りの符牒〉: この店の初回リロールは無料");
 
             run.coins -= price;
             run.coinsSpent += price;

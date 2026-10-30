@@ -82,10 +82,17 @@ namespace CombatSystem
                     int carry = Mathf.FloorToInt(psmCtx.rinkaiMeter * ratio);
                     if (carry > 0)
                     {
-                        runEnd.pendingRinkaiCarryover = carry;
+                        // 〈朝にも熱い竈〉も同じ枠へ持ち越す (OnBattleEnd)。 大きい方を残す。
+                        runEnd.pendingRinkaiCarryover = Math.Max(runEnd.pendingRinkaiCarryover, carry);
                         Debug.Log($"[MetaBuff] 臨界保温炉: メーター {psmCtx.rinkaiMeter} × {ratio:P0} → 次戦闘へ {carry}");
                     }
                 }
+            }
+
+            // 移動で貯まる品の歩数は戦闘ごとに数え直す (2026-10-31)
+            {
+                var runSteps = GameLoop.GameManager.Instance?.Run;
+                if (runSteps != null) runSteps.stepsSinceBattle = 0;
             }
 
             isCombatActive = false;

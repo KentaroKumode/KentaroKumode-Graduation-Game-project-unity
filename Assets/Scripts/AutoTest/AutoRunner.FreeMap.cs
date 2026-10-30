@@ -78,17 +78,11 @@ namespace AutoTest
             }
             if (_freeMapActions == MaxFreeMapActionsPerFloor + 1) FreeMapActionCapHits++;
 
-            // ── 回復と物資の補充 (旧航行と同じ規則) ──
+            // ── 回復 (旧航行と同じ規則)。 物資の補充は店の「物資の包」だけ (DoShop) ──
             float hpRatio = run.playerMaxHP > 0 ? (float)run.playerHP / run.playerMaxHP : 1f;
             int floorHit = EstimateFloorMaxHit(run);
             float dangerTarget = FightBudgetDanger(run, floorHit);
             while (Consumables.TryUseBestHeal(run, dangerTarget)) { }
-            if (run.provision <= ProvisionRefillFloorEffective())
-            {
-                int guardProvision = 0;
-                while (run.provision < run.provisionCap && guardProvision++ < 8
-                       && UseFirstOfFamily(run, ItemIds.ConsProvisionFamily)) { }
-            }
             hpRatio = run.playerMaxHP > 0 ? (float)run.playerHP / run.playerMaxHP : 1f;
             _curBossNear = false;
 

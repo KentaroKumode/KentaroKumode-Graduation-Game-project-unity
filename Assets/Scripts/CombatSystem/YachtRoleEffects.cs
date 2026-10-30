@@ -179,7 +179,8 @@ namespace CombatSystem
         // ── エスカレーション操作 (時間) ──
         static int Delay(CombatContext ctx) => (int)ctx.GetAccumulated(CombatManager.CoolantDelayKey);
 
-        static void AddEscalationDelay(CombatContext ctx, int turns)
+        /// <summary>エスカレーションの次の段階を turns ターン先へ送る。 役〈時間〉と〈貸与された時間〉が使う。</summary>
+        public static void AddEscalationDelay(CombatContext ctx, int turns)
         {
             if (turns <= 0) return;
             ctx.accumulatedValues[CombatManager.CoolantDelayKey] = ctx.GetAccumulated(CombatManager.CoolantDelayKey) + turns;

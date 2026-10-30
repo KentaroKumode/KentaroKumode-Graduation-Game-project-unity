@@ -1309,20 +1309,7 @@ namespace AutoTest
                     //   2026-08-16: 判定を「消耗品 0 個」から **「回復薬 0 本」** へ (EnsureHealStock)。
                     //   2026-08-17: **回復・シールドを上限まで積む** (リロールしてでも) へ強化。
                     StockDefensive(pol.consumableStockMax);
-
-                    // 物資が枯れかけているなら物資回復も最優先で確保する (2026-08-05)。
-                    //   物資は横移動・戦闘で一方的に減り、 発狂すると秒読みでランが終わる。
-                    //   回復源が cons_hope_* だけになったので、 切らすと進路の自由度を失う。
-                    // 取り置き中 (門で物資を払うアーム) はここが底上げされ、
-                    //   6/7 層の店で物資回復を先に確保する。
-                    if (run.provision <= ProvisionRefillFloorEffective())
-                        for (int i = 0; i < inv.slots.Count; i++)
-                        {
-                            var s = inv.slots[i];
-                            if (s != null && !s.sold && s.kind == ShopSlotKind.Consumable
-                                && GameLoop.ItemIds.ConsFamilyOf(s.itemId) == GameLoop.ItemIds.ConsProvisionFamily
-                                && run.coins >= s.price) { Buy(i); break; }
-                        }
+                    // 物資は入店時に「物資の包」で買い足している (DoShop の冒頭)。 物資回復の消耗品は 2026-10-31 に廃止。
 
                     // 2026-05-31 v3: 消費Gold基準なので、 黄金卿所持時は **閾値を緩めて積極消費** (旧と逆向き)
                     // 2026-08-10 経済リスケール: **絶対値の残金閾値なので価格と同じ ×5**。

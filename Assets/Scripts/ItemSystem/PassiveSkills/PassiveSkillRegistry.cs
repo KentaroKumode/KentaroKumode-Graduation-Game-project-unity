@@ -126,9 +126,9 @@ namespace ItemSystem.PassiveSkills
         public static System.Collections.Generic.IReadOnlyList<string> LeveledFamilies => _leveledFamilies;
 
         private static readonly string[] _leveledFamilies = {
-            "Pursuit", "Counter", "Might", "Fortitude", "Insight", "Vitality",
-            "BladeEdge", "BountyHunter", "Conqueror", "Lifesteal", "Indomitable",
-            "LentTime", "Grievous",   // ShieldBash は 2026-10-28 に家系ごと削除
+            "Pursuit", "Might", "Fortitude", "Insight", "Indomitable", "Grievous",
+            // ShieldBash は 2026-10-28、 Counter / Vitality / BladeEdge / BountyHunter / Conqueror / Lifesteal / LentTime は
+            //   2026-10-31 (アイテム再編) に家系ごと削除
         };
 
         /// <summary>skill ID から家系名 + Lv (1-4) を解析。 Lv 制でなければ (id, 0) を返す。</summary>
@@ -166,6 +166,79 @@ namespace ItemSystem.PassiveSkills
         private static void RegisterAll()
         {
             // ============================
+            //  アイテム再編 (2026-10-31・ReworkItemEffects.cs)
+            // ============================
+            Register(new OverheatStone());
+            Register(new HearthCloak());
+            Register(new DryTinderbox());
+            Register(new MorningOven());
+            Register(new OverflowMold());
+            Register(new SecondStrike());
+            Register(new SecondBeatHeart());
+            Register(new OffBookChain());
+            Register(new HeatWall());
+            Register(new QuickKettle());
+            Register(new IgnitionSpanner());
+            Register(new RoughWhetstone());
+            Register(new HarmlessLamp());
+            Register(new ArsenalCrate());
+            Register(new PatchedBoots());
+            Register(new HopeShard());
+            Register(new InfiniteMotor());
+            Register(new ThunderPowder());
+            Register(new OldGauge());
+            Register(new InvertedRod());
+            Register(new ThunderJar());
+            Register(new ScorchedWire());
+            Register(new ChargedCuirass());
+            Register(new CatfishSpine());
+            Register(new SearingWhip());
+            Register(new LentTime());
+            Register(new WornBuckler());
+            Register(new Pauldron());
+            Register(new MirrorBuckler());
+            Register(new HolyRoadShoes());
+            Register(new CompanionSoul());
+            Register(new KnightsTrump());
+            Register(new VeteranPatch());
+            Register(new PulselessHeart());
+            Register(new SmolderingBreastplate());
+            Register(new LightningHeadguard());
+            Register(new ThornBuckler());
+            Register(new ArmorNeedle());
+            Register(new StrainGauntlet());
+            Register(new GreenKnife());
+            Register(new PoisonWedge());
+            Register(new HerbStaff());
+            Register(new StitchThread());
+            Register(new HollowPoisonRing());
+            Register(new HundredCleaver());
+            Register(new RuinedGardenSprayer());
+            Register(new LongCenser());
+            Register(new WeightingGauntlet());
+            Register(new VenomBangle());
+            Register(new RotBlade());
+            Register(new BloodDayPendant());
+            Register(new SoulBloodstone());
+            Register(new BloodlineRing());
+            Register(new SiegeAxe());
+            Register(new BloodWheel());
+            Register(new LeadHandAxe());
+            Register(new FuryBlade());
+            Register(new CoinDish());
+            Register(new TenkouKaibutsu());
+            Register(new LuckyCoin());
+            Register(new SpoilsScale());
+            Register(new BlastPrize());
+            Register(new SurveyorMonocle());
+            Register(new FierceBlade());
+            Register(new SlowPoisonBlade());
+            Register(new LapisWhetstone());
+            Register(new FlintRing());
+            Register(new Suntetsu());
+            Register(new UnwhettedClub());
+
+            // ============================
             //  汎用パッシブ（6種×3段階）
             // ============================
 
@@ -173,13 +246,8 @@ namespace ItemSystem.PassiveSkills
             Register(new PursuitI());
             Register(new PursuitII());
             Register(new PursuitIII());
-            Register(new PursuitIV());
 
             // 反撃
-            Register(new CounterI());
-            Register(new CounterII());
-            Register(new CounterIII());
-            Register(new CounterIV());
 
             // 剛力
             // MightI はステータス化 (items.json の stats)
@@ -204,9 +272,6 @@ namespace ItemSystem.PassiveSkills
 
             // 活力
             // VitalityI はステータス化
-            Register(new VitalityII());
-            Register(new VitalityIII());
-            Register(new VitalityIV());
 
             // ============================
             //  武器家系 専用ラダー (2026-09-05)
@@ -252,40 +317,17 @@ namespace ItemSystem.PassiveSkills
             // Destiny はステータス化 (単体戦)
             // 武器Tier段階補正 (Lightweight/Mastery/Skill) は 2026-07-15 廃止
             // (筋力とロールが重複)。クラス実装は AllPassiveSkillEffects に残置 = items.json 参照は将来的に別スキルへ差し替え要
-            Register(new BladeEdgeI());
-            Register(new BladeEdgeII());
-            Register(new BladeEdgeIII());
-            Register(new BladeEdgeIV());
 
             // 処刑・対タンク・役・触媒（2026-05-29 追加）
-            Register(new BountyHunterI());
-            Register(new BountyHunterII());
-            Register(new BountyHunterIII());
-            Register(new BountyHunterIV());
             Register(new GrievousI());      // 治癒阻害（Silver）
             Register(new GrievousII());     // 治癒遮断（Gold）
             Register(new ApexCrit());       // 天極（ゾロ目→会心確定+倍率）
-            Register(new ConquerorI());
-            Register(new ConquerorII());
-            Register(new ConquerorIII());
-            Register(new ConquerorIV());
-            Register(new LifestealI());     // 吸血（与ダメ%回復）
             // LifestealII はステータス化
-            Register(new LifestealIII());
-            Register(new LifestealIV());
             Register(new IndomitableI());   // 不屈（敵threat軽減）
             Register(new IndomitableII());
             // IndomitableIII はステータス化
             Register(new IndomitableIV());
             // ShieldBashI〜IV (旧〈内から落ちた城盾〉) は 2026-10-28 削除。 盾家系の〈シールドバッシュ〉へ一本化した。
-            Register(new KnightsTrumpCard());  // 騎士団の切り札 (2026-10-28 リワーク): 戦闘に 1 回、 得たシールドの半分を取り戻す
-            Register(new LentTimeI());       // 貸与された時間（被ダメ遅延・上限で一括）
-            Register(new LentTimeII());
-            Register(new LentTimeIII());
-            Register(new LentTimeIV());
-            Register(new Lifeline());       // 命脈（ユニーク）
-            Register(new Resonance());      // 共鳴（所持数スケール）
-            Register(new TenkouKaibutsu());
             // Bloodlust / Hermes はステータス化
             Register(new GoldKingBlade());
 
@@ -294,9 +336,6 @@ namespace ItemSystem.PassiveSkills
 
             // 2026-06-05 会心バリエーション（OnCriticalDamage / OnCriticalCheck）
             Register(new LacerationCore());   // 裂傷の刃心（会心→出血+2、会心倍率連動）
-            Register(new GuardFlash());       // 防殻の一閃（会心ダメの5%シールド）
-            Register(new VitalPierce());      // 急所穿ち（会心→軽減無視+5）
-            Register(new ChainApex());        // 連環の極み（会心毎に倍率+0.2累積）
 
             // 2026-06-04 [剣の舞] セット（4枚集約→ブレイドダンスに変化）
             Register(new SaberWaltz());       // サーベル・ワルツ（ダイス+1／孤剣時HP半減）
@@ -311,18 +350,12 @@ namespace ItemSystem.PassiveSkills
 
             // 2026-07-15 鈍器系 (新規 9 種・会心を犠牲に非会心火力を伸ばすトレードオフ型)
             // 重い一撃 / 破城槌 / 鈍器 はステータス化 (items.json の stats)
-            Register(new MindlessBlade());   // 無心の刃 (会心禁止, 非会心+30%)
             // SingleMinded はステータス化 (非会心の連続)
-            Register(new Windup());          // 溜め打ち (攻撃毎+1蓄積, 非会心 蓄積×10%, 会心リセット)
             // Stubbornness はステータス化
 
             // 2026-07-15 毒系 (新規 9 種・拘束/妨害中心のキーワードビルド)
-            Register(new PoisonCoat());       // 毒塗り (開幕 毒+1)
             Register(new CorrosiveStrike());  // 腐蝕の一撃 (攻撃10% 毒+1)
             Register(new SerpentBlood());     // 蛇の血 (会心で毒+2)
-            Register(new VenomFog());         // 毒の霧 (3T毎に毒+1)
-            Register(new AssassinToxin());    // 毒殺者 (毒=5でHP×20%削り 1戦1回)
-            Register(new VenomBurst());       // 毒液噴射 (毒2消費で+10軽減不能)
             Register(new Paralysis());        // 麻痺毒 (毒スタック分 敵攻撃-N・拘束中核)
             // VenomBlade はステータス化
             Register(new SlowVenomCurse());   // 遅効の呪 (T5以降 毒+1/T)
@@ -340,26 +373,12 @@ namespace ItemSystem.PassiveSkills
             Register(new BloodFate());       // 血の宿命 (開幕 出血+2)
 
             // 2026-07-15 充電系 (ADR-0009 柱5・新パイプライン専用)
-            Register(new Battery());          // 蓄電池 (開幕+3)
-            Register(new Generator());        // 発電機 (被ダメ+1)
-            Register(new Catalyst());         // 触媒 (与ダメ+1)
             Register(new Thundercloud());     // 雷雲 (ロール後25%で+1)
-            Register(new Spark());            // 火花 (充電1消費で+5ダメ)
-            Register(new LightningStrike());  // 雷撃 (充電3消費で与ダメ+30%)
             // Overload はステータス化
             Register(new ShortCircuit());   // 2026-07-16 改名: 旧 Criticality (「臨界」キーワードを新軸に譲渡)
 
             // 臨界系 (Rinkai) 2026-07-16 追加: メーター蓄積型・Burn 撤廃後の新軸
-            Register(new Ignition());          // 発火 (開幕 meter+15)
-            Register(new Conduction());        // 熱伝導 (被ダメ → meter 加算)
-            Register(new Radiation());         // 輻射 (攻撃T meter+5 追加)
-            Register(new CriticalPressure()); // 臨界圧 (爆発ダメ 50→80)
-            Register(new ChainCombustion());   // 連鎖爆発 (爆発T 会心確定)
-            Register(new Afterglow());         // 余熱 (爆発後 meter 20残)
-            Register(new LowerThreshold());    // 降下閾値 (閾値 50→35)
-            Register(new NoCooldown());        // 不冷却 (爆発後 meter half残)
             Register(new UnyieldingHeat());    // 不朽の熱 (meter40+ で致命耐え・meter全消費)      // 臨界 (過充電3T継続で会心確定+全消費)
-            Register(new BackupPower());      // 予備電源 (充電0で1回全回復)
 
             // ============================
             //  敵専用スキル

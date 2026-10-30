@@ -1376,7 +1376,7 @@ namespace AutoTest
                         + $"  (内訳: 店無し {ItemSystem.Shop.ShopManager.RerollFailNoShop / dn:F2}"
                         + $" / 金不足 {ItemSystem.Shop.ShopManager.RerollFailNoGold / dn:F2}"
                         + $" / 上限到達 {ItemSystem.Shop.ShopManager.RerollFailCapped / dn:F2}"
-                        + $" / **無料リロール {ItemSystem.Shop.ShopManager.FreeRolls / dn:F2}** 回/ラン)");
+                        + $" / **合札の値引き {ItemSystem.Shop.ShopManager.TallyDiscounts / dn:F2}** 回/ラン)");
             }
             {
                 long gt = 0;

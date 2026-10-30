@@ -234,13 +234,6 @@ namespace GameLoop
                 float valorGoldPct = MetaProgression.MetaBuffApplicator.GetEliteGoldPct();
                 if (valorGoldPct > 0f)
                     coins = Mathf.RoundToInt(coins * (1f + valorGoldPct / 100f));
-
-                // 〈精鋭首の請取証〉: エリート勝利だけ ゴールド+2 (2026-09-15)。
-                //   **通常戦に乗せない** ── 上の〈剛胆〉と同じ理由で、 全戦闘に配ると
-                //   「強敵を選ぶ」という性格が消えて単なる金庫になる。
-                //   エリートは 1 ラン 6.3 戦なので +25G 前後。 割増 (%) ではなく定額なのは、
-                //   層が進んでも同じ重みにしないため (報酬本体が層で伸びる)。
-                if (Run.OwnsPassive(ItemIds.EliteBountyReceipt)) coins += 4;
             }
 
             // ADR-0011 〈富〉(目 9): 戦闘中に積んだ報酬加算 (%)。 割合先 (メタの定額 +N の前)。

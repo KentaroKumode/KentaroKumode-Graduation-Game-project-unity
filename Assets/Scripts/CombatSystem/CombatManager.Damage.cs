@@ -202,6 +202,10 @@ namespace CombatSystem
             {
                 Debug.Log($"[急所] 会心 → 敵の防御{ctx.enemyDefense} を無視");
             }
+            else if (ctx.enemyDefense > 0 && totalDmg > 0 && ctx.suppressedCritProc)
+            {
+                Debug.Log($"[研ぎ知らずの銑鉄棍] 会心の代わりに敵の防御{ctx.enemyDefense} を無視");
+            }
             else if (ctx.enemyDefense > 0 && totalDmg > 0)
             {
                 int effDef = DefenseFormula.Effective(ctx.enemyDefense, ctx.playerArmorPen);
@@ -398,11 +402,18 @@ namespace CombatSystem
             // 消費: シールド吸収（残量から差し引き）
             if (ctx.consShield > 0 && totalDmg > 0)
             {
-                int absorbed = Math.Min(ctx.consShield, totalDmg);
-                ctx.consShield -= absorbed;
+                // 吸収・割れの出来事を配る (2026-10-31)。 吸収に応じて品が敵へ返す分 (〈鏡返しの小盾〉) はここで使う。
+                int absorbed = ItemSystem.PassiveSkills.Keywords.Kw.AbsorbShield(ctx, totalDmg, isAttack: true);
                 totalDmg -= absorbed;
                 ctx.dbgShieldToNormal += absorbed;   // [計装] チップ側との配分を見る
                 Debug.Log($"[CombatManager] シールド吸収 {absorbed} (残{ctx.consShield})");
+                int reflect = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.ReflectKey);
+                if (reflect > 0)
+                {
+                    enemyHP = Math.Max(0, enemyHP - reflect);
+                    ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.ReflectKey] = 0;
+                    Debug.Log($"[シールドの返し] {reflect} → 敵HP {enemyHP}");
+                }
             }
 
             // 消費: 鏡写しの水晶（吸収後の実被ダメと同量を敵へ反射）

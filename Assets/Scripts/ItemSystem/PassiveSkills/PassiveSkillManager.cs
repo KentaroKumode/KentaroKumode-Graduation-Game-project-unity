@@ -420,6 +420,51 @@ namespace ItemSystem.PassiveSkills
             }
         }
 
+        /// <summary>連鎖の深さと、 この連鎖で既に働いた品 (2026-10-31 アイテム再編)。</summary>
+        private int _kwDepth;
+        private readonly HashSet<string> _kwFired = new HashSet<string>();
+
+        /// <summary>キーワードの出来事を配る。 量は <see cref="Keywords.Kw.EventAmount"/> で読める。
+        ///
+        /// <para><b>1 つの出来事から続く一続き (連鎖) の中では、 同じ品は 1 度しか働かない。</b>
+        /// 出来事の処理中に起きた出来事は同じ連鎖として数え、 いちばん外の出来事が終わったら数え直す。
+        /// これが無いと「爆発 → 充電 → 臨界 → 爆発」のような輪が 1 拍の中で回り続ける。</para></summary>
+        public void RaiseKeyword(PassiveSkillTrigger trigger, int amount)
+        {
+            if (context == null || amount <= 0) return;
+            if (!activeSkillsByTrigger.TryGetValue(trigger, out var skills) || skills.Count == 0) return;
+            if (_kwDepth == 0) _kwFired.Clear();
+            _kwDepth++;
+            float prevAmount = context.GetAccumulated(Keywords.Kw.AmountKey);
+            try
+            {
+                // 実行中にリストが増減しても壊れないよう写しを回す
+                var list = skills.ToArray();
+                for (int i = 0; i < list.Length; i++)
+                {
+                    var s = list[i];
+                    if (!_kwFired.Add(s.SkillId)) continue;
+                    context.accumulatedValues[Keywords.Kw.AmountKey] = amount;
+                    try
+                    {
+                        CombatContext.CurrentSkillId = s.SkillId;
+                        s.Execute(trigger, context);
+                        CombatContext.CurrentSkillId = "";
+                        triggeredPlayerSkills.Add(s.SkillId);
+                    }
+                    catch (System.Exception e)
+                    {
+                        Debug.LogError($"[PassiveSkillManager] Error in skill '{s.SkillId}' ({trigger}): {e.Message}");
+                    }
+                }
+            }
+            finally
+            {
+                context.accumulatedValues[Keywords.Kw.AmountKey] = prevAmount;
+                _kwDepth--;
+            }
+        }
+
         // ===========================================================
         //  バフ適用
         // ===========================================================
@@ -515,7 +560,6 @@ namespace ItemSystem.PassiveSkills
             {
                 context.consecutiveLosses++;
                 context.consecutiveWins = 0;
-                context.rollLossOccurredThisCombat = true; // 希望の灯片: 灯が一度でも陰る
                 FireTrigger(PassiveSkillTrigger.OnRollLose);
             }
             else
@@ -611,7 +655,7 @@ namespace ItemSystem.PassiveSkills
             context.critRatePctAdd += dsBuffCrit;
             if (dsBuffCrit > 0f) CombatSystem.DmgSourceDiag.Note("会心率バフ(月蝕/レイピア)", CombatSystem.DmgSourceDiag.CritRate, dsBuffCrit);
 
-            if (context.critSuppressed)
+            if (context.critSuppressed && !context.critBecomesArmorBreak)
             {
                 context.isCritical = false;   // 無心の刃など: 会心そのものを封印
             }
@@ -633,6 +677,16 @@ namespace ItemSystem.PassiveSkills
                 GameLoop.GameHooks.OnCritRateResolved?.Invoke(critAdd, critRate);
 
                 context.isCritical = critRate > 0f && GameLoop.GameRng.Value("PassiveSkillManager.2") < critRate;
+                context.lastCritAddPct = critAdd;
+
+                // 〈研ぎ知らずの銑鉄棍〉: 会心は出ない。 会心になるはずだった攻撃は敵の防御を無視し、 敵の防御を 1 下げる。
+                if (context.critBecomesArmorBreak && context.isCritical)
+                {
+                    context.isCritical = false;
+                    context.suppressedCritProc = true;
+                    context.enemyDefense = System.Math.Max(0, context.enemyDefense - 1);
+                    Debug.Log($"[研ぎ知らずの銑鉄棍] 会心の代わりに防御を砕く (敵の防御 → {context.enemyDefense})");
+                }
             }
             }   // ← if (attackerIsEnemy) の else 閉じ
 
@@ -642,6 +696,8 @@ namespace ItemSystem.PassiveSkills
 
             if (context.isCritical && totalDamage > 0)
             {
+                if (!attackerIsEnemy)
+                    context.accumulatedValues[Keywords.Kw.CritCountKey] = context.GetAccumulated(Keywords.Kw.CritCountKey) + 1;
                 FireTrigger(PassiveSkillTrigger.OnCriticalDamage);
                 // 敵側の会心耐性 (〈回帰性真理〉= 倍率 −0.5)。 **会心倍率が実際に乗る唯一の地点**なので
                 //   ここで引く。 criticalMultiplier 自体を下げると BeginNewTurn の再構築と
@@ -650,6 +706,9 @@ namespace ItemSystem.PassiveSkills
                 float effCritMul = context.criticalMultiplier;
                 if (!attackerIsEnemy && context.enemyCritMultReduction > 0f)
                     effCritMul = UnityEngine.Mathf.Max(1f, effCritMul - context.enemyCritMultReduction);
+                // 〈寸鉄〉: 会心率の 100% を超えた分が倍率になる (超えた 10% につき +0.1)。
+                if (!attackerIsEnemy && context.critOverflowToMultiplier && context.lastCritAddPct > 100f)
+                    effCritMul += (context.lastCritAddPct - 100f) / 100f;
                 totalDamage = (int)(totalDamage * effCritMul);
                 // [診断] 会心倍率は 3.0 固定ではない (メタ精密 r10 の逓減還元・一点集中 等)。
                 // 実測の平均を取らないと会心係数を 1+p×2 で見積もれない。

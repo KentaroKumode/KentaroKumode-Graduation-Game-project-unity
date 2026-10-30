@@ -13,7 +13,7 @@ namespace GameLoop
         // === 名前付きパッシブ (日本語 ID ── items.json の id と一致必須) ===
         // MerchantSeal (商人の符牒) / GourmetKnife (食通の懐刀) は 2026-07-18 削除 (アイテム削除に伴う)
         /// <summary>黄金卿の剣: AutoRunner の装備判断が参照。</summary>
-        public const string GoldenKingSword = "溶かし金の領主剣";
+        public const string GoldenKingSword = "溶金の領主剣";
         /// <summary>天工開物: GameManager の強化フックが参照。</summary>
         public const string HeavenlyCraft = "天工開物";
         /// <summary>シュヴァリエのレイピア: コントラタック切替 (Consumables.TryUseRapier)。</summary>
@@ -22,12 +22,8 @@ namespace GameLoop
         // === 店連動パッシブ (2026-09-15) ===
         //   ShopManager が所持判定に使う ＝ 跨ファイル参照なのでここを経由する。
         //   下の帯 (BRONZE/SILVER) に店の機能へ触る品が 1 つも無かったのを埋めるもの。
-        /// <summary>試し振りの符牒: 各ショップの初回リロールが無料 (ShopManager.TryReroll)。</summary>
+        /// <summary>合札: 同じショップで 2 品目以降を買うとき 10G 安い (ShopManager.TryBuy・2026-10-31)。</summary>
         public const string TrialTossToken = "合札";
-        /// <summary>釣り銭の受け皿: ショップで買うたび 物資+10 (ShopManager.TryBuy)。</summary>
-        public const string ChangeTray = "銭皿";
-        /// <summary>精鋭首の請取証: エリート勝利だけ ゴールド+2 (GameManager の戦闘報酬)。</summary>
-        public const string EliteBountyReceipt = "首級控え";
 
         // === 初期装備 ===
         public const string DiceWood = "dice_wood";
@@ -52,7 +48,14 @@ namespace GameLoop
         public const string ConsHealFamily   = "heal";   // 回復:     最大HP の 25/40/60/100%
         public const string ConsShieldFamily = "def";    // シールド: 15/30/50/80 (戦闘中に使用可)
         public const string ConsPowerFamily  = "dmg";    // 攻撃強化: 与ダメ +15/30/50/75% (戦闘中)
-        public const string ConsProvisionFamily   = "provision";   // 物資回復: +50/100/150/200 (2026-08-05 追加・2026-09-28 ×10)
+        //   物資回復の系統 (provision) は 2026-10-31 に廃止。 物資はショップの「物資の包」で買う
+        //   (ShopManager.TryBuyProvisionPack)。 品を挟んで買わせる段は冗長だった。 4 品のうち
+        //   〈古い手紙〉だけ効果を替えて残した (OldLetter)。
+
+        /// <summary>古い手紙 (2026-10-31): 次のターンの被ダメを 0 にする。 1 枚で <see cref="OldLetterUses"/> 回使える。
+        /// 使用回数を数えるので Consumables.Use と RunState から参照する。</summary>
+        public const string OldLetter = "古い手紙";
+        public const int OldLetterUses = 3;
 
         // === 航行マップで使う消耗品 (2026-09-28・2026-10-18 に囮と罠を統合) ===
         //   **系統で判定する** (ConsFamilyOf)。 下の id 定数は「開始時に配る」「店で買う」の
@@ -87,16 +90,14 @@ namespace GameLoop
         /// 回復が並ばない店があると消費で耐久を賄う設計自体が成立しないため (2026-08-04)。</summary>
         public static readonly string ConsumableFixedFamily = ConsHealFamily;
 
-        /// <summary>残り 2 枠をここから重複なしで抽選する 3 系統 (2026-08-05)。
-        /// 物資は横移動・戦闘で一方的に減る一方で回復源が無く、 進路判断の自由度を奪っていた。
-        /// 前哨基地での自動回復は「毎層リセット」になり発狂到達率が 0.4% まで落ちて棄却したので、
-        /// **ゴールドを払って買う**形にして資源のやり取りとして残す。</summary>
+        /// <summary>残り 2 枠の系統。 物資回復の系統を 2026-10-31 に外したので、 シールドと攻撃強化が毎回並ぶ
+        /// (物資はゴールドで「物資の包」を買う)。</summary>
         public static readonly string[] ConsumableRandomFamilies =
-            { ConsShieldFamily, ConsPowerFamily, ConsProvisionFamily };
+            { ConsShieldFamily, ConsPowerFamily };
 
         /// <summary>全系統 (効果解決・カタログ用)。</summary>
         public static readonly string[] ConsumableFamilies =
-            { ConsHealFamily, ConsShieldFamily, ConsPowerFamily, ConsProvisionFamily };
+            { ConsHealFamily, ConsShieldFamily, ConsPowerFamily };
 
         /// <summary>消費アイテムの Tier 段数 (1〜4)。</summary>
         public const int ConsumableMaxTier = 4;

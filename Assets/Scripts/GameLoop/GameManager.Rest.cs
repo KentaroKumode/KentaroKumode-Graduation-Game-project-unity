@@ -182,11 +182,11 @@ namespace GameLoop
                     apex ? RunChronicle.ForgeApex : RunChronicle.ForgeUpgrade,
                     run.equippedWeaponId, cost);
             }
-            // 天工開物: 武器を強化するたび、強化素材を1つ返還する
+            // 天工開物 (2026-10-31): 武器を強化するたび、 以後の戦闘の開始時の臨界 +5
             if (run != null && run.OwnsPassive(ItemIds.HeavenlyCraft))
             {
-                run.weaponMaterials += 1;
-                Debug.Log("[天工開物] 強化素材を1つ返還");
+                run.heavenlyCraftUpgrades++;
+                Debug.Log($"[天工開物] 武器強化 → 以後の戦闘の開始時 臨界 +{5 * run.heavenlyCraftUpgrades}");
             }
             return true;
         }

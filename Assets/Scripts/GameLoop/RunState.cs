@@ -455,6 +455,14 @@ namespace GameLoop
         public int  nextLootMinRarity = -1;    // 鑑定の眼鏡: 次の宝箱/ショップ最低レア(ItemRarity int)。-1=無
         public bool nextShopHalfPrice;         // 商人の鈴: 次ショップ全価格半額
         public int  philStoneUsed;             // 賢者の石: このランでの使用回数(最大5)
+        public int  oldLetterUsesSpent;        // 古い手紙: 手元の 1 枚を使った回数。 ItemIds.OldLetterUses に達したら手放して 0 に戻す
+
+        // === アイテム再編 (2026-10-31) ===
+        /// <summary>前の戦闘が終わってからマップで進んだ歩数。 移動で貯まる品 (継ぎ革の旅靴・聖路の白靴・毒草摘みの杖・測量師の片眼鏡) が
+        /// 次の戦闘の開始時に読む。 GameManager の点に入る前のフックで +1、 戦闘終了で 0。</summary>
+        public int  stepsSinceBattle;
+        /// <summary>〈天工開物〉: このランで武器・ダイスを強化した回数 (持っている間だけ数える)。 戦闘開始時の臨界 +5 × 回数。</summary>
+        public int  heavenlyCraftUpgrades;
 
         /// <summary>次戦闘持ち越しバフをすべて消去（戦闘開始時にコピー後 or リセット時）。</summary>
         public void ClearPendingCombatConsumables()

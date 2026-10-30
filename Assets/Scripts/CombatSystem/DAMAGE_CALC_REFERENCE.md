@@ -164,6 +164,7 @@ playerDamageNegateCharges>0 → total=0(獣の絆)
 consReflect(鏡写し): 吸収後の被ダメ同量を敵へ反射
 痛覚遮断剤【職業/狂戦士 2026-06-28】: painkillerArmedThisTurn && total≥playerHP → total=playerHP−1（HP=1踏みとどまり・チェーン**最後**）
 → (ダメージ適用直前) 仕込み刃【職業/暗殺者 2026-06-28・2026-09-22 に倍率 1→5】: daggerArmed && total>0 → total=0 ＋ **その 5 倍**を enemyHP へ軽減不能で返す（`CombatManager` の仕込み刃の反撃倍率）。使ったターン限りで、被弾しなくても失効
+→ 古い手紙【消耗品 2026-10-31】: accumulatedValues[Consumables.OldLetterGuardKey] > 0 → total=0（反撃なし）。仕込み刃の直後・同じく使ったターン限り。1 枚で 3 回使える
 → playerHP −= total (+ fixedDamageToPlayer)
   fixedDamageToEnemy>0 は敗北時も敵へ(反撃/Counter/Riposte) / 出血
   痛覚遮断剤 post-clamp: メイン+固定ダメ適用後も painkillerArmedThisTurn 中は playerHP≤0 → 1 に復帰
@@ -490,23 +491,12 @@ OnPreDealDamage で `mutualAttackBonus` を足しても**一切乗らない**。
 
 | 名称 | レア | Trigger | 効果(ctx/run操作) |
 |---|---|---|---|
-| 灯心の鈴 | B | OnMapMove | 10%で空腹度+1 |
-| 安らぎ/癒し/神聖の靴 | B/S/G | OnMapMove | 歩行毎 playerHP +1/2/3 |
-| 巡礼者の杖 | S | CombatEnd | 50%で空腹度+1 |
-| 希望の灯片 | S | CombatEnd | HealPlayer(3) |
-| 食通の懐刀 | S | (イベント) | イベント由来の空腹回復+1（EventEffectExecutor） |
-| 黄金の天秤 | G | CombatEnd | 勝利時 coins +5 |
-| 末那識(旧 死神の予感) | L | OnCriticalCheck/OnPreDealDamage | HP≤35% → forceCritical=true ＋ outgoing +60%（会心確定・会心率と天井を無視）。**2026-09-19 ステータス化 §2-C**（旧 OnRoll の ITimedEffect） |
-| 鋼の心臓 | L | CombatEnd | HealPlayer(5)（取得時に最大HP+20ボーナス別途） |
-| 災厄の指輪 | L | OnRoll | 被弾毎に次の与ダメ+2累積(上限+10・戦闘終了リセット) finalDamage加算 |
-| 永遠の燈 | L | CombatEnd | HP≤10 → HealPlayer(20) |
-| 商人の符牒 | L | (ショップ連携) | ショップ系フック（PassiveItemRegistry 非登録） |
-| 巡礼の杖飾り【新2026-06-03】 | B | OnMapMove | 25%で物資+10（ProvisionSystem.ApplyFood・2026-09-28 に ×10） |
-| 狂宴の仮面【新2026-06-03】 | S | OnPreDealDamage | 物資[枯渇し始める]以下 outgoing+0.10 ／[枯渇寸前]以下 +0.25。**2026-09-19 ステータス化 §2-C**（旧 OnRoll の ITimedEffect） |
+| 切り分けた帯封 | B | OnFloorEnter | 層に入るたび ゴールド +6 |
+| 佯狂者の杖・衣・冠 | — | OnRoll | 発狂中のセット効果（物資・ADR-0002） |
 
-> **2026-07-18 削除済み**（`PassiveItemEffects.cs` から class ごと削除・items.json からも撤去）:
-> 記憶の砂時計 / 死神の数珠 / 嵐の徽章 / 沈黙の剣帯 / 狂乱のメダリオン / 静寂のローブ / 黒煙の符 /
-> **蒼穹の眼** / 守護天使の鈴 —— 本表からも 2026-07-26 に削除（ドリフト解消）。
+> **2026-10-31 アイテム再編で移した品**: 巡礼の杖・希望の灯片・旅靴/白靴・天秤・鋼の心臓・災厄の指輪・無害灯・幸運の硬貨・相棒の魂は
+> パッシブスキル側 (`ReworkItemEffects.cs`・下の §3-H) へ移り、 ここからは class ごと削除した。
+> 2026-07-18 削除済み: 記憶の砂時計 / 死神の数珠 / 嵐の徽章 / 沈黙の剣帯 / 狂乱のメダリオン / 静寂のローブ / 黒煙の符 / 蒼穹の眼 / 守護天使の鈴。
 
 ### 3-D. 2026-06-03 追加の汎用パッシブ（`AllPassiveSkillEffects.cs`・PassiveSkillRegistry 登録）
 
@@ -563,6 +553,35 @@ Passive カテゴリのシナジー武器群。4枚がインベントリに揃�
 - 制限（パイロット）: DOT値は def 単位（発生源別の可変ダメ未対応）／DOT は軽減無視（fixedDamage 経由）。
 
 ---
+
+### 3-H. アイテム再編 (2026-10-31・`ReworkItemEffects.cs`・`Keywords.cs`)
+
+**キーワードの出来事。** 量の変化は `Keywords.Kw` と `CombatContext` の 1 か所を通り、 品へ出来事として配られる
+(`PassiveSkillManager.RaiseKeyword`)。 量は `Kw.EventAmount(ctx)`。
+**1 つの出来事から続く連鎖の中では、 同じ品は 1 度しか働かない** (外側の出来事が終わったら数え直す)。
+
+| 出来事 (トリガー) | 出る場所 | 量 |
+|---|---|---|
+| OnRinkaiBurst | Kw.AddHeat が閾値をまたいだとき | その爆発で使った臨界 |
+| OnChargeGain / OnOvercharge | CombatContext.AddCharge | 増えた分 / 上限で捨てた分 (〈雷壺〉はターン開始時に上限超過の半分を捨てる) |
+| OnChargeSpend | CombatContext.ConsumeCharge (リロールも通る) | 使った分 |
+| OnShieldGain | consShield の setter (増えたときだけ) | 増えた分 |
+| OnShieldAbsorb / OnShieldBreak | Kw.AbsorbShield (敵の直接攻撃と軽減無視の肩代わり) | 吸収した分 / 割られる前の量 |
+| OnShieldDecay | BeginNewTurn Phase C の半減 (〈脈なしの鋼心臓〉で止まる) | 失った分 |
+| OnPoisonGain / OnPoisonCap | CombatContext.AddStatus (敵の毒) | 増えた分 / 上限到達 |
+| OnPoisonTick | TickStatuses と〈廃庭の霧吹き〉(敵の攻撃のたび・TickPoisonOnce) | 毒のダメージ |
+| OnBleedDecay / OnBleedConsume / OnBleedZero | Phase C の自然減 / Kw.ConsumeBleed / 0 到達 | 減った分 / 使った分 / 1 |
+
+**敵への軽減不可ダメージ (Kw.DamageEnemy)。** ターンの解決中 (`ExecuteTurnMutual` の頭〜最後の HP 同期) は
+CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠へ、 攻撃の後の分はターン最後の HP 同期 (踏みとどまりの clamp より前) で通す。
+
+**会心の規則。**
+- 〈寸鉄〉: 会心ダメージ時、 会心率の加算合計が 100% を超えた分 /100 を倍率に足す (`lastCritAddPct`)。
+- 〈研ぎ知らずの銑鉄棍〉: 会心の判定は通常どおり行い、 会心になった攻撃は会心にせず `suppressedCritProc` を立てて
+  敵の防御を無視 (§③-A の防御の前) し、 敵の防御を 1 下げる (戦闘中)。
+- 会心の回数は `Kw.CritCountKey` に積む (〈戦果の天秤〉)。
+
+**個々の品の数値は `ReworkItemEffects.cs` の XML コメントが正本** (再記述しない)。
 
 ## 4. 敵/汎用パッシブ一覧（`EnemyPassiveSkillEffects.cs`・視点は§0参照）
 
@@ -778,16 +797,17 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          過充電: charge >= CombatContext.OverchargeThreshold (=7) で IsOvercharged()=true
                  (Overload: 過充電中 outgoing+30% / ShortCircuit: 過充電3T継続で会心確定+全消費)
 
-臨界     (Rinkai メーター・2026-07-16 追加。rinkaiThreshold>0 = いずれかの臨界パッシブ所持時のみ)
-         解決後: meter += attackSum (+ 攻撃配線Tなら rinkaiRadiationBonus)
-                 (rinkaiConductionEnabled なら + takenApplied)
-         meter >= rinkaiThreshold (基準50 / LowerThreshold で35) 到達で
-           → 次T爆発予約 (rinkaiBurstActive=true)、meter = rinkaiAfterglow (基準0 / Afterglow=20 / NoCooldown=threshold/2)
-         爆発 flat = rinkaiBurstDamage (基準50 / CriticalPressure=80)
+臨界     (Rinkai メーター・2026-07-16 追加。rinkaiThreshold>0 = いずれかの臨界の品を持つときだけ・Kw.EnableHeat)
+         **溜める処理は Kw.AddHeat の 1 か所** (2026-10-31 アイテム再編)。 ターン終わりに meter += attackSum、
+           品が溜める分 (被弾・充電・会心・毒のダメージ・移動・開幕) はその出来事の時点で同じ関数を通る。
+         meter >= rinkaiThreshold (基準50 /〈早沸かし釜〉で35) をまたいだ瞬間に爆発が決まる
+           → 次の攻撃に乗る予約 (rinkaiBurstActive=true・回数 Kw.BurstCountKey)、 meter = 0、 OnRinkaiBurst を配る。
+           〈帳簿外の連爆〉(rinkaiMultiBurst): meter を閾値ぶんだけ減らし、 溜まっている限り同じ処理で何度でも爆発する。
+         爆発 flat = rinkaiBurstDamage (基準50) × 回数 ＋ Kw.BurstBonusKey (〈溢れ取りの鋳型〉: 閾値を超えた臨界 ×2)。
+         〈二度目の打金〉: 爆発を使った次のターン、 その爆発ダメージの半分を固定ダメ枠へ。
          **2026-08-03 修正: 爆発は atkBase ではなく fixedDamageToEnemy へ入る。**
            旧実装は atkBase へ加算していたため、 その後の会心 ×3.0 と outgoingDamageMultiplier
-           が丸ごと乗り、 「flat 50」が実効 150〜300 になっていた。 rinkaiCritOnBurst 持ちは
-           会心が確定するので ×3.0 が保証され、 さらに悪化していた。
+           が丸ごと乗り、 「flat 50」が実効 150〜300 になっていた。
            固定ダメ枠へ移したことで倍率が乗らなくなった代わりに、 敵の基礎防御%も通らなくなる。
          遺物 (§15-5) の臨界軸 (爆発時に敵の現在HP の N%) も同じ枠へ入る。
 ```

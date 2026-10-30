@@ -364,6 +364,8 @@ namespace CombatSystem
             }
 
             // --- 0. ターン開始処理 ---
+            // ここからターンの最後の HP 同期までは、 品が入れる敵へのダメージを預かる (Kw.DamageEnemy)。
+            if (ctx != null) ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.ResolvingKey] = 1;
             psm.BeginTurn();
 
             // 装備維持費 (2026-08-15): **所持パッシブ 10 個につき充電 1** を毎ターン消費する。
@@ -878,18 +880,26 @@ namespace CombatSystem
                     Debug.Log($"[不完全な起動] 出力不足 atkBase {beforeIg} → {atkBase}");
             }
 
-            // 臨界爆発の予約消費 (前T meter が閾値到達で set された)
+            // 臨界爆発の予約消費 (臨界が閾値に達した時点で予約される・Kw.AddHeat)
+            ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.BurstThisAttackKey] = 0;
             if (ctx.rinkaiBurstActive)
             {
                 // **atkBase に足さない (2026-08-03 修正)。**
                 //   旧実装は atkBase へ加算していたため、 その後の会心 ×3.0 と
                 //   outgoingDamageMultiplier が丸ごと乗り、 「flat 50」のつもりの数字が
-                //   実効 150〜300 になっていた。 rinkaiCritOnBurst 持ちなら会心は確定なので
-                //   ×3.0 が保証されてさらに悪い。
+                //   実効 150〜300 になっていた。
                 //   §9.2 の「爆発 flat」という設計意図どおり、 倍率の乗らない
                 //   fixedDamageToEnemy (軽減無視の固定ダメ枠) へ回す。
-                ctx.fixedDamageToEnemy += ctx.rinkaiBurstDamage;
-                if (ctx.rinkaiCritOnBurst) ctx.forceCritical = true;
+                // 〈帳簿外の連爆〉で同じターンに何度も爆発したら、 その回数ぶん乗る。 品の上乗せ (〈溢れ取りの鋳型〉) は Kw.BurstBonusKey。
+                int burstN = Math.Max(1, (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstCountKey));
+                int burstBonus = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstBonusKey);
+                int burstDmg = ctx.rinkaiBurstDamage * burstN + burstBonus;
+                ctx.fixedDamageToEnemy += burstDmg;
+                ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.BurstCountKey] = 0;
+                ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.BurstBonusKey] = 0;
+                ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.BurstThisAttackKey] = 1;
+                ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.BurstAppliedTurnKey] = ctx.currentTurn;
+                ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.BurstAppliedDmgKey] = burstDmg;
                 // 遺物 (§15-5) 臨界: 爆発時に **敵の現在HP** の N% を上乗せする。
                 //   最大HP 比だと削っても威力が落ちず、 1 戦闘 8 回の爆発で合計が最大HP の
                 //   180% に達して遺物 1 個でボスを 2 回殺せる量になった (§24)。
@@ -901,10 +911,11 @@ namespace CombatSystem
                                ? Mathf.FloorToInt(ctx.enemyCurrentHP * rinPct) : 0;
                 if (relicBurst > 0) ctx.fixedDamageToEnemy += relicBurst;
                 ctx.rinkaiBurstActive = false;
-                Debug.Log($"[臨界爆発] 固定ダメ +{ctx.rinkaiBurstDamage}"
-                    + (relicBurst > 0 ? $" ＋遺物 {relicBurst} (現在HP {ctx.enemyCurrentHP} の {rinPct:P0})" : "")
-                    + (ctx.rinkaiCritOnBurst ? " ＋会心確定" : ""));
+                Debug.Log($"[臨界爆発] ×{burstN} 固定ダメ +{burstDmg}"
+                    + (relicBurst > 0 ? $" ＋遺物 {relicBurst} (現在HP {ctx.enemyCurrentHP} の {rinPct:P0})" : ""));
             }
+            // 品がここまでに預けた敵へのダメージは、 この攻撃の固定ダメ枠で通す (Kw.DamageEnemy)。
+            ctx.fixedDamageToEnemy += ItemSystem.PassiveSkills.Keywords.Kw.TakePendingEnemyDamage(ctx);
             // [診断] この呼び出しだけが「プレイヤー勝利の主攻撃」。 段別計測はここでのみ積む。
             CombatStats.DiagWinAttack = true;
             var (dealtDmg, dealtFixed, isCrit) = psm.ProcessDamage(
@@ -1128,10 +1139,21 @@ namespace CombatSystem
             {
                 Debug.Log($"[役] 封じ・揃: 敵は行動不能 (予告されていた攻撃 {enemyAtkValue} は不発)");
                 ctx.daggerArmed = false;   // 仕込み刃はこのターン限り ── 攻撃が来なくても失効
+                ctx.accumulatedValues.Remove(GameLoop.Consumables.OldLetterGuardKey);   // 古い手紙も同じ
             }
             else if (enemyHP > 0)
             {
                 primaryAttacked = true;
+                // 〈廃庭の霧吹き〉: 敵が攻撃するたびにも毒のダメージが入る (2026-10-31)
+                if (ctx.poisonTickOnEnemyAttack)
+                {
+                    int pd = ctx.TickPoisonOnce();
+                    if (pd > 0)
+                    {
+                        enemyHP = Math.Max(0, enemyHP - pd);
+                        Debug.Log($"[廃庭の霧吹き] 敵の攻撃に合わせて毒 {pd} → 敵HP {enemyHP}");
+                    }
+                }
                 // --- 敵攻撃: 基礎×段階倍率 + β×ロール − ブロック (下限0) → 被ダメ修飾チェーン ---
                 psm.FireEnemyTrigger(PassiveSkillTrigger.OnPreDealDamage);
                 if (ctx != null && !string.IsNullOrEmpty(ctx.bossId))
@@ -1191,6 +1213,15 @@ namespace CombatSystem
                         enemyHP = Math.Max(0, enemyHP - reflect);
                     }
                     ctx.daggerArmed = false;
+                }
+
+                // 古い手紙 (2026-10-31): 使ったターンの被ダメを 0 にする (反撃は無い)。 仕込み刃と同じく
+                //   このターン限りで、 被弾しなくても失効する。 仕込み刃が先に 0 にしていれば何もしない。
+                if (ctx.GetAccumulated(GameLoop.Consumables.OldLetterGuardKey) > 0f)
+                {
+                    if (takenDmg > 0) Debug.Log($"[古い手紙] 被ダメ {takenDmg} を無効化");
+                    takenDmg = 0;
+                    ctx.accumulatedValues.Remove(GameLoop.Consumables.OldLetterGuardKey);
                 }
 
                 takenDmg = MetaProgression.MetaDebuffApplicator.ApplyJudgmentDamageIncrease(
@@ -1324,34 +1355,27 @@ namespace CombatSystem
             //   1 回目を敵攻撃より前に置くのは、 致死打で `enemyHP > 0` が落ちて
             //   **ヴェスカがその手番を丸ごと飛ばす**のを防ぐため (踏みとどまった以上は殴り返す)。
             //   よってこの 2 点セットで 1 ターン分を覆う。 ClampToThreshold は冪等。
+            // 攻撃の後に品が預けた敵へのダメージ (Kw.DamageEnemy) をここで通す。 踏みとどまりの clamp より前。
+            {
+                int pendingKw = ItemSystem.PassiveSkills.Keywords.Kw.TakePendingEnemyDamage(ctx);
+                if (pendingKw > 0) enemyHP = Math.Max(0, enemyHP - pendingKw);
+            }
             if (!roleOutcome.yachtFired)
             {
                 enemyHP = ItemSystem.PassiveSkills.Effects.DivineTalent.ClampToThreshold(
                     ctx, enemyHP, currentEnemy != null ? currentEnemy.maxHP : ctx.enemyMaxHP);
             }
             ctx.enemyCurrentHP = enemyHP;
+            ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.ResolvingKey] = 0;   // 以降は品が HP を直接減らす
 
             AccumulateRunCombatTotals(ctx);
             CombatStats.RecordTurn(ctx, attackDiceCount, blockDiceCount, chargeDiceCount, blockSum, enemyAtkValue);
 
             // --- 臨界メーター (Rinkai) 更新 ---
-            //   attackSum + radiation を meter に加算、閾値到達で次T爆発予約 (Afterglow で meter 残置量調整)
-            //   熱伝導 (Conduction) が有効なら被ダメも meter に加算
-            if (ctx.rinkaiThreshold > 0)
-            {
-                int add = attackSum + (attackSum > 0 ? ctx.rinkaiRadiationBonus : 0);
-                if (ctx.rinkaiConductionEnabled && takenApplied > 0) add += takenApplied;
-                if (add > 0)
-                {
-                    ctx.rinkaiMeter += add;
-                    if (ctx.rinkaiMeter >= ctx.rinkaiThreshold)
-                    {
-                        ctx.rinkaiBurstActive = true;
-                        ctx.rinkaiMeter = ctx.rinkaiAfterglow;
-                        Debug.Log($"[臨界] メーター閾値{ctx.rinkaiThreshold}到達 → 次T爆発予約 (残 meter={ctx.rinkaiAfterglow})");
-                    }
-                }
-            }
+            //   攻撃端子の出目の合計を溜める。 閾値をまたいだ時点で爆発が決まり、 次の攻撃に乗る (Kw.AddHeat)。
+            //   品が溜める分 (被弾・充電・会心など) は、 それぞれの出来事の時点で Kw.AddHeat を通る。
+            if (ctx.rinkaiThreshold > 0 && attackSum > 0)
+                ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, attackSum);
 
             // --- 収支トリガー (柱2: OnRollWin/Lose の再定義 = 収支±のターン。解決後に発火) ---
             int balance = (dealtDmg + dealtFixed) - takenApplied;

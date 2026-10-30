@@ -254,8 +254,8 @@ namespace AutoTest.EditorTests.Ultra
         public void TwoOptionsSharingAnId_StayDistinctByIndex()
         {
             UltraObservation observation = WithChoice(
-                new UltraChoiceOption { index = 0, id = "百鳴りの共振箱" },
-                new UltraChoiceOption { index = 1, id = "百鳴りの共振箱" });
+                new UltraChoiceOption { index = 0, id = "灼線鞭" },
+                new UltraChoiceOption { index = 1, id = "灼線鞭" });
 
             var actions = UltraCheckpointProtocol.ChoiceActions(observation, UltraActionKind.ChooseReward);
 

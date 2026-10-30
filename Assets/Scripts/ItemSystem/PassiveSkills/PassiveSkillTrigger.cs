@@ -70,5 +70,37 @@ namespace ItemSystem.PassiveSkills
         /// "mutualChargeDiceCount" / "mutualSpecialDiceCount"、 ブロック量は blockSumThisTurn で読める。
         /// 攻撃値への加算 (AddPlayerAttackOrDiceBonus) はここでもまだ乗る。 **末尾に足すこと** ── 途中に挟むと序数がずれる。</summary>
         OnWired,
+
+        // === キーワードの出来事 (2026-10-31 アイテム再編) ===
+        //   Keywords (Kw) が量の変化を見て PassiveSkillManager.RaiseKeyword で配る。 量は Kw.EventAmount(ctx) で読む。
+        //   1 つの出来事から続く連鎖の中では、 同じ品は 1 度しか働かない (GAME.md §11)。
+        /// <summary>臨界が閾値に達して爆発が 1 回決まった (量 = その爆発で使った臨界)。</summary>
+        OnRinkaiBurst,
+        /// <summary>充電が実際に増えた (量 = 増えた分)。</summary>
+        OnChargeGain,
+        /// <summary>充電を使った・リロールを含む (量 = 使った分)。</summary>
+        OnChargeSpend,
+        /// <summary>過充電: 上限を超えて捨てられた (量 = 捨てられた分)。</summary>
+        OnOvercharge,
+        /// <summary>シールドが増えた (量 = 増えた分)。</summary>
+        OnShieldGain,
+        /// <summary>シールドが攻撃を吸収した (量 = 吸収した分)。</summary>
+        OnShieldAbsorb,
+        /// <summary>ターン開始の半減でシールドを失った (量 = 失った分)。</summary>
+        OnShieldDecay,
+        /// <summary>シールドが吸収で 0 になった (量 = 割られる前の量)。</summary>
+        OnShieldBreak,
+        /// <summary>敵の毒が増えた (量 = 増えた分)。</summary>
+        OnPoisonGain,
+        /// <summary>毒のダメージが入った (量 = そのダメージ)。</summary>
+        OnPoisonTick,
+        /// <summary>敵の毒が上限に達した。</summary>
+        OnPoisonCap,
+        /// <summary>出血が自然に減った (量 = 減った分)。</summary>
+        OnBleedDecay,
+        /// <summary>出血を品の効果で使った (量 = 使った分)。</summary>
+        OnBleedConsume,
+        /// <summary>敵の出血が 0 になった。</summary>
+        OnBleedZero,
     }
 }
