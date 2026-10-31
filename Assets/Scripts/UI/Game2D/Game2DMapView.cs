@@ -62,7 +62,7 @@ namespace UI.Game2D
             plotQuad.SetPropertyBlock(mpb);
         }
 
-        [Tooltip("航行だけを試す: 点に着いても戦闘・イベント・ショップなどの旧画面へ入らない (GameManager.NavOnly)")] public bool navOnly = true;
+        [Tooltip("航行だけを試す: 点に着いても戦闘・イベント・ショップなどへ入らない (GameManager.NavOnly)。 2026-10-31 に戦闘と各場面の画面がつながったので既定は切")] public bool navOnly = false;
 
         private void LateUpdate()
         {

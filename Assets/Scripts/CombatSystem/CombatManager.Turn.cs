@@ -43,6 +43,11 @@ namespace CombatSystem
                 Debug.LogError("[CombatManager] No active combat!");
                 return default;
             }
+            if (_activeTurn != null)
+            {
+                Debug.LogError("[CombatManager] 人が操作するターンの判断待ち ── AnswerReroll / AnswerWiring で進めること");
+                return default;
+            }
 
             return ExecuteTurnMutual();
         }
@@ -343,6 +348,16 @@ namespace CombatSystem
         /// </summary>
         private TurnResult ExecuteTurnMutual()
         {
+            // 方策 (BOT) で決める経路: 判断の所で止まらずに最後まで回す (_interactiveTurn = false なら一度も yield しない)。
+            var steps = ExecuteTurnMutualSteps();
+            while (steps.MoveNext()) { }
+            return _stepResult;
+        }
+
+        /// <summary>1 ターンの本体。 人が操作するとき (<see cref="BeginInteractiveTurn"/>) だけ、 リロールと配線の判断の所で止まる。
+        /// 止まる位置は方策を呼んでいた位置と同じなので、 乱数を引く順番は方策の経路と変わらない。 結果は <see cref="_stepResult"/>。</summary>
+        private IEnumerator<TurnPause> ExecuteTurnMutualSteps()
+        {
             var psm = PassiveSkillManager.Instance;
             var ctx = psm.Context;
 
@@ -353,7 +368,7 @@ namespace CombatSystem
                 MetaProgression.Achievements.AchievementService.NoteEnemyEscaped(currentEnemy?.id);
                 Debug.Log($"[CombatManager] 偽の商人: {fleeAfterTurns}ターン経過 → 逃走（戦闘強制終了）");
                 FinishCombat();
-                return new TurnResult
+                _stepResult = new TurnResult
                 {
                     turnNumber = ctx.currentTurn,
                     playerWon = false,
@@ -361,6 +376,7 @@ namespace CombatSystem
                     playerHPAfter = playerHP,
                     enemyHPAfter = enemyHP,
                 };
+                yield break;
             }
 
             // --- 0. ターン開始処理 ---
@@ -403,13 +419,14 @@ namespace CombatSystem
                 // 刻限で力尽きた。 強制決着と同じ経路で閉じる (放置すると戦闘が続く)。
                 if (ctx != null) ctx.playerCurrentHP = 0;
                 FinishCombat();
-                return new TurnResult
+                _stepResult = new TurnResult
                 {
                     turnNumber = ctx != null ? ctx.currentTurn : 0,
                     playerWon = false,
                     isDraw = false,
                     playerHPAfter = 0,
                 };
+                yield break;
             }
 
             // 安全弁: 300T 超で強制決着 (旧法と同一)
@@ -420,7 +437,7 @@ namespace CombatSystem
                 playerHP = 0;
                 ctx.playerCurrentHP = 0;
                 FinishCombat();
-                return new TurnResult
+                _stepResult = new TurnResult
                 {
                     turnNumber = ctx.currentTurn,
                     playerWon = false,
@@ -428,6 +445,7 @@ namespace CombatSystem
                     playerHPAfter = 0,
                     enemyHPAfter = enemyHP,
                 };
+                yield break;
             }
 
             // 消費アイテム持続効果の毎ターン再適用 + 死因タグリセット (旧法と同一)
@@ -556,7 +574,8 @@ namespace CombatSystem
             //   RerollPhase は配列を **その場で** 書き換えるので、 参照を先に渡せば同期は保たれる。
             ctx.playerDiceFaceIdx = playerFaceIdx;
 
-            RerollPhase(ctx, playerDice, enemyDice, playerDiceMax, playerFaceIdx);
+            var reroll = RerollPhase(ctx, playerDice, enemyDice, playerDiceMax, playerFaceIdx);
+            while (reroll.MoveNext()) yield return reroll.Current;
 
             // ロール時系効果 (出目書き換え系はここまで = LED に見える値が配線に使える値)
             ctx.playerDice = playerDice;
@@ -687,7 +706,16 @@ namespace CombatSystem
                         ? mutualWiring[i] : DiceTerminal.Attack; // 未配置は攻撃へ自動合流
                 mutualWiring = next;
             }
-            if (WiringPolicy != null)
+            if (_interactiveTurn)
+            {
+                // 人が操作する: 出目と予告を見せて、 配線が来るまで止まる (渡された配線は下の SanitizeWiring が直す)。
+                _pause.Set(TurnPauseKind.Wiring, playerDice, playerFaceIdx, tele, mutualWiring);
+                yield return _pause;
+                var main = _pause.wiring;
+                if (main != null && main.Length == playerDice.Length)
+                    mutualWiring = (DiceTerminal[])main.Clone();
+            }
+            else if (WiringPolicy != null)
             {
                 var plan = WiringPolicy(playerDice, tele);
                 if (plan.main != null && plan.main.Length == playerDice.Length)
@@ -1414,7 +1442,7 @@ namespace CombatSystem
                     FinishCombat();
                 }
             }
-            return turnResult;
+            _stepResult = turnResult;
         }
 
         // ===========================================================

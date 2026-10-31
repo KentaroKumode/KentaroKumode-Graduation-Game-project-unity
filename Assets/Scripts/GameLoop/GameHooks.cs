@@ -12,6 +12,10 @@ namespace GameLoop
     /// </summary>
     public static class GameHooks
     {
+        /// <summary>BOT がランを動かしている間 true。 人の操作を受ける画面 (2D の戦闘など) はこの間は手を出さない ──
+        /// BOT の <c>ExecuteTurn</c> と画面の「人が操作するターン」がぶつからないように。</summary>
+        public static bool BotDriving;
+
         // ===== 判断 (プレイヤーの選択を代行する口) =====
 
         /// <summary>開幕パッシブの提示 (〈兵站〉r10 の 2〜3 択) から 1 つ選ぶ。 戻り値は添字。
@@ -41,6 +45,7 @@ namespace GameLoop
         /// <summary>全部の口を外す。</summary>
         public static void Clear()
         {
+            BotDriving = false;
             ChooseStartingPassive = null;
             WeaponEvBonus = null;
             MeasureRunPower = null;

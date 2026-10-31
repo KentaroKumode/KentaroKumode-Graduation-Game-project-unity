@@ -157,6 +157,8 @@ namespace GameLoop
 
         // === EventEncounter: 選択肢確定後・フレーバー表示中フラグ ===
         private bool eventChoiceResolved;
+        /// <summary>イベントの選択肢を選び終え、 結果の文を読んでいるところか (画面が「次へ」を出すのに読む)。</summary>
+        public bool EventChoiceResolved => eventChoiceResolved;
         // 戦闘トリガで保留している場合、戦闘終了後に MapNavigation へ戻すフラグ
         private bool returnToMapAfterEventCombat;
 
@@ -487,6 +489,13 @@ namespace GameLoop
         //  デバッグ用キーバインド
         // ============================================================
 
+        /// <summary>戦闘の入力を画面 (2D の戦闘) が受けている間 true。 Space / F でターンを自動で進めるキーを止める
+        /// ── 画面の「人が操作するターン」の途中で <c>ExecuteTurn</c> が割り込まないように。</summary>
+        public static bool CombatInputByScreen;
+
+        /// <summary>画面が Space を使ったフレーム。 同じ押下が、 画面の操作で切り替わった次のフェーズ (報酬の確定など) まで流れないように。</summary>
+        public static int ScreenUsedSpaceFrame = -1;
+
         void Update()
         {
             if (Input.GetKeyDown(KeyCode.G))
@@ -639,12 +648,12 @@ namespace GameLoop
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Space))
+            if (Input.GetKeyDown(KeyCode.Space) && ScreenUsedSpaceFrame != Time.frameCount)
             {
                 switch (CurrentPhase)
                 {
                     case GamePhase.Combat:
-                        if (CombatManager.Instance.IsCombatActive)
+                        if (!CombatInputByScreen && CombatManager.Instance.IsCombatActive)
                             CombatManager.Instance.ExecuteTurn();
                         break;
                     case GamePhase.BattleResult:
@@ -678,7 +687,7 @@ namespace GameLoop
                 if (Input.GetKeyDown(KeyCode.Alpha2)) ChooseRiftFate(true);  // 閉じない → GOOD END
             }
 
-            if (Input.GetKeyDown(KeyCode.F) && CurrentPhase == GamePhase.Combat)
+            if (Input.GetKeyDown(KeyCode.F) && CurrentPhase == GamePhase.Combat && !CombatInputByScreen)
             {
                 if (CombatManager.Instance.IsCombatActive)
                     CombatManager.Instance.ExecuteFullCombat();

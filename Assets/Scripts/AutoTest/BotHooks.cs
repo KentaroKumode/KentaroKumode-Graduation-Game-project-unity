@@ -22,6 +22,7 @@ namespace AutoTest
 
         public static void Install()
         {
+            GameHooks.BotDriving = true;
             GameHooks.ChooseStartingPassive = ChooseByBuyScore;
             GameHooks.WeaponEvBonus = LearnedWeaponBonus;
             GameHooks.MeasureRunPower = InventoryPower.Compute;
