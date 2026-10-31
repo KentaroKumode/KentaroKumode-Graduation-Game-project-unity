@@ -133,14 +133,16 @@ namespace CombatSystem
         /// 振り直す対象は <see cref="RerollPolicy"/> が決める (BOT / UI が差す)。
         /// null なら振り直さない ── 旧実装は物資消費の自動ポリシーだったが、
         /// リロールのたびに発狂へ近づく形だとヨットの中核が経済ペナルティに潰される (§design-yacht)。
+        ///
+        /// <para>人が操作するターン (<c>_interactiveTurn</c>) では、 方策を呼ぶ位置で止まって「振り直すか」を待つ。</para>
         /// </summary>
-        private void RerollPhase(CombatContext ctx, int[] playerDice, int[] enemyDice, int playerDiceMax,
-                                 int[] playerFaceIdx = null)
+        private IEnumerator<TurnPause> RerollPhase(CombatContext ctx, int[] playerDice, int[] enemyDice, int playerDiceMax,
+                                                   int[] playerFaceIdx = null)
         {
-            if (ctx == null || playerDice == null || playerDice.Length == 0) return;
-            if (RerollPolicy == null) return;
+            if (ctx == null || playerDice == null || playerDice.Length == 0) yield break;
+            if (RerollPolicy == null && !_interactiveTurn) yield break;
             // 強制ロール中は対象外 (出た目が仕様で固定されているため)
-            if (ctx.GetAccumulated("player_contre") > 0) return;
+            if (ctx.GetAccumulated("player_contre") > 0) yield break;
 
             // 予告を仮組みする。 敵ダイスはこの後変わらないので素の合計で作れる。
             int rawEnemyTotal = 0;
@@ -174,7 +176,15 @@ namespace CombatSystem
             while (guard-- > 0)
             {
                 int nth = ctx.rerollsThisCombat + 1;
-                var pick = RerollPolicy(playerDice, tele, nth);
+                int[] pick;
+                if (_interactiveTurn)
+                {
+                    _pause.Set(TurnPauseKind.Reroll, playerDice, playerFaceIdx, tele, mutualWiring);
+                    _pause.rerollCost = freeRerolls > 0 ? 0 : playerDice.Length * nth;
+                    yield return _pause;
+                    pick = _pause.reroll ? AllDiceIndex(playerDice.Length) : null;
+                }
+                else pick = RerollPolicy(playerDice, tele, nth);
                 if (pick == null || pick.Length == 0) break;
 
                 // ADR-0011: 振り直せない面は無い。 常に全ダイスを振り直す。

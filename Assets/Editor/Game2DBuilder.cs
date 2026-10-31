@@ -236,6 +236,7 @@ public static class Game2DBuilder
         var modalRt = Node("Modal", gridRt, 0, 0, Game2DLayout.Width, Game2DLayout.Height);
         modalRt.anchorMin = Vector2.zero; modalRt.anchorMax = Vector2.one; modalRt.offsetMin = modalRt.offsetMax = Vector2.zero;
         var modal = modalRt.gameObject.AddComponent<Game2DModal>(); modal.Build();
+        modalRt.gameObject.AddComponent<Game2DPhaseScreens>().modal = modal;      // 実データの画面 (ショップ・イベント・報酬 ほか)
         var exRt = Node("NavExtras", hudRoot, 0, 0, Game2DLayout.Width, Game2DLayout.Height);
         exRt.anchorMin = Vector2.zero; exRt.anchorMax = Vector2.one; exRt.offsetMin = exRt.offsetMax = Vector2.zero;
         var extras = exRt.gameObject.AddComponent<Game2DNavExtras>(); extras.modal = modal; extras.Build();

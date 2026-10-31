@@ -3825,15 +3825,20 @@ MonoBehaviour:
   fx: {fileID: 642354760}
   phase: 0
   t: 0
+  enemyDiceCount: 3
   turn: 1
   playerHp: 75
   playerMax: 75
   charge: 0
   eatk: 0
-  kills: 0
   lastTaken: 0
+  stage: 0
+  nextStageIn: -1
   version: 0
   rolled: 0
+  canReroll: 0
+  rerollCost: 0
+  baseAtk: 0
 --- !u!114 &642354759
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3849,7 +3854,7 @@ MonoBehaviour:
   plotQuad: {fileID: 1066947781}
   screen: {fileID: 642354754}
   lcdQuad: {fileID: 666814969}
-  navOnly: 1
+  navOnly: 0
   panel: {fileID: 752162611}
 --- !u!114 &642354760
 MonoBehaviour:
@@ -10784,6 +10789,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2038129471}
   - component: {fileID: 2038129472}
+  - component: {fileID: 2038129473}
   m_Layer: 5
   m_Name: Modal
   m_TagString: Untagged
@@ -10825,6 +10831,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   screen: {fileID: 642354754}
   _rt: {fileID: 79167783}
+--- !u!114 &2038129473
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2038129470}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1c3adb7a87d6dd4488281d8aeebb143e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  modal: {fileID: 2038129472}
 --- !u!1 &2058922835
 GameObject:
   m_ObjectHideFlags: 0

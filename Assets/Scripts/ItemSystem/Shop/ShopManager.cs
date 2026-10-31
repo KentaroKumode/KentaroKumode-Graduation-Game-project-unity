@@ -343,7 +343,7 @@ namespace ItemSystem.Shop
                 var s = inv.slots[i];
                 if (s == null || s.sold) continue;
                 if (string.IsNullOrEmpty(s.itemId)) continue;
-                if (s.kind == ShopSlotKind.WeaponMaterial) continue;
+                if (s.kind == ShopSlotKind.WeaponMaterial || s.kind == ShopSlotKind.FacePart) continue;   // 出目パーツは items.json に無い (引くと警告だけ出る)
                 var slotData = db.GetItem(s.itemId);
                 if (slotData?.passiveSkills == null) continue;
 

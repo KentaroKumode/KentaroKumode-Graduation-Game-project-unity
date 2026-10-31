@@ -7,8 +7,8 @@ namespace UI.Game2D
     /// <summary>
     /// 戦闘の GUI (<b>仮置き</b>・2026-10-24)。 枠・ダイスの面・ボタン・ランプ・ゲージ・丸ボタンは PixelLab (参考画像の切り抜き + パレット抽出) で作った絵
     /// (Assets/gui2d/battle_ui/・<see cref="Game2DKitAssets"/>)。 枠は 1 枚の絵を 9 分割して 3 つのパネルの大きさに合わせる。 文字は 3×5 のドット字 (英数字だけ)。
-    /// 左 = 自分のダイス 3 個と配線 (攻撃・防御・充電) と武器と決定ボタン / 右 = 敵のダイスと攻撃値 / 上の帯 = 充電・エスカレーション・敵 HP。
-    /// 状態は <see cref="Game2DBattleSim"/> から読む。 クリック: ダイスか端子 = 配線を切り替え (攻撃 → 防御 → 充電) / 丸ボタン = 武器を変える / 下のボタン = ROLL → GO! → NEXT。
+    /// 左 = 自分のダイス 3 個と配線 (攻撃・防御・充電・特殊) と振り直しと決定ボタン / 右 = 敵の出目と攻撃値 / 上の帯 = 充電・エスカレーション・敵 HP。
+    /// 状態は <see cref="Game2DBattleSim"/> (実戦闘の流れ) から読む。 クリック: ダイスか端子 = 配線を切り替え / REROLL = 充電を払って振り直す / 下のボタン = GO! → NEXT。
     /// 航行用の GUI が引っ込むのと入れ替わりに、 左・右・上からばねで入ってくる (<see cref="Drive"/>)。 座標は 480×270 の格子 (左上が原点)。
     /// </summary>
     public class Game2DBattleHud : MonoBehaviour
@@ -17,7 +17,7 @@ namespace UI.Game2D
         private static readonly RectInt Left = new RectInt(2, 52, 86, 198), Right = new RectInt(392, 56, 86, 112), Top = new RectInt(96, 2, 288, 44);
         private const int FrameB = 12;
         // 左パネルの中 (パネルの左上が原点): 枠の内側は x 14〜72
-        private static readonly RectInt Btn = new RectInt(15, 154, 56, 24), WpnL = new RectInt(15, 122, 14, 16), WpnR = new RectInt(57, 122, 14, 16);
+        private static readonly RectInt Btn = new RectInt(15, 154, 56, 24), RerollR = new RectInt(15, 122, 56, 16);
         private static RectInt DieR(int i) => new RectInt(15, 20 + i * 24, 18, 18);
         private static RectInt TermR(int i) => new RectInt(36, 20 + i * 24, 36, 18);
 
@@ -33,9 +33,9 @@ namespace UI.Game2D
         private KitSrc _bAtk, _bBlk, _bChg, _bGo, _bPlain; private bool _srcInit;
 
         private static readonly Color32 Ink = Game2DKit.Ink, Dim = Game2DKit.Dim, Dark = Game2DKit.Dark, Off = Game2DKit.Off, Well = Game2DKit.Well,
-            Atk = Game2DKit.Red, Blk = Game2DKit.Blue, Chg = Game2DKit.Gold, Hp = new Color32(0xd1, 0x50, 0x3c, 255);
-        private static readonly Color32[] TermCol = { Atk, Blk, Chg };
-        private static readonly string[] TermName = { "ATK", "BLK", "CHG" };
+            Atk = Game2DKit.Red, Blk = Game2DKit.Blue, Chg = Game2DKit.Gold, Spc = Game2DKit.Amber, Hp = new Color32(0xd1, 0x50, 0x3c, 255);
+        private static readonly Color32[] TermCol = { Atk, Blk, Chg, Spc };
+        private static readonly string[] TermName = { "ATK", "BLK", "CHG", "SPC" };
 
         /// <summary>見た目を作る (builder から 1 度呼ぶ)。 親は 480×270 の格子の枠。</summary>
         public void Build()
@@ -86,8 +86,7 @@ namespace UI.Game2D
         private void Click(Vector2 d)
         {
             for (int i = 0; i < 3; i++) if (In(d, Left, DieR(i)) || In(d, Left, TermR(i))) { sim.CycleWire(i); return; }
-            if (In(d, Left, WpnL)) { sim.ChangeWeapon(-1); return; }
-            if (In(d, Left, WpnR)) { sim.ChangeWeapon(1); return; }
+            if (In(d, Left, RerollR)) { sim.Reroll(); return; }
             if (In(d, Left, Btn)) { if (sim.ButtonEnabled) sim.Button(); }
         }
 
@@ -132,13 +131,11 @@ namespace UI.Game2D
 
         private void DrawTerm(KitPix p, RectInt tr, int wv, bool on)
         {
-            var s = wv == 0 ? _bAtk : wv == 1 ? _bBlk : _bChg;
+            var s = wv == 0 ? _bAtk : wv == 1 ? _bBlk : wv == 2 ? _bChg : null;      // 特殊端子は専用の絵が無いので板で
             if (s != null) p.Sprite(s, tr.x, tr.y, tr.width, tr.height);
             else p.Box(tr.x, tr.y, tr.width, tr.height, on ? TermCol[wv] : Dim, Dark);
             p.TextC(TermName[wv], tr, on ? Ink : Dim);
         }
-
-        private static string WeaponLabel(string id) { var a = id.Split('_'); string fam = a[0].ToUpperInvariant(); if (fam.Length > 5) fam = fam.Substring(0, 5); return a.Length > 1 ? fam + a[1].Substring(a[1].Length - 1) : fam; }
 
         private void DrawLeft(Texture2D t)
         {
@@ -154,13 +151,12 @@ namespace UI.Game2D
             string a = "-", b = "-", c = "-";
             if (live && sim.rolled) { var w = sim.GetWired(); a = w.atk + "=" + (w.atk - w.aDice) + "+" + w.aDice; b = w.blk.ToString(); c = w.chg + " (T" + sim.charge + ")"; }
             p.Text("ATK " + a, 15, 93, Atk); p.Text("BLK " + b, 15, 102, Blk); p.Text("CHG " + c, 15, 111, Chg);
-            // 武器: 丸ボタン (左・右) + 名前
-            int wi = fx != null ? fx.WeaponIndex : 0; var wp = Game2DBattleFx.Weapons[wi];
-            if (Game2DKit.Tab != null) { p.NineSlice(Game2DKit.Tab, 5, Well, WpnL.x, WpnL.y, WpnL.width, WpnL.height); p.NineSlice(Game2DKit.Tab, 5, Well, WpnR.x, WpnR.y, WpnR.width, WpnR.height); }
-            else { p.Box(WpnL.x, WpnL.y, WpnL.width, WpnL.height, Off, Dark); p.Box(WpnR.x, WpnR.y, WpnR.width, WpnR.height, Off, Dark); }
-            p.TextC("<", WpnL, Ink); p.TextC(">", WpnR, Ink);
-            p.TextC(WeaponLabel(Game2DBattleFx.WeaponIds[wi]), new RectInt(WpnL.x + WpnL.width, WpnL.y, WpnR.x - WpnL.x - WpnL.width, WpnL.height), Ink);
-            p.Text("BASE ATK " + wp.atk, 15, 141, Dim);
+            // 振り直し: 充電を払って全ダイスを振り直す (払えない・判断の外では暗く)
+            bool rr = live && sim.CanRerollNow;
+            if (Game2DKit.Tab != null) p.NineSlice(Game2DKit.Tab, 5, Well, RerollR.x, RerollR.y, RerollR.width, RerollR.height);
+            else p.Box(RerollR.x, RerollR.y, RerollR.width, RerollR.height, Off, Dark);
+            p.TextC(live && sim.canReroll ? "REROLL -" + sim.rerollCost : "REROLL", RerollR, rr ? Chg : Dim);
+            p.Text("BASE ATK " + (live ? sim.baseAtk : 0), 15, 141, Dim);
             // 決定ボタン
             bool en = live && sim.ButtonEnabled; string lab = live ? sim.ButtonLabel : "...";
             if (_bGo != null) p.Sprite(_bGo, Btn.x, Btn.y, Btn.width, Btn.height);
@@ -173,9 +169,10 @@ namespace UI.Game2D
         {
             var p = Frame(Right);
             bool live = sim != null && Game2DBattleSim.Active; bool known = live && sim.phase != Game2DBattleSim.P.ERoll;
-            for (int i = 0; i < 3; i++) DrawDie(p, new RectInt(14 + i * 20, 16, 17, 17), live ? sim.ed[i] : i + 3, true);
+            int en = live ? sim.enemyDiceCount : 3;
+            for (int i = 0; i < en; i++) DrawDie(p, new RectInt(14 + i * 20, 16, 17, 17), live ? sim.ed[i] : i + 3, true);
             p.Text(known ? "ATK " + sim.eatk : "ATK ??", 14, 38, known ? Atk : Dim);
-            if (known) p.Text(Game2DBattleSim.EnemyBase + " + " + sim.EnemyDiceSum, 14, 48, Dim);
+            if (known) p.Text("ROLL " + sim.EnemyDiceSum, 14, 48, Dim);
             p.Box(14, 60, 58, 14, Off, Dark); p.Text(known ? "INTENT: ATK" : "INTENT: ...", 17, 65, Ink);
             if (live) p.Text("T" + sim.turn + " STAGE " + sim.Stage, 14, 80, Dim);
             p.Apply(t);
