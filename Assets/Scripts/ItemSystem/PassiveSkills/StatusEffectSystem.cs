@@ -29,6 +29,9 @@ namespace ItemSystem.PassiveSkills
         public StatusTick tickTiming;
         public int dotPerStack;          // 1tickのダメージ。dotScalesWithStacks=false なら固定値
         public bool dotScalesWithStacks; // true: dmg=stacks×dotPerStack（出血型） / false: dmg=dotPerStack（持続型・炎上）
+        /// <summary>0 より大きいと、 1 スタックあたりのダメージを対象の最大 HP の N% にする (dotPerStack の代わり)。
+        /// dmg = floor(stacks × 最大HP × N / 100)、 下限 1。 整数だけで計算する (Mono の float の揺れでダイジェストが割れないように)。</summary>
+        public int dotMaxHpPctPerStack;
         public int decayPerTurn;         // tick後に減らすスタック量
         public int maxStacks;
     }
@@ -39,16 +42,18 @@ namespace ItemSystem.PassiveSkills
         public static readonly Dictionary<string, StatusDef> Defs = new Dictionary<string, StatusDef>
         {
             // burn (炎上) は 2026-07-18 削除: Burn キーワード全廃 → 臨界 (Rinkai) 軸に置換。
-            // 毒 (2026-07-15 追加): 拘束・妨害中心 (差別化)。小さい DoT + 麻痺毒で敵攻撃-N が主効果。
+            // 毒 (2026-07-15 追加): 拘束・妨害中心 (差別化)。麻痺毒で敵攻撃-N が主効果。
             // 減衰なし・上限10・遅効型 = 長期戦に強く、5到達で毒殺 (キル判定) が中間トリガー。
             // 5〜10 の伸びしろは Paralysis (敵攻撃-N) と DoT で継続拘束に使う。
+            // 2026-11-01: DoT を 1/スタック → 最大HPの 1%/スタック へ。 雑魚の HP が 155〜1800 あり、
+            //   固定 1 では上限 10 でも 1 ターン 10 しか削れず何にもならなかった (上限 10 = 最大HPの 10%/T)。
             ["poison"] = new StatusDef
             {
                 id = "poison",
                 target = StatusTarget.Enemy,
                 tickTiming = StatusTick.TurnStart,
-                dotPerStack = 1,
-                dotScalesWithStacks = true,   // stacks×1 = 最大10ダメ/T (副次)
+                dotMaxHpPctPerStack = 1,
+                dotScalesWithStacks = true,
                 decayPerTurn = 0,             // 減衰なし = 永続蓄積
                 maxStacks = 10,
             },

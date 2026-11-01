@@ -60,7 +60,7 @@ namespace UI.ClassSelect
             view.showOnStart = false;
             view.buttonsSelfRaycast = Object.FindObjectOfType<Lcd.LcdPointer>() == null;
             if (cam.orthographic)
-                view.dotWorldSize = cam.orthographicSize * 2f / 139f; // 556px÷4px/dot=139dot が写野の縦
+                view.dotWorldSize = cam.orthographicSize * 2f / (Game2D.Game2DLayout.Height / 2f); // 液晶の縦 540 画素 ÷ 4 画素/dot = 135 dot が写野の縦 (旧 556 画素の頃は 139)
             view.font = FindJapaneseFont();
             uiGo.SetActive(true);
 

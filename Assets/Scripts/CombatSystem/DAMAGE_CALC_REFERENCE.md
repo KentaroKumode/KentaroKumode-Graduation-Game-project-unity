@@ -44,15 +44,17 @@
 
 ## 1. 計算パイプライン（適用順・実コード準拠）
 
-### ⓪ ダイス振り直しフェーズ（#1・`CombatManager.MaybeRerollPlayerDice`・ProcessPostRoll の前）
+### ⓪ ダイス振り直しフェーズ（#1・`CombatManager.RerollPhase`・ロール時系効果と ProcessPostRoll の前）
 
-初回ロール後・各種補正（記憶の砂時計/コルヴェン/メタ補正）と ProcessPostRoll の**前**に、物資を払って
-プレイヤーの「期待値割れの出目」を**毎ターン最大1回**振り直す（`playerDice` を in-place 更新）。
+出目書き換え系（落雷の避雷針 等）の後、予告を仮組みしてから、**充電を払って**ダイスを**全部**振り直す
+（`playerDice` を in-place 更新）。払える限り同じターンに何度でも振れる（ルール上の回数制限は無い。
+「1 ターン N 回まで」は BOT の方策 `AutoRunner.RerollMaxPerTurn` 側の打ち切り）。
 
-- コスト: `ProvisionSystem.RerollCost`（既定30・2026-09-28 に希望 3 → 物資 30）を `ProvisionSystem.TryPayReroll` で支払い。**払えない（低物資）と振り直せない**＝終盤ほど二度目が無い。
-- 自動ポリシー（UI 未実装の暫定）: 現在 自合計 ≤ 敵合計（負け/拮抗）かつ 平均（面平均 or (max+1)/2）割れダイスがあるときのみ、それらを再ロール。明確に勝っていれば温存。
-- スキップ: 強制ロール状態（`ashenSuddenDeath`/`myokakuSuddenDeath`/`myokakuFreeHit`/`player_contre`）。
-- 将来 UI 配線時に自動判定を人間の選択へ差し替える。物資の損は `ProvisionSystem.Stats.rerollLoss`（AutoRunner で発生源別計上）。
+- コスト: 充電 `振り直す個数 × (この戦闘で払った回数 + 1)`（`ctx.rerollsThisCombat`・ターンでは戻らない）を `ctx.ConsumeCharge` で支払い。**払えなければそこで打ち切り**。
+- 〈特別・対〉の無料分（`YachtRoleEffects.FreeRerollKey`）は費用 0 で、回目に数えない。
+- 振るかどうかは `RerollPolicy`（BOT / UI が差す）。人が操作するターンは `TurnPauseKind.Reroll` で止まって答えを待つ。
+- スキップ: 強制ロール状態（`player_contre`）。
+- 旧規則（物資 30 を払う・毎ターン最大 1 回・期待値割れだけ振り直す自動ポリシー）は廃止。`ProvisionSystem.RerollCost` の定数は参照されていない。
 
 ### ① ダイス合計フェーズ（`PassiveSkillManager.ProcessPostRoll` L434-463）
 
@@ -569,7 +571,7 @@ Passive カテゴリのシナジー武器群。4枚がインベントリに揃�
 | OnShieldAbsorb / OnShieldBreak | Kw.AbsorbShield (敵の直接攻撃と軽減無視の肩代わり) | 吸収した分 / 割られる前の量 |
 | OnShieldDecay | BeginNewTurn Phase C の半減 (〈脈なしの鋼心臓〉で止まる) | 失った分 |
 | OnPoisonGain / OnPoisonCap | CombatContext.AddStatus (敵の毒) | 増えた分 / 上限到達 |
-| OnPoisonTick | TickStatuses と〈廃庭の霧吹き〉(敵の攻撃のたび・TickPoisonOnce) | 毒のダメージ |
+| OnPoisonTick | TickStatuses と〈廃庭の霧吹き〉(敵の攻撃のたび・TickPoisonOnce) | 毒のダメージ = `floor(毒 × enemyMaxHP × 1 / 100)`・下限 1・`fixedDamageToEnemy` 経由 (2026-11-01〜。旧 毒 × 1。両経路とも `CombatContext.DotDamage`) |
 | OnBleedDecay / OnBleedConsume / OnBleedZero | Phase C の自然減 / Kw.ConsumeBleed / 0 到達 | 減った分 / 使った分 / 1 |
 
 **敵への軽減不可ダメージ (Kw.DamageEnemy)。** ターンの解決中 (`ExecuteTurnMutual` の頭〜最後の HP 同期) は

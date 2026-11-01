@@ -80,12 +80,13 @@ namespace UI
             gm.StartNewRun();
         }
 
-        /// <summary>職業選択の受理スタンプ確定 → UI を畳んでラン開始 (SelectedClass は View 側で設定済み)。</summary>
+        /// <summary>職業選択の受理スタンプ確定 → UI をその場で消してラン開始 (SelectedClass は View 側で設定済み)。
+        /// 引っ込める動きは付けない ── 直後のロード画面が、 消える直前のこの画面を写し取って網目で引き継ぐ。</summary>
         private void OnClassDecided(ClassType cls)
         {
             if (!_classSelectOpen) return;
             _classSelectOpen = false;
-            classSelect.Hide();
+            classSelect.HideImmediate();
 
             var gm = GameManager.Instance;
             if (gm == null) return;

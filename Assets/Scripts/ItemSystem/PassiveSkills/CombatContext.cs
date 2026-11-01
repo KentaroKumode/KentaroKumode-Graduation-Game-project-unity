@@ -781,7 +781,7 @@ namespace ItemSystem.PassiveSkills
             if (!StatusRegistry.Defs.TryGetValue("poison", out var def)) return 0;
             int stacks = EnemyPoison;
             if (stacks <= 0) return 0;
-            int dmg = def.dotScalesWithStacks ? stacks * def.dotPerStack : def.dotPerStack;
+            int dmg = DotDamage(def, stacks);
             if (dmg <= 0) return 0;
             Keywords.Kw.Raise(this, PassiveSkillTrigger.OnPoisonTick, dmg);
             return dmg;
@@ -821,6 +821,19 @@ namespace ItemSystem.PassiveSkills
             return dict.TryGetValue(id, out var v) ? v : 0;
         }
 
+        /// <summary>DoT 1 回分のダメージ。 最大 HP の割合で効く定義 (<see cref="StatusDef.dotMaxHpPctPerStack"/>) は
+        /// 対象 (絶対視点) の最大 HP から整数で数える。 ターン開始の分と〈廃庭の霧吹き〉の分はここを共有する。</summary>
+        private int DotDamage(StatusDef def, int stacks)
+        {
+            if (def.dotMaxHpPctPerStack > 0)
+            {
+                int maxHp = def.target == StatusTarget.Enemy ? enemyMaxHP : playerMaxHP;
+                int n = def.dotScalesWithStacks ? stacks : 1;
+                return System.Math.Max(1, (int)((long)n * maxHp * def.dotMaxHpPctPerStack / 100));
+            }
+            return def.dotScalesWithStacks ? stacks * def.dotPerStack : def.dotPerStack;
+        }
+
         /// <summary>指定タイミングの全ステータスを一括処理：DOTを fixedDamage へ加算 → decay。
         /// ターン開始時に1回呼ぶ（PassiveSkillManager.BeginTurn）。fixedDamage は BeginNewTurn で0化済み前提。</summary>
         public void TickStatuses(StatusTick timing)
@@ -830,7 +843,7 @@ namespace ItemSystem.PassiveSkills
                 if (def.tickTiming != timing) continue;
                 var dict = def.target == StatusTarget.Enemy ? enemyStatusStacks : playerStatusStacks;
                 if (!dict.TryGetValue(def.id, out int stacks) || stacks <= 0) continue;
-                int dmg = def.dotScalesWithStacks ? stacks * def.dotPerStack : def.dotPerStack;
+                int dmg = DotDamage(def, stacks);
                 if (dmg > 0)
                 {
                     if (def.target == StatusTarget.Enemy) fixedDamageToEnemy += dmg;

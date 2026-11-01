@@ -496,8 +496,13 @@ namespace GameLoop
         /// <summary>画面が Space を使ったフレーム。 同じ押下が、 画面の操作で切り替わった次のフェーズ (報酬の確定など) まで流れないように。</summary>
         public static int ScreenUsedSpaceFrame = -1;
 
+        /// <summary>画面が入力を丸ごと受けている間 true (ロード画面など)。 この間はキー入力を全部止める。</summary>
+        public static bool InputBlockedByScreen;
+
         void Update()
         {
+            if (InputBlockedByScreen || ScreenUsedSpaceFrame == Time.frameCount && Input.GetKeyDown(KeyCode.Space)) return;
+
             if (Input.GetKeyDown(KeyCode.G))
             {
                 Debug.Log($"[GameManager] G pressed (phase={CurrentPhase})");

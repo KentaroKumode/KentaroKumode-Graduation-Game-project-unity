@@ -65,7 +65,7 @@ namespace UI.Game2D
         private void HandleInput(FreeMapSim sim, float dt)
         {
             SupplyPreview = 0; SupplyPreviewText = null;
-            if (Game2DModal.Active) return;      // 画面 (ショップなど) が出ている間は、 地図を操作しない
+            if (Game2DModal.Active || Game2DLoadingScreen.Blocking) return;      // 画面 (ショップ・ロード画面など) が出ている間は、 地図を操作しない
             var gm = GameManager.Instance;
 
             // キー: Z = 拡大を回す / C = 追従に戻る / WASD = 視点を動かす (拡大中)

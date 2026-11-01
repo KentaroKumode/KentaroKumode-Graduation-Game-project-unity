@@ -17,7 +17,7 @@ namespace UI.ClassSelect
     /// スタンプで GameManager.SelectedClass を確定 (autoStartRun=true なら即ラン開始)。
     ///
     /// 【座標系】 すべてのレイアウト数値は「モニタードット」 単位 (物理 4×4px = 1dot、
-    /// LCD 924×556 → 231×139 dot)。 dotWorldSize (既定 4/32=0.125) でワールドへ変換し、
+    /// LCD 960×540 → 240×135 dot・旧 924×556 → 231×139)。 dotWorldSize (既定 4/32=0.125) でワールドへ変換し、
     /// 位置は整数ドットへスナップする。 Inspector の数値をドットで直接調整できる。
     ///
     /// 【配線】 空 GameObject に本コンポーネントを付け、 LCD コンテンツカメラの写る位置に置く。
@@ -459,6 +459,16 @@ namespace UI.ClassSelect
             StartCoroutine(CoDeactivateRigAfter(0.35f));
         }
 
+        /// <summary>引っ込める動きなしで、 その場で消す (リグカメラも消灯)。 受理の後は、 ロード画面がこの画面を写し取って
+        /// 網目で引き継ぐ (Game2DLoadingScreen)。 Hide の 0.35 秒の引っ込みを残すと、 このカメラ (depth 1・塗りつぶし) が
+        /// 液晶をその間ずっと上書きし、 ロード画面の入りが見えなかった (2026-11-01)。</summary>
+        public void HideImmediate()
+        {
+            StopAllCoroutines();
+            _stampPanel.SnapHidden(); _detailPanel.SnapHidden(); _sheetPanel.SnapHidden(); _tabsPanel.SnapHidden();
+            SetRigActive(false);
+        }
+
         private IEnumerator CoDeactivateRigAfter(float delay)
         {
             yield return new WaitForSecondsRealtime(delay);
@@ -494,6 +504,12 @@ namespace UI.ClassSelect
             {
                 if (rigCamera.gameObject.activeSelf != active)
                     rigCamera.gameObject.SetActive(active);
+                // 写野をタイトルのカメラに揃える (2026-11-01)。 シーンのリグは液晶が縦 556 画素だった頃に作られ、 8.6875 のまま残っていた。
+                //   今の液晶 (縦 540) では絵の 1 ドット (dotWorldSize = 0.125) が液晶の 3.9 画素に縮み、 画素の格子とずれた。
+                //   揃えると 1 ドット = 液晶 4 画素ちょうどで、 部品の置き位置も全部偶数画素に乗る (= 航行と同じ 480×270 の格子に揃う)
+                var lcd = FindObjectOfType<UI.Lcd.LcdScreen>();
+                if (active && lcd != null && lcd.contentCamera != null && rigCamera.orthographic)
+                    rigCamera.orthographicSize = lcd.contentCamera.orthographicSize;
                 if (active)
                     Debug.Log($"[ClassSelectView] リグカメラ点灯: enabled={rigCamera.enabled} depth={rigCamera.depth} " +
                               $"targetTex={(rigCamera.targetTexture != null ? rigCamera.targetTexture.name : "<未バインド>")} " +

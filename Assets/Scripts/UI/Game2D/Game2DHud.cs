@@ -36,6 +36,7 @@ namespace UI.Game2D
         /// <summary>会心の衝撃で GUI 全体を揺らす量 (dot)。 戦闘演出 (Game2DBattleFx) が毎フレーム入れる。</summary>
         public static Vector2 ShakeDots;
         private int _lastShownPhase = -1;
+        private bool _wasLoading;
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         // ── 試験用: ゴールドを任意で振り込む (HTML の「GOLD +N（試験）」) ──
@@ -83,8 +84,12 @@ namespace UI.Game2D
             var gm = GameManager.Instance;
             if (gm == null) return;
             var phase = gm.CurrentPhase;
-            bool show = phase != GameManager.GamePhase.Title && phase != GameManager.GamePhase.GameOver;
+            bool loading = Game2DLoadingScreen.Blocking;
+            bool show = phase != GameManager.GamePhase.Title && phase != GameManager.GamePhase.GameOver && !loading;      // ロード画面は液晶の全面を使う
             if (root != null && root.activeSelf != show) root.SetActive(show);
+            // ロード画面が抜けた直後: 計器盤を引っ込めた位置から、 戦闘から戻る時と同じばねで滑り込ませる (ぱっと出さない)
+            if (_wasLoading && !loading) { _spNav.Set(1f); _spGold.Set(1f); Game2DSfx.Play("gui_in"); }
+            _wasLoading = loading;
             if (!show) return;
 
             bool battle = phase == GameManager.GamePhase.Combat || Battle.Game2DBattleFx.Showing;
@@ -136,7 +141,7 @@ namespace UI.Game2D
 
             if (panel != null)
             {
-                panel.buttonsActive = !_battle;
+                panel.buttonsActive = !_battle && !Game2DLoadingScreen.Blocking;
                 bool canAct = !_battle && phase == GameManager.GamePhase.MapNavigation && sim != null && !sim.InFight && !sim.Dead;
                 int lures = CountLures(run);
                 // 照明は物資で払う (1 回 FlareSupply)。 残数 = 今の物資であと何回撃てるか

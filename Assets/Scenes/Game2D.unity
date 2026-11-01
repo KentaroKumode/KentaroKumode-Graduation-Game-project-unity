@@ -6516,7 +6516,7 @@ MonoBehaviour:
   buttonsSelfRaycast: 0
   showOnStart: 0
   autoStartRun: 0
-  debugStayOnStamp: 1
+  debugStayOnStamp: 0
   tabSizeDots: {x: 34, y: 20}
   tabTopPosDots: {x: -97, y: 20}
   tabStepDots: 24

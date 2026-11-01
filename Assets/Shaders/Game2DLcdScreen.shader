@@ -3,6 +3,7 @@
 //   残像 (lighten) → 横線ノイズ → 樽型の湾曲 → 画素の格子 → バックライトのにじみ。
 // 地図 (この Quad) にだけ掛かる。 外枠の GUI (Canvas) には掛けない (HTML も GUI は別の層)。
 // 画素の格子で暗くなる分は、 先に明るくして打ち消す (HTML の brightness 補正と同じ)。
+// 画素の格子は中身のドット (_GridDots) の継ぎ目に、 湾曲した後の座標で引く (2026-11-01 作り直し)。
 Shader "Game2D/LcdScreen"
 {
     Properties
@@ -19,7 +20,12 @@ Shader "Game2D/LcdScreen"
         _Chroma ("色のにじみ (縁ほど赤と青が左右にずれる)", Range(0, 0.01)) = 0.0018
         _Flicker ("画面のちらつき (明るさの揺れの大きさ)", Range(0, 0.05)) = 0.012
         _Exposure ("自動露出 (Game2DLcdGhost が毎フレーム入れる・1 = 変えない)", Float) = 1
-        _Grid ("画素の格子の濃さ", Range(0, 1)) = 0.22
+        _Grid ("画素の格子の濃さ (隙間の暗さ)", Range(0, 1)) = 0.6
+        _GridGap ("格子の隙間の太さ (ドット 1 つに対する割合)", Range(0.02, 0.5)) = 0.2
+        _GridDots ("格子のドット数 (中身の 1 ドット = 格子の 1 マス)", Vector) = (480, 270, 0, 0)
+        _Sub ("サブピクセル (R・G・B の縦縞) の強さ", Range(0, 1)) = 0.3
+        _Core ("ドットの芯 (真ん中が明るく縁が暗い・平均は変えない。 明るいドットは芯が飽和して光って見える)", Range(0, 1)) = 0.5
+        _SubDots ("サブピクセルの組 (R・G・B で 1 組) が画面の横にいくつ並ぶか。 格子のドット数の整数倍にすると継ぎ目が揃う", Float) = 960
         _Comp ("格子で暗くなる分の補正の倍率 (1 = 平均の明るさを保つ理論値)", Range(0.5, 2)) = 1
         _Bleed ("バックライトのにじみ", Range(0, 0.2)) = 0.03
         _Bloom ("発光のにじみ (明るい画素のまわりへ光が漏れる)", Range(0, 1)) = 0.35
@@ -50,9 +56,9 @@ Shader "Game2D/LcdScreen"
             struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
 
             sampler2D _MainTex, _PrevTex, _NoiseTex, _BloomTex, _BloomTexB;
-            float _Chroma, _Flicker, _Distort, _Power, _Exposure, _Ghost, _Curve, _Grid, _Comp, _Bleed, _Bloom, _BloomThr, _BloomPow, _Halo, _BloomTintAmt;
+            float _Chroma, _Flicker, _Distort, _Power, _Exposure, _Ghost, _Curve, _Grid, _GridGap, _Sub, _SubDots, _Core, _Comp, _Bleed, _Bloom, _BloomThr, _BloomPow, _Halo, _BloomTintAmt;
             fixed4 _Back, _BleedColor, _Ink, _BloomTint;
-            float4 _RtSize;
+            float4 _RtSize, _GridDots;
 
             v2f vert (appdata v) { v2f o; o.pos = UnityObjectToClipPos(v.vertex); o.uv = v.uv; return o; }
 
@@ -61,6 +67,19 @@ Shader "Game2D/LcdScreen"
                 p = frac(p * float2(123.34, 456.21));
                 p += dot(p, p + 45.32);
                 return frac(p.x * p.y);
+            }
+
+            // 周期 1 の中の区間 [a, a + 1/3) の帯を、 x までに何だけ通ったか (帯の面積の積分)。 画素の幅でならすのに使う
+            float StripeInt(float x, float a) { return floor(x) / 3.0 + clamp(frac(x) - a, 0.0, 1.0 / 3.0); }
+
+            // サブピクセルの被り: この画面の画素 (中心 x・幅 w ドット) のうち、 R・G・B それぞれの縞に掛かる割合 (足すと 1)。
+            //   画素がドットより大きい時は 3 色とも 1/3 に近づく = 縞が消えて平らになる (ちらつかない)
+            float3 SubpixelCov(float x, float w)
+            {
+                float lo = x - 0.5 * w, hi = x + 0.5 * w;
+                return float3(StripeInt(hi, 0.0) - StripeInt(lo, 0.0),
+                              StripeInt(hi, 1.0 / 3.0) - StripeInt(lo, 1.0 / 3.0),
+                              StripeInt(hi, 2.0 / 3.0) - StripeInt(lo, 2.0 / 3.0)) / w;
             }
 
             // 電源オン: システムの起動なので演出は付けない。 一瞬の暗転のあとに、 バックライトの明るさがなめらかに単調に上がるだけ。 p = 0 (消灯) .. 1 (点灯済み)
@@ -79,6 +98,7 @@ Shader "Game2D/LcdScreen"
                 float2 s = c * (1.0 + _Curve * r2) / (1.0 + 2.0 * _Curve);      // 四隅がちょうど絵の端に合う (縁の中央は少し内側を見る) = 外が見えず、 黒い角が出ない
                 float2 suv = s * 0.5 + 0.5;
                 if (suv.x < 0 || suv.y < 0 || suv.x > 1 || suv.y > 1) return fixed4(_Back.rgb, 1);
+                float2 gridUv = suv;      // 格子は液晶の板そのものなので、 点灯の瞬間の歪み (絵のずれ) には付いていかない
 
                 // 点灯の瞬間の歪み: 行ごとの横ずれ (走査のちぎれ)・ブロックごとの大きな横ずれ・縦の揺れ。 強さ _Distort は点灯直後に最大から急に減る
                 if (_Distort > 0.001)
@@ -100,16 +120,40 @@ Shader "Game2D/LcdScreen"
                 fixed3 prev = tex2Dlod(_PrevTex, float4(suv, 0, 0)).rgb;
                 fixed3 col = cur + _Ghost * (max(cur, prev) - cur);
 
-                // 画素の格子で暗くなる分を先に明るくして打ち消す (暗くなる画素は 3/4 × 濃さ)
-                col *= _Comp / (1.0 - 0.75 * _Grid);
+                // 画素の格子で暗くなる分を先に明るくして打ち消す。 暗くなる面積 = 隙間が縦横どちらかに掛かる割合 1 − (1 − 太さ)²
+                float gapArea = 1.0 - (1.0 - _GridGap) * (1.0 - _GridGap);
+                col *= _Comp / (1.0 - _Grid * gapArea);
 
                 // 横線ノイズ (ゆがめる前の絵に乗せる = 湾曲と一緒に曲がる)。 線の予定は Game2DLcdNoise が毎フレーム 1 枚の濃淡に描く
                 col = lerp(col, _Ink.rgb, tex2D(_NoiseTex, suv).r);
 
-                // 画素の格子: 画面の画素の偶奇で 1 画素の隙間 (2 画素周期)
-                float2 sp = floor(i.pos.xy);
-                float gap = max(fmod(sp.x, 2.0), fmod(sp.y, 2.0));
-                col *= 1.0 - gap * _Grid;
+                // 画素の格子 (2026-11-01 作り直し): 中身のドット (_GridDots) の境目に細い隙間を引く。
+                //   旧実装は出力画面の画素の偶奇 (2 画素周期・湾曲の外) で、 ドットと位置が合わず・平らに貼り付いて見え・窓の大きさでモアレが出た。
+                //   ここは湾曲した後の座標で数えるので、 ドットの継ぎ目にぴったり乗って一緒に曲がる。
+                //   隙間はドットに対する割合の太さで、 画面の 1 画素ぶんの幅でなめらかにする (細い隙間は線にならず薄くなるだけ = ちらつかない)。
+                {
+                    float2 f = gridUv * _GridDots.xy;
+                    float2 d = abs(frac(f + 0.5) - 0.5);                       // いちばん近い継ぎ目までの距離 (ドット)
+                    float2 fw = max(fwidth(f), 1e-5);                           // 画面の 1 画素がドットいくつぶんか
+                    float h = 0.5 * _GridGap;                                   // 隙間の半分の太さ (ドット)
+                    float2 cov = saturate((h - d) / fw + 0.5) * saturate(2.0 * h / fw);   // 画素がどれだけ隙間に掛かるか (画素より細い隙間は面積ぶんだけ)
+                    float gap = max(cov.x, cov.y);
+                    // サブピクセル (2026-11-01): R・G・B の縦縞。 自分の色の縞は明るく、 他の色の縞は暗い
+                    //   (平均は 1 のまま = 全体の明るさは変えない)。 色の付いたドットは自分の色の縞だけが光り、 白は 3 色の縞に分かれて見える。
+                    //   これが無いと、 1 マスがのっぺり同じ色で、 「色の付いた絵に格子を重ねた」だけに見えた。
+                    //   縞の細かさは中身のドットと別に _SubDots で決める (画面によらず同じ細かさ = 液晶の板は 1 枚)
+                    float fs = gridUv.x * _SubDots;
+                    float3 sub = SubpixelCov(fs, max(fwidth(fs), 1e-5)) * 3.0;
+                    col *= lerp(1.0, sub, _Sub);
+                    // ドットの芯: 真ん中が明るく縁が暗い山 (sin × sin・平均 (2/π)² で割って平均 1)。 明るいドットは芯が 1 を超えて飽和し、
+                    //   光源が自ら光っている見え方になる (旧実装は画素の 3/4 を暗くして残りを 3 倍にしていたので、 これが強く出ていた)。
+                    //   ドットが画面の 2 画素を割ると山が描けずちらつくので、 そこから先は弱める
+                    float2 bump = sin(UNITY_PI * frac(f));
+                    float core = bump.x * bump.y / 0.405284735;
+                    float coreAA = saturate((0.6 - max(fw.x, fw.y)) * 4.0);
+                    col *= lerp(1.0, core, _Core * coreAA);
+                    col *= 1.0 - gap * _Grid;
+                }
 
                 // 発光のにじみ: 明るい画素のまわりへ光が漏れる (格子の隙間にも回り込む = 画素が自ら光っている見え方)。
                 //   下処理 (Game2DLcdGhost + Hidden/Game2DBloom) が、 しきい値を超えた明るさだけを縮小・ぼかした絵 (_BloomTex = 1/4・_BloomTexB = 1/8) を用意する。

@@ -23,6 +23,15 @@ namespace UI.Game2D
         [Tooltip("Hidden/Game2DBloom (ビルドに含めるため参照を持つ)")] public Shader bloomShader;
         [Range(0.5f, 4f), Tooltip("ぼかしの広がり (大きいほど柔らかく広い)")] public float softness = 1.6f;
 
+        [Header("画素の格子 (中身の 1 ドット = 格子の 1 マス)")]
+        // 格子の細かさは全画面で液晶の板そのもの (480×270 = 液晶の 2 画素)。 航行・戦闘・ロード画面の中身はこれに揃っている。
+        // タイトル・職業選択の中身は揃っていない (挿絵は液晶の約 3.9 画素・本文はなめらかな字) ので、 合わせられる細かさが無い (2026-11-01 に実測)
+        [Tooltip("格子のドット数 (液晶の 2 画素 = 1 ドット)")] public Vector2 gridDots = new Vector2(Game2DLayout.Width, Game2DLayout.Height);
+        [Range(0f, 1f), Tooltip("タイトル・職業選択でのドットの芯の掛け具合 (マテリアルの _Core に掛ける)。 芯は縁を暗くするので、 格子に揃っていない細い字を潰す (2026-11-01: 職業選択の本文が読めなくなった)")]
+        public float titleCoreScale = 0f;
+        [Range(0f, 4f), Tooltip("タイトル・職業選択での光のにじみの倍率 (マテリアルの _Bloom と _Halo に掛ける)。 航行は暗い地に明るい細い線なので、 にじみが強く出て光って見える。 タイトルは絵が中間の明るさなので、 同じ値だとほとんど光らない")]
+        public float titleBloomScale = 2f;
+
         [Header("自動露出")]
         public bool autoExposure = true;
         [Range(0.05f, 0.9f), Tooltip("目標の平均の明るさ (効果を掛ける前の絵・0..1)。 これより明るいと下げる")] public float target = 0.38f;
@@ -46,7 +55,8 @@ namespace UI.Game2D
         private MaterialPropertyBlock _mpb;
         private static readonly int BloomTexId = Shader.PropertyToID("_BloomTex"), BloomTexBId = Shader.PropertyToID("_BloomTexB");
         private static readonly int ThrId = Shader.PropertyToID("_Thr"), PowId = Shader.PropertyToID("_Pow"), DirId = Shader.PropertyToID("_Dir");
-        private static readonly int PrevId = Shader.PropertyToID("_PrevTex");
+        private static readonly int PrevId = Shader.PropertyToID("_PrevTex"), GridDotsId = Shader.PropertyToID("_GridDots"), CoreId = Shader.PropertyToID("_Core"),
+            BloomId = Shader.PropertyToID("_Bloom"), HaloId = Shader.PropertyToID("_Halo");
 
         private void OnDestroy()
         {
@@ -102,6 +112,14 @@ namespace UI.Game2D
             _mpb.SetTexture(PrevId, _prev);
             if (_bloomA != null) { _mpb.SetTexture(BloomTexId, _bloomA); _mpb.SetTexture(BloomTexBId, _bloomB); }
             _mpb.SetFloat(ExposureId, Exposure);
+            // 格子のマスを中身のドットに合わせる。 タイトル・職業選択は揃えられないので、 文字を潰す芯だけ弱める
+            var gm = GameLoop.GameManager.Instance;
+            bool title = gm != null && gm.CurrentPhase == GameLoop.GameManager.GamePhase.Title;
+            _mpb.SetVector(GridDotsId, gridDots);
+            var lcdMat = surface.sharedMaterial;
+            _mpb.SetFloat(CoreId, lcdMat.GetFloat(CoreId) * (title ? titleCoreScale : 1f));
+            _mpb.SetFloat(BloomId, lcdMat.GetFloat(BloomId) * (title ? titleBloomScale : 1f));
+            _mpb.SetFloat(HaloId, lcdMat.GetFloat(HaloId) * (title ? titleBloomScale : 1f));
             surface.SetPropertyBlock(_mpb);
         }
 

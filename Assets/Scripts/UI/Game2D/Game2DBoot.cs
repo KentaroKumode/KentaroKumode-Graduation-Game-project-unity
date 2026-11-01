@@ -101,7 +101,7 @@ namespace UI.Game2D
             _promptGo.transform.position = basePos - cam.transform.forward * 0.5f; _promptGo.transform.rotation = cam.transform.rotation;
             _prompt = _promptGo.AddComponent<TextMeshPro>();
             if (font != null) _prompt.font = font;
-            float dotWorld = cam.orthographicSize * 2f / 139f;           // 液晶の 1 dot (タイトルの絵と同じ密度) = ワールドの大きさ
+            float dotWorld = cam.orthographicSize * 2f / (Game2DLayout.Height / 2f);   // 液晶の 1 dot (タイトルの絵と同じ 4 画素) = ワールドの大きさ。 縦 540 画素 ÷ 4 = 135 (旧 556 画素の頃の 139 は 3.9 画素になっていた)
             _prompt.fontSize = fontSizeDots * dotWorld * 10f;            // TMP のワールド fontSize ≒ 文字高 (ワールド単位) × 10
             _prompt.alignment = TextAlignmentOptions.Center;
             _prompt.enableWordWrapping = false;

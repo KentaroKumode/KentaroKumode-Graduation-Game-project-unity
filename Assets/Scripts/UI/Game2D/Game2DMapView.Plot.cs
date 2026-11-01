@@ -20,15 +20,23 @@ namespace UI.Game2D
         {
             if (_bg != null && _bgFloor == _viewFloor) { System.Array.Copy(_bg, _buf, _buf.Length); return; }
             _bg = new Color32[W * H]; _bgFloor = _viewFloor;
+            Ground(_bg, _lc);
+            System.Array.Copy(_bg, _buf, _buf.Length);
+        }
+
+        /// <summary>層の地 (暗い色に、 中央ほど明るい 4×4 の網点) を W×H の画素へ描く。 ロード画面も同じ地を敷く。</summary>
+        internal static void Ground(Color32[] dst, int floor) => Ground(dst, Pals[Mathf.Clamp(floor, 1, 7)]);
+
+        private static void Ground(Color32[] dst, Lc lc)
+        {
             const float rx = 300f, ry = 190f, pow = 1.5f;
             for (int y = 0; y < H; y++)
                 for (int x = 0; x < W; x++)
                 {
                     float r = Mathf.Sqrt(Mathf.Pow((x - W / 2f) / rx, 2) + Mathf.Pow((y - H / 2f) / ry, 2));
                     float lv = Mathf.Pow(Mathf.Max(0, 1 - r), pow) * 16;
-                    _bg[(H - 1 - y) * W + x] = lv > Bayer[(y & 3) * 4 + (x & 3)] ? _lc.lite : _lc.bg;
+                    dst[(H - 1 - y) * W + x] = lv > Bayer[(y & 3) * 4 + (x & 3)] ? lc.lite : lc.bg;
                 }
-            System.Array.Copy(_bg, _buf, _buf.Length);
         }
 
         // ── 点の絵・色 ──
