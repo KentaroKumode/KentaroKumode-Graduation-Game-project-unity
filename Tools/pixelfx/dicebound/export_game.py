@@ -14,6 +14,9 @@ DEST = os.path.join(PROJ, "Assets", "Resources", "Game2DFx")
 # (ゲームでの名前, 効果の id, 色の組, 追加の指定)
 GAME_FX = [
     ("crit-hit", "impacts/crit-hit", "warm", []),      # 会心 (Game2DBattleFx が会心の命中で 1 回出す)
+    # 毒・出血が効いた瞬間 (Game2DBattleFx.DotTick)。 形は今の仮の敵 (豆腐)。 敵の絵が入ったら --actor で敵ごとに書き出す
+    ("poison-tick", "dicebound/poison-tick", "poison", ["--tofu"]),
+    ("bleed-tick", "dicebound/bleed-tick", "blood", ["--tofu"]),
 ]
 
 

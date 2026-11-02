@@ -446,6 +446,7 @@ namespace CombatSystem
                     for (int k = 0; k < count && ctx.enemyBleedStacks > 0; k++)
                     {
                         int dmg = BattleModifierManager.ApplyBleedModifiers(ctx, ctx.enemyBleedStacks);
+                        RaiseDotDamage(DotKind.Bleed, Math.Min(dmg, enemyHP));
                         enemyHP = Math.Max(0, enemyHP - dmg);
                         ctx.enemyCurrentHP = enemyHP;
                     }

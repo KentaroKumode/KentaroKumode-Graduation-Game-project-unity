@@ -175,7 +175,34 @@ namespace UI.Game2D
             if (known) p.Text("ROLL " + sim.EnemyDiceSum, 14, 48, Dim);
             p.Box(14, 60, 58, 14, Off, Dark); p.Text(known ? "INTENT: ATK" : "INTENT: ...", 17, 65, Ink);
             if (live) p.Text("T" + sim.turn + " STAGE " + sim.Stage, 14, 80, Dim);
+            // 敵に乗っている毒・出血 (仮のアイコン + スタック数)。 乗っているものだけを左から詰めて並べる
+            var ctx = live ? ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context : null;
+            if (ctx != null)
+            {
+                int x = 14;
+                if (ctx.EnemyPoison > 0) x = DrawStatus(p, x, 89, false, ctx.EnemyPoison);
+                if (ctx.enemyBleedStacks > 0) DrawStatus(p, x, 89, true, ctx.enemyBleedStacks);
+            }
             p.Apply(t);
+        }
+
+        // 仮のアイコン (7×7): 毒 = 泡 / 出血 = 滴。 # = 色・o = 光
+        private static readonly string[] IconPoison = { "..###..", ".#o###.", "#o#####", "#######", "#######", ".#####.", "..###.." };
+        private static readonly string[] IconBleed = { "...#...", "..###..", ".#o###.", ".#o###.", "#######", "#######", ".#####." };
+        private static readonly Color32 PoisonCol = new Color32(0x8e, 0xea, 0x3f, 255), BleedCol = new Color32(0xe0, 0x4a, 0x38, 255), IconHi = new Color32(0xff, 0xf6, 0xe0, 255);
+
+        /// <summary>状態 1 つ (アイコン + 数)。 戻り値 = 次を置く x。</summary>
+        private static int DrawStatus(KitPix p, int x, int y, bool bleed, int stacks)
+        {
+            var icon = bleed ? IconBleed : IconPoison; var col = bleed ? BleedCol : PoisonCol;
+            for (int j = 0; j < 7; j++) for (int i = 0; i < 7; i++)
+                {
+                    char ch = icon[j][i];
+                    if (ch == '#') p.Set(x + i, y + j, col); else if (ch == 'o') p.Set(x + i, y + j, IconHi);
+                }
+            string n = stacks.ToString();
+            p.Text(n, x + 9, y + 1, col);
+            return x + 9 + Game2DKit.TextWidth(n, 1) + 6;
         }
 
         private void DrawLamp(KitPix p, int x, int y, int size, bool lit, Color32 col)

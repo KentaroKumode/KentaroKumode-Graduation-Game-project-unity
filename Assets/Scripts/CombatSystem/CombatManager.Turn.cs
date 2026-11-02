@@ -1114,6 +1114,7 @@ namespace CombatSystem
                 int bleedDmg = BattleModifierManager.ApplyBleedModifiers(ctx, ctx.enemyBleedStacks);
                 if (_diagKind == SkillDiag.Boss && currentEnemy != null)
                     SkillDiag.BossDmgOf(currentEnemy.id)[5] += Math.Min(bleedDmg, enemyHP);
+                RaiseDotDamage(DotKind.Bleed, Math.Min(bleedDmg, enemyHP));      // 入った分だけ (攻撃で倒れていれば 0 = 鳴らない)
                 enemyHP = Math.Max(0, enemyHP - bleedDmg);
             }
 

@@ -784,6 +784,7 @@ namespace ItemSystem.PassiveSkills
             int dmg = DotDamage(def, stacks);
             if (dmg <= 0) return 0;
             Keywords.Kw.Raise(this, PassiveSkillTrigger.OnPoisonTick, dmg);
+            CombatSystem.CombatManager.RaiseDotDamage(CombatSystem.CombatManager.DotKind.Poison, dmg);
             return dmg;
         }
 
@@ -849,7 +850,10 @@ namespace ItemSystem.PassiveSkills
                     if (def.target == StatusTarget.Enemy) fixedDamageToEnemy += dmg;
                     else fixedDamageToPlayer += dmg;
                     if (def.target == StatusTarget.Enemy && def.id == "poison")
+                    {
                         Keywords.Kw.Raise(this, PassiveSkillTrigger.OnPoisonTick, dmg);
+                        CombatSystem.CombatManager.RaiseDotDamage(CombatSystem.CombatManager.DotKind.Poison, dmg);
+                    }
                 }
                 int decay = def.decayPerTurn;
                 dict[def.id] = System.Math.Max(0, stacks - decay);

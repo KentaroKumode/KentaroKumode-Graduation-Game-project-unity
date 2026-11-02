@@ -48,7 +48,7 @@ namespace UI.Game2D.Battle
         private sealed class Gather { public float x, y, tx, ty, t, life; public bool big; }
         private sealed class Dmg { public float x, y, t; public int v; public Col c; }
 
-        private enum Phase { Idle, PAttack, EAttack, Dying, Won, Intro }
+        private enum Phase { Idle, PAttack, EAttack, Dying, Won, Intro, Dot }
 
         // ── 状態 (HTML の S) ──
         private Phase _phase = Phase.Idle; private float _t, _freeze, _shake, _flashE, _flashR, _flashW, _dissolve;
@@ -69,10 +69,13 @@ namespace UI.Game2D.Battle
         private static readonly float[] Speeds = { 1f, 0.5f, 0.25f, 0.1f };
         private float _guiShake;      // 会心の衝撃で GUI を揺らす強さ (1 → 0)
         // スプライトシートのエフェクト (FxSheet・試作 2026-11-01): 会心の命中で pixelfx の crit-hit を 1 回出す
-        private sealed class FxPlay { public FxSheet s; public float t; public int x, y; }
+        private sealed class FxPlay { public FxSheet s; public float t; public int x, y; public bool add = true; }
         private readonly List<FxPlay> _fx = new List<FxPlay>();
         private FxSheet _critFx; private bool _critFxDone;
         private const int CritFxLift = 26;      // crit-hit の星は基準点 (足もと) から 26 dot 上 (書き出しの height)
+        // 毒・出血が効いた瞬間 (2026-11-02): poison-tick / bleed-tick を敵の足もとに上から塗り、 粒がはじける拍子でダメージを数字に出して HP を減らす
+        private FxSheet _poisonFx, _bleedFx;
+        private int _dotDmg; private float _dotHitAt, _dotEnd; private bool _dotPending; private Col _dotCol;
 
         private BattleCanvas _c;
         private BSprite _bg; private BSprite[] _wspr;
@@ -100,7 +103,7 @@ namespace UI.Game2D.Battle
         /// <summary>自分の攻撃の演出を始める。 dealt = 与ダメージ (数字に出す)。 竜閃は会心の時だけ専用の動き。</summary>
         public void PlayerAttack(int weaponIndex, bool crit, int dealt)
         {
-            Init(); _wi = Mathf.Clamp(weaponIndex, 0, Weapons.Length - 1); _crit = crit; _dealt = dealt; _dealtSoFar = 0; _hitIdx = 0; _hitAgo = null; _critFxDone = false;
+            Init(); FlushDot(); _wi = Mathf.Clamp(weaponIndex, 0, Weapons.Length - 1); _crit = crit; _dealt = dealt; _dealtSoFar = 0; _hitIdx = 0; _hitAgo = null; _critFxDone = false;
             var w = Weapons[_wi];
             _anim = BattleMotion.MakePlan(IsDragon(_wi) && crit ? "dragon" : w.fam, crit, w.fam == "sword" && UnityEngine.Random.value < 0.5f);
             _phase = Phase.PAttack; _t = 0; _hitDone = false; _ghosts.Clear(); _cp.Clear(); Showing = true;
@@ -111,8 +114,40 @@ namespace UI.Game2D.Battle
         /// <summary>敵の攻撃の演出 (敵が手前へ飛び込み、 赤い斬撃と画面の縁の赤)。 taken = 受けたダメージ。</summary>
         public void EnemyAttack(int taken)
         {
-            Init(); _taken = taken; _phase = Phase.EAttack; _t = 0; _hitDone = false; Showing = true;
+            Init(); FlushDot(); _taken = taken; _phase = Phase.EAttack; _t = 0; _hitDone = false; Showing = true;
             Game2DSfx.PlayDelayed("slash_swing", EWind * 0.7f, 0.8f, 0.7f);
+        }
+
+        /// <summary>毒 (bleed = false) / 出血が効いた演出 (1 回きり)。 dmg = そのダメージ (粒がはじける拍子に数字に出し、 HP を減らす)。
+        /// 終わると Idle へ戻る (HP が尽きていれば撃破の演出へ)。 絵の残りは次の演出と重なって流れきる。</summary>
+        public void DotTick(bool bleed, int dmg)
+        {
+            Init(); FlushDot();
+            FxSheet s;
+            if (bleed) s = _bleedFx ?? (_bleedFx = FxSheet.Load("bleed-tick"));
+            else s = _poisonFx ?? (_poisonFx = FxSheet.Load("poison-tick"));
+            if (s != null) _fx.Add(new FxPlay { s = s, x = EX, y = FLOOR, add = false });
+            _dotDmg = dmg; _dotPending = true; _dotCol = bleed ? Hx("#ff6a50") : Hx("#b4f064");
+            _dotHitAt = bleed ? 0.1f : 0.38f;      // 出血 = 噴き出す瞬間 / 毒 = 水ぶくれがはじける瞬間 (書き出し元の拍子)
+            _dotEnd = 1.0f;
+            _phase = Phase.Dot; _t = 0; Showing = true;
+            Game2DSfx.Play(bleed ? "hit_enemy" : "ui_tab", 1f, bleed ? 1.2f : 0.6f);
+        }
+
+        /// <summary>まだ出していない毒・出血のダメージを今すぐ HP へ入れる (演出の途中で次へ進んだ時に、 HP の表示がずれないように)。</summary>
+        public void FlushDot()
+        {
+            if (!_dotPending) return;
+            _dotPending = false;
+            if (_dotDmg <= 0) return;
+            _ehp = Mathf.Max(0, _ehp - _dotDmg);
+            _dmgs.Add(new Dmg { x = EX + Mathf.Round(R(-12, 12)), y = EY - 40, v = _dotDmg, c = _dotCol });
+        }
+
+        private void UpdateDot()
+        {
+            if (_dotPending && _t >= _dotHitAt) FlushDot();
+            if (_t >= _dotEnd) { _phase = _ehp <= 0 ? Phase.Dying : Phase.Idle; _t = 0; }
         }
 
         /// <summary>戦闘の表示を入り切りする。 入る時は「戦闘への切り替わり」と「敵の出現」の演出から始まる。</summary>
@@ -126,7 +161,7 @@ namespace UI.Game2D.Battle
         private float _revealT0 = 0.38f, _introEnd = 0.9f;      // 切り替え (ブラインド) が開ききってから姿が見え始める。 ブラインドなしの時 (次の敵) はすぐ
         private void StartIntro(bool blinds) { if (blinds) Game2DSfx.Play("battle_start"); Game2DSfx.PlayDelayed("enemy_appear", blinds ? 0.3f : 0f, 0.9f); _phase = Phase.Intro; _t = 0; _introBlinds = blinds; _landed = false; _revealT0 = blinds ? 0.38f : 0.08f; _introEnd = _revealT0 + RevealDur + 0.07f; if (blinds) _flashW = 1f; }
 
-        public void ResetEnemy() { _ehp = _eMax; _phase = Phase.Idle; _t = 0; _dissolve = 0; _streaks.Clear(); _marks.Clear(); _rings.Clear(); _sparks.Clear(); _debris.Clear(); _dmgs.Clear(); _fx.Clear(); _anim = null; _hitAgo = null; }
+        public void ResetEnemy() { _ehp = _eMax; _phase = Phase.Idle; _t = 0; _dissolve = 0; _streaks.Clear(); _marks.Clear(); _rings.Clear(); _sparks.Clear(); _debris.Clear(); _dmgs.Clear(); _fx.Clear(); _dotPending = false; _anim = null; _hitAgo = null; }
 
         private void Init()
         {
@@ -212,6 +247,7 @@ namespace UI.Game2D.Battle
             if (_phase == Phase.PAttack) UpdatePlayerAttack(dt);
             else if (_phase == Phase.EAttack) UpdateEnemyAttack();
             else if (_phase == Phase.Intro) UpdateIntro();
+            else if (_phase == Phase.Dot) UpdateDot();
             else if (_phase == Phase.Dying) { _dissolve = Mathf.Clamp01(_t / 1f); if (_t >= 1f) { _phase = Phase.Won; _t = 0; } }
         }
 
@@ -573,7 +609,7 @@ namespace UI.Game2D.Battle
                 if (d.sz >= 5) _c.Rect(Mathf.RoundToInt(d.x) + 1, Mathf.RoundToInt(d.y) + 1, d.sz - 2, d.sz - 2, new Col(255, 255, 245), a, true);      // 大きい破片は芯が白い
             }
             foreach (var p in _sparks) { float a = Cl(1 - p.t / p.life, 0, 1); _c.Rect(Mathf.RoundToInt(p.x), Mathf.RoundToInt(p.y), 2, 2, p.c, a, true); }
-            _fx.RemoveAll(f => !f.s.Draw(_c, f.t, f.x, f.y));
+            _fx.RemoveAll(f => !f.s.Draw(_c, f.t, f.x, f.y, f.add));
         }
 
         // ── 3×5 のドット字 (ダメージの数字と CRITICAL!) ──

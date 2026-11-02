@@ -16,7 +16,7 @@ namespace UI.Game2D.Battle
     {
         public Game2DBattleFx fx;
 
-        public enum P { ERoll, Await, PRoll, Wire, PAttack, EAttack, Won, Lost }
+        public enum P { ERoll, Await, PRoll, Wire, PAttack, Dot, EAttack, Won, Lost }
         public static bool Active { get; private set; }
 
         public P phase = P.ERoll;
@@ -36,6 +36,9 @@ namespace UI.Game2D.Battle
         private int _hpBefore, _enemyBefore, _enemyMaxBefore, _combatSerial, _seenSerial = -1;
         private bool _eHit;
         private TurnResult _tr;
+        // 毒・出血のダメージ (CombatManager.OnDotDamage)。 この画面が呼んだ処理の間だけ数える
+        private bool _countDots; private int _poisonSeen, _bleedSeen;
+        private int _poisonShown, _bleedPending, _mistPending;      // ターン頭に見せた毒 / 攻撃の後に見せる出血 / 敵の攻撃の前に見せる毒 (〈廃庭の霧吹き〉)
 
         public int Stage => stage;
         public int NextStageIn => nextStageIn;
@@ -57,16 +60,24 @@ namespace UI.Game2D.Battle
         {
             var cm = CombatManager.Instance;
             if (cm != null) cm.OnCombatStart += OnCombatStart;
+            CombatManager.OnDotDamage += OnDot;
         }
 
         private void OnDisable()
         {
             var cm = CombatManager.Instance;
             if (cm != null) cm.OnCombatStart -= OnCombatStart;
+            CombatManager.OnDotDamage -= OnDot;
             Active = false; GameManager.CombatInputByScreen = false;
         }
 
         private void OnCombatStart(string _) { _combatSerial++; }
+
+        private void OnDot(CombatManager.DotKind kind, int dmg)
+        {
+            if (!_countDots) return;
+            if (kind == CombatManager.DotKind.Poison) _poisonSeen += dmg; else _bleedSeen += dmg;
+        }
 
         /// <summary>この画面が戦闘を受け持つ場面か。</summary>
         private static bool Wanted(GameManager gm)
@@ -123,12 +134,8 @@ namespace UI.Game2D.Battle
                     Touch(); break;
                 }
                 case P.PAttack:
-                    if (t > 0.05f && (fx.IsIdle || fx.IsWon))
-                    {
-                        fx.SetEnemyHp(_tr.enemyHPAfter, cm.EnemyMaxHP > 0 ? cm.EnemyMaxHP : _enemyMaxBefore);
-                        if (!cm.IsCombatActive) { EndFight(cm); break; }
-                        StartEnemyAttack(cm);
-                    }
+                case P.Dot:
+                    if (t > 0.05f && (fx.IsIdle || fx.IsWon)) AfterPlayerAttack(cm);
                     break;
                 case P.EAttack:
                     if (!_eHit && t >= 0.54f) { _eHit = true; playerHp = _tr.playerHPAfter; Touch(); }
@@ -146,6 +153,7 @@ namespace UI.Game2D.Battle
         private void EnterFight(CombatManager cm)
         {
             phase = P.ERoll; t = 0; rolled = false;
+            _poisonShown = _bleedPending = _mistPending = 0; _countDots = false;
             playerHp = cm.PlayerHP; playerMax = Mathf.Max(1, cm.PlayerMaxHP); baseAtk = cm.PlayerAttackPower;
             fx.SetEnemyHp(cm.EnemyHP, cm.EnemyMaxHP);
             fx.WeaponIndex = WeaponIndexOf(GameManager.Instance?.Run?.equippedWeaponId);
@@ -158,7 +166,13 @@ namespace UI.Game2D.Battle
         {
             _hpBefore = cm.PlayerHP; _enemyBefore = cm.EnemyHP; _enemyMaxBefore = cm.EnemyMaxHP;
             rolled = false; _eHit = false;
-            if (!cm.BeginInteractiveTurn()) { Resolve(cm); return; }      // 判断なしで解決したターン (逃走・刻限など)
+            _countDots = true; _poisonSeen = _bleedSeen = 0;
+            bool paused = cm.BeginInteractiveTurn();
+            // ターンの頭の毒: ここで見せて HP の表示を先に減らす (本当の HP は攻撃と一緒に減るので、 尽きる分は残す)
+            _poisonShown = Mathf.Min(_poisonSeen, Mathf.Max(0, _enemyBefore - 1));
+            _poisonSeen = _bleedSeen = 0;      // ここから先は判断への答えで入った分 (Resolve で読む)
+            if (_poisonShown > 0) fx.DotTick(false, _poisonShown);
+            if (!paused) { Resolve(cm); return; }      // 判断なしで解決したターン (逃走・刻限など)
             SyncDecision(cm, true);
             Game2DSfx.DiceRoll(4, 0.45f, 0.55f);
             phase = P.PRoll; t = 0; Touch();
@@ -270,15 +284,30 @@ namespace UI.Game2D.Battle
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             charge = ctx != null ? ctx.GetCharge() : charge;
             canReroll = false;
-            // 与ダメージは HP の差で見せる (出血・固定ダメを含む)。 形態が変わって HP が戻った時は結果の値で
-            int dealt = _enemyBefore - _tr.enemyHPAfter;
-            if (dealt < 0 || (cm.IsCombatActive && cm.EnemyMaxHP != _enemyMaxBefore)) dealt = _tr.totalDamage + _tr.fixedDamage;
-            if (!cm.IsCombatActive && _tr.playerHPAfter <= 0 && _tr.totalDamage + _tr.fixedDamage == 0) dealt = 0;      // ターンの頭で力尽きた (刻限など): 攻撃は出ていない
-            fx.SetEnemyHp(_enemyBefore, _enemyMaxBefore);
+            _countDots = false;
+            // 与ダメージは HP の差で見せる (固定ダメを含む)。 ターンの頭に見せた毒は差し引き、 出血・〈廃庭の霧吹き〉の毒は別の演出で見せる。
+            // 形態が変わって HP が戻った時は結果の値で (出血・毒も分けない)
+            int before = _enemyBefore - _poisonShown;
+            int dealt = before - _tr.enemyHPAfter;
+            _bleedPending = _bleedSeen; _mistPending = _poisonSeen;
+            if (dealt < 0 || (cm.IsCombatActive && cm.EnemyMaxHP != _enemyMaxBefore)) { dealt = _tr.totalDamage + _tr.fixedDamage; _bleedPending = _mistPending = 0; }
+            if (!cm.IsCombatActive && _tr.playerHPAfter <= 0 && _tr.totalDamage + _tr.fixedDamage == 0) { dealt = 0; _bleedPending = _mistPending = 0; }      // ターンの頭で力尽きた (刻限など): 攻撃は出ていない
+            _bleedPending = Mathf.Clamp(_bleedPending, 0, dealt); dealt -= _bleedPending;
+            _mistPending = Mathf.Clamp(_mistPending, 0, dealt); dealt -= _mistPending;
+            fx.FlushDot(); fx.SetEnemyHp(before, _enemyMaxBefore);
             if (dealt > 0) { fx.PlayerAttack(fx.WeaponIndex, _tr.isCritical, dealt); phase = P.PAttack; t = 0; }
-            else if (cm.IsCombatActive) StartEnemyAttack(cm);
-            else EndFight(cm);
+            else AfterPlayerAttack(cm);
             Touch();
+        }
+
+        /// <summary>自分の攻撃の後: 出血 → 〈廃庭の霧吹き〉の毒 (敵が攻撃に出る瞬間) を 1 つずつ見せてから、 敵の攻撃か決着へ。</summary>
+        private void AfterPlayerAttack(CombatManager cm)
+        {
+            if (_bleedPending > 0) { fx.DotTick(true, _bleedPending); _bleedPending = 0; phase = P.Dot; t = 0; Touch(); return; }
+            if (_mistPending > 0) { fx.DotTick(false, _mistPending); _mistPending = 0; phase = P.Dot; t = 0; Touch(); return; }
+            fx.SetEnemyHp(_tr.enemyHPAfter, cm.EnemyMaxHP > 0 ? cm.EnemyMaxHP : _enemyMaxBefore);
+            if (!cm.IsCombatActive) EndFight(cm);
+            else StartEnemyAttack(cm);
         }
 
         private void StartEnemyAttack(CombatManager cm)

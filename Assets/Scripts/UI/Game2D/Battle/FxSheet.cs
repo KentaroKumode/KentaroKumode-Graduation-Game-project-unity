@@ -6,7 +6,7 @@ namespace UI.Game2D.Battle
     /// <summary>
     /// コマを並べたエフェクトの絵 (スプライトシート) を戦闘演出の作図面へ貼る (試作・2026-11-01)。
     /// 絵は pixelfx (https://github.com/patch-gg/pixelfx・MIT) の効果を、 液晶の見た目へ寄せて書き出したもの
-    /// (光のぼかし → 網点・色は戦闘画面の暖色 5 色・半透明なし)。 書き出しの道具は scratchpad の lcd_export.mjs。
+    /// (光のぼかし → 網点・色は戦闘画面の暖色 5 色・半透明なし)。 書き出しの道具は Tools/pixelfx/dicebound/export_game.py。
     ///
     /// <para>置き場所は Resources/Game2DFx/: 絵は <c>名前.png.bytes</c> (中身は PNG。 .png は git の管理外なので bytes で持つ)、
     /// コマの位置は <c>名前.json</c> (Aseprite 形式・meta.pixelfx に fps と基準点)。 拡縮はしない (1 画素 = 1 dot)。</para>
@@ -57,8 +57,9 @@ namespace UI.Game2D.Battle
             return Cache[name] = s;
         }
 
-        /// <summary>経過 t 秒のコマを、 基準点が (x, y) に来るように貼る。 光として足し込む (戦闘演出の発光と同じ加算)。 終わっていたら false。</summary>
-        public bool Draw(BattleCanvas c, float t, int x, int y)
+        /// <summary>経過 t 秒のコマを、 基準点が (x, y) に来るように貼る。 終わっていたら false。
+        /// add = 光として足し込む (会心の光。 戦闘演出の発光と同じ加算) / false = 上から塗る (毒・出血の滴。 足すと明るい敵の上で消える)。</summary>
+        public bool Draw(BattleCanvas c, float t, int x, int y, bool add = true)
         {
             int k = Mathf.FloorToInt(t / FrameSeconds);
             if (k < 0) return true;
@@ -72,7 +73,7 @@ namespace UI.Game2D.Battle
                 {
                     var p = _px[row + r.x + i];
                     if (p.a == 0) continue;
-                    c.PutRgb(ox + i, oy + j, p.r, p.g, p.b, 1f, true);
+                    c.PutRgb(ox + i, oy + j, p.r, p.g, p.b, 1f, add);
                 }
             }
             return true;

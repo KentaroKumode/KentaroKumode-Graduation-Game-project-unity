@@ -1,0 +1,222 @@
+{
+ "frames": [
+  {
+   "filename": "poison-tick 0",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 125
+  },
+  {
+   "filename": "poison-tick 1",
+   "frame": {
+    "x": 220,
+    "y": 0,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 125
+  },
+  {
+   "filename": "poison-tick 2",
+   "frame": {
+    "x": 440,
+    "y": 0,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 125
+  },
+  {
+   "filename": "poison-tick 3",
+   "frame": {
+    "x": 660,
+    "y": 0,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 125
+  },
+  {
+   "filename": "poison-tick 4",
+   "frame": {
+    "x": 0,
+    "y": 210,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 125
+  },
+  {
+   "filename": "poison-tick 5",
+   "frame": {
+    "x": 220,
+    "y": 210,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 125
+  },
+  {
+   "filename": "poison-tick 6",
+   "frame": {
+    "x": 440,
+    "y": 210,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 125
+  },
+  {
+   "filename": "poison-tick 7",
+   "frame": {
+    "x": 660,
+    "y": 210,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 125
+  },
+  {
+   "filename": "poison-tick 8",
+   "frame": {
+    "x": 0,
+    "y": 420,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 125
+  },
+  {
+   "filename": "poison-tick 9",
+   "frame": {
+    "x": 220,
+    "y": 420,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 125
+  },
+  {
+   "filename": "poison-tick 10",
+   "frame": {
+    "x": 440,
+    "y": 420,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 125
+  },
+  {
+   "filename": "poison-tick 11",
+   "frame": {
+    "x": 660,
+    "y": 420,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 125
+  },
+  {
+   "filename": "poison-tick 12",
+   "frame": {
+    "x": 0,
+    "y": 630,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 125
+  },
+  {
+   "filename": "poison-tick 13",
+   "frame": {
+    "x": 220,
+    "y": 630,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 125
+  }
+ ],
+ "meta": {
+  "app": "pixelfx + lcd_export",
+  "image": "poison-tick.png",
+  "size": {
+   "w": 880,
+   "h": 840
+  },
+  "pixelfx": {
+   "id": "dicebound/poison-tick",
+   "fps": 8,
+   "frames": 14,
+   "frameSize": [
+    220,
+    210
+   ],
+   "pivot": [
+    110,
+    200
+   ],
+   "loop": false
+  }
+ }
+}

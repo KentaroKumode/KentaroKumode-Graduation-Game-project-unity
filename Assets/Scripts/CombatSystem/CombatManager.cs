@@ -61,6 +61,12 @@ namespace CombatSystem
         /// <summary>戦闘終了イベント</summary>
         public event Action<CombatResult> OnCombatEnd;
 
+        public enum DotKind { Poison, Bleed }
+        /// <summary>敵に毒・出血のダメージが入った (種類, ダメージ)。 演出用の合図で、 戦闘の値には関わらない
+        /// (戦闘画面が自分の呼んだ処理の間だけ数える。 BOT の先読みなど他所で鳴った分は拾われない)。</summary>
+        public static event Action<DotKind, int> OnDotDamage;
+        internal static void RaiseDotDamage(DotKind kind, int dmg) { if (dmg > 0) OnDotDamage?.Invoke(kind, dmg); }
+
         // ===== 戦闘状態 =====
         private EnemyData currentEnemy;
         /// <summary>戦闘開始時の HP 率 (0-100)。 行動台帳の blowout 判定に要る
