@@ -1,0 +1,138 @@
+{
+ "frames": [
+  {
+   "filename": "crit-hit 0",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 216,
+    "h": 136
+   },
+   "sourceSize": {
+    "w": 216,
+    "h": 136
+   },
+   "duration": 125
+  },
+  {
+   "filename": "crit-hit 1",
+   "frame": {
+    "x": 216,
+    "y": 0,
+    "w": 216,
+    "h": 136
+   },
+   "sourceSize": {
+    "w": 216,
+    "h": 136
+   },
+   "duration": 125
+  },
+  {
+   "filename": "crit-hit 2",
+   "frame": {
+    "x": 432,
+    "y": 0,
+    "w": 216,
+    "h": 136
+   },
+   "sourceSize": {
+    "w": 216,
+    "h": 136
+   },
+   "duration": 125
+  },
+  {
+   "filename": "crit-hit 3",
+   "frame": {
+    "x": 0,
+    "y": 136,
+    "w": 216,
+    "h": 136
+   },
+   "sourceSize": {
+    "w": 216,
+    "h": 136
+   },
+   "duration": 125
+  },
+  {
+   "filename": "crit-hit 4",
+   "frame": {
+    "x": 216,
+    "y": 136,
+    "w": 216,
+    "h": 136
+   },
+   "sourceSize": {
+    "w": 216,
+    "h": 136
+   },
+   "duration": 125
+  },
+  {
+   "filename": "crit-hit 5",
+   "frame": {
+    "x": 432,
+    "y": 136,
+    "w": 216,
+    "h": 136
+   },
+   "sourceSize": {
+    "w": 216,
+    "h": 136
+   },
+   "duration": 125
+  },
+  {
+   "filename": "crit-hit 6",
+   "frame": {
+    "x": 0,
+    "y": 272,
+    "w": 216,
+    "h": 136
+   },
+   "sourceSize": {
+    "w": 216,
+    "h": 136
+   },
+   "duration": 125
+  },
+  {
+   "filename": "crit-hit 7",
+   "frame": {
+    "x": 216,
+    "y": 272,
+    "w": 216,
+    "h": 136
+   },
+   "sourceSize": {
+    "w": 216,
+    "h": 136
+   },
+   "duration": 125
+  }
+ ],
+ "meta": {
+  "app": "pixelfx + lcd_export",
+  "image": "crit-hit.png",
+  "size": {
+   "w": 648,
+   "h": 408
+  },
+  "pixelfx": {
+   "id": "impacts/crit-hit",
+   "fps": 8,
+   "frames": 8,
+   "frameSize": [
+    216,
+    136
+   ],
+   "pivot": [
+    84,
+    106
+   ],
+   "loop": false
+  }
+ }
+}

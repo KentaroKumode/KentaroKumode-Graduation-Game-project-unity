@@ -160,6 +160,9 @@ crashlytics-build.properties
 /Tools/arms/
 __pycache__/
 
+# pixelfx の確認用の書き出し (tools/render.mjs の既定の出力先)。 ゲームに入れる絵は export_game.py が Assets へ置く
+/Tools/pixelfx/records/
+
 # 個人のファイル (ポートフォリオ・履歴書)。 このプロジェクトとは無関係なので push しない
 /portfolio/
 /resume/
