@@ -918,7 +918,7 @@ namespace CombatSystem
                 //   実効 150〜300 になっていた。
                 //   §9.2 の「爆発 flat」という設計意図どおり、 倍率の乗らない
                 //   fixedDamageToEnemy (軽減無視の固定ダメ枠) へ回す。
-                // 〈帳簿外の連爆〉で同じターンに何度も爆発したら、 その回数ぶん乗る。 品の上乗せ (〈溢れ取りの鋳型〉) は Kw.BurstBonusKey。
+                // 〈帳簿外の爆薬〉で同じターンに何度も爆発したら、 その回数ぶん乗る。 品の上乗せ (〈溢れ取りの鋳型〉) は Kw.BurstBonusKey。
                 int burstN = Math.Max(1, (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstCountKey));
                 int burstBonus = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstBonusKey);
                 int burstDmg = ctx.rinkaiBurstDamage * burstN + burstBonus;
@@ -950,7 +950,14 @@ namespace CombatSystem
                 atkBase, ctx.pursuitDamage, playerCritBaseRate);
             int lbStage = GameLoop.GameManager.Instance?.Run?.limitBreakStage ?? 0;
             dealtDmg = ApplyWinDamageModifiers(dealtDmg, ref dealtFixed, ref isCrit, lbStage, psm, ctx);
-            ApplyRoleExtraDamage(ctx, ref dealtDmg, ref dealtFixed, roleOutcome);
+            // 攻撃しないターン (攻撃端子 0 本・逃げる) は主攻撃を 0 にする (2026-11-04)。
+            //   atkBase を 0 にしても、 ProcessDamage の中でバフ (damageBonus) と OnPreDealDamage のパッシブが
+            //   主攻撃へ加算していたので、 攻撃しないはずのターンに 1 以上のダメージが入っていた。 会心も立てない。
+            //   逃げるターンは固定ダメの枠も捨てる (atkBase の確定後に足された臨界爆発・品が預けた分を含む)。
+            //   役の追撃も攻撃に付くものなので、 攻撃しないターンには乗せない。
+            if (skipAttack) { dealtDmg = 0; isCrit = false; }
+            if (_fleeRequested) dealtFixed = 0;
+            if (!skipAttack) ApplyRoleExtraDamage(ctx, ref dealtDmg, ref dealtFixed, roleOutcome);
             ctx.lastPlayerDamage = dealtDmg + dealtFixed;
             CombatStats.DiagWinAttack = false;
             // [計装] 与ダメ出どころ別の発動率。 攻撃した回だけ数える。

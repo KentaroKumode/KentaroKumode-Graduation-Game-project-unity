@@ -58,7 +58,7 @@ namespace AutoTest
                 [BuildPersona.Rinkai] = new HashSet<string>
                 {
                     "乾き火口箱", "炉番の外套", "過熱石",
-                    "溢れ取りの鋳型", "帳簿外の連爆", "朝にも熱い竈",
+                    "溢れ取りの鋳型", "帳簿外の爆薬", "朝にも熱い竈",
                     "早沸かし釜", "恒熱の炉壁", "八日目の灰燼",
                 },
                 [BuildPersona.Poison] = new HashSet<string>
@@ -80,7 +80,7 @@ namespace AutoTest
                 {
                     "工廠の材料箱", "無限モーター", "呼雷粉", "Thundercloud",
                     "焦げ柄の点火スパナ", "逆さ避雷針",
-                    "過負荷チューナー", "雷神槍", "雷壺",
+                    "過負荷チューナー", "雷神槍", "雷壷",
                 },
                 [BuildPersona.Shield] = new HashSet<string>
                 {

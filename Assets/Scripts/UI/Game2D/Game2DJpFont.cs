@@ -4,21 +4,24 @@ using UnityEngine;
 namespace UI.Game2D
 {
     /// <summary>
-    /// 日本語のドット字 (mihiPixelmoji を 16 ドットで焼いたもの・2026-10-31)。 液晶の GUI はテクスチャへ 1 ドットずつ打つので、
-    /// TextMesh Pro の SDF ではなく元のドットをそのまま打つ。 焼くのは Tools/bake_jpfont.py (出力 Resources/Fonts/mihi16.bytes)。
-    /// 1 行 = 16 ドット (基線は上から 14)。 収録の無い字は送り幅 8 の空白になる。
+    /// 液晶の GUI のドット字。 液晶の GUI はテクスチャへ 1 ドットずつ打つので、 TextMesh Pro の SDF ではなく元のドットをそのまま打つ。
+    /// どのフォントかは <see cref="GameFont"/> が決める (2026-11-04〜 x8y12pxDenkiChip・12 ドット)。 焼くのは Tools/bake_jpfont.py
+    /// (出力 Resources/<see cref="GameFont.DotPath"/>.bytes)。 字の高さはファイルが持つ (<see cref="Cell"/>)。
+    /// 収録の無い字は送り幅 = 字の高さの半分の空白になる。
     /// </summary>
     public static class Game2DJpFont
     {
-        public const int Cell = 16;
-        /// <summary>行送り (字の高さ 16 + 行間 1)。</summary>
-        public const int LineH = 17;
+        /// <summary>字の高さ (ドット)。 焼いたファイルから読む (読めない時は <see cref="GameFont.DotPx"/>)。</summary>
+        public static int Cell { get { var _ = Map; return _cell; } }
+        /// <summary>行送り (字の高さ + 行間 1)。</summary>
+        public static int LineH => Cell + 1;
 
         private struct Glyph { public byte adv; public ushort[] rows; }
         private static Dictionary<int, Glyph> _map;
+        private static int _cell = GameFont.DotPx;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() { _map = null; }
+        private static void ResetStatics() { _map = null; _cell = GameFont.DotPx; }
 
         private static Dictionary<int, Glyph> Map
         {
@@ -26,23 +29,24 @@ namespace UI.Game2D
             {
                 if (_map != null) return _map;
                 _map = new Dictionary<int, Glyph>();
-                var ta = Resources.Load<TextAsset>("Fonts/mihi16");
-                if (ta == null) { Debug.LogError("[Game2DJpFont] Resources/Fonts/mihi16.bytes が無い (Tools/bake_jpfont.py で焼く)"); return _map; }
+                var ta = Resources.Load<TextAsset>(GameFont.DotPath);
+                if (ta == null) { Debug.LogError("[Game2DJpFont] Resources/" + GameFont.DotPath + ".bytes が無い (Tools/bake_jpfont.py で焼く)"); return _map; }
                 var b = ta.bytes;
-                if (b.Length < 8 || b[0] != 'M' || b[1] != 'J' || b[2] != 'F' || b[3] != '1') { Debug.LogError("[Game2DJpFont] 形式が違う"); return _map; }
-                int n = System.BitConverter.ToInt32(b, 4), o = 8;
-                for (int i = 0; i < n && o + 37 <= b.Length; i++)
+                if (b.Length < 9 || b[0] != 'M' || b[1] != 'J' || b[2] != 'F' || b[3] != '2') { Debug.LogError("[Game2DJpFont] 形式が違う (Tools/bake_jpfont.py で焼き直す)"); return _map; }
+                _cell = b[4];
+                int n = System.BitConverter.ToInt32(b, 5), o = 9, rec = 5 + 2 * _cell;
+                for (int i = 0; i < n && o + rec <= b.Length; i++)
                 {
                     int cp = (int)System.BitConverter.ToUInt32(b, o); byte adv = b[o + 4]; o += 5;
-                    var rows = new ushort[Cell];
-                    for (int r = 0; r < Cell; r++) { rows[r] = System.BitConverter.ToUInt16(b, o); o += 2; }
+                    var rows = new ushort[_cell];
+                    for (int r = 0; r < _cell; r++) { rows[r] = System.BitConverter.ToUInt16(b, o); o += 2; }
                     _map[cp] = new Glyph { adv = adv, rows = rows };
                 }
                 return _map;
             }
         }
 
-        public static int Advance(char ch) => Map.TryGetValue(ch, out var g) ? g.adv : 8;
+        public static int Advance(char ch) => Map.TryGetValue(ch, out var g) ? g.adv : _cell / 2;
 
         public static int Width(string s)
         {
@@ -60,14 +64,14 @@ namespace UI.Game2D
             {
                 if (Map.TryGetValue(ch, out var g))
                 {
-                    for (int r = 0; r < Cell; r++)
+                    for (int r = 0; r < g.rows.Length; r++)
                     {
                         int bits = g.rows[r]; if (bits == 0) continue;
-                        for (int i = 0; i < Cell; i++) if ((bits >> (15 - i) & 1) != 0) p.Set(cx + i, y + r, c);
+                        for (int i = 0; i < 16; i++) if ((bits >> (15 - i) & 1) != 0) p.Set(cx + i, y + r, c);
                     }
                     cx += g.adv;
                 }
-                else cx += 8;
+                else cx += _cell / 2;
             }
             return cx - x;
         }

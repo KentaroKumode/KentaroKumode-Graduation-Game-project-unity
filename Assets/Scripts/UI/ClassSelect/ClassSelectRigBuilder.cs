@@ -61,7 +61,6 @@ namespace UI.ClassSelect
             view.buttonsSelfRaycast = Object.FindObjectOfType<Lcd.LcdPointer>() == null;
             if (cam.orthographic)
                 view.dotWorldSize = cam.orthographicSize * 2f / (Game2D.Game2DLayout.Height / 2f); // 液晶の縦 540 画素 ÷ 4 画素/dot = 135 dot が写野の縦 (旧 556 画素の頃は 139)
-            view.font = FindJapaneseFont();
             uiGo.SetActive(true);
 
             // LcdPointer が contentMask で限定レイヤの Collider しか拾わないので、
@@ -82,7 +81,7 @@ namespace UI.ClassSelect
 
             Debug.Log($"[ClassSelectRigBuilder] 構築完了 zoneX={rig.transform.position.x:F0} " +
                       $"dot={view.dotWorldSize:F4} selfRaycast={view.buttonsSelfRaycast} " +
-                      $"font={(view.font != null ? view.font.name : "<TMP default>")}");
+                      $"font={(GameFont.Tmp != null ? GameFont.Tmp.name : "<TMP default>")}");
             return view;
         }
 
@@ -100,22 +99,6 @@ namespace UI.ClassSelect
         {
             go.layer = layer;
             foreach (Transform c in go.transform) SetLayerRecursively(c.gameObject, layer);
-        }
-
-        /// <summary>ロード済み TMP フォントから日本語対応らしきものを探す。</summary>
-        public static TMP_FontAsset FindJapaneseFont()
-        {
-            TMP_FontAsset fallback = null;
-            foreach (var f in Resources.FindObjectsOfTypeAll<TMP_FontAsset>())
-            {
-                if (f == null) continue;
-                string n = f.name.ToLowerInvariant();
-                if (n.Contains("jp") || n.Contains("noto") || n.Contains("japan")
-                    || n.Contains("gothic") || n.Contains("mincho") || n.Contains("meiryo"))
-                    return f;
-                if (fallback == null && !n.Contains("liberation")) fallback = f;
-            }
-            return fallback; // null なら TMP 既定に任せる
         }
     }
 }

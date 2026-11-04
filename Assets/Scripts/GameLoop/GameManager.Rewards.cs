@@ -303,6 +303,23 @@ namespace GameLoop
         /// レア度の重みを上位へ寄せる (<see cref="MetaProgression.MetaPanel.SupplyRarityBias"/>)。
         /// 本数だけ増やしても弱かったのは、 配られるのがカタログ平均の品で
         /// BOT が自分で買う「学習序列の上位」に質で負けていたため。</summary>
+        /// <summary>選ぶのを預かっている開幕パッシブの提示 (〈兵站〉r10 の 2〜3 択・人が遊んでいる時だけ)。 先頭から順に選ぶ。</summary>
+        public readonly System.Collections.Generic.List<System.Collections.Generic.List<string>> PendingStartingPassiveChoices
+            = new System.Collections.Generic.List<System.Collections.Generic.List<string>>();
+
+        /// <summary>預かっている開幕パッシブの提示の先頭から 1 つ選んで所持する。</summary>
+        public void ResolveStartingPassive(int pick)
+        {
+            if (Run == null || PendingStartingPassiveChoices.Count == 0) return;
+            var cands = PendingStartingPassiveChoices[0];
+            PendingStartingPassiveChoices.RemoveAt(0);
+            if (cands == null || cands.Count == 0) return;
+            string id = cands[System.Math.Max(0, System.Math.Min(pick, cands.Count - 1))];
+            if (Run.ownedPassiveItems == null) Run.ownedPassiveItems = new System.Collections.Generic.List<string>();
+            ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
+            Log($"メタ報酬: 開幕パッシブ「{id}」を選んで獲得");
+        }
+
         private string PickStartingPassive()
         {
             var db = ItemDatabase.Instance;

@@ -189,7 +189,8 @@ namespace MetaProgression
             return true;
         }
 
-        /// <summary>T4 の ON/OFF。 選択するとカテゴリ全軸が最高 Tier へ強制される (解決時)。</summary>
+        /// <summary>T4 の ON/OFF。 効くのはそのカテゴリの基礎軸で 6pt 払っている時だけ (<see cref="ChallengeResolver.CanSelectT4"/>・満たさない T4 は解決時に無効)。
+        /// 軸を引き上げはしない。</summary>
         public bool SetChallengeT4(ChallengeT4 v, bool enabled)
         {
             if (State?.challenge == null) return false;
@@ -217,8 +218,13 @@ namespace MetaProgression
             if (State?.challenge == null) return;
             State.challenge.Clear();
             if (on)
+            {
+                // T4 は解禁ゲート (カテゴリ 6pt) で、 軸を引き上げない ── 先に全軸を最上位にする。 T4 だけだと全部無効で 0pt になる
+                for (int i = 0; i < ChallengeCatalog.Axes.Count; i++)
+                    State.challenge.SetTier(ChallengeCatalog.Axes[i].axis, ChallengeCatalog.Axes[i].MaxTier);
                 for (int i = 0; i < ChallengeCatalog.T4s.Count; i++)
-                    State.challenge.SetT4(ChallengeCatalog.T4s[i].t4, true);   // T4 が全軸を最高 Tier へ引き上げる
+                    State.challenge.SetT4(ChallengeCatalog.T4s[i].t4, true);
+            }
             State.InvalidateChallenge();
             OnStateChanged?.Invoke();
             Save();

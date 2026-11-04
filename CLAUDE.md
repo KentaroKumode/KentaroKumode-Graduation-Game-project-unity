@@ -40,6 +40,9 @@ My project — Unity 3D ローグライク（ボードゲーム調・ダイス�
   2026-10-29 に削除（GAME.md §24）。
 - 用語: 「ダイス合計+N」は**禁止語彙**。攻撃+N / 出目+N / 端子配線合計+N を使う（GAME.md §2-7）。
 - シングルトンは `_shuttingDown` + `[RuntimeInitializeOnLoadMethod]` パターンを守る。
+- **フォントの指定は [GameFont.cs](Assets/Scripts/UI/GameFont.cs) の 1 か所だけ**（2026-11-04〜）。画面ごとにフォントの欄を持たせない ──
+  TMP の字は `GameFont.Apply`、液晶のドット字は `Game2DJpFont`（`Tools/bake_jpfont.py` が GameFont.cs の指定を読んで焼く）。
+  フォントを変えたら焼き直す。DenkiChip に無い字は拡張フォント（`Tools/fontext/glyphs.txt` → `build_ext_font.py`）に足す。手順は [docs/design/gui-needed.md](docs/design/gui-needed.md)。
 - **アイテム・スキルの id = 表示名**（2026-09-22〜）。**id から構造を読み取らない** ──
   家系・段・系統・ユニークは items.json の `family` / `tier` / `consFamily` / `unique` を読む。
   綴りでパースすると、調整で品名を変えた瞬間にロジックが黙って壊れる。例外は出目パーツ（`facepart_*`）のみ。

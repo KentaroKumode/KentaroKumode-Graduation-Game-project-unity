@@ -12,7 +12,7 @@ namespace ItemSystem.PassiveSkills.Effects
     //  出血の減衰/消費/0) は Keywords.Kw が配る。 1 つの連鎖の中で同じ品は 1 度しか働かない。
     //
     //  効果を据え置いた品 (八日目の灰燼・雷神槍・過負荷チューナー・素手禁じの蛇血瓶・鋸刃の山刀・先血の腕輪・
-    //  医家の反り刃・逆綴じの止血帯・末頁の血花太刀・医書裏の開き針・溶金の領主剣・切り分けた帯封) は元のクラスのまま。
+    //  医家の反り刃・逆綴じの止血帯・末頁の血花太刀・医書裏の開き針・溶金の領主剣・黄金色の封蝋) は元のクラスのまま。
     // ============================================================
 
     /// <summary>この品群で使う小さな道具。</summary>
@@ -151,10 +151,10 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>帳簿外の連爆【規則】: 爆発で臨界を 0 にせず閾値ぶんだけ減らす。 溜まっていれば同じターンに何度でも爆発する。</summary>
+    /// <summary>帳簿外の爆薬【規則】: 爆発で臨界を 0 にせず閾値ぶんだけ減らす。 溜まっていれば同じターンに何度でも爆発する。</summary>
     public class OffBookChain : IPassiveSkillEffect
     {
-        public string SkillId => "帳簿外の連爆";
+        public string SkillId => "帳簿外の爆薬";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -324,10 +324,10 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>雷壺【規則】: 充電の上限が無くなる。 代わりにターン開始時、 上限を超えている分の半分が捨てられる。</summary>
+    /// <summary>雷壷【規則】: 充電の上限が無くなる。 代わりにターン開始時、 上限を超えている分の半分が捨てられる。</summary>
     public class ThunderJar : IPassiveSkillEffect
     {
-        public string SkillId => "雷壺";
+        public string SkillId => "雷壷";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.chargeCapRemoved = true;
     }
@@ -555,10 +555,10 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>力みの籠手: シールドを合計 10 得るたび、 この戦闘中の攻撃 +1。</summary>
+    /// <summary>力みの小手: シールドを合計 10 得るたび、 この戦闘中の攻撃 +1。</summary>
     public class StrainGauntlet : IPassiveSkillEffect
     {
-        public string SkillId => "力みの籠手";
+        public string SkillId => "力みの小手";
         private const string Atk = "rw.gauntletAtk";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldGain, PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)

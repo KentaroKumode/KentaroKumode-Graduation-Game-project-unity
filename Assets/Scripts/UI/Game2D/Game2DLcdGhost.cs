@@ -4,14 +4,17 @@ using UnityEngine;
 namespace UI.Game2D
 {
     /// <summary>
-    /// 液晶の残像 (map-prototype.html の <c>LFX.ghost</c>・液晶の応答の遅れ) の「前のフレーム」を用意する。
+    /// 液晶の残像 (液晶の応答の遅れ) の「前のフレーム」と、 発光のにじみ (ブルーム) の下処理を用意する。
     /// フレームの頭 (カメラが描く前) の液晶 RT は、 まだ前のフレームの絵なので、 それを別の RT へ写して液晶の Quad の
     /// <c>_PrevTex</c> に渡す。 重ね方 (lighten) は Quad のシェーダ (Game2D/LcdScreen) が行う。
     ///
-    /// <para><b>自動露出</b> (2026-10-19): 画面が明るすぎる時 (ブルームで眩しい時) に、 液晶全体の明るさを自動で下げる。
+    /// <para><b>自動露出</b>: 画面が明るすぎる時 (ブルームで眩しい時) に、 液晶全体の明るさを自動で下げる。
     /// 前のフレームの RT にミップマップを作り、 最も小さい階層 (15×8) を非同期に読んで、 絵の平均の明るさ (効果を掛ける前の値) を出す。
     /// 目標より明るいほど <c>_Exposure</c> を 1 より下げ、 暗いと少しだけ上げる (上限・下限あり)。 下げるのは速く (attack)、 戻すのはゆっくり (release)。
     /// シェーダは <c>_Exposure</c> を、 最終の明るさと、 ブルームの強さ (2 乗) に掛ける。</para>
+    ///
+    /// <para>2026-11-02 の効果の絞り込みで、 ここにあった画素の格子の細かさ・ドットの芯の掛け具合は外した (git の履歴に残る)。
+    /// ブルームと自動露出は同日に戻した。</para>
     /// </summary>
     [DefaultExecutionOrder(-100)]
     public class Game2DLcdGhost : MonoBehaviour
@@ -21,14 +24,6 @@ namespace UI.Game2D
 
         [Header("ブルーム (なめらかなにじみ)")]
         [Tooltip("Hidden/Game2DBloom (ビルドに含めるため参照を持つ)")] public Shader bloomShader;
-        [Range(0.5f, 4f), Tooltip("ぼかしの広がり (大きいほど柔らかく広い)")] public float softness = 1.6f;
-
-        [Header("画素の格子 (中身の 1 ドット = 格子の 1 マス)")]
-        // 格子の細かさは全画面で液晶の板そのもの (480×270 = 液晶の 2 画素)。 航行・戦闘・ロード画面の中身はこれに揃っている。
-        // タイトル・職業選択の中身は揃っていない (挿絵は液晶の約 3.9 画素・本文はなめらかな字) ので、 合わせられる細かさが無い (2026-11-01 に実測)
-        [Tooltip("格子のドット数 (液晶の 2 画素 = 1 ドット)")] public Vector2 gridDots = new Vector2(Game2DLayout.Width, Game2DLayout.Height);
-        [Range(0f, 1f), Tooltip("タイトル・職業選択でのドットの芯の掛け具合 (マテリアルの _Core に掛ける)。 芯は縁を暗くするので、 格子に揃っていない細い字を潰す (2026-11-01: 職業選択の本文が読めなくなった)")]
-        public float titleCoreScale = 0f;
         [Range(0f, 4f), Tooltip("タイトル・職業選択での光のにじみの倍率 (マテリアルの _Bloom と _Halo に掛ける)。 航行は暗い地に明るい細い線なので、 にじみが強く出て光って見える。 タイトルは絵が中間の明るさなので、 同じ値だとほとんど光らない")]
         public float titleBloomScale = 2f;
 
@@ -55,8 +50,7 @@ namespace UI.Game2D
         private MaterialPropertyBlock _mpb;
         private static readonly int BloomTexId = Shader.PropertyToID("_BloomTex"), BloomTexBId = Shader.PropertyToID("_BloomTexB");
         private static readonly int ThrId = Shader.PropertyToID("_Thr"), PowId = Shader.PropertyToID("_Pow"), DirId = Shader.PropertyToID("_Dir");
-        private static readonly int PrevId = Shader.PropertyToID("_PrevTex"), GridDotsId = Shader.PropertyToID("_GridDots"), CoreId = Shader.PropertyToID("_Core"),
-            BloomId = Shader.PropertyToID("_Bloom"), HaloId = Shader.PropertyToID("_Halo");
+        private static readonly int PrevId = Shader.PropertyToID("_PrevTex"), BloomId = Shader.PropertyToID("_Bloom"), HaloId = Shader.PropertyToID("_Halo");
 
         private void OnDestroy()
         {
@@ -85,6 +79,7 @@ namespace UI.Game2D
                 _bloomB = NewSmall(w / 2, h / 2, "Game2DBloomB"); _bloomTmpB = NewSmall(w / 2, h / 2, "Game2DBloomTmpB");
             }
             var mat = surface.sharedMaterial;
+            float softness = mat.GetFloat("_BloomSoft");      // ぼかしの広がり (マテリアルで調整する)
             _bloomMat.SetFloat(ThrId, mat.GetFloat("_BloomThr")); _bloomMat.SetFloat(PowId, mat.GetFloat("_BloomPow"));
             Graphics.Blit(_prev, _bloomA, _bloomMat, 0);                                   // 明るい所だけ・4×4 を 1 つに
             _bloomMat.SetVector(DirId, new Vector2(softness, 0)); Graphics.Blit(_bloomA, _bloomTmpA, _bloomMat, 1);
@@ -110,14 +105,12 @@ namespace UI.Game2D
             if (_mpb == null) _mpb = new MaterialPropertyBlock();
             surface.GetPropertyBlock(_mpb);
             _mpb.SetTexture(PrevId, _prev);
-            if (_bloomA != null) { _mpb.SetTexture(BloomTexId, _bloomA); _mpb.SetTexture(BloomTexBId, _bloomB); }
             _mpb.SetFloat(ExposureId, Exposure);
-            // 格子のマスを中身のドットに合わせる。 タイトル・職業選択は揃えられないので、 文字を潰す芯だけ弱める
+            if (_bloomA != null) { _mpb.SetTexture(BloomTexId, _bloomA); _mpb.SetTexture(BloomTexBId, _bloomB); }
+            // タイトル・職業選択は絵が中間の明るさなので、 光のにじみを強める
             var gm = GameLoop.GameManager.Instance;
             bool title = gm != null && gm.CurrentPhase == GameLoop.GameManager.GamePhase.Title;
-            _mpb.SetVector(GridDotsId, gridDots);
             var lcdMat = surface.sharedMaterial;
-            _mpb.SetFloat(CoreId, lcdMat.GetFloat(CoreId) * (title ? titleCoreScale : 1f));
             _mpb.SetFloat(BloomId, lcdMat.GetFloat(BloomId) * (title ? titleBloomScale : 1f));
             _mpb.SetFloat(HaloId, lcdMat.GetFloat(HaloId) * (title ? titleBloomScale : 1f));
             surface.SetPropertyBlock(_mpb);

@@ -282,6 +282,7 @@ namespace GameLoop
             //   付与済みの品は次の抽選から自動的に外れる。 抽選は `RangeAuto` (毎回進む) なので
             //   同じ品を引き続けることはない。
             {
+                PendingStartingPassiveChoices.Clear();
                 int startPassives = MetaProgression.MetaBuffApplicator.GetStartingPassiveCount();
                 for (int sp = 0; sp < startPassives; sp++)
                 {
@@ -297,9 +298,16 @@ namespace GameLoop
                         if (!string.IsNullOrEmpty(cand)) cands.Add(cand);
                     }
                     string id = null;
+                    // 人が遊んでいる時は、 選ぶのを航行に入ってからの窓まで預ける (ResolveStartingPassive)。
+                    //   提示の抽選はここで済ませるので、 乱数の消費は BOT と同じ。
+                    if (cands.Count > 1 && GameHooks.ChooseStartingPassive == null && !GameHooks.BotDriving && !Application.isBatchMode)
+                    {
+                        PendingStartingPassiveChoices.Add(cands);
+                        continue;
+                    }
                     if (cands.Count > 0)
                     {
-                        // 選ぶのはプレイヤー。 選択画面が付くまでは先頭 (BOT は GameHooks で差し込む)。
+                        // BOT は GameHooks で差し込む (無ければ先頭)。
                         int pick = GameHooks.ChooseStartingPassive?.Invoke(cands) ?? 0;
                         id = cands[System.Math.Max(0, System.Math.Min(pick, cands.Count - 1))];
                     }

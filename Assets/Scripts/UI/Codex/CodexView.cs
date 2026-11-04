@@ -31,7 +31,7 @@ namespace UI.Codex
         public SpriteButton galleryButton;
 
         [Header("配線")]
-        public TMP_FontAsset font;
+        [Tooltip("複製の元にする文字 (大きさ・層・並び順を写す)。 フォントは複製の後に GameFont へ揃える")]
         public TextMeshPro templateTmp;
         public Camera contentCamera;
         public string sortingLayer = "Default";
@@ -509,12 +509,7 @@ namespace UI.Codex
                 go.layer = templateTmp.gameObject.layer;
                 go.SetActive(true);
                 tmp = go.GetComponent<TextMeshPro>();
-                // Inspector に font が指定されていれば複製後に上書き (Codex 用フォント差し替え)
-                if (font != null)
-                {
-                    tmp.font = font;
-                    if (font.material != null) tmp.fontMaterial = font.material;
-                }
+                GameFont.Apply(tmp);      // フォントはゲーム全体で 1 か所の指定 (複製の元の字のフォントは使わない)
             }
             else
             {
@@ -523,11 +518,7 @@ namespace UI.Codex
                 go.transform.localPosition = localPos;
                 go.layer = ResolveContentLayer();
                 tmp = go.AddComponent<TextMeshPro>();
-                if (font != null)
-                {
-                    tmp.font = font;
-                    if (font.material != null) tmp.fontMaterial = font.material;
-                }
+                GameFont.Apply(tmp);
                 var r0 = tmp.GetComponent<Renderer>();
                 r0.sortingOrder = sortingOrder;
                 if (!string.IsNullOrEmpty(sortingLayer)) r0.sortingLayerName = sortingLayer;

@@ -9,6 +9,14 @@ namespace UI.Game2D
         public string icon, name, desc, value, tag; public Color32? tone; public bool disabled;
         /// <summary>count / max が付くと [+] [-] で増減できる (整備パネル・設定の音量など)。 max = 0 は数のない行。</summary>
         public int count, max;
+        /// <summary>スライダーの行 (<see cref="ScreenDef.sliders"/>) で、 バーの右に出す今の効果。</summary>
+        public string effect;
+        /// <summary>スライダーの行で、 段数の欄に count/max の代わりに出す字 (挑戦の「2pt」など)。</summary>
+        public string numText;
+        /// <summary>分離式ボタンの行 (<see cref="ScreenDef.segments"/>) の列ごとの字。 null の列はボタンを置かない (空けて列をそろえる)。</summary>
+        public string[] segs;
+        /// <summary>押されている列 (-1 = どれも押されていない)。</summary>
+        public int segOn = -1;
     }
 
     public sealed class ModalBtn { public string label, action; public bool primary; }
@@ -32,6 +40,18 @@ namespace UI.Game2D
         public int bodyLines = 5;
         /// <summary>ボタンが押された (action, 選んでいる行)。 null なら見本の動き (トーストを出すだけ)。 設定した画面は Esc で閉じない。</summary>
         public System.Action<string, int> onAction;
+        /// <summary>行の高さ (jp のときだけ・0 = 既定)。</summary>
+        public int rowH;
+        /// <summary>行を「名前・段数・スライド式のバー・今の効果」で描く (jp・count/max の行)。 バーを押す・引くと onAction("slide", 行) が呼ばれ、
+        /// 目標の段は <see cref="Game2DModal.SlideTarget"/> に入る。</summary>
+        public bool sliders;
+        /// <summary>スライダーの行の名前の欄の幅 (dot)。 分離式ボタンの行も同じ欄を使う。</summary>
+        public int sliderNameW = 64;
+        /// <summary>行を「名前・列にそろえた分離式ボタン・今の効果」で描く (jp・<see cref="ModalItem.segs"/> の行)。 ボタンを押すと onAction("seg", 行) が呼ばれ、
+        /// 押した列は <see cref="Game2DModal.SegTarget"/> に入る (トグルは呼ぶ側が決める)。</summary>
+        public bool segments;
+        /// <summary>分離式ボタン 1 つの幅 (dot)。</summary>
+        public int segW = 34;
     }
 
     /// <summary>
@@ -47,7 +67,16 @@ namespace UI.Game2D
         [SerializeField] private RectTransform _rt;
         private RawImage _img; private Texture2D _tex; private ScreenDef _def; private KitPix _lastPix;
         private Game2DSpring _sp; private bool _open; private int _sel, _hoverRow = -1, _hoverTab = -1, _hoverBtn = -1; private string _toast = ""; private float _toastT;
-        private readonly List<RectInt> _rowR = new List<RectInt>(), _tabR = new List<RectInt>(), _btnR = new List<RectInt>();
+        private readonly List<RectInt> _rowR = new List<RectInt>(), _tabR = new List<RectInt>(), _btnR = new List<RectInt>(), _barR = new List<RectInt>();
+        private int _dragRow = -1;
+
+        /// <summary>スライダーを押した・引いた時の目標の段 (onAction("slide", 行) の中で読む)。</summary>
+        public static int SlideTarget { get; private set; }
+
+        /// <summary>分離式ボタンで押された列 (onAction("seg", 行) の中で読む)。</summary>
+        public static int SegTarget { get; private set; }
+        private readonly List<RectInt[]> _segR = new List<RectInt[]>();
+        private int _hoverSegRow = -1, _hoverSeg = -1;
         private bool _dirty; private int _px, _py;
 
         public static bool Active { get; private set; }
@@ -166,10 +195,50 @@ namespace UI.Game2D
             for (int i = 0; i < _tabR.Count; i++) if (Hit(d, _tabR[i])) { ht = i; break; }
             for (int i = 0; i < _btnR.Count; i++) if (Hit(d, _btnR[i])) { hb = i; break; }
             SetHover(hr, ht, hb);
+            if (Seg(d)) return;
+            if (Slide(d)) return;
             if (!Input.GetMouseButtonDown(0)) return;
             if (hb >= 0) { if (_def.buttons[hb].action != "close") Game2DSfx.Play(_def.buttons[hb].primary ? "ui_confirm" : "ui_click"); Press(_def.buttons[hb]); }
             else if (ht >= 0 && ht != _def.tab) { _def.tab = ht; _sel = 0; _dirty = true; Game2DSfx.Play("ui_tab"); }
             else if (hr >= 0) { _sel = hr; _dirty = true; Game2DSfx.Play("ui_click"); }
+        }
+
+        /// <summary>分離式ボタン: ホバーを追い、 押したら onAction("seg", 行)。 押した時は true。</summary>
+        private bool Seg(Vector2 d)
+        {
+            if (_def == null || !_def.segments) return false;
+            int hr = -1, hs = -1;
+            for (int i = 0; i < _segR.Count && hr < 0; i++)
+            {
+                var rs = _segR[i]; if (rs == null) continue;
+                for (int k = 0; k < rs.Length; k++) if (rs[k].width > 0 && Hit(d, rs[k])) { hr = i; hs = k; break; }
+            }
+            if (hr != _hoverSegRow || hs != _hoverSeg) { _hoverSegRow = hr; _hoverSeg = hs; _dirty = true; }
+            if (hr < 0 || !Input.GetMouseButtonDown(0) || _def.onAction == null) return false;
+            _sel = hr; _dirty = true; SegTarget = hs;
+            _def.onAction("seg", hr);
+            return true;
+        }
+
+        /// <summary>スライダー: バーの上で押したら、 離すまでその行の段を指の位置へ合わせる。 扱ったら true。</summary>
+        private bool Slide(Vector2 d)
+        {
+            if (_def == null || !_def.sliders || _def.onAction == null || !Input.GetMouseButton(0)) { _dragRow = -1; return false; }
+            if (Input.GetMouseButtonDown(0))
+            {
+                _dragRow = -1;
+                for (int i = 0; i < _barR.Count; i++) { var b = _barR[i]; if (b.width > 0 && Hit(d, new RectInt(b.x - 6, b.y - 4, b.width + 12, b.height + 8))) { _dragRow = i; break; } }
+                if (_dragRow < 0) return false;
+                if (_sel != _dragRow) { _sel = _dragRow; _dirty = true; Game2DSfx.Play("ui_click"); }
+            }
+            if (_dragRow < 0) return false;
+            if (_dragRow >= _barR.Count || _dragRow >= _def.Items.Count) return true;
+            var it = _def.Items[_dragRow]; var r = _barR[_dragRow];
+            if (it.max <= 0) return true;
+            float fx = d.x - _px - r.x;
+            int target = fx < 2 ? 0 : Mathf.Clamp(Mathf.FloorToInt(fx * it.max / r.width) + 1, 0, it.max);      // 左端より左 = 0 段
+            if (target != it.count) { SlideTarget = target; _def.onAction("slide", _dragRow); }
+            return true;
         }
 
         private void SetHover(int r, int t, int b) { if (r != _hoverRow || t != _hoverTab || b != _hoverBtn) { if (r >= 0 || t >= 0 || b >= 0) Game2DSfx.Play("ui_hover", 0.7f); _hoverRow = r; _hoverTab = t; _hoverBtn = b; _dirty = true; } }
@@ -274,6 +343,11 @@ namespace UI.Game2D
         //   1 行 16 ドットの字なので、 英数字の窓より行が高い。 題 → 本文 → 行 → 詳細 (選んだ行の説明 2 行) → 足元 → ボタン。
 
         private const int JRowH = 20, JGap = 2, JDetail = 2;
+        /// <summary>高さ h の行・ボタンの中で字を上下の真ん中に置く下げ幅 (字の高さ = Game2DJpFont.Cell・漢字は上 11 ドット)。</summary>
+        private static int TextDy(int h) => (h - Game2DJpFont.Cell + 1) / 2;
+        private static int JBtnDy => TextDy(22);
+        private static int RowHOf(ScreenDef d) => d.rowH > 0 ? d.rowH : JRowH;
+        private static int GapOf(ScreenDef d) => d.rowH > 0 && d.rowH < JRowH ? 1 : JGap;
 
         private static bool HasDetail(ScreenDef d) { foreach (var it in d.Items) if (!string.IsNullOrEmpty(it.desc)) return true; return false; }
 
@@ -282,18 +356,66 @@ namespace UI.Game2D
             int iw = d.w - 2 * Inset, y = Inset + 20 + 4;
             if (!string.IsNullOrEmpty(d.body)) y += Mathf.Min(d.bodyLines, Game2DJpFont.Lines(d.body, iw - 4).Count) * Game2DJpFont.LineH + 4;
             int cols = Mathf.Max(1, d.cols), rows = (d.Items.Count + cols - 1) / cols;
-            y += rows * (JRowH + JGap);
+            y += rows * (RowHOf(d) + GapOf(d));
             if (HasDetail(d)) y += JDetail * Game2DJpFont.LineH + 6;
             y += 4 + Game2DJpFont.LineH + 4 + 22 + Inset;
             return Mathf.Min(266, y);
         }
 
+        /// <summary>分離式ボタンの行: 名前 → 列にそろえたボタン → 今の効果。 押されたボタンは金で塗り、 字を暗くする。 戻り値 = 列ごとのボタンの位置。</summary>
+        private static RectInt[] SegRow(KitPix p, ScreenDef d, ModalItem it, RectInt r, int hover)
+        {
+            int ty = r.y + TextDy(r.height), x = r.x + 6;
+            var ink = it.disabled ? Game2DKit.Faint : (it.tone ?? Game2DKit.Ink);
+            Game2DJpFont.Draw(p, Game2DJpFont.Clip(it.name ?? "", d.sliderNameW - 4), x, ty, ink); x += d.sliderNameW;
+            var rs = new RectInt[it.segs.Length];
+            for (int k = 0; k < it.segs.Length; k++)
+            {
+                var b = new RectInt(x + k * (d.segW + 2), r.y + 1, d.segW, r.height - 2);
+                string lab = it.segs[k];
+                if (lab == null) { rs[k] = default; continue; }
+                rs[k] = b;
+                bool on = k == it.segOn, hv = k == hover;
+                var fill = on ? Game2DKit.Gold : Game2DKit.Off;
+                var edge = on ? Game2DKit.Amber : hv ? Game2DKit.Ink : it.disabled ? Game2DKit.Off : Game2DKit.Faint;
+                p.Box(b.x, b.y, b.width, b.height, fill, edge);
+                var tc = on ? Game2DKit.Dark : it.disabled ? Game2DKit.Faint : hv ? Game2DKit.Ink : Game2DKit.Dim;
+                Game2DJpFont.Draw(p, lab, b.x + (b.width - Game2DJpFont.Width(lab)) / 2, b.y + TextDy(b.height), tc);
+            }
+            x += it.segs.Length * (d.segW + 2) + 8;
+            if (!string.IsNullOrEmpty(it.effect))
+                Game2DJpFont.Draw(p, Game2DJpFont.Clip(it.effect, r.x + r.width - 6 - x), x, ty, it.segOn >= 0 ? Game2DKit.Ink : Game2DKit.Dim);
+            return rs;
+        }
+
+        /// <summary>スライダーの行: 名前 → 段数 (左) → バー → 今の効果 (右)。 戻り値 = バーの位置 (押す判定に使う)。</summary>
+        private static RectInt SliderRow(KitPix p, ScreenDef d, ModalItem it, RectInt r, bool sel)
+        {
+            int ty = r.y + TextDy(r.height), x = r.x + 6;
+            var ink = it.disabled ? Game2DKit.Faint : (it.tone ?? Game2DKit.Ink);
+            Game2DJpFont.Draw(p, Game2DJpFont.Clip(it.name ?? "", d.sliderNameW - 4), x, ty, ink); x += d.sliderNameW;
+            string num = it.numText ?? it.count + "/" + it.max; int numW = Game2DJpFont.Width("10/10");
+            Game2DJpFont.Draw(p, num, x + numW - Game2DJpFont.Width(num), ty, it.count > 0 ? Game2DKit.Gold : Game2DKit.Dim); x += numW + 8;
+            // バー: 段の数だけ区切った溝。 埋まった段は金、 つまみは今の段の右端
+            const int barW = 110, barH = 6; var bar = new RectInt(x, r.y + (r.height - barH) / 2, barW, barH);
+            p.Box(bar.x, bar.y, bar.width, bar.height, Game2DKit.Dark, Game2DKit.Faint);
+            int fill = (bar.width - 2) * it.count / it.max;
+            if (fill > 0) p.Rect(bar.x + 1, bar.y + 1, fill, bar.height - 2, Game2DKit.Gold);
+            for (int k = 1; k < it.max; k++) { int tx = bar.x + 1 + (bar.width - 2) * k / it.max; p.Rect(tx, bar.y + 1, 1, bar.height - 2, k < it.count ? new Color32(0x8a, 0x70, 0x22, 255) : Game2DKit.Off); }
+            int kx = Mathf.Clamp(bar.x + 1 + fill - 2, bar.x - 1, bar.x + bar.width - 3);
+            p.Box(kx, bar.y - 3, 4, bar.height + 6, sel ? Game2DKit.Amber : Game2DKit.Ink, Game2DKit.Dark);
+            x += barW + 10;
+            if (!string.IsNullOrEmpty(it.effect))
+                Game2DJpFont.Draw(p, Game2DJpFont.Clip(it.effect, r.x + r.width - 6 - x), x, ty, it.count > 0 ? Game2DKit.Ink : Game2DKit.Dim);
+            return bar;
+        }
+
         private void RedrawJp()
         {
             var d = _def; var p = new KitPix(d.w, d.h); _lastPix = p;
-            _rowR.Clear(); _tabR.Clear(); _btnR.Clear();
+            _rowR.Clear(); _tabR.Clear(); _btnR.Clear(); _barR.Clear(); _segR.Clear();
             p.NineSlice(Game2DKit.Frame, FrameB, Game2DKit.Well);
-            int x0 = Inset, y = Inset - 4, iw = d.w - 2 * Inset, LH = Game2DJpFont.LineH;
+            int x0 = Inset, y = Inset - 4, iw = d.w - 2 * Inset, LH = Game2DJpFont.LineH, RH = RowHOf(d), RG = GapOf(d);
             // 題 (と、 その右に小さく副題)
             int tw = Game2DJpFont.Draw(p, d.title, x0, y, Game2DKit.Ink);
             if (!string.IsNullOrEmpty(d.sub)) Game2DJpFont.Draw(p, Game2DJpFont.Clip(d.sub, iw - tw - 12), x0 + tw + 12, y, Game2DKit.Gold);
@@ -305,19 +427,30 @@ namespace UI.Game2D
             bool detail = HasDetail(d); int detailY = footY - (detail ? JDetail * LH + 6 : 0), rowsBottom = detailY - 2;
             // 行
             var items = d.Items;
-            int cols = Mathf.Max(1, d.cols), rw = (iw - (cols - 1) * 4) / cols, maxRows = Mathf.Max(1, (rowsBottom - y + JGap) / (JRowH + JGap));
+            int cols = Mathf.Max(1, d.cols), rw = (iw - (cols - 1) * 4) / cols, maxRows = Mathf.Max(1, (rowsBottom - y + RG) / (RH + RG));
             for (int i = 0; i < items.Count && i < maxRows * cols; i++)
             {
-                int cx = x0 + (i % cols) * (rw + 4), cy = y + (i / cols) * (JRowH + JGap); var it = items[i]; var r = new RectInt(cx, cy, rw, JRowH); _rowR.Add(r);
+                int cx = x0 + (i % cols) * (rw + 4), cy = y + (i / cols) * (RH + RG); var it = items[i]; var r = new RectInt(cx, cy, rw, RH); _rowR.Add(r);
                 bool sel = i == _sel, hv = i == _hoverRow;
                 if (Game2DKit.Row != null) p.NineSlice(Game2DKit.Row, 6, Game2DKit.Well, r.x, r.y, r.width, r.height); else p.Plate(r.x, r.y, r.width, r.height, it.disabled ? 0.55f : sel ? 1.55f : hv ? 1.3f : 1f);
                 if (hv && !sel) p.Rect(r.x, r.y, r.width, 1, Game2DKit.Ink);
                 if (sel) { p.Rect(r.x, r.y, r.width, 1, Game2DKit.Amber); p.Rect(r.x, r.y + r.height - 1, r.width, 1, Game2DKit.Amber); p.Rect(r.x, r.y, 1, r.height, Game2DKit.Amber); p.Rect(r.x + r.width - 1, r.y, 1, r.height, Game2DKit.Amber); }
+                if (d.segments && it.segs != null) { _barR.Add(default); _segR.Add(SegRow(p, d, it, r, i == _hoverSegRow ? _hoverSeg : -1)); continue; }
+                _segR.Add(null);
+                if (d.sliders && it.max > 0) { _barR.Add(SliderRow(p, d, it, r, sel)); continue; }
+                _barR.Add(default);
                 string val = it.max > 0 ? it.count + "/" + it.max : it.value;
-                int vw = string.IsNullOrEmpty(val) ? 0 : Game2DJpFont.Width(val);
-                if (vw > 0) Game2DJpFont.Draw(p, val, r.x + r.width - 6 - vw, r.y + 2, it.disabled ? Game2DKit.Faint : Game2DKit.Gold);
+                int vw = string.IsNullOrEmpty(val) ? 0 : Game2DJpFont.Width(val), ty = r.y + TextDy(RH), nx = r.x + 6;
+                if (vw > 0) Game2DJpFont.Draw(p, val, r.x + r.width - 6 - vw, ty, it.disabled ? Game2DKit.Faint : Game2DKit.Gold);
+                if (it.icon != null)          // アイコンの枠 (icon = 品の id・"" は枠だけ)
+                {
+                    int ix = r.x + 3, iy = r.y + (RH - 18) / 2;
+                    p.Box(ix, iy, 18, 18, Game2DKit.Off, it.disabled ? Game2DKit.Faint : Game2DKit.Dim);
+                    var ic = Game2DKit.ItemIcon(it.icon); if (ic != null) p.Sprite(ic, ix + 1, iy + 1, 16, 16);
+                    nx = ix + 18 + 5;
+                }
                 var nameCol = it.disabled ? Game2DKit.Faint : (it.tone ?? Game2DKit.Ink);
-                Game2DJpFont.Draw(p, Game2DJpFont.Clip(it.name ?? "", r.width - 12 - (vw > 0 ? vw + 8 : 0)), r.x + 6, r.y + 2, nameCol);
+                Game2DJpFont.Draw(p, Game2DJpFont.Clip(it.name ?? "", r.x + r.width - nx - 6 - (vw > 0 ? vw + 8 : 0)), nx, ty, nameCol);
             }
             // 詳細 (選んだ行の説明)
             if (detail)
@@ -336,7 +469,7 @@ namespace UI.Game2D
                 var b = d.buttons[i]; var r = _btnR[i]; bool hv = i == _hoverBtn;
                 p.Sprite(b.primary ? Game2DKit.Go : Game2DKit.Btn, r.x, r.y, r.width, r.height);
                 if (hv) p.Rect(r.x, r.y + r.height - 1, r.width, 1, Game2DKit.Amber);
-                Game2DJpFont.Draw(p, b.label, r.x + (r.width - Game2DJpFont.Width(b.label)) / 2, r.y + 3, Game2DKit.Ink);
+                Game2DJpFont.Draw(p, b.label, r.x + (r.width - Game2DJpFont.Width(b.label)) / 2, r.y + JBtnDy, Game2DKit.Ink);
             }
             // 足元 (トーストが優先)
             string foot = _toast.Length > 0 ? _toast : d.footer;

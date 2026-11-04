@@ -202,7 +202,7 @@ public static class Game2DBuilder
         var boot = cgo.AddComponent<Game2DBoot>();
         boot.lcd = quadGo != null ? quadGo.GetComponent<UI.Lcd.LcdScreen>() : null;
         boot.lcdSurface = quadGo != null ? quadGo.GetComponent<MeshRenderer>() : null;
-        boot.font = AssetDatabase.LoadAssetAtPath<TMPro.TMP_FontAsset>("Assets/TextMesh Pro/Fonts/mihiPixelmoji_v1.asset");
+        // フォントは UI.GameFont (ゲーム全体で 1 か所の指定) が持つ。 ここでは割り当てない
 
         // --- 液晶の効果 (最前面・クリックは通す) ---
         const string matPath = "Assets/Settings/Game2DLcdFx.mat";
@@ -248,7 +248,7 @@ public static class Game2DBuilder
         hud.gold = goldPot; hud.radar = radar; hud.resBar = resBar; hud.panel = navPanel;
         hud.navOnly = navOnly.gameObject; hud.battleOnly = battleOnly.gameObject; hud.battleHud = battleHud; hud.battleSim = battleSim; hud.extras = extras; hud.root = hudRoot.gameObject;
 
-        // --- 液晶の Quad: 残像・湾曲・横線ノイズ・画素の格子・にじみ (Game2D/LcdScreen)。 旧 Lcd/Scanline は使わない ---
+        // --- 液晶の Quad: 走査線・湾曲・色収差・ブルーム・ノイズ + 点灯の瞬間の残像 (Game2D/LcdScreen)。 ビネットは外枠まで覆う Game2D/LcdFx ---
         if (quadGo != null)
         {
             const string qm = "Assets/Settings/Game2DLcdScreen.mat";
@@ -265,7 +265,7 @@ public static class Game2DBuilder
         var cam = GameObject.Find("Main Camera").GetComponent<Camera>();
         var quad = GameObject.Find("Quad").transform;
         var screen = cgo.AddComponent<Game2DScreen>();
-        screen.screenCamera = cam; screen.lcdQuad = quad; screen.canvas = canvas; screen.gridRoot = presentGrid; screen.fxMaterial = fxMat; mapView.screen = screen; navPanel.screen = screen; battleHud.screen = screen; modal.screen = screen; extras.screen = screen;
+        screen.screenCamera = cam; screen.lcdQuad = quad; screen.canvas = canvas; screen.gridRoot = presentGrid; mapView.screen = screen; navPanel.screen = screen; battleHud.screen = screen; modal.screen = screen; extras.screen = screen;
         screen.Apply();
 
         // 開発用のデバッグ表示 (左上の文字) は、 液晶の作図と重なるので切る (キー操作は GameManager 側)

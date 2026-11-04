@@ -23,8 +23,6 @@ namespace UI.Game2D
         public Canvas canvas;
         [Tooltip("480×270 の格子の根 (Canvas の子・中央に置く)")]
         public RectTransform gridRoot;
-        [Tooltip("画面の仕上げ (Game2D/LcdFx) のマテリアル。 RT の大きさを流す")]
-        public Material fxMaterial;
         [Tooltip("エディタだけ、 整数倍にせず Game ビューいっぱいに合わせる (ビルドでは常に整数倍)")]
         public bool fitInEditor = true;
 
@@ -77,7 +75,6 @@ namespace UI.Game2D
                     scaler.scaleFactor = PixelsPerGuiDot;
                 }
             }
-            if (fxMaterial != null) fxMaterial.SetVector("_RtSize", new Vector4(RtWidth, RtHeight, 0, 0));
             if (gridRoot != null)
             {
                 gridRoot.anchorMin = gridRoot.anchorMax = new Vector2(0.5f, 0.5f);

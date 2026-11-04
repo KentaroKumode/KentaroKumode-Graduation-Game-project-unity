@@ -72,6 +72,26 @@ namespace UI.Game2D
         public static int IconIndex(string name) { Init(); if (_atlas == null || name == null) return -1; return System.Array.IndexOf(_iconNames, name); }
         public static KitSrc Atlas { get { Init(); return _atlas; } }
 
+        private static readonly Dictionary<string, KitSrc> _itemIcons = new Dictionary<string, KitSrc>();
+        /// <summary>品のアイコン (Resources/Icons/Items/&lt;id&gt;.png・16×16)。 無ければ null。 読み出しは 1 品 1 回。</summary>
+        public static KitSrc ItemIcon(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return null;
+            if (_itemIcons.TryGetValue(id, out var s)) return s;
+            var t = Resources.Load<Texture2D>("Icons/Items/" + id);
+            if (t != null && !t.isReadable)          // 取り込みで読み出し不可でも、 一度描き写して読む
+            {
+                var rt = RenderTexture.GetTemporary(t.width, t.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+                var prev = RenderTexture.active; Graphics.Blit(t, rt); RenderTexture.active = rt;
+                var c = new Texture2D(t.width, t.height, TextureFormat.RGBA32, false); c.ReadPixels(new Rect(0, 0, t.width, t.height), 0, 0); c.Apply(false);
+                RenderTexture.active = prev; RenderTexture.ReleaseTemporary(rt);
+                s = KitSrc.From(c); Object.Destroy(c);
+            }
+            else s = KitSrc.From(t);
+            _itemIcons[id] = s;
+            return s;
+        }
+
         // 3×5 の字に無い記号
         private static readonly Dictionary<char, string> Extra = new Dictionary<char, string>
         {

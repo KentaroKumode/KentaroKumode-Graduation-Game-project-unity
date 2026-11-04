@@ -42,16 +42,20 @@ namespace UI.Game2D
         // ── 点の絵・色 ──
         private enum Ico { Unknown, Done, Normal }
 
+        // 点の色 (2026-11-02): 青白い。 線・文字の生成りのインクとは別にした。 液晶の仕上げの寒色の乗算 (赤を落とす) が掛かった後で青白く見える値。
+        //   未到達 (疑問符) も到達済みの点と同じ色。 使い切った点は暗転 (暗い青灰)。
+        private static readonly Color32 NodeInk = Hex("#e6f2fa"), NodeHot = Hex("#f0f8ff"), NodeDone = Hex("#364255");
+
         private string[] IconFor(FreeMapSim sim, int i, out Color32 col)
         {
             var lay = sim.Layout; var t = lay.types[i];
             bool isStart = i == lay.start, isGoal = i == lay.goal;
             bool known = sim.Known[i] || isStart || isGoal;
-            col = _lc.mid;
-            if (!known) return IcoUnknown;                                   // 種別が分からない点 = 疑問符
-            // 種別の絵 (使い切った点も同じ絵で、 暗い色にするだけ)
-            string[] icon; col = _lc.hi;
-            if (isStart) { col = _lc.hot; icon = IcoStart; }
+            col = NodeInk;
+            if (!known) return IcoUnknown;                                   // 種別が分からない点 = 疑問符 (色は到達済みと同じ)
+            // 種別の絵 (使い切った点も同じ絵で、 暗転させるだけ)
+            string[] icon; col = NodeInk;
+            if (isStart) { col = NodeHot; icon = IcoStart; }
             else if (isGoal) { col = _lc.red; icon = IcoExit; }
             else switch (t)
             {
@@ -62,11 +66,11 @@ namespace UI.Game2D
                 case TileType.Rest: icon = IcoRest; break;
                 case TileType.Treasure: icon = IcoTreasure; break;
                 case TileType.Boss: case TileType.Gate: col = _lc.red; icon = IcoExit; break;
-                case TileType.Outpost: col = _lc.hot; icon = IcoStart; break;
+                case TileType.Outpost: col = NodeHot; icon = IcoStart; break;
                 case TileType.SupplyDepot: icon = IcoDepot; break;
                 default: icon = IcoDone; break;
             }
-            if (sim.Done[i] && t != TileType.Shop && !isStart && !isGoal) col = _lc.dim;
+            if (sim.Done[i] && t != TileType.Shop && !isStart && !isGoal) col = NodeDone;      // 使い切った点 = 暗転
             return icon;
         }
 

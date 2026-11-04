@@ -54,7 +54,7 @@ namespace ItemSystem.PassiveSkills.Keywords
 
         /// <summary>臨界を n 溜める。 閾値をまたいだら爆発を決め、 出来事を配る。
         /// 爆発は次の攻撃に乗る (CombatManager が <see cref="BurstCountKey"/> を見て使う)。
-        /// 〈帳簿外の連爆〉(rinkaiMultiBurst) があれば臨界を閾値ぶんだけ減らし、 溜まっている限り何度でも爆発する。</summary>
+        /// 〈帳簿外の爆薬〉(rinkaiMultiBurst) があれば臨界を閾値ぶんだけ減らし、 溜まっている限り何度でも爆発する。</summary>
         public static void AddHeat(CombatContext ctx, int n)
         {
             if (ctx == null || n <= 0 || ctx.rinkaiThreshold <= 0) return;

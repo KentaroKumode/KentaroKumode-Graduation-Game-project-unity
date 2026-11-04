@@ -493,7 +493,7 @@ OnPreDealDamage で `mutualAttackBonus` を足しても**一切乗らない**。
 
 | 名称 | レア | Trigger | 効果(ctx/run操作) |
 |---|---|---|---|
-| 切り分けた帯封 | B | OnFloorEnter | 層に入るたび ゴールド +6 |
+| 黄金色の封蝋 | B | OnFloorEnter | 層に入るたび ゴールド +6 |
 | 佯狂者の杖・衣・冠 | — | OnRoll | 発狂中のセット効果（物資・ADR-0002） |
 
 > **2026-10-31 アイテム再編で移した品**: 巡礼の杖・希望の灯片・旅靴/白靴・天秤・鋼の心臓・災厄の指輪・無害灯・幸運の硬貨・相棒の魂は
@@ -565,7 +565,7 @@ Passive カテゴリのシナジー武器群。4枚がインベントリに揃�
 | 出来事 (トリガー) | 出る場所 | 量 |
 |---|---|---|
 | OnRinkaiBurst | Kw.AddHeat が閾値をまたいだとき | その爆発で使った臨界 |
-| OnChargeGain / OnOvercharge | CombatContext.AddCharge | 増えた分 / 上限で捨てた分 (〈雷壺〉はターン開始時に上限超過の半分を捨てる) |
+| OnChargeGain / OnOvercharge | CombatContext.AddCharge | 増えた分 / 上限で捨てた分 (〈雷壷〉はターン開始時に上限超過の半分を捨てる) |
 | OnChargeSpend | CombatContext.ConsumeCharge (リロールも通る) | 使った分 |
 | OnShieldGain | consShield の setter (増えたときだけ) | 増えた分 |
 | OnShieldAbsorb / OnShieldBreak | Kw.AbsorbShield (敵の直接攻撃と軽減無視の肩代わり) | 吸収した分 / 割られる前の量 |
@@ -742,6 +742,12 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                             癒し (healAmount 2 / 6・T4 は HP 上限超過分をシールド)
            富             … RunState.roleGoldBonusPct (+5% / +30%) を勝利報酬の割合先に掛ける
 
+攻撃しないターン (攻撃端子 0 本 / 逃げる・2026-11-04 修正)
+         atkBase = 0・追撃 0 に加えて、 ApplyWinDamageModifiers の後で **主攻撃 dealtDmg = 0・会心なし**。
+         (旧: ProcessDamage の damageBonus バフと OnPreDealDamage のパッシブが主攻撃へ加算し、 攻撃しないターンに 1 以上入っていた)
+         役の追撃も乗せない。 攻撃端子 0 本のターンは固定ダメ枠 (反撃・出血・毒・〈虚空〉など) を通す。
+         **逃げるターンは固定ダメ枠も 0** (臨界爆発・品が預けた分を含む・爆発の予約は消費される)。 出血の DOT は別の段なので入る。
+
 自攻撃   atkBase   = playerAttackPower + Σ(attack 端子の出目) + ctx.mutualAttackBonus
          → 臨界爆発 (予約消費): rinkaiBurstActive なら fixedDamageToEnemy += rinkaiBurstDamage
            (rinkaiCritOnBurst なら forceCritical=true。消費後 false に戻す)
@@ -804,7 +810,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            品が溜める分 (被弾・充電・会心・毒のダメージ・移動・開幕) はその出来事の時点で同じ関数を通る。
          meter >= rinkaiThreshold (基準50 /〈早沸かし釜〉で35) をまたいだ瞬間に爆発が決まる
            → 次の攻撃に乗る予約 (rinkaiBurstActive=true・回数 Kw.BurstCountKey)、 meter = 0、 OnRinkaiBurst を配る。
-           〈帳簿外の連爆〉(rinkaiMultiBurst): meter を閾値ぶんだけ減らし、 溜まっている限り同じ処理で何度でも爆発する。
+           〈帳簿外の爆薬〉(rinkaiMultiBurst): meter を閾値ぶんだけ減らし、 溜まっている限り同じ処理で何度でも爆発する。
          爆発 flat = rinkaiBurstDamage (基準50) × 回数 ＋ Kw.BurstBonusKey (〈溢れ取りの鋳型〉: 閾値を超えた臨界 ×2)。
          〈二度目の打金〉: 爆発を使った次のターン、 その爆発ダメージの半分を固定ダメ枠へ。
          **2026-08-03 修正: 爆発は atkBase ではなく fixedDamageToEnemy へ入る。**

@@ -257,6 +257,41 @@ namespace UI.Game2D.Battle
             phase = P.PRoll; t = 0; rolled = false; SyncDecision(cm, false); Touch();
         }
 
+        // ── 消耗品・逃げる (配線の判断の間だけ) ──
+
+        /// <summary>この戦闘で逃げられるか (層のボス・イベント戦は不可)。</summary>
+        public bool CanFlee
+        {
+            get
+            {
+                var cm = CombatManager.Instance; var e = GameManager.Instance?.CurrentEnemy;
+                return CanOperate && cm != null && cm.FleeAllowed && !cm.FleeRequested && (e == null || !BossIds.IsBoss(e.id));
+            }
+        }
+
+        /// <summary>逃げると宣言して、 このターンを解決する (こちらは攻撃せず、 敵の予告攻撃をブロックで受けて離脱)。</summary>
+        public bool Flee()
+        {
+            var cm = CombatManager.Instance;
+            if (!CanFlee || !cm.RequestFlee()) return false;
+            Game2DSfx.Play("decide");
+            Button();      // 配線を渡してターンを進める (逃げのターンとして解決される)
+            return true;
+        }
+
+        /// <summary>配線の判断の間に消耗品を使う。 使えたら HP・充電の表示を写し直す。</summary>
+        public bool UseItem(string id)
+        {
+            var gm = GameManager.Instance; var cm = CombatManager.Instance;
+            if (!CanOperate || gm?.Run == null || cm == null) return false;
+            if (!Consumables.Use(gm.Run, id)) return false;
+            playerHp = cm.PlayerHP; playerMax = Mathf.Max(1, cm.PlayerMaxHP);
+            var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+            if (ctx != null) charge = ctx.GetCharge();
+            Touch();
+            return true;
+        }
+
         public void CycleWire(int i)
         {
             if (!CanOperate || i < 0 || i > 2) return;

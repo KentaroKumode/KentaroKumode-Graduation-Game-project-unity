@@ -17,8 +17,6 @@ namespace UI.Lcd
         [Header("配線")]
         [Tooltip("LCD コンテンツ用カメラ（LcdScreen.contentCamera と同じもの）")]
         public Camera contentCamera;
-        [Tooltip("タイトル/サブタイトルの TMP フォント（mihiPixelmoji_v1 等を推奨）")]
-        public TMP_FontAsset font;
 
         [Header("レイアウト")]
         [Tooltip("タイトルのフォントサイズ(world)")]
@@ -86,7 +84,7 @@ namespace UI.Lcd
             go.layer = ResolveContentLayer();
 
             var tmp = go.AddComponent<TextMeshPro>();
-            if (font != null) tmp.font = font;
+            GameFont.Apply(tmp);      // フォントはゲーム全体で 1 か所の指定
             tmp.fontSize = fontSize;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.enableWordWrapping = false;

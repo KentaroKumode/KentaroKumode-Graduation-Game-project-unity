@@ -24,7 +24,7 @@ namespace UI.ClassSelect
     /// スプライト/テキストはコードで自動生成 (見た目は無地パネル+文字のプレースホルダ)。
     /// ボタン入力は SpriteButton ── 画面直描きなら pointerCamera にそのカメラを、
     /// 液晶面越しなら LcdPointer 経由 (buttonsSelfRaycast=false) にする。
-    /// 日本語表示のため font に日本語対応 TMP_FontAsset を割り当てること (未指定は TMP 既定)。
+    /// 字のフォントは <see cref="GameFont"/> (ゲーム全体で 1 か所の指定)。
     /// </summary>
     public class ClassSelectView : MonoBehaviour
     {
@@ -43,8 +43,6 @@ namespace UI.ClassSelect
         public Camera rigCamera;
         [Tooltip("スプライトスキン (Tools→ClassSelect→Create Skin Asset で作成、 Resources 配下なら自動ロード)。 未設定の要素は無地プレースホルダ")]
         public ClassSelectSkinAsset skin;
-        [Tooltip("日本語対応 TMP フォント (未指定は TMP 既定 ── 日本語が豆腐になる場合はここを設定)")]
-        public TMP_FontAsset font;
         [Tooltip("false = LcdPointer から SetPointerOver で駆動 (液晶内 UI)。 true = 自前レイキャスト")]
         public bool buttonsSelfRaycast = true;
 
@@ -913,7 +911,7 @@ namespace UI.ClassSelect
             go.transform.SetParent(parent, false);
             go.transform.localPosition = DotPos(posDots, -0.01f);
             var tmp = go.AddComponent<TextMeshPro>();
-            if (font != null) tmp.font = font;
+            GameFont.Apply(tmp);
             tmp.text = text;
             // TMP のワールド fontSize ≒ 文字高(ワールド単位)×10 → dot 指定から換算
             tmp.fontSize = fontSizeDots * dotWorldSize * 10f;

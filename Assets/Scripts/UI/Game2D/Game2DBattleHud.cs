@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using GameLoop;
 using UnityEngine;
 using UnityEngine.UI;
 using UI.Game2D.Battle;
@@ -17,7 +19,8 @@ namespace UI.Game2D
         private static readonly RectInt Left = new RectInt(2, 52, 86, 198), Right = new RectInt(392, 56, 86, 112), Top = new RectInt(96, 2, 288, 44);
         private const int FrameB = 12;
         // 左パネルの中 (パネルの左上が原点): 枠の内側は x 14〜72
-        private static readonly RectInt Btn = new RectInt(15, 154, 56, 24), RerollR = new RectInt(15, 122, 56, 16);
+        private static readonly RectInt Btn = new RectInt(15, 154, 56, 24), RerollR = new RectInt(15, 122, 56, 16),
+            ItemR = new RectInt(15, 140, 27, 12), FleeR = new RectInt(44, 140, 27, 12);      // 消耗品 / 逃げる (配線の判断の間だけ)
         private static RectInt DieR(int i) => new RectInt(15, 20 + i * 24, 18, 18);
         private static RectInt TermR(int i) => new RectInt(36, 20 + i * 24, 36, 18);
 
@@ -87,6 +90,8 @@ namespace UI.Game2D
         {
             for (int i = 0; i < 3; i++) if (In(d, Left, DieR(i)) || In(d, Left, TermR(i))) { sim.CycleWire(i); return; }
             if (In(d, Left, RerollR)) { sim.Reroll(); return; }
+            if (In(d, Left, ItemR)) { OpenItems(); return; }
+            if (In(d, Left, FleeR)) { if (_fleeArmed) { _fleeArmed = false; if (!sim.Flee()) Game2DSfx.Play("ui_click"); } else if (sim.CanFlee) { _fleeArmed = true; _drawn = -1; } return; }
             if (In(d, Left, Btn)) { if (sim.ButtonEnabled) sim.Button(); }
         }
 
@@ -156,13 +161,64 @@ namespace UI.Game2D
             if (Game2DKit.Tab != null) p.NineSlice(Game2DKit.Tab, 5, Well, RerollR.x, RerollR.y, RerollR.width, RerollR.height);
             else p.Box(RerollR.x, RerollR.y, RerollR.width, RerollR.height, Off, Dark);
             p.TextC(live && sim.canReroll ? "REROLL -" + sim.rerollCost : "REROLL", RerollR, rr ? Chg : Dim);
-            p.Text("BASE ATK " + (live ? sim.baseAtk : 0), 15, 141, Dim);
+            // 消耗品 / 逃げる (逃げるは 2 度押しで確定: SURE? → 押すとこのターンは攻撃せずに離脱)
+            if (!live || !sim.CanFlee) _fleeArmed = false;
+            bool itemOn = live && sim.CanOperate && CombatItems().Count > 0, fleeOn = live && sim.CanFlee;
+            SmallBtn(p, ItemR, "ITEM", itemOn, Chg);
+            SmallBtn(p, FleeR, _fleeArmed ? "SURE?" : "FLEE", fleeOn, _fleeArmed ? Atk : Ink);
             // 決定ボタン
             bool en = live && sim.ButtonEnabled; string lab = live ? sim.ButtonLabel : "...";
             if (_bGo != null) p.Sprite(_bGo, Btn.x, Btn.y, Btn.width, Btn.height);
             else p.Box(Btn.x, Btn.y, Btn.width, Btn.height, en ? new Color32(0x6d, 0x3a, 0x16, 255) : Off, Dark);
             p.TextC(lab, Btn, en ? Ink : Dim, 2);
             p.Apply(t);
+        }
+
+        private bool _fleeArmed;
+        private Game2DModal _modal;
+
+        private void SmallBtn(KitPix p, RectInt r, string label, bool on, Color32 col)
+        {
+            if (Game2DKit.Tab != null) p.NineSlice(Game2DKit.Tab, 5, Well, r.x, r.y, r.width, r.height);
+            else p.Box(r.x, r.y, r.width, r.height, Off, Dark);
+            p.TextC(label, r, on ? col : Dim);
+        }
+
+        /// <summary>戦闘中に使える消耗品 (囮罠は航行の道具なので除く)。 同じ品は 1 行にまとめる。</summary>
+        private static List<string> CombatItems()
+        {
+            var l = new List<string>(); var run = GameManager.Instance?.Run;
+            if (run?.ownedConsumables == null) return l;
+            foreach (var id in run.ownedConsumables)
+                if (!l.Contains(id) && ItemIds.ConsFamilyOf(id) != ItemIds.ConsLureFamily) l.Add(id);
+            return l;
+        }
+
+        /// <summary>消耗品を選んで使う窓 (配線の判断の間だけ)。 使うと窓を閉じ、 HP などの表示を写し直す。</summary>
+        private void OpenItems()
+        {
+            if (!sim.CanOperate) return;
+            if (_modal == null) _modal = FindObjectOfType<Game2DModal>();
+            var items = CombatItems(); var run = GameManager.Instance?.Run;
+            if (_modal == null || items.Count == 0 || run == null) { Game2DSfx.Play("ui_click"); return; }
+            var d = new ScreenDef { id = "battle_items", jp = true, title = "消耗品", sub = "HP " + sim.playerHp + "/" + sim.playerMax, w = 360 };
+            foreach (var id in items)
+            {
+                int n = 0; foreach (var c in run.ownedConsumables) if (c == id) n++;
+                var data = ItemSystem.ItemDatabase.Instance?.GetItem(id);
+                d.Items.Add(new ModalItem { name = data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : id, value = "x" + n, desc = data?.description });
+            }
+            d.buttons.Add(new ModalBtn { label = "使う", action = "use", primary = true });
+            d.buttons.Add(new ModalBtn { label = "閉じる", action = "close" });
+            d.footer = "使う品を選ぶ";
+            d.onAction = (a, sel) =>
+            {
+                if (a == "close") { _modal.Close(); return; }
+                if (a != "use" || sel < 0 || sel >= items.Count) return;
+                if (sim.UseItem(items[sel])) { Game2DSfx.Play("ui_confirm"); _modal.Close(); _drawn = -1; }
+                else _modal.ShowToast("今は使えない");
+            };
+            _modal.Open(d);
         }
 
         private void DrawRight(Texture2D t)

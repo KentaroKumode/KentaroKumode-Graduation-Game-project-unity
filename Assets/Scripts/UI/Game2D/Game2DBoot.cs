@@ -11,7 +11,7 @@ namespace UI.Game2D
     /// <para>システム自体の起動なので、 ゲームの演出 (光の線・閃光・ちらつき) は付けない。 実機の液晶がバックライトを点けるのと同じ、
     /// 一瞬の暗転のあとに、 明るさが<b>なめらかに単調に</b>上がるだけ (<c>_Power</c> = Quad のシェーダ)。</para>
     ///
-    /// <para>「TOUCH DISPLAY」は<b>液晶の中身として</b>描く (タイトルの液晶ゾーンに、 既存のピクセルフォント mihiPixelmoji で。 黒の覆いの前)。
+    /// <para>「TOUCH DISPLAY」は<b>液晶の中身として</b>描く (タイトルの液晶ゾーンに、 ゲームのフォント <see cref="GameFont"/> で。 黒の覆いの前)。
     /// だから、 画素の格子・ブルーム・ノイズなど液晶の効果がそのまま掛かる。 待っている間は BGM を止め (<c>AudioListener.pause</c>)・
     /// タイトルのボタンも押せない (<c>SpriteButton.InputLocked</c>)。 最初のクリックが後ろのボタンを押してしまわないため。 クリックの瞬間に BGM が始まる。</para>
     ///
@@ -21,7 +21,6 @@ namespace UI.Game2D
     {
         [Tooltip("液晶 (中身を描くカメラを持つ)")] public LcdScreen lcd;
         [Tooltip("液晶の Quad (_Power を入れる)")] public MeshRenderer lcdSurface;
-        [Tooltip("ピクセルフォント (既存: mihiPixelmoji_v1)")] public TMP_FontAsset font;
         public bool enableBoot = true;
         [Min(0.3f), Tooltip("点灯の長さ (秒)。 暗転 → バックライトが上がる")] public float bootSeconds = 1.5f;
         [Min(1f), Tooltip("文字の高さ (液晶の dot・ 1 dot = 4 RT 画素)")] public float fontSizeDots = 8f;
@@ -100,7 +99,7 @@ namespace UI.Game2D
             _promptGo = new GameObject("BootPrompt"); _promptGo.layer = layer;
             _promptGo.transform.position = basePos - cam.transform.forward * 0.5f; _promptGo.transform.rotation = cam.transform.rotation;
             _prompt = _promptGo.AddComponent<TextMeshPro>();
-            if (font != null) _prompt.font = font;
+            GameFont.Apply(_prompt);
             float dotWorld = cam.orthographicSize * 2f / (Game2DLayout.Height / 2f);   // 液晶の 1 dot (タイトルの絵と同じ 4 画素) = ワールドの大きさ。 縦 540 画素 ÷ 4 = 135 (旧 556 画素の頃の 139 は 3.9 画素になっていた)
             _prompt.fontSize = fontSizeDots * dotWorld * 10f;            // TMP のワールド fontSize ≒ 文字高 (ワールド単位) × 10
             _prompt.alignment = TextAlignmentOptions.Center;

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using GameLoop;
 using MapSystem.FreeMove;
 using UnityEngine;
@@ -9,6 +10,7 @@ namespace UI.Game2D
     /// 航行の計器の足りない分 (<b>仮置き</b>・2026-10-24)。 docs/design/gui-needed.md の「未実装」の航行の項目を、 枠・ボタンの仮の絵と文字で並べたもの。
     /// 上の帯 = 天気 (今)・層 (今の層 / 最終層)・警告ランプ (追跡者が警戒・追跡中で点灯)・待つボタン / 左下 = 職業・状態異常・消耗品・パッシブ / 右 = 航行アイテムの枠 3 つ・脱出ボタン。
     /// 層・追跡者・天気・所持数は実際の値、 そのほか (職業名・状態異常・アイテム枠) は見本。 戦闘中は 3 方向へ引っ込む (<see cref="Drive"/>)。
+    /// <para>操作 (2026-11-04): 上の帯の [WAIT] = 待つ (その場で 1 手番・Space と同じ) / 左下の ITEMS の欄 = 所持品の窓 (消耗品を使う・パッシブを見る)。</para>
     /// </summary>
     public class Game2DNavExtras : MonoBehaviour
     {
@@ -18,6 +20,14 @@ namespace UI.Game2D
         private Texture2D _tt, _tl;
         private static readonly RectInt TopR = new RectInt(96, 0, 104, 24), LeftR = new RectInt(0, 227, 100, 43);
         private int _hash = int.MinValue; private float _next; private float _e;
+        private static readonly RectInt WaitR = new RectInt(66, 4, 32, 16);      // 上の帯の中 (帯の左上が原点)
+        private static bool _shown;
+        private bool _invPassives; private int _invPage;
+        private const int InvPerPage = 10;
+
+        /// <summary>この dot (GUI の 480×270) がボタン・計器の上か (地図のクリック・ドラッグに渡さない)。</summary>
+        public static bool Consumes(Vector2 d) => _shown && (In(d, TopR) || In(d, LeftR));
+        private static bool In(Vector2 d, RectInt r) => d.x >= r.x && d.x < r.x + r.width && d.y >= r.y && d.y < r.y + r.height;
 
         public void Build()
         {
@@ -42,7 +52,7 @@ namespace UI.Game2D
             if (_top == null) return;
             _top.anchoredPosition = new Vector2(TopR.x, -TopR.y + Mathf.Round(e * 30f));
             _left.anchoredPosition = new Vector2(LeftR.x - Mathf.Round(e * 100f), -LeftR.y);
-            bool show = e < 0.995f;
+            bool show = e < 0.995f; _shown = e < 0.05f;
             foreach (var rt in new[] { _top, _left }) rt.gameObject.SetActive(show);
         }
 
@@ -52,12 +62,68 @@ namespace UI.Game2D
             var gm = GameManager.Instance; if (gm == null) return;
             var sim = gm.CurrentPhase == GameManager.GamePhase.MapNavigation ? gm.FreeMap : null;
             var run = gm.Run;
+            if (sim != null && !Game2DModal.Active && !Game2DLoadingScreen.Blocking && Input.GetMouseButtonDown(0) && screen != null && Game2DPointer.TryDot(screen, out var dot))
+            {
+                if (In(dot, new RectInt(TopR.x + WaitR.x, TopR.y + WaitR.y, WaitR.width, WaitR.height))) { if (gm.WaitTurn()) Game2DSfx.Play("ui_click"); }
+                else if (In(dot, LeftR)) OpenInventory(gm);
+            }
             int floor = run != null ? run.currentFloor : 1, passives = run?.ownedPassiveItems?.Count ?? 0, cons = run?.ownedConsumables?.Count ?? 0;
             int weather = sim != null ? (int)sim.Weather : 0, foe = sim != null && sim.HasFoe && sim.FoeAlive ? (int)sim.FoeMode : -1;
             int h = floor * 7 + passives * 31 + cons * 131 + weather * 17 + (foe + 2) * 1009;
             if (h == _hash && Time.unscaledTime < _next) return;
             _hash = h; _next = Time.unscaledTime + 0.5f;
             Redraw(floor, passives, cons, weather, foe);
+        }
+
+        // ── 所持品の窓 (航行中) ──
+        //   消耗品: 選んで使う (回復はその場で・シールドや油は次の戦闘の開幕へ・囮罠はこの点に置く)。 パッシブ: 説明を読む。 頁で送る。
+
+        private void OpenInventory(GameManager gm)
+        {
+            if (modal == null || gm.Run == null) return;
+            _invPassives = false; _invPage = 0;
+            modal.Open(Inventory(gm));
+        }
+
+        private ScreenDef Inventory(GameManager gm)
+        {
+            var run = gm.Run;
+            var ids = new List<string>();
+            var src = _invPassives ? run.ownedPassiveItems : run.ownedConsumables;
+            if (src != null) foreach (var id in src) if (_invPassives || !ids.Contains(id)) ids.Add(id);
+            int pages = Mathf.Max(1, (ids.Count + InvPerPage - 1) / InvPerPage); _invPage = Mathf.Clamp(_invPage, 0, pages - 1);
+            int first = _invPage * InvPerPage, cnt = Mathf.Min(InvPerPage, ids.Count - first);
+            var d = new ScreenDef { id = "inventory_jp", jp = true, w = 460, cols = 2,
+                title = _invPassives ? "所持品 ― パッシブ" : "所持品 ― 消耗品",
+                sub = "HP " + run.playerHP + "/" + run.playerMaxHP + "  物資 " + run.provision + "/" + run.provisionCap + "  " + run.coins + "G" };
+            for (int i = 0; i < cnt; i++)
+            {
+                string id = ids[first + i]; var data = ItemSystem.ItemDatabase.Instance?.GetItem(id);
+                int n = 0; if (!_invPassives) foreach (var c in run.ownedConsumables) if (c == id) n++;
+                d.Items.Add(new ModalItem { name = data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : id, value = _invPassives ? null : "x" + n, desc = data?.description });
+            }
+            if (ids.Count == 0) d.body = _invPassives ? "パッシブを持っていない。" : "消耗品を持っていない。";
+            if (!_invPassives) d.buttons.Add(new ModalBtn { label = "使う", action = "use", primary = true });
+            d.buttons.Add(new ModalBtn { label = _invPassives ? "消耗品へ" : "パッシブへ", action = "tab" });
+            if (pages > 1) d.buttons.Add(new ModalBtn { label = "次の頁 " + (_invPage + 1) + "/" + pages, action = "page" });
+            d.buttons.Add(new ModalBtn { label = "閉じる", action = "close" });
+            d.footer = _invPassives ? "パッシブ " + ids.Count + " 個" : "使う品を選ぶ (シールド・油は次の戦闘の開幕に効く)";
+            d.onAction = (a, sel) =>
+            {
+                switch (a)
+                {
+                    case "close": modal.Close(); return;
+                    case "tab": _invPassives = !_invPassives; _invPage = 0; break;
+                    case "page": _invPage = (_invPage + 1) % pages; break;
+                    case "use":
+                        if (sel < 0 || sel >= cnt) return;
+                        if (Consumables.Use(run, ids[first + sel])) { Game2DSfx.Play("ui_confirm"); modal.ShowToast("使った"); }
+                        else { modal.ShowToast("今は使えない"); return; }
+                        break;
+                }
+                modal.Replace(Inventory(gm));
+            };
+            return d;
         }
 
         private static void Ensure(ref Texture2D tex, RectTransform rt, RectInt r)
@@ -94,7 +160,9 @@ namespace UI.Game2D
             p.AnyIcon(weather >= 0 && weather < WeatherIcons.Length ? WeatherIcons[weather] : "still", 3, 3, 18, Game2DKit.Ink);
             p.Text("WX", 24, 5, Game2DKit.Dim); p.Text(wn, 38, 5, weather == 0 ? Game2DKit.Ink : Game2DKit.Amber);
             p.Text("NEXT", 24, 13, Game2DKit.Dim); p.Text("???", 44, 13, Game2DKit.Faint);                // 予報は物資の段階で精度が変わる (未接続)
-            for (int i = 0; i < 6; i++) p.Rect(68 + i * 5, 14, 4, 3, i < 3 ? Game2DKit.Blue : Game2DKit.Off);      // 気圧計 (見本)
+            // 待つ (その場で 1 手番)。 旧: 見本の気圧計
+            if (Game2DKit.Tab != null) p.NineSlice(Game2DKit.Tab, 5, Game2DKit.Well, WaitR.x, WaitR.y, WaitR.width, WaitR.height); else p.Box(WaitR.x, WaitR.y, WaitR.width, WaitR.height, Game2DKit.Off, Game2DKit.Dark);
+            p.TextC("WAIT", WaitR, Game2DKit.Ink);
             p.Apply(_tt);
             // ── 左下 (所持品: 消耗品とパッシブを 1 つの欄にまとめる。 状態異常は戦闘の表示) ──
             p = new KitPix(LeftR.width, LeftR.height);

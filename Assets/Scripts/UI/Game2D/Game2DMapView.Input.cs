@@ -85,7 +85,7 @@ namespace UI.Game2D
             float wheel = Input.mouseScrollDelta.y;
             if (wheel != 0f && inside && Time.unscaledTime - _wheelAt >= 0.14f) { _wheelAt = Time.unscaledTime; ZoomTo(_zoom + (wheel > 0 ? 1 : -1)); }
 
-            bool consumes = inside && panel != null && panel.Consumes(d.x, d.y);
+            bool consumes = inside && ((panel != null && panel.Consumes(d.x, d.y)) || Game2DNavExtras.Consumes(d));      // ボタン・計器の上のクリックは地図へ渡さない
             var dm = ScreenToMapDot(d);                                  // 地図の点の判定は、 湾曲を戻した位置で行う
 
             // ドラッグ (拡大中・ボタンの上でないところから)

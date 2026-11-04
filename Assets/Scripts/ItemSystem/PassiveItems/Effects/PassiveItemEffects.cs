@@ -28,13 +28,13 @@ namespace ItemSystem.PassiveItems.Effects
     public class RoadMoneyBandEffect : ITimedEffect
     {
         private const int Gain = 6;
-        public string Id => "切り分けた帯封";
+        public string Id => "黄金色の封蝋";
         public TimedEffectTrigger Trigger => TimedEffectTrigger.OnFloorEnter;
 
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat)
         {
             if (run == null) return;
-            GameLoop.GoldIncome.Gain(run, Gain, "切り分けた帯封");
+            GameLoop.GoldIncome.Gain(run, Gain, "黄金色の封蝋");
             Debug.Log($"[PassiveItem] 道銭の帯封: 層突入 ゴールド+{Gain} (所持 {run.coins})");
         }
     }

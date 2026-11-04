@@ -28,10 +28,8 @@ namespace UI.SkillTree
         public GameObject menuToHide;
         [Tooltip("戻るボタン（selfRaycast=false 推奨）")]
         public SpriteButton backButton;
-        [Tooltip("トークン残高/次コストの表示（任意）。TMP_Text なのでピクセルアート TMP フォント(mihiPixelmoji_v1) を割り当てる。")]
+        [Tooltip("トークン残高/次コストの表示（任意）。 フォントは GameFont (ゲーム全体で 1 か所の指定) に揃える。")]
         public TMP_Text infoText;
-        [Tooltip("infoText に強制適用するピクセルアート TMP フォント（item preview と同じ mihiPixelmoji_v1）。未指定なら infoText 側の設定を尊重。")]
-        public TMP_FontAsset infoFont;
         [Tooltip("infoText 自動生成時のフォントサイズ(world)。 既存 TMP には適用しない。")]
         public float infoFontSize = 8f;
         [Tooltip("デバッグ: Info テキスト GO を強制非表示にして □ の出所を切り分ける。")]
@@ -40,20 +38,12 @@ namespace UI.SkillTree
         [Header("ノード情報ウィンドウ (skilltree_window)")]
         [Tooltip("ノードクリック時に画面下に開くウィンドウ背景 sprite (BUFF モード用)。")]
         public Sprite skilltreeWindowSprite;
-        [Tooltip("DEBUFF モードのノードクリック時に開くウィンドウ背景 sprite。 未指定なら BUFF と同じ sprite を流用。")]
-        public Sprite skilltreeDebuffWindowSprite;
         [Tooltip("ウィンドウの sortingOrder (前景なのでノードより大きく)。")]
         public int windowOrder = 20;
-        [Tooltip("上段 (タイトル) 用 TMP フォント (未指定なら infoFont を流用)。")]
-        public TMP_FontAsset windowFont;
-        [Tooltip("下段 (説明) 用 TMP フォント (未指定なら windowFont → infoFont の順でフォールバック)。")]
-        public TMP_FontAsset windowDescFont;
         [Tooltip("上段 (ノード名) のフォントサイズ (world)。")]
         public float windowTitleFontSize = 2.4f;
         [Tooltip("上段 (ノード名) の色 ─ BUFF モード用。")]
         public Color windowTitleColor = new Color(1.00f, 0.95f, 0.70f, 1f);
-        [Tooltip("上段 (ノード名) の色 ─ DEBUFF モード用 (デバフ側のタイトルにのみ適用)。")]
-        public Color windowDebuffTitleColor = new Color(0.55f, 0.85f, 1.00f, 1f);
         [Tooltip("下段 (効果説明) のフォントサイズ (world)。")]
         public float windowDescFontSize = 1.6f;
         [Tooltip("下段 (効果説明) の色。")]
@@ -199,63 +189,6 @@ namespace UI.SkillTree
         [Tooltip("最終ノード (Lv58 final) を最後から2番目から余分に離す距離(world)。 通常セグメント長に加算される。")]
         public float finalNodeExtraGap = 6f;
 
-        [Header("メタデバフ拡張 (深淵モード)")]
-        [Tooltip("ON: BUFF 下端到達後の追加スクロールで DEBUFF モードへ切替できるようになる。")]
-        public bool debuffSectionEnabled = true;
-        [Tooltip("深淵モード専用の背景 (縦長 PNG)。 BUFF 背景とは別レンダで完全分離。")]
-        public Sprite debuffBackgroundSprite;
-        [Tooltip("深淵背景の sortingOrder。")]
-        public int debuffBackgroundOrder = 4;
-        [Header("メタデバフ ノードアイコン (Lv1〜Lv10)")]
-        [Tooltip("Lv1 困窮した商隊 (ショップ価格 +25%)")]              public Sprite iconDebuffLv1;
-        [Tooltip("Lv2 俊敏 (敵が最初の被弾を必ず回避)")]                 public Sprite iconDebuffLv2;
-        [Tooltip("Lv3 向かい風 (敵への与ダメ -1)")]                      public Sprite iconDebuffLv3;
-        [Tooltip("Lv4 前途多難 (マップ視界 -2)")]                         public Sprite iconDebuffLv4;
-        [Tooltip("Lv5 偽の商人 (ショップ 30% で偽商人化)")]               public Sprite iconDebuffLv5;
-        [Tooltip("Lv6 死神の影 (3層突入時に恒久デバフ +1)")]              public Sprite iconDebuffLv6;
-        [Tooltip("Lv7 補給断絶 (前哨基地回復上限 50%)")]                  public Sprite iconDebuffLv7;
-        [Tooltip("Lv8 絶望的な進軍 (移動毎に物資 -1)")]                   public Sprite iconDebuffLv8;
-        [Tooltip("Lv9 鋼の皮膚 (敵が初回致命傷を HP1 で耐える)")]         public Sprite iconDebuffLv9;
-        [Tooltip("Lv10 天変地異 (final / 敵ダメ+100% / 1層恒久 / ラスタン無効)")] public Sprite iconDebuffLv10;
-        [Tooltip("DEBUFF ノード間の一定縦間隔 (world)。 全ノード直線等間隔で配置。")]
-        public float debuffNodeSpacing = 4f;
-        [Tooltip("DEBUFF 最終ノード (Lv10) より先に余分にスクロールできる距離 (world)。 背景の下端を画面内で見せるため。")]
-        public float debuffEndExtraScroll = 8f;
-        [Tooltip("BUFF 下端 / DEBUFF 上端を超えてスクロールを継続したとき、 この距離 (world) 蓄積で モード切替トランジションが発生する。")]
-        public float overscrollThreshold = 10f;
-        [Tooltip("ホイール停止後、 オーバースクロール蓄積を 0 に減衰させる速度 (world/秒)。")]
-        public float overscrollDecay = 12f;
-        [Tooltip("モード切替直後にホイール入力を抑制する時間 (秒)。 0 で抑制なし。")]
-        public float postTransitionLockDuration = 1.0f;
-        [Tooltip("抑制期間中のホイール速度倍率 (0=完全無視、 1=通常)。 0〜0.2 推奨。")]
-        [Range(0f, 1f)] public float postTransitionScrollScale = 0.0f;
-        [Tooltip("有効化中 (activeDebuffs に含まれる) ノードの色。 青背景に焼き付く氷シアン。")]
-        public Color debuffActiveColor = new Color(0.45f, 0.85f, 1.00f, 1f);
-        [Tooltip("未有効化ノードの色。 沈降した深青。 バフ未開放 (水色) よりも一段深く濁る方向。")]
-        public Color debuffInactiveColor = new Color(0.25f, 0.35f, 0.50f, 1f);
-        [Tooltip("デバフノード間の連結線 (active)。 アイスシアン。")]
-        public Color debuffLineActiveColor = new Color(0.50f, 0.85f, 1.00f, 0.85f);
-        [Tooltip("デバフノード間の連結線 (inactive)。 深青フェード。")]
-        public Color debuffLineInactiveColor = new Color(0.20f, 0.30f, 0.45f, 0.35f);
-        [Tooltip("デバフノードの当たり判定一辺 (world)。 0 以下でスプライト矩形に従う。")]
-        public float debuffNodeHitSize = 5f;
-
-        [Header("メタデバフ ノードの脈動 (水面波紋シェーダー)")]
-        [Tooltip("ON: 中心から外向きに広がる波紋シェーダーを Lv に応じた振幅で適用する。 全 Lv 共通の周期。 明滅なし。")]
-        public bool debuffPulseEnabled = true;
-        [Tooltip("脈動の周期 (秒)。 1 周期で 1 波が中心から外周へ広がる。")]
-        public float debuffRipplePeriod = 1.6f;
-        [Tooltip("脈動終了後、 次の脈動が始まるまでの待機時間 (秒)。 0 で連続。 2.0 なら 「波が消えた後 2 秒静止 → 次の波」 のリズム。")]
-        public float debuffRippleInterval = 1.0f;
-        [Tooltip("Lv1 の波紋強度 (UV ディスプレースメント振幅)。 パーフェクトピクセル時は texelサイズ未満 (32px なら 1/32≒0.031) で 0 px 動作になる。")]
-        [Range(0f, 0.30f)] public float debuffRippleStrengthLv1 = 0.031f;
-        [Tooltip("Lv10 の波紋強度。 capstone デバフほど大きく歪む。 32px sprite なら 0.125 で約 ±4px の swing。")]
-        [Range(0f, 0.30f)] public float debuffRippleStrengthLv10 = 0.031f;
-        [Tooltip("波紋シェーダーを使った Material (Custom/MetaDebuffRipple)。 アサインしないと波紋エフェクトが無効。")]
-        public Material debuffRippleMaterial;
-
-        public enum TreeMode { Buff, Debuff }
-
         [Header("描画順")]
         public int lineOrder = 6;
         public int nodeOrder = 8;
@@ -274,26 +207,12 @@ namespace UI.SkillTree
 
         // --- 内部 ---
         private Transform _bgRoot, _linesRoot, _nodesRoot;
-        private Transform _debuffBgRoot, _debuffLinesRoot, _debuffNodesRoot;
         private float _bgHalf;        // バフ背景の縦半幅(world)。 未使用時0。
         private float _bgLim;         // バフ BG スクロールクランプ幅。
-        private float _debuffBgHalf;  // デバフ背景の縦半幅(world)。
-        private float _debuffBgLim;   // デバフ BG スクロールクランプ幅。
         private readonly List<SpriteRenderer> _nodeSr = new List<SpriteRenderer>();
         private readonly List<SpriteButton> _nodeBtn = new List<SpriteButton>();
         private readonly List<Collider2D> _nodeCol = new List<Collider2D>();
         private readonly List<SpriteRenderer> _hitDebugSr = new List<SpriteRenderer>();
-        private readonly List<SpriteRenderer> _debuffNodeSr = new List<SpriteRenderer>();
-        private readonly List<BoxCollider2D> _debuffNodeCol = new List<BoxCollider2D>();
-        private readonly List<SpriteButton> _debuffNodeBtn = new List<SpriteButton>();
-        private readonly List<SpriteRenderer> _debuffLineSr = new List<SpriteRenderer>();
-
-        // モード状態
-        private TreeMode _currentMode = TreeMode.Buff;
-        private float _overscrollAccum;   // 現在モードの境界を超えた累積 (world)
-        private bool _transitioning;
-        private float _postTransitionLockUntil; // unscaledTime: この時刻まではホイール入力を抑制
-        private MaterialPropertyBlock _debuffMpb; // 波紋シェーダー用
 
         // ノード情報ウィンドウ
         private GameObject _windowGo;
@@ -302,10 +221,6 @@ namespace UI.SkillTree
         private TMP_Text _windowDescText;
         private bool _windowVisible;
         private int _windowCurrentBuffIdx = -1;   // 現在ウィンドウに表示中のバフノード idx (-1=非表示)
-        private int _windowCurrentDebuffLv = 0;   // 現在ウィンドウに表示中のデバフ Lv (0=非表示)
-        // デバフモードの独立スクロール状態
-        private float _debuffScrollY, _debuffScrollMin, _debuffScrollMax, _debuffScrollVel;
-        private float _debuffNodeMinY, _debuffNodeMaxY;
         private readonly List<SpriteRenderer> _bgStarSr = new List<SpriteRenderer>();
         private readonly List<float> _bgStarPhase = new List<float>();
         private readonly List<float> _bgStarBaseA = new List<float>();
@@ -334,7 +249,7 @@ namespace UI.SkillTree
             if (_initialized) return;
             _initialized = true;
 
-            // TMP が未収録グリフを □ で補填するのを止める（mihiPixelmoji_v1 が一部の文字を欠くと表示が汚れる）
+            // TMP が未収録グリフを □ で補填するのを止める（ゲームのフォントが一部の文字を欠くと表示が汚れる）
             try { TMP_Settings.instance.GetType()
                 .GetField("m_MissingGlyphCharacter", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
                 ?.SetValue(TMP_Settings.instance, 0); } catch { }
@@ -384,7 +299,7 @@ namespace UI.SkillTree
             // 3) ピクセルフォントとアライメント/オーバーフロー設定を強制適用（既存 TMP にも適用）
             if (infoText != null)
             {
-                if (infoFont != null) infoText.font = infoFont;
+                GameFont.Apply(infoText);
                 infoText.alignment = TextAlignmentOptions.MidlineLeft;
                 infoText.enableWordWrapping = false;
                 // overflowMode=Ellipsis だとフォントに無い「…」が □ になるので Overflow に固定
@@ -417,8 +332,17 @@ namespace UI.SkillTree
             if (mpm != null) mpm.OnStateChanged -= RefreshStates;
         }
 
-        /// <summary>メニューを隠してツリーを開く。 走査線トランジションを挟む。</summary>
+        /// <summary>タイトルの「SKILL TREE」。 整備パネルの窓 (<see cref="Game2D.Game2DMetaPanel"/>) を開く (2026-11-04〜)。
+        /// 挑戦も同じ窓の「挑戦」頁 (<see cref="Game2D.Game2DChallengePanel"/>) で選ぶ。 このツリーの旧挑戦 (DEBUFF・深淵モード) は 2026-11-04 に削除した。
+        /// 窓が開けない環境 (Game2D の GUI が無い) でだけ、 旧ツリー (廃止した 58 段のトラックの表示) を開く。</summary>
         public void Open()
+        {
+            if (Game2D.Game2DMetaPanel.Open()) return;
+            OpenTree();
+        }
+
+        /// <summary>メニューを隠してツリーを開く。 走査線トランジションを挟む。</summary>
+        public void OpenTree()
         {
             InitializeOnce(); // 重い初期化を transition より前に終わらせる（コルーチンの dt 大ジャンプ防止）
             BuildIfNeeded();
@@ -535,41 +459,16 @@ namespace UI.SkillTree
         {
             if (!_built) return;
 
-            // ホイールスクロール (モード別)。 モード切替直後はスケール抑制 (or 完全無視)。
+            // ホイールスクロール
             float wheel = Input.mouseScrollDelta.y;
             if (invertScrollDirection) wheel = -wheel;
-            if (Time.unscaledTime < _postTransitionLockUntil)
-            {
-                wheel *= Mathf.Clamp01(postTransitionScrollScale);
-            }
-            if (!_transitioning)
-            {
-                if (_currentMode == TreeMode.Buff) HandleWheelBuff(wheel);
-                else HandleWheelDebuff(wheel);
-            }
-
-            // オーバースクロール蓄積の減衰 (ホイール停止時)
-            if (Mathf.Abs(wheel) < 0.001f && _overscrollAccum > 0f)
-            {
-                _overscrollAccum = Mathf.Max(0f, _overscrollAccum - overscrollDecay * Time.unscaledDeltaTime);
-            }
-
-            // スクロール適用 (アクティブモードのみ)
-            if (_currentMode == TreeMode.Buff)
+            HandleWheelBuff(wheel);
             {
                 float curY = _nodesRoot.localPosition.y;
                 float ny = Mathf.SmoothDamp(curY, _scrollY, ref _scrollVel, scrollSmooth, Mathf.Infinity, Time.unscaledDeltaTime);
                 _nodesRoot.localPosition = new Vector3(0f, ny, 0f);
                 _linesRoot.localPosition = new Vector3(0f, ny, 0f);
                 if (_bgRoot != null) _bgRoot.localPosition = new Vector3(0f, BgOffsetBuff(ny), 0f);
-            }
-            else
-            {
-                float curY = _debuffNodesRoot.localPosition.y;
-                float ny = Mathf.SmoothDamp(curY, _debuffScrollY, ref _debuffScrollVel, scrollSmooth, Mathf.Infinity, Time.unscaledDeltaTime);
-                _debuffNodesRoot.localPosition = new Vector3(0f, ny, 0f);
-                _debuffLinesRoot.localPosition = new Vector3(0f, ny, 0f);
-                if (_debuffBgRoot != null) _debuffBgRoot.localPosition = new Vector3(0f, BgOffsetDebuff(ny), 0f);
             }
 
             // 次ノードの明滅
@@ -580,46 +479,6 @@ namespace UI.SkillTree
                 float k = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * nextPulseSpeed);
                 var c = nextColor; c.a = Mathf.Lerp(0.55f, 1f, k);
                 _nodeSr[nextIdx].color = c;
-            }
-
-            // デバフノードの波紋脈動 (DEBUFF モード時のみ・色は静止・UV ディスプレースメントのみ)
-            if (debuffPulseEnabled && _currentMode == TreeMode.Debuff
-                && _debuffNodeSr.Count > 0 && debuffRippleMaterial != null)
-            {
-                if (_debuffMpb == null) _debuffMpb = new MaterialPropertyBlock();
-                int dn = _debuffNodeSr.Count;
-                // 1 サイクル = period (波が中心→外周へ広がる) + interval (静止)
-                float period = Mathf.Max(0.01f, debuffRipplePeriod);
-                float interval = Mathf.Max(0f, debuffRippleInterval);
-                float cycle = period + interval;
-                float cycleT = Mathf.Repeat(Time.unscaledTime, cycle);
-                float phase;
-                float strengthMul; // インターバル中は強度 0 で完全静止
-                if (cycleT < period)
-                {
-                    phase = cycleT / period;     // 0 → 1 (波が伝播)
-                    strengthMul = 1f;
-                }
-                else
-                {
-                    phase = 1f;                   // 安全値 (どこでも band 外)
-                    strengthMul = 0f;             // 静止 (歪み 0)
-                }
-                int phaseId = Shader.PropertyToID("_RipplePhase");
-                int strengthId = Shader.PropertyToID("_RippleStrength");
-                for (int i = 0; i < dn; i++)
-                {
-                    float t = (dn > 1) ? (i / (float)(dn - 1)) : 0f; // 0..1 (Lv1→Lv10)
-                    float strength = Mathf.Lerp(debuffRippleStrengthLv1, debuffRippleStrengthLv10, t) * strengthMul;
-                    var sr = _debuffNodeSr[i];
-                    sr.GetPropertyBlock(_debuffMpb);
-                    _debuffMpb.SetFloat(phaseId, phase);
-                    _debuffMpb.SetFloat(strengthId, strength);
-                    sr.SetPropertyBlock(_debuffMpb);
-                    // スケールは必ず (1,1,1) — 旧 scale 脈動を撤廃
-                    var tr = sr.transform;
-                    if (tr.localScale.x != 1f) tr.localScale = Vector3.one;
-                }
             }
 
             // 背景星の明滅（α サイン波）
@@ -737,9 +596,6 @@ namespace UI.SkillTree
                 _nodeBtn.Add(btn);
             }
 
-            // 深淵セクション (メタデバフ 10 ノード) を連結
-            BuildDebuffSection();
-
             // ノード情報ウィンドウ (画面下、 非スクロール)
             BuildInfoWindow();
 
@@ -764,11 +620,9 @@ namespace UI.SkillTree
             _windowGo = go;
 
             // タイトル (上段)
-            var titleFont = windowFont != null ? windowFont : infoFont;
-            _windowTitleText = CreateWindowText(go.transform, "Title", windowTitleFontSize, windowTitleColor, titleFont);
-            // 説明 (下段) — 個別フォント。 未指定なら titleFont へフォールバック
-            var descFont = windowDescFont != null ? windowDescFont : titleFont;
-            _windowDescText  = CreateWindowText(go.transform, "Desc",  windowDescFontSize,  windowDescColor,  descFont);
+            _windowTitleText = CreateWindowText(go.transform, "Title", windowTitleFontSize, windowTitleColor);
+            // 説明 (下段)
+            _windowDescText  = CreateWindowText(go.transform, "Desc",  windowDescFontSize,  windowDescColor);
 
             // 初期スプライト適用 (位置・サイズ計算込み)
             ApplyWindowSprite(skilltreeWindowSprite);
@@ -777,14 +631,14 @@ namespace UI.SkillTree
             _windowVisible = false;
         }
 
-        private TMP_Text CreateWindowText(Transform parent, string name, float fontSize, Color color, TMP_FontAsset font)
+        private TMP_Text CreateWindowText(Transform parent, string name, float fontSize, Color color)
         {
             var txtGo = new GameObject(name);
             txtGo.transform.SetParent(parent, false);
             txtGo.layer = gameObject.layer;
             var tmp = txtGo.AddComponent<TextMeshPro>();
             tmp.fontSize = fontSize;
-            tmp.font = font;
+            GameFont.Apply(tmp);      // フォントはゲーム全体で 1 か所の指定
             tmp.alignment = TextAlignmentOptions.TopLeft;
             tmp.enableWordWrapping = true;
             tmp.overflowMode = TextOverflowModes.Truncate;
@@ -864,8 +718,6 @@ namespace UI.SkillTree
             {
                 _windowTitleText.fontSize = windowTitleFontSize;
                 _windowTitleText.color = windowTitleColor;
-                var titleFontNow = windowFont != null ? windowFont : infoFont;
-                if (titleFontNow != null && _windowTitleText.font != titleFontNow) _windowTitleText.font = titleFontNow;
                 var rt = _windowTitleText.rectTransform;
                 rt.sizeDelta = new Vector2(innerW, titleH);
                 // タイトル中心 = 内側上端 - titleH/2
@@ -875,8 +727,6 @@ namespace UI.SkillTree
             {
                 _windowDescText.fontSize = windowDescFontSize;
                 _windowDescText.color = windowDescColor;
-                var descFontNow = windowDescFont != null ? windowDescFont : (windowFont != null ? windowFont : infoFont);
-                if (descFontNow != null && _windowDescText.font != descFontNow) _windowDescText.font = descFontNow;
                 var rt = _windowDescText.rectTransform;
                 rt.sizeDelta = new Vector2(innerW, descH);
                 // 説明中心 = 内側上端 - titleH - gap - descH/2
@@ -931,27 +781,6 @@ namespace UI.SkillTree
             _windowGo.SetActive(true);
             _windowVisible = true;
             _windowCurrentBuffIdx = idx;
-            _windowCurrentDebuffLv = 0;
-        }
-
-        private void ShowDebuffInfo(int lv)
-        {
-            if (_windowGo == null || _windowTitleText == null || _windowDescText == null) return;
-            ApplyWindowSprite(skilltreeDebuffWindowSprite != null ? skilltreeDebuffWindowSprite : skilltreeWindowSprite);
-            // デバフ側専用のタイトル色を上書き (ApplyWindowSprite では BUFF 用の windowTitleColor が入る)
-            _windowTitleText.color = windowDebuffTitleColor;
-            var mpm = MetaProgressManager.Instance;
-            var axDef = AxisAt(lv);
-            int curTier = (mpm != null && axDef != null) ? mpm.State.Challenge.Tier(axDef.axis) : 0;
-            string name = DebuffName(lv);
-            string desc = DebuffDescription(lv);
-            string status = curTier > 0 ? $"[T{curTier} 有効・{mpm.State.ChallengeScore}pt]" : "[無効]";
-            _windowTitleText.text = FilterToFont(name, _windowTitleText.font);
-            _windowDescText.text = FilterToFont($"{desc}  {status}", _windowDescText.font);
-            _windowGo.SetActive(true);
-            _windowVisible = true;
-            _windowCurrentBuffIdx = -1;
-            _windowCurrentDebuffLv = lv;
         }
 
         // ----------------------------------------------------------------
@@ -1033,234 +862,6 @@ namespace UI.SkillTree
             if (_windowGo != null) _windowGo.SetActive(false);
             _windowVisible = false;
             _windowCurrentBuffIdx = -1;
-            _windowCurrentDebuffLv = 0;
-        }
-
-        // 2026-07-29: 配点方式 (docs/GAME.md §15-2) へ移行。 ノード i は
-        // ChallengeCatalog.Axes[i] に対応し、 クリックで存在する Tier を順送りする。
-        // **10 ノード鎖という旧トポロジのままの暫定接続** ── 19 軸 + T4 5 種を正しく見せる
-        // UI 改修は S9。 ここではロジックへ繋いで操作できる状態を保つことだけを狙う。
-
-        /// <summary>ノード index (0 起点) に対応する軸定義。 範囲外なら null。</summary>
-        private static AxisDef AxisAt(int lv)
-        {
-            int i = lv - 1;
-            return (i >= 0 && i < ChallengeCatalog.Axes.Count) ? ChallengeCatalog.Axes[i] : null;
-        }
-
-        /// <summary>存在する Tier を順送りする (未選択 → 最小 → … → 最大 → 未選択)。</summary>
-        private static int NextTier(AxisDef d, int cur)
-        {
-            if (d == null) return 0;
-            if (cur == 0) return d.availableTiers[0];
-            for (int i = 0; i < d.availableTiers.Length; i++)
-                if (d.availableTiers[i] == cur)
-                    return (i + 1 < d.availableTiers.Length) ? d.availableTiers[i + 1] : 0;
-            return 0;
-        }
-
-        private static string DebuffName(int lv)
-        {
-            var d = AxisAt(lv);
-            return d != null ? d.displayName : "?";
-        }
-
-        private static string DebuffDescription(int lv)
-        {
-            var d = AxisAt(lv);
-            if (d == null) return "";
-            var sb = new System.Text.StringBuilder();
-            for (int i = 0; i < d.availableTiers.Length; i++)
-            {
-                if (i > 0) sb.Append(" / ");
-                // v4.1: Tier 番号 = 点数。 「T3=3pt」と重ねて書かず、 点数だけを見せる。
-                sb.Append(d.availableTiers[i]).Append("pt");
-            }
-            return sb.ToString();
-        }
-
-        // ============================================================
-        //  メタデバフ (深淵) セクション
-        // ============================================================
-
-        private void BuildDebuffSection()
-        {
-            if (!debuffSectionEnabled) return;
-
-            _debuffBgRoot = MakeChild("DebuffBg");
-            _debuffLinesRoot = MakeChild("DebuffLines");
-            _debuffNodesRoot = MakeChild("DebuffNodes");
-            int dn = 10;
-
-            // 専用背景 (バフ BG とは完全分離)
-            if (debuffBackgroundSprite != null)
-            {
-                _debuffBgHalf = debuffBackgroundSprite.bounds.size.y * 0.5f;
-                _debuffBgLim = Mathf.Max(0f, _debuffBgHalf - contentHalfHeight);
-                var bgGo = new GameObject("debuff_background");
-                bgGo.transform.SetParent(_debuffBgRoot, false);
-                bgGo.layer = gameObject.layer;
-                bgGo.transform.localPosition = Vector3.zero;
-                var bsr = bgGo.AddComponent<SpriteRenderer>();
-                bsr.sprite = debuffBackgroundSprite;
-                bsr.sortingOrder = debuffBackgroundOrder;
-                if (!string.IsNullOrEmpty(sortingLayer)) bsr.sortingLayerName = sortingLayer;
-            }
-
-            // デバフノード配置: 自分の座標系で中央寄せ (Lv1 が上、 Lv10 が下)
-            float totalH = (dn - 1) * Mathf.Max(0.01f, debuffNodeSpacing);
-            _debuffNodeMaxY = totalH * 0.5f;
-            _debuffNodeMinY = -totalH * 0.5f;
-
-            // 線 (9 本、 _debuffLinesRoot 下に生成)
-            for (int i = 0; i < dn - 1; i++)
-            {
-                float ya = _debuffNodeMaxY - i * debuffNodeSpacing;
-                float yb = _debuffNodeMaxY - (i + 1) * debuffNodeSpacing;
-                var lsr = MakeLineUnder(_debuffLinesRoot, new Vector2(0f, ya), new Vector2(0f, yb));
-                _debuffLineSr.Add(lsr);
-            }
-
-            // 10 ノード (直線等間隔)
-            for (int i = 0; i < dn; i++)
-            {
-                float y = _debuffNodeMaxY - i * debuffNodeSpacing;
-                var go = new GameObject("debuff_node_" + (i + 1));
-                go.transform.SetParent(_debuffNodesRoot, false);
-                go.layer = gameObject.layer;
-                go.transform.localPosition = new Vector3(0f, y, 0f);
-
-                var sr = go.AddComponent<SpriteRenderer>();
-                Sprite assigned = PickDebuffIcon(i + 1);
-                sr.sprite = assigned != null ? assigned : (nodeMajorSprite != null ? nodeMajorSprite : GenNode());
-                sr.sortingOrder = nodeOrder + 1;
-                if (!string.IsNullOrEmpty(sortingLayer)) sr.sortingLayerName = sortingLayer;
-                // 波紋シェーダー Material をアサイン (未指定なら既定 sprite material のまま)
-                if (debuffRippleMaterial != null) sr.sharedMaterial = debuffRippleMaterial;
-                _debuffNodeSr.Add(sr);
-
-                var col = go.AddComponent<BoxCollider2D>();
-                if (debuffNodeHitSize > 0f) col.size = new Vector2(debuffNodeHitSize, debuffNodeHitSize);
-                else if (sr.sprite != null) col.size = sr.sprite.bounds.size;
-                _debuffNodeCol.Add(col);
-
-                var btn = go.AddComponent<SpriteButton>();
-                btn.selfRaycast = false;
-                btn.targetRenderer = null;
-                int lv = i + 1;
-                btn.Clicked += () => OnDebuffClicked(lv);
-                _debuffNodeBtn.Add(btn);
-            }
-
-            // デバフモードのスクロール範囲
-            // 上端 (Lv1) は通常 pad のみ、 下端 (Lv10) には追加で debuffEndExtraScroll を加算 → 背景下端を見せられる
-            float pad = Mathf.Max(0f, scrollEdgePadding);
-            float endExtra = Mathf.Max(0f, debuffEndExtraScroll);
-            _debuffScrollMax = -viewHalfHeight - _debuffNodeMinY + pad + endExtra;
-            _debuffScrollMin = viewHalfHeight - _debuffNodeMaxY - pad;
-            _debuffScrollY = _debuffScrollMin; // 初期位置: 上端 (Lv1) 表示
-
-            // 既定は BUFF モード = デバフ側を非表示
-            SetDebuffSectionVisible(false);
-        }
-
-        private Sprite PickDebuffIcon(int lv)
-        {
-            switch (lv)
-            {
-                case 1:  return iconDebuffLv1;
-                case 2:  return iconDebuffLv2;
-                case 3:  return iconDebuffLv3;
-                case 4:  return iconDebuffLv4;
-                case 5:  return iconDebuffLv5;
-                case 6:  return iconDebuffLv6;
-                case 7:  return iconDebuffLv7;
-                case 8:  return iconDebuffLv8;
-                case 9:  return iconDebuffLv9;
-                case 10: return iconDebuffLv10;
-                default: return null;
-            }
-        }
-
-        private SpriteRenderer MakeLineUnder(Transform parent, Vector2 a, Vector2 b)
-        {
-            // _linesRoot ではなく指定親に作る MakeLine 派生 (デバフ線用)
-            var prev = _linesRoot;
-            _linesRoot = parent;
-            try { return MakeLine(a, b); }
-            finally { _linesRoot = prev; }
-        }
-
-        private void SetDebuffSectionVisible(bool visible)
-        {
-            if (_debuffBgRoot != null) _debuffBgRoot.gameObject.SetActive(visible);
-            if (_debuffLinesRoot != null) _debuffLinesRoot.gameObject.SetActive(visible);
-            if (_debuffNodesRoot != null) _debuffNodesRoot.gameObject.SetActive(visible);
-        }
-
-        private void SetBuffSectionVisible(bool visible)
-        {
-            if (_bgRoot != null) _bgRoot.gameObject.SetActive(visible);
-            if (_linesRoot != null) _linesRoot.gameObject.SetActive(visible);
-            if (_nodesRoot != null) _nodesRoot.gameObject.SetActive(visible);
-        }
-
-        private void EnterMode(TreeMode mode)
-        {
-            _currentMode = mode;
-            _overscrollAccum = 0f;
-            // モード切替直後の暴発防止: 一定時間ホイール入力を抑制
-            _postTransitionLockUntil = Time.unscaledTime + Mathf.Max(0f, postTransitionLockDuration);
-            // モード切替時は情報ウィンドウを閉じる
-            CloseInfoWindow();
-            if (mode == TreeMode.Buff)
-            {
-                SetBuffSectionVisible(true);
-                SetDebuffSectionVisible(false);
-                _scrollY = _scrollMax; // BUFF に戻る時は下端 (Lv1) からスタート
-            }
-            else
-            {
-                SetBuffSectionVisible(false);
-                SetDebuffSectionVisible(true);
-                _debuffScrollY = _debuffScrollMin; // DEBUFF 入る時は上端 (Lv1) からスタート
-            }
-            RefreshStates();
-        }
-
-        private void OnDebuffClicked(int lv)
-        {
-            // 同じノードを再クリック → ウィンドウを閉じる (トグルは発生させない)
-            if (_windowVisible && _windowCurrentDebuffLv == lv) { CloseInfoWindow(); return; }
-
-            // トグル + ウィンドウ表示
-            var mpm = MetaProgressManager.Instance;
-            if (mpm != null)
-            {
-                var d = AxisAt(lv);
-                if (d != null) mpm.SetChallengeTier(d.axis, NextTier(d, mpm.State.Challenge.Tier(d.axis)));
-                // OnStateChanged → RefreshStates 経由で色更新
-            }
-            ShowDebuffInfo(lv);
-        }
-
-        private void RefreshDebuffStates()
-        {
-            var mpm = MetaProgressManager.Instance;
-            if (mpm == null) return;
-            for (int i = 0; i < _debuffNodeSr.Count; i++)
-            {
-                var d = AxisAt(i + 1);
-                bool active = d != null && mpm.State.Challenge.Tier(d.axis) > 0;
-                _debuffNodeSr[i].color = active ? debuffActiveColor : debuffInactiveColor;
-            }
-            for (int i = 0; i < _debuffLineSr.Count; i++)
-            {
-                // 線 i は debuff Lv(i+1) → Lv(i+2)。 i+1 が active なら点灯。
-                var d = AxisAt(i + 1);
-                bool lit = d != null && mpm.State.Challenge.Tier(d.axis) > 0;
-                _debuffLineSr[i].color = lit ? debuffLineActiveColor : debuffLineInactiveColor;
-            }
         }
 
         // 背景星を _bgRoot 配下に散布。 4スプライト（暗→明）から重み付き抽選。 ピクセル格子へスナップ。
@@ -1455,87 +1056,14 @@ namespace UI.SkillTree
             return Mathf.Lerp(-_bgLim, _bgLim, t);
         }
 
-        // DEBUFF モードの BG オフセット (BUFF と同形・別ストリップ)。
-        private float BgOffsetDebuff(float treeY)
-        {
-            if (_debuffBgLim <= 0f) return 0f;
-            float range = _debuffScrollMax - _debuffScrollMin;
-            if (range <= 0.0001f) return 0f;
-            float t = Mathf.Clamp01((treeY - _debuffScrollMin) / range);
-            return Mathf.Lerp(-_debuffBgLim, _debuffBgLim, t);
-        }
-
         // ----------------------------------------------------------------
-        //  ホイール処理 (モード別) + オーバースクロール検出
+        //  ホイール処理
         // ----------------------------------------------------------------
 
         private void HandleWheelBuff(float wheel)
         {
             if (Mathf.Abs(wheel) < 0.001f) return;
-            float delta = wheel * scrollSpeed;
-            float next = _scrollY + delta;
-            // 通常スクロール範囲内
-            if (next >= _scrollMin && next <= _scrollMax)
-            {
-                _scrollY = next;
-                _overscrollAccum = 0f;
-                return;
-            }
-            // BUFF 下端 (scrollMax) を超える方向に押し続けたら DEBUFF へ遷移
-            if (next > _scrollMax && debuffSectionEnabled && _debuffNodeSr.Count > 0)
-            {
-                _scrollY = _scrollMax;
-                _overscrollAccum += (next - _scrollMax);
-                if (_overscrollAccum >= overscrollThreshold) BeginTransitionTo(TreeMode.Debuff);
-            }
-            else
-            {
-                _scrollY = Mathf.Clamp(next, _scrollMin, _scrollMax);
-                _overscrollAccum = 0f;
-            }
-        }
-
-        private void HandleWheelDebuff(float wheel)
-        {
-            if (Mathf.Abs(wheel) < 0.001f) return;
-            float delta = wheel * scrollSpeed;
-            float next = _debuffScrollY + delta;
-            if (next >= _debuffScrollMin && next <= _debuffScrollMax)
-            {
-                _debuffScrollY = next;
-                _overscrollAccum = 0f;
-                return;
-            }
-            // DEBUFF 上端 (scrollMin) を超える方向に押し続けたら BUFF へ復帰
-            if (next < _debuffScrollMin)
-            {
-                _debuffScrollY = _debuffScrollMin;
-                _overscrollAccum += (_debuffScrollMin - next);
-                if (_overscrollAccum >= overscrollThreshold) BeginTransitionTo(TreeMode.Buff);
-            }
-            else
-            {
-                _debuffScrollY = Mathf.Clamp(next, _debuffScrollMin, _debuffScrollMax);
-                _overscrollAccum = 0f;
-            }
-        }
-
-        // ----------------------------------------------------------------
-        //  モード切替トランジション (LcdTransition があれば使う)
-        // ----------------------------------------------------------------
-
-        private void BeginTransitionTo(TreeMode target)
-        {
-            if (_transitioning || _currentMode == target) return;
-            _transitioning = true;
-            var trans = FindObjectOfType<LcdTransition>();
-            void Swap()
-            {
-                EnterMode(target);
-                _transitioning = false;
-            }
-            if (trans != null) trans.Begin(Swap);
-            else Swap();
+            _scrollY = Mathf.Clamp(_scrollY + wheel * scrollSpeed, _scrollMin, _scrollMax);
         }
 
         // フォント未収録の文字を取り除く（TMP の □ プレースホルダ抑制）。
@@ -1606,9 +1134,6 @@ namespace UI.SkillTree
                 bool lit = (i + 1) < cur + 1; // node i(level i+1) が解放済み
                 _lineSr[i].color = lit ? lineUnlockedColor : lineLockedColor;
             }
-
-            // 深淵セクション (メタデバフ) の状態も同時更新
-            RefreshDebuffStates();
 
             if (infoText != null)
             {
