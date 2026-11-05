@@ -156,14 +156,15 @@ static class T
             for (int i = 0; i < 12; i++) s3.Wait();
             int p0 = w3.Provision; int m3 = 0;
             foreach (int c in s3.Neighbors(s3.Me)) if (s3.InFront(c) || s3.InFront(s3.Me)) { s3.MoveTo(c); m3++; break; }
-            Check(m3 == 0 || w3.Provision == p0 - 15, $"砂: 前線の中の1歩は物資1.5倍 (moved={m3}, {p0}->{w3.Provision})");
+            Check(m3 == 0 || w3.Provision == p0 - FreeMapParams.MoveSupply * 3 / 2, $"砂: 前線の中の1歩は物資1.5倍 (moved={m3}, {p0}->{w3.Provision})");
         }
         // --- 物資不足は HP で払う ---
         {
             var w = new Wallet { Provision = 5, Hp = 30 };
             var s = Make(2, FoeProfile.Summoner, WeatherKind.None, w);
             s.MoveTo(s.Neighbors(s.Me)[0]);
-            Check(w.Provision == 0 && w.Hp == 29, $"物資不足は HP で払う (prov {w.Provision}, hp {w.Hp})");
+            int hpCost = (FreeMapParams.MoveSupply - 5 + FreeMapParams.SupplyPerHp - 1) / FreeMapParams.SupplyPerHp;   // 足りない物資 10 につき HP 1
+            Check(w.Provision == 0 && w.Hp == 30 - hpCost, $"物資不足は HP で払う (prov {w.Provision}, hp {w.Hp})");
         }
         // --- 猟犬・使い魔 ---
         {

@@ -129,7 +129,10 @@ namespace UI.Game2D
                 }
                 case GameManager.GamePhase.FloorClear:
                 {
-                    var d = New("層を抜けた", run.currentFloor + " 層"); d.body = "次の層へ降りる。";
+                    // ボスを倒した直後の場面があれば、 それを先に読ませる (6 層・灰燼の王 → 椅子)
+                    string after = Endings.AftermathOf(run);
+                    var d = New("層を抜けた", run.currentFloor + " 層"); d.body = after != null ? after + "\n\n次の層へ降りる。" : "次の層へ降りる。";
+                    if (after != null) d.bodyLines = 9;
                     d.buttons.Add(B("次の層へ", "ok", true));
                     d.onAction = (a, _) => { gm.ConfirmFloorClear(); Refresh(); };
                     return d;

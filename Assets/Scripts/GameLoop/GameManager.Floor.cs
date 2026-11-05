@@ -77,6 +77,27 @@ namespace GameLoop
             if (Run.Depth == 3) MetaProgression.MetaDebuffApplicator.TryGrantOnFloor3(Run);
             if (Run.Depth == 5) MetaProgression.MetaDebuffApplicator.TryGrantOnFloor5(Run);
 
+            // 層を移ったら HP を全回復する (2026-11-04)。 1 層は満タンで始まるので 2 層から。
+            //   物資を絞って (戦闘で物資が出ない・移動 50) 寄り道が減った分、 層の中の HP の収支だけで死なないように。
+            //   〈破綻〉の切り詰めより前に置く ── 挑戦デバフは全回復の後に効く。
+            if (Run.Depth > MapSystem.FreeMove.FloorPlan.FirstFloor && Run.playerHP < Run.playerMaxHP)
+            {
+                Log($"層突入: HP 全回復 {Run.playerHP} → {Run.playerMaxHP}");
+                Run.playerHP = Run.playerMaxHP;
+            }
+
+            // 計測専用 (SuppressEvents): イベントの代わりに確信の資格を与える。 HP 半減と啓示のエリートは払わせない。
+            if (SuppressEvents && Run != null)
+            {
+                if (Run.convictionStage <= 0 && Run.ownedPassiveItems != null
+                    && !Run.ownedPassiveItems.Contains(ConvictionSystem.IdConviction) && !ConvictionSystem.HasResolveOrBetter(Run))
+                {
+                    ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, ConvictionSystem.IdConviction);
+                    ConvictionSystem.OnFirstAcquired(Run);
+                }
+                if (Run.Depth == 6) ConvictionSystem.RevealTruthInLayer6(Run);
+            }
+
             // T4-A〈破綻〉: 各層突入時、 HP を最大HPの 70% 以下へ切り詰める (§15-2 v3.0)。
             //   既にそれ以下なら何もしない ── 回復ではなく「上限の切り下げ」。
             float hpCap = MetaProgression.MetaDebuffApplicator.GetFloorEntryHpCapRatio();
@@ -343,7 +364,7 @@ namespace GameLoop
 
             // 1 戦終えた。 航行の危険度見積りが使う (RunState.AverageFightDamage)。
             //   **強盗・特殊戦は上の return で抜けているので、通常戦とボスだけが数えられる。**
-            Run.fightCount++;
+            if (Run.Depth != MapSystem.FreeMove.FloorPlan.FarmFloor) Run.fightCount++;
 
             Run.ApplyBattleResult(result.playerWon, result.playerHPRemaining, result.totalTurns);
 
@@ -367,6 +388,7 @@ namespace GameLoop
                 int hpBeforePostDamage = Run.playerHP;
                 Run.playerHP = Mathf.Max(1, Run.playerHP - postDamage);
                 MetaProgression.Achievements.AchievementService.NoteExternalHpDamage(hpBeforePostDamage - Run.playerHP);
+                HpOutsideDiag.Add("層デバフ(戦闘後)", hpBeforePostDamage - Run.playerHP);   // [計装 2026-11-05]
                 Log($"層デバフ: 戦闘後{postDamage}ダメージ (HP:{Run.playerHP})");
             }
         }
@@ -478,6 +500,11 @@ namespace GameLoop
                     else EnterShop();
                     break;
                 case TileType.Event:
+                    if (SuppressEvents)   // 計測専用 (上の SuppressEvents)
+                    {
+                        SetPhase(GamePhase.MapNavigation);
+                        break;
+                    }
                     BeginEventEncounter();
                     break;
                 case TileType.Treasure:

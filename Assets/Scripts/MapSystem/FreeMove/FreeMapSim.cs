@@ -134,6 +134,12 @@ namespace MapSystem.FreeMove
         public readonly bool[] Known;
         /// <summary>使い切った (起動済みの) 点。 沈める点の候補から外す。 MapManager が写す。</summary>
         public readonly bool[] Done;
+        /// <summary>**完全公開** (偵察・照明で見つけた) 点 (2026-11-05)。 戦闘名まで分かる。
+        /// 何もしない時の視界 (1 歩) で見えただけの点は種別だけで、 ここには入らない。 一度立ったら戻さない。</summary>
+        public readonly bool[] Scouted;
+        /// <summary>[計装] いま財布へ HP を払わせている理由 (物資切れの歩行 / 雹)。 財布の側が記録に使う (2026-11-05)。
+        /// このクラスは本体 (GameLoop) を参照しない ── 単体の検算 (Tools/freemap_check) で動かすため。</summary>
+        public string HpPayReason { get; private set; } = "";
 
         // ── 痕跡 ──
         private readonly int[] _trace;
@@ -148,6 +154,10 @@ namespace MapSystem.FreeMove
         /// <summary>追跡者が最後にプレイヤーを補足した点。</summary>
         public int LastSeen { get; private set; } = -1;
         private int _lose;
+        /// <summary>今の追跡が続いている手番数 (<see cref="FreeMapParams.ChaseGiveUp"/> で諦める)。</summary>
+        private int _chaseTurns;
+        /// <summary>諦めた後に補足しない残り手番。</summary>
+        private int _chaseRest;
         private int _patrol;
         private int _sinceSummon = 99;
         /// <summary>足止めの残り手番 (囮罠・逃げた直後)。</summary>
@@ -183,6 +193,7 @@ namespace MapSystem.FreeMove
             _sunk = new bool[n];
             Known = new bool[n];
             Done = new bool[n];
+            Scouted = new bool[n];
             _trace = new int[n];
             for (int i = 0; i < n; i++) _trace[i] = NoTrace;
 
@@ -277,6 +288,16 @@ namespace MapSystem.FreeMove
         /// <summary>点 j へ 1 歩動いた時の HP の損 (雹の前線の内側)。</summary>
         public int HpLossFor(int j) => WeatherAt(j, WeatherKind.Hail) ? 1 : 0;
 
+        /// <summary>追跡者がいま補足に使う歩数 (性質と照明で変わる)。 表示 (気配の輪) もこれを読む。</summary>
+        public int DetectHops
+        {
+            get
+            {
+                int d = Profile != null && Profile.detectRange > 0 ? Profile.detectRange : FreeMapParams.DetectRange;
+                return FlareOn ? Math.Max(d, FreeMapParams.FlareRange) : d;
+            }
+        }
+
         /// <summary>追跡者がいま見えているか (視界の内側)。</summary>
         public bool FoeVisible => FoeAlive && HopsFrom(Me)[FoeNode] <= VisionRange;
 
@@ -364,6 +385,7 @@ namespace MapSystem.FreeMove
             int cost = SupplyFor(j), turns = TurnsFor(j), hail = HpLossFor(j);
             var ev = FreeMapEvent.None;
             if (Pay(cost)) ev |= FreeMapEvent.Died;
+            HpPayReason = "雹";
             if (hail > 0 && _wallet.PayHp(hail)) ev |= FreeMapEvent.Died;
             PrevNode = Me;
             Me = j;
@@ -502,13 +524,17 @@ namespace MapSystem.FreeMove
             if (pay > 0) _wallet.SpendProvision(pay);
             int short_ = cost - pay;
             if (short_ <= 0) return false;
+            HpPayReason = "物資切れの歩行";
             return _wallet.PayHp((short_ + FreeMapParams.SupplyPerHp - 1) / FreeMapParams.SupplyPerHp);
         }
 
         private void Reveal(int center, int range)
         {
             var d = HopsFrom(center);
-            for (int i = 0; i < d.Length; i++) if (d[i] <= range) Known[i] = true;
+            // 視界 (1 歩) より広い範囲で見た = 偵察・照明 (照明中の視界も含む) → 完全公開
+            bool scouting = range > FreeMapParams.Vision;
+            for (int i = 0; i < d.Length; i++)
+                if (d[i] <= range) { Known[i] = true; if (scouting) Scouted[i] = true; }
         }
 
         private FreeMapEvent PassTurns(int n)
@@ -543,15 +569,22 @@ namespace MapSystem.FreeMove
             if (FoeAlive)
             {
                 var dMe = HopsFrom(Me);
-                int detect = FlareOn ? FreeMapParams.FlareRange : FreeMapParams.DetectRange;
-                if (dMe[FoeNode] <= detect)
+                int detect = DetectHops;
+                if (_chaseRest > 0) _chaseRest--;
+                if (_chaseRest == 0 && dMe[FoeNode] <= detect)
                 {
-                    if (FoeMode != FoeMode.Chase) ev |= FreeMapEvent.Detected;
+                    if (FoeMode != FoeMode.Chase) { ev |= FreeMapEvent.Detected; _chaseTurns = 0; }
                     FoeMode = FoeMode.Chase; LastSeen = Me; _lose = 0;
                 }
                 else if (FoeMode == FoeMode.Chase && ++_lose > FreeMapParams.QuietLose)
                 {
                     FoeMode = FoeMode.Patrol; ev |= FreeMapEvent.FoeLost;
+                }
+                // 追跡の上限: 追い続けて捕まえられなければ諦め、 しばらくは補足しない (2026-11-04)
+                if (FoeMode == FoeMode.Chase && ++_chaseTurns > FreeMapParams.ChaseGiveUp)
+                {
+                    FoeMode = FoeMode.Patrol; _chaseTurns = 0; _chaseRest = FreeMapParams.ChaseRest;
+                    ev |= FreeMapEvent.FoeLost;
                 }
                 else if (FoeMode == FoeMode.Patrol && HasTrace(FoeNode))
                 {

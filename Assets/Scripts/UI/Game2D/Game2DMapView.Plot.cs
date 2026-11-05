@@ -147,7 +147,7 @@ namespace UI.Game2D
 
             // 気配 = 察知距離の円の波 (外へだけ振れるギザギザの 1 本線)。 段 = 察知距離 (2 / 3 / 4 以上)
             {
-                int hops = sim.FlareOn ? FreeMapParams.FlareRange : FreeMapParams.DetectRange;
+                int hops = sim.DetectHops;
                 int L = Mathf.Clamp(hops - 2, 0, 2);
                 DetectNoise(hops * _hopUnit * _ls, L, L >= 2 ? _lc.red : L >= 1 ? _lc.warn : _lc.mid);
             }
@@ -192,7 +192,37 @@ namespace UI.Game2D
                 Rect(Mathf.FloorToInt(q.x) - (Pxs - 1), Mathf.FloorToInt(q.y) - (Pxs - 1), 2 * Pxs - 1, 2 * Pxs - 1, _lc.red);
             }
 
+            // 戦闘名 (2026-11-05): 種別が見えていて (視界・照明・偵察で発見済み) 戦闘名も開示済みの点は、
+            //   カーソルを乗せると戦闘名を出す。 敵の名前は出さない ── 何が待っているかの「当たり」だけを渡す。
+            //   名前は 2 体戦のプリセット → 単体戦・ボスの対応表 (EncounterPresets.SoloTitles) の順。 どちらにも無ければ出さない
+            //   (FloorManager.EncounterTitle は敵の表示名へ落ちるが、 ここでは敵の名前を出さないので使わない)。
+            if (_hover >= 0 && _hover < lay.Count && !sim.IsSunk(_hover))
+            {
+                string title = EncounterTitleAt(sim, _hover);
+                if (!string.IsNullOrEmpty(title))
+                {
+                    var q = Sp(lay.pos[_hover]);
+                    int tw = Game2DJpFont.Width(title), th = Game2DJpFont.Cell;
+                    int bx = Mathf.Clamp(Mathf.RoundToInt(q.x - tw / 2f) - 2, 0, W - tw - 4);
+                    int by = Mathf.RoundToInt(q.y) - 8 - th - 3;
+                    if (by < 0) by = Mathf.RoundToInt(q.y) + 8;   // 上に入らなければ下へ
+                    Rect(bx, by, tw + 4, th + 3, _lc.bg);
+                    JpText(title, bx + 2, by + 1, _lc.hi);
+                }
+            }
+
             Readout(sim);
+        }
+
+        /// <summary>その点の戦闘名。 種別が見えていない・戦闘名が未開示・名前の無い戦闘なら null (敵の名前には落とさない)。</summary>
+        private static string EncounterTitleAt(FreeMapSim sim, int i)
+        {
+            if (sim == null || i < 0 || i >= sim.Known.Length || !sim.Known[i]) return null;
+            var node = MapSystem.MapManager.Instance?.CurrentMap?.GetNodeByIndex(i);
+            if (node == null || !node.encounterRevealed) return null;
+            var preset = GameLoop.EncounterPresets.Get(node.encounterId);
+            if (preset != null && !string.IsNullOrEmpty(preset.title)) return preset.title;
+            return GameLoop.EncounterPresets.SoloTitle(node.encounterEnemyA);
         }
 
         /// <summary>自分: 青い十字 (中心 1 dot ＋ 腕)。 ノード (生成り) と見分けがつくよう青にし、 天候・照明・偵察の演出よりも<b>手前</b> (一番上) に描く。</summary>

@@ -128,6 +128,12 @@ namespace ItemSystem.Helpers
             if (SwordDanceSet.IsDance(itemId))
             {
                 SwordDanceSet.Acquired++;   // [計装] 提示と取得を分けて数える
+                // [計装 2026-11-04] 剣の舞がどの経路から入ったか (店以外の入手が成立率を押し上げている疑い)
+                {
+                    string key = "剣の舞:" + PassiveSourceAudit.CurrentSource(run);
+                    PassiveSourceAudit.Counts.TryGetValue(key, out int c0);
+                    PassiveSourceAudit.Counts[key] = c0 + 1;
+                }
                 SwordDanceSet.TryTransform(run);
             }
 

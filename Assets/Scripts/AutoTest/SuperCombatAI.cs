@@ -31,7 +31,7 @@ namespace AutoTest
     /// 「自分の一撃がいくら通るか」は人間も数戦で覚えることなので、 観測で埋めるのが筋が通る。
     /// </summary>
     [System.Serializable]
-    public sealed class SuperCombatAI
+    public sealed partial class SuperCombatAI
     {
         // ============================================================
         //  レバー (AutoRunner のインスペクタから触る)
@@ -436,9 +436,14 @@ namespace AutoTest
         private float HeavyAvg => _heavyPeriod <= 0 ? 1f
             : ((_heavyPeriod - 1) * _heavyWindupMul + _heavyMul) / _heavyPeriod;
         private bool _isBoss;
+        /// <summary>敵の防御と周期の規則 (構え・割れる/積み上がる装甲・先手・大技)。 公開規則なので先のターンも再現する (2026-11-04)。</summary>
+        private EnemyArmorModel _armor;
+        /// <summary>今の防御の「持続する分」(構えの増減を除く)。 先読みの盤面の初期値。</summary>
+        private int _eDef0;
         private int _termCap, _specialLimit, _chargeMax, _chargePerTurn;
         private SpecialTerminalDef _spec;
         private int _pierceMul;               // 〈貫きの錐〉: 敵攻撃値 1 につきブロックを削る量
+        private WeaponRungModel _rung;        // 剣・盾の段 (切り返し・不滅の刃・シールドバッシュ・城壁・堅守の構え・黎明)
         private int _sealPeriod;              // 〈綻び〉: 端子封印の周期 (0 = 無効)
         private int _sealedNow = -1;          // 今ターン封印されている端子 (-1 = なし)
 
@@ -473,6 +478,7 @@ namespace AutoTest
             _heavyPeriod = enemy.heavyPeriod;
             _heavyMul = enemy.heavyMul > 0f ? enemy.heavyMul : 1f;
             _heavyWindupMul = enemy.heavyWindupMul > 0f ? enemy.heavyWindupMul : 1f;
+            _armor = EnemyArmorModel.From(enemy, ctx, out _eDef0);
             var run = GameLoop.GameManager.Instance?.Run;
             _isBoss = !string.IsNullOrEmpty(ctx.bossId);
             _spec = SpecialTerminals.Equipped(run);
@@ -482,6 +488,7 @@ namespace AutoTest
             _chargeMax = CombatManager.ChargeMax;
             _chargePerTurn = MetaProgression.Relics.RelicApplicator.GetChargePerTurn(run, ctx);
             _pierceMul = ctx.playerBlockIgnored ? CombatManager.PierceAwlPerAttack : 0;
+            _rung = WeaponRungModel.From(PassiveSkillManager.Instance?.ActivePlayerSkillIds);
 
             EnsureBuffers();
             return true;
@@ -496,7 +503,12 @@ namespace AutoTest
         private struct SimState
         {
             public int pHp, eHp, turn, charge;
+            /// <summary>敵の防御の持続する分 (割れる/積み上がる装甲で動く)。 構えの増減はターン番号から足す。</summary>
+            public int eDef;
             public int blazeStacks;       // 烈炎: ターン開始時に受ける軽減無視ダメージ
+            public int shield;            // 盾のシールド (ターンの終わりに半減・防御後の被弾を吸う)
+            public int streak;            // 〈不滅の刃〉: 攻撃とブロックの両方に挿したターンの連続数
+            public int steadfastReady;    // 〈堅守の構え〉: 次に使えるターン
         }
 
         // ============================================================
@@ -651,6 +663,7 @@ namespace AutoTest
 
         public DiceTerminal[] ChooseWiring(int[] rolls, MutualTurnTelegraph tele)
         {
+            if (useV2) return ChooseWiringV2(rolls, tele);      // 新方式 (SuperCombatAI.V2.cs・2026-11-05)
             wiringDecisions++;
             var cm = CombatManager.Instance;
             if (rolls == null || rolls.Length == 0 || cm == null) return null;
@@ -667,6 +680,10 @@ namespace AutoTest
                 eHp = cm.EnemyHP,
                 turn = tele.turn,
                 charge = ctx.GetCharge(),
+                eDef = _eDef0,
+                shield = Math.Max(0, ctx.consShield),
+                streak = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.UndyingBlade.StreakKey),
+                steadfastReady = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.SteadfastStance.ReadyKey),
             };
 
             int enemyAtk = Math.Max(0, tele.enemyAttackValue);
@@ -913,7 +930,8 @@ namespace AutoTest
             }
             if (_pierceMul > 0) bSum = Math.Max(0, bSum - enemyAtk * _pierceMul);
 
-            _pendingPredAtk = skipAttack ? 0 : (atkBase + aSum);
+            // 予測は敵の防御を引いた後の値 ── 較正 (_dmgMul) が防御の増減 (構え 30 / 隙 0) で揺れないように
+            _pendingPredAtk = skipAttack ? 0 : _armor.Mitigate(atkBase + aSum, s0.eDef, s0.turn);
             _pendingPredRaw = Math.Max(0, enemyAtk - bSum);
             _pendingEnemyHp = s0.eHp;
             _pendingPlayerHp = s0.pHp;
@@ -953,6 +971,7 @@ namespace AutoTest
 
         private int[] ChooseRerollCore(int[] dice, MutualTurnTelegraph tele, int attempt)
         {
+            if (useV2) return ChooseRerollV2(dice, tele, attempt);      // 新方式 (SuperCombatAI.V2.cs・2026-11-05)
             rerollDecisions++;
             if (dice == null || dice.Length == 0) return null;
             System.Threading.Interlocked.Increment(ref RrCalls);
@@ -979,6 +998,10 @@ namespace AutoTest
                 eHp = cm.EnemyHP,
                 turn = tele.turn,
                 charge = charge,
+                eDef = _eDef0,
+                shield = Math.Max(0, ctx.consShield),
+                streak = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.UndyingBlade.StreakKey),
+                steadfastReady = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.SteadfastStance.ReadyKey),
             };
             int enemyAtk = Math.Max(0, tele.enemyAttackValue);
             // 2 体戦の 2 パケット目。 予告 (柱3) で開示済みなので、 方策はこれを見て配線できる。
@@ -1214,12 +1237,27 @@ namespace AutoTest
             // --- 〈貫きの錐〉 ---
             if (m.pierce > 0 && bSum > 0) bSum = Math.Max(0, bSum - enemyAtk * m.pierce);
 
+            // --- 剣・盾の段 (2026-11-05) ---
+            //   式は本体の効果クラスと同じ (WeaponFamilyEffects)。 これが無いと先読みは段が起きないものとして動く。
+            bool split = aCount > 0 && bCount > 0, allAtk = aCount == _k, allBlk = bCount == _k;
+            int newStreak = _rung.undying ? (split ? s.streak + 1 : 0) : 0;
+            if (_rung.guardCut && split && bSum > 0)
+                aSum += TurnRules.GuardCutBonus(bSum);
+            if (_rung.bashRate > 0f && allAtk && s.shield > 0)
+            { aSum += TurnRules.BashBonus(s.shield, _rung.bashRate); s.shield = 0; }      // 使い切る
+            if (_rung.steadfast && allBlk && s.turn >= s.steadfastReady)
+            {
+                s.shield += ItemSystem.PassiveSkills.Effects.SteadfastStance.Shield;
+                s.steadfastReady = s.turn + ItemSystem.PassiveSkills.Effects.SteadfastStance.Cooldown;
+            }
+
             // --- 自攻撃 ---
             //   攻撃端子が 0 本なら **攻撃そのものを行わない** (素火力もパッシブ加算も出ない)。
             int dealt = 0;
             if (aCount > 0)
             {
                 dealt = (int)((atkBase + aSum) * _dmgMul);
+                if (newStreak > 0) dealt = (int)(dealt * TurnRules.UndyingMul(newStreak));
             }
             // === 7層ヴェスカ〈遺物学者〉の抽選 (§13-4) ===
             //   すべて予告に開示されている性質なので、 先読みに使うのは完全情報の範囲内。
@@ -1231,6 +1269,8 @@ namespace AutoTest
                 else if (m.damageTakenMul > 0f && m.damageTakenMul < 1f)
                     dealt = (int)(dealt * m.damageTakenMul);
                 if (m.dodgeChance > 0f) dealt = (int)(dealt * (1f - m.dodgeChance));
+                // 敵の防御 (ADR-0013): そのターンの値 (構えなら上乗せ・隙なら 0) で軽減する
+                dealt = _armor.Mitigate(dealt, s.eDef, s.turn);
                 if (m.shield > 0)
                 {
                     int absorbed = Math.Min(m.shield, dealt);
@@ -1259,15 +1299,35 @@ namespace AutoTest
             if (m.blazePenalizesBlock
                 && bCount >= ItemSystem.PassiveSkills.Effects.BlazeBrand.BlockDiceThreshold)
                 s.blazeStacks++;
+            // シールド: 防御後の被弾を先に吸う (軽減無視も肩代わりする)
+            if (s.shield > 0 && taken > 0)
+            { int absorbed = Math.Min(s.shield, taken); taken -= absorbed; s.shield -= absorbed; }
             // 処刑人の烙印: 攻撃終了時に HP が最大の 20% 以下なら 9999。 **予告されている。**
-            if (m.executeArmed && (s.pHp - taken) <= (int)Math.Ceiling(_pMaxHp * 0.20f))
+            if (m.executeArmed && TurnRules.ExecuteKills(s.pHp - taken, _pMaxHp))
                 taken = s.pHp;
 
             s.pHp -= taken;
             if (s.pHp <= 0) return Loss;
 
+            // 盾〈城壁〉: 完全に受け止めたら、 余ったブロック × 率 がシールドへ
+            if (_rung.bulwarkRate > 0f && bSum > 0)
+                s.shield += TurnRules.BulwarkGain(bSum, enemyAtk, _rung.bulwarkRate);
+            // 盾〈黎明〉: HP が減らなかったら、 敵の攻撃 10 につき敵の最大 HP の 5% を削る
+            if (_rung.daybreak && taken == 0)
+            {
+                int dawn = TurnRules.DaybreakDamage(_eMaxHp, enemyAtk);
+                if (dawn > 0)
+                {
+                    s.eHp -= dawn;
+                    if (s.eHp <= 0) return Win;
+                }
+            }
+
             // --- 充電と持ち越し ---
             s.charge = Math.Min(_chargeMax, s.charge + cSum + _chargePerTurn);
+            s.eDef = _armor.EndOfTurn(s.eDef, dealt > 0);      // 割れる/積み上がる装甲
+            s.shield /= 2;                                      // シールドは次のターンの頭に半減する
+            s.streak = newStreak;
             s.turn++;
             return Ongoing;
         }
@@ -1349,7 +1409,7 @@ namespace AutoTest
                 int eTotal = 0;
                 for (int i = 0; i < _eDiceCount; i++) eTotal += _rng.Next(1, _eRollMax + 1);
                 int enemyAtk = Math.Max(0, (int)Math.Round(
-                    Escalation.GetMultiplier(_escProfile, s.turn) * (_eBaseAtk + eTotal) * HeavyAt(s.turn)));
+                    Escalation.GetMultiplier(_escProfile, s.turn) * (_eBaseAtk + eTotal) * _armor.AttackFactor(s.turn)));
 
                 GreedyWiring(_simDice, enemyAtk, s);
                 int outcome = ApplyTurn(ref s, _simDice, enemyAtk, _rolloutW, _pAtkPower, fm);
@@ -1467,19 +1527,20 @@ namespace AutoTest
             //
             //   **使い切れない充電は 0 の価値**なので、 残りターン数で割ってから上限を掛ける。
             //   1 回目のリロールは `個数 × 1` なので、 1 ターンで意味を持つのは全本数まで。
-            float dps0 = Math.Max(0.5f, (_pAtkPower + expAtkSum) * _dmgMul);
+            float defKeep = 1f - _armor.ReductionAt(s.eDef, s.turn);      // 敵の防御で残る割合
+            float dps0 = Math.Max(0.5f, (_pAtkPower + expAtkSum) * _dmgMul * defKeep);
             float turnsLeft = Math.Max(1f, Math.Min(s.eHp / dps0, rolloutDepth));
             float spendPerTurn = Math.Min(Math.Max(0, s.charge) / turnsLeft, _k);
             float diceGain = chargeRerollGain * _meanFace * spendPerTurn;
             expAtkSum += diceGain * 0.6f;    // 配分の期待値に合わせて攻撃/ブロックへ按分する
             expBlkSum += diceGain * 0.3f;
 
-            float myDps = Math.Max(0.5f, (_pAtkPower + expAtkSum) * _dmgMul);
+            float myDps = Math.Max(0.5f, (_pAtkPower + expAtkSum) * _dmgMul * defKeep);
             float ttk = s.eHp / myDps;
 
             int midTurn = s.turn + (int)Math.Min(12f, ttk * 0.5f);
             float eAtk = Escalation.GetMultiplier(_escProfile, midTurn)
-                       * (_eBaseAtk + _eDiceCount * (_eRollMax + 1) * 0.5f) * HeavyAvg;
+                       * (_eBaseAtk + _eDiceCount * (_eRollMax + 1) * 0.5f) * _armor.AvgCycleFactor();
             float hisDps = Math.Max(0f, (eAtk - expBlkSum)) * _takenMul;
             // **「いま防げている」は「ずっと防げる」ではない。**
             //   ブロックはダイス由来でほぼ一定なのに、 敵攻撃はエスカレーションで伸び続ける
@@ -1564,10 +1625,11 @@ namespace AutoTest
             w._eBaseAtk = _eBaseAtk; w._eDiceCount = _eDiceCount; w._eRollMax = _eRollMax;
             w._eMaxHp = _eMaxHp; w._escProfile = _escProfile;
             w._heavyPeriod = _heavyPeriod; w._heavyMul = _heavyMul; w._heavyWindupMul = _heavyWindupMul;
+            w._armor = _armor; w._eDef0 = _eDef0;
             w._isBoss = _isBoss;
             w._termCap = _termCap; w._specialLimit = _specialLimit;
             w._chargeMax = _chargeMax; w._chargePerTurn = _chargePerTurn;
-            w._spec = _spec; w._pierceMul = _pierceMul;
+            w._spec = _spec; w._pierceMul = _pierceMul; w._rung = _rung;
             w._sealPeriod = _sealPeriod; w._sealedNow = _sealedNow;
             w._dmgMul = _dmgMul; w._takenMul = _takenMul;
             w._nowMods = _nowMods;

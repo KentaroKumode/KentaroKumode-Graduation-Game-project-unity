@@ -41,6 +41,10 @@ namespace CombatSystem
         public int turnsToHeavy;
         /// <summary>大技ターンの攻撃倍率 (予告表示用)。</summary>
         public float heavyMul;
+        /// <summary>次の構えまで何ターンか (0 = このターンは構え / −1 = 構えない)。 EnemyData.guardPeriod。</summary>
+        public int turnsToGuard;
+        /// <summary>このターンの敵の防御 (構え・割れる装甲・積み上がる装甲を反映した後)。</summary>
+        public int enemyDefense;
         public int[] enemyDice;        // 敵の出目 (LED 表示と同値)
         public int enemyDiceTotal;     // 敵ダイス合計 (パッシブ補正込み)
 

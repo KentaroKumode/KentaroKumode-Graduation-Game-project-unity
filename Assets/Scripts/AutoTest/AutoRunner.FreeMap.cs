@@ -43,6 +43,38 @@ namespace AutoTest
         private const int LureEtaThreshold = 3;
 
         private int _freeMapActions;
+        private readonly Queue<int> _freeMapTrail = new Queue<int>();
+        /// <summary>この層で踏んだ点。 新しい点へ着いたら「進んでいる」とみなす。</summary>
+        private readonly HashSet<int> _freeMapVisited = new HashSet<int>();
+        /// <summary>新しい点へ着かないまま過ぎた行動の数。 <see cref="FreeMapStallActions"/> で迂回へ切り替える。</summary>
+        private int _freeMapSinceProgress;
+        /// <summary>迂回している行き先 (-1 = 迂回していない)。 着くか行き先が変わるまで迂回を続ける。</summary>
+        private int _freeMapDetourTarget = -1;
+        /// <summary>見えている時に最後に見た追跡者の位置と、 その位置を続けて見た回数・一度でも動いたのを見たか。
+        /// <b>性質 (FoeProfile) は読まない</b> ── 動かないことは、 人と同じく見え方から知る。</summary>
+        private int _foeSeenAt = -1, _foeSeenStill, _foeSeenTurn = -1;
+        private bool _foeSeenMove;
+
+        /// <summary>偵察と照明を使うか (2026-11-05)。 戦闘名は偵察・照明で見つけた点 (完全公開) にしか出ないので、
+        /// 使わないと危険な戦闘を避ける情報が無い。 **既定は false (使わない)** ── 2026-11-05 に同じ 5,000 シードで比べると
+        /// 使う方がクリア 19.4% → 17.9% (z=−2.42) と悪化した (照明 5 回 = 物資 250 と、 偵察 6 回分の手番を払うのに、
+        /// 戦闘名を活かす判断が TileDanger の足切りしか無い)。 使う場面を絞ってから戻す。</summary>
+        [System.NonSerialized] public bool freeNavScout = false;
+        /// <summary>この層で偵察した点 (同じ点では 1 回まで)。</summary>
+        private readonly HashSet<int> _freeMapReconAt = new HashSet<int>();
+        /// <summary>偵察: 2 歩以内に、 まだ調べていない未使用の点がこの数以上あれば使う。</summary>
+        private const int ReconMinUnscouted = 2;
+        /// <summary>照明: 3 歩以内に、 まだ調べていない未使用の点がこの数以上あれば使う。</summary>
+        private const int FlareMinUnscouted = 4;
+        /// <summary>[計装] 偵察・照明を使った回数 (バッチ累計)。</summary>
+        public static long FreeNavRecons, FreeNavFlares;
+
+        /// <summary>新しい点へ着かないまま、 この行動数が過ぎたら迂回を考える。</summary>
+        private const int FreeMapStallActions = 10;
+        /// <summary>同じ位置に居るのを続けて何回見たら「動かない追跡者」とみなすか。</summary>
+        private const int FoeStillToStatic = 2;
+        /// <summary>[計装] 迂回に切り替えた回数 (バッチ累計)。 添字は 0 迂回路あり / 1 迂回路なし (真っ直ぐ歩いて戦う)。</summary>
+        public static readonly long[] FreeNavDetours = new long[2];
         private FreeMapLayout _freeMapLayout;
 
         /// <summary>航行の方策を戦闘の技量から切り離す。 -1 = 技量に従う (既定) / 0 = Naive / 1 以上 = 追跡者を避ける。
@@ -70,10 +102,25 @@ namespace AutoTest
             var map = mm.CurrentMap;
             if (run == null || sim == null || map == null) { Finish(Outcome.Deadlock, "航行マップの層の状態が無い"); return true; }
 
-            if (!ReferenceEquals(map.layout, _freeMapLayout)) { _freeMapLayout = map.layout; _freeMapActions = 0; }
+            if (!ReferenceEquals(map.layout, _freeMapLayout))
+            {
+                _freeMapLayout = map.layout; _freeMapActions = 0; _freeMapTrail.Clear();
+                _freeMapVisited.Clear(); _freeMapSinceProgress = 0; _freeMapDetourTarget = -1;
+                _foeSeenAt = -1; _foeSeenStill = 0; _foeSeenMove = false; _foeSeenTurn = -1;
+                _freeMapReconAt.Clear();
+            }
+            if (_freeMapVisited.Add(sim.Me)) _freeMapSinceProgress = 0; else _freeMapSinceProgress++;
+            ObserveFoe(sim);
+            var L0 = map.layout;
+            _freeMapTrail.Enqueue(sim.Me); while (_freeMapTrail.Count > 12) _freeMapTrail.Dequeue();
             if (++_freeMapActions > 2 * MaxFreeMapActionsPerFloor)
             {
-                Finish(Outcome.Deadlock, $"航行マップの層で行動の上限 ({2 * MaxFreeMapActionsPerFloor}) を超えた");
+                // [計装 2026-11-04] どこで何に詰まったか。 直近の位置は往復しているかを見るため。
+                var hops = sim.HopsFrom(sim.Me);
+                Finish(Outcome.Deadlock, $"航行マップの層で行動の上限 ({2 * MaxFreeMapActionsPerFloor}) を超えた"
+                    + $" / 深さ{run.Depth} Me={sim.Me} goal={L0.goal} 出口まで{(hops[L0.goal] == int.MaxValue ? -1 : hops[L0.goal])}歩"
+                    + $" / 物資{run.provision} / 追跡者{(sim.FoeAlive ? $"{sim.FoeMode}@{sim.FoeNode}({(hops[sim.FoeNode] == int.MaxValue ? -1 : hops[sim.FoeNode])}歩)" : "なし")}"
+                    + $" / 囮{CountConsumable(run, ItemIds.Lure)} / 直近 {string.Join(",", _freeMapTrail)}");
                 return true;
             }
             if (_freeMapActions == MaxFreeMapActionsPerFloor + 1) FreeMapActionCapHits++;
@@ -93,6 +140,12 @@ namespace AutoTest
             FreeNavDecisions[mode]++;
             var hopsFromMe = sim.HopsFrom(at);
 
+            // [計装 2026-11-04] 戦えない HP か (Rank の低 HP ゲートと同じ閾値)。 下の踏み込みの計数だけが読む。
+            //   (同日に試した「重み付きの道」「出口までの HP 取り置き」は、 同一シード 5,000 ラン でクリア率を
+            //    13.5% → 10.8% → 6.8% と下げたので撤回した。 早い層の死は判断ではなく HP の収支の問題だった)
+            bool cantFightBlind = hpRatio < dangerTarget;
+            int nCount = L.Count;
+
             // ── 補足されている: 囮罠を使う (回避あり) ──
             if (avoid)
             {
@@ -102,6 +155,43 @@ namespace AutoTest
                 {
                     FreeNavLures[mode]++;
                     return false;   // 手番は使わないので、 同じ判断をもう一度する (囮罠は仕掛けた点に残る)
+                }
+            }
+
+            // ── 調べる (2026-11-05): 照明 → 偵察の順。 どちらも行き先を決める前に使い、 開示された戦闘名は Rank (TileDanger) が読む ──
+            //   照明: 物資 50 (1 歩分)・手番は使わない・3 手番のあいだ 3 歩先まで。 追跡者の察知も 3 歩に伸びるので、 近くに居る時は使わない。
+            //   偵察: 1 手番 (追跡者が動き天候の前線も進む)・2 歩先まで。 追われている時は使わない。 同じ点では 1 回まで。
+            if (freeNavScout && _freeMapActions <= MaxFreeMapActionsPerFloor)
+            {
+                int Unscouted(int range)
+                {
+                    int c = 0;
+                    foreach (var n in map.GetAllNodes())
+                    {
+                        int i = n.index;
+                        if (i < 0 || i >= L.Count || i == at || n.activated || sim.IsSunk(i) || sim.Scouted[i]) continue;
+                        if (hopsFromMe[i] != int.MaxValue && hopsFromMe[i] <= range) c++;
+                    }
+                    return c;
+                }
+                bool chased = sim.FoeAlive && sim.FoeMode == FoeMode.Chase;
+                bool foeNear = sim.FoeAlive && (sim.FoeVisible || sim.Stone().level >= 2);
+                int exitCost = hopsFromMe[L.goal] == int.MaxValue ? 0 : hopsFromMe[L.goal] * FreeMapParams.MoveSupply;
+                if (!sim.FlareOn && !chased && !foeNear
+                    && run.provision >= exitCost + FreeMapExitMargin + FreeMapParams.FlareSupply
+                    && Unscouted(FreeMapParams.FlareRange) >= FlareMinUnscouted
+                    && gm.UseFlare())
+                {
+                    FreeNavFlares++;
+                    return false;   // 手番は使わない。 見えた上で同じ判断をもう一度する
+                }
+                if (!sim.FlareOn && !chased && !_freeMapReconAt.Contains(at)
+                    && Unscouted(FreeMapParams.ReconRange) >= ReconMinUnscouted
+                    && gm.ReconTurn())
+                {
+                    _freeMapReconAt.Add(at);
+                    FreeNavRecons++;
+                    return false;
                 }
             }
 
@@ -132,7 +222,33 @@ namespace AutoTest
 
             // ── 次の 1 歩 ──
             int hop = sim.StepToward(at, target);
-            if (avoid) hop = AvoidFoeStep(sim, at, target, hop);
+            // 行動の上限 (の手前) を過ぎたら避けるのをやめて出口へ真っ直ぐ歩く ── 避け道の往復で層に閉じ込められない
+            if (avoid && _freeMapActions <= MaxFreeMapActionsPerFloor)
+            {
+                // 新しい点へ着けないまま時間が過ぎたら、 その場の 1 歩の避け方ではなく行き先までの迂回路を引く (2026-11-04)
+                if (_freeMapDetourTarget != target) _freeMapDetourTarget = -1;
+                if (_freeMapDetourTarget < 0 && _freeMapSinceProgress >= FreeMapStallActions && sim.FoeAlive)
+                {
+                    _freeMapDetourTarget = target;
+                    _freeMapSinceProgress = 0;
+                }
+                if (_freeMapDetourTarget >= 0)
+                {
+                    int d = DetourStep(sim, at, target);
+                    FreeNavDetours[d >= 0 ? 0 : 1]++;
+                    if (d >= 0) hop = d;      // 迂回路が無ければ真っ直ぐ歩く (捕まれば戦う)
+                }
+                else hop = AvoidFoeStep(sim, at, target, hop);
+            }
+            // [計装 2026-11-04] 戦えない HP で、 戦闘マス/見えていない点へ踏み込む 1 歩を理由別に数える
+            if (cantFightBlind && hop >= 0 && hop < nCount && _cur?.lowHpRiskSteps != null)
+            {
+                var hn = map.GetNode(map.NodeIdAt(hop));
+                bool battleish = hn != null && !hn.activated
+                    && (!hn.revealed || hn.EffectiveType == TileType.Battle || hn.EffectiveType == TileType.EliteBattle || hop == L.goal);
+                if (battleish)
+                    _cur.lowHpRiskSteps[hop == L.goal ? 3 : toExit ? 2 : hop == target ? 0 : 1]++;
+            }
             if (hop < 0 || hop == at || !sim.CanMoveTo(hop))
             {
                 Finish(Outcome.Deadlock, $"航行マップの層で行き先 {target} へ動けない (Me={at})");
@@ -156,13 +272,22 @@ namespace AutoTest
             bool foeKnown = sim.FoeVisible;
             if (!foeKnown && stone.level < 2) return preferred;   // 遠い / 反応なしなら避けない
 
+            // 動かない追跡者: 近づいても捕まらない。 その点を踏まないことだけを避ける
+            if (foeKnown && FoeLooksStatic())
+                return preferred != sim.FoeNode ? preferred : FirstSafeNeighbor(sim, at, target, sim.FoeNode, preferred);
+
             var toTarget = sim.HopsFrom(target);
             var nbrs = sim.Neighbors(at);
             int best = preferred; double bestScore = double.NegativeInfinity;
             double baseline = toTarget[at];
+            // 追われている時は、 行き先へ近づく隣の中でだけ避ける (2026-11-04)。
+            //   後ずさりを許すと、 出口との間に居座る追跡者の前で 2〜3 点を往復し続け、 学習の 1 ラウンドで
+            //   13% のランが行動の上限で打ち切られていた。 近づける避け道が無ければ、 出口へ歩いて戦う。
+            bool chased = sim.FoeMode == FoeMode.Chase;
             foreach (int c in nbrs)
             {
                 if (!sim.CanMoveTo(c)) continue;
+                if (chased && c != preferred && !(toTarget[c] < baseline)) continue;
                 double danger;
                 if (foeKnown)
                 {
@@ -182,6 +307,73 @@ namespace AutoTest
                 if (score > bestScore + 1e-9) { bestScore = score; best = c; }
             }
             return best;
+        }
+
+        /// <summary>見えている時だけ追跡者の位置を記録する (見えていない位置は読まない)。 足止め中 (囮罠) の静止は数えない。</summary>
+        private void ObserveFoe(FreeMapSim sim)
+        {
+            if (!sim.FoeAlive || !sim.FoeVisible || sim.FoeFreezeTurns > 0) return;
+            if (sim.Turn == _foeSeenTurn) return;   // 手番が進んでいない (囮罠を置いただけ) なら数えない
+            _foeSeenTurn = sim.Turn;
+            if (_foeSeenAt == sim.FoeNode) _foeSeenStill++;
+            else { if (_foeSeenAt >= 0) _foeSeenMove = true; _foeSeenAt = sim.FoeNode; _foeSeenStill = 0; }
+        }
+
+        /// <summary>この層の追跡者は動かないと見てよいか (一度も動くのを見ておらず、 同じ位置を続けて見た)。</summary>
+        private bool FoeLooksStatic() => !_foeSeenMove && _foeSeenStill >= FoeStillToStatic;
+
+        /// <summary>行き先までの迂回路の最初の 1 歩。 追跡者の近く (動かないならその点だけ) を通らない最短の道。
+        /// 追跡者の位置は、 見えていればその位置・見えていなければ最後に見た位置。 迂回路が無ければ -1。</summary>
+        private int DetourStep(FreeMapSim sim, int at, int target)
+        {
+            int foe = sim.FoeVisible ? sim.FoeNode : _foeSeenAt;
+            if (foe < 0) return -1;
+            int keep = FoeLooksStatic() ? 0 : FoeAvoidHops;
+            var dFoe = sim.HopsFrom(foe);
+            int n = dFoe.Length;
+            bool Blocked(int v) => v != target && dFoe[v] != int.MaxValue && dFoe[v] <= keep;
+            // 行き先から逆に広げて、 自分の隣のうち一番近いものを選ぶ (決定的: 同点は添字の小さい方)
+            var dist = new int[n];
+            for (int i = 0; i < n; i++) dist[i] = int.MaxValue;
+            var q = new Queue<int>();
+            dist[target] = 0; q.Enqueue(target);
+            while (q.Count > 0)
+            {
+                int u = q.Dequeue();
+                foreach (int v in sim.Neighbors(u))
+                {
+                    if (dist[v] != int.MaxValue || sim.IsSunk(v)) continue;
+                    if (v != at && Blocked(v)) continue;
+                    dist[v] = dist[u] + 1; q.Enqueue(v);
+                }
+            }
+            int best = -1, bd = int.MaxValue;
+            foreach (int c in sim.Neighbors(at))
+            {
+                if (!sim.CanMoveTo(c) || Blocked(c) || dist[c] == int.MaxValue) continue;
+                if (dist[c] < bd || (dist[c] == bd && c < best)) { bd = dist[c]; best = c; }
+            }
+            return best;
+        }
+
+        /// <summary>avoid を踏まずに行き先へ近づく隣 (無ければ <paramref name="fallback"/>)。</summary>
+        private static int FirstSafeNeighbor(FreeMapSim sim, int at, int target, int avoid, int fallback)
+        {
+            var toTarget = sim.HopsFrom(target);
+            int best = -1, bd = int.MaxValue;
+            foreach (int c in sim.Neighbors(at))
+            {
+                if (c == avoid || !sim.CanMoveTo(c) || toTarget[c] == int.MaxValue) continue;
+                if (toTarget[c] < bd || (toTarget[c] == bd && c < best)) { bd = toTarget[c]; best = c; }
+            }
+            return best >= 0 ? best : fallback;
+        }
+
+        private static int CountConsumable(RunState run, string id)
+        {
+            int n = 0;
+            if (run?.ownedConsumables != null) foreach (var c in run.ownedConsumables) if (c == id) n++;
+            return n;
         }
 
         private static bool HasConsumable(RunState run, string id)

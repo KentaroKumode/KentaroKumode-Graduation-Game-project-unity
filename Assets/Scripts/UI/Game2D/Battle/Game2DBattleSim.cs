@@ -25,6 +25,8 @@ namespace UI.Game2D.Battle
         public readonly int[] pd = { 1, 1, 1 }, ed = { 1, 1, 1 }, wire = { 0, 0, 0 };     // wire: 0 = 攻撃 / 1 = 防御 / 2 = 充電 / 3 = 特殊
         public int enemyDiceCount = 3;
         public int turn = 1, playerHp, playerMax = 1, charge, eatk, lastTaken, stage, nextStageIn = -1;
+        /// <summary>このターンの敵の防御と、 次の構えまでのターン (0 = このターンは構え / −1 = 構えない)。</summary>
+        public int edef, guardIn = -1;
         public int version;
         public bool rolled;                  // 今のターンのダイスが出ているか (合計の表示に使う)
         /// <summary>振り直しの判断で止まっているか / 払う充電。</summary>
@@ -183,7 +185,7 @@ namespace UI.Game2D.Battle
         {
             var p = cm.PendingDecision; if (p == null) return;
             var tele = p.tele;
-            turn = tele.turn; eatk = tele.enemyAttackValue; stage = tele.escalationStage;
+            turn = tele.turn; eatk = tele.enemyAttackValue; stage = tele.escalationStage; edef = tele.enemyDefense; guardIn = tele.turnsToGuard;
             nextStageIn = tele.nextThresholdTurn > 0 ? tele.nextThresholdTurn - tele.turn : -1;
             var e = tele.enemyDice; enemyDiceCount = e != null ? Mathf.Min(3, e.Length) : 0;
             for (int i = 0; i < 3; i++) ed[i] = e != null && i < e.Length ? e[i] : 0;

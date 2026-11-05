@@ -63,7 +63,7 @@ namespace AutoTest
         /// <summary>物資回復(食料消費)を始める物資の上限。 現在物資がこの値以下になったら食料で補充する。
         /// 高いほど早めに補充(温存・安全)、 低いほど枯渇近くまで引っ張る(食料を出し惜しみ他用途へ)。 L2が勝率で最適化。
         /// 既定45 = 旧ハードコード(悲観帯≤45で補充)と同等。 ※佯狂者の冠所持時は発狂狙いのため別途補充しない。</summary>
-        [UnityEngine.Serialization.FormerlySerializedAs("hopeRefillFloor")] public float provisionRefillFloor = 450f;   // 2026-09-28: 物資 ×10
+        [UnityEngine.Serialization.FormerlySerializedAs("hopeRefillFloor")] public float provisionRefillFloor = 900f;   // 2026-11-04: 450 → 900 (移動 1 歩 10 → 50・包 4G で 1 店 30 包 ＝ 満タン近くまで買う)
         /// <summary>物資の補充を **provisionCap のこの割合で打ち切る**。 既定 1.0 = 上限まで満たす（従来動作）。
         ///
         /// 1 未満にすると「補充はするが上へ戻し切らない」＝ **物資を帯の中に留める**。
@@ -168,7 +168,7 @@ namespace AutoTest
             emergencyHealRatio       = Mathf.Clamp(emergencyHealRatio, 0.50f, 2.00f);
             hpCritThreshold          = Mathf.Clamp(hpCritThreshold, 0.10f, 0.50f);
             lateralProvisionFloor         = Mathf.Clamp(lateralProvisionFloor, 0f, 600f);
-            provisionRefillFloor          = Mathf.Clamp(provisionRefillFloor, 0f, 750f);
+            provisionRefillFloor          = Mathf.Clamp(provisionRefillFloor, 0f, GameLoop.ProvisionRules.Max);
             provisionBandCeilRatio        = Mathf.Clamp(provisionBandCeilRatio, 0.10f, 1.00f);
             stanceDefendWinProb      = Mathf.Clamp(stanceDefendWinProb, 0f, 0.90f);
             stanceDefendHpBias       = Mathf.Clamp(stanceDefendHpBias, 0f, 0.60f);

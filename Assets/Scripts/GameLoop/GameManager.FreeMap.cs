@@ -249,30 +249,91 @@ namespace GameLoop
         //  追跡者との戦闘
         // =====================================================================
 
-        /// <summary>追跡者の専用エネミー (単独の 1 戦)。 その層の次の層のエリート (7 層は 7 層自身) を土台に、
-        /// 追跡者の性質で名前と強さを変える。 「重い」性質は最大 HP が大きい。</summary>
-        private EnemyData BuildPursuerEnemy(FreeMapSim sim)
+        /// <summary>追跡者の専用エネミーの中身 (性質ごと・2026-11-04)。 強さの土台は「その層の次の層のエリート」(7 層は 7 層自身) で、
+        /// その上に性質ごとの型を足す。 数値は全部仮置き (§23-21・動かす時は採否を取ってから測定する)。</summary>
+        private sealed class PursuerFight
         {
-            int enemyFloor = Run.Depth >= 7 ? 7 : FloorPlan.Next(Run.Depth);
+            public string name, description;
+            /// <summary>本体の最大 HP の倍率。</summary>
+            public float hpMul = 1f;
+            /// <summary>2 体目: その層の通常の敵 1 体 (召喚者の使い魔)。</summary>
+            public bool floorCompanion;
+            /// <summary>2 体目: 猟犬 (本体を縮めた写し)。 HP・攻撃は本体に対する比。</summary>
+            public bool hound;
+            public float houndHp, houndAtk;
+            /// <summary>先手: 最初の N ターンの攻撃倍率。</summary>
+            public int openingTurns; public float openingMul;
+            /// <summary>防御の下限と、 積み上がる装甲を足すか。</summary>
+            public int minDefense; public bool stackingArmor;
+        }
+
+        private static PursuerFight PursuerFightOf(string profileId)
+        {
+            switch (profileId)
+            {
+                case "summoner": return new PursuerFight { name = "群れ呼び", description = "自分は動かず、手下を呼び寄せて戦わせる。呼ばれた一体と並んで立ちはだかる。", hpMul = 1.2f, floorCompanion = true };
+                case "hound":    return new PursuerFight { name = "猟犬使い", description = "足の速い猟犬を連れた狩人。獲物を追い詰めたら、猟犬と二人がかりで仕留める。", hpMul = 0.9f, hound = true, houndHp = 0.4f, houndAtk = 0.7f };
+                case "sprinter": return new PursuerFight { name = "影走り", description = "道を二歩ずつ駆ける追手。追いついた勢いのまま斬りかかるが、長くは保たない。", hpMul = 0.8f, openingTurns = 2, openingMul = 1.5f };
+                case "brute":    return new PursuerFight { name = "鉄塊の追手", description = "全身を鉄で覆った追手。歩みは遅いが、打ち合うほど鎧が厚くなる。", hpMul = 1.2f, minDefense = 10, stackingArmor = true };
+            }
+            return new PursuerFight { name = null };
+        }
+
+        /// <summary>追跡者の専用エネミー。 性質によっては 2 体戦 (<paramref name="secondary"/>)。</summary>
+        private EnemyData BuildPursuerEnemy(FreeMapSim sim, out EnemyData secondary)
+        {
+            secondary = null;
+            // 追跡者はその層のエリートから引く (2026-11-05)。 旧: 次の層のエリート ── 2 層の死亡の約 6 割が追跡者戦で、
+            //   層をまたいだ難度の階段の中でここだけ 1 段先を踏んでいた。
+            int enemyFloor = Run.Depth;
             // 添字: 層ごとの捕まった回数 × 8。 ノードの添字 (NodeRngIndex) と重ならない帯へ置く。
             int idx = Run.Depth * 4096 + 2048 + _pursuerFightCount * 8;
             var template = FloorManager.PickEnemyForNode(enemyFloor, idx, elite: true);
             if (template == null) return null;
             var e = template.Clone();
-            e.displayName = $"〈{sim.Profile.displayName}〉{template.displayName}";
-            if (sim.Profile.heavyFight) e.maxHP = Mathf.Max(1, Mathf.RoundToInt(e.maxHP * PursuerHeavyHpMul));
+            var f = PursuerFightOf(sim.Profile.id);
+            e.displayName = f.name ?? $"〈{sim.Profile.displayName}〉{template.displayName}";
+            if (!string.IsNullOrEmpty(f.description)) e.description = f.description;
+            e.maxHP = Mathf.Max(1, Mathf.RoundToInt(e.maxHP * f.hpMul));
+            if (f.openingTurns > 0) { e.openingTurns = f.openingTurns; e.openingAttackMul = f.openingMul; }
+            if (f.minDefense > 0) e.defense = Mathf.Max(e.defense, f.minDefense);
+            if (f.stackingArmor && !HasPassive(e, "StackingArmor"))
+            {
+                if (e.passiveSkills == null) e.passiveSkills = new System.Collections.Generic.List<EnemyPassiveEntry>();
+                e.passiveSkills.Insert(0, new EnemyPassiveEntry { internalName = "StackingArmor", skillName = "積み上がる装甲", description = "毎ターンの終わりに、防御+3（24まで）" });
+            }
+            if (f.floorCompanion)
+            {
+                var c = FloorManager.PickEnemyForNode(Run.Depth, idx + 1, elite: false);
+                if (c != null) secondary = c.Clone();
+            }
+            else if (f.hound)
+            {
+                var h = template.Clone();
+                h.displayName = "猟犬"; h.description = "狩人の連れた猟犬。噛みつきは鋭いが、体は軽い。";
+                h.maxHP = Mathf.Max(1, Mathf.RoundToInt(e.maxHP * f.houndHp));
+                h.baseAttack = Mathf.Max(1, Mathf.RoundToInt(h.EffectiveBaseAttack * f.houndAtk));
+                if (h.attackRollMax > 0) h.attackRollMax = Mathf.Max(h.attackRollMin, Mathf.RoundToInt(h.attackRollMax * f.houndAtk));
+                h.defense = 0; h.guardPeriod = 0; h.heavyPeriod = 0;
+                h.passiveSkills = new System.Collections.Generic.List<EnemyPassiveEntry>();
+                secondary = h;
+            }
             return e;
         }
 
-        /// <summary>「重い」追跡者の最大 HP 倍率 (仮置き)。</summary>
-        public const float PursuerHeavyHpMul = 1.4f;
+        private static bool HasPassive(EnemyData e, string id)
+        {
+            if (e.passiveSkills == null) return false;
+            foreach (var p in e.passiveSkills) if (p != null && p.internalName == id) return true;
+            return false;
+        }
 
         private void BeginPursuerFight()
         {
             var sim = FreeMap;
             _inPursuerFight = true;
             _pursuerFightCount++;
-            var enemy = BuildPursuerEnemy(sim);
+            var enemy = BuildPursuerEnemy(sim, out var secondEnemy);
             if (enemy == null)
             {
                 Debug.LogError("[GameManager] 追跡者の敵の選出に失敗 ── 戦闘を打ち切る");
@@ -282,14 +343,14 @@ namespace GameLoop
                 return;
             }
             CurrentEnemy = enemy;
-            CurrentEnemySecondary = null;
+            CurrentEnemySecondary = secondEnemy;
             CurrentEncounterRewardMultiplier = 1f;
             OnEnemyEncountered?.Invoke(CurrentEnemy);
-            Log($"追跡者に捕まった ── {CurrentEnemy.displayName}");
+            Log($"追跡者に捕まった ── {CurrentEnemy.displayName}" + (CurrentEnemySecondary != null ? $" ＋ {CurrentEnemySecondary.displayName}" : ""));
 
             var (dc, dm, cr, df, ft_, str_) = GatherPlayerCombatStats();
             SetPhase(GamePhase.Combat);
-            CombatManager.Instance.StartCombat(CurrentEnemy, Run.playerHP, dc, dm, cr, df, str_, ft_);
+            CombatManager.Instance.StartCombat(CurrentEnemy, Run.playerHP, dc, dm, cr, df, str_, ft_, CurrentEnemySecondary);
             CombatManager.Instance.FleeAllowed = true;
         }
 

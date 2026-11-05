@@ -32,6 +32,113 @@ namespace AutoTest.ParallelSweep
         /// <summary>親が使ったビルドの指紋。 ワーカー側では検証しない (親が起動前に見る)。
         /// 応答へ写して残すことで、 **どのビルドで測った数字か**が結果ファイルだけで分かる。</summary>
         public string buildFingerprint = "";
+        /// <summary>アイテム学習の 1 区間として走らせる時の出力先 (2026-11-04)。 空なら通常の測定。
+        /// 指定すると探索 (ホールドアウト・サンプル加点) を学習バッチと同じに入れ、
+        /// ラン毎の学習用記録 (<see cref="LearnRunFile"/>) をここへ書く。 <b>学習ファイルへは書かない</b>
+        /// ── 合流は親が 1 か所でやる (プロセスごとに別の学習が育たないように)。</summary>
+        public string learnRunsPath = "";
+    }
+
+    /// <summary>アイテム学習のラン 1 本分 (2026-11-04)。 <c>ItemLearningStats.IngestBatch</c> と
+    /// <c>RunDataLogger.AppendBatch</c> が読む項目だけを持つ。 RunRec は HashSet / Dictionary を持ち
+    /// JsonUtility で運べないので、 ここで配列へ詰め替える。</summary>
+    [Serializable]
+    public sealed class LearnRunRow
+    {
+        public int index;
+        public int bandScore;
+        public int reachedFloor;
+        public bool isExploreRun;
+        public long totalDamageDealt, totalDamageTaken, totalHealed, totalShieldGained;
+        public string[] acquired = Array.Empty<string>();
+        public string[] offered = Array.Empty<string>();
+        public string[] exploreOffered = Array.Empty<string>();
+        public string[] exploreAcquired = Array.Empty<string>();
+        public string[] awakenedFormsKilled = Array.Empty<string>();
+        // ── 診断用 (学習の合流には使わない・2026-11-04) ──
+        public int deathFloor;
+        public bool deathInBossFight;
+        public string fatalEnemy = "";
+        public int[] lowHpRiskSteps = Array.Empty<int>();
+        // お金の流れ (診断用・2026-11-04)
+        public int goldGained, coinsSpent, shopPurchases, shopBuyPassive, shopRerolls, shopRerollCoins, finalCoins, peakCoins, totalCombats;
+        public LearnFightRow[] fights = Array.Empty<LearnFightRow>();
+
+        public static LearnRunRow From(AutoRunner.RunRec r)
+        {
+            string[] A(System.Collections.Generic.HashSet<string> s)
+            {
+                if (s == null || s.Count == 0) return Array.Empty<string>();
+                var a = new string[s.Count]; s.CopyTo(a); return a;
+            }
+            return new LearnRunRow
+            {
+                index = r.index, bandScore = r.bandScore, reachedFloor = r.reachedFloor,
+                isExploreRun = r.isExploreRun,
+                totalDamageDealt = r.totalDamageDealt, totalDamageTaken = r.totalDamageTaken,
+                totalHealed = r.totalHealed, totalShieldGained = r.totalShieldGained,
+                acquired = A(r.acquiredItemsEver), offered = A(r.offeredItemsEver),
+                exploreOffered = A(r.exploreOfferedEver), exploreAcquired = A(r.exploreAcquiredEver),
+                awakenedFormsKilled = A(r.awakenedFormsKilled),
+                deathFloor = r.deathFloor, deathInBossFight = r.deathInBossFight, fatalEnemy = r.fatalEnemy ?? "",
+                lowHpRiskSteps = r.lowHpRiskSteps != null ? (int[])r.lowHpRiskSteps.Clone() : Array.Empty<int>(),
+                goldGained = r.totalGoldGained, coinsSpent = r.totalCoinsSpent, shopPurchases = r.shopPurchases,
+                shopBuyPassive = r.shopBuyPassive, shopRerolls = r.shopRerolls, shopRerollCoins = r.shopRerollCoins,
+                finalCoins = r.finalCoins, peakCoins = r.peakCoins, totalCombats = r.totalCombats,
+                fights = Fights(r.combats),
+            };
+        }
+
+        private static LearnFightRow[] Fights(System.Collections.Generic.List<AutoRunner.CombatRec> cs)
+        {
+            if (cs == null || cs.Count == 0) return Array.Empty<LearnFightRow>();
+            var a = new LearnFightRow[cs.Count];
+            for (int i = 0; i < cs.Count; i++)
+            {
+                var c = cs[i];
+                a[i] = new LearnFightRow
+                {
+                    enemyId = c.enemyId ?? "", floor = c.floor, isBoss = c.isBoss, won = c.won, end = c.isFightEnd,
+                    turns = c.turns, hpBefore = c.hpBefore, hpAfter = c.hpAfter, maxHp = c.playerMaxHpEnd,
+                    dealt = c.damageDealt, taken = c.damageTaken, enemyMaxHp = c.enemyMaxHP,
+                    key = c.encounterKey ?? "",
+                };
+            }
+            return a;
+        }
+
+        public AutoRunner.RunRec ToRunRec()
+        {
+            var r = new AutoRunner.RunRec
+            {
+                index = index, bandScore = bandScore, reachedFloor = reachedFloor, isExploreRun = isExploreRun,
+                totalDamageDealt = totalDamageDealt, totalDamageTaken = totalDamageTaken,
+                totalHealed = totalHealed, totalShieldGained = totalShieldGained,
+            };
+            r.acquiredItemsEver.UnionWith(acquired ?? Array.Empty<string>());
+            r.offeredItemsEver.UnionWith(offered ?? Array.Empty<string>());
+            r.exploreOfferedEver.UnionWith(exploreOffered ?? Array.Empty<string>());
+            r.exploreAcquiredEver.UnionWith(exploreAcquired ?? Array.Empty<string>());
+            r.awakenedFormsKilled.UnionWith(awakenedFormsKilled ?? Array.Empty<string>());
+            return r;
+        }
+    }
+
+    /// <summary>戦闘 1 回分の診断用の記録 (CombatRec の写し)。</summary>
+    [Serializable]
+    public sealed class LearnFightRow
+    {
+        public string enemyId = "";
+        public int floor, turns, hpBefore, hpAfter, maxHp, dealt, taken, enemyMaxHp;
+        public bool isBoss, won, end;
+        public string key = "";   // 戦闘名の鍵 (EncounterDangerStats・2026-11-05)
+    }
+
+    [Serializable]
+    public sealed class LearnRunFile
+    {
+        public int seedStart;
+        public LearnRunRow[] runs = Array.Empty<LearnRunRow>();
     }
 
     /// <summary>ワーカー 1 プロセス分の返答。</summary>
@@ -179,6 +286,9 @@ namespace AutoTest.ParallelSweep
         /// <summary>[計装] FinishCombat の再入回数 (SkillDiag.FinishCombatReentry)。
         /// <b>0 でなければ層別の戦闘数・死亡数が二重に積まれている</b>。</summary>
         public long finishCombatReentry;
+        /// <summary>敵 HP の減りの経路・品別 (<see cref="CombatSystem.HpLossDiag"/>)。 名前 × (種類 3 × 層 5) を平らに並べる。</summary>
+        public string[] hpLossNames = Array.Empty<string>();
+        public double[] hpLoss = Array.Empty<double>();
         public string[] dmgSrcNames = Array.Empty<string>();
         public double[] dmgSrcAll = Array.Empty<double>();
         public double[] dmgSrcBoss = Array.Empty<double>();
@@ -202,7 +312,18 @@ namespace AutoTest.ParallelSweep
             {
                 string key = keys[i];
                 if (string.IsNullOrEmpty(key)) continue;
-                FieldInfo f = typeof(AutoRunner).GetField(key,
+                // 「superAI.winHpWeight」のようにドットで入れ子のフィールドも指せる (2026-11-05)。
+                object target = runner;
+                string leaf = key;
+                int dot = key.IndexOf('.');
+                while (dot > 0 && target != null)
+                {
+                    var holder = target.GetType().GetField(leaf.Substring(0, dot), BindingFlags.Public | BindingFlags.Instance);
+                    target = holder?.GetValue(target);
+                    leaf = leaf.Substring(dot + 1);
+                    dot = leaf.IndexOf('.');
+                }
+                FieldInfo f = target?.GetType().GetField(leaf,
                     BindingFlags.Public | BindingFlags.Instance);
                 if (f == null)
                 {
@@ -215,7 +336,7 @@ namespace AutoTest.ParallelSweep
                         + key + "=" + values[i] + " (" + f.FieldType.Name + ")");
                     continue;
                 }
-                f.SetValue(runner, parsed);
+                f.SetValue(target, parsed);
             }
         }
 
@@ -263,6 +384,8 @@ namespace AutoTest.ParallelSweep
                 //   運び忘れると、 別の停止位置で測ったことになる。
                 "rerollStopRule", "rerollShelfValue", "rerollPriorWeight",
                 "phase3BeforeReroll", "rerollCurveFirst", "rerollCurveStep",
+                // 計測でイベントを切っているか (2026-11-05)。 クリア率の意味が変わるので必ず印字する。
+                "suppressEvents", "freeNavScout", "navLearnedDanger",
             };
             var sb = new System.Text.StringBuilder();
             foreach (string name in watched)

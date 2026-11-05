@@ -157,6 +157,8 @@ namespace CombatSystem
                 nextThresholdTurn = Escalation.NextThresholdTurn(EscalationTurn(ctx)),
                 turnsToHeavy = Escalation.TurnsToHeavy(currentEnemy, ctx.currentTurn),
                 heavyMul = currentEnemy?.heavyMul ?? 0f,
+                turnsToGuard = Escalation.TurnsToGuard(currentEnemy, ctx.currentTurn),
+                enemyDefense = ctx.enemyDefense,
                 enemyDice = enemyDice,
                 enemyDiceTotal = rawEnemyTotal,
             };
@@ -447,7 +449,7 @@ namespace CombatSystem
                     {
                         int dmg = BattleModifierManager.ApplyBleedModifiers(ctx, ctx.enemyBleedStacks);
                         RaiseDotDamage(DotKind.Bleed, Math.Min(dmg, enemyHP));
-                        enemyHP = Math.Max(0, enemyHP - dmg);
+                        HpLossDiag.Lose(ref enemyHP, dmg, "出血端子");
                         ctx.enemyCurrentHP = enemyHP;
                     }
                     Debug.Log($"[特殊端子/出血] +{sum} スタック (計 {ctx.enemyBleedStacks}) / 即時 {count} 回");
@@ -483,6 +485,7 @@ namespace CombatSystem
                     {
                         int dmg = sum * SpecialTerminals.VitalPointMultiplier;
                         ctx.fixedDamageToEnemy += dmg;
+                        HpLossDiag.NoteSource("端子:急所", dmg, 0);
                         Debug.Log($"[特殊端子/急所] 最小値{min} を接続 → 軽減不可 {dmg}");
                     }
                     break;
@@ -570,6 +573,41 @@ namespace CombatSystem
             return takenDmg;
         }
 
+        /// <summary>実効会心率 (0〜1)。 武器 + このターンの加算 + 整備パネル − 〈俊敏〉 を <c>ResolveCritRate</c> に通す。
+        /// 役の追撃の判定と HUD の表示が同じ 1 箇所を通る (2026-11-05)。 本判定 (<c>PassiveSkillManager.ProcessDamage</c>) は
+        /// 同じ式を <c>OnCriticalCheck</c> の加算とバフの後に組むので、 配線を決める前の値には
+        /// <paramref name="pendingBuff"/> = true でまだ乗っていない戦闘中バフ (月蝕/レイピア) を足す。
+        /// 本判定の後 (バフは <c>critRatePctAdd</c> に取り込み済み) では false にすること ── 二重に数えない。</summary>
+        private float CritRateOf(CombatContext ctx, bool pendingBuff)
+        {
+            float add = playerCritBaseRate + ctx.critRatePctAdd
+                      + MetaProgression.MetaBuffApplicator.GetCritRatePctBonus();
+            if (pendingBuff) add += ctx.GetBuff(ItemSystem.PassiveSkills.CombatContext.CritRateBuffKey);
+            add = Mathf.Max(0f, add - MetaProgression.MetaDebuffApplicator.GetPlayerCritRatePenalty());
+            return ItemSystem.PassiveSkills.CombatContext.ResolveCritRate(add);
+        }
+
+        /// <summary>HUD に出すプレイヤーのステータス (2026-11-05)。 <b>配線を決める前に呼ぶ</b>こと
+        /// (与ダメ補正の整備パネル分と戦闘中バフの会心率は、 まだ本判定に取り込まれていない前提で足している)。
+        /// <c>OnCriticalCheck</c> で発動する条件付きの会心率 (3 種) は本判定まで分からないので含まない。</summary>
+        public struct HudStats { public float critRate, critMul; public int attack, outgoingPct, defense, pen; }
+
+        public HudStats PreviewHudStats()
+        {
+            var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+            var s = new HudStats { attack = playerAttackPower };
+            if (ctx == null) return s;
+            s.critRate = CritRateOf(ctx, pendingBuff: true);
+            s.critMul = ctx.criticalMultiplier;
+            float mul = ctx.outgoingDamageMultiplier <= 0f ? 1f : ctx.outgoingDamageMultiplier;
+            int metaPct = MetaProgression.MetaBuffApplicator.GetOutgoingDamagePct()
+                        + MetaProgression.MetaBuffApplicator.GetBattleSpiritPct(GameLoop.GameManager.Instance?.Run);
+            s.outgoingPct = Mathf.RoundToInt((mul - 1f) * 100f) + metaPct;
+            s.defense = ctx.playerDefense;
+            s.pen = ctx.playerArmorPen;
+            return s;
+        }
+
         /// <summary>ADR-0011 〈追撃〉(目 3): 与えたダメージの 30% (2 個そろい) / 100% (ゾロ目) を追加で与える。
         /// ゾロ目は<b>確定</b>ダメージ (固定ダメ枠・軽減無視)、 2 個そろいは通常ダメージへの上乗せ。
         /// T4 は追加分が会心判定を持つ。 会心率は本判定 (<c>PassiveSkillManager</c> の会心) と同じ組み立て:
@@ -583,10 +621,7 @@ namespace CombatSystem
             bool crit = false;
             if (outcome.extraDamageCanCrit)
             {
-                float critAdd = playerCritBaseRate + ctx.critRatePctAdd
-                              + MetaProgression.MetaBuffApplicator.GetCritRatePctBonus();
-                critAdd = Mathf.Max(0f, critAdd - MetaProgression.MetaDebuffApplicator.GetPlayerCritRatePenalty());
-                float rate = ItemSystem.PassiveSkills.CombatContext.ResolveCritRate(critAdd);
+                float rate = CritRateOf(ctx, pendingBuff: false);
                 // 本判定と同じ優先順: 封印 (無心の刃) で外れ、 forceCritical が最後に確定で上書きする。
                 crit = (!ctx.critSuppressed && GameLoop.GameRng.Chance(rate, "combat.roleExtraCrit", RngIdx(3)))
                     || ctx.forceCritical;

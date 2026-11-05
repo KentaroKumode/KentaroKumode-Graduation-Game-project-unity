@@ -39,6 +39,7 @@ namespace AutoTest
                 try
                 {
                     learnStats = ItemLearningStats.IngestBatch(learningRoot, _records);
+                    EncounterDangerStats.IngestRecs(learningRoot, _records);   // 戦闘名ごとの危険度 (2026-11-05)
                     File.WriteAllText(Path.Combine(dir, "ai_stats.json"),
                         ItemLearningStats.BuildAiCompact(learnStats), new UTF8Encoding(false));
                 }

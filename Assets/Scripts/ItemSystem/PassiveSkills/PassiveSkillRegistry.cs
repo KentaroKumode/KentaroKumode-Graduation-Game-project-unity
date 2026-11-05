@@ -393,6 +393,8 @@ namespace ItemSystem.PassiveSkills
 
             // 4～5層: 複合型
             Register(new HardScales());
+            Register(new CrackingArmor());
+            Register(new StackingArmor());
             Register(new TailStrike());
             Register(new Rampage());
             Register(new Ethereal());

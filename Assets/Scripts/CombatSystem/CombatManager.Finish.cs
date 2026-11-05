@@ -50,6 +50,7 @@ namespace CombatSystem
             // [計装] 対象層のボス戦の締め。 既定は無効。
             CombatSystem.BossCombatTrace.EndFight(enemyHP <= 0 && playerHP > 0,
                 PassiveSkillManager.Instance?.Context?.currentTurn ?? 0);
+            HpLossDiag.End(enemyHP, PassiveSkillManager.Instance?.Context?.currentTurn ?? 0);   // [計装 2026-11-05]
             SkillDiag.Note(_diagKind, playerHP <= 0, PassiveSkillManager.Instance?.Context?.currentTurn ?? 0,
                            _diagStartHp, playerHP, _diagStartMaxHp,
                            FloorStatIndex());

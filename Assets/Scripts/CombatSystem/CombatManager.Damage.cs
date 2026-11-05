@@ -394,7 +394,7 @@ namespace CombatSystem
                 int reflect = mitigated * 2;
                 if (reflect > 0)
                 {
-                    enemyHP = Math.Max(0, enemyHP - reflect);
+                    HpLossDiag.Lose(ref enemyHP, reflect, "反射(コントラタック)");
                     Debug.Log($"[コントラタック] 軽減{mitigated} → 被ダメ{totalDmg + mitigated}→{totalDmg}、反射{reflect} → 敵HP{enemyHP}");
                 }
             }
@@ -410,7 +410,7 @@ namespace CombatSystem
                 int reflect = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.ReflectKey);
                 if (reflect > 0)
                 {
-                    enemyHP = Math.Max(0, enemyHP - reflect);
+                    HpLossDiag.Lose(ref enemyHP, reflect, "反射(シールドの返し)");
                     ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.ReflectKey] = 0;
                     Debug.Log($"[シールドの返し] {reflect} → 敵HP {enemyHP}");
                 }
@@ -419,7 +419,7 @@ namespace CombatSystem
             // 消費: 鏡写しの水晶（吸収後の実被ダメと同量を敵へ反射）
             if (ctx.consReflect && totalDmg > 0)
             {
-                enemyHP = Math.Max(0, enemyHP - totalDmg);
+                HpLossDiag.Lose(ref enemyHP, totalDmg, "反射(鏡写し)");
                 Debug.Log($"[CombatManager] 鏡写し反射 {totalDmg} → 敵HP {enemyHP}");
             }
 

@@ -408,8 +408,12 @@ namespace ItemSystem.PassiveSkills
                 {
                     CombatContext.CurrentSkillId = skills[i].SkillId;
                     var dsBefore = CombatSystem.DmgSourceDiag.Take(context);
+                    int hlFixed = context.fixedDamageToEnemy;                                              // [計装 2026-11-05]
+                    int hlPend = (int)context.GetAccumulated(Keywords.Kw.PendingEnemyDamageKey);
                     skills[i].Execute(trigger, context);
                     CombatSystem.DmgSourceDiag.Attribute(skills[i].SkillId, dsBefore, context);
+                    CombatSystem.HpLossDiag.NoteSource(skills[i].SkillId, context.fixedDamageToEnemy - hlFixed,
+                        (int)context.GetAccumulated(Keywords.Kw.PendingEnemyDamageKey) - hlPend);
                     CombatContext.CurrentSkillId = "";
                     triggeredPlayerSkills.Add(skills[i].SkillId);
                 }

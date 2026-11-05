@@ -62,6 +62,12 @@ namespace CombatSystem
         public int defense;
         /// <summary>プレイヤーの防御を固定値で削る量 (ADR-0013)。 敵の攻撃値に掛かるプレイヤーの防御から引く。</summary>
         public int armorPen;
+        /// <summary>脅威度 (内部値・2026-11-04)。 実効 HP × 1 ターンの平均攻撃 ÷ 100。 <c>Tools/enemy_danger.py</c> が書く (敵の数値を変えたら実行し直す)。
+        /// 層の帯 (<see cref="MapSystem.FreeMove.FreeMapParams.BandOf"/>) ごとの抽選にだけ使い、 戦闘の計算には使わない。 0 = 未設定 (ボス・商人)。</summary>
+        public int danger;
+        /// <summary>強さの尺度の上の位置 (0 = 最弱 〜 1 = 最強・2026-11-04)。 数値は <c>Tools/enemy_scale.py</c> がこの位置の曲線から作る。
+        /// 層の候補はこの位置で選ぶ (<see cref="GameLoop.FloorManager.ScaleWindows"/>)。 −1 = 尺度に載っていない (ボス・商人)。</summary>
+        public float scale = -1f;
         public List<EnemyPassiveEntry> passiveSkills; // パッシブスキル一覧
 
         // ---- パリィ予兆 ----
@@ -90,6 +96,22 @@ namespace CombatSystem
         public float heavyMul;
         /// <summary>溜めターン (大技以外のターン) の攻撃倍率。</summary>
         public float heavyWindupMul;
+
+        // ---- 構え (予告つきの装甲・2026-11-04) ----
+        //   guardPeriod ターンごと (T = N, 2N …) に構える。 構えのターンは防御 +guardDefense・攻撃 ×guardAttackMul、
+        //   その次のターンは構えを解いた隙で防御 0。 周期は公開規則なので予告に出す (柱3 完全情報)。
+        /// <summary>構えの周期 (ターン)。 0 = 構えない。</summary>
+        public int guardPeriod;
+        /// <summary>構えのターンに足す防御。</summary>
+        public int guardDefense;
+        /// <summary>構えのターンの攻撃倍率 (0 なら 1)。</summary>
+        public float guardAttackMul;
+
+        // ---- 先手 (戦闘の始めだけ攻撃が重い・2026-11-04) ----
+        /// <summary>攻撃が重い最初のターン数。 0 = なし。</summary>
+        public int openingTurns;
+        /// <summary>最初の <see cref="openingTurns"/> ターンの攻撃倍率。</summary>
+        public float openingAttackMul;
 
         /// <summary>ADR-0009: 基礎攻撃値 (段階スケール前)。未指定時は threat から導出。</summary>
         public int EffectiveBaseAttack => baseAttack > 0 ? baseAttack : Math.Max(1, threat);

@@ -127,6 +127,27 @@ namespace UI.Game2D
             _buf[i] = new Color32((byte)(d.r + (c.r - d.r) * a), (byte)(d.g + (c.g - d.g) * a), (byte)(d.b + (c.b - d.b) * a), 255);
         }
 
+        private KitPix _jpPix;
+        private string _jpPixText;
+
+        /// <summary>日本語のドット字 (<see cref="Game2DJpFont"/>) を地図へ写す。 (x, y) は字の左上 (下向き)。 戻り値 = 幅。
+        /// 同じ文字列が続く間は焼いた絵を使い回す (ホバー中は毎フレーム同じ名前を描くため)。</summary>
+        private int JpText(string s, int x, int y, Color32 col)
+        {
+            if (string.IsNullOrEmpty(s)) return 0;
+            int w = Mathf.Max(1, Game2DJpFont.Width(s)), h = Game2DJpFont.Cell;
+            if (_jpPix == null || _jpPixText != s || _jpPix.w != w)
+            {
+                _jpPix = new KitPix(w, h);
+                Game2DJpFont.Draw(_jpPix, s, 0, 0, new Color32(255, 255, 255, 255));
+                _jpPixText = s;
+            }
+            for (int j = 0; j < h; j++)
+                for (int i = 0; i < w; i++)
+                    if (_jpPix.px[(h - 1 - j) * w + i].a > 0) Put(x + i, y + j, col);
+            return w;
+        }
+
         private void Rect(int x, int y, int w, int h, Color32 c)
         {
             for (int j = 0; j < h; j++) for (int i = 0; i < w; i++) Put(x + i, y + j, c);

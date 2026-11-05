@@ -313,6 +313,22 @@ namespace AutoTest
             _wiringDiffWriter = null;
         }
 
+        /// <summary>防ぎ切りの規則 (2026-11-05)。 このターンのブロックで、 エスカレーションで強くなった後の敵の攻撃まで
+        /// 撃破までずっと防ぎ切れる配線 (または今ターンで倒せる配線) を、 それ以外より優先する。
+        ///
+        /// <para><b>なぜ要るか。</b> 効用は「与ダメ + その 1 ターンで防げた量 − 4 × 撃破までのターン数」で、
+        /// HP を失うこと自体のコストを持たない。 攻撃が小さい敵 (層 1 の攻撃 2〜5) だと、 ダイス 1 個で全部防げるのに
+        /// 「延びる罰」に負けて全部攻撃に挿し、 毎ターン被弾していた (層 1 通常戦の損耗 18.3%・ブロックを使ったターン 15%)。
+        /// 先読みする Super は同じ戦闘で損耗 6.0%・ブロック 75% (手動プレイの「1 戦 10% 未満」と一致)。</para>
+        ///
+        /// <para><b>亀にならない理由。</b> 時間のコストを被弾量で測った旧案 (taken × ttk・2026-08-04 に棄却) は、 防ぎ切れる相手で
+        /// 罰が 0 に張り付いた。 ここでは時間のコストをエスカレーションで測る ── 撃破までに敵の攻撃が伸びてブロックを
+        /// 上回るなら規則は効かず、 従来の効用に戻る。 攻撃端子 0 本の配線は従来どおり禁止。</para></summary>
+        // インスタンスのフィールド (2026-11-05): 並列ワーカーへ設定として運ぶため。 static だと切り替えられなかった。
+        public bool FreeBlockRule = true;
+        /// <summary>防ぎ切れる配線への加点。 ほかの項より十分大きく、 致死回避 (−10000) より小さい。</summary>
+        private const float FreeBlockBonus = 1000f;
+
         private CombatSystem.WiringPlan MutualWiringPolicy(int[] rolls, CombatSystem.MutualTurnTelegraph tele)
         {
             int k = rolls?.Length ?? 0;
@@ -410,6 +426,49 @@ namespace AutoTest
             float critMul = ctxRoles?.criticalMultiplier ?? 3f;
             var specDef = CombatSystem.SpecialTerminals.Equipped(runForVoid);
 
+            // ===== 敵の防御と、 配線で条件が決まる武器の段 (2026-11-04) =====
+            //   敵の防御: 予告に出ているこのターンの値 (構えの上乗せ・隙の 0・割れる/積み上がる装甲を反映済み)。
+            //   以前は与ダメから防御を引いておらず、 装甲持ちと構えのターンで火力を大きく見誤っていた。
+            //   武器の段 (§9-4b): 剣は攻撃とブロックの両方に挿すと伸び、 盾は全部守る・全部攻めるへ振り切ると伸びる。
+            //   評価に無いと BOT はこの段を一度も狙わず、 家系の強さではなく方策の盲点を測ることになる。
+            int eDefNow = System.Math.Max(0, tele.enemyDefense);
+            int myPen = System.Math.Max(0, ctxRoles?.playerArmorPen ?? 0);
+            var activeIds = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.ActivePlayerSkillIds;
+            var rung = WeaponRungModel.From(activeIds);      // 段の検出と率は WeaponRungModel (Super と共通・2026-11-05)
+            bool stepGuardCut = rung.guardCut;
+            bool stepUndying = rung.undying;
+            int undyingStreak = (int)(ctxRoles?.GetAccumulated(ItemSystem.PassiveSkills.Effects.UndyingBlade.StreakKey) ?? 0f);
+            float bashRate = rung.bashRate;
+            float bulwarkRate = rung.bulwarkRate;
+            bool steadfastReady = rung.steadfast && ctxRoles != null
+                && ctxRoles.currentTurn >= (int)ctxRoles.GetAccumulated(ItemSystem.PassiveSkills.Effects.SteadfastStance.ReadyKey);
+            bool stepDaybreak = rung.daybreak;
+            int myShield = System.Math.Max(0, ctxRoles?.consShield ?? 0);
+            int enemyMaxHpNow = System.Math.Max(1, cm?.CurrentEnemy?.maxHP ?? 1);
+
+            // 防ぎ切りの規則 (2026-11-05): 撃破まで n ターン戦う間の、 敵の攻撃の伸び (このターン比の最大)。
+            //   エスカレーション・大技・構え・先手の周期だけを見る (どれも予告/説明に出る公開規則)。 先の出目は見ない。
+            float[] atkGrowth = null;
+            if (FreeBlockRule && EffectiveWiringSkill != WiringSkill.Naive && enemyAtk > 0 && cm?.CurrentEnemy != null)
+            {
+                var growEnemy = cm.CurrentEnemy;
+                var growArmor = EnemyArmorModel.From(growEnemy, ctxRoles, out _);
+                string growProf = growEnemy.EffectiveEscalationProfile;
+                int growDelay = (int)(ctxRoles?.GetAccumulated(CombatSystem.CombatManager.CoolantDelayKey) ?? 0f);
+                int growT0 = tele.turn;
+                float GrowMul(int t) => CombatSystem.Escalation.GetMultiplier(growProf, System.Math.Max(1, t - growDelay))
+                                        * growArmor.AttackFactor(t);
+                float growM0 = System.Math.Max(1e-3f, GrowMul(growT0));
+                atkGrowth = new float[HorizonCapTurns + 1];
+                float growMax = 1f;
+                atkGrowth[0] = 1f;
+                for (int j = 1; j <= HorizonCapTurns; j++)
+                {
+                    growMax = System.Math.Max(growMax, GrowMul(growT0 + j - 1) / growM0);
+                    atkGrowth[j] = growMax;
+                }
+            }
+
             float ScoreWithBuffers(CombatSystem.DiceTerminal[] w)
             {
                 int aCount = 0, bCount = 0, c = 0, aSum = 0, blockRaw = 0, maxBlockDie = 0;
@@ -477,7 +536,23 @@ namespace AutoTest
                     }
                 }
 
+                // 剣〈切り返し〉: 攻撃とブロックの両方に挿したターン、 ブロック × 0.5 を攻撃にも
+                if (stepGuardCut && aCount > 0 && bCount > 0)
+                    aSum += TurnRules.GuardCutBonus(blockRaw);
+                // 盾〈シールドバッシュ〉: 全部攻撃のターン、 シールドを使い切って × 率 を攻撃へ
+                bool bashSpent = bashRate > 0f && aCount == k && myShield > 0;
+                if (bashSpent) aSum += TurnRules.BashBonus(myShield, bashRate);
+                // 盾〈堅守の構え〉: 全部ブロックのターン、 シールド +15 (このターンの被弾から使える)
+                if (steadfastReady && bCount == k)
+                    blockRaw += ItemSystem.PassiveSkills.Effects.SteadfastStance.Shield;
+
                 int dmg = atkBase + aSum;
+                // 剣〈不滅の刃〉: 両方に挿したターンが続くたび与ダメ +8% (このターンで続けば streak+1)
+                if (stepUndying && aCount > 0 && bCount > 0)
+                    dmg = (int)(dmg * TurnRules.UndyingMul(undyingStreak + 1));
+                // 敵の防御 (このターンの値) で軽減
+                if (aCount > 0 && eDefNow > 0)
+                    dmg = CombatSystem.DefenseFormula.Apply(dmg, CombatSystem.DefenseFormula.Effective(eDefNow, myPen));
                 // damageCapped ボス: 与ダメが閾値超えたら超過分を半減した見積もりで探索 (実挙動と一致)
                 int effDmg = dmg;
                 if (play.damageCapped && play.damageCapThreshold > 0 && dmg > play.damageCapThreshold)
@@ -514,9 +589,12 @@ namespace AutoTest
                     block = System.Math.Max(0, block - enemyAtk * CombatSystem.CombatManager.PierceAwlPerAttack);
 
                 int taken = System.Math.Max(0, enemyAtk - block) + (int)reflectPenalty;
+                // 盾〈黎明〉: 無傷で受け切ったら、 敵の攻撃 10 につき敵の最大 HP の 5% を削る
+                if (stepDaybreak && taken == 0)
+                    effDmg += TurnRules.DaybreakDamage(enemyMaxHpNow, enemyAtk);
 
                 // 処刑人の烙印: 攻撃終了時に HP が最大の 20% 以下なら 9999。
-                if (tele.executeArmed && (myHp - taken) <= UnityEngine.Mathf.CeilToInt(myMaxHp * 0.20f))
+                if (tele.executeArmed && TurnRules.ExecuteKills(myHp - taken, myMaxHp))
                     taken = myHp;
 
                 // 〈虚空〉: 攻撃 0 本のターンだけ発動。 殻で被ダメを削り、 現在 HP 割合を刻む。
@@ -536,6 +614,11 @@ namespace AutoTest
                 float u = wAtk * System.Math.Min(effDmg, enemyHp)
                         + wDef * System.Math.Min(block, enemyAtk)
                         + specFlat;
+                // 盾〈城壁〉: 完全に受け止めたら、 余ったブロック × 率 がシールドへ (次のターン以降の弾・毎ターン半減するので半値で見る)
+                if (bulwarkRate > 0f)
+                    u += 0.5f * wDef * TurnRules.BulwarkGain(block, enemyAtk, bulwarkRate);
+                // 〈シールドバッシュ〉で使い切ったシールドは、 このターンの被弾を吸えない
+                if (bashSpent) u -= wDef * System.Math.Min(myShield, System.Math.Max(0, enemyAtk - block));
                 if (effDmg >= enemyHp) u += 50f + enemyAtk; // 今ターン撃破 = 敵攻撃が消える
                 if (taken >= myHp) u -= 10000f;              // 致死回避を最優先
 
@@ -559,7 +642,16 @@ namespace AutoTest
                         ? UnityEngine.Mathf.CeilToInt((float)enemyHp / effDmg)
                         : HorizonCapTurns;
                 if (ttk > HorizonCapTurns) ttk = HorizonCapTurns;
-                u -= TimeCostPerTurn * ttk;
+                u -= TimeCostPerTurn * v3.timeCostMul * ttk;
+
+                // 防ぎ切りの規則 (2026-11-05・上の FreeBlockRule)。 撃破まで HP を失わない配線を優先する。
+                //   その中での順位は従来の効用のまま (速く倒せる方・今ターン撃破が上)。
+                if (atkGrowth != null && aCount > 0)
+                {
+                    bool killsNow = effDmg >= enemyHp;
+                    bool coversFight = block >= UnityEngine.Mathf.CeilToInt(enemyAtk * atkGrowth[System.Math.Min(ttk, HorizonCapTurns)]);
+                    if (killsNow || coversFight) u += FreeBlockBonus;
+                }
 
                 // 烈炎 (6 層ボス): ブロック端子へ閾値以上配線すると毎ターン スタック+1、
                 //   ターン開始時にスタック分の軽減無視ダメ。 **配線側がこれを見られないと
@@ -572,7 +664,8 @@ namespace AutoTest
                                 : s0 * ttk;                            // 据え置き
                     u -= blaze;
                 }
-                u += wChg * c * 2f;                          // 充電価値 (リロールの原資)
+                u += wChg * v3.chargeMul * c * 2f;           // 充電価値 (リロールの原資)
+                if (v3.takenCost != 0f) u -= v3.takenCost * taken;     // E5 (V3)
                 u += 0.01f * aCount;                         // タイブレーク: 同効用なら攻撃を選ぶ
 
                 // 2026-07-28: 攻撃端子 0 本 = **攻撃を行わない** (素火力も追撃も出ない)。
@@ -721,7 +814,38 @@ namespace AutoTest
                     }
                 }
             }
+            _lastBestU = bestU;      // E1 (V3 rerollEv) が「この手の最良効用」として読む
             return CombatSystem.WiringPlan.Of(bestW);
+        }
+
+        /// <summary>直近の <see cref="MutualWiringPolicy"/> が選んだ配線の効用。 読むだけ・判断には使わない (SuperV3 の実験用)。</summary>
+        private float _lastBestU;
+
+        /// <summary>手 <paramref name="rolls"/> を最良に配線したときの効用 (Optimal の配線評価そのもの)。</summary>
+        private float BestUtilityOf(int[] rolls, CombatSystem.MutualTurnTelegraph tele)
+        {
+            MutualWiringPolicy(rolls, tele);
+            return _lastBestU;
+        }
+
+        /// <summary>全部振り直したあとの手の、 最良効用の期待値。 面の出方を<b>全部数える</b> (3 個 × 6 面 = 216 通り・同じ多重集合は 1 回だけ評価)。</summary>
+        private float ExpectedBestUtilityAfterReroll(int k, int[] faces, CombatSystem.MutualTurnTelegraph tele)
+        {
+            int fc = faces.Length;
+            long total = 1; for (int i = 0; i < k; i++) total *= fc;
+            var memo = new Dictionary<long, float>(64);
+            var buf = new int[k]; var sorted = new int[k];
+            double acc = 0;
+            for (long code = 0; code < total; code++)
+            {
+                long t = code;
+                for (int j = 0; j < k; j++) { buf[j] = faces[(int)(t % fc)]; t /= fc; sorted[j] = buf[j]; }
+                System.Array.Sort(sorted);
+                long key = 0; for (int j = 0; j < k; j++) key = key * 32 + sorted[j];
+                if (!memo.TryGetValue(key, out float u)) { u = BestUtilityOf(buf, tele); memo[key] = u; }
+                acc += u;
+            }
+            return (float)(acc / total);
         }
 
         /// <summary>リロール方策（ADR-0011）。 全部振り直し。
@@ -759,6 +883,23 @@ namespace AutoTest
             var all = new List<int>(k);
             int rerollSum = 0;
             for (int i = 0; i < k; i++) { all.Add(i); rerollSum += dice[i]; }
+
+            // E1 (SuperV3 rerollEv): 平均との比較ではなく、 配線の効用の期待値で決める
+            if (v3.rerollEv)
+            {
+                int freeLeftE = ctx.currentBuffs.TryGetValue(CombatSystem.YachtRoleEffects.FreeRerollKey, out float ffE) ? (int)ffE : 0;
+                int costE = freeLeftE > 0 ? 0 : all.Count * System.Math.Max(1, attempt);
+                if (ctx.GetCharge() - RerollChargeReserve < costE) return null;
+                var faceVals = (faces != null && faces.Length > 0) ? faces : new[] { 1, 2, 3, 4, 5, 6 };
+                float cur = BestUtilityOf(dice, tele);
+                float ev = ExpectedBestUtilityAfterReroll(k, faceVals, tele);
+                // 充電 1 の効用は、 配線評価の充電項 (wChg 0.6 × 2) と同じ 1.2。 ただし**上限 (ChargeMax) に近いほど安い**:
+                //   上限に張り付いた充電は使わなければ捨てるだけなので、 満タンでは費用 0。 (第 1 版は一律 1.2 で、
+                //   リロールが 3 分の 1 に減り 5 層のボス戦が 36.7% → 65.1% の死亡に悪化した。 長い戦闘では充電が溜まる。)
+                const float ChargeUtilityPerUnit = 1.2f;
+                float scarcity = 1f - UnityEngine.Mathf.Clamp01(ctx.GetCharge() / (float)CombatSystem.CombatManager.ChargeMax);
+                return ev - ChargeUtilityPerUnit * scarcity * costE > cur ? all.ToArray() : null;
+            }
 
             // ② 平均を下回る手だけ振り直す
             if (rerollSum >= meanFace * all.Count) return null;

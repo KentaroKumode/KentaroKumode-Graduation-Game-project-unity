@@ -149,6 +149,8 @@ namespace AutoTest
         /// <summary>技量帯の天井を担う先読み方策。 <see cref="WiringSkill.Super"/> のときだけ使う。
         /// レバー (ロールアウト本数・候補数・深さ) はここから触る。</summary>
         public SuperCombatAI superAI = new SuperCombatAI();
+        /// <summary>SuperV3 の実験スイッチ (Optimal + 改善案)。 全 OFF なら Optimal と同一。</summary>
+        public V3Flags v3 = new V3Flags();
 
         /// <summary>厳密方策 (<see cref="WiringSkill.Exact"/> のときだけ使う)。
         /// 天井の位置を測る参照実装で、 通常の測定には使わない。</summary>
@@ -384,6 +386,11 @@ namespace AutoTest
         public bool tuneBosses = false;
         [Tooltip("Tier表 (item_stats / regression / BALANCE_TIER_LIST.md) を更新する")]
         public bool learnTier = false;
+        /// <summary>並列アイテム学習のワーカーとして走る (2026-11-04)。 探索を学習バッチと同じに入れるだけで、
+        /// 学習ファイルは書かない (記録は親が合流させる)。 <c>RankMarginWorkerBootstrap</c> が立てる。</summary>
+        [NonSerialized] public bool learningWorker;
+        /// <summary>直近の区間のラン記録 (並列学習のワーカーが書き出しに使う)。</summary>
+        public IReadOnlyList<RunRec> Records => _records;
         [Tooltip("BOT の AI ルーチン (policy / event_stats) を成長させる")]
         public bool learnBotAi = false;
 
@@ -845,6 +852,10 @@ namespace AutoTest
         /// 出力は <c>productionOutputRootOverride</c> 配下の boss_trace.tsv。
         /// 集計では掴めない差を、 同一シードの対で 1 本ずつ読むための道具。</summary>
         public int bossTraceFloor = 0;
+        /// <summary>層 1 の戦闘を先頭からこの本数のランだけターン単位で記録する (診断・2026-11-05)。 0 = 記録しない。</summary>
+        public int fightTraceRuns = 0;
+        /// <summary>**計測専用**: イベントマスを素通りにする (GameManager.SuppressEvents・2026-11-05)。</summary>
+        public bool suppressEvents = false;
 
         // [廃止 2026-09-14] reserveGoldForRitual。 〈門〉リワークでゴールドの要求が消えた。
 
@@ -902,6 +913,9 @@ namespace AutoTest
         public float navGoldComfort = -1f;
         /// <summary>[較正専用] 開示済みマスの敵で忌避を判断し直す (既定 false)。</summary>
         public bool navTileDanger = false;
+        /// <summary>戦闘名ごとの危険度の学習値で、 開示済みのマスを戦うか決める (2026-11-05)。 学習値が無い・少ない名前は従来の判定に落ちる。
+        /// 既定 false ── 同じ学習値で true/false を比べてから既定を決める。</summary>
+        public bool navLearnedDanger = false;
         /// <summary>[較正専用] 危険度の下限 <see cref="DangerFloor"/>。 <b>負 = 触らない。</b></summary>
         public float navDangerFloor = -1f;
         /// <summary>[較正専用] 剛胆の極点〈精鋭スレイヤー〉を切る (既定 false = 有効のまま)。</summary>
@@ -1263,6 +1277,8 @@ namespace AutoTest
             public int strongRollTurns, strongRollBossWins, weakRollTurns, weakRollBossWins;
             // 緊張感曲線用: プレイヤー最大HP (戦闘終了時点)。 hpAfter / playerMaxHpEnd で残HP%
             public int playerMaxHpEnd;
+            /// <summary>戦闘名の鍵 (層|種類|戦闘名・<see cref="EncounterDangerStats.KeyOf"/>)。 戦闘名が無い戦闘は空 (2026-11-05)。</summary>
+            public string encounterKey = "";
         }
 
         [Serializable]
@@ -1272,6 +1288,9 @@ namespace AutoTest
             public Outcome outcome;
             public DeathCause cause = DeathCause.None;
             public int deathFloor;
+            /// <summary>[計装 2026-11-04] 戦えない HP (危険度の閾値未満) で、 戦闘マス/種別の見えていない点へ踏み込んだ 1 歩の理由別の回数。
+            /// 0 行き先そのもの / 1 行き先へ向かう途中 / 2 出口 (ボス) へ向かう途中 / 3 出口 (ボス) そのもの。</summary>
+            public int[] lowHpRiskSteps = new int[4];
             public bool deathInBossFight;
             public string fatalEnemy = "";
             public int reachedFloor = 1;
@@ -1439,6 +1458,7 @@ namespace AutoTest
         private string _pendingEnemyName;
         private string _pendingEnemyId;
         private bool _pendingEnemyIsBoss;
+        private string _pendingEncounterKey = "";
         private int _pendingEnemyHpBefore;
         private int _eventStuckCount;
         private string _lastEventInfo = "";
@@ -1661,6 +1681,8 @@ namespace AutoTest
             // 5層裏ボス遮断。 各スイープのコルーチンはこの後で自分の値へ書き戻すので、
             //   ここは「素の Run N runs も既定で遮断される」ことだけを担保する。
             GameLoop.GameManager.SuppressLayer5HiddenBoss = suppressLayer5HiddenBoss;
+            GameLoop.GameManager.SuppressEvents = suppressEvents;
+            if (suppressEvents) Debug.Log("[AutoRunner] **計測**: イベントマスを素通り (確信の資格は無償で付与)");
             if (suppressLayer5HiddenBoss)
                 Debug.Log("[AutoRunner] 5層裏ボス(シュヴァリエ)を遮断 (既定)");
 
@@ -1673,10 +1695,12 @@ namespace AutoTest
             //     ・サンプル加点 (UCB型)        … 序列の固定化を防ぐ = **方策側**
             //     ・ランダム化ホールドアウト     … 不偏な値付け       = **推定側**
             //   前者は交絡を減らさないので、 値付けの根拠にしてはいけない。
-            LearnedPriorityProvider.SampleBonusEnabled = learnTier;
-            exploreHoldoutRate = learnTier ? 0.10f : 0f;
+            //   並列学習のワーカー (learningWorker) は学習ファイルを書かないが、 走らせ方は学習バッチと同じにする。
+            bool exploring = learnTier || learningWorker;
+            LearnedPriorityProvider.SampleBonusEnabled = exploring;
+            exploreHoldoutRate = exploring ? 0.10f : 0f;
             // 武器分岐への探索流し込みは 2026-09-21 削除 (複合武器の廃止で分岐が無くなった)。
-            if (learnTier)
+            if (exploring)
                 Debug.Log($"[AutoRunner] 探索 ON: ホールドアウト {exploreHoldoutRate:P0} / サンプル加点 "
                         + $"{LearnedPriorityProvider.ExplorationWeight:F2} (n<{LearnedPriorityProvider.ExplorationSatN})");
 
@@ -1714,6 +1738,12 @@ namespace AutoTest
             RunStats.RobberyWins = RunStats.RobberyLosses = RunStats.RobberyLootTotal = 0;
             // 罰の実体も static。 出禁と価格割増は排他 (両方掛けると二重罰になる)。
             ItemSystem.Shop.ShopManager.RobberyProvisionCost = robberyProvisionCost;
+            CombatSystem.FightTrace.Reset();
+            CombatSystem.FightTrace.MaxRuns = fightTraceRuns;
+            CombatSystem.FightTrace.OutputPath = fightTraceRuns > 0
+                ? System.IO.Path.Combine(string.IsNullOrWhiteSpace(productionOutputRootOverride) ? "AutoRunLogs" : productionOutputRootOverride,
+                                         "fight_trace.tsv")
+                : "";
             CombatSystem.BossCombatTrace.TargetFloor = bossTraceFloor;
             if (bossTraceFloor > 0)
             {
@@ -1801,6 +1831,7 @@ namespace AutoTest
             try { PolicyParameters.ReloadFromDisk(MetaProfileHelper.LearningRoot()); } catch { }
             try { EventChoiceLearningStats.Reload(MetaProfileHelper.LearningRoot()); } catch { }
             try { LearnedPriorityProvider.Reload(TierLearningRoot, writeMarkdown: UpdatesTier); } catch { }
+            try { EncounterDangerStats.Reload(TierLearningRoot); } catch { }
             try { BossTuning.Reload(MetaProfileHelper.LearningRoot()); } catch { }
 
             if (wiringSkill == WiringSkill.Ultra)
@@ -2368,6 +2399,7 @@ namespace AutoTest
             if (saleBonusLoPct >= 0) SaleBonusLoPct = saleBonusLoPct;
             if (navGoldComfort  >  0f) GoldComfort      = navGoldComfort;
             UseTileDanger = navTileDanger;
+            UseLearnedDanger = navLearnedDanger;
             UseEliteCostNav = navEliteCost;
             if (navBlockCredit  >= 0f) BlockCreditRatio = navBlockCredit;
             if (navSafetyFights >= 0f) SafetyFights     = navSafetyFights;
@@ -2631,8 +2663,13 @@ namespace AutoTest
                     //   `BotLearningRoot(挑戦pt)` を渡されるので、 そこに置けば自動で読まれる。
                     string groot = MetaProfileHelper.BotLearningRoot(chalScore);
                     Directory.CreateDirectory(groot);
-                    if (GrantItt.Recompute(gcsv, groot))          // band 線形 (診断用)
-                        GrantItt.RecomputeSurvival(gcsv, groot);  // クリア率 (本番の序列)
+                    // 並列ワーカーでは再計算しない (2026-11-05): 1 プロセス分の割り当てだけでは標本不足で、
+                    //   しかも 22 プロセスが同じビルド内の学習フォルダへ同時に書く。 親が全チャンクをまとめてから再計算する。
+                    if (!AutoTest.ParallelSweep.RankMarginWorkerBootstrap.IsWorkerProcess)
+                    {
+                        if (GrantItt.Recompute(gcsv, groot))          // band 線形 (診断用)
+                            GrantItt.RecomputeSurvival(gcsv, groot);  // クリア率 (本番の序列)
+                    }
                 }
                 catch (Exception ex) { Debug.LogWarning($"[AutoRunner] 付与ログ出力失敗: {ex.Message}"); }
             }

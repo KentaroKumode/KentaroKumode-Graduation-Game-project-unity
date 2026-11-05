@@ -249,7 +249,7 @@ ShieldBash の空振り（盾 0）が 34.2% → 66.1%、1 機会あたりの攻�
 | `enemyStanceDamageMult`【新】 | 敵スタンスの被ダメ倍率(高火力>1/低火力<1)。ApplyLossDamageModifiersで乗算 | BeginNewTurnで1.0 |
 | `enemyStanceKind`【新】 | 0なし/1強ロール低火力/2弱ロール高火力。弱(=2)は RollDice時に敵ダイス最大出目を`EnemyStance.WeakRollMax`へ縮小。`OnTelegraph`でUI後付け | BeginNewTurnで0 |
 | `bossDiceBonus` | 強者/玉座/刹那(現在未使用) | swapで0 |
-| `enemyDefense`【2026-10-28】 | 敵の防御値。EnemyData.defense + 精鋭+2 / 硬鱗+4 / 重甲+4 (OnBattleStart) | **戦闘保持**(start/swapで設定) |
+| `enemyDefense`【2026-10-28】 | 敵の防御値。EnemyData.defense + 精鋭+2 / 硬鱗+4 / 重甲+4 (OnBattleStart)。 戦闘中に動くもの: 割れる装甲 −4 / 積み上がる装甲 +3 (OnTurnEnd)・構え (ターンの頭・`ApplyGuardCycle`)・鎧砕き | **戦闘保持**(start/swapで設定) |
 | `enemyArmorPen`【2026-10-28】 | 敵がプレイヤーの防御を固定で削る量。EnemyData.armorPen | **戦闘保持**(start/swapで設定) |
 | `playerDefenseBase` / `playerArmorPenBase`【2026-10-28】 | プレイヤーの防御・貫通の土台 = 初期防御 2 + 武器の `defense` / `armorPen`（[無印,+]） | 戦闘保持(start で設定) |
 | `playerDefense`【2026-10-28】 | プレイヤーの防御値。ステータス `def`・一対一 が OnPostRoll で加算。〈血令〉持ちは OnPostRoll の後に 0（貫通 ×2 へ換算） | BeginNewTurnで土台へ |
@@ -571,7 +571,7 @@ Passive カテゴリのシナジー武器群。4枚がインベントリに揃�
 | OnShieldAbsorb / OnShieldBreak | Kw.AbsorbShield (敵の直接攻撃と軽減無視の肩代わり) | 吸収した分 / 割られる前の量 |
 | OnShieldDecay | BeginNewTurn Phase C の半減 (〈脈なしの鋼心臓〉で止まる) | 失った分 |
 | OnPoisonGain / OnPoisonCap | CombatContext.AddStatus (敵の毒) | 増えた分 / 上限到達 |
-| OnPoisonTick | TickStatuses と〈廃庭の霧吹き〉(敵の攻撃のたび・TickPoisonOnce) | 毒のダメージ = `floor(毒 × enemyMaxHP × 1 / 100)`・下限 1・`fixedDamageToEnemy` 経由 (2026-11-01〜。旧 毒 × 1。両経路とも `CombatContext.DotDamage`) |
+| OnPoisonTick | TickStatuses と〈廃庭の霧吹き〉(敵の攻撃のたび・TickPoisonOnce) | 毒のダメージ = `floor(毒 × enemyMaxHP × 5 / 1000)`・下限 1・`fixedDamageToEnemy` 経由 (2026-11-01〜。旧 毒 × 1。両経路とも `CombatContext.DotDamage`) **2026-11-05: 1 スタック 0.5% (旧 1%)・ダメージを出すたびにスタックを半減 (切り捨て・ターン開始の分も〈廃庭の霧吹き〉の分も)・上限 10** |
 | OnBleedDecay / OnBleedConsume / OnBleedZero | Phase C の自然減 / Kw.ConsumeBleed / 0 到達 | 減った分 / 使った分 / 1 |
 
 **敵への軽減不可ダメージ (Kw.DamageEnemy)。** ターンの解決中 (`ExecuteTurnMutual` の頭〜最後の HP 同期) は
@@ -595,6 +595,8 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 | BruteForce(剛力) | OnPreDealDamage | 勝利時 finalDamage +2 |
 | Flight(飛翔)/Immovable(不動) | OnPrePursuitDamage | nullifyPursuitDamage=true(追撃無効) |
 | HardScales(硬鱗) | OnBattleStart | enemyDefense +4（2026-10-28。旧: 被弾時 −2） |
+| CrackingArmor(割れる装甲) | OnTurnEnd | `lastPlayerDamage > 0` なら `enemyDefense = max(0, enemyDefense − 4)`（2026-11-04。初期の防御は EnemyData.defense） |
+| StackingArmor(積み上がる装甲) | OnTurnEnd | `enemyDefense = min(24, enemyDefense + 3)`（2026-11-04・既に 24 以上なら触らない） |
 | TailStrike(尾撃) | OnRollLose | fixedDamageToEnemy +1(→実プレイヤー) |
 | Rampage(暴走) | OnRollLose | 次T 自分 diceBonus +3 |
 | Ethereal(虚体) | OnPreReceiveDamage | 敗北時 finalDamage /2 |
@@ -762,6 +764,10 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            ※〈過不足なし〉(exactLethal) は 2026-08-22 に〈拮抗〉(与ダメ+50%) へリワークされ廃止。
              成立条件が「攻撃合計 = 敵残HP」でスケールが合わず、実測 1000ラン で 発動 0 だったため。
          → 出血 / 吸血 / シールドバッシュ（旧勝利分岐と同一）
+         → **固定ダメ枠の取り出し (2026-11-05)**: 主攻撃の ProcessDamage が返した固定ダメ (dealtFixed) を取り出した直後に
+           ctx.fixedDamageToEnemy = 0 へ戻す。 戻さないと敵攻撃側の ProcessDamage (attackerIsEnemy: true) が同じ枠を返し、
+           「反撃固定」として同じ分がもう一度敵 HP に入っていた (毒・〈二度目の打金〉・〈急所〉・蒼白の槍騎士の倍率まで二重)。
+           敵攻撃側で返るのは、 これ以降に足された分 (被弾で発動する反撃・反射) だけ。
 
 敵攻撃   〈封じ・揃〉が前ターンに成立していれば **このターンの敵攻撃は丸ごと不発**
          (currentBuffs["roleEnemyStun"])。 予告は既に出ているので「見えている一撃を踏み倒す」形。
@@ -774,6 +780,8 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                        currentTurn % heavyPeriod == 0 → heavyMul (大技) / それ以外 → heavyWindupMul (溜め)
                        周期は冷却材の遅延を受けない実ターンで数える。 予告に turnsToHeavy / heavyMul を出す。
                        対象: 5 層以降のボス (5 層・5 層裏・ヴェスカ p1〜p4)。 6 層は〈業火の予兆〉が同じ役なので無し。
+                     × 構え倍率 (2026-11-04・EnemyData.guardPeriod > 0 の敵だけ): currentTurn % guardPeriod == 0 → guardAttackMul
+                     × 先手倍率 (2026-11-04・EnemyData.openingTurns > 0 の敵だけ): currentTurn ≤ openingTurns → openingAttackMul
                      ボス倍率 = 挑戦〈天変地異〉(ボスのみ)
                      → 呪縛等 (mutualEnemyAttackReduction) / 〈封じ・対〉 / 失血衰弱 の減算
                      → **プレイヤーの防御** (ADR-0013・2026-10-28): DefenseFormula.Apply(enemyAtk, max(0, playerDefense − max(0, enemyArmorPen − enemyArmorPenNegate)))

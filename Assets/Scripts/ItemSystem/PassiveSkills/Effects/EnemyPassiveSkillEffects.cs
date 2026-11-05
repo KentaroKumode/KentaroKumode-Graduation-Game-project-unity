@@ -104,6 +104,36 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
+    /// <summary>割れる装甲 — ダメージを受けたターンの終わりに、 自分の防御 −<see cref="Crack"/> (下限 0)。 2026-11-04。
+    /// <para>初期の防御は敵データの <c>defense</c> が持つ。 早く・多く当てるほど柔らかくなる ── 貫通が無くても手数で割れる。
+    /// 敵視点のパッシブだが <c>lastPlayerDamage</c> も <c>enemyDefense</c> も視点スワップで入れ替わらないので、
+    /// 「プレイヤーがこのターン与えたダメージ」と「この敵の防御」をそのまま読む (〈鎧砕き〉と同じ読み方)。</para></summary>
+    public class CrackingArmor : IPassiveSkillEffect
+    {
+        public const int Crack = 4;
+        public string SkillId => "CrackingArmor";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
+
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            if (ctx.lastPlayerDamage > 0) ctx.enemyDefense = System.Math.Max(0, ctx.enemyDefense - Crack);
+        }
+    }
+
+    /// <summary>積み上がる装甲 — 毎ターンの終わりに、 自分の防御 +<see cref="Grow"/> (<see cref="Cap"/> まで)。 2026-11-04。
+    /// <para>始めは柔らかく、 長引くほど硬くなる。 早く倒すか、 貫通で上から剥がすかを問う。</para></summary>
+    public class StackingArmor : IPassiveSkillEffect
+    {
+        public const int Grow = 3, Cap = 24;
+        public string SkillId => "StackingArmor";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
+
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            if (ctx.enemyDefense < Cap) ctx.enemyDefense = System.Math.Min(Cap, ctx.enemyDefense + Grow);
+        }
+    }
+
     /// <summary>尾撃 — ロール敗北時、相手に1の固定ダメージ</summary>
     public class TailStrike : IPassiveSkillEffect
     {

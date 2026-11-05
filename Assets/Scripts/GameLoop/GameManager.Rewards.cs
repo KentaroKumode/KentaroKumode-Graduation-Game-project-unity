@@ -320,7 +320,7 @@ namespace GameLoop
             Log($"メタ報酬: 開幕パッシブ「{id}」を選んで獲得");
         }
 
-        private string PickStartingPassive()
+        private string PickStartingPassive(System.Collections.Generic.ICollection<string> alsoExclude = null)
         {
             var db = ItemDatabase.Instance;
             if (db == null) return null;
@@ -335,6 +335,7 @@ namespace GameLoop
                 if (it.category != ItemCategory.Passive) continue;
                 if (!ItemSystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
                 if (dedup.Contains(it.internalName)) continue;
+                if (alsoExclude != null && alsoExclude.Contains(it.internalName)) continue;
                 pool.Add(it);
             }
             if (pool.Count == 0) return null;

@@ -24,7 +24,9 @@ namespace MapSystem.FreeMove
         public bool summons;
         /// <summary>猟犬: 最初から居る足の速い使い魔。 倒しても消えず本体の元へ戻る。</summary>
         public bool hound;
-        /// <summary>捕まった時の戦闘が重い。 追跡者の専用エネミーの強さに掛かる。</summary>
+        /// <summary>補足の歩数。 0 = 既定 (<see cref="FreeMapParams.DetectRange"/>)。</summary>
+        public int detectRange;
+        /// <summary>捕まった時の戦闘が重い (表示・推理の手がかり用。 戦闘の中身は GameManager.PursuerFightOf が性質の id で決める)。</summary>
         public bool heavyFight;
 
         public bool HasFamiliars => summons || hound;
@@ -33,10 +35,10 @@ namespace MapSystem.FreeMove
 
         // ── 性質 ──────────────────────────────────────────────
 
-        /// <summary>召喚者: 動かない。 補足すると数手ごとに使い魔を放つ。</summary>
+        /// <summary>召喚者: 動かない代わりに遠くから気づく (2026-11-04)。 補足すると数手ごとに使い魔を放つ。</summary>
         public static FoeProfile Summoner => new FoeProfile
-        { id = "summoner", displayName = "召喚者", description = "動かない。補足すると数手ごとに使い魔を放つ",
-          foeSteps = 0, familiarSteps = 1, summons = true };
+        { id = "summoner", displayName = "召喚者", description = "動かない代わりに遠くから気づき、数手ごとに使い魔を放つ",
+          foeSteps = 0, familiarSteps = 1, summons = true, detectRange = FreeMapParams.SummonerDetectRange };
 
         /// <summary>猟犬使い: 足の速い使い魔 (1 手に 2 歩) と 2 体で最短距離から追う。</summary>
         public static FoeProfile Houndmaster => new FoeProfile

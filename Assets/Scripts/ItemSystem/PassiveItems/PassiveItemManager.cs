@@ -47,8 +47,14 @@ namespace ItemSystem.PassiveItems
                 if (effect == null) continue;
                 if (effect.Trigger != trigger) continue;
                 var dsBefore = CombatSystem.DmgSourceDiag.Take(ctx);
+                // [計装 2026-11-05] ctx は戦闘の外 (層に入る時など) では null
+                int hlFixed = ctx != null ? ctx.fixedDamageToEnemy : 0;
+                int hlPend = ctx != null ? (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.PendingEnemyDamageKey) : 0;
                 effect.Apply(ctx, run, combat);
                 CombatSystem.DmgSourceDiag.Attribute(id, dsBefore, ctx);
+                if (ctx != null)
+                    CombatSystem.HpLossDiag.NoteSource(id, ctx.fixedDamageToEnemy - hlFixed,
+                        (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.PendingEnemyDamageKey) - hlPend);
             }
         }
     }

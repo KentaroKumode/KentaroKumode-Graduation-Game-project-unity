@@ -29,6 +29,15 @@ namespace AutoTest.ParallelSweep
         private RankMarginWorkerJob _job;
         private bool _terminalWritten;
 
+        /// <summary>ワーカー (-batchmode の Player) は音を出さない (2026-11-04)。 -nographics でも音は鳴り、
+        /// 22 プロセスが同時に効果音を出していた。 r9/r10・学習・Ultra のどのワーカーもここを通る。
+        /// pause は Game2DBoot が戻すので、 誰も触らない volume の方を 0 にする。</summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void MuteIfBatchPlayer()
+        {
+            if (Application.isBatchMode && !Application.isEditor) AudioListener.volume = 0f;
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void StartIfWorker()
         {
@@ -62,6 +71,13 @@ namespace AutoTest.ParallelSweep
                 var runner = runnerObject.AddComponent<AutoRunner>();
                 runner.autoStart = false;
                 RankMarginWorkerConfig.Apply(runner, _job.configKeys, _job.configValues);
+                // **配点の指定が無いジョブは、 設定の metaBuffMode から決める** (2026-11-05)。
+                //   これまでは Balanced 固定で注入していたので、 学習・ITT の並列で metaBuffMode を
+                //   BuildFocused(None) / Off にしても、 ワーカーは黙って Balanced で走っていた
+                //   (サマリーの「配分: None」と「与ダメ メタ +0.210」が食い違って発覚)。
+                //   Standard は Balanced なので従来の測定は変わらない。
+                if (string.IsNullOrWhiteSpace(_job.rankSpec) && string.IsNullOrEmpty(_job.focusTrack))
+                    spec = MetaAllocationPresets.Ranks(runner.metaAllocation);
                 // **worker 内ではスレッド並列を切る** (2026-09-19)。 並列化はプロセス数 (≒コア数) で
                 //   既に取っている。 Super は判断ごとに コア数−1 本、 Optimal の配線列挙は最大 8 本の
                 //   Parallel.For を立てるので、 22 プロセスが同時にやると 500 本超のスレッドが
@@ -85,6 +101,7 @@ namespace AutoTest.ParallelSweep
                 runner.stepsPerYield = 1000;
                 runner.runsPerYield = 25;
                 runner.productionOutputRootOverride = Path.GetFullPath(_job.outputRoot);
+                runner.learningWorker = !string.IsNullOrWhiteSpace(_job.learnRunsPath);
 
                 // ── 付与試行モード (2026-09-17) ────────────────────────────────
                 //   ランダム付与 ITT は Editor 逐次で 60,000 ラン ≈ 1.7 時間 かかる。
@@ -123,6 +140,8 @@ namespace AutoTest.ParallelSweep
                 CombatSystem.SkillDiag.Reset();
                 CombatSystem.ShieldDiag.Reset();
                 CombatSystem.DmgSourceDiag.Reset();
+                CombatSystem.HpLossDiag.Reset();
+                GameLoop.HpOutsideDiag.Reset();
                 AutoTest.SuperCombatAI.ResetProf();
                 GameLoop.RunStats.PlunderDrops = 0;
                 GameLoop.RunStats.ValorEliteDrops = 0;
@@ -228,7 +247,35 @@ namespace AutoTest.ParallelSweep
         {
             if (_terminalWritten) return;
             _terminalWritten = true;
-            FindObjectOfType<AutoRunner>()?.CloseWiringDiff();
+            // [計装 2026-11-04] 金の入手経路 (バッチ累計) を経路の集計に「金:」付きで混ぜて返す
+            ItemSystem.Helpers.PassiveSourceAudit.Counts["航行:偵察"] = (int)AutoTest.AutoRunner.FreeNavRecons;   // [計装 2026-11-05]
+            ItemSystem.Helpers.PassiveSourceAudit.Counts["航行:照明"] = (int)AutoTest.AutoRunner.FreeNavFlares;
+            foreach (var kv in GameLoop.HpOutsideDiag.Amount)   // [計装 2026-11-05] 戦闘の外の HP 減少
+                ItemSystem.Helpers.PassiveSourceAudit.Counts["HP外:" + kv.Key] = (int)System.Math.Min(int.MaxValue, kv.Value);
+            foreach (var kv in GameLoop.HpOutsideDiag.Hits)
+                ItemSystem.Helpers.PassiveSourceAudit.Counts["HP外回:" + kv.Key] = (int)System.Math.Min(int.MaxValue, kv.Value);
+            foreach (var kv in GameLoop.GoldIncome.BySource)
+                ItemSystem.Helpers.PassiveSourceAudit.Counts["金:" + kv.Key] = (int)System.Math.Min(int.MaxValue, kv.Value);
+            var runnerForDump = FindObjectOfType<AutoRunner>();
+            runnerForDump?.CloseWiringDiff();
+            // 並列アイテム学習: 担当区間のラン記録を書き出す。 先頭の捨てラン 1 本は除く (末尾 runs 本だけ)。
+            //   書けなければ失敗として返す ── 記録が欠けたまま「完了」にすると、 親は黙って薄い学習を積む。
+            if (tally != null && runnerForDump != null && !string.IsNullOrWhiteSpace(_job.learnRunsPath))
+            {
+                try
+                {
+                    var recs = runnerForDump.Records;
+                    int n = Math.Min(_job.runs, recs.Count);
+                    var file = new LearnRunFile { seedStart = _job.seedStart, runs = new LearnRunRow[n] };
+                    for (int i = 0; i < n; i++) file.runs[i] = LearnRunRow.From(recs[recs.Count - n + i]);
+                    WriteAtomic(_job.learnRunsPath, JsonUtility.ToJson(file, false));
+                }
+                catch (Exception ex)
+                {
+                    tally = null;
+                    Debug.LogError("[RankMarginWorker] 学習記録の書き出しに失敗: " + ex.Message);
+                }
+            }
             // バッチ中は logEnabled=false なので Debug.Log は届かない。 結果の隣へファイルで残す。
             try
             {
@@ -344,6 +391,7 @@ namespace AutoTest.ParallelSweep
                                 k => ItemSystem.PassiveSkills.CombatContext.AttackBonusCalls[k])),
                     };
                 CombatSystem.BossCombatTrace.Flush();
+                CombatSystem.FightTrace.Flush();
                 CombatSystem.ShieldDiag.Export(out response.shieldSrcNames,
                                                out response.shieldSrcAmounts, out response.shieldSrcCounts);
                 {
@@ -362,6 +410,14 @@ namespace AutoTest.ParallelSweep
                     response.floorKindHpLost = (double[])CombatSystem.SkillDiag.ByFloorKindHpLost.Clone();
                     response.eliteReason = (double[])CombatSystem.SkillDiag.EliteReason.Clone();
                     response.finishCombatReentry = CombatSystem.SkillDiag.FinishCombatReentry;
+                    {
+                        var hn = new List<string>(CombatSystem.HpLossDiag.Stats.Keys);
+                        int C = CombatSystem.HpLossDiag.Cells;
+                        response.hpLossNames = hn.ToArray();
+                        response.hpLoss = new double[hn.Count * C];
+                        for (int i = 0; i < hn.Count; i++)
+                            Array.Copy(CombatSystem.HpLossDiag.Stats[hn[i]], 0, response.hpLoss, i * C, C);
+                    }
                     var dsAll = CombatSystem.DmgSourceDiag.Stats[0];
                     var dsBoss = CombatSystem.DmgSourceDiag.Stats[1];
                     var dsn = new List<string>(dsAll.Keys);

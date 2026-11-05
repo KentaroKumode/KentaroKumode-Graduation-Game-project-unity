@@ -642,6 +642,20 @@ namespace AutoTest
             DangerOutSum += Mathf.Clamp(raw, DangerFloor, DangerCeil);
         }
 
+        /// <summary>戦闘名の学習値で足切りを引き直すか (<c>navLearnedDanger</c>・2026-11-05)。</summary>
+        public static bool UseLearnedDanger = false;
+
+        /// <summary>学習した戦闘名の危険度から、 このマスを戦うのに要る HP の割合を返す。 学習値が足りなければ 0 (呼び出し側が別の見積りへ落とす)。
+        /// 失う HP の割合の「平均 + 1.28 × 標準偏差」(ほぼ上位 10% の悪い結果) に、 敗北率の分の余白を足す。</summary>
+        private static float LearnedTileBar(MapNode node, GameLoop.RunState run)
+        {
+            if (node == null || run == null) return 0f;
+            string key = EncounterDangerStats.KeyOf(node, run.Depth);
+            if (!EncounterDangerStats.TryGet(key, out _, out double mean, out double sd, out double lose)) return 0f;
+            float bar = (float)(mean + 1.28 * sd + 0.5 * lose);
+            return Mathf.Clamp(bar, DangerFloor, DangerCeil);
+        }
+
         /// <summary>開示済みマスで忌避しきい値を引き直すか。 <b>既定 OFF</b> ── A/B で測ってから畳む。</summary>
         public static bool UseTileDanger = false;
 

@@ -337,10 +337,8 @@ namespace CombatSystem
         /// 自攻撃(武器+攻撃端子出目) → 敵攻撃(基礎×段階倍率+β×ロール − ブロック) を解決する。
         /// 勝敗トリガーは「収支」(与ダメ−被ダメ) に再定義され**解決後**に発火する。
         ///
-        /// v1 の未実装/暫定 (W7 後段で解消。ADR-0009 / HANDOFF-OPUS47 W7 実装メモ参照):
-        ///   - 柱5 電力経済は充電獲得の記録のみ (accumulatedValues["mutualCharge"])。消費/停電なし。
-        ///   - 特殊端子なし (Attack/Block/Charge の 3 種)。
-        ///   - 影の代償・コルヴェンの憤怒は未接続。
+        /// 充電は端子で溜めて振り直しで払う (accumulatedValues["mutualCharge"] は獲得の記録)。
+        /// ADR-0009 柱5 の「ターン開始時の消費と停電」は 2026-11-04 に廃止 (GAME.md §24)。
         ///   - ボス固有機構 (サドンデス/コントラタック) 未移植 → boss6 は旧法で計測する。
         ///   - リロール自動ポリシーは旧目的関数 (ロール勝率) のまま。
         ///   - ProcessPostRoll 中の playerWonRoll はロール比較値 (収支確定前) — 出目参照系は
@@ -462,6 +460,7 @@ namespace CombatSystem
 
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnTurnStart);
             SyncHPFromContext(ctx);
+            ApplyGuardCycle(ctx);
 
             // フロアデバフ: 敵の毎ターンHP回復 (旧法と同一)
             var floorMod = GameLoop.GameManager.Instance?.ActiveModifier;
@@ -653,6 +652,8 @@ namespace CombatSystem
                 nextThresholdTurn = Escalation.NextThresholdTurn(escTurn),
                 turnsToHeavy = Escalation.TurnsToHeavy(currentEnemy, ctx.currentTurn),
                 heavyMul = currentEnemy?.heavyMul ?? 0f,
+                turnsToGuard = Escalation.TurnsToGuard(currentEnemy, ctx.currentTurn),
+                enemyDefense = ctx.enemyDefense,
                 enemyDice = enemyDice,
                 enemyDiceTotal = ctx.enemyDiceTotal,
 
@@ -959,6 +960,12 @@ namespace CombatSystem
             if (_fleeRequested) dealtFixed = 0;
             if (!skipAttack) ApplyRoleExtraDamage(ctx, ref dealtDmg, ref dealtFixed, roleOutcome);
             ctx.lastPlayerDamage = dealtDmg + dealtFixed;
+            // 固定ダメの枠は、 ここで取り出した (dealtFixed) ので空に戻す (2026-11-05)。
+            //   戻さないと、 この後の敵の攻撃側の ProcessDamage が同じ枠をそのまま返し、 反撃固定として
+            //   もう一度敵に入っていた (毒・二度目の打金・急所・蒼白の槍騎士の倍率まで二重)。
+            //   旧ロール勝負は勝ち / 負けのどちらかしか通らず 1 回で済んでいたが、 相互攻撃は毎ターン両方を通る。
+            //   これ以降に足される分 (敵の攻撃を受けて発動する反撃・反射) だけが反撃固定になる。
+            ctx.fixedDamageToEnemy = 0;
             CombatStats.DiagWinAttack = false;
             // [計装] 与ダメ出どころ別の発動率。 攻撃した回だけ数える。
             if (atkBase > 0)
@@ -1040,7 +1047,8 @@ namespace CombatSystem
                     attackSum, blockSum, dealtDmg + dealtFixed);
             }
 
-            enemyHP = Math.Max(0, enemyHP - dealtDmg - dealtFixed);
+            HpLossDiag.Lose(ref enemyHP, dealtDmg, "通常攻撃");
+            HpLossDiag.Lose(ref enemyHP, dealtFixed, "固定ダメ");
             if (_diagKind == SkillDiag.Boss && currentEnemy != null)
             {
                 var bd = SkillDiag.BossDmgOf(currentEnemy.id);
@@ -1110,7 +1118,7 @@ namespace CombatSystem
                 int chunk = Mathf.CeilToInt(ctx.enemyMaxHP * (roleOutcome.yachtChunkPct / 100f));
                 if (_diagKind == SkillDiag.Boss && currentEnemy != null)
                     SkillDiag.BossDmgOf(currentEnemy.id)[4] += Math.Min(chunk, enemyHP);
-                enemyHP = Math.Max(0, enemyHP - chunk);
+                HpLossDiag.Lose(ref enemyHP, chunk, "役〈極〉");
                 Debug.Log($"[役] 極: 最大HP {ctx.enemyMaxHP} の {roleOutcome.yachtChunkPct:F1}% "
                         + $"= {chunk} を軽減無視で削る → 残 {enemyHP}");
             }
@@ -1122,7 +1130,7 @@ namespace CombatSystem
                 if (_diagKind == SkillDiag.Boss && currentEnemy != null)
                     SkillDiag.BossDmgOf(currentEnemy.id)[5] += Math.Min(bleedDmg, enemyHP);
                 RaiseDotDamage(DotKind.Bleed, Math.Min(bleedDmg, enemyHP));      // 入った分だけ (攻撃で倒れていれば 0 = 鳴らない)
-                enemyHP = Math.Max(0, enemyHP - bleedDmg);
+                HpLossDiag.Lose(ref enemyHP, bleedDmg, "出血");
             }
 
             // --- 〈天与の才〉踏みとどまり (2026-08-16) ---
@@ -1186,7 +1194,7 @@ namespace CombatSystem
                     int pd = ctx.TickPoisonOnce();
                     if (pd > 0)
                     {
-                        enemyHP = Math.Max(0, enemyHP - pd);
+                        HpLossDiag.Lose(ref enemyHP, pd, "毒(廃庭の霧吹き)");
                         Debug.Log($"[廃庭の霧吹き] 敵の攻撃に合わせて毒 {pd} → 敵HP {enemyHP}");
                     }
                 }
@@ -1200,7 +1208,7 @@ namespace CombatSystem
                 //   航行の危険度見積りが読むので、 ラン跨ぎの値を混ぜると決定性が壊れる。
                 {
                     var brun = GameLoop.GameManager.Instance?.Run;
-                    if (brun != null) { brun.blockSeenSum += blockSum; brun.blockSeenCount++; }
+                    if (brun != null && brun.Depth != MapSystem.FreeMove.FloorPlan.FarmFloor) { brun.blockSeenSum += blockSum; brun.blockSeenCount++; }
                 }
                 traceAtk = enemyAtkValue; traceBlock = blockSum; traceThrough = lossBase;
                 traceEBase = currentEnemy != null ? currentEnemy.EffectiveBaseAttack : 0;
@@ -1246,7 +1254,7 @@ namespace CombatSystem
                         int reflect = takenDmg * DaggerReflectMultiplier;
                         Debug.Log($"[仕込み刃] 被ダメ {takenDmg} を無効化 + 軽減不可 {reflect} (×{DaggerReflectMultiplier}) で反撃");
                         takenDmg = 0;
-                        enemyHP = Math.Max(0, enemyHP - reflect);
+                        HpLossDiag.Lose(ref enemyHP, reflect, "仕込み刃");
                     }
                     ctx.daggerArmed = false;
                 }
@@ -1283,7 +1291,7 @@ namespace CombatSystem
                     if (cap > 0 && takenDmg > 0)
                     {
                         int reflect = Math.Min(cap, takenDmg);
-                        enemyHP = Math.Max(0, enemyHP - reflect);
+                        HpLossDiag.Lose(ref enemyHP, reflect, "反攻");
                         ctx.enemyCurrentHP = enemyHP;
                         Debug.Log($"[特殊端子/反攻] 被ダメ{takenDmg} のうち {reflect} を反射");
                     }
@@ -1320,7 +1328,7 @@ namespace CombatSystem
 
                 // 反撃固定ダメ (Counter/Riposte 等)
                 if (counterFixed > 0)
-                    enemyHP = Math.Max(0, enemyHP - counterFixed);
+                    HpLossDiag.Lose(ref enemyHP, counterFixed, "反撃固定");
 
                 psm.FireEnemyTrigger(PassiveSkillTrigger.OnPostDealDamage);
             }
@@ -1394,7 +1402,7 @@ namespace CombatSystem
             // 攻撃の後に品が預けた敵へのダメージ (Kw.DamageEnemy) をここで通す。 踏みとどまりの clamp より前。
             {
                 int pendingKw = ItemSystem.PassiveSkills.Keywords.Kw.TakePendingEnemyDamage(ctx);
-                if (pendingKw > 0) enemyHP = Math.Max(0, enemyHP - pendingKw);
+                if (pendingKw > 0) HpLossDiag.Lose(ref enemyHP, pendingKw, "品の直接(攻撃後)");
             }
             if (!roleOutcome.yachtFired)
             {
@@ -1422,6 +1430,11 @@ namespace CombatSystem
                 traceEBase, traceERoll, traceEsc, attackSum, actualPlayerDiceCount,
                 traceRaw, traceBonus, traceBossBonus,
                 currentEnemy != null ? currentEnemy.maxHP : 0);
+            if (FightTrace.Enabled)   // [計装 2026-11-05] 先頭の数ランの層 1 をターン単位で
+                FightTrace.Turn(GameLoop.GameManager.Instance?.Run?.Depth ?? 0, GameLoop.GameRng.RunIndex,
+                    currentEnemy != null ? currentEnemy.id : "?", ctx.currentTurn,
+                    playerDice, mutualWiring, attackSum, blockSum, traceAtk, traceThrough, takenApplied,
+                    dealtDmg + dealtFixed, playerHP, playerMaxHP, enemyHP, ctx.GetCharge());
             ctx.playerWonRoll = balance > 0;
             ctx.playerLostRoll = balance < 0;
             result.playerWon = balance > 0;
@@ -1470,6 +1483,7 @@ namespace CombatSystem
         {
             var drun = GameLoop.GameManager.Instance?.Run;
             if (ctx == null || drun == null) return;
+            if (drun.Depth == MapSystem.FreeMove.FloorPlan.FarmFloor) return;   // ファーム層 (0 層) は航行の見積りに混ぜない
             drun.fightDamageSum += ctx.playerDamageThisTurn;
             if (ctx.currentEnemyKind != EnemyKind.Boss)
             {
@@ -1477,6 +1491,20 @@ namespace CombatSystem
                 drun.navDealt += Math.Max(0, ctx.lastPlayerDamage);
                 drun.navTaken += Math.Max(0, ctx.playerDamageThisTurn);
             }
+        }
+
+        /// <summary>構え (EnemyData.guardPeriod): ターンの頭で、 構えのターンは防御 +guardDefense、 その次のターンは防御 0 にする。
+        /// 足した・引いた分だけを覚えて次のターンに差し戻すので、 鎧砕き・割れる装甲などで動いた分は残る。</summary>
+        private void ApplyGuardCycle(CombatContext ctx)
+        {
+            if (ctx == null || currentEnemy == null || currentEnemy.guardPeriod <= 0) return;
+            const string Key = "enemy.guardDelta";
+            if (ctx.accumulatedValues.TryGetValue(Key, out var prev) && prev != 0f) ctx.enemyDefense = Math.Max(0, ctx.enemyDefense - (int)prev);
+            int delta = 0;
+            if (Escalation.IsGuardTurn(currentEnemy, ctx.currentTurn)) delta = Math.Max(0, currentEnemy.guardDefense);
+            else if (Escalation.IsAfterGuardTurn(currentEnemy, ctx.currentTurn)) delta = -ctx.enemyDefense;      // 構えを解いた隙
+            ctx.enemyDefense = Math.Max(0, ctx.enemyDefense + delta);
+            ctx.accumulatedValues[Key] = delta;
         }
     }
 }

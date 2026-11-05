@@ -94,6 +94,8 @@ namespace MapSystem
         private static void ApplyEliteUpgrade(int floor, MapNode node)
         {
             int roll = GameLoop.GameRng.Range(0, 100, "map.eliteUpgrade", floor * 100 + node.index);
+            // 安全な帯 (層の左 1/3) は格上げしない (2026-11-04・危険の帯)。 引く回数は変えない
+            if (node.freeMap && FreeMove.FreeMapParams.BandOf(node.x) == FreeMove.FreeMapParams.BandSafe) return;
             if (node.type == TileType.Battle && roll < MetaProgression.MetaBuffApplicator.GetEliteUpgradePct())
                 node.type = TileType.EliteBattle;
         }

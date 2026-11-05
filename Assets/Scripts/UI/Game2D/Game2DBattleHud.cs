@@ -18,6 +18,8 @@ namespace UI.Game2D
         // 配置 (dot)
         private static readonly RectInt Left = new RectInt(2, 52, 86, 198), Right = new RectInt(392, 56, 86, 112), Top = new RectInt(96, 2, 288, 44);
         private const int FrameB = 12;
+        // 自分のステータス (会心率・攻撃・防御): 右のパネルの下。 右と同じばねで横から入る (2026-11-05)
+        private static readonly RectInt Stat = new RectInt(392, 172, 86, 56);
         // 左パネルの中 (パネルの左上が原点): 枠の内側は x 14〜72
         private static readonly RectInt Btn = new RectInt(15, 154, 56, 24), RerollR = new RectInt(15, 122, 56, 16),
             ItemR = new RectInt(15, 140, 27, 12), FleeR = new RectInt(44, 140, 27, 12);      // 消耗品 / 逃げる (配線の判断の間だけ)
@@ -31,7 +33,8 @@ namespace UI.Game2D
         public Texture2D btnAtkTex, btnBlkTex, btnChgTex, btnGoTex, btnPlainTex;
 
         [SerializeField] private RectTransform _left, _right, _top;
-        private Texture2D _tl, _tr, _tt;
+        private RectTransform _stat;
+        private Texture2D _tl, _tr, _tt, _ts;
         private int _drawn = -1; private float _slide;
         private KitSrc _bAtk, _bBlk, _bChg, _bGo, _bPlain; private bool _srcInit;
 
@@ -44,6 +47,7 @@ namespace UI.Game2D
         public void Build()
         {
             _left = Make("left", Left, out _tl); _right = Make("right", Right, out _tr); _top = Make("top", Top, out _tt);
+            _stat = Make("stat", Stat, out _ts);
         }
 
         private RectTransform Make(string name, RectInt r, out Texture2D tex)
@@ -56,7 +60,7 @@ namespace UI.Game2D
             return ri.rectTransform;
         }
 
-        private void OnDestroy() { if (_tl != null) Destroy(_tl); if (_tr != null) Destroy(_tr); if (_tt != null) Destroy(_tt); }
+        private void OnDestroy() { if (_tl != null) Destroy(_tl); if (_tr != null) Destroy(_tr); if (_tt != null) Destroy(_tt); if (_ts != null) Destroy(_ts); }
 
         private Game2DSpring _spL, _spR, _spT; private bool _spInit;
         /// <summary>入り・出の途中を含めて、 どれかが見えている。</summary>
@@ -66,6 +70,7 @@ namespace UI.Game2D
         public void Drive(bool on, float dt)
         {
             if (_left == null) return;
+            if (_stat == null) _stat = Make("stat", Stat, out _ts);      // 組み上げ済みのシーンには無い
             if (!_spInit) { _spL.Set(0); _spR.Set(0); _spT.Set(0); _spInit = true; }
             float t = on ? 1f : 0f;
             _spL.Go(t, on ? 0.03f : 0f); _spT.Go(t, on ? 0.07f : 0.03f); _spR.Go(t, on ? 0.12f : 0.06f);
@@ -74,12 +79,17 @@ namespace UI.Game2D
             _left.anchoredPosition = new Vector2(Left.x - Mathf.Round((1f - _spL.Value(100f)) * 100f), -Left.y);
             _right.anchoredPosition = new Vector2(Right.x + Mathf.Round((1f - _spR.Value(100f)) * 100f), -Right.y);
             _top.anchoredPosition = new Vector2(Top.x, -Top.y + Mathf.Round((1f - _spT.Value(50f)) * 50f));
+            _stat.anchoredPosition = new Vector2(Stat.x + Mathf.Round((1f - _spR.Value(100f)) * 100f), -Stat.y);
         }
 
         private void Update()
         {
             if (_left == null || sim == null || !Game2DBattleSim.Active) return;
-            int ehp = fx != null ? fx.EnemyHp : 0, ver = sim.version * 31 + ehp * 7 + sim.charge;
+            // 配線を決める間だけ読み直す (その後は本判定に取り込まれて二重に数えるので、 最後の値を出し続ける)
+            if (sim.CanOperate && CombatSystem.CombatManager.Instance != null)
+            { _hs = CombatSystem.CombatManager.Instance.PreviewHudStats(); _hsKnown = true; }
+            int ehp = fx != null ? fx.EnemyHp : 0, ver = sim.version * 31 + ehp * 7 + sim.charge
+                + (_hsKnown ? Mathf.RoundToInt(_hs.critRate * 1000f) * 131 + _hs.attack * 17 + _hs.outgoingPct * 7 + _hs.defense * 3 + _hs.pen : 0);
             if (ver != _drawn) { _drawn = ver; Redraw(); }
             if (_slide > 0.95f && !Game2DModal.Active && screen != null && Input.GetMouseButtonDown(0) && Game2DPointer.TryDot(screen, out var d)) Click(d);
         }
@@ -124,6 +134,21 @@ namespace UI.Game2D
             InitSrc();
             Ensure(ref _tl, _left, Left); Ensure(ref _tr, _right, Right); Ensure(ref _tt, _top, Top);
             DrawLeft(_tl); DrawRight(_tr); DrawTop(_tt);
+            Ensure(ref _ts, _stat, Stat); DrawStat(_ts);
+        }
+
+        private CombatSystem.CombatManager.HudStats _hs; private bool _hsKnown;
+
+        /// <summary>自分のステータス: 会心率と倍率・攻撃と与ダメ補正・防御と貫通。 数字は配線を決める間に読んだ値。</summary>
+        private void DrawStat(Texture2D t)
+        {
+            var p = Frame(Stat);
+            bool k = _hsKnown && sim != null && Game2DBattleSim.Active;
+            string crit = k ? "CRIT " + Mathf.RoundToInt(_hs.critRate * 100f) + "% x" + _hs.critMul.ToString("0.0") : "CRIT --";
+            string atk = k ? "ATK " + _hs.attack + (_hs.outgoingPct != 0 ? (_hs.outgoingPct > 0 ? " +" : " ") + _hs.outgoingPct + "%" : "") : "ATK --";
+            string def = k ? "DEF " + _hs.defense + " PEN " + _hs.pen : "DEF --";
+            p.Text(crit, 14, 16, Chg); p.Text(atk, 14, 27, Atk); p.Text(def, 14, 38, Blk);
+            p.Apply(t);
         }
 
         /// <summary>テクスチャは実行時に作る (シーンには保存されないので、 再生のたびに作り直す)。</summary>
@@ -228,8 +253,11 @@ namespace UI.Game2D
             int en = live ? sim.enemyDiceCount : 3;
             for (int i = 0; i < en; i++) DrawDie(p, new RectInt(14 + i * 20, 16, 17, 17), live ? sim.ed[i] : i + 3, true);
             p.Text(known ? "ATK " + sim.eatk : "ATK ??", 14, 38, known ? Atk : Dim);
+            if (known && sim.edef > 0) p.Text("DEF " + sim.edef, 50, 38, Ink);      // 敵の防御 (構え・割れる/積み上がる装甲を反映した今の値)
             if (known) p.Text("ROLL " + sim.EnemyDiceSum, 14, 48, Dim);
-            p.Box(14, 60, 58, 14, Off, Dark); p.Text(known ? "INTENT: ATK" : "INTENT: ...", 17, 65, Ink);
+            // 予告: 構えのターンは GUARD (防御が上がり攻撃が鈍る)・次が構えなら NEXT GUARD
+            string intent = !known ? "INTENT: ..." : sim.guardIn == 0 ? "INTENT: GUARD" : sim.guardIn == 1 ? "NEXT: GUARD" : "INTENT: ATK";
+            p.Box(14, 60, 58, 14, Off, Dark); p.Text(intent, 17, 65, Ink);
             if (live) p.Text("T" + sim.turn + " STAGE " + sim.Stage, 14, 80, Dim);
             // 敵に乗っている毒・出血 (仮のアイコン + スタック数)。 乗っているものだけを左から詰めて並べる
             var ctx = live ? ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context : null;

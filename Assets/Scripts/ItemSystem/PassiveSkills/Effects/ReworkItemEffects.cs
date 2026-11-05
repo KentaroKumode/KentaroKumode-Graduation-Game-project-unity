@@ -466,19 +466,22 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>騎士団の切り札: 敵の HP が 30% 以下になったターン、 シールドを全部使い、 使った量 × 2 を攻撃に加える (1 戦闘 1 回)。</summary>
+    /// <summary>騎士団の切り札: 敵の HP が 30% 以下になったターン、 シールドを最大 <see cref="MaxSpend"/> 使い、 使った量 × 2 を攻撃に加える (1 戦闘 1 回)。</summary>
     public class KnightsTrump : IPassiveSkillEffect
     {
         public string SkillId => "騎士団の切り札";
+        /// <summary>1 回に使うシールドの上限 (2026-11-04・仮置き)。 全部使う形だと平均 40 使って攻撃 +80 になり、
+        /// 攻撃の加算全体の 15% をこの 1 品が占めていた。 使わなかった分のシールドは残る。</summary>
+        public const int MaxSpend = 20;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (ctx.enemyMaxHP <= 0 || ctx.enemyCurrentHP * 100 > ctx.enemyMaxHP * 30) return;
-            int sh = ctx.consShield;
+            int sh = Mathf.Min(ctx.consShield, MaxSpend);
             if (sh <= 0 || !Rw.OncePerBattle(ctx, "rw.trump")) return;
-            ctx.consShield = 0;
+            ctx.consShield -= sh;
             ctx.AddPlayerAttackOrDiceBonus(sh * 2);
-            Rw.Log($"[騎士団の切り札] シールド {sh} を全部使い 攻撃 +{sh * 2}");
+            Rw.Log($"[騎士団の切り札] シールド {sh} を使い 攻撃 +{sh * 2}");
         }
     }
 
@@ -619,18 +622,19 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>石抜きの毒指輪: 毒が上限に達したとき、 敵の最大 HP の 15% を軽減不可で削り、 毒を 5 に戻す (何度でも)。</summary>
+    /// <summary>石抜きの毒指輪: 毒が上限に達したとき、 敵の最大 HP の 15% を軽減不可で削り、 毒を <see cref="ResetTo"/> に戻す (何度でも)。</summary>
     public class HollowPoisonRing : IPassiveSkillEffect
     {
         public string SkillId => "石抜きの毒指輪";
+        public const int ResetTo = 5;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPoisonCap };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (ctx.enemyMaxHP <= 0) return;
             int dmg = ctx.RatioDamageToEnemy(0.15f);
             Kw.DamageEnemy(ctx, dmg);
-            ctx.AddStatus(StatusTarget.Enemy, "poison", 5 - ctx.EnemyPoison);
-            Rw.Log($"[石抜きの毒指輪] 毒が満ちた → 最大HP の 15% = {dmg} を削り、 毒を 5 に戻す");
+            ctx.AddStatus(StatusTarget.Enemy, "poison", ResetTo - ctx.EnemyPoison);
+            Rw.Log($"[石抜きの毒指輪] 毒が満ちた → 最大HP の 15% = {dmg} を削り、 毒を {ResetTo} に戻す");
         }
     }
 

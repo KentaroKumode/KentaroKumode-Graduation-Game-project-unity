@@ -105,6 +105,8 @@ namespace CombatSystem
         {
             float raw = e.EffectiveBaseAttack + diceRollTotal;
             raw *= HeavyFactor(e, combatTurn > 0 ? combatTurn : turn);
+            raw *= GuardAttackFactor(e, combatTurn > 0 ? combatTurn : turn);
+            raw *= OpeningFactor(e, combatTurn > 0 ? combatTurn : turn);
             // 挑戦デバフ〈天変地異〉(2026-08-10 リワーク): **ボスの攻撃値のみ** ×1.50。
             //   旧効果 (エスカレーション閾値の前倒し) は 3pt で −2.7pt / p=0.185 の死に段だった ──
             //   通常戦が平均 3 ターン弱で終わるため、 閾値を 2T 早めても大半の戦闘に届かない。
@@ -127,6 +129,32 @@ namespace CombatSystem
             int r = combatTurn % e.heavyPeriod;
             return r == 0 ? 0 : e.heavyPeriod - r;
         }
+
+        // ---- 構え (EnemyData.guardPeriod・2026-11-04) ----
+
+        /// <summary>そのターンに構えているか。 周期 N なら T = N, 2N …。</summary>
+        public static bool IsGuardTurn(EnemyData e, int combatTurn)
+            => e != null && e.guardPeriod > 0 && combatTurn > 0 && combatTurn % e.guardPeriod == 0;
+
+        /// <summary>構えを解いた隙のターン (構えの次のターン)。 防御 0。</summary>
+        public static bool IsAfterGuardTurn(EnemyData e, int combatTurn)
+            => e != null && e.guardPeriod > 0 && combatTurn > 1 && (combatTurn - 1) % e.guardPeriod == 0;
+
+        /// <summary>次の構えまで何ターンか (0 = このターンが構え / −1 = 構えない)。</summary>
+        public static int TurnsToGuard(EnemyData e, int combatTurn)
+        {
+            if (e == null || e.guardPeriod <= 0 || combatTurn <= 0) return -1;
+            int r = combatTurn % e.guardPeriod;
+            return r == 0 ? 0 : e.guardPeriod - r;
+        }
+
+        /// <summary>構えのターンの攻撃倍率。 構えない敵・構えていないターンは 1。</summary>
+        public static float GuardAttackFactor(EnemyData e, int combatTurn)
+            => IsGuardTurn(e, combatTurn) && e.guardAttackMul > 0f ? e.guardAttackMul : 1f;
+
+        /// <summary>先手 (最初の数ターンだけ攻撃が重い) の倍率。 なしの敵は 1。</summary>
+        public static float OpeningFactor(EnemyData e, int combatTurn)
+            => e != null && e.openingTurns > 0 && combatTurn > 0 && combatTurn <= e.openingTurns && e.openingAttackMul > 0f ? e.openingAttackMul : 1f;
 
         /// <summary>攻撃値へ掛ける大技サイクルの倍率。 大技なしの敵は 1。</summary>
         public static float HeavyFactor(EnemyData e, int combatTurn)

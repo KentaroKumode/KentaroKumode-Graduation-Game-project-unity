@@ -96,16 +96,33 @@ namespace GameLoop
                 "行方を知る者は、誰もいない。",
         };
 
+        /// <summary>6 層のボス (灰燼の王) を倒した瞬間の場面 (docs/GAME.md §19-9 の段 0)。 椅子と、 そこに残っているものの小ささだけを見せる。
+        /// <b>End3 の冒頭と同じ文</b> ── 〈真理〉が無ければそのまま End3 へ進み、 有れば層のクリアの窓に出る。 どちらの道でも同じ場面を 1 度だけ読む。</summary>
+        public const string AshThroneMoment =
+                "火が落ちて、しばらくしてから、椅子があることに気づいた。\n" +
+                "\n" +
+                "灰の中に残っているものは、小さかった。\n" +
+                "あなたが戦っていたものより、ずっと。";
+
+        /// <summary>§19-9 の段 1: 〈クェシナの怠惰〉を背負っている時だけ足す 1 行。 名前・罪は出さない。</summary>
+        public const string AshThroneSlothLine = "灰の底に、焼け残った金属がひとつ。辺境警備隊の階級章だった。";
+
+        /// <summary>層のクリアの窓に出す、 そのボスを倒した直後の場面。 無ければ null。</summary>
+        public static string AftermathOf(RunState run)
+        {
+            if (run == null || run.lastBossId != BossIds.Layer6Ash) return null;
+            bool sloth = run.permanentDebuffs != null && run.permanentDebuffs.Contains(MetaProgression.PermanentDebuffIds.Sloth);
+            return AshThroneMoment + (sloth ? "\n\n" + AshThroneSlothLine : "");
+        }
+
         public static readonly Ending End3 = new Ending
         {
             id = "end3", title = "空の玉座",
             // 6F王継承＝当該 iteration 内の局所的延命に過ぎない、という諦観のトーン。
             // 7F覚者撃破（End4/End5）との対比＝「向こう側へ降りる」を含意で置く。
+            // 冒頭は AshThroneMoment (6 層を抜けて先へ進む時の層のクリアの窓と同じ場面)
             body =
-                "火が落ちて、しばらくしてから、椅子があることに気づいた。\n" +
-                "\n" +
-                "灰の中に残っているものは、小さかった。\n" +
-                "あなたが戦っていたものより、ずっと。\n" +
+                AshThroneMoment + "\n" +
                 "\n" +
                 "玉座は空になった。\n" +
                 "滅びを見届け続けた王は去り、\n" +

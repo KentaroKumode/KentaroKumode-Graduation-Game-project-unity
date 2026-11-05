@@ -48,6 +48,7 @@ namespace MapSystem.FreeMove
         public static FreeMapLayout Generate(int floor)
         {
             if (floor == FloorPlan.LinearFloor) return GenerateLinear(floor);
+            if (floor == FloorPlan.FarmFloor) return GenerateFarm(floor);
             var rnd = new Rnd(floor);
             for (int attempt = 0; attempt < FreeMapParams.GenerateAttempts; attempt++)
             {
@@ -89,6 +90,35 @@ namespace MapSystem.FreeMove
             }
             L.gate = order[4];
             // 追跡者は居ないが、 縄張りの欄は埋めておく (道の中ほどを中心に)
+            for (int k = 1; k < n - 1; k++) { L.territory.Add(order[k]); L.waypoints.Add(order[k]); }
+            L.home = order[n / 2];
+            return L;
+        }
+
+        /// <summary>0 層 (ファーム層・2026-11-05) の直線のマップ。 乱数を使わない固定の 1 本道:
+        /// 前哨基地 → 秘宝 → 戦闘 → 戦闘 → 戦闘 → ショップ → ボス。 点の添字は始点 = 0・終点 = 1 の約束 (0, 2, 3, 4, 5, 6, 1)。
+        /// 山岳・追跡者・天候・〈門〉は無い。</summary>
+        private static FreeMapLayout GenerateFarm(int floor)
+        {
+            const double W = FreeMapParams.Width, H = FreeMapParams.Height;
+            var order = new[] { 0, 2, 3, 4, 5, 6, 1 };
+            var types = new[] { TileType.Outpost, TileType.Treasure, TileType.Battle, TileType.Battle,
+                                TileType.Battle, TileType.Shop, FloorPlan.GoalType(floor) };
+            int n = order.Length;
+            var L = new FreeMapLayout { floor = floor, start = 0, goal = 1, pos = new Vec2[n], types = new TileType[n], adj = new List<int>[n] };
+            for (int i = 0; i < n; i++) L.adj[i] = new List<int>();
+            double x0 = FreeMapParams.StartX, x1 = W - 0.5;
+            for (int k = 0; k < n; k++)
+            {
+                int idx = order[k];
+                L.pos[idx] = new Vec2(F(x0 + (x1 - x0) * k / (n - 1)), F(H / 2));
+                L.types[idx] = types[k];
+            }
+            for (int k = 0; k + 1 < n; k++)
+            {
+                int a = order[k], b = order[k + 1];
+                L.roads.Add((a, b)); L.adj[a].Add(b); L.adj[b].Add(a);
+            }
             for (int k = 1; k < n - 1; k++) { L.territory.Add(order[k]); L.waypoints.Add(order[k]); }
             L.home = order[n / 2];
             return L;
@@ -241,6 +271,9 @@ namespace MapSystem.FreeMove
                 if (pool.Count == 0) pool = others;
                 L.types[pool[Math.Min(pool.Count - 1, (int)Math.Floor(rnd.Next() * pool.Count))]] = need;
             }
+            // 安全な帯 (左の 1/3) にはエリートを置かない ── 通常の戦闘に替える (乱数は使わない)
+            for (int i = 2; i < n; i++)
+                if (L.types[i] == TileType.EliteBattle && FreeMapParams.BandOf((float)L.pos[i].x) == FreeMapParams.BandSafe) L.types[i] = TileType.Battle;
 
             // ── 6 層の「裂け目の記録」: 縄張りの外で、 層の 3 分の 1 あたりに一番近い点 ──
             if (floor == 6)

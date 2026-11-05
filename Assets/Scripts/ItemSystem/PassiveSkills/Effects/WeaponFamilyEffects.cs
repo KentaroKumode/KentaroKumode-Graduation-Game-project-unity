@@ -286,6 +286,10 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 旧: ターン終了時 HP +1 / +1 / +2 (さらに前は 被ダメ −N・ADR-0013 で武器の防御へ移した)。</para></summary>
     internal static class BulwarkHelper
     {
+        /// <summary>段 (I / II / III) ごとの ID と率。 先読み BOT (<c>WeaponRungModel</c>) も同じ値を読む。</summary>
+        public static readonly string[] SkillIds = { "城壁I", "城壁II", "城壁III" };
+        public static readonly float[] Rates = { 0.5f, 0.75f, 1.0f };
+
         public static void Apply(CombatContext ctx, float rate, string label)
         {
             int block = ctx.blockSumThisTurn;
@@ -301,21 +305,21 @@ namespace ItemSystem.PassiveSkills.Effects
     {
         public string SkillId => "城壁I";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => BulwarkHelper.Apply(ctx, 0.5f, SkillId);
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => BulwarkHelper.Apply(ctx, BulwarkHelper.Rates[0], SkillId);
     }
 
     public class BulwarkII : IPassiveSkillEffect
     {
         public string SkillId => "城壁II";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => BulwarkHelper.Apply(ctx, 0.75f, SkillId);
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => BulwarkHelper.Apply(ctx, BulwarkHelper.Rates[1], SkillId);
     }
 
     public class BulwarkIII : IPassiveSkillEffect
     {
         public string SkillId => "城壁III";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => BulwarkHelper.Apply(ctx, 1.0f, SkillId);
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => BulwarkHelper.Apply(ctx, BulwarkHelper.Rates[2], SkillId);
     }
 
     /// <summary>シールドバッシュ (2026-10-28・旧〈反攻〉の枠) — <b>出目を全部攻撃端子に挿したターン</b>、
@@ -326,6 +330,10 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 自攻撃の後に敵攻撃が来るので、 使い切ったシールドはそのターンの被弾を受けない ── それが代償。</para></summary>
     internal static class ShieldBashHelper
     {
+        /// <summary>段 (I / II / III) ごとの ID と率。 先読み BOT (<c>WeaponRungModel</c>) も同じ値を読む。</summary>
+        public static readonly string[] SkillIds = { "シールドバッシュI", "シールドバッシュII", "シールドバッシュIII" };
+        public static readonly float[] Rates = { 0.5f, 1.0f, 1.5f };
+
         public static void Apply(CombatContext ctx, float rate, string label)
         {
             if (!Fam.AllAttack(ctx) || ctx.consShield <= 0) return;
@@ -341,21 +349,21 @@ namespace ItemSystem.PassiveSkills.Effects
     {
         public string SkillId => "シールドバッシュI";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ShieldBashHelper.Apply(ctx, 0.5f, SkillId);
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ShieldBashHelper.Apply(ctx, ShieldBashHelper.Rates[0], SkillId);
     }
 
     public class ShieldBashLadderII : IPassiveSkillEffect
     {
         public string SkillId => "シールドバッシュII";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ShieldBashHelper.Apply(ctx, 1.0f, SkillId);
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ShieldBashHelper.Apply(ctx, ShieldBashHelper.Rates[1], SkillId);
     }
 
     public class ShieldBashLadderIII : IPassiveSkillEffect
     {
         public string SkillId => "シールドバッシュIII";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ShieldBashHelper.Apply(ctx, 1.5f, SkillId);
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ShieldBashHelper.Apply(ctx, ShieldBashHelper.Rates[2], SkillId);
     }
 
     /// <summary>堅守の構え (2026-10-28・旧〈パリィ〉の枠) — <b>出目を全部ブロック端子に挿したターン</b>、
@@ -368,7 +376,8 @@ namespace ItemSystem.PassiveSkills.Effects
     {
         public const int Shield = 15;
         public const int Cooldown = 3;   // 発動ターン + 3 から再び使える = 次の 2 ターンは不可
-        private const string ReadyKey = "steadfastStanceReadyTurn";
+        /// <summary>次に使えるターン (accumulatedValues の鍵)。 BOT の配線評価も読む。</summary>
+        public const string ReadyKey = "steadfastStanceReadyTurn";
         public string SkillId => "堅守の構え";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -459,6 +468,10 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 旧〈大鉈〉(敵の失った HP 割合で与ダメ +%) は〈捨て身〉と同じ HP 割合条件で重なっていたので外した。</para></summary>
     internal static class ArmorBreakHelper
     {
+        /// <summary>段 (I / II / III) ごとの ID と削り量。 先読み BOT (<c>EnemyArmorModel</c>) も同じ値を読む。</summary>
+        public static readonly string[] SkillIds = { "鎧砕きI", "鎧砕きII", "鎧砕きIII" };
+        public static readonly int[] Amounts = { 2, 3, 4 };
+
         public static void Apply(CombatContext ctx, int amount, string label)
         {
             if (ctx.lastPlayerDamage <= 0 || ctx.enemyDefense <= 0) return;
@@ -470,23 +483,23 @@ namespace ItemSystem.PassiveSkills.Effects
 
     public class ArmorBreakI : IPassiveSkillEffect
     {
-        public string SkillId => "鎧砕きI";
+        public string SkillId => ArmorBreakHelper.SkillIds[0];
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ArmorBreakHelper.Apply(ctx, 2, SkillId);
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ArmorBreakHelper.Apply(ctx, ArmorBreakHelper.Amounts[0], SkillId);
     }
 
     public class ArmorBreakII : IPassiveSkillEffect
     {
-        public string SkillId => "鎧砕きII";
+        public string SkillId => ArmorBreakHelper.SkillIds[1];
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ArmorBreakHelper.Apply(ctx, 3, SkillId);
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ArmorBreakHelper.Apply(ctx, ArmorBreakHelper.Amounts[1], SkillId);
     }
 
     public class ArmorBreakIII : IPassiveSkillEffect
     {
-        public string SkillId => "鎧砕きIII";
+        public string SkillId => ArmorBreakHelper.SkillIds[2];
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ArmorBreakHelper.Apply(ctx, 4, SkillId);
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ArmorBreakHelper.Apply(ctx, ArmorBreakHelper.Amounts[2], SkillId);
     }
 
     // 〈捨て身〉(HP 割合で敵に負けている間 与ダメ +50%) は items.json の stats だけ。

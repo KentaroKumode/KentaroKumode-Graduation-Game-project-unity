@@ -275,7 +275,7 @@ namespace AutoTest.EditorTools
         ///
         /// <para>ビルド後の照合は<b>表明</b>として残す ── 作り直したのに descriptor が
         /// ソースより古いなら、 ビルドが何かを拾い損ねている。</para></summary>
-        private static bool EnsureFreshBuild(out string reason)
+        internal static bool EnsureFreshBuild(out string reason)
         {
             if (!UltraProductionWorkerBuild.EnsureBuilt(out reason))
             {
@@ -352,7 +352,7 @@ namespace AutoTest.EditorTools
             return arms;
         }
 
-        private static void SnapshotConfig(out string[] keys, out string[] values)
+        internal static void SnapshotConfig(out string[] keys, out string[] values)
         {
             var k = new List<string>();
             var v = new List<string>();

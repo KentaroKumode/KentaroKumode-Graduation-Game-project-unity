@@ -511,6 +511,7 @@ namespace CombatSystem
                       : MapSystem.MapManager.Instance?.CurrentNode?.EffectiveType.ToEnemyKind() == EnemyKind.Elite
                         ? SkillDiag.Elite : SkillDiag.Normal;
             ShieldDiag.CurrentKind = _diagKind;
+            HpLossDiag.Begin(_diagKind, GameLoop.GameManager.Instance?.Run?.Depth ?? 1, enemy != null ? enemy.maxHP : 0);   // [計装 2026-11-05]
             StartCombatCompleted = _combatSeq;
             metaLethalSurviveUsed = false;
             metaAgilityDodgeUsed = false;
@@ -656,7 +657,7 @@ namespace CombatSystem
                     if (rs.pendingEnemyStartHpCutPct > 0)
                     {
                         int cut = Mathf.CeilToInt(enemy.maxHP * rs.pendingEnemyStartHpCutPct / 100f);
-                        enemyHP = Math.Max(1, enemyHP - cut);
+                        HpLossDiag.Lose(ref enemyHP, cut, "奇襲", 1);
                         Debug.Log($"[CombatManager] 奇襲: 敵開始HP-{cut} ({enemyHP}/{enemy.maxHP})");
                     }
                     // 2026-06-28: 職業スターター消耗品の pending → ctx コピー

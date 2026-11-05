@@ -47,8 +47,22 @@ namespace GameLoop
 
         public bool AppliesTo(int floor, bool elite)
         {
-            if (floor < minFloor || floor > maxFloor) return false;
             if (eliteOnly && !elite) return false;
+            // 2 体戦 (2026-11-04〜): 2 体とも強さの尺度に載っていれば、 2 体ともその層の尺度の範囲に入る時だけ出す (minFloor/maxFloor は使わない)
+            if (IsPair)
+            {
+                var a = CombatSystem.EnemyDatabase.Get(enemyA); var b = CombatSystem.EnemyDatabase.Get(enemyB);
+                if (a != null && b != null && a.scale >= 0f && b.scale >= 0f)
+                {
+                    // 2026-11-05: 「2 体とも窓の中」から「強い方が窓の中・弱い方は窓の上限以下」へ緩めた。
+                    //   2 体の強さの差が窓の幅 (0.3) を超える組 (灯火の下の取引・執行の立会人) が一度も出なかったため。
+                    //   弱い相方は層の危険度を上げない (上限を守る) ので、 層の左右の危険度の並びは崩れない。
+                    var (lo, hi) = FloorManager.ScaleWindowOf(floor);
+                    float strong = System.Math.Max(a.scale, b.scale), weak = System.Math.Min(a.scale, b.scale);
+                    return strong >= lo - 1e-4f && strong <= hi + 1e-4f && weak <= hi + 1e-4f;
+                }
+            }
+            if (floor < minFloor || floor > maxFloor) return false;
             return true;
         }
     }
@@ -88,19 +102,19 @@ namespace GameLoop
             Generic,
 
             // ── 通常マスに混ざる 2 体戦 ──
-            new EncounterPreset { id = "enc_burrow_leftovers", title = "巣穴の残り物",
+            new EncounterPreset { id = "enc_burrow_leftovers", title = "徒党を組む弱者",
                 enemyA = "slime",       enemyB = "goblin",      minFloor = 1, maxFloor = 2, weight = 6 },
             new EncounterPreset { id = "enc_shaft_duty",       title = "坑道の当番",
                 enemyA = "kobold",      enemyB = "skeleton",    minFloor = 2, maxFloor = 3, weight = 6 },
-            new EncounterPreset { id = "enc_houndkeeper",      title = "猟犬づれ",
+            new EncounterPreset { id = "enc_houndkeeper",      title = "相棒",
                 enemyA = "wolf",        enemyB = "kobold",      minFloor = 2, maxFloor = 3, weight = 6 },
-            new EncounterPreset { id = "enc_roll_call_gap",    title = "点呼の欠員",
+            new EncounterPreset { id = "enc_roll_call_gap",    title = "冥府の先触れ",
                 enemyA = "skeleton",    enemyB = "13th_death",  minFloor = 3, maxFloor = 4, weight = 5 },
-            new EncounterPreset { id = "enc_double_watch",     title = "見張り塔の二重哨戒",
+            new EncounterPreset { id = "enc_double_watch",     title = "二人の哨戒",
                 enemyA = "orc",         enemyB = "harpy",       minFloor = 3, maxFloor = 4, weight = 5 },
-            new EncounterPreset { id = "enc_bridge_and_tithe", title = "橋番と徴税人",
+            new EncounterPreset { id = "enc_bridge_and_tithe", title = "戦う者",
                 enemyA = "lizardman",   enemyB = "dark_knight", minFloor = 4, maxFloor = 5, weight = 5 },
-            new EncounterPreset { id = "enc_failed_castings",  title = "檻の失敗作",
+            new EncounterPreset { id = "enc_failed_castings",  title = "失敗作",
                 enemyA = "minotaur",    enemyB = "chimera",     minFloor = 4, maxFloor = 5, weight = 4 },
             new EncounterPreset { id = "enc_lamplit_bargain",  title = "灯火の下の取引",
                 enemyA = "demon",       enemyB = "dark_knight", minFloor = 4, maxFloor = 5, weight = 4 },
@@ -114,13 +128,13 @@ namespace GameLoop
                 enemyA = "death_knight", enemyB = "chimera",   minFloor = 5, maxFloor = 6, weight = 4 },
 
             // ── エリート専用。 2 体ともエリート化されるので全ゲーム最大級の利得と危険 ──
-            new EncounterPreset { id = "enc_two_failures",     title = "二枚の失敗作",
+            new EncounterPreset { id = "enc_two_failures",     title = "暴虐",
                 enemyA = "minotaur",    enemyB = "demon",       minFloor = 4, maxFloor = 5,
                 weight = 12, eliteOnly = true },
-            new EncounterPreset { id = "enc_last_relief",      title = "最後の守衛交代",
+            new EncounterPreset { id = "enc_last_relief",      title = "主亡き後",
                 enemyA = "golem",       enemyB = "death_knight", minFloor = 5, maxFloor = 7,
                 weight = 12, eliteOnly = true },
-            new EncounterPreset { id = "enc_long_night",       title = "長い夜の主従",
+            new EncounterPreset { id = "enc_long_night",       title = "血と影",
                 enemyA = "elder_vampire", enemyB = "wraith",    minFloor = 5, maxFloor = 7,
                 weight = 12, eliteOnly = true },
         };
@@ -137,30 +151,61 @@ namespace GameLoop
         public static readonly Dictionary<string, string> SoloTitles = new Dictionary<string, string>
         {
             // ── 1 層 ──
+            { "farm_crate",     "朽ちた木箱" },
             { "slime",          "湿った段差" },
             { "goblin",         "先客" },
             // ── 2 層 ──
             { "kobold",         "仕掛けの跡" },        // Trapper
-            { "skeleton",       "片付いていない列" },  // Undying
-            { "wolf",           "距離の詰め方" },      // Sprint
+            { "skeleton",       "墓場" },  // Undying
+            { "wolf",           "奇襲" },      // Sprint
             { "13th_death",     "十三番の札" },        // Decree13th
             // ── 3 層 ──
             { "orc",            "押し通る者" },        // BruteForce
             { "harpy",          "梁の上の影" },        // Flight
             // ── 4 層 ──
             { "lizardman",      "鱗と尾の作法" },      // HardScales / TailStrike
-            { "minotaur",       "角の届く範囲" },      // Rampage / BruteForce
-            { "dark_knight",    "立ち合いの申し出" },  // HoningDuel / CounterStance
-            { "chimera",        "首の数え違い" },      // MultiHead / Regeneration
-            { "demon",          "熱の出どころ" },      // DemonAura / Hellfire
+            { "minotaur",       "猪突猛進" },      // Rampage / BruteForce
+            { "dark_knight",    "黎明" },  // HoningDuel / CounterStance
+            { "chimera",        "山羊、蛇、獅子" },      // MultiHead / Regeneration
+            { "demon",          "灼火" },      // DemonAura / Hellfire
             // ── 5 層 ──
             { "wraith",         "名指しされる" },      // Curse / Ethereal
-            { "golem",          "動かない方の門" },    // Immovable / HardScales
-            { "elder_vampire",  "返ってこない血" },    // Lifesteal / NightLord
-            { "death_knight",   "刑の告知" },          // DeathSentence
+            { "golem",          "門番" },    // Immovable / HardScales
+            { "elder_vampire",  "血族" },    // Lifesteal / NightLord
+            { "death_knight",   "亡国" },          // DeathSentence
+            // ── 装甲持ち (2026-11-04 追加) ──
+            { "carapace_crawler",   "ヨロイムシ" },
+            { "patched_deserter",   "脱走兵" },
+            { "stone_eater",        "遺跡崩し" },
+            { "greatshield_sentry", "関所" },
+
+            // ── 精鋭は元の敵と同じ名前 (2026-11-05)。 精鋭かどうかはマスの種別で見えるので、 名前で漏れる情報は増えない。
+            //   **id の綴りから元の敵を推測しない** (CLAUDE.md) ── 行を明示する。 新しい精鋭を足したらここにも足す。
+            { "slime_elite",            "湿った段差" },
+            { "goblin_elite",           "先客" },
+            { "kobold_elite",           "仕掛けの跡" },
+            { "skeleton_elite",         "墓場" },
+            { "wolf_elite",             "奇襲" },
+            { "13th_death_elite",       "十三番の札" },
+            { "orc_elite",              "押し通る者" },
+            { "harpy_elite",            "梁の上の影" },
+            { "lizardman_elite",        "鱗と尾の作法" },
+            { "minotaur_elite",         "猪突猛進" },
+            { "dark_knight_elite",      "黎明" },
+            { "chimera_elite",          "山羊、蛇、獅子" },
+            { "demon_elite",            "灼火" },
+            { "wraith_elite",           "名指しされる" },
+            { "golem_elite",            "門番" },
+            { "elder_vampire_elite",    "血族" },
+            { "death_knight_elite",     "亡国" },
+            { "carapace_crawler_elite",   "ヨロイムシ" },
+            { "patched_deserter_elite",   "脱走兵" },
+            { "stone_eater_elite",        "遺跡崩し" },
+            { "greatshield_sentry_elite", "関所" },
 
             // ── ボス ──
             //   **層で確定するので抽選には乗らない。** 表示のためだけの対応。
+            { "boss_layer0",    "古い宝箱" },
             { "boss_layer1",    "持ち逃げ" },
             { "boss_layer2",    "王の威信" },          // 3 層プール: ゴブリン王
             { "boss_layer3",    "絡みつく死" },        // 3 層プール: 毒沼の主

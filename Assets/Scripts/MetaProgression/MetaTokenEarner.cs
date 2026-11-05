@@ -19,7 +19,8 @@ namespace MetaProgression
 
         public static void OnFloorReached(int floor)
         {
-            // フロア到達は currentFloor を渡すので、毎フロア +10
+            // フロア到達は currentFloor を渡すので、毎フロア +10 (ファーム層 = 0 は数えない・2026-11-05)
+            if (floor < 1) return;
             Award(TokensPerFloor, $"フロア{floor}到達");
         }
 

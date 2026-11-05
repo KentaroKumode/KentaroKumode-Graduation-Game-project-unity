@@ -172,8 +172,15 @@ namespace GameLoop
         /// <summary>5 層 隠しボス: シュヴァリエ・サン=ジョリオラ。 レイピア所持時のみ 5 層ボスと差し替わる。
         /// 計測では <c>GameManager.SuppressLayer5HiddenBoss</c> で遮断する (既定 ON)。</summary>
         public const string Layer5Hidden = "boss_layer5_hidden";
+        /// <summary>6 層ボス: 灰燼の王。</summary>
+        public const string Layer6Ash = "boss_layer6";
         /// <summary>最終段 (ヴェスカ・天与)。 8 層 Null Point。</summary>
         public const string VescaFinal = "boss_layer7_p4";
+
+        /// <summary>0 層 (ファーム層・2026-11-05) のボス: 古い宝箱 (HP100・攻撃なし)。 <see cref="IsBoss"/> に掛かるよう prefix を揃えた。</summary>
+        public const string FarmBoss = "boss_layer0";
+        /// <summary>0 層の雑魚: 古いクレート (HP1・攻撃なし)。</summary>
+        public const string FarmCrate = "farm_crate";
 
         /// <summary>敵 ID がボスか (null 安全)。</summary>
         public static bool IsBoss(string enemyId)

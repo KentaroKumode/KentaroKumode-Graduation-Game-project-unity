@@ -88,7 +88,7 @@ namespace GameLoop
         /// 旧 7 層 (〈門〉) と 8 層 (ヴェスカ戦) は 5 層に統合した (直線の 1 本道・終点がヴェスカ)。
         /// <b>敵・報酬・層デバフ・学習など深さ基準のデータは <see cref="Depth"/> で引く</b>
         /// (中身は旧い層番号 1/3/5/6/7/8 のまま ── 詰めるとデータが全部ずれる)。</summary>
-        public int currentFloor = 1;
+        public int currentFloor = MapSystem.FreeMove.FloorPlan.FarmFloor;
         /// <summary>深さ (旧い層番号 1/3/5/6/7/8)。 敵プール・ボス ID・層デバフ・報酬・層タイトル・学習ファイルなど、
         /// 深さで書かれたものはこちらで引く。 正本は <see cref="MapSystem.FreeMove.FloorPlan.DepthOf"/>。</summary>
         public int Depth => MapSystem.FreeMove.FloorPlan.DepthOf(currentFloor);
@@ -504,7 +504,7 @@ namespace GameLoop
         /// それまでの全バランス調整は実効 30 の上で行われていた)。値を変えるときは必ず GameManager 側で。</param>
         public void Initialize(int startHP = GameManager.BaseStartingHP)
         {
-            currentFloor = 1;
+            currentFloor = MapSystem.FreeMove.FloorPlan.FarmFloor;
             bossDefeatedThisFloor = false;
             shopRobberyDone = false;
             shopRobberyInProgress = false;

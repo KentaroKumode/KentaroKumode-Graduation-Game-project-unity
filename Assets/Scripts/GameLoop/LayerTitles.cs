@@ -39,6 +39,7 @@ namespace GameLoop
 
         public static Entry ForFloor(int floor)
         {
+            if (floor == 0) return new Entry("序層　古い倉庫", "朽ちた木箱が、ひとつずつ砕けていく");   // 仮置き (2026-11-05)
             int i = floor - 1;
             if (i < 0 || i >= Floors.Length) return new Entry($"第{floor}層", "");
             return Floors[i];

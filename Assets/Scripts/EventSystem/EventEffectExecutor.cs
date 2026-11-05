@@ -56,7 +56,11 @@ namespace EventSystem
                     break;
 
                 case EventEffectType.HpDelta:
+                {
+                    int hpBefore = run.playerHP;
                     run.playerHP = Mathf.Clamp(run.playerHP + eff.amount, 0, run.playerMaxHP);
+                    GameLoop.HpOutsideDiag.Add("イベント:HP減", hpBefore - run.playerHP);   // [計装 2026-11-05]
+                }
                     result.log.Add($"HP{eff.amount:+0;-0} (現在 {run.playerHP}/{run.playerMaxHP})");
                     break;
 
@@ -66,6 +70,7 @@ namespace EventSystem
                     break;
 
                 case EventEffectType.HpSetTo:
+                    GameLoop.HpOutsideDiag.Add("イベント:HP設定", run.playerHP - Mathf.Clamp(eff.amount, 0, run.playerMaxHP));   // [計装 2026-11-05]
                     run.playerHP = Mathf.Clamp(eff.amount, 0, run.playerMaxHP);
                     result.log.Add($"HP→{run.playerHP}");
                     break;
@@ -78,6 +83,7 @@ namespace EventSystem
                 {
                     int before = run.playerHP;
                     run.playerHP = Mathf.Max(1, (before + 1) / 2);
+                    GameLoop.HpOutsideDiag.Add("イベント:HP半減", before - run.playerHP);   // [計装 2026-11-05]
                     result.log.Add($"現在HPの半分を支払った ({before} → {run.playerHP})");
                     break;
                 }

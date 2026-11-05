@@ -88,12 +88,17 @@ namespace GameLoop
 
         /// <summary>ノード添字を明示して敵を 1 体引く。 <see cref="PickEnemy"/> の決定論版。
         /// <paramref name="elite"/> なら <b>エリート敵 (<c>EnemyData.elite</c>) だけ</b>から、 そうでなければ雑魚だけから引く。</summary>
-        public static EnemyData PickEnemyForNode(int floor, int nodeIdx, bool elite = false)
+        public static EnemyData PickEnemyForNode(int floor, int nodeIdx, bool elite = false, int band = BandAny)
         {
             var candidates = BuildCandidates(floor, elite);
             if (candidates == null || candidates.Count == 0) return EnemyDatabase.GetRandom();
+            candidates = NarrowByBand(candidates, band);
+            // 安全な帯は「その層の新顔を優先」をしない (新顔はその層でいちばん強い側なので)
+            if (band == MapSystem.FreeMove.FreeMapParams.BandSafe)
+                return candidates[GameRng.Range(0, candidates.Count, "enemy.pick", nodeIdx)];
 
             var newEnemies = EnemyDatabase.GetNewOnFloor(floor);
+            if (band == MapSystem.FreeMove.FreeMapParams.BandDanger) newEnemies?.RemoveAll(e => !candidates.Exists(c => c.id == e.id));
             newEnemies?.RemoveAll(e => IsBossOnly(e) || e.elite != elite);
             if (newEnemies != null && newEnemies.Count > 0
                 && GameRng.Value("enemy.preferNew", nodeIdx) < 0.5f)
@@ -128,6 +133,15 @@ namespace GameLoop
             int idx = NodeRngIndex(floor, node);
             bool elite = t == MapSystem.TileType.EliteBattle;
 
+            // ファーム層 (0 層・2026-11-05): 戦闘は古いクレートだけ。 抽選しない (乱数を消費しない)
+            if (floor == MapSystem.FreeMove.FloorPlan.FarmFloor)
+            {
+                node.encounterId = EncounterPresets.Generic.id;
+                node.encounterEnemyA = BossIds.FarmCrate;
+                node.encounterEnemyB = null;
+                return;
+            }
+
 
             // **エリートは常に単体** (2026-09-14 リワーク)。 2 体戦と精鋭は別種の危険で、
             //   両方乗せると何が効いたか読めない。 2 体戦は通常マスの引き (報酬 ×2 の賭け) として残し、
@@ -136,19 +150,21 @@ namespace GameLoop
             if (elite)
             {
                 node.encounterId = EncounterPresets.Generic.id;
-                node.encounterEnemyA = PickEnemyForNode(floor, idx, true)?.id;
+                node.encounterEnemyA = PickEnemyForNode(floor, idx, true, MapSystem.FreeMove.FreeMapParams.BandOf(node.x))?.id;
                 node.encounterEnemyB = null;
                 return;
             }
 
-            var preset = EncounterPresets.PickFor(floor, elite, idx);
+            // 危険の帯 (2026-11-04): 始点側の安全な帯は 2 体戦を出さず、 脅威度の低い敵だけ。 終点側の危険な帯は脅威度の低い敵を外す
+            int band = MapSystem.FreeMove.FreeMapParams.BandOf(node.x);
+            var preset = band == MapSystem.FreeMove.FreeMapParams.BandSafe ? EncounterPresets.Generic : EncounterPresets.PickFor(floor, elite, idx);
 
             // ペアの 2 体目が DB に無ければ単体戦へ縮退する (プリセットの typo で戦闘が壊れないように)。
             bool pairOk = preset.IsPair && EnemyDatabase.Get(preset.enemyB) != null
                                         && EnemyDatabase.Get(preset.enemyA) != null;
 
             node.encounterId   = pairOk ? preset.id : EncounterPresets.Generic.id;
-            node.encounterEnemyA = pairOk ? preset.enemyA : PickEnemyForNode(floor, idx)?.id;
+            node.encounterEnemyA = pairOk ? preset.enemyA : PickEnemyForNode(floor, idx, false, band)?.id;
             node.encounterEnemyB = pairOk ? preset.enemyB : null;
         }
 
@@ -172,6 +188,7 @@ namespace GameLoop
             //   学習ファイル・Tier 表・boss_tuning.json のキーが ID 基準で、
             //   改名すると過去データと切れる (3 層プールの boss_layer2/4 と同じ扱い)。
             if (floor == 7) return BossIds.Layer7Prefix;     // 最終層 (深さ 7 = 5 層) の終点
+            if (floor == MapSystem.FreeMove.FloorPlan.FarmFloor) return BossIds.FarmBoss;
             if (floor == 1 || floor == 5 || floor == 6)
                 return BossIds.LayerPrefix + floor;
             return null;   // 2 層 / 4 層 / 7 層 にボスマスは無い
@@ -197,9 +214,47 @@ namespace GameLoop
             return EnemyDatabase.Get(node.encounterEnemyA)?.displayName;
         }
 
-        /// <summary>抽選候補の構築 (<see cref="PickEnemy"/> と共通)。 エリートと雑魚は混ぜない。</summary>
+        /// <summary>帯の指定なし (追跡者・使い魔など、 点の位置に縛られない戦闘)。</summary>
+        public const int BandAny = -1;
+
+        /// <summary>帯で候補を絞る。 脅威度の低い順に並べ、 安全な帯は低い方の 1/3 だけ、 危険な帯は低い方の 1/3 を外す (どちらも最低 1 体は残す)。
+        /// 中間の帯と <see cref="BandAny"/> は絞らない。 脅威度が同じ敵は元の並び順を保つ (乱数の列を崩さない)。</summary>
+        private static List<EnemyData> NarrowByBand(List<EnemyData> candidates, int band)
+        {
+            if (band != MapSystem.FreeMove.FreeMapParams.BandSafe && band != MapSystem.FreeMove.FreeMapParams.BandDanger) return candidates;
+            int n = candidates.Count; if (n <= 1) return candidates;
+            int third = Mathf.Max(1, (n + 2) / 3);
+            var sorted = new List<EnemyData>(candidates);
+            var order = new Dictionary<EnemyData, int>(); for (int i = 0; i < n; i++) order[candidates[i]] = i;
+            sorted.Sort((a, b) => a.danger != b.danger ? a.danger.CompareTo(b.danger) : order[a].CompareTo(order[b]));
+            int cut = sorted[third - 1].danger;      // 同じ脅威度の敵は同じ側へ入れる
+            var keep = band == MapSystem.FreeMove.FreeMapParams.BandSafe
+                ? candidates.FindAll(e => e.danger <= cut)
+                : candidates.FindAll(e => e.danger > cut);
+            return keep.Count > 0 ? keep : candidates;
+        }
+
+        /// <summary>層 (1〜4 層) ごとに出す敵の、 強さの尺度 (<see cref="EnemyData.scale"/>) の範囲 (2026-11-04)。 隣の層と少し重ねる。
+        /// 5 層 (一本道) のエリートは 4 層の範囲から引く。 <c>Tools/enemy_scale.py</c> の WINDOWS と揃える。</summary>
+        public static readonly (float lo, float hi)[] ScaleWindows = { (0f, 0.25f), (0.2f, 0.5f), (0.45f, 0.75f), (0.7f, 1f) };
+
+        /// <summary>その層 (深さ) の尺度の範囲。</summary>
+        public static (float lo, float hi) ScaleWindowOf(int depth)
+        {
+            int ord = Mathf.Clamp(MapSystem.FreeMove.FloorPlan.OrdinalOf(depth), 1, ScaleWindows.Length);
+            return ScaleWindows[ord - 1];
+        }
+
+        /// <summary>抽選候補の構築 (<see cref="PickEnemy"/> と共通)。 エリートと雑魚は混ぜない。
+        /// <para>2026-11-04〜: 強さの尺度に載っている敵は、 層の尺度の範囲 (<see cref="ScaleWindowOf"/>) で選ぶ (旧「深さ −2 〜 深さ」の範囲は使わない)。
+        /// 尺度に載った敵が 1 体もいない時だけ旧来の範囲へ落ちる。</para></summary>
         private static List<EnemyData> BuildCandidates(int floor, bool elite = false)
         {
+            var (lo, hi) = ScaleWindowOf(floor);
+            var byScale = EnemyDatabase.GetByFloorRange(1, SpecialEncounterFloor - 1);
+            byScale?.RemoveAll(e => e == null || e.scale < 0f || IsBossOnly(e) || e.elite != elite || e.scale < lo - 1e-4f || e.scale > hi + 1e-4f);
+            if (byScale != null && byScale.Count > 0) return byScale;
+
             int minFloor = Mathf.Max(1, floor - 2);
             var candidates = EnemyDatabase.GetByFloorRange(minFloor, floor);
             candidates?.RemoveAll(e => IsBossOnly(e) || e.elite != elite);

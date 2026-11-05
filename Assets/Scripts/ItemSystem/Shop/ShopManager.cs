@@ -11,11 +11,14 @@ namespace ItemSystem.Shop
     public class ShopManager : MonoBehaviour
     {
         /// <summary>〈サーベル・ワルツ〉所持時に、 ショップのパッシブ抽選プールを
-        /// [剣の舞] だけに絞る確率。 <b>既定 0.6。</b> 0 で自己加速を止める。
+        /// [剣の舞] だけに絞る確率。 <b>既定 0.15</b> (2026-11-04: 0.6 から)。 0 で自己加速を止める。
+        ///
+        /// <para>0.6 だと 1 枚目を取った瞬間に LEGENDARY 枠の 6 割が剣の舞になり、 棚に並ぶ剣の舞の約半分が差し替え由来・
+        /// 4 枚の成立が 1 ランの 52.8% に達していた (説明文の「まれに」と食い違っていた)。</para>
         ///
         /// <para>較正用に static にしてある (書き換えるのは <c>AutoRunner.saberWaltzShopBias</c> だけ)。
         /// 実効値は <c>[実効状態]</c> に印字される。</para></summary>
-        public static float SaberWaltzShopBias = 0.6f;
+        public static float SaberWaltzShopBias = 0.15f;
 
         /// <summary>[計装 2026-09-14] パッシブ枠が何回出て、 そのうち何回 LEGENDARY 帯を引いたか。
         /// <b>差し替えの天井はここで決まる。</b> 4 枚集約に必要なのは「LEGENDARY 枠 4 回」で、
@@ -114,6 +117,9 @@ namespace ItemSystem.Shop
 
         /// <summary>鑑定の眼鏡: この入店中の最低レア保証（null=無）。</summary>
         private ItemRarity? _apprMinRarity;
+        /// <summary>いま棚に並んでいる品の id (2026-11-04)。 <see cref="PickItemByKind"/> はここにある品を引かない
+        /// ── 同じ店に同じ品が 2 つ並んでいた (武器を 2 本買えた)。 棚を作り始める時と、 リロールの前に詰め直す。</summary>
+        private readonly HashSet<string> _shelfIds = new HashSet<string>();
 
         /// <summary>ショップマス入店時に在庫を生成。</summary>
         // ================================================================
@@ -130,8 +136,9 @@ namespace ItemSystem.Shop
         /// <summary>シールド枠の LEGENDARY が〈古い手紙〉に替わる確率 (%・2026-10-31 仮置き)。</summary>
         public const int OldLetterShopChancePct = 50;
 
-        /// <summary>1 つの店で買える物資の包の数。</summary>
-        public const int ProvisionPackStock = 3;
+        /// <summary>1 つの店で買える物資の包の数 (2026-11-04: 3 → 30 ＝ 物資 3000)。
+        /// 3 包 (300) だと金がいくらあっても物資を買い足せず、 金が品だけに流れるか、 物資が尽きて探索が止まるかの両極端になった。</summary>
+        public const int ProvisionPackStock = 30;
         /// <summary>この店に残っている物資の包。 <see cref="Generate"/> で戻る。</summary>
         public int ProvisionPacksLeft { get; private set; } = ProvisionPackStock;
 
@@ -166,6 +173,7 @@ namespace ItemSystem.Shop
         {
             ProvisionPacksLeft = ProvisionPackStock;
             var inv = new ShopInventory();
+            _shelfIds.Clear();
 
             // フロア価格倍率（FloorModifier.shopPriceMultiplier）× メタデバフ Lv1
             var floorMod = MapSystem.FloorModifierDatabase.Get(floor);
@@ -506,6 +514,7 @@ namespace ItemSystem.Shop
                     basePrice = 10;
                 price = Mathf.CeilToInt(basePrice * priceMultiplier) + ItemPriceAdd;
             }
+            if (id != null) _shelfIds.Add(id);
             return new ShopSlot { kind = kind, itemId = id, price = price, sold = false };
         }
 
@@ -588,6 +597,13 @@ namespace ItemSystem.Shop
             // イベント限定アイテムを除外（ちいさな灯火・決意 等）
             pool = pool.FindAll(EventOnlyItemFilter.IsAllowed);
             if (pool.Count == 0) return null;
+
+            // 棚に並んでいる品は引かない (重複陳列の防止)。 尽きた時だけ重複を許す。
+            if (_shelfIds.Count > 0)
+            {
+                var notShelved = pool.FindAll(it => !_shelfIds.Contains(it.internalName));
+                if (notShelved.Count > 0) pool = notShelved;
+            }
 
             // パッシブはラン重複排除（所持済みは並べない）。枯渇時は元プール（重複許可）。
             if (category.Value == ItemCategory.Passive)
@@ -878,6 +894,12 @@ namespace ItemSystem.Shop
             GameLoop.RunChronicle.Reroll(run, price);
             Current.rerollCount++;
 
+            // 振り直さない枠 (売却済み) の品は棚に残る。 振り直す枠の品は棚から外す (同じ品が引き直されてよい)。
+            _shelfIds.Clear();
+            var shelfParts = new List<GameLoop.DiceFaceParts.Part>();
+            foreach (var s in Current.slots)
+                if (s != null && s.sold && !string.IsNullOrEmpty(s.itemId)) _shelfIds.Add(s.itemId);
+
             int rerolled = 0;
             for (int i = 0; i < Current.slots.Count; i++)
             {
@@ -885,7 +907,39 @@ namespace ItemSystem.Shop
                 if (s == null) continue;
                 if (s.kind == ShopSlotKind.WeaponMaterial) continue; // 価格カーブ独立
                 if (s.sold) continue;
-                var fresh = BuildSlot(s.kind, Current.priceMultiplier);
+                ShopSlot fresh;
+                switch (s.kind)
+                {
+                    // 出目パーツは items.json に無いので BuildSlot では作れない (2026-11-04 修正)。
+                    //   以前は空の枠 (出目0・None) に化けていた。 棚生成と同じく、 所持済みと棚の他のパーツを除いて引く。
+                    case ShopSlotKind.FacePart:
+                    {
+                        var pool = GameLoop.DiceFaceParts.RemainingKinds(run.diceFaceParts);
+                        pool.RemoveAll(p => shelfParts.Contains(p));
+                        if (pool.Count == 0) { fresh = s; break; }
+                        var part = pool[GameLoop.GameRng.Range(0, pool.Count, "shop.facePart")];
+                        shelfParts.Add(part);
+                        fresh = BuildFacePartSlot(part, Current.priceMultiplier);
+                        break;
+                    }
+                    // 消費は系統ごとに 1 枠 (回復固定 + 残り 2 系統) の並びを保つ。 振り直すのは Tier だけ。
+                    //   以前は全消費アイテムから引き直しており、 回復が消えたり同じ系統が 2 枠並んだりした。
+                    case ShopSlotKind.Consumable:
+                    {
+                        string fam = GameLoop.ItemIds.ConsFamilyOf(s.itemId) ?? GameLoop.ItemIds.ConsShieldFamily;   // 惜別の護符はシールド枠の差し替え
+                        int tier = GameLoop.GameRng.Range(1, GameLoop.ItemIds.ConsumableMaxTier + 1, "shop.consTier");
+                        string consId = GameLoop.ItemIds.ConsId(fam, tier);
+                        if (fam == GameLoop.ItemIds.ConsShieldFamily && tier == GameLoop.ItemIds.ConsumableMaxTier
+                            && GameLoop.GameRng.Range(0, 100, "shop.oldLetter") < OldLetterShopChancePct)
+                            consId = GameLoop.ItemIds.OldLetter;
+                        fresh = consId != null ? BuildConsumableSlot(consId, Current.priceMultiplier) : s;
+                        break;
+                    }
+                    default:
+                        fresh = BuildSlot(s.kind, Current.priceMultiplier);
+                        break;
+                }
+                if (fresh.kind == ShopSlotKind.FacePart && fresh == s) shelfParts.Add(s.facePart);
                 Current.slots[i] = fresh;
                 rerolled++;
             }

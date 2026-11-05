@@ -16,6 +16,18 @@ namespace MapSystem.FreeMove
         public const float Width = 16.4f;
         public const float Height = 9.4f;
         public const float StartX = 0.5f;
+
+        // ── 危険の帯 (2026-11-04) ──────────────────────────────
+        //   層を左右で 3 つの帯に分ける。 始点 (左端) 側が安全、 終点 (右端・ボス) 側が危険。
+        //   安全: 脅威度の低い敵だけ・エリートと 2 体戦を置かない ／ 中間: 今どおり ／ 危険: 脅威度の低い敵を外す。 敵の数値は変えない (倍率なし)。
+        public const int BandSafe = 0, BandMiddle = 1, BandDanger = 2;
+
+        /// <summary>点の横の位置 → 帯。 始点の x を 0・終点の x を 1 とした割合で、 1/3 と 2/3 で切る。</summary>
+        public static int BandOf(float x)
+        {
+            float t = (x - StartX) / (Width - 0.5f - StartX);
+            return t < 1f / 3f ? BandSafe : t < 2f / 3f ? BandMiddle : BandDanger;
+        }
         /// <summary>層の点の数 (始点・終点を含む)。 試作どおり 50 (GAME.md の旧記述は 28)。</summary>
         public const int NodeCount = 50;
         /// <summary>点どうしの最小間隔。</summary>
@@ -37,7 +49,9 @@ namespace MapSystem.FreeMove
 
         // ── 移動 ───────────────────────────────────────────────
         /// <summary>1 歩 (隣の点へ) の物資。 距離によらず一定。</summary>
-        public const int MoveSupply = 10;
+        /// <para>2026-11-04: 10 → 50。 戦闘が物資を生まなくなった (下の補給) のと合わせて、 寄り道が物資の赤字になるように。
+        /// 以前は戦闘 1 回 (+30) で 3 歩ぶんが返り、 戦うほど物資が増えて毎層マップを取り尽くしていた。</para>
+        public const int MoveSupply = 50;
         /// <summary>物資が足りない分は HP で払う。 物資 10 あたりの HP。</summary>
         public const int SupplyPerHp = 10;
 
@@ -57,6 +71,13 @@ namespace MapSystem.FreeMove
         public const int DetectRange = 2;
         /// <summary>この手番数だけ補足できなければ見失う。</summary>
         public const int QuietLose = 3;
+        /// <summary>召喚者 (動かない) の補足の歩数 (2026-11-04)。 動けない代わりに遠くから気づく。</summary>
+        public const int SummonerDetectRange = 5;
+        /// <summary>追跡の上限 (2026-11-04)。 この手番数だけ追い続けたら諦めて巡回へ戻る。
+        /// 同じ速さの追跡者は、 下がり続けるプレイヤーと永遠に距離が保たれてしまうため。</summary>
+        public const int ChaseGiveUp = 8;
+        /// <summary>諦めた後、 この手番数のあいだは補足しない (すぐ補足し直して上限が意味を失わないように)。</summary>
+        public const int ChaseRest = 4;
         /// <summary>使い魔がプレイヤーを見つける歩数。</summary>
         public const int FamiliarSee = 1;
         /// <summary>召喚者が使い魔を放つ間隔 (手番)。</summary>
@@ -99,14 +120,17 @@ namespace MapSystem.FreeMove
         public const int StartLures = 2;
 
         // ── 物資の補給 ─────────────────────────────────────────
-        public const int RewardBattle = 30;
-        public const int RewardElite = 80;
+        /// <summary>通常戦・エリート戦の物資 (2026-11-04: 30 / 80 → 0)。 物資は店で買って補給する。
+        /// 戦闘が物資を生むと、 戦うほど探索が延びて金・品・戦闘数が全部膨らんだ。</summary>
+        public const int RewardBattle = 0;
+        public const int RewardElite = 0;
         public const int RewardBoss = 150;
         /// <summary>追跡者を倒した時の物資。</summary>
         public const int RewardPursuer = 300;
         /// <summary>前哨基地の物資。</summary>
         public const int RewardOutpost = 200;
         /// <summary>ショップで 1G ＝ 10 物資。</summary>
-        public const int ProvisionPerGold = 10;
+        /// <para>2026-11-04: 10 → 25 (1 包 100 = 4G)。</para>
+        public const int ProvisionPerGold = 25;
     }
 }

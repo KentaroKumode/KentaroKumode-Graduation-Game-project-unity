@@ -269,6 +269,8 @@ namespace AutoTest
         {
             if (node == null) return 4f;
             TileType t = node.EffectiveType;
+            // 計測でイベントを切っている間は、 イベントマスは何も起きない (行く価値なし)
+            if (t == TileType.Event && GameLoop.GameManager.SuppressEvents) return 10f;
             var polN = AutoTest.PolicyParameters.Current;
             bool crit = hpRatio < polN.hpCritThreshold;   // 危機
             bool low  = hpRatio < lowBar;                 // 低HP (危険度駆動・床は hpLowThreshold)
@@ -321,9 +323,11 @@ namespace AutoTest
                 //   既にその値を読んでいるのに、 <b>戦うかどうかの足切りだけ層の最悪ケースのまま</b>
                 //   だった。 弱い敵が見えているマスも death_knight 基準で門前払いしていた。
                 //   規則は変えない (見えていないマスは従来どおり層の最悪値)。
-                if (UseTileDanger && node.encounterRevealed)
+                if ((UseTileDanger || UseLearnedDanger) && node.encounterRevealed)
                 {
-                    float tileBar = TileDanger(node, elite, run);
+                    // 戦闘名の学習値 → (無ければ) 敵の数値からの見積り (2026-11-05)
+                    float tileBar = UseLearnedDanger ? LearnedTileBar(node, run) : 0f;
+                    if (tileBar <= 0f && UseTileDanger) tileBar = TileDanger(node, elite, run);
                     if (tileBar > 0f) low = hpRatio < tileBar;
                 }
 
@@ -467,6 +471,16 @@ namespace AutoTest
                 int guardPack = 0;
                 while (gm.Run.provision <= ProvisionRefillFloorEffective() && guardPack++ < ShopManager.ProvisionPackStock
                        && sm.TryBuyProvisionPack(gm.Run)) { }
+
+                // 囮罠 (2026-11-04): 追跡者の居る層では 2 個まで持っておく。 補足された時に航行の BOT が使う (AutoRunner.FreeMap)。
+                //   棚の品より先に買うが、 所持金が 20G を切る時は買わない (8G の道具で棚を買えなくしない)
+                if (MapSystem.FreeMove.FloorPlan.HasWanderer(gm.Run.Depth))
+                {
+                    int have = 0;
+                    if (gm.Run.ownedConsumables != null) foreach (var c in gm.Run.ownedConsumables) if (c == ItemIds.Lure) have++;
+                    int guardLure = 0;
+                    while (have < 2 && gm.Run.coins >= 20 && guardLure++ < 2 && sm.TryBuyLure(gm.Run)) have++;
+                }
             }
 
             if (inv != null && inv.slots != null)

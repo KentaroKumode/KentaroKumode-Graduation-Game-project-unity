@@ -763,6 +763,13 @@ namespace ItemSystem.PassiveSkills
             int max = StatusRegistry.Defs.TryGetValue(id, out var def) ? def.maxStacks : int.MaxValue;
             int next = System.Math.Max(0, System.Math.Min(max, cur + stacks));
             dict[id] = next;
+            if (target == StatusTarget.Enemy && id == "poison" && stacks > 0)   // [計装 2026-11-05] 毒の付与量を出どころ別に
+            {
+                string hlSrc = string.IsNullOrEmpty(CurrentSkillId) ? "(戦闘開始・品以外)" : CurrentSkillId;
+                CombatSystem.HpLossDiag.Add("毒付与:" + hlSrc, stacks);
+                int hlOver = cur + stacks - max;
+                if (hlOver > 0) CombatSystem.HpLossDiag.Add("毒溢れ:" + hlSrc, hlOver);
+            }
             // 敵の毒の増加と上限到達を配る (2026-10-31 アイテム再編)
             if (target == StatusTarget.Enemy && id == "poison" && next > cur)
             {
@@ -785,6 +792,7 @@ namespace ItemSystem.PassiveSkills
             if (dmg <= 0) return 0;
             Keywords.Kw.Raise(this, PassiveSkillTrigger.OnPoisonTick, dmg);
             CombatSystem.CombatManager.RaiseDotDamage(CombatSystem.CombatManager.DotKind.Poison, dmg);
+            if (def.halveAfterTick) enemyStatusStacks["poison"] = EnemyPoison / 2;   // 出すたびに半減 (霧吹きの分も)
             return dmg;
         }
 
@@ -822,15 +830,15 @@ namespace ItemSystem.PassiveSkills
             return dict.TryGetValue(id, out var v) ? v : 0;
         }
 
-        /// <summary>DoT 1 回分のダメージ。 最大 HP の割合で効く定義 (<see cref="StatusDef.dotMaxHpPctPerStack"/>) は
+        /// <summary>DoT 1 回分のダメージ。 最大 HP の割合で効く定義 (<see cref="StatusDef.dotMaxHpPermillePerStack"/>) は
         /// 対象 (絶対視点) の最大 HP から整数で数える。 ターン開始の分と〈廃庭の霧吹き〉の分はここを共有する。</summary>
         private int DotDamage(StatusDef def, int stacks)
         {
-            if (def.dotMaxHpPctPerStack > 0)
+            if (def.dotMaxHpPermillePerStack > 0)
             {
                 int maxHp = def.target == StatusTarget.Enemy ? enemyMaxHP : playerMaxHP;
                 int n = def.dotScalesWithStacks ? stacks : 1;
-                return System.Math.Max(1, (int)((long)n * maxHp * def.dotMaxHpPctPerStack / 100));
+                return System.Math.Max(1, (int)((long)n * maxHp * def.dotMaxHpPermillePerStack / 1000));
             }
             return def.dotScalesWithStacks ? stacks * def.dotPerStack : def.dotPerStack;
         }
@@ -845,9 +853,14 @@ namespace ItemSystem.PassiveSkills
                 var dict = def.target == StatusTarget.Enemy ? enemyStatusStacks : playerStatusStacks;
                 if (!dict.TryGetValue(def.id, out int stacks) || stacks <= 0) continue;
                 int dmg = DotDamage(def, stacks);
+                if (def.target == StatusTarget.Enemy && def.id == "poison")     // [計装 2026-11-05] ターン開始時の毒スタック
+                {
+                    CombatSystem.HpLossDiag.Add("毒段:T" + System.Math.Min(currentTurn, 8), stacks);
+                    CombatSystem.HpLossDiag.Add("毒段n:T" + System.Math.Min(currentTurn, 8), 1);
+                }
                 if (dmg > 0)
                 {
-                    if (def.target == StatusTarget.Enemy) fixedDamageToEnemy += dmg;
+                    if (def.target == StatusTarget.Enemy) { fixedDamageToEnemy += dmg; CombatSystem.HpLossDiag.NoteSource("状態:" + def.id, dmg, 0); }
                     else fixedDamageToPlayer += dmg;
                     if (def.target == StatusTarget.Enemy && def.id == "poison")
                     {
@@ -856,7 +869,9 @@ namespace ItemSystem.PassiveSkills
                     }
                 }
                 int decay = def.decayPerTurn;
-                dict[def.id] = System.Math.Max(0, stacks - decay);
+                // 半減型 (毒): ダメージを出した後に、 いま残っているスタックを半分にする (切り捨て)。 tick 中に増えた分も半分になる
+                if (def.halveAfterTick) dict[def.id] = (dict.TryGetValue(def.id, out int nowStacks) ? nowStacks : stacks) / 2;
+                else dict[def.id] = System.Math.Max(0, stacks - decay);
             }
         }
 

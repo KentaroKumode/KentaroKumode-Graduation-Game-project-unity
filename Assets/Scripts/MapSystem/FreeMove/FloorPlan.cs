@@ -13,7 +13,10 @@ namespace MapSystem.FreeMove
     /// </summary>
     public static class FloorPlan
     {
-        public const int FirstFloor = 1;
+        /// <summary>ファーム層 (0 層・2026-11-05)。 物資とゴールドを貯めるための完全な一本道で、 敵は戦わずに砕ける箱だけ。
+        /// 1 層の前に必ず挟まる (深さ 0・番号 0)。 難易度の指標 (死亡率・撃破ターン・損耗) には数えない。</summary>
+        public const int FarmFloor = 0;
+        public const int FirstFloor = FarmFloor;
         public const int LastFloor = 7;
 
         /// <summary>直線の 1 本道の層 (5 層 = 深さ 7・2026-10-20)。 〈門〉とヴェスカ戦を 1 つの層へ統合した最終層。</summary>
@@ -26,7 +29,7 @@ namespace MapSystem.FreeMove
         /// <summary>層の番号 (1〜5) → 深さ (1/3/5/6/7)。 範囲外は両端へ丸める。</summary>
         public static int DepthOf(int ordinal)
         {
-            return DepthByOrdinal[ordinal < 1 ? 1 : ordinal > LastOrdinal ? LastOrdinal : ordinal];
+            return DepthByOrdinal[ordinal < 0 ? 0 : ordinal > LastOrdinal ? LastOrdinal : ordinal];
         }
 
         /// <summary>深さ (1/3/5/6/7) → 層の番号 (1〜5)。 存在しない深さ (2/4) は直前の層。</summary>
@@ -36,12 +39,16 @@ namespace MapSystem.FreeMove
             if (depth >= 6) return 4;
             if (depth >= 5) return 3;
             if (depth >= 3) return 2;
-            return 1;
+            if (depth >= 1) return 1;
+            return 0;
         }
 
         /// <summary>存在する層か (2・4 層は削除済み)。</summary>
         public static bool Exists(int floor)
             => floor >= FirstFloor && floor <= LastFloor && floor != 2 && floor != 4;
+
+        /// <summary>ファーム層か (深さ 0)。</summary>
+        public static bool IsFarm(int floor) => floor == FarmFloor;
 
         /// <summary>次の層。 最終層なら同じ値を返す。</summary>
         public static int Next(int floor)

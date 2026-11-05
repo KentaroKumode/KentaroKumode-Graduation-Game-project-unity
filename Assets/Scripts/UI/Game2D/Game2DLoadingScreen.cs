@@ -59,7 +59,7 @@ namespace UI.Game2D
             "貫通ステータスは、敵の防御力を差し引く。高防御を持つ敵により有効だ。",
             "素の面には役が無い。レアリティの上がった面を装着したダイスは、2つそろい・3つそろいで役が発動する。",
             // ── キーワード ──
-            "毒はターン経過で消えず、ターンの始めに1スタックあたり敵の最大HPの" + ItemSystem.PassiveSkills.StatusRegistry.Defs["poison"].dotMaxHpPctPerStack + "%を削る。",
+            "毒はターンの始めに、1スタックあたり敵の最大HPの" + (ItemSystem.PassiveSkills.StatusRegistry.Defs["poison"].dotMaxHpPermillePerStack / 10f).ToString("0.#") + "%を削る。削るたびにスタックは半分に減る。",
             "出血はターンごとに1ずつ減っていくが、スタック数に制限はない。",
             "臨界のメーターはATKの出目で溜まり、満ちると次の攻撃に大きく上乗せされる。",
             // ── 航行 ──
@@ -77,7 +77,8 @@ namespace UI.Game2D
             // ── 追跡者 ──
             "2層からは、層を巡回する追跡者が現れる。",
             "自分が1歩動くたびに、追跡者も動く。",
-            "追跡者は、道で" + FreeMapParams.DetectRange + "歩以内に入るとこちらに気づく。",
+            "追跡者は、道で" + FreeMapParams.DetectRange + "歩以内に入るとこちらに気づく。種類によってはもっと遠くから気づく。",
+            "追跡者は、しばらく追っても捕まえられなければ諦めて巡回に戻る。",
             "歩いた点には痕跡が残る。追跡者は痕跡をたどってくる。",
             FreeMapParams.QuietLose + "ターン見つからなければ、追跡者は見失って巡回に戻る。",
             "レーダーが、追跡者の近さと方角を知らせる。",

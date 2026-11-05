@@ -79,11 +79,6 @@ namespace AutoTest
         private int[] _faces;
         private DiceFaceParts.Tier[] _tiers;
         private int _eBaseAtk, _eDiceCount, _eRollMax, _eMaxHp;
-        /// <summary>敵の被ダメ軽減 (0〜1)。 **抜けていると自分の火力を 1/(1−r) 倍に過大評価する。**
-        /// 7層ボスは防御 14 で 0.35 なので 1.54 倍。 ctx の敵の防御値と自分の貫通から
-        /// <see cref="DefenseFormula"/> で引くので値の二重管理は無い (ADR-0013)。
-        /// 貫通は毎ターン変わり得るが、 スナップショットの時点の値で 1 戦を読み切る近似。</summary>
-        private float _eDefRate;
 
         /// <summary>2 体戦 (2026-08-28) の 2 体目の攻撃値。 0 = 単体戦 or 撃破済み。</summary>
         private int _secondAtk;
@@ -116,7 +111,11 @@ namespace AutoTest
             = new Dictionary<int, List<(int[], double)>>();
         private readonly List<(int total, double w)> _enemyDist = new List<(int, double)>();
 
-        private struct S { public int pHp, eHp, turn, charge; }
+        /// <summary>eDef = 敵の防御の持続する分 (割れる/積み上がる装甲で動く・構えの増減はターン番号から足す)。</summary>
+        private struct S { public int pHp, eHp, turn, charge, eDef; }
+        /// <summary>敵の防御と周期の規則 (構え・割れる/積み上がる装甲・先手・大技・2026-11-04)。</summary>
+        private EnemyArmorModel _armor;
+        private int _eDef0;
 
         public void BeginCombat(string enemyId)
         {
@@ -144,8 +143,9 @@ namespace AutoTest
             _eDiceCount = Math.Max(0, enemy.EffectiveRollCount);
             _eRollMax = Math.Max(1, enemy.EffectiveRollMax);
             _eMaxHp = Math.Max(1, enemy.maxHP);
-            _eDefRate = DefenseFormula.Reduction(DefenseFormula.Effective(ctx.enemyDefense, ctx.playerArmorPen));
-            _escProfile = enemy.id;
+            _armor = EnemyArmorModel.From(enemy, ctx, out _eDef0);
+            // エスカレーションの型の名前 (2026-11-04 修正: 以前は敵の id を渡しており、 rush / gentle の敵も標準で読んでいた)
+            _escProfile = enemy.EffectiveEscalationProfile;
             _chargeMax = CombatManager.ChargeMax;
             // 多段連戦（ヴェスカ 4 段）。 prefix 判定は Ids.cs の定数を経由する。
             _chained = !string.IsNullOrEmpty(enemy.id)
@@ -285,7 +285,7 @@ namespace AutoTest
             var s0 = new S
             {
                 pHp = cm.PlayerHP, eHp = cm.EnemyHP, turn = tele.turn,
-                charge = ctx != null ? ctx.GetCharge() : 0,
+                charge = ctx != null ? ctx.GetCharge() : 0, eDef = _eDef0,
             };
             int enemyAtk = Math.Max(0, tele.enemyAttackValue);
             // 2 体戦 (2026-08-28): 2 パケット目。 Optimal も同じ情報を見なければ、
@@ -331,7 +331,7 @@ namespace AutoTest
 
             var s0 = new S
             {
-                pHp = cm.PlayerHP, eHp = cm.EnemyHP, turn = tele.turn, charge = charge,
+                pHp = cm.PlayerHP, eHp = cm.EnemyHP, turn = tele.turn, charge = charge, eDef = _eDef0,
             };
             int enemyAtk = Math.Max(0, tele.enemyAttackValue);
             // 2 体戦 (2026-08-28): 2 パケット目。 Optimal も同じ情報を見なければ、
@@ -403,7 +403,7 @@ namespace AutoTest
         /// <para><b>役を実装したら割り当てに戻す必要がある</b>（合計が同じでも役が違う）。</para></summary>
         private List<Cand> Candidates(S s, int[] dice, int enemyAtk, int atkBase)
         {
-            float defMul = 1f - _eDefRate;
+            float defMul = 1f - _armor.ReductionAt(s.eDef, s.turn);      // この状態のターンの防御 (構え・装甲の増減を含む)
             // 攻撃の飽和上限: これ以上足しても敵は既に死んでいる
             int aCap = Math.Max(0, (int)Math.Ceiling(s.eHp / Math.Max(0.05f, defMul)) - atkBase);
             int bCap = enemyAtk;
@@ -482,7 +482,7 @@ namespace AutoTest
             foreach (var (hand, hw) in hands)
                 foreach (var (etot, ew) in _enemyDist)
                 {
-                    int atk = Math.Max(0, (int)Math.Round(esc * (_eBaseAtk + etot)));
+                    int atk = Math.Max(0, (int)Math.Round(esc * (_eBaseAtk + etot) * _armor.AttackFactor(s.turn)));
                     double w = hw * ew;
                     acc += Q(s, hand, atk, atkBase) * w;
                     wsum += w;
@@ -535,13 +535,14 @@ namespace AutoTest
 
             // **敵の被ダメ軽減を必ず引く。** 抜けると火力を 1/(1−r) 倍に過大評価する。
             int raw = Math.Max(0, atkBase + aSum);
-            s.eHp -= (int)Math.Round(raw * (1f - _eDefRate));
+            s.eHp -= _armor.Mitigate(raw, s.eDef, s.turn);      // そのターンの防御 (構え・隙を含む) で軽減
             if (s.eHp <= 0) return +1;
             s.pHp -= Math.Max(0, enemyAtk - bSum);
             // 2 体目は独立パケット。 ブロックは各パケットから全額引かれる (倍率なし)。
             if (_secondAtk > 0) s.pHp -= Math.Max(0, _secondAtk - bSum);
             if (s.pHp <= 0) return -1;
             s.charge = Math.Min(_chargeMax, s.charge + cSum);
+            s.eDef = _armor.EndOfTurn(s.eDef, raw > 0);      // 割れる/積み上がる装甲
             s.turn++;
             if (s.turn > StalemateTurn) return -1;
             return 0;
@@ -593,7 +594,7 @@ namespace AutoTest
         {
             long h = _snapSig;
             void Mix(long x) { h ^= x; h *= 1099511628211L; }
-            Mix(s.pHp); Mix(s.eHp); Mix(s.turn); Mix(s.charge);
+            Mix(s.pHp); Mix(s.eHp); Mix(s.turn); Mix(s.charge); Mix(s.eDef);
             return h;
         }
 

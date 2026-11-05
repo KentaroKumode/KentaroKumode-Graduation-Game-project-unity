@@ -71,6 +71,12 @@ namespace GameLoop
         /// 通常は 4 枚集約でしか入手できず、高難易度ほど揃う前に死ぬため自然発生を待って測れない。</summary>
         public static bool GrantBladeDanceOnFloor5Clear = false;
 
+        /// <summary>**計測専用**: イベントマスを素通りにする (既定 false・製品挙動は不変・2026-11-05)。
+        /// 確信の連鎖 (石板 → 啓示のエリート → 災厄の予兆の HP 半減) が層 1 で毎ラン起き、 層 1 の死亡を押し上げていた。
+        /// 設計は変えずに、 バランス測定からイベントの影響を外すための退避口。
+        /// 最終層へ進む資格は失わせない: 開始時に〈根拠のない確信〉を無償で渡し、 6 層 (4 層目) に入ったら〈真理〉を立てる。</summary>
+        public static bool SuppressEvents = false;
+
         // === ゲーム状態 ===
         public enum GamePhase
         {
@@ -187,7 +193,11 @@ namespace GameLoop
 
         void Start()
         {
-            // CombatManager のイベント購読
+            // CombatManager のイベント購読。 **-= してから += する** (2026-11-05)。
+            //   StartNewRun も同じ購読を張るので、 Start より先にランが始まる起動順 (並列ワーカー: 起動直後に
+            //   ブートストラップが最初のランを始める) だと += が 2 回になり、 戦闘終了処理 (素材・物資・戦闘数・
+            //   終了イベント) が 1 戦に 2 回走っていた。 エディタでは Start が先に済むので起きなかった。
+            CombatManager.Instance.OnCombatEnd -= HandleCombatEnd;
             CombatManager.Instance.OnCombatEnd += HandleCombatEnd;
 
             if (autoStartRun)
@@ -294,7 +304,7 @@ namespace GameLoop
                     var cands = new System.Collections.Generic.List<string>(offers);
                     for (int o = 0; o < offers; o++)
                     {
-                        string cand = PickStartingPassive();
+                        string cand = PickStartingPassive(cands);   // 同じ提示に同じ品を並べない
                         if (!string.IsNullOrEmpty(cand)) cands.Add(cand);
                     }
                     string id = null;

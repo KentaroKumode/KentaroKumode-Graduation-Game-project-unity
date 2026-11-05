@@ -258,16 +258,20 @@ namespace MapSystem
         }
 
         /// <summary>マスの種別が判明した点を <see cref="MapNode.revealed"/> へ写す (一度見えたら隠さない)。
-        /// 戦闘名も同時に開示する ── 照明・偵察で「マス・敵の種別」が分かる (§23-21 の索敵の表)。</summary>
+        /// 戦闘名は**完全公開** (偵察・照明で見つけた点 = <see cref="FreeMapSim.Scouted"/>) の時だけ開示する (2026-11-05)。
+        /// 何もしない時の視界 (1 歩) で見えただけの点は種別だけで、 戦闘名は出さない ── 近いことと調べたことは別。</summary>
         public void SyncFreeKnowledge()
         {
             if (!IsFreeMap) return;
             foreach (var n in CurrentMap.GetAllNodes())
             {
-                if (n.index < 0 || n.index >= Sim.Known.Length || !Sim.Known[n.index] || n.revealed) continue;
-                n.revealed = true;
-                GameLoop.FloorManager.EnsureEncounter(CurrentMap.floor, n);
-                n.encounterRevealed = true;
+                if (n.index < 0 || n.index >= Sim.Known.Length) continue;
+                if (Sim.Known[n.index] && !n.revealed) n.revealed = true;
+                if (Sim.Scouted[n.index] && !n.encounterRevealed)
+                {
+                    GameLoop.FloorManager.EnsureEncounter(CurrentMap.floor, n);
+                    n.encounterRevealed = true;
+                }
             }
         }
 
@@ -285,6 +289,7 @@ namespace MapSystem
                 int before = run.playerHP;
                 run.playerHP = Mathf.Max(0, run.playerHP - amount);
                 MetaProgression.Achievements.AchievementService.NoteExternalHpDamage(before - run.playerHP);
+                GameLoop.HpOutsideDiag.Add(Instance?.Sim?.HpPayReason ?? "移動", before - run.playerHP);   // [計装 2026-11-05]
                 return run.playerHP <= 0;
             }
         }

@@ -97,6 +97,9 @@ namespace AutoTest
             _pendingEnemyId = e != null && e.id != null ? e.id : "";
             // ボス判定は敵IDのみで厳密に行う（ノード種別フォールバックは誤検出の元）
             _pendingEnemyIsBoss = GameLoop.BossIds.IsBoss(_pendingEnemyId);
+            // 戦闘名の鍵 (追跡者の戦闘は点に載っていないので鍵なし)
+            _pendingEncounterKey = (gm != null && !gm.InPursuerCombat)
+                ? (EncounterDangerStats.KeyOf(MapSystem.MapManager.Instance?.CurrentNode, gm.Run?.Depth ?? 1) ?? "") : "";
             // 次フォーム開始時点の現在HP。チェーン中は CombatManager のライブHPを使う
             // （Run.playerHP は戦闘終了まで更新されないため、これが無いと各フォームの被ダメが常に0と誤計測される）。
             _pendingEnemyHpBefore = (cm != null && cm.IsCombatActive) ? cm.PlayerHP : (gm?.Run?.playerHP ?? 0);
@@ -136,6 +139,7 @@ namespace AutoTest
                 weakRollTurns = r.weakRollTurns,
                 weakRollBossWins = r.weakRollBossWins,
                 playerMaxHpEnd = gm?.Run?.playerMaxHP ?? 0,
+                encounterKey = _pendingEncounterKey,
             };
             _cur.combats.Add(rec);
             _cur.totalCombats++;
