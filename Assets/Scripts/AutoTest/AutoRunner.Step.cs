@@ -224,6 +224,8 @@ namespace AutoTest
 
             // [診断] 軸の品をまとめて開幕に配る (2026-11-07)。 軸に深く投資した構成が実際に強いかを因果で測る。
             if (!string.IsNullOrEmpty(axisPackageAxis) && gm.Run != null) GrantAxisPackage(index, gm.Run);
+            // [診断] 武器を 1 本渡して装備させる (2026-11-07)。 GrantOne は AddPassiveItem + TryAutoEquip で、 乱数を使わない。
+            if (!string.IsNullOrEmpty(grantStartWeapon) && gm.Run != null) { GrantOne(gm.Run, grantStartWeapon); _cur?.acquiredItemsEver.Add(grantStartWeapon); }
 
             // ランダム付与試行: このランの割り当てを引く。 引くだけで、 配るのは各層に着いてから。
             if (randomGrantTrial && gm.Run != null) RollGrantPlan(index, gm.Run);

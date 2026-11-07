@@ -36,6 +36,8 @@
 # 例外: GUI の元素材
 !docs/design/gui/
 !docs/design/gui/*.png
+# 採用した絵 (遊ぶシーン Game2D から届くもの・品のアイコン・レアリティ枠) は git add -f で 1 枚ずつ追跡する。
+# フォルダごと外すと試作の残骸まで入るので、 ここに例外は書かない
 *.psd
 *.ai
 *.exr

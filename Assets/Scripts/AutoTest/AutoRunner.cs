@@ -1178,6 +1178,16 @@ namespace AutoTest
         /// <summary>[診断] 開幕に軸の品をまとめて配る (2026-11-07・<see cref="GrantAxisPackage"/>)。 空 = 配らない。
         /// 軸名か "*" (軸を問わず)。 配る数は <see cref="axisPackageCount"/>。</summary>
         public string axisPackageAxis = "";
+        /// <summary>[診断] 開幕に武器を 1 本渡し、 ITT と同じ規則 (<see cref="GameLoop.Loadout.TryAutoEquip"/>) で装備させる。 空 = 渡さない。
+        /// 武器の ITT の値は「渡された武器が期待値で上なら乗り換える」込みの値なので、 <see cref="lockWeaponFamily"/> の入/切と並べて、
+        /// 武器そのものの強さと家系の乗り換えの損を切り分ける (2026-11-07・斧が段を上げるほど悪い)。</summary>
+        public string grantStartWeapon = "";
+        /// <summary>BOT が店で武器を買うか。 <b>既定は買わない</b> (2026-11-07)。 武器の ITT は「家系を乗り換える損得」を測っており
+        /// (斧を渡すと −20 ポイント・家系ロックを入れると中立)、 期待値だけで決める購入は他系統の職業のランを悪くしていた。
+        /// 強化素材で今の武器を育てる道 (WeaponMaterial) は残す。</summary>
+        public bool botBuysWeapons = false;
+        private bool WouldBuyWeapon(GameLoop.RunState run, string itemId)
+            => botBuysWeapons && GameLoop.Loadout.WouldUpgrade(run, itemId);
         public int axisPackageCount = 10;
         [Tooltip("ラン数")]
         public int randomGrantRuns = 5000;

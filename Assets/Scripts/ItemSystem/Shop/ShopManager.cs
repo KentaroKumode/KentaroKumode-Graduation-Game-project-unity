@@ -90,15 +90,18 @@ namespace ItemSystem.Shop
             (ItemRarity.LEGENDARY, 0.05f),
         };
 
+        // 2026-11-07: 武器枠は BRONZE 90% / SILVER 10% / GOLD 0 / LEGENDARY 0 (パッシブより控えめに)。
+        //   武器のレアリティ自体は SILVER / GOLD / LEGENDARY のまま (段 2 / 3 / 4)・BRONZE の武器は無い。 RollTier はプールに実在する
+        //   レアリティだけで正規化するので、 実質は SILVER (段 2) だけが出る。 段 3 を時々出したければ GOLD に小さな重みを足す。
         // 2026-06-22: 武器枠用の Tier 重み。 T4 (LEGENDARY) を 0.005 (0.5%/枠) に絞り、
         // フルラン (~6 ショップ × 1.5 武器枠 = 9 武器枠) × 10 ラン = 90 枠中 0.5 枠出現 ≒ 10 ランに 1 回ペース。
         // 強化ルート完走の代替路線として 「直接 T4 を引く運要素」 を残す設計。
         private static readonly (ItemRarity rarity, float weight)[] weaponTierWeights = new[]
         {
-            (ItemRarity.BRONZE,    0.475f),
-            (ItemRarity.SILVER,    0.335f),
-            (ItemRarity.GOLD,      0.185f),
-            (ItemRarity.LEGENDARY, 0.005f),
+            (ItemRarity.BRONZE,    0.90f),
+            (ItemRarity.SILVER,    0.10f),
+            (ItemRarity.GOLD,      0f),
+            (ItemRarity.LEGENDARY, 0f),
         };
 
         /// <summary>通常枠の Tier 提示重み。 <b>層化ホールドアウトが逆数を取るための唯一の出所</b>

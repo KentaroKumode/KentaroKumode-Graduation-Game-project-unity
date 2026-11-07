@@ -19,6 +19,8 @@ namespace AutoTest.EditorTools
     public sealed class ItemIconImporter : AssetPostprocessor
     {
         private const string TargetDir = "Assets/Resources/Icons/Items/";
+        /// <summary>レアリティの枠 (18x18・2026-11-08)。 アイコンと同じ設定にする。</summary>
+        private const string FrameDir = "Assets/Resources/Icons/Frames/";
 
         /// <summary>ピクセル規約 (PPU=32)。 <b>スケール倍率で見た目を作らない</b>ため、
         /// 解像度と PPU の対応をここで固定する。</summary>
@@ -26,7 +28,7 @@ namespace AutoTest.EditorTools
 
         private void OnPreprocessTexture()
         {
-            if (assetPath == null || !assetPath.StartsWith(TargetDir)) return;
+            if (assetPath == null || !(assetPath.StartsWith(TargetDir) || assetPath.StartsWith(FrameDir))) return;
             if (!assetPath.EndsWith(".png", System.StringComparison.OrdinalIgnoreCase)) return;
 
             var ti = (TextureImporter)assetImporter;

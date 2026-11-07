@@ -107,7 +107,8 @@ namespace AutoTest.EditorTools
         /// 100,000 ラン。 全チャンクの割り当てを 1 本へまとめて <c>GrantItt</c> で再計算し、 購入の序列 (itt_clear.json / itt_effects.json) を作る。
         /// 旧い序列は <c>*.preallkinds</c> 風に退避する。 序列を使うのは別のメニュー ([ITT の序列で学習ラウンド])。</summary>
         [MenuItem("Tools/AutoRun/■ ITT 並列: 全種プール 100000ラン → 購入の序列", priority = 8)]
-        private static void LaunchItt() => LaunchWith(0, runsPerRound: 100000, itt: true);
+        private static void LaunchItt() => LaunchWith(0, runsPerRound: 100000, itt: true,
+            overrides: new Dictionary<string, string> { ["lockWeaponFamily"] = "True" });   // 2026-11-07: 武器の値を「家系の乗り換えの損得」から切り離す
 
         /// <summary>ITT を Super の方策で取る (2026-11-06)。 配布試行の間も今の ITT の序列で買う (配布は無作為なので割り当ては交絡しない)。
         /// 品の価値は使う方策の下で測る ── Optimal + 古い観測の序列の上で測った値は、 Super の判断とずれる。</summary>
@@ -116,7 +117,7 @@ namespace AutoTest.EditorTools
         {
             AutoTest.GrantItt.Variant = "super";   // 書き先を itt_clear.super.json にする (合流の後に戻す)
             LaunchWith(0, AutoRunner.WiringSkill.Super, 100000, itt: true,
-                overrides: new Dictionary<string, string> { ["useIttBeta"] = "True" });
+                overrides: new Dictionary<string, string> { ["useIttBeta"] = "True", ["lockWeaponFamily"] = "True" });
         }
 
         /// <summary>診断: 観測の回帰 (regβ) で買う旧方式。 ITT の序列との比較用 (2026-11-05: 旧方式は学習なしより悪い)。</summary>

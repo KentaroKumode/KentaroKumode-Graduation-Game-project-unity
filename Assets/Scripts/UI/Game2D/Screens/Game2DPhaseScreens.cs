@@ -247,7 +247,7 @@ namespace UI.Game2D
         private int _sellPage;
         private const int SellPerPage = 10;
 
-        private struct SellEntry { public ShopManager.SellSource src; public int index; public string name, desc, icon; }
+        private struct SellEntry { public ShopManager.SellSource src; public int index; public string name, desc, icon; public ItemRarity? rarity; }
 
         private static List<SellEntry> SellList(RunState run)
         {
@@ -266,7 +266,7 @@ namespace UI.Game2D
         private static SellEntry Entry(ShopManager.SellSource src, int i, string id)
         {
             var data = ItemDatabase.Instance?.GetItem(id);
-            return new SellEntry { src = src, index = i, name = data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : id, desc = data?.description, icon = data != null ? data.id : id };
+            return new SellEntry { src = src, index = i, name = data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : id, desc = data?.description, icon = data != null ? data.id : id, rarity = data != null ? data.rarity : (ItemRarity?)null };
         }
 
         private ScreenDef Shop(GameManager gm)
@@ -288,7 +288,7 @@ namespace UI.Game2D
                     bool sold = s.kind != ShopSlotKind.WeaponMaterial && s.sold;
                     d.Items.Add(new ModalItem
                     {
-                        name = SlotName(s), desc = SlotDesc(s), icon = SlotIcon(s),
+                        name = SlotName(s), desc = SlotDesc(s), icon = SlotIcon(s), rarity = SlotRarity(s),
                         value = sold ? "売切" : price + "G",
                         disabled = sold || price > run.coins,
                     });
@@ -346,7 +346,7 @@ namespace UI.Game2D
             int pages = Mathf.Max(1, (list.Count + SellPerPage - 1) / SellPerPage); _sellPage = Mathf.Clamp(_sellPage, 0, pages - 1);
             var d = New("ショップ ― 売る", "所持金 " + run.coins + "G", 460); d.cols = 2;
             int first = _sellPage * SellPerPage, cnt = Mathf.Min(SellPerPage, list.Count - first);
-            for (int i = 0; i < cnt; i++) { var e = list[first + i]; d.Items.Add(new ModalItem { name = e.name, desc = e.desc, icon = e.icon, value = e.src == ShopManager.SellSource.Consumable ? "消耗品" : e.src == ShopManager.SellSource.WeaponMaterial ? "素材" : null }); }
+            for (int i = 0; i < cnt; i++) { var e = list[first + i]; d.Items.Add(new ModalItem { name = e.name, desc = e.desc, icon = e.icon, rarity = e.rarity, value = e.src == ShopManager.SellSource.Consumable ? "消耗品" : e.src == ShopManager.SellSource.WeaponMaterial ? "素材" : null }); }
             if (list.Count == 0) d.body = "売れる物を持っていない。";
             d.buttons.Add(B("売る", "sell", true));
             if (pages > 1) d.buttons.Add(B("次の頁 " + (_sellPage + 1) + "/" + pages, "page"));
@@ -390,6 +390,14 @@ namespace UI.Game2D
         }
 
         /// <summary>行の左のアイコン: 品は id (Resources/Icons/Items)、 素材・出目パーツは枠だけ ("")。</summary>
+        /// <summary>行の枠のレアリティ (2026-11-08)。 素材・出目パーツ・品の無い枠は null (従来の灰色の枠)。</summary>
+        private static ItemRarity? SlotRarity(ShopSlot s)
+        {
+            if (s.kind == ShopSlotKind.WeaponMaterial || s.kind == ShopSlotKind.FacePart || string.IsNullOrEmpty(s.itemId)) return null;
+            var data = ItemDatabase.Instance?.GetItem(s.itemId);
+            return data != null ? data.rarity : (ItemRarity?)null;
+        }
+
         private static string SlotIcon(ShopSlot s)
         {
             if (s.kind == ShopSlotKind.WeaponMaterial || s.kind == ShopSlotKind.FacePart || string.IsNullOrEmpty(s.itemId)) return "";

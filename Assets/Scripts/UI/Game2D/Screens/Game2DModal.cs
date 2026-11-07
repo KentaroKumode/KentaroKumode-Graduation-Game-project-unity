@@ -7,6 +7,9 @@ namespace UI.Game2D
     public sealed class ModalItem
     {
         public string icon, name, desc, value, tag; public Color32? tone; public bool disabled;
+        /// <summary>品のレアリティ (2026-11-08)。 付いていると、 アイコンの枠をレアリティの絵 (<see cref="Game2DKit.RarityFrame"/>) で描く。
+        /// 字では出さない ── 枠の絵だけで見分ける。 伝説は光が枠を回る。 null は従来の灰色の枠。</summary>
+        public ItemSystem.ItemRarity? rarity;
         /// <summary>count / max が付くと [+] [-] で増減できる (整備パネル・設定の音量など)。 max = 0 は数のない行。</summary>
         public int count, max;
         /// <summary>スライダーの行 (<see cref="ScreenDef.sliders"/>) で、 バーの右に出す今の効果。</summary>
@@ -78,6 +81,8 @@ namespace UI.Game2D
         private readonly List<RectInt[]> _segR = new List<RectInt[]>();
         private int _hoverSegRow = -1, _hoverSeg = -1;
         private bool _dirty; private int _px, _py;
+        /// <summary>伝説の枠を描いている間だけ 8 コマ/秒で描き直す (光を回すため)。 <see cref="_glintTick"/> が光の位置。</summary>
+        private bool _glintOn; private int _glintTick;
 
         public static bool Active { get; private set; }
         private const int Inset = 16, RowH = 22, Gap = 2, FrameB = 12;
@@ -157,6 +162,7 @@ namespace UI.Game2D
                 else
                 {
                     if (_open && _sp.x > 0.5f) HandlePointer();
+                    if (_glintOn) { int g = (int)(Time.unscaledTime * 8f); if (g != _glintTick) { _glintTick = g; _dirty = true; } }
                     if (_dirty) { Redraw(); _dirty = false; }
                     _rt.anchoredPosition = new Vector2(_px, -(_py + Mathf.Round((1f - _sp.Value(60f)) * 60f)));
                 }
@@ -412,6 +418,7 @@ namespace UI.Game2D
 
         private void RedrawJp()
         {
+            _glintOn = false;   // 描くたびに数え直す (伝説の枠を描いたら立つ)
             var d = _def; var p = new KitPix(d.w, d.h); _lastPix = p;
             _rowR.Clear(); _tabR.Clear(); _btnR.Clear(); _barR.Clear(); _segR.Clear();
             p.NineSlice(Game2DKit.Frame, FrameB, Game2DKit.Well);
@@ -445,8 +452,19 @@ namespace UI.Game2D
                 if (it.icon != null)          // アイコンの枠 (icon = 品の id・"" は枠だけ)
                 {
                     int ix = r.x + 3, iy = r.y + (RH - 18) / 2;
-                    p.Box(ix, iy, 18, 18, Game2DKit.Off, it.disabled ? Game2DKit.Faint : Game2DKit.Dim);
-                    var ic = Game2DKit.ItemIcon(it.icon); if (ic != null) p.Sprite(ic, ix + 1, iy + 1, 16, 16);
+                    var fr = it.rarity.HasValue ? Game2DKit.RarityFrame(it.rarity.Value) : null;
+                    if (fr != null)           // レアリティの枠 (2026-11-08): 地 → アイコン → 枠の絵 (角は透けて行の地が見える)
+                    {
+                        p.Rect(ix + 1, iy + 1, 16, 16, Game2DKit.Off);
+                        var ic = Game2DKit.ItemIcon(it.icon); if (ic != null) p.Sprite(ic, ix + 1, iy + 1, 16, 16);
+                        p.Sprite(fr, ix, iy, 18, 18);
+                        if (it.rarity.Value == ItemSystem.ItemRarity.LEGENDARY && !it.disabled) { Game2DKit.FrameGlint(p, fr, ix, iy, _glintTick); _glintOn = true; }
+                    }
+                    else
+                    {
+                        p.Box(ix, iy, 18, 18, Game2DKit.Off, it.disabled ? Game2DKit.Faint : Game2DKit.Dim);
+                        var ic = Game2DKit.ItemIcon(it.icon); if (ic != null) p.Sprite(ic, ix + 1, iy + 1, 16, 16);
+                    }
                     nx = ix + 18 + 5;
                 }
                 var nameCol = it.disabled ? Game2DKit.Faint : (it.tone ?? Game2DKit.Ink);

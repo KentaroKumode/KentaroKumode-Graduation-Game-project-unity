@@ -78,18 +78,67 @@ namespace UI.Game2D
         {
             if (string.IsNullOrEmpty(id)) return null;
             if (_itemIcons.TryGetValue(id, out var s)) return s;
-            var t = Resources.Load<Texture2D>("Icons/Items/" + id);
-            if (t != null && !t.isReadable)          // 取り込みで読み出し不可でも、 一度描き写して読む
-            {
-                var rt = RenderTexture.GetTemporary(t.width, t.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
-                var prev = RenderTexture.active; Graphics.Blit(t, rt); RenderTexture.active = rt;
-                var c = new Texture2D(t.width, t.height, TextureFormat.RGBA32, false); c.ReadPixels(new Rect(0, 0, t.width, t.height), 0, 0); c.Apply(false);
-                RenderTexture.active = prev; RenderTexture.ReleaseTemporary(rt);
-                s = KitSrc.From(c); Object.Destroy(c);
-            }
-            else s = KitSrc.From(t);
+            s = LoadReadable(Resources.Load<Texture2D>("Icons/Items/" + id));
             _itemIcons[id] = s;
             return s;
+        }
+
+        /// <summary>テクスチャを KitSrc にする。 取り込みで読み出し不可でも、 一度描き写して読む。 null なら null。</summary>
+        private static KitSrc LoadReadable(Texture2D t)
+        {
+            if (t == null) return KitSrc.From(t);
+            if (t.isReadable) return KitSrc.From(t);
+            var rt = RenderTexture.GetTemporary(t.width, t.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            var prev = RenderTexture.active; Graphics.Blit(t, rt); RenderTexture.active = rt;
+            var c = new Texture2D(t.width, t.height, TextureFormat.RGBA32, false); c.ReadPixels(new Rect(0, 0, t.width, t.height), 0, 0); c.Apply(false);
+            RenderTexture.active = prev; RenderTexture.ReleaseTemporary(rt);
+            var s = KitSrc.From(c); Object.Destroy(c);
+            return s;
+        }
+
+        private static readonly Dictionary<ItemSystem.ItemRarity, KitSrc> _frames = new Dictionary<ItemSystem.ItemRarity, KitSrc>();
+        /// <summary>レアリティの枠 (Resources/Icons/Frames/frame_*.png・18×18・2026-11-08)。 銅・銀・金は icon_flame.png の絵、
+        /// 伝説は手描きの偏光の絵。 品のアイコン (16×16) を 1 ドット内側に置き、 その上に重ねる。 該当なし・絵が無ければ null。</summary>
+        public static KitSrc RarityFrame(ItemSystem.ItemRarity r)
+        {
+            if (_frames.TryGetValue(r, out var s)) return s;
+            string n = r == ItemSystem.ItemRarity.BRONZE ? "bronze" : r == ItemSystem.ItemRarity.SILVER ? "silver"
+                     : r == ItemSystem.ItemRarity.GOLD ? "gold" : r == ItemSystem.ItemRarity.LEGENDARY ? "legendary" : null;
+            s = n == null ? null : LoadReadable(Resources.Load<Texture2D>("Icons/Frames/frame_" + n));
+            if (s != null && s.px == null) s = null;
+            _frames[r] = s;
+            return s;
+        }
+
+        private static KitSrc _glintSrc; private static int[] _glintPath;
+        private static readonly float[] GlintA = { 1f, 0.85f, 0.6f, 0.38f, 0.2f };
+        /// <summary>伝説の枠の光 (2026-11-08)。 向かい合わせの 2 つの光が、 枠の線のドットだけを左上から時計回りに回り続ける。
+        /// 1 コマ (tick) に 4 ドット進む・頭は 2 度足して白く飛ばし、 尾 4 ドットは薄く。 加算は枠の色に白を足して作る。</summary>
+        public static void FrameGlint(KitPix p, KitSrc frame, int x, int y, int tick)
+        {
+            if (frame == null || frame.px == null) return;
+            if (_glintSrc != frame)
+            {
+                var pts = new List<KeyValuePair<float, int>>();
+                float cx = (frame.w - 1) * 0.5f, cy = (frame.h - 1) * 0.5f;
+                for (int j = 0; j < frame.h; j++)
+                    for (int i = 0; i < frame.w; i++)
+                        if (frame.px[j * frame.w + i].a >= 128)
+                            pts.Add(new KeyValuePair<float, int>((Mathf.Atan2(j - cy, i - cx) + Mathf.PI * 0.75f + Mathf.PI * 2f) % (Mathf.PI * 2f), j * frame.w + i));
+                pts.Sort((a, b) => a.Key.CompareTo(b.Key));
+                _glintPath = new int[pts.Count]; for (int k = 0; k < pts.Count; k++) _glintPath[k] = pts[k].Value;
+                _glintSrc = frame;
+            }
+            int n = _glintPath.Length; if (n == 0) return;
+            int half = n / 2, head = (tick * 4) % n;
+            for (int o = 0; o < 2; o++)
+                for (int t = 0; t < GlintA.Length; t++)
+                {
+                    int pos = _glintPath[(((head + o * half - t) % n) + n) % n];
+                    var c = frame.px[pos]; float a = GlintA[t] * (t == 0 ? 2f : 1f);
+                    p.Set(x + pos % frame.w, y + pos / frame.w, new Color32(
+                        (byte)Mathf.Min(255, c.r + 255f * a), (byte)Mathf.Min(255, c.g + 250f * a), (byte)Mathf.Min(255, c.b + 242f * a), 255));
+                }
         }
 
         // 3×5 の字に無い記号

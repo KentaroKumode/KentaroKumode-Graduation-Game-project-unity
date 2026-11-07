@@ -689,7 +689,7 @@ namespace AutoTest
                     for (int i = 0; i < inv.slots.Count; i++)
                         if (inv.slots[i] != null && !inv.slots[i].sold
                             && inv.slots[i].kind == k
-                            && (!gearOnly || GameLoop.Loadout.WouldUpgrade(run, inv.slots[i].itemId))
+                            && (!gearOnly || WouldBuyWeapon(run, inv.slots[i].itemId))
                             && Buy(i)) return true;
                     return false;
                 }
@@ -940,7 +940,7 @@ namespace AutoTest
                     // 燈火 r10 (物資払い) を織り込んだ支払い可能額。 規則より保守的な PolicyFloor。
                     if (s.price > GameLoop.ProvisionPayment.PolicyAffordable(run) - _shopReserve) return false;
                     // **武器は装備判定を通す** (2026-08-10)。 主経路にゲートが無く素通りしていた。
-                    if (s.kind == ShopSlotKind.Weapon && !GameLoop.Loadout.WouldUpgrade(run, s.itemId)) return false;
+                    if (s.kind == ShopSlotKind.Weapon && !WouldBuyWeapon(run, s.itemId)) return false;
                     if (SealedPassive(s)) return false;
                     float step = AutoTest.LearnedPriorityProvider.StepPerTier;
                     if (s.kind == ShopSlotKind.FacePart
@@ -1036,7 +1036,7 @@ namespace AutoTest
                         var s = inv.slots[i];
                         if (s == null || s.sold) continue;
                         if (s.kind == ShopSlotKind.Weapon && run.coins > weaponGate
-                            && GameLoop.Loadout.WouldUpgrade(run, s.itemId)) Buy(i);
+                            && WouldBuyWeapon(run, s.itemId)) Buy(i);
                         else if (s.kind == ShopSlotKind.FacePart && run.coins > s.price) Buy(i);
                         else if (s.kind == ShopSlotKind.Passive && run.coins > passiveGate) Buy(i);
                     }
@@ -1063,7 +1063,7 @@ namespace AutoTest
                             (s.kind == ShopSlotKind.Passive  && after > passiveGate) ||
                             (s.kind == ShopSlotKind.FacePart && after > s.price) ||
                             (s.kind == ShopSlotKind.Weapon   && after > weaponGate
-                                && GameLoop.Loadout.WouldUpgrade(run, s.itemId));
+                                && WouldBuyWeapon(run, s.itemId));
                         if (!p3) continue;
                         DiscardItemsByNth[nth]++;
                         if (s.kind == ShopSlotKind.Passive) DiscardPassive++;
@@ -1464,7 +1464,7 @@ namespace AutoTest
                     for (int i = 0; i < inv.slots.Count; i++)
                         if (inv.slots[i] != null && !inv.slots[i].sold && run.coins > weaponGate
                             && inv.slots[i].kind == ShopSlotKind.Weapon
-                            && GameLoop.Loadout.WouldUpgrade(run, inv.slots[i].itemId)) Buy(i);
+                            && WouldBuyWeapon(run, inv.slots[i].itemId)) Buy(i);
                     // 出目パーツは「増設」なので武器のような更新判定を通さない (面が 1 枚増えるだけ)。
                     //   恒久強化なので、 素材や消耗品より先に取る。
                     for (int i = 0; i < inv.slots.Count; i++)
