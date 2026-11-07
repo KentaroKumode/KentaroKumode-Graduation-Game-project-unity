@@ -3,17 +3,16 @@ using System.Collections.Generic;
 namespace AutoTest
 {
     /// <summary>
-    /// ボス別 Bot 戦術プレイブック (2026-07-16 追加)。
+    /// Bot の戦術 (2026-07-16 追加・2026-11-06 にパッシブから読む形へ)。
     /// 目的: AutoRunner の MutualWiringPolicy が「相手を見て」配線を変えられるようにする。
     /// レイヤ 1 (露出): 予兆T/反射/大玉無効 等のフラグを列挙。
     /// レイヤ 2 (プレイブック): ボス ID → 端子重みバイアス + 条件付きブースト。
     ///
     /// 使い方:
-    ///   var play = BossPlaybook.Get(bossId);
+    ///   var play = BossPlaybook.From(enemy);
     ///   float wAtk = baseAtk * play.atkBias;
     ///   if (play.IsOmenTurn(turn)) wAtk *= 0.6f, wDef *= 1.8f;  // 予兆Tは防御シフト
     ///
-    /// 未登録ボス = Default (バイアス 1.0)。
     /// </summary>
     public struct BossPlaybook
     {
@@ -61,86 +60,38 @@ namespace AutoTest
         };
 
         // ================================================================
-        //  ボス別プレイブック定義 (Get で切り替え)
+        //  パッシブの説明から読める範囲だけ (2026-11-06)
+        //
+        //  旧: ボス ID ごとの手調整の表。 7 月の設計のまま残っていて、 実在しない被ダメ軽減 (灰燼の王・審判官・ヴェスカ p4)
+        //  や反射 (ヴェスカ p3・鏡の双子の 50%) を計算に入れていた。 攻略知識で重みを調整する形もやめる ──
+        //  相手を見て読めること (説明に周期が書いてある〈業火の予兆〉) だけを使う。
         // ================================================================
-        private static readonly Dictionary<string, BossPlaybook> _book = new Dictionary<string, BossPlaybook>
+        /// <summary>敵のパッシブから戦術を作る。</summary>
+        public static BossPlaybook From(CombatSystem.EnemyData enemy)
         {
-            // 1〜3層: 特殊対策不要 (Default で押し切り)
-            // 4層: 鏡双子 — 反射に注意 (火力控えめ)
-            ["boss_layer4"] = new BossPlaybook
+            var pb = Default;
+            if (enemy?.passiveSkills == null) return pb;
+            foreach (var ps in enemy.passiveSkills)
             {
-                atkBias = 0.85f, defBias = 1.15f, chgBias = 1.0f,
-                omenDefBoost = 1.0f, omenAtkDamp = 1.0f,
-                reflectsAttack = true, reflectRatio = 0.5f,
-            },
-            // 5層: 審判官 — ChipCap で大玉が丸められる。 小玉連打有利
-            ["boss_layer5"] = new BossPlaybook
-            {
-                atkBias = 1.0f, defBias = 1.1f, chgBias = 1.0f,
-                omenDefBoost = 1.0f, omenAtkDamp = 1.0f,
-                damageCapped = true, damageCapThreshold = 10,
-            },
-            // 5層裏: シュヴァリエ — 特殊 (レイピア切替は別処理)
-            ["boss_layer5_hidden"] = new BossPlaybook
-            {
-                atkBias = 1.1f, defBias = 1.0f, chgBias = 1.0f,
-                omenDefBoost = 1.0f, omenAtkDamp = 1.0f,
-            },
-            // 6層 v2 二相型 (2026-07-16): 灰燼の王
-            //   Phase1 (HP>50%): 周期4T 予兆・回復8%/T (削り合い抑制)
-            //   Phase2 (HP≤50%): 周期2T 予兆・回復停止・敵ダイス+5常時 (瞬発力勝負)
-            //   → Phase1 は削り控えめ + Phase2 前の温存、 Phase2 は火力全開で押し切り
-            ["boss_layer6"] = new BossPlaybook
-            {
-                atkBias = 1.0f, defBias = 1.05f, chgBias = 1.0f,
-                omenPredicate = (t, hp) =>
+                if (ps == null) continue;
+                switch (ps.internalName)
                 {
-                    if (t < 1) return false;
-                    int p = hp <= 0.5f ? 3 : 4; // Phase2 で周期3Tに加速 (2T→3Tに緩和)
-                    return ((t - 1) % p) == 0;
-                },
-                omenDefBoost = 1.8f, omenAtkDamp = 0.7f,
-                damageCapped = true, damageCapThreshold = 15,
-                immuneToDot = false,
-            },
-            // !! 要再較正 (2026-08-24): 以下 4 段のバイアスは **廃止済みの覚者連戦**
-            //    (逆観/業火残響/鏡映/一閃返し) に合わせて決めた値で、 現在の 7 層ボスである
-            //    ヴェスカ (連続実験/遺物学者/停滞する時間/解析演算/裂け目/回帰する真理/天与の才) の
-            //    機構とは対応していない。 特に p3 の reflectsAttack はヴェスカに存在しない。
-            //    数値を動かすのはバランス変更なので、 承認と測定を経てから行う (docs/GAME.md §23-9)。
-            // 7層 p1
-            ["boss_layer7"] = new BossPlaybook
-            {
-                atkBias = 0.9f, defBias = 1.15f, chgBias = 1.3f,
-                omenDefBoost = 1.0f, omenAtkDamp = 1.0f,
-            },
-            // 7層 p2
-            ["boss_layer7_p2"] = new BossPlaybook
-            {
-                atkBias = 0.9f, defBias = 1.4f, chgBias = 1.0f,
-                omenDefBoost = 1.0f, omenAtkDamp = 1.0f,
-            },
-            // 7層 p3
-            ["boss_layer7_p3"] = new BossPlaybook
-            {
-                atkBias = 0.7f, defBias = 1.2f, chgBias = 1.1f,
-                omenDefBoost = 1.0f, omenAtkDamp = 1.0f,
-                reflectsAttack = true, reflectRatio = 1.0f,
-            },
-            // 7層 p4
-            ["boss_layer7_p4"] = new BossPlaybook
-            {
-                atkBias = 0.85f, defBias = 1.15f, chgBias = 1.0f,
-                omenDefBoost = 1.0f, omenAtkDamp = 1.0f,
-                damageCapped = true, damageCapThreshold = 12,
-            },
-        };
-
-        /// <summary>ボス ID → プレイブック。 未登録は Default。</summary>
-        public static BossPlaybook Get(string bossId)
-        {
-            if (string.IsNullOrEmpty(bossId)) return Default;
-            return _book.TryGetValue(bossId, out var pb) ? pb : Default;
+                    case "EmberOmen":
+                        pb.omenPredicate = (t, hp) =>
+                        {
+                            if (t < 1) return false;
+                            int period = hp <= 0.5f ? 3 : 4;
+                            return ((t - 1) % period) == 0;
+                        };
+                        pb.omenDefBoost = 1.8f; pb.omenAtkDamp = 0.7f;
+                        break;
+                    case "AshCarapace":
+                        pb.damageCapped = true;
+                        pb.damageCapThreshold = ItemSystem.PassiveSkills.Effects.AshCarapace.Threshold;
+                        break;
+                }
+            }
+            return pb;
         }
     }
 }

@@ -228,7 +228,8 @@ namespace ItemSystem
             item.tier       = jsonItem.tier;
             item.consFamily = jsonItem.consFamily ?? "";
             item.unique     = jsonItem.unique;
-            
+            item.axis       = jsonItem.axis ?? "";
+
             // サイズ (sizeX/sizeY) は 2026-09-19 に items.json から削除、 型ごと 2026-10-28 に削除 (グリッドの廃止)。
 
             // Unity Assets設定
@@ -329,6 +330,12 @@ namespace ItemSystem
         /// </summary>
         private static readonly Dictionary<string, string> LegacyIdMap = new Dictionary<string, string>
         {
+            // 2026-11-07 軸の再設計で足した品の改名 (見た目が名前と合わなかった・効果は同じ)
+            {"継ぎ目の鞴","焚き足しの炭"},
+            {"一本差しの型","一の矢"},
+            {"余韻の鍔","余韻の鈴"},
+            {"受け流しの呼吸","受け流しの扇"},
+            {"乾電池の束","予備のバッテリー"},
             // 2026-10-31 アイテム再編の改名 (旧名 → 新しい名前)
             {"炉番の火床外套","炉番の外套"},
             {"余分に乾いた火口箱","乾き火口箱"},

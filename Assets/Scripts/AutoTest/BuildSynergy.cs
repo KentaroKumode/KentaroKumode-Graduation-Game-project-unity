@@ -80,41 +80,29 @@ namespace AutoTest
         //      3個以上の軸を持つラン 96.4% → 97.0%
         //  用量不足ではなく、<b>向かうべき「帯」が存在しない</b>。 よって 0 にして殺してある。
         //  <see cref="AxisAffinity"/> の実装は残す ── 別の根拠が出たときに用量だけで戻せるように。
-        //  軸の定義は <see cref="MetaProgression.SparkStarterPicker"/> のキーワード集合を借りている。
+        //
+        //  **2026-11-07 復活。** 軸の品 (心眼 / 血晶 / 瘴気 / 炉温 / 電流 / 堅牢の数を読む ① と、 その数で強さが決まる ②【規則】・
+        //  誓約) が入り、 絞った先に得がある「帯」ができた。 ITT の序列は品をばらばらに配って測るので、 数を参照する品は
+        //  平均の効き目で弱く見える ── 軸に寄せて買う主体が無いと、 その品が効くかどうかの測定にならない。
+        //  軸の定義は items.json の axis (金は数えない)。
         // ============================================================
 
-        /// <summary>同軸 1 個あたりの加点 (band 単位)。
-        /// <b>0 = 無効</b> (2026-09-07 / 上のブロックの実測により)。 復活させるなら 0.03 が旧値。</summary>
-        public static float AxisBonusPerOwned = 0f;
+        /// <summary>同軸 1 個あたりの加点 (band 単位)。 0 = 無効。 2026-11-07 に 0.03 (旧値) で復活。</summary>
+        public static float AxisBonusPerOwned = 0.03f;
         /// <summary>同軸加点の上限。 これ以上は伸びない ── 専門化を促す一方で、
-        /// <b>本当に弱い品を軸だけで押し上げない</b>ための蓋。</summary>
-        public static float AxisBonusCap = 0.12f;
+        /// <b>本当に弱い品を軸だけで押し上げない</b>ための蓋。 2026-11-07: 0.12 → 0.24 (軸の品は 8 個前後から効き始めるため)。</summary>
+        public static float AxisBonusCap = 0.24f;
 
-        private static readonly string[] Axes = { "charge", "rinkai", "poison", "bleed" };
-
-        /// <summary>この品が属する軸 (無ければ null)。 複数該当なら最初の 1 つ。</summary>
+        /// <summary>この品が属する軸 (無ければ null)。 金と軸なしは数えない。</summary>
         private static string AxisOf(CompleteItemData data)
         {
-            if (data == null) return null;
-            foreach (var ax in Axes)
-                if (MetaProgression.SparkStarterPicker.HasKeyword(data, ax)) return ax;
-            return null;
+            string ax = data?.axis;
+            if (string.IsNullOrEmpty(ax) || ax == ItemSystem.PassiveSkills.AxisRules.Gold) return null;
+            return ax;
         }
 
         /// <summary>所持品のうち同じ軸に属する数。</summary>
-        private static int OwnedInAxis(RunState run, string axis)
-        {
-            if (run?.ownedPassiveItems == null) return 0;
-            var db = ItemDatabase.Instance;
-            if (db == null) return 0;
-            int n = 0;
-            foreach (var id in run.ownedPassiveItems)
-            {
-                var d = db.GetItem(id);
-                if (d != null && MetaProgression.SparkStarterPicker.HasKeyword(d, axis)) n++;
-            }
-            return n;
-        }
+        private static int OwnedInAxis(RunState run, string axis) => ItemSystem.PassiveSkills.AxisRules.Count(run, axis);
 
         /// <summary>購入スコアへの補正 (加算)。 噛み合わなければ負を返す。
         ///

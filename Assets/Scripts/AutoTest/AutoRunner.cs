@@ -761,6 +761,8 @@ namespace AutoTest
         /// <para>0.10 は**実測していない仮値**。 高いほど不偏サンプルが速く貯まるが、
         /// そのぶん貪欲データのクリア率が下がる。 較正が要る。</para></summary>
         public float exploreHoldoutRate = 0f;
+        /// <summary>学習に合流しない測定で探索 (ランダムな買い物) を切る。</summary>
+        public bool measureNoExplore = false;
 
         /// <summary>**探索ランの割合** (2026-08-17b)。 探索は**ラン単位**で ON/OFF する。
         ///
@@ -856,6 +858,8 @@ namespace AutoTest
         public int fightTraceRuns = 0;
         /// <summary>**計測専用**: イベントマスを素通りにする (GameManager.SuppressEvents・2026-11-05)。</summary>
         public bool suppressEvents = false;
+        /// <summary>**計測専用**: 確信の連鎖のイベントだけ外す (GameManager.SuppressConvictionChain)。</summary>
+        public bool suppressConvictionChain = false;
 
         // [廃止 2026-09-14] reserveGoldForRitual。 〈門〉リワークでゴールドの要求が消えた。
 
@@ -885,6 +889,18 @@ namespace AutoTest
         /// <summary>[較正専用] フラット攻撃加算の倍率。 <b>負 = 触らない。</b>
         /// 配線 : フラットの比を目標 (5:5〜6:4) へ寄せるための掃き用。</summary>
         public float flatAttackMul = -1f;
+        /// <summary>Optimal の購入の序列を丸める段の数 (3 = 決定・2026-11-06)。 Super は常に無段階。 0 なら Optimal も無段階。</summary>
+        public int optimalBuyTiers = 3;
+        /// <summary>Super の購入の序列の段の数 (0 = 無段階)。</summary>
+        public int superBuyTiers = 0;
+        /// <summary>[診断] 段の境目 (順位・"46,92" の形)。 空なら等分。 段の数はここから決まる。</summary>
+        public string superTierRankCuts = "";
+        /// <summary>[較正専用] 宝箱からパッシブが出る確率 (<see cref="GameLoop.CombatRewards.TreasurePassiveRate"/>)。 負なら触らない。</summary>
+        public float treasurePassiveRate = -1f;
+        /// <summary>Optimal の配線のミスの率 (Super は 0)。</summary>
+        public float optimalMistakeRate = 0.1f;
+        /// <summary>旧 SuperCombatAI を戦闘に使う (既定 false)。 2026-11-06 に Optimal 基準へ置き換えた。 比較用に残す。</summary>
+        public bool useOldSuperAI = false;
 
         /// <summary>[較正専用] エリート戦の報酬倍率 (CombatRewards.EliteRewardMul)。 <b>負 = 触らない。</b></summary>
         public float eliteRewardMul = -1f;
@@ -949,6 +965,12 @@ namespace AutoTest
         /// <summary>[較正専用] リロール価格の倍率。 <b>1.0 = 製品</b>。 下限 1G なので 0 にしても無料にはならない。
         /// <see cref="ItemSystem.Shop.ShopInventory.RerollPriceScale"/>。</summary>
         public float rerollPriceScale = 1f;
+        /// <summary>[較正専用] 進行に合わせた価格の倍率の K (<see cref="ItemSystem.Shop.ShopManager.ProgressPriceK"/>)。 <b>負なら触らない</b> (製品の値)。</summary>
+        public float shopProgressPriceK = -1f;
+        /// <summary>[較正専用] レア度による価格の傾き s (<see cref="ItemSystem.Shop.ShopManager.RaritySlope"/>)。 <b>負なら触らない</b>。</summary>
+        public float shopRaritySlope = -1f;
+        /// <summary>[較正専用] 品物の価格の倍率 (<see cref="ItemSystem.Shop.ShopManager.ItemPriceScale"/>)。 <b>負なら触らない</b>。</summary>
+        public float shopItemPriceScale = -1f;
         /// <summary>[較正専用] リロール停止則を使う (<see cref="RerollStopRule"/>)。 既定 false = 旧規則。</summary>
         public bool rerollStopRule = false;
         /// <summary>[較正専用] リロール直前にフェーズ3 の購入を済ませる。 既定 false = 従来の順番。</summary>
@@ -978,6 +1000,8 @@ namespace AutoTest
         /// <summary>全敵の攻撃側 (baseAttack/ロール上下限/threat) へ掛ける倍率。 1.0 = 素のまま。
         /// <b>応答は極端に非線形 (§13-5)。 0.1 刻みより粗く振らないこと。</b></summary>
         public float enemyAttackMul = 1f;
+        /// <summary>全敵の最大 HP へ掛ける倍率 (EnemyDatabase.HpScale)。 1.0 = 素のまま。</summary>
+        public float enemyHpMul = 1f;
 
         /// <summary>〈サーベル・ワルツ〉の剣の舞プール絞り込み確率。 <b>負 = 触らない (既定 0.6)。</b>
         /// 4 枚集約の成立率を較正するための穴。</summary>
@@ -1042,6 +1066,8 @@ namespace AutoTest
         /// 実効値は <c>[実効状態]</c> 行ではなくコンソールの
         /// <c>[MetaAllocationPresets] spec:… を適用</c> で確認すること。</summary>
         public string metaRankSpec = "";
+        /// <summary>[測定専用] metaRankSpec が予算 (24 点) を超えても切り詰めずに当てる (2026-11-07・MetaAllocationPresets.AllowOverBudget)。</summary>
+        public bool metaAllowOverBudget = false;
 
         [Header("整備パネル drop-one アブレーション (2026-09-10)")]
         /// <summary>Balanced から 1 軸ずつ抜いて限界寄与を測る。</summary>
@@ -1149,6 +1175,10 @@ namespace AutoTest
         /// 「遅く手に入れた場合の価値」を測っている。</para></summary>
         [Tooltip("true で 1ランに複数品をランダム付与し、割り当てだけで回帰する (ITT)")]
         public bool randomGrantTrial = false;
+        /// <summary>[診断] 開幕に軸の品をまとめて配る (2026-11-07・<see cref="GrantAxisPackage"/>)。 空 = 配らない。
+        /// 軸名か "*" (軸を問わず)。 配る数は <see cref="axisPackageCount"/>。</summary>
+        public string axisPackageAxis = "";
+        public int axisPackageCount = 10;
         [Tooltip("ラン数")]
         public int randomGrantRuns = 5000;
         [Tooltip("1 ランあたりの期待付与数。 多いほど安いが、開幕の姿が変わる")]
@@ -1165,6 +1195,13 @@ namespace AutoTest
         /// <b>同じ fit から引き直す</b> ── itt_clear.txt の金係数がそれ。</para></summary>
         [Tooltip("true で 消耗品・武器・出目パーツ も付与プールへ入れる (ITT を全品へ広げる)")]
         public bool randomGrantAllKinds = false;
+        /// <summary>序列から差し引く価格の重み (Δクリア pt / 1G)。 <see cref="LearnedPriorityProvider.IttPriceK"/>。 負なら触らない。</summary>
+        public float ittPriceK = -1f;
+        /// <summary>Super の序列から差し引く価格の重み (Δクリア pt / 1G)。 金をランダムに配った時の効果からの理論値で、 同じシードで 16.3 → 18.1% (+3.08σ)。
+        /// Optimal は 0: 3 段の同じ段の中で安い方を買うので、 足すと価格を二重に見る (12.4 → 8.0%)。</summary>
+        public float superIttPriceK = 0.1f;
+        /// <summary>Super は自分の方策で測った ITT の序列 (itt_clear.super.json) を使う (2026-11-06)。 k は金の価値が約 10 倍になったので 0.1。</summary>
+        public bool superOwnItt = true;
         /// <summary>付与試行のラン番号オフセット。 <b>並列プロセスごとに区間を分けるためにある</b>。
         /// runIdx = 90000 + これ + i。 0 のとき従来と完全に同じ。</summary>
         [Tooltip("付与試行の開始オフセット (並列時にプロセスごとの担当区間を分ける)")]
@@ -1262,6 +1299,9 @@ namespace AutoTest
             public int damageDealt;
             public int damageTaken;
             public int enemyMaxHP;
+            /// <summary>[計装 2026-11-06] 与ダメの内訳 [武器, 攻撃の出目, 攻撃+N, 主攻撃の与ダメ, 固定ダメ, 追撃, 出目由来の攻撃, 毒, 出血, 臨界の爆発]。
+            /// 毒と爆発は固定ダメの内数、 出血は固定ダメの外。</summary>
+            public int[] dmgParts;
             public bool isFightEnd; // OnBattleEnded で確定した1戦分か（チェーン途中形態は false）
             // この戦闘時点の装備（武器×ダイス勝率集計用）。武器は family_tN まで（業物+段階は区別しない）。
             public string weaponId = "";
@@ -1300,6 +1340,11 @@ namespace AutoTest
             public int finalCoins;
             public int peakCoins;
             public int totalGoldGained;
+            /// <summary>[計装 2026-11-06] 金の内訳 (キー = 「深さ|経路」)。</summary>
+            public string[] goldKeys;
+            /// <summary>[計装 2026-11-06] 状態の記録 (<see cref="SnapState"/> の 10 列を平らに並べる)。 マクロの価値 V の表の元。</summary>
+            public List<int> stateSnaps = new List<int>();
+            public int[] goldVals;
             /// <summary>**このランでゲームが実際に見た挑戦スコア。**
             /// 意図した構成が本当に適用されていたかを、 結果ではなく入力側で検証するために残す。</summary>
             public int appliedChallengeScore;
@@ -1682,6 +1727,7 @@ namespace AutoTest
             //   ここは「素の Run N runs も既定で遮断される」ことだけを担保する。
             GameLoop.GameManager.SuppressLayer5HiddenBoss = suppressLayer5HiddenBoss;
             GameLoop.GameManager.SuppressEvents = suppressEvents;
+            GameLoop.GameManager.SuppressConvictionChain = suppressConvictionChain;
             if (suppressEvents) Debug.Log("[AutoRunner] **計測**: イベントマスを素通り (確信の資格は無償で付与)");
             if (suppressLayer5HiddenBoss)
                 Debug.Log("[AutoRunner] 5層裏ボス(シュヴァリエ)を遮断 (既定)");
@@ -1696,7 +1742,8 @@ namespace AutoTest
             //     ・ランダム化ホールドアウト     … 不偏な値付け       = **推定側**
             //   前者は交絡を減らさないので、 値付けの根拠にしてはいけない。
             //   並列学習のワーカー (learningWorker) は学習ファイルを書かないが、 走らせ方は学習バッチと同じにする。
-            bool exploring = learnTier || learningWorker;
+            //   A/B の測定 (measureNoExplore) では切る: 学習に合流しない測定にランダム買いを混ぜない (2026-11-06 まで全ランの 30% に入っていた)。
+            bool exploring = (learnTier || learningWorker) && !measureNoExplore;
             LearnedPriorityProvider.SampleBonusEnabled = exploring;
             exploreHoldoutRate = exploring ? 0.10f : 0f;
             // 武器分岐への探索流し込みは 2026-09-21 削除 (複合武器の廃止で分岐が無くなった)。
@@ -1814,10 +1861,35 @@ namespace AutoTest
             if (saberWaltzShopBias >= 0f)
                 ItemSystem.Shop.ShopManager.SaberWaltzShopBias = saberWaltzShopBias;
             // 敵ステータスの上書きは **DB の読み直し**なので、 ラン開始より前にここで 1 回だけ。
-            CombatSystem.EnemyDatabase.ReloadWithOverrides(enemyAttackSpec, enemyAttackMul, enemyHpSpec);
+            CombatSystem.EnemyDatabase.ReloadWithOverrides(enemyAttackSpec, enemyAttackMul, enemyHpSpec, enemyHpMul);
             MetaProgression.MetaBuffApplicator.EliteUpgradePctOverride = eliteUpgradePctOverride;
             if (flatAttackMul  >= 0f)
                 ItemSystem.PassiveSkills.CombatContext.FlatAttackMul = flatAttackMul;
+            if (treasurePassiveRate >= 0f) GameLoop.CombatRewards.TreasurePassiveRate = treasurePassiveRate;
+            float priceK = ittPriceK >= 0f ? ittPriceK : (wiringSkill == WiringSkill.Super ? superIttPriceK : 0f);
+            string ittVariant = wiringSkill == WiringSkill.Super && superOwnItt ? "super" : "";
+            if (!Mathf.Approximately(LearnedPriorityProvider.IttPriceK, priceK) || GrantItt.Variant != ittVariant)
+            {
+                LearnedPriorityProvider.IttPriceK = priceK;
+                GrantItt.Variant = ittVariant;
+                LearnedPriorityProvider.Reload(TierLearningRoot, writeMarkdown: false);
+            }
+            bool isSuperSkill = wiringSkill == WiringSkill.Super;
+            // Super = Optimal + 無段階の序列 + 激しい防御 + 消耗品の読み + 偵察と戦闘名の回避 (2026-11-06・同じシードで +4.86σ)
+            if (isSuperSkill) { v3.superDefense = true; v3.superConsumables = true; v3.superNav = true; v3.macroPlan = true; v3.phase3Ranked = true; v3.axisCommitBuy = true; UseLearnedDanger = true; AvoidLoseRate = v3.avoidLoseRate; }
+            LearnedPriorityProvider.BuyTierCount = isSuperSkill ? superBuyTiers : optimalBuyTiers;
+            wiringMistakeRate = isSuperSkill ? 0f : optimalMistakeRate;
+            LearnedPriorityProvider.GateRaw = v3.tierGateRaw;
+            if (!string.IsNullOrEmpty(superTierRankCuts))
+            {
+                var cutToks = superTierRankCuts.Split('/');
+                var cuts = new int[cutToks.Length];
+                for (int ci = 0; ci < cutToks.Length; ci++) cuts[ci] = int.Parse(cutToks[ci]);
+                LearnedPriorityProvider.TierRankCuts = cuts;
+                LearnedPriorityProvider.BuyTierCount = cuts.Length + 1;
+            }
+            // 防ぎ切りの規則 (撃破までの敵の攻撃の伸びを計算する) は Super だけ。 Optimal は 10〜100 戦の経験者相当 (2026-11-06)
+            FreeBlockRule = isSuperSkill;
             // 較正ノブは static なのでラン跨ぎ・アーム跨ぎで残る。 **毎回既定へ戻してから乗せる。**
             GameLoop.CombatRewards.EliteRewardMul = GameLoop.CombatRewards.EliteRewardMulDefault;
             if (eliteRewardMul >= 0f) GameLoop.CombatRewards.EliteRewardMul = eliteRewardMul;
@@ -2387,6 +2459,9 @@ namespace AutoTest
               : rerollHardCap <= -2 ? -1
               : rerollHardCap;
             ItemSystem.Shop.ShopInventory.RerollPriceScale = rerollPriceScale;
+            if (shopProgressPriceK >= 0f) ItemSystem.Shop.ShopManager.ProgressPriceK = shopProgressPriceK;
+            if (shopRaritySlope >= 0f) ItemSystem.Shop.ShopManager.RaritySlope = shopRaritySlope;
+            if (shopItemPriceScale >= 0f) ItemSystem.Shop.ShopManager.ItemPriceScale = shopItemPriceScale;
             // 停止則。 static なのでアーム跨ぎで残る ── 毎回既定へ戻してから乗せる。
             RerollStopRule = rerollStopRule;
             Phase3BeforeReroll = phase3BeforeReroll;
@@ -2399,7 +2474,8 @@ namespace AutoTest
             if (saleBonusLoPct >= 0) SaleBonusLoPct = saleBonusLoPct;
             if (navGoldComfort  >  0f) GoldComfort      = navGoldComfort;
             UseTileDanger = navTileDanger;
-            UseLearnedDanger = navLearnedDanger;
+            UseLearnedDanger = navLearnedDanger || v3.superNav;
+            AvoidLoseRate = v3.superNav ? v3.avoidLoseRate : 2.0;
             UseEliteCostNav = navEliteCost;
             if (navBlockCredit  >= 0f) BlockCreditRatio = navBlockCredit;
             if (navSafetyFights >= 0f) SafetyFights     = navSafetyFights;

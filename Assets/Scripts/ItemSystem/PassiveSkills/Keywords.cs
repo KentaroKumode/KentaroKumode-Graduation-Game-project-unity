@@ -52,12 +52,22 @@ namespace ItemSystem.PassiveSkills.Keywords
             if (ctx.rinkaiBurstDamage <= 0) ctx.rinkaiBurstDamage = Effects.RinkaiInit.DefaultBurstDamage;
         }
 
+        /// <summary>爆発 1 回の基礎 (2026-11-07)。 〈炉温〉の②なら 15 + 炉温 / 2、 なければ 30。 〈炉心の誓約〉で 2 倍、
+        /// 〈焼き増しの雷管〉の上乗せを足す。 品は ctx.rinkaiBurstDamage を直接書かない ── 書く品どうしの順番で値が変わったため。</summary>
+        public static int BurstBase(CombatContext ctx)
+        {
+            int b = ctx.burstCritRule ? 15 + ctx.AxisDepth(AxisRules.Heat) / 2 : ctx.rinkaiBurstDamage;
+            if (ctx.burstDoubled) b *= 2;
+            return b + ctx.burstStackBonus;
+        }
+
         /// <summary>臨界を n 溜める。 閾値をまたいだら爆発を決め、 出来事を配る。
         /// 爆発は次の攻撃に乗る (CombatManager が <see cref="BurstCountKey"/> を見て使う)。
         /// 〈帳簿外の爆薬〉(rinkaiMultiBurst) があれば臨界を閾値ぶんだけ減らし、 溜まっている限り何度でも爆発する。</summary>
         public static void AddHeat(CombatContext ctx, int n)
         {
-            if (ctx == null || n <= 0 || ctx.rinkaiThreshold <= 0) return;
+            if (ctx == null || n <= 0 || ctx.rinkaiThreshold <= 0 || ctx.heatSealed) return;   // heatSealed: 誓約で封じた
+            n += ctx.heatGainBonus;   // 〈炉温〉の①: 臨界を得るたび +1
             ctx.rinkaiMeter += n;
             int guard = 0;
             while (ctx.rinkaiMeter >= ctx.rinkaiThreshold && guard++ < 50)

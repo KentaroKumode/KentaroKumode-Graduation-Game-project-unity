@@ -26,8 +26,50 @@ namespace AutoTest
         public float timeCostMul = 1f;
         /// <summary>E3: 充電の効用 (<c>wChg × 2</c>) の倍率。</summary>
         public float chargeMul = 1f;
-        /// <summary>E5: このターンの被ダメージ 1 あたりの罰 (0 = なし)。 効用は HP を失うこと自体のコストを持たない
+        /// <summary>E5: このターンの被ダメージ 1 あたりの罰。 **2026-11-05 に既定を 4 へ畳んだ** (Optimal の基準そのもの・0 で畳む前の挙動)。
+        /// 掃引では 0.5 → 34.3% / 1 → 39.8% / 2 → 41.7% / 4 → 43.2% / 8 → 43.4% / 16 → 44.6% / 32 → 44.9% (畳む前の基準 25.0%)。
+        /// 『HP は戦闘をまたいで持ち越す資源』という最低限の知識で、 先読みではない。 (旧: 効用は HP を失うこと自体のコストを持たない
         /// (防ぎ切りの規則だけが穴埋めしている)。 ラン全体で HP は戦闘をまたいで持ち越すので、 失った分は後で響く。</summary>
-        public float takenCost = 0f;
+        public float takenCost = 4f;
+
+        /// <summary>E8: 2 ターン先読み。 各配線 w の値 = 今ターンの効用 U_now(w) + 次ターンの最良効用の期待値 E[max U_next]。
+        /// 次ターンの盤面は w でこのターンを解いた後 (敵 HP・自 HP・シールド・不滅の刃の連続数・堅守の準備・敵の防御・ターン+1・次ターンの敵攻撃) で、
+        /// 効用は同じ関数 (<c>OptimalUtility</c>)。 次の出目は面の多重集合の全列挙の期待値 (GameRng を使わない)。 割引なし・新しい重みなし。
+        /// 今ターンで撃破・死亡する配線は先読みせず今の効用のまま。 リロールは次ターンの見積もりに入れない。</summary>
+        public bool lookahead2;
+        /// <summary>E8 をボス戦 (<c>BossIds.IsBoss</c>) だけに掛ける (既定 true)。 false なら全戦闘。</summary>
+        public bool lookaheadBossOnly = true;
+        /// <summary>S2: 大きい攻撃の予告に、 激しく守る。 リロールで守れる目を引きにいき (充電の予備も使う・1 ターン 2 回)、 被ダメの罰を 3 倍にする。</summary>
+        public bool superDefense;
+        /// <summary>S3: 消耗品を読んで使う。 護符は開幕に使わず (毎ターン半減するので大技の前に消える)、 予告を見て足りない分を埋める最小のものを使う。 致死なら回復薬。</summary>
+        public bool superConsumables;
+        /// <summary>S4: 航行。 次に向かう未知の点だけ偵察し、 見えた戦闘名の危険度で避ける (敗北率 10% 以上は基本的に避ける)。</summary>
+        public bool superNav;
+        /// <summary>S4: この敗北率以上の戦闘名は HP に関わらず避ける。</summary>
+        public float avoidLoseRate = 0.10f;
+        /// <summary>S6: 層の回り方の計画 (AutoRunner.Macro)。 クリアの対数オッズの増減で 3 手先まで比べ、 得にならなければ層を出る。</summary>
+        public bool macroPlan;
+        /// <summary>[診断] 丸めた序列の何が効くかの分解 (2026-11-06)。 同じ段の中で安い方を選ばない。</summary>
+        public bool tierNoPriceTie;
+        /// <summary>[診断] 足切りを通った候補の順番を ΔPower/G (手持ちを見た評価) だけで決める。</summary>
+        public bool orderByEffOnly;
+        /// <summary>A: 段階 3 (通常購入・最後の店) を値の高い順にし、 足切り (PowerCuts[3]) 未満は買わない。 旧は棚の左から値を見ずに全部。</summary>
+        public bool phase3Ranked;
+        /// <summary>軸に絞る買い方 (2026-11-07・Super のとき on)。 その軸の品を十分に持っていたら、 ① 数を参照・②【規則】・誓約を
+        /// 最優先で買う (ITT は平均で測るので、 絞った構成でだけ価値が出るこれらの品を低く出す)。 誓約は、 封じる軸の品を
+        /// ほとんど持っていないときだけ買い、 足りないうちは買わない。 しきい値は下の 4 つ。</summary>
+        public bool axisCommitBuy;
+        public int commitCountAt = 4, commitRuleAt = 6, commitOathAt = 8, commitOathMaxSealedOwned = 2;
+        /// <summary>[診断] 同点の割り方を ID 順にする (意味の無い順)。</summary>
+        public bool tieById;
+        /// <summary>同じ目の出目パーツを持っていたら、 差し替えの差分 (新しい面 − 持っている面) で評価する (2026-11-06 に全 BOT の既定へ)。
+        /// ITT の値は「その面を新しく得た時」の効果なので、 上位版を過大に見て重ね買いしていた (無段階の Super 16.3 → 22.3%・+11.23σ)。</summary>
+        public bool partDelta = true;
+        /// <summary>[診断] 出目パーツの準パワーから引く量。 3 段の強さが「パッシブとパーツの順番」かを確かめる。</summary>
+        public float partPenalty;
+        /// <summary>[診断] 足切りは丸める前の値で判定する (順位だけ丸める)。</summary>
+        public bool tierGateRaw;
+        /// <summary>[診断] 順位は丸める前の値で決める (足切りだけ丸める)。</summary>
+        public bool tierOrderRaw;
     }
 }

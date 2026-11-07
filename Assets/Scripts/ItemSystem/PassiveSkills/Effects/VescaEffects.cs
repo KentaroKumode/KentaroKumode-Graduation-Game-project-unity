@@ -467,8 +467,10 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 守りへの罰は〈停滞する時間〉が単独で担う。</para></summary>
     public class RiftHeldOpen : IPassiveSkillEffect
     {
-        /// <summary>毎ターン双方が失う「**最大** HP」の割合。</summary>
+        /// <summary>毎ターンヴェスカが失う「**最大** HP」の割合。</summary>
         public const float LossRate = 0.02f;
+        /// <summary>毎ターンプレイヤーが失う「**最大** HP」の割合 (2026-11-06: 2% → 1%。 累計 24 ターン前後の連戦で最大 HP の半分近くが消えていた)。</summary>
+        public const float PlayerLossRate = 0.01f;
 
         public string SkillId => "RiftHeldOpen";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
@@ -490,10 +492,10 @@ namespace ItemSystem.PassiveSkills.Effects
             // **軽減は無視・シールドは肩代わりする** (2026-08-15 の規約: ③-C)。
             if (ctx.enemyCurrentHP > 0 && ctx.enemyMaxHP > 0)
             {
-                int loss = UnityEngine.Mathf.CeilToInt(ctx.enemyMaxHP * LossRate);
+                int loss = UnityEngine.Mathf.CeilToInt(ctx.enemyMaxHP * PlayerLossRate);
                 int dealt = ctx.EnemyDealUnmitigable(loss, DeathCause.Rift);
                 if (dealt > 0)
-                    UnityEngine.Debug.Log($"[裂け目] プレイヤー -{dealt} (最大HPの{LossRate:P0}) → {ctx.enemyCurrentHP}/{ctx.enemyMaxHP}");
+                    UnityEngine.Debug.Log($"[裂け目] プレイヤー -{dealt} (最大HPの{PlayerLossRate:P0}) → {ctx.enemyCurrentHP}/{ctx.enemyMaxHP}");
             }
         }
     }

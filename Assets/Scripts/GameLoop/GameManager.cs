@@ -76,6 +76,8 @@ namespace GameLoop
         /// 設計は変えずに、 バランス測定からイベントの影響を外すための退避口。
         /// 最終層へ進む資格は失わせない: 開始時に〈根拠のない確信〉を無償で渡し、 6 層 (4 層目) に入ったら〈真理〉を立てる。</summary>
         public static bool SuppressEvents = false;
+        /// <summary>計測専用: 確信の連鎖 (預言者の石板 / 啓示 / 災厄の予兆) だけ抽選から外す (2026-11-06)。 確信の資格は SuppressEvents と同じく無償で与える。 他のイベントは動く。</summary>
+        public static bool SuppressConvictionChain = false;
 
         // === ゲーム状態 ===
         public enum GamePhase
@@ -330,15 +332,18 @@ namespace GameLoop
             }
 
             // 2026-07-25 v6: 種火 r3 (充電/臨界/毒/出血) - キーワード BRONZE を 1 本ずつ開幕所持
-            foreach (var kw in new[] { "charge", "rinkai", "poison", "bleed" })
+            foreach (var kw in new[] { "charge", "rinkai", "poison", "bleed", "shield" })
             {
                 if (!MetaProgression.MetaBuffApplicator.IsSparkStartingItemUnlocked(kw)) continue;
-                string id = MetaProgression.SparkStarterPicker.PickStarterFor(kw, Run);
-                if (string.IsNullOrEmpty(id)) continue;
-                if (Run.ownedPassiveItems == null)
-                    Run.ownedPassiveItems = new System.Collections.Generic.List<string>();
-                ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
-                Log($"メタ報酬: 種火 [{kw}] 開幕パッシブ「{id}」を獲得");
+                for (int k = 0; k < MetaProgression.MetaPanel.SparkStartingItemCount; k++)
+                {
+                    string id = MetaProgression.SparkStarterPicker.PickStarterFor(kw, Run);
+                    if (string.IsNullOrEmpty(id)) break;
+                    if (Run.ownedPassiveItems == null)
+                        Run.ownedPassiveItems = new System.Collections.Generic.List<string>();
+                    ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
+                    Log($"メタ報酬: 種火 [{kw}] 開幕パッシブ「{id}」を獲得 ({k + 1}/{MetaProgression.MetaPanel.SparkStartingItemCount})");
+                }
             }
 
             LastCombatResult = null;

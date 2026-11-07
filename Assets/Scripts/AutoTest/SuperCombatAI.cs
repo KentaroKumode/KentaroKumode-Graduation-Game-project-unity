@@ -427,6 +427,7 @@ namespace AutoTest
         /// 先の出目は知りようがないが、 何ターン目に大技が来るかは盤面に出ている (予知ではない)。</summary>
         private int _heavyPeriod;
         private float _heavyMul = 1f, _heavyWindupMul = 1f;
+        private float _diceAtkPct;
         private float HeavyAt(int turn)
         {
             if (_heavyPeriod <= 0) return 1f;
@@ -470,6 +471,7 @@ namespace AutoTest
 
             _critBase = Clamp(cm.PlayerCritBaseRate + ctx.critRatePctAdd, 0f, 1f);
             _critMul = Math.Max(1f, ctx.criticalMultiplier);
+            _diceAtkPct = ctx.attackDicePct;
             _eBaseAtk = enemy.EffectiveBaseAttack;
             _eDiceCount = Math.Max(0, enemy.EffectiveRollCount);
             _eRollMax = Math.Max(1, enemy.EffectiveRollMax);
@@ -489,6 +491,13 @@ namespace AutoTest
             _chargePerTurn = MetaProgression.Relics.RelicApplicator.GetChargePerTurn(run, ctx);
             _pierceMul = ctx.playerBlockIgnored ? CombatManager.PierceAwlPerAttack : 0;
             _rung = WeaponRungModel.From(PassiveSkillManager.Instance?.ActivePlayerSkillIds);
+            _rung.chargeToAtkPct = ctx.chargeToAttackPct;
+            {
+                var ids = PassiveSkillManager.Instance?.ActivePlayerSkillIds;
+                bool push = false;
+                if (ids != null) for (int i = 0; i < ids.Count && !push; i++) push = ids[i] == ItemSystem.PassiveSkills.Effects.ShieldPushArt.Id;
+                _rung.shieldPushPct = push ? ItemSystem.PassiveSkills.Effects.ShieldPushArt.PctPerItem * ctx.AxisDepth(ItemSystem.PassiveSkills.AxisRules.Shield) : 0f;
+            }
 
             EnsureBuffers();
             return true;
@@ -1234,6 +1243,16 @@ namespace AutoTest
                 ApplySpecial(sSum, sCount, dice, w, ref aSum, ref bSum, ref cSum,
                              s, enemyAtk, ref specDmg, ref specHeal);
 
+            // 〈二股の端子〉: 充電端子の出目の一部が攻撃にも加わる (本体は上乗せ率より前に足す)
+            if (_rung.chargeToAtkPct > 0f && cSum > 0) aSum += (int)Math.Floor(cSum * _rung.chargeToAtkPct);
+            // 攻撃に挿した出目への上乗せ率 (2026-11-06・本体と同じ式)。 配線で決まる品の分 (本体は OnWired) もここで足す (2026-11-07)。
+            float atkPct = _diceAtkPct;
+            if (atkPct > 0f && aSum > 0) aSum += (int)Math.Ceiling(aSum * atkPct);
+            // 〈盾押しの心得〉: 攻撃に挿したターン、 シールドの一部が攻撃に加わる (平坦・シールドは減らない)
+            if (_rung.shieldPushPct > 0f && aCount > 0 && s.shield > 0) aSum += (int)Math.Floor(s.shield * _rung.shieldPushPct);
+            // 〈当て布の籠手〉: ブロック 2 個以上でシールド +3 (敵の攻撃の前に入る)
+            if (_rung.paddedBracer && bCount >= ItemSystem.PassiveSkills.Effects.PaddedBracer.MinBlockDice) s.shield += ItemSystem.PassiveSkills.Effects.PaddedBracer.Shield;
+
             // --- 〈貫きの錐〉 ---
             if (m.pierce > 0 && bSum > 0) bSum = Math.Max(0, bSum - enemyAtk * m.pierce);
 
@@ -1622,6 +1641,7 @@ namespace AutoTest
             w._k = _k; w._pMaxHp = _pMaxHp; w._pAtkPower = _pAtkPower; w._faces = _faces;
             w._diceMax = _diceMax; w._meanFace = _meanFace;
             w._critBase = _critBase; w._critMul = _critMul;
+            w._diceAtkPct = _diceAtkPct;
             w._eBaseAtk = _eBaseAtk; w._eDiceCount = _eDiceCount; w._eRollMax = _eRollMax;
             w._eMaxHp = _eMaxHp; w._escProfile = _escProfile;
             w._heavyPeriod = _heavyPeriod; w._heavyMul = _heavyMul; w._heavyWindupMul = _heavyWindupMul;

@@ -21,6 +21,26 @@ namespace ItemSystem.PassiveSkills.Effects
         public static GameLoop.RunState Run => GameLoop.GameManager.Instance?.Run;
         public static int Steps => Run?.stepsSinceBattle ?? 0;
         public static int Count(CombatContext ctx, string key) => (int)ctx.GetAccumulated(key);
+
+        /// <summary>刻みを「攻撃に挿した出目 +10%」に換える品の共通部 (2026-11-06)。 OnPostRoll で刻みの分の率を積み、
+        /// OnWired で攻撃に 1 本でも挿していたら刻みを 0 に戻す (使い切る)。 攻撃しないターンは持ち越す。
+        /// この 2 つのトリガーを処理したら true (呼び手は刻みを数える処理へ進まない)。</summary>
+        public const float DiceStackPct = 0.1f;
+        public static bool SpendDiceStacks(PassiveSkillTrigger t, CombatContext ctx, string key)
+        {
+            if (t == PassiveSkillTrigger.OnPostRoll)
+            {
+                int n = Count(ctx, key);
+                if (n > 0) ctx.AddAttackDicePct(n * DiceStackPct);
+                return true;
+            }
+            if (t == PassiveSkillTrigger.OnWired)
+            {
+                if (Count(ctx, MutualKeys.AttackDiceCount) > 0) ctx.accumulatedValues[key] = 0f;
+                return true;
+            }
+            return false;
+        }
         public static bool Won(CombatContext ctx) => ctx.enemyCurrentHP <= 0;
 
         /// <summary>プレイヤーの攻撃が通った (ダメージ後トリガーの中で使う)。</summary>
@@ -175,15 +195,17 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>早沸かし釜【規則】: 爆発の閾値が 50 から 35 に下がる。</summary>
+    /// <summary>早沸かし釜【規則】: 爆発の閾値が 15 下がる。 2026-11-06: 旧「50 から 35 に」は閾値が臨界の軸の深さで
+    /// 決まるようになった (AxisRules) ので差で下げる ── 「35 に」のままだと、 この 1 品で深さの罰を丸ごと消せてしまう。</summary>
     public class QuickKettle : IPassiveSkillEffect
     {
         public string SkillId => "早沸かし釜";
+        public const int Cut = 15;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             Kw.EnableHeat(ctx);
-            ctx.rinkaiThreshold = System.Math.Min(ctx.rinkaiThreshold, 35);
+            ctx.rinkaiThreshold -= Cut;
         }
     }
 
@@ -239,15 +261,17 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>継ぎ革の旅靴: マップを 1 歩進むごとに、 次の戦闘の開始時の臨界 +3。</summary>
+    /// <summary>継ぎ革の旅靴: マップを 1 歩進むごとに、 次の戦闘の開始時の臨界 +2。
+    /// 2026-11-06: 旧 +3 は配線を払わない燃料で、 クリアしたランの 94% が持っていた。</summary>
     public class PatchedBoots : IPassiveSkillEffect
     {
         public string SkillId => "継ぎ革の旅靴";
+        public const int PerStep = 2;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             Kw.EnableHeat(ctx);
-            if (Rw.Steps > 0) Kw.AddHeat(ctx, Rw.Steps * 3);
+            if (Rw.Steps > 0) Kw.AddHeat(ctx, Rw.Steps * PerStep);
         }
     }
 
@@ -293,20 +317,21 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.AddCharge(3);
     }
 
-    /// <summary>十五年目の計測器: 過充電になったとき、 過充電で失った充電 1 につき次の攻撃 +2。</summary>
+    /// <summary>十五年目の計測器: 上限で溢れた充電 2 につき、 次の攻撃で攻撃に挿した出目 +5% (攻撃したら使い切る)。
+    /// 2026-11-07: 旧「溢れた充電 1 につき次の攻撃 +2」は、 満タンのあと充電端子に挿した出目 1 が攻撃 +2 になり
+    /// (攻撃端子は +1)、 余った資源で強さを買える穴だった。</summary>
     public class OldGauge : IPassiveSkillEffect
     {
         public string SkillId => "十五年目の計測器";
         private const string Key = "rw.gauge";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnOvercharge, PassiveSkillTrigger.OnWired };
+        public const float PctPer2 = 0.05f;
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnOvercharge, PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (t == PassiveSkillTrigger.OnOvercharge) { Kw.Add(ctx, Key, Kw.EventAmount(ctx) * 2); return; }
-            int bonus = Rw.Count(ctx, Key);
-            if (bonus <= 0) return;
-            ctx.AddPlayerAttackOrDiceBonus(bonus);
-            ctx.accumulatedValues[Key] = 0;
-            Rw.Log($"[十五年目の計測器] 針が振り切れた分 攻撃 +{bonus}");
+            if (t == PassiveSkillTrigger.OnOvercharge) { Kw.Add(ctx, Key, Kw.EventAmount(ctx)); return; }
+            int spilled = Rw.Count(ctx, Key);
+            if (t == PassiveSkillTrigger.OnPostRoll) { if (spilled >= 2) ctx.AddAttackDicePct(PctPer2 * (spilled / 2)); return; }
+            if (Rw.Count(ctx, MutualKeys.AttackDiceCount) > 0) ctx.accumulatedValues[Key] = spilled % 2;   // 攻撃したら使い切る
         }
     }
 
@@ -394,27 +419,27 @@ namespace ItemSystem.PassiveSkills.Effects
     //  シールド
     // ============================================================
 
-    /// <summary>擦り減った小盾: ブロック端子に挿したダイス 1 個につきシールド +2。</summary>
+    /// <summary>擦り減った小盾: ブロック端子に挿したダイス 1 個につきシールド +1 (2026-11-06・+2 から。 シールド全体の 30% を占めていた)。</summary>
     public class WornBuckler : IPassiveSkillEffect
     {
         public string SkillId => "擦り減った小盾";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-            => Rw.Shield(ctx, Rw.Count(ctx, MutualKeys.BlockDiceCount) * 2, SkillId);
+            => Rw.Shield(ctx, Rw.Count(ctx, MutualKeys.BlockDiceCount), SkillId);
     }
 
-    /// <summary>肩当て: 3 個ともブロック端子に挿したターン、 シールド +8。</summary>
+    /// <summary>肩当て: 3 個ともブロック端子に挿したターン、 シールド +15 (2026-11-07: 旧 +8)。</summary>
     public class Pauldron : IPassiveSkillEffect
     {
         public string SkillId => "肩当て";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (Fam.AllBlock(ctx)) Rw.Shield(ctx, 8, SkillId);
+            if (Fam.AllBlock(ctx)) Rw.Shield(ctx, 15, SkillId);
         }
     }
 
-    /// <summary>鏡返しの小盾: シールドが攻撃を吸収するたび、 吸収した量の 30% を敵に返す。</summary>
+    /// <summary>鏡返しの小盾: シールドが攻撃を吸収するたび、 吸収した量の 50% を敵に返す (2026-11-07: 旧 30%)。</summary>
     public class MirrorBuckler : IPassiveSkillEffect
     {
         public string SkillId => "鏡返しの小盾";
@@ -422,7 +447,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (Rw.Count(ctx, Kw.AbsorbIsAttackKey) <= 0) return;   // 敵の直接攻撃だけ返す
-            int r = Kw.EventAmount(ctx) * 30 / 100;
+            int r = Kw.EventAmount(ctx) * 50 / 100;
             if (r > 0) Kw.Add(ctx, Kw.ReflectKey, r);
         }
     }
@@ -485,22 +510,19 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>敗残兵の部隊章: シールドを 5 失うたび (吸収・半減とも)、 この戦闘中の攻撃 +1。</summary>
+    /// <summary>敗残兵の部隊章: シールドを 5 失うたび (吸収・半減とも) 刻み +1。 攻撃に挿したターン、
+    /// 刻み 1 つにつき攻撃に挿した出目 +10% (使い切る)。
+    /// 2026-11-06: 旧「この戦闘中の攻撃 +1」は戦闘が長いほど積み上がり、 攻撃+N の 16% を占めた。</summary>
     public class VeteranPatch : IPassiveSkillEffect
     {
         public string SkillId => "敗残兵の部隊章";
-        private const string Atk = "rw.veteranAtk";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldAbsorb, PassiveSkillTrigger.OnShieldDecay, PassiveSkillTrigger.OnWired };
+        private const string Stk = "rw.veteranAtk";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldAbsorb, PassiveSkillTrigger.OnShieldDecay, PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (t == PassiveSkillTrigger.OnWired)
-            {
-                int a = Rw.Count(ctx, Atk);
-                if (a > 0) ctx.AddPlayerAttackOrDiceBonus(a);
-                return;
-            }
+            if (Rw.SpendDiceStacks(t, ctx, Stk)) return;
             int n = Kw.Tally(ctx, "rw.veteran", Kw.EventAmount(ctx), 5);
-            if (n > 0) Kw.Add(ctx, Atk, n);
+            if (n > 0) Kw.Add(ctx, Stk, n);
         }
     }
 
@@ -512,7 +534,8 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.shieldNoHalve = true;
     }
 
-    /// <summary>燻りの革胸当て: ターン開始の半減で失ったシールドを臨界にする。</summary>
+    /// <summary>燻りの革胸当て: ターン開始の減衰で失ったシールドの半分を臨界にする。
+    /// 2026-11-06: 旧「失ったシールドを臨界に」は放っておけば毎ターン入る燃料で、 クリアしたランの 95% が持っていた。</summary>
     public class SmolderingBreastplate : IPassiveSkillEffect
     {
         public string SkillId => "燻りの革胸当て";
@@ -520,7 +543,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnBattleStart) { Kw.EnableHeat(ctx); return; }
-            Kw.AddHeat(ctx, Kw.EventAmount(ctx));
+            Kw.AddHeat(ctx, Kw.EventAmount(ctx) / 2);
         }
     }
 
@@ -558,22 +581,18 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>力みの小手: シールドを合計 10 得るたび、 この戦闘中の攻撃 +1。</summary>
+    /// <summary>力みの小手: シールドを合計 10 得るたび 刻み +1。 攻撃に挿したターン、
+    /// 刻み 1 つにつき攻撃に挿した出目 +10% (使い切る)。 2026-11-06: 旧「この戦闘中の攻撃 +1」。</summary>
     public class StrainGauntlet : IPassiveSkillEffect
     {
         public string SkillId => "力みの小手";
-        private const string Atk = "rw.gauntletAtk";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldGain, PassiveSkillTrigger.OnWired };
+        private const string Stk = "rw.gauntletAtk";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnShieldGain, PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (t == PassiveSkillTrigger.OnWired)
-            {
-                int a = Rw.Count(ctx, Atk);
-                if (a > 0) ctx.AddPlayerAttackOrDiceBonus(a);
-                return;
-            }
+            if (Rw.SpendDiceStacks(t, ctx, Stk)) return;
             int n = Kw.Tally(ctx, "rw.gauntlet", Kw.EventAmount(ctx), 10);
-            if (n > 0) Kw.Add(ctx, Atk, n);
+            if (n > 0) Kw.Add(ctx, Stk, n);
         }
     }
 
@@ -581,15 +600,20 @@ namespace ItemSystem.PassiveSkills.Effects
     //  毒
     // ============================================================
 
-    /// <summary>緑染みの小刀: 戦闘開始時 毒 +2。</summary>
+    /// <summary>緑染みの小刀: 攻撃が通るたび、 敵に毒 +2。
+    /// 2026-11-06: 旧「戦闘開始時 毒 +2」は配線を払わない燃料で、 クリアしたランの 94% が持っていた。
+    /// 2026-11-07: 毒 1 スタックが現在 HP の 0.1% になり、 毒は「入り口の数」で溜める形にしたので、 攻撃のたびの入り口にした。</summary>
     public class GreenKnife : IPassiveSkillEffect
     {
         public string SkillId => "緑染みの小刀";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Poison(ctx, 2);
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
+        {
+            if (Rw.PlayerHit(ctx) && Rw.OncePerTurn(ctx, "rw.greenKnife")) Rw.Poison(ctx, 2);
+        }
     }
 
-    /// <summary>毒塗りの楔: ブロック端子に 2 個以上挿したターン、 敵が攻撃してきたら毒 +2。</summary>
+    /// <summary>毒塗りの楔: ブロック端子に 2 個以上挿したターン、 敵が攻撃してきたら毒 +4 (2026-11-07: 旧 +2)。</summary>
     public class PoisonWedge : IPassiveSkillEffect
     {
         public string SkillId => "毒塗りの楔";
@@ -597,19 +621,19 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (Rw.Count(ctx, MutualKeys.BlockDiceCount) >= 2 && Rw.Count(ctx, MutualKeys.EnemyAtkPreDefense) > 0)
-                Rw.Poison(ctx, 2);
+                Rw.Poison(ctx, 4);
         }
     }
 
-    /// <summary>毒草摘みの杖: マップを 2 歩進むごとに、 次の戦闘の開始時の毒 +1。</summary>
+    /// <summary>毒草摘みの杖: マップを 1 歩進むごとに、 次の戦闘の開始時の毒 +1 (2026-11-07: 旧 2 歩につき +1)。</summary>
     public class HerbStaff : IPassiveSkillEffect
     {
         public string SkillId => "毒草摘みの杖";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Poison(ctx, Rw.Steps / 2);
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Poison(ctx, Rw.Steps);
     }
 
-    /// <summary>口縫いの毒糸: 〈封じ〉の役が成立したとき毒 +3。</summary>
+    /// <summary>口縫いの毒糸: 〈封じ〉の役が成立したとき毒 +6 (2026-11-07: 旧 +3)。</summary>
     public class StitchThread : IPassiveSkillEffect
     {
         public string SkillId => "口縫いの毒糸";
@@ -618,27 +642,27 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             var fired = ctx.firedRolesThisTurn;
             if (fired.Contains(CombatSystem.RoleKind.Pair2) || fired.Contains(CombatSystem.RoleKind.Triple2))
-                Rw.Poison(ctx, 3);
+                Rw.Poison(ctx, 6);
         }
     }
 
-    /// <summary>石抜きの毒指輪: 毒が上限に達したとき、 敵の最大 HP の 15% を軽減不可で削り、 毒を <see cref="ResetTo"/> に戻す (何度でも)。</summary>
+    /// <summary>石抜きの毒指輪: 毒が <see cref="Threshold"/> に達したとき、 毒を <see cref="Spend"/> 使い、 使った毒 × <see cref="PerStack"/> の軽減不可ダメージ (何度でも)。
+    /// 2026-11-07: 旧「上限に達したら最大 HP の 15%」は割合ダメージで、 上限 99 にすると発動しないか、 深い毒なら毎ターン 15% を削れた。</summary>
     public class HollowPoisonRing : IPassiveSkillEffect
     {
         public string SkillId => "石抜きの毒指輪";
-        public const int ResetTo = 5;
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPoisonCap };
+        public const int Threshold = 50, Spend = 25, PerStack = 4;
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPoisonGain };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (ctx.enemyMaxHP <= 0) return;
-            int dmg = ctx.RatioDamageToEnemy(0.15f);
-            Kw.DamageEnemy(ctx, dmg);
-            ctx.AddStatus(StatusTarget.Enemy, "poison", ResetTo - ctx.EnemyPoison);
-            Rw.Log($"[石抜きの毒指輪] 毒が満ちた → 最大HP の 15% = {dmg} を削り、 毒を {ResetTo} に戻す");
+            if (ctx.EnemyPoison < Threshold) return;
+            ctx.AddStatus(StatusTarget.Enemy, "poison", -Spend);
+            Kw.DamageEnemy(ctx, Spend * PerStack);
+            Rw.Log($"[石抜きの毒指輪] 毒 {Threshold} に達した → 毒を {Spend} 使い {Spend * PerStack} を削る");
         }
     }
 
-    /// <summary>百一人切りの鉈: ターン終了時、 敵 HP が「毒 × 2」% 以下なら倒す (ボスはその半分)。</summary>
+    /// <summary>百一人切りの鉈: ターン終了時、 敵 HP が「毒 5 につき 1%」以下なら倒す (ボスはその半分)。</summary>
     public class HundredCleaver : IPassiveSkillEffect
     {
         public string SkillId => "百一人切りの鉈";
@@ -646,7 +670,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (ctx.enemyCurrentHP <= 0 || ctx.enemyMaxHP <= 0) return;
-            int pct = ctx.EnemyPoison * 2;
+            int pct = ctx.EnemyPoison / 5;   // 2026-11-07: 毒 5 につき 1% (旧 毒 × 2%・毒 1 スタックの重みが 1/5 になったため ×1/10 で天井を据え置き)
             if (BountyHunterHelper.IsBoss(ctx)) pct /= 2;
             if (pct <= 0 || ctx.enemyCurrentHP * 100 > ctx.enemyMaxHP * pct) return;
             if (!ctx.CanExecuteEnemy()) return;
@@ -663,7 +687,9 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.poisonTickOnEnemyAttack = true;
     }
 
-    /// <summary>主より長い香炉: 毒のダメージが入るたび、 その量の臨界。</summary>
+    /// <summary>主より長い香炉: 毒のダメージが入るたび、 その量の半分の臨界。
+    /// 2026-11-06: 旧「その量の臨界」は最大 HP の割合で入る毒をそのまま固定 50 の爆発にも換え、 毒を二重に数えていた
+    /// (7 層ボスで爆発のダメージ/T が香炉あり 35.4・なし 6.6、 クリアしたランの所持率 97%)。</summary>
     public class LongCenser : IPassiveSkillEffect
     {
         public string SkillId => "主より長い香炉";
@@ -671,30 +697,32 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnBattleStart) { Kw.EnableHeat(ctx); return; }
-            Kw.AddHeat(ctx, Kw.EventAmount(ctx));
+            Kw.AddHeat(ctx, Kw.EventAmount(ctx) / 2);
         }
     }
 
-    /// <summary>重増しの拳套: 敵の毒が増えるたび、 この戦闘中の攻撃 +1。</summary>
+    /// <summary>重増しの拳套: 敵の毒が 5 増えるたび 刻み +1 (2026-11-07: 旧「増えるたび」は入り口が増えるほど回数で膨らんだので量で数える)。 攻撃に挿したターン、 刻み 1 つにつき攻撃に挿した出目 +10% (使い切る)。
+    /// 2026-11-06: 旧「この戦闘中の攻撃 +1」は攻撃+N の 21% を占めた (毎ターン毒が増えるので戦闘の長さに比例して積み上がる)。
+    /// 毒の量は増やさない。</summary>
     public class WeightingGauntlet : IPassiveSkillEffect
     {
         public string SkillId => "重増しの拳套";
-        private const string Atk = "rw.weightAtk";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPoisonGain, PassiveSkillTrigger.OnWired };
+        private const string Stk = "rw.weightAtk";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPoisonGain, PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (t == PassiveSkillTrigger.OnPoisonGain) { Kw.Add(ctx, Atk, 1); return; }
-            int a = Rw.Count(ctx, Atk);
-            if (a > 0) ctx.AddPlayerAttackOrDiceBonus(a);
+            if (Rw.SpendDiceStacks(t, ctx, Stk)) return;
+            int n = Kw.Tally(ctx, "rw.weightTally", Kw.EventAmount(ctx), 5);
+            if (n > 0) Kw.Add(ctx, Stk, n);
         }
     }
 
-    /// <summary>毒固めの腕環: ターン開始時、 敵の毒 2 につきシールド +1。</summary>
+    /// <summary>毒固めの腕環: ターン開始時、 敵の毒 10 につきシールド +1 (2026-11-07: 旧 毒 2 につき)。</summary>
     public class VenomBangle : IPassiveSkillEffect
     {
         public string SkillId => "毒固めの腕環";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Shield(ctx, ctx.EnemyPoison / 2, SkillId);
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Rw.Shield(ctx, ctx.EnemyPoison / 10, SkillId);
     }
 
     /// <summary>腐し刃: 毒のダメージが入るたび敵に出血 +1。</summary>
@@ -714,7 +742,7 @@ namespace ItemSystem.PassiveSkills.Effects
     {
         public string SkillId => "血日に澄む佩玉";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.critRatePctAdd += ctx.enemyBleedStacks * 2f;
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.critRatePctAdd += ctx.enemyBleedStacks * 0.02f;
     }
 
     /// <summary>魂喰らいの血石: 出血を消費・減衰で失うたび、 失った分だけシールド。</summary>
@@ -785,14 +813,17 @@ namespace ItemSystem.PassiveSkills.Effects
     //  金
     // ============================================================
 
-    /// <summary>銭皿: 戦闘終了時、 残っているシールド 3 につき 1G。</summary>
+    /// <summary>銭皿: シールドが残った状態で勝った戦闘ごとに 2G。
+    /// 2026-11-06: 旧「残りシールド 3 につき 1G」は、 護符をとどめのターンに使うだけで買値より多く戻り (〈惜別の護符〉+13G)、
+    /// 金を増やし続けられた。 通常のプレイでも収入の 23% を占めた。 額を残量に比例させない ── 最安の護符 (4G) でも元が取れない。</summary>
     public class CoinDish : IPassiveSkillEffect
     {
         public string SkillId => "銭皿";
+        public const int Gold = 2;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (Rw.Won(ctx)) Rw.Gold(ctx.consShield / 3, SkillId);
+            if (Rw.Won(ctx) && ctx.consShield > 0) Rw.Gold(Gold, SkillId);
         }
     }
 
@@ -860,7 +891,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnBattleStart) { ctx.accumulatedValues[Key] = Rw.Steps; return; }
-            ctx.critRatePctAdd += Rw.Count(ctx, Key);
+            ctx.critRatePctAdd += Rw.Count(ctx, Key) / 100f;
         }
     }
 
@@ -872,11 +903,11 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnBattleStart) { Kw.EnableHeat(ctx); return; }
-            ctx.critRatePctAdd += ctx.rinkaiMeter / 2;
+            ctx.critRatePctAdd += (ctx.rinkaiMeter / 2) / 100f;
         }
     }
 
-    /// <summary>遅効の毒刃: 敵の毒が増えた次のターン、 増えた毒 1 につき会心率 +5%。</summary>
+    /// <summary>遅効の毒刃: 敵の毒が増えた次のターン、 増えた毒 5 につき会心率 +5% (2026-11-07: 旧 毒 1 につき)。</summary>
     public class SlowPoisonBlade : IPassiveSkillEffect
     {
         public string SkillId => "遅効の毒刃";
@@ -891,7 +922,7 @@ namespace ItemSystem.PassiveSkills.Effects
                     ctx.accumulatedValues[Last] = ctx.GetAccumulated(Cur);
                     ctx.accumulatedValues[Cur] = 0;
                     break;
-                default: ctx.critRatePctAdd += 5 * Rw.Count(ctx, Last); break;
+                default: ctx.critRatePctAdd += 0.05f * (int)(Rw.Count(ctx, Last) / 5); break;
             }
         }
     }
@@ -903,7 +934,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (ctx.firedRolesThisTurn.Count > 0) ctx.critRatePctAdd += 15f;
+            if (ctx.firedRolesThisTurn.Count > 0) ctx.critRatePctAdd += 0.25f;
         }
     }
 

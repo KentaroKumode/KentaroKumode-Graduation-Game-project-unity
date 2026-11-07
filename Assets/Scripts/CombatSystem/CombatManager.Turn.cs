@@ -620,6 +620,9 @@ namespace CombatSystem
             // ADR-0011 〈封じ・対〉(前ターン成立): 敵の攻撃を N% 減らす。 予告にもそのまま出る (完全情報)。
             if (ctx.currentBuffs.TryGetValue(YachtRoleEffects.EnemyAtkCutKey, out float roleAtkCut) && roleAtkCut > 0f)
                 enemyAtkValue = Math.Max(0, Mathf.RoundToInt(enemyAtkValue * (1f - roleAtkCut / 100f)));
+            // 軸の品 (2026-11-07): 敵の攻撃を割合で減らす (〈毒溜まりの主〉など・OnTurnStart / OnPostRoll で積む)
+            if (ctx.enemyAtkCutPct > 0f)
+                enemyAtkValue = Math.Max(0, Mathf.RoundToInt(enemyAtkValue * (1f - Mathf.Min(1f, ctx.enemyAtkCutPct))));
             // 2026-07-25 v6: 出血 r2 失血衰弱 (敵の出血 3 以上で攻撃 -2)
             enemyAtkValue = Math.Max(0, enemyAtkValue - MetaProgression.MetaBuffApplicator.GetBleedWeakenAttack(ctx.enemyBleedStacks));
             // ADR-0013: プレイヤーの防御は**ブロックの前**に敵の攻撃値へ掛ける。 予告にもこの値が出る (柱3)。
@@ -787,6 +790,9 @@ namespace CombatSystem
             //   「屑目の定席」は端子固定の性質ではなくなり、 特殊端子〈蓄電池〉(1本あたり+2 を
             //   出目に上乗せ = 出目1→3 / 出目6→8) を買った者だけの性質へ移る。 §6-5。
             if (chargeSum > 0) ctx.AddCharge(chargeSum);
+            // 〈電流〉の②: 充電端子に挿した出目の一部が攻撃にも加わる (2026-11-07)。 攻撃に 1 個も挿していないターンは攻撃しないので乗らない。
+            if (ctx.chargeToAttackPct > 0f && chargeSum > 0)
+                attackSum += Mathf.FloorToInt(chargeSum * ctx.chargeToAttackPct);
 
             // 遺物 (§15-5): 刻印〈ブロック端子に未配線〉の判定材料。 **配線集計の直後に確定させる**。
             ctx.blockWiredThisTurn = blockDiceCount > 0;
@@ -833,6 +839,15 @@ namespace CombatSystem
             //   **atkBase の確定より前** ── ここで足した攻撃はこのターンの攻撃に乗る。
             ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.ChargeDiceCount]  = chargeDiceCount;
             ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.SpecialDiceCount] = specialCount;
+            {
+                int atkMax = 0, atkMin = int.MaxValue;
+                for (int i = 0; i < playerDice.Length; i++)
+                    if (mutualWiring != null && i < mutualWiring.Length && mutualWiring[i] == DiceTerminal.Attack)
+                    { if (playerDice[i] > atkMax) atkMax = playerDice[i]; if (playerDice[i] < atkMin) atkMin = playerDice[i]; }
+                ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.AttackDiceMin] = atkMin == int.MaxValue ? 0 : atkMin;
+                ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.AttackDiceSum] = attackSum;
+                ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.AttackDiceMax] = atkMax;
+            }
             ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.EnemyAtk] =
                 Math.Max(enemyAtkValue, _secondaryAtkThisTurn);
             // 盾〈黎明〉が読む。 敵の攻撃の解決後に上書きする (行動しなかったら 0 のまま)。
@@ -860,6 +875,16 @@ namespace CombatSystem
             // 遺物 (§15-5) 攻撃+N。 パッシブ由来の mutualAttackBonus と同じ枠へ足す。
             int relicAtk = MetaProgression.Relics.RelicApplicator
                            .GetAttackBonus(GameLoop.GameManager.Instance?.Run, ctx);
+            // 攻撃に挿した出目への上乗せ率 (2026-11-06・ctx.attackDicePct): 出目の合計 × 率 (切り上げ) を 1 回だけ足す
+            if (ctx.attackDicePct > 0f && attackSum > 0)
+            {
+                int diceScaled = Mathf.CeilToInt(attackSum * ctx.attackDicePct);
+                string prevSkill = ItemSystem.PassiveSkills.CombatContext.CurrentSkillId;
+                ItemSystem.PassiveSkills.CombatContext.CurrentSkillId = "攻撃に挿した出目 +%";
+                ctx.AddPlayerAttackOrDiceBonus(diceScaled);
+                ItemSystem.PassiveSkills.CombatContext.CurrentSkillId = prevSkill;
+                ctx.diceDerivedAttack += diceScaled;
+            }
             int atkBase = playerAttackPower + attackSum + ctx.mutualAttackBonus + consAtk + relicAtk;
 
             // 攻撃端子への配線が 0 本なら、**このターンは攻撃を行わない** (2026-07-28)。
@@ -922,7 +947,7 @@ namespace CombatSystem
                 // 〈帳簿外の爆薬〉で同じターンに何度も爆発したら、 その回数ぶん乗る。 品の上乗せ (〈溢れ取りの鋳型〉) は Kw.BurstBonusKey。
                 int burstN = Math.Max(1, (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstCountKey));
                 int burstBonus = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstBonusKey);
-                int burstDmg = ctx.rinkaiBurstDamage * burstN + burstBonus;
+                int burstDmg = ItemSystem.PassiveSkills.Keywords.Kw.BurstBase(ctx) * burstN + burstBonus;
                 ctx.fixedDamageToEnemy += burstDmg;
                 ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.BurstCountKey] = 0;
                 ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.BurstBonusKey] = 0;
@@ -939,6 +964,7 @@ namespace CombatSystem
                 int relicBurst = rinPct > 0f && ctx.enemyCurrentHP > 0
                                ? Mathf.FloorToInt(ctx.enemyCurrentHP * rinPct) : 0;
                 if (relicBurst > 0) ctx.fixedDamageToEnemy += relicBurst;
+                CombatStats.DamageBreakdown[22] += burstDmg + relicBurst;   // [計装] 臨界の爆発
                 ctx.rinkaiBurstActive = false;
                 Debug.Log($"[臨界爆発] ×{burstN} 固定ダメ +{burstDmg}"
                     + (relicBurst > 0 ? $" ＋遺物 {relicBurst} (現在HP {ctx.enemyCurrentHP} の {rinPct:P0})" : ""));
@@ -958,6 +984,15 @@ namespace CombatSystem
             //   役の追撃も攻撃に付くものなので、 攻撃しないターンには乗せない。
             if (skipAttack) { dealtDmg = 0; isCrit = false; }
             if (_fleeRequested) dealtFixed = 0;
+            // 〈炉温〉の②: この攻撃の爆発に会心が乗る (爆発は固定ダメ枠なので、 会心の判定が済んだここで差分を足す)。
+            if (ctx.burstCritRule && isCrit && !_fleeRequested
+                && ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstThisAttackKey) > 0)
+            {
+                int burstApplied = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstAppliedDmgKey);
+                int critExtra = Mathf.FloorToInt(burstApplied * Math.Max(0f, ctx.criticalMultiplier - 1f));
+                dealtFixed += critExtra;
+                CombatStats.DamageBreakdown[22] += critExtra;   // [計装] 臨界の爆発
+            }
             if (!skipAttack) ApplyRoleExtraDamage(ctx, ref dealtDmg, ref dealtFixed, roleOutcome);
             ctx.lastPlayerDamage = dealtDmg + dealtFixed;
             // 固定ダメの枠は、 ここで取り出した (dealtFixed) ので空に戻す (2026-11-05)。
@@ -986,6 +1021,7 @@ namespace CombatSystem
             if (isCrit) CombatStats.DamageBreakdown[8]++;
             CombatStats.DamageBreakdown[9] += dealtFixed;
             CombatStats.DamageBreakdown[10] += ctx.pursuitDamage;
+            CombatStats.DamageBreakdown[19] += ctx.diceDerivedAttack;
             CombatStats.RecordFloorDamage(ctx, dealtDmg, dealtFixed, currentEnemy != null ? currentEnemy.maxHP : 0);
 
             // 物資(ADR-0002) 疲労: 攻撃が15%で**最終ダメージ半減** (2026-08-09 に 0 ダメから緩和)。
@@ -1130,6 +1166,7 @@ namespace CombatSystem
                 if (_diagKind == SkillDiag.Boss && currentEnemy != null)
                     SkillDiag.BossDmgOf(currentEnemy.id)[5] += Math.Min(bleedDmg, enemyHP);
                 RaiseDotDamage(DotKind.Bleed, Math.Min(bleedDmg, enemyHP));      // 入った分だけ (攻撃で倒れていれば 0 = 鳴らない)
+                CombatStats.DamageBreakdown[21] += Math.Max(0, Math.Min(bleedDmg, enemyHP));   // [計装] 出血
                 HpLossDiag.Lose(ref enemyHP, bleedDmg, "出血");
             }
 
@@ -1473,7 +1510,7 @@ namespace CombatSystem
         /// <summary>[11]パッシブ由来の outgoing [12]業物 [13]メタ [14]<b>欠番</b>(旧 副次・2026-09-15 全廃)
         /// [15]遺物 [16]最終 outgoing</summary>
 
-        private readonly double[] _bdAtCombatStart = new double[19];
+        private readonly double[] _bdAtCombatStart = new double[CombatStats.DamageBreakdown.Length];
         private bool _bd7F;
 
         /// <summary>ターンの被弾をランの累計へ足す (ゲーム処理)。

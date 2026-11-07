@@ -494,6 +494,11 @@ namespace GameLoop
             }
             if (pool.Count == 0) return null;
 
+            // 宝箱の中身の種類 (2026-11-06): パッシブは半分だけ。 取得数を 40 個以内へ抑えるため (消耗品へ置き換える)
+            bool wantPassive = GameLoop.GameRng.Value("treasure.kind") < CombatRewards.TreasurePassiveRate;
+            var kindPool = pool.FindAll(it => (it.category == ItemCategory.Passive) == wantPassive);
+            if (kindPool.Count > 0) pool = kindPool;
+
             // 鑑定の眼鏡: 次の宝箱の最低レア保証（消費）。ショップで既消費なら -1。
             CompleteItemData picked;
             if (Run != null && Run.nextLootMinRarity >= 0)

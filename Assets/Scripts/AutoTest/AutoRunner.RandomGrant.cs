@@ -113,6 +113,35 @@ namespace AutoTest
         /// 更新にならない武器は何も起きないが、 それは「その品を渡されることの効果」が
         /// たまたま 0 だったということ ── 割り当ては割り当てなので ITT は偏らない。
         /// ここで配り直すと処置確率が状態に依存してランダム化が壊れる。</para></summary>
+        /// <summary>[診断] 軸の品を開幕にまとめて配る (2026-11-07・<see cref="axisPackageAxis"/>)。
+        /// 軸名 (会心/出血/毒/臨界/充電/シールド) ならその軸の品から、 "*" なら軸を問わず (金・軸なしを除く) <see cref="axisPackageCount"/> 品。
+        /// 誓約は配らない (封じで他を巻き込むので、 軸の深さそのものを測れない)。
+        /// <b>GameRng を使わない</b> ── ラン番号だけで決まる乱数なので、 配る腕と配らない腕が同じシードで並ぶ。</summary>
+        private void GrantAxisPackage(int runIndex, GameLoop.RunState run)
+        {
+            var db = ItemSystem.ItemDatabase.Instance;
+            var all = db?.GetAllItems();
+            if (all == null) return;
+            var pool = new List<string>();
+            foreach (var it in all)
+            {
+                if (it == null || it.category != ItemSystem.ItemCategory.Passive) continue;
+                if (!ItemSystem.Shop.EventOnlyItemFilter.IsAllowed(it)) continue;
+                if (string.IsNullOrEmpty(it.axis) || it.axis == ItemSystem.PassiveSkills.AxisRules.Gold) continue;
+                if (ItemSystem.PassiveSkills.Effects.OathSeals.SealsOf.ContainsKey(it.internalName)) continue;
+                if (axisPackageAxis != "*" && it.axis != axisPackageAxis) continue;
+                pool.Add(it.internalName);
+            }
+            var rng = new System.Random(unchecked(runIndex * 40503 + 977).GetHashCode());
+            for (int i = pool.Count - 1; i > 0; i--) { int j = rng.Next(i + 1); (pool[i], pool[j]) = (pool[j], pool[i]); }
+            int n = Math.Min(axisPackageCount, pool.Count);
+            for (int i = 0; i < n; i++)
+            {
+                ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, pool[i]);
+                _cur?.acquiredItemsEver.Add(pool[i]);
+            }
+        }
+
         private static void GrantOne(GameLoop.RunState run, string id)
         {
             if (run == null || string.IsNullOrEmpty(id)) return;

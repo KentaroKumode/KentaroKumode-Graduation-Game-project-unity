@@ -27,7 +27,7 @@ namespace ItemSystem.PassiveItems.Effects
     /// 「基礎的な小品」を置ける数少ない軸。</para></summary>
     public class RoadMoneyBandEffect : ITimedEffect
     {
-        private const int Gain = 6;
+        private const int Gain = 15;   // 2026-11-06: 6 → 15。 早く買うほど得な投資にする (品物の価格 ×2 で買値が約 14G になり、 1 層で元が取れる)
         public string Id => "黄金色の封蝋";
         public TimedEffectTrigger Trigger => TimedEffectTrigger.OnFloorEnter;
 

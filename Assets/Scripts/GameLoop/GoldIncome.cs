@@ -27,12 +27,19 @@ namespace GameLoop
         /// 「なぜ 1 ラン 545G も入るのか」に答えられない ── どの蛇口が太いかを出す。</summary>
         public static readonly System.Collections.Generic.Dictionary<string, long> BySource
             = new System.Collections.Generic.Dictionary<string, long>();
+        /// <summary>[計装 2026-11-06] <b>今のラン</b>の「深さ|経路」別の内訳。 BOT がランの頭で空にし、 ランの終わりに写す
+        /// (<see cref="BySource"/> は全ランの累計なので、 クリアしたランだけを取り出せない)。</summary>
+        public static readonly System.Collections.Generic.Dictionary<string, int> RunByDepthSource
+            = new System.Collections.Generic.Dictionary<string, int>();
         public static void ResetStats() { GainedTotal = 0; BySource.Clear(); }
-        private static void Note(string source, int granted)
+        private static void Note(RunState run, string source, int granted)
         {
             if (string.IsNullOrEmpty(source)) source = "(不明)";
             BySource.TryGetValue(source, out long v);
             BySource[source] = v + granted;
+            string key = run.Depth + "|" + source;
+            RunByDepthSource.TryGetValue(key, out int rv);
+            RunByDepthSource[key] = rv + granted;
         }
 
         public static int Gain(RunState run, int amount, string source,
@@ -52,7 +59,7 @@ namespace GameLoop
             if (granted <= 0) return 0;
             run.coins += granted;
             GainedTotal += granted;
-            Note(source, granted);
+            Note(run, source, granted);
             return granted;
         }
 
@@ -65,7 +72,7 @@ namespace GameLoop
             int granted = applyLastStandFilter ? LastStand.FilterGoldGain(run, amount) : amount;
             if (granted <= 0) return 0;
             run.coins += granted;
-            Note(source, granted);          // **免除経路も数える** (売却・開幕所持金)
+            Note(run, source, granted);     // **免除経路も数える** (売却・開幕所持金)
             return granted;
         }
     }

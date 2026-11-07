@@ -6,8 +6,7 @@ namespace MetaProgression
 {
     /// <summary>
     /// 種火 r3 (キーワード開幕所持) 用のピッカー。
-    /// 2026-07-25 v6. 分類テーブルは docs/tools/item-dex.html の KW_MAP と一致 (正本の同期対象)。
-    /// パッシブ internalName から充電/臨界/毒/出血に紐付ける。
+    /// 2026-07-25 v6. 2026-11-07〜 品の軸 (items.json の axis) で充電/臨界/毒/出血に紐付ける。
     ///
     /// ピック仕様: 該当キーワードのパッシブを 1 つ以上持つアイテムから 1 個ランダム。
     /// **LEGENDARY 以上は抽選対象外** (2026-07-28 に BRONZE 固定から変更)。
@@ -15,41 +14,22 @@ namespace MetaProgression
     /// </summary>
     public static class SparkStarterPicker
     {
-        private static readonly Dictionary<string, HashSet<string>> KwToInternalNames = new()
+        /// <summary>種火のキーワード → 品の軸 (items.json の axis)。
+        /// 2026-11-07: 旧は品の id を直書きした表で、 軸とずれていた (工廠の材料箱・点火スパナが充電、 雷神槍が臨界、
+        /// 雷鯰の棘・蛇血瓶が毒など) うえに新しい品が入っていなかった。 構造は items.json から読む (CLAUDE.md)。</summary>
+        private static readonly Dictionary<string, string> KwToAxis = new()
         {
-            ["charge"] = new HashSet<string>
-            {
-                "工廠の材料箱","焦げ柄の点火スパナ","逆さ避雷針","過負荷チューナー","雷壷",
-                "Thundercloud","無限モーター","呼雷粉",
-            },
-            ["rinkai"] = new HashSet<string>
-            {
-                "乾き火口箱","炉番の外套","過熱石","溢れ取りの鋳型","帳簿外の爆薬",
-                "朝にも熱い竈","早沸かし釜","恒熱の炉壁","八日目の灰燼",
-                "雷神槍",
-            },
-            ["poison"] = new HashSet<string>
-            {
-                "緑染みの小刀","岸上げの麻痺瓶","雷鯰の棘","廃庭の霧吹き","主より長い香炉",
-                "SlowVenomCurse","素手禁じの蛇血瓶","CorrosiveStrike","石抜きの毒指輪",
-            },
-            ["bleed"] = new HashSet<string>
-            {
-                "Sting","末頁の血花太刀","血日に澄む佩玉","腐し刃","鋸刃の山刀",
-                "医書裏の開き針","GrievousI","GrievousII","先血の腕輪",
-                // 〈血令〉は 2026-10-28 に「防御→貫通＋血の盟約」へ変わり出血と無関係になったので外した。
-            },
+            ["charge"] = ItemSystem.PassiveSkills.AxisRules.Charge,
+            ["rinkai"] = ItemSystem.PassiveSkills.AxisRules.Heat,
+            ["poison"] = ItemSystem.PassiveSkills.AxisRules.Poison,
+            ["bleed"]  = ItemSystem.PassiveSkills.AxisRules.Bleed,
+            ["crit"]   = ItemSystem.PassiveSkills.AxisRules.Crit,
+            ["shield"] = ItemSystem.PassiveSkills.AxisRules.Shield,
         };
 
-        /// <summary>与えられたパッシブアイテムが keyword に該当するか。</summary>
+        /// <summary>与えられたパッシブアイテムが keyword に該当するか (品の軸で判定)。</summary>
         public static bool HasKeyword(CompleteItemData item, string keyword)
-        {
-            if (item == null || item.passiveSkills == null) return false;
-            if (!KwToInternalNames.TryGetValue(keyword, out var set)) return false;
-            foreach (var p in item.passiveSkills)
-                if (p != null && set.Contains(p.internalName)) return true;
-            return false;
-        }
+            => item != null && KwToAxis.TryGetValue(keyword, out var axis) && item.axis == axis;
 
         /// <summary>keyword に該当するアイテムから 1 個ランダムピック。 所持済/取得済は除外。 該当なし null。
         /// **抽選対象は LEGENDARY を除く全等級**（2026-07-28 に BRONZE 固定から変更）。
@@ -88,7 +68,7 @@ namespace MetaProgression
         public static string KeywordOf(CompleteItemData item)
         {
             if (item == null) return null;
-            foreach (var kv in KwToInternalNames)
+            foreach (var kv in KwToAxis)
                 if (HasKeyword(item, kv.Key)) return kv.Key;
             return null;
         }

@@ -24,10 +24,11 @@ namespace ItemSystem.PassiveSkills
         public const string Defense        = "def";         // 防御 +N (ADR-0013・敵の攻撃値に掛かる)
         public const string ArmorPen       = "pen";         // 貫通 +N (ADR-0013・敵の防御値を固定で削る)
         public const string ArmorPenNegate = "penNeg";      // 敵の固定削り −N (ADR-0013・剣〈間合〉)
+        public const string AttackDicePct  = "atkDicePct";  // 攻撃に挿した出目 +N% (2026-11-06・CombatContext.attackDicePct)
 
         public static readonly HashSet<string> All = new HashSet<string>
         { Attack, DamagePct, NonCritPct, CritPct, CritMul, CritSure, DamageTaken, DamageTakenPct, ShieldStart, Regen, Lifesteal,
-          Defense, ArmorPen, ArmorPenNegate };
+          Defense, ArmorPen, ArmorPenNegate, AttackDicePct };
     }
 }
 
@@ -134,6 +135,7 @@ namespace ItemSystem.PassiveSkills.Effects
                 case StatKeys.DamagePct:
                 case StatKeys.NonCritPct:
                 case StatKeys.CritPct:
+                case StatKeys.AttackDicePct:
                 case StatKeys.Lifesteal:      return (float)(v / 100.0);
                 case StatKeys.DamageTakenPct: return (float)(1.0 + v / 100.0);
                 default:                      return v;
@@ -153,7 +155,8 @@ namespace ItemSystem.PassiveSkills.Effects
                 // 防御・貫通は予告 (敵の攻撃値に防御を掛ける) より前に乗っている必要がある。 OnPostRoll は予告の直前。
                 case StatKeys.Defense:
                 case StatKeys.ArmorPen:
-                case StatKeys.ArmorPenNegate: return PassiveSkillTrigger.OnPostRoll;
+                case StatKeys.ArmorPenNegate:
+                case StatKeys.AttackDicePct:  return PassiveSkillTrigger.OnPostRoll;   // 配線より前に率を積む
                 case StatKeys.DamagePct:
                 case StatKeys.NonCritPct:     return PassiveSkillTrigger.OnPreDealDamage;
                 case StatKeys.CritPct:
@@ -326,6 +329,9 @@ namespace ItemSystem.PassiveSkills.Effects
                     break;
                 case StatKeys.ArmorPenNegate:
                     ctx.enemyArmorPenNegate += (int)v;   // [perTurn]
+                    break;
+                case StatKeys.AttackDicePct:
+                    ctx.AddAttackDicePct(v);   // [perTurn] 配線の確定後に CombatManager が 1 回だけ掛ける
                     break;
             }
         }

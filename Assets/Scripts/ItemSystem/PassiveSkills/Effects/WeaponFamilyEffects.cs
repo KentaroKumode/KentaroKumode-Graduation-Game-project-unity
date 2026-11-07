@@ -35,6 +35,11 @@ namespace ItemSystem.PassiveSkills.Effects
         public const string BlockDiceCount   = "mutualBlockDiceCount";
         public const string ChargeDiceCount  = "mutualChargeDiceCount";
         public const string SpecialDiceCount = "mutualSpecialDiceCount";
+        /// <summary>攻撃端子に挿した出目の合計と最大値 (上乗せ率をかける前・2026-11-06)。</summary>
+        public const string AttackDiceSum    = "mutualAttackDiceSum";
+        public const string AttackDiceMax    = "mutualAttackDiceMax";
+        /// <summary>攻撃端子に挿した出目の最小値 (攻撃に挿していなければ 0)。</summary>
+        public const string AttackDiceMin    = "mutualAttackDiceMin";
         /// <summary>予告の敵攻撃 (防御後)。 2 体戦は 2 体のうち大きい方。</summary>
         public const string EnemyAtk         = "mutualEnemyAtk";
         /// <summary>このターン実際に放たれた敵の直接攻撃の、 プレイヤーの防御を引く前の合計 (2 体戦は 2 体分)。
@@ -112,12 +117,15 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 会心率の高い短剣ほど伸びる ── ラダー同士が同じ方向を向く。</para></summary>
     internal static class VenomHandHelper
     {
+        /// <summary>毒の量の倍率 (2026-11-07)。 毒 1 スタックが最大 HP の 0.5% から現在 HP の 0.1% になったので、
+        /// 武器の個性を保つため段の数字 (2 / 3 / 4・会心 +1) は据え置きで、 実際に与える量だけ 5 倍にする。</summary>
+        public const int Scale = 5;
         public static void Open(CombatContext ctx, int stacks)
-            => ctx.AddStatus(StatusTarget.Enemy, "poison", stacks);
+            => ctx.AddStatus(StatusTarget.Enemy, "poison", stacks * Scale);
 
         public static void OnCrit(CombatContext ctx)
         {
-            if (ctx.isCritical) ctx.AddStatus(StatusTarget.Enemy, "poison", 1);
+            if (ctx.isCritical) ctx.AddStatus(StatusTarget.Enemy, "poison", Scale);
         }
     }
 
@@ -180,7 +188,8 @@ namespace ItemSystem.PassiveSkills.Effects
     //  剣 — 攻防一体: 出目を攻めと守りに分け続けるほど伸びる (貫通・防御とも中)
     // ============================================================
 
-    /// <summary>間合 — 攻撃 +N ／ 敵の固定削り −M。 常時・無条件。 II / III は items.json の stats。
+    /// <summary>間合 — 攻撃に挿した出目 +N% ／ 敵の固定削り −M。 常時・無条件。 II / III は items.json の stats。
+    /// 2026-11-06: 攻撃 +2/+3/+5 → 出目 +20/+30/+50% (上乗せが攻撃の 6 割を占め、 出目の比重が後半 6〜15% まで薄まっていた)。
     ///
     /// <para>剣の防御は盾ほど厚くないが、 <b>固定削りで剥がされない</b>。 固定削りの大きいボスの前で
     /// 防御が残るのは剣だけ、 という位置を作る。 打ち消しは <see cref="CombatContext.enemyArmorPenNegate"/>。</para></summary>
@@ -190,12 +199,13 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            ctx.AddPlayerAttackOrDiceBonus(2);
+            ctx.AddAttackDicePct(0.2f);      // 攻撃に挿した出目 +20% (2026-11-06・旧 攻撃 +2)
             ctx.enemyArmorPenNegate += 2;   // [perTurn]
         }
     }
 
-    /// <summary>一対一 — <b>単体戦のときだけ</b> 攻撃 +N / 防御 +M。 2 体戦では一切乗らない。
+    /// <summary>一対一 — <b>単体戦のときだけ</b> 攻撃に挿した出目 +N% / 防御 +M。 2 体戦では一切乗らない。
+    /// 2026-11-06: 攻撃 +3/+5/+8 → 出目 +30/+50/+80%。
     /// 防御は 2026-10-28 に被ダメ −M から置き換えた (ADR-0013)。 予告より前に乗せるため OnPostRoll で足す。
     ///
     /// <para>「タイマン力」を条件で表す。 <see cref="CombatContext.isPairEncounter"/> は
@@ -207,10 +217,10 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 条件付きを強く振れるのはマップ開示があるからで、 開示を外すならこの数値も見直すこと。</para></summary>
     internal static class DuelistHelper
     {
-        public static void Apply(PassiveSkillTrigger t, CombatContext ctx, int atk, int def)
+        public static void Apply(PassiveSkillTrigger t, CombatContext ctx, float atkDicePct, int def)
         {
             if (ctx.isPairEncounter) return;
-            ctx.AddPlayerAttackOrDiceBonus(atk);
+            ctx.AddAttackDicePct(atkDicePct);
             ctx.playerDefense += def;   // [perTurn] BeginNewTurn で土台へ戻るので毎ターン足し直す
         }
     }
@@ -219,7 +229,8 @@ namespace ItemSystem.PassiveSkills.Effects
     {
         public string SkillId => "一対一III";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => DuelistHelper.Apply(t, ctx, 8, 4);
+        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => DuelistHelper.Apply(t, ctx, AtkDicePct, 4);
+        public const float AtkDicePct = 0.8f;
     }
 
     /// <summary>切り返し (2026-10-28 リワーク) — 攻撃端子とブロック端子の<b>両方に</b>挿したターン、
@@ -241,6 +252,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (!Fam.Split(ctx) || ctx.blockSumThisTurn <= 0) return;
             int add = UnityEngine.Mathf.CeilToInt(ctx.blockSumThisTurn * Rate);
             ctx.AddPlayerAttackOrDiceBonus(add);
+            ctx.diceDerivedAttack += add;   // [計装] ブロックに挿した出目から来た攻撃
             UnityEngine.Debug.Log($"[切り返し] ブロック{ctx.blockSumThisTurn} × {Rate} → 攻撃 +{add}");
         }
     }
@@ -426,17 +438,19 @@ namespace ItemSystem.PassiveSkills.Effects
     //  斧 — 叩き割る: 殴るほど敵の防御が下がり、 自分の守りは捨てる (貫通高・防御低)
     // ============================================================
 
-    /// <summary>猛り — ターンが経つごとに攻撃 +1 (上限 N)。 自己バフの本体。
+    /// <summary>猛り — ターンが経つごとに 攻撃に挿した出目 +10% (上限 N 段)。 自己バフの本体。
+    /// 2026-11-06: 攻撃 +1/ターン (上限 5/9/14) → 出目 +10%/ターン (上限 +50/+90/+140%)。
     ///
     /// <para>蓄積用の状態を持たず <see cref="CombatContext.currentTurn"/> から直に引く ──
     /// 累積カウンタは連戦 (7層ヴェスカ) で currentTurn がリセットされない事情と絡んで
     /// 挙動が読みにくくなるので、 素直に「経過ターン」を式に入れる。</para></summary>
     internal static class FervorHelper
     {
+        public const float PerTurn = 0.1f;
         public static void Apply(CombatContext ctx, int cap)
         {
             int n = System.Math.Min(System.Math.Max(0, ctx.currentTurn - 1), cap);
-            if (n > 0) ctx.AddPlayerAttackOrDiceBonus(n);
+            if (n > 0) ctx.AddAttackDicePct(n * PerTurn);
         }
     }
 

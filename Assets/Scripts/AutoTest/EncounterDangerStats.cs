@@ -50,7 +50,7 @@ namespace AutoTest
 
         public static void Reload(string root)
         {
-            _byKey.Clear(); LoadedFrom = "";
+            _byKey.Clear(); _kindCache.Clear(); LoadedFrom = "";
             try
             {
                 string path = Path.Combine(root, FileName);
@@ -102,6 +102,25 @@ namespace AutoTest
         }
 
         /// <summary>学習値。 戦闘数が <see cref="MinSamples"/> に満たなければ false。</summary>
+        /// <summary>層と種類 ('N' 通常 / 'E' 精鋭) の全戦闘名の平均。 戦闘名が開示されていない点の見積りに使う。</summary>
+        public static bool TryGetKind(int layer, char kind, out double mean, out double loseRate)
+        {
+            mean = loseRate = 0;
+            string prefix = layer + "|" + kind + "|";
+            if (!_kindCache.TryGetValue(prefix, out var c))
+            {
+                double sum = 0, lost = 0; int n = 0;
+                foreach (var kv in _byKey)
+                    if (kv.Key.StartsWith(prefix, StringComparison.Ordinal)) { sum += kv.Value.sum; lost += kv.Value.lost; n += kv.Value.n; }
+                c = (n, n > 0 ? sum / n : 0.0, n > 0 ? lost / n : 0.0);
+                _kindCache[prefix] = c;
+            }
+            if (c.Item1 < MinSamples) return false;
+            mean = c.Item2; loseRate = c.Item3;
+            return true;
+        }
+        private static readonly Dictionary<string, (int, double, double)> _kindCache = new Dictionary<string, (int, double, double)>();
+
         public static bool TryGet(string key, out int n, out double mean, out double sd, out double loseRate)
         {
             n = 0; mean = sd = loseRate = 0;

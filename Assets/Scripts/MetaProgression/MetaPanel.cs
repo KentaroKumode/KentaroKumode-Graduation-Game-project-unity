@@ -46,8 +46,20 @@ namespace MetaProgression
         ///
         /// <para>宣言系はどれも max 3 段なので、 3pt/段 にすると <b>max まで 9pt</b> ＝
         /// 数値系 (1pt × 最大10段) と近い水準で揃う。 種火 4 トラックも同じ扱いになる
-        /// ── こちらは効果量が未測定のまま値上げする点に注意。</para></summary>
-        public static int RankCost(MetaPanelKind kind) => kind.MaxRank() <= 3 ? 3 : 1;
+        /// ── こちらは効果量が未測定のまま値上げする点に注意。</para>
+        ///
+        /// <para><b>種火は 2pt/段 (2026-11-07)。</b> 実測で種火 r3 (9pt) の効果はクリア率 +0〜4 ポイント、
+        /// 同じ 9pt の強奪・商才・燈火は約 7.5 ポイントだった。 端子は 3pt/段 のまま。</para></summary>
+        public static int RankCost(MetaPanelKind kind)
+            => IsSpark(kind) ? 2 : kind.MaxRank() <= 3 ? 3 : 1;
+
+        /// <summary>種火のトラックか。 enum の並び (末尾に足した会心・シールド) に依存しないよう名指しする。</summary>
+        public static bool IsSpark(MetaPanelKind kind) => kind switch
+        {
+            MetaPanelKind.SparkCharge or MetaPanelKind.SparkRinkai or MetaPanelKind.SparkPoison or
+            MetaPanelKind.SparkBleed or MetaPanelKind.SparkCrit or MetaPanelKind.SparkShield => true,
+            _ => false,
+        };
 
         /// <summary>その配分の総コスト (段数ではなく pt)。</summary>
         public static int CostOf(MetaPanelKind kind, int rank)
@@ -442,25 +454,38 @@ namespace MetaProgression
 
         // === 種火共通テンプレ ===
 
-        /// <summary>種火 r1: 対応キーワードアイテムの出現重み倍率 (r1 到達で 1.6 = +60%)。</summary>
-        public static float SparkAppearanceWeightMul(int rank) => rank >= 1 ? 1.60f : 1.0f;
+        /// <summary>種火 r1: 対応キーワードアイテムの出現重み倍率 (r1 到達で 2.0 = +100%・2026-11-07 に 1.6 から)。</summary>
+        public static float SparkAppearanceWeightMul(int rank) => rank >= 1 ? 2.0f : 1.0f;
 
-        /// <summary>種火 r3: 対応キーワードのアイテムを 1 つ開幕所持。
+        /// <summary>種火 r3: 対応キーワードのアイテムを開幕所持。
         /// **抽選対象は LEGENDARY を除く全等級**（BRONZE 固定ではない・2026-07-28）。</summary>
         public static bool SparkStartingItemUnlocked(int rank) => rank >= 3;
 
-        /// <summary>充電 r2 拡張バッテリー: 充電上限 +5 (10 → 15)。</summary>
-        public static int ChargeCapBonus(int rank) => rank >= 2 ? 5 : 0;
+        /// <summary>種火 r3 で開幕に持つ品の数 (2026-11-07 に 1 → 2)。</summary>
+        public const int SparkStartingItemCount = 2;
+
+        /// <summary>充電 r2 拡張バッテリー: 充電上限 +10 (2026-11-07 に +5 から)。 あわせて戦闘開始時の充電 +10 (<see cref="ChargeOpening"/>)。
+        /// 上限だけでは上限に届く前に戦闘が終わり、 何も起きていなかった (種火・充電が Balanced に −0.7)。</summary>
+        public static int ChargeCapBonus(int rank) => rank >= 2 ? 10 : 0;
+
+        /// <summary>充電 r2: 戦闘開始時に得る充電 (2026-11-07)。</summary>
+        public static int ChargeOpening(int rank) => rank >= 2 ? 10 : 0;
 
         /// <summary>臨界 r2 保温炉: 戦闘終了時にメーターの何割を持ち越すか (0..1)。</summary>
         public static float RinkaiCarryoverRatio(int rank) => rank >= 2 ? 0.5f : 0f;
 
-        /// <summary>毒 r2 濃縮: 毒付与時の追加スタック +1。</summary>
-        public static int PoisonApplyBonus(int rank) => rank >= 2 ? 1 : 0;
+        /// <summary>毒 r2 濃縮: 1 ターンに最初の 1 回だけ、 毒の付与に足すスタック (CombatContext.AddStatus)。 2026-11-07 に +2 → +5。</summary>
+        public static int PoisonApplyBonus(int rank) => rank >= 2 ? 5 : 0;
 
-        /// <summary>出血 r2 失血衰弱: 出血 N 以上の敵の攻撃値 -M (閾値=3, 減算=2)。閾値未到達なら 0。</summary>
+        /// <summary>出血 r2 失血衰弱: 出血 N 以上の敵の攻撃値 -M (閾値=3, 減算=4・2026-11-07 に 2 から)。閾値未到達なら 0。</summary>
         public static int BleedWeakenAttack(int rank, int enemyBleedStacks)
-            => (rank >= 2 && enemyBleedStacks >= 3) ? 2 : 0;
+            => (rank >= 2 && enemyBleedStacks >= 3) ? 4 : 0;
+
+        /// <summary>会心 r2 研ぎ澄まし: 会心倍率 +0.8 (2026-11-07・+0.2 → +0.5 → +0.8)。</summary>
+        public static float CritMulBonus(int rank) => rank >= 2 ? 0.8f : 0f;
+
+        /// <summary>シールド r2 厚手の芯: ターン開始の減衰で残るシールド +10 ポイント (2026-11-07)。</summary>
+        public static int ShieldKeepBonusPct(int rank) => rank >= 2 ? 10 : 0;
 
         // === 端子調律 ===
 

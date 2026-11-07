@@ -208,7 +208,7 @@ namespace CombatSystem
             }
             else if (ctx.enemyDefense > 0 && totalDmg > 0)
             {
-                int effDef = DefenseFormula.Effective(ctx.enemyDefense, ctx.playerArmorPen);
+                int effDef = DefenseFormula.Effective(ctx.enemyDefense, ctx.playerArmorPen + (isCrit ? ctx.critArmorPen : 0));
                 if (effDef > 0)
                 {
                     int beforeDef = totalDmg;

@@ -79,6 +79,7 @@ namespace AutoTest
                     //   平均の産物)。 実際に一度それを根拠に強化しかけた。
                     //   damageDealt は段の HP を削り切ったから遷移が起きるので maxHP と等しい。
                     damageTaken = Math.Max(0, _pendingEnemyHpBefore - hpNow),
+                    dmgParts = DmgPartsSinceStart(),
                     enemyMaxHP = CombatSystem.EnemyDatabase.Get(_pendingEnemyId)?.maxHP ?? 0,
                     damageDealt = CombatSystem.EnemyDatabase.Get(_pendingEnemyId)?.maxHP ?? 0,
                     playerMaxHpEnd = (cm != null && cm.IsCombatActive)
@@ -103,7 +104,40 @@ namespace AutoTest
             // 次フォーム開始時点の現在HP。チェーン中は CombatManager のライブHPを使う
             // （Run.playerHP は戦闘終了まで更新されないため、これが無いと各フォームの被ダメが常に0と誤計測される）。
             _pendingEnemyHpBefore = (cm != null && cm.IsCombatActive) ? cm.PlayerHP : (gm?.Run?.playerHP ?? 0);
+            System.Array.Copy(CombatSystem.CombatStats.DamageBreakdown, _bdAtStart, _bdAtStart.Length);
+            if (_pendingEnemyIsBoss) SnapState(1, _pendingEnemyHpBefore);
             _cwWin = _cwDraw = _cwLoss = _cwLossAbs = 0; // 新戦闘のターン内訳リセット
+        }
+
+        // ── [計装 2026-11-06] 与ダメの内訳 (戦闘ごと) ──
+        //   出目の比重 = 攻撃の出目 ÷ (武器 + 出目 + 攻撃+N)。 与ダメ増加・会心はこの合計に後から掛かるので、 出目の比重を薄めるのは
+        //   攻撃+N と、 倍率の外のダメージ (固定・追撃・毒・出血) だけ。 CombatStats.DamageBreakdown (全体の累計) の、 戦闘の開始からの差分。
+        private readonly double[] _bdAtStart = new double[CombatSystem.CombatStats.DamageBreakdown.Length];
+
+        /// <summary>[武器, 攻撃の出目, 攻撃+N, 主攻撃の与ダメ (倍率の後), 固定ダメ, 追撃, 攻撃+N のうち出目から来た分]。</summary>
+        private int[] DmgPartsSinceStart()
+        {
+            var b = CombatSystem.CombatStats.DamageBreakdown;
+            int D(int i) => (int)System.Math.Min(int.MaxValue, System.Math.Max(0, b[i] - _bdAtStart[i]));
+            return new[] { D(1), D(2), D(3), D(7), D(9), D(10), D(19), D(20), D(21), D(22) };
+        }
+
+        /// <summary>今の状態を 1 行 (10 列) 残す: 種別 (0 層に入った / 1 ボスに入る) / 深さ / HP / 最大 HP / パッシブ数 / 所持金 /
+        /// 回復薬の数 / 護符の数 / 出目パーツの数 / 物資。 「この状態ならクリアできる確率」(マクロの価値 V) を測るため。</summary>
+        private void SnapState(int kind, int hp)
+        {
+            var run = GameManager.Instance?.Run;
+            if (_cur == null || run == null) return;
+            int heal = 0, def = 0;
+            if (run.ownedConsumables != null)
+                foreach (var id in run.ownedConsumables)
+                {
+                    string fam = GameLoop.ItemIds.ConsFamilyOf(id);
+                    if (fam == GameLoop.ItemIds.ConsHealFamily) heal++;
+                    else if (fam == GameLoop.ItemIds.ConsShieldFamily) def++;
+                }
+            _cur.stateSnaps.AddRange(new[] { kind, run.Depth, hp, run.playerMaxHP, run.ownedPassiveItems?.Count ?? 0, run.coins,
+                                             heal, def, run.diceFaceParts?.Count ?? 0, run.provision });
         }
 
         private void OnBattleEnded(CombatResult r)
@@ -127,6 +161,7 @@ namespace AutoTest
                 shieldGained = r.shieldGained,
                 damageDealt = r.damageDealt,
                 damageTaken = r.damageTaken,
+                dmgParts = DmgPartsSinceStart(),
                 enemyMaxHP = r.enemyMaxHP,
                 weaponId = gm?.Run?.equippedWeaponId ?? "",
                 diceId = gm?.Run?.equippedDiceId ?? "",
@@ -303,6 +338,9 @@ namespace AutoTest
                 _cur.finalHP = run.playerHP;
                 _cur.finalMaxHP = run.playerMaxHP;
                 _cur.finalCoins = run.coins;
+                _cur.goldKeys = new string[GameLoop.GoldIncome.RunByDepthSource.Count];
+                _cur.goldVals = new int[_cur.goldKeys.Length];
+                { int gi = 0; foreach (var kv in GameLoop.GoldIncome.RunByDepthSource) { _cur.goldKeys[gi] = kv.Key; _cur.goldVals[gi++] = kv.Value; } }
                 _cur.finalProvision = run.provision;
                 _cur.finalProvisionCap = run.provisionCap;
                 if (run.provision <= 0) _cur.reachedMadness = true;

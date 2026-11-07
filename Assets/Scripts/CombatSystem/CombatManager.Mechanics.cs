@@ -116,7 +116,7 @@ namespace CombatSystem
         /// <paramref name="pen"/> はその攻撃の主がプレイヤーの防御を削る固定値。 剣〈間合〉の打ち消し
         /// (<c>enemyArmorPenNegate</c>) を先に引く。 斧〈血令〉持ちは防御を貫通へ換えているので掛けない
         /// (リロール判断用の仮予告は換算より前に組まれるため、 ここでも見る)。</summary>
-        private static int ApplyPlayerDefense(CombatContext ctx, int enemyAtk, int pen)
+        public static int ApplyPlayerDefense(CombatContext ctx, int enemyAtk, int pen)
         {
             if (ctx == null || enemyAtk <= 0) return enemyAtk;
             if (ItemSystem.PassiveSkills.Effects.BloodEdict.IsActive(ctx)) return enemyAtk;
@@ -443,12 +443,13 @@ namespace CombatSystem
                 }
                 case SpecialTerminalKind.Bleed:
                 {
-                    ctx.enemyBleedStacks += sum;
+                    ctx.AddEnemyBleed(sum);   // 入口を通す (誓約の封じ・2 倍と〈血車〉の最大値)
                     // 接続**本数**ぶんだけ即時に発動させる (合計値ではない ── 制限Ⅱなので最大 2 回)
                     for (int k = 0; k < count && ctx.enemyBleedStacks > 0; k++)
                     {
                         int dmg = BattleModifierManager.ApplyBleedModifiers(ctx, ctx.enemyBleedStacks);
                         RaiseDotDamage(DotKind.Bleed, Math.Min(dmg, enemyHP));
+                        CombatStats.DamageBreakdown[21] += Math.Max(0, Math.Min(dmg, enemyHP));   // [計装] 出血
                         HpLossDiag.Lose(ref enemyHP, dmg, "出血端子");
                         ctx.enemyCurrentHP = enemyHP;
                     }

@@ -156,6 +156,7 @@ namespace EventSystem
             // 召喚専用は名指しでしか出ない。 **抽選プールの門で落とす** ので、
             //   Pick を通る経路すべて (イベントマス / RandomEvent 効果) から一律に消える。
             if (ev.condition.summonOnly) return false;
+            if (GameLoop.GameManager.SuppressConvictionChain && (ev.name == "預言者の石板" || ev.name == "啓示" || ev.name == "災厄の予兆")) return false;
             if (!ev.condition.MatchesFloor(floor)) return false;
 
             // 一度のみイベントが既出ならスキップ

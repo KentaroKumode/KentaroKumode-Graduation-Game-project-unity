@@ -458,6 +458,52 @@ namespace AutoTest
             return true;
         }
 
+        // ── [計装 2026-11-06] パッシブの提示と購入 (店ごと・レア度別) ──
+        //   棚に並んだパッシブの枠を、 買った / リロールで捨てた / 店を出るとき 買えたのに残した / 金が足りず残した に分ける。
+        //   offered (品目の集合・入店時の棚だけ) では、 リロール後の棚も重複も数えられないため。
+        /// <summary>true のとき、 店ごとに 1 行を <c>shop_passive_audit.tsv</c> (ワーカーの出力先) に書く。 既定 OFF。</summary>
+        public bool shopPassiveAudit;
+        private readonly int[] _auBought = new int[4], _auDiscard = new int[4], _auLeftAff = new int[4], _auLeftPoor = new int[4];
+
+        private static int AuditRarity(string id)
+        {
+            var d = string.IsNullOrEmpty(id) ? null : ItemSystem.ItemDatabase.Instance?.GetItem(id);
+            int r = d != null ? (int)d.rarity : 0;
+            return r < 0 ? 0 : r > 3 ? 3 : r;
+        }
+
+        /// <summary>リロールの直前に、 棚に残っているパッシブ (捨てられる枠) を数えてからリロールする。</summary>
+        private bool AuditedReroll(GameManager gm, ItemSystem.Shop.ShopInventory inv)
+        {
+            if (shopPassiveAudit && inv?.slots != null)
+                foreach (var s in inv.slots)
+                    if (s != null && !s.sold && s.kind == ItemSystem.Shop.ShopSlotKind.Passive && !string.IsNullOrEmpty(s.itemId))
+                        _auDiscard[AuditRarity(s.itemId)]++;
+            return gm.ShopReroll();
+        }
+
+        /// <summary>店を出る直前: 売れ残ったパッシブを「買えた / 買えなかった」に分け、 店の 1 行を書いて数を戻す。</summary>
+        private void AuditShopExit(GameManager gm, ItemSystem.Shop.ShopInventory inv)
+        {
+            if (!shopPassiveAudit) return;
+            var run = gm?.Run;
+            if (run != null && inv?.slots != null)
+                foreach (var s in inv.slots)
+                    if (s != null && !s.sold && s.kind == ItemSystem.Shop.ShopSlotKind.Passive && !string.IsNullOrEmpty(s.itemId))
+                    {
+                        bool afford = s.price <= GameLoop.ProvisionPayment.PolicyAffordable(run) - _shopReserve;
+                        (afford ? _auLeftAff : _auLeftPoor)[AuditRarity(s.itemId)]++;
+                    }
+            if (!string.IsNullOrWhiteSpace(productionOutputRootOverride) && run != null)
+            {
+                string Row(int[] a) => a[0] + "\t" + a[1] + "\t" + a[2] + "\t" + a[3];
+                string line = run.currentFloor + "\t" + run.coins + "\t" + Row(_auBought) + "\t" + Row(_auDiscard) + "\t" + Row(_auLeftAff) + "\t" + Row(_auLeftPoor);
+                try { System.IO.File.AppendAllText(System.IO.Path.Combine(productionOutputRootOverride, "shop_passive_audit.tsv"), line + "\n"); } catch { }
+            }
+            System.Array.Clear(_auBought, 0, 4); System.Array.Clear(_auDiscard, 0, 4);
+            System.Array.Clear(_auLeftAff, 0, 4); System.Array.Clear(_auLeftPoor, 0, 4);
+        }
+
         private void DoShop()
         {
             var gm = GameManager.Instance;
@@ -498,6 +544,15 @@ namespace AutoTest
                     }
                 }
 
+                // 持っている誓約が封じた軸の品は買わない (2026-11-07)。 買っても働かず、 封じを知らない BOT は
+                //   臨界・シールドの品 (ITT の上位に多い) を買い続けて金を捨てていた ── ITT で誓約が実際より大きく負に出る。
+                bool SealedPassive(ItemSystem.Shop.ShopSlot s)
+                {
+                    if (s == null || s.kind != ShopSlotKind.Passive || string.IsNullOrEmpty(s.itemId)) return false;
+                    string ax = ItemSystem.ItemDatabase.Instance?.GetItem(s.itemId)?.axis;
+                    return !string.IsNullOrEmpty(ax) && ItemSystem.PassiveSkills.Effects.OathSeals.SealedAxes(run).Contains(ax);
+                }
+
                 bool Buy(int i)
                 {
                     var s = inv.slots[i];
@@ -508,6 +563,7 @@ namespace AutoTest
                     if (s == null || s.sold
                         || s.price > GameLoop.ProvisionPayment.PolicyAffordable(run) - _shopReserve)
                         return false;
+                    if (SealedPassive(s)) return false;   // 誓約が封じた軸の品 (価値を見ない第 3 段もここを通る)
                     if (s.kind != ItemSystem.Shop.ShopSlotKind.WeaponMaterial
                         && !string.IsNullOrEmpty(s.itemId))
                     {
@@ -530,7 +586,7 @@ namespace AutoTest
                         // 種別ごとに分解する。 価格倍率の弾性が枠ごとに違うため (上記コメント)。
                         switch (s.kind)
                         {
-                            case ItemSystem.Shop.ShopSlotKind.Passive:        _cur.shopBuyPassive++; break;
+                            case ItemSystem.Shop.ShopSlotKind.Passive:        _cur.shopBuyPassive++; if (shopPassiveAudit) _auBought[AuditRarity(id)]++; break;
                             case ItemSystem.Shop.ShopSlotKind.Consumable:     _cur.shopBuyConsumable++; break;
                             case ItemSystem.Shop.ShopSlotKind.Weapon:         _cur.shopBuyWeapon++; break;
                             case ItemSystem.Shop.ShopSlotKind.FacePart:       _cur.shopBuyDice++; break;
@@ -618,6 +674,7 @@ namespace AutoTest
                         // 買えない枠が 1 つだけ残ったら打ち切る (無限ループ防止)。
                         if (!Buy(pick) && cand.Count == 1) break;
                     }
+                    AuditShopExit(gm, inv);
                     gm.ExitShop();
                     return;
                 }
@@ -738,7 +795,7 @@ namespace AutoTest
                         if (Phase3BeforeReroll) BuyPhase3Items();   // A/B: 捨てる前に買い切る
                         int before = run.coins;
                         NoteShelfDiscard();   // [計装] 捨てる棚を数える
-                        gm.ShopReroll();
+                        AuditedReroll(gm, inv);
                         if (run.coins >= before) break;
                         _cur.shopRerolls++;
                         _cur.shopRerollCoins += before - run.coins;
@@ -884,6 +941,7 @@ namespace AutoTest
                     if (s.price > GameLoop.ProvisionPayment.PolicyAffordable(run) - _shopReserve) return false;
                     // **武器は装備判定を通す** (2026-08-10)。 主経路にゲートが無く素通りしていた。
                     if (s.kind == ShopSlotKind.Weapon && !GameLoop.Loadout.WouldUpgrade(run, s.itemId)) return false;
+                    if (SealedPassive(s)) return false;
                     float step = AutoTest.LearnedPriorityProvider.StepPerTier;
                     if (s.kind == ShopSlotKind.FacePart
                         && !AutoTest.LearnedPriorityProvider.HasLearned(s.itemId))
@@ -897,6 +955,35 @@ namespace AutoTest
                         pw = AutoTest.LearnedPriorityProvider.BuyScore(s.itemId)
                            + PersonaBonus(s.itemId) * step
                            + AutoTest.BuildSynergy.ScoreAdjust(s.itemId, run);
+                        // 丸めた序列では同じ段の品が同点になる。 人が同格の品で迷ったら安い方を選ぶ
+                        if (AutoTest.LearnedPriorityProvider.BuyTierCount > 0 && !v3.tierNoPriceTie) pw -= s.price * 0.0001f;
+                        if (v3.partPenalty > 0f && s.kind == ShopSlotKind.FacePart) pw -= v3.partPenalty;
+                        if (v3.partDelta && s.kind == ShopSlotKind.FacePart && run.diceFaceParts != null)
+                            foreach (var owned in run.diceFaceParts)
+                                if (owned.face == s.facePart.face)
+                                {
+                                    pw -= AutoTest.LearnedPriorityProvider.PowerScore(GameLoop.DiceFaceParts.Id(owned));
+                                    break;
+                                }
+                    }
+                    // 軸に絞る買い方 (v3.axisCommitBuy・Super)。 軸が深ければ ① / ② / 誓約 を最優先、 誓約は浅いうちは買わない。
+                    if (v3.axisCommitBuy && s.kind == ShopSlotKind.Passive && !string.IsNullOrEmpty(s.itemId)
+                        && ItemSystem.PassiveSkills.Effects.AxisCatalog.Items.TryGetValue(s.itemId, out var cat))
+                    {
+                        int n = ItemSystem.PassiveSkills.AxisRules.Count(run, cat.axis);
+                        var K = ItemSystem.PassiveSkills.Effects.AxisCatalog.Kind.Count;
+                        int need = cat.kind == K ? v3.commitCountAt
+                                 : cat.kind == ItemSystem.PassiveSkills.Effects.AxisCatalog.Kind.Rule ? v3.commitRuleAt : v3.commitOathAt;
+                        bool committed = n >= need;
+                        if (committed && cat.kind == ItemSystem.PassiveSkills.Effects.AxisCatalog.Kind.Oath)
+                        {
+                            int sealedOwned = 0;
+                            foreach (var a in ItemSystem.PassiveSkills.Effects.OathSeals.SealsOf[s.itemId])
+                                sealedOwned += ItemSystem.PassiveSkills.AxisRules.Count(run, a);
+                            committed = sealedOwned <= v3.commitOathMaxSealedOwned;
+                        }
+                        if (committed) pw = Mathf.Max(pw, AutoTest.LearnedPriorityProvider.PowerCuts[0] + step);
+                        else if (cat.kind == ItemSystem.PassiveSkills.Effects.AxisCatalog.Kind.Oath) return false;
                     }
                     // 特売補正。 **60/40 は割引段 {15,30,50} に対する意図的な線引き**。
                     //   50/30 は全条件で悪化した (2026-09-17・安物買いになる)。 下げないこと。
@@ -1002,6 +1089,24 @@ namespace AutoTest
                     return best;
                 }
 
+                /// 段階 3 の値順の購入 (v3.phase3Ranked): 種類 k の中で、 足切り以上・所持金がゲートを超える品を値の高い順に 1 つ買う。
+                bool BuyRanked(ShopSlotKind k, int coinGate)
+                {
+                    if (run.coins <= coinGate) return false;
+                    int best = -1; float bestPw = float.MinValue;
+                    for (int i = 0; i < inv.slots.Count; i++)
+                    {
+                        var s = inv.slots[i];
+                        if (s == null || s.sold || s.kind != k) continue;
+                        if (!TrySlotPower(i, out float pw)) continue;
+                        if (pw < AutoTest.LearnedPriorityProvider.PowerCuts[3]) continue;
+                        if (pw > bestPw) { bestPw = pw; best = i; }
+                    }
+                    return best >= 0 && Buy(best);
+                }
+                bool BuyKindP3(ShopSlotKind k) => v3.phase3Ranked && k != ShopSlotKind.Consumable && k != ShopSlotKind.WeaponMaterial
+                    ? BuyRanked(k, 0) : BuyKind(k);
+
                 bool BuyPriorityPass(float minPower)
                 {
                     // 動的閾値を反映。 2026-06-23c: 毎回再計算 ── 同ショップ訪問内で帯を跨いだら即時反映
@@ -1017,7 +1122,11 @@ namespace AutoTest
                         //   経緯 (燈火 r10 の物資払い / 武器ゲートの取りこぼし / 60/40 の線引き) は
                         //   git log を参照。
                         if (!TrySlotPower(i, out float pw)) continue;
-                        if (pw < effMinPower) continue;
+                        // [診断] 丸めた値と丸める前の値の差。 足切りと順位の片方だけを丸める
+                        float rawDelta = AutoTest.LearnedPriorityProvider.BuyTierCount > 0 && !string.IsNullOrEmpty(s.itemId) && (v3.tierGateRaw || v3.tierOrderRaw)
+                            ? AutoTest.LearnedPriorityProvider.RawPowerScore(s.itemId) - AutoTest.LearnedPriorityProvider.PowerScore(s.itemId) : 0f;
+                        if ((v3.tierGateRaw ? pw + rawDelta : pw) < effMinPower) continue;
+                        if (v3.tierOrderRaw) pw += rawDelta;
                         ablCand?.Add(i);   // 足切りを通った候補 (アブレーション時のみ収集)
                         // ΔPower/G コスパ (slot.price は割引後の価格なので特売/upgrade が自然に有利化)
                         int delta = AutoTest.InventoryPower.SimulateAddItemDelta(run, s.itemId);
@@ -1025,7 +1134,11 @@ namespace AutoTest
                         // 足切りを通った候補は探索の母集団になる (下のホールドアウトで使う)
                         if (exploreHoldoutRate > 0f) _exploreCandidates.Add(i);
                         // 準パワー主軸 → ΔPower/G tiebreak
-                        bool better = pw > bestPower || (pw == bestPower && eff > bestEff);
+                        bool better = v3.orderByEffOnly ? eff > bestEff
+                                    : v3.tieById ? (pw > bestPower || (pw == bestPower && bestIdx >= 0
+                                                    && string.CompareOrdinal(s.itemId ?? "", inv.slots[bestIdx].itemId ?? "") < 0))
+                                    : (pw > bestPower || (pw == bestPower && eff > bestEff));
+                        if (bestIdx < 0) better = true;
                         if (better) { bestPower = pw; bestEff = eff; bestIdx = i; }
                     }
                     // [アブレーション] 足切りを通った候補から一様抽選へ差し替える。
@@ -1170,7 +1283,7 @@ namespace AutoTest
                         if (Phase3BeforeReroll) BuyPhase3Items();   // A/B: 捨てる前に買い切る
                         int beforeR = run.coins;
                         NoteShelfDiscard();   // [計装] 捨てる棚を数える
-                        bool rolled = gm.ShopReroll();
+                        bool rolled = AuditedReroll(gm, inv);
                         if (_shopReserve > 0) _shopReserve = inv.CurrentRerollPrice;
                         if (!rolled) { exitWhy = 2; break; }
                         _cur.shopRerolls++;
@@ -1217,7 +1330,7 @@ namespace AutoTest
                     // **戻り値で判定する。** コインの増減で見ると〈合札〉の無料リロールを
                     //   失敗と誤認する (2026-09-17)。
                     NoteShelfDiscard();   // [計装] 捨てる棚を数える
-                    bool rolled = gm.ShopReroll();
+                    bool rolled = AuditedReroll(gm, inv);
                     // 取り置きを現在価格へ更新。 リロール価格は 5→10→20→30 と逓増するので、
                     //   店に入った時点の額のままだと強盗直前に足りなくなる。
                     if (_shopReserve > 0) _shopReserve = inv.CurrentRerollPrice;
@@ -1256,7 +1369,7 @@ namespace AutoTest
                         if (Phase3BeforeReroll) BuyPhase3Items();   // A/B: 捨てる前に買い切る
                         int beforeR = run.coins;
                         NoteShelfDiscard();   // [計装] 捨てる棚を数える
-                        bool rolled = gm.ShopReroll();
+                        bool rolled = AuditedReroll(gm, inv);
                         // 取り置きを現在価格へ更新。 リロール価格は 5→10→20→30 と逓増するので、
                         //   店に入った時点の額のままだと強盗直前に足りなくなる。
                         if (_shopReserve > 0) _shopReserve = inv.CurrentRerollPrice;
@@ -1294,17 +1407,17 @@ namespace AutoTest
                         bought = false;
                         // 回復 0 本なら何よりも先に確保する (2026-08-16)。
                         if (EnsureHealStock()) { bought = true; continue; }
-                        if (BuyKind(ShopSlotKind.Weapon)) { bought = true; continue; }
+                        if (BuyKindP3(ShopSlotKind.Weapon)) { bought = true; continue; }
                         // **2026-08-17 実験 B: 出目パーツをパッシブより前に置く。**
                         //   A (パッシブ優先) では 1 ラン 0.90 個しか買われず、 提示 20 回前後に対して
                         //   ほぼ全部をパッシブが吸っていた。 パーツは 8〜17G の恒久強化で
                         //   ダイス 5 個すべてに毎ターン効くので、 費用対効果で上回る可能性がある。
                         //   **ただし旧ダイス用の高いゲート (75G) を外しただけでは足りない**ことが
                         //   実測で分かったので、 順序そのものを入れ替えて比較する。
-                        if (BuyKind(ShopSlotKind.FacePart)) { bought = true; continue; }
+                        if (BuyKindP3(ShopSlotKind.FacePart)) { bought = true; continue; }
                         // **パッシブを先に買う** (2026-08-10)。 同じ金額ならパッシブの方が強い
                         //   ことが実測で出ている (ダイスが陳列から消えるだけで +9.4pt)。
-                        if (BuyKind(ShopSlotKind.Passive)) { bought = true; continue; }
+                        if (BuyKindP3(ShopSlotKind.Passive)) { bought = true; continue; }
                         // 業物廃止 (2026-08-10) 後は T4+ で素材の行き先が消える。
                         //   最後のショップで金を使い切るループなので、 ここを塞がないと
                         //   使い道の無い素材に金を捨て、 測定側のビルドが不当に弱くなる。
@@ -1339,6 +1452,15 @@ namespace AutoTest
                     //   Loadout.TryAutoEquip は「今より良い時だけ」装備するので、
                     //   劣るダイスを買ってもゴールドが消えるだけだった
                     //   (実測 1 ラン 8.14 個購入。 大半が死に金)。
+                    if (v3.phase3Ranked)
+                    {
+                        int g3 = 0;
+                        while (BuyRanked(ShopSlotKind.Weapon, weaponGate) && g3++ < 30) { }
+                        while (BuyRanked(ShopSlotKind.FacePart, 0) && g3++ < 60) { }
+                        while (BuyRanked(ShopSlotKind.Passive, passiveGate) && g3++ < 90) { }
+                    }
+                    else
+                    {
                     for (int i = 0; i < inv.slots.Count; i++)
                         if (inv.slots[i] != null && !inv.slots[i].sold && run.coins > weaponGate
                             && inv.slots[i].kind == ShopSlotKind.Weapon
@@ -1352,6 +1474,7 @@ namespace AutoTest
                     for (int i = 0; i < inv.slots.Count; i++)
                         if (inv.slots[i] != null && !inv.slots[i].sold && run.coins > passiveGate
                             && inv.slots[i].kind == ShopSlotKind.Passive) Buy(i);
+                    }
                     // T4 到達率改善: 素材買い溜め上限 2→4 (連続強化で T3+ → T4 まで一気に届く余地)
                     int needMat = GameManager.WeaponUpgradeCost(run);
                     int matBuys = 0;
@@ -1430,9 +1553,9 @@ namespace AutoTest
                             // 回復 0 本なら何よりも先に確保する。 Tier 待ちより優先 ──
                             //   T1 でも「持っている」ことに意味がある (次の 1 撃で死ぬ判定で使える)。
                             if (EnsureHealStock()) { bought = true; continue; }
-                            if (BuyKind(ShopSlotKind.Weapon)) { bought = true; continue; }
-                            if (BuyKind(ShopSlotKind.FacePart)) { bought = true; continue; }
-                            if (BuyKind(ShopSlotKind.Passive)) { bought = true; continue; }
+                            if (BuyKindP3(ShopSlotKind.Weapon)) { bought = true; continue; }
+                            if (BuyKindP3(ShopSlotKind.FacePart)) { bought = true; continue; }
+                            if (BuyKindP3(ShopSlotKind.Passive)) { bought = true; continue; }
                             if (BuyConsumableAtLeast(minTier)) { bought = true; continue; }
                             if (GameManager.CanSpendMaterials(run)
                                 && BuyKind(ShopSlotKind.WeaponMaterial)) { bought = true; continue; }
@@ -1444,7 +1567,7 @@ namespace AutoTest
                         if (Phase3BeforeReroll) BuyPhase3Items();   // A/B: 捨てる前に買い切る
                         int before = run.coins;
                         NoteShelfDiscard();   // [計装] 捨てる棚を数える
-                        gm.ShopReroll();
+                        AuditedReroll(gm, inv);
                         // 取り置きを現在価格へ更新。 リロール価格は 5→10→20→30 と逓増するので、
                         //   店に入った時点の額のままだと強盗直前に足りなくなる。
                         if (_shopReserve > 0) _shopReserve = inv.CurrentRerollPrice;
@@ -1473,10 +1596,10 @@ namespace AutoTest
                         do
                         {
                             bought = false;
-                            if (BuyKind(ShopSlotKind.Weapon)) { bought = true; continue; }
-                            if (BuyKind(ShopSlotKind.Passive)) { bought = true; continue; }
+                            if (BuyKindP3(ShopSlotKind.Weapon)) { bought = true; continue; }
+                            if (BuyKindP3(ShopSlotKind.Passive)) { bought = true; continue; }
                             if (BuyKind(ShopSlotKind.Consumable)) { bought = true; continue; }
-                            if (BuyKind(ShopSlotKind.FacePart)) { bought = true; continue; }
+                            if (BuyKindP3(ShopSlotKind.FacePart)) { bought = true; continue; }
                         }
                         while (bought && buyGuard++ < 32);
 
@@ -1488,7 +1611,7 @@ namespace AutoTest
                         if (Phase3BeforeReroll) BuyPhase3Items();   // A/B: 捨てる前に買い切る
                         int before = run.coins;
                         NoteShelfDiscard();   // [計装] 捨てる棚を数える
-                        gm.ShopReroll();   // [経路3] Super 全賭け
+                        AuditedReroll(gm, inv);   // [経路3] Super 全賭け
                         // 取り置きを現在価格へ更新。 リロール価格は 5→10→20→30 と逓増するので、
                         //   店に入った時点の額のままだと強盗直前に足りなくなる。
                         if (_shopReserve > 0) _shopReserve = inv.CurrentRerollPrice;
@@ -1509,7 +1632,7 @@ namespace AutoTest
                         if (Phase3BeforeReroll) BuyPhase3Items();   // A/B: 捨てる前に買い切る
                         int beforeRoll = run.coins;
                         NoteShelfDiscard();   // [計装] 捨てる棚を数える
-                        gm.ShopReroll();
+                        AuditedReroll(gm, inv);
                         // 取り置きを現在価格へ更新。 リロール価格は 5→10→20→30 と逓増するので、
                         //   店に入った時点の額のままだと強盗直前に足りなくなる。
                         if (_shopReserve > 0) _shopReserve = inv.CurrentRerollPrice;
@@ -1535,6 +1658,7 @@ namespace AutoTest
             _lastShopExitSeen = true;
             _shopReserve = 0;
             NoteUpgradeDeclines(gm.Run);
+            AuditShopExit(gm, inv);
             gm.ExitShop();
         }
 

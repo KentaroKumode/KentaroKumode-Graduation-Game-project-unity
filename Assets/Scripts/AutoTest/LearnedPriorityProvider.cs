@@ -172,6 +172,9 @@ namespace AutoTest
         /// <summary><b>ITT の順位でスロットを付け替える (2026-09-09)。</b>
         /// 得点の集合は変えず、 割り当てだけを Δクリア率の降順にする ＝ 純粋な並び順の介入。
         /// 対象は「ITT に列があり、 標本が足りている」品のみ。</summary>
+        /// <summary>序列から差し引く価格の重み (Δクリア pt / 店頭価格 1G・0 = 差し引かない)。 金をランダムに配った時の効果が目安 (25G で +0.35pt)。</summary>
+        public static float IttPriceK = 0f;
+
         private static int ApplyIttRankMapping(List<ItemLearningStats.ItemAggregate> pool)
         {
             var targets = new List<string>();
@@ -188,10 +191,17 @@ namespace AutoTest
             slots.Sort(); slots.Reverse();
 
             // Δクリア率の降順。 同値は id 順で決定的に割る (乱数を使わない)。
+            //   ITT は無償で配った時の効果なので、 買う判断には価格を差し引く: 効果 − 価格 × 金の価値 (2026-11-06)。
+            double Net(string id)
+            {
+                GrantItt.TryGetClearEffect(id, out double d, out double _);
+                return IttPriceK > 0f ? d - IttPriceK * ItemSystem.Shop.ShopManager.ExpectedShopPrice(id, null) : d;
+            }
+            var net = new Dictionary<string, double>(targets.Count);
+            foreach (var id in targets) net[id] = Net(id);
             targets.Sort((x, y) =>
             {
-                GrantItt.TryGetClearEffect(x, out double dx, out double _a);
-                GrantItt.TryGetClearEffect(y, out double dy, out double _b);
+                double dx = net[x], dy = net[y];
                 int c = dy.CompareTo(dx);
                 return c != 0 ? c : string.CompareOrdinal(x, y);
             });
@@ -679,7 +689,7 @@ namespace AutoTest
             if (string.IsNullOrEmpty(id)) return false;
             // 剣の舞ピース文脈ブースト: 既に 2 枚以上所持していればピース全てを最上位扱い (BD 集約を優先誘導)
             if (IsDanceBoostedToS(id)) return true;
-            return PowerScore(id) >= PowerCuts[0];   // フォールバックも Unlearned も PowerScore が吸収する
+            return (GateRaw ? RawPowerScore(id) : PowerScore(id)) >= PowerCuts[0];   // フォールバックも Unlearned も PowerScore が吸収する
         }
 
         /// <summary>「余裕があれば取る」帯 (準パワー ≥ <c>PowerCuts[2]</c>)。
@@ -687,7 +697,7 @@ namespace AutoTest
         public static bool IsARank(string id)
         {
             if (string.IsNullOrEmpty(id)) return false;
-            return PowerScore(id) >= PowerCuts[2];
+            return (GateRaw ? RawPowerScore(id) : PowerScore(id)) >= PowerCuts[2];
         }
 
         public static bool IsPriority(string id) => IsSRank(id) || IsARank(id);
@@ -747,6 +757,56 @@ namespace AutoTest
             return maxLv > 0 ? (maxLv - 1) * 0.5f : 0f;
         }
 
+        /// <summary>購入の序列を丸める段の数 (0 = 無段階・2026-11-06)。 Optimal は 3 段 = 10〜100 戦の経験者が持つティア表、
+        /// Super は無段階 = 10 万ランの ITT を全部知っている。 AutoRunner が技量から流し込む。</summary>
+        public static int BuyTierCount = 0;
+        /// <summary>[診断] 段の境目を順位で指定する (長さ = 段の数 − 1)。 null なら等分。</summary>
+        public static int[] TierRankCuts = null;
+        private static float[] _tierCuts, _tierVals;
+        private static List<string> _tierBuiltFor;
+
+        /// <summary>連続値を、 順位で等分した段の代表値 (段の平均) へ丸める。</summary>
+        private static float TierValue(float v)
+        {
+            if (_tierCuts == null || !ReferenceEquals(_tierBuiltFor, _ranked) || _tierCuts.Length != BuyTierCount - 1)
+            {
+                var all = new List<float>();
+                foreach (var kv in _itemContinuousScore) all.Add((float)kv.Value);
+                all.Sort((a, b) => b.CompareTo(a));
+                int n = System.Math.Max(1, all.Count), m = BuyTierCount;
+                _tierCuts = new float[m - 1]; _tierVals = new float[m];
+                for (int t = 0; t < m; t++)
+                {
+                    int lo = t * n / m, hi = System.Math.Max(lo + 1, (t + 1) * n / m);
+                    if (TierRankCuts != null && TierRankCuts.Length == m - 1)   // [診断] 境目を順位で指定
+                    {
+                        lo = t == 0 ? 0 : TierRankCuts[t - 1];
+                        hi = t == m - 1 ? n : TierRankCuts[t];
+                    }
+                    double sum = 0; int c = 0;
+                    for (int i = lo; i < hi && i < all.Count; i++) { sum += all[i]; c++; }
+                    _tierVals[t] = c > 0 ? (float)(sum / c) : 0f;
+                    if (t < m - 1) _tierCuts[t] = hi < all.Count ? all[hi - 1] : float.NegativeInfinity;
+                }
+                _tierBuiltFor = _ranked;
+            }
+            for (int t = 0; t < _tierCuts.Length; t++) if (v >= _tierCuts[t]) return _tierVals[t];
+            return _tierVals[_tierVals.Length - 1];
+        }
+
+        /// <summary>[診断] 丸める前の準パワー。</summary>
+        public static float RawPowerScore(string id)
+        {
+            int keep = BuyTierCount;
+            BuyTierCount = 0;
+            float v = PowerScore(id);
+            BuyTierCount = keep;
+            return v;
+        }
+
+        /// <summary>[診断] 「絶対取得」「余裕時」の判定を丸める前の値で行う (順位だけ丸める腕)。</summary>
+        public static bool GateRaw = false;
+
         public static float PowerScore(string id)
         {
             if (string.IsNullOrEmpty(id)) return Unlearned;
@@ -763,6 +823,7 @@ namespace AutoTest
                 //   全品が足切りされ、 統計が永久に溜まらない。
                 if (!_baseScore.TryGetValue(id, out v)) return Unlearned;
             }
+            if (BuyTierCount > 0) return TierValue((float)v);
             // [切り分け中 2026-09-03] 段固定化と同時に FamilyLvBonus を外したため、
             //   7層クリア 20.6% → 7.5% の寄与が分離できていない。 **一度に 1 つだけ変える**ため、
             //   この 1 行で戻せるようにしてある。 分離が済んだら片方を消すこと。

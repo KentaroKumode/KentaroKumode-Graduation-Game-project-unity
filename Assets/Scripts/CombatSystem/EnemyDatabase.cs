@@ -82,6 +82,10 @@ namespace CombatSystem
         /// 攻撃の上書き (<see cref="AttackOverrideSpec"/>) と同じく、 決まった値は enemies.json へ書き戻すこと。</summary>
         public static string HpOverrideSpec = "";
 
+        /// <summary>較正スイープ専用: 全敵の最大 HP へ掛ける倍率 (2026-11-06)。 1.0 = 素のまま。
+        /// 決まった値は enemies.json へ書き戻すこと (隠し倍率を製品に残さない)。</summary>
+        public static float HpScale = 1f;
+
         private static void ApplyStatOverrides()
         {
             if (database == null) return;
@@ -108,14 +112,17 @@ namespace CombatSystem
 
         private static void ApplyScale()
         {
-            if (Mathf.Abs(AttackScale - 1f) < 0.0001f) return;
             foreach (var e in database.Values)
             {
                 if (e == null) continue;
-                e.baseAttack     = Mathf.Max(0, Mathf.RoundToInt(e.baseAttack * AttackScale));
-                e.attackRollMin  = Mathf.Max(0, Mathf.RoundToInt(e.attackRollMin * AttackScale));
-                e.attackRollMax  = Mathf.Max(e.attackRollMin, Mathf.RoundToInt(e.attackRollMax * AttackScale));
-                e.threat         = Mathf.Max(0, Mathf.RoundToInt(e.threat * AttackScale));
+                float hs = HpScale;
+                float a = AttackScale;
+                if (Mathf.Abs(hs - 1f) >= 0.0001f) e.maxHP = Mathf.Max(1, Mathf.RoundToInt(e.maxHP * hs));
+                if (Mathf.Abs(a - 1f) < 0.0001f) continue;
+                e.baseAttack     = Mathf.Max(0, Mathf.RoundToInt(e.baseAttack * a));
+                e.attackRollMin  = Mathf.Max(0, Mathf.RoundToInt(e.attackRollMin * a));
+                e.attackRollMax  = Mathf.Max(e.attackRollMin, Mathf.RoundToInt(e.attackRollMax * a));
+                e.threat         = Mathf.Max(0, Mathf.RoundToInt(e.threat * a));
             }
             Debug.Log($"[EnemyDatabase] 攻撃側 ×{AttackScale:F2} を {database.Count} 体へ適用");
         }
@@ -141,8 +148,9 @@ namespace CombatSystem
         }
 
         /// <summary>上書き指定を差してから読み直す。 <c>AutoRunner.Begin</c> が呼ぶ。</summary>
-        public static void ReloadWithOverrides(string spec, float scale = 1f, string hpSpec = "")
+        public static void ReloadWithOverrides(string spec, float scale = 1f, string hpSpec = "", float hpScale = 1f)
         {
+            HpScale = hpScale;
             AttackOverrideSpec = spec ?? "";
             HpOverrideSpec = hpSpec ?? "";
             AttackScale = scale;

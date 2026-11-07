@@ -108,6 +108,7 @@ namespace AutoTest
                 _freeMapVisited.Clear(); _freeMapSinceProgress = 0; _freeMapDetourTarget = -1;
                 _foeSeenAt = -1; _foeSeenStill = 0; _foeSeenMove = false; _foeSeenTurn = -1;
                 _freeMapReconAt.Clear();
+                SnapState(0, run.playerHP);
             }
             if (_freeMapVisited.Add(sim.Me)) _freeMapSinceProgress = 0; else _freeMapSinceProgress++;
             ObserveFoe(sim);
@@ -200,7 +201,12 @@ namespace AutoTest
             bool toExit = _freeMapActions > MaxFreeMapActionsPerFloor
                           || run.provision < hopsFromMe[L.goal] * FreeMapParams.MoveSupply + FreeMapExitMargin
                           || hopsFromMe[L.goal] == int.MaxValue;
-            if (!toExit)
+            if (!toExit && v3.macroPlan)
+            {
+                target = MacroTarget(gm, mm, sim, L, at, hopsFromMe, run);
+                if (target < 0) toExit = true;
+            }
+            else if (!toExit)
             {
                 float best = 0f;
                 foreach (var n in map.GetAllNodes())
@@ -219,6 +225,22 @@ namespace AutoTest
                 if (target < 0) toExit = true;   // 近くの未使用の点が 1 つも無ければ出口へ
             }
             if (toExit) { target = L.goal; _curBossNear = true; FreeNavExits[mode]++; }
+
+            // S4: 次に向かう点の戦闘名が分からず、 近ければ偵察してから決める (同じ点では 1 回まで・追われている時はしない)
+            if (v3.superNav && !toExit && target >= 0 && _freeMapActions <= MaxFreeMapActionsPerFloor
+                && hopsFromMe[target] <= FreeMapParams.ReconRange
+                && !(sim.FoeAlive && sim.FoeMode == FoeMode.Chase) && !_freeMapReconAt.Contains(at))
+            {
+                var tn = map.GetNode(map.NodeIdAt(target));
+                bool unknownFight = tn != null && !tn.encounterRevealed && (!tn.revealed
+                    || tn.EffectiveType == TileType.Battle || tn.EffectiveType == TileType.EliteBattle);
+                if (unknownFight && gm.ReconTurn())
+                {
+                    _freeMapReconAt.Add(at);
+                    FreeNavRecons++;
+                    return false;
+                }
+            }
 
             // ── 次の 1 歩 ──
             int hop = sim.StepToward(at, target);

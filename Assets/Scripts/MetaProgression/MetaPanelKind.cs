@@ -32,6 +32,11 @@ namespace MetaProgression
         // === 端子調律 (max 3) ===
         AttackTerm,   // #14 攻端子: 攻撃端子の配線合計 +1/段
         BlockTerm,    // #15 防端子: 防御端子の配線合計 +1/段
+
+        // === 種火の追加 (2026-11-07・軸の再設計で会心とシールドも軸になったため)。 enum の末尾に足す ──
+        //   panelRanks は int[] を enum のインデックスで引くので、 途中に挟むと保存済みのランクがずれる。
+        SparkCrit,    // #16 会心:   r2 研ぎ澄まし (会心倍率 +0.2)
+        SparkShield,  // #17 シールド: r2 厚手の芯 (ターン開始の減衰で残るシールド +10%)
     }
 
     public static class MetaPanelKindExt
@@ -44,6 +49,9 @@ namespace MetaProgression
             //   引いているので、 中間の #9 を削除すると種火・端子の保存済みランクが
             //   1 つずれて別トラックに化ける。
             MetaPanelKind.Precision => 0,
+            // **会心の種火も廃止 (2026-11-07)。** 会心はどのビルドも最初から使う共通の資源で、 種火で品を増やしても
+            //   Balanced に対して +1.6 / −0.7 ポイント (有意でない)。 MaxRank 0 = 枠から消える。 enum は保存済みランクがずれるので残す。
+            MetaPanelKind.SparkCrit => 0,
             MetaPanelKind.Shell or MetaPanelKind.Output or MetaPanelKind.Guard or
             MetaPanelKind.Vault or MetaPanelKind.Plunder or MetaPanelKind.Trade or
             MetaPanelKind.Supply or MetaPanelKind.Lantern => 10,

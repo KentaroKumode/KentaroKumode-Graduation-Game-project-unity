@@ -169,6 +169,39 @@ namespace ItemSystem.Shop
             return true;
         }
 
+        /// <summary><b>進行に合わせた価格の倍率 (2026-11-05)</b>: 1 + K × p²。 p = 層の番号 ÷ 最後の層の番号 (0 層 = 0・5 層 = 1)。
+        ///
+        /// <para>実測でクリアしたランは約 800G (獲得の約 43%) を使わずに終わっていた。 序盤は金が足りず (退店の 4 割は残金約 15G)、
+        /// 後半は余る。 p² にして序盤はほぼ据え置き、 後半だけ高くする。 リロール価格は対象外 (在庫操作のコストなので一律・ShopInventory)。</para>
+        ///
+        /// <para>K = 0 で無効。 値は A/B で決める (AutoRunner の <c>shopProgressPriceK</c> で上書き)。</para></summary>
+        public static float ProgressPriceK = 3f;   // 2026-11-05 決定 (掃引: K=3 で クリアしたランの残金 819G → 154G)
+
+        /// <summary><b>レア度による価格の傾き (2026-11-05)</b>: 基準価格 × (1 + s × レア度の段)。 BRONZE = 段 0 は据え置き。
+        ///
+        /// <para>items.json の基準価格はレア度でほとんど差が無かった (パッシブ 7 / 8 / 9 / 10G・LEGENDARY が BRONZE の 1.4 倍)。
+        /// 金が余る中で全部買えてしまい、 強い品を選ぶことに金の重みが無い。 上のレア度ほど高くして、 買い物を選択にする。</para>
+        ///
+        /// <para>s = 0 で無効。 出目パーツ (Tier で値付け) は対象外。 値は A/B で決める (AutoRunner の <c>shopRaritySlope</c>)。</para></summary>
+        public static float RaritySlope = 0.25f;   // 2026-11-05 決定 (K=3 と組みで クリア 21.2%・LEGENDARY の取得 12→7 個/ラン)
+
+        /// <summary><b>品物の価格の倍率 (2026-11-06・2 倍)</b>。 パッシブ・消耗品・武器・出目パーツの店頭価格に掛ける。
+        /// リロール・物資の包・囮罠・強化素材は対象外 (在庫操作と資源)。 売値は items.json の基準価格のままで変えない
+        /// (基準価格を倍にすると売値も倍になり、 売却で取り戻せてしまう)。
+        /// クリアしたランはパッシブを約 71 個集めて最終ボスに挑んでおり (店のパッシブは全 82 種)、 買い物が選択になっていなかった。</summary>
+        public static float ItemPriceScale = 2f;   // 2026-11-06 決定 (最低でも 2 倍)。 敵の攻撃を出目の幅へ戻した後の値。 それ以前の測定 (2.5 で 2 層までに品が 13 個) は敵が違う
+
+        /// <summary>レア度による価格の倍率。</summary>
+        public static float RarityPriceMul(ItemRarity rarity) => 1f + RaritySlope * (int)rarity;
+
+        /// <summary>今の層の、 進行に合わせた価格の倍率。</summary>
+        public static float ProgressPriceMultiplier(GameLoop.RunState run)
+        {
+            if (run == null || ProgressPriceK == 0f) return 1f;
+            float p = UnityEngine.Mathf.Clamp01(run.currentFloor / (float)MapSystem.FreeMove.FloorPlan.LastOrdinal);
+            return 1f + ProgressPriceK * p * p;
+        }
+
         public ShopInventory Generate(int floor)
         {
             ProvisionPacksLeft = ProvisionPackStock;
@@ -179,6 +212,7 @@ namespace ItemSystem.Shop
             var floorMod = MapSystem.FloorModifierDatabase.Get(floor);
             float baseMul = floorMod != null ? floorMod.shopPriceMultiplier : 1f;
             inv.priceMultiplier = baseMul * MetaProgression.MetaDebuffApplicator.GetShopPriceMultiplier();
+            inv.priceMultiplier *= ProgressPriceMultiplier(GameLoop.GameManager.Instance?.Run);   // 進行に合わせた値上げ
             // (商人の符牒 半額フックは 2026-07-18 アイテム削除に伴い除去)
 
             // 値下げ交渉(=強盗) の代償: 以降のショップは足元を見られる (2026-09-12)。
@@ -512,7 +546,7 @@ namespace ItemSystem.Shop
                     basePrice = GameLoop.GameRng.Range(item.buyPrice.min, item.buyPrice.max + 1, "shop.price");
                 else
                     basePrice = 10;
-                price = Mathf.CeilToInt(basePrice * priceMultiplier) + ItemPriceAdd;
+                price = Mathf.CeilToInt(basePrice * ItemPriceScale * RarityPriceMul(item.rarity) * priceMultiplier) + ItemPriceAdd;
             }
             if (id != null) _shelfIds.Add(id);
             return new ShopSlot { kind = kind, itemId = id, price = price, sold = false };
@@ -534,17 +568,35 @@ namespace ItemSystem.Shop
         /// 素の帯は BRONZE 7 / SILVER 8 / GOLD 9 / LEGENDARY 10 G。</summary>
         public static int ItemPriceAdd = 0;
 
-        private ShopSlot BuildFacePartSlot(GameLoop.DiceFaceParts.Part part, float priceMultiplier)
+        private static int FacePartBasePrice(GameLoop.DiceFaceParts.Tier tier)
         {
-            int basePrice;
-            switch (part.tier)
+            switch (tier)
             {
                 // ADR-0011: 価格は据え置き (8/11/14/17)。 T1 は無能力の素の面になった。
-                case GameLoop.DiceFaceParts.Tier.T1: basePrice =  8; break;
-                case GameLoop.DiceFaceParts.Tier.T2: basePrice = 11; break;   // 2個そろいの解放
-                case GameLoop.DiceFaceParts.Tier.T3: basePrice = 14; break;
-                default:                             basePrice = 17; break;
+                case GameLoop.DiceFaceParts.Tier.T1: return  8;
+                case GameLoop.DiceFaceParts.Tier.T2: return 11;   // 2個そろいの解放
+                case GameLoop.DiceFaceParts.Tier.T3: return 14;
+                default:                             return 17;
             }
+        }
+
+        /// <summary>今の層でこの品を店で買う時の価格 (棚の抽選の幅の中央・割引なし)。 品の価値を「買う値段込み」で測る ITT が読む。</summary>
+        public static int ExpectedShopPrice(string id, GameLoop.RunState run)
+        {
+            if (string.IsNullOrEmpty(id)) return 0;
+            float prog = ProgressPriceMultiplier(run);
+            if (GameLoop.DiceFaceParts.IsPartId(id))
+                return GameLoop.DiceFaceParts.TryParseId(id, out var part)
+                    ? Mathf.CeilToInt(FacePartBasePrice(part.tier) * ItemPriceScale * prog) + ItemPriceAdd : 0;
+            var item = ItemDatabase.Instance?.GetItem(id);
+            if (item == null) return 0;
+            float basePrice = item.buyPrice != null ? (item.buyPrice.min + item.buyPrice.max) / 2f : 10f;
+            return Mathf.CeilToInt(basePrice * ItemPriceScale * RarityPriceMul(item.rarity) * prog) + ItemPriceAdd;
+        }
+
+        private ShopSlot BuildFacePartSlot(GameLoop.DiceFaceParts.Part part, float priceMultiplier)
+        {
+            int basePrice = FacePartBasePrice(part.tier);
             return new ShopSlot
             {
                 kind = ShopSlotKind.FacePart,
@@ -553,7 +605,7 @@ namespace ItemSystem.Shop
                 //   提示/取得の記録も学習の集計も itemId をキーにしている。
                 //   null のままだと学習経路に一切乗らず、 手置きの評価式に頼るしかなくなる。
                 itemId = GameLoop.DiceFaceParts.Id(part),
-                price = Mathf.CeilToInt(basePrice * priceMultiplier) + ItemPriceAdd,
+                price = Mathf.CeilToInt(basePrice * ItemPriceScale * priceMultiplier) + ItemPriceAdd,
                 sold = false,
             };
         }
@@ -571,7 +623,7 @@ namespace ItemSystem.Shop
             {
                 kind = ShopSlotKind.Consumable,
                 itemId = item != null ? id : null,
-                price = Mathf.CeilToInt(basePrice * priceMultiplier) + ItemPriceAdd,
+                price = Mathf.CeilToInt(basePrice * ItemPriceScale * (item != null ? RarityPriceMul(item.rarity) : 1f) * priceMultiplier) + ItemPriceAdd,
                 sold = false,
             };
         }

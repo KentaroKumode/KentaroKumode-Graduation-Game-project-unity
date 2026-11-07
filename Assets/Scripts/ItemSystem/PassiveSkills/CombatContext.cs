@@ -589,6 +589,70 @@ namespace ItemSystem.PassiveSkills
         public bool shieldNoHalve;
         /// <summary>[persistent] 〈廃庭の霧吹き〉: 毒のダメージが、 ターン開始に加えて敵が攻撃するたびにも入る。</summary>
         public bool poisonTickOnEnemyAttack;
+
+        // ---- 誓約の封じ (2026-11-06 軸の品)。 [persistent] ----
+        //   **戦闘の情報を作った直後に、 所持品から立てる** (OathSeals.Apply)。 品の OnBattleStart で立てると、
+        //   遺物の開幕の毒・出血・充電と臨界の持ち越し (OnBattleStart より前) が漏れた (2026-11-07)。
+        //   封じは付与の入口 (AddStatus の毒 / AddEnemyBleed / Kw.AddHeat / AddCharge / consShield の setter / 会心の判定) だけで止める。
+        /// <summary>[persistent] 敵に毒を与えられない (AddStatus で捨てる)。</summary>
+        public bool poisonSealed;
+        /// <summary>[persistent] 敵に出血を与えられない (AddEnemyBleed で捨てる)。</summary>
+        public bool bleedSealed;
+        /// <summary>[persistent] 臨界が溜まらない (Kw.AddHeat で捨てる)。</summary>
+        public bool heatSealed;
+        /// <summary>[persistent] 充電を得られない (AddCharge で捨てる)。</summary>
+        public bool chargeSealed;
+        /// <summary>[persistent] シールドを得られない (consShield の setter で増加を捨てる)。</summary>
+        public bool shieldSealed;
+        /// <summary>[persistent] 会心が出ない (会心の判定の最後で落とす ── 会心確定の効果より後)。</summary>
+        public bool critSealed;
+        /// <summary>[persistent] 〈赤錆の誓約〉: 敵に与える出血が 2 倍。</summary>
+        public bool bleedDoubled;
+        /// <summary>[persistent] 〈雷精の誓約〉: 得る充電が 2 倍。</summary>
+        public bool chargeDoubled;
+
+        // ---- 軸の ① 数を参照・②【規則】の品が立てる値 (2026-11-07)。 どれも戦闘開始時に品が書く [persistent] ----
+        /// <summary>[persistent] 毒がダメージを出したあとに残る割合 (%)。 基準 50 (半減)。 〈瘴気〉の②で上がる。</summary>
+        public int poisonKeepPct = 50;
+        /// <summary>[persistent] 出血の比例減衰の割る数への上乗せ (AxisRules.BleedDecay)。 〈血晶〉の②。</summary>
+        public int bleedDecayDivisorBonus;
+        /// <summary>[persistent] 出血のダメージへの上乗せ率 (0.03 = +3%)。 〈血晶〉の①。</summary>
+        public float bleedDamagePct;
+        /// <summary>[persistent] 臨界を得るたびの上乗せ (Kw.AddHeat)。 〈炉温〉の①。</summary>
+        public int heatGainBonus;
+        /// <summary>[persistent] 〈炉温〉の②: 爆発に会心が乗る。 代わりに爆発の基礎が 15 + 炉温 / 2。</summary>
+        public bool burstCritRule;
+        /// <summary>[persistent] 〈炉心の誓約〉: 爆発の基礎が 2 倍。</summary>
+        public bool burstDoubled;
+        /// <summary>[decay] 爆発への上乗せ (〈焼き増しの雷管〉が爆発のたびに積み、 ターン開始時に 1/4 を失う)。</summary>
+        public int burstStackBonus;
+        /// <summary>[persistent] ターン開始の減衰で残るシールドへの上乗せ (% ポイント)。 〈堅牢〉の①。 残る割合は最大 80%。</summary>
+        public int shieldKeepBonusPct;
+        /// <summary>[persistent] 〈心眼〉の②: 会心率が 100% を超えた分の確率で会心が重なる (会心倍率 +1.0)。</summary>
+        public bool critOverflowStack;
+        /// <summary>[persistent] 〈電流〉の②: 充電端子に挿した出目のこの割合が攻撃にも加わる。</summary>
+        public float chargeToAttackPct;
+        /// <summary>[persistent] 会心した攻撃だけに足す貫通 (〈刃毀れの見立て〉・CombatManager.Damage の防御の計算)。</summary>
+        public int critArmorPen;
+        /// <summary>[persistent] 充電の上限への上乗せ (〈雷鳴の太鼓〉・<see cref="ChargeCap"/>)。</summary>
+        public int chargeCapBonus;
+        /// <summary>[perTurn] 敵の攻撃を割合で減らす (0.2 = −20%)。 予告の前に掛ける (CombatManager.Turn の予告)。 BeginNewTurn の Phase B で 0。</summary>
+        public float enemyAtkCutPct;
+
+        /// <summary>[persistent] 種火・毒 r2 の上乗せを最後に使ったターン (1 ターンに 1 回)。</summary>
+        private int _poisonBonusTurn = -1;
+
+        /// <summary>[persistent] 軸の品の数の控え (戦闘ごとに CombatContext を作り直すので、 戦闘の間は所持品が変わらない前提で 1 度だけ数える)。</summary>
+        private readonly System.Collections.Generic.Dictionary<string, int> _axisDepth = new System.Collections.Generic.Dictionary<string, int>();
+
+        /// <summary>軸の品の数 (心眼 / 血晶 / 瘴気 / 炉温 / 電流 / 堅牢・<see cref="AxisRules"/>)。</summary>
+        public int AxisDepth(string axis)
+        {
+            if (_axisDepth.TryGetValue(axis, out int d)) return d;
+            d = AxisRules.Count(GameLoop.GameManager.Instance?.Run, axis);
+            _axisDepth[axis] = d;
+            return d;
+        }
         /// <summary>[persistent] 〈寸鉄〉: 会心率が 100% を超えた分が会心ダメージの倍率になる (超えた 10% につき +0.1)。</summary>
         public bool critOverflowToMultiplier;
         /// <summary>[persistent] 〈研ぎ知らずの銑鉄棍〉: 会心が出なくなる。 会心になるはずだった攻撃は敵の防御を無視し、
@@ -654,6 +718,7 @@ namespace ItemSystem.PassiveSkills
             get => _consShield;
             set
             {
+                if (shieldSealed && value > _consShield) value = _consShield;   // 誓約で封じた: 増加を捨てる
                 int gained = value - _consShield;
                 _consShield = value;
                 if (gained > 0) Keywords.Kw.Raise(this, PassiveSkillTrigger.OnShieldGain, gained);
@@ -751,12 +816,16 @@ namespace ItemSystem.PassiveSkills
         public void AddStatus(StatusTarget target, string id, int stacks)
         {
             if (stacks == 0 || string.IsNullOrEmpty(id)) return;
+            if (stacks > 0 && poisonSealed && target == StatusTarget.Enemy && id == "poison") return;   // 誓約で封じた
             // 2026-08-16: 〈回帰性真理〉のデバフ**付与拒否**は撤去した。
             //   毒/出血ビルドが最終ボスに参加できない状態になっていたため。
             //   累積の抑制は RecurrentTruth 側の「毎ターン半減」が担う。
-            if (stacks > 0 && target == StatusTarget.Enemy && id == "poison")
+            if (stacks > 0 && target == StatusTarget.Enemy && id == "poison" && _poisonBonusTurn != currentTurn)
             {
-                stacks += MetaProgression.MetaBuffApplicator.GetPoisonApplyBonus();
+                // 種火・毒 r2 (2026-11-07): 「毒を与えるたび +1」→「1 ターンに最初の 1 回だけ +2」。
+                //   毒の入り口を品ごとに増やしたので、 与えるたびだと入り口の +1 がすべて 2 倍になった。
+                int metaBonus = MetaProgression.MetaBuffApplicator.GetPoisonApplyBonus();
+                if (metaBonus > 0) { stacks += metaBonus; _poisonBonusTurn = currentTurn; }
             }
             var dict = target == StatusTarget.Enemy ? enemyStatusStacks : playerStatusStacks;
             int cur = dict.TryGetValue(id, out var v) ? v : 0;
@@ -790,9 +859,10 @@ namespace ItemSystem.PassiveSkills
             if (stacks <= 0) return 0;
             int dmg = DotDamage(def, stacks);
             if (dmg <= 0) return 0;
+            CombatSystem.CombatStats.DamageBreakdown[20] += dmg;   // [計装] 毒のダメージ
             Keywords.Kw.Raise(this, PassiveSkillTrigger.OnPoisonTick, dmg);
             CombatSystem.CombatManager.RaiseDotDamage(CombatSystem.CombatManager.DotKind.Poison, dmg);
-            if (def.halveAfterTick) enemyStatusStacks["poison"] = EnemyPoison / 2;   // 出すたびに半減 (霧吹きの分も)
+            if (def.halveAfterTick) enemyStatusStacks["poison"] = EnemyPoison * poisonKeepPct / 100;   // 出すたびに半減 (霧吹きの分も・〈瘴気〉の②で残る割合が上がる)
             return dmg;
         }
 
@@ -802,7 +872,8 @@ namespace ItemSystem.PassiveSkills
         /// 2026-08-16: 〈回帰性真理〉の付与拒否を撤去（累積抑制は毎ターン半減へ移行）。</summary>
         public void AddEnemyBleed(int stacks)
         {
-            if (stacks <= 0) return;
+            if (stacks <= 0 || bleedSealed) return;   // 誓約で封じた
+            if (bleedDoubled) stacks *= 2;
             enemyBleedStacks += stacks;
             if (enemyBleedStacks > GetAccumulated(Keywords.Kw.BleedMaxKey))
                 accumulatedValues[Keywords.Kw.BleedMaxKey] = enemyBleedStacks;   // 〈血車〉が読む
@@ -836,7 +907,9 @@ namespace ItemSystem.PassiveSkills
         {
             if (def.dotMaxHpPermillePerStack > 0)
             {
-                int maxHp = def.target == StatusTarget.Enemy ? enemyMaxHP : playerMaxHP;
+                int maxHp = def.dotUsesCurrentHp
+                    ? (def.target == StatusTarget.Enemy ? enemyCurrentHP : playerCurrentHP)
+                    : (def.target == StatusTarget.Enemy ? enemyMaxHP : playerMaxHP);
                 int n = def.dotScalesWithStacks ? stacks : 1;
                 return System.Math.Max(1, (int)((long)n * maxHp * def.dotMaxHpPermillePerStack / 1000));
             }
@@ -864,13 +937,19 @@ namespace ItemSystem.PassiveSkills
                     else fixedDamageToPlayer += dmg;
                     if (def.target == StatusTarget.Enemy && def.id == "poison")
                     {
+                        CombatSystem.CombatStats.DamageBreakdown[20] += dmg;   // [計装] 毒のダメージ
                         Keywords.Kw.Raise(this, PassiveSkillTrigger.OnPoisonTick, dmg);
                         CombatSystem.CombatManager.RaiseDotDamage(CombatSystem.CombatManager.DotKind.Poison, dmg);
                     }
                 }
                 int decay = def.decayPerTurn;
                 // 半減型 (毒): ダメージを出した後に、 いま残っているスタックを半分にする (切り捨て)。 tick 中に増えた分も半分になる
-                if (def.halveAfterTick) dict[def.id] = (dict.TryGetValue(def.id, out int nowStacks) ? nowStacks : stacks) / 2;
+                if (def.halveAfterTick)
+                {
+                    int now = dict.TryGetValue(def.id, out int nowStacks) ? nowStacks : stacks;
+                    int keep = def.target == StatusTarget.Enemy ? poisonKeepPct : 50;   // 〈瘴気〉の②は敵の毒だけ
+                    dict[def.id] = now * keep / 100;
+                }
                 else dict[def.id] = System.Math.Max(0, stacks - decay);
             }
         }
@@ -998,6 +1077,7 @@ namespace ItemSystem.PassiveSkills
             healBlocked = false;            // 狂暴化系
             enemyDamageTakenMultiplier = 1f;
             playerFlatDamageReduction = 0;  // 被ダメ固定減算
+            enemyAtkCutPct = 0f;            // 敵の攻撃の割合減 (軸の品・2026-11-07)
 
             // ダイス制約・補正
             enemyDiceOverrides.Clear();
@@ -1018,6 +1098,8 @@ namespace ItemSystem.PassiveSkills
 
             // ADR-0009 相互攻撃モデル用の一時ボーナス
             mutualAttackBonus = 0;
+            attackDicePct = 0f;
+            diceDerivedAttack = 0;
             mutualEnemyAttackReduction = 0;
             nonCritOutgoingMultiplier = 0f;
 
@@ -1025,17 +1107,22 @@ namespace ItemSystem.PassiveSkills
 
             if (enemyBleedStacks > 0 && !bleedDecayDisabled) // 出血スタック (止血阻害で減衰無効化)
             {
-                enemyBleedStacks--;
-                Keywords.Kw.Raise(this, PassiveSkillTrigger.OnBleedDecay, 1);
+                // 比例減衰 (2026-11-07): 1 + 出血 / (10 + 〈血晶〉の②)。 上限ではなく、 付与に応じた高さで落ち着く
+                int bleedDec = AxisRules.BleedDecay(enemyBleedStacks, bleedDecayDivisorBonus);
+                enemyBleedStacks -= bleedDec;
+                Keywords.Kw.Raise(this, PassiveSkillTrigger.OnBleedDecay, bleedDec);
                 if (enemyBleedStacks == 0) Keywords.Kw.Raise(this, PassiveSkillTrigger.OnBleedZero, 1);
             }
             if (enemyPassivesDisabledTurns > 0) enemyPassivesDisabledTurns--; // 敵パッシブ無効化 残ターン
+            burstStackBonus -= burstStackBonus / 4;   // 〈焼き増しの雷管〉の上乗せは毎ターン 1/4 を失う (ヴェスカ 4 段で積み上がらない)
             // プレイヤーのシールドは毎ターン半減 (切り捨て。 1 → 0 で確実に消える)。 ヴェスカのシールド規約と同じ (GAME.md §13-4)。
             // T1 は戦闘開始時の付与 (開幕シールド等) をそのまま使うので半減しない。 そのターンの付与は OnTurnStart 以降なので「半減 → 付与」の順になる。
             // 〈脈なしの鋼心臓〉で止まる。 失った分を〈半減で失った〉出来事として配る (2026-10-31)。
             if (currentTurn > 1 && _consShield > 0 && !shieldNoHalve)
             {
-                int lost = _consShield - _consShield / 2;
+                // 〈堅牢〉の①: 残る割合 50% + 上乗せ (最大 80%・2026-11-07)
+                int keepPct = System.Math.Min(80, 50 + shieldKeepBonusPct + MetaProgression.MetaBuffApplicator.GetShieldKeepBonusPct());
+                int lost = _consShield - _consShield * keepPct / 100;
                 _consShield -= lost;
                 Keywords.Kw.Raise(this, PassiveSkillTrigger.OnShieldDecay, lost);
             }
@@ -1068,6 +1155,22 @@ namespace ItemSystem.PassiveSkills
         /// <summary>ADR-0009 [perTurn]: 配線後の自攻撃値に加算されるボーナス。
         /// ExecuteTurnMutual が atkBase に加える。</summary>
         public int mutualAttackBonus;
+
+        /// <summary>[perTurn] <b>攻撃に挿した出目への上乗せ率</b> (0.5 = +50%・2026-11-06)。 BeginNewTurn の Phase B で 0。
+        /// 効果は配線より前 (OnPostRoll まで) に <see cref="AddAttackDicePct"/> で積み、 CombatManager が配線の確定後に
+        /// 「攻撃に挿した出目の合計 × この率」(切り上げ) を攻撃に 1 回だけ足す。 BOT の配線評価もこの値を読む。
+        /// <para>攻撃+N の上乗せを出目に掛ける形へ置き換えるための口。 上乗せは出目の比重を薄めるが、 これは出目に比例するので
+        /// 何を積んでも攻撃の主成分が出目のまま残り、 「1 個を攻撃へ回すか守りへ回すか」の重みが保たれる。</para></summary>
+        public float attackDicePct;
+
+        /// <summary>[perTurn] [計装] このターンの攻撃+N のうち、 出目から来た分 (上乗せ率の分・剣〈切り返し〉)。 BeginNewTurn の Phase B で 0。</summary>
+        public int diceDerivedAttack;
+
+        /// <summary>攻撃に挿した出目への上乗せ率を積む (<see cref="attackDicePct"/>)。 配線より前 (OnPostRoll まで) に呼ぶ。</summary>
+        public void AddAttackDicePct(float pct)
+        {
+            if (pct > 0f) attackDicePct += pct;
+        }
 
         /// <summary>[decay] 挑戦デバフ 軸10〈反響〉: **次のターン開始時に**プレイヤーへ入る反射ダメージ。
         /// 敵から受けたダメージの一定割合をここへ溜め、 翌ターン頭で適用してから 0 に戻す。
@@ -1160,9 +1263,12 @@ namespace ItemSystem.PassiveSkills
 
         /// <summary>充電を n 加算 (ChargeMax + メタ拡張バッテリー加算 で上限クランプ)。
         /// 2026-07-25 v6: 種火・充電 r2 で ChargeMax +5 (10→15)。</summary>
-        public void AddCharge(int n)
+        /// <para><paramref name="raiseOverflow"/> = false なら上限で溢れた分は捨てるだけで〈過充電〉の出来事を配らない
+        /// (〈電流〉の① の毎ターンの分。 配ると〈十五年目の計測器〉が溢れを攻撃に換え、 余った資源で強さを買える穴になる)。</para>
+        public void AddCharge(int n, bool raiseOverflow = true)
         {
-            if (n <= 0) return;
+            if (n <= 0 || chargeSealed) return;   // 誓約で封じた
+            if (chargeDoubled) n *= 2;
             int cur = GetCharge();
             // 〈雷壷〉は上限を外す (超えた分はターン開始時に半分捨てる・BeginNewTurn の Phase C)。
             int cap = chargeCapRemoved ? int.MaxValue : ChargeCap;
@@ -1174,11 +1280,11 @@ namespace ItemSystem.PassiveSkills
             accumulatedValues["mutualCharge"] = next;
             // 増えた分と、 上限で捨てた分 (過充電) を配る (2026-10-31 アイテム再編)
             Keywords.Kw.Raise(this, PassiveSkillTrigger.OnChargeGain, next - cur);
-            Keywords.Kw.Raise(this, PassiveSkillTrigger.OnOvercharge, n - (next - cur));
+            if (raiseOverflow) Keywords.Kw.Raise(this, PassiveSkillTrigger.OnOvercharge, n - (next - cur));
         }
 
         /// <summary>充電の上限 (ChargeMax + メタの拡張)。 〈雷壷〉でも「超えた分」の基準はこれ。</summary>
-        public int ChargeCap => CombatSystem.CombatManager.ChargeMax + MetaProgression.MetaBuffApplicator.GetChargeCapBonus();
+        public int ChargeCap => CombatSystem.CombatManager.ChargeMax + MetaProgression.MetaBuffApplicator.GetChargeCapBonus() + chargeCapBonus;
 
         /// <summary>[計装] 充電の収支。 Gained=実際に入った / Wasted=上限で捨てた /
         /// SpentTotal=ConsumeCharge 経由の消費 (リロール分は CombatStats.RerollStats[2] と重複)。</summary>

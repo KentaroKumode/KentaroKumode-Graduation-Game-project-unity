@@ -242,7 +242,7 @@ ShieldBash の空振り（盾 0）が 34.2% → 66.1%、1 機会あたりの攻�
 | `critSuppressed`【新2026-07-26】 | 会心封印(無心の刃)。forceCritical より優先度が低い | BeginNewTurnでfalse |
 | `enemyThreat` | 脅威。敗北base下限＆勝利時scratch基準 | 戦闘保持(威圧で+) |
 | `scratchDamage`/`nullifyScratchDamage` | 勝利時の削り被弾/無効化 | 毎T |
-| `enemyBleedStacks` | 出血。毎ターン-1減衰、毎T末に敵へ | 戦闘保持 |
+| `enemyBleedStacks` | 出血。毎ターン比例減衰 (1 + 出血/10・2026-11-07〜 §3-I)、毎T末に敵へ | 戦闘保持 |
 | `enemyBurnTurns`/`enemyBurnDamage` | 炎上（業火） | 戦闘保持 |
 | `enemyDiceTotalBonus` | 敵合計への加算（判定前・累積） | **BeginNewTurnでリセットしない** |
 | `enemyDiceTotalPenalty`【新】 | 敵合計への床なし減算（負値許容＝大差勝ち）。沈黙の剣帯=1T目99 | BeginNewTurnで0 |
@@ -313,6 +313,11 @@ ResolveCritRate(addTotal):
 > はどちらも常に 0）。**「逓減の捨て分を会心倍率へ還元する」極点はもう存在しない**ので、
 > 逓減の撤去で失われた機構も無い。
 > アイテム側の副次ステータス `subCritRatePct` も 2026-09-15 に全廃（GAME.md §24）。
+
+> **単位は小数 (`0.05f` = +5%)。** 2026-11-07 に、 整数の % (`8f` = +800%) で足していた 13 品
+> (軸の品 9・10/31 再編の 5: 血日に澄む佩玉・測量師の片眼鏡・烈刃・遅効の毒刃・瑠璃砥石) と、
+> 〈寸鉄〉〈重ね斬りの型〉の超過判定 (`lastCritAddPct > 100f`) を直した。 1 品で常時会心になり、 全体の会心率が 72% だった。
+> **10/31〜11/07 の測定値は会心に関して無効。**
 
 **天井**: 100%（`ResolveCritRate` のクランプ）だけ。`forceCritical` は率に関係なく確定する。
 
@@ -571,8 +576,8 @@ Passive カテゴリのシナジー武器群。4枚がインベントリに揃�
 | OnShieldAbsorb / OnShieldBreak | Kw.AbsorbShield (敵の直接攻撃と軽減無視の肩代わり) | 吸収した分 / 割られる前の量 |
 | OnShieldDecay | BeginNewTurn Phase C の半減 (〈脈なしの鋼心臓〉で止まる) | 失った分 |
 | OnPoisonGain / OnPoisonCap | CombatContext.AddStatus (敵の毒) | 増えた分 / 上限到達 |
-| OnPoisonTick | TickStatuses と〈廃庭の霧吹き〉(敵の攻撃のたび・TickPoisonOnce) | 毒のダメージ = `floor(毒 × enemyMaxHP × 5 / 1000)`・下限 1・`fixedDamageToEnemy` 経由 (2026-11-01〜。旧 毒 × 1。両経路とも `CombatContext.DotDamage`) **2026-11-05: 1 スタック 0.5% (旧 1%)・ダメージを出すたびにスタックを半減 (切り捨て・ターン開始の分も〈廃庭の霧吹き〉の分も)・上限 10** |
-| OnBleedDecay / OnBleedConsume / OnBleedZero | Phase C の自然減 / Kw.ConsumeBleed / 0 到達 | 減った分 / 使った分 / 1 |
+| OnPoisonTick | TickStatuses と〈廃庭の霧吹き〉(敵の攻撃のたび・TickPoisonOnce) | 毒のダメージ = `floor(毒 × enemyMaxHP × 1 / 1000)`・下限 1・`fixedDamageToEnemy` 経由 (両経路とも `CombatContext.DotDamage`)。 **2026-11-07: 1 スタック = 敵の最大 HP の 0.1% (旧 0.5%)・上限 99 (旧 10)**。 同日に一度「現在 HP」基準にしたが、 毒を積んでも与ダメの 13% しか出ず最大 HP に戻した。 ダメージを出すたびに、 残っているスタックを `poisonKeepPct`% に減らす (切り捨て・基準 50 = 半減・〈腐れ沼の苔玉〉で最大 70) |
+| OnBleedDecay / OnBleedConsume / OnBleedZero | Phase C の自然減 / Kw.ConsumeBleed / 0 到達 | 減った分 / 使った分 / 1。 **自然減は 2026-11-07〜 比例減衰** `1 + 出血 / (10 + bleedDecayDivisorBonus)` (`AxisRules.BleedDecay`・〈凝血の小瓶〉で割る数が増える) |
 
 **敵への軽減不可ダメージ (Kw.DamageEnemy)。** ターンの解決中 (`ExecuteTurnMutual` の頭〜最後の HP 同期) は
 CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠へ、 攻撃の後の分はターン最後の HP 同期 (踏みとどまりの clamp より前) で通す。
@@ -584,6 +589,25 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 - 会心の回数は `Kw.CritCountKey` に積む (〈戦果の天秤〉)。
 
 **個々の品の数値は `ReworkItemEffects.cs` の XML コメントが正本** (再記述しない)。
+
+### 3-I. 軸の品 (2026-11-07・`AxisItemEffects.cs`・`AxisRules.cs`)
+
+**軸の品の数。** 品の軸は items.json の `axis`。 `CombatContext.AxisDepth(axis)` が戦闘の頭に 1 度だけ所持パッシブを数える
+(呼び名: 会心 = 心眼 / 出血 = 血晶 / 毒 = 瘴気 / 臨界 = 炉温 / 充電 = 電流 / シールド = 堅牢)。 出目は軸にしない。
+
+| 計算の位置 | 式 |
+|---|---|
+| 爆発 1 回の基礎 (`Kw.BurstBase`) | `burstCritRule ? 15 + 炉温 / 2 : rinkaiBurstDamage (既定 30)` → 〈炉心の誓約〉で ×2 → `+ burstStackBonus` (〈焼き増しの雷管〉が爆発のたび +6・ターン開始時に 1/4 を失う)。 2026-11-07: 既定 50 → 30 |
+| 爆発に会心 (〈火花読みの眼鏡〉) | 主攻撃の会心の判定後、 この攻撃が爆発を使っていれば `dealtFixed += floor(爆発 × (criticalMultiplier − 1))` |
+| 臨界を得る (`Kw.AddHeat`) | `n + heatGainBonus` (〈焚き足しの炭〉で +1)。 閾値は 50 固定 (〈早沸かし釜〉は −15) |
+| 重ね会心 (〈重ね斬りの型〉) | 会心時、 会心率の加算合計 > 100% なら `(合計 − 100) / 100` の確率で会心倍率 +1.0 (`PassiveSkillManager`) |
+| 出血のダメージ | `ApplyBleedModifiers`: `floor(出血 × (1 + bleedDamagePct))` (〈血止め知らずの針箱〉が 血晶 × 3%) |
+| シールドの減衰 | 残る割合 `min(80, 50 + shieldKeepBonusPct)`% (〈油を引いた盾革〉が 堅牢 × 5) |
+| 充電端子 → 攻撃 (〈二股の端子〉) | 配線集計で `attackSum += floor(充電端子の出目の合計 × chargeToAttackPct)` (上乗せ率の前・電流 × 12%・最大 80%) |
+| 盾押し (〈盾押しの心得〉) | OnWired・攻撃に挿したターン: 攻撃 + `floor(シールド × 堅牢 × 10%)` |
+| 誓約の封じ (`OathSeals.Apply`) | 戦闘の情報を作った直後に所持品から立てる。 入口で捨てる: 毒 (AddStatus) / 出血 (AddEnemyBleed) / 臨界 (Kw.AddHeat と臨界の持ち越し) / 充電 (AddCharge) / シールド (consShield の setter の増加) / 会心 (会心確定の後で落とす) |
+| 入り口 (`EntryEffect`) | 毒・臨界の軸の既存品 22 品に、 決まった機会 (ターン開始 / 攻撃が通る / 敵の攻撃 / 受けきり / ブロックのダイス 1 個) で毒 +1〜2・臨界 +3 を重ねる。 表は `EntryEffect.Table` |
+| 種火・毒 r2 | 2026-11-07: 毒を与えるたび +1 → 1 ターンに最初の 1 回だけ +2 |
 
 ## 4. 敵/汎用パッシブ一覧（`EnemyPassiveSkillEffects.cs`・視点は§0参照）
 
@@ -649,7 +673,7 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 | ImmortalEmber(不滅の残り火) | OnTurnStart | HP≤60%/30%で 失HPの5%/8%回復(ラチェット上限)、断罪ターンは回復なし |
 | StarfireProliferation(星火燎原) | OnRollLose | starfire stack++、enemyDiceTotalBonus = stack(累積・リセット無) |
 | ScorchedEarth(焦土) | OnTurnEnd | プレイヤー敗北時 実プレイヤー最大HP −= 被ダメ10%、consShield=0 |
-| Decree13th(13番目の宣告) | OnTurnStart/OnTurnEnd | 13%でフラグ、成就で (playerDiceTotal+enemyDiceTotal)×criticalMultiplier を軽減無視で実プレイヤーへ |
+| Decree13th(13番目の宣告) | OnTurnStart/OnTurnEnd | 1/13でフラグ、成就で (playerDiceTotal+enemyDiceTotal)×criticalMultiplier を軽減無視で実プレイヤーへ |
 | StrongOne/Throne/Setsuna(強者/玉座/刹那) | OnBattleStart | bossDiceBonus = 4/8/12 ※**現在enemies.jsonから撤廃・未参照（クラスは残置）** |
 | SaintGeorgesPhases(シュヴァリエ) | 多数 | 形態1:シールド140+ロール勝利で(プレイヤー合計+プリオリテ×3)反撃+シールド−25 / 形態2:4d6+連勝報酬(ボスダイス+4,+15ダメ)・3勝で形態1帰還 / プリオリテ累積でシールド−28・反撃+10 |
 
@@ -751,6 +775,9 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          **逃げるターンは固定ダメ枠も 0** (臨界爆発・品が預けた分を含む・爆発の予約は消費される)。 出血の DOT は別の段なので入る。
 
 自攻撃   atkBase   = playerAttackPower + Σ(attack 端子の出目) + ctx.mutualAttackBonus
+         ctx.mutualAttackBonus には、 atkBase の直前に **ceil(Σ(attack 端子の出目) × ctx.attackDicePct)** が足される
+           (2026-11-06・攻撃に挿した出目への上乗せ率。 品は OnPostRoll までに AddAttackDicePct で率を積み、 ここで 1 回だけ掛ける。
+            攻撃端子 0 本なら 0。 ステータス `atkDicePct` / 〈間合〉〈一対一〉〈猛り〉/ [剣の舞] / 刻みを使い切る 3 品)
          → 臨界爆発 (予約消費): rinkaiBurstActive なら fixedDamageToEnemy += rinkaiBurstDamage
            (rinkaiCritOnBurst なら forceCritical=true。消費後 false に戻す)
          → ProcessDamage(atkBase, pursuitDamage, playerCriticalNumerator)

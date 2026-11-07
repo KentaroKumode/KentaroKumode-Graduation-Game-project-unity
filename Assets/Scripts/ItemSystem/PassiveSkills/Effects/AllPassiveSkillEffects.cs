@@ -623,8 +623,8 @@ namespace ItemSystem.PassiveSkills.Effects
             //   「揃えば強い、 単体でも損しない」へ寄せる。 集めに行く動機はここで作る。
             //   (2026-09-05 に HP半減 → -10% へ緩和した経緯があり、 今回で全廃。)
             if (trigger == PassiveSkillTrigger.OnBattleStart) return;
-            // OnPostRoll: 攻撃+1 (旧: ダイス合計+1)
-            ctx.AddPlayerAttackOrDiceBonus(1);
+            // OnPostRoll: 攻撃に挿した出目 +10% (2026-11-06・旧 攻撃+1)
+            ctx.AddAttackDicePct(0.1f);
         }
     }
 
@@ -645,7 +645,7 @@ namespace ItemSystem.PassiveSkills.Effects
             {
                 // 旧: 自他ダイス合計+5 (差分不変で「合計」参照系と相乗) / 新: 自攻撃+5 のみ
                 // (敵ダイス合計+5 は新モデルではロール勝負がないため機能喪失 = 廃止)
-                ctx.AddPlayerAttackOrDiceBonus(5);
+                ctx.AddAttackDicePct(0.5f);   // 攻撃に挿した出目 +50% (2026-11-06・旧 攻撃+5)
                 if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
                 ctx.outgoingDamageMultiplier += 0.2f; // 与ダメ+20%（毎ターンリセット→再適用）
                 return;
@@ -665,8 +665,8 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            // 旧: ダイス合計+3 / 新: 攻撃+3
-            ctx.AddPlayerAttackOrDiceBonus(3);
+            // 攻撃に挿した出目 +30% (2026-11-06・旧 攻撃+3)
+            ctx.AddAttackDicePct(0.3f);
         }
     }
 
@@ -683,12 +683,12 @@ namespace ItemSystem.PassiveSkills.Effects
         /// 10G の LEGENDARY が無効果では買われず、 ペナルティを外した意味が消えるため、
         /// セット共通の書式 (ワルツ +1 / バレエ +3 / パソドブレ +5) に合わせて最小限の上振れを持たせる。
         /// <b>この値だけが今回の追加分</b>なので、 不要ならここを 0 にすれば元の「無効果」に戻る。</para></summary>
-        public const int AttackBonus = 2;
+        public const float AttackDicePct = 0.2f;   // 攻撃に挿した出目 +20% (2026-11-06・旧 攻撃+2)
 
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
             if (trigger != PassiveSkillTrigger.OnPostRoll) return;
-            if (AttackBonus > 0) ctx.AddPlayerAttackOrDiceBonus(AttackBonus);
+            ctx.AddAttackDicePct(AttackDicePct);
         }
     }
 
@@ -752,7 +752,8 @@ namespace ItemSystem.PassiveSkills.Effects
             int stacks = ctx.GetStatus(StatusTarget.Enemy, "poison");
             if (stacks <= 0) return;
             // 2026-10-31: 最大 −5。 毒が深くなるほど敵が無力化され、 伸ばすほど安全になる形を止める。
-            ctx.mutualEnemyAttackReduction += System.Math.Min(stacks, MaxCut);
+            // 2026-11-07: 毒 5 につき −1 (旧 毒 1 につき)。 毒 1 スタックの重みが 1/5 になったため。
+            ctx.mutualEnemyAttackReduction += System.Math.Min(stacks / 5, MaxCut);
         }
     }
 
@@ -926,12 +927,10 @@ namespace ItemSystem.PassiveSkills.Effects
     internal static class RinkaiInit
     {
         public const int DefaultThreshold = 50;
-        public const int DefaultBurstDamage = 50;
-        public static void EnsureEnabled(CombatContext ctx)
-        {
-            if (ctx.rinkaiThreshold <= 0) ctx.rinkaiThreshold = DefaultThreshold;
-            if (ctx.rinkaiBurstDamage <= 0) ctx.rinkaiBurstDamage = DefaultBurstDamage;
-        }
+        /// <summary>爆発 1 回の基礎。 2026-11-07: 50 → 30 (投資しないと威力が足りない形・炉温の品で伸ばす)。</summary>
+        public const int DefaultBurstDamage = 30;
+        /// <summary>閾値は臨界の軸の深さで決まるので Kw.EnableHeat に寄せる (2026-11-06・AxisRules)。</summary>
+        public static void EnsureEnabled(CombatContext ctx) => Keywords.Kw.EnableHeat(ctx);
     }
 
 

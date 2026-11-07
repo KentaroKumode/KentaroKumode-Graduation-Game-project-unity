@@ -11,8 +11,11 @@ namespace CombatSystem
         /// **机上で組み立てて**較正したが、 実機と 5 倍ずれていたことが 2026-08-03 に判明した。
         /// 二度と机上の参照状態で較正しないための計測点。
         /// [0]件数 [1]武器素火力 [2]攻撃端子出目 [3]パッシブ加算 [4]消費 [5]遺物
-        /// [6]atkBase合計 [7]最終与ダメ合計 [8]会心回数 [9]固定ダメ合計 [10]追撃合計</summary>
-        public static readonly double[] DamageBreakdown = new double[19];
+        /// [6]atkBase合計 [7]最終与ダメ合計 [8]会心回数 [9]固定ダメ合計 [10]追撃合計
+        /// [19]パッシブ加算 [3] のうち出目から来た分 (攻撃に挿した出目への上乗せ率・剣〈切り返し〉・2026-11-06)
+        /// [20]毒のダメージ [21]出血のダメージ (固定ダメ枠を通らず敵 HP を直接引く・入った分だけ) [22]臨界の爆発 (遺物の上乗せ込み)
+        /// ── 毒と爆発は [9] の内数。 発生した時点の量で数えるので、 撃破のはみ出しや逃げるターンの捨て分を含む (2026-11-06)</summary>
+        public static readonly double[] DamageBreakdown = new double[23];
 
         /// <summary>**7層 (ヴェスカ連戦) だけ**の内訳。 添字は <see cref="DamageBreakdown"/> と同じ。
         /// 7層は 4 形態が 1 戦闘なので、 **戦闘の開始/終了の差分**で連戦全体が採れる ──
@@ -21,7 +24,7 @@ namespace CombatSystem
         /// <para>2026-08-22: 同一シードで Optimal が 7層 p3 の与ダメ/T を **+20%** 上回るのに、
         /// 攻撃本数も攻撃出目計もほぼ同じ (1.46/17.3 対 1.44/17.0)。 会心系の役の発動数も同一。
         /// **倍率のどこかに差がある**が特定できていない。 それを切り分けるための計装。</para></summary>
-        public static readonly double[] DamageBreakdown7F = new double[19];
+        public static readonly double[] DamageBreakdown7F = new double[23];
 
         public static void ResetDamageBreakdown()
         {

@@ -26,6 +26,7 @@ namespace ItemSystem.PassiveSkills
             if (initialized) return;
             RegisterAll();
             RegisterStatSkills();
+            WrapEntries();
             initialized = true;
         }
 
@@ -62,6 +63,20 @@ namespace ItemSystem.PassiveSkills
                     registry.TryGetValue(ps.internalName, out var inner);
                     registry[ps.internalName] = new Effects.StatModifierEffect(ps.internalName, ps.stats, inner);
                 }
+            }
+        }
+
+        /// <summary>毒・臨界の軸の既存品に入り口 (決まった機会に資源を少し足す) を重ねる (2026-11-07・<see cref="Effects.EntryEffect"/>)。</summary>
+        private static void WrapEntries()
+        {
+            foreach (var e in Effects.EntryEffect.Table)
+            {
+                if (!registry.TryGetValue(e.id, out var inner))
+                {
+                    UnityEngine.Debug.LogError($"[PassiveSkillRegistry] 入り口の対象 {e.id} が登録されていない");
+                    continue;
+                }
+                registry[e.id] = new Effects.EntryEffect(inner, e.when, e.heat, e.amount);
             }
         }
 
@@ -237,6 +252,26 @@ namespace ItemSystem.PassiveSkills
             Register(new FlintRing());
             Register(new Suntetsu());
             Register(new UnwhettedClub());
+
+            // ============================
+            //  軸の品 (2026-11-07・AxisItemEffects.cs)。 各軸に 燃料 / ① 数を参照 / ②【規則】 / 誓約
+            // ============================
+            Register(new FalconerGlove());    Register(new WhetterAppraisal());  Register(new LayeredCutForm());      Register(new LayeredScabbard()); Register(new PinpointEye());
+            Register(new ReturnEdgeClasp());  Register(new UnstanchedNeedles()); Register(new ClotVial());            Register(new RustOath());
+            Register(new TasterSpoon());      Register(new MiasmaJar());         Register(new RotMossBall());         Register(new DregsOath());
+            Register(new FirekeeperPoker());  Register(new CharcoalFeeder());       Register(new SparkReadingGlasses()); Register(new RefiredPrimer());   Register(new CoreOath());
+            Register(new ToppedJar());        Register(new LeakyCopperWire());   Register(new ForkedTerminal());      Register(new SpriteOath());
+            Register(new PaddedBracer());     Register(new OiledShieldLeather());Register(new ShieldPushArt());       Register(new WardenOath());
+            // 軸の品・追加 34 品 (2026-11-07・AxisItemEffects2.cs)。 各軸を 23 品にそろえた
+            Register(new AimNotch());   Register(new FirstArrow());   Register(new LingeringBell()); Register(new ParryFan());
+            Register(new NickAppraisal()); Register(new LosingStreakDie()); Register(new ChainedFlash()); Register(new QuickDrawArt()); Register(new FarsightCrystal());
+            Register(new SpareBattery()); Register(new StaticBlanket()); Register(new FlintNeedle()); Register(new StorageGauntlet());
+            Register(new RerollHammer()); Register(new InsulatedCloak()); Register(new LightningStake()); Register(new ThunderDrum());
+            Register(new ChippedKnife()); Register(new ThornGlove()); Register(new RiftWedge()); Register(new DrippingEdge());
+            Register(new NoClotSalve()); Register(new CrimsonPress()); Register(new EndlessSpringCrystal());
+            Register(new AcidVial()); Register(new NeedleRing()); Register(new LeafMoldBag()); Register(new NumbDart());
+            Register(new MiasmaMantle()); Register(new PoolKeeper());
+            Register(new RivetPlate()); Register(new CatchBracer()); Register(new LayeredTagShield()); Register(new BrokenShieldGrudge());
 
             // ============================
             //  汎用パッシブ（6種×3段階）

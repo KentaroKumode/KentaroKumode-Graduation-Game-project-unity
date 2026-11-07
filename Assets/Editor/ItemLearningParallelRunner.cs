@@ -109,6 +109,16 @@ namespace AutoTest.EditorTools
         [MenuItem("Tools/AutoRun/■ ITT 並列: 全種プール 100000ラン → 購入の序列", priority = 8)]
         private static void LaunchItt() => LaunchWith(0, runsPerRound: 100000, itt: true);
 
+        /// <summary>ITT を Super の方策で取る (2026-11-06)。 配布試行の間も今の ITT の序列で買う (配布は無作為なので割り当ては交絡しない)。
+        /// 品の価値は使う方策の下で測る ── Optimal + 古い観測の序列の上で測った値は、 Super の判断とずれる。</summary>
+        [MenuItem("Tools/AutoRun/■ ITT 並列 (Super の方策・今の序列で買う): 100000ラン", priority = 8)]
+        private static void LaunchIttSuper()
+        {
+            AutoTest.GrantItt.Variant = "super";   // 書き先を itt_clear.super.json にする (合流の後に戻す)
+            LaunchWith(0, AutoRunner.WiringSkill.Super, 100000, itt: true,
+                overrides: new Dictionary<string, string> { ["useIttBeta"] = "True" });
+        }
+
         /// <summary>診断: 観測の回帰 (regβ) で買う旧方式。 ITT の序列との比較用 (2026-11-05: 旧方式は学習なしより悪い)。</summary>
         [MenuItem("Tools/AutoRun/診断: 並列 学習ラウンド (観測の回帰 regβ で買う・旧)", priority = 14)]
         private static void LaunchObservational() => LaunchWith(0, useItt: false);
@@ -257,6 +267,7 @@ namespace AutoTest.EditorTools
             // 2026-11-05: 一旦イベントを切る (ユーザー指示)。 確信の連鎖 (層 1 で HP 半減 + 啓示のエリート) が
             //   層 1 の死亡を押し上げていたため、 バランス測定から外す。 確信の資格は本体が無償で与える。
             cfg["suppressEvents"] = "True";
+            if (ab) cfg["measureNoExplore"] = "True";   // 学習に合流しない測定にランダムな買い物を混ぜない
             cfg["freeNavScout"] = scout ? "True" : "False";
             cfg["navLearnedDanger"] = learnedDanger ? "True" : "False";
             if (overrides != null) foreach (var kv in overrides) cfg[kv.Key] = kv.Value;
@@ -444,7 +455,11 @@ namespace AutoTest.EditorTools
                         { Debug.LogError("[学習並列] 応答なしで終了: " + s.logPath); s.done = s.failed = true; done++; }
                         continue;
                     }
-                    var resp = JsonUtility.FromJson<RankMarginWorkerResponse>(File.ReadAllText(s.responsePath, Encoding.UTF8));
+                    // ワーカーが書いている最中だと共有違反になる (2026-11-06 に 1 回で測定ごと止まった)。 次の確認で読み直す。
+                    string respText;
+                    try { respText = File.ReadAllText(s.responsePath, Encoding.UTF8); }
+                    catch (IOException) { continue; }
+                    var resp = JsonUtility.FromJson<RankMarginWorkerResponse>(respText);
                     s.done = true; done++;
                     bool ok = _st.mode == "itt" ? (resp != null && File.Exists(GrantCsvOf(s))) : (resp != null && resp.completedNormally && File.Exists(s.learnPath));
                     if (!ok)
@@ -547,6 +562,7 @@ namespace AutoTest.EditorTools
             }
             bool ok1 = GrantItt.Recompute(csv, _st.learningRoot);
             bool ok2 = ok1 && GrantItt.RecomputeSurvival(csv, _st.learningRoot);
+            GrantItt.Variant = "";
             double min = (DateTime.UtcNow - _roundStartUtc).TotalMinutes;
             string line = $"ITT: 割り当て {rows.Count:N0} 行 / 回帰 {(ok1 ? "OK" : "失敗")} / 生存 {(ok2 ? "OK" : "失敗")} / {min:F1} 分 / {csv}";
             File.AppendAllText(Path.Combine(_root, "rounds.txt"), line + "\n", new UTF8Encoding(false));
@@ -561,7 +577,7 @@ namespace AutoTest.EditorTools
             EditorApplication.update -= Poll;
             _running = false;
             SessionState.EraseString(ActiveKey);
-            string msg = $"[学習並列] {note} — {_st?.round ?? 0}/{_st?.rounds ?? 0} ラウンド合流済み\n  {_root}";
+            string msg = $"[学習並列] {note} — {_st?.round ?? 0}/{_st?.rounds ?? 0} ラウンド" + (_st != null && _st.noMerge ? "完了 (学習には合流していない)" : "合流済み") + $"\n  {_root}";
             try { File.AppendAllText(Path.Combine(_root, "rounds.txt"), "# " + note + "\n", new UTF8Encoding(false)); } catch { }
             if (note == "完了") Debug.Log(msg); else Debug.LogError(msg);
         }

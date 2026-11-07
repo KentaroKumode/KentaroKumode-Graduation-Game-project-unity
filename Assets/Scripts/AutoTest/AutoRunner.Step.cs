@@ -60,6 +60,7 @@ namespace AutoTest
             //   それ以前のランに依存し、 チャンク分割と逐次で結果が変わる (決定性違反)。
             _rerollYieldSum = 0f; _rerollYieldN = 0;
 
+            GameLoop.GoldIncome.RunByDepthSource.Clear();
             _cur = new RunRec
             {
                 index = index, profile = "貪欲",
@@ -92,6 +93,7 @@ namespace AutoTest
             }
 
             // メタ恒久進行の前処理 (パターン別)
+            MetaAllocationPresets.AllowOverBudget = metaAllowOverBudget;
             try
             {
                 switch (metaPattern)
@@ -219,6 +221,9 @@ namespace AutoTest
             //   1 つも消費しないので、 付与あり/なしで乱数列はずれない ＝ ペアが保たれる。
             if (!string.IsNullOrEmpty(_pendingGrantItemId) && gm.Run != null)
                 ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(gm.Run, _pendingGrantItemId);
+
+            // [診断] 軸の品をまとめて開幕に配る (2026-11-07)。 軸に深く投資した構成が実際に強いかを因果で測る。
+            if (!string.IsNullOrEmpty(axisPackageAxis) && gm.Run != null) GrantAxisPackage(index, gm.Run);
 
             // ランダム付与試行: このランの割り当てを引く。 引くだけで、 配るのは各層に着いてから。
             if (randomGrantTrial && gm.Run != null) RollGrantPlan(index, gm.Run);

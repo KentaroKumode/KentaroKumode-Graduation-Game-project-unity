@@ -77,7 +77,16 @@ namespace AutoTest.ParallelSweep
                 //   (サマリーの「配分: None」と「与ダメ メタ +0.210」が食い違って発覚)。
                 //   Standard は Balanced なので従来の測定は変わらない。
                 if (string.IsNullOrWhiteSpace(_job.rankSpec) && string.IsNullOrEmpty(_job.focusTrack))
-                    spec = MetaAllocationPresets.Ranks(runner.metaAllocation);
+                {
+                    // 設定の metaRankSpec (A/B の腕で配点を変える) を優先する (2026-11-07)。
+                    //   これまでは読んでおらず、 種火の腕 7 本がどれも Balanced で走って全ラン同一になっていた。
+                    if (!string.IsNullOrWhiteSpace(runner.metaRankSpec))
+                    {
+                        spec = MetaAllocationPresets.ParseSpec(runner.metaRankSpec);
+                        if (spec.Count == 0) throw new InvalidDataException("metaRankSpec を解釈できない: " + runner.metaRankSpec);
+                    }
+                    else spec = MetaAllocationPresets.Ranks(runner.metaAllocation);
+                }
                 // **worker 内ではスレッド並列を切る** (2026-09-19)。 並列化はプロセス数 (≒コア数) で
                 //   既に取っている。 Super は判断ごとに コア数−1 本、 Optimal の配線列挙は最大 8 本の
                 //   Parallel.For を立てるので、 22 プロセスが同時にやると 500 本超のスレッドが
@@ -258,6 +267,7 @@ namespace AutoTest.ParallelSweep
                 ItemSystem.Helpers.PassiveSourceAudit.Counts["金:" + kv.Key] = (int)System.Math.Min(int.MaxValue, kv.Value);
             var runnerForDump = FindObjectOfType<AutoRunner>();
             runnerForDump?.CloseWiringDiff();
+            runnerForDump?.CloseTurnAudit();
             // 並列アイテム学習: 担当区間のラン記録を書き出す。 先頭の捨てラン 1 本は除く (末尾 runs 本だけ)。
             //   書けなければ失敗として返す ── 記録が欠けたまま「完了」にすると、 親は黙って薄い学習を積む。
             if (tally != null && runnerForDump != null && !string.IsNullOrWhiteSpace(_job.learnRunsPath))

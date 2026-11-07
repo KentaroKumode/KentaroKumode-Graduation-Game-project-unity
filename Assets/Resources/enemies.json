@@ -66,14 +66,14 @@
       "displayName": "スライム",
       "description": "最弱の魔物。ぷるぷると揺れながら近づいてくる。",
       "floor": 1,
-      "maxHP": 97,
+      "maxHP": 45,
       "criticalNumerator": 0,
       "threat": 1,
       "passiveSkills": [],
       "baseAttack": 3,
       "attackRollMin": 0,
       "attackRollMax": 2,
-      "danger": 4,
+      "danger": 2,
       "scale": 0.05
     },
     {
@@ -82,14 +82,14 @@
       "description": "最弱の魔物。ぷるぷると揺れながら近づいてくる。",
       "floor": 1,
       "elite": true,
-      "maxHP": 121,
+      "maxHP": 55,
       "criticalNumerator": 0,
       "threat": 4,
       "passiveSkills": [],
       "baseAttack": 2,
       "attackRollMin": 0,
       "attackRollMax": 3,
-      "danger": 4,
+      "danger": 2,
       "scale": 0.05
     },
     {
@@ -97,14 +97,14 @@
       "displayName": "ゴブリン",
       "description": "小柄だが狡猾な魔物。数の暴力を好む。",
       "floor": 1,
-      "maxHP": 100,
+      "maxHP": 45,
       "criticalNumerator": 0,
       "threat": 1,
       "passiveSkills": [],
       "baseAttack": 2,
       "attackRollMin": 0,
       "attackRollMax": 2,
-      "danger": 3,
+      "danger": 1,
       "scale": 0.0
     },
     {
@@ -113,14 +113,14 @@
       "description": "小柄だが狡猾な魔物。数の暴力を好む。",
       "floor": 1,
       "elite": true,
-      "maxHP": 125,
+      "maxHP": 55,
       "criticalNumerator": 0,
       "threat": 4,
       "passiveSkills": [],
       "baseAttack": 2,
       "attackRollMin": 0,
       "attackRollMax": 2,
-      "danger": 4,
+      "danger": 2,
       "scale": 0.0
     },
     {
@@ -128,7 +128,7 @@
       "displayName": "コボルド",
       "description": "犬のような顔の小鬼。罠を仕掛けるのが得意。",
       "floor": 1,
-      "maxHP": 119,
+      "maxHP": 50,
       "criticalNumerator": 0,
       "threat": 4,
       "passiveSkills": [
@@ -142,7 +142,7 @@
       "baseAttack": 3,
       "attackRollMin": 0,
       "attackRollMax": 2,
-      "danger": 5,
+      "danger": 2,
       "scale": 0.1
     },
     {
@@ -151,7 +151,7 @@
       "description": "犬のような顔の小鬼。罠を仕掛けるのが得意。",
       "floor": 1,
       "elite": true,
-      "maxHP": 148,
+      "maxHP": 65,
       "criticalNumerator": 0,
       "threat": 7,
       "passiveSkills": [
@@ -165,7 +165,7 @@
       "baseAttack": 3,
       "attackRollMin": 0,
       "attackRollMax": 2,
-      "danger": 6,
+      "danger": 3,
       "scale": 0.1
     },
     {
@@ -173,7 +173,7 @@
       "displayName": "スケルトン",
       "description": "朽ちた骨が動き出した不死の戦士。痛みを感じない。",
       "floor": 1,
-      "maxHP": 186,
+      "maxHP": 80,
       "criticalNumerator": 0,
       "threat": 2,
       "passiveSkills": [
@@ -187,7 +187,7 @@
       "baseAttack": 3,
       "attackRollMin": 0,
       "attackRollMax": 3,
-      "danger": 8,
+      "danger": 4,
       "scale": 0.2
     },
     {
@@ -196,7 +196,7 @@
       "description": "朽ちた骨が動き出した不死の戦士。痛みを感じない。",
       "floor": 1,
       "elite": true,
-      "maxHP": 231,
+      "maxHP": 100,
       "criticalNumerator": 0,
       "threat": 5,
       "passiveSkills": [
@@ -210,7 +210,7 @@
       "baseAttack": 3,
       "attackRollMin": 0,
       "attackRollMax": 3,
-      "danger": 10,
+      "danger": 4,
       "scale": 0.2
     },
     {
@@ -218,7 +218,7 @@
       "displayName": "ダイアウルフ",
       "description": "巨大な狼。素早い攻撃で敵を翻弄する。",
       "floor": 1,
-      "maxHP": 149,
+      "maxHP": 65,
       "criticalNumerator": 0,
       "threat": 4,
       "passiveSkills": [
@@ -232,7 +232,7 @@
       "baseAttack": 3,
       "attackRollMin": 0,
       "attackRollMax": 2,
-      "danger": 6,
+      "danger": 3,
       "scale": 0.15
     },
     {
@@ -241,7 +241,7 @@
       "description": "巨大な狼。素早い攻撃で敵を翻弄する。",
       "floor": 1,
       "elite": true,
-      "maxHP": 187,
+      "maxHP": 80,
       "criticalNumerator": 0,
       "threat": 7,
       "passiveSkills": [
@@ -255,7 +255,7 @@
       "baseAttack": 3,
       "attackRollMin": 0,
       "attackRollMax": 2,
-      "danger": 7,
+      "danger": 3,
       "scale": 0.15
     },
     {
@@ -263,7 +263,7 @@
       "displayName": "オーク",
       "description": "屈強な体躯の蛮族。力任せに武器を振るう。",
       "floor": 5,
-      "maxHP": 1628,
+      "maxHP": 525,
       "criticalNumerator": 0,
       "threat": 6,
       "passiveSkills": [
@@ -274,10 +274,10 @@
           "flavorText": "「当たっただけじゃ終わらんのか」「終わってたら苦労してない」"
         }
       ],
-      "baseAttack": 20,
+      "baseAttack": 9,
       "attackRollMin": 1,
-      "attackRollMax": 11,
-      "danger": 423,
+      "attackRollMax": 6,
+      "danger": 66,
       "scale": 0.65
     },
     {
@@ -286,7 +286,7 @@
       "description": "屈強な体躯の蛮族。力任せに武器を振るう。",
       "floor": 5,
       "elite": true,
-      "maxHP": 2605,
+      "maxHP": 845,
       "criticalNumerator": 0,
       "threat": 9,
       "passiveSkills": [
@@ -297,10 +297,10 @@
           "flavorText": "「当たっただけじゃ終わらんのか」「終わってたら苦労してない」"
         }
       ],
-      "baseAttack": 23,
+      "baseAttack": 10,
       "attackRollMin": 1,
-      "attackRollMax": 13,
-      "danger": 782,
+      "attackRollMax": 7,
+      "danger": 118,
       "scale": 0.65
     },
     {
@@ -308,7 +308,7 @@
       "displayName": "ハーピィ",
       "description": "空を舞う鳥人。鋭い爪で襲いかかる。",
       "floor": 5,
-      "maxHP": 1016,
+      "maxHP": 335,
       "criticalNumerator": 0,
       "threat": 4,
       "passiveSkills": [
@@ -319,10 +319,10 @@
           "flavorText": "「逃げたぞ、追え」「上です」「……上か」"
         }
       ],
-      "baseAttack": 15,
+      "baseAttack": 9,
       "attackRollMin": 0,
-      "attackRollMax": 4,
-      "danger": 173,
+      "attackRollMax": 3,
+      "danger": 35,
       "scale": 0.55
     },
     {
@@ -331,7 +331,7 @@
       "description": "空を舞う鳥人。鋭い爪で襲いかかる。",
       "floor": 5,
       "elite": true,
-      "maxHP": 1611,
+      "maxHP": 520,
       "criticalNumerator": 0,
       "threat": 7,
       "passiveSkills": [
@@ -342,10 +342,10 @@
           "flavorText": "「逃げたぞ、追え」「上です」「……上か」"
         }
       ],
-      "baseAttack": 17,
+      "baseAttack": 11,
       "attackRollMin": 0,
-      "attackRollMax": 5,
-      "danger": 314,
+      "attackRollMax": 3,
+      "danger": 65,
       "scale": 0.55
     },
     {
@@ -353,7 +353,7 @@
       "displayName": "蛇鱗の戦士",
       "description": "硬い鱗に覆われた爬虫類の戦士。守りが堅い。",
       "floor": 3,
-      "maxHP": 509,
+      "maxHP": 165,
       "criticalNumerator": 0,
       "threat": 6,
       "passiveSkills": [
@@ -370,10 +370,10 @@
           "flavorText": "傷は背中にあった。逃げたわけではない。"
         }
       ],
-      "baseAttack": 10,
+      "baseAttack": 8,
       "attackRollMin": 1,
-      "attackRollMax": 4,
-      "danger": 77,
+      "attackRollMax": 3,
+      "danger": 20,
       "scale": 0.45
     },
     {
@@ -382,7 +382,7 @@
       "description": "硬い鱗に覆われた爬虫類の戦士。守りが堅い。",
       "floor": 3,
       "elite": true,
-      "maxHP": 637,
+      "maxHP": 205,
       "criticalNumerator": 0,
       "threat": 9,
       "passiveSkills": [
@@ -404,10 +404,10 @@
           "description": "防御さらに+4（硬鱗と合わせて8）、敗北時に固定1反射"
         }
       ],
-      "baseAttack": 9,
+      "baseAttack": 7,
       "attackRollMin": 1,
-      "attackRollMax": 6,
-      "danger": 96,
+      "attackRollMax": 5,
+      "danger": 25,
       "scale": 0.45
     },
     {
@@ -415,7 +415,7 @@
       "displayName": "双角の暴牛",
       "description": "巨大な牛頭の怪物。分厚い皮が浅い刃を通さず、怒りに任せた突進は壊滅的。",
       "floor": 3,
-      "maxHP": 581,
+      "maxHP": 190,
       "criticalNumerator": 0,
       "threat": 7,
       "passiveSkills": [
@@ -432,11 +432,11 @@
           "flavorText": "「当たっただけじゃ終わらんのか」「終わってたら苦労してない」"
         }
       ],
-      "baseAttack": 9,
+      "baseAttack": 7,
       "attackRollMin": 1,
-      "attackRollMax": 9,
+      "attackRollMax": 7,
       "defense": 6,
-      "danger": 105,
+      "danger": 27,
       "scale": 0.5
     },
     {
@@ -445,7 +445,7 @@
       "description": "巨大な牛頭の怪物。分厚い皮が浅い刃を通さず、怒りに任せた突進は壊滅的。",
       "floor": 3,
       "elite": true,
-      "maxHP": 930,
+      "maxHP": 300,
       "criticalNumerator": 0,
       "threat": 10,
       "passiveSkills": [
@@ -467,11 +467,11 @@
           "description": "毎ロール自ダイス合計+1（既に強い→控えめ）"
         }
       ],
-      "baseAttack": 11,
+      "baseAttack": 8,
       "attackRollMin": 1,
-      "attackRollMax": 10,
+      "attackRollMax": 8,
       "defense": 6,
-      "danger": 198,
+      "danger": 48,
       "scale": 0.5
     },
     {
@@ -479,7 +479,7 @@
       "displayName": "怨嗟の影",
       "description": "怨念の塊。実体を持たず、攻撃が通りにくい。5層の亡霊は生者を確実に道連れにする。",
       "floor": 6,
-      "maxHP": 1073,
+      "maxHP": 350,
       "criticalNumerator": 0,
       "threat": 7,
       "passiveSkills": [
@@ -502,10 +502,10 @@
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
-      "baseAttack": 51,
+      "baseAttack": 11,
       "attackRollMin": 1,
-      "attackRollMax": 21,
-      "danger": 1331,
+      "attackRollMax": 6,
+      "danger": 102,
       "scale": 0.95
     },
     {
@@ -514,7 +514,7 @@
       "description": "怨念の塊。実体を持たず、攻撃が通りにくい。5層の亡霊は生者を確実に道連れにする。",
       "floor": 6,
       "elite": true,
-      "maxHP": 1716,
+      "maxHP": 555,
       "criticalNumerator": 0,
       "threat": 10,
       "passiveSkills": [
@@ -542,10 +542,10 @@
           "description": "2ターンに1度 被ダメ全て1に減少、非霊体時はダイス数+1"
         }
       ],
-      "baseAttack": 57,
+      "baseAttack": 13,
       "attackRollMin": 1,
-      "attackRollMax": 26,
-      "danger": 2420,
+      "attackRollMax": 7,
+      "danger": 189,
       "scale": 0.95
     },
     {
@@ -553,7 +553,7 @@
       "displayName": "ゴーレム",
       "description": "古代魔法で動く石の巨人。膨大なHPと、岩塊の一撃で挑む者を磨り潰す。",
       "floor": 6,
-      "maxHP": 1933,
+      "maxHP": 625,
       "criticalNumerator": 0,
       "threat": 7,
       "passiveSkills": [
@@ -576,10 +576,10 @@
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
-      "baseAttack": 54,
+      "baseAttack": 12,
       "attackRollMin": 1,
-      "attackRollMax": 18,
-      "danger": 1481,
+      "attackRollMax": 5,
+      "danger": 113,
       "scale": 1.0
     },
     {
@@ -588,7 +588,7 @@
       "description": "古代魔法で動く石の巨人。膨大なHPと、岩塊の一撃で挑む者を磨り潰す。",
       "floor": 6,
       "elite": true,
-      "maxHP": 3093,
+      "maxHP": 1000,
       "criticalNumerator": 0,
       "threat": 10,
       "passiveSkills": [
@@ -616,10 +616,10 @@
           "description": "毎ターン意志+1、撃破時にスタック分の確定ダメージ"
         }
       ],
-      "baseAttack": 61,
+      "baseAttack": 14,
       "attackRollMin": 1,
-      "attackRollMax": 23,
-      "danger": 2725,
+      "attackRollMax": 6,
+      "danger": 211,
       "scale": 1.0
     },
     {
@@ -627,7 +627,7 @@
       "displayName": "黎明騎士",
       "description": "闇に堕ちた騎士。鎧だけは堕ちる前のまま手入れされている。長引くほど刃が冴える。いずれデスナイトへと至る者。",
       "floor": 5,
-      "maxHP": 733,
+      "maxHP": 240,
       "criticalNumerator": 0,
       "threat": 6,
       "passiveSkills": [
@@ -656,11 +656,11 @@
           "flavorText": "立会人は三合目で目を離せなくなった、と後に書いている。"
         }
       ],
-      "baseAttack": 20,
+      "baseAttack": 7,
       "attackRollMin": 1,
-      "attackRollMax": 15,
+      "attackRollMax": 7,
       "defense": 8,
-      "danger": 280,
+      "danger": 36,
       "scale": 0.6
     },
     {
@@ -669,7 +669,7 @@
       "description": "闇に堕ちた騎士。鎧だけは堕ちる前のまま手入れされている。長引くほど刃が冴える。いずれデスナイトへと至る者。",
       "floor": 5,
       "elite": true,
-      "maxHP": 1174,
+      "maxHP": 380,
       "criticalNumerator": 0,
       "threat": 9,
       "passiveSkills": [
@@ -703,11 +703,11 @@
           "description": "勝利時、与ダメ+2"
         }
       ],
-      "baseAttack": 23,
+      "baseAttack": 9,
       "attackRollMin": 1,
-      "attackRollMax": 17,
+      "attackRollMax": 8,
       "defense": 8,
-      "danger": 512,
+      "danger": 70,
       "scale": 0.6
     },
     {
@@ -715,7 +715,7 @@
       "displayName": "キマイラ",
       "description": "複数の獣が融合した怪物。多彩な攻撃手段で押し込んでくる。",
       "floor": 3,
-      "maxHP": 296,
+      "maxHP": 100,
       "criticalNumerator": 0,
       "threat": 7,
       "passiveSkills": [
@@ -735,7 +735,7 @@
       "baseAttack": 4,
       "attackRollMin": 1,
       "attackRollMax": 4,
-      "danger": 19,
+      "danger": 6,
       "scale": 0.3
     },
     {
@@ -744,7 +744,7 @@
       "description": "複数の獣が融合した怪物。多彩な攻撃手段で押し込んでくる。",
       "floor": 3,
       "elite": true,
-      "maxHP": 332,
+      "maxHP": 110,
       "criticalNumerator": 0,
       "threat": 10,
       "passiveSkills": [
@@ -769,7 +769,7 @@
       "baseAttack": 4,
       "attackRollMin": 1,
       "attackRollMax": 3,
-      "danger": 22,
+      "danger": 7,
       "scale": 0.3
     },
     {
@@ -777,7 +777,7 @@
       "displayName": "業火の眷属",
       "description": "地獄から召喚された悪魔。開幕の威圧と業火で挑戦者を萎縮させる。",
       "floor": 1,
-      "maxHP": 221,
+      "maxHP": 100,
       "criticalNumerator": 0,
       "threat": 8,
       "passiveSkills": [
@@ -797,7 +797,7 @@
       "baseAttack": 3,
       "attackRollMin": 1,
       "attackRollMax": 4,
-      "danger": 12,
+      "danger": 6,
       "scale": 0.25
     },
     {
@@ -806,7 +806,7 @@
       "description": "地獄から召喚された悪魔。開幕の威圧と業火で挑戦者を萎縮させる。",
       "floor": 1,
       "elite": true,
-      "maxHP": 247,
+      "maxHP": 110,
       "criticalNumerator": 0,
       "threat": 11,
       "passiveSkills": [
@@ -831,7 +831,7 @@
       "baseAttack": 2,
       "attackRollMin": 1,
       "attackRollMax": 5,
-      "danger": 14,
+      "danger": 6,
       "scale": 0.25
     },
     {
@@ -839,7 +839,7 @@
       "displayName": "血の眷属",
       "description": "太古の吸血鬼。血を啜って傷を癒し、夜が深まるほど力を増す。",
       "floor": 5,
-      "maxHP": 2040,
+      "maxHP": 660,
       "criticalNumerator": 0,
       "threat": 6,
       "passiveSkills": [
@@ -862,10 +862,10 @@
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
-      "baseAttack": 31,
+      "baseAttack": 11,
       "attackRollMin": 1,
-      "attackRollMax": 10,
-      "danger": 745,
+      "attackRollMax": 4,
+      "danger": 89,
       "scale": 0.75
     },
     {
@@ -874,7 +874,7 @@
       "description": "太古の吸血鬼。血を啜って傷を癒し、夜が深まるほど力を増す。",
       "floor": 5,
       "elite": true,
-      "maxHP": 2938,
+      "maxHP": 955,
       "criticalNumerator": 0,
       "threat": 9,
       "passiveSkills": [
@@ -902,10 +902,10 @@
           "description": "防御+2／3ターンごとに攻撃+1（累積）"
         }
       ],
-      "baseAttack": 36,
+      "baseAttack": 13,
       "attackRollMin": 1,
-      "attackRollMax": 12,
-      "danger": 1387,
+      "attackRollMax": 5,
+      "danger": 170,
       "scale": 0.75
     },
     {
@@ -913,7 +913,7 @@
       "displayName": "落日の騎士",
       "description": "死を超越した騎士。古い鎧は打たれるたびに剥がれていく。制限時間を超えれば即死の宣告が下る。",
       "floor": 6,
-      "maxHP": 1245,
+      "maxHP": 405,
       "criticalNumerator": 0,
       "threat": 7,
       "passiveSkills": [
@@ -942,11 +942,11 @@
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
-      "baseAttack": 48,
+      "baseAttack": 10,
       "attackRollMin": 1,
-      "attackRollMax": 19,
+      "attackRollMax": 5,
       "defense": 16,
-      "danger": 1023,
+      "danger": 75,
       "scale": 0.85
     },
     {
@@ -955,7 +955,7 @@
       "description": "死を超越した騎士。古い鎧は打たれるたびに剥がれていく。制限時間を超えれば即死の宣告が下る。",
       "floor": 6,
       "elite": true,
-      "maxHP": 1941,
+      "maxHP": 630,
       "criticalNumerator": 0,
       "threat": 10,
       "passiveSkills": [
@@ -989,11 +989,11 @@
           "description": "防御+2／3ターンごとに攻撃+1（累積）"
         }
       ],
-      "baseAttack": 57,
+      "baseAttack": 13,
       "attackRollMin": 1,
-      "attackRollMax": 19,
+      "attackRollMax": 5,
       "defense": 16,
-      "danger": 1889,
+      "danger": 146,
       "scale": 0.85
     },
     {
@@ -1001,21 +1001,21 @@
       "displayName": "13番目の死",
       "description": "大穴の伝承に語られる「13番目の死神」の影。本体は小さな霊体だが、その存在自体が13の宣告を呼び込む。",
       "floor": 3,
-      "maxHP": 118,
+      "maxHP": 35,
       "criticalNumerator": 0,
       "threat": 4,
       "passiveSkills": [
         {
           "internalName": "Decree13th",
           "skillName": "13番目の宣告",
-          "description": "毎ターン13%で宣告。ターン終了時に本体が生存していれば、両者ダイス合計の会心ダメージをプレイヤーに与える（軽減無視）",
+          "description": "毎ターン1/13で宣告。ターン終了時に本体が生存していれば、両者ダイス合計の会心ダメージをプレイヤーに与える（軽減無視）",
           "flavorText": "「十二番目までは名前がついてる」「じゃあコイツは」「……番号だけだ」"
         }
       ],
-      "baseAttack": 5,
+      "baseAttack": 4,
       "attackRollMin": 0,
-      "attackRollMax": 11,
-      "danger": 12,
+      "attackRollMax": 10,
+      "danger": 3,
       "scale": 0.4
     },
     {
@@ -1024,14 +1024,14 @@
       "description": "大穴の伝承に語られる「13番目の死神」の影。本体は小さな霊体だが、その存在自体が13の宣告を呼び込む。",
       "floor": 3,
       "elite": true,
-      "maxHP": 147,
+      "maxHP": 50,
       "criticalNumerator": 0,
       "threat": 7,
       "passiveSkills": [
         {
           "internalName": "Decree13th",
           "skillName": "13番目の宣告",
-          "description": "毎ターン13%で宣告。ターン終了時に本体が生存していれば、両者ダイス合計の会心ダメージをプレイヤーに与える（軽減無視）",
+          "description": "毎ターン1/13で宣告。ターン終了時に本体が生存していれば、両者ダイス合計の会心ダメージをプレイヤーに与える（軽減無視）",
           "flavorText": "「十二番目までは名前がついてる」「じゃあコイツは」「……番号だけだ」"
         },
         {
@@ -1040,10 +1040,10 @@
           "description": "13番目の宣告が灯ったターン中、自ダイス合計+13"
         }
       ],
-      "baseAttack": 5,
+      "baseAttack": 4,
       "attackRollMin": 0,
-      "attackRollMax": 11,
-      "danger": 15,
+      "attackRollMax": 10,
+      "danger": 4,
       "scale": 0.4
     },
     {
@@ -1051,15 +1051,15 @@
       "displayName": "甲殻の這い虫",
       "description": "背の殻だけが育ちすぎた虫。殻は刃を弾くが、その下は驚くほど柔らかい。",
       "floor": 3,
-      "maxHP": 212,
+      "maxHP": 70,
       "criticalNumerator": 0,
       "threat": 6,
-      "baseAttack": 7,
+      "baseAttack": 6,
       "attackRollMin": 1,
       "attackRollMax": 4,
       "defense": 16,
       "passiveSkills": [],
-      "danger": 32,
+      "danger": 9,
       "scale": 0.35
     },
     {
@@ -1067,10 +1067,10 @@
       "displayName": "精鋭甲殻の這い虫",
       "description": "背の殻だけが育ちすぎた虫。殻は刃を弾くが、その下は驚くほど柔らかい。",
       "floor": 3,
-      "maxHP": 246,
+      "maxHP": 80,
       "criticalNumerator": 0,
       "threat": 9,
-      "baseAttack": 7,
+      "baseAttack": 6,
       "attackRollMin": 1,
       "attackRollMax": 4,
       "defense": 20,
@@ -1082,7 +1082,7 @@
           "description": "防御+2／3ターンごとに攻撃+1（累積）"
         }
       ],
-      "danger": 40,
+      "danger": 12,
       "scale": 0.35
     },
     {
@@ -1090,12 +1090,12 @@
       "displayName": "継ぎはぎ鎧の脱走兵",
       "description": "持ち場を捨てて降りてきた兵。拾い集めた板金を鎧に継いでいるが、打てば外れる。",
       "floor": 6,
-      "maxHP": 1064,
+      "maxHP": 345,
       "criticalNumerator": 0,
       "threat": 7,
-      "baseAttack": 46,
+      "baseAttack": 10,
       "attackRollMin": 1,
-      "attackRollMax": 19,
+      "attackRollMax": 5,
       "defense": 20,
       "passiveSkills": [
         {
@@ -1105,7 +1105,7 @@
           "flavorText": "打ち直す鍛冶はもう居ない。割れたところは、割れたまま歩いている。"
         }
       ],
-      "danger": 886,
+      "danger": 67,
       "scale": 0.8
     },
     {
@@ -1113,12 +1113,12 @@
       "displayName": "精鋭継ぎはぎ鎧の脱走兵",
       "description": "持ち場を捨てて降りてきた兵。拾い集めた板金を鎧に継いでいるが、打てば外れる。",
       "floor": 6,
-      "maxHP": 1605,
+      "maxHP": 520,
       "criticalNumerator": 0,
       "threat": 10,
-      "baseAttack": 54,
+      "baseAttack": 12,
       "attackRollMin": 1,
-      "attackRollMax": 20,
+      "attackRollMax": 5,
       "defense": 24,
       "passiveSkills": [
         {
@@ -1134,7 +1134,7 @@
         }
       ],
       "elite": true,
-      "danger": 1632,
+      "danger": 123,
       "scale": 0.8
     },
     {
@@ -1142,12 +1142,12 @@
       "displayName": "石喰いの蟲",
       "description": "鉱脈を食んで殻に変える蟲。戦いが長引くほど殻が厚くなる。",
       "floor": 6,
-      "maxHP": 1398,
+      "maxHP": 455,
       "criticalNumerator": 0,
       "threat": 7,
-      "baseAttack": 47,
+      "baseAttack": 10,
       "attackRollMin": 1,
-      "attackRollMax": 24,
+      "attackRollMax": 6,
       "defense": 0,
       "passiveSkills": [
         {
@@ -1157,7 +1157,7 @@
           "flavorText": "坑夫の覚え書きの隅に「止まっている間に殻が伸びる。叩くなら動いているうちに」とある。"
         }
       ],
-      "danger": 1162,
+      "danger": 86,
       "scale": 0.9
     },
     {
@@ -1165,12 +1165,12 @@
       "displayName": "精鋭石喰いの蟲",
       "description": "鉱脈を食んで殻に変える蟲。戦いが長引くほど殻が厚くなる。",
       "floor": 6,
-      "maxHP": 2236,
+      "maxHP": 725,
       "criticalNumerator": 0,
       "threat": 10,
-      "baseAttack": 57,
+      "baseAttack": 13,
       "attackRollMin": 1,
-      "attackRollMax": 22,
+      "attackRollMax": 6,
       "defense": 0,
       "passiveSkills": [
         {
@@ -1186,7 +1186,7 @@
         }
       ],
       "elite": true,
-      "danger": 2140,
+      "danger": 167,
       "scale": 0.9
     },
     {
@@ -1194,17 +1194,17 @@
       "displayName": "大盾の番兵",
       "description": "隊列が崩れても大盾を下ろさない番兵。3ターンに1度構え、そのターンは硬いが攻めが鈍る。構えを解いた直後は無防備。",
       "floor": 5,
-      "maxHP": 1827,
+      "maxHP": 590,
       "criticalNumerator": 0,
       "threat": 7,
-      "baseAttack": 27,
+      "baseAttack": 10,
       "attackRollMin": 1,
-      "attackRollMax": 11,
+      "attackRollMax": 5,
       "guardPeriod": 3,
       "guardDefense": 30,
       "guardAttackMul": 0.5,
       "passiveSkills": [],
-      "danger": 502,
+      "danger": 64,
       "scale": 0.7
     },
     {
@@ -1212,12 +1212,12 @@
       "displayName": "精鋭大盾の番兵",
       "description": "隊列が崩れても大盾を下ろさない番兵。3ターンに1度構え、そのターンは硬いが攻めが鈍る。構えを解いた直後は無防備。",
       "floor": 5,
-      "maxHP": 2617,
+      "maxHP": 850,
       "criticalNumerator": 0,
       "threat": 10,
-      "baseAttack": 31,
+      "baseAttack": 12,
       "attackRollMin": 1,
-      "attackRollMax": 12,
+      "attackRollMax": 5,
       "guardPeriod": 3,
       "guardDefense": 30,
       "guardAttackMul": 0.5,
@@ -1229,7 +1229,7 @@
           "description": "防御+2／3ターンごとに攻撃+1（累積）"
         }
       ],
-      "danger": 909,
+      "danger": 118,
       "scale": 0.7
     },
     {
@@ -1258,7 +1258,7 @@
       "displayName": "トレジャーゴブリン",
       "description": "財宝を抱え込んだ臆病なゴブリン。戦いは不得手だが、倒せば抱えた戦利品を落とす。",
       "floor": 1,
-      "maxHP": 720,
+      "maxHP": 300,
       "criticalNumerator": 0,
       "threat": 1,
       "passiveSkills": [],
@@ -1271,7 +1271,7 @@
       "displayName": "ゴブリン王",
       "description": "群れを統べる大柄なゴブリン。号令一つで配下を呼び出す。",
       "floor": 3,
-      "maxHP": 2324,
+      "maxHP": 505,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 4,
@@ -1283,16 +1283,16 @@
           "flavorText": "号令の内容は誰にも聞き取れなかった。それでも全員が、同時に、強くなった。"
         }
       ],
-      "baseAttack": 14,
+      "baseAttack": 10,
       "attackRollMin": 1,
-      "attackRollMax": 5
+      "attackRollMax": 4
     },
     {
       "id": "boss_layer3",
       "displayName": "毒沼の主",
       "description": "瘴気の澱から生まれた巨躯。触れる空気すべてを腐毒に変え、長く対峙する者ほど深く蝕まれる。",
       "floor": 3,
-      "maxHP": 2324,
+      "maxHP": 505,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 4,
@@ -1304,16 +1304,16 @@
           "flavorText": "沼は急がない。急ぐ理由が、沼の側には無い。"
         }
       ],
-      "baseAttack": 14,
+      "baseAttack": 10,
       "attackRollMin": 1,
-      "attackRollMax": 5
+      "attackRollMax": 4
     },
     {
       "id": "boss_layer4",
       "displayName": "鏡の双子",
       "description": "鏡像のように同じ動きを繰り返す双子。重い一撃ほど深く跳ね返す。",
       "floor": 3,
-      "maxHP": 2324,
+      "maxHP": 505,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 6,
@@ -1331,9 +1331,9 @@
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
-      "baseAttack": 12,
+      "baseAttack": 8,
       "attackRollMin": 4,
-      "attackRollMax": 6
+      "attackRollMax": 4
     },
     {
       "id": "boss_layer5",
@@ -1341,7 +1341,7 @@
       "displayName": "業火の審判官",
       "description": "罪人を裁く炎の審判官。罪深きほどその業火は強く燃え盛る。",
       "floor": 5,
-      "maxHP": 10200,
+      "maxHP": 1835,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 6,
@@ -1359,9 +1359,9 @@
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
-      "baseAttack": 36,
+      "baseAttack": 10,
       "attackRollMin": 2,
-      "attackRollMax": 12,
+      "attackRollMax": 4,
       "heavyPeriod": 3,
       "heavyMul": 2.0,
       "heavyWindupMul": 0.7
@@ -1372,7 +1372,7 @@
       "displayName": "シュヴァリエ・サン=ジョリオラ",
       "description": "失われた決闘術の継承者。構えと切り返しを交互に繰り出す剣聖。挑む資格を持つ者だけが見える幻。",
       "floor": 5,
-      "maxHP": 10200,
+      "maxHP": 1835,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 8,
@@ -1390,9 +1390,9 @@
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
-      "baseAttack": 36,
+      "baseAttack": 10,
       "attackRollMin": 2,
-      "attackRollMax": 10,
+      "attackRollMax": 3,
       "heavyPeriod": 3,
       "heavyMul": 2.0,
       "heavyWindupMul": 0.7
@@ -1403,7 +1403,7 @@
       "displayName": "灰燼の王",
       "description": "灰と燃え残りで形を成す古き王。半身を焼かれてなお燃え上がり、削れば削るほど残り火が荒れ狂う。",
       "floor": 6,
-      "maxHP": 11300,
+      "maxHP": 1945,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 10,
@@ -1439,16 +1439,16 @@
           "flavorText": "盾を構えるほど、灰は厚く積もる。焼かれているのは腕ではなく、迷っている時間の方だ。"
         }
       ],
-      "baseAttack": 10,
+      "baseAttack": 6,
       "attackRollMin": 2,
-      "attackRollMax": 9
+      "attackRollMax": 6
     },
     {
       "id": "boss_layer7",
       "floor": 7,
       "displayName": "ヴェスカ・小手調べ",
       "description": "「小手調べといこう」　見慣れた安物を、明らかに上手く使う。",
-      "maxHP": 4950,
+      "maxHP": 1605,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 10,
@@ -1481,15 +1481,15 @@
         {
           "internalName": "RiftHeldOpen",
           "skillName": "裂け目",
-          "description": "毎ターン、ヴェスカとプレイヤーの双方が最大HPの2%を失う。",
+          "description": "毎ターン、ヴェスカは最大HPの2%、プレイヤーは最大HPの1%を失う。",
           "flavorText": "「開けたのは私だ。だが閉じ方は誰も知らない」"
         }
       ],
-      "baseAttack": 62,
+      "baseAttack": 10,
       "attackRollMin": 2,
-      "attackRollMax": 34,
+      "attackRollMax": 6,
       "heavyPeriod": 3,
-      "heavyMul": 2.0,
+      "heavyMul": 1.75,
       "heavyWindupMul": 0.7
     },
     {
@@ -1497,7 +1497,7 @@
       "floor": 7,
       "displayName": "ヴェスカ・遺物学者",
       "description": "「少しは心得が有るようだが、まだまだ若いな」　深層の遺物が混ざり始める。",
-      "maxHP": 4950,
+      "maxHP": 1605,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 10,
@@ -1530,15 +1530,15 @@
         {
           "internalName": "RiftHeldOpen",
           "skillName": "裂け目",
-          "description": "毎ターン、ヴェスカとプレイヤーの双方が最大HPの2%を失う。",
+          "description": "毎ターン、ヴェスカは最大HPの2%、プレイヤーは最大HPの1%を失う。",
           "flavorText": "「開けたのは私だ。だが閉じ方は誰も知らない」"
         }
       ],
-      "baseAttack": 64,
+      "baseAttack": 10,
       "attackRollMin": 2,
-      "attackRollMax": 30,
+      "attackRollMax": 5,
       "heavyPeriod": 3,
-      "heavyMul": 2.0,
+      "heavyMul": 1.75,
       "heavyWindupMul": 0.7
     },
     {
@@ -1546,7 +1546,7 @@
       "floor": 7,
       "displayName": "ヴェスカ・神話",
       "description": "「遺物の使い方を見せてやろう」　神話の遺物。遺物のパワーでも押し負け始める。",
-      "maxHP": 4400,
+      "maxHP": 1425,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 12,
@@ -1579,15 +1579,15 @@
         {
           "internalName": "RiftHeldOpen",
           "skillName": "裂け目",
-          "description": "毎ターン、ヴェスカとプレイヤーの双方が最大HPの2%を失う。",
+          "description": "毎ターン、ヴェスカは最大HPの2%、プレイヤーは最大HPの1%を失う。",
           "flavorText": "「開けたのは私だ。だが閉じ方は誰も知らない」"
         }
       ],
-      "baseAttack": 60,
+      "baseAttack": 10,
       "attackRollMin": 2,
-      "attackRollMax": 37,
+      "attackRollMax": 7,
       "heavyPeriod": 3,
-      "heavyMul": 2.0,
+      "heavyMul": 1.75,
       "heavyWindupMul": 0.7
     },
     {
@@ -1595,7 +1595,7 @@
       "floor": 7,
       "displayName": "ヴェスカ・天与",
       "description": "「知りたいぞ、その強さの源が。」　天変地異すらをも引き起こす遺物を、手足のように扱う。",
-      "maxHP": 11000,
+      "maxHP": 2915,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 12,
@@ -1628,15 +1628,15 @@
         {
           "internalName": "RiftHeldOpen",
           "skillName": "裂け目",
-          "description": "毎ターン、ヴェスカとプレイヤーの双方が最大HPの2%を失う。",
+          "description": "毎ターン、ヴェスカは最大HPの2%、プレイヤーは最大HPの1%を失う。",
           "flavorText": "「開けたのは私だ。だが閉じ方は誰も知らない」"
         }
       ],
-      "baseAttack": 62,
+      "baseAttack": 10,
       "attackRollMin": 2,
-      "attackRollMax": 53,
+      "attackRollMax": 9,
       "heavyPeriod": 3,
-      "heavyMul": 2.0,
+      "heavyMul": 1.75,
       "heavyWindupMul": 0.7
     }
   ]

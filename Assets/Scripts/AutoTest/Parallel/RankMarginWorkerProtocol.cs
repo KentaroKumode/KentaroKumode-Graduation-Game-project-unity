@@ -63,6 +63,11 @@ namespace AutoTest.ParallelSweep
         // お金の流れ (診断用・2026-11-04)
         public int goldGained, coinsSpent, shopPurchases, shopBuyPassive, shopRerolls, shopRerollCoins, finalCoins, peakCoins, totalCombats;
         public LearnFightRow[] fights = Array.Empty<LearnFightRow>();
+        /// <summary>金の内訳 (キー = 「深さ|経路」・2026-11-06)。</summary>
+        public string[] goldKeys = Array.Empty<string>();
+        public int[] goldVals = Array.Empty<int>();
+        /// <summary>状態の記録 (10 列ずつ・AutoRunner.SnapState・2026-11-06)。</summary>
+        public int[] stateSnaps = Array.Empty<int>();
 
         public static LearnRunRow From(AutoRunner.RunRec r)
         {
@@ -86,6 +91,8 @@ namespace AutoTest.ParallelSweep
                 shopBuyPassive = r.shopBuyPassive, shopRerolls = r.shopRerolls, shopRerollCoins = r.shopRerollCoins,
                 finalCoins = r.finalCoins, peakCoins = r.peakCoins, totalCombats = r.totalCombats,
                 fights = Fights(r.combats),
+                goldKeys = r.goldKeys ?? Array.Empty<string>(), goldVals = r.goldVals ?? Array.Empty<int>(),
+                stateSnaps = r.stateSnaps != null ? r.stateSnaps.ToArray() : Array.Empty<int>(),
             };
         }
 
@@ -102,6 +109,7 @@ namespace AutoTest.ParallelSweep
                     turns = c.turns, hpBefore = c.hpBefore, hpAfter = c.hpAfter, maxHp = c.playerMaxHpEnd,
                     dealt = c.damageDealt, taken = c.damageTaken, enemyMaxHp = c.enemyMaxHP,
                     key = c.encounterKey ?? "",
+                    dmgParts = c.dmgParts ?? Array.Empty<int>(),
                 };
             }
             return a;
@@ -132,6 +140,9 @@ namespace AutoTest.ParallelSweep
         public int floor, turns, hpBefore, hpAfter, maxHp, dealt, taken, enemyMaxHp;
         public bool isBoss, won, end;
         public string key = "";   // 戦闘名の鍵 (EncounterDangerStats・2026-11-05)
+        /// <summary>与ダメの内訳 [武器, 攻撃の出目, 攻撃+N, 主攻撃の与ダメ, 固定ダメ, 追撃, 出目由来の攻撃, 毒, 出血, 臨界の爆発] (2026-11-06)。
+        /// 毒と爆発は固定ダメの内数、 出血は固定ダメの外 (敵 HP を直接引く)。</summary>
+        public int[] dmgParts;
     }
 
     [Serializable]
@@ -225,7 +236,7 @@ namespace AutoTest.ParallelSweep
         /// <summary>[計装] atkBase の内訳 (全戦闘の累計)。
         /// [0]件数 [1]武器素火力 [2]攻撃端子出目 [3]パッシブ加算 [6]atkBase [7]与ダメ。
         /// <b>配線 : フラットの比をここから直接読む</b> (素火力は比から除く)。</summary>
-        public double[] damageBreakdown = new double[19];
+        public double[] damageBreakdown = new double[20];
         /// <summary>[計装] エリートが何を余分に配っているかの切り分け用 (2026-09-14)。
         /// 報酬倍率 (ゴールド) を ×1.3〜×1.8 で振っても傾きが 2〜3pt しか動かなかったので、
         /// <b>主因はゴールドではない</b>。 取得物を経路別に数えて一意に決める。</summary>
@@ -258,7 +269,7 @@ namespace AutoTest.ParallelSweep
         public long[] attackBonus7FAmounts = Array.Empty<long>();
         public long[] attackBonus7FCalls = Array.Empty<long>();
         /// <summary>[計装] 最終戦だけの atkBase 内訳 (CombatStats.DamageBreakdown7F)。</summary>
-        public double[] damageBreakdown7F = new double[19];
+        public double[] damageBreakdown7F = new double[20];
 
         /// <summary>[計装 2026-09-19] 戦闘の種類別 (0 雑魚 / 1 エリート / 2 ボス) の結果 (CombatSystem.SkillDiag)。
         /// 配線方策を替えたアームどうしで、 どの戦闘で技量が効いているかを見る。</summary>
@@ -385,7 +396,7 @@ namespace AutoTest.ParallelSweep
                 "rerollStopRule", "rerollShelfValue", "rerollPriorWeight",
                 "phase3BeforeReroll", "rerollCurveFirst", "rerollCurveStep",
                 // 計測でイベントを切っているか (2026-11-05)。 クリア率の意味が変わるので必ず印字する。
-                "suppressEvents", "freeNavScout", "navLearnedDanger",
+                "suppressEvents", "suppressConvictionChain", "freeNavScout", "navLearnedDanger", "measureNoExplore",
             };
             var sb = new System.Text.StringBuilder();
             foreach (string name in watched)

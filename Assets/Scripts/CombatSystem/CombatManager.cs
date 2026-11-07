@@ -722,7 +722,7 @@ namespace CombatSystem
                 var runR = GameLoop.GameManager.Instance?.Run;
                 if (runR != null && runR.pendingRinkaiCarryover > 0)
                 {
-                    ctx.rinkaiMeter += runR.pendingRinkaiCarryover;
+                    if (!ctx.heatSealed) ctx.rinkaiMeter += runR.pendingRinkaiCarryover;   // 誓約で臨界を封じていたら持ち越さない
                     Debug.Log($"[MetaBuff] 臨界持ち越し: メーター +{runR.pendingRinkaiCarryover}");
                     runR.pendingRinkaiCarryover = 0;
                 }
@@ -742,6 +742,9 @@ namespace CombatSystem
             // 魔王の威圧 等の戦闘開始時スキル処理
             psm.FireTrigger(PassiveSkillTrigger.OnBattleStart);
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnBattleStart);
+            // 充電の種火 r2: 戦闘開始時の充電 (2026-11-07・誓約で充電が封じられていれば AddCharge が止める)
+            if (combatCtx != null && MetaProgression.MetaBuffApplicator.GetChargeOpening() > 0)
+                combatCtx.AddCharge(MetaProgression.MetaBuffApplicator.GetChargeOpening());
 
             // パッシブ刻印: 戦闘開始時の効果を適用 (HP回復・シールド付与・ダイス補正等)
             // 敵の戦闘開始スキルによるHP減少適用

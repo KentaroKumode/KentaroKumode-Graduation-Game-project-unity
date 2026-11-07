@@ -87,7 +87,7 @@ namespace GameLoop
             }
 
             // 計測専用 (SuppressEvents): イベントの代わりに確信の資格を与える。 HP 半減と啓示のエリートは払わせない。
-            if (SuppressEvents && Run != null)
+            if ((SuppressEvents || SuppressConvictionChain) && Run != null)
             {
                 if (Run.convictionStage <= 0 && Run.ownedPassiveItems != null
                     && !Run.ownedPassiveItems.Contains(ConvictionSystem.IdConviction) && !ConvictionSystem.HasResolveOrBetter(Run))

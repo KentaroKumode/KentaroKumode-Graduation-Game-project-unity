@@ -95,6 +95,9 @@ namespace CombatSystem
             // 血潮: 出血2倍
             if (ctx.HasModifier(BattleModifierId.BloodTide))
                 baseBleed *= 2;
+            // 〈血晶〉の①: 出血のダメージ +3% / 品 (2026-11-07)
+            if (ctx.bleedDamagePct > 0f && baseBleed > 0)
+                baseBleed = UnityEngine.Mathf.FloorToInt(baseBleed * (1f + ctx.bleedDamagePct));
 
             return baseBleed;
         }

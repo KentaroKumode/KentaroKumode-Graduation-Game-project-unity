@@ -252,7 +252,11 @@ namespace MetaProgression
             => MetaPanel.ShellLastStandUnlocked(Rank(MetaPanelKind.Shell));
 
         /// <summary>【v6 廃止】会心ダメージ加算。 常に 0 (メタからは付与しない)。</summary>
-        public static float GetCritDamageBonus() => 0f;
+        /// <summary>会心倍率への加算。 2026-11-07〜 種火・会心 r2 (+0.2)。</summary>
+        public static float GetCritDamageBonus() => MetaPanel.CritMulBonus(Rank(MetaPanelKind.SparkCrit));
+
+        /// <summary>種火・シールド r2: ターン開始の減衰で残るシールドへの上乗せ (% ポイント)。</summary>
+        public static int GetShieldKeepBonusPct() => MetaPanel.ShieldKeepBonusPct(Rank(MetaPanelKind.SparkShield));
 
         // ============================================================
         //  v6 新規: 防御-シールド / 精密-分母 / 端子調律 2 系 / 種火 4 系
@@ -333,6 +337,8 @@ namespace MetaProgression
                 case "rinkai":  return MetaPanelKind.SparkRinkai;
                 case "poison":  return MetaPanelKind.SparkPoison;
                 case "bleed":   return MetaPanelKind.SparkBleed;
+                case "crit":    return MetaPanelKind.SparkCrit;
+                case "shield":  return MetaPanelKind.SparkShield;
                 default:        return MetaPanelKind.SparkCharge; // fallback
             }
         }
@@ -350,6 +356,10 @@ namespace MetaProgression
         /// <summary>充電 r2: 充電上限 +N (0 or 5)。 CombatManager.ChargeMax + この値。</summary>
         public static int GetChargeCapBonus()
             => MetaPanel.ChargeCapBonus(Rank(MetaPanelKind.SparkCharge));
+
+        /// <summary>充電 r2: 戦闘開始時に得る充電 (0 or 10・2026-11-07)。</summary>
+        public static int GetChargeOpening()
+            => MetaPanel.ChargeOpening(Rank(MetaPanelKind.SparkCharge));
 
         /// <summary>臨界 r2: 戦闘終了時にメーターの何割を次戦闘へ持ち越すか (0 or 0.5)。</summary>
         public static float GetRinkaiCarryoverRatio()

@@ -28,10 +28,11 @@ namespace UI.Game2D
 
         private static readonly Track[] Declare =
         {
-            new Track { kind = MetaPanelKind.SparkCharge, name = "種火・充電", desc = "r1: 充電の品が出やすい (+60%)。 r2: 充電の上限 +5。 r3: 充電の品 (BRONZE) を 1 つ開幕で持つ。" },
+            new Track { kind = MetaPanelKind.SparkCharge, name = "種火・充電", desc = "r1: 充電の品が出やすい (+60%)。 r2: 充電の上限 +10・戦闘開始時の充電 +10。 r3: 充電の品 (BRONZE) を 1 つ開幕で持つ。" },
             new Track { kind = MetaPanelKind.SparkRinkai, name = "種火・臨界", desc = "r1: 臨界の品が出やすい (+60%)。 r2: 戦闘の終わりの臨界の 50% を次の戦闘へ。 r3: 臨界の品を 1 つ開幕で持つ。" },
-            new Track { kind = MetaPanelKind.SparkPoison, name = "種火・毒",   desc = "r1: 毒の品が出やすい (+60%)。 r2: 毒の付与量 +1。 r3: 毒の品を 1 つ開幕で持つ。" },
+            new Track { kind = MetaPanelKind.SparkPoison, name = "種火・毒",   desc = "r1: 毒の品が出やすい (+60%)。 r2: 毎ターン最初に与える毒 +2。 r3: 毒の品を 1 つ開幕で持つ。" },
             new Track { kind = MetaPanelKind.SparkBleed,  name = "種火・出血", desc = "r1: 出血の品が出やすい (+60%)。 r2: 出血 3 以上の敵の攻撃値 −2。 r3: 出血の品を 1 つ開幕で持つ。" },
+            new Track { kind = MetaPanelKind.SparkShield, name = "種火・シールド", desc = "r1: シールドの品が出やすい (+60%)。 r2: ターン開始の減衰で残るシールド +10%。 r3: シールドの品を 1 つ開幕で持つ。" },
             new Track { kind = MetaPanelKind.AttackTerm,  name = "攻撃端子",   desc = "攻撃端子へつないだダイス 1 本ごとに、 攻撃端子の配線合計 +1/段。" },
             new Track { kind = MetaPanelKind.BlockTerm,   name = "防御端子",   desc = "防御端子へつないだダイス 1 本ごとに、 防御端子の配線合計 +1/段。" },
         };
@@ -77,12 +78,13 @@ namespace UI.Game2D
                 case MetaPanelKind.AttackTerm: return "つないだ 1 本ごと +" + MetaPanel.AttackTerminalPerDice(r);
                 case MetaPanelKind.BlockTerm:  return "つないだ 1 本ごと +" + MetaPanel.BlockTerminalPerDice(r);
             }
-            // 種火 4 本: r1 出やすい / r2 固有 / r3 開幕に 1 つ
+            // 種火 6 本: r1 出やすい / r2 固有 / r3 開幕に 1 つ
             string r2 = k == MetaPanelKind.SparkCharge ? "上限 +" + MetaPanel.ChargeCapBonus(r)
                       : k == MetaPanelKind.SparkRinkai ? "持ち越し " + (MetaPanel.RinkaiCarryoverRatio(r) * 100f).ToString("0") + "%"
-                      : k == MetaPanelKind.SparkPoison ? "付与 +" + MetaPanel.PoisonApplyBonus(r)
+                      : k == MetaPanelKind.SparkPoison ? "毎ターン最初の付与 +" + MetaPanel.PoisonApplyBonus(r)
+                      : k == MetaPanelKind.SparkShield ? "残るシールド +" + MetaPanel.ShieldKeepBonusPct(r) + "%"
                       : "攻撃 -2";
-            return "出やすい" + (r >= 2 ? "・" + r2 : "") + (MetaPanel.SparkStartingItemUnlocked(r) ? "・開幕に 1 つ" : "");
+            return "出やすい" + (r >= 2 ? "・" + r2 : "") + (MetaPanel.SparkStartingItemUnlocked(r) ? $"・開幕に {MetaPanel.SparkStartingItemCount} つ" : "");
         }
 
         private static ScreenDef Build()

@@ -27,11 +27,14 @@ namespace GameLoop
     {
         /// <summary>エリート戦の勝利で恒久パッシブが落ちる確率。
         /// <b>2026-09-15: 確定 1.0 → 0.40。</b></summary>
-        public static float EliteDropRate = 0.40f;
+        public static float EliteDropRate = 0.10f;   // 2026-11-06: 0.40 → 0.10 (パッシブの取得数を 40 以下へ・選択を生むため)
 
         /// <summary>通常戦の勝利で恒久パッシブが落ちる確率。
         /// 0.50 (〜2026-09-09) → 0.15 → <b>0.10 (2026-09-15)</b>。</summary>
-        public static float NormalDropRate = 0.10f;
+        /// <summary>宝箱からパッシブが出る確率 (残りは消耗品・2026-11-06)。</summary>
+        public static float TreasurePassiveRate = 0.3f;
+
+        public static float NormalDropRate = 0f;     // 2026-11-06: 0.10 → 0 (同上)
 
         /// <summary>戦闘報酬ゴールドの倍率。 <c>FloorManager.CalculateRewardCoins</c> の
         /// <c>(7 + floor/2)/5</c> に掛かる整数係数。 ×3 (2026-08-10) → ×4 (2026-09-09) →

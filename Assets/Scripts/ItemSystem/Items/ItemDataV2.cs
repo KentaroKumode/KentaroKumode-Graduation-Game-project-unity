@@ -205,6 +205,8 @@ namespace ItemSystem
         public string consFamily = "";
         /// <summary>ユニーク品 (旧 uniq_ 接頭辞)。 昇華の対象外。</summary>
         public bool unique;
+        /// <summary>パッシブの軸 (会心/出血/毒/臨界/充電/シールド/出目/金)。 軸を持たない品は空。 軸の深さ (CombatContext.AxisDepth) が数える。</summary>
+        public string axis = "";
         public List<PassiveEffect> weaponPassives = new List<PassiveEffect>();
         
         [Header("パッシブアイテムデータ")]

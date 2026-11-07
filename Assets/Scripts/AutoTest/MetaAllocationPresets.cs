@@ -108,6 +108,10 @@ namespace AutoTest
         ///
         /// <para><b>ResetAll は呼ばない</b> ── 呼び出し側 (<see cref="Apply"/>) が既に呼んでいる。
         /// 単独で使うときは先に <c>mgr.ResetAll()</c> すること。</para></summary>
+        /// <summary>[測定専用] 予算 (MaxPoints) を超える配分をそのまま当てる (2026-11-07)。
+        /// 「標準の配分に種火だけ足す」腕で、 種火そのものの効果を他の軸を削らずに測るため。 AutoRunner.metaAllowOverBudget から立つ。</summary>
+        public static bool AllowOverBudget;
+
         public static void ApplyRanks(Dictionary<MetaPanelKind, int> ranks, string label)
         {
             var mgr = MetaProgressManager.Instance;
@@ -115,14 +119,14 @@ namespace AutoTest
 
             int total = 0;
             foreach (var kv in ranks) total += MetaPanel.CostOf(kv.Key, kv.Value);
-            if (total > MetaPanel.MaxPoints)
+            if (total > MetaPanel.MaxPoints && !AllowOverBudget)
                 UnityEngine.Debug.LogError(
                     $"[MetaAllocationPresets] {label} の配分が予算超過 ({total} > {MetaPanel.MaxPoints})。");
 
             var st = mgr.State;
             if (st == null) return;
             st.EnsurePanelInitialized();
-            st.panelPointsPurchased = System.Math.Min(total, MetaPanel.MaxPoints);
+            st.panelPointsPurchased = AllowOverBudget ? total : System.Math.Min(total, MetaPanel.MaxPoints);
 
             int spent = 0;
             foreach (var kv in ranks)

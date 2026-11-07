@@ -48,7 +48,7 @@ namespace CombatSystem
             switch (p)
             {
                 //                                             base  min   max
-                case BossParam.JudgmentDice:      return new ParamSpec(15f, 0f, 30f);
+                case BossParam.JudgmentDice:      return new ParamSpec(8f, 0f, 30f);    // 2026-11-06: 15 → 8 (敵の攻撃を出目の幅へ戻した時に据え置いていた)
                 case BossParam.JudgmentCoefBase:  return new ParamSpec( 2f, 0f,  8f);
                 // 2026-08-15: 一度 10 → 7 にしたが **10 へ戻した**。 「5層の主死因が Chip 95〜98%」
                 //   という根拠自体が、 〈怪しい商人〉が 5層の通常抽選に混ざっていた汚染下の測定だった

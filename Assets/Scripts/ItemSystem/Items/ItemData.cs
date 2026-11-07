@@ -120,8 +120,11 @@ namespace ItemSystem
         /// <summary>ユニーク品 (旧 <c>uniq_</c> 接頭辞)。 <b>昇華の対象外</b>
         /// (<see cref="GameLoop.SublimationSystem.CanSublimate"/>)。</summary>
         public bool unique;
+        /// <summary>パッシブの軸 (会心 / 出血 / 毒 / 臨界 / 充電 / シールド / 出目 / 金)。 軸を持たない品は空。
+        /// 品が<b>読む</b>資源 (発動の条件) の軸、 条件の無い品は作る資源の軸 (2026-11-06・GAME.md §8-7)。</summary>
+        public string axis;
     }
-    
+
     /// <summary>
     /// JSON配列のルートオブジェクト
     /// </summary>

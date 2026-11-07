@@ -1505,8 +1505,8 @@ namespace ItemSystem.PassiveSkills.Effects
 
             if (trigger == PassiveSkillTrigger.OnTurnStart)
             {
-                // 13% で宣告フラグを立てる
-                if (GameLoop.GameRng.Value("enemy.decree13") < 0.13f)
+                // 1/13 で宣告フラグを立てる (2026-11-06・13% から)
+                if (GameLoop.GameRng.Value("enemy.decree13") < 1f / 13f)
                 {
                     ctx.currentBuffs[FlagKey] = 1f;
                     UnityEngine.Debug.Log($"[Decree13th] 死神の声が響く...（T{ctx.currentTurn}）");

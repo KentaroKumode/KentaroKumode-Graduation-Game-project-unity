@@ -239,7 +239,9 @@ namespace ItemSystem.PassiveSkills
         public void BeginCombat(int playerMaxHP, int enemyMaxHP = 0, int playerDiceMax = 6, int enemyDiceMax = 6, int enemyThreat = 0)
         {
             context = new CombatContext(playerMaxHP, enemyMaxHP, enemyThreat);
-            
+            // 誓約の封じは、 戦闘開始時に入る資源 (遺物の開幕・臨界の持ち越し・品の OnBattleStart) より前に立てる (2026-11-07)。
+            Effects.OathSeals.Apply(context, GameLoop.GameManager.Instance?.Run);
+
             // ダイス設定値を設定
             context.playerDiceMax = playerDiceMax;
             context.enemyDiceMax = enemyDiceMax;
@@ -697,6 +699,8 @@ namespace ItemSystem.PassiveSkills
             // 末那識など: 会心強制（乱数・会心率capを無視して確定）
             // **敵の攻撃には効かせない** ── forceCritical もプレイヤー側のフラグ。
             if (context.forceCritical && !attackerIsEnemy) context.isCritical = true;
+            // 誓約の封じ (〈赤錆の誓約〉): 会心確定の効果より後に落とす (2026-11-07)。
+            if (context.critSealed && !attackerIsEnemy) context.isCritical = false;
 
             if (context.isCritical && totalDamage > 0)
             {
@@ -711,8 +715,12 @@ namespace ItemSystem.PassiveSkills
                 if (!attackerIsEnemy && context.enemyCritMultReduction > 0f)
                     effCritMul = UnityEngine.Mathf.Max(1f, effCritMul - context.enemyCritMultReduction);
                 // 〈寸鉄〉: 会心率の 100% を超えた分が倍率になる (超えた 10% につき +0.1)。
-                if (!attackerIsEnemy && context.critOverflowToMultiplier && context.lastCritAddPct > 100f)
-                    effCritMul += (context.lastCritAddPct - 100f) / 100f;
+                if (!attackerIsEnemy && context.critOverflowToMultiplier && context.lastCritAddPct > 1f)
+                    effCritMul += context.lastCritAddPct - 1f;   // lastCritAddPct は小数 (1.0 = 100%)
+                // 〈心眼〉の②: 会心率が 100% を超えた分の確率で、 会心がもう一度重なる (倍率 +1.0・2026-11-07)。
+                if (!attackerIsEnemy && context.critOverflowStack && context.lastCritAddPct > 1f
+                    && GameLoop.GameRng.Value("PassiveSkillManager.critStack") < context.lastCritAddPct - 1f)
+                    effCritMul += 1f;
                 totalDamage = (int)(totalDamage * effCritMul);
                 // [診断] 会心倍率は 3.0 固定ではない (メタ精密 r10 の逓減還元・一点集中 等)。
                 // 実測の平均を取らないと会心係数を 1+p×2 で見積もれない。
@@ -742,6 +750,10 @@ namespace ItemSystem.PassiveSkills
                 totalDamage = (int)(totalDamage * (1f + context.nonCritOutgoingMultiplier));
                 if (diag) stg[18]++;
             }
+            // 〈一点読みの片眼〉の代価: 会心しなかった攻撃の与ダメ −30% (2026-11-07)。
+            if (!context.isCritical && totalDamage > 0 && !attackerIsEnemy
+                && context.GetAccumulated(Effects.PinpointEye.NonCritCutKey) > 0f)
+                totalDamage = totalDamage * Effects.PinpointEye.NonCritKeepPct / 100;
             if (diag) stg[4] += totalDamage;   // 段 D
 
             // 8. ダメージ確定後トリガー

@@ -33,7 +33,9 @@ namespace ItemSystem.PassiveSkills
         /// dmg = floor(stacks × 最大HP × N / 1000)、 下限 1。 整数だけで計算する (Mono の float の揺れでダイジェストが割れないように
         /// ── 0.5% を小数で持たず 5‰ で持つ理由)。</summary>
         public int dotMaxHpPermillePerStack;
-        public int decayPerTurn;         // tick後に減らすスタック量
+        /// <summary>true なら <see cref="dotMaxHpPermillePerStack"/> の基準を最大 HP ではなく<b>現在 HP</b> にする (削るほど弱まる・とどめは主攻撃)。</summary>
+        public bool dotUsesCurrentHp;
+        public int decayPerTurn;        // tick後に減らすスタック量
         /// <summary>true: ダメージを出した直後に、 残っているスタックを半分にする (切り捨て)。 decayPerTurn の代わり。</summary>
         public bool halveAfterTick;
         public int maxStacks;
@@ -51,16 +53,23 @@ namespace ItemSystem.PassiveSkills
             //   毒は敵の最大 HP に比例するうえ、 減衰が無く、 毒を足す品が 5〜6 種同時に流れ込むので (ボスで 1 戦 9 スタック付与)、
             //   固定ダメの半分近くを毒が占め、 敵を硬くしても戦闘が長引かなかった。
             //   半減にしたので、 毎ターン足し続けないと貯まらない ── 足す品の数ではなく足す頻度が効く形。
+            // 2026-11-07: 1 スタック = 敵の**現在 HP** の 0.1%・上限 99 (旧 最大 HP の 0.5%・上限 10)。
+            //   上限 10 は 1〜2 品で上限の半分に届き、 つまみ食いが得になっていた。 細かくして上限を外すと、
+            //   毒の量は毒の品の数にほぼ比例する ── 高い割合を出すには毒の品を何個も積む (溜まりやすく減りやすい)。
+            // 2026-11-07 (同日): 基準を**最大 HP** に戻した。 現在 HP 基準では毒 12 本以上でも与ダメの 13% しか出ず、
+            //   毒を積んだビルドが報われなかった (出血は無投資でも 17%)。 最大 HP 比は深い層ほど毒が伸びる
+            //   (深さ 1 → 7 で ×33・主攻撃は ×2.2) ので、 測定で深い層の毒の比率を見張ること。
             ["poison"] = new StatusDef
             {
                 id = "poison",
                 target = StatusTarget.Enemy,
                 tickTiming = StatusTick.TurnStart,
-                dotMaxHpPermillePerStack = 5,   // 0.5%
+                dotMaxHpPermillePerStack = 1,   // 0.1%
+                dotUsesCurrentHp = false,
                 dotScalesWithStacks = true,
                 decayPerTurn = 0,
                 halveAfterTick = true,
-                maxStacks = 10,
+                maxStacks = 99,
             },
         };
     }

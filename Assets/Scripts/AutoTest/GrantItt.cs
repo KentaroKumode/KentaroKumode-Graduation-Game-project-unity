@@ -550,7 +550,10 @@ namespace AutoTest
         /// 15,000ラン の表で測ったバッチが「N=30000」と表示されていた)。</summary>
         public static int SurvivalN { get; private set; }
 
-        public static string ClearPath(string learningRoot) => Path.Combine(learningRoot, "itt_clear.json");
+        /// <summary>序列の版 (2026-11-06)。 "super" なら itt_clear.super.json を読み書きする (Super の方策で測った序列)。 空なら共通の itt_clear.json。
+        /// 品の価値は使う方策で変わる (Super の方策で測ると Super は 25.3 → 39.2%・同じ序列を Optimal に使うと 3 層の死亡が 3 倍)。</summary>
+        public static string Variant = "";
+        public static string ClearPath(string learningRoot) => Path.Combine(learningRoot, string.IsNullOrEmpty(Variant) ? "itt_clear.json" : "itt_clear." + Variant + ".json");
 
         private static void WriteSurvival(string learningRoot, List<string> cols, List<int> goldCols,
                                           double[] beta, int NI, double[] alpha, double p0, int runs)
@@ -586,7 +589,7 @@ namespace AutoTest
                 sb.AppendLine($"  {r.id,-28} {r.dClearPt,7:F3} {r.sePt,6:F3} {(r.sePt > 0 ? r.dClearPt / r.sePt : 0),6:F2}  |"
                             + $"{r.byFloor[0],6:F2} {r.byFloor[1],6:F2} {r.byFloor[2],6:F2} {r.byFloor[3],6:F2} {r.byFloor[4],6:F2} {r.treated,7}"
                             + (r.treated >= MinTreatedRuns ? "" : "  ※標本不足"));
-            System.IO.File.WriteAllText(Path.Combine(learningRoot, "itt_clear.txt"), sb.ToString(), Encoding.UTF8);
+            System.IO.File.WriteAllText(Path.Combine(learningRoot, string.IsNullOrEmpty(Variant) ? "itt_clear.txt" : "itt_clear." + Variant + ".txt"), sb.ToString(), Encoding.UTF8);
         }
 
         public static bool TryLoadClear(string learningRoot)
