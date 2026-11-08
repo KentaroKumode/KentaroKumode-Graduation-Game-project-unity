@@ -319,6 +319,21 @@ namespace GameLoop
         /// **ラン中ずっと固定**。 どの役が死ぬかでそのランの組み立てが変わるので、
         /// 戦闘ごとに引き直さない (引き直すと「運が悪い戦闘」の集合になり、 判断が生まれない)。</summary>
         public int sealedRoleMask;
+        /// <summary>挑戦カード (docs/GAME.md §23-25) のラン。 立っている間、 挑戦の構成は整備の配点ではなく受けたカードから作る。 [persistent]</summary>
+        public bool challengeCardMode;
+        /// <summary>このランの挑戦の難易度 (= カードを引く回数・0..10)。 クリアすると記録になる。 [persistent]</summary>
+        public int challengeDifficulty;
+        /// <summary>受けた挑戦カード ("デバフの id|バフの id")。 [persistent]</summary>
+        public List<string> challengePicks = new List<string>();
+        [System.NonSerialized] private MetaProgression.ResolvedChallenge _cardChallenge;
+        /// <summary>カードを受けた後に呼ぶ (挑戦の構成を作り直させる)。</summary>
+        public void InvalidateCardChallenge() => _cardChallenge = null;
+        /// <summary>カードのランなら受けたカードから組んだ構成、 そうでなければ null (整備の配点を使う)。</summary>
+        public static MetaProgression.ResolvedChallenge CardChallenge(RunState run)
+        {
+            if (run == null || !run.challengeCardMode) return null;
+            return run._cardChallenge ??= MetaProgression.ChallengeCards.Resolve(run.challengePicks);
+        }
         /// <summary>サイコロの**面の全部**（<see cref="DiceFaceParts"/>）。 素の面 {2,3,4,5} も T1 としてここに入る
         /// （ADR-0011・2026-10-18）。 同じ目は 1 枚まで。 面を外すと減る。
         /// セーブ対象。 適用は GameManager の戦闘開始時（面配列の解決地点）。</summary>
@@ -548,6 +563,10 @@ namespace GameLoop
             lingeringWoundLost = 0;
             lingeringWoundDamageAccum = 0;
             sealedRoleMask = 0;
+            challengeCardMode = false;
+            challengeDifficulty = 0;
+            if (challengePicks == null) challengePicks = new List<string>(); else challengePicks.Clear();
+            _cardChallenge = null;
             if (chronicle == null) chronicle = new List<string>(); else chronicle.Clear();
             diceFaceParts = DiceFaceParts.StartingParts();
             faceRemovals = 0;

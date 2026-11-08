@@ -76,6 +76,8 @@ namespace GameLoop
             // T4-E〈最後の審判〉: 3層・5層で大罪を付与 (§15-2 v3.0)。 v1 の 1層付与は廃止。
             if (Run.Depth == 3) MetaProgression.MetaDebuffApplicator.TryGrantOnFloor3(Run);
             if (Run.Depth == 5) MetaProgression.MetaDebuffApplicator.TryGrantOnFloor5(Run);
+            // 挑戦カード: この層の入口で引く (§23-25)。 BOT はここで選び、 人は航行の窓で選ぶ
+            DealChallengeForDepth(Run.Depth);
 
             // 層を移ったら HP を全回復する (2026-11-04)。 1 層は満タンで始まるので 2 層から。
             //   物資を絞って (戦闘で物資が出ない・移動 50) 寄り道が減った分、 層の中の HP の収支だけで死なないように。
@@ -979,6 +981,8 @@ namespace GameLoop
                     ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, SwordDanceSet.Finale);
                     Log("[計測] 5層撃破 → 〈ブレイドダンス〉を強制付与");
                 }
+
+                RecordChallengeClear();   // 5 層の踏破 = 挑戦の難易度の記録
 
                 if (!ConvictionSystem.HasResolveOrBetter(Run))
                 {

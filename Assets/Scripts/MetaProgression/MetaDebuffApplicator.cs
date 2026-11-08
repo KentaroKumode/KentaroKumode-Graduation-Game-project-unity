@@ -20,9 +20,15 @@ namespace MetaProgression
     /// </summary>
     public static class MetaDebuffApplicator
     {
-        /// <summary>解決済みの挑戦構成。 メタ未初期化なら空構成。</summary>
+        /// <summary>解決済みの挑戦構成。 メタ未初期化なら空構成。
+        /// 挑戦カードのラン (<see cref="RunState.challengeCardMode"/>) は、 受けたカードから組み直した構成 (<see cref="ChallengeCards.Resolve"/>) を返す。</summary>
         public static ResolvedChallenge C
-            => MetaProgressManager.Instance?.State?.Challenge ?? ResolvedChallenge.None;
+            => PreviewOverride
+               ?? RunState.CardChallenge(GameManager.Instance?.Run)
+               ?? MetaProgressManager.Instance?.State?.Challenge ?? ResolvedChallenge.None;
+
+        /// <summary>カードの文面を作る間だけ、 その 1 枚の構成で値を聞くための差し替え (<see cref="ChallengeCards.Text"/>)。 普段は null。</summary>
+        public static ResolvedChallenge PreviewOverride;
 
         /// <summary>現在の挑戦スコア (0..50)。 ラン結果へ記録する。</summary>
         public static int Score => C.Score;

@@ -17,7 +17,15 @@ namespace MetaProgression
     {
         private static MetaProgressState S => MetaProgressManager.Instance?.State;
 
-        private static int Rank(MetaPanelKind k) => S?.GetRank(k) ?? 0;
+        /// <summary>整備の段数。 挑戦カードのバフで足した段 (<see cref="ChallengeCards.BonusRanks"/>) を上乗せし、 トラックの上限で止める。</summary>
+        private static int Rank(MetaPanelKind k)
+        {
+            int r = S?.GetRank(k) ?? 0;
+            var run = GameLoop.GameManager.Instance?.Run;
+            if (run != null && run.challengeCardMode && run.challengePicks.Count > 0)
+                r = System.Math.Min(k.MaxRank(), r + ChallengeCards.BonusRanks(run.challengePicks, k));
+            return r;
+        }
 
         // ============================================================
         //  RunState 初期化時の補正

@@ -73,7 +73,7 @@ namespace UI.Game2D
             // 画面の外で所持金・HP が変わった時も描き直す (買える品の明暗・副題の数字)
             int coins = gm.Run != null ? gm.Run.coins : 0, hp = gm.Run != null ? gm.Run.playerHP : 0;
             if (coins != _lastCoins || hp != _lastHp) { _lastCoins = coins; _lastHp = hp; if (_open) _dirty = true; }
-            int pend = gm.PendingStartingPassiveChoices.Count;
+            int pend = gm.PendingStartingPassiveChoices.Count + gm.PendingChallengeTiers.Count * 100;
             if (pend != _lastPending) { _lastPending = pend; _dirty = true; }
             if (!_dirty) return;
             if (Game2DLoadingScreen.Blocking) return;      // ロード画面の間は出さない (終わってから出す・_dirty は残す)
@@ -98,6 +98,7 @@ namespace UI.Game2D
         {
             var run = gm.Run;
             if (ph == GameManager.GamePhase.MapNavigation && gm.PendingStartingPassiveChoices.Count > 0) return StartingPick(gm);
+            if (ph == GameManager.GamePhase.MapNavigation && gm.PendingChallengeTiers.Count > 0) return ChallengePick(gm);
             switch (ph)
             {
                 case GameManager.GamePhase.ShopVisit: return Shop(gm);
@@ -175,6 +176,26 @@ namespace UI.Game2D
             }
             d.buttons.Add(B("選ぶ", "pick", true));
             d.onAction = (a, sel) => { if (a == "pick") { gm.ResolveStartingPassive(Mathf.Clamp(sel, 0, cands.Count - 1)); Game2DSfx.Play("ui_confirm"); } Refresh(); };
+            return d;
+        }
+
+        // ── 挑戦カード (docs/GAME.md §23-25): 層の入口で 2 枚から 1 枚。 選んだカードのデバフとバフを両方受ける ──
+
+        private ScreenDef ChallengePick(GameManager gm)
+        {
+            var offer = gm.ChallengeOffer; int tier = gm.PendingChallengeTiers[0];
+            var d = New("試練をひとつ選ぶ", "Tier " + Game2DModal.ChallengeRomanOf(tier) + (gm.PendingChallengeTiers.Count > 1 ? "  残り " + gm.PendingChallengeTiers.Count : ""), 460);
+            d.body = "選んだ札のデバフとバフを、 両方受ける。";
+            d.bodyLines = 1;
+            d.rowH = Game2DModal.ChallengeRowH;
+            if (offer != null)
+                foreach (var card in offer)
+                {
+                    MetaProgression.ChallengeCards.Split(card, out var deb, out var buf);
+                    d.Items.Add(new ModalItem { challengeTier = tier, deb = MetaProgression.ChallengeCards.Text(deb), buf = MetaProgression.ChallengeCards.Text(buf) });
+                }
+            d.buttons.Add(B("受ける", "pick", true));
+            d.onAction = (a, sel) => { if (a == "pick") { gm.ResolveChallengePick(Mathf.Clamp(sel, 0, d.Items.Count - 1)); Game2DSfx.Play("ui_confirm"); } Refresh(); };
             return d;
         }
 

@@ -20,6 +20,9 @@ namespace UI.Game2D
         public string[] segs;
         /// <summary>押されている列 (-1 = どれも押されていない)。</summary>
         public int segOn = -1;
+        /// <summary>挑戦カードの行 (2026-11-08・docs/GAME.md §23-25)。 1..4 だと、 左に Tier の紋章、 右に「− デバフ」(赤) と「+ バフ」(緑) の 2 段で描く。
+        /// Tier はレアリティの色を使わない (灰 → 琥珀 → 熾火 → 深紅)。 IV は紋章が脈打つ。</summary>
+        public int challengeTier; public string deb, buf;
     }
 
     public sealed class ModalBtn { public string label, action; public bool primary; }
@@ -416,6 +419,73 @@ namespace UI.Game2D
             return bar;
         }
 
+        // ── 挑戦カードの行 (2026-11-08) ──
+        //   Tier の色: 灰 → 琥珀 → 熾火 → 深紅 (重くなるほど熱く暗く。 レアリティの虹・金は使わない)。 [Tier] = { 線, 地, 明るい線 }
+        private static readonly Color32[][] ChTier =
+        {
+            null,
+            new[] { new Color32(0x9e, 0xa4, 0xa1, 255), new Color32(0x3a, 0x3e, 0x3c, 255), new Color32(0xc9, 0xcf, 0xcc, 255) },
+            new[] { new Color32(0xc9, 0x9a, 0x3e, 255), new Color32(0x4a, 0x37, 0x18, 255), new Color32(0xec, 0xc9, 0x79, 255) },
+            new[] { new Color32(0xd2, 0x62, 0x2f, 255), new Color32(0x4f, 0x22, 0x10, 255), new Color32(0xf0, 0x90, 0x62, 255) },
+            new[] { new Color32(0xb3, 0x20, 0x3a, 255), new Color32(0x3e, 0x0a, 0x14, 255), new Color32(0xe2, 0x5a, 0x6b, 255) },
+        };
+        private static readonly Color32 ChDeb = new Color32(0xd8, 0x6a, 0x5c, 255), ChDebHi = new Color32(0xf2, 0xbd, 0xb4, 255);
+        private static readonly Color32 ChBuf = new Color32(0x7c, 0xc2, 0x9a, 255), ChBufHi = new Color32(0xc3, 0xec, 0xd2, 255);
+        private static readonly string[][] ChRoman =   // 3×5 の字 (I と V)
+        {
+            new[] { "1", "1", "1", "1", "1" },
+            new[] { "101", "101", "101", "101", "010" },
+        };
+
+        /// <summary>挑戦カードの行の高さ (2 段の字 + 余白)。</summary>
+        public static int ChallengeRowH => Game2DJpFont.LineH * 2 + 10;
+
+        private void ChallengeRow(KitPix p, ModalItem it, RectInt r, bool sel)
+        {
+            int t = Mathf.Clamp(it.challengeTier, 1, 4); var c = ChTier[t];
+            // 選んでいる行は、 枠を Tier の色で描き直す
+            if (sel) { p.Rect(r.x, r.y, r.width, 1, c[0]); p.Rect(r.x, r.y + r.height - 1, r.width, 1, c[0]); p.Rect(r.x, r.y, 1, r.height, c[0]); p.Rect(r.x + r.width - 1, r.y, 1, r.height, c[0]); }
+            // 紋章: 菱形 (中は Tier の地・縁は Tier の線) + 中にローマ数字 + 上に Tier の数だけ刻み
+            int rad = Mathf.Min(13, (r.height - 10) / 2), cx = r.x + 6 + rad, cy = r.y + r.height / 2 + 2;
+            for (int dy = -rad; dy <= rad; dy++) { int w = rad - Mathf.Abs(dy); p.Rect(cx - w, cy + dy, w * 2 + 1, 1, c[1]); }
+            var edge = c[0];
+            if (t == 4) { _glintOn = true; float k = 0.5f + 0.5f * Mathf.Sin(_glintTick * 0.5f); edge = Lerp(c[0], c[2], k); }
+            for (int dy = -rad; dy <= rad; dy++) { int w = rad - Mathf.Abs(dy); p.Set(cx - w, cy + dy, edge); p.Set(cx + w, cy + dy, edge); }
+            if (t == 4)   // 深紅の外側に、 加算の光 (脈に合わせて強さが変わる)
+            {
+                float a = 0.10f + 0.12f * (0.5f + 0.5f * Mathf.Sin(_glintTick * 0.5f));
+                for (int g = 1; g <= 2; g++)
+                    for (int dy = -(rad + g); dy <= rad + g; dy++) { int w = rad + g - Mathf.Abs(dy); AddLight(p, cx - w, cy + dy, a / g); AddLight(p, cx + w, cy + dy, a / g); }
+            }
+            string s = ChallengeRomanOf(t); int gw = -1; foreach (char ch in s) gw += (ch == 'V' ? 3 : 1) + 1;
+            int gx = cx - gw / 2;
+            foreach (char ch in s) { var gl = ChRoman[ch == 'V' ? 1 : 0]; for (int yy = 0; yy < 5; yy++) for (int xx = 0; xx < gl[yy].Length; xx++) if (gl[yy][xx] == '1') p.Set(gx + xx, cy - 2 + yy, sel ? c[2] : c[0]); gx += gl[0].Length + 1; }
+            for (int i = 0; i < t; i++) p.Rect(cx - (t - 1) * 2 + i * 4 - 1, cy - rad - 5, 2, 2, c[0]);
+            // 区切りの縦線と 2 段の字
+            int tx = cx + rad + 8; p.Rect(tx - 4, r.y + 5, 1, r.height - 10, Game2DKit.Off);
+            int LH = Game2DJpFont.LineH, ty = r.y + (r.height - LH * 2) / 2 + 1, tw = r.x + r.width - 6 - tx;
+            // 記号の − と + はドットで描く (字の表に無くても出るように)。 字の行の真ん中の高さ
+            const int mw = 9; int my = Game2DJpFont.Cell / 2;
+            p.Rect(tx, ty + my, 5, 1, ChDeb);
+            Game2DJpFont.Draw(p, Game2DJpFont.Clip(it.deb ?? "", tw - mw), tx + mw, ty, sel ? ChDebHi : ChDeb);
+            p.Rect(tx, ty + LH + my, 5, 1, ChBuf); p.Rect(tx + 2, ty + LH + my - 2, 1, 5, ChBuf);
+            Game2DJpFont.Draw(p, Game2DJpFont.Clip(it.buf ?? "", tw - mw), tx + mw, ty + LH, sel ? ChBufHi : ChBuf);
+        }
+
+        public static string ChallengeRomanOf(int t) => t == 1 ? "I" : t == 2 ? "II" : t == 3 ? "III" : "IV";
+        public static Color32 ChallengeTierColor(int t) => ChTier[Mathf.Clamp(t, 1, 4)][0];
+
+        private static Color32 Lerp(Color32 a, Color32 b, float k)
+            => new Color32((byte)(a.r + (b.r - a.r) * k), (byte)(a.g + (b.g - a.g) * k), (byte)(a.b + (b.b - a.b) * k), 255);
+
+        /// <summary>深紅の光を加算で足す (重ね塗りしない・明度だけ上げない)。</summary>
+        private static void AddLight(KitPix p, int x, int y, float a)
+        {
+            if (x < 0 || y < 0 || x >= p.w || y >= p.h) return;
+            int i = (p.h - 1 - y) * p.w + x; var c = p.px[i];
+            p.px[i] = new Color32((byte)Mathf.Min(255, c.r + 214 * a), (byte)Mathf.Min(255, c.g + 48 * a), (byte)Mathf.Min(255, c.b + 72 * a), c.a);
+        }
+
         private void RedrawJp()
         {
             _glintOn = false;   // 描くたびに数え直す (伝説の枠を描いたら立つ)
@@ -442,6 +512,7 @@ namespace UI.Game2D
                 if (Game2DKit.Row != null) p.NineSlice(Game2DKit.Row, 6, Game2DKit.Well, r.x, r.y, r.width, r.height); else p.Plate(r.x, r.y, r.width, r.height, it.disabled ? 0.55f : sel ? 1.55f : hv ? 1.3f : 1f);
                 if (hv && !sel) p.Rect(r.x, r.y, r.width, 1, Game2DKit.Ink);
                 if (sel) { p.Rect(r.x, r.y, r.width, 1, Game2DKit.Amber); p.Rect(r.x, r.y + r.height - 1, r.width, 1, Game2DKit.Amber); p.Rect(r.x, r.y, 1, r.height, Game2DKit.Amber); p.Rect(r.x + r.width - 1, r.y, 1, r.height, Game2DKit.Amber); }
+                if (it.challengeTier > 0) { _barR.Add(default); _segR.Add(null); ChallengeRow(p, it, r, sel); continue; }
                 if (d.segments && it.segs != null) { _barR.Add(default); _segR.Add(SegRow(p, d, it, r, i == _hoverSegRow ? _hoverSeg : -1)); continue; }
                 _segR.Add(null);
                 if (d.sliders && it.max > 0) { _barR.Add(SliderRow(p, d, it, r, sel)); continue; }

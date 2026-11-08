@@ -40,6 +40,11 @@ namespace MetaProgression
         /// activeDebuffs は JsonUtility が黙って捨てるので、 マイグレーションは不要。</summary>
         public ChallengeLoadout challenge = new ChallengeLoadout();
 
+        /// <summary>挑戦カード (docs/GAME.md §23-25) の難易度 (0..10 = ラン中にカードを引く回数)。 整備の「挑戦」の目盛りで選ぶ。</summary>
+        public int challengeDifficulty;
+        /// <summary>5 層を踏破した最高の難易度。 選べるのはこの +1 まで。</summary>
+        public int challengeBest;
+
         // 双蛇のダイス〈永劫〉: 勝利した戦闘数をランを跨いで永続蓄積。パネルとは独立。
         public int eternalStacks;
 

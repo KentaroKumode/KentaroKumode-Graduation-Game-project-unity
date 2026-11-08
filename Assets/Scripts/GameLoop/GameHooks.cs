@@ -21,6 +21,8 @@ namespace GameLoop
         /// <summary>開幕パッシブの提示 (〈兵站〉r10 の 2〜3 択) から 1 つ選ぶ。 戻り値は添字。
         /// null なら先頭 (選択画面が付くまでの仮)。</summary>
         public static Func<IReadOnlyList<string>, int> ChooseStartingPassive;
+        /// <summary>挑戦カードの 2 枚 ("デバフの id|バフの id") からどれを受けるか。 null なら人が遊んでいる時は画面で選び、 BOT は先頭。</summary>
+        public static Func<IReadOnlyList<string>, int> ChooseChallengeCard;
 
         /// <summary>自動装備の武器評価に足す点 (武器 id → 加点)。 null なら 0。</summary>
         public static Func<string, float> WeaponEvBonus;
@@ -47,6 +49,7 @@ namespace GameLoop
         {
             BotDriving = false;
             ChooseStartingPassive = null;
+            ChooseChallengeCard = null;
             WeaponEvBonus = null;
             MeasureRunPower = null;
             OnCritRateResolved = null;
