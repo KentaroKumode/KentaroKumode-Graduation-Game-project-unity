@@ -1075,8 +1075,8 @@ namespace AutoTest
         /// <summary>極点 (r10) 同士の比較。 <see cref="metaAxisAblation"/> と排他。</summary>
         public bool keystoneSweep = false;
         /// <summary><b>r9 と r10 の限界比較 (2026-09-12)。</b> 極点比較は「そのトラックに 10pt 使う」と
-        /// 「極点そのもの」を分離できない ── 燈火 −5.37pt が、 横移動5→2 が悪いのか
-        /// 燈火に 10pt 使うのが悪いのかが不明のままだった。 同じトラックの r9 と r10 を並べれば
+        /// 「極点そのもの」を分離できない ── 兵站 −5.37pt が、 横移動5→2 が悪いのか
+        /// 兵站に 10pt 使うのが悪いのかが不明のままだった。 同じトラックの r9 と r10 を並べれば
         /// 差が極点の取り分になる (r9 の余った 1pt は共通の埋め草へ行く)。</summary>
         public bool rankMarginSweep = false;
         /// <summary>r9/r10 を比べるトラック名。 カンマ区切り (例 "Shell,Lantern")。
@@ -1185,6 +1185,8 @@ namespace AutoTest
         /// <summary>挑戦カード (docs/GAME.md §23-25) の難易度 0..10。 1 以上だと挑戦カードのランになり、 層の入口で 2 枚から先頭を受ける
         /// (配る順は乱数なので、 実質ランダムに選ぶ)。 0 = 使わない (旧の配点・challengeSpec のまま)。</summary>
         public int challengeCardDifficulty = 0;
+        /// <summary>[測定] 物資の素の上限を差し替える。 0 = 差し替えない (2026-11-09・上限を振る測定の口)。</summary>
+        public int provisionMaxOverride = 0;
         /// <summary>[測定] 挑戦カードを 1 枚ずつ測る: "層:カードの id" を ; で並べる (例 "1:D:狂暴化:1" / "3:B:Plunder.gold:3")。
         /// 指定した層の入口で、 難易度の引き方の代わりにそのカードを受ける。 空 = 使わない。 層は見せる層 (1..5)。</summary>
         public string challengeForce = "";
@@ -1338,6 +1340,8 @@ namespace AutoTest
             /// <summary>[計装 2026-11-06] 与ダメの内訳 [武器, 攻撃の出目, 攻撃+N, 主攻撃の与ダメ, 固定ダメ, 追撃, 出目由来の攻撃, 毒, 出血, 臨界の爆発]。
             /// 毒と爆発は固定ダメの内数、 出血は固定ダメの外。</summary>
             public int[] dmgParts;
+            /// <summary>[計装 2026-11-10] 配線を決めたターン数 / うち防ぎ切りの規則の対象 (今ターン撃破を除く) / うち今ターン撃破。</summary>
+            public int fbDecided, fbTurns, fbKillTurns;
             public bool isFightEnd; // OnBattleEnded で確定した1戦分か（チェーン途中形態は false）
             // この戦闘時点の装備（武器×ダイス勝率集計用）。武器は family_tN まで（業物+段階は区別しない）。
             public string weaponId = "";
@@ -1380,6 +1384,8 @@ namespace AutoTest
             public string[] goldKeys;
             /// <summary>[計装 2026-11-06] 状態の記録 (<see cref="SnapState"/> の 10 列を平らに並べる)。 マクロの価値 V の表の元。</summary>
             public List<int> stateSnaps = new List<int>();
+            /// <summary>[計装 2026-11-09] 航行マップの層ごとの踏破: 4 列ずつ (深さ, マスの種別 TileType, 層にあった数, 踏んだ数)。</summary>
+            public List<int> mapVisit = new List<int>();
             public int[] goldVals;
             /// <summary>**このランでゲームが実際に見た挑戦スコア。**
             /// 意図した構成が本当に適用されていたかを、 結果ではなく入力側で検証するために残す。</summary>

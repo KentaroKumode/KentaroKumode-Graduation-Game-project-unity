@@ -162,7 +162,7 @@ namespace UI.Game2D
             }
         }
 
-        // ── 開幕パッシブの選択 (〈兵站〉r10: 何本目かで 2〜3 択) ──
+        // ── 開幕パッシブの選択 (〈宝物庫〉r10: 何本目かで 2〜3 択) ──
 
         private ScreenDef StartingPick(GameManager gm)
         {
@@ -488,7 +488,7 @@ namespace UI.Game2D
         {
             "最大 HP −25%。 拒むと〈不完全な修復〉を背負う。",
             "遺物を 2 個焚く。 拒むと〈不完全な起動〉を背負う。",
-            "物資 −40。 拒むと〈不完全な転移〉を背負う。",
+            "物資 −" + GameLoop.GameManager.GateProvisionDemand + "。 拒むと〈不完全な転移〉を背負う。",
         };
 
         private ScreenDef Gate(GameManager gm)

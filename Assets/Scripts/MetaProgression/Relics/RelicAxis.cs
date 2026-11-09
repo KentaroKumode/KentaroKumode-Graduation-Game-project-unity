@@ -118,7 +118,7 @@ namespace MetaProgression.Relics
         /// 2026-08-09: 40 → **60**。 <see cref="ProvisionBurnStartProvision"/> と同値にして、
         /// **開幕から発動圏に居る**形にした。 40 では発動率 40.5% で、 残り 6 割の攻撃が
         /// 素の火力のまま ＝ 物資を前借りした対価が返ってこなかった。
-        public const int ProvisionBurnThreshold = 600;   // 2026-09-28: 物資 ×10
+        public const int ProvisionBurnThreshold = 6;   // 2026-11-10: 旧 600 (上限の 60%) → 上限 10 の 60%
         /// <summary>〈背水〉が働く HP の閾値（playerMaxHP に対する比）。</summary>
         public const float LastBreathThreshold = 0.35f;
 
@@ -126,7 +126,7 @@ namespace MetaProgression.Relics
         /// <see cref="ProvisionBurnThreshold"/> と同値なので **開幕から発動圏**に居る。
         /// 賭けの対価は「発動までの猶予」ではなく **物資という資源そのものを前借りすること**
         /// （横移動の自由度・発狂までの余裕・上限ラチェットの早期発動）に置いている。</summary>
-        public const int ProvisionBurnStartProvision = 600;   // 2026-09-28: 物資 ×10
+        public const int ProvisionBurnStartProvision = 6;   // 2026-11-10: 旧 600 (上限の 60%) → 上限 10 の 60%
 
         public static readonly RelicAxis[] All =
             (RelicAxis[])System.Enum.GetValues(typeof(RelicAxis));

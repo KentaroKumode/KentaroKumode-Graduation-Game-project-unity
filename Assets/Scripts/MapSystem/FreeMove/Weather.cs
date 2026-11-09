@@ -11,19 +11,18 @@ namespace MapSystem.FreeMove
     {
         None = 0,
         /// <summary>前線の中では、 道で 2 歩以上離れた点が「?」に戻る (近づけば戻る・中身は引き直さない)。</summary>
-        Fog,
-        /// <summary>沈む静寂 (仮): 前線の中では痕跡が 2 倍長く残る。 物音が無くなったので作り直し中の仮の効果 (抽選には入れない)。</summary>
-        Still,
+        Fog = 1,
+        // 2 = 旧〈沈む静寂〉(2026-11-09 削除)。 番号は詰めない (アイコン表・保存値の互換)。
         /// <summary>削る砂: 前線の中では 1 歩の物資が 1.5 倍。 痕跡は 2 倍早く消える。</summary>
-        Sand,
+        Sand = 3,
         /// <summary>朱の雪: 前線の中では、 移動に 2 手番かかる (追跡者は 2 回動く)。</summary>
-        Snow,
+        Snow = 4,
         /// <summary>落石のような雹: 前線の中では、 移動ごとに HP −1。</summary>
-        Hail,
+        Hail = 5,
         /// <summary>崩れる地平: 前線が進むたび、 前線の中の道が 1 本崩れる (終点へは必ずつながったまま)。</summary>
-        Crumble,
+        Crumble = 6,
         /// <summary>沈み続ける湖面: 前線が進むたび、 前線の中の未使用の点が 1 つ沈む (終点へは必ずつながったまま)。</summary>
-        Sink,
+        Sink = 7,
     }
 
     public static class WeatherInfo
@@ -35,7 +34,6 @@ namespace MapSystem.FreeMove
             switch (w)
             {
                 case WeatherKind.Fog: return "霧";
-                case WeatherKind.Still: return "沈む静寂（仮）";
                 case WeatherKind.Sand: return "削る砂";
                 case WeatherKind.Snow: return "朱の雪";
                 case WeatherKind.Hail: return "落石のような雹";
@@ -50,7 +48,6 @@ namespace MapSystem.FreeMove
             switch (w)
             {
                 case WeatherKind.Fog: return "前線の中では、道で2歩以上離れた点が「?」に戻る（近づけば戻る・中身は引き直さない）";
-                case WeatherKind.Still: return "前線の中では、痕跡が2倍長く残る（作り直し中の仮の効果）";
                 case WeatherKind.Sand: return "前線の中では、1歩の物資が1.5倍。痕跡は2倍早く消える";
                 case WeatherKind.Snow: return "前線の中では、移動に2手番かかる（追跡者は2回動く）";
                 case WeatherKind.Hail: return "前線の中では、移動ごとにHP-1";
@@ -60,7 +57,7 @@ namespace MapSystem.FreeMove
             }
         }
 
-        /// <summary>その層で引ける天候。 1 層は穏やかに天候なし。 <see cref="WeatherKind.Still"/> は作り直し中なので抽選に入れない。</summary>
+        /// <summary>その層で引ける天候。 1 層は穏やかに天候なし。</summary>
         public static WeatherKind[] PoolFor(int floor)
             => floor <= 1 || floor == FloorPlan.LinearFloor     // 5 層 (直線) は道が 1 本なので、 崩れる・沈む天候を入れない
                 ? new[] { WeatherKind.None }

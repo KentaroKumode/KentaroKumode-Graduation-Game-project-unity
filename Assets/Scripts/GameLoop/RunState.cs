@@ -584,12 +584,12 @@ namespace GameLoop
             diceEnhanceValues.Clear();
             weaponPlus = 0;
             limitBreakStage = 0;
-            // 燈火: 物資上限 +150/段 (2026-09-28 に ×10)
+            // 兵站: 物資上限 +1/段 (2026-11-09)
             int provisionCapBonus = MetaProgression.MetaBuffApplicator.GetProvisionCapBonus();
             // 挑戦デバフ 軸5〈絶望的な戦闘〉: 物資上限 −40/−80/−120。
             // **整備パネル適用後に足す** (plan §6-4)。 先に引くとパネル側の計算で薄まる。
             int provisionCapPenalty = MetaProgression.MetaDebuffApplicator.GetProvisionCapDelta();
-            provisionCap = UnityEngine.Mathf.Max(1, ProvisionSystem.ProvisionMax + provisionCapBonus + provisionCapPenalty);
+            provisionCap = UnityEngine.Mathf.Max(1, GameHooks.ProvisionBaseMax + provisionCapBonus + provisionCapPenalty);
             provision    = provisionCap;
 
             // 遺物軸〈渇き〉: **開幕物資を下げる**（既定 600）。 上限 (provisionCap) は動かさない。

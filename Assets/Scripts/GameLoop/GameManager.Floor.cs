@@ -372,11 +372,7 @@ namespace GameLoop
 
             Run.ApplyBattleResult(result.playerWon, result.playerHPRemaining, result.totalTurns);
 
-            // 物資(ADR-0002): HP収支マイナス→床定量を減少／非マイナス→わずか回復。
-            // 飢餓→物資統合の再マップ: 暴食(トゥルハドの暴食)で損×2、ProvisionLossReduce メタバフで損を軽減。
-            float provisionLossMult = MetaProgression.PermanentDebuffEffects.HasGluttony(Run) ? 2f : 1f;
-            int provisionLossReduce = MetaProgression.MetaBuffApplicator.GetProvisionLossReduction();
-            ProvisionSystem.ApplyCombatHpBalance(Run, provisionLossMult, provisionLossReduce);
+            // (戦闘の HP 収支マイナスによる物資の損は 2026-11-09 に撤去。 物資が減るのは移動だけ)
 
             SetPhase(GamePhase.BattleResult);
             OnBattleEnded?.Invoke(result);
@@ -1104,9 +1100,6 @@ namespace GameLoop
                 if (ActiveModifier.critRatePctBonus != 0f)
                     critRatePct = Mathf.Clamp(critRatePct + ActiveModifier.critRatePctBonus, 0f, MaxWeaponCritPct);
             }
-
-            // 影の代償の出目-1 はロール時に50%確率で発動するため、ここでは何もしない。
-            // 実適用は CombatManager.ExecuteTurn のロール直後で処理。
 
             return (diceCount, diceMax, critRatePct / 100f, diceFaces, faceTiers, suppressTerminalRoles);
         }

@@ -313,9 +313,7 @@ namespace GameLoop
         {
             // 物資(ADR-0002): 飢餓・カルマを統合した精神ゲージ。床に応じて色分け、発狂/狂気スタックも表示。
             var tier = ProvisionSystem.GetTier(run);
-            string provisionColor = run.provision <= ProvisionSystem.FloorScarce ? "#ff4444"
-                             : run.provision <= ProvisionSystem.FloorDepleting ? "#ffaa44"
-                             : run.provision <= ProvisionSystem.FloorDwindling ? "#ffff66" : "#88ff88";
+            string provisionColor = run.provision <= 0 ? "#ff4444" : "#88ff88";
             string madness = run.crownProvisionLocked ? $" 狂気x{run.madnessStack}" : "";
             string provision = $"  <color={provisionColor}>物資: {run.provision}/{run.provisionCap} [{ProvisionSystem.TierName(tier)}]{madness}</color>";
 

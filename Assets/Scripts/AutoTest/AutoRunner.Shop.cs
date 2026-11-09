@@ -515,7 +515,9 @@ namespace AutoTest
             if (sm != null && gm.Run != null)
             {
                 int guardPack = 0;
-                while (gm.Run.provision <= ProvisionRefillFloorEffective() && guardPack++ < ShopManager.ProvisionPackStock
+                // 2026-11-09: 満タンまで買う (上限 5 で、 店は一度入ると使い切り。 次の店まで歩ける分を持って出る)
+                while ((gm.Run.provision <= ProvisionRefillFloorEffective() || gm.Run.provision < gm.Run.provisionCap)
+                       && guardPack++ < ShopManager.ProvisionPackStock
                        && sm.TryBuyProvisionPack(gm.Run)) { }
 
                 // 囮罠 (2026-11-04): 追跡者の居る層では 2 個まで持っておく。 補足された時に航行の BOT が使う (AutoRunner.FreeMap)。
@@ -556,7 +558,7 @@ namespace AutoTest
                 bool Buy(int i)
                 {
                     var s = inv.slots[i];
-                    // **支払い可能額で見る** ── 燈火 r10 は不足分を物資で払える。
+                    // **支払い可能額で見る** ── 兵站 r10 は不足分を物資で払える。
                     //   ここを run.coins のままにすると、 足切りを通した候補が
                     //   この入口で弾かれ、 **機構が 1 回も発動しない** (実測 170,000 ラン で 0 件)。
                     //   同じ判断を 2 箇所に置いた典型で、 2026-08-10 の WouldUpgrade と同じ形。
@@ -937,7 +939,7 @@ namespace AutoTest
                     pw = 0f;
                     var s = inv.slots[i];
                     if (s == null || s.sold) return false;
-                    // 燈火 r10 (物資払い) を織り込んだ支払い可能額。 規則より保守的な PolicyFloor。
+                    // 兵站 r10 (物資払い) を織り込んだ支払い可能額。 規則より保守的な PolicyFloor。
                     if (s.price > GameLoop.ProvisionPayment.PolicyAffordable(run) - _shopReserve) return false;
                     // **武器は装備判定を通す** (2026-08-10)。 主経路にゲートが無く素通りしていた。
                     if (s.kind == ShopSlotKind.Weapon && !WouldBuyWeapon(run, s.itemId)) return false;
@@ -1119,7 +1121,7 @@ namespace AutoTest
                     {
                         var s = inv.slots[i];
                         // 準パワー・支払可否・武器の装備判定・特売補正は TrySlotPower に一本化。
-                        //   経緯 (燈火 r10 の物資払い / 武器ゲートの取りこぼし / 60/40 の線引き) は
+                        //   経緯 (兵站 r10 の物資払い / 武器ゲートの取りこぼし / 60/40 の線引き) は
                         //   git log を参照。
                         if (!TrySlotPower(i, out float pw)) continue;
                         // [診断] 丸めた値と丸める前の値の差。 足切りと順位の片方だけを丸める

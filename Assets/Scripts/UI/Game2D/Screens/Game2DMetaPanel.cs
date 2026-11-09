@@ -22,8 +22,8 @@ namespace UI.Game2D
             new Track { kind = MetaPanelKind.Vault,   name = "金庫", desc = "開幕ゴールド +5/段。 r10: 宝箱のゴールドが復活・ゴールドをランを跨いで預ける (上限 150G)。" },
             new Track { kind = MetaPanelKind.Plunder, name = "強奪", desc = "ボス撃破の追加ゴールド +1/段・通常の敵のパッシブドロップ +2%/段。 r10: ショップ強盗を解禁。" },
             new Track { kind = MetaPanelKind.Trade,   name = "商才", desc = "ショップの特売枠 +1/段 (15/30/50% 引き)。 r10: 99% 引きの枠が出る。" },
-            new Track { kind = MetaPanelKind.Supply,  name = "兵站", desc = "r3/6/9 で開幕パッシブ +1 本・段が上がるほどレア度が上寄り。 r10: 開幕パッシブが選択式。" },
-            new Track { kind = MetaPanelKind.Lantern, name = "燈火", desc = "物資の上限 +150/段。 r10: ゴールドの不足分を物資で払える。" },
+            new Track { kind = MetaPanelKind.Supply,  name = "宝物庫", desc = "r3/6/9 で開幕パッシブ +1 本・段が上がるほどレア度が上寄り。 r10: 開幕パッシブが選択式。" },
+            new Track { kind = MetaPanelKind.Armor,   name = "装甲", desc = "防御 +2/段。 r10〈不動〉: 失った HP 10% ごとに防御 +1 (最大 +9)。 防御は割合の軽減になり、 積むほど伸びは鈍る。 相手の貫通に削られる。" },
         };
 
         private static readonly Track[] Declare =
@@ -74,7 +74,7 @@ namespace UI.Game2D
                 case MetaPanelKind.Plunder: return "ボス +" + MetaPanel.PlunderBossGold(r) + "G・ドロップ +" + MetaPanel.PlunderPassiveDropPct(r).ToString("0") + "%" + (r >= 10 ? "・強盗" : "");
                 case MetaPanelKind.Trade:   return "特売の枠 " + MetaPanel.TradeSaleSlots(r) + (r >= 10 ? "・99% 引き" : "");
                 case MetaPanelKind.Supply:  return "開幕パッシブ " + MetaPanel.SupplyStartingPassives(r) + " 本" + (r >= 10 ? "・選べる" : "");
-                case MetaPanelKind.Lantern: return "物資の上限 +" + MetaPanel.LanternProvisionCapBonus(r) + (r >= 10 ? "・物資で払う" : "");
+                case MetaPanelKind.Armor:   return "防御 +" + MetaPanel.ArmorDefense(r) + (r >= 10 ? "・不動" : "");
                 case MetaPanelKind.AttackTerm: return "つないだ 1 本ごと +" + MetaPanel.AttackTerminalPerDice(r);
                 case MetaPanelKind.BlockTerm:  return "つないだ 1 本ごと +" + MetaPanel.BlockTerminalPerDice(r);
             }

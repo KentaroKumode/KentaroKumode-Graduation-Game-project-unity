@@ -137,6 +137,8 @@ namespace AutoTest
                                 : (System.Func<int[], CombatSystem.MutualTurnTelegraph, int, int[]>)MutualRerollPolicy;
             }
 
+            _fbDecided = _fbTurns = _fbKillTurns = 0;   // [計装] 防ぎ切りの規則の数え直し
+            _fbUnavoidSeen = false; _fbPrevHp = -1; _fbPrevExpTaken = 0;
             int guard = 0;
             while (cm.IsCombatActive && guard++ < 250)
             {
@@ -241,7 +243,13 @@ namespace AutoTest
         private CombatSystem.WiringPlan MutualWiringPlanPolicy(int[] rolls, CombatSystem.MutualTurnTelegraph tele)
         {
             PrepareSuperTurn(rolls, tele);
+            // 予告の外のダメージの観測: 前のターンに見込んだ被ダメより HP が多く減っていたら、 この戦闘にはそれがある
+            int hpNow = CombatSystem.CombatManager.Instance != null ? CombatSystem.CombatManager.Instance.PlayerHP : -1;
+            if (_fbPrevHp >= 0 && hpNow >= 0 && _fbPrevHp - hpNow > _fbPrevExpTaken) _fbUnavoidSeen = true;
+            _lastFreeBlock = _lastKillsNow = false;
             var plan = MutualWiringPolicy(rolls, tele);
+            _fbDecided++; if (_lastFreeBlock) _fbTurns++; if (_lastKillsNow) _fbKillTurns++;
+            _fbPrevHp = hpNow; _fbPrevExpTaken = _lastExpTaken;
             if (wiringMistakeRate > 0f) plan = MaybeMisWire(rolls, tele, plan);
             if (turnAudit) WriteTurnAudit(rolls, tele, plan.main);
             return plan;
@@ -482,6 +490,23 @@ namespace AutoTest
             public float diceAtkPct;           // 攻撃に挿した出目への上乗せ率 (ctx.attackDicePct・2026-11-06)
             public BossPlaybook play;
             public float[] atkGrowth;          // 防ぎ切りの規則: 撃破まで n ターンの敵の攻撃の伸び (null = 規則なし)
+            public bool ledger;                // [V3 hpLedger] 効用を HP の帳簿で測る
+            public float dFull;                // [V3 hpLedger] 先のターンに全部攻撃に挿した時の 1 ターンの与ダメの見込み
+        }
+
+        /// <summary>[V3 hpLedger] この戦闘で失う HP の見込み = 今ターンの被ダメ + 撃破までの残りターンで受ける被ダメ (全部攻撃する前提)。</summary>
+        private float LedgerLoss(in OptimalTurnState s, int effDmg, int taken)
+        {
+            int rem = s.enemyHp - System.Math.Min(effDmg, s.enemyHp);
+            if (rem <= 0) return taken;
+            int n = System.Math.Min(HorizonCapTurns, UnityEngine.Mathf.CeilToInt(rem / System.Math.Max(1f, s.dFull)));
+            float future = 0f;
+            for (int j = 1; j <= n; j++)
+            {
+                float g = s.atkGrowth != null ? s.atkGrowth[System.Math.Min(j + 1, HorizonCapTurns)] : 1f;
+                future += s.enemyAtk * g;
+            }
+            return taken + v3.ledgerFutureShare * future;
         }
 
         /// <summary>配線 <paramref name="w"/> の効用 (state + 出目 + 配線 → 効用)。 盤面を読まない純粋な関数 (v3 の係数だけ読む)。</summary>
@@ -496,6 +521,8 @@ namespace AutoTest
             public int block;
             public int aCount, bCount;
             public bool bashSpent;  // 盾〈シールドバッシュ〉でシールドを使い切った
+            public bool freeBlock;  // [計装 2026-11-10] 防ぎ切りの規則の対象 (撃破まで HP を失わない) だった
+            public bool killsNow;   // [計装] 今ターン撃破の見込み
         }
 
         private float OptimalUtility(in OptimalTurnState s, int[] rolls, CombatSystem.DiceTerminal[] w, out OptimalTurnOutcome outcome)
@@ -652,7 +679,9 @@ namespace AutoTest
                 if (shell > 0f) taken = System.Math.Max(0, (int)(taken * (1f - shell)));
             }
 
-            float u = wAtk * System.Math.Min(effDmg, enemyHp)
+            float u = s.ledger
+                    ? specFlat - LedgerLoss(in s, effDmg, taken)
+                    : wAtk * System.Math.Min(effDmg, enemyHp)
                     + wDef * System.Math.Min(block, enemyAtk)
                     + specFlat;
             // 盾〈城壁〉: 完全に受け止めたら、 余ったブロック × 率 がシールドへ (次のターン以降の弾・毎ターン半減するので半値で見る)
@@ -660,7 +689,7 @@ namespace AutoTest
                 u += 0.5f * wDef * TurnRules.BulwarkGain(block, enemyAtk, bulwarkRate);
             // 〈シールドバッシュ〉で使い切ったシールドは、 このターンの被弾を吸えない
             if (bashSpent) u -= wDef * System.Math.Min(myShield, System.Math.Max(0, enemyAtk - block));
-            if (effDmg >= enemyHp) u += 50f + enemyAtk; // 今ターン撃破 = 敵攻撃が消える
+            if (effDmg >= enemyHp && !s.ledger) u += 50f + enemyAtk; // 今ターン撃破 = 敵攻撃が消える (帳簿では先の被ダメ 0 として既に入っている)
             if (taken >= myHp) u -= 10000f;              // 致死回避を最優先
 
             // ===== 短期決戦の概念 (2026-08-04) =====
@@ -683,15 +712,17 @@ namespace AutoTest
                     ? UnityEngine.Mathf.CeilToInt((float)enemyHp / effDmg)
                     : HorizonCapTurns;
             if (ttk > HorizonCapTurns) ttk = HorizonCapTurns;
-            u -= TimeCostPerTurn * v3.timeCostMul * ttk;
+            if (!s.ledger) u -= TimeCostPerTurn * v3.timeCostMul * ttk;
 
             // 防ぎ切りの規則 (2026-11-05・上の FreeBlockRule)。 撃破まで HP を失わない配線を優先する。
             //   その中での順位は従来の効用のまま (速く倒せる方・今ターン撃破が上)。
+            bool fbCovers = false, fbKills = false;
             if (atkGrowth != null && aCount > 0)
             {
                 bool killsNow = effDmg >= enemyHp;
                 bool coversFight = block >= UnityEngine.Mathf.CeilToInt(enemyAtk * atkGrowth[System.Math.Min(ttk, HorizonCapTurns)]);
-                if (killsNow || coversFight) u += FreeBlockBonus;
+                if (!s.ledger && (killsNow || (coversFight && !(v3.fbCheckUnavoid && _fbUnavoidSeen)))) u += FreeBlockBonus;
+                fbCovers = coversFight; fbKills = killsNow;
             }
 
             // 烈炎 (6 層ボス): ブロック端子へ閾値以上配線すると毎ターン スタック+1、
@@ -706,7 +737,7 @@ namespace AutoTest
                 u -= blaze;
             }
             u += wChg * v3.chargeMul * c * 2f;           // 充電価値 (リロールの原資)
-            if (v3.takenCost != 0f) u -= v3.takenCost * _takenMulNow * taken;     // E5 (V3)
+            if (v3.takenCost != 0f && !s.ledger) u -= v3.takenCost * _takenMulNow * taken;     // E5 (V3)
             u += 0.01f * aCount;                         // タイブレーク: 同効用なら攻撃を選ぶ
 
             // 2026-07-28: 攻撃端子 0 本 = **攻撃を行わない** (素火力も追撃も出ない)。
@@ -720,7 +751,8 @@ namespace AutoTest
                 bool onlySurvivesByNotAttacking = (takenIfAttackOne >= myHp) && (taken < myHp);
                 if (!onlySurvivesByNotAttacking) u -= 10000f;
             }
-            outcome = new OptimalTurnOutcome { effDmg = effDmg, taken = taken, block = block, aCount = aCount, bCount = bCount, bashSpent = bashSpent };
+            outcome = new OptimalTurnOutcome { effDmg = effDmg, taken = taken, block = block, aCount = aCount, bCount = bCount, bashSpent = bashSpent,
+                                               freeBlock = fbCovers, killsNow = fbKills };
             return u;
         }
 
@@ -1077,6 +1109,21 @@ namespace AutoTest
                 play = play, atkGrowth = atkGrowth,
                 diceAtkPct = ctxRoles?.attackDicePct ?? 0f,
             };
+            // [V3 hpLedger] 先のターンの 1 ターンの与ダメの見込み: 今の手を全部攻撃に挿した時の値を、 面の平均で均す
+            if (v3.hpLedger && EffectiveWiringSkill != WiringSkill.Naive)
+            {
+                var allAtk = new CombatSystem.DiceTerminal[k];
+                for (int i = 0; i < k; i++) allAtk[i] = CombatSystem.DiceTerminal.Attack;
+                OptimalUtility(in st, rolls, allAtk, out var oa);
+                var fc = ctxRoles?.equippedDiceFaces;
+                float avgFace = 3.5f;
+                if (fc != null && fc.Length > 0) { float sf = 0f; foreach (int f in fc) sf += f; avgFace = sf / fc.Length; }
+                int sumR = 0; for (int i = 0; i < k; i++) sumR += rolls[i];
+                float expected = System.Math.Max(0, atkBase) + k * avgFace;
+                st.dFull = System.Math.Max(1f, oa.effDmg * expected / System.Math.Max(1f, System.Math.Max(0, atkBase) + sumR));
+                st.ledger = true;
+                if (st.atkGrowth == null && enemyAtk > 0 && cm?.CurrentEnemy != null) st.atkGrowth = BuildAtkGrowth(cm.CurrentEnemy, ctxRoles, tele.turn);
+            }
             // E8 (SuperV3 lookahead2): 次ターンの前提を 1 回だけ組む。 null なら従来どおり (OFF のときは何も変わらない)。
             NextTurnPlan plan = null;
             if (v3.lookahead2 && EffectiveWiringSkill != WiringSkill.Naive && ctxRoles != null && cm?.CurrentEnemy != null
@@ -1221,11 +1268,21 @@ namespace AutoTest
             }
             // E1 (V3 rerollEv) が「この手の最良効用」として読む。 先読みの値は次ターン分を含むので、 今ターンの効用だけに戻す。
             _lastBestU = plan != null ? OptimalUtility(in st, rolls, bestW) : bestU;
+            // [計装 2026-11-10] 選んだ配線が防ぎ切りの規則の対象だったか (実際の配線の時だけ MutualWiringPlanPolicy が数える)
+            OptimalUtility(in st, rolls, bestW, out var fbo);
+            _lastFreeBlock = fbo.freeBlock && !fbo.killsNow; _lastKillsNow = fbo.killsNow; _lastExpTaken = fbo.taken;
             return CombatSystem.WiringPlan.Of(bestW);
         }
 
         /// <summary>直近の <see cref="MutualWiringPolicy"/> が選んだ配線の効用。 読むだけ・判断には使わない (SuperV3 の実験用)。</summary>
         private float _lastBestU;
+        /// <summary>[計装 2026-11-10] 直近に選んだ配線が防ぎ切りの規則の対象か (今ターン撃破は除く) / 今ターン撃破か。</summary>
+        private bool _lastFreeBlock, _lastKillsNow;
+        /// <summary>[計装] この戦闘で実際に配線を決めたターン数 / うち防ぎ切りの規則の対象 / うち今ターン撃破。</summary>
+        private int _fbDecided, _fbTurns, _fbKillTurns;
+        /// <summary>[V3 fbCheckUnavoid] この戦闘で予告の外のダメージを見たか / 前のターンの HP / 前のターンに見込んだ被ダメ / 直近に選んだ配線の見込み被ダメ。</summary>
+        private bool _fbUnavoidSeen;
+        private int _fbPrevHp = -1, _fbPrevExpTaken, _lastExpTaken;
 
         /// <summary>手 <paramref name="rolls"/> を最良に配線したときの効用 (Optimal の配線評価そのもの)。</summary>
         private float BestUtilityOf(int[] rolls, CombatSystem.MutualTurnTelegraph tele)

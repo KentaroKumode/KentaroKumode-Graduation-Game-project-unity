@@ -156,7 +156,9 @@ namespace UI.Game2D
             if (_hover >= 0 && _hover != sim.Me && _hover < lay.Count && !sim.IsSunk(_hover))
             {
                 var q = Sp(lay.pos[_hover]); bool ok = sim.CanMoveTo(_hover);
-                if (ok) Line(_me, q, _lc.hot);
+                // 〈補給線〉で跳べる点は、 線を引かずに括弧だけ強調する (道を通らない)
+                if (!ok && GameLoop.GameManager.SupplyLineUnlocked && sim.CanRelayTo(_hover)) ok = true;
+                else if (ok) Line(_me, q, _lc.hot);
                 Bracket(q, 6, ok ? _lc.hot : _lc.dim);
             }
 
@@ -298,7 +300,6 @@ namespace UI.Game2D
             switch (k)
             {
                 case WeatherKind.Fog: return "FOG";
-                case WeatherKind.Still: return "STILL";
                 case WeatherKind.Sand: return "SAND";
                 case WeatherKind.Snow: return "SNOW";
                 case WeatherKind.Hail: return "HAIL";

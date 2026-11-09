@@ -93,6 +93,8 @@ namespace MapSystem
                 bool withFoe = FloorPlan.HasWanderer(floor);
                 Sim = new FreeMapSim(CurrentMap.layout, new RunWallet(), withFoe,
                                      withFoe ? FoeProfile.ForFloor(floor) : null);
+                // 〈補給線〉: 層の開始点 (前哨基地) は「着いた」処理を通らないので、 ここで中継点にする
+                if (IsRelayType(CurrentMap.layout.types[CurrentMap.layout.start])) Sim.AddRelayPoint(CurrentMap.layout.start);
                 SyncFreeKnowledge();
             }
             else
@@ -237,6 +239,9 @@ namespace MapSystem
 
         /// <summary>点に着いた: <see cref="CurrentNode"/> を写して OnNodeEntered を鳴らす。
         /// タイルの起動は呼び出し側 (GameManager) が行う。</summary>
+        /// <summary>〈補給線〉(〈兵站〉r10) の中継点になる点の種別。</summary>
+        public static bool IsRelayType(TileType t) => t == TileType.Outpost || t == TileType.SupplyDepot || t == TileType.Shop;
+
         public MapNode NoteFreeArrival(int index)
         {
             var node = CurrentMap?.GetNodeByIndex(index);
@@ -244,6 +249,8 @@ namespace MapSystem
             CurrentNode = node;
             node.visited = true;
             Sim?.MarkDone(index);
+            // 〈補給線〉の中継点: この層で一度着いた前哨基地・補給庫・店
+            if (IsRelayType(node.type)) Sim?.AddRelayPoint(index);
             SyncFreeKnowledge();
             OnNodeEntered?.Invoke(node);
             return node;

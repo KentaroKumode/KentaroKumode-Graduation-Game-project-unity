@@ -118,9 +118,7 @@ namespace ItemSystem.PassiveSkills.Effects
             switch (name)
             {
                 case "Calm":      return (int)GameLoop.ProvisionTier.Ample;
-                case "Fretful":   return (int)GameLoop.ProvisionTier.Dwindling;
-                case "Pessimism": return (int)GameLoop.ProvisionTier.Depleting;
-                case "Despair":   return (int)GameLoop.ProvisionTier.Scarce;
+                // Fretful / Pessimism / Despair (= 目減り・枯渇し始める・枯渇寸前) は 2026-11-09 に段ごと撤去
                 case "Madness":   return (int)GameLoop.ProvisionTier.Exhausted;
             }
             UnityEngine.Debug.LogError($"[StatModifierEffect] {skillId}: 未知の物資段階 '{name}'");

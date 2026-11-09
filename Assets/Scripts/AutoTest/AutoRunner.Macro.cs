@@ -19,7 +19,8 @@ namespace AutoTest
     /// </summary>
     public partial class AutoRunner
     {
-        private const int MacroDepth = 3;
+        /// <summary>2026-11-10: 3 → 5 (上限が小さい時に「店 → 周辺 → 次の店」の鎖を組めるように)。</summary>
+        private const int MacroDepth = 5;
         private const int MacroCandidates = 10;
 
         // 序数 (0 ファーム / 1〜5 = 深さ 1,3,5,6,7) ごとの重み。 対数オッズ。
@@ -34,7 +35,7 @@ namespace AutoTest
         private const float MacroDeathCost = 3f;
         private const float MacroStepCost = 0.004f;
 
-        private struct MacroSim { public float hp; public float coins; public float supply; }
+        private struct MacroSim { public float hp; public float coins; public float supply; public float cap; }
 
         /// <summary>次に向かう点。 どの回り方も得にならなければ -1 (層を出る)。</summary>
         private int MacroTarget(GameManager gm, MapManager mm, FreeMapSim sim, FreeMapLayout L, int at, int[] hopsFromMe, RunState run)
@@ -62,34 +63,75 @@ namespace AutoTest
                 hp = run.playerMaxHP > 0 ? (float)run.playerHP / run.playerMaxHP : 1f,
                 coins = run.coins,
                 supply = run.provision,
+                cap = run.provisionCap,
             };
+            // 補給できる店 (まだ入っていない・種別が見えている)。 計画の中で寄った店は used で外れる
+            var shops = new List<int>();
+            foreach (var n in map.GetAllNodes())
+                if (n.index >= 0 && !n.activated && n.revealed && !sim.IsSunk(n.index) && n.EffectiveType == TileType.Shop && !n.isFalseMerchant)
+                    shops.Add(n.index);
             float best = 0f; int bestFirst = -1;
             var used = new bool[cands.Count];
 
-            void Search(int from, MacroSim s, float acc, int first, int depth)
+            // ── 速度 (2026-11-10・結果は変えない): 判断ごとに 1 回だけ求めて使い回す ──
+            //   ・終点がボスか (残す HP) ── 以前は並びを評価するたびに文字列の ID で終点を引き直していた
+            //   ・候補の点 (MapNode) と、 そこからの歩数の表 ── 以前は毎回 文字列の ID / 辞書で引いていた
+            //   ・店が候補の何番目か ── 以前は毎回リストを先頭から探していた
+            float reserve = run.playerMaxHP * (LayerHasBoss(mm) ? 0.75f : 0.25f);
+            int WalkSteps(float hpFrac) => run == null || run.playerMaxHP <= 0 ? 0
+                : Mathf.Max(0, Mathf.FloorToInt(((hpFrac >= 0f ? hpFrac * run.playerMaxHP : run.playerHP) - reserve) / FreeMapParams.HpPerSupply));   // HpWalkSteps と同じ式
+            var candNode = new MapNode[cands.Count];
+            var candDist = new int[cands.Count][];
+            for (int i = 0; i < cands.Count; i++) { candNode[i] = map.GetNode(map.NodeIdAt(cands[i])); candDist[i] = dist[cands[i]]; }
+            var shopCi = new int[shops.Count];
+            for (int k = 0; k < shops.Count; k++) shopCi[k] = cands.IndexOf(shops[k]);
+
+            void Search(int[] dFrom, MacroSim s, float acc, int first, int depth)
             {
                 for (int i = 0; i < cands.Count; i++)
                 {
                     if (used[i]) continue;
                     int c = cands[i];
-                    int steps = dist[from][c];
+                    int steps = dFrom[c];
                     if (steps == int.MaxValue) continue;
                     var ns = s;
                     ns.supply -= steps * FreeMapParams.MoveSupply;
-                    if (toGoal[c] == int.MaxValue || ns.supply < toGoal[c] * FreeMapParams.MoveSupply + FreeMapExitMargin) continue;
-                    float gain = MacroGain(map.GetNode(map.NodeIdAt(c)), layer, run, ref ns) - steps * MacroStepCost;
+                    if (toGoal[c] == int.MaxValue) continue;
+                    // 2026-11-10: 物資が尽きた分は HP で払って歩く (1 歩 HP HpPerSupply)。 残す HP を割るなら行かない
+                    if (ns.supply < 0)
+                    {
+                        ns.hp -= -ns.supply * FreeMapParams.HpPerSupply / Mathf.Max(1f, run.playerMaxHP);
+                        ns.supply = 0;
+                        if (WalkSteps(ns.hp) <= 0 && ns.hp * run.playerMaxHP < reserve) continue;
+                    }
+                    float gain = MacroGain(candNode[i], layer, run, ref ns) - steps * MacroStepCost;
+                    // 2026-11-09: 踏んだ後に「出口」か「まだ寄っていない補給できる店」まで歩けるか (店で買い足す前提の計画)
+                    bool ok = ns.supply + WalkSteps(ns.hp) >= toGoal[c] * FreeMapParams.MoveSupply + FreeMapExitMargin;
+                    if (!ok && ns.coins >= FreeMapParams.ProvisionPrice)
+                    {
+                        int[] dc = candDist[i];
+                        for (int k = 0; k < shops.Count; k++)
+                        {
+                            int sh = shops[k];
+                            if (sh == c) continue;
+                            int ci = shopCi[k];
+                            if (ci >= 0 && used[ci]) continue;
+                            if (dc[sh] != int.MaxValue && ns.supply >= dc[sh] * FreeMapParams.MoveSupply) { ok = true; break; }
+                        }
+                    }
+                    if (!ok) continue;
                     float total = acc + gain;
                     int f = first < 0 ? c : first;
                     if (total > best + 1e-6f) { best = total; bestFirst = f; }
                     if (depth + 1 < MacroDepth && ns.hp > 0f)
                     {
                         used[i] = true;
-                        Search(c, ns, total, f, depth + 1);
+                        Search(candDist[i], ns, total, f, depth + 1);
                         used[i] = false;
                     }
                 }
             }
-            Search(at, start, 0f, -1, 0);
+            Search(hopsFromMe, start, 0f, -1, 0);
             return bestFirst;
         }
 
@@ -126,6 +168,10 @@ namespace AutoTest
                 }
                 case TileType.Shop:
                 {
+                    // 物資を満タンまで買い足す (2026-11-09)。 残りの金で品を買う
+                    float need = Mathf.Max(0f, s.cap - s.supply);
+                    float afford = Mathf.Min(need, Mathf.Floor(s.coins / FreeMapParams.ProvisionPrice));
+                    s.supply += afford; s.coins -= afford * FreeMapParams.ProvisionPrice;
                     float price = Mathf.Max(1f, MacroPrice[layer]);
                     float items = s.coins / price;
                     float g = items * wItem - s.coins * wGold;

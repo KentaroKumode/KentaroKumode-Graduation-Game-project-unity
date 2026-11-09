@@ -131,8 +131,8 @@ namespace ItemSystem.Shop
         // ================================================================
 
         /// <summary>物資 1 包の量と値段 (1G ＝ 10 物資)。</summary>
-        public const int ProvisionPackAmount = 100;
-        public static int ProvisionPackPrice => ProvisionPackAmount / MapSystem.FreeMove.FreeMapParams.ProvisionPerGold;
+        public const int ProvisionPackAmount = 1;   // 2026-11-09 デノミ: 1 包 = 物資 1
+        public static int ProvisionPackPrice => MapSystem.FreeMove.FreeMapParams.ProvisionPrice;
         /// <summary>〈合札〉: 同じショップで 2 品目以降を買うときの値引き (G)。</summary>
         public const int TallyDiscount = 10;
 
@@ -141,11 +141,11 @@ namespace ItemSystem.Shop
 
         /// <summary>1 つの店で買える物資の包の数 (2026-11-04: 3 → 30 ＝ 物資 3000)。
         /// 3 包 (300) だと金がいくらあっても物資を買い足せず、 金が品だけに流れるか、 物資が尽きて探索が止まるかの両極端になった。</summary>
-        public const int ProvisionPackStock = 30;
+        public const int ProvisionPackStock = 60;   // 2026-11-09 デノミ: 旧 30 包 × 100 = 3000 → 物資 60
         /// <summary>この店に残っている物資の包。 <see cref="Generate"/> で戻る。</summary>
         public int ProvisionPacksLeft { get; private set; } = ProvisionPackStock;
 
-        /// <summary>物資を 1 包買う (ゴールドのみ・燈火の物資払いは使わない ── 物資を物資で買うことになる)。</summary>
+        /// <summary>物資を 1 包買う (ゴールドのみ・兵站の物資払いは使わない ── 物資を物資で買うことになる)。</summary>
         public bool TryBuyProvisionPack(RunState run)
         {
             if (run == null || ProvisionPacksLeft <= 0 || run.coins < ProvisionPackPrice) return false;
@@ -672,11 +672,11 @@ namespace ItemSystem.Shop
                     var dd = pool.FindAll(it => !owned.Contains(it.internalName));
                     if (dd.Count > 0) pool = dd;
 
-                    // 佯狂者の鈴(ADR-0002): 絶望(≤20)/発狂中、他の[佯狂者]アイテムがショップに出やすい。
+                    // 佯狂者の鈴(ADR-0002): 払底中 (物資 0)、他の[佯狂者]アイテムがショップに出やすい (2026-11-09: 段の撤去で「絶望帯」→「払底」)。
                     // 2026-06-23c: 60% 短絡で全レア無差別ピックではなく、 60% でプール自体を佯狂者に絞る (Tier 重みは下流の RollTier に委譲)。
                     // これにより [佯狂者] セット組み立てを後押ししつつ LEG 出現率は 0.05 のまま維持される。
                     if (owned.Contains(GameLoop.YokyoSet.Bell)
-                        && GameLoop.ProvisionSystem.GetTier(run) >= GameLoop.ProvisionTier.Scarce)
+                        && GameLoop.ProvisionSystem.IsExhausted(run))
                     {
                         var yokyo = pool.FindAll(it => System.Array.IndexOf(GameLoop.YokyoSet.All, it.internalName) >= 0);
                         if (yokyo.Count > 0 && GameLoop.GameRng.Chance(0.6f, "shop.yokyo")) pool = yokyo;
@@ -823,7 +823,7 @@ namespace ItemSystem.Shop
             if (slot.kind == ShopSlotKind.WeaponMaterial)
             {
                 int price = Current.CurrentMaterialPrice;
-                // 燈火 r10: 不足分は物資で払える。 未解禁ならゴールドのみで判定する。
+                // 兵站 r10: 不足分は物資で払える。 未解禁ならゴールドのみで判定する。
                 if (!GameLoop.ProvisionPayment.TryPay(run, price, "強化素材"))
                 { Log("ゴールド不足"); return false; }
                 MetaProgression.Achievements.AchievementService.NoteShopPurchase(run.coins);
@@ -842,7 +842,7 @@ namespace ItemSystem.Shop
             int pay = slot.price;
             bool tally = Current.purchaseCount >= 1 && run.OwnsPassive(ItemIds.TrialTossToken);
             if (tally) pay = Mathf.Max(0, pay - TallyDiscount);
-            // 燈火 r10 を含めた支払い可能額で判定する。 未解禁なら run.coins と同じ。
+            // 兵站 r10 を含めた支払い可能額で判定する。 未解禁なら run.coins と同じ。
             if (GameLoop.ProvisionPayment.Affordable(run) < pay)
             {
                 // 行動台帳〈見送り〉: **買おうとして届かなかった**ときだけ積む。

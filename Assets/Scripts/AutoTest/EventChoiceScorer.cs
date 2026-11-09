@@ -138,8 +138,8 @@ namespace AutoTest
             float hpPct = (float)hp / maxHP;
             int coins  = run != null ? run.coins : 0;
             // 物資(ADR-0002): 飢餓を統合した精神ゲージ。低いほど回復価値↑・損失忌避↑。
-            int provisionVal = run != null ? run.provision : 100;
-            int provisionCap = run != null ? UnityEngine.Mathf.Max(1, run.provisionCap) : 100;
+            int provisionVal = run != null ? run.provision : GameLoop.ProvisionRules.Max;
+            int provisionCap = run != null ? UnityEngine.Mathf.Max(1, run.provisionCap) : GameLoop.ProvisionRules.Max;
             float provisionPct = (float)provisionVal / provisionCap;
 
             switch (e.type)

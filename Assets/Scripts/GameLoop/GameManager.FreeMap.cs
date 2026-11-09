@@ -62,6 +62,21 @@ namespace GameLoop
             return true;
         }
 
+        /// <summary>〈補給線〉が使えるか (整備パネル〈兵站〉r10)。</summary>
+        public static bool SupplyLineUnlocked => MetaProgression.MetaBuffApplicator.IsSupplyLineUnlocked();
+
+        /// <summary>〈補給線〉: この層で一度着いた前哨基地・店へ跳ぶ (物資 1・手番を使わない・補足は解けない)。</summary>
+        public bool RelayStep(string nodeId)
+        {
+            var sim = FreeMapForAction();
+            if (sim == null || !SupplyLineUnlocked) return false;
+            var node = MapManager.Instance.CurrentMap.GetNode(nodeId);
+            if (node == null || node.index < 0 || !sim.CanRelayTo(node.index)) return false;
+            Log($"補給線（物資 −{FreeMapParams.RelaySupply}・手番は使わない）→ {TileToJapanese(node.type)}");
+            RunFreeMapOp(s => s.RelayTo(node.index));
+            return true;
+        }
+
         /// <summary>待つ (1 手番)。</summary>
         public bool WaitTurn()
         {

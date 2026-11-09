@@ -299,11 +299,11 @@ namespace GameLoop
         }
 
         /// <summary>ボス撃破ボーナス用のパッシブ抽選。wantRare=true で GOLD 以上のみ、レア度重み付き。</summary>
-        /// <summary>開幕パッシブ専用の抽選 (2026-09-13)。 兵站の段に応じて
+        /// <summary>開幕パッシブ専用の抽選 (2026-09-13)。 宝物庫の段に応じて
         /// レア度の重みを上位へ寄せる (<see cref="MetaProgression.MetaPanel.SupplyRarityBias"/>)。
         /// 本数だけ増やしても弱かったのは、 配られるのがカタログ平均の品で
         /// BOT が自分で買う「学習序列の上位」に質で負けていたため。</summary>
-        /// <summary>選ぶのを預かっている開幕パッシブの提示 (〈兵站〉r10 の 2〜3 択・人が遊んでいる時だけ)。 先頭から順に選ぶ。</summary>
+        /// <summary>選ぶのを預かっている開幕パッシブの提示 (〈宝物庫〉r10 の 2〜3 択・人が遊んでいる時だけ)。 先頭から順に選ぶ。</summary>
         public readonly System.Collections.Generic.List<System.Collections.Generic.List<string>> PendingStartingPassiveChoices
             = new System.Collections.Generic.List<System.Collections.Generic.List<string>>();
 

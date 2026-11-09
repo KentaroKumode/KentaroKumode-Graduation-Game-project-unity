@@ -445,7 +445,7 @@ namespace MetaProgression
         /// 2026-08-05: −5/−10/−15 から圧縮。 T1 据え置きで T3 だけを緩める同型の調整。</summary>
         /// 2026-08-10: −3/−7/−11 → **−5/−10/−15**。 単独 T3 −8.3pt でカテゴリ E が 6pt −14.0 と
         /// 最軽量級だったため。 段の刻みは実測で線形 (−4.3 / −6.3 / −8.3) なので比率で伸ばす。
-        public static int GetProvisionCapDelta() => PickI(ChallengeAxis.絶望的な戦闘, 0, -40, -80, -120);   // 2026-09-28: 物資 ×10
+        public static int GetProvisionCapDelta() => PickI(ChallengeAxis.絶望的な戦闘, 0, -1, -2, -2);   // 2026-11-09 デノミ (旧 −40/−80/−120)
 
         /// <summary>〈天変地異〉: **ボスの攻撃値がターンごとに 1.75% ずつ増える**。 1 = 無効。
         ///
@@ -649,7 +649,7 @@ namespace MetaProgression
 
         /// <summary>[廃止: 焦燥] 常に 0 (無効)。</summary>
         public static int GetImpatienceTileThreshold() => 0;
-        public const int ImpatienceProvisionLoss = 50;   // 2026-09-28: 物資 ×10
+        public const int ImpatienceProvisionLoss = 1;   // 2026-11-09 デノミ (旧 50)
 
         /// <summary>[廃止: 絶望的な進軍] 配点方式に無い。 常に false。</summary>
         public static bool IsDespairMarchActive() => false;

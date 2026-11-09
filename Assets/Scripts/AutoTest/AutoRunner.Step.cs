@@ -151,6 +151,7 @@ namespace AutoTest
                 {
                     var stc = MetaProgression.MetaProgressManager.Instance?.State;
                     if (stc != null) stc.challengeDifficulty = challengeCardDifficulty;
+                    GameHooks.ProvisionMaxOverride = provisionMaxOverride;
                     GameHooks.ForcedChallengeCards = ParseChallengeForce(challengeForce);
                     GameHooks.ChooseChallengeCard = challengeCardPickByAxis ? BotHooks.ChooseChallengeByAxis : (System.Func<IReadOnlyList<string>, int>)null;
                 }

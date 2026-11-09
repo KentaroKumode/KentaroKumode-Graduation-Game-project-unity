@@ -18,7 +18,7 @@ namespace GameLoop
 
         // ===== 判断 (プレイヤーの選択を代行する口) =====
 
-        /// <summary>開幕パッシブの提示 (〈兵站〉r10 の 2〜3 択) から 1 つ選ぶ。 戻り値は添字。
+        /// <summary>開幕パッシブの提示 (〈宝物庫〉r10 の 2〜3 択) から 1 つ選ぶ。 戻り値は添字。
         /// null なら先頭 (選択画面が付くまでの仮)。</summary>
         public static Func<IReadOnlyList<string>, int> ChooseStartingPassive;
         /// <summary>挑戦カードの 2 枚 ("デバフの id|バフの id") からどれを受けるか。 null なら人が遊んでいる時は画面で選び、 BOT は先頭。</summary>
@@ -29,6 +29,12 @@ namespace GameLoop
 
         /// <summary>自動装備の武器評価に足す点 (武器 id → 加点)。 null なら 0。</summary>
         public static Func<string, float> WeaponEvBonus;
+
+        /// <summary>[測定] 物資の素の上限を差し替える (0 = 差し替えない = <see cref="ProvisionRules.Max"/>)。 BOT が上限を振って測る口 (2026-11-09)。</summary>
+        public static int ProvisionMaxOverride;
+
+        /// <summary>物資の素の上限 (差し替えがあればそれ)。</summary>
+        public static int ProvisionBaseMax => ProvisionMaxOverride > 0 ? ProvisionMaxOverride : ProvisionRules.Max;
 
         // ===== 計測 (結果を変えない) =====
 

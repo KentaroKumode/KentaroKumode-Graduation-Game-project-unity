@@ -162,6 +162,7 @@ namespace AutoTest
                 damageDealt = r.damageDealt,
                 damageTaken = r.damageTaken,
                 dmgParts = DmgPartsSinceStart(),
+                fbDecided = _fbDecided, fbTurns = _fbTurns, fbKillTurns = _fbKillTurns,
                 enemyMaxHP = r.enemyMaxHP,
                 weaponId = gm?.Run?.equippedWeaponId ?? "",
                 diceId = gm?.Run?.equippedDiceId ?? "",
@@ -335,6 +336,7 @@ namespace AutoTest
                 GameLoop.RunChronicle.End(run,
                     o == Outcome.GameOver ? GameLoop.RunChronicle.EndDeath
                                           : GameLoop.RunChronicle.EndClear, null);
+                RecordMapVisit();   // 最後の層の踏破
                 _cur.finalHP = run.playerHP;
                 _cur.finalMaxHP = run.playerMaxHP;
                 _cur.finalCoins = run.coins;

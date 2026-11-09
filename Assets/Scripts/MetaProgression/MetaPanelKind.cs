@@ -16,8 +16,8 @@ namespace MetaProgression
         Vault,        // #4 金庫:  開幕ゴールド +5/段、r10:宝箱ゴールド復活
         Plunder,      // #5 強奪:  戦闘勝利ゴールド+1/段、r10:ショップ強盗 解禁
         Trade,        // #6 商才:  特売枠+1/段 (割引 15/30/50%)、r10:99%引きの枠が出る
-        Supply,       // #7 兵站:  r2/5/8 素材+1、r10:開幕パッシブ
-        Lantern,      // #8 燈火:  物資上限+10/段、r10:横移動の物資消費 0
+        Supply,       // #7 宝物庫:  r2/5/8 素材+1、r10:開幕パッシブ
+        Lantern,      // #8 兵站 (旧〈燈火〉):  2026-11-10 に枠から外した (MaxRank 0)。 物資の上限は素の 8 で固定。 後継は末尾の〈装甲〉
         Precision,    // #9 精密:  r3/6/9 会心ダイス+1、全段 会心率+0.55%/段 (r10 で +5.5%)
 
         // === 種火 (キーワードビルド宣言・max 3) ===
@@ -37,6 +37,9 @@ namespace MetaProgression
         //   panelRanks は int[] を enum のインデックスで引くので、 途中に挟むと保存済みのランクがずれる。
         SparkCrit,    // #16 会心:   r2 研ぎ澄まし (会心倍率 +0.2)
         SparkShield,  // #17 シールド: r2 厚手の芯 (ターン開始の減衰で残るシールド +10%)
+
+        // === 2026-11-10 追加 (数値系・max 10)。 末尾に足す (保存済みランクの番号を保つ) ===
+        Armor,        // #18 装甲:  防御 +1/段 (r10 で +10)。 極点なし ── 10 段を同じ刻みで伸ばす
     }
 
     public static class MetaPanelKindExt
@@ -52,9 +55,12 @@ namespace MetaProgression
             // **会心の種火も廃止 (2026-11-07)。** 会心はどのビルドも最初から使う共通の資源で、 種火で品を増やしても
             //   Balanced に対して +1.6 / −0.7 ポイント (有意でない)。 MaxRank 0 = 枠から消える。 enum は保存済みランクがずれるので残す。
             MetaPanelKind.SparkCrit => 0,
+            // **兵站も廃止 (2026-11-10)。** 物資の上限は「頭打ち (約 10〜11) の手前か後か」で価値が反転し、 段の効き目を設計で制御できなかった
+            //   (素の上限 8 で r3→r10 の 7 点は −11〜−20、 素の上限 5 なら +2〜+4)。 物資の上限は素の 8 で固定し、 後継は〈装甲〉。
+            MetaPanelKind.Lantern => 0,
             MetaPanelKind.Shell or MetaPanelKind.Output or MetaPanelKind.Guard or
             MetaPanelKind.Vault or MetaPanelKind.Plunder or MetaPanelKind.Trade or
-            MetaPanelKind.Supply or MetaPanelKind.Lantern => 10,
+            MetaPanelKind.Supply or MetaPanelKind.Armor => 10,
             _ => 3,
         };
 

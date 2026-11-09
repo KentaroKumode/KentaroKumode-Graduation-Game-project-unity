@@ -184,7 +184,7 @@ namespace UI.Game2D
             var ri = rt.GetComponent<RawImage>(); if (ri != null) { ri.texture = tex; ri.enabled = true; }
         }
 
-        private static readonly string[] WeatherIcons = { "still", "fog", "still", "sand", "snow", "hail", "crumble", "sink" };      // WeatherKind: None, Fog, Still, Sand, Snow, Hail, Crumble, Sink
+        private static readonly string[] WeatherIcons = { "still", "fog", "still", "sand", "snow", "hail", "crumble", "sink" };      // WeatherKind: None, Fog, (2 = 旧 沈む静寂・空き), Sand, Snow, Hail, Crumble, Sink
         private static readonly string[] WeatherNames = { "CALM", "FOG", "STILL", "SAND", "SNOW", "HAIL", "CRUMBLE", "SINK" };
 
         /// <summary>計器の台 (PixelLab のチップ台を 9 分割)。 無ければコード描画の板。</summary>

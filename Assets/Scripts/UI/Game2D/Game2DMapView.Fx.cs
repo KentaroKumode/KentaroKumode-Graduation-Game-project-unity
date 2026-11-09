@@ -19,7 +19,7 @@ namespace UI.Game2D
         private const float MsPerTurn = 4000f;            // 照明の燃焼の時計 1 手番 = 実時間 (演出の目安)
         private const float WedgeA = 1.05f, ReconFlashMs = 380, ReconMinR = 3, ReconDensity = 11, ReconSweepMs = 1400;
         private const int ReconTicks = 12;
-        private const float FogInner = 70, FogOuter = 260, FogMax = 0.30f, FogDrift = 5, RingEveryMs = 2600, RingLifeMs = 2200, RingReach = 3.2f,
+        private const float FogInner = 70, FogOuter = 260, FogMax = 0.30f, FogDrift = 5,
                             HailRate = 7, ShakeMs = 380, RippleEveryMs = 1250, RippleLifeMs = 1900, RippleReach = 26;
         private const int SandN = 110, SnowN = 130, DustN = 70;
 
@@ -192,8 +192,8 @@ namespace UI.Game2D
         private List<Grain> _sand, _snow, _dust;
         private readonly List<HailDrop> _hail = new List<HailDrop>();
         private readonly List<Hit> _hits = new List<Hit>();
-        private readonly List<Ring> _rings = new List<Ring>(), _ripples = new List<Ring>();
-        private float _nextRing, _nextRipple, _nextShake, _shakeUntil;
+        private readonly List<Ring> _ripples = new List<Ring>();
+        private float _nextRipple, _nextShake, _shakeUntil;
         private bool _wxBuilt;
         private bool[] _prevSunk;
         private int _prevSunkFloor = -1;
@@ -261,13 +261,7 @@ namespace UI.Game2D
 
             if (On(sim, WeatherKind.Fog)) Fog(tNow);
 
-            if (On(sim, WeatherKind.Still))
-            {
-                if (tNow >= _nextRing) { _rings.Add(new Ring { t0 = tNow, x = _me.x - _lox, y = _me.y - _loy }); _nextRing = tNow + RingEveryMs; }
-                foreach (var r in _rings) { float u = (tNow - r.t0) / RingLifeMs; if (u >= 1) continue; float rad = 4 + Mathf.Floor(u * 9) / 9 * RingReach * _ls; BlockRing(r.x + _lox, r.y + _loy, rad, rad, u < 0.6f ? InkMid : InkDim); }
-                _rings.RemoveAll(r => tNow - r.t0 >= RingLifeMs);
-            }
-            else _rings.Clear();
+            // 旧〈沈む静寂〉の波紋は 2026-11-09 に天候ごと削除
 
             if (On(sim, WeatherKind.Sand))
             {

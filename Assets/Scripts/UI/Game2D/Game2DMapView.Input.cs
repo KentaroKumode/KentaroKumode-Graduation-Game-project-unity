@@ -121,12 +121,13 @@ namespace UI.Game2D
             }
             int hvSfx = (_hover >= 0 && _hover != sim.Me && sim.CanMoveTo(_hover)) ? _hover : -1;
             if (hvSfx != _hoverSfx) { _hoverSfx = hvSfx; if (hvSfx >= 0) Game2DSfx.Play("node_hover"); }
-            if (_hover >= 0 && _hover != sim.Me && sim.CanMoveTo(_hover))
+            bool relayHover = _hover >= 0 && _hover != sim.Me && !sim.CanMoveTo(_hover) && GameManager.SupplyLineUnlocked && sim.CanRelayTo(_hover);
+            if (_hover >= 0 && _hover != sim.Me && (sim.CanMoveTo(_hover) || relayHover))
             {
                 var run = gm != null ? gm.Run : null;
                 if (run != null && run.provisionCap > 0)
                 {
-                    int pay = Mathf.Min(FreeMapParams.MoveSupply, run.provision);
+                    int pay = Mathf.Min(relayHover ? FreeMapParams.RelaySupply : sim.SupplyFor(_hover), run.provision);
                     SupplyPreview = pay / (float)run.provisionCap; SupplyPreviewText = "-" + pay;
                 }
             }
@@ -147,7 +148,10 @@ namespace UI.Game2D
                 }
                 if (hit < 0 || hit == sim.Me) return;                      // 空振り / 今いる点: 何もしない
                 string id = IdOf(hit);
-                if (id != null) gm.MoveStep(id);                           // 隣でなければ「行けない」がログに出る
+                if (id == null) return;
+                // 〈補給線〉(〈兵站〉r10): 隣でない中継点 (一度着いた前哨基地・補給庫・店) は跳ぶ
+                if (!sim.CanMoveTo(hit) && GameManager.SupplyLineUnlocked && sim.CanRelayTo(hit)) { gm.RelayStep(id); return; }
+                gm.MoveStep(id);                                           // 隣でなければ「行けない」がログに出る
             }
         }
 

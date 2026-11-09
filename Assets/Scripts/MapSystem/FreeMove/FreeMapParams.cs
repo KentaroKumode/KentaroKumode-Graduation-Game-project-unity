@@ -51,16 +51,21 @@ namespace MapSystem.FreeMove
         /// <summary>1 歩 (隣の点へ) の物資。 距離によらず一定。</summary>
         /// <para>2026-11-04: 10 → 50。 戦闘が物資を生まなくなった (下の補給) のと合わせて、 寄り道が物資の赤字になるように。
         /// 以前は戦闘 1 回 (+30) で 3 歩ぶんが返り、 戦うほど物資が増えて毎層マップを取り尽くしていた。</para>
-        public const int MoveSupply = 50;
-        /// <summary>物資が足りない分は HP で払う。 物資 10 あたりの HP。</summary>
-        public const int SupplyPerHp = 10;
+        /// <para>2026-11-09: デノミで 50 → 1 (1 歩 = 1)。</para>
+        public const int MoveSupply = 1;
+        /// <summary>物資が足りない分は HP で払う。 物資 1 あたりの HP (2026-11-09 デノミ: 旧「物資 10 = HP 1」と同じ重さ)。</summary>
+        public const int HpPerSupply = 5;
+        /// <summary>削る砂の前線の内側で、 1 歩に物資 +1 が追加でかかる確率 (2026-11-09: 旧「1.5 倍」をデノミ後の 1 で表す)。</summary>
+        public const float SandExtraChance = 0.5f;
 
         // ── 索敵 ───────────────────────────────────────────────
         /// <summary>何もしていない時に見える範囲 (道で何歩先まで)。</summary>
         public const int Vision = 1;
         public const int FlareRange = 3;
         public const int FlareTurns = 3;
-        public const int FlareSupply = 50;
+        public const int FlareSupply = 1;
+        /// <summary>〈補給線〉(〈兵站〉r10) で 1 回跳ぶ物資。</summary>
+        public const int RelaySupply = 1;
         public const int ReconRange = 2;
         /// <summary>魔石の反応の段: これ以下の歩数が「かなり近い」「遠い」。 それより外は反応なし。</summary>
         public const int StoneNear = 2;
@@ -105,7 +110,7 @@ namespace MapSystem.FreeMove
         public const int RestMoreTurns = 1;
 
         // ── 逃げる ─────────────────────────────────────────────
-        public const int FleeProvision = 100;
+        public const int FleeProvision = 2;
         /// <summary>追跡者の戦闘から逃げた後、 追跡が始まるまでの手番。</summary>
         public const int FleeFreezeTurns = 2;
 
@@ -124,13 +129,12 @@ namespace MapSystem.FreeMove
         /// 戦闘が物資を生むと、 戦うほど探索が延びて金・品・戦闘数が全部膨らんだ。</summary>
         public const int RewardBattle = 0;
         public const int RewardElite = 0;
-        public const int RewardBoss = 150;
+        public const int RewardBoss = 3;
         /// <summary>追跡者を倒した時の物資。</summary>
-        public const int RewardPursuer = 300;
+        public const int RewardPursuer = 6;
         /// <summary>前哨基地の物資。</summary>
-        public const int RewardOutpost = 200;
-        /// <summary>ショップで 1G ＝ 10 物資。</summary>
-        /// <para>2026-11-04: 10 → 25 (1 包 100 = 4G)。</para>
-        public const int ProvisionPerGold = 25;
+        public const int RewardOutpost = 4;
+        /// <summary>ショップの物資 1 の値段 (G)。 2026-11-04 の「1 包 100 = 4G」を 2026-11-09 のデノミで 1 = 2G に。</summary>
+        public const int ProvisionPrice = 2;
     }
 }

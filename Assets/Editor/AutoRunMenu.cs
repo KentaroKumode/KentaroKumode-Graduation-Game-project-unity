@@ -2303,14 +2303,14 @@ namespace AutoTest.EditorTools
             Launch(3000);
         }
 
-        /// <summary><b>r9 vs r10 の切り分け (2026-09-12)。</b> 既定は 外殻 と 燈火 ──
+        /// <summary><b>r9 vs r10 の切り分け (2026-09-12)。</b> 既定は 外殻 と 兵站 ──
         /// 前者は「+8.19pt はラストスタンドの取り分か、 外殻が強いだけか」、
-        /// 後者は「−5.37pt は横移動5→2 が悪いのか、 燈火に 10pt 使うのが悪いのか」。
+        /// 後者は「−5.37pt は横移動5→2 が悪いのか、 兵站に 10pt 使うのが悪いのか」。
         /// どちらも**次に何をリワークするか**が変わるので測る価値がある。
         /// 4 アーム × 3000ラン = 12,000ラン ≒ 950 秒。</summary>
         /// <summary><b>全軸 r9+r10+Balanced (2026-09-12)。</b> 17 アーム × 5000ラン = 85,000ラン ≒ 113 分。
         /// 判定基準 (r9 = Bal±2 / r10 = r9 超 かつ Bal±3) をレポートが直接出す。
-        /// 埋め草は兵站5を最優先で確保するので、 全アームが Balanced と同じ開幕パッシブ 2 本。</summary>
+        /// 埋め草は宝物庫5を最優先で確保するので、 全アームが Balanced と同じ開幕パッシブ 2 本。</summary>
         /// <summary><b>予算 24pt・均一土台での全軸 r10 比較 (2026-09-12)。</b>
         /// Balanced (数値系 8本 × r3) + 8 軸の r10 = 9 アーム × 10,000ラン = 90,000ラン ≒ 119 分。
         /// 差の 95%CI が ±1.36pt まで狭まり、 ±2pt の基準が初めて解像できる。
@@ -2370,7 +2370,7 @@ namespace AutoTest.EditorTools
             Launch(1);
         }
 
-        [MenuItem("Tools/AutoRun/r9 vs r10 切り分け: 外殻・燈火 (4アーム×3000ラン ≒950秒)", priority = 8)]
+        [MenuItem("Tools/AutoRun/r9 vs r10 切り分け: 外殻・兵站 (4アーム×3000ラン ≒950秒)", priority = 8)]
         public static void RunRankMarginSweepMenu()
         {
             ClearBatchModeSessionState();
@@ -2435,7 +2435,7 @@ namespace AutoTest.EditorTools
             Launch(1);
         }
 
-        /// <summary><b>兵站の原因究明 (2026-09-12)。</b> 開幕パッシブ 3 本 (兵站r9) と 0 本 (商才r9) を
+        /// <summary><b>宝物庫の原因究明 (2026-09-12)。</b> 開幕パッシブ 3 本 (宝物庫r9) と 0 本 (商才r9) を
         /// <b>埋め草を完全に同一にして</b>単発で回し、 サマリーの「パッシブ取得の経路別」を突き合わせる。
         ///
         /// <para>仮説: 所持パッシブが <c>InventoryPower</c> を押し上げ、 帯が上がると
@@ -2444,11 +2444,11 @@ namespace AutoTest.EditorTools
         ///
         /// <para>両者とも Shell6 Guard5 Vault4 Output3 AT1 BT1 で焦点だけが違う (各 33pt)。
         /// アーム別に見たいので 2 バッチに分ける (スイープだと集約になる)。 各 3,000ラン ≒ 230 秒。</para></summary>
-        [MenuItem("Tools/AutoRun/兵站診断A: 兵站r9 開幕P3本 (3000ラン)", priority = 8)]
+        [MenuItem("Tools/AutoRun/宝物庫診断A: 宝物庫r9 開幕P3本 (3000ラン)", priority = 8)]
         public static void RunSupplyR9Solo()
             => LaunchSpecSolo("Supply:9,AttackTerm:1,BlockTerm:1,Shell:6,Guard:5,Vault:4,Output:3");
 
-        [MenuItem("Tools/AutoRun/兵站診断B: 商才r9 開幕P0本 (3000ラン)", priority = 8)]
+        [MenuItem("Tools/AutoRun/宝物庫診断B: 商才r9 開幕P0本 (3000ラン)", priority = 8)]
         public static void RunTradeR9Solo()
             => LaunchSpecSolo("Trade:9,AttackTerm:1,BlockTerm:1,Shell:6,Guard:5,Vault:4,Output:3");
 
@@ -2467,7 +2467,7 @@ namespace AutoTest.EditorTools
         /// <para>集計は <c>Tools/pair_gain.py A/runs.jsonl B/runs.jsonl</c>。</para></summary>
         [MenuItem("Tools/AutoRun/ペア測定A: Balanced 2000ラン (jsonl)", priority = 8)]
         public static void RunPairBalancedSolo()
-            => LaunchSpecSolo("Shell:3,Output:3,Guard:3,Vault:3,Plunder:3,Trade:3,Supply:3,Lantern:3", 2000);
+            => LaunchSpecSolo("Shell:3,Output:3,Guard:3,Vault:3,Plunder:3,Trade:3,Supply:3,Armor:3", 2000);
 
         /// <summary><b>決定論の検査 (2026-09-13)。</b> 同じ配分を n=1000 と n=2000 で走らせ、
         /// <c>deterministicDigest</c> を index 0〜999 で突き合わせる。
@@ -2481,11 +2481,11 @@ namespace AutoTest.EditorTools
         /// <b>必ず digest がずれる</b> ── プロセス分割と同じ性質のテストになる。</para></summary>
         [MenuItem("Tools/AutoRun/決定論検査: Balanced 1000ラン (jsonl)", priority = 8)]
         public static void RunDeterminismCheck1000()
-            => LaunchSpecSolo("Shell:3,Output:3,Guard:3,Vault:3,Plunder:3,Trade:3,Supply:3,Lantern:3", 1000);
+            => LaunchSpecSolo("Shell:3,Output:3,Guard:3,Vault:3,Plunder:3,Trade:3,Supply:3,Armor:3", 1000);
 
         [MenuItem("Tools/AutoRun/ペア測定B: 商才r10 2000ラン (jsonl)", priority = 8)]
         public static void RunPairTradeSolo()
-            => LaunchSpecSolo("Trade:10,Shell:2,Output:2,Guard:2,Vault:2,Plunder:2,Supply:2,Lantern:2", 2000);
+            => LaunchSpecSolo("Trade:10,Shell:2,Output:2,Guard:2,Vault:2,Plunder:2,Supply:2,Armor:2", 2000);
 
         /// <summary>任意のパネル配分を単発で回す。 条件は極点比較と揃える。</summary>
         private static void LaunchSpecSolo(string spec, int runs = 3000)

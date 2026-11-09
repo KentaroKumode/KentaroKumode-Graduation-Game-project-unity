@@ -30,7 +30,7 @@ namespace AutoTest
         /// その倍を超えたら詰みとして打ち切る (バッチを無限に回さない)。</summary>
         public const int MaxFreeMapActionsPerFloor = 120;
         /// <summary>出口までの費用に足す物資の余裕。</summary>
-        public const int FreeMapExitMargin = 150;
+        public const int FreeMapExitMargin = 1;   // 2026-11-09: 上限 5 の 2 割
         /// <summary>種別の見えていない点の価値 (Rank の天井からの距離)。 通常の戦闘と同じくらい。</summary>
         private const float UnknownNodeDesire = 5f;
         /// <summary>Rank の天井。 これより悪い (大きい) 点は行く価値が無いとして候補から外す。</summary>
@@ -76,6 +76,26 @@ namespace AutoTest
         /// <summary>[計装] 迂回に切り替えた回数 (バッチ累計)。 添字は 0 迂回路あり / 1 迂回路なし (真っ直ぐ歩いて戦う)。</summary>
         public static readonly long[] FreeNavDetours = new long[2];
         private FreeMapLayout _freeMapLayout;
+        /// <summary>[計装] 踏破を記録する対象の層 (層を出た時・ランの終わりに記録して null に戻す)。</summary>
+        private FloorMap _visitMap;
+        private int _visitDepth;
+
+        /// <summary>[計装 2026-11-09] 層の踏破 (マスの種別ごとの数と踏んだ数) を記録する。</summary>
+        private void RecordMapVisit()
+        {
+            if (_visitMap == null || _cur == null) { _visitMap = null; return; }
+            var tot = new int[32]; var vis = new int[32];
+            foreach (var n in _visitMap.GetAllNodes())
+            {
+                int t = (int)n.type;
+                if (t < 0 || t >= 32) continue;
+                tot[t]++;
+                if (n.visited || n.activated) vis[t]++;
+            }
+            for (int t = 0; t < 32; t++)
+                if (tot[t] > 0) _cur.mapVisit.AddRange(new[] { _visitDepth, t, tot[t], vis[t] });
+            _visitMap = null;
+        }
 
         /// <summary>航行の方策を戦闘の技量から切り離す。 -1 = 技量に従う (既定) / 0 = Naive / 1 以上 = 追跡者を避ける。
         /// 「航行の読みの深さ」と「戦闘の読みの深さ」を別々に測るためのつまみ。</summary>
@@ -94,6 +114,59 @@ namespace AutoTest
         public static long FreeMapActionCapHits;
         /// <summary>[計装] 追跡者の戦闘から逃げた回数 (バッチ累計)。</summary>
         public static long FreeMapPursuerFlees;
+        /// <summary>[計装] 〈補給線〉(〈兵站〉r10) で跳んだ回数 (バッチ累計)。</summary>
+        public static long FreeMapRelays;
+
+        /// <summary>[計装] 店を探すために照明を使った回数 (バッチ累計)。</summary>
+        public static long FreeMapShopFlares;
+
+        /// <summary>補給できる店 (種別が見えていて・まだ入っていない・物資 1 を買える金がある) の添字。 <paramref name="hops"/> で最も近いもの。 無ければ -1。
+        /// <para>2026-11-09: 物資の上限 5 に合わせて、 寄り道の計画を「今の物資で出口まで」から「出口か、 まだ入っていない店まで」へ。
+        /// 店は一度入ると使い切りなので、 補給の当てになるのは未使用の店だけ。</para></summary>
+        private static int NearestRefuel(MapManager mm, FreeMapSim sim, int[] hops, RunState run, int exclude = -1, int[] toGoal = null, int maxToGoal = int.MaxValue)
+        {
+            if (run == null || run.coins < FreeMapParams.ProvisionPrice) return -1;
+            int best = -1, bestH = int.MaxValue;
+            foreach (var n in mm.CurrentMap.GetAllNodes())
+            {
+                int i = n.index;
+                if (i < 0 || i >= hops.Length || n.activated || !n.revealed || sim.IsSunk(i)) continue;
+                if (n.EffectiveType != TileType.Shop || n.isFalseMerchant) continue;
+                if (i == exclude) continue;
+                if (toGoal != null && (toGoal[i] == int.MaxValue || toGoal[i] >= maxToGoal)) continue;   // 出口へ近づく店だけ
+                if (hops[i] < bestH) { bestH = hops[i]; best = i; }
+            }
+            return best;
+        }
+
+        /// <summary>[2026-11-10] HP で払って歩ける歩数 (物資が尽きた後・1 歩 HP <see cref="FreeMapParams.HpPerSupply"/>)。
+        /// HP は層を移るたびに全回復するので、 ボスのいない層では HP を燃料として使い切ってよい (最大 HP の 25% を残す)。
+        /// ボスのいる層ではボス戦の分を残す (最大 HP の 75%)。</summary>
+        private static int HpWalkSteps(RunState run, MapManager mm, float hpFrac = -1f)
+        {
+            if (run == null || run.playerMaxHP <= 0) return 0;
+            float hp = hpFrac >= 0f ? hpFrac * run.playerMaxHP : run.playerHP;
+            float reserve = run.playerMaxHP * (LayerHasBoss(mm) ? 0.75f : 0.25f);
+            return Mathf.Max(0, Mathf.FloorToInt((hp - reserve) / FreeMapParams.HpPerSupply));
+        }
+
+        /// <summary>今の層の終点がボスか。</summary>
+        private static bool LayerHasBoss(MapManager mm)
+        {
+            var map = mm?.CurrentMap; if (map == null || map.layout == null) return true;
+            var g = map.GetNode(map.NodeIdAt(map.layout.goal));
+            return g == null || g.type == TileType.Boss || g.type == TileType.Gate;
+        }
+
+        /// <summary>点 (<paramref name="hopsFromThere"/> の起点) に物資 <paramref name="supply"/> で立った時、 出口か補給できる店まで歩けるか。
+        /// 2026-11-10: 出口までは HP で払って歩く分も数える (<see cref="HpWalkSteps"/>)。</summary>
+        private static bool Sustainable(MapManager mm, FreeMapSim sim, int[] hopsFromThere, int goal, int supply, RunState run)
+        {
+            if (hopsFromThere[goal] != int.MaxValue && supply + HpWalkSteps(run, mm) >= hopsFromThere[goal] * FreeMapParams.MoveSupply + FreeMapExitMargin) return true;
+            if (hopsFromThere[goal] != int.MaxValue && supply >= hopsFromThere[goal] * FreeMapParams.MoveSupply + FreeMapExitMargin) return true;
+            int shop = NearestRefuel(mm, sim, hopsFromThere, run);
+            return shop >= 0 && hopsFromThere[shop] != int.MaxValue && supply >= hopsFromThere[shop] * FreeMapParams.MoveSupply;
+        }
 
         private bool DoNavigateFree(GameManager gm, MapManager mm)
         {
@@ -104,6 +177,8 @@ namespace AutoTest
 
             if (!ReferenceEquals(map.layout, _freeMapLayout))
             {
+                RecordMapVisit();
+                _visitMap = map; _visitDepth = run.Depth;
                 _freeMapLayout = map.layout; _freeMapActions = 0; _freeMapTrail.Clear();
                 _freeMapVisited.Clear(); _freeMapSinceProgress = 0; _freeMapDetourTarget = -1;
                 _foeSeenAt = -1; _foeSeenStill = 0; _foeSeenMove = false; _foeSeenTurn = -1;
@@ -159,6 +234,20 @@ namespace AutoTest
                 }
             }
 
+            // ── 〈補給線〉(〈兵站〉r10・2026-11-09): 追われていたら、 追跡者から今より 3 歩以上遠い中継点へ跳ぶ ──
+            //   補足は解けない (追跡者は跳んだ先へ向かう) ので、 稼げるのは距離だけ。 手番を使わないので同じ判断をもう一度する。
+            //   「今より遠い」でしか跳ばないので、 跳び返して往復することはない。
+            if (sim.FoeAlive && sim.FoeMode == MapSystem.FreeMove.FoeMode.Chase && GameManager.SupplyLineUnlocked
+                && run.provision >= FreeMapParams.RelaySupply)
+            {
+                var fromFoe = sim.HopsFrom(sim.FoeNode);
+                int here = fromFoe[at], best = -1, bestD = here == int.MaxValue ? int.MaxValue : here + 2;
+                if (here != int.MaxValue)
+                    foreach (int r in sim.RelayPoints)
+                        if (sim.CanRelayTo(r) && fromFoe[r] != int.MaxValue && fromFoe[r] > bestD) { bestD = fromFoe[r]; best = r; }
+                if (best >= 0 && gm.RelayStep(map.NodeIdAt(best))) { FreeMapRelays++; return false; }
+            }
+
             // ── 調べる (2026-11-05): 照明 → 偵察の順。 どちらも行き先を決める前に使い、 開示された戦闘名は Rank (TileDanger) が読む ──
             //   照明: 物資 50 (1 歩分)・手番は使わない・3 手番のあいだ 3 歩先まで。 追跡者の察知も 3 歩に伸びるので、 近くに居る時は使わない。
             //   偵察: 1 手番 (追跡者が動き天候の前線も進む)・2 歩先まで。 追われている時は使わない。 同じ点では 1 回まで。
@@ -197,11 +286,34 @@ namespace AutoTest
             }
 
             // ── 行き先 ──
+            //   2026-11-09: 物資が出口まで足りなくても、 まだ入っていない店まで届くなら先に店へ寄って買い足す。
+            //   店が見つかっていなければ、 照明で周りを照らして探す (物資 1・手番は使わない)。
             int target = -1;
+            //   店は何度でも入れる (2026-11-09) ので、 往復で詰まらないように:
+            //   ・補給に行くのは満タンでない時だけ・今いる点は除く
+            //   ・満タンでも出口に届かない時は、 今より出口に近い店へ (店を伝って出口へ進む)。 無ければ出口へ (足りない分は HP)
+            bool full = run.provision >= run.provisionCap;
+            bool exitOk = hopsFromMe[L.goal] != int.MaxValue && run.provision + HpWalkSteps(run, mm) >= hopsFromMe[L.goal] * FreeMapParams.MoveSupply + FreeMapExitMargin;
+            int refuel = full ? NearestRefuel(mm, sim, hopsFromMe, run, at, sim.HopsFrom(L.goal), sim.HopsFrom(L.goal)[at])
+                              : NearestRefuel(mm, sim, hopsFromMe, run, at);
+            bool refuelOk = refuel >= 0 && run.provision >= hopsFromMe[refuel] * FreeMapParams.MoveSupply;
+            if (refuel < 0 && !sim.FlareOn && !(sim.FoeAlive && sim.FoeMode == FoeMode.Chase)
+                && run.coins >= FreeMapParams.ProvisionPrice && run.provision > FreeMapParams.FlareSupply
+                && _freeMapActions <= MaxFreeMapActionsPerFloor)
+            {
+                int unknown = 0;
+                foreach (var n in map.GetAllNodes())
+                {
+                    int i = n.index;
+                    if (i >= 0 && i < L.Count && !n.revealed && !sim.IsSunk(i) && hopsFromMe[i] != int.MaxValue && hopsFromMe[i] <= FreeMapParams.FlareRange) unknown++;
+                }
+                if (unknown >= 2 && gm.UseFlare()) { FreeMapShopFlares++; FreeNavFlares++; return false; }
+            }
             bool toExit = _freeMapActions > MaxFreeMapActionsPerFloor
-                          || run.provision < hopsFromMe[L.goal] * FreeMapParams.MoveSupply + FreeMapExitMargin
-                          || hopsFromMe[L.goal] == int.MaxValue;
-            if (!toExit && v3.macroPlan)
+                          || hopsFromMe[L.goal] == int.MaxValue
+                          || (!exitOk && !refuelOk);
+            if (!toExit && !exitOk && refuelOk) target = refuel;   // 先に補給
+            else if (!toExit && v3.macroPlan)
             {
                 target = MacroTarget(gm, mm, sim, L, at, hopsFromMe, run);
                 if (target < 0) toExit = true;
@@ -214,6 +326,8 @@ namespace AutoTest
                     if (n.index < 0 || n.index == at || n.index == L.goal || n.index == L.start) continue;
                     if (n.activated || sim.IsSunk(n.index)) continue;             // 使い切った点・沈んだ点
                     if (hopsFromMe[n.index] == int.MaxValue) continue;
+                    // 行った先から出口か補給できる店まで歩けない点は寄らない
+                    if (!Sustainable(mm, sim, sim.HopsFrom(n.index), L.goal, run.provision - hopsFromMe[n.index] * FreeMapParams.MoveSupply, run)) continue;
                     float desire = !n.revealed ? UnknownNodeDesire
                                  : RankCeil - Rank(n, hpRatio, _curCombatAverse, false, run, dangerTarget);
                     if (desire <= 0f) continue;

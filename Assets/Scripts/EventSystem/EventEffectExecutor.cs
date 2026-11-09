@@ -130,7 +130,7 @@ namespace EventSystem
 
                 case EventEffectType.ProvisionDelta:
                 {
-                    int amount = eff.amount;
+                    int amount = GameLoop.ProvisionRules.FromLegacyEventAmount(eff.amount);   // 文面は旧単位のまま (イベント再編 #17 で書き直す)
                     if (amount > 0) GameLoop.ProvisionSystem.Recover(run, amount);
                     else if (amount < 0) GameLoop.ProvisionSystem.Reduce(run, -amount);
                     result.log.Add($"物資{amount:+0;-0} (現在 {run.provision}/{run.provisionCap})");

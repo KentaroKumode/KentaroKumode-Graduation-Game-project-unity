@@ -66,7 +66,7 @@ namespace GameLoop
         }
 
         /// <summary>〈破綻〉の空白化で失う物資。 4 種の文面すべてに一律で掛かる。</summary>
-        private const int VoidTileProvisionCost = 30;   // 2026-09-28: 物資 ×10
+        private const int VoidTileProvisionCost = 1;   // 2026-11-09 デノミ (旧 30)
 
         /// <summary>〈破綻〉の空白化で呼ぶ召喚専用イベントの名前 (event_list.txt と一致させる)。
         ///

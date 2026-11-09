@@ -47,7 +47,7 @@ namespace AutoTest
                     return new Dictionary<MetaPanelKind, int> {
                     { MetaPanelKind.Shell, 3 }, { MetaPanelKind.Output, 3 }, { MetaPanelKind.Guard, 3 },
                     { MetaPanelKind.Vault, 3 }, { MetaPanelKind.Plunder, 3 }, { MetaPanelKind.Trade, 3 },
-                    { MetaPanelKind.Supply, 3 }, { MetaPanelKind.Lantern, 3 },
+                    { MetaPanelKind.Supply, 3 }, { MetaPanelKind.Armor, 3 },   // 2026-11-10: 兵站 → 装甲
                 };
 
                 // 10+5+4+3+2 = 24

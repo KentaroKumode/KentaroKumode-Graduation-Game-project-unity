@@ -49,7 +49,7 @@ namespace MetaProgression
         /// ── こちらは効果量が未測定のまま値上げする点に注意。</para>
         ///
         /// <para><b>種火は 2pt/段 (2026-11-07)。</b> 実測で種火 r3 (9pt) の効果はクリア率 +0〜4 ポイント、
-        /// 同じ 9pt の強奪・商才・燈火は約 7.5 ポイントだった。 端子は 3pt/段 のまま。</para></summary>
+        /// 同じ 9pt の強奪・商才・兵站は約 7.5 ポイントだった。 端子は 3pt/段 のまま。</para></summary>
         public static int RankCost(MetaPanelKind kind)
             => IsSpark(kind) ? 2 : kind.MaxRank() <= 3 ? 3 : 1;
 
@@ -286,14 +286,14 @@ namespace MetaProgression
         public static int[] TradeSaleWeights(int rank)
             => rank >= 10 ? new[] { 42, 35, 15, 8 } : new[] { 42, 38, 20 };
 
-        /// <b>【2026-09-10 廃止】常に 0。</b> 兵站が配るものを素材からパッシブへ変えた。
+        /// <b>【2026-09-10 廃止】常に 0。</b> 宝物庫が配るものを素材からパッシブへ変えた。
         /// 理由: drop-one 実測で寄与が測定分解能未満 (0.013 対数オッズ/pt / 分解能 ±0.029)。
         /// 原因は<b>素材が制約になっていない</b>こと ── ラン終了時の平均残が 12〜16 もあり、
         /// 余っている資源を +2 増やしても何も変わらない。 精密 (二重減衰で価値が薄い) とは
         /// 故障の種類が違い、 <b>需要のない資源を配っていた</b>。
         public static int SupplyStartMaterial(int rank) => 0;
 
-        /// <summary><b>兵站: 開幕パッシブの本数 = r2/5/8 で +1 (0..3)、 r10 で +1 (計4)。</b>
+        /// <summary><b>宝物庫: 開幕パッシブの本数 = r2/5/8 で +1 (0..3)、 r10 で +1 (計4)。</b>
         /// 2026-09-10 に素材から移行 ── 旧 r10 極点「開幕パッシブ1本」を刻んで前倒ししたもので、
         /// 新しい機構は足していない。
         ///
@@ -314,7 +314,7 @@ namespace MetaProgression
             return n;   // r10 は本数を増やさない ── 極点は SupplyStartingChoiceUnlocked
         }
 
-        /// <summary><b>兵站: 開幕パッシブのレア度重み付け (2026-09-13)。</b>
+        /// <summary><b>宝物庫: 開幕パッシブのレア度重み付け (2026-09-13)。</b>
         /// 段が上がるほど抽選が LEGENDARY 側へ寄る。 0 = 素の重み / 1.0 = 最大の寄せ。
         ///
         /// <para>本数だけ増やしても <b>r9 で Balanced −2.63pt</b> と弱かった。 配られるのが
@@ -341,67 +341,29 @@ namespace MetaProgression
         public static int SupplyStartingOffers(int rank, int itemIndex)
             => rank >= 10 ? Mathf.Clamp(itemIndex + 1, 1, 3) : 1;
 
-        /// <summary>燈火: 戦闘後の物資減少軽減。 <b>2026-09-12 廃止 (常に 0)</b> ──
-        /// 効果を <see cref="LanternProvisionCapBonus"/> (物資上限) へ移した。
-        /// r9 で −3 軽減まで積んでも Balanced −5.06pt で、 戦闘 1 回あたりの損 (4〜10) を
-        /// 削っても効いていなかった。</summary>
+        /// <summary>兵站: 戦闘後の物資減少軽減。 2026-09-12 廃止 (常に 0)。 2026-11-09 に戦闘の物資の損そのものを撤去。</summary>
         public static int LanternProvisionLossReduce(int rank) => 0;
 
-        /// <summary><b>燈火: 物資上限 +15/段。</b> r9 で 235、 r10 で 250。
-        ///
-        /// <para><b>効いていない。</b> 上限を上げても<b>物資には収入が無い</b>ので、
-        /// タンクが空のまま大きくなるだけだった ── 実測で r9 の 6 層突入時の物資が
-        /// <b>170 (未使用)</b>、 全軸 10,000 ラン で r9 が Bal比 <b>−11.12pt と全アーム最下位</b>。
-        /// 減少軽減 (2026-09-12 廃止・−5.06pt) に続き、 <b>上限も効かない</b>ことが確定した。
-        /// <b>未解決</b> ── 使い道へ移す案 (2026-09-14 案C) は BOT の方策が追随せず撤回した。</para></summary>
-        public static int LanternProvisionCapBonus(int rank) => Mathf.Clamp(rank, 0, 10) * 150;   // 2026-09-28: 物資 ×10
+        /// <summary>兵站 (旧〈燈火〉・2026-11-09 改名): 物資上限 +1/段 (r10 で +10)。
+        /// <para>2026-11-09: 物資のデノミ (1 歩 = 1・素の上限 20)。 旧 +150/段 (1 歩 50) の 1/50。
+        /// 物資払い (旧 r10・ゴールドの不足分を物資で) と「物資で払える下限」の段効果は撤去した。
+        /// r10 の極点は〈補給線〉に差し替える (未実装・GAME.md §23-21)。</para></summary>
+        public static int LanternProvisionCapBonus(int rank) => Mathf.Clamp(rank, 0, 10) * 1;   // 2026-11-09: 上限 5 に合わせて +1/段 (2026-11-10 に兵站ごと枠から外した・MaxRank 0)
 
-        /// <summary><b>燈火: 物資で支払える下限 (段効果)。</b> 段が上がるほど深く払える。
-        ///
-        /// <para><b>2026-09-14 新設 (案C)。</b> 旧構成は「物資払い」を r10 の極点だけの特権にしていたが、
-        /// 極点は実測で <b>95,283 回発動</b>しており<b>機構は確実に動く</b>。
-        /// これを段効果へ降ろせば、 上限 +N がそのまま購買力になり
-        /// 「タンクが空」問題が構造的に消える ── 上限と使い道が同じ方向を向く。</para>
-        ///
-        /// <para>返すのは<b>「ここまで物資を減らしてよい」という床</b>。 rank 0 は解禁前なので
-        /// <see cref="int.MaxValue"/> 相当 (＝1 も払えない) を意味する大きな値を返す。
-        /// r1 で 悲観帯 (45)、 段ごとに 3 ずつ下がり、 r9 で 21、
-        /// r10 で <see cref="GameLoop.ProvisionSystem.FloorScarce"/> (20) ＝ 規則上の最深。</para></summary>
-        /// <summary>燈火: 物資払いの<b>規則としての</b>下限。 ここを割る支払いはできない。
-        ///
-        /// <para><b>規則は緩い。</b> 絶望帯 (20) の手前まで払える ── 物資 0 は発狂＝ラン終了なので
-        /// そこだけは止めるが、 <b>残り少なくても払えること自体は許す</b>。
-        /// 人間が「ここで押し切る」と決めた手を規則で禁じない。</para>
-        ///
-        /// <para><b>「どこまで払うのが賢いか」は方策の側</b>
-        /// (<see cref="GameLoop.ProvisionPayment.PolicyFloorNow"/>) が決める。 規則と方策を同じ数字にすると、
-        /// 規則を緩めた瞬間に方策まで無謀になる。 実際 案C 初版でそれを踏んだ
-        /// ── 床を段で 45→20 まで下げたら BOT が使い切り、 Balanced が 24.60% → 12.29% へ崩れた。</para>
-        ///
-        /// <para><b>段効果は上限が担う。</b> 物資上限 +15/段 で r9 なら 235。
-        /// 方策側の閾値 100 (= 素の上限) を超えた分がそのまま購買力になるので、
-        /// <b>燈火で伸ばした分しか実際には使われない</b> ── 上限と使い道が直結する。</para></summary>
-        public static int LanternProvisionSpendFloor(int rank)
-            => Mathf.Clamp(rank, 0, 10) >= 1 ? GameLoop.ProvisionSystem.FloorScarce : int.MaxValue;
+        /// <summary><b>装甲 (2026-11-10): 防御 +2/段</b> (r10 で +20)。 r10〈不動〉は <see cref="ArmorImmovable"/>。
+        /// <para>2026-11-10: +1/段 では 7 点 (防御 5→12) が外殻・出力に負けた (−9.6) ので +2/段 へ。
+        /// 防御は逓減式 Rmax·D/(D+K) で軽減率になる (ADR-0013・今は 0.6 / 10)。 初期の防御 2 で軽減 10%、 r3 (8) で約 27%、 r10 (22) で約 41%。
+        /// 武器の防御はこれとは別に足される。 相手の貫通に固定値で削られる。</para>
+        /// <para>旧〈防御〉の開幕シールドは「危険でない戦闘だけを消す」形で外した (§24)。 防御値は割合の軽減なので、 強い攻撃ほど多く減らす。</para></summary>
+        public static int ArmorDefense(int rank) => Mathf.Clamp(rank, 0, 10) * 2;
 
-        /// <summary><b>[方策] BOT が物資を使い始める水位。</b> 規則ではない ──
-        /// 規則上は <see cref="LanternProvisionSpendFloor"/> (絶望帯の手前) まで払える。
-        ///
-        /// <para>素の物資上限 (<see cref="GameLoop.ProvisionSystem.ProvisionMax"/> = 100) と同じ値。
-        /// <b>燈火で上限を伸ばした分しか BOT は使わない</b>。
-        /// 80 で測ると Balanced でも 3.39 回/ラン 発動してクリア率が 24.60% → 21.56% へ落ちた
-        /// ── 平穏ギリギリまで使い切った後、 通常の戦闘損で焦燥へ落ちるため。</para></summary>
-        public const int ProvisionSpendThreshold = GameLoop.ProvisionSystem.ProvisionMax;
-
-        /// <summary><b>燈火 r10 (極点): ゴールド不足分を物資で 1:1 で払える。</b> 2026-09-13。
-        ///
-        /// <para>旧極点「横移動を無税にする」を差し替えた。 無税は r10−r9 +1.07pt で
-        /// 目標 (+3pt) に届かず、 かつ<b>トラックの段効果と噛み合っていなかった</b> ──
-        /// 物資上限 +15/段 を積んでも、 回復源が無い物資は余ればランの終わりに捨てられる。
-        /// 支払いに使えるなら上限がそのまま購買力になる。</para>
-        ///
-        /// <para>規則の本体は <see cref="GameLoop.ProvisionPayment"/>。</para></summary>
-        public static bool LanternProvisionPaymentUnlocked(int rank) => rank >= 10;
+        /// <summary><b>装甲 r10〈不動〉: 失った HP 10% ごとに防御 +1 (最大 +9)。</b> 毎ターンの始め (CombatContext.BeginNewTurn) に、 その時の HP で数え直す。</summary>
+        public static int ArmorImmovable(int rank, int hp, int maxHp)
+        {
+            if (rank < 10 || maxHp <= 0) return 0;
+            int lostPct10 = (Mathf.Max(0, maxHp - hp) * 10) / maxHp;   // 失った HP の 10% 刻みの数 (切り捨て)
+            return Mathf.Clamp(lostPct10, 0, 9);
+        }
 
         /// <summary>【廃止】精密の「会心ダイス」補正。 常に 0。
         ///

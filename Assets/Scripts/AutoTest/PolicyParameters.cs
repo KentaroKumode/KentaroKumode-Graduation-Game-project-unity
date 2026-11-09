@@ -59,11 +59,11 @@ namespace AutoTest
         /// <summary>横移動(寄り道)を許可する物資の下限。 現在物資がこの値を超えるときだけ物資-LateralCost を払って寄り道する。
         /// 低いほど「物資を資源として深く損耗してでも利得を取りにいく」、 高いほど温存重視。 L2が勝率(composite)で最適点を学習。
         /// 既定20 = 旧ハードコード(絶望帯≤20で見送り)と同等。</summary>
-        [UnityEngine.Serialization.FormerlySerializedAs("lateralHopeFloor")] public float lateralProvisionFloor = 200f;   // 2026-09-28: 物資 ×10 (横移動は廃止・読まれない)
+        [UnityEngine.Serialization.FormerlySerializedAs("lateralHopeFloor")] public float lateralProvisionFloor = 4f;   // 横移動は廃止・読まれない (2026-11-09 デノミで 200 → 4)
         /// <summary>物資回復(食料消費)を始める物資の上限。 現在物資がこの値以下になったら食料で補充する。
         /// 高いほど早めに補充(温存・安全)、 低いほど枯渇近くまで引っ張る(食料を出し惜しみ他用途へ)。 L2が勝率で最適化。
         /// 既定45 = 旧ハードコード(悲観帯≤45で補充)と同等。 ※佯狂者の冠所持時は発狂狙いのため別途補充しない。</summary>
-        [UnityEngine.Serialization.FormerlySerializedAs("hopeRefillFloor")] public float provisionRefillFloor = 900f;   // 2026-11-04: 450 → 900 (移動 1 歩 10 → 50・包 4G で 1 店 30 包 ＝ 満タン近くまで買う)
+        [UnityEngine.Serialization.FormerlySerializedAs("hopeRefillFloor")] public float provisionRefillFloor = 10f;   // 満タンまで買う (2026-11-10: 上限 10)
         /// <summary>物資の補充を **provisionCap のこの割合で打ち切る**。 既定 1.0 = 上限まで満たす（従来動作）。
         ///
         /// 1 未満にすると「補充はするが上へ戻し切らない」＝ **物資を帯の中に留める**。
@@ -167,7 +167,10 @@ namespace AutoTest
             importantThreatThreshold = Mathf.Clamp(importantThreatThreshold, 2, 9);
             emergencyHealRatio       = Mathf.Clamp(emergencyHealRatio, 0.50f, 2.00f);
             hpCritThreshold          = Mathf.Clamp(hpCritThreshold, 0.10f, 0.50f);
-            lateralProvisionFloor         = Mathf.Clamp(lateralProvisionFloor, 0f, 600f);
+            // 2026-11-09 デノミ (1/50) より前に保存された値は、 上限 (20) を超えていたら旧単位とみなして読み替える
+            if (provisionRefillFloor > 20f) provisionRefillFloor /= 50f;
+            if (lateralProvisionFloor > 20f) lateralProvisionFloor /= 50f;
+            lateralProvisionFloor         = Mathf.Clamp(lateralProvisionFloor, 0f, 12f);
             provisionRefillFloor          = Mathf.Clamp(provisionRefillFloor, 0f, GameLoop.ProvisionRules.Max);
             provisionBandCeilRatio        = Mathf.Clamp(provisionBandCeilRatio, 0.10f, 1.00f);
             stanceDefendWinProb      = Mathf.Clamp(stanceDefendWinProb, 0f, 0.90f);

@@ -597,10 +597,7 @@ namespace CombatSystem
             if (psm.Context != null) psm.Context.playerCurrentHP = playerHP;
             psm.Context?.playerDamageBySource.Clear(); // 被ダメ ソース別内訳を戦闘開始でリセット
 
-            // 物資(ADR-0002) 迷妄: 絶望帯(物資≤20)以降、戦闘開始時にプレイヤーパッシブを1-3個ランダム無効化。
-            // 佯狂者は PassiveItem 系統のため対象外（activeSkillNames に含まれない）。
-            int delusionCount = GameLoop.ProvisionSystem.RollPassiveDisableCount(GameLoop.GameManager.Instance?.Run);
-            if (delusionCount > 0) psm.DisableRandomPlayerSkills(delusionCount);
+            // (物資の段のデバフ〈迷妄〉は 2026-11-09 に撤去)
 
             // 装備ダイスの面をコンテキストに設定
             var ctx = psm.Context;
@@ -616,12 +613,12 @@ namespace CombatSystem
             //   ── secondaryEnemy は上で解決済みなので、 ここで写せば戦闘中ぶれない。
             if (ctx != null) ctx.isPairEncounter = secondaryEnemy != null;
             // 防御値と貫通 (ADR-0013)。 敵の防御は〈精鋭〉〈硬鱗〉〈重甲〉が OnBattleStart で足す。
-            //   プレイヤーの土台 = 初期値 + 武器。 アイテムの def / pen は毎ターン OnPostRoll で乗る。
+            //   プレイヤーの土台 = 初期値 + 武器 + 整備パネル〈装甲〉。 アイテムの def / pen は毎ターン OnPostRoll で乗る。
             if (ctx != null)
             {
                 ctx.enemyDefense = Math.Max(0, enemy.defense) + MetaProgression.MetaDebuffApplicator.GetEnemyDefenseBonus();   // 挑戦カード: 敵の防御 +N
                 ctx.enemyArmorPen = Math.Max(0, enemy.armorPen);
-                ctx.playerDefenseBase = DefenseFormula.PlayerBaseDefense + _weaponDefense;
+                ctx.playerDefenseBase = DefenseFormula.PlayerBaseDefense + _weaponDefense + MetaProgression.MetaBuffApplicator.GetArmorDefense();
                 ctx.playerArmorPenBase = _weaponArmorPen;
                 ctx.playerDefense = ctx.playerDefenseBase;
                 ctx.playerArmorPen = ctx.playerArmorPenBase;
@@ -629,8 +626,7 @@ namespace CombatSystem
                 ctx.bossId = CombatSystem.BossParams.IsBoss(enemy.id) ? enemy.id : "";
                 ctx.lastDamageCause = ItemSystem.PassiveSkills.DeathCause.Normal;
 
-                // 物資(ADR-0002) 苦悩: 悲観床(45)以下で会心倍率 -0.5。
-                ctx.criticalMultiplier += GameLoop.ProvisionSystem.GetCritMultiplierDelta(GameLoop.GameManager.Instance?.Run);
+                // (物資の段のデバフ〈苦悩〉は 2026-11-09 に撤去)
             }
 
             // 消費アイテム: マップで使用した「次戦闘バフ」を ctx へコピーし RunState 側をクリア

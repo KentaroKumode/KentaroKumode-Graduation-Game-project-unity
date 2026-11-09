@@ -289,8 +289,8 @@ namespace GameLoop
             Run.sealedRoleMask = MetaProgression.MetaDebuffApplicator.RollSealedRoles(Run);
             if (Run.sealedRoleMask != 0)
                 Log($"凶運: 役を封印 (mask={Run.sealedRoleMask})");
-            // メタバフ〈開幕パッシブ〉(兵站): ノーマル枠から N 個獲得して所持。
-            //   2026-09-10: 兵站が素材からパッシブへ変わり、 本数が r2/5/8/10 で増える。
+            // メタバフ〈開幕パッシブ〉(宝物庫): ノーマル枠から N 個獲得して所持。
+            //   2026-09-10: 宝物庫が素材からパッシブへ変わり、 本数が r2/5/8/10 で増える。
             //   `PickPassiveItemForBossExtra` は `BuildDedupExclude` でラン内重複を除くので、
             //   付与済みの品は次の抽選から自動的に外れる。 抽選は `RangeAuto` (毎回進む) なので
             //   同じ品を引き続けることはない。
@@ -299,7 +299,7 @@ namespace GameLoop
                 int startPassives = MetaProgression.MetaBuffApplicator.GetStartingPassiveCount();
                 for (int sp = 0; sp < startPassives; sp++)
                 {
-                    // 兵站 r10 (極点): **何本目かで提示数が増える** (1 本目 1 択 / 2 本目 2 択 / 3 本目 3 択)。
+                    // 宝物庫 r10 (極点): **何本目かで提示数が増える** (1 本目 1 択 / 2 本目 2 択 / 3 本目 3 択)。
                     //   offers=1 なら従来どおりランダム。
                     //   **提示は必ず offers 回引く** ── 引く回数を採否で変えると GameRng の
                     //   消費列が条件で変わり、 同一シードのペア比較が壊れる。
@@ -419,8 +419,6 @@ namespace GameLoop
             //   判断は必ず「いまの手番で、この分岐をどうするか」に閉じる。
             RevealAdjacentEncounters();
 
-            bool despairMarch = MetaProgression.MetaDebuffApplicator.IsDespairMarchActive();
-
             // 挑戦デバフ 軸14〈焦燥〉: この層の踏破が閾値を超えたら、 1 マスごとに物資 −5。
             //   「長く彷徨うほど追い詰められる」形。 閾値以内なら一切効かないので、
             //   最短で降りるプレイには無害 ── 寄り道の対価としてだけ働く。
@@ -432,7 +430,7 @@ namespace GameLoop
                 Log($"焦燥: {Run.currentFloor}層 {Run.tilesThisFloor}マス目 (閾値{impatienceMax}) → 物資 -{MetaProgression.MetaDebuffApplicator.ImpatienceProvisionLoss}");
             }
 
-            if (ProvisionSystem.ApplyArrival(Run, despairMarch))
+            if (ProvisionSystem.ApplyArrival(Run))
             {
                 Log("燃え尽き: 佯狂者の冠で最大HPが尽きてラン終了");
                 Run.EndRun();

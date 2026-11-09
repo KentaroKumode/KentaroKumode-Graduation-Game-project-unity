@@ -165,6 +165,11 @@ namespace MapSystem.FreeMove
         private int _alertLure = -1;
         public readonly List<Familiar> Familiars = new List<Familiar>();
 
+        // ── 補給線 (〈兵站〉r10・2026-11-09) ──
+        private readonly HashSet<int> _relays = new HashSet<int>();
+        /// <summary>この層で一度着いた前哨基地・店 (〈補給線〉で跳べる先)。 本体 (MapManager) が着いた時に足す。</summary>
+        public IReadOnlyCollection<int> RelayPoints => _relays;
+
         // ── 囮罠 ──
         public struct Lure { public int node; public int turnsLeft; }
         public readonly List<Lure> Lures = new List<Lure>();
@@ -272,15 +277,20 @@ namespace MapSystem.FreeMove
         private double TraceLife(int i)
         {
             double life = FreeMapParams.TraceLife;
-            if (WeatherAt(i, WeatherKind.Still)) life *= 2;
             if (WeatherAt(i, WeatherKind.Sand)) life /= 2;
             return life;
         }
 
-        /// <summary>点 j へ 1 歩動く物資 (砂の前線の内側は 1.5 倍)。</summary>
+        /// <summary>点 j へ 1 歩動く物資。 削る砂の前線の内側は 50% で +1 (2026-11-09: 旧「1.5 倍」をデノミ後の 1 で表す)。
+        /// 抽選は (手番, 行き先) で決まる専用の鍵なので、 同じ手番に何度聞いても同じ答え (予告・BOT の先読みと実際の支払いが一致する)。</summary>
         public int SupplyFor(int j)
-            => (int)Math.Round(FreeMapParams.MoveSupply * (WeatherAt(j, WeatherKind.Sand) || WeatherAt(Me, WeatherKind.Sand) ? 1.5 : 1.0),
-                               MidpointRounding.AwayFromZero);
+        {
+            int c = FreeMapParams.MoveSupply;
+            if ((WeatherAt(j, WeatherKind.Sand) || WeatherAt(Me, WeatherKind.Sand))
+                && GameLoop.GameRng.Range(0, 1000, "map.free.sand", Turn * 1000 + j) < (int)(FreeMapParams.SandExtraChance * 1000))
+                c += 1;
+            return c;
+        }
 
         /// <summary>点 j へ 1 歩動くのに進む手番 (雪の前線の内側は 2)。</summary>
         public int TurnsFor(int j) => WeatherAt(j, WeatherKind.Snow) || WeatherAt(Me, WeatherKind.Snow) ? 2 : 1;
@@ -397,6 +407,33 @@ namespace MapSystem.FreeMove
             if ((ev & FreeMapEvent.Died) != 0) { Dead = true; return ev; }
             ev |= PassTurns(turns);
             if ((ev & (FreeMapEvent.Caught | FreeMapEvent.FamiliarContact)) != 0) PendingArrival = j;
+            return ev;
+        }
+
+        /// <summary>〈補給線〉の中継点を足す (この層で一度着いた前哨基地・店)。</summary>
+        public void AddRelayPoint(int i) { if (i >= 0 && i < _adj.Length && _relays.Add(i)) Version++; }
+
+        /// <summary>〈補給線〉で点 j へ跳べるか (解禁の判定は呼ぶ側 = 整備パネル〈兵站〉r10)。</summary>
+        public bool CanRelayTo(int j)
+            => !Dead && !InFight && j >= 0 && j < _adj.Length && j != Me && !_sunk[j] && _relays.Contains(j);
+
+        /// <summary>〈補給線〉: 一度着いた前哨基地・店へ跳ぶ。 物資 <see cref="FreeMapParams.RelaySupply"/>・<b>手番は使わない</b> (追跡者は動かない)。
+        /// <para><b>補足は解けない</b> ── 追いかけている追跡者は跳んだ先を知っていて、 そこへ向かう。 距離は稼げるが撒けない (2026-11-09)。</para></summary>
+        public FreeMapEvent RelayTo(int j)
+        {
+            if (!CanRelayTo(j)) return FreeMapEvent.None;
+            var ev = FreeMapEvent.None;
+            if (Pay(FreeMapParams.RelaySupply)) ev |= FreeMapEvent.Died;
+            PrevNode = Me;
+            Me = j;
+            Version++;
+            _trace[j] = Turn;
+            Known[j] = true;
+            LastArrived = j;
+            if (FoeAlive && FoeMode == FoeMode.Chase) LastSeen = j;
+            ev |= FreeMapEvent.Arrived;
+            if ((ev & FreeMapEvent.Died) != 0) { Dead = true; return ev; }
+            Reveal(Me, VisionRange);
             return ev;
         }
 
@@ -525,7 +562,7 @@ namespace MapSystem.FreeMove
             int short_ = cost - pay;
             if (short_ <= 0) return false;
             HpPayReason = "物資切れの歩行";
-            return _wallet.PayHp((short_ + FreeMapParams.SupplyPerHp - 1) / FreeMapParams.SupplyPerHp);
+            return _wallet.PayHp(short_ * FreeMapParams.HpPerSupply);
         }
 
         private void Reveal(int center, int range)

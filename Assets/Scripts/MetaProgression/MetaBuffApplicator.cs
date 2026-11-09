@@ -54,7 +54,7 @@ namespace MetaProgression
                 - MetaDebuffApplicator.GetStartingGoldPenalty());
             GoldIncome.GainExempt(run, startGold, "整備パネル(金庫)", applyLastStandFilter: false);
 
-            // 2026-09-10: 兵站は素材ではなく開幕パッシブを配る (MetaPanel.SupplyStartingPassives)。
+            // 2026-09-10: 宝物庫は素材ではなく開幕パッシブを配る (MetaPanel.SupplyStartingPassives)。
             //   実際の付与は GameManager 側 (アイテムDB と重複排除が要るため)。
             int material = MetaPanel.SupplyStartMaterial(Rank(MetaPanelKind.Supply));   // 常に 0
             run.weaponMaterials += material;
@@ -119,11 +119,20 @@ namespace MetaProgression
         // ============================================================
 
         /// <summary>戦闘後の物資ゲージ減少の軽減量。 <b>2026-09-12 以降 常に 0</b>
-        /// (燈火の効果を物資上限へ移したため)。 呼び出し側の互換のため残置。</summary>
+        /// (兵站の効果を物資上限へ移したため)。 呼び出し側の互換のため残置。</summary>
         public static int GetProvisionLossReduction()
             => MetaPanel.LanternProvisionLossReduce(Rank(MetaPanelKind.Lantern));
 
-        /// <summary>燈火: 物資上限 +10/段 (0..100)。</summary>
+        /// <summary>兵站 r10〈補給線〉: この層で一度着いた前哨基地・店のあいだを物資 1 で跳べる (手番を使わない・2026-11-09)。</summary>
+        public static bool IsSupplyLineUnlocked() => Rank(MetaPanelKind.Lantern) >= 10;
+
+        /// <summary>装甲 (2026-11-10): 防御 +1/段 (0..10)。 戦闘開始時に防御の土台へ足す。</summary>
+        public static int GetArmorDefense() => MetaPanel.ArmorDefense(Rank(MetaPanelKind.Armor));
+
+        /// <summary>装甲 r10〈不動〉: 失った HP 10% ごとに防御 +1 (最大 +9)。 r10 未満は 0。</summary>
+        public static int GetArmorImmovableDefense(int hp, int maxHp) => MetaPanel.ArmorImmovable(Rank(MetaPanelKind.Armor), hp, maxHp);
+
+        /// <summary>兵站: 物資上限 +1/段 (0..10)。 2026-11-10 に枠から外した (常に 0)。</summary>
         public static int GetProvisionCapBonus()
             => MetaPanel.LanternProvisionCapBonus(Rank(MetaPanelKind.Lantern));
 
@@ -177,7 +186,7 @@ namespace MetaProgression
         //  各種 unlock
         // ============================================================
 
-        /// <summary>兵站: 開幕で獲得するパッシブスティックの本数 (r2/5/8/10 で +1 ずつ)。</summary>
+        /// <summary>宝物庫: 開幕で獲得するパッシブスティックの本数 (r2/5/8/10 で +1 ずつ)。</summary>
         public static int GetStartingPassiveCount()
             => MetaPanel.SupplyStartingPassives(Rank(MetaPanelKind.Supply));
 
@@ -192,19 +201,14 @@ namespace MetaProgression
         public static bool IsShieldCarryUnlocked()
             => MetaPanel.GuardShieldCarryUnlocked(Rank(MetaPanelKind.Guard));
 
-        /// <summary>兵站 r3/6/9: 開幕パッシブのレア度を上位へ寄せる度合い (0..1)。</summary>
+        /// <summary>宝物庫 r3/6/9: 開幕パッシブのレア度を上位へ寄せる度合い (0..1)。</summary>
         public static float GetStartingPassiveRarityBias()
             => MetaPanel.SupplyRarityBias(Rank(MetaPanelKind.Supply));
 
-        /// <summary>兵站 r10: 開幕パッシブ <paramref name="itemIndex"/> 本目 (0 起点) の提示数。
+        /// <summary>宝物庫 r10: 開幕パッシブ <paramref name="itemIndex"/> 本目 (0 起点) の提示数。
         /// 1 本目 1 択 / 2 本目 2 択 / 3 本目 3 択。</summary>
         public static int GetStartingPassiveOffers(int itemIndex)
             => MetaPanel.SupplyStartingOffers(Rank(MetaPanelKind.Supply), itemIndex);
-
-        /// <summary>燈火 r10: ゴールド不足分を物資で 1:1 で払えるか。</summary>
-        /// <summary>燈火: 物資で支払える下限 (段効果)。 未解禁なら int.MaxValue。</summary>
-        public static int GetProvisionSpendFloor()
-            => MetaPanel.LanternProvisionSpendFloor(Rank(MetaPanelKind.Lantern));
 
         /// <summary>金庫 r10: 貸金庫 (ランを跨ぐ預金) を使えるか。</summary>
         public static bool IsVaultBankUnlocked()

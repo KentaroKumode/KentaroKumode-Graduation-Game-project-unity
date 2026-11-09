@@ -535,7 +535,7 @@ namespace AutoTest
                     //   ランが終わり、 上限まで満たすと〈渇き〉の発動条件から外れる。
                     //   実測ではどちらも軸が死んだので、 発動閾値 (provisionCap×40%) の少し下を
                     //   天井に、 発狂を避けられる高さを床に置いて **帯 [18, 38] を維持**する。
-                    armProvisionRefill = 180f;   // 2026-09-28: 物資 ×10
+                    armProvisionRefill = 4f;   // 2026-11-09 デノミ (旧 180)
                     armProvisionCeil   = 0.38f;
                     groupTag = "渇き";
                     if (ci == extraCrit + 1) { armAxis = MetaProgression.Relics.RelicAxis.ProvisionBurn; armStep = step; }

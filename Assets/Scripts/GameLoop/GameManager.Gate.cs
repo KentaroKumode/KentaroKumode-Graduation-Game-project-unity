@@ -127,7 +127,7 @@ namespace GameLoop
         }
 
         /// <summary>③で支払う物資。</summary>
-        public const int GateProvisionDemand = 400;   // 2026-09-28: 物資 ×10
+        public const int GateProvisionDemand = 4;   // 2026-11-10: 旧 400 (上限の 40%) → 上限 10 の 40%
 
         /// <summary>③「門が転移を開始した時、あなたの意識が薄れゆく…」
         /// — 光に身を任せる = 物資 −40。 抗う/不足なら〈不完全な転移〉。</summary>

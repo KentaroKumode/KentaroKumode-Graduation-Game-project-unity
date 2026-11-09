@@ -68,6 +68,8 @@ namespace AutoTest.ParallelSweep
         public int[] goldVals = Array.Empty<int>();
         /// <summary>状態の記録 (10 列ずつ・AutoRunner.SnapState・2026-11-06)。</summary>
         public int[] stateSnaps = Array.Empty<int>();
+        /// <summary>航行マップの層ごとの踏破 (4 列ずつ: 深さ, TileType, 数, 踏んだ数・2026-11-09)。</summary>
+        public int[] mapVisit = Array.Empty<int>();
 
         public static LearnRunRow From(AutoRunner.RunRec r)
         {
@@ -93,6 +95,7 @@ namespace AutoTest.ParallelSweep
                 fights = Fights(r.combats),
                 goldKeys = r.goldKeys ?? Array.Empty<string>(), goldVals = r.goldVals ?? Array.Empty<int>(),
                 stateSnaps = r.stateSnaps != null ? r.stateSnaps.ToArray() : Array.Empty<int>(),
+                mapVisit = r.mapVisit != null ? r.mapVisit.ToArray() : Array.Empty<int>(),
             };
         }
 
@@ -110,6 +113,7 @@ namespace AutoTest.ParallelSweep
                     dealt = c.damageDealt, taken = c.damageTaken, enemyMaxHp = c.enemyMaxHP,
                     key = c.encounterKey ?? "",
                     dmgParts = c.dmgParts ?? Array.Empty<int>(),
+                    fbDecided = c.fbDecided, fbTurns = c.fbTurns, fbKillTurns = c.fbKillTurns,
                 };
             }
             return a;
@@ -143,6 +147,8 @@ namespace AutoTest.ParallelSweep
         /// <summary>与ダメの内訳 [武器, 攻撃の出目, 攻撃+N, 主攻撃の与ダメ, 固定ダメ, 追撃, 出目由来の攻撃, 毒, 出血, 臨界の爆発] (2026-11-06)。
         /// 毒と爆発は固定ダメの内数、 出血は固定ダメの外 (敵 HP を直接引く)。</summary>
         public int[] dmgParts;
+        /// <summary>[計装 2026-11-10] 配線を決めたターン数 / うち防ぎ切りの規則の対象 / うち今ターン撃破。</summary>
+        public int fbDecided, fbTurns, fbKillTurns;
     }
 
     [Serializable]
@@ -183,7 +189,7 @@ namespace AutoTest.ParallelSweep
         /// <b>「値を変えたのに効いていない」を数字で切り分けるために要る。</b>
         /// 発動数が同じでも配った HP が変わっていなければ、 変更が届いていない。</summary>
         public long revivalHpRestored;
-        /// <summary>燈火 r10: 物資で払った回数と物資の総消費。</summary>
+        /// <summary>兵站 r10: 物資で払った回数と物資の総消費。</summary>
         public long provisionPayments;
         public long provisionSpent;
         /// <summary>金庫 r10: 層跨ぎの倍化回数 / 増えたゴールド / 上限に当たった回数。</summary>

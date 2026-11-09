@@ -350,8 +350,7 @@ namespace CombatSystem
         ///
         /// 充電は端子で溜めて振り直しで払う (accumulatedValues["mutualCharge"] は獲得の記録)。
         /// ADR-0009 柱5 の「ターン開始時の消費と停電」は 2026-11-04 に廃止 (GAME.md §24)。
-        ///   - ボス固有機構 (サドンデス/コントラタック) 未移植 → boss6 は旧法で計測する。
-        ///   - リロール自動ポリシーは旧目的関数 (ロール勝率) のまま。
+        ///   - ボス固有機構: コントラタック (5 層裏ボスのレイピア) は移植済み。 サドンデス (灰燼の烙印) と妙覚は機構ごと廃止。
         ///   - ProcessPostRoll 中の playerWonRoll はロール比較値 (収支確定前) — 出目参照系は
         ///     従来どおり、勝敗参照系のみ解決後の再発火で拾う。
         /// </summary>
@@ -555,6 +554,22 @@ namespace CombatSystem
             int[] playerFaceIdx;
             int[] playerDice = RollDice(actualPlayerDiceCount, playerDiceMax, ctx.equippedDiceFaces, out playerFaceIdx);
             CombatStats.NoteFirstRoll(actualPlayerDiceCount, ctx, playerDice);
+
+            // 恒久デバフ〈コルヴェンの憤怒〉: ボス戦の 1 ターン目は自ダイスが全て最大値 (HP 半減は戦闘開始時に済ませてある)。
+            //   2026-11-09 まで予約の印 (wrathDiceOverrideArmed) だけ立って誰も読んでいなかった。 面ごと最大の面へ止める (パーツ効果も発火する)。
+            if (wrathDiceOverrideArmed)
+            {
+                wrathDiceOverrideArmed = false;
+                var faces = ctx?.equippedDiceFaces;
+                int top = -1;
+                if (faces != null) for (int f = 0; f < faces.Length; f++) if (top < 0 || faces[f] > faces[top]) top = f;
+                for (int i = 0; i < playerDice.Length; i++)
+                {
+                    playerDice[i] = top >= 0 ? faces[top] : playerDiceMax;
+                    if (playerFaceIdx != null && i < playerFaceIdx.Length) playerFaceIdx[i] = top;
+                }
+                Debug.Log($"[{MetaProgression.PermanentDebuffIds.Wrath}] 1T目: 自ダイスを全て最大値 {(top >= 0 ? faces[top] : playerDiceMax)} に");
+            }
 
             // 挑戦デバフ 軸9〈見放された運〉: ダイスを N 本 1 に潰す。
             //   T1 = 1T目に 1 本 / T2 = 1T目に 2 本 / T3 = 全ターン 1 本。
@@ -1096,16 +1111,7 @@ namespace CombatSystem
             CombatStats.DamageBreakdown[19] += ctx.diceDerivedAttack;
             CombatStats.RecordFloorDamage(ctx, dealtDmg, dealtFixed, currentEnemy != null ? currentEnemy.maxHP : 0);
 
-            // 物資(ADR-0002) 疲労: 攻撃が15%で**最終ダメージ半減** (2026-08-09 に 0 ダメから緩和)。
-            //   **isCrit は落とさない** ── 会心の成否は判定済みの事実で、 疲労は結果の目減り。
-            float fatigueChance = GameLoop.ProvisionSystem.GetFatigueChance(GameLoop.GameManager.Instance?.Run);
-            if (fatigueChance > 0f && GameLoop.GameRng.Chance(fatigueChance, "combat.fatigue", RngIdx(2)))
-            {
-                float fm = GameLoop.ProvisionSystem.FatigueDamageMultiplier;
-                dealtDmg   = dealtDmg   > 0 ? Math.Max(1, Mathf.RoundToInt(dealtDmg   * fm)) : dealtDmg;
-                dealtFixed = dealtFixed > 0 ? Math.Max(1, Mathf.RoundToInt(dealtFixed * fm)) : dealtFixed;
-                Debug.Log($"[物資] 疲労: 最終ダメージ半減 → 主{dealtDmg} 固{dealtFixed}");
-            }
+            // (物資の段のデバフ〈疲労〉は 2026-11-09 に撤去)
 
             result.mainDamage = atkBase;
             result.totalDamage = dealtDmg;

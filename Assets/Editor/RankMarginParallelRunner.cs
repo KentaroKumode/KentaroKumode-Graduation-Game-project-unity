@@ -673,13 +673,13 @@ namespace AutoTest.EditorTools
                             + $" | {(hpEvents > 0 ? rv.hp / (double)hpEvents : 0),8:F1}");
             }
 
-            // 燈火 r10。 **0 件なら機構が使われていない** ── 効果の有無を論じる前にここを見る。
+            // 兵站 r10。 **0 件なら機構が使われていない** ── 効果の有無を論じる前にここを見る。
             long anyProvisionPay = 0;
             foreach (var kv in provisionPay) anyProvisionPay += kv.Value.count;
             if (anyProvisionPay > 0)
             {
                 sb.AppendLine();
-                sb.AppendLine("物資での支払い (燈火 r10)");
+                sb.AppendLine("物資での支払い (兵站 r10)");
                 sb.AppendLine("アーム                  |     回数 | ラン当たり | 1回あたり物資");
                 foreach (string label in order)
                 {
