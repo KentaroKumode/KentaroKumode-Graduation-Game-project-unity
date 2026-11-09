@@ -67,28 +67,28 @@ namespace MetaProgression
         {
             // ── デバフ (汎用の圧)。 2026-11-09 の 1 枚ずつの測定から、 目標の重さ (I −3.6 / II −5.3 / III −6.6 / IV −9.7) に届く Tier にだけ置く。
             //    I は 1 層・II は 4 層・III/IV は 5 層の入口で受けるので、 ラン全体で効く札 (経済・持ち込み・HP) は I に、 戦闘を直接重くする札は II〜IV に寄る。
-            //    値は比例で逆算した見込み (要測定)。
-            K(EnemyAtk, false, Family.Attack, T(7, 14, 26, 37));          // 敵の攻撃 +N% (予告の前・Escalation.GetMultiplier)
-            K(Esc, false, Family.Attack, T(20, 40, 70, 100));             // エスカレーションの上がり幅 +N% (段の倍率の 1 を超えた分に掛ける)
-            K(BossEsc, false, Family.Attack, T(null, 1, 1, null));        // ボス戦ではエスカレーションが毎ターン進む
-            K(Judge, false, Family.Attack, T(null, 30, 35, 50), v2: T(null, 300, 300, 260));   // 〈最後の審判〉累計 v2 ターンの後、 敵の攻撃 +N%
+            //    値は比例で逆算した見込み。 2026-11-09 第 3 回の測定 (Super 3000) で外れた札を寄せ直した (敵のシールドは 3/5% で −21/−23 と壊れていた)。
+            K(EnemyAtk, false, Family.Attack, T(7, 17, 26, 37));          // 敵の攻撃 +N% (予告の前・Escalation.GetMultiplier)
+            K(Esc, false, Family.Attack, T(20, 40, 55, 100));             // エスカレーションの上がり幅 +N% (段の倍率の 1 を超えた分に掛ける)
+            K(BossEsc, false, Family.Attack, T(null, null, 1, null));        // ボス戦ではエスカレーションが毎ターン進む
+            K(Judge, false, Family.Attack, T(null, 22, 35, 42), v2: T(null, 300, 300, 260));   // 〈最後の審判〉累計 v2 ターンの後、 敵の攻撃 +N%
             K(Heavy, false, Family.Attack, T(null, 0.5f, 0.7f, 1.0f));    // 大技の倍率 +N
             K(Ambush, false, Family.Attack, T(null, 60, 70, 100), v2: T(null, 2, 3, 3));   // 〈先手を取られる〉形態の最初の v2 ターン、 敵の攻撃 +N% (予告に出るのでブロックで受けられる)
-            K(Twin, false, Family.Attack, T(null, null, 40, 60));         // 〈連撃〉敵の攻撃が 2 回。 2 回目は N% の威力 (ブロックは 2 回とも効く)
-            K(Opener, false, Family.Attack, T(null, null, 100, 150));     // 〈開幕の大技〉ボスの各形態の最初のターン、 敵の攻撃 +N%
-            K(Rage, false, Family.Attack, T(null, 2, 3, 5));              // 〈怒り〉形態の中で 1 ターン進むごとに敵の攻撃 +N% (加算)
+            K(Twin, false, Family.Attack, T(null, null, 65, 85));          // 〈連撃〉敵の攻撃が 2 回。 2 回目は N% の威力 (ブロックは 2 回とも効く)
+            K(Opener, false, Family.Attack, T(null, null, 175, 245));     // 〈開幕の大技〉ボスの各形態の最初のターン、 敵の攻撃 +N%
+            K(Rage, false, Family.Attack, T(null, 3, 5, 10));             // 〈怒り〉形態の中で 1 ターン進むごとに敵の攻撃 +N% (加算)
             K(EnemyHp, false, Family.Durability, T(30, null, null, null));   // 敵の最大 HP +N% (連戦の全段)
             K(EnemyDef, false, Family.Durability, T(2, 3, null, null), pending: true);   // 敵の防御 +N ── 受けると易しくなる (I +1.5 有意)。 原因を調べるまで配らない
             K(Steel, false, Family.Durability, T(1, null, null, null));   // 〈鋼の皮膚〉
-            K(Regen, false, Family.Durability, T(null, null, 2, 3));      // 〈再生〉敵が毎ターン最大 HP の N% を回復する
-            K(EnemyShield, false, Family.Durability, T(null, null, 3, 5));   // 〈敵のシールド〉敵は毎ターン、 最大 HP の N% までシールドを張り直す
+            K(Regen, false, Family.Durability, T(null, null, 3.5f, 5.5f));      // 〈再生〉敵が毎ターン最大 HP の N% を回復する
+            K(EnemyShield, false, Family.Durability, T(null, null, 0.8f, 1.5f));   // 〈敵のシールド〉敵は毎ターン、 最大 HP の N% までシールドを張り直す
             K(Die1, false, Family.Hand, T(null, 1, 2, 3));                // 戦闘中ずっと、 ダイス N 本の出目が 1 (大きい目から潰す)
-            K(Erode, false, Family.Hand, T(null, null, 1, 2));            // 〈蝕み〉ターンの始めに、 最大 HP の N% の軽減できないダメージ (シールドは肩代わりする)
-            K(Bag, false, Family.Hand, T(4, null, null, null));           // 消耗品は N 個までしか持てない
+            K(Erode, false, Family.Hand, T(null, null, 7, 10));           // 〈蝕み〉ターンの始めに、 最大 HP の N% の軽減できないダメージ (シールドは肩代わりする)
+            K(Bag, false, Family.Hand, T(6, null, null, null));           // 消耗品は N 個までしか持てない
             K(UseCap, false, Family.Hand, T(2, null, null, null));        // 1 戦闘で使える消耗品は N 個まで
             K(Heal, false, Family.Hand, T(40, null, null, null));         // 回復 −N% (層の入口の全回復にも)
             K(Price, false, Family.Economy, T(6, null, null, null));      // 店の品物の値段 +N%
-            K(Money, false, Family.Economy, T(35, null, null, null));     // 層を移るたび、 所持金の N% を失う
+            K(Money, false, Family.Economy, T(20, null, null, null));     // 層を移るたび、 所持金の N% を失う
 
             // ── バフ (構成の向き: 軸ごとに 1 種類 + 汎用)。 2026-11-09: 壊れていない限り据え置き (勝利の金は I +11.4 で壊れていたので外した) ──
             K(Poison, true, Family.None, T(10, 20, 30, 40));              // 毒: 半減で減る量を N% 減らす (残る割合 50 → 55/60/65/70%)
