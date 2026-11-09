@@ -116,7 +116,8 @@ namespace GameLoop
             }
 
             // 恒久デバフ「ムシュファの強欲」: 5層突入時に所持ゴールド0
-            if (Run.Depth == 5 && MetaProgression.PermanentDebuffEffects.HasGreed(Run))
+            // 2026-11-10: Depth == 5 (= 今の 3 層) で判定していたのを、 見せる層の 5 層へ直した
+            if (Run.currentFloor == MapSystem.FreeMove.FloorPlan.LastOrdinal && MetaProgression.PermanentDebuffEffects.HasGreed(Run))
             {
                 Log($"恒久デバフ {MetaProgression.PermanentDebuffIds.Greed}: 所持ゴールド {Run.coins}→0");
                 Run.coins = 0;

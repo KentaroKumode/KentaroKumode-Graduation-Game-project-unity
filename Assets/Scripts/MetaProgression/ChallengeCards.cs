@@ -46,6 +46,10 @@ namespace MetaProgression
             Price = "price", Money = "money", Esc = "esc", BossEsc = "bossesc", Steel = "steel",
             Judge = "judge", Heavy = "heavy", Heal = "heal", Ambush = "ambush",
             Twin = "twin", Regen = "regen", Erode = "erode", EnemyShield = "eshield", Opener = "opener", Rage = "rage";
+        // 七つの大罪 (IV 固有・2026-11-10・#93)。 IV は 4→5 の場所でだけ配られるので、 効果は 5 層の間だけ効く
+        public const string SinPride = "sin_pride", SinEnvy = "sin_envy", SinGreed = "sin_greed", SinWrath = "sin_wrath",
+            SinSloth = "sin_sloth", SinGluttony = "sin_gluttony", SinLust = "sin_lust";
+        public static bool IsSin(string kind) => kind != null && kind.StartsWith("sin_");
         // バフ
         public const string Poison = "poison", Bleed = "bleed", Heat = "heat", Charge = "charge", Shield = "shield", Crit = "crit",
             Output = "out", TermAtk = "tatk", TermBlk = "tblk", WinGold = "gold", Cat = "cat", GoldPunch = "punch", MaxHp = "maxhp", HealUp = "healup";
@@ -77,18 +81,27 @@ namespace MetaProgression
             K(Twin, false, Family.Attack, T(null, null, 65, 85));          // 〈連撃〉敵の攻撃が 2 回。 2 回目は N% の威力 (ブロックは 2 回とも効く)
             K(Opener, false, Family.Attack, T(null, null, 175, 245));     // 〈開幕の大技〉ボスの各形態の最初のターン、 敵の攻撃 +N%
             K(Rage, false, Family.Attack, T(null, 3, 5, 10));             // 〈怒り〉形態の中で 1 ターン進むごとに敵の攻撃 +N% (加算)
-            K(EnemyHp, false, Family.Durability, T(30, null, null, null));   // 敵の最大 HP +N% (連戦の全段)
+            K(EnemyHp, false, Family.Durability, T(30, 45, null, null));   // 厚い皮: 敵の最大 HP +N% (連戦の全段)。 II は 2026-11-10 に追加 (〈出目 1〉を外して II が 6 種になったため)
             K(EnemyDef, false, Family.Durability, T(2, 3, null, null), pending: true);   // 敵の防御 +N ── 受けると易しくなる (I +1.5 有意)。 原因を調べるまで配らない
             K(Steel, false, Family.Durability, T(1, null, null, null));   // 〈鋼の皮膚〉
             K(Regen, false, Family.Durability, T(null, null, 3.5f, 5.5f));      // 〈再生〉敵が毎ターン最大 HP の N% を回復する
             K(EnemyShield, false, Family.Durability, T(null, null, 0.8f, 1.5f));   // 〈敵のシールド〉敵は毎ターン、 最大 HP の N% までシールドを張り直す
-            K(Die1, false, Family.Hand, T(null, 1, 2, 3));                // 戦闘中ずっと、 ダイス N 本の出目が 1 (大きい目から潰す)
+            // 〈出目 1〉の札は 2026-11-10 に外した (ユーザー判断)。 出目を潰す処理は旧配点〈見放された運〉と共有なので #9 で一緒に消す
             K(Erode, false, Family.Hand, T(null, null, 7, 10));           // 〈蝕み〉ターンの始めに、 最大 HP の N% の軽減できないダメージ (シールドは肩代わりする)
             K(Bag, false, Family.Hand, T(6, null, null, null));           // 消耗品は N 個までしか持てない
             K(UseCap, false, Family.Hand, T(2, null, null, null));        // 1 戦闘で使える消耗品は N 個まで
             K(Heal, false, Family.Hand, T(40, null, null, null));         // 回復 −N% (層の入口の全回復にも)
             K(Price, false, Family.Economy, T(6, null, null, null));      // 店の品物の値段 +N%
             K(Money, false, Family.Economy, T(20, null, null, null));     // 層を移るたび、 所持金の N% を失う
+
+            // ── 七つの大罪 (IV 固有・2026-11-10・#93)。 Tier IV 相当、 大罪なのでかなり強くて良い (ユーザー)。 5 層 (エリート戦とヴェスカの 4 形態) に効く形へ作り直した。 値は仮置き
+            K(SinPride, false, Family.Hand, T(null, null, null, 75));        // ブロック −N%・シールドの獲得 −N%。 2026-11-10 測定: ブロックだけ 50% −3.9 / 75% −6.9 (BOT が殴りに寄せる) → シールドも        // 傲慢: ブロックに挿した出目 −N%
+            K(SinEnvy, false, Family.Attack, T(null, null, null, 60));       // 嫉妬: 残り HP の割合がこちらのほうが高い間、 敵の攻撃 +N%
+            K(SinGreed, false, Family.Economy, T(null, null, null, 1));      // 強欲: 受けた時、 所持金と消耗品をすべて失う
+            K(SinWrath, false, Family.Attack, T(null, null, null, 1));       // 憤怒: ボスの各形態の最初のターン、 自ダイスが全て最大・現在 HP 半減
+            K(SinSloth, false, Family.Hand, T(null, null, null, 2));         // 怠惰: 全部の出目 −N (下限 1)。 2026-11-10: −2 で −5.2。 −4 は出目が潰れすぎるので不採用 (ユーザー判断)、 −2 で確定 2026-11-10: 旧「最初の N ターン攻撃に挿せない (ブロックへ回る)」は全部ブロックで受けるのと同じで、 2T −4.5 / 4T −6.3 / 7T −7.3 と効かなかった         // 怠惰: 各形態の最初の N ターン、 攻撃端子に挿せない (挿した出目はブロックへ回る)
+            K(SinGluttony, false, Family.Durability, T(null, null, null, 100));   // 回復 −N%・受けた時に最大 HP −SinGluttonyMaxHpPct%。 2026-11-10 測定: 回復だけ 70% −3.8 / 100% −7.6 → 最大 HP も   // 暴食: 回復 −N% (吸血・層の入口の全回復にも)
+            K(SinLust, false, Family.Hand, T(null, null, null, 8));          // 2026-11-10 測定: 3 個 −5.3 / 6 個 −9.9 / 10 個 −16.0 → 8 個          // 色欲: 受けた時、 持っているパッシブ N 個 (ランダム) が働かなくなる
 
             // ── バフ (構成の向き: 軸ごとに 1 種類 + 汎用)。 2026-11-09: 壊れていない限り据え置き (勝利の金は I +11.4 で壊れていたので外した) ──
             K(Poison, true, Family.None, T(10, 20, 30, 40));              // 毒: 半減で減る量を N% 減らす (残る割合 50 → 55/60/65/70%)
@@ -110,6 +123,12 @@ namespace MetaProgression
         public static int ChargeOpening(int tier) => tier == 1 ? 3 : tier == 2 ? 5 : tier == 3 ? 8 : tier == 4 ? 12 : 0;
         /// <summary>〈鋼の皮膚〉のボスの HP の上乗せ (%)。 敵の最大 HP の札と同じ溜まりに足す (掛け算にしない)。</summary>
         public const float SteelBossHpPct = 20f;
+        /// <summary>〈出目 1〉が効くターン数の既定 (各形態の最初の N ターン・2026-11-10)。 Tier ごとの値は札の 2 つ目の量 (value2)。</summary>
+        public const int Die1Turns = 5;
+        /// <summary>大罪:暴食 で受けた時に下がる最大 HP (%)。 大罪:強欲 で失うパッシブの数 (最も高価なものから)。</summary>
+        public const int SinGluttonyMaxHpPct = 60, SinGreedPassives = 1;   // 暴食: 最大 HP −20% で −8.3 → −40%
+        /// <summary>大罪:傲慢 のシールドの獲得の削り (%)。 ブロックと同じ −75% だと −27.4 (クリア 0.9%) と効きすぎた。</summary>
+        public const int SinPrideShieldCutPct = 10;   // 0% −6.9 / 30% −19.2 / 75% −27.4 (2026-11-10)
 
         public static Card Get(string id) => id != null && _byId.TryGetValue(id, out var c) ? c : null;
         public static IReadOnlyList<Card> All => _all;
@@ -237,10 +256,17 @@ namespace MetaProgression
                 case Regen: return "敵が毎ターン、 最大 HP の " + n + "% を回復する（再生）";
                 case EnemyShield: return "敵は毎ターン、 最大 HP の " + n + "% までシールドを張り直す";
                 case Erode: return "ターンの始めに、 最大 HP の " + n + "% の軽減できないダメージ（蝕み）";
-                case EnemyHp: return "敵の最大 HP +" + n + "%";
+                case EnemyHp: return "厚い皮 ─ 敵の最大 HP +" + n + "%";
                 case EnemyDef: return "敵の防御 +" + n;
                 case Steel: return "各戦闘 1 度、 敵が致命傷を HP1 で耐える・ボスの HP +" + SteelBossHpPct.ToString("0") + "%（鋼の皮膚）";
-                case Die1: return "戦闘中ずっと、 ダイス " + n + " 本の出目が 1";
+                case Die1: return "各形態の最初の " + (c.value2 > 0 ? c.value2.ToString("0") : Die1Turns.ToString()) + " ターン、 ダイス " + n + " 本の出目が 1";
+                case SinPride: return "大罪:傲慢 ─ ブロックに挿した出目 −" + n + "%・シールドの獲得 −" + SinPrideShieldCutPct + "%";
+                case SinEnvy: return "大罪:嫉妬 ─ 残り HP の割合がこちらのほうが高い間、 敵の攻撃 +" + n + "%";
+                case SinGreed: return "大罪:強欲 ─ 所持金と消耗品をすべて失い、 最も高価なパッシブ " + SinGreedPassives + " 個を失う";
+                case SinWrath: return "大罪:憤怒 ─ ボスの各形態の最初のターン、 自ダイスが全て最大・現在 HP 半減";
+                case SinSloth: return "大罪:怠惰 ─ 全部の出目 −" + n + "（1 より小さくはならない）";
+                case SinGluttony: return "大罪:暴食 ─ 最大 HP −" + SinGluttonyMaxHpPct + "%・回復 −" + n + "%（吸血・層の入口の全回復にも）";
+                case SinLust: return "大罪:色欲 ─ 持っているパッシブ " + n + " 個（ランダム）が働かなくなる";
                 case Bag: return "消耗品は " + n + " 個までしか持てない";
                 case UseCap: return "1 戦闘で使える消耗品は " + n + " 個まで";
                 case Heal: return "回復 −" + n + "%（層の入口の全回復にも）";

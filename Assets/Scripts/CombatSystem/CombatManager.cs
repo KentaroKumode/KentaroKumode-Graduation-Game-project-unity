@@ -796,7 +796,7 @@ namespace CombatSystem
             wrathDiceOverrideArmed = false;
             if (runForWrath != null && nodeForWrath != null
                 && nodeForWrath.type == MapSystem.TileType.Boss
-                && MetaProgression.PermanentDebuffEffects.HasWrath(runForWrath))
+                && (MetaProgression.PermanentDebuffEffects.HasWrath(runForWrath) || MetaProgression.MetaDebuffApplicator.HasSinWrath))   // 大罪:憤怒 (挑戦カード IV) も
             {
                 int oldHp = playerHP;
                 playerHP = Mathf.Max(1, playerHP / 2); // 割合計算が先
@@ -905,6 +905,15 @@ namespace CombatSystem
                 }
                 ctx.phaseStartTurn = ctx.currentTurn + 1;
                 Escalation.PhaseStartTurn = ctx.phaseStartTurn;
+                // 大罪:憤怒 (挑戦カード IV・2026-11-10): ボスの**各形態**の最初のターンも、 現在 HP 半減・自ダイスを全て最大
+                if (MetaProgression.MetaDebuffApplicator.HasSinWrath && CombatSystem.BossParams.IsBoss(newEnemy.id))
+                {
+                    int oldHp = playerHP;
+                    playerHP = Mathf.Max(1, playerHP / 2);
+                    ctx.playerCurrentHP = playerHP;
+                    wrathDiceOverrideArmed = true;
+                    Debug.Log($"[大罪:憤怒] 形態の交代: HP {oldHp}→{playerHP}, 次のターンのダイス最大化を予約");
+                }
                 ctx.bossId = CombatSystem.BossParams.IsBoss(newEnemy.id) ? newEnemy.id : "";
                 ctx.lastDamageCause = ItemSystem.PassiveSkills.DeathCause.Normal; // 形態swapで死因タグをリセット (前形態の残留防止)
                 // (ADR-0011: 役は毎ターン自動で効き、 使用済みの管理を持たないので、 形態交代で戻すものは無い。)

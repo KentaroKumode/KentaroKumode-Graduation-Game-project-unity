@@ -23,7 +23,7 @@ namespace UI.Game2D
             new Track { kind = MetaPanelKind.Plunder, name = "強奪", desc = "ボス撃破の追加ゴールド +1/段・通常の敵のパッシブドロップ +2%/段。 r10: ショップ強盗を解禁。" },
             new Track { kind = MetaPanelKind.Trade,   name = "商才", desc = "ショップの特売枠 +1/段 (15/30/50% 引き)。 r10: 99% 引きの枠が出る。" },
             new Track { kind = MetaPanelKind.Supply,  name = "宝物庫", desc = "r3/6/9 で開幕パッシブ +1 本・段が上がるほどレア度が上寄り。 r10: 開幕パッシブが選択式。" },
-            new Track { kind = MetaPanelKind.Armor,   name = "装甲", desc = "防御 +2/段・被ダメージ −1/段。 r10〈不動〉: 1 回の攻撃で受けるダメージは最大 HP の 35% まで。 防御は割合の軽減 (積むほど伸びは鈍る)、 被ダメージ −N は防御の後に引く。" },
+            new Track { kind = MetaPanelKind.Armor,   name = "装甲", desc = "防御 +2/段・被ダメージ −1/2 段。 r10〈不動〉: 1 回の攻撃で受けるダメージは最大 HP の 35% まで。 防御は割合の軽減 (積むほど伸びは鈍る)、 被ダメージ −N は防御の後に引く。" },
         };
 
         private static readonly Track[] Declare =

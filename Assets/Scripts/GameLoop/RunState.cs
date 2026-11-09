@@ -325,6 +325,8 @@ namespace GameLoop
         public int challengeDifficulty;
         /// <summary>受けた挑戦カード ("デバフの id|バフの id")。 [persistent]</summary>
         public List<string> challengePicks = new List<string>();
+        /// <summary>大罪:色欲 (挑戦カード IV) で働かなくなった所持パッシブの id。 [persistent]</summary>
+        public List<string> sinSealedPassives = new List<string>();
         [System.NonSerialized] private Dictionary<string, MetaProgression.ChallengeCards.Card> _cardMap;
         /// <summary>カードを受けた後に呼ぶ (種類ごとの値を作り直させる)。</summary>
         public void InvalidateCardChallenge() => _cardMap = null;
@@ -569,6 +571,7 @@ namespace GameLoop
             challengeCardMode = false;
             challengeDifficulty = 0;
             if (challengePicks == null) challengePicks = new List<string>(); else challengePicks.Clear();
+            if (sinSealedPassives == null) sinSealedPassives = new List<string>(); else sinSealedPassives.Clear();
             _cardMap = null;
             if (chronicle == null) chronicle = new List<string>(); else chronicle.Clear();
             diceFaceParts = DiceFaceParts.StartingParts();

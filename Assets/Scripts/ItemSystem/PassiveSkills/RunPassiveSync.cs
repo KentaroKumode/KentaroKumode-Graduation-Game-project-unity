@@ -50,6 +50,8 @@ namespace ItemSystem.PassiveSkills
                     //   (b) 装備中の段階式武器は静的 skills と動的付与 (WeaponProgression) で二重に発火していた。
                     //   実測: 攻撃の 97% で武器が所持一覧にあり、 〈果たし合い〉はほぼ常時 2 重 (額面の 2 倍)。
                     if (data.category == ItemCategory.Weapon) continue;
+                    // 大罪:色欲 (挑戦カード IV) で働かなくなった品
+                    if (run.sinSealedPassives != null && run.sinSealedPassives.Contains(id)) continue;
 
                     // 名前付き固有パッシブ（PassiveItemRegistry に登録済み）は PassiveItemManager で
                     // 別経路発動するため、PassiveSkillManager 側には流さず二重発火を防ぐ。

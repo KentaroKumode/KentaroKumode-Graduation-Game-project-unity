@@ -136,6 +136,30 @@ namespace CombatSystem
         ///
         /// <para>人が操作するターン (<c>_interactiveTurn</c>) では、 方策を呼ぶ位置で止まって「振り直すか」を待つ。</para>
         /// </summary>
+        /// <summary>このターンに〈出目 1〉で 1 に潰した本数と、 潰したダイスの添字。 振り直しの後に掛け直すのに使う。</summary>
+        private int _forsakenThisTurn;
+        private readonly HashSet<int> _crushedDice = new HashSet<int>();
+
+        /// <summary>振り直した出目へ、 振った直後と同じデバフを掛け直す (2026-11-10)。
+        /// 旧: 振り直しは面から値を引き直すだけで、 〈出目 1〉と 大罪:怠惰 (全部の出目 −N) が振り直したダイスから消えていた
+        /// (Super は充電で振り直すので、 怠惰の −2 が −5.2 ポイントしか効かなかった)。
+        /// 怠惰は振り直したダイスにだけ引く (振り直していないダイスは引き済み)。 出目 1 は潰れている本数が足りない分だけ、 大きい目から潰し直す。</summary>
+        private void ReapplyDicePenaltiesAfterReroll(int[] playerDice, int[] playerFaceIdx, List<int> rerolled)
+        {
+            foreach (int i in rerolled) _crushedDice.Remove(i);
+            while (_crushedDice.Count < _forsakenThisTurn)
+            {
+                int best = -1, bestVal = 1;
+                for (int i = 0; i < playerDice.Length; i++)
+                    if (!_crushedDice.Contains(i) && playerDice[i] > bestVal) { bestVal = playerDice[i]; best = i; }
+                if (best < 0) break;
+                playerDice[best] = 1; _crushedDice.Add(best);
+                if (playerFaceIdx != null && best < playerFaceIdx.Length) playerFaceIdx[best] = -1;
+            }
+            int sloth = MetaProgression.MetaDebuffApplicator.GetSlothDicePenalty();
+            if (sloth > 0) foreach (int i in rerolled) if (!_crushedDice.Contains(i)) playerDice[i] = Math.Max(1, playerDice[i] - sloth);
+        }
+
         private IEnumerator<TurnPause> RerollPhase(CombatContext ctx, int[] playerDice, int[] enemyDice, int playerDiceMax,
                                                    int[] playerFaceIdx = null)
         {
@@ -214,6 +238,7 @@ namespace CombatSystem
                         if (playerFaceIdx != null && i < playerFaceIdx.Length) playerFaceIdx[i] = -1;
                     }
                 }
+                ReapplyDicePenaltiesAfterReroll(playerDice, playerFaceIdx, rerollIdx);
                 if (!usedFree) ctx.rerollsThisCombat++;
                 ctx.rerollsThisTurn++;
                 CombatStats.RerollStats[0]++; CombatStats.RerollStats[1] += rerollIdx.Count; CombatStats.RerollStats[2] += cost;

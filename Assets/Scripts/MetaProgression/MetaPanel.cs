@@ -368,7 +368,7 @@ namespace MetaProgression
 
         /// <summary><b>装甲: 被ダメージ −1/段</b> (敵の攻撃を防御で減らした後に N 引く・下限 1)。 防御の逓減を受けない引き算。
         /// 強すぎたら 2 段ごと (<see cref="ArmorFlatEvery"/>)。 [2026-11-10] 当初の「固定ダメージ −N」は、 敵に固定ダメージが無く常に 0 だったので戻した。</summary>
-        public const int ArmorFlatEvery = 1;
+        public const int ArmorFlatEvery = 2;   // 2026-11-10 測定: 1 段ごとだと他の項目から 7 点移して +2.9/+2.3 (有意) と強すぎ、 2 段ごとで +1.1/−1.5 (有意でない)
         public static int ArmorFlatReduction(int rank)
         {
             int every = GameLoop.GameHooks.ArmorFlatEveryOverride > 0 ? GameLoop.GameHooks.ArmorFlatEveryOverride : ArmorFlatEvery;

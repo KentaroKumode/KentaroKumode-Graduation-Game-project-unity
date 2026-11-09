@@ -45,7 +45,24 @@ namespace GameLoop
         {
             if (Run == null || !Run.challengeCardMode) return;
             var forced = GameHooks.ForcedChallengeCards?.Invoke(layer);   // 測定: 引き方の代わりに決めたカードを受ける
-            if (forced != null) { foreach (var c in forced) if (!string.IsNullOrEmpty(c)) TakeChallengeCard(c); return; }
+            if (forced != null)
+            {
+                foreach (var c in forced)
+                {
+                    if (string.IsNullOrEmpty(c)) continue;
+                    // "R:N" = この層で Tier N を本番と同じように 2 枚配って選ぶ (測定: Tier ごとの正味・2026-11-10)
+                    if (c.StartsWith("R:") && int.TryParse(c.Substring(2), out int rt))
+                    {
+                        var offer = ChallengeCards.Deal(rt, Run.challengePicks);
+                        if (offer.Count == 0) continue;
+                        int pick = GameHooks.ChooseChallengeCard?.Invoke(offer) ?? 0;
+                        TakeChallengeCard(offer[Mathf.Clamp(pick, 0, offer.Count - 1)]);
+                        continue;
+                    }
+                    TakeChallengeCard(c);
+                }
+                return;
+            }
             if (GameHooks.ForcedChallengeCards != null || Run.challengeDifficulty <= 0) return;
             int slot = ChallengeCards.SlotOfLayer(layer);
             if (slot < 0) return;
@@ -87,6 +104,52 @@ namespace GameLoop
             Run.InvalidateCardChallenge();
             ChallengeCards.Split(card, out var deb, out var buf);
             Log($"挑戦カード: − {ChallengeCards.Text(deb)} ／ + {ChallengeCards.Text(buf)}");
+            // 七つの大罪 (IV・2026-11-10): 受けた時に効く 2 枚
+            if (deb != null && deb.kind == ChallengeCards.SinGreed)
+            {
+                Log($"大罪:強欲: 所持金 {Run.coins}G と消耗品 {Run.ownedConsumables?.Count ?? 0} 個を失った");
+                Run.coins = 0;
+                Run.ownedConsumables?.Clear();
+                // 最も高価なパッシブを失う (進行用の品と武器は除く)
+                var db = ItemSystem.ItemDatabase.Instance;
+                for (int k = 0; k < ChallengeCards.SinGreedPassives && db != null && Run.ownedPassiveItems != null; k++)
+                {
+                    int best = -1, bestPrice = -1;
+                    for (int i = 0; i < Run.ownedPassiveItems.Count; i++)
+                    {
+                        string id = Run.ownedPassiveItems[i];
+                        if (string.IsNullOrEmpty(id) || ItemIds.ProgressionItems.Contains(id)) continue;
+                        var it = db.GetItem(id);
+                        if (it == null || it.category == ItemSystem.ItemCategory.Weapon) continue;
+                        if (it.basePrice > bestPrice) { bestPrice = it.basePrice; best = i; }
+                    }
+                    if (best < 0) break;
+                    Log($"大罪:強欲: {Run.ownedPassiveItems[best]} を失った");
+                    Run.ownedPassiveItems.RemoveAt(best);
+                }
+                ItemSystem.PassiveSkills.RunPassiveSync.RefreshFromRun(Run);
+            }
+            if (deb != null && deb.kind == ChallengeCards.SinLust)
+            {
+                var cands = new List<string>();
+                if (Run.ownedPassiveItems != null)
+                    foreach (var id in Run.ownedPassiveItems)
+                        if (!string.IsNullOrEmpty(id) && !ItemIds.ProgressionItems.Contains(id) && !Run.sinSealedPassives.Contains(id) && !cands.Contains(id)) cands.Add(id);
+                for (int k = 0; k < (int)deb.value && cands.Count > 0; k++)
+                {
+                    int at = GameRng.Range(0, cands.Count, "challenge.lust", k);
+                    Run.sinSealedPassives.Add(cands[at]); cands.RemoveAt(at);
+                }
+                ItemSystem.PassiveSkills.RunPassiveSync.RefreshFromRun(Run);
+                Log("大罪:色欲: 働かなくなった品 = " + string.Join("・", Run.sinSealedPassives));
+            }
+            if (deb != null && deb.kind == ChallengeCards.SinGluttony)
+            {
+                int cut = Mathf.Max(1, Mathf.RoundToInt(Run.playerMaxHP * ChallengeCards.SinGluttonyMaxHpPct / 100f));
+                Run.playerMaxHP = Mathf.Max(1, Run.playerMaxHP - cut);
+                Run.playerHP = Mathf.Min(Run.playerHP, Run.playerMaxHP);
+                Log($"大罪:暴食: 最大 HP −{cut} ({Run.playerHP}/{Run.playerMaxHP})");
+            }
             if (buf != null && buf.kind == ChallengeCards.MaxHp)
             {
                 // 最大 HP +N%: 受けた時に上げ、 上がった分だけ今の HP も増やす

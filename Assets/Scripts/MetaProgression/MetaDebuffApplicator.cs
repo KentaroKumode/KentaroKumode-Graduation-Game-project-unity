@@ -129,6 +129,23 @@ namespace MetaProgression
         public static float GetRagePct(int phaseTurn) => phaseTurn > 1 ? CardV(ChallengeCards.Rage) * (phaseTurn - 1) : 0f;
         /// <summary>〈開幕の大技〉: ボス戦の各形態の最初のターンの敵の攻撃の上乗せ (%)。</summary>
         public static float GetOpenerPct(int phaseTurn, bool bossFight) => bossFight && phaseTurn == 1 ? CardV(ChallengeCards.Opener) : 0f;
+        // ── 七つの大罪 (IV 固有・2026-11-10・#93) ──
+        /// <summary>大罪:傲慢 ── ブロックに挿した出目の削り (%)。</summary>
+        public static float GetSinBlockCutPct() => CardV(ChallengeCards.SinPride);
+        /// <summary>大罪:嫉妬 ── 残り HP の割合がこちらのほうが敵より高い間の、 敵の攻撃の上乗せ (%)。</summary>
+        public static float GetEnvyPct()
+        {
+            float v = CardV(ChallengeCards.SinEnvy);
+            if (v <= 0f) return 0f;
+            var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+            if (ctx == null || ctx.playerMaxHP <= 0 || ctx.enemyMaxHP <= 0) return 0f;
+            return ctx.playerCurrentHP * (long)ctx.enemyMaxHP > ctx.enemyCurrentHP * (long)ctx.playerMaxHP ? v : 0f;
+        }
+        /// <summary>大罪:憤怒 を受けているか (ボスの各形態の最初のターン)。</summary>
+        public static bool HasSinWrath => CardV(ChallengeCards.SinWrath) > 0f;
+        /// <summary>大罪:怠惰 ── 全部の出目から引く量 (下限 1)。</summary>
+        public static int GetSlothDicePenalty() => CardI(ChallengeCards.SinSloth);
+
         /// <summary>エスカレーションの上がり幅の上乗せ (%)。 段の倍率の 1 を超えた分に掛ける。</summary>
         public static float GetEscalationRisePct() => CardV(ChallengeCards.Esc);
         /// <summary>〈連撃〉: 2 回目の攻撃の威力 (%)。 0 = 連撃しない。</summary>
@@ -259,7 +276,8 @@ namespace MetaProgression
         /// 2026-08-17: ×0.86 → **×0.90**。 単軸スイープで 1pt −3.4pt (1pt当り −3.40) と割高だったため。
         public static float GetHealMultiplier()
             => Pick(ChallengeAxis.遅い回復, 1f, 0.90f, /*T2 なし*/ 1f, /*T3 なし*/ 1f) * (1f - CardV(ChallengeCards.Heal) / 100f)
-               * (1f + CardV(ChallengeCards.HealUp) / 100f);   // 挑戦カードのバフ「回復 +N%」も同じ倍率に入れる
+               * (1f + CardV(ChallengeCards.HealUp) / 100f)    // 挑戦カードのバフ「回復 +N%」も同じ倍率に入れる
+               * (1f - CardV(ChallengeCards.SinGluttony) / 100f);   // 大罪:暴食 (2026-11-10)
 
         // ============================================================
         //  B. 敵強化 — 厚い皮膚 / 狂暴化  (T4: 鋼の皮膚)
@@ -328,8 +346,11 @@ namespace MetaProgression
         /// 全ターン継続は T4〈凶運〉の専有にして、 基礎軸との差を段でなく**性質**で作る。</summary>
         public static int GetForsakenLuckDiceCount(int currentTurn)
         {
-            int cardDice = CardI(ChallengeCards.Die1);   // 挑戦カード: 戦闘中ずっと N 本 (2026-11-09)
-            if (cardDice > 0) return cardDice;
+            // 挑戦カード: 各形態の最初の 5 ターンだけ N 本 (2026-11-10: 戦闘中ずっとだと IV で 3 本とも 1 になり、 出目が戦闘から消えていた)。
+            //   ターンはカードのときは形態ごとに数え直す (CombatManager.Turn の forsakenTurn)
+            var die1 = ChallengeCards.Held(ChallengeCards.Die1);
+            if (die1 != null && die1.value > 0f)
+                return currentTurn <= (die1.value2 > 0f ? (int)die1.value2 : ChallengeCards.Die1Turns) ? (int)die1.value : 0;
             int t = Tier(ChallengeAxis.見放された運);
             if (t <= 0) return 0;
             int window = t >= 3 ? 5 : 2;                        // T3 = 5T / T1 = 2T

@@ -728,6 +728,9 @@ namespace ItemSystem.PassiveSkills
                 {
                     float sg = MetaProgression.Relics.RelicApplicator.GetShieldGainPct();
                     if (sg > 0f) value += (int)((value - _consShield) * sg);
+                    // 大罪:傲慢 (挑戦カード IV): シールドの獲得 −N% (切り捨てた分を捨てる)
+                    if (MetaProgression.MetaDebuffApplicator.GetSinBlockCutPct() > 0f)
+                        value = _consShield + (int)((value - _consShield) * (1f - MetaProgression.ChallengeCards.SinPrideShieldCutPct / 100f));
                 }
                 int gained = value - _consShield;
                 _consShield = value;

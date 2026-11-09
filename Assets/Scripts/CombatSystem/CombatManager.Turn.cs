@@ -583,6 +583,7 @@ namespace CombatSystem
             int forsakenTurn = (GameLoop.GameManager.Instance?.Run?.challengeCardMode ?? false) && ctx != null
                 ? CurrentCombatTurn - ctx.phaseStartTurn + 1 : CurrentCombatTurn;
             int forsaken = MetaProgression.MetaDebuffApplicator.GetForsakenLuckDiceCount(forsakenTurn);
+            _forsakenThisTurn = forsaken; _crushedDice.Clear();
             for (int k = 0; k < forsaken && k < playerDice.Length; k++)
             {
                 int best = -1, bestVal = 0;
@@ -590,11 +591,18 @@ namespace CombatSystem
                     if (playerDice[i] > bestVal) { bestVal = playerDice[i]; best = i; }
                 if (best < 0 || bestVal <= 1) break;
                 playerDice[best] = 1;
+                _crushedDice.Add(best);
                 // 出目パーツ: **値を上書きする効果は、そのダイスを面から降ろす**。
                 //   潰された 1 はもうその面ではないので、 パーツ効果も発火しない。
                 //   (加算する〈鋳造口〉は面が変わらないので添字を保つ ── 上書きと加算で扱いが違う)
                 if (playerFaceIdx != null && best < playerFaceIdx.Length) playerFaceIdx[best] = -1;
                 Debug.Log($"[見放された運] 出目 {bestVal} → 1 (T{CurrentCombatTurn})");
+            }
+
+            // 大罪:怠惰 (挑戦カード IV・2026-11-10): 全部の出目 −N (下限 1)。 値を減らすだけで面は変えない (〈鋳造口〉の加算と同じ扱い)
+            {
+                int sloth = MetaProgression.MetaDebuffApplicator.GetSlothDicePenalty();
+                if (sloth > 0) for (int i = 0; i < playerDice.Length; i++) playerDice[i] = Math.Max(1, playerDice[i] - sloth);
             }
 
             // 特殊端子〈鋳造口〉(§6-5): 前ターンまでに蓄積した恒常の出目 +N。
@@ -839,6 +847,11 @@ namespace CombatSystem
             {
                 float rbp = MetaProgression.Relics.RelicApplicator.GetBlockDicePct();
                 if (rbp > 0f && blockSum > 0) blockSum += Mathf.CeilToInt(blockSum * rbp);
+            }
+            // 大罪:傲慢 (挑戦カード IV・2026-11-10): ブロックに挿した出目 −N% (切り捨て)
+            {
+                float cut = MetaProgression.MetaDebuffApplicator.GetSinBlockCutPct();
+                if (cut > 0f && blockSum > 0) blockSum = Mathf.FloorToInt(blockSum * (1f - cut / 100f));
             }
 
             // 端子調律メタバフ: **接続したダイス 1 本あたり** +N (2026-07-28 に「合計 +N」から変更)。

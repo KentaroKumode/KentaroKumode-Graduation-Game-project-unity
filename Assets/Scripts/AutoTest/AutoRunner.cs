@@ -1209,7 +1209,8 @@ namespace AutoTest
                 if (colon <= 0 || !int.TryParse(t.Substring(0, colon), out int layer)) continue;
                 string id = t.Substring(colon + 1).Trim();
                 // 知らない id は腕ごと止める (黙ってカード無しの基準のランにしない・2026-11-09)
-                if (!MetaProgression.ChallengeCards.IsKnown(id)) throw new System.ArgumentException("[challengeForce] 知らないカード: " + id);
+                bool randomTier = id.StartsWith("R:") && int.TryParse(id.Substring(2), out int rt) && rt >= 1 && rt <= 4;   // "R:N" = Tier N を配って選ぶ
+                if (!randomTier && !MetaProgression.ChallengeCards.IsKnown(id)) throw new System.ArgumentException("[challengeForce] 知らないカード: " + id);
                 if (!byLayer.TryGetValue(layer, out var list)) byLayer[layer] = list = new List<string>();
                 list.Add(id);
             }

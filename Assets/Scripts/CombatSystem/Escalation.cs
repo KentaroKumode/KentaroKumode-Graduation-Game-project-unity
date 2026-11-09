@@ -92,7 +92,8 @@ namespace CombatSystem
             return curve * (1f + MetaProgression.MetaDebuffApplicator.GetEnemyAttackPct() / 100f)
                  * (1f + MetaProgression.MetaDebuffApplicator.GetAmbushPct(phaseTurn) / 100f)                // 〈先手を取られる〉
                  * (1f + MetaProgression.MetaDebuffApplicator.GetRagePct(phaseTurn) / 100f)                  // 〈怒り〉
-                 * (1f + MetaProgression.MetaDebuffApplicator.GetOpenerPct(phaseTurn, BossFight) / 100f);    // 〈開幕の大技〉
+                 * (1f + MetaProgression.MetaDebuffApplicator.GetOpenerPct(phaseTurn, BossFight) / 100f)     // 〈開幕の大技〉
+                 * (1f + MetaProgression.MetaDebuffApplicator.GetEnvyPct() / 100f);                         // 大罪:嫉妬 (今の HP の割合で決まる)
         }
 
         /// <summary>いまの形態が始まったターン (CombatManager が戦闘開始時に 1、 ヴェスカの形態を替えるたびに立てる)。 「形態の最初の N ターン」を数える。</summary>
