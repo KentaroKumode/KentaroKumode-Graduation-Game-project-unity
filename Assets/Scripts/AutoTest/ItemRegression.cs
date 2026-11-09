@@ -102,7 +102,7 @@ namespace AutoTest
         /// <summary>キャッシュ命中回数 (診断用)。</summary>
         public static int CacheHits { get; private set; }
 
-        /// <summary>入力 csv の指紋 (絶対パス + 長さ + 最終更新)。 読めなければ空文字を返し、
+        /// <summary>入力 csv の指紋 (ファイル名 + 長さ + 最終更新)。 読めなければ空文字を返し、
         /// その場合キャッシュは成立させない。</summary>
         private static string FitInputKey(string learningRoot)
         {
@@ -110,7 +110,10 @@ namespace AutoTest
             {
                 var fi = new FileInfo(Path.Combine(learningRoot ?? "", RunDataLogger.FileName));
                 if (!fi.Exists) return "";
-                return fi.FullName + "|" + fi.Length.ToString(CultureInfo.InvariantCulture)
+                // **絶対パスは鍵に入れない** (2026-11-10)。 ワーカー用のビルドは本体の学習データを複写するので、
+                //   パスを入れると本体で作ったキャッシュがワーカーで一度も当たらず、 22 個のワーカーが毎回 411 MB の csv から
+                //   回帰を解き直していた (腕ごとに約 50 秒の起動待ち)。 複写は長さと更新時刻を保つので、 それで同一性は判定できる。
+                return fi.Name + "|" + fi.Length.ToString(CultureInfo.InvariantCulture)
                      + "|" + fi.LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture);
             }
             catch { return ""; }
@@ -171,11 +174,11 @@ namespace AutoTest
             try
             {
                 string path = FitCachePath(learningRoot);
-                if (!File.Exists(path)) return false;
+                if (!File.Exists(path)) { LoadMiss("no file " + path); return false; }
                 string[] lines = File.ReadAllLines(path, Encoding.UTF8);
-                if (lines.Length < 5) return false;
-                if (!string.Equals(lines[0], FitCacheVersion, StringComparison.Ordinal)) return false;
-                if (!string.Equals(lines[1], expectedKey, StringComparison.Ordinal)) return false;
+                if (lines.Length < 5) { LoadMiss("short " + lines.Length); return false; }
+                if (!string.Equals(lines[0], FitCacheVersion, StringComparison.Ordinal)) { LoadMiss("version " + lines[0]); return false; }
+                if (!string.Equals(lines[1], expectedKey, StringComparison.Ordinal)) { LoadMiss("key file=" + lines[1] + " expected=" + expectedKey); return false; }
                 // **件数を必ず突き合わせる。** 差し替えは原子的ではないので、 行の途中まで
                 // しか書かれていないファイルを読みうる。 それが「係数が少し足りない表」として
                 // 通ってしまうと、 BOT の判断が黙って変わる ── 一番たちの悪い壊れ方なので、
@@ -205,7 +208,7 @@ namespace AutoTest
                     loaded6[parts[0]] = new Coef { beta = beta6, se = se6 };
                     if (parts[5] == "1") loadedT.Add(parts[0]);
                 }
-                if (loaded.Count != expectedCount) return false;
+                if (loaded.Count != expectedCount) { LoadMiss("count " + loaded.Count + "/" + expectedCount); return false; }
                 _coefs = loaded;
                 _coefs6F = loaded6;
                 _trusted = loadedT;
@@ -213,8 +216,11 @@ namespace AutoTest
                 _lastSummary = lines[4] + " (cache)";
                 return true;
             }
-            catch { return false; }   // 壊れていたら黙って計算し直す
+            catch (Exception ex) { LoadMiss("exception " + ex.GetType().Name + ": " + ex.Message); return false; }   // 壊れていたら計算し直す
         }
+
+        /// <summary>[計装 2026-11-10] ディスクキャッシュが使えなかった理由 (ワーカーが毎回 50 秒かけて計算し直していた原因調べ)。</summary>
+        private static void LoadMiss(string why) => UnityEngine.Debug.Log("[ItemRegression] ディスクキャッシュ不成立: " + why);
 
         private static void TrySaveFit(string learningRoot, string key)
         {

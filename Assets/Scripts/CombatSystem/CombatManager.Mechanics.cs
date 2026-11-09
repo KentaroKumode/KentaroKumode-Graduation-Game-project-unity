@@ -451,6 +451,7 @@ namespace CombatSystem
                     {
                         int dmg = BattleModifierManager.ApplyBleedModifiers(ctx, ctx.enemyBleedStacks);
                         RaiseDotDamage(DotKind.Bleed, Math.Min(dmg, enemyHP));
+                        RelicBloodOffering(Math.Min(dmg, enemyHP));
                         CombatStats.DamageBreakdown[21] += Math.Max(0, Math.Min(dmg, enemyHP));   // [計装] 出血
                         HpLossDiag.Lose(ref enemyHP, dmg, "出血端子");
                         ctx.enemyCurrentHP = enemyHP;

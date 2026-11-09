@@ -592,13 +592,7 @@ namespace GameLoop
             provisionCap = UnityEngine.Mathf.Max(1, GameHooks.ProvisionBaseMax + provisionCapBonus + provisionCapPenalty);
             provision    = provisionCap;
 
-            // 遺物軸〈渇き〉: **開幕物資を下げる**（既定 600）。 上限 (provisionCap) は動かさない。
-            //   この軸は「物資 ≤ 600 の間だけ与ダメ+N%」なので、 開幕 1000 のままだと
-            //   序盤に一度も発動せず、 実測で 1〜3層の与ダメが遺物なしと同じ (+2.5%) だった。
-            //   軸が**自分で発動条件を作る**形にして、 最初から圧倒的な火力を出す代わりに
-            //   物資という資源を丸ごと前借りする ── 賭けとして自己完結させる。
-            int provisionStartCap = MetaProgression.Relics.RelicApplicator.GetProvisionBurnStartProvision();
-            if (provisionStartCap > 0) provision = UnityEngine.Mathf.Min(provision, provisionStartCap);
+            // (遺物軸〈渇き〉の開幕物資の引き下げは 2026-11-10 の遺物の再編で撤去・§24)
             combatStartHP = 0;
             crownProvisionLocked = false;
             madnessStack = 0;
@@ -652,7 +646,7 @@ namespace GameLoop
         {
             if (!isRunActive) return;   // 二重終了で遺物が 2 個出るのを防ぐ
             isRunActive = false;
-            MetaProgression.MetaBuffApplicator.GrantRelicOnRunEnd(Depth, bossDefeatedThisFloor);
+            MetaProgression.MetaBuffApplicator.GrantRelicOnRunEnd(currentFloor, bossDefeatedThisFloor);
         }
     }
 }

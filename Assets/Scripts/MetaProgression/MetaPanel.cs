@@ -355,15 +355,30 @@ namespace MetaProgression
         /// 防御は逓減式 Rmax·D/(D+K) で軽減率になる (ADR-0013・今は 0.6 / 10)。 初期の防御 2 で軽減 10%、 r3 (8) で約 27%、 r10 (22) で約 41%。
         /// 武器の防御はこれとは別に足される。 相手の貫通に固定値で削られる。</para>
         /// <para>旧〈防御〉の開幕シールドは「危険でない戦闘だけを消す」形で外した (§24)。 防御値は割合の軽減なので、 強い攻撃ほど多く減らす。</para></summary>
-        public static int ArmorDefense(int rank) => Mathf.Clamp(rank, 0, 10) * 2;
+        public const int ArmorDefPerRank = 2, ArmorShieldPerRank = 0;
+        public static int ArmorDefense(int rank)
+            => Mathf.Clamp(rank, 0, 10) * (GameLoop.GameHooks.ArmorDefPerRankOverride >= 0 ? GameLoop.GameHooks.ArmorDefPerRankOverride : ArmorDefPerRank);
 
-        /// <summary><b>装甲 r10〈不動〉: 失った HP 10% ごとに防御 +1 (最大 +9)。</b> 毎ターンの始め (CombatContext.BeginNewTurn) に、 その時の HP で数え直す。</summary>
-        public static int ArmorImmovable(int rank, int hp, int maxHp)
+        /// <summary>装甲: 開幕シールド (戦闘の始めに張る・戦闘中持続)。 段 × 刻み。</summary>
+        public static int ArmorOpeningShield(int rank)
+            => Mathf.Clamp(rank, 0, 10) * (GameLoop.GameHooks.ArmorShieldPerRankOverride >= 0 ? GameLoop.GameHooks.ArmorShieldPerRankOverride : ArmorShieldPerRank);
+
+        /// <summary>[2026-11-10 撤去] 旧 r10〈不動〉(失った HP 10% ごとに防御 +1)。 防御は逓減式で効きが鈍るので、 r10 は「一撃の上限」へ差し替えた。 常に 0。</summary>
+        public static int ArmorImmovable(int rank, int hp, int maxHp) => 0;
+
+        /// <summary><b>装甲: 被ダメージ −1/段</b> (敵の攻撃を防御で減らした後に N 引く・下限 1)。 防御の逓減を受けない引き算。
+        /// 強すぎたら 2 段ごと (<see cref="ArmorFlatEvery"/>)。 [2026-11-10] 当初の「固定ダメージ −N」は、 敵に固定ダメージが無く常に 0 だったので戻した。</summary>
+        public const int ArmorFlatEvery = 1;
+        public static int ArmorFlatReduction(int rank)
         {
-            if (rank < 10 || maxHp <= 0) return 0;
-            int lostPct10 = (Mathf.Max(0, maxHp - hp) * 10) / maxHp;   // 失った HP の 10% 刻みの数 (切り捨て)
-            return Mathf.Clamp(lostPct10, 0, 9);
+            int every = GameLoop.GameHooks.ArmorFlatEveryOverride > 0 ? GameLoop.GameHooks.ArmorFlatEveryOverride : ArmorFlatEvery;
+            return Mathf.Clamp(rank, 0, 10) / System.Math.Max(1, every);
         }
+
+        /// <summary><b>装甲 r10〈不動〉(2026-11-10): 1 回の攻撃で受けるダメージは最大 HP の 35% まで</b> (条件なし)。 r10 未満は 0 (= 上限なし)。
+        /// 防御の逓減とは無関係に、 山場の一撃で死なないことを保証する極点。</summary>
+        public const float ArmorHitCapPct = 0.35f;
+        public static int ArmorHitCap(int rank, int maxHp) => rank >= 10 && maxHp > 0 ? Mathf.Max(1, Mathf.CeilToInt(maxHp * ArmorHitCapPct)) : 0;
 
         /// <summary>【廃止】精密の「会心ダイス」補正。 常に 0。
         ///

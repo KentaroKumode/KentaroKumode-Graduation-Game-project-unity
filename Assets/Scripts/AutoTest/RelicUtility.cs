@@ -1,106 +1,103 @@
+using System.Collections.Generic;
+using System.Text;
 using MetaProgression.Relics;
 
 namespace AutoTest
 {
     /// <summary>
-    /// 遺物の効用関数。 周回モード（<see cref="AscensionLoop"/>）が「乗り換えるか」を決めるのに使う。
-    ///
-    /// **総点そのままでは測れない。** 枠が増えるほど総点は上がるが、増えた枠が要らない軸に
-    /// 配られていれば実際の強さは変わらない。 §15-5 の「層の支配性」を検証したときも、
-    /// 期待総点で比べると逆転して見えて、効用で測り直して初めて正しい順序になった。
-    ///
-    /// そこで **ペルソナごとに軸へ重みを置き、段 × 重み の総和**を効用とする。
-    /// 基準は「全軸 1.0 ＝ 総点と一致」で、ペルソナの選好だけが重みを動かす。
-    ///
-    /// 重みは設計上の想定であって実測値ではない。 **結論が重みに依存する可能性がある**ので、
-    /// 周回モードの結果を読むときは「この重みのもとでの話」であることを忘れないこと。
+    /// 遺物の効用関数 (2026-11-10 再編)。 周回モード (<see cref="AscensionLoop"/>) が部位ごとに持ち込む遺物を選び、 強化する順を決めるのに使う。
+    /// 効用 = Σ 段 × そのペルソナにとっての重み ＋ セットのボーナス。 重みは設計上の想定であって実測値ではない
+    /// ── 周回モードの結果は「この重みのもとでの話」として読むこと。 バランス調整は別 issue。
     /// </summary>
     public static class RelicUtility
     {
-        /// <summary>臨界軸は**臨界パッシブを持っていないと効果が 0**（メーターが動かないため）。
-        /// Rinkai ペルソナ以外はパッシブを引く保証がないので、期待値として大きく割り引く。</summary>
-        private const float RinkaiWithoutBuild = 0.3f;
-
-        /// <summary>そのペルソナにとっての軸の重み。 1.0 が基準（＝総点と同じ扱い）。</summary>
-        public static float Weight(RelicAxis axis, BuildPersona persona)
+        /// <summary>ペルソナ → 相性のよいセット (3 個揃えを狙う先)。</summary>
+        public static RelicSet PreferredSet(BuildPersona p)
         {
-            // 会心排他ビルドでは会心系が**完全に無価値**。 12 軸のうち 2 軸が死ぬ。
-            if (persona == BuildPersona.Bludgeon &&
-                (axis == RelicAxis.CritRatePct || axis == RelicAxis.CritMultPct))
-                return 0f;
-
-            // 臨界は専用パッシブが要る。 Rinkai ビルド以外では期待値を大きく落とす。
-            if (axis == RelicAxis.Rinkai && persona != BuildPersona.Rinkai)
-                return RinkaiWithoutBuild;
-
-            switch (persona)
+            switch (p)
             {
-                case BuildPersona.Standard:
-                    if (axis == RelicAxis.Attack || axis == RelicAxis.DamagePct) return 1.3f;
-                    break;
-                case BuildPersona.Crit:
-                    if (axis == RelicAxis.CritRatePct) return 2.0f;
-                    if (axis == RelicAxis.CritMultPct) return 2.0f;
-                    if (axis == RelicAxis.DamagePct)   return 1.2f;
-                    break;
-                case BuildPersona.Bleed:
-                    if (axis == RelicAxis.OpeningBleed) return 2.5f;
-                    break;
-                case BuildPersona.Rinkai:
-                    if (axis == RelicAxis.Rinkai) return 3.0f;   // 専用パッシブ前提なので跳ねる
-                    break;
-                case BuildPersona.Poison:
-                    if (axis == RelicAxis.OpeningPoison) return 2.5f;
-                    break;
-                case BuildPersona.Bludgeon:
-                    // 会心を捨てた分を素の火力で取り返す
-                    if (axis == RelicAxis.Attack)    return 1.5f;
-                    if (axis == RelicAxis.DamagePct) return 1.5f;
-                    break;
-                case BuildPersona.Charge:
-                    if (axis == RelicAxis.Charge) return 2.5f;
-                    break;
-                case BuildPersona.Shield:
-                    if (axis == RelicAxis.OpeningShield)      return 2.0f;
-                    if (axis == RelicAxis.DamageReductionPct) return 1.5f;
-                    if (axis == RelicAxis.MaxHp)              return 1.5f;
-                    break;
-                case BuildPersona.Berserk:
-                    // 低HP を維持して火力を出す型なので、最大HP はむしろ邪魔寄り
-                    if (axis == RelicAxis.MaxHp)      return 0.5f;
-                    if (axis == RelicAxis.DamagePct)  return 1.5f;
-                    break;
-                default:
-                    break;   // RawTier は中立 (全軸 1.0)
+                case BuildPersona.Crit:   return RelicSet.Shingan;
+                case BuildPersona.Bleed:  return RelicSet.Kessho;
+                case BuildPersona.Poison: return RelicSet.Shoki;
+                case BuildPersona.Rinkai: return RelicSet.Roon;
+                case BuildPersona.Charge: return RelicSet.Denryu;
+                case BuildPersona.Shield: return RelicSet.Kenro;
+                default:                  return RelicSet.Shingan;
             }
-            return 1.0f;
         }
 
-        /// <summary>遺物の効用。 段 × 重み の総和。
-        /// **刻印は段 7 として数えるが、条件を満たせない確率は織り込まない** ──
-        /// 条件は「守ろうと思えば常に守れる」ものに限ってあるため（§15-5）。</summary>
-        public static float Score(RolledRelic relic, BuildPersona persona)
+        /// <summary>そのペルソナにとってのステータスの重み (1.0 が基準)。</summary>
+        public static float Weight(RelicStat s, BuildPersona persona)
         {
-            if (relic == null) return 0f;
-            float sum = 0f;
-            for (int i = 0; i < relic.SlotCount; i++)
-                sum += relic.EffectiveStepAt(i) * Weight(relic.AxisAt(i), persona);
-            return sum;
+            if (persona == BuildPersona.Bludgeon && (s == RelicStat.CritRate || s == RelicStat.CritMult)) return 0f;   // 会心排他
+            var pref = PreferredSet(persona);
+            // 軸の資源は、 その軸のビルドでなければ大きく割り引く
+            switch (s)
+            {
+                case RelicStat.OpeningBleed:  case RelicStat.BloodOffering: return pref == RelicSet.Kessho ? 1.5f : 0.4f;
+                case RelicStat.OpeningPoison: case RelicStat.EscalationDelay: return pref == RelicSet.Shoki ? 1.5f : 0.6f;
+                case RelicStat.Rinkai:        return pref == RelicSet.Roon ? 1.5f : 0.3f;
+                case RelicStat.Charge:        return pref == RelicSet.Denryu ? 1.5f : 0.6f;
+                case RelicStat.ShieldGainPct: case RelicStat.BlockDicePct: return pref == RelicSet.Kenro ? 1.5f : 0.4f;
+                case RelicStat.CritRate: case RelicStat.CritMult: return pref == RelicSet.Shingan ? 1.5f : 0.8f;
+            }
+            return RelicCatalog.IsLikely(pref, s) ? 1.2f : 1.0f;
         }
 
-        /// <summary>効用の内訳を 1 行で。 レポート用。</summary>
-        public static string Explain(RolledRelic relic, BuildPersona persona)
+        /// <summary>1 個の効用 (セットのボーナスを除く)。</summary>
+        public static float Score(Relic r, BuildPersona persona)
         {
-            if (relic == null) return "遺物なし (効用 0.0)";
-            var sb = new System.Text.StringBuilder();
-            sb.Append($"効用 {Score(relic, persona):F1}  ({persona}) ");
-            for (int i = 0; i < relic.SlotCount; i++)
+            if (r == null) return 0f;
+            float u = r.MainStep * Weight(r.MainStat, persona);
+            for (int i = 0; i < r.SubCount; i++) u += r.subSteps[i] * Weight((RelicStat)r.subStats[i], persona);
+            return u;
+        }
+
+        /// <summary>持ち込み 3 個の効用 (セット 2 個 +2・3 個 +5 を足す。 相性のよいセットなら 1.5 倍)。</summary>
+        public static float ScoreLoadout(IList<Relic> eq, BuildPersona persona)
+        {
+            float u = 0f; var cnt = new int[RelicCatalog.SetCount];
+            foreach (var r in eq) { if (r == null) continue; u += Score(r, persona); cnt[r.set]++; }
+            var pref = PreferredSet(persona);
+            for (int s = 0; s < cnt.Length; s++)
             {
-                float w = Weight(relic.AxisAt(i), persona);
-                sb.Append(i == 0 ? " ★" : " / ");
-                sb.Append($"{RelicAxisCatalog.NameOf(relic.AxisAt(i))}"
-                        + $"{relic.EffectiveStepAt(i)}×{w:F1}");
+                float b = cnt[s] >= 3 ? 5f : cnt[s] >= 2 ? 2f : 0f;
+                u += (RelicSet)s == pref ? b * 1.5f : b;
             }
+            return u;
+        }
+
+        /// <summary>所持品から部位ごとの持ち込みを選ぶ。 候補は「相性のセットで 3 個」「部位ごとに単体の最高」「相性のセット 2 個 ＋ 単体の最高」の 3 通り。</summary>
+        public static Relic[] ChooseLoadout(IList<Relic> owned, BuildPersona persona)
+        {
+            var pref = (int)PreferredSet(persona);
+            var best = new Relic[3]; var bestSet = new Relic[3];
+            foreach (var r in owned)
+            {
+                if (r == null || !r.IsValid()) continue;
+                if (best[r.slot] == null || Score(r, persona) > Score(best[r.slot], persona)) best[r.slot] = r;
+                if (r.set == pref && (bestSet[r.slot] == null || Score(r, persona) > Score(bestSet[r.slot], persona))) bestSet[r.slot] = r;
+            }
+            var cands = new List<Relic[]> { best, bestSet };
+            for (int k = 0; k < 3; k++)
+            {
+                var mix = (Relic[])bestSet.Clone(); mix[k] = best[k]; cands.Add(mix);
+            }
+            Relic[] pick = best; float pu = float.MinValue;
+            foreach (var c in cands)
+            {
+                var l = new List<Relic>(); foreach (var r in c) if (r != null) l.Add(r);
+                float u = ScoreLoadout(l, persona);
+                if (u > pu) { pu = u; pick = c; }
+            }
+            return pick;
+        }
+
+        public static string Explain(IList<Relic> eq, BuildPersona persona)
+        {
+            var sb = new StringBuilder();
+            foreach (var r in eq) if (r != null) sb.Append(r.Describe()).Append(" (u=").Append(Score(r, persona).ToString("F1")).Append(") ");
+            sb.Append("計 ").Append(ScoreLoadout(eq, persona).ToString("F1"));
             return sb.ToString();
         }
     }

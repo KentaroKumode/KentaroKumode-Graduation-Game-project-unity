@@ -3065,7 +3065,7 @@ namespace AutoTest.EditorTools
                 // 診断は 2 アームだけなので jsonl を出せる (死因・死亡層・致死敵を追うため)。
                 runner.writeRunsJsonl = axisDiag;
                 runner.relicAxisSweepOnlyAxis =
-                    axisDiag ? (int)MetaProgression.Relics.RelicAxis.CritMultPct : -1;
+                    -1;   // 2026-11-10: 旧遺物の軸は撤去 (単軸スイープも撤去済み)
                 // 2026-08-09: **挑戦 30pt で測る**。 高難易度限定軸 (渇き/刻限/背水) は
                 //   25pt 以上でしか出ないので、 0pt の測定は「出ない軸を出た前提で測る」形だった。
                 //   30pt は RelicBonusCap = 30 ＝ 遺物の見返りが頭打ちになる実用上限でもある。

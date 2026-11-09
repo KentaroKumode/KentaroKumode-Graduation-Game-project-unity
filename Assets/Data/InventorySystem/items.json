@@ -2203,7 +2203,7 @@
     {
       "id": "絶縁の外套",
       "name": "絶縁の外套",
-      "description": "過充電の間、受けるダメージ −3",
+      "description": "過充電の間、ターンの始めにシールド +4",
       "flavorText": "蝋を染みこませた厚布。雷見物のために、物好きな学者が仕立てさせた。",
       "category": "Passive",
       "rarity": "SILVER",

@@ -51,7 +51,8 @@ namespace AutoTest.EditorTests.Ultra
 
             var relic = RelicPresets.Build(RelicPresets.Preset.TheoreticalBestCursed);
             Assert.That(relic, Is.Not.Null);
-            Assert.That(relic.IsValid(), Is.True);
+            Assert.That(relic.Count, Is.EqualTo(3));
+            foreach (var r in relic) Assert.That(r.IsValid(), Is.True);
         }
 
         [Test]

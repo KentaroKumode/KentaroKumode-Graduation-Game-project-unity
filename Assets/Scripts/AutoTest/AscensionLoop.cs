@@ -44,7 +44,10 @@ namespace AutoTest
         public readonly int window;
 
         private readonly Queue<bool> _recent = new Queue<bool>();
-        private RolledRelic _relic;
+        /// <summary>このラインの所持品 (2026-11-10 再編: 3 部位・強化・分解)。 持ち込みは毎ラン RelicUtility.ChooseLoadout で選び直す。</summary>
+        private readonly List<Relic> _owned = new List<Relic>();
+        private Relic[] _equipped = new Relic[3];
+        private int _material;
         private float _relicUtility;
         private int _runIndex;
 
@@ -60,7 +63,8 @@ namespace AutoTest
         /// <summary>難易度を上げた直後は成績が落ちるので、 窓が埋まるまで再判定しない。</summary>
         private int _cooldown;
 
-        public RolledRelic CurrentRelic => _relic;
+        /// <summary>今の持ち込み (表示用の 1 行)。</summary>
+        public string CurrentRelicText => RelicUtility.Explain(_equipped, persona);
         public float CurrentUtility => _relicUtility;
         public int SwapCount { get; private set; }
         public int DifficultyUpCount { get; private set; }
@@ -80,7 +84,7 @@ namespace AutoTest
         /// <summary>ライン開始時。 遺物なし・挑戦スコア 0 から始める。</summary>
         public void Reset()
         {
-            _recent.Clear(); _relic = null; _relicUtility = 0f;
+            _recent.Clear(); _owned.Clear(); _equipped = new Relic[3]; _material = 0; _relicUtility = 0f;
             _runIndex = 0; _cooldown = 0;
             SwapCount = DifficultyUpCount = DifficultyDownCount = 0;
             _lastRaisedCategory = ChallengeCategory.E崩壊;   // 次は A から始まる
@@ -98,29 +102,34 @@ namespace AutoTest
         {
             var st = State;
             if (st == null) return;
-            st.relics = new List<RolledRelic>();
-            st.equippedRelicIndex = -1;
-            if (_relic != null) st.AddRelic(_relic);
+            var eq = new List<Relic>();
+            foreach (var r in _equipped) if (r != null) eq.Add(r);
+            st.SetRelicLoadout(eq);
             st.challenge = _loadout;
             st.InvalidateChallenge();
         }
 
-        /// <summary>ラン終了後。 遺物を引いて乗り換え判定、 続いて難易度判定。</summary>
-        public void AfterRun(int reachedFloor, bool cleared)
+        /// <summary>ラン終了後。 遺物を引いて持ち込みを選び直し、 要らないものを分解して強化、 続いて難易度判定。
+        /// ordinalReached は見せる層 (1〜5)、 cleared は 5 層を踏破したか。</summary>
+        public void AfterRun(int ordinalReached, bool cleared)
         {
             _runIndex++;
 
-            // ---- ① 遺物を 1 個引く ----
-            int score = ChallengeScore;
-            var got = RelicRoller.Roll(reachedFloor, cleared, score, _runIndex);
-            if (got != null && got.IsValid())
-            {
-                float u = RelicUtility.Score(got, persona);
-                if (u > _relicUtility)
-                {
-                    _relic = got; _relicUtility = u; SwapCount++;
-                }
-            }
+            // ---- ① 遺物を引く (落ちる数は到達した層で決まる)。 難易度は旧ロードアウトの点数を 5 点 = 1 段で読み替える ----
+            int diff = System.Math.Min(10, ChallengeScore / 5);
+            var got = RelicRoller.RollRunEnd(_runIndex, ordinalReached, diff, (int)RelicUtility.PreferredSet(persona));
+            _owned.AddRange(got);
+            var prev = _equipped;
+            _equipped = RelicUtility.ChooseLoadout(_owned, persona);
+            for (int k = 0; k < 3; k++) if (_equipped[k] != prev[k]) { SwapCount++; break; }
+            // 持ち込みに使っていない遺物は分解して素材にし、 持ち込みを強化する
+            for (int i = _owned.Count - 1; i >= 0; i--)
+                if (System.Array.IndexOf(_equipped, _owned[i]) < 0) { _owned.RemoveAt(i); _material++; }
+            var rng = new System.Random(_runIndex * 7919 + 17);
+            foreach (var r in _equipped)
+                while (r != null && r.CanEnhance && _material > 0) { RelicRoller.Enhance(r, rng); _material--; }
+            var eqList = new List<Relic>(); foreach (var r in _equipped) if (r != null) eqList.Add(r);
+            _relicUtility = RelicUtility.ScoreLoadout(eqList, persona);
 
             // ---- ② 成績を窓へ積む ----
             // 「5 層クリア以上」を成功の基準にする ── §15-5 で層点が +3 跳ねる節目であり、
@@ -326,7 +335,7 @@ namespace AutoTest
         {
             return $"{persona,-9} {policy,-12} 挑戦{ChallengeScore,3}pt  効用{_relicUtility,5:F1}  "
                  + $"乗換{SwapCount,3}回  難度↑{DifficultyUpCount,2} ↓{DifficultyDownCount,2}  "
-                 + (_relic != null ? _relic.Describe() : "遺物なし");
+                 + CurrentRelicText;
         }
     }
 }

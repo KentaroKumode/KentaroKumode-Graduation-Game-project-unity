@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using GameLoop;
 using ItemSystem.PassiveSkills;
 using UnityEngine;
@@ -5,262 +6,162 @@ using UnityEngine;
 namespace MetaProgression.Relics
 {
     /// <summary>
-    /// 装備中の遺物の効果を各システムへ渡す中央ヘルパー。 正本: docs/GAME.md §15-5。
-    /// MetaBuffApplicator と同じ形（静的 getter 群）に揃えてあるので、
-    /// 呼び出し側はメタバフの隣に 1 行足すだけで済む。
-    ///
-    /// **刻印はメイン枠にだけ掛かる。** 条件を満たしていない間はメイン枠の軸が 0 を返し、
-    /// サブ枠は常に働く（遺物が丸ごと死に装備にならないようにするため）。
-    /// 刻印付きのメインは段 7 として評価する。
+    /// 持ち込んだ遺物 (最大 3 個) とセット効果を各システムへ渡す中央ヘルパー。 正本: docs/GAME.md §15-5 (2026-11-10 再編)。
+    /// MetaBuffApplicator と同じ形 (静的 getter 群)。 呼び出し側の引数 (run, ctx) は旧仕様から残しているが、 今は使っていない
+    /// (条件付きの効果は ctx だけを見る)。
     /// </summary>
     public static class RelicApplicator
     {
-        private static RolledRelic Equipped => MetaProgressManager.Instance?.State?.EquippedRelic;
+        /// <summary>[測定] 持ち込みを差し替える (null = セーブの持ち込みを使う)。 AutoRunner が測定のプリセットを入れる。</summary>
+        public static List<Relic> Override;
 
-        /// <summary>刻印の条件を満たしているか。 刻印なしなら常に true。
-        ///
-        /// ctx が無い文脈（ラン開始時の最大HP など）では、 毎ターン判定の 2 条件は
-        /// **成立扱い**にする ── ラン開始時にはまだ配線もオーバーロードも起きていないため。</summary>
-        public static bool MainActive(RunState run, CombatContext ctx)
+        private static List<Relic> Equipped()
         {
-            var r = Equipped;
-            if (r == null || !r.IsCursed) return true;
-            switch (r.Curse)
+            if (Override != null) return Override;
+            var st = MetaProgressManager.Instance?.State;
+            return st != null ? st.EquippedRelics() : _empty;
+        }
+        private static readonly List<Relic> _empty = new List<Relic>();
+
+        private static int Step(RelicStat s)
+        {
+            int n = 0;
+            foreach (var r in Equipped()) if (r != null) n += r.StepOf(s);
+            return n;
+        }
+        /// <summary>段を合計してから実数値にする (段の表は線形なので、 1 個ずつ足しても同じ)。 充電だけは別 (下)。</summary>
+        private static int Value(RelicStat s)
+        {
+            int v = 0;
+            foreach (var r in Equipped())
             {
-                case RelicCurse.NoConsumables:
-                    return CountConsumables(run) == 0;
-                case RelicCurse.LowGold:
-                    return run == null || run.coins <= 10;
-                case RelicCurse.NoBlockWiring:
-                    return ctx == null || !ctx.blockWiredThisTurn;
-                case RelicCurse.NoRoleFired:
-                    // ADR-0010: 〈オーバーロード未使用〉の後継。 **役を 1 つも切っていないターン**。
-                    //   評価順の注意 ── 役の判定 (5b) より前に呼ばれる遺物 (充電の毎ターン成分) では
-                    //   まだ空なので常に成立する。 旧〈オーバーロード未使用〉も同じ順序だった。
-                    return ctx == null || ctx.firedRolesThisTurn.Count == 0;
-                default:
-                    return true;
+                if (r == null) continue;
+                if (r.MainStat == s) v += RelicCatalog.ValueOf(s, r.MainStep);
+                for (int i = 0; i < r.SubCount; i++) if (r.subStats[i] == (int)s) v += RelicCatalog.ValueOf(s, r.subSteps[i]);
             }
+            return v;
         }
 
-        private static int CountConsumables(RunState run)
-            => run?.ownedConsumables != null ? run.ownedConsumables.Count : 0;
-
-        /// <summary>指定軸の段。 載っていなければ 0。
-        /// メイン枠なら刻印の条件を見て、 満たしていなければ 0 を返す。</summary>
-        private static int StepOf(RelicAxis axis, RunState run, CombatContext ctx)
+        /// <summary>指定セットを何個持ち込んでいるか。</summary>
+        public static int SetCount(RelicSet set)
         {
-            var r = Equipped;
-            if (r == null) return 0;
-            int i = r.IndexOf(axis);
-            if (i < 0) return 0;
-            if (i == 0 && !MainActive(run, ctx)) return 0;   // 刻印の条件を満たしていない
-            return r.EffectiveStepAt(i);
+            int n = 0;
+            foreach (var r in Equipped()) if (r != null && r.Set == set) n++;
+            return n;
+        }
+        public static bool Has2(RelicSet s) => SetCount(s) >= 2;
+        public static bool Has3(RelicSet s) => SetCount(s) >= 3;
+
+        // ============================================================
+        //  ラン開始・戦闘開始に 1 回
+        // ============================================================
+
+        public static int GetMaxHpBonus(RunState run) => Value(RelicStat.MaxHp);
+
+        /// <summary>防御 +N。 戦闘開始時に playerDefenseBase へ足す。</summary>
+        public static int GetDefense() => Value(RelicStat.Defense);
+
+        public static int GetOpeningCharge(RunState run)
+        {
+            int v = 0;
+            foreach (var r in Equipped()) if (r != null && r.MainStat == RelicStat.Charge) v += RelicCatalog.ChargeOpening(r.MainStep);
+            return v;
         }
 
-        /// <summary>指定軸の実数値。 載っていない／刻印の条件を満たしていなければ 0。</summary>
-        private static int ValueOf(RelicAxis axis, RunState run, CombatContext ctx)
-        {
-            int step = StepOf(axis, run, ctx);
-            return step > 0 ? RelicAxisCatalog.ValueOf(axis, step) : 0;
-        }
+        public static int GetOpeningBleed(RunState run)
+            => Value(RelicStat.OpeningBleed) + (Has2(RelicSet.Kessho) ? RelicCatalog.Kessho2Bleed : 0);
+
+        public static int GetOpeningPoison(RunState run)
+            => Value(RelicStat.OpeningPoison) + (Has2(RelicSet.Shoki) ? RelicCatalog.Shoki2Poison : 0);
+
+        /// <summary>敵の段階の遅れ (ターン)。 戦闘開始時に YachtRoleEffects.AddEscalationDelay で入れる。</summary>
+        public static int GetEscalationDelay() => Value(RelicStat.EscalationDelay);
 
         // ============================================================
         //  戦闘中に毎ターン参照するもの
         // ============================================================
 
-        /// <summary>攻撃+N。 ctx.mutualAttackBonus へ加算する。</summary>
-        public static int GetAttackBonus(RunState run, CombatContext ctx)
-            => ValueOf(RelicAxis.Attack, run, ctx);
+        public static int GetAttackBonus(RunState run, CombatContext ctx) => Value(RelicStat.Attack);
 
-        /// <summary>与ダメージ+N%。 他の outgoing% と同じ pool へ additive。
-        /// 〈渇き〉〈刻限〉分を含む（軸は重複しないので同時に載ることは無い）。</summary>
+        /// <summary>与ダメ +N% (血晶 3 個: 出血 10 以上の敵へ +20% を含む)。</summary>
         public static float GetOutgoingPct(RunState run, CombatContext ctx)
-            => ValueOf(RelicAxis.DamagePct, run, ctx) * 0.01f
-             + GetProvisionBurnPct(run, ctx)
-             + GetLongBattlePct(run, ctx);
+        {
+            float p = Value(RelicStat.DamagePct) * 0.01f;
+            if (ctx != null && ctx.enemyBleedStacks >= RelicCatalog.Kessho3BleedMin && Has3(RelicSet.Kessho)) p += RelicCatalog.Kessho3DmgPct * 0.01f;
+            return p;
+        }
 
-        /// <summary>会心率+N%。 0.0〜0.28 を返す（ctx.critRatePctAdd へ加算）。</summary>
-        public static float GetCritRatePct(RunState run, CombatContext ctx)
-            => ValueOf(RelicAxis.CritRatePct, run, ctx) * 0.01f;
+        public static float GetCritRatePct(RunState run, CombatContext ctx) => Value(RelicStat.CritRate) * 0.01f;
 
-        /// <summary>会心倍率+N%。 **基準 2.0 に対する**加算量を返す（段6 の +90% なら +1.8）。
-        /// 2026-08-03 に基準 3.0→2.0（[MetaBuffApplicator.GetCriticalMultiplier]）。
-        /// 基準3.0 のときこの軸は段6 で実効 ×1.53 と 12軸で突出し、 最弱軸との差が 4.2 倍あった。</summary>
+        /// <summary>会心倍率の加算 (基準 2.0 に対する %・心眼 2 個の +30% を含む)。</summary>
         public static float GetCritMultBonus(RunState run, CombatContext ctx)
-            => ValueOf(RelicAxis.CritMultPct, run, ctx) * 0.01f * 2.0f;
-        /// <summary>〈渇き〉物資が <see cref="RelicAxisCatalog.ProvisionBurnThreshold"/> 以下の間の
-        /// 与ダメージ +N%。 条件を外れていれば 0。
-        ///
-        /// **絶対値で判定する。** provisionCap は一方向のラチェット（物資 45 以下で上限 45、
-        /// 20 以下で上限 20 に固定＝それ以上回復できない）なので、 比にすると閾値も
-        /// 40→18→8 と一緒に下がり、 物資が閾値へ永久に追いつかない。
-        /// 実測 (計装 33,864 判定): 比だった頃の発動率は **6.6%** しかなかった。</summary>
-        public static float GetProvisionBurnPct(RunState run, CombatContext ctx)
-        {
-            if (run == null) return 0f;
-            int step = StepOf(RelicAxis.ProvisionBurn, run, ctx);
-            if (step <= 0) return 0f;
-            // [計装] 「弱い」のか「そもそも発動していない」のかを数字で分けるための計数。
-            //   実測では倍率を 3 回上げても与ダメが動かず、 原因の切り分けができなかった。
-            ProvisionBurnChecks++;
-            ProvisionBurnProvisionSum += run.provision;
-            ProvisionBurnCapSum  += Mathf.Max(1, run.provisionCap);
-            // **絶対値で判定する。** provisionCap 比にすると、 物資が 45 を割った時の cap ロック
-            //   (45以下で上限45 / 20以下で上限20) で閾値まで一緒に下がり、 永久に条件を
-            //   満たさない (RelicAxis の ProvisionBurnThreshold 参照)。
-            if (run.provision > RelicAxisCatalog.ProvisionBurnThreshold) return 0f;
-            ProvisionBurnActive++;
-            return RelicAxisCatalog.ValueOf(RelicAxis.ProvisionBurn, step) * 0.01f;
-        }
+            => (Value(RelicStat.CritMult) + (Has2(RelicSet.Shingan) ? RelicCatalog.Shingan2CritMultPct : 0)) * 0.01f * 2.0f;
 
-        // ── 〈渇き〉の計装。 スイープが読んでレポートへ出す。 ResetProvisionBurnStats で 0 に戻す ──
-        /// <summary>〈渇き〉を載せた状態で与ダメ計算が走った回数。</summary>
-        public static long ProvisionBurnChecks;
-        /// <summary>そのうち条件 (物資 ≤ provisionCap×閾値) を満たしていた回数。</summary>
-        public static long ProvisionBurnActive;
-        /// <summary>判定時の物資の合計 (平均を出すため)。</summary>
-        public static long ProvisionBurnProvisionSum;
-        /// <summary>判定時の provisionCap の合計 (平均を出すため)。</summary>
-        public static long ProvisionBurnCapSum;
+        public static int GetArmorPen(RunState run, CombatContext ctx) => Value(RelicStat.ArmorPen);
 
-        public static void ResetProvisionBurnStats()
-        { ProvisionBurnChecks = ProvisionBurnActive = ProvisionBurnProvisionSum = ProvisionBurnCapSum = 0; }
-
-        /// <summary>「発動率 x% / 判定時の平均物資 y (上限 z)」の 1 行。</summary>
-        public static string DescribeProvisionBurnStats()
-            => ProvisionBurnChecks == 0 ? "〈渇き〉判定なし"
-             : $"〈渇き〉発動率 {ProvisionBurnActive * 100.0 / ProvisionBurnChecks:F1}% "
-             + $"({ProvisionBurnActive}/{ProvisionBurnChecks}) / 判定時の平均物資 "
-             + $"{ProvisionBurnProvisionSum / (double)ProvisionBurnChecks:F1} (上限 {ProvisionBurnCapSum / (double)ProvisionBurnChecks:F1}, "
-             + $"閾値 {RelicAxisCatalog.ProvisionBurnThreshold} 固定)";
-
-        /// <summary>〈刻限〉経過ターン数 × N% の与ダメージ加算。 ctx が無ければ 0。
-        ///
-        /// **エスカレーション段階ではなく経過ターン数を直接見る**。 段階連動は実測で
-        /// 平均 0.29（全ターンの 77.5% が段階 0）にしかならず死に軸だった (§24)。</summary>
-        public static float GetLongBattlePct(RunState run, CombatContext ctx)
-        {
-            if (ctx == null) return 0f;
-            int step = StepOf(RelicAxis.LongBattle, run, ctx);
-            if (step <= 0) return 0f;
-            int turn = Mathf.Max(0, ctx.currentTurn);
-            return turn * RelicAxisCatalog.ValueOf(RelicAxis.LongBattle, step) * 0.01f;
-        }
-
-        /// <summary>〈背水〉の条件 ── HP が最大の
-        /// <see cref="RelicAxisCatalog.LastBreathThreshold"/> 以下か。
-        ///
-        /// **ctx 側の HP を見る。** run.playerHP は戦闘中は同期されず、 戦闘終了時に書き戻される
-        /// （CombatManager が playerHP をローカルに持ち、 ctx.playerCurrentHP へ都度反映する）。</summary>
-        private static bool LastBreathActive(CombatContext ctx)
-            => ctx != null && ctx.playerMaxHP > 0
-            && ctx.playerCurrentHP <= ctx.playerMaxHP * RelicAxisCatalog.LastBreathThreshold;
-
-        /// <summary>〈背水〉低HP 中の被ダメージ −N%。 条件を外れていれば 0。</summary>
-        public static float GetLastBreathPct(RunState run, CombatContext ctx)
-        {
-            if (!LastBreathActive(ctx)) return 0f;
-            int step = StepOf(RelicAxis.LastBreath, run, ctx);
-            if (step <= 0) return 0f;
-            return RelicAxisCatalog.ValueOf(RelicAxis.LastBreath, step) * 0.01f;
-        }
-
-        /// <summary>〈背水〉低HP 中の吸収 ── 与ダメージの N% を回復。 ctx.lifestealPct へ加算する。
-        ///
-        /// **自己減衰する**: 回復して閾値を超えた瞬間に条件が切れるので、 閾値の周りで振動し、
-        /// 際限なく硬くなる方向へは走らない。 これが「賭け」として成立する理由でもある ──
-        /// 低HP に留まる限りしか働かないので、 安全域へ戻れば手放すことになる。</summary>
-        public static float GetLastBreathLifestealPct(RunState run, CombatContext ctx)
-        {
-            if (!LastBreathActive(ctx)) return 0f;
-            int step = StepOf(RelicAxis.LastBreath, run, ctx);
-            if (step <= 0) return 0f;
-            return RelicAxisCatalog.LastBreathLifesteal(step) * 0.01f;
-        }
-
-        /// <summary>防御貫通 +N (ADR-0013・2026-10-28 に % から点へ)。 ctx.playerArmorPen へ加算する。</summary>
-        public static int GetArmorPen(RunState run, CombatContext ctx)
-            => ValueOf(RelicAxis.ArmorPenPct, run, ctx);
-
-        /// <summary>被ダメージ−N%。 **割合軽減**であって定額ではない
-        /// （定額だと参照被ダメ 7.7/T に対し段6 が 78% 軽減になり序盤を無力化した・§24）。
-        /// 〈背水〉分を含む。 両方載ることは無い（軸は重複しない）が、 念のため 0.85 で頭打ち。</summary>
+        /// <summary>被ダメ −N% (割合軽減)。 念のため 0.85 で頭打ち。</summary>
         public static float GetDamageReductionPct(RunState run, CombatContext ctx)
-            => Mathf.Min(0.85f,
-                   ValueOf(RelicAxis.DamageReductionPct, run, ctx) * 0.01f
-                 + GetLastBreathPct(run, ctx));
+            => Mathf.Min(0.85f, Value(RelicStat.DamageReduction) * 0.01f);
 
-        /// <summary>臨界爆発時に追加する、 敵の**現在**HP に対する割合 (0.0〜0.07)。</summary>
-        public static float GetRinkaiCurrentHpPct(RunState run, CombatContext ctx)
-            => ValueOf(RelicAxis.Rinkai, run, ctx) * 0.01f;
+        /// <summary>吸血 (主攻撃のダメージの N%)。 ctx.lifestealPct へ毎ターン足す。</summary>
+        public static float GetLifestealPct() => Value(RelicStat.Lifesteal) * 0.01f;
 
-        /// <summary>毎ターンの充電加算。 段 4 以上でのみ 0 より大きい。</summary>
+        /// <summary>血贄: 出血が与えたダメージの N% を回復 (敵味方問わず・今はプレイヤーの出血は無い)。</summary>
+        public static float GetBloodOfferingPct() => Value(RelicStat.BloodOffering) * 0.01f;
+
+        public static float GetRinkaiCurrentHpPct(RunState run, CombatContext ctx) => Value(RelicStat.Rinkai) * 0.01f;
+
+        /// <summary>毎ターンの充電 (符の段 4 で +2・電流 2 個で +2)。</summary>
         public static int GetChargePerTurn(RunState run, CombatContext ctx)
         {
-            int step = StepOf(RelicAxis.Charge, run, ctx);
-            return step > 0 ? RelicAxisCatalog.ChargePerTurn(step) : 0;
+            int v = Has2(RelicSet.Denryu) ? RelicCatalog.Denryu2ChargePerTurn : 0;
+            foreach (var r in Equipped()) if (r != null && r.MainStat == RelicStat.Charge) v += RelicCatalog.ChargePerTurn(r.MainStep);
+            return v;
         }
 
-        // ============================================================
-        //  戦闘開始時に 1 回だけ参照するもの
-        // ============================================================
+        /// <summary>ブロックに挿した出目 +N%。</summary>
+        public static float GetBlockDicePct() => Value(RelicStat.BlockDicePct) * 0.01f;
 
-        /// <summary>開幕シールド+N。</summary>
-        public static int GetOpeningShield(RunState run)
-            => ValueOf(RelicAxis.OpeningShield, run, null);
+        /// <summary>シールドの獲得量 +N% (堅牢 2 個の +20% を含む)。 consShield の増加に掛ける。</summary>
+        public static float GetShieldGainPct()
+            => (Value(RelicStat.ShieldGainPct) + (Has2(RelicSet.Kenro) ? RelicCatalog.Kenro2ShieldGainPct : 0)) * 0.01f;
 
-        /// <summary>開幕の充電。</summary>
-        public static int GetOpeningCharge(RunState run)
-        {
-            int step = StepOf(RelicAxis.Charge, run, null);
-            return step > 0 ? RelicAxisCatalog.ChargeOpening(step) : 0;
-        }
+        /// <summary>臨界の獲得量 +N% (炉温 2 個)。</summary>
+        public static float GetHeatGainPct() => Has2(RelicSet.Roon) ? RelicCatalog.Roon2HeatPct * 0.01f : 0f;
 
-        /// <summary>開幕出血+N。 短期戦専用（ボス戦では N ターンで枯れる）。</summary>
-        public static int GetOpeningBleed(RunState run)
-            => ValueOf(RelicAxis.OpeningBleed, run, null);
+        /// <summary>爆発のたびのシールド (炉温 3 個)。</summary>
+        public static int GetBurstShield() => Has3(RelicSet.Roon) ? RelicCatalog.Roon3BurstShield : 0;
 
-        /// <summary>開幕毒+N。 減衰しないので長期戦向き。 上限 10 は AddStatus 側でクランプされる。</summary>
-        public static int GetOpeningPoison(RunState run)
-            => ValueOf(RelicAxis.OpeningPoison, run, null);
+        /// <summary>毒が残る割合の上乗せ (瘴気 3 個)。 上限は <see cref="RelicCatalog.PoisonKeepCap"/>。</summary>
+        public static int GetPoisonKeepBonus() => Has3(RelicSet.Shoki) ? RelicCatalog.Shoki3KeepPct : 0;
 
-        // ============================================================
-        //  ラン開始時に 1 回だけ参照するもの
-        // ============================================================
+        /// <summary>過充電の間の被ダメ −N (電流 3 個)。 ターンの始めに playerFlatDamageReduction へ足す。</summary>
+        public static int GetOverchargeFlatReduce(CombatContext ctx)
+            => ctx != null && ctx.IsOvercharged() && Has3(RelicSet.Denryu) ? RelicCatalog.Denryu3FlatReduce : 0;
 
-        /// <summary>最大HP+N。 RunState.Initialize 直後に足す。</summary>
-        public static int GetMaxHpBonus(RunState run)
-            => ValueOf(RelicAxis.MaxHp, run, null);
+        /// <summary>ターン始めの減衰で残るシールドの上乗せ % (堅牢 3 個)。</summary>
+        public static int GetShieldKeepBonus() => Has3(RelicSet.Kenro) ? RelicCatalog.Kenro3ShieldKeepPct : 0;
 
-        /// <summary>〈渇き〉を装備しているときの**開幕物資の上限**。 非装備なら 0（＝制限なし）。
-        ///
-        /// この軸は「物資 ≤ provisionCap×40% の間だけ与ダメ+N%」という条件付きだが、
-        /// 開幕 100 のままだと序盤に一度も条件を満たさない ── 実測で 1〜3層の 1攻撃与ダメが
-        /// 遺物なし (52.1) に対し 53.6 ＝ **+2.5% しか動かず、ほぼ発動していなかった**。
-        /// 倍率を +63%→+126% に倍化しても結果は変わらなかった（発動しない区間では 0 のため）。
-        ///
-        /// そこで**軸自身が発動条件を作る**。 開幕から発動圏に居る代わりに、
-        /// 物資という資源を丸ごと前借りする（横移動の自由度・発狂までの余裕を失う）。
-        /// 賭けとして自己完結し、 他のバランスには一切影響しない。</summary>
-        public static int GetProvisionBurnStartProvision(RunState run)
-        {
-            // ctx が無い文脈なので刻印は成立扱い（RelicApplicator の規約）。
-            int step = StepOf(RelicAxis.ProvisionBurn, run, null);
-            return step > 0 ? RelicAxisCatalog.ProvisionBurnStartProvision : 0;
-        }
-
-        /// <summary>run を持たない呼び出し口（RunState.Initialize の途中）用。</summary>
-        public static int GetProvisionBurnStartProvision() => GetProvisionBurnStartProvision(null);
+        /// <summary>前のターンに会心が出たら、 このターンの会心率 +N% (心眼 3 個)。</summary>
+        public static bool HasShingan3 => Has3(RelicSet.Shingan);
+        public const string ShinganCritKey = "relic.shingan.lastCrit";
 
         // ============================================================
-        //  デバッグ表示
+        //  表示
         // ============================================================
 
         public static string DescribeEquipped()
         {
-            var r = Equipped;
-            return r == null ? "遺物なし" : r.Describe();
+            var eq = Equipped();
+            if (eq.Count == 0) return "遺物なし";
+            var parts = new List<string>();
+            foreach (var r in eq) parts.Add(r.Describe());
+            for (int s = 0; s < RelicCatalog.SetCount; s++)
+            {
+                int n = SetCount((RelicSet)s);
+                if (n >= 2) parts.Add(RelicCatalog.SetNames[s] + " " + n + " 個");
+            }
+            return string.Join(" | ", parts);
         }
     }
 }

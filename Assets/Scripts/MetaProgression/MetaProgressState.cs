@@ -68,33 +68,98 @@ namespace MetaProgression
         [System.Obsolete("GameLoop.ObservatoryState を使うこと")]
         public int observatoryMeetings;
 
-        /// <summary>所持している遺物 (§15-5)。 ラン終了ごとに 1 個追加される。
-        /// JsonUtility は Dictionary 非対応だが List&lt;[Serializable]&gt; は通る。</summary>
-        public List<Relics.RolledRelic> relics = new List<Relics.RolledRelic>();
+        /// <summary>所持している遺物 (§15-5・2026-11-10 再編)。 旧仕様の `relics` / `equippedRelicIndex` は捨てた (JsonUtility は未知の欄を黙って無視する)。
+        /// 所持の上限は無い。 JsonUtility は Dictionary 非対応だが List&lt;[Serializable]&gt; は通る。</summary>
+        public List<Relics.Relic> ownedRelics = new List<Relics.Relic>();
 
-        /// <summary>持ち込む遺物の index。 -1 = 装備なし。 **持ち込みは 1 個・コストなし**。</summary>
-        public int equippedRelicIndex = -1;
+        /// <summary>部位ごとに持ち込む遺物の index (冠 / 環 / 符)。 -1 = 空き。 持ち込みはコストなし。</summary>
+        public int[] equippedRelics = { -1, -1, -1 };
 
-        /// <summary>装備中の遺物。 未装備・破損セーブなら null。</summary>
-        public Relics.RolledRelic EquippedRelic
+        /// <summary>強化素材 (遺物 1 個の分解 = 1)。 強化 1 段に 1 使う。</summary>
+        public int relicMaterial;
+
+        /// <summary>指名したセット (-1 = 指名なし)。 ランの終わりに落ちる遺物の半分がこのセットになる。</summary>
+        public int relicTargetSet = -1;
+
+        private void EnsureRelicSlots()
         {
-            get
-            {
-                if (relics == null) return null;
-                if (equippedRelicIndex < 0 || equippedRelicIndex >= relics.Count) return null;
-                var r = relics[equippedRelicIndex];
-                // enum の並べ替え事故やセーブ破損をここで止める (効果を一切適用しない)
-                return (r != null && r.IsValid()) ? r : null;
-            }
+            if (ownedRelics == null) ownedRelics = new List<Relics.Relic>();
+            if (equippedRelics == null || equippedRelics.Length != Relics.RelicCatalog.SlotCount) equippedRelics = new[] { -1, -1, -1 };
         }
 
-        /// <summary>遺物を 1 個追加する。 初めての 1 個は自動装備する。</summary>
-        public void AddRelic(Relics.RolledRelic relic)
+        /// <summary>部位に持ち込んでいる遺物。 空き・破損・部位違いなら null。</summary>
+        public Relics.Relic EquippedRelicAt(Relics.RelicSlot slot)
+        {
+            EnsureRelicSlots();
+            int i = equippedRelics[(int)slot];
+            if (i < 0 || i >= ownedRelics.Count) return null;
+            var r = ownedRelics[i];
+            return r != null && r.IsValid() && r.Slot == slot ? r : null;
+        }
+
+        /// <summary>持ち込んでいる遺物 (0〜3 個)。</summary>
+        public List<Relics.Relic> EquippedRelics()
+        {
+            var list = new List<Relics.Relic>(3);
+            for (int k = 0; k < Relics.RelicCatalog.SlotCount; k++) { var r = EquippedRelicAt((Relics.RelicSlot)k); if (r != null) list.Add(r); }
+            return list;
+        }
+
+        /// <summary>遺物を 1 個追加する。 その部位が空いていれば持ち込みにも入れる。</summary>
+        public void AddRelic(Relics.Relic relic)
         {
             if (relic == null || !relic.IsValid()) return;
-            if (relics == null) relics = new List<Relics.RolledRelic>();
-            relics.Add(relic);
-            if (equippedRelicIndex < 0) equippedRelicIndex = relics.Count - 1;
+            EnsureRelicSlots();
+            ownedRelics.Add(relic);
+            if (EquippedRelicAt(relic.Slot) == null) equippedRelics[relic.slot] = ownedRelics.Count - 1;
+        }
+
+        /// <summary>持ち込みを切り替える (同じ遺物を押すと外す)。</summary>
+        public void ToggleEquip(int index)
+        {
+            EnsureRelicSlots();
+            if (index < 0 || index >= ownedRelics.Count || ownedRelics[index] == null) return;
+            int s = ownedRelics[index].slot;
+            equippedRelics[s] = equippedRelics[s] == index ? -1 : index;
+        }
+
+        /// <summary>遺物を分解する (素材 +1)。 持ち込みの index をずらす。</summary>
+        public bool DismantleRelic(int index)
+        {
+            EnsureRelicSlots();
+            if (index < 0 || index >= ownedRelics.Count) return false;
+            ownedRelics.RemoveAt(index);
+            relicMaterial++;
+            for (int k = 0; k < equippedRelics.Length; k++)
+            {
+                if (equippedRelics[k] == index) equippedRelics[k] = -1;
+                else if (equippedRelics[k] > index) equippedRelics[k]--;
+            }
+            return true;
+        }
+
+        /// <summary>持ち込んでいない★maxStars 以下の遺物を全部分解する。 分解した数を返す。</summary>
+        public int DismantleUpToStars(int maxStars)
+        {
+            EnsureRelicSlots();
+            int n = 0;
+            for (int i = ownedRelics.Count - 1; i >= 0; i--)
+            {
+                var r = ownedRelics[i];
+                if (r == null || r.stars > maxStars) continue;
+                if (System.Array.IndexOf(equippedRelics, i) >= 0) continue;
+                if (DismantleRelic(i)) n++;
+            }
+            return n;
+        }
+
+        /// <summary>持ち込みを丸ごと差し替える (BOT・測定用)。 所持品も渡した遺物だけにする。</summary>
+        public void SetRelicLoadout(List<Relics.Relic> relics)
+        {
+            ownedRelics = new List<Relics.Relic>();
+            equippedRelics = new[] { -1, -1, -1 };
+            if (relics == null) return;
+            foreach (var r in relics) AddRelic(r);
         }
 
         // === レガシー (旧 58 段トラック時代の遺物・マイグレーション判定にのみ使用) ===

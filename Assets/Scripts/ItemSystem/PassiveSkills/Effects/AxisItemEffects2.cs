@@ -202,14 +202,14 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>絶縁の外套: 過充電の間、 受けるダメージ −3。</summary>
+    /// <summary>絶縁の外套: 過充電の間、 ターンの始めにシールド +4 (2026-11-10・#40: 旧「受けるダメージ −3」。 充電軸に被ダメ −N が寄りすぎていた)。</summary>
     public class InsulatedCloak : IPassiveSkillEffect
     {
         public string SkillId => "絶縁の外套";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (ctx.IsOvercharged()) ctx.playerFlatDamageReduction += 3;
+            if (ctx.IsOvercharged()) Rw.Shield(ctx, 4, "絶縁の外套");
         }
     }
 

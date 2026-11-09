@@ -130,3 +130,6 @@ __pycache__/
 # HTML / PDF (生成物・資料)
 *.html
 *.pdf
+
+# CSV (測定・作業の書き出し。追跡しない)
+*.csv

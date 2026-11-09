@@ -72,27 +72,28 @@ namespace MetaProgression
         /// 周回モード (AscensionLoop) は自前で RelicRoller を呼ぶので、 自動獲得は不要。</summary>
         public static bool SuppressRelicGrant;
 
-        /// <summary>ラン終了時に遺物を 1 個獲得する (§15-5)。 クリア・死亡いずれでも呼ぶ。
-        /// floor は到達した最深層、 cleared は「その層のボスを倒したか」。</summary>
-        public static void GrantRelicOnRunEnd(int floor, bool cleared)
+        /// <summary>直近のランの終わりに入手した遺物 (結果画面が見せる)。 次のランの開始まで残る。</summary>
+        public static readonly System.Collections.Generic.List<Relics.Relic> LastRunRelics = new System.Collections.Generic.List<Relics.Relic>();
+
+        /// <summary>ラン終了時に遺物を獲得する (§15-5・2026-11-10 再編)。 クリア・死亡いずれでも呼ぶ。
+        /// ordinal は見せる層 (1〜5)。 落ちる数は 3 層以下 1 / 4 層 2 / 5 層到達 3。 難易度は挑戦カードの目盛り (8 で頭打ち)。</summary>
+        public static void GrantRelicOnRunEnd(int ordinal, bool cleared)
         {
+            LastRunRelics.Clear();
             if (SuppressRelicGrant) return;
             var s = S;
             if (s == null) return;
-            int score = s.ChallengeScore;
-            // rngIndex は同一シード内で衝突しないようにラン番号を使う。
-            int idx = GameLoop.GameRng.RunIndex;
-            var relic = Relics.RelicRoller.Roll(floor, cleared, score, idx);
-            if (relic == null || !relic.IsValid())
+            int diff = s.challengeDifficulty;
+            var got = Relics.RelicRoller.RollRunEnd(GameLoop.GameRng.RunIndex, ordinal, diff, s.relicTargetSet);
+            foreach (var relic in got)
             {
-                Debug.LogWarning($"[遺物] 生成に失敗 (層{floor} クリア{cleared} 挑戦{score})");
-                return;
+                if (relic == null || !relic.IsValid()) { Debug.LogWarning($"[遺物] 生成に失敗 (層{ordinal} 難易度{diff})"); continue; }
+                s.AddRelic(relic);
+                LastRunRelics.Add(relic);
+                Achievements.AchievementService.NoteRelicAcquired(relic);
+                Debug.Log($"[遺物] 獲得: {relic.Describe()}  (層{ordinal}{(cleared ? "クリア" : "")} / 難易度{diff} / 所持{s.ownedRelics.Count}個)");
             }
-            s.AddRelic(relic);
-            Achievements.AchievementService.NoteRelicAcquired(relic);
             MetaProgressManager.Instance?.Save();
-            Debug.Log($"[遺物] 獲得: {relic.Describe()}  "
-                    + $"(層{floor}{(cleared ? "クリア" : "で死亡")} / 挑戦{score} / 所持{s.relics.Count}個)");
         }
 
         // ============================================================
@@ -128,6 +129,15 @@ namespace MetaProgression
 
         /// <summary>装甲 (2026-11-10): 防御 +1/段 (0..10)。 戦闘開始時に防御の土台へ足す。</summary>
         public static int GetArmorDefense() => MetaPanel.ArmorDefense(Rank(MetaPanelKind.Armor));
+
+        /// <summary>装甲: 被ダメージ −N (防御の後に引く)。</summary>
+        public static int GetArmorFlatReduction() => MetaPanel.ArmorFlatReduction(Rank(MetaPanelKind.Armor));
+
+        /// <summary>装甲 r10〈不動〉: 1 回の攻撃で受けるダメージの上限 (0 = 上限なし)。</summary>
+        public static int GetArmorHitCap(int maxHp) => MetaPanel.ArmorHitCap(Rank(MetaPanelKind.Armor), maxHp);
+
+        /// <summary>装甲: 開幕シールド (段 × 刻み)。</summary>
+        public static int GetArmorOpeningShield() => MetaPanel.ArmorOpeningShield(Rank(MetaPanelKind.Armor));
 
         /// <summary>装甲 r10〈不動〉: 失った HP 10% ごとに防御 +1 (最大 +9)。 r10 未満は 0。</summary>
         public static int GetArmorImmovableDefense(int hp, int maxHp) => MetaPanel.ArmorImmovable(Rank(MetaPanelKind.Armor), hp, maxHp);

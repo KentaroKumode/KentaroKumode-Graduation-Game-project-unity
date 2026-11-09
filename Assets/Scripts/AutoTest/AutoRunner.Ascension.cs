@@ -68,7 +68,7 @@ namespace AutoTest
                     // 「5 層以上をクリアしたか」を cleared として渡し、 それ未満は到達層で評価する。
                     bool cleared = clearedFloor >= 5;
                     int layerFloor = cleared ? clearedFloor : reached;
-                    _ascension.AfterRun(layerFloor, cleared);
+                    _ascension.AfterRun(MapSystem.FreeMove.FloorPlan.OrdinalOf(reached), !died);   // 2026-11-10: 遺物の落ちる数は見せる層で決まる
 
                     tr.score.Add(_ascension.ChallengeScore);
                     tr.util.Add(_ascension.CurrentUtility);
@@ -80,8 +80,7 @@ namespace AutoTest
                 tr.swaps     = _ascension.SwapCount;
                 tr.upCount   = _ascension.DifficultyUpCount;
                 tr.downCount = _ascension.DifficultyDownCount;
-                tr.finalRelic = _ascension.CurrentRelic != null
-                              ? _ascension.CurrentRelic.Describe() : "遺物なし";
+                tr.finalRelic = _ascension.CurrentRelicText;
             }
 
             _ascension = null;

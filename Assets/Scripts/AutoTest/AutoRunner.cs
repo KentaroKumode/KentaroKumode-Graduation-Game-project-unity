@@ -705,17 +705,16 @@ namespace AutoTest
             var st = MetaProgression.MetaProgressManager.Instance?.State;
             if (st == null) return "[実効状態] MetaProgressState が null";
             int chal = st.challenge != null ? MetaProgression.ChallengeResolver.Score(st.challenge) : -1;
-            int relicCount = st.relics != null ? st.relics.Count : 0;
-            int relicPts = 0;
-            if (st.relics != null)
-                for (int i = 0; i < st.relics.Count; i++) relicPts += st.relics[i].TotalPoints;
+            var eqRelics = MetaProgression.Relics.RelicApplicator.Override ?? st.EquippedRelics();
+            int relicCount = eqRelics.Count;
+            int relicPts = RelicPresets.TotalSteps(eqRelics);
             // **生のロードアウトと解決済みキャッシュを分けて出す。**
             //   各システムが見るのは st.Challenge (解決済み)。 ロードアウトを書き換えても
             //   InvalidateChallenge() を呼ばなければ古い解決結果が残り続ける。
             //   前者だけ見て「0pt だから条件は同じ」と判断すると取り違える (2026-08-10 に実際にやった)。
             int resolved = st.Challenge != null ? st.Challenge.Score : -1;
             return $"[実効状態] 挑戦スコア ロードアウト {chal}pt / **解決済み {resolved}pt** "
-                 + $"/ 遺物 {relicCount}個 計{relicPts}pt / 装備index {st.equippedRelicIndex} "
+                 + $"/ 遺物 持ち込み {relicCount}個 計{relicPts}段 "
                  + $"/ メタ ダイス合計+{MetaProgression.MetaBuffApplicator.GetDiceTotalBonus()} "
                  + $"攻撃端子+{MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice()}";
         }
@@ -742,7 +741,7 @@ namespace AutoTest
         }
         private string _relicSweepReport;
         /// <summary>次ランに流し込む固定遺物。 ResetAll 直後に State へ入れる (周回モードと同じ位置)。</summary>
-        private MetaProgression.Relics.RolledRelic _pendingPresetRelic;
+        private System.Collections.Generic.List<MetaProgression.Relics.Relic> _pendingPresetRelic;
         /// <summary>遺物構成をスイープ側が**明示的に管理する**か。 true なら毎ラン作り直し、
         /// <see cref="_pendingPresetRelic"/> が null なら **遺物なしを強制**する。
         /// false のときだけ従来どおり「触らない」。</summary>
@@ -1187,6 +1186,12 @@ namespace AutoTest
         public int challengeCardDifficulty = 0;
         /// <summary>[測定] 物資の素の上限を差し替える。 0 = 差し替えない (2026-11-09・上限を振る測定の口)。</summary>
         public int provisionMaxOverride = 0;
+        /// <summary>[測定] 〈装甲〉の 1 段あたりの防御 / 開幕シールド。 負 = 差し替えない (2026-11-10)。</summary>
+        public int armorDefPerRank = -1, armorShieldPerRank = -1;
+        /// <summary>[測定] 〈装甲〉の被ダメージ軽減を何段ごとに −1 にするか (0 = 既定)。</summary>
+        public int armorFlatEvery = 0;
+        /// <summary>[測定] 遺物の持ち込みを固定する (2026-11-10)。 "プリセット:セット" (例 "TheoreticalBest:Kessho")。 空 = 触らない (セーブ・スイープの遺物を使う)。</summary>
+        public string relicLoadoutSpec = "";
         /// <summary>[測定] 挑戦カードを 1 枚ずつ測る: "層:カードの id" を ; で並べる (例 "1:D:狂暴化:1" / "3:B:Plunder.gold:3")。
         /// 指定した層の入口で、 難易度の引き方の代わりにそのカードを受ける。 空 = 使わない。 層は見せる層 (1..5)。</summary>
         public string challengeForce = "";
@@ -1809,8 +1814,7 @@ namespace AutoTest
                 _pendingRelicExplicit = true;
                 _pendingPresetRelic = RelicPresets.Build(RelicPresets.Preset.TheoreticalBestCursed);
                 MetaProgression.MetaBuffApplicator.SuppressRelicGrant = true;
-                Debug.Log("[AutoRunner] 遺物を理論値固定 (TheoreticalBestCursed "
-                        + $"{MetaProgression.Relics.RelicRoller.TotalCap}pt/5枠+刻印)");
+                Debug.Log("[AutoRunner] 遺物を理論値固定 (TheoreticalBest・心眼 3 個・30 段)");
             }
 
             // 計測モード: 武器家系の乗り換え禁止。 **static はドメインリロードで消える**ので

@@ -1,134 +1,83 @@
+using System.Collections.Generic;
 using MetaProgression.Relics;
 
 namespace AutoTest
 {
     /// <summary>
-    /// AutoRunner 用の遺物プリセット。 正本: docs/GAME.md §15-5。
-    ///
-    /// **なぜ要るか**: 遺物は持ち込み 1 個・コストなしの恒常ボーナスなので、
-    /// これを固定しないと L3 ボスチューナーと tier list が「どのプレイヤーを基準にした値か」を
-    /// 失う。 MetaAllocationPresets が整備パネルに対して果たしている役割と同じ。
-    ///
-    /// 天井 (TheoreticalBest) は **29pt ＝ メイン9 + サブ5×4** で、 §15-5 の理論最良
-    /// (2026-08-08 の段上限引き上げに追従。 旧 18pt)。
-    /// 実際には難度 30 の 5 層以上クリアでしか出ないので、 **上限の測定用**であって
-    /// 「よくいるプレイヤー」ではない。 標準は Mid。
+    /// AutoRunner 用の遺物プリセット (持ち込み 3 個の組)。 正本: docs/GAME.md §15-5 (2026-11-10 再編)。
+    /// 遺物を固定しないと L3 ボスチューナーと tier list が「どのプレイヤーを基準にした値か」を失う
+    /// (MetaAllocationPresets が整備パネルに対して果たしている役割と同じ)。 乱数は使わない ── 比較可能性を保つため常に同じ組を返す。
+    /// <para>セットは心眼 (会心・主攻撃) で固定。 どのビルドでも主攻撃は振るので、 セットの選び方で結果が割れにくい。</para>
     /// </summary>
     public static class RelicPresets
     {
         public enum Preset
         {
-            /// <summary>遺物なし。 バランスの床。 周回 0 のプレイヤー。</summary>
+            /// <summary>遺物なし。 バランスの床。</summary>
             None,
-            /// <summary>難度 0 で 5 層クリアを何度か回した頃の標準形（3枠・合計 9）。
-            /// **ボス調整の基準はこれ**。</summary>
+            /// <summary>一通り使える頃 (★3・サブ 2 個 1 段・心眼 3 個)。 ボス調整の基準。</summary>
             Mid,
-            /// <summary>難度 25 で 7 層クリアあたりの上位形（5枠・合計 16）。</summary>
+            /// <summary>★4・サブ 3 個 (出やすい 2 個が 2 段・残り 1 段)。</summary>
             High,
-            /// <summary>理論最良 29pt（5枠・メイン9 + サブ5×4）。 天井の測定用。</summary>
+            /// <summary>理論値 (★4・+4・出やすいサブ 3 個がすべて 2 段・心眼 3 個)。 天井の測定用。</summary>
             TheoreticalBest,
-            /// <summary>理論最良に刻印を載せた形。 メインが段7 になる上振れの上限。</summary>
+            /// <summary>[旧] 刻印付きの理論最良。 刻印の廃止 (2026-11-10) で TheoreticalBest と同じ組を返す (呼び出し側の互換のため残す)。</summary>
             TheoreticalBestCursed,
         }
 
-        /// <summary>プリセットを実体化する。 **軸の選び方は固定**（乱数を使わない）──
-        /// スイープの比較可能性を保つため、 プリセットは常に同じ遺物を返す。</summary>
-        public static RolledRelic Build(Preset p)
+        public const RelicSet PresetSet = RelicSet.Shingan;
+
+        public static List<Relic> Build(Preset p) => Build(p, PresetSet);
+
+        public static List<Relic> Build(Preset p, RelicSet set)
         {
-            switch (p)
+            if (p == Preset.None) return null;
+            var list = new List<Relic>(3);
+            for (int k = 0; k < RelicCatalog.SlotCount; k++)
             {
-                case Preset.Mid:
-                    // 3枠・合計9。 §15-5 の平均化バイアス下で最頻の形 (5,2,2)。
-                    return Make(RelicCurse.None,
-                        RelicAxis.Attack, 5,
-                        RelicAxis.DamagePct, 2,
-                        RelicAxis.DamageReductionPct, 2);
-
-                case Preset.High:
-                    // 5枠・合計16。 難度25・7層クリア帯で最も出やすい (6,3,3,2,2)。
-                    // 2026-08-08: 会心率が引退したので 防御貫通 へ差し替え。
-                    return Make(RelicCurse.None,
-                        RelicAxis.Attack, 6,
-                        RelicAxis.DamagePct, 3,
-                        RelicAxis.DamageReductionPct, 3,
-                        RelicAxis.ArmorPenPct, 2,
-                        RelicAxis.MaxHp, 2);
-
-                case Preset.TheoreticalBest:
-                case Preset.TheoreticalBestCursed:
-                    // 2026-08-08: 段上限の引き上げ (メイン6→9 / サブ3→5) に追従。
-                    //   総点 18 → **29** (メイン9 + サブ5×4)。 期待与ダメ +108% → +174% 相当。
-                    return Make(p == Preset.TheoreticalBestCursed ? RelicCurse.NoRoleFired : RelicCurse.None,
-                        RelicAxis.Attack, 9,
-                        RelicAxis.DamagePct, 5,
-                        RelicAxis.DamageReductionPct, 5,
-                        RelicAxis.ArmorPenPct, 5,     // 2026-08-08: 会心率 引退につき差し替え
-                        RelicAxis.MaxHp, 5);
-
-                default:
-                    return null;   // None
+                var r = new Relic { slot = k, set = (int)set };
+                var main = r.MainStat;
+                // 出やすいサブ → 普通の順に、 主ステと重ならないものを 3 つ
+                var subs = new List<RelicStat>();
+                foreach (var s in RelicCatalog.SubPool) if (s != main && RelicCatalog.IsLikely(set, s)) subs.Add(s);
+                foreach (var s in RelicCatalog.SubPool) if (s != main && !subs.Contains(s) && RelicCatalog.SubWeight(set, s) >= RelicCatalog.WeightNormal) subs.Add(s);
+                switch (p)
+                {
+                    case Preset.Mid:
+                        r.stars = 3; r.enhance = 0;
+                        Add(r, subs[0], 1); Add(r, subs[1], 1);
+                        break;
+                    case Preset.High:
+                        r.stars = 4; r.enhance = 2;
+                        Add(r, subs[0], 2); Add(r, subs[1], 2); Add(r, subs[2], 1);
+                        break;
+                    default:   // TheoreticalBest / TheoreticalBestCursed
+                        r.stars = 4; r.enhance = RelicCatalog.MaxEnhance;
+                        Add(r, subs[0], 2); Add(r, subs[1], 2); Add(r, subs[2], 2);
+                        break;
+                }
+                list.Add(r);
             }
+            return list;
         }
 
-        /// <summary>単軸スイープ用。 **メイン枠に指定軸・段N、 サブ 2 枠は全アーム共通の埋め草**。
-        ///
-        /// **枠 1 本の遺物は作れない。** <see cref="RolledRelic.IsValid"/> が枠数 3〜5 を要求し、
-        /// <c>MetaProgressState.EquippedRelic</c> は不正な遺物に null を返す ＝ 効果が一切乗らない。
-        /// 実測: 枠 1 本で組んだ版は 17 区分すべてが「遺物なし」で走り、 与ダメ+45% が
-        /// 与ダメを 1 も動かさなかった (2026-08-08)。 サブ 2 枠を必ず埋めること。
-        ///
-        /// サブは全アームで同じ軸・同じ段 1 なので、 **アーム間の差はメイン軸だけに帰属する**。
-        /// 埋め草が指定軸と衝突したら次の候補へ送る (同一軸の重複は IsValid が弾く)。
-        ///
-        /// 段は既定で 9 (通常の上限)。 実測では挑戦 25pt 以上のメインは段8・9 が 6 割強を
-        /// 占めるので、 **段9 が「その軸を引き当てたときの実際の姿」**に最も近い。
-        ///
-        /// 高難易度限定軸 (渇き/刻限/背水) もここでは素通しで載る ──
-        /// 出現制限は RelicRoller 側の抽選条件であって、 効果側の条件ではない。</summary>
-        public static RolledRelic BuildSingleAxis(RelicAxis axis, int step = 9)
+        /// <summary>"プリセット:セット" を組にする (空・解釈できなければ null)。</summary>
+        public static List<Relic> Parse(string spec)
         {
-            // 埋め草の候補。 開幕系は「戦闘開始時 1 回だけ」なので、 メイン軸の測定に
-            // 与える干渉が最も小さい。 段 1 = サブの構造下限。
-            var fillerPool = new[] { RelicAxis.OpeningBleed, RelicAxis.OpeningPoison, RelicAxis.Rinkai };
-            var r = new RolledRelic { curse = (int)RelicCurse.None };
-            r.axes.Add((int)axis); r.steps.Add(step);
-            for (int i = 0; i < fillerPool.Length && r.axes.Count < 3; i++)
-            {
-                if (fillerPool[i] == axis) continue;
-                r.axes.Add((int)fillerPool[i]); r.steps.Add(1);
-            }
-            if (!r.IsValid())
-                UnityEngine.Debug.LogError($"[RelicPresets] 単軸遺物が不正: {r.Describe()} — 効果は乗らない");
-            return r;
+            if (string.IsNullOrEmpty(spec)) return null;
+            var parts = spec.Split(':');
+            if (!System.Enum.TryParse(parts[0], true, out Preset p)) return null;
+            var set = PresetSet;
+            if (parts.Length > 1 && !System.Enum.TryParse(parts[1], true, out set)) return null;
+            return Build(p, set);
         }
 
-        /// <summary>MetaProgressState へ流し込む。 AutoRunner のラン開始前に呼ぶ。</summary>
-        public static void Apply(Preset p)
-        {
-            var st = MetaProgression.MetaProgressManager.Instance?.State;
-            if (st == null) return;
-            st.relics = new System.Collections.Generic.List<RolledRelic>();
-            st.equippedRelicIndex = -1;
-            var r = Build(p);
-            if (r != null) st.AddRelic(r);
-        }
+        private static void Add(Relic r, RelicStat s, int step) { r.subStats.Add((int)s); r.subSteps.Add(step); }
 
-        public static string Describe(Preset p)
+        /// <summary>段の合計 (3 個ぶん)。 表示用。</summary>
+        public static int TotalSteps(List<Relic> list)
         {
-            var r = Build(p);
-            return r == null ? "遺物なし" : r.Describe();
-        }
-
-        // 可変長の (軸, 段) ペアから 1 個組み立てる。 index 0 がメイン。
-        private static RolledRelic Make(RelicCurse curse, params object[] pairs)
-        {
-            var r = new RolledRelic { curse = (int)curse };
-            for (int i = 0; i + 1 < pairs.Length; i += 2)
-            {
-                r.axes.Add((int)(RelicAxis)pairs[i]);
-                r.steps.Add((int)pairs[i + 1]);
-            }
-            return r;
+            int n = 0; if (list != null) foreach (var r in list) n += r.TotalSteps; return n;
         }
     }
 }

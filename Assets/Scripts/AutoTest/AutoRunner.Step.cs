@@ -152,6 +152,10 @@ namespace AutoTest
                     var stc = MetaProgression.MetaProgressManager.Instance?.State;
                     if (stc != null) stc.challengeDifficulty = challengeCardDifficulty;
                     GameHooks.ProvisionMaxOverride = provisionMaxOverride;
+                    GameHooks.ArmorDefPerRankOverride = armorDefPerRank;
+                    GameHooks.ArmorShieldPerRankOverride = armorShieldPerRank;
+                    GameHooks.ArmorFlatEveryOverride = armorFlatEvery;
+                    MetaProgression.Relics.RelicApplicator.Override = RelicPresets.Parse(relicLoadoutSpec);
                     GameHooks.ForcedChallengeCards = ParseChallengeForce(challengeForce);
                     GameHooks.ChooseChallengeCard = challengeCardPickByAxis ? BotHooks.ChooseChallengeByAxis : (System.Func<IReadOnlyList<string>, int>)null;
                 }
@@ -187,9 +191,8 @@ namespace AutoTest
                         //   一致していたため、 合計だけ見ても気づけない ── 配点先の軸が違う)。
                         if (_pendingRelicExplicit)
                         {
-                            st.relics = new List<MetaProgression.Relics.RolledRelic>();
-                            st.equippedRelicIndex = -1;
-                            if (_pendingPresetRelic != null) st.AddRelic(_pendingPresetRelic);
+                            st.SetRelicLoadout(_pendingPresetRelic != null
+                                ? _pendingPresetRelic.ConvertAll(r => r.Clone()) : null);
                         }
                         if (_pendingChallengeLoadout != null)
                         {

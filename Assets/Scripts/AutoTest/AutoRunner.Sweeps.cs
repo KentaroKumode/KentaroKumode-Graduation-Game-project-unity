@@ -162,7 +162,7 @@ namespace AutoTest
             sb.AppendLine($"配線AI  : {wiringSkill}");
             sb.AppendLine($"ペルソナ Standard 固定 / 遺物 "
                         + (forceNoRelic ? "**なし** (対照アーム)"
-                           : $"TheoreticalBestCursed ({MetaProgression.Relics.RelicRoller.TotalCap}pt/5枠+刻印) 固定"));
+                           : "TheoreticalBest (心眼 3 個・30 段) 固定"));
             sb.AppendLine($"1 段階 {runs} ラン / 決定論シード: 0000 0000 0000 0000");
             sb.AppendLine($"※ 全軸最高 Tier = {MetaProgression.ChallengeCatalog.BaseMaxScore}pt "
                         + $"(T4 込みの満点は {MetaProgression.ChallengeCatalog.TotalMaxScore}pt)");
@@ -437,245 +437,11 @@ namespace AutoTest
         /// 踏みに行かない**（回復目標が高く低HP/低物資に留まらない）ことを疑うこと。</summary>
         private IEnumerator RunRelicAxisSweep()
         {
-            bool prevSuppress = MetaProgression.MetaBuffApplicator.SuppressRelicGrant;
-            MetaProgression.MetaBuffApplicator.SuppressRelicGrant = true;
-            var prevPickMode = itemPickMode;
-            itemPickMode = ItemPickMode.BuildFocused;
-            _ascensionPersonaLock = true;
-            _currentPersona = BuildPersona.Standard;
-            // 裏ボスは遮断する。 レイピアを引いたランだけ 5層の難度が跳ね上がり、
-            // 軸間の差より大きい分散源になるため。
-            bool prevHidden5 = GameLoop.GameManager.SuppressLayer5HiddenBoss;
-            GameLoop.GameManager.SuppressLayer5HiddenBoss = true;
-
-            int runs = Mathf.Max(50, relicAxisSweepRuns);
-            int step = Mathf.Clamp(relicAxisSweepStep, 1, MetaProgression.Relics.RelicAxisCatalog.CursedStep);
-            var axes = MetaProgression.Relics.RelicAxisCatalog.All;
-
-            var loadout = AscensionLoop.BuildLoadoutAtScore(relicAxisSweepChallengeScore);
-            int actualScore = MetaProgression.ChallengeResolver.Score(loadout);
-
-            var sb = new StringBuilder();
-            sb.AppendLine("=== 遺物 単軸スイープ (§15-5) ===");
-            sb.AppendLine($"日時    : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-            sb.AppendLine($"ペルソナ Standard 固定 / 挑戦スコア {actualScore} 固定 / 5層裏ボス遮断");
-            sb.AppendLine($"遺物は **メイン枠 = 対象軸@段{step} + 全アーム共通の埋め草サブ 2 枠** / 1 軸 {runs} ラン");
-            sb.AppendLine($"ペア比較の基準は [基準]攻撃3 (メインだけ段3 へ落とした同一構成)。 遺物なしは文脈用。");
-            sb.AppendLine("決定論シード: 0000 0000 0000 0000");
-            sb.AppendLine();
-            sb.AppendLine("軸            段の効果                              | 平均到達層 | 5層クリア | 7層クリア | 1攻撃与ダメ | 被ダメ/戦 | 5F改善/悪化 (McNemar p) | 7F改善/悪化 (McNemar p)");
-
-            // ペア比較の基準の 1 ラン単位の結果。 **同一シードのペア比較**に使う。
-            //   平均どうしの比較は使わない ── 500 ランでも 5層クリアの標準誤差が ±2.2pt あり、
-            //   軸 1 本の寄与 (数pt) が埋もれるため (§13-5 / paircmp と同じ方針)。
-            bool[] baseC5 = new bool[runs];
-            // **7層クリアでも取る。** 5層クリア後にしか効かない軸は 5F 指標では「効果ゼロ」と測定される
-            //   (2026-08-08 に旧〈Λ共鳴〉で実際に誤読した。 Λ共鳴は 2026-10-28 に引退)。
-            bool[] baseC7 = new bool[runs];
-            // 追加区分 (会心群/渇き群) はビルドごと条件を変えるので、 **その区分の基準**と対にする。
-            //   全体基準と比べると「軸の寄与」と「ビルドを変えた効果」が混ざるため。
-            bool[] grpC5 = new bool[runs], grpC7 = new bool[runs];
-
-            // ── 追加区分: **その軸を主軸に据えたビルドで測り直す** ──
-            //   軸によっては「噛み合わせて初めて働く」ので、 Standard/Balanced では実力が出ない。
-            //   ただし条件を変えたら**基準も同じ条件で取り直す**こと ── そうしないと
-            //   「軸の寄与」と「ビルドを変えた効果」が混ざる。 区分ごとに基準を先頭へ置く。
-            //     会心群: ペルソナ Crit (メタ側の会心軸は 2026-09-10 に撤去)
-            //     渇き群: provisionRefillFloor = 0 ＝ **物資を買い戻さない** = 低物資を維持する命令
-            int extraCrit = 3;   // [会心基準]攻撃3 / 会心率 / 会心倍率
-            int extraProvision = 2;   // [渇き基準]攻撃3 / 渇き
-            int total = axes.Length + extraCrit + extraProvision;
-
-            // 診断モード: [基準]攻撃3 と指定軸の 2 アームだけ。 追加区分は回さない。
-            bool diagOne = relicAxisSweepOnlyAxis >= 0 && relicAxisSweepOnlyAxis < axes.Length;
-            if (diagOne) { extraCrit = 0; extraProvision = 0; total = axes.Length; }
-            ResetScreenProgress((diagOne ? 3 : total + 2) * runs, "遺物単軸");
-
-            var prevPolicy = PolicyParameters.Current;
-            var prevMetaAxis = metaBuildAxis;
-
-            // ai == -2: 遺物なし (文脈用・ペア比較の基準にはしない)
-            // ai == -1: **ペア比較の基準** = メイン 攻撃@段3 + 全アーム共通の埋め草サブ 2 枠
-            //           枠構成を揃えないと「軸の差」と「埋め草の有無」が混ざる。
-            //           段3 はメインの構造下限なので、 ここからの差分が軸の寄与になる。
-            // ai >= 0 : メインを対象軸@段N へ差し替え (末尾 5 本は上記の追加区分)
-            int armOrdinal = 0;
-            for (int ai = -2; ai < total; ai++)
-            {
-                // ── この区分の測定条件を決める ──
-                var armPersona = BuildPersona.Standard;
-                var armMeta    = prevMetaAxis;
-                float armProvisionRefill = -1f;                 // <0 = 既定のまま
-                var armAxis = MetaProgression.Relics.RelicAxis.Attack;
-                int  armStep = MetaProgression.Relics.RelicAxisCatalog.MainStepMin;
-                string groupTag = "";
-                float armProvisionCeil = -1f;                   // <0 = 既定 (上限まで満たす)
-
-                // 診断モードでは指定軸以外の本体アームを飛ばす (基準 ai==-1 は残す)。
-                if (diagOne && ai >= 0 && ai != relicAxisSweepOnlyAxis) continue;
-                curArmIndex = ++armOrdinal;
-                curArmCount = diagOne ? 3 : total + 2;
-                curRunsPerArm = runs;
-
-                int ci = ai - axes.Length;                  // 追加区分のインデックス
-                if (ai >= 0 && ci < 0) { armAxis = axes[ai]; armStep = step; }
-                else if (ci >= 0 && ci < extraCrit)
-                {
-                    armPersona = BuildPersona.Crit;
-                    // 2026-09-10: 精密トラック撤去に伴い PrecisionApex を廃止。 会心群は
-                    //   ペルソナ Crit + 標準配分 (Balanced) で測る ── メタ側に会心軸が無くなった。
-                    armMeta = MetaAllocationPresets.Preset.Balanced;
-                    groupTag = "会心";
-                    if (ci == 1) { armAxis = MetaProgression.Relics.RelicAxis.CritRatePct; armStep = step; }
-                    if (ci == 2) { armAxis = MetaProgression.Relics.RelicAxis.CritMultPct; armStep = step; }
-                }
-                else if (ci >= extraCrit)
-                {
-                    // **帯を維持する**。 補充を止める (refill=0) と物資が 0 まで落ちて発狂で
-                    //   ランが終わり、 上限まで満たすと〈渇き〉の発動条件から外れる。
-                    //   実測ではどちらも軸が死んだので、 発動閾値 (provisionCap×40%) の少し下を
-                    //   天井に、 発狂を避けられる高さを床に置いて **帯 [18, 38] を維持**する。
-                    armProvisionRefill = 4f;   // 2026-11-09 デノミ (旧 180)
-                    armProvisionCeil   = 0.38f;
-                    groupTag = "渇き";
-                    if (ci == extraCrit + 1) { armAxis = MetaProgression.Relics.RelicAxis.ProvisionBurn; armStep = step; }
-                }
-
-                metaBuildAxis = armMeta;
-                var pol = prevPolicy.Clone();
-                if (armProvisionRefill >= 0f) pol.provisionRefillFloor = armProvisionRefill;
-                if (armProvisionCeil   >= 0f) pol.provisionBandCeilRatio = armProvisionCeil;
-                PolicyParameters.SetCurrent(pol);
-
-                bool isGroupBase = ci >= 0 && (ci == 0 || ci == extraCrit);
-
-                var relic = ai == -2 ? null
-                          : RelicPresets.BuildSingleAxis(armAxis, armStep);
-                string label = ai == -2 ? "(遺物なし)"
-                             : ai == -1 ? "[基準]攻撃3"
-                             : isGroupBase ? $"[{groupTag}基準]攻撃3"
-                             : (groupTag != "" ? groupTag + ":" : "")
-                               + MetaProgression.Relics.RelicAxisCatalog.NameOf(armAxis);
-                curArmLabel = label;
-                string effect = ai == -2 ? "—"
-                              : (ai == -1 || isGroupBase) ? "攻撃+3 (+埋め草サブ2枠)"
-                              : MetaProgression.Relics.RelicAxisCatalog.Describe(armAxis, armStep);
-                // **装備できているかを毎行に出す。** 枠数 1 の遺物は IsValid() で弾かれ、
-                //   EquippedRelic が null を返して効果が一切乗らない ── これを黙って通すと
-                //   「全軸が横並び」という読める形の嘘になる (2026-08-08 に実際に起きた)。
-                if (relic != null && !relic.IsValid()) effect = "!!装備不可!! " + effect;
-
-                var reach = new int[9];
-                int c5 = 0, c7 = 0; double sumFloor = 0;
-                int recBase = _records.Count;
-                var thisC5 = new bool[runs];
-                var thisC7 = new bool[runs];
-                CombatStats.ResetFloorDamage();
-                MetaProgression.Relics.RelicApplicator.ResetProvisionBurnStats();
-
-                for (int i = 0; i < runs; i++)
-                {
-                    // **全軸で同じ runIdx を使う ＝ ペア比較にする。** (ai を混ぜない)
-                    //   軸ごとに別シード帯を割ると軸間の差にシード分散が丸ごと乗り、
-                    //   300 ラン (5層クリアの標準誤差 ±2.9pt) では軸の寄与が完全に埋もれる。
-                    //   実測: 軸ごとに別帯にした版では 攻撃+9 が与ダメを下げ、
-                    //   攻撃に無関係な 被ダメージ−45% が与ダメを上げる、という構造上ありえない
-                    //   並びが出た (2026-08-08)。 同一シードなら差は軸だけに帰属する。
-                    //
-                    // **BeginRun を必ず呼ぶ。** 抜けるとラン間で乱数列が引き継がれる (2026-08-04)。
-                    int runIdx = 40000 + i;
-                    GameLoop.GameRng.BeginRun(runIdx);
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
-                    _currentPersona = armPersona;
-                    _pendingChallengeLoadout = loadout;
-                    _pendingPresetRelic = relic;
-                    yield return RunOne(runIdx);
-
-                    var rec = _records.Count > 0 ? _records[_records.Count - 1] : null;
-                    int reached = rec != null ? rec.reachedFloor : 1;
-                    bool died = rec == null || rec.outcome == Outcome.GameOver;
-                    int cf = died ? reached - 1 : reached;
-                    reach[Mathf.Clamp(reached, 0, 8)]++; sumFloor += reached;
-                    if (cf >= 5) { c5++; thisC5[i] = true; }
-                    if (cf >= 7) { c7++; thisC7[i] = true; }
-                    if ((i + 1) % Mathf.Max(1, runsPerYield) == 0) yield return null;
-                }
-                if (ai == -1)
-                {
-                    System.Array.Copy(thisC5, baseC5, runs);
-                    System.Array.Copy(thisC7, baseC7, runs);
-                }
-                if (isGroupBase)
-                {
-                    System.Array.Copy(thisC5, grpC5, runs);
-                    System.Array.Copy(thisC7, grpC7, runs);
-                }
-                // 追加区分の軸は自分の区分基準と、 それ以外は全体基準と対にする。
-                bool inGroup = ci >= 0;
-                var refC5 = inGroup ? grpC5 : baseC5;
-                var refC7 = inGroup ? grpC7 : baseC7;
-
-                // ── ペア比較 (McNemar)。 同一シードなので「同じランがどう転んだか」で見る ──
-                //   b = 軸ありだけ 5層クリア / c = 基準だけ 5層クリア。
-                //   一致したランは検定に寄与しない ＝ 分散が落ちて数pt の差が読める。
-                int b = 0, cc = 0, b7 = 0, c7b = 0;
-                for (int i = 0; i < runs; i++)
-                {
-                    if (thisC5[i] && !refC5[i]) b++;
-                    else if (!thisC5[i] && refC5[i]) cc++;
-                    if (thisC7[i] && !refC7[i]) b7++;
-                    else if (!thisC7[i] && refC7[i]) c7b++;
-                }
-                bool isBaseRow = ai < 0 || isGroupBase;
-                string mc  = isBaseRow ? "—" : $"{b,3}/{cc,3} (p={McNemarP(b, cc),6:F3})";
-                string mc7 = isBaseRow ? "—" : $"{b7,3}/{c7b,3} (p={McNemarP(b7, c7b),6:F3})";
-
-                // 1〜3F の通常+エリート戦だけ (ボスは長さの性質が違うので除く)。
-                //   FloorDamage の第3添字は 0=攻撃回数 / 1=与ダメ合計 / 2=最小 / 3=最大 /
-                //   4=敵maxHP合計 / 5=ターン合計 / 6=戦闘数。 **被ダメは入っていない**ので
-                //   そちらは _records の戦闘明細から拾う。
-                var fd = CombatStats.FloorDamage;
-                double atk = 0, dmgOut = 0;
-                for (int f = 1; f <= 3; f++)
-                    for (int k = 0; k < 2; k++)
-                    { atk += fd[f, k, 0]; dmgOut += fd[f, k, 1]; }
-
-                double dmgIn = 0; int fights = 0;
-                for (int r = recBase; r < _records.Count; r++)
-                {
-                    var cl = _records[r].combats;
-                    if (cl == null) continue;
-                    for (int c = 0; c < cl.Count; c++)
-                        if (!cl[c].isBoss && cl[c].floor >= 1 && cl[c].floor <= 3)
-                        { dmgIn += cl[c].damageTaken; fights++; }
-                }
-
-                sb.AppendLine($"{label,-12} {Trunc(effect, 36),-36} | {sumFloor / runs,10:F2} | "
-                            + $"{c5 * 100.0 / runs,8:F1}% | {c7 * 100.0 / runs,8:F1}% | "
-                            + $"{(atk > 0 ? dmgOut / atk : 0),11:F1} | {(fights > 0 ? dmgIn / fights : 0),9:F1} | {mc} | {mc7}");
-                // 〈渇き〉のアームだけ、 発動率を追記する。 「弱い」と「発動していない」を分けるため。
-                if (armAxis == MetaProgression.Relics.RelicAxis.ProvisionBurn)
-                    sb.AppendLine($"             └ {MetaProgression.Relics.RelicApplicator.DescribeProvisionBurnStats()}");
-            }
-
-            sb.AppendLine();
-            sb.AppendLine("※ 基準は 1 行目 (遺物なし)。 単位の定義は『参照状態での期待与ダメ 6% = 攻撃+1』(§15-5)。");
-            sb.AppendLine("※ **全軸が同一シード**。 判断は『5F改善/悪化』の McNemar p 値で行い、");
-            sb.AppendLine("   平均どうしの比較はしない (300ランの標準誤差 ±2.9pt に軸の寄与が埋もれるため)。");
-            sb.AppendLine("※ 末尾 5 行は測定条件を変えた区分。 会心群=ペルソナCrit /");
-            sb.AppendLine("   渇き群=物資を帯 [18, provisionCap×38%] に維持 (発動閾値 40% の下に留めつつ発狂を避ける)。");
-            sb.AppendLine("   **各区分の先頭が対の基準**。");
-            _relicAxisSweepReport = sb.ToString();
-
-            _pendingChallengeLoadout = null;
-            _pendingPresetRelic = null;
-            _ascensionPersonaLock = false;
-            itemPickMode = prevPickMode;
-            metaBuildAxis = prevMetaAxis;
-            PolicyParameters.SetCurrent(prevPolicy);
-            GameLoop.GameManager.SuppressLayer5HiddenBoss = prevHidden5;
-            MetaProgression.MetaBuffApplicator.SuppressRelicGrant = prevSuppress;
+            // 2026-11-10: 遺物の再編 (3 部位・セット・強化・§15-5) で「メイン枠 1 本だけの遺物」が作れなくなったので撤去した。
+            //   新しい遺物の軸ごとの寄与を測るときは、 RelicPresets で 3 部位の組を作って比べる (遺物のバランス調整の issue)。
+            _relicAxisSweepReport = "=== 遺物 単軸スイープ ===\n2026-11-10 の遺物の再編で撤去 (§15-5)。\n";
+            Debug.LogWarning("[AutoRunner] 遺物の単軸スイープは 2026-11-10 の再編で撤去した");
+            yield break;
         }
 
         // ============================================================
@@ -2177,8 +1943,8 @@ namespace AutoTest
                     if ((i + 1) % Mathf.Max(1, runsPerYield) == 0) yield return null;
                 }
 
-                int pts = relic != null ? relic.TotalPoints : 0;
-                int slots = relic != null ? relic.SlotCount : 0;
+                int pts = RelicPresets.TotalSteps(relic);
+                int slots = relic != null ? relic.Count : 0;
                 var dist = new StringBuilder();
                 for (int f = 1; f <= 7; f++) dist.Append($"{reach[f] * 100.0 / runs,5:F1}%");
                 sb.AppendLine($"{preset,-22} {pts,2}/{slots} | {sumFloor / runs,10:F2} | "

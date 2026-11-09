@@ -23,7 +23,7 @@ namespace UI.Game2D
             new Track { kind = MetaPanelKind.Plunder, name = "強奪", desc = "ボス撃破の追加ゴールド +1/段・通常の敵のパッシブドロップ +2%/段。 r10: ショップ強盗を解禁。" },
             new Track { kind = MetaPanelKind.Trade,   name = "商才", desc = "ショップの特売枠 +1/段 (15/30/50% 引き)。 r10: 99% 引きの枠が出る。" },
             new Track { kind = MetaPanelKind.Supply,  name = "宝物庫", desc = "r3/6/9 で開幕パッシブ +1 本・段が上がるほどレア度が上寄り。 r10: 開幕パッシブが選択式。" },
-            new Track { kind = MetaPanelKind.Armor,   name = "装甲", desc = "防御 +2/段。 r10〈不動〉: 失った HP 10% ごとに防御 +1 (最大 +9)。 防御は割合の軽減になり、 積むほど伸びは鈍る。 相手の貫通に削られる。" },
+            new Track { kind = MetaPanelKind.Armor,   name = "装甲", desc = "防御 +2/段・被ダメージ −1/段。 r10〈不動〉: 1 回の攻撃で受けるダメージは最大 HP の 35% まで。 防御は割合の軽減 (積むほど伸びは鈍る)、 被ダメージ −N は防御の後に引く。" },
         };
 
         private static readonly Track[] Declare =
@@ -74,7 +74,7 @@ namespace UI.Game2D
                 case MetaPanelKind.Plunder: return "ボス +" + MetaPanel.PlunderBossGold(r) + "G・ドロップ +" + MetaPanel.PlunderPassiveDropPct(r).ToString("0") + "%" + (r >= 10 ? "・強盗" : "");
                 case MetaPanelKind.Trade:   return "特売の枠 " + MetaPanel.TradeSaleSlots(r) + (r >= 10 ? "・99% 引き" : "");
                 case MetaPanelKind.Supply:  return "開幕パッシブ " + MetaPanel.SupplyStartingPassives(r) + " 本" + (r >= 10 ? "・選べる" : "");
-                case MetaPanelKind.Armor:   return "防御 +" + MetaPanel.ArmorDefense(r) + (r >= 10 ? "・不動" : "");
+                case MetaPanelKind.Armor:   return "防御 +" + MetaPanel.ArmorDefense(r) + "・被ダメ −" + MetaPanel.ArmorFlatReduction(r) + (r >= 10 ? "・不動" : "");
                 case MetaPanelKind.AttackTerm: return "つないだ 1 本ごと +" + MetaPanel.AttackTerminalPerDice(r);
                 case MetaPanelKind.BlockTerm:  return "つないだ 1 本ごと +" + MetaPanel.BlockTerminalPerDice(r);
             }
@@ -107,6 +107,7 @@ namespace UI.Game2D
             d.buttons.Add(new ModalBtn { label = _page == 0 ? "宣言へ" : "数値へ", action = "page" });
             d.buttons.Add(new ModalBtn { label = "全戻し", action = "respec" });
             d.buttons.Add(new ModalBtn { label = "挑戦", action = "challenge" });
+            d.buttons.Add(new ModalBtn { label = "遺物", action = "relic" });
             d.buttons.Add(new ModalBtn { label = "閉じる", action = "close" });
             string per = _page == 1 ? "1 段 3pt。 " : "1 段 1pt。 ";
             d.footer = per + "バーを押す・引いて段を決める (戻すのは無料)" + (mpm.IsPointCapReached ? "" : "。 pt はトークン " + cost + " で 1 つ");
@@ -117,6 +118,7 @@ namespace UI.Game2D
                 {
                     case "close": Close(); return;
                     case "challenge": Game2DChallengePanel.Show(_modal); return;
+                    case "relic": Game2DRelicPanel.Show(_modal); return;
                     case "inc":
                         if (kind == null) break;
                         if (mpm.TryAssignRank(kind.Value)) Game2DSfx.Play("ui_confirm");

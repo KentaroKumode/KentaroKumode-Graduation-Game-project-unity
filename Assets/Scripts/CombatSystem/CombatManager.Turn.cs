@@ -485,6 +485,10 @@ namespace CombatSystem
                     DmgSourceDiag.Note("消費〈会心率〉", DmgSourceDiag.CritRate, ctx.consCritPct);
                 }
                 if (ctx.consFlatReduce > 0) ctx.playerFlatDamageReduction += ctx.consFlatReduce;
+                // 整備パネル〈装甲〉: 被ダメージ −1/段 (防御の後に引く・逓減を受けない・2026-11-10)
+                ctx.playerFlatDamageReduction += MetaProgression.MetaBuffApplicator.GetArmorFlatReduction();
+                // 遺物 電流 3 個: 過充電の間、 被ダメ −3
+                ctx.playerFlatDamageReduction += MetaProgression.Relics.RelicApplicator.GetOverchargeFlatReduce(ctx);
                 ctx.lastDamageCause = ItemSystem.PassiveSkills.DeathCause.Normal;
             }
 
@@ -831,6 +835,11 @@ namespace CombatSystem
                 }
             }
             int _diagAtkRaw = attackSum;
+            // 遺物 (§15-5) 堅牢の環: ブロックに挿した出目 +N% (出目の合計に掛けて切り上げ・端子調律より前)
+            {
+                float rbp = MetaProgression.Relics.RelicApplicator.GetBlockDicePct();
+                if (rbp > 0f && blockSum > 0) blockSum += Mathf.CeilToInt(blockSum * rbp);
+            }
 
             // 端子調律メタバフ: **接続したダイス 1 本あたり** +N (2026-07-28 に「合計 +N」から変更)。
             // r3 で 3 本挿せば +9 ── 端子へ厚く配線するほど伸びるので、 §6-4 の配線判断と噛む。
@@ -1070,6 +1079,7 @@ namespace CombatSystem
             //   逃げるターンは固定ダメの枠も捨てる (atkBase の確定後に足された臨界爆発・品が預けた分を含む)。
             //   役の追撃も攻撃に付くものなので、 攻撃しないターンには乗せない。
             if (skipAttack) { dealtDmg = 0; isCrit = false; }
+            if (isCrit) ctx.accumulatedValues[MetaProgression.Relics.RelicApplicator.ShinganCritKey] = 1f;   // 遺物 心眼 3 個 (次のターンの会心率)
             if (_fleeRequested) dealtFixed = 0;
             // 〈炉温〉の②: この攻撃の爆発に会心が乗る (爆発は固定ダメ枠なので、 会心の判定が済んだここで差分を足す)。
             if (ctx.burstCritRule && isCrit && !_fleeRequested
@@ -1244,6 +1254,7 @@ namespace CombatSystem
                 if (_diagKind == SkillDiag.Boss && currentEnemy != null)
                     SkillDiag.BossDmgOf(currentEnemy.id)[5] += Math.Min(bleedDmg, enemyHP);
                 RaiseDotDamage(DotKind.Bleed, Math.Min(bleedDmg, enemyHP));      // 入った分だけ (攻撃で倒れていれば 0 = 鳴らない)
+                RelicBloodOffering(Math.Min(bleedDmg, enemyHP));
                 CombatStats.DamageBreakdown[21] += Math.Max(0, Math.Min(bleedDmg, enemyHP));   // [計装] 出血
                 HpLossDiag.Lose(ref enemyHP, bleedDmg, "出血");
             }
@@ -1385,6 +1396,8 @@ namespace CombatSystem
 
                 takenDmg = MetaProgression.MetaDebuffApplicator.ApplyJudgmentDamageIncrease(
                     takenDmg, GameLoop.GameManager.Instance?.Run, playerHP);
+                // 整備パネル〈装甲〉r10〈不動〉: 1 回の攻撃で受けるダメージは最大 HP の 35% まで (2026-11-10)
+                { int cap = MetaProgression.MetaBuffApplicator.GetArmorHitCap(playerMaxHP); if (cap > 0 && takenDmg > cap) takenDmg = cap; }
                 playerHP = Math.Max(0, playerHP - takenDmg);
                 takenApplied = takenDmg;
                 MetaProgression.MetaDebuffApplicator.NoteDamageTaken(
@@ -1490,6 +1503,7 @@ namespace CombatSystem
 
                     secTaken = MetaProgression.MetaDebuffApplicator.ApplyJudgmentDamageIncrease(
                         secTaken, GameLoop.GameManager.Instance?.Run, playerHP);
+                    { int cap = MetaProgression.MetaBuffApplicator.GetArmorHitCap(playerMaxHP); if (cap > 0 && secTaken > cap) secTaken = cap; }   // 〈装甲〉r10〈不動〉
 
                     if (secTaken > 0)
                     {

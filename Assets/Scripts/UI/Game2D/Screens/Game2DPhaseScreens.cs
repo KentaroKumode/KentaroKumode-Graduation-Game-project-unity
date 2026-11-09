@@ -154,6 +154,10 @@ namespace UI.Game2D
                     bool clear = ph == GameManager.GamePhase.RunClear;
                     var d = New(clear ? "踏破" : "力尽きた");
                     d.body = run != null ? "到達 " + run.currentFloor + " 層 ／ 戦闘 " + run.totalBattles + " ／ 勝利 " + run.totalWins + " ／ 所持金 " + run.coins + "G" : "";
+                    // 入手した遺物 (§15-5・2026-11-10): ランの終わりに落ちた分を見せる (所持品へは自動で入っている)
+                    foreach (var rel in MetaProgression.MetaBuffApplicator.LastRunRelics)
+                        d.Items.Add(new ModalItem { name = "入手: " + rel.Name, value = "★" + rel.stars,
+                            desc = MetaProgression.Relics.RelicCatalog.Describe(rel.MainStat, rel.MainStep) + (rel.SubCount > 0 ? " ほか サブ " + rel.SubCount + " 個" : "") });
                     d.buttons.Add(B("タイトルへ", "ok", true));
                     d.onAction = (a, _) => { gm.ReturnToTitle(); Refresh(); };
                     return d;

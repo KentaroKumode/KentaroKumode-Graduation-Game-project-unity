@@ -68,6 +68,8 @@ namespace ItemSystem.PassiveSkills.Keywords
         {
             if (ctx == null || n <= 0 || ctx.rinkaiThreshold <= 0 || ctx.heatSealed) return;   // heatSealed: 誓約で封じた
             n += ctx.heatGainBonus;   // 〈炉温〉の①: 臨界を得るたび +1
+            float relicHeat = MetaProgression.Relics.RelicApplicator.GetHeatGainPct();   // 遺物 炉温 2 個: 臨界の獲得量 +20% (切り上げ)
+            if (relicHeat > 0f) n += (int)System.Math.Ceiling(n * relicHeat);
             ctx.rinkaiMeter += n;
             int guard = 0;
             while (ctx.rinkaiMeter >= ctx.rinkaiThreshold && guard++ < 50)
@@ -80,6 +82,8 @@ namespace ItemSystem.PassiveSkills.Keywords
                 ctx.accumulatedValues[BurstExcessKey] = ctx.rinkaiMultiBurst ? 0 : excess;
                 Debug.Log($"[臨界] 閾値{th} 到達 → 爆発 (超過 {excess}・残 {ctx.rinkaiMeter})");
                 Raise(ctx, PassiveSkillTrigger.OnRinkaiBurst, th);
+                int relicSh = MetaProgression.Relics.RelicApplicator.GetBurstShield();   // 遺物 炉温 3 個: 爆発のたびにシールド +6
+                if (relicSh > 0) { ctx.consShield += relicSh; ctx.shieldGainedTotal += relicSh; CombatSystem.ShieldDiag.Note("遺物〈炉温〉3", relicSh); }
                 if (!ctx.rinkaiMultiBurst) break;
             }
         }

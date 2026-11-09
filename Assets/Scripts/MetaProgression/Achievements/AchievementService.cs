@@ -57,13 +57,15 @@ namespace MetaProgression.Achievements
         {
             if (Suppressed || state == null) { run = null; return; }
             var meta = MetaProgressManager.Instance?.State;
-            var relic = meta?.EquippedRelic;
+            var relics = meta != null ? meta.EquippedRelics() : null;
+            bool fullSet = false;
+            for (int s = 0; s < RelicCatalog.SetCount; s++) if (RelicApplicator.Has3((RelicSet)s)) fullSet = true;
             run = new RunProgress
             {
                 active = true,
                 startMaxHp = Math.Max(1, state.playerMaxHP),
-                relicEquipped = relic != null,
-                cursedRelicEquipped = relic != null && relic.Curse != RelicCurse.None,
+                relicEquipped = relics != null && relics.Count > 0,
+                cursedRelicEquipped = fullSet,   // 2026-11-10: 刻印の廃止に伴い「同じセットを 3 個持ち込んだ」に読み替え (id は据え置き)
                 challenge = meta?.challenge != null ? ChallengeResolver.Build(meta.challenge.Clone()) : ResolvedChallenge.None,
             };
             Unlock(AchievementCatalog.FirstRun);
@@ -226,19 +228,17 @@ namespace MetaProgression.Achievements
 
         public static void NoteFinalPageOpened() { if (Ready) Unlock(AchievementCatalog.HiddenFinalPage); }
 
-        public static void NoteRelicAcquired(RolledRelic relic)
+        /// <summary>遺物を入手した・強化した時に呼ぶ (§15-5・2026-11-10)。 主ステ最大 = ★4 / サブ最大 = どれかのサブが 2 段 / 全部最大 = ★4・サブ 3 個がすべて 2 段。</summary>
+        public static void NoteRelicAcquired(Relic relic)
         {
             if (Suppressed || relic == null || !relic.IsValid()) return;
             Unlock(AchievementCatalog.FirstRelic);
-            bool mainMax = relic.steps != null && relic.steps.Count > 0 && relic.steps[0] >= RelicAxisCatalog.MainStepMax;
-            bool subMax = false, allMax = relic.steps != null && relic.steps.Count >= 3 && relic.steps[0] == RelicAxisCatalog.MainStepMax;
-            if (relic.steps != null)
+            bool mainMax = relic.stars >= RelicCatalog.MaxStars;
+            bool subMax = false, allMax = mainMax && relic.SubCount >= RelicCatalog.MaxSubs;
+            for (int i = 0; i < relic.SubCount; i++)
             {
-                for (int i = 1; i < relic.steps.Count; i++)
-                {
-                    if (relic.steps[i] >= RelicAxisCatalog.SubStepMax) subMax = true;
-                    if (relic.steps[i] != RelicAxisCatalog.SubStepMax) allMax = false;
-                }
+                if (relic.subSteps[i] >= RelicCatalog.SubStepMax) subMax = true;
+                else allMax = false;
             }
             if (mainMax) Unlock(AchievementCatalog.RelicMainMax);
             if (subMax) Unlock(AchievementCatalog.RelicSubMax);

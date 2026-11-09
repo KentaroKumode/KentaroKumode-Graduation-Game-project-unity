@@ -214,6 +214,16 @@ namespace CombatSystem
         /// </summary>
         /// <param name="amount">回復量</param>
         /// <returns>実際に回復した量</returns>
+        /// <summary>遺物 (§15-5) 血晶の環〈血贄〉: 出血が与えたダメージの N% を回復 (切り捨て)。 敵味方問わず ── 今はプレイヤーに出血が無いので敵の出血だけ。</summary>
+        private void RelicBloodOffering(int bleedDealt)
+        {
+            if (bleedDealt <= 0) return;
+            float p = MetaProgression.Relics.RelicApplicator.GetBloodOfferingPct();
+            if (p <= 0f) return;
+            int heal = (int)(bleedDealt * p);
+            if (heal > 0) HealPlayer(heal);
+        }
+
         public int HealPlayer(int amount)
         {
             if (amount <= 0) return 0;
@@ -618,7 +628,8 @@ namespace CombatSystem
             {
                 ctx.enemyDefense = Math.Max(0, enemy.defense) + MetaProgression.MetaDebuffApplicator.GetEnemyDefenseBonus();   // 挑戦カード: 敵の防御 +N
                 ctx.enemyArmorPen = Math.Max(0, enemy.armorPen);
-                ctx.playerDefenseBase = DefenseFormula.PlayerBaseDefense + _weaponDefense + MetaProgression.MetaBuffApplicator.GetArmorDefense();
+                ctx.playerDefenseBase = DefenseFormula.PlayerBaseDefense + _weaponDefense + MetaProgression.MetaBuffApplicator.GetArmorDefense()
+                                      + MetaProgression.Relics.RelicApplicator.GetDefense();   // 遺物 (§15-5) 防御 +N
                 ctx.playerArmorPenBase = _weaponArmorPen;
                 ctx.playerDefense = ctx.playerDefenseBase;
                 ctx.playerArmorPen = ctx.playerArmorPenBase;
@@ -682,7 +693,8 @@ namespace CombatSystem
                 // 整備パネル分は 2026-08-15 に割合軽減へ移したのでここには居ない
                 // (GetGuardDamageReductionPct)。 アイテム副次ステータスは 2026-09-15 に全廃。
                 // 残るのは遺物 (§15-5) だけ。
-                int openingShield = MetaProgression.Relics.RelicApplicator.GetOpeningShield(relicRun);
+                // 遺物の開幕シールドは 2026-11-10 の再編で撤去 (毎戦闘タダで配られ、 シールドバッシュで火力に化ける・§15-5)
+                int openingShield = MetaProgression.MetaBuffApplicator.GetArmorOpeningShield();   // 整備パネル〈装甲〉の開幕シールド (2026-11-10)
                 // 防御 r10 (極点): 前戦闘の残りシールドを持ち越す。 使い切ったら 0。
                 if (relicRun != null && relicRun.carriedShield > 0)
                 {
@@ -708,6 +720,10 @@ namespace CombatSystem
 
                 int rb = MetaProgression.Relics.RelicApplicator.GetOpeningBleed(relicRun);
                 if (rb > 0) { ctx.AddEnemyBleed(rb); Debug.Log($"[遺物] 開幕出血 +{rb}"); }
+
+                // 遺物 (§15-5) 敵の段階の遅れ (瘴気の環)。 役〈時間〉と同じ遅延の枠へ
+                int rdelay = MetaProgression.Relics.RelicApplicator.GetEscalationDelay();
+                if (rdelay > 0) { YachtRoleEffects.AddEscalationDelay(ctx, rdelay); Debug.Log($"[遺物] 敵の段階の遅れ +{rdelay}T"); }
 
                 int rp = MetaProgression.Relics.RelicApplicator.GetOpeningPoison(relicRun);
                 if (rp > 0)
