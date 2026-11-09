@@ -4,68 +4,112 @@ using GameLoop;
 namespace MetaProgression
 {
     /// <summary>
-    /// 挑戦カード (docs/GAME.md §23-25・第 1 段 2026-11-08)。 難易度 = ラン中にカードを引く回数。
-    /// 層の移り目 (開始・1→2・2→3・3→4・4→5) で 2 枚から 1 枚を選び、 選んだカードのデバフとバフを両方受ける。
+    /// 挑戦カード (docs/GAME.md §23-25・第 2 段 2026-11-09)。 難易度 = ラン中にカードを引く回数。
+    /// 見せる層の入口 (開始・1→2・2→3・3→4・4→5) で 2 枚から 1 枚を選び、 選んだカードのデバフとバフを両方受ける。
     ///
-    /// <para><b>効果は既存の仕組みに載せる</b>。 デバフ = 挑戦の軸の Tier / Tier4 (<see cref="MetaDebuffApplicator.C"/> がカードから組み直した構成を返す)、
-    /// バフ = 整備パネルの段の上乗せ (<see cref="MetaBuffApplicator"/> の段数に足す)。 数字はどちらも元の関数が持ち、 ここは写しを持たない。
-    /// 同じ軸のデバフを重ねたら重い Tier 1 つが効く。 バフの段は足し算で、 トラックの上限で止まる。</para>
+    /// <para><b>カード専用の効果</b>: 1 つの種類を Tier I〜IV で強さ (値) だけ変える。 旧の挑戦の軸や整備パネルの段は借りない。
+    /// 効果の値は <see cref="Value"/> で種類ごとに引き、 各システムの計算の場所 (<see cref="MetaDebuffApplicator"/> / <see cref="MetaBuffApplicator"/> の getter) が読む。</para>
     ///
-    /// <para><b>第 1 段で外したもの</b>: 〈遅い回復〉と Tier4〈破綻〉は作り直す予定なので配らない。 バフは<b>ラン中に毎回読み直している効果だけ</b>
-    /// (ラン開始時にだけ効く 外殻・金庫・兵站・燈火 と、 種火 r3 の開幕の品は、 途中で段を足しても効かないので外す)。</para>
+    /// <para><b>同じ種類はランで 1 度だけ</b> (デバフもバフも)。 重ねの定義も上限も要らない。 軽い段で先に取って重い段を消すのは戦術として許す。
+    /// デバフは 4 つの系統 (攻撃・耐久・手・経済) に分け、 1 回の 2 枚は別の系統から配る (作れなければ系統の条件を外す)。
+    /// バフは軸ごとに 1 種類 (毒・出血・臨界・充電・シールド・会心) + 汎用。</para>
     /// </summary>
     public static class ChallengeCards
     {
         public const int MaxDifficulty = 10;
-        /// <summary>引く場所の数 (開始・1→2・2→3・3→4・4→5)。 層 d (1..5) に入る時が場所 d-1。</summary>
+        /// <summary>引く場所の数 (開始・1→2・2→3・3→4・4→5)。 見せる層 n (1..5 = RunState.currentFloor) に入る時が場所 n-1。</summary>
         public const int Slots = 5;
         public static readonly string[] SlotNames = { "開始", "1→2", "2→3", "3→4", "4→5" };
 
+        public enum Family { None, Attack, Durability, Hand, Economy }
+
         public sealed class Card
         {
-            public string id;
+            public string id, kind;
             public int tier;
-            /// <summary>重なりの判定に使う種類 (デバフ = 軸 / Tier4 の名前・バフ = 整備のトラック)。</summary>
-            public string kind;
             public bool isBuff;
-            public ChallengeAxis axis; public int axisTier; public bool isT4; public ChallengeT4 t4;
-            public MetaPanelKind panel; public int ranks;
+            public Family family;
+            /// <summary>効果の量 (種類ごとに意味が違う。 % の種類は % の数)。</summary>
+            public float value;
+            /// <summary>2 つ目の量 (〈最後の審判〉の刻限ターン・〈先手を取られる〉のターン数)。 他の種類は 0。</summary>
+            public float value2;
+            /// <summary>効果がまだ実装されていない (配らない)。</summary>
+            public bool pending;
         }
 
         private static readonly List<Card> _all = new List<Card>();
         private static readonly Dictionary<string, Card> _byId = new Dictionary<string, Card>();
 
-        private static void D(int tier, ChallengeAxis ax, int axTier)
-            => Add(new Card { id = "D:" + ax + ":" + axTier, tier = tier, kind = ax.ToString(), axis = ax, axisTier = axTier });
-        private static void T4(ChallengeT4 v)
-            => Add(new Card { id = "D:T4:" + v, tier = 4, kind = "T4:" + v, isT4 = true, t4 = v });
-        private static void B(int tier, MetaPanelKind k, int ranks)
-            => Add(new Card { id = "B:" + k + ":" + ranks, tier = tier, kind = k.ToString(), isBuff = true, panel = k, ranks = ranks });
-        private static void Add(Card c) { _all.Add(c); _byId[c.id] = c; }
+        // ── 種類 (kind) の名前。 効果を読む側はこの名前で Value を引く ──
+        // デバフ
+        public const string EnemyAtk = "eatk", EnemyHp = "ehp", EnemyDef = "edef", Die1 = "die1", Bag = "bag", UseCap = "use",
+            Price = "price", Money = "money", Esc = "esc", BossEsc = "bossesc", Steel = "steel",
+            Judge = "judge", Heavy = "heavy", Heal = "heal", Ambush = "ambush",
+            Twin = "twin", Regen = "regen", Erode = "erode", EnemyShield = "eshield", Opener = "opener", Rage = "rage";
+        // バフ
+        public const string Poison = "poison", Bleed = "bleed", Heat = "heat", Charge = "charge", Shield = "shield", Crit = "crit",
+            Output = "out", TermAtk = "tatk", TermBlk = "tblk", WinGold = "gold", Cat = "cat", GoldPunch = "punch", MaxHp = "maxhp", HealUp = "healup";
+
+        /// <summary>1 つの種類を Tier ごとの値で登録する。 null の Tier には出さない。 <paramref name="v2"/> は 2 つ目の量を持つ種類だけ (審判の刻限・先手のターン数)。</summary>
+        private static void K(string kind, bool buff, Family fam, float?[] v, bool pending = false, float?[] v2 = null)
+        {
+            for (int t = 1; t <= 4; t++)
+            {
+                if (!v[t - 1].HasValue) continue;
+                var c = new Card { id = (buff ? "B:" : "D:") + kind + ":" + t, kind = kind, tier = t, isBuff = buff, family = fam, value = v[t - 1].Value,
+                    value2 = v2 != null && v2[t - 1].HasValue ? v2[t - 1].Value : 0f, pending = pending };
+                _all.Add(c); _byId[c.id] = c;
+            }
+        }
+        private static float?[] T(float? a, float? b, float? c, float? d) => new[] { a, b, c, d };
 
         static ChallengeCards()
         {
-            // ── デバフ: 挑戦の軸 (ChallengeCatalog) の Tier をそのまま使う。 カードの Tier ≒ 軸の Tier ──
-            D(1, ChallengeAxis.長引く負傷, 1); D(1, ChallengeAxis.穴の空いた鞄, 1); D(1, ChallengeAxis.狂暴化, 1); D(1, ChallengeAxis.綻び, 1);
-            D(1, ChallengeAxis.見放された運, 1); D(1, ChallengeAxis.通行料, 1); D(1, ChallengeAxis.絶望的な戦闘, 1);
-            D(2, ChallengeAxis.長引く負傷, 2); D(2, ChallengeAxis.穴の空いた鞄, 2); D(2, ChallengeAxis.厚い皮膚, 2); D(2, ChallengeAxis.狂暴化, 2);
-            D(2, ChallengeAxis.綻び, 2); D(2, ChallengeAxis.搾取経済, 2); D(2, ChallengeAxis.宿屋連合, 2); D(2, ChallengeAxis.絶望的な戦闘, 2);
-            D(3, ChallengeAxis.長引く負傷, 3); D(3, ChallengeAxis.厚い皮膚, 3); D(3, ChallengeAxis.狂暴化, 3); D(3, ChallengeAxis.綻び, 3);
-            D(3, ChallengeAxis.見放された運, 3); D(3, ChallengeAxis.搾取経済, 3); D(3, ChallengeAxis.絶望的な戦闘, 3); D(3, ChallengeAxis.天変地異, 3);
-            T4(ChallengeT4.鋼の皮膚); T4(ChallengeT4.凶運); T4(ChallengeT4.破産); T4(ChallengeT4.最後の審判);
+            // ── デバフ (汎用の圧)。 2026-11-09 の 1 枚ずつの測定から、 目標の重さ (I −3.6 / II −5.3 / III −6.6 / IV −9.7) に届く Tier にだけ置く。
+            //    I は 1 層・II は 4 層・III/IV は 5 層の入口で受けるので、 ラン全体で効く札 (経済・持ち込み・HP) は I に、 戦闘を直接重くする札は II〜IV に寄る。
+            //    値は比例で逆算した見込み (要測定)。
+            K(EnemyAtk, false, Family.Attack, T(7, 14, 26, 37));          // 敵の攻撃 +N% (予告の前・Escalation.GetMultiplier)
+            K(Esc, false, Family.Attack, T(20, 40, 70, 100));             // エスカレーションの上がり幅 +N% (段の倍率の 1 を超えた分に掛ける)
+            K(BossEsc, false, Family.Attack, T(null, 1, 1, null));        // ボス戦ではエスカレーションが毎ターン進む
+            K(Judge, false, Family.Attack, T(null, 30, 35, 50), v2: T(null, 300, 300, 260));   // 〈最後の審判〉累計 v2 ターンの後、 敵の攻撃 +N%
+            K(Heavy, false, Family.Attack, T(null, 0.5f, 0.7f, 1.0f));    // 大技の倍率 +N
+            K(Ambush, false, Family.Attack, T(null, 60, 70, 100), v2: T(null, 2, 3, 3));   // 〈先手を取られる〉形態の最初の v2 ターン、 敵の攻撃 +N% (予告に出るのでブロックで受けられる)
+            K(Twin, false, Family.Attack, T(null, null, 40, 60));         // 〈連撃〉敵の攻撃が 2 回。 2 回目は N% の威力 (ブロックは 2 回とも効く)
+            K(Opener, false, Family.Attack, T(null, null, 100, 150));     // 〈開幕の大技〉ボスの各形態の最初のターン、 敵の攻撃 +N%
+            K(Rage, false, Family.Attack, T(null, 2, 3, 5));              // 〈怒り〉形態の中で 1 ターン進むごとに敵の攻撃 +N% (加算)
+            K(EnemyHp, false, Family.Durability, T(30, null, null, null));   // 敵の最大 HP +N% (連戦の全段)
+            K(EnemyDef, false, Family.Durability, T(2, 3, null, null), pending: true);   // 敵の防御 +N ── 受けると易しくなる (I +1.5 有意)。 原因を調べるまで配らない
+            K(Steel, false, Family.Durability, T(1, null, null, null));   // 〈鋼の皮膚〉
+            K(Regen, false, Family.Durability, T(null, null, 2, 3));      // 〈再生〉敵が毎ターン最大 HP の N% を回復する
+            K(EnemyShield, false, Family.Durability, T(null, null, 3, 5));   // 〈敵のシールド〉敵は毎ターン、 最大 HP の N% までシールドを張り直す
+            K(Die1, false, Family.Hand, T(null, 1, 2, 3));                // 戦闘中ずっと、 ダイス N 本の出目が 1 (大きい目から潰す)
+            K(Erode, false, Family.Hand, T(null, null, 1, 2));            // 〈蝕み〉ターンの始めに、 最大 HP の N% の軽減できないダメージ (シールドは肩代わりする)
+            K(Bag, false, Family.Hand, T(4, null, null, null));           // 消耗品は N 個までしか持てない
+            K(UseCap, false, Family.Hand, T(2, null, null, null));        // 1 戦闘で使える消耗品は N 個まで
+            K(Heal, false, Family.Hand, T(40, null, null, null));         // 回復 −N% (層の入口の全回復にも)
+            K(Price, false, Family.Economy, T(6, null, null, null));      // 店の品物の値段 +N%
+            K(Money, false, Family.Economy, T(35, null, null, null));     // 層を移るたび、 所持金の N% を失う
 
-            // ── バフ: 整備パネルの段の上乗せ。 種火 (軸の向き) を主に、 汎用の地力は少なめ ──
-            foreach (var k in Sparks) B(1, k, 1);
-            B(1, MetaPanelKind.Output, 1); B(1, MetaPanelKind.Plunder, 3); B(1, MetaPanelKind.Trade, 2);
-            foreach (var k in Sparks) B(2, k, 2);
-            B(2, MetaPanelKind.AttackTerm, 1); B(2, MetaPanelKind.BlockTerm, 1); B(2, MetaPanelKind.Output, 2);
-            B(3, MetaPanelKind.AttackTerm, 2); B(3, MetaPanelKind.BlockTerm, 2); B(3, MetaPanelKind.Output, 4);
-            B(3, MetaPanelKind.Plunder, 6); B(3, MetaPanelKind.Trade, 5);
-            B(4, MetaPanelKind.AttackTerm, 3); B(4, MetaPanelKind.BlockTerm, 3); B(4, MetaPanelKind.Output, 8);
+            // ── バフ (構成の向き: 軸ごとに 1 種類 + 汎用)。 2026-11-09: 壊れていない限り据え置き (勝利の金は I +11.4 で壊れていたので外した) ──
+            K(Poison, true, Family.None, T(10, 20, 30, 40));              // 毒: 半減で減る量を N% 減らす (残る割合 50 → 55/60/65/70%)
+            K(Bleed, true, Family.None, T(2, 4, 6, 8));                   // 出血 2 につき敵の攻撃 −1 (最大 −N)
+            K(Heat, true, Family.None, T(2, 3, 5, 8));                    // 臨界: 毎ターン、 メーター +N
+            K(Charge, true, Family.None, T(6, 10, 15, 25));               // 充電: 上限 +N・開幕の充電 +ChargeOpening(Tier)
+            K(Shield, true, Family.None, T(10, 20, 30, 50));              // シールド: 減衰で減る量を N% 減らす
+            K(Crit, true, Family.None, T(5, 8, 12, 18));                  // 会心率 +N%
+            K(Output, true, Family.None, T(5, 8, 12, 18));                // 与ダメ +N%
+            K(TermAtk, true, Family.None, T(null, 1, 2, 3));              // 攻撃の端子: 挿したダイス 1 個ごとに配線合計 +N
+            K(TermBlk, true, Family.None, T(null, 1, 2, 3));              // ブロックの端子: 同上
+            K(MaxHp, true, Family.None, T(5, 8, 12, 18));                 // 最大 HP +N% (受けた時に上げ、 上がった分だけ HP も増える)
+            K(HealUp, true, Family.None, T(10, 15, 20, 30));              // 回復 +N% (回復の倍率に掛ける。 入口の全回復は満タンまでなので、 回復 −N% を打ち消す分だけ効く)
+            K(Cat, true, Family.None, T(2, null, null, null), pending: true);          // 猫の手 (予告と BOT の配線に先に見せる仕組みができてから)
+            K(GoldPunch, true, Family.None, T(null, null, 1, 1), pending: true);     // 金で殴る (BOT の方策ができてから)
         }
 
-        private static readonly MetaPanelKind[] Sparks =
-            { MetaPanelKind.SparkPoison, MetaPanelKind.SparkBleed, MetaPanelKind.SparkRinkai, MetaPanelKind.SparkCharge, MetaPanelKind.SparkShield };
+        /// <summary>充電の札の、 開幕の充電 (Tier ごと)。</summary>
+        public static int ChargeOpening(int tier) => tier == 1 ? 3 : tier == 2 ? 5 : tier == 3 ? 8 : tier == 4 ? 12 : 0;
+        /// <summary>〈鋼の皮膚〉のボスの HP の上乗せ (%)。 敵の最大 HP の札と同じ溜まりに足す (掛け算にしない)。</summary>
+        public const float SteelBossHpPct = 20f;
 
         public static Card Get(string id) => id != null && _byId.TryGetValue(id, out var c) ? c : null;
         public static IReadOnlyList<Card> All => _all;
@@ -87,160 +131,138 @@ namespace MetaProgression
             return outp;
         }
 
-        /// <summary>層 depth (1..5) に入る時の場所。 それ以外は -1。</summary>
-        public static int SlotOfDepth(int depth) => depth >= 1 && depth <= Slots ? depth - 1 : -1;
+        /// <summary>見せる層 (1..5 = <see cref="RunState.currentFloor"/>) に入る時の場所。 それ以外は -1。
+        /// <b>深さ (<see cref="RunState.Depth"/> = 0/1/3/5/6/7) で引かないこと</b> ── 2026-11-08 に深さで引いて、 1→2 と 3→4 の場所が一度も配られていなかった。</summary>
+        public static int SlotOfLayer(int layer) => layer >= 1 && layer <= Slots ? layer - 1 : -1;
 
         // ============================================================
         //  配る (2 枚・表と裏の組)
         // ============================================================
 
-        /// <summary>Tier の 2 組を配る。 返すのは "デバフの id|バフの id" の 2 つ。 同じ回の 2 組は表どうし・裏どうしの種類が別。
-        /// すでに受けた種類は出やすさ 1/4 (同じ軸を何枚も重ねない)。 乱数は専用の鍵 (他の抽選の消費列を動かさない)。</summary>
+        /// <summary>Tier の 2 組を配る。 返すのは "デバフの id|バフの id" の並び (最大 2)。
+        /// 持っている種類は配らない (表も裏も)。 2 枚の表は別の系統から (作れなければ系統の条件を外す)、 2 枚の裏は別の種類。
+        /// 乱数は専用の鍵 (他の抽選の消費列を動かさない)。</summary>
         public static List<string> Deal(int tier, IReadOnlyList<string> picks)
         {
-            var takenD = new HashSet<string>(); var takenB = new HashSet<string>();
-            if (picks != null) foreach (var p in picks) { Split(p, out var dc, out var bc); if (dc != null) takenD.Add(dc.kind); if (bc != null) takenB.Add(bc.kind); }
-            Card d1 = Draw(tier, false, takenD, null), d2 = Draw(tier, false, takenD, d1?.kind);
-            Card b1 = Draw(tier, true, takenB, null), b2 = Draw(tier, true, takenB, b1?.kind);
+            var owned = new HashSet<string>();
+            if (picks != null) foreach (var p in picks) { Split(p, out var dc, out var bc); if (dc != null) owned.Add(dc.kind); if (bc != null) owned.Add(bc.kind); }
+            var d1 = Draw(tier, false, owned, null, Family.None);
+            var d2 = d1 != null ? (Draw(tier, false, owned, d1.kind, d1.family) ?? Draw(tier, false, owned, d1.kind, Family.None)) : null;
+            var b1 = Draw(tier, true, owned, null, Family.None);
+            var b2 = b1 != null ? Draw(tier, true, owned, b1.kind, Family.None) : null;
             var outp = new List<string>(2);
             if (d1 != null && b1 != null) outp.Add(d1.id + "|" + b1.id);
             if (d2 != null && b2 != null) outp.Add(d2.id + "|" + b2.id);
             return outp;
         }
 
-        private static Card Draw(int tier, bool buff, HashSet<string> taken, string exclude)
+        /// <summary>1 枚引く。 <paramref name="avoidFamily"/> が None でなければ、 その系統を除く。</summary>
+        private static Card Draw(int tier, bool buff, HashSet<string> owned, string excludeKind, Family avoidFamily)
         {
-            var pool = new List<Card>(); var w = new List<int>(); int tot = 0;
+            var pool = new List<Card>();
             foreach (var c in _all)
             {
-                if (c.tier != tier || c.isBuff != buff || c.kind == exclude) continue;
-                int wt = taken.Contains(c.kind) ? 1 : 4;
-                pool.Add(c); w.Add(wt); tot += wt;
+                if (c.tier != tier || c.isBuff != buff || c.pending) continue;
+                if (owned.Contains(c.kind) || c.kind == excludeKind) continue;
+                if (avoidFamily != Family.None && c.family == avoidFamily) continue;
+                pool.Add(c);
             }
-            if (tot <= 0) return null;
-            int r = GameRng.RangeAuto("challenge_card", 0, tot);
-            for (int i = 0; i < pool.Count; i++) { r -= w[i]; if (r < 0) return pool[i]; }
-            return pool[pool.Count - 1];
+            if (pool.Count == 0) return null;
+            return pool[GameRng.RangeAuto("challenge_card", 0, pool.Count)];
         }
 
         public static void Split(string pick, out Card deb, out Card buf)
         {
             deb = buf = null; if (string.IsNullOrEmpty(pick)) return;
             int bar = pick.IndexOf('|');
-            if (bar < 0) { deb = Get(pick); return; }
+            if (bar < 0) { var one = Get(pick); if (one != null && one.isBuff) buf = one; else deb = one; return; }   // 片面だけ (測定)
             deb = Get(pick.Substring(0, bar)); buf = Get(pick.Substring(bar + 1));
         }
 
+        /// <summary>id が全部知っているカードか (測定の口の検査)。</summary>
+        public static bool IsKnown(string pick)
+        {
+            if (string.IsNullOrEmpty(pick)) return false;
+            foreach (var part in pick.Split('|')) if (Get(part) == null) return false;
+            return true;
+        }
+
         // ============================================================
-        //  効果: 受けたカードから挑戦の構成と整備の段を組み直す
+        //  効果: 受けたカードの値を種類ごとに引く
         // ============================================================
 
-        /// <summary>受けたカードのデバフから挑戦の構成を作る。 同じ軸は重い Tier 1 つ。 点数 = Tier の合計 + Tier4 × 4。</summary>
-        public static ResolvedChallenge Resolve(IReadOnlyList<string> picks)
+        /// <summary>受けたカードの (種類 → カード)。 同じ種類は 1 度しか受けないので 1 枚。</summary>
+        public static Dictionary<string, Card> Collect(IReadOnlyList<string> picks)
         {
-            int axisCount = 0;
-            foreach (ChallengeAxis a in System.Enum.GetValues(typeof(ChallengeAxis))) if ((int)a > axisCount) axisCount = (int)a;
-            var tiers = new int[axisCount + 1];
-            var t4 = new bool[System.Enum.GetValues(typeof(ChallengeT4)).Length + 1];
-            int score = 0;
+            var d = new Dictionary<string, Card>();
             if (picks != null)
                 foreach (var p in picks)
                 {
-                    Split(p, out var d, out _);
-                    if (d == null) continue;
-                    if (d.isT4) { if (!t4[(int)d.t4]) { t4[(int)d.t4] = true; score += ChallengeCatalog.T4Points; } }
-                    else if (d.axisTier > tiers[(int)d.axis]) tiers[(int)d.axis] = d.axisTier;
+                    Split(p, out var dc, out var bc);
+                    if (dc != null) d[dc.kind] = dc;
+                    if (bc != null) d[bc.kind] = bc;
                 }
-            for (int i = 0; i < tiers.Length; i++) score += tiers[i];
-            return new ResolvedChallenge(tiers, t4, score);
+            return d;
         }
 
-        /// <summary>受けたカードのバフで、 その整備トラックに足す段数。</summary>
-        public static int BonusRanks(IReadOnlyList<string> picks, MetaPanelKind k)
+        /// <summary>今のラン (カードのランなら) で受けている、 その種類の値。 受けていなければ 0。</summary>
+        public static float Value(string kind) => Held(kind)?.value ?? 0f;
+
+        /// <summary>今のラン (カードのランなら) で受けている、 その種類のカード。 無ければ null。</summary>
+        public static Card Held(string kind)
         {
-            int n = 0;
-            if (picks != null) foreach (var p in picks) { Split(p, out _, out var b); if (b != null && b.panel == k) n += b.ranks; }
-            return n;
+            var map = RunState.CardMap(GameManager.Instance?.Run);
+            return map != null && map.TryGetValue(kind, out var c) ? c : null;
         }
 
         // ============================================================
-        //  文面 (数字は元の関数から取る・写しを持たない)
+        //  文面 (人が読む)
         // ============================================================
 
         public static string Text(Card c)
         {
             if (c == null) return "";
-            return c.isBuff ? BuffText(c.panel, c.ranks) : DebuffText(c);
-        }
-
-        private static string DebuffText(Card c)
-        {
-            // その 1 枚だけを受けた構成で、 元の関数に効果の値を聞く
-            var prev = MetaDebuffApplicator.PreviewOverride;
-            MetaDebuffApplicator.PreviewOverride = Resolve(new[] { c.id });
-            try { return c.isT4 ? T4Effect(c.t4) : AxisEffect(c.axis); }
-            finally { MetaDebuffApplicator.PreviewOverride = prev; }
-        }
-
-        /// <summary>軸の効果 (短く)。 数字は <see cref="MetaDebuffApplicator"/> が今の構成から返す値。</summary>
-        public static string AxisEffect(ChallengeAxis a)
-        {
-            switch (a)
+            float v = c.value; string n = v.ToString("0.##");
+            switch (c.kind)
             {
-                case ChallengeAxis.長引く負傷:   return "受けたダメージの " + (MetaDebuffApplicator.GetLingeringWoundRatio() * 100f).ToString("0") + "% だけ、 最大 HP が減っていく";
-                case ChallengeAxis.穴の空いた鞄: return "消耗品は " + MetaDebuffApplicator.GetConsumableCarryCap() + " 個までしか持てない";
-                case ChallengeAxis.遅い回復:     return "回復 ×" + MetaDebuffApplicator.GetHealMultiplier().ToString("0.00");
-                case ChallengeAxis.厚い皮膚:     return "敵の最大 HP ×" + MetaDebuffApplicator.GetEnemyHpMultiplier().ToString("0.###");
-                case ChallengeAxis.狂暴化:       return "敵の攻撃 ×" + MetaDebuffApplicator.GetEnemyDamageMultiplier().ToString("0.00");
-                case ChallengeAxis.綻び:         return MetaDebuffApplicator.GetTerminalSealPeriod() + " ターンごとに、 端子が 1 つ封印される";
-                case ChallengeAxis.見放された運:
-                {
-                    int n = 0; while (n < 50 && MetaDebuffApplicator.GetForsakenLuckDiceCount(n + 1) > 0) n++;
-                    return "戦闘の最初の " + n + " ターン、 ダイス 1 本の出目が 1";
-                }
-                case ChallengeAxis.搾取経済:     return "店の値段 ×" + MetaDebuffApplicator.GetShopPriceMultiplier().ToString("0.00");
-                case ChallengeAxis.通行料:       return "層を移るたび、 所持金の " + (MetaDebuffApplicator.GetFloorTollRatio() * 100f).ToString("0") + "% を失う";
-                case ChallengeAxis.宿屋連合:     return "休むたび " + MetaDebuffApplicator.GetRestGoldCost() + "G を払う";
-                case ChallengeAxis.絶望的な戦闘: return "物資の上限 −" + (-MetaDebuffApplicator.GetProvisionCapDelta());
-                case ChallengeAxis.天変地異:     return "ボスの攻撃が、 ターンごとに +" + ((MetaDebuffApplicator.GetBossAttackMultiplier(2) - 1f) * 100f).ToString("0.#") + "% 強くなる";
+                case EnemyAtk: return "敵の攻撃 +" + n + "%";
+                case Esc: return "エスカレーションの上がり幅 +" + n + "%";
+                case BossEsc: return "ボス戦ではエスカレーションが毎ターン進む";
+                case Judge: return "ランの累計 " + c.value2.ToString("0") + " ターンを過ぎると、 敵の攻撃 +" + n + "%（最後の審判）";
+                case Heavy: return "敵の大技の倍率 +" + n;
+                case Ambush: return "戦闘 (形態ごと) の最初の " + c.value2.ToString("0") + " ターン、 敵の攻撃 +" + n + "%（先手を取られる）";
+                case Twin: return "敵の攻撃が 2 回になる。 2 回目は " + n + "% の威力（連撃）";
+                case Opener: return "ボスの各形態の最初のターン、 敵の攻撃 +" + n + "%（開幕の大技）";
+                case Rage: return "形態の中で 1 ターン進むごとに、 敵の攻撃 +" + n + "%（怒り）";
+                case Regen: return "敵が毎ターン、 最大 HP の " + n + "% を回復する（再生）";
+                case EnemyShield: return "敵は毎ターン、 最大 HP の " + n + "% までシールドを張り直す";
+                case Erode: return "ターンの始めに、 最大 HP の " + n + "% の軽減できないダメージ（蝕み）";
+                case EnemyHp: return "敵の最大 HP +" + n + "%";
+                case EnemyDef: return "敵の防御 +" + n;
+                case Steel: return "各戦闘 1 度、 敵が致命傷を HP1 で耐える・ボスの HP +" + SteelBossHpPct.ToString("0") + "%（鋼の皮膚）";
+                case Die1: return "戦闘中ずっと、 ダイス " + n + " 本の出目が 1";
+                case Bag: return "消耗品は " + n + " 個までしか持てない";
+                case UseCap: return "1 戦闘で使える消耗品は " + n + " 個まで";
+                case Heal: return "回復 −" + n + "%（層の入口の全回復にも）";
+                case Price: return "店の品物の値段 +" + n + "%";
+                case Money: return "層を移るたび、 所持金の " + n + "% を失う";
+                case Poison: return "毒: 半減で減る量 −" + n + "%（残る割合 " + (50 + v / 2f).ToString("0") + "%）";
+                case Bleed: return "出血 2 につき敵の攻撃 −1（最大 −" + n + "）";
+                case Heat: return "毎ターン、 臨界のメーター +" + n;
+                case Charge: return "充電の上限 +" + n + "・開幕の充電 +" + ChargeOpening(c.tier);
+                case Shield: return "シールド: 減衰で減る量 −" + n + "%";
+                case Crit: return "会心率 +" + n + "%";
+                case Output: return "与ダメ +" + n + "%";
+                case TermAtk: return "攻撃の端子: 挿したダイス 1 個ごとに配線合計 +" + n;
+                case TermBlk: return "ブロックの端子: 挿したダイス 1 個ごとに配線合計 +" + n;
+                case WinGold: return "戦闘に勝つたびゴールド +" + n;
+                case MaxHp: return "最大 HP +" + n + "%";
+                case HealUp: return "回復 +" + n + "%";
+                case Cat: return "猫の手: 毎ターン、 ダイス 1 個を猫が配線する。 猫が挿したダイスは出目 +" + n;
+                case GoldPunch: return "金で殴る: 攻撃に金を挿せる（1G につき攻撃 +" + n + "）";
             }
-            return a.ToString();
+            return c.kind;
         }
-
-        public static string T4Effect(ChallengeT4 t)
-        {
-            switch (t)
-            {
-                case ChallengeT4.破綻:       return "有利なマスが " + (MetaDebuffApplicator.GetVoidTileChance() * 100f).ToString("0") + "% で空振り";
-                case ChallengeT4.鋼の皮膚:   return "各戦闘 1 度、 敵が致命傷を耐える・ボスの HP ×" + MetaDebuffApplicator.GetBossHpMultiplier().ToString("0.##") + "（鋼の皮膚）";
-                case ChallengeT4.凶運:       return "役を " + MetaDebuffApplicator.SealedRoleCount + " つ、 ラン中封じる（凶運）";
-                case ChallengeT4.破産:       return "売値 ×" + MetaDebuffApplicator.GetSellPriceMultiplier().ToString("0.##") + "（破産）";
-                case ChallengeT4.最後の審判: return "戦闘の累計 " + MetaDebuffApplicator.GetJudgmentTurnThreshold() + " ターン以降、 受けるダメージが増える（最後の審判）";
-            }
-            return t.ToString();
-        }
-
-        /// <summary>整備トラックを n 段足したときの文面。</summary>
-        public static string BuffText(MetaPanelKind k, int n)
-        {
-            switch (k)
-            {
-                case MetaPanelKind.Output:     return "与ダメ +" + MetaPanel.OutputPct(n) + "%";
-                case MetaPanelKind.AttackTerm: return "攻撃に挿したダイス 1 個ごとに、 配線合計 +" + MetaPanel.AttackTerminalPerDice(n);
-                case MetaPanelKind.BlockTerm:  return "ブロックに挿したダイス 1 個ごとに、 配線合計 +" + MetaPanel.BlockTerminalPerDice(n);
-                case MetaPanelKind.Plunder:    return "ボスを倒すとゴールド +" + MetaPanel.PlunderBossGold(n) + "・敵がパッシブを落とす率 +" + MetaPanel.PlunderPassiveDropPct(n).ToString("0") + "%";
-                case MetaPanelKind.Trade:      return "店の特売の枠 +" + MetaPanel.TradeSaleSlots(n);
-                case MetaPanelKind.SparkPoison: return SparkText("毒", n, "毒を付けるたび +" + MetaPanel.PoisonApplyBonus(2));
-                case MetaPanelKind.SparkBleed:  return SparkText("出血", n, "出血 3 以上の敵の攻撃 −" + MetaPanel.BleedWeakenAttack(2, 3));
-                case MetaPanelKind.SparkRinkai: return SparkText("臨界", n, "臨界のメーターの " + (MetaPanel.RinkaiCarryoverRatio(2) * 100f).ToString("0") + "% を次の戦闘へ持ち越す");
-                case MetaPanelKind.SparkCharge: return SparkText("充電", n, "充電の上限 +" + MetaPanel.ChargeCapBonus(2) + "・開幕の充電 +" + MetaPanel.ChargeOpening(2));
-                case MetaPanelKind.SparkShield: return SparkText("シールド", n, "減衰で残るシールド +" + MetaPanel.ShieldKeepBonusPct(2) + "%");
-            }
-            return k + " +" + n;
-        }
-
-        private static string SparkText(string axis, int n, string r2)
-            => n >= 2 ? axis + "の品が店に出やすい・" + r2 : axis + "の品が店に出やすい";
 
         /// <summary>難易度 d の引き方を 1 行で (整備の窓に出す)。 例: "開始 I ／ 1→2 I ／ 4→5 II II"。</summary>
         public static string ScheduleText(int difficulty)

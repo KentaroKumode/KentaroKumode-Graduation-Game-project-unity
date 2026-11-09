@@ -17,15 +17,7 @@ namespace MetaProgression
     {
         private static MetaProgressState S => MetaProgressManager.Instance?.State;
 
-        /// <summary>整備の段数。 挑戦カードのバフで足した段 (<see cref="ChallengeCards.BonusRanks"/>) を上乗せし、 トラックの上限で止める。</summary>
-        private static int Rank(MetaPanelKind k)
-        {
-            int r = S?.GetRank(k) ?? 0;
-            var run = GameLoop.GameManager.Instance?.Run;
-            if (run != null && run.challengeCardMode && run.challengePicks.Count > 0)
-                r = System.Math.Min(k.MaxRank(), r + ChallengeCards.BonusRanks(run.challengePicks, k));
-            return r;
-        }
+        private static int Rank(MetaPanelKind k) => S?.GetRank(k) ?? 0;
 
         // ============================================================
         //  RunState 初期化時の補正
@@ -239,7 +231,7 @@ namespace MetaProgression
         // ============================================================
 
         public static int GetOutgoingDamagePct()
-            => MetaPanel.OutputPct(Rank(MetaPanelKind.Output));
+            => MetaPanel.OutputPct(Rank(MetaPanelKind.Output)) + (int)ChallengeCards.Value(ChallengeCards.Output);   // 挑戦カード: 与ダメ +N%
 
         /// <summary>出力 r10 (極点) 〈戦意〉が解禁されているか。</summary>
         public static bool IsBattleSpiritUnlocked()
@@ -322,17 +314,17 @@ namespace MetaProgression
         /// <summary>【2026-07-28 廃止】精密の段あたり会心率加算。 常に 0。
         /// 較正段規約 (r1/2/4/5/7/8 は効果なし) を破っていたため撤去。 詳細は MetaPanel 側。</summary>
         public static float GetCritRatePctBonus()
-            => MetaPanel.PrecisionCritRatePct(Rank(MetaPanelKind.Precision));
+            => MetaPanel.PrecisionCritRatePct(Rank(MetaPanelKind.Precision)) + ChallengeCards.Value(ChallengeCards.Crit) / 100f;   // 挑戦カード: 会心率 +N% (小数で足す)
 
         /// <summary>攻撃端子 配線合計への加算 (0..3)。</summary>
         /// <summary>攻撃端子: 接続ダイス 1 本あたりの加算 (0..3)。 呼び出し側で本数を掛けること。</summary>
         public static int GetAttackTerminalPerDice()
-            => MetaPanel.AttackTerminalPerDice(Rank(MetaPanelKind.AttackTerm));
+            => MetaPanel.AttackTerminalPerDice(Rank(MetaPanelKind.AttackTerm)) + (int)ChallengeCards.Value(ChallengeCards.TermAtk);
 
         /// <summary>防御端子 配線合計への加算 (0..3)。</summary>
         /// <summary>防御端子: 接続ダイス 1 本あたりの加算 (0..3)。 呼び出し側で本数を掛けること。</summary>
         public static int GetBlockTerminalPerDice()
-            => MetaPanel.BlockTerminalPerDice(Rank(MetaPanelKind.BlockTerm));
+            => MetaPanel.BlockTerminalPerDice(Rank(MetaPanelKind.BlockTerm)) + (int)ChallengeCards.Value(ChallengeCards.TermBlk);
 
         // === 種火共通 (r1 出現重み・r3 開幕所持) ===
 
@@ -363,11 +355,11 @@ namespace MetaProgression
 
         /// <summary>充電 r2: 充電上限 +N (0 or 5)。 CombatManager.ChargeMax + この値。</summary>
         public static int GetChargeCapBonus()
-            => MetaPanel.ChargeCapBonus(Rank(MetaPanelKind.SparkCharge));
+            => MetaPanel.ChargeCapBonus(Rank(MetaPanelKind.SparkCharge)) + (int)ChallengeCards.Value(ChallengeCards.Charge);
 
         /// <summary>充電 r2: 戦闘開始時に得る充電 (0 or 10・2026-11-07)。</summary>
         public static int GetChargeOpening()
-            => MetaPanel.ChargeOpening(Rank(MetaPanelKind.SparkCharge));
+            => MetaPanel.ChargeOpening(Rank(MetaPanelKind.SparkCharge)) + ChallengeCards.ChargeOpening(ChallengeCards.Held(ChallengeCards.Charge)?.tier ?? 0);
 
         /// <summary>臨界 r2: 戦闘終了時にメーターの何割を次戦闘へ持ち越すか (0 or 0.5)。</summary>
         public static float GetRinkaiCarryoverRatio()
@@ -379,6 +371,16 @@ namespace MetaProgression
 
         /// <summary>出血 r2: 敵の出血 3 以上で敵攻撃値 -N (0 or 2)。 CombatManager 予告後・敵攻撃前で減算。</summary>
         public static int GetBleedWeakenAttack(int enemyBleedStacks)
-            => MetaPanel.BleedWeakenAttack(Rank(MetaPanelKind.SparkBleed), enemyBleedStacks);
+            => MetaPanel.BleedWeakenAttack(Rank(MetaPanelKind.SparkBleed), enemyBleedStacks)
+               + System.Math.Min((int)ChallengeCards.Value(ChallengeCards.Bleed), enemyBleedStacks / 2);   // 挑戦カード: 出血 2 につき −1 (最大はカードの値)
+
+        /// <summary>挑戦カード: 毎ターン足す臨界のメーター。</summary>
+        public static int GetHeatPerTurn() => (int)ChallengeCards.Value(ChallengeCards.Heat);
+        /// <summary>挑戦カード: 戦闘に勝つたびの追加ゴールド。</summary>
+        public static int GetWinGoldBonus() => (int)ChallengeCards.Value(ChallengeCards.WinGold);
+        /// <summary>挑戦カード: 毒の半減で減る量を減らす割合 (0..1)。</summary>
+        public static float GetPoisonDecayCut() => ChallengeCards.Value(ChallengeCards.Poison) / 100f;
+        /// <summary>挑戦カード: シールドの減衰で減る量を減らす割合 (0..1)。</summary>
+        public static float GetShieldDecayCut() => ChallengeCards.Value(ChallengeCards.Shield) / 100f;
     }
 }

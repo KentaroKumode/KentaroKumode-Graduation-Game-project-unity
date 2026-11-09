@@ -1182,6 +1182,32 @@ namespace AutoTest
         /// 武器の ITT の値は「渡された武器が期待値で上なら乗り換える」込みの値なので、 <see cref="lockWeaponFamily"/> の入/切と並べて、
         /// 武器そのものの強さと家系の乗り換えの損を切り分ける (2026-11-07・斧が段を上げるほど悪い)。</summary>
         public string grantStartWeapon = "";
+        /// <summary>挑戦カード (docs/GAME.md §23-25) の難易度 0..10。 1 以上だと挑戦カードのランになり、 層の入口で 2 枚から先頭を受ける
+        /// (配る順は乱数なので、 実質ランダムに選ぶ)。 0 = 使わない (旧の配点・challengeSpec のまま)。</summary>
+        public int challengeCardDifficulty = 0;
+        /// <summary>[測定] 挑戦カードを 1 枚ずつ測る: "層:カードの id" を ; で並べる (例 "1:D:狂暴化:1" / "3:B:Plunder.gold:3")。
+        /// 指定した層の入口で、 難易度の引き方の代わりにそのカードを受ける。 空 = 使わない。 層は見せる層 (1..5)。</summary>
+        public string challengeForce = "";
+        /// <summary>挑戦カードの 2 枚の選び方。 true = バフが自分の軸に合う方 (BotHooks.ChooseChallengeByAxis)、 false = 先頭 (配る順は乱数なので実質無作為)。</summary>
+        public bool challengeCardPickByAxis = true;
+
+        /// <summary><see cref="challengeForce"/> を「層 → 受けるカード」の関数にする。 空なら null (難易度の引き方のまま)。</summary>
+        private static Func<int, IReadOnlyList<string>> ParseChallengeForce(string spec)
+        {
+            if (string.IsNullOrWhiteSpace(spec)) return null;
+            var byLayer = new Dictionary<int, List<string>>();
+            foreach (var part in spec.Split(';'))
+            {
+                var t = part.Trim(); int colon = t.IndexOf(':');
+                if (colon <= 0 || !int.TryParse(t.Substring(0, colon), out int layer)) continue;
+                string id = t.Substring(colon + 1).Trim();
+                // 知らない id は腕ごと止める (黙ってカード無しの基準のランにしない・2026-11-09)
+                if (!MetaProgression.ChallengeCards.IsKnown(id)) throw new System.ArgumentException("[challengeForce] 知らないカード: " + id);
+                if (!byLayer.TryGetValue(layer, out var list)) byLayer[layer] = list = new List<string>();
+                list.Add(id);
+            }
+            return layer => byLayer.TryGetValue(layer, out var l) ? l : null;
+        }
         /// <summary>BOT が店で武器を買うか。 <b>既定は買わない</b> (2026-11-07)。 武器の ITT は「家系を乗り換える損得」を測っており
         /// (斧を渡すと −20 ポイント・家系ロックを入れると中立)、 期待値だけで決める購入は他系統の職業のランを悪くしていた。
         /// 強化素材で今の武器を育てる道 (WeaponMaterial) は残す。</summary>

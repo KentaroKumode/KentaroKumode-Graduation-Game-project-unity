@@ -150,9 +150,9 @@ namespace GameLoop
             MetaProgression.MetaTokenEarner.OnEnemyDefeated();
 
             bool isBossNodeForMeta = node != null && node.type == TileType.Boss;
-            int metaWinGold = isBossNodeForMeta
+            int metaWinGold = (isBossNodeForMeta
                 ? MetaProgression.MetaBuffApplicator.GetBossGoldBonus()
-                : 0;
+                : 0) + MetaProgression.MetaBuffApplicator.GetWinGoldBonus();   // 挑戦カード: 戦闘に勝つたびゴールド +N
             bool prideActive = MetaProgression.PermanentDebuffEffects.HasPride(Run);
 
             // ボス勝利 → フロアクリア

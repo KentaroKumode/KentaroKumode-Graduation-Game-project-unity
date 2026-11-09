@@ -33,6 +33,31 @@ namespace AutoTest
             BossTuning.Install();
         }
 
+        /// <summary>挑戦カードの 2 枚から、 バフが自分の軸 (品の数が一番多い軸) に合う方を取る (2026-11-09)。
+        /// 軸の札は「その軸の品の数」、 汎用の札は 1 で比べ、 同点は先頭。 デバフは見ない (方策は最小限・比べるための基準)。</summary>
+        public static int ChooseChallengeByAxis(System.Collections.Generic.IReadOnlyList<string> offer)
+        {
+            var run = GameManager.Instance?.Run;
+            int best = 0; float bestScore = float.MinValue;
+            for (int i = 0; i < offer.Count; i++)
+            {
+                MetaProgression.ChallengeCards.Split(offer[i], out _, out var buf);
+                string axis = buf == null ? null : buf.kind switch
+                {
+                    MetaProgression.ChallengeCards.Poison => ItemSystem.PassiveSkills.AxisRules.Poison,
+                    MetaProgression.ChallengeCards.Bleed => ItemSystem.PassiveSkills.AxisRules.Bleed,
+                    MetaProgression.ChallengeCards.Heat => ItemSystem.PassiveSkills.AxisRules.Heat,
+                    MetaProgression.ChallengeCards.Charge => ItemSystem.PassiveSkills.AxisRules.Charge,
+                    MetaProgression.ChallengeCards.Shield => ItemSystem.PassiveSkills.AxisRules.Shield,
+                    MetaProgression.ChallengeCards.Crit => ItemSystem.PassiveSkills.AxisRules.Crit,
+                    _ => null,
+                };
+                float score = axis != null ? ItemSystem.PassiveSkills.AxisRules.Count(run, axis) : 1f;
+                if (score > bestScore) { bestScore = score; best = i; }
+            }
+            return best;
+        }
+
         public static void Uninstall()
         {
             GameHooks.Clear();

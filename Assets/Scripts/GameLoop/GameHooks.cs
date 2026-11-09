@@ -23,6 +23,9 @@ namespace GameLoop
         public static Func<IReadOnlyList<string>, int> ChooseStartingPassive;
         /// <summary>挑戦カードの 2 枚 ("デバフの id|バフの id") からどれを受けるか。 null なら人が遊んでいる時は画面で選び、 BOT は先頭。</summary>
         public static Func<IReadOnlyList<string>, int> ChooseChallengeCard;
+        /// <summary>[測定] 見せる層 (1..5) の入口で、 難易度の引き方の代わりに受けるカード (id の並び)。 null を返す層は何も受けない。
+        /// カードを 1 枚ずつ測るための口 (AutoRunner.challengeForce)。</summary>
+        public static Func<int, IReadOnlyList<string>> ForcedChallengeCards;
 
         /// <summary>自動装備の武器評価に足す点 (武器 id → 加点)。 null なら 0。</summary>
         public static Func<string, float> WeaponEvBonus;
@@ -50,6 +53,7 @@ namespace GameLoop
             BotDriving = false;
             ChooseStartingPassive = null;
             ChooseChallengeCard = null;
+            ForcedChallengeCards = null;
             WeaponEvBonus = null;
             MeasureRunPower = null;
             OnCritRateResolved = null;

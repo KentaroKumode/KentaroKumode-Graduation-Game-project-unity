@@ -147,6 +147,14 @@ namespace AutoTest
                     _ascension?.BeforeRun();
                 }
 
+                // 挑戦カードの難易度 (§23-25)。 1 以上なら配点より優先してカードのランになる (GameManager.BeginChallengeCards)
+                {
+                    var stc = MetaProgression.MetaProgressManager.Instance?.State;
+                    if (stc != null) stc.challengeDifficulty = challengeCardDifficulty;
+                    GameHooks.ForcedChallengeCards = ParseChallengeForce(challengeForce);
+                    GameHooks.ChooseChallengeCard = challengeCardPickByAxis ? BotHooks.ChooseChallengeByAxis : (System.Func<IReadOnlyList<string>, int>)null;
+                }
+
                 // 遺物プリセット / 挑戦構成をここで流し込む。
                 //
                 // **2026-09-05 修正: この流し込みは `_ascensionPersonaLock` の else 側に入っていた。**

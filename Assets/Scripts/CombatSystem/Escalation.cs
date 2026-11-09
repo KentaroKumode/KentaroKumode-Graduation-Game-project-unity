@@ -53,20 +53,28 @@ namespace CombatSystem
         /// 40 ターン級のボス戦で誤差にしかならず、 単独 T3 で対照群を上回る=実質無料だった。</summary>
         public static int StageOf(int turn)
         {
-            int shift = MetaProgression.MetaDebuffApplicator.GetEscalationTurnShift();
             int s = 0;
             for (int i = 0; i < Thresholds.Length; i++)
-                if (turn > Mathf.Max(1, Thresholds[i] - shift)) s++;
+                if (turn > ThresholdAt(i)) s++;
             return s;
+        }
+
+        /// <summary>いまの戦闘がボス戦か (CombatManager が戦闘開始時に立てる)。 挑戦カード「ボス戦ではエスカレーションが毎ターン進む」が読む。</summary>
+        public static bool BossFight;
+
+        /// <summary>i 段目の閾値ターン。 挑戦カードのボス戦の毎ターン進行 (閾値 1/2/3/4) を反映する。</summary>
+        private static int ThresholdAt(int i)
+        {
+            if (BossFight && MetaProgression.MetaDebuffApplicator.BossEscalatesEveryTurn()) return i + 1;
+            return Thresholds[i];
         }
 
         /// <summary>次の段階閾値ターン。最終段階なら -1 (計器盤の残ターン表示用)。</summary>
         public static int NextThresholdTurn(int turn)
         {
-            int shift = MetaProgression.MetaDebuffApplicator.GetEscalationTurnShift();
             for (int i = 0; i < Thresholds.Length; i++)
             {
-                int th = Mathf.Max(1, Thresholds[i] - shift);
+                int th = ThresholdAt(i);
                 if (turn <= th) return th;
             }
             return -1;
@@ -74,6 +82,25 @@ namespace CombatSystem
 
         /// <summary>プロファイル×ターンの攻撃値倍率。</summary>
         public static float GetMultiplier(string profile, int turn)
+        {
+            // 挑戦カード (§23-25): すべて予告の前に掛かる (ブロックで受けられる・BOT の先読みにも見える)
+            //   エスカレーションの上がり幅 +N%: 段の倍率の 1 を超えた分だけを伸ばす (段 0 は 1 のまま)
+            float curve = CurveMultiplier(profile, turn);
+            float rise = MetaProgression.MetaDebuffApplicator.GetEscalationRisePct();
+            if (rise > 0f && curve > 1f) curve = 1f + (curve - 1f) * (1f + rise / 100f);
+            int phaseTurn = turn - PhaseStartTurn + 1;
+            return curve * (1f + MetaProgression.MetaDebuffApplicator.GetEnemyAttackPct() / 100f)
+                 * (1f + MetaProgression.MetaDebuffApplicator.GetAmbushPct(phaseTurn) / 100f)                // 〈先手を取られる〉
+                 * (1f + MetaProgression.MetaDebuffApplicator.GetRagePct(phaseTurn) / 100f)                  // 〈怒り〉
+                 * (1f + MetaProgression.MetaDebuffApplicator.GetOpenerPct(phaseTurn, BossFight) / 100f);    // 〈開幕の大技〉
+        }
+
+        /// <summary>いまの形態が始まったターン (CombatManager が戦闘開始時に 1、 ヴェスカの形態を替えるたびに立てる)。 「形態の最初の N ターン」を数える。</summary>
+        public static int PhaseStartTurn = 1;
+
+        /// <summary>段階の曲線だけの倍率。 挑戦カード「敵の攻撃 +N%」は <see cref="GetMultiplier"/> がここに掛ける
+        /// (予告の前・EnemyAttackValue の 1 回の四捨五入の中。 BOT の先読みも同じ関数を通るので見える)。</summary>
+        private static float CurveMultiplier(string profile, int turn)
         {
             int stage = StageOf(turn);
             switch (profile)
@@ -160,7 +187,7 @@ namespace CombatSystem
         public static float HeavyFactor(EnemyData e, int combatTurn)
         {
             if (e == null || e.heavyPeriod <= 0) return 1f;
-            if (IsHeavyTurn(e, combatTurn)) return e.heavyMul > 0f ? e.heavyMul : 1f;
+            if (IsHeavyTurn(e, combatTurn)) return e.heavyMul > 0f ? e.heavyMul + MetaProgression.MetaDebuffApplicator.GetHeavyMulBonus() : 1f;   // 挑戦カード: 大技の倍率 +N
             return e.heavyWindupMul > 0f ? e.heavyWindupMul : 1f;
         }
     }

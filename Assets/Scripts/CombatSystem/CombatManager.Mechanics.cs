@@ -156,7 +156,7 @@ namespace CombatSystem
                 escalationStage = Escalation.StageOf(EscalationTurn(ctx)),
                 nextThresholdTurn = Escalation.NextThresholdTurn(EscalationTurn(ctx)),
                 turnsToHeavy = Escalation.TurnsToHeavy(currentEnemy, ctx.currentTurn),
-                heavyMul = currentEnemy?.heavyMul ?? 0f,
+                heavyMul = (currentEnemy?.heavyMul ?? 0f) > 0f ? currentEnemy.heavyMul + MetaProgression.MetaDebuffApplicator.GetHeavyMulBonus() : 0f,   // 挑戦カード: 大技の倍率 +N も予告に出す
                 turnsToGuard = Escalation.TurnsToGuard(currentEnemy, ctx.currentTurn),
                 enemyDefense = ctx.enemyDefense,
                 enemyDice = enemyDice,
@@ -296,6 +296,8 @@ namespace CombatSystem
         {
             var run = GameLoop.GameManager.Instance?.Run;
             if (run == null) return;
+            // 挑戦カードの〈最後の審判〉はファーム層のターンを数えない (旧の配点は今まで通り数える)
+            if (run.challengeCardMode && run.Depth == MapSystem.FreeMove.FloorPlan.FarmFloor) return;
             run.totalCombatTurns++;
             MetaProgression.MetaDebuffApplicator.JudgmentTurnsTotal++;
             int th = MetaProgression.MetaDebuffApplicator.GetJudgmentTurnThreshold();

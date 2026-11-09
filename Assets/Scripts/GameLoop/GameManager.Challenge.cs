@@ -14,11 +14,24 @@ namespace GameLoop
         /// <summary>選ぶのを預かっている引き (Tier の並び・先頭から)。 人が遊んでいる時だけ。</summary>
         public readonly List<int> PendingChallengeTiers = new List<int>();
         private List<string> _challengeOffer;
+        /// <summary>層の入口の全回復を、 人が札を選び終えるまで預けている。</summary>
+        private bool _entryHealPending;
+
+        /// <summary>層の入口の全回復。 挑戦カードのランでは「回復 −N%」が掛かる (旧の配点では掛けない ── 今まで通り)。</summary>
+        private void ApplyEntryHeal()
+        {
+            _entryHealPending = false;
+            if (Run == null || Run.playerHP >= Run.playerMaxHP) return;
+            float mul = Run.challengeCardMode ? MetaDebuffApplicator.GetHealMultiplier() : 1f;
+            int before = Run.playerHP;
+            Run.playerHP = Mathf.Min(Run.playerMaxHP, before + Mathf.RoundToInt((Run.playerMaxHP - before) * mul));
+            Log($"層突入: HP 回復 {before} → {Run.playerHP}" + (mul < 1f ? $" (回復 ×{mul:0.##})" : ""));
+        }
 
         /// <summary>ランの始め: 整備で選んだ難易度でカードのランにする。 整備の配点 (旧 §15-2) が入っている時は配点を使う (BOT の測定)。</summary>
         private void BeginChallengeCards()
         {
-            PendingChallengeTiers.Clear(); _challengeOffer = null;
+            PendingChallengeTiers.Clear(); _challengeOffer = null; _entryHealPending = false;
             var st = MetaProgressManager.Instance?.State;
             int d = st != null ? Mathf.Clamp(st.challengeDifficulty, 0, ChallengeCards.MaxDifficulty) : 0;
             Run.challengeCardMode = st == null || d > 0 || st.Challenge.IsEmpty;
@@ -27,11 +40,14 @@ namespace GameLoop
             if (Run.challengeCardMode && d > 0) Log($"挑戦: 難易度 {d} ({ChallengeCards.ScheduleText(d)})");
         }
 
-        /// <summary>層に入った時: この場所で引く回数だけ配る。</summary>
-        private void DealChallengeForDepth(int depth)
+        /// <summary>層に入った時: この場所で引く回数だけ配る。 <paramref name="layer"/> は見せる層 (1..5 = currentFloor)・深さではない。</summary>
+        private void DealChallengeForLayer(int layer)
         {
-            if (Run == null || !Run.challengeCardMode || Run.challengeDifficulty <= 0) return;
-            int slot = ChallengeCards.SlotOfDepth(depth);
+            if (Run == null || !Run.challengeCardMode) return;
+            var forced = GameHooks.ForcedChallengeCards?.Invoke(layer);   // 測定: 引き方の代わりに決めたカードを受ける
+            if (forced != null) { foreach (var c in forced) if (!string.IsNullOrEmpty(c)) TakeChallengeCard(c); return; }
+            if (GameHooks.ForcedChallengeCards != null || Run.challengeDifficulty <= 0) return;
+            int slot = ChallengeCards.SlotOfLayer(layer);
             if (slot < 0) return;
             bool human = GameHooks.ChooseChallengeCard == null && !GameHooks.BotDriving && !Application.isBatchMode;
             foreach (var e in ChallengeCards.Schedule(Run.challengeDifficulty))
@@ -61,8 +77,8 @@ namespace GameLoop
             var offer = ChallengeOffer;
             if (offer == null) return;
             PendingChallengeTiers.RemoveAt(0); _challengeOffer = null;
-            if (offer.Count == 0) return;
-            TakeChallengeCard(offer[Mathf.Clamp(pick, 0, offer.Count - 1)]);
+            if (offer.Count > 0) TakeChallengeCard(offer[Mathf.Clamp(pick, 0, offer.Count - 1)]);
+            if (PendingChallengeTiers.Count == 0 && _entryHealPending) ApplyEntryHeal();
         }
 
         private void TakeChallengeCard(string card)
@@ -71,9 +87,13 @@ namespace GameLoop
             Run.InvalidateCardChallenge();
             ChallengeCards.Split(card, out var deb, out var buf);
             Log($"挑戦カード: − {ChallengeCards.Text(deb)} ／ + {ChallengeCards.Text(buf)}");
-            // 〈凶運〉はランの始めに役を封じる効果なので、 途中で受けたら受けた時に封じる
-            if (Run.sealedRoleMask == 0 && MetaDebuffApplicator.C.Has(ChallengeT4.凶運))
-                Run.sealedRoleMask = MetaDebuffApplicator.RollSealedRoles(Run);
+            if (buf != null && buf.kind == ChallengeCards.MaxHp)
+            {
+                // 最大 HP +N%: 受けた時に上げ、 上がった分だけ今の HP も増やす
+                int add = Mathf.Max(1, Mathf.RoundToInt(Run.playerMaxHP * buf.value / 100f));
+                Run.playerMaxHP += add; Run.playerHP += add;
+                Log($"挑戦カード: 最大 HP +{add} ({Run.playerHP}/{Run.playerMaxHP})");
+            }
         }
 
         /// <summary>5 層 (通常の終点) のボスを倒した時: 難易度を記録する。</summary>

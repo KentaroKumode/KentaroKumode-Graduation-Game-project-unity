@@ -325,14 +325,17 @@ namespace GameLoop
         public int challengeDifficulty;
         /// <summary>受けた挑戦カード ("デバフの id|バフの id")。 [persistent]</summary>
         public List<string> challengePicks = new List<string>();
-        [System.NonSerialized] private MetaProgression.ResolvedChallenge _cardChallenge;
-        /// <summary>カードを受けた後に呼ぶ (挑戦の構成を作り直させる)。</summary>
-        public void InvalidateCardChallenge() => _cardChallenge = null;
-        /// <summary>カードのランなら受けたカードから組んだ構成、 そうでなければ null (整備の配点を使う)。</summary>
+        [System.NonSerialized] private Dictionary<string, MetaProgression.ChallengeCards.Card> _cardMap;
+        /// <summary>カードを受けた後に呼ぶ (種類ごとの値を作り直させる)。</summary>
+        public void InvalidateCardChallenge() => _cardMap = null;
+        /// <summary>カードのランなら旧の挑戦の軸は全部切る (空の構成)、 そうでなければ null (整備の配点を使う・BOT の旧測定)。</summary>
         public static MetaProgression.ResolvedChallenge CardChallenge(RunState run)
+            => run != null && run.challengeCardMode ? MetaProgression.ResolvedChallenge.None : null;
+        /// <summary>カードのランなら受けたカード (種類 → カード)、 そうでなければ null。</summary>
+        public static Dictionary<string, MetaProgression.ChallengeCards.Card> CardMap(RunState run)
         {
             if (run == null || !run.challengeCardMode) return null;
-            return run._cardChallenge ??= MetaProgression.ChallengeCards.Resolve(run.challengePicks);
+            return run._cardMap ??= MetaProgression.ChallengeCards.Collect(run.challengePicks);
         }
         /// <summary>サイコロの**面の全部**（<see cref="DiceFaceParts"/>）。 素の面 {2,3,4,5} も T1 としてここに入る
         /// （ADR-0011・2026-10-18）。 同じ目は 1 枚まで。 面を外すと減る。
@@ -566,7 +569,7 @@ namespace GameLoop
             challengeCardMode = false;
             challengeDifficulty = 0;
             if (challengePicks == null) challengePicks = new List<string>(); else challengePicks.Clear();
-            _cardChallenge = null;
+            _cardMap = null;
             if (chronicle == null) chronicle = new List<string>(); else chronicle.Clear();
             diceFaceParts = DiceFaceParts.StartingParts();
             faceRemovals = 0;

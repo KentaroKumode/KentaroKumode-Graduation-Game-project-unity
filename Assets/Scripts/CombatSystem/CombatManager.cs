@@ -351,6 +351,8 @@ namespace CombatSystem
 
         /// <summary>このターンの 2 体目の攻撃値。 予告 (柱3) で確定し、 解決でも同じ値を使う。</summary>
         private int _secondaryAtkThisTurn;
+        /// <summary>このターンの 2 回目のパケットが、 挑戦カード〈連撃〉の 1 体目の追撃か (2 体目ではない)。</summary>
+        private bool _twinStrikeThisTurn;
 
         /// <summary>2 体目の残り HP。 0 = 撃破済み or 単体戦。</summary>
         public int SecondaryEnemyHP => secondaryHP;
@@ -418,6 +420,9 @@ namespace CombatSystem
             //   入口で一度だけ確実に私物化する。
             if (enemy != null) enemy = enemy.Clone();
 
+            // エスカレーションの「ボス戦」の旗 (挑戦カード「ボス戦ではエスカレーションが毎ターン進む」)
+            Escalation.BossFight = enemy != null && GameLoop.BossIds.IsBoss(enemy.id);
+            Escalation.PhaseStartTurn = 1;
             // 挑戦デバフ〈厚い皮膚〉: 敵の最大HP ×1.10 / ×1.20 / ×1.30。
             float thickSkin = MetaProgression.MetaDebuffApplicator.GetEnemyHpMultiplier();
             if (thickSkin > 1.001f && enemy != null)
@@ -614,7 +619,7 @@ namespace CombatSystem
             //   プレイヤーの土台 = 初期値 + 武器。 アイテムの def / pen は毎ターン OnPostRoll で乗る。
             if (ctx != null)
             {
-                ctx.enemyDefense = Math.Max(0, enemy.defense);
+                ctx.enemyDefense = Math.Max(0, enemy.defense) + MetaProgression.MetaDebuffApplicator.GetEnemyDefenseBonus();   // 挑戦カード: 敵の防御 +N
                 ctx.enemyArmorPen = Math.Max(0, enemy.armorPen);
                 ctx.playerDefenseBase = DefenseFormula.PlayerBaseDefense + _weaponDefense;
                 ctx.playerArmorPenBase = _weaponArmorPen;
@@ -815,6 +820,17 @@ namespace CombatSystem
             if (newEnemy == null) { Debug.LogError($"[CombatManager.SwapEnemy] enemy not found: {newEnemyId}"); return false; }
             // ボス難易度オートチューナー: ヴェスカ連戦の各形態にも hpMul を適用
             newEnemy = CombatSystem.BossParams.Apply(newEnemy);
+            // 挑戦 (敵の最大 HP・〈鋼の皮膚〉のボス HP) を連戦の全段に掛ける (2026-11-09)。 旧は 1 段目にしか掛かっていなかった。
+            //   共有のインスタンスを書き換えると値が積み上がるので、 先に複製する。
+            {
+                float hpMul = MetaProgression.MetaDebuffApplicator.GetEnemyHpMultiplier()
+                            * (GameLoop.BossIds.IsBoss(newEnemy.id) ? MetaProgression.MetaDebuffApplicator.GetBossHpMultiplier() : 1f);
+                if (hpMul > 1.001f)
+                {
+                    newEnemy = newEnemy.Clone();
+                    newEnemy.maxHP = Mathf.Max(1, Mathf.RoundToInt(newEnemy.maxHP * hpMul));
+                }
+            }
 
             string prevName = currentEnemy?.displayName ?? "?";
             currentEnemy = newEnemy;
@@ -863,7 +879,7 @@ namespace CombatSystem
                 ctx.enemyDiceMax = newEnemy.EffectiveRollMax;
                 ctx.enemyDiceTotalBonus = 0;
                 ctx.bossDiceBonus = 0; // swapで一旦クリア。新形態の OnBattleStart パッシブ(刹那等)が再設定する
-                ctx.enemyDefense = Math.Max(0, newEnemy.defense);   // 新形態の防御値を反映 (ADR-0013)
+                ctx.enemyDefense = Math.Max(0, newEnemy.defense) + MetaProgression.MetaDebuffApplicator.GetEnemyDefenseBonus();   // 新形態の防御値を反映 (ADR-0013)・挑戦カードの防御 +N も全段に
                 ctx.enemyArmorPen = Math.Max(0, newEnemy.armorPen);
                 // [計装] 出ていく段の実長を締める。 currentTurn は連戦で通算なので、
                 //   開始点 (phaseStartTurn) との差でしか段の長さは出せない。
@@ -876,6 +892,7 @@ namespace CombatSystem
                         ctx.phaseStartTurn, ctx.currentTurn);
                 }
                 ctx.phaseStartTurn = ctx.currentTurn + 1;
+                Escalation.PhaseStartTurn = ctx.phaseStartTurn;
                 ctx.bossId = CombatSystem.BossParams.IsBoss(newEnemy.id) ? newEnemy.id : "";
                 ctx.lastDamageCause = ItemSystem.PassiveSkills.DeathCause.Normal; // 形態swapで死因タグをリセット (前形態の残留防止)
                 // (ADR-0011: 役は毎ターン自動で効き、 使用済みの管理を持たないので、 形態交代で戻すものは無い。)

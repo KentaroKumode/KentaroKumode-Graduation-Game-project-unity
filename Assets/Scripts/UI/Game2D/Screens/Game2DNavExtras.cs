@@ -23,6 +23,8 @@ namespace UI.Game2D
         private static readonly RectInt WaitR = new RectInt(66, 4, 32, 16);      // 上の帯の中 (帯の左上が原点)
         private static bool _shown;
         private bool _invPassives; private int _invPage;
+        /// <summary>所持品の窓の頁: 0 = 消耗品 / 1 = パッシブ / 2 = ステータス (2026-11-09)。 _invPassives は 1 の時だけ立つ。</summary>
+        private int _invTab;
         private const int InvPerPage = 10;
 
         /// <summary>この dot (GUI の 480×270) がボタン・計器の上か (地図のクリック・ドラッグに渡さない)。</summary>
@@ -81,12 +83,13 @@ namespace UI.Game2D
         private void OpenInventory(GameManager gm)
         {
             if (modal == null || gm.Run == null) return;
-            _invPassives = false; _invPage = 0;
+            _invPassives = false; _invPage = 0; _invTab = 0;
             modal.Open(Inventory(gm));
         }
 
         private ScreenDef Inventory(GameManager gm)
         {
+            if (_invTab == 2) return Status(gm);
             var run = gm.Run;
             var ids = new List<string>();
             var src = _invPassives ? run.ownedPassiveItems : run.ownedConsumables;
@@ -104,7 +107,7 @@ namespace UI.Game2D
             }
             if (ids.Count == 0) d.body = _invPassives ? "パッシブを持っていない。" : "消耗品を持っていない。";
             if (!_invPassives) d.buttons.Add(new ModalBtn { label = "使う", action = "use", primary = true });
-            d.buttons.Add(new ModalBtn { label = _invPassives ? "消耗品へ" : "パッシブへ", action = "tab" });
+            d.buttons.Add(new ModalBtn { label = _invPassives ? "ステータスへ" : "パッシブへ", action = "tab" });
             if (pages > 1) d.buttons.Add(new ModalBtn { label = "次の頁 " + (_invPage + 1) + "/" + pages, action = "page" });
             d.buttons.Add(new ModalBtn { label = "閉じる", action = "close" });
             d.footer = _invPassives ? "パッシブ " + ids.Count + " 個" : "使う品を選ぶ (シールド・油は次の戦闘の開幕に効く)";
@@ -113,7 +116,7 @@ namespace UI.Game2D
                 switch (a)
                 {
                     case "close": modal.Close(); return;
-                    case "tab": _invPassives = !_invPassives; _invPage = 0; break;
+                    case "tab": _invTab = (_invTab + 1) % 3; _invPassives = _invTab == 1; _invPage = 0; break;
                     case "page": _invPage = (_invPage + 1) % pages; break;
                     case "use":
                         if (sel < 0 || sel >= cnt) return;
@@ -121,6 +124,53 @@ namespace UI.Game2D
                         else { modal.ShowToast("今は使えない"); return; }
                         break;
                 }
+                modal.Replace(Inventory(gm));
+            };
+            return d;
+        }
+
+        // ── ステータスの頁: 会心率・攻撃 (武器)・会心倍率・与ダメ・防御・貫通と、 受けている挑戦カード (2026-11-09) ──
+        //   HP と シールドは計器に出ているので載せない。 戦闘の外では、 直近の戦闘で読んだ値 (CombatManager.PreviewHudStats)。
+
+        private ScreenDef Status(GameManager gm)
+        {
+            var run = gm.Run;
+            var cm = CombatSystem.CombatManager.Instance;
+            var hs = cm != null ? cm.PreviewHudStats() : default;
+            bool inBattle = gm.CurrentPhase == GameManager.GamePhase.Combat;
+            var weapon = ItemSystem.ItemDatabase.Instance?.GetItem(run.equippedWeaponId);
+            var d = new ScreenDef { id = "status_jp", jp = true, w = 460, cols = 1, rowH = Game2DModal.ChallengeRowH,
+                title = "ステータス", sub = inBattle ? "この戦闘" : "直近の戦闘の値" };
+            string wname = weapon != null && !string.IsNullOrEmpty(weapon.displayName) ? weapon.displayName : "なし";
+            // まだ一度も戦闘の文脈が無い時は数字を出さない (0% や ×0.0 は間違った値に見える)
+            bool known = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context != null;
+            d.body = known
+                ? "武器 " + wname + "  攻撃 " + hs.attack + "  会心率 " + Mathf.RoundToInt(hs.critRate * 100f) + "%  会心倍率 ×" + hs.critMul.ToString("0.0")
+                  + "\n与ダメ " + (hs.outgoingPct >= 0 ? "+" : "") + hs.outgoingPct + "%  防御 " + hs.defense + "  貫通 " + hs.pen
+                : "武器 " + wname + "  攻撃 ―  会心率 ―  会心倍率 ―\n与ダメ ―  防御 ―  貫通 ―  (戦闘に入ると出る)";
+            d.bodyLines = 2;
+            int pages = 1;
+            if (run.challengeCardMode && run.challengePicks.Count > 0)
+            {
+                const int perPage = 3;   // 2 段の行が窓に収まる数
+                pages = (run.challengePicks.Count + perPage - 1) / perPage; _invPage = Mathf.Clamp(_invPage, 0, pages - 1);
+                for (int i = _invPage * perPage; i < Mathf.Min(run.challengePicks.Count, (_invPage + 1) * perPage); i++)
+                {
+                    MetaProgression.ChallengeCards.Split(run.challengePicks[i], out var deb, out var buf);
+                    int tier = deb?.tier ?? buf?.tier ?? 1;
+                    d.Items.Add(new ModalItem { challengeTier = Mathf.Clamp(tier, 1, 4), deb = MetaProgression.ChallengeCards.Text(deb), buf = MetaProgression.ChallengeCards.Text(buf) });
+                }
+                d.footer = "受けている挑戦カード " + run.challengePicks.Count + " 枚 (同じ種類はランで 1 度だけ)";
+            }
+            else d.footer = run.challengeCardMode ? "挑戦カードはまだ受けていない" : "";
+            d.buttons.Add(new ModalBtn { label = "消耗品へ", action = "tab", primary = true });
+            if (pages > 1) d.buttons.Add(new ModalBtn { label = "次の頁 " + (_invPage + 1) + "/" + pages, action = "page" });
+            d.buttons.Add(new ModalBtn { label = "閉じる", action = "close" });
+            d.onAction = (a, sel) =>
+            {
+                if (a == "close") { modal.Close(); return; }
+                if (a == "tab") { _invTab = 0; _invPassives = false; _invPage = 0; }
+                if (a == "page") _invPage = (_invPage + 1) % pages;
                 modal.Replace(Inventory(gm));
             };
             return d;

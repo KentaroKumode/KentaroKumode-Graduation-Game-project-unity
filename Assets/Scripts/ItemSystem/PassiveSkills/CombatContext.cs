@@ -16,6 +16,7 @@ namespace ItemSystem.PassiveSkills
         //   過去バッチと突き合わせたときに黙って別の死因へすり替わる。
         MassiveBleed, // ヴェスカ・天与: 大出血 (スタック累積・解除不可・4連戦を跨ぐ)
         Rift,         // ヴェスカ: 裂け目 (双方の最大HP 2%/T)
+        Erosion,      // 挑戦カード〈蝕み〉 (ターンの始めの軽減できないダメージ)
     }
 
     /// <summary>
@@ -948,6 +949,9 @@ namespace ItemSystem.PassiveSkills
                 {
                     int now = dict.TryGetValue(def.id, out int nowStacks) ? nowStacks : stacks;
                     int keep = def.target == StatusTarget.Enemy ? poisonKeepPct : 50;   // 〈瘴気〉の②は敵の毒だけ
+                    // 挑戦カード: 敵の毒が半減で減る量を N% 減らす (残る割合の足し算でなく減る量に掛けるので 100% を超えない)
+                    float cut = def.target == StatusTarget.Enemy ? MetaProgression.MetaBuffApplicator.GetPoisonDecayCut() : 0f;
+                    if (cut > 0f) keep = 100 - (int)((100 - keep) * (1f - cut));
                     dict[def.id] = now * keep / 100;
                 }
                 else dict[def.id] = System.Math.Max(0, stacks - decay);
@@ -1122,6 +1126,9 @@ namespace ItemSystem.PassiveSkills
             {
                 // 〈堅牢〉の①: 残る割合 50% + 上乗せ (最大 80%・2026-11-07)
                 int keepPct = System.Math.Min(80, 50 + shieldKeepBonusPct + MetaProgression.MetaBuffApplicator.GetShieldKeepBonusPct());
+                // 挑戦カード: 減衰で減る量を N% 減らす (減る量に掛けるので 100% を超えない)
+                float shCut = MetaProgression.MetaBuffApplicator.GetShieldDecayCut();
+                if (shCut > 0f) keepPct = 100 - (int)((100 - keepPct) * (1f - shCut));
                 int lost = _consShield - _consShield * keepPct / 100;
                 _consShield -= lost;
                 Keywords.Kw.Raise(this, PassiveSkillTrigger.OnShieldDecay, lost);

@@ -17,6 +17,8 @@ namespace GameLoop
     /// </summary>
     public static class Consumables
     {
+        /// <summary>この戦闘で使った消耗品の数 (挑戦カード「1 戦闘で使える消耗品は N 個まで」・戦闘ごとに作り直す CombatContext の一時値)。</summary>
+        public const string BattleUseKey = "chal_battleUse";
         /// <summary>古い手紙を使ったターンの印 (ctx.accumulatedValues)。 CombatManager が敵攻撃の解決で読んで消す。</summary>
         public const string OldLetterGuardKey = "oldLetterGuard";
 
@@ -95,9 +97,18 @@ namespace GameLoop
                 return false;
             }
 
+            // 挑戦カード: 1 戦闘で使える消耗品は N 個まで (ヴェスカ連戦は 1 戦闘として数える)
+            int useCap = MetaProgression.MetaDebuffApplicator.GetBattleConsumableCap();
+            if (useCap > 0 && lockCtx != null && lockCtx.GetAccumulated(BattleUseKey) >= useCap)
+            {
+                Debug.Log($"[Consumables] この戦闘ではもう使えない ({useCap} 個まで)");
+                return false;
+            }
+
             bool ok = Apply(run, id);
             if (ok)
             {
+                if (useCap > 0 && lockCtx != null) lockCtx.accumulatedValues[BattleUseKey] = lockCtx.GetAccumulated(BattleUseKey) + 1f;
                 // 古い手紙は 1 枚で OldLetterUses 回使える。 使い切ったときだけ手放す。
                 bool keep = false;
                 if (id == ItemIds.OldLetter)

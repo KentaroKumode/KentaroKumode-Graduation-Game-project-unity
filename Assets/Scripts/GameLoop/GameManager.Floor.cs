@@ -76,16 +76,18 @@ namespace GameLoop
             // T4-E〈最後の審判〉: 3層・5層で大罪を付与 (§15-2 v3.0)。 v1 の 1層付与は廃止。
             if (Run.Depth == 3) MetaProgression.MetaDebuffApplicator.TryGrantOnFloor3(Run);
             if (Run.Depth == 5) MetaProgression.MetaDebuffApplicator.TryGrantOnFloor5(Run);
-            // 挑戦カード: この層の入口で引く (§23-25)。 BOT はここで選び、 人は航行の窓で選ぶ
-            DealChallengeForDepth(Run.Depth);
+            // 挑戦カード: この層の入口で引く (§23-25)。 BOT はここで選び、 人は航行の窓で選ぶ。 見せる層 (currentFloor) で引く ── 深さ (Depth) ではない
+            DealChallengeForLayer(Run.currentFloor);
 
             // 層を移ったら HP を全回復する (2026-11-04)。 1 層は満タンで始まるので 2 層から。
             //   物資を絞って (戦闘で物資が出ない・移動 50) 寄り道が減った分、 層の中の HP の収支だけで死なないように。
             //   〈破綻〉の切り詰めより前に置く ── 挑戦デバフは全回復の後に効く。
+            //   挑戦カードの入口の札を全部受けてから回復する (回復 −N% が人にも BOT にも同じに効くように)。
+            //   人が航行の窓で選ぶ間は預け、 最後の札を受けた時に回復する (ResolveChallengePick)。
             if (Run.Depth > MapSystem.FreeMove.FloorPlan.FirstFloor && Run.playerHP < Run.playerMaxHP)
             {
-                Log($"層突入: HP 全回復 {Run.playerHP} → {Run.playerMaxHP}");
-                Run.playerHP = Run.playerMaxHP;
+                if (PendingChallengeTiers.Count == 0) ApplyEntryHeal();
+                else _entryHealPending = true;
             }
 
             // 計測専用 (SuppressEvents): イベントの代わりに確信の資格を与える。 HP 半減と啓示のエリートは払わせない。

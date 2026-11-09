@@ -407,6 +407,26 @@ namespace CombatSystem
                     CombatStats.PassiveUpkeepDue  += upkeep;
                 }
             }
+            // 挑戦カード〈蝕み〉: ターンの始めに、 最大 HP の N% の軽減できないダメージ (シールドは肩代わりする)。
+            //   刻限の死と同じく下の死亡判定・ラストスタンドを通す。
+            if (ctx != null && playerHP > 0)
+            {
+                float erode = MetaProgression.MetaDebuffApplicator.GetErodePct();
+                if (erode > 0f)
+                {
+                    int raw = Math.Max(1, Mathf.CeilToInt(playerMaxHP * erode / 100f));
+                    int absorbed = ctx.consShield > 0 ? ItemSystem.PassiveSkills.Keywords.Kw.AbsorbShield(ctx, raw, isAttack: false) : 0;
+                    int dmg = raw - absorbed;
+                    if (dmg > 0)
+                    {
+                        playerHP = Math.Max(0, playerHP - dmg);
+                        ctx.playerCurrentHP = playerHP;
+                        ctx.AddPlayerDamageSource(ItemSystem.PassiveSkills.DeathCause.Erosion, dmg);
+                        if (playerHP <= 0) ctx.lastDamageCause = ItemSystem.PassiveSkills.DeathCause.Erosion;
+                    }
+                    Debug.Log($"[蝕み] {raw} (シールド {absorbed} 肩代わり) → HP {playerHP}");
+                }
+            }
             // T4-E〈最後の審判〉: ラン累計ターンの刻限。 **ターン開始時に清算する**。
             ApplyFinalJudgment();
             // 刻限の死にもラストスタンドは効く。 ここを飛ばすと「ターン開始で死んだ時だけ
@@ -459,6 +479,11 @@ namespace CombatSystem
             }
 
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnTurnStart);
+            // 挑戦カード: 毎ターン、 臨界のメーター +N (臨界の品が無い・誓約で封じられている時は AddHeat が 0 にする)
+            {
+                int heat = MetaProgression.MetaBuffApplicator.GetHeatPerTurn();
+                if (heat > 0 && ctx != null) ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, heat);
+            }
             SyncHPFromContext(ctx);
             ApplyGuardCycle(ctx);
 
@@ -472,6 +497,26 @@ namespace CombatSystem
                     enemyHP += heal;
                     ctx.enemyCurrentHP = enemyHP;
                     Debug.Log($"[CombatManager] フロアデバフ: 敵HP+{heal} ({enemyHP}/{currentEnemy.maxHP})");
+                }
+            }
+            // 挑戦カード〈再生〉: 敵が毎ターン最大 HP の N% を回復する / 〈敵のシールド〉: 最大 HP の N% までシールドを張り直す。
+            //   シールドはヴェスカと同じ池 (ApplyVescaDefense が吸わせる・予告に出る)。 ヴェスカは自分の半減と抽選の後にここで底上げされる。
+            if (ctx != null && enemyHP > 0)
+            {
+                int eMax = Math.Max(1, ctx.enemyMaxHP > 0 ? ctx.enemyMaxHP : currentEnemy.maxHP);
+                float regen = MetaProgression.MetaDebuffApplicator.GetEnemyRegenPct();
+                if (regen > 0f && enemyHP < eMax)
+                {
+                    int heal = Math.Min(eMax - enemyHP, Math.Max(1, Mathf.CeilToInt(eMax * regen / 100f)));
+                    enemyHP += heal;
+                    ctx.enemyCurrentHP = enemyHP;
+                    Debug.Log($"[再生] 敵HP+{heal} ({enemyHP}/{eMax})");
+                }
+                float esh = MetaProgression.MetaDebuffApplicator.GetEnemyShieldPct();
+                if (esh > 0f)
+                {
+                    int want = Math.Max(1, Mathf.CeilToInt(eMax * esh / 100f));
+                    if (ctx.vescaShield < want) { ctx.vescaShield = want; Debug.Log($"[敵のシールド] {want} まで張り直す"); }
                 }
             }
 
@@ -504,7 +549,10 @@ namespace CombatSystem
             //   T1 = 1T目に 1 本 / T2 = 1T目に 2 本 / T3 = 全ターン 1 本。
             //   潰す対象は **出目が大きいものから** ── ランダムだと元から低い目を潰すだけの
             //   無害なターンが混ざり、 Tier ごとの重みが安定しない。
-            int forsaken = MetaProgression.MetaDebuffApplicator.GetForsakenLuckDiceCount(CurrentCombatTurn);
+            // 挑戦カード「出目 1」は戦闘中ずっと N 本 (ターンは見ない)。 旧の配点は通算ターンのまま
+            int forsakenTurn = (GameLoop.GameManager.Instance?.Run?.challengeCardMode ?? false) && ctx != null
+                ? CurrentCombatTurn - ctx.phaseStartTurn + 1 : CurrentCombatTurn;
+            int forsaken = MetaProgression.MetaDebuffApplicator.GetForsakenLuckDiceCount(forsakenTurn);
             for (int k = 0; k < forsaken && k < playerDice.Length; k++)
             {
                 int best = -1, bestVal = 0;
@@ -645,6 +693,19 @@ namespace CombatSystem
                 _secondaryAtkThisTurn = ApplyPlayerDefense(ctx, secondaryAtkBeforeDefense,
                     Math.Max(0, secondaryEnemy.armorPen));
             }
+            // 挑戦カード〈連撃〉: 単体の敵の攻撃が 2 回になる。 2 回目は 1 回目の N% の威力で、 2 体戦の 2 体目と同じパケット
+            //   (予告に載る・ブロックは各パケットから全額引く)。 1 回目は今まで通りなので、 どう配線しても被ダメは減らない。
+            _twinStrikeThisTurn = false;
+            if (_secondaryAtkThisTurn == 0 && (secondaryEnemy == null || secondaryHP <= 0))
+            {
+                float twin = MetaProgression.MetaDebuffApplicator.GetTwinStrikePct();
+                if (twin > 0f && enemyAtkValue > 0)
+                {
+                    secondaryAtkBeforeDefense = Mathf.RoundToInt(enemyAtkBeforeDefense * twin / 100f);
+                    _secondaryAtkThisTurn = Mathf.RoundToInt(enemyAtkValue * twin / 100f);
+                    _twinStrikeThisTurn = _secondaryAtkThisTurn > 0;
+                }
+            }
 
             var tele = new MutualTurnTelegraph
             {
@@ -654,7 +715,7 @@ namespace CombatSystem
                 escalationStage = Escalation.StageOf(escTurn),
                 nextThresholdTurn = Escalation.NextThresholdTurn(escTurn),
                 turnsToHeavy = Escalation.TurnsToHeavy(currentEnemy, ctx.currentTurn),
-                heavyMul = currentEnemy?.heavyMul ?? 0f,
+                heavyMul = (currentEnemy?.heavyMul ?? 0f) > 0f ? currentEnemy.heavyMul + MetaProgression.MetaDebuffApplicator.GetHeavyMulBonus() : 0f,   // 挑戦カード: 大技の倍率 +N も予告に出す
                 turnsToGuard = Escalation.TurnsToGuard(currentEnemy, ctx.currentTurn),
                 enemyDefense = ctx.enemyDefense,
                 enemyDice = enemyDice,
@@ -1376,12 +1437,13 @@ namespace CombatSystem
             // ============================================================
             //  2 体戦 (2026-08-28)
             // ============================================================
-            if (secondaryEnemy != null && secondaryHP > 0)
+            if ((secondaryEnemy != null && secondaryHP > 0) || (_twinStrikeThisTurn && primaryAttacked))
             {
+                bool twinOnly = !(secondaryEnemy != null && secondaryHP > 0);
                 // --- (a) 与ダメージは 2 体目にも全額入る ---
                 //   標的選択は無い。 撃破ターンは和ではなく max になるので**戦闘長は伸びず**、
                 //   エスカレーションも 1 体戦と同じ速さでしか進まない。 増えるのは被ダメだけ。
-                int mirrored = Math.Max(0, primaryHpBeforeDamage - enemyHP);
+                int mirrored = twinOnly ? 0 : Math.Max(0, primaryHpBeforeDamage - enemyHP);
                 if (mirrored > 0)
                 {
                     secondaryHP = Math.Max(0, secondaryHP - mirrored);
@@ -1392,7 +1454,7 @@ namespace CombatSystem
                 // --- (b) 2 体目の攻撃 = 独立した 2 つ目のパケット ---
                 //   **ブロックは各パケットから全額引く (倍率なし)。** 1 本のプールを分配すると
                 //   防御配線が成立しなくなるため、 2 回引く形を採る (2026-08-28 決定)。
-                if (secondaryHP > 0 && playerHP > 0 && !enemyStunnedThisTurn)
+                if ((twinOnly || secondaryHP > 0) && playerHP > 0 && !enemyStunnedThisTurn)
                 {
                     secondaryAttacked = true;
                     // 予告で開示済みの値をそのまま使う (ここで振り直さない)。
@@ -1420,7 +1482,7 @@ namespace CombatSystem
                         ctx.playerDamageThisTurn += secTaken;
                         ctx.AddPlayerDamageSource(ctx.lastDamageCause, secTaken);
                     }
-                    Debug.Log($"[2体戦] {secondaryEnemy.displayName} 攻撃 {secAtkValue} − ブロック {blockSum} "
+                    Debug.Log($"[{(twinOnly ? "連撃" : "2体戦")}] {(twinOnly ? currentEnemy.displayName : secondaryEnemy.displayName)} 攻撃 {secAtkValue} − ブロック {blockSum} "
                             + $"→ 被ダメ {secTaken} (HP {playerHP})");
                 }
             }

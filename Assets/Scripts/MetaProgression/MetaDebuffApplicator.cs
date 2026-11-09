@@ -107,7 +107,46 @@ namespace MetaProgression
         /// <summary>〈穴の空いた鞄〉: 消耗品の同時所持上限。 T1 5 個 / T2 3 個。 0 = 制限なし。
         /// 3/2 個は1000ランで −3.7/−7.5ptと、1ptあたり約−3.7ptで重すぎたため1枠ずつ緩和。</summary>
         public static int GetConsumableCarryCap()
-            => PickI(ChallengeAxis.穴の空いた鞄, 0, 5, 3, /*T3 なし*/ 0);
+            => CardI(ChallengeCards.Bag) > 0 ? CardI(ChallengeCards.Bag) : PickI(ChallengeAxis.穴の空いた鞄, 0, 5, 3, /*T3 なし*/ 0);
+
+        // ── 挑戦カード (§23-25 第 2 段): カードのランでは旧の軸は全部「無し」になり、 ここで足すカードの値だけが効く ──
+        private static float CardV(string kind) => ChallengeCards.Value(kind);
+        private static int CardI(string kind) => (int)ChallengeCards.Value(kind);
+        /// <summary>敵の攻撃の上乗せ (%)。 予告の前 (Escalation.GetMultiplier) に掛かる。 〈最後の審判〉の刻限の後は、 その札の値を同じ溜まりに足す。</summary>
+        public static float GetEnemyAttackPct()
+        {
+            float p = CardV(ChallengeCards.EnemyAtk);
+            if (ChallengeCards.Held(ChallengeCards.Judge) != null && IsPastJudgmentDeadline(GameManager.Instance?.Run)) p += CardV(ChallengeCards.Judge);
+            return p;
+        }
+        /// <summary>〈先手を取られる〉: 戦闘 (形態) の最初の数ターン (札の 2 つ目の量) の敵の攻撃の上乗せ (%)。 <paramref name="phaseTurn"/> は形態の中の何ターン目か。</summary>
+        public static float GetAmbushPct(int phaseTurn)
+        {
+            var c = ChallengeCards.Held(ChallengeCards.Ambush);
+            return c != null && phaseTurn >= 1 && phaseTurn <= (int)c.value2 ? c.value : 0f;
+        }
+        /// <summary>〈怒り〉: 形態の中で 1 ターン進むごとの敵の攻撃の上乗せ (%・加算)。 1 ターン目は 0。</summary>
+        public static float GetRagePct(int phaseTurn) => phaseTurn > 1 ? CardV(ChallengeCards.Rage) * (phaseTurn - 1) : 0f;
+        /// <summary>〈開幕の大技〉: ボス戦の各形態の最初のターンの敵の攻撃の上乗せ (%)。</summary>
+        public static float GetOpenerPct(int phaseTurn, bool bossFight) => bossFight && phaseTurn == 1 ? CardV(ChallengeCards.Opener) : 0f;
+        /// <summary>エスカレーションの上がり幅の上乗せ (%)。 段の倍率の 1 を超えた分に掛ける。</summary>
+        public static float GetEscalationRisePct() => CardV(ChallengeCards.Esc);
+        /// <summary>〈連撃〉: 2 回目の攻撃の威力 (%)。 0 = 連撃しない。</summary>
+        public static float GetTwinStrikePct() => CardV(ChallengeCards.Twin);
+        /// <summary>〈再生〉: 敵が毎ターン回復する、 最大 HP に対する割合 (%)。</summary>
+        public static float GetEnemyRegenPct() => CardV(ChallengeCards.Regen);
+        /// <summary>〈敵のシールド〉: 敵が毎ターン張り直すシールドの、 最大 HP に対する割合 (%)。</summary>
+        public static float GetEnemyShieldPct() => CardV(ChallengeCards.EnemyShield);
+        /// <summary>〈蝕み〉: ターンの始めに受ける軽減できないダメージの、 自分の最大 HP に対する割合 (%)。</summary>
+        public static float GetErodePct() => CardV(ChallengeCards.Erode);
+        /// <summary>敵の防御の上乗せ (連戦の全段)。</summary>
+        public static int GetEnemyDefenseBonus() => CardI(ChallengeCards.EnemyDef);
+        /// <summary>大技の倍率の上乗せ。</summary>
+        public static float GetHeavyMulBonus() => CardV(ChallengeCards.Heavy);
+        /// <summary>1 戦闘で使える消耗品の数 (0 = 制限なし)。</summary>
+        public static int GetBattleConsumableCap() => CardI(ChallengeCards.UseCap);
+        /// <summary>ボス戦ではエスカレーションが毎ターン進むか。</summary>
+        public static bool BossEscalatesEveryTurn() => ChallengeCards.Held(ChallengeCards.BossEsc) != null;
 
         /// <summary>〈綻び〉: **N ターンごとに端子が 1 つ封印される**。 0 = 無効。
         /// 返すのは周期 N (T1 3ターン / T2 2ターン / T3 毎ターン)。
@@ -153,7 +192,11 @@ namespace MetaProgression
         /// 勝率を上げた (不器用 +6.0 / 旧売り渋り +9.4)。 本軸は「余らせるな」という矯正でもあるので、
         /// 余らせているのが下手なら勝率が上がりうる。 **実測で符号を確認すること。**</summary>
         public static float GetFloorTollRatio()
-            => Pick(ChallengeAxis.通行料, 0f, 0.10f, /*T2 なし*/ 0f, /*T3 なし*/ 0f);
+        {
+            var m = ChallengeCards.Held(ChallengeCards.Money);   // 挑戦カード: 層を移るたび N%
+            if (m != null) return m.value / 100f;
+            return Pick(ChallengeAxis.通行料, 0f, 0.10f, /*T2 なし*/ 0f, /*T3 なし*/ 0f);
+        }
 
         /// <summary>〈宿屋連合〉: 前哨基地で休憩するたびに失う GOLD。
         /// 2026-08-10: 5 → 2。 1pt で −10.0pt (1pt当り −10.00) と、 3pt 軸に匹敵する重さだった。
@@ -215,7 +258,8 @@ namespace MetaProgression
         /// **上限ではなく倍率にし、 対象をスポットから全回復へ広げる**のが正しい形。</summary>
         /// 2026-08-17: ×0.86 → **×0.90**。 単軸スイープで 1pt −3.4pt (1pt当り −3.40) と割高だったため。
         public static float GetHealMultiplier()
-            => Pick(ChallengeAxis.遅い回復, 1f, 0.90f, /*T2 なし*/ 1f, /*T3 なし*/ 1f);
+            => Pick(ChallengeAxis.遅い回復, 1f, 0.90f, /*T2 なし*/ 1f, /*T3 なし*/ 1f) * (1f - CardV(ChallengeCards.Heal) / 100f)
+               * (1f + CardV(ChallengeCards.HealUp) / 100f);   // 挑戦カードのバフ「回復 +N%」も同じ倍率に入れる
 
         // ============================================================
         //  B. 敵強化 — 厚い皮膚 / 狂暴化  (T4: 鋼の皮膚)
@@ -225,7 +269,7 @@ namespace MetaProgression
         /// 2026-08-10: ×1.15/×1.30 から緩和。 単独 T3 −16.7pt でカテゴリ B が 6pt −28.0 と
         /// 全カテゴリ中で突出していたため。 敵HP は +1% あたり −0.55pt と素直に線形。</summary>
         public static float GetEnemyHpMultiplier()
-            => Pick(ChallengeAxis.厚い皮膚, 1f, /*T1 なし*/ 1f, 1.045f, 1.10f);
+            => Pick(ChallengeAxis.厚い皮膚, 1f, /*T1 なし*/ 1f, 1.045f, 1.10f) * (1f + CardV(ChallengeCards.EnemyHp) / 100f);
 
         /// <summary>敵ダメージ倍率。 T1 +3% / T2 +6% / T3 +10%。
         /// **ボス限定分はここに含めない** ── <see cref="GetBossDamageBonus"/> を別に足す。</summary>
@@ -234,7 +278,7 @@ namespace MetaProgression
 
         /// <summary>T4-B 鋼の皮膚: 敵が各戦闘 1 回だけ致命傷を HP1 で耐えるか。
         /// **発動ターンの敵攻撃は行わない** (plan の Tier4-B 定義)。</summary>
-        public static bool EnemySurvivesFirstLethal() => C.Has(ChallengeT4.鋼の皮膚);
+        public static bool EnemySurvivesFirstLethal() => C.Has(ChallengeT4.鋼の皮膚) || ChallengeCards.Held(ChallengeCards.Steel) != null;
 
         /// <summary>T4-B 鋼の皮膚: **ボスの最大HP 倍率** (2026-08-11 追加)。 1 = 無効。
         /// 通常敵には掛からない ── 〈厚い皮膚〉が全敵に掛かるので、 T4 は**層の主だけ**を厚くして
@@ -243,7 +287,16 @@ namespace MetaProgression
         /// 2026-08-11: ×1.20 → ×1.40 → **×1.20 へ差し戻し**。 ×1.40 は T4 コスト −9.8pt と
         /// 目安には収まったが、 カテゴリ B が 10pt で −25.8 (7層クリア 5.6%・3F止まり 17.1%) と
         /// 全カテゴリ中で突出し、 B を選んだ時点でランが成立しなくなっていた。
-        public static float GetBossHpMultiplier() => C.Has(ChallengeT4.鋼の皮膚) ? 1.20f : 1f;
+        public static float GetBossHpMultiplier()
+        {
+            // カード: ボスの +20% は敵の最大 HP の札と同じ溜まりに足す (掛け算にしない)。 敵の HP 倍率の後に掛かるので、 比で返す
+            if (ChallengeCards.Held(ChallengeCards.Steel) != null)
+            {
+                float hp = CardV(ChallengeCards.EnemyHp);
+                return (100f + hp + ChallengeCards.SteelBossHpPct) / (100f + hp);
+            }
+            return C.Has(ChallengeT4.鋼の皮膚) ? 1.20f : 1f;
+        }
 
         // ============================================================
         //  C. 戦闘則 — 俊敏 / 見放された運  (T4: 凶運)
@@ -275,6 +328,8 @@ namespace MetaProgression
         /// 全ターン継続は T4〈凶運〉の専有にして、 基礎軸との差を段でなく**性質**で作る。</summary>
         public static int GetForsakenLuckDiceCount(int currentTurn)
         {
+            int cardDice = CardI(ChallengeCards.Die1);   // 挑戦カード: 戦闘中ずっと N 本 (2026-11-09)
+            if (cardDice > 0) return cardDice;
             int t = Tier(ChallengeAxis.見放された運);
             if (t <= 0) return 0;
             int window = t >= 3 ? 5 : 2;                        // T3 = 5T / T1 = 2T
@@ -332,7 +387,7 @@ namespace MetaProgression
         public static float GetShopPriceMultiplier()
             => ShopPriceOverride > 0f
              ? ShopPriceOverride
-             : Pick(ChallengeAxis.搾取経済, 1f, /*T1 なし*/ 1f, 1.12f, 1.15f);
+             : Pick(ChallengeAxis.搾取経済, 1f, /*T1 なし*/ 1f, 1.12f, 1.15f) * (1f + CardV(ChallengeCards.Price) / 100f);
 
         /// <summary>[廃止: 補給断絶の宝箱減量] 常に 1。
         /// 2026-08-05: 補給断絶を **回復阻害の 1 本だけ**に絞った。 宝箱と前哨基地の
@@ -392,25 +447,6 @@ namespace MetaProgression
         /// 最軽量級だったため。 段の刻みは実測で線形 (−4.3 / −6.3 / −8.3) なので比率で伸ばす。
         public static int GetProvisionCapDelta() => PickI(ChallengeAxis.絶望的な戦闘, 0, -40, -80, -120);   // 2026-09-28: 物資 ×10
 
-        /// <summary>エスカレーション段階の到達を何ターン前倒しするか。 T1 = 1 / T2 = 1 / T3 = 2。
-        ///
-        /// 2026-08-09: 1/2/3 → 1/1/2。 **長いボス戦ほど重い**という性質が、 高難易度で
-        /// 6〜7 層だけを不可能にしていた (5層クリアの 7層への転換率が 0.71 → 0.23)。
-        /// この軸は「早く倒せば届かない」＝技量で答えられる圧なので**残す**が、 傾きを寝かせた。
-        ///
-        /// 2026-08-08: 旧「ボス戦の最初 N 撃 ×1.50 + ラストスタンド封印」から差し替え。
-        /// 旧効果は 40 ターン級のボス戦で 3 撃だけ強化しても誤差にしかならず、
-        /// 封印側もラストスタンド使用率が全ペルソナ 0% で無意味だったため、
-        /// **単独 T3 が対照群 50.7% に対し 52.7% と実質無料**だった (§15-2 V8 実測)。
-        ///
-        /// 新効果は閾値 {5,10,15,20} を前倒しするだけで倍率カーブ自体は触らない。
-        /// 全戦闘に効き、 長引くほど重くなるので**序盤偏重にならない**。
-        /// 「世界の崩れが早まる」という軸の意味とも一致する。</summary>
-        /// 2026-08-10 リワーク: エスカレーション前倒しは 3pt で −2.7pt / p=0.185 の死に段だった。
-        /// 閾値を 2T 早めても、 実際の戦闘は平均 3 ターン弱で終わるので**そもそも届いていない**。
-        /// **ボス攻撃力 ×1.50 へ差し替え。** ボス戦は長く、 全ターンに効くので確実に盤面へ出る。
-        public static int GetEscalationTurnShift() => 0;
-
         /// <summary>〈天変地異〉: **ボスの攻撃値がターンごとに 1.75% ずつ増える**。 1 = 無効。
         ///
         /// 2026-08-10 再リワーク。 一律 ×1.50 は 3pt で −12.0pt と重すぎ、 しかも
@@ -451,7 +487,8 @@ namespace MetaProgression
         /// 改善/悪化が 10/89 と一方通行だったのはこのため。
         /// 300T ならクリアランの 39% にしか掛からず、 設計意図どおりの分岐になる
         /// (参考: 260T→65% / 340T→19%)。</summary>
-        public static int GetJudgmentTurnThreshold() => C.Has(ChallengeT4.最後の審判) ? 300 : 0;
+        public static int GetJudgmentTurnThreshold()
+            => ChallengeCards.Held(ChallengeCards.Judge) is ChallengeCards.Card jc ? (int)jc.value2 : C.Has(ChallengeT4.最後の審判) ? 300 : 0;
 
         /// <summary>[互換用] 旧・刻限後の回復阻害。現仕様では常に素通し。</summary>
         public static int ApplyJudgmentHealReduction(int amount, RunState run)
@@ -465,6 +502,7 @@ namespace MetaProgression
         {
             if (amount <= 0) return 0;
             if (!IsPastJudgmentDeadline(run)) return amount;
+            if (run != null && run.challengeCardMode) return amount;   // カードの審判は敵の攻撃の溜まり (予告の前) に入る
 
             int increased = Mathf.Max(1, Mathf.CeilToInt(amount * 1.30f));
             int bonus = increased - amount;
