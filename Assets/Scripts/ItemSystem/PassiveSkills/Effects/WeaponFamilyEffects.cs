@@ -407,7 +407,7 @@ namespace ItemSystem.PassiveSkills.Effects
     ///
     /// <para>数え方 (2026-10-28 決定):
     /// 軽減前 = 直接攻撃の予告値のうちプレイヤーの防御を引く前 (エスカレーション・大技・〈封じ〉は反映済み、
-    /// パッシブ由来のダメージは含めない)。 2 体戦は 2 体の合計。 シールドで吸収して HP が減らなければ成立、
+    /// パッシブ由来のダメージは含めない)。 2 体戦は 2 体の合計で数え、 削りは 2 体の両方に同じ量が入る (主攻撃の写しと同じ)。 シールドで吸収して HP が減らなければ成立、
     /// 軽減無視のパッシブで HP が減ったら不成立。 10 未満は切り捨て。 ヴェスカは今の形態の最大 HP。</para>
     ///
     /// <para>素の装備では成立は〈堅守の構え〉のターン (3 ターンに 1 回) が上限。 敵の攻撃が伸びるほど払いは増えるが、
@@ -416,6 +416,8 @@ namespace ItemSystem.PassiveSkills.Effects
     {
         public const int PerUnit = 10;
         public const int PctPerUnit = 5;
+        /// <summary>このターンに 1 体目へ入れた削り。 2 体戦で 2 体目へ同じ量を写すために CombatManager が読む (読んだら消す)。</summary>
+        public const string DealtKey = "daybreakDealt";
         public string SkillId => "黎明";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -429,6 +431,8 @@ namespace ItemSystem.PassiveSkills.Effects
             int before = ctx.enemyCurrentHP;
             int after = DivineTalent.ClampToThreshold(ctx, System.Math.Max(0, before - dmg), ctx.enemyMaxHP);
             ctx.enemyCurrentHP = after;
+            // 2 体戦: 同じ量を 2 体目にも入れる (CombatManager が OnTurnEnd の直後に読んで消す・2026-11-09)
+            if (before > after) ctx.accumulatedValues[DealtKey] = before - after;
             UnityEngine.Debug.Log($"[黎明] 無傷で受け切った: 軽減前 {pre} → {units}×{PctPerUnit}% = {dmg} "
                                 + $"(敵HP {before} → {after})");
         }

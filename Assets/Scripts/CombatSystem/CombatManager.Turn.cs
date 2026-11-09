@@ -86,6 +86,17 @@ namespace CombatSystem
             psm.FireTrigger(PassiveSkillTrigger.OnTurnEnd);
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnTurnEnd);
 
+            // 盾〈黎明〉の削りを 2 体目にも同じ量だけ入れる (主攻撃の写しと同じ扱い・2 体目の HP ≤ 1 体目の不変条件を保つ)
+            if (ctx.accumulatedValues.TryGetValue(ItemSystem.PassiveSkills.Effects.Daybreak.DealtKey, out float dbDealt))
+            {
+                ctx.accumulatedValues.Remove(ItemSystem.PassiveSkills.Effects.Daybreak.DealtKey);
+                if (secondaryEnemy != null && secondaryHP > 0 && dbDealt > 0f)
+                {
+                    secondaryHP = Math.Max(0, secondaryHP - (int)dbDealt);
+                    Debug.Log($"[黎明] 2体目 {secondaryEnemy.displayName} にも −{(int)dbDealt} (HP {secondaryHP})");
+                }
+            }
+
             // ヴェスカ連戦: 敵パッシブが予約した SwapEnemy を perspective 復帰後に実行
             if (!string.IsNullOrEmpty(ctx.pendingEnemySwapId))
             {

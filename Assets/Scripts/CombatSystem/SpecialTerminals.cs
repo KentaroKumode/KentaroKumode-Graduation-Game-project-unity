@@ -12,7 +12,7 @@ namespace CombatSystem
         Bleed,         // 出血: 接続合計値分の出血を付与し、 接続本数分だけ即時発動
         Heal,          // 治癒: 接続合計値分 HP 回復
         Deathwish,     // 決死: 接続合計値分の自傷 + 同数を攻撃へ + 不足HPの5%を攻撃へ
-        VitalPoint,    // 急所: 接続ダイスがそのロールの最小値のときだけ 軽減不可ダメ 出目×2
+        VitalPoint,    // 一寸 (旧名 急所・短剣の段と同名だったので 2026-11-09 改名): 接続ダイスがそのロールの最小値のときだけ 軽減不可ダメ 出目×2
         Aim,           // 照準: 接続出目 ÷2 (切上) を会心率へ加算 (そのターンのみ)
         Battery,       // 蓄電池: 充電獲得が 1 ダイスあたり +2
         Coolant,       // 冷却材: 接続合計値を蓄積、 閾値到達でエスカレーションを 1 ターン遅延
@@ -56,7 +56,7 @@ namespace CombatSystem
         public const int FullGuardMultiplier = 2;
         /// <summary>〈決死〉が加算する「不足 HP」の割合。</summary>
         public const float DeathwishMissingHpPct = 0.05f;
-        /// <summary>〈急所〉の出目倍率 (軽減不可の固定ダメージ枠へ入る)。</summary>
+        /// <summary>〈一寸〉の出目倍率 (軽減不可の固定ダメージ枠へ入る)。</summary>
         public const int VitalPointMultiplier = 2;
         /// <summary>〈蓄電池〉の 1 ダイスあたり上乗せ充電。</summary>
         public const int BatteryPerDice = 2;
@@ -85,7 +85,7 @@ namespace CombatSystem
               "接続合計値ぶん HP を回復する。"),
             D(SpecialTerminalKind.Deathwish,   "term_death",   "決死",     LimitIII, 20,
               "接続合計値ぶん自傷し、 同数と「失った HP の 5%」を攻撃へ加算する。"),
-            D(SpecialTerminalKind.VitalPoint,  "term_vital",   "急所",     LimitI,   16,
+            D(SpecialTerminalKind.VitalPoint,  "term_vital",   "一寸",     LimitI,   16,
               "接続したダイスがそのロールの最小値のときだけ、 出目×2 の軽減不可ダメージ。"),
             D(SpecialTerminalKind.Aim,         "term_aim",     "照準",     LimitI,   14,
               "接続出目の半分 (切り上げ) を、 そのターンの会心率へ加算する。"),

@@ -37,7 +37,7 @@ namespace Codex
             // E4 最後の見出し ── 留まる (7層で敗北)
             ChousaHoukoku,     // 調査報告（第三次）(E4, 初到達・単一)
 
-            // E5 穴のあとに ── 塞ぐ
+            // E5 終幕 ── 塞ぐ
             TatamuJunban,      // 畳む順番          (E5, 初到達)
             Ichimaime,         // 一枚目            (E5, 3到達)
         }

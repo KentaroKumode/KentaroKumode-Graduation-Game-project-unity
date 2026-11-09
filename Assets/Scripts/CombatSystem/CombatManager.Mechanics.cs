@@ -488,8 +488,8 @@ namespace CombatSystem
                     {
                         int dmg = sum * SpecialTerminals.VitalPointMultiplier;
                         ctx.fixedDamageToEnemy += dmg;
-                        HpLossDiag.NoteSource("端子:急所", dmg, 0);
-                        Debug.Log($"[特殊端子/急所] 最小値{min} を接続 → 軽減不可 {dmg}");
+                        HpLossDiag.NoteSource("端子:一寸", dmg, 0);
+                        Debug.Log($"[特殊端子/一寸] 最小値{min} を接続 → 軽減不可 {dmg}");
                     }
                     break;
                 }

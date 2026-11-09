@@ -21,7 +21,6 @@ DICE BOUND（Unity 3D ローグライク・ボードゲーム調ダイス戦闘�
 | [tools/](tools/) | アイテム辞書・挑戦デバフ配点シミュレータ（HTML） |
 | [reports/](reports/) | 進捗・バランス調整の可視化レポート |
 | [presentation/](presentation/) | 改修ハイライト資料 |
-| items_catalog.md / items_uniques.md | items.json からの自動生成カタログ |
 | HANDOFF-OPUS47.md | 引き継ぎ手順書（2026-07-15 作成・参照先が旧 specs のままなので要更新） |
 
 ## 正本ポリシー（重要）
