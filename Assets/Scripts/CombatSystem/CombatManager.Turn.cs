@@ -394,6 +394,7 @@ namespace CombatSystem
             // ここからターンの最後の HP 同期までは、 品が入れる敵へのダメージを預かる (Kw.DamageEnemy)。
             if (ctx != null) ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.ResolvingKey] = 1;
             psm.BeginTurn();
+            DrawTerminalHand(ctx);   // 端子の山札 (ADR-0014): 3 枚引く (振り直しの判断より前 ── 手札を見て振り直すか決められる)
 
             // 装備維持費 (2026-08-15): **所持パッシブ 10 個につき充電 1** を毎ターン消費する。
             //   §7-3 の仕様として決まっていたが実装されていなかった。
@@ -778,8 +779,28 @@ namespace CombatSystem
                         + (tele.playerHighDiceCrushed ? "  【出目3以上を再抽選】" : "")
                         + (tele.playerBlockIgnored ? "  【ブロック無効】" : ""));
 
-            // --- 5. 配線 (前ターン配線の自動適用 → ポリシー/UI による変更) ---
-            if (mutualWiring == null || mutualWiring.Length != playerDice.Length)
+            // --- 5. 配線 ---
+            //   端子の山札 (ADR-0014): 場の端子 (常設 + 手札) へ出目を挿す。 結果は TerminalCards.Resolve が 1 か所で計算する。
+            TerminalOutcome term = null;
+            if (_deck != null)
+            {
+                var tenv = TerminalEnvNow(ctx, enemyAtkValue);
+                int[] slots = null;
+                if (_interactiveTurn)
+                {
+                    _pause.Set(TurnPauseKind.Wiring, playerDice, playerFaceIdx, tele, mutualWiring);
+                    _pause.board = _deck.board; _pause.terminalEnv = tenv; _pause.terminalState = _deck.state;
+                    yield return _pause;
+                    slots = _pause.slots;
+                }
+                else if (WiringPolicy != null) slots = WiringPolicy(playerDice, tele).slots;
+                if (slots == null) slots = TerminalWiring.Auto(_deck.board, playerDice, tenv, _deck.state);
+                term = TerminalCards.Resolve(_deck.board, slots, playerDice, tenv, _deck.state);
+                mutualWiring = term.kindOfDie;
+                _termOutcome = term;
+            }
+            //   旧い配線 (前ターン配線の自動適用 → ポリシー/UI による変更)。 山札がそろったら消す。
+            else if (mutualWiring == null || mutualWiring.Length != playerDice.Length)
             {
                 var next = new DiceTerminal[playerDice.Length];
                 for (int i = 0; i < next.Length; i++)
@@ -787,7 +808,8 @@ namespace CombatSystem
                         ? mutualWiring[i] : DiceTerminal.Attack; // 未配置は攻撃へ自動合流
                 mutualWiring = next;
             }
-            if (_interactiveTurn)
+            if (term != null) { }
+            else if (_interactiveTurn)
             {
                 // 人が操作する: 出目と予告を見せて、 配線が来るまで止まる (渡された配線は下の SanitizeWiring が直す)。
                 _pause.Set(TurnPauseKind.Wiring, playerDice, playerFaceIdx, tele, mutualWiring);
@@ -805,12 +827,19 @@ namespace CombatSystem
 
             // 特殊端子 (§6-5) の接続制限と、 挑戦デバフ〈不器用〉の端子上限を強制する。
             // **方策/UI を信用しない** ── 制限を破った配線が来たら攻撃へ落とす。
-            SanitizeWiring(mutualWiring, playerDice.Length);
+            if (term == null) SanitizeWiring(mutualWiring, playerDice.Length);
 
             int attackSum = 0, blockSum = 0, chargeDiceCount = 0;
             int attackDiceCount = 0, blockDiceCount = 0, chargeSum = 0;
             int specialSum = 0, specialCount = 0;
-            for (int i = 0; i < playerDice.Length; i++)
+            if (term != null)
+            {
+                // 端子の山札: 合計も個数も端子の結果から (出目をそのまま足さない ── 端子ごとに入る量が違う)
+                attackSum = term.attackAdd; blockSum = term.blockAdd; chargeSum = term.chargeAdd;
+                attackDiceCount = term.attackDice; blockDiceCount = term.blockDice; chargeDiceCount = term.chargeDice;
+                ApplyTerminalOutcome(ctx, term, ref enemyAtkValue);
+            }
+            else for (int i = 0; i < playerDice.Length; i++)
             {
                 switch (i < mutualWiring.Length ? mutualWiring[i] : DiceTerminal.Attack)
                 {
@@ -842,7 +871,8 @@ namespace CombatSystem
             // --- 特殊端子 (§6-5) ---
             //   端子調律メタの後・〈貫きの錐〉と充電付与の前に置く。
             //   〈完全防御〉のぶんも錐の貫通対象にしたいので、 錐より前でなければならない。
-            if (specialCount > 0)
+            if (term != null) specialCount = term.supportDice;      // 既存の品が読む「特殊に挿した個数」= 補助の端子に挿した個数
+            else if (specialCount > 0)
                 ApplySpecialTerminal(ctx, playerDice, specialSum, specialCount,
                                      ref attackSum, ref blockSum, ref chargeSum);
             // 〈貫きの錐〉(7層ヴェスカ GOLD 遺物・2026-07-29 変更)。
@@ -900,6 +930,9 @@ namespace CombatSystem
             //   手札役 / 端子役 / 配線役 を判定し、 方策が「切る」と決めた役だけを適用する。
             //   **1 戦闘 1 役 1 回・発動は任意**。 オーバーロード (タイミング判定) の後継。
             var roleOutcome = ResolveRoles(ctx, playerDice, playerFaceIdx);
+            // 端子の「このターンの被ダメージ −N%」は、 役〈守り〉と同じ口で掛ける (掛け合わせる)
+            if (term != null && term.takenMul < 1f)
+                roleOutcome.damageTakenCutPct = Mathf.RoundToInt(100f - (100f - roleOutcome.damageTakenCutPct) * term.takenMul);
             // 次ターンへ持ち越す分 (無料リロール・敵の攻撃減・行動不能) は Apply が nextTurnBuffs へ積み済み。
             // 〈癒し〉: 回復する。 T4 は HP 上限を超えた分をシールドに変える。
             if (roleOutcome.healAmount > 0)
@@ -1092,6 +1125,7 @@ namespace CombatSystem
                 EnemyHpLedger.NoteBurstIntoFixed(critExtra);
             }
             if (!skipAttack) ApplyRoleExtraDamage(ctx, ref dealtDmg, ref dealtFixed, roleOutcome);
+            if (term != null && term.bleedOnHit > 0 && dealtDmg > 0) ctx.AddEnemyBleed(term.bleedOnHit);      // 端子〈返し鉤〉: 攻撃が通れば出血
             ctx.lastPlayerDamage = dealtDmg + dealtFixed;
             // 固定ダメの枠は、 ここで取り出した (dealtFixed) ので空に戻す (2026-11-05)。
             //   戻さないと、 この後の敵の攻撃側の ProcessDamage が同じ枠をそのまま返し、 反撃固定として
@@ -1581,6 +1615,9 @@ namespace CombatSystem
                 psm.FireEnemyTrigger(PassiveSkillTrigger.OnRollWin);
             else
                 psm.FireEnemyTrigger(PassiveSkillTrigger.OnRollDraw);
+
+            // 端子の山札: 撃破のボーナスと、 使い捨て・写し取り・焼き切り・保持の反映
+            if (term != null) FinishTerminalTurn(term);
 
             // --- 7. ターン終了処理 (共通終端) ---
             var turnResult = FinishTurnCommon(result, ctx);

@@ -537,6 +537,7 @@ namespace CombatSystem
             FleeAllowed = false;   // 戦闘ごとに GameManager が立て直す (既定は逃げられない)
             turnLog.Clear();
             mutualWiring = null; // ADR-0009: 配線は戦闘単位でリセット (ラン跨ぎ既定値は W7 後段)
+            BeginTerminalDeck();   // 端子の山札 (ADR-0014): ランの山札を写して切る
             _fightPlayerRollSum = 0;
             _fightPlayerRollCount = 0;
             _fightStrongTurns = _fightStrongBossWins = _fightWeakTurns = _fightWeakBossWins = 0;

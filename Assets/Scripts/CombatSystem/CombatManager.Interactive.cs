@@ -28,14 +28,22 @@ namespace CombatSystem
         /// <summary>リロールの判断のとき: 振り直すと払う充電。</summary>
         public int rerollCost;
 
+        /// <summary>端子の山札 (ADR-0014): 場の端子 (常設 + 手札) の名前。 山札で戦っていなければ null。 書き換えないこと。</summary>
+        public List<string> board;
+        /// <summary>端子の見積もりに要る盤面 (画面が挿し方の結果を先に見せるのに使う)。</summary>
+        public TerminalEnv terminalEnv;
+        /// <summary>端子の戦闘中の状態 (溜まり・連続)。 見積もりは Clone した写しに掛けること。</summary>
+        public TerminalBattleState terminalState;
+
         // ===== 答え (CombatManager が読む) =====
         internal bool reroll;
         internal DiceTerminal[] wiring;
+        internal int[] slots;
 
         internal void Set(TurnPauseKind k, int[] dice, int[] faceIdx, MutualTurnTelegraph t, DiceTerminal[] wired)
         {
             kind = k; playerDice = dice; playerFaceIdx = faceIdx; tele = t; currentWiring = wired;
-            rerollCost = 0; reroll = false; wiring = null;
+            rerollCost = 0; reroll = false; wiring = null; slots = null; board = null; terminalState = null;
         }
     }
 
@@ -85,6 +93,14 @@ namespace CombatSystem
         {
             if (_activeTurn == null || _pause.kind != TurnPauseKind.Wiring) return;
             _pause.wiring = wiring;
+            Advance();
+        }
+
+        /// <summary>端子の山札 (ADR-0014) の配線に答える。 出目ごとの挿し先 (場の端子の添字・−1 = 挿さない)。 規則に合わない挿し方は挿さなかった扱いになる。</summary>
+        public void AnswerWiringSlots(int[] slots)
+        {
+            if (_activeTurn == null || _pause.kind != TurnPauseKind.Wiring) return;
+            _pause.slots = slots;
             Advance();
         }
 

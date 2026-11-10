@@ -308,6 +308,12 @@ namespace GameLoop
         /// <summary>層ボスの報酬で提示されている特殊端子 (§6-5) の id (2 択・2026-11-11)。 空 = 提示なし。
         /// 人が遊んでいる時だけ入る (Game2DPhaseScreens が窓を出し、 GameManager.ResolveTerminalOffer で決める)。</summary>
         public List<string> pendingTerminalOffer = new List<string>();
+        /// <summary>端子の山札 (ADR-0014)。 ラン単位。 開始は攻撃 2・防御 2・充電 1。 戦闘のたびに写して切る (CombatSystem.TerminalDeckState)。</summary>
+        public List<string> terminalDeck = new List<string>();
+        /// <summary>端子〈研ぎ澄まし〉の恒久の攻撃 (このターンに敵を倒すたび +1・同じ名前の端子で共有)。</summary>
+        public int terminalWhetBonus;
+        /// <summary>端子〈剥ぎ取り〉: 次の戦闘後の端子の選択肢を増やす数 (報酬を出したら 0 に戻す)。</summary>
+        public int terminalExtraChoices;
 
         /// <summary>装備中のダイスアイテムID（空=武器ダイス使用）。取得時に Loadout.TryAutoEquip で更新。</summary>
         public string equippedDiceId = "";
@@ -587,6 +593,9 @@ namespace GameLoop
             limitBreakStage = 0;
             pendingWeaponIds.Clear();
             pendingTerminalOffer.Clear();
+            terminalDeck = CombatSystem.TerminalCards.StartingDeck();
+            terminalWhetBonus = 0;
+            terminalExtraChoices = 0;
             // 兵站: 物資上限 +1/段 (2026-11-09)
             int provisionCapBonus = MetaProgression.MetaBuffApplicator.GetProvisionCapBonus();
             provisionCap = UnityEngine.Mathf.Max(1, GameHooks.ProvisionBaseMax + provisionCapBonus);

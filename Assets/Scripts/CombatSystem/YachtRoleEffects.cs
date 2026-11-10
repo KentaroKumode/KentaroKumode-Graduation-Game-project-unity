@@ -191,7 +191,7 @@ namespace CombatSystem
             => Escalation.StageOf(Mathf.Max(1, ctx.currentTurn - Delay(ctx)));
 
         /// <summary>次のターンの段階を 1 つ戻すのに要る遅延の追加量。 既に段階 0 なら 0。</summary>
-        static int TurnsToRetreatOneStage(CombatContext ctx)
+        public static int TurnsToRetreatOneStage(CombatContext ctx)
         {
             int next = Mathf.Max(1, ctx.currentTurn + 1 - Delay(ctx));
             int stage = Escalation.StageOf(next);

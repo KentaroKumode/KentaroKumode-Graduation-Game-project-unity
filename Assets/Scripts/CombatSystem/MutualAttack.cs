@@ -13,6 +13,8 @@ namespace CombatSystem
         /// 未装着なら接続制限 0 ＝ 1 本も挿せない。 効果と接続制限は
         /// <see cref="SpecialTerminals"/> が持つ。</summary>
         Special = 3,
+        /// <summary>挿していない (端子の山札・ADR-0014)。 どの端子にも入らない出目。 **末尾に置く** (0〜3 を添字に使う所がある)。</summary>
+        None = 4,
     }
 
     /// <summary>1 ターンぶんの配線。 添字 = ダイス番号、 値 = 接続先の端子。
@@ -23,8 +25,11 @@ namespace CombatSystem
     {
         /// <summary>接続先。 添字 = ダイス番号。</summary>
         public DiceTerminal[] main;
+        /// <summary>端子の山札 (ADR-0014): 出目ごとの挿し先 (場の端子の添字・−1 = 挿さない)。 山札で戦う時はこちらを読む。</summary>
+        public int[] slots;
 
         public static WiringPlan Of(DiceTerminal[] main) => new WiringPlan { main = main };
+        public static WiringPlan OfSlots(int[] slots) => new WiringPlan { slots = slots };
     }
 
     /// <summary>

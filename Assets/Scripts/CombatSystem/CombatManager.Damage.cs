@@ -183,6 +183,8 @@ namespace CombatSystem
             if (CombatStats.DiagWinAttack) CombatStats.Stage(7, totalDmg);   // 段 G
 
             // [測定用の物差し 2026-11-10] 主攻撃の倍率 (既定 1 = 素通し・製品では使わない)。 この関数の呼び手はプレイヤーの主攻撃だけ (Turn.cs)。
+            // 端子の山札 (ADR-0014): 別枠の与ダメージの掛け算 (〈増幅器〉〈共振器〉)。 他の与ダメ% と足さずに掛ける。
+            if (_termDamageMul != 1f && totalDmg > 0) totalDmg = Mathf.Max(1, Mathf.RoundToInt(totalDmg * _termDamageMul));
             totalDmg = EnemyHpLedger.ProbeMain(totalDmg);
             // 大罪:怠惰 (挑戦カード IV・2026-11-11): 主攻撃の最終ダメージ −N% (すべての倍率の後・敵の防御の前)
             totalDmg = MetaProgression.MetaDebuffApplicator.ApplySlothCut(totalDmg);   // 主攻撃以外は敵の HP を減らす口 (HpLossDiag.Lose) で掛ける
