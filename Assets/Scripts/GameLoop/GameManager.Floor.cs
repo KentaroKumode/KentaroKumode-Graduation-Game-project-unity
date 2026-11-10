@@ -21,6 +21,7 @@ namespace GameLoop
         /// (旧: BOT だけラン開始時にビルドの型で 1 つ決めて持っていた)。</summary>
         private void OfferSpecialTerminal()
         {
+            if (CombatSystem.TerminalCards.Enabled) return;      // 端子の山札 (ADR-0014) では戦闘後の報酬が代わりに出る
             if (Run == null || Run.currentFloor < 1 || Run.currentFloor > SpecialTerminalLastFloor) return;
             var offer = CombatSystem.SpecialTerminals.RollOffer(Run);
             if (offer.Count == 0) return;
@@ -357,6 +358,14 @@ namespace GameLoop
             if (Run.Depth != MapSystem.FreeMove.FloorPlan.FarmFloor) Run.fightCount++;
 
             Run.ApplyBattleResult(result.playerWon, result.playerHPRemaining, result.totalTurns);
+
+            // 端子の山札 (ADR-0014): 勝ったら端子の報酬 (戦闘後 2 択・エリート 3 択・層ボスはレア 3 択)
+            if (result.playerWon && Run.playerHP > 0)
+            {
+                var tnode = MapSystem.MapManager.Instance?.CurrentNode;
+                OfferTerminalReward(tnode != null && tnode.EffectiveType == MapSystem.TileType.EliteBattle,
+                                    tnode != null && tnode.type == MapSystem.TileType.Boss);
+            }
 
             // (戦闘の HP 収支マイナスによる物資の損は 2026-11-09 に撤去。 物資が減るのは移動だけ)
 
