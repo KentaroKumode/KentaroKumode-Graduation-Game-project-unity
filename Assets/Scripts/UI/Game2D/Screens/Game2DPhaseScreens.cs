@@ -100,7 +100,9 @@ namespace UI.Game2D
         {
             var run = gm.Run;
             if (run != null && run.pendingWeaponIds.Count > 0 && ph != GameManager.GamePhase.Combat && ph != GameManager.GamePhase.BattleResult) return WeaponSwap(gm);
-            if (run != null && run.pendingTerminalOffer.Count > 0 && ph != GameManager.GamePhase.Combat && ph != GameManager.GamePhase.BattleResult) return TerminalPick(gm);
+            if (run != null && run.pendingTerminalOffer.Count > 0 && ph != GameManager.GamePhase.Combat && ph != GameManager.GamePhase.BattleResult)
+                return CombatSystem.TerminalCards.Enabled ? TerminalReward(gm) : TerminalPick(gm);      // 山札 (ADR-0014) の報酬 / 旧い特殊端子の 2 択
+            _termDeckView = false;
             if (ph == GameManager.GamePhase.MapNavigation && gm.PendingStartingPassiveChoices.Count > 0) return StartingPick(gm);
             if (ph == GameManager.GamePhase.MapNavigation && gm.PendingChallengeTiers.Count > 0) return ChallengePick(gm);
             switch (ph)
@@ -413,6 +415,81 @@ namespace UI.Game2D
             d.buttons.Add(B(cur != null ? "今のままにする" : "受け取らない", "keep"));
             if (cur != null) d.footer = "取り付けると「" + cur.displayName + "」は外れる";
             d.onAction = (a, sel) => { gm.ResolveTerminalOffer(a == "pick" ? Mathf.Clamp(sel, 0, offer.Count - 1) : -1); Game2DSfx.Play("ui_confirm"); Refresh(); };
+            return d;
+        }
+
+        // ── 端子の山札 (ADR-0014) の報酬 ──
+        //   戦闘後 2 択・エリート 3 択・層ボスはレア 3 択 (候補は GameManager が入れる)。 1 枚を山札に加えるか、 受け取らない。
+        //   「山札を見る」で今の山札 (名前ごとの枚数) を頁で送って読める。
+
+        private bool _termDeckView;
+        private int _termDeckPage;
+        private const int TermDeckPerPage = 12;
+
+        private ScreenDef TerminalReward(GameManager gm)
+        {
+            if (_termDeckView) return TerminalDeckList(gm);
+            var run = gm.Run; var offer = run.pendingTerminalOffer;
+            var d = New("端子の報酬", "山札 " + (run.terminalDeck != null ? run.terminalDeck.Count : 0) + " 枚", 460);
+            d.body = "1 枚を山札に加える。 加えなくてもよい。"; d.bodyLines = 1;
+            foreach (var id in offer)
+            {
+                var t = CombatSystem.TerminalCards.Get(id);
+                d.Items.Add(new ModalItem
+                {
+                    name = id, tone = t != null ? Game2DTerminalLook.KindColor(t.kind) : (Color32?)null,
+                    value = t != null ? Game2DTerminalLook.Marks(t, run) : null,
+                    desc = t != null ? t.description : null,
+                });
+            }
+            d.buttons.Add(B("山札に加える", "pick", true));
+            d.buttons.Add(B("受け取らない", "skip"));
+            d.buttons.Add(B("山札を見る", "deck"));
+            d.footer = "受け取らないと、 候補はすべて流れる";
+            d.onAction = (a, sel) =>
+            {
+                switch (a)
+                {
+                    case "pick": gm.ResolveTerminalReward(Mathf.Clamp(sel, 0, offer.Count - 1)); Game2DSfx.Play("ui_confirm"); break;
+                    case "skip": gm.ResolveTerminalReward(-1); Game2DSfx.Play("ui_confirm"); break;
+                    case "deck": _termDeckView = true; _termDeckPage = 0; break;
+                }
+                Refresh();
+            };
+            return d;
+        }
+
+        /// <summary>今の山札の中身 (名前ごとの枚数)。 並びは定義の順 (基本 → コモン → レア → 軸 → 使い捨て)。</summary>
+        private ScreenDef TerminalDeckList(GameManager gm)
+        {
+            var run = gm.Run; var deck = run.terminalDeck ?? new List<string>();
+            var counts = new Dictionary<string, int>();
+            foreach (var id in deck) { counts.TryGetValue(id, out int c); counts[id] = c + 1; }
+            var names = new List<string>();
+            foreach (var t in CombatSystem.TerminalCards.All) if (counts.ContainsKey(t.id)) names.Add(t.id);
+            foreach (var id in counts.Keys) if (!names.Contains(id)) names.Add(id);      // 定義に無い名前 (古いセーブなど) も落とさない
+            int pages = Mathf.Max(1, (names.Count + TermDeckPerPage - 1) / TermDeckPerPage); _termDeckPage = Mathf.Clamp(_termDeckPage, 0, pages - 1);
+            var d = New("山札", "計 " + deck.Count + " 枚・" + names.Count + " 種", 460); d.cols = 2;
+            int first = _termDeckPage * TermDeckPerPage, cnt = Mathf.Min(TermDeckPerPage, names.Count - first);
+            for (int i = 0; i < cnt; i++)
+            {
+                string id = names[first + i]; var t = CombatSystem.TerminalCards.Get(id);
+                d.Items.Add(new ModalItem
+                {
+                    name = id, value = "×" + counts[id], tone = t != null ? Game2DTerminalLook.KindColor(t.kind) : (Color32?)null,
+                    desc = t != null ? Game2DTerminalLook.Describe(t, run) : null,
+                });
+            }
+            if (names.Count == 0) d.body = "山札は空。";
+            if (pages > 1) d.buttons.Add(B("次の頁 " + (_termDeckPage + 1) + "/" + pages, "page"));
+            d.buttons.Add(B("戻る", "back", true));
+            d.footer = "名前の色は種類 (赤 = 攻撃・青 = 防御・金 = 充電・緑 = 補助)";
+            d.onAction = (a, _) =>
+            {
+                if (a == "page") _termDeckPage = (_termDeckPage + 1) % pages;
+                else if (a == "back") _termDeckView = false;
+                Refresh();
+            };
             return d;
         }
 

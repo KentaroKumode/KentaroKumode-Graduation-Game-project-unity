@@ -145,6 +145,8 @@ namespace CombatSystem
         public int firedNonBasic;
         /// <summary>〈保持器〉〈写し取り〉〈焼き切り〉の対象 (場の添字・−1 = なし)。</summary>
         public int retainTarget = -1, copyTarget = -1, burnTarget = -1;
+        /// <summary>〈発振器〉の連続をこのターンもう数えたか。</summary>
+        public bool oscCounted;
 
         public bool Fired(List<string> board, string id)
         {
@@ -477,8 +479,12 @@ namespace CombatSystem
                 case TerminalIds.Relay: o.attackAdd += sum; break;                 // +8 × 他の発動は後で
                 case TerminalIds.Grinder: o.attackAdd += sum; break;               // 他の出目 +1 は先に済み
                 case TerminalIds.Oscillator:
-                    if (st.oscLast == sum) st.oscStreak++; else st.oscStreak = 0;
-                    st.oscLast = sum;
+                    // 連続は 1 ターンに 1 つだけ進める (〈倍電圧〉で効果が 2 回走っても、 2 回目は同じ連続回数で足すだけ)
+                    if (!o.oscCounted)
+                    {
+                        if (st.oscLast == sum) st.oscStreak++; else st.oscStreak = 0;
+                        st.oscLast = sum; o.oscCounted = true;
+                    }
                     o.attackAdd += sum + OscPerStreak * st.oscStreak; break;
                 case TerminalIds.Twin: o.attackAdd += sum; break;
                 case TerminalIds.Fuse: o.blockAdd += FuseBlock; break;

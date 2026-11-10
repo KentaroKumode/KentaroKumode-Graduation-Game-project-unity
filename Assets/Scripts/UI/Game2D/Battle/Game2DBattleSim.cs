@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using CombatSystem;
 using GameLoop;
 using UnityEngine;
@@ -10,6 +11,7 @@ namespace UI.Game2D.Battle
     /// 1 ターン: 敵の攻撃が予告される → 自分のダイスが出る → (充電を払って振り直す) → 配線 → [GO!] → 自分の攻撃 → 敵の攻撃 → 次のターン。
     /// HP・出目・配線・ダメージはすべて本物で、 この部品は値を作らない (見せる順番と間だけを持つ)。
     /// 操作: [GO! / NEXT] ボタンか Space / ダイス・端子のクリックか 1 2 3 / [REROLL] ボタンか E。
+    /// 端子の山札 (ADR-0014・<see cref="DeckMode"/>) の時は、 出目ごとの挿し先 (<see cref="slot"/>) を持ち、 決定で AnswerWiringSlots へ渡す。 Q = おまかせ。
     /// BOT がランを動かしている間 (<see cref="GameHooks.BotDriving"/>) は手を出さない。
     /// </summary>
     public class Game2DBattleSim : MonoBehaviour
@@ -65,6 +67,13 @@ namespace UI.Game2D.Battle
         public struct Wired { public int atk, aDice, blk, chg; }
         public Wired GetWired()
         {
+            // 端子の山札: 見込み (解決後は結果) の値。 攻撃の種類に 1 個も挿さないターンは攻撃しないので 0
+            if (DeckMode)
+            {
+                var o = preview;
+                if (o == null) return new Wired();
+                return new Wired { atk = o.attackDice > 0 ? baseAtk + o.attackAdd : 0, aDice = o.attackAdd, blk = o.blockAdd, chg = o.chargeAdd };
+            }
             int a = 0, b = 0, c = 0;
             for (int i = 0; i < 3; i++) { if (wire[i] == 0) a += pd[i]; else if (wire[i] == 1) b += pd[i]; else if (wire[i] == 2) c += pd[i]; }
             return new Wired { atk = baseAtk + a, aDice = a, blk = b, chg = c };
@@ -176,7 +185,8 @@ namespace UI.Game2D.Battle
             playerHp = cm.PlayerHP; playerMax = Mathf.Max(1, cm.PlayerMaxHP); baseAtk = cm.PlayerAttackPower;
             fx.SetEnemyHp(cm.EnemyHP, cm.EnemyMaxHP);
             fx.WeaponIndex = WeaponIndexOf(GameManager.Instance?.Run?.equippedWeaponId);
-            for (int i = 0; i < 3; i++) wire[i] = 0;
+            for (int i = 0; i < 3; i++) { wire[i] = 0; slot[i] = -1; }
+            board.Clear(); preview = null; lastOutcome = null; focusSlot = -1;
             Touch();
         }
 
@@ -187,6 +197,8 @@ namespace UI.Game2D.Battle
             rolled = false; _eHit = false;
             _countDots = true; _poisonSeen = _bleedSeen = 0;
             bool paused = cm.BeginInteractiveTurn();
+            // 端子の山札: このターンの場 (常設 + 手札) を写す。 判断なしで解決したターンも、 発動の表示はこの並びの添字で読む
+            if (DeckMode) TakeBoard(cm);
             // ターンの頭の毒: ここで見せて HP の表示を先に減らす (本当の HP は攻撃と一緒に減るので、 尽きる分は残す)
             _poisonShown = Mathf.Min(_poisonSeen, Mathf.Max(0, _enemyBefore - 1));
             _poisonSeen = _bleedSeen = 0;      // ここから先は判断への答えで入った分 (Resolve で読む)
@@ -212,6 +224,18 @@ namespace UI.Game2D.Battle
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             charge = ctx != null ? ctx.GetCharge() : 0;
             _shownDice = p.playerDice != null ? (int[])p.playerDice.Clone() : null;
+            // 端子の山札: ターンの頭は挿し方を空から (または おまかせ) / 振り直しの後は、 挿せなくなった出目だけ外す
+            if (DeckMode)
+            {
+                if (takeWiring)
+                {
+                    for (int i = 0; i < 3; i++) slot[i] = -1;
+                    lastOutcome = null; focusSlot = -1;
+                    if (AutoWireOnTurnStart) AutoWire(false);
+                }
+                else ValidateSlots();
+                RecomputePreview();
+            }
         }
 
         private void Keys()
@@ -222,6 +246,7 @@ namespace UI.Game2D.Battle
             if (Input.GetKeyDown(KeyCode.Alpha1)) CycleWire(0);
             if (Input.GetKeyDown(KeyCode.Alpha2)) CycleWire(1);
             if (Input.GetKeyDown(KeyCode.Alpha3)) CycleWire(2);
+            if (Input.GetKeyDown(KeyCode.Q)) AutoWire();
         }
 
         public bool CanOperate => phase == P.Wire;
@@ -251,7 +276,9 @@ namespace UI.Game2D.Battle
                     if (p.kind == TurnPauseKind.Wiring)
                     {
                         Game2DSfx.Play("decide");
-                        cm.AnswerWiring(BuildWiring(p.playerDice != null ? p.playerDice.Length : 3));
+                        int n = p.playerDice != null ? p.playerDice.Length : 3;
+                        if (DeckMode) cm.AnswerWiringSlots(BuildSlots(n));
+                        else cm.AnswerWiring(BuildWiring(n));
                         if (!cm.IsAwaitingDecision) Resolve(cm);
                     }
                     break;
@@ -311,11 +338,131 @@ namespace UI.Game2D.Battle
             return true;
         }
 
-        public void CycleWire(int i)
+        /// <summary>出目 i の行き先を順に変える (dir = 1 で次・−1 で前)。 山札のときは場の端子 → 挿さない の順で、 挿せない端子は飛ばす。</summary>
+        public void CycleWire(int i, int dir = 1)
         {
             if (!CanOperate || i < 0 || i > 2) return;
-            wire[i] = (wire[i] + 1) % TerminalKinds; Game2DSfx.Play("wire", 1f, 1f + wire[i] * 0.12f); Touch();
+            if (DeckMode) { CycleSlot(i, dir >= 0 ? 1 : -1); return; }
+            int k = TerminalKinds;
+            wire[i] = ((wire[i] + (dir >= 0 ? 1 : -1)) % k + k) % k; Game2DSfx.Play("wire", 1f, 1f + wire[i] * 0.12f); Touch();
         }
+
+        // ── 端子の山札 (ADR-0014) ──
+        //   出目 3 個を場の端子 (常設 + 手札) へ 1 個ずつ挿す。 挿し方を変えるたびに TerminalCards.Resolve を状態の写しで呼んで見込みを出す
+        //   (式は本体の 1 か所だけ ── ここは呼ぶだけ)。 決定で CombatManager.AnswerWiringSlots へ渡す。
+
+        /// <summary>ターンの頭に おまかせの挿し方を入れておくか。 false = 空 (全部「挿さない」) から選ぶ。</summary>
+        private static readonly bool AutoWireOnTurnStart = false;      // const にすると「到達しないコード」の警告が出る
+
+        /// <summary>山札で戦っているか (CombatManager.TerminalDeck が有る)。 false の間は旧い配線の画面のまま。</summary>
+        public bool DeckMode { get { var cm = CombatManager.Instance; return cm != null && cm.TerminalDeck != null; } }
+        /// <summary>出目ごとの挿し先 (場の添字・−1 = 挿さない)。</summary>
+        public readonly int[] slot = { -1, -1, -1 };
+        /// <summary>このターンの場の写し (添字 = 挿し先)。</summary>
+        public readonly List<string> board = new List<string>();
+        /// <summary>今の挿し方の見込み。 解決した後は結果 (<see cref="lastOutcome"/> と同じ)。 null あり。</summary>
+        public TerminalOutcome preview;
+        /// <summary>解決したターンの結果 (発動した端子を光らせる)。 次のターンの手札が来るまで残す。 null = 判断の前。</summary>
+        public TerminalOutcome lastOutcome;
+        /// <summary>説明を出す端子 (最後に挿し先にした・押した端子の場の添字。 −1 = なし)。</summary>
+        public int focusSlot = -1;
+
+        public bool ShowingResult => lastOutcome != null;
+
+        private void TakeBoard(CombatManager cm)
+        {
+            board.Clear(); if (cm.TerminalDeck != null) board.AddRange(cm.TerminalDeck.board);
+            lastOutcome = null; preview = null;      // 前のターンの結果は前の場の添字なので持ち越さない
+            for (int i = 0; i < 3; i++) if (slot[i] >= board.Count) slot[i] = -1;
+        }
+
+        /// <summary>見積もりに要る入力。 配線の判断で止まっていれば本体が詰めた盤面を、 振り直しの判断ならその場で作る。</summary>
+        private bool TermInputs(out int[] dice, out TerminalEnv env, out TerminalBattleState st)
+        {
+            var cm = CombatManager.Instance; var p = cm != null ? cm.PendingDecision : null;
+            dice = p?.playerDice; env = default; st = null;
+            if (cm == null || cm.TerminalDeck == null || dice == null || board.Count == 0) return false;
+            if (p.kind == TurnPauseKind.Wiring && p.board != null) { env = p.terminalEnv; st = p.terminalState; }
+            else env = cm.TerminalEnvNow(ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context, p.tele.enemyAttackValue);
+            if (st == null) st = cm.TerminalDeck.state;
+            return true;
+        }
+
+        private int[] BuildSlots(int n)
+        {
+            var s = new int[n];
+            for (int i = 0; i < n; i++) s[i] = i < 3 ? slot[i] : -1;      // 4 個目以降は表示していないので挿さない
+            return s;
+        }
+
+        private void RecomputePreview()
+        {
+            if (lastOutcome != null) { preview = lastOutcome; return; }
+            if (!TermInputs(out var dice, out var env, out var st)) { preview = null; return; }
+            preview = TerminalCards.Resolve(board, BuildSlots(dice.Length), dice, env, st.Clone());
+        }
+
+        /// <summary>出目 i を端子 s に挿せるか (挿せる数・払う充電・出目の条件)。 他の出目との関係を見る条件は、 そろう見込みがあれば通す
+        /// (〈双発〉の 1 個目を挿せるように)。 本当に発動するかは見込み (Resolve) が決める。</summary>
+        public bool Accepts(int i, int s)
+        {
+            if (!TermInputs(out var dice, out var env, out var st) || i < 0 || i >= dice.Length || s < 0 || s >= board.Count) return false;
+            var d = TerminalCards.Get(board[s]); if (d == null) return false;
+            int used = 0;
+            for (int j = 0; j < 3; j++) if (j != i && slot[j] == s) used++;
+            if (used >= d.capacity) return false;
+            if (d.chargeCost > 0 && env.charge < d.chargeCost) return false;
+            if (board[s] == TerminalIds.BigDischarge && env.charge <= 0) return false;
+            if (st.ignoreCond) return true;
+            // 〈研磨盤〉: 他の出目が研磨盤に挿さっていれば、 その数だけ +1
+            int v = dice[i];
+            for (int j = 0; j < 3 && j < dice.Length; j++)
+                if (j != i && slot[j] >= 0 && slot[j] < board.Count && board[slot[j]] == TerminalIds.Grinder) v++;
+            switch (d.cond)
+            {
+                case TerminalCond.SameElsewhere:
+                case TerminalCond.PairSame:
+                    for (int j = 0; j < dice.Length && j < 3; j++) if (j != i && dice[j] == dice[i]) return true;
+                    return false;
+                default: return TerminalCards.CondOk(d.cond, v);
+            }
+        }
+
+        private void CycleSlot(int i, int dir)
+        {
+            int m = board.Count; if (m == 0) return;
+            int n = m + 1, cur = slot[i] < 0 || slot[i] >= m ? m : slot[i];      // 並び: 0..m-1 → 挿さない (= m)
+            for (int k = 1; k <= n; k++)
+            {
+                int c = ((cur + dir * k) % n + n) % n;
+                if (c == m || Accepts(i, c)) { slot[i] = c == m ? -1 : c; break; }
+            }
+            if (slot[i] >= 0) focusSlot = slot[i];
+            var d = slot[i] >= 0 ? TerminalCards.Get(board[slot[i]]) : null;
+            Game2DSfx.Play("wire", 1f, d != null ? 1f + (int)d.kind * 0.12f : 0.85f);
+            RecomputePreview(); Touch();
+        }
+
+        /// <summary>振り直しで出目が変わった: 挿せなくなった出目を外す。</summary>
+        private void ValidateSlots()
+        {
+            for (int i = 0; i < 3; i++)
+                if (slot[i] >= 0 && (slot[i] >= board.Count || !Accepts(i, slot[i]))) slot[i] = -1;
+        }
+
+        /// <summary>おまかせ (<see cref="TerminalWiring.Auto"/>) の挿し方にする。</summary>
+        public void AutoWire(bool sound = true)
+        {
+            if (!DeckMode || (sound && !CanOperate)) return;
+            if (!TermInputs(out var dice, out var env, out var st)) return;
+            var w = TerminalWiring.Auto(board, dice, env, st);
+            for (int i = 0; i < 3; i++) slot[i] = w != null && i < w.Length ? w[i] : -1;
+            focusSlot = -1;
+            if (sound) { Game2DSfx.Play("wire", 1f, 1.1f); RecomputePreview(); Touch(); }
+        }
+
+        /// <summary>説明を出す端子を選ぶ (画面が端子の行を押した時)。</summary>
+        public void Focus(int s) { focusSlot = s >= 0 && s < board.Count ? s : -1; Touch(); }
 
         private DiceTerminal[] BuildWiring(int n)
         {
@@ -335,6 +482,8 @@ namespace UI.Game2D.Battle
         private void Resolve(CombatManager cm)
         {
             _tr = cm.LastInteractiveResult ?? default;
+            // 端子の山札: 解決した結果を残す (発動した端子を光らせる・見込みの数字を結果に置き換える)
+            if (DeckMode && cm.LastTerminalOutcome != null) { lastOutcome = cm.LastTerminalOutcome; preview = lastOutcome; }
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             charge = ctx != null ? ctx.GetCharge() : charge;
             canReroll = false;

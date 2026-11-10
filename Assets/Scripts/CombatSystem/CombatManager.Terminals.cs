@@ -97,7 +97,12 @@ namespace CombatSystem
             if (o.forceCrit) ctx.forceCritical = true;
             if (o.critMultAdd > 0f) ctx.criticalMultiplier += o.critMultAdd;      // 会心倍率は毎ターン組み直されるので、 このターンだけ効く
             if (o.outgoingPctAdd > 0f) ctx.AddOutgoingPct(o.outgoingPctAdd);
-            if (o.enemyAttackMul < 1f) enemyAtkValue = Math.Max(0, Mathf.RoundToInt(enemyAtkValue * o.enemyAttackMul));
+            if (o.enemyAttackMul < 1f)
+            {
+                enemyAtkValue = Math.Max(0, Mathf.RoundToInt(enemyAtkValue * o.enemyAttackMul));
+                // 2 体目の攻撃・〈連撃〉の 2 回目にも同じだけ掛ける (「このターンの敵の攻撃」なので)
+                _secondaryAtkThisTurn = Math.Max(0, Mathf.RoundToInt(_secondaryAtkThisTurn * o.enemyAttackMul));
+            }
 
             if (_deck != null)
             {

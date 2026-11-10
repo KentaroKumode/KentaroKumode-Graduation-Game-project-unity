@@ -226,7 +226,17 @@ namespace AutoTest
             // 特殊端子 (§6-5): ラン開始時は持たない。 1〜4 層のボスの報酬の 2 択から選ぶ (人と同じ入手・2026-11-11)。
             //   旧: ラン開始前にペルソナで 1 つ決めて 1 層から持っていた = 人の遊びより甘い条件で測っていた。
             GameLoop.GameManager.SelectedSpecialTerminal = "";
-            GameHooks.ChooseSpecialTerminal = ChooseSpecialTerminal;
+            // 端子の山札 (ADR-0014) で戦うランは、 戦闘後の端子の報酬を選ぶ (AutoRunner.Terminals)。 旧い特殊端子の 2 択は山札では出ないので差さない。
+            if (CombatSystem.TerminalCards.Enabled)
+            {
+                GameHooks.ChooseTerminalReward = ChooseTerminalReward;
+                GameHooks.ChooseSpecialTerminal = null;
+            }
+            else
+            {
+                GameHooks.ChooseSpecialTerminal = ChooseSpecialTerminal;
+                GameHooks.ChooseTerminalReward = null;
+            }
             gm.StartNewRun();
             // アイテム アブレーション: 開幕付与。 **StartNewRun の直後**でないと
             //   ownedPassiveItems がまだ存在しない。 AddPassiveItem は GameRng を
