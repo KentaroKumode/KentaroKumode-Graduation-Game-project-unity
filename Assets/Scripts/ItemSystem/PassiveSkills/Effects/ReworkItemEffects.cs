@@ -11,8 +11,8 @@ namespace ItemSystem.PassiveSkills.Effects
     //  キーワードの出来事 (爆発・充電を得る/使う・過充電・シールドの吸収/半減/割れ・毒の増加/ダメージ/上限・
     //  出血の減衰/消費/0) は Keywords.Kw が配る。 1 つの連鎖の中で同じ品は 1 度しか働かない。
     //
-    //  効果を据え置いた品 (八日目の灰燼・雷神槍・過負荷チューナー・素手禁じの蛇血瓶・鋸刃の山刀・先血の腕輪・
-    //  医家の反り刃・逆綴じの止血帯・末頁の血花太刀・医書裏の開き針・溶金の領主剣・黄金色の封蝋) は元のクラスのまま。
+    //  効果を据え置いた品 (八日目の灰燼・雷神槍・過負荷チューナー・蛇血瓶・鋸刃の山刀・先血の腕輪・
+    //  医家の反り刃・逆綴じの止血帯・血桜・医書裏の開き針・溶金の領主剣・黄金色の封蝋) は元のクラスのまま。
     // ============================================================
 
     /// <summary>この品群で使う小さな道具。</summary>
@@ -127,11 +127,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>朝にも熱い竈: 戦闘開始時、 前の戦闘の終わりに残っていた臨界の半分から始まる
+    /// <summary>恒温の竈: 戦闘開始時、 前の戦闘の終わりに残っていた臨界の半分から始まる
     /// (RunState.pendingRinkaiCarryover を CombatManager が戦闘開始時に足す)。</summary>
     public class MorningOven : IPassiveSkillEffect
     {
-        public string SkillId => "朝にも熱い竈";
+        public string SkillId => "恒温の竈";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnBattleEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {

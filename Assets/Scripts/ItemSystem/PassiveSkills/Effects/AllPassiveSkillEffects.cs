@@ -727,7 +727,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// <summary>蛇の血 (SerpentBlood) — 会心時、敵毒+2。会心系と組んで加速。</summary>
     public class SerpentBlood : IPassiveSkillEffect
     {
-        public string SkillId => "素手禁じの蛇血瓶";
+        public string SkillId => "蛇血瓶";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -814,7 +814,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 積んだ出血を火力に変換するバースト。スタック多いほど爆発力大。</summary>
     public class BloodStrike : IPassiveSkillEffect
     {
-        public string SkillId => "末頁の血花太刀";
+        public string SkillId => "血桜";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {

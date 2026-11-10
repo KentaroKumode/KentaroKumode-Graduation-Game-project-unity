@@ -44,12 +44,12 @@ namespace AutoTest
                     // "ApexCrit" は 2026-09-05 削除 (六面天頂儀ごと撤去・下記)
                     "燧石の指輪",
                     "医家の反り刃", "鏡返しの小盾", "鎧縫いの針",
-                    "血日に澄む佩玉", "素手禁じの蛇血瓶", // FlameEdge/Kindling は Burn 全廃 (2026-07-18) で削除
+                    "血日に澄む佩玉", "蛇血瓶", // FlameEdge/Kindling は Burn 全廃 (2026-07-18) で削除
                 },
                 [BuildPersona.Bleed] = new HashSet<string>
                 {
                     "Sting", "医家の反り刃",   // BloodPathBanner は 2026-08-09 削除 (死にID)
-                    "血日に澄む佩玉", "鋸刃の山刀", "逆綴じの止血帯", "末頁の血花太刀",
+                    "血日に澄む佩玉", "鋸刃の山刀", "逆綴じの止血帯", "血桜",
                     "医書裏の開き針", "先血の腕輪",
                 },
                 // 臨界 (Rinkai) 2026-07-16 追加: メーター蓄積型 (attackSum を積み、閾値到達で爆発)
@@ -58,12 +58,12 @@ namespace AutoTest
                 [BuildPersona.Rinkai] = new HashSet<string>
                 {
                     "乾き火口箱", "炉番の外套", "過熱石",
-                    "溢れ取りの鋳型", "帳簿外の爆薬", "朝にも熱い竈",
+                    "溢れ取りの鋳型", "帳簿外の爆薬", "恒温の竈",
                     "早沸かし釜", "恒熱の炉壁", "八日目の灰燼",
                 },
                 [BuildPersona.Poison] = new HashSet<string>
                 {
-                    "緑染みの小刀", "CorrosiveStrike", "素手禁じの蛇血瓶", "主より長い香炉",
+                    "緑染みの小刀", "CorrosiveStrike", "蛇血瓶", "主より長い香炉",
                     "石抜きの毒指輪", "廃庭の霧吹き",
                     "岸上げの麻痺瓶", "雷鯰の棘", "SlowVenomCurse",
                     // CurseBind は curse 系列 (2026-07-17 削除) 依存で参照消失、除去。

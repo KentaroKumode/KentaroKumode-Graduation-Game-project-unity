@@ -179,7 +179,7 @@ namespace ItemSystem.PassiveSkills.Effects
             ("工廠の材料箱", When.TurnStart,     true, 3, Gate.Top, 1),
             ("希望の灯片", When.TurnStart,     true, 3, Gate.Top, 2),
             ("帳簿外の爆薬", When.TurnStart,     true, 3, Gate.AtLeast, 10),
-            ("朝にも熱い竈", When.TurnStart,     true, 3, Gate.AtLeast, 8),
+            ("恒温の竈", When.TurnStart,     true, 3, Gate.AtLeast, 8),
             ("無害灯", When.TurnStart,     true, 3, Gate.AtLeast, 6),
             ("恒熱の炉壁", When.EnemyAttacked, true, 3, Gate.Top, 2),
             ("早沸かし釜", When.EnemyAttacked, true, 3, Gate.AtLeast, 7),
