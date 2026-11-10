@@ -59,7 +59,7 @@ namespace UI.Game2D
             "貫通ステータスは、敵の防御力を差し引く。高防御を持つ敵により有効だ。",
             "素の面には役が無い。レアリティの上がった面を装着したダイスは、2つそろい・3つそろいで役が発動する。",
             // ── キーワード ──
-            "毒はターンの始めに、1スタックあたり敵の最大HPの" + (ItemSystem.PassiveSkills.StatusRegistry.Defs["poison"].dotMaxHpPermillePerStack / 10f).ToString("0.#") + "%を削る。削るたびにスタックは半分に減る。",
+            "毒はターンの始めに、1スタックあたり敵の最大HPの" + (ItemSystem.PassiveSkills.StatusRegistry.Defs["poison"].dotMaxHpPer10kPerStack / 100f).ToString("0.##") + "%を削る。削るたびにスタックは半分に減る。",
             "出血はターンごとに1ずつ減っていくが、スタック数に制限はない。",
             "臨界のメーターはATKの出目で溜まり、満ちると次の攻撃に大きく上乗せされる。",
             // ── 航行 ──

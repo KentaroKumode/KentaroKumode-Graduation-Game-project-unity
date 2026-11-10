@@ -27,6 +27,8 @@ namespace UI.Game2D.Battle
         public int turn = 1, playerHp, playerMax = 1, charge, eatk, lastTaken, stage, nextStageIn = -1;
         /// <summary>このターンの敵の防御と、 次の構えまでのターン (0 = このターンは構え / −1 = 構えない)。</summary>
         public int edef, guardIn = -1;
+        /// <summary>次の大技までのターン (0 = このターンが大技 / −1 = 大技を持たない)。</summary>
+        public int heavyIn = -1;
         public int version;
         public bool rolled;                  // 今のターンのダイスが出ているか (合計の表示に使う)
         /// <summary>振り直しの判断で止まっているか / 払う充電。</summary>
@@ -43,6 +45,18 @@ namespace UI.Game2D.Battle
         private int _poisonShown, _bleedPending, _mistPending;      // ターン頭に見せた毒 / 攻撃の後に見せる出血 / 敵の攻撃の前に見せる毒 (〈廃庭の霧吹き〉)
 
         public int Stage => stage;
+
+        /// <summary>敵の周りに出す印 (2026-11-11): 頭上 = 攻撃の予告 (大技のターンは交差した剣)・右下 = デバフ (毒・出血)・左下 = バフ (構え)。
+        /// 予告は敵の出目が見えてから出す (振る前は数字が無い)。</summary>
+        private Game2DBattleFx.Marks Marks()
+        {
+            var m = new Game2DBattleFx.Marks();
+            bool known = phase != P.ERoll && phase != P.Won && phase != P.Lost;
+            if (known) { m.intent = heavyIn == 0 ? 2 : 1; m.atk = eatk; m.guard = guardIn == 0; }
+            var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+            if (ctx != null) { m.poison = ctx.EnemyPoison; m.bleed = ctx.enemyBleedStacks; }
+            return m;
+        }
         public int NextStageIn => nextStageIn;
         public int EnemyDiceSum { get { int s = 0; for (int i = 0; i < enemyDiceCount && i < ed.Length; i++) s += ed[i]; return s; } }
         /// <summary>端子の種類の数 (特殊端子を装着していれば 4)。</summary>
@@ -94,6 +108,8 @@ namespace UI.Game2D.Battle
             var gm = GameManager.Instance; var cm = CombatManager.Instance;
             bool want = fx != null && cm != null && Wanted(gm);
             GameManager.CombatInputByScreen = want && gm.CurrentPhase == GameManager.GamePhase.Combat;
+            // 決着の演出 (攻撃・撃破) を流している間は、 GameManager の Space で結果を確定させない (NEXT / END が出てから)
+            GameManager.BattleResultHeldByScreen = want && Active && phase != P.Won && phase != P.Lost;
             if (!want)
             {
                 if (Active) { Active = false; fx.SimDriven = false; if (Game2DBattleFx.Showing) fx.Show(false); }
@@ -109,6 +125,7 @@ namespace UI.Game2D.Battle
                 // 続けて次の戦闘が始まった (激戦の 2 戦目・イベントの戦闘など)
                 _seenSerial = _combatSerial; fx.NextEnemy(); EnterFight(cm);
             }
+            fx.marks = Marks();
             if (fx.IsIntro) { t = 0; return; }      // 切り替わり・出現の演出が終わるまで、 ターンを始めない
             // 画面の外で戦闘が閉じた (逃走・強制決着など): 判断待ちのまま残らないよう、 決着の表示へ
             if (!cm.IsCombatActive && !cm.IsAwaitingDecision && (phase == P.ERoll || phase == P.PRoll || phase == P.Wire))
@@ -185,7 +202,7 @@ namespace UI.Game2D.Battle
         {
             var p = cm.PendingDecision; if (p == null) return;
             var tele = p.tele;
-            turn = tele.turn; eatk = tele.enemyAttackValue; stage = tele.escalationStage; edef = tele.enemyDefense; guardIn = tele.turnsToGuard;
+            turn = tele.turn; eatk = tele.enemyAttackValue; stage = tele.escalationStage; edef = tele.enemyDefense; guardIn = tele.turnsToGuard; heavyIn = tele.turnsToHeavy;
             nextStageIn = tele.nextThresholdTurn > 0 ? tele.nextThresholdTurn - tele.turn : -1;
             var e = tele.enemyDice; enemyDiceCount = e != null ? Mathf.Min(3, e.Length) : 0;
             for (int i = 0; i < 3; i++) ed[i] = e != null && i < e.Length ? e[i] : 0;
@@ -210,7 +227,7 @@ namespace UI.Game2D.Battle
         public bool CanOperate => phase == P.Wire;
         public bool CanRerollNow => phase == P.Wire && canReroll && charge >= rerollCost;
         public bool ButtonEnabled => phase == P.Wire || phase == P.Won || phase == P.Lost;
-        public string ButtonLabel => phase == P.Wire ? "GO!" : phase == P.Won ? "NEXT" : phase == P.Lost ? "END" : "...";
+        public string ButtonLabel => phase == P.Wire ? "決める" : phase == P.Won ? "次へ" : phase == P.Lost ? "終わる" : "…";
 
         /// <summary>決定ボタン (GO! → NEXT)。</summary>
         public void Button()

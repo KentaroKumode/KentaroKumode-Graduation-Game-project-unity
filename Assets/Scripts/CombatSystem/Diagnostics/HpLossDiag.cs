@@ -61,6 +61,7 @@ namespace CombatSystem
             int before = hp;
             hp = Math.Max(floor, hp - dmg);
             Add("経路:" + channel, before - hp);
+            EnemyHpLedger.Land(channel, dmg, before - hp);   // [計装 2026-11-10] 経路別の入った量 (ファーム層も数える)
         }
 
         /// <summary>品が要求した固定ダメと預けたダメージ (実際に通る量ではなく、 倍率・頭打ちの前の量)。</summary>

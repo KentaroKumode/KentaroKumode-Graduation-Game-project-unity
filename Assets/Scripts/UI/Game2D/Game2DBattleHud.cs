@@ -16,15 +16,16 @@ namespace UI.Game2D
     public class Game2DBattleHud : MonoBehaviour
     {
         // 配置 (dot)
-        private static readonly RectInt Left = new RectInt(2, 52, 86, 198), Right = new RectInt(392, 56, 86, 112), Top = new RectInt(96, 2, 288, 44);
+        // 2026-11-11: 字を既定のフォント (高さ 12) にしたので、 左右の枠を広げ、 上の帯を高くし、 左右は帯の下から始める
+        private static readonly RectInt Left = new RectInt(2, 60, 108, 208), Right = new RectInt(370, 60, 108, 120), Top = new RectInt(96, 2, 288, 56);
         private const int FrameB = 12;
         // 自分のステータス (会心率・攻撃・防御): 右のパネルの下。 右と同じばねで横から入る (2026-11-05)
-        private static readonly RectInt Stat = new RectInt(392, 172, 86, 56);
+        private static readonly RectInt Stat = new RectInt(370, 184, 108, 68);
         // 左パネルの中 (パネルの左上が原点): 枠の内側は x 14〜72
-        private static readonly RectInt Btn = new RectInt(15, 154, 56, 24), RerollR = new RectInt(15, 122, 56, 16),
-            ItemR = new RectInt(15, 140, 27, 12), FleeR = new RectInt(44, 140, 27, 12);      // 消耗品 / 逃げる (配線の判断の間だけ)
-        private static RectInt DieR(int i) => new RectInt(15, 20 + i * 24, 18, 18);
-        private static RectInt TermR(int i) => new RectInt(36, 20 + i * 24, 36, 18);
+        private static readonly RectInt Btn = new RectInt(15, 170, 80, 26), RerollR = new RectInt(15, 134, 80, 16),
+            ItemR = new RectInt(15, 152, 39, 15), FleeR = new RectInt(56, 152, 39, 15);      // 消耗品 / 逃げる (配線の判断の間だけ)
+        private static RectInt DieR(int i) => new RectInt(15, 18 + i * 24, 18, 18);
+        private static RectInt TermR(int i) => new RectInt(37, 18 + i * 24, 58, 18);
 
         public Game2DBattleSim sim;
         public Game2DBattleFx fx;
@@ -41,7 +42,7 @@ namespace UI.Game2D
         private static readonly Color32 Ink = Game2DKit.Ink, Dim = Game2DKit.Dim, Dark = Game2DKit.Dark, Off = Game2DKit.Off, Well = Game2DKit.Well,
             Atk = Game2DKit.Red, Blk = Game2DKit.Blue, Chg = Game2DKit.Gold, Spc = Game2DKit.Amber, Hp = new Color32(0xd1, 0x50, 0x3c, 255);
         private static readonly Color32[] TermCol = { Atk, Blk, Chg, Spc };
-        private static readonly string[] TermName = { "ATK", "BLK", "CHG", "SPC" };
+        private static readonly string[] TermName = { "攻撃", "防御", "充電", "特殊" };
 
         /// <summary>見た目を作る (builder から 1 度呼ぶ)。 親は 480×270 の格子の枠。</summary>
         public void Build()
@@ -76,10 +77,10 @@ namespace UI.Game2D
             _spL.Go(t, on ? 0.03f : 0f); _spT.Go(t, on ? 0.07f : 0.03f); _spR.Go(t, on ? 0.12f : 0.06f);
             _spL.Step(dt); _spT.Step(dt); _spR.Step(dt);
             _slide = _spL.x;
-            _left.anchoredPosition = new Vector2(Left.x - Mathf.Round((1f - _spL.Value(100f)) * 100f), -Left.y);
-            _right.anchoredPosition = new Vector2(Right.x + Mathf.Round((1f - _spR.Value(100f)) * 100f), -Right.y);
-            _top.anchoredPosition = new Vector2(Top.x, -Top.y + Mathf.Round((1f - _spT.Value(50f)) * 50f));
-            _stat.anchoredPosition = new Vector2(Stat.x + Mathf.Round((1f - _spR.Value(100f)) * 100f), -Stat.y);
+            _left.anchoredPosition = new Vector2(Left.x - Mathf.Round((1f - _spL.Value(120f)) * 120f), -Left.y);
+            _right.anchoredPosition = new Vector2(Right.x + Mathf.Round((1f - _spR.Value(120f)) * 120f), -Right.y);
+            _top.anchoredPosition = new Vector2(Top.x, -Top.y + Mathf.Round((1f - _spT.Value(62f)) * 62f));
+            _stat.anchoredPosition = new Vector2(Stat.x + Mathf.Round((1f - _spR.Value(120f)) * 120f), -Stat.y);
         }
 
         private void Update()
@@ -144,10 +145,10 @@ namespace UI.Game2D
         {
             var p = Frame(Stat);
             bool k = _hsKnown && sim != null && Game2DBattleSim.Active;
-            string crit = k ? "CRIT " + Mathf.RoundToInt(_hs.critRate * 100f) + "% x" + _hs.critMul.ToString("0.0") : "CRIT --";
-            string atk = k ? "ATK " + _hs.attack + (_hs.outgoingPct != 0 ? (_hs.outgoingPct > 0 ? " +" : " ") + _hs.outgoingPct + "%" : "") : "ATK --";
-            string def = k ? "DEF " + _hs.defense + " PEN " + _hs.pen : "DEF --";
-            p.Text(crit, 14, 16, Chg); p.Text(atk, 14, 27, Atk); p.Text(def, 14, 38, Blk);
+            string crit = k ? "会心 " + Mathf.RoundToInt(_hs.critRate * 100f) + "% " + _hs.critMul.ToString("0.0") + "倍" : "会心 --";
+            string atk = k ? "攻撃 " + _hs.attack + (_hs.outgoingPct != 0 ? (_hs.outgoingPct > 0 ? " +" : " ") + _hs.outgoingPct + "%" : "") : "攻撃 --";
+            string def = k ? "防御 " + _hs.defense + " 貫通 " + _hs.pen : "防御 --";
+            p.Text(crit, 14, 14, Chg); p.Text(atk, 14, 27, Atk); p.Text(def, 14, 40, Blk);
             p.Apply(t);
         }
 
@@ -179,18 +180,18 @@ namespace UI.Game2D
                 DrawTerm(p, tr, wv, on);
             }
             string a = "-", b = "-", c = "-";
-            if (live && sim.rolled) { var w = sim.GetWired(); a = w.atk + "=" + (w.atk - w.aDice) + "+" + w.aDice; b = w.blk.ToString(); c = w.chg + " (T" + sim.charge + ")"; }
-            p.Text("ATK " + a, 15, 93, Atk); p.Text("BLK " + b, 15, 102, Blk); p.Text("CHG " + c, 15, 111, Chg);
+            if (live && sim.rolled) { var w = sim.GetWired(); a = w.atk + " = " + (w.atk - w.aDice) + "+" + w.aDice; b = w.blk.ToString(); c = "+" + w.chg + " (" + sim.charge + ")"; }
+            p.Text("攻撃 " + a, 15, 90, Atk); p.Text("防御 " + b, 15, 103, Blk); p.Text("充電 " + c, 15, 116, Chg);
             // 振り直し: 充電を払って全ダイスを振り直す (払えない・判断の外では暗く)
             bool rr = live && sim.CanRerollNow;
             if (Game2DKit.Tab != null) p.NineSlice(Game2DKit.Tab, 5, Well, RerollR.x, RerollR.y, RerollR.width, RerollR.height);
             else p.Box(RerollR.x, RerollR.y, RerollR.width, RerollR.height, Off, Dark);
-            p.TextC(live && sim.canReroll ? "REROLL -" + sim.rerollCost : "REROLL", RerollR, rr ? Chg : Dim);
+            p.TextC(live && sim.canReroll ? "振り直す -" + sim.rerollCost : "振り直す", RerollR, rr ? Chg : Dim);
             // 消耗品 / 逃げる (逃げるは 2 度押しで確定: SURE? → 押すとこのターンは攻撃せずに離脱)
             if (!live || !sim.CanFlee) _fleeArmed = false;
             bool itemOn = live && sim.CanOperate && CombatItems().Count > 0, fleeOn = live && sim.CanFlee;
-            SmallBtn(p, ItemR, "ITEM", itemOn, Chg);
-            SmallBtn(p, FleeR, _fleeArmed ? "SURE?" : "FLEE", fleeOn, _fleeArmed ? Atk : Ink);
+            SmallBtn(p, ItemR, "道具", itemOn, Chg);
+            SmallBtn(p, FleeR, _fleeArmed ? "本当に?" : "逃げる", fleeOn, _fleeArmed ? Atk : Ink);
             // 決定ボタン
             bool en = live && sim.ButtonEnabled; string lab = live ? sim.ButtonLabel : "...";
             if (_bGo != null) p.Sprite(_bGo, Btn.x, Btn.y, Btn.width, Btn.height);
@@ -252,42 +253,17 @@ namespace UI.Game2D
             bool live = sim != null && Game2DBattleSim.Active; bool known = live && sim.phase != Game2DBattleSim.P.ERoll;
             int en = live ? sim.enemyDiceCount : 3;
             for (int i = 0; i < en; i++) DrawDie(p, new RectInt(14 + i * 20, 16, 17, 17), live ? sim.ed[i] : i + 3, true);
-            p.Text(known ? "ATK " + sim.eatk : "ATK ??", 14, 38, known ? Atk : Dim);
-            if (known && sim.edef > 0) p.Text("DEF " + sim.edef, 50, 38, Ink);      // 敵の防御 (構え・割れる/積み上がる装甲を反映した今の値)
-            if (known) p.Text("ROLL " + sim.EnemyDiceSum, 14, 48, Dim);
-            // 予告: 構えのターンは GUARD (防御が上がり攻撃が鈍る)・次が構えなら NEXT GUARD
-            string intent = !known ? "INTENT: ..." : sim.guardIn == 0 ? "INTENT: GUARD" : sim.guardIn == 1 ? "NEXT: GUARD" : "INTENT: ATK";
-            p.Box(14, 60, 58, 14, Off, Dark); p.Text(intent, 17, 65, Ink);
-            if (live) p.Text("T" + sim.turn + " STAGE " + sim.Stage, 14, 80, Dim);
-            // 敵に乗っている毒・出血 (仮のアイコン + スタック数)。 乗っているものだけを左から詰めて並べる
-            var ctx = live ? ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context : null;
-            if (ctx != null)
-            {
-                int x = 14;
-                if (ctx.EnemyPoison > 0) x = DrawStatus(p, x, 89, false, ctx.EnemyPoison);
-                if (ctx.enemyBleedStacks > 0) DrawStatus(p, x, 89, true, ctx.enemyBleedStacks);
-            }
+            p.Text(known ? "攻撃 " + sim.eatk : "攻撃 ??", 14, 36, known ? Atk : Dim);
+            if (known) p.Text("出目 " + sim.EnemyDiceSum, 14, 49, Dim);
+            if (known && sim.edef > 0) p.Text("防御 " + sim.edef, 14, 62, Ink);      // 敵の防御 (構え・割れる/積み上がる装甲を反映した今の値)
+            // 予告 (攻撃・大技・構え) と毒・出血は敵の周りに出す (Game2DBattleFx.DrawMarks・2026-11-11)。 ここは次の構え・大技の前触れだけ
+            string next = known ? (sim.guardIn == 1 && sim.heavyIn == 1 ? "次: 構え・大技" : sim.guardIn == 1 ? "次: 構え" : sim.heavyIn == 1 ? "次: 大技" : null) : null;
+            if (next != null) p.Text(next, 14, 75, sim.heavyIn == 1 ? MarkHeavyHud : Dim);
+            if (live) p.Text("手番 " + sim.turn + "  段階 " + sim.Stage, 14, 90, Dim);
             p.Apply(t);
         }
 
-        // 仮のアイコン (7×7): 毒 = 泡 / 出血 = 滴。 # = 色・o = 光
-        private static readonly string[] IconPoison = { "..###..", ".#o###.", "#o#####", "#######", "#######", ".#####.", "..###.." };
-        private static readonly string[] IconBleed = { "...#...", "..###..", ".#o###.", ".#o###.", "#######", "#######", ".#####." };
-        private static readonly Color32 PoisonCol = new Color32(0x8e, 0xea, 0x3f, 255), BleedCol = new Color32(0xe0, 0x4a, 0x38, 255), IconHi = new Color32(0xff, 0xf6, 0xe0, 255);
-
-        /// <summary>状態 1 つ (アイコン + 数)。 戻り値 = 次を置く x。</summary>
-        private static int DrawStatus(KitPix p, int x, int y, bool bleed, int stacks)
-        {
-            var icon = bleed ? IconBleed : IconPoison; var col = bleed ? BleedCol : PoisonCol;
-            for (int j = 0; j < 7; j++) for (int i = 0; i < 7; i++)
-                {
-                    char ch = icon[j][i];
-                    if (ch == '#') p.Set(x + i, y + j, col); else if (ch == 'o') p.Set(x + i, y + j, IconHi);
-                }
-            string n = stacks.ToString();
-            p.Text(n, x + 9, y + 1, col);
-            return x + 9 + Game2DKit.TextWidth(n, 1) + 6;
-        }
+        private static readonly Color32 MarkHeavyHud = new Color32(0xff, 0xb3, 0x47, 255);
 
         private void DrawLamp(KitPix p, int x, int y, int size, bool lit, Color32 col)
         {
@@ -300,14 +276,14 @@ namespace UI.Game2D
         {
             var p = Frame(Top); bool live = sim != null && Game2DBattleSim.Active;
             int pips = live ? Mathf.Min(10, sim.charge / 3) : 4;
-            p.Text("CHARGE", 14, 15, Chg);
-            for (int i = 0; i < 10; i++) DrawLamp(p, 50 + i * 10, 12, 10, i < pips, Chg);
-            string esc = live ? "ESC T" + sim.turn + (sim.NextStageIn >= 0 ? " NEXT " + sim.NextStageIn : " MAX") : "ESC";
-            p.Text(esc, 160, 15, Dim);
-            if (live) for (int i = 0; i < 5; i++) DrawLamp(p, 222 + i * 10, 12, 10, i < sim.Stage, Atk);
+            p.Text("充電", 14, 13, Chg);
+            for (int i = 0; i < 10; i++) DrawLamp(p, 38 + i * 10, 14, 10, i < pips, Chg);
+            string esc = live ? "激化 " + (sim.NextStageIn >= 0 ? "あと" + sim.NextStageIn : "最大") : "激化";
+            p.Text(esc, 146, 13, Dim);
+            if (live) for (int i = 0; i < 5; i++) DrawLamp(p, 214 + i * 10, 14, 10, i < sim.Stage, Atk);
             int cur = fx != null ? fx.EnemyHp : 56, max = fx != null ? fx.EnemyMax : 80;
-            p.Text("ENEMY", 14, 28, Ink); p.GaugeBar(Game2DKit.Gauge, 48, 26, 190, 10, Mathf.Clamp01(cur / (float)Mathf.Max(1, max)), Hp);
-            p.Text(cur + "/" + max, 244, 28, Ink);
+            p.Text("敵", 14, 29, Ink); p.GaugeBar(Game2DKit.Gauge, 30, 31, 192, 10, Mathf.Clamp01(cur / (float)Mathf.Max(1, max)), Hp);
+            p.Text(cur + "/" + max, 228, 29, Ink);
             p.Apply(t);
         }
     }

@@ -34,8 +34,7 @@ namespace GameLoop
                     string id = PickPassiveItemForBossExtra(wantRare: true);
                     if (!string.IsNullOrEmpty(id))
                     {
-                        ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
-                        Loadout.TryAutoEquip(Run, id);
+                        Loadout.Gain(Run, id);
                         var dd = ItemDatabase.Instance?.GetItem(id);
                         Log($"偽の商人を討伐 → レア恒久アイテム「{(dd != null ? dd.displayName : id)}」を奪い返した");
                     }
@@ -179,8 +178,7 @@ namespace GameLoop
                     string dropId = PickTreasureGoblinDrop();
                     if (!string.IsNullOrEmpty(dropId))
                     {
-                        ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, dropId);
-                        Loadout.TryAutoEquip(Run, dropId);
+                        Loadout.Gain(Run, dropId);
                         var dd = ItemDatabase.Instance?.GetItem(dropId);
                         Log($"トレジャーゴブリン討伐報酬: {(dd != null ? dd.displayName : dropId)} を獲得");
                     }
@@ -440,8 +438,7 @@ namespace GameLoop
             string itemLabel = "（なし）";
             if (!string.IsNullOrEmpty(itemId))
             {
-                ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, itemId);
-                Loadout.TryAutoEquip(Run, itemId);
+                Loadout.Gain(Run, itemId);
                 var data = ItemDatabase.Instance?.GetItem(itemId);
                 itemLabel = data != null ? data.displayName : itemId;
             }
@@ -547,8 +544,7 @@ namespace GameLoop
         private void GrantRewardItem(string itemId, bool eliteWin)
         {
             if (string.IsNullOrEmpty(itemId)) return;
-            ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, itemId);
-            Loadout.TryAutoEquip(Run, itemId);
+            Loadout.Gain(Run, itemId);
             var dd = ItemDatabase.Instance?.GetItem(itemId);
             Log($"戦闘勝利報酬: {(dd != null ? dd.displayName : itemId)} を獲得{(eliteWin ? "（精鋭）" : "")}");
         }

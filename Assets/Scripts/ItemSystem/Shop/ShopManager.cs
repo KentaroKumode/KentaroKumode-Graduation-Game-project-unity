@@ -815,6 +815,9 @@ namespace ItemSystem.Shop
             int pay = slot.price;
             bool tally = Current.purchaseCount >= 1 && run.OwnsPassive(ItemIds.TrialTossToken);
             if (tally) pay = Mathf.Max(0, pay - TallyDiscount);
+            // 武器は 1 本だけ (2026-11-11): 人が別の武器を持って武器を買う時は、 今の武器を下取りに出して差額で乗り換える
+            int tradeIn = WeaponTradeIn(slotIndex, run);
+            if (tradeIn > 0) pay = Mathf.Max(0, pay - tradeIn);
             // 兵站 r10 を含めた支払い可能額で判定する。 未解禁なら run.coins と同じ。
             if (GameLoop.ProvisionPayment.Affordable(run) < pay)
             {
@@ -828,7 +831,8 @@ namespace ItemSystem.Shop
             { Log("支払いに失敗"); return false; }
             MetaProgression.Achievements.AchievementService.NoteShopPurchase(run.coins);
             Current.purchaseCount++;
-            if (tally && pay < slot.price) { TallyDiscounts++; Log($"〈合札〉: 2 品目以降 {slot.price - pay}G 引き"); }
+            if (tally && pay < slot.price) { TallyDiscounts++; Log($"〈合札〉: 2 品目以降 {TallyDiscount}G 引き"); }
+            if (tradeIn > 0) Log($"下取り: {run.equippedWeaponId} を {tradeIn}G で引き取り、 差額 {pay}G で乗り換え");
 
             // 〈銭皿〉の「買うたび物資 +10」は 2026-10-31 に「戦闘終了時、 残っているシールド 3 につき 1G」へ作り替えた (ReworkItemEffects)。
 
@@ -836,8 +840,8 @@ namespace ItemSystem.Shop
             {
                 case ShopSlotKind.Passive:
                 case ShopSlotKind.Weapon:
-                    ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, slot.itemId);
-                    GameLoop.Loadout.TryAutoEquip(run, slot.itemId);
+                    // 武器は 1 本だけ (2026-11-11): 店で買う武器は入れ替えを承知して買ったもの (画面は「買う」の 2 度押しで確かめる)
+                    GameLoop.Loadout.Gain(run, slot.itemId, confirmed: slot.kind == ShopSlotKind.Weapon && GameLoop.Loadout.HumanPlaying);
                     break;
                 case ShopSlotKind.FacePart:
                     // 同じ目の面があれば差し替え (Tier が上がる時だけ並ぶ)、 無ければ追加。
@@ -1112,6 +1116,33 @@ namespace ItemSystem.Shop
             Debug.Log($"[ShopManager] 売却: {id} +{gainPrice}G");
             OnShopUpdated?.Invoke();
             return true;
+        }
+
+        /// <summary>武器の下取り額 (2026-11-11)。 人が別の武器を装備したまま武器の枠を買う時だけ 0 より大きい。
+        /// 額はその武器のレア度の売値 (乱数を引かない ── 画面に出す値と払う値を揃えるため・個別の売値は下限)。</summary>
+        public int WeaponTradeIn(int slotIndex, RunState run)
+        {
+            if (Current == null || run == null || !GameLoop.Loadout.HumanPlaying) return 0;
+            if (slotIndex < 0 || slotIndex >= Current.slots.Count) return 0;
+            var slot = Current.slots[slotIndex];
+            if (slot.kind != ShopSlotKind.Weapon || string.IsNullOrEmpty(run.equippedWeaponId) || run.equippedWeaponId == slot.itemId) return 0;
+            var data = ItemDatabase.Instance?.GetItem(run.equippedWeaponId);
+            if (data == null) return 0;
+            if (data.sellPrice != null) return Mathf.Max(0, data.sellPrice.min);
+            return RaritySellPrice(data.rarity);
+        }
+
+        private static int RaritySellPrice(ItemRarity r)
+        {
+            switch (r)
+            {
+                case ItemRarity.BRONZE:    return 3;
+                case ItemRarity.SILVER:    return 5;
+                case ItemRarity.GOLD:      return 7;
+                case ItemRarity.LEGENDARY: return 9;
+                case ItemRarity.MYTHIC:    return 12;
+                default:                   return 3;
+            }
         }
 
         /// <summary>2026-06-23: 売却額をレアリティに応じてスケール。

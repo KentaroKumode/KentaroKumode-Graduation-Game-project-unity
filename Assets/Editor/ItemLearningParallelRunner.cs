@@ -120,6 +120,19 @@ namespace AutoTest.EditorTools
                 overrides: new Dictionary<string, string> { ["useIttBeta"] = "True", ["lockWeaponFamily"] = "True" });
         }
 
+        /// <summary>ITT (Super の方策) を 10,000 ラン × 20 回 = 合計 200,000 ラン (2026-11-10)。
+        /// <b>回ごとにラン番号をずらす</b> (同じ割り当てを引き直さない) ・<b>割り当ては積み上げて合算</b>し、 回の終わりごとに
+        /// 序列を作り直す (次の回はその序列で買う)。 精度は 20 万ラン 1 回と同じで、 買い方だけが途中で更新される。
+        /// 条件は今の測定と同じ: 〈黎明〉の新しい形 (+150%)・主攻撃の見積もりの補正 (v3.mainCorr)。 物差しは掛けない。</summary>
+        [MenuItem("Tools/AutoRun/■ ITT 並列 (Super の方策): 10000ラン × 20 回 (合算 20万)", priority = 8)]
+        private static void LaunchIttSuperPooled()
+        {
+            AutoTest.GrantItt.Variant = "super";
+            LaunchWith(0, AutoRunner.WiringSkill.Super, 10000, itt: true, ittRounds: 20,
+                overrides: new Dictionary<string, string> { ["useIttBeta"] = "True", ["lockWeaponFamily"] = "True",
+                    ["v3.mainCorr"] = "True", ["v3.readOutgoingMult"] = "-1", ["daybreakNextAttackPct"] = "1.5" });
+        }
+
         /// <summary>診断: 観測の回帰 (regβ) で買う旧方式。 ITT の序列との比較用 (2026-11-05: 旧方式は学習なしより悪い)。</summary>
         [MenuItem("Tools/AutoRun/診断: 並列 学習ラウンド (観測の回帰 regβ で買う・旧)", priority = 14)]
         private static void LaunchObservational() => LaunchWith(0, useItt: false);
@@ -226,7 +239,8 @@ namespace AutoTest.EditorTools
 
         private static void LaunchWith(int fightTraceRuns,
             AutoRunner.WiringSkill skill = AutoRunner.WiringSkill.Optimal, int runsPerRound = RunsPerRound, bool scout = false,
-            bool learnedDanger = false, bool itt = false, bool useItt = true, Dictionary<string, string> overrides = null, bool ab = false)
+            bool learnedDanger = false, bool itt = false, bool useItt = true, Dictionary<string, string> overrides = null, bool ab = false,
+            int ittRounds = 1)
         {
             if (_running) { Debug.LogWarning("[学習並列] すでに走っている"); return; }
             if (EditorApplication.isPlayingOrWillChangePlaymode)
@@ -281,7 +295,7 @@ namespace AutoTest.EditorTools
             Directory.CreateDirectory(_root);
             _st = new State
             {
-                round = 0, rounds = (itt || ab) ? 1 : Rounds, runsPerRound = runsPerRound, mode = itt ? "itt" : "learn", noMerge = ab,
+                round = 0, rounds = itt ? Math.Max(1, ittRounds) : ab ? 1 : Rounds, runsPerRound = runsPerRound, mode = itt ? "itt" : "learn", noMerge = ab,
                 learningRoot = MetaProfileHelper.BotLearningRoot(0),
                 configKeysJoined = string.Join("\n", ks),
                 configValuesJoined = string.Join("\n", vs),
@@ -376,7 +390,7 @@ namespace AutoTest.EditorTools
                 {
                     jobKeys = new string[keys.Length + 1]; jobValues = new string[values.Length + 1];
                     System.Array.Copy(keys, jobKeys, keys.Length); System.Array.Copy(values, jobValues, values.Length);
-                    jobKeys[keys.Length] = "randomGrantStartIndex"; jobValues[values.Length] = offset.ToString(CultureInfo.InvariantCulture);
+                    jobKeys[keys.Length] = "randomGrantStartIndex"; jobValues[values.Length] = (_st.round * _st.runsPerRound + offset).ToString(CultureInfo.InvariantCulture);   // 回ごとにもずらす (同じ割り当てを引き直さない)
                 }
                 var job = new RankMarginWorkerJob
                 {
@@ -475,8 +489,11 @@ namespace AutoTest.EditorTools
                 if (elapsed - _lastReport >= 30)
                 {
                     _lastReport = elapsed;
-                    Debug.Log($"[学習並列] ラウンド {_st.round + 1}/{_st.rounds}: {completed:N0}/{total:N0} ラン"
-                            + $" / {completed / Math.Max(1.0, elapsed):F1} ラン/秒");
+                    long all = (long)_st.rounds * _st.runsPerRound, doneAll = (long)_st.round * _st.runsPerRound + completed;
+                    string pl = $"{DateTime.Now:HH:mm:ss} ラウンド {_st.round + 1}/{_st.rounds}: {completed:N0}/{total:N0} ラン"
+                              + $" / {completed / Math.Max(1.0, elapsed):F1} ラン/秒 / 全体 {doneAll:N0}/{all:N0} ({100.0 * doneAll / Math.Max(1, all):F1}%)";
+                    Debug.Log("[学習並列] " + pl);
+                    try { File.AppendAllText(Path.Combine(_root, "progress.txt"), pl + Environment.NewLine, new UTF8Encoding(false)); } catch { }
                 }
                 if (done >= _slots.Count) FinishRound();
             }
@@ -551,25 +568,30 @@ namespace AutoTest.EditorTools
             Directory.CreateDirectory(outDir);
             string csv = Path.Combine(outDir, "allkinds_grant_runs.csv");
             string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
-            if (File.Exists(csv)) File.Move(csv, csv + "." + stamp + ".bak");
-            File.WriteAllLines(csv, rows, new UTF8Encoding(false));
+            // 1 回目は旧い割り当てを退避して書き直す。 2 回目からは積み上げる (ラン番号が回ごとに違うので、 合算して 1 つの回帰へ入れる)。
+            if (_st.round == 0) { if (File.Exists(csv)) File.Move(csv, csv + "." + stamp + ".bak"); File.WriteAllLines(csv, rows, new UTF8Encoding(false)); }
+            else File.AppendAllLines(csv, rows, new UTF8Encoding(false));
+            int pooled = File.ReadAllLines(csv, Encoding.UTF8).Length;
 
             // 旧い序列は上書きせず退避する (新しい fit が悪かったときに戻せるように)
             Directory.CreateDirectory(_st.learningRoot);
-            foreach (string name in new[] { "itt_fit.txt", "itt_clear.txt", "itt_clear.json", "itt_effects.json" })
-            {
-                string p = Path.Combine(_st.learningRoot, name);
-                if (File.Exists(p)) File.Copy(p, p + "." + stamp + ".preITT", true);
-            }
+            if (_st.round == 0)
+                foreach (string name in new[] { "itt_fit.txt", "itt_clear.txt", "itt_clear.json", "itt_effects.json" })
+                {
+                    string p = Path.Combine(_st.learningRoot, name);
+                    if (File.Exists(p)) File.Copy(p, p + "." + stamp + ".preITT", true);
+                }
             bool ok1 = GrantItt.Recompute(csv, _st.learningRoot);
             bool ok2 = ok1 && GrantItt.RecomputeSurvival(csv, _st.learningRoot);
-            GrantItt.Variant = "";
+            bool last = _st.round + 1 >= _st.rounds;
+            if (last || !ok2) GrantItt.Variant = "";
             double min = (DateTime.UtcNow - _roundStartUtc).TotalMinutes;
-            string line = $"ITT: 割り当て {rows.Count:N0} 行 / 回帰 {(ok1 ? "OK" : "失敗")} / 生存 {(ok2 ? "OK" : "失敗")} / {min:F1} 分 / {csv}";
+            string line = $"ITT {_st.round + 1}/{_st.rounds}: この回 {rows.Count:N0} 行 / 合算 {pooled:N0} 行 / 回帰 {(ok1 ? "OK" : "失敗")} / 生存 {(ok2 ? "OK" : "失敗")} / {min:F1} 分 / {csv}";
             File.AppendAllText(Path.Combine(_root, "rounds.txt"), line + "\n", new UTF8Encoding(false));
             Debug.Log("[学習並列] " + line);
             _st.round++;
             SaveState();
+            if (ok2 && !last) { StartRound(); return; }   // 次の回は作り直した序列で買う (StartRound がワーカーの写しを更新する)
             Stop(ok2 ? "完了" : "ITT の再計算に失敗");
         }
 

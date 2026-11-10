@@ -22,7 +22,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public static int Steps => Run?.stepsSinceBattle ?? 0;
         public static int Count(CombatContext ctx, string key) => (int)ctx.GetAccumulated(key);
 
-        /// <summary>刻みを「攻撃に挿した出目 +10%」に換える品の共通部 (2026-11-06)。 OnPostRoll で刻みの分の率を積み、
+        /// <summary>刻みを「与ダメージ +10%」に換える品の共通部 (2026-11-06・2026-11-10 に出目 +10% から変更)。 OnPostRoll で刻みの分の率を積み、
         /// OnWired で攻撃に 1 本でも挿していたら刻みを 0 に戻す (使い切る)。 攻撃しないターンは持ち越す。
         /// この 2 つのトリガーを処理したら true (呼び手は刻みを数える処理へ進まない)。</summary>
         public const float DiceStackPct = 0.1f;
@@ -31,7 +31,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (t == PassiveSkillTrigger.OnPostRoll)
             {
                 int n = Count(ctx, key);
-                if (n > 0) ctx.AddAttackDicePct(n * DiceStackPct);
+                if (n > 0) ctx.AddOutgoingPct(n * DiceStackPct);
                 return true;
             }
             if (t == PassiveSkillTrigger.OnWired)
@@ -142,32 +142,42 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>溢れ取りの鋳型: 爆発のとき、 閾値を超えて溜まっていた臨界 1 につき追加ダメージ +2。</summary>
+    /// <summary>溢れ取りの鋳型: 爆発のとき、 閾値を超えて溜まっていた臨界 1 につき、 次の攻撃の与ダメージ +2% (攻撃したら使い切る)。
+    /// 2026-11-10: 旧「超えた臨界 1 につき爆発の追加ダメージ +2」から主攻撃へ返す形に変えた (5 層ボス戦で爆発が主攻撃を押しのけていた)。</summary>
     public class OverflowMold : IPassiveSkillEffect
     {
         public string SkillId => "溢れ取りの鋳型";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnRinkaiBurst };
+        public const float PctPerExcess = 0.02f;
+        /// <summary>[persistent・戦闘開始で 0・攻撃したら 0] 溜まっている与ダメージの率。</summary>
+        public const string PctKey = "rw.moldPct";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnRinkaiBurst, PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (t == PassiveSkillTrigger.OnBattleStart) { Kw.EnableHeat(ctx); return; }
-            int excess = Rw.Count(ctx, Kw.BurstExcessKey);
-            if (excess > 0) Kw.Add(ctx, Kw.BurstBonusKey, excess * 2);
+            if (t == PassiveSkillTrigger.OnBattleStart) { Kw.EnableHeat(ctx); ctx.accumulatedValues[PctKey] = 0f; return; }
+            if (t == PassiveSkillTrigger.OnRinkaiBurst)
+            {
+                int excess = Rw.Count(ctx, Kw.BurstExcessKey);
+                if (excess > 0) ctx.accumulatedValues[PctKey] = ctx.GetAccumulated(PctKey) + excess * PctPerExcess;
+                return;
+            }
+            if (t == PassiveSkillTrigger.OnPostRoll) { ctx.AddOutgoingPct(ctx.GetAccumulated(PctKey)); return; }
+            if (Rw.Count(ctx, MutualKeys.AttackDiceCount) > 0) ctx.accumulatedValues[PctKey] = 0f;   // OnWired: 攻撃したら使い切る
         }
     }
 
-    /// <summary>二度目の打金: 爆発した次のターンも、 追加ダメージの半分が乗る。</summary>
+    /// <summary>二度目の打金: 爆発した次のターン、 与ダメージ +30%。
+    /// 2026-11-10: 旧「爆発した次のターンも、 追加ダメージの半分が乗る」(爆発の残響 = 固定ダメ枠) から主攻撃へ返す形に変えた。</summary>
     public class SecondStrike : IPassiveSkillEffect
     {
         public string SkillId => "二度目の打金";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnWired };
+        public const float Pct = 0.30f;
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnPostRoll };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnBattleStart) { Kw.EnableHeat(ctx); return; }
             int turn = Rw.Count(ctx, Kw.BurstAppliedTurnKey);
-            int dmg = Rw.Count(ctx, Kw.BurstAppliedDmgKey);
-            if (turn <= 0 || turn != ctx.currentTurn - 1 || dmg / 2 <= 0) return;
-            ctx.fixedDamageToEnemy += dmg / 2;
-            Rw.Log($"[二度目の打金] 前のターンの爆発の半分 +{dmg / 2}");
+            if (turn <= 0 || turn != ctx.currentTurn - 1) return;
+            ctx.AddOutgoingPct(Pct);
         }
     }
 
@@ -221,14 +231,21 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>荒砥: 爆発した攻撃が通ると敵に出血 +4。</summary>
+    /// <summary>荒砥: 爆発した攻撃が通ると敵に出血 +4。 爆発 1 回につき、 この戦闘中の与ダメージ +5% (積もる・上限なし)。
+    /// 2026-11-10: 「攻撃が通るたび臨界 +3」を与ダメージへ差し替えた (爆発が主攻撃へ返る口)。</summary>
     public class RoughWhetstone : IPassiveSkillEffect
     {
         public string SkillId => "荒砥";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnPostDealDamage };
+        public const float PctPerBurst = 0.05f;
+        /// <summary>[persistent・戦闘開始で 0] 積もった与ダメージの率。</summary>
+        public const string PctKey = "rw.aratoPct";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnRinkaiBurst,
+                                                         PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (t == PassiveSkillTrigger.OnBattleStart) { Kw.EnableHeat(ctx); return; }
+            if (t == PassiveSkillTrigger.OnBattleStart) { Kw.EnableHeat(ctx); ctx.accumulatedValues[PctKey] = 0f; return; }
+            if (t == PassiveSkillTrigger.OnRinkaiBurst) { ctx.accumulatedValues[PctKey] = ctx.GetAccumulated(PctKey) + PctPerBurst; return; }
+            if (t == PassiveSkillTrigger.OnPostRoll) { ctx.AddOutgoingPct(ctx.GetAccumulated(PctKey)); return; }
             if (!ctx.playerWonRoll || Rw.Count(ctx, Kw.BurstThisAttackKey) <= 0) return;
             if (!Rw.OncePerTurn(ctx, "rw.arato")) return;
             ctx.AddEnemyBleed(4);
@@ -317,21 +334,22 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.AddCharge(3);
     }
 
-    /// <summary>十五年目の計測器: 上限で溢れた充電 2 につき、 次の攻撃で攻撃に挿した出目 +5% (攻撃したら使い切る)。
+    /// <summary>十五年目の計測器: 上限で溢れた充電 1 につき、 次の攻撃で与ダメージ +3% (攻撃したら使い切る)。
+    /// 2026-11-10: 「溢れた充電 2 につき出目 +5%」から変更 (出目 +% の掛け先が小さすぎた)。
     /// 2026-11-07: 旧「溢れた充電 1 につき次の攻撃 +2」は、 満タンのあと充電端子に挿した出目 1 が攻撃 +2 になり
     /// (攻撃端子は +1)、 余った資源で強さを買える穴だった。</summary>
     public class OldGauge : IPassiveSkillEffect
     {
         public string SkillId => "十五年目の計測器";
         private const string Key = "rw.gauge";
-        public const float PctPer2 = 0.05f;
+        public const float PctPer1 = 0.03f;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnOvercharge, PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnOvercharge) { Kw.Add(ctx, Key, Kw.EventAmount(ctx)); return; }
             int spilled = Rw.Count(ctx, Key);
-            if (t == PassiveSkillTrigger.OnPostRoll) { if (spilled >= 2) ctx.AddAttackDicePct(PctPer2 * (spilled / 2)); return; }
-            if (Rw.Count(ctx, MutualKeys.AttackDiceCount) > 0) ctx.accumulatedValues[Key] = spilled % 2;   // 攻撃したら使い切る
+            if (t == PassiveSkillTrigger.OnPostRoll) { if (spilled > 0) ctx.AddOutgoingPct(PctPer1 * spilled); return; }
+            if (Rw.Count(ctx, MutualKeys.AttackDiceCount) > 0) ctx.accumulatedValues[Key] = 0f;   // 攻撃したら使い切る
         }
     }
 
@@ -600,16 +618,25 @@ namespace ItemSystem.PassiveSkills.Effects
     //  毒
     // ============================================================
 
-    /// <summary>緑染みの小刀: 攻撃が通るたび、 敵に毒 +2。
-    /// 2026-11-06: 旧「戦闘開始時 毒 +2」は配線を払わない燃料で、 クリアしたランの 94% が持っていた。
-    /// 2026-11-07: 毒 1 スタックが現在 HP の 0.1% になり、 毒は「入り口の数」で溜める形にしたので、 攻撃のたびの入り口にした。</summary>
+    /// <summary>緑染みの小刀: 敵の毒 5 につき、 与ダメージ +5%。 瘴気が最も大きい偏重なら、 攻撃が通るたび、 敵に毒 +2。
+    /// 2026-11-10: 旧「攻撃が通るたび、 敵に毒 +2」から、 溜めた毒を主攻撃へ返す形に変えた (毒 1 スタックを 0.05% に下げた代わり)。
+    /// 毒 +2 は毒を最も深く積んだ時だけ残す。
+    /// 2026-11-06: 旧「戦闘開始時 毒 +2」は配線を払わない燃料で、 クリアしたランの 94% が持っていた。</summary>
     public class GreenKnife : IPassiveSkillEffect
     {
         public string SkillId => "緑染みの小刀";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
+        public const int PerStacks = 5;
+        public const float Pct = 0.05f;
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (Rw.PlayerHit(ctx) && Rw.OncePerTurn(ctx, "rw.greenKnife")) Rw.Poison(ctx, 2);
+            if (t == PassiveSkillTrigger.OnPostDealDamage)
+            {
+                if (ctx.AxisRank(AxisRules.Poison) == 0 && Rw.PlayerHit(ctx) && Rw.OncePerTurn(ctx, "rw.greenKnife")) Rw.Poison(ctx, 2);
+                return;
+            }
+            int n = ctx.EnemyPoison / PerStacks;
+            if (n > 0) ctx.AddOutgoingPct(Pct * n);
         }
     }
 
@@ -687,17 +714,22 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.poisonTickOnEnemyAttack = true;
     }
 
-    /// <summary>主より長い香炉: 毒のダメージが入るたび、 その量の半分の臨界。
+    /// <summary>主より長い香炉: 毒のダメージが入るたび、 この戦闘中の与ダメージ +5% (積もる・上限なし)。
+    /// 2026-11-10: 旧「その量の半分の臨界」から作り直した (毒が爆発へ流れる口を閉じ、 主攻撃へ返す)。 以下は旧効果の経緯。
     /// 2026-11-06: 旧「その量の臨界」は最大 HP の割合で入る毒をそのまま固定 50 の爆発にも換え、 毒を二重に数えていた
     /// (7 層ボスで爆発のダメージ/T が香炉あり 35.4・なし 6.6、 クリアしたランの所持率 97%)。</summary>
     public class LongCenser : IPassiveSkillEffect
     {
         public string SkillId => "主より長い香炉";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnPoisonTick };
+        public const float PctPerTick = 0.05f;
+        /// <summary>[persistent・戦闘開始で 0] 積もった与ダメージの率。</summary>
+        public const string PctKey = "rw.censerPct";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnPoisonTick, PassiveSkillTrigger.OnPostRoll };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (t == PassiveSkillTrigger.OnBattleStart) { Kw.EnableHeat(ctx); return; }
-            Kw.AddHeat(ctx, Kw.EventAmount(ctx) / 2);
+            if (t == PassiveSkillTrigger.OnBattleStart) { ctx.accumulatedValues[PctKey] = 0f; return; }
+            if (t == PassiveSkillTrigger.OnPoisonTick) { ctx.accumulatedValues[PctKey] = ctx.GetAccumulated(PctKey) + PctPerTick; return; }
+            ctx.AddOutgoingPct(ctx.GetAccumulated(PctKey));
         }
     }
 

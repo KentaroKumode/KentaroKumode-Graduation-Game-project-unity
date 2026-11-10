@@ -76,7 +76,7 @@ namespace ItemSystem.PassiveSkills
                     UnityEngine.Debug.LogError($"[PassiveSkillRegistry] 入り口の対象 {e.id} が登録されていない");
                     continue;
                 }
-                registry[e.id] = new Effects.EntryEffect(inner, e.when, e.heat, e.amount);
+                registry[e.id] = new Effects.EntryEffect(inner, e.when, e.heat, e.amount, e.gate, e.gateN);
             }
         }
 
@@ -317,7 +317,7 @@ namespace ItemSystem.PassiveSkills
             Register(new SwiftHandI());   // II / III はステータス化
             Register(new VenomHandI());   Register(new VenomHandII());   Register(new VenomHandIII());
             Register(new VitalStrike());  // 急所: 会心は防御無視 (会心率 +10% は stats)
-            // 処刑はステータスだけ (残HP 25% 以下で与ダメ +80%)
+            // 処刑はステータスだけ (残HP 35% 以下で与ダメ +80%・2026-11-11 に 25% から)
             Register(new SwordReachI());  // II / III はステータス化
             Register(new DuelistIII());   // I / II はステータス化
             Register(new GuardCut());     // 切り返し

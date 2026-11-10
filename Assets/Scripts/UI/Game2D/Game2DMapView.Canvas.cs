@@ -165,20 +165,13 @@ namespace UI.Game2D
 
         public enum Align { Left, Center, Right }
 
-        /// <summary>3×5 の字 (HTML の ltext)。 1 dot が Pxs dot。 (x, y) は文字の縦の中心。</summary>
+        /// <summary>字 (既定のフォント・GameFont・2026-11-11 に旧 3×5 の字の 2 倍から変更)。 (x, y) は文字の縦の中心。</summary>
         private void Text(string s, float x, float y, Color32 col, Align align = Align.Center)
         {
-            s = s.ToUpperInvariant();
-            int w = (s.Length * 4 - 1) * Pxs;
+            int w = Game2DJpFont.Width(s);
             int x0 = Mathf.RoundToInt(align == Align.Left ? x : align == Align.Right ? x - w : x - w / 2f);
-            int y0 = Mathf.RoundToInt(y - 2.5f * Pxs);
-            foreach (char ch in s)
-            {
-                if (!F35.TryGetValue(ch, out var g)) g = F35[' '];
-                for (int i = 0; i < 15; i++)
-                    if (g[i] == '1') Rect(x0 + (i % 3) * Pxs, y0 + (i / 3) * Pxs, Pxs, Pxs, col);
-                x0 += 4 * Pxs;
-            }
+            int y0 = Mathf.RoundToInt(y - Game2DJpFont.Cell / 2f);
+            Game2DJpFont.Draw((px, py) => Rect(px, py, 1, 1, col), s, x0, y0);
         }
 
         /// <summary>行の文字列で描いた絵 (HTML の glyph)。 (x, y) は絵の中心、 u は 1 マスの大きさ。</summary>

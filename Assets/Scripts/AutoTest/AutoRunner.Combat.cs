@@ -138,6 +138,7 @@ namespace AutoTest
             }
 
             _fbDecided = _fbTurns = _fbKillTurns = 0;   // [計装] 防ぎ切りの規則の数え直し
+            EndCombatMainCorr();   // [V3 mainCorr] 前の戦闘の残りを締めてから、 この戦闘の累計を 0 から
             _fbUnavoidSeen = false; _fbPrevHp = -1; _fbPrevExpTaken = 0;
             int guard = 0;
             while (cm.IsCombatActive && guard++ < 250)
@@ -190,6 +191,7 @@ namespace AutoTest
                 else if (tr.playerWon) _cwWin++;
                 else { _cwLoss++; if (tr.totalDamage <= 0) _cwLossAbs++; }
             }
+            EndCombatMainCorr();   // [V3 mainCorr] この戦闘の累計をランの累計へ
         }
 
 
@@ -242,12 +244,15 @@ namespace AutoTest
         /// <summary>配線方策を <see cref="CombatSystem.WiringPlan"/> として返す薄い包み。</summary>
         private CombatSystem.WiringPlan MutualWiringPlanPolicy(int[] rolls, CombatSystem.MutualTurnTelegraph tele)
         {
+            RefreshMainCorr();   // [V3 mainCorr] 前のターンの実際を締めて比を出し直す (計装は切り替えに関わらず)
             PrepareSuperTurn(rolls, tele);
             // 予告の外のダメージの観測: 前のターンに見込んだ被ダメより HP が多く減っていたら、 この戦闘にはそれがある
             int hpNow = CombatSystem.CombatManager.Instance != null ? CombatSystem.CombatManager.Instance.PlayerHP : -1;
             if (_fbPrevHp >= 0 && hpNow >= 0 && _fbPrevHp - hpNow > _fbPrevExpTaken) _fbUnavoidSeen = true;
             _lastFreeBlock = _lastKillsNow = false;
             var plan = MutualWiringPolicy(rolls, tele);
+            if (predTrace) BeginPredTrace(tele.turn);   // [計装] この配線の主攻撃の見積もり (旧/新) と、 次の判断の時点で実際の主攻撃を並べる
+            BeginMainCorrTurn(_lastPredA);
             _fbDecided++; if (_lastFreeBlock) _fbTurns++; if (_lastKillsNow) _fbKillTurns++;
             _fbPrevHp = hpNow; _fbPrevExpTaken = _lastExpTaken;
             if (wiringMistakeRate > 0f) plan = MaybeMisWire(rolls, tele, plan);
@@ -372,9 +377,156 @@ namespace AutoTest
                 tele.enemyAttackValue, cm?.PlayerHP ?? 0, cm?.PlayerMaxHP ?? 0, ctx?.consShield ?? 0, sum, a, b, c, nb }));
         }
 
+        // ============================================================
+        //  [計装 2026-11-10] 主攻撃の見積もり (配線時点) と実際の主攻撃の照合 (readOutgoingMult)
+        // ============================================================
+        /// <summary>true のとき、 配線ごとに主攻撃の見積もり (旧の式・倍率を読む式) と、 そのターンに実際に出た主攻撃
+        /// (DamageBreakdown[7] の増分 = ヴェスカの防御の前・役の追撃込み) を pred_trace.tsv に書く。 判断には使わない。</summary>
+        public bool predTrace;
+        /// <summary>predTrace の行を書くラン数の上限 (index がこれ未満のランだけ)。</summary>
+        public int predTraceRuns = 50;
+        private System.IO.StreamWriter _predWriter;
+        private int _lastPredOld, _lastPredNew, _lastPredA;
+        // 見積もりに使った倍率の入力 (照合で「どこが外れたか」を段別の実測 CombatStats.DamageStages と並べる)
+        private float _lastPredCritP, _lastPredCritMul, _lastPredOutMul; private int _lastPredRaw;
+        private float _predCritP, _predCritMul, _predOutMul; private int _predRaw;
+        private readonly double[] _predStg = new double[CombatSystem.CombatStats.DamageStages.Length];
+        private bool _predPending;
+        private int _predTurn, _predOld, _predNew, _predA;
+        private string _predEnemy = "";
+        private double _predBd7;
+
+        private void BeginPredTrace(int turn)
+        {
+            FlushPredTrace();
+            if ((_cur?.index ?? int.MaxValue) >= predTraceRuns) return;
+            _predPending = true;
+            _predTurn = turn; _predOld = _lastPredOld; _predNew = _lastPredNew; _predA = _lastPredA;
+            _predEnemy = CombatManager.Instance?.CurrentEnemy?.id ?? "";
+            _predBd7 = CombatSystem.CombatStats.DamageBreakdown[7];
+            _predCritP = _lastPredCritP; _predCritMul = _lastPredCritMul; _predOutMul = _lastPredOutMul; _predRaw = _lastPredRaw;
+            System.Array.Copy(CombatSystem.CombatStats.DamageStages, _predStg, _predStg.Length);
+        }
+
+        /// <summary>保留中の見積もりに、 その後に出た主攻撃を並べて 1 行書く (次の配線判断・段の切り替え・戦闘の終わりで呼ぶ)。</summary>
+        private void FlushPredTrace()
+        {
+            if (!_predPending) return;
+            _predPending = false;
+            if (string.IsNullOrWhiteSpace(productionOutputRootOverride)) return;
+            try
+            {
+                if (_predWriter == null)
+                {
+                    _predWriter = new System.IO.StreamWriter(System.IO.Path.Combine(productionOutputRootOverride, "pred_trace.tsv"), true,
+                                                             new System.Text.UTF8Encoding(false)) { AutoFlush = true };
+                }
+                int actual = (int)System.Math.Round(CombatSystem.CombatStats.DamageBreakdown[7] - _predBd7);
+                var sg = CombatSystem.CombatStats.DamageStages;
+                string S(int i) => (sg[i] - _predStg[i]).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+                string F(float v) => v.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+                // 列: run 層 敵 T 攻撃本数 旧予測 新予測 実際 フラグ | 見積もり: atkBase 会心率 会心倍率 与ダメ倍率 |
+                //     実測 (段の増分): A atkBase / B OnPreDealDamage 後 / D 会心後 / E 与ダメ倍率後 / I 防御後 / O 最終 / 会心回数 / 会心倍率の和 / 掛けた与ダメ倍率
+                _predWriter.WriteLine(string.Join("\t", new object[] {
+                    _cur?.index ?? -1, GameManager.Instance?.Run?.currentFloor ?? -1, _predEnemy, _predTurn, _predA,
+                    _predOld, _predNew, actual, ReadOutgoingMultEffective ? 1 : 0,
+                    _predRaw, F(_predCritP), F(_predCritMul), F(_predOutMul),
+                    S(1), S(2), S(4), S(5), S(9), S(15), S(17), S(16), S(22) }));
+            }
+            catch (Exception ex) { Debug.LogWarning("[predTrace] " + ex.Message); }
+        }
+
+        // ============================================================
+        //  [V3 mainCorr 2026-11-10] 主攻撃の実績の比 (実際に入った主攻撃 ÷ 配線時点の見積もり)
+        // ============================================================
+        //   実際 = CombatStats.DamageBreakdown[7] の増分 (predTrace と同じ: 敵の防御の後・ヴェスカの回避/半減/シールド/はみ出しの前・役の追撃込み)。
+        //   見積もり = 効用に使った主攻撃 (比を掛ける前・OptimalTurnOutcome.dmgUsed)。 攻撃に 1 本以上挿したターンだけ積む。
+        //   次の判断 (リロール・配線)・段の切り替え・戦闘の終わりで、 保留中のターンの実際を締める。 GameRng を使わない (読むだけ)。
+        //   計装 (段ごとの見積もり・比を掛けた見積もり・実際・攻撃の本数の分布・黎明の溜めを撃った値) は切り替えに関わらず取る。
+        private int _lastPredUsed;
+        private double _mcRunAct, _mcRunPred;     // このランの、 終わった戦闘の累計
+        private double _mcCmbAct, _mcCmbPred;     // 今の戦闘 (連戦は通算) の累計
+        private bool _mcPending; private int _mcPendPred, _mcPendA; private double _mcPendBd7; private float _mcPendRatio = 1f;
+        private float _mcRatioNow = 1f;
+        // 段 (形態) ごとの計装
+        private double _mfPred, _mfPredCorr, _mfAct;
+        private readonly int[] _mfAtkHist = new int[4];
+        private readonly List<int> _mfDawnShots = new List<int>();
+
+        private void SettleMainCorr()
+        {
+            if (!_mcPending) return;
+            _mcPending = false;
+            if (_mcPendA <= 0) return;
+            double act = System.Math.Max(0.0, CombatSystem.CombatStats.DamageBreakdown[7] - _mcPendBd7);
+            _mcCmbAct += act; _mcCmbPred += _mcPendPred;
+            _mfAct += act; _mfPred += _mcPendPred; _mfPredCorr += _mcPendPred * (double)_mcPendRatio;
+        }
+
+        /// <summary>今の比: 今の戦闘の累計 → 無ければこのランの直前までの戦闘の累計 → 無ければ 1。</summary>
+        private float MainCorrRatio()
+        {
+            if (_mcCmbPred >= 1.0) return (float)(_mcCmbAct / _mcCmbPred);
+            if (_mcRunPred >= 1.0) return (float)(_mcRunAct / _mcRunPred);
+            return 1f;
+        }
+
+        /// <summary>判断 (リロール・配線) の前: 前のターンの実際を締めて比を出し直す。</summary>
+        private void RefreshMainCorr() { SettleMainCorr(); _mcRatioNow = MainCorrRatio(); }
+
+        /// <summary>配線を決めた直後: このターンの見積もりを保留する (実際は次の判断か段の切り替え・戦闘の終わりで締める)。</summary>
+        private void BeginMainCorrTurn(int aCount)
+        {
+            _mfAtkHist[System.Math.Min(3, System.Math.Max(0, aCount))]++;
+            _mcPending = true; _mcPendPred = System.Math.Max(0, _lastPredUsed); _mcPendA = aCount;
+            _mcPendBd7 = CombatSystem.CombatStats.DamageBreakdown[7]; _mcPendRatio = _mcRatioNow;
+            // 黎明の溜める形: 攻撃したターンに乗った溜め (OnWired の前なので鍵に値が残っている)
+            if (aCount > 0)
+            {
+                var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+                float pool = ctx != null ? ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.Daybreak.ChargeKey) : 0f;
+                if (pool > 0f) _mfDawnShots.Add(Mathf.RoundToInt(pool * 100f));
+            }
+        }
+
+        /// <summary>戦闘の開始と終わり: 保留を締め、 今の戦闘の累計をランの累計へ移す。</summary>
+        private void EndCombatMainCorr()
+        {
+            SettleMainCorr();
+            _mcRunAct += _mcCmbAct; _mcRunPred += _mcCmbPred;
+            _mcCmbAct = _mcCmbPred = 0;
+            _mcRatioNow = MainCorrRatio();
+        }
+
+        /// <summary>ランの開始: ランをまたいで持ち越さない (決定性・チャンク分割で結果を変えない)。</summary>
+        private void ResetMainCorrRun()
+        {
+            _mcRunAct = _mcRunPred = _mcCmbAct = _mcCmbPred = 0;
+            _mcPending = false; _mcRatioNow = 1f; _mcPendRatio = 1f;
+            ResetMainCorrForm();
+        }
+
+        private void ResetMainCorrForm()
+        {
+            _mfPred = _mfPredCorr = _mfAct = 0;
+            System.Array.Clear(_mfAtkHist, 0, _mfAtkHist.Length);
+            _mfDawnShots.Clear();
+        }
+
         /// <summary>バッチ終了時に閉じる (worker が呼ぶ)。</summary>
         public void CloseTurnAudit()
         {
+            // [計装 2026-11-10] ctx を通した削りの品別 (EnemyHpLedger.CtxBySource) を書き出す (predTrace のときだけ)
+            if (predTrace && !string.IsNullOrWhiteSpace(productionOutputRootOverride))
+                try
+                {
+                    var sb = new System.Text.StringBuilder();
+                    foreach (var kv in CombatSystem.EnemyHpLedger.CtxBySource)
+                        sb.Append(kv.Key).Append('\t').Append(kv.Value.ToString("0", System.Globalization.CultureInfo.InvariantCulture)).Append('\n');
+                    System.IO.File.WriteAllText(System.IO.Path.Combine(productionOutputRootOverride, "ctx_direct_sources.tsv"), sb.ToString(),
+                                                new System.Text.UTF8Encoding(false));
+                }
+                catch (Exception ex) { Debug.LogWarning("[ctxSources] " + ex.Message); }
             try { _turnAuditWriter?.Flush(); _turnAuditWriter?.Dispose(); } catch { }
             _turnAuditWriter = null;
         }
@@ -492,6 +644,115 @@ namespace AutoTest
             public float[] atkGrowth;          // 防ぎ切りの規則: 撃破まで n ターンの敵の攻撃の伸び (null = 規則なし)
             public bool ledger;                // [V3 hpLedger] 効用を HP の帳簿で測る
             public float dFull;                // [V3 hpLedger] 先のターンに全部攻撃に挿した時の 1 ターンの与ダメの見込み
+            public float mainCorr;             // [V3 mainCorr] 主攻撃の見積もりに掛ける実績の比 (0 = 掛けない)
+            // ---- [V3 readOutgoingMult 2026-11-10] 与ダメの倍率を読む (本体の主攻撃の計算 CombatManager.Turn / Damage / PassiveSkillManager.ProcessDamage に合わせる) ----
+            public bool readOut;               // 下の値で主攻撃を見積もる (false = 旧: 素の攻撃力 + 攻撃の出目 − 防御)
+            public bool traceBoth;             // [計装] 旧と新の両方を出す (予測の照合用)
+            public int atkPower, atkPenalty;   // 武器の素火力 / 麻痺毒の減算 (本体は atkBase 全体から引く)
+            public int atkFlat;                // 攻撃+N: ctx.mutualAttackBonus (配線前に積まれた分) + 消費の攻撃 + 遺物の攻撃
+            public int atkPerDie;              // 端子調律: 攻撃に挿したダイス 1 本あたり
+            public float chgToAtk;             // 〈電流〉の②: 充電に挿した出目のこの割合が攻撃へ
+            public float igCut;                // 〈不完全な起動〉の攻撃カット率
+            public int dmgBonus;               // バフ damageBonus (ProcessDamage の 1.)
+            public float critP, critMulEff;    // 会心率 (配線前に分かる分) / 実効の会心倍率 (敵の会心耐性・〈寸鉄〉〈心眼〉の②の期待値込み)
+            public float nonCritMul;           // 鈍器: 非会心だけ ×(1+x)
+            public bool pinpointCut;           // 〈一点読みの片眼〉の代価: 非会心 ×0.7
+            public float outMul;               // 与ダメ倍率の池 (ctx.outgoing + 整備パネル + 戦意 + 剛胆 + 遺物 + 研磨剤 + 油・膏薬)
+            public int consBurst;              // 消費: 攻撃バースト (倍率の後に足す)
+            public int critPen;                // 会心した攻撃だけに足す貫通
+            public bool vitalIgnore;           // 短剣〈急所〉: 会心は防御を無視
+            public int minDmg;                 // 勝利時の与ダメ最低保証
+            public float berserkMul;           // 狂暴化 (敵の被ダメ倍率)
+        }
+
+        /// <summary>[V3 readOutgoingMult] 配線時点で分かる範囲で、 本体と同じ順に主攻撃 (ヴェスカの防御の前) の期待値を出す。
+        /// 会心は確率で 2 通りを混ぜる。 配線の後で積まれる分 (OnWired・OnPreDealDamage・OnCriticalCheck・追撃・役の追撃・敵の軽減パッシブ・脆弱) は入らない。</summary>
+        private static int ReadOutMainDamage(in OptimalTurnState s, int aCount, int bCount, int aSum)
+        {
+            if (aCount <= 0) return 0;   // 攻撃端子 0 本 = 攻撃しない (本体の skipAttack)
+            int raw = s.atkPower + s.atkFlat + aSum;
+            raw = System.Math.Max(0, raw - s.atkPenalty);
+            if (s.igCut > 0f && raw > 0) raw -= Mathf.FloorToInt(raw * s.igCut);
+            raw += s.dmgBonus;
+            float outMul = s.outMul;
+            if (s.stepUndying && bCount > 0) outMul += TurnRules.UndyingMul(s.undyingStreak + 1) - 1f;   // 本体は与ダメ倍率の池へ足す
+            int minDmg = s.minDmg, consBurst = s.consBurst, eDef = s.eDefNow, pen = s.myPen, critPen = s.critPen;
+            float critMulEff = s.critMulEff, nonCritMul = s.nonCritMul, berserk = s.berserkMul;
+            bool pinpoint = s.pinpointCut, vital = s.vitalIgnore;
+            float D(bool crit)
+            {
+                int d = raw;
+                if (d <= 0) return System.Math.Max(0, minDmg);
+                if (crit) d = (int)(d * critMulEff);
+                else
+                {
+                    if (nonCritMul > 0f) d = (int)(d * (1f + nonCritMul));
+                    if (pinpoint) d = d * ItemSystem.PassiveSkills.Effects.PinpointEye.NonCritKeepPct / 100;
+                }
+                if (outMul > 0f && System.Math.Abs(outMul - 1f) > 0.001f) d = Mathf.CeilToInt(d * outMul);
+                d += consBurst;
+                d = CombatSystem.EnemyHpLedger.ProbeMain(d);   // [測定用の物差し 2026-11-10] 本体と同じ位置 (攻撃バーストの後・防御の前)
+                if (eDef > 0 && d > 0 && !(crit && vital))
+                {
+                    int effDef = CombatSystem.DefenseFormula.Effective(eDef, pen + (crit ? critPen : 0));
+                    if (effDef > 0) d = CombatSystem.DefenseFormula.Apply(d, effDef);
+                }
+                if (d < minDmg) d = minDmg;
+                if (berserk > 1f && d > 0) d = Mathf.CeilToInt(d * berserk);
+                return d;
+            }
+            float p = s.critP;
+            float e = p >= 1f ? D(true) : p <= 0f ? D(false) : p * D(true) + (1f - p) * D(false);
+            return Mathf.RoundToInt(e);
+        }
+
+        /// <summary>[V3 readOutgoingMult] 配線時点の盤面から、 主攻撃の倍率の入力を読む (読むだけ・書き換えない)。</summary>
+        private void FillReadOut(ref OptimalTurnState st, CombatManager cm, ItemSystem.PassiveSkills.CombatContext ctx,
+                                 GameLoop.RunState run, int atkPenalty)
+        {
+            st.atkPower = System.Math.Max(0, cm?.PlayerAttackPower ?? 2);
+            st.atkPenalty = System.Math.Max(0, atkPenalty);
+            int consAtk = ctx.rollPurity ? 0 : ctx.consDiceRoll;
+            st.atkFlat = ctx.mutualAttackBonus + consAtk + MetaProgression.Relics.RelicApplicator.GetAttackBonus(run, ctx);
+            st.atkPerDie = MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice();
+            st.chgToAtk = ctx.chargeToAttackPct;
+            st.igCut = (run != null && run.HasFlaw(GameLoop.GateFlaw.IncompleteIgnition)) ? System.Math.Max(0f, GameLoop.GateFlaws.IgnitionAttackCutPct) : 0f;
+            st.dmgBonus = (int)ctx.GetBuff("damageBonus");
+            // 会心率: 本体の CritRateOf(pendingBuff: true) と同じ (武器 + このターンの加算 + 整備パネル + 戦闘中バフ)。 OnCriticalCheck の条件付きは入らない。
+            float add = (cm?.PlayerCritBaseRate ?? 0f) + ctx.critRatePctAdd + MetaProgression.MetaBuffApplicator.GetCritRatePctBonus()
+                      + ctx.GetBuff(ItemSystem.PassiveSkills.CombatContext.CritRateBuffKey);
+            add = System.Math.Max(0f, add);
+            float p = ItemSystem.PassiveSkills.CombatContext.ResolveCritRate(add);
+            if (ctx.critSuppressed || ctx.critBecomesArmorBreak) p = 0f;
+            if (ctx.forceCritical) p = 1f;
+            if (ctx.critSealed) p = 0f;
+            st.critP = p;
+            float cmul = ctx.criticalMultiplier;
+            if (ctx.enemyCritMultReduction > 0f) cmul = System.Math.Max(1f, cmul - ctx.enemyCritMultReduction);
+            if (ctx.critOverflowToMultiplier && add > 1f) cmul += add - 1f;
+            if (ctx.critOverflowStack && add > 1f) cmul += System.Math.Min(1f, add - 1f);   // 確率 (add−1) で +1.0 の期待値
+            st.critMulEff = cmul;
+            st.nonCritMul = ctx.nonCritOutgoingMultiplier;
+            st.pinpointCut = ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.PinpointEye.NonCritCutKey) > 0f;
+            // 与ダメ倍率の池: ApplyWinDamageModifiers と同じ足し方 (加算の池)
+            float outMul = ctx.outgoingDamageMultiplier <= 0f ? 1f : ctx.outgoingDamageMultiplier;
+            int metaPct = MetaProgression.MetaBuffApplicator.GetOutgoingDamagePct()
+                        + MetaProgression.MetaBuffApplicator.GetBattleSpiritPct(run);
+            {
+                int slayer = MetaProgression.MetaBuffApplicator.GetEliteSlayerPct();
+                var node = MapSystem.MapManager.Instance?.CurrentNode;
+                if (slayer > 0 && node != null && node.EffectiveType.ToEnemyKind() == EnemyKind.Elite) metaPct += slayer;
+            }
+            outMul += metaPct * 0.01f;
+            outMul += MetaProgression.Relics.RelicApplicator.GetOutgoingPct(run, ctx);
+            if (ctx.polishArmed && !ctx.rollPurity) outMul += 1.5f;
+            if (ctx.consDmgMultPct > 0) outMul += ctx.consDmgMultPct / 100f;
+            st.outMul = outMul;
+            st.consBurst = ctx.consAtkBurst;
+            st.critPen = ctx.critArmorPen;
+            st.vitalIgnore = ItemSystem.PassiveSkills.Effects.VitalStrike.IgnoresDefense(ctx);
+            st.minDmg = ctx.winMinDamage;
+            st.berserkMul = ctx.enemyDamageTakenMultiplier;
         }
 
         /// <summary>[V3 hpLedger] この戦闘で失う HP の見込み = 今ターンの被ダメ + 撃破までの残りターンで受ける被ダメ (全部攻撃する前提)。</summary>
@@ -523,6 +784,9 @@ namespace AutoTest
             public bool bashSpent;  // 盾〈シールドバッシュ〉でシールドを使い切った
             public bool freeBlock;  // [計装 2026-11-10] 防ぎ切りの規則の対象 (撃破まで HP を失わない) だった
             public bool killsNow;   // [計装] 今ターン撃破の見込み
+            public int rawNew;           // [計装] 倍率の前の攻撃 (素火力 + 攻撃+N + 出目)
+            public int dmgOld, dmgNew;   // [計装 readOutgoingMult] 主攻撃の見積もり (ヴェスカの防御の前): 旧の式 / 倍率を読む式 (traceBoth か readOut のときだけ)
+            public int dmgUsed;          // [V3 mainCorr] 効用に使った主攻撃の見積もり (実績の比を掛ける前・ヴェスカの防御の前)
         }
 
         private float OptimalUtility(in OptimalTurnState s, int[] rolls, CombatSystem.DiceTerminal[] w, out OptimalTurnOutcome outcome)
@@ -566,7 +830,7 @@ namespace AutoTest
                     case CombatSystem.SpecialTerminalKind.FullGuard:
                         blockRaw += sSum * CombatSystem.SpecialTerminals.FullGuardMultiplier; break;
                     case CombatSystem.SpecialTerminalKind.Bleed:
-                        specFlat += sSum * 0.8f + sSum * sCount * 0.5f; break;
+                        specFlat += (sSum * 0.8f + sSum * sCount * 0.5f) * CombatSystem.EnemyHpLedger.ProbePassiveMult; break;   // [測定用の物差し] 出血の見込み
                     case CombatSystem.SpecialTerminalKind.Heal:
                         specFlat += sSum * wDef; break;
                     case CombatSystem.SpecialTerminalKind.Deathwish:
@@ -601,15 +865,24 @@ namespace AutoTest
                 }
             }
 
+            // [V3 readOutgoingMult] 本体は 攻撃の出目 + 端子調律 (本数) + 〈電流〉の② の合計に上乗せ率を掛ける。 旧の式はどちらも入れていない。
+            bool wantNew = s.readOut || s.traceBoth;
+            int aSumNew = aSum;
+            if (wantNew)
+            {
+                aSumNew += aCount * s.atkPerDie;
+                if (s.chgToAtk > 0f && chargeRaw > 0) aSumNew += Mathf.FloorToInt(chargeRaw * s.chgToAtk);
+                if (s.diceAtkPct > 0f && aSumNew > 0) aSumNew += Mathf.CeilToInt(aSumNew * s.diceAtkPct);
+            }
             // 攻撃に挿した出目への上乗せ率 (2026-11-06): 本体と同じく 攻撃の出目の合計 × 率 (切り上げ)
             if (s.diceAtkPct > 0f && aSum > 0)
                 aSum += Mathf.CeilToInt(aSum * s.diceAtkPct);
             // 剣〈切り返し〉: 攻撃とブロックの両方に挿したターン、 ブロック × 0.5 を攻撃にも
             if (stepGuardCut && aCount > 0 && bCount > 0)
-                aSum += TurnRules.GuardCutBonus(blockRaw);
+            { int gc = TurnRules.GuardCutBonus(blockRaw); aSum += gc; aSumNew += gc; }
             // 盾〈シールドバッシュ〉: 全部攻撃のターン、 シールドを使い切って × 率 を攻撃へ
             bool bashSpent = bashRate > 0f && aCount == k && myShield > 0;
-            if (bashSpent) aSum += TurnRules.BashBonus(myShield, bashRate);
+            if (bashSpent) { int bb = TurnRules.BashBonus(myShield, bashRate); aSum += bb; aSumNew += bb; }
             // 盾〈堅守の構え〉: 全部ブロックのターン、 シールド +15 (このターンの被弾から使える)
             if (steadfastReady && bCount == k)
                 blockRaw += ItemSystem.PassiveSkills.Effects.SteadfastStance.Shield;
@@ -618,9 +891,17 @@ namespace AutoTest
             // 剣〈不滅の刃〉: 両方に挿したターンが続くたび与ダメ +8% (このターンで続けば streak+1)
             if (stepUndying && aCount > 0 && bCount > 0)
                 dmg = (int)(dmg * TurnRules.UndyingMul(undyingStreak + 1));
+            if (aCount > 0) dmg = CombatSystem.EnemyHpLedger.ProbeMain(dmg);   // [測定用の物差し 2026-11-10] 旧の式にも同じ位置で (防御の前)
             // 敵の防御 (このターンの値) で軽減
             if (aCount > 0 && eDefNow > 0)
                 dmg = CombatSystem.DefenseFormula.Apply(dmg, CombatSystem.DefenseFormula.Effective(eDefNow, myPen));
+            int dmgOld = dmg, dmgNew = 0, rawNew = wantNew ? s.atkPower + s.atkFlat + aSumNew : 0;
+            // [V3 readOutgoingMult] 攻撃+N・与ダメ倍率・会心の期待値・端子調律・〈電流〉の② を本体の順で読む
+            if (wantNew) dmgNew = ReadOutMainDamage(in s, aCount, bCount, aSumNew);
+            if (s.readOut) dmg = dmgNew;
+            int dmgUsed = dmg;
+            // [V3 mainCorr] 配線の後で積まれる分を実績の比で埋める (主攻撃の項だけ・ここから effDmg → ttk / HP の帳簿の撃破までの見込みへ流れる)
+            if (s.mainCorr > 0f && dmg > 0) dmg = Mathf.RoundToInt(dmg * s.mainCorr);
             // damageCapped ボス: 与ダメが閾値超えたら超過分を半減した見積もりで探索 (実挙動と一致)
             int effDmg = dmg;
             if (play.damageCapped && play.damageCapThreshold > 0 && dmg > play.damageCapThreshold)
@@ -659,7 +940,11 @@ namespace AutoTest
             int taken = System.Math.Max(0, enemyAtk - block) + (int)reflectPenalty;
             // 盾〈黎明〉: 無傷で受け切ったら、 敵の攻撃 10 につき敵の最大 HP の 5% を削る
             if (stepDaybreak && taken == 0)
-                effDmg += TurnRules.DaybreakDamage(enemyMaxHpNow, enemyAtk);
+            {
+                effDmg += TurnRules.DaybreakDamage(enemyMaxHpNow, enemyAtk);   // 溜める形 (段 B の試験) のときは 0
+                // [2026-11-10 試験] 溜める形: 次の主攻撃に乗る +% の価値 = 先のターンの 1 ターンの与ダメの見込み × 溜まる率 (dFull が無い計算では 0)
+                effDmg += TurnRules.DaybreakDeferredValue(s.dFull, enemyAtk);
+            }
 
             // 処刑人の烙印: 攻撃終了時に HP が最大の 20% 以下なら 9999。
             if (tele.executeArmed && TurnRules.ExecuteKills(myHp - taken, myMaxHp))
@@ -752,7 +1037,8 @@ namespace AutoTest
                 if (!onlySurvivesByNotAttacking) u -= 10000f;
             }
             outcome = new OptimalTurnOutcome { effDmg = effDmg, taken = taken, block = block, aCount = aCount, bCount = bCount, bashSpent = bashSpent,
-                                               freeBlock = fbCovers, killsNow = fbKills };
+                                               freeBlock = fbCovers, killsNow = fbKills, dmgOld = dmgOld, dmgNew = dmgNew, rawNew = rawNew,
+                                               dmgUsed = aCount > 0 ? dmgUsed : 0 };
             return u;
         }
 
@@ -850,6 +1136,7 @@ namespace AutoTest
             ns.tele = tele;
             ns.enemyAtk = nextAtk;
             ns.atkBase = System.Math.Max(0, cm.PlayerAttackPower);
+            ns.atkPower = System.Math.Max(0, cm.PlayerAttackPower); ns.atkPenalty = 0;   // [readOutgoingMult] 次ターンの麻痺毒は未知
             ns.atkGrowth = (FreeBlockRule && nextAtk > 0) ? BuildAtkGrowth(enemy, ctx, nt) : null;
             plan.next = ns;
             return plan;
@@ -1109,6 +1396,15 @@ namespace AutoTest
                 play = play, atkGrowth = atkGrowth,
                 diceAtkPct = ctxRoles?.attackDicePct ?? 0f,
             };
+            // [V3 readOutgoingMult] 主攻撃の見積もりに与ダメの倍率を読む (Super で既定 ON)。 予測の照合 (predTrace) では両方を出す。
+            bool readOutNow = ReadOutgoingMultEffective && EffectiveWiringSkill != WiringSkill.Naive;
+            if ((readOutNow || predTrace) && ctxRoles != null)
+            {
+                st.readOut = readOutNow; st.traceBoth = predTrace;
+                FillReadOut(ref st, cm, ctxRoles, runForVoid, tele.playerAttackPenalty);
+            }
+            // [V3 mainCorr] 主攻撃の見積もりに実績の比を掛ける。 下の dFull (HP の帳簿の撃破までの見込み) の計算より前に入れる
+            if (v3.mainCorr && EffectiveWiringSkill != WiringSkill.Naive) st.mainCorr = _mcRatioNow;
             // [V3 hpLedger] 先のターンの 1 ターンの与ダメの見込み: 今の手を全部攻撃に挿した時の値を、 面の平均で均す
             if (v3.hpLedger && EffectiveWiringSkill != WiringSkill.Naive)
             {
@@ -1271,6 +1567,8 @@ namespace AutoTest
             // [計装 2026-11-10] 選んだ配線が防ぎ切りの規則の対象だったか (実際の配線の時だけ MutualWiringPlanPolicy が数える)
             OptimalUtility(in st, rolls, bestW, out var fbo);
             _lastFreeBlock = fbo.freeBlock && !fbo.killsNow; _lastKillsNow = fbo.killsNow; _lastExpTaken = fbo.taken;
+            _lastPredOld = fbo.dmgOld; _lastPredNew = fbo.dmgNew; _lastPredA = fbo.aCount; _lastPredUsed = fbo.dmgUsed;
+            _lastPredRaw = fbo.rawNew; _lastPredCritP = st.critP; _lastPredCritMul = st.critMulEff; _lastPredOutMul = st.outMul;
             return CombatSystem.WiringPlan.Of(bestW);
         }
 
@@ -1324,6 +1622,7 @@ namespace AutoTest
         private int[] MutualRerollPolicy(int[] dice, CombatSystem.MutualTurnTelegraph tele, int attempt)
         {
             if (dice == null || dice.Length == 0) return null;
+            RefreshMainCorr();   // [V3 mainCorr] リロールの効用 (配線の評価) も同じ比で見る
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             if (ctx == null) return null;
             bool heavyNow = v3.superDefense && IsHeavyAttack(dice, tele.enemyAttackValue + tele.secondaryAttackValue,

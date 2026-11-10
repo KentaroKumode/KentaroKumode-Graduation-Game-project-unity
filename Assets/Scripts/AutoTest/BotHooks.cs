@@ -20,6 +20,15 @@ namespace AutoTest
         /// <para>0 にすると旧来の「ステータスだけ」に戻る。 <b>暫定値・要測定</b>。</para></summary>
         private const float LearnedWeaponWeight = 6.0f;
 
+        /// <summary>[2026-11-10] 軸に寄せる方策 (AutoRunner.buyAxisFocus)。 空 = 無効。 開幕の品の選択と挑戦カードで、 この軸を優先する。</summary>
+        public static string AxisFocus = "";
+        /// <summary>軸に寄せる加点 (序列の段の数・× StepPerTier)。</summary>
+        public static int AxisFocusBonus = 1;
+
+        private static bool IsFocusItem(string id)
+            => !string.IsNullOrEmpty(AxisFocus) && !string.IsNullOrEmpty(id)
+            && ItemSystem.ItemDatabase.Instance?.GetItem(id)?.axis == AxisFocus;
+
         public static void Install()
         {
             GameHooks.BotDriving = true;
@@ -53,6 +62,7 @@ namespace AutoTest
                     _ => null,
                 };
                 float score = axis != null ? ItemSystem.PassiveSkills.AxisRules.Count(run, axis) : 1f;
+                if (axis != null && !string.IsNullOrEmpty(AxisFocus) && axis == AxisFocus) score += 1000f;   // [2026-11-10] 軸に寄せる方策
                 if (score > bestScore) { bestScore = score; best = i; }
             }
             return best;
@@ -71,6 +81,7 @@ namespace AutoTest
             for (int i = 0; i < offers.Count; i++)
             {
                 float sc = LearnedPriorityProvider.BuyScore(offers[i]);
+                if (IsFocusItem(offers[i])) sc += AxisFocusBonus * LearnedPriorityProvider.StepPerTier;   // [2026-11-10] 軸に寄せる方策
                 if (sc > bestScore) { bestScore = sc; best = i; }
             }
             return best;

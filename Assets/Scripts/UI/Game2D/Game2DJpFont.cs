@@ -56,7 +56,10 @@ namespace UI.Game2D
         }
 
         /// <summary>1 行を描く (改行しない)。 戻り値 = 描いた幅。</summary>
-        public static int Draw(KitPix p, string s, int x, int y, Color32 c)
+        public static int Draw(KitPix p, string s, int x, int y, Color32 c) => Draw((px, py) => p.Set(px, py, c), s, x, y);
+
+        /// <summary>1 行を描く。 点は put(x, y) で打つ (KitPix 以外の作図面 ── 戦闘の演出・地図 ── から使う・2026-11-11)。 戻り値 = 描いた幅。</summary>
+        public static int Draw(System.Action<int, int> put, string s, int x, int y)
         {
             if (string.IsNullOrEmpty(s)) return 0;
             int cx = x;
@@ -67,7 +70,7 @@ namespace UI.Game2D
                     for (int r = 0; r < g.rows.Length; r++)
                     {
                         int bits = g.rows[r]; if (bits == 0) continue;
-                        for (int i = 0; i < 16; i++) if ((bits >> (15 - i) & 1) != 0) p.Set(cx + i, y + r, c);
+                        for (int i = 0; i < 16; i++) if ((bits >> (15 - i) & 1) != 0) put(cx + i, y + r);
                     }
                     cx += g.adv;
                 }

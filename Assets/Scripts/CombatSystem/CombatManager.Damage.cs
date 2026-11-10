@@ -182,12 +182,17 @@ namespace CombatSystem
             //   (同種のデバフを足すときは重ねがけせず厳しい方 1 つを採ること ── 乗算は 0.756 まで落ちた。)
             if (CombatStats.DiagWinAttack) CombatStats.DamageStages[7] += totalDmg;   // 段 G
 
+            // [測定用の物差し 2026-11-10] 主攻撃の倍率 (既定 1 = 素通し・製品では使わない)。 この関数の呼び手はプレイヤーの主攻撃だけ (Turn.cs)。
+            totalDmg = EnemyHpLedger.ProbeMain(totalDmg);
+
             // 敵側のダメージ軽減パッシブを発火（前後で ctx.finalDamage と totalDmg を同期し、
             // 敵パッシブ（AshArmor 等やシュヴァリエのシールド経由処理）が
             // 実際の与ダメに反映されるようにする）
             ctx.finalDamage = totalDmg;
+            int ledgerBeforeRed = totalDmg;   // [計装] 敵の軽減パッシブで削られた量
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnPreReceiveDamage);
             totalDmg = System.Math.Max(0, ctx.finalDamage);
+            EnemyHpLedger.NoteMainEnemyReduction(ledgerBeforeRed, totalDmg);
             if (CombatStats.DiagWinAttack) CombatStats.DamageStages[8] += totalDmg;   // 段 H
 
             // 敵の防御値 (ADR-0013)。 敵の軽減パッシブ (灰塵の鎧 等) の後、 倍率が全部乗った最終値に掛ける。
@@ -210,6 +215,7 @@ namespace CombatSystem
                 {
                     int beforeDef = totalDmg;
                     totalDmg = DefenseFormula.Apply(totalDmg, effDef);
+                    EnemyHpLedger.NoteMainDefense(beforeDef, totalDmg);   // [計装] 防御値で削られた量
                     Debug.Log($"[敵の防御] 防御{ctx.enemyDefense}−貫通{ctx.playerArmorPen}→{effDef}"
                             + $"（軽減{DefenseFormula.Reduction(effDef):P0}）{beforeDef}→{totalDmg}");
                 }

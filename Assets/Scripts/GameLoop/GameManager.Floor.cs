@@ -289,9 +289,12 @@ namespace GameLoop
                             bool got;
                             if (data.category == ItemCategory.Consumable)
                                 got = Run.TryAddConsumable(id);
+                            else if (Loadout.IsWeapon(id)) { Loadout.Gain(Run, id); got = true; }   // 武器は 1 本だけ (入れ替えるかを聞く)
                             else
+                            {
                                 got = ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
-                            if (got) Loadout.TryAutoEquip(Run, id);
+                                if (got) Loadout.TryAutoEquip(Run, id);
+                            }
                             loot++;
                             if (got) RunStats.RobberyLootApplied++;
                         }
@@ -682,8 +685,7 @@ namespace GameLoop
             }
 
             ItemSystem.Helpers.PassiveAddHelper.RemoveAt(Run, idx);
-            ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, resultId);
-            Loadout.TryAutoEquip(Run, resultId);
+            Loadout.Gain(Run, resultId);
             var rd = db?.GetItem(resultId);
             Log($"交換マス: 「{given.displayName}」を渡し「{(rd != null ? rd.displayName : resultId)}」を入手");
             SetPhase(GamePhase.MapNavigation);

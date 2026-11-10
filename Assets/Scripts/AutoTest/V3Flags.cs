@@ -86,5 +86,15 @@ namespace AutoTest
         public bool tierGateRaw;
         /// <summary>[診断] 順位は丸める前の値で決める (足切りだけ丸める)。</summary>
         public bool tierOrderRaw;
+        /// <summary>[2026-11-10] 配線の効用の主攻撃に与ダメの倍率を読む (攻撃+N・与ダメ%・会心の期待値・端子調律・〈電流〉の②・最低保証・狂暴化)。
+        /// −1 = 技量に従う (Super で ON・それ以外は OFF) / 0 = OFF (旧の式: 素の攻撃力 + 攻撃の出目 − 防御) / 1 = ON。
+        /// 実効値は <see cref="AutoRunner.ReadOutgoingMultEffective"/>。 配線の後で積まれる分 (OnWired・OnPreDealDamage・OnCriticalCheck・追撃・役・脆弱) は入らない。</summary>
+        public int readOutgoingMult = -1;
+        /// <summary>[2026-11-10 A/B] 配線の効用の主攻撃の見積もりに、 実績の比 (実際に入った主攻撃 ÷ 配線時点の見積もり) を掛ける。
+        /// 比は同じ戦闘 (ヴェスカの連戦は通算) の攻撃したターンの累計 ÷ 累計。 その戦闘に実績が無いうちは、 そのランの直前までの戦闘の累計の比 (無ければ 1)。
+        /// 配線の後で積まれる分 (OnWired の攻撃加算・OnPreDealDamage の倍率・会心・役の追撃) を、 式で読まずに実績で埋める。
+        /// 掛けるのは主攻撃の項だけ (黎明・〈虚空〉の刻み・特殊端子の寄与には掛けない)。 hpLedger の「撃破までの見込み」(dFull) にも流れる。
+        /// 実績は CombatStats.DamageBreakdown[7] の増分 (predTrace と同じ「実際」)。 ランをまたいで持ち越さない。</summary>
+        public bool mainCorr;
     }
 }

@@ -73,10 +73,12 @@ namespace UI.Game2D
             // 画面の外で所持金・HP が変わった時も描き直す (買える品の明暗・副題の数字)
             int coins = gm.Run != null ? gm.Run.coins : 0, hp = gm.Run != null ? gm.Run.playerHP : 0;
             if (coins != _lastCoins || hp != _lastHp) { _lastCoins = coins; _lastHp = hp; if (_open) _dirty = true; }
-            int pend = gm.PendingStartingPassiveChoices.Count + gm.PendingChallengeTiers.Count * 100;
+            int pend = gm.PendingStartingPassiveChoices.Count + gm.PendingChallengeTiers.Count * 100 + (gm.Run != null ? gm.Run.pendingWeaponIds.Count * 10000 : 0);
             if (pend != _lastPending) { _lastPending = pend; _dirty = true; }
             if (!_dirty) return;
-            if (Game2DLoadingScreen.Blocking) return;      // ロード画面の間は出さない (終わってから出す・_dirty は残す)
+            // ロード画面の間は出さない (終わってから出す・_dirty は残す)。 開いている窓も閉じる ──
+            //   「層を抜けた」の窓は押した直後にロード画面が始まるので、 閉じないとロード画面の上に残り続けていた (2026-11-11)
+            if (Game2DLoadingScreen.Blocking) { CloseIfOpen(); return; }
             _dirty = false;
             var def = Build(gm, ph);
             if (def == null) { CloseIfOpen(); return; }
@@ -97,6 +99,7 @@ namespace UI.Game2D
         private ScreenDef Build(GameManager gm, GameManager.GamePhase ph)
         {
             var run = gm.Run;
+            if (run != null && run.pendingWeaponIds.Count > 0 && ph != GameManager.GamePhase.Combat && ph != GameManager.GamePhase.BattleResult) return WeaponSwap(gm);
             if (ph == GameManager.GamePhase.MapNavigation && gm.PendingStartingPassiveChoices.Count > 0) return StartingPick(gm);
             if (ph == GameManager.GamePhase.MapNavigation && gm.PendingChallengeTiers.Count > 0) return ChallengePick(gm);
             switch (ph)
@@ -302,7 +305,7 @@ namespace UI.Game2D
         private ScreenDef ShopBuy(GameManager gm)
         {
             var run = gm.Run; var sm = ShopManager.Instance; var inv = sm != null ? sm.Current : null;
-            var d = New(_shopSupply ? "ショップ ― 補給" : "ショップ", "所持金 " + run.coins + "G  物資 " + run.provision + "/" + run.provisionCap, 460); d.cols = 2;
+            var d = New(_shopSupply ? "ショップ ― 補給" : "ショップ", "所持金 " + run.coins + "G  物資 " + run.provision + "/" + run.provisionCap + "  武器 " + WeaponLabel(run.equippedWeaponId), 460); d.cols = 2;
             int n = 0;
             if (inv != null && !_shopSupply)
             {
@@ -310,11 +313,13 @@ namespace UI.Game2D
                 {
                     var s = inv.slots[i];
                     int price = s.kind == ShopSlotKind.WeaponMaterial ? inv.CurrentMaterialPrice : s.price;
+                    int tradeIn = sm.WeaponTradeIn(i, run); price = Mathf.Max(0, price - tradeIn);      // 武器の乗り換えは差額
                     bool sold = s.kind != ShopSlotKind.WeaponMaterial && s.sold;
                     d.Items.Add(new ModalItem
                     {
-                        name = SlotName(s), desc = SlotDesc(s), icon = SlotIcon(s), rarity = SlotRarity(s),
-                        value = sold ? "売切" : price + "G",
+                        name = SlotName(s), desc = tradeIn > 0 ? SlotDesc(s) + "\n※ 武器は 1 本だけ。 装備中の「" + WeaponLabel(run.equippedWeaponId) + "」を " + tradeIn + "G で下取りに出し、 差額で乗り換える" : SlotDesc(s),
+                        icon = SlotIcon(s), rarity = SlotRarity(s),
+                        value = sold ? "売切" : tradeIn > 0 ? "差額 " + price + "G" : price + "G",
                         disabled = sold || price > run.coins,
                     });
                 }
@@ -338,10 +343,12 @@ namespace UI.Game2D
             d.buttons.Add(B("売る", "sellmode"));
             if (robOk) d.buttons.Add(B(_robArmed ? "本当に強盗" : "強盗", "rob"));
             d.buttons.Add(B("出る", "leave"));
-            d.footer = _robArmed ? "強盗: 商人と戦う。 勝てば棚の品を奪う。 以降の店は値段 ×" + ShopManager.RobberySurcharge.ToString("0.#") + "。 もう一度押すと実行" : "品を選んで「買う」";
+            d.footer = _robArmed ? "強盗: 商人と戦う。 勝てば棚の品を奪う。 以降の店は値段 ×" + ShopManager.RobberySurcharge.ToString("0.#") + "。 もう一度押すと実行"
+                     : _weaponArmed >= 0 ? "武器の乗り換え: 「" + WeaponLabel(run.equippedWeaponId) + "」を下取りに出す。 もう一度「買う」で買う" : "品を選んで「買う」";
             d.onAction = (a, sel) =>
             {
                 if (a != "rob") _robArmed = false;
+                int armed = _weaponArmed; if (a != "buy") _weaponArmed = -1;
                 switch (a)
                 {
                     case "buy":
@@ -349,6 +356,11 @@ namespace UI.Game2D
                         if (sel == packRow) { if (sm != null && sm.TryBuyProvisionPack(run)) Game2DSfx.Play("ui_confirm"); else modal.ShowToast(run.provision >= run.provisionCap ? "物資は満タン" : "買えない (所持金が足りない・品切れ)"); break; }
                         if (sel == lureRow) { if (sm != null && sm.TryBuyLure(run)) Game2DSfx.Play("ui_confirm"); else modal.ShowToast("買えない (所持金が足りない・持ちきれない)"); break; }
                         if (_shopSupply) break;
+                        // 武器は 1 本だけ: 別の武器を持っている時は、 1 度目の「買う」で入れ替えの警告を出し、 2 度目で買う
+                        if (inv != null && sel >= 0 && sel < inv.slots.Count && inv.slots[sel].kind == ShopSlotKind.Weapon && !inv.slots[sel].sold
+                            && HoldsOtherWeapon(run, inv.slots[sel].itemId) && armed != sel)
+                        { _weaponArmed = sel; modal.ShowToast("「" + WeaponLabel(run.equippedWeaponId) + "」を下取りに出して乗り換える"); break; }
+                        _weaponArmed = -1;
                         int before = run.coins; gm.ShopBuy(sel);
                         if (run.coins == before && sel >= 0 && inv != null && sel < inv.slots.Count && !inv.slots[sel].sold) modal.ShowToast("買えない (所持金が足りない・売り切れ)");
                         else Game2DSfx.Play("ui_confirm");
@@ -362,6 +374,39 @@ namespace UI.Game2D
                 }
                 Refresh();
             };
+            return d;
+        }
+
+        private int _weaponArmed = -1;      // 入れ替えの警告を出した武器の行 (もう一度「買う」で買う)
+
+        private static bool HoldsOtherWeapon(RunState run, string id) => run != null && !string.IsNullOrEmpty(run.equippedWeaponId) && run.equippedWeaponId != id;
+
+        private static string WeaponLabel(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return "なし";
+            var w = ItemDatabase.Instance?.GetItem(id);
+            return w != null && !string.IsNullOrEmpty(w.displayName) ? w.displayName : id;
+        }
+
+        private static string WeaponLine(RunState run, string id, bool equipped)
+        {
+            var w = string.IsNullOrEmpty(id) ? null : ItemDatabase.Instance?.GetItem(id);
+            if (w == null) return id;
+            string plus = equipped && run.weaponPlus > 0 ? " +" + run.weaponPlus : "";
+            return "攻撃 " + w.attackPower + plus + "  会心 " + w.critRatePct + "%\n" + w.description;
+        }
+
+        /// <summary>武器の入れ替え (武器は 1 本だけ・2026-11-11)。 2 本目の武器を手に入れた時に、 どの場面でも先に聞く。</summary>
+        private ScreenDef WeaponSwap(GameManager gm)
+        {
+            var run = gm.Run; string cur = run.equippedWeaponId, next = run.pendingWeaponIds[0];
+            var d = New("武器の入れ替え", "武器は 1 本しか持てない");
+            d.Items.Add(new ModalItem { name = "装備中: " + WeaponLabel(cur), desc = WeaponLine(run, cur, true), icon = cur });
+            d.Items.Add(new ModalItem { name = "手に入れた: " + WeaponLabel(next), desc = WeaponLine(run, next, false), icon = next });
+            d.buttons.Add(B("入れ替える", "swap", true));
+            d.buttons.Add(B("今のままにする", "keep"));
+            d.footer = "入れ替えると「" + WeaponLabel(cur) + "」は手放す。 今のままにすると「" + WeaponLabel(next) + "」は置いていく";
+            d.onAction = (a, _) => { Loadout.ResolvePendingWeapon(run, a == "swap"); Game2DSfx.Play("ui_confirm"); Refresh(); };
             return d;
         }
 

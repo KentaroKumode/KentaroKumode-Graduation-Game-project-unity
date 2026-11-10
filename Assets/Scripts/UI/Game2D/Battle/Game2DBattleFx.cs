@@ -86,6 +86,10 @@ namespace UI.Game2D.Battle
 
         // ── 公開 API ──
 
+        /// <summary>敵の周りに出す印 (<see cref="Game2DBattleSim"/> が毎フレーム書く)。 intent: 0 = 無し / 1 = 攻撃 / 2 = 大技。</summary>
+        public struct Marks { public int intent, atk, poison, bleed; public bool guard; }
+        public Marks marks;
+
         /// <summary>戦闘の流れ (Game2DBattleSim) が操作を握っている間 true。 試験用のキー (Space・←→) は効かなくなる。</summary>
         public bool SimDriven;
         public int WeaponIndex { get => _wi; set => _wi = Mathf.Clamp(value, 0, Weapons.Length - 1); }
@@ -489,10 +493,11 @@ namespace UI.Game2D.Battle
                         float dx = (x - W / 2f) / 240f, dy = (y - H / 2f) / 135f, d = Mathf.Sqrt(dx * dx + dy * dy), lv = Cl((d - 0.55f) / 0.7f, 0, 1) * _flashR * 14;
                         if (lv > BattleCanvas.Bayer[(y & 3) * 4 + (x & 3)]) _c.Put(x, y, new Col(170, 24, 12), 0.7f);      // 被弾の赤い縁 (網点)
                     }
-            foreach (var d in _dmgs) { float u = d.t / 1.2f, y = d.y - Mathf.Round(Mathf.Min(1, u * 1.8f) * 20); if (u < 1f) Text35("-" + d.v, Mathf.RoundToInt(d.x), Mathf.RoundToInt(y), u < 0.12f ? 5 : 4, d.c, 1); }
+            if (SimDriven && (_phase == Phase.Idle || _phase == Phase.Dot)) DrawMarks(EX + ep.dx, FLOOR + bob + ep.y);
+            foreach (var d in _dmgs) { float u = d.t / 1.2f, y = d.y - Mathf.Round(Mathf.Min(1, u * 1.8f) * 20); if (u < 1f) Text35("-" + d.v, Mathf.RoundToInt(d.x), Mathf.RoundToInt(y) - 4, 2, d.c, 1); }
             if (_phase == Phase.PAttack && _anim != null && _anim.fam == "dragon") DragonLine(_t);
             if (_flashW > 0) for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) if (_flashW * 16 > BattleCanvas.Bayer[(y & 3) * 4 + (x & 3)]) _c.Put(x, y, new Col(255, 248, 232), 0.4f, true);
-            if (_crit && _phase == Phase.PAttack && _t < 1.1f) Text35("CRITICAL!", W / 2, 70, 4, Hx("#ffb347"), 1);
+            if (_crit && _phase == Phase.PAttack && _t < 1.1f) Text35("CRITICAL!", W / 2, 66, 2, Hx("#ffb347"), 1);
             if (_phase == Phase.Intro && _introBlinds) Blinds(_t);
             if (sx != 0 || sy != 0)
             {
@@ -612,26 +617,74 @@ namespace UI.Game2D.Battle
             _fx.RemoveAll(f => !f.s.Draw(_c, f.t, f.x, f.y, f.add));
         }
 
+        // ── 敵の周りの印 (2026-11-11) ──
+        // 絵は 12×12 の手打ち (IconWork/intent_icons12/make12.py)。 Resources/Game2DIcons/*.png.bytes を読む (取り込みの設定に左右されない)。
+        private static readonly Dictionary<string, BSprite> _icons = new Dictionary<string, BSprite>();
+        private static BSprite Icon(string name)
+        {
+            if (_icons.TryGetValue(name, out var s)) return s;
+            var a = Resources.Load<TextAsset>("Game2DIcons/" + name + ".png");
+            if (a != null) { var t = new Texture2D(2, 2, TextureFormat.RGBA32, false); t.LoadImage(a.bytes); s = new BSprite(t); Destroy(t); }
+            else Debug.LogWarning("[Game2DBattleFx] Resources/Game2DIcons/" + name + " が無い");
+            return _icons[name] = s;
+        }
+
+        /// <summary>1 dot ずつ写す (拡縮・回転なし)。</summary>
+        private void Stamp(BSprite s, int x, int y)
+        {
+            if (s == null) return;
+            for (int j = 0; j < s.h; j++) for (int i = 0; i < s.w; i++)
+                {
+                    int k = (j * s.w + i) * 4; if (s.d[k + 3] < 128) continue;
+                    _c.Put(x + i, y + j, new Col(s.d[k], s.d[k + 1], s.d[k + 2]));
+                }
+        }
+
+        private static readonly Col MarkAtk = Col.Hex("#fff6e0"), MarkHeavy = Col.Hex("#ffb347"), MarkPoison = Col.Hex("#a6f06a"), MarkBleed = Col.Hex("#e04a50"), MarkBuff = Col.Hex("#8fc4ff");
+        private const int MarkGap = 4;
+
+        /// <summary>頭上 = 攻撃の予告 / 右下 = デバフ / 左下 = バフ。 cx・feet は敵の足もとの中心 (豆腐は幅 100・高さ 120)。</summary>
+        private void DrawMarks(float cx, float feet)
+        {
+            var m = marks; int x0 = Mathf.RoundToInt(cx), fe = Mathf.RoundToInt(feet);
+            if (m.intent > 0)
+            {
+                string v = m.atk.ToString(); int tw = Game2DJpFont.Width(v), w = 12 + 3 + tw, x = x0 - w / 2, y = fe - 120 - 18;
+                Stamp(Icon(m.intent == 2 ? "heavy" : "attack"), x, y);
+                Text35(v, x + 15, y, 1, m.intent == 2 ? MarkHeavy : MarkAtk, 0);
+            }
+            // 足もとの下と体の下の端は筐体の計器 (HP・物資・丸い窓) に隠れるので、 体の脇の計器より上に、 下から上へ積む (2026-11-11)
+            int dy = fe - 50, dx = x0 + 60;      // デバフ: 体の右下
+            if (m.poison > 0) { MarkItem("poison", m.poison, dx, dy, MarkPoison); dy -= 14; }
+            if (m.bleed > 0) { MarkItem("bleed", m.bleed, dx, dy, MarkBleed); dy -= 14; }
+            if (m.guard) { const string g = "構え"; int gw = Game2DJpFont.Width(g); Text35(g, x0 - 54 - gw, fe - 50, 1, MarkBuff, 0); }      // バフ: 体の左下 (構えは絵が無いので字)
+        }
+
+        private int MarkItem(string icon, int n, int x, int y, Col col)
+        {
+            Stamp(Icon(icon), x, y);
+            string s = n.ToString(); Text35(s, x + 14, y, 1, col, 0);
+            return x + 14 + Game2DJpFont.Width(s) + MarkGap;
+        }
+
         // ── 3×5 のドット字 (ダメージの数字と CRITICAL!) ──
         private static readonly Dictionary<char, string> F35 = new Dictionary<char, string>
         {
             {'0',"111101101101111"},{'1',"010110010010111"},{'2',"110001010100111"},{'3',"110001010001110"},{'4',"101101111001001"},{'5',"111100110001110"},{'6',"011100111101111"},
             {'7',"111001010010010"},{'8',"111101111101111"},{'9',"111101111001110"},{'-',"000000111000000"},{'!',"010010010000010"},
-            {'C',"011100100100011"},{'R',"110101110101101"},{'I',"111010010010111"},{'T',"111010010010010"},{'A',"010101111101101"},{'L',"100100100100111"},
+            {'C',"011100100100011"},{'G',"011100101101011"},{'U',"101101101101111"},{'D',"110101101101110"},{'R',"110101110101101"},{'I',"111010010010111"},{'T',"111010010010010"},{'A',"010101111101101"},{'L',"100100100100111"},
         };
 
-        /// <summary>3×5 の字を scale 倍で打つ (align: 0 = 左 / 1 = 中央)。 影つき。</summary>
+        /// <summary>字を scale 倍のドットで打つ (既定のフォント・GameFont・2026-11-11 に旧 3×5 の字から変更)。 align: 0 = 左 / 1 = 中央。 影つき。
+        /// scale は整数倍 (1 dot を scale×scale の四角で打つ・補間しない)。</summary>
         private void Text35(string s, int x, int y, int scale, Col col, int align)
         {
-            int w = (s.Length * 4 - 1) * scale; if (align == 1) x -= w / 2;
+            scale = Mathf.Max(1, scale);
+            int w = Game2DJpFont.Width(s) * scale; if (align == 1) x -= w / 2;
             for (int pass = 0; pass < 2; pass++)
             {
-                int ox = pass == 0 ? 1 : 0, oy = pass == 0 ? 1 : 0; var cc = pass == 0 ? new Col(0, 0, 0) : col;
-                for (int k = 0; k < s.Length; k++)
-                {
-                    if (!F35.TryGetValue(s[k], out var g)) continue;
-                    for (int i = 0; i < 15; i++) if (g[i] == '1') _c.Rect(x + k * 4 * scale + (i % 3) * scale + ox, y + (i / 3) * scale + oy, scale, scale, cc);
-                }
+                int o = pass == 0 ? Mathf.Max(1, scale / 2) : 0; var cc = pass == 0 ? new Col(0, 0, 0) : col;
+                Game2DJpFont.Draw((px, py) => _c.Rect(x + (px - x) * scale + o, y + (py - y) * scale + o, scale, scale, cc), s, x, y);
             }
         }
 

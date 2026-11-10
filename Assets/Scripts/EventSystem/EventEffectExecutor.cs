@@ -199,7 +199,7 @@ namespace EventSystem
                     // カテゴリ未指定: パッシブ扱い（イベントで [固有名] 指定された場合）
                     if (!string.IsNullOrEmpty(eff.param))
                     {
-                        ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, eff.param);
+                        GameLoop.Loadout.Gain(run, eff.param);   // 武器なら 1 本だけ (入れ替えるかを聞く・2026-11-11)
                         result.log.Add($"アイテム獲得: {ResolveLabel(eff.param)}");
                         ApplyPassiveAcquisitionBonus(run, eff.param, result);
                     }

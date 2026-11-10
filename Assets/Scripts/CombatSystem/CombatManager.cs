@@ -490,6 +490,8 @@ namespace CombatSystem
                  && enemy.id.StartsWith(GameLoop.BossIds.Layer7Prefix);
             if (_bd7F) System.Array.Copy(CombatStats.DamageBreakdown, _bdAtCombatStart, CombatStats.DamageBreakdown.Length);
             enemyHP = enemy.maxHP;
+            EnemyHpLedger.BeginForm();   // [計装 2026-11-10] 予約を持ち越さない
+            EnemyHpLedger.SourceScope = enemy.id != null && enemy.id.StartsWith(GameLoop.BossIds.Layer7Prefix) ? enemy.id : "他";
             // [計測] 7層連戦の 1 段目突入。 2 段目以降との比較の基準になる。
             if (enemy != null && enemy.id == "boss_layer7")
                 BossDmgDiag.PhaseEntry(enemy.id, this.playerMaxHP > 0 ? (double)playerHP / this.playerMaxHP : 1.0);
@@ -840,6 +842,13 @@ namespace CombatSystem
             }
 
             string prevName = currentEnemy?.displayName ?? "?";
+            // [計装 2026-11-10] 前の段の ctx を通した削り (ターン終了の品など) を、 HP を張り直す前に帳簿へ (enemyHP は変えない)
+            {
+                var ledgerCtx = PassiveSkillManager.Instance?.Context;
+                if (ledgerCtx != null) EnemyHpLedger.CtxSync(enemyHP, Math.Max(0, ledgerCtx.enemyCurrentHP));
+                EnemyHpLedger.BeginForm();
+                EnemyHpLedger.SourceScope = newEnemy.id != null && newEnemy.id.StartsWith(GameLoop.BossIds.Layer7Prefix) ? newEnemy.id : "他";
+            }
             currentEnemy = newEnemy;
             enemyHP = newEnemy.maxHP;
 

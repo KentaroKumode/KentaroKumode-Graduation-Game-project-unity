@@ -510,6 +510,10 @@ namespace GameLoop
         /// <summary>画面が入力を丸ごと受けている間 true (ロード画面など)。 この間はキー入力を全部止める。</summary>
         public static bool InputBlockedByScreen;
 
+        /// <summary>戦闘の結果 (BattleResult) を画面がまだ見せている間 true (2026-11-11)。 戦闘はとどめの攻撃を解決した瞬間に
+        /// BattleResult へ移るが、 画面はそこから攻撃・撃破の演出を流す。 この間に Space の確定が通ると、 演出の途中で報酬・層の終わりへ飛んでいた。</summary>
+        public static bool BattleResultHeldByScreen;
+
         void Update()
         {
             if (InputBlockedByScreen || ScreenUsedSpaceFrame == Time.frameCount && Input.GetKeyDown(KeyCode.Space)) return;
@@ -673,7 +677,7 @@ namespace GameLoop
                             CombatManager.Instance.ExecuteTurn();
                         break;
                     case GamePhase.BattleResult:
-                        ConfirmBattleResult();
+                        if (!BattleResultHeldByScreen) ConfirmBattleResult();
                         break;
                     case GamePhase.Reward:
                         ConfirmReward();

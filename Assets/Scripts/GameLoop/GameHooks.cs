@@ -35,6 +35,10 @@ namespace GameLoop
         /// <summary>[測定] 〈装甲〉の被ダメージ軽減: 何段ごとに −1 か (0 以下 = 差し替えない)。</summary>
         public static int ArmorFlatEveryOverride = 0;
 
+        /// <summary>[測定] 武器の段の上限 (0 = 上限なし・2026-11-11)。 強化 (休憩) と自動装備がこの段を超えない。
+        /// 段 4 の本当の価値 (段 3 のままヴェスカに着いたら) を測る口 (AutoRunner.weaponTierCap)。</summary>
+        public static int WeaponTierCap;
+
         /// <summary>[測定] 物資の素の上限を差し替える (0 = 差し替えない = <see cref="ProvisionRules.Max"/>)。 BOT が上限を振って測る口 (2026-11-09)。</summary>
         public static int ProvisionMaxOverride;
 

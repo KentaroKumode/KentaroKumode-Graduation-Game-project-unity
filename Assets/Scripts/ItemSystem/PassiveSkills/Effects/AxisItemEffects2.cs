@@ -179,7 +179,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>蓄電の小手: 充電 5 につき、 攻撃に挿した出目 +7% (2026-11-07: 旧 充電 10 につき +5%)。</summary>
+    /// <summary>蓄電の小手: 充電 5 につき、 与ダメージ +5% (2026-11-10: 旧 出目 +7%・2026-11-07 以前は充電 10 につき +5%)。</summary>
     public class StorageGauntlet : IPassiveSkillEffect
     {
         public string SkillId => "蓄電の小手";
@@ -187,18 +187,18 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             int n = ctx.GetCharge() / 5;
-            if (n > 0) ctx.AddAttackDicePct(0.07f * n);
+            if (n > 0) ctx.AddOutgoingPct(0.05f * n);
         }
     }
 
-    /// <summary>振り直しの撃鉄: リロールしたターン、 攻撃に挿した出目 +25% (2026-11-07: 旧 +10%)。</summary>
+    /// <summary>振り直しの撃鉄: リロールしたターン、 与ダメージ +15% (2026-11-10: 旧 出目 +25%)。</summary>
     public class RerollHammer : IPassiveSkillEffect
     {
         public string SkillId => "振り直しの撃鉄";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (ctx.rerollsThisTurn > 0) ctx.AddAttackDicePct(0.25f);
+            if (ctx.rerollsThisTurn > 0) ctx.AddOutgoingPct(0.15f);
         }
     }
 
@@ -213,7 +213,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>避雷の杭: 充電が 20 以上のターン、 充電を 5 使って攻撃に挿した出目 +25% (2026-11-07: 旧「上限のとき」)。</summary>
+    /// <summary>避雷の杭: 充電が 20 以上のターン、 充電を 5 使って与ダメージ +20% (2026-11-10: 旧 出目 +25%)。</summary>
     public class LightningStake : IPassiveSkillEffect
     {
         public string SkillId => "避雷の杭";
@@ -222,7 +222,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (ctx.GetCharge() < MinCharge) return;
-            if (ctx.ConsumeCharge(5)) ctx.AddAttackDicePct(0.25f);
+            if (ctx.ConsumeCharge(5)) ctx.AddOutgoingPct(0.20f);
         }
     }
 
@@ -274,14 +274,14 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>血の滴る刃先: 敵の出血が 10 以上の間、 攻撃に挿した出目 +10%。</summary>
+    /// <summary>血の滴る刃先: 敵の出血が 10 以上の間、 与ダメージ +10% (2026-11-10: 旧 出目 +10%)。</summary>
     public class DrippingEdge : IPassiveSkillEffect
     {
         public string SkillId => "血の滴る刃先";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (ctx.enemyBleedStacks >= 10) ctx.AddAttackDicePct(0.10f);
+            if (ctx.enemyBleedStacks >= 10) ctx.AddOutgoingPct(0.10f);
         }
     }
 
@@ -343,14 +343,23 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>腐葉土の袋: ターン開始時、 敵の毒が 10 未満なら毒 +3 (2026-11-07: 旧「0 なら」)。</summary>
+    /// <summary>腐葉土の袋: ターン開始時、 敵の毒が 10 未満なら毒 +3、 10 以上ならそのターンの攻撃 +3 (2026-11-10: 攻撃 +3 を追加・2026-11-07: 旧「0 なら」)。
+    /// 攻撃 +N は OnPostRoll で足す (ターン開始では配線前の値が上書きされる)。 ターン開始で決めた側を、 そのターンの番号で覚えておく。</summary>
     public class LeafMoldBag : IPassiveSkillEffect
     {
         public string SkillId => "腐葉土の袋";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
+        public const int Atk = 3;
+        private const string AtkTurnKey = "rw.leafMoldAtkTurn";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart, PassiveSkillTrigger.OnPostRoll };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (ctx.EnemyPoison < 10) Rw.Poison(ctx, 3);
+            if (t == PassiveSkillTrigger.OnTurnStart)
+            {
+                if (ctx.EnemyPoison < 10) Rw.Poison(ctx, 3);
+                else ctx.accumulatedValues[AtkTurnKey] = ctx.currentTurn;
+                return;
+            }
+            if ((int)ctx.GetAccumulated(AtkTurnKey) == ctx.currentTurn && ctx.currentTurn > 0) ctx.AddPlayerAttackOrDiceBonus(Atk);
         }
     }
 
@@ -418,7 +427,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>割れ盾の仕返し: シールドが割られた次のターン、 攻撃に挿した出目 +50% (2026-11-07: 旧 +30%)。</summary>
+    /// <summary>割れ盾の仕返し: シールドが割られた次のターン、 与ダメージ +30% (2026-11-10: 旧 出目 +50%)。</summary>
     public class BrokenShieldGrudge : IPassiveSkillEffect
     {
         public string SkillId => "割れ盾の仕返し";
@@ -427,7 +436,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (t == PassiveSkillTrigger.OnShieldBreak) { ctx.accumulatedValues[Key] = ctx.currentTurn; return; }
-            if (Ax2.LastTurn(ctx, Key)) ctx.AddAttackDicePct(0.50f);
+            if (Ax2.LastTurn(ctx, Key)) ctx.AddOutgoingPct(0.30f);
         }
     }
 }

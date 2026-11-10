@@ -38,6 +38,77 @@ namespace GameLoop
         private const int DefWeaponDiceMax = 6;
         private const int DefWeaponCrit = 1;
 
+        // ============================================================
+        //  武器は 1 本だけ (2026-11-11)
+        // ============================================================
+        //   旧: 武器もパッシブの一覧に何本でも入り、 期待値で黙って装備が切り替わっていた
+        //   (装備していない武器は何もしない)。 どれを装備しているか・買うとどうなるかが画面から読めなかった。
+        //   新: 持てる武器は装備中の 1 本だけ。 2 本目を手に入れる時は、 人が遊ぶ時は入れ替えるかを聞き
+        //   (RunState.pendingWeaponIds → 場面の画面が窓を出す)、 BOT は従来の期待値の判定で決めて、 負けた方を手放す。
+
+        /// <summary>人が遊んでいる (BOT・バッチでない)。 入れ替えを聞く・店の下取りをするのはこの時だけ。</summary>
+        public static bool HumanPlaying => !GameHooks.BotDriving && !UnityEngine.Application.isBatchMode;
+
+        public static bool IsWeapon(string itemId)
+        {
+            if (string.IsNullOrEmpty(itemId)) return false;
+            return ItemDatabase.Instance?.GetItem(itemId)?.category == ItemCategory.Weapon;
+        }
+
+        /// <summary>品を手に入れる (所持へ足す + 装備)。 <c>AddPassiveItem</c> + <see cref="TryAutoEquip"/> の組の代わりに呼ぶ。
+        /// 武器を持っている時の武器は、 confirmed (店で入れ替えを承知して買った) なら入れ替え、
+        /// 人が遊んでいる時は保留して聞き、 BOT は期待値で選んで 1 本に絞る。</summary>
+        public static void Gain(RunState run, string itemId, bool confirmed = false)
+        {
+            if (run == null || string.IsNullOrEmpty(itemId)) return;
+            if (!IsWeapon(itemId))
+            {
+                ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, itemId);
+                TryAutoEquip(run, itemId);
+                return;
+            }
+            if (string.IsNullOrEmpty(run.equippedWeaponId) || run.equippedWeaponId == itemId || confirmed)
+            {
+                SwapWeapon(run, itemId);
+                return;
+            }
+            if (!HumanPlaying)
+            {
+                ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, itemId);
+                TryAutoEquip(run, itemId);
+                KeepOnlyEquippedWeapon(run);
+                return;
+            }
+            run.pendingWeaponIds.Add(itemId);     // 人: 入れ替えるかを聞く (Game2DPhaseScreens が窓を出し、 ResolvePendingWeapon で決める)
+        }
+
+        /// <summary>武器を newId に替える。 今の武器は手放す (所持から外す)。</summary>
+        public static void SwapWeapon(RunState run, string newId)
+        {
+            if (run == null || string.IsNullOrEmpty(newId)) return;
+            if (!run.ownedPassiveItems.Contains(newId)) ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, newId);
+            if (run.equippedWeaponId != newId) run.weaponPlus = 0;   // 強化の +N は武器に付く: 入れ替えたら +0 (2026-11-11)
+            run.equippedWeaponId = newId;
+            KeepOnlyEquippedWeapon(run);
+        }
+
+        /// <summary>保留している武器の先頭を決める。 swap = 入れ替える / false = 新しい方を置いていく。</summary>
+        public static void ResolvePendingWeapon(RunState run, bool swap)
+        {
+            if (run == null || run.pendingWeaponIds.Count == 0) return;
+            string id = run.pendingWeaponIds[0]; run.pendingWeaponIds.RemoveAt(0);
+            if (swap) SwapWeapon(run, id);
+        }
+
+        /// <summary>所持の一覧に残す武器を、 装備中の 1 本だけにする。</summary>
+        public static void KeepOnlyEquippedWeapon(RunState run)
+        {
+            var owned = run.ownedPassiveItems; if (owned == null) return;
+            for (int i = owned.Count - 1; i >= 0; i--)
+                if (owned[i] != run.equippedWeaponId && IsWeapon(owned[i])) owned.RemoveAt(i);
+            if (!string.IsNullOrEmpty(run.equippedWeaponId) && !owned.Contains(run.equippedWeaponId)) owned.Add(run.equippedWeaponId);
+        }
+
         /// <summary>武器なら期待値が上なら、ダイスなら面平均が上なら自動装備する。</summary>
         public static void TryAutoEquip(RunState run, string itemId)
         {
@@ -47,6 +118,7 @@ namespace GameLoop
 
             if (item.category == ItemCategory.Weapon && item.hasWeaponStats && item.weaponDice != null)
             {
+                if (GameHooks.WeaponTierCap > 0 && item.tier > GameHooks.WeaponTierCap) return;   // [測定] 段の上限 (2026-11-11)
                 // 計測モード: 家系の乗り換えを一切させない (WouldUpgrade と同じ判定をここにも置く
                 //   ── 装備は購入と別経路で走るので、 片方だけだと素通りする)
                 {
@@ -54,7 +126,7 @@ namespace GameLoop
                     if (LockWeaponFamily && cf != null && !SameLineage(cf, WeaponFamily(itemId))) return;
                 }
                 if (WeaponEV(item, run) > CurrentWeaponEV(run) + Eps)
-                    run.equippedWeaponId = itemId;
+                { run.equippedWeaponId = itemId; run.weaponPlus = 0; }   // 強化の +N は武器に付く: 入れ替えたら +0 (2026-11-11)
             }
             else if (item.category == ItemCategory.Dice && item.diceFaces != null && item.diceFaces.Length > 0)
             {

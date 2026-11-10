@@ -18,9 +18,9 @@ namespace UI.Game2D
         public Game2DModal modal;
         [SerializeField] private RectTransform _top, _left, _right;      // _right は旧版の残り (航行アイテムの欄は廃止。 シーンに残っていれば隠す)
         private Texture2D _tt, _tl;
-        private static readonly RectInt TopR = new RectInt(96, 0, 104, 24), LeftR = new RectInt(0, 227, 100, 43);
+        private static readonly RectInt TopR = new RectInt(96, 0, 124, 30), LeftR = new RectInt(0, 219, 100, 51);      // 2026-11-11: 字を既定のフォント (高さ 12) にして広げた
         private int _hash = int.MinValue; private float _next; private float _e;
-        private static readonly RectInt WaitR = new RectInt(66, 4, 32, 16);      // 上の帯の中 (帯の左上が原点)
+        private static readonly RectInt WaitR = new RectInt(84, 4, 38, 22);      // 上の帯の中 (帯の左上が原点)
         private static bool _shown;
         private bool _invPassives; private int _invPage;
         /// <summary>所持品の窓の頁: 0 = 消耗品 / 1 = パッシブ / 2 = ステータス (2026-11-09)。 _invPassives は 1 の時だけ立つ。</summary>
@@ -185,7 +185,7 @@ namespace UI.Game2D
         }
 
         private static readonly string[] WeatherIcons = { "still", "fog", "still", "sand", "snow", "hail", "crumble", "sink" };      // WeatherKind: None, Fog, (2 = 旧 沈む静寂・空き), Sand, Snow, Hail, Crumble, Sink
-        private static readonly string[] WeatherNames = { "CALM", "FOG", "STILL", "SAND", "SNOW", "HAIL", "CRUMBLE", "SINK" };
+        private static readonly string[] WeatherNames = { "凪", "霧", "静寂", "砂", "雪", "雹", "崩れ", "沈み" };
 
         /// <summary>計器の台 (PixelLab のチップ台を 9 分割)。 無ければコード描画の板。</summary>
         private static void Plate(KitPix p, int x, int y, int w, int h, float mul = 1f)
@@ -205,20 +205,20 @@ namespace UI.Game2D
             if (_right != null) _right.gameObject.SetActive(false);
             // ── 上の帯 ──
             var p = new KitPix(TopR.width, TopR.height);
-            Plate(p, 0, 2, 100, 20);                                                                   // 天気 (気圧計の代わり)
+            Plate(p, 0, 2, 82, 28);                                                                    // 天気 (気圧計の代わり)
             string wn = weather >= 0 && weather < WeatherNames.Length ? WeatherNames[weather] : "W" + weather;
-            p.AnyIcon(weather >= 0 && weather < WeatherIcons.Length ? WeatherIcons[weather] : "still", 3, 3, 18, Game2DKit.Ink);
-            p.Text("WX", 24, 5, Game2DKit.Dim); p.Text(wn, 38, 5, weather == 0 ? Game2DKit.Ink : Game2DKit.Amber);
-            p.Text("NEXT", 24, 13, Game2DKit.Dim); p.Text("???", 44, 13, Game2DKit.Faint);                // 予報は物資の段階で精度が変わる (未接続)
+            p.AnyIcon(weather >= 0 && weather < WeatherIcons.Length ? WeatherIcons[weather] : "still", 3, 7, 18, Game2DKit.Ink);
+            p.Text("天気", 24, 3, Game2DKit.Dim); p.Text(wn, 48, 3, weather == 0 ? Game2DKit.Ink : Game2DKit.Amber);
+            p.Text("予報", 24, 16, Game2DKit.Dim); p.Text("???", 48, 16, Game2DKit.Faint);                // 予報は物資の段階で精度が変わる (未接続)
             // 待つ (その場で 1 手番)。 旧: 見本の気圧計
             if (Game2DKit.Tab != null) p.NineSlice(Game2DKit.Tab, 5, Game2DKit.Well, WaitR.x, WaitR.y, WaitR.width, WaitR.height); else p.Box(WaitR.x, WaitR.y, WaitR.width, WaitR.height, Game2DKit.Off, Game2DKit.Dark);
-            p.TextC("WAIT", WaitR, Game2DKit.Ink);
+            p.TextC("待つ", WaitR, Game2DKit.Ink);
             p.Apply(_tt);
             // ── 左下 (所持品: 消耗品とパッシブを 1 つの欄にまとめる。 状態異常は戦闘の表示) ──
             p = new KitPix(LeftR.width, LeftR.height);
             int total = cons + passives;
-            p.Text("ITEMS", 2, 0, Game2DKit.Dim); p.Text("X" + total, 90 - Game2DKit.TextWidth("X" + total) + 6, 0, Game2DKit.Ink);
-            for (int i = 0; i < 10; i++) Slot(p, (i % 5) * 19, 7 + (i / 5) * 19, 17, i < total, i < cons ? "flare" : "relic");
+            p.Text("所持品", 2, 0, Game2DKit.Dim); p.TextR(total + "個", 96, 0, Game2DKit.Ink);
+            for (int i = 0; i < 10; i++) Slot(p, (i % 5) * 19, 13 + (i / 5) * 19, 17, i < total, i < cons ? "flare" : "relic");
             p.Apply(_tl);
         }
     }

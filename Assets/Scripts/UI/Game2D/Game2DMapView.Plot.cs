@@ -184,7 +184,7 @@ namespace UI.Game2D
             {
                 var q = Sp(lay.pos[sim.FoeNode]);
                 Glyph(IcoFoe, q.x, q.y, _lc.red);
-                string st = sim.FoeFreezeTurns > 0 ? "HOLD" : sim.FoeMode == FoeMode.Chase ? "CHSE" : sim.FoeMode == FoeMode.Alert ? "ALRT" : "PTRL";
+                string st = sim.FoeFreezeTurns > 0 ? "停止" : sim.FoeMode == FoeMode.Chase ? "追跡" : sim.FoeMode == FoeMode.Alert ? "警戒" : "巡回";
                 Text(st, q.x, q.y - 6 * Pxs, _lc.red);
             }
             // 使い魔
@@ -270,7 +270,7 @@ namespace UI.Game2D
         }
 
         // ── 読み出し (左下: EXIT の方角・縮尺・自艦の格子位置・経過手番 / 上: 天候) ──
-        private static readonly string[] Compass = { "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW" };
+        private static readonly string[] Compass = { "北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西" };
 
         private void Readout(FreeMapSim sim)
         {
@@ -284,15 +284,15 @@ namespace UI.Game2D
             Rect((int)cx0, (int)(cy0 - Rr - 1), 1, 2, _lc.hi);                                     // 北の目印
             Rect(Mathf.RoundToInt(cx0 + Mathf.Cos(ang) * Rr) - 1, Mathf.RoundToInt(cy0 + Mathf.Sin(ang) * Rr) - 1, 3, 3, _lc.hot);
             for (int r = 1; r < Rr - 1; r++) Put(Mathf.RoundToInt(cx0 + Mathf.Cos(ang) * r), Mathf.RoundToInt(cy0 + Mathf.Sin(ang) * r), _lc.dim);   // 針
-            Text("EXIT " + Compass[sec], 96, H - 35, _lc.mid, Align.Left);
-            Text("SCALE X" + _zoom, 96, H - 22, _lc.dim, Align.Left);
+            Text("出口 " + Compass[sec], 96, H - 35, _lc.mid, Align.Left);
+            Text("縮尺 " + _zoom + "倍", 96, H - 22, _lc.dim, Align.Left);
             char col = (char)('A' + Mathf.Clamp(Mathf.FloorToInt((float)me.x / 2f), 0, 25));
             int row = Mathf.FloorToInt((float)me.y / 2f) + 1;
-            Text("OWN " + col + row, 96, H - 9, _lc.dim, Align.Left);
-            Text("T+" + Mathf.Min(999, sim.Turn).ToString("000"), 96 + 8 * 4 * Pxs, H - 9, _lc.dim, Align.Left);
+            Text("現在 " + col + row, 96, H - 9, _lc.dim, Align.Left);
+            Text("手番 " + Mathf.Min(999, sim.Turn).ToString("000"), 96 + 8 * 4 * Pxs, H - 9, _lc.dim, Align.Left);
 
-            string wx = sim.Weather != WeatherKind.None && !double.IsNegativeInfinity(sim.Front) ? WxCode(sim.Weather) : "CALM";
-            Text("WX " + wx, W - 8 - 89, 6, wx == "CALM" ? _lc.dim : _lc.hi, Align.Right);
+            bool calm = !(sim.Weather != WeatherKind.None && !double.IsNegativeInfinity(sim.Front));
+            Text("天気 " + (calm ? "凪" : sim.Weather.DisplayName()), W - 8 - 89, 8, calm ? _lc.dim : _lc.hi, Align.Right);
         }
 
         private static string WxCode(WeatherKind k)

@@ -59,6 +59,16 @@ namespace AutoTest
             // 停止則のラン内実績。 **ランを跨いで持ち越さない** ── 持ち越すと run i の判断が
             //   それ以前のランに依存し、 チャンク分割と逐次で結果が変わる (決定性違反)。
             _rerollYieldSum = 0f; _rerollYieldN = 0;
+            // [V3 mainCorr] 主攻撃の実績の比もランをまたいで持ち越さない
+            ResetMainCorrRun();
+            // [2026-11-10 試験] 黎明の溜める形の率を本体へ (ラン終了時に 0 へ戻す)
+            ItemSystem.PassiveSkills.Effects.Daybreak.NextAttackPctPerUnit = System.Math.Max(0f, daybreakNextAttackPct);
+            _daybreakApplied = ItemSystem.PassiveSkills.Effects.Daybreak.NextAttackPctPerUnit; _daybreakAppliedOnce = true;
+            // [測定用の物差し 2026-11-10] 主攻撃 / 毒・出血・爆発・止血帯の倍率を本体へ (ラン終了時に 1 へ戻す)
+            GameLoop.GameHooks.WeaponTierCap = System.Math.Max(0, weaponTierCap);   // [測定 2026-11-11] 武器の段の上限 (ラン終了時に 0 へ)
+            CombatSystem.EnemyHpLedger.ProbeMainMult = ProbeMultClamp(probeMainMult);
+            CombatSystem.EnemyHpLedger.ProbePassiveMult = ProbeMultClamp(probePassiveMult);
+            _probeMainApplied = CombatSystem.EnemyHpLedger.ProbeMainMult; _probePassiveApplied = CombatSystem.EnemyHpLedger.ProbePassiveMult; _probeAppliedOnce = true;
 
             GameLoop.GoldIncome.RunByDepthSource.Clear();
             _cur = new RunRec
@@ -223,6 +233,22 @@ namespace AutoTest
             //   1 つも消費しないので、 付与あり/なしで乱数列はずれない ＝ ペアが保たれる。
             if (!string.IsNullOrEmpty(_pendingGrantItemId) && gm.Run != null)
                 ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(gm.Run, _pendingGrantItemId);
+
+            // [計装 2026-11-10] 実際に入っていた整備パネルの段 (配点の指定が予算で切り詰められていないかを、 ランの記録で確かめる)
+            if (_cur != null)
+            {
+                var mst = MetaProgression.MetaProgressManager.Instance?.State;
+                if (mst != null)
+                {
+                    var parts = new List<string>();
+                    foreach (MetaProgression.MetaPanelKind k in Enum.GetValues(typeof(MetaProgression.MetaPanelKind)))
+                    {
+                        int rk = mst.GetRank(k);
+                        if (rk > 0) parts.Add(k + ":" + rk);
+                    }
+                    _cur.metaRanks = string.Join(",", parts);
+                }
+            }
 
             // [診断] 軸の品をまとめて開幕に配る (2026-11-07)。 軸に深く投資した構成が実際に強いかを因果で測る。
             if (!string.IsNullOrEmpty(axisPackageAxis) && gm.Run != null) GrantAxisPackage(index, gm.Run);
@@ -460,6 +486,12 @@ namespace AutoTest
                         bool ownsA = owned != null && ra != null && owned.Contains(ra);
                         bool ownsB = owned != null && rb != null && owned.Contains(rb);
                         int pick = (ownsA && !ownsB) ? 1 : 0;
+                        // [2026-11-10] 軸に寄せる方策: 片方だけが未所持の軸の品なら、 そちらを取る (両方/どちらも違うなら従来どおり)
+                        if (!string.IsNullOrEmpty(buyAxisFocus))
+                        {
+                            bool fa = !ownsA && IsAxisFocusItem(ra), fb = !ownsB && IsAxisFocusItem(rb);
+                            if (fa != fb) pick = fa ? 0 : 1;
+                        }
                         // Ultra: 2 択をそのまま委ねる。 sink 未接続なら pick は素通り。
                         pick = UltraOverrideChoice(gm,
                             AutoTest.Ultra.UltraDecisionPoint.RewardChoice,

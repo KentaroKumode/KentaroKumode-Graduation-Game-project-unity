@@ -24,6 +24,10 @@ namespace ItemSystem.PassiveSkills
         public static int BleedDecay(int stacks, int divisorBonus)
             => stacks <= 0 ? 0 : System.Math.Min(stacks, 1 + stacks / (BleedDecayDivisor + System.Math.Max(0, divisorBonus)));
 
+        /// <summary><b>偏重 (2026-11-10)。</b> 軸の品を持っている数 (心眼 / 血晶 / 瘴気 / 炉温 / 電流 / 堅牢) をまとめて呼ぶ語。
+        /// 順位を比べるのはこの 6 つ (金は入れない)。</summary>
+        public static readonly string[] Ranked = { Crit, Bleed, Poison, Heat, Charge, Shield };
+
         /// <summary>軸の品の数を数える (所持パッシブの axis)。 戦闘中は CombatContext.AxisDepth がこれを 1 度だけ呼ぶ。</summary>
         public static int Count(GameLoop.RunState run, string axis)
         {

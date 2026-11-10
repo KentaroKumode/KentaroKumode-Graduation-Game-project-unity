@@ -158,6 +158,7 @@ namespace GameLoop
                     //   (業物は 2026-08-10 に、 純／複合の分岐は 2026-09-21 に複合武器ごと廃止・GAME.md §24)。
                     string next = ChooseUpgradeTarget(run);
                     if (next == null) return false;
+                    if (GameHooks.WeaponTierCap > 0 && FamilyTierOf(next).tier > GameHooks.WeaponTierCap) return false;   // [測定] 段の上限
                     run.equippedWeaponId = next; run.weaponPlus = 0;
                 }
             }
@@ -165,11 +166,13 @@ namespace GameLoop
             {
                 string next = NextTierWeaponId(run.equippedWeaponId);
                 if (next == null) return false;
+                if (GameHooks.WeaponTierCap > 0 && FamilyTierOf(next).tier > GameHooks.WeaponTierCap) return false;   // [測定] 段の上限
                 run.equippedWeaponId = next;
             }
             if (!free) run.weaponMaterials -= cost;
             if (prevWeaponId != run.equippedWeaponId)
             {
+                Loadout.KeepOnlyEquippedWeapon(run);   // 武器は 1 本だけ: 前の段の武器を所持に残さない (2026-11-11)
                 OnWeaponTierUpgraded?.Invoke(prevWeaponId, run.equippedWeaponId);
                 // 行動台帳: Tier が上がったときだけ積む。 素材を注いだだけで
                 //   段が上がらない回は「山」ではないので載せない。

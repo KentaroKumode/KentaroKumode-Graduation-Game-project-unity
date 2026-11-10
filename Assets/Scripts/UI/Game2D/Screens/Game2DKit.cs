@@ -155,7 +155,8 @@ namespace UI.Game2D
             return Game2DMapView.F35.TryGetValue(ch, out g) || Extra.TryGetValue(ch, out g);
         }
 
-        public static int TextWidth(string s, int scale = 1) => s.Length == 0 ? 0 : s.Length * 4 * scale - scale;
+        /// <summary>字の幅 (既定のフォント・GameFont)。 scale は旧 3×5 の字の名残で、 今は使わない。</summary>
+        public static int TextWidth(string s, int scale = 1) => Game2DJpFont.Width(s);
     }
 
     /// <summary>1 枚のテクスチャへ dot を打つ道具 (上が先頭の座標)。</summary>
@@ -168,15 +169,10 @@ namespace UI.Game2D
         public void Rect(int x, int y, int rw, int rh, Color32 c) { for (int j = 0; j < rh; j++) for (int i = 0; i < rw; i++) Set(x + i, y + j, c); }
         public void Box(int x, int y, int rw, int rh, Color32 fill, Color32 edge) { Rect(x, y, rw, rh, edge); Rect(x + 1, y + 1, rw - 2, rh - 2, fill); }
 
-        public void Text(string s, int x, int y, Color32 c, int scale = 1)
-        {
-            for (int k = 0; k < s.Length; k++)
-            {
-                if (!Game2DKit.TryGlyph(s[k], out var g)) continue;
-                for (int i = 0; i < 15; i++) if (g[i] == '1') Rect(x + k * 4 * scale + (i % 3) * scale, y + (i / 3) * scale, scale, scale, c);
-            }
-        }
-        public void TextC(string s, RectInt r, Color32 c, int scale = 1) { Text(s, r.x + (r.width - Game2DKit.TextWidth(s, scale)) / 2, r.y + (r.height - 5 * scale) / 2, c, scale); }
+        /// <summary>字を描く (既定のフォント・GameFont・2026-11-11 に旧 3×5 の字から変更)。 (x, y) は字の枠 (高さ <see cref="Game2DJpFont.Cell"/>) の左上。
+        /// scale は旧 3×5 の字の名残で、 今は使わない (ドット字は拡大しない)。</summary>
+        public void Text(string s, int x, int y, Color32 c, int scale = 1) { if (!string.IsNullOrEmpty(s)) Game2DJpFont.Draw(this, s, x, y, c); }
+        public void TextC(string s, RectInt r, Color32 c, int scale = 1) { Text(s, r.x + (r.width - Game2DKit.TextWidth(s)) / 2, r.y + (r.height - Game2DJpFont.Cell) / 2 + 1, c); }
         public void TextR(string s, int right, int y, Color32 c, int scale = 1) { Text(s, right - Game2DKit.TextWidth(s, scale), y, c, scale); }
 
         /// <summary>幅 maxW (dot) に収まるよう、 空白で折り返して描く。 戻り値 = 描いた行数。</summary>

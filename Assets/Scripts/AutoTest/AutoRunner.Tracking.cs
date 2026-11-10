@@ -52,6 +52,7 @@ namespace AutoTest
             // チェーン swap で再エンカウントしたケース: 前フォームの戦績を 1 件確定させる。
             // (戦闘自体は継続するため OnBattleEnded は鳴らない → ここで明示記録しないと
             //  途中フォームが永遠に summary に出てこない)
+            SettleMainCorr();   // [V3 mainCorr] 前の段の最後のターンの実際を締める (段の記録に入れる)
             bool isChainSwap = cm != null && cm.IsCombatActive
                 && !string.IsNullOrEmpty(_pendingEnemyId);
             if (isChainSwap && _cur != null)
@@ -80,6 +81,9 @@ namespace AutoTest
                     //   damageDealt は段の HP を削り切ったから遷移が起きるので maxHP と等しい。
                     damageTaken = Math.Max(0, _pendingEnemyHpBefore - hpNow),
                     dmgParts = DmgPartsSinceStart(),
+                    hpLedger = LedgerSinceStart(), shownFloor = _pendingShownFloor, axisAtStart = _pendingAxis,
+                    mainPred = (float)System.Math.Round(_mfPred, 1), mainPredCorr = (float)System.Math.Round(_mfPredCorr, 1),
+                    mainActual = (float)System.Math.Round(_mfAct, 1), atkHist = (int[])_mfAtkHist.Clone(), dawnShots = _mfDawnShots.ToArray(),
                     enemyMaxHP = CombatSystem.EnemyDatabase.Get(_pendingEnemyId)?.maxHP ?? 0,
                     damageDealt = CombatSystem.EnemyDatabase.Get(_pendingEnemyId)?.maxHP ?? 0,
                     playerMaxHpEnd = (cm != null && cm.IsCombatActive)
@@ -105,14 +109,33 @@ namespace AutoTest
             // （Run.playerHP は戦闘終了まで更新されないため、これが無いと各フォームの被ダメが常に0と誤計測される）。
             _pendingEnemyHpBefore = (cm != null && cm.IsCombatActive) ? cm.PlayerHP : (gm?.Run?.playerHP ?? 0);
             System.Array.Copy(CombatSystem.CombatStats.DamageBreakdown, _bdAtStart, _bdAtStart.Length);
+            System.Array.Copy(CombatSystem.EnemyHpLedger.Cum, _ledAtStart, _ledAtStart.Length);
+            _pendingShownFloor = gm?.Run?.currentFloor ?? 0;
+            _pendingAxis = new int[ItemSystem.PassiveSkills.AxisRules.Ranked.Length];
+            for (int ai = 0; ai < _pendingAxis.Length; ai++)
+                _pendingAxis[ai] = ItemSystem.PassiveSkills.AxisRules.Count(gm?.Run, ItemSystem.PassiveSkills.AxisRules.Ranked[ai]);
+            FlushPredTrace();
             if (_pendingEnemyIsBoss) SnapState(1, _pendingEnemyHpBefore);
             _cwWin = _cwDraw = _cwLoss = _cwLossAbs = 0; // 新戦闘のターン内訳リセット
+            ResetMainCorrForm();
         }
 
         // ── [計装 2026-11-06] 与ダメの内訳 (戦闘ごと) ──
         //   出目の比重 = 攻撃の出目 ÷ (武器 + 出目 + 攻撃+N)。 与ダメ増加・会心はこの合計に後から掛かるので、 出目の比重を薄めるのは
         //   攻撃+N と、 倍率の外のダメージ (固定・追撃・毒・出血) だけ。 CombatStats.DamageBreakdown (全体の累計) の、 戦闘の開始からの差分。
         private readonly double[] _bdAtStart = new double[CombatSystem.CombatStats.DamageBreakdown.Length];
+        // [計装 2026-11-10] 経路別の入った量 (EnemyHpLedger) の段の開始時点・見せる層・偏重 6 軸の数
+        private readonly double[] _ledAtStart = new double[CombatSystem.EnemyHpLedger.Length];
+        private int _pendingShownFloor;
+        private int[] _pendingAxis;
+
+        private float[] LedgerSinceStart()
+        {
+            var c = CombatSystem.EnemyHpLedger.Cum;
+            var a = new float[c.Length];
+            for (int i = 0; i < a.Length; i++) a[i] = (float)System.Math.Round(c[i] - _ledAtStart[i], 3);
+            return a;
+        }
 
         /// <summary>[武器, 攻撃の出目, 攻撃+N, 主攻撃の与ダメ (倍率の後), 固定ダメ, 追撃, 攻撃+N のうち出目から来た分]。</summary>
         private int[] DmgPartsSinceStart()
@@ -142,6 +165,8 @@ namespace AutoTest
 
         private void OnBattleEnded(CombatResult r)
         {
+            FlushPredTrace();
+            SettleMainCorr();   // [V3 mainCorr] 最後のターンの実際を締める
             if (_cur == null) return;
             var gm = GameManager.Instance;
             var rec = new CombatRec
@@ -162,6 +187,9 @@ namespace AutoTest
                 damageDealt = r.damageDealt,
                 damageTaken = r.damageTaken,
                 dmgParts = DmgPartsSinceStart(),
+                hpLedger = LedgerSinceStart(), shownFloor = _pendingShownFloor, axisAtStart = _pendingAxis,
+                mainPred = (float)System.Math.Round(_mfPred, 1), mainPredCorr = (float)System.Math.Round(_mfPredCorr, 1),
+                mainActual = (float)System.Math.Round(_mfAct, 1), atkHist = (int[])_mfAtkHist.Clone(), dawnShots = _mfDawnShots.ToArray(),
                 fbDecided = _fbDecided, fbTurns = _fbTurns, fbKillTurns = _fbKillTurns,
                 enemyMaxHP = r.enemyMaxHP,
                 weaponId = gm?.Run?.equippedWeaponId ?? "",
@@ -474,6 +502,10 @@ namespace AutoTest
             _curLog.Enqueue($"[AutoRunner] === RUN {_cur.index} 終了: {_cur.band} ({_cur.bandLabel}) — {note} ===");
             _curAttachLog(_cur);
             _cur = null;
+            ItemSystem.PassiveSkills.Effects.Daybreak.NextAttackPctPerUnit = 0f;   // [2026-11-10 試験] ラン終了で既定へ戻す
+            GameLoop.GameHooks.WeaponTierCap = 0;               // [測定 2026-11-11] 武器の段の上限を外す
+            CombatSystem.EnemyHpLedger.ProbeMainMult = 1f;      // [測定用の物差し 2026-11-10] ラン終了で既定 (1) へ戻す
+            CombatSystem.EnemyHpLedger.ProbePassiveMult = 1f;
         }
 
         private static string ComputeRunDeterministicDigest(RunRec rec, GameLoop.RunState run)

@@ -50,7 +50,9 @@ namespace ItemSystem.PassiveItems
                 // [計装 2026-11-05] ctx は戦闘の外 (層に入る時など) では null
                 int hlFixed = ctx != null ? ctx.fixedDamageToEnemy : 0;
                 int hlPend = ctx != null ? (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.PendingEnemyDamageKey) : 0;
+                int ledHp = ctx != null ? ctx.enemyCurrentHP : 0;   // [計装 2026-11-10]
                 effect.Apply(ctx, run, combat);
+                if (ctx != null) CombatSystem.EnemyHpLedger.NoteCtxSource("品:" + id, ledHp, ctx.enemyCurrentHP);
                 CombatSystem.DmgSourceDiag.Attribute(id, dsBefore, ctx);
                 if (ctx != null)
                     CombatSystem.HpLossDiag.NoteSource(id, ctx.fixedDamageToEnemy - hlFixed,

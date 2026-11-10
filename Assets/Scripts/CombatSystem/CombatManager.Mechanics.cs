@@ -114,12 +114,10 @@ namespace CombatSystem
 
         /// <summary>プレイヤーの防御で敵の攻撃値を軽減する (ADR-0013)。 <b>ブロックの前</b>に掛け、 予告にもこの値を出す。
         /// <paramref name="pen"/> はその攻撃の主がプレイヤーの防御を削る固定値。 剣〈間合〉の打ち消し
-        /// (<c>enemyArmorPenNegate</c>) を先に引く。 斧〈血令〉持ちは防御を貫通へ換えているので掛けない
-        /// (リロール判断用の仮予告は換算より前に組まれるため、 ここでも見る)。</summary>
+        /// (<c>enemyArmorPenNegate</c>) を先に引く。 (旧: 斧〈血令〉持ちは防御を貫通へ換えていたので掛けなかった・2026-11-11 に〈血令〉を作り直して外した)</summary>
         public static int ApplyPlayerDefense(CombatContext ctx, int enemyAtk, int pen)
         {
             if (ctx == null || enemyAtk <= 0) return enemyAtk;
-            if (ItemSystem.PassiveSkills.Effects.BloodEdict.IsActive(ctx)) return enemyAtk;
             int effPen = Math.Max(0, pen - ctx.enemyArmorPenNegate);
             return DefenseFormula.Apply(enemyAtk, DefenseFormula.Effective(ctx.playerDefense, effPen));
         }
@@ -407,8 +405,9 @@ namespace CombatSystem
                         RaiseDotDamage(DotKind.Bleed, Math.Min(dmg, enemyHP));
                         RelicBloodOffering(Math.Min(dmg, enemyHP));
                         CombatStats.DamageBreakdown[21] += Math.Max(0, Math.Min(dmg, enemyHP));   // [計装] 出血
-                        HpLossDiag.Lose(ref enemyHP, dmg, "出血端子");
+                        HpLossDiag.Lose(ref enemyHP, EnemyHpLedger.ProbePassive(dmg), "出血端子");   // [測定用の物差し] 入る量だけ
                         ctx.enemyCurrentHP = enemyHP;
+                        EnemyHpLedger.CtxOverwritten();
                     }
                     Debug.Log($"[特殊端子/出血] +{sum} スタック (計 {ctx.enemyBleedStacks}) / 即時 {count} 回");
                     break;
@@ -605,6 +604,7 @@ namespace CombatSystem
             if (ctx == null) return;
             playerHP = ctx.playerCurrentHP;
             playerMaxHP = ctx.playerMaxHP;
+            EnemyHpLedger.CtxSync(enemyHP, ctx.enemyCurrentHP);   // [計装] ctx を通した削り・敵の自傷・回復
             enemyHP = ctx.enemyCurrentHP;
         }
 

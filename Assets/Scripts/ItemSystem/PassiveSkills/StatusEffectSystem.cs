@@ -29,11 +29,11 @@ namespace ItemSystem.PassiveSkills
         public StatusTick tickTiming;
         public int dotPerStack;          // 1tickのダメージ。dotScalesWithStacks=false なら固定値
         public bool dotScalesWithStacks; // true: dmg=stacks×dotPerStack（出血型） / false: dmg=dotPerStack（持続型・炎上）
-        /// <summary>0 より大きいと、 1 スタックあたりのダメージを対象の最大 HP の N‰ (千分率) にする (dotPerStack の代わり)。
-        /// dmg = floor(stacks × 最大HP × N / 1000)、 下限 1。 整数だけで計算する (Mono の float の揺れでダイジェストが割れないように
-        /// ── 0.5% を小数で持たず 5‰ で持つ理由)。</summary>
-        public int dotMaxHpPermillePerStack;
-        /// <summary>true なら <see cref="dotMaxHpPermillePerStack"/> の基準を最大 HP ではなく<b>現在 HP</b> にする (削るほど弱まる・とどめは主攻撃)。</summary>
+        /// <summary>0 より大きいと、 1 スタックあたりのダメージを対象の最大 HP の N/10000 (万分率・2026-11-10 に千分率から細かくした) にする (dotPerStack の代わり)。
+        /// dmg = floor(stacks × 最大HP × N / 10000)、 下限 1。 整数だけで計算する (Mono の float の揺れでダイジェストが割れないように
+        /// ── 0.05% を小数で持たず万分率 5 で持つ理由)。</summary>
+        public int dotMaxHpPer10kPerStack;
+        /// <summary>true なら <see cref="dotMaxHpPer10kPerStack"/> の基準を最大 HP ではなく<b>現在 HP</b> にする (削るほど弱まる・とどめは主攻撃)。</summary>
         public bool dotUsesCurrentHp;
         public int decayPerTurn;        // tick後に減らすスタック量
         /// <summary>true: ダメージを出した直後に、 残っているスタックを半分にする (切り捨て)。 decayPerTurn の代わり。</summary>
@@ -64,7 +64,7 @@ namespace ItemSystem.PassiveSkills
                 id = "poison",
                 target = StatusTarget.Enemy,
                 tickTiming = StatusTick.TurnStart,
-                dotMaxHpPermillePerStack = 1,   // 0.1%
+                dotMaxHpPer10kPerStack = 5,   // 0.05% (2026-11-10: 旧 0.1%)
                 dotUsesCurrentHp = false,
                 dotScalesWithStacks = true,
                 decayPerTurn = 0,

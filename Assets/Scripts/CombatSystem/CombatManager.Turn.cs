@@ -71,6 +71,7 @@ namespace CombatSystem
             ctx.playerCurrentHP = playerHP;
             ctx.playerMaxHP = playerMaxHP;
             ctx.enemyCurrentHP = enemyHP;
+            EnemyHpLedger.CtxOverwritten();   // [計装]
             ctx.enemyMaxHP = currentEnemy.maxHP;
 
             // ラストスタンド: **combatLethalThisTurn の確定より前**。 ここを後ろへ動かすと
@@ -264,6 +265,7 @@ namespace CombatSystem
             {
                 Debug.Log($"[解析演算] 回避 {ctx.enemyDodgeChance:P0} 成功 — 与ダメ {dealtDmg}+{dealtFixed} を無効化"
                         + " (次ターンは回避不能)");
+                EnemyHpLedger.NoteVescaDefense(0, dealtDmg, dealtFixed);   // [計装] 回避で消えた量
                 dealtDmg = 0; dealtFixed = 0;
                 ctx.enemyDodgeCooldown = 2;   // 今ターン分 + 次ターン分
                 return; // 回避したのでシールドは減らない
@@ -277,6 +279,7 @@ namespace CombatSystem
                 int beforeDmg = dealtDmg, beforeFixed = dealtFixed;
                 dealtDmg   = (dealtDmg   + 1) / 2;
                 dealtFixed = (dealtFixed + 1) / 2;
+                EnemyHpLedger.NoteVescaDefense(1, beforeDmg - dealtDmg, beforeFixed - dealtFixed);   // [計装] 半減で消えた量
                 Debug.Log($"[天与の盾] 与ダメ {beforeDmg}+{beforeFixed} → {dealtDmg}+{dealtFixed} (半減)");
             }
 
@@ -290,6 +293,7 @@ namespace CombatSystem
                 int takeF = Math.Min(ctx.vescaShield, dealtFixed);
                 dealtFixed -= takeF; ctx.vescaShield -= takeF; absorbed += takeF;
             }
+            EnemyHpLedger.NoteVescaDefense(2, take, absorbed - take);   // [計装] シールドに吸われた量 (主攻撃 / 固定ダメ枠)
             if (absorbed > 0)
             {
                 ctx.vescaShieldAbsorbedThisTurn += absorbed;
@@ -509,6 +513,7 @@ namespace CombatSystem
                 {
                     enemyHP += heal;
                     ctx.enemyCurrentHP = enemyHP;
+                    EnemyHpLedger.NoteHeal(heal); EnemyHpLedger.CtxOverwritten();   // [計装]
                     Debug.Log($"[CombatManager] フロアデバフ: 敵HP+{heal} ({enemyHP}/{currentEnemy.maxHP})");
                 }
             }
@@ -523,6 +528,7 @@ namespace CombatSystem
                     int heal = Math.Min(eMax - enemyHP, Math.Max(1, Mathf.CeilToInt(eMax * regen / 100f)));
                     enemyHP += heal;
                     ctx.enemyCurrentHP = enemyHP;
+                    EnemyHpLedger.NoteHeal(heal); EnemyHpLedger.CtxOverwritten();   // [計装]
                     Debug.Log($"[再生] 敵HP+{heal} ({enemyHP}/{eMax})");
                 }
                 float esh = MetaProgression.MetaDebuffApplicator.GetEnemyShieldPct();
@@ -664,8 +670,6 @@ namespace CombatSystem
             // パターン系パッシブ (ゾロ目/階段/全相異) + 合計確定
             psm.ProcessPostRoll(playerDice, enemyDice);
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnPostRoll);
-            // 斧〈血令〉: 防御を貫通へ換える。 防御の加算 (OnPostRoll) が全部済んだ後・予告より前でなければならない。
-            ItemSystem.PassiveSkills.Effects.BloodEdict.ConvertDefenseToPen(ctx);
 
             _fightPlayerRollSum += ctx.playerDiceTotal;
             _fightPlayerRollCount++;
@@ -1029,7 +1033,9 @@ namespace CombatSystem
                 int burstN = Math.Max(1, (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstCountKey));
                 int burstBonus = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstBonusKey);
                 int burstDmg = ItemSystem.PassiveSkills.Keywords.Kw.BurstBase(ctx) * burstN + burstBonus;
-                ctx.fixedDamageToEnemy += burstDmg;
+                // [測定用の物差し 2026-11-10] 入る量だけに掛ける (BurstAppliedDmgKey = 〈二度目の打金〉の元は素の量のまま)
+                int burstLanded = EnemyHpLedger.ProbePassive(burstDmg);
+                ctx.fixedDamageToEnemy += burstLanded;
                 ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.BurstCountKey] = 0;
                 ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.BurstBonusKey] = 0;
                 ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.BurstThisAttackKey] = 1;
@@ -1044,8 +1050,10 @@ namespace CombatSystem
                                .GetRinkaiCurrentHpPct(GameLoop.GameManager.Instance?.Run, ctx);
                 int relicBurst = rinPct > 0f && ctx.enemyCurrentHP > 0
                                ? Mathf.FloorToInt(ctx.enemyCurrentHP * rinPct) : 0;
+                relicBurst = EnemyHpLedger.ProbePassive(relicBurst);   // [測定用の物差し]
                 if (relicBurst > 0) ctx.fixedDamageToEnemy += relicBurst;
-                CombatStats.DamageBreakdown[22] += burstDmg + relicBurst;   // [計装] 臨界の爆発
+                CombatStats.DamageBreakdown[22] += burstLanded + relicBurst;   // [計装] 臨界の爆発
+                EnemyHpLedger.NoteBurstIntoFixed(burstLanded + relicBurst);
                 ctx.rinkaiBurstActive = false;
                 Debug.Log($"[臨界爆発] ×{burstN} 固定ダメ +{burstDmg}"
                     + (relicBurst > 0 ? $" ＋遺物 {relicBurst} (現在HP {ctx.enemyCurrentHP} の {rinPct:P0})" : ""));
@@ -1064,6 +1072,7 @@ namespace CombatSystem
             //   逃げるターンは固定ダメの枠も捨てる (atkBase の確定後に足された臨界爆発・品が預けた分を含む)。
             //   役の追撃も攻撃に付くものなので、 攻撃しないターンには乗せない。
             if (skipAttack) { dealtDmg = 0; isCrit = false; }
+            EnemyHpLedger.CommitMainMitigation(!skipAttack);   // [計装] 主攻撃の防御・敵の軽減で削った量
             if (isCrit) ctx.accumulatedValues[MetaProgression.Relics.RelicApplicator.ShinganCritKey] = 1f;   // 遺物 心眼 3 個 (次のターンの会心率)
             if (_fleeRequested) dealtFixed = 0;
             // 〈炉温〉の②: この攻撃の爆発に会心が乗る (爆発は固定ダメ枠なので、 会心の判定が済んだここで差分を足す)。
@@ -1071,9 +1080,12 @@ namespace CombatSystem
                 && ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstThisAttackKey) > 0)
             {
                 int burstApplied = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstAppliedDmgKey);
-                int critExtra = Mathf.FloorToInt(burstApplied * Math.Max(0f, ctx.criticalMultiplier - 1f));
+                // 2026-11-10: 爆発に乗る会心は会心倍率の半分 ((基礎 + 追加) / 2)。 倍率 3.0 なら爆発 ×1.5。
+                int critExtra = Mathf.FloorToInt(burstApplied * Math.Max(0f, ctx.criticalMultiplier / 2f - 1f));
+                critExtra = EnemyHpLedger.ProbePassive(critExtra);   // [測定用の物差し] 爆発の会心の上乗せも爆発の量
                 dealtFixed += critExtra;
                 CombatStats.DamageBreakdown[22] += critExtra;   // [計装] 臨界の爆発
+                EnemyHpLedger.NoteBurstIntoFixed(critExtra);
             }
             if (!skipAttack) ApplyRoleExtraDamage(ctx, ref dealtDmg, ref dealtFixed, roleOutcome);
             ctx.lastPlayerDamage = dealtDmg + dealtFixed;
@@ -1116,6 +1128,7 @@ namespace CombatSystem
             result.scratchDamage = 0; // scratch 廃止 (threat は基礎攻撃値へ転生)
 
             // 7層ヴェスカ: 〈解析演算〉の回避 → 〈真守/革の手甲/不落の城盾〉のシールド吸収 の順に通す。
+            EnemyHpLedger.NoteFixedPreDefense(dealtFixed);   // [計装] 固定ダメ枠の要求 (毒・爆発・その他に按分する)
             ApplyVescaDefense(ctx, ref dealtDmg, ref dealtFixed);
             result.totalDamage = dealtDmg;
             result.fixedDamage = dealtFixed;
@@ -1212,6 +1225,7 @@ namespace CombatSystem
                 && MetaProgression.MetaDebuffApplicator.EnemySurvivesFirstLethal())
             {
                 enemyHP = 1;
+                EnemyHpLedger.Restore(1);   // [計装] 踏みとどまりで戻した
                 metaLethalSurviveUsed = true;
                 Debug.Log("[CombatManager] メタデバフ Lv9 鋼の皮膚: 敵が初回致命傷で1HPに踏みとどまった");
             }
@@ -1240,7 +1254,7 @@ namespace CombatSystem
                 RaiseDotDamage(DotKind.Bleed, Math.Min(bleedDmg, enemyHP));      // 入った分だけ (攻撃で倒れていれば 0 = 鳴らない)
                 RelicBloodOffering(Math.Min(bleedDmg, enemyHP));
                 CombatStats.DamageBreakdown[21] += Math.Max(0, Math.Min(bleedDmg, enemyHP));   // [計装] 出血
-                HpLossDiag.Lose(ref enemyHP, bleedDmg, "出血");
+                HpLossDiag.Lose(ref enemyHP, EnemyHpLedger.ProbePassive(bleedDmg), "出血");   // [測定用の物差し] 入る量だけ
             }
 
             // --- 〈天与の才〉踏みとどまり (2026-08-16) ---
@@ -1256,9 +1270,12 @@ namespace CombatSystem
             //   この仕組みそのものが無意味になる。
             if (!roleOutcome.yachtFired)
             {
+                int hpBeforeClamp = enemyHP;
                 enemyHP = ItemSystem.PassiveSkills.Effects.DivineTalent.ClampToThreshold(
                     ctx, enemyHP, currentEnemy != null ? currentEnemy.maxHP : ctx.enemyMaxHP);
+                EnemyHpLedger.Restore(enemyHP - hpBeforeClamp);   // [計装] 踏みとどまりで戻した
                 ctx.enemyCurrentHP = enemyHP;
+                EnemyHpLedger.CtxOverwritten();
             }
 
             if (enemyHP == 0 && dealtDmg > 0)
@@ -1304,7 +1321,7 @@ namespace CombatSystem
                     int pd = ctx.TickPoisonOnce();
                     if (pd > 0)
                     {
-                        HpLossDiag.Lose(ref enemyHP, pd, "毒(廃庭の霧吹き)");
+                        HpLossDiag.Lose(ref enemyHP, EnemyHpLedger.ProbePassive(pd), "毒(廃庭の霧吹き)");   // [測定用の物差し] 入る量だけ
                         Debug.Log($"[廃庭の霧吹き] 敵の攻撃に合わせて毒 {pd} → 敵HP {enemyHP}");
                     }
                 }
@@ -1401,6 +1418,7 @@ namespace CombatSystem
                         int reflect = Math.Min(cap, takenDmg);
                         HpLossDiag.Lose(ref enemyHP, reflect, "反攻");
                         ctx.enemyCurrentHP = enemyHP;
+                        EnemyHpLedger.CtxOverwritten();
                         Debug.Log($"[特殊端子/反攻] 被ダメ{takenDmg} のうち {reflect} を反射");
                     }
                 }
@@ -1512,14 +1530,18 @@ namespace CombatSystem
             }
             if (!roleOutcome.yachtFired)
             {
+                int hpBeforeClamp2 = enemyHP;
                 enemyHP = ItemSystem.PassiveSkills.Effects.DivineTalent.ClampToThreshold(
                     ctx, enemyHP, currentEnemy != null ? currentEnemy.maxHP : ctx.enemyMaxHP);
+                EnemyHpLedger.Restore(enemyHP - hpBeforeClamp2);   // [計装] 踏みとどまりで戻した
             }
             ctx.enemyCurrentHP = enemyHP;
+            EnemyHpLedger.CtxOverwritten();
             ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.ResolvingKey] = 0;   // 以降は品が HP を直接減らす
 
             AccumulateRunCombatTotals(ctx);
             CombatStats.RecordTurn(ctx, attackDiceCount, blockDiceCount, chargeDiceCount, blockSum, enemyAtkValue);
+            EnemyHpLedger.NoteWiring(attackDiceCount, blockDiceCount, chargeDiceCount);   // [計装 2026-11-10] 戦闘ごとの配線の集計
 
             // --- 臨界メーター (Rinkai) 更新 ---
             //   攻撃端子の出目の合計を溜める。 閾値をまたいだ時点で爆発が決まり、 次の攻撃に乗る (Kw.AddHeat)。

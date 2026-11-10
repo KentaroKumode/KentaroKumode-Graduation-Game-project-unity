@@ -32,8 +32,19 @@ namespace AutoTest
         /// 呼ぶ側が「HP が減らなかった」を確かめてから足すこと。</summary>
         public static int DaybreakDamage(int enemyMaxHp, int enemyAtk)
         {
+            if (Daybreak.NextAttackPctPerUnit > 0f) return 0;   // [2026-11-10 試験] 溜めて次の主攻撃へ乗せる形のときは、 敵の HP を直接削らない
             int units = enemyAtk / Daybreak.PerUnit;
             return units > 0 ? Mathf.Max(1, enemyMaxHp * Daybreak.PctPerUnit * units / 100) : 0;
+        }
+
+        /// <summary>[2026-11-10 試験] 盾〈黎明〉の溜める形 (<see cref="Daybreak.NextAttackPctPerUnit"/> &gt; 0): HP が減らなかったターンに溜まる
+        /// 「次の主攻撃 +%」の価値を、 先のターンの 1 ターンの与ダメの見込み <paramref name="nextMain"/> × 溜まる率で見積もる。 溜める形でなければ 0。</summary>
+        public static int DaybreakDeferredValue(float nextMain, int enemyAtk)
+        {
+            float pct = Daybreak.NextAttackPctPerUnit;
+            int units = enemyAtk / Daybreak.PerUnit;
+            if (pct <= 0f || units <= 0 || nextMain <= 0f) return 0;
+            return Mathf.RoundToInt(nextMain * pct * units);
         }
 
         /// <summary>処刑人の烙印: 攻撃終了時の HP が最大の 20% 以下なら即死。 <paramref name="hpAfterHit"/> = 被弾後の HP。</summary>

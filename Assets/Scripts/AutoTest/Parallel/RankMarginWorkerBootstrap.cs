@@ -127,6 +127,7 @@ namespace AutoTest.ParallelSweep
                     runner.rankMarginWorkerSpec = spec;
                     runner.randomGrantRuns = _job.runs;
                     runner.BatchCompleted += OnGrantBatchCompleted;
+                    runner.RankMarginArmProgress += done => WriteProgress(done, "running");
                     GameLoop.LastStand.ResetStats();
                     _effectiveState = RankMarginWorkerConfig.DescribeEffective(runner);
                     WriteProgress(0, "started");

@@ -623,8 +623,8 @@ namespace ItemSystem.PassiveSkills.Effects
             //   「揃えば強い、 単体でも損しない」へ寄せる。 集めに行く動機はここで作る。
             //   (2026-09-05 に HP半減 → -10% へ緩和した経緯があり、 今回で全廃。)
             if (trigger == PassiveSkillTrigger.OnBattleStart) return;
-            // OnPostRoll: 攻撃に挿した出目 +10% (2026-11-06・旧 攻撃+1)
-            ctx.AddAttackDicePct(0.1f);
+            // OnPostRoll: 与ダメージ +10% (2026-11-10・旧 攻撃に挿した出目 +10%・その前は 攻撃+1)
+            ctx.AddOutgoingPct(0.1f);
         }
     }
 
@@ -645,9 +645,8 @@ namespace ItemSystem.PassiveSkills.Effects
             {
                 // 旧: 自他ダイス合計+5 (差分不変で「合計」参照系と相乗) / 新: 自攻撃+5 のみ
                 // (敵ダイス合計+5 は新モデルではロール勝負がないため機能喪失 = 廃止)
-                ctx.AddAttackDicePct(0.5f);   // 攻撃に挿した出目 +50% (2026-11-06・旧 攻撃+5)
-                if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
-                ctx.outgoingDamageMultiplier += 0.2f; // 与ダメ+20%（毎ターンリセット→再適用）
+                // 与ダメージ +40% (2026-11-10: 旧 出目 +50% と与ダメージ +20% を 1 本にまとめた・毎ターンリセット→再適用)
+                ctx.AddOutgoingPct(0.4f);
                 return;
             }
             // OnPreReceiveDamage: 被ダメ+20%（毎被弾イベントで都度乗る＝累積しない）
@@ -665,8 +664,8 @@ namespace ItemSystem.PassiveSkills.Effects
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            // 攻撃に挿した出目 +30% (2026-11-06・旧 攻撃+3)
-            ctx.AddAttackDicePct(0.3f);
+            // 与ダメージ +25% (2026-11-10・旧 攻撃に挿した出目 +30%・その前は 攻撃+3)
+            ctx.AddOutgoingPct(0.25f);
         }
     }
 
@@ -683,12 +682,12 @@ namespace ItemSystem.PassiveSkills.Effects
         /// 10G の LEGENDARY が無効果では買われず、 ペナルティを外した意味が消えるため、
         /// セット共通の書式 (ワルツ +1 / バレエ +3 / パソドブレ +5) に合わせて最小限の上振れを持たせる。
         /// <b>この値だけが今回の追加分</b>なので、 不要ならここを 0 にすれば元の「無効果」に戻る。</para></summary>
-        public const float AttackDicePct = 0.2f;   // 攻撃に挿した出目 +20% (2026-11-06・旧 攻撃+2)
+        public const float OutgoingPct = 0.2f;   // 与ダメージ +20% (2026-11-10・旧 攻撃に挿した出目 +20%・その前は 攻撃+2)
 
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
             if (trigger != PassiveSkillTrigger.OnPostRoll) return;
-            ctx.AddAttackDicePct(AttackDicePct);
+            ctx.AddOutgoingPct(OutgoingPct);
         }
     }
 
@@ -805,7 +804,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (ctx.enemyBleedStacks <= 0 || ctx.enemyCurrentHP <= 0) return;
-            int dmg = ctx.enemyBleedStacks * 2;
+            int dmg = CombatSystem.EnemyHpLedger.ProbePassive(ctx.enemyBleedStacks * 2);   // [測定用の物差し 2026-11-10] 既定 1 = 素通し
             ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - dmg);
             UnityEngine.Debug.Log($"[絞り出し] 敵出血×2 = {dmg} 追加ダメ (軽減無視) → 敵HP={ctx.enemyCurrentHP}");
         }

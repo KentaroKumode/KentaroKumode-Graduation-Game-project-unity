@@ -70,6 +70,8 @@ namespace AutoTest.ParallelSweep
         public int[] stateSnaps = Array.Empty<int>();
         /// <summary>航行マップの層ごとの踏破 (4 列ずつ: 深さ, TileType, 数, 踏んだ数・2026-11-09)。</summary>
         public int[] mapVisit = Array.Empty<int>();
+        /// <summary>[計装 2026-11-10] ラン開始時に実際に入っていた整備パネルの段。</summary>
+        public string metaRanks = "";
 
         public static LearnRunRow From(AutoRunner.RunRec r)
         {
@@ -96,6 +98,7 @@ namespace AutoTest.ParallelSweep
                 goldKeys = r.goldKeys ?? Array.Empty<string>(), goldVals = r.goldVals ?? Array.Empty<int>(),
                 stateSnaps = r.stateSnaps != null ? r.stateSnaps.ToArray() : Array.Empty<int>(),
                 mapVisit = r.mapVisit != null ? r.mapVisit.ToArray() : Array.Empty<int>(),
+                metaRanks = r.metaRanks ?? "",
             };
         }
 
@@ -114,6 +117,10 @@ namespace AutoTest.ParallelSweep
                     key = c.encounterKey ?? "",
                     dmgParts = c.dmgParts ?? Array.Empty<int>(),
                     fbDecided = c.fbDecided, fbTurns = c.fbTurns, fbKillTurns = c.fbKillTurns,
+                    hpLedger = c.hpLedger ?? Array.Empty<float>(), shownFloor = c.shownFloor,
+                    axisAtStart = c.axisAtStart ?? Array.Empty<int>(),
+                    mainPred = c.mainPred, mainPredCorr = c.mainPredCorr, mainActual = c.mainActual,
+                    atkHist = c.atkHist ?? Array.Empty<int>(), dawnShots = c.dawnShots ?? Array.Empty<int>(),
                 };
             }
             return a;
@@ -149,6 +156,19 @@ namespace AutoTest.ParallelSweep
         public int[] dmgParts;
         /// <summary>[計装 2026-11-10] 配線を決めたターン数 / うち防ぎ切りの規則の対象 / うち今ターン撃破。</summary>
         public int fbDecided, fbTurns, fbKillTurns;
+        /// <summary>[計装 2026-11-10] 敵の HP を実際に減らした量の経路別 (CombatSystem.EnemyHpLedger の添字)。 dmgParts とは数えた時点が違う
+        /// (こちらは回避・シールド・踏みとどまり・はみ出しの後)。</summary>
+        public float[] hpLedger;
+        /// <summary>[計装 2026-11-10] 見せる層 (currentFloor)。 floor は深さ。</summary>
+        public int shownFloor;
+        /// <summary>[計装 2026-11-10] 段の開始時の偏重 6 軸の品の数 (会心・出血・毒・臨界・充電・シールド)。</summary>
+        public int[] axisAtStart;
+        /// <summary>[計装 2026-11-10 V3 mainCorr] 攻撃したターンの主攻撃の 見積もり / 比を掛けた見積もり / 実際 (DamageBreakdown[7] の増分) の合計。</summary>
+        public float mainPred, mainPredCorr, mainActual;
+        /// <summary>[計装 2026-11-10] 配線のターン数を攻撃の本数 0/1/2/3+ で数えたもの。</summary>
+        public int[] atkHist;
+        /// <summary>[計装 2026-11-10] 黎明の溜める形で、 攻撃したターンに乗った溜め (%)。</summary>
+        public int[] dawnShots;
     }
 
     [Serializable]
@@ -403,14 +423,41 @@ namespace AutoTest.ParallelSweep
                 "phase3BeforeReroll", "rerollCurveFirst", "rerollCurveStep",
                 // 計測でイベントを切っているか (2026-11-05)。 クリア率の意味が変わるので必ず印字する。
                 "suppressEvents", "suppressConvictionChain", "freeNavScout", "navLearnedDanger", "measureNoExplore",
+                // 2026-11-10: 配線が与ダメの倍率を読むか (−1 = 技量に従う) と実効値・軸に寄せる方策・配布の有無 (配布は使わない前提を確かめる)
+                "v3.readOutgoingMult", "ReadOutgoingMultEffective", "buyAxisFocus", "buyAxisFocusBonus",
+                "axisPackageAxis", "axisPackageCount", "v3.hpLedger", "v3.axisCommitBuy", "predTrace",
+                // 2026-11-10: 主攻撃の見積もりを実績の比で掛け直すか・黎明の溜める形 (送った値と、 ラン開始時に本体へ入れた値)
+                "v3.mainCorr", "daybreakNextAttackPct", "DaybreakNextAttackPctApplied", "weaponTierCap",
+                // 2026-11-10: 測定用の物差し (主攻撃 / 毒・出血・爆発の倍率)。 送った値と、 ラン開始時に本体へ入れた値
+                "probeMainMult", "ProbeMainMultApplied", "probePassiveMult", "ProbePassiveMultApplied",
             };
             var sb = new System.Text.StringBuilder();
             foreach (string name in watched)
             {
-                FieldInfo f = typeof(AutoRunner).GetField(name,
-                    BindingFlags.Public | BindingFlags.Instance);
+                // ドットで入れ子 (v3.xxx) も読む。 フィールドが無ければプロパティ (実効値) を読む。
+                object target = runner; string leaf = name; bool missing = false;
+                int dot = leaf.IndexOf('.');
+                while (dot > 0 && target != null)
+                {
+                    FieldInfo pf = target.GetType().GetField(leaf.Substring(0, dot), BindingFlags.Public | BindingFlags.Instance);
+                    if (pf == null) { missing = true; break; }
+                    target = pf.GetValue(target);
+                    leaf = leaf.Substring(dot + 1);
+                    dot = leaf.IndexOf('.');
+                }
+                object val = null;
+                if (!missing && target != null)
+                {
+                    FieldInfo f = target.GetType().GetField(leaf, BindingFlags.Public | BindingFlags.Instance);
+                    if (f != null) val = f.GetValue(target) ?? "";
+                    else
+                    {
+                        PropertyInfo pi = target.GetType().GetProperty(leaf, BindingFlags.Public | BindingFlags.Instance);
+                        if (pi != null) val = pi.GetValue(target) ?? "";
+                    }
+                }
                 sb.Append(name).Append('=')
-                  .Append(f == null ? "<無>" : (f.GetValue(runner) ?? "").ToString())
+                  .Append(val == null ? "<無>" : val.ToString())
                   .Append('\n');
             }
             return sb.ToString();

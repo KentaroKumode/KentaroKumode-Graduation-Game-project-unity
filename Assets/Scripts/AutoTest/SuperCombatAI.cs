@@ -1364,7 +1364,7 @@ namespace AutoTest
                 case SpecialTerminalKind.FullGuard:
                     bSum += sSum * SpecialTerminals.FullGuardMultiplier; break;
                 case SpecialTerminalKind.Bleed:
-                    specDmg += (int)(sSum * 0.8f + sSum * sCount * 0.5f); break;
+                    specDmg += (int)((sSum * 0.8f + sSum * sCount * 0.5f) * CombatSystem.EnemyHpLedger.ProbePassiveMult); break;   // [測定用の物差し 2026-11-10] 出血の見込み
                 case SpecialTerminalKind.Heal:
                     specHeal += sSum; break;
                 case SpecialTerminalKind.Deathwish:

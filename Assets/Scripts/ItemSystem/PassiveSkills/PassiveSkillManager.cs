@@ -302,6 +302,8 @@ namespace ItemSystem.PassiveSkills
             if (context.enemyPassivesDisabledTurns > 0) return;
             if (!enemySkillsByTrigger.TryGetValue(trigger, out var skills)) return;
 
+            int ledgerHpBefore = context.enemyCurrentHP;   // [計装 2026-11-10] 敵自身の効果による敵 HP の増減
+
             // 敵視点に反転
             SwapPerspective();
 
@@ -322,6 +324,7 @@ namespace ItemSystem.PassiveSkills
 
             // プレイヤー視点に戻す
             SwapPerspective();
+            CombatSystem.EnemyHpLedger.NoteEnemyTriggerDelta(context.enemyCurrentHP - ledgerHpBefore);
         }
 
         /// <summary>
@@ -412,7 +415,9 @@ namespace ItemSystem.PassiveSkills
                     var dsBefore = CombatSystem.DmgSourceDiag.Take(context);
                     int hlFixed = context.fixedDamageToEnemy;                                              // [計装 2026-11-05]
                     int hlPend = (int)context.GetAccumulated(Keywords.Kw.PendingEnemyDamageKey);
+                    int ledHp = context.enemyCurrentHP;   // [計装 2026-11-10] ctx を通した削りの品別
                     skills[i].Execute(trigger, context);
+                    CombatSystem.EnemyHpLedger.NoteCtxSource(skills[i].SkillId, ledHp, context.enemyCurrentHP);
                     CombatSystem.DmgSourceDiag.Attribute(skills[i].SkillId, dsBefore, context);
                     CombatSystem.HpLossDiag.NoteSource(skills[i].SkillId, context.fixedDamageToEnemy - hlFixed,
                         (int)context.GetAccumulated(Keywords.Kw.PendingEnemyDamageKey) - hlPend);

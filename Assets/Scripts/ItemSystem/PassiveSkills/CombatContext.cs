@@ -657,6 +657,16 @@ namespace ItemSystem.PassiveSkills
             _axisDepth[axis] = d;
             return d;
         }
+        /// <summary>偏重の順位: この軸より品の数が多い軸の数 (0 = 最も大きい偏重・同数は上に数えない)。
+        /// 品を 1 つも持たない軸は順位に入らない (99)。</summary>
+        public int AxisRank(string axis)
+        {
+            int d = AxisDepth(axis);
+            if (d <= 0) return 99;
+            int above = 0;
+            foreach (var a in AxisRules.Ranked) if (a != axis && AxisDepth(a) > d) above++;
+            return above;
+        }
         /// <summary>[persistent] 〈寸鉄〉: 会心率が 100% を超えた分が会心ダメージの倍率になる (超えた 10% につき +0.1)。</summary>
         public bool critOverflowToMultiplier;
         /// <summary>[persistent] 〈研ぎ知らずの銑鉄棍〉: 会心が出なくなる。 会心になるはずだった攻撃は敵の防御を無視し、
@@ -914,17 +924,17 @@ namespace ItemSystem.PassiveSkills
             return dict.TryGetValue(id, out var v) ? v : 0;
         }
 
-        /// <summary>DoT 1 回分のダメージ。 最大 HP の割合で効く定義 (<see cref="StatusDef.dotMaxHpPermillePerStack"/>) は
+        /// <summary>DoT 1 回分のダメージ。 最大 HP の割合で効く定義 (<see cref="StatusDef.dotMaxHpPer10kPerStack"/>) は
         /// 対象 (絶対視点) の最大 HP から整数で数える。 ターン開始の分と〈廃庭の霧吹き〉の分はここを共有する。</summary>
         private int DotDamage(StatusDef def, int stacks)
         {
-            if (def.dotMaxHpPermillePerStack > 0)
+            if (def.dotMaxHpPer10kPerStack > 0)
             {
                 int maxHp = def.dotUsesCurrentHp
                     ? (def.target == StatusTarget.Enemy ? enemyCurrentHP : playerCurrentHP)
                     : (def.target == StatusTarget.Enemy ? enemyMaxHP : playerMaxHP);
                 int n = def.dotScalesWithStacks ? stacks : 1;
-                return System.Math.Max(1, (int)((long)n * maxHp * def.dotMaxHpPermillePerStack / 1000));
+                return System.Math.Max(1, (int)((long)n * maxHp * def.dotMaxHpPer10kPerStack / 10000));
             }
             return def.dotScalesWithStacks ? stacks * def.dotPerStack : def.dotPerStack;
         }
@@ -946,7 +956,13 @@ namespace ItemSystem.PassiveSkills
                 }
                 if (dmg > 0)
                 {
-                    if (def.target == StatusTarget.Enemy) { fixedDamageToEnemy += dmg; CombatSystem.HpLossDiag.NoteSource("状態:" + def.id, dmg, 0); }
+                    if (def.target == StatusTarget.Enemy)
+                    {
+                        // [測定用の物差し 2026-11-10] 毒の tick が敵の HP に入る量だけ (出来事 OnPoisonTick へ渡す量・半減は素の量のまま)
+                        int landed = def.id == "poison" ? CombatSystem.EnemyHpLedger.ProbePassive(dmg) : dmg;
+                        fixedDamageToEnemy += landed; CombatSystem.HpLossDiag.NoteSource("状態:" + def.id, landed, 0);
+                        if (def.id == "poison") CombatSystem.EnemyHpLedger.NotePoisonIntoFixed(landed);   // [計装 2026-11-10] 固定ダメ枠の毒
+                    }
                     else fixedDamageToPlayer += dmg;
                     if (def.target == StatusTarget.Enemy && def.id == "poison")
                     {
@@ -1030,6 +1046,7 @@ namespace ItemSystem.PassiveSkills
             nullifyPursuitDamage = false;
             nullifyScratchDamage = false;
             fixedDamageToEnemy = 0;
+            CombatSystem.EnemyHpLedger.BeginTurn();   // [計装 2026-11-10] 固定ダメ枠と一緒に予約を捨てる
             fixedDamageToPlayer = 0;
             scratchDamage = 0;
             damageReduced = false;
@@ -1200,6 +1217,16 @@ namespace ItemSystem.PassiveSkills
         public void AddAttackDicePct(float pct)
         {
             if (pct > 0f) attackDicePct += pct;
+        }
+
+        /// <summary>与ダメージ +pct (<see cref="outgoingDamageMultiplier"/> の加算プール・未初期化の 0 は 1.0 に直す)。
+        /// 2026-11-10: 出目 +% を配っていた主攻撃の品 13 品をこちらへ移した ── 出目 +% は掛け先 (攻撃に挿した出目・
+        /// 5 層ボス戦で 1 ターン約 3) が小さく、 ITT で軒並み下位だった。 固定ダメ枠 (毒・爆発) には掛からない。</summary>
+        public void AddOutgoingPct(float pct)
+        {
+            if (pct <= 0f) return;
+            if (outgoingDamageMultiplier <= 0f) outgoingDamageMultiplier = 1f;
+            outgoingDamageMultiplier += pct;
         }
 
         /// <summary>[decay] 挑戦デバフ 軸10〈反響〉: **次のターン開始時に**プレイヤーへ入る反射ダメージ。

@@ -243,6 +243,7 @@ namespace AutoTest
                     _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
                 yield return RunOne(runIdx);
                 RecordGrantRow();
+                if ((i + 1) % 10 == 0) { try { RankMarginArmProgress?.Invoke(i + 1); } catch { } }   // 進捗 (2026-11-10: 付与試行は何も書かず、 止まって見えた)
                 if ((i + 1) % Mathf.Max(1, runsPerYield) == 0) yield return null;
             }
         }

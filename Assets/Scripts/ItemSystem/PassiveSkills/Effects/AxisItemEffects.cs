@@ -88,16 +88,21 @@ namespace ItemSystem.PassiveSkills.Effects
     public sealed class EntryEffect : IPassiveSkillEffect
     {
         public enum When { TurnStart, PlayerHit, EnemyAttacked, BlockedAll, PerBlockDie }
+        /// <summary>偏重の条件 (2026-11-10)。 機会の多い入り口ほど厳しく、 少ない入り口は無条件。
+        /// Free = 無条件 / AtLeast = 軸の品が n 個以上 / Top = 偏重の順位が上から n 番目まで (同数は満たす)。</summary>
+        public enum Gate { Free, AtLeast, Top }
         private readonly IPassiveSkillEffect _inner;
         private readonly When _when;
         private readonly bool _heat;
         private readonly int _amount;
+        private readonly Gate _gate;
+        private readonly int _gateN;
         private readonly PassiveSkillTrigger[] _triggers;
         private readonly PassiveSkillTrigger _entryTrigger;
 
-        public EntryEffect(IPassiveSkillEffect inner, When when, bool heat, int amount)
+        public EntryEffect(IPassiveSkillEffect inner, When when, bool heat, int amount, Gate gate = Gate.Free, int gateN = 0)
         {
-            _inner = inner; _when = when; _heat = heat; _amount = amount;
+            _inner = inner; _when = when; _heat = heat; _amount = amount; _gate = gate; _gateN = gateN;
             _entryTrigger = when switch
             {
                 When.TurnStart   => PassiveSkillTrigger.OnTurnStart,
@@ -119,7 +124,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (_heat && t == PassiveSkillTrigger.OnBattleStart) Kw.EnableHeat(ctx);
             if (t == _entryTrigger)
             {
-                int n = Times(ctx);
+                int n = GateOpen(ctx) ? Times(ctx) : 0;
                 if (n > 0)
                 {
                     if (_heat) Kw.AddHeat(ctx, _amount * n);
@@ -127,6 +132,17 @@ namespace ItemSystem.PassiveSkills.Effects
                 }
             }
             if (System.Array.IndexOf(_inner.Triggers, t) >= 0) _inner.Execute(t, ctx);
+        }
+
+        private bool GateOpen(CombatContext ctx)
+        {
+            string axis = _heat ? AxisRules.Heat : AxisRules.Poison;
+            switch (_gate)
+            {
+                case Gate.AtLeast: return ctx.AxisDepth(axis) >= _gateN;
+                case Gate.Top:     return ctx.AxisRank(axis) < _gateN;
+                default:           return true;
+            }
         }
 
         private int Times(CombatContext ctx)
@@ -143,33 +159,35 @@ namespace ItemSystem.PassiveSkills.Effects
             }
         }
 
-        /// <summary>入り口の一覧 (品の id, 機会, 臨界か, 量)。 説明文 (items.json) と揃えること。</summary>
-        public static readonly (string id, When when, bool heat, int amount)[] Table =
+        /// <summary>入り口の一覧 (品の id, 機会, 臨界か, 量, 偏重の条件, 条件の数)。 説明文 (items.json) と揃えること。
+        /// <para>条件の付け方 (2026-11-10): 機会が多い (ターン開始・ブロックのダイスごと・敵の攻撃のたび) ほど厳しく、
+        /// 出目を払う (攻撃が通る) か機会が少ない (受けきり) 入り口は無条件。 数は一律にしない ── 一律だと超えた瞬間に全部が点く。
+        /// 絶対数の線は 2026-11-10 の実測 (配布なしの終了時: 瘴気 中央 5・P90 9 / 炉温 中央 6・P90 10) から置いた。</para></summary>
+        public static readonly (string id, When when, bool heat, int amount, Gate gate, int gateN)[] Table =
         {
-            // 毒の軸
-            ("毒固めの腕環",       When.TurnStart,     false, 1),
-            ("百一人切りの鉈",     When.PlayerHit,     false, 1),
-            ("石抜きの毒指輪",     When.EnemyAttacked, false, 1),
-            ("岸上げの麻痺瓶",     When.BlockedAll,    false, 2),
-            ("腐し刃",             When.PlayerHit,     false, 1),
-            ("遅効の毒刃",         When.PlayerHit,     false, 1),
-            ("重増しの拳套",       When.PerBlockDie,   false, 1),
-            ("主より長い香炉",     When.TurnStart,     false, 1),
-            ("廃庭の霧吹き",       When.EnemyAttacked, false, 1),
-            // 臨界の軸 (自分では臨界を作らない品)
-            ("工廠の材料箱",       When.TurnStart,     true, 3),
-            ("帳簿外の爆薬",       When.TurnStart,     true, 3),
-            ("希望の灯片",         When.TurnStart,     true, 3),
-            ("無害灯",             When.TurnStart,     true, 3),
-            ("朝にも熱い竈",       When.TurnStart,     true, 3),
-            ("荒砥",               When.PlayerHit,     true, 3),
-            ("溢れ取りの鋳型",     When.PlayerHit,     true, 3),
-            ("烈刃",               When.PlayerHit,     true, 3),
-            ("二度目の打金",       When.PlayerHit,     true, 3),
-            ("焦げ柄の点火スパナ", When.PlayerHit,     true, 3),
-            ("早沸かし釜",         When.EnemyAttacked, true, 3),
-            ("恒熱の炉壁",         When.EnemyAttacked, true, 3),
-            ("八日目の灰燼",       When.EnemyAttacked, true, 3),
+            // 毒の軸 (瘴気)
+            ("毒固めの腕環", When.TurnStart,     false, 1, Gate.Top, 1),
+            ("主より長い香炉", When.TurnStart,     false, 1, Gate.Top, 2),
+            ("重増しの拳套", When.PerBlockDie,   false, 1, Gate.AtLeast, 9),
+            ("廃庭の霧吹き", When.EnemyAttacked, false, 1, Gate.AtLeast, 8),
+            ("石抜きの毒指輪", When.EnemyAttacked, false, 1, Gate.AtLeast, 6),
+            ("岸上げの麻痺瓶", When.BlockedAll,    false, 2, Gate.Free, 0),
+            ("百一人切りの鉈", When.PlayerHit,     false, 1, Gate.Free, 0),
+            ("腐し刃", When.PlayerHit,     false, 1, Gate.Free, 0),
+            ("遅効の毒刃", When.PlayerHit,     false, 1, Gate.Free, 0),
+            // 臨界の軸 (炉温・自分では臨界を作らない品)
+            ("工廠の材料箱", When.TurnStart,     true, 3, Gate.Top, 1),
+            ("希望の灯片", When.TurnStart,     true, 3, Gate.Top, 2),
+            ("帳簿外の爆薬", When.TurnStart,     true, 3, Gate.AtLeast, 10),
+            ("朝にも熱い竈", When.TurnStart,     true, 3, Gate.AtLeast, 8),
+            ("無害灯", When.TurnStart,     true, 3, Gate.AtLeast, 6),
+            ("恒熱の炉壁", When.EnemyAttacked, true, 3, Gate.Top, 2),
+            ("早沸かし釜", When.EnemyAttacked, true, 3, Gate.AtLeast, 7),
+            ("八日目の灰燼", When.EnemyAttacked, true, 3, Gate.AtLeast, 5),
+            ("溢れ取りの鋳型", When.PlayerHit,     true, 3, Gate.Free, 0),
+            ("烈刃", When.PlayerHit,     true, 3, Gate.Free, 0),
+            ("二度目の打金", When.PlayerHit,     true, 3, Gate.Free, 0),
+            ("焦げ柄の点火スパナ", When.PlayerHit,     true, 3, Gate.Free, 0),
         };
     }
 
@@ -359,7 +377,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>火花読みの眼鏡 (②【規則】): 爆発に会心が乗る。 代わりに爆発の基礎が 30 から「15 + 炉温の半分」になる (Kw.BurstBase)。</summary>
+    /// <summary>火花読みの眼鏡 (②【規則】): 爆発に会心が**会心倍率の半分**で乗る (2026-11-10: 旧 会心倍率そのまま・倍率が 2 以下なら増えない)。 代わりに爆発の基礎が 30 から「15 + 炉温の半分」になる (Kw.BurstBase)。</summary>
     public class SparkReadingGlasses : IPassiveSkillEffect
     {
         public string SkillId => "火花読みの眼鏡";
@@ -371,11 +389,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>焼き増しの雷管: 爆発のたび、 爆発のダメージ +6 が 1 つ積もる。 ターン開始時に積もった分の 1/4 を失う (CombatContext.burstStackBonus)。</summary>
+    /// <summary>焼き増しの雷管: 爆発のたび、 爆発のダメージ +5 が 1 つ積もる (2026-11-10: 旧 +6)。 ターン開始時に積もった分の 1/4 を失う (CombatContext.burstStackBonus)。</summary>
     public class RefiredPrimer : IPassiveSkillEffect
     {
         public string SkillId => "焼き増しの雷管";
-        public const int PerBurst = 6;
+        public const int PerBurst = 5;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnRinkaiBurst };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {

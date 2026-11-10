@@ -94,7 +94,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 「早く終わらせられないなら弱い武器」という性格をここで作る。</para></summary>
     internal static class SwiftHandHelper
     {
-        public const int Window = 3;
+        public const int Window = 5;   // 2026-11-11: 3 → 5 (ボス戦の後半にも届くように・II / III は items.json の turnMax)
         public static void Apply(CombatContext ctx, int atk)
         {
             if (ctx.currentTurn > Window) return;
@@ -180,7 +180,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public static bool IgnoresDefense(CombatContext ctx) => ctx != null && ctx.GetAccumulated(Key) > 0f;
     }
 
-    // 〈処刑〉は items.json の stats だけになった (敵の残HP 25% 以下で与ダメ +80%)。
+    // 〈処刑〉は items.json の stats だけになった (敵の残HP 35% 以下で与ダメ +80%・2026-11-11 に 25% から)。
     //   旧: 勝利時に次ターン敵の最大ダイスを 1 に固定する固有部分を持っていた (2026-10-28 削除・GAME.md §24)。
     // 〈蝕夜〉(過剰ダメージを次の戦闘へ持ち越す) は 2026-10-28 削除。
 
@@ -418,15 +418,50 @@ namespace ItemSystem.PassiveSkills.Effects
         public const int PctPerUnit = 5;
         /// <summary>このターンに 1 体目へ入れた削り。 2 体戦で 2 体目へ同じ量を写すために CombatManager が読む (読んだら消す)。</summary>
         public const string DealtKey = "daybreakDealt";
+        /// <summary>[2026-11-10 試験・既定 0 = 今の挙動] 0 より大きいとき、 最大 HP の削りをやめ、 成立したターンに
+        /// <c>units × この値</c> を「次の主攻撃の与ダメ +%」として溜める (1.0 = +100%)。 溜めは攻撃に 1 本以上挿したターンに
+        /// <see cref="CombatContext.AddOutgoingPct"/> で主攻撃へ乗り、 そのターンで使い切る。 攻撃しないターンは持ち越して積み増す (上限なし)。
+        /// 連戦の段替えでも持ち越す (accumulatedValues は段替えで消えない)。 計測用の切り替えで、 AutoRunner がラン開始時に入れ、 ラン終了時に 0 へ戻す。</summary>
+        public static float NextAttackPctPerUnit = 0f;
+        /// <summary>溜めた「次の主攻撃 +%」(accumulatedValues の鍵・1.0 = +100%)。 BOT の計装も読む。</summary>
+        public const string ChargeKey = "daybreakNextAtkPct";
         public string SkillId => "黎明";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
+        // 発火の順序は〈十五年目の計測器〉(ReworkItemEffects.OldGauge) と同じ: OnPostRoll で乗せる・OnWired で攻撃したら使い切る・OnTurnEnd で溜める
+        //   既定 (0) では OnTurnEnd だけ (今の挙動と発火の列を同じに保つ)。 Triggers は戦闘ごとの登録時に読まれる。
+        public PassiveSkillTrigger[] Triggers => NextAttackPctPerUnit > 0f
+            ? new[] { PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnWired, PassiveSkillTrigger.OnTurnEnd }
+            : new[] { PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
+            float perUnit = NextAttackPctPerUnit;
+            if (t == PassiveSkillTrigger.OnPostRoll)
+            {
+                float stored = ctx.GetAccumulated(ChargeKey);
+                if (perUnit > 0f && stored > 0f) ctx.AddOutgoingPct(stored);   // 攻撃しないターンは主攻撃が無いので乗っても払われない
+                return;
+            }
+            if (t == PassiveSkillTrigger.OnWired)
+            {
+                if (ctx.GetAccumulated(ChargeKey) > 0f && ctx.GetAccumulated(MutualKeys.AttackDiceCount) > 0f)
+                {
+                    UnityEngine.Debug.Log($"[黎明] 溜めた +{ctx.GetAccumulated(ChargeKey) * 100f:0}% を主攻撃に乗せて使い切る");
+                    ctx.accumulatedValues[ChargeKey] = 0f;
+                }
+                return;
+            }
             int pre = (int)ctx.GetAccumulated(MutualKeys.EnemyAtkPreDefense);
             int units = pre / PerUnit;
             if (units <= 0) return;
             if (ctx.GetAccumulated(MutualKeys.HpLossFromEnemy) > 0f) return;
             if (ctx.enemyCurrentHP <= 0 || ctx.enemyMaxHP <= 0) return;
+            if (perUnit > 0f)
+            {
+                // 溜める形: 削らない (2 体戦の写し DealtKey も書かないので CombatManager.Turn の写しは何もしない)
+                float now = ctx.GetAccumulated(ChargeKey) + units * perUnit;
+                ctx.accumulatedValues[ChargeKey] = now;
+                UnityEngine.Debug.Log($"[黎明] 無傷で受け切った: 軽減前 {pre} → {units}×{perUnit * 100f:0}% を溜める (計 +{now * 100f:0}%)");
+                return;
+            }
             int dmg = System.Math.Max(1, ctx.enemyMaxHP * PctPerUnit * units / 100);
             int before = ctx.enemyCurrentHP;
             int after = DivineTalent.ClampToThreshold(ctx, System.Math.Max(0, before - dmg), ctx.enemyMaxHP);
@@ -524,68 +559,59 @@ namespace ItemSystem.PassiveSkills.Effects
     //   旧〈血令〉の効果を改名して T3+ へ移し、 被ダメ −15% を外した (2026-10-28)。
     // 〈復讐〉(被弾ごとに攻撃 +2) は 2026-10-28 削除 ── 相互攻撃モデルではほぼ毎ターン被弾するので〈猛り〉と同じ意味だった。
 
-    /// <summary>血令 (2026-10-28) — <b>自分の防御をすべて貫通に換える</b> (防御 1 → 貫通 2) ／
-    /// 〈血の盟約〉: 失った HP 15% ごとに 1 (最大 6)。 1 つにつき 攻撃 +1、 攻撃したターンの終わりに HP +1。
+    /// <summary>血令 (2026-11-11 作り直し) — <b>流した血を刃に</b>。 敵の攻撃で失った HP の半分を「血」として溜め、
+    /// 次に攻撃したターン、 攻撃 +血 (攻撃したら使い切る)。 攻撃が通ったターン、 使った血の 1/4 だけ HP を戻す。 防御は変えない。
     ///
-    /// <para><b>盟約はその時点の HP から数える</b> (リアルタイム)。 回復すると減るので仕組みの中で釣り合う。
-    /// 上限 6 は失った HP 90% にあたる ── 実質は HP が決める。</para>
+    /// <para><b>旧 (2026-10-28〜11-11): 自分の防御をすべて貫通に換える (防御 1 → 貫通 2) ／〈血の盟約〉 失った HP 15% ごとに攻撃 +1・攻撃時 HP +1 (最大 6)。</b>
+    /// 斧は元から貫通が高く〈鎧砕き〉で敵の防御も削るので、 換えた貫通は余り (ヴェスカの防御 14 を超えた分は何もしない)、 防御 0 で打たれ弱さだけが残った。
+    /// ITT (20 万ラン・家系固定) で段 4 の斧〈血帝廻天〉だけが −0.2 ポイント (段 4 の武器で唯一のマイナス)。</para>
     ///
-    /// <para>換算は予告より前・全部の防御加算 (OnPostRoll) の後でなければならないので、
-    /// CombatManager が OnPostRoll の直後に <see cref="ConvertDefenseToPen"/> を呼ぶ。
-    /// リロール判断用の仮予告はそれより前に組まれるので、 <see cref="IsActive"/> を見て防御を掛けない。
-    /// 余った貫通は何にもならないので、 防御を積んで換えても青天井にはならない。</para></summary>
+    /// <para>攻撃 +N は OnPostRoll で足す (OnPreDealDamage では乗らない)。 使い切りは配線が決まった OnWired で、 攻撃に 1 本でも挿していたら。
+    /// 溜めるのは OnTurnEnd (敵の攻撃の解決後・<see cref="MutualKeys.HpLossFromEnemy"/>)。 4 連戦の段替えでも持ち越す。</para></summary>
     public class BloodEdict : IPassiveSkillEffect
     {
-        public const string ActiveKey = "bloodEdictDefToPen";
-        public const int PenPerDefense = 2;
-        public const int PactStepPct = 15;
-        public const int PactMax = 6;
+        /// <summary>[persistent・戦闘開始で 0] 溜まっている血。</summary>
+        public const string BloodKey = "bloodEdictBlood";
+        /// <summary>[perTurn] このターンの攻撃に使った血 (攻撃が通ったら 1/4 を戻す)。</summary>
+        public const string SpentKey = "bloodEdictSpent";
+        /// <summary>失った HP のうち血になる割合 (%)。</summary>
+        public const int StorePct = 50;
+        /// <summary>使った血のうち HP に戻る割合 (分母)。</summary>
+        public const int HealDiv = 4;
         public string SkillId => "血令";
         public PassiveSkillTrigger[] Triggers => new[]
-        { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnTurnEnd };
+        { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnWired, PassiveSkillTrigger.OnTurnEnd };
 
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             switch (t)
             {
                 case PassiveSkillTrigger.OnBattleStart:
-                    ctx.accumulatedValues[ActiveKey] = 1f;
+                    ctx.accumulatedValues[BloodKey] = 0f; ctx.accumulatedValues[SpentKey] = 0f;
                     break;
                 case PassiveSkillTrigger.OnPostRoll:
                 {
-                    int pact = Pact(ctx);
-                    if (pact > 0) ctx.AddPlayerAttackOrDiceBonus(pact);
+                    ctx.accumulatedValues[SpentKey] = 0f;
+                    int blood = (int)ctx.GetAccumulated(BloodKey);
+                    if (blood > 0) ctx.AddPlayerAttackOrDiceBonus(blood);   // 攻撃しないターンは攻撃値が使われないだけ (血は残る)
                     break;
                 }
+                case PassiveSkillTrigger.OnWired:
+                    if (ctx.GetAccumulated(MutualKeys.AttackDiceCount) <= 0f) return;
+                    ctx.accumulatedValues[SpentKey] = ctx.GetAccumulated(BloodKey);
+                    ctx.accumulatedValues[BloodKey] = 0f;
+                    break;
                 case PassiveSkillTrigger.OnTurnEnd:
                 {
-                    if (ctx.GetAccumulated(MutualKeys.AttackDiceCount) <= 0f) return;
-                    if (ctx.healBlocked || ctx.playerCurrentHP <= 0) return;
-                    int pact = Pact(ctx);
-                    if (pact <= 0) return;
-                    ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + pact);
+                    int spent = (int)ctx.GetAccumulated(SpentKey);
+                    if (spent >= HealDiv && Rw.PlayerHit(ctx) && !ctx.healBlocked && ctx.playerCurrentHP > 0)
+                        ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + spent / HealDiv);
+                    ctx.accumulatedValues[SpentKey] = 0f;
+                    int lost = (int)ctx.GetAccumulated(MutualKeys.HpLossFromEnemy);
+                    if (lost > 0) ctx.accumulatedValues[BloodKey] = ctx.GetAccumulated(BloodKey) + lost * StorePct / 100;
                     break;
                 }
             }
-        }
-
-        /// <summary>〈血の盟約〉の数 = floor(失った HP 割合 / 15%)、 最大 6。</summary>
-        public static int Pact(CombatContext ctx)
-        {
-            if (ctx.playerMaxHP <= 0) return 0;
-            int lost = System.Math.Max(0, ctx.playerMaxHP - ctx.playerCurrentHP);
-            return System.Math.Min(PactMax, lost * 100 / (ctx.playerMaxHP * PactStepPct));
-        }
-
-        public static bool IsActive(CombatContext ctx) => ctx != null && ctx.GetAccumulated(ActiveKey) > 0f;
-
-        public static void ConvertDefenseToPen(CombatContext ctx)
-        {
-            if (!IsActive(ctx) || ctx.playerDefense <= 0) return;
-            int def = ctx.playerDefense;
-            ctx.playerArmorPen += def * PenPerDefense;
-            ctx.playerDefense = 0;
-            UnityEngine.Debug.Log($"[血令] 防御{def} → 貫通 +{def * PenPerDefense} (貫通 {ctx.playerArmorPen})");
         }
     }
 

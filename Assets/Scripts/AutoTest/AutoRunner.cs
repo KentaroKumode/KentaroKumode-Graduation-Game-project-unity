@@ -152,6 +152,45 @@ namespace AutoTest
         /// <summary>SuperV3 の実験スイッチ (Optimal + 改善案)。 全 OFF なら Optimal と同一。</summary>
         public V3Flags v3 = new V3Flags();
 
+        /// <summary>[2026-11-10] 配線の効用が与ダメの倍率を読むか (<see cref="V3Flags.readOutgoingMult"/> の実効値: −1 は Super だけ ON)。</summary>
+        public bool ReadOutgoingMultEffective
+            => v3.readOutgoingMult > 0 || (v3.readOutgoingMult < 0 && EffectiveWiringSkill == WiringSkill.Super);
+
+        /// <summary>[2026-11-10 試験] 盾〈黎明〉を「溜めて次の主攻撃 +%」にする形の率 (<see cref="ItemSystem.PassiveSkills.Effects.Daybreak.NextAttackPctPerUnit"/>)。
+        /// 0 = 今の挙動 (最大 HP を直接削る)。 ラン開始時に本体の static へ入れ、 ラン終了時に 0 へ戻す。</summary>
+        public float daybreakNextAttackPct = 0f;
+        /// <summary>[計装] 本体へ入れる値。 ラン開始後は直近のラン開始時に実際に入れた値、 ラン開始前 (ワーカーの実効状態はここで読む) は
+        /// ラン開始時に入れる値 (負は 0 に切り詰める)。 2026-11-10: 開始前に読むと 0 と出ていたので直した。 実際に効いたかは戦闘記録の dawnShots で見る。</summary>
+        public float DaybreakNextAttackPctApplied => _daybreakAppliedOnce ? _daybreakApplied : System.Math.Max(0f, daybreakNextAttackPct);
+        private bool _daybreakAppliedOnce;
+        private float _daybreakApplied;
+
+        /// <summary>[測定用の物差し 2026-11-10] プレイヤーの主攻撃の最終ダメージに掛ける倍率 (<see cref="CombatSystem.EnemyHpLedger.ProbeMainMult"/>)。
+        /// 既定 1 = 今の挙動と同じ。 ラン開始時に本体の static へ入れ、 ラン終了時に 1 へ戻す。 製品では使わない。</summary>
+        public float probeMainMult = 1f;
+        /// <summary>[測定 2026-11-11] 武器の段の上限 (0 = 上限なし)。 本体の <see cref="GameLoop.GameHooks.WeaponTierCap"/> へ流す。</summary>
+        public int weaponTierCap = 0;
+        /// <summary>[測定用の物差し 2026-11-10] 敵の HP に入る毒・出血・爆発・〈逆綴じの止血帯〉の量に掛ける倍率 (<see cref="CombatSystem.EnemyHpLedger.ProbePassiveMult"/>)。
+        /// 既定 1。 ラン開始時に本体へ入れ、 ラン終了時に 1 へ戻す。 製品では使わない。</summary>
+        public float probePassiveMult = 1f;
+        /// <summary>[計装] 本体へ入れる値 (ラン開始後は実際に入れた値・開始前は入れる予定の値)。</summary>
+        public float ProbeMainMultApplied => _probeAppliedOnce ? _probeMainApplied : ProbeMultClamp(probeMainMult);
+        public float ProbePassiveMultApplied => _probeAppliedOnce ? _probePassiveApplied : ProbeMultClamp(probePassiveMult);
+        private bool _probeAppliedOnce;
+        private float _probeMainApplied = 1f, _probePassiveApplied = 1f;
+        private static float ProbeMultClamp(float v) => float.IsNaN(v) || v < 0f ? 1f : v;
+
+        /// <summary>[2026-11-10] 軸に寄せる方策 (品は配らない)。 軸の名前 (毒/出血/臨界/充電/シールド/会心 = items.json の axis)。 空 = 無効。
+        /// 店 (<see cref="PersonaBonus"/> を通る 3 か所)・戦闘後の 2 択・開幕の品の選択・挑戦カードで、 この軸の品を優先する。</summary>
+        public string buyAxisFocus = "";
+        /// <summary>軸に寄せる加点 (序列の段の数・店では × StepPerTier の準パワー)。 1 = 「同じ値段帯なら軸の品を先に取る」程度。</summary>
+        public int buyAxisFocusBonus = 1;
+
+        /// <summary>品 <paramref name="itemId"/> が <see cref="buyAxisFocus"/> の軸か (items.json の axis を読む・id の綴りは読まない)。</summary>
+        private bool IsAxisFocusItem(string itemId)
+            => !string.IsNullOrEmpty(buyAxisFocus) && !string.IsNullOrEmpty(itemId)
+            && ItemSystem.ItemDatabase.Instance?.GetItem(itemId)?.axis == buyAxisFocus;
+
         /// <summary>厳密方策 (<see cref="WiringSkill.Exact"/> のときだけ使う)。
         /// 天井の位置を測る参照実装で、 通常の測定には使わない。</summary>
         public ExactCombatAI exactAI = new ExactCombatAI();
@@ -448,8 +487,10 @@ namespace AutoTest
         /// LearnedPriorityProvider.Score() の結果に加算して使う。</summary>
         private int PersonaBonus(string itemId)
         {
-            if (!useBuildPersonas || _currentPersona == BuildPersona.RawTier) return 0;
-            return BuildPersonaProfiles.ScoreBonusForItem(_currentPersona, itemId);
+            // [2026-11-10] 軸に寄せる方策 (buyAxisFocus): ペルソナとは独立に足す
+            int axisFocus = IsAxisFocusItem(itemId) ? buyAxisFocusBonus : 0;
+            if (!useBuildPersonas || _currentPersona == BuildPersona.RawTier) return axisFocus;
+            return BuildPersonaProfiles.ScoreBonusForItem(_currentPersona, itemId) + axisFocus;
         }
 
         [Header("実行後")]
@@ -1342,6 +1383,19 @@ namespace AutoTest
             public int[] dmgParts;
             /// <summary>[計装 2026-11-10] 配線を決めたターン数 / うち防ぎ切りの規則の対象 (今ターン撃破を除く) / うち今ターン撃破。</summary>
             public int fbDecided, fbTurns, fbKillTurns;
+            /// <summary>[計装 2026-11-10] 敵の HP を実際に減らした量の経路別 (<see cref="CombatSystem.EnemyHpLedger"/> の添字・この段の開始からの差分)。</summary>
+            public float[] hpLedger;
+            /// <summary>[計装 2026-11-10] 見せる層 (RunState.currentFloor)。 <see cref="floor"/> は深さ (Run.Depth)。</summary>
+            public int shownFloor;
+            /// <summary>[計装 2026-11-10] 戦闘 (段) の開始時の偏重 6 軸の品の数 (AxisRules.Ranked の順: 会心・出血・毒・臨界・充電・シールド)。</summary>
+            public int[] axisAtStart;
+            /// <summary>[計装 2026-11-10 V3 mainCorr] この段で攻撃したターンの 主攻撃の見積もり (比を掛ける前) / 比を掛けた見積もり (切り替えが OFF でも、 掛けたなら の値) /
+            /// 実際 (DamageBreakdown[7] の増分) の合計。</summary>
+            public float mainPred, mainPredCorr, mainActual;
+            /// <summary>[計装 2026-11-10] この段の配線のターン数を攻撃の本数 0/1/2/3+ で数えたもの。</summary>
+            public int[] atkHist;
+            /// <summary>[計装 2026-11-10 黎明の溜める形] 攻撃したターンに乗った溜め (%・1 回 1 値)。</summary>
+            public int[] dawnShots;
             public bool isFightEnd; // OnBattleEnded で確定した1戦分か（チェーン途中形態は false）
             // この戦闘時点の装備（武器×ダイス勝率集計用）。武器は family_tN まで（業物+段階は区別しない）。
             public string weaponId = "";
@@ -1365,6 +1419,8 @@ namespace AutoTest
         public class RunRec
         {
             public int index;
+            /// <summary>[計装 2026-11-10] ラン開始時に実際に入っていた整備パネルの段 ("種類:段" を , で連結・0 段は省く)。</summary>
+            public string metaRanks = "";
             public Outcome outcome;
             public DeathCause cause = DeathCause.None;
             public int deathFloor;
@@ -1918,6 +1974,9 @@ namespace AutoTest
             bool isSuperSkill = wiringSkill == WiringSkill.Super;
             // Super = Optimal + 無段階の序列 + 激しい防御 + 消耗品の読み + 偵察と戦闘名の回避 (2026-11-06・同じシードで +4.86σ)
             if (isSuperSkill) { v3.superDefense = true; v3.superConsumables = true; v3.superNav = true; v3.macroPlan = true; v3.phase3Ranked = true; v3.axisCommitBuy = true; UseLearnedDanger = true; AvoidLoseRate = v3.avoidLoseRate; }
+            // [2026-11-10] 軸に寄せる方策を本体の差し込み口 (開幕の品・挑戦カード) へも渡す。 空なら無効。
+            BotHooks.AxisFocus = buyAxisFocus ?? "";
+            BotHooks.AxisFocusBonus = buyAxisFocusBonus;
             LearnedPriorityProvider.BuyTierCount = isSuperSkill ? superBuyTiers : optimalBuyTiers;
             wiringMistakeRate = isSuperSkill ? 0f : optimalMistakeRate;
             LearnedPriorityProvider.GateRaw = v3.tierGateRaw;
