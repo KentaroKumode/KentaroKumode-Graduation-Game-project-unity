@@ -73,7 +73,7 @@ namespace UI.Game2D
             // 画面の外で所持金・HP が変わった時も描き直す (買える品の明暗・副題の数字)
             int coins = gm.Run != null ? gm.Run.coins : 0, hp = gm.Run != null ? gm.Run.playerHP : 0;
             if (coins != _lastCoins || hp != _lastHp) { _lastCoins = coins; _lastHp = hp; if (_open) _dirty = true; }
-            int pend = gm.PendingStartingPassiveChoices.Count + gm.PendingChallengeTiers.Count * 100 + (gm.Run != null ? gm.Run.pendingWeaponIds.Count * 10000 : 0);
+            int pend = gm.PendingStartingPassiveChoices.Count + gm.PendingChallengeTiers.Count * 100 + (gm.Run != null ? gm.Run.pendingWeaponIds.Count * 10000 + gm.Run.pendingTerminalOffer.Count * 1000000 : 0);
             if (pend != _lastPending) { _lastPending = pend; _dirty = true; }
             if (!_dirty) return;
             // ロード画面の間は出さない (終わってから出す・_dirty は残す)。 開いている窓も閉じる ──
@@ -100,6 +100,7 @@ namespace UI.Game2D
         {
             var run = gm.Run;
             if (run != null && run.pendingWeaponIds.Count > 0 && ph != GameManager.GamePhase.Combat && ph != GameManager.GamePhase.BattleResult) return WeaponSwap(gm);
+            if (run != null && run.pendingTerminalOffer.Count > 0 && ph != GameManager.GamePhase.Combat && ph != GameManager.GamePhase.BattleResult) return TerminalPick(gm);
             if (ph == GameManager.GamePhase.MapNavigation && gm.PendingStartingPassiveChoices.Count > 0) return StartingPick(gm);
             if (ph == GameManager.GamePhase.MapNavigation && gm.PendingChallengeTiers.Count > 0) return ChallengePick(gm);
             switch (ph)
@@ -394,6 +395,25 @@ namespace UI.Game2D
             if (w == null) return id;
             string plus = equipped && run.weaponPlus > 0 ? " +" + run.weaponPlus : "";
             return "攻撃 " + w.attackPower + plus + "  会心 " + w.critRatePct + "%\n" + w.description;
+        }
+
+        /// <summary>層ボスの報酬: 特殊端子 (§6-5) を 2 つから 1 つ (2026-11-11)。 「層を抜けた」の窓より先に出す。</summary>
+        private ScreenDef TerminalPick(GameManager gm)
+        {
+            var run = gm.Run; var offer = run.pendingTerminalOffer; var cur = CombatSystem.SpecialTerminals.Equipped(run);
+            var d = New("特殊端子", "層の主の報酬", 440);
+            d.body = cur != null ? "4 つ目の端子を 1 つ選んで付け替える。 今は「" + cur.displayName + "」: " + cur.description
+                                 : "4 つ目の端子を 1 つ選んで取り付ける。 出目を挿すと、 その端子だけの効果が出る。";
+            foreach (var id in offer)
+            {
+                var t = CombatSystem.SpecialTerminals.Get(id);
+                d.Items.Add(new ModalItem { name = t != null ? t.displayName : id, desc = t?.description, value = t != null ? t.connectLimit + " 個まで" : null });
+            }
+            d.buttons.Add(B("取り付ける", "pick", true));
+            d.buttons.Add(B(cur != null ? "今のままにする" : "受け取らない", "keep"));
+            if (cur != null) d.footer = "取り付けると「" + cur.displayName + "」は外れる";
+            d.onAction = (a, sel) => { gm.ResolveTerminalOffer(a == "pick" ? Mathf.Clamp(sel, 0, offer.Count - 1) : -1); Game2DSfx.Play("ui_confirm"); Refresh(); };
+            return d;
         }
 
         /// <summary>武器の入れ替え (武器は 1 本だけ・2026-11-11)。 2 本目の武器を手に入れた時に、 どの場面でも先に聞く。</summary>

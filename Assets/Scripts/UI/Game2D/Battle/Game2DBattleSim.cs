@@ -349,7 +349,7 @@ namespace UI.Game2D.Battle
             _bleedPending = Mathf.Clamp(_bleedPending, 0, dealt); dealt -= _bleedPending;
             _mistPending = Mathf.Clamp(_mistPending, 0, dealt); dealt -= _mistPending;
             fx.FlushDot(); fx.SetEnemyHp(before, _enemyMaxBefore);
-            if (dealt > 0) { fx.PlayerAttack(fx.WeaponIndex, _tr.isCritical, dealt); phase = P.PAttack; t = 0; }
+            if (dealt > 0) { fx.HitMultPct = cm.LastHitMultPct; fx.PlayerAttack(fx.WeaponIndex, _tr.isCritical, dealt); phase = P.PAttack; t = 0; }
             else AfterPlayerAttack(cm);
             Touch();
         }

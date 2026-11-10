@@ -14,6 +14,35 @@ namespace GameLoop
     /// <summary>GameManager: 層の出入り・マスの起動・戦闘終了の処理・交換マス・ボス・層クリア。</summary>
     public partial class GameManager
     {
+        /// <summary>層ボスの報酬: 特殊端子 (§6-5) を 2 つ提示する (2026-11-11)。 付けられるのは 1 つだけで、 選ぶと今のものは外れる。
+        /// <b>1〜4 層のボスだけ</b> (5 層のヴェスカの後には層が無い)。 ラン開始時は何も付いていない ──
+        /// 1 層の開幕から持っていると強すぎる (ユーザー判断・2026-11-11)。
+        /// 人は画面で選ぶ (pendingTerminalOffer)。 BOT も同じ 2 択から <see cref="GameHooks.ChooseSpecialTerminal"/> でその場で選ぶ
+        /// (旧: BOT だけラン開始時にビルドの型で 1 つ決めて持っていた)。</summary>
+        private void OfferSpecialTerminal()
+        {
+            if (Run == null || Run.currentFloor < 1 || Run.currentFloor > SpecialTerminalLastFloor) return;
+            var offer = CombatSystem.SpecialTerminals.RollOffer(Run);
+            if (offer.Count == 0) return;
+            if (GameHooks.ChooseSpecialTerminal == null && Loadout.HumanPlaying) { Run.pendingTerminalOffer = offer; return; }
+            Run.pendingTerminalOffer = offer;
+            ResolveTerminalOffer(GameHooks.ChooseSpecialTerminal?.Invoke(offer) ?? 0);
+        }
+        /// <summary>特殊端子の報酬が出る最後の層 (見せる層の番号)。</summary>
+        public const int SpecialTerminalLastFloor = 4;
+
+        /// <summary>提示された特殊端子から index 番目を取り付ける。 index &lt; 0 = 受け取らない (今のまま)。</summary>
+        public void ResolveTerminalOffer(int index)
+        {
+            if (Run == null || Run.pendingTerminalOffer.Count == 0) return;
+            if (index >= 0 && index < Run.pendingTerminalOffer.Count)
+            {
+                Run.equippedSpecialTerminalId = Run.pendingTerminalOffer[index];
+                Log($"特殊端子を取り付けた: {CombatSystem.SpecialTerminals.Equipped(Run)?.displayName}");
+            }
+            Run.pendingTerminalOffer.Clear();
+        }
+
         /// <summary>フロアクリア確認→次フロアへ</summary>
         public void ConfirmFloorClear()
         {
@@ -951,6 +980,7 @@ namespace GameLoop
                 // 〈決意〉以上所持 → 6 層へ降りる。
                 //   ここが「記録の残らない深さ」へ踏み込む節目なので、 演出だけはフックで出せるようにしておく。
                 OnDeepDescent?.Invoke(Run);
+                OfferSpecialTerminal();
                 SetPhase(GamePhase.FloorClear);
                 OnFloorAdvanced?.Invoke(MapSystem.FreeMove.FloorPlan.Next(Run.Depth));
                 Log($"フロア{Run.currentFloor}クリア → 深部へ");
@@ -983,6 +1013,7 @@ namespace GameLoop
                     VignetteUnlockState.OnRunClear(Run, ending6f.id, VignetteUnlockState.IsMaxDifficultyRun(Run));
                     return;
                 }
+                OfferSpecialTerminal();
                 SetPhase(GamePhase.FloorClear);
                 OnFloorAdvanced?.Invoke(MapSystem.FreeMove.FloorPlan.Next(Run.Depth));
                 Log($"フロア{Run.currentFloor}クリア → 次へ");

@@ -223,11 +223,10 @@ namespace AutoTest
 
             // 2026-06-28: BOT は職業をランダムに選択 (BOT 学習で全 4 職を均等にサンプル)
             GameLoop.GameManager.SelectedClass = (GameLoop.ClassType)GameLoop.GameRng.RangeAuto("AutoRunner.1", 0, 4);
-            // 特殊端子 (§6-5) もラン開始前の宣言。 **ペルソナに合わせて選ぶ** ──
-            //   一様ランダムだと「どの端子がどのビルドで効くか」が測れず、
-            //   全部を平均した薄い数字しか出ない。 ペルソナ無しのランだけ一様抽選にして
-            //   11 種すべてがサンプルされるようにする。
-            GameLoop.GameManager.SelectedSpecialTerminal = PickSpecialTerminal();
+            // 特殊端子 (§6-5): ラン開始時は持たない。 1〜4 層のボスの報酬の 2 択から選ぶ (人と同じ入手・2026-11-11)。
+            //   旧: ラン開始前にペルソナで 1 つ決めて 1 層から持っていた = 人の遊びより甘い条件で測っていた。
+            GameLoop.GameManager.SelectedSpecialTerminal = "";
+            GameHooks.ChooseSpecialTerminal = ChooseSpecialTerminal;
             gm.StartNewRun();
             // アイテム アブレーション: 開幕付与。 **StartNewRun の直後**でないと
             //   ownedPassiveItems がまだ存在しない。 AddPassiveItem は GameRng を

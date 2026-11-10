@@ -46,7 +46,8 @@ namespace UI.Game2D.Battle
         private sealed class Spark { public float x, y, vx, vy, t, life; public Col c; }
         private sealed class Debris { public float x, y, vx, vy, t, life, spin; public int sz; }
         private sealed class Gather { public float x, y, tx, ty, t, life; public bool big; }
-        private sealed class Dmg { public float x, y, t; public int v; public Col c; }
+        /// <summary>cnt = 数え上げの長さ (秒・0 = 無し。 倍率の前の値から v まで)。 slam = 会心の「決め」(数え上げの終わり) を済ませたか。</summary>
+        private sealed class Dmg { public float x, y, t, cnt, life = 1.2f; public int v, pct; public Col c; public bool crit, slam; }
 
         private enum Phase { Idle, PAttack, EAttack, Dying, Won, Intro, Dot }
 
@@ -54,6 +55,11 @@ namespace UI.Game2D.Battle
         private Phase _phase = Phase.Idle; private float _t, _freeze, _shake, _flashE, _flashR, _flashW, _dissolve;
         private int _wi, _ehp = 80, _eMax = 80, _dealt, _dealtSoFar, _hitIdx, _taken;
         private bool _crit, _hitDone;
+        /// <summary>CRITICAL! の字の時計 (秒)。 会心の着弾で −(数え上げの長さ) から始め、 0 で字が出る。 −999 = 出さない。
+        /// 旧: 攻撃の始まりから出していた = 当たる前に会心が分かってしまい、 当たった瞬間の手応えが無かった (2026-11-11)。</summary>
+        private float _critT = -999f;
+        /// <summary>CRITICAL! の字を出す位置 (会心の数字のすぐ上・中央の x と上端の y)。</summary>
+        private int _critX, _critY;
         private Plan _anim;
         private float? _hitAgo;
         private readonly List<Streak> _streaks = new List<Streak>(), _marks = new List<Streak>();
@@ -89,6 +95,8 @@ namespace UI.Game2D.Battle
         /// <summary>敵の周りに出す印 (<see cref="Game2DBattleSim"/> が毎フレーム書く)。 intent: 0 = 無し / 1 = 攻撃 / 2 = 大技。</summary>
         public struct Marks { public int intent, atk, poison, bleed; public bool guard; }
         public Marks marks;
+        /// <summary>次の自分の攻撃の倍率 (%)。 最初の着弾の数字の横に出す (0 なら出さない・2026-11-11)。</summary>
+        public int HitMultPct;
 
         /// <summary>戦闘の流れ (Game2DBattleSim) が操作を握っている間 true。 試験用のキー (Space・←→) は効かなくなる。</summary>
         public bool SimDriven;
@@ -107,7 +115,7 @@ namespace UI.Game2D.Battle
         /// <summary>自分の攻撃の演出を始める。 dealt = 与ダメージ (数字に出す)。 竜閃は会心の時だけ専用の動き。</summary>
         public void PlayerAttack(int weaponIndex, bool crit, int dealt)
         {
-            Init(); FlushDot(); _wi = Mathf.Clamp(weaponIndex, 0, Weapons.Length - 1); _crit = crit; _dealt = dealt; _dealtSoFar = 0; _hitIdx = 0; _hitAgo = null; _critFxDone = false;
+            Init(); FlushDot(); _wi = Mathf.Clamp(weaponIndex, 0, Weapons.Length - 1); _crit = crit; _dealt = dealt; _dealtSoFar = 0; _hitIdx = 0; _hitAgo = null; _critFxDone = false; _critT = -999f;
             var w = Weapons[_wi];
             _anim = BattleMotion.MakePlan(IsDragon(_wi) && crit ? "dragon" : w.fam, crit, w.fam == "sword" && UnityEngine.Random.value < 0.5f);
             _phase = Phase.PAttack; _t = 0; _hitDone = false; _ghosts.Clear(); _cp.Clear(); Showing = true;
@@ -241,7 +249,14 @@ namespace UI.Game2D.Battle
             _guiShake = Mathf.Max(0, _guiShake - dt * 3.2f);
             Game2DHud.ShakeDots = _guiShake > 0.01f ? new Vector2(R(-1, 1), R(-1, 1)) * (_guiShake * _guiShake * 7f) : Vector2.zero;
             _flashW = Mathf.Max(0, _flashW - dt * 4); _shake = Mathf.Max(0, _shake - dt * 5); _flashE = Mathf.Max(0, _flashE - dt * 7); _flashR = Mathf.Max(0, _flashR - dt * 3.2f);
-            foreach (var d in _dmgs) d.t += dt; _dmgs.RemoveAll(d => d.t >= 1.2f);
+            if (_critT > -900f) _critT += dt;
+            for (int i = 0; i < _dmgs.Count; i++)
+            {
+                var d = _dmgs[i]; d.t += dt;
+                if (d.crit && d.cnt > 0 && !d.slam && d.t >= d.cnt)      // 会心の決め: 数え上げが終わった瞬間 (= 止めが解ける瞬間) にもう一度揺らして、 数字から火花
+                { d.slam = true; _shake = Mathf.Max(_shake, 1.6f); _guiShake = Mathf.Max(_guiShake, 0.6f); Burst(d.x, d.y + 8, 14, Yel); }
+            }
+            _dmgs.RemoveAll(d => d.t >= d.life);
             foreach (var p in _sparks) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 300 * dt; } _sparks.RemoveAll(p => p.t >= p.life);
             foreach (var r in _rings) r.t += dt; _rings.RemoveAll(r => r.t >= r.life);
             foreach (var s in _streaks) s.t += dt; _streaks.RemoveAll(s => s.t >= s.life);
@@ -306,6 +321,7 @@ namespace UI.Game2D.Battle
                 if (_hitAgo == null) _hitAgo = 0;
                 Game2DSfx.Hit(A.fam, h.kind, _crit, A.fam == "dagger" ? 1.1f : 1f);
                 int part = _hitIdx == A.hits.Count ? _dealt - _dealtSoFar : Mathf.Max(1, Mathf.RoundToInt(_dealt * h.frac));
+                bool first = _dealtSoFar == 0;      // この攻撃で最初にダメージが入る着弾 (薄い斬撃痕 cut は数えない)
                 _dealtSoFar += part; _ehp = Mathf.Max(0, _ehp - part);
                 bool big = h.kind == "chop" || h.kind == "slam" || h.kind == "finish" || h.kind == "dragon"; float c = _crit ? 1.5f : 1f;
                 if (_crit) _guiShake = big ? 1f : 0.45f;      // 会心だけ、 GUI が衝撃で揺れる
@@ -315,8 +331,15 @@ namespace UI.Game2D.Battle
                     if (_critFx == null) _critFx = FxSheet.Load("crit-hit");
                     if (_critFx != null) _fx.Add(new FxPlay { s = _critFx, x = EX, y = EY + CritFxLift });
                 }
+                // 倍率は 1 回の攻撃の最初の着弾にだけ。 倍率の前の値から数え上げる (会心 = 止めの間に数え上げ、 止めが解ける瞬間に決め)
+                int pct = first ? HitMultPct : 0;
+                float cnt = pct > 100 && part > 1 ? (_crit ? (big ? 0.2f : 0.11f) : 0.14f) : 0f;
                 _flashE = 1; _shake = (big ? 1.8f : 0.7f) * c; _freeze = (big ? 0.06f : 0.03f) * (_crit ? 1.4f : 1f);
-                _dmgs.Add(new Dmg { x = EX + Mathf.Round(R(-15, 15)), y = EY - 54 - (h.kind == "slash" ? Mathf.Round(R(0, 12)) : 0), v = part, c = _crit ? Col.Hex("#ffb347") : Col.Hex("#ffe27a") });
+                if (_crit && first) { _freeze = Mathf.Max(_freeze, cnt); _critT = -cnt; }
+                float dmgX = EX + Mathf.Round(R(-15, 15)), dmgY = EY - 54 - (h.kind == "slash" ? Mathf.Round(R(0, 12)) : 0);
+                if (_crit && first) { _critX = Mathf.RoundToInt(dmgX); _critY = Mathf.RoundToInt(dmgY) - 4 - 27; }
+                _dmgs.Add(new Dmg { x = dmgX, y = dmgY, v = part, c = _crit ? Col.Hex("#ffb347") : Col.Hex("#ffe27a"),
+                                    pct = pct, crit = _crit, cnt = cnt, life = _crit ? 1.5f : 1.2f });
                 Burst(EX, EY, Mathf.RoundToInt((big ? 28 : 14) * c), Yel);
                 if (h.kind == "dragon")
                 {
@@ -494,10 +517,45 @@ namespace UI.Game2D.Battle
                         if (lv > BattleCanvas.Bayer[(y & 3) * 4 + (x & 3)]) _c.Put(x, y, new Col(170, 24, 12), 0.7f);      // 被弾の赤い縁 (網点)
                     }
             if (SimDriven && (_phase == Phase.Idle || _phase == Phase.Dot)) DrawMarks(EX + ep.dx, FLOOR + bob + ep.y);
-            foreach (var d in _dmgs) { float u = d.t / 1.2f, y = d.y - Mathf.Round(Mathf.Min(1, u * 1.8f) * 20); if (u < 1f) Text35("-" + d.v, Mathf.RoundToInt(d.x), Mathf.RoundToInt(y) - 4, 2, d.c, 1); }
+            foreach (var d in _dmgs)
+            {
+                if (d.t >= d.life || (d.life - d.t < 0.16f && ((int)(d.t * 30) & 1) == 0)) continue;      // 消え際は明滅
+                float ts = d.t - d.cnt; bool counting = ts < 0;      // ts = 決めからの時間
+                int v = d.v, step = 0;
+                if (counting)      // 倍率の前の値から加速して数え上げる (6 段・最後の 1 段で大きく跳ねる)
+                {
+                    step = Mathf.Min(5, (int)(d.t / d.cnt * 6f)); float k = step / 6f;
+                    int b = Mathf.Max(1, d.v * 100 / d.pct); v = b + Mathf.RoundToInt((d.v - b) * k * k * k);
+                }
+                // 位置: 数え上げ中は 1 ドット刻む。 会心の決めは下へ叩きつけて 1 度跳ね返り、 その場で脈打つ
+                int dy = counting ? -(step & 1)
+                       : d.crit && ts < 0.04f ? 3 : d.crit && ts < 0.08f ? -2
+                       : d.crit ? 0 : -Mathf.RoundToInt(Mathf.Min(1, ts / 0.6f) * 18);      // 会心はその場に居座る (CRITICAL! の字の下)
+                string num = "-" + v; int xi = Mathf.RoundToInt(d.x), y0 = Mathf.RoundToInt(d.y) - 4, yi = y0 + dy;
+                int right = xi + Game2DJpFont.Width("-" + d.v), nx = right - Game2DJpFont.Width(num) * 2;      // 右端をそろえる (桁が増えても倍率の字が動かない)
+                var col = d.c;
+                if (d.crit && !counting)
+                {
+                    col = ts < 0.05f ? new Col(255, 255, 255) : ts < 0.1f ? Hx("#fff0c8") : ((int)(ts * 8) & 1) == 0 ? d.c : Hx("#ffc866");      // 白 → 橙の濃淡で脈打つ (8 コマ/秒)
+                    if (d.cnt > 0 && ts < 0.09f) { int hh = ts < 0.03f ? 3 : ts < 0.06f ? 2 : 1; _c.Rect(0, yi + Game2DJpFont.Cell - hh / 2, W, hh, Hx("#fff0c8"), 0.8f - ts * 6f, true); }      // 横一閃
+                    if (ts < 0.14f) for (int j = 1; j <= 3; j++) Text35(num, nx - j * Mathf.RoundToInt(5 - ts * 28), yi, 2, Hx("#ff7a1e"), 0, true, 0.45f / j * (1 - ts / 0.14f), true, false);      // 左へ流れる残像 (加算)
+                    for (int g = 0; g < 4; g++) Text35(num, nx + (g == 0 ? -2 : g == 1 ? 2 : 0), yi + (g == 2 ? -2 : g == 3 ? 2 : 0), 2, Hx("#ff8a2a"), 0, true, 0.2f, true, false);      // 発光 (加算)
+                }
+                Text35(num, nx, yi, 2, col, 0, d.crit);      // 会心は斜体
+                if (d.pct > 0 && ts < 0.75f)      // 倍率 (会心込み) を数字の右下に。 数え上げの間は明滅、 決めの後は暗くなって先に消える
+                {
+                    var mc = d.t < 0.04f || (counting && (step & 1) == 0) ? Hx("#fff6e0") : ts < 0.25f ? d.c : ts < 0.5f ? Hx("#c98c3a") : Hx("#7d5a2c");
+                    Text35(d.pct + "%", right + 3, y0 + 12 - (d.t < 0.04f ? 2 : 0), 1, mc, 0, d.crit);
+                }
+            }
             if (_phase == Phase.PAttack && _anim != null && _anim.fam == "dragon") DragonLine(_t);
             if (_flashW > 0) for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) if (_flashW * 16 > BattleCanvas.Bayer[(y & 3) * 4 + (x & 3)]) _c.Put(x, y, new Col(255, 248, 232), 0.4f, true);
-            if (_crit && _phase == Phase.PAttack && _t < 1.1f) Text35("CRITICAL!", W / 2, 66, 2, Hx("#ffb347"), 1);
+            if (_critT >= 0 && _critT < 1.1f && !(_critT > 0.95f && ((int)(_critT * 30) & 1) == 0))      // 会心の決めの瞬間に左から滑り込み、 白と橙で明滅してから落ち着く
+            {
+                int slide = _critT < 0.04f ? -20 : _critT < 0.08f ? 3 : 0;
+                var cc = _critT < 0.32f && ((int)(_critT / 0.04f) & 1) == 0 ? new Col(255, 255, 255) : Hx("#ffb347");
+                Text35("CRITICAL!", _critX + slide, _critY, 2, cc, 1, true);
+            }
             if (_phase == Phase.Intro && _introBlinds) Blinds(_t);
             if (sx != 0 || sy != 0)
             {
@@ -677,14 +735,22 @@ namespace UI.Game2D.Battle
 
         /// <summary>字を scale 倍のドットで打つ (既定のフォント・GameFont・2026-11-11 に旧 3×5 の字から変更)。 align: 0 = 左 / 1 = 中央。 影つき。
         /// scale は整数倍 (1 dot を scale×scale の四角で打つ・補間しない)。</summary>
-        private void Text35(string s, int x, int y, int scale, Col col, int align)
+        /// <param name="italic">斜体 (会心のダメージの数字・2026-11-11)。 字の上ほど右へずらす (元の 3 行ごとに 1 ドット = 約 18°)。 ドットは拡大しないので崩れない。</param>
+        /// <param name="a">濃さ。</param><param name="add">加算で重ねる (発光・残像)。</param><param name="shadow">影を打つか。</param>
+        private void Text35(string s, int x, int y, int scale, Col col, int align, bool italic = false, float a = 1f, bool add = false, bool shadow = true)
         {
             scale = Mathf.Max(1, scale);
-            int w = Game2DJpFont.Width(s) * scale; if (align == 1) x -= w / 2;
-            for (int pass = 0; pass < 2; pass++)
+            int cell = Game2DJpFont.Cell;
+            int w = Game2DJpFont.Width(s) * scale + (italic ? (cell / 3) * scale : 0); if (align == 1) x -= w / 2;
+            if (a <= 0f) return;
+            for (int pass = shadow ? 0 : 1; pass < 2; pass++)
             {
                 int o = pass == 0 ? Mathf.Max(1, scale / 2) : 0; var cc = pass == 0 ? new Col(0, 0, 0) : col;
-                Game2DJpFont.Draw((px, py) => _c.Rect(x + (px - x) * scale + o, y + (py - y) * scale + o, scale, scale, cc), s, x, y);
+                Game2DJpFont.Draw((px, py) =>
+                {
+                    int sh = italic ? ((cell - 1 - (py - y)) / 3) * scale : 0;
+                    _c.Rect(x + (px - x) * scale + o + sh, y + (py - y) * scale + o, scale, scale, cc, a, add);
+                }, s, x, y);
             }
         }
 

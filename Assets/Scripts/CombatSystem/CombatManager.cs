@@ -26,6 +26,9 @@ namespace CombatSystem
     /// </summary>
     public partial class CombatManager : MonoBehaviour
     {
+        /// <summary>直近の主攻撃の倍率 (%) = 最終の主攻撃 ÷ 倍率の前の攻撃値 (会心・与ダメ%・敵の防御を全部含む)。 攻撃しなかったら 0。 画面の表示用 (2026-11-11)。</summary>
+        public int LastHitMultPct { get; private set; }
+
         // ===== シングルトン =====
         private static CombatManager instance;
         private static bool isApplicationQuitting;

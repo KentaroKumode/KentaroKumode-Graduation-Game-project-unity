@@ -305,6 +305,9 @@ namespace GameLoop
         /// <summary>手に入れたが、 入れ替えるかをまだ決めていない武器 (人が遊ぶ時だけ・2026-11-11)。 武器は 1 本しか持てない
         /// (<see cref="Loadout.Gain"/>)。 場面の画面が先頭から聞き、 <see cref="Loadout.ResolvePendingWeapon"/> で決める。</summary>
         public List<string> pendingWeaponIds = new List<string>();
+        /// <summary>層ボスの報酬で提示されている特殊端子 (§6-5) の id (2 択・2026-11-11)。 空 = 提示なし。
+        /// 人が遊んでいる時だけ入る (Game2DPhaseScreens が窓を出し、 GameManager.ResolveTerminalOffer で決める)。</summary>
+        public List<string> pendingTerminalOffer = new List<string>();
 
         /// <summary>装備中のダイスアイテムID（空=武器ダイス使用）。取得時に Loadout.TryAutoEquip で更新。</summary>
         public string equippedDiceId = "";
@@ -583,6 +586,7 @@ namespace GameLoop
             weaponPlus = 0;
             limitBreakStage = 0;
             pendingWeaponIds.Clear();
+            pendingTerminalOffer.Clear();
             // 兵站: 物資上限 +1/段 (2026-11-09)
             int provisionCapBonus = MetaProgression.MetaBuffApplicator.GetProvisionCapBonus();
             provisionCap = UnityEngine.Mathf.Max(1, GameHooks.ProvisionBaseMax + provisionCapBonus);

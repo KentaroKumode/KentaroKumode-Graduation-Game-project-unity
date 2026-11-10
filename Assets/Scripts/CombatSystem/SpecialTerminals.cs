@@ -112,6 +112,35 @@ namespace CombatSystem
             return null;
         }
 
+        /// <summary>層ボスの報酬の 2 択 (2026-11-11)。 装着中のものを除いた中から、 重ならない count 個。</summary>
+        public static List<string> RollOffer(GameLoop.RunState run, int count = 2)
+        {
+            var pool = new List<string>();
+            for (int i = 0; i < All.Count; i++) if (run == null || All[i].id != run.equippedSpecialTerminalId) pool.Add(All[i].id);
+            var res = new List<string>();
+            while (res.Count < count && pool.Count > 0)
+            {
+                int k = GameLoop.GameRng.RangeAuto("terminal.offer", 0, pool.Count);
+                res.Add(pool[k]); pool.RemoveAt(k);
+            }
+            return res;
+        }
+
+        /// <summary>戦闘画面の端子の札に出す 2 文字の名前。</summary>
+        public static string ShortName(SpecialTerminalDef d)
+        {
+            if (d == null) return "特殊";
+            switch (d.kind)
+            {
+                case SpecialTerminalKind.HeavyStrike: return "重撃";
+                case SpecialTerminalKind.FullGuard:   return "鉄壁";
+                case SpecialTerminalKind.Battery:     return "蓄電";
+                case SpecialTerminalKind.Coolant:     return "冷却";
+                case SpecialTerminalKind.Foundry:     return "鋳造";
+                default: return d.displayName != null && d.displayName.Length > 2 ? d.displayName.Substring(0, 2) : d.displayName;
+            }
+        }
+
         /// <summary>装着中の定義。 未購入なら null ＝ **第 4 端子そのものが存在しない**。</summary>
         public static SpecialTerminalDef Equipped(GameLoop.RunState run)
             => run == null ? null : Get(run.equippedSpecialTerminalId);

@@ -1733,12 +1733,25 @@ namespace AutoTest
             return false;
         }
 
-        /// <summary>ラン開始前に宣言する特殊端子 (§6-5) をペルソナから決める。
+        /// <summary>層ボスの報酬の特殊端子 (§6-5) の 2 択から選ぶ (2026-11-11・人と同じ入手)。 戻り値は添字、 負 = 今のまま。
         ///
-        /// **一様ランダムにしない。** 端子は「そのビルドで何をしたいか」の宣言なので、
-        /// ビルドと無関係に配ると全ペルソナの平均しか出ず、 どの端子が効くのか分からなくなる。
-        /// ペルソナが立っていないラン (RawTier) だけ一様抽選にして、 11 種の網羅を担保する。</summary>
-        private string PickSpecialTerminal()
+        /// 方策: ペルソナに合う端子が並んでいればそれ。 無ければ、 何も付けていない時だけ先頭を取り (配線の評価は得な時しか挿さないので、
+        /// 持っていて損はしない)、 付けている時は替えない。 ペルソナに合う物をもう付けていれば替えない。
+        /// 旧: ラン開始前にペルソナで 1 つ決めて 1 層から持っていた。</summary>
+        private int ChooseSpecialTerminal(IReadOnlyList<string> offer)
+        {
+            var gm = GameLoop.GameManager.Instance; var run = gm != null ? gm.Run : null;
+            string want = PreferredSpecialTerminal(), cur = run != null ? run.equippedSpecialTerminalId : "";
+            if (!string.IsNullOrEmpty(want))
+            {
+                if (cur == want) return -1;
+                for (int i = 0; i < offer.Count; i++) if (offer[i] == want) return i;
+            }
+            return string.IsNullOrEmpty(cur) ? 0 : -1;
+        }
+
+        /// <summary>ペルソナに合う特殊端子の id (無ければ空)。</summary>
+        private string PreferredSpecialTerminal()
         {
             var K = CombatSystem.SpecialTerminalKind.None;
             switch (_currentPersona)
@@ -1753,11 +1766,7 @@ namespace AutoTest
                 case BuildPersona.Rinkai:   K = CombatSystem.SpecialTerminalKind.Foundry;     break;
                 case BuildPersona.Standard: K = CombatSystem.SpecialTerminalKind.HeavyStrike; break;
             }
-            if (K != CombatSystem.SpecialTerminalKind.None)
-                return CombatSystem.SpecialTerminals.Get(K)?.id ?? "";
-
-            var pool = CombatSystem.SpecialTerminals.All;
-            return pool[GameLoop.GameRng.RangeAuto("AutoRunner.specialTerm", 0, pool.Count)].id;
+            return K != CombatSystem.SpecialTerminalKind.None ? CombatSystem.SpecialTerminals.Get(K)?.id ?? "" : "";
         }
 
         /// <summary>端子上限の判定で使う「その端子を使ったか」のフラグ。 毎回 new しないため使い回す。</summary>

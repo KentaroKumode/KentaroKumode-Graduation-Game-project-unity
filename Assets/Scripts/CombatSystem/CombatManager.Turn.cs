@@ -1074,6 +1074,8 @@ namespace CombatSystem
             //   逃げるターンは固定ダメの枠も捨てる (atkBase の確定後に足された臨界爆発・品が預けた分を含む)。
             //   役の追撃も攻撃に付くものなので、 攻撃しないターンには乗せない。
             if (skipAttack) { dealtDmg = 0; isCrit = false; }
+            // 画面: 主攻撃の倍率 (会心・与ダメ%・敵の防御まで全部込みの 最終 ÷ 倍率の前の攻撃値) を着弾の数字の横に出す (2026-11-11)
+            LastHitMultPct = !skipAttack && atkBase > 0 && dealtDmg > 0 ? Mathf.RoundToInt(dealtDmg * 100f / atkBase) : 0;
             EnemyHpLedger.CommitMainMitigation(!skipAttack);   // [計装] 主攻撃の防御・敵の軽減で削った量
             if (isCrit) ctx.accumulatedValues[MetaProgression.Relics.RelicApplicator.ShinganCritKey] = 1f;   // 遺物 心眼 3 個 (次のターンの会心率)
             if (_fleeRequested) dealtFixed = 0;
