@@ -83,7 +83,6 @@ namespace MapSystem
             foreach (var (a, b) in L.roads)
                 map.AddConnection(map.NodeIdAt(a), map.NodeIdAt(b), bidirectional: true);
 
-            ApplyFalseMerchant(map);
             return map;
         }
 
@@ -98,26 +97,6 @@ namespace MapSystem
             if (node.freeMap && FreeMove.FreeMapParams.BandOf(node.x) == FreeMove.FreeMapParams.BandSafe) return;
             if (node.type == TileType.Battle && roll < MetaProgression.MetaBuffApplicator.GetEliteUpgradePct())
                 node.type = TileType.EliteBattle;
-        }
-
-        /// <summary>メタデバフ Lv5 が有効なとき、各 Shop マスを確率で偽商人に変える。
-        /// type は Shop のまま（プレイヤーには判別不可）、isFalseMerchant フラグだけ立てる。</summary>
-        private static void ApplyFalseMerchant(FloorMap map)
-        {
-            // 偽商人は3層以降のみ出現（序盤の事故を避ける）
-            if (map == null || map.floor < 3) return;
-            float chance = MetaProgression.MetaDebuffApplicator.GetFalseMerchantChance();
-            if (chance <= 0f) return;
-
-            foreach (var n in map.GetAllNodes())
-            {
-                if (n == null || n.EffectiveType != TileType.Shop) continue;
-                if (GameLoop.GameRng.Chance(chance, "map.falseMerchant", map.floor * 100 + n.index))
-                {
-                    n.isFalseMerchant = true;
-                    Debug.Log($"[MapGenerator] 偽の商人を配置: {n.id}");
-                }
-            }
         }
 
         // ================================================================

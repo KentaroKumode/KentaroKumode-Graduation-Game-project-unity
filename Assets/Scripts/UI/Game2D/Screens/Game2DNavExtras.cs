@@ -150,7 +150,7 @@ namespace UI.Game2D
                 : "武器 " + wname + "  攻撃 ―  会心率 ―  会心倍率 ―\n与ダメ ―  防御 ―  貫通 ―  (戦闘に入ると出る)";
             d.bodyLines = 2;
             int pages = 1;
-            if (run.challengeCardMode && run.challengePicks.Count > 0)
+            if (run.challengePicks.Count > 0)
             {
                 const int perPage = 3;   // 2 段の行が窓に収まる数
                 pages = (run.challengePicks.Count + perPage - 1) / perPage; _invPage = Mathf.Clamp(_invPage, 0, pages - 1);
@@ -162,7 +162,7 @@ namespace UI.Game2D
                 }
                 d.footer = "受けている挑戦カード " + run.challengePicks.Count + " 枚 (同じ種類はランで 1 度だけ)";
             }
-            else d.footer = run.challengeCardMode ? "挑戦カードはまだ受けていない" : "";
+            else d.footer = "挑戦カードはまだ受けていない";
             d.buttons.Add(new ModalBtn { label = "消耗品へ", action = "tab", primary = true });
             if (pages > 1) d.buttons.Add(new ModalBtn { label = "次の頁 " + (_invPage + 1) + "/" + pages, action = "page" });
             d.buttons.Add(new ModalBtn { label = "閉じる", action = "close" });

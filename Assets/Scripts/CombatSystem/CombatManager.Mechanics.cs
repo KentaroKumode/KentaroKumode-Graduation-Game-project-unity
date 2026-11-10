@@ -136,28 +136,13 @@ namespace CombatSystem
         ///
         /// <para>人が操作するターン (<c>_interactiveTurn</c>) では、 方策を呼ぶ位置で止まって「振り直すか」を待つ。</para>
         /// </summary>
-        /// <summary>このターンに〈出目 1〉で 1 に潰した本数と、 潰したダイスの添字。 振り直しの後に掛け直すのに使う。</summary>
-        private int _forsakenThisTurn;
-        private readonly HashSet<int> _crushedDice = new HashSet<int>();
-
         /// <summary>振り直した出目へ、 振った直後と同じデバフを掛け直す (2026-11-10)。
-        /// 旧: 振り直しは面から値を引き直すだけで、 〈出目 1〉と 大罪:怠惰 (全部の出目 −N) が振り直したダイスから消えていた
-        /// (Super は充電で振り直すので、 怠惰の −2 が −5.2 ポイントしか効かなかった)。
-        /// 怠惰は振り直したダイスにだけ引く (振り直していないダイスは引き済み)。 出目 1 は潰れている本数が足りない分だけ、 大きい目から潰し直す。</summary>
+        /// 旧: 振り直しは面から値を引き直すだけで、 大罪:怠惰 (全部の出目 −N) が振り直したダイスから消えていた。
+        /// 振り直したダイスにだけ引く (振り直していないダイスは引き済み)。</summary>
         private void ReapplyDicePenaltiesAfterReroll(int[] playerDice, int[] playerFaceIdx, List<int> rerolled)
         {
-            foreach (int i in rerolled) _crushedDice.Remove(i);
-            while (_crushedDice.Count < _forsakenThisTurn)
-            {
-                int best = -1, bestVal = 1;
-                for (int i = 0; i < playerDice.Length; i++)
-                    if (!_crushedDice.Contains(i) && playerDice[i] > bestVal) { bestVal = playerDice[i]; best = i; }
-                if (best < 0) break;
-                playerDice[best] = 1; _crushedDice.Add(best);
-                if (playerFaceIdx != null && best < playerFaceIdx.Length) playerFaceIdx[best] = -1;
-            }
             int sloth = MetaProgression.MetaDebuffApplicator.GetSlothDicePenalty();
-            if (sloth > 0) foreach (int i in rerolled) if (!_crushedDice.Contains(i)) playerDice[i] = Math.Max(1, playerDice[i] - sloth);
+            if (sloth > 0) foreach (int i in rerolled) playerDice[i] = Math.Max(1, playerDice[i] - sloth);
         }
 
         private IEnumerator<TurnPause> RerollPhase(CombatContext ctx, int[] playerDice, int[] enemyDice, int playerDiceMax,
@@ -286,58 +271,17 @@ namespace CombatSystem
             }
         }
 
-        /// <summary>T4-A〈破綻〉: HP が閾値を下回っていたら**その時点の最大HP を半分にする**。
-        ///
-        /// 発動後は HP が新しい最大HP の 38% 相当になるので、 **その場で連鎖しない**。
-        /// 次の発動は新しい最大HP の 20% を割ったときで、 踏むたびに難しくなる。
-        /// 現在HP は下げない ── 半減で最大HP を下回ったぶんだけ切り詰める。</summary>
-        private void ApplyBreakdownIfNeeded()
-        {
-            float th = MetaProgression.MetaDebuffApplicator.GetBreakdownThreshold();
-            if (th <= 0f || playerHP <= 0) return;
-            var run = GameLoop.GameManager.Instance?.Run;
-            if (run == null || run.playerMaxHP <= 1) return;
-            // **回数制限なし** (2026-08-11 差し戻し)。 1 回限りにしたところ 1000 ラン で
-            //   590 回発動してなお T4 コスト −2.2pt しかなかった ── HP 20% を割る局面は
-            //   既に負けが決まっており、 そこで 1 度だけ最大HP を半分にしても結果が動かない。
-            //   複数回に戻すと「踏むたびに次の閾値が下がる」自己減速はそのままに、
-            //   立て直しの余地だけが削られる。
-            if (playerHP >= Mathf.CeilToInt(run.playerMaxHP * th)) return;
-
-            int before = run.playerMaxHP;
-            run.playerMaxHP = Math.Max(1, run.playerMaxHP / 2);
-            run.breakdownCount++;
-            MetaProgression.MetaDebuffApplicator.BreakdownTriggers++;
-            run.playerHP = Math.Min(playerHP, run.playerMaxHP);
-            playerMaxHP = run.playerMaxHP;
-            playerHP = run.playerHP;
-            Debug.Log($"[破綻] HP {playerHP} が閾値 {th:P0} を割った → 最大HP {before} → {run.playerMaxHP}"
-                    + $" (通算 {run.breakdownCount} 回目)");
-        }
-
-        /// <summary>T4-E〈最後の審判〉のラン累計戦闘ターンを進める。
-        /// 刻限後の罰は各被ダメージの最終適用時に乗せる。</summary>
+        /// <summary>〈最後の審判〉のラン累計戦闘ターンを進める。 刻限後の罰は敵の攻撃の上乗せ (MetaDebuffApplicator.GetEnemyAttackPct)。</summary>
         private void ApplyFinalJudgment()
         {
             var run = GameLoop.GameManager.Instance?.Run;
             if (run == null) return;
-            // 挑戦カードの〈最後の審判〉はファーム層のターンを数えない (旧の配点は今まで通り数える)
-            if (run.challengeCardMode && run.Depth == MapSystem.FreeMove.FloorPlan.FarmFloor) return;
+            // 〈最後の審判〉はファーム層のターンを数えない
+            if (run.Depth == MapSystem.FreeMove.FloorPlan.FarmFloor) return;
             run.totalCombatTurns++;
-            MetaProgression.MetaDebuffApplicator.JudgmentTurnsTotal++;
             int th = MetaProgression.MetaDebuffApplicator.GetJudgmentTurnThreshold();
-            // 刻限の分布は**デバフの有無に関わらず**採る (閾値を決める材料なので)。
-            if (th <= 0)
-            {
-                const int ProbeThreshold = 120;
-                if (run.totalCombatTurns == ProbeThreshold)
-                    MetaProgression.MetaDebuffApplicator.JudgmentRunsOverThreshold++;
-                return;
-            }
-            if (run.totalCombatTurns == th)
-                MetaProgression.MetaDebuffApplicator.JudgmentRunsOverThreshold++;
-            if (run.totalCombatTurns == th)
-                Debug.Log($"[最後の審判] 刻限到来 (累計{run.totalCombatTurns}T >= {th}) → 以後の被ダメージ×1.30");
+            if (th > 0 && run.totalCombatTurns == th)
+                Debug.Log($"[最後の審判] 刻限到来 (累計{run.totalCombatTurns}T >= {th}) → 以後の敵の攻撃 +%");
         }
 
         // 役の判定で使う一時バッファ。 毎ターン new すると GC を踏むので使い回す。
@@ -413,21 +357,6 @@ namespace CombatSystem
                 wiring[i] = DiceTerminal.Attack;
             }
 
-            // ② 〈綻び〉: 封印された端子へ挿さっているダイスを追い出す。
-            //   **方策/UI を信用しない** ── 封印を破った配線が来たら別の端子へ落とす。
-            {
-                int kinds = limit > 0 ? 4 : 3;
-                int sealed_ = MetaProgression.MetaDebuffApplicator.GetSealedTerminal(
-                    PassiveSkillManager.Instance?.Context?.currentTurn ?? 0, kinds);
-                if (sealed_ >= 0)
-                {
-                    // 逃がし先は攻撃。 攻撃が封印されているなら充電へ (最も無害な受け皿)。
-                    var fallback = (sealed_ == (int)DiceTerminal.Attack)
-                                 ? DiceTerminal.Charge : DiceTerminal.Attack;
-                    for (int i = 0; i < n; i++)
-                        if ((int)wiring[i] == sealed_) wiring[i] = fallback;
-                }
-            }
             // (旧〈不器用〉の端子上限は撤去済み。)
             //   2026-08-10 リワーク前は「同時に使える端子の種類数の上限」で、 ここで畳んでいた。
             //   新効果は**厚みへの後払い**なので、 配線を検閲せず ResolveClumsyOverload が
@@ -612,7 +541,7 @@ namespace CombatSystem
             float add = playerCritBaseRate + ctx.critRatePctAdd
                       + MetaProgression.MetaBuffApplicator.GetCritRatePctBonus();
             if (pendingBuff) add += ctx.GetBuff(ItemSystem.PassiveSkills.CombatContext.CritRateBuffKey);
-            add = Mathf.Max(0f, add - MetaProgression.MetaDebuffApplicator.GetPlayerCritRatePenalty());
+            add = Mathf.Max(0f, add);
             return ItemSystem.PassiveSkills.CombatContext.ResolveCritRate(add);
         }
 

@@ -676,7 +676,7 @@ namespace ItemSystem.PassiveSkills
                 // 逓減は 2026-09-15 に撤去したので、 加算合計から引くのと実効率から引くのは同値。
                 // **加算側で引く形を維持する** ── 下限 0 のクランプがここに要るのは変わらない。
                 critAdd = System.Math.Max(0f,
-                    critAdd - MetaProgression.MetaDebuffApplicator.GetPlayerCritRatePenalty());
+                    critAdd);
 
                 // 逓減撤去後は実質クランプのみ。 加算した分がそのまま実効会心率になる。
                 float critRate = CombatContext.ResolveCritRate(critAdd);

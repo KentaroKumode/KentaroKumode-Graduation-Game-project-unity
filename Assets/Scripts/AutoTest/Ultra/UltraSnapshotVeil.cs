@@ -211,7 +211,7 @@ namespace AutoTest.Ultra
         /// from the same distribution the board was built with instead of a second constant.</summary>
         public static float CurrentFalseMerchantChance()
         {
-            return MetaProgression.MetaDebuffApplicator.GetFalseMerchantChance();
+            return 0f;   // 旧〈偽の商人〉は旧配点方式と一緒に撤去 (2026-11-10)
         }
     }
 

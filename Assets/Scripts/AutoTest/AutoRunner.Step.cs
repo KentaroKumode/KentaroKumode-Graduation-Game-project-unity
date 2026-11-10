@@ -127,17 +127,16 @@ namespace AutoTest
                         break;
                 }
 
-                // 挑戦デバフ (docs/GAME.md §15-2)
-                //   challengeSpec があればそれを適用、 無ければ enableAllDebuffs で 100pt / 全解除。
-                //
-                //   **周回モード中はここを飛ばす。** SetChallengeMax は State.challenge.Clear() を
-                //   呼ぶので、 AscensionLoop が上げた難易度がラン開始のたびに消えてしまう。
-                //   周回モードでは AscensionLoop が挑戦構成の唯一の所有者。
+                // 挑戦の難易度 (挑戦カード・§23-25)。 2026-11-10 に旧配点方式 (§15-2) を撤去 (#9)。
+                //   優先: スイープの固定値 (_pendingChallengeDifficulty) → enableAllDebuffs (難易度 10) → challengeCardDifficulty。
+                //   **周回モード中はここを飛ばす** ── AscensionLoop が難易度の唯一の所有者。
                 if (!_ascensionPersonaLock)
                 {
-                    var mgr = MetaProgression.MetaProgressManager.Instance;
-                    if (!string.IsNullOrWhiteSpace(challengeSpec)) ApplyChallengeSpec(mgr, challengeSpec);
-                    else mgr?.SetChallengeMax(enableAllDebuffs);
+                    var stc = MetaProgression.MetaProgressManager.Instance?.State;
+                    if (stc != null)
+                        stc.challengeDifficulty = _pendingChallengeDifficulty >= 0 ? _pendingChallengeDifficulty
+                                                : enableAllDebuffs ? MetaProgression.ChallengeCards.MaxDifficulty
+                                                : challengeCardDifficulty;
                 }
                 else
                 {
@@ -147,10 +146,8 @@ namespace AutoTest
                     _ascension?.BeforeRun();
                 }
 
-                // 挑戦カードの難易度 (§23-25)。 1 以上なら配点より優先してカードのランになる (GameManager.BeginChallengeCards)
+                // 測定の差し込み口
                 {
-                    var stc = MetaProgression.MetaProgressManager.Instance?.State;
-                    if (stc != null) stc.challengeDifficulty = challengeCardDifficulty;
                     GameHooks.ProvisionMaxOverride = provisionMaxOverride;
                     GameHooks.ArmorDefPerRankOverride = armorDefPerRank;
                     GameHooks.ArmorShieldPerRankOverride = armorShieldPerRank;
@@ -174,9 +171,7 @@ namespace AutoTest
                 //   **遺物なしアームだけ挑戦スコアが 0 に落ちていた**。 実測: 挑戦30pt の
                 //   単軸スイープで、 遺物なし行だけ 5層クリア 53.2% (他アームは 5% 前後) と
                 //   0pt の値がそのまま出ていた。
-                //
-                // 位置は **SetChallengeMax の後**でなければならない ── 先に置くと
-                //   `_pendingChallengeLoadout` が Clear() で消える。
+
                 {
                     var st = MetaProgression.MetaProgressManager.Instance?.State;
                     if (st != null)
@@ -193,11 +188,6 @@ namespace AutoTest
                         {
                             st.SetRelicLoadout(_pendingPresetRelic != null
                                 ? _pendingPresetRelic.ConvertAll(r => r.Clone()) : null);
-                        }
-                        if (_pendingChallengeLoadout != null)
-                        {
-                            st.challenge = _pendingChallengeLoadout;
-                            st.InvalidateChallenge();
                         }
                     }
                 }
@@ -252,7 +242,6 @@ namespace AutoTest
                                 + $"/整備パネルHP+{MetaProgression.MetaPanel.ShellHp(MetaProgression.MetaProgressManager.Instance?.State?.GetRank(MetaProgression.MetaPanelKind.Shell) ?? 0)}"
                                 + $"/遺物HP+{MetaProgression.Relics.RelicApplicator.GetMaxHpBonus(r)}"
                                 + $"/メタ{metaBuffMode}"
-                                + $"/脆弱x{MetaProgression.MetaDebuffApplicator.GetMaxHpMultiplier():F2}"
                                 + $"/恒久:{pd}";
             }
             // 先読み方策の内部乱数と較正をラン単位で戻す。 **ラン番号だけで決まる**ので、

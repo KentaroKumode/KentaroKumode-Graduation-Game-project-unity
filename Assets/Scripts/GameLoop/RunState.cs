@@ -319,8 +319,6 @@ namespace GameLoop
         /// **ラン中ずっと固定**。 どの役が死ぬかでそのランの組み立てが変わるので、
         /// 戦闘ごとに引き直さない (引き直すと「運が悪い戦闘」の集合になり、 判断が生まれない)。</summary>
         public int sealedRoleMask;
-        /// <summary>挑戦カード (docs/GAME.md §23-25) のラン。 立っている間、 挑戦の構成は整備の配点ではなく受けたカードから作る。 [persistent]</summary>
-        public bool challengeCardMode;
         /// <summary>このランの挑戦の難易度 (= カードを引く回数・0..10)。 クリアすると記録になる。 [persistent]</summary>
         public int challengeDifficulty;
         /// <summary>受けた挑戦カード ("デバフの id|バフの id")。 [persistent]</summary>
@@ -330,13 +328,10 @@ namespace GameLoop
         [System.NonSerialized] private Dictionary<string, MetaProgression.ChallengeCards.Card> _cardMap;
         /// <summary>カードを受けた後に呼ぶ (種類ごとの値を作り直させる)。</summary>
         public void InvalidateCardChallenge() => _cardMap = null;
-        /// <summary>カードのランなら旧の挑戦の軸は全部切る (空の構成)、 そうでなければ null (整備の配点を使う・BOT の旧測定)。</summary>
-        public static MetaProgression.ResolvedChallenge CardChallenge(RunState run)
-            => run != null && run.challengeCardMode ? MetaProgression.ResolvedChallenge.None : null;
         /// <summary>カードのランなら受けたカード (種類 → カード)、 そうでなければ null。</summary>
         public static Dictionary<string, MetaProgression.ChallengeCards.Card> CardMap(RunState run)
         {
-            if (run == null || !run.challengeCardMode) return null;
+            if (run == null) return null;
             return run._cardMap ??= MetaProgression.ChallengeCards.Collect(run.challengePicks);
         }
         /// <summary>サイコロの**面の全部**（<see cref="DiceFaceParts"/>）。 素の面 {2,3,4,5} も T1 としてここに入る
@@ -529,10 +524,7 @@ namespace GameLoop
             shopRobberyDone = false;
             shopRobberyInProgress = false;
             robberyPendingItems = new List<string>();
-            // 挑戦デバフ〈脆弱な肉体〉: 最大HP ×0.90 / ×0.85 / ×0.80。 **1 を下回らせない。**
-            //   v3.0 で定数減算から倍率へ変更 ── 定数だと整備パネルで最大HPを伸ばすほど薄まった。
-            float fragile = MetaProgression.MetaDebuffApplicator.GetMaxHpMultiplier();
-            playerMaxHP = UnityEngine.Mathf.Max(1, UnityEngine.Mathf.RoundToInt(startHP * fragile));
+            playerMaxHP = UnityEngine.Mathf.Max(1, startHP);
             playerHP = playerMaxHP;
             totalBattles = 0;
             totalWins = 0;
@@ -568,7 +560,6 @@ namespace GameLoop
             lingeringWoundLost = 0;
             lingeringWoundDamageAccum = 0;
             sealedRoleMask = 0;
-            challengeCardMode = false;
             challengeDifficulty = 0;
             if (challengePicks == null) challengePicks = new List<string>(); else challengePicks.Clear();
             if (sinSealedPassives == null) sinSealedPassives = new List<string>(); else sinSealedPassives.Clear();
@@ -589,10 +580,7 @@ namespace GameLoop
             limitBreakStage = 0;
             // 兵站: 物資上限 +1/段 (2026-11-09)
             int provisionCapBonus = MetaProgression.MetaBuffApplicator.GetProvisionCapBonus();
-            // 挑戦デバフ 軸5〈絶望的な戦闘〉: 物資上限 −40/−80/−120。
-            // **整備パネル適用後に足す** (plan §6-4)。 先に引くとパネル側の計算で薄まる。
-            int provisionCapPenalty = MetaProgression.MetaDebuffApplicator.GetProvisionCapDelta();
-            provisionCap = UnityEngine.Mathf.Max(1, GameHooks.ProvisionBaseMax + provisionCapBonus + provisionCapPenalty);
+            provisionCap = UnityEngine.Mathf.Max(1, GameHooks.ProvisionBaseMax + provisionCapBonus);
             provision    = provisionCap;
 
             // (遺物軸〈渇き〉の開幕物資の引き下げは 2026-11-10 の遺物の再編で撤去・§24)

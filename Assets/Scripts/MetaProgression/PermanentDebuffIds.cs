@@ -130,18 +130,4 @@ namespace MetaProgression
             Pride, Envy, Greed, Wrath, Sloth, Gluttony, Lust,
         };
     }
-
-    /// <summary>恒久デバフ判定の薄いヘルパー。</summary>
-    public static class PermanentDebuffEffects
-    {
-        public static bool Has(RunState run, string id)
-            => run != null && run.permanentDebuffs != null && run.permanentDebuffs.Contains(id);
-
-        public static bool HasPride(RunState run)    => Has(run, PermanentDebuffIds.Pride);
-        public static bool HasEnvy(RunState run)     => Has(run, PermanentDebuffIds.Envy);
-        public static bool HasGreed(RunState run)    => Has(run, PermanentDebuffIds.Greed);
-        public static bool HasWrath(RunState run)    => Has(run, PermanentDebuffIds.Wrath);
-        public static bool HasGluttony(RunState run) => Has(run, PermanentDebuffIds.Gluttony);
-        public static bool HasLust(RunState run)     => Has(run, PermanentDebuffIds.Lust);
-    }
 }

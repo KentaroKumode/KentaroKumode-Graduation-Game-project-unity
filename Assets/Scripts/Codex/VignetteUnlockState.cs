@@ -97,14 +97,14 @@ namespace Codex
 
         /// <summary>
         /// ランが最高難度かどうかを判定する。 2026-07-29 に配点方式 (docs/GAME.md §15-2) へ移行し、
-        /// 「メタデバフフル」の定義を **挑戦スコア満点 (100pt)** に置き換えた。
+        /// 「メタデバフフル」の定義を **難易度 10 を踏破したこと** に置き換えた (2026-11-10)。
         /// プレイ開始時に確定するため Run 中でも参照できる。
         /// </summary>
         public static bool IsMaxDifficultyRun(RunState run)
         {
             var meta = MetaProgression.MetaProgressManager.Instance?.State;
             if (meta == null) return false;
-            return meta.ChallengeScore >= MetaProgression.ChallengeCatalog.TotalMaxScore;
+            return meta.challengeBest >= MetaProgression.ChallengeCards.MaxDifficulty;   // 2026-11-10: 旧配点の満点から難易度 10 の踏破へ
         }
 
         // ----------------------------------------------------------------

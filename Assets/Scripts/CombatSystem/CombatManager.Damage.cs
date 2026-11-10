@@ -180,9 +180,6 @@ namespace CombatSystem
             //   **最低 1 は残す** ── 0 にすると削りが完全に止まり、 耐久レースが成立しなくなる。
             //
             //   (同種のデバフを足すときは重ねがけせず厳しい方 1 つを採ること ── 乗算は 0.756 まで落ちた。)
-            float metaDmgMul = MetaProgression.MetaDebuffApplicator.GetPlayerDamageMultiplier();
-            if (metaDmgMul < 0.999f && totalDmg > 0)
-                totalDmg = Mathf.Max(1, Mathf.RoundToInt(totalDmg * metaDmgMul));
             if (CombatStats.DiagWinAttack) CombatStats.DamageStages[7] += totalDmg;   // 段 G
 
             // 敵側のダメージ軽減パッシブを発火（前後で ctx.finalDamage と totalDmg を同期し、
@@ -261,30 +258,6 @@ namespace CombatSystem
             }
             if (CombatStats.DiagWinAttack) CombatStats.DamageStages[14] += totalDmg;   // 段 N
 
-            // 挑戦デバフ 軸7〈俊敏〉
-            //   T1 以上: 各戦闘の最初の 1 回の被弾を必ず回避
-            //   T2/T3  : さらに 2 回目以降も 20% / 40% で回避
-            if ((totalDmg + fixedDmg) > 0 && MetaProgression.MetaDebuffApplicator.EnemyDodgesFirstHit())
-            {
-                bool dodged = false;
-                if (!metaAgilityDodgeUsed)
-                {
-                    metaAgilityDodgeUsed = true;
-                    dodged = true;
-                    Debug.Log($"[俊敏] 初撃を回避 (与ダメ {totalDmg}+{fixedDmg} を無効化)");
-                }
-                else
-                {
-                    float p = MetaProgression.MetaDebuffApplicator.GetEnemyDodgeChance();
-                    // 決定論のため GameRng を通す。 連番は戦闘通し番号 + ターンで一意 (RngIdx)。
-                    if (p > 0f && GameLoop.GameRng.Value("meta.agilityDodge", RngIdx(7)) < p)
-                    {
-                        dodged = true;
-                        Debug.Log($"[俊敏] 2回目以降の回避 ({p:P0}) (与ダメ {totalDmg}+{fixedDmg} を無効化)");
-                    }
-                }
-                if (dodged) { totalDmg = 0; fixedDmg = 0; }
-            }
 
             if (CombatStats.DiagWinAttack) CombatStats.DamageStages[15] += totalDmg;   // 段 O (最終)
             return totalDmg;
@@ -302,9 +275,6 @@ namespace CombatSystem
             //   〈天変地異〉のボス初撃強化は 2026-08-08 に廃止し、 エスカレーション閾値の
             //   前倒し (Escalation.StageOf) へ移した。 ボス戦のみ・最初の 3 撃という形は
             //   40 ターン級の戦闘では誤差にしかならず、 単独 T3 が実質無料だったため。
-            float enemyMul = MetaProgression.MetaDebuffApplicator.GetEnemyDamageMultiplier();
-            if (Mathf.Abs(enemyMul - 1f) > 0.001f)
-                totalDmg = Mathf.CeilToInt(totalDmg * enemyMul);
 
             // 敵スタンス（ADR-0005）: 被ダメ倍率（高ダメ>1/低ダメ<1）。以降の軽減はスタンス後の値に効く。
             if (ctx != null && Mathf.Abs(ctx.enemyStanceDamageMult - 1f) > 0.001f && totalDmg > 0)

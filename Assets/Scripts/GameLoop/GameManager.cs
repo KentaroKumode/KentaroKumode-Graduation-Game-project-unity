@@ -284,11 +284,6 @@ namespace GameLoop
             // メタ恒久バフを適用（HP/Gold/初期素材を底上げ）
             MetaProgression.MetaBuffApplicator.ApplyToRunStart(Run, BaseStartingHP);
 
-            // T4-C〈凶運〉: **ラン開始時に一度だけ**全役から 2 つ封印する。
-            //   メタバフ適用の後に置く ── GameRng の消費順を固定するため。
-            Run.sealedRoleMask = MetaProgression.MetaDebuffApplicator.RollSealedRoles(Run);
-            if (Run.sealedRoleMask != 0)
-                Log($"凶運: 役を封印 (mask={Run.sealedRoleMask})");
             // メタバフ〈開幕パッシブ〉(宝物庫): ノーマル枠から N 個獲得して所持。
             //   2026-09-10: 宝物庫が素材からパッシブへ変わり、 本数が r2/5/8/10 で増える。
             //   `PickPassiveItemForBossExtra` は `BuildDedupExclude` でラン内重複を除くので、
@@ -423,12 +418,6 @@ namespace GameLoop
             //   「長く彷徨うほど追い詰められる」形。 閾値以内なら一切効かないので、
             //   最短で降りるプレイには無害 ── 寄り道の対価としてだけ働く。
             Run.tilesThisFloor++;
-            int impatienceMax = MetaProgression.MetaDebuffApplicator.GetImpatienceTileThreshold();
-            if (impatienceMax > 0 && Run.tilesThisFloor > impatienceMax)
-            {
-                ProvisionSystem.Reduce(Run, MetaProgression.MetaDebuffApplicator.ImpatienceProvisionLoss);
-                Log($"焦燥: {Run.currentFloor}層 {Run.tilesThisFloor}マス目 (閾値{impatienceMax}) → 物資 -{MetaProgression.MetaDebuffApplicator.ImpatienceProvisionLoss}");
-            }
 
             if (ProvisionSystem.ApplyArrival(Run))
             {

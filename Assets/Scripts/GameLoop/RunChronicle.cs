@@ -17,7 +17,7 @@ namespace GameLoop
     ///
     /// <para><b>コードを enum の暗黙 int でセーブしないこと。</b>
     /// このプロジェクトには既に <c>RelicAxis</c> / <c>RelicCurse</c> / <c>RoleKind</c> /
-    /// <c>ChallengeAxis</c> で「宣言順を変えると過去のセーブが壊れる」制約がある。
+    /// 旧 <c>ChallengeAxis</c> (2026-11-10 撤去) で「宣言順を変えると過去のセーブが壊れる」制約がある。
     /// 同じ罠をもう 1 つ作らないため、コードは **文字列** で持つ。
     /// バリアントは後から必ず増えるので、順序の概念自体を持たせない。</para>
     /// </summary>

@@ -35,10 +35,7 @@ namespace MetaProgression
         public int achievementCombatWins;
         public int achievementRoleMask;
 
-        /// <summary>挑戦デバフの構成 (docs/GAME.md §15-2)。 2026-07-29 に旧 activeDebuffs
-        /// (MetaDebuffLevel Lv1-10 の独立トグル) を**破棄して**置換した。 旧セーブの
-        /// activeDebuffs は JsonUtility が黙って捨てるので、 マイグレーションは不要。</summary>
-        public ChallengeLoadout challenge = new ChallengeLoadout();
+        // (旧: 挑戦デバフの配点 `challenge` (§15-2) は 2026-11-10 に撤去 (#9)。 JsonUtility は未知の欄を黙って捨てる)
 
         /// <summary>挑戦カード (docs/GAME.md §23-25) の難易度 (0..10 = ラン中にカードを引く回数)。 整備の「挑戦」の目盛りで選ぶ。</summary>
         public int challengeDifficulty;
@@ -193,33 +190,8 @@ namespace MetaProgression
         }
 
         // ============================================================
-        //  挑戦デバフ
+        //  (挑戦の配点の解決は 2026-11-10 に撤去・難易度は challengeDifficulty)
         // ============================================================
-
-        /// <summary>解決済み構成のキャッシュ。 挑戦設定はラン中に変わらないので、
-        /// 変更時だけ捨てて作り直す (<see cref="InvalidateChallenge"/>)。</summary>
-        [System.NonSerialized] private ResolvedChallenge _resolved;
-
-        /// <summary>解決済みの挑戦構成。 各システムはこれだけを見る。</summary>
-        public ResolvedChallenge Challenge
-        {
-            get
-            {
-                if (_resolved == null)
-                {
-                    if (challenge == null) challenge = new ChallengeLoadout();
-                    challenge.Sanitize();
-                    _resolved = ChallengeResolver.Build(challenge);
-                }
-                return _resolved;
-            }
-        }
-
-        /// <summary>挑戦構成を書き換えたあとに呼ぶ。 次回参照時に再解決される。</summary>
-        public void InvalidateChallenge() => _resolved = null;
-
-        /// <summary>現在の挑戦スコア (0..100)。</summary>
-        public int ChallengeScore => Challenge.Score;
 
         // ============================================================
         //  パネル API

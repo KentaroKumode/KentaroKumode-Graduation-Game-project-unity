@@ -1702,149 +1702,8 @@ namespace AutoTest.EditorTools
             Launch(1);
         }
 
-        /// <summary>〈最後の審判〉の効果を、既定の 60000 帯とは独立したシードで再測定する。
-        /// 基準 + 審判単独 + ノイズ床だけを各 1000 ラン回し、混沌的発散による偶然の差かを判定する。</summary>
-        [MenuItem("Tools/AutoRun/診断: 最後の審判 別シード帯 (基準 vs 審判・各1000ラン)", priority = 13)]
-        public static void RunFinalJudgmentAlternateSeedDiag()
-        {
-            Skill = AutoRunner.WiringSkill.Optimal;
-            SessionState.SetBool(ChalAxisKey, true);
-            SessionState.SetBool(ChalAxisNoRelicKey, true);
-            SessionState.SetBool(ChalCatKey, true);
-            SessionState.SetBool(ChalCatAloneKey, true);
-            SessionState.SetInt(ChalCatOnlyKey, (int)MetaProgression.ChallengeCategory.E崩壊);
-            SessionState.SetInt(ChalAxisSeedBaseKey, 70000);
-            Launch(1);
-        }
+        // (挑戦の単軸・カテゴリ スイープと、 それを使う審判の診断・決定性検査のメニューは 2026-11-10 の旧配点方式の撤去で削除)
 
-        /// <summary>正式な配点条件で E崩壊 6pt と 6pt+〈最後の審判〉を別シード比較する。</summary>
-        [MenuItem("Tools/AutoRun/診断: 最後の審判 配点検証 (E6pt vs E6pt+審判・各1000ラン)", priority = 13)]
-        public static void RunFinalJudgmentPricingDiag()
-        {
-            Skill = AutoRunner.WiringSkill.Optimal;
-            SessionState.SetBool(ChalAxisKey, true);
-            SessionState.SetBool(ChalAxisNoRelicKey, true);
-            SessionState.SetBool(ChalCatKey, true);
-            SessionState.SetInt(ChalCatOnlyKey, (int)MetaProgression.ChallengeCategory.E崩壊);
-            SessionState.SetInt(ChalAxisSeedBaseKey, 70000);
-            Launch(1);
-        }
-
-        /// <summary>**固着の再現用**。 A生存圧+破綻 アームだけを進捗毎ラン で回す。
-        ///
-        /// 2026-08-11: T4 スイープが arm 2/7 (A生存圧+破綻) の 850〜900 ラン目付近で
-        /// 固着した。 番犬 (実時間) も反復上限もストール検出も**発火しなかった** ──
-        /// この 3 つは全て yield のたびに判定するので、 **1 フレーム内で回り続ける
-        /// ループ**には効かない。 進捗を毎ラン出せば、 Editor.log の最終行が
-        /// 固着したラン番号をそのまま指す。</summary>
-        [MenuItem("Tools/AutoRun/T4 固着再現: A生存圧+破綻 のみ (進捗毎ラン)", priority = 13)]
-        public static void RunT4StallRepro()
-        {
-            Skill = AutoRunner.WiringSkill.Optimal;
-            SessionState.SetBool(ChalAxisKey, true);
-            SessionState.SetBool(ChalAxisNoRelicKey, true);
-            SessionState.SetBool(ChalCatKey, true);
-            SessionState.SetBool(ChalCatT4Key, true);
-            SessionState.SetInt(ChalCatOnlyKey, (int)MetaProgression.ChallengeCategory.A生存圧);
-            Launch(1);
-        }
-
-        [MenuItem("Tools/AutoRun/挑戦 単軸スイープ (遺物なし・ノーマルAI・各1000ラン)", priority = 13)]
-        public static void RunChallengeAxisSweepNoRelic()
-        {
-            Skill = AutoRunner.WiringSkill.Optimal;   // 天井ではなく現行の参照点で測る
-            SessionState.SetBool(ChalAxisKey, true);
-            SessionState.SetBool(ChalAxisNoRelicKey, true);
-            Launch(1);
-        }
-
-        [MenuItem("Tools/AutoRun/挑戦 単軸スイープ (全23段 × 各300ラン)", priority = 13)]
-        public static void RunChallengeAxisSweep()
-        {
-            SessionState.SetBool(ChalAxisKey, true);
-            Launch(1);
-        }
-
-        /// <summary>上の短縮版。 各軸の最上位段だけ (12 アーム) を回す。 段のカーブは見えないが
-        /// 「どの軸が一番重いか」だけなら半分の時間で出る。</summary>
-        [MenuItem("Tools/AutoRun/挑戦 単軸スイープ: 最上位段のみ (12軸 × 各300ラン)", priority = 13)]
-        public static void RunChallengeAxisSweepMaxOnly()
-        {
-            SessionState.SetBool(ChalAxisKey, true);
-            SessionState.SetBool(ChalAxisMaxKey, true);
-            Launch(1);
-        }
-
-        /// <summary>上の動作確認版。 **ログを抑止せず** 各段 3 ラン だけ回す。
-        /// 本測定は 6900 ラン・50 分級で進捗が一切出ないので、 先にこれで通ることを見る。</summary>
-        /// <summary>乖離調査: 基準アームだけを 20 ラン 回して先頭 10 ランの到達層を採る。
-        /// 技量帯スイープの同一 runIdx と突き合わせるため。</summary>
-        [MenuItem("Tools/AutoRun/診断: 単軸スイープの先頭10ラン (基準のみ・20ラン)", priority = 13)]
-        public static void RunAxisProbe()
-        {
-            Skill = AutoRunner.WiringSkill.Optimal;
-            SessionState.SetBool(ChalAxisKey, true);
-            SessionState.SetBool(ChalAxisNoRelicKey, true);
-            SessionState.SetBool(ChalAxisSmokeKey, true);
-            SessionState.SetInt(ChalAxisOnlyKey, 0);   // 1 軸だけ = 基準 + その軸
-            Launch(1);
-        }
-
-        [MenuItem("Tools/AutoRun/挑戦 単軸スイープ: 動作確認 (各3ラン・ログ有)", priority = 13)]
-        public static void RunChallengeAxisSweepSmoke()
-        {
-            SessionState.SetBool(ChalAxisKey, true);
-            SessionState.SetBool(ChalAxisSmokeKey, true);
-            Launch(1);
-        }
-
-        /// <summary>1 軸だけを全段で回す診断。 基準 + その軸の段数 だけなので 900〜1200 ラン。
-        /// 「価格 +15% と +35% が同じ結果になる」のような 1 軸の疑問に、
-        /// 全 23 段 (6900 ラン) を回さずに答える。 **対話ダイアログは置かない** ──
-        /// このメニューは MCP から自動実行するので、 モーダルが出ると押せずに固まる。</summary>
-        private static void LaunchChallengeAxisOne(MetaProgression.ChallengeAxis axis)
-        {
-            int idx = MetaProgression.ChallengeCatalog.Axes.FindIndex(a => a.axis == axis);
-            if (idx < 0) { Debug.LogError($"[AutoRun] 軸が見つからない: {axis}"); return; }
-            SessionState.SetBool(ChalAxisKey, true);
-            SessionState.SetInt(ChalAxisOnlyKey, idx);
-            Launch(1);
-        }
-
-        [MenuItem("Tools/AutoRun/診断: 挑戦1軸/搾取経済 (全段 × 各300ラン)", priority = 13)]
-        public static void RunChalAxisOneShopPrice()
-            => LaunchChallengeAxisOne(MetaProgression.ChallengeAxis.搾取経済);
-
-        [MenuItem("Tools/AutoRun/診断: 挑戦1軸/宿屋連合 (全段 × 各300ラン)", priority = 13)]
-        public static void RunChalAxisOneInn()
-            => LaunchChallengeAxisOne(MetaProgression.ChallengeAxis.宿屋連合);
-
-        [MenuItem("Tools/AutoRun/診断: 挑戦1軸/長引く負傷 (全段 × 各300ラン)", priority = 13)]
-        public static void RunChalAxisOneWound()
-            => LaunchChallengeAxisOne(MetaProgression.ChallengeAxis.長引く負傷);
-
-        /// <summary>決定性の検査。 **0pt だけの同一アームを 4 本**並べ、 ラン単位で指紋を照合する。
-        /// 同一シード・同一設定なので全ラン一致が正。 一致しないならラン間で状態が漏れており、
-        /// 軸間比較が全て信用できない (2026-08-10 に 4.0pt の食い違いを観測)。</summary>
-        [MenuItem("Tools/AutoRun/診断: 決定性検査 (0pt × 4アーム × 各300ラン)", priority = 13)]
-        public static void RunDeterminismCheck()
-        {
-            SessionState.SetBool(ChalAxisKey, true);
-            SessionState.SetInt(ChalAxisDetKey, 4);
-            Launch(1);
-        }
-
-        /// <summary>決定性の破れを **1 ラン単位で捕まえる**。 同一設定・同一 runIdx の 2 アームを
-        /// 1 ラン ずつ回し、 ナラティブの最初に分岐した行を出す。 ログ抑止を切る必要があるので
-        /// ラン数は最小にする。</summary>
-        [MenuItem("Tools/AutoRun/診断: 決定性 1ラン差分 (2アーム × 1ラン)", priority = 13)]
-        public static void RunDeterminismDiff()
-        {
-            SessionState.SetBool(ChalAxisKey, true);
-            SessionState.SetInt(ChalAxisDetKey, 2);
-            SessionState.SetBool(ChalAxisDiffKey, true);
-            Launch(1);
-        }
 
         [MenuItem("Tools/AutoRun/診断: 通常AI 並列化 (直列 vs 並列・各100ラン)", priority = 13)]
         public static void RunOptimalParallelBenchmark()
@@ -2805,7 +2664,6 @@ namespace AutoTest.EditorTools
                         + " ── **別シードの測定は同シードの測定と混ぜないこと**");
                 }
             }
-            runner.challengeSpec = EditorPrefs.GetString("AutoRun.ChallengeSpec", "");
             runner.autoStart = false;
             runner.exitPlayModeWhenDone = true;
             // プロファイルから metaPattern / enableAllDebuffs は Begin() 内で自動上書きされる

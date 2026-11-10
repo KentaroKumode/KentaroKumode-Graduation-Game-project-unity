@@ -30,7 +30,7 @@ namespace AutoTest
             var prevPickMode = itemPickMode;
             var prevSkill = wiringSkill;
             bool prevLock = _ascensionPersonaLock;
-            var prevChallenge = _pendingChallengeLoadout;
+            int prevChallenge = _pendingChallengeDifficulty;
 
             itemPickMode = ItemPickMode.BuildFocused;
             wiringSkill = WiringSkill.Optimal;
@@ -45,10 +45,10 @@ namespace AutoTest
                 {
                     int requestedScore = tierCalibrationScores[scoreIndex];
                     _activeTierCalibrationScore = Mathf.Max(0, requestedScore);
-                    var loadout = AscensionLoop.BuildLoadoutAtScore(_activeTierCalibrationScore);
-                    int actualScore = MetaProgression.ChallengeResolver.Score(loadout);
+                    int loadout = ScoreToDifficulty(_activeTierCalibrationScore);
+                    int actualScore = loadout * ScorePerDifficulty;
                     _activeTierCalibrationScore = actualScore;
-                    _pendingChallengeLoadout = loadout;
+                    _pendingChallengeDifficulty = loadout;
                     _currentPersona = BuildPersona.Standard;
 
                     string learningRoot = TierLearningRoot;
@@ -90,7 +90,7 @@ namespace AutoTest
             }
             finally
             {
-                _pendingChallengeLoadout = prevChallenge;
+                _pendingChallengeDifficulty = prevChallenge;
                 _ascensionPersonaLock = prevLock;
                 itemPickMode = prevPickMode;
                 wiringSkill = prevSkill;
@@ -164,16 +164,15 @@ namespace AutoTest
                         + (forceNoRelic ? "**なし** (対照アーム)"
                            : "TheoreticalBest (心眼 3 個・30 段) 固定"));
             sb.AppendLine($"1 段階 {runs} ラン / 決定論シード: 0000 0000 0000 0000");
-            sb.AppendLine($"※ 全軸最高 Tier = {MetaProgression.ChallengeCatalog.BaseMaxScore}pt "
-                        + $"(T4 込みの満点は {MetaProgression.ChallengeCatalog.TotalMaxScore}pt)");
+            sb.AppendLine("※ 挑戦の点数は 2026-11-10 から難易度 × 5 で読み替え (50 点 = 難易度 10)");
             sb.AppendLine();
             sb.AppendLine("挑戦pt(実) | 平均到達層 | 5層クリア | 7層クリア | 到達層分布 1F〜7F");
 
             for (int si = 0; si < challengeSweepScores.Length; si++)
             {
-                var loadout = AscensionLoop.BuildLoadoutAtScore(challengeSweepScores[si]);
-                int actual = MetaProgression.ChallengeResolver.Score(loadout);
-                _pendingChallengeLoadout = loadout;
+                int loadout = ScoreToDifficulty(challengeSweepScores[si]);
+                int actual = loadout * ScorePerDifficulty;
+                _pendingChallengeDifficulty = loadout;
                 curArmIndex = si + 1;
                 curArmLabel = $"{actual}pt/{wiringSkill}";
 
@@ -277,110 +276,9 @@ namespace AutoTest
             sb.AppendLine();
             sb.AppendLine("※ 7層クリアが 0% になる地点が『理論上の壁』。 BOT の探索限界とは別物。");
 
-            // ── 診断セクション (軸単独 + 組み合わせ) ──
-            //   状態汚染バグ (共有 EnemyData の破壊) を追うために足した足場で、 階段測定の
-            //   1.25 倍のラン数を食う。 バグは 2026-08-04 に解消したので **既定 OFF**。
-            //   軸ごとの重さを測り直したくなったら true に戻す。
-            if (!challengeSweepDiagnostics)
-            {
-                _challengeSweepReport = sb.ToString();
-                // **末尾の後始末をここでも行う。** yield break で抜けると下の復元に到達せず、
-                // SuppressRelicGrant / itemPickMode / 裏ボス遮断が立ちっぱなしで
-                // 後続のバッチへ漏れる (2026-08-05 修正)。
-                RestoreChallengeFixedSweepState(prevSuppress, prevPickMode, prevHidden5, prevBD);
-                yield break;
-            }
-
-            // ── 軸ごとの単独試験 (plan §6: 特定 1 軸だけでクリアが消滅しないこと) ──
-            //   累積スイープだけでは「どの軸が壊しているか」が分からない。 1 軸ずつ T3 で回す。
-            int isoRuns = Mathf.Max(50, runs / 2);
-            sb.AppendLine();
-            sb.AppendLine($"=== 軸ごとの単独試験 (その軸だけ T3 = 3pt / 各 {isoRuns} ラン) ===");
-            sb.AppendLine("軸                 | 平均到達層 | 5層クリア | 1F終了");
-            for (int ai = 0; ai < MetaProgression.ChallengeCatalog.Axes.Count; ai++)
-            {
-                var def = MetaProgression.ChallengeCatalog.Axes[ai];
-                var lo = new MetaProgression.ChallengeLoadout();
-                lo.SetTier(def.axis, 3);
-                _pendingChallengeLoadout = lo;
-
-                int c5 = 0, died1F = 0; double sumFloor = 0;
-                for (int i = 0; i < isoRuns; i++)
-                {
-                    int runIdx = 90000 + ai * isoRuns + i;
-                    GameLoop.GameRng.BeginRun(runIdx);
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
-                    _currentPersona = BuildPersona.Standard;
-                    yield return RunOne(runIdx);
-                    var rec = _records.Count > 0 ? _records[_records.Count - 1] : null;
-                    int reached = rec != null ? rec.reachedFloor : 1;
-                    bool died = rec == null || rec.outcome == Outcome.GameOver;
-                    sumFloor += reached;
-                    if (reached <= 1) died1F++;
-                    if ((died ? reached - 1 : reached) >= 5) c5++;
-                    if ((i + 1) % Mathf.Max(1, runsPerYield) == 0) yield return null;
-                }
-                sb.AppendLine($"{def.displayName,-18} | {sumFloor / isoRuns,10:F2} | "
-                            + $"{c5 * 100.0 / isoRuns,8:F1}% | {died1F * 100.0 / isoRuns,5:F1}%");
-            }
-            sb.AppendLine("※ 0pt の 5層クリア率と比べて突出して低い軸が犯人。");
-
-            // ── 組み合わせ試験 ──
-            //   「軸単独は健全なのに累積スイープでは崩壊する」現象が、
-            //   **組み合わせ固有**なのか **スイープ位置依存 (状態汚染)** なのかを切り分ける。
-            //   単独試験と同じ index 帯・同じ手順で、 手組みの組み合わせを回す。
-            var combos = new List<(string name, MetaProgression.ChallengeAxis[] axes, int tier)>
-            {
-                ("空 (対照群 0pt)",       new MetaProgression.ChallengeAxis[0], 0),
-                ("A負傷 単独T1",          new[]{ MetaProgression.ChallengeAxis.長引く負傷 }, 1),
-                ("C不器用 単独T1",        new[]{ MetaProgression.ChallengeAxis.綻び }, 1),
-                ("E絶望 単独T1",          new[]{ MetaProgression.ChallengeAxis.絶望的な戦闘 }, 1),
-                ("5軸すべてT1",           new[]{ MetaProgression.ChallengeAxis.長引く負傷, MetaProgression.ChallengeAxis.厚い皮膚,
-                                                 MetaProgression.ChallengeAxis.綻び, MetaProgression.ChallengeAxis.搾取経済,
-                                                 MetaProgression.ChallengeAxis.絶望的な戦闘 }, 1),
-            };
-            sb.AppendLine();
-            sb.AppendLine($"=== 組み合わせ試験 (単独試験と同じ index 帯 / 各 {isoRuns} ラン) ===");
-            sb.AppendLine("構成                 | 平均到達層 | 5層クリア | 1F終了");
-            for (int ci = 0; ci < combos.Count; ci++)
-            {
-                var lo = new MetaProgression.ChallengeLoadout();
-                foreach (var ax in combos[ci].axes) lo.SetTier(ax, combos[ci].tier);
-                _pendingChallengeLoadout = lo;
-
-                int c5 = 0, died1F = 0; double sumFloor = 0;
-                for (int i = 0; i < isoRuns; i++)
-                {
-                    int runIdx = 95000 + ci * isoRuns + i;
-                    GameLoop.GameRng.BeginRun(runIdx);
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
-                    _currentPersona = BuildPersona.Standard;
-                    yield return RunOne(runIdx);
-                    var rec = _records.Count > 0 ? _records[_records.Count - 1] : null;
-                    int reached = rec != null ? rec.reachedFloor : 1;
-                    bool died = rec == null || rec.outcome == Outcome.GameOver;
-                    sumFloor += reached;
-                    if (reached <= 1) died1F++;
-                    if ((died ? reached - 1 : reached) >= 5) c5++;
-                    if ((i + 1) % Mathf.Max(1, runsPerYield) == 0) yield return null;
-                }
-                sb.AppendLine($"{combos[ci].name,-20} | {sumFloor / isoRuns,10:F2} | "
-                            + $"{c5 * 100.0 / isoRuns,8:F1}% | {died1F * 100.0 / isoRuns,5:F1}%");
-            }
-            sb.AppendLine("※「空」が 0pt 相当にならないならスイープ側の状態汚染。");
-            sb.AppendLine("※「5軸すべてT1」だけが崩れるなら組み合わせ固有の相互作用。");
-
+            // (軸ごとの単独試験・組み合わせ試験は旧配点方式の軸を使っていたので 2026-11-10 に撤去)
             _challengeSweepReport = sb.ToString();
-
-            _pendingChallengeLoadout = null;
-            _pendingPresetRelic = null;
-            _ascensionPersonaLock = false;
-            itemPickMode = prevPickMode;
-            MetaProgression.MetaBuffApplicator.SuppressRelicGrant = prevSuppress;
-            GameLoop.GameManager.SuppressLayer5HiddenBoss = prevHidden5;
-            GameLoop.GameManager.GrantBladeDanceOnFloor5Clear = prevBD;
+            RestoreChallengeFixedSweepState(prevSuppress, prevPickMode, prevHidden5, prevBD);
         }
 
         private void RestoreChallengeFixedSweepState(
@@ -389,7 +287,7 @@ namespace AutoTest
             bool previousHiddenBossSuppression,
             bool previousBladeDanceGrant)
         {
-            _pendingChallengeLoadout = null;
+            _pendingChallengeDifficulty = -1;
             _pendingPresetRelic = null;
             _ascensionPersonaLock = false;
             itemPickMode = previousPickMode;
@@ -1075,473 +973,10 @@ namespace AutoTest
         /// ── そうしないと階段の測定値と直接つき合わせられない。</summary>
         private IEnumerator RunChallengeAxisSweep()
         {
-            bool prevParallelWiring = parallelizeOptimalWiring;
-            bool prevSuppress = MetaProgression.MetaBuffApplicator.SuppressRelicGrant;
-            MetaProgression.MetaBuffApplicator.SuppressRelicGrant = true;
-            var prevPickMode = itemPickMode;
-            itemPickMode = ItemPickMode.BuildFocused;
-            _ascensionPersonaLock = true;
-            _currentPersona = BuildPersona.Standard;
-            _pendingRelicExplicit = true;
-            // 遺物なしは**バランスの正式な基準** (周回引継ぎなので初回プレイヤーは 0 個)。
-            //   2026-08-10: このフラグ分岐が**固定難易度スイープ側にしか入っていなかった**ため、
-            //   レポートは「遺物なし (基準条件)」と表示しながら理論最良遺物込みで走っていた。
-            //   結果、 同じ 0pt 基準値が単軸 53.3% / 技量帯 16.6% に割れた
-            //   (実測: 同一シード・同一職業で最大HP が 113 と 93。 差は遺物の +20 だけ)。
-            //   **表示と実体を分けて持つと、 嘘が静かに通る。**
-            _pendingPresetRelic = challengeAxisSweepNoRelic
-                ? null : RelicPresets.Build(RelicPresets.Preset.TheoreticalBestCursed);
-            bool prevHidden5 = GameLoop.GameManager.SuppressLayer5HiddenBoss;
-            GameLoop.GameManager.SuppressLayer5HiddenBoss = true;
-
-            // **下限は 1**。 他のスイープは Max(50,…) で床を張っているが、 ここは
-            //   動作確認 (各3ラン) が主要な使い方なので床を張ると「3 と指定したのに
-            //   50 走る」ことになる (2026-08-10 に実際にやった)。
-            int runs = Mathf.Max(1, challengeAxisSweepRuns);
-
-            // ── アームの列挙 ──
-            //   先頭は必ず 0pt (ペア比較の基準)。 以降は (軸, Tier) の全組。
-            //   **必ず def.tiers を回すこと。** v4.1 で Tier 番号が飛び飛びになったので、
-            //   1..MaxTier で回すと存在しない段のアームを走らせる (2026-08-10 に実際にやった)。
-            var arms = new List<(MetaProgression.AxisDef def, int tier)>();
-            arms.Add((null, 0));
-            // 診断モード: T4 の解禁条件 (カテゴリ 6pt) を外す。 **このスイープの間だけ**。
-            MetaProgression.ChallengeResolver.IgnoreT4Unlock = challengeCategorySweepT4Alone;
-
-            // T4 モード: 軸ではなくカテゴリ単位のアームを組む (下の catArms を使う)。
-            var catArms = new List<(MetaProgression.ChallengeCategory cat, bool withT4)>();
-            if (challengeCategorySweep)
-                foreach (MetaProgression.ChallengeCategory c in
-                         System.Enum.GetValues(typeof(MetaProgression.ChallengeCategory)))
-                {
-                    // **基礎軸を変えていない回は 6pt アームを省ける** ── 前回と同じ値を
-                    //   再現するだけなので、 前回の実測を参照値に使う。 その代わり
-                    //   **基準アームが前回と一致するか**でバッチ間の地続きを確認すること。
-                    if (challengeCategorySweepOnlyCat >= 0 && (int)c != challengeCategorySweepOnlyCat) continue;
-                    if (!challengeCategorySweepT4Only && !challengeCategorySweepT4Alone) catArms.Add((c, false));
-                    catArms.Add((c, true));
-                }
-            // 指定があればその軸だけに絞る。 基準アームとノイズ床は常に残す。
-            var axisFilter = (challengeAxisSweepAxisNames != null && challengeAxisSweepAxisNames.Length > 0)
-                           ? new HashSet<string>(challengeAxisSweepAxisNames) : null;
-            // 価格曲線モード: 挑戦デバフは 0pt のまま、 価格倍率だけを振る。
-            bool priceCurve = shopPriceCurve != null && shopPriceCurve.Length > 0;
-            if (priceCurve)
-            {
-                for (int k = 0; k < shopPriceCurve.Length; k++) arms.Add((null, 0));
-            }
-            // 決定性診断: 0pt だけを N 本。 軸は一切載せない。
-            else if (challengeAxisSweepDeterminismArms > 0)
-            {
-                for (int k = 1; k < challengeAxisSweepDeterminismArms; k++) arms.Add((null, 0));
-            }
-            else if (challengeCategorySweep)
-            {
-                // アームの中身は下の catArms が持つ。 ここでは個数だけ合わせる。
-                for (int ci = 0; ci < catArms.Count; ci++) arms.Add((null, -1 - ci));
-            }
-            else
-            for (int ai = 0; ai < MetaProgression.ChallengeCatalog.Axes.Count; ai++)
-            {
-                if (challengeAxisSweepOnlyAxis >= 0 && ai != challengeAxisSweepOnlyAxis) continue;
-                var def = MetaProgression.ChallengeCatalog.Axes[ai];
-                if (axisFilter != null && !axisFilter.Contains(def.axis.ToString())) continue;
-                foreach (int t in def.tiers)
-                {
-                    if (challengeAxisSweepMaxTierOnly && t != def.MaxTier) continue;
-                    arms.Add((def, t));
-                }
-            }
-            // **末尾に基準の複製を置く。** 設定が 1 行目と完全に同一・同一シードなのに
-            //   結果がどれだけ動くか ＝ **アーム間ノイズの実測床**。 これが無いと、
-            //   ノイズを軸の効果と読み違える (2026-08-10 に偶然の重複アームで 4.0pt と判明)。
-            //   軸の差がこの床より小さいなら「差は測れていない」と判定すること。
-            arms.Add((null, 0));
-
-            var sb = new StringBuilder();
-            sb.AppendLine("=== 挑戦 単軸スイープ (v4.0) ===");
-            sb.AppendLine($"日時    : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-            sb.AppendLine($"ペルソナ Standard 固定 / 遺物 {(challengeAxisSweepNoRelic ? "なし (基準条件)" : "TheoreticalBestCursed 固定")} / 5層裏ボス遮断 / 技量 {wiringSkill}");
-            sb.AppendLine($"1 アーム {runs} ラン / **全アーム同一シード** (ペア比較)");
-            sb.AppendLine(_stateLineAtStart);
-            _probeTrace = "";
-            _probeTrace = "";
-            sb.AppendLine();
-            sb.AppendLine("軸              段  点 | 平均到達層 | 5層クリア | 7層クリア | 7F差分 | 1pt当り | 3F止まり | 獲得G | 支出G | 残金 | 購入計 | パッシブ| 消耗品| 武器 | ダイス| 素材 | 装備力 | 打切 | 到達層分布 1F〜7F | 7F改善/悪化 (McNemar p)");
-
-            // 固定難易度1000ランと同じ画面内進捗。単軸スイープは全アーム合計を100%とする。
-            ResetScreenProgress(arms.Count * runs, "挑戦単軸");
-
-            bool[] baseC5 = new bool[runs], baseC7 = new bool[runs];
-            double base7Pct = 0;
-            int missingRec = 0;   // RunOne 後に _records から結果を拾えなかった回数
-            float swStart = Time.realtimeSinceStartup;   // 進捗行の経過/ETA 用
-            // 決定性検査用。 アームごとのラン指紋を丸ごと保持する。
-            var fpBase = new int[runs];
-            var fpDiag = new List<(string label, int[] fp)>();
-            // 1ラン差分モード: アームごとのナラティブを退避する (_detail は runIdx キーなので
-            //   後のアームが上書きしてしまい、 そのままでは 2 アームを比べられない)。
-            bool narrateDiff = challengeAxisSweepDeterminismArms > 0 && runs <= 2;
-            var narr = new List<List<string>>();
-
-            for (int armIdx = 0; armIdx < arms.Count; armIdx++)
-            {
-                if (challengeAxisSweepParallelCompare)
-                    parallelizeOptimalWiring = armIdx > 0;
-                float armStartRt = Time.realtimeSinceStartup;
-                var (def, tier) = arms[armIdx];
-                var lo = new MetaProgression.ChallengeLoadout();
-                int pts = def != null ? def.PointsOf(tier) : 0;
-                string catLabel = null;
-                if (def != null) lo.SetTier(def.axis, tier);
-                else if (tier < 0)
-                {
-                    // T4 モード: カテゴリの全軸を最上位へ。 withT4 ならその上に T4 を載せる。
-                    var (cat, withT4) = catArms[-1 - tier];
-                    // 単独モードではカテゴリ基礎軸を載せない (基準 + T4 のみ)。
-                    if (!challengeCategorySweepT4Alone)
-                        foreach (var ax in MetaProgression.ChallengeCatalog.AxesOf(cat))
-                        { lo.SetTier(ax.axis, ax.MaxTier); pts += ax.MaxPoints; }
-                    if (withT4)
-                    {
-                        var t4 = MetaProgression.ChallengeCatalog.T4s.Find(x => x.category == cat);
-                        if (t4 != null) { lo.SetT4(t4.t4, true); pts += t4.points; }
-                        catLabel = challengeCategorySweepT4Alone
-                                 ? "単独:" + (t4 != null ? t4.displayName : "T4")
-                                 : cat + "+" + (t4 != null ? t4.displayName : "T4");
-                    }
-                    else catLabel = cat + " 6pt";
-                }
-
-                // 救済 (灯火/ラストスタンド/フルーレ) の発動をアーム単位で数える。
-                GameLoop.LastStand.ResetStats();
-
-                var reach = new int[9];
-                int c5 = 0, c7 = 0; double sumFloor = 0;
-                var thisC5 = new bool[runs];
-                var thisC7 = new bool[runs];
-                var thisFp = new int[runs];
-                int recBase = _records.Count;   // 経済統計の集計開始位置
-                int abortedSoFar = 0;           // 進捗行に出す打ち切り件数
-                // 価格曲線モードでは倍率を差し込む。 基準アーム (armIdx 0) は上書きしない。
-                float priceMul = 0f;
-                if (priceCurve && armIdx > 0 && armIdx - 1 < shopPriceCurve.Length)
-                    priceMul = shopPriceCurve[armIdx - 1];
-                MetaProgression.MetaDebuffApplicator.ShopPriceOverride = priceMul;
-
-                string armLabel = catLabel != null ? catLabel
-                                : def != null ? def.displayName + " T" + tier
-                                : priceMul > 0f ? $"価格 ×{priceMul:F2}"
-                                : challengeAxisSweepParallelCompare
-                                    ? (armIdx == 0 ? "0pt直列" : "0pt並列")
-                                : (armIdx == 0 ? "0pt基準" : "0pt複製");
-                // 外部観測用。 「どのアームの何ラン目で止まったか」を反射に頼らず読めるように。
-                curArmIndex = armIdx + 1; curArmCount = arms.Count;
-                curRunsPerArm = runs; curArmLabel = armLabel;
-
-                for (int i = 0; i < runs; i++)
-                {
-                    // **全アームで同じ runIdx** ＝ ペア比較。 アームごとに別シード帯を割ると
-                    //   軸間の差にシード分散が丸ごと乗り、 数pt の寄与が埋もれる (§13-5)。
-                    curRunInArm = i + 1;
-                    int runIdx = challengeAxisSweepIndexBase + i;
-                    GameLoop.GameRng.BeginRun(runIdx);
-                    // **UnityEngine.Random もラン単位で固定する** (2026-08-10)。
-                    //   GameRng は BeginRun で完全にリセットされるが、 UnityEngine.Random の
-                    //   静的状態はラン跨ぎで残り、 **それまでに何回引かれたか**に依存する。
-                    //   スイープ内は呼び出し履歴が同一なので再現する (ノイズ床 0/300) 一方、
-                    //   別のスイープ関数から回すと履歴が変わって同一シードのランが割れていた。
-                    UnityEngine.Random.InitState(runIdx);
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
-                    _currentPersona = BuildPersona.Standard;
-                    _pendingChallengeLoadout = lo;
-                    yield return RunOne(runIdx);
-
-                    var rec = _records.Count > 0 ? _records[_records.Count - 1] : null;
-                    // **rec が拾えないまま黙って進まない。** 拾えなければ全ランが「1F 敗北」に
-                    //   計上され、 表は形になるのに中身が全部 0 という**読める形の嘘**になる。
-                    if (rec == null) missingRec++;
-                    if (rec != null && (rec.outcome == Outcome.Deadlock || rec.outcome == Outcome.Crash))
-                    {
-                        abortedSoFar++;
-                        // **打ち切りは即座に出す。** 後でまとめて数えるだけだと、
-                        //   走行中に「いま何が起きているか」が分からない。
-                        LogAlways($"[挑戦単軸] 打切 {armLabel} run#{i} — {rec.note}", LogType.Warning);
-                    }
-                    thisFp[i] = rec != null ? rec.fingerprint : 0;
-                    if (narrateDiff && i == 0)
-                        narr.Add(_detail.TryGetValue(runIdx, out var dl)
-                                 ? new List<string>(dl) : new List<string>());
-                    int reached = rec != null ? rec.reachedFloor : 1;
-                    // 乖離調査 (2026-08-10): 同一 runIdx のランが技量帯スイープと一致するか。
-                    if ( armIdx == 0 && i < 10)
-                        _probeTrace += $" #{runIdx}:{reached}{((rec == null || rec.outcome == Outcome.GameOver) ? "x" : "o")}"
-                                     + $"[{_probeRunConfig}]";
-                    bool died = rec == null || rec.outcome == Outcome.GameOver;
-                    int cf = died ? reached - 1 : reached;
-                    reach[Mathf.Clamp(reached, 0, 8)]++; sumFloor += reached;
-                    if (cf >= 5) { c5++; thisC5[i] = true; }
-                    if (cf >= 7) { c7++; thisC7[i] = true; }
-                    // **アーム内でも進捗を出す。** アーム末尾だけだと 1 アーム 300 ラン の間
-                    //   無音になり、 「遅い」と「止まった」を区別できない (2026-08-10)。
-                    if (challengeAxisSweepProgressEvery > 0
-                        && (i + 1) % challengeAxisSweepProgressEvery == 0 && i + 1 < runs)
-                    {
-                        float el = Time.realtimeSinceStartup - swStart;
-                        int doneRuns = armIdx * runs + i + 1;
-                        int allRuns = arms.Count * runs;
-                        float eta = doneRuns > 0 ? el / doneRuns * (allRuns - doneRuns) : 0f;
-                        LogAlways($"[挑戦単軸]   {armIdx + 1}/{arms.Count} {armLabel} "
-                                + $"{i + 1}/{runs} ラン … 経過 {el / 60f:F1}分 / 残り {eta / 60f:F1}分 "
-                                + $"(暫定 7F {c7 * 100.0 / (i + 1):F1}%, 打切 {abortedSoFar})");
-                    }
-                    if ((i + 1) % Mathf.Max(1, runsPerYield) == 0) yield return null;
-                }
-
-                // アーム完了。 経過と残り見込みを添える。
-                {
-                    float el = Time.realtimeSinceStartup - swStart;
-                    int doneRuns = (armIdx + 1) * runs;
-                    int allRuns = arms.Count * runs;
-                    float eta = el / doneRuns * (allRuns - doneRuns);
-                    LogAlways($"[挑戦単軸] {armIdx + 1}/{arms.Count} 完了 {armLabel} "
-                            + $"→ 5F {c5 * 100.0 / runs:F1}% / 7F {c7 * 100.0 / runs:F1}% "
-                            + $"| 打切 {abortedSoFar} / rec欠落 {missingRec} "
-                            + $"| アーム {Time.realtimeSinceStartup - armStartRt:F1}秒 "
-                            + $"| 経過 {el / 60f:F1}分 残り {eta / 60f:F1}分");
-                }
-
-                double pct7 = c7 * 100.0 / runs;
-                if (armIdx == 0)
-                {
-                    System.Array.Copy(thisC5, baseC5, runs);
-                    System.Array.Copy(thisC7, baseC7, runs);
-                    System.Array.Copy(thisFp, fpBase, runs);
-                    base7Pct = pct7;
-                }
-                else
-                {
-                    var keep = new int[runs];
-                    System.Array.Copy(thisFp, keep, runs);
-                    fpDiag.Add((def != null ? def.displayName + " T" + tier : "0pt複製#" + armIdx, keep));
-                }
-
-                int b7 = 0, c7b = 0;
-                for (int i = 0; i < runs; i++)
-                {
-                    if (thisC7[i] && !baseC7[i]) b7++;
-                    else if (!thisC7[i] && baseC7[i]) c7b++;
-                }
-
-                double delta7 = pct7 - base7Pct;
-                // **1pt 当たりの削り量**。 値付けが揃っているかはこの列だけで読める。
-                string perPt = (armIdx == 0 || pts <= 0) ? "—" : $"{delta7 / pts,6:F2}";
-                string mc7 = armIdx == 0 ? "—" : $"{b7,3}/{c7b,3} (p={McNemarP(b7, c7b),6:F3})";
-
-                // ── 経済の実挙動 ──
-                //   価格倍率を上げたのに 7F 差分が動かない、 といった飽和が
-                //   「買えなくなった」のか「買い方が変わった」のかは、
-                //   到達層だけでは絶対に区別できない。 購入数・獲得GOLD・
-                //   最終装備力を並べて初めて読める (2026-08-10 に説明を憶測で埋めて指摘された)。
-                double gold = 0, buys = 0, power = 0, spent = 0, left = 0;
-                double bPas = 0, bCon = 0, bWep = 0, bDic = 0, bMat = 0;
-                double wTrig = 0, wLost = 0; int wRuns = 0;
-                int en = 0, aborted = 0;
-                for (int r = recBase; r < _records.Count; r++)
-                {
-                    var rr = _records[r];
-                    if (rr.outcome == Outcome.Deadlock || rr.outcome == Outcome.Crash) aborted++;
-                    gold  += rr.totalGoldGained;
-                    buys  += rr.shopPurchases;
-                    power += rr.finalInventoryPower;
-                    spent += rr.totalCoinsSpent;
-                    left  += rr.finalCoins;
-                    bPas += rr.shopBuyPassive;  bCon += rr.shopBuyConsumable;
-                    bWep += rr.shopBuyWeapon;   bDic += rr.shopBuyDice;
-                    bMat += rr.shopBuyMaterial;
-                    wTrig += rr.woundTriggers; wLost += rr.woundHpLost;
-                    if (rr.woundTriggers > 0) wRuns++;
-                    en++;
-                }
-                string econ = en > 0
-                    ? $"{gold / en,6:F0} |{spent / en,6:F0} |{left / en,5:F1} |{buys / en,6:F2} |"
-                      + $"{bPas / en,5:F2} |{bCon / en,5:F2} |{bWep / en,5:F2} |{bDic / en,5:F2} |"
-                      + $"{bMat / en,5:F2} |{power / en,7:F1} |{aborted,4}"
-                    : "     ? |     ? |    ? |     ? |    ? |    ? |    ? |    ? |    ? |      ? |   ?";
-
-                var dist = new StringBuilder();
-                for (int f = 1; f <= 7; f++) dist.Append($"{reach[f] * 100.0 / runs,5:F1}%");
-
-                // **T4 モードのアームは tier < 0 で区別する。** これを見ないと
-                //   カテゴリアームが全部「基準複製」と表示され、 表が読めない (2026-08-11 に踏んだ)。
-                bool isNoiseFloor = def == null && tier == 0 && armIdx > 0;
-                string label = def != null ? def.displayName
-                             : catLabel != null ? catLabel
-                             : (isNoiseFloor ? "[ノイズ床] 基準複製" : "(挑戦なし 0pt)");
-                string seg = def != null ? $"T{tier}{(tier == def.MaxTier ? "*" : " ")}{pts,2}pt"
-                           : catLabel != null ? $"    {pts,2}pt" : "     0pt";
-
-                sb.AppendLine($"{PadR(label, 14)} {seg} | {sumFloor / runs,10:F2} | "
-                            + $"{c5 * 100.0 / runs,8:F1}% | {pct7,8:F1}% | "
-                            + $"{(armIdx == 0 ? "—" : $"{delta7,6:F1}"),6} | {perPt,7} | "
-                            + $"{reach[3] * 100.0 / runs,7:F1}% |{econ} |{dist} | {mc7}");
-                // 〈長引く負傷〉の行にだけ発動状況を添える。 **「弱い」と「発動していない」は
-                //   到達層からは区別できない** ── 実際 2026-08-10 にそこで判断を誤った。
-                // 救済の発動元。 **HP0 は「死」ではなく「全回復の引き金」**でもあるので、
-                //   HP を削るデバフの効き方はここを見ないと読めない (2026-08-11)。
-                if (en > 0)
-                {
-                    var rc = GameLoop.LastStand.RevivalCount;
-                    long rtot = rc[0] + rc[1] + rc[2];
-                    sb.AppendLine($"             └ 救済: 灯火 {rc[0]} / ラストスタンド {rc[1]} / フルーレ {rc[2]} "
-                                + $"= 計 {rtot} 回 ({rtot * 100.0 / en:F1}% のラン) "
-                                + $"/ 戻した HP 計 {GameLoop.LastStand.RevivalHpRestored}");
-                }
-                // **閾値・上限は印字しない (2026-08-17)。** 2026-08-10 のリワークで
-                //   〈長引く負傷〉は「被ダメ比例」になり、 閾値も回数上限も持たなくなったのに
-                //   定数だけが残り、 ログが廃止済みの旧仕様を出し続けていた。
-                //   実測の平均損失 32.4 が「上限 20」を超えていて矛盾しており、
-                //   **上限が壊れているのではなく上限が存在しない**のが実態。
-                //   効いている値 (被ダメの何 %) だけを出す。
-                if (def != null && def.axis == MetaProgression.ChallengeAxis.長引く負傷 && en > 0)
-                    sb.AppendLine($"             └ 発動: {wRuns * 100.0 / en:F1}% のランで平均 {wTrig / en:F2} 回 "
-                                + $"/ 失った最大HP 平均 {wLost / en:F1} "
-                                + $"(被ダメの {MetaProgression.MetaDebuffApplicator.GetLingeringWoundRatio():P0})");
-            }
-
-            // **診断バイパスを必ず戻す。** 立てっぱなしだと以後の全測定が不正条件になる。
-            MetaProgression.ChallengeResolver.IgnoreT4Unlock = false;
-            parallelizeOptimalWiring = prevParallelWiring;
-
-            // ── 決定性検査 ──
-            //   1 行目と設定が同じアーム (0pt 複製) は、 同一シードなら**全ラン指紋一致**が正。
-            //   一致しないなら、 それは統計のばらつきではなく **状態の持ち越し**。
-            sb.AppendLine();
-            sb.AppendLine("=== 決定性検査 (基準アームとのラン単位 指紋照合) ===");
-            for (int k = 0; k < fpDiag.Count; k++)
-            {
-                var (lbl, fp) = fpDiag[k];
-                int diff = 0, first = -1;
-                for (int i = 0; i < runs; i++)
-                    if (fp[i] != fpBase[i]) { diff++; if (first < 0) first = i; }
-                sb.AppendLine($"{PadR(lbl, 22)} 不一致 {diff,4}/{runs} ({diff * 100.0 / runs,5:F1}%)"
-                            + (first < 0 ? "  — 完全一致" : $"  初回発散 = ラン #{first}"));
-            }
-            sb.AppendLine("※ **0pt複製 は 1 行目と設定が完全に同一**。 ここが完全一致でないなら");
-            sb.AppendLine("   ラン間で状態が持ち越されている ＝ 全ての軸間比較が信用できない。");
-            sb.AppendLine("   **初回発散 #0 は「アーム切替の初期化漏れ」を意味しない** ── アーム 1 が");
-            sb.AppendLine("   始まる時点で既に前アーム分のランが経過しており、 累積状態でも #0 で出る。");
-            sb.AppendLine("   両者の区別には 1 ラン単位の詳細ログ差分が要る (2026-08-10 の反省)。");
-
-            // ── 1ラン差分: 同一設定・同一 runIdx の 2 アームで、 **最初に分岐した行**を出す ──
-            //   ここが「何が状態を持ち越しているか」への唯一の直接証拠になる。
-            if (narrateDiff && narr.Count >= 2)
-            {
-                var a = narr[0]; var b = narr[1];
-                int at = -1;
-                int n = Math.Min(a.Count, b.Count);
-                for (int i = 0; i < n; i++) if (a[i] != b[i]) { at = i; break; }
-                if (at < 0 && a.Count != b.Count) at = n;
-                sb.AppendLine();
-                sb.AppendLine("=== 1ラン差分 (アーム1 vs アーム2 / 同一 runIdx・同一設定) ===");
-                sb.AppendLine($"行数: アーム1 {a.Count} / アーム2 {b.Count}");
-                if (at < 0) sb.AppendLine("→ **完全一致**。 このランでは分岐していない。");
-                else
-                {
-                    sb.AppendLine($"→ **最初の分岐は {at} 行目**。 直前 6 行と両者の該当行:");
-                    for (int i = Math.Max(0, at - 6); i < at; i++) sb.AppendLine($"   共通 | {a[i]}");
-                    sb.AppendLine($"   A>>> | {(at < a.Count ? a[at] : "(行なし)")}");
-                    sb.AppendLine($"   B>>> | {(at < b.Count ? b[at] : "(行なし)")}");
-                    for (int i = at + 1; i < Math.Min(at + 5, n); i++)
-                    {
-                        sb.AppendLine($"   A    | {a[i]}");
-                        sb.AppendLine($"   B    | {b[i]}");
-                    }
-                }
-            }
-
-            sb.AppendLine();
-            if (missingRec > 0)
-                sb.AppendLine($"!!! rec 欠落 {missingRec} 件 — この表は信用できない (欠落ランは全て『1F 敗北』に計上されている) !!!");
-            sb.AppendLine("※ **打切** = Deadlock/Crash で終わったラン数 (番犬による実時間打ち切りを含む)。");
-            sb.AppendLine("   0 でないアームの数値は、 その分だけ『1F 敗北』側に歪んでいる。");
-            sb.AppendLine($"[先頭10ラン 到達層]{_probeTrace}");
-            {
-                long calls = MetaProgression.MetaDebuffApplicator.HealSpotCalls;
-                long raw   = MetaProgression.MetaDebuffApplicator.HealSpotRawHeal;
-                long capn  = MetaProgression.MetaDebuffApplicator.HealSpotCapped;
-                long lost  = MetaProgression.MetaDebuffApplicator.HealSpotLostHeal;
-                sb.AppendLine($"[回復スポット計装] 呼出 {calls} 回 / 実回復 {raw} HP"
-                            + $" / 上限で削られた {capn} 回・{lost} HP"
-                            + (calls > 0 ? $" (1 回あたり 実回復 {raw / (float)calls:F1} / 損失 {lost / (float)calls:F1})" : ""));
-            }
-            {
-                var M = typeof(MetaProgression.MetaDebuffApplicator);
-                long tt = MetaProgression.MetaDebuffApplicator.JudgmentTurnsTotal;
-                long ov = MetaProgression.MetaDebuffApplicator.JudgmentRunsOverThreshold;
-                long tk = MetaProgression.MetaDebuffApplicator.JudgmentTicks;
-                long hl = MetaProgression.MetaDebuffApplicator.JudgmentHpLost;
-                long bd = MetaProgression.MetaDebuffApplicator.BreakdownTriggers;
-                long totalRuns = (long)runs * arms.Count;
-                sb.AppendLine($"[T4計装] 累計戦闘ターン {tt} / 全 {totalRuns} ラン ＝ 1ラン {tt / (double)Math.Max(1, totalRuns):F1} ターン"
-                            + $" / 刻限({MetaProgression.MetaDebuffApplicator.GetJudgmentTurnThreshold()}T)超え {ov} ラン ({100.0 * ov / Math.Max(1, totalRuns):F1}%)"
-                            + $" / 被ダメ増幅 {tk} 回・+{hl} HP");
-                long vc = MetaProgression.MetaDebuffApplicator.VoidTileChecks;
-                long vt = MetaProgression.MetaDebuffApplicator.VoidTileTriggers;
-                sb.AppendLine($"[T4計装] 破綻: 有利マス判定 {vc} 回 (1ラン {vc / (double)Math.Max(1, runs):F1} 個)"
-                            + $" / 空白化 {vt} 回 (1ラン {vt / (double)Math.Max(1, runs):F2} 個 / 実効 {100.0 * vt / Math.Max(1, vc):F1}%)");
-                {
-                    long jk = MetaProgression.MetaDebuffApplicator.JudgmentKills;
-                    long jd = MetaProgression.MetaDebuffApplicator.JudgmentPostDamageTaken;
-                    long jh = MetaProgression.MetaDebuffApplicator.JudgmentPostHeal;
-                    var rf = MetaProgression.MetaDebuffApplicator.JudgmentReachByFloor;
-                    long rfTot = 0; for (int f = 0; f < rf.Length; f++) rfTot += rf[f];
-                    var rfs = new System.Text.StringBuilder();
-                    for (int f = 1; f <= 7; f++)
-                        rfs.Append($" {f}F {100.0 * rf[f] / Math.Max(1, rfTot):F1}%");
-                    long hp = MetaProgression.MetaDebuffApplicator.JudgmentHealPrevented;
-                    sb.AppendLine($"[T4計装] 審判: 致命打 {jk} 回"
-                                + $" / 超過後 被ダメ {jd}・実回復 {jh}・被ダメ増幅 +{hl}"
-                                + $" (増幅分は超過後被ダメの {100.0 * hl / Math.Max(1, jd):F1}%)");
-                    sb.AppendLine($"[T4計装] 審判: 刻限超過ランの到達層 ({rfTot} ラン)" + rfs);
-                    long dn = MetaProgression.MetaDebuffApplicator.JudgmentDeadlineDeaths;
-                    long sn = MetaProgression.MetaDebuffApplicator.JudgmentDeadlineSurvivors;
-                    long dd = MetaProgression.MetaDebuffApplicator.JudgmentDeathDamage;
-                    long dr = MetaProgression.MetaDebuffApplicator.JudgmentDeathHealRequested;
-                    long da = MetaProgression.MetaDebuffApplicator.JudgmentDeathHealActual;
-                    long sd = MetaProgression.MetaDebuffApplicator.JudgmentSurvivorDamage;
-                    long sr = MetaProgression.MetaDebuffApplicator.JudgmentSurvivorHealRequested;
-                    long sa = MetaProgression.MetaDebuffApplicator.JudgmentSurvivorHealActual;
-                    sb.AppendLine($"[T4計装] 審判: 死亡 {dn}ラン 平均 被ダメ {dd / (double)Math.Max(1, dn):F1} / 回復要求 {dr / (double)Math.Max(1, dn):F1} / 実回復 {da / (double)Math.Max(1, dn):F1}");
-                    sb.AppendLine($"[T4計装] 審判: 生存 {sn}ラン 平均 被ダメ {sd / (double)Math.Max(1, sn):F1} / 回復要求 {sr / (double)Math.Max(1, sn):F1} / 実回復 {sa / (double)Math.Max(1, sn):F1}");
-                }
-            }
-            sb.AppendLine("※ 基準は 1 行目 (挑戦なし 0pt)。 * が付く段はその軸の最上位。");
-            sb.AppendLine("※ **最終行 [ノイズ床] は 1 行目と設定が完全に同一・同一シード**。 その 7F差分が");
-            sb.AppendLine("   このバッチのアーム間ノイズの実測値。 **これより小さい差は読まないこと**。");
-            sb.AppendLine("   (2026-08-10 実測で 4.0pt。 軸の効果と誤認しかけたため常設化した)");
-            sb.AppendLine("※ **判断は McNemar p で行う**。 7F差分の絶対値だけを見ない (同一シードでも");
-            sb.AppendLine("   7層クリアは低頻度事象なので、 有意でない ±数pt は普通に出る)。");
-            sb.AppendLine("※ 『1pt当り』が他軸より大きく負の軸が **値段に見合わず重い**軸。");
-            sb.AppendLine("   同じ軸の T1→T2→T3 でこの列が悪化するなら、 その軸は段が超線形に効いている。");
-            sb.AppendLine("※ 3F止まりが基準より突出する軸は、 天井を下げるのでなく **序盤で詰ませて**いる。");
-            sb.AppendLine("※ 経済列の読み方 (2026-08-10 に追加)。 価格倍率を上げても 7F 差分が動かないとき:");
-            sb.AppendLine("   ・**残金が増えている** → 買えないのではなく **買う対象が尽きている**");
-            sb.AppendLine("     (陳列は 12 枠しかない)。 価格では段を作れず、 触るべきは陳列枠。");
-            sb.AppendLine("   ・**種別ごとの弾性が違う** → 価格に鈍い枠が分母を薄めている。");
-            sb.AppendLine("     リロールは倍率非適用、 素材は 3×2^N×倍率 で log 弾性、 特売品は 20〜60% 引き。");
-            sb.AppendLine("   ・購入計だけ見ると上の 2 つを区別できない。 **必ず内訳と残金を併せて読む**。");
-            _challengeAxisSweepReport = sb.ToString();
-
-            _pendingChallengeLoadout = null;
-            _pendingPresetRelic = null;
-            _ascensionPersonaLock = false;
-            itemPickMode = prevPickMode;
-            GameLoop.GameManager.SuppressLayer5HiddenBoss = prevHidden5;
-            MetaProgression.MetaBuffApplicator.SuppressRelicGrant = prevSuppress;
-            // **計測用の上書きは必ず戻す。** 立ちっぱなしだと後続の測定が全部汚れる。
-            MetaProgression.MetaDebuffApplicator.ShopPriceOverride = 0f;
+            // 2026-11-10: 旧配点方式 (§15-2) の撤去 (#9) で、 軸・カテゴリ・T4 ごとに測るこのスイープは成り立たなくなった。
+            //   挑戦カードを 1 枚ずつ測るときは challengeForce を使う (V3 のキュー)。
+            Debug.LogWarning("[AutoRunner] 挑戦の単軸スイープは 2026-11-10 の旧配点方式の撤去で廃止した (challengeForce を使う)");
+            yield break;
         }
 
         /// <summary>ビルド別勝率スイープ。 **ペルソナだけを振って 5層/7層クリア率を比べる。**
@@ -1567,7 +1002,7 @@ namespace AutoTest
             int runs = Mathf.Max(50, personaSweepRuns);
             var personas = (BuildPersona[])Enum.GetValues(typeof(BuildPersona));
             ResetScreenProgress(personas.Length * runs, "ビルド別");
-            var loadout = AscensionLoop.BuildLoadoutAtScore(0);
+            int loadout = ScoreToDifficulty(0);
 
             var sb = new StringBuilder();
             sb.AppendLine("=== ビルド別勝率スイープ ===");
@@ -1601,7 +1036,7 @@ namespace AutoTest
                     if (GameLoop.GameRng.IsSeeded)
                         _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
                     _currentPersona = persona;
-                    _pendingChallengeLoadout = loadout;
+                    _pendingChallengeDifficulty = loadout;
                     _pendingPresetRelic = null;
                     yield return RunOne(runIdx);
 
@@ -1647,7 +1082,7 @@ namespace AutoTest
             sb.AppendLine("※ RawTier は Tier 表そのまま = ビルド選好なし。 ペルソナ選好の効果量はこことの差で読む。");
             _personaSweepReport = sb.ToString();
 
-            _pendingChallengeLoadout = null;
+            _pendingChallengeDifficulty = -1;
             _ascensionPersonaLock = false;
             itemPickMode = prevPickMode;
             metaBuffMode = prevMetaMode;
@@ -1717,7 +1152,7 @@ namespace AutoTest
             // **0pt でも必ず非 null を渡す。** null は「0pt」ではなく「挑戦設定に触らない」を
             //   意味するので、 前の状態が残る。 単軸スイープは常に代入していて、
             //   それが両者で唯一残った前処理の差だった (2026-08-10 の乖離調査)。
-            var cmpLoadout = AscensionLoop.BuildLoadoutAtScore(wiringSkillCompareScore);
+            int cmpLoadout = ScoreToDifficulty(wiringSkillCompareScore);
 
             int runs = Mathf.Max(20, wiringSkillCompareRuns);
             ResetScreenProgress(arms.Length * runs, "技量比較");
@@ -1768,7 +1203,7 @@ namespace AutoTest
                         _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
                     _currentPersona = BuildPersona.Standard;
                     _pendingPresetRelic = cmpRelic;
-                    _pendingChallengeLoadout = cmpLoadout;
+                    _pendingChallengeDifficulty = cmpLoadout;
                     yield return RunOne(runIdx);
 
                     var rec = _records.Count > 0 ? _records[_records.Count - 1] : null;
@@ -1844,7 +1279,7 @@ namespace AutoTest
             _ascensionPersonaLock = false;
             _pendingPresetRelic = null;
             _pendingRelicExplicit = false;
-            _pendingChallengeLoadout = null;
+            _pendingChallengeDifficulty = -1;
             MetaProgression.MetaBuffApplicator.SuppressRelicGrant = prevSuppress;
             GameLoop.GameManager.SuppressLayer5HiddenBoss = prevHidden5;
 

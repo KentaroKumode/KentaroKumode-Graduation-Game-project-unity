@@ -35,23 +35,10 @@ namespace MetaProgression
             // この時点でまだ判定材料が無いので成立扱い (RelicApplicator の規約)。
             int relicHp  = Relics.RelicApplicator.GetMaxHpBonus(run);
             int hp       = baseHP + hpBonus + relicHp;
-            // 挑戦デバフ〈脆弱な肉体〉×0.90 / ×0.85 / ×0.80 を **最後に**掛ける。
-            //   **ここで掛けないと効かない** ── このメソッドは RunState.Initialize が入れた
-            //   playerMaxHP を丸ごと上書きするので、 Initialize 側だけに書くと消える
-            //   (v1 の定数減算 −5/−15/−30 はこれで死んでいた・2026-08-04 修正)。
-            //   整備パネル・遺物のボーナスを足した後の値に掛けるので、
-            //   メタを伸ばすほどデバフが薄まることもない。
-            float fragile = MetaDebuffApplicator.GetMaxHpMultiplier();
-            if (fragile < 1f) hp = UnityEngine.Mathf.Max(1, UnityEngine.Mathf.RoundToInt(hp * fragile));
             run.playerMaxHP = hp;
             run.playerHP    = hp;
 
-            // 開幕所持金は〈搾取経済〉の対象外 (T4-D〈破産〉の管轄)。
-            // T4-D〈破産〉: 開幕 GOLD から一定額を差し引く (下限 0)。
-            //   2026-08-11: 「0 にする」から差し引き方式へ。
-            int startGold = UnityEngine.Mathf.Max(0,
-                MetaPanel.VaultGold(Rank(MetaPanelKind.Vault))
-                - MetaDebuffApplicator.GetStartingGoldPenalty());
+            int startGold = UnityEngine.Mathf.Max(0, MetaPanel.VaultGold(Rank(MetaPanelKind.Vault)));
             GoldIncome.GainExempt(run, startGold, "整備パネル(金庫)", applyLastStandFilter: false);
 
             // 2026-09-10: 宝物庫は素材ではなく開幕パッシブを配る (MetaPanel.SupplyStartingPassives)。

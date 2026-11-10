@@ -534,7 +534,6 @@ namespace AutoTest
             if (e == null) return 0;
             float hit = e.EffectiveBaseAttack + e.EffectiveRollCount * e.EffectiveRollMax;
             if (ctx != null) hit += Mathf.Max(0, ctx.enemyDiceTotalBonus) + Mathf.Max(0, ctx.bossDiceBonus);
-            hit *= MetaProgression.MetaDebuffApplicator.GetEnemyDamageMultiplier();
             hit *= CombatSystem.Escalation.GetMultiplier(null, Mathf.Max(1, turn));
             return Mathf.RoundToInt(hit);
         }

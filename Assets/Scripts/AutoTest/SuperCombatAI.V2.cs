@@ -141,7 +141,7 @@ namespace AutoTest
             for (int d = 0; d < V2Horizon; d++)
             {
                 var fm = SampleMods();
-                _sealedNow = MetaProgression.MetaDebuffApplicator.GetSealedTerminal(s.turn, _specialLimit > 0 ? 4 : 3);
+                _sealedNow = -1;
                 int eTotal = 0;
                 for (int i = 0; i < _eDiceCount; i++) eTotal += _rng.Next(1, _eRollMax + 1);
                 int enemyAtk = Math.Max(0, (int)Math.Round(

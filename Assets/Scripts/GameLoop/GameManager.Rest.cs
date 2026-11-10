@@ -22,12 +22,8 @@ namespace GameLoop
             // 〈遅い回復〉: **あらゆる回復に掛かる**ので休憩地点にも適用する。
                 int heal = Mathf.CeilToInt(Run.playerMaxHP * ratio
                                            * MetaProgression.MetaDebuffApplicator.GetHealMultiplier());
-            heal = MetaProgression.MetaDebuffApplicator.ApplyJudgmentHealReduction(heal, Run);
             int beforeRestHP = Run.playerHP;
             Run.playerHP = Mathf.Min(Run.playerMaxHP, Run.playerHP + heal);
-            // 〈浅い眠り〉: 回復スポットの頭打ち。 **対象は前哨基地と休憩地点だけ**。
-            Run.playerHP = MetaProgression.MetaDebuffApplicator.ApplyHealSpotCap(Run.playerHP, Run.playerMaxHP, beforeRestHP);
-            MetaProgression.MetaDebuffApplicator.NoteHeal(heal, Run.playerHP - beforeRestHP, Run);
             RunChronicle.Rest(Run, Run.playerHP - beforeRestHP, beforeRestHP, Run.playerMaxHP);
             Log($"休憩回復: +{Run.playerHP - beforeRestHP}HP ({(int)(ratio*100)}%) (現在: {Run.playerHP}/{Run.playerMaxHP})");
             ReturnToMapOrClearFloor();

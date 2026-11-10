@@ -22,28 +22,27 @@ namespace GameLoop
         {
             _entryHealPending = false;
             if (Run == null || Run.playerHP >= Run.playerMaxHP) return;
-            float mul = Run.challengeCardMode ? MetaDebuffApplicator.GetHealMultiplier() : 1f;
+            float mul = MetaDebuffApplicator.GetHealMultiplier();
             int before = Run.playerHP;
             Run.playerHP = Mathf.Min(Run.playerMaxHP, before + Mathf.RoundToInt((Run.playerMaxHP - before) * mul));
             Log($"層突入: HP 回復 {before} → {Run.playerHP}" + (mul < 1f ? $" (回復 ×{mul:0.##})" : ""));
         }
 
-        /// <summary>ランの始め: 整備で選んだ難易度でカードのランにする。 整備の配点 (旧 §15-2) が入っている時は配点を使う (BOT の測定)。</summary>
+        /// <summary>ランの始め: 整備で選んだ難易度でカードを引く (§23-25)。</summary>
         private void BeginChallengeCards()
         {
             PendingChallengeTiers.Clear(); _challengeOffer = null; _entryHealPending = false;
             var st = MetaProgressManager.Instance?.State;
             int d = st != null ? Mathf.Clamp(st.challengeDifficulty, 0, ChallengeCards.MaxDifficulty) : 0;
-            Run.challengeCardMode = st == null || d > 0 || st.Challenge.IsEmpty;
-            Run.challengeDifficulty = Run.challengeCardMode ? d : 0;
+            Run.challengeDifficulty = d;
             Run.InvalidateCardChallenge();
-            if (Run.challengeCardMode && d > 0) Log($"挑戦: 難易度 {d} ({ChallengeCards.ScheduleText(d)})");
+            if (d > 0) Log($"挑戦: 難易度 {d} ({ChallengeCards.ScheduleText(d)})");
         }
 
         /// <summary>層に入った時: この場所で引く回数だけ配る。 <paramref name="layer"/> は見せる層 (1..5 = currentFloor)・深さではない。</summary>
         private void DealChallengeForLayer(int layer)
         {
-            if (Run == null || !Run.challengeCardMode) return;
+            if (Run == null) return;
             var forced = GameHooks.ForcedChallengeCards?.Invoke(layer);   // 測定: 引き方の代わりに決めたカードを受ける
             if (forced != null)
             {
@@ -163,7 +162,7 @@ namespace GameLoop
         private void RecordChallengeClear()
         {
             var mpm = MetaProgressManager.Instance; var st = mpm?.State;
-            if (st == null || Run == null || !Run.challengeCardMode || Run.challengeDifficulty <= st.challengeBest) return;
+            if (st == null || Run == null || Run.challengeDifficulty <= st.challengeBest) return;
             st.challengeBest = Run.challengeDifficulty;
             mpm.Save();
             Log($"挑戦: 難易度 {Run.challengeDifficulty} を踏破 (記録を更新)");

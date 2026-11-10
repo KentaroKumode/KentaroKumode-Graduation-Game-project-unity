@@ -135,13 +135,7 @@ namespace CombatSystem
             raw *= HeavyFactor(e, combatTurn > 0 ? combatTurn : turn);
             raw *= GuardAttackFactor(e, combatTurn > 0 ? combatTurn : turn);
             raw *= OpeningFactor(e, combatTurn > 0 ? combatTurn : turn);
-            // 挑戦デバフ〈天変地異〉(2026-08-10 リワーク): **ボスの攻撃値のみ** ×1.50。
-            //   旧効果 (エスカレーション閾値の前倒し) は 3pt で −2.7pt / p=0.185 の死に段だった ──
-            //   通常戦が平均 3 ターン弱で終わるため、 閾値を 2T 早めても大半の戦闘に届かない。
-            //   ボス戦は長く全ターンに効くので、 ここなら確実に盤面へ出る。
-            float bossMul = GameLoop.BossIds.IsBoss(e.id)
-                          ? MetaProgression.MetaDebuffApplicator.GetBossAttackMultiplier(turn) : 1f;
-            return Math.Max(0, Mathf.RoundToInt(GetMultiplier(e.EffectiveEscalationProfile, turn) * raw * bossMul));
+            return Math.Max(0, Mathf.RoundToInt(GetMultiplier(e.EffectiveEscalationProfile, turn) * raw));
         }
 
         // ---- 大技サイクル (EnemyData.heavyPeriod・2026-09-19) ----

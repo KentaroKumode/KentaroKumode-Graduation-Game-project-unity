@@ -101,7 +101,6 @@ namespace MapSystem
             {
                 Sim = null;
                 // メタデバフ Lv4: 初期位置で視界を反映 (離散マップのみ。 自由移動の層は視界そのものが距離 1)
-                ApplyMetaSightLimit();
             }
 
             OnMapGenerated?.Invoke(CurrentMap);
@@ -113,7 +112,7 @@ namespace MapSystem
         /// <para><see cref="GenerateFloor"/> との違いは 2 つ。 生成せずに与えられた盤面を据えること、
         /// そして <b>視界を再計算しないこと</b> ── snapshot の <c>revealed</c> は
         /// 「その時点でプレイヤーが何を見えていたか」の記録なので、 復元後に
-        /// <see cref="ApplyMetaSightLimit"/> を掛け直すと、 記録した可視状態を
+        /// 旧〈戦場の霧〉の視界制限 (2026-11-10 に撤去) を掛け直すと、 記録した可視状態を
         /// 現在のデバフ状態で塗り替えてしまう。</para></summary>
         public void RestoreState(FloorMap map, string currentNodeId)
         {
@@ -190,47 +189,10 @@ namespace MapSystem
             }
 
             // メタデバフ Lv4: 視界制限を再計算
-            ApplyMetaSightLimit();
 
             OnNodeEntered?.Invoke(target);
 
             return 0;
-        }
-
-        /// <summary>挑戦デバフ 軸13〈戦場の霧〉/ T4-C〈暗夜〉: 現在地から N ホップ先まで以外を unrevealed に。
-        /// **limit の意味: -1 = 制限なし / 0 = 暗夜 (現在地以外すべて不可視) / N&gt;0 = N ホップ先まで。**</summary>
-        private void ApplyMetaSightLimit()
-        {
-            int limit = MetaProgression.MetaDebuffApplicator.GetMapSightLimit();
-            if (limit < 0 || CurrentMap == null || CurrentNode == null) return;
-
-            var nodes = CurrentMap.GetAllNodes();
-            // BFS で各ノードの距離を計算
-            var dist = new Dictionary<string, int>();
-            var queue = new Queue<string>();
-            dist[CurrentNode.id] = 0;
-            queue.Enqueue(CurrentNode.id);
-            while (queue.Count > 0)
-            {
-                string id = queue.Dequeue();
-                int d = dist[id];
-                if (d >= limit) continue;
-                var n = CurrentMap.GetNode(id);
-                if (n == null) continue;
-                foreach (var conn in n.connections)
-                {
-                    if (dist.ContainsKey(conn)) continue;
-                    dist[conn] = d + 1;
-                    queue.Enqueue(conn);
-                }
-            }
-
-            foreach (var n in nodes)
-            {
-                if (n == null) continue;
-                bool inSight = dist.ContainsKey(n.id) || n.visited; // 訪問済みは見える
-                n.revealed = inSight;
-            }
         }
 
         // ================================================================

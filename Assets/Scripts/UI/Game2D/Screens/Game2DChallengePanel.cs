@@ -6,7 +6,7 @@ namespace UI.Game2D
     /// 挑戦の難易度を選ぶ窓 (2026-11-08・docs/GAME.md §23-25)。 整備パネル (<see cref="Game2DMetaPanel"/>) の「挑戦」から開く。
     /// 一本の目盛り (0..10 = ラン中にカードを引く回数) と、 その難易度で「どの層の移り目で何 Tier を引くか」の並びを出す。
     /// カードの中身はここでは見せない (ラン中に選ぶ時の楽しみ)。 選べるのは 5 層を踏破した最高の難易度 +1 まで。
-    /// <para>旧: 軸ごとに点数のボタンを押す配点の窓 (§15-2) は、 この窓に置き換えた。 配点そのもの (<see cref="ChallengeLoadout"/>) は BOT の測定が使うので残る。</para>
+    /// <para>旧: 軸ごとに点数のボタンを押す配点の窓 (§15-2) は、 この窓に置き換えた (配点方式は 2026-11-10 に撤去・#9)。</para>
     /// </summary>
     public static class Game2DChallengePanel
     {
@@ -68,7 +68,6 @@ namespace UI.Game2D
                         if (goal != st.challengeDifficulty)
                         {
                             st.challengeDifficulty = goal;
-                            mpm.ClearChallenge();   // 旧の配点が残っているとカードのランにならない (BeginChallengeCards)
                             mpm.Save();
                             Game2DSfx.Play("ui_click");
                         }

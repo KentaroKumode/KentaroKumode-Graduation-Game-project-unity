@@ -171,7 +171,7 @@ namespace AutoTest
             sb.AppendLine("################ AutoRun サマリ ################");
             sb.AppendLine($"日時      : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             sb.AppendLine($"メタ進行  : {metaLabel}");
-            sb.AppendLine($"メタデバフ: {(enableAllDebuffs ? "全ON (Lv1-10, 最高難易度)" : "全OFF")}");
+            sb.AppendLine($"挑戦: {(enableAllDebuffs ? "難易度 10 (最高)" : "難易度 " + challengeCardDifficulty)}");
             sb.AppendLine($"実行設定  : メタ={metaBuffMode} / 軸={(sweepAllMetaAxes ? "全軸走査" : metaAllocation.ToString())} / アイテム={itemPickMode}");
             sb.AppendLine($"配線AI    : {wiringSkill}");
             // **実効状態を必ず印字する。** EditorPrefs 由来のトグルは黙って持ち越されるので、
@@ -209,7 +209,7 @@ namespace AutoTest
                         + $" / メタデバフ全ON={enableAllDebuffs}"
                         + $" / 全軸走査={sweepAllMetaAxes}"
                         + $" / 購入序列={(useIttBeta ? $"ITT(生存N={GrantItt.SurvivalN}/{LearnedPriorityProvider.IttMode})" : "観測regβ")}"
-                        + $" / 挑戦spec={(string.IsNullOrEmpty(challengeSpec) ? "(空=スコアから導出)" : challengeSpec)}");
+                        + $" / 挑戦の難易度={challengeCardDifficulty}");
             // 出目パーツの評価係数。 **掃引中はこの行が唯一の「どの値で回したか」の記録**。
             sb.AppendLine($"出目パーツ: 較正={AutoTest.InventoryPower.PowerCalibration:F2}"
                         + $" / 対={AutoTest.InventoryPower.TierGainPair:F1}"

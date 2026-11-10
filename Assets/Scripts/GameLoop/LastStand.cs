@@ -115,7 +115,6 @@ namespace GameLoop
         {
             if (run == null || run.lastStandActive) return false;
             if (!MetaProgression.MetaBuffApplicator.IsLastStandUnlocked()) return false;
-            if (MetaProgression.MetaDebuffApplicator.IsLastStandDisabled()) return false;
             // 灯火が先。 ボス戦では灯火が発動しないので、 そのときは譲らない。
             if (!isBossFight && run.ownedPassiveItems != null
                 && run.ownedPassiveItems.Contains(

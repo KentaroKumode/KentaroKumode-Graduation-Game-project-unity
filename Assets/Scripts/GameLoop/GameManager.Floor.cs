@@ -71,11 +71,8 @@ namespace GameLoop
             // 前層終了で 商業連合隊の層末収入支払い、 サーカスフラグクリア等が行われる
             // [廃止] 旅団契約の層フック (2026-08-11 削除)
 
-            // メタ: トークン獲得 + 1層/3層で固有恒久デバフ抽選
+            // メタ: トークン獲得
             MetaProgression.MetaTokenEarner.OnFloorReached(Run.Depth);
-            // T4-E〈最後の審判〉: 3層・5層で大罪を付与 (§15-2 v3.0)。 v1 の 1層付与は廃止。
-            if (Run.Depth == 3) MetaProgression.MetaDebuffApplicator.TryGrantOnFloor3(Run);
-            if (Run.Depth == 5) MetaProgression.MetaDebuffApplicator.TryGrantOnFloor5(Run);
             // 挑戦カード: この層の入口で引く (§23-25)。 BOT はここで選び、 人は航行の窓で選ぶ。 見せる層 (currentFloor) で引く ── 深さ (Depth) ではない
             DealChallengeForLayer(Run.currentFloor);
 
@@ -102,29 +99,7 @@ namespace GameLoop
                 if (Run.Depth == 6) ConvictionSystem.RevealTruthInLayer6(Run);
             }
 
-            // T4-A〈破綻〉: 各層突入時、 HP を最大HPの 70% 以下へ切り詰める (§15-2 v3.0)。
-            //   既にそれ以下なら何もしない ── 回復ではなく「上限の切り下げ」。
-            float hpCap = MetaProgression.MetaDebuffApplicator.GetFloorEntryHpCapRatio();
-            if (hpCap < 1f)
-            {
-                int cap = Mathf.Max(1, Mathf.FloorToInt(Run.playerMaxHP * hpCap));
-                if (Run.playerHP > cap)
-                {
-                    Log($"【破綻】層突入: HP {Run.playerHP} → {cap} (最大の{hpCap:P0}へ切詰め)");
-                    Run.playerHP = cap;
-                }
-            }
-
-            // 恒久デバフ「ムシュファの強欲」: 5層突入時に所持ゴールド0
-            // 2026-11-10: Depth == 5 (= 今の 3 層) で判定していたのを、 見せる層の 5 層へ直した
-            if (Run.currentFloor == MapSystem.FreeMove.FloorPlan.LastOrdinal && MetaProgression.PermanentDebuffEffects.HasGreed(Run))
-            {
-                Log($"恒久デバフ {MetaProgression.PermanentDebuffIds.Greed}: 所持ゴールド {Run.coins}→0");
-                Run.coins = 0;
-            }
-
-            // 層突入のパッシブ (2026-09-15)。 **層デバフより前に鳴らす** ── 〈ムシュファの強欲〉が
-            //   5 層で所持金を 0 にするので、 後ろに置くと配ったゴールドが同じ層で消える。
+            // 層突入のパッシブ (2026-09-15)。
             ItemSystem.PassiveItems.PassiveItemManager.OnFloorEnter(Run);
 
             // 層デバフ取得
@@ -153,20 +128,7 @@ namespace GameLoop
             // 挑戦デバフ〈補給断絶〉: 前哨基地の回復量 ×0.80 / ×0.60 / ×0.40 (§15-2 v3.0)。
             //   **v3.0 は前哨基地を消さない** ── 低効率でも経路を残す (challenge-debuff-plan §3)。
             //   T4-A〈破綻〉の全回復−25% もここに乗る。
-            //   〈浅い眠り〉は倍率ではなく**回復後 HP の上限**として ApplyHealSpotCap で掛かる。
             float healMult = MetaProgression.MetaDebuffApplicator.GetHealMultiplier();
-
-            // 挑戦デバフ〈宿屋連合〉(§15-2 v4.0): 前哨基地で休むたびに GOLD を払う。
-            //   **回復を止めずに値段を付ける** ── 経路を消さないのが v3.0 以来の制約。
-            {
-                int toll = MetaProgression.MetaDebuffApplicator.GetRestGoldCost();
-                if (toll > 0 && Run.coins > 0)
-                {
-                    int paid = Mathf.Min(toll, Run.coins);
-                    Run.coins -= paid;
-                    Log($"宿屋連合: 前哨基地の宿代 -{paid}G (残 {Run.coins}G)");
-                }
-            }
 
             if (ActiveModifier != null && ActiveModifier.maxHPBonusFlat != 0)
             {
@@ -175,10 +137,7 @@ namespace GameLoop
                 int beforeHP = Run.playerHP;
                 int missing = Mathf.Max(0, Run.playerMaxHP - Run.playerHP);
                 int healAmount = Mathf.CeilToInt(missing * healMult);
-                healAmount = MetaProgression.MetaDebuffApplicator.ApplyJudgmentHealReduction(healAmount, Run);
                 Run.playerHP = Mathf.Min(Run.playerMaxHP, Run.playerHP + healAmount);
-                Run.playerHP = MetaProgression.MetaDebuffApplicator.ApplyHealSpotCap(Run.playerHP, Run.playerMaxHP, beforeHP);
-                MetaProgression.MetaDebuffApplicator.NoteHeal(healAmount, Run.playerHP - beforeHP, Run);
                 RunChronicle.Rest(Run, Run.playerHP - beforeHP, beforeHP, Run.playerMaxHP);
                 Log($"前哨基地: MaxHP+{ActiveModifier.maxHPBonusFlat} → {Run.playerMaxHP}, HP+{Run.playerHP - beforeHP} → {Run.playerHP}");
             }
@@ -196,10 +155,7 @@ namespace GameLoop
                 int beforeHP = Run.playerHP;
                 int missing = Mathf.Max(0, Run.playerMaxHP - Run.playerHP);
                 int healAmount = Mathf.CeilToInt(missing * healMult);
-                healAmount = MetaProgression.MetaDebuffApplicator.ApplyJudgmentHealReduction(healAmount, Run);
                 Run.playerHP = Mathf.Min(Run.playerMaxHP, Run.playerHP + healAmount);
-                Run.playerHP = MetaProgression.MetaDebuffApplicator.ApplyHealSpotCap(Run.playerHP, Run.playerMaxHP, beforeHP);
-                MetaProgression.MetaDebuffApplicator.NoteHeal(healAmount, Run.playerHP - beforeHP, Run);
                 RunChronicle.Rest(Run, Run.playerHP - beforeHP, beforeHP, Run.playerMaxHP);
                 Log($"前哨基地(7F): HP+{Run.playerHP - beforeHP} → {Run.playerHP}/{Run.playerMaxHP}");
             }
@@ -213,11 +169,8 @@ namespace GameLoop
                 //   最大HP 基準なら 28 HP 前後になり、 経路として意味を持つ。
                 //   6F/7F の特殊前哨基地 (全回復+MaxHP+5 / 全回復) は別経路。
                 int healAmount = Mathf.CeilToInt(Run.playerMaxHP * 0.30f * healMult);
-                healAmount = MetaProgression.MetaDebuffApplicator.ApplyJudgmentHealReduction(healAmount, Run);
                 int beforeHP = Run.playerHP;
                 Run.playerHP = Mathf.Min(Run.playerMaxHP, Run.playerHP + healAmount);
-                Run.playerHP = MetaProgression.MetaDebuffApplicator.ApplyHealSpotCap(Run.playerHP, Run.playerMaxHP, beforeHP);
-                MetaProgression.MetaDebuffApplicator.NoteHeal(healAmount, Run.playerHP - beforeHP, Run);
                 RunChronicle.Rest(Run, Run.playerHP - beforeHP, beforeHP, Run.playerMaxHP);
                 Log($"前哨基地: 不足HPの30%回復 +{Run.playerHP - beforeHP} → {Run.playerHP}/{Run.playerMaxHP}");
             }
@@ -384,8 +337,7 @@ namespace GameLoop
             // 層デバフ: 戦闘後固定ダメージ（瘀気侵蟀等）
             if (ActiveModifier != null && ActiveModifier.postCombatDamage > 0 && Run.playerHP > 0)
             {
-                int postDamage = MetaProgression.MetaDebuffApplicator.ApplyJudgmentDamageIncrease(
-                    ActiveModifier.postCombatDamage, Run, Run.playerHP);
+                int postDamage = ActiveModifier.postCombatDamage;
                 int hpBeforePostDamage = Run.playerHP;
                 Run.playerHP = Mathf.Max(1, Run.playerHP - postDamage);
                 MetaProgression.Achievements.AchievementService.NoteExternalHpDamage(hpBeforePostDamage - Run.playerHP);
@@ -467,7 +419,6 @@ namespace GameLoop
             // T4-A〈破綻〉: 有利マスが空白になっていることがある。
             //   **oneShot で activated を立てた後に判定する** ── 空白化したマスは
             //   「踏んだ」扱いで確定させ、 往復して引き直せないようにする。
-            if (TryVoidAdvantageTile(effectiveType)) return;
 
             switch (effectiveType)
             {

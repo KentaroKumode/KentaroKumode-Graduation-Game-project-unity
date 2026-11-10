@@ -14,57 +14,6 @@ namespace GameLoop
     /// <summary>GameManager: イベントマス・空虚の利・イベント戦闘。</summary>
     public partial class GameManager
     {
-        /// <summary>イベントマスに到達したときに呼ばれる。抽選 → EventEncounter へ。</summary>
-        /// <summary>T4-A〈破綻〉: 有利マス (休憩/秘宝/交換) を確率で空白化する。
-        /// 空白化したら固有イベント〈国破れて山河あり〉を起こし、 true を返す。
-        ///
-        /// **マップ生成ではなく踏んだ瞬間に判定する。** 盤上は普通の有利マスに見えるので、
-        /// 「そこへ向かう」判断は必ず先に済んでおり、 空だと分かるのは着いてから。
-        /// 迂回で避けられない代わりに、 有利マスの期待値そのものが目減りする。
-        ///
-        /// イベント側は効果も選択肢も持たない ── 罰は**この関数が一律で取る物資 −3** に
-        /// 一本化する。 文面ごとに効果を散らすと、 どの文面を引いたかで罰が変わり、
-        /// 空白化の確率だけを較正できなくなる。</summary>
-        private bool TryVoidAdvantageTile(TileType type)
-        {
-            if (type != TileType.Rest && type != TileType.Treasure && type != TileType.Exchange)
-                return false;
-            float p = MetaProgression.MetaDebuffApplicator.GetVoidTileChance();
-            if (p <= 0f) return false;
-            MetaProgression.MetaDebuffApplicator.VoidTileChecks++;
-            if (GameRng.Value("challenge.hatan") >= p) return false;
-            MetaProgression.MetaDebuffApplicator.VoidTileTriggers++;
-
-            Log($"[破綻] {TileToJapanese(type)} は空白だった");
-            // **物資 −3 を必ず取る (2026-08-17)。**
-            //   空白化だけでは 4pt を払って p=0.103 の死に段だった (実測 −2.0pt)。
-            //   有利マスを 1 つ失う痛みは「そこへ向かった手番が無駄になった」だけで、
-            //   盤面には何も残らない ── 損失が観測されないので判断も変わらない。
-            //   物資を削れば以後の振り直し・進路選択に効き続けるので、罰が持続する。
-            //   **空白化の 4 種すべてに一律で乗せる**。 文面ごとに差を付けると、
-            //   イベント側に効果を持たせないという設計 (下の doc 参照) が崩れる。
-            ProvisionSystem.ApplyEvilChoice(Run, VoidTileProvisionCost);
-            var ee = EventSystem.EventEncounter.Instance;
-            // 文面の抽選は**発動判定と別の乱数列**から引く。 同じ列を続けて消費すると、
-            //   文面を増減しただけで発動の並びまで変わり、 シード固定のペア比較が壊れる。
-            string pickName = VoidTileEventNames[
-                GameRng.RangeAuto("challenge.hatan.flavor", 0, VoidTileEventNames.Length)];
-            var def = EventSystem.EventDatabase.GetByName(pickName);
-            // **イベントを出せなくても空白化は成立させる。** ここで有利マスの処理へ
-            //   落とすと、 シングルトン未配置やテキスト欠落が「デバフが効かない」という
-            //   形で現れ、 数値だけ見ても原因に辿り着けない。
-            if (ee == null || def == null || !ee.BeginWith(Run, def))
-            {
-                Debug.LogWarning($"[破綻] 固有イベント『{pickName}』を開始できず — 空白のみ適用");
-                SetPhase(GamePhase.MapNavigation);
-                return true;
-            }
-            eventChoiceResolved = false;
-            returnToMapAfterEventCombat = false;
-            SetPhase(GamePhase.EventEncounter);
-            return true;
-        }
-
         /// <summary>〈破綻〉の空白化で失う物資。 4 種の文面すべてに一律で掛かる。</summary>
         private const int VoidTileProvisionCost = 1;   // 2026-11-09 デノミ (旧 30)
 

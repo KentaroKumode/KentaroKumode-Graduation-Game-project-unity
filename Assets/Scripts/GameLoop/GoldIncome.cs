@@ -52,9 +52,6 @@ namespace GameLoop
             // 挑戦デバフ 軸3〈偽の硬貨〉: GOLD 収入 −20% / −35% / −50%。
             //   **掛ける場所はここ 1 箇所だけ。** 呼び出し側では絶対に掛けないこと。
             //   1 以上あった収入を 0 にはしない (完全な無収入は経済が停止して別ゲームになる)。
-            float goldMul = MetaProgression.MetaDebuffApplicator.GetGoldGainMultiplier();
-            if (goldMul < 0.999f && granted > 0)
-                granted = UnityEngine.Mathf.Max(1, UnityEngine.Mathf.RoundToInt(granted * goldMul));
 
             if (granted <= 0) return 0;
             run.coins += granted;

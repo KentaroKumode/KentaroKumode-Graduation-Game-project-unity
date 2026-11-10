@@ -51,15 +51,13 @@ namespace AutoTest
         private float _relicUtility;
         private int _runIndex;
 
-        /// <summary>挑戦構成の**正本はここ**。 State 側には毎ラン入れ直す。
-        ///
-        /// AutoRunner はラン開始時に <c>MetaAllocationPresets.Apply</c> → <c>ResetAll()</c> を呼び、
-        /// MetaProgressState を丸ごと作り直す。 State に置いたままだと遺物も挑戦構成も
-        /// 毎ラン消えるので、 ライン側で保持して BeforeRun で流し込む。</summary>
-        private ChallengeLoadout _loadout = new ChallengeLoadout();
+        /// <summary>挑戦の難易度 (挑戦カードの目盛り 0..10) の**正本はここ**。 State 側には毎ラン入れ直す
+        /// (AutoRunner はラン開始時に State を作り直すので、 ライン側で保持して BeforeRun で流し込む)。
+        /// 2026-11-10: 旧の配点 (軸ごとの Tier) から置き換えた (#9)。</summary>
+        private int _difficulty;
 
-        /// <summary>現在の挑戦スコア。 State ではなくライン側の構成から算出する。</summary>
-        public int ChallengeScore => ChallengeResolver.Score(_loadout);
+        /// <summary>現在の挑戦の難易度 (0..10)。</summary>
+        public int Difficulty => _difficulty;
         /// <summary>難易度を上げた直後は成績が落ちるので、 窓が埋まるまで再判定しない。</summary>
         private int _cooldown;
 
@@ -69,8 +67,6 @@ namespace AutoTest
         public int SwapCount { get; private set; }
         public int DifficultyUpCount { get; private set; }
         public int DifficultyDownCount { get; private set; }
-        /// <summary>直近に上げたカテゴリ。 次はこの「次」から探して巡回させる。</summary>
-        private ChallengeCategory _lastRaisedCategory = ChallengeCategory.E崩壊;
 
         public AscensionLoop(BuildPersona persona, Policy policy, int window = 20)
         {
@@ -87,8 +83,7 @@ namespace AutoTest
             _recent.Clear(); _owned.Clear(); _equipped = new Relic[3]; _material = 0; _relicUtility = 0f;
             _runIndex = 0; _cooldown = 0;
             SwapCount = DifficultyUpCount = DifficultyDownCount = 0;
-            _lastRaisedCategory = ChallengeCategory.E崩壊;   // 次は A から始まる
-            _loadout = new ChallengeLoadout();
+            _difficulty = 0;
             ApplyToState();
         }
 
@@ -105,8 +100,7 @@ namespace AutoTest
             var eq = new List<Relic>();
             foreach (var r in _equipped) if (r != null) eq.Add(r);
             st.SetRelicLoadout(eq);
-            st.challenge = _loadout;
-            st.InvalidateChallenge();
+            st.challengeDifficulty = _difficulty;
         }
 
         /// <summary>ラン終了後。 遺物を引いて持ち込みを選び直し、 要らないものを分解して強化、 続いて難易度判定。
@@ -115,8 +109,8 @@ namespace AutoTest
         {
             _runIndex++;
 
-            // ---- ① 遺物を引く (落ちる数は到達した層で決まる)。 難易度は旧ロードアウトの点数を 5 点 = 1 段で読み替える ----
-            int diff = System.Math.Min(10, ChallengeScore / 5);
+            // ---- ① 遺物を引く (落ちる数は到達した層で決まる) ----
+            int diff = _difficulty;
             var got = RelicRoller.RollRunEnd(_runIndex, ordinalReached, diff, (int)RelicUtility.PreferredSet(persona));
             _owned.AddRange(got);
             var prev = _equipped;
@@ -171,70 +165,6 @@ namespace AutoTest
         private const float StandardUpAt   = 0.20f;
         private const float StandardDownAt = 0.10f;
 
-        /// <summary>目標スコアに達するまで `RaiseDifficulty` と同じ規則で積んだ挑戦構成を返す。
-        /// **固定難易度スイープ用** ── 「難易度 N で 7 層をクリアできるか」を測るのに使う。
-        /// ラチェットの探索挙動を挟まないので、 難易度そのものの壁が見える。</summary>
-        public static ChallengeLoadout BuildLoadoutAtScore(int targetScore)
-        {
-            var lo = new ChallengeLoadout();
-            var lastCat = ChallengeCategory.E崩壊;
-            int catCount = System.Enum.GetValues(typeof(ChallengeCategory)).Length;
-            for (int guard = 0; guard < 200 && ChallengeResolver.Score(lo) < targetScore; guard++)
-            {
-                int minCost = int.MaxValue;
-                foreach (var def in ChallengeCatalog.Axes)
-                {
-                    int cur = lo.GetTier(def.axis);
-                    for (int i = 0; i < def.availableTiers.Length; i++)
-                    {
-                        int t = def.availableTiers[i];
-                        if (t <= cur) continue;
-                        // v4.1: 段番号 = 点数。 PointsOf は存在しない Tier を 0 にするので
-                        //   「その軸に無い Tier」を経由したコスト計算にならない。
-                        int cost = def.PointsOf(t) - def.PointsOf(cur);
-                        if (cost < minCost) minCost = cost;
-                        break;
-                    }
-                }
-                bool moved = false;
-                if (minCost != int.MaxValue)
-                {
-                    for (int off = 1; off <= catCount && !moved; off++)
-                    {
-                        var cat = (ChallengeCategory)(((int)lastCat + off) % catCount);
-                        foreach (var def in ChallengeCatalog.Axes)
-                        {
-                            if (def.category != cat) continue;
-                            int cur = lo.GetTier(def.axis);
-                            for (int i = 0; i < def.availableTiers.Length; i++)
-                            {
-                                int t = def.availableTiers[i];
-                                if (t <= cur) continue;
-                                if (def.PointsOf(t) - def.PointsOf(cur) != minCost) break;
-                                lo.SetTier(def.axis, t); lastCat = cat; moved = true;
-                                break;
-                            }
-                            if (moved) break;
-                        }
-                    }
-                }
-                // **軸が尽きたら Tier4 を解禁する。** 軸だけでは 30pt までしか行かないので、
-                // 満点 50pt を作るには解禁済みカテゴリの Tier4 を積む必要がある。
-                if (!moved)
-                {
-                    for (int i = 0; i < ChallengeCatalog.T4s.Count && !moved; i++)
-                    {
-                        var t4 = ChallengeCatalog.T4s[i];
-                        if (lo.HasT4(t4.t4)) continue;
-                        if (!ChallengeResolver.CanSelectT4(lo, t4.t4)) continue;
-                        lo.SetT4(t4.t4, true); moved = true;
-                    }
-                }
-                if (!moved) break;
-            }
-            return lo;
-        }
-
         private static float UpThreshold(Policy p)
             => p == Policy.Conservative ? 0.70f
              : p == Policy.Aggressive   ? 0.30f
@@ -251,89 +181,24 @@ namespace AutoTest
         //  難易度の上げ下げ
         // ============================================================
 
-        /// <summary>上げ幅を 1 つ適用する。 **決定論** ── 同じシードなら同じ難易度履歴になる。
-        ///
-        /// 選定は 2 段: **① コスト昇順が最優先 → ② 同コスト内でカテゴリを巡回**。
-        ///
-        /// **なぜカテゴリ巡回が要るか** (2026-08-04): 旧実装は「最も安い上げ幅」だけを見て、
-        /// 同点は `cost &lt; bestCost` の厳密不等号で **List の先頭が必ず勝っていた**。
-        /// 結果、脆弱な肉体 T1→T3 → 練度不足 T1→T3 → 偽の硬貨 → 不足する物資 → 絶望的な戦闘 と
-        /// **カテゴリA(数値悪化) だけを埋め続け**、B(戦闘機構) に入るのは挑戦pt 15 から。
-        /// 実測のラチェット上限は 4〜13 なので、**B〜E の 39pt が一度も発火していなかった**。
-        /// 「挑戦上限」も難易度一般ではなく A への耐性しか測れていなかった (§24)。
-        ///
-        /// **コスト昇順を優先キーに残す**のは、カテゴリE が T3 (cost 3) しか持たないため。
-        /// 巡回だけにすると挑戦pt 3 で天変地異が入って刻みが粗くなる。
-        /// cost 1〜2 が他に残っている限り E は選ばれない。</summary>
+        /// <summary>難易度を 1 上げる (最大 10)。</summary>
         private bool RaiseDifficulty()
         {
-            var lo = _loadout;
-
-            // ① 各軸の「最小の上げ幅」を集め、 全体の最小コストを求める。
-            int minCost = int.MaxValue;
-            foreach (var def in ChallengeCatalog.Axes)
-            {
-                int cur = lo.GetTier(def.axis);
-                for (int i = 0; i < def.availableTiers.Length; i++)
-                {
-                    int t = def.availableTiers[i];
-                    if (t <= cur) continue;
-                    if (t - cur < minCost) minCost = t - cur;   // Tier = 点数 なので差分がコスト
-                    break;
-                }
-            }
-            if (minCost == int.MaxValue) return false;          // 全軸が最高 Tier
-
-            // ② 最小コストの候補の中で、 **前回上げたカテゴリの次**から巡回して最初に見つかる軸。
-            int catCount = System.Enum.GetValues(typeof(ChallengeCategory)).Length;
-            for (int off = 1; off <= catCount; off++)
-            {
-                var cat = (ChallengeCategory)(((int)_lastRaisedCategory + off) % catCount);
-                foreach (var def in ChallengeCatalog.Axes)
-                {
-                    if (def.category != cat) continue;
-                    int cur = lo.GetTier(def.axis);
-                    for (int i = 0; i < def.availableTiers.Length; i++)
-                    {
-                        int t = def.availableTiers[i];
-                        if (t <= cur) continue;
-                        if (t - cur != minCost) break;          // この軸の最小上げ幅が最小コストでない
-                        if (!lo.SetTier(def.axis, t)) return false;
-                        _lastRaisedCategory = cat;
-                        ApplyToState();
-                        return true;
-                    }
-                }
-            }
-            return false;
+            if (_difficulty >= MetaProgression.ChallengeCards.MaxDifficulty) return false;
+            _difficulty++; ApplyToState(); return true;
         }
 
-        /// <summary>最後に上げた分を戻すのではなく、 **最も高い Tier を 1 段下げる**。
-        /// 履歴を持たずに済み、 かつ「一番きついものから緩める」ので挙動が読みやすい。</summary>
+        /// <summary>難易度を 1 下げる (最小 0)。</summary>
         private bool LowerDifficulty()
         {
-            var lo = _loadout;
-            int bestTier = 0; ChallengeAxis bestAxis = default;
-            foreach (var def in ChallengeCatalog.Axes)
-            {
-                int cur = lo.GetTier(def.axis);
-                if (cur > bestTier) { bestTier = cur; bestAxis = def.axis; }
-            }
-            if (bestTier <= 0) return false;
-            // 1 つ下の「存在する Tier」へ落とす (無ければ解除)
-            var d = ChallengeCatalog.Get(bestAxis);
-            int next = 0;
-            for (int i = 0; i < d.availableTiers.Length; i++)
-                if (d.availableTiers[i] < bestTier) next = d.availableTiers[i];
-            if (!lo.SetTier(bestAxis, next)) return false;
-            ApplyToState();
-            return true;
+            if (_difficulty <= 0) return false;
+            _difficulty--; ApplyToState(); return true;
         }
 
         /// <summary>レポート 1 行。</summary>
         public string Summary()
         {
-            return $"{persona,-9} {policy,-12} 挑戦{ChallengeScore,3}pt  効用{_relicUtility,5:F1}  "
+            return $"{persona,-9} {policy,-12} 難易度{_difficulty,3}  効用{_relicUtility,5:F1}  "
                  + $"乗換{SwapCount,3}回  難度↑{DifficultyUpCount,2} ↓{DifficultyDownCount,2}  "
                  + CurrentRelicText;
         }

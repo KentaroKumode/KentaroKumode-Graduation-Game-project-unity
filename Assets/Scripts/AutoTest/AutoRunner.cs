@@ -200,7 +200,7 @@ namespace AutoTest
         private bool IsSuperTailMode
             => superHighDifficultyTailMode
             && EffectiveWiringSkill == WiringSkill.Super
-            && MetaProgression.MetaDebuffApplicator.Score >= superHighDifficultyMinScore;
+            && CurrentChallengeScore() >= superHighDifficultyMinScore;
 
         /// <summary>余剰リロール後に「1 個買える」ために残す額。 これを割るなら回さない。</summary>
         public int SurplusBuyReserve = 30;
@@ -364,8 +364,7 @@ namespace AutoTest
         /// <summary>挑戦デバフ構成の指定 (docs/GAME.md §15-2)。 空なら無効。
         /// 書式は <c>軸名:Tier</c> をカンマ区切り、 T4 は <c>T4:名前</c>。
         /// 例: <c>練度不足:3,俊敏:2,T4:暗夜</c>
-        /// <see cref="enableAllDebuffs"/> より優先される。 EditorPref "AutoRun.ChallengeSpec" から入る。</summary>
-        public string challengeSpec = "";
+        /// [撤去 2026-11-10] 旧配点の構成の文字列 (challengeSpec)。 挑戦は難易度 (challengeCardDifficulty) だけになった。</summary>
 
         [Header("④ 決定論シード (再現性)")]
         [Tooltip("16 桁の 10 進シード。 空なら毎回ランダム (従来動作)。 同じ値なら同じ 1 万通りのランが再現され、 変更前後で同じシードを使えば対応のある比較になる (シナリオ差のノイズが消える)。")]
@@ -516,13 +515,14 @@ namespace AutoTest
             ? MetaProfileHelper.TierLearningRoot(_activeTierCalibrationScore)
             : MetaProfileHelper.BotLearningRoot(CurrentChallengeScore());
 
-        /// <summary>いまの実効挑戦スコア。 解決済みキャッシュを読む
-        /// (ロードアウトを書き換えても InvalidateChallenge しなければ古い値が残るため)。</summary>
+        /// <summary>いまの挑戦の「点数」。 2026-11-10 に旧配点方式を撤去したので、 挑戦カードの難易度 × <see cref="ScorePerDifficulty"/> で読み替える
+        /// (学習の帯 `bot_band_*`・Ultra の基準 50 点・測定の口の点数をそのまま使えるようにするため)。</summary>
         private static int CurrentChallengeScore()
-        {
-            var st = MetaProgression.MetaProgressManager.Instance?.State;
-            return st?.Challenge != null ? st.Challenge.Score : 0;
-        }
+            => (MetaProgression.MetaProgressManager.Instance?.State?.challengeDifficulty ?? 0) * ScorePerDifficulty;
+        /// <summary>旧配点の点数と挑戦カードの難易度の読み替え (50 点 = 難易度 10)。</summary>
+        public const int ScorePerDifficulty = 5;
+        public static int ScoreToDifficulty(int score)
+            => Mathf.Clamp(Mathf.RoundToInt(score / (float)ScorePerDifficulty), 0, MetaProgression.ChallengeCards.MaxDifficulty);
         private string TierOutputSuffix => _activeTierCalibrationScore >= 0
             ? $"{MetaProfileHelper.CurrentSuffix}_score{_activeTierCalibrationScore}"
             : MetaProfileHelper.CurrentSuffix;
@@ -547,8 +547,8 @@ namespace AutoTest
                + "剣の舞4枚完成で高難易度を通せるかの切り分け用")]
         public bool challengeSweepGrantBladeDance = false;
         private string _challengeSweepReport;
-        /// <summary>次ランに流し込む固定挑戦構成。 ResetAll 直後に State へ入れる。</summary>
-        private MetaProgression.ChallengeLoadout _pendingChallengeLoadout;
+        /// <summary>次ランに流し込む挑戦の難易度 (ResetAll 直後に State へ入れる)。 負 = 触らない。</summary>
+        private int _pendingChallengeDifficulty = -1;
 
         [Header("遺物プリセットスイープ")]
         [Tooltip("true で ペルソナ/挑戦スコアを固定したまま遺物プリセットだけを振り、深度が動くかを測る")]
@@ -567,7 +567,7 @@ namespace AutoTest
         /// Verification ③ (30pt で 7層クリア 10% 前後) を方策別に測るため。</summary>
         /// <summary>挑戦 単軸スイープを**遺物なし**で回す。 段の値付けは基準条件で測るのが筋。</summary>
         public bool challengeAxisSweepNoRelic = false;
-        /// <summary>この軸だけを回す (空なら全軸)。 <see cref="MetaProgression.ChallengeAxis"/> の名前で指定。
+        /// <summary>この軸だけを回す (空なら全軸)。 旧配点の軸 (2026-11-10 に撤去) の名前で指定。
         /// 変更した軸だけ測り直すとき用 ── 全 23 段を回すと 1000 ラン で 40 分かかる。</summary>
         public string[] challengeAxisSweepAxisNames;
         /// <summary>T4 調整モード: 単軸ではなく**カテゴリ 6pt** と **6pt+T4** をアームにする。
@@ -585,7 +585,7 @@ namespace AutoTest
         /// 戦闘が短くなっている」のかを区別する手段が無かった。 これはその分離用。
         /// **配点としては不正な組み合わせ**なので、 値付けには使わず診断専用。</summary>
         public bool challengeCategorySweepT4Alone = false;
-        /// <summary>カテゴリ 1 つだけに絞る (ChallengeCategory の値)。 −1 で全部。
+        /// <summary>カテゴリ 1 つだけに絞る (旧配点のカテゴリ・2026-11-10 に撤去)。 −1 で全部。
         /// **固着の再現用**。 どのアームで止まったかが分かっているとき、 そこだけを
         /// 進捗毎ラン で回して**止まったラン番号を 1 本に特定する**。</summary>
         public int challengeCategorySweepOnlyCat = -1;
@@ -696,7 +696,7 @@ namespace AutoTest
         /// <summary>**名目ではなく実効値**を読む計装 (2026-08-10)。
         ///
         /// 同じ「遺物なし・挑戦0pt」を名乗る 2 つのスイープで基準値が 53.3% と 16.6% に
-        /// 割れたため。 `_pendingPresetRelic` / `_pendingChallengeLoadout` は
+        /// 割れたため。 `_pendingPresetRelic` / `_pendingChallengeDifficulty` は
         /// **null が「無し」ではなく「触らない」** を意味する構造なので、
         /// 設定したつもりの条件が実際には前の状態を引き継いでいる可能性がある。
         /// 推測で潰さず、 生きている State から直接読む。</summary>
@@ -704,16 +704,10 @@ namespace AutoTest
         {
             var st = MetaProgression.MetaProgressManager.Instance?.State;
             if (st == null) return "[実効状態] MetaProgressState が null";
-            int chal = st.challenge != null ? MetaProgression.ChallengeResolver.Score(st.challenge) : -1;
             var eqRelics = MetaProgression.Relics.RelicApplicator.Override ?? st.EquippedRelics();
             int relicCount = eqRelics.Count;
             int relicPts = RelicPresets.TotalSteps(eqRelics);
-            // **生のロードアウトと解決済みキャッシュを分けて出す。**
-            //   各システムが見るのは st.Challenge (解決済み)。 ロードアウトを書き換えても
-            //   InvalidateChallenge() を呼ばなければ古い解決結果が残り続ける。
-            //   前者だけ見て「0pt だから条件は同じ」と判断すると取り違える (2026-08-10 に実際にやった)。
-            int resolved = st.Challenge != null ? st.Challenge.Score : -1;
-            return $"[実効状態] 挑戦スコア ロードアウト {chal}pt / **解決済み {resolved}pt** "
+            return $"[実効状態] 挑戦の難易度 {st.challengeDifficulty} "
                  + $"/ 遺物 持ち込み {relicCount}個 計{relicPts}段 "
                  + $"/ メタ ダイス合計+{MetaProgression.MetaBuffApplicator.GetDiceTotalBonus()} "
                  + $"攻撃端子+{MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice()}";
@@ -1054,8 +1048,8 @@ namespace AutoTest
         /// 帯別の学習ディレクトリ (<c>bot_band_16_30</c> / <c>bot_band_31up</c>) が
         /// 器だけあって埋まらなかった。</para>
         ///
-        /// <para><see cref="AscensionLoop.BuildLoadoutAtScore"/> で構成を組み、
-        /// <c>_pendingChallengeLoadout</c> へ流し込む。 実効値は必ずサマリ冒頭の
+        /// <para>点数を難易度へ読み替え (ScoreToDifficulty)、
+        /// <c>_pendingChallengeDifficulty</c> へ流し込む。 実効値は必ずサマリ冒頭の
         /// <c>[実効状態]</c> 行で確認すること ── 目標 pt と解決済み pt は一致しないことがある。</para></summary>
         public int challengeScoreTarget = 0;
 
@@ -1857,9 +1851,9 @@ namespace AutoTest
             AutoTest.LearnedPriorityProvider.IttStrict = ittStrict;
             if (challengeScoreTarget > 0)
             {
-                _pendingChallengeLoadout = AscensionLoop.BuildLoadoutAtScore(challengeScoreTarget);
-                int resolved = MetaProgression.ChallengeResolver.Score(_pendingChallengeLoadout);
-                Debug.Log($"[AutoRunner] 挑戦スコア固定: 目標 {challengeScoreTarget}pt → 解決済み {resolved}pt"
+                _pendingChallengeDifficulty = ScoreToDifficulty(challengeScoreTarget);
+                int resolved = _pendingChallengeDifficulty * ScorePerDifficulty;
+                Debug.Log($"[AutoRunner] 挑戦の難易度固定: {challengeScoreTarget}pt → 難易度 {_pendingChallengeDifficulty}"
                         + $" / 帯 {MetaProfileHelper.ChallengeBand(resolved)}");
             }
 
@@ -2943,38 +2937,6 @@ namespace AutoTest
             string label = string.IsNullOrEmpty(curArmLabel) ? "run" : curArmLabel;
             _screenRunLog.Add($"{DateTime.Now:HH:mm:ss}  {pct,5:F1}%  {label}  floor={floor}  {outcome}");
             if (_screenRunLog.Count > 20) _screenRunLog.RemoveAt(0);
-        }
-
-        /// <summary>挑戦デバフ構成の文字列を解釈して適用する。 書式は <see cref="challengeSpec"/> 参照。
-        /// 未知の軸名 / 存在しない Tier は警告して読み飛ばす (バッチを止めない)。</summary>
-        private static void ApplyChallengeSpec(MetaProgression.MetaProgressManager mgr, string spec)
-        {
-            if (mgr == null) return;
-            mgr.ClearChallenge();
-            foreach (var raw in spec.Split(','))
-            {
-                string part = raw.Trim();
-                if (part.Length == 0) continue;
-                int colon = part.IndexOf(':');
-                if (colon <= 0) { Debug.LogWarning($"[挑戦] 書式不正: '{part}'"); continue; }
-                string key = part.Substring(0, colon).Trim();
-                string val = part.Substring(colon + 1).Trim();
-
-                if (key == "T4")
-                {
-                    var t4 = MetaProgression.ChallengeCatalog.T4s.Find(d => d.displayName == val);
-                    if (t4 == null) { Debug.LogWarning($"[挑戦] 未知の T4: '{val}'"); continue; }
-                    mgr.SetChallengeT4(t4.t4, true);
-                    continue;
-                }
-
-                var def = MetaProgression.ChallengeCatalog.Axes.Find(d => d.displayName == key);
-                if (def == null) { Debug.LogWarning($"[挑戦] 未知の軸: '{key}'"); continue; }
-                if (!int.TryParse(val, out int tier) || !def.HasTier(tier))
-                { Debug.LogWarning($"[挑戦] {key} に Tier {val} は存在しない"); continue; }
-                mgr.SetChallengeTier(def.axis, tier);
-            }
-            Debug.Log($"[挑戦] {mgr.State.Challenge.Describe()}");
         }
     }
 }

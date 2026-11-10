@@ -139,8 +139,7 @@ namespace CombatSystem
             // フロアデバフ: 毎ターン自傷（6層 深淵の洗礼: -1）
             if (floorMod != null && floorMod.perTurnSelfDamage > 0 && playerHP > 0)
             {
-                int dmg = MetaProgression.MetaDebuffApplicator.ApplyJudgmentDamageIncrease(
-                    floorMod.perTurnSelfDamage, GameLoop.GameManager.Instance?.Run, playerHP);
+                int dmg = floorMod.perTurnSelfDamage;
                 playerHP = Math.Max(0, playerHP - dmg);
                 ctx.playerCurrentHP = playerHP;
                 Debug.Log($"[CombatManager] フロアデバフ: 自傷-{dmg} (HP: {playerHP}/{playerMaxHP})");
@@ -575,29 +574,6 @@ namespace CombatSystem
                 Debug.Log($"[{MetaProgression.PermanentDebuffIds.Wrath}] 1T目: 自ダイスを全て最大値 {(top >= 0 ? faces[top] : playerDiceMax)} に");
             }
 
-            // 挑戦デバフ 軸9〈見放された運〉: ダイスを N 本 1 に潰す。
-            //   T1 = 1T目に 1 本 / T2 = 1T目に 2 本 / T3 = 全ターン 1 本。
-            //   潰す対象は **出目が大きいものから** ── ランダムだと元から低い目を潰すだけの
-            //   無害なターンが混ざり、 Tier ごとの重みが安定しない。
-            // 挑戦カード「出目 1」は戦闘中ずっと N 本 (ターンは見ない)。 旧の配点は通算ターンのまま
-            int forsakenTurn = (GameLoop.GameManager.Instance?.Run?.challengeCardMode ?? false) && ctx != null
-                ? CurrentCombatTurn - ctx.phaseStartTurn + 1 : CurrentCombatTurn;
-            int forsaken = MetaProgression.MetaDebuffApplicator.GetForsakenLuckDiceCount(forsakenTurn);
-            _forsakenThisTurn = forsaken; _crushedDice.Clear();
-            for (int k = 0; k < forsaken && k < playerDice.Length; k++)
-            {
-                int best = -1, bestVal = 0;
-                for (int i = 0; i < playerDice.Length; i++)
-                    if (playerDice[i] > bestVal) { bestVal = playerDice[i]; best = i; }
-                if (best < 0 || bestVal <= 1) break;
-                playerDice[best] = 1;
-                _crushedDice.Add(best);
-                // 出目パーツ: **値を上書きする効果は、そのダイスを面から降ろす**。
-                //   潰された 1 はもうその面ではないので、 パーツ効果も発火しない。
-                //   (加算する〈鋳造口〉は面が変わらないので添字を保つ ── 上書きと加算で扱いが違う)
-                if (playerFaceIdx != null && best < playerFaceIdx.Length) playerFaceIdx[best] = -1;
-                Debug.Log($"[見放された運] 出目 {bestVal} → 1 (T{CurrentCombatTurn})");
-            }
 
             // 大罪:怠惰 (挑戦カード IV・2026-11-10): 全部の出目 −N (下限 1)。 値を減らすだけで面は変えない (〈鋳造口〉の加算と同じ扱い)
             {
@@ -605,9 +581,7 @@ namespace CombatSystem
                 if (sloth > 0) for (int i = 0; i < playerDice.Length; i++) playerDice[i] = Math.Max(1, playerDice[i] - sloth);
             }
 
-            // 特殊端子〈鋳造口〉(§6-5): 前ターンまでに蓄積した恒常の出目 +N。
-            //   **1 固定系デバフの後に置く** ── 先に足すと〈見放された運〉が潰す対象が
-            //   底上げ後の値になり、 デバフと端子が互いを打ち消し合って両方無意味になる。
+            // 特殊端子〈鋳造口〉(§6-5): 前ターンまでに蓄積した恒常の出目 +N。 出目を減らすデバフ (大罪:怠惰) の後に置く。
             {
                 int foundry = (int)ctx.GetAccumulated(FoundryBonusKey);
                 if (foundry > 0)
@@ -778,9 +752,7 @@ namespace CombatSystem
                         ItemSystem.PassiveSkills.Effects.BlazeBrand.ActiveKey, out var _bza)
                     && _bza > 0f,
                 executeArmed = ctx.vescaExecuteArmed,
-                // 〈綻び〉: このターン封印される端子。 **配線前に開示する** (柱3)。
-                sealedTerminal = MetaProgression.MetaDebuffApplicator.GetSealedTerminal(
-                    ctx.currentTurn, SpecialTerminals.EquippedLimit(GameLoop.GameManager.Instance?.Run) > 0 ? 4 : 3),
+                sealedTerminal = -1,   // 旧〈綻び〉(端子の封印) は 2026-11-10 に撤去
             };
             if (ctx.bossId == "boss_layer7_p4")
                 BossDmgDiag.P4Turn(ctx.playerHighDiceCrushed, ctx.vescaExecuteArmed,
@@ -1228,8 +1200,7 @@ namespace CombatSystem
                 int reflect = Mathf.RoundToInt(ctx.vescaShieldAbsorbedThisTurn * ctx.vescaShieldReflectRate);
                 if (reflect > 0)
                 {
-                    reflect = MetaProgression.MetaDebuffApplicator.ApplyJudgmentDamageIncrease(
-                        reflect, GameLoop.GameManager.Instance?.Run, playerHP);
+                    reflect = reflect;
                     playerHP = Math.Max(0, playerHP - reflect);
                     ctx.playerCurrentHP = playerHP;
                     Debug.Log($"[ヴェスカ] シールド反射 {ctx.vescaShieldAbsorbedThisTurn}×{ctx.vescaShieldReflectRate:F1} = {reflect} ダメージ");
@@ -1407,15 +1378,11 @@ namespace CombatSystem
                     ctx.accumulatedValues.Remove(GameLoop.Consumables.OldLetterGuardKey);
                 }
 
-                takenDmg = MetaProgression.MetaDebuffApplicator.ApplyJudgmentDamageIncrease(
-                    takenDmg, GameLoop.GameManager.Instance?.Run, playerHP);
+                takenDmg = takenDmg;
                 // 整備パネル〈装甲〉r10〈不動〉: 1 回の攻撃で受けるダメージは最大 HP の 35% まで (2026-11-10)
                 { int cap = MetaProgression.MetaBuffApplicator.GetArmorHitCap(playerMaxHP); if (cap > 0 && takenDmg > cap) takenDmg = cap; }
                 playerHP = Math.Max(0, playerHP - takenDmg);
                 takenApplied = takenDmg;
-                MetaProgression.MetaDebuffApplicator.NoteDamageTaken(
-                    takenDmg, GameLoop.GameManager.Instance?.Run);
-                ApplyBreakdownIfNeeded();
                 // 〈長引く負傷〉: ラン中の累計被ダメを積む。 **最大HP の減少はここからは行わない** ──
                 //   戦闘中に最大HP を削ると、 予告に無い形でその場の生死が変わる。 精算は戦闘終了時。
                 if (takenDmg > 0)
@@ -1441,14 +1408,11 @@ namespace CombatSystem
                 ctx.AddPlayerDamageSource(ctx.lastDamageCause, takenDmg);
                 if (ctx.fixedDamageToPlayer > 0)
                 {
-                    int fixedTaken = MetaProgression.MetaDebuffApplicator.ApplyJudgmentDamageIncrease(
-                        ctx.fixedDamageToPlayer, GameLoop.GameManager.Instance?.Run, playerHP);
+                    int fixedTaken = ctx.fixedDamageToPlayer;
                     playerHP = Math.Max(0, playerHP - fixedTaken);
                     takenApplied += fixedTaken;
                     ctx.playerDamageThisTurn += fixedTaken;
                     ctx.AddPlayerDamageSource(ctx.lastDamageCause, fixedTaken);
-                    MetaProgression.MetaDebuffApplicator.NoteDamageTaken(
-                        fixedTaken, GameLoop.GameManager.Instance?.Run);
                 }
 
                 // 痛覚遮断剤 (狂戦士) post-clamp (旧法と同一)
@@ -1514,8 +1478,7 @@ namespace CombatSystem
                     //   〈守り〉の価値が 2 体戦でだけ半減してしまう。
                     secTaken = ApplyRoleGuard(ctx, secTaken, roleOutcome);
 
-                    secTaken = MetaProgression.MetaDebuffApplicator.ApplyJudgmentDamageIncrease(
-                        secTaken, GameLoop.GameManager.Instance?.Run, playerHP);
+                    secTaken = secTaken;
                     { int cap = MetaProgression.MetaBuffApplicator.GetArmorHitCap(playerMaxHP); if (cap > 0 && secTaken > cap) secTaken = cap; }   // 〈装甲〉r10〈不動〉
 
                     if (secTaken > 0)

@@ -230,10 +230,8 @@ namespace GameLoop
             }
             if (run.playerHP >= run.playerMaxHP) return false;
             int a = Mathf.CeilToInt(run.playerMaxHP * pct);
-            a = MetaProgression.MetaDebuffApplicator.ApplyJudgmentHealReduction(a, run);
             int before = run.playerHP;
             run.playerHP = Mathf.Min(run.playerMaxHP, run.playerHP + a);
-            MetaProgression.MetaDebuffApplicator.NoteHeal(a, run.playerHP - before, run);
             return true;
         }
 

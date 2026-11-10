@@ -19,7 +19,7 @@ namespace MetaProgression.Achievements
             public bool active, usedConsumable, purchased, rerolled, playerFled, relicEquipped;
             public int startMaxHp, damageTaken, combatRequestedHeal, hpOneStreak;
             public int shopPurchases, shopSales, shopRerolls;
-            public ResolvedChallenge challenge;
+            public int difficulty;
             public bool cursedRelicEquipped;
             public readonly HashSet<string> escapedEnemyIds = new HashSet<string>();
         }
@@ -66,7 +66,7 @@ namespace MetaProgression.Achievements
                 startMaxHp = Math.Max(1, state.playerMaxHP),
                 relicEquipped = relics != null && relics.Count > 0,
                 cursedRelicEquipped = fullSet,   // 2026-11-10: 刻印の廃止に伴い「同じセットを 3 個持ち込んだ」に読み替え (id は据え置き)
-                challenge = meta?.challenge != null ? ChallengeResolver.Build(meta.challenge.Clone()) : ResolvedChallenge.None,
+                difficulty = state.challengeDifficulty,
             };
             Unlock(AchievementCatalog.FirstRun);
         }
@@ -255,42 +255,46 @@ namespace MetaProgression.Achievements
                 if (!run.relicEquipped && !run.usedConsumable) Unlock(AchievementCatalog.NoRelicConsumableClear7);
                 if (run.cursedRelicEquipped) Unlock(AchievementCatalog.CursedRelicClear7);
                 UnlockChallengeAchievements();
-                UnlockCategoryAchievements();
+                UnlockCategoryAchievements(state);
             }
             run.active = false;
         }
 
+        /// <summary>挑戦の実績 (2026-11-10: 旧配点の点数 10〜50 から、 難易度 2・4・6・8・10 へ読み替え・id は据え置き)。</summary>
         private static void UnlockChallengeAchievements()
         {
-            int score = run.challenge?.Score ?? 0;
-            if (score >= 10) Unlock(AchievementCatalog.Challenge10);
-            if (score >= 20) Unlock(AchievementCatalog.Challenge20);
-            if (score >= 30) Unlock(AchievementCatalog.Challenge30);
-            if (score >= 40) Unlock(AchievementCatalog.Challenge40);
-            if (score == ChallengeCatalog.TotalMaxScore) Unlock(AchievementCatalog.Challenge50);
+            int d = run.difficulty;
+            if (d >= 2) Unlock(AchievementCatalog.Challenge10);
+            if (d >= 4) Unlock(AchievementCatalog.Challenge20);
+            if (d >= 6) Unlock(AchievementCatalog.Challenge30);
+            if (d >= 8) Unlock(AchievementCatalog.Challenge40);
+            if (d >= ChallengeCards.MaxDifficulty) Unlock(AchievementCatalog.Challenge50);
         }
 
-        private static void UnlockCategoryAchievements()
+        /// <summary>系統の実績 (2026-11-10: 旧「カテゴリを最高 Tier で揃える」から、 受けたデバフの系統へ読み替え・id と名前は据え置き)。
+        /// A 耐久・B 攻撃・C 手を 3 枚以上 ／ D 経済を 2 枚 (経済の札は 2 種しかない) ／ E 七つの大罪を受けてクリア。</summary>
+        private static void UnlockCategoryAchievements(RunState state)
         {
-            string[] ids = { AchievementCatalog.CategoryAMax, AchievementCatalog.CategoryBMax, AchievementCatalog.CategoryCMax,
-                             AchievementCatalog.CategoryDMax, AchievementCatalog.CategoryEMax };
-            for (int c = 0; c < ids.Length; c++)
-            {
-                var cat = (ChallengeCategory)c;
-                bool ok = true;
-                for (int i = 0; i < ChallengeCatalog.Axes.Count; i++)
+            int dur = 0, atk = 0, hand = 0, eco = 0; bool sin = false;
+            if (state.challengePicks != null)
+                foreach (var p in state.challengePicks)
                 {
-                    var a = ChallengeCatalog.Axes[i];
-                    int expected = a.category == cat ? a.MaxTier : 0;
-                    if (run.challenge.Tier(a.axis) != expected) { ok = false; break; }
+                    ChallengeCards.Split(p, out var deb, out _);
+                    if (deb == null) continue;
+                    if (ChallengeCards.IsSin(deb.kind)) sin = true;
+                    switch (deb.family)
+                    {
+                        case ChallengeCards.Family.Durability: dur++; break;
+                        case ChallengeCards.Family.Attack: atk++; break;
+                        case ChallengeCards.Family.Hand: hand++; break;
+                        case ChallengeCards.Family.Economy: eco++; break;
+                    }
                 }
-                for (int i = 0; ok && i < ChallengeCatalog.T4s.Count; i++)
-                {
-                    var t4 = ChallengeCatalog.T4s[i];
-                    if (run.challenge.Has(t4.t4) != (t4.category == cat)) ok = false;
-                }
-                if (ok) Unlock(ids[c]);
-            }
+            if (dur >= 3) Unlock(AchievementCatalog.CategoryAMax);
+            if (atk >= 3) Unlock(AchievementCatalog.CategoryBMax);
+            if (hand >= 3) Unlock(AchievementCatalog.CategoryCMax);
+            if (eco >= 2) Unlock(AchievementCatalog.CategoryDMax);
+            if (sin) Unlock(AchievementCatalog.CategoryEMax);
         }
 
         private static bool Ready => !Suppressed && run != null && run.active;

@@ -98,32 +98,7 @@ namespace CombatSystem
 
             isCombatActive = false;
 
-            // 挑戦デバフ〈長引く負傷〉(2026-08-10 リワーク): **ラン中の累計被ダメの N% だけ最大HP を失う**。
-            //   蓄積量に割合を掛けた整数部が増えるたび、 その差分を最大HP から引く
-            //   (例: 5% なら累計 20 ダメごとに −1)。 閾値も回数も持たないので、
-            //   「削られながら勝つ」を繰り返すほど確実に効く ── 旧実装が死んでいた理由の裏返し。
-            //
-            //   **上限を設けない。** 旧実装の累計上限 20 は、 閾値が現在最大HP 比だったころの
-            //   自己加速 (削れる→閾値が下がる→さらに削れる) を止めるためのもの。 新方式は
-            //   絶対量の累計に比例するだけで自己加速しないので、 上限は意味を持たない。
-            {
-                float lwRatio = MetaProgression.MetaDebuffApplicator.GetLingeringWoundRatio();
-                var lwRun = GameLoop.GameManager.Instance?.Run;
-                if (lwRatio > 0f && playerHP > 0 && lwRun != null)
-                {
-                    int target = Mathf.FloorToInt(lwRun.lingeringWoundDamageAccum * lwRatio);
-                    int delta = target - lwRun.lingeringWoundLost;
-                    if (delta > 0)
-                    {
-                        lwRun.lingeringWoundLost = target;
-                        lwRun.lingeringWoundTriggers++;
-                        lwRun.playerMaxHP = Math.Max(1, lwRun.playerMaxHP - delta);
-                        lwRun.playerHP = Math.Min(lwRun.playerHP, lwRun.playerMaxHP);
-                        Debug.Log($"[長引く負傷] 累計被ダメ {lwRun.lingeringWoundDamageAccum} × {lwRatio:P0}"
-                                + $" → 最大HP -{delta} (累計 -{lwRun.lingeringWoundLost}) → {lwRun.playerMaxHP}");
-                    }
-                }
-            }
+            // (挑戦デバフ〈長引く負傷〉は 2026-11-10 に旧配点方式ごと撤去・#9)
 
 
             var result = GetLastCombatResult();

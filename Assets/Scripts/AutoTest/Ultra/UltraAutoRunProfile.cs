@@ -98,7 +98,6 @@ namespace AutoTest.Ultra
             runner.shieldAbsorbsUnmitigable = shieldAbsorbsUnmitigable;
             runner.enableAllDebuffs = enableAllDebuffs;
             runner.sweepAllMetaAxes = sweepAllMetaAxes;
-            runner.challengeSpec = challengeSpec ?? string.Empty;
 
             // ---- every other batch mode off ----
             //   Each of these replaces the run loop or the loadout. One left on from a
@@ -178,9 +177,6 @@ namespace AutoTest.Ultra
                 return Fail("runtime blanket debuff mismatch", out reason);
             if (runner.sweepAllMetaAxes != sweepAllMetaAxes)
                 return Fail("runtime meta axis sweep mismatch", out reason);
-            if (!string.Equals(runner.challengeSpec ?? string.Empty,
-                               challengeSpec ?? string.Empty, StringComparison.Ordinal))
-                return Fail("runtime challenge spec mismatch", out reason);
 
             if (runner.simBoss5Sweep || runner.relicPresetSweep
                 || runner.relicSweepBaselineOnly || runner.relicAxisSweep

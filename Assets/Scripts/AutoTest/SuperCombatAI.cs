@@ -486,7 +486,7 @@ namespace AutoTest
             _spec = SpecialTerminals.Equipped(run);
             _specialLimit = SpecialTerminals.EquippedLimit(run);
             _termCap = 4;   // 〈不器用〉は端子の種類を縛らなくなった (2026-08-10 リワーク)
-            _sealPeriod = MetaProgression.MetaDebuffApplicator.GetTerminalSealPeriod();
+            _sealPeriod = 0;   // 旧〈綻び〉(端子の封印) は 2026-11-10 に撤去
             _chargeMax = CombatManager.ChargeMax;
             _chargePerTurn = MetaProgression.Relics.RelicApplicator.GetChargePerTurn(run, ctx);
             _pierceMul = ctx.playerBlockIgnored ? CombatManager.PierceAwlPerAttack : 0;
@@ -1410,8 +1410,7 @@ namespace AutoTest
                 var fm = SampleMods();
                 // 〈綻び〉の封印は輪番で周期も既知なので、 先のターンぶんも正確に再現できる。
                 //   これは予知ではなく **公開された規則の適用**。
-                _sealedNow = MetaProgression.MetaDebuffApplicator.GetSealedTerminal(
-                    s.turn, _specialLimit > 0 ? 4 : 3);
+                _sealedNow = -1;
                 for (int i = 0; i < _k; i++) _simDice[i] = RollFace();
 
                 // ロールアウト内の簡易リロール。 **これが無いと充電が強さへ変換されない** ──

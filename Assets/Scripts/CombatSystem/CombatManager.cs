@@ -175,8 +175,7 @@ namespace CombatSystem
         public void DamagePlayerDirect(int amount)
         {
             if (amount <= 0 || !isCombatActive) return;
-            amount = MetaProgression.MetaDebuffApplicator.ApplyJudgmentDamageIncrease(
-                amount, GameLoop.GameManager.Instance?.Run, playerHP);
+            amount = amount;
             playerHP = Math.Max(0, playerHP - amount);
             var ctx = PassiveSkillManager.Instance?.Context;
             if (ctx != null) ctx.playerCurrentHP = playerHP;
@@ -243,8 +242,6 @@ namespace CombatSystem
             {
                 float hm = MetaProgression.MetaDebuffApplicator.GetHealMultiplier();
                 if (hm < 1f) amount = Math.Max(1, Mathf.RoundToInt(amount * hm));
-                amount = MetaProgression.MetaDebuffApplicator.ApplyJudgmentHealReduction(
-                    amount, GameLoop.GameManager.Instance?.Run);
             }
             // 〈不完全な修復〉(門・2026-09-14): 血を回さなかったので傷が塞がらない。
             //   **ここが回復の唯一の絞り込み点**なので、 消耗品・吸血・パッシブ・イベントの
@@ -264,8 +261,6 @@ namespace CombatSystem
             int oldHP = playerHP;
             int newHP = Math.Min(playerMaxHP, playerHP + amount);
             int actualHealed = newHP - oldHP;
-            MetaProgression.MetaDebuffApplicator.NoteHeal(
-                amount, actualHealed, GameLoop.GameManager.Instance?.Run);
             
             playerHP = newHP;
             
@@ -796,7 +791,7 @@ namespace CombatSystem
             wrathDiceOverrideArmed = false;
             if (runForWrath != null && nodeForWrath != null
                 && nodeForWrath.type == MapSystem.TileType.Boss
-                && (MetaProgression.PermanentDebuffEffects.HasWrath(runForWrath) || MetaProgression.MetaDebuffApplicator.HasSinWrath))   // 大罪:憤怒 (挑戦カード IV) も
+                && MetaProgression.MetaDebuffApplicator.HasSinWrath)   // 大罪:憤怒 (挑戦カード IV)
             {
                 int oldHp = playerHP;
                 playerHP = Mathf.Max(1, playerHP / 2); // 割合計算が先

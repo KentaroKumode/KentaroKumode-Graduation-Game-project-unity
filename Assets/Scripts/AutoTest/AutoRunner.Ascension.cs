@@ -70,7 +70,7 @@ namespace AutoTest
                     int layerFloor = cleared ? clearedFloor : reached;
                     _ascension.AfterRun(MapSystem.FreeMove.FloorPlan.OrdinalOf(reached), !died);   // 2026-11-10: 遺物の落ちる数は見せる層で決まる
 
-                    tr.score.Add(_ascension.ChallengeScore);
+                    tr.score.Add(_ascension.Difficulty * ScorePerDifficulty);
                     tr.util.Add(_ascension.CurrentUtility);
                     tr.floor.Add(reached);
                     tr.win.Add(cleared);

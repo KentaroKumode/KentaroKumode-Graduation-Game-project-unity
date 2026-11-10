@@ -162,7 +162,6 @@ namespace AutoTest
 
             add += SumInsightRate(run);
             add += MetaProgression.MetaBuffApplicator.GetCritRatePctBonus();
-            add -= MetaProgression.MetaDebuffApplicator.GetPlayerCritRatePenalty();
 
             if (add <= 0f) return 0f;
             return CombatContext.ResolveCritRate(add);

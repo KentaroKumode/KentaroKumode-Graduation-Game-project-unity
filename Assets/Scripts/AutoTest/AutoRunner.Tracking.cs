@@ -328,9 +328,6 @@ namespace AutoTest
             {
                 _cur.reachedFloor = run.Depth;
                 _cur.reached6F = run.Depth >= 6;
-                // 刻限を越えたランだけの到達層分布。 深い側に寄っていれば勝ち筋を
-                //   削れており、 浅い側なら「負けるランを罰しているだけ」。
-                MetaProgression.MetaDebuffApplicator.NoteRunEnd(run, run.Depth, o == Outcome.GameOver);
                 // 行動台帳の締め。 **ラン 1 本につき必ず 1 行** ── G 群の合計が
                 //   ラン数と一致しない場合、 どこかの終了経路がここを通っていない。
                 GameLoop.RunChronicle.End(run,
@@ -354,7 +351,7 @@ namespace AutoTest
                 _cur.provisionFoodGain     = GameLoop.ProvisionSystem.Stats.foodGain;
                 _cur.provisionRerollLoss   = GameLoop.ProvisionSystem.Stats.rerollLoss;
                 _cur.deathFloor = (o == Outcome.GameOver) ? run.Depth : 0;
-                _cur.appliedChallengeScore = MetaProgression.MetaDebuffApplicator.Score;
+                _cur.appliedChallengeScore = CurrentChallengeScore();   // 難易度 × 5 (2026-11-10)
                 _cur.finalInventoryPower = InventoryPower.Compute(run);
                 _cur.finalMaterials = run.weaponMaterials;
                 _cur.finalUpgradeCost = GameManager.CanSpendMaterials(run)

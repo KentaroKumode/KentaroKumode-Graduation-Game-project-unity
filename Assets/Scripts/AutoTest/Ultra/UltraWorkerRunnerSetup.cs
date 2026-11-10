@@ -27,7 +27,6 @@ namespace AutoTest.Ultra
             runner.shieldAbsorbsUnmitigable = profile.shieldAbsorbsUnmitigable;
             runner.enableAllDebuffs = profile.enableAllDebuffs;
             runner.sweepAllMetaAxes = profile.sweepAllMetaAxes;
-            runner.challengeSpec = profile.challengeSpec ?? string.Empty;
 
             // ---- a benchmark must not rewrite learning or balance data ----
             runner.tuneBosses = false;

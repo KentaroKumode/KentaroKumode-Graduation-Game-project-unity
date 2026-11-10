@@ -173,59 +173,14 @@ namespace MetaProgression
         }
 
         // ============================================================
-        //  挑戦デバフ (docs/GAME.md §15-2)
+        //  挑戦 (docs/GAME.md §23-25)
         // ============================================================
 
-        /// <summary>軸の Tier を設定する。 tier = 0 で解除。 軸内排他は Loadout 側が保証する。
-        /// 存在しない Tier を渡すと false を返して何もしない。</summary>
-        public bool SetChallengeTier(ChallengeAxis axis, int tier)
-        {
-            if (State?.challenge == null) return false;
-            if (State.challenge.GetTier(axis) == tier) return false;
-            if (!State.challenge.SetTier(axis, tier)) return false;
-            State.InvalidateChallenge();
-            OnStateChanged?.Invoke();
-            Save();
-            return true;
-        }
-
-        /// <summary>T4 の ON/OFF。 効くのはそのカテゴリの基礎軸で 6pt 払っている時だけ (<see cref="ChallengeResolver.CanSelectT4"/>・満たさない T4 は解決時に無効)。
-        /// 軸を引き上げはしない。</summary>
-        public bool SetChallengeT4(ChallengeT4 v, bool enabled)
-        {
-            if (State?.challenge == null) return false;
-            if (State.challenge.HasT4(v) == enabled) return false;
-            State.challenge.SetT4(v, enabled);
-            State.InvalidateChallenge();
-            OnStateChanged?.Invoke();
-            Save();
-            return true;
-        }
-
-        /// <summary>挑戦構成を全解除。</summary>
-        public void ClearChallenge()
-        {
-            if (State?.challenge == null) return;
-            State.challenge.Clear();
-            State.InvalidateChallenge();
-            OnStateChanged?.Invoke();
-            Save();
-        }
-
-        /// <summary>満点 (100pt) 構成にする / 全解除する。 AutoRunner の最高難度モード用。</summary>
+        /// <summary>挑戦の難易度を最大 (10) にする / 0 に戻す。 AutoRunner の最高難度モード用 (2026-11-10: 旧配点の満点から置き換え)。</summary>
         public void SetChallengeMax(bool on)
         {
-            if (State?.challenge == null) return;
-            State.challenge.Clear();
-            if (on)
-            {
-                // T4 は解禁ゲート (カテゴリ 6pt) で、 軸を引き上げない ── 先に全軸を最上位にする。 T4 だけだと全部無効で 0pt になる
-                for (int i = 0; i < ChallengeCatalog.Axes.Count; i++)
-                    State.challenge.SetTier(ChallengeCatalog.Axes[i].axis, ChallengeCatalog.Axes[i].MaxTier);
-                for (int i = 0; i < ChallengeCatalog.T4s.Count; i++)
-                    State.challenge.SetT4(ChallengeCatalog.T4s[i].t4, true);
-            }
-            State.InvalidateChallenge();
+            if (State == null) return;
+            State.challengeDifficulty = on ? ChallengeCards.MaxDifficulty : 0;
             OnStateChanged?.Invoke();
             Save();
         }

@@ -42,7 +42,7 @@ namespace MetaProgression
 
         // ── 種類 (kind) の名前。 効果を読む側はこの名前で Value を引く ──
         // デバフ
-        public const string EnemyAtk = "eatk", EnemyHp = "ehp", EnemyDef = "edef", Die1 = "die1", Bag = "bag", UseCap = "use",
+        public const string EnemyAtk = "eatk", EnemyHp = "ehp", EnemyDef = "edef", Bag = "bag", UseCap = "use",
             Price = "price", Money = "money", Esc = "esc", BossEsc = "bossesc", Steel = "steel",
             Judge = "judge", Heavy = "heavy", Heal = "heal", Ambush = "ambush",
             Twin = "twin", Regen = "regen", Erode = "erode", EnemyShield = "eshield", Opener = "opener", Rage = "rage";
@@ -123,8 +123,6 @@ namespace MetaProgression
         public static int ChargeOpening(int tier) => tier == 1 ? 3 : tier == 2 ? 5 : tier == 3 ? 8 : tier == 4 ? 12 : 0;
         /// <summary>〈鋼の皮膚〉のボスの HP の上乗せ (%)。 敵の最大 HP の札と同じ溜まりに足す (掛け算にしない)。</summary>
         public const float SteelBossHpPct = 20f;
-        /// <summary>〈出目 1〉が効くターン数の既定 (各形態の最初の N ターン・2026-11-10)。 Tier ごとの値は札の 2 つ目の量 (value2)。</summary>
-        public const int Die1Turns = 5;
         /// <summary>大罪:暴食 で受けた時に下がる最大 HP (%)。 大罪:強欲 で失うパッシブの数 (最も高価なものから)。</summary>
         public const int SinGluttonyMaxHpPct = 60, SinGreedPassives = 1;   // 暴食: 最大 HP −20% で −8.3 → −40%
         /// <summary>大罪:傲慢 のシールドの獲得の削り (%)。 ブロックと同じ −75% だと −27.4 (クリア 0.9%) と効きすぎた。</summary>
@@ -259,7 +257,6 @@ namespace MetaProgression
                 case EnemyHp: return "厚い皮 ─ 敵の最大 HP +" + n + "%";
                 case EnemyDef: return "敵の防御 +" + n;
                 case Steel: return "各戦闘 1 度、 敵が致命傷を HP1 で耐える・ボスの HP +" + SteelBossHpPct.ToString("0") + "%（鋼の皮膚）";
-                case Die1: return "各形態の最初の " + (c.value2 > 0 ? c.value2.ToString("0") : Die1Turns.ToString()) + " ターン、 ダイス " + n + " 本の出目が 1";
                 case SinPride: return "大罪:傲慢 ─ ブロックに挿した出目 −" + n + "%・シールドの獲得 −" + SinPrideShieldCutPct + "%";
                 case SinEnvy: return "大罪:嫉妬 ─ 残り HP の割合がこちらのほうが高い間、 敵の攻撃 +" + n + "%";
                 case SinGreed: return "大罪:強欲 ─ 所持金と消耗品をすべて失い、 最も高価なパッシブ " + SinGreedPassives + " 個を失う";

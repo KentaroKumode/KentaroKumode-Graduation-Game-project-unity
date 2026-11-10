@@ -20,13 +20,6 @@ public static class AchievementVerify
             Require(AchievementCatalog.Get(d.id) == d, $"index mismatch: {d.id}");
         }
 
-        ExpectClass(0, "STABLE"); ExpectClass(9, "STABLE");
-        ExpectClass(10, "CAUTION"); ExpectClass(19, "CAUTION");
-        ExpectClass(20, "DANGER"); ExpectClass(29, "DANGER");
-        ExpectClass(30, "CRITICAL-SITUATION"); ExpectClass(39, "CRITICAL-SITUATION");
-        ExpectClass(40, "FATAL-ERROR"); ExpectClass(49, "FATAL-ERROR");
-        ExpectClass(50, "CATASTROPHIC-ERROR");
-
         var state = new MetaProgressState();
         Require(state.unlockedAchievementIds != null, "unlock ID list not initialized");
         Require(state.achievementUnlockUtcTicks != null, "unlock timestamp list not initialized");
@@ -39,12 +32,8 @@ public static class AchievementVerify
         }
         finally { MetaBuffApplicator.SuppressRelicGrant = old; }
 
-        Debug.Log("[AchievementVerify] PASS: 46 definitions, unique IDs, difficulty boundaries, save defaults, AutoRunner guard");
+        Debug.Log("[AchievementVerify] PASS: 46 definitions, unique IDs, save defaults, AutoRunner guard");
     }
-
-    private static void ExpectClass(int score, string expected)
-        => Require(ChallengeDifficultyClass.NameOf(score) == expected,
-                   $"difficulty {score}: {ChallengeDifficultyClass.NameOf(score)} != {expected}");
 
     private static void Require(bool condition, string message)
     {

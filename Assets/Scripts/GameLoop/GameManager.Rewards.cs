@@ -153,7 +153,6 @@ namespace GameLoop
             int metaWinGold = (isBossNodeForMeta
                 ? MetaProgression.MetaBuffApplicator.GetBossGoldBonus()
                 : 0) + MetaProgression.MetaBuffApplicator.GetWinGoldBonus();   // 挑戦カード: 戦闘に勝つたびゴールド +N
-            bool prideActive = MetaProgression.PermanentDebuffEffects.HasPride(Run);
 
             // ボス勝利 → フロアクリア
             if (node.type == TileType.Boss)
@@ -188,8 +187,6 @@ namespace GameLoop
                 }
 
                 int rewardBase = FloorManager.CalculateRewardCoins(Run.Depth, true, result.totalTurns) * 2;
-                // 傲慢: ボスはエリート以上扱いで報酬2倍（割合先）
-                if (prideActive) rewardBase *= 2;
                 // パッシブ刻印〈守銭〉: 発動分 × 1G/ボス
                 // ADR-0011 〈富〉(目 9): 戦闘中に積んだ報酬加算 (%)。 割合先 (メタの定額 +N の前)。
                 rewardBase = ApplyRoleGoldBonus(rewardBase);
@@ -206,7 +203,6 @@ namespace GameLoop
 
             // エリートマスは1連戦（精鋭1体で完結）。2連戦は廃止。
 
-            // 通常報酬（傲慢: 通常戦闘=0、エリート以上=×2、いずれも割合計算が先）
             // エンカウントプリセットの報酬倍率 (2 体戦 = ×2)。 2 体ぶんの攻撃を受け切った対価。
             int coins = FloorManager.CalculateRewardCoins(Run.Depth, true, result.totalTurns,
                                                           CurrentEncounterRewardMultiplier);
@@ -218,11 +214,6 @@ namespace GameLoop
                    == CombatSystem.EnemyKind.Elite;
             if (eliteNodeReward)
                 coins = Mathf.RoundToInt(coins * CombatRewards.EliteRewardMul);
-            if (prideActive)
-            {
-                if (eliteNodeReward) coins *= 2;
-                else coins = 0;
-            }
             // 整備パネル〈剛胆〉: **エリート戦だけ**報酬ゴールドを割増。
             //   通常戦に乗せると「強敵を選ぶ」という軸の性格が消えて単なる金庫になる。
             bool eliteNodeForValor = MapManager.Instance?.CurrentNode != null
@@ -426,13 +417,6 @@ namespace GameLoop
         {
             int floor = Run.Depth;
 
-            // 挑戦デバフ 軸15〈空箱〉T3: 宝箱そのものが空 (1 層から)。
-            if (MetaProgression.MetaDebuffApplicator.IsTreasureGone())
-            {
-                LastTreasureSummary = "空箱";
-                Log("宝箱は空だった（空箱 T3）");
-                return;
-            }
             // 宝箱はゴールド0(価値はアイテムのみ)が基準。1/5デノミ後、僅少な変動が無意味になるため撤廃済み。
             // メタバフ〈宝箱の財宝〉解放時のみ、フロア依存の少額ゴールドが復活する。
             int gold = 0;
@@ -447,13 +431,7 @@ namespace GameLoop
             }
             gold = GoldIncome.Gain(Run, gold, "宝箱");
 
-            // 挑戦デバフ 軸15〈空箱〉T2: 中身 −50%。
-            //   宝箱の中身はゴールドではなく **アイテム 1 個 + 素材 1 個**が本体なので、
-            //   「50% の確率でそれぞれ出ない」形で半減を表現する。 量を半分にできない離散報酬のため。
-            float boxMul = MetaProgression.MetaDebuffApplicator.GetTreasureContentMultiplier();
-            bool halfBox = boxMul < 0.999f;
-            bool dropMaterial = !halfBox || GameLoop.GameRng.Chance(boxMul, "meta.emptyBoxMat", floor);
-            bool dropItem     = !halfBox || GameLoop.GameRng.Chance(boxMul, "meta.emptyBoxItem", floor);
+            const bool dropMaterial = true, dropItem = true;
 
             // 2026-06-04: 宝箱でも強化素材+1（素材経済の潤沢化）
             if (dropMaterial) Run.weaponMaterials += 1;

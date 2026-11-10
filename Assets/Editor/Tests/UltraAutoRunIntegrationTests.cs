@@ -45,9 +45,8 @@ namespace AutoTest.EditorTests.Ultra
             Assert.That(profile.sweepAllMetaAxes, Is.False);
             Assert.That(profile.challengeSpec, Is.Empty);
 
-            var loadout = AscensionLoop.BuildLoadoutAtScore(profile.challengeScore);
-            Assert.That(MetaProgression.ChallengeResolver.Score(loadout), Is.EqualTo(50),
-                "the requested score must be attainable exactly, not rounded to another tier combination");
+            Assert.That(AutoRunner.ScoreToDifficulty(profile.challengeScore), Is.EqualTo(MetaProgression.ChallengeCards.MaxDifficulty),
+                "the canonical 50 points must map to the maximum challenge difficulty");
 
             var relic = RelicPresets.Build(RelicPresets.Preset.TheoreticalBestCursed);
             Assert.That(relic, Is.Not.Null);
@@ -70,7 +69,6 @@ namespace AutoTest.EditorTests.Ultra
                 runner.shieldAbsorbsUnmitigable = false;
                 runner.enableAllDebuffs = true;
                 runner.sweepAllMetaAxes = true;
-                runner.challengeSpec = "bogus";
                 runner.personaSweep = true;
                 runner.relicAxisSweep = true;
                 runner.ascensionMode = true;
@@ -92,7 +90,6 @@ namespace AutoTest.EditorTests.Ultra
                 Assert.That(runner.shieldAbsorbsUnmitigable, Is.True);
                 Assert.That(runner.enableAllDebuffs, Is.False);
                 Assert.That(runner.sweepAllMetaAxes, Is.False);
-                Assert.That(runner.challengeSpec, Is.Empty);
                 Assert.That(runner.personaSweep || runner.relicAxisSweep || runner.ascensionMode,
                     Is.False, "a competing batch mode would replace the run loop");
 

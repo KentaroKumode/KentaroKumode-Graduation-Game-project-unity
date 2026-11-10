@@ -246,11 +246,8 @@ namespace GameLoop
             if (CurrentPhase != GamePhase.RestStop) return;
             int heal = Mathf.CeilToInt(Run.playerMaxHP * FreeMapParams.RestMoreRatio
                                        * MetaProgression.MetaDebuffApplicator.GetHealMultiplier());
-            heal = MetaProgression.MetaDebuffApplicator.ApplyJudgmentHealReduction(heal, Run);
             int before = Run.playerHP;
             Run.playerHP = Mathf.Min(Run.playerMaxHP, Run.playerHP + heal);
-            Run.playerHP = MetaProgression.MetaDebuffApplicator.ApplyHealSpotCap(Run.playerHP, Run.playerMaxHP, before);
-            MetaProgression.MetaDebuffApplicator.NoteHeal(heal, Run.playerHP - before, Run);
             RunChronicle.Rest(Run, Run.playerHP - before, before, Run.playerMaxHP);
             Log($"休憩（多めに回復）: +{Run.playerHP - before}HP（{FreeMapParams.RestMoreTurns}手番）");
 

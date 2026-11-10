@@ -366,11 +366,6 @@ namespace ItemSystem.Shop
             OnShopOpened?.Invoke(inv);
             Debug.Log($"[ShopManager] 入店: フロア{floor}, スロット{inv.slots.Count}");
 
-            // 恒久デバフ「クァディルの色欲」: 入店時、買える中で最も高価な品を強制購入
-            var run = GameLoop.GameManager.Instance?.Run;
-            if (run != null && MetaProgression.PermanentDebuffEffects.HasLust(run))
-                ForceBuyHighestAffordable(inv, run);
-
             return inv;
         }
 
@@ -513,28 +508,6 @@ namespace ItemSystem.Shop
         public static long SaleShops, SaleWanted, SaleCandidates, SaleApplied, SaleDiscountSum;
         public static void ResetSaleStats()
         { SaleShops = SaleWanted = SaleCandidates = SaleApplied = SaleDiscountSum = 0; }
-
-        private void ForceBuyHighestAffordable(ShopInventory inv, GameLoop.RunState run)
-        {
-            int bestIdx = -1;
-            int bestPrice = -1;
-            for (int i = 0; i < inv.slots.Count; i++)
-            {
-                var slot = inv.slots[i];
-                if (slot == null || slot.sold) continue;
-                int price = slot.kind == ShopSlotKind.WeaponMaterial ? inv.CurrentMaterialPrice : slot.price;
-                if (string.IsNullOrEmpty(slot.itemId) && slot.kind != ShopSlotKind.WeaponMaterial) continue;
-                if (price > run.coins) continue;
-                if (price > bestPrice) { bestPrice = price; bestIdx = i; }
-            }
-            if (bestIdx < 0)
-            {
-                Debug.Log($"[ShopManager] {MetaProgression.PermanentDebuffIds.Lust}: 強制購入対象なし（金欠 or 在庫無し）");
-                return;
-            }
-            Debug.Log($"[ShopManager] {MetaProgression.PermanentDebuffIds.Lust}: 強制購入 slot={bestIdx} price={bestPrice}G");
-            TryBuy(bestIdx, run);
-        }
 
         private ShopSlot BuildSlot(ShopSlotKind kind, float priceMultiplier)
         {
@@ -851,13 +824,6 @@ namespace ItemSystem.Shop
                 Log("ゴールド不足"); return false;
             }
 
-            // 恒久デバフ「ヤルノクの嫉妬」: 1ショップで通常品は1個まで
-            if (MetaProgression.PermanentDebuffEffects.HasEnvy(run) && Current.purchaseCount >= 1)
-            {
-                Log($"恒久デバフ {MetaProgression.PermanentDebuffIds.Envy}: このショップでは既に1個購入済み");
-                return false;
-            }
-
             if (!GameLoop.ProvisionPayment.TryPay(run, pay, slot.itemId))
             { Log("支払いに失敗"); return false; }
             MetaProgression.Achievements.AchievementService.NoteShopPurchase(run.coins);
@@ -1132,7 +1098,7 @@ namespace ItemSystem.Shop
             string id = list[listIndex];
             // T4-D〈破産〉: 売却額 −50% (§15-2 v3.0)。 **売却不能にはしない** ── 経路は残す。
             int price = Mathf.Max(1, Mathf.RoundToInt(
-                ResolveSellPrice(id) * MetaProgression.MetaDebuffApplicator.GetSellPriceMultiplier()));
+                ResolveSellPrice(id)));
             // 除去は PassiveAddHelper.RemoveAt に寄せる
             if (source == SellSource.Passive)
                 ItemSystem.Helpers.PassiveAddHelper.RemoveAt(run, listIndex);
