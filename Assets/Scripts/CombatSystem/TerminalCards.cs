@@ -163,8 +163,8 @@ namespace CombatSystem
     /// </summary>
     public static class TerminalCards
     {
-        /// <summary>[開発中の切り替え] 端子の山札で戦う。 BOT と画面がそろうまで既定は false (旧い配線のまま)。 そろったら外して旧い経路を消す。</summary>
-        public static bool Enabled = false;
+        /// <summary>[開発中の切り替え] 端子の山札で戦う (既定 true・2026-11-11 に BOT と画面がそろった)。 false = 旧い配線。 旧い経路を消したらこの切り替えも外す。</summary>
+        public static bool Enabled = true;
 
         public const int HandSize = 3;
 

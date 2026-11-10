@@ -364,7 +364,7 @@ namespace UI.Game2D.Battle
         public TerminalOutcome preview;
         /// <summary>解決したターンの結果 (発動した端子を光らせる)。 次のターンの手札が来るまで残す。 null = 判断の前。</summary>
         public TerminalOutcome lastOutcome;
-        /// <summary>説明を出す端子 (最後に挿し先にした・押した端子の場の添字。 −1 = なし)。</summary>
+        /// <summary>説明を出す端子 (画面で押して選んだ端子の場の添字。 −1 = なし)。 ターンの頭に外す。</summary>
         public int focusSlot = -1;
 
         public bool ShowingResult => lastOutcome != null;
@@ -428,6 +428,13 @@ namespace UI.Game2D.Battle
             }
         }
 
+        /// <summary>今の出目のどれかを端子 s に挿せるか (もう挿している出目があれば true)。 画面が挿せない端子を暗くするのに使う。</summary>
+        public bool AnyDieFits(int s)
+        {
+            for (int i = 0; i < 3; i++) if (slot[i] == s || Accepts(i, s)) return true;
+            return false;
+        }
+
         private void CycleSlot(int i, int dir)
         {
             int m = board.Count; if (m == 0) return;
@@ -437,7 +444,6 @@ namespace UI.Game2D.Battle
                 int c = ((cur + dir * k) % n + n) % n;
                 if (c == m || Accepts(i, c)) { slot[i] = c == m ? -1 : c; break; }
             }
-            if (slot[i] >= 0) focusSlot = slot[i];
             var d = slot[i] >= 0 ? TerminalCards.Get(board[slot[i]]) : null;
             Game2DSfx.Play("wire", 1f, d != null ? 1f + (int)d.kind * 0.12f : 0.85f);
             RecomputePreview(); Touch();
