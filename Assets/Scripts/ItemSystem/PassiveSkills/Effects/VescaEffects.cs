@@ -410,6 +410,8 @@ namespace ItemSystem.PassiveSkills.Effects
             //   実質「攻撃に半分挿しても罰される」状態だった。
             int atk = (int)ctx.GetAccumulated("mutualAttackDiceCount");
             int blk = (int)ctx.GetAccumulated("mutualBlockDiceCount");
+            CombatSystem.GuardDiag.NoteStag7F(ctx.bossId, atk, blk, (int)ctx.GetAccumulated("mutualChargeDiceCount"), (int)ctx.GetAccumulated("mutualSpecialDiceCount"),
+                atk < blk, System.Math.Min(StackCap, ctx.stagnationStacks + (atk < blk ? 1 : 0)));   // [計装 2026-11-11] 配線と停滞 (近似: 積んだ後のスタック)
             if (atk >= blk) return;
             // 守りに寄せたターンを数え、 TurnsPerStack ごとに 1 スタック積む。
             // 上限は据え置きなので **最終的な総量は変わらず、 到達までの時間だけが伸びる**。

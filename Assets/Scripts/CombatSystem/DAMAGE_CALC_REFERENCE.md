@@ -129,6 +129,7 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
 + consAtkBurst                     ← 消費:攻撃バースト(単発)
 + メタ会心ボーナス(会心時)
 − メタデバフ向かい風(最低1)
+× (100 − 30)/100                  ← 大罪:怠惰 (挑戦カード IV) を受けている時だけ・与えるダメージ −30%【2026-11-11】(主攻撃はすべての倍率の後・敵の防御の前・切り捨て。 毒・出血・爆発・固定ダメ・反射・品の直接は敵の HP を減らす口 HpLossDiag.Lose で同じく −30%)
 ─ FireEnemyTrigger(OnPreReceiveDamage): 灰塵の鎧/Ethereal/各敵被ダメ軽減
   → total = max(0, ctx.finalDamage)
 × 敵の防御値【2026-10-28・ADR-0013】: effDef = max(0, enemyDefense − playerArmorPen)
@@ -604,7 +605,7 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 | 出血のダメージ | `ApplyBleedModifiers`: `floor(出血 × (1 + bleedDamagePct))` (〈血止め知らずの針箱〉が 血晶 × 3%) |
 | シールドの減衰 | 残る割合 `min(80, 50 + shieldKeepBonusPct)`% (〈油を引いた盾革〉が 堅牢 × 5) |
 | 充電端子 → 攻撃 (〈二股の端子〉) | 配線集計で `attackSum += floor(充電端子の出目の合計 × chargeToAttackPct)` (上乗せ率の前・電流 × 12%・最大 80%) |
-| 盾押し (〈盾押しの心得〉) | OnWired・攻撃に挿したターン: 攻撃 + `floor(シールド × 堅牢 × 10%)` |
+| 盾押し (〈盾押しの心得〉) | OnWired・攻撃に挿したターン: 攻撃 + `floor(シールド × 堅牢 × 5%)`（2026-11-11 に 10% から） |
 | 誓約の封じ (`OathSeals.Apply`) | 戦闘の情報を作った直後に所持品から立てる。 入口で捨てる: 毒 (AddStatus) / 出血 (AddEnemyBleed) / 臨界 (Kw.AddHeat と臨界の持ち越し) / 充電 (AddCharge) / シールド (consShield の setter の増加) / 会心 (会心確定の後で落とす) |
 | 入り口 (`EntryEffect`) | 毒・臨界の軸の既存品 22 品に、 決まった機会 (ターン開始 / 攻撃が通る / 敵の攻撃 / 受けきり / ブロックのダイス 1 個) で毒 +1〜2・臨界 +3 を重ねる。 表は `EntryEffect.Table`。 2026-11-10 から 13 品に**偏重の条件**が付く: `AtLeast n` (軸の品が n 個以上) / `Top n` (`CombatContext.AxisRank` < n ＝ その軸より品の多い軸が n 未満・同数は満たす・比べるのは金を除く 6 軸)。 条件を満たさない機会は何も足さない (品の本来の効果は動く) |
 | 種火・毒 r2 | 2026-11-07: 毒を与えるたび +1 → 1 ターンに最初の 1 回だけ +2 |

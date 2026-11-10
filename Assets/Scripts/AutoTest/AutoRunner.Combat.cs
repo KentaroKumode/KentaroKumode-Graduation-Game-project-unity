@@ -644,6 +644,7 @@ namespace AutoTest
             public float[] atkGrowth;          // 防ぎ切りの規則: 撃破まで n ターンの敵の攻撃の伸び (null = 規則なし)
             public bool ledger;                // [V3 hpLedger] 効用を HP の帳簿で測る
             public float dFull;                // [V3 hpLedger] 先のターンに全部攻撃に挿した時の 1 ターンの与ダメの見込み
+            public float stagCost;             // [2026-11-11] ヴェスカ〈停滞する時間〉: 攻撃 < ブロックで挿すと、 先のターンの敵の攻撃がこれだけ上がる (1 スタック × 今のエスカレーション・上限なら 0)
             public float mainCorr;             // [V3 mainCorr] 主攻撃の見積もりに掛ける実績の比 (0 = 掛けない)
             // ---- [V3 readOutgoingMult 2026-11-10] 与ダメの倍率を読む (本体の主攻撃の計算 CombatManager.Turn / Damage / PassiveSkillManager.ProcessDamage に合わせる) ----
             public bool readOut;               // 下の値で主攻撃を見積もる (false = 旧: 素の攻撃力 + 攻撃の出目 − 防御)
@@ -756,7 +757,7 @@ namespace AutoTest
         }
 
         /// <summary>[V3 hpLedger] この戦闘で失う HP の見込み = 今ターンの被ダメ + 撃破までの残りターンで受ける被ダメ (全部攻撃する前提)。</summary>
-        private float LedgerLoss(in OptimalTurnState s, int effDmg, int taken)
+        private float LedgerLoss(in OptimalTurnState s, int effDmg, int taken, bool addsStag = false)
         {
             int rem = s.enemyHp - System.Math.Min(effDmg, s.enemyHp);
             if (rem <= 0) return taken;
@@ -766,6 +767,7 @@ namespace AutoTest
             {
                 float g = s.atkGrowth != null ? s.atkGrowth[System.Math.Min(j + 1, HorizonCapTurns)] : 1f;
                 future += s.enemyAtk * g;
+                if (addsStag) future += s.stagCost * g;   // ヴェスカ〈停滞する時間〉: このターン守りに寄せた分 (残りのターンずっと乗る)
             }
             return taken + v3.ledgerFutureShare * future;
         }
@@ -965,7 +967,7 @@ namespace AutoTest
             }
 
             float u = s.ledger
-                    ? specFlat - LedgerLoss(in s, effDmg, taken)
+                    ? specFlat - LedgerLoss(in s, effDmg, taken, s.stagCost > 0f && aCount < bCount)
                     : wAtk * System.Math.Min(effDmg, enemyHp)
                     + wDef * System.Math.Min(block, enemyAtk)
                     + specFlat;
@@ -1419,6 +1421,13 @@ namespace AutoTest
                 st.dFull = System.Math.Max(1f, oa.effDmg * expected / System.Math.Max(1f, System.Math.Max(0, atkBase) + sumR));
                 st.ledger = true;
                 if (st.atkGrowth == null && enemyAtk > 0 && cm?.CurrentEnemy != null) st.atkGrowth = BuildAtkGrowth(cm.CurrentEnemy, ctxRoles, tele.turn);
+                // ヴェスカ〈停滞する時間〉(2026-11-11): 守りに寄せると次のターンから敵の攻撃が上がる。 帳簿の「撃破までの被ダメ」に乗せる
+                var stagEnemy = cm?.CurrentEnemy;
+                if (stagEnemy?.passiveSkills != null && ctxRoles != null && ctxRoles.stagnationStacks < ItemSystem.PassiveSkills.Effects.StagnantTime.StackCap)
+                    foreach (var ps in stagEnemy.passiveSkills)
+                        if (ps != null && ps.internalName == "StagnantTime")
+                            st.stagCost = ItemSystem.PassiveSkills.Effects.StagnantTime.DicePerStack(ctxRoles)
+                                        * CombatSystem.Escalation.GetMultiplier(stagEnemy.EffectiveEscalationProfile, tele.turn);
             }
             // E8 (SuperV3 lookahead2): 次ターンの前提を 1 回だけ組む。 null なら従来どおり (OFF のときは何も変わらない)。
             NextTurnPlan plan = null;
@@ -1430,137 +1439,166 @@ namespace AutoTest
             }
             float ScoreWithBuffers(CombatSystem.DiceTerminal[] w)
                 => plan != null ? LookaheadValue(in st, plan, rolls, w) : OptimalUtility(in st, rolls, w);
-            float Score(CombatSystem.DiceTerminal[] w) => ScoreWithBuffers(w);
+            // [2026-11-11] ヴェスカ〈停滞する時間〉: 停滞を積む配線 (攻撃の本数 < ブロックの本数) を選ばない。
+            //   帳簿は先の被ダメを ledgerFutureShare (0.2) で薄めるので、 停滞の罰が実際の 5 分の 1 程度にしか効かず、 BOT は 4 ターンに 1 回ブロックへ寄せて
+            //   p4 で平均 4.9 スタックを育てていた (禁止で 20.8% → 24.3%・同じシード 改善 122 / 悪化 15)。
+            //   例外: 停滞が上限 (それ以上積もらない) / 避けた最良の手でも今ターン死ぬ (下の選び直し)。
+            //   (倒し切るターンは敵の攻撃が来ないので、 ブロックに挿す理由がそもそも無い ── 例外にしない)
+            bool stagFilter = false;
+            if (v3.noStagWire && cm?.CurrentEnemy?.passiveSkills != null
+                && (ctxRoles == null || ctxRoles.stagnationStacks < ItemSystem.PassiveSkills.Effects.StagnantTime.StackCap))
+                foreach (var ps in cm.CurrentEnemy.passiveSkills) if (ps != null && ps.internalName == "StagnantTime") stagFilter = true;
+            float Score(CombatSystem.DiceTerminal[] w)
+            {
+                if (stagFilter)
+                {
+                    int na = 0, nb = 0;
+                    foreach (var t in w) { if (t == CombatSystem.DiceTerminal.Attack) na++; else if (t == CombatSystem.DiceTerminal.Block) nb++; }
+                    if (na < nb) return float.NegativeInfinity;
+                }
+                return ScoreWithBuffers(w);
+            }
 
             var assign = new CombatSystem.DiceTerminal[k];
             var bestW = new CombatSystem.DiceTerminal[k];
             float bestU = float.NegativeInfinity;
-            if (EffectiveWiringSkill == WiringSkill.Naive)
+            void SelectBest()
             {
-                // 素朴版: 出目降順の本数分割だけを見る (ADR-0010 以前と同じ探索)。
-                for (int a = 0; a <= k; a++)
-                    for (int b = 0; b <= k - a; b++)
-                    {
-                        for (int i = 0; i < k; i++)
-                            assign[idx[i]] = (i < a) ? CombatSystem.DiceTerminal.Attack
-                                           : (i < a + b) ? CombatSystem.DiceTerminal.Block
-                                           : CombatSystem.DiceTerminal.Charge;
-                        if (tele.sealedTerminal >= 0)
-                        {
-                            bool used = false;
-                            for (int i = 0; i < k && !used; i++)
-                                if ((int)assign[i] == tele.sealedTerminal) used = true;
-                            if (used) continue;
-                        }
-                        float u = Score(assign);
-                        if (u > bestU) { bestU = u; System.Array.Copy(assign, bestW, k); }
-                    }
-            }
-            else
-            {
-                // 端子は 攻撃/ブロック/充電 の 3 種、 特殊端子 (§6-5) を装着していれば 4 種。
-                //   **未装着なら第 4 端子は存在しない**ので列挙もしない (3^5=243 / 4^5=1024)。
-                int specialLimit = CombatSystem.SpecialTerminals.EquippedLimit(runForVoid);
-                int termKinds = specialLimit > 0 ? 4 : 3;
-                // 〈綻び〉: 封印された端子は使えない。 **予告に載っているので配線前に読める**。
-                //   本体側 (SanitizeWiring) が追い出すので、 候補に残すと
-                //   「追い出された後の形」で効用を出せず判断がずれる。
-                int sealedTerm = tele.sealedTerminal;
-                // 挑戦デバフ〈不器用〉(2026-08-10 リワーク) は端子の種類を縛らない。
-                //   N 個以上挿すと**次のターン**その端子が半減するので、 合法性ではなく
-                //   効用側で扱う (下の overload ペナルティ)。
-                int termCap = 4;
-
-                int total = 1;
-                for (int i = 0; i < k; i++) total *= termKinds;
-                optimalWiringDecisions++;
-                optimalWiringCandidatesEvaluated += total;
-
-                bool runParallel = parallelizeOptimalWiring && plan == null   // 先読みの memo は共有するので直列
-                    && total >= System.Math.Max(1, optimalWiringParallelMinCandidates)
-                    && System.Environment.ProcessorCount > 1;
-                if (runParallel)
+                bestU = float.NegativeInfinity;
+                if (EffectiveWiringSkill == WiringSkill.Naive)
                 {
-                    var scores = new float[total];
-                    int maxWorkers = optimalWiringMaxParallelism > 0
-                        ? optimalWiringMaxParallelism
-                        : System.Math.Min(8, System.Math.Max(1, System.Environment.ProcessorCount - 1));
-                    var options = new ParallelOptions { MaxDegreeOfParallelism = maxWorkers };
-                    Parallel.For(
-                        0, total, options,
-                        () => new OptimalWiringBuffers(k),
-                        (code, _, buffers) =>
+                    // 素朴版: 出目降順の本数分割だけを見る (ADR-0010 以前と同じ探索)。
+                    for (int a = 0; a <= k; a++)
+                        for (int b = 0; b <= k - a; b++)
                         {
-                            scores[code] = float.NegativeInfinity;
-                            int t = code;
                             for (int i = 0; i < k; i++)
+                                assign[idx[i]] = (i < a) ? CombatSystem.DiceTerminal.Attack
+                                               : (i < a + b) ? CombatSystem.DiceTerminal.Block
+                                               : CombatSystem.DiceTerminal.Charge;
+                            if (tele.sealedTerminal >= 0)
                             {
-                                buffers.assign[i] = (CombatSystem.DiceTerminal)(t % termKinds);
-                                t /= termKinds;
+                                bool used = false;
+                                for (int i = 0; i < k && !used; i++)
+                                    if ((int)assign[i] == tele.sealedTerminal) used = true;
+                                if (used) continue;
                             }
-
-                            int spec = 0, distinct = 0;
-                            System.Array.Clear(buffers.termSeen, 0, buffers.termSeen.Length);
-                            for (int i = 0; i < k; i++)
-                            {
-                                int ti = (int)buffers.assign[i];
-                                if (ti == (int)CombatSystem.DiceTerminal.Special) spec++;
-                                if (!buffers.termSeen[ti]) { buffers.termSeen[ti] = true; distinct++; }
-                            }
-                            if (spec > specialLimit || distinct > termCap) return buffers;
-                            if (sealedTerm >= 0)
-                            {
-                                for (int i = 0; i < k; i++)
-                                    if ((int)buffers.assign[i] == sealedTerm) return buffers;
-                            }
-
-                            scores[code] = ScoreWithBuffers(buffers.assign);
-                            return buffers;
-                        },
-                        _ => { });
-
-                    // 評価順に集約し、従来の「最初の最大値」を厳密に維持する。
-                    for (int code = 0; code < total; code++)
-                    {
-                        float u = scores[code];
-                        if (u <= bestU) continue;
-                        bestU = u;
-                        int t = code;
-                        for (int i = 0; i < k; i++)
-                        {
-                            bestW[i] = (CombatSystem.DiceTerminal)(t % termKinds);
-                            t /= termKinds;
+                            float u = Score(assign);
+                            if (u > bestU) { bestU = u; System.Array.Copy(assign, bestW, k); }
                         }
-                    }
                 }
                 else
                 {
-                    for (int code = 0; code < total; code++)
-                    {
-                        int t = code;
-                        for (int i = 0; i < k; i++) { assign[i] = (CombatSystem.DiceTerminal)(t % termKinds); t /= termKinds; }
+                    // 端子は 攻撃/ブロック/充電 の 3 種、 特殊端子 (§6-5) を装着していれば 4 種。
+                    //   **未装着なら第 4 端子は存在しない**ので列挙もしない (3^5=243 / 4^5=1024)。
+                    int specialLimit = CombatSystem.SpecialTerminals.EquippedLimit(runForVoid);
+                    int termKinds = specialLimit > 0 ? 4 : 3;
+                    // 〈綻び〉: 封印された端子は使えない。 **予告に載っているので配線前に読める**。
+                    //   本体側 (SanitizeWiring) が追い出すので、 候補に残すと
+                    //   「追い出された後の形」で効用を出せず判断がずれる。
+                    int sealedTerm = tele.sealedTerminal;
+                    // 挑戦デバフ〈不器用〉(2026-08-10 リワーク) は端子の種類を縛らない。
+                    //   N 個以上挿すと**次のターン**その端子が半減するので、 合法性ではなく
+                    //   効用側で扱う (下の overload ペナルティ)。
+                    int termCap = 4;
 
-                        // 実行側 (SanitizeWiring) が畳む前に、 **制約を破る割り当てをそもそも評価しない**。
-                        int spec = 0, distinct = 0;
-                        _termSeen[0] = _termSeen[1] = _termSeen[2] = _termSeen[3] = false;
-                        for (int i = 0; i < k; i++)
+                    int total = 1;
+                    for (int i = 0; i < k; i++) total *= termKinds;
+                    optimalWiringDecisions++;
+                    optimalWiringCandidatesEvaluated += total;
+
+                    bool runParallel = parallelizeOptimalWiring && plan == null   // 先読みの memo は共有するので直列
+                        && total >= System.Math.Max(1, optimalWiringParallelMinCandidates)
+                        && System.Environment.ProcessorCount > 1;
+                    if (runParallel)
+                    {
+                        var scores = new float[total];
+                        int maxWorkers = optimalWiringMaxParallelism > 0
+                            ? optimalWiringMaxParallelism
+                            : System.Math.Min(8, System.Math.Max(1, System.Environment.ProcessorCount - 1));
+                        var options = new ParallelOptions { MaxDegreeOfParallelism = maxWorkers };
+                        Parallel.For(
+                            0, total, options,
+                            () => new OptimalWiringBuffers(k),
+                            (code, _, buffers) =>
+                            {
+                                scores[code] = float.NegativeInfinity;
+                                int t = code;
+                                for (int i = 0; i < k; i++)
+                                {
+                                    buffers.assign[i] = (CombatSystem.DiceTerminal)(t % termKinds);
+                                    t /= termKinds;
+                                }
+
+                                int spec = 0, distinct = 0;
+                                System.Array.Clear(buffers.termSeen, 0, buffers.termSeen.Length);
+                                for (int i = 0; i < k; i++)
+                                {
+                                    int ti = (int)buffers.assign[i];
+                                    if (ti == (int)CombatSystem.DiceTerminal.Special) spec++;
+                                    if (!buffers.termSeen[ti]) { buffers.termSeen[ti] = true; distinct++; }
+                                }
+                                if (spec > specialLimit || distinct > termCap) return buffers;
+                                if (sealedTerm >= 0)
+                                {
+                                    for (int i = 0; i < k; i++)
+                                        if ((int)buffers.assign[i] == sealedTerm) return buffers;
+                                }
+
+                                scores[code] = ScoreWithBuffers(buffers.assign);
+                                return buffers;
+                            },
+                            _ => { });
+
+                        // 評価順に集約し、従来の「最初の最大値」を厳密に維持する。
+                        for (int code = 0; code < total; code++)
                         {
-                            int ti = (int)assign[i];
-                            if (ti == (int)CombatSystem.DiceTerminal.Special) spec++;
-                            if (!_termSeen[ti]) { _termSeen[ti] = true; distinct++; }
+                            float u = scores[code];
+                            if (u <= bestU) continue;
+                            bestU = u;
+                            int t = code;
+                            for (int i = 0; i < k; i++)
+                            {
+                                bestW[i] = (CombatSystem.DiceTerminal)(t % termKinds);
+                                t /= termKinds;
+                            }
                         }
-                        if (spec > specialLimit || distinct > termCap) continue;
-                        if (sealedTerm >= 0)
+                    }
+                    else
+                    {
+                        for (int code = 0; code < total; code++)
                         {
-                            bool usesSealed = false;
-                            for (int i = 0; i < k && !usesSealed; i++)
-                                if ((int)assign[i] == sealedTerm) usesSealed = true;
-                            if (usesSealed) continue;
+                            int t = code;
+                            for (int i = 0; i < k; i++) { assign[i] = (CombatSystem.DiceTerminal)(t % termKinds); t /= termKinds; }
+
+                            // 実行側 (SanitizeWiring) が畳む前に、 **制約を破る割り当てをそもそも評価しない**。
+                            int spec = 0, distinct = 0;
+                            _termSeen[0] = _termSeen[1] = _termSeen[2] = _termSeen[3] = false;
+                            for (int i = 0; i < k; i++)
+                            {
+                                int ti = (int)assign[i];
+                                if (ti == (int)CombatSystem.DiceTerminal.Special) spec++;
+                                if (!_termSeen[ti]) { _termSeen[ti] = true; distinct++; }
+                            }
+                            if (spec > specialLimit || distinct > termCap) continue;
+                            if (sealedTerm >= 0)
+                            {
+                                bool usesSealed = false;
+                                for (int i = 0; i < k && !usesSealed; i++)
+                                    if ((int)assign[i] == sealedTerm) usesSealed = true;
+                                if (usesSealed) continue;
+                            }
+                            float u = Score(assign);
+                            if (u > bestU) { bestU = u; System.Array.Copy(assign, bestW, k); }
                         }
-                        float u = Score(assign);
-                        if (u > bestU) { bestU = u; System.Array.Copy(assign, bestW, k); }
                     }
                 }
+            }
+            SelectBest();
+            // [2026-11-11] 停滞を避けた最良の手でも今ターン死ぬなら、 停滞を積む手も許して選び直す (生き残る方が先)
+            if (stagFilter)
+            {
+                OptimalUtility(in st, rolls, bestW, out var so);
+                if (so.taken >= st.myHp) { stagFilter = false; SelectBest(); }
             }
             // E1 (V3 rerollEv) が「この手の最良効用」として読む。 先読みの値は次ターン分を含むので、 今ターンの効用だけに戻す。
             _lastBestU = plan != null ? OptimalUtility(in st, rolls, bestW) : bestU;

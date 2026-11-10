@@ -643,11 +643,11 @@ namespace ItemSystem.PassiveSkills
             // [診断] 段 B: damageBonus + OnPreDealDamage の通過後
             bool diag = CombatSystem.CombatStats.DiagWinAttack;
             var stg = CombatSystem.CombatStats.DamageStages;
-            if (diag) { stg[0]++; stg[1] += baseDamage; stg[2] += context.finalDamage; }
+            if (diag) { CombatSystem.CombatStats.Stage(0, 1); CombatSystem.CombatStats.Stage(1, baseDamage); CombatSystem.CombatStats.Stage(2, context.finalDamage); }
 
             // 5. 全ダメージ合算（メイン＋追撃）
             int totalDamage = context.finalDamage + context.pursuitDamage;
-            if (diag) stg[3] += totalDamage;   // 段 C
+            if (diag) CombatSystem.CombatStats.Stage(3, totalDamage);   // 段 C
 
             // 6. クリティカル判定（合算後に1回だけ）
             //
@@ -729,7 +729,7 @@ namespace ItemSystem.PassiveSkills
                 totalDamage = (int)(totalDamage * effCritMul);
                 // [診断] 会心倍率は 3.0 固定ではない (メタ精密 r10 の逓減還元・一点集中 等)。
                 // 実測の平均を取らないと会心係数を 1+p×2 で見積もれない。
-                if (diag) { stg[16] += context.criticalMultiplier; stg[17]++; }
+                if (diag) { CombatSystem.CombatStats.Stage(16, context.criticalMultiplier); CombatSystem.CombatStats.Stage(17, 1); }
             }
             else if (totalDamage > 0 && !attackerIsEnemy
                      && context.nonCritOutgoingMultiplier > 0f)
@@ -753,13 +753,13 @@ namespace ItemSystem.PassiveSkills
                 //   会心との衝突を疑ったが交互作用は +0.024 ± 0.036 で、 原因はこちらだった。
                 //   相互攻撃モデルが既定になった 2026-07-27 に生まれたはず (両側が毎ターン攻撃するため)。
                 totalDamage = (int)(totalDamage * (1f + context.nonCritOutgoingMultiplier));
-                if (diag) stg[18]++;
+                if (diag) CombatSystem.CombatStats.Stage(18, 1);
             }
             // 〈一点読みの片眼〉の代価: 会心しなかった攻撃の与ダメ −30% (2026-11-07)。
             if (!context.isCritical && totalDamage > 0 && !attackerIsEnemy
                 && context.GetAccumulated(Effects.PinpointEye.NonCritCutKey) > 0f)
                 totalDamage = totalDamage * Effects.PinpointEye.NonCritKeepPct / 100;
-            if (diag) stg[4] += totalDamage;   // 段 D
+            if (diag) CombatSystem.CombatStats.Stage(4, totalDamage);   // 段 D
 
             // 8. ダメージ確定後トリガー
             context.finalDamage = totalDamage; // 確定値をコンテキストに反映

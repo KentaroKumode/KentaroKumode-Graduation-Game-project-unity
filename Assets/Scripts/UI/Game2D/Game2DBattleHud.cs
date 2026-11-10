@@ -20,7 +20,7 @@ namespace UI.Game2D
         private static readonly RectInt Left = new RectInt(2, 60, 108, 208), Right = new RectInt(370, 60, 108, 120), Top = new RectInt(96, 2, 288, 56);
         private const int FrameB = 12;
         // 自分のステータス (会心率・攻撃・防御): 右のパネルの下。 右と同じばねで横から入る (2026-11-05)
-        private static readonly RectInt Stat = new RectInt(370, 184, 108, 68);
+        private static readonly RectInt Stat = new RectInt(370, 184, 108, 80);
         // 左パネルの中 (パネルの左上が原点): 枠の内側は x 14〜72
         private static readonly RectInt Btn = new RectInt(15, 170, 80, 26), RerollR = new RectInt(15, 134, 80, 16),
             ItemR = new RectInt(15, 152, 39, 15), FleeR = new RectInt(56, 152, 39, 15);      // 消耗品 / 逃げる (配線の判断の間だけ)
@@ -146,9 +146,11 @@ namespace UI.Game2D
             var p = Frame(Stat);
             bool k = _hsKnown && sim != null && Game2DBattleSim.Active;
             string crit = k ? "会心 " + Mathf.RoundToInt(_hs.critRate * 100f) + "% " + _hs.critMul.ToString("0.0") + "倍" : "会心 --";
-            string atk = k ? "攻撃 " + _hs.attack + (_hs.outgoingPct != 0 ? (_hs.outgoingPct > 0 ? " +" : " ") + _hs.outgoingPct + "%" : "") : "攻撃 --";
+            string atk = k ? "攻撃 " + _hs.attack : "攻撃 --";
+            // 与ダメージの倍率 (2026-11-11): 与ダメ% の合計 (このターンに積まれた分・〈黎明〉の溜めなど) を % で出す。 会心はこの外 (上の行) で掛かる
+            string outp = k ? "与ダメ " + (_hs.outgoingPct >= 0 ? "+" : "") + _hs.outgoingPct + "%" : "与ダメ --";
             string def = k ? "防御 " + _hs.defense + " 貫通 " + _hs.pen : "防御 --";
-            p.Text(crit, 14, 14, Chg); p.Text(atk, 14, 27, Atk); p.Text(def, 14, 40, Blk);
+            p.Text(crit, 14, 14, Chg); p.Text(atk, 14, 27, Atk); p.Text(outp, 14, 40, k && _hs.outgoingPct > 0 ? OutCol : Dim); p.Text(def, 14, 53, Blk);
             p.Apply(t);
         }
 
@@ -263,7 +265,7 @@ namespace UI.Game2D
             p.Apply(t);
         }
 
-        private static readonly Color32 MarkHeavyHud = new Color32(0xff, 0xb3, 0x47, 255);
+        private static readonly Color32 MarkHeavyHud = new Color32(0xff, 0xb3, 0x47, 255), OutCol = new Color32(0xff, 0xd0, 0x6a, 255);
 
         private void DrawLamp(KitPix p, int x, int y, int size, bool lit, Color32 col)
         {

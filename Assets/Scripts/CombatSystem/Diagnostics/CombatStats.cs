@@ -31,6 +31,7 @@ namespace CombatSystem
             for (int i = 0; i < DamageBreakdown7F.Length; i++) DamageBreakdown7F[i] = 0;
             for (int i = 0; i < DamageBreakdown.Length; i++) DamageBreakdown[i] = 0;
             for (int i = 0; i < DamageStages.Length; i++) DamageStages[i] = 0;
+            for (int i = 0; i < DamageStages7F.Length; i++) DamageStages7F[i] = 0;
             ResetFloorDamage();
         }
 
@@ -51,6 +52,17 @@ namespace CombatSystem
         /// [18]鈍器発動 [19]研磨剤発動 [20]脆弱発動 [21]狂暴化発動
         /// [22]乗算時点の outgoing 合計 (研磨剤込み) [23](旧 余剰貫通率の合計・未使用)</summary>
         public static readonly double[] DamageStages = new double[24];
+
+        /// <summary>[計装 2026-11-11] <see cref="DamageStages"/> のヴェスカ連戦 (boss_layer7*) だけの分。 添字は同じ。</summary>
+        public static readonly double[] DamageStages7F = new double[24];
+
+        /// <summary>段の記録 (全体とヴェスカ連戦の両方)。</summary>
+        public static void Stage(int i, double v)
+        {
+            DamageStages[i] += v;
+            var c = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+            if (c != null && c.bossId != null && c.bossId.StartsWith(GameLoop.BossIds.Layer7Prefix)) DamageStages7F[i] += v;
+        }
 
         /// <summary>ProcessDamage は勝敗・引分・敵側でも呼ばれるので、
         /// **プレイヤー勝利の主攻撃のときだけ** DamageStages を積むためのゲート。</summary>

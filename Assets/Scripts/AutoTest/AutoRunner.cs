@@ -170,6 +170,8 @@ namespace AutoTest
         public float probeMainMult = 1f;
         /// <summary>[測定 2026-11-11] 武器の段の上限 (0 = 上限なし)。 本体の <see cref="GameLoop.GameHooks.WeaponTierCap"/> へ流す。</summary>
         public int weaponTierCap = 0;
+        /// <summary>[測定 2026-11-11] ヴェスカ連戦の出目を固定する値 (0 = 触らない)。 本体の GameHooks.VescaDiceForce へ流す。</summary>
+        public int vescaDiceForce = 0;
         /// <summary>[測定用の物差し 2026-11-10] 敵の HP に入る毒・出血・爆発・〈逆綴じの止血帯〉の量に掛ける倍率 (<see cref="CombatSystem.EnemyHpLedger.ProbePassiveMult"/>)。
         /// 既定 1。 ラン開始時に本体へ入れ、 ラン終了時に 1 へ戻す。 製品では使わない。</summary>
         public float probePassiveMult = 1f;

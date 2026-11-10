@@ -133,7 +133,7 @@ namespace CombatSystem
                 ctx.outgoingDamageMultiplier += 1.5f;
                 DmgSourceDiag.Note("消費〈瞬間研磨剤〉", DmgSourceDiag.Out, 1.5f);
                 ctx.polishArmed = false;   // 1 撃限り
-                if (CombatStats.DiagWinAttack) CombatStats.DamageStages[19]++;
+                if (CombatStats.DiagWinAttack) CombatStats.Stage(19, 1);
                 Debug.Log("[瞬間研磨剤] 与ダメージ+150%");
             }
 
@@ -156,8 +156,8 @@ namespace CombatSystem
             }
             if (CombatStats.DiagWinAttack)
             {
-                CombatStats.DamageStages[5] += totalDmg;   // 段 E
-                CombatStats.DamageStages[22] += ctx.outgoingDamageMultiplier <= 0f ? 1f : ctx.outgoingDamageMultiplier;
+                CombatStats.Stage(5, totalDmg);   // 段 E
+                CombatStats.Stage(22, ctx.outgoingDamageMultiplier <= 0f ? 1f : ctx.outgoingDamageMultiplier);
             }
 
             // 消費: 攻撃力バースト（この勝利ターンのみ・単発消費）
@@ -167,7 +167,7 @@ namespace CombatSystem
                 Debug.Log($"[CombatManager] 攻撃バースト +{ctx.consAtkBurst}");
                 ctx.consAtkBurst = 0;
             }
-            if (CombatStats.DiagWinAttack) CombatStats.DamageStages[6] += totalDmg;   // 段 F
+            if (CombatStats.DiagWinAttack) CombatStats.Stage(6, totalDmg);   // 段 F
 
             // [2026-07-28 撤去] メタバフ「会心ダイス」による会心時の固定ダメ加算。
             //   GetCritBonus() は精密トラックの分子補正だったが、 分子/分母モデル廃止に伴い常に 0。
@@ -180,10 +180,12 @@ namespace CombatSystem
             //   **最低 1 は残す** ── 0 にすると削りが完全に止まり、 耐久レースが成立しなくなる。
             //
             //   (同種のデバフを足すときは重ねがけせず厳しい方 1 つを採ること ── 乗算は 0.756 まで落ちた。)
-            if (CombatStats.DiagWinAttack) CombatStats.DamageStages[7] += totalDmg;   // 段 G
+            if (CombatStats.DiagWinAttack) CombatStats.Stage(7, totalDmg);   // 段 G
 
             // [測定用の物差し 2026-11-10] 主攻撃の倍率 (既定 1 = 素通し・製品では使わない)。 この関数の呼び手はプレイヤーの主攻撃だけ (Turn.cs)。
             totalDmg = EnemyHpLedger.ProbeMain(totalDmg);
+            // 大罪:怠惰 (挑戦カード IV・2026-11-11): 主攻撃の最終ダメージ −N% (すべての倍率の後・敵の防御の前)
+            totalDmg = MetaProgression.MetaDebuffApplicator.ApplySlothCut(totalDmg);   // 主攻撃以外は敵の HP を減らす口 (HpLossDiag.Lose) で掛ける
 
             // 敵側のダメージ軽減パッシブを発火（前後で ctx.finalDamage と totalDmg を同期し、
             // 敵パッシブ（AshArmor 等やシュヴァリエのシールド経由処理）が
@@ -193,7 +195,7 @@ namespace CombatSystem
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnPreReceiveDamage);
             totalDmg = System.Math.Max(0, ctx.finalDamage);
             EnemyHpLedger.NoteMainEnemyReduction(ledgerBeforeRed, totalDmg);
-            if (CombatStats.DiagWinAttack) CombatStats.DamageStages[8] += totalDmg;   // 段 H
+            if (CombatStats.DiagWinAttack) CombatStats.Stage(8, totalDmg);   // 段 H
 
             // 敵の防御値 (ADR-0013)。 敵の軽減パッシブ (灰塵の鎧 等) の後、 倍率が全部乗った最終値に掛ける。
             //   貫通は防御値を固定値で引く。 余った貫通は何にもならない
@@ -220,13 +222,13 @@ namespace CombatSystem
                             + $"（軽減{DefenseFormula.Reduction(effDef):P0}）{beforeDef}→{totalDmg}");
                 }
             }
-            if (CombatStats.DiagWinAttack) CombatStats.DamageStages[9] += totalDmg;   // 段 I
+            if (CombatStats.DiagWinAttack) CombatStats.Stage(9, totalDmg);   // 段 I
 
             // 段 J (旧: 余剰貫通の与ダメ転用) は撤去。 段別実測の添字を保つため計測点だけ残す。
-            if (CombatStats.DiagWinAttack) CombatStats.DamageStages[10] += totalDmg;   // 段 J
+            if (CombatStats.DiagWinAttack) CombatStats.Stage(10, totalDmg);   // 段 J
 
             // 段 K は撤去。 段別実測の添字を保つため計測点だけ残す。
-            if (CombatStats.DiagWinAttack) CombatStats.DamageStages[11] += totalDmg;   // 段 K
+            if (CombatStats.DiagWinAttack) CombatStats.Stage(11, totalDmg);   // 段 K
 
             // 脆弱 (狩猟旅団契約): armed状態で会心ダメージを与えると最終ダメージに ×(1+0.15/0.30/0.45) 倍率。
             // 適用後 consumed 状態へ遷移。 ロール勝利時の非会心ダメで armed に再点火する処理は応答側で別途。
@@ -239,7 +241,7 @@ namespace CombatSystem
                     totalDmg = Mathf.CeilToInt(totalDmg * vulMult);
                     DmgSourceDiag.Note("契約〈脆弱〉", DmgSourceDiag.Vul, vulMult - 1f);
                     Debug.Log($"[狩猟旅団] 脆弱発動 ×{vulMult:F2} {beforeVul}→{totalDmg}");
-                    if (CombatStats.DiagWinAttack) CombatStats.DamageStages[20]++;
+                    if (CombatStats.DiagWinAttack) CombatStats.Stage(20, 1);
                 }
             }
             else if (!isCrit && totalDmg > 0)
@@ -247,12 +249,12 @@ namespace CombatSystem
                 // ロール勝利時の非会心ダメで脆弱を再点火 (契約継続中のみ)
                 VulnerabilityStatus.RearmOnNonCritWin(ctx);
             }
-            if (CombatStats.DiagWinAttack) CombatStats.DamageStages[12] += totalDmg;   // 段 L
+            if (CombatStats.DiagWinAttack) CombatStats.Stage(12, totalDmg);   // 段 L
 
             // 勝利時の与ダメ最低保証（基本1、利刃Lvで1/2/3/4）。「勝ったのに0」を防止。
             if (totalDmg < ctx.winMinDamage)
                 totalDmg = ctx.winMinDamage;
-            if (CombatStats.DiagWinAttack) CombatStats.DamageStages[13] += totalDmg;   // 段 M
+            if (CombatStats.DiagWinAttack) CombatStats.Stage(13, totalDmg);   // 段 M
 
             // 狂暴化(ボス50T後): エネミーが受けるダメージを倍化（軽減処理の後・適用直前）
             if (ctx.enemyDamageTakenMultiplier > 1f && totalDmg > 0)
@@ -260,12 +262,12 @@ namespace CombatSystem
                 int orig = totalDmg;
                 totalDmg = Mathf.CeilToInt(totalDmg * ctx.enemyDamageTakenMultiplier);
                 Debug.Log($"[CombatManager] 狂暴化: 敵被ダメ ×{ctx.enemyDamageTakenMultiplier:F1} ({orig}→{totalDmg})");
-                if (CombatStats.DiagWinAttack) CombatStats.DamageStages[21]++;
+                if (CombatStats.DiagWinAttack) CombatStats.Stage(21, 1);
             }
-            if (CombatStats.DiagWinAttack) CombatStats.DamageStages[14] += totalDmg;   // 段 N
+            if (CombatStats.DiagWinAttack) CombatStats.Stage(14, totalDmg);   // 段 N
 
 
-            if (CombatStats.DiagWinAttack) CombatStats.DamageStages[15] += totalDmg;   // 段 O (最終)
+            if (CombatStats.DiagWinAttack) CombatStats.Stage(15, totalDmg);   // 段 O (最終)
             return totalDmg;
         }
 
@@ -293,7 +295,11 @@ namespace CombatSystem
 
             // 名前付きパッシブ由来の固定被ダメ削減（不屈の鎧・苦難の刻印 等の合算）
             if (ctx.playerFlatDamageReduction > 0 && totalDmg > 0)
+            {
+                int bf = totalDmg;
                 totalDmg = Mathf.Max(1, totalDmg - ctx.playerFlatDamageReduction);
+                if (GuardDiag.InVesca()) GuardDiag.Cut7F[5] += bf - totalDmg;   // [計装 2026-11-11]
+            }
 
             // 遺物 (§15-5) 被ダメージ−N%。 **割合軽減**であって定額ではない。
             //   定額だと参照被ダメ 7.7/T に対し段6 が 78% 軽減になり、 序盤の敵 (baseAttack 2〜10) を
@@ -301,7 +307,11 @@ namespace CombatSystem
             float relicRed = MetaProgression.Relics.RelicApplicator
                              .GetDamageReductionPct(GameLoop.GameManager.Instance?.Run, ctx);
             if (relicRed > 0f && totalDmg > 0)
+            {
+                int bf = totalDmg;
                 totalDmg = Mathf.Max(1, Mathf.CeilToInt(totalDmg * (1f - relicRed)));
+                if (GuardDiag.InVesca()) GuardDiag.Cut7F[6] += bf - totalDmg;   // [計装 2026-11-11]
+            }
 
             // [撤去 2026-09-13] 整備パネル〈防御〉の割合軽減。 このトラックは
             //   リスク軸〈剛胆〉へ完全リワークし、 被ダメには一切触れなくなった。
@@ -381,6 +391,7 @@ namespace CombatSystem
                 // 吸収・割れの出来事を配る (2026-10-31)。 吸収に応じて品が敵へ返す分 (〈鏡返しの小盾〉) はここで使う。
                 int absorbed = ItemSystem.PassiveSkills.Keywords.Kw.AbsorbShield(ctx, totalDmg, isAttack: true);
                 totalDmg -= absorbed;
+                if (GuardDiag.InVesca()) GuardDiag.Cut7F[7] += absorbed;   // [計装 2026-11-11]
                 ctx.dbgShieldToNormal += absorbed;   // [計装] チップ側との配分を見る
                 Debug.Log($"[CombatManager] シールド吸収 {absorbed} (残{ctx.consShield})");
                 int reflect = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.ReflectKey);

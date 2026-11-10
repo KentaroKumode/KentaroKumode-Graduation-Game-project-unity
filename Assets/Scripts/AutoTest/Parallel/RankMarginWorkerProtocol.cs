@@ -329,6 +329,11 @@ namespace AutoTest.ParallelSweep
         public string[] dmgSrcNames = Array.Empty<string>();
         public double[] dmgSrcAll = Array.Empty<double>();
         public double[] dmgSrcBoss = Array.Empty<double>();
+        /// <summary>[計装 2026-11-11] ヴェスカ連戦だけの与ダメ増加の出どころ (dmgSrcNames と同じ並び) ・倍率の段 (CombatStats.DamageStages7F)・被ダメのカット (GuardDiag.Cut7F)。</summary>
+        public double[] dmgSrcVesca = Array.Empty<double>();
+        public double[] damageStages7F = Array.Empty<double>();
+        public double[] cut7F = Array.Empty<double>();
+        public double[] stag7F = Array.Empty<double>();
     }
 
     /// <summary>AutoRunner の設定をプロセス間で運ぶ。
@@ -427,7 +432,7 @@ namespace AutoTest.ParallelSweep
                 "v3.readOutgoingMult", "ReadOutgoingMultEffective", "buyAxisFocus", "buyAxisFocusBonus",
                 "axisPackageAxis", "axisPackageCount", "v3.hpLedger", "v3.axisCommitBuy", "predTrace",
                 // 2026-11-10: 主攻撃の見積もりを実績の比で掛け直すか・黎明の溜める形 (送った値と、 ラン開始時に本体へ入れた値)
-                "v3.mainCorr", "daybreakNextAttackPct", "DaybreakNextAttackPctApplied", "weaponTierCap",
+                "v3.mainCorr", "daybreakNextAttackPct", "DaybreakNextAttackPctApplied", "weaponTierCap", "vescaDiceForce",
                 // 2026-11-10: 測定用の物差し (主攻撃 / 毒・出血・爆発の倍率)。 送った値と、 ラン開始時に本体へ入れた値
                 "probeMainMult", "ProbeMainMultApplied", "probePassiveMult", "ProbePassiveMultApplied",
             };

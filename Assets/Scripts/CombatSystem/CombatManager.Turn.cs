@@ -593,6 +593,7 @@ namespace CombatSystem
                 if (foundry > 0)
                     for (int i = 0; i < playerDice.Length; i++) playerDice[i] += foundry;
             }
+            ForceVescaDice(ctx, playerDice, null);   // [測定 2026-11-11] ヴェスカ連戦の出目の固定 (既定は触らない)
 
             // 7層ヴェスカ〈天与の指輪〉: 3 以上の出目をすべて 1〜2 へ再抽選する。
             //   全出目 1 は本数ぶんの手が完全に死に、 その前の「行動不可」と重さが変わらなかった。
@@ -679,6 +680,7 @@ namespace CombatSystem
             // 「何ターン稼いだか」が盤面から読める (完全情報テレグラフ・柱3)。
             int escTurn = EscalationTurn(ctx);
             int enemyAtkValue = Escalation.EnemyAttackValue(currentEnemy, escTurn, ctx.enemyDiceTotal, ctx.currentTurn);
+            int enemyAtkRaw = enemyAtkValue;   // [計装 2026-11-11] 敵の攻撃を下げる効果の前
             // ADR-0009 D群: 敵攻撃値-N (呪縛 等の敵ダイス弱化系の転生先)
             enemyAtkValue = Math.Max(0, enemyAtkValue - ctx.mutualEnemyAttackReduction);
             // ADR-0011 〈封じ・対〉(前ターン成立): 敵の攻撃を N% 減らす。 予告にもそのまま出る (完全情報)。
@@ -1400,6 +1402,7 @@ namespace CombatSystem
                 { int cap = MetaProgression.MetaBuffApplicator.GetArmorHitCap(playerMaxHP); if (cap > 0 && takenDmg > cap) takenDmg = cap; }
                 playerHP = Math.Max(0, playerHP - takenDmg);
                 takenApplied = takenDmg;
+                GuardDiag.NoteCut7F(enemyAtkRaw, enemyAtkBeforeDefense, enemyAtkValue, blockSum, lossBase, takenDmg);   // [計装 2026-11-11]
                 // 〈長引く負傷〉: ラン中の累計被ダメを積む。 **最大HP の減少はここからは行わない** ──
                 //   戦闘中に最大HP を削ると、 予告に無い形でその場の生死が変わる。 精算は戦闘終了時。
                 if (takenDmg > 0)

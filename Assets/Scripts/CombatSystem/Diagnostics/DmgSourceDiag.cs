@@ -26,9 +26,9 @@ namespace CombatSystem
         /// 会心倍率は会心した攻撃だけ、 非会心% は非会心の攻撃だけを発動として数える (乗らなかった分は効いていない)。</summary>
         public const int Width = 3 + 2 * Fields;
 
-        /// <summary>[0]全戦闘 [1]ボス戦のみ。</summary>
+        /// <summary>[0]全戦闘 [1]ボス戦のみ [2]ヴェスカ連戦のみ (2026-11-11)。</summary>
         public static readonly Dictionary<string, double[]>[] Stats =
-            { new Dictionary<string, double[]>(), new Dictionary<string, double[]>() };
+            { new Dictionary<string, double[]>(), new Dictionary<string, double[]>(), new Dictionary<string, double[]>() };
 
         /// <summary>全攻撃に対して「所持」扱いにする出どころ (役・端子・武器の素の会心率)。</summary>
         public static readonly HashSet<string> Universal = new HashSet<string>();
@@ -42,7 +42,7 @@ namespace CombatSystem
 
         public static void Reset()
         {
-            Stats[0].Clear(); Stats[1].Clear(); Universal.Clear();
+            Stats[0].Clear(); Stats[1].Clear(); Stats[2].Clear(); Universal.Clear();
             foreach (var k in YachtRoles.All) Universal.Add("役〈" + YachtRoles.NameOf(k) + "〉");
             Universal.Add(AimKey);
             _pending.Clear(); _heldNow.Clear();
@@ -110,8 +110,11 @@ namespace CombatSystem
             foreach (var u in Universal) _heldNow.Add(u);
             foreach (var k in _pending.Keys) _heldNow.Add(k);
 
-            for (int d = 0; d < (boss ? 2 : 1); d++)
+            bool vesca = c.bossId != null && c.bossId.StartsWith(GameLoop.BossIds.Layer7Prefix);
+            for (int d = 0; d < 3; d++)
             {
+                if (d == 1 && !boss) continue;
+                if (d == 2 && !vesca) continue;
                 var st = Stats[d];
                 foreach (var src in _heldNow)
                 {

@@ -39,6 +39,10 @@ namespace GameLoop
         /// 段 4 の本当の価値 (段 3 のままヴェスカに着いたら) を測る口 (AutoRunner.weaponTierCap)。</summary>
         public static int WeaponTierCap;
 
+        /// <summary>[測定] ヴェスカ連戦 (boss_layer7*) の間、 プレイヤーの出目を全部この値にする (0 = 触らない・2026-11-11)。
+        /// 「出目が 1 しか出なかったら」の重さを測る口 (AutoRunner.vescaDiceForce)。 振り直した出目にも掛ける。</summary>
+        public static int VescaDiceForce;
+
         /// <summary>[測定] 物資の素の上限を差し替える (0 = 差し替えない = <see cref="ProvisionRules.Max"/>)。 BOT が上限を振って測る口 (2026-11-09)。</summary>
         public static int ProvisionMaxOverride;
 

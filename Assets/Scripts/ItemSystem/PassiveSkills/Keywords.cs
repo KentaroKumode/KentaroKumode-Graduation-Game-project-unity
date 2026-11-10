@@ -151,7 +151,7 @@ namespace ItemSystem.PassiveSkills.Keywords
         {
             if (ctx == null || dmg <= 0) return;
             if (ctx.GetAccumulated(ResolvingKey) > 0) Add(ctx, PendingEnemyDamageKey, dmg);
-            else ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - dmg);
+            else ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - MetaProgression.MetaDebuffApplicator.ApplySlothCut(dmg));   // 預けた分は HpLossDiag.Lose で掛かる
         }
 
         /// <summary>預かっている敵へのダメージを取り出して 0 に戻す。</summary>

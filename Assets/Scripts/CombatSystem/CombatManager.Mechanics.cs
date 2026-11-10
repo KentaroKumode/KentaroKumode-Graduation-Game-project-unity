@@ -141,6 +141,17 @@ namespace CombatSystem
         {
             int sloth = MetaProgression.MetaDebuffApplicator.GetSlothDicePenalty();
             if (sloth > 0) foreach (int i in rerolled) playerDice[i] = Math.Max(1, playerDice[i] - sloth);
+            ForceVescaDice(ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context, playerDice, rerolled);
+        }
+
+        /// <summary>[測定 2026-11-11] ヴェスカ連戦の間、 出目を <see cref="GameLoop.GameHooks.VescaDiceForce"/> に固定する (0 なら何もしない)。
+        /// rerolled が null なら全部、 そうでなければ振り直したダイスだけ。</summary>
+        private static void ForceVescaDice(ItemSystem.PassiveSkills.CombatContext ctx, int[] playerDice, List<int> rerolled)
+        {
+            int v = GameLoop.GameHooks.VescaDiceForce;
+            if (v <= 0 || playerDice == null || ctx?.bossId == null || !ctx.bossId.StartsWith(GameLoop.BossIds.Layer7Prefix)) return;
+            if (rerolled == null) for (int i = 0; i < playerDice.Length; i++) playerDice[i] = v;
+            else foreach (int i in rerolled) playerDice[i] = v;
         }
 
         private IEnumerator<TurnPause> RerollPhase(CombatContext ctx, int[] playerDice, int[] enemyDice, int playerDiceMax,

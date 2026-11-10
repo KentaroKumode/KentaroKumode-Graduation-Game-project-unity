@@ -124,7 +124,9 @@ namespace MetaProgression
         /// <summary>〈鋼の皮膚〉のボスの HP の上乗せ (%)。 敵の最大 HP の札と同じ溜まりに足す (掛け算にしない)。</summary>
         public const float SteelBossHpPct = 20f;
         /// <summary>大罪:暴食 で受けた時に下がる最大 HP (%)。 大罪:強欲 で失うパッシブの数 (最も高価なものから)。</summary>
-        public const int SinGluttonyMaxHpPct = 60, SinGreedPassives = 1;   // 暴食: 最大 HP −20% で −8.3 → −40%
+        public const int SinGluttonyMaxHpPct = 60, SinGreedPassives = 1;
+        /// <summary>怠惰: 与えるダメージ −N% (主攻撃はすべての倍率の後・敵の防御の前、 毒・出血・爆発・固定ダメも・2026-11-11)。 出目 −2 だけでは 5 層で −4.9 と軽かった (出目は主攻撃の基礎の 2 割)。</summary>
+        public const int SinSlothDamageCutPct = 30;   // 暴食: 最大 HP −20% で −8.3 → −40%
         /// <summary>大罪:傲慢 のシールドの獲得の削り (%)。 ブロックと同じ −75% だと −27.4 (クリア 0.9%) と効きすぎた。</summary>
         public const int SinPrideShieldCutPct = 10;   // 0% −6.9 / 30% −19.2 / 75% −27.4 (2026-11-10)
 
@@ -261,7 +263,7 @@ namespace MetaProgression
                 case SinEnvy: return "大罪:嫉妬 ─ 残り HP の割合がこちらのほうが高い間、 敵の攻撃 +" + n + "%";
                 case SinGreed: return "大罪:強欲 ─ 所持金と消耗品をすべて失い、 最も高価なパッシブ " + SinGreedPassives + " 個を失う";
                 case SinWrath: return "大罪:憤怒 ─ ボスの各形態の最初のターン、 自ダイスが全て最大・現在 HP 半減";
-                case SinSloth: return "大罪:怠惰 ─ 全部の出目 −" + n + "（1 より小さくはならない）";
+                case SinSloth: return "大罪:怠惰 ─ 全部の出目 −" + n + "（1 より小さくはならない）・与えるダメージ −" + SinSlothDamageCutPct + "%（毒・出血・爆発も）";
                 case SinGluttony: return "大罪:暴食 ─ 最大 HP −" + SinGluttonyMaxHpPct + "%・回復 −" + n + "%（吸血・層の入口の全回復にも）";
                 case SinLust: return "大罪:色欲 ─ 持っているパッシブ " + n + " 個（ランダム）が働かなくなる";
                 case Bag: return "消耗品は " + n + " 個までしか持てない";

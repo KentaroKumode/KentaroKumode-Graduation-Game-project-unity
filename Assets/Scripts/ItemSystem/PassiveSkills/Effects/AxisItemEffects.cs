@@ -480,11 +480,12 @@ namespace ItemSystem.PassiveSkills.Effects
             => ctx.shieldKeepBonusPct = System.Math.Max(ctx.shieldKeepBonusPct, 5 * ctx.AxisDepth(AxisRules.Shield));
     }
 
-    /// <summary>盾押しの心得 (②【規則】): 攻撃に挿したターン、 シールドの「堅牢 × 10%」が攻撃に加わる (2026-11-07: 旧 ×2%)。 シールドは減らない。</summary>
+    /// <summary>盾押しの心得 (②【規則】): 攻撃に挿したターン、 シールドの「堅牢 × 5%」が攻撃に加わる (2026-11-11: 10% → 5%・2026-11-07: 2% → 10%)。 シールドは減らない。
+    /// 2026-11-11: ヴェスカ戦の主攻撃の基礎の 31% をこの 1 品が出していた (シールドは減らず、 毎ターン満額が乗る)。</summary>
     public class ShieldPushArt : IPassiveSkillEffect
     {
         public const string Id = "盾押しの心得";
-        public const float PctPerItem = 0.10f;
+        public const float PctPerItem = 0.05f;
         public string SkillId => Id;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)

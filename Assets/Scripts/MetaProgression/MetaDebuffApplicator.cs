@@ -57,6 +57,9 @@ namespace MetaProgression
         public static bool HasSinWrath => CardV(ChallengeCards.SinWrath) > 0f;
         /// <summary>大罪:怠惰 ── 全部の出目から引く量 (下限 1)。</summary>
         public static int GetSlothDicePenalty() => CardI(ChallengeCards.SinSloth);
+        /// <summary>大罪:怠惰 ── プレイヤーが敵に与えるダメージ −N% (主攻撃・毒・出血・爆発・固定ダメ・反射・品の直接、 全部・2026-11-11)。 受けていなければ素通し。</summary>
+        public static int ApplySlothCut(int dmg)
+            => dmg > 0 && GetSlothDicePenalty() > 0 ? dmg * (100 - ChallengeCards.SinSlothDamageCutPct) / 100 : dmg;
 
         // ── 敵の耐久 ──
 

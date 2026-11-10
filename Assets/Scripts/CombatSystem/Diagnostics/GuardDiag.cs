@@ -27,9 +27,38 @@ namespace CombatSystem
         /// <summary>軽減後にブロックで<b>全吸収</b>された回数 (lossBase == 0)。</summary>
         public static long FullyBlocked;
 
+        /// <summary>[計装 2026-11-11] ヴェスカ連戦の敵の直接攻撃 1 回ごとの段:
+        /// [0]回数 [1]素の攻撃値 [2]敵の攻撃を下げる効果の後 (呪縛・封じ・割合減・失血衰弱) [3]プレイヤーの防御の後
+        /// [4]ブロックの後 (lossBase) [5]被ダメ −N (定額) で減った量 [6]被ダメ −% (遺物ほか) で減った量 [7]シールドが吸った量
+        /// [8]最終的に HP が減った量 [9]ブロックの出目の合計。 [4] − [5] − [6] − [7] − [8] = その他 (役・虚空・仕込み刃・上限など)。</summary>
+        public static readonly double[] Cut7F = new double[10];
+
+        /// <summary>[計装 2026-11-11] ヴェスカ連戦の配線と停滞。 段 (p1..p4) × 8: [0]ターン [1]停滞を積んだターン (攻撃 &lt; ブロック) [2]ターンの終わりの停滞スタックの合計
+        /// [3]攻撃の本数 [4]ブロックの本数 [5]充電の本数 [6]特殊の本数 [7]攻撃 0 本のターン。</summary>
+        public static readonly double[] Stag7F = new double[32];
+        public static void NoteStag7F(string bossId, int atk, int blk, int chg, int spc, bool stacked, int stacks)
+        {
+            if (bossId == null || !bossId.StartsWith(GameLoop.BossIds.Layer7Prefix)) return;
+            int st = bossId.EndsWith("_p2") ? 1 : bossId.EndsWith("_p3") ? 2 : bossId.EndsWith("_p4") ? 3 : 0, o = st * 8;
+            Stag7F[o]++; if (stacked) Stag7F[o + 1]++; Stag7F[o + 2] += stacks;
+            Stag7F[o + 3] += atk; Stag7F[o + 4] += blk; Stag7F[o + 5] += chg; Stag7F[o + 6] += spc; if (atk <= 0) Stag7F[o + 7]++;
+        }
+        public static bool InVesca()
+        {
+            var c = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+            return c != null && c.bossId != null && c.bossId.StartsWith(GameLoop.BossIds.Layer7Prefix);
+        }
+        public static void NoteCut7F(int raw, int beforeDef, int afterDef, int block, int lossBase, int hpLoss)
+        {
+            if (!InVesca()) return;
+            Cut7F[0]++; Cut7F[1] += raw; Cut7F[2] += beforeDef; Cut7F[3] += afterDef; Cut7F[4] += lossBase; Cut7F[8] += hpLoss; Cut7F[9] += block;
+        }
+
         public static void Reset()
         {
             AtkBefore = AtkAfter = BlockSum = LossBase = Attacks = FullyBlocked = 0;
+            System.Array.Clear(Cut7F, 0, Cut7F.Length);
+            System.Array.Clear(Stag7F, 0, Stag7F.Length);
         }
 
         public static void Note(int atkBefore, int atkAfter, int blockSum, int lossBase)

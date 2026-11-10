@@ -65,7 +65,8 @@ namespace AutoTest
             ItemSystem.PassiveSkills.Effects.Daybreak.NextAttackPctPerUnit = System.Math.Max(0f, daybreakNextAttackPct);
             _daybreakApplied = ItemSystem.PassiveSkills.Effects.Daybreak.NextAttackPctPerUnit; _daybreakAppliedOnce = true;
             // [測定用の物差し 2026-11-10] 主攻撃 / 毒・出血・爆発・止血帯の倍率を本体へ (ラン終了時に 1 へ戻す)
-            GameLoop.GameHooks.WeaponTierCap = System.Math.Max(0, weaponTierCap);   // [測定 2026-11-11] 武器の段の上限 (ラン終了時に 0 へ)
+            GameLoop.GameHooks.WeaponTierCap = System.Math.Max(0, weaponTierCap);
+            GameLoop.GameHooks.VescaDiceForce = System.Math.Max(0, vescaDiceForce);   // [測定 2026-11-11]   // [測定 2026-11-11] 武器の段の上限 (ラン終了時に 0 へ)
             CombatSystem.EnemyHpLedger.ProbeMainMult = ProbeMultClamp(probeMainMult);
             CombatSystem.EnemyHpLedger.ProbePassiveMult = ProbeMultClamp(probePassiveMult);
             _probeMainApplied = CombatSystem.EnemyHpLedger.ProbeMainMult; _probePassiveApplied = CombatSystem.EnemyHpLedger.ProbePassiveMult; _probeAppliedOnce = true;

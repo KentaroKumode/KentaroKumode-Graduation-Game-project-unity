@@ -431,15 +431,21 @@ namespace AutoTest.ParallelSweep
                     }
                     var dsAll = CombatSystem.DmgSourceDiag.Stats[0];
                     var dsBoss = CombatSystem.DmgSourceDiag.Stats[1];
+                    var dsVesca = CombatSystem.DmgSourceDiag.Stats[2];
                     var dsn = new List<string>(dsAll.Keys);
                     int W = CombatSystem.DmgSourceDiag.Width;
                     response.dmgSrcNames = dsn.ToArray();
                     response.dmgSrcAll = new double[dsn.Count * W];
                     response.dmgSrcBoss = new double[dsn.Count * W];
+                    response.dmgSrcVesca = new double[dsn.Count * W];
+                    response.damageStages7F = (double[])CombatSystem.CombatStats.DamageStages7F.Clone();
+                    response.cut7F = (double[])CombatSystem.GuardDiag.Cut7F.Clone();
+                    response.stag7F = (double[])CombatSystem.GuardDiag.Stag7F.Clone();
                     for (int i = 0; i < dsn.Count; i++)
                     {
                         Array.Copy(dsAll[dsn[i]], 0, response.dmgSrcAll, i * W, W);
                         if (dsBoss.TryGetValue(dsn[i], out var bRow)) Array.Copy(bRow, 0, response.dmgSrcBoss, i * W, W);
+                        if (dsVesca.TryGetValue(dsn[i], out var vRow)) Array.Copy(vRow, 0, response.dmgSrcVesca, i * W, W);
                     }
                 }
                 WriteAtomic(_job.responsePath, JsonUtility.ToJson(response, false));

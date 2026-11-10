@@ -40,6 +40,9 @@ namespace AutoTest
         /// <summary>候補 1 つあたりのロールアウト本数。 候補間は**共通乱数**なので
         /// 少ない本数でも順位は安定する (差の分散だけを見ているため)。</summary>
         public int rolloutCount = 12;
+        /// <summary>[測定 2026-11-11] ヴェスカ〈停滞する時間〉を持つ敵に、 停滞を積む配線 (攻撃の本数 &lt; ブロックの本数) を選ばせない。
+        /// 「攻撃 2・ブロック 1 のように停滞を避ける方が良いのか」を BOT の判断ごと比べるための口 (既定 false)。</summary>
+        public bool noStagWire;
         /// <summary>深く読む配線候補の数。 全列挙 (243〜1024) を浅い評価で絞ってから回す。</summary>
         public int candidateWirings = 6;
         /// <summary>**浅い評価が最良と同点だらけのとき**だけ候補枠をここまで広げる (0 = 無効)。
@@ -439,6 +442,14 @@ namespace AutoTest
         private bool _isBoss;
         /// <summary>敵の防御と周期の規則 (構え・割れる/積み上がる装甲・先手・大技)。 公開規則なので先のターンも再現する (2026-11-04)。</summary>
         private EnemyArmorModel _armor;
+        /// <summary>ヴェスカ〈停滞する時間〉(2026-11-11): 1 スタックあたりの敵の出目の加算 (持たない敵は 0)。
+        /// 攻撃に挿した本数 &lt; ブロックの本数のターンに 1 スタック積み (上限 <see cref="ItemSystem.PassiveSkills.Effects.StagnantTime.StackCap"/>)、 次のターンから敵の攻撃に乗る。
+        /// これが無いと先読みは「守りに寄せると敵が強くなる」を知らず、 先のターンの敵の攻撃に積もった停滞も入らなかった。</summary>
+        private int _stagPer;
+        /// <summary>斧〈血令〉(2026-11-11 作り直し): 敵の攻撃で失った HP の半分を溜め、 次に攻撃したターン 攻撃 +血・攻撃が通ったら 1/4 回復。</summary>
+        private bool _bloodEdict;
+        /// <summary>判断しているターン (このターンの攻撃値には血がもう入っている = 先読みのターンだけ足す)。</summary>
+        private int _decTurn;
         /// <summary>今の防御の「持続する分」(構えの増減を除く)。 先読みの盤面の初期値。</summary>
         private int _eDef0;
         private int _termCap, _specialLimit, _chargeMax, _chargePerTurn;
@@ -492,6 +503,15 @@ namespace AutoTest
             _pierceMul = ctx.playerBlockIgnored ? CombatManager.PierceAwlPerAttack : 0;
             _rung = WeaponRungModel.From(PassiveSkillManager.Instance?.ActivePlayerSkillIds);
             _rung.chargeToAtkPct = ctx.chargeToAttackPct;
+            _stagPer = 0;
+            if (enemy.passiveSkills != null)
+                foreach (var p in enemy.passiveSkills)
+                    if (p != null && p.internalName == "StagnantTime") _stagPer = Math.Max(0, ItemSystem.PassiveSkills.Effects.StagnantTime.DicePerStack(ctx));
+            {
+                var ids0 = PassiveSkillManager.Instance?.ActivePlayerSkillIds;
+                _bloodEdict = false;
+                if (ids0 != null) for (int i = 0; i < ids0.Count && !_bloodEdict; i++) _bloodEdict = ids0[i] == "血令";
+            }
             {
                 var ids = PassiveSkillManager.Instance?.ActivePlayerSkillIds;
                 bool push = false;
@@ -518,6 +538,8 @@ namespace AutoTest
             public int shield;            // 盾のシールド (ターンの終わりに半減・防御後の被弾を吸う)
             public int streak;            // 〈不滅の刃〉: 攻撃とブロックの両方に挿したターンの連続数
             public int steadfastReady;    // 〈堅守の構え〉: 次に使えるターン
+            public int stag;              // ヴェスカ〈停滞する時間〉のスタック
+            public int blood;             // 斧〈血令〉の溜まっている血
         }
 
         // ============================================================
@@ -693,7 +715,10 @@ namespace AutoTest
                 shield = Math.Max(0, ctx.consShield),
                 streak = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.UndyingBlade.StreakKey),
                 steadfastReady = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.SteadfastStance.ReadyKey),
+                stag = ctx.stagnationStacks,
+                blood = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.BloodEdict.BloodKey),
             };
+            _decTurn = tele.turn;
 
             int enemyAtk = Math.Max(0, tele.enemyAttackValue);
             // 2 体戦の 2 パケット目。 予告 (柱3) で開示済みなので、 方策はこれを見て配線できる。
@@ -1256,6 +1281,15 @@ namespace AutoTest
             // --- 〈貫きの錐〉 ---
             if (m.pierce > 0 && bSum > 0) bSum = Math.Max(0, bSum - enemyAtk * m.pierce);
 
+            // 斧〈血令〉: 攻撃したターンに血を使い切る。 判断しているターンの攻撃値 (atkBase) には本体が足し済みなので、 先読みのターンだけ足す
+            int bloodSpent = 0;
+            if (_bloodEdict && aCount > 0)
+            {
+                bloodSpent = s.blood;
+                if (s.turn > _decTurn) aSum += s.blood;
+                s.blood = 0;
+            }
+
             // --- 剣・盾の段 (2026-11-05) ---
             //   式は本体の効果クラスと同じ (WeaponFamilyEffects)。 これが無いと先読みは段が起きないものとして動く。
             bool split = aCount > 0 && bCount > 0, allAtk = aCount == _k, allBlk = bCount == _k;
@@ -1327,6 +1361,11 @@ namespace AutoTest
 
             s.pHp -= taken;
             if (s.pHp <= 0) return Loss;
+            if (_bloodEdict)
+            {
+                if (bloodSpent >= ItemSystem.PassiveSkills.Effects.BloodEdict.HealDiv && dealt > 0) s.pHp = Math.Min(_pMaxHp, s.pHp + bloodSpent / ItemSystem.PassiveSkills.Effects.BloodEdict.HealDiv);
+                if (taken > 0) s.blood += taken * ItemSystem.PassiveSkills.Effects.BloodEdict.StorePct / 100;
+            }
 
             // 盾〈城壁〉: 完全に受け止めたら、 余ったブロック × 率 がシールドへ
             if (_rung.bulwarkRate > 0f && bSum > 0)
@@ -1347,6 +1386,7 @@ namespace AutoTest
             s.eDef = _armor.EndOfTurn(s.eDef, dealt > 0);      // 割れる/積み上がる装甲
             s.shield /= 2;                                      // シールドは次のターンの頭に半減する
             s.streak = newStreak;
+            if (_stagPer > 0 && aCount < bCount && s.stag < ItemSystem.PassiveSkills.Effects.StagnantTime.StackCap) s.stag++;   // ヴェスカ〈停滞する時間〉: 守りに寄せたターン
             s.turn++;
             return Ongoing;
         }
@@ -1426,6 +1466,7 @@ namespace AutoTest
 
                 int eTotal = 0;
                 for (int i = 0; i < _eDiceCount; i++) eTotal += _rng.Next(1, _eRollMax + 1);
+                eTotal += s.stag * _stagPer;      // ヴェスカ〈停滞する時間〉: 敵の出目の合計に乗る (本体と同じ・倍率の前)
                 int enemyAtk = Math.Max(0, (int)Math.Round(
                     Escalation.GetMultiplier(_escProfile, s.turn) * (_eBaseAtk + eTotal) * _armor.AttackFactor(s.turn)));
 
@@ -1558,7 +1599,7 @@ namespace AutoTest
 
             int midTurn = s.turn + (int)Math.Min(12f, ttk * 0.5f);
             float eAtk = Escalation.GetMultiplier(_escProfile, midTurn)
-                       * (_eBaseAtk + _eDiceCount * (_eRollMax + 1) * 0.5f) * _armor.AvgCycleFactor();
+                       * (_eBaseAtk + _eDiceCount * (_eRollMax + 1) * 0.5f + s.stag * _stagPer) * _armor.AvgCycleFactor();
             float hisDps = Math.Max(0f, (eAtk - expBlkSum)) * _takenMul;
             // **「いま防げている」は「ずっと防げる」ではない。**
             //   ブロックはダイス由来でほぼ一定なのに、 敵攻撃はエスカレーションで伸び続ける
@@ -1645,6 +1686,7 @@ namespace AutoTest
             w._eMaxHp = _eMaxHp; w._escProfile = _escProfile;
             w._heavyPeriod = _heavyPeriod; w._heavyMul = _heavyMul; w._heavyWindupMul = _heavyWindupMul;
             w._armor = _armor; w._eDef0 = _eDef0;
+            w._stagPer = _stagPer; w._bloodEdict = _bloodEdict; w._decTurn = _decTurn; w.noStagWire = noStagWire;
             w._isBoss = _isBoss;
             w._termCap = _termCap; w._specialLimit = _specialLimit;
             w._chargeMax = _chargeMax; w._chargePerTurn = _chargePerTurn;
@@ -1714,6 +1756,12 @@ namespace AutoTest
         /// **提案しても本体が追い出す**ので、 候補から外さないと探索がずれる。</summary>
         private bool UsesSealed(DiceTerminal[] w)
         {
+            if (noStagWire && _stagPer > 0)
+            {
+                int a = 0, b = 0;
+                for (int i = 0; i < _k; i++) { if (w[i] == DiceTerminal.Attack) a++; else if (w[i] == DiceTerminal.Block) b++; }
+                if (a < b) return true;
+            }
             if (_sealedNow < 0) return false;
             for (int i = 0; i < _k; i++) if ((int)w[i] == _sealedNow) return true;
             return false;
