@@ -372,6 +372,7 @@ namespace UI.Game2D.Battle
         private void TakeBoard(CombatManager cm)
         {
             board.Clear(); if (cm.TerminalDeck != null) board.AddRange(cm.TerminalDeck.board);
+            boardSerial++;
             lastOutcome = null; preview = null;      // 前のターンの結果は前の場の添字なので持ち越さない
             for (int i = 0; i < 3; i++) if (slot[i] >= board.Count) slot[i] = -1;
         }
@@ -427,6 +428,57 @@ namespace UI.Game2D.Battle
                 default: return TerminalCards.CondOk(d.cond, v);
             }
         }
+
+        /// <summary>端子 s にあと何個挿せるか (挿せる数 − 今挿している出目の数)。</summary>
+        public int Remaining(int s)
+        {
+            var d = s >= 0 && s < board.Count ? TerminalCards.Get(board[s]) : null; if (d == null) return 0;
+            int n = 0; for (int i = 0; i < 3; i++) if (slot[i] == s) n++;
+            return Mathf.Max(0, d.capacity - n);
+        }
+
+        /// <summary>出目 die へ端子 s を挿せるか (画面のドラッグ用)。 fromDie = つかんで動かしている元の出目 (手札からなら −1)。
+        /// die に別の端子が挿さっていれば入れ替え (前の端子は手札へ戻る) とみなす。</summary>
+        public bool CanPlug(int die, int s, int fromDie = -1)
+        {
+            if (!CanOperate || die < 0 || die > 2 || s < 0 || s >= board.Count) return false;
+            int keepFrom = fromDie >= 0 && fromDie <= 2 ? slot[fromDie] : -1, keepDie = slot[die];
+            if (fromDie >= 0 && fromDie <= 2) slot[fromDie] = -1;
+            slot[die] = -1;
+            bool ok = Accepts(die, s);
+            slot[die] = keepDie; if (fromDie >= 0 && fromDie <= 2) slot[fromDie] = keepFrom;
+            return ok;
+        }
+
+        /// <summary>出目 die へ端子 s を挿す (fromDie からの移動なら元を外す)。 挿せなければ false (何も変えない)。</summary>
+        public bool Plug(int die, int s, int fromDie = -1)
+        {
+            if (!CanPlug(die, s, fromDie)) return false;
+            if (fromDie >= 0 && fromDie <= 2 && fromDie != die) slot[fromDie] = -1;
+            slot[die] = s;
+            var d = TerminalCards.Get(board[s]);
+            Game2DSfx.Play("wire", 1f, d != null ? 1f + (int)d.kind * 0.12f : 1f);
+            RecomputePreview(); Touch();
+            return true;
+        }
+
+        /// <summary>出目 die から端子を外す (手札へ戻す)。</summary>
+        public void Unplug(int die)
+        {
+            if (!CanOperate || die < 0 || die > 2 || slot[die] < 0) return;
+            slot[die] = -1; Game2DSfx.Play("wire", 1f, 0.85f);
+            RecomputePreview(); Touch();
+        }
+
+        /// <summary>まだ端子 s を挿していない出目のどれかに、 s を挿せるか (手札の USB の明暗)。</summary>
+        public bool HandFits(int s)
+        {
+            for (int i = 0; i < 3; i++) if (slot[i] != s && CanPlug(i, s)) return true;
+            return false;
+        }
+
+        /// <summary>場が新しくなるたびに増える (画面が引いてくる動きを始める合図)。</summary>
+        public int boardSerial;
 
         /// <summary>今の出目のどれかを端子 s に挿せるか (もう挿している出目があれば true)。 画面が挿せない端子を暗くするのに使う。</summary>
         public bool AnyDieFits(int s)
