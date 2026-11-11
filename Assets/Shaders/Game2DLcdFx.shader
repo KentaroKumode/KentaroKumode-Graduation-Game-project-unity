@@ -10,6 +10,7 @@ Shader "Game2D/LcdFx"
         _Ground ("地の色 (ビネット)", Color) = (0.043, 0.039, 0.035, 1)
         _Vignette ("ビネットの濃さ (四隅での地の色の混ざり具合)", Range(0, 1)) = 0.45
         _Cool ("寒色の乗算 (航行のクリーム色の線を白へ寄せる・赤を落とす)", Color) = (0.90, 0.93, 1.0, 1)
+        _Bright ("明るさ (設定の画面が入れる・1 = そのまま・2 まで)", Range(0, 2)) = 1
     }
     SubShader
     {
@@ -44,16 +45,18 @@ Shader "Game2D/LcdFx"
         }
 
         // 寒色の乗算 (2026-11-02 に戻した): 航行の線・ノードは生成り (黄みの白) で描いてあるので、 赤を少し落として白へ寄せる。 外すとクリーム色に見える
+        //   明るさ (設定・2026-11-11) も同じ乗算に載せる。 1 より明るくもできるよう 2 倍の乗算 (結果 = 下地 × 出力 × 2) にして、 出力は半分で返す
         Pass
         {
-            Blend DstColor Zero
+            Blend DstColor SrcColor
             CGPROGRAM
             #pragma vertex vert2
             #pragma fragment frag2
             #include "UnityCG.cginc"
             fixed4 _Cool;
+            float _Bright;
             float4 vert2 (float4 v : POSITION) : SV_POSITION { return UnityObjectToClipPos(v); }
-            fixed4 frag2 () : SV_Target { return fixed4(_Cool.rgb, 1); }
+            fixed4 frag2 () : SV_Target { return fixed4(saturate(_Cool.rgb * _Bright * 0.5), 1); }
             ENDCG
         }
     }

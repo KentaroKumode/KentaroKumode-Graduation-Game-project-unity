@@ -53,6 +53,8 @@ namespace UI.Game2D
         public bool sliders;
         /// <summary>スライダーの行の名前の欄の幅 (dot)。 分離式ボタンの行も同じ欄を使う。</summary>
         public int sliderNameW = 64;
+        /// <summary>スライダーのバーに段の区切りを描かない (段の多い目盛り ── 設定の 1〜100 など・2026-11-11)。</summary>
+        public bool sliderNoTicks;
         /// <summary>行を「名前・列にそろえた分離式ボタン・今の効果」で描く (jp・<see cref="ModalItem.segs"/> の行)。 ボタンを押すと onAction("seg", 行) が呼ばれ、
         /// 押した列は <see cref="Game2DModal.SegTarget"/> に入る (トグルは呼ぶ側が決める)。</summary>
         public bool segments;
@@ -100,6 +102,10 @@ namespace UI.Game2D
             return Mathf.Min(266, y + rows * (RowH + Gap) + 4 + 28 + 12 + 22 + Inset + 4);
         }
         public bool IsOpen => _open;
+        /// <summary>いま出している中身 (どの画面が窓を使っているかを見分ける・2026-11-11)。</summary>
+        public ScreenDef Current => _def;
+        /// <summary>選んでいる行 (キーで値を動かす画面が読む・2026-11-11)。</summary>
+        public int Selected => _sel;
 
         /// <summary>見た目を作る (builder から 1 度呼ぶ)。 親は 480×270 の格子の枠。</summary>
         public void Build()
@@ -410,7 +416,7 @@ namespace UI.Game2D
             p.Box(bar.x, bar.y, bar.width, bar.height, Game2DKit.Dark, Game2DKit.Faint);
             int fill = (bar.width - 2) * it.count / it.max;
             if (fill > 0) p.Rect(bar.x + 1, bar.y + 1, fill, bar.height - 2, Game2DKit.Gold);
-            for (int k = 1; k < it.max; k++) { int tx = bar.x + 1 + (bar.width - 2) * k / it.max; p.Rect(tx, bar.y + 1, 1, bar.height - 2, k < it.count ? new Color32(0x8a, 0x70, 0x22, 255) : Game2DKit.Off); }
+            if (!d.sliderNoTicks) for (int k = 1; k < it.max; k++) { int tx = bar.x + 1 + (bar.width - 2) * k / it.max; p.Rect(tx, bar.y + 1, 1, bar.height - 2, k < it.count ? new Color32(0x8a, 0x70, 0x22, 255) : Game2DKit.Off); }
             int kx = Mathf.Clamp(bar.x + 1 + fill - 2, bar.x - 1, bar.x + bar.width - 3);
             p.Box(kx, bar.y - 3, 4, bar.height + 6, sel ? Game2DKit.Amber : Game2DKit.Ink, Game2DKit.Dark);
             x += barW + 10;

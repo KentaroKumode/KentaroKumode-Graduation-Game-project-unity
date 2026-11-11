@@ -7,7 +7,8 @@ namespace Codex
 {
     /// <summary>
     /// 読み物（WorldVignettes）の解禁判定 + メタ永続状態への読み書き。
-    /// MonoBehaviour 非依存。UI は別途実装。
+    /// MonoBehaviour 非依存。 画面は UI.Game2D.Game2DCodexPanel (タイトルの GALLERY・2026-11-11)。
+    /// 段の定義と割り当て表は docs/GAME.md §20「codex の解禁」。
     ///
     /// 永続化は MetaProgressState に追加した並列リストフィールドを介して
     /// MetaProgressManager.Save() / Load() に乗せる。
@@ -82,8 +83,38 @@ namespace Codex
                 case WorldVignettes.UnlockTier.AllEndingsMaxDifficulty:
                     return AllEndingsMaxDifficultyCleared(meta);
 
+                case WorldVignettes.UnlockTier.ReachFloor:
+                    return CodexRecord.FloorReached(cond.floor) || CodexRecord.DeepestFloor() >= cond.floor;
+
+                case WorldVignettes.UnlockTier.AnyEnding:
+                    foreach (var id in EndingIds) if (GetClearCount(meta, id) >= 1) return true;
+                    return false;
+
+                case WorldVignettes.UnlockTier.AllEndings:
+                    foreach (var id in EndingIds) if (GetClearCount(meta, id) < 1) return false;
+                    return true;
+
                 default:
                     return false;
+            }
+        }
+
+        /// <summary>今ある結末 (到達不能の end4 を除く)。 <see cref="WorldVignettes.UnlockTier.AnyEnding"/> / <see cref="WorldVignettes.UnlockTier.AllEndings"/> が数える。</summary>
+        private static readonly string[] EndingIds = { Endings.End1.id, Endings.End2.id, Endings.End3.id, Endings.EndGood.id, Endings.EndTrue.id };
+
+        /// <summary>伏せてある読み物に添える手がかり (結末の名前は出さない ── 題そのものが先読みになるので)。</summary>
+        public static string Hint(WorldVignettes.Vignette v)
+        {
+            var c = v?.condition; if (c == null) return "";
+            switch (c.tier)
+            {
+                case WorldVignettes.UnlockTier.AlwaysUnlocked: return "";
+                case WorldVignettes.UnlockTier.ReachFloor: return "もっと深くへ潜ると読める。";
+                case WorldVignettes.UnlockTier.AnyEnding: return "どれかの結末を見ると読める。";
+                case WorldVignettes.UnlockTier.AllEndings: return "すべての結末を見ると読める。";
+                case WorldVignettes.UnlockTier.FirstClear:
+                    return c.endingId == Endings.EndTrue.id || c.endingId == Endings.EndGood.id ? "最後の層の先で読める。" : "ある結末を見ると読める。";
+                default: return "ある結末を見ると読める。";
             }
         }
 

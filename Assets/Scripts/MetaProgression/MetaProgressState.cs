@@ -28,6 +28,15 @@ namespace MetaProgression
         /// <summary>最高難度クリア済エンドのIDリスト (要素が存在 = true)。</summary>
         public List<string> endingMaxDiffCleared = new List<string>();
 
+        // === 記録 (codex) の「出会った・手に入れた・着いた」 (#24・2026-11-11) ===
+        //   書くのは Codex.CodexRecord だけ (人が遊んでいる時だけ数える)。 解禁の判定は Codex.CodexRecord / VignetteUnlockState。
+        /// <summary>戦ったことのある敵の id。</summary>
+        public List<string> codexEnemies = new List<string>();
+        /// <summary>手に入れたことのある品の id (items.json の id = 表示名)。</summary>
+        public List<string> codexItems = new List<string>();
+        /// <summary>着いたことのある層 (Run.Depth)。</summary>
+        public List<int> codexFloors = new List<int>();
+
         // === Achievements (docs/achievements.md) ===
         // Parallel lists keep JsonUtility compatibility. IDs are stable strings.
         public List<string> unlockedAchievementIds = new List<string>();

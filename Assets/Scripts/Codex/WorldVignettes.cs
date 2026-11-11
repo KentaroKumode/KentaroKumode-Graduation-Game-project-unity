@@ -17,29 +17,30 @@ namespace Codex
 
         public enum VignetteId
         {
-            // 2026-07-28 再編: **初到達 / 3到達 の 2 段**に統一（中段「最高難度」は全廃）。
-            //   → codex は難度システムに一切依存しなくなった。§15-2 配点システムの実装を待たない。
-            //   End4 は敗北エンドのため 1 本のみ。
-            Prologue,          // ある朝            (常時開放)
+            // 2026-11-11 (#24) 再編: **重大な内容ほど後で開く**段に並べ直した (段の定義と割り当て表は docs/GAME.md §20「codex の解禁」)。
+            //   段 0 常時 / 段 1 ランの途中 (層に着く・敵に会う・品を得る ── 層・敵・品の項目は CodexRecord) / 段 2 結末を 1 つ見た /
+            //   段 3 結末ごとの初回 / 段 4 7 層の後 (見送り・帳尻) / 段 5 全部の結末を見た後。
+            //   旧: 結末の初回 / 3 回の 2 段で、 全部が結末の後だった。 「3 回」は使わなくなった (enum は残す)。
+            Prologue,          // ある朝            (段 0: 常時)
 
             // E1 英雄の帰還 ── 帰る
-            MinamiNoHashi,     // 南の端            (E1, 初到達)
-            Houskaku,          // 豊作              (E1, 3到達)
+            MinamiNoHashi,     // 南の端            (段 3: end1 初回)
+            Houskaku,          // 豊作              (段 2: どれかの結末を 1 つ見た)
 
             // E2 無明の剣 ── 帰らない
-            KimeteInai,        // 決めていない      (E2, 初到達)
-            ShiNoTsurugi,      // 師の剣            (E2, 3到達)
+            KimeteInai,        // 決めていない      (段 3: end2 初回)
+            ShiNoTsurugi,      // 師の剣            (段 3: end2 初回)
 
             // E3 空の玉座 ── 座る
-            MumeiNoKeisho,     // 玉座の番          (E3, 初到達)
-            Tomuraikin,        // 弔い金            (E3, 3到達)
+            MumeiNoKeisho,     // 玉座の番          (段 3: end3 初回・§19-9 の段 3「codex で明示」)
+            Tomuraikin,        // 弔い金            (段 1: Run.Depth 5〈審きの淵〉に着いた)
 
-            // E4 最後の見出し ── 留まる (7層で敗北)
-            ChousaHoukoku,     // 調査報告（第三次）(E4, 初到達・単一)
+            // 見送り (GOOD) ── 閉じなかった世界
+            ChousaHoukoku,     // 調査報告（第三次）(段 4: end_good 初回)
 
             // E5 終幕 ── 塞ぐ
-            TatamuJunban,      // 畳む順番          (E5, 初到達)
-            Ichimaime,         // 一枚目            (E5, 3到達)
+            TatamuJunban,      // 畳む順番          (段 4: end_true 初回)
+            Ichimaime,         // 一枚目            (段 5: 帳尻を含む全部の結末を見た ── 額縁が閉じる地点)
         }
 
         public enum UnlockTier
@@ -53,6 +54,12 @@ namespace Codex
             ThreeClears,
             /// <summary>[未使用] capstone 廃止に伴い参照無し。</summary>
             AllEndingsMaxDifficulty,
+            /// <summary>層 (Run.Depth = <see cref="UnlockCondition.floor"/>) に着いたことがある (2026-11-11)。</summary>
+            ReachFloor,
+            /// <summary>どれかの結末を 1 回見た (2026-11-11)。</summary>
+            AnyEnding,
+            /// <summary>帳尻 (end_true) を含む、 今ある全部の結末 (end1・end2・end3・end_good・end_true) を見た (2026-11-11)。</summary>
+            AllEndings,
         }
 
         public class UnlockCondition
@@ -60,6 +67,8 @@ namespace Codex
             /// <summary>"end1"〜"end5"。capstone は null。</summary>
             public string endingId;
             public UnlockTier tier;
+            /// <summary><see cref="UnlockTier.ReachFloor"/> の層 (Run.Depth)。</summary>
+            public int floor;
         }
 
         public class Vignette
@@ -217,7 +226,7 @@ namespace Codex
                     "鑑定所の台帳は、その年の分だけで、棚を二つ埋めた。\n" +
                     "誰もその台帳を、後年、読み返さなかった。\n" +
                     "その台帳がどこに行ったのかすら、もう誰も覚えていない。",
-                condition = new UnlockCondition { endingId = "end1", tier = UnlockTier.ThreeClears },
+                condition = new UnlockCondition { endingId = null, tier = UnlockTier.AnyEnding },      // 2026-11-11: 旧 end1 3 回
             },
 
             new Vignette
@@ -310,7 +319,7 @@ namespace Codex
                     "ただ、彼が深層を目指さなかったことだけは、噂で師の耳に届いた。剣は、ある日、稽古場の戸口に置かれていた。鞘は新しく整え直されていて、刃は変わらずに研がれていた。彼はもう要らないという伝言だけが、添えられていた。\n" +
                     "師は、その剣を、壁に戻した。\n" +
                     "次の弟子に渡す日のことを、もう、考え始めていた。",
-                condition = new UnlockCondition { endingId = "end2", tier = UnlockTier.ThreeClears },
+                condition = new UnlockCondition { endingId = "end2", tier = UnlockTier.FirstClear },      // 2026-11-11: 旧 end2 3 回
             },
 
             new Vignette
@@ -415,7 +424,7 @@ namespace Codex
                     "「辞めません」と彼女は応えた。\n" +
                     "「そう」と母親は言った。\n" +
                     "それきり、母親はその仕事のことを、彼女に訊かなかった。",
-                condition = new UnlockCondition { endingId = "end3", tier = UnlockTier.ThreeClears },
+                condition = new UnlockCondition { endingId = null, tier = UnlockTier.ReachFloor, floor = 5 },      // 2026-11-11: 旧 end3 3 回。 組合の話なので、 多くが引き返す層に着いた時
             },
 
             new Vignette
@@ -575,7 +584,7 @@ namespace Codex
                     "他に呼びようが無かった。",
                 // 『大穴』が書かれる ＝ 額縁が閉じる地点。 EndTrue にだけ接続する
                 //   (EndGood では本が書かれない ── それが GOOD END の代償)。
-                condition = new UnlockCondition { endingId = "end_true", tier = UnlockTier.ThreeClears },
+                condition = new UnlockCondition { endingId = null, tier = UnlockTier.AllEndings },      // 2026-11-11: 旧 end_true 3 回。 いちばん最後に開く
             },
         };
 

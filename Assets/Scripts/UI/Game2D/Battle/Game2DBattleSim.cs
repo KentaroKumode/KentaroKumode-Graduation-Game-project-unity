@@ -240,6 +240,7 @@ namespace UI.Game2D.Battle
 
         private void Keys()
         {
+            if (Game2DModal.Active) return;      // 窓 (敵の詳細・設定・道具) が出ている間は戦闘を進めない (2026-11-11)
             // Space は配線の決定だけ。 戦闘結果の確定は GameManager の Space が受ける (両方で受けると次のフェーズまで流れる)
             if (Input.GetKeyDown(KeyCode.Space) && phase == P.Wire) { GameManager.ScreenUsedSpaceFrame = Time.frameCount; Button(); }
             if (Input.GetKeyDown(KeyCode.E)) Reroll();

@@ -56,6 +56,10 @@ namespace UI
         [Tooltip("PlayerPrefs に保存する Key。 同一プロジェクトで複数 BGM 系統があれば変える。")]
         public string mutePrefKey = "TitleBgm.Muted";
 
+        /// <summary>実際に鳴らす音量 = Inspector の <see cref="volume"/> × 設定の BGM の音量 (<see cref="GameSettings"/>・2026-11-11)。
+        /// メインの音量は AudioListener 側で掛かる。</summary>
+        private float Vol => volume * GameSettings.Bgm01;
+
         public BgmMode CurrentMode { get; private set; } = BgmMode.Day;
         public BgmMode PreviousMode { get; private set; } = BgmMode.Day;
 
@@ -97,7 +101,7 @@ namespace UI
             if (c != null)
             {
                 _srcA.clip = c;
-                _srcA.volume = (fadeIn > 0f) ? 0f : volume;
+                _srcA.volume = (fadeIn > 0f) ? 0f : Vol;
                 _srcA.Play();
             }
         }
@@ -140,7 +144,7 @@ namespace UI
             {
                 _srcA.Stop();
                 _srcA.clip = next;
-                _srcA.volume = volume;
+                _srcA.volume = Vol;
                 if (next != null) _srcA.Play();
                 _xfActive = false;
                 return;
@@ -183,7 +187,7 @@ namespace UI
         {
             if (_srcA == null) _srcA = GetComponent<AudioSource>();
             ApplySpatialSettings();
-            if (_srcA != null && !(fadeIn > 0f && _fadeT < fadeIn) && !_xfActive) _srcA.volume = volume;
+            if (_srcA != null && !(fadeIn > 0f && _fadeT < fadeIn) && !_xfActive) _srcA.volume = Application.isPlaying ? Vol : volume;      // 編集中は設定 (PlayerPrefs) を読まない
         }
 
         private void Update()
@@ -203,8 +207,8 @@ namespace UI
             {
                 _xfT += Time.unscaledDeltaTime;
                 float t = Mathf.Clamp01(_xfT / Mathf.Max(0.0001f, crossfade));
-                _srcA.volume = Mathf.Lerp(volume, 0f, t);
-                _srcB.volume = Mathf.Lerp(0f, volume, t);
+                _srcA.volume = Mathf.Lerp(Vol, 0f, t);
+                _srcB.volume = Mathf.Lerp(0f, Vol, t);
                 if (t >= 1f)
                 {
                     _srcA.Stop();
@@ -219,11 +223,11 @@ namespace UI
             if (_srcA.isPlaying && fadeIn > 0f && _fadeT < fadeIn)
             {
                 _fadeT += Time.unscaledDeltaTime;
-                _srcA.volume = Mathf.Lerp(0f, volume, Mathf.Clamp01(_fadeT / fadeIn));
+                _srcA.volume = Mathf.Lerp(0f, Vol, Mathf.Clamp01(_fadeT / fadeIn));
             }
-            else if (_srcA.isPlaying && Mathf.Abs(_srcA.volume - volume) > 0.001f)
+            else if (_srcA.isPlaying && Mathf.Abs(_srcA.volume - Vol) > 0.001f)
             {
-                _srcA.volume = volume;
+                _srcA.volume = Vol;
             }
 
             // ミュート中は最終的に音量を 0 に上書き (フェード/クロスフェードの値を尊重したまま消音)

@@ -137,7 +137,9 @@ namespace UI.Codex
             _wired = false;
         }
 
-        private void HandleGalleryClick() { if (_mode == Mode.Closed) Open(); }
+        /// <summary>タイトルの「GALLERY」。 Game2D の記録の窓 (<see cref="Game2D.Game2DCodexPanel"/>・未解禁は伏せ字) を開く (2026-11-11〜)。
+        /// 窓が開けない環境 (Game2D の GUI が無い) でだけ、 この旧い閲覧画面 (TMP・debugUnlockAll で全部読める) を開く。</summary>
+        private void HandleGalleryClick() { if (_mode != Mode.Closed) return; if (Game2D.Game2DCodexPanel.Open()) return; Open(); }
 
         // ----------------------------------------------------------------
         //  Open / Close
