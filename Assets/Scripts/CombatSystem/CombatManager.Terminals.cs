@@ -99,7 +99,6 @@ namespace CombatSystem
             }
             if (o.poison > 0) ItemSystem.PassiveSkills.Effects.Rw.Poison(ctx, o.poison);
             if (o.heat > 0) { ItemSystem.PassiveSkills.Keywords.Kw.EnableHeat(ctx); ItemSystem.PassiveSkills.Keywords.Kw.AddHeat(ctx, o.heat); }
-            if (o.escalationDelay > 0) YachtRoleEffects.AddEscalationDelay(ctx, o.escalationDelay);
             if (o.retreatStage) YachtRoleEffects.AddEscalationDelay(ctx, YachtRoleEffects.TurnsToRetreatOneStage(ctx));
             if (o.enemyStunNext) ctx.nextTurnBuffs[YachtRoleEffects.EnemyStunKey] = 1f;
             if (o.ignoreDefense) ctx.playerArmorPen += DefenseFormula.IgnoreAll;

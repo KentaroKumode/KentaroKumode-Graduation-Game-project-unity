@@ -796,8 +796,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            shieldSpend    → ctx.consShield = max(0, consShield − 量) (〈盾押し口〉が攻撃に足した分・shield より先に引く)
            shield         → ctx.consShield += 量 (shieldGainedTotal にも足す)
            poison         → Rw.Poison(ctx, 量)       heat → Kw.EnableHeat + Kw.AddHeat(ctx, 量)
-           escalationDelay→ YachtRoleEffects.AddEscalationDelay (CoolantDelayKey・役〈時間〉と同じキー)。 2026-11-11〜 これを立てる端子は無い
-           retreatStage   → AddEscalationDelay(TurnsToRetreatOneStage) (段階を 1 つ戻す・〈冷却弾〉と、 溜まりが CoolantNeed に届いた〈冷却材〉)
+           retreatStage   → AddEscalationDelay(TurnsToRetreatOneStage) (段階を 1 つ戻す・〈冷却弾〉と、 溜まりが CoolantNeed に届いた〈冷却材〉。 遅延のキーは CoolantDelayKey・役〈時間〉と共有)
            enemyStunNext  → nextTurnBuffs[EnemyStunKey] (次のターン敵は行動しない)
            ignoreDefense  → ctx.playerArmorPen += DefenseFormula.IgnoreAll
            forceCrit      → ctx.forceCritical = true       critMultAdd → ctx.criticalMultiplier += 量 (毎ターン組み直されるのでこのターンだけ)

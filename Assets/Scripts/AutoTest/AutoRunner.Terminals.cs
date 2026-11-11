@@ -37,7 +37,7 @@ namespace AutoTest
         /// <summary>エスカレーションを 1 ターン遅らせる価値 = 敵の攻撃の 1 割 × 残りターン (1 段の伸びを 1 割と見る・先の HP なので割り引く)。
         /// 〈冷却弾〉(段階を 1 つ戻す) はその 2 倍と見る。</summary>
         private const float DeckEscStepShare = 0.1f, DeckRetreatTurns = 2f;
-        /// <summary>次のターンに効く補助 (与ダメ相当): 条件を無視 (〈予熱器〉) 3 / 1 枚多く引く (〈配電盤〉) 4 / 手札に残す (〈保持器〉) 2。</summary>
+        /// <summary>次のターンに効く補助 (与ダメ相当): 条件を無視 (〈予熱器〉) 3 / 多く引く 1 枚につき 4 (〈配電盤〉は SwitchboardDraw 枚) / 手札に残す (〈保持器〉) 2。</summary>
         private const float DeckPreheatDmg = 3f, DeckDrawDmg = 4f, DeckRetainDmg = 2f;
         /// <summary>〈写し取り〉: 基本以外を複製 6 / 基本を複製 1。 〈焼き切り〉: 基本を抜く 6 (山札が締まる) / 基本以外を抜く −4 (与ダメ相当)。</summary>
         private const float DeckCopyGoodDmg = 6f, DeckCopyBasicDmg = 1f, DeckBurnBasicDmg = 6f, DeckBurnGoodDmg = -4f;
@@ -113,8 +113,7 @@ namespace AutoTest
             }
             // 〈鋳造口〉が発動した: この戦闘中の出目 +1 (個数 × 残りターン・攻撃に挿す割合を 7 割と見る)
             flat += (after.foundryBonus - before.foundryBonus) * k * turns * DeckFutureAttackShare * dw;
-            // エスカレーションの遅れ (〈冷却材〉) / 段階を戻す (〈冷却弾〉)
-            flat += o.escalationDelay * escDelayWorth;
+            // エスカレーションの段階を戻す (〈冷却弾〉・溜まり切った〈冷却材〉)
             if (o.retreatStage) flat += DeckRetreatTurns * escDelayWorth;
             // 次のターンの補助
             if (after.ignoreCondNext && !before.ignoreCondNext) flat += DeckPreheatDmg * dw;

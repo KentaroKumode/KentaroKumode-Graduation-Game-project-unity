@@ -76,8 +76,6 @@ namespace CombatSystem
         public int oscLast, oscStreak;
         /// <summary>基本以外の端子の発動の累計 (〈計数器〉)。</summary>
         public int firedTotal;
-        /// <summary>〈計数器〉で積んだ与ダメージ (+10% × 段)。</summary>
-        public int counterStacks;
         /// <summary>このターン / 次のターン、 出目の条件を無視する (〈予熱器〉)。</summary>
         public bool ignoreCond, ignoreCondNext;
         /// <summary>次に攻撃するターンの攻撃に足す量 (〈蓄電器〉)。 / 次のターンから使える分 (〈受け太刀〉)。</summary>
@@ -145,7 +143,6 @@ namespace CombatSystem
         public int shieldSpend;
         public bool chargeFill;
         public int poison, heat, bleedOnHit;
-        public int escalationDelay;
         public bool retreatStage, enemyStunNext, ignoreDefense;
         /// <summary>このターンに発動した端子 (場の添字)。</summary>
         public readonly List<int> fired = new List<int>();
@@ -533,7 +530,13 @@ namespace CombatSystem
             switch (id)
             {
                 // 基本
-                case TerminalIds.Attack: o.attackAdd += sum; break;
+                case TerminalIds.Attack:
+                // 出目をそのまま攻撃に入れるだけの端子。 上乗せは別の所で付く:
+                //   研磨盤 = 解決の前に他の出目 +1 / 継電器 = 下の「6. 他の端子を見る効果」/ 計数器 = 本体 (DrawTerminalHand) /
+                //   収穫機・戦利品箱 = 撃破した時 (CombatManager.FinishTerminalTurn)
+                case TerminalIds.Relay: case TerminalIds.Grinder: case TerminalIds.Twin: case TerminalIds.Counter:
+                case TerminalIds.Harvester: case TerminalIds.LootBox:
+                    o.attackAdd += sum; break;
                 case TerminalIds.Block: o.blockAdd += sum; break;
                 case TerminalIds.Charge: o.chargeAdd += sum; break;
                 // コモン
@@ -545,8 +548,6 @@ namespace CombatSystem
                     int self = Math.Min(sum, Math.Max(0, env.hp - 1 - o.selfDamage));
                     o.selfDamage += self; o.attackAdd += sum * DeathwishMul; break;
                 }
-                case TerminalIds.Relay: o.attackAdd += sum; break;                 // +8 × 他の発動は後で
-                case TerminalIds.Grinder: o.attackAdd += sum; break;               // 他の出目 +1 は先に済み
                 case TerminalIds.Oscillator:
                     // 連続は 1 ターンに 1 つだけ進める (〈倍電圧〉で効果が 2 回走っても、 2 回目は同じ連続回数で足すだけ)
                     if (!o.oscCounted)
@@ -555,7 +556,6 @@ namespace CombatSystem
                         st.oscLast = sum; o.oscCounted = true;
                     }
                     o.attackAdd += sum + OscPerStreak * st.oscStreak; break;
-                case TerminalIds.Twin: o.attackAdd += sum; break;
                 case TerminalIds.Fuse: o.blockAdd += FuseBlock; break;
                 case TerminalIds.Ground: o.takenMul *= 1f - GroundCutPct / 100f; break;
                 case TerminalIds.Insulator: o.shield += sum + InsulatorBonus; break;
@@ -566,7 +566,6 @@ namespace CombatSystem
                 case TerminalIds.Heal: o.heal += sum * HealMul; break;
                 case TerminalIds.Capacitor: st.storedAttack += CapacitorAttack * Gauge(st, id, sum, CapacitorNeed); break;
                 case TerminalIds.Arrester: if (Gauge(st, id, sum, ArresterNeed) > 0) o.takenMul *= 0.5f; break;
-                case TerminalIds.Transformer: break;                               // 後で
                 case TerminalIds.Switchboard: st.extraDrawNext += SwitchboardDraw; break;
                 // レア
                 case TerminalIds.Amplifier: o.damageMul *= 1f + AmplifierPerPip * sum; break;
@@ -574,15 +573,11 @@ namespace CombatSystem
                 case TerminalIds.Resonator: o.damageMul *= ResonatorMul; break;
                 case TerminalIds.Foundry: st.foundryBonus += Gauge(st, id, sum, FoundryNeed); break;
                 case TerminalIds.Coolant: if (Gauge(st, id, sum, CoolantNeed) > 0) o.retreatStage = true; break;
-                case TerminalIds.Counter: o.attackAdd += sum; break;
                 case TerminalIds.Preheater: o.blockAdd += sum; st.ignoreCondNext = true; break;
                 case TerminalIds.Mains: o.attackAdd += sum + MainsPerUse * st.mainsUses; st.mainsUses++; break;
                 case TerminalIds.TwinShot: o.attackAdd += sum * TwinShotMul; break;
-                case TerminalIds.Harvester: o.attackAdd += sum; break;
                 case TerminalIds.Whet: o.attackAdd += sum + env.whetBonus; break;
-                case TerminalIds.LootBox: o.attackAdd += sum; break;
-                case TerminalIds.Stripper: break;
-                case TerminalIds.Doubler: break;
+                // 変圧器 (6. で足す)・剥ぎ取り (撃破した時)・倍電圧 (5. の頭で見る) は、 ここでは何もしない
                 case TerminalIds.Retainer: o.blockAdd += sum; o.retainTarget = empty(slot); break;
                 case TerminalIds.StopSignal: o.enemyStunNext = true; break;
                 case TerminalIds.Fork: o.attackAdd += sum; o.blockAdd += sum; break;
