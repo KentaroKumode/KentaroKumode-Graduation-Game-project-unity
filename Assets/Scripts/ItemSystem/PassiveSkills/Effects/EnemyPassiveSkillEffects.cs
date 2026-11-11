@@ -15,8 +15,11 @@ namespace ItemSystem.PassiveSkills.Effects
     //     OnRollLose = プレイヤーの収支プラス (CombatManager.Turn.cs の収支トリガー)。
     //     下の要約に残る「ロール勝利時/敗北時」はこの意味に読み替える。
     //     敵視点の playerDiceTotal / enemyDiceTotalBonus への加算は、 敵の攻撃 +N としてそのまま入る (Escalation.EnemyAttackValue)。
-    //  ※ 2026-11-11 (#30) の記述監査で「相互攻撃モデルでは効いていない疑い」が出たものには
-    //     [不発の疑い] を付けた。 ロジックは触っていない (直すとバランスが動く)。
+    //  ※ 2026-11-11 (#30 / #104) の記述監査で、 相互攻撃モデルでの実挙動を追い切った印を付けた:
+    //     [不発・確定] 読み手が無い・トリガーが敵の側で鳴らない・書いた値が読まれる前に消える /
+    //     [向きが逆・確定] [漏れ・確定] 効き先が説明と逆、 またはプレイヤーにも乗る /
+    //     [積み上がり・確定] 説明より多く積み上がる / [疑い] 実機で確かめないと決着しない。
+    //     ロジックは触っていない (直すとバランスが動く)。
     // ============================================================
 
     // ----------------------------------------------------------
@@ -24,7 +27,7 @@ namespace ItemSystem.PassiveSkills.Effects
     // ----------------------------------------------------------
 
     /// <summary>罠師 — ロール勝利時、次ターン相手のダイス合計値-1
-    /// <para>[不発の疑い・逆向き] <c>nextTurnBuffs["enemyDiceDebuff"]</c> は視点スワップされない共有バフで、
+    /// <para>[向きが逆・確定] <c>nextTurnBuffs["enemyDiceDebuff"]</c> は視点スワップされない共有バフで、
     /// 次ターンの <c>PassiveSkillManager.RecomputeDiceTotals</c> (プレイヤー視点) が**実際の敵**の enemyDiceTotal から引く。
     /// つまりこの敵自身の攻撃が −1 される。 〈呪縛〉(Curse) も同じ。</para></summary>
     public class Trapper : IPassiveSkillEffect
@@ -68,7 +71,7 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>剛力 — ロール勝利時、ダメージ+2
-    /// <para>[不発の疑い] 敵の OnPreDealDamage は CombatManager.Turn.cs の敵攻撃の直前で鳴るが、 その時点の
+    /// <para>[不発・確定] 敵の OnPreDealDamage は CombatManager.Turn.cs の敵攻撃の直前で鳴るが、 その時点の
     /// playerWonRoll はプレイヤー攻撃用に true のまま (スワップ後 false) で条件が立たない。 立っても、 直後の
     /// <c>ProcessDamage(lossBase, …)</c> が finalDamage を上書きするので届かない。 〈闇技〉(EliteDarkKnight) も同じ。</para></summary>
     public class BruteForce : IPassiveSkillEffect
@@ -86,7 +89,7 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>飛翔 — 追撃ダメージを受けない
-    /// <para>[不発の疑い] OnPrePursuitDamage はプレイヤー側の FireTrigger (ProcessDamage 内) でしか鳴らず、
+    /// <para>[不発・確定] OnPrePursuitDamage はプレイヤー側の FireTrigger (ProcessDamage 内) でしか鳴らず、
     /// FireEnemyTrigger では一度も焚かれない。 〈不動〉(Immovable) も同じ。</para></summary>
     public class Flight : IPassiveSkillEffect
     {
@@ -151,7 +154,7 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>尾撃 — ロール敗北時、相手に1の固定ダメージ
-    /// <para>[不発の疑い] 敵の OnRollLose は収支トリガーでターン解決の**後**に鳴る。 ここで積んだ
+    /// <para>[不発・確定] 敵の OnRollLose は収支トリガーでターン解決の**後**に鳴る。 ここで積んだ
     /// fixedDamageToPlayer (スワップ後の fixedDamageToEnemy) を読むのは敵攻撃の解決中だけで、
     /// 次の BeginNewTurn で 0 に戻る ── 入らない。 〈地獄の業火〉〈重甲〉の反射も同じ。</para></summary>
     public class TailStrike : IPassiveSkillEffect
@@ -166,7 +169,7 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>暴走 — ロール敗北時、次ターンのダイス合計値+3
-    /// <para>[不発の疑い・逆向き] <c>nextTurnBuffs["diceBonus"]</c> は共有バフで、 次ターンの RecomputeDiceTotals が
+    /// <para>[向きが逆・確定] <c>nextTurnBuffs["diceBonus"]</c> は共有バフで、 次ターンの RecomputeDiceTotals が
     /// **プレイヤーの** playerDiceTotal に足す。 敵の攻撃には入らない。</para></summary>
     public class Rampage : IPassiveSkillEffect
     {
@@ -224,7 +227,7 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>反撃態勢 — ロール敗北時、次ターンのダメージ+3
-    /// <para>[不発の疑い・漏れ] <c>nextTurnBuffs["damageBonus"]</c> は共有バフで、 次ターンの ProcessDamage が
+    /// <para>[漏れ・確定] <c>nextTurnBuffs["damageBonus"]</c> は共有バフで、 次ターンの ProcessDamage が
     /// **プレイヤーの主攻撃にも**敵の攻撃にも +3 する (敵の側はブロックの後に足される)。</para></summary>
     public class CounterStance : IPassiveSkillEffect
     {
@@ -244,7 +247,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// によるこう着（長期戦）を、敵の決め手火力を逓増させて終局へ導く。
     /// 敵パッシブは敵視点で勝敗反転発火するため OnRollWin = 敵がロール勝利
     /// （＝敵が与ダメするターン）。T1-2:+0 / T3-5:+1 / T6-8:+2 / T9-11:+3 …
-    /// <para>[不発の疑い] 敵の OnRollWin は収支トリガーでターン解決の後に鳴る。 currentBuffs へ書いた値は
+    /// <para>[不発・確定] 敵の OnRollWin は収支トリガーでターン解決の後に鳴る。 currentBuffs へ書いた値は
     /// 次の BeginNewTurn が currentBuffs.Clear() で捨てるので、 どの攻撃にも乗らない。</para></summary>
     public class HoningDuel : IPassiveSkillEffect
     {
@@ -444,7 +447,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>精鋭リザードマン — 重甲: 防御さらに +4 (硬鱗と合わせて 8・ADR-0013)、 敗北時に固定 1 反射。
     /// 旧: 被弾時さらに −2 軽減。
-    /// <para>[不発の疑い] 反射の半分は〈尾撃〉と同じ理由で入らない (OnRollLose はターン解決の後)。 防御 +4 は効いている。</para></summary>
+    /// <para>[不発・確定] 反射の半分は〈尾撃〉と同じ理由で入らない (OnRollLose はターン解決の後)。 防御 +4 は効いている。</para></summary>
     public class EliteLizard : IPassiveSkillEffect
     {
         public const int Defense = 4;
@@ -512,7 +515,7 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>精鋭ダークナイト — 闇技: 勝利時、与ダメ+2（4Fへ降格に伴いナーフ）
-    /// <para>[不発の疑い] 〈剛力〉と同じ理由 (OnPreDealDamage の時点で条件が立たず、 立っても上書きされる)。</para></summary>
+    /// <para>[不発・確定] 〈剛力〉と同じ理由 (OnPreDealDamage の時点で条件が立たず、 立っても上書きされる)。</para></summary>
     public class EliteDarkKnight : IPassiveSkillEffect
     {
         public string SkillId => "EliteDarkKnight";
@@ -526,7 +529,7 @@ namespace ItemSystem.PassiveSkills.Effects
     // ----------------------------------------------------------
 
     /// <summary>多頭攻撃 — ロール勝利時、追撃ダイスを1個追加
-    /// <para>[不発の疑い] <c>accumulatedValues["extraPursuitDice"]</c> を読む処理がどこにも無い。</para></summary>
+    /// <para>[不発・確定] <c>accumulatedValues["extraPursuitDice"]</c> を読む処理がどこにも無い。</para></summary>
     public class MultiHead : IPassiveSkillEffect
     {
         public string SkillId => "MultiHead";
@@ -567,7 +570,7 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>地獄の業火 — ロール勝利時、追加で2の固定ダメージ
-    /// <para>[不発の疑い] 〈尾撃〉と同じ理由 (OnRollWin はターン解決の後で、 積んだ固定ダメを読む処理が残っていない)。</para></summary>
+    /// <para>[不発・確定] 〈尾撃〉と同じ理由 (OnRollWin はターン解決の後で、 積んだ固定ダメを読む処理が残っていない)。</para></summary>
     public class Hellfire : IPassiveSkillEffect
     {
         public string SkillId => "Hellfire";
@@ -579,7 +582,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>吸血 — ダメージを与えた時、その50%分HPを回復</summary>
+    /// <summary>吸血 — ダメージを与えた時、その50%分HPを回復
+    /// <para>[不発・確定] (#104 で見つけた) 敵の OnPostDealDamage は CombatManager.Turn.cs の敵攻撃の末尾で鳴り、
+    /// 回復は ctx の HP (スワップ後の playerCurrentHP = 敵の ctx.enemyCurrentHP) にだけ書かれる。 その後
+    /// 同じターンのうちに CombatManager が <c>ctx.enemyCurrentHP = enemyHP</c> (自分のフィールド) で上書きし、
+    /// 間に ctx から enemyHP を拾う処理が無いので、 回復は消える。</para></summary>
     public class Lifesteal : IPassiveSkillEffect
     {
         public string SkillId => "Lifesteal";
@@ -641,7 +648,7 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>威圧+: 戦闘開始時に脅威(threat)を +3 する (ボスは BossParam.IntimidateThreat・基準 3)。
-    /// <para>[不発の疑い] 脅威の削りダメ (scratch) は相互攻撃モデルで廃止され、 threat は「baseAttack 未指定時の基礎攻撃値」
+    /// <para>[不発・確定] 脅威の削りダメ (scratch) は相互攻撃モデルで廃止され、 threat は「baseAttack 未指定時の基礎攻撃値」
     /// (EnemyData.EffectiveBaseAttack) にしか使われない。 <c>ctx.enemyThreat</c> を読む処理が無いので、 この加算は何にも効かない。
     /// 基礎攻撃値への統合は DAMAGE_CALC_REFERENCE §9.6 の宿題のまま。 〈威圧++〉も同じ。</para></summary>
     public class IntimidatePlus : IPassiveSkillEffect
@@ -1394,7 +1401,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>業火の予兆 — HP>50% は T1/5/9/13... の周期 4T、 HP≤50% は周期 3T で発動。
     /// 予兆ターンは敵の攻撃を上乗せ (BossParam.JudgmentDice・基準 +8)。 予告が前ターンに出るので配線で対策可能。
-    /// <para>[不具合の疑い] 上乗せは enemyDiceTotalBonus への `+=` で、 このフィールドは BeginNewTurn で戻らない。
+    /// <para>[積み上がり・確定] 上乗せは enemyDiceTotalBonus への `+=` で、 このフィールドは BeginNewTurn で戻らない。
     /// 予兆ターンが来るたびに +8 が戦闘終了まで積み上がる (〈焦土契約〉の差分更新が直した「雪だるま」と同じ形)。
     /// 〈憤怒の残滓〉も同じ。</para>
     /// 旧 JudgmentBlaze の即死一撃を「相互攻撃モデルで対応可能な予告火力」に転換。</summary>
@@ -1459,7 +1466,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// <summary>憤怒の残滓 (EmberFury) — 2026-07-16 追加。 HP≤50% のターン、 敵の攻撃 +<see cref="Bonus"/>。
     /// Phase2 突入で「再生ゼロ・高火力連打」の後半戦を演出する。
     /// EmberOmen (周期3Tに加速) + AshRegrowth (停止) と合わせて瞬発力勝負を強制。
-    /// <para>[不具合の疑い] enemyDiceTotalBonus への `+=` を毎ターン行うので、 HP≤50% のターンが続くと
+    /// <para>[積み上がり・確定] enemyDiceTotalBonus への `+=` を毎ターン行うので、 HP≤50% のターンが続くと
     /// +3 が積み上がる (「常時 +3」にはなっていない)。 〈業火の予兆〉の注記を参照。</para></summary>
     public class EmberFury : IPassiveSkillEffect
     {
@@ -1602,10 +1609,14 @@ namespace ItemSystem.PassiveSkills.Effects
     ///   各スタック効果: 形態1シールド初期 −28 (最低 28) / 形態1反撃 +7。
     ///   シールドが薄くなるほど往復は速くなるが、毎サイクル受ける反撃が重くなる
     ///   = "粘る者ほど無駄に身を削る" 罠。
-    /// <para>[不具合の疑い] 形態1の「ボスはダイスを振らない (0d0)」は <c>extraDice = −BaseDiceCount</c> で作っているが、
+    /// <para>[不発・確定] 形態1の「ボスはダイスを振らない (0d0)」は <c>extraDice = −BaseDiceCount</c> で作っているが、
     /// boss_layer5_hidden は攻撃ロール方式 (attackRollMax > 0) で、 <c>EnemyData.RollAttack</c> は引く回数を
     /// max(1, 1 + max(0, extra)) にするため負の値が効かない。 形態1でも基礎攻撃 + 攻撃ロールで普通に攻撃してくる。
-    /// enemies.json の旧記述にあった「4d6」も攻撃ロール方式では当たらない (攻撃ロール 2〜3)。</para></summary>
+    /// enemies.json の旧記述にあった「4d6」も攻撃ロール方式では当たらない (攻撃ロール 2〜3)。</para>
+    /// <para>[不発・確定] (#104 で見つけた) 形態1の反撃 (EnemyDealUnmitigable) と形態2の「ボスへ 15」は
+    /// OnRollLose (収支トリガー・ターン解決の後) で ctx の HP にだけ書かれる。 直後の FinishTurnCommon が
+    /// <c>ctx.playerCurrentHP = playerHP</c> / <c>ctx.enemyCurrentHP = enemyHP</c> で CombatManager の値に戻すので、
+    /// HP の増減は消える。 反撃をシールドが肩代わりした分 (consShield の減少) と、 シールドへの 25・形態の遷移は残る。</para></summary>
     public class SaintGeorgesPhases : IPassiveSkillEffect
     {
         public string SkillId => "SaintGeorgesPhases";
