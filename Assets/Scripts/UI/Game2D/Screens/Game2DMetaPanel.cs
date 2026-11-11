@@ -7,7 +7,7 @@ namespace UI.Game2D
     /// <summary>
     /// 整備パネル (docs/GAME.md §15-1) の窓 (<b>仮置き</b>・2026-11-04)。 タイトルの「SKILL TREE」から開く。
     /// トークンでポイントを買い、 トラックへ 1 段ずつ配る (拠点では無料で戻せる・全部戻せる)。 ゲームの処理は <see cref="MetaProgressManager"/> の既存の口だけ。
-    /// 頁: 数値系 8 本 (max 10・1 段 1pt) / 宣言系 6 本 (種火 4 + 端子 2・max 3・1 段 3pt)。 挑戦 (§15-2) は「挑戦」ボタンの窓 (<see cref="Game2DChallengePanel"/>) で選ぶ。
+    /// 頁: 数値系 8 本 (max 10・1 段 1 点) / 宣言系 7 本 (種火 5 本・1 段 2 点 + 端子 2 本・1 段 3 点・どれも max 3)。 費用の正本は <see cref="MetaPanel.RankCost"/>。 挑戦 (§15-2) は「挑戦」ボタンの窓 (<see cref="Game2DChallengePanel"/>) で選ぶ。
     /// <para>旧スキルツリーの BUFF 側は 2026-07-25 に廃止した 58 段の一直線トラックのままで、 今の配点はどこからもできなかった。</para>
     /// </summary>
     public static class Game2DMetaPanel
@@ -87,6 +87,25 @@ namespace UI.Game2D
             return "出やすい" + (r >= 2 ? "・" + r2 : "") + (MetaPanel.SparkStartingItemUnlocked(r) ? $"・開幕に {MetaPanel.SparkStartingItemCount} つ" : "");
         }
 
+        /// <summary>頁の 1 段あたりの費用の一文。 費用は <see cref="MetaPanel.RankCost"/> から取る (写しを持たない)。
+        /// 頁の中で費用が揃っていれば「1 段 N 点。」、 割れていれば「1 段: 種火 2 点・攻撃端子/防御端子 3 点。」。</summary>
+        private static string CostLine(Track[] tracks)
+        {
+            var groups = new List<(int cost, List<string> names)>();
+            foreach (var t in tracks)
+            {
+                int c = MetaPanel.RankCost(t.kind);
+                string label = MetaPanel.IsSpark(t.kind) ? "種火" : t.name;
+                var g = groups.Find(x => x.cost == c);
+                if (g.names == null) { g = (c, new List<string>()); groups.Add(g); }
+                if (!g.names.Contains(label)) g.names.Add(label);
+            }
+            if (groups.Count == 1) return "1 段 " + groups[0].cost + " 点。 ";
+            var parts = new List<string>();
+            foreach (var g in groups) parts.Add(string.Join("/", g.names) + " " + g.cost + " 点");
+            return "1 段: " + string.Join("・", parts) + "。 ";
+        }
+
         private static ScreenDef Build()
         {
             var mpm = MetaProgressManager.Instance; var st = mpm.State;
@@ -109,8 +128,7 @@ namespace UI.Game2D
             d.buttons.Add(new ModalBtn { label = "挑戦", action = "challenge" });
             d.buttons.Add(new ModalBtn { label = "遺物", action = "relic" });
             d.buttons.Add(new ModalBtn { label = "閉じる", action = "close" });
-            string per = _page == 1 ? "1 段 3pt。 " : "1 段 1pt。 ";
-            d.footer = per + "バーを押す・引いて段を決める (戻すのは無料)" + (mpm.IsPointCapReached ? "" : "。 pt はトークン " + cost + " で 1 つ");
+            d.footer = CostLine(tracks) + "バーを押す・引いて段を決める (戻すのは無料)" + (mpm.IsPointCapReached ? "" : "。 1 点はトークン " + cost + " で買える");
             d.onAction = (a, sel) =>
             {
                 var kind = sel >= 0 && sel < tracks.Length ? tracks[sel].kind : (MetaPanelKind?)null;
