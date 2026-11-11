@@ -54,6 +54,7 @@ namespace GameLoop
                 SetPhase(GamePhase.MapNavigation);
                 return;
             }
+            ee.TakePendingTurns();   // 前のイベントで進め損ねた分は持ち越さない
 
             // 6層の固定の点「裂け目の記録」は〈真理〉へ至る専用イベントにする (2026-09-28: 自由移動の層では
             //   「最初に踏んだイベントマス」ではなく生成時に決めた固定の点 ── MapNode.isFixedEvent)。
@@ -126,6 +127,8 @@ namespace GameLoop
             var ee = EventEncounter.Instance;
             if (ee?.Current == null) return;
             if (eventChoiceResolved) return;
+            // 払えないゴールドの選択肢は選べない (押されても何もしない・画面は暗く出す)
+            if (!EventEncounter.IsChoiceSelectable(ee.Current, index, Run)) return;
 
             var result = ee.ResolveChoice(index);
             eventChoiceResolved = true;
@@ -180,6 +183,21 @@ namespace GameLoop
             if (!eventChoiceResolved && !curNull) return;
             EventEncounter.Instance?.Clear();
             SetPhase(GamePhase.MapNavigation);
+            PassEventTurns();
+        }
+
+        /// <summary>イベントの選択肢が使ったターン (効果「ターン+N」) を、 地図へ戻ってから進める (2026-11-11・issue #17)。
+        ///
+        /// <para>口は休憩の「多めに回復」と同じ <see cref="MapSystem.FreeMove.FreeMapSim.PassTurnsExternal"/>。 その間に追跡者・使い魔・
+        /// 天候の前線が動き、 捕まれば追跡者の戦闘へ入る (<see cref="RunFreeMapOp"/> が処理する)。
+        /// 航行マップの無い層・戦闘の途中では何もしない (使わなかった分は捨てる)。</para></summary>
+        private void PassEventTurns()
+        {
+            var ee = EventEncounter.Instance;
+            int n = ee != null ? ee.TakePendingTurns() : 0;
+            if (n <= 0 || CurrentPhase != GamePhase.MapNavigation || FreeMap == null) return;
+            Log($"イベントで {n} ターンを使った");
+            RunFreeMapOp(s => s.PassTurnsExternal(n));
         }
 
         /// <summary>イベントから戦闘を開始する。</summary>

@@ -46,16 +46,18 @@ namespace AutoTest
                 // [アブレーション] イベントの選択判断を潰す (提示された選択肢から一様抽選)。
                 if (ablateEvent && cur.choices != null && cur.choices.Count > 1)
                     idx = AblationRng.Next(0, cur.choices.Count);
-                // Ultra: 選択肢に条件は無く (EventChoice は text/effects のみ)、
-                //   提示された分がそのまま合法手になる。
+                // Ultra: 提示された分を合法手として渡す。 選べるかの条件は払えないゴールドだけ
+                //   (2026-11-11・EventChoice.IsAvailable) で、 外れた手は直後に選べる手へ戻す。
                 idx = UltraOverrideChoice(gm,
                     AutoTest.Ultra.UltraDecisionPoint.EventChoice,
                     AutoTest.Ultra.UltraActionKind.ChooseEventOption,
                     BuildEventChoiceView(cur), idx);
+                // 払えないゴールドの選択肢は本体が受け付けない (押しても進まず詰まる) ので、 選べる手へ戻す
+                if (!EventEncounter.IsChoiceSelectable(cur, idx, gm.Run)) idx = PickSafeChoice(cur);
                 _lastResolvedEvent = cur;
                 // L1.5: イベント学習用に「id|choiceIndex」を記録
                 if (_cur != null && cur != null && !string.IsNullOrEmpty(cur.id))
-                    _cur.eventChoicesMade.Add(cur.id + "|" + idx);
+                    _cur.eventChoicesMade.Add(EventChoiceLearningStats.EventKey(cur.id) + "|" + idx);
                 gm.ResolveEventChoice(idx);
             }
             else
@@ -128,6 +130,7 @@ namespace AutoTest
                     {
                         for (int i = 0; i < def.choices.Count; i++)
                         {
+                            if (!EventEncounter.IsChoiceSelectable(def, i, run)) continue;
                             var txt = def.choices[i]?.text ?? "";
                             foreach (var kw in LeaveKeywords)
                                 if (txt.Contains(kw)) return i;
@@ -139,6 +142,10 @@ namespace AutoTest
             return 0;
         }
 
+        /// <summary>進路の近道 (<see cref="PickFlagProgressChoice"/>) を通さない数値スコアの下限。
+        /// 二撃で死ぬ (−60)・致死 (−400)・選べない (−10000) を弾き、 戦闘 (−8〜−35) は通す。 捕まる手は別に弾く。</summary>
+        private const float ProgressVetoScore = -50f;
+
         /// <summary>選択肢の効果を見て「フラグを進める」スコアを算出。
         /// いずれかの選択肢がプラスならその index を返し、なければ -1。
         /// 既存所持フラグを廃棄するだけの選択肢はマイナス点で忌避される。</summary>
@@ -149,6 +156,11 @@ namespace AutoTest
             int bestScore = 0;
             for (int i = 0; i < def.choices.Count; i++)
             {
+                if (!EventEncounter.IsChoiceSelectable(def, i, run)) continue;
+                // 進路でも、 選んだ直後に死ぬ・捕まって戦闘になる手は数値スコアラに任せる (2026-11-11)。
+                //   ここは数値を見ない近道なので、 ターンを使う選択肢を足した後は捕まる手を素通しで選んでしまう。
+                if (EventChoiceScorer.Score(def.choices[i], run) <= ProgressVetoScore) continue;
+                if (EventEncounter.WouldBeCaught(def.choices[i].TurnCost)) continue;
                 int s = ScoreFlagChoice(def.choices[i], run);
                 if (s > bestScore) { bestScore = s; bestIdx = i; }
             }
@@ -173,7 +185,10 @@ namespace AutoTest
                         break;
                     case EventSystem.EventEffectType.GainPassiveItem:
                     case EventSystem.EventEffectType.GainSpecificItem:
-                        // 名前付き / パッシブ獲得は基本的に進路系
+                        // **名前付きの品だけ**を進路とみなす (2026-11-11)。 旧: ランダムなパッシブ獲得も +60 で、
+                        //   「パッシブが付く選択肢はどんな代償でも選ぶ」近道になっていた (物資 −3 の強盗・3 ターンの立ち話も素通し)。
+                        //   ランダムなパッシブは数値スコアラ (V_GAIN_PASS) が代償と比べる。
+                        if (string.IsNullOrEmpty(eff.param)) break;
                         score += 60; hasGain = true;
                         break;
                     case EventSystem.EventEffectType.DiscardFlag:

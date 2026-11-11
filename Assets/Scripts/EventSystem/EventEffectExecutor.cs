@@ -18,6 +18,9 @@ namespace EventSystem
             public bool triggerCombat;
             public bool triggerEliteCombat;
             public bool triggerRandomEvent;
+            /// <summary>この選択で使うターン (効果「ターン+N」の合計)。 実行はここではせず、
+            /// イベントを閉じて地図へ戻った時に GameManager が進める (追跡者が動き、 捕まれば戦闘になる)。</summary>
+            public int turnsToPass;
             /// <summary>戦闘勝利後に再適用すべき効果（「勝利後...」プレフィックス付き）</summary>
             public List<EventEffect> postCombatEffects = new List<EventEffect>();
             /// <summary>UI 表示用ログ</summary>
@@ -130,12 +133,40 @@ namespace EventSystem
 
                 case EventEffectType.ProvisionDelta:
                 {
-                    int amount = GameLoop.ProvisionRules.FromLegacyEventAmount(eff.amount);   // 文面は旧単位のまま (イベント再編 #17 で書き直す)
-                    if (amount > 0) GameLoop.ProvisionSystem.Recover(run, amount);
-                    else if (amount < 0) GameLoop.ProvisionSystem.Reduce(run, -amount);
-                    result.log.Add($"物資{amount:+0;-0} (現在 {run.provision}/{run.provisionCap})");
+                    // 2026-11-11 (issue #17): 文面の値は今の単位 (1 歩 = 1) で書いてある。 旧単位からの読み替えは外した。
+                    int amount = eff.amount;
+                    if (amount > 0)
+                    {
+                        GameLoop.ProvisionSystem.Recover(run, amount);
+                        result.log.Add($"物資{amount:+0} (現在 {run.provision}/{run.provisionCap})");
+                    }
+                    else if (amount < 0)
+                    {
+                        // 足りない分は HP で払う (航行の「物資が足りない分は HP で払う」と同じ交換比)。
+                        //   **この効果では死なない** (HP は 1 で止まる)。 払えないから選べない、 にはしない ──
+                        //   物資が尽きている時ほど、 物資を払う選択が HP の選択に変わる。
+                        int need = -amount;
+                        int paid = System.Math.Min(need, run.provision);
+                        GameLoop.ProvisionSystem.Reduce(run, paid);
+                        int shortfall = need - paid;
+                        if (shortfall > 0)
+                        {
+                            int hpBefore = run.playerHP;
+                            int hpCost = shortfall * MapSystem.FreeMove.FreeMapParams.HpPerSupply;
+                            run.playerHP = Mathf.Max(1, run.playerHP - hpCost);
+                            GameLoop.HpOutsideDiag.Add("イベント:物資不足", hpBefore - run.playerHP);
+                            result.log.Add($"物資-{paid}、足りない {shortfall} を HP で払った (HP {hpBefore} → {run.playerHP})");
+                        }
+                        else
+                            result.log.Add($"物資-{paid} (現在 {run.provision}/{run.provisionCap})");
+                    }
                     break;
                 }
+
+                case EventEffectType.TurnsPass:
+                    result.turnsToPass += Mathf.Max(0, eff.amount);
+                    result.log.Add($"{eff.amount} ターンを使う");
+                    break;
 
                 case EventEffectType.MaterialDelta:
                     run.weaponMaterials = Mathf.Max(0, run.weaponMaterials + eff.amount);

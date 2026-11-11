@@ -8,7 +8,7 @@ namespace AutoTest
 {
     /// <summary>
     /// BOT 用イベント選択肢評価器。
-    /// 各選択肢の効果を数値スコアに変換し、現在の RunState（HP/空腹/コイン）で文脈補正する。
+    /// 各選択肢の効果を数値スコアに変換し、現在の RunState（HP/物資/コイン）と追跡の状況（ターンを使う選択肢）で文脈補正する。
     ///
     /// 設計方針:
     ///  - 「100G+物資損 vs なにもなし」は通常 100G を取る（ゴールド価値 > 物資コスト）
@@ -24,7 +24,23 @@ namespace AutoTest
         const float W_HP_GAIN    = 1.6f;
         const float W_HP_LOSS    = 1.8f;
         const float W_MAX_HP     = 2.6f;
-        const float W_HUNGER     = 0.35f;
+        /// <summary>物資 1 の値打ち (2026-11-11・今の単位 = 1 歩)。 店の値段は 2G (= 1.1 点) だが、 店の数は層に 1 つで
+        /// 足りない 1 は HP 5 (= 9 点) で払う ── その間に置く。 上限を超える分は 0。</summary>
+        const float W_PROVISION  = 3.0f;
+        /// <summary>この物資以下なら、 得る価値・失う痛みを 2 倍に見る (残り 3 歩)。</summary>
+        const int   PROVISION_LOW = 3;
+
+        // ===== ターンを使う選択肢 (2026-11-11・issue #17) =====
+        /// <summary>補足されていない時の 1 ターンの値段。 巡回中の追跡者がいる層は、 その場に留まると通りかかられる見込みがある。</summary>
+        const float V_TURN_FOE_PATROL = -1.0f;
+        /// <summary>追跡者のいない層 (または倒した後) の 1 ターン。 天候の前線が進むだけ。</summary>
+        const float V_TURN_NO_FOE     = -0.3f;
+        /// <summary>補足されているが、 使うターンの間には捕まらない時の 1 ターン (距離が詰まる)。</summary>
+        const float V_TURN_CHASED     = -3.0f;
+        /// <summary>使うターンの間に捕まる: 追跡者 (本体・猟犬) との戦闘。 勝てば物資 +6 とアイテムが入るので、 エリートの戦闘より少し軽く見る。</summary>
+        const float V_CAUGHT_BODY     = -18.0f;
+        /// <summary>使い魔に捕まる: その層の通常の敵 1 体 (物資は得ない)。</summary>
+        const float V_CAUGHT_FAMILIAR = -8.0f;
         const float W_MATERIAL   = 3.0f;
         const float V_TIMED_BUFF = +5.0f;
         const float V_TIMED_DEB  = -6.0f;
@@ -42,6 +58,8 @@ namespace AutoTest
         //  加点の最大は V_GAIN_FLAG(+30) なので、 この値ならどんな報酬でも覆せない。
         const float V_LETHAL_VETO = -400f;   // 選んだ直後の一撃で死ぬ
         const float V_FRAGILE     = -60f;    // 二撃で死ぬ
+        /// <summary>選べない選択肢 (払えないゴールド)。 致死の拒否権より下に置く。</summary>
+        public const float V_UNAVAILABLE = -10000f;
 
         /// <summary>〈観測所の写し〉の評価。 上乗せ (パッシブ×1+素材+8+金+60+全回復) は
         /// パッシブ 1 個 (V_GAIN_PASS=9) + 雑多 を足して 18 前後だが、
@@ -59,6 +77,8 @@ namespace AutoTest
         public static float Score(EventChoice choice, RunState run)
         {
             if (choice?.effects == null || choice.effects.Count == 0) return 0f;
+            // 払えないゴールドの選択肢は選べない (本体も弾く)。 どの加点でも覆らない値にする。
+            if (!choice.IsAvailable(run)) return V_UNAVAILABLE;
             float total = 0f;
             foreach (var e in choice.effects)
                 total += ScoreEffect(e, run);
@@ -80,15 +100,26 @@ namespace AutoTest
         {
             int hp = run.playerHP;
             int maxHp = UnityEngine.Mathf.Max(1, run.playerMaxHP);
-            foreach (var e in choice.effects) ApplyWorst(e, ref hp, ref maxHp);
+            int prov = run.provision;
+            foreach (var e in choice.effects) ApplyWorst(e, ref hp, ref maxHp, ref prov);
             return UnityEngine.Mathf.Clamp(hp, 0, maxHp);
         }
 
-        private static void ApplyWorst(EventEffect e, ref int hp, ref int maxHp)
+        private static void ApplyWorst(EventEffect e, ref int hp, ref int maxHp, ref int prov)
         {
             if (e == null) return;
             switch (e.type)
             {
+                case EventEffectType.ProvisionDelta:
+                case EventEffectType.HungerDelta:
+                    if (e.amount >= 0) { prov += e.amount; break; }
+                    {
+                        // 足りない分は HP で払う (本体: EventEffectExecutor・HP は 1 で止まる)
+                        int need = -e.amount, paid = UnityEngine.Mathf.Min(need, UnityEngine.Mathf.Max(0, prov));
+                        prov -= paid;
+                        if (need > paid) hp = UnityEngine.Mathf.Max(1, hp - (need - paid) * MapSystem.FreeMove.FreeMapParams.HpPerSupply);
+                    }
+                    break;
                 case EventEffectType.HpDelta:    hp = UnityEngine.Mathf.Clamp(hp + e.amount, 0, maxHp); break;
                 case EventEffectType.HpFullHeal: hp = maxHp; break;
                 case EventEffectType.HpSetTo:    hp = UnityEngine.Mathf.Clamp(e.amount, 0, maxHp); break;
@@ -100,14 +131,14 @@ namespace AutoTest
                 case EventEffectType.Probability:
                 {
                     if (e.branches == null || e.branches.Count == 0) return;
-                    int worst = int.MaxValue, worstMax = maxHp;
+                    int worst = int.MaxValue, worstMax = maxHp, worstProv = prov;
                     foreach (var br in e.branches)
                     {
-                        int h = hp, m = maxHp;
-                        foreach (var c in br) ApplyWorst(c, ref h, ref m);
-                        if (h < worst) { worst = h; worstMax = m; }
+                        int h = hp, m = maxHp, p = prov;
+                        foreach (var c in br) ApplyWorst(c, ref h, ref m, ref p);
+                        if (h < worst) { worst = h; worstMax = m; worstProv = p; }
                     }
-                    if (worst != int.MaxValue) { hp = worst; maxHp = worstMax; }
+                    if (worst != int.MaxValue) { hp = worst; maxHp = worstMax; prov = worstProv; }
                     break;
                 }
             }
@@ -137,10 +168,9 @@ namespace AutoTest
             int maxHP  = run != null ? UnityEngine.Mathf.Max(1, run.playerMaxHP) : 30;
             float hpPct = (float)hp / maxHP;
             int coins  = run != null ? run.coins : 0;
-            // 物資(ADR-0002): 飢餓を統合した精神ゲージ。低いほど回復価値↑・損失忌避↑。
+            // 物資: 移動の燃料 (1 歩 = 1)。 低いほど得る価値・失う痛みが大きい。
             int provisionVal = run != null ? run.provision : GameLoop.ProvisionRules.Max;
             int provisionCap = run != null ? UnityEngine.Mathf.Max(1, run.provisionCap) : GameLoop.ProvisionRules.Max;
-            float provisionPct = (float)provisionVal / provisionCap;
 
             switch (e.type)
             {
@@ -212,21 +242,25 @@ namespace AutoTest
                 case EventEffectType.MaxHpDelta:
                     return e.amount * W_MAX_HP;
 
-                case EventEffectType.HungerDelta:   // 飢餓→物資統合(ADR-0002): 物資±N
+                // 物資±N (今の単位: 1 歩 = 1・2026-11-11)。 2026-11-11 までは ProvisionDelta を読んでおらず (0 点)、
+                //   旧表記の HungerDelta だけを旧単位の重みで読んでいた ── データ側はすべて「物資±N」なので、 物資は評価に入っていなかった。
+                case EventEffectType.ProvisionDelta:
+                case EventEffectType.HungerDelta:
                 {
+                    bool low = provisionVal <= PROVISION_LOW;
                     if (e.amount >= 0)
                     {
-                        float w = W_HUNGER;
-                        if (provisionPct < 0.45f) w *= 2.0f;   // 物資が悲観域(≤45)以下なら回復価値大
-                        return e.amount * w;
+                        int eff = UnityEngine.Mathf.Min(e.amount, UnityEngine.Mathf.Max(0, provisionCap - provisionVal));   // 上限を超える分は捨てられる
+                        return eff * W_PROVISION * (low ? 2f : 1f);
                     }
-                    else
-                    {
-                        float w = W_HUNGER;
-                        if (provisionPct < 0.45f) w *= 2.5f;   // 物資が低いほど損を忌避
-                        return e.amount * w; // 負
-                    }
+                    int need = -e.amount;
+                    int paid = UnityEngine.Mathf.Min(need, UnityEngine.Mathf.Max(0, provisionVal));
+                    int shortHp = (need - paid) * MapSystem.FreeMove.FreeMapParams.HpPerSupply;   // 足りない分は HP で払う
+                    return -paid * W_PROVISION * (provisionVal - need <= PROVISION_LOW ? 2f : 1f) - shortHp * W_HP_LOSS;
                 }
+
+                case EventEffectType.TurnsPass:
+                    return ScoreTurns(e.amount);
 
                 case EventEffectType.MaterialDelta:
                     return e.amount * W_MATERIAL;
@@ -301,6 +335,28 @@ namespace AutoTest
             }
         }
 
+        /// <summary>その場で N ターンを使う値段 (2026-11-11・issue #17)。 本体と同じ見込み (<see cref="EventEncounter.CatchEtaNow"/>・
+        /// 補足中に「留まったら何ターンで捕まるか」) を読む。 **捕まるなら戦闘 1 回ぶん**、 捕まらないなら 1 ターンごとの小さな値段。</summary>
+        private static float ScoreTurns(int turns)
+        {
+            if (turns <= 0) return 0f;
+            var sim = GameManager.Instance != null ? GameManager.Instance.FreeMap : null;
+            if (sim == null) return 0f;   // 航行マップの外では時間は何も動かさない
+            var eta = EventEncounter.CatchEtaNow();
+            if (eta.Valid)
+            {
+                if (eta.turns <= turns)
+                {
+                    var run = GameManager.Instance.Run;
+                    float hpPct = run != null ? (float)run.playerHP / UnityEngine.Mathf.Max(1, run.playerMaxHP) : 1f;
+                    float caught = eta.who == 2 ? V_CAUGHT_FAMILIAR : V_CAUGHT_BODY;
+                    return caught * (hpPct < 0.65f ? 1.8f : 1f) + V_TURN_CHASED * (eta.turns - 1);
+                }
+                return V_TURN_CHASED * turns;
+            }
+            return (sim.FoeAlive ? V_TURN_FOE_PATROL : V_TURN_NO_FOE) * turns;
+        }
+
         /// <summary>L1.5 学習リフトの加算重み。 観測 lift1点 ≈ 数値スコア何点ぶんに相当させるか。</summary>
         public const float LearnedLiftWeight = 3.0f;
 
@@ -332,7 +388,7 @@ namespace AutoTest
             }
 
             // スコア差が小さい or 探索枠に当たった場合は次点を選ぶ
-            if (second >= 0 && rng != null)
+            if (second >= 0 && rng != null && secondS > V_UNAVAILABLE * 0.5f)   // 選べない選択肢は探索でも選ばない
             {
                 float margin = bestS - secondS;
                 bool closeCall = margin < 4.0f; // 僅差なら半々

@@ -20,6 +20,15 @@ namespace AutoTest
     {
         public const int MinTrials = 30;     // この試行数未満は集計から除外
 
+        /// <summary>選択肢の中身の版。 キーの eventId に付ける (<see cref="EventKey"/>)。
+        /// **イベントの選択肢の効果・並びを作り直したら上げる** ── 上げないと、 旧い選択肢で測った観測リフトが
+        /// 同じ添字の新しい選択肢に乗る。 旧い版の行はファイルに残るが読まれない。
+        /// c2 = 2026-11-11 のイベント再編 (issue #17: 物資の単位・ターンを使う選択肢)。</summary>
+        public const string ChoiceRevision = "c2";
+
+        /// <summary>学習のキーに使う eventId (版つき)。 記録 (AutoRunner) と参照 (<see cref="GetLearnedLift"/>) の両方がここを通る。</summary>
+        public static string EventKey(string eventId) => (eventId ?? "") + "#" + ChoiceRevision;
+
         [Serializable]
         public class ChoiceAggregate
         {
@@ -199,7 +208,7 @@ namespace AutoTest
         {
             if (!_loaded) Reload();
             if (_liftMap == null) return 0f;
-            string key = (eventId ?? "") + "|" + choiceIndex;
+            string key = EventKey(eventId) + "|" + choiceIndex;
             return _liftMap.TryGetValue(key, out var lift) ? lift : 0f;
         }
     }

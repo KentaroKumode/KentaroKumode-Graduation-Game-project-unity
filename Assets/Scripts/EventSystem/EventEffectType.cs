@@ -13,7 +13,7 @@ namespace EventSystem
         MaxHpDelta,              // 最大HP+N / 最大HP-N
         GoldDelta,               // ゴールド+N / ゴールド-N
         HungerDelta,             // 空腹度+N / 空腹度-N (旧表記、物資±N と等価)
-        ProvisionDelta,               // 物資+N / 物資-N
+        ProvisionDelta,          // 物資+N / 物資-N (今の単位: 1 歩 = 1。 足りない分は HP で払う)
         MaterialDelta,           // 武器強化素材+N / 武器強化素材-N
         ArmorDurabilityLoss,     // 防具の耐久値減少
         TimedBuff,               // 時限バフ[xxx]を獲得
@@ -34,5 +34,10 @@ namespace EventSystem
         /// <summary>観測所の写しを持ち帰る。 **ラン跨ぎ**で残り、次の再訪 1 回で追加報酬になる。
         /// フラグアイテムでは表現できない (ownedFlags はラン内で消える)。</summary>
         ObservatoryTakeCopy,
+
+        /// <summary>ターン+N: その場で N ターンを使う (2026-11-11・issue #17)。 追跡者・使い魔・天候の前線が N 回動く。
+        /// **選んだ瞬間ではなく、 イベントを閉じて地図へ戻った時に進める** (<c>GameManager.ConfirmEventEncounter</c>)。
+        /// 航行マップの無い層では何も起きない。 確率分岐の中・「勝利後」には置かない (読まれない)。</summary>
+        TurnsPass,
     }
 }

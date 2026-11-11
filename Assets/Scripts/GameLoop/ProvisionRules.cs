@@ -34,15 +34,6 @@ namespace GameLoop
             int p = provision - MapSystem.FreeMove.FreeMapParams.FleeProvision;
             return (p < 0 ? 0 : p, gold / 2);
         }
-
-        /// <summary>旧単位 (1 歩 50 の頃より前の「1 歩 10」の頃に作ったイベントの「物資±N」) を今の単位へ読み替える。
-        /// N/50 を四捨五入し、 0 になるものは ±1。 イベントの再編 (issue #17) で文面の値を書き直したら外す。</summary>
-        public static int FromLegacyEventAmount(int legacy)
-        {
-            if (legacy == 0) return 0;
-            int a = (int)System.Math.Round(System.Math.Abs(legacy) / 50.0, System.MidpointRounding.AwayFromZero);
-            if (a < 1) a = 1;
-            return legacy < 0 ? -a : a;
-        }
+        // 旧単位のイベントの「物資±N」を読み替える FromLegacyEventAmount は 2026-11-11 に削除 (issue #17 で文面を今の単位へ書き直した)。
     }
 }

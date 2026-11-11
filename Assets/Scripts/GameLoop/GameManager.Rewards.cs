@@ -123,6 +123,7 @@ namespace GameLoop
                 EventEncounter.Instance?.ApplyPostCombatEffects();
                 EventEncounter.Instance?.Clear();
                 SetPhase(GamePhase.MapNavigation);
+                PassEventTurns();   // 戦闘を挟む選択肢がターンも使っていた場合 (今のデータには無い)
                 return;
             }
 

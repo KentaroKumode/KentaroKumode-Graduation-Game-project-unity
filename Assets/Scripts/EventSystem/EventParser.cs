@@ -256,7 +256,15 @@ namespace EventSystem
             if (probMatches.Count >= 2)
             {
                 var prob = ParseProbabilityBranches(s, probMatches);
-                if (prob != null) { list.Add(prob); return list; }
+                if (prob != null)
+                {
+                    // 最初の「N%で」より前は全分岐に共通の効果 (例: 「ターン+1,50%でA、50%でB」)。
+                    //   2026-11-11 まではここを黙って捨てていた。
+                    string common = s.Substring(0, probMatches[0].Index).TrimEnd('、', ',', ' ', '　');
+                    if (common.Length > 0) list.AddRange(ParseEffects(common));
+                    list.Add(prob);
+                    return list;
+                }
             }
 
             // 通常: ',' で分割
@@ -307,6 +315,7 @@ namespace EventSystem
         private static readonly Regex hunger       = new Regex(@"^空腹度([+\-])(\d+)$");
         private static readonly Regex provision         = new Regex(@"^物資([+\-])(\d+)$");
         private static readonly Regex material     = new Regex(@"^武器強化素材([+\-])(\d+)$");
+        private static readonly Regex turns        = new Regex(@"^ターン\+(\d+)$");
         private static readonly Regex tBuff        = new Regex(@"^時限バフ\[(.+?)\](?:を獲得)?$");
         private static readonly Regex tDebuff      = new Regex(@"^時限デバフ\[(.+?)\](?:を獲得)?$");
         private static readonly Regex pDebuff      = new Regex(@"^永続デバフ\[(.+?)\](?:を獲得)?$");
@@ -355,6 +364,7 @@ namespace EventSystem
             m = hunger.Match(t);     if (m.Success) return Eff(EventEffectType.HungerDelta, amount: SignedInt(m, 1, 2), postCombat: postCombat);
             m = provision.Match(t);       if (m.Success) return Eff(EventEffectType.ProvisionDelta, amount: SignedInt(m, 1, 2), postCombat: postCombat);
             m = material.Match(t);   if (m.Success) return Eff(EventEffectType.MaterialDelta, amount: SignedInt(m, 1, 2), postCombat: postCombat);
+            m = turns.Match(t);      if (m.Success) return Eff(EventEffectType.TurnsPass, amount: int.Parse(m.Groups[1].Value), postCombat: postCombat);
             m = tBuff.Match(t);      if (m.Success) return Eff(EventEffectType.TimedBuff, param: m.Groups[1].Value, postCombat: postCombat);
             m = tDebuff.Match(t);    if (m.Success) return Eff(EventEffectType.TimedDebuff, param: m.Groups[1].Value, postCombat: postCombat);
             m = pDebuff.Match(t);    if (m.Success) return Eff(EventEffectType.PermanentDebuff, param: m.Groups[1].Value, postCombat: postCombat);

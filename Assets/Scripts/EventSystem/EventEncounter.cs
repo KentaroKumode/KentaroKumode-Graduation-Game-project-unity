@@ -99,18 +99,21 @@ namespace EventSystem
 
             var choice = Current.choices[index];
             var run = GameManager.Instance?.Run;
+            if (!IsChoiceSelectable(Current, index, run)) return null;   // 払えないゴールド
 
             // 行動台帳: 効果の**種別を解釈せず**、 実行前後の差分で「代償を払ったか」を決める。
             //   EventEffectType は増えるので、 型で分類すると新しい効果が追加されるたびに
             //   ここが取り残される。 GOLD と HP の減少という結果だけを見る。
             int chGold = run != null ? run.coins : 0;
             int chHp   = run != null ? run.playerHP : 0;
+            int chProv = run != null ? run.provision : 0;
 
             var execResult = EventEffectExecutor.Execute(choice.effects, run);
 
             if (run != null)
             {
-                bool paid = run.coins < chGold || run.playerHP < chHp;
+                // 物資と時間も代償に数える (2026-11-11・ターンを使う選択肢)
+                bool paid = run.coins < chGold || run.playerHP < chHp || run.provision < chProv || execResult.turnsToPass > 0;
                 bool empty = choice.effects == null || choice.effects.Count == 0;
                 string code = empty  ? RunChronicle.EventRefuse
                             : paid   ? RunChronicle.EventPrice
@@ -124,6 +127,7 @@ namespace EventSystem
 
             LastPostFlavor = choice.postFlavor;
             LastResult = execResult;
+            PendingTurns += execResult.turnsToPass;   // ランダムなイベントへ振り直した時は両方の分を積む
 
             // 戦闘勝利後の効果を保存
             PendingPostCombatEffects = new List<EventEffect>(execResult.postCombatEffects);
@@ -155,6 +159,63 @@ namespace EventSystem
             Current = null;
             LastPostFlavor = null;
             LastResult = null;
+        }
+
+        // =====================================================================
+        //  ターンを使う選択肢 (2026-11-11・issue #17)
+        // =====================================================================
+
+        /// <summary>選んだ選択肢が使うターンのうち、 まだ進めていない分。 GameManager がイベントを閉じて
+        /// 地図へ戻った時に <see cref="TakePendingTurns"/> で取り出して進める。</summary>
+        public int PendingTurns { get; private set; }
+
+        /// <summary>まだ進めていないターンを取り出して 0 に戻す。</summary>
+        public int TakePendingTurns() { int n = PendingTurns; PendingTurns = 0; return n; }
+
+        /// <summary>選択肢 index を選べるか。 **全部が選べない時は全部を選べる扱いにする** (詰み防止)。</summary>
+        public static bool IsChoiceSelectable(EventDefinition ev, int index, RunState run)
+        {
+            if (ev?.choices == null || index < 0 || index >= ev.choices.Count) return false;
+            if (ev.choices[index] == null || ev.choices[index].IsAvailable(run)) return true;
+            foreach (var c in ev.choices) if (c != null && c.IsAvailable(run)) return false;
+            return true;
+        }
+
+        /// <summary>いま追跡者・猟犬・使い魔に補足されているなら「最短で何ターンで捕まるか」(こちらが留まった場合)。
+        /// 補足されていない・航行マップの外なら <see cref="MapSystem.FreeMove.CatchEta.None"/>。
+        /// 表示 (#72) と BOT が同じ値を読む。</summary>
+        public static MapSystem.FreeMove.CatchEta CatchEtaNow()
+        {
+            var sim = GameManager.Instance != null ? GameManager.Instance.FreeMap : null;
+            return sim != null ? sim.Eta() : MapSystem.FreeMove.CatchEta.None;
+        }
+
+        /// <summary>N ターンをその場で使うと捕まるか (今の補足の見込みで判定。 巡回中の追跡者が偶然通りかかる分は含まない)。</summary>
+        public static bool WouldBeCaught(int turns)
+        {
+            if (turns <= 0) return false;
+            var eta = CatchEtaNow();
+            return eta.Valid && eta.turns <= turns;
+        }
+
+        /// <summary>選択肢の「代償」の短い説明 (イベントの画面の選択肢の下に出す)。 何も無ければ null。
+        /// 得るものは書かない (見出しの文が語る) ── 書くのは時間と、 払えないゴールドだけ。</summary>
+        public static string DescribeCost(EventChoice choice, RunState run)
+        {
+            if (choice == null) return null;
+            var sb = new System.Text.StringBuilder();
+            if (!choice.IsAvailable(run)) sb.Append($"ゴールドが足りない（{choice.GoldCost}G）");
+            int t = choice.TurnCost;
+            if (t > 0)
+            {
+                if (sb.Length > 0) sb.Append("・");
+                sb.Append($"{t} ターンを使う");
+                var eta = CatchEtaNow();
+                if (eta.Valid)
+                    sb.Append(eta.turns <= t ? $"（補足されている: {eta.turns} ターンで捕まる）"
+                                             : $"（補足されている: 最短 {eta.turns} ターンで捕まる）");
+            }
+            return sb.Length > 0 ? sb.ToString() : null;
         }
     }
 }
