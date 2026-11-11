@@ -1,6 +1,6 @@
 # 端子のアイコン (Game2DTerminalIcons.cs) の合否ページ (HTML) を書き出す。
 #   使い方: python Tools/terminal_icons_review.py <出力する .html>
-#   ページは合否と直しの指示を Artifact の db (collection "reviews3" (第 4 稿・17×17・2 色)) に保存する。
+#   ページは合否と直しの指示を Artifact の db (collection "reviews4" (第 5 稿・17×17・2 色・合否を受けた描き直し)) に保存する。
 import io, re, sys, json
 
 ROOT = "C:/Users/kumod/My project/"
@@ -119,8 +119,8 @@ button:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px sol
 </style>
 <div class="wrap">
   <header>
-    <h1>端子アイコン合否（第4稿・新しい様式）</h1>
-    <p>端子 60 種を新しい様式で描き直しました。17×17・明るい主役と、その後ろの暗めの飾りの 2 色だけです（主役の中の線は抜き）。物の絵に限らず、意味を表す記号にした物もあります。左が拡大、その右が USB メモリに載せた実寸の 3 倍です。1 つずつ「合」か「否」を押し、直してほしい点があれば書いてください。押した内容は自動で保存され、こちらで読み取って描き直します。</p>
+    <h1>端子アイコン合否（第5稿）</h1>
+    <p>前回の合否を受けて 35 種を描き直しました。前回「合」で絵を変えていない 25 種は合のまま入れてあります（表示を「未判定だけ」にすると、描き直した物だけ出ます）。名前は 定電圧（旧 点火栓）・増圧（旧 研磨盤）・充填（旧 蓄電器）に変わっています。左が拡大、その右が USB メモリに載せた実寸の 3 倍です。1 つずつ「合」か「否」を押し、直してほしい点があれば書いてください。押した内容は自動で保存され、こちらで読み取って描き直します。</p>
   </header>
   <div class="bar">
     <b>合 <span class="ok" id="nOk">0</span></b><b>否 <span class="ng" id="nNg">0</span></b><b>未 <span id="nNone">0</span></b>
@@ -150,10 +150,10 @@ function counts(){ let o=0,n=0; for(const d of DATA){ const v=(state[d.key]||{})
 function applyFilter(){ const f=$('filt').value;
   for(const el of document.querySelectorAll('.card')){ const v=el.dataset.v||''; el.hidden = f==='none'? v!=='' : f==='ng'? v!=='ng' : false; } }
 const timers={};
-function save(key){ counts(); applyFilter(); if(!db){ $('save').textContent='保存先に接続できていません (この端末の中だけに残ります)'; try{localStorage.setItem('rv3',JSON.stringify(state));}catch(e){} return; }
+function save(key){ counts(); applyFilter(); if(!db){ $('save').textContent='保存先に接続できていません (この端末の中だけに残ります)'; try{localStorage.setItem('rv4',JSON.stringify(state));}catch(e){} return; }
   clearTimeout(timers[key]); $('save').textContent='保存中…';
   timers[key]=setTimeout(async()=>{ const d=DATA.find(x=>x.key===key), s=state[key]||{};
-    try{ await db.doc('reviews3/'+key).set({name:d.name, verdict:s.v||'', note:s.note||'', at:new Date().toISOString()}); $('save').textContent='保存しました'; }
+    try{ await db.doc('reviews4/'+key).set({name:d.name, verdict:s.v||'', note:s.note||'', at:new Date().toISOString()}); $('save').textContent='保存しました'; }
     catch(e){ $('save').textContent='保存に失敗しました: '+(e&&e.message||e); } }, 500); }
 function build(){ const list=$('list'); let group=null, grid=null;
   for(const d of DATA){
@@ -185,9 +185,9 @@ build(); counts();
 $('filt').onchange=applyFilter;
 (async()=>{
   try{ db = await claude.use('db'); }catch(e){ db=null; }
-  if(!db){ $('save').textContent='保存先に接続できていません (この端末の中だけに残ります)'; try{ Object.assign(state, JSON.parse(localStorage.getItem('rv3')||'{}')); }catch(e){}
+  if(!db){ $('save').textContent='保存先に接続できていません (この端末の中だけに残ります)'; try{ Object.assign(state, JSON.parse(localStorage.getItem('rv4')||'{}')); }catch(e){}
     for(const d of DATA) paint(d.key); counts(); return; }
-  try{ const snap = await db.collection('reviews3').get();
+  try{ const snap = await db.collection('reviews4').get();
     for(const doc of snap.docs){ const x=doc.data()||{}; state[doc.id]={v:x.verdict||'', note:x.note||''}; paint(doc.id); }
     counts(); $('save').textContent='読み込みました'; }
   catch(e){ $('save').textContent='読み込みに失敗しました: '+(e&&e.message||e); }
