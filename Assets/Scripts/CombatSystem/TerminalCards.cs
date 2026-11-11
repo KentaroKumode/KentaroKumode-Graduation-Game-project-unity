@@ -25,7 +25,7 @@ namespace CombatSystem
         // 基本
         public const string Attack = "攻撃", Block = "防御", Charge = "充電";
         // コモン
-        public const string Igniter = "点火栓", Detector = "検波器", DischargeTube = "放電管", Deathwish = "決死", Relay = "継電器",
+        public const string Igniter = "定電圧", Detector = "検波器", DischargeTube = "放電管", Deathwish = "決死", Relay = "継電器",
             Grinder = "増圧", Oscillator = "発振器", Twin = "二連", Fuse = "ヒューズ", Ground = "接地", Insulator = "絶縁体",
             Parry = "受け太刀", Breaker = "遮断器", Rectifier = "整流器", Battery = "蓄電池", Heal = "治癒", Capacitor = "充填",
             Arrester = "避雷器", Transformer = "変圧器", Switchboard = "配電盤";
