@@ -230,7 +230,7 @@ namespace UI.Game2D
             // 端子の山札 (ADR-0014): 回復の代わりに 1 枚抜く (無料)。 山札が手札の枚数を下回る抜き方はできない
             bool canTerm = gm.CanRemoveTerminal; int deckN = run.terminalDeck != null ? run.terminalDeck.Count : 0;
             d.Items.Add(new ModalItem { name = "山札から抜く", value = canTerm ? "山札 " + deckN + " 枚" : "抜けない", disabled = !canTerm,
-                desc = canTerm ? "回復の代わりに、 山札から端子を 1 枚抜く (この先ずっと)。 抜く端子を次に選ぶ。" : "山札が手札の枚数 (" + CombatSystem.TerminalCards.HandSize + ") を下回る抜き方はできない。" });
+                desc = canTerm ? "回復の代わりに、 山札から端子を 1 枚抜く (この先ずっと)。 抜く端子を次に選ぶ。" : "山札が下限の枚数 (" + CombatSystem.TerminalCards.MinDeckSize + ") を下回る抜き方はできない。" });
             d.buttons.Add(B("決める", "do", true));
             d.onAction = (a, sel) =>
             {
@@ -339,7 +339,7 @@ namespace UI.Game2D
             {
                 name = "山札から 1 枚抜く", value = canRemove ? price + "G" : "抜けない",
                 desc = canRemove ? "山札から端子を 1 枚抜く (この先ずっと)。 抜くたびに値段が上がる。 抜く端子を次に選ぶ。"
-                                 : "山札が手札の枚数 (" + CombatSystem.TerminalCards.HandSize + ") を下回る抜き方はできない。",
+                                 : "山札が下限の枚数 (" + CombatSystem.TerminalCards.MinDeckSize + ") を下回る抜き方はできない。",
                 disabled = !canRemove || price > run.coins,
             });
             d.buttons.Add(B("決める", "do", true));

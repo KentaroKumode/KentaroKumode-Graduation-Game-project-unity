@@ -376,11 +376,16 @@ namespace UI.Game2D
         {
             var l = new List<KeyValuePair<int, int>>(); divider = -1;
             int m = sim.board.Count, j = 0, q = 0;
+            // 手札は 5 枚が基本 (2026-11-11)。 場に残る端子や〈配電盤〉で枠に収まらない時は、 間隔を詰めて並べる
+            int nHand = 0, nPerm = 0;
+            for (int s = 0; s < m; s++) { var d0 = CombatSystem.TerminalCards.Get(sim.board[s]); if (d0 != null && d0.permanent) nPerm++; else nHand++; }
+            int avail = Hand.width - 2 * HandPad - nPerm * HandStep - (nPerm > 0 ? 4 : 0);
+            int step = nHand > 1 ? Mathf.Min(HandStep, (avail - UsbBody) / (nHand - 1)) : HandStep;
             for (int s = 0; s < m; s++)
             {
                 var def = CombatSystem.TerminalCards.Get(sim.board[s]);
                 if (def != null && def.permanent) continue;
-                l.Add(new KeyValuePair<int, int>(s, HandPad + j++ * HandStep));
+                l.Add(new KeyValuePair<int, int>(s, HandPad + j++ * step));
             }
             for (int s = 0; s < m; s++)
             {

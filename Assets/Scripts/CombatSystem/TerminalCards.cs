@@ -168,7 +168,9 @@ namespace CombatSystem
     /// </summary>
     public static class TerminalCards
     {
-        public const int HandSize = 3;
+        public const int HandSize = 5;
+        /// <summary>山札の下限 (これを下回る抜き方はできない)。 出目 3 個を挿す先が足りなくならない枚数。</summary>
+        public const int MinDeckSize = 3;
 
         // ===== 数値 (すべて仮・未測定) =====
         public const int IgniterAttack = 7, FuseBlock = 8, GroundCutPct = 40, BreakerCutPct = 50, ReliefCutPct = 80;

@@ -80,7 +80,7 @@ namespace GameLoop
         // =====================================================================
         //   店: 端子の棚 (TerminalShopSlots 枚・レアも混ざり、 値段が高い) と、 「山札から 1 枚抜く」サービス (店で使うたびに値段が上がる通算価格)。
         //   休憩: 回復の代わりに「山札から 1 枚抜く」(無料・休憩の行動を使う)。
-        //   どちらも山札が手札の枚数 (TerminalCards.HandSize) を下回る抜き方はできない。 人の画面も BOT も、 下の同じ関数を呼ぶ。
+        //   どちらも山札が下限 (TerminalCards.MinDeckSize) を下回る抜き方はできない。 人の画面も BOT も、 下の同じ関数を呼ぶ。
 
         /// <summary>店の端子の棚の枚数 / 値段の素 (店の価格倍率 = 進行・強盗の割増・商人の鈴 を掛ける)。</summary>
         public const int TerminalShopSlots = 3, TerminalShopPriceCommon = 16, TerminalShopPriceDisposable = 12, TerminalShopPriceRare = 36;
@@ -123,7 +123,7 @@ namespace GameLoop
         }
 
         /// <summary>山札から抜ける (抜いても手札の枚数を下回らない)。</summary>
-        public bool CanRemoveTerminal => Run?.terminalDeck != null && Run.terminalDeck.Count > TerminalCards.HandSize;
+        public bool CanRemoveTerminal => Run?.terminalDeck != null && Run.terminalDeck.Count > TerminalCards.MinDeckSize;
 
         /// <summary>店で山札から 1 枚抜く値段 (店で抜くたびに上がる)。</summary>
         public int TerminalRemovePrice => TerminalRemoveBasePrice + TerminalRemoveStep * (Run != null ? Run.terminalShopRemovals : 0);

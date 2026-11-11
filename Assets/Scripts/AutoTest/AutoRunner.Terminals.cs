@@ -382,7 +382,7 @@ namespace AutoTest
         private static int PruneTarget(RunState run)
         {
             var deck = run?.terminalDeck;
-            if (deck == null || deck.Count <= TerminalCards.HandSize) return -1;
+            if (deck == null || deck.Count <= TerminalCards.MinDeckSize) return -1;
             int basic = 0, nonBasic = 0, atkKind = 0;
             var cnt = new Dictionary<string, int>();
             foreach (var id in deck)

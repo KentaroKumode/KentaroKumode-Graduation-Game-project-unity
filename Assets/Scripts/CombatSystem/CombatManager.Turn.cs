@@ -394,7 +394,7 @@ namespace CombatSystem
             // ここからターンの最後の HP 同期までは、 品が入れる敵へのダメージを預かる (Kw.DamageEnemy)。
             if (ctx != null) ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.ResolvingKey] = 1;
             psm.BeginTurn();
-            DrawTerminalHand(ctx);   // 端子の山札 (ADR-0014): 3 枚引く (振り直しの判断より前 ── 手札を見て振り直すか決められる)
+            DrawTerminalHand(ctx);   // 端子の山札 (ADR-0014): 5 枚引く (振り直しの判断より前 ── 手札を見て振り直すか決められる)
 
             // 装備維持費 (2026-08-15): **所持パッシブ 10 個につき充電 1** を毎ターン消費する。
             //   §7-3 の仕様として決まっていたが実装されていなかった。
