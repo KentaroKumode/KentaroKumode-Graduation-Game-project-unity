@@ -183,13 +183,18 @@ namespace CombatSystem
         public const int DetectorMul = 2, RectifierMul = 2;
         public const int IgniterAttack = 7, FuseBlock = 8, GroundCutPct = 60, BreakerCutPct = 75, ReliefCutPct = 90;
         public const int DischargeCost = 3, DischargeMul = 3, BreakerCost = 6, DeathwishMul = 3, RelayPerFired = 8, OscPerStreak = 5;
-        public const int CapacitorNeed = 15, CapacitorAttack = 40, ArresterNeed = 12, FoundryNeed = 10, CoolantNeed = 12;
+        public const int CapacitorNeed = 12, CapacitorAttack = 40, ArresterNeed = 12, FoundryNeed = 10, CoolantNeed = 12;
         public const float AmplifierPerPip = 0.16f, ResonatorMul = 1.5f, VacuumCritMult = 2.0f;
-        public const int CounterEvery = 10; public const float CounterPct = 0.20f;
-        public const int TwinShotMul = 3, DetonatorMul = 4, FirstAidMul = 3, HealMul = 4, BatteryBonus = 2, InsulatorBonus = 6;
-        public const int HarvesterMaxHp = 2, WhetGain = 1, LootGold = 10;
+        public const int CounterEvery = 10; public const float CounterPct = 0.10f;
+        public const int TwinShotMul = 3, DetonatorMul = 4, FirstAidMul = 2, HealMul = 2, BatteryBonus = 2, InsulatorBonus = 4;
+        public const int HarvesterMaxHp = 2, WhetGain = 1, LootGold = 5;
         public const float SightPerRank = 0.2f, VitalPerRank = 0.1f, BloodTapPct = 0.05f, BigDischargePerRank = 0.10f, ShieldPushPerRank = 0.06f;
         public const int BloodTapPer = 5, PoisonScalePer = 10, PoisonScaleAttack = 3, AfterHeatPerBurst = 2;
+        // 2026-11-12 (3): 端子の ITT (Optimal / Super・各 5 万ラン・AutoRunLogs/terminal_itt/) で、 両方そろって強すぎ・弱すぎの物だけを動かした。
+        //   強すぎ (Δクリア率 Optimal / Super): 応急箱 +13.0 / +16.0 → ×3→×2・治癒 +7.8 / +12.8 → ×4→×2・計数器 +2.9 / +5.6 → 20%→10%・
+        //     戦利品箱 +1.9 / +3.6 → 10G→5G・絶縁体 +1.7 / +2.7 → +6→+4。
+        //   弱すぎ: 決死 −1.8 / −3.3 → 払う HP を出目の半分 (切り上げ) に・充填 −1.2 / −1.4 → 溜める量 15→12。
+        //   主幹 (+4.9 / +6.8)・二股 (+3.2 / +4.0) はユーザーの指定した作りなので据え置き。 防御の割合の端子 (接地・避雷器) は弱いが原因が読めないので据え置き。
         /// <summary>〈主幹〉: この戦闘で使うたび、 以後の攻撃 +N。 / 〈配電盤〉: 次のターンに多く引く枚数。</summary>
         public const int MainsPerUse = 1, SwitchboardDraw = 2;
 
@@ -235,7 +240,7 @@ namespace CombatSystem
                 D(TerminalIds.Igniter, A, "攻撃 +" + IgniterAttack + "。", TerminalCond.AtMost3),
                 D(TerminalIds.Detector, A, "出目 ×" + DetectorMul + " を攻撃に。", TerminalCond.Odd),
                 Cost(D(TerminalIds.DischargeTube, A, "充電 " + DischargeCost + " を払い、出目 ×" + DischargeMul + " を攻撃に。"), DischargeCost),
-                D(TerminalIds.Deathwish, A, "出目ぶん HP を払い、出目 ×" + DeathwishMul + " を攻撃に。"),
+                D(TerminalIds.Deathwish, A, "出目の半分 (切り上げ) の HP を払い、出目 ×" + DeathwishMul + " を攻撃に。"),
                 D(TerminalIds.Relay, A, "出目を攻撃に。このターンに発動した基本以外の端子 1 つにつき攻撃 +" + RelayPerFired + "。"),
                 D(TerminalIds.Grinder, A, "出目を攻撃に。他の出目すべて +1。"),
                 D(TerminalIds.Oscillator, A, "出目を攻撃に。前にここへ挿した目と同じなら攻撃 +" + OscPerStreak + " × 連続回数。"),
@@ -545,7 +550,7 @@ namespace CombatSystem
                 case TerminalIds.DischargeTube: o.attackAdd += sum * DischargeMul; break;
                 case TerminalIds.Deathwish:
                 {
-                    int self = Math.Min(sum, Math.Max(0, env.hp - 1 - o.selfDamage));
+                    int self = Math.Min((sum + 1) / 2, Math.Max(0, env.hp - 1 - o.selfDamage));   // 出目の半分 (切り上げ)・2026-11-12 (旧: 出目ぶん)
                     o.selfDamage += self; o.attackAdd += sum * DeathwishMul; break;
                 }
                 case TerminalIds.Oscillator:
