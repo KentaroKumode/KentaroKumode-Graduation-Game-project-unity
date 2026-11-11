@@ -29,7 +29,57 @@ for line in build.splitlines():
     if g: cur = g.group(1)
     for k in re.findall(r"TerminalIds\.(\w+)", line): groups.setdefault(k, cur)
     if "Rare(perm)" in line: groups["Mains"] = "レア"
-data = [{"key": k, "name": names.get(k, k), "kind": kind.get(k, "S"), "group": groups.get(k, ""), "rows": icons[k]} for k in keys]
+
+# 効果の文 (TerminalCards.Build の説明の式を、 定数を読んでそのまま評価する) と条件の札
+consts = {}
+for mm in re.finditer(r"public const (?:int|float) ([^;]+);", tcs):
+    for nm, val in re.findall(r"(\w+)\s*=\s*([0-9.]+)f?", mm.group(1)): consts[nm] = float(val) if "." in val else int(val)
+condlab = dict(re.findall(r"case TerminalCond\.(\w+): return \"([^\"]+)\";", tcs))
+
+
+class S(str):
+    def __add__(self, o): return S(str(self) + (o if isinstance(o, str) else str(o)))
+
+
+def cs_fmt(v, f):
+    # C# の書式 "0.0" / "0.0#" (# の桁は 0 なら出さない)
+    frac = f.split(".")[1] if "." in f else ""
+    s = ("%." + str(len(frac)) + "f") % v
+    while "#" in frac and len(s.split(".")[1]) > frac.count("0") and s.endswith("0"): s = s[:-1]
+    return s
+
+
+def desc_of(expr):
+    e = re.sub(r"(\w+)\.ToString\(\"([^\"]+)\"\)", r'cs_fmt(\1,"\2")', expr)
+    e = re.sub(r"\(int\)\(([^)]*)\)", r"int(round(\1))", e)
+    e = re.sub(r"\"([^\"]*)\"", lambda m: "S(" + json.dumps(m.group(1), ensure_ascii=False) + ")", e)
+    return str(eval(e, {"S": S, "cs_fmt": cs_fmt, "int": int, "round": round}, dict(consts)))
+
+
+desc, cond, once = {}, {}, set()
+for line in build.splitlines() + [l for l in tcs.splitlines() if "var perm = D(TerminalIds.Mains" in l]:
+    mm = re.search(r"D\(TerminalIds\.(\w+),\s*[ABCS],\s*", line)
+    if not mm: continue
+    k = mm.group(1)
+    # D( の引数を、 括弧の深さと引用符を見ながら切り出す (式の中に括弧やカンマがあるため)
+    args, cur_a, depth, q = [], "", 0, False
+    for ch in line[mm.end():]:
+        if ch == '"': q = not q
+        if not q:
+            if ch == "(": depth += 1
+            elif ch == ")":
+                if depth == 0: break
+                depth -= 1
+            elif ch == "," and depth == 0: args.append(cur_a); cur_a = ""; continue
+        cur_a += ch
+    args.append(cur_a)
+    try: desc[k] = desc_of(args[0].strip())
+    except Exception as ex: desc[k] = "(読み取れず: %s)" % ex
+    cm = re.search(r"TerminalCond\.(\w+)", args[1]) if len(args) > 1 else None
+    if cm and cm.group(1) != "None": cond[k] = condlab.get(cm.group(1), cm.group(1))
+    if "Once(" in line: once.add(k)
+data = [{"key": k, "name": names.get(k, k), "kind": kind.get(k, "S"), "group": groups.get(k, ""), "rows": icons[k],
+         "desc": desc.get(k, ""), "cond": cond.get(k, ""), "once": k in once} for k in keys]
 
 html = r"""<title>端子アイコン合否</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -58,6 +108,8 @@ canvas{image-rendering:pixelated;display:block}
 .side{display:grid;gap:6px;align-content:start;min-width:0}
 .name{font-family:var(--f-dot);font-size:17px}
 .name small{color:var(--mute);font-size:12px;margin-left:6px}
+.ef{font-size:13px;line-height:1.55;color:var(--fg)}
+.ef .tag{display:inline-block;font-size:11px;color:var(--accent);border:1px solid var(--line);padding:0 5px;margin-right:5px}
 .vb{display:flex;gap:6px}
 .vb button{flex:1;font-family:var(--f-dot);font-size:15px;padding:6px 0;background:var(--bg);color:var(--mute);border:1px solid var(--line);cursor:pointer}
 .vb button[aria-pressed=true].o{background:var(--ok);color:#10201a;border-color:var(--ok)}
@@ -120,7 +172,11 @@ function build(){ const list=$('list'); let group=null, grid=null;
     const set=v=>{ const s=state[d.key]||(state[d.key]={v:'',note:''}); s.v = s.v===v? '' : v; paint(d.key); save(d.key); };
     bo.onclick=()=>set('ok'); bn.onclick=()=>set('ng');
     ta.oninput=()=>{ (state[d.key]||(state[d.key]={v:'',note:''})).note=ta.value; save(d.key); };
-    vb.append(bo,bn); side.append(nm,vb,ta); card.append(pics,side); grid.appendChild(card);
+    const ef=document.createElement('div'); ef.className='ef';
+    if(d.cond){ const t=document.createElement('span'); t.className='tag'; t.textContent='条件 '+d.cond; ef.appendChild(t); }
+    if(d.once){ const t=document.createElement('span'); t.className='tag'; t.textContent='使い捨て'; ef.appendChild(t); }
+    ef.appendChild(document.createTextNode(d.desc||''));
+    vb.append(bo,bn); side.append(nm,ef,vb,ta); card.append(pics,side); grid.appendChild(card);
   } }
 function paint(key){ const s=state[key]||{}, card=$('c_'+key); if(!card)return; card.dataset.v=s.v||'';
   card.querySelector('.o').setAttribute('aria-pressed', s.v==='ok'); card.querySelector('.n').setAttribute('aria-pressed', s.v==='ng');
@@ -140,4 +196,5 @@ $('filt').onchange=applyFilter;
 """
 out = sys.argv[1]
 io.open(out, "w", encoding="utf-8").write(html.replace("__DATA__", json.dumps(data, ensure_ascii=False)))
-print(len(data), "icons ->", out, "| missing kind:", [d["key"] for d in data if d["key"] not in kind])
+print(len(data), "icons ->", out, "| missing kind:", [d["key"] for d in data if d["key"] not in kind], "| 効果なし:", [d["key"] for d in data if not d["desc"] or "読み取れず" in d["desc"]])
+for d in data: print(" ", d["name"], "|", d["cond"], "|", "使い捨て" if d["once"] else "", "|", d["desc"])
