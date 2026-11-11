@@ -201,6 +201,8 @@ namespace GameLoop
         public const string Layer6Ash = "boss_layer6";
         /// <summary>最終段 (ヴェスカ・天与)。 8 層 Null Point。</summary>
         public const string VescaFinal = "boss_layer7_p4";
+        /// <summary>ヴェスカの段 1〜3 (段 4 は <see cref="VescaFinal"/>)。</summary>
+        public const string VescaP1 = "boss_layer7", VescaP2 = "boss_layer7_p2", VescaP3 = "boss_layer7_p3";
 
         /// <summary>0 層 (ファーム層・2026-11-05) のボス: 古い宝箱 (HP100・攻撃なし)。 <see cref="IsBoss"/> に掛かるよう prefix を揃えた。</summary>
         public const string FarmBoss = "boss_layer0";

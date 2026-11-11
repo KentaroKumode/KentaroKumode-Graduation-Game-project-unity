@@ -196,11 +196,11 @@ namespace AutoTest
             if (ctx != null && !st.readOut && !st.traceBoth) FillReadOut(ref st, cm, ctx, run, tele.playerAttackPenalty);
 
             bool deckHasCounter = run?.terminalDeck != null && run.terminalDeck.Contains(TerminalIds.Counter);
-            var cands = TerminalWiring.Enumerate(board, k);
+            // 止まった端子 (ヴェスカ〈停滞する時間〉) へ挿す手は列挙しない (Resolve が外すので結果は「挿さない」と同じ)
+            var cands = TerminalWiring.Enumerate(board, k, deck.state);
             int n = cands.Count;
             var us = new float[n];
             var outs = new OptimalTurnOutcome[n];
-            var addsStag = new bool[n];
             var tgts = new int[n][];
             for (int i = 0; i < n; i++)
             {
@@ -215,25 +215,11 @@ namespace AutoTest
                 }
                 var ws = DeckSums(in st, rolls, board, o, deck.state, after, in env, deckHasCounter);
                 us[i] = OptimalUtilityCore(in st, k, in ws, out outs[i]);
-                // ヴェスカ〈停滞する時間〉: 本体と同じく、 挿し方を直した後の攻撃の個数 < ブロックの個数で積む
-                addsStag[i] = o.attackDice < o.blockDice;
             }
 
-            int Pick(bool stagFilter)
-            {
-                int b = -1; float bu = float.NegativeInfinity;
-                for (int i = 0; i < n; i++)
-                {
-                    if (stagFilter && addsStag[i]) continue;
-                    if (b < 0 || us[i] > bu) { b = i; bu = us[i]; }
-                }
-                return b;
-            }
-            // ヴェスカ〈停滞する時間〉は旧い配線と同じ規則 (SelectOptimalWiring の注記)。 手札の都合で避けられないターン
-            // (停滞を積まない候補が残らない) と、 避けた最良の手でも今ターン死ぬターンは、 制限を外して選び直す。
-            bool stag = StagFilterActive(cm, ctx);
-            int best = Pick(stag);
-            if (stag && (best < 0 || outs[best].taken >= st.myHp)) best = Pick(false);
+            int best = -1; float bu = float.NegativeInfinity;
+            for (int i = 0; i < n; i++)
+                if (best < 0 || us[i] > bu) { best = i; bu = us[i]; }
             if (best < 0) return null;
 
             bestU = us[best];
@@ -255,7 +241,7 @@ namespace AutoTest
             for (int p = 0; p < board.Count; p++)
             {
                 if (!TerminalCards.PicksTarget(board[p]) || !o.fired.Contains(p)) continue;
-                var cand = TerminalCards.TargetCandidates(board, o.slotOfDie, p);
+                var cand = TerminalCards.TargetCandidates(board, o, p);
                 if (cand.Count == 0) continue;
                 bool wantLow = board[p] == TerminalIds.BurnOut;
                 int pick = -1; float bestSc = 0f;

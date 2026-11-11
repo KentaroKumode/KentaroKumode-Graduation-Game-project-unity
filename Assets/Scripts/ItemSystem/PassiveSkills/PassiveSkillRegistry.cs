@@ -507,7 +507,7 @@ namespace ItemSystem.PassiveSkills
             Register(new SaintGeorgesPhases());
             // 7層ボス: ヴェスカ（遺物学者）×4段連戦。 正本: docs/GAME.md §13-4
             Register(new RelicScholar());        // 遺物学者（毎T 遺物を抽選使用・予告で開示）
-            Register(new StagnantTime());        // 停滞する時間（攻撃 < ブロックの配線のTを罰する・上限10スタック。L3 第一レバー）
+            Register(new StagnantTime());        // 停滞する時間（引いた端子を確率で止める・処理は TerminalDeckState.DrawTurn / TerminalCards.Resolve。L3 第一レバー）
             Register(new AnalyticComputation()); // 解析演算（収支プラスごとに回避率+2%・上限40%・回避の次Tは回避なし）
             Register(new RiftHeldOpen());        // 裂け目（毎T ヴェスカ最大HPの2%・プレイヤー最大HPの1%を失う）
             Register(new RecurrentTruth());      // 回帰性真理（毒/出血の毎T半減・受ける会心倍率-0.5・臨界-5/T・処刑/最大HP変更を拒否）

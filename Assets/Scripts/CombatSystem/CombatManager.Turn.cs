@@ -905,6 +905,7 @@ namespace CombatSystem
             // 2026-07-29: ブロック本数も記録する。 〈停滞する時間〉が「攻撃0本」ではなく
             // 「守りに寄せたか (攻撃 ≦ ブロック)」で判定できるようにするため。
             // 攻撃に 1 本だけ挿して残りを全部ブロックへ回す ガン守りが、 旧条件では素通りしていた。
+            // (〈停滞する時間〉は 2026-11-12 #103 で端子を止める効果に替わり、 もうこの値を読まない。 他のパッシブ・敵〈多頭攻撃〉などが読む)
             ctx.accumulatedValues["mutualBlockDiceCount"] = blockDiceCount;
             // 2026-10-28: 充電・補助の端子の個数と予告の敵攻撃も載せ、 配線を条件にするパッシブ
             //   (剣〈切り返し〉〈不滅の刃〉・盾〈シールドバッシュ〉〈堅守の構え〉〈城壁〉) を OnWired で焚く。
@@ -1343,13 +1344,13 @@ namespace CombatSystem
                 traceBossBonus = ctx.bossDiceBonus;
                 // [計装] 7層p4 だけ、 攻撃値の内訳をターン帯ごとに積む。
                 //   p1〜p3 が 9T で 7 しか削らないのに p4 が 14T で 90 削る理由を、
-                //   素火力 / ダイス合計 / 停滞 / 遺物 / ブロック貫通 に割って見る。
+                //   素火力 / ダイス合計 / 遺物 / ブロック貫通 に割って見る (と、 〈停滞する時間〉で止まった端子の枚数)。
                 if (ctx.bossId == GameLoop.BossIds.VescaFinal)
                     GameLoop.RunChronicle.NoteP4Turn(
                         ctx.currentTurn,
                         currentEnemy != null ? currentEnemy.EffectiveBaseAttack : 0,
                         ctx.enemyDiceTotal,
-                        ctx.stagnationStacks * ItemSystem.PassiveSkills.Effects.StagnantTime.DicePerStack(ctx),
+                        _deck != null ? _deck.state.StoppedCount : 0,      // 〈停滞する時間〉で止まった端子の枚数 (2026-11-12〜・ダイス計の内訳ではない)
                         (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.VescaRelicPool.KeyDiceBonusThisTurn),
                         enemyAtkValue, blockSum, lossBase, ctx.massiveBleedStacks);
                 ctx.playerWonRoll = false; ctx.playerLostRoll = true; // ProcessDamage 内で OnPreReceiveDamage を発火させる
