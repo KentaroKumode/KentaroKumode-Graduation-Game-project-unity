@@ -334,6 +334,9 @@ namespace AutoTest.ParallelSweep
         public double[] damageStages7F = Array.Empty<double>();
         public double[] cut7F = Array.Empty<double>();
         public double[] stag7F = Array.Empty<double>();
+        /// <summary>[計装 2026-11-12] 端子ごとの使われ方 (<see cref="CombatSystem.TerminalDiag"/>)。 名前 × TerminalDiag.Width を平らに並べる。</summary>
+        public string[] termDiagNames = Array.Empty<string>();
+        public double[] termDiag = Array.Empty<double>();
     }
 
     /// <summary>AutoRunner の設定をプロセス間で運ぶ。

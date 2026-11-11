@@ -20,6 +20,22 @@ ENEMIES = {
     "wolf":     "a huge scarred dire wolf, bristling grey fur, glowing yellow eyes, fangs bared",
     "orc":      "a brutish orc brute with a spiked club and iron shoulder plates",
 }
+# 2026-11-12: 見せる層 0〜2 (深さ 0 / 1 / 3) の雑魚 12 種 (精鋭は同じ絵を色で分ける想定なので作らない)。 説明は enemies.json の description から。
+#   python Tools/pixellab_battle.py enemies --set early --dir enemies_l012
+EARLY = {
+    "farm_crate":       "an old rotting wooden supply crate with loose planks and rusty nails, an inanimate object, no face",
+    "slime":            "a small wobbling green slime blob with a glossy highlight and a faint menacing grin",
+    "goblin":           "a small cunning goblin with a rusty cleaver and ragged leather armor, sly grin",
+    "kobold":           "a dog-faced kobold trapper with a short spear, a coil of rope and a bear trap on its belt",
+    "skeleton":         "an undead skeleton soldier with a cracked round shield and a chipped short sword",
+    "wolf":             "a huge scarred dire wolf in a lunging stance, bristling grey fur, glowing yellow eyes, fangs bared",
+    "demon":            "a hellfire imp demon with small horns and bat wings, wreathed in orange flames, intimidating pose",
+    "lizardman":        "a snake-scaled lizardman warrior with hard green scales, a large round bronze shield and a curved sword, defensive stance",
+    "minotaur":         "a huge bull-headed minotaur with two great horns and thick hide, a heavy double-bladed axe, charging pose",
+    "chimera":          "a chimera beast with a lion body, a goat head on its back and a snake for a tail",
+    "13th_death":       "a small hooded death spirit ghost holding a tiny scythe, pale glowing eyes, wisps of shadow",
+    "carapace_crawler": "a crawling insect with an oversized armored back shell much larger than its soft pale body, many short legs",
+}
 BACKDROP = ("a dark stone dungeon hall seen from the front for a side-view turn-based battle, empty floor in the lower third, "
             "arched stone wall with torches casting warm orange light, deep blue-black shadows, no characters, no text, "
             "wide flat floor for two fighters to stand on, atmospheric")
@@ -81,11 +97,15 @@ def gen_backdrop(seed):
 
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("what", choices=["enemies", "backdrop"]); ap.add_argument("--only", default=""); ap.add_argument("--seed", type=int, default=20261020)
-    a = ap.parse_args(); os.makedirs(OUT, exist_ok=True)
+    ap = argparse.ArgumentParser(); ap.add_argument("what", choices=["enemies", "backdrop"]); ap.add_argument("--only", default=""); ap.add_argument("--seed", type=int, default=20261020); ap.add_argument("--set", default="old", choices=["old", "early"]); ap.add_argument("--dir", default="")
+    a = ap.parse_args()
+    global OUT
+    if a.dir: OUT = os.path.join(OUT, a.dir)
+    os.makedirs(OUT, exist_ok=True)
     if a.what == "backdrop": gen_backdrop(a.seed); return
-    only = [x for x in a.only.split(",") if x] or list(ENEMIES)
-    for i, n in enumerate(only): gen_enemy(n, ENEMIES[n], a.seed + i)
+    table = EARLY if a.set == "early" else ENEMIES
+    only = [x for x in a.only.split(",") if x] or list(table)
+    for n in only: gen_enemy(n, table[n], a.seed + list(table).index(n))
 
 
 if __name__ == "__main__":

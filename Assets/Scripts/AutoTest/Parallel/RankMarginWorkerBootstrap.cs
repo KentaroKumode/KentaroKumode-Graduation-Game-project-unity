@@ -147,6 +147,7 @@ namespace AutoTest.ParallelSweep
                 GameLoop.ProvisionPayment.ResetStats();
                 MetaProgression.VaultBank.ResetStats();
                 CombatSystem.GuardDiag.Reset();
+                CombatSystem.TerminalDiag.Reset();
                 CombatSystem.SkillDiag.Reset();
                 CombatSystem.ShieldDiag.Reset();
                 CombatSystem.DmgSourceDiag.Reset();
@@ -441,6 +442,13 @@ namespace AutoTest.ParallelSweep
                     response.damageStages7F = (double[])CombatSystem.CombatStats.DamageStages7F.Clone();
                     response.cut7F = (double[])CombatSystem.GuardDiag.Cut7F.Clone();
                     response.stag7F = (double[])CombatSystem.GuardDiag.Stag7F.Clone();
+                    {   // [計装 2026-11-12] 端子ごとの使われ方
+                        var tn = new List<string>(CombatSystem.TerminalDiag.Rows.Keys);
+                        int TW = CombatSystem.TerminalDiag.Width;
+                        response.termDiagNames = tn.ToArray();
+                        response.termDiag = new double[tn.Count * TW];
+                        for (int i = 0; i < tn.Count; i++) { var r = CombatSystem.TerminalDiag.Rows[tn[i]]; for (int c = 0; c < TW; c++) response.termDiag[i * TW + c] = r[c]; }
+                    }
                     for (int i = 0; i < dsn.Count; i++)
                     {
                         Array.Copy(dsAll[dsn[i]], 0, response.dmgSrcAll, i * W, W);

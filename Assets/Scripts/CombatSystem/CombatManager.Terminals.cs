@@ -37,6 +37,7 @@ namespace CombatSystem
             else runDeck = TerminalCards.StartingDeck();
             _deck = new TerminalDeckState();
             _deck.BeginBattle(runDeck);
+            TerminalDiag.NoteBattle(runDeck);   // [計装 2026-11-12]
         }
 
         /// <summary>ターンの始め: 手札を引く。 持ち越し (条件無視・多く引く・溜めた攻撃・鋳造の出目) を今のターンへ移す。</summary>
@@ -135,14 +136,16 @@ namespace CombatSystem
                 {
                     if (o.Fired(b, TerminalIds.Harvester))
                     {
+                        TerminalDiag.Note(TerminalIds.Harvester, TerminalDiag.KillBonus);   // [計装]
                         run.playerMaxHP += TerminalCards.HarvesterMaxHp; playerMaxHP += TerminalCards.HarvesterMaxHp;
                         Debug.Log($"[端子/収穫機] 最大 HP +{TerminalCards.HarvesterMaxHp}");
                     }
-                    if (o.Fired(b, TerminalIds.Whet)) { run.terminalWhetBonus += TerminalCards.WhetGain; Debug.Log($"[端子/研ぎ澄まし] 攻撃 +{TerminalCards.WhetGain} (計 {run.terminalWhetBonus})"); }
-                    if (o.Fired(b, TerminalIds.LootBox)) { run.coins += TerminalCards.LootGold; Debug.Log($"[端子/戦利品箱] ゴールド +{TerminalCards.LootGold}"); }
-                    if (o.Fired(b, TerminalIds.Stripper)) run.terminalExtraChoices++;
+                    if (o.Fired(b, TerminalIds.Whet)) { TerminalDiag.Note(TerminalIds.Whet, TerminalDiag.KillBonus); run.terminalWhetBonus += TerminalCards.WhetGain; Debug.Log($"[端子/研ぎ澄まし] 攻撃 +{TerminalCards.WhetGain} (計 {run.terminalWhetBonus})"); }
+                    if (o.Fired(b, TerminalIds.LootBox)) { TerminalDiag.Note(TerminalIds.LootBox, TerminalDiag.KillBonus); run.coins += TerminalCards.LootGold; Debug.Log($"[端子/戦利品箱] ゴールド +{TerminalCards.LootGold}"); }
+                    if (o.Fired(b, TerminalIds.Stripper)) { TerminalDiag.Note(TerminalIds.Stripper, TerminalDiag.KillBonus); run.terminalExtraChoices++; }
                 }
             }
+            TerminalDiag.NoteTurn(_deck.board, o);   // [計装 2026-11-12] (FinishTurn が手札を書き換える前に)
             _termRetain = _deck.FinishTurn(o);
         }
     }
