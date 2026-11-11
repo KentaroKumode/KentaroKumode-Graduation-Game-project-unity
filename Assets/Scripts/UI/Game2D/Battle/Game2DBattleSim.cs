@@ -419,7 +419,7 @@ namespace UI.Game2D.Battle
             if (d.chargeCost > 0 && env.charge < d.chargeCost) return false;
             if (board[s] == TerminalIds.BigDischarge && env.charge <= 0) return false;
             if (st.ignoreCond) return true;
-            // 〈研磨盤〉: 他の出目が研磨盤に挿さっていれば、 その数だけ +1
+            // 〈増圧〉: 他の出目が増圧に挿さっていれば、 その数だけ +1
             int v = dice[i];
             for (int j = 0; j < slot.Length && j < dice.Length; j++)
                 if (j != i && slot[j] >= 0 && slot[j] < board.Count && board[slot[j]] == TerminalIds.Grinder) v++;

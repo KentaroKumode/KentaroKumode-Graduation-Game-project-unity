@@ -27,7 +27,7 @@ namespace AutoTest
         // =====================================================================
         /// <summary>充電の価値の単位: 充電 3.5 (出目の平均) = 旧い配線の充電 1 本。 旧い効用の充電の項 (wChg × 2 × 本数) をそのまま使うため。</summary>
         private const float DeckChargePipsPerDie = 3.5f;
-        /// <summary>次の攻撃に乗る攻撃 (〈蓄電器〉〈受け太刀〉の溜め) を、 今の与ダメの 7 割と見る (次に攻撃するまでに戦闘が終わる・倒し過ぎる分)。</summary>
+        /// <summary>次の攻撃に乗る攻撃 (〈充填〉〈受け太刀〉の溜め) を、 今の与ダメの 7 割と見る (次に攻撃するまでに戦闘が終わる・倒し過ぎる分)。</summary>
         private const float DeckFutureAttackShare = 0.7f;
         /// <summary>溜める端子の溜まり 1 あたりの価値 = 発動 1 回の価値 ÷ 必要量 × 0.5 (溜め切る前に戦闘が終わることが多い)。
         /// 発動した回の価値は別に数えるので、 発動で溜まりが減る分は負の溜まりとして相殺される (溜めるほど得・発動すれば満額)。</summary>
@@ -92,7 +92,7 @@ namespace AutoTest
             int turns = DeckEstTurns(in s, k);
             float escDelayWorth = DeckEscStepShare * Math.Max(0, s.enemyAtk) * turns * fw;
             float flat = 0f;
-            // 次の攻撃に乗る攻撃 (〈蓄電器〉が発動した分・〈受け太刀〉)。 今ターン攻撃して使った分は attackAdd に入っているので、 減った分は負で相殺
+            // 次の攻撃に乗る攻撃 (〈充填〉が発動した分・〈受け太刀〉)。 今ターン攻撃して使った分は attackAdd に入っているので、 減った分は負で相殺
             int stored0 = before.storedAttack + before.storedAttackNext, stored1 = after.storedAttack + after.storedAttackNext;
             flat += (stored1 - stored0) * DeckFutureAttackShare * dw;
             // 溜まり (発動前の分)

@@ -26,8 +26,8 @@ namespace CombatSystem
         public const string Attack = "攻撃", Block = "防御", Charge = "充電";
         // コモン
         public const string Igniter = "点火栓", Detector = "検波器", DischargeTube = "放電管", Deathwish = "決死", Relay = "継電器",
-            Grinder = "研磨盤", Oscillator = "発振器", Twin = "二連", Fuse = "ヒューズ", Ground = "接地", Insulator = "絶縁体",
-            Parry = "受け太刀", Breaker = "遮断器", Rectifier = "整流器", Battery = "蓄電池", Heal = "治癒", Capacitor = "蓄電器",
+            Grinder = "増圧", Oscillator = "発振器", Twin = "二連", Fuse = "ヒューズ", Ground = "接地", Insulator = "絶縁体",
+            Parry = "受け太刀", Breaker = "遮断器", Rectifier = "整流器", Battery = "蓄電池", Heal = "治癒", Capacitor = "充填",
             Arrester = "避雷器", Transformer = "変圧器", Switchboard = "配電盤";
         // レア
         public const string Amplifier = "増幅器", VacuumTube = "真空管", Resonator = "共振器", Foundry = "鋳造口", Coolant = "冷却材",
@@ -78,7 +78,7 @@ namespace CombatSystem
         public int firedTotal;
         /// <summary>このターン / 次のターン、 出目の条件を無視する (〈予熱器〉)。</summary>
         public bool ignoreCond, ignoreCondNext;
-        /// <summary>次に攻撃するターンの攻撃に足す量 (〈蓄電器〉)。 / 次のターンから使える分 (〈受け太刀〉)。</summary>
+        /// <summary>次に攻撃するターンの攻撃に足す量 (〈充填〉)。 / 次のターンから使える分 (〈受け太刀〉)。</summary>
         public int storedAttack, storedAttackNext;
         /// <summary>次のターンに多く引く枚数 (〈配電盤〉)。</summary>
         public int extraDrawNext;
@@ -363,7 +363,7 @@ namespace CombatSystem
                 cnt[s]++;
             }
 
-            // ── 1. 〈研磨盤〉: 他の出目すべて +1 (他の端子より先に効く) ──
+            // ── 1. 〈増圧〉: 他の出目すべて +1 (他の端子より先に効く) ──
             for (int i = 0; i < n; i++)
                 if (o.slotOfDie[i] >= 0 && board[o.slotOfDie[i]] == TerminalIds.Grinder)
                     for (int j = 0; j < n; j++) if (j != i) v[j]++;
@@ -532,7 +532,7 @@ namespace CombatSystem
                 // 基本
                 case TerminalIds.Attack:
                 // 出目をそのまま攻撃に入れるだけの端子。 上乗せは別の所で付く:
-                //   研磨盤 = 解決の前に他の出目 +1 / 継電器 = 下の「6. 他の端子を見る効果」/ 計数器 = 本体 (DrawTerminalHand) /
+                //   増圧 = 解決の前に他の出目 +1 / 継電器 = 下の「6. 他の端子を見る効果」/ 計数器 = 本体 (DrawTerminalHand) /
                 //   収穫機・戦利品箱 = 撃破した時 (CombatManager.FinishTerminalTurn)
                 case TerminalIds.Relay: case TerminalIds.Grinder: case TerminalIds.Twin: case TerminalIds.Counter:
                 case TerminalIds.Harvester: case TerminalIds.LootBox:
