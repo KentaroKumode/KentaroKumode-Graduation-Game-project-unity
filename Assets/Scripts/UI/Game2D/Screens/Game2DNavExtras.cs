@@ -10,7 +10,7 @@ namespace UI.Game2D
     /// <summary>
     /// 航行の計器の足りない分 (<b>仮置き</b>・2026-10-24)。 docs/design/gui-needed.md の「未実装」の航行の項目を、 枠・ボタンの仮の絵と文字で並べたもの。
     /// 上の帯 = 天気 (今)・層 (今の層 / 最終層)・警告ランプ (追跡者が警戒・追跡中で点灯)・待つボタン / 左下 = 職業・状態異常・消耗品・パッシブ / 右 = 航行アイテムの枠 3 つ・脱出ボタン。
-    /// 層・追跡者・天気・所持数は実際の値、 そのほか (職業名・状態異常・アイテム枠) は見本。 戦闘中は 3 方向へ引っ込む (<see cref="Drive"/>)。
+    /// 層・追跡者・天気・所持品 (左下の 10 枠は品のアイコン・2026-11-12) は実際の値、 予報は見本。 戦闘中は 3 方向へ引っ込む (<see cref="Drive"/>)。
     /// <para>操作 (2026-11-04): 上の帯の [WAIT] = 待つ (その場で 1 ターン・Space と同じ) / 左下の ITEMS の欄 = 所持品の窓 (消耗品を使う・パッシブを見る)。</para>
     /// <para>2026-11-11: 上の帯の右隣に「経過ターン・補足中の警告 (ETA)・照明の残り」の帯、 右の列に航行アイテムの 3 枠 (V / B / N・〈前哨の旗〉を立てる)、
     /// 終点 (ボス・〈門〉) へ踏み出す前の確認の窓 (<see cref="ConfirmExit"/>) を足した。</para>
@@ -118,7 +118,7 @@ namespace UI.Game2D
             bool jump = Time.unscaledTime < _jumpUntil;
             bool chase = sim != null && sim.FoeAlive && sim.FoeMode == FoeMode.Chase;
             int blink = chase ? Mathf.FloorToInt(Time.unscaledTime * 2.5f) & 1 : 0;      // 補足中の警告は 2.5 回/秒で明滅
-            int h = floor * 7 + passives * 31 + cons * 131 + weather * 17 + (foe + 2) * 1009 + (sim != null ? sim.Version * 7919 : 0) + blink * 104729 + (_hoverSlot + 2) * 15485863 + (jump ? 31 : 0);
+            int h = floor * 7 + passives * 31 + cons * 131 + (run != null ? run.playerHP * 389 : 0) + weather * 17 + (foe + 2) * 1009 + (sim != null ? sim.Version * 7919 : 0) + blink * 104729 + (_hoverSlot + 2) * 15485863 + (jump ? 31 : 0);
             if (h == _hash && Time.unscaledTime < _next) return;
             _hash = h; _next = Time.unscaledTime + 0.5f;
             Redraw(floor, passives, cons, weather, foe);
@@ -284,7 +284,11 @@ namespace UI.Game2D
             {
                 string id = ids[first + i]; var data = ItemSystem.ItemDatabase.Instance?.GetItem(id);
                 int n = 0; if (!_invPassives) foreach (var c in run.ownedConsumables) if (c == id) n++;
-                d.Items.Add(new ModalItem { name = data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : id, value = _invPassives ? null : "x" + n, desc = data?.description });
+                string block = _invPassives ? null : Consumables.BlockReason(run, id);      // 今は使えない消耗品は暗く・理由は説明の下に
+                string desc = data?.description;
+                if (block != null) desc = string.IsNullOrEmpty(desc) ? "(" + block + ")" : desc + "\n(" + block + ")";
+                d.Items.Add(new ModalItem { icon = id, rarity = data != null ? data.rarity : (ItemSystem.ItemRarity?)null,
+                    name = data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : id, value = _invPassives ? null : "x" + n, desc = desc, disabled = block != null });
             }
             if (ids.Count == 0) d.body = _invPassives ? "パッシブを持っていない。" : "消耗品を持っていない。";
             if (!_invPassives) d.buttons.Add(new ModalBtn { label = "使う", action = "use", primary = true });
@@ -301,6 +305,8 @@ namespace UI.Game2D
                     case "page": _invPage = (_invPage + 1) % pages; break;
                     case "use":
                         if (sel < 0 || sel >= cnt) return;
+                        string why = Consumables.BlockReason(run, ids[first + sel]);
+                        if (why != null) { Game2DSfx.Play("ui_click"); modal.ShowToast(why); return; }
                         if (Consumables.Use(run, ids[first + sel])) { Game2DSfx.Play("ui_confirm"); modal.ShowToast("使った"); }
                         else { modal.ShowToast("今は使えない"); return; }
                         break;
@@ -374,10 +380,37 @@ namespace UI.Game2D
             if (Game2DKit.Chip != null) p.NineSlice(Game2DKit.Chip, 6, Game2DKit.Well, x, y, w, h); else p.Plate(x, y, w, h, mul);
         }
 
-        private static void Slot(KitPix p, int x, int y, int size, bool filled, string icon)
+        /// <summary>所持品の欄の 1 枠 (18×18)。 itemId = 品のアイコン (Resources/Icons/Items・16×16 をそのまま打つ・拡大縮小しない)。
+        /// 絵の無い品は、 系統の代わりのアイコン (fallback) を塗る。 dim = 今は使えない消耗品 (明度を落として出す ── 大きさは変えない)。</summary>
+        private static void Slot(KitPix p, int x, int y, string itemId, string fallback, bool dim)
         {
+            const int size = SlotCell;
             if (Game2DKit.Slot != null) p.Sprite(Game2DKit.Slot, x, y, size, size); else p.Box(x, y, size, size, Game2DKit.Off, Game2DKit.Dark);
-            if (filled) p.AnyIcon(icon, x + 2, y + 2, size - 4, Game2DKit.Ink);
+            if (itemId == null) return;
+            var ic = Game2DKit.ItemIcon(itemId);
+            if (ic != null) p.Sprite(ic, x + 1, y + 1, 16, 16);
+            else p.AnyIcon(fallback, x + 2, y + 2, size - 4, Game2DKit.Ink);
+            if (!dim) return;
+            for (int j = 1; j < size - 1; j++)
+                for (int i = 1; i < size - 1; i++)
+                {
+                    int px = x + i, py = y + j; if (px < 0 || py < 0 || px >= p.w || py >= p.h) continue;
+                    int k = (p.h - 1 - py) * p.w + px; var c = p.px[k];
+                    p.px[k] = new Color32((byte)(c.r * 2 / 5), (byte)(c.g * 2 / 5), (byte)(c.b * 2 / 5), c.a);
+                }
+        }
+
+        /// <summary>所持品の欄の枠の大きさと間隔 (5 枠 × 2 段)。</summary>
+        private const int SlotCell = 18, SlotStep = 19, SlotCols = 5, SlotRows = 2;
+
+        /// <summary>所持品の欄に並べる品: 消耗品 (同じ品は 1 枠・持っている順) → パッシブ。 枠に入りきらない分は最後の枠に「+」。</summary>
+        private static List<string> ShelfItems(RunState run, out int consKinds)
+        {
+            var l = new List<string>(); consKinds = 0;
+            if (run?.ownedConsumables != null) foreach (var id in run.ownedConsumables) if (!l.Contains(id)) l.Add(id);
+            consKinds = l.Count;
+            if (run?.ownedPassiveItems != null) l.AddRange(run.ownedPassiveItems);
+            return l;
         }
 
         private void Redraw(int floor, int passives, int cons, int weather, int foe)
@@ -395,10 +428,21 @@ namespace UI.Game2D
             p.TextC("待つ", WaitR, Game2DKit.Ink);
             p.Apply(_tt);
             // ── 左下 (所持品: 消耗品とパッシブを 1 つの欄にまとめる。 状態異常は戦闘の表示) ──
+            //   実際の所持品 (issue #11): 品のアイコンを消耗品 → パッシブの順に。 今は使えない消耗品 (戦闘の中だけで使える品・HP が満ちている時の回復薬 等) は暗く。
             p = new KitPix(LeftR.width, LeftR.height);
             int total = cons + passives;
             p.Text("所持品", 2, 0, Game2DKit.Dim); p.TextR(total + "個", 96, 0, Game2DKit.Ink);
-            for (int i = 0; i < 10; i++) Slot(p, (i % 5) * 19, 13 + (i / 5) * 19, 17, i < total, i < cons ? "flare" : "relic");
+            var run = GameManager.Instance?.Run;
+            var shelf = ShelfItems(run, out int consKinds);
+            int slots = SlotCols * SlotRows; bool more = shelf.Count > slots;
+            for (int i = 0; i < slots; i++)
+            {
+                int x = (i % SlotCols) * SlotStep, y = 13 + (i / SlotCols) * SlotStep;
+                bool last = i == slots - 1;
+                if (more && last) { Slot(p, x, y, null, null, false); p.TextC("+" + (shelf.Count - slots + 1), new RectInt(x, y, SlotCell, SlotCell), Game2DKit.Ink); continue; }
+                string id = i < shelf.Count ? shelf[i] : null; bool isCons = i < consKinds;
+                Slot(p, x, y, id, isCons ? "supply" : "relic", id != null && isCons && !Consumables.CanUse(run, id));
+            }
             p.Apply(_tl);
         }
     }

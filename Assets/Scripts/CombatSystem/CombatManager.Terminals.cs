@@ -18,6 +18,15 @@ namespace CombatSystem
         /// <summary>このターンの主攻撃に掛ける別枠の倍率 (〈増幅器〉〈共振器〉)。 毎ターン 1 に戻す。</summary>
         private float _termDamageMul = 1f;
 
+        /// <summary>挑戦カード〈猫の手〉: このターン猫が先に挿した 1 組 (出目の添字 → 場の添字)。 −1 = 挿していない。
+        /// ターンの始め (<see cref="DrawTerminalHand"/>) に外し、 配線の判断の頭 (<see cref="ChooseCatPaw"/>) で決める。</summary>
+        private int _catDie = -1, _catSlot = -1;
+
+        /// <summary>〈猫の手〉がこのターン先に挿した出目 (−1 = 無し)。 BOT の挿し方の方策はこの 1 組を固定として扱う (外さない)。</summary>
+        public int CatPawDie => _catDie;
+        /// <summary>〈猫の手〉がこのターン先に挿した端子 (場の添字・−1 = 無し)。</summary>
+        public int CatPawSlot => _catSlot;
+
         /// <summary>この戦闘の山札 (画面・BOT が読む)。 最初の戦闘の前だけ null。 書き換えないこと。</summary>
         public TerminalDeckState TerminalDeck => _deck;
         /// <summary>このターンの端子の結果 (画面が発動した端子を光らせるのに使う)。</summary>
@@ -25,7 +34,7 @@ namespace CombatSystem
 
         private void BeginTerminalDeck()
         {
-            _termOutcome = null; _termRetain = null; _termDamageMul = 1f;
+            _termOutcome = null; _termRetain = null; _termDamageMul = 1f; _catDie = _catSlot = -1;
             // 山札は常に有る (旧い配線の経路は 2026-11-11 に削除)。 ランが無い戦闘 (単体の試験など) は開始の山札で戦う。
             var run = GameLoop.GameManager.Instance?.Run;
             List<string> runDeck;
@@ -43,9 +52,18 @@ namespace CombatSystem
         /// <summary>ターンの始め: 手札を引く。 持ち越し (条件無視・多く引く・溜めた攻撃・鋳造の出目) を今のターンへ移す。</summary>
         private void DrawTerminalHand(CombatContext ctx)
         {
+            _catDie = _catSlot = -1;      // 〈猫の手〉は配線の判断の頭で挿し直す (振り直しの判断の間は無い)
             if (_deck == null) return;
             int extra = _deck.state.BeginTurn();
-            _deck.DrawTurn(TerminalCards.HandSize + extra, _termRetain);
+            // ヴェスカ〈停滞する時間〉: 引いた端子 1 枚ごとに確率で止める (持たない敵は 0)
+            float stop = ItemSystem.PassiveSkills.Effects.StagnantTime.StopChance(currentEnemy);
+            _deck.DrawTurn(TerminalCards.HandSize + extra, _termRetain, stop);
+            if (stop > 0f)
+            {
+                GuardDiag.NoteStag7F(currentEnemy?.id, _deck.LastDrawnCount, _deck.LastStoppedCount, _deck.LastStoppedMains, _deck.LastHeldCount);   // [計装]
+                if (_deck.LastStoppedCount > 0)
+                    Debug.Log($"[停滞する時間] 引いた {_deck.LastDrawnCount} 枚のうち {_deck.LastStoppedCount} 枚が止まった (確率 {stop:P0})");
+            }
             _termRetain = null; _termOutcome = null; _termDamageMul = 1f;
             if (ctx == null) return;
             // 〈鋳造口〉: この戦闘中の出目 +N (自ロールの後に足す既存の口へ渡す)
@@ -57,6 +75,28 @@ namespace CombatSystem
                 int stacks = _deck.state.firedTotal / TerminalCards.CounterEvery;
                 if (stacks > 0) ctx.AddOutgoingPct(TerminalCards.CounterPct * stacks);
             }
+        }
+
+        /// <summary>挑戦カード〈猫の手〉(#5): 配線の判断の頭 (振り直しが済み、 予告が確定した後) に、 札の確率で 1 組を先に挿す。
+        /// 選ぶのは Super の評価 (<see cref="GameLoop.GameHooks.CatPawPick"/>)。 口が無い・評価できない時は既定の挿し方 (<see cref="TerminalWiring.CatPawFallback"/>)。
+        /// 乱数は専用の鍵 "challenge.cat" (他の抽選の消費列を動かさない)。 札を受けていなければ乱数も引かない。</summary>
+        private void ChooseCatPaw(int[] dice, MutualTurnTelegraph tele, TerminalEnv env)
+        {
+            _catDie = _catSlot = -1;
+            float p = MetaProgression.MetaBuffApplicator.GetCatPawChance();
+            if (p <= 0f || _deck == null || dice == null || dice.Length == 0 || _deck.board.Count == 0) return;
+            if (!GameLoop.GameRng.Chance(p, "challenge.cat", RngIdx(0))) return;
+            int[] pick = null;
+            var hook = GameLoop.GameHooks.CatPawPick;
+            if (hook != null)
+            {
+                try { pick = hook(dice, tele); }
+                catch (Exception e) { Debug.LogWarning("[猫の手] 評価に失敗したので既定の挿し方で選ぶ: " + e.Message); pick = null; }
+            }
+            if (pick == null) pick = TerminalWiring.CatPawFallback(_deck.board, dice, env, _deck.state);
+            if (pick == null || pick.Length < 2 || pick[0] < 0 || pick[0] >= dice.Length || pick[1] < 0 || pick[1] >= _deck.board.Count) return;
+            _catDie = pick[0]; _catSlot = pick[1];
+            Debug.Log($"[猫の手] 出目 {dice[_catDie]} → 〈{_deck.board[_catSlot]}〉");
         }
 
         /// <summary>端子の見積もりに要る盤面を、 今の戦闘から作る。</summary>
@@ -153,17 +193,22 @@ namespace CombatSystem
     /// <summary>挿し方の列挙と、 既定の挿し方 (方策も画面も答えを出さなかった時・人の「おまかせ」)。 ADR-0014。</summary>
     public static class TerminalWiring
     {
-        /// <summary>規則上ありうる挿し方をすべて返す (出目ごとの挿し先・−1 = 挿さない)。 挿せる数だけ見る (条件・充電は <see cref="TerminalCards.Resolve"/> が直す)。</summary>
-        public static List<int[]> Enumerate(List<string> board, int diceCount)
+        /// <summary>規則上ありうる挿し方をすべて返す (出目ごとの挿し先・−1 = 挿さない)。 挿せる数だけ見る (条件・充電は <see cref="TerminalCards.Resolve"/> が直す)。
+        /// state を渡すと、 止まった端子 (ヴェスカ〈停滞する時間〉) へ挿す手は出さない (Resolve が外すのと同じ結果になる手を数え直さないため)。
+        /// <paramref name="fixedDie"/> ≥ 0 なら、 その出目は <paramref name="fixedSlot"/> に挿した挿し方だけ (〈猫の手〉が先に挿した 1 組)。</summary>
+        public static List<int[]> Enumerate(List<string> board, int diceCount, TerminalBattleState state = null, int fixedDie = -1, int fixedSlot = -1)
         {
             var res = new List<int[]>();
             int m = board.Count;
             var cap = new int[m];
-            for (int s = 0; s < m; s++) cap[s] = TerminalCards.Get(board[s])?.capacity ?? 0;
+            for (int s = 0; s < m; s++) cap[s] = state != null && state.IsStopped(s) ? 0 : TerminalCards.Get(board[s])?.capacity ?? 0;
+            bool hasFixed = fixedDie >= 0 && fixedDie < diceCount && fixedSlot >= 0 && fixedSlot < m && cap[fixedSlot] > 0;
+            if (hasFixed) cap[fixedSlot]--;      // 先に挿した 1 組の分を、 先に場から取っておく
             var cur = new int[diceCount];
             void Rec(int i)
             {
                 if (i == diceCount) { res.Add((int[])cur.Clone()); return; }
+                if (hasFixed && i == fixedDie) { cur[i] = fixedSlot; Rec(i + 1); return; }
                 cur[i] = -1; Rec(i + 1);
                 for (int s = 0; s < m; s++)
                 {
@@ -176,17 +221,62 @@ namespace CombatSystem
         }
 
         /// <summary>既定の挿し方: 全部の挿し方を試して、 素朴な点 (攻撃 + 防げる分 + 充電と回復の一部) が最も高いものを選ぶ。
-        /// 本気の方策ではない ── BOT は自分の評価で選ぶ (AutoRunner)。</summary>
-        public static int[] Auto(List<string> board, int[] dice, TerminalEnv env, TerminalBattleState state)
+        /// 本気の方策ではない ── BOT は自分の評価で選ぶ (AutoRunner)。 <paramref name="fixedDie"/> は <see cref="Enumerate"/> と同じ (〈猫の手〉の 1 組を外さない)。</summary>
+        public static int[] Auto(List<string> board, int[] dice, TerminalEnv env, TerminalBattleState state, int fixedDie = -1, int fixedSlot = -1)
         {
             int[] best = null; float bestScore = float.NegativeInfinity;
-            foreach (var w in Enumerate(board, dice.Length))
+            foreach (var w in Enumerate(board, dice.Length, state, fixedDie, fixedSlot))
             {
                 var o = TerminalCards.Resolve(board, w, dice, env, state.Clone());
                 float score = NaiveScore(o, env);
                 if (score > bestScore) { bestScore = score; best = w; }
             }
             return best ?? new int[dice.Length];
+        }
+
+        // ── 挑戦カード〈猫の手〉(#5) ──
+        //   ターンの配線の判断の頭に、 最良の挿し方の中から「外すと効用が一番落ちる 1 組」を先に挿す。 効用は Super の評価 (GameHooks.CatPawPick・AutoTest が差す)、
+        //   評価が使えなければ既定の挿し方の素朴な点。 1 組の選び方 (MostValuablePair) はここの 1 か所だけで、 どちらの評価も同じ規則で選ぶ。
+
+        /// <summary>挿し方 <paramref name="wiring"/> (挿し方を直した後の値 = <see cref="TerminalOutcome.slotOfDie"/> を渡す) の中で、
+        /// その 1 組だけを外した時に効用が一番落ちる組 <c>{ 出目, 場の添字 }</c>。 同点は若い出目。 挿した組が無ければ <c>{ -1, -1 }</c>。</summary>
+        public static int[] MostValuablePair(int[] wiring, Func<int[], float> utility)
+        {
+            var none = new[] { -1, -1 };
+            if (wiring == null || utility == null) return none;
+            float full = utility(wiring);
+            int bestDie = -1; float bestLoss = float.NegativeInfinity;
+            for (int i = 0; i < wiring.Length; i++)
+            {
+                if (wiring[i] < 0) continue;
+                var w = (int[])wiring.Clone(); w[i] = -1;
+                float loss = full - utility(w);
+                if (bestDie < 0 || loss > bestLoss) { bestDie = i; bestLoss = loss; }
+            }
+            return bestDie >= 0 ? new[] { bestDie, wiring[bestDie] } : none;
+        }
+
+        /// <summary>〈猫の手〉の既定 (Super の評価が使えない時): 既定の挿し方 (<see cref="Auto"/>) の中から、 素朴な点で 1 組を選ぶ。</summary>
+        public static int[] CatPawFallback(List<string> board, int[] dice, TerminalEnv env, TerminalBattleState state)
+        {
+            if (board == null || board.Count == 0 || dice == null || dice.Length == 0 || state == null) return new[] { -1, -1 };
+            var best = Auto(board, dice, env, state);
+            var fixedUp = TerminalCards.Resolve(board, best, dice, env, state.Clone()).slotOfDie;
+            return MostValuablePair(fixedUp, w => NaiveScore(TerminalCards.Resolve(board, w, dice, env, state.Clone()), env));
+        }
+
+        /// <summary>挿し方に〈猫の手〉の 1 組を入れた写しを返す (元の配列は書き換えない)。 その端子が挿せる数を超える分は、 他の出目を後ろから外す。</summary>
+        public static int[] WithPair(int[] slots, int diceCount, List<string> board, int die, int slot)
+        {
+            var w = new int[diceCount];
+            for (int i = 0; i < diceCount; i++) w[i] = slots != null && i < slots.Length ? slots[i] : -1;
+            if (die < 0 || die >= diceCount || board == null || slot < 0 || slot >= board.Count) return w;
+            w[die] = slot;
+            int cap = Math.Max(1, TerminalCards.Get(board[slot])?.capacity ?? 1), used = 1;
+            for (int i = 0; i < diceCount; i++) if (i != die && w[i] == slot) used++;
+            for (int i = diceCount - 1; i >= 0 && used > cap; i--)
+                if (i != die && w[i] == slot) { w[i] = -1; used--; }
+            return w;
         }
 
         public static float NaiveScore(TerminalOutcome o, TerminalEnv env)

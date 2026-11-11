@@ -255,6 +255,7 @@ namespace UI.Game2D.Battle
                 if (AutoWireOnTurnStart) AutoWire(false);
             }
             else ValidateSlots();
+            TakeCatPaw(p);
             RecomputePreview();
         }
 
@@ -291,6 +292,9 @@ namespace UI.Game2D.Battle
                         if (!cm.IsAwaitingDecision) { Resolve(cm); break; }
                         if (!SameDice(cm.PendingDecision.playerDice)) { SyncDecision(cm, false); Game2DSfx.Play("ui_tab"); Touch(); break; }
                         p = cm.PendingDecision;
+                        // 〈猫の手〉が挿した: 人が見ないまま決めないよう、 猫の 1 組を見せて止まる (もう一度押すと決まる)
+                        if (p.kind == TurnPauseKind.Wiring && p.catDie >= 0 && (p.catDie >= slot.Length || slot[p.catDie] != p.catSlot))
+                        { SyncDecision(cm, false); Game2DSfx.Play("wire", 1f, 1.1f); Touch(); break; }
                     }
                     if (p.kind == TurnPauseKind.Wiring)
                     {
@@ -343,17 +347,44 @@ namespace UI.Game2D.Battle
             return true;
         }
 
-        /// <summary>配線の判断の間に消耗品を使う。 使えたら HP・充電の表示を写し直す。</summary>
+        /// <summary>消耗品を使える段か: ターンの判断 (振り直し・配線) で止まっている間だけ。 本体は CombatManager.Interactive のイテレーターで待っている。
+        /// BOT が戦闘中に消耗品を使う所 (ターンの間・配線の方策の中) と同じく、 敵の攻撃が予告されてから、 そのターンが解決する前。</summary>
+        public bool CanUseItems
+        {
+            get { var cm = CombatManager.Instance; return CanOperate && cm != null && cm.IsCombatActive && cm.IsAwaitingDecision; }
+        }
+
+        /// <summary>判断の間に消耗品を使う。 <b>本体の <see cref="Consumables.Use"/> をそのまま呼ぶ</b> (BOT と同じ関数・画面は値を作らない)。
+        /// 使えたら HP・充電の表示を写し直す (シールド・与ダメは HUD が毎フレーム読み直す)。</summary>
         public bool UseItem(string id)
         {
-            var gm = GameManager.Instance; var cm = CombatManager.Instance;
-            if (!CanOperate || gm?.Run == null || cm == null) return false;
+            var gm = GameManager.Instance;
+            if (!CanUseItems || gm?.Run == null) return false;
+            int hp0 = CombatManager.Instance.PlayerHP;
             if (!Consumables.Use(gm.Run, id)) return false;
-            playerHp = cm.PlayerHP; playerMax = Mathf.Max(1, cm.PlayerMaxHP);
+            AfterItem(hp0);
+            return true;
+        }
+
+        /// <summary>〈シュヴァリエのレイピア〉のコントラタックを切り替える (消費しない)。 本体の <see cref="Consumables.TryUseRapier"/> を呼ぶ (BOT と同じ関数)。</summary>
+        public bool UseRapier()
+        {
+            var gm = GameManager.Instance;
+            if (!CanUseItems || gm?.Run == null) return false;
+            int hp0 = CombatManager.Instance.PlayerHP;
+            if (!Consumables.TryUseRapier(gm.Run)) return false;
+            AfterItem(hp0);
+            return true;
+        }
+
+        /// <summary>使った後の表示の写し。 回復した分はターンの頭の HP にも足す (敵の攻撃の演出で見せる被ダメ = 頭の HP − 解決後の HP を、 回復で小さく見せない)。</summary>
+        private void AfterItem(int hpBefore)
+        {
+            var cm = CombatManager.Instance;
+            if (cm != null) { _hpBefore += cm.PlayerHP - hpBefore; playerHp = cm.PlayerHP; playerMax = Mathf.Max(1, cm.PlayerMaxHP); }
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             if (ctx != null) charge = ctx.GetCharge();
             Touch();
-            return true;
         }
 
         /// <summary>出目 i の行き先を順に変える (dir = 1 で次・−1 で前)。 場の端子 → 挿さない の順で、 挿せない端子は飛ばす。</summary>
@@ -426,6 +457,7 @@ namespace UI.Game2D.Battle
         public bool Accepts(int i, int s)
         {
             if (!TermInputs(out var dice, out var env, out var st) || i < 0 || i >= dice.Length || i >= slot.Length || s < 0 || s >= board.Count) return false;
+            if (st.IsStopped(s)) return false;      // ヴェスカ〈停滞する時間〉で止まった端子は挿せない (Resolve も外す)
             var d = TerminalCards.Get(board[s]); if (d == null) return false;
             int used = 0;
             for (int j = 0; j < slot.Length; j++) if (j != i && slot[j] == s) used++;
@@ -447,6 +479,10 @@ namespace UI.Game2D.Battle
             }
         }
 
+        /// <summary>場の s が、 このターン止まっているか (ヴェスカ〈停滞する時間〉)。 画面が暗くして印を付けるのに使う。</summary>
+        public bool IsStopped(int s)
+            => TermInputs(out _, out _, out var st) ? st.IsStopped(s) : CombatManager.Instance?.TerminalDeck?.state.IsStopped(s) ?? false;
+
         /// <summary>端子 s にあと何個挿せるか (挿せる数 − 今挿している出目の数)。</summary>
         public int Remaining(int s)
         {
@@ -457,11 +493,34 @@ namespace UI.Game2D.Battle
 
         private bool IsDie(int i) => i >= 0 && i < slot.Length;
 
+        // ── 挑戦カード〈猫の手〉(#5) ──
+        //   本体が配線の判断の頭に 1 組 (出目 catDie → 場の catSlot) を先に挿したら、 その出目は動かせない (挿し替え・外す・おまかせでも残す)。
+
+        /// <summary>このターン〈猫の手〉が先に挿した出目 (−1 = 無し)。 画面の印に使う。</summary>
+        public int catDie = -1;
+        /// <summary>〈猫の手〉が挿した端子 (場の添字・−1 = 無し)。</summary>
+        public int catSlot = -1;
+
+        /// <summary>出目 i が〈猫の手〉に挿されていて動かせないか。</summary>
+        public bool IsCatLocked(int i) => catDie >= 0 && i == catDie;
+
+        /// <summary>判断の写しから猫の 1 組を読み、 挿し方に入れる (配線の判断の時だけ入る)。</summary>
+        private void TakeCatPaw(TurnPause p)
+        {
+            catDie = catSlot = -1;
+            if (p == null || p.kind != TurnPauseKind.Wiring || p.catDie < 0 || p.catSlot < 0 || p.catSlot >= board.Count || !IsDie(p.catDie)) return;
+            catDie = p.catDie; catSlot = p.catSlot;
+            // 猫の端子が挿せる数を超えるなら、 他の出目を後ろから外す (本体の TerminalWiring.WithPair と同じ規則)
+            var w = TerminalWiring.WithPair(slot, slot.Length, board, catDie, catSlot);
+            for (int i = 0; i < slot.Length; i++) slot[i] = w[i];
+        }
+
         /// <summary>出目 die へ端子 s を挿せるか (画面のドラッグ用)。 fromDie = つかんで動かしている元の出目 (手札からなら −1)。
         /// die に別の端子が挿さっていれば入れ替え (前の端子は手札へ戻る) とみなす。</summary>
         public bool CanPlug(int die, int s, int fromDie = -1)
         {
             if (!CanOperate || !IsDie(die) || s < 0 || s >= board.Count) return false;
+            if (IsCatLocked(die) || IsCatLocked(fromDie)) return false;      // 猫の出目は動かせない
             int keepFrom = IsDie(fromDie) ? slot[fromDie] : -1, keepDie = slot[die];
             if (IsDie(fromDie)) slot[fromDie] = -1;
             slot[die] = -1;
@@ -485,7 +544,7 @@ namespace UI.Game2D.Battle
         /// <summary>出目 die から端子を外す (手札へ戻す)。</summary>
         public void Unplug(int die)
         {
-            if (!CanOperate || !IsDie(die) || slot[die] < 0) return;
+            if (!CanOperate || !IsDie(die) || slot[die] < 0 || IsCatLocked(die)) return;
             slot[die] = -1; Game2DSfx.Play("wire", 1f, 0.85f);
             RecomputePreview(); Touch();
         }
@@ -509,7 +568,7 @@ namespace UI.Game2D.Battle
 
         private void CycleSlot(int i, int dir)
         {
-            int m = board.Count; if (m == 0 || !IsDie(i)) return;
+            int m = board.Count; if (m == 0 || !IsDie(i) || IsCatLocked(i)) return;
             int n = m + 1, cur = slot[i] < 0 || slot[i] >= m ? m : slot[i];      // 並び: 0..m-1 → 挿さない (= m)
             for (int k = 1; k <= n; k++)
             {
@@ -533,7 +592,7 @@ namespace UI.Game2D.Battle
         {
             if (sound && !CanOperate) return;
             if (!TermInputs(out var dice, out var env, out var st)) return;
-            var w = TerminalWiring.Auto(board, dice, env, st);
+            var w = TerminalWiring.Auto(board, dice, env, st, catDie, catSlot);      // 猫の 1 組は外さない
             for (int i = 0; i < slot.Length; i++) slot[i] = w != null && i < w.Length ? w[i] : -1;
             focusSlot = -1;
             if (sound) { Game2DSfx.Play("wire", 1f, 1.1f); RecomputePreview(); Touch(); }
@@ -562,8 +621,8 @@ namespace UI.Game2D.Battle
         {
             var o = preview; if (o == null) return -1;
             int want = picker >= 0 && picker < target.Length ? target[picker] : -1;
-            if (TerminalCards.IsCandidate(board, o.slotOfDie, picker, want)) return want;
-            var c = TerminalCards.TargetCandidates(board, o.slotOfDie, picker);
+            if (TerminalCards.IsCandidate(board, o, picker, want)) return want;
+            var c = TerminalCards.TargetCandidates(board, o, picker);
             return c.Count > 0 ? c[0] : -1;
         }
 
@@ -574,7 +633,7 @@ namespace UI.Game2D.Battle
             if (o == null || ShowingResult) return false;
             for (int p = 0; p < board.Count; p++)
             {
-                if (!IsPicker(p) || !TerminalCards.IsCandidate(board, o.slotOfDie, p, s)) continue;
+                if (!IsPicker(p) || !TerminalCards.IsCandidate(board, o, p, s)) continue;
                 any = true;
                 if (TargetOf(p) == s) chosen = true;
             }
@@ -583,7 +642,7 @@ namespace UI.Game2D.Battle
 
         /// <summary>候補 s を picker の対象にできるか (画面のドラッグ用)。</summary>
         public bool CanSetTarget(int picker, int s)
-            => CanOperate && IsPicker(picker) && preview != null && TerminalCards.IsCandidate(board, preview.slotOfDie, picker, s);
+            => CanOperate && IsPicker(picker) && preview != null && TerminalCards.IsCandidate(board, preview, picker, s);
 
         /// <summary>候補 s を picker の対象にする (落とし直せば替わる)。 できなければ false。</summary>
         public bool SetTarget(int picker, int s)

@@ -181,6 +181,18 @@ namespace GameLoop
             _shuttingDown = false;
             _instance = this;
             DontDestroyOnLoad(gameObject);
+            // 中断セーブ (issue #84): 閉じる直前 (各シングルトンがまだ生きている間) に、 セーブできる時点なら書く。
+            //   OnApplicationQuit では遅い ── 他のシングルトンが先に「終了中」へ入り Instance が null を返す。
+            //   エディタの再生停止では呼ばれない (開発中に止めるたびにセーブが残らないように)。
+            Application.wantsToQuit -= OnWantsToQuit;
+            Application.wantsToQuit += OnWantsToQuit;
+        }
+
+        private bool OnWantsToQuit()
+        {
+            try { AutoSuspendOnQuit(); }
+            catch (Exception e) { Debug.LogError($"[RunSave] 終了時の中断セーブで例外: {e}"); }
+            return true;   // 終了は止めない
         }
 
         void OnApplicationQuit() => _shuttingDown = true;
@@ -204,7 +216,7 @@ namespace GameLoop
                 CombatManager.Instance.OnCombatEnd -= HandleCombatEnd;
             // 自分が現役なら静的参照も畳む。 破棄済み参照を残すと Unity の擬似 null 経由で
             // 「非 null だが使えない Instance」になり、 原因の分かりにくい停止を生む。
-            if (_instance == this) _instance = null;
+            if (_instance == this) { _instance = null; Application.wantsToQuit -= OnWantsToQuit; }
         }
 
         // ============================================================

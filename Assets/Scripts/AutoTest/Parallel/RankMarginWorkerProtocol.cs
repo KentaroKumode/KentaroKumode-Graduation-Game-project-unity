@@ -333,6 +333,7 @@ namespace AutoTest.ParallelSweep
         public double[] dmgSrcVesca = Array.Empty<double>();
         public double[] damageStages7F = Array.Empty<double>();
         public double[] cut7F = Array.Empty<double>();
+        /// <summary>[計装 2026-11-12 #103] ヴェスカ〈停滞する時間〉で止まった端子 (GuardDiag.Stag7F・段 × 8 の並びはそちらの注記)。</summary>
         public double[] stag7F = Array.Empty<double>();
         /// <summary>[計装 2026-11-12] 端子ごとの使われ方 (<see cref="CombatSystem.TerminalDiag"/>)。 名前 × TerminalDiag.Width を平らに並べる。</summary>
         public string[] termDiagNames = Array.Empty<string>();
@@ -438,6 +439,8 @@ namespace AutoTest.ParallelSweep
                 "v3.mainCorr", "daybreakNextAttackPct", "DaybreakNextAttackPctApplied", "weaponTierCap", "vescaDiceForce",
                 // 2026-11-10: 測定用の物差し (主攻撃 / 毒・出血・爆発の倍率)。 送った値と、 ラン開始時に本体へ入れた値
                 "probeMainMult", "ProbeMainMultApplied", "probePassiveMult", "ProbePassiveMultApplied",
+                // 2026-11-12 (#107): 配線が収支で決まる敵のパッシブと〈吸血〉を読むか (−1 = 技量に従う) と実効値・内訳
+                "v3.readEnemyPassives", "ReadEnemyPassivesEffective", "v3.enemyPassiveMask",
             };
             var sb = new System.Text.StringBuilder();
             foreach (string name in watched)

@@ -119,6 +119,10 @@ namespace UI.Game2D
             d.buttons.Add(new ModalBtn { label = "+", action = "inc" });
             d.buttons.Add(new ModalBtn { label = _page == 0 ? "音へ" : "画面へ", action = "page" });
             d.buttons.Add(new ModalBtn { label = "既定に戻す", action = "reset" });
+            // 中断セーブ (issue #84): 航行のマップで開いた時だけ。 押せない時 (選ぶものが残っている など) は押した時に理由を出す
+            var gmNow = GameManager.Instance;
+            bool canSuspendHere = gmNow != null && gmNow.CurrentPhase == GameManager.GamePhase.MapNavigation && gmNow.Run != null && gmNow.Run.isRunActive;
+            if (canSuspendHere) d.buttons.Add(new ModalBtn { label = "中断して終える", action = "suspend" });
             d.buttons.Add(new ModalBtn { label = "手引きをもう一度", action = "tutorial" });
             d.buttons.Add(new ModalBtn { label = "閉じる", action = "close", primary = true });
             d.footer = "バーを押す・引く / ← → で 1 ずつ (Shift で 10 ずつ) / Esc で閉じる";
@@ -127,6 +131,14 @@ namespace UI.Game2D
                 switch (a)
                 {
                     case "close": Close(); return;
+                    case "suspend":
+                    {
+                        var gm = GameManager.Instance;
+                        if (gm == null) return;
+                        if (!gm.SuspendAndReturnToTitle(out var why)) { modal.ShowToast(why ?? "保存できない"); return; }
+                        Close();
+                        return;
+                    }
                     case "dec": Step(sel, -1); return;
                     case "inc": Step(sel, 1); return;
                     case "slide":

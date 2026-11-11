@@ -711,8 +711,8 @@ ProcessDamage の中の OnPreDealDamage は「その陣営が攻撃している�
 | Decree13th(13番目の宣告) | OnTurnStart/OnTurnEnd | 1/13でフラグ、本体が生存していれば成就で ceil((playerDiceTotal+enemyDiceTotal)×2.0) を軽減無視で実プレイヤーへ（2.0 は定数。プレイヤーの criticalMultiplier は 2026-08-08 から読まない・シールドは肩代わり） |
 | StrongOne/Throne/Setsuna(強者/玉座/刹那) | OnBattleStart | bossDiceBonus = 4/8/12 ※**現在enemies.jsonから撤廃・未参照（クラスは残置）** |
 | SaintGeorgesPhases(シュヴァリエ) | 多数 | 開幕プリオリテ1。形態1: シールド = 140−28×プリオリテ（最低28）が主攻撃を吸う・収支プラスのTに (プレイヤーの出目の合計+プリオリテ×7) の不可避反撃＋シールド−25 / 形態2: 連勝報酬（次T ボスの攻撃+4、そのTも収支プラスならボスへ15）・ボスの収支 3 勝で形態1帰還 / 帰還ごとにプリオリテ+1。**[#104 修正]** 形態1の 0d0（`extraDice=−4`）: `EnemyData.RollAttack` が引く回数を max(0, 1 + extra) にしたので、形態1は攻撃ロールを引かない（**基礎攻撃 × 大技・段階の倍率は残る**・「攻撃しない」とは読んでいない）。反撃のHP減と形態2の「ボスへ15」: 収支トリガーの後に CombatManager が ctx の HP を拾う（§9.3）ので残る。旧: 引く回数が max(1, …) で負の値が効かず、HP の増減は FinishTurnCommon の書き戻しで消えていた |
-| RelicScholar(遺物学者) | OnTurnStart/OnTurnEnd | 毎T 遺物を 1 枚抽選（段の切り替え直後は新等級から・天与の才の次Tは 2 枚）。`enemyDiceTotalBonus` = 遺物 + 溜め打ち + 停滞×Stagnation を `=` で一括代入。OnTurnEnd で大出血の tick。抽選結果は `MutualTurnTelegraph.drawnRelics` に載るが画面は未配線 |
-| StagnantTime(停滞する時間) | OnTurnEnd | 攻撃端子の本数 < ブロック端子の本数のTに停滞+1（上限10）。1 スタックあたり敵攻撃 + Stagnation（基準 1） |
+| RelicScholar(遺物学者) | OnTurnStart/OnTurnEnd | 毎T 遺物を 1 枚抽選（段の切り替え直後は新等級から・天与の才の次Tは 2 枚）。`enemyDiceTotalBonus` = 遺物 + 溜め打ち を `=` で一括代入（停滞の加算は 2026-11-12 #103 で無くなった）。OnTurnEnd で大出血の tick。抽選結果は `MutualTurnTelegraph.drawnRelics` に載るが画面は未配線 |
+| StagnantTime(停滞する時間) | —（トリガーなし） | **2026-11-12 #103 作り直し。** 端子を引くたび 1 枚ごとに確率 p で止める（`TerminalDeckState.DrawTurn`・乱数は専用キー `vesca.stagnant`）。p = `BossParam.Stagnation` %（基準 p1 10 / p2 15 / p3 20 / p4 25・範囲 0〜50）。止まった端子はそのターン挿せず（`Resolve` の 0. で外す）、捨て札に行かず次のターンも手札に残って解ける（もう一度は止まらない・その分 新しく引く枚数が減る）。止まった常設はそのターンだけ挿せない。**敵の攻撃・ダメージの式には何も足さない**。旧: 攻撃 < ブロックのTに停滞+1（上限10）・1 スタックあたり敵攻撃 +1 |
 | AnalyticComputation(解析演算) | OnRollLose | 収支プラスごとに回避率 +2%（上限40%）。回避はその攻撃の通常・固定ダメを丸ごと消し、次Tは回避しない（`ApplyVescaDefense`） |
 | RiftHeldOpen(裂け目) | OnTurnStart | ヴェスカ 最大HPの2% / プレイヤー 最大HPの1%（軽減無視・シールドは肩代わり） |
 | RecurrentTruth(回帰性真理) | OnBattleStart/OnTurnStart | 毒・出血を毎T半減 / 受ける会心倍率 −0.5（下限1.0） / 臨界メーター −5/T / 最大HP変更と処刑を拒否 |
@@ -758,6 +758,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
 ```
 0. ターン開始       : BeginTurn / DoT / OnTurnStart / SyncHP / フロア敵回復
    端子の手札         : DrawTerminalHand (ADR-0014) ── 前の手札を捨てて HandSize(5) + 〈配電盤〉の分を引く (振り直しの判断より前)
+                        ヴェスカ〈停滞する時間〉: 前のターンに止まった端子は捨てずに手札に残し (解ける)、 新しく引いた 1 枚ごとに確率 p で止める
 1. 敵ロール         : スタンスなし → 敵ダイスを振る
 3. 自ロール         : 自ダイスを振る（旧法と同一の RollDice）
 4. リロール（任意） : MaybeRerollPlayerDice（配線前のみ、目的関数は暫定=旧勝率のまま）
@@ -790,7 +791,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          式の正本は TerminalCards.Resolve (盤面を書き換えない純粋な計算・BOT も同じ関数を写しの状態で呼ぶ)。
          数値は TerminalCards の定数、 端子の一覧は TerminalCards.Build()。 ここには「どの値がどこへ入るか」だけを書く。
          Resolve の順:
-           0. 挿せる数 (capacity・既定 1) を超えた出目を外す
+           0. 止まった端子 (ヴェスカ〈停滞する時間〉・state.stopped) に挿した出目と、 挿せる数 (capacity・既定 1) を超えた出目を外す
            1. 〈増圧〉に挿した出目があれば、 他の出目すべて +1 (以降の条件と量はこの値で見る)
            2. 条件 (3 以下 / 5 以上 / 6 以上 / 偶数 / 奇数 / 同じ目が他の端子に / 同じ目 2 個)。 合わない出目は外す。
               〈予熱器〉の次のターンは条件を無視 (同じ目 2 個の端子も 2 個そろっていれば通る)
@@ -803,10 +804,10 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
               本体の口 (AddStatus・AddEnemyBleed・Kw.AddHeat・AddCharge・consShield・会心の判定) も同じ物を止めるので、 落とすのは見込み (画面・BOT) と揃えるため。
               攻撃・ブロックへ入る量は落とさない。 充電を落とすので、 封じた戦闘では〈電流〉の② (chargeToAttackPct) にも端子の充電は乗らない (2026-11-11〜)
          〈写し取り〉〈焼き切り〉〈保持器〉の対象: Resolve の wantTarget (人 = 画面で選んだ端子 / BOT = WiringPlan.targets)。
-           候補 = 自分でない・常設でない・挿し方を直した後に出目が 1 個も無い手札の端子 (TerminalCards.IsCandidate)。 選ばない・候補でない時は左端の候補
+           候補 = 自分でない・常設でない・止まっていない・挿し方を直した後に出目が 1 個も無い手札の端子 (TerminalCards.IsCandidate)。 選ばない・候補でない時は左端の候補
          結果 (TerminalOutcome) の行き先:
            attackAdd / blockAdd / chargeAdd → attackSum / blockSum / chargeSum (出目をそのまま足さない ── 端子ごとに入る量が違う)
-           attackDice / blockDice / chargeDice → 攻撃・ブロック・充電の「個数」(既存の品・〈停滞する時間〉・攻撃しない判定が読む)
+           attackDice / blockDice / chargeDice → 攻撃・ブロック・充電の「個数」(既存の品・敵〈多頭攻撃〉・攻撃しない判定が読む)
            supportDice → MutualKeys.SpecialDiceCount (補助の種類の端子に挿した個数)
            kindOfDie   → mutualWiring (出目ごとの種類・DiceTerminal。 補助は Special・挿さないは None)
          ApplyTerminalOutcome (配線の時点・堅牢の環/傲慢/端子調律より前) が戦闘へ配る:

@@ -156,6 +156,10 @@ namespace AutoTest
         public bool ReadOutgoingMultEffective
             => v3.readOutgoingMult > 0 || (v3.readOutgoingMult < 0 && EffectiveWiringSkill == WiringSkill.Super);
 
+        /// <summary>[#107] 配線の効用が収支で決まる敵のパッシブと〈吸血〉を読むか (<see cref="V3Flags.readEnemyPassives"/> の実効値: −1 は Super だけ ON)。</summary>
+        public bool ReadEnemyPassivesEffective
+            => v3.readEnemyPassives > 0 || (v3.readEnemyPassives < 0 && EffectiveWiringSkill == WiringSkill.Super);
+
         /// <summary>[2026-11-10 試験] 盾〈黎明〉を「溜めて次の主攻撃 +%」にする形の率 (<see cref="ItemSystem.PassiveSkills.Effects.Daybreak.NextAttackPctPerUnit"/>)。
         /// 0 = 今の挙動 (最大 HP を直接削る)。 ラン開始時に本体の static へ入れ、 ラン終了時に 0 へ戻す。</summary>
         public float daybreakNextAttackPct = 0f;

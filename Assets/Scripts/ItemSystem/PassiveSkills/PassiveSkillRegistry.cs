@@ -120,6 +120,39 @@ namespace ItemSystem.PassiveSkills
                     resettable.ResetRunState();
         }
 
+        /// <summary>中断セーブ (issue #84): ラン中の状態を持つスキルの状態を (スキル id, 状態) の並びで写す。 id の順に並べる。
+        /// <see cref="IRunResettable"/> なのに <see cref="IRunStatePersistent"/> を実装していないスキルは、 再開で状態が 0 に戻るので警告する。</summary>
+        public static void CaptureAllRunState(List<string> ids, List<string> states)
+        {
+            EnsureInitialized();
+            var keys = new List<string>(registry.Keys);
+            keys.Sort(System.StringComparer.Ordinal);
+            foreach (var k in keys)
+            {
+                var effect = registry[k];
+                if (effect is IRunStatePersistent p) { ids.Add(k); states.Add(p.CaptureRunState() ?? ""); }
+                else if (effect is IRunResettable)
+                    UnityEngine.Debug.LogWarning($"[PassiveSkillRegistry] {k} はラン中の状態を持つが中断セーブに写せない (IRunStatePersistent が無い)。 再開するとこの状態は 0 に戻る");
+            }
+        }
+
+        /// <summary><see cref="CaptureAllRunState"/> の写しを戻す。 先に <see cref="ResetAllRunState"/> を呼んでおくこと (写しに無いスキルは 0 のまま)。
+        /// 登録に無い id・読めない状態があれば false (戻せた分は戻す)。</summary>
+        public static bool RestoreAllRunState(List<string> ids, List<string> states)
+        {
+            EnsureInitialized();
+            int n = ids?.Count ?? 0;
+            if (n != (states?.Count ?? 0)) return false;
+            bool ok = true;
+            for (int i = 0; i < n; i++)
+            {
+                if (registry.TryGetValue(ids[i], out var effect) && effect is IRunStatePersistent p && p.RestoreRunState(states[i])) continue;
+                UnityEngine.Debug.LogWarning($"[PassiveSkillRegistry] 中断セーブのスキル状態を戻せない: {ids[i]} = {states[i]}");
+                ok = false;
+            }
+            return ok;
+        }
+
         private static void Register(IPassiveSkillEffect effect)
         {
             registry[effect.SkillId] = effect;
@@ -507,7 +540,7 @@ namespace ItemSystem.PassiveSkills
             Register(new SaintGeorgesPhases());
             // 7層ボス: ヴェスカ（遺物学者）×4段連戦。 正本: docs/GAME.md §13-4
             Register(new RelicScholar());        // 遺物学者（毎T 遺物を抽選使用・予告で開示）
-            Register(new StagnantTime());        // 停滞する時間（攻撃 < ブロックの配線のTを罰する・上限10スタック。L3 第一レバー）
+            Register(new StagnantTime());        // 停滞する時間（引いた端子を確率で止める・処理は TerminalDeckState.DrawTurn / TerminalCards.Resolve。L3 第一レバー）
             Register(new AnalyticComputation()); // 解析演算（収支プラスごとに回避率+2%・上限40%・回避の次Tは回避なし）
             Register(new RiftHeldOpen());        // 裂け目（毎T ヴェスカ最大HPの2%・プレイヤー最大HPの1%を失う）
             Register(new RecurrentTruth());      // 回帰性真理（毒/出血の毎T半減・受ける会心倍率-0.5・臨界-5/T・処刑/最大HP変更を拒否）

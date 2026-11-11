@@ -140,7 +140,8 @@ namespace AutoTest
                     // 2026-07-27: 7層は特殊勝利機構の廃止に伴い、 通常の難易度調整
                     // (ダイス/HP/機構) の対象へ復帰した。 旧「7層だけロール勝率を寄せる」
                     // 特例は削除 ── 相互攻撃モデルには寄せる先のロール勝率が存在しない。
-                    // 7層固有の第一レバーは〈停滞する時間〉(BossParam.Stagnation)。 詳細: docs/GAME.md §13-3 / §13-4。
+                    // 7層固有の第一レバーは〈停滞する時間〉(BossParam.Stagnation = 引いた端子 1 枚あたりの止まる確率 %)。 詳細: docs/GAME.md §13-3 / §13-4。
+                    // 注 (2026-11-12): 下の AppendBossLevers に StagnantTime の行が無いので、 いまの実装はこのレバーを候補に積まない。
 
                     // 難度(クリア率)を目標へ。 **勝率が目標帯(DeadZone)内なら一切調整しない**
                     //   （ロール勝率調整はクリア率調整の手段であって目的ではない＝勝率OKなのにロール勝率を
@@ -280,7 +281,7 @@ namespace AutoTest
         /// 戻り値=実際に値が変化したか。 変化なし(範囲飽和)なら呼び出し側は次の候補レバーへフォールスルーする。</summary>
         private static bool AdjustParam(string id, BossParam param, float err, BossAgg a, List<string> changes, bool fallback = false)
         {
-            var meta = BossTuning.Meta(param);
+            var meta = BossTuning.Meta(param, id);
             var knob = BossTuning.GetOrCreate(BossTuning.KeyFor(id));
             float before = BossTuning.GetParam(knob, param);
             float step = Mathf.Clamp(meta.gain * err, -meta.maxStep, meta.maxStep);
@@ -492,7 +493,7 @@ namespace AutoTest
                 case BossParam.RobeStacks:        return "天衣無縫上限";
                 case BossParam.ChipCap:           return "審判の炎上限";
                 case BossParam.RegenReduction:    return "灰塵の鎧軽減";
-                case BossParam.Stagnation:        return "停滞する時間";
+                case BossParam.Stagnation:        return "停滞する時間(止まる確率%)";
                 case BossParam.IntimidateThreat:  return "威圧の脅威";
                 case BossParam.PoisonStackCap:    return "毒スタック上限";
                 case BossParam.MirrorReflectCap:  return "反射上限";
