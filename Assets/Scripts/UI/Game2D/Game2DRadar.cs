@@ -57,6 +57,7 @@ namespace UI.Game2D
         public void SetStone(int level, int bearing4)
         {
             if (level > _level && level >= 1 && level <= 3) Game2DSfx.Play("radar_" + level);
+            if (level >= 1) Game2DTutorial.Request(TutorialTopics.Patrol);      // 手引き「巡回するもの」: 初めて気配を感じた時 (issue #86)
             _level = level; _bearing = level > 0 ? bearing4 : -1;
         }
 

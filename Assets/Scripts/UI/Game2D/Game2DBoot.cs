@@ -63,6 +63,7 @@ namespace UI.Game2D
             bool skip = !enableBoot || Booted || Application.isBatchMode || (gm != null && gm.CurrentPhase != GameManager.GamePhase.Title);
             if (skip) { Finish(); return; }
             _state = State.Waiting; _enabledAt = Time.unscaledTime;
+            Waiting = true;      // LateUpdate を待たずに立てる (最初のフレームに手引きなどが TOUCH DISPLAY の上へ出ないように・#86)
             SpriteButton.InputLocked = true;
             AudioListener.pause = true;
             BuildCover();
@@ -118,7 +119,7 @@ namespace UI.Game2D
 
         private void Finish()
         {
-            _state = State.Done; Booted = true;
+            _state = State.Done; Booted = true; Waiting = false;
             SpriteButton.InputLocked = false; AudioListener.pause = false;
             DestroyCover();
             SetPower(1f);

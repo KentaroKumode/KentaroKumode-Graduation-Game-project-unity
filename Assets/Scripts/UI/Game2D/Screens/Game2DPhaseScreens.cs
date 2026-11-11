@@ -478,6 +478,7 @@ namespace UI.Game2D
         private ScreenDef TerminalReward(GameManager gm)
         {
             if (_termDeckView) return TerminalDeckList(gm);
+            Game2DTutorial.Request(TutorialTopics.GrowDeck);      // 手引き「端子を増やす」: 初めて戦闘に勝って端子の報酬が出た (issue #86)
             var run = gm.Run; var offer = run.pendingTerminalOffer;
             var d = New("端子の報酬", "山札 " + (run.terminalDeck != null ? run.terminalDeck.Count : 0) + " 枚", 460);
             d.body = "1 枚を山札に加える。 加えなくてもよい。"; d.bodyLines = 1;

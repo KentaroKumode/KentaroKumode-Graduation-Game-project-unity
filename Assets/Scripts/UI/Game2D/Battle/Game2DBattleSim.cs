@@ -156,7 +156,7 @@ namespace UI.Game2D.Battle
                         int fin = real != null && i < real.Length ? real[i] : 0;
                         if (k < 0.5f + i * 0.14f) { if (Random.value < 0.55f) pd[i] = Random.Range(1, 7); } else pd[i] = fin;
                     }
-                    if (t >= 0.5f) { SyncDecision(cm, false); phase = P.Wire; rolled = true; t = 0; }
+                    if (t >= 0.5f) { SyncDecision(cm, false); phase = P.Wire; rolled = true; t = 0; TutorialOnWire(); }
                     Touch(); break;
                 }
                 case P.PAttack:
@@ -186,6 +186,18 @@ namespace UI.Game2D.Battle
             for (int i = 0; i < slot.Length; i++) slot[i] = -1;
             board.Clear(); target = new int[0]; preview = null; lastOutcome = null; focusSlot = -1;
             Touch();
+            // 手引き (issue #86): 「戦闘の形式」は初回戦闘の直前・「層とボス」は層の底のボスに着いた時
+            Game2DTutorial.Request(TutorialTopics.CombatForm);
+            var foe = GameManager.Instance?.CurrentEnemy;
+            if (foe != null && BossIds.IsBoss(foe.id)) Game2DTutorial.Request(TutorialTopics.LayerBoss);
+        }
+
+        /// <summary>配線の判断に入った時の手引き: 「敵の予告」「端子に挿す」(初回戦闘)・「逃げる」(「端子に挿す」を読んだ後の、 逃げられる戦闘)。</summary>
+        private void TutorialOnWire()
+        {
+            Game2DTutorial.Request(TutorialTopics.Telegraph);
+            Game2DTutorial.Request(TutorialTopics.Plug);
+            if (Game2DTutorial.Seen(TutorialTopics.Plug) && CanFlee) Game2DTutorial.Request(TutorialTopics.Flee);
         }
 
         /// <summary>出目の個数を n に合わせる (挿し先は持ち越せる分だけ持ち越す)。 個数の上限は置かない。</summary>
@@ -212,6 +224,7 @@ namespace UI.Game2D.Battle
             _poisonSeen = _bleedSeen = 0;      // ここから先は判断への答えで入った分 (Resolve で読む)
             if (_poisonShown > 0) fx.DotTick(false, _poisonShown);
             if (!paused) { Resolve(cm); return; }      // 判断なしで解決したターン (逃走・刻限など)
+            if (board.Count > 0) Game2DTutorial.Request(TutorialTopics.Deck);      // 手引き「端子の山札」: 最初の手札 (issue #86)
             SyncDecision(cm, true);
             Game2DSfx.DiceRoll(4, 0.45f, 0.55f);
             phase = P.PRoll; t = 0; Touch();
@@ -224,6 +237,7 @@ namespace UI.Game2D.Battle
             var tele = p.tele;
             turn = tele.turn; eatk = tele.enemyAttackValue; stage = tele.escalationStage; edef = tele.enemyDefense; guardIn = tele.turnsToGuard; heavyIn = tele.turnsToHeavy;
             nextStageIn = tele.nextThresholdTurn > 0 ? tele.nextThresholdTurn - tele.turn : -1;
+            if (stage >= 1) Game2DTutorial.Request(TutorialTopics.Long);      // 手引き「戦闘の長期化」: 敵の攻撃が初めて段を上げた (issue #86)
             var e = tele.enemyDice; enemyDiceCount = e != null ? Mathf.Min(3, e.Length) : 0;
             for (int i = 0; i < 3; i++) ed[i] = e != null && i < e.Length ? e[i] : 0;
             EnsureDice(p.playerDice != null ? p.playerDice.Length : 0);
@@ -585,7 +599,11 @@ namespace UI.Game2D.Battle
         }
 
         /// <summary>説明を出す端子を選ぶ (画面が端子の行を押した時)。</summary>
-        public void Focus(int s) { focusSlot = s >= 0 && s < board.Count ? s : -1; Touch(); }
+        public void Focus(int s)
+        {
+            focusSlot = s >= 0 && s < board.Count ? s : -1; Touch();
+            if (focusSlot >= 0) Game2DTutorial.Request(TutorialTopics.Kinds);      // 手引き「端子の種類」: 初めて端子の説明を開いた (issue #86)
+        }
 
         // ── 〈写し取り〉〈焼き切り〉〈保持器〉の対象 ──
         //   これらに出目を挿すと (見込みで発動すると)、 手札の「挿していない端子」が候補になる。 候補の USB をその端子の上へ落とすと対象が決まる。
@@ -653,6 +671,13 @@ namespace UI.Game2D.Battle
             charge = ctx != null ? ctx.GetCharge() : charge;
             canReroll = false;
             _countDots = false;
+            // 手引き (issue #86): 「解決の順番」は最初の解決・「会心」「確定会心」は初めて出た時 (確定会心 = 会心確定の効果が立っていたターンの会心)
+            Game2DTutorial.Request(TutorialTopics.Order);
+            if (_tr.isCritical)
+            {
+                Game2DTutorial.Request(TutorialTopics.Crit);
+                if (ctx != null && ctx.forceCritical) Game2DTutorial.Request(TutorialTopics.ForceCrit);
+            }
             // 与ダメージは HP の差で見せる (固定ダメを含む)。 ターンの頭に見せた毒は差し引き、 出血・〈廃庭の霧吹き〉の毒は別の演出で見せる。
             // 形態が変わって HP が戻った時は結果の値で (出血・毒も分けない)
             int before = _enemyBefore - _poisonShown;

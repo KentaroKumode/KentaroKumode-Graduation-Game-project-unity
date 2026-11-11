@@ -16,6 +16,9 @@ related: [overview, combat, meta-progression]
 > 語調は**説明文**で統一する。比喩・格言・伝聞（「〜という」「〜と聞く」）は使わない。
 > 仕様の正本は実コードと [DAMAGE_CALC_REFERENCE.md](../Assets/Scripts/CombatSystem/DAMAGE_CALC_REFERENCE.md)。
 > 戦闘の記述は相互攻撃モデル (ADR-0009) に準拠する。
+> 画面へは `python Tools/sync_handbook.py` で写す (直したら必ず回す)。 **「## 見出し」は見た印の鍵**なので、
+> 変えたら `TutorialTopics` (Game2DTutorial.cs) も合わせる。 拾うのは見出しの次の行が「*— 出す契機*」の節だけ。
+> 画面の字は液晶のドット字にある字だけ (`python Tools/glyph_check.py` で確かめる)。
 
 ---
 
@@ -66,7 +69,7 @@ related: [overview, combat, meta-progression]
 マスは種類ごとに内容が異なる。戦闘、イベント、ショップ、休憩、補給庫などがある。
 **一度踏んだマスは再び起動しない**。着いた点だけが起動し、途中で通り過ぎた点は起動しない。
 
-## 徘徊するもの
+## 巡回するもの
 
 *— 初めて徘徊エネミーの気配を感じた時*
 
