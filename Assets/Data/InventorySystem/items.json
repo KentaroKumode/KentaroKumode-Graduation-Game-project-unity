@@ -262,8 +262,7 @@
       "armorPen": [4, 4],
       "basePrice": 12,
       "skills": [
-        "猛りII",
-        "鎧砕きI"
+        "猛りI"
       ],
       "family": "axe",
       "tier": 2
@@ -289,8 +288,7 @@
       "basePrice": 16,
       "skills": [
         "猛りII",
-        "鎧砕きII",
-        "捨て身"
+        "鎧砕きI"
       ],
       "family": "axe",
       "tier": 3
@@ -340,8 +338,7 @@
       "armorPen": [2, 2],
       "basePrice": 12,
       "skills": [
-        "間合II",
-        "一対一I"
+        "間合I"
       ],
       "family": "sword",
       "tier": 2
@@ -364,8 +361,7 @@
       "basePrice": 16,
       "skills": [
         "間合II",
-        "一対一II",
-        "切り返し"
+        "一対一I"
       ],
       "family": "sword",
       "tier": 3
@@ -412,8 +408,7 @@
       "armorPen": [4, 6],
       "basePrice": 12,
       "skills": [
-        "疾手II",
-        "毒手I"
+        "疾手I"
       ],
       "family": "dagger",
       "tier": 2
@@ -436,8 +431,7 @@
       "basePrice": 16,
       "skills": [
         "疾手II",
-        "毒手II",
-        "急所"
+        "毒手I"
       ],
       "family": "dagger",
       "tier": 3
@@ -484,8 +478,7 @@
       "armorPen": [0, 0],
       "basePrice": 12,
       "skills": [
-        "城壁II",
-        "シールドバッシュI"
+        "城壁I"
       ],
       "family": "shield",
       "tier": 2
@@ -508,8 +501,7 @@
       "basePrice": 16,
       "skills": [
         "城壁II",
-        "シールドバッシュII",
-        "堅守の構え"
+        "シールドバッシュI"
       ],
       "family": "shield",
       "tier": 3
