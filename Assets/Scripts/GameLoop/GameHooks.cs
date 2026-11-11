@@ -30,6 +30,13 @@ namespace GameLoop
         /// カードを 1 枚ずつ測るための口 (AutoRunner.challengeForce)。</summary>
         public static Func<int, IReadOnlyList<string>> ForcedChallengeCards;
 
+        /// <summary>挑戦カード〈猫の手〉(#5): 出目と予告から、 猫が先に挿す 1 組 <c>{ 出目の添字, 場の端子の添字 }</c> を返す。
+        /// <c>{ -1, -1 }</c> = このターンは挿さない。 null を返す (か口が null) = 評価できない ── 本体は既定の挿し方
+        /// (<see cref="CombatSystem.TerminalWiring.CatPawFallback"/>) で選ぶ。 場と盤面は <c>CombatManager.Instance</c> から読む (読むだけ)。
+        /// <para><b>BOT の判断の口ではない</b> ── 札の効果そのもので、 人が遊ぶ時にも使う。 Super の評価 (AutoRunner の山札の挿し方の効用) を
+        /// 本体へ二重に書かないため、 AutoTest 側 (<c>AutoTest.CatPawAdvisor</c>) が起動時に差す。 そのため <see cref="Clear"/> では外さない。</para></summary>
+        public static Func<int[], CombatSystem.MutualTurnTelegraph, int[]> CatPawPick;
+
         /// <summary>自動装備の武器評価に足す点 (武器 id → 加点)。 null なら 0。</summary>
         public static Func<string, float> WeaponEvBonus;
 
@@ -69,7 +76,7 @@ namespace GameLoop
         /// <summary>ショップで強化を買った (上がった段数)。</summary>
         public static Action<int> OnShopUpgradeBought;
 
-        /// <summary>全部の口を外す。</summary>
+        /// <summary>全部の口を外す (BOT の口だけ。 〈猫の手〉の <see cref="CatPawPick"/> は札の効果なので残す)。</summary>
         public static void Clear()
         {
             BotDriving = false;

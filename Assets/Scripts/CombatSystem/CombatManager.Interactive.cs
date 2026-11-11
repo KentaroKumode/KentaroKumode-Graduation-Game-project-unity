@@ -33,6 +33,9 @@ namespace CombatSystem
         public TerminalEnv terminalEnv;
         /// <summary>端子の戦闘中の状態 (溜まり・連続)。 見積もりは Clone した写しに掛けること。</summary>
         public TerminalBattleState terminalState;
+        /// <summary>挑戦カード〈猫の手〉が先に挿した 1 組 (出目の添字 → 場の添字)。 配線の判断の時だけ入る・−1 = 無し。
+        /// 答えの挿し方にこの組が無くても、 本体が入れ直す (画面はこの組を外せないように見せる)。</summary>
+        public int catDie = -1, catSlot = -1;
 
         // ===== 答え (CombatManager が読む) =====
         internal bool reroll;
@@ -44,6 +47,7 @@ namespace CombatSystem
         {
             kind = k; playerDice = dice; playerFaceIdx = faceIdx; tele = t;
             rerollCost = 0; reroll = false; slots = null; targets = null; board = null; terminalEnv = default; terminalState = null;
+            catDie = catSlot = -1;
         }
     }
 

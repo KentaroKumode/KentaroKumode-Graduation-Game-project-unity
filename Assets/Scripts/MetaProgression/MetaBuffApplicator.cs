@@ -327,6 +327,10 @@ namespace MetaProgression
         public static int GetBlockTerminalPerDice()
             => MetaPanel.BlockTerminalPerDice(Rank(MetaPanelKind.BlockTerm)) + (int)ChallengeCards.Value(ChallengeCards.TermBlk);
 
+        /// <summary>挑戦カード〈猫の手〉: 毎ターン、 猫が 1 組を先に挿す確率 (0..1)。 札を受けていなければ 0。 読むのは CombatManager.ChooseCatPaw。</summary>
+        public static float GetCatPawChance()
+            => System.Math.Max(0f, System.Math.Min(1f, ChallengeCards.Value(ChallengeCards.Cat) / 100f));
+
         // === 種火共通 (r1 出現重み・r3 開幕所持) ===
 
         /// <summary>キーワード → 対応する種火 MetaPanelKind。</summary>
