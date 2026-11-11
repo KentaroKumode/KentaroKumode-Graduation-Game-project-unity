@@ -475,6 +475,7 @@ namespace UI.Game2D
             {
                 int x0 = PortX(i), y0 = PortY(i);
                 DrawDie(p, PDieR(i), sim.pd[i], false, !sim.rolled && sim.phase != Game2DBattleSim.P.PRoll);
+                if (sim.IsCatLocked(i)) DrawCatMark(p, i);
                 int s = dieSlot != null && i < dieSlot.Length ? dieSlot[i] : -1;
                 var d = s >= 0 && s < m ? CombatSystem.TerminalCards.Get(sim.board[s]) : null;
                 bool used = d != null && o != null && i < o.slotOfDie.Length && o.slotOfDie[i] == s;      // 挿して発動に使われる出目
@@ -508,6 +509,27 @@ namespace UI.Game2D
                 p.Box(lx, ly, 5, 5, fires && used ? kc : Off, fires && used ? Game2DTerminalLook.Mix(kc, Game2DKit.Ivory, 0.3f) : Game2DKit.Faint);
             }
             p.Apply(t);
+        }
+
+        /// <summary>挑戦カード〈猫の手〉(#5) の印: 猫が先に挿した出目 (このターン動かせない) を琥珀の枠で囲み、 左の余白に肉球を置く。
+        /// 大きさは変えない (色と別の絵だけ)。</summary>
+        private static readonly string[] CatPaw =
+        {
+            "#.#.#",
+            ".....",
+            ".###.",
+            "#####",
+            ".###.",
+        };
+        private static void DrawCatMark(KitPix p, int i)
+        {
+            var r = PDieR(i); var c = Game2DKit.Amber;
+            p.Rect(r.x - 1, r.y - 1, r.width + 2, 1, c); p.Rect(r.x - 1, r.y + r.height, r.width + 2, 1, c);
+            p.Rect(r.x - 1, r.y, 1, r.height, c); p.Rect(r.x + r.width, r.y, 1, r.height, c);
+            int px = PortX(i) + 1, py = r.y + (r.height - CatPaw.Length) / 2;
+            for (int j = 0; j < CatPaw.Length; j++)
+                for (int k = 0; k < CatPaw[j].Length; k++)
+                    if (CatPaw[j][k] == '#') p.Set(px + k, py + j, c);
         }
 
         /// <summary>Hand: 上 = 山/捨て(/外) の枚数 / 下 = 手札の USB (縦向き)。 ターンの頭に右から滑り込む (位置だけ・拡大しない)。

@@ -115,7 +115,9 @@ namespace MetaProgression
             K(TermBlk, true, Family.None, T(null, 1, 2, 3));              // ブロックの端子: 同上
             K(MaxHp, true, Family.None, T(5, 8, 12, 18));                 // 最大 HP +N% (受けた時に上げ、 上がった分だけ HP も増える)
             K(HealUp, true, Family.None, T(10, 15, 20, 30));              // 回復 +N% (回復の倍率に掛ける。 入口の全回復は満タンまでなので、 回復 −N% を打ち消す分だけ効く)
-            K(Cat, true, Family.None, T(2, null, null, null), pending: true);          // 猫の手 (予告と BOT の配線に先に見せる仕組みができてから)
+            // 猫の手 (#5・2026-11-12): 毎ターン N% の確率で、 配線の判断の頭に、 Super の評価で最良の挿し方の中から 1 組 (出目 1 個 → 端子 1 枚) を先に挿す。
+            //   猫が挿した組はそのターン外せない。 値は仮置き・未測定 (CombatManager.ChooseCatPaw / GameHooks.CatPawPick)
+            K(Cat, true, Family.None, T(25, 50, 75, 100));
             K(GoldPunch, true, Family.None, T(null, null, 1, 1), pending: true);     // 金で殴る (BOT の方策ができてから)
         }
 
@@ -283,7 +285,7 @@ namespace MetaProgression
                 case WinGold: return "戦闘に勝つたびゴールド +" + n;
                 case MaxHp: return "最大 HP +" + n + "%";
                 case HealUp: return "回復 +" + n + "%";
-                case Cat: return "猫の手: 毎ターン、 ダイス 1 個を猫が配線する。 猫が挿したダイスは出目 +" + n;
+                case Cat: return "猫の手: 毎ターン " + n + "% の確率で、 猫が出目 1 個を一番得な端子に先に挿す（そのターンは外せない）";
                 case GoldPunch: return "金で殴る: 攻撃に金を挿せる（1G につき攻撃 +" + n + "）";
             }
             return c.kind;

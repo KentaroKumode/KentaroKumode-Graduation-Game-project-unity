@@ -180,42 +180,29 @@ namespace AutoTest
             int k = rolls?.Length ?? 0;
             if (deck == null || k == 0) return null;
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
-            var run = GameManager.Instance?.Run;
             var board = deck.board;
-            var env = cm.TerminalEnvNow(ctx, tele.enemyAttackValue);
+            // 挑戦カード〈猫の手〉が先に挿した 1 組は固定 (外す挿し方を候補に入れない)。 振り直しの値付けの時は −1 (猫は配線の判断の頭で挿す)
+            int catDie = cm.CatPawDie, catSlot = cm.CatPawSlot;
 
             // 素朴版: 本体の既定 (素朴な点) と同じ。 旧い配線の素朴版 (出目降順の本数分割) に当たる「深く考えない」打ち方。
             if (EffectiveWiringSkill == WiringSkill.Naive)
             {
                 bestU = 0f;
-                return TerminalWiring.Auto(board, rolls, env, deck.state);
+                return TerminalWiring.Auto(board, rolls, cm.TerminalEnvNow(ctx, tele.enemyAttackValue), deck.state, catDie, catSlot);
             }
 
-            var st = BuildOptimalTurnState(rolls, tele);
-            // 会心の効果 (〈真空管〉〈照星〉〈急所読み〉) を旧の式でも見積もれるよう、 会心率と倍率は常に読む (readOut の切り替えは変えない)
-            if (ctx != null && !st.readOut && !st.traceBoth) FillReadOut(ref st, cm, ctx, run, tele.playerAttackPenalty);
-
-            bool deckHasCounter = run?.terminalDeck != null && run.terminalDeck.Contains(TerminalIds.Counter);
+            var ev = PrepareDeckEval(rolls, tele);
             // 止まった端子 (ヴェスカ〈停滞する時間〉) へ挿す手は列挙しない (Resolve が外すので結果は「挿さない」と同じ)
-            var cands = TerminalWiring.Enumerate(board, k, deck.state);
+            var cands = TerminalWiring.Enumerate(board, k, deck.state, catDie, catSlot);
             int n = cands.Count;
             var us = new float[n];
             var outs = new OptimalTurnOutcome[n];
             var tgts = new int[n][];
             for (int i = 0; i < n; i++)
             {
-                var after = deck.state.Clone();
-                var o = TerminalCards.Resolve(board, cands[i], rolls, env, after);
-                // 〈写し取り〉〈焼き切り〉〈保持器〉が発動する挿し方なら、 対象を方策で選び直して解き直す (対象は今ターンの攻防を変えない)
-                tgts[i] = ChooseDeckTargets(board, o, run);
-                if (tgts[i] != null)
-                {
-                    after = deck.state.Clone();
-                    o = TerminalCards.Resolve(board, cands[i], rolls, env, after, tgts[i]);
-                }
-                var ws = DeckSums(in st, rolls, board, o, deck.state, after, in env, deckHasCounter);
-                us[i] = OptimalUtilityCore(in st, k, in ws, out outs[i]);
+                us[i] = EvalDeckWiring(ev, rolls, cands[i], out outs[i], out _, out tgts[i]);
             }
+            var st = ev.st;
 
             int best = -1; float bu = float.NegativeInfinity;
             for (int i = 0; i < n; i++)
@@ -231,6 +218,66 @@ namespace AutoTest
             _lastPredRaw = fbo.rawNew; _lastPredCritP = st.critP; _lastPredCritMul = st.critMulEff; _lastPredOutMul = st.outMul;
             targets = tgts[best];
             return cands[best];
+        }
+
+        /// <summary>山札の挿し方の効用の入力 (盤面を 1 回だけ読んだもの)。 <see cref="ChooseDeckWiring"/> と〈猫の手〉の評価 (<see cref="CatPawPick"/>) が使う。</summary>
+        private struct DeckEval
+        {
+            public OptimalTurnState st;
+            public TerminalEnv env;
+            public List<string> board;
+            public TerminalDeckState deck;
+            public RunState run;
+            public bool deckHasCounter;
+        }
+
+        /// <summary>今の盤面から <see cref="DeckEval"/> を組む (読むだけ)。 山札で戦っていない時は呼ばないこと。</summary>
+        private DeckEval PrepareDeckEval(int[] rolls, MutualTurnTelegraph tele)
+        {
+            var cm = CombatManager.Instance;
+            var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+            var run = GameManager.Instance?.Run;
+            var ev = new DeckEval
+            {
+                deck = cm.TerminalDeck, board = cm.TerminalDeck.board, run = run,
+                env = cm.TerminalEnvNow(ctx, tele.enemyAttackValue),
+                st = BuildOptimalTurnState(rolls, tele),
+                deckHasCounter = run?.terminalDeck != null && run.terminalDeck.Contains(TerminalIds.Counter),
+            };
+            // 会心の効果 (〈真空管〉〈照星〉〈急所読み〉) を旧の式でも見積もれるよう、 会心率と倍率は常に読む (readOut の切り替えは変えない)
+            if (ctx != null && !ev.st.readOut && !ev.st.traceBoth) FillReadOut(ref ev.st, cm, ctx, run, tele.playerAttackPenalty);
+            return ev;
+        }
+
+        /// <summary>挿し方 1 つの効用 (山札の状態は写しに掛ける・読むだけ)。 <paramref name="o"/> = 端子の結果・<paramref name="tgts"/> = 方策が選んだ対象 (null あり)。</summary>
+        private float EvalDeckWiring(in DeckEval ev, int[] rolls, int[] cand, out OptimalTurnOutcome outc, out TerminalOutcome o, out int[] tgts)
+        {
+            var after = ev.deck.state.Clone();
+            o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after);
+            // 〈写し取り〉〈焼き切り〉〈保持器〉が発動する挿し方なら、 対象を方策で選び直して解き直す (対象は今ターンの攻防を変えない)
+            tgts = ChooseDeckTargets(ev.board, o, ev.run);
+            if (tgts != null)
+            {
+                after = ev.deck.state.Clone();
+                o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, tgts);
+            }
+            var ws = DeckSums(in ev.st, rolls, ev.board, o, ev.deck.state, after, in ev.env, ev.deckHasCounter);
+            return OptimalUtilityCore(in ev.st, rolls.Length, in ws, out outc);
+        }
+
+        /// <summary>挑戦カード〈猫の手〉(#5) の評価 (<see cref="GameHooks.CatPawPick"/> の中身・<see cref="CatPawAdvisor"/> が Super の設定の写しで呼ぶ)。
+        /// この評価で最良の挿し方を選び (<see cref="ChooseDeckWiring"/> と同じ列挙と効用)、 その中で「外すと効用が一番落ちる 1 組」を返す
+        /// (選び方は本体の <see cref="TerminalWiring.MostValuablePair"/>)。 戻り値 <c>{ 出目, 場の添字 }</c>・挿す組が無ければ <c>{ -1, -1 }</c>・評価できなければ null。</summary>
+        internal int[] CatPawPick(int[] rolls, MutualTurnTelegraph tele)
+        {
+            var cm = CombatManager.Instance;
+            if (cm?.TerminalDeck == null || rolls == null || rolls.Length == 0) return null;
+            var best = ChooseDeckWiring(rolls, tele, out _, out var targets);
+            if (best == null) return null;
+            var ev = PrepareDeckEval(rolls, tele);
+            // 挿し方を直した後の値で数える (条件に合わず外れる組を猫が挿さないように)
+            var fixedUp = TerminalCards.Resolve(ev.board, best, rolls, ev.env, ev.deck.state.Clone(), targets).slotOfDie;
+            return TerminalWiring.MostValuablePair(fixedUp, w => EvalDeckWiring(ev, rolls, w, out _, out _, out _));
         }
 
         /// <summary>対象を取る端子の対象の方策 (読むだけ)。 写し取り = 山札に増やして一番得な端子 (素の点の最大) / 焼き切り = 一番要らない端子 (最小) /

@@ -787,16 +787,21 @@ namespace CombatSystem
             TerminalOutcome term;
             {
                 var tenv = TerminalEnvNow(ctx, enemyAtkValue);
+                // 挑戦カード〈猫の手〉: 出目と予告が確定したここで、 1 組を先に挿す (人の画面・BOT の方策はこの 1 組を外せない)
+                ChooseCatPaw(playerDice, tele, tenv);
                 int[] slots = null, targets = null;
                 if (_interactiveTurn)
                 {
                     _pause.Set(TurnPauseKind.Wiring, playerDice, playerFaceIdx, tele);
                     _pause.board = _deck.board; _pause.terminalEnv = tenv; _pause.terminalState = _deck.state;
+                    _pause.catDie = _catDie; _pause.catSlot = _catSlot;
                     yield return _pause;
                     slots = _pause.slots; targets = _pause.targets;
                 }
                 else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; }
-                if (slots == null) slots = TerminalWiring.Auto(_deck.board, playerDice, tenv, _deck.state);
+                if (slots == null) slots = TerminalWiring.Auto(_deck.board, playerDice, tenv, _deck.state, _catDie, _catSlot);
+                // 猫の 1 組は答えに関わらず入れる (外した答え・同じ口に挿しすぎた答えは、 猫の組を残して直す)
+                if (_catDie >= 0) slots = TerminalWiring.WithPair(slots, playerDice.Length, _deck.board, _catDie, _catSlot);
                 // 〈写し取り〉〈焼き切り〉〈保持器〉の対象: 人 = 画面で選んだ端子 / BOT = 方策 / どちらも無ければ左端の候補
                 term = TerminalCards.Resolve(_deck.board, slots, playerDice, tenv, _deck.state, targets);
                 mutualWiring = term.kindOfDie;
