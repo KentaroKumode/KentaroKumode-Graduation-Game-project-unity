@@ -125,6 +125,66 @@ namespace GameLoop
             return ok;
         }
 
+        /// <summary>今 <see cref="Use"/> を呼んだら使えるか (使えれば null・使えなければ理由の短い文)。 画面が品を暗く出すための<b>読むだけ</b>の判定で、
+        /// 状態を変えない。 条件は <see cref="Use"/> と <see cref="Apply"/> が false を返す所の写し ── Apply の分岐を変えたらここも直す。
+        /// 使うのは必ず <see cref="Use"/> (人の画面も BOT も同じ関数)。 ここが null でも Use が false を返すことはある (その時は消費しない)。
+        /// <para>使えても効き目が無い場面 (〈狂暴化〉で回復が封じられている時の回復薬など) は、 Use が消費するので「使える」と答える。</para></summary>
+        public static string BlockReason(RunState run, string id)
+        {
+            if (run == null || string.IsNullOrEmpty(id)) return "使えない";
+            if (run.ownedConsumables == null || !run.ownedConsumables.Contains(id)) return "持っていない";
+            var ctx = ActiveCtx();
+            if (ctx != null && ctx.consumablesLocked) return "この戦闘では消耗品を使えない";
+            int useCap = MetaProgression.MetaDebuffApplicator.GetBattleConsumableCap();
+            if (useCap > 0 && ctx != null && ctx.GetAccumulated(BattleUseKey) >= useCap) return "この戦闘ではもう使えない (" + useCap + " 個まで)";
+
+            if (ItemIds.ConsFamilyOf(id) == ItemIds.ConsLureFamily)
+            {
+                if (ctx != null) return "戦闘中は使えない";
+                var gm = GameManager.Instance;
+                return gm != null && gm.CanPlaceLure ? null : "航行中だけ置ける";
+            }
+            if (HealRatio(id) > 0f)
+            {
+                var cm = CombatManager.Instance;
+                bool full = ctx != null ? (cm == null || cm.PlayerHP >= cm.PlayerMaxHP) : run.playerHP >= run.playerMaxHP;
+                return full ? "HP が満ちている" : null;
+            }
+            // シールド・攻撃強化の系統は、 戦闘の中でも外でも必ず効く (外なら次の戦闘の開幕へ持ち越す)。 系統で読む ── id の綴りは見ない
+            string fam = ItemIds.ConsFamilyOf(id);
+            if (fam == ItemIds.ConsShieldFamily || fam == ItemIds.ConsPowerFamily) return null;
+            switch (id)
+            {
+                case ClassStarter.PolishId: case ClassStarter.OathId: case ClassStarter.DaggerId:
+                    return null;
+                case ItemIds.OldLetter:
+                case ClassStarter.PainkillerId:
+                    return ctx != null ? null : "戦闘中だけ使える";
+                case ItemIds.PhilStone:
+                    return run.philStoneUsed >= 5 ? "もう使えない (ランで 5 回まで)" : null;
+                default:
+                    return "使えない";
+            }
+        }
+
+        /// <summary>今 <see cref="Use"/> で使えるか (<see cref="BlockReason"/> が null)。</summary>
+        public static bool CanUse(RunState run, string id) => BlockReason(run, id) == null;
+
+        /// <summary>〈シュヴァリエのレイピア〉を今 <see cref="TryUseRapier"/> で切り替えられるか (持っていて・戦闘中で・死翔で封じられていない)。</summary>
+        public static bool CanUseRapier(RunState run)
+        {
+            if (run?.ownedPassiveItems == null || !run.ownedPassiveItems.Contains(ItemIds.ChevalierRapier)) return false;
+            var ctx = ActiveCtx();
+            return ctx != null && !ctx.consumablesLocked;
+        }
+
+        /// <summary>〈シュヴァリエのレイピア〉のコントラタックが立っているか (戦闘中だけ意味がある)。</summary>
+        public static bool RapierContreOn()
+        {
+            var ctx = ActiveCtx();
+            return ctx != null && ctx.GetAccumulated("player_contre") > 0;
+        }
+
         /// <summary>所持リストを介さず効果のみ適用（UI/グリッド経路用。削除はグリッド側が行う）。</summary>
         public static bool ApplyDirect(RunState run, string id)
             => run != null && !string.IsNullOrEmpty(id) && Apply(run, id);

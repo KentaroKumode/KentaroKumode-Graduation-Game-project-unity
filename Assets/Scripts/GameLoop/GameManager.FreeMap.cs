@@ -119,6 +119,9 @@ namespace GameLoop
             return true;
         }
 
+        /// <summary>囮罠を今いる点に置けるか (航行中で・戦闘中でない)。 <see cref="TryPlaceLure"/> が true を返す条件と同じ (画面が品を暗く出すのに使う)。</summary>
+        public bool CanPlaceLure => FreeMapForAction() != null;
+
         /// <summary>〈前哨の旗〉を今いる点に立てられるか (持っていて、 この層でまだ立てていない・航行中)。
         /// 層に 1 回なので「まだ拠点が無い」で見る (層の途中で旗を得た直後は、 回数が次の操作で入る)。</summary>
         public bool CanUseOutpostFlag

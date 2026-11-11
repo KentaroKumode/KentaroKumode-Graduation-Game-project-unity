@@ -109,7 +109,10 @@ namespace UI.Game2D
                 float hp = simOn ? battleSim.playerHp / (float)battleSim.playerMax : (run.playerMaxHP > 0 ? run.playerHP / (float)run.playerMaxHP : 0f);
                 bool nav = _view != null && !_battle;
                 float frac;
-                if (_battle && simOn) frac = Mathf.Clamp01(battleSim.GetWired().blk / 18f);      // 試作の戦闘: 今ターンの防御の配線 (最大 18)
+                // 戦闘の画面: 今ターンの守り = 防御の配線 (端子の見込み) + シールド (護符など・ブロックの後で被ダメを肩代わりする)。
+                //   シールドを足すのは、 戦闘中に護符を使った時にその場で数字が増えて見えるように (issue #11)
+                int battleGuard = simOn ? battleSim.GetWired().blk + (ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context?.consShield ?? 0) : 0;
+                if (_battle && simOn) frac = Mathf.Clamp01(battleGuard / 18f);      // 試作の戦闘: 18 で満ちる
                 else if (_battle)
                 {
                     // 戦闘 = シールド (吸収量 ÷ 最大 HP)
@@ -117,7 +120,7 @@ namespace UI.Game2D
                     frac = ctx != null && run.playerMaxHP > 0 ? Mathf.Clamp01(ctx.consShield / (float)run.playerMaxHP) : 0f;
                 }
                 else frac = run.provisionCap > 0 ? run.provision / (float)run.provisionCap : 0f;
-                int mainNum = _battle && simOn ? battleSim.GetWired().blk : _battle ? (ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context?.consShield ?? 0) : run.provision;
+                int mainNum = _battle && simOn ? battleGuard : _battle ? (ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context?.consShield ?? 0) : run.provision;
                 resBar.Set(hp, frac, _battle, nav ? _view.SupplyPreview : 0f, nav ? _view.SupplyPreviewText : null, simOn ? battleSim.playerHp : run.playerHP, mainNum);
             }
 
