@@ -172,16 +172,20 @@ namespace CombatSystem
         /// <summary>山札の下限 (これを下回る抜き方はできない)。 出目 3 個を挿す先が足りなくならない枚数。</summary>
         public const int MinDeckSize = 3;
 
-        // ===== 数値 (すべて仮・未測定) =====
-        public const int IgniterAttack = 7, FuseBlock = 8, GroundCutPct = 40, BreakerCutPct = 50, ReliefCutPct = 80;
-        public const int DischargeCost = 3, DischargeMul = 3, BreakerCost = 4, DeathwishMul = 3, RelayPerFired = 8, OscPerStreak = 5;
-        public const int CapacitorNeed = 15, CapacitorAttack = 40, ArresterNeed = 12, FoundryNeed = 20, CoolantNeed = 24;
-        public const float AmplifierPerPip = 0.08f, ResonatorMul = 1.5f, VacuumCritMult = 1.0f;
-        public const int CounterEvery = 10; public const float CounterPct = 0.10f;
-        public const int TwinShotMul = 3, DetonatorMul = 4, FirstAidMul = 3, HealMul = 2, BatteryBonus = 2, InsulatorBonus = 3;
+        // ===== 数値 (仮) =====
+        // 2026-11-11: 基本以外の端子の得を約 2 倍にした。 旧の値では、 端子を取る BOT が取らない BOT より弱かった
+        //   (同じ BOT・各 100 ラン・6 層到達: 取らない 80% / 旧の値 68% / 2 倍 82%。 main は 81%)。
+        //   固定値は 2 倍・倍率は「基本との差」を 2 倍・溜める端子は必要量を半分・割合は引き上げ。
+        public const int DetectorMul = 3, RectifierMul = 3;
+        public const int IgniterAttack = 14, FuseBlock = 16, GroundCutPct = 60, BreakerCutPct = 75, ReliefCutPct = 90;
+        public const int DischargeCost = 3, DischargeMul = 5, BreakerCost = 4, DeathwishMul = 5, RelayPerFired = 16, OscPerStreak = 10;
+        public const int CapacitorNeed = 15, CapacitorAttack = 80, ArresterNeed = 6, FoundryNeed = 10, CoolantNeed = 12;
+        public const float AmplifierPerPip = 0.16f, ResonatorMul = 2.0f, VacuumCritMult = 2.0f;
+        public const int CounterEvery = 10; public const float CounterPct = 0.20f;
+        public const int TwinShotMul = 5, DetonatorMul = 7, FirstAidMul = 6, HealMul = 4, BatteryBonus = 4, InsulatorBonus = 6;
         public const int HarvesterMaxHp = 2, WhetGain = 1, LootGold = 10;
-        public const float SightPerRank = 0.1f, VitalPerRank = 0.05f, BloodTapPct = 0.05f, BigDischargePerRank = 0.10f, ShieldPushPerRank = 0.03f;
-        public const int BloodTapPer = 5, PoisonScalePer = 10, PoisonScaleAttack = 3, AfterHeatPerBurst = 2;
+        public const float SightPerRank = 0.2f, VitalPerRank = 0.1f, BloodTapPct = 0.1f, BigDischargePerRank = 0.20f, ShieldPushPerRank = 0.06f;
+        public const int BloodTapPer = 5, PoisonScalePer = 10, PoisonScaleAttack = 6, AfterHeatPerBurst = 4;
 
         private static TerminalDef D(string id, TerminalKind k, string desc, TerminalCond c = TerminalCond.None, string axis = null)
             => new TerminalDef { id = id, kind = k, cond = c, description = desc, axis = axis, condLabel = CondLabel(c) };
@@ -223,7 +227,7 @@ namespace CombatSystem
                 Basic(D(TerminalIds.Charge, C, "出目を充電に。")),
                 // ── コモン ──
                 D(TerminalIds.Igniter, A, "攻撃 +" + IgniterAttack + "。", TerminalCond.AtMost3),
-                D(TerminalIds.Detector, A, "出目 ×2 を攻撃に。", TerminalCond.Odd),
+                D(TerminalIds.Detector, A, "出目 ×" + DetectorMul + " を攻撃に。", TerminalCond.Odd),
                 Cost(D(TerminalIds.DischargeTube, A, "充電 " + DischargeCost + " を払い、出目 ×" + DischargeMul + " を攻撃に。"), DischargeCost),
                 D(TerminalIds.Deathwish, A, "出目ぶん HP を払い、出目 ×" + DeathwishMul + " を攻撃に。"),
                 D(TerminalIds.Relay, A, "出目を攻撃に。このターンに発動した基本以外の端子 1 つにつき攻撃 +" + RelayPerFired + "。"),
@@ -235,7 +239,7 @@ namespace CombatSystem
                 D(TerminalIds.Insulator, B, "シールド +出目 +" + InsulatorBonus + "。", TerminalCond.Even),
                 D(TerminalIds.Parry, B, "出目をブロックに。防いだ量を、次に攻撃するターンの攻撃に足す。"),
                 Cost(D(TerminalIds.Breaker, B, "充電 " + BreakerCost + " を払い、このターンの敵の攻撃 −" + BreakerCutPct + "%。"), BreakerCost),
-                D(TerminalIds.Rectifier, C, "充電 +出目 ×2。", TerminalCond.Even),
+                D(TerminalIds.Rectifier, C, "充電 +出目 ×" + RectifierMul + "。", TerminalCond.Even),
                 D(TerminalIds.Battery, C, "充電 +出目 +" + BatteryBonus + "。"),
                 D(TerminalIds.Heal, S, "HP +出目 ×" + HealMul + "。", TerminalCond.AtMost3),
                 D(TerminalIds.Capacitor, S, "出目を溜める。" + CapacitorNeed + " で次の攻撃 +" + CapacitorAttack + "。"),
@@ -525,7 +529,7 @@ namespace CombatSystem
                 case TerminalIds.Charge: o.chargeAdd += sum; break;
                 // コモン
                 case TerminalIds.Igniter: o.attackAdd += IgniterAttack; break;
-                case TerminalIds.Detector: o.attackAdd += sum * 2; break;
+                case TerminalIds.Detector: o.attackAdd += sum * DetectorMul; break;
                 case TerminalIds.DischargeTube: o.attackAdd += sum * DischargeMul; break;
                 case TerminalIds.Deathwish:
                 {
@@ -548,7 +552,7 @@ namespace CombatSystem
                 case TerminalIds.Insulator: o.shield += sum + InsulatorBonus; break;
                 case TerminalIds.Parry: o.blockAdd += sum; st.storedAttackNext += Math.Min(sum, Math.Max(0, env.enemyAttack)); break;
                 case TerminalIds.Breaker: o.enemyAttackMul *= 1f - BreakerCutPct / 100f; break;
-                case TerminalIds.Rectifier: o.chargeAdd += sum * 2; break;
+                case TerminalIds.Rectifier: o.chargeAdd += sum * RectifierMul; break;
                 case TerminalIds.Battery: o.chargeAdd += sum + BatteryBonus; break;
                 case TerminalIds.Heal: o.heal += sum * HealMul; break;
                 case TerminalIds.Capacitor: st.storedAttack += CapacitorAttack * Gauge(st, id, sum, CapacitorNeed); break;
