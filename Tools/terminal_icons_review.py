@@ -1,6 +1,6 @@
 # 端子のアイコン (Game2DTerminalIcons.cs) の合否ページ (HTML) を書き出す。
 #   使い方: python Tools/terminal_icons_review.py <出力する .html>
-#   ページは合否と直しの指示を Artifact の db (collection "reviews") に保存する。
+#   ページは合否と直しの指示を Artifact の db (collection "reviews2" (第 2 稿)) に保存する。
 import io, re, sys, json
 
 ROOT = "C:/Users/kumod/My project/"
@@ -67,8 +67,8 @@ button:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px sol
 </style>
 <div class="wrap">
   <header>
-    <h1>端子アイコン合否</h1>
-    <p>端子 60 種の 16×16 アイコンです。左が 8 倍の拡大、その下が USB メモリに載せた実寸の 3 倍です。1 つずつ「合」か「否」を押し、直してほしい点があれば書いてください。押した内容は自動で保存され、こちらで読み取って描き直します。</p>
+    <h1>端子アイコン合否（第2稿）</h1>
+    <p>端子 60 種の 16×16 アイコンの第 2 稿です（物の絵に描き直し）。左が 8 倍の拡大、その下が USB メモリに載せた実寸の 3 倍です。1 つずつ「合」か「否」を押し、直してほしい点があれば書いてください。押した内容は自動で保存され、こちらで読み取って描き直します。</p>
   </header>
   <div class="bar">
     <b>合 <span class="ok" id="nOk">0</span></b><b>否 <span class="ng" id="nNg">0</span></b><b>未 <span id="nNone">0</span></b>
@@ -101,7 +101,7 @@ const timers={};
 function save(key){ counts(); applyFilter(); if(!db){ $('save').textContent='保存先に接続できていません (この端末の中だけに残ります)'; try{localStorage.setItem('rv',JSON.stringify(state));}catch(e){} return; }
   clearTimeout(timers[key]); $('save').textContent='保存中…';
   timers[key]=setTimeout(async()=>{ const d=DATA.find(x=>x.key===key), s=state[key]||{};
-    try{ await db.doc('reviews/'+key).set({name:d.name, verdict:s.v||'', note:s.note||'', at:new Date().toISOString()}); $('save').textContent='保存しました'; }
+    try{ await db.doc('reviews2/'+key).set({name:d.name, verdict:s.v||'', note:s.note||'', at:new Date().toISOString()}); $('save').textContent='保存しました'; }
     catch(e){ $('save').textContent='保存に失敗しました: '+(e&&e.message||e); } }, 500); }
 function build(){ const list=$('list'); let group=null, grid=null;
   for(const d of DATA){
@@ -131,7 +131,7 @@ $('filt').onchange=applyFilter;
   try{ db = await claude.use('db'); }catch(e){ db=null; }
   if(!db){ $('save').textContent='保存先に接続できていません (この端末の中だけに残ります)'; try{ Object.assign(state, JSON.parse(localStorage.getItem('rv')||'{}')); }catch(e){}
     for(const d of DATA) paint(d.key); counts(); return; }
-  try{ const snap = await db.collection('reviews').get();
+  try{ const snap = await db.collection('reviews2').get();
     for(const doc of snap.docs){ const x=doc.data()||{}; state[doc.id]={v:x.verdict||'', note:x.note||''}; paint(doc.id); }
     counts(); $('save').textContent='読み込みました'; }
   catch(e){ $('save').textContent='読み込みに失敗しました: '+(e&&e.message||e); }
