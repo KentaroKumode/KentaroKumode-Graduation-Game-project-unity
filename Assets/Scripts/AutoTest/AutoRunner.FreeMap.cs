@@ -102,6 +102,8 @@ namespace AutoTest
         [System.NonSerialized] public int freeNavModeOverride = -1;
         /// <summary>[計装] 方策ごとの航行判断の回数・逃げた回数・出口へ向かった回数・囮罠を使った回数 (バッチ累計)。添字は 0 Naive / 1 回避あり。</summary>
         public static readonly long[] FreeNavDecisions = new long[2], FreeNavFlees = new long[2], FreeNavExits = new long[2], FreeNavLures = new long[2];
+        /// <summary>[計装 2026-11-12] 囮罠を踏ませる向きへ一歩を振り直した回数 (バッチ累計)。</summary>
+        public static long FreeNavLureFlees;
 
         /// <summary>この判断で追跡者を避ける方策か。</summary>
         private bool FreeNavAvoidsFoe()
@@ -375,6 +377,23 @@ namespace AutoTest
                     if (d >= 0) hop = d;      // 迂回路が無ければ真っ直ぐ歩く (捕まれば戦う)
                 }
                 else hop = AvoidFoeStep(sim, at, target, hop);
+                // 囮罠を置いた点から逃げる (2026-11-12・#35): 追跡中の追跡者は囮罠に気を取られず、 最短の道を詰めてくる。
+                //   踏ませるには、 次の 1 歩を「追跡者から見て、 囮罠の点を通るのが最短」の隣にする
+                //   (追跡者からの歩数が 囮罠の点 + 1 になる隣)。 その中で行き先に一番近い物を選ぶ。 無ければ今の 1 歩のまま。
+                if (sim.FoeAlive && sim.FoeMode == FoeMode.Chase && sim.HasLureAt(at))
+                {
+                    var fromFoe = sim.HopsFrom(sim.FoeNode);
+                    var toT = sim.HopsFrom(target);
+                    int best = -1, bestD = int.MaxValue;
+                    if (fromFoe[at] != int.MaxValue)
+                        foreach (int n in sim.Neighbors(at))
+                        {
+                            if (!sim.CanMoveTo(n) || n == sim.FoeNode || fromFoe[n] != fromFoe[at] + 1) continue;
+                            int dT = toT[n] == int.MaxValue ? int.MaxValue - 1 : toT[n];
+                            if (dT < bestD) { bestD = dT; best = n; }
+                        }
+                    if (best >= 0) { if (best != hop) FreeNavLureFlees++; hop = best; }
+                }
             }
             // [計装 2026-11-04] 戦えない HP で、 戦闘マス/見えていない点へ踏み込む 1 歩を理由別に数える
             if (cantFightBlind && hop >= 0 && hop < nCount && _cur?.lowHpRiskSteps != null)
