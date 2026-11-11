@@ -55,7 +55,15 @@ namespace CombatSystem
             _catDie = _catSlot = -1;      // 〈猫の手〉は配線の判断の頭で挿し直す (振り直しの判断の間は無い)
             if (_deck == null) return;
             int extra = _deck.state.BeginTurn();
-            _deck.DrawTurn(TerminalCards.HandSize + extra, _termRetain);
+            // ヴェスカ〈停滞する時間〉: 引いた端子 1 枚ごとに確率で止める (持たない敵は 0)
+            float stop = ItemSystem.PassiveSkills.Effects.StagnantTime.StopChance(currentEnemy);
+            _deck.DrawTurn(TerminalCards.HandSize + extra, _termRetain, stop);
+            if (stop > 0f)
+            {
+                GuardDiag.NoteStag7F(currentEnemy?.id, _deck.LastDrawnCount, _deck.LastStoppedCount, _deck.LastStoppedMains, _deck.LastHeldCount);   // [計装]
+                if (_deck.LastStoppedCount > 0)
+                    Debug.Log($"[停滞する時間] 引いた {_deck.LastDrawnCount} 枚のうち {_deck.LastStoppedCount} 枚が止まった (確率 {stop:P0})");
+            }
             _termRetain = null; _termOutcome = null; _termDamageMul = 1f;
             if (ctx == null) return;
             // 〈鋳造口〉: この戦闘中の出目 +N (自ロールの後に足す既存の口へ渡す)
@@ -186,13 +194,14 @@ namespace CombatSystem
     public static class TerminalWiring
     {
         /// <summary>規則上ありうる挿し方をすべて返す (出目ごとの挿し先・−1 = 挿さない)。 挿せる数だけ見る (条件・充電は <see cref="TerminalCards.Resolve"/> が直す)。
+        /// state を渡すと、 止まった端子 (ヴェスカ〈停滞する時間〉) へ挿す手は出さない (Resolve が外すのと同じ結果になる手を数え直さないため)。
         /// <paramref name="fixedDie"/> ≥ 0 なら、 その出目は <paramref name="fixedSlot"/> に挿した挿し方だけ (〈猫の手〉が先に挿した 1 組)。</summary>
-        public static List<int[]> Enumerate(List<string> board, int diceCount, int fixedDie = -1, int fixedSlot = -1)
+        public static List<int[]> Enumerate(List<string> board, int diceCount, TerminalBattleState state = null, int fixedDie = -1, int fixedSlot = -1)
         {
             var res = new List<int[]>();
             int m = board.Count;
             var cap = new int[m];
-            for (int s = 0; s < m; s++) cap[s] = TerminalCards.Get(board[s])?.capacity ?? 0;
+            for (int s = 0; s < m; s++) cap[s] = state != null && state.IsStopped(s) ? 0 : TerminalCards.Get(board[s])?.capacity ?? 0;
             bool hasFixed = fixedDie >= 0 && fixedDie < diceCount && fixedSlot >= 0 && fixedSlot < m && cap[fixedSlot] > 0;
             if (hasFixed) cap[fixedSlot]--;      // 先に挿した 1 組の分を、 先に場から取っておく
             var cur = new int[diceCount];
@@ -216,7 +225,7 @@ namespace CombatSystem
         public static int[] Auto(List<string> board, int[] dice, TerminalEnv env, TerminalBattleState state, int fixedDie = -1, int fixedSlot = -1)
         {
             int[] best = null; float bestScore = float.NegativeInfinity;
-            foreach (var w in Enumerate(board, dice.Length, fixedDie, fixedSlot))
+            foreach (var w in Enumerate(board, dice.Length, state, fixedDie, fixedSlot))
             {
                 var o = TerminalCards.Resolve(board, w, dice, env, state.Clone());
                 float score = NaiveScore(o, env);

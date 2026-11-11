@@ -651,8 +651,17 @@ namespace AutoTest
             public bool ledger;                // [V3 hpLedger] 効用を HP の帳簿で測る
             public float dFull;                // [V3 hpLedger] 先のターンに全部攻撃に挿した時の 1 ターンの与ダメの見込み
             public bool enemyDoubleOnBlockHeavy; // [2026-11-12] 敵〈多頭攻撃〉: 攻撃の個数 < ブロックの個数で挿したターン、 敵の攻撃が 2 回 (CombatManager.Turn.cs)
-            public int enemyHitBonus;            // [2026-11-12] 敵の攻撃が通った時に足される量 (〈剛力〉〈闇技〉+2・〈研ぎ澄まし〉+ターン÷3)。 本体は敵の攻撃の計算の中 (PSM.ProcessDamage) で足す
-            public float stagCost;             // [2026-11-11] ヴェスカ〈停滞する時間〉: 攻撃 < ブロックで挿すと、 先のターンの敵の攻撃がこれだけ上がる (1 スタック × 今のエスカレーション・上限なら 0)
+            public int enemyHitBonus;            // [2026-11-12] 敵の攻撃が通った時に足される量 (〈剛力〉〈闇技〉+2・〈研ぎ澄まし〉+ターン÷3・前のターンに積まれた〈反撃態勢〉)。 本体は敵の攻撃の計算の中 (PSM.ProcessDamage) で足す
+            // ---- [#107 2026-11-12] 敵のパッシブ: 収支 (与えたダメージ − 受けたダメージ) で決まる効果と〈吸血〉 ----
+            public bool enemyBalanceRead;        // 下のどれかを持つ (false なら効用は従来どおり)
+            public int enemyChipOnPlus;          // 収支プラスのターンにその場で入る軽減無視 (〈尾撃〉1・〈重甲〉の反射 1)
+            public int enemyChipOnMinus;         // 収支マイナスのターンにその場で入る軽減無視 (〈地獄の業火〉2)
+            public bool shieldAbsorbsChip;       // 軽減無視をシールドが肩代わりする (CombatContext.ShieldAbsorbsUnmitigable)
+            public int enemyLifesteal;           // 〈吸血〉の数 (1 つにつき、 通った主攻撃のダメージ ÷2 を回復)
+            public float enemyHealCut;           // 治癒阻害 (ctx.enemyHealReductionPct)
+            public int nextHitOnPlus;            // 収支プラスの次のターン、 敵の攻撃が通った時 +N (〈反撃態勢〉3)
+            public float nextAtkOnPlus;          // 収支プラスの次のターン、 敵の攻撃 +N (〈暴走〉3) を次のターンのエスカレーションとプレイヤーの防御に通した被ダメの増分
+            public int counterPendingNow;        // 前のターンに積まれ、 このターンの enemyHitBonus に入れた〈反撃態勢〉の分 (先読みの次のターンでは外す)
             public float mainCorr;             // [V3 mainCorr] 主攻撃の見積もりに掛ける実績の比 (0 = 掛けない)
             // ---- [V3 readOutgoingMult 2026-11-10] 与ダメの倍率を読む (本体の主攻撃の計算 CombatManager.Turn / Damage / PassiveSkillManager.ProcessDamage に合わせる) ----
             public bool readOut;               // 下の値で主攻撃を見積もる (false = 旧: 素の攻撃力 + 攻撃の出目 − 防御)
@@ -769,19 +778,62 @@ namespace AutoTest
         }
 
         /// <summary>[V3 hpLedger] この戦闘で失う HP の見込み = 今ターンの被ダメ + 撃破までの残りターンで受ける被ダメ (全部攻撃する前提)。</summary>
-        private float LedgerLoss(in OptimalTurnState s, int effDmg, int taken, bool addsStag = false)
+        /// <param name="enemyHeal">[#107] 敵〈吸血〉で今ターンの終わりに戻る敵 HP (撃破しないときだけ・<see cref="OptimalTurnOutcome.enemyHeal"/>)。</param>
+        /// <param name="nextTurnExtra">[#107] 今ターンの挿し方で次のターンの被ダメに乗る分 (収支プラス → 〈反撃態勢〉〈暴走〉)。 次のターンの 1 回だけ。</param>
+        private float LedgerLoss(in OptimalTurnState s, int effDmg, int taken, int enemyHeal = 0, float nextTurnExtra = 0f)
         {
             int rem = s.enemyHp - System.Math.Min(effDmg, s.enemyHp);
             if (rem <= 0) return taken;
-            int n = System.Math.Min(HorizonCapTurns, UnityEngine.Mathf.CeilToInt(rem / System.Math.Max(1f, s.dFull)));
+            rem = System.Math.Min(System.Math.Max(rem, s.enemyMaxHpNow), rem + System.Math.Max(0, enemyHeal));
+            float dF = System.Math.Max(1f, s.dFull);
+            int n;
+            if (s.enemyLifesteal <= 0)
+                n = System.Math.Min(HorizonCapTurns, UnityEngine.Mathf.CeilToInt(rem / dF));
+            else
+            {
+                // 〈吸血〉(#107): 先のターンも、 敵の攻撃が通るたび (全部攻撃 = ブロック 0 の前提で敵の攻撃そのまま) その ÷2 だけ戻る。
+                //   撃破するターンは敵が攻撃しない (CombatManager.Turn.cs の `else if (enemyHP > 0)`) ので戻らない。
+                float r = rem; n = HorizonCapTurns;
+                for (int j = 1; j <= HorizonCapTurns; j++)
+                {
+                    r -= dF;
+                    if (r <= 0f) { n = j; break; }
+                    float g = s.atkGrowth != null ? s.atkGrowth[System.Math.Min(j + 1, HorizonCapTurns)] : 1f;
+                    int hit = Mathf.RoundToInt(s.enemyAtk * g);
+                    r = System.Math.Min(System.Math.Max(r, s.enemyMaxHpNow), r + LifestealHeal(in s, hit));
+                }
+            }
             float future = 0f;
             for (int j = 1; j <= n; j++)
             {
                 float g = s.atkGrowth != null ? s.atkGrowth[System.Math.Min(j + 1, HorizonCapTurns)] : 1f;
                 future += s.enemyAtk * g;
-                if (addsStag) future += s.stagCost * g;   // ヴェスカ〈停滞する時間〉: このターン守りに寄せた分 (残りのターンずっと乗る)
             }
+            if (n >= 1) future += nextTurnExtra;   // 〈反撃態勢〉〈暴走〉: 次のターンも敵が生きていれば乗る
             return taken + v3.ledgerFutureShare * future;
+        }
+
+        /// <summary>[#107] 敵〈吸血〉の回復量 (本体: EnemyPassiveSkillEffects.Lifesteal = ReduceEnemyHeal(通った主攻撃 ÷2)・1 つずつ)。</summary>
+        private static int LifestealHeal(in OptimalTurnState s, int hpDamage)
+        {
+            if (s.enemyLifesteal <= 0 || hpDamage <= 0) return 0;
+            int heal = hpDamage / 2;
+            if (s.enemyHealCut > 0f && heal > 0) heal = (int)(heal * (1f - s.enemyHealCut));
+            return heal * s.enemyLifesteal;
+        }
+
+        /// <summary>[#107] 1 ターンに <paramref name="dmg"/> 削り、 撃破しなかったターンの終わりに <paramref name="heal"/> 戻る (最大 HP まで) 時の、 撃破までのターン数 (上限 <see cref="HorizonCapTurns"/>)。</summary>
+        private static int TurnsToKillWithHeal(int hp, int dmg, int heal, int maxHp)
+        {
+            if (dmg <= 0) return HorizonCapTurns;
+            int r = hp;
+            for (int t = 1; t <= HorizonCapTurns; t++)
+            {
+                r -= dmg;
+                if (r <= 0) return t;
+                r = System.Math.Min(System.Math.Max(r, maxHp), r + heal);
+            }
+            return HorizonCapTurns;
         }
 
         /// <summary>配線 <paramref name="w"/> の効用 (state + 出目 + 配線 → 効用)。 盤面を読まない純粋な関数 (v3 の係数だけ読む)。</summary>
@@ -801,6 +853,8 @@ namespace AutoTest
             public int rawNew;           // [計装] 倍率の前の攻撃 (素火力 + 攻撃+N + 出目)
             public int dmgOld, dmgNew;   // [計装 readOutgoingMult] 主攻撃の見積もり (ヴェスカの防御の前): 旧の式 / 倍率を読む式 (traceBoth か readOut のときだけ)
             public int dmgUsed;          // [V3 mainCorr] 効用に使った主攻撃の見積もり (実績の比を掛ける前・ヴェスカの防御の前)
+            public int enemyHeal;        // [#107] 敵〈吸血〉で、 このターンの終わりに敵 HP が戻る量 (撃破しないときだけ)
+            public bool balancePlus;     // [#107] このターンの収支プラスの見込み (〈反撃態勢〉〈暴走〉が次のターンに乗る)
         }
 
         /// <summary>配線から出た「端子ごとの合計と個数」と、 端子の山札 (ADR-0014) の結果の追加の効果。 <see cref="OptimalUtilityCore"/> の入力。
@@ -968,11 +1022,15 @@ namespace AutoTest
             int taken = System.Math.Max(0, enemyAtk - block - ws.shield);
             // 敵の攻撃が通った時の上乗せ (〈剛力〉〈闇技〉〈研ぎ澄まし〉・2026-11-12)。 本体はブロックの後に 1 以上残る時だけ、 プレイヤーの軽減の前に足す
             if (s.enemyHitBonus > 0 && enemyAtk - block > 0) taken += s.enemyHitBonus;
+            // [#107] 収支の見積もりに使う、 シールドの前の 1 回目 / 2 回目の攻撃 (本体の takenDmg / secTaken のシールドの前)
+            int hit1Raw = System.Math.Max(0, enemyAtk - block), hit2Raw = 0;
+            if (hit1Raw > 0) hit1Raw += s.enemyHitBonus;
             // 敵〈多頭攻撃〉(2026-11-12): 攻撃の個数 < ブロックの個数なら同じ攻撃値でもう 1 回 (ブロックは 2 回とも全額・シールドは 1 回目で使った分を引く)
             if (s.enemyDoubleOnBlockHeavy && ws.bCount > ws.aCount && enemyAtk > 0)
             {
                 int shieldLeft = System.Math.Max(0, ws.shield - System.Math.Max(0, enemyAtk - block));
                 taken += System.Math.Max(0, enemyAtk - block - shieldLeft);
+                hit2Raw = System.Math.Max(0, enemyAtk - block);   // 2 回目には通った時の上乗せが乗らない (本体: 2 回目の ProcessDamage は OnPreDealDamage を鳴らさない)
             }
             if (ws.takenMul < 1f) taken = Mathf.RoundToInt(taken * ws.takenMul);
             taken += (int)reflectPenalty;
@@ -989,6 +1047,7 @@ namespace AutoTest
                 taken = myHpEff;
 
             // 〈虚空〉: 攻撃 0 本のターンだけ発動。 殻で被ダメを削り、 現在 HP 割合を刻む。
+            float shellKeep = 1f;   // [#107] 殻で残る割合 (収支の見積もりで敵の攻撃に掛ける)
             if (aCount == 0 && hasVoidStance)
             {
                 int n = System.Math.Min(
@@ -999,11 +1058,47 @@ namespace AutoTest
                 effDmg += chip;   // 殴らない代わりに通る軽減不可ダメージ
                 float shell = System.Math.Max(0,
                     90 - ItemSystem.PassiveSkills.Effects.VoidStance.ReducePerStack * n) / 100f;
-                if (shell > 0f) taken = System.Math.Max(0, (int)(taken * (1f - shell)));
+                if (shell > 0f) { taken = System.Math.Max(0, (int)(taken * (1f - shell))); shellKeep = 1f - shell; }
             }
 
+            // ===== 敵のパッシブ: 収支で決まる効果と〈吸血〉(#107・2026-11-12) =====
+            //   本体: 収支 = (与ダメ + 固定) − 敵の攻撃で減った HP (CombatManager.Turn.cs の `int balance = (dealtDmg + dealtFixed) - takenApplied`)。
+            //   収支プラス → 敵の OnRollLose (〈尾撃〉〈重甲〉の反射・〈反撃態勢〉〈暴走〉を次のターンへ) / マイナス → OnRollWin (〈地獄の業火〉)。
+            //   ここでは 与えた = effDmg、 受けた = 敵の攻撃 (シールドの前) からシールド (持ち越し + このターンの端子) を引いた HP の減り。
+            //   撃破するターンは敵が攻撃しない (`else if (enemyHP > 0)`) ので受けた = 0。 収支トリガーは撃破のターンにも鳴る。
+            int enemyHeal = 0; bool balancePlus = false;
+            if (s.enemyBalanceRead)
+            {
+                bool enemyAttacks = effDmg < enemyHp;
+                float tm = ws.takenMul < 1f ? ws.takenMul : 1f;
+                int h1 = 0, hAll = 0;
+                if (enemyAttacks)
+                {
+                    h1 = (int)(Mathf.RoundToInt(hit1Raw * tm) * shellKeep);
+                    hAll = (int)(Mathf.RoundToInt((hit1Raw + hit2Raw) * tm) * shellKeep);
+                }
+                int pool = (bashSpent ? 0 : myShield) + ws.shield;   // シールドは敵の攻撃で先に減り、 残りが軽減無視を肩代わりする (③-C)
+                int hp1 = System.Math.Max(0, h1 - pool);
+                int hpAll = System.Math.Max(0, hAll - pool);
+                int shieldAfter = System.Math.Max(0, pool - hAll);
+                int balance = effDmg - hpAll;
+                balancePlus = balance > 0;
+                // 〈尾撃〉〈重甲〉(収支プラス) / 〈地獄の業火〉(収支マイナス): その場で EnemyDealUnmitigable (CombatContext.cs)
+                int chip = balance > 0 ? s.enemyChipOnPlus : balance < 0 ? s.enemyChipOnMinus : 0;
+                if (chip > 0)
+                {
+                    if (s.shieldAbsorbsChip) chip = System.Math.Max(0, chip - shieldAfter);
+                    taken += chip;
+                }
+                // 〈吸血〉: 敵の攻撃の末尾で、 通った主攻撃 (1 回目・シールドの後) ÷2 を回復 (最大 HP まで)
+                if (enemyAttacks && s.enemyLifesteal > 0)
+                    enemyHeal = System.Math.Min(LifestealHeal(in s, hp1),
+                                                System.Math.Max(0, enemyMaxHpNow - (enemyHp - effDmg)));
+            }
+            float nextTurnExtra = balancePlus ? s.nextHitOnPlus + s.nextAtkOnPlus : 0f;
+
             float u = s.ledger
-                    ? specFlat - LedgerLoss(in s, effDmg, taken, s.stagCost > 0f && aCount < bCount)
+                    ? specFlat - LedgerLoss(in s, effDmg, taken, enemyHeal, nextTurnExtra)
                     : wAtk * System.Math.Min(effDmg, enemyHp)
                     + wDef * System.Math.Min(block, enemyAtk)
                     + specFlat;
@@ -1039,6 +1134,9 @@ namespace AutoTest
                     ? UnityEngine.Mathf.CeilToInt((float)enemyHp / effDmg)
                     : HorizonCapTurns;
             if (ttk > HorizonCapTurns) ttk = HorizonCapTurns;
+            // [#107] 敵〈吸血〉: 撃破しないターンの終わりに戻る分を、 同じ挿し方を続けた前提で毎ターン差し引く
+            if (enemyHeal > 0 && effDmg > 0 && effDmg < enemyHp)
+                ttk = TurnsToKillWithHeal(enemyHp, effDmg, enemyHeal, enemyMaxHpNow);
             if (!s.ledger) u -= TimeCostPerTurn * v3.timeCostMul * ttk;
 
             // 防ぎ切りの規則 (2026-11-05・上の FreeBlockRule)。 撃破まで HP を失わない配線を優先する。
@@ -1080,7 +1178,7 @@ namespace AutoTest
             }
             outcome = new OptimalTurnOutcome { effDmg = effDmg, taken = taken, block = block, aCount = aCount, bCount = bCount, bashSpent = bashSpent,
                                                freeBlock = fbCovers, killsNow = fbKills, dmgOld = dmgOld, dmgNew = dmgNew, rawNew = rawNew,
-                                               dmgUsed = aCount > 0 ? dmgUsed : 0 };
+                                               dmgUsed = aCount > 0 ? dmgUsed : 0, enemyHeal = enemyHeal, balancePlus = balancePlus };
             return u;
         }
 
@@ -1146,16 +1244,8 @@ namespace AutoTest
             plan.termKinds = 3;      // 攻撃・ブロック・充電
             plan.enemyMaxHp = System.Math.Max(1, enemy.maxHP);
 
-            // 次ターンの敵の攻撃: 公開規則 (Escalation.EnemyAttackValue) に、 敵ダイスは面の平均を入れる。
-            //   ダイス合計のパッシブ補正は今ターンの予告との差で見る。 プレイヤーの防御は本体と同じ関数を通す。
-            int diceNow = 0;
-            if (st.tele.enemyDice != null) for (int i = 0; i < st.tele.enemyDice.Length; i++) diceNow += st.tele.enemyDice[i];
-            int bonus = st.tele.enemyDice != null ? st.tele.enemyDiceTotal - diceNow : 0;
-            int expTotal = (int)System.Math.Round(enemy.EffectiveRollCount * (1 + enemy.EffectiveRollMax) / 2.0 + bonus);
             int nt = plan.turn + 1;
-            int delay = (int)ctx.GetAccumulated(CombatSystem.CombatManager.CoolantDelayKey);
-            int nextAtk = CombatSystem.CombatManager.ApplyPlayerDefense(ctx,
-                CombatSystem.Escalation.EnemyAttackValue(enemy, System.Math.Max(1, nt - delay), expTotal, nt), ctx.enemyArmorPen);
+            int nextAtk = ExpectedEnemyAttackAt(enemy, ctx, in st.tele, nt, 0);
 
             // 次ターンの予告: 抽選で決まるもの (ヴェスカの盾・回避・遺物・封印・麻痺毒) は未知なので「無し」とみなす
             var tele = st.tele;
@@ -1178,8 +1268,33 @@ namespace AutoTest
             ns.atkBase = System.Math.Max(0, cm.PlayerAttackPower);
             ns.atkPower = System.Math.Max(0, cm.PlayerAttackPower); ns.atkPenalty = 0;   // [readOutgoingMult] 次ターンの麻痺毒は未知
             ns.atkGrowth = (FreeBlockRule && nextAtk > 0) ? BuildAtkGrowth(enemy, ctx, nt) : null;
+            // [#107] 前のターンに積まれた〈反撃態勢〉はこのターンだけ。 次のターンへ乗るかは今ターンの収支で決まる (LookaheadValue)
+            ns.enemyHitBonus = System.Math.Max(0, st.enemyHitBonus - st.counterPendingNow);
+            ns.counterPendingNow = 0;
             plan.next = ns;
             return plan;
+        }
+
+        /// <summary>[#107] 前のターンに積まれた〈暴走〉のこのターンの分 (本体: EnemyPassiveSkillEffects.Rampage が次のターンの敵の OnPostRoll で
+        /// 敵の出目の合計へ足す → 予告の enemyDiceTotal に入っている)。 nextTurnBuffs の専用キーは本体の private 定数の写し。</summary>
+        private const string RampageNextTurnKey = "enemy.rampage.atkUp";
+        /// <summary>[#107] 同じく〈反撃態勢〉(本体: EnemyPassiveSkillEffects.CounterStance・次のターンの敵の OnPreDealDamage で finalDamage += )。</summary>
+        private const string CounterStanceNextTurnKey = "enemy.counterStance.dmgUp";
+
+        /// <summary>ターン <paramref name="turn"/> の敵の攻撃の見込み (プレイヤーの防御の後)。 公開規則 (Escalation.EnemyAttackValue) に、 敵ダイスは面の平均を入れる。
+        /// ダイス合計のパッシブ補正は今ターンの予告との差で見る (前のターンの〈暴走〉はこのターン限りなので除く・#107)。
+        /// <paramref name="extraDice"/> = 敵の出目の合計へさらに足す分 (〈暴走〉の +3 の見積もり)。 プレイヤーの防御は本体と同じ関数を通す。</summary>
+        private static int ExpectedEnemyAttackAt(EnemyData enemy, ItemSystem.PassiveSkills.CombatContext ctx,
+                                                 in CombatSystem.MutualTurnTelegraph teleNow, int turn, int extraDice)
+        {
+            int diceNow = 0;
+            if (teleNow.enemyDice != null) for (int i = 0; i < teleNow.enemyDice.Length; i++) diceNow += teleNow.enemyDice[i];
+            int bonus = teleNow.enemyDice != null ? teleNow.enemyDiceTotal - diceNow : 0;
+            bonus -= (int)ctx.GetBuff(RampageNextTurnKey);
+            int expTotal = (int)System.Math.Round(enemy.EffectiveRollCount * (1 + enemy.EffectiveRollMax) / 2.0 + bonus) + extraDice;
+            int delay = (int)ctx.GetAccumulated(CombatSystem.CombatManager.CoolantDelayKey);
+            return CombatSystem.CombatManager.ApplyPlayerDefense(ctx,
+                CombatSystem.Escalation.EnemyAttackValue(enemy, System.Math.Max(1, turn - delay), expTotal, turn), ctx.enemyArmorPen);
         }
 
         /// <summary>配線 w の値 = 今ターンの効用 + 次ターンの最良効用の期待値。 今ターンで撃破・死亡する配線は今の効用のまま。</summary>
@@ -1190,7 +1305,17 @@ namespace AutoTest
             if (o.effDmg >= st.enemyHp || o.taken >= st.myHp) return uNow;
 
             var ns = plan.next;
-            ns.enemyHp = st.enemyHp - System.Math.Min(o.effDmg, st.enemyHp);
+            ns.enemyHp = st.enemyHp - System.Math.Min(o.effDmg, st.enemyHp) + o.enemyHeal;   // [#107] 〈吸血〉の戻り (撃破しないときだけ・最大 HP まで)
+            // [#107] 収支プラスなら次のターン〈反撃態勢〉(通った時 +N)・〈暴走〉(攻撃 +N)
+            if (o.balancePlus)
+            {
+                ns.enemyHitBonus += st.nextHitOnPlus;
+                if (st.nextAtkOnPlus > 0f)
+                {
+                    ns.enemyAtk += Mathf.RoundToInt(st.nextAtkOnPlus);
+                    ns.tele.enemyAttackValue = ns.enemyAtk;
+                }
+            }
             ns.myHp = st.myHp - o.taken;
             // シールド: 今ターンの被弾で吸われ、 〈城壁〉で増え、 次のターン頭に半分 (切り捨て・DAMAGE_CALC_REFERENCE ③-D)
             int shield = o.bashSpent ? 0 : System.Math.Max(0, st.myShield - o.taken);
@@ -1209,7 +1334,9 @@ namespace AutoTest
             ns.tele.blazeStacks = plan.nextBlazeBase
                 + ((st.tele.blazePenalizesBlock && o.bCount >= ItemSystem.PassiveSkills.Effects.BlazeBrand.BlockDiceThreshold) ? 1 : 0);
 
-            var key = (ns.enemyHp, ns.myHp, ns.myShield, ns.undyingStreak, ns.steadfastReady ? 1 : 0, ns.eDefNow, ns.tele.blazeStacks);
+            // 最後の要素: 烈炎のスタック × 2 + [#107] 次のターンに〈反撃態勢〉〈暴走〉が乗るか
+            int plusNext = (o.balancePlus && (st.nextHitOnPlus > 0 || st.nextAtkOnPlus > 0f)) ? 1 : 0;
+            var key = (ns.enemyHp, ns.myHp, ns.myShield, ns.undyingStreak, ns.steadfastReady ? 1 : 0, ns.eDefNow, ns.tele.blazeStacks * 2 + plusNext);
             if (!plan.memo.TryGetValue(key, out float e))
             {
                 // 端子の重みは次ターンの敵 HP 比で決まる (予兆ターンの Phase)
@@ -1368,16 +1495,6 @@ namespace AutoTest
             return SelectOptimalWiring(in st, rolls, tele, plan, idx);
         }
 
-        /// <summary>ヴェスカ〈停滞する時間〉: 停滞を積む配線 (攻撃の個数 &lt; ブロックの個数) を候補から外すか。 旧い配線と山札で共通。
-        /// (理由と例外は <see cref="SelectOptimalWiring"/> の stagFilter の注記)</summary>
-        private bool StagFilterActive(CombatManager cm, ItemSystem.PassiveSkills.CombatContext ctxRoles)
-        {
-            if (!v3.noStagWire || cm?.CurrentEnemy?.passiveSkills == null) return false;
-            if (ctxRoles != null && ctxRoles.stagnationStacks >= ItemSystem.PassiveSkills.Effects.StagnantTime.StackCap) return false;
-            foreach (var ps in cm.CurrentEnemy.passiveSkills) if (ps != null && ps.internalName == "StagnantTime") return true;
-            return false;
-        }
-
         /// <summary>配線の効用の入力 (<see cref="OptimalTurnState"/>) を、 今の盤面から 1 回だけ読んで組む (読むだけ・書き換えない)。
         /// 旧い配線 (<see cref="MutualWiringPolicy"/>) と端子の山札 (AutoRunner.Terminals) が同じものを使う。</summary>
         private OptimalTurnState BuildOptimalTurnState(int[] rolls, CombatSystem.MutualTurnTelegraph tele)
@@ -1473,6 +1590,43 @@ namespace AutoTest
                 }
             if (ctxRoles != null && ctxRoles.GetAccumulated(ItemSystem.PassiveSkills.Effects.MutualKeys.EnemyDoubleOnBlockHeavy) > 0f)
                 st.enemyDoubleOnBlockHeavy = true;
+            // [#107 2026-11-12] 収支で決まる敵のパッシブと〈吸血〉。 2 体戦は 1 体目 (CurrentEnemy) だけを見る (上の見本と同じ)。
+            //   敵のパッシブが封じられているターン (静寂のローブ等・PSM.FireEnemyTrigger が鳴らさない) は読まない。
+            //   読むのは Super だけ (V3Flags.readEnemyPassives・Optimal で読ませると悪化した)。 内訳は enemyPassiveMask。
+            if (ReadEnemyPassivesEffective && cm?.CurrentEnemy?.passiveSkills != null && ctxRoles != null && ctxRoles.enemyPassivesDisabledTurns <= 0)
+            {
+                int mask = v3.enemyPassiveMask;
+                bool mLife = (mask & 1) != 0, mNext = (mask & 2) != 0, mChip = (mask & 4) != 0;
+                int rampage = 0;
+                foreach (var ps in cm.CurrentEnemy.passiveSkills)
+                {
+                    if (ps == null) continue;
+                    switch (ps.internalName)
+                    {
+                        case "TailStrike":    if (mChip) st.enemyChipOnPlus  += ItemSystem.PassiveSkills.Effects.TailStrike.Damage; break;
+                        case "EliteLizard":   if (mChip) st.enemyChipOnPlus  += ItemSystem.PassiveSkills.Effects.EliteLizard.Reflect; break;
+                        case "Hellfire":      if (mChip) st.enemyChipOnMinus += ItemSystem.PassiveSkills.Effects.Hellfire.Damage; break;
+                        case "Lifesteal":     if (mLife) st.enemyLifesteal++; break;
+                        case "CounterStance": if (mNext) st.nextHitOnPlus    += ItemSystem.PassiveSkills.Effects.CounterStance.Bonus; break;
+                        case "Rampage":       if (mNext) rampage           += ItemSystem.PassiveSkills.Effects.Rampage.Bonus; break;
+                    }
+                }
+                // 前のターンに積まれた〈反撃態勢〉: このターン、 敵の攻撃が通った時に足される (〈剛力〉と同じ位置)
+                if (mNext) st.counterPendingNow = System.Math.Max(0, (int)ctxRoles.GetBuff(CounterStanceNextTurnKey));
+                st.enemyHitBonus += st.counterPendingNow;
+                // 〈暴走〉: 次のターンの敵の出目の合計 +N → 次のターンのエスカレーション・大技・プレイヤーの防御を通した増分
+                if (rampage > 0)
+                {
+                    int nt = tele.turn + 1;
+                    st.nextAtkOnPlus = System.Math.Max(0,
+                        ExpectedEnemyAttackAt(cm.CurrentEnemy, ctxRoles, in tele, nt, rampage)
+                      - ExpectedEnemyAttackAt(cm.CurrentEnemy, ctxRoles, in tele, nt, 0));
+                }
+                st.enemyHealCut = ctxRoles.enemyHealReductionPct;
+                st.shieldAbsorbsChip = ItemSystem.PassiveSkills.CombatContext.ShieldAbsorbsUnmitigable;
+                st.enemyBalanceRead = st.enemyChipOnPlus > 0 || st.enemyChipOnMinus > 0 || st.enemyLifesteal > 0
+                                   || st.nextHitOnPlus > 0 || st.nextAtkOnPlus > 0f;
+            }
             // [V3 readOutgoingMult] 主攻撃の見積もりに与ダメの倍率を読む (Super で既定 ON)。 予測の照合 (predTrace) では両方を出す。
             bool readOutNow = ReadOutgoingMultEffective && EffectiveWiringSkill != WiringSkill.Naive;
             if ((readOutNow || predTrace) && ctxRoles != null)
@@ -1496,13 +1650,7 @@ namespace AutoTest
                 st.dFull = System.Math.Max(1f, oa.effDmg * expected / System.Math.Max(1f, System.Math.Max(0, atkBase) + sumR));
                 st.ledger = true;
                 if (st.atkGrowth == null && enemyAtk > 0 && cm?.CurrentEnemy != null) st.atkGrowth = BuildAtkGrowth(cm.CurrentEnemy, ctxRoles, tele.turn);
-                // ヴェスカ〈停滞する時間〉(2026-11-11): 守りに寄せると次のターンから敵の攻撃が上がる。 帳簿の「撃破までの被ダメ」に乗せる
-                var stagEnemy = cm?.CurrentEnemy;
-                if (stagEnemy?.passiveSkills != null && ctxRoles != null && ctxRoles.stagnationStacks < ItemSystem.PassiveSkills.Effects.StagnantTime.StackCap)
-                    foreach (var ps in stagEnemy.passiveSkills)
-                        if (ps != null && ps.internalName == "StagnantTime")
-                            st.stagCost = ItemSystem.PassiveSkills.Effects.StagnantTime.DicePerStack(ctxRoles)
-                                        * CombatSystem.Escalation.GetMultiplier(stagEnemy.EffectiveEscalationProfile, tele.turn);
+                // (ヴェスカ〈停滞する時間〉の帳簿の項 stagCost は 2026-11-12 #103 で撤去 ── 配線では何も積まなくなった)
             }
             return st;
         }
@@ -1518,22 +1666,8 @@ namespace AutoTest
             var runForVoid = GameLoop.GameManager.Instance?.Run;
             float ScoreWithBuffers(CombatSystem.DiceTerminal[] w)
                 => plan != null ? LookaheadValue(in st, plan, rolls, w) : OptimalUtility(in st, rolls, w);
-            // [2026-11-11] ヴェスカ〈停滞する時間〉: 停滞を積む配線 (攻撃の本数 < ブロックの本数) を選ばない。
-            //   帳簿は先の被ダメを ledgerFutureShare (0.2) で薄めるので、 停滞の罰が実際の 5 分の 1 程度にしか効かず、 BOT は 4 ターンに 1 回ブロックへ寄せて
-            //   p4 で平均 4.9 スタックを育てていた (禁止で 20.8% → 24.3%・同じシード 改善 122 / 悪化 15)。
-            //   例外: 停滞が上限 (それ以上積もらない) / 避けた最良の手でも今ターン死ぬ (下の選び直し)。
-            //   (倒し切るターンは敵の攻撃が来ないので、 ブロックに挿す理由がそもそも無い ── 例外にしない)
-            bool stagFilter = StagFilterActive(cm, ctxRoles);
-            float Score(CombatSystem.DiceTerminal[] w)
-            {
-                if (stagFilter)
-                {
-                    int na = 0, nb = 0;
-                    foreach (var t in w) { if (t == CombatSystem.DiceTerminal.Attack) na++; else if (t == CombatSystem.DiceTerminal.Block) nb++; }
-                    if (na < nb) return float.NegativeInfinity;
-                }
-                return ScoreWithBuffers(w);
-            }
+            // (2026-11-11 の「ヴェスカ〈停滞する時間〉で停滞を積む配線を選ばない」規則は 2026-11-12 #103 で撤去。 効果が端子を止める形に替わった)
+            float Score(CombatSystem.DiceTerminal[] w) => ScoreWithBuffers(w);
 
             var assign = new CombatSystem.DiceTerminal[k];
             var bestW = new CombatSystem.DiceTerminal[k];
@@ -1664,12 +1798,6 @@ namespace AutoTest
                 }
             }
             SelectBest();
-            // [2026-11-11] 停滞を避けた最良の手でも今ターン死ぬなら、 停滞を積む手も許して選び直す (生き残る方が先)
-            if (stagFilter)
-            {
-                OptimalUtility(in st, rolls, bestW, out var so);
-                if (so.taken >= st.myHp) { stagFilter = false; SelectBest(); }
-            }
             // E1 (V3 rerollEv) が「この手の最良効用」として読む。 先読みの値は次ターン分を含むので、 今ターンの効用だけに戻す。
             _lastBestU = plan != null ? OptimalUtility(in st, rolls, bestW) : bestU;
             // [計装 2026-11-10] 選んだ配線が防ぎ切りの規則の対象だったか (実際の配線の時だけ MutualWiringPlanPolicy が数える)

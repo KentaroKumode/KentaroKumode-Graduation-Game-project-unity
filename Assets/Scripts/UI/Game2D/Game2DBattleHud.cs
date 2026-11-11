@@ -72,6 +72,8 @@ namespace UI.Game2D
             Atk = Game2DKit.Red, Blk = Game2DKit.Blue, Chg = Game2DKit.Gold, Hp = new Color32(0xd1, 0x50, 0x3c, 255);
         /// <summary>対象を選ぶ印: 候補の縁 / 決まった対象の縁 (色と明度だけで出す・拡大しない)。</summary>
         private static readonly Color32 CandEdge = Game2DTerminalLook.Mix(Game2DKit.Ivory, Game2DKit.Off, 0.45f), ChosenEdge = Game2DKit.Ivory;
+        /// <summary>ヴェスカ〈停滞する時間〉で止まった端子の印 (本体を横切る線と下の「停止」)。 暗くした本体の上で読める、 くすんだ青白。</summary>
+        private static readonly Color32 StopMark = Game2DTerminalLook.Mix(Game2DKit.Blue, Game2DKit.Ivory, 0.45f);
 
         /// <summary>手札・出目をつかんでいる間と、 離したフレーム (の次まで) は true。 敵の詳細の窓 (<see cref="Game2DEnemyPanel"/>) はこの間は開かない。</summary>
         public static bool PointerBusy => _busyDrag || Time.frameCount <= _releaseFrame + 1;
@@ -297,7 +299,12 @@ namespace UI.Game2D
                 int pt = PortAt(d);
                 if (pt >= 0) { if (sim.CanOperate && sim.slot[pt] >= 0) StartDrag(sim.slot[pt], pt, d); return; }
                 int h = HandAt(d);
-                if (h >= 0) { if (sim.CanOperate && sim.Remaining(h) > 0) StartDrag(h, -1, d); return; }
+                if (h >= 0)
+                {
+                    if (sim.CanOperate && sim.IsStopped(h)) { Game2DSfx.Play("ui_click"); return; }      // 〈停滞する時間〉で止まった端子はつかめない
+                    if (sim.CanOperate && sim.Remaining(h) > 0) StartDrag(h, -1, d);
+                    return;
+                }
                 if (In(d, Ctl, CReroll)) { sim.Reroll(); return; }
                 if (In(d, Ctl, CAuto)) { sim.AutoWire(); return; }
                 if (In(d, Ctl, CItem)) { OpenItems(); return; }
@@ -528,7 +535,8 @@ namespace UI.Game2D
 
         /// <summary>Hand: 上 = 山/捨て(/外) の枚数 / 下 = 手札の USB (縦向き)。 ターンの頭に右から滑り込む (位置だけ・拡大しない)。
         /// 使い切った端子は抜け殻の枠だけ残す (並びが動かないように)。 2 個挿せる端子は残りの数を下に出す。 挿せる出目が無い端子は暗い。
-        /// 対象を選ぶ印: 候補 = 灰白の縁と下に「候補」/ 決まった対象 = 白の縁と下に「対象」。</summary>
+        /// 対象を選ぶ印: 候補 = 灰白の縁と下に「候補」/ 決まった対象 = 白の縁と下に「対象」。
+        /// 止まった端子 (ヴェスカ〈停滞する時間〉): いちばん暗い本体・縁と金具なし・本体を横切る青白の線と下に「停止」(つかめない)。</summary>
         private void DrawHand(Texture2D t)
         {
             var p = Frame(Hand);
@@ -558,13 +566,22 @@ namespace UI.Game2D
                     p.Box(x, HandY + UsbConn, UsbBody, UsbBody, tgt ? Game2DTerminalLook.Mix(ChosenEdge, Well, 0.8f) : Well, edge);
                     continue;
                 }
-                bool fits = !op || res || sim.HandFits(s);
+                bool stopped = sim.IsStopped(s);      // ヴェスカ〈停滞する時間〉: このターン挿せない
+                bool fits = !stopped && (!op || res || sim.HandFits(s));
                 var c = UsbColors(d, fits, false, _hoverPort < 0 && _hoverS == s, false);
                 bool chosen = false, cand = op && sim.IsTargetCandidate(s, out chosen);
                 if (cand && !(_hoverPort < 0 && _hoverS == s)) c.edge = chosen ? ChosenEdge : CandEdge;
+                if (stopped)
+                {
+                    // 止まった端子: 挿せない端子よりさらに暗く、 縁と金具を消す (色と明度だけ・拡大縮小はしない)
+                    var kc0 = d != null ? Game2DTerminalLook.KindColor(d.kind) : Dim;
+                    c.body = Game2DTerminalLook.Mix(kc0, Off, 0.92f); c.metal = Dark;
+                    if (!(_hoverPort < 0 && _hoverS == s)) c.edge = Off;
+                }
                 DrawUsb(p, x, HandY, false, d, c.body, c.edge, c.metal);
-                string label = cand ? (chosen ? "対象" : "候補") : d != null && d.capacity >= 2 ? "残" + rem : null;
-                if (label != null) p.Text(label, x + (UsbBody - Game2DJpFont.Width(label)) / 2, HandY + UsbLong + 1, cand && chosen ? Ink : Dim);
+                if (stopped) p.Rect(x + 2, HandY + UsbConn + UsbBody / 2, UsbBody - 4, 1, StopMark);      // 本体を横切る 1 本の線 = 止まっている印
+                string label = stopped ? "停止" : cand ? (chosen ? "対象" : "候補") : d != null && d.capacity >= 2 ? "残" + rem : null;
+                if (label != null) p.Text(label, x + (UsbBody - Game2DJpFont.Width(label)) / 2, HandY + UsbLong + 1, stopped ? StopMark : cand && chosen ? Ink : Dim);
             }
             p.Apply(t);
         }
@@ -584,6 +601,9 @@ namespace UI.Game2D
             var body = new List<string>(Game2DJpFont.Lines(d.description, iw));
             // 対象 (〈写し取り〉など) と誓約の封じの行
             var extra = new List<string>();
+            if (sim.IsStopped(f))
+                extra.AddRange(Game2DJpFont.Lines(d.permanent ? "止まっている (このターンは挿せない)"
+                                                              : "止まっている (このターンは挿せない・次のターンまで手札に残る)", iw));
             string tgt = TargetLine(f);
             if (tgt != null) extra.AddRange(Game2DJpFont.Lines(tgt, iw));
             for (int q = 0; q < m && !sim.ShowingResult; q++)

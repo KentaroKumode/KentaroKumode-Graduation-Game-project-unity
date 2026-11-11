@@ -110,6 +110,7 @@ namespace ItemSystem.PassiveSkills.Effects
             //   ・p4 は〈回帰性真理〉でデバフ免疫 → 敵側の出血/毒はそもそも存在せず空振り
             //   ・プレイヤーがゲージを溜めていなければ完全な不発
             // 「奪った時間がそのまま彼のターンになる」形へ。 奪う対象が無くても停滞は必ず積む。
+            // (**2026-11-12 #103**: 〈停滞する時間〉がスタックを持たなくなったので「停滞 +1」は外した。 残るのは充電の没収と出目への転換)
             //
             // **2026-08-16 ナーフ。** 「臨界+充電を全没収し、 その半分を出目へ」→
             //   **「充電の半分を没収し、 その全量を出目へ」**。 変えた点は 2 つ。
@@ -124,9 +125,7 @@ namespace ItemSystem.PassiveSkills.Effects
                 {
                     int stolen = ctx.ConsumeHalfCharge();
                     if (stolen > 0) AddDice(ctx, stolen);
-                    ctx.stagnationStacks += StolenTimeStacks;
-                    UnityEngine.Debug.Log($"[刻] 充電の半分 {stolen} を没収 → 出目+{stolen} / "
-                                        + $"停滞+{StolenTimeStacks} (計 {ctx.stagnationStacks})");
+                    UnityEngine.Debug.Log($"[刻] 充電の半分 {stolen} を没収 → 出目+{stolen}");
                 }),
 
             // ---------- DIVINE ----------
@@ -138,9 +137,6 @@ namespace ItemSystem.PassiveSkills.Effects
             //   最終段は MYTHIC 止まりとする (MYTHIC 自体は据え置き)。
             //   経緯は CapForStage の doc を参照。
         };
-
-        /// <summary>〈刻〉が奪う「時間」= 停滞スタックの加算量。 奪うゲージが無くても必ず積む。</summary>
-        public const int StolenTimeStacks = 1;
 
         public const string KeyChargedFistPending = "vesca_chargedfist_pending";
         public const string KeyChargedFistStacks  = "vesca_chargedfist_stacks";
@@ -340,94 +336,53 @@ namespace ItemSystem.PassiveSkills.Effects
 
             // --- 敵出目ボーナスの一括代入 ---
             // enemyDiceTotalBonus は累積フィールドなので `+=` は使わない。 このターンの寄与
-            // (遺物 + 溜め打ちの永続分 + 停滞する時間) をここで計算し、 単一の書き込み口として `=` する。
-            // 停滞する時間の値をこちら側で読むことで、 パッシブ同士の発火順への依存を無くしている。
+            // (遺物 + 溜め打ちの永続分) をここで計算し、 単一の書き込み口として `=` する。
+            // (〈停滞する時間〉の加算は 2026-11-12 #103 で無くなった ── 今は端子を止める効果で、 敵の攻撃には乗らない)
             int diceBonus = (int)ctx.GetAccumulated(VescaRelicPool.KeyDiceBonusThisTurn)
-                          + (int)ctx.GetAccumulated(VescaRelicPool.KeyChargedFistStacks)
-                          + ctx.stagnationStacks * StagnantTime.DicePerStack(ctx);
+                          + (int)ctx.GetAccumulated(VescaRelicPool.KeyChargedFistStacks);
             ctx.enemyDiceTotalBonus = diceBonus;
             if (diceBonus > 0)
                 UnityEngine.Debug.Log($"[遺物学者] 敵攻撃への加算 合計 +{diceBonus}"
                     + $" (遺物 {(int)ctx.GetAccumulated(VescaRelicPool.KeyDiceBonusThisTurn)}"
-                    + $" / 溜め打ち {(int)ctx.GetAccumulated(VescaRelicPool.KeyChargedFistStacks)}"
-                    + $" / 停滞 {ctx.stagnationStacks * StagnantTime.DicePerStack(ctx)})");
+                    + $" / 溜め打ち {(int)ctx.GetAccumulated(VescaRelicPool.KeyChargedFistStacks)})");
         }
     }
 
-    /// <summary>停滞する時間 ── 攻撃端子へ挿した本数がブロック端子より少なかったターン (攻撃 &lt; ブロック)、
-    /// 次ターン以降の敵攻撃 +N (累積・上限 <see cref="StackCap"/> スタック)。 シールド半減で「待つ」が無料の正解になる穴を塞ぐ。
-    /// **N は L3 チューナーの第一レバー**（廃止した 真我 の後任。 実数値なので §13-3 隠し倍率禁止に適合）。</summary>
+    /// <summary>停滞する時間 ── 端子を引くたび、 1 枚ごとに確率 p でその端子を<b>止める</b> (2026-11-12 #103 作り直し)。
+    ///
+    /// <para>止まった端子はそのターン挿せない (場には見えていて手札の枠を 1 つ使う)。 ターンの終わりに捨て札へ行かず手札に残り、
+    /// 次のターンは解けて普通に使える (引いた物ではないので、 もう一度は止まらない ── その分 新しく引く枚数が 1 枚減る)。
+    /// 常設 (〈主幹〉) を引いて止まった時は、 そのターンだけ挿せない。 止まった端子は〈写し取り〉〈焼き切り〉〈保持器〉の対象にならない。</para>
+    ///
+    /// <para>処理の場所: 引いて止めるのは <see cref="CombatSystem.TerminalDeckState.DrawTurn"/> (確率は <see cref="StopChance"/>・乱数は専用キー)、
+    /// 止まった場所は <see cref="CombatSystem.TerminalBattleState.stopped"/>、 挿した出目を外すのは <see cref="CombatSystem.TerminalCards.Resolve"/>
+    /// (本体も BOT も画面も同じ関数)。 このパッシブ自身はトリガーで何もしない ── 敵のパッシブ欄に出して効果を読ませるための登録。</para>
+    ///
+    /// <para><b>p は L3 チューナーの第一レバー</b> (<c>BossParam.Stagnation</c> = 1 枚あたりの止まる確率 %)。
+    /// 基準は段ごとに p1 10% / p2 15% / p3 20% / p4 25% (<see cref="CombatSystem.BossParams.Spec(CombatSystem.BossParam, string)"/>)。
+    /// 実数値なので §13-3 の隠し倍率禁止に適合。</para>
+    ///
+    /// <para>旧効果 (〜2026-11-11): 攻撃の個数 &lt; ブロックの個数のターンにスタックを積み、 次のターンから敵の攻撃 +N (上限 10)。
+    /// 守りを罰する形は BOT に「守らない」規則を足させ、 人には説明しにくかったので、 手札そのものを乱す形へ替えた。</para></summary>
     public class StagnantTime : IPassiveSkillEffect
     {
-        /// <summary>1 スタックあたりの敵出目ボーナスの基準値。 実効値は L3 チューナーが持つ
-        /// <c>BossParam.Stagnation</c> の override（無ければこの基準値）。
-        /// **7 層ヴェスカの第一レバー**（廃止した 真我 の後任。 実数値なので §13-3 の隠し倍率禁止に適合）。</summary>
-        public const int DicePerStackBase = 1;
-        /// <summary>1 スタック積むのに必要な「守りに寄せたターン」数。
-        /// 2026-07-29: 1 → 2 → **1 に戻した**。 スケール速度は 2T刻みではなく
-        /// 1 スタックあたりの上昇量 (DicePerStackBase: 3 → 1) 側で落とす。
-        /// 判定は毎ターン走るので、 守った分だけ素直に 1 ずつ積む形に戻る
-        /// (上限は <see cref="StackCap"/> = 10 スタック。 BossParam.Stagnation の基準 1 で敵攻撃 +10)。</summary>
-        public const int TurnsPerStack = 1;
-        /// <summary>スタック上限。 **2026-08-16 に 99 → 10 へ戻した。**
-        ///
-        /// <para>2026-07-29 に 10 → 99 (実質無制限) へ上げたのは、
-        /// 上限 10 = 敵攻撃 +30 で頭打ちになり、 プレイヤーがブロックを積むだけで
-        /// **永久に受け切れた**ためだった（実測: 86.8 ターン戦って被ダメ合計 14.8）。</para>
-        ///
-        /// <para><b>その前提は 2 つとも消えている。</b>
-        /// ① 当時 <c>DicePerStackBase</c> は 3 で「上限 10 = +30」だったが、 現在は 1 なので「+10」。
-        /// ② 当時は〈裂け目〉がヴェスカの現在HP を毎ターン 40% 削る「時計」で、
-        ///    <b>待てば勝てた</b>から青天井の罰が要った。 2026-08-16 に裂け目を
-        ///    「双方の最大HP 2%/T」へ作り替えたので、 <b>削らない限り勝てない</b>。
-        ///    待ち続けても勝利に近づかないため、 天井を戻しても「待つほど有利」は復活しない。</para>
-        ///
-        /// <para>実測 (HP 1385/1565/1715/2055): 停滞は 15T+ で 14.7 に達し、
-        /// 敵ダイス合計 31.3 の 47% を占めていた。 上限 10 でそこが 10 に収まる。</para></summary>
-        public const int StackCap = 10;
+        public const string Id = "StagnantTime";
 
-        /// <summary>チューナー調整後の 1 スタックあたり敵出目ボーナス。</summary>
-        public static int DicePerStack(CombatContext ctx)
+        /// <summary>この敵の、 引いた端子 1 枚あたりの止まる確率 (0〜1)。 〈停滞する時間〉を持たない敵は 0。</summary>
+        public static float StopChance(CombatSystem.EnemyData enemy)
         {
-            int v = CombatSystem.BossParams.ParamInt(ctx?.bossId, CombatSystem.BossParam.Stagnation);
-            return v > 0 ? v : DicePerStackBase;
+            if (enemy?.passiveSkills == null) return 0f;
+            bool has = false;
+            foreach (var p in enemy.passiveSkills) if (p != null && p.internalName == Id) { has = true; break; }
+            if (!has) return 0f;
+            float pct = CombatSystem.BossParams.Param(enemy.id, CombatSystem.BossParam.Stagnation);
+            return UnityEngine.Mathf.Clamp01(pct / 100f);
         }
 
-        private const string KeyPressure = "vesca_stagnation_pressure";
+        public string SkillId => Id;
+        public PassiveSkillTrigger[] Triggers => new PassiveSkillTrigger[0];
 
-        public string SkillId => "StagnantTime";
-        // 加算そのものは RelicScholar が enemyDiceTotalBonus へ一括代入する際に stagnationStacks を
-        // 読んで行う。 このパッシブはスタックの計上だけを担当する（書き込み口を 1 本に保つため）。
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
-
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            if (ctx == null) return;
-            // 2026-07-29: 判定を「攻撃端子が空」→「**攻撃 ≦ ブロック**」へ広げた。
-            //   旧条件は 0 本のときしか積まないので、 攻撃に 1 本だけ挿して残りを全部ブロックへ
-            //   回す「ガン守り」が素通りしていた。 実測でプレイヤーの p4 実火力は 25/T まで落ち、
-            //   37 ターン耐えて裂け目の自壊を待つだけの戦いになっていた。
-            // 2026-07-29: 判定を「攻撃 ≦ ブロック」→「攻撃 **＜** ブロック」へ狭めた。
-            //   同数 (2-2 など) は守りに寄せた配線ではないのに毎ターン発火しており、
-            //   実質「攻撃に半分挿しても罰される」状態だった。
-            int atk = (int)ctx.GetAccumulated("mutualAttackDiceCount");
-            int blk = (int)ctx.GetAccumulated("mutualBlockDiceCount");
-            CombatSystem.GuardDiag.NoteStag7F(ctx.bossId, atk, blk, (int)ctx.GetAccumulated("mutualChargeDiceCount"), (int)ctx.GetAccumulated("mutualSpecialDiceCount"),
-                atk < blk, System.Math.Min(StackCap, ctx.stagnationStacks + (atk < blk ? 1 : 0)));   // [計装 2026-11-11] 配線と停滞 (近似: 積んだ後のスタック)
-            if (atk >= blk) return;
-            // 守りに寄せたターンを数え、 TurnsPerStack ごとに 1 スタック積む。
-            // 上限は据え置きなので **最終的な総量は変わらず、 到達までの時間だけが伸びる**。
-            float pressure = ctx.GetAccumulated(KeyPressure) + 1f;
-            ctx.accumulatedValues[KeyPressure] = pressure;
-            int want = System.Math.Min(StackCap, (int)pressure / TurnsPerStack);
-            if (want > ctx.stagnationStacks)
-            {
-                ctx.stagnationStacks = want;
-                UnityEngine.Debug.Log($"[停滞する時間] 守りに寄せた (攻撃{atk}<ブロック{blk}) → "
-                                    + $"スタック={ctx.stagnationStacks}/{StackCap} "
-                                    + $"(次T以降 敵攻撃+{ctx.stagnationStacks * DicePerStack(ctx)})");
-            }
-        }
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { }
     }
 
     /// <summary>解析演算 ── プレイヤーが収支プラスで終えるたび回避率 +<see cref="PerWin"/> (2%・最大 <see cref="Cap"/> 40%)。
@@ -470,7 +425,8 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 自壊しない」で守りを罰していたが、 これは自壊がプレイヤーの唯一の勝ち筋だった頃の設計。
     /// 双方を同率で削るようになった今は、 止めても割合では損得が生じない
     /// (ヴェスカ 2% / プレイヤー 2%) ため、 条件そのものが意味を失う。
-    /// 守りへの罰は〈停滞する時間〉が単独で担う。</para></summary>
+    /// (守りへの罰は当時〈停滞する時間〉が担っていたが、 2026-11-12 #103 で〈停滞する時間〉は「引いた端子を確率で止める」に替わり、
+    /// 配線を見る罰は無くなった。)</para></summary>
     public class RiftHeldOpen : IPassiveSkillEffect
     {
         /// <summary>毎ターンヴェスカが失う「**最大** HP」の割合。</summary>
