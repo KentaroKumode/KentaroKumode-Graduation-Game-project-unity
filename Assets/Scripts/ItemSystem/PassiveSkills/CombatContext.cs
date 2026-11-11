@@ -259,9 +259,8 @@ namespace ItemSystem.PassiveSkills
         /// **通常・固定・軽減不可を問わず全ダメージを回避する**（既存のメタ俊敏回避と同じ挙動）。</summary>
         public float enemyDodgeChance;
 
-        /// <summary>[persistent] 停滞する時間のスタック。 プレイヤーが攻撃端子にダイスを 1 本も置かなかった
-        /// ターンごとに +1（上限あり）。 次ターン以降の敵攻撃へ加算される。 L3 チューナーの第一レバー。</summary>
-        public int stagnationStacks;
+        // 旧 stagnationStacks (停滞する時間のスタック) は 2026-11-12 #103 で削除。 今の〈停滞する時間〉は端子を止める効果で、
+        //   止まった場所は CombatSystem.TerminalBattleState.stopped (山札の状態) に持つ。
 
         /// <summary>[perTurn] 〈天与の指輪〉: このターン、 3 以上の出目をすべて 1〜2 へ再抽選する。
         /// 旧「全出目 1」は本数ぶんの手が完全に死に、 その前の「行動不可」と実質同じ重さだった。
@@ -1057,7 +1056,7 @@ namespace ItemSystem.PassiveSkills
             lastDamageCause = DeathCause.Normal; // 断罪等の増幅タグが翌ターンへ残留しないように
 
             // 7層ヴェスカ (§13-4) の perTurn 分。 persistent 側 (vescaShield / massiveBleedStacks /
-            // enemyDodgeChance / stagnationStacks) は 4 連戦を通じて持続するのでここでは触らない。
+            // enemyDodgeChance) は 4 連戦を通じて持続するのでここでは触らない。
             playerHighDiceCrushed = false;
             vescaHalvesDamageThisTurn = false;
             playerAttackPowerPenalty = 0;

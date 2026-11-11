@@ -412,6 +412,7 @@ namespace UI.Game2D.Battle
         public bool Accepts(int i, int s)
         {
             if (!TermInputs(out var dice, out var env, out var st) || i < 0 || i >= dice.Length || i >= slot.Length || s < 0 || s >= board.Count) return false;
+            if (st.IsStopped(s)) return false;      // ヴェスカ〈停滞する時間〉で止まった端子は挿せない (Resolve も外す)
             var d = TerminalCards.Get(board[s]); if (d == null) return false;
             int used = 0;
             for (int j = 0; j < slot.Length; j++) if (j != i && slot[j] == s) used++;
@@ -432,6 +433,10 @@ namespace UI.Game2D.Battle
                 default: return TerminalCards.CondOk(d.cond, v);
             }
         }
+
+        /// <summary>場の s が、 このターン止まっているか (ヴェスカ〈停滞する時間〉)。 画面が暗くして印を付けるのに使う。</summary>
+        public bool IsStopped(int s)
+            => TermInputs(out _, out _, out var st) ? st.IsStopped(s) : CombatManager.Instance?.TerminalDeck?.state.IsStopped(s) ?? false;
 
         /// <summary>端子 s にあと何個挿せるか (挿せる数 − 今挿している出目の数)。</summary>
         public int Remaining(int s)
@@ -544,8 +549,8 @@ namespace UI.Game2D.Battle
         {
             var o = preview; if (o == null) return -1;
             int want = picker >= 0 && picker < target.Length ? target[picker] : -1;
-            if (TerminalCards.IsCandidate(board, o.slotOfDie, picker, want)) return want;
-            var c = TerminalCards.TargetCandidates(board, o.slotOfDie, picker);
+            if (TerminalCards.IsCandidate(board, o, picker, want)) return want;
+            var c = TerminalCards.TargetCandidates(board, o, picker);
             return c.Count > 0 ? c[0] : -1;
         }
 
@@ -556,7 +561,7 @@ namespace UI.Game2D.Battle
             if (o == null || ShowingResult) return false;
             for (int p = 0; p < board.Count; p++)
             {
-                if (!IsPicker(p) || !TerminalCards.IsCandidate(board, o.slotOfDie, p, s)) continue;
+                if (!IsPicker(p) || !TerminalCards.IsCandidate(board, o, p, s)) continue;
                 any = true;
                 if (TargetOf(p) == s) chosen = true;
             }
@@ -565,7 +570,7 @@ namespace UI.Game2D.Battle
 
         /// <summary>候補 s を picker の対象にできるか (画面のドラッグ用)。</summary>
         public bool CanSetTarget(int picker, int s)
-            => CanOperate && IsPicker(picker) && preview != null && TerminalCards.IsCandidate(board, preview.slotOfDie, picker, s);
+            => CanOperate && IsPicker(picker) && preview != null && TerminalCards.IsCandidate(board, preview, picker, s);
 
         /// <summary>候補 s を picker の対象にする (落とし直せば替わる)。 できなければ false。</summary>
         public bool SetTarget(int picker, int s)

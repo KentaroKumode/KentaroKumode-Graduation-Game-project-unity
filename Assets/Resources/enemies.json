@@ -1469,8 +1469,8 @@
         {
           "internalName": "StagnantTime",
           "skillName": "停滞する時間",
-          "description": "攻撃端子への配線がブロック端子より少なかったターン、以降の敵攻撃+1（累積・上限10スタック）。",
-          "flavorText": "「見ていないなら、貰っておくよ」"
+          "description": "端子を引くたび、10%の確率でその端子を止める。止まった端子はそのターン挿せず、捨て札に行かず次のターンまで手札に残る。",
+          "flavorText": "「急ぐことはない。時間なら、こちらにある」"
         },
         {
           "internalName": "AnalyticComputation",
@@ -1518,8 +1518,8 @@
         {
           "internalName": "StagnantTime",
           "skillName": "停滞する時間",
-          "description": "攻撃端子への配線がブロック端子より少なかったターン、以降の敵攻撃+1（累積・上限10スタック）。",
-          "flavorText": "「見ていないなら、貰っておくよ」"
+          "description": "端子を引くたび、15%の確率でその端子を止める。止まった端子はそのターン挿せず、捨て札に行かず次のターンまで手札に残る。",
+          "flavorText": "「急ぐことはない。時間なら、こちらにある」"
         },
         {
           "internalName": "AnalyticComputation",
@@ -1567,8 +1567,8 @@
         {
           "internalName": "StagnantTime",
           "skillName": "停滞する時間",
-          "description": "攻撃端子への配線がブロック端子より少なかったターン、以降の敵攻撃+1（累積・上限10スタック）。",
-          "flavorText": "「見ていないなら、貰っておくよ」"
+          "description": "端子を引くたび、20%の確率でその端子を止める。止まった端子はそのターン挿せず、捨て札に行かず次のターンまで手札に残る。",
+          "flavorText": "「急ぐことはない。時間なら、こちらにある」"
         },
         {
           "internalName": "AnalyticComputation",
@@ -1616,8 +1616,8 @@
         {
           "internalName": "StagnantTime",
           "skillName": "停滞する時間",
-          "description": "攻撃端子への配線がブロック端子より少なかったターン、以降の敵攻撃+1（累積・上限10スタック）。",
-          "flavorText": "「見ていないなら、貰っておくよ」"
+          "description": "端子を引くたび、25%の確率でその端子を止める。止まった端子はそのターン挿せず、捨て札に行かず次のターンまで手札に残る。",
+          "flavorText": "「急ぐことはない。時間なら、こちらにある」"
         },
         {
           "internalName": "DivineTalent",

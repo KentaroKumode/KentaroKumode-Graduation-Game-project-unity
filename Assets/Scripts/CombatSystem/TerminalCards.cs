@@ -86,11 +86,24 @@ namespace CombatSystem
         public int foundryBonus;
         /// <summary>〈主幹〉をこの戦闘で使った回数。</summary>
         public int mainsUses;
+        /// <summary>ヴェスカ〈停滞する時間〉: このターン止まっている場の端子 (添字 = 場の位置・null = 止まっている端子なし)。
+        /// <see cref="TerminalDeckState.DrawTurn"/> が毎ターン作り直す。 止まった端子には挿せない (<see cref="TerminalCards.Resolve"/> が外す)。</summary>
+        public bool[] stopped;
+
+        /// <summary>場の s がこのターン止まっているか。</summary>
+        public bool IsStopped(int s) => stopped != null && s >= 0 && s < stopped.Length && stopped[s];
+
+        /// <summary>このターン止まっている端子の枚数。</summary>
+        public int StoppedCount
+        {
+            get { int n = 0; if (stopped != null) foreach (bool b in stopped) if (b) n++; return n; }
+        }
 
         public TerminalBattleState Clone()
         {
             var c = (TerminalBattleState)MemberwiseClone();
             c.gauge = new Dictionary<string, int>(gauge);
+            c.stopped = stopped != null ? (bool[])stopped.Clone() : null;
             return c;
         }
 
@@ -153,6 +166,9 @@ namespace CombatSystem
         public int retainTarget = -1, copyTarget = -1, burnTarget = -1;
         /// <summary>〈発振器〉の連続をこのターンもう数えたか。</summary>
         public bool oscCounted;
+        /// <summary>ヴェスカ〈停滞する時間〉で止まっている場の端子 (Resolve に渡した状態の写し・null = なし)。
+        /// 〈写し取り〉〈焼き切り〉〈保持器〉の候補から外す (<see cref="TerminalCards.IsCandidate"/>)。</summary>
+        public bool[] stopped;
 
         public bool Fired(List<string> board, string id)
         {
@@ -349,17 +365,19 @@ namespace CombatSystem
         {
             int n = dice.Length, m = board.Count;
             var o = new TerminalOutcome { slotOfDie = new int[n], kindOfDie = new DiceTerminal[n] };
+            o.stopped = state.stopped != null ? (bool[])state.stopped.Clone() : null;
             var v = new int[n];
             for (int i = 0; i < n; i++) { v[i] = dice[i]; o.slotOfDie[i] = wantSlot != null && i < wantSlot.Length && wantSlot[i] >= 0 && wantSlot[i] < m ? wantSlot[i] : -1; }
             var defs = new TerminalDef[m];
             for (int s = 0; s < m; s++) defs[s] = Get(board[s]);
 
-            // ── 0. 挿せる数を超えた分を外す ──
+            // ── 0. 止まった端子 (ヴェスカ〈停滞する時間〉) と、 挿せる数を超えた分を外す ──
+            //   止まった端子に挿した出目は挿さなかった扱い。 本体も BOT も画面もここを通るので、 同じ計算になる。
             var cnt = new int[m];
             for (int i = 0; i < n; i++)
             {
                 int s = o.slotOfDie[i]; if (s < 0) continue;
-                if (defs[s] == null || cnt[s] >= defs[s].capacity) { o.slotOfDie[i] = -1; continue; }
+                if (defs[s] == null || state.IsStopped(s) || cnt[s] >= defs[s].capacity) { o.slotOfDie[i] = -1; continue; }
                 cnt[s]++;
             }
 
@@ -415,9 +433,9 @@ namespace CombatSystem
             int Empty(int self)
             {
                 int want = wantTarget != null && self >= 0 && self < wantTarget.Length ? wantTarget[self] : -1;
-                if (IsCandidate(board, o.slotOfDie, self, want)) return want;
+                if (IsCandidate(board, o, self, want)) return want;
                 for (int s = 0; s < m; s++)
-                    if (IsCandidate(board, o.slotOfDie, self, s)) return s;
+                    if (IsCandidate(board, o, self, s)) return s;
                 return -1;
             }
 
@@ -476,20 +494,22 @@ namespace CombatSystem
         /// <summary>挿さずに空けた手札の端子を対象に取る端子 (〈写し取り〉〈焼き切り〉〈保持器〉)。</summary>
         public static bool PicksTarget(string id) => id == TerminalIds.Copier || id == TerminalIds.BurnOut || id == TerminalIds.Retainer;
 
-        /// <summary>場の s が、 self (対象を取る端子) の対象の候補か: 自分でない・常設でない・出目が 1 個も挿さっていない手札の端子。
-        /// slotOfDie は挿し方を直した後の値 (<see cref="TerminalOutcome.slotOfDie"/>) を渡す ── 条件に合わず外れた端子も「空けた」に入る。</summary>
-        public static bool IsCandidate(List<string> board, int[] slotOfDie, int self, int s)
+        /// <summary>場の s が、 self (対象を取る端子) の対象の候補か: 自分でない・常設でない・止まっていない (ヴェスカ〈停滞する時間〉)・
+        /// 出目が 1 個も挿さっていない手札の端子。 o は解決の結果 ── 挿し方を直した後の <see cref="TerminalOutcome.slotOfDie"/>
+        /// (条件に合わず外れた端子も「空けた」に入る) と、 止まった端子 (<see cref="TerminalOutcome.stopped"/>) を読む。</summary>
+        public static bool IsCandidate(List<string> board, TerminalOutcome o, int self, int s)
         {
             if (board == null || s < 0 || s >= board.Count || s == self) return false;
+            if (o?.stopped != null && s < o.stopped.Length && o.stopped[s]) return false;
             var d = Get(board[s]);
-            return d != null && !d.permanent && (slotOfDie == null || !Plugged(slotOfDie, s));
+            return d != null && !d.permanent && (o?.slotOfDie == null || !Plugged(o.slotOfDie, s));
         }
 
         /// <summary>self の対象の候補 (場の添字・左から)。</summary>
-        public static List<int> TargetCandidates(List<string> board, int[] slotOfDie, int self)
+        public static List<int> TargetCandidates(List<string> board, TerminalOutcome o, int self)
         {
             var l = new List<int>();
-            if (board != null) for (int s = 0; s < board.Count; s++) if (IsCandidate(board, slotOfDie, self, s)) l.Add(s);
+            if (board != null) for (int s = 0; s < board.Count; s++) if (IsCandidate(board, o, self, s)) l.Add(s);
             return l;
         }
 
@@ -660,9 +680,29 @@ namespace CombatSystem
             return id;
         }
 
-        /// <summary>ターンの始め: 前の手札を捨て (残す 1 枚は残し)、 手札が size 枚になるまで引く。 常設は場へ出して引き直す。</summary>
-        public void DrawTurn(int size, string retained = null)
+        /// <summary>ヴェスカ〈停滞する時間〉の乱数のキー (専用 ── 他の抽選の連番を動かさない)。</summary>
+        public const string StopRngKey = "vesca.stagnant";
+
+        /// <summary>ターンの始め: 前の手札を捨て (残す 1 枚と、 前のターンに止まっていた端子は残し)、 手札が size 枚になるまで引く。
+        /// 常設は場へ出して引き直す。
+        ///
+        /// <para><paramref name="stopChance"/> (0〜1) = ヴェスカ〈停滞する時間〉: <b>このターンに引いた</b>端子 1 枚ごとに、 この確率で止める
+        /// (常設を引いた時も・〈配電盤〉で多く引く分も)。 止まった端子はこのターン挿せず、 捨て札へ行かず次のターンも手札に残って普通に使える
+        /// (引いた物ではないのでもう一度は止まらない・その分 新しく引く枚数が減る)。 止まった常設は場に残り、 次のターンには解ける。
+        /// 止まった場所は <see cref="TerminalBattleState.stopped"/> (場の添字) に持つ ── BOT の写しにも乗る。</para></summary>
+        public void DrawTurn(int size, string retained = null, float stopChance = 0f)
         {
+            // 前のターンに止まっていた手札の端子 (前のターンの場と、 その時の常設の枚数から読む ── 常設は DrawTurn でしか増えない)。
+            // FinishTurn が使い捨て・焼き切りを手札から抜いて添字がずれるので、 名前で数えて同じ枚数を残す。
+            var held = new List<string>();
+            var prevStopped = state.stopped;
+            if (prevStopped != null)
+                for (int s = permanent.Count; s < board.Count && s < prevStopped.Length; s++)
+                    if (prevStopped[s]) held.Add(board[s]);
+            state.stopped = null;
+
+            var keep = new List<string>();
+            foreach (var id in held) if (hand.Remove(id)) keep.Add(id);
             bool kept = false;
             foreach (var id in hand)
             {
@@ -670,18 +710,40 @@ namespace CombatSystem
                 discard.Add(id);
             }
             hand.Clear();
+            hand.AddRange(keep);
             if (kept) hand.Add(retained);
-            int guard = 0;
+
+            // 引く (このターンに引いた物だけが止まる対象)
+            var stoppedPerm = new List<int>();   // permanent の添字
+            var stoppedHand = new List<int>();   // hand の添字
+            int guard = 0, drawn = 0;
             while (hand.Count < size && guard++ < 64)
             {
                 var id = DrawOne();
                 if (id == null) break;
+                drawn++;
+                bool stop = stopChance > 0f && GameLoop.GameRng.Chance(stopChance, StopRngKey);
                 var d = TerminalCards.Get(id);
-                if (d != null && d.permanent) { permanent.Add(id); continue; }
+                if (d != null && d.permanent) { if (stop) stoppedPerm.Add(permanent.Count); permanent.Add(id); continue; }
+                if (stop) stoppedHand.Add(hand.Count);
                 hand.Add(id);
             }
             board.Clear(); board.AddRange(permanent); board.AddRange(hand);
+            if (stoppedPerm.Count + stoppedHand.Count > 0)
+            {
+                state.stopped = new bool[board.Count];
+                foreach (int p in stoppedPerm) state.stopped[p] = true;
+                foreach (int h in stoppedHand) state.stopped[permanent.Count + h] = true;
+            }
+            LastDrawnCount = drawn; LastHeldCount = keep.Count;
+            LastStoppedCount = stoppedPerm.Count + stoppedHand.Count; LastStoppedMains = stoppedPerm.Count;
         }
+
+        /// <summary>直近の <see cref="DrawTurn"/> で 新しく引いた枚数 / 前のターンに止まっていて手札に残った枚数 / 止まった枚数 / うち常設 (計装・画面用)。</summary>
+        public int LastDrawnCount { get; private set; }
+        public int LastHeldCount { get; private set; }
+        public int LastStoppedCount { get; private set; }
+        public int LastStoppedMains { get; private set; }
 
         /// <summary>ターンの終わり: 結果を山札へ反映する (使い捨て・写し取り・焼き切り)。 戻り値 = 次のターンも手札に残す端子 (無ければ null)。</summary>
         public string FinishTurn(TerminalOutcome o)

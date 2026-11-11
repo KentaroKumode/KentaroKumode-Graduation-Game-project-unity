@@ -96,7 +96,7 @@ namespace AutoTest
         /// 掛けるのは主攻撃の項だけ (黎明・〈虚空〉の刻み・山札の先の得の見積もりには掛けない)。 hpLedger の「撃破までの見込み」(dFull) にも流れる。
         /// 実績は CombatStats.DamageBreakdown[7] の増分 (predTrace と同じ「実際」)。 ランをまたいで持ち越さない。</summary>
         public bool mainCorr;
-        /// <summary>ヴェスカ〈停滞する時間〉を持つ敵に、 停滞を積む配線 (攻撃の本数 &lt; ブロックの本数) を選ばせない (2026-11-11・既定 ON)。 例外は AutoRunner.Combat の MutualWiringPolicy。</summary>
-        public bool noStagWire = true;   // 2026-11-11 既定 ON (停滞の罰を帳簿が薄めて BOT が自分で p4 を重くしていた)
+        // noStagWire (ヴェスカ〈停滞する時間〉で停滞を積む配線を選ばせない・2026-11-11) は 2026-11-12 #103 で削除。
+        //   効果が「引いた端子を確率で止める」に替わり、 避ける配線が無くなった。 arm の設定に残っていても未知の項目として警告が出るだけ。
     }
 }
