@@ -43,9 +43,9 @@ namespace UI.Game2D
         private static int PortX(int i) => (i / PortRows) * PortColW;
         private static int PortY(int i) => 6 + (i % PortRows) * 31;
         private static RectInt PDieR(int i) => new RectInt(PortX(i) + 8, PortY(i) + 3, 18, 18);
-        private static RectInt PortR(int i, int n) => new RectInt(PortX(i) + 30, PortY(i), PortCols(n) > 1 ? PortColW - 30 : 68, 24);      // 落とせる範囲 (口と挿さった USB)
+        private static RectInt PortR(int i, int n) => new RectInt(PortX(i) + 30, PortY(i), PortCols(n) > 1 ? PortColW - 30 : 68, UsbBody);      // 落とせる範囲 (口と挿さった USB)
         // USB の大きさ: 差し込み部 8×12 (縦向きは 12×8) + 本体 24×24
-        private const int UsbConn = 8, UsbConnW = 12, UsbBody = 24, UsbLong = UsbConn + UsbBody;
+        private const int UsbConn = 8, UsbConnW = 12, UsbBody = 25, UsbLong = UsbConn + UsbBody;
         // 手札 (Hand の中)
         private const int HandY = 18, HandStep = 28, HandPad = 6;
         private static readonly RectInt CReroll = new RectInt(5, 5, 56, 20), CAuto = new RectInt(63, 5, 40, 20),
@@ -425,7 +425,7 @@ namespace UI.Game2D
             return c;
         }
 
-        /// <summary>USB メモリ 1 本 (差し込み部 + 本体 24×24・本体に 16×16 のアイコン、 無ければ種類の 1 字)。 horiz = 横向き (差し込み部が左・口に挿さった絵) / 縦向き (差し込み部が上・手札)。
+        /// <summary>USB メモリ 1 本 (差し込み部 + 本体 25×25・本体に 17×17 のアイコン (奇数どうしで中央に載る)、 無ければ種類の 1 字)。 horiz = 横向き (差し込み部が左・口に挿さった絵) / 縦向き (差し込み部が上・手札)。
         /// 印: 使い捨て = 本体の右下の切り欠き / 常設 = 本体の下の角の鋲 / レア = 金の縁。</summary>
         private static void DrawUsb(KitPix p, int x, int y, bool horiz, CombatSystem.TerminalDef d, Color32 body, Color32 edge, Color32 metal)
         {
@@ -436,17 +436,18 @@ namespace UI.Game2D
             int b = UsbBody;
             if (d != null && d.disposable) { p.Rect(bx + b - 4, by + b - 4, 4, 4, Well); p.Rect(bx + b - 4, by + b - 4, 1, 3, edge); p.Rect(bx + b - 4, by + b - 4, 3, 1, edge); }
             if (d != null && d.permanent) { var rv = Game2DTerminalLook.Mix(body, Game2DKit.Ivory, 0.6f); p.Rect(bx + 2, by + b - 3, 1, 1, rv); p.Rect(bx + b - 3, by + b - 3, 1, 1, rv); }
-            int ix = bx + (b - 16) / 2, iy = by + (b - 16) / 2;
+            const int n = Game2DTerminalIcons.Size;
+            int ix = bx + (b - n) / 2, iy = by + (b - n) / 2;
             var icon = d != null ? IconOf(d.id) : null;
-            if (icon != null && icon.Length >= 256)
+            if (icon != null && icon.Length >= n * n)
             {
-                // 2bit の値を、 本体の色に対して 暗 / 中 / 明 の 3 階調で打つ
-                Color32 c1 = Game2DTerminalLook.Mix(body, Dark, 0.6f), c2 = Game2DTerminalLook.Mix(body, Game2DKit.Ivory, 0.35f), c3 = Game2DTerminalLook.Mix(body, Game2DKit.Ivory, 0.75f);
-                for (int j = 0; j < 16; j++)
-                    for (int i = 0; i < 16; i++)
+                // 2 色だけ (2026-11-11): 明 = 主役 / 中 = 主役の後ろの飾り。 主役の中の線は抜き (本体の色)。 暗い色は使わない
+                Color32 back = Game2DTerminalLook.Mix(body, Game2DKit.Ivory, 0.35f), front = Game2DTerminalLook.Mix(body, Game2DKit.Ivory, 0.75f);
+                for (int j = 0; j < n; j++)
+                    for (int i = 0; i < n; i++)
                     {
-                        byte v = icon[j * 16 + i];
-                        if (v != 0) p.Set(ix + i, iy + j, v == 1 ? c1 : v == 2 ? c2 : c3);
+                        byte v = icon[j * n + i];
+                        if (v != 0) p.Set(ix + i, iy + j, v == Game2DTerminalIcons.Back ? back : front);
                     }
             }
             else

@@ -1,6 +1,6 @@
 # 端子のアイコン (Game2DTerminalIcons.cs) の合否ページ (HTML) を書き出す。
 #   使い方: python Tools/terminal_icons_review.py <出力する .html>
-#   ページは合否と直しの指示を Artifact の db (collection "reviews2" (第 2 稿)) に保存する。
+#   ページは合否と直しの指示を Artifact の db (collection "reviews3" (第 4 稿・17×17・2 色)) に保存する。
 import io, re, sys, json
 
 ROOT = "C:/Users/kumod/My project/"
@@ -104,7 +104,7 @@ h2{font-family:var(--f-dot);font-weight:400;font-size:17px;margin:14px 0 0;color
 .card[data-v=ok]{border-color:var(--ok)} .card[data-v=ng]{border-color:var(--ng)}
 .pics{display:grid;gap:6px;justify-items:center}
 canvas{image-rendering:pixelated;display:block}
-.big{width:128px;height:128px;background:#3a4a52}
+.big{width:136px;height:136px;background:#3a4a52}
 .side{display:grid;gap:6px;align-content:start;min-width:0}
 .name{font-family:var(--f-dot);font-size:17px}
 .name small{color:var(--mute);font-size:12px;margin-left:6px}
@@ -119,8 +119,8 @@ button:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px sol
 </style>
 <div class="wrap">
   <header>
-    <h1>端子アイコン合否（第3稿）</h1>
-    <p>端子 60 種の 16×16 アイコンです。残っていた決死と余熱板を描き直しました（表示を「未判定だけ」にすると、その 2 種だけ出ます）。左が 8 倍の拡大、その下が USB メモリに載せた実寸の 3 倍です。1 つずつ「合」か「否」を押し、直してほしい点があれば書いてください。押した内容は自動で保存され、こちらで読み取って描き直します。</p>
+    <h1>端子アイコン合否（第4稿・新しい様式）</h1>
+    <p>端子 60 種を新しい様式で描き直しました。17×17・明るい主役と、その後ろの暗めの飾りの 2 色だけです（主役の中の線は抜き）。物の絵に限らず、意味を表す記号にした物もあります。左が拡大、その右が USB メモリに載せた実寸の 3 倍です。1 つずつ「合」か「否」を押し、直してほしい点があれば書いてください。押した内容は自動で保存され、こちらで読み取って描き直します。</p>
   </header>
   <div class="bar">
     <b>合 <span class="ok" id="nOk">0</span></b><b>否 <span class="ng" id="nNg">0</span></b><b>未 <span id="nNone">0</span></b>
@@ -138,30 +138,30 @@ let db = null;
 const $ = id => document.getElementById(id);
 function mix(hex, t, to){ const n=parseInt(hex.slice(1),16), r=n>>16, g=n>>8&255, b=n&255;
   const f=c=>Math.round(c+(to-c)*t); return 'rgb('+f(r)+','+f(g)+','+f(b)+')'; }
-function drawIcon(cv, rows, pal){ cv.width=16; cv.height=16; const c=cv.getContext('2d');
-  for(let y=0;y<16;y++)for(let x=0;x<16;x++){ const v=+rows[y][x]||0; if(!v)continue; c.fillStyle=pal[v-1]; c.fillRect(x,y,1,1);} }
-function drawStick(cv, rows, kind){ cv.width=28; cv.height=38; const c=cv.getContext('2d'); const col=KIND[kind][1];
-  c.fillStyle='#8f989a'; c.fillRect(7,0,14,12); c.fillStyle='#5d6668'; c.fillRect(10,3,3,5); c.fillRect(15,3,3,5);
-  c.fillStyle=mix(col,.45,0); c.fillRect(2,12,24,26); c.fillStyle=col; c.fillRect(3,13,22,24);
-  const pal=[mix(col,.5,0),mix(col,.45,255),mix(col,.88,255)];
-  for(let y=0;y<16;y++)for(let x=0;x<16;x++){ const v=+rows[y][x]||0; if(!v)continue; c.fillStyle=pal[v-1]; c.fillRect(6+x,17+y,1,1);} }
+function drawIcon(cv, rows, pal){ cv.width=17; cv.height=17; const c=cv.getContext('2d');
+  for(let y=0;y<17;y++)for(let x=0;x<17;x++){ const v=+rows[y][x]||0; if(!v)continue; c.fillStyle=pal[v-1]; c.fillRect(x,y,1,1);} }
+function drawStick(cv, rows, kind){ cv.width=29; cv.height=39; const c=cv.getContext('2d'); const col=KIND[kind][1];
+  c.fillStyle='#8f989a'; c.fillRect(8,0,13,12); c.fillStyle='#5d6668'; c.fillRect(10,3,3,5); c.fillRect(16,3,3,5);
+  c.fillStyle=mix(col,.45,0); c.fillRect(2,12,25,27); c.fillStyle=col; c.fillRect(3,13,23,25);
+  const pal=[col,mix(col,.35,235),mix(col,.75,235)];   // ゲームと同じ混ぜ方: 後ろの飾り 35% / 主役 75%
+  for(let y=0;y<17;y++)for(let x=0;x<17;x++){ const v=+rows[y][x]||0; if(!v)continue; c.fillStyle=pal[v-1]; c.fillRect(6+x,17+y,1,1);} }
 function counts(){ let o=0,n=0; for(const d of DATA){ const v=(state[d.key]||{}).v; if(v==='ok')o++; else if(v==='ng')n++; }
   $('nOk').textContent=o; $('nNg').textContent=n; $('nNone').textContent=DATA.length-o-n; }
 function applyFilter(){ const f=$('filt').value;
   for(const el of document.querySelectorAll('.card')){ const v=el.dataset.v||''; el.hidden = f==='none'? v!=='' : f==='ng'? v!=='ng' : false; } }
 const timers={};
-function save(key){ counts(); applyFilter(); if(!db){ $('save').textContent='保存先に接続できていません (この端末の中だけに残ります)'; try{localStorage.setItem('rv',JSON.stringify(state));}catch(e){} return; }
+function save(key){ counts(); applyFilter(); if(!db){ $('save').textContent='保存先に接続できていません (この端末の中だけに残ります)'; try{localStorage.setItem('rv3',JSON.stringify(state));}catch(e){} return; }
   clearTimeout(timers[key]); $('save').textContent='保存中…';
   timers[key]=setTimeout(async()=>{ const d=DATA.find(x=>x.key===key), s=state[key]||{};
-    try{ await db.doc('reviews2/'+key).set({name:d.name, verdict:s.v||'', note:s.note||'', at:new Date().toISOString()}); $('save').textContent='保存しました'; }
+    try{ await db.doc('reviews3/'+key).set({name:d.name, verdict:s.v||'', note:s.note||'', at:new Date().toISOString()}); $('save').textContent='保存しました'; }
     catch(e){ $('save').textContent='保存に失敗しました: '+(e&&e.message||e); } }, 500); }
 function build(){ const list=$('list'); let group=null, grid=null;
   for(const d of DATA){
     if(d.group!==group){ group=d.group; const h=document.createElement('h2'); h.textContent=group; list.appendChild(h); grid=document.createElement('div'); grid.className='grid'; list.appendChild(grid); }
     const card=document.createElement('div'); card.className='card'; card.id='c_'+d.key; card.dataset.v='';
     const pics=document.createElement('div'); pics.className='pics';
-    const big=document.createElement('canvas'); big.className='big'; drawIcon(big,d.rows,['#5d7078','#9fb3b8','#e8f0ee']);
-    const st=document.createElement('canvas'); st.style.width='84px'; st.style.height='114px'; drawStick(st,d.rows,d.kind);
+    const big=document.createElement('canvas'); big.className='big'; drawIcon(big,d.rows,['#3a4a52','#778489','#bdc7c7']);
+    const st=document.createElement('canvas'); st.style.width='87px'; st.style.height='117px'; drawStick(st,d.rows,d.kind);
     pics.append(big,st);
     const side=document.createElement('div'); side.className='side';
     const nm=document.createElement('div'); nm.className='name'; nm.textContent=d.name; const sm=document.createElement('small'); sm.textContent=KIND[d.kind][0]; nm.appendChild(sm);
@@ -185,9 +185,9 @@ build(); counts();
 $('filt').onchange=applyFilter;
 (async()=>{
   try{ db = await claude.use('db'); }catch(e){ db=null; }
-  if(!db){ $('save').textContent='保存先に接続できていません (この端末の中だけに残ります)'; try{ Object.assign(state, JSON.parse(localStorage.getItem('rv')||'{}')); }catch(e){}
+  if(!db){ $('save').textContent='保存先に接続できていません (この端末の中だけに残ります)'; try{ Object.assign(state, JSON.parse(localStorage.getItem('rv3')||'{}')); }catch(e){}
     for(const d of DATA) paint(d.key); counts(); return; }
-  try{ const snap = await db.collection('reviews2').get();
+  try{ const snap = await db.collection('reviews3').get();
     for(const doc of snap.docs){ const x=doc.data()||{}; state[doc.id]={v:x.verdict||'', note:x.note||''}; paint(doc.id); }
     counts(); $('save').textContent='読み込みました'; }
   catch(e){ $('save').textContent='読み込みに失敗しました: '+(e&&e.message||e); }

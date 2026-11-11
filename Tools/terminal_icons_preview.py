@@ -1,7 +1,7 @@
 """端子アイコン (Game2DTerminalIcons.cs) の確認用一覧画像を書き出す。
 
 使い方: python Tools/terminal_icons_preview.py
-  - .cs の表を正規表現で取り出し、 行数・行の長さ・外周の空き・60 種そろっているかを検査する。
+  - .cs の表を正規表現で取り出し、 行数・行の長さ・60 種そろっているかを検査する。
   - 全アイコンを 8 倍に拡大し、 名前つきで並べた 1 枚を Captures/terminal_icons.png に書く。
 """
 import os
@@ -15,10 +15,10 @@ ICONS_CS = os.path.join(ROOT, "Assets", "Scripts", "UI", "Game2D", "Game2DTermin
 CARDS_CS = os.path.join(ROOT, "Assets", "Scripts", "CombatSystem", "TerminalCards.cs")
 OUT = os.path.join(ROOT, "Captures", "terminal_icons.png")
 
-SIZE = 16
+SIZE = 17
 SCALE = 8
 BODY = (0x3A, 0x4A, 0x52)
-SHADES = {1: (0x5D, 0x70, 0x78), 2: (0x9F, 0xB3, 0xB8), 3: (0xE8, 0xF0, 0xEE)}
+SHADES = {1: (0x3A, 0x4A, 0x52), 2: (0x77, 0x84, 0x89), 3: (0xBD, 0xC7, 0xC7)}   # 2 色: 後ろの飾り (2) / 主役 (3)。 1 は使わない
 BG = (0x1A, 0x20, 0x24)
 TEXT = (0xE8, 0xF0, 0xEE)
 
@@ -67,10 +67,8 @@ def main():
         for y, r in enumerate(rows):
             if len(r) != SIZE:
                 errors.append(f"{n}: {y} 行目の長さ {len(r)} ({r!r})")
-            if re.search(r"[^.123]", r):
+            if re.search(r"[^.23]", r):
                 errors.append(f"{n}: {y} 行目に不正な字 ({r!r})")
-            if (y in (0, SIZE - 1) and r.strip(".")) or (len(r) == SIZE and (r[0] != "." or r[-1] != ".")):
-                errors.append(f"{n}: {y} 行目が外周にかかる ({r!r})")
 
     print(f"TerminalIds: {len(ids)} 種 / 表: {len(table)} 種")
     if missing:
