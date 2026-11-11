@@ -91,8 +91,10 @@ namespace MapSystem
             if (CurrentMap.IsFreeMap)
             {
                 bool withFoe = FloorPlan.HasWanderer(floor);
+                // 航行アイテムの係数 (2026-11-11): 層に入る時の持ち物で作る (〈地図売りの走り書き〉はこの時の 1 回だけ効く)
                 Sim = new FreeMapSim(CurrentMap.layout, new RunWallet(), withFoe,
-                                     withFoe ? FoeProfile.ForFloor(floor) : null);
+                                     withFoe ? FoeProfile.ForFloor(floor) : null, null,
+                                     GameLoop.NavItems.PerksFor(GameLoop.GameManager.Instance?.Run));
                 // 〈補給線〉: 層の開始点 (前哨基地) は「着いた」処理を通らないので、 ここで中継点にする
                 if (IsRelayType(CurrentMap.layout.types[CurrentMap.layout.start])) Sim.AddRelayPoint(CurrentMap.layout.start);
                 SyncFreeKnowledge();

@@ -66,6 +66,8 @@ namespace ItemSystem.Shop
         public static bool IsAllowed(CompleteItemData item)
         {
             if (item == null) return false;
+            // 航行アイテム (2026-11-11): 配布の山に混ぜるかを 1 か所で切り替える (GameLoop.NavItems.InRandomPools)
+            if (!GameLoop.NavItems.InRandomPools && GameLoop.NavItems.IsNavItem(item.internalName)) return false;
             return !IsExcluded(item.internalName);
         }
     }

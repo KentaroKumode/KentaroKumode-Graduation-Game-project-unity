@@ -151,6 +151,9 @@ namespace UI.Game2D
                 if (id == null) return;
                 // 〈補給線〉(〈兵站〉r10): 隣でない中継点 (一度着いた前哨基地・補給庫・店) は跳ぶ
                 if (!sim.CanMoveTo(hit) && GameManager.SupplyLineUnlocked && sim.CanRelayTo(hit)) { gm.RelayStep(id); return; }
+                // 終点 (ボス・〈門〉) へ踏み出す前は確認の窓を出す (着くと起動して戻れない・issue #59)。 「進む」で窓が MoveStep を叩く
+                if (hit == sim.Layout.goal && sim.CanMoveTo(hit) && !GameManager.NavOnly
+                    && Game2DNavExtras.ConfirmExit(gm, id, sim.Layout.types[hit])) return;
                 gm.MoveStep(id);                                           // 隣でなければ「行けない」がログに出る
             }
         }

@@ -132,7 +132,8 @@ namespace ItemSystem.Shop
 
         /// <summary>物資 1 包の量と値段 (1G ＝ 10 物資)。</summary>
         public const int ProvisionPackAmount = 1;   // 2026-11-09 デノミ: 1 包 = 物資 1
-        public static int ProvisionPackPrice => MapSystem.FreeMove.FreeMapParams.ProvisionPrice;
+        /// <para>〈夜目の指輪〉〈補給商の割符〉で −50% (重ねない・GameLoop.NavItems.ProvisionPrice)。</para>
+        public static int ProvisionPackPrice => GameLoop.NavItems.ProvisionPrice(GameLoop.GameManager.Instance?.Run);
         /// <summary>〈合札〉: 同じショップで 2 品目以降を買うときの値引き (G)。</summary>
         public const int TallyDiscount = 10;
 

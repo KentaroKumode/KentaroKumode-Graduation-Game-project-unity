@@ -119,6 +119,29 @@ namespace GameLoop
             return true;
         }
 
+        /// <summary>〈前哨の旗〉を今いる点に立てられるか (持っていて、 この層でまだ立てていない・航行中)。
+        /// 層に 1 回なので「まだ拠点が無い」で見る (層の途中で旗を得た直後は、 回数が次の操作で入る)。</summary>
+        public bool CanUseOutpostFlag
+        {
+            get
+            {
+                var sim = FreeMapForAction();
+                return sim != null && NavItems.Has(Run, ItemIds.NavOutpostFlag) && sim.Beacon < 0;
+            }
+        }
+
+        /// <summary>〈前哨の旗〉(層に 1 回・手番は使わない): 今いる点に偵察拠点を置く。 その層にいる間、 拠点から
+        /// <see cref="FreeMapPerks.beaconRange"/> 歩の点の種類と戦闘名・追跡者・使い魔を常に見せる。 人も BOT もここを叩く。</summary>
+        public bool UseOutpostFlag()
+        {
+            var sim = FreeMapForAction();
+            if (sim == null || !NavItems.Has(Run, ItemIds.NavOutpostFlag)) return false;
+            bool ok = false;
+            RunFreeMapOp(s => { ok = s.PlaceBeacon(); return FreeMapEvent.None; });
+            if (ok) Log($"〈{ItemIds.NavOutpostFlag}〉を立てた（手番は使わない・この層にいる間、 {sim.Perks.beaconRange}歩先まで見張る）");
+            return ok;
+        }
+
         /// <summary>手番を進められる状態の中身 (マップ移動中・戦闘中でない)。 そうでなければ null。</summary>
         private FreeMapSim FreeMapForAction()
         {
@@ -132,6 +155,7 @@ namespace GameLoop
         {
             var sim = FreeMap;
             if (sim == null) return FreeMapEvent.None;
+            sim.SetPerks(NavItems.PerksFor(Run));      // 層の途中で航行アイテムを得た・封じられた時も、 次の操作から効く
             var ev = op(sim);
             MapManager.Instance?.SyncFreeKnowledge();
             if (ev != FreeMapEvent.None) OnFreeMapEvent?.Invoke(ev);
@@ -143,6 +167,7 @@ namespace GameLoop
         {
             if (ev == FreeMapEvent.None) return;
             var pf = sim.Profile;
+            if ((ev & FreeMapEvent.SmokeUsed) != 0) Log($"〈{ItemIds.NavSmokeBall}〉が弾けた ── 追跡者は見失い、 最後に見た所を探している（この層ではもう使えない）");
             if ((ev & FreeMapEvent.Detected) != 0) Log($"〈{pf.displayName}〉に補足された");
             if ((ev & FreeMapEvent.FoeLost) != 0) Log($"〈{pf.displayName}〉は見失った");
             if ((ev & FreeMapEvent.FoeAlerted) != 0) Log("（追跡者が何かに気づいた）");
@@ -330,6 +355,8 @@ namespace GameLoop
                 h.passiveSkills = new System.Collections.Generic.List<EnemyPassiveEntry>();
                 secondary = h;
             }
+            // 〈追っ手殺しの刃〉: 2 体目 (手下・猟犬) は付かない ── 逃げる一択だった敵を狩る道 (nav-items.md の「連戦が 1 戦減る」の読み替え)
+            if (NavItems.PursuerSolo(Run)) secondary = null;
             return e;
         }
 
@@ -372,7 +399,7 @@ namespace GameLoop
             _inPursuerFight = false;
             FreeMap?.ResolveBodyWon();
             int before = Run.provision;
-            ProvisionSystem.Supply(Run, FreeMapParams.RewardPursuer);
+            ProvisionSystem.Supply(Run, NavItems.PursuerSupply(Run));      // 〈追っ手殺しの刃〉で ×1.5
             string pid = PickPassiveItemForBossExtra(false);
             if (!string.IsNullOrEmpty(pid)) GrantRewardItem(pid, eliteWin: true);
             Log($"追跡者を退けた。物資 +{Run.provision - before}" + (string.IsNullOrEmpty(pid) ? "" : $"、{pid}"));
@@ -398,6 +425,7 @@ namespace GameLoop
         private void PayFleeCost()
         {
             var (p, g) = ProvisionRules.ApplyFlee(Run.provision, Run.coins);
+            g = NavItems.GoldAfterFlee(Run, Run.coins, g);      // 〈逃げ足の護符〉: 失うのは 1/4
             Log($"逃げた代償: 物資 {Run.provision}→{p}、ゴールド {Run.coins}→{g}");
             Run.provision = p;
             Run.coins = g;

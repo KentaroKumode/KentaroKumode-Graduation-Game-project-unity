@@ -45,6 +45,8 @@ namespace MapSystem.FreeMove
         MapChanged = 1 << 11,
         /// <summary>物資が尽き、 HP も尽きた。</summary>
         Died = 1 << 12,
+        /// <summary>〈煙玉〉が発動した (補足される代わりに、 追跡者は警戒へ落ちた)。 Detected は立たない。</summary>
+        SmokeUsed = 1 << 13,
     }
 
     /// <summary>使い魔。 本体の手先で、 プレイヤーの最後に分かった位置へ向かう。 猟犬は倒しても消えず本体の元へ戻る。</summary>
@@ -186,8 +188,31 @@ namespace MapSystem.FreeMove
         /// <summary>前線の x (左端からの距離)。 まだ届いていなければ負の無限大。</summary>
         public double Front { get; private set; } = double.NegativeInfinity;
 
+        // ── 航行アイテムの係数 (2026-11-11・nav-items.md) ──
+        /// <summary>いま掛かっている係数。 本体が操作のたびに <see cref="SetPerks"/> で差し替える (層の途中で品を得た時も効くように)。</summary>
+        public FreeMapPerks Perks { get; private set; } = FreeMapPerks.None;
+        /// <summary>この層の〈煙玉〉の残り回数。</summary>
+        public int SmokeLeft { get; private set; }
+        /// <summary>この層の〈前哨の旗〉の残り回数。</summary>
+        public int BeaconLeft { get; private set; }
+        /// <summary>〈前哨の旗〉の拠点 (-1 = 置いていない)。 層を出ると Sim ごと消える。</summary>
+        public int Beacon { get; private set; } = -1;
+        private bool _smokeGranted, _beaconGranted;
+        /// <summary>〈渡り鳥の羅盤〉: 終点へ近づいた歩の数 (偶数番目の歩が無料)。</summary>
+        private int _goalwardSteps;
+
+        /// <summary>係数を差し替える。 回数のある品 (煙玉・前哨の旗) は、 層の中で初めて持った時に 1 度だけ回数を入れる。</summary>
+        public void SetPerks(FreeMapPerks p)
+        {
+            p = p ?? FreeMapPerks.None;
+            if (p.smokeCharges > 0 && !_smokeGranted) { SmokeLeft = p.smokeCharges; _smokeGranted = true; }
+            if (p.beaconCharges > 0 && !_beaconGranted) { BeaconLeft = p.beaconCharges; _beaconGranted = true; }
+            if (!ReferenceEquals(p, Perks)) Version++;
+            Perks = p;
+        }
+
         public FreeMapSim(FreeMapLayout layout, IFreeMapWallet wallet, bool withFoe,
-                          FoeProfile profile = null, WeatherKind? weather = null)
+                          FoeProfile profile = null, WeatherKind? weather = null, FreeMapPerks perks = null)
         {
             Layout = layout ?? throw new ArgumentNullException(nameof(layout));
             Floor = layout.floor;
@@ -216,7 +241,18 @@ namespace MapSystem.FreeMove
             FoeMode = FoeMode.Patrol;
             if (HasFoe && Profile.hound)
                 Familiars.Add(new Familiar { pos = FoeNode, target = -1, hound = true });
-            Reveal(Me, FreeMapParams.Vision);
+            SetPerks(perks);
+            // 〈地図売りの走り書き〉: 層に入った瞬間だけ、 始点から直線距離で半径の内の点の種類を公開する (戦闘名・敵は出さない)
+            if (Perks.sketchRadius > 0)
+            {
+                var s = layout.pos[layout.start]; double r2 = Perks.sketchRadius * Perks.sketchRadius;
+                for (int i = 0; i < n; i++)
+                {
+                    double dx = layout.pos[i].x - s.x, dy = layout.pos[i].y - s.y;
+                    if (dx * dx + dy * dy <= r2) Known[i] = true;
+                }
+            }
+            Reveal(Me, Perks.vision, false);
         }
 
         // =====================================================================
@@ -244,7 +280,11 @@ namespace MapSystem.FreeMove
         public int StepToward(int from, int to) => FreeMapLayout.StepToward(_adj, from, to);
 
         /// <summary>いま見える範囲 (道で何歩先まで)。 照明中は <see cref="FreeMapParams.FlareRange"/>。</summary>
-        public int VisionRange => FlareOn ? FreeMapParams.FlareRange : FreeMapParams.Vision;
+        public int VisionRange => FlareOn ? Math.Max(FreeMapParams.FlareRange, Perks.vision) : Perks.vision;
+
+        /// <summary>点 i が〈前哨の旗〉の拠点から見えている範囲か (拠点が無ければ false)。</summary>
+        public bool InBeacon(int i, int[] hopsFromBeacon = null)
+            => Beacon >= 0 && i >= 0 && (hopsFromBeacon ?? HopsFrom(Beacon))[i] <= Perks.beaconRange;
 
         /// <summary>点 i が前線の内側か。</summary>
         public bool InFront(int i) => Layout.pos[i].x <= Front;
@@ -276,7 +316,7 @@ namespace MapSystem.FreeMove
 
         private double TraceLife(int i)
         {
-            double life = FreeMapParams.TraceLife;
+            double life = FreeMapParams.TraceLife * Perks.traceLifeMul;
             if (WeatherAt(i, WeatherKind.Sand)) life /= 2;
             return life;
         }
@@ -286,10 +326,19 @@ namespace MapSystem.FreeMove
         public int SupplyFor(int j)
         {
             int c = FreeMapParams.MoveSupply;
-            if ((WeatherAt(j, WeatherKind.Sand) || WeatherAt(Me, WeatherKind.Sand))
+            if (!Perks.ignoreSand && (WeatherAt(j, WeatherKind.Sand) || WeatherAt(Me, WeatherKind.Sand))
                 && GameLoop.GameRng.Range(0, 1000, "map.free.sand", Turn * 1000 + j) < (int)(FreeMapParams.SandExtraChance * 1000))
                 c += 1;
+            // 〈渡り鳥の羅盤〉: 終点へ近づく歩は 2 歩に 1 回 1 安い (×0.5 を 1 歩 = 1 の物資で表す・偶数番目の歩が安い)
+            if (Perks.goalwardHalf && c > 0 && (_goalwardSteps & 1) == 1 && IsGoalward(j)) c -= 1;
             return c;
+        }
+
+        /// <summary>点 j へ動くと終点までの道の歩数が減るか。</summary>
+        public bool IsGoalward(int j)
+        {
+            var g = HopsFrom(Layout.goal);
+            return g[j] != int.MaxValue && g[j] < g[Me];
         }
 
         /// <summary>点 j へ 1 歩動くのに進む手番 (雪の前線の内側は 2)。</summary>
@@ -309,13 +358,13 @@ namespace MapSystem.FreeMove
         }
 
         /// <summary>追跡者がいま見えているか (視界の内側)。</summary>
-        public bool FoeVisible => FoeAlive && HopsFrom(Me)[FoeNode] <= VisionRange;
+        public bool FoeVisible => FoeAlive && (HopsFrom(Me)[FoeNode] <= VisionRange || InBeacon(FoeNode));
 
-        /// <summary>いま見えている使い魔。</summary>
+        /// <summary>いま見えている使い魔 (〈前哨の旗〉の拠点の範囲も含む)。</summary>
         public IEnumerable<Familiar> VisibleFamiliars()
         {
-            var d = HopsFrom(Me);
-            foreach (var f in Familiars) if (d[f.pos] <= VisionRange) yield return f;
+            var d = HopsFrom(Me); var b = Beacon >= 0 ? HopsFrom(Beacon) : null;
+            foreach (var f in Familiars) if (d[f.pos] <= VisionRange || (b != null && b[f.pos] <= Perks.beaconRange)) yield return f;
         }
 
         /// <summary>追跡者の次の 1 歩 (予告用・状態は変えない)。 動かない性質・居ない時は <see cref="FoeNode"/> のまま。</summary>
@@ -333,7 +382,7 @@ namespace MapSystem.FreeMove
             int d = HopsFrom(Me)[FoeNode];
             int level = FoeMode == FoeMode.Chase ? 3
                       : d <= FreeMapParams.StoneNear ? 2
-                      : d <= FreeMapParams.StoneFar ? 1 : 0;
+                      : d <= FreeMapParams.StoneFar + Perks.stoneFarBonus ? 1 : 0;
             return new StoneReading { level = level, bearing = level > 0 ? Bearing(Me, FoeNode) : -1 };
         }
 
@@ -393,6 +442,7 @@ namespace MapSystem.FreeMove
         {
             if (!CanMoveTo(j)) return FreeMapEvent.None;
             int cost = SupplyFor(j), turns = TurnsFor(j), hail = HpLossFor(j);
+            if (Perks.goalwardHalf && IsGoalward(j)) _goalwardSteps++;
             var ev = FreeMapEvent.None;
             if (Pay(cost)) ev |= FreeMapEvent.Died;
             HpPayReason = "雹";
@@ -433,7 +483,7 @@ namespace MapSystem.FreeMove
             if (FoeAlive && FoeMode == FoeMode.Chase) LastSeen = j;
             ev |= FreeMapEvent.Arrived;
             if ((ev & FreeMapEvent.Died) != 0) { Dead = true; return ev; }
-            Reveal(Me, VisionRange);
+            RevealView();
             return ev;
         }
 
@@ -444,7 +494,7 @@ namespace MapSystem.FreeMove
         public FreeMapEvent Recon()
         {
             if (Dead || InFight) return FreeMapEvent.None;
-            Reveal(Me, FreeMapParams.ReconRange);
+            Reveal(Me, FreeMapParams.ReconRange, true);
             return PassTurns(1);
         }
 
@@ -456,7 +506,7 @@ namespace MapSystem.FreeMove
             var ev = Pay(FreeMapParams.FlareSupply) ? FreeMapEvent.Died : FreeMapEvent.None;
             if ((ev & FreeMapEvent.Died) != 0) { Dead = true; return ev; }
             FlareTurnsLeft = FreeMapParams.FlareTurns;
-            Reveal(Me, FreeMapParams.FlareRange);
+            Reveal(Me, FreeMapParams.FlareRange, true);
             Version++;
             return ev;
         }
@@ -467,7 +517,7 @@ namespace MapSystem.FreeMove
             Version++;
             if (Me != PrevNode && _adj[Me].Contains(PrevNode)) Me = PrevNode;
             PendingArrival = -1;
-            Reveal(Me, VisionRange);
+            RevealView();
         }
 
         /// <summary>多めに回復する休憩など、 手番だけを進める。</summary>
@@ -528,7 +578,7 @@ namespace MapSystem.FreeMove
             PendingArrival = -1;
             if (Me != PrevNode && _adj[Me].Contains(PrevNode)) Me = PrevNode;
             FoeFreezeTurns = Math.Max(FoeFreezeTurns, FreeMapParams.FleeFreezeTurns);
-            Reveal(Me, VisionRange);
+            RevealView();
         }
 
         /// <summary>使い魔との戦闘が終わった (勝っても逃げても使い魔は消える。 猟犬は本体の元へ戻る)。</summary>
@@ -547,7 +597,7 @@ namespace MapSystem.FreeMove
             {
                 PendingArrival = -1;
                 if (Me != PrevNode && _adj[Me].Contains(PrevNode)) Me = PrevNode;
-                Reveal(Me, VisionRange);
+                RevealView();
             }
         }
 
@@ -565,13 +615,32 @@ namespace MapSystem.FreeMove
             return _wallet.PayHp(short_ * FreeMapParams.HpPerSupply);
         }
 
-        private void Reveal(int center, int range)
+        /// <summary>道で range 歩以内の点の種類を公開する。 scouting = 完全公開 (戦闘名まで) ── 偵察・照明 (照明中の視界も含む)・〈前哨の旗〉。
+        /// 何もしない時の視界 (〈夜目の指輪〉で広げた分も含む) は種類だけ。</summary>
+        private void Reveal(int center, int range, bool scouting)
         {
             var d = HopsFrom(center);
-            // 視界 (1 歩) より広い範囲で見た = 偵察・照明 (照明中の視界も含む) → 完全公開
-            bool scouting = range > FreeMapParams.Vision;
             for (int i = 0; i < d.Length; i++)
                 if (d[i] <= range) { Known[i] = true; if (scouting) Scouted[i] = true; }
+        }
+
+        /// <summary>今の視界 (照明中は完全公開) と、 〈前哨の旗〉の拠点の範囲 (常に完全公開) を公開する。</summary>
+        private void RevealView()
+        {
+            Reveal(Me, VisionRange, FlareOn);
+            if (Beacon >= 0) Reveal(Beacon, Perks.beaconRange, true);
+        }
+
+        /// <summary>〈前哨の旗〉: 今いる点に偵察拠点を置く (手番は使わない・層に 1 回)。 その層にいる間、 拠点から
+        /// <see cref="FreeMapPerks.beaconRange"/> 歩の点の種類と戦闘名・追跡者・使い魔を常に見せる。 置けなければ false。</summary>
+        public bool PlaceBeacon()
+        {
+            if (Dead || InFight || BeaconLeft <= 0) return false;
+            BeaconLeft--;
+            Beacon = Me;
+            Version++;
+            RevealView();
+            return true;
         }
 
         private FreeMapEvent PassTurns(int n)
@@ -587,7 +656,7 @@ namespace MapSystem.FreeMove
                 if (Turn % FreeMapParams.FrontEvery == 0) ev |= AdvanceFront();
                 if (Contact != ContactKind.None) break;
             }
-            Reveal(Me, VisionRange);
+            RevealView();
             return ev;
         }
 
@@ -608,7 +677,15 @@ namespace MapSystem.FreeMove
                 var dMe = HopsFrom(Me);
                 int detect = DetectHops;
                 if (_chaseRest > 0) _chaseRest--;
-                if (_chaseRest == 0 && dMe[FoeNode] <= detect)
+                if (_chaseRest == 0 && dMe[FoeNode] <= detect && FoeMode != FoeMode.Chase && SmokeLeft > 0)
+                {
+                    // 〈煙玉〉(層に 1 回・自動): 補足される代わりに、 追跡者は警戒へ落ちて痕跡をたどる (最後の位置 = 発動した地点)。
+                    //   すぐ補足し直さないよう、 数手番は補足しない。 その間にどこへ逃げるかは問われる (痕跡を踏まれれば追いつかれる)
+                    SmokeLeft--;
+                    FoeMode = FoeMode.Alert; _alertLure = -1; _chaseRest = FreeMapPerks.SmokeRestTurns;
+                    ev |= FreeMapEvent.SmokeUsed;
+                }
+                else if (_chaseRest == 0 && dMe[FoeNode] <= detect)
                 {
                     if (FoeMode != FoeMode.Chase) { ev |= FreeMapEvent.Detected; _chaseTurns = 0; }
                     FoeMode = FoeMode.Chase; LastSeen = Me; _lose = 0;
@@ -672,12 +749,12 @@ namespace MapSystem.FreeMove
                 if (f.hound) f.target = FoeMode == FoeMode.Chase ? LastSeen : FoeNode;
                 for (int k = 0; k < Profile.familiarSteps; k++)
                 {
-                    if (HopsFrom(f.pos)[Me] <= FreeMapParams.FamiliarSee) f.target = Me;
+                    if (HopsFrom(f.pos)[Me] <= Perks.familiarSee) f.target = Me;
                     if (f.target < 0) break;
                     f.pos = FreeMapLayout.StepToward(_adj, f.pos, f.target);
                     if (f.pos == Me) break;
                 }
-                if (!f.hound && f.pos == f.target && f.pos != Me && HopsFrom(f.pos)[Me] > FreeMapParams.FamiliarSee)
+                if (!f.hound && f.pos == f.target && f.pos != Me && HopsFrom(f.pos)[Me] > Perks.familiarSee)
                 {
                     f.target = -2;   // 消える印
                     vanished = true;

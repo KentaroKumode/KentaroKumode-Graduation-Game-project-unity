@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using GameLoop;
+using MapSystem;
 using MapSystem.FreeMove;
 using UnityEngine;
 using UnityEngine.UI;
@@ -11,29 +12,52 @@ namespace UI.Game2D
     /// 上の帯 = 天気 (今)・層 (今の層 / 最終層)・警告ランプ (追跡者が警戒・追跡中で点灯)・待つボタン / 左下 = 職業・状態異常・消耗品・パッシブ / 右 = 航行アイテムの枠 3 つ・脱出ボタン。
     /// 層・追跡者・天気・所持数は実際の値、 そのほか (職業名・状態異常・アイテム枠) は見本。 戦闘中は 3 方向へ引っ込む (<see cref="Drive"/>)。
     /// <para>操作 (2026-11-04): 上の帯の [WAIT] = 待つ (その場で 1 手番・Space と同じ) / 左下の ITEMS の欄 = 所持品の窓 (消耗品を使う・パッシブを見る)。</para>
+    /// <para>2026-11-11: 上の帯の右隣に「経過ターン・補足中の警告 (ETA)・照明の残り」の帯、 右の列に航行アイテムの 3 枠 (Q / E / T・〈前哨の旗〉を立てる)、
+    /// 終点 (ボス・〈門〉) へ踏み出す前の確認の窓 (<see cref="ConfirmExit"/>) を足した。</para>
     /// </summary>
     public class Game2DNavExtras : MonoBehaviour
     {
         public Game2DScreen screen;
         public Game2DModal modal;
-        [SerializeField] private RectTransform _top, _left, _right;      // _right は旧版の残り (航行アイテムの欄は廃止。 シーンに残っていれば隠す)
-        private Texture2D _tt, _tl;
+        [SerializeField] private RectTransform _top, _left, _right;      // _right = 航行アイテムの 3 枠 (2026-11-11 に戻した。 旧版のシーンに残っていたものは大きさ・位置を直して使う)
+        /// <summary>経過ターン・補足中の警告 (ETA)・照明の残り・羅針の方角の帯 (2026-11-11・issue #69 / #72)。 シーンに無ければ実行時に作る。</summary>
+        [SerializeField] private RectTransform _status;
+        private Texture2D _tt, _tl, _tr, _ts;
         private static readonly RectInt TopR = new RectInt(96, 0, 124, 30), LeftR = new RectInt(0, 219, 100, 51);      // 2026-11-11: 字を既定のフォント (高さ 12) にして広げた
+        /// <summary>上の帯の右隣 (レーダーの手前まで)。 押せる物は無い。</summary>
+        private static readonly RectInt StatusR = new RectInt(222, 0, 166, 30);
+        /// <summary>右の列: 航行アイテムの 3 枠 (Q / E / T)。 レーダーの下・HP のバーの上。</summary>
+        private static readonly RectInt RightR = new RectInt(436, 94, 44, 76);
+        private const int SlotSize = 20, SlotPitch = 25;
+        /// <summary>枠のキー。 W は視点の移動 (WASD) と重なるので、 設計 (Q / W / E) から Q / E / T に変えた (R は偵察・F は照明・L は囮罠・数字は移動)。</summary>
+        private static readonly KeyCode[] SlotKeys = { KeyCode.Q, KeyCode.E, KeyCode.T };
+        private static readonly string[] SlotKeyNames = { "Q", "E", "T" };
         private int _hash = int.MinValue; private float _next; private float _e;
         private static readonly RectInt WaitR = new RectInt(84, 4, 38, 22);      // 上の帯の中 (帯の左上が原点)
         private static bool _shown;
+        private static Game2DNavExtras _instance;
         private bool _invPassives; private int _invPage;
         /// <summary>所持品の窓の頁: 0 = 消耗品 / 1 = パッシブ / 2 = ステータス (2026-11-09)。 _invPassives は 1 の時だけ立つ。</summary>
         private int _invTab;
         private const int InvPerPage = 10;
 
         /// <summary>この dot (GUI の 480×270) がボタン・計器の上か (地図のクリック・ドラッグに渡さない)。</summary>
-        public static bool Consumes(Vector2 d) => _shown && (In(d, TopR) || In(d, LeftR));
+        public static bool Consumes(Vector2 d) => _shown && (In(d, TopR) || In(d, LeftR) || In(d, StatusR) || In(d, RightR));
         private static bool In(Vector2 d, RectInt r) => d.x >= r.x && d.x < r.x + r.width && d.y >= r.y && d.y < r.y + r.height;
 
         public void Build()
         {
-            _top = Make("top", TopR); _left = Make("left", LeftR);
+            _top = Make("top", TopR); _left = Make("left", LeftR); _status = Make("status", StatusR); _right = Make("right", RightR);
+        }
+
+        private void Awake() { _instance = this; }
+
+        /// <summary>シーンを builder で作り直していない時に、 新しく足した欄 (状態の帯・右の列) を作る。</summary>
+        private void EnsureParts()
+        {
+            if (_top == null) return;
+            if (_status == null) _status = Make("status", StatusR);
+            if (_right == null) _right = Make("right", RightR);
         }
 
         private RectTransform Make(string name, RectInt r)
@@ -45,17 +69,24 @@ namespace UI.Game2D
             return rt;
         }
 
-        private void OnDestroy() { if (_tt != null) Destroy(_tt); if (_tl != null) Destroy(_tl); }
+        private void OnDestroy()
+        {
+            foreach (var t in new[] { _tt, _tl, _tr, _ts }) if (t != null) Destroy(t);
+            if (_instance == this) _instance = null;
+        }
 
         /// <param name="e">引っ込み具合 0 = 出ている / 1 = 画面の外 (ばね。 行き過ぎはそのまま渡す)</param>
         public void Drive(float e)
         {
             _e = e;
             if (_top == null) return;
+            EnsureParts();
             _top.anchoredPosition = new Vector2(TopR.x, -TopR.y + Mathf.Round(e * 30f));
+            _status.anchoredPosition = new Vector2(StatusR.x, -StatusR.y + Mathf.Round(e * 30f));
             _left.anchoredPosition = new Vector2(LeftR.x - Mathf.Round(e * 100f), -LeftR.y);
+            _right.anchoredPosition = new Vector2(RightR.x + Mathf.Round(e * 60f), -RightR.y);
             bool show = e < 0.995f; _shown = e < 0.05f;
-            foreach (var rt in new[] { _top, _left }) rt.gameObject.SetActive(show);
+            foreach (var rt in new[] { _top, _left, _status, _right }) rt.gameObject.SetActive(show);
         }
 
         private void Update()
@@ -64,17 +95,167 @@ namespace UI.Game2D
             var gm = GameManager.Instance; if (gm == null) return;
             var sim = gm.CurrentPhase == GameManager.GamePhase.MapNavigation ? gm.FreeMap : null;
             var run = gm.Run;
-            if (sim != null && !Game2DModal.Active && !Game2DLoadingScreen.Blocking && Input.GetMouseButtonDown(0) && screen != null && Game2DPointer.TryDot(screen, out var dot))
+            bool free = sim != null && !Game2DModal.Active && !Game2DLoadingScreen.Blocking;
+            _hoverSlot = -1;
+            if (free && screen != null && Game2DPointer.TryDot(screen, out var hd))
+                for (int i = 0; i < 3; i++) if (In(hd, SlotRect(i))) _hoverSlot = i;
+            if (free && Input.GetMouseButtonDown(0) && screen != null && Game2DPointer.TryDot(screen, out var dot))
             {
                 if (In(dot, new RectInt(TopR.x + WaitR.x, TopR.y + WaitR.y, WaitR.width, WaitR.height))) { if (gm.WaitTurn()) Game2DSfx.Play("ui_click"); }
                 else if (In(dot, LeftR)) OpenInventory(gm);
+                else if (_hoverSlot >= 0) UseSlot(gm, _hoverSlot);
             }
+            if (free) for (int i = 0; i < SlotKeys.Length; i++) if (Input.GetKeyDown(SlotKeys[i])) UseSlot(gm, i);
             int floor = run != null ? run.currentFloor : 1, passives = run?.ownedPassiveItems?.Count ?? 0, cons = run?.ownedConsumables?.Count ?? 0;
             int weather = sim != null ? (int)sim.Weather : 0, foe = sim != null && sim.HasFoe && sim.FoeAlive ? (int)sim.FoeMode : -1;
-            int h = floor * 7 + passives * 31 + cons * 131 + weather * 17 + (foe + 2) * 1009;
+            // まとめて進んだターン (イベント・多めに休む・雪の前線): 「+N」を 2.5 秒だけ出す (#21 の待ち時間の代わり)
+            if (sim != null)
+            {
+                if (_lastSim != sim) { _lastSim = sim; _lastTurn = sim.Turn; }
+                if (sim.Turn - _lastTurn >= 2) { _jumpN = sim.Turn - _lastTurn; _jumpUntil = Time.unscaledTime + 2.5f; }
+                _lastTurn = sim.Turn;
+            }
+            bool jump = Time.unscaledTime < _jumpUntil;
+            bool chase = sim != null && sim.FoeAlive && sim.FoeMode == FoeMode.Chase;
+            int blink = chase ? Mathf.FloorToInt(Time.unscaledTime * 2.5f) & 1 : 0;      // 補足中の警告は 2.5 回/秒で明滅
+            int h = floor * 7 + passives * 31 + cons * 131 + weather * 17 + (foe + 2) * 1009 + (sim != null ? sim.Version * 7919 : 0) + blink * 104729 + (_hoverSlot + 2) * 15485863 + (jump ? 31 : 0);
             if (h == _hash && Time.unscaledTime < _next) return;
             _hash = h; _next = Time.unscaledTime + 0.5f;
             Redraw(floor, passives, cons, weather, foe);
+            RedrawStatus(gm, sim, run, blink == 0);
+            RedrawSlots(gm, sim, run);
+        }
+
+        // ── 経過ターン・補足中の警告 (issue #69 / #72) ──
+        //   1 行目 = 経過ターン (「手番」とは書かない) と照明の残り。 2 行目 = 優先順に 「枠の説明 (乗せている時)」→「補足中の ETA」→「羅針の方角」。
+        //   補給 (店) で動けない待ち時間は、 今の規則 (店は 0 ターン) では起きない。 まとめて進んだ分 (イベント・多めに休む) はターン数の横の「+N」(gui-needed.md #21)。
+
+        private void RedrawStatus(GameManager gm, FreeMapSim sim, RunState run, bool blinkOn)
+        {
+            if (_status == null) return;
+            Ensure(ref _ts, _status, StatusR);
+            var p = new KitPix(StatusR.width, StatusR.height);
+            if (sim == null) { p.Apply(_ts); return; }
+            Plate(p, 0, 2, StatusR.width, 28);
+            p.Text("ターン", 5, 3, Game2DKit.Dim);
+            string tn = Mathf.Min(9999, sim.Turn).ToString(); int tx = 5 + Game2DJpFont.Width("ターン") + 4;
+            p.Text(tn, tx, 3, Game2DKit.Ink);
+            if (Time.unscaledTime < _jumpUntil) p.Text("+" + _jumpN, tx + Game2DJpFont.Width(tn) + 4, 3, Game2DKit.Amber);      // まとめて進んだ分
+            if (sim.FlareOn) p.TextR("照明 残り" + sim.FlareTurnsLeft, StatusR.width - 5, 3, Game2DKit.Amber);
+            string line = null; var col = Game2DKit.Dim;
+            if (_hoverSlot >= 0) { line = SlotHint(gm, sim, run, _hoverSlot); col = Game2DKit.Ink; }
+            else if (sim.FoeAlive && sim.FoeMode == FoeMode.Chase)
+            {
+                // 補足中: こちらが動かなかった場合に最短で何ターンで捕まるか (§5-9・FreeMapSim.Eta)。 誰が来るかは出さない (性質は明かさない)
+                var eta = sim.Eta();
+                line = eta.Valid ? "補足中 あと" + eta.turns + "ターンで捕まる" : "補足中";
+                col = blinkOn ? Game2DKit.Red : Game2DKit.Off;
+            }
+            else if (NavItems.FineBearing(run))
+            {
+                var st = sim.Stone();      // 〈羅針の針〉: 魔石の方角を 8 方位の字で (レーダーは 4 方向の扇)
+                if (st.level > 0 && st.bearing >= 0) { line = "魔石 " + StoneReading.BearingNames[st.bearing]; col = st.level >= 2 ? Game2DKit.Amber : Game2DKit.Dim; }
+            }
+            if (!string.IsNullOrEmpty(line)) p.Text(Game2DJpFont.Clip(line, StatusR.width - 10), 5, 16, col);
+            p.Apply(_ts);
+        }
+
+        // ── 航行アイテムの 3 枠 (issue #10・gui-needed.md #20) ──
+        //   枠に入るのは「使う」か「回数のある」航行アイテムだけ: 〈前哨の旗〉(押すと立てる)・〈煙玉〉(補足された時に自動で弾ける・押しても何もしない)。
+        //   ほかの 11 品は持っているだけで効くので、 所持品の窓 (パッシブ) で読む。 絵は無いので、 名前の頭の 1 字で出す。
+
+        private int _hoverSlot = -1;
+        private FreeMapSim _lastSim; private int _lastTurn, _jumpN; private float _jumpUntil;
+
+        private static RectInt SlotRect(int i) => new RectInt(RightR.x + 12, RightR.y + i * SlotPitch, SlotSize, SlotSize);
+
+        /// <summary>枠に入る品 (順番どおり・最大 3)。</summary>
+        private static List<string> SlotItems(RunState run)
+        {
+            var l = new List<string>();
+            if (NavItems.Has(run, ItemIds.NavOutpostFlag)) l.Add(ItemIds.NavOutpostFlag);
+            if (NavItems.Has(run, ItemIds.NavSmokeBall)) l.Add(ItemIds.NavSmokeBall);
+            return l;
+        }
+
+        /// <summary>その枠の品がまだこの層で使えるか。</summary>
+        private static bool SlotReady(GameManager gm, FreeMapSim sim, string id)
+        {
+            if (sim == null) return false;
+            if (id == ItemIds.NavOutpostFlag) return sim.Beacon < 0;
+            if (id == ItemIds.NavSmokeBall) return sim.SmokeLeft > 0 || sim.Perks.smokeCharges == 0;      // 層の途中で得た直後は、 次の操作で回数が入る
+            return false;
+        }
+
+        private static string SlotHint(GameManager gm, FreeMapSim sim, RunState run, int i)
+        {
+            var items = SlotItems(run);
+            if (i >= items.Count) return "空き (" + SlotKeyNames[i] + ")";
+            string id = items[i]; bool ready = SlotReady(gm, sim, id);
+            if (id == ItemIds.NavOutpostFlag) return ready ? id + " 押すとここに立てる" : id + " この層は立て済み";
+            if (id == ItemIds.NavSmokeBall) return ready ? id + " 補足された時に自動" : id + " この層は使用済み";
+            return id;
+        }
+
+        private void UseSlot(GameManager gm, int i)
+        {
+            var items = SlotItems(gm.Run);
+            if (i < 0 || i >= items.Count) return;
+            if (items[i] == ItemIds.NavOutpostFlag)
+            {
+                if (gm.UseOutpostFlag()) Game2DSfx.Play("ui_confirm"); else Game2DSfx.Play("ui_click", 0.4f);
+                _hash = int.MinValue;
+            }
+            else Game2DSfx.Play("ui_click", 0.4f);      // 〈煙玉〉は自動 (押しても何もしない)
+        }
+
+        private void RedrawSlots(GameManager gm, FreeMapSim sim, RunState run)
+        {
+            if (_right == null) return;
+            Ensure(ref _tr, _right, RightR);
+            var p = new KitPix(RightR.width, RightR.height);
+            var items = SlotItems(run);
+            for (int i = 0; i < 3; i++)
+            {
+                var r = SlotRect(i); int x = r.x - RightR.x, y = r.y - RightR.y;
+                bool has = i < items.Count, ready = has && SlotReady(gm, sim, items[i]), hv = i == _hoverSlot;
+                p.Text(SlotKeyNames[i], 1, y + (SlotSize - Game2DJpFont.Cell) / 2 + 1, hv ? Game2DKit.Ink : Game2DKit.Dim);
+                p.Box(x, y, SlotSize, SlotSize, Game2DKit.Off, hv ? Game2DKit.Amber : has ? Game2DKit.Dim : Game2DKit.Faint);
+                if (!has) continue;
+                string g = items[i].Substring(items[i].Length - 1);      // 名前の最後の 1 字 (旗・玉)。 id の綴りから効果は読まない ── 字を出すだけ
+                p.TextC(g, new RectInt(x, y, SlotSize, SlotSize), ready ? Game2DKit.Ink : Game2DKit.Faint);
+                if (ready) p.Rect(x + SlotSize - 4, y + SlotSize - 4, 2, 2, Game2DKit.Amber);      // 使える印
+            }
+            p.Apply(_tr);
+        }
+
+        // ── 脱出の確認 (issue #59・gui-needed.md #19) ──
+        //   終点 (ボス・〈門〉) は着いた瞬間に起動して戻れない (ボスからは逃げられない・層の残りの点は二度と踏めない)。
+        //   なので、 終点へ踏み出す前に共通の板の窓で確かめる。 「進む」で実際の 1 歩 (GameManager.MoveStep) を叩く。
+
+        /// <summary>終点への 1 歩を確かめる窓を出す。 出したら true (呼んだ側は動かない)。 窓が無い・BOT が動かしている時は false (そのまま動いてよい)。</summary>
+        public static bool ConfirmExit(GameManager gm, string nodeId, TileType goalType)
+        {
+            var me = _instance;
+            if (me == null || me.modal == null || gm == null || gm.Run == null || GameHooks.BotDriving || Game2DModal.Active) return false;
+            var run = gm.Run;
+            bool gate = goalType == TileType.Gate;
+            var d = new ScreenDef { id = "exit_jp", jp = true, w = 300,
+                title = gate ? "〈門〉へ進む" : "終点へ進む",
+                sub = "HP " + run.playerHP + "/" + run.playerMaxHP + "  物資 " + run.provision + "/" + run.provisionCap };
+            d.body = (gate ? "この先は〈門〉の前。 着いたら、 門へ何を捧げるかを決めることになる。"
+                           : "この先にボスが待っている。 着いたら戦闘が始まり、 ボスからは逃げられない。")
+                   + "\nこの層の残りの点には、 もう戻れない。";
+            d.bodyLines = 4;
+            d.buttons.Add(new ModalBtn { label = "進む", action = "go", primary = true });
+            d.buttons.Add(new ModalBtn { label = "やめる", action = "close" });
+            d.onAction = (a, _) =>
+            {
+                me.modal.Close();
+                if (a == "go") gm.MoveStep(nodeId);
+            };
+            me.modal.Open(d);
+            return true;
         }
 
         // ── 所持品の窓 (航行中) ──
@@ -202,7 +383,6 @@ namespace UI.Game2D
         private void Redraw(int floor, int passives, int cons, int weather, int foe)
         {
             Ensure(ref _tt, _top, TopR); Ensure(ref _tl, _left, LeftR);
-            if (_right != null) _right.gameObject.SetActive(false);
             // ── 上の帯 ──
             var p = new KitPix(TopR.width, TopR.height);
             Plate(p, 0, 2, 82, 28);                                                                    // 天気 (気圧計の代わり)

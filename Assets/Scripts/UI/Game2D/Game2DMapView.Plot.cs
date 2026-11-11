@@ -179,6 +179,14 @@ namespace UI.Game2D
                 if (blink || lure.turnsLeft > 2) Glyph(GlyphPlus, q.x, q.y, blink ? _lc.hot : _lc.mid, Pxs);
             }
 
+            // 〈前哨の旗〉の拠点 (2026-11-11): 見張っている範囲の破線の輪と、 点の上の「旗」の字
+            if (sim.Beacon >= 0 && sim.Beacon < lay.Count)
+            {
+                var q = Sp(lay.pos[sim.Beacon]); float br = sim.Perks.beaconRange * _hopUnit * _ls;
+                Ellipse(q, br, br, 0, _lc.mid, new[] { 1, 3 });
+                Text("旗", q.x, q.y - 6 * Pxs, _lc.hi);
+            }
+
             // 追跡者
             if (sim.HasFoe && sim.FoeAlive && sim.FoeVisible)
             {
@@ -289,7 +297,7 @@ namespace UI.Game2D
             char col = (char)('A' + Mathf.Clamp(Mathf.FloorToInt((float)me.x / 2f), 0, 25));
             int row = Mathf.FloorToInt((float)me.y / 2f) + 1;
             Text("現在 " + col + row, 96, H - 9, _lc.dim, Align.Left);
-            Text("手番 " + Mathf.Min(999, sim.Turn).ToString("000"), 96 + 8 * 4 * Pxs, H - 9, _lc.dim, Align.Left);
+            Text("ターン " + Mathf.Min(999, sim.Turn).ToString("000"), 96 + 8 * 4 * Pxs, H - 9, _lc.dim, Align.Left);      // 「手番」とは書かない (2026-11-11)
 
             bool calm = !(sim.Weather != WeatherKind.None && !double.IsNegativeInfinity(sim.Front));
             Text("天気 " + (calm ? "凪" : sim.Weather.DisplayName()), W - 8 - 89, 8, calm ? _lc.dim : _lc.hi, Align.Right);

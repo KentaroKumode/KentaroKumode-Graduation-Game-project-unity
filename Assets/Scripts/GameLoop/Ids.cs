@@ -64,6 +64,31 @@ namespace GameLoop
         /// <summary>囮罠 (items.json の id ＝ 表示名)。 旧〈囮〉〈罠〉は LegacyIdMap が解決する。</summary>
         public const string Lure = "囮罠";
 
+        // === 航行アイテム 13 品 (2026-11-11・docs/design/nav-items.md) ===
+        //   どれもパッシブ (〈前哨の旗〉だけ層に 1 回「使う」)。 効果は GameLoop.NavItems が係数 (FreeMapPerks) にして航行の規則へ渡す。
+        //   FreeMapSim はこれらの id を見ない。
+        public const string NavSmokeBall    = "煙玉";
+        public const string NavOiledBoots   = "油布の靴";
+        public const string NavStoneShard   = "魔石の欠片";
+        public const string NavMapSketch    = "地図売りの走り書き";
+        public const string NavCompassNeedle = "羅針の針";
+        public const string NavStealthCloak = "忍びの外套";
+        public const string NavMirrorCharm  = "鏡の護符";
+        public const string NavNightRing    = "夜目の指輪";
+        public const string NavSupplyTally  = "補給商の割符";
+        public const string NavBirdCompass  = "渡り鳥の羅盤";
+        public const string NavFleetCharm   = "逃げ足の護符";
+        public const string NavHunterBlade  = "追っ手殺しの刃";
+        public const string NavOutpostFlag  = "前哨の旗";
+
+        /// <summary>航行アイテム 13 品の id。</summary>
+        public static readonly System.Collections.Generic.HashSet<string> NavItems =
+            new System.Collections.Generic.HashSet<string>
+        {
+            NavSmokeBall, NavOiledBoots, NavStoneShard, NavMapSketch, NavCompassNeedle, NavStealthCloak, NavMirrorCharm,
+            NavNightRing, NavSupplyTally, NavBirdCompass, NavFleetCharm, NavHunterBlade, NavOutpostFlag,
+        };
+
         // === 進行用の品 ===
         /// <summary>**進行用の品**: 強さではなく進行度や配布条件を表す品。 〈門〉で遺物として捧げられない
         /// (GameManager.OfferGateRelics)。 BOT の lift 評価もこれを除外する (AutoTest.ItemLearningStats)。</summary>
