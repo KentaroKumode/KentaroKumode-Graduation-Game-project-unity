@@ -12,7 +12,7 @@ namespace MapSystem.FreeMove
         public int vision = FreeMapParams.Vision;
         /// <summary>魔石の「遠い」の歩数に足す分。 〈魔石の欠片〉で +1 (4 → 5)。</summary>
         public int stoneFarBonus;
-        /// <summary>痕跡が残る手番の倍率。 〈忍びの外套〉で 0.5 (4 → 2)。</summary>
+        /// <summary>痕跡が残るターンの倍率。 〈忍びの外套〉で 0.5 (4 → 2)。</summary>
         public double traceLifeMul = 1.0;
         /// <summary>使い魔がプレイヤーを見つける歩数。 〈鏡の護符〉で 0 (重なった時だけ)。</summary>
         public int familiarSee = FreeMapParams.FamiliarSee;
@@ -30,7 +30,7 @@ namespace MapSystem.FreeMove
         public int beaconRange = BeaconRangeDefault;
 
         public const int BeaconRangeDefault = 3;
-        /// <summary>〈煙玉〉が効いた後、 追跡者が補足し直さない手番 (減らしてから判定するので、 実際の猶予は 1 少ない)。</summary>
+        /// <summary>〈煙玉〉が効いた後、 追跡者が補足し直さないターン (減らしてから判定するので、 実際の猶予は 1 少ない)。</summary>
         public const int SmokeRestTurns = 3;
 
         public static readonly FreeMapPerks None = new FreeMapPerks();

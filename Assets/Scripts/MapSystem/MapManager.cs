@@ -9,7 +9,7 @@ namespace MapSystem
     /// マップの生成・ナビゲーション・タイル起動を管理するシングルトン。
     /// GameManager から呼ばれ、移動・空腹度・?マス解決を処理する。
     ///
-    /// <para><b>航行マップの層</b>（1/3/5/6/7・手番制 2026-10-18）では動く中身を素の C# の <see cref="FreeMapSim"/> が持ち、
+    /// <para><b>航行マップの層</b>（1/3/5/6/7・ターン制 2026-10-18）では動く中身を素の C# の <see cref="FreeMapSim"/> が持ち、
     /// ここはその窓口になる（物資と HP の支払いを RunState へ橋渡しする・着いた点を <see cref="CurrentNode"/> に写す）。
     /// 時間を進めるのは GameManager（<c>MoveStep</c> ほか）。
     /// 8 層（ボス戦だけ）は離散のまま <see cref="MoveTo"/> で動く。</para>

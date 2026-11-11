@@ -33,7 +33,7 @@ namespace UI.Game2D
             new Region("SUPPLY",      "物資バー（強調・全長）",        224, 251, 256, 19, State.Done),
             new Region("HP",          "HP バー（半分）",               352, 232, 128, 19, State.Done),
             new Region("WX",          "天気の予報",                    212, 219, 140, 32, State.Plan),
-            new Region("TIME",        "手番の表示",                     96,   0, 100, 22, State.Temp),
+            new Region("TIME",        "ターンの表示",                     96,   0, 100, 22, State.Temp),
             new Region("LAYER",       "層・進行",                      200,   0,  44, 22, State.Temp),
             new Region("ALERT",       "気配・追跡の警告",              248,   0,  60, 22, State.Temp),
             new Region("WAIT",        "待つ",                          312,   0,  60, 22, State.Temp),

@@ -5,7 +5,7 @@ using System.Linq;
 namespace MapSystem.FreeMove
 {
     /// <summary>
-    /// 航行マップの生成 (手番制・2026-10-18)。 参照実装は docs/design/map-grid-prototype.html の <c>generate / genOnce</c>。
+    /// 航行マップの生成 (ターン制・2026-10-18)。 参照実装は docs/design/map-grid-prototype.html の <c>generate / genOnce</c>。
     ///
     /// <para>手順: 山岳 3〜5 か所 → 始点・終点 → 点を撒く (最小間隔 1.15・山岳の外) →
     /// 道 = 最小全域木 (つながりを保証) ＋ 近い組を交差しない範囲で足す →

@@ -40,7 +40,7 @@ namespace MapSystem.FreeMove
 
     /// <summary>
     /// 航行マップ 1 枚ぶんの形 (点・道・山岳・追跡者の縄張り)。 生成後は変わらない。
-    /// 動く状態 (自分・追跡者・手番・痕跡・前線で崩れた道) は <see cref="FreeMapSim"/> が持つ。
+    /// 動く状態 (自分・追跡者・ターン・痕跡・前線で崩れた道) は <see cref="FreeMapSim"/> が持つ。
     /// </summary>
     public sealed class FreeMapLayout
     {

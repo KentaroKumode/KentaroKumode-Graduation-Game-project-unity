@@ -257,10 +257,10 @@ namespace UI.Game2D
 
         private void DrawTerm(KitPix p, RectInt tr, int wv, bool on)
         {
-            var s = wv == 0 ? _bAtk : wv == 1 ? _bBlk : wv == 2 ? _bChg : null;      // 特殊端子は専用の絵が無いので板で
+            var s = wv == 0 ? _bAtk : wv == 1 ? _bBlk : wv == 2 ? _bChg : null;      // 補助は専用の絵が無いので板で
             if (s != null) p.Sprite(s, tr.x, tr.y, tr.width, tr.height);
             else p.Box(tr.x, tr.y, tr.width, tr.height, on ? TermCol[wv] : Dim, Dark);
-            p.TextC(wv == 3 ? CombatSystem.SpecialTerminals.ShortName(CombatSystem.SpecialTerminals.Equipped(GameLoop.GameManager.Instance?.Run)) : TermName[wv], tr, on ? Ink : Dim);      // 特殊端子は付けている物の名前
+            p.TextC(TermName[wv], tr, on ? Ink : Dim);
         }
 
         private void DrawLeft(Texture2D t)
@@ -658,7 +658,7 @@ namespace UI.Game2D
             // 予告 (攻撃・大技・構え) と毒・出血は敵の周りに出す (Game2DBattleFx.DrawMarks・2026-11-11)。 ここは次の構え・大技の前触れだけ
             string next = known ? (sim.guardIn == 1 && sim.heavyIn == 1 ? "次: 構え・大技" : sim.guardIn == 1 ? "次: 構え" : sim.heavyIn == 1 ? "次: 大技" : null) : null;
             if (next != null) p.Text(next, 14, 75, sim.heavyIn == 1 ? MarkHeavyHud : Dim);
-            if (live) p.Text("手番 " + sim.turn + "  段階 " + sim.Stage, 14, 90, Dim);
+            if (live) p.Text("ターン " + sim.turn + "  段階 " + sim.Stage, 14, 90, Dim);
             p.Apply(t);
         }
 

@@ -15,7 +15,7 @@ namespace GameLoop
         /// BOT は <see cref="GameHooks.ChooseTerminalReward"/> でその場で選ぶ (無ければ先頭)。</summary>
         private void OfferTerminalReward(bool elite, bool boss)
         {
-            if (!TerminalCards.Enabled || Run == null) return;
+            if (Run == null) return;
             if (boss && Run.currentFloor > TerminalBossRewardLastFloor) return;
             int n = (boss ? TerminalChoicesBoss : elite ? TerminalChoicesElite : TerminalChoicesNormal) + Run.terminalExtraChoices;
             Run.terminalExtraChoices = 0;

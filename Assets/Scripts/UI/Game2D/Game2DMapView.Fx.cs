@@ -16,7 +16,7 @@ namespace UI.Game2D
         private const float RiseMs = 320, RiseH = 72, FadeMs = 700, Drift = 26, Sway = 4, GlowR = 44, GlowA = 0.55f,
                             IgnMs = 130, IgnScale = 1.5f, SmokeMs = 1300, RayLong = 16, RayShort = 8;
         private const int Embers = 16;
-        private const float MsPerTurn = 4000f;            // 照明の燃焼の時計 1 手番 = 実時間 (演出の目安)
+        private const float MsPerTurn = 4000f;            // 照明の燃焼の時計 1 ターン = 実時間 (演出の目安)
         private const float WedgeA = 1.05f, ReconFlashMs = 380, ReconMinR = 3, ReconDensity = 11, ReconSweepMs = 1400;
         private const int ReconTicks = 12;
         private const float FogInner = 70, FogOuter = 260, FogMax = 0.30f, FogDrift = 5,
@@ -94,7 +94,7 @@ namespace UI.Game2D
             _flareRt += dtMs;
             if (_riseT < RiseMs) _riseT += dtMs; else _burnClock += dtMs;
 
-            // 燃焼の経過 (ms 換算) = 手番ぶんの階段 + 手番の中での実時間のゆっくりした進み
+            // 燃焼の経過 (ms 換算) = ターンぶんの階段 + ターンの中での実時間のゆっくりした進み
             if (sim.FlareTurnsLeft != _flareLeftSeen) { _flareLeftSeen = sim.FlareTurnsLeft; _subTurn = 0; }
             _subTurn = Mathf.Min(0.9f, _subTurn + dtMs / MsPerTurn);
             float totalTurns = FreeMapParams.FlareTurns;

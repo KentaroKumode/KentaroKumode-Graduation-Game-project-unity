@@ -6,13 +6,13 @@ using UnityEngine;
 namespace GameLoop
 {
     /// <summary>
-    /// 航行マップ (手番制・2026-10-18・docs/GAME.md §5) の進行。 動く中身は素の C# の <see cref="FreeMapSim"/>
+    /// 航行マップ (ターン制・2026-10-18・docs/GAME.md §5) の進行。 動く中身は素の C# の <see cref="FreeMapSim"/>
     /// (<see cref="MapManager.Sim"/>) で、 ここはゲームの規則 (到着した点の起動・追跡者との戦闘・
     /// 逃げる・囮罠・休憩) へ橋渡しする。
     ///
     /// <para><b>時間を進める口は「1 歩動く」「待つ」「偵察」「休憩で多めに回復」だけ。</b> どれも
-    /// <see cref="FreeMapSim"/> の操作 1 回が 1 手番ぶん (雪の前線の内側は 2 手番) で、
-    /// 戦闘・イベント・照明・囮罠は手番を使わない。 人も BOT も同じ口を同期的に叩く。</para>
+    /// <see cref="FreeMapSim"/> の操作 1 回が 1 ターンぶん (雪の前線の内側は 2 ターン) で、
+    /// 戦闘・イベント・照明・囮罠はターンを使わない。 人も BOT も同じ口を同期的に叩く。</para>
     /// </summary>
     public partial class GameManager
     {
@@ -25,7 +25,7 @@ namespace GameLoop
         /// <summary>操作ごとに起きたこと (None は流さない)。 表示・効果音・計器が購読する。</summary>
         public event System.Action<FreeMapEvent> OnFreeMapEvent;
 
-        /// <summary>航行の画面演出の合図 (偵察・照明)。 手番を進めない照明や、 イベントを返さない偵察でも鳴る。 Game2DMapFx が購読する。</summary>
+        /// <summary>航行の画面演出の合図 (偵察・照明)。 ターンを進めない照明や、 イベントを返さない偵察でも鳴る。 Game2DMapFx が購読する。</summary>
         public enum NavFx { Recon, Flare }
         public event System.Action<NavFx> OnNavFx;
 
@@ -44,7 +44,7 @@ namespace GameLoop
         public bool InMapEncounterCombat => _inPursuerFight || _inFamiliarFight;
 
         // =====================================================================
-        //  操作 (手番を進める)
+        //  操作 (ターンを進める)
         // =====================================================================
 
         /// <summary>隣の点へ 1 歩動く。 行けない (道が無い・沈んだ・戦闘中) なら false。</summary>
@@ -65,56 +65,56 @@ namespace GameLoop
         /// <summary>〈補給線〉が使えるか (整備パネル〈兵站〉r10)。</summary>
         public static bool SupplyLineUnlocked => MetaProgression.MetaBuffApplicator.IsSupplyLineUnlocked();
 
-        /// <summary>〈補給線〉: この層で一度着いた前哨基地・店へ跳ぶ (物資 1・手番を使わない・補足は解けない)。</summary>
+        /// <summary>〈補給線〉: この層で一度着いた前哨基地・店へ跳ぶ (物資 1・ターンを使わない・補足は解けない)。</summary>
         public bool RelayStep(string nodeId)
         {
             var sim = FreeMapForAction();
             if (sim == null || !SupplyLineUnlocked) return false;
             var node = MapManager.Instance.CurrentMap.GetNode(nodeId);
             if (node == null || node.index < 0 || !sim.CanRelayTo(node.index)) return false;
-            Log($"補給線（物資 −{FreeMapParams.RelaySupply}・手番は使わない）→ {TileToJapanese(node.type)}");
+            Log($"補給線（物資 −{FreeMapParams.RelaySupply}・ターンは使わない）→ {TileToJapanese(node.type)}");
             RunFreeMapOp(s => s.RelayTo(node.index));
             return true;
         }
 
-        /// <summary>待つ (1 手番)。</summary>
+        /// <summary>待つ (1 ターン)。</summary>
         public bool WaitTurn()
         {
             var sim = FreeMapForAction();
             if (sim == null) return false;
-            Log("待つ（1手番）");
+            Log("待つ（1ターン）");
             RunFreeMapOp(s => s.Wait());
             return true;
         }
 
-        /// <summary>偵察 (1 手番): 道で 2 歩先まで見える。</summary>
+        /// <summary>偵察 (1 ターン): 道で 2 歩先まで見える。</summary>
         public bool ReconTurn()
         {
             var sim = FreeMapForAction();
             if (sim == null) return false;
-            Log("偵察（1手番）");
+            Log("偵察（1ターン）");
             RunFreeMapOp(s => s.Recon());
             OnNavFx?.Invoke(NavFx.Recon);
             return true;
         }
 
-        /// <summary>照明 (手番は使わない): 物資 −50 で 3 手番のあいだ道で 3 歩先まで見える。</summary>
+        /// <summary>照明 (ターンは使わない): 物資 −50 で 3 ターンのあいだ道で 3 歩先まで見える。</summary>
         public bool UseFlare()
         {
             var sim = FreeMapForAction();
             if (sim == null || sim.FlareOn) return false;
-            Log($"照明（物資 −{FreeMapParams.FlareSupply}・手番は使わない・{FreeMapParams.FlareTurns}手番のあいだ見える）");
+            Log($"照明（物資 −{FreeMapParams.FlareSupply}・ターンは使わない・{FreeMapParams.FlareTurns}ターンのあいだ見える）");
             RunFreeMapOp(s => s.UseFlare());
             OnNavFx?.Invoke(NavFx.Flare);
             return true;
         }
 
-        /// <summary>囮罠を今いる点に仕掛ける (手番は使わない・消耗品の消費は <see cref="Consumables.Use"/> が行う)。</summary>
+        /// <summary>囮罠を今いる点に仕掛ける (ターンは使わない・消耗品の消費は <see cref="Consumables.Use"/> が行う)。</summary>
         public bool TryPlaceLure()
         {
             var sim = FreeMapForAction();
             if (sim == null) return false;
-            Log($"囮罠を仕掛けた（{FreeMapParams.LureLife}手番のあいだ有効・踏んだ追跡者は{FreeMapParams.LureHoldTurns}手番足止めされる）");
+            Log($"囮罠を仕掛けた（{FreeMapParams.LureLife}ターンのあいだ有効・踏んだ追跡者は{FreeMapParams.LureHoldTurns}ターン足止めされる）");
             RunFreeMapOp(s => s.PlaceLure());
             return true;
         }
@@ -130,7 +130,7 @@ namespace GameLoop
             }
         }
 
-        /// <summary>〈前哨の旗〉(層に 1 回・手番は使わない): 今いる点に偵察拠点を置く。 その層にいる間、 拠点から
+        /// <summary>〈前哨の旗〉(層に 1 回・ターンは使わない): 今いる点に偵察拠点を置く。 その層にいる間、 拠点から
         /// <see cref="FreeMapPerks.beaconRange"/> 歩の点の種類と戦闘名・追跡者・使い魔を常に見せる。 人も BOT もここを叩く。</summary>
         public bool UseOutpostFlag()
         {
@@ -138,11 +138,11 @@ namespace GameLoop
             if (sim == null || !NavItems.Has(Run, ItemIds.NavOutpostFlag)) return false;
             bool ok = false;
             RunFreeMapOp(s => { ok = s.PlaceBeacon(); return FreeMapEvent.None; });
-            if (ok) Log($"〈{ItemIds.NavOutpostFlag}〉を立てた（手番は使わない・この層にいる間、 {sim.Perks.beaconRange}歩先まで見張る）");
+            if (ok) Log($"〈{ItemIds.NavOutpostFlag}〉を立てた（ターンは使わない・この層にいる間、 {sim.Perks.beaconRange}歩先まで見張る）");
             return ok;
         }
 
-        /// <summary>手番を進められる状態の中身 (マップ移動中・戦闘中でない)。 そうでなければ null。</summary>
+        /// <summary>ターンを進められる状態の中身 (マップ移動中・戦闘中でない)。 そうでなければ null。</summary>
         private FreeMapSim FreeMapForAction()
         {
             if (CurrentPhase != GamePhase.MapNavigation) return null;
@@ -173,7 +173,7 @@ namespace GameLoop
             if ((ev & FreeMapEvent.FoeAlerted) != 0) Log("（追跡者が何かに気づいた）");
             if ((ev & FreeMapEvent.FamiliarLaunched) != 0) Log("使い魔が放たれた");
             if ((ev & FreeMapEvent.FamiliarVanished) != 0) Log("（使い魔は見失って消えた）");
-            if ((ev & FreeMapEvent.LureTriggered) != 0) Log($"（囮罠が作動した）追跡者が{FreeMapParams.LureHoldTurns}手番足止めされた");
+            if ((ev & FreeMapEvent.LureTriggered) != 0) Log($"（囮罠が作動した）追跡者が{FreeMapParams.LureHoldTurns}ターン足止めされた");
             if ((ev & FreeMapEvent.FrontAdvanced) != 0 && sim.Weather != WeatherKind.None)
                 Log($"前線が左から {System.Math.Min(sim.Front, FreeMapParams.Width):0.0} まで届いた（{sim.Weather.DisplayName()}）");
             if ((ev & FreeMapEvent.MapChanged) != 0) Log(sim.Weather == WeatherKind.Crumble ? "（道が1本崩れた）" : "（点が1つ沈んだ）");
@@ -192,7 +192,7 @@ namespace GameLoop
                 if ((ev & FreeMapEvent.FamiliarContact) != 0)
                 {
                     sim.ResolveFamiliarFight(false); MapManager.Instance?.SyncCurrentNodeFromSim(); Log("（航行のみ）使い魔に接触 ── 戦闘は省略した");
-                    // 着いた手番に接触していても、 着いた点はそのまま (終点なら次の層へ進めるように、 到着の処理へ続ける)
+                    // 着いたターンに接触していても、 着いた点はそのまま (終点なら次の層へ進めるように、 到着の処理へ続ける)
                     if ((ev & FreeMapEvent.Arrived) == 0) return;
                     if ((ev & FreeMapEvent.Caught) == 0) sim.TakePendingArrival();
                 }
@@ -200,7 +200,7 @@ namespace GameLoop
                 {
                     if ((ev & FreeMapEvent.Arrived) != 0 && sim.LastArrived == sim.Layout.goal)
                     {
-                        // 終点に着いた手番に捕まった: 戦闘は省いて勝ったことにし、 そのまま到着の処理へ (追い返され続けて終点へ入れなくなるのを防ぐ)
+                        // 終点に着いたターンに捕まった: 戦闘は省いて勝ったことにし、 そのまま到着の処理へ (追い返され続けて終点へ入れなくなるのを防ぐ)
                         sim.ResolveBodyWon(); sim.TakePendingArrival(); Log("（航行のみ）終点で追跡者に捕まった ── 戦闘は省略し、 退けたことにした");
                     }
                     else { sim.ResolveBodyFled(); MapManager.Instance?.SyncCurrentNodeFromSim(); Log("（航行のみ）追跡者に捕まった ── 戦闘は省略し、 直前の点へ戻った"); return; }
@@ -244,7 +244,7 @@ namespace GameLoop
             AfterNodeEntered();
         }
 
-        /// <summary>点に着いた手番に捕まっていたら、 戦闘が終わった今その点を発動させる。
+        /// <summary>点に着いたターンに捕まっていたら、 戦闘が終わった今その点を発動させる。
         /// 放っておくと、 着いたのに起動しない点ができる。</summary>
         private void FlushPendingArrival()
         {
@@ -261,11 +261,11 @@ namespace GameLoop
         }
 
         // =====================================================================
-        //  休憩 (多めに回復 = +1 手番)
+        //  休憩 (多めに回復 = +1 ターン)
         // =====================================================================
 
         /// <summary>休憩で多めに回復する: 最大 HP の <see cref="FreeMapParams.RestMoreRatio"/>、 代わりに
-        /// <see cref="FreeMapParams.RestMoreTurns"/> 手番が進む (追跡者が動く)。 通常の回復 (<see cref="RestHeal"/>) は 0 手番。</summary>
+        /// <see cref="FreeMapParams.RestMoreTurns"/> ターンが進む (追跡者が動く)。 通常の回復 (<see cref="RestHeal"/>) は 0 ターン。</summary>
         public void RestHealMore()
         {
             if (CurrentPhase != GamePhase.RestStop) return;
@@ -274,9 +274,9 @@ namespace GameLoop
             int before = Run.playerHP;
             Run.playerHP = Mathf.Min(Run.playerMaxHP, Run.playerHP + heal);
             RunChronicle.Rest(Run, Run.playerHP - before, before, Run.playerMaxHP);
-            Log($"休憩（多めに回復）: +{Run.playerHP - before}HP（{FreeMapParams.RestMoreTurns}手番）");
+            Log($"休憩（多めに回復）: +{Run.playerHP - before}HP（{FreeMapParams.RestMoreTurns}ターン）");
 
-            // 休憩の画面を閉じてから手番を進める。 捕まれば戦闘へ、 そうでなければ地図 (ボス撃破後は層クリア) へ戻る。
+            // 休憩の画面を閉じてからターンを進める。 捕まれば戦闘へ、 そうでなければ地図 (ボス撃破後は層クリア) へ戻る。
             ReturnToMapOrClearFloor();
             if (CurrentPhase == GamePhase.MapNavigation && FreeMap != null)
                 RunFreeMapOp(s => s.PassTurnsExternal(FreeMapParams.RestMoreTurns));
@@ -407,14 +407,14 @@ namespace GameLoop
             FlushPendingArrival();
         }
 
-        /// <summary>追跡者の戦闘から抜けた (逃げた・救済で生き延びた): 直前の点へ戻り、 追跡者は 2 手番足止めされる。</summary>
+        /// <summary>追跡者の戦闘から抜けた (逃げた・救済で生き延びた): 直前の点へ戻り、 追跡者は 2 ターン足止めされる。</summary>
         private void EndPursuerFightAsFled(bool payCost)
         {
             _inPursuerFight = false;
             if (payCost) PayFleeCost();
             FreeMap?.ResolveBodyFled();
             MapManager.Instance?.SyncCurrentNodeFromSim();
-            Log($"追跡者から逃げた。直前の点へ戻った（{FreeMapParams.FleeFreezeTurns}手番は追ってこない）");
+            Log($"追跡者から逃げた。直前の点へ戻った（{FreeMapParams.FleeFreezeTurns}ターンは追ってこない）");
         }
 
         // =====================================================================

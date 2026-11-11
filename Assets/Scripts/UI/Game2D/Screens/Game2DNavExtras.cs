@@ -11,8 +11,8 @@ namespace UI.Game2D
     /// 航行の計器の足りない分 (<b>仮置き</b>・2026-10-24)。 docs/design/gui-needed.md の「未実装」の航行の項目を、 枠・ボタンの仮の絵と文字で並べたもの。
     /// 上の帯 = 天気 (今)・層 (今の層 / 最終層)・警告ランプ (追跡者が警戒・追跡中で点灯)・待つボタン / 左下 = 職業・状態異常・消耗品・パッシブ / 右 = 航行アイテムの枠 3 つ・脱出ボタン。
     /// 層・追跡者・天気・所持数は実際の値、 そのほか (職業名・状態異常・アイテム枠) は見本。 戦闘中は 3 方向へ引っ込む (<see cref="Drive"/>)。
-    /// <para>操作 (2026-11-04): 上の帯の [WAIT] = 待つ (その場で 1 手番・Space と同じ) / 左下の ITEMS の欄 = 所持品の窓 (消耗品を使う・パッシブを見る)。</para>
-    /// <para>2026-11-11: 上の帯の右隣に「経過ターン・補足中の警告 (ETA)・照明の残り」の帯、 右の列に航行アイテムの 3 枠 (Q / E / T・〈前哨の旗〉を立てる)、
+    /// <para>操作 (2026-11-04): 上の帯の [WAIT] = 待つ (その場で 1 ターン・Space と同じ) / 左下の ITEMS の欄 = 所持品の窓 (消耗品を使う・パッシブを見る)。</para>
+    /// <para>2026-11-11: 上の帯の右隣に「経過ターン・補足中の警告 (ETA)・照明の残り」の帯、 右の列に航行アイテムの 3 枠 (V / B / N・〈前哨の旗〉を立てる)、
     /// 終点 (ボス・〈門〉) へ踏み出す前の確認の窓 (<see cref="ConfirmExit"/>) を足した。</para>
     /// </summary>
     public class Game2DNavExtras : MonoBehaviour
@@ -26,12 +26,12 @@ namespace UI.Game2D
         private static readonly RectInt TopR = new RectInt(96, 0, 124, 30), LeftR = new RectInt(0, 219, 100, 51);      // 2026-11-11: 字を既定のフォント (高さ 12) にして広げた
         /// <summary>上の帯の右隣 (レーダーの手前まで)。 押せる物は無い。</summary>
         private static readonly RectInt StatusR = new RectInt(222, 0, 166, 30);
-        /// <summary>右の列: 航行アイテムの 3 枠 (Q / E / T)。 レーダーの下・HP のバーの上。</summary>
+        /// <summary>右の列: 航行アイテムの 3 枠 (V / B / N)。 レーダーの下・HP のバーの上。</summary>
         private static readonly RectInt RightR = new RectInt(436, 94, 44, 76);
         private const int SlotSize = 20, SlotPitch = 25;
-        /// <summary>枠のキー。 W は視点の移動 (WASD) と重なるので、 設計 (Q / W / E) から Q / E / T に変えた (R は偵察・F は照明・L は囮罠・数字は移動)。</summary>
-        private static readonly KeyCode[] SlotKeys = { KeyCode.Q, KeyCode.E, KeyCode.T };
-        private static readonly string[] SlotKeyNames = { "Q", "E", "T" };
+        /// <summary>枠のキー。 W は視点の移動 (WASD) と重なるので、 設計 (Q / W / E) から V / B / N に変えた (2026-11-11: Q / E も視点の移動の隣で紛らわしいので下の段へ) (R は偵察・F は照明・L は囮罠・数字は移動)。</summary>
+        private static readonly KeyCode[] SlotKeys = { KeyCode.V, KeyCode.B, KeyCode.N };
+        private static readonly string[] SlotKeyNames = { "V", "B", "N" };
         private int _hash = int.MinValue; private float _next; private float _e;
         private static readonly RectInt WaitR = new RectInt(84, 4, 38, 22);      // 上の帯の中 (帯の左上が原点)
         private static bool _shown;
@@ -127,7 +127,7 @@ namespace UI.Game2D
         }
 
         // ── 経過ターン・補足中の警告 (issue #69 / #72) ──
-        //   1 行目 = 経過ターン (「手番」とは書かない) と照明の残り。 2 行目 = 優先順に 「枠の説明 (乗せている時)」→「補足中の ETA」→「羅針の方角」。
+        //   1 行目 = 経過ターン (「ターン」とは書かない) と照明の残り。 2 行目 = 優先順に 「枠の説明 (乗せている時)」→「補足中の ETA」→「羅針の方角」。
         //   補給 (店) で動けない待ち時間は、 今の規則 (店は 0 ターン) では起きない。 まとめて進んだ分 (イベント・多めに休む) はターン数の横の「+N」(gui-needed.md #21)。
 
         private void RedrawStatus(GameManager gm, FreeMapSim sim, RunState run, bool blinkOn)
@@ -390,7 +390,7 @@ namespace UI.Game2D
             p.AnyIcon(weather >= 0 && weather < WeatherIcons.Length ? WeatherIcons[weather] : "still", 3, 7, 18, Game2DKit.Ink);
             p.Text("天気", 24, 3, Game2DKit.Dim); p.Text(wn, 48, 3, weather == 0 ? Game2DKit.Ink : Game2DKit.Amber);
             p.Text("予報", 24, 16, Game2DKit.Dim); p.Text("???", 48, 16, Game2DKit.Faint);                // 予報は物資の段階で精度が変わる (未接続)
-            // 待つ (その場で 1 手番)。 旧: 見本の気圧計
+            // 待つ (その場で 1 ターン)。 旧: 見本の気圧計
             if (Game2DKit.Tab != null) p.NineSlice(Game2DKit.Tab, 5, Game2DKit.Well, WaitR.x, WaitR.y, WaitR.width, WaitR.height); else p.Box(WaitR.x, WaitR.y, WaitR.width, WaitR.height, Game2DKit.Off, Game2DKit.Dark);
             p.TextC("待つ", WaitR, Game2DKit.Ink);
             p.Apply(_tt);

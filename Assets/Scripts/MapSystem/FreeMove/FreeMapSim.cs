@@ -27,9 +27,9 @@ namespace MapSystem.FreeMove
         FoeLost = 1 << 2,
         /// <summary>追跡者がプレイヤーの痕跡に気づいた / 囮罠に気を引かれた。</summary>
         FoeAlerted = 1 << 3,
-        /// <summary>追跡者に捕まった。 戦闘の決着まで手番は進まない。</summary>
+        /// <summary>追跡者に捕まった。 戦闘の決着までターンは進まない。</summary>
         Caught = 1 << 4,
-        /// <summary>使い魔に接触した。 戦闘の決着まで手番は進まない。</summary>
+        /// <summary>使い魔に接触した。 戦闘の決着までターンは進まない。</summary>
         FamiliarContact = 1 << 5,
         /// <summary>使い魔が放たれた。</summary>
         FamiliarLaunched = 1 << 6,
@@ -37,7 +37,7 @@ namespace MapSystem.FreeMove
         FamiliarVanished = 1 << 7,
         /// <summary>追跡者が囮罠を踏んで足止めされた。</summary>
         LureTriggered = 1 << 8,
-        /// <summary>手番が 1 つ以上進んだ。</summary>
+        /// <summary>ターンが 1 つ以上進んだ。</summary>
         TurnPassed = 1 << 9,
         /// <summary>前線が進んだ。</summary>
         FrontAdvanced = 1 << 10,
@@ -98,13 +98,13 @@ namespace MapSystem.FreeMove
     }
 
     /// <summary>
-    /// 航行マップの動く中身 (手番制・2026-10-18)。 参照実装は docs/design/map-grid-prototype.html。
+    /// 航行マップの動く中身 (ターン制・2026-10-18)。 参照実装は docs/design/map-grid-prototype.html。
     ///
-    /// <para><b>移動は道でつながった隣の点へ 1 歩</b>。 自分が 1 歩動く (または待つ・偵察する) ごとに 1 手番が進み、
-    /// 追跡者が 1 度動く。 戦闘・イベント・照明・囮罠は手番を使わない。 物資は距離によらず 1 歩ごとに一定。</para>
+    /// <para><b>移動は道でつながった隣の点へ 1 歩</b>。 自分が 1 歩動く (または待つ・偵察する) ごとに 1 ターンが進み、
+    /// 追跡者が 1 度動く。 戦闘・イベント・照明・囮罠はターンを使わない。 物資は距離によらず 1 歩ごとに一定。</para>
     ///
     /// <para>乱数は前線の天候 (道が崩れる・点が沈む) の選択だけで、
-    /// <c>GameRng.Range(.., "map.free.weather", 層 × 100000 + 手番 × 10 + 試行)</c> ── 同じ操作なら同じ結果になる。</para>
+    /// <c>GameRng.Range(.., "map.free.weather", 層 × 100000 + ターン × 10 + 試行)</c> ── 同じ操作なら同じ結果になる。</para>
     ///
     /// <para>UnityEngine に依存しない (BOT が同期的に回す・単体で検算できる)。</para>
     /// </summary>
@@ -127,7 +127,7 @@ namespace MapSystem.FreeMove
         public int Turn { get; private set; }
         /// <summary>状態が変わるたびに増える番号。 表示が「描き直すか」を安く判定するために読む。</summary>
         public int Version { get; private set; }
-        /// <summary>照明が点いている残り手番。</summary>
+        /// <summary>照明が点いている残りターン。</summary>
         public int FlareTurnsLeft { get; private set; }
         public bool FlareOn => FlareTurnsLeft > 0;
 
@@ -156,13 +156,13 @@ namespace MapSystem.FreeMove
         /// <summary>追跡者が最後にプレイヤーを補足した点。</summary>
         public int LastSeen { get; private set; } = -1;
         private int _lose;
-        /// <summary>今の追跡が続いている手番数 (<see cref="FreeMapParams.ChaseGiveUp"/> で諦める)。</summary>
+        /// <summary>今の追跡が続いているターン数 (<see cref="FreeMapParams.ChaseGiveUp"/> で諦める)。</summary>
         private int _chaseTurns;
-        /// <summary>諦めた後に補足しない残り手番。</summary>
+        /// <summary>諦めた後に補足しない残りターン。</summary>
         private int _chaseRest;
         private int _patrol;
         private int _sinceSummon = 99;
-        /// <summary>足止めの残り手番 (囮罠・逃げた直後)。</summary>
+        /// <summary>足止めの残りターン (囮罠・逃げた直後)。</summary>
         public int FoeFreezeTurns { get; private set; }
         private int _alertLure = -1;
         public readonly List<Familiar> Familiars = new List<Familiar>();
@@ -322,7 +322,7 @@ namespace MapSystem.FreeMove
         }
 
         /// <summary>点 j へ 1 歩動く物資。 削る砂の前線の内側は 50% で +1 (2026-11-09: 旧「1.5 倍」をデノミ後の 1 で表す)。
-        /// 抽選は (手番, 行き先) で決まる専用の鍵なので、 同じ手番に何度聞いても同じ答え (予告・BOT の先読みと実際の支払いが一致する)。</summary>
+        /// 抽選は (ターン, 行き先) で決まる専用の鍵なので、 同じターンに何度聞いても同じ答え (予告・BOT の先読みと実際の支払いが一致する)。</summary>
         public int SupplyFor(int j)
         {
             int c = FreeMapParams.MoveSupply;
@@ -341,7 +341,7 @@ namespace MapSystem.FreeMove
             return g[j] != int.MaxValue && g[j] < g[Me];
         }
 
-        /// <summary>点 j へ 1 歩動くのに進む手番 (雪の前線の内側は 2)。</summary>
+        /// <summary>点 j へ 1 歩動くのに進むターン (雪の前線の内側は 2)。</summary>
         public int TurnsFor(int j) => WeatherAt(j, WeatherKind.Snow) || WeatherAt(Me, WeatherKind.Snow) ? 2 : 1;
 
         /// <summary>点 j へ 1 歩動いた時の HP の損 (雹の前線の内側)。</summary>
@@ -467,7 +467,7 @@ namespace MapSystem.FreeMove
         public bool CanRelayTo(int j)
             => !Dead && !InFight && j >= 0 && j < _adj.Length && j != Me && !_sunk[j] && _relays.Contains(j);
 
-        /// <summary>〈補給線〉: 一度着いた前哨基地・店へ跳ぶ。 物資 <see cref="FreeMapParams.RelaySupply"/>・<b>手番は使わない</b> (追跡者は動かない)。
+        /// <summary>〈補給線〉: 一度着いた前哨基地・店へ跳ぶ。 物資 <see cref="FreeMapParams.RelaySupply"/>・<b>ターンは使わない</b> (追跡者は動かない)。
         /// <para><b>補足は解けない</b> ── 追いかけている追跡者は跳んだ先を知っていて、 そこへ向かう。 距離は稼げるが撒けない (2026-11-09)。</para></summary>
         public FreeMapEvent RelayTo(int j)
         {
@@ -487,10 +487,10 @@ namespace MapSystem.FreeMove
             return ev;
         }
 
-        /// <summary>待つ (1 手番)。</summary>
+        /// <summary>待つ (1 ターン)。</summary>
         public FreeMapEvent Wait() => Dead || InFight ? FreeMapEvent.None : PassTurns(1);
 
-        /// <summary>偵察 (1 手番): 道で <see cref="FreeMapParams.ReconRange"/> 歩先まで見える。</summary>
+        /// <summary>偵察 (1 ターン): 道で <see cref="FreeMapParams.ReconRange"/> 歩先まで見える。</summary>
         public FreeMapEvent Recon()
         {
             if (Dead || InFight) return FreeMapEvent.None;
@@ -498,7 +498,7 @@ namespace MapSystem.FreeMove
             return PassTurns(1);
         }
 
-        /// <summary>照明 (手番は使わない): 物資を払い、 <see cref="FreeMapParams.FlareTurns"/> 手番のあいだ
+        /// <summary>照明 (ターンは使わない): 物資を払い、 <see cref="FreeMapParams.FlareTurns"/> ターンのあいだ
         /// 道で <see cref="FreeMapParams.FlareRange"/> 歩先まで見える。 追跡者の補足の歩数も同じだけ伸びる。</summary>
         public FreeMapEvent UseFlare()
         {
@@ -511,7 +511,7 @@ namespace MapSystem.FreeMove
             return ev;
         }
 
-        /// <summary>通常の戦闘から逃げた: 直前の点へ戻る (手番は使わない)。</summary>
+        /// <summary>通常の戦闘から逃げた: 直前の点へ戻る (ターンは使わない)。</summary>
         public void FleeToPrevious()
         {
             Version++;
@@ -520,10 +520,10 @@ namespace MapSystem.FreeMove
             RevealView();
         }
 
-        /// <summary>多めに回復する休憩など、 手番だけを進める。</summary>
+        /// <summary>多めに回復する休憩など、 ターンだけを進める。</summary>
         public FreeMapEvent PassTurnsExternal(int n) => Dead || InFight ? FreeMapEvent.None : PassTurns(n);
 
-        /// <summary>囮罠を今いる点に置く (手番は使わない)。 近くの追跡者は気を引かれて向かい、 踏むと足止めされる。</summary>
+        /// <summary>囮罠を今いる点に置く (ターンは使わない)。 近くの追跡者は気を引かれて向かい、 踏むと足止めされる。</summary>
         public FreeMapEvent PlaceLure()
         {
             if (Dead || InFight) return FreeMapEvent.None;
@@ -570,7 +570,7 @@ namespace MapSystem.FreeMove
             Familiars.Clear();
         }
 
-        /// <summary>追跡者の戦闘から逃げた: 直前の点へ戻り、 追跡者は <see cref="FreeMapParams.FleeFreezeTurns"/> 手番足止めされる。</summary>
+        /// <summary>追跡者の戦闘から逃げた: 直前の点へ戻り、 追跡者は <see cref="FreeMapParams.FleeFreezeTurns"/> ターン足止めされる。</summary>
         public void ResolveBodyFled()
         {
             Version++;
@@ -602,7 +602,7 @@ namespace MapSystem.FreeMove
         }
 
         // =====================================================================
-        //  手番
+        //  ターン
         // =====================================================================
 
         private bool Pay(int cost)
@@ -631,7 +631,7 @@ namespace MapSystem.FreeMove
             if (Beacon >= 0) Reveal(Beacon, Perks.beaconRange, true);
         }
 
-        /// <summary>〈前哨の旗〉: 今いる点に偵察拠点を置く (手番は使わない・層に 1 回)。 その層にいる間、 拠点から
+        /// <summary>〈前哨の旗〉: 今いる点に偵察拠点を置く (ターンは使わない・層に 1 回)。 その層にいる間、 拠点から
         /// <see cref="FreeMapPerks.beaconRange"/> 歩の点の種類と戦闘名・追跡者・使い魔を常に見せる。 置けなければ false。</summary>
         public bool PlaceBeacon()
         {
@@ -680,7 +680,7 @@ namespace MapSystem.FreeMove
                 if (_chaseRest == 0 && dMe[FoeNode] <= detect && FoeMode != FoeMode.Chase && SmokeLeft > 0)
                 {
                     // 〈煙玉〉(層に 1 回・自動): 補足される代わりに、 追跡者は警戒へ落ちて痕跡をたどる (最後の位置 = 発動した地点)。
-                    //   すぐ補足し直さないよう、 数手番は補足しない。 その間にどこへ逃げるかは問われる (痕跡を踏まれれば追いつかれる)
+                    //   すぐ補足し直さないよう、 数ターンは補足しない。 その間にどこへ逃げるかは問われる (痕跡を踏まれれば追いつかれる)
                     SmokeLeft--;
                     FoeMode = FoeMode.Alert; _alertLure = -1; _chaseRest = FreeMapPerks.SmokeRestTurns;
                     ev |= FreeMapEvent.SmokeUsed;

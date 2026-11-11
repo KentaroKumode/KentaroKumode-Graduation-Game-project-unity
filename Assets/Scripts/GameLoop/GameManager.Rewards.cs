@@ -86,7 +86,7 @@ namespace GameLoop
                 if (LastStand.TryConsumeRevival(Run, isBossFight))
                 {
                     Log("救済発動: マップへ戻る");
-                    // 追跡者の戦闘の途中なら、 逃げた扱い (直前の点へ戻り、 追跡者は 2 手番足止め)。
+                    // 追跡者の戦闘の途中なら、 逃げた扱い (直前の点へ戻り、 追跡者は 2 ターン足止め)。
                     //   代償は取らない ── 救済そのものが代償 (灯火を失う)。
                     bool wasPursuer = InPursuerCombat;
                     if (InFamiliarCombat) { EndFamiliarFight(fled: false); return; }
@@ -236,7 +236,7 @@ namespace GameLoop
             //   (Highfleet の「追ってきた敵から燃料を奪う」)。
             ProvisionSystem.Supply(Run, eliteNodeReward
                 ? MapSystem.FreeMove.FreeMapParams.RewardElite : MapSystem.FreeMove.FreeMapParams.RewardBattle);
-            // (手番制の航行マップでは戦闘は手番を使わず、 物音も立てない。)
+            // (ターン制の航行マップでは戦闘はターンを使わず、 物音も立てない。)
 
             // 戦闘勝利報酬: **エリートは確定 1 個 / 通常は 15%** (2026-09-09 変更)。
             //

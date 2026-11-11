@@ -5,7 +5,7 @@ using UnityEngine;
 namespace UI.Game2D
 {
     /// <summary>
-    /// 航行の液晶 (地図) の本体 (2026-10-19)。 map-prototype.html の <c>drawLCD</c> / <c>setScreen</c> を、 手番制の <see cref="FreeMapSim"/> の上に移した。
+    /// 航行の液晶 (地図) の本体 (2026-10-19)。 map-prototype.html の <c>drawLCD</c> / <c>setScreen</c> を、 ターン制の <see cref="FreeMapSim"/> の上に移した。
     ///
     /// <para>480×270 (GUI の 1 dot) のバッファへ毎フレーム 1 dot ずつ作図し (<c>Plot</c>)、 天候・照明・偵察の演出 (<c>Fx</c>) を重ね、
     /// 航行を映すカメラの正面に置いた Quad のテクスチャへ流す。 それが液晶の RT に映り、 Quad のシェーダ (残像・湾曲・ノイズ・格子) が掛かる。

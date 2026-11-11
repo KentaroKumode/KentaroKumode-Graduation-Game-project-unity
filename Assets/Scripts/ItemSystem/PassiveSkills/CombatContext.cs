@@ -269,7 +269,7 @@ namespace ItemSystem.PassiveSkills
         public bool playerHighDiceCrushed;
 
         /// <summary>[perTurn] 〈天与の盾〉: このターン、 ヴェスカへの与ダメージが半分になる。
-        /// 完全無効は「殴っても無駄」で手番が消えるのと変わらないため、 半減に留める。</summary>
+        /// 完全無効は「殴っても無駄」でターンが消えるのと変わらないため、 半減に留める。</summary>
         public bool vescaHalvesDamageThisTurn;
 
         /// <summary>[perTurn] 麻痺毒の小瓶: このターンのプレイヤー攻撃力減算。 実効攻撃力は 0 で床を引く。</summary>

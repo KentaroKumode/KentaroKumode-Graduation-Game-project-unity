@@ -1,14 +1,14 @@
 namespace MapSystem.FreeMove
 {
     /// <summary>
-    /// 航行マップの数値 (手番制・2026-10-18)。 参照実装は docs/design/map-grid-prototype.html の <c>const P = {...}</c> ──
+    /// 航行マップの数値 (ターン制・2026-10-18)。 参照実装は docs/design/map-grid-prototype.html の <c>const P = {...}</c> ──
     /// 値はそのまま写してある。 正本は docs/GAME.md §5。 数値は全部仮置き (動かす時は採否を取ってから測定する)。
     ///
     /// <para><b>UnityEngine に依存しない。</b> この名前空間の型は素の C# で、 乱数は
     /// <see cref="GameLoop.GameRng"/> のキー付き抽選だけを使う (同じシード・同じ操作なら同じ結果)。</para>
     ///
     /// <para>連続時間の自由移動 (刻み・速さ・道の外の移動・照明の継続・使い魔の巡航ミサイル) は 2026-10-18 に廃止した。
-    /// 移動は<b>道でつながった隣の点へ 1 歩</b>。 自分が 1 歩動くと追跡者が 1 度動く。 戦闘・イベントは手番を使わない。</para>
+    /// 移動は<b>道でつながった隣の点へ 1 歩</b>。 自分が 1 歩動くと追跡者が 1 度動く。 戦闘・イベントはターンを使わない。</para>
     /// </summary>
     public static class FreeMapParams
     {
@@ -74,24 +74,24 @@ namespace MapSystem.FreeMove
         // ── 追跡者 ─────────────────────────────────────────────
         /// <summary>補足 (察知) の歩数。 照明中は <see cref="FlareRange"/>。</summary>
         public const int DetectRange = 2;
-        /// <summary>この手番数だけ補足できなければ見失う。</summary>
+        /// <summary>このターン数だけ補足できなければ見失う。</summary>
         public const int QuietLose = 3;
         /// <summary>召喚者 (動かない) の補足の歩数 (2026-11-04)。 動けない代わりに遠くから気づく。</summary>
         public const int SummonerDetectRange = 5;
-        /// <summary>追跡の上限 (2026-11-04)。 この手番数だけ追い続けたら諦めて巡回へ戻る。
+        /// <summary>追跡の上限 (2026-11-04)。 このターン数だけ追い続けたら諦めて巡回へ戻る。
         /// 同じ速さの追跡者は、 下がり続けるプレイヤーと永遠に距離が保たれてしまうため。</summary>
         public const int ChaseGiveUp = 8;
-        /// <summary>諦めた後、 この手番数のあいだは補足しない (すぐ補足し直して上限が意味を失わないように)。</summary>
+        /// <summary>諦めた後、 このターン数のあいだは補足しない (すぐ補足し直して上限が意味を失わないように)。</summary>
         public const int ChaseRest = 4;
         /// <summary>使い魔がプレイヤーを見つける歩数。</summary>
         public const int FamiliarSee = 1;
-        /// <summary>召喚者が使い魔を放つ間隔 (手番)。</summary>
+        /// <summary>召喚者が使い魔を放つ間隔 (ターン)。</summary>
         public const int SummonEvery = 3;
-        /// <summary>痕跡が残る手番。</summary>
+        /// <summary>痕跡が残るターン。</summary>
         public const int TraceLife = 4;
 
         // ── 前線 (天候) ────────────────────────────────────────
-        /// <summary>前線が進む間隔 (手番) と、 1 回に進む距離 (層の広さ 16.4 のうち)。 前線は「現象の届く範囲」で罰は無い。</summary>
+        /// <summary>前線が進む間隔 (ターン) と、 1 回に進む距離 (層の広さ 16.4 のうち)。 前線は「現象の届く範囲」で罰は無い。</summary>
         public const int FrontEvery = 5;
         public const float FrontStep = 2.4f;
 
@@ -105,21 +105,21 @@ namespace MapSystem.FreeMove
         public const float TerritoryStartClearance = 3f;
 
         // ── 休憩 ───────────────────────────────────────────────
-        /// <summary>多めに回復する休憩 (+1 手番) の回復割合。 通常は層の修飾 (restHealMultiplier・既定 0.3) で 0 手番。</summary>
+        /// <summary>多めに回復する休憩 (+1 ターン) の回復割合。 通常は層の修飾 (restHealMultiplier・既定 0.3) で 0 ターン。</summary>
         public const float RestMoreRatio = 0.6f;
         public const int RestMoreTurns = 1;
 
         // ── 逃げる ─────────────────────────────────────────────
         public const int FleeProvision = 2;
-        /// <summary>追跡者の戦闘から逃げた後、 追跡が始まるまでの手番。</summary>
+        /// <summary>追跡者の戦闘から逃げた後、 追跡が始まるまでのターン。</summary>
         public const int FleeFreezeTurns = 2;
 
         // ── 囮罠 (囮と罠を 1 つに統合・2026-10-18) ─────────────
-        /// <summary>置いた点が残る手番。 過ぎたら効果が切れる。</summary>
+        /// <summary>置いた点が残るターン。 過ぎたら効果が切れる。</summary>
         public const int LureLife = 8;
         /// <summary>追跡者がこの歩数以内に居れば、 置いた瞬間に気を引かれる (警戒して向かう)。</summary>
         public const int LureNotice = 6;
-        /// <summary>踏んだ追跡者を足止めする手番。</summary>
+        /// <summary>踏んだ追跡者を足止めするターン。</summary>
         public const int LureHoldTurns = 2;
         public const int ShopLurePrice = 8;
         public const int StartLures = 2;

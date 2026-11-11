@@ -277,7 +277,7 @@ namespace UI.Game2D
             }
         }
 
-        // ── 読み出し (左下: EXIT の方角・縮尺・自艦の格子位置・経過手番 / 上: 天候) ──
+        // ── 読み出し (左下: EXIT の方角・縮尺・自艦の格子位置・経過ターン / 上: 天候) ──
         private static readonly string[] Compass = { "北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西" };
 
         private void Readout(FreeMapSim sim)
@@ -297,7 +297,7 @@ namespace UI.Game2D
             char col = (char)('A' + Mathf.Clamp(Mathf.FloorToInt((float)me.x / 2f), 0, 25));
             int row = Mathf.FloorToInt((float)me.y / 2f) + 1;
             Text("現在 " + col + row, 96, H - 9, _lc.dim, Align.Left);
-            Text("ターン " + Mathf.Min(999, sim.Turn).ToString("000"), 96 + 8 * 4 * Pxs, H - 9, _lc.dim, Align.Left);      // 「手番」とは書かない (2026-11-11)
+            Text("ターン " + Mathf.Min(999, sim.Turn).ToString("000"), 96 + 8 * 4 * Pxs, H - 9, _lc.dim, Align.Left);      // 「ターン」とは書かない (2026-11-11)
 
             bool calm = !(sim.Weather != WeatherKind.None && !double.IsNegativeInfinity(sim.Front));
             Text("天気 " + (calm ? "凪" : sim.Weather.DisplayName()), W - 8 - 89, 8, calm ? _lc.dim : _lc.hi, Align.Right);

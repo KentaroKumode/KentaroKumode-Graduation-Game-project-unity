@@ -335,7 +335,7 @@ namespace GameLoop
             var sim = mm.Sim;
             if (sim != null)
             {
-                sb.AppendLine($"手番 {sim.Turn} / 魔石 {sim.Stone().Text} / 天候 {sim.Weather.DisplayName()}"
+                sb.AppendLine($"ターン {sim.Turn} / 魔石 {sim.Stone().Text} / 天候 {sim.Weather.DisplayName()}"
                             + (sim.FlareOn ? " / 照明中" : ""));
                 var eta = sim.Eta();
                 if (eta.Valid) sb.AppendLine($"補足されている ── 最短 {eta.turns} 手で捕まる（{eta.WhoName}）");

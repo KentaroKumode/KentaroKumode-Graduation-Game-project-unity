@@ -52,14 +52,6 @@ namespace GameLoop
         /// <summary>2026-06-28: 次ラン開始時に適用する職業。 UI / BOT が StartNewRun 前に書き込む。 デフォルト = 剣士。</summary>
         public static ClassType SelectedClass = ClassType.Swordsman;
 
-        /// <summary>ラン開始前に選ぶ特殊端子 (§6-5)。 空 = 未選択 (第4端子なし)。
-        ///
-        /// **ショップ販売ではなく開始前の宣言にした** (2026-08-10)。 ショップ品にすると
-        /// 「端子を増やすか武器を買うか」というゴールドの取り合いになり、 選択肢を増やす仕組みが
-        /// 逆に選択肢を減らす ── 実測でも 7層クリアが 25.8% → 20.8% と**下がった**。
-        /// 職業・種火と同じ「ランの宣言」レイヤーへ置く。</summary>
-        public static string SelectedSpecialTerminal = "";
-
         /// <summary>true の間、 5層裏ボス(シュヴァリエ)への置換を行わない。 **計測専用の一時遮断** で、
         /// 製品挙動を変えるものではない (既定 false)。 裏ボスはレイピア所持という
         /// BOT のアイテム運に依存して 5層の難度を二分するため、 バランス基準値の測定では
@@ -145,7 +137,7 @@ namespace GameLoop
         ///   さらにシーンの値を直接書き換えても、 エディタがメモリ上の旧値を保持していて反映されない。
         ///   正本ポリシー(実コードが唯一の正本)どおり、 ここを唯一の定義点にする。
         ///
-        /// 経緯: 通常戦を 1T → 3〜4T にして敵が手番を得るようになり、 1 ランの総被ダメが
+        /// 経緯: 通常戦を 1T → 3〜4T にして敵がターンを得るようになり、 1 ランの総被ダメが
         /// 約 3 倍 (~101) に増えたため 30 → 100 とした。 その後 2026-08-04 の消費アイテム再編で
         /// 回復/シールドが常にショップに並ぶようになり、 **耐久の一部を消費アイテム側へ移した**ので
         /// 75 へ引き下げている ── 「回復を買うか強化を買うか」がショップの選択として立つようにするため。</summary>
@@ -247,16 +239,6 @@ namespace GameLoop
             string starterConsumable = ClassStarter.GetConsumableId(Run.playerClass);
             Run.TryAddConsumable(starterConsumable);
             Log($"職業: {Run.playerClass} → スターター消耗品「{starterConsumable}」を配布");
-
-            // 特殊端子 (§6-5): 開始前の宣言。 **第 4 端子が存在するかどうかを決める**ので、
-            //   装備の強弱ではなく「配線の自由度」を選んでいることになる。
-            Run.equippedSpecialTerminalId = SelectedSpecialTerminal ?? "";
-            if (!string.IsNullOrEmpty(Run.equippedSpecialTerminalId))
-            {
-                var td = CombatSystem.SpecialTerminals.Get(Run.equippedSpecialTerminalId);
-                Log($"特殊端子: {(td != null ? td.displayName : Run.equippedSpecialTerminalId)}"
-                  + $" (接続制限 {(td != null ? td.connectLimit : 0)})");
-            }
 
             // ラン跨ぎで永続するスキル状態 (Nightfall の蓄積過剰ダメ等) をリセット
             ItemSystem.PassiveSkills.PassiveSkillRegistry.ResetAllRunState();
@@ -364,8 +346,8 @@ namespace GameLoop
 
         /// <summary>マップ上のノードへ移動。
         ///
-        /// <para><b>航行マップの層</b>（手番制・2026-10-18）では道でつながった隣の点へ 1 歩動く
-        /// （<see cref="MoveStep"/>）。 動くと 1 手番が進み、 追跡者が 1 度動く。</para>
+        /// <para><b>航行マップの層</b>（ターン制・2026-10-18）では道でつながった隣の点へ 1 歩動く
+        /// （<see cref="MoveStep"/>）。 動くと 1 ターンが進み、 追跡者が 1 度動く。</para>
         ///
         /// <para>8 層は離散のまま、 1 手で隣へ動く。</para></summary>
         public void MoveToNode(string nodeId)
@@ -411,7 +393,7 @@ namespace GameLoop
 
             // 戦闘名の開示 (2026-08-28)。 **到着した時点で、隣接ノードぶんだけ**開く。
             //   遠くからは見えないので「危険なプリセットを何手も前から迂回する」ことはできず、
-            //   判断は必ず「いまの手番で、この分岐をどうするか」に閉じる。
+            //   判断は必ず「いまのターンで、この分岐をどうするか」に閉じる。
             RevealAdjacentEncounters();
 
             // 挑戦デバフ 軸14〈焦燥〉: この層の踏破が閾値を超えたら、 1 マスごとに物資 −5。

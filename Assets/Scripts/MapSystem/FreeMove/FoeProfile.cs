@@ -1,7 +1,7 @@
 namespace MapSystem.FreeMove
 {
     /// <summary>
-    /// 追跡者の性質 (手番制・2026-10-18)。 層ごとに 1 つ引く。 参照実装は docs/design/map-grid-prototype.html の <c>PROFILES</c>。
+    /// 追跡者の性質 (ターン制・2026-10-18)。 層ごとに 1 つ引く。 参照実装は docs/design/map-grid-prototype.html の <c>PROFILES</c>。
     ///
     /// <para>追跡者は全員「巡回 → (痕跡に気づいて) 警戒 → (補足して) 追跡 → 見失う」を行い、
     /// 性質は<b>味変</b>として使い魔の有無・足の速さ・捕まった時の戦闘の重さだけを変える。
@@ -16,9 +16,9 @@ namespace MapSystem.FreeMove
         public string id;
         public string displayName;
         public string description;
-        /// <summary>本体が 1 手番に進む歩数 (0 = 動かない)。</summary>
+        /// <summary>本体が 1 ターンに進む歩数 (0 = 動かない)。</summary>
         public int foeSteps = 1;
-        /// <summary>使い魔が 1 手番に進む歩数 (0 = 使い魔なし)。</summary>
+        /// <summary>使い魔が 1 ターンに進む歩数 (0 = 使い魔なし)。</summary>
         public int familiarSteps;
         /// <summary>補足している間、 一定間隔で使い魔を放つ。</summary>
         public bool summons;
@@ -45,12 +45,12 @@ namespace MapSystem.FreeMove
         { id = "hound", displayName = "猟犬使い", description = "足の速い使い魔と2体で、最短距離から追ってくる",
           foeSteps = 1, familiarSteps = 2, hound = true };
 
-        /// <summary>疾走者: 使い魔なし。 1 手番に 2 歩。</summary>
+        /// <summary>疾走者: 使い魔なし。 1 ターンに 2 歩。</summary>
         public static FoeProfile Sprinter => new FoeProfile
         { id = "sprinter", displayName = "疾走者", description = "使い魔は使わないが、1手に2歩動く",
           foeSteps = 2 };
 
-        /// <summary>重装: 使い魔なし。 1 手番に 1 歩だが、 捕まった時の戦闘が重い。</summary>
+        /// <summary>重装: 使い魔なし。 1 ターンに 1 歩だが、 捕まった時の戦闘が重い。</summary>
         public static FoeProfile Brute => new FoeProfile
         { id = "brute", displayName = "重装", description = "使い魔は使わない。捕まった時の戦闘が重い",
           foeSteps = 1, heavyFight = true };

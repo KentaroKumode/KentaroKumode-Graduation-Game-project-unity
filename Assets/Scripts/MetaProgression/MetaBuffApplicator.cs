@@ -111,7 +111,7 @@ namespace MetaProgression
         public static int GetProvisionLossReduction()
             => MetaPanel.LanternProvisionLossReduce(Rank(MetaPanelKind.Lantern));
 
-        /// <summary>兵站 r10〈補給線〉: この層で一度着いた前哨基地・店のあいだを物資 1 で跳べる (手番を使わない・2026-11-09)。</summary>
+        /// <summary>兵站 r10〈補給線〉: この層で一度着いた前哨基地・店のあいだを物資 1 で跳べる (ターンを使わない・2026-11-09)。</summary>
         public static bool IsSupplyLineUnlocked() => Rank(MetaPanelKind.Lantern) >= 10;
 
         /// <summary>装甲 (2026-11-10): 防御 +1/段 (0..10)。 戦闘開始時に防御の土台へ足す。</summary>

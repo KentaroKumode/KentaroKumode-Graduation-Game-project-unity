@@ -305,8 +305,8 @@ namespace GameLoop
         /// <summary>手に入れたが、 入れ替えるかをまだ決めていない武器 (人が遊ぶ時だけ・2026-11-11)。 武器は 1 本しか持てない
         /// (<see cref="Loadout.Gain"/>)。 場面の画面が先頭から聞き、 <see cref="Loadout.ResolvePendingWeapon"/> で決める。</summary>
         public List<string> pendingWeaponIds = new List<string>();
-        /// <summary>層ボスの報酬で提示されている特殊端子 (§6-5) の id (2 択・2026-11-11)。 空 = 提示なし。
-        /// 人が遊んでいる時だけ入る (Game2DPhaseScreens が窓を出し、 GameManager.ResolveTerminalOffer で決める)。</summary>
+        /// <summary>戦闘後に提示されている端子の報酬 (ADR-0014・2〜3 択の名前)。 空 = 提示なし。
+        /// 人が遊んでいる時だけ残る (Game2DPhaseScreens が窓を出し、 GameManager.ResolveTerminalReward で決める)。</summary>
         public List<string> pendingTerminalOffer = new List<string>();
         /// <summary>端子の山札 (ADR-0014)。 ラン単位。 開始は攻撃 2・防御 2・充電 1。 戦闘のたびに写して切る (CombatSystem.TerminalDeckState)。</summary>
         public List<string> terminalDeck = new List<string>();
@@ -389,10 +389,6 @@ namespace GameLoop
         /// 「効いていない」のか「そもそも発動していない」のかは、 到達層や勝率からは
         /// 絶対に区別できない ── 2026-08-10 に実際にそこで判断を誤った。</summary>
         public int lingeringWoundTriggers;
-
-        /// <summary>装着中の特殊端子ID（空=未装着＝**第4端子が存在しない**）。ショップで購入する。
-        /// 正本は <see cref="CombatSystem.SpecialTerminals"/>、仕様は docs/GAME.md §6-5。</summary>
-        public string equippedSpecialTerminalId = "";
 
         /// <summary>ダイス強化 Lv (2026-07-18): id → Lv (0=素、Max はレア別)。 素材消費で最も低い2面に+1/Lv。
         /// 未登録なら Lv0 扱い。 セーブ時はそのままシリアライズ (Dictionary&lt;string,int&gt; は Unity JSON 未対応のため
@@ -568,7 +564,6 @@ namespace GameLoop
             layer7Unlocked = false;
             equippedWeaponId = "";
             equippedDiceId = "";
-            equippedSpecialTerminalId = "";
             baseMaxHPAtRunStart = 0;
             lingeringWoundLost = 0;
             lingeringWoundDamageAccum = 0;

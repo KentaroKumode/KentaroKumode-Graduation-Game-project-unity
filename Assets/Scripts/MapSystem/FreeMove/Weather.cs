@@ -1,10 +1,10 @@
 namespace MapSystem.FreeMove
 {
     /// <summary>
-    /// 航行マップの天候 (手番制・2026-10-18)。 層ごとに 1 つ。 参照実装は map-grid-prototype.html の <c>WEATHERS</c>。
+    /// 航行マップの天候 (ターン制・2026-10-18)。 層ごとに 1 つ。 参照実装は map-grid-prototype.html の <c>WEATHERS</c>。
     ///
     /// <para><b>前線</b>は「その現象が届く範囲」を表すだけで、 前線そのものに罰は無い。 左端から
-    /// <see cref="FreeMapParams.FrontEvery"/> 手番ごとに <see cref="FreeMapParams.FrontStep"/> ずつ右へ進み、
+    /// <see cref="FreeMapParams.FrontEvery"/> ターンごとに <see cref="FreeMapParams.FrontStep"/> ずつ右へ進み、
     /// 前線の<b>内側の点</b>でだけ各天候の効果が起きる。</para>
     /// </summary>
     public enum WeatherKind
@@ -15,7 +15,7 @@ namespace MapSystem.FreeMove
         // 2 = 旧〈沈む静寂〉(2026-11-09 削除)。 番号は詰めない (アイコン表・保存値の互換)。
         /// <summary>削る砂: 前線の中では 1 歩の物資が 1.5 倍。 痕跡は 2 倍早く消える。</summary>
         Sand = 3,
-        /// <summary>朱の雪: 前線の中では、 移動に 2 手番かかる (追跡者は 2 回動く)。</summary>
+        /// <summary>朱の雪: 前線の中では、 移動に 2 ターンかかる (追跡者は 2 回動く)。</summary>
         Snow = 4,
         /// <summary>落石のような雹: 前線の中では、 移動ごとに HP −1。</summary>
         Hail = 5,
@@ -49,7 +49,7 @@ namespace MapSystem.FreeMove
             {
                 case WeatherKind.Fog: return "前線の中では、道で2歩以上離れた点が「?」に戻る（近づけば戻る・中身は引き直さない）";
                 case WeatherKind.Sand: return "前線の中では、1歩の物資が1.5倍。痕跡は2倍早く消える";
-                case WeatherKind.Snow: return "前線の中では、移動に2手番かかる（追跡者は2回動く）";
+                case WeatherKind.Snow: return "前線の中では、移動に2ターンかかる（追跡者は2回動く）";
                 case WeatherKind.Hail: return "前線の中では、移動ごとにHP-1";
                 case WeatherKind.Crumble: return "前線が進むたび、前線の中の道が1本崩れる（終点へは必ずつながったまま）";
                 case WeatherKind.Sink: return "前線が進むたび、前線の中の未使用の点が1つ沈む（終点へは必ずつながったまま）";
