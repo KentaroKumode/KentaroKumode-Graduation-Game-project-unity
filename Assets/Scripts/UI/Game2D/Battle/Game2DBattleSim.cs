@@ -241,6 +241,7 @@ namespace UI.Game2D.Battle
                 if (AutoWireOnTurnStart) AutoWire(false);
             }
             else ValidateSlots();
+            TakeCatPaw(p);
             RecomputePreview();
         }
 
@@ -277,6 +278,9 @@ namespace UI.Game2D.Battle
                         if (!cm.IsAwaitingDecision) { Resolve(cm); break; }
                         if (!SameDice(cm.PendingDecision.playerDice)) { SyncDecision(cm, false); Game2DSfx.Play("ui_tab"); Touch(); break; }
                         p = cm.PendingDecision;
+                        // 〈猫の手〉が挿した: 人が見ないまま決めないよう、 猫の 1 組を見せて止まる (もう一度押すと決まる)
+                        if (p.kind == TurnPauseKind.Wiring && p.catDie >= 0 && (p.catDie >= slot.Length || slot[p.catDie] != p.catSlot))
+                        { SyncDecision(cm, false); Game2DSfx.Play("wire", 1f, 1.1f); Touch(); break; }
                     }
                     if (p.kind == TurnPauseKind.Wiring)
                     {
@@ -443,11 +447,34 @@ namespace UI.Game2D.Battle
 
         private bool IsDie(int i) => i >= 0 && i < slot.Length;
 
+        // ── 挑戦カード〈猫の手〉(#5) ──
+        //   本体が配線の判断の頭に 1 組 (出目 catDie → 場の catSlot) を先に挿したら、 その出目は動かせない (挿し替え・外す・おまかせでも残す)。
+
+        /// <summary>このターン〈猫の手〉が先に挿した出目 (−1 = 無し)。 画面の印に使う。</summary>
+        public int catDie = -1;
+        /// <summary>〈猫の手〉が挿した端子 (場の添字・−1 = 無し)。</summary>
+        public int catSlot = -1;
+
+        /// <summary>出目 i が〈猫の手〉に挿されていて動かせないか。</summary>
+        public bool IsCatLocked(int i) => catDie >= 0 && i == catDie;
+
+        /// <summary>判断の写しから猫の 1 組を読み、 挿し方に入れる (配線の判断の時だけ入る)。</summary>
+        private void TakeCatPaw(TurnPause p)
+        {
+            catDie = catSlot = -1;
+            if (p == null || p.kind != TurnPauseKind.Wiring || p.catDie < 0 || p.catSlot < 0 || p.catSlot >= board.Count || !IsDie(p.catDie)) return;
+            catDie = p.catDie; catSlot = p.catSlot;
+            // 猫の端子が挿せる数を超えるなら、 他の出目を後ろから外す (本体の TerminalWiring.WithPair と同じ規則)
+            var w = TerminalWiring.WithPair(slot, slot.Length, board, catDie, catSlot);
+            for (int i = 0; i < slot.Length; i++) slot[i] = w[i];
+        }
+
         /// <summary>出目 die へ端子 s を挿せるか (画面のドラッグ用)。 fromDie = つかんで動かしている元の出目 (手札からなら −1)。
         /// die に別の端子が挿さっていれば入れ替え (前の端子は手札へ戻る) とみなす。</summary>
         public bool CanPlug(int die, int s, int fromDie = -1)
         {
             if (!CanOperate || !IsDie(die) || s < 0 || s >= board.Count) return false;
+            if (IsCatLocked(die) || IsCatLocked(fromDie)) return false;      // 猫の出目は動かせない
             int keepFrom = IsDie(fromDie) ? slot[fromDie] : -1, keepDie = slot[die];
             if (IsDie(fromDie)) slot[fromDie] = -1;
             slot[die] = -1;
@@ -471,7 +498,7 @@ namespace UI.Game2D.Battle
         /// <summary>出目 die から端子を外す (手札へ戻す)。</summary>
         public void Unplug(int die)
         {
-            if (!CanOperate || !IsDie(die) || slot[die] < 0) return;
+            if (!CanOperate || !IsDie(die) || slot[die] < 0 || IsCatLocked(die)) return;
             slot[die] = -1; Game2DSfx.Play("wire", 1f, 0.85f);
             RecomputePreview(); Touch();
         }
@@ -495,7 +522,7 @@ namespace UI.Game2D.Battle
 
         private void CycleSlot(int i, int dir)
         {
-            int m = board.Count; if (m == 0 || !IsDie(i)) return;
+            int m = board.Count; if (m == 0 || !IsDie(i) || IsCatLocked(i)) return;
             int n = m + 1, cur = slot[i] < 0 || slot[i] >= m ? m : slot[i];      // 並び: 0..m-1 → 挿さない (= m)
             for (int k = 1; k <= n; k++)
             {
@@ -519,7 +546,7 @@ namespace UI.Game2D.Battle
         {
             if (sound && !CanOperate) return;
             if (!TermInputs(out var dice, out var env, out var st)) return;
-            var w = TerminalWiring.Auto(board, dice, env, st);
+            var w = TerminalWiring.Auto(board, dice, env, st, catDie, catSlot);      // 猫の 1 組は外さない
             for (int i = 0; i < slot.Length; i++) slot[i] = w != null && i < w.Length ? w[i] : -1;
             focusSlot = -1;
             if (sound) { Game2DSfx.Play("wire", 1f, 1.1f); RecomputePreview(); Touch(); }
