@@ -256,6 +256,106 @@ namespace MapSystem.FreeMove
         }
 
         // =====================================================================
+        //  中断セーブ (issue #84)
+        // =====================================================================
+
+        /// <summary>動く中身の写し (JsonUtility で書ける形)。 形 (<see cref="Layout"/>)・追跡者の性質 (<see cref="Profile"/>)・
+        /// 航行アイテムの係数 (<see cref="Perks"/>) は持たない ── 形は別に写し、 性質と係数は作り直す時に同じものを渡す。
+        /// 実数 (前線の x) は丸めずに戻すため、 ビット列 (long) で持つ。</summary>
+        [Serializable]
+        public sealed class SavedState
+        {
+            public int count;
+            public int[] adjCounts = new int[0];
+            public int[] adjItems = new int[0];
+            public bool[] sunk = new bool[0], known = new bool[0], done = new bool[0], scouted = new bool[0];
+            public int[] trace = new int[0];
+            public int me, prevNode, lastArrived, turn, version, flareTurnsLeft;
+            public bool dead;
+            public string hpPayReason = "";
+            public bool hasFoe, foeAlive;
+            public int foeNode, foeMode, lastSeen, lose, chaseTurns, chaseRest, patrol, sinceSummon, foeFreezeTurns, alertLure;
+            public int[] famPos = new int[0], famTarget = new int[0];
+            public bool[] famHound = new bool[0];
+            public int[] relays = new int[0];
+            public int[] lureNode = new int[0], lureTurns = new int[0];
+            public int contact, pendingArrival;
+            public int weather;
+            public bool frontSet;
+            public long frontBits;
+            public int smokeLeft, beaconLeft, beacon, goalwardSteps;
+            public bool smokeGranted, beaconGranted;
+        }
+
+        /// <summary>いまの中身を写す。</summary>
+        public SavedState CaptureState()
+        {
+            int n = _adj.Length;
+            var s = new SavedState { count = n, adjCounts = new int[n] };
+            var items = new List<int>();
+            for (int i = 0; i < n; i++) { s.adjCounts[i] = _adj[i].Count; items.AddRange(_adj[i]); }   // 並びも写す (経路の同点は並びで決まる)
+            s.adjItems = items.ToArray();
+            s.sunk = (bool[])_sunk.Clone(); s.known = (bool[])Known.Clone(); s.done = (bool[])Done.Clone(); s.scouted = (bool[])Scouted.Clone();
+            s.trace = (int[])_trace.Clone();
+            s.me = Me; s.prevNode = PrevNode; s.lastArrived = LastArrived; s.turn = Turn; s.version = Version; s.flareTurnsLeft = FlareTurnsLeft;
+            s.dead = Dead; s.hpPayReason = HpPayReason ?? "";
+            s.hasFoe = HasFoe; s.foeAlive = FoeAlive; s.foeNode = FoeNode; s.foeMode = (int)FoeMode; s.lastSeen = LastSeen;
+            s.lose = _lose; s.chaseTurns = _chaseTurns; s.chaseRest = _chaseRest; s.patrol = _patrol; s.sinceSummon = _sinceSummon;
+            s.foeFreezeTurns = FoeFreezeTurns; s.alertLure = _alertLure;
+            int fc = Familiars.Count;
+            s.famPos = new int[fc]; s.famTarget = new int[fc]; s.famHound = new bool[fc];
+            for (int i = 0; i < fc; i++) { s.famPos[i] = Familiars[i].pos; s.famTarget[i] = Familiars[i].target; s.famHound[i] = Familiars[i].hound; }
+            var relays = new List<int>(_relays); relays.Sort(); s.relays = relays.ToArray();
+            int lc = Lures.Count;
+            s.lureNode = new int[lc]; s.lureTurns = new int[lc];
+            for (int i = 0; i < lc; i++) { s.lureNode[i] = Lures[i].node; s.lureTurns[i] = Lures[i].turnsLeft; }   // 並びも写す (一番近い囮罠の同点は並びで決まる)
+            s.contact = (int)Contact; s.pendingArrival = PendingArrival;
+            s.weather = (int)Weather;
+            s.frontSet = !double.IsNegativeInfinity(Front);
+            s.frontBits = s.frontSet ? BitConverter.DoubleToInt64Bits(Front) : 0L;
+            s.smokeLeft = SmokeLeft; s.beaconLeft = BeaconLeft; s.beacon = Beacon; s.goalwardSteps = _goalwardSteps;
+            s.smokeGranted = _smokeGranted; s.beaconGranted = _beaconGranted;
+            return s;
+        }
+
+        /// <summary>写しを戻す。 同じ形 (<see cref="Layout"/>) と同じ性質で作った中身に対して呼ぶ。 点の数が合わなければ例外。
+        /// <paramref name="perks"/> は回数を入れ直さずにそのまま掛ける (回数は写しの残りを使う)。</summary>
+        public void LoadState(SavedState s, FreeMapPerks perks)
+        {
+            if (s == null) throw new ArgumentNullException(nameof(s));
+            int n = _adj.Length;
+            if (s.count != n || s.adjCounts == null || s.adjCounts.Length != n
+                || s.sunk?.Length != n || s.known?.Length != n || s.done?.Length != n || s.scouted?.Length != n || s.trace?.Length != n)
+                throw new InvalidOperationException($"航行の写しの点の数が形と合わない (写し {s.count} / 形 {n})");
+            int k = 0;
+            for (int i = 0; i < n; i++)
+            {
+                _adj[i].Clear();
+                for (int c = 0; c < s.adjCounts[i]; c++) _adj[i].Add(s.adjItems[k++]);
+            }
+            Array.Copy(s.sunk, _sunk, n); Array.Copy(s.known, Known, n); Array.Copy(s.done, Done, n); Array.Copy(s.scouted, Scouted, n);
+            Array.Copy(s.trace, _trace, n);
+            Me = s.me; PrevNode = s.prevNode; LastArrived = s.lastArrived; Turn = s.turn; Version = s.version + 1; FlareTurnsLeft = s.flareTurnsLeft;
+            Dead = s.dead; HpPayReason = s.hpPayReason ?? "";
+            HasFoe = s.hasFoe; FoeAlive = s.foeAlive; FoeNode = s.foeNode; FoeMode = (FoeMode)s.foeMode; LastSeen = s.lastSeen;
+            _lose = s.lose; _chaseTurns = s.chaseTurns; _chaseRest = s.chaseRest; _patrol = s.patrol; _sinceSummon = s.sinceSummon;
+            FoeFreezeTurns = s.foeFreezeTurns; _alertLure = s.alertLure;
+            Familiars.Clear();
+            for (int i = 0; i < (s.famPos?.Length ?? 0); i++)
+                Familiars.Add(new Familiar { pos = s.famPos[i], target = s.famTarget[i], hound = s.famHound[i] });
+            _relays.Clear();
+            if (s.relays != null) foreach (int r in s.relays) _relays.Add(r);
+            Lures.Clear();
+            for (int i = 0; i < (s.lureNode?.Length ?? 0); i++) Lures.Add(new Lure { node = s.lureNode[i], turnsLeft = s.lureTurns[i] });
+            Contact = (ContactKind)s.contact; PendingArrival = s.pendingArrival;
+            Weather = (WeatherKind)s.weather;
+            Front = s.frontSet ? BitConverter.Int64BitsToDouble(s.frontBits) : double.NegativeInfinity;
+            SmokeLeft = s.smokeLeft; BeaconLeft = s.beaconLeft; Beacon = s.beacon; _goalwardSteps = s.goalwardSteps;
+            _smokeGranted = s.smokeGranted; _beaconGranted = s.beaconGranted;
+            Perks = perks ?? FreeMapPerks.None;
+        }
+
+        // =====================================================================
         //  読み取り
         // =====================================================================
 

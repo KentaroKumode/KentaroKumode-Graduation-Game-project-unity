@@ -66,6 +66,17 @@ namespace UI
                 return;
             }
 
+            // 中断したランがあれば、 先に「続きから / 新しく始める」を聞く (issue #84)。 新しく始めるなら、 記録を消してから下へ進む
+            if (!_classSelectOpen && Game2D.Game2DResumePanel.TryOffer(BeginNewRunFlow)) return;
+            BeginNewRunFlow();
+        }
+
+        /// <summary>新しいランを始める流れ (職業選択 → ラン開始)。</summary>
+        private void BeginNewRunFlow()
+        {
+            var gm = GameManager.Instance;
+            if (gm == null || gm.CurrentPhase != GameManager.GamePhase.Title) return;
+
             // 職業選択が配線されていれば、 ラン開始前に提示 (マップ侵入は受理スタンプ後)
             if (classSelect != null)
             {

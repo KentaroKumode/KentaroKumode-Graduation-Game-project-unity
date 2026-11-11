@@ -30,4 +30,15 @@ namespace ItemSystem.PassiveSkills
     {
         void ResetRunState();
     }
+
+    /// <summary>ラン中の状態を中断セーブへ書き出せるスキル (issue #84)。 <see cref="IRunResettable"/> を実装するスキルは
+    /// <b>必ずこれも実装する</b> ── 実装しないと、 中断して再開した時にその状態だけ 0 に戻る
+    /// (<see cref="PassiveSkillRegistry.CaptureAllRunState"/> が実装漏れを警告する)。</summary>
+    public interface IRunStatePersistent
+    {
+        /// <summary>状態を文字列にする (JSON でなくてよい・同じ状態は同じ文字列)。</summary>
+        string CaptureRunState();
+        /// <summary><see cref="CaptureRunState"/> の文字列から戻す。 読めなければ false (状態は変えない)。</summary>
+        bool RestoreRunState(string state);
+    }
 }
