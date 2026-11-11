@@ -333,6 +333,7 @@ namespace AutoTest.ParallelSweep
         public double[] dmgSrcVesca = Array.Empty<double>();
         public double[] damageStages7F = Array.Empty<double>();
         public double[] cut7F = Array.Empty<double>();
+        /// <summary>[計装 2026-11-12 #103] ヴェスカ〈停滞する時間〉で止まった端子 (GuardDiag.Stag7F・段 × 8 の並びはそちらの注記)。</summary>
         public double[] stag7F = Array.Empty<double>();
         /// <summary>[計装 2026-11-12] 端子ごとの使われ方 (<see cref="CombatSystem.TerminalDiag"/>)。 名前 × TerminalDiag.Width を平らに並べる。</summary>
         public string[] termDiagNames = Array.Empty<string>();

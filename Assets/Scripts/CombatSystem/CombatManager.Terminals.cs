@@ -45,7 +45,15 @@ namespace CombatSystem
         {
             if (_deck == null) return;
             int extra = _deck.state.BeginTurn();
-            _deck.DrawTurn(TerminalCards.HandSize + extra, _termRetain);
+            // ヴェスカ〈停滞する時間〉: 引いた端子 1 枚ごとに確率で止める (持たない敵は 0)
+            float stop = ItemSystem.PassiveSkills.Effects.StagnantTime.StopChance(currentEnemy);
+            _deck.DrawTurn(TerminalCards.HandSize + extra, _termRetain, stop);
+            if (stop > 0f)
+            {
+                GuardDiag.NoteStag7F(currentEnemy?.id, _deck.LastDrawnCount, _deck.LastStoppedCount, _deck.LastStoppedMains, _deck.LastHeldCount);   // [計装]
+                if (_deck.LastStoppedCount > 0)
+                    Debug.Log($"[停滞する時間] 引いた {_deck.LastDrawnCount} 枚のうち {_deck.LastStoppedCount} 枚が止まった (確率 {stop:P0})");
+            }
             _termRetain = null; _termOutcome = null; _termDamageMul = 1f;
             if (ctx == null) return;
             // 〈鋳造口〉: この戦闘中の出目 +N (自ロールの後に足す既存の口へ渡す)
@@ -153,13 +161,14 @@ namespace CombatSystem
     /// <summary>挿し方の列挙と、 既定の挿し方 (方策も画面も答えを出さなかった時・人の「おまかせ」)。 ADR-0014。</summary>
     public static class TerminalWiring
     {
-        /// <summary>規則上ありうる挿し方をすべて返す (出目ごとの挿し先・−1 = 挿さない)。 挿せる数だけ見る (条件・充電は <see cref="TerminalCards.Resolve"/> が直す)。</summary>
-        public static List<int[]> Enumerate(List<string> board, int diceCount)
+        /// <summary>規則上ありうる挿し方をすべて返す (出目ごとの挿し先・−1 = 挿さない)。 挿せる数だけ見る (条件・充電は <see cref="TerminalCards.Resolve"/> が直す)。
+        /// state を渡すと、 止まった端子 (ヴェスカ〈停滞する時間〉) へ挿す手は出さない (Resolve が外すのと同じ結果になる手を数え直さないため)。</summary>
+        public static List<int[]> Enumerate(List<string> board, int diceCount, TerminalBattleState state = null)
         {
             var res = new List<int[]>();
             int m = board.Count;
             var cap = new int[m];
-            for (int s = 0; s < m; s++) cap[s] = TerminalCards.Get(board[s])?.capacity ?? 0;
+            for (int s = 0; s < m; s++) cap[s] = state != null && state.IsStopped(s) ? 0 : TerminalCards.Get(board[s])?.capacity ?? 0;
             var cur = new int[diceCount];
             void Rec(int i)
             {
@@ -180,7 +189,7 @@ namespace CombatSystem
         public static int[] Auto(List<string> board, int[] dice, TerminalEnv env, TerminalBattleState state)
         {
             int[] best = null; float bestScore = float.NegativeInfinity;
-            foreach (var w in Enumerate(board, dice.Length))
+            foreach (var w in Enumerate(board, dice.Length, state))
             {
                 var o = TerminalCards.Resolve(board, w, dice, env, state.Clone());
                 float score = NaiveScore(o, env);

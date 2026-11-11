@@ -662,7 +662,6 @@ namespace AutoTest
             public int nextHitOnPlus;            // 収支プラスの次のターン、 敵の攻撃が通った時 +N (〈反撃態勢〉3)
             public float nextAtkOnPlus;          // 収支プラスの次のターン、 敵の攻撃 +N (〈暴走〉3) を次のターンのエスカレーションとプレイヤーの防御に通した被ダメの増分
             public int counterPendingNow;        // 前のターンに積まれ、 このターンの enemyHitBonus に入れた〈反撃態勢〉の分 (先読みの次のターンでは外す)
-            public float stagCost;             // [2026-11-11] ヴェスカ〈停滞する時間〉: 攻撃 < ブロックで挿すと、 先のターンの敵の攻撃がこれだけ上がる (1 スタック × 今のエスカレーション・上限なら 0)
             public float mainCorr;             // [V3 mainCorr] 主攻撃の見積もりに掛ける実績の比 (0 = 掛けない)
             // ---- [V3 readOutgoingMult 2026-11-10] 与ダメの倍率を読む (本体の主攻撃の計算 CombatManager.Turn / Damage / PassiveSkillManager.ProcessDamage に合わせる) ----
             public bool readOut;               // 下の値で主攻撃を見積もる (false = 旧: 素の攻撃力 + 攻撃の出目 − 防御)
@@ -781,7 +780,7 @@ namespace AutoTest
         /// <summary>[V3 hpLedger] この戦闘で失う HP の見込み = 今ターンの被ダメ + 撃破までの残りターンで受ける被ダメ (全部攻撃する前提)。</summary>
         /// <param name="enemyHeal">[#107] 敵〈吸血〉で今ターンの終わりに戻る敵 HP (撃破しないときだけ・<see cref="OptimalTurnOutcome.enemyHeal"/>)。</param>
         /// <param name="nextTurnExtra">[#107] 今ターンの挿し方で次のターンの被ダメに乗る分 (収支プラス → 〈反撃態勢〉〈暴走〉)。 次のターンの 1 回だけ。</param>
-        private float LedgerLoss(in OptimalTurnState s, int effDmg, int taken, bool addsStag = false, int enemyHeal = 0, float nextTurnExtra = 0f)
+        private float LedgerLoss(in OptimalTurnState s, int effDmg, int taken, int enemyHeal = 0, float nextTurnExtra = 0f)
         {
             int rem = s.enemyHp - System.Math.Min(effDmg, s.enemyHp);
             if (rem <= 0) return taken;
@@ -800,7 +799,7 @@ namespace AutoTest
                     r -= dF;
                     if (r <= 0f) { n = j; break; }
                     float g = s.atkGrowth != null ? s.atkGrowth[System.Math.Min(j + 1, HorizonCapTurns)] : 1f;
-                    int hit = Mathf.RoundToInt(s.enemyAtk * g + (addsStag ? s.stagCost * g : 0f));
+                    int hit = Mathf.RoundToInt(s.enemyAtk * g);
                     r = System.Math.Min(System.Math.Max(r, s.enemyMaxHpNow), r + LifestealHeal(in s, hit));
                 }
             }
@@ -809,7 +808,6 @@ namespace AutoTest
             {
                 float g = s.atkGrowth != null ? s.atkGrowth[System.Math.Min(j + 1, HorizonCapTurns)] : 1f;
                 future += s.enemyAtk * g;
-                if (addsStag) future += s.stagCost * g;   // ヴェスカ〈停滞する時間〉: このターン守りに寄せた分 (残りのターンずっと乗る)
             }
             if (n >= 1) future += nextTurnExtra;   // 〈反撃態勢〉〈暴走〉: 次のターンも敵が生きていれば乗る
             return taken + v3.ledgerFutureShare * future;
@@ -1100,7 +1098,7 @@ namespace AutoTest
             float nextTurnExtra = balancePlus ? s.nextHitOnPlus + s.nextAtkOnPlus : 0f;
 
             float u = s.ledger
-                    ? specFlat - LedgerLoss(in s, effDmg, taken, s.stagCost > 0f && aCount < bCount, enemyHeal, nextTurnExtra)
+                    ? specFlat - LedgerLoss(in s, effDmg, taken, enemyHeal, nextTurnExtra)
                     : wAtk * System.Math.Min(effDmg, enemyHp)
                     + wDef * System.Math.Min(block, enemyAtk)
                     + specFlat;
@@ -1497,16 +1495,6 @@ namespace AutoTest
             return SelectOptimalWiring(in st, rolls, tele, plan, idx);
         }
 
-        /// <summary>ヴェスカ〈停滞する時間〉: 停滞を積む配線 (攻撃の個数 &lt; ブロックの個数) を候補から外すか。 旧い配線と山札で共通。
-        /// (理由と例外は <see cref="SelectOptimalWiring"/> の stagFilter の注記)</summary>
-        private bool StagFilterActive(CombatManager cm, ItemSystem.PassiveSkills.CombatContext ctxRoles)
-        {
-            if (!v3.noStagWire || cm?.CurrentEnemy?.passiveSkills == null) return false;
-            if (ctxRoles != null && ctxRoles.stagnationStacks >= ItemSystem.PassiveSkills.Effects.StagnantTime.StackCap) return false;
-            foreach (var ps in cm.CurrentEnemy.passiveSkills) if (ps != null && ps.internalName == "StagnantTime") return true;
-            return false;
-        }
-
         /// <summary>配線の効用の入力 (<see cref="OptimalTurnState"/>) を、 今の盤面から 1 回だけ読んで組む (読むだけ・書き換えない)。
         /// 旧い配線 (<see cref="MutualWiringPolicy"/>) と端子の山札 (AutoRunner.Terminals) が同じものを使う。</summary>
         private OptimalTurnState BuildOptimalTurnState(int[] rolls, CombatSystem.MutualTurnTelegraph tele)
@@ -1662,13 +1650,7 @@ namespace AutoTest
                 st.dFull = System.Math.Max(1f, oa.effDmg * expected / System.Math.Max(1f, System.Math.Max(0, atkBase) + sumR));
                 st.ledger = true;
                 if (st.atkGrowth == null && enemyAtk > 0 && cm?.CurrentEnemy != null) st.atkGrowth = BuildAtkGrowth(cm.CurrentEnemy, ctxRoles, tele.turn);
-                // ヴェスカ〈停滞する時間〉(2026-11-11): 守りに寄せると次のターンから敵の攻撃が上がる。 帳簿の「撃破までの被ダメ」に乗せる
-                var stagEnemy = cm?.CurrentEnemy;
-                if (stagEnemy?.passiveSkills != null && ctxRoles != null && ctxRoles.stagnationStacks < ItemSystem.PassiveSkills.Effects.StagnantTime.StackCap)
-                    foreach (var ps in stagEnemy.passiveSkills)
-                        if (ps != null && ps.internalName == "StagnantTime")
-                            st.stagCost = ItemSystem.PassiveSkills.Effects.StagnantTime.DicePerStack(ctxRoles)
-                                        * CombatSystem.Escalation.GetMultiplier(stagEnemy.EffectiveEscalationProfile, tele.turn);
+                // (ヴェスカ〈停滞する時間〉の帳簿の項 stagCost は 2026-11-12 #103 で撤去 ── 配線では何も積まなくなった)
             }
             return st;
         }
@@ -1684,22 +1666,8 @@ namespace AutoTest
             var runForVoid = GameLoop.GameManager.Instance?.Run;
             float ScoreWithBuffers(CombatSystem.DiceTerminal[] w)
                 => plan != null ? LookaheadValue(in st, plan, rolls, w) : OptimalUtility(in st, rolls, w);
-            // [2026-11-11] ヴェスカ〈停滞する時間〉: 停滞を積む配線 (攻撃の本数 < ブロックの本数) を選ばない。
-            //   帳簿は先の被ダメを ledgerFutureShare (0.2) で薄めるので、 停滞の罰が実際の 5 分の 1 程度にしか効かず、 BOT は 4 ターンに 1 回ブロックへ寄せて
-            //   p4 で平均 4.9 スタックを育てていた (禁止で 20.8% → 24.3%・同じシード 改善 122 / 悪化 15)。
-            //   例外: 停滞が上限 (それ以上積もらない) / 避けた最良の手でも今ターン死ぬ (下の選び直し)。
-            //   (倒し切るターンは敵の攻撃が来ないので、 ブロックに挿す理由がそもそも無い ── 例外にしない)
-            bool stagFilter = StagFilterActive(cm, ctxRoles);
-            float Score(CombatSystem.DiceTerminal[] w)
-            {
-                if (stagFilter)
-                {
-                    int na = 0, nb = 0;
-                    foreach (var t in w) { if (t == CombatSystem.DiceTerminal.Attack) na++; else if (t == CombatSystem.DiceTerminal.Block) nb++; }
-                    if (na < nb) return float.NegativeInfinity;
-                }
-                return ScoreWithBuffers(w);
-            }
+            // (2026-11-11 の「ヴェスカ〈停滞する時間〉で停滞を積む配線を選ばない」規則は 2026-11-12 #103 で撤去。 効果が端子を止める形に替わった)
+            float Score(CombatSystem.DiceTerminal[] w) => ScoreWithBuffers(w);
 
             var assign = new CombatSystem.DiceTerminal[k];
             var bestW = new CombatSystem.DiceTerminal[k];
@@ -1830,12 +1798,6 @@ namespace AutoTest
                 }
             }
             SelectBest();
-            // [2026-11-11] 停滞を避けた最良の手でも今ターン死ぬなら、 停滞を積む手も許して選び直す (生き残る方が先)
-            if (stagFilter)
-            {
-                OptimalUtility(in st, rolls, bestW, out var so);
-                if (so.taken >= st.myHp) { stagFilter = false; SelectBest(); }
-            }
             // E1 (V3 rerollEv) が「この手の最良効用」として読む。 先読みの値は次ターン分を含むので、 今ターンの効用だけに戻す。
             _lastBestU = plan != null ? OptimalUtility(in st, rolls, bestW) : bestU;
             // [計装 2026-11-10] 選んだ配線が防ぎ切りの規則の対象だったか (実際の配線の時だけ MutualWiringPlanPolicy が数える)

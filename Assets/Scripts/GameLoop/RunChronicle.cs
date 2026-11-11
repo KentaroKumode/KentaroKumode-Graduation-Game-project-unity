@@ -259,7 +259,7 @@ namespace GameLoop
         public static readonly long[] P4Turns = new long[P4Bands];
         public static readonly long[] P4Base = new long[P4Bands];       // 素火力
         public static readonly long[] P4DiceTotal = new long[P4Bands];  // 敵ダイス合計 (全ボーナス込み)
-        public static readonly long[] P4Stagnation = new long[P4Bands]; // うち停滞スタック
+        public static readonly long[] P4Stagnation = new long[P4Bands]; // 〈停滞する時間〉で止まった端子の枚数 (2026-11-12〜。 旧: うち停滞スタック)
         public static readonly long[] P4RelicDice = new long[P4Bands];  // うち遺物の出目加算 (当ターン)
         public static readonly long[] P4AtkValue = new long[P4Bands];   // 倍率適用後の敵攻撃値
         public static readonly long[] P4Block = new long[P4Bands];      // プレイヤーのブロック合計
@@ -269,12 +269,12 @@ namespace GameLoop
         public static int P4Band(int turn)
             => turn <= 4 ? 0 : turn <= 9 ? 1 : turn <= 14 ? 2 : 3;
 
-        public static void NoteP4Turn(int turn, int baseAtk, int diceTotal, int stagnation,
+        public static void NoteP4Turn(int turn, int baseAtk, int diceTotal, int stoppedTerminals,
                                       int relicDice, int atkValue, int block, int lossBase, int bleed)
         {
             int b = P4Band(turn);
             P4Turns[b]++; P4Base[b] += baseAtk; P4DiceTotal[b] += diceTotal;
-            P4Stagnation[b] += stagnation; P4RelicDice[b] += relicDice;
+            P4Stagnation[b] += stoppedTerminals; P4RelicDice[b] += relicDice;
             P4AtkValue[b] += atkValue; P4Block[b] += block; P4LossBase[b] += lossBase;
             P4Bleed[b] += bleed;
         }
@@ -357,7 +357,8 @@ namespace GameLoop
             var sb = new StringBuilder();
             sb.AppendLine("【7層p4 敵攻撃値の分解 (計装)】");
             sb.AppendLine("  敵攻撃値 = エスカレーション倍率 × (素火力 + 敵ダイス合計)。 貫通 = 攻撃値 − ブロック。");
-            sb.AppendLine("  帯      ターン数   素火力  ダイス計  うち停滞  うち遺物   攻撃値  ブロック   貫通  大出血");
+            sb.AppendLine("  止め枚数 = 〈停滞する時間〉で止まった端子の枚数 (ダイス計の内訳ではない)。");
+            sb.AppendLine("  帯      ターン数   素火力  ダイス計  止め枚数  うち遺物   攻撃値  ブロック   貫通  大出血");
             string[] label = { "  1-4T ", "  5-9T ", " 10-14T", " 15T+  " };
             for (int i = 0; i < P4Bands; i++)
             {

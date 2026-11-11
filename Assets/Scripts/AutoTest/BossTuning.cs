@@ -51,7 +51,7 @@ namespace AutoTest
         public const bool TuneRegenReduction    = true;  // 灰塵の鎧の軽減量
         public const bool TuneDice              = true;  // ボス素ダイスの期待値 (平均出目+offset)
         public const bool TuneHp                = true;  // HP絶対値 (Dice飽和時の受け皿)
-        public const bool TuneStagnation        = true;  // 停滞する時間 (7層ヴェスカの第一レバー)
+        public const bool TuneStagnation        = true;  // 停滞する時間 = 引いた端子 1 枚あたりの止まる確率 % (7層ヴェスカの第一レバー)
         public const bool TuneIntimidateThreat  = true;  // 威圧+ の脅威加算 (5層業火の審判官ほか)
         public const bool TunePoisonStackCap    = true;  // 毒の侵蝕の毒スタック上限 (3層毒沼の主)
         public const bool TuneMirrorReflectCap  = true;  // 鏡映の応答の反射上限 (4層鏡の双子)
@@ -172,10 +172,10 @@ namespace AutoTest
             }
         }
 
-        /// <summary>各 BossParam の基準値/範囲 (本体の正本) とチューナーのゲイン。</summary>
-        public static ParamMeta Meta(BossParam p)
+        /// <summary>各 BossParam の基準値/範囲 (本体の正本) とチューナーのゲイン。 id を渡すと段ごとの基準 (<see cref="BossParams.Spec(BossParam, string)"/>) を読む。</summary>
+        public static ParamMeta Meta(BossParam p, string id = null)
         {
-            var s = BossParams.Spec(p);
+            var s = BossParams.Spec(p, id);
             float gain, maxStep;
             switch (p)
             {
@@ -185,7 +185,8 @@ namespace AutoTest
                 case BossParam.RobeStacks:        gain = 20f;  maxStep = 1.5f;  break;
                 case BossParam.ChipCap:           gain = 20f;  maxStep = 1.5f;  break;
                 case BossParam.RegenReduction:    gain = 20f;  maxStep = 1.5f;  break;
-                case BossParam.Stagnation:        gain = 20f;  maxStep = 1f;    break;
+                // 2026-11-12 #103: 単位が「止まる確率 (%)」に変わった。 勝率の差 5% (err 0.05) で 2.5% 動き、 1 バッチ最大 2.5% (旧: 敵攻撃 +1/スタック・gain 20・最大 1)
+                case BossParam.Stagnation:        gain = 50f;  maxStep = 2.5f;  break;
                 case BossParam.IntimidateThreat:  gain = 20f;  maxStep = 1f;    break;
                 case BossParam.PoisonStackCap:    gain = 20f;  maxStep = 1f;    break;
                 case BossParam.MirrorReflectCap:  gain = 20f;  maxStep = 1.5f;  break;
@@ -217,8 +218,14 @@ namespace AutoTest
         {
             public string updatedAt = "";
             public int batches;
+            /// <summary>〈停滞する時間〉の単位の版。 0 = 旧 (停滞スタック 1 つあたりの敵攻撃加算) / 1 = 止まる確率 % (2026-11-12 #103〜)。
+            /// 0 のファイルを読んだら Stagnation の調整値を捨てる (旧の 1〜12 を % として読むと、 黙って別の強さになる)。</summary>
+            public int stagnationUnit;
             public List<Knob> knobs = new List<Knob>();
         }
+
+        /// <summary>今の〈停滞する時間〉の単位の版 (<see cref="TuningFile.stagnationUnit"/>)。</summary>
+        private const int StagnationUnitPct = 1;
 
         private static Dictionary<string, Knob> _map = new Dictionary<string, Knob>();
         private static bool _loaded;
@@ -245,7 +252,7 @@ namespace AutoTest
         /// <summary>Knob の override から param の現在値を取得 (無ければ基準値)。</summary>
         public static float GetParam(Knob k, BossParam p)
         {
-            var meta = Meta(p);
+            var meta = Meta(p, k?.key);
             if (k?.overrides != null)
             {
                 string name = p.ToString();
@@ -260,7 +267,7 @@ namespace AutoTest
         public static void SetParam(Knob k, BossParam p, float value)
         {
             if (k == null) return;
-            var meta = Meta(p);
+            var meta = Meta(p, k.key);
             value = Mathf.Clamp(value, meta.min, meta.max);
             string name = p.ToString();
             if (k.overrides == null) k.overrides = new List<ParamOverride>();
@@ -280,7 +287,7 @@ namespace AutoTest
             EnsureLoaded();
             if (!string.IsNullOrEmpty(id) && _map.TryGetValue(KeyFor(id), out var k))
                 return GetParam(k, p);
-            return Meta(p).baseValue;
+            return Meta(p, id).baseValue;
         }
 
         /// <summary>id のボスの param を丸めた整数値。</summary>
@@ -407,9 +414,16 @@ namespace AutoTest
                 if (!File.Exists(path)) return;
                 var tf = JsonUtility.FromJson<TuningFile>(File.ReadAllText(path, Encoding.UTF8));
                 if (tf?.knobs == null) return;
+                bool oldStagUnit = tf.stagnationUnit < StagnationUnitPct;
                 foreach (var k in tf.knobs)
                 {
                     if (k == null || string.IsNullOrEmpty(k.key)) continue;
+                    if (oldStagUnit && k.overrides != null)
+                    {
+                        string stagName = BossParam.Stagnation.ToString();
+                        int removed = k.overrides.RemoveAll(o => o != null && o.param == stagName);
+                        if (removed > 0) Debug.LogWarning($"[BossTuning] {k.key}: 旧い単位の Stagnation (停滞スタックの加算) の調整値を捨てた (今は止まる確率 %)");
+                    }
                     SanitizeKnob(k);
                     _map[k.key] = k;
                 }
@@ -427,6 +441,7 @@ namespace AutoTest
                 {
                     updatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                     batches = batches,
+                    stagnationUnit = StagnationUnitPct,
                     knobs = new List<Knob>(_map.Values),
                 };
                 File.WriteAllText(path, JsonUtility.ToJson(tf, true), new UTF8Encoding(false));
@@ -510,7 +525,7 @@ namespace AutoTest
                 foreach (BossParam p in Enum.GetValues(typeof(BossParam)))
                 {
                     float v = GetParam(k, p);
-                    if (Mathf.Abs(v - Meta(p).baseValue) > 0.001f)
+                    if (Mathf.Abs(v - Meta(p, k.key).baseValue) > 0.001f)
                         parts.Add($"{p}={v.ToString("0.#", CultureInfo.InvariantCulture)}");
                 }
                 if (k.maxHP > 0) parts.Add($"HP={k.maxHP}");
