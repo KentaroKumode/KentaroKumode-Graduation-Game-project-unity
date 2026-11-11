@@ -135,7 +135,7 @@
         {
           "internalName": "Trapper",
           "skillName": "罠師",
-          "description": "ロール勝利時、次ターン相手のダイス合計値-1",
+          "description": "与えたダメージが受けたダメージより多かったターン、次のターンの相手の攻撃-1",
           "flavorText": "「昨日も同じ穴に落ちてませんでした？」「掘り直してんだよ。毎晩」"
         }
       ],
@@ -158,7 +158,7 @@
         {
           "internalName": "Trapper",
           "skillName": "罠師",
-          "description": "ロール勝利時、次ターン相手のダイス合計値-1",
+          "description": "与えたダメージが受けたダメージより多かったターン、次のターンの相手の攻撃-1",
           "flavorText": "「昨日も同じ穴に落ちてませんでした？」「掘り直してんだよ。毎晩」"
         }
       ],
@@ -270,7 +270,7 @@
         {
           "internalName": "BruteForce",
           "skillName": "剛力",
-          "description": "ロール勝利時、ダメージ+2",
+          "description": "攻撃がブロックを抜けた時、ダメージ+2",
           "flavorText": "「当たっただけじゃ終わらんのか」「終わってたら苦労してない」"
         }
       ],
@@ -293,7 +293,7 @@
         {
           "internalName": "BruteForce",
           "skillName": "剛力",
-          "description": "ロール勝利時、ダメージ+2",
+          "description": "攻撃がブロックを抜けた時、ダメージ+2",
           "flavorText": "「当たっただけじゃ終わらんのか」「終わってたら苦労してない」"
         }
       ],
@@ -315,7 +315,7 @@
         {
           "internalName": "Flight",
           "skillName": "飛翔",
-          "description": "追撃ダメージを受けない",
+          "description": "役〈追撃〉の追加ダメージを受けない",
           "flavorText": "「逃げたぞ、追え」「上です」「……上か」"
         }
       ],
@@ -338,7 +338,7 @@
         {
           "internalName": "Flight",
           "skillName": "飛翔",
-          "description": "追撃ダメージを受けない",
+          "description": "役〈追撃〉の追加ダメージを受けない",
           "flavorText": "「逃げたぞ、追え」「上です」「……上か」"
         }
       ],
@@ -366,7 +366,7 @@
         {
           "internalName": "TailStrike",
           "skillName": "尾撃",
-          "description": "ロール敗北時、相手に1の固定ダメージ",
+          "description": "受けたダメージが与えたダメージより多かったターン、相手に1の軽減不可ダメージ",
           "flavorText": "傷は背中にあった。逃げたわけではない。"
         }
       ],
@@ -395,13 +395,13 @@
         {
           "internalName": "TailStrike",
           "skillName": "尾撃",
-          "description": "ロール敗北時、相手に1の固定ダメージ",
+          "description": "受けたダメージが与えたダメージより多かったターン、相手に1の軽減不可ダメージ",
           "flavorText": "傷は背中にあった。逃げたわけではない。"
         },
         {
           "internalName": "EliteLizard",
           "skillName": "重甲",
-          "description": "防御さらに+4（硬鱗と合わせて8）、敗北時に固定1反射"
+          "description": "防御さらに+4（硬鱗と合わせて8）。受けたダメージが与えたダメージより多かったターン、相手に1の軽減不可ダメージ"
         }
       ],
       "baseAttack": 7,
@@ -422,13 +422,13 @@
         {
           "internalName": "Rampage",
           "skillName": "暴走",
-          "description": "ロール敗北時、次ターンのダイス合計値+3",
+          "description": "受けたダメージが与えたダメージより多かったターン、次のターンの攻撃+3",
           "flavorText": "「よけたら怒るんだよ、あいつら」"
         },
         {
           "internalName": "BruteForce",
           "skillName": "剛力",
-          "description": "ロール勝利時、ダメージ+2",
+          "description": "攻撃がブロックを抜けた時、ダメージ+2",
           "flavorText": "「当たっただけじゃ終わらんのか」「終わってたら苦労してない」"
         }
       ],
@@ -452,13 +452,13 @@
         {
           "internalName": "Rampage",
           "skillName": "暴走",
-          "description": "ロール敗北時、次ターンのダイス合計値+3",
+          "description": "受けたダメージが与えたダメージより多かったターン、次のターンの攻撃+3",
           "flavorText": "「よけたら怒るんだよ、あいつら」"
         },
         {
           "internalName": "BruteForce",
           "skillName": "剛力",
-          "description": "ロール勝利時、ダメージ+2",
+          "description": "攻撃がブロックを抜けた時、ダメージ+2",
           "flavorText": "「当たっただけじゃ終わらんのか」「終わってたら苦労してない」"
         },
         {
@@ -492,7 +492,7 @@
         {
           "internalName": "Curse",
           "skillName": "呪縛",
-          "description": "ロール勝利時、次ターン相手のダイス合計値-2",
+          "description": "与えたダメージが受けたダメージより多かったターン、次のターンの相手の攻撃-2",
           "flavorText": "恨まれる覚えは無かった。向こうにはあった。"
         },
         {
@@ -527,7 +527,7 @@
         {
           "internalName": "Curse",
           "skillName": "呪縛",
-          "description": "ロール勝利時、次ターン相手のダイス合計値-2",
+          "description": "与えたダメージが受けたダメージより多かったターン、次のターンの相手の攻撃-2",
           "flavorText": "恨まれる覚えは無かった。向こうにはあった。"
         },
         {
@@ -566,7 +566,7 @@
         {
           "internalName": "Immovable",
           "skillName": "不動",
-          "description": "追撃ダメージを受けない",
+          "description": "役〈追撃〉の追加ダメージを受けない",
           "flavorText": "押しても引いても同じだった。休んでいる間も同じだった。"
         },
         {
@@ -601,7 +601,7 @@
         {
           "internalName": "Immovable",
           "skillName": "不動",
-          "description": "追撃ダメージを受けない",
+          "description": "役〈追撃〉の追加ダメージを受けない",
           "flavorText": "押しても引いても同じだった。休んでいる間も同じだった。"
         },
         {
@@ -640,7 +640,7 @@
         {
           "internalName": "CounterStance",
           "skillName": "反撃態勢",
-          "description": "ロール敗北時、次ターンのダメージ+3",
+          "description": "受けたダメージが与えたダメージより多かったターン、次のターンは攻撃がブロックを抜けた時ダメージ+3",
           "flavorText": "ある剣譜の余白に「初太刀は捨ててよい」とだけ。書いた者の名は削られている。"
         },
         {
@@ -652,7 +652,7 @@
         {
           "internalName": "HoningDuel",
           "skillName": "研ぎ澄まし",
-          "description": "決闘が長引くほど冴える。3ターンごとにロール勝利時の与ダメージ+1（累積）",
+          "description": "決闘が長引くほど冴える。攻撃がブロックを抜けた時、ダメージ+（ターン数÷3）",
           "flavorText": "立会人は三合目で目を離せなくなった、と後に書いている。"
         }
       ],
@@ -682,7 +682,7 @@
         {
           "internalName": "CounterStance",
           "skillName": "反撃態勢",
-          "description": "ロール敗北時、次ターンのダメージ+3",
+          "description": "受けたダメージが与えたダメージより多かったターン、次のターンは攻撃がブロックを抜けた時ダメージ+3",
           "flavorText": "ある剣譜の余白に「初太刀は捨ててよい」とだけ。書いた者の名は削られている。"
         },
         {
@@ -694,13 +694,13 @@
         {
           "internalName": "HoningDuel",
           "skillName": "研ぎ澄まし",
-          "description": "決闘が長引くほど冴える。3ターンごとにロール勝利時の与ダメージ+1（累積）",
+          "description": "決闘が長引くほど冴える。攻撃がブロックを抜けた時、ダメージ+（ターン数÷3）",
           "flavorText": "立会人は三合目で目を離せなくなった、と後に書いている。"
         },
         {
           "internalName": "EliteDarkKnight",
           "skillName": "闇技",
-          "description": "勝利時、与ダメ+2"
+          "description": "攻撃がブロックを抜けた時、ダメージ+2"
         }
       ],
       "baseAttack": 9,
@@ -790,7 +790,7 @@
         {
           "internalName": "Hellfire",
           "skillName": "地獄の業火",
-          "description": "ロール勝利時、追加で2の固定ダメージ",
+          "description": "与えたダメージが受けたダメージより多かったターン、追加で2の軽減不可ダメージ",
           "flavorText": "「盾ですか。……これはもう、飾りですね」"
         }
       ],
@@ -819,7 +819,7 @@
         {
           "internalName": "Hellfire",
           "skillName": "地獄の業火",
-          "description": "ロール勝利時、追加で2の固定ダメージ",
+          "description": "与えたダメージが受けたダメージより多かったターン、追加で2の軽減不可ダメージ",
           "flavorText": "「盾ですか。……これはもう、飾りですね」"
         },
         {
@@ -932,7 +932,7 @@
         {
           "internalName": "CounterStance",
           "skillName": "反撃態勢",
-          "description": "ロール敗北時、次ターンのダメージ+3",
+          "description": "受けたダメージが与えたダメージより多かったターン、次のターンは攻撃がブロックを抜けた時ダメージ+3",
           "flavorText": "ある剣譜の余白に「初太刀は捨ててよい」とだけ。書いた者の名は削られている。"
         },
         {
@@ -974,7 +974,7 @@
         {
           "internalName": "CounterStance",
           "skillName": "反撃態勢",
-          "description": "ロール敗北時、次ターンのダメージ+3",
+          "description": "受けたダメージが与えたダメージより多かったターン、次のターンは攻撃がブロックを抜けた時ダメージ+3",
           "flavorText": "ある剣譜の余白に「初太刀は捨ててよい」とだけ。書いた者の名は削られている。"
         },
         {
