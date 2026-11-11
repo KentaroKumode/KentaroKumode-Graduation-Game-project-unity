@@ -130,8 +130,8 @@ namespace MapSystem.FreeMove
         public const int RewardBattle = 0;
         public const int RewardElite = 0;
         public const int RewardBoss = 3;
-        /// <summary>追跡者を倒した時の物資。</summary>
-        public const int RewardPursuer = 6;
+        /// <summary>追跡者を倒した時の物資 (2026-11-12・#35: 6 → 3)。</summary>
+        public const int RewardPursuer = 3;
         /// <summary>前哨基地の物資。</summary>
         public const int RewardOutpost = 4;
         /// <summary>ショップの物資 1 の値段 (G)。 2026-11-04 の「1 包 100 = 4G」を 2026-11-09 のデノミで 1 = 2G に。</summary>

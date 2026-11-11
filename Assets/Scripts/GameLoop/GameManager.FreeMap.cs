@@ -289,7 +289,8 @@ namespace GameLoop
         // =====================================================================
 
         /// <summary>追跡者の専用エネミーの中身 (性質ごと・2026-11-04)。
-        /// 2026-11-12 (#35): 捕まった後の死亡 2.6% / 生還時の HP 65% (目標 15〜25% / 30〜40%) と楽すぎたので、 HP を各 +0.3・攻撃 ×1.25 (一段目)。 強さの土台は「その層の次の層のエリート」(7 層は 7 層自身) で、
+        /// 2026-11-12 (#35): 捕まった後の死亡 2.6% / 生還時の HP 65% (目標 15〜25% / 30〜40%) と楽すぎたので、 HP を各 +0.3・攻撃 ×1.25 (一段目)。
+        /// 2026-11-12 二段目: HP をさらに各 +0.3・攻撃 ×1.6・勝った時の物資 6→3。 捕まった後の死亡 Optimal 6.1→14.2% / Super 4.3→10.4%、 クリア率 Optimal 11.9→9.2% / Super 30.1→24.7%。 強さの土台は「その層の次の層のエリート」(7 層は 7 層自身) で、
         /// その上に性質ごとの型を足す。 数値は全部仮置き (§23-21・動かす時は採否を取ってから測定する)。</summary>
         private sealed class PursuerFight
         {
@@ -313,10 +314,10 @@ namespace GameLoop
         {
             switch (profileId)
             {
-                case "summoner": return new PursuerFight { name = "群れ呼び", description = "自分は動かず、手下を呼び寄せて戦わせる。呼ばれた一体と並んで立ちはだかる。", hpMul = 1.5f, atkMul = 1.25f, floorCompanion = true };
-                case "hound":    return new PursuerFight { name = "猟犬使い", description = "足の速い猟犬を連れた狩人。獲物を追い詰めたら、猟犬と二人がかりで仕留める。", hpMul = 1.2f, atkMul = 1.25f, hound = true, houndHp = 0.4f, houndAtk = 0.7f };
-                case "sprinter": return new PursuerFight { name = "影走り", description = "道を二歩ずつ駆ける追手。追いついた勢いのまま斬りかかるが、長くは保たない。", hpMul = 1.1f, atkMul = 1.25f, openingTurns = 2, openingMul = 1.5f };
-                case "brute":    return new PursuerFight { name = "鉄塊の追手", description = "全身を鉄で覆った追手。歩みは遅いが、打ち合うほど鎧が厚くなる。", hpMul = 1.5f, atkMul = 1.25f, minDefense = 10, stackingArmor = true };
+                case "summoner": return new PursuerFight { name = "群れ呼び", description = "自分は動かず、手下を呼び寄せて戦わせる。呼ばれた一体と並んで立ちはだかる。", hpMul = 1.8f, atkMul = 1.6f, floorCompanion = true };
+                case "hound":    return new PursuerFight { name = "猟犬使い", description = "足の速い猟犬を連れた狩人。獲物を追い詰めたら、猟犬と二人がかりで仕留める。", hpMul = 1.5f, atkMul = 1.6f, hound = true, houndHp = 0.4f, houndAtk = 0.7f };
+                case "sprinter": return new PursuerFight { name = "影走り", description = "道を二歩ずつ駆ける追手。追いついた勢いのまま斬りかかるが、長くは保たない。", hpMul = 1.4f, atkMul = 1.6f, openingTurns = 2, openingMul = 1.5f };
+                case "brute":    return new PursuerFight { name = "鉄塊の追手", description = "全身を鉄で覆った追手。歩みは遅いが、打ち合うほど鎧が厚くなる。", hpMul = 1.8f, atkMul = 1.6f, minDefense = 10, stackingArmor = true };
             }
             return new PursuerFight { name = null };
         }
@@ -406,7 +407,7 @@ namespace GameLoop
             CombatManager.Instance.FleeAllowed = true;
         }
 
-        /// <summary>追跡者に勝った: 追跡者は倒れ、 物資 +300 とアイテム 1 個。</summary>
+        /// <summary>追跡者に勝った: 追跡者は倒れ、 物資 +3 とアイテム 1 個。</summary>
         private void HandlePursuerWon()
         {
             _inPursuerFight = false;
