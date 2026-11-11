@@ -8,7 +8,7 @@ namespace CombatSystem
     {
         /// <summary>振り直すか (全ダイス・充電を払う)。 <see cref="CombatManager.AnswerReroll"/> で答える。</summary>
         Reroll,
-        /// <summary>配線 (ダイス → 端子)。 <see cref="CombatManager.AnswerWiring"/> で答える。</summary>
+        /// <summary>配線 (出目 → 場の端子)。 <see cref="CombatManager.AnswerWiringSlots"/> で答える。</summary>
         Wiring,
     }
 
@@ -23,34 +23,34 @@ namespace CombatSystem
         public int[] playerFaceIdx;
         /// <summary>予告。 リロール中は敵ダイスの素の合計で組んだ近似 (配線の時に確定値へ組み直される)。</summary>
         public MutualTurnTelegraph tele;
-        /// <summary>今の配線 (前ターンのまま・未配置は攻撃)。 null あり。</summary>
-        public DiceTerminal[] currentWiring;
         /// <summary>リロールの判断のとき: 振り直すと払う充電。</summary>
         public int rerollCost;
 
-        /// <summary>端子の山札 (ADR-0014): 場の端子 (常設 + 手札) の名前。 山札で戦っていなければ null。 書き換えないこと。</summary>
+        /// <summary>端子の山札 (ADR-0014): 場の端子 (常設 + 手札) の名前。 振り直しの判断の時も配線の時も入っている
+        /// (手札は振り直しでは変わらない・規則 6)。 書き換えないこと。</summary>
         public List<string> board;
-        /// <summary>端子の見積もりに要る盤面 (画面が挿し方の結果を先に見せるのに使う)。</summary>
+        /// <summary>端子の見積もりに要る盤面 (画面が挿し方の結果を先に見せるのに使う)。 振り直しの判断の時は、 予告の近似の敵の攻撃で組む。</summary>
         public TerminalEnv terminalEnv;
         /// <summary>端子の戦闘中の状態 (溜まり・連続)。 見積もりは Clone した写しに掛けること。</summary>
         public TerminalBattleState terminalState;
 
         // ===== 答え (CombatManager が読む) =====
         internal bool reroll;
-        internal DiceTerminal[] wiring;
         internal int[] slots;
+        /// <summary>〈写し取り〉〈焼き切り〉〈保持器〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置・−1 = 選ばない)。 null あり。</summary>
+        internal int[] targets;
 
-        internal void Set(TurnPauseKind k, int[] dice, int[] faceIdx, MutualTurnTelegraph t, DiceTerminal[] wired)
+        internal void Set(TurnPauseKind k, int[] dice, int[] faceIdx, MutualTurnTelegraph t)
         {
-            kind = k; playerDice = dice; playerFaceIdx = faceIdx; tele = t; currentWiring = wired;
-            rerollCost = 0; reroll = false; wiring = null; slots = null; board = null; terminalState = null;
+            kind = k; playerDice = dice; playerFaceIdx = faceIdx; tele = t;
+            rerollCost = 0; reroll = false; slots = null; targets = null; board = null; terminalEnv = default; terminalState = null;
         }
     }
 
     /// <summary>CombatManager: 人が操作するターン。 <see cref="ExecuteTurn"/> (方策が決める) と同じ本体を、 判断の所で止めながら進める。
     ///
     /// <para>使い方: <see cref="BeginInteractiveTurn"/> → <see cref="PendingDecision"/> を読んで画面に出す →
-    /// <see cref="AnswerReroll"/> / <see cref="AnswerWiring"/> で答える → 判断が無くなったらターンが解決し、
+    /// <see cref="AnswerReroll"/> / <see cref="AnswerWiringSlots"/> で答える → 判断が無くなったらターンが解決し、
     /// <see cref="OnTurnEnd"/> が鳴る (結果は <see cref="LastInteractiveResult"/>)。</para></summary>
     public partial class CombatManager
     {
@@ -88,19 +88,12 @@ namespace CombatSystem
             Advance();
         }
 
-        /// <summary>配線の判断に答える。 長さが合わなければ今の配線のまま。 接続できない端子は攻撃へ落ちる。</summary>
-        public void AnswerWiring(DiceTerminal[] wiring)
+        /// <summary>端子の山札 (ADR-0014) の配線に答える。 出目ごとの挿し先 (場の端子の添字・−1 = 挿さない)。 規則に合わない挿し方は挿さなかった扱いになる。
+        /// targets = 〈写し取り〉〈焼き切り〉〈保持器〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置)。 null / −1 / 候補でない対象は左端の候補。</summary>
+        public void AnswerWiringSlots(int[] slots, int[] targets = null)
         {
             if (_activeTurn == null || _pause.kind != TurnPauseKind.Wiring) return;
-            _pause.wiring = wiring;
-            Advance();
-        }
-
-        /// <summary>端子の山札 (ADR-0014) の配線に答える。 出目ごとの挿し先 (場の端子の添字・−1 = 挿さない)。 規則に合わない挿し方は挿さなかった扱いになる。</summary>
-        public void AnswerWiringSlots(int[] slots)
-        {
-            if (_activeTurn == null || _pause.kind != TurnPauseKind.Wiring) return;
-            _pause.slots = slots;
+            _pause.slots = slots; _pause.targets = targets;
             Advance();
         }
 

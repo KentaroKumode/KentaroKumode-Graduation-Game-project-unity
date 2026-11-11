@@ -126,7 +126,7 @@ namespace AutoTest
             // 〈計数器〉: 基本以外の発動 1 回 = 与ダメ +(10% ÷ 10 回) を残りターンずっと (山札に入っている時だけ効く・本体 DrawTerminalHand)
             if (deckHasCounter)
                 flat += o.firedNonBasic * (TerminalCards.CounterPct / TerminalCards.CounterEvery) * DeckPerTurnDamage(in s, k) * turns * dw;
-            // 手札の操作 (対象は本体が選ぶ = 挿さずに空けた最初の端子)
+            // 手札の操作 (対象は ChooseDeckTargets が選んだ端子・選ばなければ左端の候補)
             if (o.retainTarget >= 0) flat += DeckRetainDmg * dw;
             if (o.copyTarget >= 0 && o.copyTarget < board.Count)
                 flat += ((TerminalCards.Get(board[o.copyTarget])?.basic ?? true) ? DeckCopyBasicDmg : DeckCopyGoodDmg) * dw;
@@ -154,9 +154,9 @@ namespace AutoTest
 
         /// <summary>山札の挿し方を選ぶ (読むだけ・山札の状態は写しに掛ける)。 戻り値 = 出目ごとの挿し先 (場の添字・−1 = 挿さない)。
         /// <paramref name="bestU"/> = 選んだ挿し方の効用 (リロールの値付けが読む)。 山札で戦っていなければ null。</summary>
-        private int[] ChooseDeckWiring(int[] rolls, MutualTurnTelegraph tele, out float bestU)
+        private int[] ChooseDeckWiring(int[] rolls, MutualTurnTelegraph tele, out float bestU, out int[] targets)
         {
-            bestU = float.NegativeInfinity;
+            bestU = float.NegativeInfinity; targets = null;
             var cm = CombatManager.Instance;
             var deck = cm?.TerminalDeck;
             int k = rolls?.Length ?? 0;
@@ -183,10 +183,18 @@ namespace AutoTest
             var us = new float[n];
             var outs = new OptimalTurnOutcome[n];
             var addsStag = new bool[n];
+            var tgts = new int[n][];
             for (int i = 0; i < n; i++)
             {
                 var after = deck.state.Clone();
                 var o = TerminalCards.Resolve(board, cands[i], rolls, env, after);
+                // 〈写し取り〉〈焼き切り〉〈保持器〉が発動する挿し方なら、 対象を方策で選び直して解き直す (対象は今ターンの攻防を変えない)
+                tgts[i] = ChooseDeckTargets(board, o, run);
+                if (tgts[i] != null)
+                {
+                    after = deck.state.Clone();
+                    o = TerminalCards.Resolve(board, cands[i], rolls, env, after, tgts[i]);
+                }
                 var ws = DeckSums(in st, rolls, board, o, deck.state, after, in env, deckHasCounter);
                 us[i] = OptimalUtilityCore(in st, k, in ws, out outs[i]);
                 // ヴェスカ〈停滞する時間〉: 本体と同じく、 挿し方を直した後の攻撃の個数 < ブロックの個数で積む
@@ -217,8 +225,36 @@ namespace AutoTest
             _lastFreeBlock = fbo.freeBlock && !fbo.killsNow; _lastKillsNow = fbo.killsNow; _lastExpTaken = fbo.taken;
             _lastPredOld = fbo.dmgOld; _lastPredNew = fbo.dmgNew; _lastPredA = fbo.aCount; _lastPredUsed = fbo.dmgUsed;
             _lastPredRaw = fbo.rawNew; _lastPredCritP = st.critP; _lastPredCritMul = st.critMulEff; _lastPredOutMul = st.outMul;
+            targets = tgts[best];
             return cands[best];
         }
+
+        /// <summary>対象を取る端子の対象の方策 (読むだけ)。 写し取り = 山札に増やして一番得な端子 (素の点の最大) / 焼き切り = 一番要らない端子 (最小) /
+        /// 保持器 = 次のターンに一番使いたい端子 (最大)。 点は報酬の素の点 (<see cref="RewardBaseScore"/>)・基本の端子は 1。 対象を取る端子が発動しなければ null。</summary>
+        private static int[] ChooseDeckTargets(List<string> board, TerminalOutcome o, RunState run)
+        {
+            int[] res = null;
+            for (int p = 0; p < board.Count; p++)
+            {
+                if (!TerminalCards.PicksTarget(board[p]) || !o.fired.Contains(p)) continue;
+                var cand = TerminalCards.TargetCandidates(board, o.slotOfDie, p);
+                if (cand.Count == 0) continue;
+                bool wantLow = board[p] == TerminalIds.BurnOut;
+                int pick = -1; float bestSc = 0f;
+                foreach (int s in cand)
+                {
+                    float sc = TargetWorth(TerminalCards.Get(board[s]), run);
+                    if (pick < 0 || (wantLow ? sc < bestSc : sc > bestSc)) { pick = s; bestSc = sc; }
+                }
+                if (res == null) { res = new int[board.Count]; for (int q = 0; q < res.Length; q++) res[q] = -1; }
+                res[p] = pick;
+            }
+            return res;
+        }
+
+        /// <summary>対象の点: 基本の端子 1 (報酬の足切りと同じ見方)・それ以外は報酬の素の点。</summary>
+        private static float TargetWorth(TerminalDef d, RunState run)
+            => d == null ? 0f : d.basic ? 1f : RewardBaseScore(d, run);
 
         /// <summary>山札で戦う戦闘の配線方策 (<see cref="CombatManager.WiringPolicy"/> へ差す)。 包みの処理は MutualWiringPlanPolicy と同じ。</summary>
         private WiringPlan DeckWiringPlanPolicy(int[] rolls, MutualTurnTelegraph tele)
@@ -228,12 +264,12 @@ namespace AutoTest
             int hpNow = CombatManager.Instance != null ? CombatManager.Instance.PlayerHP : -1;
             if (_fbPrevHp >= 0 && hpNow >= 0 && _fbPrevHp - hpNow > _fbPrevExpTaken) _fbUnavoidSeen = true;
             _lastFreeBlock = _lastKillsNow = false;
-            var slots = ChooseDeckWiring(rolls, tele, out _);
+            var slots = ChooseDeckWiring(rolls, tele, out _, out var targets);
             if (predTrace) BeginPredTrace(tele.turn);
             BeginMainCorrTurn(_lastPredA);
             _fbDecided++; if (_lastFreeBlock) _fbTurns++; if (_lastKillsNow) _fbKillTurns++;
             _fbPrevHp = hpNow; _fbPrevExpTaken = _lastExpTaken;
-            return slots != null ? WiringPlan.OfSlots(slots) : default;      // null なら本体が既定 (TerminalWiring.Auto) で挿す
+            return slots != null ? WiringPlan.OfSlots(slots, targets) : default;      // null なら本体が既定 (TerminalWiring.Auto) で挿す
         }
 
         // =====================================================================
@@ -292,8 +328,6 @@ namespace AutoTest
             }
             switch (d.id)
             {
-                case TerminalIds.Copier:
-                case TerminalIds.BurnOut:     return 0.8f;      // 対象を選べない (空けた最初の端子)
                 case TerminalIds.Retainer:
                 case TerminalIds.Stripper:    return 1.0f;      // 効く場面が狭い
                 case TerminalIds.Heal:        return 1.2f;      // 3 以下だけ・攻撃にならない
@@ -303,6 +337,66 @@ namespace AutoTest
             }
             if (d.rare) return d.disposable ? 2.5f : 3f;
             return d.disposable ? 1.5f : 2f;
+        }
+
+        // =====================================================================
+        //  店と休憩で山札に足す・抜く (人と同じ GameManager の関数を呼ぶ・手書きの規則・未測定)
+        // =====================================================================
+        //   買う: 棚の候補を報酬と同じ点 (ChooseTerminalReward・足切り込み) で選び、 払った後に TerminalShopReserve G 残るなら買う。 1 店で棚の枚数まで。
+        //   抜く: 基本の端子 (攻撃・防御・充電) が TerminalPruneBasicMin 枚以上で、 基本以外が TerminalPruneNonBasicMin 枚以上ある時だけ、 基本を 1 枚。
+        //         どれを抜くか: 攻撃の割合を守る ── 攻撃以外の基本 (枚数の多い方) を先に、 攻撃の基本は攻撃の種類が TerminalPruneAttackKeep 枚より多い時だけ。
+        //         店: 抜いた後に TerminalShopReserve G 残るなら 1 店 1 回。 休憩: HP が満ちていて回復が無駄になる時だけ (回復と択一)。
+        private const int TerminalShopReserve = 40, TerminalPruneBasicMin = 3, TerminalPruneNonBasicMin = 2, TerminalPruneAttackKeep = 3;
+
+        /// <summary>店に入った時の端子の買い物と抜くサービス。 棚の品の買い物より先に呼ぶ。</summary>
+        private void DoShopTerminals(GameManager gm)
+        {
+            var run = gm?.Run; if (run == null) return;
+            // 買う
+            for (int guard = 0; guard < GameManager.TerminalShopSlots; guard++)
+            {
+                var idx = new List<int>(); var ids = new List<string>();
+                for (int i = 0; i < gm.TerminalShop.Count; i++)
+                {
+                    var s = gm.TerminalShop[i];
+                    if (!s.sold && run.coins - s.price >= TerminalShopReserve) { idx.Add(i); ids.Add(s.id); }
+                }
+                if (ids.Count == 0) break;
+                int pick = ChooseTerminalReward(ids);
+                if (pick < 0 || !gm.ShopBuyTerminal(idx[pick])) break;
+            }
+            // 抜く
+            int at = PruneTarget(run);
+            if (at >= 0 && gm.CanRemoveTerminal && run.coins - gm.TerminalRemovePrice >= TerminalShopReserve) gm.ShopRemoveTerminal(at);
+        }
+
+        /// <summary>休憩: 回復が無駄になる時に、 基本が多ければ 1 枚抜く (休憩の行動を使う)。 抜いたら true。</summary>
+        private bool TryRestRemoveTerminal(GameManager gm)
+        {
+            var run = gm?.Run; if (run == null || !gm.CanRemoveTerminal) return false;
+            int at = PruneTarget(run);
+            return at >= 0 && gm.RestRemoveTerminal(at);
+        }
+
+        /// <summary>抜く端子 (山札の添字・−1 = 抜かない)。 規則は上の注記。</summary>
+        private static int PruneTarget(RunState run)
+        {
+            var deck = run?.terminalDeck;
+            if (deck == null || deck.Count <= TerminalCards.HandSize) return -1;
+            int basic = 0, nonBasic = 0, atkKind = 0;
+            var cnt = new Dictionary<string, int>();
+            foreach (var id in deck)
+            {
+                var d = TerminalCards.Get(id); if (d == null) continue;
+                if (d.kind == TerminalKind.Attack) atkKind++;
+                if (d.basic) { basic++; cnt.TryGetValue(id, out int c); cnt[id] = c + 1; } else nonBasic++;
+            }
+            if (basic < TerminalPruneBasicMin || nonBasic < TerminalPruneNonBasicMin) return -1;
+            string pick = null; int most = 0;
+            foreach (var id in new[] { TerminalIds.Block, TerminalIds.Charge })
+                if (cnt.TryGetValue(id, out int c) && c > most) { most = c; pick = id; }
+            if (pick == null && atkKind > TerminalPruneAttackKeep && cnt.ContainsKey(TerminalIds.Attack)) pick = TerminalIds.Attack;
+            return pick != null ? deck.IndexOf(pick) : -1;
         }
 
         /// <summary>ビルドの型に合う端子 (規則 2)。 軸の端子は偏重の点で別に上がるので、 ここは軸の外の相性。</summary>

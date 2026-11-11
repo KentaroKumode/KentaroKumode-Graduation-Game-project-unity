@@ -26,9 +26,11 @@ namespace CombatSystem
         public DiceTerminal[] main;
         /// <summary>端子の山札 (ADR-0014): 出目ごとの挿し先 (場の端子の添字・−1 = 挿さない)。 山札で戦う時はこちらを読む。</summary>
         public int[] slots;
+        /// <summary>端子の山札: 〈写し取り〉〈焼き切り〉〈保持器〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置・−1 = 選ばない)。 null = 左端の候補。</summary>
+        public int[] targets;
 
         public static WiringPlan Of(DiceTerminal[] main) => new WiringPlan { main = main };
-        public static WiringPlan OfSlots(int[] slots) => new WiringPlan { slots = slots };
+        public static WiringPlan OfSlots(int[] slots, int[] targets = null) => new WiringPlan { slots = slots, targets = targets };
     }
 
     /// <summary>

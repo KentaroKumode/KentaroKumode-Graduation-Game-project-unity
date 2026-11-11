@@ -1674,7 +1674,7 @@ namespace AutoTest
         private float BestUtilityOf(int[] rolls, CombatSystem.MutualTurnTelegraph tele)
         {
             // 端子の山札: 手札の端子への挿し方の最良の効用 (リロールの値付けも山札の効用で見る)
-            ChooseDeckWiring(rolls, tele, out float du);
+            ChooseDeckWiring(rolls, tele, out float du, out _);
             return du;
         }
 

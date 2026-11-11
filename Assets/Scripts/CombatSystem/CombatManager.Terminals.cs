@@ -73,6 +73,9 @@ namespace CombatSystem
             e.bursts = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.BurstTotalKey);
             e.axCrit = ctx.AxisDepth(AxisRules.Crit); e.axBleed = ctx.AxisDepth(AxisRules.Bleed); e.axPoison = ctx.AxisDepth(AxisRules.Poison);
             e.axHeat = ctx.AxisDepth(AxisRules.Heat); e.axCharge = ctx.AxisDepth(AxisRules.Charge); e.axShield = ctx.AxisDepth(AxisRules.Shield);
+            // 誓約の封じ (OathSeals.Apply が戦闘の始めに立てる)。 Resolve が同じ物を結果から落とす
+            e.sealPoison = ctx.poisonSealed; e.sealBleed = ctx.bleedSealed; e.sealHeat = ctx.heatSealed;
+            e.sealCharge = ctx.chargeSealed; e.sealShield = ctx.shieldSealed; e.sealCrit = ctx.critSealed;
             return e;
         }
 

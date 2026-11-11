@@ -748,7 +748,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                       予告に出る値はここまで (ブロックの前)。 2 体目は secondaryEnemy.armorPen で同じく掛ける
 5. 配線             : 場の端子 (常設 + 手札) への挿し先を決める (出目ごとに場の添字・−1 = 挿さない)
                       人 = 画面 (_pause.slots) / BOT = WiringPolicy(...).slots / どちらも無ければ TerminalWiring.Auto (素朴な点の最大)
-                      → TerminalCards.Resolve(board, slots, dice, TerminalEnvNow, deck.state) → TerminalOutcome
+                      → TerminalCards.Resolve(board, slots, dice, TerminalEnvNow, deck.state, targets) → TerminalOutcome
                       → ApplyTerminalOutcome (下記 9.2「配線」)
    **方策/UI を信用しない**: 規則に合わない挿し方 (挿せる数の超過・条件に合わない出目・払えない充電) は Resolve が「挿さなかった」に直す。
    挿さない出目は捨てる (旧: 攻撃へ自動合流)。 旧い配線 (前ターンの配線の自動適用) と SanitizeWiring は 2026-11-11 に削除
@@ -778,6 +778,12 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            5. 効果 (場の順)。 〈倍電圧〉が発動していれば他の端子の効果を 2 回走らせる
            6. 他の端子を見る効果: 〈継電器〉攻撃 + RelayPerFired × (基本以外の発動数 − 1)、 〈変圧器〉攻撃 + (攻撃の種類の端子に挿した出目の合計)
               溜めた攻撃 (〈蓄電器〉〈受け太刀〉) は、 攻撃の種類に 1 個以上挿したターンに attackAdd へ足して 0 に戻す
+           7. 誓約の封じ (TerminalEnv.seal* = ctx.poisonSealed などの写し): 封じた資源を足す分だけを結果から落とす
+              (毒 → poison=0 / 出血 → bleedOnHit=0 / 臨界 → heat=0 / 充電 → chargeAdd=0・chargeFill=false / シールド → shield=0 / 会心 → forceCrit・critMultAdd)。
+              本体の口 (AddStatus・AddEnemyBleed・Kw.AddHeat・AddCharge・consShield・会心の判定) も同じ物を止めるので、 落とすのは見込み (画面・BOT) と揃えるため。
+              攻撃・ブロックへ入る量は落とさない。 充電を落とすので、 封じた戦闘では〈電流〉の② (chargeToAttackPct) にも端子の充電は乗らない (2026-11-11〜)
+         〈写し取り〉〈焼き切り〉〈保持器〉の対象: Resolve の wantTarget (人 = 画面で選んだ端子 / BOT = WiringPlan.targets)。
+           候補 = 自分でない・常設でない・挿し方を直した後に出目が 1 個も無い手札の端子 (TerminalCards.IsCandidate)。 選ばない・候補でない時は左端の候補
          結果 (TerminalOutcome) の行き先:
            attackAdd / blockAdd / chargeAdd → attackSum / blockSum / chargeSum (出目をそのまま足さない ── 端子ごとに入る量が違う)
            attackDice / blockDice / chargeDice → 攻撃・ブロック・充電の「個数」(既存の品・〈停滞する時間〉・攻撃しない判定が読む)

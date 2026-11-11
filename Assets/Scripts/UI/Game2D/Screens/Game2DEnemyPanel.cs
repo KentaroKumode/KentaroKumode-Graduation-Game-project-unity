@@ -49,6 +49,9 @@ namespace UI.Game2D
                 return;
             }
             if (modal.IsOpen || Game2DModal.Active || !InCombat()) return;
+            // 手札・出目をつかんでいる間と、 落とした瞬間は開かない (2026-11-11)。 敵の範囲は手札 (x 318〜)・差し込み口 (x 〜186) と重ならないので
+            //   押した所からつかみは始まらないが、 Tab と、 フレームの順で押下と離しが前後する場合のために、 戦闘の画面の印を見る
+            if (Game2DBattleHud.PointerBusy) return;
             if (Input.GetKeyDown(KeyCode.Tab) || (Input.GetMouseButtonDown(0) && ClickedEnemy())) Open();
         }
 

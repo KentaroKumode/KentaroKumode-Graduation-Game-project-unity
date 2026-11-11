@@ -113,6 +113,10 @@ namespace CombatSystem
         public int axCrit, axBleed, axPoison, axHeat, axCharge, axShield;
         /// <summary>〈研ぎ澄まし〉の恒久の攻撃 (ラン単位)。</summary>
         public int whetBonus;
+        /// <summary>誓約の封じ (CombatContext の poisonSealed などの写し)。 本体では封じは資源の付与の口 (AddStatus の毒・AddEnemyBleed・
+        /// Kw.AddHeat・AddCharge・consShield・会心の判定) で止まる。 <see cref="TerminalCards.Resolve"/> は同じ物を結果から落とし、
+        /// 見込み (画面・BOT) が本体と食い違わないようにする。</summary>
+        public bool sealPoison, sealBleed, sealHeat, sealCharge, sealShield, sealCrit;
     }
 
     /// <summary>1 ターンの端子の結果。 本体がこれを攻撃・防御・充電・戦闘の情報へ反映する。</summary>
@@ -143,7 +147,8 @@ namespace CombatSystem
         public readonly List<int> fired = new List<int>();
         /// <summary>このターンに発動した基本以外の端子の数。</summary>
         public int firedNonBasic;
-        /// <summary>〈保持器〉〈写し取り〉〈焼き切り〉の対象 (場の添字・−1 = なし)。</summary>
+        /// <summary>〈保持器〉〈写し取り〉〈焼き切り〉の対象 (場の添字・−1 = なし)。 選んだ対象 (Resolve の wantTarget) が候補なら それ、
+        /// でなければ左端の候補 (<see cref="TerminalCards.TargetCandidates"/> の先頭)。</summary>
         public int retainTarget = -1, copyTarget = -1, burnTarget = -1;
         /// <summary>〈発振器〉の連続をこのターンもう数えたか。</summary>
         public bool oscCounted;
@@ -289,6 +294,10 @@ namespace CombatSystem
         public static TerminalDef Get(string id)
             => id != null && _byId.TryGetValue(id, out var d) ? d : null;
 
+        /// <summary>ランの持ち物 (誓約) で、 この端子の軸が封じられているか (戦闘の外 ── 報酬・店・山札の一覧)。 軸の無い端子は false。</summary>
+        public static bool AxisSealedByRun(TerminalDef d, GameLoop.RunState run)
+            => d?.axis != null && run != null && ItemSystem.PassiveSkills.Effects.OathSeals.SealedAxes(run).Contains(d.axis);
+
         /// <summary>開始の山札: 攻撃 2・防御 2・充電 1。</summary>
         public static List<string> StartingDeck()
             => new List<string> { TerminalIds.Attack, TerminalIds.Attack, TerminalIds.Block, TerminalIds.Block, TerminalIds.Charge };
@@ -322,7 +331,9 @@ namespace CombatSystem
         /// <param name="wantSlot">出目ごとの挿し先 (場の添字・−1 = 挿さない)。 規則に合わない挿し方は直す (挿さなかった扱い)。</param>
         /// <param name="dice">出目。 書き換えない。</param>
         /// <param name="state">戦闘の間の端子の状態。 <b>書き換える</b> (見積もりなら写しを渡す)。</param>
-        public static TerminalOutcome Resolve(List<string> board, int[] wantSlot, int[] dice, TerminalEnv env, TerminalBattleState state)
+        /// <param name="wantTarget">〈写し取り〉〈焼き切り〉〈保持器〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置・−1 / null = 選ばない)。
+        /// 対象が候補でなければ (挿した・常設・自分) 左端の候補になる。</param>
+        public static TerminalOutcome Resolve(List<string> board, int[] wantSlot, int[] dice, TerminalEnv env, TerminalBattleState state, int[] wantTarget = null)
         {
             int n = dice.Length, m = board.Count;
             var o = new TerminalOutcome { slotOfDie = new int[n], kindOfDie = new DiceTerminal[n] };
@@ -388,11 +399,13 @@ namespace CombatSystem
                 charge -= cost; o.chargeSpend += cost; paid[s] = true;
             }
 
-            // ── 4. 空けた手札の端子 (〈保持器〉〈写し取り〉〈焼き切り〉の対象) ──
+            // ── 4. 空けた手札の端子 (〈保持器〉〈写し取り〉〈焼き切り〉の対象)。 選んだ対象が候補ならそれ、 でなければ左端の候補 ──
             int Empty(int self)
             {
+                int want = wantTarget != null && self >= 0 && self < wantTarget.Length ? wantTarget[self] : -1;
+                if (IsCandidate(board, o.slotOfDie, self, want)) return want;
                 for (int s = 0; s < m; s++)
-                    if (s != self && defs[s] != null && !defs[s].permanent && !Plugged(o.slotOfDie, s)) return s;
+                    if (IsCandidate(board, o.slotOfDie, self, s)) return s;
                 return -1;
             }
 
@@ -432,9 +445,53 @@ namespace CombatSystem
             // 次に攻撃するターンの攻撃に足す分
             if (o.attackDice > 0 && state.storedAttack > 0) { o.attackAdd += state.storedAttack; state.storedAttack = 0; }
 
+            // ── 7. 誓約の封じ: 封じた軸の資源を足す分だけを落とす (攻撃・ブロックへ入る出目は残す) ──
+            //   本体の口 (AddStatus の毒・AddEnemyBleed・Kw.AddHeat・AddCharge・consShield・会心の判定) と同じ物を落とす。
+            //   軸の端子 (〈霧吹き口〉〈返し針〉〈焚き口〉〈漏電口〉〈当て板〉〈急所読み〉〈照星〉) も品と同じくここで止まり、
+            //   軸の外の端子 (〈絶縁体〉〈蓄電池〉・基本の充電) も品と同じく口で止まる。 本体で二度落としても結果は同じ。
+            if (env.sealPoison) o.poison = 0;
+            if (env.sealBleed) o.bleedOnHit = 0;
+            if (env.sealHeat) o.heat = 0;
+            if (env.sealCharge) { o.chargeAdd = 0; o.chargeFill = false; }
+            if (env.sealShield) o.shield = 0;
+            if (env.sealCrit) { o.forceCrit = false; o.critMultAdd = 0f; }
+
             for (int i = 0; i < n; i++)
                 o.kindOfDie[i] = o.slotOfDie[i] >= 0 ? LegacyKind(defs[o.slotOfDie[i]].kind) : DiceTerminal.None;
             return o;
+        }
+
+        /// <summary>挿さずに空けた手札の端子を対象に取る端子 (〈写し取り〉〈焼き切り〉〈保持器〉)。</summary>
+        public static bool PicksTarget(string id) => id == TerminalIds.Copier || id == TerminalIds.BurnOut || id == TerminalIds.Retainer;
+
+        /// <summary>場の s が、 self (対象を取る端子) の対象の候補か: 自分でない・常設でない・出目が 1 個も挿さっていない手札の端子。
+        /// slotOfDie は挿し方を直した後の値 (<see cref="TerminalOutcome.slotOfDie"/>) を渡す ── 条件に合わず外れた端子も「空けた」に入る。</summary>
+        public static bool IsCandidate(List<string> board, int[] slotOfDie, int self, int s)
+        {
+            if (board == null || s < 0 || s >= board.Count || s == self) return false;
+            var d = Get(board[s]);
+            return d != null && !d.permanent && (slotOfDie == null || !Plugged(slotOfDie, s));
+        }
+
+        /// <summary>self の対象の候補 (場の添字・左から)。</summary>
+        public static List<int> TargetCandidates(List<string> board, int[] slotOfDie, int self)
+        {
+            var l = new List<int>();
+            if (board != null) for (int s = 0; s < board.Count; s++) if (IsCandidate(board, slotOfDie, self, s)) l.Add(s);
+            return l;
+        }
+
+        /// <summary>軸の端子で、 その軸が誓約で封じられているか (封じた軸の資源を足す部分は効かない)。</summary>
+        public static bool AxisSealed(TerminalDef d, in TerminalEnv env)
+        {
+            if (d?.axis == null) return false;
+            if (d.axis == ItemSystem.PassiveSkills.AxisRules.Poison) return env.sealPoison;
+            if (d.axis == ItemSystem.PassiveSkills.AxisRules.Bleed) return env.sealBleed;
+            if (d.axis == ItemSystem.PassiveSkills.AxisRules.Heat) return env.sealHeat;
+            if (d.axis == ItemSystem.PassiveSkills.AxisRules.Charge) return env.sealCharge;
+            if (d.axis == ItemSystem.PassiveSkills.AxisRules.Shield) return env.sealShield;
+            if (d.axis == ItemSystem.PassiveSkills.AxisRules.Crit) return env.sealCrit;
+            return false;
         }
 
         private static bool Plugged(int[] slotOfDie, int s)

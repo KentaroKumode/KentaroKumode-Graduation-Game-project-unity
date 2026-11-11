@@ -8,42 +8,42 @@ namespace UI.Game2D
 {
     /// <summary>
     /// 戦闘の GUI (<b>仮置き</b>・2026-10-24)。 枠・ダイスの面・ボタン・ランプ・ゲージ・丸ボタンは PixelLab (参考画像の切り抜き + パレット抽出) で作った絵
-    /// (Assets/gui2d/battle_ui/・<see cref="Game2DKitAssets"/>)。 枠は 1 枚の絵を 9 分割して 3 つのパネルの大きさに合わせる。 文字は 3×5 のドット字 (英数字だけ)。
-    /// 左 = 自分のダイス 3 個と配線 (攻撃・防御・充電・特殊) と振り直しと決定ボタン / 右 = 敵の出目と攻撃値 / 上の帯 = 充電・エスカレーション・敵 HP。
-    /// 状態は <see cref="Game2DBattleSim"/> (実戦闘の流れ) から読む。 クリック: ダイスか端子 = 配線を切り替え / REROLL = 充電を払って振り直す / 下のボタン = GO! → NEXT。
+    /// (Assets/gui2d/battle_ui/・<see cref="Game2DKitAssets"/>)。 枠は 1 枚の絵を 9 分割してパネルの大きさに合わせる。
+    /// 右 = 敵の出目と攻撃値 (予告の枠) / 上の帯 = 充電・エスカレーション・敵 HP。 状態は <see cref="Game2DBattleSim"/> (実戦闘の流れ) から読む。
     /// 航行用の GUI が引っ込むのと入れ替わりに、 左・右・上からばねで入ってくる (<see cref="Drive"/>)。 座標は 480×270 の格子 (左上が原点)。
-    /// <para>端子の山札 (ADR-0014) で戦っている時は、 左のパネルの代わりに 3 枚を左に積む: Ports (出目 3 個とそれぞれの差し込み口) / ステータス / Ctl (操作)。
+    /// <para>端子の山札 (ADR-0014): 左に 3 枚を積む: Ports (出目とそれぞれの差し込み口・出目が 4 個以上なら 3 個ずつの列を右へ足す) / ステータス / Ctl (操作)。
     /// 右下 (Hand) にこのターンに引いた端子 (USB メモリの形) を並べ、 つかんで出目の差し込み口へ落とすと装着する (<see cref="Game2DBattleSim.Plug"/>)。
-    /// 名前・条件・効果は USB にマウスを乗せた時だけ帯 (Tip) で出す。 発動の見込みは <see cref="CombatSystem.TerminalCards.Resolve"/> を状態の写しで呼んだ値
-    /// (<see cref="Game2DBattleSim.preview"/>)。 攻撃・防御の数字は資源バーとステータスに任せる。</para>
+    /// 〈写し取り〉〈焼き切り〉〈保持器〉に出目を挿すと、 挿していない手札の端子に「候補」の印が付き、 候補をその端子の上へ落とすと対象が決まる
+    /// (<see cref="Game2DBattleSim.SetTarget"/>)。 名前・条件・効果は USB にマウスを乗せた時だけ帯 (Tip) で出す。 発動の見込みは
+    /// <see cref="CombatSystem.TerminalCards.Resolve"/> を状態の写しで呼んだ値 (<see cref="Game2DBattleSim.preview"/>)。</para>
+    /// (旧い配線の画面 ── 左のパネルに出目 3 個と攻撃・防御・充電・特殊の板 ── は 2026-11-11 に削除。 戦闘は常に山札で戦う)
     /// </summary>
     public class Game2DBattleHud : MonoBehaviour
     {
         // 配置 (dot)
-        // 2026-11-11: 字を既定のフォント (高さ 12) にしたので、 左右の枠を広げ、 上の帯を高くし、 左右は帯の下から始める
-        private static readonly RectInt Left = new RectInt(2, 60, 108, 208), Right = new RectInt(370, 60, 108, 120), Top = new RectInt(96, 2, 288, 56);
+        // 2026-11-11: 字を既定のフォント (高さ 12) にしたので、 右の枠を広げ、 上の帯を高くし、 右は帯の下から始める
+        private static readonly RectInt Right = new RectInt(370, 60, 108, 120), Top = new RectInt(96, 2, 288, 56);
         private const int FrameB = 12;
-        // 自分のステータス (会心率・攻撃・防御): 旧い配線の画面では右のパネルの下 (右と同じばねで横から入る・2026-11-05)。
-        // 山札の画面では左下 (Ports と Ctl の間・左と同じばね)。
-        private static readonly RectInt Stat = new RectInt(370, 184, 108, 68), StatDeck = new RectInt(2, 162, 108, 48);
-        // 左パネルの中 (パネルの左上が原点): 枠の内側は x 14〜72
-        private static readonly RectInt Btn = new RectInt(15, 170, 80, 26), RerollR = new RectInt(15, 134, 80, 16),
-            ItemR = new RectInt(15, 152, 39, 15), FleeR = new RectInt(56, 152, 39, 15);      // 消耗品 / 逃げる (配線の判断の間だけ)
-        private static RectInt DieR(int i) => new RectInt(15, 18 + i * 24, 18, 18);
-        private static RectInt TermR(int i) => new RectInt(37, 18 + i * 24, 58, 18);
+        /// <summary>自分のステータス (会心率・攻撃・防御): 左下 (Ports と Ctl の間・左と同じばね)。</summary>
+        private static readonly RectInt Stat = new RectInt(2, 162, 108, 48);
 
         // ── 端子の山札 (ADR-0014・2026-11-11) の配置 ──
-        //   Ports (2,60,108,98)   = 出目 3 個と、 出目ごとの差し込み口 (挿した USB は横向きに挿さった絵で残る)。
-        //   StatDeck (2,162,108,48) = 会心・攻撃・防御/貫通。
+        //   Ports (2,60,108,98)   = 出目と、 出目ごとの差し込み口 (挿した USB は横向きに挿さった絵で残る)。 3 個ずつ縦に並べ、 4 個目からは列を右へ足す。
+        //   Stat (2,162,108,48)   = 会心・攻撃・防御/貫通。
         //   Ctl (2,214,108,52)    = 振り直す・おまかせ / 道具・逃げる・決める。 x 110 まで = 資源バー (x 110〜・y 215〜) にかからない。
-        //   Hand (318,184,160,80) = このターンに引いた端子 (縦向きの USB・左から) と常設 (右の端・仕切りの右)・山/捨ての枚数。 敵 (x 190〜290) と予告の欄 (y 〜180) の外。
-        //   Tip (幅 200)          = USB にマウスを乗せた時だけ。 差し込み口の USB は Ports の右 (x 112)、 手札の USB は Hand の上に出す。
+        //   Hand (318,184,160,80) = このターンに引いた端子 (縦向きの USB・左から) と常設 (右の端・仕切りの右)・山/捨ての枚数。 敵 (x 190〜290) と予告の枠 (Right・y 〜180) の外。
+        //   Tip (幅 200)          = USB にマウスを乗せた時だけ。 予告の枠 (Right) と敵の頭上の予告 (y 〜78) に重ねない:
+        //                           差し込み口の USB は Ports の右・口の高さ (y は TipMinY から)、 手札の USB は Hand の上で、 右端を予告の枠の左に揃える。
         private static readonly RectInt Ports = new RectInt(2, 60, 108, 98), Ctl = new RectInt(2, 214, 108, 52), Hand = new RectInt(318, 184, 160, 80);
-        private const int TipW = 200, TipH = 61, TipLines = 4, TipMaxY = 214;
-        // 差し込み口の行 (Ports の中): 出目 → 配線 → 口 (USB の差し込み部が口に入る) → 本体
-        private static int PortY(int i) => 6 + i * 31;
-        private static RectInt PDieR(int i) => new RectInt(8, PortY(i) + 3, 18, 18);
-        private static RectInt PortR(int i) => new RectInt(30, PortY(i), 68, 24);      // 落とせる範囲 (口と挿さった USB)
+        private const int TipW = 200, TipLinesMax = 6, TipH = 6 + TipLinesMax * 13 + 3, TipMinY = 82, TipMaxY = 214;
+        // 差し込み口の行 (Ports の中): 出目 → 配線 → 口 (USB の差し込み部が口に入る) → 本体 → ランプ。 1 列 3 個・列の幅 76
+        private const int PortRows = 3, PortColW = 76;
+        private static int PortCols(int n) => Mathf.Max(1, (n + PortRows - 1) / PortRows);
+        private static int PortsW(int n) => Ports.width + (PortCols(n) - 1) * PortColW;
+        private static int PortX(int i) => (i / PortRows) * PortColW;
+        private static int PortY(int i) => 6 + (i % PortRows) * 31;
+        private static RectInt PDieR(int i) => new RectInt(PortX(i) + 8, PortY(i) + 3, 18, 18);
+        private static RectInt PortR(int i, int n) => new RectInt(PortX(i) + 30, PortY(i), PortCols(n) > 1 ? PortColW - 30 : 68, 24);      // 落とせる範囲 (口と挿さった USB)
         // USB の大きさ: 差し込み部 8×12 (縦向きは 12×8) + 本体 24×24
         private const int UsbConn = 8, UsbConnW = 12, UsbBody = 24, UsbLong = UsbConn + UsbBody;
         // 手札 (Hand の中)
@@ -51,34 +51,36 @@ namespace UI.Game2D
         private static readonly RectInt CReroll = new RectInt(5, 5, 56, 20), CAuto = new RectInt(63, 5, 40, 20),
             CItem = new RectInt(5, 27, 24, 20), CFlee = new RectInt(31, 27, 36, 20), CGo = new RectInt(69, 27, 34, 20);
         private RectTransform _ports, _ctl, _hand, _tip, _drag; private Texture2D _tp, _tc, _th, _tt2, _td;
+        private int _portsTexW = -1;
 
-        /// <summary>端子のアイコン (16×16・行優先・左上から・0 = 透明 / 1 = 暗 / 2 = 中 / 3 = 明)。 無ければ null。
-        /// 仮: アイコンの担当 (Game2DTerminalIcons.Get) がそろうまで null を返す ── 差し替えはここ 1 か所。</summary>
+        /// <summary>端子のアイコン (16×16・行優先・左上から・0 = 透明 / 1 = 暗 / 2 = 中 / 3 = 明)。 無ければ null。</summary>
         private static byte[] IconOf(string id) => Game2DTerminalIcons.Get(id);
 
         public Game2DBattleSim sim;
         public Game2DBattleFx fx;
         public Game2DScreen screen;
-        [Tooltip("端子のボタン (攻撃・防御・充電) と決定ボタン。 枠・ダイスなどの共通の絵は Game2DKitAssets")]
-        public Texture2D btnAtkTex, btnBlkTex, btnChgTex, btnGoTex, btnPlainTex;
+        [Tooltip("決定ボタンの絵。 枠・ダイスなどの共通の絵は Game2DKitAssets")]
+        public Texture2D btnGoTex;
 
-        [SerializeField] private RectTransform _left, _right, _top;
+        [SerializeField] private RectTransform _right, _top;
         private RectTransform _stat;
-        private Texture2D _tl, _tr, _tt, _ts;
+        private Texture2D _tr, _tt, _ts;
         private int _drawn = -1; private float _slide;
-        private KitSrc _bAtk, _bBlk, _bChg, _bGo, _bPlain; private bool _srcInit;
-        /// <summary>最後に描いた時、 山札の配置だったか (ステータスの置き場とばねを決める)。</summary>
-        private bool _deckLayout;
+        private KitSrc _bGo; private bool _srcInit;
 
         private static readonly Color32 Ink = Game2DKit.Ink, Dim = Game2DKit.Dim, Dark = Game2DKit.Dark, Off = Game2DKit.Off, Well = Game2DKit.Well,
-            Atk = Game2DKit.Red, Blk = Game2DKit.Blue, Chg = Game2DKit.Gold, Spc = Game2DKit.Amber, Hp = new Color32(0xd1, 0x50, 0x3c, 255);
-        private static readonly Color32[] TermCol = { Atk, Blk, Chg, Spc };
-        private static readonly string[] TermName = { "攻撃", "防御", "充電", "特殊" };
+            Atk = Game2DKit.Red, Blk = Game2DKit.Blue, Chg = Game2DKit.Gold, Hp = new Color32(0xd1, 0x50, 0x3c, 255);
+        /// <summary>対象を選ぶ印: 候補の縁 / 決まった対象の縁 (色と明度だけで出す・拡大しない)。</summary>
+        private static readonly Color32 CandEdge = Game2DTerminalLook.Mix(Game2DKit.Ivory, Game2DKit.Off, 0.45f), ChosenEdge = Game2DKit.Ivory;
+
+        /// <summary>手札・出目をつかんでいる間と、 離したフレーム (の次まで) は true。 敵の詳細の窓 (<see cref="Game2DEnemyPanel"/>) はこの間は開かない。</summary>
+        public static bool PointerBusy => _busyDrag || Time.frameCount <= _releaseFrame + 1;
+        private static bool _busyDrag; private static int _releaseFrame = -10;
 
         /// <summary>見た目を作る (builder から 1 度呼ぶ)。 親は 480×270 の格子の枠。</summary>
         public void Build()
         {
-            _left = Make("left", Left, out _tl); _right = Make("right", Right, out _tr); _top = Make("top", Top, out _tt);
+            _right = Make("right", Right, out _tr); _top = Make("top", Top, out _tt);
             _stat = Make("stat", Stat, out _ts);
         }
 
@@ -94,7 +96,8 @@ namespace UI.Game2D
 
         private void OnDestroy()
         {
-            foreach (var t in new[] { _tl, _tr, _tt, _ts, _tp, _tc, _th, _tt2, _td }) if (t != null) Destroy(t);
+            foreach (var t in new[] { _tr, _tt, _ts, _tp, _tc, _th, _tt2, _td }) if (t != null) Destroy(t);
+            _busyDrag = false;
         }
 
         /// <summary>組み上げ済みのシーンに無いパネルを作る (ステータス・山札の画面の部品。 実行時に作り、 シーンには保存しない)。
@@ -116,19 +119,17 @@ namespace UI.Game2D
         /// <summary>戦闘の GUI をばねで出し入れする (毎フレーム)。 入る順は 左 → 上 → 右 で、 少しずつずらす。 行き過ぎは 3 dot 以内。</summary>
         public void Drive(bool on, float dt)
         {
-            if (_left == null) return;
+            if (_right == null) return;
             EnsurePanels();
             if (!_spInit) { _spL.Set(0); _spR.Set(0); _spT.Set(0); _spInit = true; }
             float t = on ? 1f : 0f;
             _spL.Go(t, on ? 0.03f : 0f); _spT.Go(t, on ? 0.07f : 0.03f); _spR.Go(t, on ? 0.12f : 0.06f);
             _spL.Step(dt); _spT.Step(dt); _spR.Step(dt);
             _slide = _spL.x;
-            float inL = Mathf.Round((1f - _spL.Value(120f)) * 120f), inR = Mathf.Round((1f - _spR.Value(170f)) * 170f);
-            _left.anchoredPosition = new Vector2(Left.x - inL, -Left.y);
+            float inL = Mathf.Round((1f - _spL.Value(200f)) * 200f), inR = Mathf.Round((1f - _spR.Value(170f)) * 170f);
             _right.anchoredPosition = new Vector2(Right.x + Mathf.Round((1f - _spR.Value(120f)) * 120f), -Right.y);
             _top.anchoredPosition = new Vector2(Top.x, -Top.y + Mathf.Round((1f - _spT.Value(62f)) * 62f));
-            if (_deckLayout) _stat.anchoredPosition = new Vector2(StatDeck.x - inL, -StatDeck.y);
-            else _stat.anchoredPosition = new Vector2(Stat.x + Mathf.Round((1f - _spR.Value(120f)) * 120f), -Stat.y);
+            _stat.anchoredPosition = new Vector2(Stat.x - inL, -Stat.y);
             _ports.anchoredPosition = new Vector2(Ports.x - inL, -Ports.y);
             _ctl.anchoredPosition = new Vector2(Ctl.x - inL, -Ctl.y);
             _hand.anchoredPosition = new Vector2(Hand.x + inR, -Hand.y);
@@ -137,36 +138,23 @@ namespace UI.Game2D
 
         private void Update()
         {
-            if (_left == null || sim == null || !Game2DBattleSim.Active) { CancelDrag(); return; }
+            if (_right == null || sim == null || !Game2DBattleSim.Active) { CancelDrag(); return; }
             // 配線を決める間だけ読み直す (その後は本判定に取り込まれて二重に数えるので、 最後の値を出し続ける)
             if (sim.CanOperate && CombatSystem.CombatManager.Instance != null)
             { _hs = CombatSystem.CombatManager.Instance.PreviewHudStats(); _hsKnown = true; }
-            bool deck = sim.DeckMode, ptr = _slide > 0.95f && !Game2DModal.Active && screen != null;
+            bool ptr = _slide > 0.95f && !Game2DModal.Active && screen != null;
             Vector2 d = default; bool hasDot = ptr && Game2DPointer.TryDot(screen, out d);
-            if (deck) DeckPointer(hasDot, d);
-            else if (_dragS >= 0) CancelDrag();
+            DeckPointer(hasDot, d);
             // 引いてくる動きの間は毎フレーム描き直す
             if (sim.boardSerial != _dealSerial) { _dealSerial = sim.boardSerial; _dealT0 = Time.unscaledTime; }
-            bool dealing = deck && Time.unscaledTime - _dealT0 < DealTime(sim.board.Count);
+            bool dealing = Time.unscaledTime - _dealT0 < DealTime(sim.board.Count);
             int ehp = fx != null ? fx.EnemyHp : 0, ver = sim.version * 31 + ehp * 7 + sim.charge
                 + (_hsKnown ? Mathf.RoundToInt(_hs.critRate * 1000f) * 131 + _hs.attack * 17 + _hs.outgoingPct * 7 + _hs.defense * 3 + _hs.pen : 0)
-                + (deck ? 977 + DeckCountsHash() : 0) + (dealing ? Time.frameCount * 7919 : 0);
+                + 977 + DeckCountsHash() + sim.DiceCount * 7577 + (dealing ? Time.frameCount * 7919 : 0);
             if (ver != _drawn) { _drawn = ver; Redraw(); }
-            if (!hasDot || deck) return;
-            if (Input.GetMouseButtonDown(0)) Click(d);
         }
 
-        private bool In(Vector2 d, RectInt panel, RectInt r) => d.x >= panel.x + r.x && d.x < panel.x + r.x + r.width && d.y >= panel.y + r.y && d.y < panel.y + r.y + r.height;
-
-        /// <summary>旧い配線の画面のクリック。</summary>
-        private void Click(Vector2 d)
-        {
-            for (int i = 0; i < 3; i++) if (In(d, Left, DieR(i)) || In(d, Left, TermR(i))) { sim.CycleWire(i); return; }
-            if (In(d, Left, RerollR)) { sim.Reroll(); return; }
-            if (In(d, Left, ItemR)) { OpenItems(); return; }
-            if (In(d, Left, FleeR)) { PressFlee(); return; }
-            if (In(d, Left, Btn)) { if (sim.ButtonEnabled) sim.Button(); }
-        }
+        private static bool In(Vector2 d, RectInt panel, RectInt r) => d.x >= panel.x + r.x && d.x < panel.x + r.x + r.width && d.y >= panel.y + r.y && d.y < panel.y + r.y + r.height;
 
         /// <summary>逃げるは 2 度押しで確定 (本当に? → 押すとこのターンは攻撃せずに離脱)。</summary>
         private void PressFlee()
@@ -187,11 +175,11 @@ namespace UI.Game2D
         {
             if (_srcInit) return; _srcInit = true;
             if (Game2DKit.Plain) return;
-            _bAtk = KitSrc.From(btnAtkTex); _bBlk = KitSrc.From(btnBlkTex); _bChg = KitSrc.From(btnChgTex); _bGo = KitSrc.From(btnGoTex);
-            _bPlain = KitSrc.From(btnPlainTex);
+            _bGo = KitSrc.From(btnGoTex);
         }
 
-        private KitPix Frame(RectInt r) { var p = new KitPix(r.width, r.height); p.NineSlice(Game2DKit.Frame, FrameB, Well); return p; }
+        private KitPix Frame(int w, int h) { var p = new KitPix(w, h); p.NineSlice(Game2DKit.Frame, FrameB, Well); return p; }
+        private KitPix Frame(RectInt r) => Frame(r.width, r.height);
 
         /// <summary>ダイス 1 個: 面の絵 (点の数が出目)。 絵が無い時は無地の板 + 数字。</summary>
         private void DrawDie(KitPix p, RectInt r, int v, bool enemy, bool question = false)
@@ -208,21 +196,15 @@ namespace UI.Game2D
         private void Redraw()
         {
             InitSrc(); EnsurePanels();
-            bool deck = sim != null && Game2DBattleSim.Active && sim.DeckMode;
-            if (deck != _deckLayout) { _deckLayout = deck; if (_ts != null) { Destroy(_ts); _ts = null; } }      // ステータスの大きさが変わる
             Ensure(ref _tr, _right, Right); Ensure(ref _tt, _top, Top);
-            bool tip = false;
-            if (deck)
-            {
-                Ensure(ref _tp, _ports, Ports); Ensure(ref _tc, _ctl, Ctl); Ensure(ref _th, _hand, Hand);
-                DrawPorts(_tp); DrawCtl(_tc); DrawHand(_th); tip = DrawTip();
-            }
-            else { Ensure(ref _tl, _left, Left); DrawLeft(_tl); }
-            Show(_left, !deck); Show(_ports, deck); Show(_ctl, deck); Show(_hand, deck); Show(_tip, tip && _slide > 0.95f);
+            // 出目の個数で Ports の幅が変わる: 絵を作り直す
+            int pw = PortsW(sim.DiceCount);
+            if (pw != _portsTexW) { if (_tp != null) Destroy(_tp); _tp = null; _portsTexW = pw; _ports.sizeDelta = new Vector2(pw, Ports.height); }
+            Ensure(ref _tp, _ports, new RectInt(Ports.x, Ports.y, pw, Ports.height)); Ensure(ref _tc, _ctl, Ctl); Ensure(ref _th, _hand, Hand);
+            DrawPorts(_tp, pw); DrawCtl(_tc); DrawHand(_th); bool tip = DrawTip();
+            Show(_ports, true); Show(_ctl, true); Show(_hand, true); Show(_tip, tip && _slide > 0.95f);
             DrawRight(_tr); DrawTop(_tt);
-            var sr = deck ? StatDeck : Stat;
-            if (_stat != null) _stat.sizeDelta = new Vector2(sr.width, sr.height);
-            Ensure(ref _ts, _stat, sr); DrawStat(_ts, sr, deck);
+            Ensure(ref _ts, _stat, Stat); DrawStat(_ts);
         }
 
         /// <summary>パネルを出す / 隠す。 絵がまだ無いパネルは出さない。</summary>
@@ -234,16 +216,15 @@ namespace UI.Game2D
 
         private CombatSystem.CombatManager.HudStats _hs; private bool _hsKnown;
 
-        /// <summary>自分のステータス: 会心率と倍率・攻撃と与ダメ補正・防御と貫通。 数字は配線を決める間に読んだ値。 山札の画面では左下の低いパネル。</summary>
-        private void DrawStat(Texture2D t, RectInt r, bool deck)
+        /// <summary>自分のステータス: 会心率と倍率・攻撃・防御と貫通。 数字は配線を決める間に読んだ値。</summary>
+        private void DrawStat(Texture2D t)
         {
-            var p = Frame(r);
+            var p = Frame(Stat);
             bool k = _hsKnown && sim != null && Game2DBattleSim.Active;
             string crit = k ? "会心 " + Mathf.RoundToInt(_hs.critRate * 100f) + "% " + _hs.critMul.ToString("0.0") + "倍" : "会心 --";
             string atk = k ? "攻撃 " + _hs.attack : "攻撃 --";      // 与ダメの倍率は着弾の数字の横に出す (Game2DBattleFx・2026-11-11)
             string def = k ? "防御 " + _hs.defense + " 貫通 " + _hs.pen : "防御 --";
-            int x = deck ? 8 : 14, y = deck ? 5 : 14;
-            p.Text(crit, x, y, Chg); p.Text(atk, x, y + 13, Atk); p.Text(def, x, y + 26, Blk);
+            p.Text(crit, 8, 5, Chg); p.Text(atk, 8, 18, Atk); p.Text(def, 8, 31, Blk);
             p.Apply(t);
         }
 
@@ -253,42 +234,6 @@ namespace UI.Game2D
             if (tex != null || rt == null) return;
             tex = new Texture2D(r.width, r.height, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp, name = "Game2DBattleHud" };
             var ri = rt.GetComponent<RawImage>(); if (ri != null) { ri.texture = tex; ri.enabled = true; }
-        }
-
-        private void DrawTerm(KitPix p, RectInt tr, int wv, bool on)
-        {
-            var s = wv == 0 ? _bAtk : wv == 1 ? _bBlk : wv == 2 ? _bChg : null;      // 補助は専用の絵が無いので板で
-            if (s != null) p.Sprite(s, tr.x, tr.y, tr.width, tr.height);
-            else p.Box(tr.x, tr.y, tr.width, tr.height, on ? TermCol[wv] : Dim, Dark);
-            p.TextC(TermName[wv], tr, on ? Ink : Dim);
-        }
-
-        private void DrawLeft(Texture2D t)
-        {
-            var p = Frame(Left);
-            bool live = sim != null && Game2DBattleSim.Active;
-            for (int i = 0; i < 3; i++)
-            {
-                var dr = DieR(i); var tr = TermR(i); int wv = live ? sim.wire[i] : i; bool on = live && sim.CanOperate;
-                DrawDie(p, dr, live ? sim.pd[i] : i + 1, false, live && !sim.rolled && sim.phase != Game2DBattleSim.P.PRoll);
-                p.Rect(dr.x + dr.width + 1, dr.y + 8, tr.x - dr.x - dr.width - 2, 2, on ? Ink : Dim);                      // 配線 (ダイス → 端子)
-                DrawTerm(p, tr, wv, on);
-            }
-            string a = "-", b = "-", c = "-";
-            if (live && sim.rolled) { var w = sim.GetWired(); a = w.atk + " = " + (w.atk - w.aDice) + "+" + w.aDice; b = w.blk.ToString(); c = "+" + w.chg + " (" + sim.charge + ")"; }
-            p.Text("攻撃 " + a, 15, 90, Atk); p.Text("防御 " + b, 15, 103, Blk); p.Text("充電 " + c, 15, 116, Chg);
-            // 振り直し: 充電を払って全ダイスを振り直す (払えない・判断の外では暗く)
-            bool rr = live && sim.CanRerollNow;
-            if (Game2DKit.Tab != null) p.NineSlice(Game2DKit.Tab, 5, Well, RerollR.x, RerollR.y, RerollR.width, RerollR.height);
-            else p.Box(RerollR.x, RerollR.y, RerollR.width, RerollR.height, Off, Dark);
-            p.TextC(live && sim.canReroll ? "振り直す -" + sim.rerollCost : "振り直す", RerollR, rr ? Chg : Dim);
-            // 消耗品 / 逃げる (逃げるは 2 度押しで確定: SURE? → 押すとこのターンは攻撃せずに離脱)
-            if (!live || !sim.CanFlee) _fleeArmed = false;
-            bool itemOn = live && sim.CanOperate && CombatItems().Count > 0, fleeOn = live && sim.CanFlee;
-            SmallBtn(p, ItemR, "道具", itemOn, Chg);
-            SmallBtn(p, FleeR, _fleeArmed ? "本当に?" : "逃げる", fleeOn, _fleeArmed ? Atk : Ink);
-            DrawGo(p, Btn, live);
-            p.Apply(t);
         }
 
         /// <summary>決定ボタン (決める → 次へ / 終わる)。</summary>
@@ -304,20 +249,24 @@ namespace UI.Game2D
         //   右下の手札の USB をつかんで (左ボタンを押したまま動かす)、 左の出目の差し込み口へ落とす = その出目をその端子に挿す。
         //   挿さった USB もつかめる: 別の出目の口へ落とす = 移す / 口の外で離す = 手札へ戻す。 口の上で右クリック = 外す。
         //   別の USB を挿さっている口へ落とす = 入れ替え (前の USB は手札へ)。 落とせない口で離したら手札へ戻る。
-        //   出目を押す = 行き先を順に変える (右クリックで逆・1〜3 キーと同じ)。 Q = おまかせ・Space = 決める (Sim のキー)。
+        //   対象を選ぶ: 〈写し取り〉〈焼き切り〉〈保持器〉が挿さっている口 (か手札の抜け殻) へ、 候補の USB を落とす = 対象に決める
+        //   (その口への「入れ替え」より先に効く。 入れ替えたい時は右クリックで外してから挿す)。
+        //   出目を押す = 行き先を順に変える (右クリックで逆・1〜9 キーと同じ)。 Q = おまかせ・Space = 決める (Sim のキー)。
 
         /// <summary>つかんでいる端子 (場の添字・−1 = つかんでいない) / つかんだ元の出目 (手札からなら −1)。</summary>
         private int _dragS = -1, _dragFrom = -1, _dropHover = -1;
         private bool _moved; private Vector2 _pressDot;
-        private readonly bool[] _dropOk = new bool[3];
+        /// <summary>つかんでいる間: 出目ごとに 挿せる口か / 対象に決められる口か。 場の添字ごとに 対象に決められる手札の抜け殻か。</summary>
+        private bool[] _dropOk = new bool[3], _targetOk = new bool[3], _targetHand = new bool[0];
         /// <summary>マウスが乗っている USB (場の添字) と、 それが挿さっている出目 (手札なら −1)。 説明の帯に使う。</summary>
-        private int _hoverS = -1, _hoverPort = -1;
+        private int _hoverS = -1, _hoverPort = -1, _handHover = -1;
         private int _dealSerial = -1; private float _dealT0 = -10f;
 
         private static float DealTime(int n) => 0.22f + 0.07f * n;
 
         private void DeckPointer(bool hasDot, Vector2 d)
         {
+            int n = sim.DiceCount;
             if (_dragS >= 0)
             {
                 if (!sim.CanOperate || _dragS >= sim.board.Count) { CancelDrag(); return; }
@@ -325,9 +274,10 @@ namespace UI.Game2D
                 {
                     if (_drag != null) _drag.anchoredPosition = new Vector2(Mathf.FloorToInt(d.x) - UsbBody / 2, -(Mathf.FloorToInt(d.y) - UsbLong / 2));
                     if (!_moved && (d - _pressDot).sqrMagnitude > 9f) { _moved = true; Show(_drag, true); _drawn = -1; }
-                    int tgt = PortAt(d); if (tgt != _dropHover) { _dropHover = tgt; _drawn = -1; }
+                    int tgt = PortAt(d), hh = HandAt(d);
+                    if (tgt != _dropHover || hh != _handHover) { _dropHover = tgt; _handHover = hh; _drawn = -1; }
                 }
-                if (Input.GetMouseButtonUp(0)) EndDrag(hasDot ? PortAt(d) : -1);
+                if (Input.GetMouseButtonUp(0)) EndDrag(hasDot ? PortAt(d) : -1, hasDot ? HandAt(d) : -1);
                 return;
             }
             // 乗っている USB (説明の帯)
@@ -335,7 +285,7 @@ namespace UI.Game2D
             if (hasDot)
             {
                 int pt = PortAt(d);
-                if (pt >= 0 && sim.slot[pt] >= 0 && !sim.ShowingResult) { hs = sim.slot[pt]; hp = pt; }
+                if (pt >= 0 && pt < sim.slot.Length && sim.slot[pt] >= 0 && !sim.ShowingResult) { hs = sim.slot[pt]; hp = pt; }
                 else if (pt >= 0 && sim.ShowingResult && sim.lastOutcome != null && pt < sim.lastOutcome.slotOfDie.Length && sim.lastOutcome.slotOfDie[pt] >= 0) { hs = sim.lastOutcome.slotOfDie[pt]; hp = pt; }
                 else hs = HandAt(d);
             }
@@ -343,7 +293,7 @@ namespace UI.Game2D
             if (!hasDot) return;
             if (Input.GetMouseButtonDown(0))
             {
-                for (int i = 0; i < 3; i++) if (In(d, Ports, PDieR(i))) { sim.CycleWire(i, 1); return; }
+                for (int i = 0; i < n; i++) if (In(d, Ports, PDieR(i))) { sim.CycleWire(i, 1); return; }
                 int pt = PortAt(d);
                 if (pt >= 0) { if (sim.CanOperate && sim.slot[pt] >= 0) StartDrag(sim.slot[pt], pt, d); return; }
                 int h = HandAt(d);
@@ -356,15 +306,26 @@ namespace UI.Game2D
             }
             else if (Input.GetMouseButtonDown(1))
             {
-                for (int i = 0; i < 3; i++) if (In(d, Ports, PDieR(i))) { sim.CycleWire(i, -1); return; }
+                for (int i = 0; i < n; i++) if (In(d, Ports, PDieR(i))) { sim.CycleWire(i, -1); return; }
                 int pt = PortAt(d); if (pt >= 0) sim.Unplug(pt);
             }
         }
 
         private void StartDrag(int s, int from, Vector2 d)
         {
-            _dragS = s; _dragFrom = from; _moved = false; _pressDot = d; _dropHover = -1; _hoverS = _hoverPort = -1;
-            for (int i = 0; i < 3; i++) _dropOk[i] = sim.CanPlug(i, s, from);
+            int n = sim.DiceCount, m = sim.board.Count;
+            _dragS = s; _dragFrom = from; _moved = false; _pressDot = d; _dropHover = _handHover = -1; _hoverS = _hoverPort = -1;
+            _busyDrag = true;
+            if (_dropOk.Length != n) { _dropOk = new bool[n]; _targetOk = new bool[n]; }
+            if (_targetHand.Length != m) _targetHand = new bool[m];
+            for (int i = 0; i < n; i++)
+            {
+                _dropOk[i] = sim.CanPlug(i, s, from);
+                // 手札の候補を、 対象を取る端子が挿さった口へ落とす = 対象に決める (手札から つかんだ時だけ)
+                int ps = i < sim.slot.Length ? sim.slot[i] : -1;
+                _targetOk[i] = from < 0 && ps >= 0 && sim.CanSetTarget(ps, s);
+            }
+            for (int q = 0; q < m; q++) _targetHand[q] = from < 0 && sim.CanSetTarget(q, s);
             // つかんでいる USB の絵 (縦向き)。 動かし始めたら出す
             Ensure(ref _td, _drag, new RectInt(0, 0, UsbBody, UsbLong));
             var p = new KitPix(UsbBody, UsbLong);
@@ -376,15 +337,19 @@ namespace UI.Game2D
             _drawn = -1;
         }
 
-        private void EndDrag(int target)
+        private void EndDrag(int port, int hand)
         {
             int s = _dragS, from = _dragFrom; bool moved = _moved;
+            bool[] tOk = _targetOk, tHand = _targetHand;
             CancelDrag();
             if (!moved || s < 0) return;      // 押しただけ (動かしていない) なら何もしない
-            if (target >= 0)
+            // 対象を選ぶ (差し込み口の上 / 手札の抜け殻の上)
+            if (port >= 0 && port < tOk.Length && tOk[port] && sim.SetTarget(sim.slot[port], s)) return;
+            if (port < 0 && hand >= 0 && hand < tHand.Length && tHand[hand] && sim.SetTarget(hand, s)) return;
+            if (port >= 0)
             {
-                if (target == from) return;
-                if (sim.Plug(target, s, from)) return;
+                if (port == from) return;
+                if (sim.Plug(port, s, from)) return;
                 Game2DSfx.Play("ui_click");      // 落とせない口: 手札へ戻る
             }
             if (from >= 0) sim.Unplug(from);
@@ -393,14 +358,16 @@ namespace UI.Game2D
         private void CancelDrag()
         {
             if (_dragS < 0) return;
-            _dragS = _dragFrom = _dropHover = -1; _moved = false;
+            _dragS = _dragFrom = _dropHover = _handHover = -1; _moved = false;
+            _busyDrag = false; _releaseFrame = Time.frameCount;
             Show(_drag, false); _drawn = -1;
         }
 
         /// <summary>d の下の出目の行 (出目か差し込み口)。 −1 = なし。</summary>
         private int PortAt(Vector2 d)
         {
-            for (int i = 0; i < 3; i++) if (In(d, Ports, PortR(i)) || In(d, Ports, PDieR(i))) return i;
+            int n = sim.DiceCount;
+            for (int i = 0; i < n; i++) if (In(d, Ports, PortR(i, n)) || In(d, Ports, PDieR(i))) return i;
             return -1;
         }
 
@@ -425,7 +392,7 @@ namespace UI.Game2D
             return l;
         }
 
-        /// <summary>d の下の手札の USB (場の添字)。 −1 = なし。</summary>
+        /// <summary>d の下の手札の USB (場の添字・使い切った抜け殻も含む)。 −1 = なし。</summary>
         private int HandAt(Vector2 d)
         {
             foreach (var e in HandLayout(out _))
@@ -485,47 +452,54 @@ namespace UI.Game2D
         }
 
         /// <summary>Ports: 出目ごとに 出目 → 配線 → 差し込み口。 挿した USB は横向きに挿さった絵で残る (2 個挿せる端子は両方の口に出る)。
-        /// つかんでいる間は、 落とせる口を琥珀で明るく・落とせない口を暗く。 発動の見込み (解決後は結果) を口の右のランプで出す。</summary>
-        private void DrawPorts(Texture2D t)
+        /// つかんでいる間は、 落とせる口を琥珀で明るく・対象に決められる口を白で・落とせない口を暗く。 発動の見込み (解決後は結果) を口の右のランプで出す。</summary>
+        private void DrawPorts(Texture2D t, int w)
         {
-            var p = Frame(Ports);
-            bool res = sim.ShowingResult, dragging = _dragS >= 0 && _moved; var o = sim.preview; int m = sim.board.Count;
+            var p = Frame(w, Ports.height);
+            bool res = sim.ShowingResult, dragging = _dragS >= 0 && _moved; var o = sim.preview; int m = sim.board.Count, n = sim.DiceCount;
             int[] dieSlot = res && o != null ? o.slotOfDie : sim.slot;
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < n; i++)
             {
-                int y0 = PortY(i);
+                int x0 = PortX(i), y0 = PortY(i);
                 DrawDie(p, PDieR(i), sim.pd[i], false, !sim.rolled && sim.phase != Game2DBattleSim.P.PRoll);
                 int s = dieSlot != null && i < dieSlot.Length ? dieSlot[i] : -1;
                 var d = s >= 0 && s < m ? CombatSystem.TerminalCards.Get(sim.board[s]) : null;
                 bool used = d != null && o != null && i < o.slotOfDie.Length && o.slotOfDie[i] == s;      // 挿して発動に使われる出目
                 bool fires = d != null && o != null && o.fired.Contains(s), lit = res && fires;
                 var kc = d != null ? Game2DTerminalLook.KindColor(d.kind) : Game2DKit.Faint;
-                p.Rect(27, y0 + 11, 3, 2, used ? kc : Game2DKit.Faint);      // 配線
+                p.Rect(x0 + 27, y0 + 11, 3, 2, used ? kc : Game2DKit.Faint);      // 配線
                 bool ghost = dragging && _dragFrom == i;
-                // 口の地: つかんでいる間は 落とせる = 琥珀 (真上なら明るく) / 落とせない = 暗い
+                bool tOk = dragging && i < _targetOk.Length && _targetOk[i], dOk = dragging && i < _dropOk.Length && _dropOk[i];
+                // 口の地: つかんでいる間は 対象に決められる = 白 / 落とせる = 琥珀 (真上なら明るく) / 落とせない = 暗い
                 Color32 mouth = Game2DKit.Faint, fill = Well;
-                if (dragging) { mouth = _dropOk[i] ? (_dropHover == i ? Game2DTerminalLook.Mix(Game2DKit.Amber, Game2DKit.Ivory, 0.4f) : Game2DKit.Amber) : Off; fill = _dropOk[i] ? Game2DTerminalLook.Mix(Game2DKit.Amber, Well, 0.8f) : Dark; }
+                if (dragging)
+                {
+                    var on = tOk ? ChosenEdge : Game2DKit.Amber;
+                    mouth = tOk || dOk ? (_dropHover == i ? Game2DTerminalLook.Mix(on, Game2DKit.Ivory, 0.4f) : on) : Off;
+                    fill = tOk || dOk ? Game2DTerminalLook.Mix(on, Well, 0.8f) : Dark;
+                }
                 if (d == null || ghost)
                 {
-                    p.Box(30, y0, UsbLong + 2, UsbBody, fill, mouth);
-                    p.Rect(31, y0 + (UsbBody - UsbConnW) / 2, 2, UsbConnW, dragging && _dropOk[i] ? mouth : Off);      // 差し込みの口
+                    p.Box(x0 + 30, y0, UsbLong + 2, UsbBody, fill, mouth);
+                    p.Rect(x0 + 31, y0 + (UsbBody - UsbConnW) / 2, 2, UsbConnW, dragging && dOk ? mouth : Off);      // 差し込みの口
                 }
                 else
                 {
                     var c = UsbColors(d, true, fires || (!res && used), _hoverPort == i && _hoverS == s, lit);
                     if (!used) c.body = Game2DTerminalLook.Mix(kc, Off, 0.8f);      // 挿したが発動に使われない (条件・充電・2 個そろわない)
                     if (dragging) c.edge = mouth;
-                    DrawUsb(p, 31, y0, true, d, c.body, c.edge, c.metal);
+                    DrawUsb(p, x0 + 31, y0, true, d, c.body, c.edge, c.metal);
                 }
                 // ランプ (見込みで発動 / 解決後に発動)
-                int lx = 68, ly = y0 + 9;
+                int lx = x0 + 68, ly = y0 + 9;
                 p.Box(lx, ly, 5, 5, fires && used ? kc : Off, fires && used ? Game2DTerminalLook.Mix(kc, Game2DKit.Ivory, 0.3f) : Game2DKit.Faint);
             }
             p.Apply(t);
         }
 
         /// <summary>Hand: 上 = 山/捨て(/外) の枚数 / 下 = 手札の USB (縦向き)。 ターンの頭に右から滑り込む (位置だけ・拡大しない)。
-        /// 使い切った端子は抜け殻の枠だけ残す (並びが動かないように)。 2 個挿せる端子は残りの数を下に出す。 挿せる出目が無い端子は暗い。</summary>
+        /// 使い切った端子は抜け殻の枠だけ残す (並びが動かないように)。 2 個挿せる端子は残りの数を下に出す。 挿せる出目が無い端子は暗い。
+        /// 対象を選ぶ印: 候補 = 灰白の縁と下に「候補」/ 決まった対象 = 白の縁と下に「対象」。</summary>
         private void DrawHand(Texture2D t)
         {
             var p = Frame(Hand);
@@ -547,18 +521,27 @@ namespace UI.Game2D
                     x += Mathf.RoundToInt((1f - k) * Hand.width);
                 }
                 int rem = sim.Remaining(s) - (dragging && _dragFrom < 0 && _dragS == s ? 1 : 0);
-                if (rem <= 0) { p.Box(x, HandY + UsbConn, UsbBody, UsbBody, Well, Off); continue; }      // 抜け殻
+                if (rem <= 0)
+                {
+                    // 抜け殻。 対象を取る端子の抜け殻は、 候補をつかんでいる間 落とせる所として白く
+                    bool tgt = dragging && s < _targetHand.Length && _targetHand[s];
+                    var edge = tgt ? (_handHover == s ? Game2DTerminalLook.Mix(ChosenEdge, Game2DKit.Ivory, 0.4f) : ChosenEdge) : Off;
+                    p.Box(x, HandY + UsbConn, UsbBody, UsbBody, tgt ? Game2DTerminalLook.Mix(ChosenEdge, Well, 0.8f) : Well, edge);
+                    continue;
+                }
                 bool fits = !op || res || sim.HandFits(s);
                 var c = UsbColors(d, fits, false, _hoverPort < 0 && _hoverS == s, false);
+                bool chosen = false, cand = op && sim.IsTargetCandidate(s, out chosen);
+                if (cand && !(_hoverPort < 0 && _hoverS == s)) c.edge = chosen ? ChosenEdge : CandEdge;
                 DrawUsb(p, x, HandY, false, d, c.body, c.edge, c.metal);
-                int cap = d != null ? d.capacity : 1;
-                if (cap >= 2) { string r = "残" + rem; p.Text(r, x + (UsbBody - Game2DJpFont.Width(r)) / 2, HandY + UsbLong + 1, Dim); }
+                string label = cand ? (chosen ? "対象" : "候補") : d != null && d.capacity >= 2 ? "残" + rem : null;
+                if (label != null) p.Text(label, x + (UsbBody - Game2DJpFont.Width(label)) / 2, HandY + UsbLong + 1, cand && chosen ? Ink : Dim);
             }
             p.Apply(t);
         }
 
-        /// <summary>説明の帯 (USB にマウスを乗せた時だけ・つかんでいる間は出さない): 1 行目 = 名前 (種類の色) と印 / 続けて効果。
-        /// 差し込み口の USB は Ports の右 (x 112) に口の高さで、 手札の USB は Hand の上に右寄せで出す。 出すものが無ければ false。</summary>
+        /// <summary>説明の帯 (USB にマウスを乗せた時だけ・つかんでいる間は出さない): 1 行目 = 名前 (種類の色) と印 / 続けて効果 /
+        /// 対象 (〈写し取り〉など) / 誓約の封じ。 出すものが無ければ false。</summary>
         private bool DrawTip()
         {
             int m = sim.board.Count, f = _hoverS;
@@ -566,22 +549,56 @@ namespace UI.Game2D
             var d = CombatSystem.TerminalCards.Get(sim.board[f]); if (d == null) return false;
             Ensure(ref _tt2, _tip, new RectInt(0, 0, TipW, TipH));
             int iw = TipW - 10;
-            string head = d.id + "（" + Game2DTerminalLook.Marks(d, GameManager.Instance?.Run) + "）";
+            var run = GameManager.Instance?.Run;
+            string head = d.id + "（" + Game2DTerminalLook.Marks(d, run) + "）";
             var headLines = Game2DJpFont.Lines(head, iw);
-            var lines = new List<string>(headLines); lines.AddRange(Game2DJpFont.Lines(d.description, iw));
-            int n = Mathf.Min(TipLines, lines.Count), h = 6 + n * Game2DJpFont.LineH + 3;
+            var body = new List<string>(Game2DJpFont.Lines(d.description, iw));
+            // 対象 (〈写し取り〉など) と誓約の封じの行
+            var extra = new List<string>();
+            string tgt = TargetLine(f);
+            if (tgt != null) extra.AddRange(Game2DJpFont.Lines(tgt, iw));
+            for (int q = 0; q < m && !sim.ShowingResult; q++)
+                if (q != f && sim.IsPicker(q) && sim.TargetOf(q) == f) extra.AddRange(Game2DJpFont.Lines("〈" + sim.board[q] + "〉の対象", iw));
+            if (CombatSystem.TerminalCards.AxisSealedByRun(d, run)) extra.AddRange(Game2DJpFont.Lines("誓約で封じられている (軸の資源は増えない)", iw));
+            // 収まらない時は効果の末尾を削って、 対象・封じの行を残す
+            int over = headLines.Count + body.Count + extra.Count - TipLinesMax;
+            if (over > 0) body.RemoveRange(Mathf.Max(0, body.Count - over), Mathf.Min(body.Count, over));
+            var lines = new List<string>(headLines); lines.AddRange(body);
+            int extraFrom = lines.Count; lines.AddRange(extra);
+            int n = Mathf.Min(TipLinesMax, lines.Count), h = 6 + n * Game2DJpFont.LineH + 3;
             var p = new KitPix(TipW, TipH);      // 使わない下の部分は透明のまま
             var kc = Game2DTerminalLook.KindColor(d.kind);
             p.Box(0, 0, TipW, h, Well, kc);
-            for (int i = 0; i < n; i++) Game2DJpFont.Draw(p, lines[i], 5, 4 + i * Game2DJpFont.LineH, i < headLines.Count ? Dim : Ink);
+            for (int i = 0; i < n; i++) Game2DJpFont.Draw(p, lines[i], 5, 4 + i * Game2DJpFont.LineH, i < headLines.Count ? Dim : i >= extraFrom ? Chg : Ink);
             Game2DJpFont.Draw(p, d.id, 5, 4, kc);      // 名前だけ種類の色で上書き
             p.Apply(_tt2);
-            int x, y;
-            if (_hoverPort >= 0) { x = Ports.x + Ports.width + 2; y = Mathf.Clamp(Ports.y + PortY(_hoverPort), 2, TipMaxY - h); }
-            else { x = Hand.x + Hand.width - TipW; y = Hand.y - h - 2; }
-            _tip.anchoredPosition = new Vector2(x, -y);
+            int x0, y0;
+            int rightLimit = Right.x - 2 - TipW;      // 予告の枠 (Right) の左に収める
+            if (_hoverPort >= 0) { x0 = Mathf.Min(Ports.x + PortsW(sim.DiceCount) + 2, rightLimit); y0 = Mathf.Clamp(Ports.y + PortY(_hoverPort), TipMinY, TipMaxY - h); }
+            else { x0 = rightLimit; y0 = Mathf.Max(TipMinY, Hand.y - h - 2); }
+            _tip.anchoredPosition = new Vector2(x0, -y0);
             _tip.SetAsLastSibling();
             return true;
+        }
+
+        /// <summary>対象を取る端子の「対象: 〈◯◯〉」の行 (対象を取る端子でなければ null)。 解決の後は結果の対象を出す。</summary>
+        private string TargetLine(int f)
+        {
+            string id = sim.board[f];
+            if (!CombatSystem.TerminalCards.PicksTarget(id)) return null;
+            int t = -1;
+            if (sim.ShowingResult)
+            {
+                var o = sim.lastOutcome;
+                if (o == null || !o.fired.Contains(f)) return null;
+                t = id == CombatSystem.TerminalIds.Copier ? o.copyTarget : id == CombatSystem.TerminalIds.BurnOut ? o.burnTarget : o.retainTarget;
+            }
+            else
+            {
+                if (!sim.IsPicker(f)) return "出目を挿すと、 挿していない手札の端子を対象に選べる";
+                t = sim.TargetOf(f);
+            }
+            return t >= 0 && t < sim.board.Count ? "対象: 〈" + sim.board[t] + "〉" : "対象: なし (空けた端子が無い)";
         }
 
         /// <summary>Ctl: 上の段 = 振り直す・おまかせ / 下の段 = 道具・逃げる・決める。</summary>

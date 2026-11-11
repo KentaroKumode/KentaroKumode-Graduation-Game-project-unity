@@ -151,7 +151,7 @@ public static class Game2DBuilder
 
         var battleSim = cgo.AddComponent<UI.Game2D.Battle.Game2DBattleSim>(); battleSim.fx = battleFx;
         var battleHud = battleOnly.gameObject.AddComponent<Game2DBattleHud>(); battleHud.sim = battleSim; battleHud.fx = battleFx;
-        battleHud.btnAtkTex = BattleUiTex("btn_atk"); battleHud.btnBlkTex = BattleUiTex("btn_blk"); battleHud.btnChgTex = BattleUiTex("btn_chg"); battleHud.btnGoTex = BattleUiTex("btn_go");
+        battleHud.btnGoTex = BattleUiTex("btn_go");      // 端子のボタンの絵 (攻撃・防御・充電) は旧い配線の画面と一緒に削除 (2026-11-11)
         battleHud.Build();      // 戦闘の GUI (仮置きの長方形 + 字)
 
         // --- 操作パネル (map-prototype.html の BTNP): 枠の上端が、 閉じた GOLD の入れ物の下端 (54) に接する (枠は PNG の 3 行目から) → y = 51。

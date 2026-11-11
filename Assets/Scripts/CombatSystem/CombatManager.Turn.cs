@@ -45,7 +45,7 @@ namespace CombatSystem
             }
             if (_activeTurn != null)
             {
-                Debug.LogError("[CombatManager] 人が操作するターンの判断待ち ── AnswerReroll / AnswerWiring で進めること");
+                Debug.LogError("[CombatManager] 人が操作するターンの判断待ち ── AnswerReroll / AnswerWiringSlots で進めること");
                 return default;
             }
 
@@ -787,17 +787,18 @@ namespace CombatSystem
             TerminalOutcome term;
             {
                 var tenv = TerminalEnvNow(ctx, enemyAtkValue);
-                int[] slots = null;
+                int[] slots = null, targets = null;
                 if (_interactiveTurn)
                 {
-                    _pause.Set(TurnPauseKind.Wiring, playerDice, playerFaceIdx, tele, mutualWiring);
+                    _pause.Set(TurnPauseKind.Wiring, playerDice, playerFaceIdx, tele);
                     _pause.board = _deck.board; _pause.terminalEnv = tenv; _pause.terminalState = _deck.state;
                     yield return _pause;
-                    slots = _pause.slots;
+                    slots = _pause.slots; targets = _pause.targets;
                 }
-                else if (WiringPolicy != null) slots = WiringPolicy(playerDice, tele).slots;
+                else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; }
                 if (slots == null) slots = TerminalWiring.Auto(_deck.board, playerDice, tenv, _deck.state);
-                term = TerminalCards.Resolve(_deck.board, slots, playerDice, tenv, _deck.state);
+                // 〈写し取り〉〈焼き切り〉〈保持器〉の対象: 人 = 画面で選んだ端子 / BOT = 方策 / どちらも無ければ左端の候補
+                term = TerminalCards.Resolve(_deck.board, slots, playerDice, tenv, _deck.state, targets);
                 mutualWiring = term.kindOfDie;
                 _termOutcome = term;
             }

@@ -531,6 +531,9 @@ namespace AutoTest
                 }
             }
 
+            // 端子の山札 (ADR-0014): 端子の棚と、 山札から抜くサービス (AutoRunner.Terminals)。 棚の品より先 (足切りと残金の取り置きつき)
+            DoShopTerminals(gm);
+
             if (inv != null && inv.slots != null)
             {
                 var run = gm.Run;

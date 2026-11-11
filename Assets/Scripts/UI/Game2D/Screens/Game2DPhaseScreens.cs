@@ -69,7 +69,7 @@ namespace UI.Game2D
             if (gm == null || GameHooks.BotDriving || Application.isBatchMode) { CloseIfOpen(); return; }
             Subscribe();
             var ph = gm.CurrentPhase;
-            if (ph != _shown) { _shown = ph; _dirty = true; _shopSell = false; _shopSupply = false; _robArmed = false; _sellPage = 0; _restFaces = false; if (ph != GameManager.GamePhase.EventEncounter) _eventResult = null; if (ph == GameManager.GamePhase.GateRitual) System.Array.Clear(_gateOffer, 0, 3); }
+            if (ph != _shown) { _shown = ph; _dirty = true; _shopSell = false; _shopSupply = false; _robArmed = false; _sellPage = 0; _restFaces = false; _shopTerm = false; _termPick = TermPick.None; _termDeckPage = 0; if (ph != GameManager.GamePhase.EventEncounter) _eventResult = null; if (ph == GameManager.GamePhase.GateRitual) System.Array.Clear(_gateOffer, 0, 3); }
             // 画面の外で所持金・HP が変わった時も描き直す (買える品の明暗・副題の数字)
             int coins = gm.Run != null ? gm.Run.coins : 0, hp = gm.Run != null ? gm.Run.playerHP : 0;
             if (coins != _lastCoins || hp != _lastHp) { _lastCoins = coins; _lastHp = hp; if (_open) _dirty = true; }
@@ -218,6 +218,7 @@ namespace UI.Game2D
         {
             var run = gm.Run;
             if (_restFaces) return RestFaces(gm);
+            if (_termPick == TermPick.Rest) return TerminalDeckList(gm);
             var d = New("休憩", "HP " + run.playerHP + "/" + run.playerMaxHP + "  素材 " + run.weaponMaterials);
             int more = Mathf.RoundToInt(MapSystem.FreeMove.FreeMapParams.RestMoreRatio * 100);
             d.Items.Add(new ModalItem { name = "休む", desc = "HP を回復する。 ターンは進まない。" });
@@ -226,6 +227,10 @@ namespace UI.Game2D
             bool canRemove = gm.TryGetFaceRemovalCost(out int g, out int m);
             d.Items.Add(new ModalItem { name = "面を外す", value = canRemove ? g + "G 素材" + m : "外せない", disabled = !canRemove,
                 desc = canRemove ? "ダイスの面を 1 枚外す (出目の合計と、 その目の役を失う)。 外す面を次に選ぶ。" : "面はこれ以上外せない。" });
+            // 端子の山札 (ADR-0014): 回復の代わりに 1 枚抜く (無料)。 山札が手札の枚数を下回る抜き方はできない
+            bool canTerm = gm.CanRemoveTerminal; int deckN = run.terminalDeck != null ? run.terminalDeck.Count : 0;
+            d.Items.Add(new ModalItem { name = "山札から抜く", value = canTerm ? "山札 " + deckN + " 枚" : "抜けない", disabled = !canTerm,
+                desc = canTerm ? "回復の代わりに、 山札から端子を 1 枚抜く (この先ずっと)。 抜く端子を次に選ぶ。" : "山札が手札の枚数 (" + CombatSystem.TerminalCards.HandSize + ") を下回る抜き方はできない。" });
             d.buttons.Add(B("決める", "do", true));
             d.onAction = (a, sel) =>
             {
@@ -235,6 +240,7 @@ namespace UI.Game2D
                     case 1: gm.RestHealMore(); break;
                     case 2: gm.RestUpgrade(); break;
                     case 3: if (canRemove) _restFaces = true; break;
+                    case 4: if (canTerm) { _termPick = TermPick.Rest; _termDeckPage = 0; } break;
                     default: gm.RestHeal(); break;
                 }
                 Refresh();
@@ -302,7 +308,67 @@ namespace UI.Game2D
 
         private ScreenDef Shop(GameManager gm)
         {
+            if (_termPick != TermPick.None) return TerminalDeckList(gm);
+            if (_shopTerm && !_shopSell) return ShopTerminals(gm);
             return _shopSell ? ShopSell(gm) : ShopBuy(gm);
+        }
+
+        // ── 店の端子 (ADR-0014): 端子の棚 (山札に加える) と、 山札から 1 枚抜くサービス (店で抜くたびに値段が上がる) ──
+
+        private bool _shopTerm;
+
+        private ScreenDef ShopTerminals(GameManager gm)
+        {
+            var run = gm.Run; int deckN = run.terminalDeck != null ? run.terminalDeck.Count : 0;
+            var d = New("ショップ ― 端子", "所持金 " + run.coins + "G  山札 " + deckN + " 枚", 460);
+            var shelf = gm.TerminalShop;
+            foreach (var s in shelf)
+            {
+                var t = CombatSystem.TerminalCards.Get(s.id);
+                bool sealedAx = CombatSystem.TerminalCards.AxisSealedByRun(t, run);
+                d.Items.Add(new ModalItem
+                {
+                    name = s.id, tone = t != null ? Game2DTerminalLook.KindColor(t.kind) : (Color32?)null,
+                    value = s.sold ? "売切" : s.price + "G",
+                    desc = t != null ? Game2DTerminalLook.Marks(t, run) + "\n" + t.description + (sealedAx ? "\n誓約で封じられている" : "") : null,
+                    disabled = s.sold || s.price > run.coins,
+                });
+            }
+            int removeRow = d.Items.Count, price = gm.TerminalRemovePrice; bool canRemove = gm.CanRemoveTerminal;
+            d.Items.Add(new ModalItem
+            {
+                name = "山札から 1 枚抜く", value = canRemove ? price + "G" : "抜けない",
+                desc = canRemove ? "山札から端子を 1 枚抜く (この先ずっと)。 抜くたびに値段が上がる。 抜く端子を次に選ぶ。"
+                                 : "山札が手札の枚数 (" + CombatSystem.TerminalCards.HandSize + ") を下回る抜き方はできない。",
+                disabled = !canRemove || price > run.coins,
+            });
+            d.buttons.Add(B("決める", "do", true));
+            d.buttons.Add(B("山札を見る", "deck"));
+            d.buttons.Add(B("棚へ", "back"));
+            d.buttons.Add(B("出る", "leave"));
+            d.footer = "端子を選んで「決める」で山札に加える";
+            d.onAction = (a, sel) =>
+            {
+                switch (a)
+                {
+                    case "do":
+                        if (sel == removeRow)
+                        {
+                            if (canRemove && price <= run.coins) { _termPick = TermPick.Shop; _termDeckPage = 0; }
+                            else modal.ShowToast(canRemove ? "所持金が足りない" : "これ以上は抜けない");
+                        }
+                        else if (sel >= 0 && sel < shelf.Count)
+                        {
+                            if (gm.ShopBuyTerminal(sel)) Game2DSfx.Play("ui_confirm"); else modal.ShowToast("買えない (所持金が足りない・売り切れ)");
+                        }
+                        break;
+                    case "deck": _termPick = TermPick.View; _termDeckPage = 0; break;
+                    case "back": _shopTerm = false; break;
+                    case "leave": _shopTerm = false; gm.ExitShop(); break;
+                }
+                Refresh();
+            };
+            return d;
         }
 
         private ScreenDef ShopBuy(GameManager gm)
@@ -343,6 +409,7 @@ namespace UI.Game2D
             d.buttons.Add(B("買う", "buy", true));
             if (inv != null && !_shopSupply) d.buttons.Add(B("振り直す " + inv.CurrentRerollPrice + "G", "reroll"));
             d.buttons.Add(B(_shopSupply ? "棚へ" : "補給 (物資)", "supply"));
+            d.buttons.Add(B("端子", "term"));
             d.buttons.Add(B("売る", "sellmode"));
             if (robOk) d.buttons.Add(B(_robArmed ? "本当に強盗" : "強盗", "rob"));
             d.buttons.Add(B("出る", "leave"));
@@ -370,6 +437,7 @@ namespace UI.Game2D
                         break;
                     }
                     case "supply": _shopSupply = !_shopSupply; break;
+                    case "term": _shopTerm = true; _shopSupply = false; break;
                     case "reroll": if (!gm.ShopReroll()) modal.ShowToast("振り直せない (所持金が足りない)"); break;
                     case "sellmode": _shopSell = true; _sellPage = 0; if (!gm.ShopSellMode) gm.ToggleShopSellMode(); break;
                     case "rob": if (!_robArmed) _robArmed = true; else { _robArmed = false; gm.ShopRobbery(); } break;
@@ -441,6 +509,11 @@ namespace UI.Game2D
         }
 
         /// <summary>今の山札の中身 (名前ごとの枚数)。 並びは定義の順 (基本 → コモン → レア → 軸 → 使い捨て)。</summary>
+        /// <summary>山札の一覧を何のために開いているか。 View = 見るだけ (店の端子の頁から) / Shop = 店で抜く端子を選ぶ / Rest = 休憩で抜く端子を選ぶ。
+        /// None は報酬の窓の「山札を見る」(_termDeckView) の時。</summary>
+        private enum TermPick { None, View, Shop, Rest }
+        private TermPick _termPick;
+
         private ScreenDef TerminalDeckList(GameManager gm)
         {
             var run = gm.Run; var deck = run.terminalDeck ?? new List<string>();
@@ -458,17 +531,30 @@ namespace UI.Game2D
                 d.Items.Add(new ModalItem
                 {
                     name = id, value = "×" + counts[id], tone = t != null ? Game2DTerminalLook.KindColor(t.kind) : (Color32?)null,
-                    desc = t != null ? Game2DTerminalLook.Describe(t, run) : null,
+                    desc = t != null ? Game2DTerminalLook.Describe(t, run) + (CombatSystem.TerminalCards.AxisSealedByRun(t, run) ? "\n誓約で封じられている" : "") : null,
                 });
             }
             if (names.Count == 0) d.body = "山札は空。";
+            bool pick = _termPick == TermPick.Shop || _termPick == TermPick.Rest;
+            if (pick)
+            {
+                d.title = _termPick == TermPick.Shop ? "抜く端子を選ぶ ― " + gm.TerminalRemovePrice + "G" : "抜く端子を選ぶ ― 休憩";
+                d.buttons.Add(B("抜く", "remove", true));
+            }
             if (pages > 1) d.buttons.Add(B("次の頁 " + (_termDeckPage + 1) + "/" + pages, "page"));
-            d.buttons.Add(B("戻る", "back", true));
-            d.footer = "名前の色は種類 (赤 = 攻撃・青 = 防御・金 = 充電・緑 = 補助)";
-            d.onAction = (a, _) =>
+            d.buttons.Add(B("戻る", "back", !pick));
+            d.footer = pick ? "抜いた端子は、 このランの山札から消える" : "名前の色は種類 (赤 = 攻撃・青 = 防御・金 = 充電・緑 = 補助)";
+            d.onAction = (a, sel) =>
             {
                 if (a == "page") _termDeckPage = (_termDeckPage + 1) % pages;
-                else if (a == "back") _termDeckView = false;
+                else if (a == "back") { _termDeckView = false; _termPick = TermPick.None; }
+                else if (a == "remove" && pick && sel >= 0 && sel < cnt)
+                {
+                    int at = deck.IndexOf(names[first + sel]);
+                    bool ok = _termPick == TermPick.Shop ? gm.ShopRemoveTerminal(at) : gm.RestRemoveTerminal(at);
+                    if (ok) { Game2DSfx.Play("ui_confirm"); _termPick = TermPick.None; }
+                    else modal.ShowToast("抜けない (所持金が足りない・山札が手札の枚数を下回る)");
+                }
                 Refresh();
             };
             return d;

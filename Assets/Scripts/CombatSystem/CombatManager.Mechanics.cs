@@ -199,8 +199,10 @@ namespace CombatSystem
                 int[] pick;
                 if (_interactiveTurn)
                 {
-                    _pause.Set(TurnPauseKind.Reroll, playerDice, playerFaceIdx, tele, mutualWiring);
+                    _pause.Set(TurnPauseKind.Reroll, playerDice, playerFaceIdx, tele);
                     _pause.rerollCost = freeRerolls > 0 ? 0 : playerDice.Length * nth;
+                    // 振り直すかを決める時も手札と場を見せる (手札は振り直しで変わらない)。 敵の攻撃は予告の近似で組む
+                    if (_deck != null) { _pause.board = _deck.board; _pause.terminalEnv = TerminalEnvNow(ctx, tele.enemyAttackValue); _pause.terminalState = _deck.state; }
                     yield return _pause;
                     pick = _pause.reroll ? AllDiceIndex(playerDice.Length) : null;
                 }

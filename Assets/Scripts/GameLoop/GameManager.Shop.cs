@@ -24,6 +24,7 @@ namespace GameLoop
             var sm = ShopManager.Instance;
             if (sm == null) { Debug.LogError("[GameManager] ShopManager.Instance is null!"); return; }
             sm.Generate(Run.Depth);
+            RollTerminalShop();      // 端子の山札 (ADR-0014): 端子の棚 (GameManager.Terminals)
             SetPhase(GamePhase.ShopVisit);
         }
 
@@ -101,6 +102,7 @@ namespace GameLoop
         {
             if (CurrentPhase != GamePhase.ShopVisit) return;
             ShopManager.Instance.Close();
+            TerminalShop.Clear();
 
             SetPhase(GamePhase.MapNavigation);
         }

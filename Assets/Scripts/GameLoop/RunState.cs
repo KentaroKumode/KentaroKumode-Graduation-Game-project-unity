@@ -314,6 +314,8 @@ namespace GameLoop
         public int terminalWhetBonus;
         /// <summary>端子〈剥ぎ取り〉: 次の戦闘後の端子の選択肢を増やす数 (報酬を出したら 0 に戻す)。</summary>
         public int terminalExtraChoices;
+        /// <summary>店のサービスで山札から端子を抜いた回数 (抜く値段が上がる・ラン単位・上限なし)。 休憩で抜いた分は数えない。</summary>
+        public int terminalShopRemovals;
 
         /// <summary>装備中のダイスアイテムID（空=武器ダイス使用）。取得時に Loadout.TryAutoEquip で更新。</summary>
         public string equippedDiceId = "";
@@ -591,6 +593,7 @@ namespace GameLoop
             terminalDeck = CombatSystem.TerminalCards.StartingDeck();
             terminalWhetBonus = 0;
             terminalExtraChoices = 0;
+            terminalShopRemovals = 0;
             // 兵站: 物資上限 +1/段 (2026-11-09)
             int provisionCapBonus = MetaProgression.MetaBuffApplicator.GetProvisionCapBonus();
             provisionCap = UnityEngine.Mathf.Max(1, GameHooks.ProvisionBaseMax + provisionCapBonus);
