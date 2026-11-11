@@ -226,9 +226,11 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>遺物学者 ── 毎ターン開始時にプールから抽選して遺物を使用する。
-    /// 段 4 は〈天与の才〉により 2 枚 (1 枚 MYTHIC 確定 + 1 枚ランダム)。
-    /// **形態変化直後の 1 ターン目は、その段で追加された等級から確定で選出する。**</summary>
+    /// <summary>遺物学者 ── 毎ターン開始時にプールから抽選して遺物を使用する (通常 1 枚)。
+    /// 段 4 は〈天与の才〉が HP 66% / 33% を初めて割った**次のターンだけ** 2 枚 (<c>vescaDoubleDrawNextTurn</c>)。
+    /// **形態変化直後の 1 ターン目は、その段で追加された等級から確定で選出する。**
+    /// 引いた遺物の名前は予告 (<c>MutualTurnTelegraph.drawnRelics</c>) に載る。 ただし 2026-11-11 時点で
+    /// 画面の側はこの欄を読んでいない (enemies.json の「予告に開示」はまだ表示されない)。</summary>
     public class RelicScholar : IPassiveSkillEffect
     {
         public string SkillId => "RelicScholar";
@@ -352,8 +354,8 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>停滞する時間 ── プレイヤーが攻撃端子にダイスを 1 本も置かなかったターン、
-    /// 次ターン以降の敵攻撃 +N (累積)。 シールド半減で「待つ」が無料の正解になる穴を塞ぐ。
+    /// <summary>停滞する時間 ── 攻撃端子へ挿した本数がブロック端子より少なかったターン (攻撃 &lt; ブロック)、
+    /// 次ターン以降の敵攻撃 +N (累積・上限 <see cref="StackCap"/> スタック)。 シールド半減で「待つ」が無料の正解になる穴を塞ぐ。
     /// **N は L3 チューナーの第一レバー**（廃止した 真我 の後任。 実数値なので §13-3 隠し倍率禁止に適合）。</summary>
     public class StagnantTime : IPassiveSkillEffect
     {
@@ -365,7 +367,7 @@ namespace ItemSystem.PassiveSkills.Effects
         /// 2026-07-29: 1 → 2 → **1 に戻した**。 スケール速度は 2T刻みではなく
         /// 1 スタックあたりの上昇量 (DicePerStackBase: 3 → 1) 側で落とす。
         /// 判定は毎ターン走るので、 守った分だけ素直に 1 ずつ積む形に戻る
-        /// (上限 99 = 敵攻撃 +99。 旧 +297 の 1/3)。</summary>
+        /// (上限は <see cref="StackCap"/> = 10 スタック。 BossParam.Stagnation の基準 1 で敵攻撃 +10)。</summary>
         public const int TurnsPerStack = 1;
         /// <summary>スタック上限。 **2026-08-16 に 99 → 10 へ戻した。**
         ///
@@ -428,8 +430,9 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>解析演算 ── プレイヤーが収支プラスで終えるたび回避率 +3% (最大 60%)。
-    /// **通常・固定・軽減不可を問わず全ダメージを回避する** (既存のメタ俊敏回避と同挙動)。
+    /// <summary>解析演算 ── プレイヤーが収支プラスで終えるたび回避率 +<see cref="PerWin"/> (2%・最大 <see cref="Cap"/> 40%)。
+    /// 回避するとその攻撃の通常・固定ダメージを丸ごと消し、 次のターンは回避しない (CombatManager.ApplyVescaDefense)。
+    /// 出血・毒はこの経路を通らないので回避されない。
     /// 敵視点 OnRollLose = プレイヤーの収支プラス。</summary>
     public class AnalyticComputation : IPassiveSkillEffect
     {
@@ -451,7 +454,8 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>裂け目 ── 毎ターン、 **ヴェスカとプレイヤーの双方**が最大 HP の 2% を失う。
+    /// <summary>裂け目 ── 毎ターン、 **ヴェスカとプレイヤーの双方**が最大 HP の一定割合を失う
+    /// (ヴェスカ <see cref="LossRate"/> 2% / プレイヤー <see cref="PlayerLossRate"/> 1%)。
     /// 裂け目を強引に開き続けている代償 (§19-4)。 開けている本人だけでなく、
     /// 中に立っている者も等しく削られる。
     ///
@@ -504,13 +508,13 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>回帰性真理 ── 7 層 p4 ヴェスカ・天与 の中核パッシブ。
     ///
-    /// HP 99999 を「削り切る対象」ではなく「時計」に変えるための封じ。
-    /// 割合ダメージ・処刑・最大 HP 操作はいずれも巨大 HP に対する近道になるため塞ぐ。
-    /// デバフ免疫も同じ理由 (毒/出血の累積は割合ダメージと同じ働きをする)。
+    /// 効果 (2026-11-11 の実コード): 毒・出血の蓄積を毎ターン半減 (付与そのものは通る) /
+    /// 受ける会心の倍率 −<see cref="CritMultReduction"/> (下限 1.0) / 臨界メーターを毎ターン −<see cref="RinkaiDrainPerTurn"/> /
+    /// 最大 HP の変更を拒否 / 処刑を拒否。 割合ダメージの免疫は 2026-07-29 に撤去済み。
     ///
-    /// 実際に HP を減らすのは〈裂け目〉の自壊 (現在 HP の 20%/T) と、 プレイヤーの通常ダメージのみ。
-    /// 免疫の判定そのものは <see cref="CombatContext"/> 側のゲート
-    /// (RatioDamageToEnemy / CanExecuteEnemy / SetEnemyMaxHP / AddStatus / AddEnemyBleed) が持ち、
+    /// (旧記述の「HP 99999 を時計に変える」「裂け目の自壊 現在 HP 20%/T」は当時の設計。 現在 p4 の HP は enemies.json の値 (2915)、
+    ///  裂け目は最大 HP 比の定額。)
+    /// 判定そのものは <see cref="CombatContext"/> 側のゲート (CanExecuteEnemy / SetEnemyMaxHP / HalveEnemyDots) が持ち、
     /// ここはフラグを立てるだけ。</summary>
     public class RecurrentTruth : IPassiveSkillEffect
     {
@@ -603,12 +607,12 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>天与の才 ── 段 4 以降限定。 遺物を 2 つ同時に使用する
-    /// (形態変化直後は 1 枚 その段の新等級確定 + 1 枚ランダム)。
+    /// <summary>天与の才 ── 段 4 限定。 HP が最大 HP の 66% / 33% を割る一撃を受けても閾値で踏みとどまり
+    /// (<see cref="ClampToThreshold"/>)、 閾値を初めて割った**次のターンだけ**遺物を 2 つ使う
+    /// (OnTurnEnd で <c>vescaDoubleDrawNextTurn</c> を立て、 RelicScholar が読んで倒す)。
     ///
-    /// **実効判定は RelicScholar が `VescaRelicPool.HasDivineTalent()` で
-    /// 敵の passiveSkills を直接見て行う** ── パッシブ同士の発火順に依存させないため。
-    /// このクラスは登録の実体とログ用。</summary>
+    /// 踏みとどまりの側は `VescaRelicPool.HasDivineTalent()` で敵の passiveSkills を直接見る
+    /// ── パッシブ同士の発火順に依存させないため。</summary>
     public class DivineTalent : IPassiveSkillEffect
     {
         /// <summary>この割合を **初めて割った** 次のターンに 2 枚引く。 降順で持つこと。

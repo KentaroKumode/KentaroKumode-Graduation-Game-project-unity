@@ -490,9 +490,9 @@ namespace ItemSystem.PassiveSkills
             Register(new ImmortalEmber());
             Register(new EmberAura());
             Register(new StarfireProliferation());
-            Register(new ScorchedEarth()); // 焦土（敗北毎に最大HP-2・シールド破壊）
+            Register(new ScorchedEarth()); // 焦土（敗北毎に被ダメの10%だけ最大HP減・シールド破壊。どの敵も未装備）
             // 灰燼の王 v2 リワーク (2026-07-16 ADR-0009 相互攻撃対応): 外殻半減/周期予兆/階段回復/収支負けスタック
-            // 2026-07-16 二相型化: HP50% で Phase1(再生)→Phase2(火力連打) に切替 (AshRegrowth 停止 + EmberFury 発動 + Omen 周期2T)
+            // 2026-07-16 二相型化: HP50% で Phase1(再生)→Phase2(火力連打) に切替 (AshRegrowth 停止 + EmberFury 発動 + Omen 周期3T)
             Register(new AshCarapace());
             Register(new EmberOmen());
             Register(new AshRegrowth());
@@ -507,10 +507,10 @@ namespace ItemSystem.PassiveSkills
             Register(new SaintGeorgesPhases());
             // 7層ボス: ヴェスカ（遺物学者）×4段連戦。 正本: docs/GAME.md §13-4
             Register(new RelicScholar());        // 遺物学者（毎T 遺物を抽選使用・予告で開示）
-            Register(new StagnantTime());        // 停滞する時間（攻撃端子が空のTを罰する。L3 第一レバー）
-            Register(new AnalyticComputation()); // 解析演算（収支プラスごとに回避率+3%・上限60%）
-            Register(new RiftHeldOpen());        // 裂け目（毎T 現在HPの20%を自壊 → HP依存しない一定長）
-            Register(new RecurrentTruth());      // 回帰性真理（割合ダメ/処刑/最大HP変更/デバフを無効化）
+            Register(new StagnantTime());        // 停滞する時間（攻撃 < ブロックの配線のTを罰する・上限10スタック。L3 第一レバー）
+            Register(new AnalyticComputation()); // 解析演算（収支プラスごとに回避率+2%・上限40%・回避の次Tは回避なし）
+            Register(new RiftHeldOpen());        // 裂け目（毎T ヴェスカ最大HPの2%・プレイヤー最大HPの1%を失う）
+            Register(new RecurrentTruth());      // 回帰性真理（毒/出血の毎T半減・受ける会心倍率-0.5・臨界-5/T・処刑/最大HP変更を拒否）
             Register(new ContinuousExperiment()); // 連続実験（HP0で死なず次フェーズへ。最終段は非所持）
             Register(new DivineTalent());        // 天与の才（段4のみ 2枚抽選）
             // [削除 2026-10-17] FlawlessRobe (天衣無縫) ── 覚者専用・使う敵なし        // 天衣無縫（回復/シールド獲得の減衰。 ヴェスカでも流用可）

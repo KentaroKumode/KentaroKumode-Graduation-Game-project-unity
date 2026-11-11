@@ -41,19 +41,19 @@
         {
           "internalName": "Ethereal",
           "skillName": "虚体",
-          "description": "受けるダメージを50%軽減",
+          "description": "受ける攻撃のダメージを50%軽減（固定ダメージ・出血・毒には効かない）",
           "flavorText": "手応えはある。手応えだけがある。"
         },
         {
           "internalName": "IntimidatePlus",
           "skillName": "威圧+",
-          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "description": "戦闘開始時、脅威+3",
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         },
         {
           "internalName": "EliteWraith",
           "skillName": "霊体",
-          "description": "2ターンに1度 被ダメ全て1に減少、非霊体時はダイス数+1",
+          "description": "偶数ターンは霊体になり、受ける攻撃のダメージを1に減らす。霊体でないターンは攻撃の出目を1つ多く振る",
           "flavorText": "「今日はこういう体なんですよ。明日はまた別ですが」"
         }
       ],
@@ -225,7 +225,7 @@
         {
           "internalName": "Sprint",
           "skillName": "疾駆",
-          "description": "初回ロール時、ダイス合計値+2",
+          "description": "1ターン目、攻撃+2",
           "flavorText": "「逃げるなら今のうちだぞ」「もう後ろにいます」"
         }
       ],
@@ -248,7 +248,7 @@
         {
           "internalName": "Sprint",
           "skillName": "疾駆",
-          "description": "初回ロール時、ダイス合計値+2",
+          "description": "1ターン目、攻撃+2",
           "flavorText": "「逃げるなら今のうちだぞ」「もう後ろにいます」"
         }
       ],
@@ -464,7 +464,7 @@
         {
           "internalName": "EliteMinotaur",
           "skillName": "際限なき暴走",
-          "description": "毎ロール自ダイス合計+1（既に強い→控えめ）"
+          "description": "毎ターン、攻撃+1"
         }
       ],
       "baseAttack": 8,
@@ -477,7 +477,7 @@
     {
       "id": "wraith",
       "displayName": "怨嗟の影",
-      "description": "怨念の塊。実体を持たず、攻撃が通りにくい。5層の亡霊は生者を確実に道連れにする。",
+      "description": "怨念の塊。実体を持たず、攻撃が通りにくい。",
       "floor": 6,
       "maxHP": 350,
       "criticalNumerator": 0,
@@ -486,7 +486,7 @@
         {
           "internalName": "Ethereal",
           "skillName": "虚体",
-          "description": "受けるダメージを50%軽減",
+          "description": "受ける攻撃のダメージを50%軽減（固定ダメージ・出血・毒には効かない）",
           "flavorText": "手応えはある。手応えだけがある。"
         },
         {
@@ -498,7 +498,7 @@
         {
           "internalName": "IntimidatePlus",
           "skillName": "威圧+",
-          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "description": "戦闘開始時、脅威+3",
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
@@ -511,7 +511,7 @@
     {
       "id": "wraith_elite",
       "displayName": "精鋭怨嗟の影",
-      "description": "怨念の塊。実体を持たず、攻撃が通りにくい。5層の亡霊は生者を確実に道連れにする。",
+      "description": "怨念の塊。実体を持たず、攻撃が通りにくい。",
       "floor": 6,
       "elite": true,
       "maxHP": 555,
@@ -521,7 +521,7 @@
         {
           "internalName": "Ethereal",
           "skillName": "虚体",
-          "description": "受けるダメージを50%軽減",
+          "description": "受ける攻撃のダメージを50%軽減（固定ダメージ・出血・毒には効かない）",
           "flavorText": "手応えはある。手応えだけがある。"
         },
         {
@@ -533,13 +533,13 @@
         {
           "internalName": "IntimidatePlus",
           "skillName": "威圧+",
-          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "description": "戦闘開始時、脅威+3",
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         },
         {
           "internalName": "EliteWraith",
           "skillName": "霊体",
-          "description": "2ターンに1度 被ダメ全て1に減少、非霊体時はダイス数+1"
+          "description": "偶数ターンは霊体になり、受ける攻撃のダメージを1に減らす。霊体でないターンは攻撃の出目を1つ多く振る"
         }
       ],
       "baseAttack": 13,
@@ -572,7 +572,7 @@
         {
           "internalName": "IntimidatePlus",
           "skillName": "威圧+",
-          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "description": "戦闘開始時、脅威+3",
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
@@ -607,7 +607,7 @@
         {
           "internalName": "IntimidatePlus",
           "skillName": "威圧+",
-          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "description": "戦闘開始時、脅威+3",
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         },
         {
@@ -646,7 +646,7 @@
         {
           "internalName": "IntimidatePlus",
           "skillName": "威圧+",
-          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "description": "戦闘開始時、脅威+3",
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         },
         {
@@ -688,7 +688,7 @@
         {
           "internalName": "IntimidatePlus",
           "skillName": "威圧+",
-          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "description": "戦闘開始時、脅威+3",
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         },
         {
@@ -852,13 +852,13 @@
         {
           "internalName": "NightLord",
           "skillName": "夜の王",
-          "description": "3ターン目以降、ダイス1個追加",
+          "description": "5ターン目以降、攻撃の出目を1つ多く振る",
           "flavorText": "急がなくていい。夜は向こうの持ち物だ。"
         },
         {
           "internalName": "IntimidatePlus",
           "skillName": "威圧+",
-          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "description": "戦闘開始時、脅威+3",
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
@@ -887,13 +887,13 @@
         {
           "internalName": "NightLord",
           "skillName": "夜の王",
-          "description": "3ターン目以降、ダイス1個追加",
+          "description": "5ターン目以降、攻撃の出目を1つ多く振る",
           "flavorText": "急がなくていい。夜は向こうの持ち物だ。"
         },
         {
           "internalName": "IntimidatePlus",
           "skillName": "威圧+",
-          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "description": "戦闘開始時、脅威+3",
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         },
         {
@@ -926,7 +926,7 @@
         {
           "internalName": "DeathSentence",
           "skillName": "死の宣告",
-          "description": "5ターン以内に倒さなければ即死攻撃を放つ",
+          "description": "10ターン以内に倒さなければ、11ターン目に即死攻撃を放つ",
           "flavorText": "期限が切られた。異議の申し立て先は書かれていない。"
         },
         {
@@ -938,7 +938,7 @@
         {
           "internalName": "IntimidatePlus",
           "skillName": "威圧+",
-          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "description": "戦闘開始時、脅威+3",
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
@@ -968,7 +968,7 @@
         {
           "internalName": "DeathSentence",
           "skillName": "死の宣告",
-          "description": "5ターン以内に倒さなければ即死攻撃を放つ",
+          "description": "10ターン以内に倒さなければ、11ターン目に即死攻撃を放つ",
           "flavorText": "期限が切られた。異議の申し立て先は書かれていない。"
         },
         {
@@ -980,7 +980,7 @@
         {
           "internalName": "IntimidatePlus",
           "skillName": "威圧+",
-          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "description": "戦闘開始時、脅威+3",
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         },
         {
@@ -1008,7 +1008,7 @@
         {
           "internalName": "Decree13th",
           "skillName": "13番目の宣告",
-          "description": "毎ターン1/13で宣告。ターン終了時に本体が生存していれば、両者ダイス合計の会心ダメージをプレイヤーに与える（軽減無視）",
+          "description": "毎ターン1/13で宣告。ターン終了時に本体が生存していれば、両者の出目の合計×2のダメージをプレイヤーに与える（軽減無視・シールドは肩代わりする）",
           "flavorText": "「十二番目までは名前がついてる」「じゃあコイツは」「……番号だけだ」"
         }
       ],
@@ -1031,13 +1031,13 @@
         {
           "internalName": "Decree13th",
           "skillName": "13番目の宣告",
-          "description": "毎ターン1/13で宣告。ターン終了時に本体が生存していれば、両者ダイス合計の会心ダメージをプレイヤーに与える（軽減無視）",
+          "description": "毎ターン1/13で宣告。ターン終了時に本体が生存していれば、両者の出目の合計×2のダメージをプレイヤーに与える（軽減無視・シールドは肩代わりする）",
           "flavorText": "「十二番目までは名前がついてる」「じゃあコイツは」「……番号だけだ」"
         },
         {
           "internalName": "EliteDecree13",
           "skillName": "死の重圧",
-          "description": "13番目の宣告が灯ったターン中、自ダイス合計+13"
+          "description": "13番目の宣告が灯ったターン、攻撃+13"
         }
       ],
       "baseAttack": 4,
@@ -1246,7 +1246,7 @@
         {
           "internalName": "GreedyMerchant",
           "skillName": "貪欲",
-          "description": "獲物が豊かなほど肥え太る。プレイヤーの所持パッシブ1つにつきHP+2、3つごとにダイス合計値+1",
+          "description": "獲物が豊かなほど肥え太る。プレイヤーの所持パッシブ1つにつきHP+2、3つごとに攻撃+1",
           "flavorText": "「いいものをお持ちで。……ええ、ほんとうに」"
         }
       ],
@@ -1279,7 +1279,7 @@
         {
           "internalName": "GoblinKingsCall",
           "skillName": "号令",
-          "description": "毎ターン、自身のダイス合計+3",
+          "description": "毎ターン、攻撃+3",
           "flavorText": "号令の内容は誰にも聞き取れなかった。それでも全員が、同時に、強くなった。"
         }
       ],
@@ -1311,7 +1311,7 @@
     {
       "id": "boss_layer4",
       "displayName": "鏡の双子",
-      "description": "鏡像のように同じ動きを繰り返す双子。重い一撃ほど深く跳ね返す。",
+      "description": "鏡像のように同じ動きを繰り返す双子。浅い一撃ほど深く跳ね返す。",
       "floor": 3,
       "maxHP": 505,
       "criticalNumerator": 0,
@@ -1321,13 +1321,13 @@
         {
           "internalName": "MirrorTwinsResponse",
           "skillName": "鏡映の応答",
-          "description": "小さなダメージしか与えなかったターン、次ターン開始時に固定ダメージを反射（軽減無視・上限9）。閾値はこのボスの最大HPの5%。高火力で殴れば反射0＝鏡を叩き割る",
+          "description": "小さなダメージしか与えなかったターン、次ターン開始時に固定ダメージを反射（軽減無視・上限9）。閾値はこのボスの最大HPの4%（最低12）で、反射量は閾値と与ダメの差。高火力で殴れば反射0＝鏡を叩き割る",
           "flavorText": "軽く叩けば軽く返る。強く叩けば——そこで唄は途切れている。"
         },
         {
           "internalName": "IntimidatePlus",
           "skillName": "威圧+",
-          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "description": "戦闘開始時、脅威+3",
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
@@ -1349,13 +1349,13 @@
         {
           "internalName": "JudgmentFlames",
           "skillName": "審判の炎",
-          "description": "毎ターン終了時、1+経過ターン+罪の確定ダメ（罪=総戦闘回数/8、上限2。総ダメ上限13、軽減無視）",
+          "description": "毎ターン終了時、1+経過ターン÷3（切り上げ）+罪の確定ダメ（罪=総戦闘回数/8、上限2。1回の上限10、軽減無視）",
           "flavorText": "ここまでに何度斬ったかを、向こうは正確に知っている。"
         },
         {
           "internalName": "IntimidatePlus",
           "skillName": "威圧+",
-          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "description": "戦闘開始時、脅威+3",
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
@@ -1380,13 +1380,13 @@
         {
           "internalName": "SaintGeorgesPhases",
           "skillName": "形態転換／プリオリテ",
-          "description": "コントラタック(0d0+シールド+反撃)とオポジション(4d6+連勝報酬)を循環。形態2→1帰還毎にプリオリテ累積=各スタックでシールド初期-20(最低20)/反撃+3。粘る者ほど無駄に身を削る",
+          "description": "コントラタック（シールド+反撃）とオポジション（殴り合い+連勝報酬）を循環。形態2→1の帰還ごとにプリオリテ+1＝シールド初期 140−28×プリオリテ（最低28・開幕はプリオリテ1で112）／反撃+7。粘る者ほど無駄に身を削る",
           "flavorText": "構えを変えるたびに一礼が入る。省いてくれてもいいのだが。"
         },
         {
           "internalName": "IntimidatePlus",
           "skillName": "威圧+",
-          "description": "戦闘開始時、脅威+3（勝利しても削られ、敗北で脅威分被弾）",
+          "description": "戦闘開始時、脅威+3",
           "flavorText": "「なにもされてない。ほんとに、なにも」"
         }
       ],
@@ -1411,7 +1411,7 @@
         {
           "internalName": "EmberOmen",
           "skillName": "業火の予兆",
-          "description": "HP>50%は周期4T (T1/5/9...)、HP≤50%は周期3T (T1/4/7...) に加速。予兆ターンは敵ダイス合計+15。",
+          "description": "HP>50%は周期4T (T1/5/9...)、HP≤50%は周期3T (T1/4/7...) に加速。予兆ターンは攻撃+8。",
           "flavorText": "火が小さくなる。次に大きくなるまでの間だけ、息ができる。"
         },
         {
@@ -1423,7 +1423,7 @@
         {
           "internalName": "EmberFury",
           "skillName": "憤怒の残滓",
-          "description": "HP≤50%のとき敵ダイス合計+3 常時（Phase2: 再生ゼロ・高火力連打の決着期）。",
+          "description": "HP≤50%のとき攻撃+3（Phase2: 再生ゼロ・高火力連打の決着期）。",
           "flavorText": "燃え残りの方が熱い。もう惜しむものが無いからだ。"
         },
         {
@@ -1435,7 +1435,7 @@
         {
           "internalName": "BlazeBrand",
           "skillName": "烈炎",
-          "description": "防御端子へ2本以上配線したターン終了時、烈炎+1。ターン開始時、烈炎の数だけ軽減無視ダメージ。",
+          "description": "ブロック端子へ2本以上配線したターン終了時、烈炎+1。ターン開始時、烈炎の数だけ軽減無視ダメージ。",
           "flavorText": "盾を構えるほど、灰は厚く積もる。焼かれているのは腕ではなく、迷っている時間の方だ。"
         }
       ],
@@ -1469,13 +1469,13 @@
         {
           "internalName": "StagnantTime",
           "skillName": "停滞する時間",
-          "description": "攻撃端子への配線がブロック端子以下だったターン、以降の敵攻撃+1（累積・上限99）。",
+          "description": "攻撃端子への配線がブロック端子より少なかったターン、以降の敵攻撃+1（累積・上限10スタック）。",
           "flavorText": "「見ていないなら、貰っておくよ」"
         },
         {
           "internalName": "AnalyticComputation",
           "skillName": "解析演算",
-          "description": "プレイヤーが収支プラスで終えるたび回避率+2%（最大40%）。回避は通常・固定・軽減不可すべてを無効化するが、回避した次のターンは回避できない。",
+          "description": "プレイヤーが収支プラスで終えるたび回避率+2%（最大40%）。回避はその攻撃（通常・固定ダメージ）を丸ごと無効化するが（出血・毒は対象外）、回避した次のターンは回避できない。",
           "flavorText": "「二度は当たらんよ。」"
         },
         {
@@ -1518,13 +1518,13 @@
         {
           "internalName": "StagnantTime",
           "skillName": "停滞する時間",
-          "description": "攻撃端子への配線がブロック端子以下だったターン、以降の敵攻撃+1（累積・上限99）。",
+          "description": "攻撃端子への配線がブロック端子より少なかったターン、以降の敵攻撃+1（累積・上限10スタック）。",
           "flavorText": "「見ていないなら、貰っておくよ」"
         },
         {
           "internalName": "AnalyticComputation",
           "skillName": "解析演算",
-          "description": "プレイヤーが収支プラスで終えるたび回避率+2%（最大40%）。回避は通常・固定・軽減不可すべてを無効化するが、回避した次のターンは回避できない。",
+          "description": "プレイヤーが収支プラスで終えるたび回避率+2%（最大40%）。回避はその攻撃（通常・固定ダメージ）を丸ごと無効化するが（出血・毒は対象外）、回避した次のターンは回避できない。",
           "flavorText": "「二度は当たらんよ。」"
         },
         {
@@ -1567,13 +1567,13 @@
         {
           "internalName": "StagnantTime",
           "skillName": "停滞する時間",
-          "description": "攻撃端子への配線がブロック端子以下だったターン、以降の敵攻撃+1（累積・上限99）。",
+          "description": "攻撃端子への配線がブロック端子より少なかったターン、以降の敵攻撃+1（累積・上限10スタック）。",
           "flavorText": "「見ていないなら、貰っておくよ」"
         },
         {
           "internalName": "AnalyticComputation",
           "skillName": "解析演算",
-          "description": "プレイヤーが収支プラスで終えるたび回避率+2%（最大40%）。回避は通常・固定・軽減不可すべてを無効化するが、回避した次のターンは回避できない。",
+          "description": "プレイヤーが収支プラスで終えるたび回避率+2%（最大40%）。回避はその攻撃（通常・固定ダメージ）を丸ごと無効化するが（出血・毒は対象外）、回避した次のターンは回避できない。",
           "flavorText": "「二度は当たらんよ。」"
         },
         {
@@ -1604,7 +1604,7 @@
         {
           "internalName": "RecurrentTruth",
           "skillName": "回帰性真理",
-          "description": "毒と出血の蓄積を毎ターン半減する。受ける会心ダメージ-50%。毎ターン、プレイヤーの臨界メーターを5減らす。最大HPの変更を受けず、処刑も成立しない。",
+          "description": "毒と出血の蓄積を毎ターン半減する。受ける会心の倍率−0.5（下限1.0）。毎ターン、プレイヤーの臨界メーターを5減らす。最大HPの変更を受けず、処刑も成立しない。",
           "flavorText": "「すべては真理へと回帰する」"
         },
         {
@@ -1616,7 +1616,7 @@
         {
           "internalName": "StagnantTime",
           "skillName": "停滞する時間",
-          "description": "攻撃端子への配線がブロック端子以下だったターン、以降の敵攻撃+1（累積・上限99）。",
+          "description": "攻撃端子への配線がブロック端子より少なかったターン、以降の敵攻撃+1（累積・上限10スタック）。",
           "flavorText": "「見ていないなら、貰っておくよ」"
         },
         {

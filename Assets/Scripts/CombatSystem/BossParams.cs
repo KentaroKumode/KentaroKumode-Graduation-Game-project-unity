@@ -10,20 +10,24 @@ namespace CombatSystem
     /// </summary>
     public enum BossParam
     {
-        JudgmentDice,      // 灰燼/業火・断罪ターンの敵ダイス上乗せ (見切りロール難度)。 基準10
+        // 基準値の正本は下の Spec()。 ここの「基準」は 2026-11-11 (#30) に Spec() へ合わせた写し。
+        JudgmentDice,      // 6層 灰燼の王・〈業火の予兆〉の予兆ターンの敵攻撃上乗せ (旧〈業火の断罪〉と共用)。 基準8
         JudgmentCoefBase,  // 業火の断罪の係数基礎。 係数 = base + 2n。 基準2 (1回目=4)
+                           //   [読む敵なし] JudgmentBlaze はどの敵も持っていない (BOT のチューナーだけが動かす)
         RobeStacks,        // [死にパラメータ・2026-10-17] 天衣無縫 (FlawlessRobe) を削除したので読む側が無い。 並びを保つため残置
-                           //   現在どの敵も未装備だが Registry には流用可として登録済み
-        ChipCap,           // 業火の審判官・審判の炎の毎ターン継続ダメ上限。 基準13
+        ChipCap,           // 業火の審判官・審判の炎の 1 回 (毎ターン) あたりの上限。 基準10
         RegenReduction,    // 灰燼・灰塵の鎧の被ダメ軽減量 (タンク性/ジリ貧)。 基準9
-        Stagnation,        // 停滞する時間: 攻撃端子が空のTごとに積むスタック1つあたりの敵出目加算。 基準3
+                           //   [読む敵なし] AshArmor はどの敵も持っていない
+        Stagnation,        // 停滞する時間: 攻撃 < ブロックの配線のTごとに積むスタック1つあたりの敵攻撃加算。 基準1
                            //   → **7層ヴェスカの第一レバー** (docs/GAME.md §13-4)
-        IntimidateThreat,  // 威圧+ の脅威加算 (勝利時の削り/敗北時の被弾の基準)。 基準3
+        IntimidateThreat,  // 威圧+ の脅威加算。 基準3。 [効き先なし] 脅威の削り/被弾は廃止済みで ctx.enemyThreat を読む処理が無い
         PoisonStackCap,    // 毒沼の主・毒の侵蝕の毒スタック上限 (DOTの最大強度)。 基準5
         MirrorReflectCap,  // 鏡の双子・鏡映の応答の反射ダメ上限。 基準9
-        GoblinCall,        // ゴブリン王・号令の毎ターン自ダイス合計加算。 基準3
+        GoblinCall,        // ゴブリン王・号令の毎ターンの敵攻撃加算。 基準3
         StanceAtkMult,     // 敵スタンス(ADR-0005)・高火力スタンスの被ダメ倍率 (=ボスの攻撃力)。 基準1.6
+                           //   [本体に読む側なし] 敵スタンスは ADR-0009 で廃止。 AutoTest のチューナーだけが参照
         WeakRollRatio,     // 敵スタンス・弱ロールの面縮小比 (高いほどロールが弱まらない=強い)。 基準0.65
+                           //   [本体に読む側なし] 同上
     }
 
     /// <summary>
@@ -135,6 +139,9 @@ namespace CombatSystem
         // ===== 固有面ダイス(署名ダイス) =====
         //  対象4ボスは均一ダイス(diceExpected/BestDiceConfig)を使わず、 ボス固有の面構成で振る。
         //  グラフィック制約により 1面の値は [SignatureFaceMin, SignatureFaceMax] にクランプ。
+        //  **2026-11-11 時点: 4 ボスとも enemies.json が攻撃ロール方式 (attackRollMax > 0) なので、
+        //  CombatManager.RollEnemyAttack は攻撃ロールを引き、 ここで載せた diceFaces は振られない** (旧ダイス方式の互換パスだけが読む)。
+        //  下の面の平均・「灰塵の威圧 +3」(6層はもう持っていない) は当時の記録。
 
         public const int SignatureDiceCount = 5;   // 署名ダイスは5個振り
         public const int SignatureFaceCount = 6;   // 面は6つ
