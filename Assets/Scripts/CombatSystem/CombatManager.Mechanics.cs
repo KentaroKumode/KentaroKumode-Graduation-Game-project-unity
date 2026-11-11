@@ -387,8 +387,10 @@ namespace CombatSystem
 
         /// <summary>HUD に出すプレイヤーのステータス (2026-11-05)。 <b>配線を決める前に呼ぶ</b>こと
         /// (与ダメ補正の整備パネル分と戦闘中バフの会心率は、 まだ本判定に取り込まれていない前提で足している)。
-        /// <c>OnCriticalCheck</c> で発動する条件付きの会心率 (3 種) は本判定まで分からないので含まない。</summary>
-        public struct HudStats { public float critRate, critMul; public int attack, outgoingPct, defense, pen; }
+        /// <c>OnCriticalCheck</c> で発動する条件付きの会心率 (3 種) は本判定まで分からないので含まない。
+        /// <para>consOutgoingPct (2026-11-12) = そのうち消耗品 (〈油・膏薬〉と、 立てている〈瞬間研磨剤〉) が足す与ダメ%。
+        /// どちらも本判定 (<c>ApplyWinDamageModifiers</c>) で同じ加算プールへ入るので、 outgoingPct にも含める。 戦闘中に使った品を画面に出すため。</para></summary>
+        public struct HudStats { public float critRate, critMul; public int attack, outgoingPct, defense, pen, consOutgoingPct; }
 
         public HudStats PreviewHudStats()
         {
@@ -400,7 +402,9 @@ namespace CombatSystem
             float mul = ctx.outgoingDamageMultiplier <= 0f ? 1f : ctx.outgoingDamageMultiplier;
             int metaPct = MetaProgression.MetaBuffApplicator.GetOutgoingDamagePct()
                         + MetaProgression.MetaBuffApplicator.GetBattleSpiritPct(GameLoop.GameManager.Instance?.Run);
-            s.outgoingPct = Mathf.RoundToInt((mul - 1f) * 100f) + metaPct;
+            // 消耗品の分 (ApplyWinDamageModifiers の〈瞬間研磨剤〉+150%・〈油・膏薬〉consDmgMultPct と同じ条件)
+            s.consOutgoingPct = Mathf.Max(0, ctx.consDmgMultPct) + (ctx.polishArmed && !ctx.rollPurity ? 150 : 0);
+            s.outgoingPct = Mathf.RoundToInt((mul - 1f) * 100f) + metaPct + s.consOutgoingPct;
             s.defense = ctx.playerDefense;
             s.pen = ctx.playerArmorPen;
             return s;

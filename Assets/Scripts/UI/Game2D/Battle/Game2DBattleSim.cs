@@ -329,17 +329,44 @@ namespace UI.Game2D.Battle
             return true;
         }
 
-        /// <summary>配線の判断の間に消耗品を使う。 使えたら HP・充電の表示を写し直す。</summary>
+        /// <summary>消耗品を使える段か: ターンの判断 (振り直し・配線) で止まっている間だけ。 本体は CombatManager.Interactive のイテレーターで待っている。
+        /// BOT が戦闘中に消耗品を使う所 (ターンの間・配線の方策の中) と同じく、 敵の攻撃が予告されてから、 そのターンが解決する前。</summary>
+        public bool CanUseItems
+        {
+            get { var cm = CombatManager.Instance; return CanOperate && cm != null && cm.IsCombatActive && cm.IsAwaitingDecision; }
+        }
+
+        /// <summary>判断の間に消耗品を使う。 <b>本体の <see cref="Consumables.Use"/> をそのまま呼ぶ</b> (BOT と同じ関数・画面は値を作らない)。
+        /// 使えたら HP・充電の表示を写し直す (シールド・与ダメは HUD が毎フレーム読み直す)。</summary>
         public bool UseItem(string id)
         {
-            var gm = GameManager.Instance; var cm = CombatManager.Instance;
-            if (!CanOperate || gm?.Run == null || cm == null) return false;
+            var gm = GameManager.Instance;
+            if (!CanUseItems || gm?.Run == null) return false;
+            int hp0 = CombatManager.Instance.PlayerHP;
             if (!Consumables.Use(gm.Run, id)) return false;
-            playerHp = cm.PlayerHP; playerMax = Mathf.Max(1, cm.PlayerMaxHP);
+            AfterItem(hp0);
+            return true;
+        }
+
+        /// <summary>〈シュヴァリエのレイピア〉のコントラタックを切り替える (消費しない)。 本体の <see cref="Consumables.TryUseRapier"/> を呼ぶ (BOT と同じ関数)。</summary>
+        public bool UseRapier()
+        {
+            var gm = GameManager.Instance;
+            if (!CanUseItems || gm?.Run == null) return false;
+            int hp0 = CombatManager.Instance.PlayerHP;
+            if (!Consumables.TryUseRapier(gm.Run)) return false;
+            AfterItem(hp0);
+            return true;
+        }
+
+        /// <summary>使った後の表示の写し。 回復した分はターンの頭の HP にも足す (敵の攻撃の演出で見せる被ダメ = 頭の HP − 解決後の HP を、 回復で小さく見せない)。</summary>
+        private void AfterItem(int hpBefore)
+        {
+            var cm = CombatManager.Instance;
+            if (cm != null) { _hpBefore += cm.PlayerHP - hpBefore; playerHp = cm.PlayerHP; playerMax = Mathf.Max(1, cm.PlayerMaxHP); }
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             if (ctx != null) charge = ctx.GetCharge();
             Touch();
-            return true;
         }
 
         /// <summary>出目 i の行き先を順に変える (dir = 1 で次・−1 で前)。 場の端子 → 挿さない の順で、 挿せない端子は飛ばす。</summary>
