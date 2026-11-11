@@ -2,7 +2,7 @@
 
 使い方: python Tools/flavor_review.py <書き直しの JSON があるフォルダ> <出力する .html>
   - フォルダの *.json (各要素 {"id","flavorText","note","rename"}) を全部読み、items.json の今の文と並べる。
-  - ページは合否と直しの指示を Artifact の db (collection "flavor1") に保存する。
+  - ページは合否と直しの指示を Artifact の db (collection "flavor2") に保存する。
   - 書き直しの無い品は出さない (rename / note だけの提案は出す)。
 """
 import glob, io, json, os, sys
@@ -88,7 +88,7 @@ function applyFilter(){const f=$('filt').value;for(const el of document.querySel
 const timers={};
 function key(id){let h=0;for(const c of id)h=(h*31+c.codePointAt(0))>>>0;return 'i'+h.toString(36);}
 function save(id){counts();applyFilter();if(!db){$('save').textContent='保存先に接続できていません';return;}clearTimeout(timers[id]);$('save').textContent='保存中…';
- timers[id]=setTimeout(async()=>{const s=state[id]||{};try{await db.doc('flavor1/'+key(id)).set({id,verdict:s.v||'',note:s.note||'',rename:!!s.rn,at:new Date().toISOString()});$('save').textContent='保存しました';}catch(e){$('save').textContent='保存に失敗しました: '+(e&&e.message||e);}},500);}
+ timers[id]=setTimeout(async()=>{const s=state[id]||{};try{await db.doc('flavor2/'+key(id)).set({id,verdict:s.v||'',note:s.note||'',rename:!!s.rn,at:new Date().toISOString()});$('save').textContent='保存しました';}catch(e){$('save').textContent='保存に失敗しました: '+(e&&e.message||e);}},500);}
 function el(t,c,txt){const e=document.createElement(t);if(c)e.className=c;if(txt!=null)e.textContent=txt;return e;}
 function build(){const list=$('list');for(const d of DATA){const card=el('div','card');card.id='c_'+key(d.id);card.dataset.v='';card.dataset.r=d.rename?'1':'';
  const head=el('div','head');head.append(el('span','name',d.id));for(const t of [d.rarity,d.cat,d.axis&&('軸 '+d.axis),d.family&&(d.family+(d.tier?' '+d.tier:''))])if(t)head.append(el('span','tag',t));
@@ -109,7 +109,7 @@ function paint(id){const s=state[id]||{},c=$('c_'+key(id));if(!c)return;c.datase
 build();counts();$('filt').onchange=applyFilter;
 (async()=>{try{db=await claude.use('db');}catch(e){db=null;}
  if(!db){$('save').textContent='保存先に接続できていません';return;}
- try{const snap=await db.collection('flavor1').get();for(const doc of snap.docs){const x=doc.data()||{};if(!x.id)continue;state[x.id]={v:x.verdict||'',note:x.note||'',rn:!!x.rename};paint(x.id);}counts();$('save').textContent='読み込みました';}
+ try{const snap=await db.collection('flavor2').get();for(const doc of snap.docs){const x=doc.data()||{};if(!x.id)continue;state[x.id]={v:x.verdict||'',note:x.note||'',rn:!!x.rename};paint(x.id);}counts();$('save').textContent='読み込みました';}
  catch(e){$('save').textContent='読み込みに失敗しました: '+(e&&e.message||e);}})();
 </script>
 """
