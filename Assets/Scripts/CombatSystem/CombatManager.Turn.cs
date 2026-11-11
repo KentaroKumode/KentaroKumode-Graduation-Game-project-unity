@@ -1455,6 +1455,21 @@ namespace CombatSystem
             // ============================================================
             //  2 体戦 (2026-08-28)
             // ============================================================
+            // 敵〈多頭攻撃〉(2026-11-11 #104): プレイヤーが攻撃よりブロックに多く挿したターン、 敵の攻撃が 2 回になる。
+            //   2 回目は 1 回目と同じ攻撃値で、 〈連撃〉と同じパケットに載せる (ブロックは 2 回とも全額効く)。
+            //   挿し方で決まるので、 配線の前の予告 (secondaryAttackValue) には載らない ── 条件は敵の説明文に書いてある。
+            //   2 体戦・〈連撃〉で既に 2 回目がある時は増やさない (3 回にしない)。
+            if (primaryAttacked && !_twinStrikeThisTurn && !(secondaryEnemy != null && secondaryHP > 0)
+                && ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.MutualKeys.EnemyDoubleOnBlockHeavy) > 0f
+                && ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.MutualKeys.BlockDiceCount)
+                 > ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.MutualKeys.AttackDiceCount)
+                && enemyAtkValue > 0)
+            {
+                _secondaryAtkThisTurn = enemyAtkValue;
+                secondaryAtkBeforeDefense = enemyAtkBeforeDefense;
+                _twinStrikeThisTurn = true;
+                Debug.Log($"[多頭攻撃] ブロックの個数が攻撃より多い ── {currentEnemy.displayName} が 2 回攻撃 ({enemyAtkValue} × 2)");
+            }
             if ((secondaryEnemy != null && secondaryHP > 0) || (_twinStrikeThisTurn && primaryAttacked))
             {
                 bool twinOnly = !(secondaryEnemy != null && secondaryHP > 0);

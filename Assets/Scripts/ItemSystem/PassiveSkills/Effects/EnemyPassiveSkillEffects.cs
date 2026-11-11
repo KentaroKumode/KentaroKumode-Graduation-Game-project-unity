@@ -19,7 +19,7 @@ namespace ItemSystem.PassiveSkills.Effects
     //     [不発・確定] 読み手が無い・トリガーが敵の側で鳴らない・書いた値が読まれる前に消える /
     //     [向きが逆・確定] [漏れ・確定] 効き先が説明と逆、 またはプレイヤーにも乗る /
     //     [積み上がり・確定] 説明より多く積み上がる / [疑い] 実機で確かめないと決着しない。
-    //  ※ 2026-11-11 (#104) に、 上の印のうち〈多頭攻撃〉以外を説明文どおりに直した (数値は変えていない)。
+    //  ※ 2026-11-11 (#104) に、 上の印を説明文どおりに直した (数値は変えていない)。 〈多頭攻撃〉だけは効果を置き換えた (クラスの注記)。
     //     読み替えの決まり (相互攻撃モデル):
     //       - OnRollWin / OnRollLose は収支トリガー (ターン解決の後) のまま。 「次ターン …」はその次のターンに効かせ、
     //         固定ダメージ・反撃はその場 (解決の後) で入れる (CombatManager.Turn.cs が収支トリガーの後に HP を拾う)。
@@ -602,19 +602,19 @@ namespace ItemSystem.PassiveSkills.Effects
     //  6～7層: ユニーク型（高度な戦略を持つ敵専用スキル）
     // ----------------------------------------------------------
 
-    /// <summary>多頭攻撃 — ロール勝利時、追撃ダイスを1個追加
-    /// <para>[不発・確定] <c>accumulatedValues["extraPursuitDice"]</c> を読む処理がどこにも無い。
-    /// 2026-11-11 (#104) では直していない: 相互攻撃モデルの敵には「追撃ダイス」に当たる仕組みが無く、
-    /// 読み替え (次のターンだけ攻撃ロールを 1 回多く引く / 毎ターン 1 回多く引く / 勝つたびに積み上がる / 追加ダメージ) が 1 通りに決まらない。</para></summary>
+    /// <summary>多頭攻撃 — プレイヤーが攻撃よりブロックに多く挿したターン、 2 回攻撃する。
+    /// <para>2026-11-11 (#104): 旧い説明「ロール勝利時、追撃ダイスを1個追加」は相互攻撃モデルに当たる物が無く不発だった
+    /// (<c>extraPursuitDice</c> の読み手が無い)。 ユーザーの指定でこの効果に置き換えた。</para>
+    /// <para>ここは印を立てるだけ。 2 回目の攻撃は CombatManager.Turn.cs が、 挿し方が決まった後に 1 回目と同じ攻撃値で入れる
+    /// (ブロックは 2 回とも全額効く・挑戦カード〈連撃〉や 2 体戦で既に 2 回目がある時は増やさない)。</para></summary>
     public class MultiHead : IPassiveSkillEffect
     {
         public string SkillId => "MultiHead";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollWin };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
 
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            // extraPursuitDice をコンテキスト蓄積で管理
-            ctx.AddAccumulated("extraPursuitDice", 1);
+            ctx.accumulatedValues[MutualKeys.EnemyDoubleOnBlockHeavy] = 1f;
         }
     }
 

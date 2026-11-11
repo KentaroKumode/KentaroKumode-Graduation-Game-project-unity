@@ -35,6 +35,9 @@ namespace ItemSystem.PassiveSkills.Effects
         public const string BlockDiceCount   = "mutualBlockDiceCount";
         public const string ChargeDiceCount  = "mutualChargeDiceCount";
         public const string SpecialDiceCount = "mutualSpecialDiceCount";
+        /// <summary>敵〈多頭攻撃〉が戦闘の始めに立てる印 (persistent)。 プレイヤーが攻撃よりブロックに多く挿したターン、 敵の攻撃が 2 回になる
+        /// (CombatManager.Turn.cs の 2 回目のパケット)。</summary>
+        public const string EnemyDoubleOnBlockHeavy = "enemyDoubleOnBlockHeavy";
         /// <summary>攻撃端子に挿した出目の合計と最大値 (上乗せ率をかける前・2026-11-06)。</summary>
         public const string AttackDiceSum    = "mutualAttackDiceSum";
         public const string AttackDiceMax    = "mutualAttackDiceMax";

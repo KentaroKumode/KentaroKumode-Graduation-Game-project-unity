@@ -722,7 +722,7 @@
         {
           "internalName": "MultiHead",
           "skillName": "多頭攻撃",
-          "description": "ロール勝利時、追撃ダイスを1個追加",
+          "description": "攻撃よりブロックに多く挿したターン、2回攻撃してくる",
           "flavorText": "「頭数」の欄が、版ごとに違う。"
         },
         {
@@ -751,7 +751,7 @@
         {
           "internalName": "MultiHead",
           "skillName": "多頭攻撃",
-          "description": "ロール勝利時、追撃ダイスを1個追加",
+          "description": "攻撃よりブロックに多く挿したターン、2回攻撃してくる",
           "flavorText": "「頭数」の欄が、版ごとに違う。"
         },
         {
