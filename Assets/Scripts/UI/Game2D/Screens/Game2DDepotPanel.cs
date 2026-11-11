@@ -8,7 +8,7 @@ namespace UI.Game2D
     /// 補給拠点の画面 (#15・<b>仮置き</b>・2026-11-11)。
     /// <para>現状 (2026-11-11 に確認): 補給拠点 (<see cref="TileType.SupplyDepot"/>) は 5 層の一本道の 2 つ目の点にだけ置かれ、 踏んでも
     /// <c>GameManager.ActivateTile</c> の既定の分岐で航行へ戻るだけ ── 画面も補給の処理も無かった (TileType の注記「生成・効果は未実装」)。
-    /// 補給の処理 (照明・罠・物資の受け取り) は航行の担当の領分なので、 ここでは<b>着いた時に、 今の手持ちを文字で見せるだけ</b>にした。</para>
+    /// 2026-11-11: 着いた時に今の手持ちを見せ、 <b>物資を安く買える</b> (1 つ <c>ProvisionSystem.DepotPrice</c> G・数の限りなし)。</para>
     /// <para>出るのは人が遊んでいる時に補給拠点へ着いた瞬間だけ (BOT の間・ロード画面の間・ほかの窓が出ている間は出さない)。 「出発」か Esc で閉じる。
     /// 本番の絵は別 issue (#101)。</para>
     /// </summary>
@@ -60,7 +60,7 @@ namespace UI.Game2D
         {
             var d = new ScreenDef { id = "depot_panel", jp = true, w = 400, cols = 1, rowH = 15 };
             d.title = "補給拠点"; d.sub = run != null ? run.currentFloor + " 層" : null;
-            d.body = "照明・罠・物資を補給できる拠点。\n補給の受け取りはまだ作っていない (仮置き)。 今の手持ちだけを見せる。";
+            d.body = "物資を安く買える拠点。 1 つ " + ProvisionSystem.DepotPrice + "G (数の限りは無い)。\n所持金 " + (run != null ? run.coins : 0) + "G";
             if (run != null)
             {
                 int flareCost = Mathf.Max(1, MapSystem.FreeMove.FreeMapParams.FlareSupply);
@@ -69,9 +69,15 @@ namespace UI.Game2D
                 d.Items.Add(new ModalItem { name = "囮罠", value = CountLures(run) + " 個", desc = "航行で置くと、 追跡者を罠の方へ引きつける。 ショップで買える。" });
                 d.Items.Add(new ModalItem { name = "HP", value = run.playerHP + "/" + run.playerMaxHP, desc = "休憩・前哨基地・消耗品で回復する。" });
             }
-            d.buttons.Add(new ModalBtn { label = "出発", action = "close", primary = true });
+            bool canBuy = run != null && run.coins >= ProvisionSystem.DepotPrice && run.provision < run.provisionCap;
+            if (canBuy) d.buttons.Add(new ModalBtn { label = "物資を買う " + ProvisionSystem.DepotPrice + "G", action = "buy", primary = true });
+            d.buttons.Add(new ModalBtn { label = "出発", action = "close", primary = !canBuy });
             d.footer = "行を選ぶと説明が出る / Esc で閉じる";
-            d.onAction = (a, _) => { if (a == "close") Close(); };
+            d.onAction = (a, _) =>
+            {
+                if (a == "close") { Close(); return; }
+                if (a == "buy" && ProvisionSystem.TryBuyAtDepot(GameManager.Instance?.Run)) { _def = Build(GameManager.Instance.Run); modal.Open(_def); }   // 買ったら数字を描き直す
+            };
             return d;
         }
     }

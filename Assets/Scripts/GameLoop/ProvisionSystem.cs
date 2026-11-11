@@ -78,6 +78,18 @@ namespace GameLoop
             int b = run.provision; Recover(run, amount); Stats.supplyGain += run.provision - b;
         }
 
+        /// <summary>補給拠点で物資 1 を買う値段 (G)。 ショップ (<c>FreeMapParams.ProvisionPrice</c>) より安い・在庫の数は無い (2026-11-11・仮置き)。</summary>
+        public const int DepotPrice = 1;
+
+        /// <summary>補給拠点で物資を 1 買う。 金が足りない・物資が満ちている時は false。</summary>
+        public static bool TryBuyAtDepot(RunState run)
+        {
+            if (run == null || run.coins < DepotPrice || run.provision >= run.provisionCap || run.crownProvisionLocked) return false;
+            run.coins -= DepotPrice; run.coinsSpent += DepotPrice;
+            Supply(run, 1);
+            return true;
+        }
+
         /// <summary>移動の消費（自由移動マップが距離に応じて払う）。 計測は travelLoss。</summary>
         public static void SpendTravel(RunState run, int amount)
         {
