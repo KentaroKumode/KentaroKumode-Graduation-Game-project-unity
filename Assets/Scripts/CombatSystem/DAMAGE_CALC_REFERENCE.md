@@ -353,6 +353,9 @@ ResolveCritRate(addTotal):
 DoubleStruck / BackingPlate / GatewardStance / LifestealII / HeavyStrike / BatteringRam / BluntWeapon /
 SwordReachII・III / BulwarkII・III。 置き換え前と同一シード 10,000 ランで決定性ダイジェスト 10,000/10,000 一致。
 
+**可変量 (`stats[].per`・段 3・2026-11-11)。** 量が実行時の状態で変わる効果は `per`（単位数の出どころ: `coinsSpent` / `axis:軸名` / `enemyBleed` / `enemyPoison` / `chargeSpent` / `turnsElapsed`）・`perEvery`（N につき・整数の割り算）・`perMax`（単位数の頭打ち）・`on`（乗せるトリガーの上書き）で書き、`StatModifierEffect.ApplyScaled` が「生成時に確定した float の量 × 単位数」を旧クラスと同じ形で足す。単位数が 0 なら何もしない。
+段 3 でステータス化済み（9 件）: 溶金の領主剣 / 研ぎ師の見立て書 / 千里眼の水晶 / 血日に澄む佩玉 / 鎧縫いの針 / 麻痺の吹き矢 / 雷神槍 / 猛りII・III。 同一シードのダイジェストは未測定。
+
 **条件 (`stats[].when`・段 2)。** 書いた項目はすべて AND。判定は**そのステータスのトリガーの時点**（旧クラスと同じ）。
 
 | when | 成立条件（式は旧クラスのまま） |
@@ -432,7 +435,7 @@ Hermes / Bloodlust / EvenEyes / MasterworkNotes / KaleidoDice。
 | TenkouKaibutsu(天工開物) | (なし) | no-op(効果は GameManager.TryUpgradeWeapon の素材返還) |
 | Bloodlust(背水の狂刃) | OnPreDealDamage | HP≤50% → outgoing+=0.3、≤25% → +=0.8 (2026-05-31 outgoing移行) |
 | Hermes(ヘルメスの靴) | OnPostRoll | 初回ロール `AddPlayerAttackOrDiceBonus(5)`（攻撃+5・ステータス化 §2-C） |
-| GoldKingBlade(黄金卿の剣) | OnPreDealDamage | outgoing += 0.01×coinsSpent (100Gで+1.0=×2倍相当、 上限なし、 2026-05-31 v3 消費Gold基準) |
+| GoldKingBlade(溶金の領主剣) | OnPreDealDamage | 攻撃が通る時 outgoing += 0.002×coinsSpent (500G で +1.0、 上限なし。 2026-11-11 ステータス化 §2-C 段 3: `dmgPct 0.2 per coinsSpent`) |
 | MugaMushin(無我無心) | OnBattleStart | rollPurity=true(diceBonus等の補正拒否) |
 | GaryoTensei(画竜点睛) | OnPostRoll | 出目が最大面 → garyoProc=true,garyoDieValue。即勝利+(出目+10)×criticalMultiplier会心確定 |
 
@@ -467,7 +470,7 @@ items.json 側は**ツールチップ表示専用**なので、両者を必ず�
 | シールドバッシュ I/II/III | **OnWired** | 出目を**全部攻撃端子**に挿したターン、`consShield` を 0 にして `AddPlayerAttackOrDiceBonus(ceil(使った量 × 0.5/1.0/1.5))`。攻撃値なので倍率・会心が乗る |
 | SteadfastStance(堅守の構え) | **OnWired** | 出目を**全部ブロック端子**に挿したターン `consShield += 15`。次の 2 ターンは不発（`steadfastStanceReadyTurn`） |
 | Daybreak(黎明) | OnTurnEnd | `mutualHpLossFromEnemy == 0` なら `floor(mutualEnemyAtkPreDefense / 10) × 5%` × 敵最大HP を `enemyCurrentHP` から引く（〈天与の才〉の踏みとどまりは通す） |
-| Fervor I/II/III(猛り) | OnPostRoll | `AddPlayerAttackOrDiceBonus(min(currentTurn−1, 5/9/14))` |
+| Fervor I/II/III(猛り) | OnPostRoll | `AddAttackDicePct(min(currentTurn−1, 5/9/14) × 0.1)`（攻撃に挿した出目 +10%/ターン。II・III は 2026-11-11 ステータス化 §2-C 段 3: `atkDicePct 10 per turnsElapsed`・`perMax 9/14`。I は武器の段から出るのでクラスのまま） |
 | ArmorBreak I/II/III(鎧砕き) | OnTurnEnd | `lastPlayerDamage > 0` なら `enemyDefense = max(0, enemyDefense − 2/3/4)`。戦闘中持続・形態 swap で新形態の値に戻る |
 | 捨て身 | OnPreDealDamage | 自HP割合 < 敵HP割合 のとき outgoing+50%（ステータスのみ・旧〈血令〉の被ダメ −15% は外した） |
 | BloodEdict(血令) | OnBattleStart / OnPostRoll / OnWired / OnTurnEnd | **2026-11-11 作り直し。** OnTurnEnd で `floor(mutualHpLossFromEnemy × 50%)` を血 (`bloodEdictBlood`) に溜める。OnPostRoll で `AddPlayerAttackOrDiceBonus(血)`。OnWired で攻撃端子が 1 本以上なら血を使い切る (`bloodEdictSpent` へ移す)。攻撃が通ったターンの OnTurnEnd で HP +`floor(使った血 / 4)`。防御は変えない（旧: 防御を貫通 ×2 へ換算・〈血の盟約〉は外した） |

@@ -363,26 +363,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
 
 
-    /// <summary>黄金卿の剣 (2026-05-31 v3 消費Gold基準) — 消費した累積ゴールド×0.002 を outgoing に加算。
-    /// 500Gで+1.0 (×2)、 1000Gで+2.0 (×3)。 「使えば使うほど強くなる」軸への切替。
-    /// 旧仕様 (保有Gold×0.04) は「貯めるほど強い → 出費抑制 = 戦略歪み」だったため変更。
-    ///
-    /// **2026-08-10 経済リスケールで係数を 0.01 → 0.002 へ。** 支出額が約 5 倍になったので、
-    /// 係数を据え置くと効果が 5 倍になる。 **同じ「支出額に対する強さ」を保つための追随**であって、
-    /// このアイテムの強弱を変える意図ではない。</summary>
-    public class GoldKingBlade : IPassiveSkillEffect
-    {
-        public string SkillId => "溶金の領主剣";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            if (ctx.finalDamage <= 0) return;
-            int spent = GameLoop.GameManager.Instance?.Run?.coinsSpent ?? 0;
-            if (spent <= 0) return;
-            if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
-            ctx.outgoingDamageMultiplier += 0.002f * spent;
-        }
-    }
+    // 〈溶金の領主剣〉(旧 GoldKingBlade・使ったゴールド 1 につき与ダメ +0.2%・2026-08-10 の経済リスケールで係数 0.01 → 0.002) は 2026-11-11 に items.json の stats へ移した (段 3・per=coinsSpent)。
 
     // ============================================================
     //  2026-06-03 新規追加アイテム
@@ -878,38 +859,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
 
 
-    /// <summary>短絡 (2026-07-16 改名: 旧 Criticality → ShortCircuit)。
-    /// 過充電状態 (charge≥7) が3ターン続いたら会心確定、充電を全消費してクールダウン。
-    /// OnPostRoll でストリーク計測、閾値到達で OnCriticalCheck 時に会心強制+リセット。
-    /// 「臨界」キーワードは別軸 (自メーター爆発型) に割り当てるためリネーム。</summary>
-    /// <summary>短絡 (2026-09-05 リワーク) — <b>そのターンに消費した充電の 50% を攻撃値へ加算</b>。
-    ///
-    /// <para>旧: 過充電 (充電7以上) が 3 ターン続いたら会心確定＋充電全消費。
-    /// 「溜め続ける」ことが条件なのに、 <b>充電の主な使い道はリロール (ADR-0010) で消費すること</b>
-    /// ── 溜めと使いが正面から食い合っており、 実測 準パワー -0.88 と成立していなかった。</para>
-    ///
-    /// <para>新は逆向きに、 <b>払った充電が火力になる</b>。 リロールを回すほど攻撃が伸びるので、
-    /// 充電軸の「振り直して手を作る」動きとペイオフが同じ方向を向く。</para>
-    ///
-    /// <para>OnPostRoll で読むのは、 充電の消費 (リロール) が<b>配線より前</b>のフェーズで
-    /// 完了しているから (§9.1 step4 → step5)。 攻撃値への加算は OnPostRoll でしか乗らない。</para></summary>
-    public class ShortCircuit : IPassiveSkillEffect
-    {
-        /// <summary>消費充電の何割を攻撃へ回すか。</summary>
-        private const float ReturnRate = 0.50f;
-
-        public string SkillId => "雷神槍";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            int spent = (int)ctx.GetAccumulated(CombatContext.ChargeSpentThisTurnKey);
-            if (spent <= 0) return;
-            int gain = UnityEngine.Mathf.FloorToInt(spent * ReturnRate);
-            if (gain <= 0) return;
-            ctx.AddPlayerAttackOrDiceBonus(gain);
-            UnityEngine.Debug.Log($"[短絡] 消費充電 {spent} → 攻撃 +{gain}");
-        }
-    }
+    // 〈雷神槍〉(旧 ShortCircuit・このターンに使った充電の 50% を攻撃へ・端数切り捨て) は 2026-11-11 に items.json の stats へ移した (段 3・per=chargeSpent)。
 
 
     // ============================================================

@@ -85,7 +85,9 @@ namespace ItemSystem.PassiveSkills
             var sb = new System.Text.StringBuilder();
             foreach (var s in stats)
                 sb.Append(s.stat).Append('=').Append(s.value.ToString(System.Globalization.CultureInfo.InvariantCulture))
-                  .Append(s.when == null || s.when.IsEmpty ? "" : UnityEngine.JsonUtility.ToJson(s.when)).Append(';');
+                  .Append(s.when == null || s.when.IsEmpty ? "" : UnityEngine.JsonUtility.ToJson(s.when))
+                  .Append(string.IsNullOrEmpty(s.per) ? "" : $"/per={s.per},{s.perEvery},{s.perMax}")
+                  .Append(string.IsNullOrEmpty(s.on) ? "" : "@" + s.on).Append(';');
             return sb.ToString();
         }
 
@@ -220,7 +222,7 @@ namespace ItemSystem.PassiveSkills
             Register(new SmolderingBreastplate());
             Register(new LightningHeadguard());
             Register(new ThornBuckler());
-            Register(new ArmorNeedle());
+            // 鎧縫いの針 はステータス化 (段 3・敵の出血 1 につき貫通 +1)
             Register(new StrainGauntlet());
             Register(new GreenKnife());
             Register(new PoisonWedge());
@@ -233,7 +235,7 @@ namespace ItemSystem.PassiveSkills
             Register(new WeightingGauntlet());
             Register(new VenomBangle());
             Register(new RotBlade());
-            Register(new BloodDayPendant());
+            // 血日に澄む佩玉 はステータス化 (段 3・敵の出血 1 につき会心率 +2%)
             Register(new SoulBloodstone());
             Register(new BloodlineRing());
             Register(new SiegeAxe());
@@ -256,7 +258,8 @@ namespace ItemSystem.PassiveSkills
             // ============================
             //  軸の品 (2026-11-07・AxisItemEffects.cs)。 各軸に 燃料 / ① 数を参照 / ②【規則】 / 誓約
             // ============================
-            Register(new FalconerGlove());    Register(new WhetterAppraisal());  Register(new LayeredCutForm());      Register(new LayeredScabbard()); Register(new PinpointEye());
+            // 研ぎ師の見立て書 / 千里眼の水晶 / 麻痺の吹き矢 はステータス化 (段 3・2026-11-11)
+            Register(new FalconerGlove());                                       Register(new LayeredCutForm());     Register(new LayeredScabbard()); Register(new PinpointEye());
             Register(new ReturnEdgeClasp());  Register(new UnstanchedNeedles()); Register(new ClotVial());            Register(new RustOath());
             Register(new TasterSpoon());      Register(new MiasmaJar());         Register(new RotMossBall());         Register(new DregsOath());
             Register(new FirekeeperPoker());  Register(new CharcoalFeeder());       Register(new SparkReadingGlasses()); Register(new RefiredPrimer());   Register(new CoreOath());
@@ -264,12 +267,12 @@ namespace ItemSystem.PassiveSkills
             Register(new PaddedBracer());     Register(new OiledShieldLeather());Register(new ShieldPushArt());       Register(new WardenOath());
             // 軸の品・追加 34 品 (2026-11-07・AxisItemEffects2.cs)。 各軸を 23 品にそろえた
             Register(new AimNotch());   Register(new FirstArrow());   Register(new LingeringBell()); Register(new ParryFan());
-            Register(new NickAppraisal()); Register(new LosingStreakDie()); Register(new ChainedFlash()); Register(new QuickDrawArt()); Register(new FarsightCrystal());
+            Register(new NickAppraisal()); Register(new LosingStreakDie()); Register(new ChainedFlash()); Register(new QuickDrawArt());
             Register(new SpareBattery()); Register(new StaticBlanket()); Register(new FlintNeedle()); Register(new StorageGauntlet());
             Register(new RerollHammer()); Register(new InsulatedCloak()); Register(new LightningStake()); Register(new ThunderDrum());
             Register(new ChippedKnife()); Register(new ThornGlove()); Register(new RiftWedge()); Register(new DrippingEdge());
             Register(new NoClotSalve()); Register(new CrimsonPress()); Register(new EndlessSpringCrystal());
-            Register(new AcidVial()); Register(new NeedleRing()); Register(new LeafMoldBag()); Register(new NumbDart());
+            Register(new AcidVial()); Register(new NeedleRing()); Register(new LeafMoldBag());
             Register(new MiasmaMantle()); Register(new PoolKeeper());
             Register(new RivetPlate()); Register(new CatchBracer()); Register(new LayeredTagShield()); Register(new BrokenShieldGrudge());
 
@@ -326,7 +329,7 @@ namespace ItemSystem.PassiveSkills
             Register(new ShieldBashLadderI()); Register(new ShieldBashLadderII()); Register(new ShieldBashLadderIII());
             Register(new SteadfastStance());   // 堅守の構え
             Register(new Daybreak());          // 黎明
-            Register(new FervorI());      Register(new FervorII());      Register(new FervorIII());
+            Register(new FervorI());      // II / III はステータス化 (段 3・経過ターン 1 につき 攻撃に挿した出目 +10%・上限 9 / 14)
             Register(new ArmorBreakI());  Register(new ArmorBreakII());  Register(new ArmorBreakIII());
             // 捨て身はステータスだけ (HP 割合で劣勢)
             Register(new BloodEdict());   // 血令
@@ -364,7 +367,7 @@ namespace ItemSystem.PassiveSkills
             Register(new IndomitableIV());
             // ShieldBashI〜IV (旧〈内から落ちた城盾〉) は 2026-10-28 削除。 盾家系の〈シールドバッシュ〉へ一本化した。
             // Bloodlust / Hermes はステータス化
-            Register(new GoldKingBlade());
+            // 溶金の領主剣 はステータス化 (段 3・使ったゴールド 1 につき与ダメ +0.2%)
 
             // 2026-06-03 新規追加アイテム
             // EvenEyes / MasterworkNotes / KaleidoDice はステータス化
@@ -410,7 +413,7 @@ namespace ItemSystem.PassiveSkills
             // 2026-07-15 充電系 (ADR-0009 柱5・新パイプライン専用)
             Register(new Thundercloud());     // 雷雲 (ロール後25%で+1)
             // Overload はステータス化
-            Register(new ShortCircuit());   // 2026-07-16 改名: 旧 Criticality (「臨界」キーワードを新軸に譲渡)
+            // 雷神槍 (旧 ShortCircuit) はステータス化 (段 3・このターンに使った充電の半分を攻撃へ)
 
             // 臨界系 (Rinkai) 2026-07-16 追加: メーター蓄積型・Burn 撤廃後の新軸
             Register(new UnyieldingHeat());    // 不朽の熱 (meter40+ で致命耐え・meter全消費)      // 臨界 (過充電3T継続で会心確定+全消費)

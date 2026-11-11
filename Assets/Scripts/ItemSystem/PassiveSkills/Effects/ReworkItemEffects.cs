@@ -588,16 +588,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>鎧縫いの針: 敵の出血 1 につき、 敵の防御を 1 無視する。</summary>
-    public class ArmorNeedle : IPassiveSkillEffect
-    {
-        public string SkillId => "鎧縫いの針";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (ctx.enemyBleedStacks > 0) ctx.playerArmorPen += ctx.enemyBleedStacks;
-        }
-    }
+    // 〈鎧縫いの針〉(敵の出血 1 につき貫通 +1・OnWired) は 2026-11-11 に items.json の stats へ移した (段 3・per=enemyBleed)。
 
     /// <summary>力みの小手: シールドを合計 10 得るたび 刻み +1。 攻撃に挿したターン、
     /// 刻み 1 つにつき攻撃に挿した出目 +10% (使い切る)。 2026-11-06: 旧「この戦闘中の攻撃 +1」。</summary>
@@ -733,19 +724,21 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>重増しの拳套: 敵の毒が 5 増えるたび 刻み +1 (2026-11-07: 旧「増えるたび」は入り口が増えるほど回数で膨らんだので量で数える)。 攻撃に挿したターン、 刻み 1 つにつき攻撃に挿した出目 +10% (使い切る)。
-    /// 2026-11-06: 旧「この戦闘中の攻撃 +1」は攻撃+N の 21% を占めた (毎ターン毒が増えるので戦闘の長さに比例して積み上がる)。
-    /// 毒の量は増やさない。</summary>
+    /// <summary>重増しの拳套: 攻撃が通るたび (1 ターンに 1 回) 刻み +1。 刻み 1 つにつき与ダメージ +3%。 戦闘が終わると刻みは 0 に戻る。
+    /// 2026-11-11 (#100): 毒の品から作り直した ── 拳套なのに毒で、 名前・フレーバー (「留め紐は一撃ごとに長くなる。 外すと元へ戻る」) と
+    /// 効果が合っていなかった。 軸なし。 数値は仮置き (未測定)。 旧効果は「敵の毒が 5 増えるたび刻み +1・攻撃に挿したターンに使い切る」。</summary>
     public class WeightingGauntlet : IPassiveSkillEffect
     {
         public string SkillId => "重増しの拳套";
-        private const string Stk = "rw.weightAtk";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPoisonGain, PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnWired };
+        public const float PctPerStack = 0.03f;
+        /// <summary>[persistent・戦闘開始で 0] 刻みの数。</summary>
+        private const string Stk = "rw.weightStacks";
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnPostRoll, PassiveSkillTrigger.OnPostDealDamage };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
-            if (Rw.SpendDiceStacks(t, ctx, Stk)) return;
-            int n = Kw.Tally(ctx, "rw.weightTally", Kw.EventAmount(ctx), 5);
-            if (n > 0) Kw.Add(ctx, Stk, n);
+            if (t == PassiveSkillTrigger.OnBattleStart) { ctx.accumulatedValues[Stk] = 0f; return; }
+            if (t == PassiveSkillTrigger.OnPostRoll) { ctx.AddOutgoingPct(ctx.GetAccumulated(Stk) * PctPerStack); return; }
+            if (Rw.PlayerHit(ctx) && Rw.OncePerTurn(ctx, "rw.weightHit")) ctx.accumulatedValues[Stk] = ctx.GetAccumulated(Stk) + 1f;
         }
     }
 
@@ -769,13 +762,7 @@ namespace ItemSystem.PassiveSkills.Effects
     //  出血
     // ============================================================
 
-    /// <summary>血日に澄む佩玉: 敵の出血 1 につき会心率 +2%。</summary>
-    public class BloodDayPendant : IPassiveSkillEffect
-    {
-        public string SkillId => "血日に澄む佩玉";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.critRatePctAdd += ctx.enemyBleedStacks * 0.02f;
-    }
+    // 〈血日に澄む佩玉〉(敵の出血 1 につき会心率 +2%・OnWired) は 2026-11-11 に items.json の stats へ移した (段 3・per=enemyBleed)。
 
     /// <summary>魂喰らいの血石: 出血を消費・減衰で失うたび、 失った分だけシールド。</summary>
     public class SoulBloodstone : IPassiveSkillEffect

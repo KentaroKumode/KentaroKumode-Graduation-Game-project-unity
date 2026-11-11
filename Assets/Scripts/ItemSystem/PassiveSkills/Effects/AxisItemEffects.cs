@@ -168,7 +168,6 @@ namespace ItemSystem.PassiveSkills.Effects
             // 毒の軸 (瘴気)
             ("毒固めの腕環", When.TurnStart,     false, 1, Gate.Top, 1),
             ("主より長い香炉", When.TurnStart,     false, 1, Gate.Top, 2),
-            ("重増しの拳套", When.PerBlockDie,   false, 1, Gate.AtLeast, 9),
             ("廃庭の霧吹き", When.EnemyAttacked, false, 1, Gate.AtLeast, 8),
             ("石抜きの毒指輪", When.EnemyAttacked, false, 1, Gate.AtLeast, 6),
             ("岸上げの麻痺瓶", When.BlockedAll,    false, 2, Gate.Free, 0),
@@ -207,15 +206,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>研ぎ師の見立て書 (①): 心眼 1 につき、 会心倍率 +0.15。
-    /// 2026-11-07 に「会心率 +3%」から変更 ── 会心の品を揃えると会心率は燃料だけで 76% に届き、 率の上乗せが余っていた。</summary>
-    public class WhetterAppraisal : IPassiveSkillEffect
-    {
-        public string SkillId => "研ぎ師の見立て書";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalCheck };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-            => ctx.criticalMultiplier += 0.15f * ctx.AxisDepth(AxisRules.Crit);
-    }
+    // 〈研ぎ師の見立て書〉(①: 心眼 1 につき会心倍率 +0.15) は 2026-11-11 に items.json の stats へ移した (段 3・per=axis:会心)。
 
     /// <summary>重ね斬りの型 (②【規則】): 会心率が 100% を超えた分の確率で、 会心がもう一度重なる (会心倍率 +1.0)。
     /// 判定は PassiveSkillManager の会心倍率を掛ける地点。</summary>

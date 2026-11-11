@@ -135,14 +135,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>千里眼の水晶: 心眼 1 につき会心倍率 +0.15 (2026-11-07: 旧 +0.05)。</summary>
-    public class FarsightCrystal : IPassiveSkillEffect
-    {
-        public string SkillId => "千里眼の水晶";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalCheck };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-            => ctx.criticalMultiplier += 0.15f * ctx.AxisDepth(AxisRules.Crit);
-    }
+    // 〈千里眼の水晶〉(心眼 1 につき会心倍率 +0.15) は 2026-11-11 に items.json の stats へ移した (段 3・per=axis:会心)。
 
     // ============================================================
     //  充電 (8)
@@ -363,13 +356,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>麻痺の吹き矢: 敵の毒 5 につき、 敵の防御 −1 (貫通として足す・2026-11-07: 旧 毒 10 につき)。</summary>
-    public class NumbDart : IPassiveSkillEffect
-    {
-        public string SkillId => "麻痺の吹き矢";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.playerArmorPen += ctx.EnemyPoison / 5;
-    }
+    // 〈麻痺の吹き矢〉(敵の毒 5 につき貫通 +1・OnWired) は 2026-11-11 に items.json の stats へ移した (段 3・per=enemyPoison・perEvery 5)。
 
     /// <summary>瘴気の外套: 敵の毒が 10 以上の間、 受けるダメージ − 瘴気 (2026-11-07: 旧 毒 20 以上・瘴気の半分)。</summary>
     public class MiasmaMantle : IPassiveSkillEffect

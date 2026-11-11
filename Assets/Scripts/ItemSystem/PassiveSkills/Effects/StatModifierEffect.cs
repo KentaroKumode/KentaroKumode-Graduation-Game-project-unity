@@ -45,6 +45,10 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 〈切り返し〉の「前のターンに被弾」と〈一心不乱〉の「非会心の連続」だけは状態を持つので、
     /// そのための追加トリガー (OnPreReceiveDamage / OnPostDealDamage) で記録する。</para>
     ///
+    /// <para><b>可変量 (段 3・2026-11-11)。</b> <c>per</c> を書いたステータスは value を 1 単位の量として、
+    /// 実行時の単位数 (使ったゴールド・軸の品の数・敵の出血/毒・使った充電・経過ターン) を掛けて当てる。
+    /// <c>perEvery</c> で「N につき」、 <c>perMax</c> で単位数の上限。 タイミングが既定と違う旧クラスは <c>on</c> で合わせる。</para>
+    ///
     /// <para><b>固有部分を持つスキル</b> (〈処刑〉のダイス潰し等) は専用クラスを <c>inner</c> に包む。
     /// 同じトリガーでは inner → ステータスの順に当てる。</para>
     ///
@@ -73,6 +77,16 @@ namespace ItemSystem.PassiveSkills.Effects
         /// 2026-09-19 の段 1 で 10,000 ラン中 2 ランの決定性ダイジェストがずれた。
         /// float の配列に格納すれば旧クラスの定数と同じ値になる。</para></summary>
         private readonly float[] _amount;
+        /// <summary>そのステータスを乗せるタイミング (<c>on</c> の上書きか、 ステータスの既定)。 生成時に確定させる。</summary>
+        private readonly PassiveSkillTrigger[] _trigger;
+        /// <summary>段 3 (可変量): 単位数の出どころ。 <see cref="Per.None"/> は定量。</summary>
+        private readonly Per[] _per;
+        private readonly string[] _perAxis;   // Per.Axis の軸名
+        private readonly int[] _perEvery;     // 1 以上
+        private readonly int[] _perMax;       // 0 = 上限なし
+
+        /// <summary>段 3 の単位数の出どころ。 式は旧クラスのものをそのまま写している。</summary>
+        private enum Per { None, CoinsSpent, Axis, EnemyBleed, EnemyPoison, ChargeSpent, TurnsElapsed }
 
         public StatModifierEffect(string skillId, StatJson[] stats, IPassiveSkillEffect inner = null)
         {
@@ -85,6 +99,11 @@ namespace ItemSystem.PassiveSkills.Effects
             _when = new StatWhen[stats.Length];
             _provisionMin = new int[stats.Length];
             _provisionBelow = new int[stats.Length];
+            _trigger = new PassiveSkillTrigger[stats.Length];
+            _per = new Per[stats.Length];
+            _perAxis = new string[stats.Length];
+            _perEvery = new int[stats.Length];
+            _perMax = new int[stats.Length];
             var ts = new List<PassiveSkillTrigger>();
             if (inner != null)
                 foreach (var t in inner.Triggers) if (!ts.Contains(t)) ts.Add(t);
@@ -100,7 +119,13 @@ namespace ItemSystem.PassiveSkills.Effects
                     _tracksHit    |= _when[i].hitLastTurn;
                     _tracksStreak |= _when[i].nonCritStreakMin > 0;
                 }
-                var t = TriggerOf(s.stat);
+                _per[i] = PerOf(skillId, s.per, out _perAxis[i]);
+                _perEvery[i] = s.perEvery > 1 ? s.perEvery : 1;
+                _perMax[i] = s.perMax > 0 ? s.perMax : 0;
+                if (_per[i] != Per.None && !Scalable(s.stat))
+                    UnityEngine.Debug.LogError($"[StatModifierEffect] {skillId}: '{s.stat}' は可変量 (per) に対応していない");
+                var t = TriggerOf(skillId, s);
+                _trigger[i] = t;
                 if (!ts.Contains(t)) ts.Add(t);
             }
             if (_tracksHit && !ts.Contains(PassiveSkillTrigger.OnPreReceiveDamage))
@@ -138,6 +163,68 @@ namespace ItemSystem.PassiveSkills.Effects
                 case StatKeys.DamageTakenPct: return (float)(1.0 + v / 100.0);
                 default:                      return v;
             }
+        }
+
+        /// <summary><c>per</c> の名前 → 出どころ。 未知の名前はエラーにして定量として扱う (黙って 0 にしない)。</summary>
+        private static Per PerOf(string skillId, string name, out string axis)
+        {
+            axis = null;
+            if (string.IsNullOrEmpty(name)) return Per.None;
+            const string AxisPrefix = "axis:";
+            if (name.StartsWith(AxisPrefix, System.StringComparison.Ordinal))
+            {
+                axis = name.Substring(AxisPrefix.Length);
+                if (System.Array.IndexOf(AxisRules.Ranked, axis) < 0)
+                    UnityEngine.Debug.LogError($"[StatModifierEffect] {skillId}: 未知の軸 '{axis}'");
+                return Per.Axis;
+            }
+            switch (name)
+            {
+                case "coinsSpent":   return Per.CoinsSpent;
+                case "enemyBleed":   return Per.EnemyBleed;
+                case "enemyPoison":  return Per.EnemyPoison;
+                case "chargeSpent":  return Per.ChargeSpent;
+                case "turnsElapsed": return Per.TurnsElapsed;
+            }
+            UnityEngine.Debug.LogError($"[StatModifierEffect] {skillId}: 未知の単位 per='{name}'");
+            return Per.None;
+        }
+
+        /// <summary>可変量 (per) に対応しているステータス。 式は <see cref="ApplyScaled"/>。</summary>
+        private static bool Scalable(string stat) => stat switch
+        {
+            StatKeys.Attack or StatKeys.DamagePct or StatKeys.CritPct or StatKeys.CritMul or
+            StatKeys.ArmorPen or StatKeys.Defense or StatKeys.AttackDicePct => true,
+            _ => false,
+        };
+
+        /// <summary>そのステータスのタイミング。 <c>on</c> があればそれ、 無ければ <see cref="TriggerOf(string)"/>。</summary>
+        private static PassiveSkillTrigger TriggerOf(string skillId, StatJson s)
+        {
+            if (string.IsNullOrEmpty(s.on)) return TriggerOf(s.stat);
+            if (System.Enum.TryParse(s.on, out PassiveSkillTrigger t)) return t;
+            UnityEngine.Debug.LogError($"[StatModifierEffect] {skillId}: 未知のタイミング on='{s.on}'");
+            return TriggerOf(s.stat);
+        }
+
+        /// <summary>段 3 の単位数 (割り算・上限を当てた後)。 読む値は旧クラスと同じ。</summary>
+        private int Units(int i, CombatContext ctx)
+        {
+            int q;
+            switch (_per[i])
+            {
+                case Per.CoinsSpent:   q = GameLoop.GameManager.Instance?.Run?.coinsSpent ?? 0; break;
+                case Per.Axis:         q = ctx.AxisDepth(_perAxis[i]); break;
+                case Per.EnemyBleed:   q = ctx.enemyBleedStacks; break;
+                case Per.EnemyPoison:  q = ctx.EnemyPoison; break;
+                case Per.ChargeSpent:  q = (int)ctx.GetAccumulated(CombatContext.ChargeSpentThisTurnKey); break;
+                case Per.TurnsElapsed: q = System.Math.Max(0, ctx.currentTurn - 1); break;
+                default:               return 0;
+            }
+            if (q <= 0) return 0;
+            if (_perEvery[i] > 1) q /= _perEvery[i];
+            if (_perMax[i] > 0 && q > _perMax[i]) q = _perMax[i];
+            return q;
         }
 
         public string SkillId => _id;
@@ -182,9 +269,11 @@ namespace ItemSystem.PassiveSkills.Effects
             // 同じトリガーのステータスは items.json に書いた順に当てる。
             for (int i = 0; i < _stats.Length; i++)
             {
-                if (TriggerOf(_stats[i].stat) != trigger) continue;
+                if (_trigger[i] != trigger) continue;
                 if (_when[i] != null && !Holds(i, ctx)) continue;
-                Apply(_stats[i].stat, _amount[i], ctx);
+                if (_per[i] == Per.None) { Apply(_stats[i].stat, _amount[i], ctx); continue; }
+                int n = Units(i, ctx);
+                if (n > 0) ApplyScaled(_stats[i].stat, _amount[i], n, ctx);
             }
 
             // 連続の更新は適用の後 (その攻撃の結果で数える)。
@@ -330,6 +419,45 @@ namespace ItemSystem.PassiveSkills.Effects
                     break;
                 case StatKeys.AttackDicePct:
                     ctx.AddAttackDicePct(v);   // [perTurn] 配線の確定後に CombatManager が 1 回だけ掛ける
+                    break;
+            }
+        }
+
+        /// <summary>段 3 (可変量): 1 単位の量 <paramref name="v"/> × 単位数 <paramref name="n"/> (n ≥ 1) を当てる。
+        ///
+        /// <para><b>掛け算は「float の量 × int の単位数」をその場で書く</b> ── 旧クラスの
+        /// <c>0.002f * spent</c> / <c>bleed * 0.02f</c> / <c>AddAttackDicePct(n * 0.1f)</c> と同じ形。
+        /// 積をいったん float の変数や配列に入れると、 Mono が double のまま進めていた積がそこで丸められ、
+        /// 旧クラスと最下位ビットがずれうる (<see cref="_amount"/> の注記と同じ罠)。</para></summary>
+        private static void ApplyScaled(string stat, float v, int n, CombatContext ctx)
+        {
+            switch (stat)
+            {
+                case StatKeys.Attack:
+                {
+                    // 端数は切り捨て (旧〈雷神槍〉の FloorToInt(使った充電 × 0.5))。 0 なら足さない。
+                    int add = UnityEngine.Mathf.FloorToInt(v * n);
+                    if (add != 0) ctx.AddPlayerAttackOrDiceBonus(add);
+                    break;
+                }
+                case StatKeys.DamagePct:
+                    if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
+                    ctx.outgoingDamageMultiplier += v * n;
+                    break;
+                case StatKeys.CritPct:
+                    ctx.critRatePctAdd += v * n;
+                    break;
+                case StatKeys.CritMul:
+                    ctx.criticalMultiplier += v * n;
+                    break;
+                case StatKeys.ArmorPen:
+                    ctx.playerArmorPen += (int)v * n;
+                    break;
+                case StatKeys.Defense:
+                    ctx.playerDefense += (int)v * n;   // [perTurn]
+                    break;
+                case StatKeys.AttackDicePct:
+                    ctx.AddAttackDicePct(v * n);       // [perTurn]
                     break;
             }
         }

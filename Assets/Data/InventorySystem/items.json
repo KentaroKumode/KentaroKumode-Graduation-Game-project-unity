@@ -103,12 +103,28 @@
     {
       "id": "猛りII",
       "name": "猛りII",
-      "description": "ターン経過ごとに 攻撃に挿した出目+10%（上限+90%）"
+      "description": "ターン経過ごとに 攻撃に挿した出目+10%（上限+90%）",
+      "stats": [
+        {
+          "stat": "atkDicePct",
+          "value": 10,
+          "per": "turnsElapsed",
+          "perMax": 9
+        }
+      ]
     },
     {
       "id": "猛りIII",
       "name": "猛りIII",
-      "description": "ターン経過ごとに 攻撃に挿した出目+10%（上限+140%）"
+      "description": "ターン経過ごとに 攻撃に挿した出目+10%（上限+140%）",
+      "stats": [
+        {
+          "stat": "atkDicePct",
+          "value": 10,
+          "per": "turnsElapsed",
+          "perMax": 14
+        }
+      ]
     },
     {
       "id": "画竜点睛",
@@ -841,13 +857,12 @@
     {
       "id": "重増しの拳套",
       "name": "重増しの拳套",
-      "description": "敵の毒が 5 増えるたび刻み+1。攻撃に挿したターン、刻み1つにつき与ダメージ+10%（使い切る）。瘴気 9 以上なら、ブロック端子に挿したダイス 1 個につき、敵に毒 +1",
+      "description": "攻撃が通るたび（1 ターンに 1 回）刻み+1。刻み1つにつき与ダメージ+3%。戦闘が終わると刻みは 0 に戻る",
       "flavorText": "拳套の留め紐は、一撃ごとに長くなる。外した後で測ると元へ戻るため、修繕依頼は一度も受理されない。",
       "category": "Passive",
       "rarity": "SILVER",
       "basePrice": 8,
-      "skill": "重増しの拳套",
-      "axis": "毒"
+      "skill": "重増しの拳套"
     },
     {
       "id": "避雷の鉢金",
@@ -946,6 +961,14 @@
       "rarity": "BRONZE",
       "basePrice": 7,
       "skill": "血日に澄む佩玉",
+      "stats": [
+        {
+          "stat": "critPct",
+          "value": 2,
+          "per": "enemyBleed",
+          "on": "OnWired"
+        }
+      ],
       "axis": "出血"
     },
     {
@@ -1012,6 +1035,13 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "雷神槍",
+      "stats": [
+        {
+          "stat": "atk",
+          "value": 0.5,
+          "per": "chargeSpent"
+        }
+      ],
       "axis": "充電"
     },
     {
@@ -1127,12 +1157,22 @@
     {
       "id": "溶金の領主剣",
       "name": "溶金の領主剣",
-      "description": "消費したゴールド累計×0.01 を与ダメージ倍率に加算（100Gで実質×2）。",
+      "description": "消費したゴールド累計×0.002 を与ダメージ倍率に加算（500Gで実質×2）。",
       "flavorText": "領主は貨幣を炉へ投じるたび、剣へ新しい都市名を刻ませた。最後の銘は彼自身の領地で、そこだけ金が剥がれている。",
       "category": "Passive",
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "溶金の領主剣",
+      "stats": [
+        {
+          "stat": "dmgPct",
+          "value": 0.2,
+          "per": "coinsSpent",
+          "when": {
+            "hit": true
+          }
+        }
+      ],
       "axis": "金"
     },
     {
@@ -1309,6 +1349,14 @@
       "rarity": "SILVER",
       "basePrice": 8,
       "skill": "鎧縫いの針",
+      "stats": [
+        {
+          "stat": "pen",
+          "value": 1,
+          "per": "enemyBleed",
+          "on": "OnWired"
+        }
+      ],
       "axis": "出血"
     },
     {
@@ -1932,6 +1980,13 @@
       "rarity": "SILVER",
       "basePrice": 8,
       "skill": "研ぎ師の見立て書",
+      "stats": [
+        {
+          "stat": "critMul",
+          "value": 0.15,
+          "per": "axis:会心"
+        }
+      ],
       "axis": "会心"
     },
     {
@@ -2152,6 +2207,13 @@
       "rarity": "LEGENDARY",
       "basePrice": 10,
       "skill": "千里眼の水晶",
+      "stats": [
+        {
+          "stat": "critMul",
+          "value": 0.15,
+          "per": "axis:会心"
+        }
+      ],
       "axis": "会心"
     },
     {
@@ -2361,6 +2423,15 @@
       "rarity": "GOLD",
       "basePrice": 9,
       "skill": "麻痺の吹き矢",
+      "stats": [
+        {
+          "stat": "pen",
+          "value": 1,
+          "per": "enemyPoison",
+          "perEvery": 5,
+          "on": "OnWired"
+        }
+      ],
       "axis": "毒"
     },
     {

@@ -25,6 +25,24 @@ namespace ItemSystem
         /// <summary>このステータスが乗る条件 (2026-09-19)。 書いた項目はすべて AND。
         /// 省略すると JsonUtility が既定値 (＝条件なし) で埋める。</summary>
         public StatWhen when;
+
+        // ===== 段 3: 可変量 (2026-11-11) =====
+        //   量が実行時の状態で変わるステータス。 per を書くと value は「1 単位あたりの量」になり、
+        //   実際に乗る量は value × 単位数。 単位数が 0 のときは何もしない (旧クラスの「0 なら return」と同じ)。
+
+        /// <summary>単位数の出どころ (省略 = 定量)。 <c>coinsSpent</c> (このランで使ったゴールド) /
+        /// <c>axis:軸名</c> (その軸の品の数・例 <c>axis:会心</c>) / <c>enemyBleed</c> / <c>enemyPoison</c> /
+        /// <c>chargeSpent</c> (このターンに使った充電) / <c>turnsElapsed</c> (経過ターン = 現在ターン − 1)。
+        /// 読み方は <see cref="PassiveSkills.Effects.StatModifierEffect"/>。</summary>
+        public string per;
+        /// <summary>何ごとに 1 単位か (整数の割り算・切り捨て)。 0 / 1 = 1 ごと。 例: 毒 5 につき → 5。</summary>
+        public int perEvery;
+        /// <summary>単位数の上限 (0 = 上限なし)。 表示の「MAX」は value × perMax。</summary>
+        public int perMax;
+        /// <summary>乗せるタイミングの上書き (<see cref="PassiveSkills.PassiveSkillTrigger"/> の名前・省略 = ステータスの既定)。
+        /// 2026-10-31 以降の品は配線の確定 (OnWired) で会心率や貫通を足すものがあり、 既定のタイミングへ寄せると
+        /// 読む状態 (出血・毒の数) の時点が変わるので、 旧クラスのタイミングをそのまま書く。</summary>
+        public string on;
     }
 
     /// <summary>ステータスの発動条件。 <b>既定値 (0 / false) は「その条件を使わない」</b>。
