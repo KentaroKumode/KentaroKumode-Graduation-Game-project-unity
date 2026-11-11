@@ -110,6 +110,7 @@ namespace GameLoop
                     Log("7層で敗北 ── エンディング無し");
                 }
 
+                if (InPursuerCombat) NavDiag.End(NavDiag.Died, Run);   // [計装 2026-11-12・#35]
                 Run.EndRun();
                 SetPhase(GamePhase.GameOver);
                 OnGameOver?.Invoke(Run);

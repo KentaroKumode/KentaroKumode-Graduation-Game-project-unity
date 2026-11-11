@@ -337,6 +337,9 @@ namespace AutoTest.ParallelSweep
         /// <summary>[計装 2026-11-12] 端子ごとの使われ方 (<see cref="CombatSystem.TerminalDiag"/>)。 名前 × TerminalDiag.Width を平らに並べる。</summary>
         public string[] termDiagNames = Array.Empty<string>();
         public double[] termDiag = Array.Empty<double>();
+        /// <summary>[計装 2026-11-12・#35] 追跡者に捕まった後の結果 (<see cref="GameLoop.NavDiag"/>)。 型の名前 × NavDiag.Width を平らに並べる。</summary>
+        public string[] navDiagNames = Array.Empty<string>();
+        public double[] navDiag = Array.Empty<double>();
     }
 
     /// <summary>AutoRunner の設定をプロセス間で運ぶ。

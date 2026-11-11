@@ -384,6 +384,7 @@ namespace GameLoop
             CurrentEnemy = enemy;
             CurrentEnemySecondary = secondEnemy;
             CurrentEncounterRewardMultiplier = 1f;
+            NavDiag.Begin(sim?.Profile?.id, Run);   // [計装 2026-11-12・#35]
             OnEnemyEncountered?.Invoke(CurrentEnemy);
             Log($"追跡者に捕まった ── {CurrentEnemy.displayName}" + (CurrentEnemySecondary != null ? $" ＋ {CurrentEnemySecondary.displayName}" : ""));
 
@@ -397,6 +398,7 @@ namespace GameLoop
         private void HandlePursuerWon()
         {
             _inPursuerFight = false;
+            NavDiag.End(NavDiag.Won, Run);   // [計装]
             FreeMap?.ResolveBodyWon();
             int before = Run.provision;
             ProvisionSystem.Supply(Run, NavItems.PursuerSupply(Run));      // 〈追っ手殺しの刃〉で ×1.5
@@ -411,6 +413,7 @@ namespace GameLoop
         private void EndPursuerFightAsFled(bool payCost)
         {
             _inPursuerFight = false;
+            NavDiag.End(payCost ? NavDiag.Fled : NavDiag.Rescued, Run);   // [計装] 逃げた (代償あり) / 救済 (代償なし)
             if (payCost) PayFleeCost();
             FreeMap?.ResolveBodyFled();
             MapManager.Instance?.SyncCurrentNodeFromSim();
