@@ -338,6 +338,9 @@ namespace AutoTest.ParallelSweep
         /// <summary>[計装 2026-11-12] 端子ごとの使われ方 (<see cref="CombatSystem.TerminalDiag"/>)。 名前 × TerminalDiag.Width を平らに並べる。</summary>
         public string[] termDiagNames = Array.Empty<string>();
         public double[] termDiag = Array.Empty<double>();
+        /// <summary>[計装 2026-11-12・#35] 追跡者に捕まった後の結果 (<see cref="GameLoop.NavDiag"/>)。 型の名前 × NavDiag.Width を平らに並べる。</summary>
+        public string[] navDiagNames = Array.Empty<string>();
+        public double[] navDiag = Array.Empty<double>();
     }
 
     /// <summary>AutoRunner の設定をプロセス間で運ぶ。
@@ -437,6 +440,7 @@ namespace AutoTest.ParallelSweep
                 "axisPackageAxis", "axisPackageCount", "v3.hpLedger", "v3.axisCommitBuy", "predTrace",
                 // 2026-11-10: 主攻撃の見積もりを実績の比で掛け直すか・黎明の溜める形 (送った値と、 ラン開始時に本体へ入れた値)
                 "v3.mainCorr", "daybreakNextAttackPct", "DaybreakNextAttackPctApplied", "weaponTierCap", "vescaDiceForce",
+                "pursuerNoReward", "pursuerAtkMul", "pursuerHpAdd", "pursuerSupply", "navFear", "navFearMacro", "navFearRange",
                 // 2026-11-10: 測定用の物差し (主攻撃 / 毒・出血・爆発の倍率)。 送った値と、 ラン開始時に本体へ入れた値
                 "probeMainMult", "ProbeMainMultApplied", "probePassiveMult", "ProbePassiveMultApplied",
                 // 2026-11-12 (#107): 配線が収支で決まる敵のパッシブと〈吸血〉を読むか (−1 = 技量に従う) と実効値・内訳

@@ -70,6 +70,8 @@ namespace AutoTest
             foreach (var n in map.GetAllNodes())
                 if (n.index >= 0 && !n.activated && n.revealed && !sim.IsSunk(n.index) && n.EffectiveType == TileType.Shop && !n.isFalseMerchant)
                     shops.Add(n.index);
+            int fearR = navFearMacro > 0f ? FearRange() : 0;
+            int[] fearHops = fearR > 0 ? FearFoeHops(sim, at) : null;   // [測定 2026-11-12・#35] 恐れ (計画の中の各点に掛ける)
             float best = 0f; int bestFirst = -1;
             var used = new bool[cands.Count];
 
@@ -105,6 +107,7 @@ namespace AutoTest
                         if (WalkSteps(ns.hp) <= 0 && ns.hp * run.playerMaxHP < reserve) continue;
                     }
                     float gain = MacroGain(candNode[i], layer, run, ref ns) - steps * MacroStepCost;
+                    if (fearHops != null) gain -= navFearMacro * FearCloseness(fearHops, c, fearR);
                     // 2026-11-09: 踏んだ後に「出口」か「まだ寄っていない補給できる店」まで歩けるか (店で買い足す前提の計画)
                     bool ok = ns.supply + WalkSteps(ns.hp) >= toGoal[c] * FreeMapParams.MoveSupply + FreeMapExitMargin;
                     if (!ok && ns.coins >= FreeMapParams.ProvisionPrice)

@@ -148,6 +148,7 @@ namespace AutoTest.ParallelSweep
                 MetaProgression.VaultBank.ResetStats();
                 CombatSystem.GuardDiag.Reset();
                 CombatSystem.TerminalDiag.Reset();
+                GameLoop.NavDiag.Reset();
                 CombatSystem.SkillDiag.Reset();
                 CombatSystem.ShieldDiag.Reset();
                 CombatSystem.DmgSourceDiag.Reset();
@@ -442,6 +443,13 @@ namespace AutoTest.ParallelSweep
                     response.damageStages7F = (double[])CombatSystem.CombatStats.DamageStages7F.Clone();
                     response.cut7F = (double[])CombatSystem.GuardDiag.Cut7F.Clone();
                     response.stag7F = (double[])CombatSystem.GuardDiag.Stag7F.Clone();
+                    {   // [計装 2026-11-12・#35] 追跡者に捕まった後
+                        var nn = new List<string>(GameLoop.NavDiag.Rows.Keys);
+                        int NW = GameLoop.NavDiag.Width;
+                        response.navDiagNames = nn.ToArray();
+                        response.navDiag = new double[nn.Count * NW];
+                        for (int i = 0; i < nn.Count; i++) Array.Copy(GameLoop.NavDiag.Rows[nn[i]], 0, response.navDiag, i * NW, NW);
+                    }
                     {   // [計装 2026-11-12] 端子ごとの使われ方
                         var tn = new List<string>(CombatSystem.TerminalDiag.Rows.Keys);
                         int TW = CombatSystem.TerminalDiag.Width;

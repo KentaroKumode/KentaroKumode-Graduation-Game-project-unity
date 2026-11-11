@@ -115,6 +115,7 @@ namespace GameLoop
             var sim = FreeMapForAction();
             if (sim == null) return false;
             Log($"囮罠を仕掛けた（{FreeMapParams.LureLife}ターンのあいだ有効・踏んだ追跡者は{FreeMapParams.LureHoldTurns}ターン足止めされる）");
+            NavDiag.NoteLure(false);   // [計装]
             RunFreeMapOp(s => s.PlaceLure());
             return true;
         }
@@ -176,6 +177,7 @@ namespace GameLoop
             if ((ev & FreeMapEvent.FoeAlerted) != 0) Log("（追跡者が何かに気づいた）");
             if ((ev & FreeMapEvent.FamiliarLaunched) != 0) Log("使い魔が放たれた");
             if ((ev & FreeMapEvent.FamiliarVanished) != 0) Log("（使い魔は見失って消えた）");
+            if ((ev & FreeMapEvent.LureTriggered) != 0) NavDiag.NoteLure(true);   // [計装]
             if ((ev & FreeMapEvent.LureTriggered) != 0) Log($"（囮罠が作動した）追跡者が{FreeMapParams.LureHoldTurns}ターン足止めされた");
             if ((ev & FreeMapEvent.FrontAdvanced) != 0 && sim.Weather != WeatherKind.None)
                 Log($"前線が左から {System.Math.Min(sim.Front, FreeMapParams.Width):0.0} まで届いた（{sim.Weather.DisplayName()}）");
@@ -289,13 +291,17 @@ namespace GameLoop
         //  追跡者との戦闘
         // =====================================================================
 
-        /// <summary>追跡者の専用エネミーの中身 (性質ごと・2026-11-04)。 強さの土台は「その層の次の層のエリート」(7 層は 7 層自身) で、
+        /// <summary>追跡者の専用エネミーの中身 (性質ごと・2026-11-04)。
+        /// 2026-11-12 (#35): 捕まった後の死亡 2.6% / 生還時の HP 65% (目標 15〜25% / 30〜40%) と楽すぎたので、 HP を各 +0.3・攻撃 ×1.25 (一段目)。
+        /// 2026-11-12 二段目: HP をさらに各 +0.3・攻撃 ×1.6・勝った時の物資 6→3。 捕まった後の死亡 Optimal 6.1→14.2% / Super 4.3→10.4%、 クリア率 Optimal 11.9→9.2% / Super 30.1→24.7%。 強さの土台は「その層の次の層のエリート」(7 層は 7 層自身) で、
         /// その上に性質ごとの型を足す。 数値は全部仮置き (§23-21・動かす時は採否を取ってから測定する)。</summary>
         private sealed class PursuerFight
         {
             public string name, description;
             /// <summary>本体の最大 HP の倍率。</summary>
             public float hpMul = 1f;
+            /// <summary>本体の攻撃 (基礎攻撃と攻撃ロールの上限) の倍率 (2026-11-12・#35)。</summary>
+            public float atkMul = 1f;
             /// <summary>2 体目: その層の通常の敵 1 体 (召喚者の使い魔)。</summary>
             public bool floorCompanion;
             /// <summary>2 体目: 猟犬 (本体を縮めた写し)。 HP・攻撃は本体に対する比。</summary>
@@ -311,10 +317,10 @@ namespace GameLoop
         {
             switch (profileId)
             {
-                case "summoner": return new PursuerFight { name = "群れ呼び", description = "自分は動かず、手下を呼び寄せて戦わせる。呼ばれた一体と並んで立ちはだかる。", hpMul = 1.2f, floorCompanion = true };
-                case "hound":    return new PursuerFight { name = "猟犬使い", description = "足の速い猟犬を連れた狩人。獲物を追い詰めたら、猟犬と二人がかりで仕留める。", hpMul = 0.9f, hound = true, houndHp = 0.4f, houndAtk = 0.7f };
-                case "sprinter": return new PursuerFight { name = "影走り", description = "道を二歩ずつ駆ける追手。追いついた勢いのまま斬りかかるが、長くは保たない。", hpMul = 0.8f, openingTurns = 2, openingMul = 1.5f };
-                case "brute":    return new PursuerFight { name = "鉄塊の追手", description = "全身を鉄で覆った追手。歩みは遅いが、打ち合うほど鎧が厚くなる。", hpMul = 1.2f, minDefense = 10, stackingArmor = true };
+                case "summoner": return new PursuerFight { name = "群れ呼び", description = "自分は動かず、手下を呼び寄せて戦わせる。呼ばれた一体と並んで立ちはだかる。", hpMul = 1.8f, atkMul = 1.6f, floorCompanion = true };
+                case "hound":    return new PursuerFight { name = "猟犬使い", description = "足の速い猟犬を連れた狩人。獲物を追い詰めたら、猟犬と二人がかりで仕留める。", hpMul = 1.5f, atkMul = 1.6f, hound = true, houndHp = 0.4f, houndAtk = 0.7f };
+                case "sprinter": return new PursuerFight { name = "影走り", description = "道を二歩ずつ駆ける追手。追いついた勢いのまま斬りかかるが、長くは保たない。", hpMul = 1.4f, atkMul = 1.6f, openingTurns = 2, openingMul = 1.5f };
+                case "brute":    return new PursuerFight { name = "鉄塊の追手", description = "全身を鉄で覆った追手。歩みは遅いが、打ち合うほど鎧が厚くなる。", hpMul = 1.8f, atkMul = 1.6f, minDefense = 10, stackingArmor = true };
             }
             return new PursuerFight { name = null };
         }
@@ -332,9 +338,16 @@ namespace GameLoop
             if (template == null) return null;
             var e = template.Clone();
             var f = PursuerFightOf(sim.Profile.id);
+            if (GameHooks.PursuerAtkMulOverride > 0f) f.atkMul = GameHooks.PursuerAtkMulOverride;   // [測定 #35]
+            f.hpMul += GameHooks.PursuerHpAdd;                                                     // [測定 #35]
             e.displayName = f.name ?? $"〈{sim.Profile.displayName}〉{template.displayName}";
             if (!string.IsNullOrEmpty(f.description)) e.description = f.description;
             e.maxHP = Mathf.Max(1, Mathf.RoundToInt(e.maxHP * f.hpMul));
+            if (f.atkMul != 1f)
+            {
+                e.baseAttack = Mathf.Max(1, Mathf.RoundToInt(e.EffectiveBaseAttack * f.atkMul));
+                if (e.attackRollMax > 0) e.attackRollMax = Mathf.Max(e.attackRollMin, Mathf.RoundToInt(e.attackRollMax * f.atkMul));
+            }
             if (f.openingTurns > 0) { e.openingTurns = f.openingTurns; e.openingAttackMul = f.openingMul; }
             if (f.minDefense > 0) e.defense = Mathf.Max(e.defense, f.minDefense);
             if (f.stackingArmor && !HasPassive(e, "StackingArmor"))
@@ -387,6 +400,7 @@ namespace GameLoop
             CurrentEnemy = enemy;
             CurrentEnemySecondary = secondEnemy;
             CurrentEncounterRewardMultiplier = 1f;
+            NavDiag.Begin(sim?.Profile?.id, Run, sim != null && sim.Lures.Count > 0);   // [計装 2026-11-12・#35]
             OnEnemyEncountered?.Invoke(CurrentEnemy);
             Log($"追跡者に捕まった ── {CurrentEnemy.displayName}" + (CurrentEnemySecondary != null ? $" ＋ {CurrentEnemySecondary.displayName}" : ""));
 
@@ -396,14 +410,16 @@ namespace GameLoop
             CombatManager.Instance.FleeAllowed = true;
         }
 
-        /// <summary>追跡者に勝った: 追跡者は倒れ、 物資 +300 とアイテム 1 個。</summary>
+        /// <summary>追跡者に勝った: 追跡者は倒れ、 物資 +3 とアイテム 1 個。</summary>
         private void HandlePursuerWon()
         {
             _inPursuerFight = false;
+            NavDiag.End(NavDiag.Won, Run);   // [計装]
             FreeMap?.ResolveBodyWon();
             int before = Run.provision;
-            ProvisionSystem.Supply(Run, NavItems.PursuerSupply(Run));      // 〈追っ手殺しの刃〉で ×1.5
-            string pid = PickPassiveItemForBossExtra(false);
+            int supply = GameHooks.PursuerSupplyOverride >= 0 ? GameHooks.PursuerSupplyOverride : NavItems.PursuerSupply(Run);   // [測定 #35]
+            if (!GameHooks.PursuerNoReward) ProvisionSystem.Supply(Run, supply);      // 〈追っ手殺しの刃〉で ×1.5
+            string pid = GameHooks.PursuerNoReward ? null : PickPassiveItemForBossExtra(false);
             if (!string.IsNullOrEmpty(pid)) GrantRewardItem(pid, eliteWin: true);
             Log($"追跡者を退けた。物資 +{Run.provision - before}" + (string.IsNullOrEmpty(pid) ? "" : $"、{pid}"));
             SetPhase(GamePhase.MapNavigation);
@@ -414,6 +430,7 @@ namespace GameLoop
         private void EndPursuerFightAsFled(bool payCost)
         {
             _inPursuerFight = false;
+            NavDiag.End(payCost ? NavDiag.Fled : NavDiag.Rescued, Run);   // [計装] 逃げた (代償あり) / 救済 (代償なし)
             if (payCost) PayFleeCost();
             FreeMap?.ResolveBodyFled();
             MapManager.Instance?.SyncCurrentNodeFromSim();
