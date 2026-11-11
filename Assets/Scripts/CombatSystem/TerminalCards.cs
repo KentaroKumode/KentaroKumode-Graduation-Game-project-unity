@@ -34,7 +34,7 @@ namespace CombatSystem
             Counter = "計数器", Preheater = "予熱器", Mains = "主幹", TwinShot = "双発", Harvester = "収穫機", Whet = "研ぎ澄まし",
             LootBox = "戦利品箱", Stripper = "剥ぎ取り", Doubler = "倍電圧", Retainer = "保持器", StopSignal = "停止信号", Fork = "二股";
         // 軸
-        public const string Sight = "照星", VitalRead = "急所読み", Barb = "返し鉤", BloodTap = "血抜き栓", Mister = "霧吹き口",
+        public const string Sight = "照星", VitalRead = "急所読み", Barb = "返し針", BloodTap = "血抜き栓", Mister = "霧吹き口",
             PoisonScale = "毒見の秤", Stoker = "焚き口", AfterHeat = "余熱板", Leak = "漏電口", BigDischarge = "大放電",
             Patch = "当て板", ShieldPush = "盾押し口";
         // 使い捨て

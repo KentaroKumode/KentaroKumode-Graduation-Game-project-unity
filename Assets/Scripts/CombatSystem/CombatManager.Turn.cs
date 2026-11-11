@@ -1125,7 +1125,7 @@ namespace CombatSystem
                 EnemyHpLedger.NoteBurstIntoFixed(critExtra);
             }
             if (!skipAttack) ApplyRoleExtraDamage(ctx, ref dealtDmg, ref dealtFixed, roleOutcome);
-            if (term != null && term.bleedOnHit > 0 && dealtDmg > 0) ctx.AddEnemyBleed(term.bleedOnHit);      // 端子〈返し鉤〉: 攻撃が通れば出血
+            if (term != null && term.bleedOnHit > 0 && dealtDmg > 0) ctx.AddEnemyBleed(term.bleedOnHit);      // 端子〈返し針〉: 攻撃が通れば出血
             ctx.lastPlayerDamage = dealtDmg + dealtFixed;
             // 固定ダメの枠は、 ここで取り出した (dealtFixed) ので空に戻す (2026-11-05)。
             //   戻さないと、 この後の敵の攻撃側の ProcessDamage が同じ枠をそのまま返し、 反撃固定として
