@@ -320,6 +320,8 @@ namespace AutoTest
             }
             else if (!toExit)
             {
+                int fearR = navFear > 0f ? FearRange() : 0;
+                int[] fearHops = fearR > 0 ? FearFoeHops(sim, at) : null;   // [測定 2026-11-12・#35] 恐れ
                 float best = 0f;
                 foreach (var n in map.GetAllNodes())
                 {
@@ -333,6 +335,7 @@ namespace AutoTest
                     if (desire <= 0f) continue;
                     float cost = hopsFromMe[n.index] * FreeMapParams.MoveSupply;
                     float value = desire / (1f + cost / 100f);
+                    if (fearHops != null) value -= navFear * FearCloseness(fearHops, n.index, fearR);
                     // 同点は添字の小さい方 (決定的)
                     if (value > best + 1e-6f) { best = value; target = n.index; }
                 }
@@ -396,6 +399,44 @@ namespace AutoTest
                 return true;
             }
             return false;
+        }
+
+        /// <summary>[測定 2026-11-12・#35] 恐れの範囲 (歩)。 動かない追跡者はその点だけを怖がる。</summary>
+        private int FearRange() => FoeLooksStatic() ? 1 : System.Math.Max(1, navFearRange);
+
+        /// <summary>[測定 2026-11-12・#35] 恐れの重み: 推定した追跡者の位置から <paramref name="r"/> 歩より近いほど大きい (r − 歩数・0 以上)。</summary>
+        private static float FearCloseness(int[] foeHops, int node, int r)
+        {
+            int h = node >= 0 && node < foeHops.Length ? foeHops[node] : int.MaxValue;
+            return h == int.MaxValue ? 0f : System.Math.Max(0, r - h);
+        }
+
+        /// <summary>[測定 2026-11-12・#35] 推定した追跡者の位置から各点への歩数。 分からない (魔石に反応なし) なら null。
+        /// 見えていればその位置。 見えていなければ魔石の段と方角から推す: 方角が ±45° に収まる点のうち、
+        /// 自分からの歩数が段の目安 (遠い = <see cref="FreeMapParams.StoneFar"/>・かなり近い/察知 = <see cref="FreeMapParams.StoneNear"/>) に近い点。
+        /// 見えていない位置そのものは読まない (魔石と同じ情報だけ)。</summary>
+        private int[] FearFoeHops(FreeMapSim sim, int at)
+        {
+            if (!sim.FoeAlive) return null;
+            int foe = -1;
+            if (sim.FoeVisible) foe = sim.FoeNode;
+            else
+            {
+                var st = sim.Stone();
+                if (st.level <= 0) return null;
+                int want = st.level == 1 ? FreeMapParams.StoneFar : FreeMapParams.StoneNear;
+                var d = sim.HopsFrom(at);
+                int bestScore = int.MaxValue;
+                for (int i = 0; i < d.Length; i++)
+                {
+                    if (i == at || d[i] == int.MaxValue) continue;
+                    int bd = System.Math.Abs(sim.Bearing(at, i) - st.bearing); if (bd > 4) bd = 8 - bd;
+                    if (bd > 1) continue;
+                    int score = System.Math.Abs(d[i] - want) * 2 + bd;
+                    if (score < bestScore) { bestScore = score; foe = i; }   // 同点は添字の小さい方
+                }
+            }
+            return foe < 0 ? null : sim.HopsFrom(foe);
         }
 
         /// <summary>見えている追跡者 / 魔石に出ている方角を避けて、 次の 1 歩を選び直す。

@@ -439,6 +439,7 @@ namespace AutoTest.ParallelSweep
                 "axisPackageAxis", "axisPackageCount", "v3.hpLedger", "v3.axisCommitBuy", "predTrace",
                 // 2026-11-10: 主攻撃の見積もりを実績の比で掛け直すか・黎明の溜める形 (送った値と、 ラン開始時に本体へ入れた値)
                 "v3.mainCorr", "daybreakNextAttackPct", "DaybreakNextAttackPctApplied", "weaponTierCap", "vescaDiceForce",
+                "pursuerNoReward", "pursuerAtkMul", "pursuerHpAdd", "pursuerSupply", "navFear", "navFearMacro", "navFearRange",
                 // 2026-11-10: 測定用の物差し (主攻撃 / 毒・出血・爆発の倍率)。 送った値と、 ラン開始時に本体へ入れた値
                 "probeMainMult", "ProbeMainMultApplied", "probePassiveMult", "ProbePassiveMultApplied",
             };

@@ -49,6 +49,15 @@ namespace GameLoop
         /// <summary>[測定] 物資の素の上限を差し替える (0 = 差し替えない = <see cref="ProvisionRules.Max"/>)。 BOT が上限を振って測る口 (2026-11-09)。</summary>
         public static int ProvisionMaxOverride;
 
+        /// <summary>[測定 2026-11-12・#35] 追跡者に勝った時のアイテムと物資を出さない (「捕まると得」かを確かめる腕)。</summary>
+        public static bool PursuerNoReward;
+        /// <summary>[測定 2026-11-12・#35] 追跡者の戦闘の攻撃倍率を差し替える (0 以下 = 差し替えない)。</summary>
+        public static float PursuerAtkMulOverride;
+        /// <summary>[測定 2026-11-12・#35] 追跡者の型ごとの HP 倍率に足す値 (0 = 触らない)。</summary>
+        public static float PursuerHpAdd;
+        /// <summary>[測定 2026-11-12・#35] 追跡者に勝った時の物資を差し替える (負 = 差し替えない)。</summary>
+        public static int PursuerSupplyOverride = -1;
+
         /// <summary>物資の素の上限 (差し替えがあればそれ)。</summary>
         public static int ProvisionBaseMax => ProvisionMaxOverride > 0 ? ProvisionMaxOverride : ProvisionRules.Max;
 

@@ -334,6 +334,8 @@ namespace GameLoop
             if (template == null) return null;
             var e = template.Clone();
             var f = PursuerFightOf(sim.Profile.id);
+            if (GameHooks.PursuerAtkMulOverride > 0f) f.atkMul = GameHooks.PursuerAtkMulOverride;   // [測定 #35]
+            f.hpMul += GameHooks.PursuerHpAdd;                                                     // [測定 #35]
             e.displayName = f.name ?? $"〈{sim.Profile.displayName}〉{template.displayName}";
             if (!string.IsNullOrEmpty(f.description)) e.description = f.description;
             e.maxHP = Mathf.Max(1, Mathf.RoundToInt(e.maxHP * f.hpMul));
@@ -411,8 +413,9 @@ namespace GameLoop
             NavDiag.End(NavDiag.Won, Run);   // [計装]
             FreeMap?.ResolveBodyWon();
             int before = Run.provision;
-            ProvisionSystem.Supply(Run, NavItems.PursuerSupply(Run));      // 〈追っ手殺しの刃〉で ×1.5
-            string pid = PickPassiveItemForBossExtra(false);
+            int supply = GameHooks.PursuerSupplyOverride >= 0 ? GameHooks.PursuerSupplyOverride : NavItems.PursuerSupply(Run);   // [測定 #35]
+            if (!GameHooks.PursuerNoReward) ProvisionSystem.Supply(Run, supply);      // 〈追っ手殺しの刃〉で ×1.5
+            string pid = GameHooks.PursuerNoReward ? null : PickPassiveItemForBossExtra(false);
             if (!string.IsNullOrEmpty(pid)) GrantRewardItem(pid, eliteWin: true);
             Log($"追跡者を退けた。物資 +{Run.provision - before}" + (string.IsNullOrEmpty(pid) ? "" : $"、{pid}"));
             SetPhase(GamePhase.MapNavigation);

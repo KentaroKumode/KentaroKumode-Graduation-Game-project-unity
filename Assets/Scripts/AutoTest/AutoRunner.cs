@@ -170,6 +170,15 @@ namespace AutoTest
         public float probeMainMult = 1f;
         /// <summary>[測定 2026-11-11] 武器の段の上限 (0 = 上限なし)。 本体の <see cref="GameLoop.GameHooks.WeaponTierCap"/> へ流す。</summary>
         public int weaponTierCap = 0;
+        /// <summary>[測定 2026-11-12・#35] 追跡者の戦闘と報酬の差し替え。 本体の GameHooks.Pursuer* へ流す (ラン終了で既定へ)。
+        /// 攻撃倍率 0 以下・物資 負 = 差し替えない。</summary>
+        public bool pursuerNoReward = false;
+        public float pursuerAtkMul = 0f, pursuerHpAdd = 0f;
+        public int pursuerSupply = -1;
+        /// <summary>[測定 2026-11-12・#35] 航行の「恐れ」: 行き先の点が、 推定した追跡者の位置から <see cref="navFearRange"/> 歩より近いほど引く。
+        /// 引く量 = 恐れ × (範囲 − 推定の歩数)。 Optimal の行き先選び (価値の単位) は navFear、 Super の計画 (対数オッズ) は navFearMacro。 0 = 使わない。</summary>
+        public float navFear = 0f, navFearMacro = 0f;
+        public int navFearRange = 4;
         /// <summary>[測定 2026-11-11] ヴェスカ連戦の出目を固定する値 (0 = 触らない)。 本体の GameHooks.VescaDiceForce へ流す。</summary>
         public int vescaDiceForce = 0;
         /// <summary>[測定用の物差し 2026-11-10] 敵の HP に入る毒・出血・爆発・〈逆綴じの止血帯〉の量に掛ける倍率 (<see cref="CombatSystem.EnemyHpLedger.ProbePassiveMult"/>)。
