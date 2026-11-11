@@ -1276,6 +1276,10 @@ namespace AutoTest
         /// <b>同じ fit から引き直す</b> ── itt_clear.txt の金係数がそれ。</para></summary>
         [Tooltip("true で 消耗品・武器・出目パーツ も付与プールへ入れる (ITT を全品へ広げる)")]
         public bool randomGrantAllKinds = false;
+        /// <summary>[2026-11-12] true で付与プールを「基本以外の端子 (ADR-0014)」だけにする (品は配らない)。 端子ごとの ITT 用。
+        /// 配った端子はランの山札へ足す (戦闘後の報酬で受け取るのと同じ・GameManager.ResolveTerminalReward)。
+        /// 付与ログのファイル名は randomGrantAllKinds に従うので、 並列の ITT では両方 true にする。</summary>
+        public bool randomGrantTerminals = false;
         /// <summary>序列から差し引く価格の重み (Δクリア pt / 1G)。 <see cref="LearnedPriorityProvider.IttPriceK"/>。 負なら触らない。</summary>
         public float ittPriceK = -1f;
         /// <summary>Super の序列から差し引く価格の重み (Δクリア pt / 1G)。 金をランダムに配った時の効果からの理論値で、 同じシードで 16.3 → 18.1% (+3.08σ)。

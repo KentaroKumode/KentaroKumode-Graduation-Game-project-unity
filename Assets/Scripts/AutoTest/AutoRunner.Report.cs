@@ -1381,11 +1381,11 @@ namespace AutoTest
             }
             {
                 long gt = 0;
-                for (int i = 0; i < 4; i++) gt += GrantOk[i] + GrantNg[i];
+                for (int i = 0; i < GrantOk.Length; i++) gt += GrantOk[i] + GrantNg[i];
                 if (gt > 0)
                 {
                     sb.AppendLine($"  ── ランダム付与の配布結果 (計 {(double)gt / dn:F2} 品/ラン) ──");
-                    for (int i = 0; i < 4; i++)
+                    for (int i = 0; i < GrantOk.Length; i++)
                     {
                         long tot = GrantOk[i] + GrantNg[i];
                         if (tot <= 0) continue;

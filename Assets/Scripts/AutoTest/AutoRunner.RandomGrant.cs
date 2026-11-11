@@ -45,6 +45,12 @@ namespace AutoTest
             //   単位を揃える道は「全品を付与プールへ入れる」しか無い。
             var pool = new List<string>();
             int nPassive = 0, nCons = 0, nWeapon = 0, nPart = 0;
+            // [2026-11-12] 端子の ITT: プールは基本以外の端子だけ (品は配らない)。
+            if (randomGrantTerminals)
+            {
+                foreach (var d in CombatSystem.TerminalCards.All) if (d != null && !d.basic) pool.Add(d.id);
+                all = new List<ItemSystem.CompleteItemData>();   // 下の品の列挙を飛ばす
+            }
             foreach (var it in all)
             {
                 if (it == null) continue;
@@ -57,7 +63,7 @@ namespace AutoTest
                 if (it.category == ItemSystem.ItemCategory.Weapon)
                 { pool.Add(it.internalName); nWeapon++; continue; }
             }
-            if (randomGrantAllKinds)
+            if (randomGrantAllKinds && !randomGrantTerminals)
             {
                 // 出目パーツは ItemDatabase に無い (DiceFaceParts.cs の規約コメント)。
                 //   36 種を ID で列挙する ── 所持済みの除外は配る側 (ApplyGrants) で見る。
@@ -68,7 +74,7 @@ namespace AutoTest
             if (!_grantPoolLogged)
             {
                 _grantPoolLogged = true;
-                Debug.Log($"[AutoRunner] 付与プール {pool.Count} 品"
+                Debug.Log($"[AutoRunner] 付与プール {pool.Count} {(randomGrantTerminals ? "端子" : "品")}"
                         + $" (パッシブ {nPassive} / 消耗品 {nCons} / 武器 {nWeapon} / 出目パーツ {nPart})"
                         + $" / 1品あたり付与確率 {Mathf.Clamp01(randomGrantExpectedItems / pool.Count):P2}"
                         + $" / 期待付与数 {randomGrantExpectedItems:F1}");
@@ -142,9 +148,19 @@ namespace AutoTest
             }
         }
 
-        private static void GrantOne(GameLoop.RunState run, string id)
+        private static void GrantOne(GameLoop.RunState run, string id, bool terminal = false)
         {
             if (run == null || string.IsNullOrEmpty(id)) return;
+
+            // 端子 (2026-11-12): ランの山札へ足す (報酬で受け取るのと同じ・GameManager.ResolveTerminalReward)。
+            if (terminal)
+            {
+                if (CombatSystem.TerminalCards.Get(id) == null) { NoteGrant(4, false); return; }
+                if (run.terminalDeck == null || run.terminalDeck.Count == 0) run.terminalDeck = CombatSystem.TerminalCards.StartingDeck();
+                run.terminalDeck.Add(id);
+                NoteGrant(4, true);
+                return;
+            }
 
             // 出目パーツ: ItemDatabase に無いので ID から復元する。
             if (GameLoop.DiceFaceParts.IsPartId(id))
@@ -174,11 +190,11 @@ namespace AutoTest
         /// 配る側が黙って落としていても行は立つ。 出目パーツは ItemDatabase に存在しない ID で、
         /// 消耗品・武器も別経路なので、 **ログを見ただけでは配布の成否が分からない**。
         /// 添字: 0=出目パーツ 1=消耗品 2=武器 3=パッシブ。</para></summary>
-        public static readonly long[] GrantOk = new long[4];
-        public static readonly long[] GrantNg = new long[4];
-        public static readonly string[] GrantKindName = { "出目パーツ", "消耗品", "武器", "パッシブ" };
+        public static readonly long[] GrantOk = new long[5];
+        public static readonly long[] GrantNg = new long[5];
+        public static readonly string[] GrantKindName = { "出目パーツ", "消耗品", "武器", "パッシブ", "端子" };
         private static void NoteGrant(int kind, bool ok)
-        { if (kind < 0 || kind > 3) return; if (ok) GrantOk[kind]++; else GrantNg[kind]++; }
+        { if (kind < 0 || kind > 4) return; if (ok) GrantOk[kind]++; else GrantNg[kind]++; }
 
         /// <summary>到達した層ぶんの付与を実行する。 配り終えたものは計画から外す。</summary>
         private void ApplyDueGrants(GameManager gm)
@@ -190,7 +206,7 @@ namespace AutoTest
             for (int i = _grantPlan.Count - 1; i >= 0; i--)
             {
                 if (_grantPlan[i].floor > floor) continue;
-                GrantOne(run, _grantPlan[i].id);
+                GrantOne(run, _grantPlan[i].id, randomGrantTerminals);
                 _cur?.acquiredItemsEver.Add(_grantPlan[i].id);
                 _grantPlan.RemoveAt(i);
             }

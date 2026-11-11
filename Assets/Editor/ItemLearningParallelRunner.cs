@@ -51,6 +51,8 @@ namespace AutoTest.EditorTools
             public string mode = "learn";
             /// <summary>true のとき、 結果を学習へ合流させない (A/B 用: 腕どうしが同じ学習状態で走る)。</summary>
             public bool noMerge;
+            /// <summary>ITT の序列の版 (GrantItt.Variant)。 静的な値はドメインの再読み込みで消えるので、 状態に持って締めの処理で戻す (2026-11-12)。</summary>
+            public string variant = "";
         }
 
         private sealed class Slot
@@ -131,6 +133,19 @@ namespace AutoTest.EditorTools
             LaunchWith(0, AutoRunner.WiringSkill.Super, 10000, itt: true, ittRounds: 20,
                 overrides: new Dictionary<string, string> { ["useIttBeta"] = "True", ["lockWeaponFamily"] = "True",
                     ["v3.mainCorr"] = "True", ["v3.readOutgoingMult"] = "-1", ["daybreakNextAttackPct"] = "1.5" });
+        }
+
+        /// <summary><b>端子の ITT (2026-11-12・#102)。</b> 基本以外の端子 57 種だけを、 1 ランに期待 5 枚、 ランダムな層 (深さ 1〜5) で山札へ足し、
+        /// 100,000 ラン。 端子ごとの Δクリア率 (pt) を出す。 品の買い方は今の標準 (ITT の序列) のまま。
+        /// <b>結果は本番の学習フォルダへ書かない</b> ── 品の序列 (itt_clear.json / itt_effects.json) を上書きすると買い物が壊れる。
+        /// 書き先は AutoRunLogs/terminal_itt/&lt;日時&gt;/ (itt_clear.terminal.txt が表)。</summary>
+        [MenuItem("Tools/AutoRun/■ ITT 並列 (端子 57 種): 100000ラン", priority = 8)]
+        private static void LaunchIttTerminals()
+        {
+            AutoTest.GrantItt.Variant = "terminal";
+            LaunchWith(0, AutoRunner.WiringSkill.Optimal, 100000, itt: true,
+                overrides: new Dictionary<string, string> { ["randomGrantTerminals"] = "True", ["randomGrantExpectedItems"] = "5",
+                    ["useIttBeta"] = "True", ["lockWeaponFamily"] = "True", ["learnTier"] = "False" });
         }
 
         /// <summary>診断: 観測の回帰 (regβ) で買う旧方式。 ITT の序列との比較用 (2026-11-05: 旧方式は学習なしより悪い)。</summary>
@@ -301,6 +316,7 @@ namespace AutoTest.EditorTools
                 configValuesJoined = string.Join("\n", vs),
                 buildFingerprint = desc.fingerprints?.buildFingerprint ?? "",
                 startedUtc = DateTime.UtcNow.ToString("O"),
+                variant = GrantItt.Variant ?? "",
             };
             SaveState();
             SessionState.SetString(ActiveKey, _root);
@@ -566,8 +582,16 @@ namespace AutoTest.EditorTools
                 foreach (var gl in File.ReadAllLines(GrantCsvOf(s), Encoding.UTF8)) if (gl.Length > 0) rows.Add(gl);
             string outDir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "AutoRunLogs", "grant_trial"));
             Directory.CreateDirectory(outDir);
-            string csv = Path.Combine(outDir, "allkinds_grant_runs.csv");
             string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
+            // 端子の ITT (2026-11-12): 割り当ても結果も本番と別の所へ (品の序列を上書きしない)。
+            //   版は状態から戻す (ドメインの再読み込みで GrantItt.Variant が空に戻っていても、 本番の序列を上書きしないように)。
+            if (!string.IsNullOrEmpty(_st.variant)) GrantItt.Variant = _st.variant;
+            bool terminalItt = GrantItt.Variant == "terminal";
+            string fitRoot = terminalItt
+                ? Path.GetFullPath(Path.Combine(Application.dataPath, "..", "AutoRunLogs", "terminal_itt", Path.GetFileName(_root)))
+                : _st.learningRoot;
+            string csv = Path.Combine(terminalItt ? fitRoot : outDir, terminalItt ? "terminal_grant_runs.csv" : "allkinds_grant_runs.csv");
+            Directory.CreateDirectory(Path.GetDirectoryName(csv));
             // 1 回目は旧い割り当てを退避して書き直す。 2 回目からは積み上げる (ラン番号が回ごとに違うので、 合算して 1 つの回帰へ入れる)。
             if (_st.round == 0) { if (File.Exists(csv)) File.Move(csv, csv + "." + stamp + ".bak"); File.WriteAllLines(csv, rows, new UTF8Encoding(false)); }
             else File.AppendAllLines(csv, rows, new UTF8Encoding(false));
@@ -575,16 +599,17 @@ namespace AutoTest.EditorTools
 
             // 旧い序列は上書きせず退避する (新しい fit が悪かったときに戻せるように)
             Directory.CreateDirectory(_st.learningRoot);
-            if (_st.round == 0)
+            if (_st.round == 0 && !terminalItt)
                 foreach (string name in new[] { "itt_fit.txt", "itt_clear.txt", "itt_clear.json", "itt_effects.json" })
                 {
                     string p = Path.Combine(_st.learningRoot, name);
                     if (File.Exists(p)) File.Copy(p, p + "." + stamp + ".preITT", true);
                 }
-            bool ok1 = GrantItt.Recompute(csv, _st.learningRoot);
-            bool ok2 = ok1 && GrantItt.RecomputeSurvival(csv, _st.learningRoot);
+            bool ok1 = GrantItt.Recompute(csv, fitRoot);
+            bool ok2 = ok1 && GrantItt.RecomputeSurvival(csv, fitRoot);
             bool last = _st.round + 1 >= _st.rounds;
             if (last || !ok2) GrantItt.Variant = "";
+            if (terminalItt) GrantItt.Clear();   // 端子の係数を親の手元に残さない (次の逐次バッチが品の序列と取り違えないように)
             double min = (DateTime.UtcNow - _roundStartUtc).TotalMinutes;
             string line = $"ITT {_st.round + 1}/{_st.rounds}: この回 {rows.Count:N0} 行 / 合算 {pooled:N0} 行 / 回帰 {(ok1 ? "OK" : "失敗")} / 生存 {(ok2 ? "OK" : "失敗")} / {min:F1} 分 / {csv}";
             File.AppendAllText(Path.Combine(_root, "rounds.txt"), line + "\n", new UTF8Encoding(false));
