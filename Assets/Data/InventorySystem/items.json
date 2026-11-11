@@ -1157,7 +1157,7 @@
     {
       "id": "溶金の領主剣",
       "name": "溶金の領主剣",
-      "description": "消費したゴールド累計×0.002 を与ダメージ倍率に加算（500Gで実質×2）。",
+      "description": "消費したゴールド累計×0.005 を与ダメージ倍率に加算（200Gで実質×2）。",
       "flavorText": "領主は貨幣を炉へ投じるたび、剣へ新しい都市名を刻ませた。最後の銘は彼自身の領地で、そこだけ金が剥がれている。",
       "category": "Passive",
       "rarity": "LEGENDARY",
@@ -1166,7 +1166,7 @@
       "stats": [
         {
           "stat": "dmgPct",
-          "value": 0.2,
+          "value": 0.5,
           "per": "coinsSpent",
           "when": {
             "hit": true
@@ -2499,6 +2499,123 @@
       "basePrice": 8,
       "skill": "割れ盾の仕返し",
       "axis": "シールド"
+    },
+    {
+      "id": "煙玉",
+      "name": "煙玉",
+      "description": "各層1回、追跡者に補足された瞬間に自動で弾け、追跡者を警戒へ落とす（補足された所を探しに来る）。その後2ターンは補足されない。",
+      "flavorText": "薬種屋の棚の奥で埃をかぶっていた丸薬。火を点けずとも、強く握れば割れる。割れた後のことは、袋の裏に小さく書いてある。",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7
+    },
+    {
+      "id": "油布の靴",
+      "name": "油布の靴",
+      "description": "削る砂の前線の中でも、1歩の物資が増えない。",
+      "flavorText": "油を吸わせた布を幾重にも巻いた靴。砂は噛まずに滑り落ちる。匂いだけは、どうにもならない。",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7
+    },
+    {
+      "id": "魔石の欠片",
+      "name": "魔石の欠片",
+      "description": "魔石が追跡者に反応する距離が4歩→5歩。",
+      "flavorText": "大きな魔石から欠けた小指ほどの破片。持ち主の石と同じ方角を向いて、少しだけ先に震える。",
+      "category": "Passive",
+      "rarity": "BRONZE",
+      "basePrice": 7
+    },
+    {
+      "id": "地図売りの走り書き",
+      "name": "地図売りの走り書き",
+      "description": "層に入った瞬間、前哨基地の近く（半径5）の点の種類が分かる。戦闘名と敵は分からない。",
+      "flavorText": "市場の地図売りが、売り物にならない走り書きを包み紙にしていた。裏を見ると、どこかの層の入口の辺りだけが妙に細かい。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8
+    },
+    {
+      "id": "羅針の針",
+      "name": "羅針の針",
+      "description": "魔石が反応している間、追跡者の方角が計器に8方位で出る。",
+      "flavorText": "針だけが残った羅針盤。磁石の北ではなく、別の何かを指して止まる。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8
+    },
+    {
+      "id": "忍びの外套",
+      "name": "忍びの外套",
+      "description": "踏んだ点に残る痕跡が4ターン→2ターンで消える。",
+      "flavorText": "裾を引きずるほど長い外套。足跡の上を裾がなぞり、残るのは布の擦れた跡だけになる。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8
+    },
+    {
+      "id": "鏡の護符",
+      "name": "鏡の護符",
+      "description": "使い魔は、同じ点に重ならない限りこちらを見つけられない（見つける距離1歩→0歩）。",
+      "flavorText": "掌ほどの磨いた銅板。使い魔は覗き込んだ自分の顔に気を取られ、その奥を見ない。",
+      "category": "Passive",
+      "rarity": "SILVER",
+      "basePrice": 8
+    },
+    {
+      "id": "夜目の指輪",
+      "name": "夜目の指輪",
+      "description": "照明なしでも2歩先まで見える（点の種類・追跡者・使い魔）。ショップの物資の値段−50%（補給商の割符と重ならない）。",
+      "flavorText": "内側に小さな黒い石を埋めた指輪。はめていると、暗がりの方が目に優しい。物資商はこれを見ると、黙って値を下げる。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9
+    },
+    {
+      "id": "補給商の割符",
+      "name": "補給商の割符",
+      "description": "前哨基地で得る物資×1.5。ショップの物資の値段−50%（夜目の指輪と重ならない）。",
+      "flavorText": "補給商の組合が取引先に渡す木札の片割れ。もう片方を持つ店は、いまも律儀に値を下げる。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9
+    },
+    {
+      "id": "渡り鳥の羅盤",
+      "name": "渡り鳥の羅盤",
+      "description": "終点へ近づく歩は、2歩に1回物資を払わない。",
+      "flavorText": "渡り鳥の骨を針にした羅盤。帰る先を一つしか知らない。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9
+    },
+    {
+      "id": "逃げ足の護符",
+      "name": "逃げ足の護符",
+      "description": "戦闘から逃げた時に失うゴールドが半分→4分の1。",
+      "flavorText": "かかとの形に削った木の護符。持っていると、命より先に財布を拾う癖がつくと言われている。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9
+    },
+    {
+      "id": "追っ手殺しの刃",
+      "name": "追っ手殺しの刃",
+      "description": "追跡者に捕まった時の戦闘に、手下や猟犬が加わらない。追跡者を倒した時の物資×1.5。",
+      "flavorText": "追われる側が、ある夜を境に追う側へ回った。その夜に研いだ刃だという。持ち主の名は伝わっていない。",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10
+    },
+    {
+      "id": "前哨の旗",
+      "name": "前哨の旗",
+      "description": "航行中に使う（各層1回・ターンを使わない）。今いる点に旗を立て、その層にいる間、旗から3歩先までの点の種類と戦闘名・追跡者・使い魔が常に見える。",
+      "flavorText": "探索者協会の古い測量旗。立てた杭の周りだけ、地図がひとりでに書き足されていく。",
+      "category": "Passive",
+      "rarity": "LEGENDARY",
+      "basePrice": 10
     }
   ]
 }

@@ -29,7 +29,7 @@
 |---|---|
 | `ctx.playerDiceTotal` / `playerDice` | **敵自身**のダイス合計／出目 |
 | `ctx.playerCurrentHP` / `playerMaxHP` | **敵自身**のHP |
-| `ctx.playerWonRoll` / `OnRollWin` | **敵が**ロール勝利 |
+| `ctx.playerWonRoll` / `OnRollWin` | **敵が**収支で勝った＝プレイヤーの収支マイナス（ロール勝負は無い。収支トリガーはターン解決の**後**に鳴る・§9.3） |
 | `ctx.enemyCurrentHP` / `enemyMaxHP` | **実プレイヤー**のHP |
 | `ctx.enemyDiceTotal` | **実プレイヤー**のダイス合計 |
 | `ctx.fixedDamageToEnemy` | **実プレイヤーへの**軽減無視ダメージ |
@@ -38,7 +38,13 @@
 **スワップされない共有フィールド**（敵パッシブが書くと実値に直接効く）:
 `enemyDiceTotalBonus` / `bossDiceBonus` / `enemyDefense` / `enemyArmorPen` / `enemyThreat` /
 `enemyDamageTakenMultiplier` / `healBlocked` / `healShieldReduction` / `accumulatedValues` /
-`ashenSuddenDeath` / `myokakuSuddenDeath` / `pendingEnemySwapId`
+`currentBuffs` / `nextTurnBuffs` / `pendingEnemySwapId`
+（`ashenSuddenDeath` / `myokakuSuddenDeath` はコードから消えている。）
+
+**共有バフの罠（2026-11-11 #30 の監査）**: `nextTurnBuffs["enemyDiceDebuff"]` / `["diceBonus"]` / `["damageBonus"]` は
+視点スワップされず、次ターンの `RecomputeDiceTotals` / `ProcessDamage` が**プレイヤー視点で**読む。敵パッシブが書くと
+「相手の出目を下げる」つもりが**敵自身の攻撃**を下げ（罠師・呪縛）、「自分の出目 +」が**プレイヤーの**出目に入り（暴走）、
+`damageBonus` はプレイヤーの主攻撃と敵の攻撃の両方に乗る（反撃態勢）。§4 の [不発の疑い] 参照。
 
 ---
 
@@ -435,7 +441,7 @@ Hermes / Bloodlust / EvenEyes / MasterworkNotes / KaleidoDice。
 | TenkouKaibutsu(天工開物) | (なし) | no-op(効果は GameManager.TryUpgradeWeapon の素材返還) |
 | Bloodlust(背水の狂刃) | OnPreDealDamage | HP≤50% → outgoing+=0.3、≤25% → +=0.8 (2026-05-31 outgoing移行) |
 | Hermes(ヘルメスの靴) | OnPostRoll | 初回ロール `AddPlayerAttackOrDiceBonus(5)`（攻撃+5・ステータス化 §2-C） |
-| GoldKingBlade(溶金の領主剣) | OnPreDealDamage | 攻撃が通る時 outgoing += 0.002×coinsSpent (500G で +1.0、 上限なし。 2026-11-11 ステータス化 §2-C 段 3: `dmgPct 0.2 per coinsSpent`) |
+| GoldKingBlade(溶金の領主剣) | OnPreDealDamage | 攻撃が通る時 outgoing += 0.005×coinsSpent (200G で +1.0、 上限なし。 2026-11-11 に 0.002 から・ステータス化 §2-C 段 3: `dmgPct 0.5 per coinsSpent`) |
 | MugaMushin(無我無心) | OnBattleStart | rollPurity=true(diceBonus等の補正拒否) |
 | GaryoTensei(画竜点睛) | OnPostRoll | 出目が最大面 → garyoProc=true,garyoDieValue。即勝利+(出目+10)×criticalMultiplier会心確定 |
 
@@ -615,84 +621,88 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 
 ## 4. 敵/汎用パッシブ一覧（`EnemyPassiveSkillEffects.cs`・視点は§0参照）
 
+**2026-11-11 に enemies.json と 1 件ずつ突き合わせた（#30）。** Trigger の OnRollWin / OnRollLose は収支トリガー
+（敵視点 OnRollWin = プレイヤーの収支マイナス・ターン解決の**後**に鳴る・§9.3）。「自ダイス +N」は敵の攻撃値へそのまま入る
+（`Escalation.EnemyAttackValue` = 基礎攻撃 + 出目の合計）。**[不発の疑い]** は相互攻撃モデルで効いていないと読めたもの
+（ロジックは未修正・理由は各クラスの XML コメント）。**[未装備]** はどの敵も持っていない（登録だけ残っている）。
+
 | SkillId(表示) | Trigger | 効果 |
 |---|---|---|
-| Trapper(罠師) | OnRollWin | 次T 相手 enemyDiceDebuff +1 |
+| Trapper(罠師) | OnRollWin | 次T `nextTurnBuffs["enemyDiceDebuff"]` +1。**[不発の疑い・逆向き]** 共有バフなので次ターンに**この敵自身**の出目の合計から引かれる |
 | Undying(不死者) | OnTurnStart | 自HP +1 |
-| Sprint(疾駆) | OnPostRoll | 初回 自ダイス +2 |
-| BruteForce(剛力) | OnPreDealDamage | 勝利時 finalDamage +2 |
-| Flight(飛翔)/Immovable(不動) | OnPrePursuitDamage | nullifyPursuitDamage=true(追撃無効) |
+| Sprint(疾駆) | OnPostRoll | 1T目 自ダイス +2（＝攻撃 +2） |
+| BruteForce(剛力) | OnPreDealDamage | 勝利時 finalDamage +2。**[不発の疑い]** 敵の OnPreDealDamage の時点で playerWonRoll はプレイヤー攻撃用の true のまま（スワップ後 false）。立っても直後の `ProcessDamage(lossBase)` が finalDamage を上書きする |
+| Flight(飛翔)/Immovable(不動) | OnPrePursuitDamage | nullifyPursuitDamage=true(追撃無効)。**[不発の疑い]** OnPrePursuitDamage は FireEnemyTrigger で一度も焚かれない |
 | HardScales(硬鱗) | OnBattleStart | enemyDefense +4（2026-10-28。旧: 被弾時 −2） |
 | CrackingArmor(割れる装甲) | OnTurnEnd | `lastPlayerDamage > 0` なら `enemyDefense = max(0, enemyDefense − 4)`（2026-11-04。初期の防御は EnemyData.defense） |
 | StackingArmor(積み上がる装甲) | OnTurnEnd | `enemyDefense = min(24, enemyDefense + 3)`（2026-11-04・既に 24 以上なら触らない） |
-| TailStrike(尾撃) | OnRollLose | fixedDamageToEnemy +1(→実プレイヤー) |
-| Rampage(暴走) | OnRollLose | 次T 自分 diceBonus +3 |
-| Ethereal(虚体) | OnPreReceiveDamage | 敗北時 finalDamage /2 |
-| Curse(呪縛/敵) | OnRollWin | 次T 相手 enemyDiceDebuff +2 |
-| CounterStance(反撃態勢) | OnRollLose | 次T 自分 damageBonus +3 |
-| HoningDuel(研ぎ澄まし) | OnRollWin | currentBuffs damageBonus += currentTurn/3 |
+| TailStrike(尾撃) | OnRollLose | fixedDamageToEnemy +1(→実プレイヤー)。**[不発の疑い]** ターン解決の後に積むので、読まれないまま次の BeginNewTurn で 0 に戻る |
+| Rampage(暴走) | OnRollLose | 次T `nextTurnBuffs["diceBonus"]` +3。**[不発の疑い・逆向き]** 次ターンに**プレイヤーの** playerDiceTotal へ入る |
+| Ethereal(虚体) | OnPreReceiveDamage | 主攻撃の finalDamage /2（`CombatManager.Damage.cs` の敵の軽減パッシブ。固定ダメ・出血・毒には効かない） |
+| Curse(呪縛/敵) | OnRollWin | 次T `enemyDiceDebuff` +2。**[不発の疑い・逆向き]** 罠師と同じ |
+| CounterStance(反撃態勢) | OnRollLose | 次T `nextTurnBuffs["damageBonus"]` +3。**[不発の疑い・漏れ]** 次ターンの ProcessDamage がプレイヤーの主攻撃にも敵の攻撃にも +3 する |
+| HoningDuel(研ぎ澄まし) | OnRollWin | currentBuffs damageBonus += currentTurn/3。**[不発の疑い]** ターン解決の後に書くので、次の BeginNewTurn の `currentBuffs.Clear()` で消える |
 | EliteVigor(精鋭・汎用) | OnBattleStart/OnPostRoll | enemyDefense +2（2026-10-28。旧: 被ダメ%軽減 +0.10） / 自ダイス += currentTurn/3 |
-| EliteSlime/EliteGoblin | OnPostRoll | 自ダイス +3 |
-| EliteKobold(早業) | OnPostRoll/OnPreReceiveDamage | GOLD奪取 / 50%で被ダメ0 |
-| EliteSkeleton(不死の軍勢) | OnTurnEnd/OnPostRoll | 致命時2回までHP全回復 / 自ダイス += 3×発動回数 |
-| EliteWolf(血盟の疾走) | OnPostRoll/OnPreDealDamage | 自ダイス +2 / 勝利時 finalDamage +2 |
-| EliteHarpy(死翔) | OnBattleStart/OnPostRoll | 消費ロック / 自ダイス += 3+currentTurn |
+| EliteSlime/EliteGoblin | OnPostRoll | 自ダイス +3 **[未装備]** |
+| EliteKobold(早業) | OnPostRoll/OnPreReceiveDamage | GOLD奪取 / 50%で被ダメ0 **[未装備]** |
+| EliteSkeleton(不死の軍勢) | OnTurnEnd/OnPostRoll | 致命時2回までHP全回復 / 自ダイス += 3×発動回数 **[未装備]** |
+| EliteWolf(血盟の疾走) | OnPostRoll/OnPreDealDamage | 自ダイス +2 / 勝利時 finalDamage +2 **[未装備]** |
+| EliteHarpy(死翔) | OnBattleStart/OnPostRoll | 消費ロック / 自ダイス += 3+currentTurn **[未装備]** |
 | EliteDecree13(死の重圧) | OnPostRoll | 宣告ターン中 自ダイス +13 |
-| EliteOrc(痛恨の一撃) | OnPreDealDamage他 | 勝利+8 / 敗北でダイス数+1(max3,extraDice)・勝利reset |
-| EliteLizard(重甲) | OnBattleStart/OnRollLose | enemyDefense +4（硬鱗と合わせて 8・2026-10-28。旧: 被弾時 −2） / fixedDamageToEnemy +1反射 |
-| EliteWraith(霊体) | OnTurnStart/OnPreReceiveDamage | 奇数Tダイス+1 / 偶数T(霊体)被ダメ=1 |
+| EliteOrc(痛恨の一撃) | OnPreDealDamage他 | 勝利+8 / 敗北でダイス数+1(max3,extraDice)・勝利reset **[未装備]** |
+| EliteLizard(重甲) | OnBattleStart/OnRollLose | enemyDefense +4（硬鱗と合わせて 8・2026-10-28。旧: 被弾時 −2） / fixedDamageToEnemy +1反射。**反射の半分は [不発の疑い]**（尾撃と同じ） |
+| EliteWraith(霊体) | OnTurnStart/OnPreReceiveDamage | 奇数T 攻撃ロールを 1 回多く引く(extraDice=1) / 偶数T(霊体) 主攻撃の被ダメ=1 |
 | EliteGolem(巌の意志) | OnTurnEnd | 意志+1、撃破時 意志分を実プレイヤーへ確定ダメ |
 | EliteMinotaur | OnPostRoll | 自ダイス +1 |
-| EliteDarkKnight(闇技) | OnPreDealDamage | 勝利時 finalDamage +2 |
-| MultiHead(多頭攻撃) | OnRollWin | extraPursuitDice +1 |
+| EliteDarkKnight(闇技) | OnPreDealDamage | 勝利時 finalDamage +2。**[不発の疑い]**（剛力と同じ） |
+| MultiHead(多頭攻撃) | OnRollWin | extraPursuitDice +1。**[不発の疑い]** `extraPursuitDice` を読む処理が無い |
 | Regeneration(再生) | OnTurnStart | 自HP +1 |
 | DemonAura(魔王の威圧) | OnBattleStart | enemyMaxHPReduction +3(相手最大HP−3) |
-| Hellfire(地獄の業火) | OnRollWin | fixedDamageToEnemy +2 |
+| Hellfire(地獄の業火) | OnRollWin | fixedDamageToEnemy +2。**[不発の疑い]**（尾撃と同じ） |
 | Lifesteal(吸血) | OnPostDealDamage | 勝利時 自HP += finalDamage/2 |
-| NightLord(夜の王) | OnTurnStart | T5以降 extraDice=1 |
-| DeathSentence(死の宣告) | OnTurnStart | T>10 で fixedDamageToEnemy +999(即死) |
-| ScratchAura | OnRollLose | no-op(脅威はCombatManager共通処理に昇格) |
-| IntimidatePlus/PlusPlus(威圧+/++) | OnBattleStart | enemyThreat += 3/5 |
-| GreedyMerchant(貪欲商人) | OnBattleStart | no-op(スケーリングは GameManager) |
+| NightLord(夜の王) | OnTurnStart | T5以降 extraDice=1（攻撃ロールを 1 回多く引いて足す） |
+| DeathSentence(死の宣告) | OnTurnStart | T>10（＝11ターン目）で fixedDamageToEnemy +999(即死) |
+| ScratchAura | OnRollLose | no-op(脅威の削りは廃止) **[未装備]** |
+| IntimidatePlus/PlusPlus(威圧+/++) | OnBattleStart | enemyThreat += 3/5（ボスの威圧+は BossParam.IntimidateThreat）。**[不発の疑い]** `ctx.enemyThreat` を読む処理が無い（§9.6 の宿題「基礎攻撃値に統合」のまま） |
+| GreedyMerchant(貪欲商人) | OnBattleStart | no-op(スケーリングは GameManager.StartFalseMerchantCombat: HP +2/個・攻撃 +1/3個) |
 | Berserk(狂暴化・全ボス付与) | OnTurnStart | T>50: healBlocked, enemyDamageTakenMultiplier=3, enemyDiceTotalBonus +=10(1回) |
-| FlawlessRobe(天衣無縫) | OnRollWin | healShieldReduction++ (max10) |
+
+（FlawlessRobe 天衣無縫は 2026-10-17 にクラスごと削除。）
 
 ---
 
-## 5. ボス専用パッシブ一覧（`EnemyPassiveSkillEffects.cs`）
+## 5. ボス専用パッシブ一覧（`EnemyPassiveSkillEffects.cs` / ヴェスカは `VescaEffects.cs`）
+
+機構の数値（`BossParam.*`）の基準値の正本は `BossParams.Spec`。
 
 | SkillId(表示) | Trigger | 効果 |
 |---|---|---|
-| GoblinKingsCall(号令) | OnPostRoll | 自ダイス +3 |
-| FrozenBardSong(凍えの旋律) | OnTurnEnd/OnPostRoll | 未使用streak++ / 自ダイス += min(8, streak−1) |
-| MiasmaCorrosion(毒の侵蝕) | OnTurnEnd | 毒stack+1(max5)、stack分を実プレイヤーへ軽減無視ダメ |
-| MirrorTwinsResponse(鏡映の応答) | OnPostReceiveDamage/OnTurnStart | 与ダメ<12で reflect=min(9,12−ダメ)蓄積、次T開始で反射 |
+| GoblinKingsCall(号令) | OnPostRoll | 自ダイス + GoblinCall（基準 3） |
+| FrozenBardSong(凍えの旋律) | OnTurnEnd/OnPostRoll | 未使用streak++ / 自ダイス += min(8, streak−1) **[未装備]** |
+| MiasmaCorrosion(毒の侵蝕) | OnTurnEnd | 毒stack+1(max PoisonStackCap=5)、stack分を実プレイヤーへ軽減無視ダメ |
+| MirrorTwinsResponse(鏡映の応答) | OnPostReceiveDamage/OnTurnStart | 閾値 `Thr = max(12, ボス最大HP×4%)`。与ダメ<Thr で reflect=min(MirrorReflectCap=9, Thr−ダメ)を蓄積、次T開始で軽減無視の反射 |
 | JudgmentFlames(審判の炎) | OnTurnEnd | `dmg=min(ChipCap, 1+ceil(currentTurn/3)+罪)`、実プレイヤーへ軽減無視（罪=totalBattles/8,max2 / ChipCap 基準 10・BossTuning で可変）。ターン係数は 2026-07-28 に 1→1/2、2026-08-15 に 1/2→1/3 へ緩和（15T 累積 108→90・上限は T≥19 まで届かない）。**シールドは肩代わりする**（③-C） |
-| RoyalEmber(王の業炎) | OnTurnStart/OnTurnEnd | stack分ダメ / stack++ |
-| SinChain(業の連鎖) | OnRollLose/Win/PostRoll | ボス敗北でcount+1(max5)・勝利reset / 自ダイス += count |
-| EternalBurning(永劫の燃焼) | OnPostRoll | 実プレイヤーHP割合 ≤50/25/10% で 自ダイス +2/3/5 |
-| ReturnToAshes(灰燼への回帰) | OnTurnStart | 自HP≤50% で 最大HP5%回復 |
-| JudgmentBlaze(業火の断罪) | OnTurnStart他 | 断罪周期=HP割合で3/2/1T。断罪ターン:ボス勝利→finalDamage×10+15 / プレイヤー見切り→反撃18(鎧貫通) / 断罪敗北→追加4軽減無視 |
-| AshArmor(灰塵の鎧) | OnPreReceiveDamage | 非断罪ターン・敗北時 finalDamage = min(max(0,ダメ−9), 10) |
-| ImmortalEmber(不滅の残り火) | OnTurnStart | HP≤60%/30%で 失HPの5%/8%回復(ラチェット上限)、断罪ターンは回復なし |
-| StarfireProliferation(星火燎原) | OnRollLose | starfire stack++、enemyDiceTotalBonus = stack(累積・リセット無) |
-| ScorchedEarth(焦土) | OnTurnEnd | プレイヤー敗北時 実プレイヤー最大HP −= 被ダメ10%、consShield=0 |
-| Decree13th(13番目の宣告) | OnTurnStart/OnTurnEnd | 1/13でフラグ、成就で (playerDiceTotal+enemyDiceTotal)×criticalMultiplier を軽減無視で実プレイヤーへ |
+| RoyalEmber / SinChain / EternalBurning / ReturnToAshes / JudgmentBlaze / AshArmor / ImmortalEmber / EmberAura / StarfireProliferation / ScorchedEarth / AshCarapace | — | 旧 6 層ボスの機構。**[未装備]**（6 層は下の 5 つで組み直した・数値はクラスの XML コメント） |
+| EmberOmen(業火の予兆) | OnTurnStart | 予兆ターン = HP>50% は T1/5/9…（周期4）、HP≤50% は T1/4/7…（周期3）。予兆Tに `enemyDiceTotalBonus += JudgmentDice`（基準 8）。**[不具合の疑い]** `+=` を戻す処理が無く、予兆のたびに積み上がる |
+| AshRegrowth(灰の再生) | OnTurnStart | HP>50% かつ非予兆T: 最大HPの2%回復（最低1） |
+| EmberFury(憤怒の残滓) | OnTurnStart | HP≤50% のT: `enemyDiceTotalBonus += 3`。**[不具合の疑い]** 毎ターン積み上がる（「常時 +3」になっていない） |
+| ScorchedPact(焦土契約) | OnRollWin/OnTurnStart | 収支負けでスタック+1（上限5）。毎T 差分更新で `enemyDiceTotalBonus` に現在スタック×1 を反映（累積しない） |
+| BlazeBrand(烈炎) | OnTurnEnd/OnTurnStart | ブロック端子へ 2 本以上のT終了時に烈炎+1 / T開始時に烈炎の数だけ軽減無視ダメ |
+| Decree13th(13番目の宣告) | OnTurnStart/OnTurnEnd | 1/13でフラグ、本体が生存していれば成就で ceil((playerDiceTotal+enemyDiceTotal)×2.0) を軽減無視で実プレイヤーへ（2.0 は定数。プレイヤーの criticalMultiplier は 2026-08-08 から読まない・シールドは肩代わり） |
 | StrongOne/Throne/Setsuna(強者/玉座/刹那) | OnBattleStart | bossDiceBonus = 4/8/12 ※**現在enemies.jsonから撤廃・未参照（クラスは残置）** |
-| SaintGeorgesPhases(シュヴァリエ) | 多数 | 形態1:シールド140+ロール勝利で(プレイヤー合計+プリオリテ×3)反撃+シールド−25 / 形態2:4d6+連勝報酬(ボスダイス+4,+15ダメ)・3勝で形態1帰還 / プリオリテ累積でシールド−28・反撃+10 |
+| SaintGeorgesPhases(シュヴァリエ) | 多数 | 開幕プリオリテ1。形態1: シールド = 140−28×プリオリテ（最低28）が主攻撃を吸う・収支プラスのTに (プレイヤーの出目の合計+プリオリテ×7) の不可避反撃＋シールド−25 / 形態2: 連勝報酬（次T ボスの攻撃+4、そのTも収支プラスならボスへ15）・ボスの収支 3 勝で形態1帰還 / 帰還ごとにプリオリテ+1。**[不具合の疑い]** 形態1の 0d0（`extraDice=−4`）は攻撃ロール方式の敵には効かず、形態1でも普通に攻撃する |
+| RelicScholar(遺物学者) | OnTurnStart/OnTurnEnd | 毎T 遺物を 1 枚抽選（段の切り替え直後は新等級から・天与の才の次Tは 2 枚）。`enemyDiceTotalBonus` = 遺物 + 溜め打ち + 停滞×Stagnation を `=` で一括代入。OnTurnEnd で大出血の tick。抽選結果は `MutualTurnTelegraph.drawnRelics` に載るが画面は未配線 |
+| StagnantTime(停滞する時間) | OnTurnEnd | 攻撃端子の本数 < ブロック端子の本数のTに停滞+1（上限10）。1 スタックあたり敵攻撃 + Stagnation（基準 1） |
+| AnalyticComputation(解析演算) | OnRollLose | 収支プラスごとに回避率 +2%（上限40%）。回避はその攻撃の通常・固定ダメを丸ごと消し、次Tは回避しない（`ApplyVescaDefense`） |
+| RiftHeldOpen(裂け目) | OnTurnStart | ヴェスカ 最大HPの2% / プレイヤー 最大HPの1%（軽減無視・シールドは肩代わり） |
+| RecurrentTruth(回帰性真理) | OnBattleStart/OnTurnStart | 毒・出血を毎T半減 / 受ける会心倍率 −0.5（下限1.0） / 臨界メーター −5/T / 最大HP変更と処刑を拒否 |
+| ContinuousExperiment(連続実験) | OnTurnEnd | HP0 で次段へ差し替えを予約（p4 は持たない） |
+| DivineTalent(天与の才) | OnTurnEnd | 最大HPの 66%/33% を跨ぐ一撃を閾値で止め（`ClampToThreshold`）、初めて割った次Tに遺物 2 枚 |
 
-### 覚者7形態連戦（boss_layer7 → p2 → … → p7、各OnTurnEndでHP0検知し次形態SwapEnemy予約）
+### （欠番）覚者7形態連戦
 
-| SkillId(形態) | Trigger | 効果 |
-|---|---|---|
-| AwakenedP1Inverse(初眼・逆観) | OnPostRoll | fixedDamageToEnemy += (プレイヤー最大出目 + currentTurn/3) 軽減無視 |
-| AwakenedP2BurstFire(業火残響・爆ぜ火) | OnRollWin | プレイヤー敗北時 fixedDamageToEnemy +5 軽減無視 |
-| AwakenedP3Mirror(無相・鏡映) | OnPreReceiveDamage | 覚者への与ダメの25%を fixedDamageToEnemy(実プレイヤーへ)反射 |
-| AwakenedP4Riposte(残影・一閃返し) | OnPreReceiveDamage | 1回限り finalDamage=0（反射なし・初撃完全無効のみ） |
-| AwakenedP5Silent(寂照) | OnPostRoll/OnTurnEnd | 毎T 所持パッシブ数/4(min1)軽減無視 / 消費品使用でランダムパッシブ永久喪失 |
-| AwakenedP6EmberWill(薄火・業火の遺志) | OnTurnStart | enemyDiceTotalBonus = 形態内経過T(ランプ) |
-| AwakenedP7Myokaku(妙覚) | OnTurnStart/OnTurnEnd | 妙覚T1〜6: enemyDiceTotalBonus=99 ＋ fixedDamageToEnemy += mT×4(軽減無視・HP直引きで死亡回避/シールド貫通)。T6生存後 myokakuSuddenDeath(両者1d2)。サドンデスでボス敗北→gedatsuPending(解脱・特殊勝利) |
-| FlawlessRobe(天衣無縫・覚者各形態) | OnRollWin | healShieldReduction++(max10) |
+2026-07-27 に廃止、`AwakenedP1..P7` / `FlawlessRobe` のクラスも 2026-10-17 までに削除（GAME.md §24）。
+連戦の差し替えと死因（大出血・裂け目）はヴェスカが流用している（上の表）。
 
 ### 〈門〉の不完全起動（`GameLoop.GateFlaws` / GAME.md §4-3）
 
@@ -917,7 +927,9 @@ ADR-0009 パイプラインでのパッシブ挙動のリワーク記録 (2026-0
 
 **リワーク不要 (自然に動く・敵側含む)**:
 - 被ダメ軽減/回復/シールド/会心/出目パターン/HP参照系 — 全 46 種
-- 敵側ダイス合計+N の 22 種 — 既存の enemyDiceTotal → β=0.3 圧縮経由で自動的に攻撃値へ寄与
+- 敵側ダイス合計+N の 22 種 — 既存の enemyDiceTotal 経由で自動的に攻撃値へ寄与（当時は β=0.3 圧縮。β は 2026-07-28 に撤去し、いまは等倍で入る）。
+  ただし 2026-11-11 の監査（#30）で、共有バフ（`nextTurnBuffs`）や OnPreDealDamage・OnPrePursuitDamage・解決後の収支トリガーに頼る敵パッシブは
+  効いていない疑いが出た（§0 の「共有バフの罠」と §4 の [不発の疑い]）
 - 収支トリガー再定義で無改修動作の 15 種 (Counter/ShieldBash/LentTime/BladeEdge/Conqueror 他)
 
 **W7 後段の宿題 (§9.5 に既記載)**:
