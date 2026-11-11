@@ -559,9 +559,13 @@ namespace UI.Game2D
             }
             // ボタン (右寄せ)
             int bx = d.w - Inset;
+            // 窓の幅に収まらない時は、 最小幅と余白と間隔を詰める (設定の窓は 7 個並ぶ・左端が窓の外へ切れていた)
+            int bMin = 52, bPad = 20, bGap = 5, bTotal = 0;
+            foreach (var b in d.buttons) bTotal += Mathf.Max(bMin, Game2DJpFont.Width(b.label) + bPad) + bGap;
+            if (bTotal - bGap > d.w - Inset * 2) { bMin = 28; bPad = 10; bGap = 3; }
             for (int i = d.buttons.Count - 1; i >= 0; i--)
             {
-                var b = d.buttons[i]; int bw = Mathf.Max(52, Game2DJpFont.Width(b.label) + 20); bx -= bw; _btnR.Insert(0, new RectInt(bx, btnY, bw, 22)); bx -= 5;
+                var b = d.buttons[i]; int bw = Mathf.Max(bMin, Game2DJpFont.Width(b.label) + bPad); bx -= bw; _btnR.Insert(0, new RectInt(bx, btnY, bw, 22)); bx -= bGap;
             }
             for (int i = 0; i < d.buttons.Count; i++)
             {
