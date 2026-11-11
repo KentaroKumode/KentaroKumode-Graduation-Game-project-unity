@@ -136,14 +136,24 @@ namespace AutoTest.EditorTools
         }
 
         /// <summary><b>端子の ITT (2026-11-12・#102)。</b> 基本以外の端子 57 種だけを、 1 ランに期待 5 枚、 ランダムな層 (深さ 1〜5) で山札へ足し、
-        /// 100,000 ラン。 端子ごとの Δクリア率 (pt) を出す。 品の買い方は今の標準 (ITT の序列) のまま。
+        /// 50,000 ラン (2026-11-12 にユーザーの判断で 10 万 → 5 万)。 端子ごとの Δクリア率 (pt) を出す。 品の買い方は今の標準 (ITT の序列) のまま。
         /// <b>結果は本番の学習フォルダへ書かない</b> ── 品の序列 (itt_clear.json / itt_effects.json) を上書きすると買い物が壊れる。
         /// 書き先は AutoRunLogs/terminal_itt/&lt;日時&gt;/ (itt_clear.terminal.txt が表)。</summary>
-        [MenuItem("Tools/AutoRun/■ ITT 並列 (端子 57 種): 100000ラン", priority = 8)]
+        [MenuItem("Tools/AutoRun/■ ITT 並列 (端子 57 種): 50000ラン", priority = 8)]
         private static void LaunchIttTerminals()
         {
             AutoTest.GrantItt.Variant = "terminal";
-            LaunchWith(0, AutoRunner.WiringSkill.Optimal, 100000, itt: true,
+            LaunchWith(0, AutoRunner.WiringSkill.Optimal, 50000, itt: true,
+                overrides: new Dictionary<string, string> { ["randomGrantTerminals"] = "True", ["randomGrantExpectedItems"] = "5",
+                    ["useIttBeta"] = "True", ["lockWeaponFamily"] = "True", ["learnTier"] = "False" });
+        }
+
+        /// <summary>端子の ITT を Super の方策で (2026-11-12)。 書き先は AutoRunLogs/terminal_itt/&lt;日時&gt;/ (itt_clear.terminal_super.txt)。</summary>
+        [MenuItem("Tools/AutoRun/■ ITT 並列 (端子 57 種・Super): 50000ラン", priority = 8)]
+        private static void LaunchIttTerminalsSuper()
+        {
+            AutoTest.GrantItt.Variant = "terminal_super";
+            LaunchWith(0, AutoRunner.WiringSkill.Super, 50000, itt: true,
                 overrides: new Dictionary<string, string> { ["randomGrantTerminals"] = "True", ["randomGrantExpectedItems"] = "5",
                     ["useIttBeta"] = "True", ["lockWeaponFamily"] = "True", ["learnTier"] = "False" });
         }
@@ -586,7 +596,7 @@ namespace AutoTest.EditorTools
             // 端子の ITT (2026-11-12): 割り当ても結果も本番と別の所へ (品の序列を上書きしない)。
             //   版は状態から戻す (ドメインの再読み込みで GrantItt.Variant が空に戻っていても、 本番の序列を上書きしないように)。
             if (!string.IsNullOrEmpty(_st.variant)) GrantItt.Variant = _st.variant;
-            bool terminalItt = GrantItt.Variant == "terminal";
+            bool terminalItt = GrantItt.Variant != null && GrantItt.Variant.StartsWith("terminal");
             string fitRoot = terminalItt
                 ? Path.GetFullPath(Path.Combine(Application.dataPath, "..", "AutoRunLogs", "terminal_itt", Path.GetFileName(_root)))
                 : _st.learningRoot;

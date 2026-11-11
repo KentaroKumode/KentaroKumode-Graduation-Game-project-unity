@@ -650,6 +650,8 @@ namespace AutoTest
             public float[] atkGrowth;          // 防ぎ切りの規則: 撃破まで n ターンの敵の攻撃の伸び (null = 規則なし)
             public bool ledger;                // [V3 hpLedger] 効用を HP の帳簿で測る
             public float dFull;                // [V3 hpLedger] 先のターンに全部攻撃に挿した時の 1 ターンの与ダメの見込み
+            public bool enemyDoubleOnBlockHeavy; // [2026-11-12] 敵〈多頭攻撃〉: 攻撃の個数 < ブロックの個数で挿したターン、 敵の攻撃が 2 回 (CombatManager.Turn.cs)
+            public int enemyHitBonus;            // [2026-11-12] 敵の攻撃が通った時に足される量 (〈剛力〉〈闇技〉+2・〈研ぎ澄まし〉+ターン÷3)。 本体は敵の攻撃の計算の中 (PSM.ProcessDamage) で足す
             public float stagCost;             // [2026-11-11] ヴェスカ〈停滞する時間〉: 攻撃 < ブロックで挿すと、 先のターンの敵の攻撃がこれだけ上がる (1 スタック × 今のエスカレーション・上限なら 0)
             public float mainCorr;             // [V3 mainCorr] 主攻撃の見積もりに掛ける実績の比 (0 = 掛けない)
             // ---- [V3 readOutgoingMult 2026-11-10] 与ダメの倍率を読む (本体の主攻撃の計算 CombatManager.Turn / Damage / PassiveSkillManager.ProcessDamage に合わせる) ----
@@ -964,6 +966,14 @@ namespace AutoTest
 
             // 端子の山札: このターンに得たシールド (〈絶縁体〉〈当て板〉) はこのターンの被弾から吸う / 被ダメ −N% (〈接地〉〈避雷器〉〈非常弁〉)
             int taken = System.Math.Max(0, enemyAtk - block - ws.shield);
+            // 敵の攻撃が通った時の上乗せ (〈剛力〉〈闇技〉〈研ぎ澄まし〉・2026-11-12)。 本体はブロックの後に 1 以上残る時だけ、 プレイヤーの軽減の前に足す
+            if (s.enemyHitBonus > 0 && enemyAtk - block > 0) taken += s.enemyHitBonus;
+            // 敵〈多頭攻撃〉(2026-11-12): 攻撃の個数 < ブロックの個数なら同じ攻撃値でもう 1 回 (ブロックは 2 回とも全額・シールドは 1 回目で使った分を引く)
+            if (s.enemyDoubleOnBlockHeavy && ws.bCount > ws.aCount && enemyAtk > 0)
+            {
+                int shieldLeft = System.Math.Max(0, ws.shield - System.Math.Max(0, enemyAtk - block));
+                taken += System.Math.Max(0, enemyAtk - block - shieldLeft);
+            }
             if (ws.takenMul < 1f) taken = Mathf.RoundToInt(taken * ws.takenMul);
             taken += (int)reflectPenalty;
             // 盾〈黎明〉: 無傷で受け切ったら、 敵の攻撃 10 につき敵の最大 HP の 5% を削る
@@ -1453,6 +1463,16 @@ namespace AutoTest
                 play = play, atkGrowth = atkGrowth,
                 diceAtkPct = ctxRoles?.attackDicePct ?? 0f,
             };
+            // 敵のパッシブ (2026-11-12・#104 で効くようにした物のうち、 被ダメを読み違える物)
+            if (cm?.CurrentEnemy?.passiveSkills != null)
+                foreach (var ps in cm.CurrentEnemy.passiveSkills)
+                {
+                    if (ps == null) continue;
+                    if (ps.internalName == "BruteForce" || ps.internalName == "EliteDarkKnight") st.enemyHitBonus += 2;
+                    else if (ps.internalName == "HoningDuel") st.enemyHitBonus += System.Math.Max(0, tele.turn) / 3;
+                }
+            if (ctxRoles != null && ctxRoles.GetAccumulated(ItemSystem.PassiveSkills.Effects.MutualKeys.EnemyDoubleOnBlockHeavy) > 0f)
+                st.enemyDoubleOnBlockHeavy = true;
             // [V3 readOutgoingMult] 主攻撃の見積もりに与ダメの倍率を読む (Super で既定 ON)。 予測の照合 (predTrace) では両方を出す。
             bool readOutNow = ReadOutgoingMultEffective && EffectiveWiringSkill != WiringSkill.Naive;
             if ((readOutNow || predTrace) && ctxRoles != null)

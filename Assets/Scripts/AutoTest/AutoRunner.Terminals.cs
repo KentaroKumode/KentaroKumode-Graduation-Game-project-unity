@@ -46,8 +46,12 @@ namespace AutoTest
         /// <summary>使い捨ての端子を使う費用 (この戦闘ではもう使えない): 攻撃の種類は与ダメ相当 8 (出目 2 個ぶん)・それ以外は HP 相当 3。
         /// 弱い目で起爆筒を切らず、 良い目・危ないターンに回すための足切り。</summary>
         private const float DeckDisposableDmgCost = 8f, DeckDisposableHpCost = 3f;
-        /// <summary>〈停止信号〉: 次のターンの敵の攻撃 × 0.9 (先の HP なので割り引く)。</summary>
-        private const float DeckStunShare = 0.9f;
+        /// <summary>〈停止信号〉: 次のターンの敵の攻撃 × 0.5 を今の HP で見る (2026-11-12)。 次のターンはほぼ確実に来るので先の割引 (帳簿の 0.2) は掛けない。
+        /// 半分にするのは、 止めなくてもブロックで一部は受けられるから。 旧: × 0.9 × 先の割引 で、 使い捨ての費用を超えず一度も使われなかった。</summary>
+        private const float DeckStunShare = 0.5f;
+        /// <summary>端子の「素の点」1 点 = 1 回使うたびの与ダメ相当 3.5 (出目 1 個の平均)。 写し取り・焼き切り・保持器の値付けに使う (2026-11-12)。
+        /// 素の点は 基本 1 / コモン 2 / レア 3 なので、 コモン 1 枚は基本より 1 回あたり 3.5 ほど得、 という見方。</summary>
+        private const float DeckCardDmgPerPoint = 3.5f;
         /// <summary>撃破のボーナス (HP 相当・恒久なので割り引かない): 最大 HP +1 = 1.5 / 研ぎ澄まし +1 = 3 / ゴールド 1 = 0.15 / 報酬の選択肢 +1 = 1.5。</summary>
         private const float DeckKillMaxHpWorth = 1.5f, DeckKillWhetWorth = 3f, DeckKillGoldWorth = 0.15f, DeckKillExtraChoiceWorth = 1.5f;
 
@@ -120,26 +124,39 @@ namespace AutoTest
             flat += Math.Max(0, after.extraDrawNext - before.extraDrawNext) * DeckDrawDmg * dw;
             // 〈主幹〉: 使うたび以後の攻撃 +N (残りターンの半分で使えると見る)
             flat += (after.mainsUses - before.mainsUses) * TerminalCards.MainsPerUse * turns * 0.5f * DeckFutureAttackShare * dw;
-            if (o.enemyStunNext) flat += DeckStunShare * Math.Max(0, s.enemyAtk) * fw;
+            if (o.enemyStunNext) flat += DeckStunShare * Math.Max(0, s.enemyAtk) * (s.ledger ? 1f : s.wDef);
             // 別枠のダメージ
             flat += (o.poison * DeckPoisonDmg + o.heat * DeckHeatDmg) * dw;
             if (o.attackDice > 0) flat += o.bleedOnHit * DeckBleedDmg * dw;
             // 〈計数器〉: 基本以外の発動 1 回 = 与ダメ +(10% ÷ 10 回) を残りターンずっと (山札に入っている時だけ効く・本体 DrawTerminalHand)
             if (deckHasCounter)
                 flat += o.firedNonBasic * (TerminalCards.CounterPct / TerminalCards.CounterEvery) * DeckPerTurnDamage(in s, k) * turns * dw;
-            // 手札の操作 (対象は ChooseDeckTargets が選んだ端子・選ばなければ左端の候補)
-            if (o.retainTarget >= 0) flat += DeckRetainDmg * dw;
-            if (o.copyTarget >= 0 && o.copyTarget < board.Count)
-                flat += ((TerminalCards.Get(board[o.copyTarget])?.basic ?? true) ? DeckCopyBasicDmg : DeckCopyGoodDmg) * dw;
-            if (o.burnTarget >= 0 && o.burnTarget < board.Count)
-                flat += ((TerminalCards.Get(board[o.burnTarget])?.basic ?? true) ? DeckBurnBasicDmg : DeckBurnGoodDmg) * dw;
+            // 手札の操作 (対象は ChooseDeckTargets が選んだ端子・選ばなければ左端の候補)。 2026-11-12: この戦闘で山札を引く回数から値付けする。
+            //   旧: 定数 (写し取り 6 / 焼き切り 6 × 未来の与ダメの価値) で、 使い捨ての費用 (HP 3) をほぼ超えず、 発動率が 0.1〜0.2% だった。
+            //   引く回数 = 残りターン × 手札 ÷ 山札の残り (この戦闘で同じ 1 枚をあと何回引くか・残りターンで頭打ち)。
+            var runNow = GameManager.Instance?.Run;
+            var dkNow = CombatManager.Instance?.TerminalDeck;
+            int deckN = dkNow != null ? Math.Max(1, dkNow.Remaining) : 10;
+            float draws = Math.Min(turns, turns * (float)TerminalCards.HandSize / deckN);
+            float PerUse(int slot) => slot >= 0 && slot < board.Count
+                ? DeckCardDmgPerPoint * Math.Max(0f, TargetWorth(TerminalCards.Get(board[slot]), runNow) - 1f) : 0f;
+            if (o.retainTarget >= 0) flat += (DeckRetainDmg + PerUse(o.retainTarget)) * dw;          // 次のターンにもう 1 回使える
+            if (o.copyTarget >= 0 && o.copyTarget < board.Count) flat += draws * PerUse(o.copyTarget) * dw;
+            if (o.burnTarget >= 0 && o.burnTarget < board.Count && runNow?.terminalDeck != null && runNow.terminalDeck.Count > 0)
+            {
+                // 抜いた分だけ、 山札の平均の端子を引く回数が増える (対象が平均より悪いほど得・良い端子を抜けば損)
+                float avg = 0f; foreach (var id in runNow.terminalDeck) avg += TargetWorth(TerminalCards.Get(id), runNow);
+                avg /= runNow.terminalDeck.Count;
+                flat += draws * DeckCardDmgPerPoint * (avg - TargetWorth(TerminalCards.Get(board[o.burnTarget]), runNow)) * dw;
+            }
             // 使い捨ての費用
             float hpUnit = s.ledger ? 1f : s.wDef;
             foreach (int slot in o.fired)
             {
                 var d = TerminalCards.Get(board[slot]);
                 if (d == null || !d.disposable) continue;
-                flat -= d.kind == TerminalKind.Attack ? DeckDisposableDmgCost * dw : DeckDisposableHpCost * hpUnit;
+                // 使い捨てを失うのはこの戦闘の残りだけ (次の戦闘では山札に戻る)。 攻撃以外の費用は先の HP の価値で見る (2026-11-12・旧: 今の HP で見て高すぎた)
+                flat -= d.kind == TerminalKind.Attack ? DeckDisposableDmgCost * dw : DeckDisposableHpCost * fw;
             }
             ws.specFlat = flat;
 
@@ -339,8 +356,8 @@ namespace AutoTest
             }
             switch (d.id)
             {
-                case TerminalIds.Retainer:
-                case TerminalIds.Stripper:    return 1.0f;      // 効く場面が狭い
+                case TerminalIds.Stripper:    return 1.5f;      // 倒したターンにしか効かない (2026-11-12: 1.0 では一度も取られなかった)
+                case TerminalIds.Retainer:    return 2.0f;      // 出目をブロックに入れたうえで 1 枚残す (2026-11-12 の作り替えの後・旧 1.0)
                 case TerminalIds.Heal:        return 1.2f;      // 3 以下だけ・攻撃にならない
                 case TerminalIds.DischargeTube:
                 case TerminalIds.Breaker:     return 1.3f;      // 充電を払う (充電の型なら下の +2 で上がる)
