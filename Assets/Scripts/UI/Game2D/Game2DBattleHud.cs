@@ -515,19 +515,18 @@ namespace UI.Game2D
         /// 大きさは変えない (色と別の絵だけ)。</summary>
         private static readonly string[] CatPaw =
         {
-            ".#.#.#.",
-            "#.....#",
-            "..###..",
-            ".#####.",
-            ".#####.",
-            "..###..",
+            "#.#.#",
+            ".....",
+            ".###.",
+            "#####",
+            ".###.",
         };
         private static void DrawCatMark(KitPix p, int i)
         {
             var r = PDieR(i); var c = Game2DKit.Amber;
             p.Rect(r.x - 1, r.y - 1, r.width + 2, 1, c); p.Rect(r.x - 1, r.y + r.height, r.width + 2, 1, c);
             p.Rect(r.x - 1, r.y, 1, r.height, c); p.Rect(r.x + r.width, r.y, 1, r.height, c);
-            int px = PortX(i), py = r.y + (r.height - CatPaw.Length) / 2;
+            int px = PortX(i) + 1, py = r.y + (r.height - CatPaw.Length) / 2;
             for (int j = 0; j < CatPaw.Length; j++)
                 for (int k = 0; k < CatPaw[j].Length; k++)
                     if (CatPaw[j][k] == '#') p.Set(px + k, py + j, c);
