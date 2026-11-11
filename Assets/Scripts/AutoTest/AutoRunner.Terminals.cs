@@ -293,10 +293,14 @@ namespace AutoTest
         private const int RewardThresholdFreeSize = 10;
         private const float RewardPersonaBonus = 2f, RewardMinAttackShare = 0.3f, RewardMinBlockShare = 0.2f, RewardAttackNeedBonus = 1.25f, RewardDilutePenalty = 0.75f, RewardDupPenalty = 1f;
 
+        /// <summary>診断: 山札を初めの形のまま変えない (報酬を受け取らない・店で買わない・抜かない)。
+        /// 「端子を取ると得か」の対照の腕。 並列の A/B (v3_arm.txt) で <c>terminalsLeaveDeck=True</c>。</summary>
+        public bool terminalsLeaveDeck = false;
+
         /// <summary>報酬の候補 (端子の名前の並び) から 1 つ選ぶ。 戻り値 = 添字・負 = 受け取らない。</summary>
         private int ChooseTerminalReward(IReadOnlyList<string> offer)
         {
-            if (offer == null || offer.Count == 0) return -1;
+            if (offer == null || offer.Count == 0 || terminalsLeaveDeck) return -1;
             var run = GameManager.Instance?.Run;
             var deck = run?.terminalDeck;
             int total = deck?.Count ?? 0, atk = 0, blk = 0;
@@ -360,7 +364,7 @@ namespace AutoTest
         /// <summary>店に入った時の端子の買い物と抜くサービス。 棚の品の買い物より先に呼ぶ。</summary>
         private void DoShopTerminals(GameManager gm)
         {
-            var run = gm?.Run; if (run == null) return;
+            var run = gm?.Run; if (run == null || terminalsLeaveDeck) return;
             // 買う
             for (int guard = 0; guard < GameManager.TerminalShopSlots; guard++)
             {
@@ -382,7 +386,7 @@ namespace AutoTest
         /// <summary>休憩: 回復が無駄になる時に、 基本が多ければ 1 枚抜く (休憩の行動を使う)。 抜いたら true。</summary>
         private bool TryRestRemoveTerminal(GameManager gm)
         {
-            var run = gm?.Run; if (run == null || !gm.CanRemoveTerminal) return false;
+            var run = gm?.Run; if (run == null || !gm.CanRemoveTerminal || terminalsLeaveDeck) return false;
             int at = PruneTarget(run);
             return at >= 0 && gm.RestRemoveTerminal(at);
         }
