@@ -86,6 +86,8 @@ namespace CombatSystem
         public int extraDrawNext;
         /// <summary>〈鋳造口〉で増えた出目 (この戦闘中・次のターンから)。</summary>
         public int foundryBonus;
+        /// <summary>〈主幹〉をこの戦闘で使った回数。</summary>
+        public int mainsUses;
 
         public TerminalBattleState Clone()
         {
@@ -139,6 +141,8 @@ namespace CombatSystem
         /// <summary>このターンの敵の攻撃に掛ける (1 = なし)。</summary>
         public float enemyAttackMul = 1f;
         public int heal, selfDamage, shield, chargeSpend;
+        /// <summary>このターンに払うシールド (〈盾押し口〉)。 足す分 (shield) より先に引く。</summary>
+        public int shieldSpend;
         public bool chargeFill;
         public int poison, heat, bleedOnHit;
         public int escalationDelay;
@@ -173,19 +177,24 @@ namespace CombatSystem
         public const int MinDeckSize = 3;
 
         // ===== 数値 (仮) =====
-        // 2026-11-11: 基本以外の端子の得を約 2 倍にした。 旧の値では、 端子を取る BOT が取らない BOT より弱かった
+        // 2026-11-11 (1): 基本以外の端子の得を約 2 倍にした。 旧の値では、 端子を取る BOT が取らない BOT より弱かった
         //   (同じ BOT・各 100 ラン・6 層到達: 取らない 80% / 旧の値 68% / 2 倍 82%。 main は 81%)。
-        //   固定値は 2 倍・倍率は「基本との差」を 2 倍・溜める端子は必要量を半分・割合は引き上げ。
-        public const int DetectorMul = 3, RectifierMul = 3;
-        public const int IgniterAttack = 14, FuseBlock = 16, GroundCutPct = 60, BreakerCutPct = 75, ReliefCutPct = 90;
-        public const int DischargeCost = 3, DischargeMul = 5, BreakerCost = 4, DeathwishMul = 5, RelayPerFired = 16, OscPerStreak = 10;
-        public const int CapacitorNeed = 15, CapacitorAttack = 80, ArresterNeed = 6, FoundryNeed = 10, CoolantNeed = 12;
-        public const float AmplifierPerPip = 0.16f, ResonatorMul = 2.0f, VacuumCritMult = 2.0f;
+        // 2026-11-11 (2): 1 枚ずつの合否 (Tools/terminal_values_review.py のページ) で、 2 倍が強すぎると判定された端子を元の値へ戻した。
+        //   2 倍のまま残したのは: 接地・非常弁・絶縁体・治癒・鋳造口・冷却材・計数器・増幅器・真空管・照星・急所読み・盾押し口。
+        //   作り替え: 遮断器 (充電 6)・冷却材 (段階を戻す)・主幹 (使うたび +1)・盾押し口 (足した分のシールドを払う)・
+        //             変圧器 (条件なし)・配電盤 (2 枚)・保持器 (出目をブロックに)。
+        public const int DetectorMul = 2, RectifierMul = 2;
+        public const int IgniterAttack = 7, FuseBlock = 8, GroundCutPct = 60, BreakerCutPct = 75, ReliefCutPct = 90;
+        public const int DischargeCost = 3, DischargeMul = 3, BreakerCost = 6, DeathwishMul = 3, RelayPerFired = 8, OscPerStreak = 5;
+        public const int CapacitorNeed = 15, CapacitorAttack = 40, ArresterNeed = 12, FoundryNeed = 10, CoolantNeed = 12;
+        public const float AmplifierPerPip = 0.16f, ResonatorMul = 1.5f, VacuumCritMult = 2.0f;
         public const int CounterEvery = 10; public const float CounterPct = 0.20f;
-        public const int TwinShotMul = 5, DetonatorMul = 7, FirstAidMul = 6, HealMul = 4, BatteryBonus = 4, InsulatorBonus = 6;
+        public const int TwinShotMul = 3, DetonatorMul = 4, FirstAidMul = 3, HealMul = 4, BatteryBonus = 2, InsulatorBonus = 6;
         public const int HarvesterMaxHp = 2, WhetGain = 1, LootGold = 10;
-        public const float SightPerRank = 0.2f, VitalPerRank = 0.1f, BloodTapPct = 0.1f, BigDischargePerRank = 0.20f, ShieldPushPerRank = 0.06f;
-        public const int BloodTapPer = 5, PoisonScalePer = 10, PoisonScaleAttack = 6, AfterHeatPerBurst = 4;
+        public const float SightPerRank = 0.2f, VitalPerRank = 0.1f, BloodTapPct = 0.05f, BigDischargePerRank = 0.10f, ShieldPushPerRank = 0.06f;
+        public const int BloodTapPer = 5, PoisonScalePer = 10, PoisonScaleAttack = 3, AfterHeatPerBurst = 2;
+        /// <summary>〈主幹〉: この戦闘で使うたび、 以後の攻撃 +N。 / 〈配電盤〉: 次のターンに多く引く枚数。</summary>
+        public const int MainsPerUse = 1, SwitchboardDraw = 2;
 
         private static TerminalDef D(string id, TerminalKind k, string desc, TerminalCond c = TerminalCond.None, string axis = null)
             => new TerminalDef { id = id, kind = k, cond = c, description = desc, axis = axis, condLabel = CondLabel(c) };
@@ -218,7 +227,7 @@ namespace CombatSystem
             const TerminalKind A = TerminalKind.Attack, B = TerminalKind.Block, C = TerminalKind.Charge, S = TerminalKind.Support;
             string ax = ItemSystem.PassiveSkills.AxisRules.Crit, ab = ItemSystem.PassiveSkills.AxisRules.Bleed, ap = ItemSystem.PassiveSkills.AxisRules.Poison,
                    ah = ItemSystem.PassiveSkills.AxisRules.Heat, ac = ItemSystem.PassiveSkills.AxisRules.Charge, asx = ItemSystem.PassiveSkills.AxisRules.Shield;
-            var perm = D(TerminalIds.Mains, A, "出目を攻撃に。一度引くとこの戦闘中ずっと場に残る。"); perm.permanent = true;
+            var perm = D(TerminalIds.Mains, A, "出目を攻撃に。この戦闘で使うたび、以後の攻撃 +" + MainsPerUse + "。一度引くとこの戦闘中ずっと場に残る。"); perm.permanent = true;
             return new List<TerminalDef>
             {
                 // ── 基本 ──
@@ -244,14 +253,14 @@ namespace CombatSystem
                 D(TerminalIds.Heal, S, "HP +出目 ×" + HealMul + "。", TerminalCond.AtMost3),
                 D(TerminalIds.Capacitor, S, "出目を溜める。" + CapacitorNeed + " で次の攻撃 +" + CapacitorAttack + "。"),
                 D(TerminalIds.Arrester, S, "出目を溜める。" + ArresterNeed + " でそのターンの被ダメージ半分。"),
-                D(TerminalIds.Transformer, S, "攻撃の端子に挿した出目を 2 倍。", TerminalCond.AtLeast5),
-                D(TerminalIds.Switchboard, S, "次のターン、端子を 1 枚多く引く。"),
+                D(TerminalIds.Transformer, S, "攻撃の端子に挿した出目を 2 倍。"),
+                D(TerminalIds.Switchboard, S, "次のターン、端子を " + SwitchboardDraw + " 枚多く引く。"),
                 // ── レア ──
                 Rare(D(TerminalIds.Amplifier, S, "出目 1 につき与ダメージ +" + (int)(AmplifierPerPip * 100) + "% (別枠)。", TerminalCond.AtLeast5)),
                 Rare(D(TerminalIds.VacuumTube, S, "このターンの会心倍率 +" + VacuumCritMult.ToString("0.0") + "。", TerminalCond.AtLeast6)),
                 Rare(D(TerminalIds.Resonator, S, "このターンの与ダメージ ×" + ResonatorMul.ToString("0.0") + " (別枠)。", TerminalCond.SameElsewhere)),
                 Rare(D(TerminalIds.Foundry, S, "出目を溜める。" + FoundryNeed + " ごとにこの戦闘中の全部の出目 +1。")),
-                Rare(D(TerminalIds.Coolant, S, "出目を溜める。" + CoolantNeed + " ごとにエスカレーションを 1 ターン遅らせる。")),
+                Rare(D(TerminalIds.Coolant, S, "出目を溜める。" + CoolantNeed + " ごとにエスカレーションの段階を 1 つ戻す。")),
                 Rare(D(TerminalIds.Counter, A, "出目を攻撃に。基本以外の発動が累計 " + CounterEvery + " 回になるごとに、この戦闘中の与ダメージ +" + (int)(CounterPct * 100) + "%。")),
                 Rare(D(TerminalIds.Preheater, B, "出目をブロックに。次のターン、端子の条件を無視する。")),
                 Rare(perm),
@@ -261,7 +270,7 @@ namespace CombatSystem
                 Rare(D(TerminalIds.LootBox, A, "出目を攻撃に。このターンに敵を倒すとゴールド +" + LootGold + "。")),
                 Rare(D(TerminalIds.Stripper, S, "このターンに敵を倒すと、戦闘後の端子の選択肢が 1 つ増える。")),
                 Rare(D(TerminalIds.Doubler, S, "このターン、他の端子の効果を 2 回発動させる。", TerminalCond.AtLeast6)),
-                Rare(D(TerminalIds.Retainer, S, "挿さずに空けた手札の端子を、次のターンも手札に残す。")),
+                Rare(D(TerminalIds.Retainer, B, "出目をブロックに。挿さずに空けた手札の端子を 1 枚、次のターンも手札に残す。")),
                 Rare(Once(D(TerminalIds.StopSignal, S, "敵は次のターン行動しない。"))),
                 Rare(D(TerminalIds.Fork, A, "出目を攻撃とブロックの両方に入れる。")),
                 // ── 軸 ──
@@ -276,7 +285,7 @@ namespace CombatSystem
                 D(TerminalIds.Leak, C, "充電 +出目 +電流。", TerminalCond.None, ac),
                 D(TerminalIds.BigDischarge, A, "充電をすべて払い、払った充電を攻撃に足す (電流 1 につき +" + (int)(BigDischargePerRank * 100) + "%)。", TerminalCond.None, ac),
                 D(TerminalIds.Patch, B, "出目をブロックに。シールド +堅牢。", TerminalCond.None, asx),
-                D(TerminalIds.ShieldPush, A, "出目を攻撃に。今のシールドの 堅牢 ×" + (int)(ShieldPushPerRank * 100) + "% を攻撃に足す。", TerminalCond.None, asx),
+                D(TerminalIds.ShieldPush, A, "出目を攻撃に。今のシールドの 堅牢 ×" + (int)(ShieldPushPerRank * 100) + "% を攻撃に足し、足した分のシールドを払う。", TerminalCond.None, asx),
                 // ── 使い捨て ──
                 Once(D(TerminalIds.Detonator, A, "出目 ×" + DetonatorMul + " を攻撃に。")),
                 Once(D(TerminalIds.Piercer, A, "出目を攻撃に。このターン敵の防御を無視。")),
@@ -558,23 +567,23 @@ namespace CombatSystem
                 case TerminalIds.Capacitor: st.storedAttack += CapacitorAttack * Gauge(st, id, sum, CapacitorNeed); break;
                 case TerminalIds.Arrester: if (Gauge(st, id, sum, ArresterNeed) > 0) o.takenMul *= 0.5f; break;
                 case TerminalIds.Transformer: break;                               // 後で
-                case TerminalIds.Switchboard: st.extraDrawNext++; break;
+                case TerminalIds.Switchboard: st.extraDrawNext += SwitchboardDraw; break;
                 // レア
                 case TerminalIds.Amplifier: o.damageMul *= 1f + AmplifierPerPip * sum; break;
                 case TerminalIds.VacuumTube: o.critMultAdd += VacuumCritMult; break;
                 case TerminalIds.Resonator: o.damageMul *= ResonatorMul; break;
                 case TerminalIds.Foundry: st.foundryBonus += Gauge(st, id, sum, FoundryNeed); break;
-                case TerminalIds.Coolant: o.escalationDelay += Gauge(st, id, sum, CoolantNeed); break;
+                case TerminalIds.Coolant: if (Gauge(st, id, sum, CoolantNeed) > 0) o.retreatStage = true; break;
                 case TerminalIds.Counter: o.attackAdd += sum; break;
                 case TerminalIds.Preheater: o.blockAdd += sum; st.ignoreCondNext = true; break;
-                case TerminalIds.Mains: o.attackAdd += sum; break;
+                case TerminalIds.Mains: o.attackAdd += sum + MainsPerUse * st.mainsUses; st.mainsUses++; break;
                 case TerminalIds.TwinShot: o.attackAdd += sum * TwinShotMul; break;
                 case TerminalIds.Harvester: o.attackAdd += sum; break;
                 case TerminalIds.Whet: o.attackAdd += sum + env.whetBonus; break;
                 case TerminalIds.LootBox: o.attackAdd += sum; break;
                 case TerminalIds.Stripper: break;
                 case TerminalIds.Doubler: break;
-                case TerminalIds.Retainer: o.retainTarget = empty(slot); break;
+                case TerminalIds.Retainer: o.blockAdd += sum; o.retainTarget = empty(slot); break;
                 case TerminalIds.StopSignal: o.enemyStunNext = true; break;
                 case TerminalIds.Fork: o.attackAdd += sum; o.blockAdd += sum; break;
                 // 軸
@@ -591,7 +600,13 @@ namespace CombatSystem
                     o.attackAdd += (int)Math.Floor(charge * (1f + BigDischargePerRank * env.axCharge));
                     o.chargeSpend += charge; charge = 0; break;
                 case TerminalIds.Patch: o.blockAdd += sum; o.shield += env.axShield; break;
-                case TerminalIds.ShieldPush: o.attackAdd += sum + (int)Math.Floor(env.shield * ShieldPushPerRank * env.axShield); break;
+                case TerminalIds.ShieldPush:
+                {
+                    // 足した分と同じ量のシールドを払う (払える分まで・〈倍電圧〉の 2 回目は残りのシールドから)
+                    int left = Math.Max(0, env.shield - o.shieldSpend);
+                    int push = Math.Min(left, (int)Math.Floor(left * ShieldPushPerRank * env.axShield));
+                    o.attackAdd += sum + push; o.shieldSpend += push; break;
+                }
                 // 使い捨て
                 case TerminalIds.Detonator: o.attackAdd += sum * DetonatorMul; break;
                 case TerminalIds.Piercer: o.attackAdd += sum; o.ignoreDefense = true; break;

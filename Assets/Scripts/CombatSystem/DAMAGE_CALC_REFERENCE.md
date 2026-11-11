@@ -737,7 +737,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
 
 ```
 0. ターン開始       : BeginTurn / DoT / OnTurnStart / SyncHP / フロア敵回復
-   端子の手札         : DrawTerminalHand (ADR-0014) ── 前の手札を捨てて HandSize(3) + 〈配電盤〉の分を引く (振り直しの判断より前)
+   端子の手札         : DrawTerminalHand (ADR-0014) ── 前の手札を捨てて HandSize(5) + 〈配電盤〉の分を引く (振り直しの判断より前)
 1. 敵ロール         : スタンスなし → 敵ダイスを振る
 3. 自ロール         : 自ダイスを振る（旧法と同一の RollDice）
 4. リロール（任意） : MaybeRerollPlayerDice（配線前のみ、目的関数は暫定=旧勝率のまま）
@@ -793,10 +793,11 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            damageMul      → _termDamageMul (主攻撃の別枠の掛け算・下の自攻撃を参照)。 毎ターン 1 に戻す
            chargeSpend    → ctx.ConsumeCharge(min(払う量, 今の充電))     chargeFill → ctx.AddCharge(ChargeCap)
            heal           → HealPlayer        selfDamage → playerHP = max(1, playerHP − 量)  (〈決死〉は Resolve の時点で HP−1 までに切る)
+           shieldSpend    → ctx.consShield = max(0, consShield − 量) (〈盾押し口〉が攻撃に足した分・shield より先に引く)
            shield         → ctx.consShield += 量 (shieldGainedTotal にも足す)
            poison         → Rw.Poison(ctx, 量)       heat → Kw.EnableHeat + Kw.AddHeat(ctx, 量)
-           escalationDelay→ YachtRoleEffects.AddEscalationDelay (CoolantDelayKey・役〈時間〉と同じキー)
-           retreatStage   → AddEscalationDelay(TurnsToRetreatOneStage) (段階を 1 つ戻す)
+           escalationDelay→ YachtRoleEffects.AddEscalationDelay (CoolantDelayKey・役〈時間〉と同じキー)。 2026-11-11〜 これを立てる端子は無い
+           retreatStage   → AddEscalationDelay(TurnsToRetreatOneStage) (段階を 1 つ戻す・〈冷却弾〉と、 溜まりが CoolantNeed に届いた〈冷却材〉)
            enemyStunNext  → nextTurnBuffs[EnemyStunKey] (次のターン敵は行動しない)
            ignoreDefense  → ctx.playerArmorPen += DefenseFormula.IgnoreAll
            forceCrit      → ctx.forceCritical = true       critMultAdd → ctx.criticalMultiplier += 量 (毎ターン組み直されるのでこのターンだけ)

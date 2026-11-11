@@ -85,7 +85,7 @@ namespace AutoTest
             // ---- 今ターンの追加の効果 (効用の Core が本体の位置で掛ける) ----
             ws.damageMul = o.damageMul; ws.outPctAdd = o.outgoingPctAdd; ws.critMultAdd = o.critMultAdd; ws.forceCrit = o.forceCrit;
             ws.ignoreDefense = o.ignoreDefense; ws.takenMul = o.takenMul; ws.enemyAtkMul = o.enemyAttackMul;
-            ws.shield = o.shield; ws.heal = o.heal; ws.selfDamage = o.selfDamage;
+            ws.shield = o.shield - o.shieldSpend; ws.heal = o.heal; ws.selfDamage = o.selfDamage;
 
             // ---- 先のターンに効く分の見積もり (上の定数) ----
             float dw = DeckDamageWorth(in s), fw = DeckFutureHpWorth(in s);
@@ -107,7 +107,7 @@ namespace AutoTest
                     case TerminalIds.Capacitor: perPip = TerminalCards.CapacitorAttack / (float)TerminalCards.CapacitorNeed * DeckFutureAttackShare * dw; break;
                     case TerminalIds.Arrester:  perPip = 0.5f * Math.Max(0, s.enemyAtk) / TerminalCards.ArresterNeed * fw; break;
                     case TerminalIds.Foundry:   perPip = k * turns / (float)TerminalCards.FoundryNeed * DeckFutureAttackShare * dw; break;
-                    case TerminalIds.Coolant:   perPip = escDelayWorth / TerminalCards.CoolantNeed; break;
+                    case TerminalIds.Coolant:   perPip = DeckRetreatTurns * escDelayWorth / TerminalCards.CoolantNeed; break;
                 }
                 flat += d * perPip * DeckGaugeShare;
             }
@@ -119,6 +119,8 @@ namespace AutoTest
             // 次のターンの補助
             if (after.ignoreCondNext && !before.ignoreCondNext) flat += DeckPreheatDmg * dw;
             flat += Math.Max(0, after.extraDrawNext - before.extraDrawNext) * DeckDrawDmg * dw;
+            // 〈主幹〉: 使うたび以後の攻撃 +N (残りターンの半分で使えると見る)
+            flat += (after.mainsUses - before.mainsUses) * TerminalCards.MainsPerUse * turns * 0.5f * DeckFutureAttackShare * dw;
             if (o.enemyStunNext) flat += DeckStunShare * Math.Max(0, s.enemyAtk) * fw;
             // 別枠のダメージ
             flat += (o.poison * DeckPoisonDmg + o.heat * DeckHeatDmg) * dw;

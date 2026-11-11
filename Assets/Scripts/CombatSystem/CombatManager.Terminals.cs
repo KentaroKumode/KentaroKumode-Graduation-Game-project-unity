@@ -91,6 +91,7 @@ namespace CombatSystem
                 playerHP = Math.Max(1, playerHP - o.selfDamage);
                 ctx.playerCurrentHP = playerHP;
             }
+            if (o.shieldSpend > 0) ctx.consShield = Math.Max(0, ctx.consShield - o.shieldSpend);
             if (o.shield > 0)
             {
                 ctx.consShield += o.shield; ctx.shieldGainedTotal += o.shield;
