@@ -6,7 +6,7 @@
 """
 import glob, io, json, os, sys
 
-COLS = ["捕まった", "勝った", "逃げた", "救済", "死んだ", "HP前", "HP後", "深さ"]
+COLS = ["捕まった", "勝った", "逃げた", "救済", "死んだ", "HP前", "HP後", "深さ", "囮罠を持っていた", "囮罠が置いてあった"]
 NAMES = {"summoner": "召喚者", "hound": "猟犬使い", "sprinter": "疾走者", "brute": "重装", "all": "全部"}
 
 
@@ -19,7 +19,7 @@ def main():
         W = len(COLS)
         for i, n in enumerate(names):
             row = tot.setdefault(n, [0.0] * W)
-            for c in range(W): row[c] += vals[i * W + c]
+            for c in range(W): row[c] += vals[i * W + c] if i * W + c < len(vals) else 0
     if not tot: sys.exit("navDiag が応答に無い (応答 %d 個)" % nresp)
     runs = None
     try:
@@ -27,13 +27,16 @@ def main():
             if "有効" in l: runs = int(l.split("有効")[1].split("/")[0].strip().replace(",", ""))
     except Exception: pass
     print("応答 %d 個%s" % (nresp, "・%d ラン" % runs if runs else ""))
-    print("%-8s %7s %6s %7s %7s %7s %7s %8s %8s %6s" % ("型", "捕まった", "/ラン", "勝った", "逃げた", "救済", "死亡率", "HP前%", "生還HP%", "深さ"))
-    for k in ["summoner", "hound", "sprinter", "brute", "all"] + [k for k in tot if k not in NAMES]:
+    print("%-8s %7s %6s %7s %7s %7s %7s %8s %8s %6s %8s %8s" % ("型", "捕まった", "/ラン", "勝った", "逃げた", "救済", "死亡率", "HP前%", "生還HP%", "深さ", "囮罠所持", "囮罠設置"))
+    for k in ["summoner", "hound", "sprinter", "brute", "all"] + [k for k in tot if k not in NAMES and k != "__lures"]:
         if k not in tot: continue
         r = tot[k]; c = r[0] or 1; alive = (r[1] + r[2] + r[3]) or 1
-        print("%-8s %7d %6.2f %6.1f%% %6.1f%% %6.1f%% %6.1f%% %7.1f %8.1f %6.2f" % (
+        print("%-8s %7d %6.2f %6.1f%% %6.1f%% %6.1f%% %6.1f%% %7.1f %8.1f %6.2f %7.1f%% %7.1f%%" % (
             NAMES.get(k, k), r[0], r[0] / runs if runs else 0, 100 * r[1] / c, 100 * r[2] / c, 100 * r[3] / c, 100 * r[4] / c,
-            r[5] / c, r[6] / alive, r[7] / c))
+            r[5] / c, r[6] / alive, r[7] / c, 100 * r[8] / c, 100 * r[9] / c))
+    if "__lures" in tot:
+        l = tot["__lures"]
+        print("囮罠: 置いた %d (%.2f/ラン)・追跡者が踏んだ %d (%.0f%%)" % (l[0], l[0] / runs if runs else 0, l[1], 100 * l[1] / max(1, l[0])))
     print("目標: 死亡率 15〜25% / 生還時の残り HP 30〜40%")
 
 

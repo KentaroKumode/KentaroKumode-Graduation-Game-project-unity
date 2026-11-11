@@ -115,6 +115,7 @@ namespace GameLoop
             var sim = FreeMapForAction();
             if (sim == null) return false;
             Log($"囮罠を仕掛けた（{FreeMapParams.LureLife}ターンのあいだ有効・踏んだ追跡者は{FreeMapParams.LureHoldTurns}ターン足止めされる）");
+            NavDiag.NoteLure(false);   // [計装]
             RunFreeMapOp(s => s.PlaceLure());
             return true;
         }
@@ -173,6 +174,7 @@ namespace GameLoop
             if ((ev & FreeMapEvent.FoeAlerted) != 0) Log("（追跡者が何かに気づいた）");
             if ((ev & FreeMapEvent.FamiliarLaunched) != 0) Log("使い魔が放たれた");
             if ((ev & FreeMapEvent.FamiliarVanished) != 0) Log("（使い魔は見失って消えた）");
+            if ((ev & FreeMapEvent.LureTriggered) != 0) NavDiag.NoteLure(true);   // [計装]
             if ((ev & FreeMapEvent.LureTriggered) != 0) Log($"（囮罠が作動した）追跡者が{FreeMapParams.LureHoldTurns}ターン足止めされた");
             if ((ev & FreeMapEvent.FrontAdvanced) != 0 && sim.Weather != WeatherKind.None)
                 Log($"前線が左から {System.Math.Min(sim.Front, FreeMapParams.Width):0.0} まで届いた（{sim.Weather.DisplayName()}）");
@@ -392,7 +394,7 @@ namespace GameLoop
             CurrentEnemy = enemy;
             CurrentEnemySecondary = secondEnemy;
             CurrentEncounterRewardMultiplier = 1f;
-            NavDiag.Begin(sim?.Profile?.id, Run);   // [計装 2026-11-12・#35]
+            NavDiag.Begin(sim?.Profile?.id, Run, sim != null && sim.Lures.Count > 0);   // [計装 2026-11-12・#35]
             OnEnemyEncountered?.Invoke(CurrentEnemy);
             Log($"追跡者に捕まった ── {CurrentEnemy.displayName}" + (CurrentEnemySecondary != null ? $" ＋ {CurrentEnemySecondary.displayName}" : ""));
 
