@@ -19,16 +19,34 @@ namespace AutoTest
     /// </summary>
     public static class EventChoiceScorer
     {
-        // ===== 基本ウェイト =====
-        const float W_GOLD       = 0.55f;
-        const float W_HP_GAIN    = 1.6f;
-        const float W_HP_LOSS    = 1.8f;
-        const float W_MAX_HP     = 2.6f;
-        /// <summary>物資 1 の値打ち (2026-11-11・今の単位 = 1 歩)。 店の値段は 2G (= 1.1 点) だが、 店の数は層に 1 つで
-        /// 足りない 1 は HP 5 (= 9 点) で払う ── その間に置く。 上限を超える分は 0。</summary>
-        const float W_PROVISION  = 3.0f;
+        // ===== 値段表 (2026-11-11・issue #17・docs/GAME.md §17 の交換レート) =====
+        //  **点の単位はゴールド**。 品の値段は店の値段 (層の物価 ShopManager.ProgressPriceMultiplier が掛かる) から、
+        //  HP は回復薬の店頭価格 ÷ 回復量から、 物資は「店の 2G」と「不足を HP 5 で払う」の高い方から決める。
+        //  旧: 手置きの点 (パッシブ 9・消耗品 5・ゴールド 0.55/旧単位) ── パッシブがゴールド 16 ほどにしか見えていなかった。
+        /// <summary>パッシブ 1 個の店頭価格 (物価 ×1 のとき)。 レア度の抽選重み (RarityWeightedPicker) で平均した
+        /// 基準価格 8.8 × 抽選の幅の平均 1.125 × 品物の価格の倍率 2 (ShopManager.ItemPriceScale)。</summary>
+        const float PRICE_PASSIVE = 19.8f;
+        /// <summary>消耗品 1 個の店頭価格 (物価 ×1)。 基準価格の重み平均 5.9 × 1.125 × 2。</summary>
+        const float PRICE_CONSUMABLE = 13.3f;
+        /// <summary>HP 1 の値段 (物価 ×1)。 回復薬 (最大 HP の 40%・基準価格 5・SILVER) の店頭価格 14.1 ÷ 最大 HP 85 の 40%。</summary>
+        const float PRICE_HP = 0.41f;
+        /// <summary>強化素材 1。 店の値段 (15 × 物価) ではない ── 1 ランに 56 入って使い道は 16 (武器の 5 段の合計) で、
+        /// 終了時に 43 余っている (2026-11-11 の runs.jsonl)。 限界の価値はほぼ無い。</summary>
+        const float PRICE_MATERIAL = 2.0f;
+        /// <summary>物資 1 の下限 (店の値段・FreeMapParams.ProvisionPrice)。 上限を超える分は 0。</summary>
+        const float PRICE_PROVISION_MIN = 2.0f;
+        /// <summary>HP を失う時の上乗せ (回復薬で買い戻す手間と、 次の戦闘の危険)。</summary>
+        const float HP_LOSS_PREMIUM = 1.2f;
         /// <summary>この物資以下なら、 得る価値・失う痛みを 2 倍に見る (残り 3 歩)。</summary>
         const int   PROVISION_LOW = 3;
+
+        /// <summary>今の層の物価 (店の値段の進行倍率・本体の式をそのまま読む)。</summary>
+        static float Prog(RunState run) => ItemSystem.Shop.ShopManager.ProgressPriceMultiplier(run);
+        static float HpPrice(RunState run) => PRICE_HP * Prog(run);
+        static float ProvisionPrice(RunState run)
+            => UnityEngine.Mathf.Max(PRICE_PROVISION_MIN, MapSystem.FreeMove.FreeMapParams.HpPerSupply * HpPrice(run));
+        static float PassivePrice(RunState run) => PRICE_PASSIVE * Prog(run);
+        static float ConsumablePrice(RunState run) => PRICE_CONSUMABLE * Prog(run);
 
         // ===== ターンを使う選択肢 (2026-11-11・issue #17) =====
         /// <summary>補足されていない時の 1 ターンの値段。 巡回中の追跡者がいる層は、 その場に留まると通りかかられる見込みがある。</summary>
@@ -41,28 +59,23 @@ namespace AutoTest
         const float V_CAUGHT_BODY     = -18.0f;
         /// <summary>使い魔に捕まる: その層の通常の敵 1 体 (物資は得ない)。</summary>
         const float V_CAUGHT_FAMILIAR = -8.0f;
-        const float W_MATERIAL   = 3.0f;
-        const float V_TIMED_BUFF = +5.0f;
-        const float V_TIMED_DEB  = -6.0f;
-        const float V_PERM_DEB   = -28.0f;
-        const float V_GAIN_PASS  = +9.0f;   // ランダムパッシブ獲得
-        const float V_GAIN_CONS  = +5.0f;
+        /// <summary>時限バフ / デバフ: 消耗品の半分 (多くは次の 1 戦闘だけ効く)。</summary>
+        const float TIMED_VS_CONSUMABLE = 0.5f;
         const float V_GAIN_FLAG  = +30.0f;
         const float V_DISC_FLAG  = -22.0f;
-        const float V_DISC_PASS  = -8.0f;
         const float V_ARMOR_DUR  = -3.5f;
         const float V_COMBAT     = -8.0f;
         const float V_ELITE      = -22.0f;
 
         // ===== 生存拒否権 =====
-        //  加点の最大は V_GAIN_FLAG(+30) なので、 この値ならどんな報酬でも覆せない。
+        //  致死はどんな報酬でも覆せない値。 二撃で死ぬは「パッシブ 2 個ぶん」(層の物価で 44〜158G) ── 品 1 つでは覆らない。
         const float V_LETHAL_VETO = -400f;   // 選んだ直後の一撃で死ぬ
-        const float V_FRAGILE     = -60f;    // 二撃で死ぬ
+        static float FragilePenalty(RunState run) => -2f * PassivePrice(run);   // 二撃で死ぬ
         /// <summary>選べない選択肢 (払えないゴールド)。 致死の拒否権より下に置く。</summary>
         public const float V_UNAVAILABLE = -10000f;
 
         /// <summary>〈観測所の写し〉の評価。 上乗せ (パッシブ×1+素材+8+金+60+全回復) は
-        /// パッシブ 1 個 (V_GAIN_PASS=9) + 雑多 を足して 18 前後だが、
+        /// パッシブ 1 個 + 雑多 を足して 2026-11-05 の点で 18 前後だったが、
         /// **次に博士へ会える保証が無い** (出現率 1/50)。 大きく割り引いて
         /// 「他の択より少し弱いが、選ばれることはある」帯に置く。</summary>
         const float V_OBSERVATORY_COPY = +7.0f;
@@ -89,9 +102,17 @@ namespace AutoTest
             {
                 int hpAfter = PredictWorstHp(choice, run);
                 if (hpAfter <= hit)          total += V_LETHAL_VETO;
-                else if (hpAfter <= hit * 2) total += V_FRAGILE;
+                else if (hpAfter <= hit * 2) total += FragilePenalty(run);
             }
             return total;
+        }
+
+        /// <summary>選んだ直後の HP (最悪分岐) が「この層の雑魚 2 発」以下になるか (二撃で死ぬ・致死)。</summary>
+        public static bool EndangersLife(EventChoice choice, RunState run)
+        {
+            if (choice?.effects == null || run == null) return false;
+            int hit = AutoRunner.EstimateFloorMaxHit(run);
+            return hit > 0 && PredictWorstHp(choice, run) <= hit * 2;
         }
 
         /// <summary>この選択肢を取った直後の HP を、 **最悪分岐**で見積もる。
@@ -179,7 +200,7 @@ namespace AutoTest
                 case EventEffectType.GoldDelta:
                 {
                     // ゴールド：少額・余ってない時は高評価、たんまり持ってる時は減価
-                    float w = W_GOLD;
+                    float w = 1f;   // 点の単位はゴールド (2026-11-11 からイベントの文面も今の大きさ)
                     if (coins < 8) w *= 1.6f;
                     else if (coins > 40) w *= 0.7f;
                     return e.amount * w;
@@ -190,7 +211,7 @@ namespace AutoTest
                     if (e.amount >= 0)
                     {
                         // 治癒：HP低いほど価値大
-                        float w = W_HP_GAIN;
+                        float w = HpPrice(run);
                         if (hpPct < 0.35f) w *= 2.2f;
                         else if (hpPct > 0.85f) w *= 0.4f; // 満タンに近いと無駄
                         // 最大HPを超えた分は無価値
@@ -201,7 +222,7 @@ namespace AutoTest
                     {
                         // 被ダメ：HP低いほど忌避強い、致死域なら極端
                         int dmg = -e.amount;
-                        float w = W_HP_LOSS;
+                        float w = HpPrice(run) * HP_LOSS_PREMIUM;
                         if (hpPct < 0.35f) w *= 2.5f;
                         if (hp - dmg <= 0) w *= 6.0f;       // 直接死
                         else if (hp - dmg <= maxHP * 0.15f) w *= 3.0f; // 残り15%以下で危険
@@ -212,7 +233,7 @@ namespace AutoTest
                 case EventEffectType.HpFullHeal:
                 {
                     int gain = UnityEngine.Mathf.Max(0, maxHP - hp);
-                    float w = W_HP_GAIN;
+                    float w = HpPrice(run);
                     if (hpPct < 0.35f) w *= 2.2f;
                     return gain * w;
                 }
@@ -220,9 +241,9 @@ namespace AutoTest
                 case EventEffectType.HpSetTo:
                 {
                     int delta = e.amount - hp;
-                    if (delta >= 0) return delta * W_HP_GAIN;
+                    if (delta >= 0) return delta * HpPrice(run);
                     int dmg = -delta;
-                    float w = W_HP_LOSS;
+                    float w = HpPrice(run) * HP_LOSS_PREMIUM;
                     // **「HP が 1 になる」も致死域として扱う。** 旧実装は amount<=0 しか
                     // 増幅せず、 HP1 は通常の被ダメと同じ重みだったため、 アイテム獲得の
                     // 加点に負けて BOT が選び続けていた (2026-08-04)。
@@ -234,13 +255,13 @@ namespace AutoTest
                 case EventEffectType.HpHalve:
                 {
                     int dmg = hp - UnityEngine.Mathf.Max(1, (hp + 1) / 2);
-                    float w = W_HP_LOSS;
+                    float w = HpPrice(run) * HP_LOSS_PREMIUM;
                     if (hpPct < 0.35f) w *= 2.5f;   // 低HPで半分はほぼ立て直せない
                     return -dmg * w;
                 }
 
                 case EventEffectType.MaxHpDelta:
-                    return e.amount * W_MAX_HP;
+                    return e.amount * 3f * HpPrice(run);   // 最大 HP 1 ≒ 層ごとの全回復で 3 回ほど効く HP
 
                 // 物資±N (今の単位: 1 歩 = 1・2026-11-11)。 2026-11-11 までは ProvisionDelta を読んでおらず (0 点)、
                 //   旧表記の HungerDelta だけを旧単位の重みで読んでいた ── データ側はすべて「物資±N」なので、 物資は評価に入っていなかった。
@@ -251,26 +272,26 @@ namespace AutoTest
                     if (e.amount >= 0)
                     {
                         int eff = UnityEngine.Mathf.Min(e.amount, UnityEngine.Mathf.Max(0, provisionCap - provisionVal));   // 上限を超える分は捨てられる
-                        return eff * W_PROVISION * (low ? 2f : 1f);
+                        return eff * ProvisionPrice(run) * (low ? 2f : 1f);
                     }
                     int need = -e.amount;
                     int paid = UnityEngine.Mathf.Min(need, UnityEngine.Mathf.Max(0, provisionVal));
                     int shortHp = (need - paid) * MapSystem.FreeMove.FreeMapParams.HpPerSupply;   // 足りない分は HP で払う
-                    return -paid * W_PROVISION * (provisionVal - need <= PROVISION_LOW ? 2f : 1f) - shortHp * W_HP_LOSS;
+                    return -paid * ProvisionPrice(run) * (provisionVal - need <= PROVISION_LOW ? 2f : 1f) - shortHp * HpPrice(run) * HP_LOSS_PREMIUM;
                 }
 
                 case EventEffectType.TurnsPass:
                     return ScoreTurns(e.amount);
 
                 case EventEffectType.MaterialDelta:
-                    return e.amount * W_MATERIAL;
+                    return e.amount * PRICE_MATERIAL;
 
                 case EventEffectType.ArmorDurabilityLoss:
                     return V_ARMOR_DUR;
 
-                case EventEffectType.TimedBuff:    return V_TIMED_BUFF;
-                case EventEffectType.TimedDebuff:  return V_TIMED_DEB;
-                case EventEffectType.PermanentDebuff: return V_PERM_DEB;
+                case EventEffectType.TimedBuff:    return  TIMED_VS_CONSUMABLE * ConsumablePrice(run);
+                case EventEffectType.TimedDebuff:  return -TIMED_VS_CONSUMABLE * ConsumablePrice(run);
+                case EventEffectType.PermanentDebuff: return -PassivePrice(run);
 
                 case EventEffectType.GainPassiveItem:
                 case EventEffectType.GainSpecificItem:
@@ -278,16 +299,16 @@ namespace AutoTest
                     // 具体ID指定があれば優先度で加算
                     if (!string.IsNullOrEmpty(e.param))
                     {
-                        if (LearnedPriorityProvider.IsSRank(e.param)) return 35f;
-                        if (LearnedPriorityProvider.IsARank(e.param)) return 22f;
-                        return 12f;
+                        if (LearnedPriorityProvider.IsSRank(e.param)) return 1.7f * PassivePrice(run);
+                        if (LearnedPriorityProvider.IsARank(e.param)) return 1.3f * PassivePrice(run);
+                        return 1.1f * PassivePrice(run);   // 名前付き (ユニーク) は店に並ばない
                     }
-                    return V_GAIN_PASS;
+                    return PassivePrice(run);
                 }
                 case EventEffectType.GainConsumableItem:
                 {
-                    if (!string.IsNullOrEmpty(e.param) && LearnedPriorityProvider.IsSRank(e.param)) return 20f;
-                    return V_GAIN_CONS;
+                    if (!string.IsNullOrEmpty(e.param) && LearnedPriorityProvider.IsSRank(e.param)) return 1.5f * ConsumablePrice(run);
+                    return ConsumablePrice(run);
                 }
 
                 case EventEffectType.ObservatoryTakeCopy:
@@ -311,7 +332,7 @@ namespace AutoTest
                     return V_GAIN_FLAG;
                 }
                 case EventEffectType.DiscardFlag:    return V_DISC_FLAG;
-                case EventEffectType.DiscardPassiveItem: return V_DISC_PASS;
+                case EventEffectType.DiscardPassiveItem: return -PassivePrice(run);
 
                 case EventEffectType.EnterCombat:
                 {

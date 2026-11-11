@@ -99,22 +99,10 @@ namespace EventSystem
 
                 case EventEffectType.GoldDelta:
                 {
+                    // 2026-11-11 (issue #17): 文面の値は今の大きさ (戦闘 1 回 = 10G)。 収入を ×3/5 する読み替え
+                    //   (2026-08-10 の経済リスケールの名残) は外した。 支払いは選べるかの判定 (EventChoice.IsAvailable) と同じ額。
                     int delta = eff.amount;
-                    // 1/5 デノミ: イベント記載の値を素直に /5 (差を残すため Mathf.Max(1, ...))。
-                    // 例: +15→+3, +8→+2, +6→+1, +5→+1, +3→+1, +1→+1
-                    //     -5→-1, -1→-1
-                    // **2026-08-10 経済リスケール**: 収入 ×3 / 支出 ×5。
-                    //   旧 1/5 デノミの除算を、 収入は ×3/5、 支出 (負の delta) は等倍へ。
-                    //   イベント記載値は 1/5 デノミ**前**のスケールで書かれている。
-                    if (delta > 0)
-                    {
-                        delta = Mathf.Max(1, Mathf.RoundToInt(delta * 3f / 5f));
-                        delta = GameLoop.LastStand.FilterGoldGain(run, delta);
-                    }
-                    else if (delta < 0)
-                    {
-                        delta = -Mathf.Max(1, Mathf.RoundToInt(-delta));
-                    }
+                    if (delta > 0) delta = GameLoop.LastStand.FilterGoldGain(run, delta);
                     run.coins = Mathf.Max(0, run.coins + delta);
                     result.log.Add($"ゴールド{delta:+0;-0} (現在 {run.coins})");
                     break;

@@ -142,10 +142,6 @@ namespace AutoTest
             return 0;
         }
 
-        /// <summary>進路の近道 (<see cref="PickFlagProgressChoice"/>) を通さない数値スコアの下限。
-        /// 二撃で死ぬ (−60)・致死 (−400)・選べない (−10000) を弾き、 戦闘 (−8〜−35) は通す。 捕まる手は別に弾く。</summary>
-        private const float ProgressVetoScore = -50f;
-
         /// <summary>選択肢の効果を見て「フラグを進める」スコアを算出。
         /// いずれかの選択肢がプラスならその index を返し、なければ -1。
         /// 既存所持フラグを廃棄するだけの選択肢はマイナス点で忌避される。</summary>
@@ -159,7 +155,7 @@ namespace AutoTest
                 if (!EventEncounter.IsChoiceSelectable(def, i, run)) continue;
                 // 進路でも、 選んだ直後に死ぬ・捕まって戦闘になる手は数値スコアラに任せる (2026-11-11)。
                 //   ここは数値を見ない近道なので、 ターンを使う選択肢を足した後は捕まる手を素通しで選んでしまう。
-                if (EventChoiceScorer.Score(def.choices[i], run) <= ProgressVetoScore) continue;
+                if (EventChoiceScorer.EndangersLife(def.choices[i], run)) continue;   // 二撃で死ぬ・致死
                 if (EventEncounter.WouldBeCaught(def.choices[i].TurnCost)) continue;
                 int s = ScoreFlagChoice(def.choices[i], run);
                 if (s > bestScore) { bestScore = s; bestIdx = i; }
@@ -187,7 +183,7 @@ namespace AutoTest
                     case EventSystem.EventEffectType.GainSpecificItem:
                         // **名前付きの品だけ**を進路とみなす (2026-11-11)。 旧: ランダムなパッシブ獲得も +60 で、
                         //   「パッシブが付く選択肢はどんな代償でも選ぶ」近道になっていた (物資 −3 の強盗・3 ターンの立ち話も素通し)。
-                        //   ランダムなパッシブは数値スコアラ (V_GAIN_PASS) が代償と比べる。
+                        //   ランダムなパッシブは数値スコアラ (値段表のパッシブの値段) が代償と比べる。
                         if (string.IsNullOrEmpty(eff.param)) break;
                         score += 60; hasGain = true;
                         break;
