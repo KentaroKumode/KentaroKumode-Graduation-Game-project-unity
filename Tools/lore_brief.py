@@ -34,13 +34,6 @@ def sins():
     return out
 
 
-def axes():
-    src = read("Assets/Scripts/ItemSystem/PassiveSkills/AxisRules.cs")
-    m = re.search(r"public const string (.+?);", src)
-    consts = re.findall(r'(\w+)\s*=\s*"([^"]+)"', m.group(1))
-    depth = dict(re.findall(r'(\w+)\s*=>\s*"([^"]+)"', src))
-    return [(k, v, depth.get(k, "")) for k, v in consts]
-
 
 BRIEF_HEAD = """# 世界観の資料 (外部の書き手向け)
 
@@ -71,20 +64,27 @@ BRIEF_HEAD = """# 世界観の資料 (外部の書き手向け)
 筐体・液晶の外の物 (筐体・端子・充電の機構・計器盤・USB・電源・ダイスの機械) は、世界の中には存在しない。
 フレーバーにそれらを出さない。逆に、世界の固有名詞を筐体の側に使うこともない。
 
-## 軸の用語
+## 軸ごとの題材の向き
 
-品の多くは「軸」に属する。軸の品を持っている数には、世界の中の呼び名がある。
+品の多くは「軸」に属する (items.json の `axis`)。フレーバーの題材は、軸ごとに次の向きへ寄せる
+(同じ軸の品が同じ世界の匂いを持つように。ただし全部を同じ話にはしない)。
 
-| 内部名 (items.json の axis) | 深さの呼び名 |
-|---|---|
+| 軸 (items.json の axis) | 題材の向き | 世界観の根拠 |
+|---|---|---|
+| 充電 | 工廠・技師・無線 | 工業化途上の公国、ヴェイランドの技師が発明した無線電信 (1882) |
+| 出血 | 暗殺者・吸血鬼 | クルガ起源の暗殺教団 |
+| 毒 | 錬金術師・薬師・沼 | ストラスバウム学界の異端派 (錬金術は薬剤学として継承)、毒沼 |
+| 臨界 | 炉・鉱夫・火薬・鋳造 | 蒸気機関の世紀、大穴の採掘、鍛冶 |
+| 会心 | 狩人・射手・戦術家 | 狩猟旅団、旧アルフォニアの戦術書を継ぐ私塾 |
+| シールド | 騎士・城塞・番兵 | 旧ストレリツ守備騎士団の脱退者、辺境警備隊 |
+| 金 | 商人・鑑定所・帳簿 | ギルドの鑑定所とスプレッド、商業組合 |
+| (軸なし) | 自由 | 大穴・遺物・探検家の暮らし全般 |
 """
 
 
 def main():
     os.makedirs(OUT, exist_ok=True)
     parts = [BRIEF_HEAD]
-    for k, v, d in axes():
-        parts.append("| %s | %s |\n" % (v, d or "(呼び名なし)"))
     parts.append("\n---\n\n# 世界観 (正本: docs/GAME.md §19 の写し)\n\n")
     parts.append(lore_section().replace("\n## 19.", "\n## 19.", 1))
     parts.append("\n\n---\n\n# 七つの大罪のフレーバー (正本: PermanentDebuffIds.cs の写し)\n\n")
