@@ -922,12 +922,21 @@ namespace ItemSystem.PassiveSkills.Effects
     /// <summary>ブレイドダンス (特殊・4枚集約の変化先): 戦闘突入ごとに[剣先]スタック+1（最大99・ラン中持続）。
     /// ダイス合計に剣先スタック分を加算。与ダメージ時に剣先スタック分HP回復、被ダメージ時に剣先スタック分の
     /// 軽減不可ダメージを相手へ。スタックはランを跨がず IRunResettable でリセット。</summary>
-    public class BladeDance : IPassiveSkillEffect, IRunResettable
+    public class BladeDance : IPassiveSkillEffect, IRunResettable, IRunStatePersistent
     {
         public string SkillId => "ブレイドダンス";
         private int kensaki = 0; // 剣先スタック（ラン中持続）
 
         public void ResetRunState() { kensaki = 0; }
+
+        // 中断セーブ (issue #84): 剣先スタックはラン中ずっと持つので、 中断して再開しても続きから数える
+        public string CaptureRunState() => kensaki.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        public bool RestoreRunState(string state)
+        {
+            if (!int.TryParse(state, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out int v)) return false;
+            kensaki = System.Math.Max(0, System.Math.Min(99, v));
+            return true;
+        }
 
         /// <summary>4枚集約による BD 取得時の初期スタック付与 (現在層 × 3)。
         /// 取得が後半層に偏る構造のため、 集約成功への報酬として「現時点の層数 × 3」 をプリロードする。

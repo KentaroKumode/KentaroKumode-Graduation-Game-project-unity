@@ -136,6 +136,31 @@ namespace MapSystem
             OnMapGenerated?.Invoke(CurrentMap);
         }
 
+        /// <summary>中断セーブ (issue #84) から盤面を戻す。 <see cref="RestoreState"/> と違い<b>航行マップの層を扱う</b>:
+        /// 形 (<see cref="FloorMap.layout"/>) はそのまま据え、 動く中身は <see cref="GenerateFloor"/> と同じ引数で作ってから写しを書き戻す
+        /// (追跡者の性質・財布は作り直す。 性質は層と乱数の塩だけで決まるので、 塩を戻した後なら同じものが出る)。
+        /// 視界は計算し直さない (写しの <c>Known</c> / <c>revealed</c> をそのまま使う)。</summary>
+        public void RestoreFromSave(FloorMap map, int depth, string currentNodeId, FreeMapSim.SavedState simState)
+        {
+            if (map == null) throw new System.ArgumentNullException(nameof(map));
+            if (map.IsFreeMap)
+            {
+                if (simState == null) throw new System.InvalidOperationException("航行マップの層なのに、 動く中身の写しが無い");
+                bool withFoe = FloorPlan.HasWanderer(depth);
+                var perks = GameLoop.NavItems.PerksFor(GameLoop.GameManager.Instance?.Run);
+                Sim = new FreeMapSim(map.layout, new RunWallet(), withFoe, withFoe ? FoeProfile.ForFloor(depth) : null, null, perks);
+                Sim.LoadState(simState, perks);
+            }
+            else Sim = null;
+
+            CurrentMap = map;
+            CurrentNode = map.GetNode(currentNodeId) ?? map.GetNode(map.startNodeId);
+            if (CurrentNode == null)
+                throw new System.InvalidOperationException("restored map has neither the requested node nor a start node");
+
+            OnMapGenerated?.Invoke(CurrentMap);
+        }
+
         /// <summary>現在位置から移動可能なノード一覧。 航行マップでは<b>いま道がつながっている隣</b>
         /// (前線の天候で崩れた道・沈んだ点は含まない)。</summary>
         public List<MapNode> GetAvailableMoves()

@@ -35,6 +35,12 @@ namespace CombatSystem
         /// これを飛ばすと同一シードのペア比較が成立しない (上記)。</summary>
         public void ResetRunCombatSequence() => _combatSeq = 0;
 
+        /// <summary>このランで始めた戦闘の数 (= 次の戦闘の乱数の通し番号)。 中断セーブが写す (issue #84)。</summary>
+        public int RunCombatSequence => _combatSeq;
+
+        /// <summary>中断セーブから再開する時に通し番号を戻す。 戻さないと再開後の戦闘の乱数列が、 中断しなかった時とずれる。</summary>
+        public void RestoreRunCombatSequence(int seq) => _combatSeq = Math.Max(0, seq);
+
         /// <summary>決定論的乱数の連番。 (戦闘番号, ターン, スロット) で一意になる。
         /// slot は同一ターン内で複数回引く場合の識別子 (ダイスの本数など)。</summary>
         private int RngIdx(int slot)

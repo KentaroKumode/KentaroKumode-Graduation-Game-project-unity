@@ -143,6 +143,64 @@ namespace GameLoop
             => (list == null || list.Count == 0) ? default(T) : list[Range(0, list.Count, key, index)];
 
         // ============================================================
+        //  中断セーブ (issue #84)
+        // ============================================================
+
+        /// <summary>乱数の状態の写し (中断セーブ用・<see cref="RunSave"/>)。 JsonUtility で書ける形。
+        ///
+        /// <para><b>これで足りる理由:</b> 値は <c>hash(塩, キー, 連番)</c> で出るので、 状態は「塩」と
+        /// 「連番を省いた抽選のキー別カウンタ」だけ。 両方を戻せば、 中断しなかった時と同じ続きが出る。
+        /// シード設定 (IsSeeded / MasterSeed / RunIndex) も戻す ── シードを入れて遊んでいたランは、 再開後もそのシードのまま。</para></summary>
+        [System.Serializable]
+        public sealed class State
+        {
+            public bool isSeeded;
+            /// <summary>ulong は JsonUtility で桁が落ちることがあるので 10 進の文字列で持つ。</summary>
+            public string masterSeed = "0";
+            public int runIndex;
+            public string runSalt = "0";
+            public List<string> counterKeys = new List<string>();
+            public List<int> counterValues = new List<int>();
+            public long totalDraws;
+        }
+
+        /// <summary>いまの状態を写す。 カウンタはキーの順に並べる (同じ状態は同じ文字列になる)。</summary>
+        public static State CaptureState()
+        {
+            var s = new State
+            {
+                isSeeded = IsSeeded,
+                masterSeed = MasterSeed.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                runIndex = RunIndex,
+                runSalt = _runSalt.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                totalDraws = TotalDraws,
+            };
+            var keys = new List<string>(_counters.Keys);
+            keys.Sort(System.StringComparer.Ordinal);
+            foreach (var k in keys) { s.counterKeys.Add(k); s.counterValues.Add(_counters[k]); }
+            return s;
+        }
+
+        /// <summary>写しを戻す。 読めない値なら何も変えずに false。</summary>
+        public static bool RestoreState(State s)
+        {
+            if (s == null) return false;
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            if (!ulong.TryParse(s.masterSeed ?? "", System.Globalization.NumberStyles.None, inv, out ulong master)) return false;
+            if (!ulong.TryParse(s.runSalt ?? "", System.Globalization.NumberStyles.None, inv, out ulong salt)) return false;
+            int n = s.counterKeys?.Count ?? 0;
+            if (n != (s.counterValues?.Count ?? 0)) return false;
+            IsSeeded = s.isSeeded;
+            MasterSeed = master;
+            RunIndex = s.runIndex;
+            _runSalt = salt;
+            _counters.Clear();
+            for (int i = 0; i < n; i++) _counters[s.counterKeys[i]] = s.counterValues[i];
+            TotalDraws = s.totalDraws;
+            return true;
+        }
+
+        // ============================================================
         //  内部
         // ============================================================
 
