@@ -98,5 +98,12 @@ namespace AutoTest
         public bool mainCorr;
         /// <summary>ヴェスカ〈停滞する時間〉を持つ敵に、 停滞を積む配線 (攻撃の本数 &lt; ブロックの本数) を選ばせない (2026-11-11・既定 ON)。 例外は AutoRunner.Combat の MutualWiringPolicy。</summary>
         public bool noStagWire = true;   // 2026-11-11 既定 ON (停滞の罰を帳簿が薄めて BOT が自分で p4 を重くしていた)
+        /// <summary>[#107 2026-11-12] 配線の効用に、 収支で決まる敵のパッシブ (〈尾撃〉〈重甲〉〈地獄の業火〉〈反撃態勢〉〈暴走〉) と〈吸血〉を読む。
+        /// −1 = 技量に従う (Super で ON・それ以外は OFF) / 0 = OFF / 1 = ON。 実効値は <see cref="AutoRunner.ReadEnemyPassivesEffective"/>。
+        /// Optimal (中堅の知識) で ON にすると 3000 ランの対で 12.9 → 11.8% (z −2.74)。 〈吸血〉の敵で戦闘が長くなる
+        /// (Optimal は主攻撃を低く見積もるので、 吸血を減らすブロックの価値だけが上がる) ので、 Optimal には読ませない。</summary>
+        public int readEnemyPassives = -1;
+        /// <summary>[#107 診断] readEnemyPassives で読む物の内訳 (ビット)。 1 = 〈吸血〉 / 2 = 次のターンへ乗る物 (〈反撃態勢〉〈暴走〉) / 4 = 収支の軽減無視 (〈尾撃〉〈重甲〉〈地獄の業火〉)。 既定 7 = 全部。</summary>
+        public int enemyPassiveMask = 7;
     }
 }

@@ -1604,24 +1604,27 @@ namespace AutoTest
                 st.enemyDoubleOnBlockHeavy = true;
             // [#107 2026-11-12] 収支で決まる敵のパッシブと〈吸血〉。 2 体戦は 1 体目 (CurrentEnemy) だけを見る (上の見本と同じ)。
             //   敵のパッシブが封じられているターン (静寂のローブ等・PSM.FireEnemyTrigger が鳴らさない) は読まない。
-            if (cm?.CurrentEnemy?.passiveSkills != null && ctxRoles != null && ctxRoles.enemyPassivesDisabledTurns <= 0)
+            //   読むのは Super だけ (V3Flags.readEnemyPassives・Optimal で読ませると悪化した)。 内訳は enemyPassiveMask。
+            if (ReadEnemyPassivesEffective && cm?.CurrentEnemy?.passiveSkills != null && ctxRoles != null && ctxRoles.enemyPassivesDisabledTurns <= 0)
             {
+                int mask = v3.enemyPassiveMask;
+                bool mLife = (mask & 1) != 0, mNext = (mask & 2) != 0, mChip = (mask & 4) != 0;
                 int rampage = 0;
                 foreach (var ps in cm.CurrentEnemy.passiveSkills)
                 {
                     if (ps == null) continue;
                     switch (ps.internalName)
                     {
-                        case "TailStrike":    st.enemyChipOnPlus  += ItemSystem.PassiveSkills.Effects.TailStrike.Damage; break;
-                        case "EliteLizard":   st.enemyChipOnPlus  += ItemSystem.PassiveSkills.Effects.EliteLizard.Reflect; break;
-                        case "Hellfire":      st.enemyChipOnMinus += ItemSystem.PassiveSkills.Effects.Hellfire.Damage; break;
-                        case "Lifesteal":     st.enemyLifesteal++; break;
-                        case "CounterStance": st.nextHitOnPlus    += ItemSystem.PassiveSkills.Effects.CounterStance.Bonus; break;
-                        case "Rampage":       rampage           += ItemSystem.PassiveSkills.Effects.Rampage.Bonus; break;
+                        case "TailStrike":    if (mChip) st.enemyChipOnPlus  += ItemSystem.PassiveSkills.Effects.TailStrike.Damage; break;
+                        case "EliteLizard":   if (mChip) st.enemyChipOnPlus  += ItemSystem.PassiveSkills.Effects.EliteLizard.Reflect; break;
+                        case "Hellfire":      if (mChip) st.enemyChipOnMinus += ItemSystem.PassiveSkills.Effects.Hellfire.Damage; break;
+                        case "Lifesteal":     if (mLife) st.enemyLifesteal++; break;
+                        case "CounterStance": if (mNext) st.nextHitOnPlus    += ItemSystem.PassiveSkills.Effects.CounterStance.Bonus; break;
+                        case "Rampage":       if (mNext) rampage           += ItemSystem.PassiveSkills.Effects.Rampage.Bonus; break;
                     }
                 }
                 // 前のターンに積まれた〈反撃態勢〉: このターン、 敵の攻撃が通った時に足される (〈剛力〉と同じ位置)
-                st.counterPendingNow = System.Math.Max(0, (int)ctxRoles.GetBuff(CounterStanceNextTurnKey));
+                if (mNext) st.counterPendingNow = System.Math.Max(0, (int)ctxRoles.GetBuff(CounterStanceNextTurnKey));
                 st.enemyHitBonus += st.counterPendingNow;
                 // 〈暴走〉: 次のターンの敵の出目の合計 +N → 次のターンのエスカレーション・大技・プレイヤーの防御を通した増分
                 if (rampage > 0)
