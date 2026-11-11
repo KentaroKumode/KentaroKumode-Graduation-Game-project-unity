@@ -19,7 +19,14 @@ namespace ItemSystem.PassiveSkills.Effects
     //     [不発・確定] 読み手が無い・トリガーが敵の側で鳴らない・書いた値が読まれる前に消える /
     //     [向きが逆・確定] [漏れ・確定] 効き先が説明と逆、 またはプレイヤーにも乗る /
     //     [積み上がり・確定] 説明より多く積み上がる / [疑い] 実機で確かめないと決着しない。
-    //     ロジックは触っていない (直すとバランスが動く)。
+    //  ※ 2026-11-11 (#104) に、 上の印のうち〈多頭攻撃〉以外を説明文どおりに直した (数値は変えていない)。
+    //     読み替えの決まり (相互攻撃モデル):
+    //       - OnRollWin / OnRollLose は収支トリガー (ターン解決の後) のまま。 「次ターン …」はその次のターンに効かせ、
+    //         固定ダメージ・反撃はその場 (解決の後) で入れる (CombatManager.Turn.cs が収支トリガーの後に HP を拾う)。
+    //       - ProcessDamage の中で鳴る OnPreDealDamage は「この陣営が攻撃しているダメージ計算」(playerWonRoll = 攻撃側)。
+    //         敵の OnPreDealDamage は敵の攻撃が通る (ブロックの後に 1 以上残る) ときだけ、 敵の攻撃の計算の中で鳴る。
+    //       - 次ターンへ持ち越す値は、 プレイヤーが読む共有キー (diceBonus / enemyDiceDebuff / damageBonus) に書かない。
+    //         各クラスの専用キーで nextTurnBuffs に積み、 同じクラスが敵の側の計算で読む。
     // ============================================================
 
     // ----------------------------------------------------------
@@ -27,19 +34,41 @@ namespace ItemSystem.PassiveSkills.Effects
     // ----------------------------------------------------------
 
     /// <summary>罠師 — ロール勝利時、次ターン相手のダイス合計値-1
-    /// <para>[向きが逆・確定] <c>nextTurnBuffs["enemyDiceDebuff"]</c> は視点スワップされない共有バフで、
-    /// 次ターンの <c>PassiveSkillManager.RecomputeDiceTotals</c> (プレイヤー視点) が**実際の敵**の enemyDiceTotal から引く。
-    /// つまりこの敵自身の攻撃が −1 される。 〈呪縛〉(Curse) も同じ。</para></summary>
+    /// <para>相互攻撃モデルでの効き方 (2026-11-11 #104 で修正): プレイヤーの収支マイナスのターン (敵視点 OnRollWin) の後、
+    /// <b>次のターンのプレイヤーの攻撃 −<see cref="AttackDown"/></b>。 プレイヤーの「ダイス合計値」は攻撃に挿した出目として
+    /// 攻撃へ入るので、 プレイヤーの〈呪縛〉(敵の攻撃値 −N・§9.6 D群) と同じ向きの読み替えにした。
+    /// 次ターンの OnTurnStart で <c>playerAttackPowerPenalty</c> (視点スワップされない・perTurn) に足す。
+    /// 消費は CombatManager.Turn.cs の atkBase からの減算 (下限 0)・予告の playerAttackPenalty にも出る。</para>
+    /// <para>旧実装は共有バフ <c>nextTurnBuffs["enemyDiceDebuff"]</c> に書いており、 次ターンの RecomputeDiceTotals が
+    /// <b>この敵自身</b>の出目の合計から引いていた (向きが逆)。 〈呪縛〉(Curse) も同じ形で直した。</para></summary>
     public class Trapper : IPassiveSkillEffect
     {
+        public const int AttackDown = 1;
+        /// <summary>nextTurnBuffs の専用キー (このクラスだけが読み書きする)。</summary>
+        private const string NextTurnKey = "enemy.trapper.atkDown";
         public string SkillId => "Trapper";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollWin };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollWin, PassiveSkillTrigger.OnTurnStart };
 
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+            => EnemyNextTurnAttackDown.Execute(trigger, ctx, NextTurnKey, AttackDown, "罠師");
+    }
+
+    /// <summary>〈罠師〉〈呪縛〉の共通処理: 収支で勝った (敵視点 OnRollWin) 次のターン、 プレイヤーの攻撃 −N。</summary>
+    internal static class EnemyNextTurnAttackDown
+    {
+        public static void Execute(PassiveSkillTrigger trigger, CombatContext ctx, string key, int amount, string label)
         {
-            float current = 0f;
-            ctx.nextTurnBuffs.TryGetValue("enemyDiceDebuff", out current);
-            ctx.nextTurnBuffs["enemyDiceDebuff"] = current + 1;
+            if (trigger == PassiveSkillTrigger.OnRollWin)
+            {
+                ctx.nextTurnBuffs.TryGetValue(key, out float cur);
+                ctx.nextTurnBuffs[key] = cur + amount;
+                return;
+            }
+            // OnTurnStart: 前のターンに積んだ分 (BeginNewTurn が nextTurnBuffs → currentBuffs へ移したもの) を、 このターンの攻撃から引く
+            int down = (int)ctx.GetBuff(key);
+            if (down <= 0) return;
+            ctx.playerAttackPowerPenalty += down;
+            UnityEngine.Debug.Log($"[{label}] このターンのプレイヤーの攻撃 −{down}");
         }
     }
 
@@ -71,9 +100,12 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>剛力 — ロール勝利時、ダメージ+2
-    /// <para>[不発・確定] 敵の OnPreDealDamage は CombatManager.Turn.cs の敵攻撃の直前で鳴るが、 その時点の
-    /// playerWonRoll はプレイヤー攻撃用に true のまま (スワップ後 false) で条件が立たない。 立っても、 直後の
-    /// <c>ProcessDamage(lossBase, …)</c> が finalDamage を上書きするので届かない。 〈闇技〉(EliteDarkKnight) も同じ。</para></summary>
+    /// <para>相互攻撃モデルでの効き方 (2026-11-11 #104 で修正): 「ロール勝利時」= この敵がダメージを与える計算。
+    /// 敵の OnPreDealDamage は <c>PassiveSkillManager.ProcessDamage</c> の敵の攻撃の計算の中 (ブロックを引いた後に 1 以上残るとき)
+    /// で鳴り、 敵視点の playerWonRoll が true になる。 ここで足した +2 はそのまま被ダメの補正チェーン (シールド等) を通る。
+    /// プレイヤーの攻撃の計算では鳴らないので、 プレイヤー側へは漏れない。 〈闇技〉(EliteDarkKnight) も同じ。</para>
+    /// <para>旧実装は敵の攻撃の前 (playerWonRoll がプレイヤー攻撃用のまま) に鳴り、 条件が立っても直後の
+    /// <c>ProcessDamage(lossBase, …)</c> が finalDamage を上書きしていた。</para></summary>
     public class BruteForce : IPassiveSkillEffect
     {
         public string SkillId => "BruteForce";
@@ -89,8 +121,12 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>飛翔 — 追撃ダメージを受けない
-    /// <para>[不発・確定] OnPrePursuitDamage はプレイヤー側の FireTrigger (ProcessDamage 内) でしか鳴らず、
-    /// FireEnemyTrigger では一度も焚かれない。 〈不動〉(Immovable) も同じ。</para></summary>
+    /// <para>相互攻撃モデルでの効き方 (2026-11-11 #104 で修正): いまのゲームで「追撃」のダメージは役〈追撃〉(目 3・
+    /// 与ダメの 30% / 100% を追加・<c>CombatManager.ApplyRoleExtraDamage</c>) だけ (<c>ctx.pursuitDamage</c> の書き手は無い)。
+    /// 敵の OnPrePursuitDamage はプレイヤーの攻撃の <c>ProcessDamage</c> の中で鳴り、 ここで立てた
+    /// <c>nullifyPursuitDamage</c> (perTurn) を CombatManager.Turn.cs が見て、 役〈追撃〉の追加ダメージを入れない。
+    /// 〈不動〉(Immovable) も同じ。</para>
+    /// <para>旧実装の時点では OnPrePursuitDamage が FireEnemyTrigger で一度も焚かれていなかった。</para></summary>
     public class Flight : IPassiveSkillEffect
     {
         public string SkillId => "Flight";
@@ -154,33 +190,50 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>尾撃 — ロール敗北時、相手に1の固定ダメージ
-    /// <para>[不発・確定] 敵の OnRollLose は収支トリガーでターン解決の**後**に鳴る。 ここで積んだ
-    /// fixedDamageToPlayer (スワップ後の fixedDamageToEnemy) を読むのは敵攻撃の解決中だけで、
-    /// 次の BeginNewTurn で 0 に戻る ── 入らない。 〈地獄の業火〉〈重甲〉の反射も同じ。</para></summary>
+    /// <para>相互攻撃モデルでの効き方 (2026-11-11 #104 で修正): プレイヤーの収支プラスのターン (敵視点 OnRollLose・ターン解決の後) に、
+    /// その場で <see cref="Damage"/> の軽減無視ダメージを <c>EnemyDealUnmitigable</c> で入れる (シールドは肩代わりする・③-C)。
+    /// CombatManager.Turn.cs が収支トリガーの後に ctx の HP を拾う (SyncHPFromContext)。 〈地獄の業火〉〈重甲〉の反射も同じ。</para>
+    /// <para>旧実装は fixedDamageToEnemy (スワップ後の fixedDamageToPlayer) に積んでいたが、 その枠を読むのは敵攻撃の
+    /// 解決中だけで、 読まれないまま次の BeginNewTurn で 0 に戻っていた。</para></summary>
     public class TailStrike : IPassiveSkillEffect
     {
+        public const int Damage = 1;
         public string SkillId => "TailStrike";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollLose };
 
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            ctx.fixedDamageToEnemy += 1;
+            ctx.EnemyDealUnmitigable(Damage, null);   // 敵視点: enemyCurrentHP = 実プレイヤー (計上は他の軽減無視と同じく無し)
         }
     }
 
     /// <summary>暴走 — ロール敗北時、次ターンのダイス合計値+3
-    /// <para>[向きが逆・確定] <c>nextTurnBuffs["diceBonus"]</c> は共有バフで、 次ターンの RecomputeDiceTotals が
-    /// **プレイヤーの** playerDiceTotal に足す。 敵の攻撃には入らない。</para></summary>
+    /// <para>相互攻撃モデルでの効き方 (2026-11-11 #104 で修正): プレイヤーの収支プラスのターン (敵視点 OnRollLose) の後、
+    /// <b>次のターンのこの敵の攻撃 +<see cref="Bonus"/></b>。 専用キーで nextTurnBuffs に積み、 次ターンの敵の OnPostRoll で
+    /// 敵視点の playerDiceTotal (= この敵の出目の合計 → Escalation.EnemyAttackValue) に足す。 予告にもそのまま出る。</para>
+    /// <para>旧実装は共有バフ <c>nextTurnBuffs["diceBonus"]</c> に書いており、 次ターンの RecomputeDiceTotals が
+    /// <b>プレイヤーの</b> playerDiceTotal に足していた (向きが逆)。</para></summary>
     public class Rampage : IPassiveSkillEffect
     {
+        public const int Bonus = 3;
+        /// <summary>nextTurnBuffs の専用キー (このクラスだけが読み書きする)。</summary>
+        private const string NextTurnKey = "enemy.rampage.atkUp";
         public string SkillId => "Rampage";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollLose };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollLose, PassiveSkillTrigger.OnPostRoll };
 
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            float current = 0f;
-            ctx.nextTurnBuffs.TryGetValue("diceBonus", out current);
-            ctx.nextTurnBuffs["diceBonus"] = current + 3;
+            if (trigger == PassiveSkillTrigger.OnRollLose)
+            {
+                ctx.nextTurnBuffs.TryGetValue(NextTurnKey, out float cur);
+                ctx.nextTurnBuffs[NextTurnKey] = cur + Bonus;
+                return;
+            }
+            // OnPostRoll (敵視点): playerDiceTotal = この敵の出目の合計
+            int up = (int)ctx.GetBuff(NextTurnKey);
+            if (up <= 0) return;
+            ctx.playerDiceTotal += up;
+            UnityEngine.Debug.Log($"[暴走] このターンの攻撃 +{up}");
         }
     }
 
@@ -200,18 +253,19 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>呪縛 — ロール勝利時、次ターン相手のダイス合計値-2</summary>
+    /// <summary>呪縛 — ロール勝利時、次ターン相手のダイス合計値-2
+    /// <para>相互攻撃モデルでの効き方 (2026-11-11 #104 で修正): 〈罠師〉と同じ形で、 プレイヤーの収支マイナスのターンの後、
+    /// 次のターンのプレイヤーの攻撃 −<see cref="AttackDown"/>。 旧実装は〈罠師〉と同じく、 この敵自身の攻撃を下げていた。</para></summary>
     public class Curse : IPassiveSkillEffect
     {
+        public const int AttackDown = 2;
+        /// <summary>nextTurnBuffs の専用キー (このクラスだけが読み書きする)。</summary>
+        private const string NextTurnKey = "enemy.curse.atkDown";
         public string SkillId => "Curse";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollWin };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollWin, PassiveSkillTrigger.OnTurnStart };
 
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            float current = 0f;
-            ctx.nextTurnBuffs.TryGetValue("enemyDiceDebuff", out current);
-            ctx.nextTurnBuffs["enemyDiceDebuff"] = current + 2;
-        }
+            => EnemyNextTurnAttackDown.Execute(trigger, ctx, NextTurnKey, AttackDown, "呪縛");
     }
 
     /// <summary>不動 — 追撃ダメージを受けない</summary>
@@ -227,38 +281,56 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>反撃態勢 — ロール敗北時、次ターンのダメージ+3
-    /// <para>[漏れ・確定] <c>nextTurnBuffs["damageBonus"]</c> は共有バフで、 次ターンの ProcessDamage が
-    /// **プレイヤーの主攻撃にも**敵の攻撃にも +3 する (敵の側はブロックの後に足される)。</para></summary>
+    /// <para>相互攻撃モデルでの効き方 (2026-11-11 #104 で修正): プレイヤーの収支プラスのターン (敵視点 OnRollLose) の後、
+    /// <b>次のターンのこの敵の攻撃のダメージ +<see cref="Bonus"/></b> (ブロックの後に 1 以上残ったとき・〈剛力〉と同じ位置)。
+    /// 専用キーで nextTurnBuffs に積み、 次ターンの敵の OnPreDealDamage (敵の攻撃の ProcessDamage の中) で読む。</para>
+    /// <para>旧実装は共有バフ <c>nextTurnBuffs["damageBonus"]</c> に書いており、 次ターンの ProcessDamage が
+    /// <b>プレイヤーの主攻撃にも</b>敵の攻撃 (2 経路) にも +3 していた (漏れ)。</para></summary>
     public class CounterStance : IPassiveSkillEffect
     {
+        public const int Bonus = 3;
+        /// <summary>nextTurnBuffs の専用キー (このクラスだけが読み書きする)。</summary>
+        private const string NextTurnKey = "enemy.counterStance.dmgUp";
         public string SkillId => "CounterStance";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollLose };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollLose, PassiveSkillTrigger.OnPreDealDamage };
 
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            float current = 0f;
-            ctx.nextTurnBuffs.TryGetValue("damageBonus", out current);
-            ctx.nextTurnBuffs["damageBonus"] = current + 3;
+            if (trigger == PassiveSkillTrigger.OnRollLose)
+            {
+                ctx.nextTurnBuffs.TryGetValue(NextTurnKey, out float cur);
+                ctx.nextTurnBuffs[NextTurnKey] = cur + Bonus;
+                return;
+            }
+            // OnPreDealDamage (敵視点): playerWonRoll = この敵が攻撃している計算
+            if (!ctx.playerWonRoll) return;
+            int up = (int)ctx.GetBuff(NextTurnKey);
+            if (up <= 0) return;
+            ctx.finalDamage += up;
+            UnityEngine.Debug.Log($"[反撃態勢] 攻撃のダメージ +{up}");
         }
     }
 
     /// <summary>ダークナイト — 研ぎ澄まし: 決闘が長引くほど剣技が冴える。
     /// 3ターンごとに「ロール勝利時の与ダメージ」+1（累積）。相互火力不足
     /// によるこう着（長期戦）を、敵の決め手火力を逓増させて終局へ導く。
-    /// 敵パッシブは敵視点で勝敗反転発火するため OnRollWin = 敵がロール勝利
-    /// （＝敵が与ダメするターン）。T1-2:+0 / T3-5:+1 / T6-8:+2 / T9-11:+3 …
-    /// <para>[不発・確定] 敵の OnRollWin は収支トリガーでターン解決の後に鳴る。 currentBuffs へ書いた値は
-    /// 次の BeginNewTurn が currentBuffs.Clear() で捨てるので、 どの攻撃にも乗らない。</para></summary>
+    /// T1-2:+0 / T3-5:+1 / T6-8:+2 / T9-11:+3 …
+    /// <para>相互攻撃モデルでの効き方 (2026-11-11 #104 で修正): 「ロール勝利時の与ダメージ」は〈剛力〉〈闇技〉と同じ言い回しなので
+    /// 同じ読み替え ── この敵の攻撃が通るたび (敵の OnPreDealDamage・ブロックの後に 1 以上残るとき)、 ダメージ +currentTurn/3。
+    /// 旧実装の OnRollWin は「敵が与ダメするターン」の代わりとして使っていたもの (旧ロール勝負では勝った側だけがダメージを与えた)。</para>
+    /// <para>旧実装は収支トリガー (ターン解決の後) で currentBuffs["damageBonus"] に書いており、 次の BeginNewTurn の
+    /// currentBuffs.Clear() で捨てられていた。 書けていてもプレイヤーの主攻撃へ漏れるキーだった。</para></summary>
     public class HoningDuel : IPassiveSkillEffect
     {
         public string SkillId => "HoningDuel";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollWin };
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
+            if (!ctx.playerWonRoll) return;   // 敵視点: この敵が攻撃している計算だけ
             int bonus = System.Math.Max(0, ctx.currentTurn) / 3; // 3ターンごとに+1
             if (bonus <= 0) return;
-            ctx.currentBuffs.TryGetValue("damageBonus", out var cur);
-            ctx.currentBuffs["damageBonus"] = cur + bonus; // 今ターンの敵与ダメに加算
+            ctx.finalDamage += bonus;
+            UnityEngine.Debug.Log($"[研ぎ澄まし] T{ctx.currentTurn} 攻撃のダメージ +{bonus}");
         }
     }
 
@@ -447,17 +519,19 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>精鋭リザードマン — 重甲: 防御さらに +4 (硬鱗と合わせて 8・ADR-0013)、 敗北時に固定 1 反射。
     /// 旧: 被弾時さらに −2 軽減。
-    /// <para>[不発・確定] 反射の半分は〈尾撃〉と同じ理由で入らない (OnRollLose はターン解決の後)。 防御 +4 は効いている。</para></summary>
+    /// <para>反射 (2026-11-11 #104 で修正): 〈尾撃〉と同じく、 プレイヤーの収支プラスのターン (敵視点 OnRollLose・解決の後) に
+    /// その場で <see cref="Reflect"/> の軽減無視ダメージ (シールドは肩代わりする)。 旧実装は fixedDamageToEnemy に積んで読まれずに消えていた。</para></summary>
     public class EliteLizard : IPassiveSkillEffect
     {
         public const int Defense = 4;
+        public const int Reflect = 1;
         public string SkillId => "EliteLizard";
         public PassiveSkillTrigger[] Triggers => new[] {
             PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnRollLose };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
             if (trigger == PassiveSkillTrigger.OnBattleStart) ctx.enemyDefense += Defense;
-            else ctx.fixedDamageToEnemy += 1;
+            else ctx.EnemyDealUnmitigable(Reflect, null);   // 敵視点: enemyCurrentHP = 実プレイヤー
         }
     }
 
@@ -515,7 +589,7 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>精鋭ダークナイト — 闇技: 勝利時、与ダメ+2（4Fへ降格に伴いナーフ）
-    /// <para>[不発・確定] 〈剛力〉と同じ理由 (OnPreDealDamage の時点で条件が立たず、 立っても上書きされる)。</para></summary>
+    /// <para>2026-11-11 #104 で修正: 〈剛力〉と同じ (この敵の攻撃が通る計算の中で敵の OnPreDealDamage が鳴り、 ダメージ +2)。</para></summary>
     public class EliteDarkKnight : IPassiveSkillEffect
     {
         public string SkillId => "EliteDarkKnight";
@@ -529,7 +603,9 @@ namespace ItemSystem.PassiveSkills.Effects
     // ----------------------------------------------------------
 
     /// <summary>多頭攻撃 — ロール勝利時、追撃ダイスを1個追加
-    /// <para>[不発・確定] <c>accumulatedValues["extraPursuitDice"]</c> を読む処理がどこにも無い。</para></summary>
+    /// <para>[不発・確定] <c>accumulatedValues["extraPursuitDice"]</c> を読む処理がどこにも無い。
+    /// 2026-11-11 (#104) では直していない: 相互攻撃モデルの敵には「追撃ダイス」に当たる仕組みが無く、
+    /// 読み替え (次のターンだけ攻撃ロールを 1 回多く引く / 毎ターン 1 回多く引く / 勝つたびに積み上がる / 追加ダメージ) が 1 通りに決まらない。</para></summary>
     public class MultiHead : IPassiveSkillEffect
     {
         public string SkillId => "MultiHead";
@@ -570,23 +646,25 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>地獄の業火 — ロール勝利時、追加で2の固定ダメージ
-    /// <para>[不発・確定] 〈尾撃〉と同じ理由 (OnRollWin はターン解決の後で、 積んだ固定ダメを読む処理が残っていない)。</para></summary>
+    /// <para>2026-11-11 #104 で修正: 〈尾撃〉と同じ形で、 プレイヤーの収支マイナスのターン (敵視点 OnRollWin・解決の後) に
+    /// その場で <see cref="Damage"/> の軽減無視ダメージ (シールドは肩代わりする)。 旧実装は fixedDamageToEnemy に積んで読まれずに消えていた。</para></summary>
     public class Hellfire : IPassiveSkillEffect
     {
+        public const int Damage = 2;
         public string SkillId => "Hellfire";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollWin };
 
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            ctx.fixedDamageToEnemy += 2;
+            ctx.EnemyDealUnmitigable(Damage, null);   // 敵視点: enemyCurrentHP = 実プレイヤー
         }
     }
 
     /// <summary>吸血 — ダメージを与えた時、その50%分HPを回復
-    /// <para>[不発・確定] (#104 で見つけた) 敵の OnPostDealDamage は CombatManager.Turn.cs の敵攻撃の末尾で鳴り、
-    /// 回復は ctx の HP (スワップ後の playerCurrentHP = 敵の ctx.enemyCurrentHP) にだけ書かれる。 その後
-    /// 同じターンのうちに CombatManager が <c>ctx.enemyCurrentHP = enemyHP</c> (自分のフィールド) で上書きし、
-    /// 間に ctx から enemyHP を拾う処理が無いので、 回復は消える。</para></summary>
+    /// <para>2026-11-11 #104 で修正: 敵の OnPostDealDamage は CombatManager.Turn.cs の敵攻撃の末尾で鳴る。 その直前に
+    /// ctx の HP を CombatManager の値へ揃え、 <c>ctx.finalDamage</c> に<b>この攻撃で実際に通った主攻撃のダメージ</b>
+    /// (ブロック・シールド等の後) を入れてから鳴らし、 鳴らした後に ctx の HP を拾う (SyncHPFromContext)。</para>
+    /// <para>旧実装は回復を ctx の HP にだけ書き、 同じターンのうちに <c>ctx.enemyCurrentHP = enemyHP</c> で上書きされて消えていた。</para></summary>
     public class Lifesteal : IPassiveSkillEffect
     {
         public string SkillId => "Lifesteal";
@@ -648,31 +726,38 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>威圧+: 戦闘開始時に脅威(threat)を +3 する (ボスは BossParam.IntimidateThreat・基準 3)。
-    /// <para>[不発・確定] 脅威の削りダメ (scratch) は相互攻撃モデルで廃止され、 threat は「baseAttack 未指定時の基礎攻撃値」
-    /// (EnemyData.EffectiveBaseAttack) にしか使われない。 <c>ctx.enemyThreat</c> を読む処理が無いので、 この加算は何にも効かない。
-    /// 基礎攻撃値への統合は DAMAGE_CALC_REFERENCE §9.6 の宿題のまま。 〈威圧++〉も同じ。</para></summary>
+    /// <para>相互攻撃モデルでの効き方 (2026-11-11 #104 で修正): 脅威の削りダメ (scratch) は廃止され、 脅威はいま
+    /// 「基礎攻撃値」(EnemyData.EffectiveBaseAttack = baseAttack 未指定時の threat) としてしか使われない。
+    /// DAMAGE_CALC_REFERENCE §9.6 の宿題「威圧の脅威加算を基礎攻撃値に統合」のとおり、 <b>この敵の攻撃 +N (戦闘を通して)</b>にした。
+    /// 足し先は <c>enemyDiceTotalBonus</c> (視点スワップされない・persistent・形態の差し替えで 0 に戻り OnBattleStart で積み直す)。
+    /// Escalation.EnemyAttackValue は (基礎攻撃 + 出目の合計) にまとめて倍率を掛けるので、 基礎攻撃 +N と同じ値になり、 予告にも出る。</para>
+    /// <para>旧実装は <c>ctx.enemyThreat</c> に足していたが、 それを読む処理が無く何にも効いていなかった
+    /// (<c>ctx.enemyThreat</c> へはもう書かない ── 戦場の修飾子〈逆境〉も同じ欄に書くので、 将来読み手を作ったとき二重にならないように)。
+    /// 〈威圧++〉も同じ。</para></summary>
     public class IntimidatePlus : IPassiveSkillEffect
     {
         public string SkillId => "IntimidatePlus";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            // ボス難易度オートチューナー: 威圧の脅威加算をボス別に直接調整 (基準3)。
+            // ボス難易度オートチューナー: 威圧の加算をボス別に直接調整 (基準3)。
             int add = UnityEngine.Mathf.Max(0, CombatSystem.BossParams.ParamInt(ctx.bossId, CombatSystem.BossParam.IntimidateThreat));
-            ctx.enemyThreat += add;
-            UnityEngine.Debug.Log($"[威圧+] 脅威 +{add} → {ctx.enemyThreat}");
+            ctx.enemyDiceTotalBonus += add;
+            UnityEngine.Debug.Log($"[威圧+] 攻撃 +{add} (戦闘を通して)");
         }
     }
 
-    /// <summary>威圧++: 戦闘開始時に脅威(threat)を +5 する。ボス専用の最高位脅威(上限10)。</summary>
+    /// <summary>威圧++: 戦闘開始時に脅威(threat)を +5 する。ボス専用の最高位脅威(上限10)。
+    /// <para>2026-11-11 #104 で修正: 〈威圧+〉と同じく、 この敵の攻撃 +<see cref="Add"/> (戦闘を通して)。 2026-11-11 時点で持っている敵はいない。</para></summary>
     public class IntimidatePlusPlus : IPassiveSkillEffect
     {
+        public const int Add = 5;
         public string SkillId => "IntimidatePlusPlus";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
-            ctx.enemyThreat += 5;
-            UnityEngine.Debug.Log($"[威圧++] 脅威 +5 → {ctx.enemyThreat}");
+            ctx.enemyDiceTotalBonus += Add;
+            UnityEngine.Debug.Log($"[威圧++] 攻撃 +{Add} (戦闘を通して)");
         }
     }
 
@@ -1401,12 +1486,15 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>業火の予兆 — HP>50% は T1/5/9/13... の周期 4T、 HP≤50% は周期 3T で発動。
     /// 予兆ターンは敵の攻撃を上乗せ (BossParam.JudgmentDice・基準 +8)。 予告が前ターンに出るので配線で対策可能。
-    /// <para>[積み上がり・確定] 上乗せは enemyDiceTotalBonus への `+=` で、 このフィールドは BeginNewTurn で戻らない。
-    /// 予兆ターンが来るたびに +8 が戦闘終了まで積み上がる (〈焦土契約〉の差分更新が直した「雪だるま」と同じ形)。
-    /// 〈憤怒の残滓〉も同じ。</para>
+    /// <para>2026-11-11 #104 で修正: 上乗せは「予兆ターンだけ」になるよう、 〈焦土契約〉と同じ差分更新にした。
+    /// 毎ターン頭に「このターン積むべき量」(予兆ターンなら JudgmentDice、 それ以外は 0) を出し、 前ターンに自分が
+    /// enemyDiceTotalBonus へ積んだ量 (<see cref="KeyApplied"/>) との差だけを足し引きする (他のパッシブの寄与は消さない)。
+    /// 旧実装は `+=` だけで戻す処理が無く、 予兆のたびに +8 が戦闘終了まで積み上がっていた。</para>
     /// 旧 JudgmentBlaze の即死一撃を「相互攻撃モデルで対応可能な予告火力」に転換。</summary>
     public class EmberOmen : IPassiveSkillEffect
     {
+        /// <summary>前ターンに自分が enemyDiceTotalBonus へ積んだ量 (差分更新用)。 "ember_" 始まりなので形態の差し替えで消える。</summary>
+        private const string KeyApplied = "ember_omen_applied";
         public string SkillId => "EmberOmen";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
@@ -1419,10 +1507,11 @@ namespace ItemSystem.PassiveSkills.Effects
                 + $" ratio={hpRatio.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)}"
                 + $" period={EmberOmenTiming.PeriodFor(hpRatio)}"
                 + $" fired={EmberOmenTiming.IsOmen(ctx.currentTurn, hpRatio)}");
-            if (EmberOmenTiming.IsOmen(ctx.currentTurn, hpRatio))
+            bool omen = EmberOmenTiming.IsOmen(ctx.currentTurn, hpRatio);
+            EmberBonus.SetApplied(ctx, KeyApplied, omen ? bonus : 0);
+            if (omen)
             {
-                ctx.enemyDiceTotalBonus += bonus;
-                UnityEngine.Debug.Log($"[業火の予兆] T{ctx.currentTurn} 発動 → 敵ダイス+{bonus} (周期{EmberOmenTiming.PeriodFor(hpRatio)}T)");
+                UnityEngine.Debug.Log($"[業火の予兆] T{ctx.currentTurn} 発動 → このターンの攻撃 +{bonus} (周期{EmberOmenTiming.PeriodFor(hpRatio)}T)");
             }
             else
             {
@@ -1466,20 +1555,36 @@ namespace ItemSystem.PassiveSkills.Effects
     /// <summary>憤怒の残滓 (EmberFury) — 2026-07-16 追加。 HP≤50% のターン、 敵の攻撃 +<see cref="Bonus"/>。
     /// Phase2 突入で「再生ゼロ・高火力連打」の後半戦を演出する。
     /// EmberOmen (周期3Tに加速) + AshRegrowth (停止) と合わせて瞬発力勝負を強制。
-    /// <para>[積み上がり・確定] enemyDiceTotalBonus への `+=` を毎ターン行うので、 HP≤50% のターンが続くと
-    /// +3 が積み上がる (「常時 +3」にはなっていない)。 〈業火の予兆〉の注記を参照。</para></summary>
+    /// <para>2026-11-11 #104 で修正: 〈業火の予兆〉と同じ差分更新。 ターン頭の HP が 50% 以下のターンは +3、 50% を超えるターンは 0
+    /// (回復して戻れば外れる)。 旧実装は HP≤50% のターンごとに `+=` して +3 が積み上がっていた。</para></summary>
     public class EmberFury : IPassiveSkillEffect
     {
         public const int Bonus = 3;
+        /// <summary>前ターンに自分が enemyDiceTotalBonus へ積んだ量 (差分更新用)。 "ember_" 始まりなので形態の差し替えで消える。</summary>
+        private const string KeyApplied = "ember_fury_applied";
         public string SkillId => "EmberFury";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
             if (ctx.playerMaxHP <= 0) return;
             float r = (float)ctx.playerCurrentHP / ctx.playerMaxHP;
-            if (r > 0.5f) return; // Phase1 は不発
-            ctx.enemyDiceTotalBonus += Bonus;
-            UnityEngine.Debug.Log($"[憤怒の残滓] Phase2 敵ダイス+{Bonus} (HP {ctx.playerCurrentHP}/{ctx.playerMaxHP})");
+            bool phase2 = r <= 0.5f;   // Phase1 (HP>50%) は 0
+            EmberBonus.SetApplied(ctx, KeyApplied, phase2 ? Bonus : 0);
+            if (phase2)
+                UnityEngine.Debug.Log($"[憤怒の残滓] Phase2 このターンの攻撃 +{Bonus} (HP {ctx.playerCurrentHP}/{ctx.playerMaxHP})");
+        }
+    }
+
+    /// <summary>〈業火の予兆〉〈憤怒の残滓〉の差分更新: enemyDiceTotalBonus (persistent・他のパッシブと共有) に、
+    /// 自分の寄与が <paramref name="want"/> になるよう前ターンとの差だけを足し引きする (〈焦土契約〉と同じ形)。</summary>
+    internal static class EmberBonus
+    {
+        public static void SetApplied(CombatContext ctx, string keyApplied, int want)
+        {
+            int prev = (int)ctx.GetAccumulated(keyApplied);
+            if (want == prev) return;
+            ctx.enemyDiceTotalBonus += want - prev;
+            ctx.accumulatedValues[keyApplied] = want;
         }
     }
 
@@ -1609,14 +1714,15 @@ namespace ItemSystem.PassiveSkills.Effects
     ///   各スタック効果: 形態1シールド初期 −28 (最低 28) / 形態1反撃 +7。
     ///   シールドが薄くなるほど往復は速くなるが、毎サイクル受ける反撃が重くなる
     ///   = "粘る者ほど無駄に身を削る" 罠。
-    /// <para>[不発・確定] 形態1の「ボスはダイスを振らない (0d0)」は <c>extraDice = −BaseDiceCount</c> で作っているが、
-    /// boss_layer5_hidden は攻撃ロール方式 (attackRollMax > 0) で、 <c>EnemyData.RollAttack</c> は引く回数を
-    /// max(1, 1 + max(0, extra)) にするため負の値が効かない。 形態1でも基礎攻撃 + 攻撃ロールで普通に攻撃してくる。
-    /// enemies.json の旧記述にあった「4d6」も攻撃ロール方式では当たらない (攻撃ロール 2〜3)。</para>
-    /// <para>[不発・確定] (#104 で見つけた) 形態1の反撃 (EnemyDealUnmitigable) と形態2の「ボスへ 15」は
-    /// OnRollLose (収支トリガー・ターン解決の後) で ctx の HP にだけ書かれる。 直後の FinishTurnCommon が
-    /// <c>ctx.playerCurrentHP = playerHP</c> / <c>ctx.enemyCurrentHP = enemyHP</c> で CombatManager の値に戻すので、
-    /// HP の増減は消える。 反撃をシールドが肩代わりした分 (consShield の減少) と、 シールドへの 25・形態の遷移は残る。</para></summary>
+    /// <para>形態1の「ボスはダイスを振らない (0d0)」(2026-11-11 #104 で修正): <c>extraDice = −BaseDiceCount</c> を、
+    /// 攻撃ロール方式の <c>EnemyData.RollAttack</c> が「引く回数 = max(0, 1 + extra)」として受けるようにした。
+    /// 形態1は攻撃ロールを 1 回も引かない (攻撃値 = 基礎攻撃 × 大技・段階の倍率だけ)。 <b>基礎攻撃は残る</b> ── 「振らない」の字面どおりで、
+    /// 「形態1は攻撃しない」とは読んでいない。 旧実装は引く回数が max(1, 1 + max(0, extra)) で負の値が効かず、 形態1でも攻撃ロールを引いていた。
+    /// (BaseDiceCount = 4 は旧ダイス方式の「4d6」の名残で、 1 + extra ≦ 0 にするための値。)</para>
+    /// <para>形態1の反撃 (EnemyDealUnmitigable) と形態2の「ボスへ 15」(2026-11-11 #104 で修正): OnRollLose (収支トリガー・ターン解決の後) で
+    /// ctx の HP に書かれる。 CombatManager.Turn.cs が収支トリガーの直前に ctx の HP を CombatManager の値へ揃え、 直後に
+    /// SyncHPFromContext で拾うようにしたので、 HP の増減が残る。 旧実装は直後の FinishTurnCommon の書き戻しで消えていた
+    /// (シールドの肩代わり分・シールドへの 25・形態の遷移だけが残っていた)。</para></summary>
     public class SaintGeorgesPhases : IPassiveSkillEffect
     {
         public string SkillId => "SaintGeorgesPhases";
@@ -1640,7 +1746,7 @@ namespace ItemSystem.PassiveSkills.Effects
         private const string KP2ExtendPending = "sg_p2_extend_pending"; // P2: 帰還1T延長予約
         private const string KPrioriteStacks  = "sg_priorite_stacks";   // プリオリテ累積（往復ペナルティ）
 
-        private const int BaseDiceCount   = 4; // enemies.json と一致させること
+        private const int BaseDiceCount   = 4; // 形態1で extraDice = −4 → 攻撃ロールを引く回数 max(0, 1 − 4) = 0 (EnemyData.RollAttack)
         private const int BaseShield      = 140; // HP +40% に比例して上方修正
         private const int MinShield       = 28; // プリオリテ削減後の下限 (20→28, +40%)
         private const int PrioriteShieldDecPer = 28; // /stack でシールド初期量を減らす

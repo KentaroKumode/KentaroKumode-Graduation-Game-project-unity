@@ -134,7 +134,10 @@ namespace CombatSystem
             {
                 int hi = maxOverride > 0 ? maxOverride : attackRollMax;
                 int lo = Math.Min(Math.Max(0, attackRollMin), hi);
-                int n = Math.Max(1, 1 + Math.Max(0, extraDraws));
+                // 負の extraDraws は引く回数を減らす (0 回 = 攻撃ロール無し・攻撃値は基礎攻撃だけ)。
+                //   〈形態転換〉(シュヴァリエ) 形態1の「ダイスを振らない」が extraDice = −4 で使う (2026-11-11 #104)。
+                //   旧: max(1, 1 + max(0, extra)) で負の値が効かず、 必ず 1 回以上引いていた。
+                int n = Math.Max(0, 1 + extraDraws);
                 var res = new int[n];
                 for (int i = 0; i < n; i++)
                     res[i] = GameLoop.GameRng.Range(lo, hi + 1, "enemy.atkRoll." + id, RngSlot(i));

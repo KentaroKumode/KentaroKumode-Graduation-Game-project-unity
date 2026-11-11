@@ -6,6 +6,7 @@
 > `AllPassiveSkillEffects.cs`（プレイヤー） / `EnemyPassiveSkillEffects.cs`（敵）
 > 最終確認: 2026-07-26（会心システム リバランス — §2-B 追加）
 > 2026-10-28: 防御値と貫通（ADR-0013）── ③-A の敵の防御・§9 の予告・フィールド表・武器ラダー・敵パッシブ表を更新
+> 2026-11-11: #104 の敵パッシブ 12 件を説明文どおりに直した ── §0・②・③-C・§4・§5・§9.2・§9.3・§9.6 を更新（〈多頭攻撃〉は未修正）
 >
 > **戦闘の経路は ADR-0009 相互攻撃パイプライン（§9）だけ**。旧ロール勝負の経路
 > (`UseMutualAttackPipeline=false`) は **2026-10-29 に削除**した。
@@ -44,7 +45,15 @@
 **共有バフの罠（2026-11-11 #30 の監査）**: `nextTurnBuffs["enemyDiceDebuff"]` / `["diceBonus"]` / `["damageBonus"]` は
 視点スワップされず、次ターンの `RecomputeDiceTotals` / `ProcessDamage` が**プレイヤー視点で**読む。敵パッシブが書くと
 「相手の出目を下げる」つもりが**敵自身の攻撃**を下げ（罠師・呪縛）、「自分の出目 +」が**プレイヤーの**出目に入り（暴走）、
-`damageBonus` はプレイヤーの主攻撃と敵の攻撃の両方に乗る（反撃態勢）。§4 の [向きが逆・確定] [漏れ・確定] 参照。
+`damageBonus` はプレイヤーの主攻撃と敵の攻撃の両方に乗る（反撃態勢）。
+**2026-11-11 #104 で、敵パッシブはこの 3 キーに書かなくなった。** 次ターンへ持ち越す値は各クラスの専用キー
+（`enemy.trapper.atkDown` / `enemy.curse.atkDown` / `enemy.rampage.atkUp` / `enemy.counterStance.dmgUp`）で `nextTurnBuffs` に積み、
+同じクラスが次ターンに敵の側の計算で読む（§4）。新しく敵パッシブを書くときも共有キーへは書かない。
+
+**敵パッシブが ctx の HP を動かすとき（2026-11-11 #104）**: CombatManager は `playerHP` / `enemyHP` を自分のフィールドで持ち、
+ctx の HP はフィールドから書き戻される。敵のトリガーを鳴らす前に ctx の HP をフィールドへ揃え、鳴らした後に
+`SyncHPFromContext` で拾うのは、ターン頭（OnTurnStart）・敵の OnPostDealDamage（〈吸血〉）・収支トリガー（〈尾撃〉〈地獄の業火〉〈重甲〉・シュヴァリエ）・
+OnTurnEnd の 4 か所。これ以外の位置で敵パッシブが ctx の HP を書いても残らない。
 
 ---
 
@@ -97,10 +106,17 @@ base  = 勝利:attackPower + floor(|diceDifference|/3)  /  敗北:max(|diceDiffe
         ※勝利base は CombatManager で算出（#2 案A'・ADR-0004）。attackPower=装備武器の素火力(items.json)、
           差は WeaponDiffPerBonus=3 ごとに+1の小ボーナス。会心(critRate)には非干渉。敗北/scratch は不変。
 final = base + buff "damageBonus"
+[敵の攻撃・1 体目だけ (fireEnemyDealTriggers)・final > 0] FireEnemyTrigger(OnPreDealDamage)
+                                         ← 敵の与ダメ改変（剛力/闇技/研ぎ澄まし/反撃態勢・2026-11-11 #104）。
+                                           敵視点 playerWonRoll = true。 final は視点スワップされないので敵の攻撃に乗る。
+                                           2 体目・〈連撃〉の 2 回目では鳴らさない
 [勝利] FireTrigger(OnPreDealDamage)      ← 与ダメ改変パッシブ
 [敗北] FireTrigger(OnPreReceiveDamage)   ← 被ダメ軽減パッシブ（堅忍/鉄壁/頑強/天命 等）
-FireTrigger(OnPrePursuitDamage)          ← 追撃無効化(飛翔/不動)
-nullifyAllDamage → final=0,pursuit=0  /  nullifyPursuitDamage → pursuit=0
+FireTrigger(OnPrePursuitDamage)
+[プレイヤーの攻撃だけ] FireEnemyTrigger(OnPrePursuitDamage)
+                                         ← 追撃無効化(飛翔/不動) が nullifyPursuitDamage を立てる (2026-11-11 #104)。
+                                           CombatManager がこれを見て役〈追撃〉の追加ダメージを入れない (§9.2)
+nullifyAllDamage → final=0,pursuit=0  /  nullifyPursuitDamage → pursuit=0（pursuitDamage はいま書き手が無く常に 0）
 total = final + pursuitDamage
 [会心] FireTrigger(OnCriticalCheck); critRatePctAdd += buff "critRatePct"
        ── 2026-09-19: 会心率を % に統一し 5% 刻みに揃えた（旧「分子 1 = 5.5%」は撤去・§2-B）──
@@ -203,8 +219,9 @@ fixedDamageToPlayer ≥ 999 → playerHP = 0（死の宣告）
 - `cause` は被ダメ内訳と死因タグへの計上分類。`null` で計上しない。
 - 対照群スイッチ: `CombatContext.ShieldAbsorbsUnmitigable`（既定 true。false は計測専用）。
 
-通す対象は 9 件 ─ 審判の炎 / 王の業炎 / 烈炎 / 大出血 / 毒の侵蝕 / 鏡映の応答 /
-13番目の宣告 / 巌の意志の撃破時反撃 / コントラタック。
+通す対象は 12 件 ─ 審判の炎 / 王の業炎 / 烈炎 / 大出血 / 毒の侵蝕 / 鏡映の応答 /
+13番目の宣告 / 巌の意志の撃破時反撃 / コントラタック /
+尾撃 / 地獄の業火 / 重甲の反射（この 3 件は 2026-11-11 #104 に fixedDamageToEnemy からここへ移した・収支トリガーで入る）。
 
 **この変更が持つ副作用**（同一シード 1000 ラン・対照群比較で実測）:
 盾は `ShieldBash` が **残存量の 20〜80% を攻撃力に加算**する常時効果の弾でもある。
@@ -623,25 +640,28 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 
 **2026-11-11 に enemies.json と 1 件ずつ突き合わせた（#30）。** Trigger の OnRollWin / OnRollLose は収支トリガー
 （敵視点 OnRollWin = プレイヤーの収支マイナス・ターン解決の**後**に鳴る・§9.3）。「自ダイス +N」は敵の攻撃値へそのまま入る
-（`Escalation.EnemyAttackValue` = 基礎攻撃 + 出目の合計）。印は 2026-11-11 #104 で消費側まで追い切った区分: **[不発・確定]** 効いていない / **[向きが逆・確定]** **[漏れ・確定]** 効き先が逆・プレイヤーにも乗る / **[積み上がり・確定]** 説明より積み上がる
-（ロジックは未修正・根拠は各クラスの XML コメント）。**[未装備]** はどの敵も持っていない（登録だけ残っている）。
+（`Escalation.EnemyAttackValue` = 基礎攻撃 + 出目の合計）。印は 2026-11-11 #104 で消費側まで追い切った区分: **[不発・確定]** 効いていない / **[向きが逆・確定]** **[漏れ・確定]** 効き先が逆・プレイヤーにも乗る / **[積み上がり・確定]** 説明より積み上がる。
+**同日 #104 で〈多頭攻撃〉以外を直した**（数値は変えていない）。直した行は **[#104 修正]** と、相互攻撃モデルでの読み替えを書いてある。
+読み替えの決まり: OnRollWin/Lose は収支トリガー（解決の後）のまま、「次ターン …」は次のターンに、固定ダメージはその場で入れる。
+ProcessDamage の中の OnPreDealDamage は「その陣営が攻撃している計算」（敵は 1 体目の攻撃が通るときだけ・§1 ②）。
+根拠は各クラスの XML コメント。**[未装備]** はどの敵も持っていない（登録だけ残っている）。
 
 | SkillId(表示) | Trigger | 効果 |
 |---|---|---|
-| Trapper(罠師) | OnRollWin | 次T `nextTurnBuffs["enemyDiceDebuff"]` +1。**[向きが逆・確定]** 共有バフなので次ターンに**この敵自身**の出目の合計から引かれる |
+| Trapper(罠師) | OnRollWin/OnTurnStart | **[#104 修正]** 収支マイナスの次のターン、**プレイヤーの攻撃 −1**（`nextTurnBuffs["enemy.trapper.atkDown"]` → 次ターンの OnTurnStart で `playerAttackPowerPenalty` += → atkBase から減算・下限 0・予告の playerAttackPenalty にも出る）。「相手のダイス合計値」をプレイヤーの攻撃と読む（プレイヤーの〈呪縛〉= 敵攻撃値 −N と同じ向き）。旧: 共有バフ `enemyDiceDebuff` で**この敵自身**の出目の合計を引いていた |
 | Undying(不死者) | OnTurnStart | 自HP +1 |
 | Sprint(疾駆) | OnPostRoll | 1T目 自ダイス +2（＝攻撃 +2） |
-| BruteForce(剛力) | OnPreDealDamage | 勝利時 finalDamage +2。**[不発・確定]** 敵の OnPreDealDamage の時点で playerWonRoll はプレイヤー攻撃用の true のまま（スワップ後 false）。立っても直後の `ProcessDamage(lossBase)` が finalDamage を上書きする |
-| Flight(飛翔)/Immovable(不動) | OnPrePursuitDamage | nullifyPursuitDamage=true(追撃無効)。**[不発・確定]** OnPrePursuitDamage は FireEnemyTrigger で一度も焚かれない |
+| BruteForce(剛力) | OnPreDealDamage | **[#104 修正]** この敵の攻撃が通る（ブロックの後に 1 以上残る）たび、ダメージ +2。敵の攻撃の ProcessDamage の中で鳴る（§1 ②）ので、+2 はプレイヤーの被ダメ軽減・シールドを通る。プレイヤーの攻撃には乗らない。旧: 敵の攻撃の前に鳴り条件が立たず、立っても finalDamage が上書きされていた |
+| Flight(飛翔)/Immovable(不動) | OnPrePursuitDamage | **[#104 修正]** 役〈追撃〉（目 3）の追加ダメージを受けない。プレイヤーの攻撃の ProcessDamage の中で鳴り nullifyPursuitDamage=true、CombatManager が ApplyRoleExtraDamage を飛ばす。いまの「追撃」のダメージは役〈追撃〉だけ（`ctx.pursuitDamage` の書き手は無い）。旧: OnPrePursuitDamage が FireEnemyTrigger で一度も焚かれていなかった |
 | HardScales(硬鱗) | OnBattleStart | enemyDefense +4（2026-10-28。旧: 被弾時 −2） |
 | CrackingArmor(割れる装甲) | OnTurnEnd | `lastPlayerDamage > 0` なら `enemyDefense = max(0, enemyDefense − 4)`（2026-11-04。初期の防御は EnemyData.defense） |
 | StackingArmor(積み上がる装甲) | OnTurnEnd | `enemyDefense = min(24, enemyDefense + 3)`（2026-11-04・既に 24 以上なら触らない） |
-| TailStrike(尾撃) | OnRollLose | fixedDamageToEnemy +1(→実プレイヤー)。**[不発・確定]** ターン解決の後に積むので、読まれないまま次の BeginNewTurn で 0 に戻る |
-| Rampage(暴走) | OnRollLose | 次T `nextTurnBuffs["diceBonus"]` +3。**[向きが逆・確定]** 次ターンに**プレイヤーの** playerDiceTotal へ入る |
+| TailStrike(尾撃) | OnRollLose | **[#104 修正]** プレイヤーの収支プラスのターン、その場で `EnemyDealUnmitigable(1)`（軽減無視・シールドは肩代わり・③-C）。収支トリガーの後に CombatManager が ctx の HP を拾う（§9.3）。旧: fixedDamageToEnemy に積み、読まれないまま次の BeginNewTurn で 0 に戻っていた |
+| Rampage(暴走) | OnRollLose/OnPostRoll | **[#104 修正]** 収支プラス（プレイヤー）の次のターン、**この敵の攻撃 +3**（`nextTurnBuffs["enemy.rampage.atkUp"]` → 次ターンの敵の OnPostRoll で自ダイス +3 → 予告値に入る）。旧: 共有バフ `diceBonus` で**プレイヤーの** playerDiceTotal へ入っていた |
 | Ethereal(虚体) | OnPreReceiveDamage | 主攻撃の finalDamage /2（`CombatManager.Damage.cs` の敵の軽減パッシブ。固定ダメ・出血・毒には効かない） |
-| Curse(呪縛/敵) | OnRollWin | 次T `enemyDiceDebuff` +2。**[向きが逆・確定]** 罠師と同じ |
-| CounterStance(反撃態勢) | OnRollLose | 次T `nextTurnBuffs["damageBonus"]` +3。**[漏れ・確定]** 次ターンの ProcessDamage がプレイヤーの主攻撃にも敵の攻撃にも +3 する |
-| HoningDuel(研ぎ澄まし) | OnRollWin | currentBuffs damageBonus += currentTurn/3。**[不発・確定]** ターン解決の後に書くので、次の BeginNewTurn の `currentBuffs.Clear()` で消える |
+| Curse(呪縛/敵) | OnRollWin/OnTurnStart | **[#104 修正]** 罠師と同じ形で、次のターンのプレイヤーの攻撃 −2（`enemy.curse.atkDown`）。旧: この敵自身の攻撃を下げていた |
+| CounterStance(反撃態勢) | OnRollLose/OnPreDealDamage | **[#104 修正]** 収支プラス（プレイヤー）の次のターン、**この敵の攻撃のダメージ +3**（`nextTurnBuffs["enemy.counterStance.dmgUp"]` → 次ターンの敵の OnPreDealDamage で finalDamage += ・剛力と同じ位置）。旧: 共有バフ `damageBonus` で次ターンのプレイヤーの主攻撃と敵の攻撃 2 経路の全部に +3 |
+| HoningDuel(研ぎ澄まし) | OnPreDealDamage | **[#104 修正]** この敵の攻撃が通るたび、ダメージ +currentTurn/3（剛力・闇技と同じ「勝利時の与ダメージ」の読み替え。トリガーを OnRollWin から OnPreDealDamage に替えた）。旧: 収支トリガーで currentBuffs["damageBonus"] に書き、次の BeginNewTurn の `currentBuffs.Clear()` で消えていた |
 | EliteVigor(精鋭・汎用) | OnBattleStart/OnPostRoll | enemyDefense +2（2026-10-28。旧: 被ダメ%軽減 +0.10） / 自ダイス += currentTurn/3 |
 | EliteSlime/EliteGoblin | OnPostRoll | 自ダイス +3 **[未装備]** |
 | EliteKobold(早業) | OnPostRoll/OnPreReceiveDamage | GOLD奪取 / 50%で被ダメ0 **[未装備]** |
@@ -650,20 +670,20 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 | EliteHarpy(死翔) | OnBattleStart/OnPostRoll | 消費ロック / 自ダイス += 3+currentTurn **[未装備]** |
 | EliteDecree13(死の重圧) | OnPostRoll | 宣告ターン中 自ダイス +13 |
 | EliteOrc(痛恨の一撃) | OnPreDealDamage他 | 勝利+8 / 敗北でダイス数+1(max3,extraDice)・勝利reset **[未装備]** |
-| EliteLizard(重甲) | OnBattleStart/OnRollLose | enemyDefense +4（硬鱗と合わせて 8・2026-10-28。旧: 被弾時 −2） / fixedDamageToEnemy +1反射。**反射の半分は [不発・確定]**（尾撃と同じ） |
+| EliteLizard(重甲) | OnBattleStart/OnRollLose | enemyDefense +4（硬鱗と合わせて 8・2026-10-28。旧: 被弾時 −2） / 収支プラス（プレイヤー）のターンに `EnemyDealUnmitigable(1)` の反射（**[#104 修正]** 尾撃と同じ） |
 | EliteWraith(霊体) | OnTurnStart/OnPreReceiveDamage | 奇数T 攻撃ロールを 1 回多く引く(extraDice=1) / 偶数T(霊体) 主攻撃の被ダメ=1 |
 | EliteGolem(巌の意志) | OnTurnEnd | 意志+1、撃破時 意志分を実プレイヤーへ確定ダメ |
 | EliteMinotaur | OnPostRoll | 自ダイス +1 |
-| EliteDarkKnight(闇技) | OnPreDealDamage | 勝利時 finalDamage +2。**[不発・確定]**（剛力と同じ） |
-| MultiHead(多頭攻撃) | OnRollWin | extraPursuitDice +1。**[不発・確定]** `extraPursuitDice` を読む処理が無い |
+| EliteDarkKnight(闇技) | OnPreDealDamage | **[#104 修正]** 剛力と同じ（この敵の攻撃が通るたびダメージ +2） |
+| MultiHead(多頭攻撃) | OnRollWin | extraPursuitDice +1。**[不発・確定]** `extraPursuitDice` を読む処理が無い。#104 では**未修正**（敵側に「追撃ダイス」に当たる仕組みが無く、読み替えが 1 通りに決まらない） |
 | Regeneration(再生) | OnTurnStart | 自HP +1 |
 | DemonAura(魔王の威圧) | OnBattleStart | enemyMaxHPReduction +3(相手最大HP−3) |
-| Hellfire(地獄の業火) | OnRollWin | fixedDamageToEnemy +2。**[不発・確定]**（尾撃と同じ） |
-| Lifesteal(吸血) | OnPostDealDamage | 勝利時 自HP += finalDamage/2。**[不発・確定]** ctx にだけ書いた回復が、同じターンの `ctx.enemyCurrentHP = enemyHP` で上書きされる |
+| Hellfire(地獄の業火) | OnRollWin | **[#104 修正]** プレイヤーの収支マイナスのターン、その場で `EnemyDealUnmitigable(2)`（尾撃と同じ） |
+| Lifesteal(吸血) | OnPostDealDamage | **[#104 修正]** 敵の攻撃の末尾で、自HP += この攻撃で実際に通った主攻撃のダメージ（ブロック・シールド・軽減の後）/2（ReduceEnemyHeal を通す）。CombatManager が鳴らす前に ctx の HP と `ctx.finalDamage = takenDmg` を揃え、鳴らした後に HP を拾う。旧: ctx にだけ書いた回復が同じターンの `ctx.enemyCurrentHP = enemyHP` で上書きされていた |
 | NightLord(夜の王) | OnTurnStart | T5以降 extraDice=1（攻撃ロールを 1 回多く引いて足す） |
 | DeathSentence(死の宣告) | OnTurnStart | T>10（＝11ターン目）で fixedDamageToEnemy +999(即死) |
 | ScratchAura | OnRollLose | no-op(脅威の削りは廃止) **[未装備]** |
-| IntimidatePlus/PlusPlus(威圧+/++) | OnBattleStart | enemyThreat += 3/5（ボスの威圧+は BossParam.IntimidateThreat）。**[不発・確定]** `ctx.enemyThreat` を読む処理が無い（§9.6 の宿題「基礎攻撃値に統合」のまま） |
+| IntimidatePlus/PlusPlus(威圧+/++) | OnBattleStart | **[#104 修正]** この敵の攻撃 +3/+5（戦闘を通して・ボスの威圧+は BossParam.IntimidateThreat）。足し先は `enemyDiceTotalBonus`（Escalation.EnemyAttackValue で基礎攻撃と同じく倍率が掛かる＝基礎攻撃 +N と同値・予告に出る）。「脅威」はいま基礎攻撃値の代わり（baseAttack 未指定時）としてしか使われないので、§9.6 の宿題どおり基礎攻撃値への加算と読んだ。旧: `ctx.enemyThreat` に足して読む処理が無かった（いまは enemyThreat へ書かない） |
 | GreedyMerchant(貪欲商人) | OnBattleStart | no-op(スケーリングは GameManager.StartFalseMerchantCombat: HP +2/個・攻撃 +1/3個) |
 | Berserk(狂暴化・全ボス付与) | OnTurnStart | T>50: healBlocked, enemyDamageTakenMultiplier=3, enemyDiceTotalBonus +=10(1回) |
 
@@ -683,14 +703,14 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 | MirrorTwinsResponse(鏡映の応答) | OnPostReceiveDamage/OnTurnStart | 閾値 `Thr = max(12, ボス最大HP×4%)`。与ダメ<Thr で reflect=min(MirrorReflectCap=9, Thr−ダメ)を蓄積、次T開始で軽減無視の反射 |
 | JudgmentFlames(審判の炎) | OnTurnEnd | `dmg=min(ChipCap, 1+ceil(currentTurn/3)+罪)`、実プレイヤーへ軽減無視（罪=totalBattles/8,max2 / ChipCap 基準 10・BossTuning で可変）。ターン係数は 2026-07-28 に 1→1/2、2026-08-15 に 1/2→1/3 へ緩和（15T 累積 108→90・上限は T≥19 まで届かない）。**シールドは肩代わりする**（③-C） |
 | RoyalEmber / SinChain / EternalBurning / ReturnToAshes / JudgmentBlaze / AshArmor / ImmortalEmber / EmberAura / StarfireProliferation / ScorchedEarth / AshCarapace | — | 旧 6 層ボスの機構。**[未装備]**（6 層は下の 5 つで組み直した・数値はクラスの XML コメント） |
-| EmberOmen(業火の予兆) | OnTurnStart | 予兆ターン = HP>50% は T1/5/9…（周期4）、HP≤50% は T1/4/7…（周期3）。予兆Tに `enemyDiceTotalBonus += JudgmentDice`（基準 8）。**[積み上がり・確定]** `+=` を戻す処理が無く、予兆のたびに積み上がる |
+| EmberOmen(業火の予兆) | OnTurnStart | 予兆ターン = HP>50% は T1/5/9…（周期4）、HP≤50% は T1/4/7…（周期3）。予兆Tだけ攻撃 +JudgmentDice（基準 8）。**[#104 修正]** 焦土契約と同じ差分更新（自分の寄与 `ember_omen_applied` を毎T頭に「予兆なら JudgmentDice、それ以外 0」へ合わせて `enemyDiceTotalBonus` を足し引き）。旧: `+=` を戻す処理が無く、予兆のたびに積み上がっていた |
 | AshRegrowth(灰の再生) | OnTurnStart | HP>50% かつ非予兆T: 最大HPの2%回復（最低1） |
-| EmberFury(憤怒の残滓) | OnTurnStart | HP≤50% のT: `enemyDiceTotalBonus += 3`。**[積み上がり・確定]** 毎ターン積み上がる（「常時 +3」になっていない） |
+| EmberFury(憤怒の残滓) | OnTurnStart | T頭の HP≤50% のT: 攻撃 +3（それ以外 0）。**[#104 修正]** 業火の予兆と同じ差分更新（`ember_fury_applied`）。旧: 毎ターン `+=` で積み上がっていた |
 | ScorchedPact(焦土契約) | OnRollWin/OnTurnStart | 収支負けでスタック+1（上限5）。毎T 差分更新で `enemyDiceTotalBonus` に現在スタック×1 を反映（累積しない） |
 | BlazeBrand(烈炎) | OnTurnEnd/OnTurnStart | ブロック端子へ 2 本以上のT終了時に烈炎+1 / T開始時に烈炎の数だけ軽減無視ダメ |
 | Decree13th(13番目の宣告) | OnTurnStart/OnTurnEnd | 1/13でフラグ、本体が生存していれば成就で ceil((playerDiceTotal+enemyDiceTotal)×2.0) を軽減無視で実プレイヤーへ（2.0 は定数。プレイヤーの criticalMultiplier は 2026-08-08 から読まない・シールドは肩代わり） |
 | StrongOne/Throne/Setsuna(強者/玉座/刹那) | OnBattleStart | bossDiceBonus = 4/8/12 ※**現在enemies.jsonから撤廃・未参照（クラスは残置）** |
-| SaintGeorgesPhases(シュヴァリエ) | 多数 | 開幕プリオリテ1。形態1: シールド = 140−28×プリオリテ（最低28）が主攻撃を吸う・収支プラスのTに (プレイヤーの出目の合計+プリオリテ×7) の不可避反撃＋シールド−25 / 形態2: 連勝報酬（次T ボスの攻撃+4、そのTも収支プラスならボスへ15）・ボスの収支 3 勝で形態1帰還 / 帰還ごとにプリオリテ+1。**[不発・確定]** 形態1の 0d0（`extraDice=−4`）は攻撃ロール方式の敵には効かず、形態1でも普通に攻撃する。反撃のHP減と形態2の「ボスへ15」も、収支トリガーで ctx にだけ書かれ FinishTurnCommon の HP 書き戻しで消える（シールドの肩代わり分・シールド−25・遷移は残る） |
+| SaintGeorgesPhases(シュヴァリエ) | 多数 | 開幕プリオリテ1。形態1: シールド = 140−28×プリオリテ（最低28）が主攻撃を吸う・収支プラスのTに (プレイヤーの出目の合計+プリオリテ×7) の不可避反撃＋シールド−25 / 形態2: 連勝報酬（次T ボスの攻撃+4、そのTも収支プラスならボスへ15）・ボスの収支 3 勝で形態1帰還 / 帰還ごとにプリオリテ+1。**[#104 修正]** 形態1の 0d0（`extraDice=−4`）: `EnemyData.RollAttack` が引く回数を max(0, 1 + extra) にしたので、形態1は攻撃ロールを引かない（**基礎攻撃 × 大技・段階の倍率は残る**・「攻撃しない」とは読んでいない）。反撃のHP減と形態2の「ボスへ15」: 収支トリガーの後に CombatManager が ctx の HP を拾う（§9.3）ので残る。旧: 引く回数が max(1, …) で負の値が効かず、HP の増減は FinishTurnCommon の書き戻しで消えていた |
 | RelicScholar(遺物学者) | OnTurnStart/OnTurnEnd | 毎T 遺物を 1 枚抽選（段の切り替え直後は新等級から・天与の才の次Tは 2 枚）。`enemyDiceTotalBonus` = 遺物 + 溜め打ち + 停滞×Stagnation を `=` で一括代入。OnTurnEnd で大出血の tick。抽選結果は `MutualTurnTelegraph.drawnRelics` に載るが画面は未配線 |
 | StagnantTime(停滞する時間) | OnTurnEnd | 攻撃端子の本数 < ブロック端子の本数のTに停滞+1（上限10）。1 スタックあたり敵攻撃 + Stagnation（基準 1） |
 | AnalyticComputation(解析演算) | OnRollLose | 収支プラスごとに回避率 +2%（上限40%）。回避はその攻撃の通常・固定ダメを丸ごと消し、次Tは回避しない（`ApplyVescaDefense`） |
@@ -851,7 +871,8 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          → 物資の疲労（15% で**最終ダメージ半減**。 isCrit は落とさない）
          → 敵HP -= dealtDmg + dealtFixed
          → 鋼の皮膚
-         → **役の追撃**: ApplyWinDamageModifiers の直後に ApplyRoleExtraDamage (与ダメ内訳の算出後)
+         → **役の追撃**: ApplyWinDamageModifiers の直後に ApplyRoleExtraDamage (与ダメ内訳の算出後)。
+           敵の〈飛翔〉〈不動〉が ProcessDamage の中で nullifyPursuitDamage を立てていれば入れない (2026-11-11 #104)
          → **役の削り**: 極(yachtFired フラグ + yachtChunkPct)。 **鋼の皮膚より後**に置く
            ── 「軽減・シールドを無視して削る」を謳う役なので 1HP 踏みとどまりに吸われると文面が嘘になる
            ※〈過不足なし〉(exactLethal) は 2026-08-22 に〈拮抗〉(与ダメ+50%) へリワークされ廃止。
@@ -886,9 +907,12 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                      → 〈貫きの錐〉: blockSum −= enemyAtk × PierceAwlPerAttack   (enemyAtk は防御を引いた後の値)
                      → 〈不完全な転移〉(門・§4-3): blockSum −= floor(blockSum × 0.50)
          lossBase  = max(0, enemyAtk − blockSum)
-         → ProcessDamage(lossBase, 0, enemyCriticalNumerator, attackerIsEnemy: true)
+         → ProcessDamage(lossBase, 0, enemyCriticalNumerator, attackerIsEnemy: true, fireEnemyDealTriggers: true)
            ※ attackerIsEnemy: true = **会心判定を飛ばす**。 これが無いと敵の攻撃が
              プレイヤーの会心率で会心し、 プレイヤーの criticalMultiplier で増幅される
+           ※ fireEnemyDealTriggers: true = lossBase (+damageBonus) > 0 なら中で敵の OnPreDealDamage を鳴らす
+             (剛力/闇技/研ぎ澄まし/反撃態勢・§1 ②)。 2 体目・〈連撃〉の 2 回目は false。
+             (旧: この直前で敵の OnPreDealDamage を鳴らしていた ── 2026-11-11 #104 で撤去)
          → ApplyLossDamageModifiers（旧敗北分岐と同一）
          → nullifyAllDamage (虚空)
          → **役の被ダメ側**: 大階・相殺(0) / 束(防)(半減)。 虚空と**同じ位置・同じ対象**
@@ -896,6 +920,8 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          → 仕込み刃（旧法と同一）
          → プレイヤーHP -= takenDmg (+ fixedDamageToPlayer)
          → 痛覚遮断剤 post-clamp / Counter 固定ダメ
+         → ctx の HP を playerHP / enemyHP へ揃え、 ctx.finalDamage = takenDmg にして敵の OnPostDealDamage (〈吸血〉)
+           → SyncHPFromContext (2026-11-11 #104)
 
 充電     chargeSum = 端子の結果の chargeAdd      ← 個数ではない (基本の〈充電〉は出目そのまま・〈蓄電池〉出目 +2 など)
          → ctx.AddCharge(chargeSum)  (上限 ChargeMax=**30** + メタ種火r2 で +5)
@@ -931,6 +957,12 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
 `OnRollWin/Lose/Draw` を再発火する。既存 79 箇所のトリガー効果は無改修で「収支トリガー」として動く。
 副作用: 出目参照系は `ProcessPostRoll` の時点で発火するため、収支確定前の `playerWonRoll` を
 参照する効果があると値が古い（W7 後段で個別判定）。
+
+**HP の受け渡し（2026-11-11 #104）**: 収支トリガーを鳴らす直前に `ctx.playerCurrentHP/playerMaxHP/enemyCurrentHP` を
+CombatManager のフィールドへ揃え、鳴らした直後に `SyncHPFromContext` で拾う（CombatManager.Turn.cs の収支トリガー）。
+揃える値は直後の FinishTurnCommon の書き戻しと同じなので、敵パッシブが ctx の HP を動かさない限り挙動は変わらない。
+これで収支トリガーの中の HP の増減（〈尾撃〉〈地獄の業火〉〈重甲〉の `EnemyDealUnmitigable`・シュヴァリエの反撃と「ボスへ 15」）が残る。
+ここで入ったダメージは収支（balance）には数え直さない。致死なら FinishTurnCommon の combatLethalThisTurn に入る。
 
 ### 9.4 Escalation プロファイル（`Escalation.cs`・stage は T5/10/15/20 で 0→1→2→3→4）
 
@@ -981,12 +1013,12 @@ ADR-0009 パイプラインでのパッシブ挙動のリワーク記録 (2026-0
 - 被ダメ軽減/回復/シールド/会心/出目パターン/HP参照系 — 全 46 種
 - 敵側ダイス合計+N の 22 種 — 既存の enemyDiceTotal 経由で自動的に攻撃値へ寄与（当時は β=0.3 圧縮。β は 2026-07-28 に撤去し、いまは等倍で入る）。
   ただし 2026-11-11 の監査（#30）で、共有バフ（`nextTurnBuffs`）や OnPreDealDamage・OnPrePursuitDamage・解決後の収支トリガーに頼る敵パッシブは
-  効いていないことが確定した（§0 の「共有バフの罠」と §4 の [不発・確定] ほか・#104）
+  効いていないことが確定した（§0 の「共有バフの罠」と §4 の [不発・確定] ほか・#104）。同日 #104 で〈多頭攻撃〉以外を直した（§4・§5 の [#104 修正]）
 - 収支トリガー再定義で無改修動作の 15 種 (Counter/ShieldBash/LentTime/BladeEdge/Conqueror 他)
 
 **W7 後段の宿題 (§9.5 に既記載)**:
 - ボス固有機構 (SaintGeorges/Awakened P1-P7/EmberKing/JudgmentBlaze) の個別移植
 - パッシブ〈Parry〉の scratch 廃止に伴う効果差し替え (現状は KEEP 動作だが無意味に)。
   **タイミング判定のパリィとは別物**（そちらは 2026-08-09 に全廃・GAME.md §24）
-- IntimidatePlus/PlusPlus の threat 加算を「基礎攻撃値」加算に統合
+- ~~IntimidatePlus/PlusPlus の threat 加算を「基礎攻撃値」加算に統合~~ → 2026-11-11 #104 で敵の攻撃 +N（enemyDiceTotalBonus）にした（§4）
 - ScratchAura の正式削除

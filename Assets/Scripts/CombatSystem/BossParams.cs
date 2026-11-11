@@ -20,7 +20,8 @@ namespace CombatSystem
                            //   [読む敵なし] AshArmor はどの敵も持っていない
         Stagnation,        // 停滞する時間: 攻撃 < ブロックの配線のTごとに積むスタック1つあたりの敵攻撃加算。 基準1
                            //   → **7層ヴェスカの第一レバー** (docs/GAME.md §13-4)
-        IntimidateThreat,  // 威圧+ の脅威加算。 基準3。 [効き先なし] 脅威の削り/被弾は廃止済みで ctx.enemyThreat を読む処理が無い
+        IntimidateThreat,  // 威圧+ の加算。 基準3。 2026-11-11 (#104) から敵の攻撃 +N (enemyDiceTotalBonus・戦闘を通して) として効く
+                           //   (それまでは ctx.enemyThreat に足して読む処理が無く、 効き先が無かった)
         PoisonStackCap,    // 毒沼の主・毒の侵蝕の毒スタック上限 (DOTの最大強度)。 基準5
         MirrorReflectCap,  // 鏡の双子・鏡映の応答の反射ダメ上限。 基準9
         GoblinCall,        // ゴブリン王・号令の毎ターンの敵攻撃加算。 基準3

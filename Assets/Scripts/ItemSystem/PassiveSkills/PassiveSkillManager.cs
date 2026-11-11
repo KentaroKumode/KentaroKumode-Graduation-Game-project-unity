@@ -607,9 +607,14 @@ namespace ItemSystem.PassiveSkills
         /// 実測 (2026-08-08・500ラン): 遺物〈会心倍率+135%〉で倍率が 2.0→4.7 になると
         /// 1〜4層の戦闘死が 43 → 97 件へ倍増し、 致死敵がトレジャーゴブリン/ハーピィ/オークと
         /// いった雑魚で埋まった。 遺物なし (72件) より悪いという反転が起きていた。</param>
+        /// <param name="fireEnemyDealTriggers">**1 体目の敵の攻撃のときだけ true** (CombatManager.Turn.cs)。
+        /// ブロックを引いた後に 1 以上残るなら、 敵の <c>OnPreDealDamage</c> (〈剛力〉〈闇技〉〈研ぎ澄まし〉〈反撃態勢〉) を
+        /// ここで鳴らす。 プレイヤーの被ダメ軽減 (OnPreReceiveDamage) より前 ── 敵が足した分にもプレイヤーの軽減が掛かる。
+        /// 2 体目・〈連撃〉の 2 回目には鳴らさない (別の敵 / 1 回目の写し)。 2026-11-11 (#104)。</param>
         /// <returns>(totalDamage: クリティカル適用済み合計ダメージ, fixedDamage: 別枠固定ダメージ, isCritical)</returns>
         public (int totalDamage, int fixedDamage, bool isCritical) ProcessDamage(
-            int baseDamage, int pursuitDamage, float critBaseRate = 0f, bool attackerIsEnemy = false)
+            int baseDamage, int pursuitDamage, float critBaseRate = 0f, bool attackerIsEnemy = false,
+            bool fireEnemyDealTriggers = false)
         {
             if (context == null) return (baseDamage + pursuitDamage, 0, false);
 
@@ -620,6 +625,14 @@ namespace ItemSystem.PassiveSkills
             // 1. バフによるダメージボーナス（メインダメージに加算）
             context.finalDamage += (int)context.GetBuff("damageBonus");
 
+            // 1b. 敵の与ダメ補正 (敵の攻撃の計算の中だけ・2026-11-11 #104)。
+            //   呼び手が playerWonRoll = false / playerLostRoll = true にしてあるので、 敵視点では playerWonRoll = true
+            //   (= この敵が攻撃している)。 finalDamage は視点スワップされないので、 敵のパッシブが足した分がこの攻撃に乗る。
+            //   旧: CombatManager が敵の攻撃の前 (playerWonRoll がプレイヤー攻撃用のまま) に鳴らしており、
+            //   条件が立たず、 立っても直後のこの関数の finalDamage = baseDamage に上書きされていた。
+            if (attackerIsEnemy && fireEnemyDealTriggers && context.finalDamage > 0)
+                FireEnemyTrigger(PassiveSkillTrigger.OnPreDealDamage);
+
             // 2. ダメージ計算前スキル（ダメージ値を増減するパッシブ）
             if (context.playerWonRoll)
                 FireTrigger(PassiveSkillTrigger.OnPreDealDamage);
@@ -628,6 +641,11 @@ namespace ItemSystem.PassiveSkills
 
             // 3. 追撃ダメージスキル
             FireTrigger(PassiveSkillTrigger.OnPrePursuitDamage);
+            // 敵の「追撃ダメージを受けない」(〈飛翔〉〈不動〉): プレイヤーの攻撃の計算の中で鳴らす (2026-11-11 #104)。
+            //   立てた nullifyPursuitDamage (perTurn) を CombatManager.Turn.cs が見て、 役〈追撃〉の追加ダメージを入れない。
+            //   (ctx.pursuitDamage はいま書き手が無く常に 0。 下の 4. の 0 化はその枠のためのもの。)
+            if (!attackerIsEnemy)
+                FireEnemyTrigger(PassiveSkillTrigger.OnPrePursuitDamage);
 
             // 4. 無効化チェック
             if (context.nullifyAllDamage)

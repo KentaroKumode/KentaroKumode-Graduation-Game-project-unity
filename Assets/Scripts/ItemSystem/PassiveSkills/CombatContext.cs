@@ -272,7 +272,8 @@ namespace ItemSystem.PassiveSkills
         /// 完全無効は「殴っても無駄」でターンが消えるのと変わらないため、 半減に留める。</summary>
         public bool vescaHalvesDamageThisTurn;
 
-        /// <summary>[perTurn] 麻痺毒の小瓶: このターンのプレイヤー攻撃力減算。 実効攻撃力は 0 で床を引く。</summary>
+        /// <summary>[perTurn] このターンのプレイヤー攻撃力減算。 実効攻撃力は 0 で床を引く。
+        /// 書き手: 7層ヴェスカ〈麻痺毒の小瓶〉/ 敵〈罠師〉〈呪縛〉(前のターンに収支で勝った分・OnTurnStart・2026-11-11 #104)。</summary>
         public int playerAttackPowerPenalty;
         /// <summary>[persistent] 〈虚空〉のスタック。 攻撃端子に 0 本置いたターンごとに +1（戦闘中は戻らない）。
         /// 積むほど被ダメ軽減が薄れ、 敵への刻みが増える ＝「殻が剥がれる」。

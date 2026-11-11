@@ -983,13 +983,13 @@ namespace CombatSystem
                 atkBase = 0;
                 ctx.pursuitDamage = 0;
             }
-            // 7層ヴェスカ〈麻痺毒の小瓶〉: このターンのプレイヤー攻撃力を減算 (0 で床)。
+            // 7層ヴェスカ〈麻痺毒の小瓶〉・敵〈罠師〉〈呪縛〉: このターンのプレイヤー攻撃力を減算 (0 で床)。
             // 武器 attackPower は LEG でも 4〜8 なので実効は「武器素火力を消す」。 配線出目の分は残る。
             if (ctx.playerAttackPowerPenalty > 0)
             {
                 int before = atkBase;
                 atkBase = Math.Max(0, atkBase - ctx.playerAttackPowerPenalty);
-                Debug.Log($"[麻痺毒の小瓶] 攻撃力 {before} → {atkBase} (-{ctx.playerAttackPowerPenalty}, 0で床)");
+                Debug.Log($"[攻撃力の減算] 攻撃力 {before} → {atkBase} (-{ctx.playerAttackPowerPenalty}, 0で床)");
             }
             // 〈不完全な起動〉(門を不完全に起動した罰・2026-09-14)。
             //   回路が繋がりきらず出力が出ない。 **atkBase への割合**で掛ける ──
@@ -1076,7 +1076,11 @@ namespace CombatSystem
                 CombatStats.DamageBreakdown[22] += critExtra;   // [計装] 臨界の爆発
                 EnemyHpLedger.NoteBurstIntoFixed(critExtra);
             }
-            if (!skipAttack) ApplyRoleExtraDamage(ctx, ref dealtDmg, ref dealtFixed, roleOutcome);
+            // 敵の〈飛翔〉〈不動〉「追撃ダメージを受けない」: 上の ProcessDamage の中で敵の OnPrePursuitDamage が立てる (2026-11-11 #104)。
+            //   いまの「追撃」のダメージは役〈追撃〉の追加ダメージだけなので、 それを入れない。
+            if (!skipAttack && ctx.nullifyPursuitDamage && roleOutcome.extraDamageRatio > 0f)
+                Debug.Log("[追撃無効] この敵は追撃ダメージを受けない ── 役〈追撃〉の追加ダメージを入れない");
+            else if (!skipAttack) ApplyRoleExtraDamage(ctx, ref dealtDmg, ref dealtFixed, roleOutcome);
             if (term.bleedOnHit > 0 && dealtDmg > 0) ctx.AddEnemyBleed(term.bleedOnHit);      // 端子〈返し針〉: 攻撃が通れば出血
             ctx.lastPlayerDamage = dealtDmg + dealtFixed;
             // 固定ダメの枠は、 ここで取り出した (dealtFixed) ので空に戻す (2026-11-05)。
@@ -1316,7 +1320,9 @@ namespace CombatSystem
                     }
                 }
                 // --- 敵攻撃: 基礎×段階倍率 + β×ロール − ブロック (下限0) → 被ダメ修飾チェーン ---
-                psm.FireEnemyTrigger(PassiveSkillTrigger.OnPreDealDamage);
+                //   敵の OnPreDealDamage は下の ProcessDamage (fireEnemyDealTriggers: true) の中で鳴らす (2026-11-11 #104)。
+                //   旧: ここ (playerWonRoll がプレイヤー攻撃用のまま) で鳴らしており、 〈剛力〉〈闇技〉の条件が立たず、
+                //   立っても ProcessDamage の finalDamage = lossBase に上書きされていた。
                 if (ctx != null && !string.IsNullOrEmpty(ctx.bossId))
                     BossDmgDiag.RecordTurn(ctx.bossId, currentEnemy != null ? currentEnemy.displayName : ctx.bossId);
                 int lossBase = Math.Max(0, enemyAtkValue - blockSum);
@@ -1351,7 +1357,7 @@ namespace CombatSystem
                 //   **プレイヤーの**会心率で会心し、 **プレイヤーの** criticalMultiplier で
                 //   増幅される (§6-10 敵会心の全廃は enemies.json の分子 0 だけでは担保できない)。
                 var (takenDmg, counterFixed, _) =
-                    psm.ProcessDamage(lossBase, 0, 0f, attackerIsEnemy: true);
+                    psm.ProcessDamage(lossBase, 0, 0f, attackerIsEnemy: true, fireEnemyDealTriggers: true);
                 takenDmg = ApplyLossDamageModifiers(takenDmg, floorMod, ctx);
                 if (ctx.nullifyAllDamage) takenDmg = 0; // 虚空 等: 双方ダメ0化
 
@@ -1430,7 +1436,17 @@ namespace CombatSystem
                 if (counterFixed > 0)
                     HpLossDiag.Lose(ref enemyHP, counterFixed, "反撃固定");
 
+                // 敵の「ダメージを与えた時」(〈吸血〉)。 2026-11-11 #104:
+                //   ctx の HP を CombatManager の値へ揃えてから鳴らし (上の反撃固定・仕込み刃は enemyHP だけを減らしている)、
+                //   鳴らした後に ctx の HP を拾う ── 旧実装は ctx にだけ書いた回復が、 このターンの後ろの ctx.enemyCurrentHP = enemyHP で消えていた。
+                //   finalDamage (敵視点で「与えた量」) は、 この攻撃で実際に通った主攻撃のダメージ (ブロック・シールド・軽減の後) にする。
+                ctx.playerCurrentHP = playerHP;
+                ctx.playerMaxHP = playerMaxHP;
+                ctx.enemyCurrentHP = enemyHP;
+                EnemyHpLedger.CtxOverwritten();   // [計装]
+                ctx.finalDamage = takenDmg;
                 psm.FireEnemyTrigger(PassiveSkillTrigger.OnPostDealDamage);
+                SyncHPFromContext(ctx);
             }
             // **旧: else で OnPostReceiveDamage を焚いていた (2026-09-09 撤去)。**
             //   この else は「敵が死んでいて攻撃しなかった」枝で、 被弾の通知には使えない
@@ -1547,12 +1563,20 @@ namespace CombatSystem
             Debug.Log($"[相互攻撃] T{ctx.currentTurn} 収支 {(balance >= 0 ? "+" : "")}{balance} " +
                       $"(与 {dealtDmg + dealtFixed} / 被 {takenApplied})");
 
+            // 収支トリガーの中で敵のパッシブが動かす HP (〈尾撃〉〈地獄の業火〉〈重甲〉の固定ダメージ・シュヴァリエの反撃と「ボスへ 15」) を残す (2026-11-11 #104)。
+            //   鳴らす前に ctx の HP を CombatManager の値へ揃え、 鳴らした後に拾う。 揃えるのは FinishTurnCommon の頭の書き戻しと同じ値
+            //   なので、 それ以外の挙動は変わらない。 旧実装は ctx にだけ書かれ、 FinishTurnCommon の書き戻しで消えていた。
+            ctx.playerCurrentHP = playerHP;
+            ctx.playerMaxHP = playerMaxHP;
+            ctx.enemyCurrentHP = enemyHP;
+            EnemyHpLedger.CtxOverwritten();   // [計装]
             if (ctx.playerWonRoll)
                 psm.FireEnemyTrigger(PassiveSkillTrigger.OnRollLose);
             else if (ctx.playerLostRoll)
                 psm.FireEnemyTrigger(PassiveSkillTrigger.OnRollWin);
             else
                 psm.FireEnemyTrigger(PassiveSkillTrigger.OnRollDraw);
+            SyncHPFromContext(ctx);
 
             // 端子の山札: 撃破のボーナスと、 使い捨て・写し取り・焼き切り・保持の反映
             FinishTerminalTurn(term);
