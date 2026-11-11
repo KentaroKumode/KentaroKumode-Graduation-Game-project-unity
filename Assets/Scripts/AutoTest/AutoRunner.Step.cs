@@ -223,20 +223,8 @@ namespace AutoTest
 
             // 2026-06-28: BOT は職業をランダムに選択 (BOT 学習で全 4 職を均等にサンプル)
             GameLoop.GameManager.SelectedClass = (GameLoop.ClassType)GameLoop.GameRng.RangeAuto("AutoRunner.1", 0, 4);
-            // 特殊端子 (§6-5): ラン開始時は持たない。 1〜4 層のボスの報酬の 2 択から選ぶ (人と同じ入手・2026-11-11)。
-            //   旧: ラン開始前にペルソナで 1 つ決めて 1 層から持っていた = 人の遊びより甘い条件で測っていた。
-            GameLoop.GameManager.SelectedSpecialTerminal = "";
-            // 端子の山札 (ADR-0014) で戦うランは、 戦闘後の端子の報酬を選ぶ (AutoRunner.Terminals)。 旧い特殊端子の 2 択は山札では出ないので差さない。
-            if (CombatSystem.TerminalCards.Enabled)
-            {
-                GameHooks.ChooseTerminalReward = ChooseTerminalReward;
-                GameHooks.ChooseSpecialTerminal = null;
-            }
-            else
-            {
-                GameHooks.ChooseSpecialTerminal = ChooseSpecialTerminal;
-                GameHooks.ChooseTerminalReward = null;
-            }
+            // 端子の山札 (ADR-0014): 戦闘後の端子の報酬を選ぶ (AutoRunner.Terminals)。
+            GameHooks.ChooseTerminalReward = ChooseTerminalReward;
             gm.StartNewRun();
             // アイテム アブレーション: 開幕付与。 **StartNewRun の直後**でないと
             //   ownedPassiveItems がまだ存在しない。 AddPassiveItem は GameRng を
@@ -267,7 +255,7 @@ namespace AutoTest
 
             // ランダム付与試行: このランの割り当てを引く。 引くだけで、 配るのは各層に着いてから。
             if (randomGrantTrial && gm.Run != null) RollGrantPlan(index, gm.Run);
-            // 乖離調査 (2026-08-10): **ラン開始時点の構成**。 職業と特殊端子はここまでの
+            // 乖離調査 (2026-08-10): **ラン開始時点の構成**。 職業はここまでの
             //   GameRng 消費で決まるので、 ここが割れていれば乱数、 揃っていれば乱数より後の分岐。
             {
                 var r = gm.Run;
@@ -595,7 +583,7 @@ namespace AutoTest
                     //   どちらも「回復を選んだ」後の枝で、 強化を選ぶ基準 (上の分岐) は変えない。
                     //   面を外す: HP が満ちていて回復が無駄になる場面だけ。 役を持たない低い目 (2 以下) を外して出目の平均を上げる
                     if (hpR >= 0.95f && TryRestRemoveLowFace(gm)) return false;
-                    //   多めに休む: HP が 6 割を切っていて、 追跡者に補足されていない時 (1 手番進むので、 追われている時は使わない)
+                    //   多めに休む: HP が 6 割を切っていて、 追跡者に補足されていない時 (1 ターン進むので、 追われている時は使わない)
                     var sim = gm.FreeMap;
                     bool hunted = sim != null && sim.FoeAlive && sim.FoeMode == MapSystem.FreeMove.FoeMode.Chase;
                     if (hpR < 0.6f && sim != null && !hunted) { gm.RestHealMore(); return false; }

@@ -136,15 +136,13 @@ namespace AutoTest
                 cm.RerollPolicy = effectiveSkill == WiringSkill.Naive ? null
                                 : (System.Func<int[], CombatSystem.MutualTurnTelegraph, int, int[]>)MutualRerollPolicy;
             }
-            // 端子の山札 (ADR-0014): どの技量の方策を差していても、 山札で戦う戦闘は山札用の方策へ流す (AutoRunner.Terminals)。
-            //   山札に未対応の方策 (Exact・Super・旧い配線の Optimal) は WiringPlan.main しか返さないので、 そのままだと本体が
-            //   素朴な既定 (TerminalWiring.Auto) で挿してしまう。 リロールも Exact / Super の方策は旧い配線で値付けするので、
-            //   Optimal のリロール (山札のときは山札の効用で値付けする) へ替える。 素朴版はリロールしないまま。
-            if (cm.TerminalDeck != null)
-            {
-                cm.WiringPolicy = DeckWiringPlanPolicy;
-                if (effectiveSkill != WiringSkill.Naive) cm.RerollPolicy = MutualRerollPolicy;
-            }
+            // 端子の山札 (ADR-0014): どの技量の方策を差していても、 配線は山札用の方策へ流す (AutoRunner.Terminals)。
+            //   戦闘は常に山札で戦う (旧い配線の経路は 2026-11-11 に本体から削除)。 山札に未対応の方策 (Exact・Super・旧い配線の Optimal)
+            //   は WiringPlan.main しか返さず、 本体はもう main を読まないので、 ここで必ず差し替える。 リロールも Exact / Super の方策は
+            //   旧い配線で値付けするので、 Optimal のリロール (山札の効用で値付けする) へ替える。 素朴版はリロールしないまま。
+            //   ※ 上の分岐の Exact / Super の配線とリロールは、 ここで上書きされるので戦闘の判断には使われない (BeginCombat の副作用だけ残る)。
+            cm.WiringPolicy = DeckWiringPlanPolicy;
+            if (effectiveSkill != WiringSkill.Naive) cm.RerollPolicy = MutualRerollPolicy;
 
             _fbDecided = _fbTurns = _fbKillTurns = 0;   // [計装] 防ぎ切りの規則の数え直し
             EndCombatMainCorr();   // [V3 mainCorr] 前の戦闘の残りを締めてから、 この戦闘の累計を 0 から
@@ -642,7 +640,6 @@ namespace AutoTest
             public int atkBase;                // 麻痺毒の減算後の素の攻撃力
             public int enemyAtk;               // tele.enemyAttackValue と同値 (先読みでは次ターンの期待値)
             public float wAtk, wDef, wChg;     // 端子の重み (ペルソナ・ボス別プレイブック・予兆ターン込み)
-            public CombatSystem.SpecialTerminalDef specDef;
             public float critMul;
             public int eDefNow, myPen;
             public bool stepGuardCut, stepUndying, steadfastReady, stepDaybreak, hasVoidStance;
@@ -814,7 +811,7 @@ namespace AutoTest
             /// <summary>充電の価値の単位 (旧い配線 = 充電に挿したダイスの本数。 山札 = 実際に増える充電 ÷ <c>DeckChargePipsPerDie</c>)。</summary>
             public float chargeUnits;
             public int aSum, blockRaw, chargeRaw, maxBlockDie;
-            /// <summary>効用へそのまま足す分 (旧い特殊端子の見積もり / 山札の先の得の見積もり)。</summary>
+            /// <summary>効用へそのまま足す分 (山札の先の得の見積もり)。</summary>
             public float specFlat;
             // ---- 端子の山札の結果 (旧い配線では「なし」) ----
             public float damageMul;      // 別枠の与ダメの掛け算 (1 = なし)
@@ -837,15 +834,12 @@ namespace AutoTest
             return OptimalUtilityCore(in s, rolls.Length, in ws, out outcome);
         }
 
-        /// <summary>旧い配線 (攻撃/ブロック/充電/特殊) の出目の合計と個数。 特殊端子 (§6-5) の見積もりもここ (山札では通らない)。</summary>
+        /// <summary>旧い配線 (攻撃/ブロック/充電) の出目の合計と個数 (山札では通らない)。</summary>
         private static WiredSums LegacySums(in OptimalTurnState s, int[] rolls, CombatSystem.DiceTerminal[] w)
         {
             int k = rolls.Length;
-            int myHp = s.myHp, myMaxHp = s.myMaxHp, enemyAtk = s.enemyAtk;
-            float wAtk = s.wAtk, wDef = s.wDef, critMul = s.critMul;
-            var specDef = s.specDef;
             int aCount = 0, bCount = 0, c = 0, aSum = 0, blockRaw = 0, maxBlockDie = 0;
-            int sCount = 0, sSum = 0, chargeRaw = 0;
+            int chargeRaw = 0;
             for (int i = 0; i < k; i++)
             {
                 int v = rolls[i];
@@ -856,62 +850,11 @@ namespace AutoTest
                     bCount++; blockRaw += v;
                     if (v > maxBlockDie) maxBlockDie = v;
                 }
-                else if (w[i] == CombatSystem.DiceTerminal.Special)
-                { sCount++; sSum += v; }
-                else { c++; chargeRaw += v; }
-            }
-
-            // --- 特殊端子 (§6-5) の寄与を見積もる ---
-            //   **ここを書かないと BOT は特殊端子へ 1 本も挿さない** ── 挿した瞬間に
-            //   攻撃にもブロックにも充電にもならないので、 効用が単調に下がるため。
-            float specFlat = 0f;
-            if (specDef != null && sCount > 0)
-            {
-                switch (specDef.kind)
-                {
-                    case CombatSystem.SpecialTerminalKind.HeavyStrike:
-                        aSum += Mathf.CeilToInt(sSum * CombatSystem.SpecialTerminals.HeavyStrikeMultiplier); break;
-                    case CombatSystem.SpecialTerminalKind.FullGuard:
-                        blockRaw += sSum * CombatSystem.SpecialTerminals.FullGuardMultiplier; break;
-                    case CombatSystem.SpecialTerminalKind.Bleed:
-                        specFlat += (sSum * 0.8f + sSum * sCount * 0.5f) * CombatSystem.EnemyHpLedger.ProbePassiveMult; break;   // [測定用の物差し] 出血の見込み
-                    case CombatSystem.SpecialTerminalKind.Heal:
-                        specFlat += sSum * wDef; break;
-                    case CombatSystem.SpecialTerminalKind.Deathwish:
-                    {
-                        int missing = Mathf.Max(0, myMaxHp - myHp);
-                        aSum += sSum + Mathf.FloorToInt(missing * CombatSystem.SpecialTerminals.DeathwishMissingHpPct);
-                        specFlat -= sSum * wDef;   // 自傷ぶんの不利
-                        break;
-                    }
-                    case CombatSystem.SpecialTerminalKind.VitalPoint:
-                    {
-                        int mn = int.MaxValue;
-                        for (int i = 0; i < k; i++) if (rolls[i] < mn) mn = rolls[i];
-                        bool allMin = true;
-                        for (int i = 0; i < k && allMin; i++)
-                            if (w[i] == CombatSystem.DiceTerminal.Special && rolls[i] != mn) allMin = false;
-                        if (allMin) aSum += sSum * CombatSystem.SpecialTerminals.VitalPointMultiplier;
-                        break;
-                    }
-                    case CombatSystem.SpecialTerminalKind.Aim:
-                        specFlat += Mathf.CeilToInt(sSum / 2f) / 100f * aSum * (critMul - 1f); break;
-                    case CombatSystem.SpecialTerminalKind.Battery:
-                        chargeRaw += sSum + sCount * CombatSystem.SpecialTerminals.BatteryPerDice;
-                        c += sCount;
-                        break;
-                    case CombatSystem.SpecialTerminalKind.Coolant:
-                    case CombatSystem.SpecialTerminalKind.Foundry:
-                        // 蓄積型。 1 ターンでは返らないので「蓄積 1 あたりの期待値」で薄く評価する
-                        specFlat += sSum * 0.6f; break;
-                    case CombatSystem.SpecialTerminalKind.Riposte:
-                        specFlat += Mathf.Min(sSum, Mathf.Max(0, enemyAtk - blockRaw)) * wAtk; break;
-                }
+                else if (w[i] == CombatSystem.DiceTerminal.Charge) { c++; chargeRaw += v; }
             }
             var ws = WiredSums.None();
             ws.aCount = aCount; ws.bCount = bCount; ws.chargeUnits = c;
             ws.aSum = aSum; ws.blockRaw = blockRaw; ws.chargeRaw = chargeRaw; ws.maxBlockDie = maxBlockDie;
-            ws.specFlat = specFlat;
             return ws;
         }
 
@@ -1145,7 +1088,7 @@ namespace AutoTest
             public bool steadfastOn;
             public int steadfastReadyTurn;
             public int[] faces;                // 次の出目の面 (全ダイス共通)
-            public int specialLimit, termKinds;
+            public int termKinds;
             public int nextBlazeBase;
             public float enemyMaxHp;           // 敵の最大 HP (Phase 判定の比に使う)
             public readonly Dictionary<(int, int, int, int, int, int, int), float> memo
@@ -1158,8 +1101,8 @@ namespace AutoTest
         /// ボス戦のみでも 5,000 ランに約 28 分かかった。 今の効用の上位だけを読む (同点はすべて含める)。</summary>
         private const int LookaheadTopK = 4;
 
-        /// <summary>今ターンの効用の上位 K 本目の値。 列挙の制約 (特殊端子の上限・封印) は本体の列挙と同じ。</summary>
-        private float LookaheadCutoff(in OptimalTurnState st, int[] rolls, int termKinds, int specialLimit, int sealedTerm)
+        /// <summary>今ターンの効用の上位 K 本目の値。 列挙の制約 (封印) は本体の列挙と同じ。</summary>
+        private float LookaheadCutoff(in OptimalTurnState st, int[] rolls, int termKinds, int sealedTerm)
         {
             int k = rolls.Length;
             int total = 1; for (int i = 0; i < k; i++) total *= termKinds;
@@ -1167,14 +1110,13 @@ namespace AutoTest
             var top = new List<float>(total);
             for (int code = 0; code < total; code++)
             {
-                int t = code, spec = 0; bool sealedUsed = false;
+                int t = code; bool sealedUsed = false;
                 for (int i = 0; i < k; i++)
                 {
                     w[i] = (CombatSystem.DiceTerminal)(t % termKinds); t /= termKinds;
-                    if (w[i] == CombatSystem.DiceTerminal.Special) spec++;
                     if (sealedTerm >= 0 && (int)w[i] == sealedTerm) sealedUsed = true;
                 }
-                if (spec > specialLimit || sealedUsed) continue;
+                if (sealedUsed) continue;
                 top.Add(OptimalUtility(in st, rolls, w));
             }
             if (top.Count <= LookaheadTopK) return float.NegativeInfinity;
@@ -1191,8 +1133,7 @@ namespace AutoTest
             plan.steadfastOn = WeaponRungModel.From(ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.ActivePlayerSkillIds).steadfast;
             plan.steadfastReadyTurn = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.SteadfastStance.ReadyKey);
             plan.faces = (ctx.equippedDiceFaces != null && ctx.equippedDiceFaces.Length > 0) ? ctx.equippedDiceFaces : new[] { 1, 2, 3, 4, 5, 6 };
-            plan.specialLimit = CombatSystem.SpecialTerminals.EquippedLimit(run);
-            plan.termKinds = plan.specialLimit > 0 ? 4 : 3;
+            plan.termKinds = 3;      // 攻撃・ブロック・充電
             plan.enemyMaxHp = System.Math.Max(1, enemy.maxHP);
 
             // 次ターンの敵の攻撃: 公開規則 (Escalation.EnemyAttackValue) に、 敵ダイスは面の平均を入れる。
@@ -1306,13 +1247,10 @@ namespace AutoTest
             for (int code = 0; code < total; code++)
             {
                 int t = code;
-                int spec = 0;
                 for (int i = 0; i < k; i++)
                 {
                     assign[i] = (CombatSystem.DiceTerminal)(t % termKinds); t /= termKinds;
-                    if (assign[i] == CombatSystem.DiceTerminal.Special) spec++;
                 }
-                if (spec > plan.specialLimit) continue;
                 bool dup = false;
                 for (int i = 1; i < k && !dup; i++)
                     if (rolls[i] == rolls[i - 1] && (int)assign[i] < (int)assign[i - 1]) dup = true;
@@ -1415,7 +1353,7 @@ namespace AutoTest
                 && (!v3.lookaheadBossOnly || GameLoop.BossIds.IsBoss(cm.CurrentEnemy.id)))
             {
                 plan = BuildNextTurnPlan(in st, cm, ctxRoles, runForVoid, k);
-                plan.cutoff = LookaheadCutoff(in st, rolls, plan.termKinds, plan.specialLimit, tele.sealedTerminal);
+                plan.cutoff = LookaheadCutoff(in st, rolls, plan.termKinds, tele.sealedTerminal);
             }
             return SelectOptimalWiring(in st, rolls, tele, plan, idx);
         }
@@ -1470,13 +1408,12 @@ namespace AutoTest
             // 端子の重み (ペルソナ・ボス別プレイブック・予兆ターン): TerminalWeights に切り出し済み (先読みも同じ式を呼ぶ)
             TerminalWeights(in play, tele.turn, bossHpRatio, out float wAtk, out float wDef, out float wChg);
             // ===== 割り当ての列挙 =====
-            //   端子は 攻撃/ブロック/充電 (+特殊) の全列挙 (3^k)。 ADR-0011 でダイスは 3 個になったので 27 通り。
+            //   端子は 攻撃/ブロック/充電 の全列挙 (3^k)。 ADR-0011 でダイスは 3 個になったので 27 通り。
             //   役は配線に依存せず振った出目だけで決まるので、 配線の効用には役を入れない。
             var ctxRoles = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
 
             // 会心倍率は「束(攻)＝会心確定」「奇(攻)＝会心率+25%」の価値見積もりに要る。
             float critMul = ctxRoles?.criticalMultiplier ?? 3f;
-            var specDef = CombatSystem.SpecialTerminals.Equipped(runForVoid);
 
             // ===== 敵の防御と、 配線で条件が決まる武器の段 (2026-11-04) =====
             //   敵の防御: 予告に出ているこのターンの値 (構えの上乗せ・隙の 0・割れる/積み上がる装甲を反映済み)。
@@ -1508,7 +1445,7 @@ namespace AutoTest
             var st = new OptimalTurnState
             {
                 tele = tele, enemyHp = enemyHp, myHp = myHp, myMaxHp = myMaxHp, atkBase = atkBase, enemyAtk = enemyAtk,
-                wAtk = wAtk, wDef = wDef, wChg = wChg, specDef = specDef, critMul = critMul,
+                wAtk = wAtk, wDef = wDef, wChg = wChg, critMul = critMul,
                 eDefNow = eDefNow, myPen = myPen, stepGuardCut = stepGuardCut, stepUndying = stepUndying,
                 undyingStreak = undyingStreak, bashRate = bashRate, bulwarkRate = bulwarkRate,
                 steadfastReady = steadfastReady, stepDaybreak = stepDaybreak, myShield = myShield,
@@ -1607,13 +1544,9 @@ namespace AutoTest
                 }
                 else
                 {
-                    // 端子は 攻撃/ブロック/充電 の 3 種、 特殊端子 (§6-5) を装着していれば 4 種。
-                    //   **未装着なら第 4 端子は存在しない**ので列挙もしない (3^5=243 / 4^5=1024)。
-                    int specialLimit = CombatSystem.SpecialTerminals.EquippedLimit(runForVoid);
-                    int termKinds = specialLimit > 0 ? 4 : 3;
+                    // 端子は 攻撃/ブロック/充電 の 3 種 (3^k)。
+                    const int termKinds = 3;
                     // 〈綻び〉: 封印された端子は使えない。 **予告に載っているので配線前に読める**。
-                    //   本体側 (SanitizeWiring) が追い出すので、 候補に残すと
-                    //   「追い出された後の形」で効用を出せず判断がずれる。
                     int sealedTerm = tele.sealedTerminal;
                     // 挑戦デバフ〈不器用〉(2026-08-10 リワーク) は端子の種類を縛らない。
                     //   N 個以上挿すと**次のターン**その端子が半減するので、 合法性ではなく
@@ -1648,15 +1581,14 @@ namespace AutoTest
                                     t /= termKinds;
                                 }
 
-                                int spec = 0, distinct = 0;
+                                int distinct = 0;
                                 System.Array.Clear(buffers.termSeen, 0, buffers.termSeen.Length);
                                 for (int i = 0; i < k; i++)
                                 {
                                     int ti = (int)buffers.assign[i];
-                                    if (ti == (int)CombatSystem.DiceTerminal.Special) spec++;
                                     if (!buffers.termSeen[ti]) { buffers.termSeen[ti] = true; distinct++; }
                                 }
-                                if (spec > specialLimit || distinct > termCap) return buffers;
+                                if (distinct > termCap) return buffers;
                                 if (sealedTerm >= 0)
                                 {
                                     for (int i = 0; i < k; i++)
@@ -1689,16 +1621,15 @@ namespace AutoTest
                             int t = code;
                             for (int i = 0; i < k; i++) { assign[i] = (CombatSystem.DiceTerminal)(t % termKinds); t /= termKinds; }
 
-                            // 実行側 (SanitizeWiring) が畳む前に、 **制約を破る割り当てをそもそも評価しない**。
-                            int spec = 0, distinct = 0;
+                            // **制約を破る割り当てをそもそも評価しない**。
+                            int distinct = 0;
                             _termSeen[0] = _termSeen[1] = _termSeen[2] = _termSeen[3] = false;
                             for (int i = 0; i < k; i++)
                             {
                                 int ti = (int)assign[i];
-                                if (ti == (int)CombatSystem.DiceTerminal.Special) spec++;
                                 if (!_termSeen[ti]) { _termSeen[ti] = true; distinct++; }
                             }
-                            if (spec > specialLimit || distinct > termCap) continue;
+                            if (distinct > termCap) continue;
                             if (sealedTerm >= 0)
                             {
                                 bool usesSealed = false;
@@ -1743,13 +1674,8 @@ namespace AutoTest
         private float BestUtilityOf(int[] rolls, CombatSystem.MutualTurnTelegraph tele)
         {
             // 端子の山札: 手札の端子への挿し方の最良の効用 (リロールの値付けも山札の効用で見る)
-            if (CombatManager.Instance?.TerminalDeck != null)
-            {
-                ChooseDeckWiring(rolls, tele, out float du);
-                return du;
-            }
-            MutualWiringPolicy(rolls, tele);
-            return _lastBestU;
+            ChooseDeckWiring(rolls, tele, out float du);
+            return du;
         }
 
         /// <summary>全部振り直したあとの手の、 最良効用の期待値。 面の出方を<b>全部数える</b> (3 個 × 6 面 = 216 通り・同じ多重集合は 1 回だけ評価)。</summary>
@@ -1856,42 +1782,6 @@ namespace AutoTest
         {
             for (int i = 0; i < v.Length; i++) if (v[i] == x) return true;
             return false;
-        }
-
-        /// <summary>層ボスの報酬の特殊端子 (§6-5) の 2 択から選ぶ (2026-11-11・人と同じ入手)。 戻り値は添字、 負 = 今のまま。
-        ///
-        /// 方策: ペルソナに合う端子が並んでいればそれ。 無ければ、 何も付けていない時だけ先頭を取り (配線の評価は得な時しか挿さないので、
-        /// 持っていて損はしない)、 付けている時は替えない。 ペルソナに合う物をもう付けていれば替えない。
-        /// 旧: ラン開始前にペルソナで 1 つ決めて 1 層から持っていた。</summary>
-        private int ChooseSpecialTerminal(IReadOnlyList<string> offer)
-        {
-            var gm = GameLoop.GameManager.Instance; var run = gm != null ? gm.Run : null;
-            string want = PreferredSpecialTerminal(), cur = run != null ? run.equippedSpecialTerminalId : "";
-            if (!string.IsNullOrEmpty(want))
-            {
-                if (cur == want) return -1;
-                for (int i = 0; i < offer.Count; i++) if (offer[i] == want) return i;
-            }
-            return string.IsNullOrEmpty(cur) ? 0 : -1;
-        }
-
-        /// <summary>ペルソナに合う特殊端子の id (無ければ空)。</summary>
-        private string PreferredSpecialTerminal()
-        {
-            var K = CombatSystem.SpecialTerminalKind.None;
-            switch (_currentPersona)
-            {
-                case BuildPersona.Charge:   K = CombatSystem.SpecialTerminalKind.Battery;     break;
-                case BuildPersona.Shield:   K = CombatSystem.SpecialTerminalKind.FullGuard;   break;
-                case BuildPersona.Berserk:  K = CombatSystem.SpecialTerminalKind.Deathwish;   break;
-                case BuildPersona.Bludgeon: K = CombatSystem.SpecialTerminalKind.HeavyStrike; break;
-                case BuildPersona.Crit:     K = CombatSystem.SpecialTerminalKind.Aim;         break;
-                case BuildPersona.Bleed:    K = CombatSystem.SpecialTerminalKind.Bleed;       break;
-                case BuildPersona.Poison:   K = CombatSystem.SpecialTerminalKind.VitalPoint;  break;
-                case BuildPersona.Rinkai:   K = CombatSystem.SpecialTerminalKind.Foundry;     break;
-                case BuildPersona.Standard: K = CombatSystem.SpecialTerminalKind.HeavyStrike; break;
-            }
-            return K != CombatSystem.SpecialTerminalKind.None ? CombatSystem.SpecialTerminals.Get(K)?.id ?? "" : "";
         }
 
         /// <summary>端子上限の判定で使う「その端子を使ったか」のフラグ。 毎回 new しないため使い回す。</summary>

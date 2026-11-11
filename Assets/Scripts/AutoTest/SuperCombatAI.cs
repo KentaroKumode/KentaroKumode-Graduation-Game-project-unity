@@ -452,8 +452,7 @@ namespace AutoTest
         private int _decTurn;
         /// <summary>今の防御の「持続する分」(構えの増減を除く)。 先読みの盤面の初期値。</summary>
         private int _eDef0;
-        private int _termCap, _specialLimit, _chargeMax, _chargePerTurn;
-        private SpecialTerminalDef _spec;
+        private int _termCap, _chargeMax, _chargePerTurn;
         private int _pierceMul;               // 〈貫きの錐〉: 敵攻撃値 1 につきブロックを削る量
         private WeaponRungModel _rung;        // 剣・盾の段 (切り返し・不滅の刃・シールドバッシュ・城壁・堅守の構え・黎明)
         private int _sealPeriod;              // 〈綻び〉: 端子封印の周期 (0 = 無効)
@@ -494,8 +493,6 @@ namespace AutoTest
             _armor = EnemyArmorModel.From(enemy, ctx, out _eDef0);
             var run = GameLoop.GameManager.Instance?.Run;
             _isBoss = !string.IsNullOrEmpty(ctx.bossId);
-            _spec = SpecialTerminals.Equipped(run);
-            _specialLimit = SpecialTerminals.EquippedLimit(run);
             _termCap = 4;   // 〈不器用〉は端子の種類を縛らなくなった (2026-08-10 リワーク)
             _sealPeriod = 0;   // 旧〈綻び〉(端子の封印) は 2026-11-10 に撤去
             _chargeMax = CombatManager.ChargeMax;
@@ -971,20 +968,17 @@ namespace AutoTest
             _pendingPlayerHp = s0.pHp;
         }
 
-        /// <summary>特殊端子の接続上限と〈不器用〉の端子上限を守っているか。
-        /// **破る割り当ては評価すらしない** ── 本体側 (SanitizeWiring) が畳んだ形で
-        /// 効用を出すと「挿したつもりの効果」で過大評価するため。</summary>
+        /// <summary>〈不器用〉の端子上限を守っているか。 **破る割り当ては評価すらしない**。</summary>
         private bool Legal(DiceTerminal[] w)
         {
-            int spec = 0, distinct = 0;
+            int distinct = 0;
             _termSeen[0] = _termSeen[1] = _termSeen[2] = _termSeen[3] = false;
             for (int i = 0; i < _k; i++)
             {
                 int ti = (int)w[i];
-                if (ti == (int)DiceTerminal.Special) spec++;
                 if (!_termSeen[ti]) { _termSeen[ti] = true; distinct++; }
             }
-            return spec <= _specialLimit && distinct <= _termCap;
+            return distinct <= _termCap;
         }
 
         // ============================================================
@@ -1248,7 +1242,7 @@ namespace AutoTest
                               in TurnMods m)
         {
             System.Threading.Interlocked.Increment(ref ProfApplyTurn);
-            int aCount = 0, bCount = 0, aSum = 0, bSum = 0, cSum = 0, sCount = 0, sSum = 0;
+            int aCount = 0, bCount = 0, aSum = 0, bSum = 0, cSum = 0;
             for (int i = 0; i < _k; i++)
             {
                 int v = dice[i];
@@ -1256,17 +1250,9 @@ namespace AutoTest
                 {
                     case DiceTerminal.Attack: _grpA[aCount++] = v; aSum += v; break;
                     case DiceTerminal.Block: _grpB[bCount++] = v; bSum += v; break;
-                    case DiceTerminal.Special: sCount++; sSum += v; break;
-                    default: cSum += v; break;
+                    case DiceTerminal.Charge: cSum += v; break;
                 }
             }
-
-            // --- 特殊端子 (§6-5) ---
-            //   軽減無視の追加ダメージ相当 (出血・反撃・工房) と回復に畳んで扱う。
-            int specDmg = 0, specHeal = 0;
-            if (_spec != null && sCount > 0)
-                ApplySpecial(sSum, sCount, dice, w, ref aSum, ref bSum, ref cSum,
-                             s, enemyAtk, ref specDmg, ref specHeal);
 
             // 〈二股の端子〉: 充電端子の出目の一部が攻撃にも加わる (本体は上乗せ率より前に足す)
             if (_rung.chargeToAtkPct > 0f && cSum > 0) aSum += (int)Math.Floor(cSum * _rung.chargeToAtkPct);
@@ -1331,10 +1317,8 @@ namespace AutoTest
                     if (m.shieldReflectRate > 0f) reflectBack += (int)(absorbed * m.shieldReflectRate);
                 }
             }
-            dealt += specDmg;
             s.eHp -= dealt;
             if (s.eHp <= 0) return Win;
-            if (specHeal > 0) s.pHp = Math.Min(_pMaxHp, s.pHp + specHeal);
 
             // --- 敵攻撃 ---
             int taken = reflectBack;
@@ -1389,50 +1373,6 @@ namespace AutoTest
             if (_stagPer > 0 && aCount < bCount && s.stag < ItemSystem.PassiveSkills.Effects.StagnantTime.StackCap) s.stag++;   // ヴェスカ〈停滞する時間〉: 守りに寄せたターン
             s.turn++;
             return Ongoing;
-        }
-
-        /// <summary>特殊端子の寄与。 効果表は <see cref="SpecialTerminals"/> が正本。
-        /// 蓄積型 (冷却材・工房) は 1 ターンでは返らないので薄く見積もる。</summary>
-        private void ApplySpecial(int sSum, int sCount, int[] dice, DiceTerminal[] w,
-                                  ref int aSum, ref int bSum, ref int cSum, SimState s, int enemyAtk,
-                                  ref int specDmg, ref int specHeal)
-        {
-            switch (_spec.kind)
-            {
-                case SpecialTerminalKind.HeavyStrike:
-                    aSum += (int)Math.Ceiling(sSum * SpecialTerminals.HeavyStrikeMultiplier); break;
-                case SpecialTerminalKind.FullGuard:
-                    bSum += sSum * SpecialTerminals.FullGuardMultiplier; break;
-                case SpecialTerminalKind.Bleed:
-                    specDmg += (int)((sSum * 0.8f + sSum * sCount * 0.5f) * CombatSystem.EnemyHpLedger.ProbePassiveMult); break;   // [測定用の物差し 2026-11-10] 出血の見込み
-                case SpecialTerminalKind.Heal:
-                    specHeal += sSum; break;
-                case SpecialTerminalKind.Deathwish:
-                {
-                    int missing = Math.Max(0, _pMaxHp - s.pHp);
-                    aSum += sSum + (int)(missing * SpecialTerminals.DeathwishMissingHpPct);
-                    break;
-                }
-                case SpecialTerminalKind.VitalPoint:
-                {
-                    int mn = int.MaxValue;
-                    for (int i = 0; i < _k; i++) if (dice[i] < mn) mn = dice[i];
-                    bool allMin = true;
-                    for (int i = 0; i < _k && allMin; i++)
-                        if (w[i] == DiceTerminal.Special && dice[i] != mn) allMin = false;
-                    if (allMin) aSum += sSum * SpecialTerminals.VitalPointMultiplier;
-                    break;
-                }
-                case SpecialTerminalKind.Aim:
-                    specDmg += (int)((int)Math.Ceiling(sSum / 2f) / 100f * aSum * (_critMul - 1f)); break;
-                case SpecialTerminalKind.Battery:
-                    cSum += sSum + sCount * SpecialTerminals.BatteryPerDice; break;
-                case SpecialTerminalKind.Coolant:
-                case SpecialTerminalKind.Foundry:
-                    specDmg += (int)(sSum * 0.6f); break;
-                case SpecialTerminalKind.Riposte:
-                    specDmg += (int)(Math.Min(sSum, Math.Max(0, enemyAtk - bSum)) * 0.8f); break;
-            }
         }
 
         /// <summary>決着まで打ち切りながら回す。 方策は**軽い貪欲** ──
@@ -1688,9 +1628,9 @@ namespace AutoTest
             w._armor = _armor; w._eDef0 = _eDef0;
             w._stagPer = _stagPer; w._bloodEdict = _bloodEdict; w._decTurn = _decTurn; w.noStagWire = noStagWire;
             w._isBoss = _isBoss;
-            w._termCap = _termCap; w._specialLimit = _specialLimit;
+            w._termCap = _termCap;
             w._chargeMax = _chargeMax; w._chargePerTurn = _chargePerTurn;
-            w._spec = _spec; w._pierceMul = _pierceMul; w._rung = _rung;
+            w._pierceMul = _pierceMul; w._rung = _rung;
             w._sealPeriod = _sealPeriod; w._sealedNow = _sealedNow;
             w._dmgMul = _dmgMul; w._takenMul = _takenMul;
             w._nowMods = _nowMods;
@@ -1720,15 +1660,15 @@ namespace AutoTest
         // ============================================================
 
         /// <summary>合法な割り当ての表。 **ダイスの出目に依存しない** ── 端子上限〈不器用〉と
-        /// 特殊端子の接続制限だけで決まるので、 スナップショットごとに 1 回作れば足りる。
+        /// 端子の数 (3) だけで決まるので、 スナップショットごとに 1 回作れば足りる。
         /// 呼び出しのたびに 243 回の <c>% / /</c> と合法判定を回すのをやめるため。</summary>
         private DiceTerminal[][] _codes;
         private long _codesKey = -1;
 
         private void BuildCodes()
         {
-            int termKinds = _specialLimit > 0 ? 4 : 3;
-            long key = ((long)_k << 24) | ((long)termKinds << 16) | ((long)_specialLimit << 8) | (uint)_termCap;
+            const int termKinds = 3;      // 攻撃・ブロック・充電
+            long key = ((long)_k << 24) | ((long)termKinds << 16) | (uint)_termCap;
             if (key == _codesKey && _codes != null) return;
             _codesKey = key;
 

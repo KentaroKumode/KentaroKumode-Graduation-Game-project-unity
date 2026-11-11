@@ -40,7 +40,7 @@ namespace CombatSystem
         ///  攻撃した回数, その atkBase 合計, うち会心回数,
         ///  atkBase の内訳: 武器素火力, 攻撃端子の出目合計(ゴースト・役込み), 端子調律メタ分, パッシブ攻撃+, 消費攻撃+, 遺物攻撃+,
         ///  攻撃端子のダイス本数, 振ったダイス本数,
-        ///  出目合計の内訳: 実体ダイスの出目, ゴースト接続, それ以外 (役・特殊端子など), 最大出目]。
+        ///  出目合計の内訳: 実体ダイスの出目, ゴースト接続, それ以外 (役・端子など), 最大出目]。
         /// 「それ以外」 = 最大HP − 終了HP − (通常攻撃+固定+極+出血)。 即処刑・パッシブの直接削り・開始時削りがここに入る。</summary>
         public static readonly System.Collections.Generic.Dictionary<string, double[]> BossDmg
             = new System.Collections.Generic.Dictionary<string, double[]>();

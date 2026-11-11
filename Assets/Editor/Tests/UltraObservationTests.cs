@@ -45,11 +45,13 @@ namespace AutoTest.EditorTests.Ultra
             "totalBattles", "totalWins", "totalTurns", "totalCombatTurns", "combatStartHP",
             "baseMaxHPAtRunStart",
             // build / equipment
-            "equippedWeaponId", "equippedDiceId", "equippedSpecialTerminalId", "weaponPlus",
+            "equippedWeaponId", "equippedDiceId", "weaponPlus",
             "playerClass", "limitBreakStage", "sublimationCount",
             "ownedPassiveItems", "ownedConsumables", "ownedFlags",
             "ascendedPassiveIds", "diceFaceParts", "faceRemovals", "roleGoldBonusPct",
             "diceEnhanceKeys", "diceEnhanceLevels", "diceEnhanceValues",
+            // 端子の山札 (ADR-0014): 山札・提示中の報酬・〈研ぎ澄まし〉〈剥ぎ取り〉の持ち越しは画面に出る / 入れ替えを聞いている武器
+            "terminalDeck", "pendingTerminalOffer", "terminalWhetBonus", "terminalExtraChoices", "pendingWeaponIds",
             // knowledge the player has accumulated
             "seenOnceEvents", "seenPassiveItemIds", "shopPurchasedCounts",
             // status / debuffs

@@ -174,7 +174,6 @@ namespace AutoTest
             }
 
             var st = BuildOptimalTurnState(rolls, tele);
-            st.specDef = null;      // 旧い特殊端子 (§6-5) は山札では無い
             // 会心の効果 (〈真空管〉〈照星〉〈急所読み〉) を旧の式でも見積もれるよう、 会心率と倍率は常に読む (readOut の切り替えは変えない)
             if (ctx != null && !st.readOut && !st.traceBoth) FillReadOut(ref st, cm, ctx, run, tele.playerAttackPenalty);
 

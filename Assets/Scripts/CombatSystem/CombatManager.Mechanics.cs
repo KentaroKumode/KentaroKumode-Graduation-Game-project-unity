@@ -6,7 +6,7 @@ using ItemSystem.PassiveSkills;
 
 namespace CombatSystem
 {
-    /// <summary>CombatManager: ターン内の各機構 (敵の攻撃ロール・ダイス・防御・リロール・ラストスタンド・役・特殊端子)。</summary>
+    /// <summary>CombatManager: ターン内の各機構 (敵の攻撃ロール・ダイス・防御・リロール・ラストスタンド・役)。</summary>
     public partial class CombatManager
     {
         /// <summary>敵の攻撃ロール。 2026-07-28 以降の敵は **ダイスを振らず**、
@@ -343,184 +343,12 @@ namespace CombatSystem
             return outcome;
         }
 
-        /// <summary>配線の後始末。 **方策や UI が返した配線を信用しない**。
-        ///
-        ///   ① 特殊端子 (§6-5) の接続制限 N を超えた分を攻撃へ落とす。 未装着なら N=0 ＝ 全部落とす
-        ///   ② 挑戦デバフ〈不器用〉の「同時に配線できる端子の上限」を強制する
-        ///
-        /// ② は **使う端子を減らす**ので、 どれを捨てるかで結果が変わる。
-        /// 上限に収まらなかった端子のうち **本数の少ない方から**畳んで攻撃へ寄せる ──
-        /// 厚く挿した端子ほどプレイヤーの意図が強いとみなす。</summary>
-        private void SanitizeWiring(DiceTerminal[] wiring, int diceCount)
-        {
-            if (wiring == null) return;
-            int n = Math.Min(diceCount, wiring.Length);
-
-            // ① 特殊端子の接続制限
-            int limit = SpecialTerminals.EquippedLimit(GameLoop.GameManager.Instance?.Run);
-            int used = 0;
-            for (int i = 0; i < n; i++)
-            {
-                if (wiring[i] != DiceTerminal.Special) continue;
-                if (used < limit) { used++; continue; }
-                wiring[i] = DiceTerminal.Attack;
-            }
-
-            // (旧〈不器用〉の端子上限は撤去済み。)
-            //   2026-08-10 リワーク前は「同時に使える端子の種類数の上限」で、 ここで畳んでいた。
-            //   新効果は**厚みへの後払い**なので、 配線を検閲せず ResolveClumsyOverload が
-            //   次ターンの合計へ罰を掛ける。 配線の自由は残す。
-
-            // (〈不完全な起動〉の端子ごとの本数上限は 2026-09-14 に撤去。
-            //   5 ダイスなら 2+2+1 で置けてしまい全振りとの差が小さく、
-            //   1 本上限にすると 3 端子へ 5 本置けず**配線不能**になる。
-            //   罰は賽の本数 (GateFlaws.DiceCountAfterIgnition) へ移した。)
-        }
-
-        /// <summary>特殊端子 (§6-5) の効果を適用する。 効果表の正本は
-        /// <see cref="SpecialTerminals"/> と docs/GAME.md §6-5。
-        ///
-        /// **特殊端子は端子役 (ADR-0010) を成立させない。** 固有効果と接続制限を既に持っており、
-        /// そこへ役まで乗せると同じダイスで二重に報われる。 接続制限が最大 3 本なので
-        /// 分布系の役 (3 本以上) がちょうど成立してしまう点も避けたい。</summary>
-        private void ApplySpecialTerminal(CombatContext ctx, int[] dice, int sum, int count,
-                                          ref int attackSum, ref int blockSum, ref int chargeSum)
-        {
-            var run = GameLoop.GameManager.Instance?.Run;
-            var def = SpecialTerminals.Equipped(run);
-            if (def == null || ctx == null || sum <= 0) return;
-
-            switch (def.kind)
-            {
-                case SpecialTerminalKind.HeavyStrike:
-                {
-                    int add = Mathf.CeilToInt(sum * SpecialTerminals.HeavyStrikeMultiplier);
-                    attackSum += add;
-                    Debug.Log($"[特殊端子/重攻撃] 出目{sum} ×{SpecialTerminals.HeavyStrikeMultiplier} → 攻撃 +{add}");
-                    break;
-                }
-                case SpecialTerminalKind.FullGuard:
-                {
-                    int add = sum * SpecialTerminals.FullGuardMultiplier;
-                    blockSum += add;
-                    Debug.Log($"[特殊端子/完全防御] 出目{sum} ×{SpecialTerminals.FullGuardMultiplier} → ブロック +{add}");
-                    break;
-                }
-                case SpecialTerminalKind.Bleed:
-                {
-                    ctx.AddEnemyBleed(sum);   // 入口を通す (誓約の封じ・2 倍と〈血車〉の最大値)
-                    // 接続**本数**ぶんだけ即時に発動させる (合計値ではない ── 制限Ⅱなので最大 2 回)
-                    for (int k = 0; k < count && ctx.enemyBleedStacks > 0; k++)
-                    {
-                        int dmg = BattleModifierManager.ApplyBleedModifiers(ctx, ctx.enemyBleedStacks);
-                        RaiseDotDamage(DotKind.Bleed, Math.Min(dmg, enemyHP));
-                        RelicBloodOffering(Math.Min(dmg, enemyHP));
-                        CombatStats.DamageBreakdown[21] += Math.Max(0, Math.Min(dmg, enemyHP));   // [計装] 出血
-                        HpLossDiag.Lose(ref enemyHP, EnemyHpLedger.ProbePassive(dmg), "出血端子");   // [測定用の物差し] 入る量だけ
-                        ctx.enemyCurrentHP = enemyHP;
-                        EnemyHpLedger.CtxOverwritten();
-                    }
-                    Debug.Log($"[特殊端子/出血] +{sum} スタック (計 {ctx.enemyBleedStacks}) / 即時 {count} 回");
-                    break;
-                }
-                case SpecialTerminalKind.Heal:
-                    HealPlayer(sum);
-                    Debug.Log($"[特殊端子/治癒] HP +{sum}");
-                    break;
-
-                case SpecialTerminalKind.Deathwish:
-                {
-                    int missing = Math.Max(0, playerMaxHP - playerHP);
-                    int bonus = Mathf.FloorToInt(missing * SpecialTerminals.DeathwishMissingHpPct);
-                    // 自傷は **HP を 1 未満にしない** ── 端子を挿しただけで死ぬのは選択にならない
-                    int selfDmg = Math.Min(sum, Math.Max(0, playerHP - 1));
-                    playerHP -= selfDmg;
-                    ctx.playerCurrentHP = playerHP;
-                    attackSum += sum + bonus;
-                    Debug.Log($"[特殊端子/決死] 自傷{selfDmg} → 攻撃 +{sum}+{bonus}(不足HP{missing}の5%)");
-                    break;
-                }
-                case SpecialTerminalKind.VitalPoint:
-                {
-                    int min = int.MaxValue;
-                    for (int i = 0; i < dice.Length; i++) if (dice[i] < min) min = dice[i];
-                    // 接続したダイスが **すべてそのロールの最小値** のときだけ発動
-                    bool allMin = true;
-                    for (int i = 0; i < dice.Length && allMin; i++)
-                        if (i < mutualWiring.Length && mutualWiring[i] == DiceTerminal.Special
-                            && dice[i] != min) allMin = false;
-                    if (allMin)
-                    {
-                        int dmg = sum * SpecialTerminals.VitalPointMultiplier;
-                        ctx.fixedDamageToEnemy += dmg;
-                        HpLossDiag.NoteSource("端子:一寸", dmg, 0);
-                        Debug.Log($"[特殊端子/一寸] 最小値{min} を接続 → 軽減不可 {dmg}");
-                    }
-                    break;
-                }
-                case SpecialTerminalKind.Aim:
-                {
-                    int pts = Mathf.CeilToInt(sum / 2f);
-                    ctx.critRatePctAdd += pts / 100f;
-                    DmgSourceDiag.Note(DmgSourceDiag.AimKey, DmgSourceDiag.CritRate, pts / 100f);
-                    Debug.Log($"[特殊端子/照準] 会心率 +{pts}pt");
-                    break;
-                }
-                case SpecialTerminalKind.Battery:
-                    chargeSum += sum + count * SpecialTerminals.BatteryPerDice;
-                    Debug.Log($"[特殊端子/蓄電池] 充電 +{sum} +{count * SpecialTerminals.BatteryPerDice}");
-                    break;
-
-                case SpecialTerminalKind.Coolant:
-                {
-                    float acc = ctx.GetAccumulated(CoolantAccKey) + sum;
-                    int gained = 0;
-                    while (acc >= SpecialTerminals.CoolantThreshold)
-                    { acc -= SpecialTerminals.CoolantThreshold; gained++; }
-                    ctx.accumulatedValues[CoolantAccKey] = acc;
-                    if (gained > 0)
-                    {
-                        ctx.accumulatedValues[CoolantDelayKey] =
-                            ctx.GetAccumulated(CoolantDelayKey) + gained;
-                        Debug.Log($"[特殊端子/冷却材] エスカレーションを {gained}T 遅延 "
-                                + $"(累計 {(int)ctx.GetAccumulated(CoolantDelayKey)}T)");
-                    }
-                    break;
-                }
-                case SpecialTerminalKind.Foundry:
-                {
-                    float acc = ctx.GetAccumulated(FoundryAccKey) + sum;
-                    int gained = 0;
-                    while (acc >= SpecialTerminals.FoundryThreshold)
-                    { acc -= SpecialTerminals.FoundryThreshold; gained++; }
-                    ctx.accumulatedValues[FoundryAccKey] = acc;
-                    if (gained > 0)
-                    {
-                        ctx.accumulatedValues[FoundryBonusKey] =
-                            ctx.GetAccumulated(FoundryBonusKey) + gained;
-                        Debug.Log($"[特殊端子/鋳造口] この戦闘中の出目 +{gained} "
-                                + $"(累計 +{(int)ctx.GetAccumulated(FoundryBonusKey)})");
-                    }
-                    break;
-                }
-                case SpecialTerminalKind.Riposte:
-                    // 反射量の上限を積むだけ。 実際の反射は被ダメ確定後に行う
-                    ctx.accumulatedValues[RiposteKey] = sum;
-                    break;
-            }
-        }
-
-        /// <summary>特殊端子が accumulatedValues に置くキー。 **フィールドを増やさない**
-        /// (CombatContext の 3 区分規約: set/read が 1〜2 箇所なら辞書へ)。</summary>
-        private const string CoolantAccKey   = "termCoolantAcc";
-        /// <summary>エスカレーションの遅延ターン数のキー。 〈冷却材〉と役〈時間〉(目 6) が共有する。</summary>
+        // 端子の状態のうち、 戦闘の情報 (accumulatedValues) を通して渡すキー。 **フィールドを増やさない**
+        //   (CombatContext の 3 区分規約: set/read が 1〜2 箇所なら辞書へ)。
+        /// <summary>エスカレーションの遅延ターン数のキー。 端子〈冷却材〉〈冷却弾〉(ADR-0014) と役〈時間〉(目 6) が共有する。</summary>
         public const string CoolantDelayKey = "termCoolantDelay";
-        private const string FoundryAccKey   = "termFoundryAcc";
+        /// <summary>端子〈鋳造口〉(ADR-0014) で増えた、 この戦闘中の出目 +N (DrawTerminalHand が置き、 自ロールの後に足す)。</summary>
         private const string FoundryBonusKey = "termFoundryBonus";
-        private const string RiposteKey      = "termRiposteCap";
-
-        /// <summary>端子上限の畳み込みで使う本数バッファ。 毎ターン new しないため使い回す。</summary>
-        private readonly int[] _termCountBuf = new int[4];
 
         /// <summary>ADR-0011 〈守り〉(目 5): このターンの被ダメを N% 減らす。 T4 は減らした分の半分をシールドにする。
         /// 〈虚空〉と同じ位置・同じ対象 (敵の直接攻撃パケット) に置く ── fixedDamageToPlayer は別チャネルなので触らない。</summary>

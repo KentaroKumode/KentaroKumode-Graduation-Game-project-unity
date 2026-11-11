@@ -9,7 +9,7 @@ namespace CombatSystem
     /// 端子の効果の式は <see cref="TerminalCards.Resolve"/> にだけある (ここは結果を配るだけ)。</summary>
     public partial class CombatManager
     {
-        /// <summary>この戦闘の山札。 山札で戦っていなければ null (旧い配線)。</summary>
+        /// <summary>この戦闘の山札。 戦闘の始め (<see cref="BeginTerminalDeck"/>) に必ず作る (最初の戦闘の前だけ null)。</summary>
         private TerminalDeckState _deck;
         /// <summary>このターンの端子の結果 (配線の前は null)。</summary>
         private TerminalOutcome _termOutcome;
@@ -18,20 +18,25 @@ namespace CombatSystem
         /// <summary>このターンの主攻撃に掛ける別枠の倍率 (〈増幅器〉〈共振器〉)。 毎ターン 1 に戻す。</summary>
         private float _termDamageMul = 1f;
 
-        /// <summary>この戦闘の山札 (画面・BOT が読む)。 山札で戦っていなければ null。 書き換えないこと。</summary>
+        /// <summary>この戦闘の山札 (画面・BOT が読む)。 最初の戦闘の前だけ null。 書き換えないこと。</summary>
         public TerminalDeckState TerminalDeck => _deck;
         /// <summary>このターンの端子の結果 (画面が発動した端子を光らせるのに使う)。</summary>
         public TerminalOutcome LastTerminalOutcome => _termOutcome;
 
         private void BeginTerminalDeck()
         {
-            _deck = null; _termOutcome = null; _termRetain = null; _termDamageMul = 1f;
-            if (!TerminalCards.Enabled) return;
+            _termOutcome = null; _termRetain = null; _termDamageMul = 1f;
+            // 山札は常に有る (旧い配線の経路は 2026-11-11 に削除)。 ランが無い戦闘 (単体の試験など) は開始の山札で戦う。
             var run = GameLoop.GameManager.Instance?.Run;
-            if (run == null) return;
-            if (run.terminalDeck == null || run.terminalDeck.Count == 0) run.terminalDeck = TerminalCards.StartingDeck();
+            List<string> runDeck;
+            if (run != null)
+            {
+                if (run.terminalDeck == null || run.terminalDeck.Count == 0) run.terminalDeck = TerminalCards.StartingDeck();
+                runDeck = run.terminalDeck;
+            }
+            else runDeck = TerminalCards.StartingDeck();
             _deck = new TerminalDeckState();
-            _deck.BeginBattle(run.terminalDeck);
+            _deck.BeginBattle(runDeck);
         }
 
         /// <summary>ターンの始め: 手札を引く。 持ち越し (条件無視・多く引く・溜めた攻撃・鋳造の出目) を今のターンへ移す。</summary>

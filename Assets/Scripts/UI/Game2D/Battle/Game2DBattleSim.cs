@@ -61,8 +61,8 @@ namespace UI.Game2D.Battle
         }
         public int NextStageIn => nextStageIn;
         public int EnemyDiceSum { get { int s = 0; for (int i = 0; i < enemyDiceCount && i < ed.Length; i++) s += ed[i]; return s; } }
-        /// <summary>端子の種類の数 (特殊端子を装着していれば 4)。</summary>
-        public int TerminalKinds => SpecialTerminals.EquippedLimit(GameManager.Instance?.Run) > 0 ? 4 : 3;
+        /// <summary>端子の種類の数 (攻撃・防御・充電)。 山札 (ADR-0014) の画面では使わない。</summary>
+        public int TerminalKinds => 3;
 
         public struct Wired { public int atk, aDice, blk, chg; }
         public Wired GetWired()

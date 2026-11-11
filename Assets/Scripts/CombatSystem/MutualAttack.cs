@@ -1,17 +1,16 @@
 namespace CombatSystem
 {
     /// <summary>
-    /// ADR-0009 柱1: ダイス配線先の端子種別。
-    /// Special (特殊端子・ショップ販売・接続制限N) は W7 後段で追加する。
+    /// ADR-0009 柱1: ダイス配線先の端子種別。 端子の山札 (ADR-0014) では、 挿した端子の種類 (TerminalKind) から作る
+    /// (<see cref="TerminalCards.LegacyKind"/>)。 <b>値の並びを変えない</b> (添字・記録の文字に使う所がある)。
     /// </summary>
     public enum DiceTerminal
     {
         Attack = 0,  // 置いた出目分、自攻撃ダメージへ加算 (未配置ダイスの自動合流先)
         Block = 1,   // 置いた出目分、敵攻撃を軽減
         Charge = 2,  // 置いたダイス個数分、充電を獲得 (柱5)
-        /// <summary>§6-5 特殊端子。 **ショップで買った 1 種を装着しているときだけ存在する**。
-        /// 未装着なら接続制限 0 ＝ 1 本も挿せない。 効果と接続制限は
-        /// <see cref="SpecialTerminals"/> が持つ。</summary>
+        /// <summary>補助の種類の端子 (ADR-0014・<see cref="TerminalKind.Support"/>) に挿した出目。
+        /// 既存の品が読む「特殊に挿した個数」(MutualKeys.SpecialDiceCount) はこの個数。</summary>
         Special = 3,
         /// <summary>挿していない (端子の山札・ADR-0014)。 どの端子にも入らない出目。 **末尾に置く** (0〜3 を添字に使う所がある)。</summary>
         None = 4,

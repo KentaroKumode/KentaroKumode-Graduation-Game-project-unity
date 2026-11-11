@@ -35,7 +35,6 @@ namespace CombatSystem
 
         public const string TotalKey = "__total__";
         public const string WeaponCritKey = "武器の素の会心率";
-        public const string AimKey = "特殊端子〈照準〉";
 
         static readonly Dictionary<string, float[]> _pending = new Dictionary<string, float[]>();
         static readonly HashSet<string> _heldNow = new HashSet<string>();
@@ -44,7 +43,6 @@ namespace CombatSystem
         {
             Stats[0].Clear(); Stats[1].Clear(); Stats[2].Clear(); Universal.Clear();
             foreach (var k in YachtRoles.All) Universal.Add("役〈" + YachtRoles.NameOf(k) + "〉");
-            Universal.Add(AimKey);
             _pending.Clear(); _heldNow.Clear();
         }
 

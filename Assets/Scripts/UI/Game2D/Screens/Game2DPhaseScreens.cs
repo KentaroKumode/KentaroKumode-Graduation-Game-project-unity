@@ -101,7 +101,7 @@ namespace UI.Game2D
             var run = gm.Run;
             if (run != null && run.pendingWeaponIds.Count > 0 && ph != GameManager.GamePhase.Combat && ph != GameManager.GamePhase.BattleResult) return WeaponSwap(gm);
             if (run != null && run.pendingTerminalOffer.Count > 0 && ph != GameManager.GamePhase.Combat && ph != GameManager.GamePhase.BattleResult)
-                return CombatSystem.TerminalCards.Enabled ? TerminalReward(gm) : TerminalPick(gm);      // 山札 (ADR-0014) の報酬 / 旧い特殊端子の 2 択
+                return TerminalReward(gm);      // 山札 (ADR-0014) の報酬
             _termDeckView = false;
             if (ph == GameManager.GamePhase.MapNavigation && gm.PendingStartingPassiveChoices.Count > 0) return StartingPick(gm);
             if (ph == GameManager.GamePhase.MapNavigation && gm.PendingChallengeTiers.Count > 0) return ChallengePick(gm);
@@ -210,7 +210,7 @@ namespace UI.Game2D
         }
 
         // ── 休憩 ──
-        //   休む / 多めに休む (手番が進む) / 鍛える / 面を外す (どの面かを選ぶ画面へ)。 どれも 1 回の休憩で 1 つだけ。
+        //   休む / 多めに休む (ターンが進む) / 鍛える / 面を外す (どの面かを選ぶ画面へ)。 どれも 1 回の休憩で 1 つだけ。
 
         private bool _restFaces;
 
@@ -220,8 +220,8 @@ namespace UI.Game2D
             if (_restFaces) return RestFaces(gm);
             var d = New("休憩", "HP " + run.playerHP + "/" + run.playerMaxHP + "  素材 " + run.weaponMaterials);
             int more = Mathf.RoundToInt(MapSystem.FreeMove.FreeMapParams.RestMoreRatio * 100);
-            d.Items.Add(new ModalItem { name = "休む", desc = "HP を回復する。 手番は進まない。" });
-            d.Items.Add(new ModalItem { name = "多めに休む", value = "+" + MapSystem.FreeMove.FreeMapParams.RestMoreTurns + " 手番", desc = "最大 HP の " + more + "% を回復する。 代わりに手番が進む (追跡者が動く)。" });
+            d.Items.Add(new ModalItem { name = "休む", desc = "HP を回復する。 ターンは進まない。" });
+            d.Items.Add(new ModalItem { name = "多めに休む", value = "+" + MapSystem.FreeMove.FreeMapParams.RestMoreTurns + " ターン", desc = "最大 HP の " + more + "% を回復する。 代わりにターンが進む (追跡者が動く)。" });
             d.Items.Add(new ModalItem { name = "鍛える", value = "素材 " + run.weaponMaterials, desc = "素材を使って武器を 1 段強化する (強化できなければダイス強化・それも無理なら休む)。" });
             bool canRemove = gm.TryGetFaceRemovalCost(out int g, out int m);
             d.Items.Add(new ModalItem { name = "面を外す", value = canRemove ? g + "G 素材" + m : "外せない", disabled = !canRemove,
@@ -397,25 +397,6 @@ namespace UI.Game2D
             if (w == null) return id;
             string plus = equipped && run.weaponPlus > 0 ? " +" + run.weaponPlus : "";
             return "攻撃 " + w.attackPower + plus + "  会心 " + w.critRatePct + "%\n" + w.description;
-        }
-
-        /// <summary>層ボスの報酬: 特殊端子 (§6-5) を 2 つから 1 つ (2026-11-11)。 「層を抜けた」の窓より先に出す。</summary>
-        private ScreenDef TerminalPick(GameManager gm)
-        {
-            var run = gm.Run; var offer = run.pendingTerminalOffer; var cur = CombatSystem.SpecialTerminals.Equipped(run);
-            var d = New("特殊端子", "層の主の報酬", 440);
-            d.body = cur != null ? "4 つ目の端子を 1 つ選んで付け替える。 今は「" + cur.displayName + "」: " + cur.description
-                                 : "4 つ目の端子を 1 つ選んで取り付ける。 出目を挿すと、 その端子だけの効果が出る。";
-            foreach (var id in offer)
-            {
-                var t = CombatSystem.SpecialTerminals.Get(id);
-                d.Items.Add(new ModalItem { name = t != null ? t.displayName : id, desc = t?.description, value = t != null ? t.connectLimit + " 個まで" : null });
-            }
-            d.buttons.Add(B("取り付ける", "pick", true));
-            d.buttons.Add(B(cur != null ? "今のままにする" : "受け取らない", "keep"));
-            if (cur != null) d.footer = "取り付けると「" + cur.displayName + "」は外れる";
-            d.onAction = (a, sel) => { gm.ResolveTerminalOffer(a == "pick" ? Mathf.Clamp(sel, 0, offer.Count - 1) : -1); Game2DSfx.Play("ui_confirm"); Refresh(); };
-            return d;
         }
 
         // ── 端子の山札 (ADR-0014) の報酬 ──
@@ -597,7 +578,14 @@ namespace UI.Game2D
                 return d;
             }
             d.body = ev != null ? ev.flavor : null;
-            if (ev != null) foreach (var c in ev.choices) d.Items.Add(new ModalItem { name = c.text });
+            // 選択肢の下に代償 (使うターン・補足中の捕まるまで・足りないゴールド) を出す (2026-11-11・issue #17)
+            if (ev != null)
+                for (int i = 0; i < ev.choices.Count; i++)
+                {
+                    var c = ev.choices[i];
+                    d.Items.Add(new ModalItem { name = c.text, desc = EventEncounter.DescribeCost(c, gm.Run),
+                                                disabled = !EventEncounter.IsChoiceSelectable(ev, i, gm.Run) });
+                }
             d.buttons.Add(B("選ぶ", "pick", true));
             d.onAction = (a, sel) => { if (a == "pick" && ev != null && sel >= 0 && sel < ev.choices.Count) gm.ResolveEventChoice(sel); Refresh(); };
             return d;

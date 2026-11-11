@@ -7,7 +7,7 @@ using UnityEngine;
 namespace AutoTest
 {
     /// <summary>
-    /// 航行マップ (手番制・2026-10-18・docs/GAME.md §5) の BOT の航行。 <b>技量で方策が変わる</b> (§21):
+    /// 航行マップ (ターン制・2026-10-18・docs/GAME.md §5) の BOT の航行。 <b>技量で方策が変わる</b> (§21):
     /// <list type="bullet">
     /// <item><b>Naive</b>: 行き先だけを決めて最短の道を歩く。 追跡者を避けない。</item>
     /// <item><b>Optimal / Super / Exact / Ultra</b>: 同じ行き先に加えて、 <b>見えている / 魔石に出ている追跡者を避ける</b>
@@ -57,7 +57,7 @@ namespace AutoTest
 
         /// <summary>偵察と照明を使うか (2026-11-05)。 戦闘名は偵察・照明で見つけた点 (完全公開) にしか出ないので、
         /// 使わないと危険な戦闘を避ける情報が無い。 **既定は false (使わない)** ── 2026-11-05 に同じ 5,000 シードで比べると
-        /// 使う方がクリア 19.4% → 17.9% (z=−2.42) と悪化した (照明 5 回 = 物資 250 と、 偵察 6 回分の手番を払うのに、
+        /// 使う方がクリア 19.4% → 17.9% (z=−2.42) と悪化した (照明 5 回 = 物資 250 と、 偵察 6 回分のターンを払うのに、
         /// 戦闘名を活かす判断が TileDanger の足切りしか無い)。 使う場面を絞ってから戻す。</summary>
         [System.NonSerialized] public bool freeNavScout = false;
         /// <summary>この層で偵察した点 (同じ点では 1 回まで)。</summary>
@@ -230,12 +230,12 @@ namespace AutoTest
                     && HasConsumable(run, ItemIds.Lure) && Consumables.Use(run, ItemIds.Lure))
                 {
                     FreeNavLures[mode]++;
-                    return false;   // 手番は使わないので、 同じ判断をもう一度する (囮罠は仕掛けた点に残る)
+                    return false;   // ターンは使わないので、 同じ判断をもう一度する (囮罠は仕掛けた点に残る)
                 }
             }
 
             // ── 〈補給線〉(〈兵站〉r10・2026-11-09): 追われていたら、 追跡者から今より 3 歩以上遠い中継点へ跳ぶ ──
-            //   補足は解けない (追跡者は跳んだ先へ向かう) ので、 稼げるのは距離だけ。 手番を使わないので同じ判断をもう一度する。
+            //   補足は解けない (追跡者は跳んだ先へ向かう) ので、 稼げるのは距離だけ。 ターンを使わないので同じ判断をもう一度する。
             //   「今より遠い」でしか跳ばないので、 跳び返して往復することはない。
             if (sim.FoeAlive && sim.FoeMode == MapSystem.FreeMove.FoeMode.Chase && GameManager.SupplyLineUnlocked
                 && run.provision >= FreeMapParams.RelaySupply)
@@ -249,8 +249,8 @@ namespace AutoTest
             }
 
             // ── 調べる (2026-11-05): 照明 → 偵察の順。 どちらも行き先を決める前に使い、 開示された戦闘名は Rank (TileDanger) が読む ──
-            //   照明: 物資 50 (1 歩分)・手番は使わない・3 手番のあいだ 3 歩先まで。 追跡者の察知も 3 歩に伸びるので、 近くに居る時は使わない。
-            //   偵察: 1 手番 (追跡者が動き天候の前線も進む)・2 歩先まで。 追われている時は使わない。 同じ点では 1 回まで。
+            //   照明: 物資 50 (1 歩分)・ターンは使わない・3 ターンのあいだ 3 歩先まで。 追跡者の察知も 3 歩に伸びるので、 近くに居る時は使わない。
+            //   偵察: 1 ターン (追跡者が動き天候の前線も進む)・2 歩先まで。 追われている時は使わない。 同じ点では 1 回まで。
             if (freeNavScout && _freeMapActions <= MaxFreeMapActionsPerFloor)
             {
                 int Unscouted(int range)
@@ -273,7 +273,7 @@ namespace AutoTest
                     && gm.UseFlare())
                 {
                     FreeNavFlares++;
-                    return false;   // 手番は使わない。 見えた上で同じ判断をもう一度する
+                    return false;   // ターンは使わない。 見えた上で同じ判断をもう一度する
                 }
                 if (!sim.FlareOn && !chased && !_freeMapReconAt.Contains(at)
                     && Unscouted(FreeMapParams.ReconRange) >= ReconMinUnscouted
@@ -287,7 +287,7 @@ namespace AutoTest
 
             // ── 行き先 ──
             //   2026-11-09: 物資が出口まで足りなくても、 まだ入っていない店まで届くなら先に店へ寄って買い足す。
-            //   店が見つかっていなければ、 照明で周りを照らして探す (物資 1・手番は使わない)。
+            //   店が見つかっていなければ、 照明で周りを照らして探す (物資 1・ターンは使わない)。
             int target = -1;
             //   店は何度でも入れる (2026-11-09) ので、 往復で詰まらないように:
             //   ・補給に行くのは満タンでない時だけ・今いる点は除く
@@ -449,7 +449,7 @@ namespace AutoTest
         private void ObserveFoe(FreeMapSim sim)
         {
             if (!sim.FoeAlive || !sim.FoeVisible || sim.FoeFreezeTurns > 0) return;
-            if (sim.Turn == _foeSeenTurn) return;   // 手番が進んでいない (囮罠を置いただけ) なら数えない
+            if (sim.Turn == _foeSeenTurn) return;   // ターンが進んでいない (囮罠を置いただけ) なら数えない
             _foeSeenTurn = sim.Turn;
             if (_foeSeenAt == sim.FoeNode) _foeSeenStill++;
             else { if (_foeSeenAt >= 0) _foeSeenMove = true; _foeSeenAt = sim.FoeNode; _foeSeenStill = 0; }
