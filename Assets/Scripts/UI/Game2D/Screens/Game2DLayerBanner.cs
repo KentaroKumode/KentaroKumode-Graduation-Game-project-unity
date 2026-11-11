@@ -45,7 +45,13 @@ namespace UI.Game2D
 
         private void OnEnable() => LayerTitles.OnShow += HandleShow;
         private void OnDisable() => LayerTitles.OnShow -= HandleShow;
-        private void OnDestroy() { if (_tex != null) Destroy(_tex); }
+        private void OnDestroy() { if (_tex != null) Destroy(_tex); Busy = false; }
+
+        /// <summary>帯を待っている・流している間 true (手引きの板は帯が済んでから出す・issue #86)。</summary>
+        public static bool Busy { get; private set; }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() { Busy = false; }
 
         private void HandleShow(string title, string subtitle)
         {
@@ -54,7 +60,9 @@ namespace UI.Game2D
             _pending = true; _playing = false; _img.enabled = false;
         }
 
-        private void Update()
+        private void Update() { Step(); Busy = _pending || _playing; }
+
+        private void Step()
         {
             var gm = GameManager.Instance;
             bool battle = gm != null && gm.CurrentPhase == GameManager.GamePhase.Combat;

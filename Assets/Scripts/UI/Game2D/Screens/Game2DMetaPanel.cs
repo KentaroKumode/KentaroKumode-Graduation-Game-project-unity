@@ -48,6 +48,7 @@ namespace UI.Game2D
             _page = 0;
             SpriteButton.InputLocked = true;      // 後ろのタイトルのボタンを押さない
             _modal.Open(Build());
+            Game2DTutorial.Request(TutorialTopics.MetaPanel);      // 手引き「整備パネル」: 初めて開いた時 (issue #86)
             return true;
         }
 
