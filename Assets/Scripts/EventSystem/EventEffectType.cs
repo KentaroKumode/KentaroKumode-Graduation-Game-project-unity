@@ -39,5 +39,37 @@ namespace EventSystem
         /// **選んだ瞬間ではなく、 イベントを閉じて地図へ戻った時に進める** (<c>GameManager.ConfirmEventEncounter</c>)。
         /// 航行マップの無い層では何も起きない。 確率分岐の中・「勝利後」には置かない (読まれない)。</summary>
         TurnsPass,
+
+        // ── 2026-11-12: 報酬を多様にする汎用の動詞 (docs/GAME.md §17「効果種別」)。 末尾に足す (既存の番号を動かさない) ──
+        //   航行の効果 (Reveal* / *Pursuer / Shortcut / ShiftFront) は「ターン+N」と同じく、 イベントを閉じて地図へ戻った時に
+        //   GameManager.ApplyEventNav が適用する。 航行マップの無い層では何も起きない。 確率分岐の中・「勝利後」には置かない (読まれない)。
+
+        /// <summary>地図を明かす+N: 今いる点から道で N 歩以内の点の種類を明かす (戦闘名は出さない)。</summary>
+        RevealMap,
+        /// <summary>戦闘を見抜く+N: 道で N 歩以内の点を完全公開する (偵察と同じ・戦闘名まで)。</summary>
+        RevealEncounters,
+        /// <summary>補給の場所が分かる: この層の店と休憩の点を完全公開する。</summary>
+        RevealSupplies,
+        /// <summary>追跡者を撒く: 補足を外す (巡回へ戻り、 しばらく補足しない・使い魔は消える)。</summary>
+        ShakeOffPursuer,
+        /// <summary>追跡者を遠ざける+N: 追跡者の本体を道で N 歩遠ざける。</summary>
+        PushPursuer,
+        /// <summary>追跡者を呼ぶ+N (代償): 追跡者の本体が道で N 歩近づく (隣で止まる)。</summary>
+        PullPursuer,
+        /// <summary>近道+N: 終点へ向かう道を N 歩先の点へ移る (途中の点は起動しない・着いた点は起動する)。</summary>
+        Shortcut,
+        /// <summary>前線を遠ざける+N / 前線を近づける+N: 天候の前線を N 段戻す / 進める。 amount は符号つき (近づける = 正)。</summary>
+        ShiftFront,
+
+        /// <summary>パッシブアイテムをNつから選ぶ: N 個を引いて 1 つ選ぶ (人は地図に戻った時の選択画面・BOT は GameHooks)。</summary>
+        OfferPassives,
+        /// <summary>パッシブを差し出して替える: 交換マスと同じ取り替え (いちばん段の低いパッシブ → 上の段のパッシブ)。 渡せる品が無ければ選べない。</summary>
+        TradePassive,
+        /// <summary>武器を鍛える: 休憩の「鍛える」と同じ強化を 1 段 (素材は通常どおり払う)。 鍛えられない・素材が足りないなら選べない。</summary>
+        ForgeWeapon,
+        /// <summary>次の店の値段-N%: 次に入る店の全価格に (1 − N/100) を掛ける (重ねたら掛け合わせ)。</summary>
+        NextShopDiscount,
+        /// <summary>次の休憩の回復+N%: 次に休憩で回復する時、 回復量に最大 HP の N% を足す (重ねたら足し合わせ)。</summary>
+        NextRestBonus,
     }
 }

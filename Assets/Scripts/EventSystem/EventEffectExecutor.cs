@@ -21,6 +21,9 @@ namespace EventSystem
             /// <summary>この選択で使うターン (効果「ターン+N」の合計)。 実行はここではせず、
             /// イベントを閉じて地図へ戻った時に GameManager が進める (追跡者が動き、 捕まれば戦闘になる)。</summary>
             public int turnsToPass;
+            /// <summary>航行の効果 (地図を明かす・追跡者を撒く・近道・前線 …・2026-11-12)。 ターンと同じく、 ここでは実行せず
+            /// イベントを閉じて地図へ戻った時に GameManager が適用する (<c>GameManager.ApplyEventNav</c>)。 並びは書いた順。</summary>
+            public List<EventEffect> navEffects = new List<EventEffect>();
             /// <summary>戦闘勝利後に再適用すべき効果（「勝利後...」プレフィックス付き）</summary>
             public List<EventEffect> postCombatEffects = new List<EventEffect>();
             /// <summary>UI 表示用ログ</summary>
@@ -271,7 +274,100 @@ namespace EventSystem
                 case EventEffectType.CircusHandover:
                     ExecuteCircusHandover(run, result);
                     break;
+
+                // ── 2026-11-12: 報酬を多様にする汎用の動詞 ──
+
+                case EventEffectType.RevealMap:
+                case EventEffectType.RevealEncounters:
+                case EventEffectType.RevealSupplies:
+                case EventEffectType.ShakeOffPursuer:
+                case EventEffectType.PushPursuer:
+                case EventEffectType.PullPursuer:
+                case EventEffectType.Shortcut:
+                case EventEffectType.ShiftFront:
+                    // 航行の効果は地図へ戻った時に (ターン+N と同じ口)。 画面の文はここで出す (地図へ戻った直後に必ず適用されるので)
+                    result.navEffects.Add(eff);
+                    { string s = DescribeNav(eff); if (s != null) result.log.Add(s); }
+                    break;
+
+                case EventEffectType.OfferPassives:
+                {
+                    var cands = new List<string>();
+                    for (int k = 0; k < Mathf.Max(1, eff.amount); k++)
+                    {
+                        string id = PickRandomItemId(ItemCategory.Passive, run, cands);
+                        if (!string.IsNullOrEmpty(id) && !cands.Contains(id)) cands.Add(id);
+                    }
+                    if (cands.Count == 0) break;
+                    var gm = GameLoop.GameManager.Instance;
+                    if (gm != null)
+                    {
+                        // 人が遊んでいる時は地図へ戻ってからの選択画面へ預ける。 BOT は GameHooks で今選ぶ (乱数の消費は同じ)
+                        string got = gm.OfferPassiveChoice(cands);
+                        result.log.Add(got == null ? $"パッシブを {cands.Count} つから 1 つ選ぶ" : $"パッシブアイテム獲得: {ResolveLabel(got)}");
+                    }
+                    else
+                    {
+                        ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, cands[0]);
+                        result.log.Add($"パッシブアイテム獲得: {ResolveLabel(cands[0])}");
+                    }
+                    break;
+                }
+
+                case EventEffectType.TradePassive:
+                {
+                    if (GameLoop.GameManager.TradeLowestPassive(run, out string given, out string got))
+                        result.log.Add($"「{ResolveLabel(given)}」を渡し、「{ResolveLabel(got)}」を受け取った");
+                    else
+                        result.log.Add("取り替えは成り立たなかった");
+                    break;
+                }
+
+                case EventEffectType.ForgeWeapon:
+                {
+                    int before = run.weaponMaterials;
+                    if (GameLoop.GameManager.TryUpgradeWeapon(run))
+                        result.log.Add($"武器を 1 段鍛えた: {ResolveLabel(run.equippedWeaponId)}{(run.weaponPlus > 0 ? "+" : "")} (素材-{before - run.weaponMaterials})");
+                    else
+                        result.log.Add("武器は鍛えられなかった");
+                    break;
+                }
+
+                case EventEffectType.NextShopDiscount:
+                {
+                    // 重ねたら掛け合わせ (足し合わせて 100% を超える、 を上限で止めない形)。 小数は float へ確定させて持つ (Mono の精度)
+                    float f = 1f - Mathf.Clamp(eff.amount, 0, 100) / 100f;
+                    run.nextShopPriceMul *= f;
+                    result.log.Add($"次の店の値段 -{eff.amount}%");
+                    break;
+                }
+
+                case EventEffectType.NextRestBonus:
+                    run.nextRestHealBonusPct += Mathf.Max(0, eff.amount);
+                    result.log.Add($"次の休憩の回復 +{eff.amount}%（最大 HP の）");
+                    break;
             }
+        }
+
+        /// <summary>航行の効果の画面の文 (選んだ直後の結果に並べる)。 航行マップの無い層では null (何も起きないので書かない)。</summary>
+        private static string DescribeNav(EventEffect eff)
+        {
+            var sim = GameLoop.GameManager.Instance != null ? GameLoop.GameManager.Instance.FreeMap : null;
+            if (sim == null) return null;
+            switch (eff.type)
+            {
+                case EventEffectType.RevealMap:        return $"周りの {eff.amount} 歩先まで、点の種類が分かる";
+                case EventEffectType.RevealEncounters: return $"周りの {eff.amount} 歩先まで、戦闘の相手が分かる";
+                case EventEffectType.RevealSupplies:   return "この層の店と休憩の場所が分かる";
+                case EventEffectType.ShakeOffPursuer:  return sim.FoeAlive ? "追跡者の目から外れる" : null;
+                case EventEffectType.PushPursuer:      return sim.FoeAlive ? $"追跡者が {eff.amount} 歩遠のく" : null;
+                case EventEffectType.PullPursuer:      return sim.FoeAlive ? $"追跡者が {eff.amount} 歩近づく" : null;
+                case EventEffectType.Shortcut:         return $"終点の方へ {eff.amount} 歩、抜け道を行く";
+                case EventEffectType.ShiftFront:
+                    if (sim.Weather == MapSystem.FreeMove.WeatherKind.None) return null;
+                    return eff.amount < 0 ? $"天候の前線が {-eff.amount} 段退く" : $"天候の前線が {eff.amount} 段迫る";
+            }
+            return null;
         }
 
         /// <summary>[廃止] サーカス団引渡し。 旅団契約システムを 2026-08-11 に削除したため、
@@ -342,7 +438,7 @@ namespace EventSystem
                                 + " / 素材+8 / ゴールド+60 / 全回復");
         }
 
-        private static string PickRandomItemId(ItemCategory category, GameLoop.RunState run = null)
+        private static string PickRandomItemId(ItemCategory category, GameLoop.RunState run = null, List<string> alsoExclude = null)
         {
             var db = ItemDatabase.Instance;
             if (db == null) return null;
@@ -361,6 +457,12 @@ namespace EventSystem
                 if (run.seenPassiveItemIds != null) owned.UnionWith(run.seenPassiveItemIds);
                 var dd = filtered.FindAll(it => !owned.Contains(it.internalName));
                 if (dd.Count > 0) filtered = dd;
+            }
+            // 同じ提示に同じ品を並べない (パッシブアイテムをNつから選ぶ・2026-11-12)
+            if (alsoExclude != null && alsoExclude.Count > 0)
+            {
+                var ex = filtered.FindAll(it => !alsoExclude.Contains(it.internalName));
+                if (ex.Count > 0) filtered = ex;
             }
 
             var picked = ItemSystem.RarityWeightedPicker.Pick(filtered);

@@ -120,12 +120,13 @@ namespace EventSystem
                 if (GameLoop.GameRng.Value("EventDatabase.1") < maxChance) pool = priority;
             }
 
-            // 重み付き抽選
+            // 重み付き抽選。 出やすさの札 (重み[追跡] など・2026-11-12) は今の状況で倍率が掛かる (EventWeights)。
             float total = 0f;
             var weights = new float[pool.Count];
+            var sim = GameLoop.GameManager.Instance != null ? GameLoop.GameManager.Instance.FreeMap : null;
             for (int i = 0; i < pool.Count; i++)
             {
-                float w = pool[i].condition.rare ? 0.33f : 1f;
+                float w = (pool[i].condition.rare ? 0.33f : 1f) * EventWeights.Multiplier(pool[i].condition, run, sim);
                 weights[i] = w;
                 total += w;
             }

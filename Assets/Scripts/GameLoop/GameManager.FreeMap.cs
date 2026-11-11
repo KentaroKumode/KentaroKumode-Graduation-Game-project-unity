@@ -269,7 +269,7 @@ namespace GameLoop
         public void RestHealMore()
         {
             if (CurrentPhase != GamePhase.RestStop) return;
-            int heal = Mathf.CeilToInt(Run.playerMaxHP * FreeMapParams.RestMoreRatio
+            int heal = Mathf.CeilToInt(Run.playerMaxHP * (FreeMapParams.RestMoreRatio + TakeRestHealBonus())
                                        * MetaProgression.MetaDebuffApplicator.GetHealMultiplier());
             int before = Run.playerHP;
             Run.playerHP = Mathf.Min(Run.playerMaxHP, Run.playerHP + heal);

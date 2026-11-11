@@ -92,9 +92,14 @@ namespace AutoTest
             if (choice?.effects == null || choice.effects.Count == 0) return 0f;
             // 払えないゴールドの選択肢は選べない (本体も弾く)。 どの加点でも覆らない値にする。
             if (!choice.IsAvailable(run)) return V_UNAVAILABLE;
+            // 航行の効果はターンより先に適用される (GameManager.PassEventTurns)。 撒く・遠ざけるが付いた選択肢のターンは、 その後の見込みで値段を付ける
+            _turnShaken = choice.Has(EventEffectType.ShakeOffPursuer);
+            _turnPushed = 0;
+            foreach (var e in choice.effects) if (e != null && e.type == EventEffectType.PushPursuer) _turnPushed += e.amount;
             float total = 0f;
             foreach (var e in choice.effects)
                 total += ScoreEffect(e, run);
+            _turnShaken = false; _turnPushed = 0;
 
             // 危険度は「このフロアの雑魚 1 発」を尺度にする (進路選択・回復目標と同じ尺度)。
             int hit = AutoRunner.EstimateFloorMaxHit(run);
@@ -351,9 +356,146 @@ namespace AutoTest
                     // [廃止] 旅団契約システムを 2026-08-11 に削除したので、 引き渡す契約が無い。
                     return 0f;
 
+                // ── 2026-11-12: 報酬を多様にする汎用の動詞 (docs/GAME.md §17 の値段表の行と同じ値) ──
+                case EventEffectType.RevealMap:        return ScoreReveal(e.amount, false, run);
+                case EventEffectType.RevealEncounters: return ScoreReveal(e.amount, true, run);
+                case EventEffectType.RevealSupplies:   return ScoreRevealSupplies(run);
+                case EventEffectType.ShakeOffPursuer:  return ScoreShakeOff(run);
+                case EventEffectType.PushPursuer:      return ScorePush(e.amount);
+                case EventEffectType.PullPursuer:      return ScorePull(e.amount, run);
+                case EventEffectType.Shortcut:         return ScoreShortcut(e.amount, run);
+                case EventEffectType.ShiftFront:       return ScoreFront(e.amount, run);
+
+                case EventEffectType.OfferPassives:
+                    // N つから選べる分の上乗せ: 3 つなら ×1.3 (BOT は開幕の品と同じ買いの点で選ぶ)
+                    return PassivePrice(run) * (1f + V_OFFER_PER_EXTRA * UnityEngine.Mathf.Max(0, e.amount - 1));
+                case EventEffectType.TradePassive:
+                    return GameManager.CanTradePassive(run) ? V_TRADE * PassivePrice(run) : 0f;
+                case EventEffectType.ForgeWeapon:
+                    // 素材は別に払う (WeaponUpgradeCost × PRICE_MATERIAL を差し引く)。 鍛えられないなら選べない (IsAvailable)
+                {
+                    int cost = GameManager.WeaponUpgradeCost(run);
+                    if (cost == int.MaxValue) return 0f;
+                    return V_FORGE * PassivePrice(run) - cost * PRICE_MATERIAL;
+                }
+                case EventEffectType.NextShopDiscount:
+                    // 次の店で使う金 ≒ 今の所持金 + 次の店までの収入 (戦闘 1〜2 回)
+                    return UnityEngine.Mathf.Clamp(e.amount, 0, 100) / 100f * (coins + V_SHOP_INCOME_AHEAD);
+                case EventEffectType.NextRestBonus:
+                    // 最大 HP の N% の HP。 次の休憩で回復を選ぶとは限らず、 満ちていれば捨てる分があるので割り引く
+                    return e.amount / 100f * maxHP * HpPrice(run) * V_REST_BONUS_USE;
+
                 default:
                     return 0f;
             }
+        }
+
+        // ===== 2026-11-12: 報酬を多様にする汎用の動詞の値段 (docs/GAME.md §17 の値段表) =====
+        /// <summary>地図を明かす: 新しく種類が分かる点 1 つ = 物資 0.1 (12 点ほど明かして「1 歩ぶんの寄り道を減らす」)。</summary>
+        const float V_REVEAL_POINT = 0.1f;
+        /// <summary>戦闘を見抜く: まだ完全公開でない点 1 つ = 物資 0.05 (戦闘名は種類より使い道が狭い)。</summary>
+        const float V_SCOUT_POINT = 0.05f;
+        /// <summary>補給の場所が分かる: まだ分かっていない店・休憩 1 つ = 1 歩 (物資 1)。</summary>
+        const float V_SUPPLY_POINT = 1.0f;
+        /// <summary>追跡者を撒く (補足中): 捕まる見込みの 6 割を消す。 補足されていなくても近い時は少し。</summary>
+        const float V_SHAKE_CHASED = 0.6f;
+        const float V_SHAKE_NEAR = 2.0f;
+        /// <summary>追跡者を遠ざける: 補足中は 1 歩 = 補足中の 1 ターンぶん (V_TURN_CHASED)、 巡回中は 1 歩 0.3。</summary>
+        const float V_PUSH_PATROL = 0.3f;
+        /// <summary>近道: 1 歩 = 物資 1 の 6 割 (飛ばした点の報酬も逃すので満額ではない)。 補足中は距離も稼ぐ (1 歩 +2)。</summary>
+        const float V_SHORTCUT_STEP = 0.6f;
+        const float V_SHORTCUT_CHASED = 2.0f;
+        /// <summary>前線 1 段 (= 5 ターンぶんの前線の進み) = 物資 0.5。 今いる所に前線が届いていれば倍。</summary>
+        const float V_FRONT_STEP = 0.5f;
+        /// <summary>N つから選ぶ: 1 つ増えるごとにパッシブの値段の +15%。</summary>
+        const float V_OFFER_PER_EXTRA = 0.15f;
+        /// <summary>取り替え: 段の低い品を上の段の品にする差 ≒ パッシブ 0.4 個。</summary>
+        const float V_TRADE = 0.4f;
+        /// <summary>武器の 1 段 = パッシブ 0.7 個 (休憩・前哨基地の強化の機会を 1 回増やす)。</summary>
+        const float V_FORGE = 0.7f;
+        /// <summary>次の店までに入る金の見込み (戦闘 1〜2 回)。</summary>
+        const float V_SHOP_INCOME_AHEAD = 15f;
+        /// <summary>次の休憩の回復の上乗せのうち、 実際に効く割合。</summary>
+        const float V_REST_BONUS_USE = 0.6f;
+
+        /// <summary>この選択肢に「追跡者を撒く」があるか / 「遠ざける」の合計 (ターンの値段をその後の見込みで付けるため)。 Score の間だけ立つ。</summary>
+        [System.ThreadStatic] static bool _turnShaken;
+        [System.ThreadStatic] static int _turnPushed;
+
+        static MapSystem.FreeMove.FreeMapSim Sim => GameManager.Instance != null ? GameManager.Instance.FreeMap : null;
+
+        private static float ScoreReveal(int range, bool scouting, RunState run)
+        {
+            var sim = Sim;
+            if (sim == null || range <= 0) return 0f;
+            var d = sim.HopsFrom(sim.Me);
+            int fresh = 0;
+            for (int i = 0; i < d.Length; i++)
+                if (d[i] <= range && (scouting ? !sim.Scouted[i] : !sim.Known[i])) fresh++;
+            return fresh * (scouting ? V_SCOUT_POINT : V_REVEAL_POINT) * ProvisionPrice(run);
+        }
+
+        private static float ScoreRevealSupplies(RunState run)
+        {
+            var sim = Sim; var map = MapManager.Instance?.CurrentMap;
+            if (sim == null || map == null) return 0f;
+            int n = 0;
+            foreach (var node in map.GetAllNodes())
+                if (node != null && node.index >= 0 && node.index < sim.Known.Length && !node.visited && !sim.Known[node.index]
+                    && (node.type == TileType.Shop || node.type == TileType.Rest)) n++;
+            return n * V_SUPPLY_POINT * ProvisionPrice(run);
+        }
+
+        private static float ScoreShakeOff(RunState run)
+        {
+            var sim = Sim;
+            if (sim == null || !sim.FoeAlive) return 0f;
+            if (sim.Eta().Valid)
+            {
+                float hpPct = run != null ? (float)run.playerHP / UnityEngine.Mathf.Max(1, run.playerMaxHP) : 1f;
+                return -V_CAUGHT_BODY * V_SHAKE_CHASED * (hpPct < 0.65f ? 1.8f : 1f);
+            }
+            return sim.Stone().level >= 1 ? V_SHAKE_NEAR : 0f;
+        }
+
+        private static float ScorePush(int steps)
+        {
+            var sim = Sim;
+            if (sim == null || !sim.FoeAlive || steps <= 0) return 0f;
+            return sim.Eta().Valid ? -V_TURN_CHASED * steps : V_PUSH_PATROL * steps;
+        }
+
+        private static float ScorePull(int steps, RunState run)
+        {
+            var sim = Sim;
+            if (sim == null || !sim.FoeAlive || steps <= 0) return 0f;
+            if (sim.Eta().Valid) return V_TURN_CHASED * steps;
+            int d = sim.HopsFrom(sim.Me)[sim.FoeNode];
+            int after = d == int.MaxValue ? int.MaxValue : UnityEngine.Mathf.Max(1, d - steps);
+            // 補足される距離まで来るなら、 捕まる見込みの半分 (補足されても逃げ切れることがある)
+            if (after <= sim.DetectHops) return 0.5f * V_CAUGHT_BODY;
+            return V_TURN_FOE_PATROL * steps;
+        }
+
+        private static float ScoreShortcut(int steps, RunState run)
+        {
+            var sim = Sim;
+            if (sim == null || steps <= 0) return 0f;
+            int toGoal = sim.HopsFrom(sim.Layout.goal)[sim.Me];
+            if (toGoal == int.MaxValue) return 0f;
+            int n = UnityEngine.Mathf.Min(steps, UnityEngine.Mathf.Max(0, toGoal - 1));   // 終点の手前で止まる
+            float v = n * V_SHORTCUT_STEP * ProvisionPrice(run);
+            if (sim.Eta().Valid) v += n * V_SHORTCUT_CHASED;
+            return v;
+        }
+
+        private static float ScoreFront(int steps, RunState run)
+        {
+            var sim = Sim;
+            if (sim == null || steps == 0 || sim.Weather == MapSystem.FreeMove.WeatherKind.None) return 0f;
+            if (steps < 0 && double.IsNegativeInfinity(sim.Front)) return 0f;   // まだ届いていない前線は戻せない
+            float per = V_FRONT_STEP * ProvisionPrice(run) * (sim.InFront(sim.Me) ? 2f : 1f);
+            return -steps * per;   // 遠ざける (負) が得、 近づける (正) が損
         }
 
         /// <summary>その場で N ターンを使う値段 (2026-11-11・issue #17)。 本体と同じ見込み (<see cref="EventEncounter.CatchEtaNow"/>・
@@ -364,6 +506,9 @@ namespace AutoTest
             var sim = GameManager.Instance != null ? GameManager.Instance.FreeMap : null;
             if (sim == null) return 0f;   // 航行マップの外では時間は何も動かさない
             var eta = EventEncounter.CatchEtaNow();
+            // 同じ選択肢で撒く・遠ざけるなら、 ターンはその後に過ぎる (2026-11-12)
+            if (_turnShaken) eta = MapSystem.FreeMove.CatchEta.None;
+            else if (eta.Valid && _turnPushed > 0) eta.turns += _turnPushed;
             if (eta.Valid)
             {
                 if (eta.turns <= turns)

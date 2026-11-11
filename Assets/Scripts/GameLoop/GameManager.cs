@@ -273,6 +273,7 @@ namespace GameLoop
             //   同じ品を引き続けることはない。
             {
                 PendingStartingPassiveChoices.Clear();
+                PendingEventPassiveOffers.Clear();
                 int startPassives = MetaProgression.MetaBuffApplicator.GetStartingPassiveCount();
                 for (int sp = 0; sp < startPassives; sp++)
                 {

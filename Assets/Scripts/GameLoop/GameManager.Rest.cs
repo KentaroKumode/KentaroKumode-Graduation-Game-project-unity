@@ -18,7 +18,7 @@ namespace GameLoop
         public void RestHeal()
         {
             if (CurrentPhase != GamePhase.RestStop) return;
-            float ratio = ActiveModifier?.restHealMultiplier ?? 0.3f;
+            float ratio = (ActiveModifier?.restHealMultiplier ?? 0.3f) + TakeRestHealBonus();
             // 〈遅い回復〉: **あらゆる回復に掛かる**ので休憩地点にも適用する。
                 int heal = Mathf.CeilToInt(Run.playerMaxHP * ratio
                                            * MetaProgression.MetaDebuffApplicator.GetHealMultiplier());
@@ -27,6 +27,17 @@ namespace GameLoop
             RunChronicle.Rest(Run, Run.playerHP - beforeRestHP, beforeRestHP, Run.playerMaxHP);
             Log($"休憩回復: +{Run.playerHP - beforeRestHP}HP ({(int)(ratio*100)}%) (現在: {Run.playerHP}/{Run.playerMaxHP})");
             ReturnToMapOrClearFloor();
+        }
+
+        /// <summary>イベント「次の休憩の回復+N%」(2026-11-12) で積んだ上乗せ (最大 HP に対する割合) を取り出して 0 に戻す。
+        /// 回復する休憩 (休む・多めに休む) だけが使う ── 鍛える・面を外すを選んだ休憩では残る。</summary>
+        private float TakeRestHealBonus()
+        {
+            if (Run == null || Run.nextRestHealBonusPct <= 0) return 0f;
+            float b = Run.nextRestHealBonusPct / 100f;
+            Log($"休憩の回復の上乗せ: 最大 HP の +{Run.nextRestHealBonusPct}%");
+            Run.nextRestHealBonusPct = 0;
+            return b;
         }
 
         // ===== 武器Tier強化＆限界突破システム =====

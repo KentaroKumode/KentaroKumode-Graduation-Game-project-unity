@@ -21,6 +21,9 @@ namespace GameLoop
         /// <summary>開幕パッシブの提示 (〈宝物庫〉r10 の 2〜3 択) から 1 つ選ぶ。 戻り値は添字。
         /// null なら先頭 (選択画面が付くまでの仮)。</summary>
         public static Func<IReadOnlyList<string>, int> ChooseStartingPassive;
+        /// <summary>イベント「パッシブアイテムをNつから選ぶ」の提示から 1 つ選ぶ (2026-11-12)。 戻り値は添字。
+        /// null なら <see cref="ChooseStartingPassive"/> を使い、 それも null なら人が遊んでいる時は画面で選び、 BOT は先頭。</summary>
+        public static Func<IReadOnlyList<string>, int> ChooseOfferedPassive;
         /// <summary>挑戦カードの 2 枚 ("デバフの id|バフの id") からどれを受けるか。 null なら人が遊んでいる時は画面で選び、 BOT は先頭。</summary>
         public static Func<IReadOnlyList<string>, int> ChooseChallengeCard;
         /// <summary>端子の山札 (ADR-0014): 戦闘後の報酬の端子 (2〜3 択の名前) からどれを山札に加えるか。 戻り値は添字、 負 = 受け取らない。
@@ -74,6 +77,7 @@ namespace GameLoop
         {
             BotDriving = false;
             ChooseStartingPassive = null;
+            ChooseOfferedPassive = null;
             ChooseChallengeCard = null;
             ChooseTerminalReward = null;
             ForcedChallengeCards = null;

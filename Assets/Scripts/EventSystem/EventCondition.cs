@@ -24,6 +24,10 @@ namespace EventSystem
         /// 「呼ばれたときだけ出る」という意図を条件そのものに書く。</summary>
         public bool summonOnly;
 
+        /// <summary>出やすさの重みの札 (「重み[追跡]」など・2026-11-12)。 今の状況でこの札の条件が立っていれば、 抽選の重みに
+        /// <see cref="EventWeights"/> の倍率が掛かる。 複数あれば掛け合わせ。 札と倍率の正本は <see cref="EventWeights"/>。</summary>
+        public List<string> weightTags = new List<string>();
+
         /// <summary>floor が範囲内か</summary>
         public bool MatchesFloor(int floor)
         {

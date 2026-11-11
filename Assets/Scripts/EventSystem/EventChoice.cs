@@ -48,9 +48,51 @@ namespace EventSystem
             }
         }
 
+        /// <summary>この選択肢で払う強化素材 (効果「武器強化素材-N」の合計・確率分岐の中は数えない)。 2026-11-12。</summary>
+        public int MaterialCost
+        {
+            get
+            {
+                int n = 0;
+                if (effects != null)
+                    foreach (var e in effects)
+                        if (e != null && !e.postCombat && e.type == EventEffectType.MaterialDelta && e.amount < 0) n -= e.amount;
+                return n;
+            }
+        }
+
+        /// <summary>この選択肢が効果 type を (確率分岐の外に) 持つか。</summary>
+        public bool Has(EventEffectType type)
+        {
+            if (effects != null)
+                foreach (var e in effects)
+                    if (e != null && !e.postCombat && e.type == type) return true;
+            return false;
+        }
+
         /// <summary>選べるか。 **払えないゴールドの支払いは選べない** (2026-11-11 まで、 所持金 0 でも
         /// 「20 ゴールドで品を買う」が通り、 所持金が 0 で止まるだけだった)。 物資は足りなくても選べる
-        /// (足りない分は HP で払う ── 航行と同じ規則)。 run が null なら常に true。</summary>
-        public bool IsAvailable(GameLoop.RunState run) => run == null || run.coins >= GoldCost;
+        /// (足りない分は HP で払う ── 航行と同じ規則)。 run が null なら常に true。
+        /// <para>2026-11-12: 払えない強化素材・差し出せるパッシブが無い取り替え・鍛えられない武器 (素材が足りない / 終点) も選べない。
+        /// 理由の文は <see cref="UnavailableReason"/>。</para></summary>
+        public bool IsAvailable(GameLoop.RunState run) => UnavailableReason(run) == null;
+
+        /// <summary>選べない理由 (画面に出す短い文)。 選べるなら null。 判定の順は ゴールド → 素材 → 取り替え → 鍛える。</summary>
+        public string UnavailableReason(GameLoop.RunState run)
+        {
+            if (run == null) return null;
+            int g = GoldCost;
+            if (run.coins < g) return $"ゴールドが足りない（{g}G）";
+            int m = MaterialCost;
+            if (Has(EventEffectType.ForgeWeapon))
+            {
+                int cost = GameLoop.GameManager.WeaponUpgradeCost(run);
+                if (cost == int.MaxValue) return "武器はもう鍛えられない";
+                m += cost;
+            }
+            if (run.weaponMaterials < m) return $"素材が足りない（{m}）";
+            if (Has(EventEffectType.TradePassive) && !GameLoop.GameManager.CanTradePassive(run)) return "差し出せるパッシブが無い";
+            return null;
+        }
     }
 }

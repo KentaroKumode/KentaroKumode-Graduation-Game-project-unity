@@ -523,6 +523,151 @@ namespace MapSystem.FreeMove
         /// <summary>多めに回復する休憩など、 ターンだけを進める。</summary>
         public FreeMapEvent PassTurnsExternal(int n) => Dead || InFight ? FreeMapEvent.None : PassTurns(n);
 
+        // =====================================================================
+        //  イベントの航行の効果 (2026-11-12・docs/GAME.md §17)
+        //  どれもターンを使わない。 本体はイベントを閉じて地図へ戻った時に 1 つずつ呼ぶ (GameManager.ApplyEventNav)。
+        //  イベント専用の分岐を本体の他の処理に持たせないため、 動詞は「地図の上で何が起きるか」だけで書く。
+        // =====================================================================
+
+        /// <summary>この層で種類が分かっている点の割合 (0..1)。 イベントの出やすさ (地図の系) が読む。</summary>
+        public double KnownFraction
+        {
+            get
+            {
+                int k = 0;
+                for (int i = 0; i < Known.Length; i++) if (Known[i]) k++;
+                return Known.Length > 0 ? (double)k / Known.Length : 1.0;
+            }
+        }
+
+        /// <summary>今いる点から道で range 歩以内の点を明かす。 scouting = 戦闘名まで (偵察と同じ完全公開)。 新しく種類が分かった点の数を返す。</summary>
+        public int RevealAround(int range, bool scouting)
+        {
+            if (range <= 0) return 0;
+            var d = HopsFrom(Me);
+            int fresh = 0;
+            for (int i = 0; i < d.Length; i++)
+            {
+                if (d[i] > range) continue;
+                if (!Known[i]) fresh++;
+                Known[i] = true;
+                if (scouting) Scouted[i] = true;
+            }
+            Version++;
+            return fresh;
+        }
+
+        /// <summary>指定した点を完全公開する (種類と戦闘名)。 沈んだ点は飛ばす。</summary>
+        public int RevealPoints(IEnumerable<int> points)
+        {
+            int fresh = 0;
+            if (points == null) return 0;
+            foreach (int i in points)
+            {
+                if (i < 0 || i >= Known.Length || _sunk[i]) continue;
+                if (!Known[i]) fresh++;
+                Known[i] = true; Scouted[i] = true;
+            }
+            Version++;
+            return fresh;
+        }
+
+        /// <summary>補足を外す: 追跡者は見失って巡回へ戻り、 <see cref="FreeMapParams.ChaseRest"/> ターンは補足しない
+        /// (追跡の上限で諦めた時と同じ休み)。 放たれた使い魔は消え、 猟犬は本体の元へ戻る。 追跡者が居なければ何もしない。</summary>
+        public FreeMapEvent ShakeOff()
+        {
+            if (!FoeAlive) return FreeMapEvent.None;
+            bool was = FoeMode != FoeMode.Patrol || Familiars.Exists(f => !f.hound);
+            FoeMode = FoeMode.Patrol; _lose = 0; _chaseTurns = 0; _alertLure = -1;
+            _chaseRest = Math.Max(_chaseRest, FreeMapParams.ChaseRest);
+            Familiars.RemoveAll(f => !f.hound);
+            for (int i = 0; i < Familiars.Count; i++) { var f = Familiars[i]; f.pos = FoeNode; f.target = -1; Familiars[i] = f; }
+            Version++;
+            return was ? FreeMapEvent.FoeLost : FreeMapEvent.None;
+        }
+
+        /// <summary>追跡者の本体を道で steps 歩、 自分から遠ざける (毎歩、 自分からの歩数がいちばん増える隣へ・同点は隣接表の並び)。
+        /// これ以上離れられなければそこで止まる。 動かない性質 (召喚者) も動かす ── 本体の性質ではなく、 イベントの出来事として動く。
+        /// 猟犬は本体の元へ戻る。 追跡中なら追跡は続く (最後に補足した点へ向かう)。</summary>
+        public FreeMapEvent PushFoe(int steps)
+        {
+            if (!FoeAlive || steps <= 0) return FreeMapEvent.None;
+            var d = HopsFrom(Me);
+            for (int k = 0; k < steps; k++)
+            {
+                int best = FoeNode;
+                foreach (int v in _adj[FoeNode])
+                    if (d[v] != int.MaxValue && d[v] > d[best]) best = v;
+                if (best == FoeNode) break;
+                FoeNode = best;
+            }
+            for (int i = 0; i < Familiars.Count; i++)
+                if (Familiars[i].hound) { var f = Familiars[i]; f.pos = FoeNode; Familiars[i] = f; }
+            Version++;
+            return FreeMapEvent.None;
+        }
+
+        /// <summary>追跡者の本体を道で steps 歩、 自分へ近づける (代償の効果)。 自分の隣で止まる (この効果では捕まらない)。
+        /// 補足するかどうかは次のターンの追跡者の手番が決める。</summary>
+        public FreeMapEvent PullFoe(int steps)
+        {
+            if (!FoeAlive || steps <= 0) return FreeMapEvent.None;
+            for (int k = 0; k < steps; k++)
+            {
+                int nx = StepToward(FoeNode, Me);
+                if (nx == FoeNode || nx == Me) break;
+                FoeNode = nx;
+            }
+            Version++;
+            return FreeMapEvent.None;
+        }
+
+        /// <summary>近道: 終点へ向かう最短の道を steps 歩先の点へ移る (物資もターンも使わない)。 途中の点は通り過ぎるだけで起動しない
+        /// (使い切りにならず、 種類も明かさない)。 終点と追跡者の居る点の手前で止まる。 移れたら着いた扱い (<see cref="FreeMapEvent.Arrived"/>) で、
+        /// 着いた点は本体が起動する。 痕跡は着いた点にだけ残り、 追跡者が最後に補足した点は動かない。</summary>
+        public FreeMapEvent Shortcut(int steps)
+        {
+            if (Dead || InFight || steps <= 0) return FreeMapEvent.None;
+            int cur = Me, prev = PrevNode, moved = 0;
+            for (int k = 0; k < steps; k++)
+            {
+                int nx = StepToward(cur, Layout.goal);
+                if (nx == cur || nx == Layout.goal || (FoeAlive && nx == FoeNode)) break;
+                prev = cur; cur = nx; moved++;
+            }
+            if (moved == 0) return FreeMapEvent.None;
+            PrevNode = prev;
+            Me = cur;
+            Version++;
+            _trace[cur] = Turn;
+            Known[cur] = true;
+            LastArrived = cur;
+            RevealView();
+            return FreeMapEvent.Arrived;
+        }
+
+        /// <summary>天候の前線を動かす。 steps &gt; 0 = 近づける (前線が steps 回進む・崩れる地平と沈む湖面はその分だけ働く)、
+        /// steps &lt; 0 = 遠ざける (前線を |steps| × <see cref="FreeMapParams.FrontStep"/> だけ左へ戻す・まだ届いていない所まで戻ったら未到達に戻す)。
+        /// 天候の無い層・まだ前線が来ていない時に遠ざけるのは何も起きない。</summary>
+        public FreeMapEvent ShiftFront(int steps)
+        {
+            if (Weather == WeatherKind.None || steps == 0) return FreeMapEvent.None;
+            var ev = FreeMapEvent.None;
+            if (steps > 0)
+            {
+                for (int k = 0; k < steps; k++) ev |= AdvanceFront();
+            }
+            else if (!double.IsNegativeInfinity(Front))
+            {
+                double f = Math.Min(Front, FreeMapParams.Width) + steps * (double)FreeMapParams.FrontStep;
+                Front = f < FreeMapParams.FrontStep ? double.NegativeInfinity : f;
+                // 戻した時は FrontAdvanced を立てない (「前線が進んだ」の知らせを鳴らさない)
+            }
+            Version++;
+            RevealView();
+            return ev;
+        }
+
         /// <summary>囮罠を今いる点に置く (ターンは使わない)。 近くの追跡者は気を引かれて向かい、 踏むと足止めされる。</summary>
         public FreeMapEvent PlaceLure()
         {

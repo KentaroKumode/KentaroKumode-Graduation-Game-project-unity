@@ -236,6 +236,13 @@ namespace ItemSystem.Shop
                 rsCons.nextShopHalfPrice = false;
                 Debug.Log("[ShopManager] 商人の鈴: 全価格-50%");
             }
+            // イベント「次の店の値段-N%」(2026-11-12): 次の 1 店だけ。 使ったら戻す
+            if (rsCons != null && rsCons.nextShopPriceMul != 1f)
+            {
+                inv.priceMultiplier *= rsCons.nextShopPriceMul;
+                Debug.Log($"[ShopManager] イベントの値引き: 全価格 ×{rsCons.nextShopPriceMul:F2}");
+                rsCons.nextShopPriceMul = 1f;
+            }
             _apprMinRarity = null;
             if (rsCons != null && rsCons.nextLootMinRarity >= 0)
             {

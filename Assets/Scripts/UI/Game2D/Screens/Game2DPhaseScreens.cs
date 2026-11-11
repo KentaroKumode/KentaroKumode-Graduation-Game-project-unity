@@ -73,7 +73,7 @@ namespace UI.Game2D
             // 画面の外で所持金・HP が変わった時も描き直す (買える品の明暗・副題の数字)
             int coins = gm.Run != null ? gm.Run.coins : 0, hp = gm.Run != null ? gm.Run.playerHP : 0;
             if (coins != _lastCoins || hp != _lastHp) { _lastCoins = coins; _lastHp = hp; if (_open) _dirty = true; }
-            int pend = gm.PendingStartingPassiveChoices.Count + gm.PendingChallengeTiers.Count * 100 + (gm.Run != null ? gm.Run.pendingWeaponIds.Count * 10000 + gm.Run.pendingTerminalOffer.Count * 1000000 : 0);
+            int pend = gm.PendingStartingPassiveChoices.Count + gm.PendingEventPassiveOffers.Count * 100000000 + gm.PendingChallengeTiers.Count * 100 + (gm.Run != null ? gm.Run.pendingWeaponIds.Count * 10000 + gm.Run.pendingTerminalOffer.Count * 1000000 : 0);
             if (pend != _lastPending) { _lastPending = pend; _dirty = true; }
             if (!_dirty) return;
             // ロード画面の間は出さない (終わってから出す・_dirty は残す)。 開いている窓も閉じる ──
@@ -104,6 +104,7 @@ namespace UI.Game2D
                 return TerminalReward(gm);      // 山札 (ADR-0014) の報酬
             _termDeckView = false;
             if (ph == GameManager.GamePhase.MapNavigation && gm.PendingStartingPassiveChoices.Count > 0) return StartingPick(gm);
+            if (ph == GameManager.GamePhase.MapNavigation && gm.PendingEventPassiveOffers.Count > 0) return EventPassivePick(gm);
             if (ph == GameManager.GamePhase.MapNavigation && gm.PendingChallengeTiers.Count > 0) return ChallengePick(gm);
             switch (ph)
             {
@@ -186,6 +187,23 @@ namespace UI.Game2D
             }
             d.buttons.Add(B("選ぶ", "pick", true));
             d.onAction = (a, sel) => { if (a == "pick") { gm.ResolveStartingPassive(Mathf.Clamp(sel, 0, cands.Count - 1)); Game2DSfx.Play("ui_confirm"); } Refresh(); };
+            return d;
+        }
+
+        // ── イベントの「パッシブアイテムをNつから選ぶ」(2026-11-12)。 開幕パッシブの選択と同じ形 ──
+
+        private ScreenDef EventPassivePick(GameManager gm)
+        {
+            var cands = gm.PendingEventPassiveOffers[0];
+            var d = New("品を選ぶ", gm.PendingEventPassiveOffers.Count > 1 ? "残り " + gm.PendingEventPassiveOffers.Count : null, 420);
+            d.body = "差し出された品から 1 つ選ぶ。";
+            foreach (var id in cands)
+            {
+                var data = ItemDatabase.Instance?.GetItem(id);
+                d.Items.Add(new ModalItem { name = data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : id, desc = data?.description });
+            }
+            d.buttons.Add(B("選ぶ", "pick", true));
+            d.onAction = (a, sel) => { if (a == "pick") { gm.ResolveEventPassiveOffer(Mathf.Clamp(sel, 0, cands.Count - 1)); Game2DSfx.Play("ui_confirm"); } Refresh(); };
             return d;
         }
 
