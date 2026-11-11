@@ -279,14 +279,17 @@ namespace AutoTest
         //   1. 端子ごとの素の点 (RewardBaseScore): レア 3・コモン 2・使い捨て 1.5、 弱い/状況次第の物は下げる。
         //      軸の端子は偏重 (軸の品の数) で決まる: 0 なら 0.3 (効果が 0 に近い)・1 以上は 1.5 + 0.75 × 偏重 (上限 5)。
         //   2. ビルドの型 (_currentPersona) に合う端子に +2 (PersonaTerminals)。
-        //   3. 攻撃の種類の割合: 今 4 割未満なら攻撃の種類に +2.5。 攻撃以外を足して 4 割を割るなら −1.5。
-        //      攻撃の種類を引けないターンは攻撃できない (ADR-0014 規則 5) ので、 山札が守りと補助で薄まると殴れないターンが増える。
+        //   3. 攻撃の種類の割合: 今 3 割未満なら攻撃の種類に +1.25。 攻撃以外を足して 3 割を割るなら −0.75。
+        //      防御の種類の割合: 今 2 割未満なら防御の種類に +1.25。 防御以外を足して 2 割を割るなら −0.75。
+        //      2026-11-11: 旧は「攻撃 4 割・+2.5 / −1.5」だけで、 防御の下限が無かった。 その方策で山札を組むとブロックに挿す出目が
+        //      1 ターン 0.45 個 (main 0.82 個) まで減り、 6 層到達が 80% → 54% に落ちた (各 100 ラン・山札を変えない腕は 80%)。
+        //      手札 5 枚では攻撃の種類を引けないターンは少ないので、 攻撃の下限を緩め、 防御にも下限を置く。
         //   4. 同じ端子をもう持っていれば 1 枚ごとに −1 (手札がそろって条件や連鎖が噛み合わなくなる)。
         //   5. 最良でも足切り (1.2 + 山札 10 枚を超えた 1 枚ごとに +0.1) に届かなければ受け取らない ── 弱い端子は、
         //      引くたびに強い端子を引く機会を削る (山札を弱くする)。 基本の端子 (攻撃・防御・充電) の価値を 1 前後と見た足切り。
         private const float RewardRejectBelow = 1.2f, RewardThresholdPerCard = 0.1f;
         private const int RewardThresholdFreeSize = 10;
-        private const float RewardPersonaBonus = 2f, RewardMinAttackShare = 0.4f, RewardAttackNeedBonus = 2.5f, RewardDilutePenalty = 1.5f, RewardDupPenalty = 1f;
+        private const float RewardPersonaBonus = 2f, RewardMinAttackShare = 0.3f, RewardMinBlockShare = 0.2f, RewardAttackNeedBonus = 1.25f, RewardDilutePenalty = 0.75f, RewardDupPenalty = 1f;
 
         /// <summary>報酬の候補 (端子の名前の並び) から 1 つ選ぶ。 戻り値 = 添字・負 = 受け取らない。</summary>
         private int ChooseTerminalReward(IReadOnlyList<string> offer)
@@ -294,9 +297,9 @@ namespace AutoTest
             if (offer == null || offer.Count == 0) return -1;
             var run = GameManager.Instance?.Run;
             var deck = run?.terminalDeck;
-            int total = deck?.Count ?? 0, atk = 0;
-            if (deck != null) foreach (var id in deck) if (TerminalCards.Get(id)?.kind == TerminalKind.Attack) atk++;
-            float shareNow = total > 0 ? atk / (float)total : 0f;
+            int total = deck?.Count ?? 0, atk = 0, blk = 0;
+            if (deck != null) foreach (var id in deck) { var k = TerminalCards.Get(id)?.kind; if (k == TerminalKind.Attack) atk++; else if (k == TerminalKind.Block) blk++; }
+            float shareNow = total > 0 ? atk / (float)total : 0f, blkShareNow = total > 0 ? blk / (float)total : 0f;
             var want = PersonaTerminals(_currentPersona);
             float threshold = RewardRejectBelow + RewardThresholdPerCard * Math.Max(0, total - RewardThresholdFreeSize);
 
@@ -310,6 +313,9 @@ namespace AutoTest
                 bool isAtk = d.kind == TerminalKind.Attack;
                 if (shareNow < RewardMinAttackShare && isAtk) sc += RewardAttackNeedBonus;
                 if (!isAtk && (atk / (float)(total + 1)) < RewardMinAttackShare) sc -= RewardDilutePenalty;
+                bool isBlk = d.kind == TerminalKind.Block;
+                if (blkShareNow < RewardMinBlockShare && isBlk) sc += RewardAttackNeedBonus;
+                if (!isBlk && (blk / (float)(total + 1)) < RewardMinBlockShare) sc -= RewardDilutePenalty;
                 int copies = 0;
                 if (deck != null) foreach (var id in deck) if (id == d.id) copies++;
                 sc -= RewardDupPenalty * copies;
@@ -344,9 +350,10 @@ namespace AutoTest
         // =====================================================================
         //   買う: 棚の候補を報酬と同じ点 (ChooseTerminalReward・足切り込み) で選び、 払った後に TerminalShopReserve G 残るなら買う。 1 店で棚の枚数まで。
         //   抜く: 基本の端子 (攻撃・防御・充電) が TerminalPruneBasicMin 枚以上で、 基本以外が TerminalPruneNonBasicMin 枚以上ある時だけ、 基本を 1 枚。
-        //         どれを抜くか: 攻撃の割合を守る ── 攻撃以外の基本 (枚数の多い方) を先に、 攻撃の基本は攻撃の種類が TerminalPruneAttackKeep 枚より多い時だけ。
+        //         どれを抜くか: 基本のうち枚数の多い物から。 ただし攻撃の基本は攻撃の種類が TerminalPruneAttackKeep 枚より多い時だけ、
+        //         防御の基本は防御の種類が TerminalPruneBlockKeep 枚より多い時だけ (2026-11-11: 旧は防御・充電を先に抜いて守りが薄くなった)。
         //         店: 抜いた後に TerminalShopReserve G 残るなら 1 店 1 回。 休憩: HP が満ちていて回復が無駄になる時だけ (回復と択一)。
-        private const int TerminalShopReserve = 40, TerminalPruneBasicMin = 3, TerminalPruneNonBasicMin = 2, TerminalPruneAttackKeep = 3;
+        private const int TerminalShopReserve = 40, TerminalPruneBasicMin = 3, TerminalPruneNonBasicMin = 2, TerminalPruneAttackKeep = 3, TerminalPruneBlockKeep = 2;
 
         /// <summary>店に入った時の端子の買い物と抜くサービス。 棚の品の買い物より先に呼ぶ。</summary>
         private void DoShopTerminals(GameManager gm)
@@ -383,19 +390,22 @@ namespace AutoTest
         {
             var deck = run?.terminalDeck;
             if (deck == null || deck.Count <= TerminalCards.MinDeckSize) return -1;
-            int basic = 0, nonBasic = 0, atkKind = 0;
+            int basic = 0, nonBasic = 0, atkKind = 0, blkKind = 0;
             var cnt = new Dictionary<string, int>();
             foreach (var id in deck)
             {
                 var d = TerminalCards.Get(id); if (d == null) continue;
-                if (d.kind == TerminalKind.Attack) atkKind++;
+                if (d.kind == TerminalKind.Attack) atkKind++; else if (d.kind == TerminalKind.Block) blkKind++;
                 if (d.basic) { basic++; cnt.TryGetValue(id, out int c); cnt[id] = c + 1; } else nonBasic++;
             }
             if (basic < TerminalPruneBasicMin || nonBasic < TerminalPruneNonBasicMin) return -1;
             string pick = null; int most = 0;
-            foreach (var id in new[] { TerminalIds.Block, TerminalIds.Charge })
+            foreach (var id in new[] { TerminalIds.Charge, TerminalIds.Attack, TerminalIds.Block })      // 同数なら充電 → 攻撃 → 防御 の順
+            {
+                if (id == TerminalIds.Attack && atkKind <= TerminalPruneAttackKeep) continue;
+                if (id == TerminalIds.Block && blkKind <= TerminalPruneBlockKeep) continue;
                 if (cnt.TryGetValue(id, out int c) && c > most) { most = c; pick = id; }
-            if (pick == null && atkKind > TerminalPruneAttackKeep && cnt.ContainsKey(TerminalIds.Attack)) pick = TerminalIds.Attack;
+            }
             return pick != null ? deck.IndexOf(pick) : -1;
         }
 
