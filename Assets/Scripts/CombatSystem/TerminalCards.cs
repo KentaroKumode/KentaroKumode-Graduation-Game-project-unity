@@ -174,7 +174,7 @@ namespace CombatSystem
         public const int CapacitorNeed = 15, CapacitorAttack = 40, ArresterNeed = 12, FoundryNeed = 20, CoolantNeed = 24;
         public const float AmplifierPerPip = 0.08f, ResonatorMul = 1.5f, VacuumCritMult = 1.0f;
         public const int CounterEvery = 10; public const float CounterPct = 0.10f;
-        public const int TwinShotMul = 3, DetonatorMul = 4, FirstAidMul = 3, HealMul = 2, BatteryBonus = 2;
+        public const int TwinShotMul = 3, DetonatorMul = 4, FirstAidMul = 3, HealMul = 2, BatteryBonus = 2, InsulatorBonus = 3;
         public const int HarvesterMaxHp = 2, WhetGain = 1, LootGold = 10;
         public const float SightPerRank = 0.1f, VitalPerRank = 0.05f, BloodTapPct = 0.05f, BigDischargePerRank = 0.10f, ShieldPushPerRank = 0.03f;
         public const int BloodTapPer = 5, PoisonScalePer = 10, PoisonScaleAttack = 3, AfterHeatPerBurst = 2;
@@ -228,7 +228,7 @@ namespace CombatSystem
                 Cap(D(TerminalIds.Twin, A, "出目を攻撃に。2 個まで挿せる。"), 2),
                 D(TerminalIds.Fuse, B, "ブロック +" + FuseBlock + "。", TerminalCond.AtMost3),
                 D(TerminalIds.Ground, B, "このターンの被ダメージ −" + GroundCutPct + "%。", TerminalCond.AtMost3),
-                D(TerminalIds.Insulator, B, "シールド +出目。", TerminalCond.Even),
+                D(TerminalIds.Insulator, B, "シールド +出目 +" + InsulatorBonus + "。", TerminalCond.Even),
                 D(TerminalIds.Parry, B, "出目をブロックに。防いだ量を、次に攻撃するターンの攻撃に足す。"),
                 Cost(D(TerminalIds.Breaker, B, "充電 " + BreakerCost + " を払い、このターンの敵の攻撃 −" + BreakerCutPct + "%。"), BreakerCost),
                 D(TerminalIds.Rectifier, C, "充電 +出目 ×2。", TerminalCond.Even),
@@ -489,7 +489,7 @@ namespace CombatSystem
                 case TerminalIds.Twin: o.attackAdd += sum; break;
                 case TerminalIds.Fuse: o.blockAdd += FuseBlock; break;
                 case TerminalIds.Ground: o.takenMul *= 1f - GroundCutPct / 100f; break;
-                case TerminalIds.Insulator: o.shield += sum; break;
+                case TerminalIds.Insulator: o.shield += sum + InsulatorBonus; break;
                 case TerminalIds.Parry: o.blockAdd += sum; st.storedAttackNext += Math.Min(sum, Math.Max(0, env.enemyAttack)); break;
                 case TerminalIds.Breaker: o.enemyAttackMul *= 1f - BreakerCutPct / 100f; break;
                 case TerminalIds.Rectifier: o.chargeAdd += sum * 2; break;
