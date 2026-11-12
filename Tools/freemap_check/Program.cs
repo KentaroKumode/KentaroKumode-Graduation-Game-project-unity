@@ -49,6 +49,14 @@ static class T
         return -1;
     }
 
+    /// <summary>最短の道 (StepToward をたどる) で踏む縄張りの点の数 (from を含めず to を含む)。 AutoRunner.TerritoryStepsOnShortest と同じ。</summary>
+    static int TerritoryStepsOnShortest(FreeMapSim s, int from, int to)
+    {
+        int c = 0, cur = from;
+        for (int g = 0; g < 200 && cur != to; g++) { int nx = s.StepToward(cur, to); if (nx == cur) break; cur = nx; if (s.InTerritory(cur)) c++; }
+        return c;
+    }
+
     static bool FoeInsideTerritory(FreeMapSim s)
         => !s.FoeAlive || (s.InTerritory(s.FoeNode) && s.Familiars.All(f => s.InTerritory(f.pos)));
 
@@ -301,6 +309,59 @@ static class T
                 }
             }
             Console.WriteLine($"直行BOT {(leash ? "縄張り" : "旧い作り")} {pr.id,-10}: 捕まる {100.0 * caught / N:F0}% / 到達 {100.0 * reached / N:F0}%");
+        }
+        // --- 縄張りを横切らない道 (FreeMapSim.StepAvoidingTerritory) が、 縄張りを通らない道があればそれを最短で返す ---
+        {
+            int layers = 0, bad = 0, hasAvoid = 0;
+            for (int salt = 1; salt <= 200; salt++)
+            {
+                var s = Make(salt, FoeProfile.Brute, WeatherKind.None, leashed: true); layers++;
+                int to = s.Layout.goal;
+                int nx = s.StepAvoidingTerritory(s.Me, to, out int hops, out int terr);
+                // 縄張りの点を通らない幅優先の歩数 (検算用の素朴な計算)
+                var d = new int[s.Layout.Count]; for (int i = 0; i < d.Length; i++) d[i] = int.MaxValue;
+                var q = new Queue<int>(); d[to] = 0; q.Enqueue(to);
+                while (q.Count > 0) { int u = q.Dequeue(); foreach (int v in s.Neighbors(u)) if (d[v] == int.MaxValue && !s.InTerritory(v)) { d[v] = d[u] + 1; q.Enqueue(v); } }
+                int clean = int.MaxValue; foreach (int v in s.Neighbors(s.Me)) if (!s.InTerritory(v) && d[v] != int.MaxValue) clean = Math.Min(clean, d[v] + 1);
+                if (clean != int.MaxValue) { hasAvoid++; if (terr != 0 || hops != clean || s.InTerritory(nx)) bad++; }
+                else if (terr <= 0) bad++;
+                // たどると、 言った歩数で着き、 言った数だけ縄張りを踏む
+                int cur = s.Me, walked = 0, stepped = 0;
+                for (int g = 0; g < 200 && cur != to; g++) { int n2 = s.StepAvoidingTerritory(cur, to, out _, out _); if (n2 == cur) break; cur = n2; walked++; if (s.InTerritory(cur)) stepped++; }
+                if (cur != to || walked != hops || stepped != terr) bad++;
+            }
+            Check(bad == 0, $"縄張りを横切らない道: 通らない道があれば最短・たどると言った歩数と踏む数のとおり (層 {layers} / 通らない道あり {hasAvoid} / 異常 {bad})");
+        }
+        // --- 縄張りを避ける BOT の捕まり率 (AutoRunner.TerritoryAwareStep と同じ決め方・物資は数えない) ---
+        //   遠回りの上限 0 = 直行と同じ。 縄張りの外では捕まらないので、 捕まる率は「縄張りを踏まずに済まなかった層」の分だけ残る
+        foreach (int detour in new[] { 0, 3, 99 })
+        foreach (var pr in new[] { FoeProfile.Summoner, FoeProfile.Houndmaster, FoeProfile.Sprinter, FoeProfile.Brute })
+        {
+            int caught = 0, reached = 0, entered = 0, N = 300, caughtOut = 0;
+            for (int salt = 1; salt <= N; salt++)
+            {
+                var s = Make(salt, pr, WeatherKind.None, leashed: true);
+                bool inT = false;
+                for (int step = 0; step < 80 && !s.Dead; step++)
+                {
+                    int to = s.Layout.goal;
+                    int next = s.StepToward(s.Me, to);
+                    if (detour > 0)
+                    {
+                        int alt = s.StepAvoidingTerritory(s.Me, to, out int hops, out int terr);
+                        int direct = s.HopsFrom(s.Me)[to];
+                        if (alt != next && alt != s.Me && terr < TerritoryStepsOnShortest(s, s.Me, to) && hops - direct <= detour) next = alt;
+                    }
+                    if (next == s.Me) break;
+                    var ev = s.MoveTo(next);
+                    if (s.InTerritory(s.Me)) inT = true;
+                    if ((ev & (FreeMapEvent.Caught | FreeMapEvent.FamiliarContact)) != 0) { caught++; if (!s.InTerritory(s.Me)) caughtOut++; break; }
+                    if (s.Me == s.Layout.goal) { reached++; break; }
+                }
+                if (inT) entered++;
+            }
+            Console.WriteLine($"避けるBOT 遠回り+{detour,-2} {pr.id,-10}: 捕まる {100.0 * caught / N:F0}% / 縄張りに入った {100.0 * entered / N:F0}% / 到達 {100.0 * reached / N:F0}%");
+            if (caughtOut > 0) Check(false, $"避けるBOT: 縄張りの外で捕まった ({pr.id} {caughtOut})");
         }
         Console.WriteLine(fails == 0 ? "ALL OK" : $"FAILED {fails}");
     }
