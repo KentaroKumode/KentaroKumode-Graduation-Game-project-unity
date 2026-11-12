@@ -20,7 +20,7 @@ namespace AutoTest
         public bool paddedBracer;
         /// <summary>〈二股の端子〉: 充電端子の出目のこの割合が攻撃にも加わる (ctx.chargeToAttackPct)。</summary>
         public float chargeToAtkPct;
-        /// <summary>〈盾押しの心得〉: 攻撃に挿したターン、 シールドのこの割合が攻撃に加わる (堅牢 × 2%)。</summary>
+        /// <summary>〈盾押しの心得〉: 攻撃の端子を挿したターン、 シールドのこの割合が攻撃に加わる (堅牢 × 2%)。</summary>
         public float shieldPushPct;
 
         public bool Any => guardCut || undying || steadfast || daybreak || bashRate > 0f || bulwarkRate > 0f;

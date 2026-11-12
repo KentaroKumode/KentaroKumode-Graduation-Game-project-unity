@@ -30,7 +30,7 @@ namespace MetaProgression.Relics
         CritRate = 8,        // 会心率 +N%
         BloodOffering = 9,   // 血贄 +N% (敵味方問わず、 出血が与えたダメージの N% を回復)
         EscalationDelay = 10,// 敵の段階の遅れ +N ターン
-        BlockDicePct = 11,   // ブロックに挿した出目 +N%
+        BlockDicePct = 11,   // 防御の端子を挿した出目 +N%
         OpeningBleed = 12,   // 開幕出血 +N
         OpeningPoison = 13,  // 開幕毒 +N
         Rinkai = 14,         // 爆発時に敵の現在 HP の N% を固定ダメ枠へ

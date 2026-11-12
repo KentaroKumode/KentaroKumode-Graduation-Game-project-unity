@@ -27,7 +27,7 @@ namespace ItemSystem.PassiveSkills.Effects
     //  会心 (9)
     // ============================================================
 
-    /// <summary>狙い目の刻み: 攻撃に挿した出目に 6 があるターン、 会心率 +15%。</summary>
+    /// <summary>狙い目の刻み: 攻撃の端子を挿した出目に 6 があるターン、 会心率 +15%。</summary>
     public class AimNotch : IPassiveSkillEffect
     {
         public string SkillId => "狙い目の刻み";
@@ -38,7 +38,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>一の矢 (旧〈一本差しの型〉): 攻撃に挿したダイスが 1 個だけのターン、 会心率 +30%。</summary>
+    /// <summary>一の矢 (旧〈一本差しの型〉): 攻撃の端子を挿したダイスが 1 個だけのターン、 会心率 +30%。</summary>
     public class FirstArrow : IPassiveSkillEffect
     {
         public string SkillId => "一の矢";
@@ -149,7 +149,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.AddCharge(10);
     }
 
-    /// <summary>静電気の毛布: ブロック端子に挿したダイス 1 個につき充電 +1。</summary>
+    /// <summary>静電気の毛布: 防御の端子を挿したダイス 1 個につき充電 +1。</summary>
     public class StaticBlanket : IPassiveSkillEffect
     {
         public string SkillId => "静電気の毛布";
@@ -254,7 +254,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>裂け目の楔: 攻撃に挿した出目に 1 か 2 があるターン、 攻撃が通ると出血 +3 (2026-11-07: 旧 1 だけ)。</summary>
+    /// <summary>裂け目の楔: 攻撃の端子を挿した出目に 1 か 2 があるターン、 攻撃が通ると出血 +3 (2026-11-07: 旧 1 だけ)。</summary>
     public class RiftWedge : IPassiveSkillEffect
     {
         public string SkillId => "裂け目の楔";
@@ -325,7 +325,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>毒針の指輪: 攻撃が通ると、 攻撃に挿したダイス 1 個につき毒 +1。</summary>
+    /// <summary>毒針の指輪: 攻撃が通ると、 攻撃の端子を挿したダイス 1 個につき毒 +1。</summary>
     public class NeedleRing : IPassiveSkillEffect
     {
         public string SkillId => "毒針の指輪";

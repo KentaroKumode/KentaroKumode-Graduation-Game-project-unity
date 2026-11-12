@@ -1248,7 +1248,7 @@ namespace AutoTest
             // 攻撃に挿した出目への上乗せ率 (2026-11-06・本体と同じ式)。 配線で決まる品の分 (本体は OnWired) もここで足す (2026-11-07)。
             float atkPct = _diceAtkPct;
             if (atkPct > 0f && aSum > 0) aSum += (int)Math.Ceiling(aSum * atkPct);
-            // 〈盾押しの心得〉: 攻撃に挿したターン、 シールドの一部が攻撃に加わる (平坦・シールドは減らない)
+            // 〈盾押しの心得〉: 攻撃の端子を挿したターン、 シールドの一部が攻撃に加わる (平坦・シールドは減らない)
             if (_rung.shieldPushPct > 0f && aCount > 0 && s.shield > 0) aSum += (int)Math.Floor(s.shield * _rung.shieldPushPct);
             // 〈当て布の籠手〉: ブロック 2 個以上でシールド +3 (敵の攻撃の前に入る)
             if (_rung.paddedBracer && bCount >= ItemSystem.PassiveSkills.Effects.PaddedBracer.MinBlockDice) s.shield += ItemSystem.PassiveSkills.Effects.PaddedBracer.Shield;

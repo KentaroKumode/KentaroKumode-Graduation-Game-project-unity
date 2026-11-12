@@ -119,7 +119,7 @@ namespace MetaProgression.Relics
             return v;
         }
 
-        /// <summary>ブロックに挿した出目 +N%。</summary>
+        /// <summary>防御の端子を挿した出目 +N%。</summary>
         public static float GetBlockDicePct() => Value(RelicStat.BlockDicePct) * 0.01f;
 
         /// <summary>シールドの獲得量 +N% (堅牢 2 個の +20% を含む)。 consShield の増加に掛ける。</summary>

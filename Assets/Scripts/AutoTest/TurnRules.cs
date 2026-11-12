@@ -15,7 +15,7 @@ namespace AutoTest
     /// </summary>
     public static class TurnRules
     {
-        /// <summary>剣〈切り返し〉: 攻撃とブロックの両方に挿したターン、 ブロック合計 × <see cref="GuardCut.Rate"/> を攻撃へ。</summary>
+        /// <summary>剣〈切り返し〉: 攻撃と防御の端子を両方挿したターン、 ブロック合計 × <see cref="GuardCut.Rate"/> を攻撃へ。</summary>
         public static int GuardCutBonus(int blockSum) => Mathf.CeilToInt(blockSum * GuardCut.Rate);
 
         /// <summary>盾〈シールドバッシュ〉: 全部攻撃のターン、 シールドを使い切って × 率 を攻撃へ。</summary>
