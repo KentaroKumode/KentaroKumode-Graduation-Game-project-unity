@@ -665,26 +665,11 @@ namespace CombatSystem
                 var rs = GameLoop.GameManager.Instance?.Run;
                 if (rs != null)
                 {
-                    ctx.consAtkBurst        = rs.pendingConsAtkBurst;
-                    ctx.consDiceRoll        = rs.pendingConsDiceRoll;
-                    ctx.consDiceRollTurnsLeft = rs.pendingConsDiceRollTurns;
                     ctx.consShield          = rs.pendingConsShield;
                     ctx.shieldGainedTotal  += rs.pendingConsShield; // 検証計測
                     ctx.consShieldExpireTurn= rs.pendingConsShieldTurns;
-                    ctx.consRegen           = rs.pendingConsRegen;
-                    ctx.consCritPct         = rs.pendingConsCritPct;
-                    ctx.consFlatReduce      = rs.pendingConsFlatReduce;
                     ctx.consDmgMultPct      = rs.pendingConsDmgMultPct;
                     ctx.consDmgMultTurnsLeft = rs.pendingConsDmgMultTurns;
-                    ctx.consReflect         = rs.pendingConsReflect;
-                    ctx.consEnemyDiceDebuff = rs.pendingConsEnemyDiceDebuff;
-                    ctx.gamblerArmed        = rs.pendingGamblerDice;
-                    if (rs.pendingEnemyStartHpCutPct > 0)
-                    {
-                        int cut = Mathf.CeilToInt(enemy.maxHP * rs.pendingEnemyStartHpCutPct / 100f);
-                        HpLossDiag.Lose(ref enemyHP, cut, "奇襲", 1);
-                        Debug.Log($"[CombatManager] 奇襲: 敵開始HP-{cut} ({enemyHP}/{enemy.maxHP})");
-                    }
                     // 2026-06-28: 職業スターター消耗品の pending → ctx コピー
                     if (rs.pendingPolishArmed) ctx.polishArmed = true;
                     if (rs.pendingOathArmed)

@@ -357,7 +357,7 @@ namespace ItemSystem.PassiveSkills
         public int enemyDiceTotalBonus;
 
         /// <summary>[perTurn] 沈黙の剣帯 等: 敵ダイス合計への「床なし」減算ペナルティ。
-        /// enemyDiceDebuff/consEnemyDiceDebuff は Math.Max(0) で0床処理されるが、こちらは床処理せず
+        /// enemyDiceDebuff は Math.Max(0) で0床処理されるが、こちらは床処理せず
         /// enemyDiceTotal を負値まで押し下げられる（=ロール大差勝ち＝基礎ダメ激増）。BeginNewTurn でリセット。</summary>
         public int enemyDiceTotalPenalty;
 
@@ -723,10 +723,7 @@ namespace ItemSystem.PassiveSkills
 
         // ===== 消費アイテム由来（この1戦闘のみ。ctxは戦闘毎に生成→破棄で自動消去） =====
         public int consAtkBurst;          // [persistent] (主攻撃で使ったら 0) 次の主攻撃で与ダメ+X（与ダメ倍率の後に足す・適用後0）
-        public int consDiceRoll;          // [decay] (残ターンが尽きると CombatManager.Turn.cs が 0 (BeginNewTurn の外)) 攻撃+X（CombatManager.Turn.cs が攻撃値へ足す。 旧: 勝敗判定のみ）
-        /// <summary>[decay] cons_atk 効果の残ターン数。0=無効, -1=戦闘中永続, N=残 N ターン。
-        /// EndTurn で decrement し 0 になった瞬間 consDiceRoll を 0 化する。2026-07-21 追加。</summary>
-        public int consDiceRollTurnsLeft;
+        public int consDiceRoll;          // [persistent] 攻撃+X（CombatManager.Turn.cs が攻撃値へ足す）。 書くのは〈痛覚遮断剤〉の発動 (BeginNewTurn Phase A) だけ
         /// <summary>[persistent] この戦闘で払ったリロールの回数（2026-10-17〜）。 費用 = 振り直す個数 × (この値 + 1)。
         /// <b>ターンでは戻らない</b> ── 同じ戦闘で振り直すほど高くつく（続けるとジリ貧）。 ctx は戦闘ごとに作り直すので、
         /// 戦闘の頭で 0。 〈中階〉の無料リロールは数えない。</summary>
@@ -762,16 +759,10 @@ namespace ItemSystem.PassiveSkills
         }
         private int _consShield;
         public int consShieldExpireTurn;  // [decay] (減算は CombatManager.Turn.cs (BeginNewTurn の外)) この番号を超えるターンで失効。-1=無制限/0=無
-        public int consRegen;             // [decay] (減算は CombatManager.Turn.cs (BeginNewTurn の外)) 毎ターン終了時 +consRegen 回復し consRegen--
-        public float consCritPct;         // [persistent] 会心率 (小数) 永続（毎ターン critRatePctAdd へ再適用）
-        public int consFlatReduce;        // [persistent] 被ダメ定数-X 永続（毎ターン再適用）
         public int consDmgMultPct;        // [decay] (残ターンが尽きると CombatManager.Turn.cs が 0 (BeginNewTurn の外)) 与ダメ +X%
         /// <summary>[decay] cons_dmg 効果の残ターン数。0=無効, -1=戦闘中永続, N=残 N ターン。
         /// EndTurn で decrement し 0 になった瞬間 consDmgMultPct を 0 化する。2026-07-21 追加。</summary>
         public int consDmgMultTurnsLeft;
-        public bool consReflect;          // [persistent] 被メインダメと同量を敵へ反射
-        public int consEnemyDiceDebuff;   // [persistent] 敵ダイス合計 -X（毎ロール）
-        public bool gamblerArmed;         // [persistent] (振りで 1 回使ったら false) 賭博師のダイス（ロール時に発火・消費）
 
         // ===== エリート: 精鋭ハーピィ「死翔」 =====
         public bool consumablesLocked;    // [persistent] この戦闘中、消費アイテム使用不可（戦闘開始時に付与・戦闘ごとに新規生成でリセット）

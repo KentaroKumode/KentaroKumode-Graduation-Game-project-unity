@@ -149,15 +149,6 @@ namespace CombatSystem
             // ターン終了スキルによるHP変動をCombatManagerに反映（剣鎧等）
             SyncHPFromContext(ctx);
 
-            // 消費: 継続回復（毎ターン終了時 +consRegen → consRegen--）。狂暴化中は封印。
-            if (ctx.consRegen > 0 && playerHP > 0 && !ctx.healBlocked)
-            {
-                int regen = Math.Max(0, ctx.consRegen - ctx.healShieldReduction); // 天衣無縫減衰
-                int heal = Math.Min(playerMaxHP - playerHP, regen);
-                if (heal > 0) { playerHP += heal; ctx.playerCurrentHP = playerHP; ctx.healAppliedTotal += heal; }
-                Debug.Log($"[CombatManager] 継続回復 +{heal} (次T {ctx.consRegen - 1})");
-                ctx.consRegen--;
-            }
             // 消費: シールド残ターン減算（-1=無制限 / 0で失効）
             if (ctx.consShieldExpireTurn > 0)
             {
@@ -166,16 +157,6 @@ namespace CombatSystem
                 {
                     ctx.consShield = 0;
                     Debug.Log("[CombatManager] シールド失効");
-                }
-            }
-            // 2026-07-21 消費: 攻撃バフ (cons_atk_*) の残ターン減算
-            if (ctx.consDiceRollTurnsLeft > 0)
-            {
-                ctx.consDiceRollTurnsLeft--;
-                if (ctx.consDiceRollTurnsLeft == 0)
-                {
-                    ctx.consDiceRoll = 0;
-                    Debug.Log("[CombatManager] 攻撃バフ失効");
                 }
             }
             // 2026-07-21 消費: 与ダメ倍率 (cons_dmg_*) の残ターン減算
@@ -483,12 +464,6 @@ namespace CombatSystem
             // 消費アイテム持続効果の毎ターン再適用 + 死因タグリセット (旧法と同一)
             if (ctx != null)
             {
-                if (ctx.consCritPct > 0f)
-                {
-                    ctx.critRatePctAdd += ctx.consCritPct;
-                    DmgSourceDiag.Note("消費〈会心率〉", DmgSourceDiag.CritRate, ctx.consCritPct);
-                }
-                if (ctx.consFlatReduce > 0) ctx.playerFlatDamageReduction += ctx.consFlatReduce;
                 // 整備パネル〈装甲〉: 被ダメージ −1/段 (防御の後に引く・逓減を受けない・2026-11-10)
                 ctx.playerFlatDamageReduction += MetaProgression.MetaBuffApplicator.GetArmorFlatReduction();
                 // 遺物 電流 3 個: 過充電の間、 被ダメ −3

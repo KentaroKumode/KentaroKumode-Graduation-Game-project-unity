@@ -78,7 +78,6 @@ OnTurnEnd の 4 か所。これ以外の位置で敵パッシブが ctx の HP �
 playerDiceTotal = Σ(プレイヤー出目)
 enemyDiceTotal  = Σ(敵出目)
                 − buff "enemyDiceDebuff"
-                − consEnemyDiceDebuff      ← 消費:敵弱体
                 − enemyDiceTotalPenalty    ← 床なし減算(負値許容)。沈黙の剣帯=1T目-99
                 + enemyDiceTotalBonus      ← 星火燎原/業火の遺志/狂暴化 等(累積)
                 + bossDiceBonus            ← 強者/玉座/刹那(※現在enemies.jsonから撤廃・常時0)
@@ -186,7 +185,6 @@ total = ProcessDamage結果
 playerDamageNegateCharges>0 → total=0(獣の絆)
 コントラタック(player_contre): total半減 + 軽減量×2を敵へ反射
 − consShield(消費シールド吸収。 盾は T2 以降のターン頭に半減 ── ③-D)
-consReflect(鏡写し): 吸収後の被ダメ同量を敵へ反射
 痛覚遮断剤【職業/狂戦士 2026-06-28】: painkillerArmedThisTurn && total≥playerHP → total=playerHP−1（HP=1踏みとどまり・チェーン**最後**）
 → (ダメージ適用直前) 仕込み刃【職業/暗殺者 2026-06-28・2026-09-22 に倍率 1→5】: daggerArmed && total>0 → total=0 ＋ **その 5 倍**を enemyHP へ軽減不能で返す（`CombatManager` の仕込み刃の反撃倍率）。使ったターン限りで、被弾しなくても失効
 → 古い手紙【消耗品 2026-10-31】: accumulatedValues[Consumables.OldLetterGuardKey] > 0 → total=0（反撃なし）。仕込み刃の直後・同じく使ったターン限り。1 枚で 3 回使える
@@ -291,7 +289,7 @@ ShieldBash の空振り（盾 0）が 34.2% → 66.1%、1 機会あたりの攻�
 | `truceThisTurn` | 停戦協定ターン(他効果抑止) | 毎T |
 | `rollPurity` | 無我無心(消費アイテムの攻撃補正・瞬間研磨剤を拒否) | 戦闘保持 |
 | `garyoProc`/`garyoDieValue` | 画竜点睛発動/出目 | — |
-| `consShield`/`consReflect`/`consDmgMultPct`/`consAtkBurst`/`consCritPct`/`consDiceRoll`/`consEnemyDiceDebuff` | 消費アイテム由来 | 各種 |
+| `consShield`/`consDmgMultPct`/`consAtkBurst`/`consDiceRoll` | 消費アイテム由来 (`consAtkBurst`/`consDiceRoll` を書くのは〈痛覚遮断剤〉だけ) | 各種 |
 | buff `damageBonus`/`critRatePct`(小数)/`enemyDiceDebuff` | currentBuffs/nextTurnBuffs経由 | nextTurn→current移行 |
 | `accumulatedValues["extraDice"]` | そのターンのダイス数増減(NightLord/精鋭/0d0等) | — |
 | `accumulatedValues["extraPursuitDice"]` | 追撃ダイス追加(多頭) | — |

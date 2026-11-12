@@ -65,14 +65,11 @@ namespace AutoTest.EditorTests.Ultra
             // shop
             "shopRobberyDone", "shopRobberyInProgress", "robberyPendingItems", "nextShopHalfPrice",
             // armed consumable effects (the player spent an item for each of these)
-            "nextLootMinRarity", "pendingEnemyStartHpCutPct",
-            "pendingGamblerDice", "pendingDaggerArmed", "pendingOathArmed",
+            "nextLootMinRarity",
+            "pendingDaggerArmed", "pendingOathArmed",
             "pendingPolishArmed", "pendingRinkaiCarryover",
-            "pendingConsAtkBurst", "pendingConsCrit", "pendingConsCritBattles",
-            "pendingConsDiceRoll", "pendingConsDiceRollBattles", "pendingConsDiceRollTurns",
-            "pendingConsDmgMultPct", "pendingConsDmgMultTurns", "pendingConsEnemyDiceDebuff",
-            "pendingConsFlatReduce", "pendingConsFlatReduceBattles", "pendingConsReflect",
-            "pendingConsRegen", "pendingConsShield", "pendingConsShieldTurns",
+            "pendingConsDmgMultPct", "pendingConsDmgMultTurns",
+            "pendingConsShield", "pendingConsShieldTurns",
         };
 
         /// <summary>Fields that must never reach the observation.

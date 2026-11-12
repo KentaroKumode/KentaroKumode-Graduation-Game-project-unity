@@ -469,16 +469,6 @@ namespace ItemSystem.PassiveSkills
             context.playerDice = playerDice;
             context.enemyDice = enemyDice;
 
-            // 消費: 賭博師のダイス（50%で全最大 / 50%で全1・消費）
-            if (context.gamblerArmed)
-            {
-                int pm = context.playerDiceMax > 0 ? context.playerDiceMax : 6;
-                int v = GameLoop.GameRng.Value("PassiveSkillManager.1") < 0.5f ? pm : 1;
-                for (int i = 0; i < playerDice.Length; i++) playerDice[i] = v;
-                context.gamblerArmed = false;
-                UnityEngine.Debug.Log($"[Consumables] 賭博師のダイス: 全ダイス→{v}");
-            }
-
             // 敵ダイスへの制約適用（処刑/正義への妄執）
             ApplyDiceOverrides(enemyDice);
 
@@ -717,7 +707,7 @@ namespace ItemSystem.PassiveSkills
 
         /// <summary>
         /// ダイス出目の合計を計算し、各種ダイス補正（enemyDiceDebuff /
-        /// consEnemyDiceDebuff / enemyDiceTotalBonus / bossDiceBonus）を適用する。
+        /// enemyDiceTotalBonus / bossDiceBonus）を適用する。
         /// OnPostRoll パッシブによる加算はここでは扱わない。
         /// </summary>
         private void RecomputeDiceTotals(int[] playerDice, int[] enemyDice)
@@ -735,10 +725,6 @@ namespace ItemSystem.PassiveSkills
             int enemyDebuff = (int)context.GetBuff("enemyDiceDebuff");
             if (enemyDebuff > 0)
                 context.enemyDiceTotal = System.Math.Max(0, context.enemyDiceTotal - enemyDebuff);
-
-            // 消費: 敵弱体（敵ダイス合計-X・全戦闘）
-            if (context.consEnemyDiceDebuff > 0)
-                context.enemyDiceTotal = System.Math.Max(0, context.enemyDiceTotal - context.consEnemyDiceDebuff);
 
             // 沈黙の剣帯 等: 床なし減算（負値許容＝大差勝ち→基礎ダメ激増）
             if (context.enemyDiceTotalPenalty != 0)

@@ -437,18 +437,9 @@ namespace GameLoop
         // === 消費アイテム: 次戦闘へ持ち越すバフ（マップ上で使用した場合） ===
         // 戦闘中に使用した場合は CombatContext へ直接書き込まれるため、これらは使われない。
         // 戦闘開始時に CombatContext へコピーされ、ここはクリアされる（1戦のみ）。
-        public int  pendingConsAtkBurst;       // 攻撃力: 次戦闘の最初の勝利ターンに与ダメ+X
-        public int  pendingConsDiceRoll;       // ダイス補正: 勝敗判定のみ+X（ダメージ非加算）
-        public int  pendingConsDiceRollBattles;// ダイス補正の残戦闘数（>0 で次戦闘へ持ち越し）
-        /// <summary>2026-07-21: cons_atk_* の残ターン数 (-1=戦闘中永続)。 出戦時に ctx.consDiceRollTurnsLeft へコピー。</summary>
-        public int  pendingConsDiceRollTurns;
+        // (2026-11-12: 書く所の無かった持ち越し ── 攻撃バースト・攻撃+X・継続回復・会心率・被ダメ軽減・反射・敵弱体・奇襲・賭博師 ── は削除。 #127)
         public int  pendingConsShield;         // シールド吸収量
         public int  pendingConsShieldTurns;    // シールド持続(>0)/無制限(-1)/無(0)
-        public int  pendingConsRegen;          // 継続回復: 初期値X（毎T後X回復しX-1）
-        public float pendingConsCritPct;       // 会心率 (小数) の持ち越し
-        public int  pendingConsCritBattles;    // 会心率の残戦闘数
-        public int  pendingConsFlatReduce;     // 被ダメ毎ターン定数-X
-        public int  pendingConsFlatReduceBattles; // 軽減の残戦闘数
         public int  pendingConsDmgMultPct;     // 与ダメ+X%（cons_dmg_*)
         /// <summary>2026-07-21: cons_dmg_* の残ターン数 (-1=戦闘中永続)。 出戦時に ctx.consDmgMultTurnsLeft へコピー。</summary>
         public int  pendingConsDmgMultTurns;
@@ -456,10 +447,6 @@ namespace GameLoop
         // === メタ v6: 種火の戦闘跨ぎ値 ===
         /// <summary>臨界 r2 保温炉: 前戦闘終了時に memored し次戦闘開始時に ctx.rinkaiMeter へ +する量。</summary>
         public int  pendingRinkaiCarryover;
-        public bool pendingConsReflect;        // 鏡写し: 被メインダメを敵に反射
-        public int  pendingConsEnemyDiceDebuff;// 敵弱体: 敵ダイス合計-X
-        public int  pendingEnemyStartHpCutPct; // 奇襲: 敵開始HP-X%
-        public bool pendingGamblerDice;        // 賭博師: 50%全最大/50%全1
 
         // === 2026-06-28: 職業スターター消耗品 (戦闘外で使用された場合の次戦闘持ち越し) ===
         public bool pendingPolishArmed;        // 瞬間研磨剤: 次戦闘の最初の1撃で 与ダメージ+150%
@@ -482,30 +469,10 @@ namespace GameLoop
         /// <summary>次戦闘持ち越しバフをすべて消去（戦闘開始時にコピー後 or リセット時）。</summary>
         public void ClearPendingCombatConsumables()
         {
-            // 単発系は即クリア。 マルチバトル系（dice/crit/reduce）は ConsumePendingAfterBattle で
-            // 残戦闘数 > 0 の間は値を保持する。
-            pendingConsAtkBurst = 0;
             pendingConsShield = 0; pendingConsShieldTurns = 0;
-            pendingConsRegen = 0;
             pendingConsDmgMultPct = 0; pendingConsDmgMultTurns = 0;
-            pendingConsDiceRollTurns = 0;
-            pendingConsReflect = false; pendingConsEnemyDiceDebuff = 0;
-            pendingEnemyStartHpCutPct = 0; pendingGamblerDice = false;
             // 2026-06-28: 職業スターター消耗品の pending フラグ ── 戦闘開始時に ctx へコピー後クリア
             pendingPolishArmed = false; pendingOathArmed = false; pendingDaggerArmed = false;
-            // dice/crit/reduce は ConsumePendingAfterBattle 側で管理（残戦闘数 0 で初めてクリア）
-            ConsumeMultiBattleConsumablesAfterCopy();
-        }
-
-        /// <summary>マルチバトル持続バフ（dice/crit/reduce）の戦闘消費。 残数を 1 減らし、 0 到達時のみ値クリア。</summary>
-        private void ConsumeMultiBattleConsumablesAfterCopy()
-        {
-            if (pendingConsDiceRollBattles > 1) pendingConsDiceRollBattles--;
-            else { pendingConsDiceRoll = 0; pendingConsDiceRollBattles = 0; }
-            if (pendingConsCritBattles > 1) pendingConsCritBattles--;
-            else { pendingConsCritPct = 0f; pendingConsCritBattles = 0; }
-            if (pendingConsFlatReduceBattles > 1) pendingConsFlatReduceBattles--;
-            else { pendingConsFlatReduce = 0; pendingConsFlatReduceBattles = 0; }
         }
 
         // === 時限バフ・デバフ用ヘルパー ===

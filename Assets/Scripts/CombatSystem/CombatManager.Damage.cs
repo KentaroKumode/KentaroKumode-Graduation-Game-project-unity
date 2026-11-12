@@ -405,13 +405,6 @@ namespace CombatSystem
                 }
             }
 
-            // 消費: 鏡写しの水晶（吸収後の実被ダメと同量を敵へ反射）
-            if (ctx.consReflect && totalDmg > 0)
-            {
-                HpLossDiag.Lose(ref enemyHP, totalDmg, "反射(鏡写し)");
-                Debug.Log($"[CombatManager] 鏡写し反射 {totalDmg} → 敵HP {enemyHP}");
-            }
-
             // 〈虚空〉の殻: 攻撃端子 0 本のターンだけ立つ。 積むほど薄くなり n=6 で消える。
             // **下限を 0 にしないので完全無敵にはならない** (旧 nullifyAllDamage の抜け穴対策)。
             if (ctx != null && ctx.voidStanceDamageMul < 1f && totalDmg > 0)
