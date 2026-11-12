@@ -455,7 +455,7 @@ namespace AutoTest.ParallelSweep
                 // 2026-11-12 (#107): 配線が収支で決まる敵のパッシブと〈吸血〉を読むか (−1 = 技量に従う) と実効値・内訳
                 "v3.readEnemyPassives", "ReadEnemyPassivesEffective", "v3.enemyPassiveMask",
                 // 2026-11-12 (#105): 山札の 2 ターン先読み (既定 OFF) と、 その範囲・候補数・標本数
-                "deckLookahead", "deckLookaheadBossOnly", "deckLookaheadTopK", "deckLookaheadSamples",
+                "deckLookahead", "deckLookaheadBossOnly", "deckLookaheadTopK", "deckLookaheadSamples", "deckLookaheadProbe",
                 // 2026-11-12 (#6): 挑戦カードを 1 枚ずつ受ける測定の口と、〈金で殴る〉の BOT の金の値段・取り置き
                 "challengeForce", "goldPunchHpPerGold", "goldPunchReserve",
                 // 2026-11-12 (#118): 挑戦の難易度 (v3_queue の腕が振る値) と、 BOT が読む学習の帯の固定・欠けたら止めるか
