@@ -283,7 +283,7 @@ namespace EventSystem
                 case EventEffectType.ShiftFront:
                     // 航行の効果は地図へ戻った時に (ターン+N と同じ口)。 画面の文はここで出す (地図へ戻った直後に必ず適用されるので)
                     result.navEffects.Add(eff);
-                    { string s = DescribeNav(eff); if (s != null) result.log.Add(s); }
+                    { string s = DescribeNav(eff, run); if (s != null) result.log.Add(s); }
                     break;
 
                 case EventEffectType.OfferPassives:
@@ -345,22 +345,29 @@ namespace EventSystem
             }
         }
 
-        /// <summary>航行の効果の画面の文 (選んだ直後の結果に並べる)。 航行マップの無い層では null (何も起きないので書かない)。</summary>
-        private static string DescribeNav(EventEffect eff)
+        /// <summary>航行の効果の画面の文 (選んだ直後の結果に並べる)。
+        /// <para>2026-11-13: 起きない効果 (追跡者の居ない層の「追跡者を呼ぶ」など) は、 起きない理由を 1 行出す (「この層に追跡者は居ない」)。
+        /// 選べるかの判定 (<c>EventChoice.UnavailableReason</c>) と同じ規則・同じ文 (<see cref="EventEffectRoles.NotHappeningReason"/>)。
+        /// 代償だけが起きない選択肢・得の一部だけが起きない選択肢は選べるので、 ここで起きなかったことを見せる。
+        /// 本体のランでない (航行を判定できない) 時は、 地図が無ければ何も書かない (これまでどおり)。</para></summary>
+        private static string DescribeNav(EventEffect eff, RunState run)
         {
+            string not = EventEffectRoles.NotHappeningReason(eff, EventChoice.Situation(run, false, false));
+            if (not != null) return not;
             var sim = GameLoop.GameManager.Instance != null ? GameLoop.GameManager.Instance.FreeMap : null;
             if (sim == null) return null;
+            // 縄張りを出ない番人 (既定) は、 縄張りの中の道だけで動く (FreeMapSim.PushFoe / PullFoe・縁で止まる)
+            string leash = sim.Leashed ? "縄張りの中で " : "";
             switch (eff.type)
             {
                 case EventEffectType.RevealMap:        return $"周りの {eff.amount} 歩先まで、点の種類が分かる";
                 case EventEffectType.RevealEncounters: return $"周りの {eff.amount} 歩先まで、戦闘の相手が分かる";
                 case EventEffectType.RevealSupplies:   return "この層の店と休憩の場所が分かる";
-                case EventEffectType.ShakeOffPursuer:  return sim.FoeAlive ? "追跡者の目から外れる" : null;
-                case EventEffectType.PushPursuer:      return sim.FoeAlive ? $"追跡者が {eff.amount} 歩遠のく" : null;
-                case EventEffectType.PullPursuer:      return sim.FoeAlive ? $"追跡者が {eff.amount} 歩近づく" : null;
+                case EventEffectType.ShakeOffPursuer:  return "追跡者の目から外れる";
+                case EventEffectType.PushPursuer:      return sim.Leashed ? $"追跡者が{leash}{eff.amount} 歩まで遠のく" : $"追跡者が {eff.amount} 歩遠のく";
+                case EventEffectType.PullPursuer:      return sim.Leashed ? $"追跡者が{leash}{eff.amount} 歩まで近づく" : $"追跡者が {eff.amount} 歩近づく";
                 case EventEffectType.Shortcut:         return $"時限バフ獲得: 近道 ({eff.amount}回)";   // 時限バフと同じ言い方 (2026-11-13・作者の決定「近道というバフに統一」)
                 case EventEffectType.ShiftFront:
-                    if (sim.Weather == MapSystem.FreeMove.WeatherKind.None) return null;
                     return eff.amount < 0 ? $"天候の前線が {-eff.amount} 段退く" : $"天候の前線が {eff.amount} 段迫る";
             }
             return null;
