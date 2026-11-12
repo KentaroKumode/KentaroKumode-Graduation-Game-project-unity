@@ -188,26 +188,7 @@ namespace AutoTest.EditorTools
         [MenuItem("Tools/AutoRun/診断: 並列 5000ラン (防ぎ切りの規則 OFF・Optimal・ITT の序列で買う)", priority = 15)]
         private static void LaunchNoFreeBlock() => LaunchWith(0, overrides: new Dictionary<string, string> { ["FreeBlockRule"] = "False" });
 
-        /// <summary>診断: Super の勝利時の残り HP の重み (<c>superAI.winHpWeight</c>・既定 0.5) を 1.0 にして 1,000 ラン (2026-11-05)。
-        /// 防ぎ切りの規則を持つ Optimal との差が、 HP の重みで縮むかを見る。 1 ラウンドで中止すること。
-        /// <b>2026-11-12〜 効かない</b> (旧い先読みの経路を削除した・<c>SuperCombatAI</c> の冒頭を読むこと)。</summary>
-        [MenuItem("Tools/AutoRun/診断: 並列 Super 1000ラン (HP の重み 1.0・メタ標準・挑戦0pt)", priority = 15)]
-        private static void LaunchSuperHpWeight() => LaunchWith(0, AutoRunner.WiringSkill.Super, 1000,
-            overrides: new Dictionary<string, string> { ["superAI.winHpWeight"] = "1.0" });
-
-        /// <summary>診断: Super の配線候補数 (<c>superAI.candidateWirings</c>・既定 6) を 12 にして 1,000 ラン (2026-11-05)。
-        /// 探索を広げると Optimal との差が縮むかを見る。 1 ラウンドで中止すること。
-        /// <b>2026-11-12〜 効かない</b> (旧い先読みの経路を削除した)。</summary>
-        [MenuItem("Tools/AutoRun/診断: 並列 Super 1000ラン (配線候補 12・メタ標準・挑戦0pt)", priority = 15)]
-        private static void LaunchSuperCand12() => LaunchWith(0, AutoRunner.WiringSkill.Super, 1000,
-            overrides: new Dictionary<string, string> { ["superAI.candidateWirings"] = "12" });
-
-        /// <summary>診断: Super の新方式 V2 (<c>superAI.useV2</c>・旧 <c>SuperCombatAI.V2.cs</c>) で 1,000 ラン (2026-11-05)。
-        /// 旧方式 (同じ学習状態の Super / Optimal) と同じシードで比べる。 1 ラウンドで中止すること。
-        /// <b>2026-11-12〜 効かない</b> (V2 は旧い先読みの経路ごと削除した)。</summary>
-        [MenuItem("Tools/AutoRun/診断: 並列 Super V2 1000ラン (メタ標準・挑戦0pt)", priority = 15)]
-        private static void LaunchSuperV2() => LaunchWith(0, AutoRunner.WiringSkill.Super, 1000,
-            overrides: new Dictionary<string, string> { ["superAI.useV2"] = "True" });
+        // (Super の旧い先読みのレバー superAI.* を振る診断 3 本は 2026-11-12 に削除・#135。 SuperCombatAI ごと消した)
 
         /// <summary><b>SuperV3 の A/B (2026-11-05)。</b> <c>AutoRunLogs/v3_arm.txt</c> の設定で 1 ラウンドだけ回し、
         /// <b>学習へ合流させない</b>。 1 行 1 設定 (<c>キー=値</c>・<c>#</c> は注釈)。 特別なキー: <c>_runs</c> (ラン数・既定 5000) /

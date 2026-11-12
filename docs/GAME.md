@@ -616,7 +616,7 @@ lore 的には「ギルド管轄も 5 層まで」「5 層を抜けた時点で�
 - **アイコン**: 17×17・2 色（明るい主役＋後ろの暗めの飾り・主役の中の線は抜き）。物の絵に限らず意味を表す記号でよい（2026-11-11 確定・`Game2DTerminalIcons.cs`）。
 - **BOT**（`AutoRunner.Terminals`）: 挿し方は全列挙して効用で選ぶ。**どの技量でも配線は `DeckWiringPlanPolicy`、振り直しは `MutualRerollPolicy`**
   （素朴版は振り直さない）に上書きされる（`AutoRunner.Combat`）。旧い先読みの `SuperCombatAI` と `ExactCombatAI` の配線・振り直しは呼ばれなかったので
-  （2026-11-12 確認・`super_prof.txt` は「配線 0 回 / リロール 0 回」）、同日に判断ごと削除した（§24・`SuperCombatAI` にはレバーと計装の口だけが残る）。Super と Optimal の戦闘での違いは、効用への入力（与ダメージの倍率と敵のパッシブを読む）・
+  （2026-11-12 確認・`super_prof.txt` は「配線 0 回 / リロール 0 回」）、同日に判断ごと削除した（§24）。残っていたレバー（`superAI.*`）・計装の口・それを振るメニューも 2026-11-12（#135）に `SuperCombatAI` ごと消した。Super と Optimal の戦闘での違いは、効用への入力（与ダメージの倍率と敵のパッシブを読む）・
   重い攻撃の予告で振り直しを 1 回増やす・護符の使い時だけで、残りの差は航行と買い物（§13-7）。先読みは既定では通らない ──
   切り替え式の 2 ターン先読み `deckLookahead`（既定 OFF・素朴版では使わない・既定はボス戦だけ `deckLookaheadBossOnly`・上位 `deckLookaheadTopK` 3 本 × 標本 `deckLookaheadSamples` 6）を
   入れると、挿し方の値が「今ターンの効用 + 次のターンの最良効用の期待値」になる（#105・2026-11-12・効き目は未測定）。振り直しの値付けと〈猫の手〉には掛けない。撃破のボーナス・対象・使い捨ては
@@ -4346,6 +4346,7 @@ BOT の払い方（`AutoRunner.Terminals` の `ChooseGoldPunch`）は実装済�
 
 | 対象 | 時期 | 理由 |
 |---|---|---|
+| **`SuperCombatAI` の残り（レバーの公開フィールド `superAI.*`・計装 `DescribeSearch` / `DescribeProf`（`super_prof.txt`）・進捗行 `superWiringDecisions` ほか）と、それを振るメニュー（同点拡張・充電値付け・ttd 頭打ち・ttk 価格・残 HP 値付け・リロール全列挙・飽和センサス・並列の superAI.* 診断 3 本）・技量「厳密 (Exact)」を選ぶメニューと速度計測・`superLayer6OptimalCombatRoutine` / `superLayer7OptimalCombatRoutine`（6・7 層だけ Optimal へ逃がす切替）・`AutoRunner.lambdaFarmTiles`** | 2026-11-12 | 作者の決定（#135「作り直していい」）。端子の山札（2026-11-11）の後はどの技量でも配線が山札の方策に上書きされ、どれも読む所が無く、計装は常に 0 だった。A/B の腕に使うと差が出ない理由を取り違える。`WiringSkill.Exact` の値（番号 3）は保存済みの設定のために残す（選べない・Optimal と同じ）。Ultra の方策仕様 `UltraPortfolioPolicySpec` の `superLayer6OptimalCombatRoutine` / `lambdaFarmTiles` は、候補集合のハッシュがワーカーの `actionFingerprint` に入るので値だけ残した（受け取る側は無い） |
 | **ボス自動チューナー L3（`BossTuning`・`BossBalanceTuner`・メニュー「③ 学習/ボスチューナー ON」・`AutoRunner.tuneBosses`・計装 `playerRollSum` / スタンス別のロール勝ち数）と、敵スタンス（ADR-0005）の残り（`EnemyStance`・`ctx.enemyStanceDamageMult` / `enemyStanceKind` / `enemyStanceWeakRollRatio`・`BossParam.StanceAtkMult` / `WeakRollRatio` / `RobeStacks`）** | 2026-11-12 | 作者の決定（#126「オートチューナーは削除でいい」）。調整値ファイルは 7/28 から空で、測定は既定 OFF。効かない値（呼ぶ所の無い敵スタンスの 2 値・読む敵のいない値）を飽和するまで動かして「調整した」と記録し、効く HP まで降りない欠陥があった。ボスの数値は `BossParams` の実数値を手で直す。差し込み口 `BossParams.Overrides` は残す（§13-3） |
 | **灰燼の王の撃破の場面に足す階級章の 1 行（§19-9 の段 1・`Endings.AshThroneSlothLine`・〈クェシナの怠惰〉を背負った周だけ）** | 2026-11-12 | 作者の決定（#115 の案 c）。条件の `RunState.permanentDebuffs` に怠惰を入れる所が c89b942（旧配点方式の撤去・#9）で無くなり、分岐が通らなくなっていた。挑戦カード〈怠惰〉（`sin_sloth`）への付け替えは採らず、段 0（椅子）だけを全員に見せる。`PermanentDebuffIds` のフレーバー本文は正本のまま残す |
 | **クリア率の基準を Optimal に置く決まり（§13-7 の条件「基準 BOT のクリア 10〜15%」・2026-11-06）** | 2026-11-12 | 作者の決定。クリア率の目標 20〜25% は Super で測る（§13-5）。高難易度を Optimal で合わせると難易度 0 が大幅に易しくなる。Optimal は参考値として測り続ける（同日の実測: 難易度 0 で Super 20.2% / Optimal 6.7% / Naive 5.7%） |

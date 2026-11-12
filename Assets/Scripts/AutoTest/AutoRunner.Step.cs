@@ -290,9 +290,6 @@ namespace AutoTest
                                 + $"/メタ{metaBuffMode}"
                                 + $"/恒久:{pd}";
             }
-            // 先読み方策の内部乱数と較正をラン単位で戻す。 **ラン番号だけで決まる**ので、
-            // 同一シードの再実行で AI の判断まで同じ列を辿る (決定性検査の対象に入る)。
-            superAI.ResetForRun(index);
             _deckLaRunSeed = index;   // [#105] 山札の先読みの専用乱数もラン番号だけで決める
             ResetAblationRng(index);
 

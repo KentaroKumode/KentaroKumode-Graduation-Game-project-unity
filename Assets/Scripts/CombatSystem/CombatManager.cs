@@ -206,7 +206,7 @@ namespace CombatSystem
         public int PlayerAttackPower => playerAttackPower;
         public int PlayerMaxHP => playerMaxHP;
         /// <summary>武器 + 層補正の会心率 (小数・0.15 = 15%)。
-        /// 先読み方策 (<see cref="AutoTest.SuperCombatAI"/>) が会心の期待値を組むのに要る。</summary>
+        /// BOT の方策が会心の期待値を組むのに要る (旧 SuperCombatAI は 2026-11-12 に削除)。</summary>
         public float PlayerCritBaseRate => playerCritBaseRate;
         public int EnemyHP => enemyHP;
         public int CurrentCombatTurn => PassiveSkillManager.Instance?.Context?.currentTurn ?? 0;

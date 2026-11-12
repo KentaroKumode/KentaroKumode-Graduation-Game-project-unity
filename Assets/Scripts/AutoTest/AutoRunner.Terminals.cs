@@ -503,7 +503,7 @@ namespace AutoTest
         public int DeckLookaheadDecisions { get; private set; }
         public int DeckLookaheadChanged { get; private set; }
 
-        /// <summary>[#105] 先読みの乱数の種のもと (ラン番号・<see cref="SuperCombatAI.ResetForRun"/> と同じ所で入れる)。</summary>
+        /// <summary>[#105] 先読みの乱数の種のもと (ラン番号・ラン開始時に入れる)。</summary>
         private int _deckLaRunSeed;
 
         /// <summary>1 回の判断のあいだ変わらない、 先読みの前提と memo。</summary>

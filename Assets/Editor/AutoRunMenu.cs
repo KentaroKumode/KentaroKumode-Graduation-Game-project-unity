@@ -88,27 +88,10 @@ namespace AutoTest.EditorTools
         private const string FloorDpKey = "AutoRun.FloorDpDiscountPct";
         /// <summary>階層DP航行の HP 量子化帯数 (0 = 既定 11)。</summary>
         private const string FloorDpBandsKey = "AutoRun.FloorDpHpBands";
-        /// <summary>浅い評価が同点だらけのときに広げる配線候補枠 (0 = 既定 OFF)。</summary>
-        private const string TieExpandKey = "AutoRun.TieExpandCandidates";
-        /// <summary>同点の中身を数える診断 (既定 OFF)。 判断は変えない。</summary>
-        private const string SatCensusKey = "AutoRun.SaturationCensus";
-        /// <summary>chargeRerollGain ×100 (0 = 既定 0.30 のまま触らない)。</summary>
-        private const string RerollGainKey = "AutoRun.ChargeRerollGainPct";
-        /// <summary>7層の役札持ち越しを**切る** (既定は持ち越し ON なので、これは旧仕様の対照用)。</summary>
-        /// <summary>リロールを全列挙する最大個数 (0 = 既定の標本抽出のまま)。</summary>
-        private const string ExactRerollKey = "AutoRun.ExactRerollMaxDice";
-        /// <summary>winHpWeight ×100 (0 = 既定 0.5 のまま触らない)。</summary>
-        private const string WinHpWeightKey = "AutoRun.WinHpWeightPct";
-        /// <summary>ロールアウト内方策の ttk 価格 ×10 (0 = 既定 4.0 のまま触らない)。</summary>
-        private const string TtkWeightKey = "AutoRun.RolloutTtkWeightX10";
         /// <summary>マクロ判断のアブレーション対象 (0 = 潰さない / 1 = 航行)。</summary>
         private const string AblateKey = "AutoRun.AblateAxis";
         /// <summary>不偏 lift 混入の縮小係数 K (0 = 混ぜない)。</summary>
         private const string ExploreBlendKey = "AutoRun.ExploreBlendK";
-        /// <summary>7層の戦闘方策を Optimal へ切り替える (既定 OFF＝Super のまま)。</summary>
-        private const string Layer7OptimalKey = "AutoRun.Layer7OptimalOn";
-        /// <summary>ttd の頭打ちターン数 (0 = 無効・従来どおり)。</summary>
-        private const string TtdCapKey = "AutoRun.TtdCapTurns";
         /// <summary>決定seed の一時上書き (再現確認用・1 回で消費)。</summary>
         private const string SeedOverrideKey = "AutoRun.SeedOverride";
 
@@ -319,23 +302,10 @@ namespace AutoTest.EditorTools
         [MenuItem(M4S, priority = 402)] private static void SetM4S() { Skill = AutoRunner.WiringSkill.Super; }
         [MenuItem(M4S, validate = true)] private static bool VM4S()
         { Menu.SetChecked(M4S, Skill == AutoRunner.WiringSkill.Super); return true; }
-        // 厳密: 偶然ノードを全列挙する参照実装。 **バランス測定には使わない** ──
-        //   天井の位置を測るためだけのもので、 速度は桁で落ちる。 数ラン単位で回す。
-        private const string M4E = "Tools/AutoRun/④ 配線技量/厳密 (expectimax・天井の位置を測る専用)";
-        [MenuItem(M4E, priority = 403)] private static void SetM4E() { Skill = AutoRunner.WiringSkill.Exact; }
-        [MenuItem(M4E, validate = true)] private static bool VM4E()
-        { Menu.SetChecked(M4E, Skill == AutoRunner.WiringSkill.Exact); return true; }
+        // 厳密 (Exact) の選択メニューは 2026-11-12 に削除 (#135)。 ExactCombatAI は削除済みで、 戦闘の判断は Optimal と同じだった。
         [MenuItem(M4U, priority = 404)] private static void SetM4U() { Skill = AutoRunner.WiringSkill.Ultra; }
         [MenuItem(M4U, validate = true)] private static bool VM4U()
         { Menu.SetChecked(M4U, Skill == AutoRunner.WiringSkill.Ultra); return true; }
-
-        [MenuItem("Tools/AutoRun/診断: 厳密AI 速度計測 (3ラン・0pt・遺物なし)", priority = 10)]
-        public static void RunExactBenchmark()
-        {
-            EditorPrefs.SetBool(NoRelicKey, true);
-            Skill = AutoRunner.WiringSkill.Exact;
-            Launch(3);
-        }
 
 
         // ===== ラン起動 =====
@@ -1100,40 +1070,6 @@ namespace AutoTest.EditorTools
         [MenuItem("Tools/AutoRun/階層DP航行: 50pt 帯101 (遺物あり・1000ラン)", priority = 73)]
         public static void RunFloorDp50Variant() => LaunchFloorDp(1, 1000, 101, null, 50, false);
 
-        // ---- 配線の同点拡張 (2026-08-22) ----
-        //  実測で **56.8% の判断が「上位候補すべて同点」** だった。 同点なら浅い評価は
-        //  順位を決められないので、 どの 6 本がロールアウトへ進むかは列挙順が決めている。
-        //  枠を広げても主判断の向きは変えない ── **入口の恣意性だけを減らす**変更。
-        //  対照アームは階層DP の対照と同一条件なので、 決定性が保たれていれば再現する。
-        [MenuItem("Tools/AutoRun/配線同点拡張: 対照 Super (0pt・1000ラン)", priority = 75)]
-        public static void RunTieExpandBaseline() => LaunchTieExpand(0, 1000);
-
-        [MenuItem("Tools/AutoRun/配線同点拡張: 枠24 (0pt・1000ラン)", priority = 76)]
-        public static void RunTieExpand24() => LaunchTieExpand(24, 1000);
-
-        [MenuItem("Tools/AutoRun/配線同点拡張: 枠48 (0pt・1000ラン)", priority = 77)]
-        public static void RunTieExpand48() => LaunchTieExpand(48, 1000);
-
-        // ---- 充電の値付け掃引 (2026-08-22) ----
-        //  実測: リロール判断の **34.6% を「利得なし」で辞退、 基準との差は平均 0.0008**。
-        //  15 万件が紙一重で落ちている。 `chargeRerollGain` を下げると充電の価値が下がり、
-        //  払うのが安くなってリロールが増える。 コード自身の但し書きでは素の推定値が 0.40 で、
-        //  0.30 は「役を狙って期待値を捨てる振り直しもあるぶん控えめに」置いた値。
-        //  **対照は既存の 0pt 対照アーム (17.8%) と同一条件。**
-        [MenuItem("Tools/AutoRun/充電値付け: gain 0.20 (0pt・1000ラン)", priority = 80)]
-        public static void RunRerollGain20() => LaunchRerollGain(20);
-
-        [MenuItem("Tools/AutoRun/充電値付け: gain 0.10 (0pt・1000ラン)", priority = 81)]
-        public static void RunRerollGain10() => LaunchRerollGain(10);
-
-        [MenuItem("Tools/AutoRun/充電値付け: gain 0.40 (0pt・1000ラン)", priority = 82)]
-        public static void RunRerollGain40() => LaunchRerollGain(40);
-
-        /// <summary>旧既定 0.30 の対照アーム。 **0.20 の採用根拠をパーツ有りで検証する**ため
-        /// (採用時の +3.7pt はパーツ無し条件の測定だった)。</summary>
-        [MenuItem("Tools/AutoRun/充電値付け: gain 0.30 (旧既定・0pt・1000ラン)", priority = 79)]
-        public static void RunRerollGain30() => LaunchRerollGain(30);
-
         // ---- マクロ判断のアブレーション (2026-08-22) ----
         //  技量帯スイープは `wiringSkill` しか振っておらず、 航行・ショップ・報酬・イベントは
         //  両アームで同一だった ＝ **マクロの技量帯は未測定**。
@@ -1151,62 +1087,6 @@ namespace AutoTest.EditorTools
             ClearBatchModeSessionState();
             EditorPrefs.SetBool(NoRelicKey, true);
             Skill = AutoRunner.WiringSkill.Optimal;
-            SessionState.SetInt(ChalOneScoreKey, 0);
-            SessionState.SetInt(ChalOneRunsKey, 1000);
-            SessionState.SetBool(ChalSweepKey, true);
-            Launch(1);
-        }
-
-        /// <summary>7層だけ Optimal の戦闘方策へ切り替えたアーム。
-        /// 条件付き実測 (両AIが7層到達した379ラン) で Optimal 71 対 Super 41 / p=0.0059。</summary>
-        [MenuItem("Tools/AutoRun/7層Optimal戦闘: 旧挙動(Super)対照 (0pt・1000ラン)", priority = 96)]
-        public static void RunLayer7Optimal() => LaunchLayer7Optimal(true);
-
-        /// <summary>遺物ありでも同じ向きに効くか。 **階層DP はここで符号が反転した**
-        /// (0pt遺物なし +2.3pt / 0pt遺物あり −3.3pt、 どちらも有意)。
-        /// 対照は「充電値付け: 対照 遺物あり」(現行既定のまま遺物ON) を使う。</summary>
-        [MenuItem("Tools/AutoRun/7層Optimal戦闘: 旧挙動(Super)対照 遺物あり (0pt・1000ラン)", priority = 96)]
-        public static void RunLayer7OptimalRelic() => LaunchLayer7Optimal(false);
-
-        private static void LaunchLayer7Optimal(bool noRelic)
-        {
-            ClearBatchModeSessionState();
-            EditorPrefs.SetBool(NoRelicKey, noRelic);
-            Skill = AutoRunner.WiringSkill.Super;
-            SessionState.SetBool(Layer7OptimalKey, true);
-            SessionState.SetInt(ChalOneScoreKey, 0);
-            SessionState.SetInt(ChalOneRunsKey, 1000);
-            SessionState.SetBool(ChalSweepKey, true);
-            Launch(1);
-        }
-
-        // ---- StaticValue の飽和修正 (2026-08-22) ----
-        //  「防げている」局面で ttd=999 → 勝率 p が 1 に飽和 → **敵HPが評価から消える**。
-        //  7層 (40ターン級・エスカレーション×2.3) でだけ致命的になり、 Super は Optimal に対し
-        //  実効倍率は同一 (5.414 対 5.460) なのに atkBase が 12.7% 低く、 ターン数が 8.6% 多かった。
-        //  **7層で Super が戦っていないと効果が見えない**ので、 7層 Optimal 切替を OFF にして測る。
-        [MenuItem("Tools/AutoRun/ttd頭打ち: 12ターン (7層Super・0pt遺物あり・1000ラン)", priority = 104)]
-        public static void RunTtdCap12() => LaunchTtdCap(12);
-
-        [MenuItem("Tools/AutoRun/ttd頭打ち: 6ターン (7層Super・0pt遺物あり・1000ラン)", priority = 105)]
-        public static void RunTtdCap6() => LaunchTtdCap(6);
-
-        /// <summary>修正 + 7層Optimal切替 **併用**。 修正だけ (74.9%) を上回らなければ
-        /// 切替は冗長 ＝ 撤回してよい、 という判定に使う。</summary>
-        [MenuItem("Tools/AutoRun/ttd頭打ち: 12ターン + 7層Optimal併用 (0pt遺物あり・1000ラン)", priority = 106)]
-        public static void RunTtdCap12WithSwitch() => LaunchTtdCap(12, keepSwitch: true);
-
-        [MenuItem("Tools/AutoRun/ttd頭打ち: 12ターン (7層Super・0pt遺物なし・1000ラン)", priority = 107)]
-        public static void RunTtdCap12NoRelic() => LaunchTtdCap(12, noRelic: true);
-
-        private static void LaunchTtdCap(int turns, bool keepSwitch = false, bool noRelic = false)
-        {
-            ClearBatchModeSessionState();
-            EditorPrefs.SetBool(NoRelicKey, noRelic);
-            Skill = AutoRunner.WiringSkill.Super;
-            SessionState.SetInt(TtdCapKey, turns);
-            // 既定で 7層も Super が戦う。 keepSwitch なら撤回済みの Optimal 切替を足して測る。
-            if (keepSwitch) SessionState.SetBool(Layer7OptimalKey, true);
             SessionState.SetInt(ChalOneScoreKey, 0);
             SessionState.SetInt(ChalOneRunsKey, 1000);
             SessionState.SetBool(ChalSweepKey, true);
@@ -1261,151 +1141,6 @@ namespace AutoTest.EditorTools
             SessionState.SetInt(AblateKey, axis);
             SessionState.SetInt(ChalOneScoreKey, 0);
             SessionState.SetInt(ChalOneRunsKey, 1000);
-            SessionState.SetBool(ChalSweepKey, true);
-            Launch(1);
-        }
-
-        // ---- ロールアウト内方策の ttk 価格 (2026-08-22) ----
-        //  `u = -ttk×A − 被ダメ×1.0 + 充電×0.3`。 **全ロールアウトがここを通る。**
-        //  A=4 は「1 ターン短縮 = 4 HP」の値付けだが、 1 ターン伸びれば敵の攻撃を
-        //  丸ごと 1 回余計に受ける ── 実測の敵攻撃値 11〜34 からすると実勢は 15〜30 HP 相当。
-        //  **現行は 1/4〜1/8 に安く見積もっている疑いがある。**
-        [MenuItem("Tools/AutoRun/ttk価格: 10.0 (0pt・1000ラン)", priority = 94)]
-        public static void RunTtk10() => LaunchTtkWeight(100);
-
-        [MenuItem("Tools/AutoRun/ttk価格: 20.0 (0pt・1000ラン)", priority = 95)]
-        public static void RunTtk20() => LaunchTtkWeight(200);
-
-        [MenuItem("Tools/AutoRun/ttk価格: 2.0 (逆側・0pt・1000ラン)", priority = 96)]
-        public static void RunTtk2() => LaunchTtkWeight(20);
-
-        private static void LaunchTtkWeight(int x10)
-        {
-            ClearBatchModeSessionState();
-            EditorPrefs.SetBool(NoRelicKey, true);
-            Skill = AutoRunner.WiringSkill.Super;
-            SessionState.SetInt(TtkWeightKey, x10);
-            SessionState.SetInt(ChalOneScoreKey, 0);
-            SessionState.SetInt(ChalOneRunsKey, 1000);
-            SessionState.SetBool(ChalSweepKey, true);
-            Launch(1);
-        }
-
-        // ---- 残HP の値付け掃引 (2026-08-22) ----
-        //  効用は p × (1 + winHpWeight × HP率)。 既定 0.5 では満タン勝利 1.5 対 瀕死勝利 1.0 で
-        //  **1.5 倍の開きしかない**。 7層は 4 連戦、 しかも役札の連戦持ち越しを採用したので
-        //  「HP は跨いで効くが役札は跨いで減る」── 残HP の価値は非線形寄りのはず。
-        //  **下側 (0.25) も測る** ── 上げて効いた時に「HPを重く見るのが正しい」のか
-        //  「動かせば何か起きる」のかを区別するため。 単調でなければ採らない。
-        [MenuItem("Tools/AutoRun/残HP値付け: winHpWeight 0.25 (0pt・1000ラン)", priority = 90)]
-        public static void RunWinHp025() => LaunchWinHpWeight(25);
-
-        [MenuItem("Tools/AutoRun/残HP値付け: winHpWeight 1.00 (0pt・1000ラン)", priority = 91)]
-        public static void RunWinHp100() => LaunchWinHpWeight(100);
-
-        [MenuItem("Tools/AutoRun/残HP値付け: winHpWeight 2.00 (0pt・1000ラン)", priority = 92)]
-        public static void RunWinHp200() => LaunchWinHpWeight(200);
-
-        private static void LaunchWinHpWeight(int pct)
-        {
-            ClearBatchModeSessionState();
-            EditorPrefs.SetBool(NoRelicKey, true);
-            Skill = AutoRunner.WiringSkill.Super;
-            SessionState.SetInt(WinHpWeightKey, pct);
-            SessionState.SetInt(ChalOneScoreKey, 0);
-            SessionState.SetInt(ChalOneRunsKey, 1000);
-            SessionState.SetBool(ChalSweepKey, true);
-            Launch(1);
-        }
-
-        // ---- リロールの全列挙 (2026-08-22) ----
-        //  8 標本では確率 1/36 の引き (1,1,1 から 1 を 2 つ = 〈極〉) が構造的に見えない。
-        //  6 面なら 1 個で 6 通り・2 個で 36 通りなので、 標本より安いか同程度で厳密になる。
-        //  実測で採用リロールの平均は 1.60 個 ＝ **いちばん頻繁な判断がいちばん安く直せる**。
-        [MenuItem("Tools/AutoRun/リロール全列挙: 2個まで (0pt・1000ラン)", priority = 88)]
-        public static void RunExactReroll2() => LaunchExactReroll(2);
-
-        [MenuItem("Tools/AutoRun/リロール全列挙: 3個まで (0pt・1000ラン)", priority = 89)]
-        public static void RunExactReroll3() => LaunchExactReroll(3);
-
-        // ---- 別シードでの再現確認 (2026-08-22) ----
-        //  seed1 の結果は 37.7% → 40.3% / **p=0.0976** で、 有意に 2 件足りない。
-        //  同日に階層DP は同程度の数字から条件を変えて符号が反転し、
-        //  chargeRerollGain は条件を変えたら効果が消えている。 **際どい 1 本では採らない。**
-        //  対照と変種を必ずペアで別シードへ振る (変種だけ振っても比較にならない)。
-        [MenuItem("Tools/AutoRun/リロール全列挙: 再現確認 対照 (seed2・1000ラン)", priority = 90)]
-        public static void RunExactRerollSeed2Base() => LaunchExactReroll(0, "2");
-
-        [MenuItem("Tools/AutoRun/リロール全列挙: 再現確認 2個まで (seed2・1000ラン)", priority = 91)]
-        public static void RunExactRerollSeed2() => LaunchExactReroll(2, "2");
-
-        /// <summary>遺物ありでも同じ向きか。 対照は ttd 修正後の 74.9% (batch_161424)。
-        /// 2シード併合で p=0.0237 だが、 **条件を変えたら消えた例が同日に 2 件ある**ので必ず測る。</summary>
-        [MenuItem("Tools/AutoRun/リロール全列挙: 2個まで 遺物あり (0pt・1000ラン)", priority = 92)]
-        public static void RunExactRerollRelic() => LaunchExactReroll(2, null, noRelic: false);
-
-        /// <summary><paramref name="maxDice"/> が 0 なら全列挙を差さない対照群。</summary>
-        private static void LaunchExactReroll(int maxDice, string seedOverride = null, bool noRelic = true)
-        {
-            ClearBatchModeSessionState();
-            EditorPrefs.SetBool(NoRelicKey, noRelic);
-            Skill = AutoRunner.WiringSkill.Super;
-            if (maxDice > 0) SessionState.SetInt(ExactRerollKey, maxDice);
-            if (!string.IsNullOrEmpty(seedOverride))
-                SessionState.SetString(SeedOverrideKey, seedOverride);
-            SessionState.SetInt(ChalOneScoreKey, 0);
-            SessionState.SetInt(ChalOneRunsKey, 1000);
-            SessionState.SetBool(ChalSweepKey, true);
-            Launch(1);
-        }
-
-        // (7層 役札の連戦持ち越しの A/B メニューは ADR-0011 で規則ごと廃止した。 役は自動で効き、 使用済みの管理が無い。)
-
-        // 遺物ありでも同じ向きに効くか。 **階層DP はここで符号が反転した** (0pt遺物なし +2.3pt /
-        //   0pt遺物あり −3.3pt、 どちらも有意)。 1 条件の有意は一般化ではない。
-        //   対照は既存の 0pt+遺物 アーム (batch_20260821_235558 / 57.5%)。
-        [MenuItem("Tools/AutoRun/充電値付け: gain 0.20 遺物あり (0pt・1000ラン)", priority = 83)]
-        public static void RunRerollGain20Relic() => LaunchRerollGain(20, false);
-
-        [MenuItem("Tools/AutoRun/充電値付け: 対照 遺物あり (0pt・1000ラン)", priority = 84)]
-        public static void RunRerollGainRelicBase() => LaunchRerollGain(0, false);
-
-        private static void LaunchRerollGain(int gainPct, bool noRelic = true)
-        {
-            ClearBatchModeSessionState();
-            EditorPrefs.SetBool(NoRelicKey, noRelic);
-            Skill = AutoRunner.WiringSkill.Super;
-            if (gainPct > 0) SessionState.SetInt(RerollGainKey, gainPct);
-            SessionState.SetInt(ChalOneScoreKey, 0);
-            SessionState.SetInt(ChalOneRunsKey, 1000);
-            SessionState.SetBool(ChalSweepKey, true);
-            Launch(1);
-        }
-
-        /// <summary>同点の中身を数える (0pt・遺物なし・Super)。 **判断を変えない診断**なので、
-        /// 7層クリアが対照 (17.8%) と一致するはず ── 一致しなければ計装が盤面へ漏れている。</summary>
-        [MenuItem("Tools/AutoRun/飽和センサス: 同点の中身 (0pt・1000ラン)", priority = 78)]
-        public static void RunSaturationCensus()
-        {
-            ClearBatchModeSessionState();
-            EditorPrefs.SetBool(NoRelicKey, true);
-            Skill = AutoRunner.WiringSkill.Super;
-            SessionState.SetBool(SatCensusKey, true);
-            SessionState.SetInt(ChalOneScoreKey, 0);
-            SessionState.SetInt(ChalOneRunsKey, 1000);
-            SessionState.SetBool(ChalSweepKey, true);
-            Launch(1);
-        }
-
-        /// <summary><paramref name="cap"/> が 0 以下なら拡張を差さない対照群。</summary>
-        private static void LaunchTieExpand(int cap, int runs)
-        {
-            ClearBatchModeSessionState();
-            EditorPrefs.SetBool(NoRelicKey, true);
-            Skill = AutoRunner.WiringSkill.Super;
-            if (cap > 0) SessionState.SetInt(TieExpandKey, cap);
-            SessionState.SetInt(ChalOneScoreKey, 0);
-            SessionState.SetInt(ChalOneRunsKey, runs);
             SessionState.SetBool(ChalSweepKey, true);
             Launch(1);
         }
@@ -1497,16 +1232,8 @@ namespace AutoTest.EditorTools
             SessionState.EraseBool(UltraCensusKey);
             SessionState.EraseInt(FloorDpKey);
             SessionState.EraseInt(FloorDpBandsKey);
-            SessionState.EraseInt(TieExpandKey);
-            SessionState.EraseBool(SatCensusKey);
-            SessionState.EraseInt(RerollGainKey);
-            SessionState.EraseInt(ExactRerollKey);
-            SessionState.EraseInt(WinHpWeightKey);
-            SessionState.EraseInt(TtkWeightKey);
             SessionState.EraseInt(AblateKey);
             SessionState.EraseInt(ExploreBlendKey);
-            SessionState.EraseBool(Layer7OptimalKey);
-            SessionState.EraseInt(TtdCapKey);
             SessionState.EraseString(SeedOverrideKey);
             // **static なので前バッチから残る。** 毎回既定 (混ぜない) へ戻す。
             AutoTest.LearnedPriorityProvider.ExploreBlendK = 0f;
@@ -2573,26 +2300,10 @@ namespace AutoTest.EditorTools
             SessionState.EraseInt(FloorDpKey);
             int floorDpBands = SessionState.GetInt(FloorDpBandsKey, 0);
             SessionState.EraseInt(FloorDpBandsKey);
-            int tieExpand = SessionState.GetInt(TieExpandKey, 0);
-            SessionState.EraseInt(TieExpandKey);
-            bool satCensus = SessionState.GetBool(SatCensusKey, false);
-            SessionState.EraseBool(SatCensusKey);
-            int rerollGainPct = SessionState.GetInt(RerollGainKey, 0);
-            SessionState.EraseInt(RerollGainKey);
-            int exactReroll = SessionState.GetInt(ExactRerollKey, 0);
-            SessionState.EraseInt(ExactRerollKey);
-            int winHpPct = SessionState.GetInt(WinHpWeightKey, 0);
-            SessionState.EraseInt(WinHpWeightKey);
-            int ttkX10 = SessionState.GetInt(TtkWeightKey, 0);
-            SessionState.EraseInt(TtkWeightKey);
             int ablateAxis = SessionState.GetInt(AblateKey, 0);
             SessionState.EraseInt(AblateKey);
             int exploreK = SessionState.GetInt(ExploreBlendKey, 0);
             SessionState.EraseInt(ExploreBlendKey);
-            bool layer7OptimalOn = SessionState.GetBool(Layer7OptimalKey, false);
-            SessionState.EraseBool(Layer7OptimalKey);
-            int ttdCap = SessionState.GetInt(TtdCapKey, 0);
-            SessionState.EraseInt(TtdCapKey);
             SessionState.EraseInt(TierCalScoreKey);
             SessionState.EraseInt(TierCalRunsKey);
             SessionState.EraseInt(TierCalBatchesKey);
@@ -2960,58 +2671,6 @@ namespace AutoTest.EditorTools
                     + " ── **Super の航行方策が変わる。 既存の基準値と混ぜないこと**");
             }
 
-            // 同点拡張。 **キーが無ければ 1 命令も変わらない** ── 既定 OFF を保つ。
-            if (tieExpand > 0)
-            {
-                runner.superAI.tieExpandCandidates = tieExpand;
-                Debug.LogWarning("[AutoRunMenu] 配線の同点拡張 ON / 候補枠 " + tieExpand
-                    + " ── **Super の戦闘方策が変わる。 既存の基準値と混ぜないこと**");
-            }
-
-            // 飽和センサス。 **診断専用で判断を変えない** ので、 基準値はそのまま再現するはず。
-            //   再現しなかったら計装が盤面へ漏れている ── それ自体が検査になる。
-            if (satCensus)
-            {
-                runner.superAI.saturationCensus = true;
-                Debug.LogWarning("[AutoRunMenu] 飽和センサス ON (診断専用・判断は変えない)");
-            }
-
-            // 充電の値付け (chargeRerollGain)。 **キーが無ければ既定 0.30 のまま。**
-            if (rerollGainPct > 0)
-            {
-                runner.superAI.chargeRerollGain = rerollGainPct / 100f;
-                Debug.LogWarning("[AutoRunMenu] chargeRerollGain = "
-                    + runner.superAI.chargeRerollGain.ToString("F2")
-                    + " (既定 0.30) ── **Super の戦闘方策が変わる。 既存の基準値と混ぜないこと**");
-            }
-
-
-            // リロールの全列挙。 **キーが無ければ従来の標本抽出のまま。**
-            if (exactReroll > 0)
-            {
-                runner.superAI.exactRerollMaxDice = exactReroll;
-                Debug.LogWarning("[AutoRunMenu] リロール全列挙 ON / 最大 " + exactReroll + " 個"
-                    + " ── **Super の戦闘方策が変わる。 既存の基準値と混ぜないこと**");
-            }
-
-            // 残HP の値付け (winHpWeight)。 **キーが無ければ既定 0.5 のまま。**
-            if (winHpPct > 0)
-            {
-                runner.superAI.winHpWeight = winHpPct / 100f;
-                Debug.LogWarning("[AutoRunMenu] winHpWeight = "
-                    + runner.superAI.winHpWeight.ToString("F2") + " (既定 0.50)"
-                    + " ── **Super の戦闘方策が変わる。 既存の基準値と混ぜないこと**");
-            }
-
-            // ロールアウト内方策の ttk 価格。 **キーが無ければ既定 4.0 のまま。**
-            if (ttkX10 > 0)
-            {
-                runner.superAI.rolloutTtkWeight = ttkX10 / 10f;
-                Debug.LogWarning("[AutoRunMenu] rolloutTtkWeight = "
-                    + runner.superAI.rolloutTtkWeight.ToString("F1") + " (既定 4.0)"
-                    + " ── **全ロールアウトの向きが変わる。 既存の基準値と混ぜないこと**");
-            }
-
             // マクロ判断のアブレーション。 **キーが無ければ 1 命令も変わらない。**
             if (ablateAxis > 0)
             {
@@ -3036,20 +2695,6 @@ namespace AutoTest.EditorTools
                     + " ── **購入序列が変わる。 既存の基準値と混ぜないこと**");
             }
 
-            // 7層の戦闘方策。 **既定 OFF (Super のまま)。**
-            //   ttdCapTurns で根本を直したので、 Optimal へ逃がす対症療法は撤回済み。
-            //   static ではないが毎回明示的に書く (前バッチの設定を持ち越さない)。
-            runner.superLayer7OptimalCombatRoutine = layer7OptimalOn;
-            if (layer7OptimalOn)
-                Debug.LogWarning("[AutoRunMenu] 7層の戦闘方策を **Optimal へ切替** (撤回済み措置の対照アーム)");
-
-            // ttd の頭打ち。 **キーが無ければ 0 = 従来どおり (999 で飽和)。**
-            if (ttdCap > 0)
-            {
-                runner.superAI.ttdCapTurns = ttdCap;
-                Debug.LogWarning("[AutoRunMenu] ttd 頭打ち = " + ttdCap + " ターン"
-                    + " ── **StaticValue の飽和を止める。 既存の基準値と混ぜないこと**");
-            }
             AutoTest.Ultra.UltraDispatchStats.Reset();
 
             // 国勢調査は **数えるだけ**。 一度で消費するキーにしてあるので、 次のバッチへ

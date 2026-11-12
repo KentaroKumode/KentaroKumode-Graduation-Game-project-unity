@@ -414,8 +414,6 @@ namespace AutoTest
             var rr = CombatStats.RerollStats;
             sb.AppendLine($"  リロール: {rr[0]:N0} 回 / {rr[1]:N0} 個 / 充電 {rr[2]:N0}"
                         + (rr[0] > 0 ? $"  (1回あたり {rr[1] / (double)rr[0]:F2}個 / {rr[2] / (double)rr[0]:F2}充電)" : ""));
-            // 先読みが順位を変えているか。 Super 以外の技量では 0 件なので何も出ない。
-            sb.Append(SuperCombatAI.DescribeSearch());
             sb.Append(DescribeNavTies());
             sb.Append(DescribeDamageBreakdown7F());
             return sb.ToString();

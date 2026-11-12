@@ -251,10 +251,7 @@ namespace AutoTest
                               + $"arm={si + 1}/{challengeSweepScores.Length}\n"
                               + $"runs={i + 1}/{runs}\nrecords={_records.Count}\n"
                               + $"elapsedSeconds={elapsed:F1}\netaSeconds={eta:F1}\n"
-                              + $"heartbeat={heartbeat}\nphase={lastPhaseSeen}\n"
-                              + $"superWiringDecisions={superAI.wiringDecisions}\n"
-                              + $"superRerollDecisions={superAI.rerollDecisions}\n"
-                              + $"superRolloutEvaluations={superAI.rolloutEvaluations}\n",
+                              + $"heartbeat={heartbeat}\nphase={lastPhaseSeen}\n",
                                 new UTF8Encoding(false));
                         }
                         catch (Exception ex)
@@ -1430,7 +1427,6 @@ namespace AutoTest
             System.Array.Clear(CombatStats.RerollStats, 0,
                                CombatStats.RerollStats.Length);
             CombatStats.ResetDamageBreakdown();
-            SuperCombatAI.ResetSearchStats();
             ResetNavStats();
         }
 

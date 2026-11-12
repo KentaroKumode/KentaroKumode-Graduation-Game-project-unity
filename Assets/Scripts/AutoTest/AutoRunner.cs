@@ -109,7 +109,7 @@ namespace AutoTest
             ///
             /// <para><b>2026-11-12 時点の実態: 戦闘の判断は先読みしない。</b> 端子の山札 (2026-11-11) の後は、 どの技量でも配線は
             /// <c>DeckWiringPlanPolicy</c>、 リロールは <c>MutualRerollPolicy</c> に上書きされる (AutoRunner.Combat)。
-            /// 旧 <see cref="SuperCombatAI"/> (戦闘決着までのロールアウト) の配線とリロールは呼ばれない。
+            /// 旧 <c>SuperCombatAI</c> (戦闘決着までのロールアウト) は 2026-11-12 に削除した (#135)。
             /// 先読みは山札の 2 ターン先読み <c>deckLookahead</c> (#105・既定 OFF) だけで、 技量とは別の口。</para>
             /// <para>Super が Optimal と違うのは Begin が立てる次の物: 予告を読む防御 (重い攻撃の予告でリロール +1・v3.superDefense)・
             /// 護符の使い時 (v3.superConsumables)・与ダメの倍率と敵のパッシブを配線の効用で読む (v3.readOutgoingMult / readEnemyPassives の −1)・
@@ -122,7 +122,7 @@ namespace AutoTest
             ///
             /// <para><b>2026-11-12 に ExactCombatAI を削除した。</b> 端子の山札 (2026-11-11) の後は、 配線もリロールも
             /// AutoRunner.Combat で山札の方策に上書きされ、 ExactCombatAI の判断は 1 度も呼ばれていなかった。
-            /// 値はメニューと保存済みの設定のために残す (戦闘の判断は Optimal と同じ山札の方策)。</para>
+            /// 値は保存済みの設定 (EditorPrefs の番号) のために残す (戦闘の判断は Optimal と同じ山札の方策)。 2026-11-12 (#135) にメニューから選ぶ口を消した。</para>
             ///
             /// <para><b>末尾に足すこと。</b> 既存値の番号を動かすとセーブ/EditorPrefs が壊れる。</para></summary>
             Exact,
@@ -142,10 +142,6 @@ namespace AutoTest
         public WiringSkill EffectiveWiringSkill
             => wiringSkill == WiringSkill.Ultra ? _ultraSelectedBaseSkill : wiringSkill;
 
-        /// <summary>旧い先読み方策 (戦闘決着までのロールアウト)。 <b>端子の山札 (2026-11-11) の後は戦闘の判断に使わない</b> ──
-        /// 配線とリロールは AutoRunner.Combat で山札の方策に上書きされ、 ここは <c>ResetForRun</c> / <c>BeginCombat</c> の副作用だけが残る
-        /// (super_prof.txt は「配線 0 回 / リロール 0 回」)。 <see cref="WiringSkill.Super"/> の実態はその enum の説明を読むこと。</summary>
-        public SuperCombatAI superAI = new SuperCombatAI();
         /// <summary>SuperV3 の実験スイッチ (Optimal + 改善案)。 全 OFF なら Optimal と同一。</summary>
         public V3Flags v3 = new V3Flags();
 
@@ -218,36 +214,8 @@ namespace AutoTest
         public bool superHighDifficultyTailMode = true;
         [Tooltip("この実効挑戦スコア以上で専用ルーチンを起動")]
         public int superHighDifficultyMinScore = 50;
-        [Tooltip("満点難度の6層ボスだけ、通常AIの戦闘方策を使う (旧い先読みの時代の切替)。山札の後は配線が常に山札の方策に上書きされるので、戦闘の判断は変わらない")]
-        public bool superLayer6OptimalCombatRoutine = true;
-
-        /// <summary>**7層ヴェスカでも Optimal の戦闘方策を使う** (既定 OFF)。
-        ///
-        /// <para><b>一度採用し、同日に撤回した。</b> これは <c>StaticValue</c> の飽和という
-        /// 実際のバグへの**対症療法**だった。 根本 (<see cref="SuperCombatAI.ttdCapTurns"/>) を
-        /// 直したら Super の方が強くなり (74.9% 対 73.3%)、 併用しても上乗せが無い
-        /// (74.9% → 73.2% / p=0.0821)。 **原因を直したので逃がす必要がなくなった。**
-        /// フラグは対照アーム用に残す。</para>
-        ///
-        /// <para>採用時の実測 (参考):
-        ///
-        /// <para>採用の実測 (パーツ有り・同一シード・各1000ラン):
-        /// <b>0pt 遺物なし 31.1% → 33.9% (p=0.0056) / 0pt 遺物あり 70.9% → 73.3% (p=0.0250)</b>
-        /// ── **両条件とも有意で同じ向き**。 同日に階層DP は符号反転で、
-        /// `chargeRerollGain` はパーツ抑止の artifact で撤回しており、
-        /// 2 条件そろって効いたのはこれだけ。</para>
-        ///
-        /// <para>2026-08-22 実測: 同一シードで両 AI が 7層へ到達した 379 ラン に限ると
-        /// <b>Optimal だけクリア 71 / Super だけクリア 41 (p=0.0059)</b>。
-        /// 6F 突破時点の状態 (HP率 0.888 vs 0.878 / パッシブ 46.95 vs 46.71 / 武器Tier 3.855 vs 3.842)
-        /// は Super が僅かに**上**なので、 「弱いランを拾って着いている」では説明できない。</para>
-        ///
-        /// <para>心当たり: <c>SuperCombatAI.StaticValue</c> は期待ブロックが敵攻撃を上回ると
-        /// <c>ttd=999</c> → 勝率 p が 1 に飽和し、 **敵HP が評価から消える**
-        /// (飽和センサスで同点候補の 19.5%)。 8 ターンの通常戦なら「いま安全」はほぼ正しいが、
-        /// 7層は 4 連戦 40 ターン級でエスカレーションが ×2.3 まで伸びるので、
-        /// そこで飽和させるのが最も危ない。</para></summary>
-        [NonSerialized] public bool superLayer7OptimalCombatRoutine;
+        // (6 層・7 層だけ Optimal の戦闘方策へ逃がす superLayer6/7OptimalCombatRoutine は 2026-11-12 に削除・#135。
+        //  山札の後は配線が常に山札の方策に上書きされ、 どちらも読む所が無かった)
 
         private bool IsSuperTailMode
             => superHighDifficultyTailMode
@@ -527,11 +495,8 @@ namespace AutoTest
         // [削除 2026-11-12] simDice ── スイープ対象のダイス。 ダイスの品は 2026-08-17 に廃止 (items.json に 0 件) で、
         //   有効な ID が 0 本になり、 スイープ全体が「有効な武器/ダイスIDがありません」で止まっていた。
 
-        /// <summary>**[廃止 2026-10-28] 何も読まない。** 旧 Λ層の撤退条件 (周回マス数)。
-        /// Λ層は廃止したが、 Ultra の方策仕様 (<c>UltraPortfolioPolicySpec.lambdaFarmTiles</c>) が
-        /// 候補集合のハッシュと許可プロパティに含めて運んでいる値なので、 ワーカーとの取り決めを変えないよう残す。
-        /// 仕様側を作り直すときに一緒に消すこと。 Λ のファーム量スイープと lambdaLv3Risk は同日削除。</summary>
-        [HideInInspector] public int lambdaFarmTiles = 6;
+        // (旧 Λ層の撤退条件 lambdaFarmTiles は 2026-11-12 に削除・#135。 Ultra の方策仕様 UltraPortfolioPolicySpec には
+        //  ワーカーとの取り決め (候補集合のハッシュ = ワーカーの actionFingerprint) として値だけ残っている)
 
         [Header("固定難易度スイープ")]
         [Tooltip("true で 挑戦スコアを固定値ごとに振り、最良遺物で 7 層クリアが成立するかを測る")]
@@ -790,7 +755,7 @@ namespace AutoTest
                 for (int i = 0; i < ctx.equippedDiceFaces.Length; i++) sum += ctx.equippedDiceFaces[i];
                 mean = sum / (float)ctx.equippedDiceFaces.Length;
             }
-            // 与ダメの倍率は 1 で固定。 旧 Super の自己較正 (SuperCombatAI._dmgMul) は配線の判断の中でしか
+            // 与ダメの倍率は 1 で固定。 旧 Super の自己較正 (旧 SuperCombatAI._dmgMul) は配線の判断の中でしか
             //   更新されず、 その判断は端子の山札の後は呼ばれないので、 常に初期値 1 だった (2026-11-12 に畳んだ)。
             return RunPowerBudget.Gap(run, run.Depth, 1f, dice, mean);
         }
@@ -2180,8 +2145,6 @@ namespace AutoTest
             UltraPortfolioPolicySpec selectedRunPolicy = selection.selectedRunPolicy;
             _ultraSelectedBaseSkill = (WiringSkill)selectedRunPolicy.wiringSkill;
             superHighDifficultyTailMode = selectedRunPolicy.superHighDifficultyTailMode;
-            superLayer6OptimalCombatRoutine = selectedRunPolicy.superLayer6OptimalCombatRoutine;
-            lambdaFarmTiles = selectedRunPolicy.lambdaFarmTiles;
             UltraProgressHub.SetPhase(
                 _ultraProgressSession,
                 UltraProgressPhase.Executing,
