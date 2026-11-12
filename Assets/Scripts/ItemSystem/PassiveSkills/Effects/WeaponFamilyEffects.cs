@@ -505,7 +505,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // 〈猛りII〉は 2026-11-11 に items.json の skills 表の stats へ移した (段 3・per=turnsElapsed・perMax 9)。
 
-    // 〈猛りIII〉は同上 (perMax 14)。 〈猛りI〉はどの品の skills 表にも無い (T2 の武器を WeaponProgression.Compute が組むときだけ出る) のでクラスのまま。
+    // 〈猛りIII〉は同上 (perMax 14)。 〈猛りI〉はクラスのまま (skills 表には説明だけを置く・stats は持たない)。
 
     /// <summary>鎧砕き (2026-10-28・旧〈大鉈〉の枠) — 与ダメが通ったターンの終わりに、 敵の防御 −2 / −3 / −4。
     ///
