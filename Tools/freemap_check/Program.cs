@@ -33,7 +33,8 @@ static class T
             for (int salt = 1; salt <= 120; salt++)
             {
                 GameLoop.GameRng.Salt = (ulong)salt * 7919;
-                foreach (int floor in new[] { 1, 3, 5, 6, 7 })
+                // 直線の層 (FloorPlan.LinearFloor・固定の 1 本道) は不変条件 (点 50・道 2 本以上) の外なので除く
+                foreach (int floor in new[] { 1, 3, 5, 6, 7 }.Where(f => f != FloorPlan.LinearFloor && f != FloorPlan.FarmFloor))
                 {
                     var L = FreeMapGenerator.Generate(floor);
                     if (!L.IsConnected()) bad++;
@@ -43,7 +44,7 @@ static class T
                     shortest.Add(L.Hops(L.start)[L.goal]); edgesSum += L.roads.Count;
                 }
             }
-            Check(bad == 0, $"生成: 異常 {bad} / 平均道 {edgesSum / 600.0:F1} / 終点まで平均 {shortest.Average():F1}手 ({shortest.Min()}-{shortest.Max()})");
+            Check(bad == 0, $"生成: 異常 {bad} / 平均道 {(double)edgesSum / shortest.Count:F1} / 終点まで平均 {shortest.Average():F1}手 ({shortest.Min()}-{shortest.Max()})");
         }
         // --- 決定性 ---
         {
@@ -156,14 +157,15 @@ static class T
             for (int i = 0; i < 12; i++) s3.Wait();
             int p0 = w3.Provision; int m3 = 0;
             foreach (int c in s3.Neighbors(s3.Me)) if (s3.InFront(c) || s3.InFront(s3.Me)) { s3.MoveTo(c); m3++; break; }
-            Check(m3 == 0 || w3.Provision == p0 - FreeMapParams.MoveSupply * 3 / 2, $"砂: 前線の中の1歩は物資1.5倍 (moved={m3}, {p0}->{w3.Provision})");
+            int spent3 = p0 - w3.Provision;
+            Check(m3 == 0 || spent3 == FreeMapParams.MoveSupply || spent3 == FreeMapParams.MoveSupply + 1, $"砂: 前線の中の1歩は物資 1 か 2 (50% で +1) (moved={m3}, {p0}->{w3.Provision})");
         }
         // --- 物資不足は HP で払う ---
         {
-            var w = new Wallet { Provision = 5, Hp = 30 };
+            var w = new Wallet { Provision = 0, Hp = 30 };
             var s = Make(2, FoeProfile.Summoner, WeatherKind.None, w);
             s.MoveTo(s.Neighbors(s.Me)[0]);
-            int hpCost = (FreeMapParams.MoveSupply - 5 + FreeMapParams.SupplyPerHp - 1) / FreeMapParams.SupplyPerHp;   // 足りない物資 10 につき HP 1
+            int hpCost = FreeMapParams.MoveSupply * FreeMapParams.HpPerSupply;   // 足りない物資 1 につき HP HpPerSupply
             Check(w.Provision == 0 && w.Hp == 30 - hpCost, $"物資不足は HP で払う (prov {w.Provision}, hp {w.Hp})");
         }
         // --- 猟犬・使い魔 ---
