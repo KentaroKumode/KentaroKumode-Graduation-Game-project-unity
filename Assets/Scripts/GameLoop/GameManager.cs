@@ -245,6 +245,8 @@ namespace GameLoop
             BeginChallengeCards();   // 挑戦カードのランか (効果を読む前に決める)
             // 〈長引く負傷〉の閾値基準。 **ここで焼き付けて以降変えない** (§15-2 v4.0)
             Run.baseMaxHPAtRunStart = Run.playerMaxHP;
+            // [測定 2026-11-13] 博士の時計をランの最初から預かった状態にする (既定は何もしない・乱数は引かない)
+            if (GameHooks.VescaClockHeldAtStart) VescaClock.Take(Run);
 
             // 2026-06-28: 職業セット + スターター消耗品 1 個配布
             Run.playerClass = SelectedClass;
