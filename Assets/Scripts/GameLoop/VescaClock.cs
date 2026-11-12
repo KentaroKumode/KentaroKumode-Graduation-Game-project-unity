@@ -13,7 +13,7 @@ namespace GameLoop
     /// (値の正本は <c>CombatSystem.BossParams.VescaClockNotch</c>・足す所は <c>CombatManager.ResetBossDown</c> の 1 か所)。
     /// 画面・BOT は、 戦闘が持つ目盛りの並び (<c>CombatManager.Down.notches</c>) をそのまま読む。</para>
     ///
-    /// <para>文 (下の定数) は作者の確定文 (2026-11-13)。 書き換えない。</para>
+    /// <para>文 (下の定数) は作者の確定文 (2026-11-13)。 書き換えない。 ヴェスカの台詞は作者の決定で置かない (2026-11-13)。</para>
     /// </summary>
     public static class VescaClock
     {
@@ -21,10 +21,8 @@ namespace GameLoop
         public const string Name = ItemIds.VescaClock;
         /// <summary>ヴェスカの状態の欄に出す説明 (debuff_desc)。</summary>
         public const string Description = "体勢を崩してダウンする機会が、各段で一回ずつ増える。";
-        /// <summary>最初の段 (VescaP1) の開始時に 1 回だけ出す地の文 (battle_line)。</summary>
+        /// <summary>最初の段 (VescaP1) の開始時に 1 回だけ戦闘ログに出す地の文 (battle_line)。</summary>
         public const string BattleLine = "重くよどんだ底の空気の中で、懐の時計だけが休まず針を刻んでいる。";
-        /// <summary>続けて出すヴェスカの台詞 (vesca_line)。</summary>
-        public const string VescaLine = "「……聞き覚えのある音だな。まだ動いていたのか、その片割れは」";
 
         /// <summary>このランで時計を預かっているか。</summary>
         public static bool Held(RunState run) => run?.ownedFlags != null && run.ownedFlags.Contains(ItemIds.VescaClock);
