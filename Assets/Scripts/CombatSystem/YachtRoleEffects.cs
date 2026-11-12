@@ -37,7 +37,8 @@ namespace CombatSystem
     /// CombatContext の 3 区分規約 (perTurn/decay/persistent) の管理対象が膨らむため。
     /// 次ターンへ持ち越す分は <c>nextTurnBuffs</c> 辞書へ載せる (BeginNewTurn が currentBuffs へ移す)。</para>
     ///
-    /// <para>効果表の正本は docs/adr/0011-three-dice-matching-roles.md。 数値は叩き台 (バランス調整で見直す)。</para>
+    /// <para>効果の正本はこのファイル (実コード)。 一覧は DAMAGE_CALC_REFERENCE.md の「役」の段に写す (数値を変えたら同時に直す)。
+    /// ADR-0011 の表は決定当時の叩き台の記録。 数値は叩き台 (バランス調整で見直す)。</para>
     /// </summary>
     public static class YachtRoleEffects
     {

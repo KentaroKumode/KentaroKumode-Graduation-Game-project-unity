@@ -844,6 +844,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                             封じ T4: enemyPassivesDisabledTurns / 富 T4: 所持ゴールド 5% (最大 10) を mutualAttackBonus
            次ターンへ     … 封じ: currentBuffs["roleEnemyAtkCut"] (敵攻撃 −40%) / ["roleEnemyStun"] (敵が行動しない) /
                             特別: ["roleFreeReroll"] (無料リロール 2 回)
+           特別 T4        … 2 個そろいでも極を撃つ (面数×5%・ボス・ヴェスカは面数×2.5%)
            盤面フラグ (RoleOutcome)
                           … 極 (yachtFired + yachtChunkPct: 敵最大HP の 面数×30% (ボス・ヴェスカは ×15%) を軽減無視) /
                             追撃 (extraDamageRatio 0.3 / 1.0・ゾロ目は確定ダメージ・T4 は会心判定) /
