@@ -57,7 +57,9 @@ namespace UI.Game2D
         {
             var sb = new System.Text.StringBuilder();
             if (result?.log != null) foreach (var line in result.log) sb.Append("・").Append(line).Append('\n');
-            if (!string.IsNullOrEmpty(choice?.postFlavor)) sb.Append(choice.postFlavor);
+            // 確率分岐は引いた分岐の文 (分けて書いていなければ全分岐で同じ文・2026-11-12)
+            string after = choice?.PostFlavorFor(result != null ? result.pickedBranch : -1);
+            if (!string.IsNullOrEmpty(after)) sb.Append(after);
             _eventResult = sb.ToString().TrimEnd('\n');
             _dirty = true;
         }

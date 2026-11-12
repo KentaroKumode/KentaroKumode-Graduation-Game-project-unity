@@ -147,12 +147,14 @@ namespace GameLoop
             Commit(run, sb);
         }
 
-        public static void Event(RunState run, string code, string eventId, int choiceIndex)
+        /// <param name="branch">引いた確率分岐 (記録の文を分岐ごとに分けた選択肢だけ渡す・それ以外は -1 で書かない)。</param>
+        public static void Event(RunState run, string code, string eventId, int choiceIndex, int branch = -1)
         {
             var sb = Begin(run, code);
             if (sb == null) return;
             Arg(sb, "ev", eventId);
             Arg(sb, "c", choiceIndex);
+            if (branch >= 0) Arg(sb, "b", branch);
             Commit(run, sb);
         }
 

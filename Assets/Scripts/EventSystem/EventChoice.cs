@@ -22,6 +22,29 @@ namespace EventSystem
         /// <c>-</c> 区切りは結果セクションの <c>HP-5</c> と衝突するので使えない。</para></summary>
         public string digest;
 
+        /// <summary>確率分岐ごとの選んだ後の文 (2026-11-12)。 並びは結果の欄の「N%で」の順。
+        /// event_list.txt で <c>||</c> 区切りに分けて書いた時だけ埋まる ── 分けていなければ null で、
+        /// 全分岐で <see cref="postFlavor"/> を出す。 分けた時の <see cref="postFlavor"/> は先頭の分岐の文。
+        /// 読む側は <see cref="PostFlavorFor"/> を通す。</summary>
+        public List<string> postFlavorByBranch;
+
+        /// <summary>確率分岐ごとの記録の文 (2026-11-12)。 <see cref="postFlavorByBranch"/> と同じ扱い。
+        /// 空の分岐は「その分岐では記録に載せない」 (未記入と同じく沈黙する)。</summary>
+        public List<string> digestByBranch;
+
+        /// <summary>引いた分岐 <paramref name="branch"/> (<c>ExecutionResult.pickedBranch</c>・引いていなければ -1) の選んだ後の文。</summary>
+        public string PostFlavorFor(int branch) => EventBranchText.For(postFlavorByBranch, branch, postFlavor);
+
+        /// <summary>引いた分岐の記録の文。 未記入なら null。</summary>
+        public string DigestFor(int branch)
+        {
+            string d = EventBranchText.For(digestByBranch, branch, digest);
+            return string.IsNullOrEmpty(d) ? null : d;
+        }
+
+        /// <summary>記録の文を分岐ごとに分けて書いてあるか (分けてある時だけ、 引いた分岐を戦記に残す)。</summary>
+        public bool DigestSplitByBranch => digestByBranch != null;
+
         /// <summary>この選択肢が使うターン (効果「ターン+N」の合計・確率分岐の中は数えない)。 0 なら時間を使わない。</summary>
         public int TurnCost
         {

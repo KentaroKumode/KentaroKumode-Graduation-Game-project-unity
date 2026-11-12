@@ -231,7 +231,7 @@ namespace GameLoop
                     sb.AppendLine($"  ・{line}");
             }
             sb.AppendLine();
-            sb.AppendLine(choice.postFlavor);
+            sb.AppendLine(choice.PostFlavorFor(result != null ? result.pickedBranch : -1));
             sb.AppendLine();
             sb.AppendLine("[Space] マップに戻る");
             eventText = sb.ToString();

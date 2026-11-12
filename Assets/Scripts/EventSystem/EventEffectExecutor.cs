@@ -28,6 +28,10 @@ namespace EventSystem
             public List<EventEffect> postCombatEffects = new List<EventEffect>();
             /// <summary>UI 表示用ログ</summary>
             public List<string> log = new List<string>();
+            /// <summary>引いた確率分岐の添字 (結果の欄の「N%で」の順・0 始まり)。 確率分岐が無ければ -1 (2026-11-12)。
+            /// 画面 (選んだ後の文) と戦記 (記録の文) が分岐ごとの文を選ぶのに使う (<c>EventChoice.PostFlavorFor</c> / <c>DigestFor</c>)。
+            /// 1 選択肢に確率分岐は 1 つ (解析がそう作る) なので、 最初に引いたものを残す。</summary>
+            public int pickedBranch = -1;
         }
 
         /// <summary>
@@ -396,6 +400,7 @@ namespace EventSystem
 
             int pct = Mathf.RoundToInt(eff.branchWeights[picked] * 100f);
             result.log.Add($"確率分岐: {pct}% 抽選");
+            if (result.pickedBranch < 0) result.pickedBranch = picked;   // 引き方はそのまま、 どれを引いたかを渡すだけ
 
             foreach (var sub in eff.branches[picked])
                 ExecuteOne(sub, run, result);

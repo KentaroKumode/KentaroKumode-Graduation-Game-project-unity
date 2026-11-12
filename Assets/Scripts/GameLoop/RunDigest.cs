@@ -203,7 +203,7 @@ namespace GameLoop
                 case RunChronicle.EventTake:
                 case RunChronicle.EventRefuse:
                 case RunChronicle.EventPrice:
-                    return EventDigest(b.item, b.choice);
+                    return EventDigest(b.item, b.choice, b.branch);
 
                 case RunChronicle.EndDeath:
                     return $"{Kanji(b.floor)}層で、記録はそこで途切れている。";
@@ -305,14 +305,15 @@ namespace GameLoop
             return id;
         }
 
-        private static string EventDigest(string evId, int choice)
+        /// <param name="branch">引いた確率分岐 (戦記の b=・無ければ -1)。 記録の文を分岐ごとに分けた選択肢は、 その分岐の文を出す。</param>
+        private static string EventDigest(string evId, int choice, int branch)
         {
             try
             {
                 var ev = EventSystem.EventDatabase.GetById(evId);
                 if (ev != null && choice >= 0 && choice < ev.choices.Count)
                 {
-                    string d = ev.choices[choice].digest;
+                    string d = ev.choices[choice].DigestFor(branch);
                     // **未記入なら沈黙する。** postFlavor で埋めない（独白調が混じる）。
                     if (!string.IsNullOrEmpty(d)) return d;
                 }
@@ -338,7 +339,7 @@ namespace GameLoop
         private struct Beat
         {
             public string code, item, raw;
-            public int floor, turns, hp, dmg, gold, choice, weight, index;
+            public int floor, turns, hp, dmg, gold, choice, branch, weight, index;
             public bool boss;
         }
 
@@ -346,7 +347,7 @@ namespace GameLoop
 
         private static Beat Parse(string line)
         {
-            var b = new Beat { index = _seq++, raw = line, choice = -1 };
+            var b = new Beat { index = _seq++, raw = line, choice = -1, branch = -1 };
             if (string.IsNullOrEmpty(line)) return b;
 
             var parts = line.Split('|');
@@ -366,6 +367,7 @@ namespace GameLoop
                     case "d":    if (int.TryParse(v, out n)) b.dmg = n; break;
                     case "g":    if (int.TryParse(v, out n)) b.gold = n; break;
                     case "c":    if (int.TryParse(v, out n)) b.choice = n; break;
+                    case "b":    if (int.TryParse(v, out n)) b.branch = n; break;   // 引いた確率分岐 (2026-11-12)
                     case "boss": b.boss = true; break;
                     case "e":    b.item = v; break;
                     case "i":    b.item = v; break;

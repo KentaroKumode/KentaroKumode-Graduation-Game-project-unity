@@ -125,6 +125,7 @@ crashlytics-build.properties
 /Tools/arms/
 /Tools/pixelfx/records/
 Tools/freemap_check/obj/
+Tools/event_branch_check/obj/
 __pycache__/
 
 # HTML / PDF (生成物・資料)

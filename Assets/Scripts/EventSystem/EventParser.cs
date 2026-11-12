@@ -8,6 +8,7 @@ namespace EventSystem
     /// <summary>
     /// イベントテキストフォーマットをパースする。
     /// フォーマット: イベント名:出現条件:フレーバー:選択肢-結果-選択後フレ/選択肢-結果-選択後フレ
+    /// 確率分岐のある選択肢は、 選択後フレと記録の文 (@@ の後ろ) を <c>||</c> で分岐ごとに分けられる (<see cref="EventBranchText"/>)。
     /// コメント行は # で始まる行、または 「###」「━━」を含む見出し行は無視。
     /// </summary>
     public static class EventParser
@@ -233,14 +234,39 @@ namespace EventSystem
             ChoicesParsed++;
             if (digest != null) ChoicesWithDigest++;
 
+            var effects = ParseEffects(resultStr);
+
+            // 確率分岐ごとの文 (2026-11-12): 「文A||文B@@記録A||記録B」。 数が合わなければ警告して先頭の文を全分岐に使う
+            int nBranch = CountBranches(effects);
+            var afterBy = EventBranchText.Split(postFlavor, nBranch, out string afterFirst, out string afterProblem);
+            if (afterProblem != null) Debug.LogWarning($"[EventParser] 選んだ後の文: {afterProblem} ({choiceText})");
+            List<string> digestBy = null;
+            if (digest != null)
+            {
+                digestBy = EventBranchText.Split(digest, nBranch, out string digestFirst, out string digestProblem);
+                if (digestProblem != null) Debug.LogWarning($"[EventParser] 記録の文: {digestProblem} ({choiceText})");
+                digest = string.IsNullOrEmpty(digestFirst) ? null : digestFirst;
+            }
+
             var choice = new EventChoice
             {
                 text = choiceText,
-                postFlavor = postFlavor,
+                postFlavor = afterFirst,
+                postFlavorByBranch = afterBy,
                 digest = digest,
-                effects = ParseEffects(resultStr),
+                digestByBranch = digestBy,
+                effects = effects,
             };
             return choice;
+        }
+
+        /// <summary>選択肢の確率分岐の数 (確率分岐が無ければ 0)。 解析は 1 選択肢に確率分岐を 1 つしか作らない。</summary>
+        private static int CountBranches(List<EventEffect> effects)
+        {
+            if (effects == null) return 0;
+            foreach (var e in effects)
+                if (e != null && e.type == EventEffectType.Probability && e.branches != null) return e.branches.Count;
+            return 0;
         }
 
         /// <summary>パースした選択肢の総数と、 ダイジェスト文が記入済みの数。

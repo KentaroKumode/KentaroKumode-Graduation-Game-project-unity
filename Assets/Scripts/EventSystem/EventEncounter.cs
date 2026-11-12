@@ -120,14 +120,16 @@ namespace EventSystem
                 string code = empty  ? RunChronicle.EventRefuse
                             : paid   ? RunChronicle.EventPrice
                                      : RunChronicle.EventTake;
-                RunChronicle.Event(run, code, Current.id, index);
+                // 記録の文を分岐ごとに分けた選択肢だけ、 引いた分岐も残す (分けていない選択肢の行は今までと 1 字も変えない
+                //   ── 戦記はワーカー照合の digest に畳まれるので)
+                RunChronicle.Event(run, code, Current.id, index, choice.DigestSplitByBranch ? execResult.pickedBranch : -1);
             }
 
             // 一度のみイベントの記録
             if (Current.condition.onceOnly && run != null)
                 run.seenOnceEvents.Add(Current.id);
 
-            LastPostFlavor = choice.postFlavor;
+            LastPostFlavor = choice.PostFlavorFor(execResult.pickedBranch);   // 確率分岐は引いた分岐の文 (2026-11-12)
             LastResult = execResult;
             PendingTurns += execResult.turnsToPass;   // ランダムなイベントへ振り直した時は両方の分を積む
             PendingNav.AddRange(execResult.navEffects);   // 航行の効果も同じく地図へ戻った時に (2026-11-12)
