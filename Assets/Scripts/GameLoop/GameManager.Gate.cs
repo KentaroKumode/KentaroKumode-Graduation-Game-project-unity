@@ -130,7 +130,7 @@ namespace GameLoop
         public const int GateProvisionDemand = 4;   // 2026-11-10: 旧 400 (上限の 40%) → 上限 10 の 40%
 
         /// <summary>③「門が転移を開始した時、あなたの意識が薄れゆく…」
-        /// — 光に身を任せる = 物資 −40。 抗う/不足なら〈不完全な転移〉。</summary>
+        /// — 光に身を任せる = 物資 −<see cref="GateProvisionDemand"/>。 抗う/不足なら〈不完全な転移〉。</summary>
         public void OfferGateTransfer(bool accept)
         {
             if (CurrentPhase != GamePhase.GateRitual) return;

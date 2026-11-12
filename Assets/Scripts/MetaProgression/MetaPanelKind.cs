@@ -1,45 +1,46 @@
 namespace MetaProgression
 {
     /// <summary>
-    /// 整備パネルの15トラック識別子。
-    /// 数値系9 (max 10) + 宣言系6 (種火4 + 端子2, max 3)。
-    /// #16〈予見〉は ADR-0010 でパリィごと廃止した。 **enum 末尾だったので
-    /// セーブ移行は不要** (EnsurePanelRanks が配列長の差を吸収する)。
-    /// 正本仕様: docs/GAME.md §15-1
+    /// 整備パネルのトラック識別子 (18 個)。 うち Lantern / Precision / SparkCrit は廃止 (MaxRank 0 = 枠に出ない)。
+    /// 数値系 max 10 (Shell / Output / Guard / Vault / Plunder / Trade / Supply / Armor) +
+    /// 宣言系 max 3 (種火 5 + 端子 2)。 <b>enum は並べ替えも削除もしない</b> (panelRanks は enum のインデックスで引く)。
+    /// 旧 #16〈予見〉は ADR-0010 でパリィごと廃止した (enum 末尾だったのでセーブ移行は不要)。
+    /// <b>段ごとの数値の正本は MetaPanel.cs</b> (下の行のコメントは何のトラックかの目印だけ。 数値は写さない)。
+    /// 画面の説明文は Game2DMetaPanel。 仕様: docs/GAME.md §15-1
     /// </summary>
     public enum MetaPanelKind
     {
         // === 数値系 (max 10) ===
-        Shell,        // #1 外殻:  最大HP +3/段
-        Output,       // #2 出力:  与ダメ +5%/段
-        Guard,        // #3 防御:  開幕シールド +3/段、r5:被ダメ-1、r10:被ダメ-2 (累計)
-        Vault,        // #4 金庫:  開幕ゴールド +5/段、r10:宝箱ゴールド復活
-        Plunder,      // #5 強奪:  戦闘勝利ゴールド+1/段、r10:ショップ強盗 解禁
-        Trade,        // #6 商才:  特売枠+1/段 (割引 15/30/50%)、r10:99%引きの枠が出る
-        Supply,       // #7 宝物庫:  r2/5/8 素材+1、r10:開幕パッシブ
-        Lantern,      // #8 兵站 (旧〈燈火〉):  2026-11-10 に枠から外した (MaxRank 0)。 物資の上限は素の 8 で固定。 後継は末尾の〈装甲〉
-        Precision,    // #9 精密:  r3/6/9 会心ダイス+1、全段 会心率+0.55%/段 (r10 で +5.5%)
+        Shell,        // #1 外殻:  最大HP (MetaPanel.ShellHp)、 r10: ラストスタンド
+        Output,       // #2 出力:  与ダメ % (OutputPct)、 r10:〈戦意〉
+        Guard,        // #3 剛胆 (旧〈防御〉・開幕シールドは 2026-08-15 廃止):  エリートの格上げ・報酬・ドロップ (Valor*)、 r10: エリートへの与ダメ
+        Vault,        // #4 金庫:  開幕ゴールド (VaultGold)、 r10: 宝箱ゴールド復活・預け入れ
+        Plunder,      // #5 強奪:  ボス撃破の追加ゴールド・パッシブドロップ (Plunder*)、 r10: ショップ強盗 解禁
+        Trade,        // #6 商才:  特売枠 (TradeSale*)、 r10: 99%引きの枠が出る
+        Supply,       // #7 宝物庫:  開幕パッシブの本数とレア度 (Supply*)、 r10: 開幕パッシブが選択式
+        Lantern,      // #8 兵站 (旧〈燈火〉):  2026-11-10 に枠から外した (MaxRank 0)。 物資の上限は素の値で固定。 後継は末尾の〈装甲〉
+        Precision,    // #9 精密:  2026-09-10 廃止 (MaxRank 0)。 旧: 会心ダイス・会心率 +%/段
 
         // === 種火 (キーワードビルド宣言・max 3) ===
-        //   r1: 対応キーワードアイテムの出現重み +60%
+        //   r1: 対応キーワードアイテムの出現重み (SparkAppearanceWeightMul)
         //   r2: 固有効果 (下記)
-        //   r3: 対応キーワードアイテムを1つ (BRONZE) 開幕所持
-        SparkCharge,  // #10 充電:   r2 拡張バッテリー (充電上限 10→15)
+        //   r3: 対応キーワードアイテムを開幕所持 (SparkStartingItemCount 個)
+        SparkCharge,  // #10 充電:   r2 拡張バッテリー (充電上限 + と開幕の充電・ChargeCapBonus / ChargeOpening)
         SparkRinkai,  // #11 臨界:   r2 保温炉 (戦闘終了時メーターの50%を次戦闘へ持ち越し)
-        SparkPoison,  // #12 毒:     r2 濃縮 (毒付与量 +1)
-        SparkBleed,   // #13 出血:   r2 失血衰弱 (出血3以上の敵の攻撃値 -2)
+        SparkPoison,  // #12 毒:     r2 濃縮 (毒付与量 +・PoisonApplyBonus)
+        SparkBleed,   // #13 出血:   r2 失血衰弱 (出血が溜まった敵の攻撃値 −・BleedWeakenAttack)
 
         // === 端子調律 (max 3) ===
-        AttackTerm,   // #14 攻端子: 攻撃端子の配線合計 +1/段
-        BlockTerm,    // #15 防端子: 防御端子の配線合計 +1/段
+        AttackTerm,   // #14 攻端子: 攻撃端子に挿したダイス 1 個ごとに配線合計 +1/段
+        BlockTerm,    // #15 防端子: 防御端子に挿したダイス 1 個ごとに配線合計 +1/段
 
         // === 種火の追加 (2026-11-07・軸の再設計で会心とシールドも軸になったため)。 enum の末尾に足す ──
         //   panelRanks は int[] を enum のインデックスで引くので、 途中に挟むと保存済みのランクがずれる。
-        SparkCrit,    // #16 会心:   r2 研ぎ澄まし (会心倍率 +0.2)
-        SparkShield,  // #17 シールド: r2 厚手の芯 (ターン開始の減衰で残るシールド +10%)
+        SparkCrit,    // #16 会心:   2026-11-07 廃止 (MaxRank 0)。 旧 r2 研ぎ澄まし (会心倍率 +)
+        SparkShield,  // #17 シールド: r2 厚手の芯 (ターン開始の減衰で残るシールド +%・ShieldKeepBonusPct)
 
         // === 2026-11-10 追加 (数値系・max 10)。 末尾に足す (保存済みランクの番号を保つ) ===
-        Armor,        // #18 装甲:  防御 +1/段 (r10 で +10)。 極点なし ── 10 段を同じ刻みで伸ばす
+        Armor,        // #18 装甲:  防御 (ArmorDefense)・被ダメージ −N (ArmorFlatReduction)、 r10〈不動〉: 一撃の上限 (ArmorHitCap)
     }
 
     public static class MetaPanelKindExt

@@ -11,7 +11,7 @@ namespace GameLoop
 {
     /// <summary>
     /// マップベースゲームループの状態をIMGUIで表示するデバッグHUD。
-    /// マップ・空腹度・移動先・戦闘情報をテキスト表示。
+    /// マップ・物資・移動先・戦闘情報をテキスト表示。
     /// 本番UIに差し替え可能 — このコンポーネントを外すだけで消える。
     /// </summary>
     public class GameDebugHUD : MonoBehaviour
@@ -474,7 +474,7 @@ namespace GameLoop
                         : "交換マス: 渡せるパッシブが無い [Space] 通過";
                     break;
                 case GameManager.GamePhase.GateRitual:
-                    helpText = "門: [1] 血を捧げる(最大HP-25%) [2] 遺物2個を焚く [3] 光に身を任せる(物資-40) → [Space] 起動\n"
+                    helpText = $"門: [1] 血を捧げる(最大HP-{GameManager.GateBloodMaxHpPct * 100f:0}%) [2] 遺物2個を焚く [3] 光に身を任せる(物資-{GameManager.GateProvisionDemand}) → [Space] 起動\n"
                              + "  押下=捧げる / 未押下=拒む (拒んだ工程ぶん〈不完全な〜〉を背負う)";
                     break;
                 case GameManager.GamePhase.FloorClear:
