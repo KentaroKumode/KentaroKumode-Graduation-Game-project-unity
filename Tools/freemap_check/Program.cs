@@ -539,6 +539,7 @@ static class T
             Check(reached == layers && noticed == 0 && stepped == 0, $"避ける道を歩く ({pr.id}・照明つき): 全層で縄張りを踏まずに終点へ・気づかれない ({reached}/{layers} 到達 / 気づかれた {noticed} / 踏んだ {stepped})");
         }
         BypassReport();
+        RiftGateReport();
         Console.WriteLine(fails == 0 ? "ALL OK" : $"FAILED {fails}");
     }
 
@@ -652,5 +653,152 @@ static class T
         for (int k = 0; k < 2; k++)
             Console.WriteLine($"[避ける道] 物資で賄えるか (層に入る時 {(k == 0 ? Cap : 4)}・店で上限まで買い足す・HP で払わない): 縄張りを通ってよい道 {100.0 * feasDirect[k] / layers:F1}% / 避ける道 {100.0 * feasBypass[k] / layers:F1}%"
                               + $" / 通ってよいなら賄えるのに避けると賄えない層 {100.0 * lostByBypass[k] / layers:F2}% ({lostByBypass[k]}・うち削った層 {lostByBypassTrimmed[k]})");
+    }
+
+    /// <summary>形の比較 (点・道・山岳・縄張り・巡回の輪・中心)。 種別は比べない。</summary>
+    static bool SameShape(FreeMapLayout a, FreeMapLayout b)
+    {
+        if (a.Count != b.Count || a.start != b.start || a.goal != b.goal || a.home != b.home || a.gate != b.gate) return false;
+        for (int i = 0; i < a.Count; i++)
+            if (a.pos[i].x != b.pos[i].x || a.pos[i].y != b.pos[i].y || !a.adj[i].SequenceEqual(b.adj[i])) return false;
+        if (!a.roads.SequenceEqual(b.roads) || a.mountains.Count != b.mountains.Count) return false;
+        for (int i = 0; i < a.mountains.Count; i++)
+        {
+            var m = a.mountains[i]; var k = b.mountains[i];
+            if (m.x != k.x || m.y != k.y || m.a != k.a || m.b != k.b || m.cos != k.cos || m.sin != k.sin) return false;
+        }
+        return a.territory.SetEquals(b.territory) && a.waypoints.SequenceEqual(b.waypoints);
+    }
+
+    /// <summary>深さ 6 (画面の第 4 層) の「裂け目の記録」(2026-11-13・RiftGate) の検算。
+    /// 口 (riftAtBoss) によらず深さ 6 以外の地図は同じ・深さ 6 も形は同じで種別だけが変わる・隣り合う点は全部イベントで終点へは必ず通る・
+    /// ボス前の休憩と店が 1 つ手前に並ぶ・歩いて終点に着くまでに必ず 1 回だけ起き、 2 つ目の隣り合う点は通常のイベント・安全弁は 0。</summary>
+    static void RiftGateReport()
+    {
+        const int Seeds = 3000;
+        // ── 口によらず、 深さ 6 以外の層は全く同じ ──
+        {
+            int layers = 0, diff = 0;
+            foreach (int floor in new[] { 0, 1, 3, 5, 7 })
+                for (int salt = 1; salt <= 600; salt++)
+                {
+                    GameLoop.GameRng.Salt = (ulong)salt * 7919 + (ulong)floor;
+                    var a = FreeMapGenerator.Generate(floor, true); var b = FreeMapGenerator.Generate(floor, false);
+                    layers++;
+                    if (!SameShape(a, b) || !a.types.SequenceEqual(b.types) || a.fixedEvent != b.fixedEvent || a.riftGate.Count != 0 || b.riftGate.Count != 0) diff++;
+                }
+            Check(diff == 0, $"裂け目の記録: 深さ 6 以外の地図は口によらず同じ ({layers} 層・食い違い {diff})");
+        }
+        // ── 深さ 6: 形は同じ・置き方の中身 ──
+        int n6 = 0, shapeDiff = 0, ringBad = 0, oldBad = 0, prepFail = 0, prepBad = 0, supplyBad = 0, typeDiffOutside = 0;
+        var ringSize = new List<int>(); var changed = new List<int>(); var ringTerr = new List<int>(); var replaced = new int[32];
+        int ringWithTreasurePoint = 0;
+        for (int salt = 1; salt <= Seeds; salt++)
+        {
+            GameLoop.GameRng.Salt = (ulong)salt * 7919 + 6UL;
+            var A = FreeMapGenerator.Generate(6, true); var B = FreeMapGenerator.Generate(6, false);
+            n6++;
+            if (!SameShape(A, B)) { shapeDiff++; continue; }
+            var ring = A.adj[A.goal].Where(i => i != A.start).OrderBy(i => i).ToList();
+            if (A.fixedEvent != -1 || !A.riftGate.SequenceEqual(ring) || ring.Count < 1 || ring.Any(i => A.types[i] != TileType.Event)) ringBad++;
+            ringSize.Add(ring.Count); ringTerr.Add(ring.Count(i => A.territory.Contains(i)));
+            foreach (int i in ring) replaced[(int)B.types[i]]++;
+            if (ring.Contains(FreeMapSim.TreasurePointOf(A))) ringWithTreasurePoint++;
+            // 旧い作り: 縄張りの外の固定の点 1 つ・隣り合う点の欄は空
+            if (B.riftGate.Count != 0 || B.fixedEvent < 2 || B.types[B.fixedEvent] != TileType.Event || B.territory.Contains(B.fixedEvent)) oldBad++;
+            // 種別の差は「隣り合う点」「旧い固定の点」「ボス前の休憩と店」だけ
+            var hg = A.Hops(A.goal);
+            int diffN = 0;
+            for (int i = 0; i < A.Count; i++)
+            {
+                if (A.types[i] == B.types[i]) continue;
+                diffN++;
+                bool ok = ring.Contains(i) || i == B.fixedEvent || A.types[i] == TileType.Rest || A.types[i] == TileType.Shop;
+                if (!ok) typeDiffOutside++;
+            }
+            changed.Add(diffN);
+            // ボス前: 終点から 2 歩の休憩と、 その隣 (終点から 2 歩以上) の店 = 「店 → 休憩 → イベント → ボス」
+            bool prep = false;
+            for (int r = 2; r < A.Count && !prep; r++)
+                if (hg[r] == 2 && A.types[r] == TileType.Rest)
+                    foreach (int s2 in A.adj[r]) if (s2 >= 2 && hg[s2] >= 2 && A.types[s2] == TileType.Shop) { prep = true; break; }
+            if (A.riftPrepFailed) prepFail++;
+            else if (!prep) prepBad++;
+            // 店と休憩は層に必ず 1 つずつ (生成の決まり)
+            bool hasShop = false, hasRest = false;
+            for (int i = 2; i < A.Count; i++) { if (A.types[i] == TileType.Shop) hasShop = true; if (A.types[i] == TileType.Rest) hasRest = true; }
+            if (!hasShop || !hasRest) supplyBad++;
+        }
+        Check(shapeDiff == 0, $"裂け目の記録: 深さ 6 の形 (点・道・山岳・縄張り) は口によらず同じ ({n6} 層・食い違い {shapeDiff})");
+        Check(ringBad == 0 && oldBad == 0, $"裂け目の記録: 今の作りは終点に隣り合う点が全部イベント・旧い作りは固定の点 1 つ (今の作りの異常 {ringBad} / 旧い作りの異常 {oldBad})");
+        Check(typeDiffOutside == 0, $"裂け目の記録: 種別が変わるのは隣り合う点・旧い固定の点・ボス前の休憩と店だけ (それ以外の差 {typeDiffOutside}・1 層あたり {Dist(changed)})");
+        Check(prepBad == 0 && supplyBad == 0, $"裂け目の記録: ボス前に「店 → 休憩 → イベント → ボス」が並ぶ (並ばない {prepBad} / 店か休憩の無い層 {supplyBad} / 形のせいで置けない層 {prepFail} = {100.0 * prepFail / n6:F2}%)");
+        Console.WriteLine($"[裂け目の記録] 隣り合う点の数 {Dist(ringSize)} / うち縄張りの中 {Dist(ringTerr)} / 縄張りの宝の点が隣り合う点に重なる層 {ringWithTreasurePoint} ({100.0 * ringWithTreasurePoint / n6:F1}%)");
+        Console.WriteLine("[裂け目の記録] 隣り合う点に元々あった種別 (旧い作りの種別): " + string.Join(" / ", Enumerable.Range(0, 32).Where(t => replaced[t] > 0).Select(t => $"{(TileType)t} {replaced[t]}")));
+
+        // ── 歩く: 終点に着くまでに必ず 1 回だけ起きる・2 つ目の隣り合う点は通常のイベント・安全弁 0 (天候あり) ──
+        foreach (bool atBoss in new[] { true, false })
+        {
+            int walks = 0, reached = 0, firedOnce = 0, firedTwice = 0, valve = 0, secondNormal = 0, missed = 0;
+            var turnsAt = new List<int>();
+            foreach (var wx in new[] { WeatherKind.None, WeatherKind.Sink, WeatherKind.Crumble, WeatherKind.Fog })
+                for (int salt = 1; salt <= 400; salt++)
+                {
+                    GameLoop.GameRng.Salt = (ulong)salt * 104729 + 6UL;
+                    var L = FreeMapGenerator.Generate(6, atBoss);
+                    var s = new FreeMapSim(L, new Wallet(), false, null, wx);
+                    var rng = new Random(salt * 31 + (int)wx);
+                    var activated = new HashSet<int>();
+                    bool seen = false; int fired = 0; walks++;
+                    for (int g = 0; g < 400 && s.Me != L.goal && !s.Dead; g++)
+                    {
+                        // 終点へ向かう 1 歩 (6 割) か、 寄り道 (隣のどれか) か、 待つ (前線を進める)
+                        double r = rng.NextDouble();
+                        var nb = s.Neighbors(s.Me);
+                        int nx = r < 0.6 ? s.StepToward(s.Me, L.goal) : r < 0.9 && nb.Count > 0 ? nb[rng.Next(nb.Count)] : s.Me;
+                        if (nx == s.Me || !s.CanMoveTo(nx)) { s.Wait(); continue; }
+                        s.MoveTo(nx); s.MarkDone(s.Me);
+                        int at = s.Me;
+                        if (at == L.goal)
+                        {
+                            if (RiftGate.ValveNeeded(6, false, L, seen, true, false)) valve++;
+                            if (!seen) missed++;
+                            break;
+                        }
+                        // 点の起動は一度きり (2 回目の到着は何も起きない)
+                        if (L.types[at] != TileType.Event || !activated.Add(at)) continue;
+                        bool isRing = L.riftGate.Contains(at), isFixed = at == L.fixedEvent;
+                        if (RiftGate.ForcesRecord(6, true, isFixed, isRing, false, seen, true, false)) { fired++; seen = true; turnsAt.Add(s.Turn); }
+                        else if (isRing && seen) secondNormal++;
+                    }
+                    if (s.Me == L.goal) reached++;
+                    if (fired == 1) firedOnce++;
+                    if (fired > 1) firedTwice++;
+                }
+            if (atBoss)
+            {
+                Check(reached == walks && firedOnce == walks && firedTwice == 0 && valve == 0 && missed == 0 && secondNormal > 0,
+                    $"裂け目の記録 (今の作り・天候 4 種で歩く): 全部の層で終点に着き、 着くまでに 1 回だけ起き、 安全弁は 0 (着いた {reached}/{walks} / 1 回 {firedOnce} / 2 回以上 {firedTwice} / 安全弁 {valve} / 踏まずに着いた {missed} / 2 つ目の隣り合う点で通常のイベント {secondNormal} 回)");
+                Console.WriteLine($"[裂け目の記録] 起きた時の航行のターン {Dist(turnsAt)}");
+            }
+            else
+            {
+                Console.WriteLine($"[裂け目の記録] 旧い作りで同じように歩くと、 踏まずに終点へ着いた層 {missed}/{walks} ({100.0 * missed / walks:F1}%)");
+                Check(valve == 0 && firedTwice == 0, $"裂け目の記録 (旧い作り): 安全弁は働かず、 二度は起きない (安全弁 {valve} / 2 回以上 {firedTwice})");
+            }
+        }
+        // ── 規則: 済んだ後・〈真理〉を持っている時・他の深さでは出さない ──
+        {
+            bool ok = RiftGate.ForcesRecord(6, true, false, true, false, false, true, false)
+                   && !RiftGate.ForcesRecord(6, true, false, true, false, true, true, false)    // 済んだ後は通常のイベント
+                   && !RiftGate.ForcesRecord(6, true, false, true, false, false, true, true)    // 〈真理〉を持っている
+                   && !RiftGate.ForcesRecord(5, true, false, true, false, false, true, false)   // 他の深さ
+                   && !RiftGate.ForcesRecord(6, true, false, false, false, false, true, false)  // 隣り合う点でない普通のイベント
+                   && RiftGate.ForcesRecord(6, true, true, false, false, true, true, false)     // 旧い作りの固定の点 (main と同じ: 済んだかは見ない)
+                   && RiftGate.ForcesRecord(6, true, false, false, true, false, true, false)    // 安全弁
+                   && !RiftGate.ValveNeeded(6, true, FreeMapGenerator.Generate(6, true), false, true, false)    // イベントなしの測定では出さない
+                   && !RiftGate.ValveNeeded(6, false, FreeMapGenerator.Generate(6, false), false, true, false); // 旧い作りでは出さない
+            Check(ok, "裂け目の記録: 規則 (済んだ後・〈真理〉あり・他の深さ・普通のイベントでは出さない / 旧い固定の点と安全弁では出す / イベントなしと旧い作りでは安全弁なし)");
+        }
     }
 }
