@@ -6,7 +6,7 @@ namespace AutoTest
     /// <summary>
     /// BOT の 1 ターンの見積もりに使う、 <b>物理的な規則</b>だけを集めた純粋な関数 (2026-11-05)。
     ///
-    /// <para>Optimal の配線評価 (<c>AutoRunner.Combat</c>) と Super の先読み (<c>SuperCombatAI.ApplyTurn</c>) が
+    /// <para>Optimal の配線評価 (<c>AutoRunner.Combat</c>) と Super の先読み (旧 <c>SuperCombatAI.ApplyTurn</c>・2026-11-12 に削除) が
     /// 同じゲームの規則を別々に書いていて、 片方にだけ入った規則 (武器の段・防ぎ切り) が取り残される原因になっていた。
     /// 規則の式はここ 1 箇所に置き、 両方が呼ぶ。 <b>効用の重みや価値判断 (ペルソナ・時間コスト・加点) はここに入れない</b> ──
     /// それは方策ごとに違ってよいもの。</para>

@@ -102,10 +102,9 @@ namespace AutoTest
             // Optimalだけ勝利425 / Superだけ勝利267。Superの未来近似は灰の再生・
             // 周期予兆・烈炎の複合戦で局所的に劣るため、ここだけ実測上位方策へ切替える。
             //   (7層の切り替えは 2026-08-22 に足した: 上の useLayer7Routine 参照)
-            // Super の BeginCombat は、 旧い配線の方策を差していた頃の副作用だけを残している
-            //   (方策の差し込み・旧い Super の配線・リロールの切り替えは 2026-11-12 に削除。 下で必ず山札の方策に上書きされていた)。
-            //   ExactCombatAI は 2026-11-12 に削除 (BeginCombat は自分のメモを消すだけだった)。
-            if (effectiveSkill != WiringSkill.Exact && useOptimalRoutine) superAI.BeginCombat(e0.id);
+            // 旧い先読み方策 (ExactCombatAI・SuperCombatAI) の BeginCombat は 2026-11-12 に呼び出しごと削除した。
+            //   どちらも自分の中のメモと観測を消すだけで、 共有の状態にも乱数にも触れていなかった
+            //   (配線とリロールは下で必ず山札の方策に上書きされ、 そのメモを読む判断が呼ばれなかった)。
             // 端子の山札 (ADR-0014): どの技量でも、 配線は山札用の方策 (AutoRunner.Terminals)、 リロールは Optimal の方策
             //   (山札の効用で値付けする) を差す。 素朴版はリロールしない。
             cm.WiringPolicy = DeckWiringPlanPolicy;
