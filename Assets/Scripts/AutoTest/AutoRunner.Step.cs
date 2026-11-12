@@ -394,8 +394,8 @@ namespace AutoTest
                     _cur.hadResolveAt5F     = owned != null && owned.Contains(GameLoop.ConvictionSystem.IdResolve);
                     _cur.hadTruthAt5F       = owned != null && owned.Contains(GameLoop.ConvictionSystem.IdTruth);
                     var flags = rs.ownedFlags;
-                    _cur.hadFlagYogenAt5F    = flags != null && flags.Contains("苦難の予言");
-                    _cur.hadFlagKakushinAt5F = flags != null && flags.Contains("苦難の確信");
+                    _cur.hadFlagYogenAt5F    = flags != null && flags.Contains(GameLoop.ItemIds.HardshipProphecy);
+                    _cur.hadFlagKakushinAt5F = flags != null && flags.Contains(GameLoop.ItemIds.HardshipConviction);
                 }
 
                 lastPhase = phase; lastNode = node; lastFloor = fl; lastHp = hp;
