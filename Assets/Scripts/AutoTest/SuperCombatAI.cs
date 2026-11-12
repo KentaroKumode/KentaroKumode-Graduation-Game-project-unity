@@ -348,7 +348,7 @@ namespace AutoTest
             unchecked { _rolloutSeed = (runSeed * 1103515245 + 12345) & 0x7FFFFFFF; }
             _rng = new System.Random(_rolloutSeed);
             _dmgMul = 1f; _takenMul = 1f; _calSamples = 0;
-            _pendingPredAtk = -1; _pendingPredRaw = -1;
+            _pendingPredAtk = -1; _pendingPredRaw = -1; _pendingUndyingAdd = 0f;
             wiringDecisions = rerollDecisions = rolloutEvaluations = 0;
         }
 
@@ -373,6 +373,8 @@ namespace AutoTest
         private float _takenMul = 1f;
         private int _calSamples;
         private int _pendingPredAtk = -1, _pendingPredRaw = -1;
+        /// <summary>[#122] 控えた判断で〈不滅の刃〉が池へ足した量 (+0.08n)。 較正で実測の比から引く。</summary>
+        private float _pendingUndyingAdd;
         private int _pendingEnemyHp, _pendingPlayerHp;
 
         /// <summary>[計装] 較正値の現在地。 レポートで「AI が自分をどう見積もっているか」を出す用。</summary>
@@ -391,7 +393,8 @@ namespace AutoTest
             if (_pendingPredAtk > 0)
             {
                 int lost = Math.Max(0, _pendingEnemyHp - cm.EnemyHP);
-                float r = lost / (float)_pendingPredAtk;
+                // [#122] 実測の比から、 その判断の〈不滅の刃〉の分 (池へ足した +0.08n) を引く ── _dmgMul を「〈不滅の刃〉を除いた池」に保つ
+                float r = lost / (float)_pendingPredAtk - _pendingUndyingAdd;
                 if (r > 0.01f && r < 8f) { _dmgMul += (r - _dmgMul) * Alpha; _calSamples++; }
             }
             if (_pendingPredRaw > 0)
@@ -402,7 +405,7 @@ namespace AutoTest
             }
             _dmgMul = Clamp(_dmgMul, 0.2f, 6f);
             _takenMul = Clamp(_takenMul, 0f, 4f);
-            _pendingPredAtk = -1; _pendingPredRaw = -1;
+            _pendingPredAtk = -1; _pendingPredRaw = -1; _pendingUndyingAdd = 0f;
         }
 
         private static float Clamp(float v, float lo, float hi) => v < lo ? lo : (v > hi ? hi : v);
@@ -952,6 +955,12 @@ namespace AutoTest
 
             // 予測は敵の防御を引いた後の値 ── 較正 (_dmgMul) が防御の増減 (構え 30 / 隙 0) で揺れないように
             _pendingPredAtk = skipAttack ? 0 : _armor.Mitigate(atkBase + aSum, s0.eDef, s0.turn);
+            // [#122] この配線で〈不滅の刃〉が続くなら、 本体はこのターンの池へ +0.08 × (連続 + 1) を足す。 較正で差し引くために控える。
+            {
+                int aC = 0, bC = 0;
+                for (int i = 0; i < _k; i++) { if (w[i] == DiceTerminal.Attack) aC++; else if (w[i] == DiceTerminal.Block) bC++; }
+                _pendingUndyingAdd = (_rung.undying && aC > 0 && bC > 0) ? TurnRules.UndyingAdd(s0.streak + 1) : 0f;
+            }
             _pendingPredRaw = Math.Max(0, enemyAtk - bSum);
             _pendingEnemyHp = s0.eHp;
             _pendingPlayerHp = s0.pHp;
@@ -1284,8 +1293,11 @@ namespace AutoTest
             int dealt = 0;
             if (aCount > 0)
             {
-                dealt = (int)((atkBase + aSum) * _dmgMul);
-                if (newStreak > 0) dealt = (int)(dealt * TurnRules.UndyingMul(newStreak));
+                // [#122] 〈不滅の刃〉は本体と同じく倍率の池へ足す。 _dmgMul は較正で「〈不滅の刃〉を除いた池」に保つ (Observe)。
+                //   旧: (攻撃 × _dmgMul) × (1 + 0.08n) ── 池と別に掛けたうえ、 _dmgMul が過去の〈不滅の刃〉の伸びを含んでいて二重に数えた。
+                float mul = _dmgMul;
+                if (newStreak > 0) mul += TurnRules.UndyingAdd(newStreak);
+                dealt = (int)((atkBase + aSum) * mul);
             }
             // === 7層ヴェスカ〈遺物学者〉の抽選 (§13-4) ===
             //   すべて予告に開示されている性質なので、 先読みに使うのは完全情報の範囲内。
