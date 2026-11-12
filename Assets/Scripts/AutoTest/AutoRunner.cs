@@ -105,11 +105,18 @@ namespace AutoTest
             Naive,
             /// <summary>最適: 3^5 の割り当てを全列挙し役の価値も効用へ入れる。 リロールと役も使う。</summary>
             Optimal,
-            /// <summary>天井: 戦闘決着まで前向きに読む (<see cref="SuperCombatAI"/>)。
+            /// <summary>天井: 「攻略を知り尽くした人」(docs/GAME.md §13-7 の技量の梯子)。
             ///
-            /// Optimal との差が「1 ターン貪欲では届かない読みの深さ」＝ **技量帯の上半分**。
-            /// **未来の出目は読まない** ── ロールアウトは専用乱数で、 GameRng を消費しない。
-            /// 1 ターンあたりの計算量が 2 桁上がるので、 スイープは短めのラン数で。</summary>
+            /// <para><b>2026-11-12 時点の実態: 戦闘の判断は先読みしない。</b> 端子の山札 (2026-11-11) の後は、 どの技量でも配線は
+            /// <c>DeckWiringPlanPolicy</c>、 リロールは <c>MutualRerollPolicy</c> に上書きされる (AutoRunner.Combat)。
+            /// 旧 <see cref="SuperCombatAI"/> (戦闘決着までのロールアウト) の配線とリロールは呼ばれない。
+            /// 先読みは山札の 2 ターン先読み <c>deckLookahead</c> (#105・既定 OFF) だけで、 技量とは別の口。</para>
+            /// <para>Super が Optimal と違うのは Begin が立てる次の物: 予告を読む防御 (重い攻撃の予告でリロール +1・v3.superDefense)・
+            /// 護符の使い時 (v3.superConsumables)・与ダメの倍率と敵のパッシブを配線の効用で読む (v3.readOutgoingMult / readEnemyPassives の −1)・
+            /// 航行の計画 (v3.macroPlan)・戦闘名の危険度で避ける (v3.superNav → UseLearnedDanger)・無段階の序列 (superBuyTiers)・
+            /// ITT の Super 版の序列と価格の差し引き (superOwnItt / superIttPriceK)・段階 3 の値順の購入 (v3.phase3Ranked)・
+            /// 軸に絞る買い方 (v3.axisCommitBuy)・難易度 10 の 6 層の店の全投入 (IsSuperTailMode)。
+            /// 配線のミスなし (wiringMistakeRate=0) と防ぎ切りの規則 (FreeBlockRule) は、 山札の方策と HP の帳簿 (既定) では差にならない。</para></summary>
             Super,
             /// <summary>厳密: 近似を入れない expectimax (<see cref="ExactCombatAI"/>)。
             ///
@@ -146,8 +153,9 @@ namespace AutoTest
         [NonSerialized] public long optimalWiringDecisions;
         [NonSerialized] public long optimalWiringCandidatesEvaluated;
 
-        /// <summary>技量帯の天井を担う先読み方策。 <see cref="WiringSkill.Super"/> のときだけ使う。
-        /// レバー (ロールアウト本数・候補数・深さ) はここから触る。</summary>
+        /// <summary>旧い先読み方策 (戦闘決着までのロールアウト)。 <b>端子の山札 (2026-11-11) の後は戦闘の判断に使わない</b> ──
+        /// 配線とリロールは AutoRunner.Combat で山札の方策に上書きされ、 ここは <c>ResetForRun</c> / <c>BeginCombat</c> の副作用だけが残る
+        /// (super_prof.txt は「配線 0 回 / リロール 0 回」)。 <see cref="WiringSkill.Super"/> の実態はその enum の説明を読むこと。</summary>
         public SuperCombatAI superAI = new SuperCombatAI();
         /// <summary>SuperV3 の実験スイッチ (Optimal + 改善案)。 全 OFF なら Optimal と同一。</summary>
         public V3Flags v3 = new V3Flags();
@@ -220,7 +228,7 @@ namespace AutoTest
         public bool superHighDifficultyTailMode = true;
         [Tooltip("この実効挑戦スコア以上で専用ルーチンを起動")]
         public int superHighDifficultyMinScore = 50;
-        [Tooltip("満点難度の6層ボスだけ、同一シード実測で優位だった通常AIの戦闘方策を使う。7層ではSuper先読みに戻す")]
+        [Tooltip("満点難度の6層ボスだけ、通常AIの戦闘方策を使う (旧い先読みの時代の切替)。山札の後は配線が常に山札の方策に上書きされるので、戦闘の判断は変わらない")]
         public bool superLayer6OptimalCombatRoutine = true;
 
         /// <summary>**7層ヴェスカでも Optimal の戦闘方策を使う** (既定 OFF)。
@@ -767,7 +775,7 @@ namespace AutoTest
         /// **null が「無し」ではなく「触らない」** を意味する構造なので、
         /// 設定したつもりの条件が実際には前の状態を引き継いでいる可能性がある。
         /// 推測で潰さず、 生きている State から直接読む。</summary>
-        private static string EffectiveStateLine()
+        private string EffectiveStateLine()
         {
             var st = MetaProgression.MetaProgressManager.Instance?.State;
             if (st == null) return "[実効状態] MetaProgressState が null";
@@ -777,6 +785,7 @@ namespace AutoTest
             return $"[実効状態] 挑戦の難易度 {st.challengeDifficulty} "
                  + $"/ 学習の帯 {(string.IsNullOrEmpty(LearnedPriorityProvider.LoadedRoot) ? "(未読み込み)" : BandFolderName(LearnedPriorityProvider.LoadedRoot))}"
                  + $"{(LearnedPriorityProvider.UsingFallback ? " **手書きの序列 (学習データなし)**" : "")} "
+                 + $"/ 山札の先読み {(deckLookahead && EffectiveWiringSkill != WiringSkill.Naive ? "ON" : "OFF")} (deckLookahead={deckLookahead}) "
                  + $"/ 遺物 持ち込み {relicCount}個 計{relicPts}段 "
                  + $"/ メタ ダイス合計+{MetaProgression.MetaBuffApplicator.GetDiceTotalBonus()} "
                  + $"攻撃端子+{MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice()}";
@@ -2086,7 +2095,8 @@ namespace AutoTest
                 LearnedPriorityProvider.Reload(TierLearningRoot, writeMarkdown: false);
             }
             bool isSuperSkill = wiringSkill == WiringSkill.Super;
-            // Super = Optimal + 無段階の序列 + 激しい防御 + 消耗品の読み + 偵察と戦闘名の回避 (2026-11-06・同じシードで +4.86σ)
+            // Super = Optimal + 無段階の序列 + 激しい防御 + 消耗品の読み + 偵察と戦闘名の回避 (2026-11-06・同じシードで +4.86σ)。
+            //   **戦闘の先読みは含まない** (配線とリロールは山札の方策・先読みは deckLookahead だけ・2026-11-12 に確認)。
             if (isSuperSkill) { v3.superDefense = true; v3.superConsumables = true; v3.superNav = true; v3.macroPlan = true; v3.phase3Ranked = true; v3.axisCommitBuy = true; UseLearnedDanger = true; AvoidLoseRate = v3.avoidLoseRate; }
             // [2026-11-10] 軸に寄せる方策を本体の差し込み口 (開幕の品・挑戦カード) へも渡す。 空なら無効。
             BotHooks.AxisFocus = buyAxisFocus ?? "";
