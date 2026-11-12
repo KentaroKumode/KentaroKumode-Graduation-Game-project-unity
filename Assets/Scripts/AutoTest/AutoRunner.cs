@@ -608,6 +608,15 @@ namespace AutoTest
         /// <summary>次ランに流し込む挑戦の難易度 (ResetAll 直後に State へ入れる)。 負 = 触らない。</summary>
         private int _pendingChallengeDifficulty = -1;
 
+        /// <summary>この腕がラン開始時に State へ入れる挑戦の難易度 (周回モード以外)。
+        /// 優先: スイープの固定値 (_pendingChallengeDifficulty) → enableAllDebuffs (難易度 10) → challengeCardDifficulty。
+        /// <para>ラン開始時 (AutoRunner.Step) と Begin が<b>同じ関数を呼ぶ</b> (2026-11-12・#119)。 Begin はこの値を先に State へ入れてから
+        /// バッチ開始時の学習を読む ── 入れないと、 前の測定が残した難易度 (ビルド版は PlayerPrefs から読む) の帯を読んでしまう。</para></summary>
+        private int IntendedChallengeDifficulty()
+            => _pendingChallengeDifficulty >= 0 ? _pendingChallengeDifficulty
+             : enableAllDebuffs ? MetaProgression.ChallengeCards.MaxDifficulty
+             : challengeCardDifficulty;
+
         [Header("遺物プリセットスイープ")]
         [Tooltip("true で ペルソナ/挑戦スコアを固定したまま遺物プリセットだけを振り、深度が動くかを測る")]
         public bool relicPresetSweep = false;
@@ -2006,6 +2015,16 @@ namespace AutoTest
                 int resolved = _pendingChallengeDifficulty * ScorePerDifficulty;
                 Debug.Log($"[AutoRunner] 挑戦の難易度固定: {challengeScoreTarget}pt → 難易度 {_pendingChallengeDifficulty}"
                         + $" / 帯 {MetaProfileHelper.ChallengeBand(resolved)}");
+            }
+            // **バッチ開始時の学習を読む前に、 この腕の難易度を State へ入れる** (2026-11-12・#119)。
+            //   これまでは State に残っていた値 (ビルド版のワーカーは MetaProgressManager.Load が PlayerPrefs から読む ──
+            //   22 プロセスで共有され、 前の測定が書いた難易度が残る) の帯で、 下の学習と戦闘名の危険度を読んでいた。
+            //   危険度はバッチ開始時の 1 回しか読まなかったので、 ワーカーごとに読んだ帯が違い、 同じ設定でも最初のランから結果が割れた。
+            //   周回モードは AscensionLoop が難易度を持つが、 Begin の時点では立っていない (スイープの中で立てる)。
+            if (!_ascensionPersonaLock)
+            {
+                var stBegin = MetaProgression.MetaProgressManager.Instance?.State;
+                if (stBegin != null) stBegin.challengeDifficulty = IntendedChallengeDifficulty();
             }
 
             AutoTest.LearnedPriorityProvider.IttMode = ittRawPt

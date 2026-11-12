@@ -38,6 +38,16 @@ namespace AutoTest.ParallelSweep
             if (Application.isBatchMode && !Application.isEditor) AudioListener.volume = 0f;
         }
 
+        /// <summary>ワーカー (-batchmode の Player) はメタ進行を PlayerPrefs へ保存せず、 PlayerPrefs から読まない (2026-11-12・#119)。
+        /// PlayerPrefs は 22 プロセスで共有されるので、 前の測定のワーカーが終了時に保存した挑戦の難易度が、 次の測定のワーカーの
+        /// バッチ開始時の読み込み (学習の帯・戦闘名の危険度) に持ち込まれ、 同じ設定の繰り返しで結果がワーカー単位で割れていた。
+        /// シーンの Awake (MetaProgressManager.Load) より前に立てる。 r9/r10・学習・Ultra のどのワーカーもここを通る。</summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void IsolateMetaIfBatchPlayer()
+        {
+            if (Application.isBatchMode && !Application.isEditor) GameLoop.GameHooks.MetaPersistenceDisabled = true;
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void StartIfWorker()
         {
@@ -65,6 +75,11 @@ namespace AutoTest.ParallelSweep
                 Directory.CreateDirectory(Path.GetDirectoryName(
                     Path.GetFullPath(_job.responsePath)) ?? ".");
                 Directory.CreateDirectory(Path.GetFullPath(_job.outputRoot));
+
+                // **前の測定の残りを持ち込まない** (#119)。 BeforeSceneLoad で口は立ててあるが、 呼び出し順は保証されないので、
+                //   ここで改めて立ててメタ進行を読み直す (PlayerPrefs を読まない、 まっさらな状態)。 挑戦の難易度は Begin が腕の指定から入れる。
+                GameLoop.GameHooks.MetaPersistenceDisabled = true;
+                MetaProgression.MetaProgressManager.Instance?.Load();
 
                 var runnerObject = new GameObject("[RankMargin AutoRunner]");
                 DontDestroyOnLoad(runnerObject);
@@ -132,7 +147,7 @@ namespace AutoTest.ParallelSweep
                     _effectiveState = RankMarginWorkerConfig.DescribeEffective(runner);
                     WriteProgress(0, "started");
                     runner.Begin();
-                    _effectiveState += "learningRead(開始時)=" + runner.LearningReadEffective + "\n";
+                    _effectiveState += "learningRead(開始時)=" + runner.LearningReadEffective + "\n" + "metaPersistenceDisabled=" + GameLoop.GameHooks.MetaPersistenceDisabled + "\n";
                     return;
                 }
 
@@ -197,7 +212,7 @@ namespace AutoTest.ParallelSweep
                 runner.Begin();
                 // **実際に読んだ学習の帯を残す** (2026-11-12・#118)。 Begin がバッチ開始時の学習を読んだ後の値。
                 //   帯のフォルダが無いと手書きの序列へ落ちるので、 送った設定と並べて必ず出す。
-                _effectiveState += "learningRead(開始時)=" + runner.LearningReadEffective + "\n";
+                _effectiveState += "learningRead(開始時)=" + runner.LearningReadEffective + "\n" + "metaPersistenceDisabled=" + GameLoop.GameHooks.MetaPersistenceDisabled + "\n";
             }
             catch (AutoRunner.LearningMissingException ex)
             {

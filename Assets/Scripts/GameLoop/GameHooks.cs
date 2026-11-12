@@ -16,6 +16,12 @@ namespace GameLoop
         /// BOT の <c>ExecuteTurn</c> と画面の「人が操作するターン」がぶつからないように。</summary>
         public static bool BotDriving;
 
+        /// <summary>[測定] メタ進行 (<c>MetaProgressManager</c>) を PlayerPrefs へ保存しない・PlayerPrefs から読まない (2026-11-12・#119)。
+        /// 並列ワーカー (-batchmode の Player) が起動時に立てる。 PlayerPrefs は全ワーカーで共有されるので、
+        /// 前の測定が書いた挑戦の難易度などが次の測定のワーカーへ持ち込まれ、 バッチ開始時に読む学習の帯がワーカーごとに割れていた。
+        /// 立てるとエディタ実行と同じく毎回まっさらな状態から始まる。 <see cref="Clear"/> では外さない (プロセス単位の設定)。</summary>
+        public static bool MetaPersistenceDisabled;
+
         // ===== 判断 (プレイヤーの選択を代行する口) =====
 
         /// <summary>開幕パッシブの提示 (〈宝物庫〉r10 の 2〜3 択) から 1 つ選ぶ。 戻り値は添字。
