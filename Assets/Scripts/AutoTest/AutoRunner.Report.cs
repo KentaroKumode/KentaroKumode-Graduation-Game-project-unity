@@ -1331,14 +1331,13 @@ namespace AutoTest
             double sCoins=0, sPeak=0, sGain=0, sStarv=0, sStarvHit=0, sShop=0;
             double sReroll=0, sRerollG=0, sPrio=0, sMatGain=0;
             double sFinalProvision=0, sMinProvision=0; int madnessCount=0;   // 物資(ADR-0002)
-            double sHCombat=0, sHComposure=0, sHLateral=0, sHMarch=0, sHEvil=0, sHFood=0, sHReroll=0; // 物資 発生源別収支
+            double sHLateral=0, sHEvil=0; // 物資 発生源別収支
             foreach (var r in recs)
             { sCoins+=r.finalCoins; sPeak+=r.peakCoins; sGain+=r.totalGoldGained;
               sStarv+=r.starvationTotal; sStarvHit+=r.starvationHits; sShop+=r.shopPurchases;
               sReroll+=r.shopRerolls; sRerollG+=r.shopRerollCoins; sPrio+=r.priorityItemsAcquired; sMatGain+=r.materialsGainedTotal;
               sFinalProvision+=r.finalProvision; sMinProvision+=r.minProvision; if (r.reachedMadness) madnessCount++;
-              sHCombat+=r.provisionCombatLoss; sHComposure+=r.provisionComposureGain; sHLateral+=r.provisionLateralLoss;
-              sHMarch+=r.provisionMarchLoss; sHEvil+=r.provisionEvilLoss; sHFood+=r.provisionFoodGain; sHReroll+=r.provisionRerollLoss; }
+              sHLateral+=r.provisionLateralLoss; sHEvil+=r.provisionEvilLoss; }
             int dn = Math.Max(1, n);
             sb.AppendLine($"  {PadR("平均最終ゴールド", 20)}: {(sCoins/dn):F1}");
             sb.AppendLine($"  {PadR("平均ピークゴールド", 20)}: {(sPeak/dn):F1}");
@@ -1357,10 +1356,7 @@ namespace AutoTest
             sb.AppendLine($"  {PadR("平均最終物資", 20)}: {(sFinalProvision/dn):F1}");
             sb.AppendLine($"  {PadR("平均最低物資", 20)}: {(sMinProvision/dn):F1}  (発狂到達 {madnessCount}/{n} = {Pct(madnessCount, n)})");
             sb.AppendLine($"  ── 物資 発生源別収支（1ラン平均・損は−） ──");
-            sb.AppendLine($"  {PadR("  戦闘損", 20)}: -{(sHCombat/dn):F1}   {PadR("被弾0回復", 12)}: +{(sHComposure/dn):F1}");
-            sb.AppendLine($"  {PadR("  横移動損", 20)}: -{(sHLateral/dn):F1}   {PadR("絶望進軍損", 12)}: -{(sHMarch/dn):F1}");
-            sb.AppendLine($"  {PadR("  悪選択損", 20)}: -{(sHEvil/dn):F1}   {PadR("食料回復", 12)}: +{(sHFood/dn):F1}");
-            sb.AppendLine($"  {PadR("  振り直し損", 20)}: -{(sHReroll/dn):F1}");
+            sb.AppendLine($"  {PadR("  移動損", 20)}: -{(sHLateral/dn):F1}   {PadR("悪選択損", 12)}: -{(sHEvil/dn):F1}");
             sb.AppendLine($"  {PadR("ショップ購入数", 20)}: {(sShop/dn):F2}");
             // --- パッシブ取得の経路別内訳 (2026-09-09) ---
             //   供給の 2/3 が無料経路で、 価格を上げても届かない。 どこが配っているかを出す。

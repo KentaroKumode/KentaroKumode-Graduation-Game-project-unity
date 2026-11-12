@@ -1662,13 +1662,8 @@ namespace AutoTest
             public int minProvision = GameLoop.ProvisionRules.Max;   // 2026-09-28: 物資 ×10
             public bool reachedMadness;   // 物資0(払底)に到達したか (旧・発狂。 名前は集計の互換のため据え置き)
             // 物資の発生源別 収支（ProvisionSystem.Stats を1ラン分キャプチャ）
-            public int provisionCombatLoss;
-            public int provisionComposureGain;
             public int provisionLateralLoss;
-            public int provisionMarchLoss;
             public int provisionEvilLoss;
-            public int provisionFoodGain;
-            public int provisionRerollLoss;   // ダイス振り直しコスト（#1）
             public int totalCombats;
             public int totalWins;
             public int shopPurchases;

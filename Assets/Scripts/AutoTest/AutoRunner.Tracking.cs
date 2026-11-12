@@ -371,13 +371,8 @@ namespace AutoTest
                 _cur.finalProvision = run.provision;
                 _cur.finalProvisionCap = run.provisionCap;
                 if (run.provision <= 0) _cur.reachedMadness = true;
-                _cur.provisionCombatLoss   = GameLoop.ProvisionSystem.Stats.combatLoss;
-                _cur.provisionComposureGain = GameLoop.ProvisionSystem.Stats.composureGain;
                 _cur.provisionLateralLoss  = GameLoop.ProvisionSystem.Stats.travelLoss;
-                _cur.provisionMarchLoss    = GameLoop.ProvisionSystem.Stats.marchLoss;
                 _cur.provisionEvilLoss     = GameLoop.ProvisionSystem.Stats.evilLoss;
-                _cur.provisionFoodGain     = GameLoop.ProvisionSystem.Stats.foodGain;
-                _cur.provisionRerollLoss   = GameLoop.ProvisionSystem.Stats.rerollLoss;
                 _cur.deathFloor = (o == Outcome.GameOver) ? run.Depth : 0;
                 _cur.appliedChallengeScore = CurrentChallengeScore();   // 難易度 × 5 (2026-11-10)
                 _cur.finalInventoryPower = InventoryPower.Compute(run);

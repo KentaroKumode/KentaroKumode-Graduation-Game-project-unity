@@ -37,18 +37,14 @@ namespace GameLoop
         /// AutoRunner が1ランごとに <see cref="Reset"/> し、終了時に読み取る。</summary>
         public static class Stats
         {
-            public static int combatLoss;     // 戦闘HP収支マイナスによる損
-            public static int composureGain;  // 被弾0勝利のわずか回復
+            // 2026-11-12: 書く所の無くなった combatLoss / composureGain / marchLoss / foodGain / rerollLoss を削除。
             public static int travelLoss;     // 移動の消費（自由移動マップ・照明）
-            public static int marchLoss;      // 絶望的な進軍(点に着くたび)
             public static int evilLoss;       // 悪選択コスト
-            public static int foodGain;       // 食料回復
-            public static int rerollLoss;     // ダイス振り直しコスト（#1）
             public static int supplyGain;     // 補給（戦闘の報酬・補給庫・前哨基地・ショップ）
 
             public static void Reset()
             {
-                combatLoss = composureGain = travelLoss = marchLoss = evilLoss = foodGain = rerollLoss = supplyGain = 0;
+                travelLoss = evilLoss = supplyGain = 0;
             }
         }
 
