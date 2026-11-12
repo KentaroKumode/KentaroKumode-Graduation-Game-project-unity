@@ -409,6 +409,82 @@ namespace AutoTest
             return pick;
         }
 
+        // =====================================================================
+        //  手札の規則 Pick (2026-11-13): 次のターンも手札に残す端子の方策
+        // =====================================================================
+        /// <summary>残す印の BOT の方策。 Auto = 技量で決める (素朴版 None / それ以外 Greedy / deckLookahead が ON なら Lookahead)。</summary>
+        public enum HandKeepPolicy { Auto = -1, None = 0, Greedy = 1, Lookahead = 2 }
+
+        /// <summary>[測定 2026-11-13] 残す印の方策 (手札の規則 Pick の時だけ効く)。 None = 何も残さない (Off と同じ結果になるはず)。</summary>
+        public HandKeepPolicy handKeepPolicy = HandKeepPolicy.Auto;
+
+        /// <summary>実効の方策 (Auto を技量で解いた値)。</summary>
+        public HandKeepPolicy EffectiveHandKeepPolicy
+            => handKeepPolicy != HandKeepPolicy.Auto ? handKeepPolicy
+             : EffectiveWiringSkill == WiringSkill.Naive ? HandKeepPolicy.None
+             : deckLookahead ? HandKeepPolicy.Lookahead : HandKeepPolicy.Greedy;
+
+        /// <summary>
+        /// 次のターンも手札に残す印を決める (読むだけ・手札の規則 Pick の時だけ・それ以外は null)。 残せるのは挿さなかった手札の端子だけ
+        /// (本体と同じ <see cref="TerminalDeckState.KeepFromMarks"/> で直る)。
+        /// <list type="bullet">
+        /// <item><b>Greedy</b> (先読みなし・公開情報だけ): (1) 素の点 (<see cref="TargetWorth"/>) が、 山と捨て札 (これから引ける端子) の平均より高い端子を残す。
+        /// (2) 次のターンが大技 (予告の turnsToHeavy = 1) なら、 防御の種類の端子も残す。</item>
+        /// <item><b>Lookahead</b>: 残す組の候補 = 残さない・1 枚ずつ・Greedy の組 を、 次のターンの最良効用の期待値 (<see cref="DeckNextValue"/>・共通乱数) で比べる。
+        /// 先読みが掛からない戦闘 (ボス戦だけの設定でボス戦でない) は Greedy。</item>
+        /// </list>
+        /// </summary>
+        private bool[] ChooseHandKeep(int[] rolls, MutualTurnTelegraph tele, int[] slots)
+        {
+            if (TerminalCards.CarryMode != HandCarryMode.Pick) return null;
+            var pol = EffectiveHandKeepPolicy;
+            if (pol == HandKeepPolicy.None) return null;
+            var cm = CombatManager.Instance; var deck = cm?.TerminalDeck;
+            if (deck == null || rolls == null || rolls.Length == 0) return null;
+            var run = GameManager.Instance?.Run;
+            var ev = PrepareDeckEval(rolls, tele);
+            EvalDeckWiring(in ev, rolls, slots, out var outc, out var o, out _, out var after);
+            var board = ev.board; int perm = deck.permanent.Count;
+            // 残せる端子 (挿していない・止まっていない手札)
+            var cand = new List<int>();
+            for (int s = perm; s < board.Count; s++)
+                if (!o.fired.Contains(s) && !deck.state.IsStopped(s)) cand.Add(s);
+            if (cand.Count == 0) return null;
+            // Greedy の組
+            float avg = 0f; int n = 0;
+            foreach (var id in deck.draw) { avg += TargetWorth(TerminalCards.Get(id), run); n++; }
+            foreach (var id in deck.discard) { avg += TargetWorth(TerminalCards.Get(id), run); n++; }
+            avg = n > 0 ? avg / n : 1f;
+            bool heavyNext = tele.turnsToHeavy == 1;
+            var greedy = new List<int>();
+            foreach (int s in cand)
+            {
+                var d = TerminalCards.Get(board[s]);
+                if (d == null) continue;
+                if (TargetWorth(d, run) > avg || (heavyNext && d.kind == TerminalKind.Block)) greedy.Add(s);
+            }
+            List<int> pick = greedy;
+            DeckLookahead la = pol == HandKeepPolicy.Lookahead ? BuildDeckLookahead(in ev, rolls, tele) : null;
+            if (la != null && outc.effDmg < ev.st.enemyHp)
+            {
+                // 候補: 残さない / 1 枚ずつ / Greedy の組 (重なりは 1 回だけ)。 値 = 次のターンの最良効用の期待値
+                var opts = new List<List<int>> { new List<int>() };
+                foreach (int s in cand) opts.Add(new List<int> { s });
+                if (greedy.Count > 1) opts.Add(greedy);
+                float bestV = float.NegativeInfinity;
+                foreach (var op in opts)
+                {
+                    var names = new List<string>(); foreach (int s in op) names.Add(board[s]);
+                    float v = DeckNextValue(in ev, la, rolls, o, after, in outc, names);
+                    if (v > bestV + 1e-4f) { bestV = v; pick = op; }
+                }
+            }
+            if (pick.Count == 0) return null;
+            var marks = new bool[board.Count];
+            foreach (int s in pick) marks[s] = true;
+            return marks;
+        }
+
         /// <summary>対象の点: 基本の端子 1 (報酬の足切りと同じ見方)・それ以外は報酬の素の点。</summary>
         private static float TargetWorth(TerminalDef d, RunState run)
             => d == null ? 0f : d.basic ? 1f : RewardBaseScore(d, run);
@@ -431,11 +507,13 @@ namespace AutoTest
                 NoAttackDecisions++;
                 if (_lastChosenA == 0) { NoAttackChosen++; if (!_lastAttackCandExists) NoAttackNoChoice++; }
             }
+            // 手札の規則 Pick (2026-11-13): 次のターンも手札に残す印 (方策 handKeepPolicy・Off / All では null)
+            bool[] keep = slots != null ? ChooseHandKeep(rolls, tele, slots) : null;
             if (predTrace) BeginPredTrace(tele.turn);
             BeginMainCorrTurn(_lastPredA);
             _fbDecided++; if (_lastFreeBlock) _fbTurns++; if (_lastKillsNow) _fbKillTurns++;
             _fbPrevHp = hpNow; _fbPrevExpTaken = _lastExpTaken;
-            return slots != null ? WiringPlan.OfSlots(slots, targets, gold) : default;      // null なら本体が既定 (TerminalWiring.Auto) で挿す
+            return slots != null ? WiringPlan.OfSlots(slots, targets, gold, keep) : default;      // null なら本体が既定 (TerminalWiring.Auto) で挿す
         }
 
         // =====================================================================
@@ -657,7 +735,8 @@ namespace AutoTest
         }
 
         /// <summary>挿し方 1 つの、 次のターンの最良効用の期待値 (今ターンで撃破・死亡するなら 0)。 読むだけ。</summary>
-        private float DeckNextValue(in DeckEval ev, DeckLookahead la, int[] rolls, TerminalOutcome o, TerminalBattleState after, in OptimalTurnOutcome outc)
+        private float DeckNextValue(in DeckEval ev, DeckLookahead la, int[] rolls, TerminalOutcome o, TerminalBattleState after, in OptimalTurnOutcome outc,
+                                    List<string> keep = null)
         {
             var st = ev.st;
             int k = rolls.Length;
@@ -680,6 +759,7 @@ namespace AutoTest
             if (o.attackDice > 0) env.enemyBleed += o.bleedOnHit;
 
             string key = DeckNextKey(in ns, plusNext, ev.board, o, after, in env);
+            if (keep != null && keep.Count > 0) key += "|K:" + string.Join(",", keep);   // 手札の規則 Pick: 残す端子の組ごとに別の値
             if (la.memo.TryGetValue(key, out float memoV)) return memoV;
 
             int samples = deckLookaheadSamples;
@@ -690,7 +770,7 @@ namespace AutoTest
                 var rng = new System.Random(unchecked(la.seed + j * 7919));
                 var nst = after.Clone();
                 int extra = nst.BeginTurn();
-                var nb = SampleNextBoard(ev.deck, ev.board, o, TerminalCards.HandSize + extra, la.stopChance, rng, out var stopped);
+                var nb = SampleNextBoard(ev.deck, ev.board, o, TerminalCards.HandSize + extra, la.stopChance, rng, out var stopped, keep);
                 nst.stopped = stopped;
                 // 〈鋳造口〉の出目 +N は振った後に足される (本体 DrawTerminalHand → FoundryBonusKey)
                 var dice = new int[k];
@@ -729,7 +809,7 @@ namespace AutoTest
         /// 本体の <see cref="TerminalDeckState.FinishTurn"/> → <see cref="TerminalDeckState.DrawTurn"/> と同じ順。 違いは、 山の並びを読まずに中身から一様に引くことだけ。
         /// <paramref name="stopped"/> = ヴェスカ〈停滞する時間〉で止まった場の端子 (null = なし)。</summary>
         private static List<string> SampleNextBoard(TerminalDeckState dk, List<string> board, TerminalOutcome o, int size, float stopChance,
-                                                    System.Random rng, out bool[] stopped)
+                                                    System.Random rng, out bool[] stopped, List<string> keep = null)
         {
             var draw = new List<string>(dk.draw);
             var discard = new List<string>(dk.discard);
@@ -745,15 +825,14 @@ namespace AutoTest
             }
             if (o.burnTarget >= 0 && o.burnTarget < board.Count) hand.Remove(board[o.burnTarget]);
             // ---- DrawTurn: 本体と同じ関数 (TerminalDeckState.SplitHand) で、 残す端子と捨て札へ送る端子に分ける ----
-            //   手札の持ち越し (TerminalCards.HandCarry): 今ターンに挿した端子だけを捨て札へ・挿さなかった端子は残る。
-            //   旧い規則: 今ターンに止まっていた手札は残す・残す 1 枚 (〈呼び戻し〉)・それ以外は捨て札へ。
-            var keep = new List<string>();
+            //   Pick (既定): 旧い規則 + 残す印 (keep) の付いた端子 / All: 今ターンに挿した端子だけを捨て札へ / Off: 止まっていた手札と旧い〈保持器〉の 1 枚だけ残す。
+            var kept = new List<string>();
             TerminalDeckState.SplitHand(hand, board, perm.Count, dk.state.stopped, retain,
-                                        TerminalDeckState.UsedFromHand(board, perm.Count, o), TerminalCards.HandCarry, keep, discard);
+                                        TerminalDeckState.UsedFromHand(board, perm.Count, o), TerminalCards.CarryMode, kept, discard, keep);
             // 〈呼び戻し〉(持ち越しの規則): 本体と同じ選び方・同じ関数で、 捨て札から 1 枚を手札へ戻す
             if (o.recall && TerminalCards.HandCarry)
-                TerminalDeckState.ApplyRecall(TerminalDeckState.RecallPick(dk.discard, RecallBest(dk.discard, GameManager.Instance?.Run)), keep, discard, size);
-            hand.Clear(); hand.AddRange(keep);
+                TerminalDeckState.ApplyRecall(TerminalDeckState.RecallPick(dk.discard, RecallBest(dk.discard, GameManager.Instance?.Run)), kept, discard, size);
+            hand.Clear(); hand.AddRange(kept);
             // ---- 引く (山が尽きたら捨て札を混ぜて続ける・常設は場へ出して引き直す・引いた物だけが止まる対象) ----
             var stopPerm = new List<int>(); var stopHand = new List<int>();
             int guard = 0;

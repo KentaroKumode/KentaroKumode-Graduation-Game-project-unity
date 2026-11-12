@@ -194,9 +194,10 @@ namespace AutoTest
         /// <summary>[測定 2026-11-13・#117] true = 端子の撃破のボーナスを旧い条件で配る (攻撃の端子に挿したターンの、 主攻撃までの撃破だけ)。
         /// 本体の GameHooks.TerminalKillBonusNeedsAttack と、 BOT の撃破のボーナスの見積もり (OptimalTurnCore) の両方を切り替える。 既定 false = 今の作り (経路を問わない)。</summary>
         public bool terminalKillNeedsAttack = false;
-        /// <summary>[測定 2026-11-13] 手札の持ち越し (挿さなかった端子は次のターンも手札に残る・TerminalCards.HandCarry)。 既定 true = 新しい規則。
-        /// false = 旧い規則 (ターンの頭に前の手札を全部捨てる)。 本体の GameHooks.HandCarryDisabled へ流し、 BOT の先読み (SampleNextBoard) も同じ口を読む。</summary>
-        public bool handCarry = true;
+        /// <summary>[測定 2026-11-13] 手札の規則 (CombatSystem.HandCarryMode)。 既定 Pick = 残す印を付けた端子だけ残る (新しい規則)。
+        /// Off = 旧い規則 (全部捨てる・main と同じ) / All = 挿さなかった端子は全部残る (取り下げた形・測定用)。 旧い指定 True = All・False = Off と読む (ワーカーの読み方)。
+        /// 本体の GameHooks.HandCarry へ流し、 BOT の先読み (SampleNextBoard) も同じ口を読む。 残すかの BOT の方策は <see cref="handKeepPolicy"/>。</summary>
+        public CombatSystem.HandCarryMode handCarry = CombatSystem.HandCarryMode.Pick;
         /// <summary>[測定 2026-11-13] ボスのダウン (HP の目盛り・CombatSystem.BossDown)。 既定 true = 新しい規則。 false = 目盛りを置かない旧い作り。
         /// 本体の GameHooks.BossDownDisabled へ流す (目盛りが無ければ BOT の見積もりも自然にダウンを見ない)。</summary>
         public bool bossDown = true;
@@ -757,7 +758,8 @@ namespace AutoTest
                  + $"/ メタ 攻撃端子+{MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice()} "
                  + $"/ 追跡者 縄張りの外へ{(pursuerLeavesTerritory ? "出る (旧い作り)" : "出ない")} "
                  + $"/ 端子の撃破のボーナス {(terminalKillNeedsAttack ? "攻撃したターンだけ (旧い条件)" : "経路を問わない")} "
-                 + $"/ 手札 {(handCarry ? "持ち越し (挿さなかった端子は残る)" : "毎ターン捨てる (旧い規則)")} "
+                 + $"/ 手札 {(handCarry == CombatSystem.HandCarryMode.Pick ? "印を付けた端子だけ残す (Pick)" : handCarry == CombatSystem.HandCarryMode.All ? "挿さなかった端子は全部残る (All)" : "毎ターン捨てる (Off・旧い規則)")}"
+                 + $"{(handCarry == CombatSystem.HandCarryMode.Pick ? " 残す方策 " + EffectiveHandKeepPolicy + " (handKeepPolicy=" + handKeepPolicy + ")" : "")} "
                  + $"/ ボスのダウン {(bossDown ? "あり" : "なし (旧い作り)")} "
                  + $"/ 深さ 3 のボスの大技 {(depth3Heavy ? "あり" : "なし (旧い作り)")} "
                  + $"/ 攻撃なしの手の主攻撃 (旧の式) {(v3.oldNoAttackBaseDmg ? "素火力を数える (旧い挙動)" : "0")} "

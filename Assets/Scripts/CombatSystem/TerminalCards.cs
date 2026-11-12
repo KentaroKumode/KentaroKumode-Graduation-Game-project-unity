@@ -3,6 +3,17 @@ using System.Collections.Generic;
 
 namespace CombatSystem
 {
+    /// <summary>手札の規則 (2026-11-13・GAME.md §6-4)。 値の並びを変えない (測定の口が番号でも受ける)。</summary>
+    public enum HandCarryMode
+    {
+        /// <summary>旧い規則: ターンの頭に前の手札を全部捨てる (止まっていた端子と、 旧い〈保持器〉の 1 枚だけ残る)。</summary>
+        Off = 0,
+        /// <summary>挿さなかった端子は全部残る (2026-11-13 の最初の形・居座りで選べる端子が減ったので取り下げ・測定用に残す)。</summary>
+        All = 1,
+        /// <summary>既定: 挿さなかった端子のうち、 残す印を付けた端子だけ残る (何も印を付けなければ旧い規則と同じ)。</summary>
+        Pick = 2,
+    }
+
     /// <summary>端子の種類 (ADR-0014)。 「攻撃に挿した個数」などを読む既存の品・武器・敵の規則は、 この種類で数える。</summary>
     public enum TerminalKind { Attack, Block, Charge, Support }
 
@@ -239,7 +250,10 @@ namespace CombatSystem
         /// <summary>手札の持ち越し (2026-11-13): 挿さなかった端子は捨て札へ行かず、 次のターンも手札に残る。 次のターンは手札が規定の枚数になるまで引く。
         /// 測定の口 <see cref="GameLoop.GameHooks.HandCarryDisabled"/> が立っていれば旧い規則 (前の手札を全部捨てて引き直す)。
         /// 本体 (<see cref="TerminalDeckState.DrawTurn"/>) と BOT の先読みが <see cref="TerminalDeckState.SplitHand"/> を通して同じ規則を読む。</summary>
-        public static bool HandCarry => !GameLoop.GameHooks.HandCarryDisabled;
+        public static bool HandCarry => GameLoop.GameHooks.HandCarry != HandCarryMode.Off;
+
+        /// <summary>手札の規則 (測定の口 <see cref="GameLoop.GameHooks.HandCarry"/>)。 <see cref="HandCarry"/> は Off 以外 (〈呼び戻し〉が捨て札から戻す形になる)。</summary>
+        public static HandCarryMode CarryMode => GameLoop.GameHooks.HandCarry;
 
         private static TerminalDef D(string id, TerminalKind k, string desc, TerminalCond c = TerminalCond.None, string axis = null)
             => new TerminalDef { id = id, kind = k, cond = c, description = desc, axis = axis, condLabel = CondLabel(c) };
@@ -700,7 +714,7 @@ namespace CombatSystem
         /// <summary>戦闘の始め: ランの山札を写して切る。</summary>
         public void BeginBattle(List<string> runDeck)
         {
-            draw.Clear(); discard.Clear(); hand.Clear(); permanent.Clear(); exiled.Clear(); board.Clear(); _usedLastTurn.Clear(); recallNext = null;
+            draw.Clear(); discard.Clear(); hand.Clear(); permanent.Clear(); exiled.Clear(); board.Clear(); _usedLastTurn.Clear(); recallNext = null; keepNext.Clear(); LastKept.Clear();
             if (runDeck != null) draw.AddRange(runDeck);
             Shuffle(draw);
         }
@@ -739,10 +753,14 @@ namespace CombatSystem
         public void DrawTurn(int size, string retained = null, float stopChance = 0f)
         {
             // 前のターンの手札を、 残す端子と捨て札へ送る端子に分ける (規則は SplitHand の 1 か所・BOT の先読みも同じ関数を呼ぶ)
-            bool carry = TerminalCards.HandCarry;
+            var mode = TerminalCards.CarryMode;
+            bool carry = mode != HandCarryMode.Off;      // 〈呼び戻し〉が捨て札から戻す (All・Pick)
             var keep = new List<string>();
             var toDiscard = new List<string>();
-            int heldStopped = SplitHand(hand, board, permanent.Count, state.stopped, retained, _usedLastTurn, carry, keep, toDiscard);
+            int heldStopped = SplitHand(hand, board, permanent.Count, state.stopped, retained, _usedLastTurn, mode, keep, toDiscard, keepNext);
+            LastKept.Clear();
+            if (mode == HandCarryMode.Pick) foreach (var id in keepNext) if (keep.Contains(id)) LastKept.Add(id);   // [計装] 印で残した端子
+            keepNext.Clear();
             state.stopped = null;
             _usedLastTurn.Clear();
             discard.AddRange(toDiscard);
@@ -751,7 +769,7 @@ namespace CombatSystem
             recallNext = null;
             hand.Clear();
             hand.AddRange(keep);
-            LastCarriedCount = carry ? carried : 0;
+            LastCarriedCount = mode == HandCarryMode.All ? carried : mode == HandCarryMode.Pick ? LastKept.Count : 0;
 
             // 引く (このターンに引いた物だけが止まる対象)
             var stoppedPerm = new List<int>();   // permanent の添字
@@ -790,6 +808,28 @@ namespace CombatSystem
         /// <summary>〈呼び戻し〉(手札の持ち越しの規則) が次のターンの手札に戻す端子 (null = 戻さない)。 配線の後に CombatManager が
         /// <see cref="RecallPick"/> で決め、 次の <see cref="DrawTurn"/> が捨て札から手札へ移して空にする。</summary>
         public string recallNext;
+
+        /// <summary>残す印 (手札の規則 Pick): 次のターンも手札に残す端子の名前 (このターンに挿さなかった手札の端子だけ)。 配線の後に CombatManager が
+        /// <see cref="KeepFromMarks"/> で入れ、 次の <see cref="DrawTurn"/> が読んで空にする。</summary>
+        public readonly List<string> keepNext = new List<string>();
+        /// <summary>[計装] 直近の <see cref="DrawTurn"/> で残す印で残った端子の名前。</summary>
+        public readonly List<string> LastKept = new List<string>();
+
+        /// <summary>残す印 (場の添字ごとの真偽) から、 残す端子の名前を作る。 残せるのは手札の端子 (常設でない) で、 このターンに挿さなかった
+        /// (発動していない) 物だけ。 止まっている端子は印が無くても残るので数えない。 本体と BOT が同じ関数を呼ぶ。</summary>
+        public static List<string> KeepFromMarks(List<string> board, int permCount, TerminalOutcome o, bool[] marks)
+        {
+            var l = new List<string>();
+            if (board == null || marks == null) return l;
+            for (int s = permCount; s < board.Count && s < marks.Length; s++)
+            {
+                if (!marks[s]) continue;
+                if (o != null && o.fired.Contains(s)) continue;
+                if (o?.stopped != null && s < o.stopped.Length && o.stopped[s]) continue;
+                l.Add(board[s]);
+            }
+            return l;
+        }
 
         /// <summary>〈呼び戻し〉が戻す 1 枚: <paramref name="want"/> が捨て札の添字として正しければそれ、 でなければ最後に捨てた 1 枚 (捨て札の末尾)。 捨て札が空なら null (効果なし)。
         /// 使い捨てで外れた端子・焼き切った端子は捨て札に無いので選べない。 本体と BOT が同じ関数を呼ぶ。</summary>
@@ -833,16 +873,18 @@ namespace CombatSystem
         /// 捨て札へ送る端子 <paramref name="toDiscard"/> に分ける。 <b>手札の規則の正本</b> ── 本体の <see cref="DrawTurn"/> と BOT の先読み
         /// (AutoRunner.Terminals の SampleNextBoard) が同じ関数を呼ぶ。 <paramref name="hand"/> は書き換えない。
         /// <list type="bullet">
-        /// <item><b>持ち越し</b> (<paramref name="carry"/> = <see cref="TerminalCards.HandCarry"/>): 前のターンに挿した端子 (<paramref name="used"/>) だけを捨て札へ、
-        /// 残りは手札の順のまま残す (止まっていた端子・〈呼び戻し〉の対象も、 挿していないので残る)。</item>
+        /// <item><b>全部残す</b> (<paramref name="mode"/> = All): 前のターンに挿した端子 (<paramref name="used"/>) だけを捨て札へ、 残りは手札の順のまま残す。</item>
+        /// <item><b>印を付けて残す</b> (Pick・既定): 旧い規則に加えて、 残す印 (<paramref name="marks"/>・挿さなかった端子の名前) の付いた端子を残す (止まっていた端子の後ろ)。
+        /// 印が無ければ旧い規則と同じ分け方 (捨てる順も同じ)。</item>
         /// <item><b>旧い規則</b>: 前のターンに止まっていた端子 (ヴェスカ〈停滞する時間〉・<paramref name="prevStopped"/> は前のターンの場の添字) と、
         /// 〈呼び戻し〉が残す 1 枚 (<paramref name="retained"/>) だけを残し、 残りは手札の順に捨て札へ。</item>
         /// </list>
         /// 戻り値 = 前のターンに止まっていて残った枚数 (計装)。
         /// </summary>
         public static int SplitHand(List<string> hand, List<string> prevBoard, int prevPermCount, bool[] prevStopped, string retained,
-                                    List<string> used, bool carry, List<string> keep, List<string> toDiscard)
+                                    List<string> used, HandCarryMode mode, List<string> keep, List<string> toDiscard, List<string> marks = null)
         {
+            bool carry = mode == HandCarryMode.All;
             // 前のターンに止まっていた手札の端子 (前のターンの場と、 その時の常設の枚数から読む ── 常設は DrawTurn でしか増えない)。
             // FinishTurn が使い捨て・焼き切りを手札から抜いて添字がずれるので、 名前で数えて同じ枚数を残す。
             var rest = new List<string>(hand);
@@ -863,13 +905,18 @@ namespace CombatSystem
                 return heldCount;
             }
             foreach (var id in held) if (rest.Remove(id)) { keep.Add(id); heldCount++; }
+            // 残す印 (Pick): 印の付いた端子を 1 枚ずつ残す (同じ名前が 2 枚あれば印の数だけ)。 Off では印を読まない。 印が無ければ Off と同じ分け方
+            var marksLeft = mode == HandCarryMode.Pick && marks != null && marks.Count > 0 ? new List<string>(marks) : null;
             bool kept = false;
+            var marked = new List<string>();
             foreach (var id in rest)
             {
                 if (!kept && retained != null && id == retained) { kept = true; continue; }
+                if (marksLeft != null && marksLeft.Remove(id)) { marked.Add(id); continue; }
                 toDiscard.Add(id);
             }
             if (kept) keep.Add(retained);
+            keep.AddRange(marked);
             return heldCount;
         }
 

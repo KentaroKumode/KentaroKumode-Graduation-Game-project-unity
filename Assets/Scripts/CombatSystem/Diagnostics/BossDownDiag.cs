@@ -16,7 +16,7 @@ namespace CombatSystem
 
         private static long[] _cur;
 
-        public static void Reset() { ByBoss.Clear(); CarryTurns = 0; CarryCards = 0; _cur = null; }
+        public static void Reset() { ByBoss.Clear(); CarryTurns = 0; CarryCards = 0; KeptCards = 0; KeptUsed = 0; _cur = null; }
 
         /// <summary>戦闘の始め (ヴェスカは段ごと)。 ボスでなければ数えない。</summary>
         public static void BeginFight(string id, bool hasNotches)
@@ -43,12 +43,17 @@ namespace CombatSystem
 
         public static void NoteCarry(int carried) { CarryTurns++; CarryCards += carried; }
 
+        /// <summary>手札の規則 Pick: 残す印で残した端子の数 / そのうち、 残した次のターンに挿した (使った) 数。</summary>
+        public static long KeptCards, KeptUsed;
+        public static void NoteKeptUse(int kept, int used) { KeptCards += kept; KeptUsed += used; }
+
         /// <summary>サマリーの行 (何も数えていなければ空)。</summary>
         public static string Line()
         {
             if (ByBoss.Count == 0 && CarryTurns == 0) return "";
             var sb = new System.Text.StringBuilder("[ダウンと手札] ");
-            sb.Append(CarryTurns > 0 ? $"手札の持ち越し 1 ターン平均 {(double)CarryCards / CarryTurns:0.00} 枚 ({CarryTurns} ターン)" : "手札の持ち越し なし");
+            sb.Append(CarryTurns > 0 ? $"手札の持ち越し ({GameLoop.GameHooks.HandCarry}) 1 ターン平均 {(double)CarryCards / CarryTurns:0.00} 枚 ({CarryTurns} ターン)" : "手札の持ち越し なし");
+            if (KeptCards > 0) sb.Append($" / 印で残した端子 {KeptCards} 枚のうち、 次のターンに使った {KeptUsed} 枚 ({100.0 * KeptUsed / KeptCards:0.0}%)");
             var ids = new List<string>(ByBoss.Keys); ids.Sort(System.StringComparer.Ordinal);
             foreach (var id in ids)
             {

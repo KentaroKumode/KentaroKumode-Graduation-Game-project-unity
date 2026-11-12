@@ -481,7 +481,7 @@ namespace AutoTest
             GameLoop.GameHooks.TerminalArresterNeedOverride = 0;
             GameLoop.GameHooks.TerminalFirstAidBattleOnly = false;
             GameLoop.GameHooks.TerminalKillBonusNeedsAttack = false;            // [測定 2026-11-13・#117]
-            GameLoop.GameHooks.HandCarryDisabled = false;                       // [測定 2026-11-13] 手札の持ち越しを既定 (新しい規則) へ
+            GameLoop.GameHooks.HandCarry = CombatSystem.HandCarryMode.Pick;     // [測定 2026-11-13] 手札の規則を既定 (Pick) へ
             GameLoop.GameHooks.BossDownDisabled = false;                        // [測定 2026-11-13] ボスのダウンを既定 (あり) へ
             GameLoop.GameHooks.Depth3HeavyDisabled = false;                     // [測定 2026-11-13] 深さ 3 のボスの大技を既定 (あり) へ
             GameLoop.GameHooks.VescaDiceForce = 0;               // [測定 2026-11-11] 武器の段の上限を外す

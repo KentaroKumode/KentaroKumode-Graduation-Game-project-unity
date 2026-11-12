@@ -30,9 +30,11 @@ namespace CombatSystem
         public int[] targets;
         /// <summary>挑戦カード〈金で殴る〉(#6): このターンに払う金額 (G)。 攻撃するターンだけ所持金まで払う (<see cref="MetaProgression.ChallengeCards.GoldPunchAttack"/>)。 0 = 払わない。</summary>
         public int goldSpend;
+        /// <summary>手札の規則 Pick (2026-11-13): 次のターンも手札に残す印 (添字 = 場の位置)。 残せるのは挿さなかった手札の端子だけ (本体が KeepFromMarks で直す)。 null = 何も残さない。</summary>
+        public bool[] keep;
 
         public static WiringPlan Of(DiceTerminal[] main) => new WiringPlan { main = main };
-        public static WiringPlan OfSlots(int[] slots, int[] targets = null, int goldSpend = 0) => new WiringPlan { slots = slots, targets = targets, goldSpend = goldSpend };
+        public static WiringPlan OfSlots(int[] slots, int[] targets = null, int goldSpend = 0, bool[] keep = null) => new WiringPlan { slots = slots, targets = targets, goldSpend = goldSpend, keep = keep };
     }
 
     /// <summary>

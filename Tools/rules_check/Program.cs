@@ -42,7 +42,7 @@ static class T
             string ret = rnd.Next(2) == 0 ? null : names[rnd.Next(names.Length)];
             var k1 = new List<string>(); var d1 = new List<string>(); var k2 = new List<string>(); var d2 = new List<string>();
             OldSplit(hand, board, perm, st, ret, k1, d1);
-            TerminalDeckState.SplitHand(hand, board, perm, st, ret, new List<string> { names[0] }, false, k2, d2);
+            TerminalDeckState.SplitHand(hand, board, perm, st, ret, new List<string> { names[0] }, HandCarryMode.Off, k2, d2);
             if (k1.SequenceEqual(k2) && d1.SequenceEqual(d2)) same++;
         }
         Check(same == N, $"旧い規則の分け方が旧い DrawTurn と一致 ({same}/{N})");
@@ -53,7 +53,7 @@ static class T
             var used = TerminalDeckState.UsedFromHand(board, 1, Fired(0, 1, 4));   // 常設 (0) は数えない
             Check(used.SequenceEqual(new[] { TerminalIds.Attack, TerminalIds.Charge }), "挿した端子の数え方 (常設は除く)");
             var hand = board.Skip(1).ToList(); var k = new List<string>(); var d = new List<string>();
-            TerminalDeckState.SplitHand(hand, board, 1, null, TerminalIds.Fuse, used, true, k, d);
+            TerminalDeckState.SplitHand(hand, board, 1, null, TerminalIds.Fuse, used, HandCarryMode.All, k, d);
             Check(k.SequenceEqual(new[] { TerminalIds.Block, TerminalIds.Attack, TerminalIds.Fuse }) && d.SequenceEqual(new[] { TerminalIds.Attack, TerminalIds.Charge }),
                   "持ち越し: 挿さなかった 3 枚が残り、 挿した 2 枚が捨て札へ");
         }
@@ -61,7 +61,7 @@ static class T
         // ---- 3. 本体の山札で回す ----
         foreach (bool carry in new[] { false, true })
         {
-            GameLoop.GameHooks.HandCarryDisabled = !carry; GameLoop.GameRng.Reset();
+            GameLoop.GameHooks.HandCarry = carry ? HandCarryMode.All : HandCarryMode.Off; GameLoop.GameRng.Reset();
             var dk = new TerminalDeckState();
             var deck = new List<string> { "攻撃", "攻撃", "防御", "防御", "充電", "定電圧", "ヒューズ", "起爆筒", "検波器", "蓄電池" };
             dk.BeginBattle(deck);
@@ -80,7 +80,7 @@ static class T
             Check(carry ? carriedSum == 11 * 3 : carriedSum == 0, (carry ? "持ち越し" : "旧い規則") + $": 持ち越した枚数の合計 {carriedSum} (持ち越しは 2 ターン目から毎ターン 3 枚)");
         }
         {
-            GameLoop.GameHooks.HandCarryDisabled = false;
+            GameLoop.GameHooks.HandCarry = HandCarryMode.All;
             var dk = new TerminalDeckState();
             dk.BeginBattle(new List<string> { "攻撃", "攻撃", "防御", "防御", "充電", "定電圧", "ヒューズ", "蓄電池" });
             dk.DrawTurn(TerminalCards.HandSize + 2);   // 〈配電盤〉の分で 7 枚
@@ -110,10 +110,57 @@ static class T
                 var keep = new List<string> { "a", "b", "c", "d", "e" }; var d3 = new List<string> { "x" };
                 Check(!TerminalDeckState.ApplyRecall("x", keep, d3, 5) && d3.Count == 1 && keep.Count == 5, "手札が規定の枚数なら戻さない (上限を超えない)");
             }
-            GameLoop.GameHooks.HandCarryDisabled = true;
+            GameLoop.GameHooks.HandCarry = HandCarryMode.Off;
             Check(TerminalCards.Resolve(rb, new[] { 0 }, new[] { 4 }, new TerminalEnv(), new TerminalBattleState()).retainTarget == 1,
                   "旧い規則では〈呼び戻し〉が空けた端子を残す");
-            GameLoop.GameHooks.HandCarryDisabled = false;
+            GameLoop.GameHooks.HandCarry = HandCarryMode.All;
+        }
+
+        // ---- 3b. 手札の規則 Pick (残す印) ----
+        {
+            // 何も残さない Pick は Off と同じ: 同じ山札を同じ順で回し、 毎ターンの手札・捨て札・乱数の回数が一致する
+            string Run(HandCarryMode mode, bool markFirstUnplugged, out int shuffles, out int keptTotal)
+            {
+                GameLoop.GameHooks.HandCarry = mode; GameLoop.GameRng.Reset();
+                var dk = new TerminalDeckState();
+                var deck = new List<string> { "攻撃", "攻撃", "防御", "防御", "充電", "定電圧", "ヒューズ", "起爆筒", "検波器", "蓄電池", "治癒" };
+                dk.BeginBattle(deck);
+                var log = new System.Text.StringBuilder(); keptTotal = 0; bool ok = true;
+                for (int turn = 1; turn <= 15; turn++)
+                {
+                    dk.DrawTurn(TerminalCards.HandSize);
+                    if (dk.hand.Count != TerminalCards.HandSize) ok = false;
+                    if (dk.draw.Count + dk.discard.Count + dk.hand.Count + dk.permanent.Count + dk.exiled.Count != deck.Count) ok = false;
+                    keptTotal += dk.LastKept.Count;
+                    log.Append(string.Join(",", dk.hand)).Append('/').Append(string.Join(",", dk.discard)).Append(';');
+                    var o = Fired(dk.permanent.Count, dk.permanent.Count + 1);   // 手札の先頭 2 枚を挿した
+                    if (markFirstUnplugged)
+                    {
+                        var marks = new bool[dk.board.Count]; marks[dk.permanent.Count + 2] = true;
+                        dk.keepNext.AddRange(TerminalDeckState.KeepFromMarks(dk.board, dk.permanent.Count, o, marks));
+                    }
+                    dk.FinishTurn(o);
+                }
+                shuffles = GameLoop.GameRng.Count("terminal.shuffle");
+                return ok ? log.ToString() : "NG";
+            }
+            string a = Run(HandCarryMode.Off, false, out int shA, out _);
+            string b = Run(HandCarryMode.Pick, false, out int shB, out _);
+            Check(a != "NG" && a == b && shA == shB, $"Pick で何も残さない時は Off と同じ (手札・捨て札・切る乱数 {shA}/{shB} 回)");
+            string c = Run(HandCarryMode.Pick, true, out _, out int kept);
+            Check(c != "NG" && kept == 14, $"Pick: 印を付けた端子だけ残る (2 ターン目から毎ターン 1 枚・計 {kept})・手札 5 枚と端子の総数は保たれる");
+            // 挿した端子・止まった端子には印が付いても残さない
+            var bd = new List<string> { "攻撃", "防御", "充電" };
+            var o2 = Fired(0); o2.stopped = new[] { false, true, false };
+            var km = TerminalDeckState.KeepFromMarks(bd, 0, o2, new[] { true, true, true });
+            Check(km.Count == 1 && km[0] == "充電", "挿した端子・止まった端子には残す印が効かない");
+            // 〈呼び戻し〉と重なった時: 印で残した分が先・手札が規定の枚数に満ちたら戻さない
+            GameLoop.GameHooks.HandCarry = HandCarryMode.Pick;
+            var keep = new List<string> { "攻撃", "防御", "充電", "定電圧" }; var disc = new List<string> { "ヒューズ", "蓄電池" };
+            bool r1 = TerminalDeckState.ApplyRecall("蓄電池", keep, disc, 5);
+            bool r2 = TerminalDeckState.ApplyRecall("ヒューズ", keep, disc, 5);
+            Check(r1 && !r2 && keep.Count == 5 && disc.Count == 1, "印で残した分の後に〈呼び戻し〉・手札は規定の枚数を超えない");
+            GameLoop.GameHooks.HandCarry = HandCarryMode.All;
         }
 
         // ---- 4. ボスのダウン ----

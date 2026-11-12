@@ -208,6 +208,13 @@ namespace CombatSystem
                 else _termKillPending = kb;
             }
             TerminalDiag.NoteTurn(_deck.board, o);   // [計装 2026-11-12] (FinishTurn が手札を書き換える前に)
+            if (_deck.LastKept.Count > 0)            // [計装 2026-11-13] 残す印で残した端子を、 このターンに使ったか
+            {
+                var usedNames = TerminalDeckState.UsedFromHand(_deck.board, _deck.permanent.Count, o);
+                int usedKept = 0;
+                foreach (var id in _deck.LastKept) if (usedNames.Remove(id)) usedKept++;
+                BossDownDiag.NoteKeptUse(_deck.LastKept.Count, usedKept);
+            }
             RemoveUsedFromRunDeck(o);                // (FinishTurn が手札を書き換える前に ── 場の添字で読む)
             _termRetain = _deck.FinishTurn(o);
         }

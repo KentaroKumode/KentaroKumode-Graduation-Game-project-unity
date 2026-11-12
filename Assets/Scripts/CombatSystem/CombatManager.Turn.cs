@@ -766,16 +766,16 @@ namespace CombatSystem
                 var tenv = TerminalEnvNow(ctx, enemyAtkValue);
                 // 挑戦カード〈猫の手〉: 出目と予告が確定したここで、 1 組を先に挿す (人の画面・BOT の方策はこの 1 組を外せない)
                 ChooseCatPaw(playerDice, tele, tenv);
-                int[] slots = null, targets = null;
+                int[] slots = null, targets = null; bool[] keepMarks = null;
                 if (_interactiveTurn)
                 {
                     _pause.Set(TurnPauseKind.Wiring, playerDice, playerFaceIdx, tele);
                     _pause.board = _deck.board; _pause.terminalEnv = tenv; _pause.terminalState = _deck.state;
                     _pause.catDie = _catDie; _pause.catSlot = _catSlot;
                     yield return _pause;
-                    slots = _pause.slots; targets = _pause.targets; goldAsk = _pause.goldSpend;
+                    slots = _pause.slots; targets = _pause.targets; goldAsk = _pause.goldSpend; keepMarks = _pause.keep;
                 }
-                else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; goldAsk = plan.goldSpend; }
+                else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; goldAsk = plan.goldSpend; keepMarks = plan.keep; }
                 if (slots == null) slots = TerminalWiring.Auto(_deck.board, playerDice, tenv, _deck.state, _catDie, _catSlot);
                 // 猫の 1 組は答えに関わらず入れる (外した答え・同じ口に挿しすぎた答えは、 猫の組を残して直す)
                 if (_catDie >= 0) slots = TerminalWiring.WithPair(slots, playerDice.Length, _deck.board, _catDie, _catSlot);
@@ -785,6 +785,10 @@ namespace CombatSystem
                 _termOutcome = term;
                 // 〈呼び戻し〉(手札の持ち越しの規則): 捨て札から次のターンの手札に戻す 1 枚。 対象 (targets の値) は捨て札の添字・選ばなければ最後に捨てた 1 枚
                 _deck.recallNext = term.recall ? TerminalDeckState.RecallPick(_deck.discard, TerminalWiring.RecallWant(_deck.board, term, targets)) : null;
+                // 手札の規則 Pick: 残す印 (挿さなかった手札の端子だけ・人 = 画面 / BOT = 方策)。 Off・All では読まない
+                _deck.keepNext.Clear();
+                if (TerminalCards.CarryMode == HandCarryMode.Pick && keepMarks != null)
+                    _deck.keepNext.AddRange(TerminalDeckState.KeepFromMarks(_deck.board, _deck.permanent.Count, term, keepMarks));
             }
 
             // 端子の山札: 合計も個数も端子の結果から (出目をそのまま足さない ── 端子ごとに入る量が違う)

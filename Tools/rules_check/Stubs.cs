@@ -6,7 +6,8 @@ namespace GameLoop
     public static class GameHooks
     {
         public static int TerminalHealMulOverride, TerminalArresterNeedOverride;
-        public static bool TerminalFirstAidBattleOnly, HandCarryDisabled;
+        public static bool TerminalFirstAidBattleOnly;
+        public static CombatSystem.HandCarryMode HandCarry = CombatSystem.HandCarryMode.Pick;
     }
     public static class GameRng
     {

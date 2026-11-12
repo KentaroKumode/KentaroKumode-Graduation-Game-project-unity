@@ -470,7 +470,7 @@ namespace AutoTest.ParallelSweep
                 // 2026-11-13 (#117): 端子の撃破のボーナスを旧い条件 (攻撃したターンの主攻撃までの撃破だけ) へ戻す腕 (False = 今の作り)
                 "terminalKillNeedsAttack",
                 // 2026-11-13: 戦闘の規則の 3 つの口 (True = 新しい規則・3 つとも False = 旧い規則 = main と同じ)
-                "handCarry", "bossDown", "depth3Heavy",
+                "handCarry", "handKeepPolicy", "EffectiveHandKeepPolicy", "bossDown", "depth3Heavy",
                 // 2026-11-13: 配線の旧の式が、 攻撃の端子に挿さない手にも武器の素火力を数える旧い挙動へ戻す腕 (False = 直した挙動)
                 "v3.oldNoAttackBaseDmg",
                 // 2026-11-12 (#134): Optimal の配線のミスの率 (0 = ミスなし・Super と素朴版は経路を通らない)
@@ -532,6 +532,12 @@ namespace AutoTest.ParallelSweep
             }
             if (type.IsEnum)
             {
+                // 手札の規則 (2026-11-13): 旧い bool の指定 (handCarry=True / False) を読めるように、 True = All・False = Off
+                if (type == typeof(CombatSystem.HandCarryMode))
+                {
+                    if (string.Equals(raw, "True", StringComparison.OrdinalIgnoreCase)) { parsed = CombatSystem.HandCarryMode.All; return true; }
+                    if (string.Equals(raw, "False", StringComparison.OrdinalIgnoreCase)) { parsed = CombatSystem.HandCarryMode.Off; return true; }
+                }
                 // 名前でも番号でも受ける。 親は番号 (EditorPrefs の生値) を書く。
                 if (int.TryParse(raw, NumberStyles.Integer,
                     CultureInfo.InvariantCulture, out int num))
