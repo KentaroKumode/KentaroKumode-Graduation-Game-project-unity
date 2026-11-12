@@ -98,6 +98,10 @@ namespace CombatSystem
                 }
             }
 
+            // 端子の撃破のボーナス (#117): ターン終了の削り (〈絞り出し〉〈百断〉など・ctx の HP を直接減らす) で倒れたか。
+            //   段の移行 (SwapEnemy) が敵の HP を次の形態へ戻す前に見る。
+            SettleTerminalKillBonus(Math.Min(enemyHP, ctx.enemyCurrentHP), final: false);
+
             // ヴェスカ連戦: 敵パッシブが予約した SwapEnemy を perspective 復帰後に実行
             if (!string.IsNullOrEmpty(ctx.pendingEnemySwapId))
             {
@@ -206,6 +210,8 @@ namespace CombatSystem
             //   なっていた (実測: 完全クリア 197 件のうち 93 件 = 47% が p1〜p3 撃破)。
             //   固定ダメージ・虚空の刻み・反射など、 敵パッシブを経由しない撃破経路が複数あるため、
             //   パッシブの発火順に頼らずここで確定させる。
+            // 端子の撃破のボーナス (#117): このターン最後の確かめ (ターン終了時の効果の削りを SyncHPFromContext で拾った後・次の形態へ移す前)
+            SettleTerminalKillBonus(enemyHP, final: true);
             if (enemyHP <= 0 && playerHP > 0) TryAdvanceVescaChain();
 
             // 2 体戦の締め。 SetSecondaryEnemy の不変条件 (2 体目の HP ≤ 1 体目) が成り立つ限り

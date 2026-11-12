@@ -812,8 +812,12 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            bleedOnHit     → 主攻撃の dealtDmg > 0 のとき ctx.AddEnemyBleed(量) (〈返し針〉)
          ターンの頭 (DrawTerminalHand): 〈鋳造口〉の出目 +N を accumulatedValues[termFoundryBonus] へ置き、 自ロールの後 (大罪:怠惰の後) に全部の出目へ足す。
            〈計数器〉が山札に入っていれば ctx.AddOutgoingPct(CounterPct × floor(基本以外の発動の累計 ÷ CounterEvery))
-         ターンの終わり (FinishTerminalTurn): 敵 HP ≤ 0 かつ攻撃の種類の端子を 1 枚以上挿したターンだけ、 撃破のボーナス
+         ターンの終わり (FinishTerminalTurn): 発動した端子の撃破のボーナス
            (〈収穫機〉最大 HP + / 〈研ぎ澄まし〉RunState.terminalWhetBonus + / 〈戦利品箱〉ゴールド + / 〈剥ぎ取り〉次の報酬の選択肢 +1)。
+           撃破の経路は問わない (#117・2026-11-13)。 ここで敵 HP ≤ 0 なら配り、 まだ倒れていなければ控えておき、
+           FinishTurnCommon の 2 か所 (OnTurnEnd の後・SwapEnemy の前 / SyncHPFromContext の後・TryAdvanceVescaChain の前) で敵 HP ≤ 0 なら配る
+           (〈絞り出し〉〈百断〉などターン終了時の撃破)。 2 体戦の 2 体目だけが倒れたターンは数えない (戦闘の撃破 = 1 体目)。
+           旧: 敵 HP ≤ 0 かつ攻撃の種類の端子を 1 枚以上挿したターンの、 ここまでの撃破だけ (測定の口 GameHooks.TerminalKillBonusNeedsAttack)。
            その後、 使い捨て・〈写し取り〉・〈焼き切り〉・〈保持器〉を山札へ反映
 
 役 (ADR-0011・配線集計の直後 / 攻防の解決より**前**)

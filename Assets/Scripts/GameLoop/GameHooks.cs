@@ -108,6 +108,10 @@ namespace GameLoop
         /// <summary>[測定 2026-11-12・#102] true = 〈応急箱〉を使ってもランの山札から抜かない (旧の作り = その戦闘中だけ戻らない)。
         /// AutoRunner.terminalFirstAidBattleOnly が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
         public static bool TerminalFirstAidBattleOnly;
+        /// <summary>[測定 2026-11-13・#117] true = 端子の撃破のボーナス (〈収穫機〉〈研ぎ澄まし〉〈戦利品箱〉〈剥ぎ取り〉) を旧い条件で配る
+        /// (攻撃の端子に出目を挿したターンの、 主攻撃までの撃破だけ・ターン終了時の撃破には配らない)。 既定 false = 説明文どおり、 撃破の経路を問わない。
+        /// AutoRunner.terminalKillNeedsAttack が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
+        public static bool TerminalKillBonusNeedsAttack;
 
         /// <summary>敵の固定削り (データの値・<see cref="EnemyArmorPenOverride"/> があればその値・下限 0)。</summary>
         public static int EnemyArmorPen(string enemyId, int dataValue)
@@ -144,6 +148,7 @@ namespace GameLoop
             TerminalHealMulOverride = 0;
             TerminalArresterNeedOverride = 0;
             TerminalFirstAidBattleOnly = false;
+            TerminalKillBonusNeedsAttack = false;
         }
     }
 }
