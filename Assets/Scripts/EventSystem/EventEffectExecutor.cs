@@ -234,8 +234,8 @@ namespace EventSystem
                     break;
 
                 case EventEffectType.VescaClockTake:
-                    GameLoop.VescaClock.Take(run);
-                    result.log.Add("止まらない時計を預かった");
+                    // 秘宝として持つ (2026-11-13)。 結果の行はほかの「秘宝を得た」行と同じ書式 (GainPassiveItem)
+                    if (GameLoop.VescaClock.Take(run)) result.log.Add($"秘宝獲得: {ResolveLabel(GameLoop.ItemIds.VescaClock)}");
                     break;
 
                 case EventEffectType.DiscardFlag:

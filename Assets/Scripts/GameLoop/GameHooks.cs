@@ -130,7 +130,7 @@ namespace GameLoop
         /// <summary>[測定 2026-11-13] true = 深さ 3 のボス 3 体に大技の周期を足さない旧い作り。 既定 false = 足す
         /// (<see cref="CombatSystem.BossParams.Depth3Heavy"/>)。 AutoRunner.depth3Heavy が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
         public static bool Depth3HeavyDisabled;
-        /// <summary>[測定 2026-11-13] true = ランの最初から博士の「止まらない時計」を預かった状態にする (<see cref="VescaClock"/>・七層のヴェスカの各段に
+        /// <summary>[測定 2026-11-13] true = ランの最初から博士の「止まらない時計」を秘宝として持たせる (<see cref="VescaClock.Take"/>・開幕の秘宝の後・七層のヴェスカの各段に
         /// ダウンの目盛りが 1 つ増える)。 既定 false = 預からない (〈さびれた観測所・再訪・写し〉で選んだ時だけ)。 乱数は引かない。
         /// AutoRunner.vescaClockHeld が毎ランの始めに入れ、 ラン終了で false へ戻す。 GameManager.StartNewRun が読む。</summary>
         public static bool VescaClockHeldAtStart;
