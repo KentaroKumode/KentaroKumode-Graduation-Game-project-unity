@@ -2958,11 +2958,28 @@ Tier ごとの正味（本番と同じく 2 枚配って選ぶ・各 1 万ラン
   - 検算: `python Tools/event_branch_check/run.py`（Unity なし・全イベントファイルで数が合うかも見る）。
   - 仕組み: `EventBranchText.cs`（切り分け）→ `EventChoice.postFlavorByBranch` / `digestByBranch` → 実行の `ExecutionResult.pickedBranch`（乱数の引き方・消費順は変えない）→ 画面 `EventChoice.PostFlavorFor` / 戦記 `RunChronicle.Event` の `b=`（記録の文を分けた選択肢だけ書く）→ `RunDigest` が `DigestFor`。
   - 文の中に `/`・`-` は使えない（選択肢と結果の欄の区切り）。
+- **全角の `／` は段落の区切り = 画面の頁の区切り**（2026-11-13・下の「イベントの窓」）。導入にも選んだ後の文にも使える。画面には出ない。
 - `EventParser.cs` が条件（例 `パッシブ:[xxx]`・`フラグ:[xxx]`）や効果文字列を解釈。
 - `EventDatabase.cs`: priority / rare / onceOnly に対応。
 - `EventEffectExecutor.cs`: 効果を `RunState` / `ProvisionSystem` に適用。
   戦闘後にしか適用できない効果は `postCombatEffects` にキュー。
 - 一度のみイベントは `RunState.seenOnceEvents` で既出管理。
+
+### イベントの窓（画面・2026-11-13）
+
+正本: `UI/Game2D/Screens/EventPaging.cs`（頁割り）・`UI/Game2D/JpTextLayout.cs`（折り返し・`／` で段落に分ける）・
+`UI/Game2D/Screens/ModalJpMetrics.cs`（窓の寸法の式）。画面は `Game2DPhaseScreens.Event`。どれも Unity に依存せず、検算がそのままコンパイルする。
+
+- 窓は幅 420・高さは 266 まで（GUI の格子 480×270・上下 2 dot）。本文の折り返しの幅は 384 dot（ドット字の送り幅で数える・禁則なし）。
+- **導入は段落（`／` の区切り）ごとに 1 頁。** 1 頁は 8 行まで。8 行を超える段落と `／` の無い長い導入は、行の切れ目で次の頁へ送る（文の途中では切れるが、行の途中では切らない）。**文を切り捨てない。**
+- **選択肢は最後の頁だけに出す。** 途中の頁は [前へ] [次へ]、最後の頁は [前へ] [選ぶ]。最後の頁は選択肢と説明（選んだ行の代償・選べない理由・2 行）に場所を空けるので、本文はそこに入る行数まで（溢れる行は 1 つ前の頁へ）。本文が 3 行も残らない時・最後の段落が割れる時は、選択肢の行の高さを 20 から 16 に詰める。
+- 結果（結果の行「・ゴールド+10」と選んだ後の文）も同じ規則で 8 行ずつ頁に割る。最後の頁の [次へ] で地図へ戻る。
+- 窓の高さは全頁で同じ（一番高い頁に合わせる）。頁の位置（「2/4」）は題の右に暗い字で出す。
+- 操作は手引きの板と同じ: Space / Enter / → で次の頁・← / Backspace で前の頁・1〜9 は選択肢の頁でだけ選ぶ（選択肢の頁の Space は何もしない）。この間 `GameManager` のイベントのキーは止める（`GameManager.EventKeysByScreen`）。
+- 頁の位置は画面だけが持つ。進行（乱数・効果・BOT の経路）は変えない。BOT が動かしている間（`GameHooks.BotDriving`）は窓を出さない。中断セーブは航行のマップでしか書けない（`GameManager.CanSuspendNow`）ので、イベントの途中の状態は保存されない。
+- 今の窓に入る選択肢は 7 つまで（説明の 2 行あり・本文 0 行）。超えると検算が落ちる。
+- 書く時の目安: 1 段落 1〜6 行（1 行 ≒ 40 字・240 字まで）。長い導入は `／` で段落に分ける。選択肢の名前は 1 行（376 dot・≒ 38 字）に収める。
+- 検算: `python Tools/event_page_check/run.py`（全イベントの導入・結果の文で切り捨て 0・窓の高さ 266 以下・選択肢が全部描ける・選択肢の名前と説明が切れない。直す前の窓で溢れていた件数も出す）。
 
 ### 効果種別
 
