@@ -194,7 +194,7 @@ namespace EventSystem
                     if (!string.IsNullOrEmpty(id))
                     {
                         ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, id);
-                        result.log.Add($"パッシブアイテム獲得: {ResolveLabel(id)}");
+                        result.log.Add($"秘宝獲得: {ResolveLabel(id)}");      // 画面に出す言い方 (データの書式「パッシブアイテム獲得」は EventParser が読むので変えない)
                         ApplyPassiveAcquisitionBonus(run, id, result);
                     }
                     break;
@@ -244,7 +244,7 @@ namespace EventSystem
                         int idx = run.ownedPassiveItems.IndexOf(eff.param);
                         if (idx >= 0)
                             ItemSystem.Helpers.PassiveAddHelper.RemoveAt(run, idx);
-                        result.log.Add($"パッシブアイテム廃棄: {eff.param}");
+                        result.log.Add($"秘宝廃棄: {eff.param}");
                     }
                     break;
 
