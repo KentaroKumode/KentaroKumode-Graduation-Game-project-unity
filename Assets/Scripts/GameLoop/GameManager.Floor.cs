@@ -857,19 +857,8 @@ namespace GameLoop
             OnEnemyEncountered?.Invoke(CurrentEnemy);
             Log($"ボス戦: {CurrentEnemy.displayName}");
 
-            // 5層ボス戦の清算系デバフ (カルマ系統廃止済み)
-            if (Run.Depth == Run.normalClearFloor)
-            {
-                // 血の負債: 最大HP-15（一度きり、戦闘前に適用）
-                if (Run.permanentDebuffs.Contains("血の負債"))
-                {
-                    int reduction = 15;
-                    Run.playerMaxHP = Mathf.Max(1, Run.playerMaxHP - reduction);
-                    Run.playerHP = Mathf.Min(Run.playerHP, Run.playerMaxHP);
-                    Run.permanentDebuffs.Remove("血の負債"); // 一度限り消費
-                    Log($"血の負債清算: 最大HP-{reduction} → {Run.playerMaxHP}");
-                }
-            }
+            // (旧: 5層ボス戦の前に清算デバフ〈血の負債〉(最大HP-15) を払う分岐があったが、 〈血の負債〉を
+            //  permanentDebuffs に足す所がどこにも無かった (カルマ系統の廃止の残り)。 2026-11-12 削除)
 
             var (dc, dm, cr, df, ft_, str_) = GatherPlayerCombatStats();
             SetPhase(GamePhase.Combat);

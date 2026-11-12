@@ -20,9 +20,9 @@ namespace ItemSystem.Shop
         {
             // 名前付き固有パッシブ（イベント限定獲得）
             "ちいさな灯火",
-            "決意",
-            "根拠のない確信",
-            "真理",
+            GameLoop.ConvictionSystem.IdResolve,
+            GameLoop.ConvictionSystem.IdConviction,
+            GameLoop.ConvictionSystem.IdTruth,
             "英雄の意志",
             "幸運の硬貨",
             "相棒の魂",
@@ -37,8 +37,8 @@ namespace ItemSystem.Shop
             // 必要なら個別に再追加可能。
 
             // フラグアイテム連鎖（システム的に内部状態で扱うべき）
-            "苦難の予言",
-            "苦難の確信",
+            GameLoop.ItemIds.HardshipProphecy,
+            GameLoop.ItemIds.HardshipConviction,
             "迷い犬の首輪",
             "忠犬ノクト",
 

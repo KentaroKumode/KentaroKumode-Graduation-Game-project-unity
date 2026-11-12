@@ -380,13 +380,13 @@ namespace EventSystem
             if (run == null || string.IsNullOrEmpty(itemId)) return;
             switch (itemId)
             {
-                case "決意":
+                case GameLoop.ConvictionSystem.IdResolve:
                 {
                     int gain = GameLoop.GoldIncome.Gain(run, 1, "イベント(決意)");
                     result.log.Add($"決意の獲得ボーナス: +{gain}ゴールド");
                     break;
                 }
-                case "根拠のない確信":
+                case GameLoop.ConvictionSystem.IdConviction:
                 {
                     GameLoop.ConvictionSystem.OnFirstAcquired(run);
                     result.log.Add("根拠のない確信が芽吹いた (確信段階1)。エリート撃破毎に成長する。");

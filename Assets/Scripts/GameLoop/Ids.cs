@@ -25,6 +25,14 @@ namespace GameLoop
         /// <summary>合札: 同じショップで 2 品目以降を買うとき 10G 安い (ShopManager.TryBuy・2026-10-31)。</summary>
         public const string TrialTossToken = "合札";
 
+        // === 確信チェーンのフラグ品 (5F-6F の進路・2026-11-12 に定数化) ===
+        //   イベント文 (Resources/Events/event_list.txt) の [] 内の表記と一致必須。
+        //   チェーンのパッシブ (決意 / 根拠のない確信 / 真理) は ConvictionSystem.Id* が持つ。
+        /// <summary>苦難の予言: 預言者の石板で得るフラグ。 次段〈啓示〉の条件。</summary>
+        public const string HardshipProphecy = "苦難の予言";
+        /// <summary>苦難の確信: 〈啓示〉で得るフラグ。 次段〈災厄の予兆〉の条件。</summary>
+        public const string HardshipConviction = "苦難の確信";
+
         // === 初期装備 ===
         public const string DiceWood = "dice_wood";
 
@@ -97,7 +105,7 @@ namespace GameLoop
         {
             // 確信チェーン (5F-6F の進路フラグ・アイテム)
             ConvictionSystem.IdTruth, ConvictionSystem.IdResolve, ConvictionSystem.IdConviction,
-            "苦難の予言", "苦難の確信", "真理の予兆",
+            HardshipProphecy, HardshipConviction, "真理の予兆",
             // デフォルト/初期装備
             DiceWood,
             // 起動でしか取れないイベント専用アイテム
