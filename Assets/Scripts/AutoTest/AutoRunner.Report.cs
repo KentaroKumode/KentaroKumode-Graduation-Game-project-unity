@@ -221,6 +221,7 @@ namespace AutoTest
             //   印字が無いと「遺物なしのつもりだった」を後から検証できない。
             //   2026-08-10 に同じ穴で 0pt 基準値が 53.3% / 16.6% に割れている。
             sb.AppendLine(EffectiveStateLine());
+            sb.AppendLine(RiftRecordLine());
             // **BOT が読んだ学習を必ず印字する** (2026-11-12・#118)。 帯のフォルダが無いと手書きの序列へ黙って落ち、
             //   難易度 1〜3 のクリアが 0% になっていた。 落ちたランがあれば、 はっきり書く。
             sb.AppendLine($"学習の読み: {LearningReadEffective} / 帯の固定={(botLearningBandOverride >= 0 ? botLearningBandOverride.ToString() : "なし")}"
@@ -1892,6 +1893,22 @@ namespace AutoTest
                 sb.AppendLine();
             }
             return sb.ToString();
+        }
+
+        /// <summary>[計装 2026-11-13] 深さ 6 (画面の第 4 層) の「裂け目の記録」の集計。 「深さ 6 へ届いたのに起きなかったラン」と「安全弁が出したラン」は今の作りでは 0 のはず。</summary>
+        private string RiftRecordLine()
+        {
+            int reached = 0, fired = 0, valve = 0, opened = 0, missed = 0;
+            foreach (var r in _records)
+            {
+                if (r == null || !r.reached6F) continue;
+                reached++;
+                if (r.riftRecord > 0) fired++; else missed++;
+                if (r.riftRecord == 2) valve++;
+                if (r.riftRecordOpened) opened++;
+            }
+            return $"裂け目の記録 (深さ 6 = 画面の第 4 層): 深さ 6 へ届いた {reached} ラン / 起きた {fired} (うち終点の安全弁 {valve}) / 起きなかった {missed} / 最後の頁を開いた {opened}"
+                 + $" (riftRecordAtBoss={riftRecordAtBoss}・安全弁のプロセス通算 {GameLoop.GameManager.RiftValveFiredCount})";
         }
     }
 }
