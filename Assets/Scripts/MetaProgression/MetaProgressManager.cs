@@ -53,13 +53,39 @@ namespace MetaProgression
         //  保存・ロード
         // ============================================================
 
+        /// <summary>PlayerPrefs を <see cref="BackedPrefs"/> の置き場として渡す口。</summary>
+        private sealed class PlayerPrefsStore : IPrefsStore
+        {
+            public static readonly PlayerPrefsStore I = new PlayerPrefsStore();
+            public bool HasKey(string key) => PlayerPrefs.HasKey(key);
+            public string GetString(string key) => PlayerPrefs.GetString(key, "");
+            public void SetString(string key, string value) => PlayerPrefs.SetString(key, value);
+            public void DeleteKey(string key) => PlayerPrefs.DeleteKey(key);
+        }
+
+        /// <summary>記録として読める JSON か (JsonUtility が例外を出さず、 null を返さない)。</summary>
+        private static bool IsValidStateJson(string json)
+        {
+            try { return JsonUtility.FromJson<MetaProgressState>(json) != null; }
+            catch { return false; }
+        }
+
+        /// <summary>直近の読み込みがどの経路を通ったか (G-25)。 画面への知らせは未実装 ── 出すならここを読む (Backup / CorruptReset の時)。</summary>
+        public BackedPrefs.LoadSource LastLoadSource { get; private set; } = BackedPrefs.LoadSource.Empty;
+
         public void Save()
         {
             if (State == null) return;
             // 並列ワーカーは保存しない (PlayerPrefs は全プロセスで共有され、 次の測定へ状態が持ち込まれる・GameHooks の説明)
             if (GameLoop.GameHooks.MetaPersistenceDisabled) return;
             var json = JsonUtility.ToJson(State);
+#if UNITY_EDITOR
+            // エディタは起動のたびに空で始めて読み込まない (Load) ので、 控えは作らない (エディタの測定の動きを旧いまま保つ)。
             PlayerPrefs.SetString(PrefsKey, json);
+#else
+            // 1 つ前の値を控え (鍵.bak) に残してから書く (G-25・BackedPrefs)。
+            BackedPrefs.Save(PlayerPrefsStore.I, PrefsKey, json, IsValidStateJson);
+#endif
             PlayerPrefs.Save();
         }
 
@@ -80,16 +106,19 @@ namespace MetaProgression
                 State.EnsurePanelInitialized();
                 return;
             }
-            string json = PlayerPrefs.GetString(PrefsKey, "");
-            if (string.IsNullOrEmpty(json))
+            // 鍵が無い = 初回 (空で始める・控えは見ない)。 鍵があるのに読めない = 壊れた値を退避して控えから・控えも駄目なら空で (G-25)。
+            var src = BackedPrefs.Load(PlayerPrefsStore.I, PrefsKey, IsValidStateJson, out var json, out var note);
+            LastLoadSource = src;
+            State = null;
+            if (json != null)
             {
-                State = new MetaProgressState();
+                try { State = JsonUtility.FromJson<MetaProgressState>(json); }
+                catch (System.Exception e) { Debug.LogError($"[MetaProgress] 確かめた値が読めない (起きないはず): {e.Message}"); }
             }
-            else
-            {
-                try { State = JsonUtility.FromJson<MetaProgressState>(json) ?? new MetaProgressState(); }
-                catch { State = new MetaProgressState(); }
-            }
+            if (State == null) State = new MetaProgressState();
+            if (src == BackedPrefs.LoadSource.Backup) Debug.LogWarning($"[MetaProgress] {note}");
+            else if (src == BackedPrefs.LoadSource.CorruptReset) Debug.LogError($"[MetaProgress] {note}");
+            if (src == BackedPrefs.LoadSource.Backup || src == BackedPrefs.LoadSource.CorruptReset) PlayerPrefs.Save();   // 退避した値をディスクへ
             State.EnsurePanelInitialized();
             State.MigrateFromLegacyTrackIfNeeded();
             State.ClampRanksToMax();   // #113: 枠から外したトラックの段が古いセーブから残って効くのを防ぐ
@@ -99,7 +128,8 @@ namespace MetaProgression
         public void ResetAll()
         {
             State = new MetaProgressState();
-            PlayerPrefs.DeleteKey(PrefsKey);
+            // 控えも消す (残すと、 やり直した後に古い値が戻る道ができる)。 退避した壊れた値 (.corrupt) は残す。
+            BackedPrefs.DeleteAll(PlayerPrefsStore.I, PrefsKey);
             OnStateChanged?.Invoke();
         }
 
