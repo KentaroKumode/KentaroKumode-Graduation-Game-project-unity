@@ -140,33 +140,54 @@ namespace CombatSystem
 
         // ---- 大技サイクル (EnemyData.heavyPeriod・2026-09-19) ----
 
-        /// <summary>そのターンが大技か。 周期 N なら T = N, 2N, 3N …。</summary>
-        public static bool IsHeavyTurn(EnemyData e, int combatTurn)
-            => e != null && e.heavyPeriod > 0 && combatTurn > 0 && combatTurn % e.heavyPeriod == 0;
+        /// <summary>敵の周期の起点のずれ (2026-11-13・ボスのダウン)。 大技・構え・灰燼の王〈業火の予兆〉の周期は <c>戦闘のターン − これ</c> で数える。
+        /// 既定 0 (= 戦闘のターンのまま・旧い作りと同じ)。 ボスがダウンしたターンの頭に CombatManager がそのターン番号を入れる
+        /// (ダウンが明けた次のターンが周期の 1 ターン目)。 戦闘の始めに 0 へ戻す。 BOT の見積もりも同じ値を読む。</summary>
+        public static int HeavyCycleOffset;
 
-        /// <summary>次の大技まで何ターンか (0 = このターンが大技 / −1 = 大技なし)。</summary>
+        /// <summary>周期を数えるターン (戦闘のターンから <see cref="HeavyCycleOffset"/> を引いた値)。</summary>
+        public static int HeavyCycleTurn(int combatTurn) => combatTurn - HeavyCycleOffset;
+
+        /// <summary>そのターンが大技か。 周期 N なら (起点から数えて) T = N, 2N, 3N …。</summary>
+        public static bool IsHeavyTurn(EnemyData e, int combatTurn)
+        {
+            int c = HeavyCycleTurn(combatTurn);
+            return e != null && e.heavyPeriod > 0 && c > 0 && c % e.heavyPeriod == 0;
+        }
+
+        /// <summary>次の大技まで何ターンか (0 = このターンが大技 / −1 = 大技なし・ダウンのターン)。</summary>
         public static int TurnsToHeavy(EnemyData e, int combatTurn)
         {
-            if (e == null || e.heavyPeriod <= 0 || combatTurn <= 0) return -1;
-            int r = combatTurn % e.heavyPeriod;
+            int c = HeavyCycleTurn(combatTurn);
+            if (e == null || e.heavyPeriod <= 0 || c <= 0) return -1;
+            int r = c % e.heavyPeriod;
             return r == 0 ? 0 : e.heavyPeriod - r;
         }
 
         // ---- 構え (EnemyData.guardPeriod・2026-11-04) ----
 
-        /// <summary>そのターンに構えているか。 周期 N なら T = N, 2N …。</summary>
+        //   構えの周期も、 ボスのダウンが明けたら頭から (大技と同じ起点 HeavyCycleOffset を読む・2026-11-13。 起点 0 なら今までどおり)。
+
+        /// <summary>そのターンに構えているか。 周期 N なら (起点から数えて) T = N, 2N …。</summary>
         public static bool IsGuardTurn(EnemyData e, int combatTurn)
-            => e != null && e.guardPeriod > 0 && combatTurn > 0 && combatTurn % e.guardPeriod == 0;
+        {
+            int c = HeavyCycleTurn(combatTurn);
+            return e != null && e.guardPeriod > 0 && c > 0 && c % e.guardPeriod == 0;
+        }
 
         /// <summary>構えを解いた隙のターン (構えの次のターン)。 防御 0。</summary>
         public static bool IsAfterGuardTurn(EnemyData e, int combatTurn)
-            => e != null && e.guardPeriod > 0 && combatTurn > 1 && (combatTurn - 1) % e.guardPeriod == 0;
+        {
+            int c = HeavyCycleTurn(combatTurn);
+            return e != null && e.guardPeriod > 0 && c > 1 && (c - 1) % e.guardPeriod == 0;
+        }
 
-        /// <summary>次の構えまで何ターンか (0 = このターンが構え / −1 = 構えない)。</summary>
+        /// <summary>次の構えまで何ターンか (0 = このターンが構え / −1 = 構えない・ダウンのターン)。</summary>
         public static int TurnsToGuard(EnemyData e, int combatTurn)
         {
-            if (e == null || e.guardPeriod <= 0 || combatTurn <= 0) return -1;
-            int r = combatTurn % e.guardPeriod;
+            int c = HeavyCycleTurn(combatTurn);
+            if (e == null || e.guardPeriod <= 0 || c <= 0) return -1;
+            int r = c % e.guardPeriod;
             return r == 0 ? 0 : e.guardPeriod - r;
         }
 

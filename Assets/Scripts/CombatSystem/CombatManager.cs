@@ -448,6 +448,8 @@ namespace CombatSystem
             // エスカレーションの「ボス戦」の旗 (挑戦カード「ボス戦ではエスカレーションが毎ターン進む」)
             Escalation.BossFight = enemy != null && GameLoop.BossIds.IsBoss(enemy.id);
             Escalation.PhaseStartTurn = 1;
+            // ボスのダウン (2026-11-13・HP の目盛り): 目盛りを入れ、 大技の周期の起点を 0 に戻す (目盛りの無い敵は何もしない)
+            ResetBossDown(enemy, newCombat: true);
             // 挑戦デバフ〈厚い皮膚〉: 敵の最大HP ×1.10 / ×1.20 / ×1.30。
             float thickSkin = MetaProgression.MetaDebuffApplicator.GetEnemyHpMultiplier();
             if (thickSkin > 1.001f && enemy != null)
@@ -838,6 +840,8 @@ namespace CombatSystem
             }
             currentEnemy = newEnemy;
             enemyHP = newEnemy.maxHP;
+            // ボスのダウン (2026-11-13): 段ごとに目盛りを入れ直す (割った数・待ちは前の段から持ち越さない。 大技の周期は戦闘を通して数えるので起点はそのまま)
+            ResetBossDown(newEnemy, newCombat: false);
 
             var psm = PassiveSkillManager.Instance;
             if (psm == null) { Debug.LogError("[CombatManager.SwapEnemy] PSM null"); return false; }

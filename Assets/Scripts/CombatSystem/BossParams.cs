@@ -191,6 +191,49 @@ namespace CombatSystem
         public static bool IsValidSignature(int[] faces)
             => faces != null && faces.Length == SignatureFaceCount;
 
+        // ===== ダウンの目盛り (2026-11-13・GAME.md §6-15・規則は BossDown.cs) =====
+        //  HP が目盛り以下になったターンの次のターン、 ボスはダウンする (攻撃しない・受けるダメージ ×1.5・溜めた大技は取り消し)。
+        //  値は最大 HP の割合 (大きい順)。 **隠し倍率ではなく実数値**。 数・位置は敵ごとに違う (数値は仮置き・未測定)。
+        //  既にある「HP で切り替わる仕掛け」と同じ位置に重ねない: 灰燼の王 50% (段の切り替え)・ヴェスカ天与 66% / 33% (〈天与の才〉の踏みとどまり)。
+        //  対象は見せる層の第 2 層 (内部の深さ 3) 以降のボスだけ。 序層のトレジャーゴブリン (boss_layer1)・ファーム層の古い宝箱 (boss_layer0) には置かない。
+
+        private static readonly Dictionary<string, float[]> _downNotches = new Dictionary<string, float[]>
+        {
+            // 深さ 3 (HP 505): 戦闘は 5〜8 ターン。 大技 (周期 3) を 1〜2 回消せる数
+            { GameLoop.BossIds.Layer3Goblin, new[] { 0.70f, 0.35f } },   // 〈号令〉で毎ターン攻撃が乗る → 早めの目盛りで、 前のめりに割る価値を作る
+            { GameLoop.BossIds.Layer3Marsh,  new[] { 0.60f } },          // 長引くほど毒が深い敵 → 目盛り 1 つ (割り時を 1 度だけ選ぶ・長引かせる理由を作らない)
+            { GameLoop.BossIds.Layer3Mirror, new[] { 0.75f, 0.40f } },   // 浅い一撃を返す鏡 → 溜めて一気に割る遊びと〈鏡映の応答〉(大きく殴れ) の向きが揃う
+            // 深さ 5 (HP 1835): 10 ターン前後
+            { GameLoop.BossIds.Layer5Judgment, new[] { 0.75f, 0.50f, 0.25f } },   // 毎ターンの〈審判の炎〉に耐える長丁場 → 目盛り 3 つ
+            { GameLoop.BossIds.Layer5Hidden,   new[] { 0.65f, 0.30f } },          // 形態の循環で間合いが変わる → 少なめ
+            // 深さ 6 (HP 1945): 50% は段の切り替え (再生が止まり予兆が速まる) なので避ける
+            { GameLoop.BossIds.Layer6Ash, new[] { 0.80f, 0.30f } },
+            // 深さ 7 ヴェスカ: 4 段で段ごとに HP が別 → 段ごとに 1 つ。 天与 (p4) は 66% / 33% が〈天与の才〉なので 50%
+            { GameLoop.BossIds.VescaP1,    new[] { 0.60f } },
+            { GameLoop.BossIds.VescaP2,    new[] { 0.50f } },
+            { GameLoop.BossIds.VescaP3,    new[] { 0.40f } },
+            { GameLoop.BossIds.VescaFinal, new[] { 0.50f } },
+        };
+
+        /// <summary>id のボスのダウンの目盛り (最大 HP の割合・大きい順)。 目盛りの無い敵・測定の口
+        /// (<see cref="GameLoop.GameHooks.BossDownDisabled"/>) で止めた時は null。 返す配列を書き換えないこと。</summary>
+        public static float[] DownNotches(string id)
+        {
+            if (GameLoop.GameHooks.BossDownDisabled || string.IsNullOrEmpty(id)) return null;
+            return _downNotches.TryGetValue(id, out var n) ? n : null;
+        }
+
+        // ===== 深さ 3 のボスの大技の周期 (2026-11-13・仮置き) =====
+        //  深さ 5 以降と同じ形 (EnemyData.heavyPeriod / heavyMul / heavyWindupMul・式は Escalation.HeavyFactor) を、 軽めの値で足す。
+        //  json ではなくここに置くのは、 測定の口 (GameHooks.Depth3HeavyDisabled) で旧い作りへ戻せるようにするため。
+        public const int Depth3HeavyPeriod = 3;
+        public const float Depth3HeavyMul = 2.0f, Depth3HeavyWindupMul = 0.6f;
+
+        /// <summary>id が深さ 3 のボス 3 体 (ゴブリン王・毒沼の主・鏡の双子) で、 大技の周期を足すか。</summary>
+        public static bool Depth3Heavy(string id)
+            => !GameLoop.GameHooks.Depth3HeavyDisabled
+            && (id == GameLoop.BossIds.Layer3Goblin || id == GameLoop.BossIds.Layer3Marsh || id == GameLoop.BossIds.Layer3Mirror);
+
         // ===== 適用 =====
 
         /// <summary>ボスなら固有面ダイスと差し替え (HP・ダイス期待値) を反映した敵データを返す。
@@ -225,8 +268,10 @@ namespace CombatSystem
             float diceOv = Overrides?.DiceExpected(e.id) ?? 0f;
             bool changeHp = hpOv > 0 && hpOv != e.maxHP;
             bool changeDice = diceOv > 0f;
-            if (!changeHp && !changeDice) return e;
+            bool addHeavy = Depth3Heavy(e.id) && e.heavyPeriod <= 0;   // 深さ 3 のボスの大技 (2026-11-13・測定の口で止められる)
+            if (!changeHp && !changeDice && !addHeavy) return e;
             var cc = e.Clone();
+            if (addHeavy) { cc.heavyPeriod = Depth3HeavyPeriod; cc.heavyMul = Depth3HeavyMul; cc.heavyWindupMul = Depth3HeavyWindupMul; }
             if (changeHp) cc.maxHP = Mathf.Max(1, hpOv);
             if (changeDice)
             {

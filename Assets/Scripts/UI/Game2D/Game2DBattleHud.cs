@@ -13,7 +13,7 @@ namespace UI.Game2D
     /// 航行用の GUI が引っ込むのと入れ替わりに、 左・右・上からばねで入ってくる (<see cref="Drive"/>)。 座標は 480×270 の格子 (左上が原点)。
     /// <para>端子の山札 (ADR-0014): 左に 3 枚を積む: Ports (出目とそれぞれの差し込み口・出目が 4 個以上なら 3 個ずつの列を右へ足す) / ステータス / Ctl (操作)。
     /// 右下 (Hand) にこのターンに引いた端子 (USB メモリの形) を並べ、 つかんで出目の差し込み口へ落とすと装着する (<see cref="Game2DBattleSim.Plug"/>)。
-    /// 〈写し取り〉〈焼き切り〉〈保持器〉に出目を挿すと、 挿していない手札の端子に「候補」の印が付き、 候補をその端子の上へ落とすと対象が決まる
+    /// 〈写し取り〉〈焼き切り〉〈呼び戻し〉に出目を挿すと、 挿していない手札の端子に「候補」の印が付き、 候補をその端子の上へ落とすと対象が決まる
     /// (<see cref="Game2DBattleSim.SetTarget"/>)。 名前・条件・効果は USB にマウスを乗せた時だけ帯 (Tip) で出す。 発動の見込みは
     /// <see cref="CombatSystem.TerminalCards.Resolve"/> を状態の写しで呼んだ値 (<see cref="Game2DBattleSim.preview"/>)。</para>
     /// (旧い配線の画面 ── 左のパネルに出目 3 個と攻撃・防御・充電・特殊の板 ── は 2026-11-11 に削除。 戦闘は常に山札で戦う)
@@ -75,6 +75,8 @@ namespace UI.Game2D
         /// <summary>対象を選ぶ印: 候補の縁 / 決まった対象の縁 (色と明度だけで出す・拡大しない)。</summary>
         private static readonly Color32 CandEdge = Game2DTerminalLook.Mix(Game2DKit.Ivory, Game2DKit.Off, 0.45f), ChosenEdge = Game2DKit.Ivory;
         /// <summary>ヴェスカ〈停滞する時間〉で止まった端子の印 (本体を横切る線と下の「停止」)。 暗くした本体の上で読める、 くすんだ青白。</summary>
+        /// <summary>手札の規則 Pick: 残す印の色 (仮)。</summary>
+        private static readonly Color32 KeepMark = Game2DTerminalLook.Mix(Game2DKit.Amber, Game2DKit.Ivory, 0.3f);
         private static readonly Color32 StopMark = Game2DTerminalLook.Mix(Game2DKit.Blue, Game2DKit.Ivory, 0.45f);
 
         /// <summary>手札・出目をつかんでいる間と、 離したフレーム (の次まで) は true。 敵の詳細の窓 (<see cref="Game2DEnemyPanel"/>) はこの間は開かない。</summary>
@@ -304,7 +306,7 @@ namespace UI.Game2D
         //   右下の手札の USB をつかんで (左ボタンを押したまま動かす)、 左の出目の差し込み口へ落とす = その出目をその端子に挿す。
         //   挿さった USB もつかめる: 別の出目の口へ落とす = 移す / 口の外で離す = 手札へ戻す。 口の上で右クリック = 外す。
         //   別の USB を挿さっている口へ落とす = 入れ替え (前の USB は手札へ)。 落とせない口で離したら手札へ戻る。
-        //   対象を選ぶ: 〈写し取り〉〈焼き切り〉〈保持器〉が挿さっている口 (か手札の抜け殻) へ、 候補の USB を落とす = 対象に決める
+        //   対象を選ぶ: 〈写し取り〉〈焼き切り〉〈呼び戻し〉が挿さっている口 (か手札の抜け殻) へ、 候補の USB を落とす = 対象に決める
         //   (その口への「入れ替え」より先に効く。 入れ替えたい時は右クリックで外してから挿す)。
         //   出目を押す = 行き先を順に変える (右クリックで逆・1〜9 キーと同じ)。 Q = おまかせ・Space = 決める (Sim のキー)。
 
@@ -402,14 +404,25 @@ namespace UI.Game2D
             int s = _dragS, from = _dragFrom; bool moved = _moved;
             bool[] tOk = _targetOk, tHand = _targetHand;
             CancelDrag();
-            if (!moved || s < 0) return;      // 押しただけ (動かしていない) なら何もしない
+            if (!moved || s < 0)
+            {
+                // 押しただけ: 挿してある〈呼び戻し〉なら、 戻す 1 枚を選ぶ窓を開く (それ以外は何もしない)
+                if (s >= 0 && from >= 0 && sim.IsRecaller(s)) OpenRecall(s);
+                // 手札の端子を押した: 手札の規則 Pick なら「次のターンも残す」の印を付け外し
+                else if (s >= 0 && from < 0) sim.ToggleKeep(s);
+                return;
+            }
             // 対象を選ぶ (差し込み口の上 / 手札の抜け殻の上)
             if (port >= 0 && port < tOk.Length && tOk[port] && sim.SetTarget(sim.slot[port], s)) return;
             if (port < 0 && hand >= 0 && hand < tHand.Length && tHand[hand] && sim.SetTarget(hand, s)) return;
             if (port >= 0)
             {
                 if (port == from) return;
-                if (sim.Plug(port, s, from)) return;
+                if (sim.Plug(port, s, from))
+                {
+                    if (from < 0 && sim.IsRecaller(s)) OpenRecall(s);      // 〈呼び戻し〉を挿した: 捨て札から戻す 1 枚を選ぶ窓 (選ばずに閉じれば最後に捨てた 1 枚)
+                    return;
+                }
                 Game2DSfx.Play("ui_click");      // 落とせない口: 手札へ戻る
             }
             if (from >= 0) sim.Unplug(from);
@@ -633,8 +646,10 @@ namespace UI.Game2D
                 }
                 DrawUsb(p, x, HandY, false, d, c.body, c.edge, c.metal);
                 if (stopped) p.Rect(x + 2, HandY + UsbConn + UsbBody / 2, UsbBody - 4, 1, StopMark);      // 本体を横切る 1 本の線 = 止まっている印
-                string label = stopped ? "停止" : cand ? (chosen ? "対象" : "候補") : d != null && d.capacity >= 2 ? "残" + rem : null;
-                if (label != null) p.Text(label, x + (UsbBody - Game2DJpFont.Width(label)) / 2, HandY + UsbLong + 1, stopped ? StopMark : cand && chosen ? Ink : Dim);
+                bool kept = op && sim.IsKept(s);      // 手札の規則 Pick: 次のターンも残す印 (仮の印 = 本体の上の 2 ドットの帯・色だけ・拡大縮小はしない)
+                if (kept) p.Rect(x + 1, HandY + UsbConn, UsbBody - 2, 2, KeepMark);
+                string label = stopped ? "停止" : cand ? (chosen ? "対象" : "候補") : kept ? "残す" : d != null && d.capacity >= 2 ? "残" + rem : null;
+                if (label != null) p.Text(label, x + (UsbBody - Game2DJpFont.Width(label)) / 2, HandY + UsbLong + 1, stopped ? StopMark : kept ? KeepMark : cand && chosen ? Ink : Dim);
             }
             p.Apply(t);
         }
@@ -657,6 +672,9 @@ namespace UI.Game2D
             if (sim.IsStopped(f))
                 extra.AddRange(Game2DJpFont.Lines(d.permanent ? "止まっている (このターンは挿せない)"
                                                               : "止まっている (このターンは挿せない・次のターンまで手札に残る)", iw));
+            // 手札の規則 Pick: 残す印の状態
+            if (sim.IsKept(f)) extra.AddRange(Game2DJpFont.Lines("次のターンも手札に残す (押して外す)", iw));
+            else if (sim.CanKeep(f) && !sim.ShowingResult && sim.Remaining(f) > 0) extra.AddRange(Game2DJpFont.Lines("押すと、 挿さなかった時に次のターンも手札に残す", iw));
             string tgt = TargetLine(f);
             if (tgt != null) extra.AddRange(Game2DJpFont.Lines(tgt, iw));
             for (int q = 0; q < m && !sim.ShowingResult; q++)
@@ -687,6 +705,16 @@ namespace UI.Game2D
         private string TargetLine(int f)
         {
             string id = sim.board[f];
+            // 〈呼び戻し〉(手札の持ち越しの規則): 捨て札から戻す 1 枚
+            if (CombatSystem.TerminalCards.PicksDiscard(id))
+            {
+                if (sim.ShowingResult) return null;
+                var disc = sim.Discard;
+                if (disc == null || disc.Count == 0) return "捨て札が空 (戻す端子が無い)";
+                if (!sim.IsRecaller(f)) return "出目に挿すと、 捨て札から戻す 1 枚を選べる";
+                int r = sim.RecallOf(f);
+                return r >= 0 ? "戻す: 〈" + disc[r] + "〉 (押して選び直す)" : null;
+            }
             if (!CombatSystem.TerminalCards.PicksTarget(id)) return null;
             int t = -1;
             if (sim.ShowingResult)
@@ -761,6 +789,44 @@ namespace UI.Game2D
             var run = GameManager.Instance?.Run; if (run == null) return false;
             foreach (var r in CombatItems()) if (RowBlock(run, r) == null) return true;
             return false;
+        }
+
+        // ── 〈呼び戻し〉の窓 (捨て札から 1 枚・仮の見た目 = 道具の窓と同じ部品) ──
+        //   開く: 〈呼び戻し〉を出目に挿した時 / 挿してある〈呼び戻し〉を押した (動かさずに放した) 時。 捨て札が空なら開かない。
+        //   最初から「今戻る 1 枚」(選んでいなければ最後に捨てた 1 枚) を選んでおき、 その行に「戻す」の印を付ける。
+        //   [これを戻す] = 選んだ行に決める / [閉じる] = 今の 1 枚のまま。 決めた値は sim.target[〈呼び戻し〉の場の位置] = 捨て札の添字。
+
+        private void OpenRecall(int s)
+        {
+            if (!sim.CanOperate || !sim.IsRecaller(s)) return;
+            if (_modal == null) _modal = FindObjectOfType<Game2DModal>();
+            if (_modal == null) return;
+            _modal.Open(RecallDef(s));
+        }
+
+        private ScreenDef RecallDef(int s)
+        {
+            var disc = sim.Discard ?? new List<string>();
+            int cur = sim.RecallOf(s);
+            var d = new ScreenDef { id = "battle_recall", jp = true, title = "〈" + sim.board[s] + "〉: 戻す 1 枚", w = 460, cols = 2,
+                sub = "捨て札 " + disc.Count + " 枚から選ぶ (次のターンの手札に入る)", sel0 = Mathf.Max(0, cur) };
+            for (int i = 0; i < disc.Count; i++)
+            {
+                var td = CombatSystem.TerminalCards.Get(disc[i]);
+                d.Items.Add(new ModalItem { name = disc[i], value = i == cur ? "戻す" : "", desc = td?.description });
+            }
+            d.buttons.Add(new ModalBtn { label = "これを戻す", action = "pick", primary = true });
+            d.buttons.Add(new ModalBtn { label = "閉じる", action = "close" });
+            d.footer = "選ばずに閉じると、 最後に捨てた 1 枚が戻る";
+            d.onAction = (a, sel) =>
+            {
+                if (a == "close") { _modal.Close(); return; }
+                if (a != "pick") return;
+                if (!sim.SetRecall(s, sel)) { Game2DSfx.Play("ui_click"); _modal.ShowToast("今は選べない"); return; }
+                _drawn = -1;
+                _modal.Close();
+            };
+            return d;
         }
 
         private int _itemPage;
@@ -845,13 +911,19 @@ namespace UI.Game2D
             bool live = sim != null && Game2DBattleSim.Active; bool known = live && sim.phase != Game2DBattleSim.P.ERoll;
             int en = live ? sim.enemyDiceCount : 3;
             for (int i = 0; i < en; i++) DrawDie(p, new RectInt(14 + i * 20, 16, 17, 17), live ? sim.ed[i] : i + 3, true);
-            p.Text(known ? "攻撃 " + sim.eatk : "攻撃 ??", 14, 36, known ? Atk : Dim);
+            if (known && sim.down) p.Text("ダウン:攻撃なし", 14, 36, MarkHeavyHud);      // ボスのダウン (2026-11-13): 止まるのは攻撃だけ (パッシブは動く)
+            else p.Text(known ? "攻撃 " + sim.eatk : "攻撃 ??", 14, 36, known ? Atk : Dim);
             if (known) p.Text("出目 " + sim.EnemyDiceSum, 14, 49, Dim);
             if (known && sim.edef > 0) p.Text("防御 " + sim.edef, 14, 62, Ink);      // 敵の防御 (構え・割れる/積み上がる装甲を反映した今の値)
             // 予告 (攻撃・大技・構え) と毒・出血は敵の周りに出す (Game2DBattleFx.DrawMarks・2026-11-11)。 ここは次の構え・大技の前触れだけ
             string next = known ? (sim.guardIn == 1 && sim.heavyIn == 1 ? "次: 構え・大技" : sim.guardIn == 1 ? "次: 構え" : sim.heavyIn == 1 ? "次: 大技" : null) : null;
-            if (next != null) p.Text(next, 14, 75, sim.heavyIn == 1 ? MarkHeavyHud : Dim);
+            // ボスのダウン (2026-11-13): 後に続くダウンが決まっていれば「次: ダウン」(大技・構えの前触れより先に出す)
+            if (known && sim.downPending > 0) next = "次: ダウン";
+            if (next != null) p.Text(next, 14, 75, sim.heavyIn == 1 || (known && sim.downPending > 0) ? MarkHeavyHud : Dim);
             if (live) p.Text("ターン " + sim.turn + "  段階 " + sim.Stage, 14, 90, Dim);
+            // ボスのダウン: ダウン中は受けるダメージの倍率、 そうでなければ次の目盛りまでの残り (HP がこの点数だけ減れば割れる)
+            if (known && sim.down) p.Text("被ダメ×" + CombatSystem.BossDown.TakenMul.ToString("0.0"), 14, 103, MarkHeavyHud);
+            else if (known && sim.downNotchHp >= 0 && fx != null) p.Text("目盛りまで " + Mathf.Max(0, fx.EnemyHp - sim.downNotchHp), 14, 103, Ink);
             p.Apply(t);
         }
 
@@ -875,6 +947,13 @@ namespace UI.Game2D
             if (live) for (int i = 0; i < 5; i++) DrawLamp(p, 214 + i * 10, 14, 10, i < sim.Stage, Atk);
             int cur = fx != null ? fx.EnemyHp : 56, max = fx != null ? fx.EnemyMax : 80;
             p.Text("敵", 14, 29, Ink); p.GaugeBar(Game2DKit.Gauge, 30, 31, 192, 10, Mathf.Clamp01(cur / (float)Mathf.Max(1, max)), Hp);
+            // ボスのダウンの目盛り (2026-11-13・仮の印): 棒に 1 ドットの刻み。 まだ割っていない目盛りは明るく、 割った目盛りは暗く (状態は色で表す)
+            if (live && sim.downNotches != null)
+                for (int i = 0; i < sim.downNotches.Length; i++)
+                {
+                    int nx = 30 + Mathf.Clamp(Mathf.RoundToInt(192 * sim.downNotches[i]), 1, 190);
+                    p.Rect(nx, 30, 1, 12, i < sim.downBroken ? Dim : MarkHeavyHud);
+                }
             p.Text(cur + "/" + max, 228, 29, Ink);
             p.Apply(t);
         }

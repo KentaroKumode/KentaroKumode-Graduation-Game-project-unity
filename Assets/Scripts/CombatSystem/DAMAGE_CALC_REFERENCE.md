@@ -149,6 +149,9 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
 + メタ会心ボーナス(会心時)
 − メタデバフ向かい風(最低1)
 × (100 − 30)/100                  ← 大罪:怠惰 (挑戦カード IV) を受けている時だけ・与えるダメージ −30%【2026-11-11】(主攻撃はすべての倍率の後・敵の防御の前・切り捨て。 毒・出血・爆発・固定ダメ・反射・品の直接は敵の HP を減らす口 HpLossDiag.Lose で同じく −30%)
+× 1.5 (切り捨て)                    ← ボスのダウン【2026-11-13】: ボスがダウンしているターンだけ (BossDown.ApplyTakenNow・定数 BossDown.TakenMul)。
+                                     怠惰の直後 = すべての倍率の後・敵の軽減パッシブと敵の防御の前。 与ダメ% の池には足さない (別枠の掛け算)。
+                                     主攻撃以外も全部掛かる (下の「ボスのダウン」)
 ─ FireEnemyTrigger(OnPreReceiveDamage): 灰塵の鎧/Ethereal/各敵被ダメ軽減
   → total = max(0, ctx.finalDamage)
 × 敵の防御値【2026-10-28・ADR-0013】: effDef = max(0, enemyDefense − playerArmorPen)
@@ -875,6 +878,22 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            「反撃固定」として同じ分がもう一度敵 HP に入っていた (毒・〈二度目の打金〉・〈急所〉・蒼白の槍騎士の倍率まで二重)。
            敵攻撃側で返るのは、 これ以降に足された分 (被弾で発動する反撃・反射) だけ。
 
+ボスのダウン (2026-11-13・規則の正本 BossDown.cs・目盛りの値は BossParams.DownNotches)
+         ターンの終わり (FinishTurnCommon のターン終了時の削りを拾った後): 敵の HP ≤ floor(最大 HP × 目盛り) になった目盛りの数だけ、 次のターンからダウンを待たせる
+         (1 ターンで 2 つ割れば 2 ターン・ダウン中に次を割ればもう 1 ターン。 上限なし)。 ヴェスカは段ごとに目盛りを入れ直す (待ちは持ち越さない)。
+         ダウンのターン (ターンの頭・敵が振る前に立つ):
+           ・敵の攻撃 (予告値) = 0 ・〈連撃〉の 2 回目も 0。 敵の出目は振る (乱数の消費は変えない)。 攻撃の枝は〈封じ・揃〉と同じ (下の「敵攻撃」)
+           ・受けるダメージ ×1.5 (切り捨て・BossDown.ApplyTaken)。 掛ける口は 4 つで、 大罪:怠惰と同じ所:
+               主攻撃 = ApplyWinDamageModifiers の怠惰の直後 (CombatManager.Damage.cs)
+               主攻撃以外 = HpLossDiag.Lose (channel ≠ "通常攻撃") ── 固定ダメの枠 (毒の tick・臨界の爆発・品が預けた分・〈虚空〉など)・出血・役〈極〉・反射・仕込み刃・反撃固定・品の直接 (攻撃後)
+               〈逆綴じの止血帯〉(ターン終了・ctx の HP を直接減らす) = AllPassiveSkillEffects.Wringing
+               品の直接 (ターンの解決の外) = Kw.DamageEnemy
+           ・敵のパッシブ・エスカレーション・敵の回復は普段どおり動く (止まるのは攻撃だけ)。 例外は「ダウン中は発動しない」を名乗ったパッシブ
+             (BossDownPassives の一覧・PassiveSkillManager.FireEnemyTrigger の入口で鳴らさない・いまは空)。
+           ・大技: そのターンが大技なら取り消し (攻撃しないので)。 大技の周期は次のターンから頭に戻す (Escalation.HeavyCycleOffset = このターン)。
+             周期は「戦闘のターン − HeavyCycleOffset」で数える (既定 0 = 旧い数え方)。 構え (guardPeriod)・灰燼の王〈業火の予兆〉(EmberOmenTiming) も同じ起点を読む
+             (予兆は起点 0 なら T1/1+p/…・ダウンの後は明けてから p ターン目)。
+
 敵攻撃   〈封じ・揃〉が前ターンに成立していれば **このターンの敵攻撃は丸ごと不発**
          (currentBuffs["roleEnemyStun"])。 予告は既に出ているので「見えている一撃を踏み倒す」形。
          〈封じ・対〉は予告値そのものを −40% する (currentBuffs["roleEnemyAtkCut"]・予告にも反映される)。
@@ -883,8 +902,8 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          enemyAtk  = Escalation.EnemyAttackValue(e, escTurn, enemyDiceTotal, currentTurn)
                     = round(段階倍率(escTurn) × (baseAttack + enemyDiceTotal) × 大技倍率(currentTurn) × ボス倍率)
                      大技倍率 (2026-09-19・EnemyData.heavyPeriod > 0 の敵だけ):
-                       currentTurn % heavyPeriod == 0 → heavyMul (大技) / それ以外 → heavyWindupMul (溜め)
-                       周期は冷却材の遅延を受けない実ターンで数える。 予告に turnsToHeavy / heavyMul を出す。
+                       (currentTurn − HeavyCycleOffset) % heavyPeriod == 0 → heavyMul (大技) / それ以外 → heavyWindupMul (溜め)
+                       周期は冷却材の遅延を受けない実ターンで数える (ボスのダウンで起点が戻る・上)。 予告に turnsToHeavy / heavyMul を出す。
                        対象: 5 層以降のボス (5 層・5 層裏・ヴェスカ p1〜p4)。 6 層は〈業火の予兆〉が同じ役なので無し。
                      × 構え倍率 (2026-11-04・EnemyData.guardPeriod > 0 の敵だけ): currentTurn % guardPeriod == 0 → guardAttackMul
                      × 先手倍率 (2026-11-04・EnemyData.openingTurns > 0 の敵だけ): currentTurn ≤ openingTurns → openingAttackMul
