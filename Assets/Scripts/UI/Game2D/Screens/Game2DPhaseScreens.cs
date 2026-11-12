@@ -182,7 +182,7 @@ namespace UI.Game2D
             foreach (var id in cands)
             {
                 var data = ItemDatabase.Instance?.GetItem(id);
-                d.Items.Add(new ModalItem { name = data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : id, desc = data?.description });
+                d.Items.Add(new ModalItem { name = ItemDatabase.DisplayNameOf(data, id), desc = data?.description });
             }
             d.buttons.Add(B("選ぶ", "pick", true));
             d.onAction = (a, sel) => { if (a == "pick") { gm.ResolveStartingPassive(Mathf.Clamp(sel, 0, cands.Count - 1)); Game2DSfx.Play("ui_confirm"); } Refresh(); };
@@ -304,7 +304,7 @@ namespace UI.Game2D
         private static SellEntry Entry(ShopManager.SellSource src, int i, string id)
         {
             var data = ItemDatabase.Instance?.GetItem(id);
-            return new SellEntry { src = src, index = i, name = data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : id, desc = data?.description, icon = data != null ? data.id : id, rarity = data != null ? data.rarity : (ItemRarity?)null };
+            return new SellEntry { src = src, index = i, name = ItemDatabase.DisplayNameOf(data, id), desc = data?.description, icon = data != null ? data.id : id, rarity = data != null ? data.rarity : (ItemRarity?)null };
         }
 
         private ScreenDef Shop(GameManager gm)
@@ -457,8 +457,7 @@ namespace UI.Game2D
         private static string WeaponLabel(string id)
         {
             if (string.IsNullOrEmpty(id)) return "なし";
-            var w = ItemDatabase.Instance?.GetItem(id);
-            return w != null && !string.IsNullOrEmpty(w.displayName) ? w.displayName : id;
+            return ItemDatabase.DisplayNameOf(id);
         }
 
         private static string WeaponLine(RunState run, string id, bool equipped)
@@ -623,8 +622,7 @@ namespace UI.Game2D
                 case ShopSlotKind.FacePart: return "出目パーツ " + DiceFaceParts.Label(s.facePart);
             }
             if (string.IsNullOrEmpty(s.itemId)) return "(空)";
-            var data = ItemDatabase.Instance?.GetItem(s.itemId);
-            return data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : s.itemId;
+            return ItemDatabase.DisplayNameOf(s.itemId);
         }
 
         /// <summary>行の左のアイコン: 品は id (Resources/Icons/Items)、 素材・出目パーツは枠だけ ("")。</summary>

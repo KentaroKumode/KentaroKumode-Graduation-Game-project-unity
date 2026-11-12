@@ -792,7 +792,7 @@ namespace UI.Game2D
             {
                 var r = all[first + i]; rows.Add(r);
                 var data = ItemSystem.ItemDatabase.Instance?.GetItem(r.id);
-                string name = data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : r.id;
+                string name = ItemSystem.ItemDatabase.DisplayNameOf(data, r.id);
                 string block = run != null ? RowBlock(run, r) : "使えない";
                 string value;
                 if (r.rapier) value = Consumables.RapierContreOn() ? "構え中" : "";

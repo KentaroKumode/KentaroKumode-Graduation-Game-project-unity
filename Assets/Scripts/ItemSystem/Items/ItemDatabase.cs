@@ -531,8 +531,13 @@ namespace ItemSystem
         public static string DisplayNameOf(string itemId)
         {
             var data = string.IsNullOrEmpty(itemId) ? null : Instance?.GetItem(itemId);
-            return data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : itemId;
+            return DisplayNameOf(data, itemId);
         }
+
+        /// <summary>引いた品 <paramref name="data"/> の画面に出す品名。 null か name が空なら <paramref name="fallbackId"/> を返す
+        /// (品を引き済みの画面が、 同じ品をもう一度引かずに使う口・2026-11-12)。</summary>
+        public static string DisplayNameOf(CompleteItemData data, string fallbackId)
+            => data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : fallbackId;
 
         /// <summary>
         /// アイテムを取得 (レガシー ID 自動変換対応)。

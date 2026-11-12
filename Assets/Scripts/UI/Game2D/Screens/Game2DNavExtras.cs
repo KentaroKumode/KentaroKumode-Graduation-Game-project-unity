@@ -291,7 +291,7 @@ namespace UI.Game2D
                 string desc = data?.description;
                 if (block != null) desc = string.IsNullOrEmpty(desc) ? "(" + block + ")" : desc + "\n(" + block + ")";
                 d.Items.Add(new ModalItem { icon = id, rarity = data != null ? data.rarity : (ItemSystem.ItemRarity?)null,
-                    name = data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : id, value = _invPassives ? null : "x" + n, desc = desc, disabled = block != null });
+                    name = ItemSystem.ItemDatabase.DisplayNameOf(data, id), value = _invPassives ? null : "x" + n, desc = desc, disabled = block != null });
             }
             if (ids.Count == 0) d.body = _invPassives ? "パッシブを持っていない。" : "消耗品を持っていない。";
             if (!_invPassives) d.buttons.Add(new ModalBtn { label = "使う", action = "use", primary = true });
