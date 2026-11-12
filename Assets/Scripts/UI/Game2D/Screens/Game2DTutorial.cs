@@ -138,6 +138,7 @@ namespace UI.Game2D
             new Topic(TutorialTopics.Shop, Scene.Any),
             new Topic(TutorialTopics.Origin, Scene.Any),
             new Topic(TutorialTopics.LayerBoss, Scene.Battle),
+            new Topic(TutorialTopics.BossDown, Scene.Battle),      // 2026-11-13: 表に無く、 Request が黙って捨てていた (docs/qa/spec-gaps.md G-21)
             new Topic(TutorialTopics.MetaPanel, Scene.Any),
             new Topic(TutorialTopics.Challenge, Scene.Title),
         };
