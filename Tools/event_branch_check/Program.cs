@@ -139,6 +139,15 @@ static class Program
         var front = new EventEffectSituation { navKnown = true, map = true, foe = true, weather = true, frontArrived = false, canTrade = true, canForge = true };
         Check(EventEffectRoles.NotHappeningReason(E(EventEffectType.ShiftFront, -2), front) == "前線はまだ来ていない"
               && EventEffectRoles.NotHappeningReason(E(EventEffectType.ShiftFront, 2), front) == null, "規則: まだ来ていない前線は遠ざけられない・近づけるのは起きる");
+        // 嵐 (2026-11-13): 「前線を遠ざける/近づける」は嵐の時計を動かす。 静かな時間でも遠ざけられる (まだ来ていないで選べなくしない)・嵐の無い層は「この層に嵐は無い」
+        var quiet = new EventEffectSituation { navKnown = true, map = true, foe = true, weather = false, frontArrived = false, stormRules = true, storm = true, canTrade = true, canForge = true };
+        var noStorm = new EventEffectSituation { navKnown = true, map = true, foe = false, weather = false, stormRules = true, storm = false, canTrade = true, canForge = true };
+        Check(EventEffectRoles.NotHappeningReason(E(EventEffectType.ShiftFront, -2), quiet) == null
+              && EventEffectRoles.NotHappeningReason(E(EventEffectType.ShiftFront, 2), quiet) == null
+              && EventEffectRoles.NotHappeningReason(E(EventEffectType.ShiftFront, -2), noStorm) == "この層に嵐は無い"
+              && EventEffectRoles.NothingGainedReason(new List<EventEffect> { E(EventEffectType.ShiftFront, -2) }, noStorm) == "この層に嵐は無い"
+              && EventEffectRoles.NothingGainedReason(new List<EventEffect> { E(EventEffectType.ShiftFront, -2) }, quiet) == null,
+              "規則 (嵐): 嵐のある層は静かな時間でも遠ざけられる・嵐の無い層は「この層に嵐は無い」で選べない");
     }
 
     sealed class Scene
