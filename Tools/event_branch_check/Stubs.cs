@@ -89,6 +89,8 @@ namespace GameLoop
     public static class GameHooks
     {
         public static bool RiftRecordAtBoss = true;
+        /// <summary>検算が場面ごとに決める: 天候が「嵐」の作りか (本体の既定は true・ここでは旧い前線の規則を既定にする)。</summary>
+        public static bool StormEnabled = false;
     }
 
     public class GameManager
@@ -104,9 +106,4 @@ namespace GameLoop
         public static int WeaponUpgradeCost(RunState run) => ForgeCost;
     }
 
-    public static class GameHooks
-    {
-        /// <summary>検算が場面ごとに決める: 天候が「嵐」の作りか (本体の既定は true)。</summary>
-        public static bool StormEnabled = false;
-    }
 }
