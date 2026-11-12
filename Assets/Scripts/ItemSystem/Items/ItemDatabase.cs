@@ -254,6 +254,8 @@ namespace ItemSystem
                 item.buyPrice = new PriceRange { min = buyMin, max = buyMax };
                 item.sellPrice = new PriceRange { min = sellMin, max = sellMax };
             }
+            // 売値 0G の品 (2026-11-13)。 買値と sellPrice の幅は basePrice のまま (CompleteItemData.basePrice を変えない)
+            item.noSellValue = jsonItem.noSellValue;
             
             // 武器ダイス設定（JSON の diceCount / diceMax から生成）
             if (jsonItem.diceCount > 0)

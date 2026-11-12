@@ -101,6 +101,9 @@ namespace ItemSystem
         /// <summary>武器の貫通 (ADR-0013)。 <c>[無印, +]</c> の 2 要素。 Weaponのみ。</summary>
         public int[] armorPen;
         public int basePrice;        // 設定中央価格（購入/売却額はシステムが±25%で算出）
+        /// <summary>売値 0G の品 (2026-11-13)。 true なら売っても 0G (売ること自体はできる)・BOT は売らない。
+        /// 買値 (<see cref="basePrice"/>) には効かない。 規則は ItemSystem.Shop.SellPriceRule。</summary>
+        public bool noSellValue;
         public int[] diceFaces;      // ダイスアイテムの面配列
         /// <summary>ADR-0010〈無銘の賽〉: このダイスでは**端子役が成立しない**。
         /// 手札役・配線役は通常どおり成立する。

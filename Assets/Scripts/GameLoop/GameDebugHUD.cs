@@ -534,8 +534,7 @@ namespace GameLoop
                         string id = list[i];
                         var data = ItemDatabase.Instance?.GetItem(id);
                         string name = data != null ? data.displayName : id;
-                        int approx = ApproxSellPrice(data);
-                        sb.AppendLine($"  [{i + 1}] {name} (≈{approx}G)");
+                        sb.AppendLine($"  [{i + 1}] {name} ({ShopManager.SellPriceLabel(id)})");
                     }
                 }
             }
@@ -583,12 +582,6 @@ namespace GameLoop
                 case ShopManager.SellSource.WeaponMaterial: return "強化素材";
                 default: return "?";
             }
-        }
-
-        private int ApproxSellPrice(CompleteItemData data)
-        {
-            if (data?.sellPrice == null) return 5;
-            return (data.sellPrice.min + data.sellPrice.max) / 2;
         }
 
         private string PhaseToJapanese(GameManager.GamePhase phase)

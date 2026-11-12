@@ -1630,7 +1630,8 @@
       "flavorText": "決闘記録では、シュヴァリエは必ず後手を取った。敗北の記録は一つもなく、先に抜いた相手の名だけがすべて抹消されている。",
       "category": "Passive",
       "rarity": "LEGENDARY",
-      "basePrice": 10
+      "basePrice": 10,
+      "noSellValue": true
     },
     {
       "id": "十五年目の計測器",
@@ -1736,7 +1737,8 @@
       "flavorText": "油を足した記録は無いのに、灯は減らない。刻印は一つきりで、渡した回数を刻む決まりだったと聞く。",
       "category": "Passive",
       "rarity": "GOLD",
-      "basePrice": 9
+      "basePrice": 9,
+      "noSellValue": true
     },
     {
       "id": "希望の灯片",

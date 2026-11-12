@@ -6,6 +6,9 @@
 //      得になる効果が何ひとつ起きない時だけ。 全イベントを本物の解析 (EventParser) で読み、 状況を総当たりして
 //      「暗くなり得る選択肢」の一覧と理由を出し、 全部が同時に暗くなり得るイベントが 0 件であることを見る
 //   4. 〈さびれた観測所〉3 本の選択肢と効果の並び・博士の時計が秘宝として items.json と除外の集合に入っているか (2026-11-13)
+//   5. 手放せない品 (確信の 3 品・預かり物・ItemIds.Undroppable): 売却・取り替え・偽の商人のどの経路でも残るか・
+//      確信を売ってしまったランで深さ 5 のボスを倒すと〈決意〉が足されるか (2026-11-13・Ids.cs と ConvictionSystem.cs は本物をコンパイル)
+//   6. 売値 0G の品 (灯火・レイピア・items.json の noSellValue): 売値の規則 (SellPriceRule は本物をコンパイル)・BOT は売らない・人は売れる
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -297,12 +300,135 @@ static class Program
         Check(prog >= 0 && progEnd > prog && Regex.IsMatch(ids.Substring(prog, progEnd - prog), @"^\s*VescaClock,", RegexOptions.Multiline),
               "時計: 進行用の品 (ItemIds.ProgressionItems: 〈門〉・大罪・BOT の学習から外す)");
         Check(Regex.IsMatch(ids, @"Entrusted\s*=\s*new System\.Collections\.Generic\.HashSet<string> \{ VescaClock \}"),
-              "時計: 預かり物 (ItemIds.Entrusted: 売れない・取り替えに出さない・ランダムに失わない・図鑑は手に入れるまで出さない)");
+              "時計: 預かり物 (ItemIds.Entrusted: 図鑑は手に入れるまで出さない・手放せない品 Undroppable にも入る ── 下の KeepConviction)");
         string clock = File.ReadAllText(Path.Combine(root, "Assets/Scripts/GameLoop/VescaClock.cs"));
         Check(clock.Contains("ownedPassiveItems.Contains(ItemIds.VescaClock)") && clock.Contains("PassiveAddHelper.AddPassiveItem(run, ItemIds.VescaClock)")
               && !clock.Contains("ownedFlags.Add"), "時計: 持っているか = 秘宝の所持 (ownedFlags は使わない)");
         Check(!clock.Contains("VescaLine") && !File.ReadAllText(Path.Combine(root, "Assets/Scripts/CombatSystem/CombatManager.Down.cs")).Contains("[ヴェスカ]"),
               "時計: ヴェスカの台詞は置かない (作者の決定)");
+    }
+
+    /// <summary>手放せない品 (2026-11-13・ItemIds.Undroppable): 確信の 3 品と預かり物は売却・取り替え・偽の商人のどの経路でも持ち物に残る。
+    /// 判定 (ItemIds.CanSell / CanTradeAway / CanBeLost) は本物をコンパイルして見る。 経路 (ShopManager・GameManager・画面) は
+    /// UnityEngine に深く依存するのでコンパイルせず、 その判定を呼んでいることと、 集合を直接読む所が Ids.cs の外に無いことを原文で見る。
+    /// 確信の書き換え (ConvictionSystem) は本物をコンパイルし、 確信を売ってしまったランで深さ 5 のボス撃破の後に〈決意〉が足されるかを見る。</summary>
+    static void KeepConviction(string root)
+    {
+        string[] keep = { GameLoop.ConvictionSystem.IdConviction, GameLoop.ConvictionSystem.IdResolve, GameLoop.ConvictionSystem.IdTruth, GameLoop.ItemIds.VescaClock };
+        foreach (var id in keep)
+            Check(!GameLoop.ItemIds.CanSell(id) && !GameLoop.ItemIds.CanTradeAway(id) && !GameLoop.ItemIds.CanBeLost(id)
+                  && GameLoop.ItemIds.RefuseSellText(id) != null && !GameLoop.ItemIds.CanOfferAtGate(id) && !GameLoop.ItemIds.CanBeTakenBySin(id),
+                  $"手放せない: 〈{id}〉は売れない・取り替えに出さない・失わない・〈門〉と大罪の対象外");
+        foreach (var id in new[] { "ちいさな灯火", "シュヴァリエのレイピア", "合札" })
+            Check(GameLoop.ItemIds.CanSell(id) && GameLoop.ItemIds.CanTradeAway(id) && GameLoop.ItemIds.CanBeLost(id),
+                  $"手放せる: 〈{id}〉は売れる (灯火・レイピアは売値 0G ── 下の ZeroSellPrice)");
+        Check(GameLoop.ItemIds.RefuseSellText(GameLoop.ItemIds.VescaClock) == "預かった品は売れない"
+              && GameLoop.ItemIds.RefuseSellText(GameLoop.ConvictionSystem.IdConviction) == "これは手放せない",
+              "手放せない: 断りの文は集合ごと (時計 = 預かった品は売れない・確信 = これは手放せない)");
+        Check(GameLoop.ItemIds.HiddenInCodexUntilOwned(GameLoop.ItemIds.VescaClock)
+              && !GameLoop.ItemIds.HiddenInCodexUntilOwned(GameLoop.ConvictionSystem.IdConviction)
+              && !GameLoop.ItemIds.HiddenInCodexUntilOwned(GameLoop.ConvictionSystem.IdTruth),
+              "図鑑: 枠を隠すのは預かり物 (時計) だけ・確信の 3 品は隠さない");
+        bool subset = true;
+        foreach (var id in GameLoop.ItemIds.Undroppable) subset &= GameLoop.ItemIds.ProgressionItems.Contains(id);
+        Check(subset, "手放せない品は全部、 進行用の品 (〈門〉・大罪・学習から外す) にも入っている");
+
+        // 経路が判定を呼んでいるか (原文)
+        string Src(string p) => File.ReadAllText(Path.Combine(root, p));
+        string shop = Src("Assets/Scripts/ItemSystem/Shop/ShopManager.cs");
+        int sell = shop.IndexOf("public bool TrySell(", StringComparison.Ordinal);
+        int refuse = sell < 0 ? -1 : shop.IndexOf("!GameLoop.ItemIds.CanSell(id)", sell, StringComparison.Ordinal);
+        int remove = sell < 0 ? -1 : shop.IndexOf("PassiveAddHelper.RemoveAt(run, listIndex)", sell, StringComparison.Ordinal);
+        Check(refuse > sell && remove > refuse, "売却: ShopManager.TrySell は外す前に ItemIds.CanSell で断る (人・BOT・キー操作の共通の口)");
+        Check(Src("Assets/Scripts/UI/Game2D/Screens/Game2DPhaseScreens.cs").Contains("ItemIds.CanSell(run.ownedPassiveItems[i])"), "売る画面: ItemIds.CanSell で並べない");
+        string tiles = Src("Assets/Scripts/GameLoop/GameManager.Tiles.cs");
+        Check(tiles.Contains("if (!ItemIds.CanTradeAway(owned[i])) continue;"), "取り替え: LowestTierPassiveIndex (交換マス・イベント) は ItemIds.CanTradeAway で外す");
+        Check(tiles.Contains("if (ItemIds.CanBeLost(owned[i])) cands.Add(i);"), "偽の商人: LoseRandomPassiveItem は ItemIds.CanBeLost の品からだけ選ぶ");
+        Check(Src("Assets/Scripts/AutoTest/AutoRunner.Shop.cs").Contains("if (!GameLoop.ItemIds.CanSell(id)) continue;"), "BOT の売却 (SellOneScore0): 売れない品を飛ばして次の品へ");
+        var direct = new List<string>();
+        foreach (var f in Directory.GetFiles(Path.Combine(root, "Assets/Scripts"), "*.cs", SearchOption.AllDirectories))
+        {
+            if (f.Replace('\\', '/').EndsWith("GameLoop/Ids.cs", StringComparison.Ordinal)) continue;
+            foreach (var line in File.ReadAllLines(f))
+            {
+                string code = line.TrimStart();
+                if (code.StartsWith("//")) continue;
+                if (Regex.IsMatch(code, @"\b(Entrusted|Undroppable|ProgressionItems)\.Contains\(")) direct.Add(Path.GetFileName(f) + ": " + code);
+            }
+        }
+        Check(direct.Count == 0, "集合を直接読む所が Ids.cs の外に無い (経路は判定メソッドを呼ぶ)" + (direct.Count > 0 ? " ── " + string.Join(" / ", direct) : ""));
+
+        // 確信の書き換え (本物の ConvictionSystem)
+        var run = new GameLoop.RunState { convictionStage = 1 };
+        run.seenPassiveItemIds.Add(GameLoop.ConvictionSystem.IdConviction);   // 確信は手に入れてから売った (古い中断セーブ)
+        GameLoop.ConvictionSystem.OnEliteDefeated(run);
+        Check(run.convictionStage == 2 && run.ownedPassiveItems.Count == 0, "エリート撃破: 確信の品が無くても段が 1 以上なら段 +1 (品は足さない)");
+        Check(GameLoop.ConvictionSystem.PromoteForLayer6(run) && run.layer6Unlocked && run.ownedPassiveItems.Contains(GameLoop.ConvictionSystem.IdResolve),
+              "深さ 5 のボス撃破: 確信を売ったランでも〈決意〉が持ち物に足される");
+        Check(GameLoop.ConvictionSystem.RevealTruthInLayer6(run) && run.layer7Unlocked
+              && run.ownedPassiveItems.Count == 1 && run.ownedPassiveItems[0] == GameLoop.ConvictionSystem.IdTruth,
+              "裂け目の記録: 〈決意〉が〈真理〉に書き換わる (1 品のまま)");
+        var held = new GameLoop.RunState { convictionStage = 1 };
+        held.ownedPassiveItems.Add(GameLoop.ConvictionSystem.IdConviction);
+        int adds = ItemSystem.Helpers.PassiveAddHelper.Adds;
+        GameLoop.ConvictionSystem.PromoteForLayer6(held);
+        Check(held.ownedPassiveItems.Count == 1 && held.ownedPassiveItems[0] == GameLoop.ConvictionSystem.IdResolve && ItemSystem.Helpers.PassiveAddHelper.Adds == adds,
+              "深さ 5 のボス撃破: 確信を持っていれば書き換えるだけ (足さない)");
+        var none = new GameLoop.RunState();
+        GameLoop.ConvictionSystem.OnEliteDefeated(none);
+        Check(!GameLoop.ConvictionSystem.PromoteForLayer6(none) && none.convictionStage == 0 && none.ownedPassiveItems.Count == 0,
+              "災厄の予兆を受けていないラン: エリートでも段は 0・深さ 5 のボスで資格も品も得ない");
+    }
+
+    /// <summary>売値 0G の品 (2026-11-13・作者の決定): 〈ちいさな灯火〉〈シュヴァリエのレイピア〉は売値 0G (items.json の noSellValue)・
+    /// 人は売れる (ItemIds.CanSell は true のまま)・BOT の売却 (SellOneScore0) は候補から外す。 規則 (SellPriceRule) は本物をコンパイル、
+    /// 経路 (ShopManager・AutoRunner・画面) は UnityEngine に依存するので原文で見る。</summary>
+    static void ZeroSellPrice(string root)
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "Assets/Data/InventorySystem/items.json")));
+        var zero = new List<string>();
+        foreach (var it in doc.RootElement.GetProperty("items").EnumerateArray())
+        {
+            bool flag = it.TryGetProperty("noSellValue", out var v) && v.ValueKind == System.Text.Json.JsonValueKind.True;
+            // 幅は最悪 (0〜0 = basePrice の無い品) で見る: それでも 0G になるのは noSellValue の品だけ
+            ItemSystem.Shop.SellPriceRule.Range(flag, 0, 0, out _, out int max);
+            if (max <= 0) zero.Add(it.GetProperty("id").GetString());
+        }
+        zero.Sort(StringComparer.Ordinal);
+        var want = new List<string> { "シュヴァリエのレイピア", "ちいさな灯火" }; want.Sort(StringComparer.Ordinal);
+        Check(string.Join("・", zero) == string.Join("・", want), "売値 0G: 灯火とレイピアだけ (" + string.Join("・", zero) + ")");
+        ItemSystem.Shop.SellPriceRule.Range(false, 0, 0, out int lo0, out int hi0);
+        ItemSystem.Shop.SellPriceRule.Range(false, 5, 8, out int lo1, out int hi1);
+        Check(lo0 == 1 && hi0 == 1 && lo1 == 5 && hi1 == 8, "売値: basePrice の無い品は 1G・ある品は basePrice の幅のまま");
+        ItemSystem.Shop.SellPriceRule.Range(true, 5, 8, out int lo2, out int hi2);
+        Check(lo2 == 0 && hi2 == 0, "売値: noSellValue の品は basePrice があっても 0G (買値は basePrice のまま)");
+        foreach (var id in want) Check(GameLoop.ItemIds.CanSell(id), $"売値 0G: 〈{id}〉も人は売れる (CanSell に入れない)");
+
+        string Src(string p) => File.ReadAllText(Path.Combine(root, p));
+        string bot = Src("Assets/Scripts/AutoTest/AutoRunner.Shop.cs");
+        int fn = bot.IndexOf("bool SellOneScore0()", StringComparison.Ordinal);
+        int skip = fn < 0 ? -1 : bot.IndexOf("if (ItemSystem.Shop.ShopManager.SellsForNothing(id)) continue;", fn, StringComparison.Ordinal);
+        int sell = fn < 0 ? -1 : bot.IndexOf("BotSelling.TrySellFromBot(run, i)", fn, StringComparison.Ordinal);
+        Check(skip > fn && sell > skip, "BOT の売却 (SellOneScore0): 売値 0G の品を売る前に候補から外す");
+        string shop = Src("Assets/Scripts/ItemSystem/Shop/ShopManager.cs");
+        Check(shop.Contains("SellPriceRule.Range(data.noSellValue,") && shop.Contains("int price = ResolveSellPrice(id);") && !shop.Contains("Mathf.Max(1, Mathf.RoundToInt("),
+              "売却: TrySell は SellRange (SellPriceRule) の値をそのまま入れる (0G を 1G に繰り上げない)");
+        Check(Src("Assets/Scripts/UI/Game2D/Screens/Game2DPhaseScreens.cs").Contains("price = ShopManager.SellPriceLabel(id)"), "売る画面: 売値は SellPriceLabel (売却と同じ SellRange)");
+        Check(Src("Assets/Scripts/ItemSystem/Items/ItemDatabase.cs").Contains("item.noSellValue = jsonItem.noSellValue;"), "読み込み: ItemDatabase が noSellValue を品へ写す");
+        // 品の売値の幅 (sellPrice) を直接読む所が ShopManager.SellRange の外に無い (noSellValue を見落とさないため)
+        var direct = new List<string>();
+        foreach (var f in Directory.GetFiles(Path.Combine(root, "Assets/Scripts"), "*.cs", SearchOption.AllDirectories))
+        {
+            string name = Path.GetFileName(f);
+            if (name == "ItemDatabase.cs" || name == "ItemDataV2.cs") continue;   // 作る所と型の定義
+            foreach (var line in File.ReadAllLines(f))
+            {
+                string code = line.TrimStart();
+                if (code.StartsWith("//") || code.StartsWith("///")) continue;
+                if (Regex.IsMatch(code, @"\.sellPrice\b(?!"")") && !code.Contains("SellPriceRule.Range(data.noSellValue,")) direct.Add(name + ": " + code);
+            }
+        }
+        Check(direct.Count == 0, "売値の幅を直接読む所が SellRange の外に無い" + (direct.Count > 0 ? " ── " + string.Join(" / ", direct) : ""));
     }
 
     static int Main(string[] args)
@@ -315,6 +441,8 @@ static class Program
         Selectability(dir);
         Observatory(dir);
         ClockRelic(Path.GetFullPath(Path.Combine(dir, "../../..")));   // dir = <root>/Assets/Resources/Events
+        KeepConviction(Path.GetFullPath(Path.Combine(dir, "../../..")));
+        ZeroSellPrice(Path.GetFullPath(Path.Combine(dir, "../../..")));
         Console.WriteLine(fails == 0 ? "ALL OK" : $"{fails} 件 NG");
         return fails == 0 ? 0 : 1;
     }

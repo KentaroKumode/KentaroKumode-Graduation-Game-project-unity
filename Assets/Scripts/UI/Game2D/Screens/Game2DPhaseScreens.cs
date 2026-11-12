@@ -310,7 +310,7 @@ namespace UI.Game2D
         private int _sellPage;
         private const int SellPerPage = 10;
 
-        private struct SellEntry { public ShopManager.SellSource src; public int index; public string name, desc, icon; public ItemRarity? rarity; }
+        private struct SellEntry { public ShopManager.SellSource src; public int index; public string name, desc, icon, price; public ItemRarity? rarity; }
 
         private static List<SellEntry> SellList(RunState run)
         {
@@ -318,19 +318,20 @@ namespace UI.Game2D
             if (run.ownedPassiveItems != null)
                 for (int i = 0; i < run.ownedPassiveItems.Count; i++)
                     if (run.ownedPassiveItems[i] != run.equippedWeaponId      // 装備中の武器は売らせない (武器もパッシブの一覧に入っている)
-                        && !ItemIds.Entrusted.Contains(run.ownedPassiveItems[i]))   // 預かり物 (博士の時計) は売れない (ShopManager.TrySell)
+                        && ItemIds.CanSell(run.ownedPassiveItems[i]))   // 手放せない品 (確信の 3 品・預かり物) は売れない (ShopManager.TrySell と同じ判定)
                         l.Add(Entry(ShopManager.SellSource.Passive, i, run.ownedPassiveItems[i]));
             if (run.ownedConsumables != null)
                 for (int i = 0; i < run.ownedConsumables.Count; i++) l.Add(Entry(ShopManager.SellSource.Consumable, i, run.ownedConsumables[i]));
             if (run.weaponMaterials > 0)
-                l.Add(new SellEntry { src = ShopManager.SellSource.WeaponMaterial, index = 0, name = "強化素材 (所持 " + run.weaponMaterials + ")", desc = "1 つ売る。", icon = "" });
+                l.Add(new SellEntry { src = ShopManager.SellSource.WeaponMaterial, index = 0, name = "強化素材 (所持 " + run.weaponMaterials + ")", desc = "1 つ売る。", icon = "", price = ShopManager.WeaponMaterialSellPrice + "G" });
             return l;
         }
 
         private static SellEntry Entry(ShopManager.SellSource src, int i, string id)
         {
             var data = ItemDatabase.Instance?.GetItem(id);
-            return new SellEntry { src = src, index = i, name = ItemDatabase.DisplayNameOf(data, id), desc = data?.description, icon = data != null ? data.id : id, rarity = data != null ? data.rarity : (ItemRarity?)null };
+            // 売値は ShopManager.SellRange (売却・BOT と同じ口)。 売値 0G の品 (items.json の noSellValue) は「0G」と出て、 売れば 0G が入る
+            return new SellEntry { src = src, index = i, name = ItemDatabase.DisplayNameOf(data, id), desc = data?.description, icon = data != null ? data.id : id, price = ShopManager.SellPriceLabel(id), rarity = data != null ? data.rarity : (ItemRarity?)null };
         }
 
         private ScreenDef Shop(GameManager gm)
@@ -609,12 +610,12 @@ namespace UI.Game2D
             int pages = Mathf.Max(1, (list.Count + SellPerPage - 1) / SellPerPage); _sellPage = Mathf.Clamp(_sellPage, 0, pages - 1);
             var d = New("ショップ ― 売る", "所持金 " + run.coins + "G", 460); d.cols = 2;
             int first = _sellPage * SellPerPage, cnt = Mathf.Min(SellPerPage, list.Count - first);
-            for (int i = 0; i < cnt; i++) { var e = list[first + i]; d.Items.Add(new ModalItem { name = e.name, desc = e.desc, icon = e.icon, rarity = e.rarity, value = e.src == ShopManager.SellSource.Consumable ? "消耗品" : e.src == ShopManager.SellSource.WeaponMaterial ? "素材" : null }); }
+            for (int i = 0; i < cnt; i++) { var e = list[first + i]; d.Items.Add(new ModalItem { name = e.name, desc = e.desc, icon = e.icon, rarity = e.rarity, value = (e.src == ShopManager.SellSource.Consumable ? "消耗品 " : e.src == ShopManager.SellSource.WeaponMaterial ? "素材 " : "") + e.price }); }
             if (list.Count == 0) d.body = "売れる物を持っていない。";
             d.buttons.Add(B("売る", "sell", true));
             if (pages > 1) d.buttons.Add(B("次の頁 " + (_sellPage + 1) + "/" + pages, "page"));
             d.buttons.Add(B("買う画面へ", "buymode"));
-            d.footer = "売る物を選んで「売る」 (値はレア度で決まる)";
+            d.footer = "売る物を選んで「売る」";
             d.onAction = (a, sel) =>
             {
                 switch (a)
@@ -623,12 +624,14 @@ namespace UI.Game2D
                     {
                         if (sel < 0 || sel >= cnt) break;
                         var e = list[first + sel]; int before = run.coins;
+                        // 売れたかは持ち物の数で見る (売値 0G の品は売っても所持金が増えない)
+                        int held = (run.ownedPassiveItems?.Count ?? 0) + (run.ownedConsumables?.Count ?? 0) + run.weaponMaterials;
                         // GameManager の売却は「売る対象の種類」を切り替えてから番号で売る (キー操作と同じ口)
                         if (!gm.ShopSellMode) gm.ToggleShopSellMode();
                         for (int k = 0; k < 3 && gm.ShopSellSource != e.src; k++) gm.CycleSellSource();      // 種類は 3 つ (パッシブ・消耗品・素材) を回る
                         if (gm.ShopSellSource != e.src) { modal.ShowToast("売れない"); break; }
                         gm.ShopSell(e.index);
-                        if (run.coins > before) { Game2DSfx.Play("ui_confirm"); modal.ShowToast(e.name + " を売った +" + (run.coins - before) + "G"); }
+                        if ((run.ownedPassiveItems?.Count ?? 0) + (run.ownedConsumables?.Count ?? 0) + run.weaponMaterials < held) { Game2DSfx.Play("ui_confirm"); modal.ShowToast(e.name + " を売った +" + (run.coins - before) + "G"); }
                         else modal.ShowToast("売れない");
                         break;
                     }
