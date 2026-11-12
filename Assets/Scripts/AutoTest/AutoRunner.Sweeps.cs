@@ -1444,7 +1444,6 @@ namespace AutoTest
             CombatStats.ResetDamageBreakdown();
             SuperCombatAI.ResetSearchStats();
             ResetNavStats();
-            AutoTest.FamilyTierStats.Reset();
         }
 
         /// <summary>実ランから5F到達ビルドを採取し、全武器で5Fボス勝率を総当たり計測。

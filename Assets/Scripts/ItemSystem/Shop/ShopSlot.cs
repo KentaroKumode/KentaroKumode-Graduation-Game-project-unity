@@ -17,11 +17,6 @@ namespace ItemSystem.Shop
         public int discountPct;
         /// <summary>特売前の元価格 (UI 表示用、 計算では使わない)。</summary>
         public int originalPrice;
-
-        /// <summary>[計装] 上位互換アップグレード割引が乗っているスロットの段差 (0 = 割引なし)。
-        /// 購入時に <c>AutoTest.FamilyTierStats.NoteUpgradeBought</c> を撃つためだけに持つ ──
-        /// **提示だけでなく成約を数えないと、「1G でも見送られている」が見えない。**</summary>
-        public int upgradeStep;
     }
 
     public enum ShopSlotKind

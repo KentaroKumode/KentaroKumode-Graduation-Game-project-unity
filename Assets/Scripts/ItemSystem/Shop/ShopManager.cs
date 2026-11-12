@@ -778,9 +778,6 @@ namespace ItemSystem.Shop
                 run.shopPurchasedCounts[slot.itemId] = prev + 1;
             }
             slot.sold = true;
-            // [計装] 1G アップグレードが**成約**した回数 (§ FamilyTierStats ②)。
-            //   提示だけ数えても「並んでいた」しか分からない。 梯子を登った回数はこちら。
-            if (slot.upgradeStep > 0) GameLoop.GameHooks.OnShopUpgradeBought?.Invoke(slot.upgradeStep);
 
             var data = ItemDatabase.Instance?.GetItem(slot.itemId);
             // パーツは ItemDatabase に無い ── GetItem は null を返すので表示名は自前で引く。

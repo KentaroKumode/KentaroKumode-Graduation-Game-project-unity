@@ -279,20 +279,7 @@ namespace AutoTest
                 }
             }
 
-            // 上位 Lv 抑制 (2026-06-22 高速化: 旧版は O(skills²)、 family→maxLv マップで O(skills) に短縮)
-            var familyMaxLv = new Dictionary<string, int>();
-            foreach (var sid in allSkillIds)
-            {
-                var (fam, lv) = ItemSystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(sid);
-                if (lv > 0 && (!familyMaxLv.TryGetValue(fam, out int prev) || lv > prev))
-                    familyMaxLv[fam] = lv;
-            }
-            foreach (var sid in allSkillIds)
-            {
-                var (fam, lv) = ItemSystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(sid);
-                if (lv > 0 && familyMaxLv.TryGetValue(fam, out int maxLv) && maxLv > lv) continue;
-                result.Add(sid);
-            }
+            foreach (var sid in allSkillIds) result.Add(sid);
             return result;
         }
     }

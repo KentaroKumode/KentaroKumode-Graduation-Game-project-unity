@@ -491,7 +491,6 @@ namespace AutoTest
             _cur.policyVariant = _currentRunVariant;
             _cur.pairedSeed = _currentRunSeed;
             _records.Add(_cur);
-            NoteFamilyTierRunEnd();
             AutoTest.Ultra.UltraDecisionCensus.NoteRunCompleted();
             RecordScreenRunCompletion(_cur);
             _curLog.Enqueue($"[AutoRunner] === RUN {_cur.index} 終了: {_cur.band} ({_cur.bandLabel}) — {note} ===");

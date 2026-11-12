@@ -36,9 +36,6 @@ namespace AutoTest
             GameHooks.WeaponEvBonus = LearnedWeaponBonus;
             GameHooks.MeasureRunPower = InventoryPower.Compute;
             GameHooks.OnCritRateResolved = CritRateCensus.Note;
-            GameHooks.OnShopTierOffered = FamilyTierStats.NoteOffer;
-            GameHooks.OnShopUpgradeOffered = FamilyTierStats.NoteUpgradeOffered;
-            GameHooks.OnShopUpgradeBought = FamilyTierStats.NoteUpgradeBought;
             BossTuning.Install();
         }
 

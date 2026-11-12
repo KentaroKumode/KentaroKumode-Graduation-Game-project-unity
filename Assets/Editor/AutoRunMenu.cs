@@ -426,7 +426,6 @@ namespace AutoTest.EditorTools
             MetaMode = AutoRunner.MetaBuffMode.Standard;
             ItemMode = AutoRunner.ItemPickMode.TierBased;
             Skill = AutoRunner.WiringSkill.Optimal;       // Super は 1 ラン 5-10 秒で 25 万ランに乗らない
-            AutoTest.LearnedPriorityProvider.DisableFamilyLvBonus = true;
             // **武器家系をクラス開始武器に固定する** (2026-09-05)。 職業は 4 種均等配分なので
             //   各家系が約 25% のランで最後まで担がれ、 4 家系を同じ厚みで測れる。
             //   固定しないと BOT の乗り換えが偏り (実測 盾 1.0%〜4.7%)、

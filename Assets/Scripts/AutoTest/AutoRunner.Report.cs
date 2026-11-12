@@ -365,7 +365,6 @@ namespace AutoTest
                 long s = ItemSystem.PassiveSkills.CombatContext.ChargeSpentTotal;
                 long rrC = CombatStats.RerollStats[2];
                 double t = System.Math.Max(1, CombatSystem.YachtRoleEffects.TurnsEvaluated);
-                sb.Append(AutoTest.FamilyTierStats.Dump());
                 sb.AppendLine("【充電経済】");
                 sb.AppendLine($"  収入 {g:N0} (1ターン {g / t:F2}) / 上限で破棄 {w:N0} (1ターン {w / t:F2}"
                             + $" ・収入比 {(g + w > 0 ? 100.0 * w / (g + w) : 0):F1}%)");

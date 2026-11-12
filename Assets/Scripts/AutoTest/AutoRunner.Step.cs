@@ -23,8 +23,6 @@ namespace AutoTest
         private IEnumerator RunOne(int index)
         {
             var gm = GameManager.Instance;
-            // [計装] 家系 Tier の梯子。 ラン内カウンタだけ落とす (累計は保つ)。
-            AutoTest.FamilyTierStats.BeginRun();
             // 全ラン戦闘貪欲ルーチン（戦闘回避ルーチンは廃止）
             _curCombatAverse = false;
 

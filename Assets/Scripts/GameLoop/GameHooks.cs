@@ -100,15 +100,6 @@ namespace GameLoop
         /// <summary>会心率を決めた直後 (逓減前の加算合計, 実効率)。</summary>
         public static Action<float, float> OnCritRateResolved;
 
-        /// <summary>ショップが段付き武器を並べた (家系, 段)。</summary>
-        public static Action<string, int> OnShopTierOffered;
-
-        /// <summary>ショップが強化枠を並べた。</summary>
-        public static Action OnShopUpgradeOffered;
-
-        /// <summary>ショップで強化を買った (上がった段数)。</summary>
-        public static Action<int> OnShopUpgradeBought;
-
         /// <summary>全部の口を外す (BOT の口だけ。 〈猫の手〉の <see cref="CatPawPick"/> は札の効果なので残す)。</summary>
         public static void Clear()
         {
@@ -120,9 +111,6 @@ namespace GameLoop
             WeaponEvBonus = null;
             MeasureRunPower = null;
             OnCritRateResolved = null;
-            OnShopTierOffered = null;
-            OnShopUpgradeOffered = null;
-            OnShopUpgradeBought = null;
             EnemyArmorPenOverride = null;
             RelicStatOffMask = 0;
             RelicSetBonusOffMask = 0;
