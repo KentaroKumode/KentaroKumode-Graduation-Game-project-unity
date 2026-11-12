@@ -143,16 +143,6 @@ namespace AutoTest
         public WiringSkill EffectiveWiringSkill
             => wiringSkill == WiringSkill.Ultra ? _ultraSelectedBaseSkill : wiringSkill;
 
-        [Header("通常AI・並列評価")]
-        [Tooltip("【実験用】Optimal AI の配線候補評価を CPU 並列化する。長時間バッチで停止事例があるため既定OFF")]
-        public bool parallelizeOptimalWiring = false;
-        [Tooltip("この候補数以上で並列化する。小さい探索はスレッド起動コストを避けて直列実行")]
-        public int optimalWiringParallelMinCandidates = 128;
-        [Tooltip("並列ワーカー上限。0 は min(8, 論理CPU数-1)。小候補での過剰並列を防ぐ")]
-        public int optimalWiringMaxParallelism = 0;
-        [NonSerialized] public long optimalWiringDecisions;
-        [NonSerialized] public long optimalWiringCandidatesEvaluated;
-
         /// <summary>旧い先読み方策 (戦闘決着までのロールアウト)。 <b>端子の山札 (2026-11-11) の後は戦闘の判断に使わない</b> ──
         /// 配線とリロールは AutoRunner.Combat で山札の方策に上書きされ、 ここは <c>ResetForRun</c> / <c>BeginCombat</c> の副作用だけが残る
         /// (super_prof.txt は「配線 0 回 / リロール 0 回」)。 <see cref="WiringSkill.Super"/> の実態はその enum の説明を読むこと。</summary>

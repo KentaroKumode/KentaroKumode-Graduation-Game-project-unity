@@ -262,7 +262,10 @@ namespace AutoTest
 
         /// <summary>配線のミスの率 (2026-11-06・0 = しない)。 Optimal を 10〜100 戦の経験者とみなす: 人は毎ターン同じ規則で最善を選べない。
         /// ミスは「1 個を攻撃とブロックの反対へ挿す」形。 致死を見落とすミスはしない (予告を読めば分かるので経験者はしない)。
-        /// 乱数は局面から作る専用の値で、 GameRng を消費しない (同じシードの対比較を壊さない)。</summary>
+        /// 乱数は局面から作る専用の値で、 GameRng を消費しない (同じシードの対比較を壊さない)。
+        /// <para><b>2026-11-12 時点で呼ぶ所が無い。</b> 呼んでいたのは旧い配線の包み (MutualWiringPlanPolicy) だけで、 端子の山札 (2026-11-11) の後は
+        /// その包みが必ず山札の方策に上書きされていた。 山札の方策 (DeckWiringPlanPolicy) へつなぐか消すかは未決 (つなぐと挙動が変わる)。
+        /// <see cref="turnAudit"/> も同じ。</para></summary>
         public float wiringMistakeRate = 0f;
 
         private CombatSystem.WiringPlan MaybeMisWire(int[] rolls, CombatSystem.MutualTurnTelegraph tele, CombatSystem.WiringPlan plan)
@@ -1098,35 +1101,6 @@ namespace AutoTest
             public float enemyMaxHp;           // 敵の最大 HP (Phase 判定の比に使う)
             public readonly Dictionary<(int, int, int, int, int, int, int), float> memo
                 = new Dictionary<(int, int, int, int, int, int, int), float>(32);
-            /// <summary>先読みにかける候補の足切り = 今ターンの効用の上位 <see cref="LookaheadTopK"/> 本目。 これ未満の配線は選ばない。</summary>
-            public float cutoff = float.NegativeInfinity;
-        }
-
-        /// <summary>先読みにかける候補の数 (2026-11-05)。 全候補 (最大 27) を先読みすると 1 判断で約 4 万回の効用評価になり、
-        /// ボス戦のみでも 5,000 ランに約 28 分かかった。 今の効用の上位だけを読む (同点はすべて含める)。</summary>
-        private const int LookaheadTopK = 4;
-
-        /// <summary>今ターンの効用の上位 K 本目の値。 列挙の制約 (封印) は本体の列挙と同じ。</summary>
-        private float LookaheadCutoff(in OptimalTurnState st, int[] rolls, int termKinds, int sealedTerm)
-        {
-            int k = rolls.Length;
-            int total = 1; for (int i = 0; i < k; i++) total *= termKinds;
-            var w = new CombatSystem.DiceTerminal[k];
-            var top = new List<float>(total);
-            for (int code = 0; code < total; code++)
-            {
-                int t = code; bool sealedUsed = false;
-                for (int i = 0; i < k; i++)
-                {
-                    w[i] = (CombatSystem.DiceTerminal)(t % termKinds); t /= termKinds;
-                    if (sealedTerm >= 0 && (int)w[i] == sealedTerm) sealedUsed = true;
-                }
-                if (sealedUsed) continue;
-                top.Add(OptimalUtility(in st, rolls, w));
-            }
-            if (top.Count <= LookaheadTopK) return float.NegativeInfinity;
-            top.Sort((a, b) => b.CompareTo(a));
-            return top[LookaheadTopK - 1];
         }
 
         private NextTurnPlan BuildNextTurnPlan(in OptimalTurnState st, CombatManager cm,
@@ -1194,25 +1168,6 @@ namespace AutoTest
                 CombatSystem.Escalation.EnemyAttackValue(enemy, System.Math.Max(1, turn - delay), expTotal, turn), ctx.enemyArmorPen);
         }
 
-        /// <summary>配線 w の値 = 今ターンの効用 + 次ターンの最良効用の期待値。 今ターンで撃破・死亡する配線は今の効用のまま。</summary>
-        private float LookaheadValue(in OptimalTurnState st, NextTurnPlan plan, int[] rolls, CombatSystem.DiceTerminal[] w)
-        {
-            float uNow = OptimalUtility(in st, rolls, w, out var o);
-            if (uNow < plan.cutoff) return float.NegativeInfinity;      // 上位 K 本に入らない配線は読まない
-            if (o.effDmg >= st.enemyHp || o.taken >= st.myHp) return uNow;
-
-            var ns = NextTurnStateFrom(in st, plan, in o, rolls.Length, st.myHp, st.myShield, out int plusNext);
-            var key = (ns.enemyHp, ns.myHp, ns.myShield, ns.undyingStreak, ns.steadfastReady ? 1 : 0, ns.eDefNow, ns.tele.blazeStacks * 2 + plusNext);
-            if (!plan.memo.TryGetValue(key, out float e))
-            {
-                // 端子の重みは次ターンの敵 HP 比で決まる (予兆ターンの Phase)
-                TerminalWeights(in ns.play, plan.turn + 1, ns.enemyHp / plan.enemyMaxHp, out float wa, out float wd, out float wc);
-                ns.wAtk = wa; ns.wDef = wd; ns.wChg = wc;
-                e = ExpectedBestNextUtility(in ns, plan, rolls.Length);
-                plan.memo[key] = e;
-            }
-            return uNow + e;
-        }
 
         /// <summary>このターンを解いた結果 <paramref name="o"/> から、 次のターンの盤面を組む (E8 と山札の先読み #105 が共通で使う)。
         /// <paramref name="hpStart"/> = 敵の攻撃の前の自 HP (旧い配線は今の HP・山札は回復と払った HP の後)、
@@ -1255,31 +1210,6 @@ namespace AutoTest
             return ns;
         }
 
-        /// <summary>次ターンの盤面 <paramref name="ns"/> で、 出目の全列挙 (面^個数・同じ多重集合は 1 回だけ評価) の最良効用の期待値。</summary>
-        private float ExpectedBestNextUtility(in OptimalTurnState ns, NextTurnPlan plan, int k)
-        {
-            var faces = plan.faces;
-            int fc = faces.Length;
-            long total = 1; for (int i = 0; i < k; i++) total *= fc;
-            var memo = new Dictionary<long, float>(64);
-            var sorted = new int[k];
-            var assign = new CombatSystem.DiceTerminal[k];
-            double acc = 0;
-            for (long code = 0; code < total; code++)
-            {
-                long tcode = code;
-                for (int j = 0; j < k; j++) { sorted[j] = faces[(int)(tcode % fc)]; tcode /= fc; }
-                System.Array.Sort(sorted);
-                long key = 0; for (int j = 0; j < k; j++) key = key * 32 + sorted[j];
-                if (!memo.TryGetValue(key, out float u))
-                {
-                    u = BestUtilityOver(in ns, sorted, assign, plan);
-                    memo[key] = u;
-                }
-                acc += u;
-            }
-            return (float)(acc / total);
-        }
 
         /// <summary>出目 <paramref name="rolls"/> の全配線 (今ターンの列挙と同じ制約) の最大効用。 封印は次ターン分が未知なので考えない。</summary>
         private float BestUtilityOver(in OptimalTurnState ns, int[] rolls, CombatSystem.DiceTerminal[] assign, NextTurnPlan plan)
@@ -1377,33 +1307,8 @@ namespace AutoTest
             return atkGrowth;
         }
 
-        private CombatSystem.WiringPlan MutualWiringPolicy(int[] rolls, CombatSystem.MutualTurnTelegraph tele)
-        {
-            int k = rolls?.Length ?? 0;
-            if (k == 0) return default;
-            var cm = CombatManager.Instance;
-            var st = BuildOptimalTurnState(rolls, tele);
-            var ctxRoles = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
-            var runForVoid = GameLoop.GameManager.Instance?.Run;
-
-            // 出目降順ソートのインデックス (攻撃には高い目・ブロックは次・充電は残り)
-            var idx = new int[k];
-            for (int i = 0; i < k; i++) idx[i] = i;
-            System.Array.Sort(idx, (a, b) => rolls[b].CompareTo(rolls[a]));
-
-            // E8 (SuperV3 lookahead2): 次ターンの前提を 1 回だけ組む。 null なら従来どおり (OFF のときは何も変わらない)。
-            NextTurnPlan plan = null;
-            if (v3.lookahead2 && EffectiveWiringSkill != WiringSkill.Naive && ctxRoles != null && cm?.CurrentEnemy != null
-                && (!v3.lookaheadBossOnly || GameLoop.BossIds.IsBoss(cm.CurrentEnemy.id)))
-            {
-                plan = BuildNextTurnPlan(in st, cm, ctxRoles, runForVoid, k);
-                plan.cutoff = LookaheadCutoff(in st, rolls, plan.termKinds, tele.sealedTerminal);
-            }
-            return SelectOptimalWiring(in st, rolls, tele, plan, idx);
-        }
-
         /// <summary>配線の効用の入力 (<see cref="OptimalTurnState"/>) を、 今の盤面から 1 回だけ読んで組む (読むだけ・書き換えない)。
-        /// 旧い配線 (<see cref="MutualWiringPolicy"/>) と端子の山札 (AutoRunner.Terminals) が同じものを使う。</summary>
+        /// 端子の山札 (AutoRunner.Terminals) が使う。</summary>
         private OptimalTurnState BuildOptimalTurnState(int[] rolls, CombatSystem.MutualTurnTelegraph tele)
         {
             int k = rolls.Length;
@@ -1564,160 +1469,7 @@ namespace AutoTest
             return st;
         }
 
-        /// <summary>旧い配線の全列挙と選択 (<see cref="MutualWiringPolicy"/> の後半)。</summary>
-        private CombatSystem.WiringPlan SelectOptimalWiring(in OptimalTurnState stIn, int[] rolls, CombatSystem.MutualTurnTelegraph tele,
-                                                            NextTurnPlan plan, int[] idx)
-        {
-            var st = stIn;      // ローカル関数から読むため写す (in 引数はラムダ・ローカル関数に取り込めない)
-            int k = rolls.Length;
-            var cm = CombatManager.Instance;
-            var ctxRoles = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
-            var runForVoid = GameLoop.GameManager.Instance?.Run;
-            float ScoreWithBuffers(CombatSystem.DiceTerminal[] w)
-                => plan != null ? LookaheadValue(in st, plan, rolls, w) : OptimalUtility(in st, rolls, w);
-            // (2026-11-11 の「ヴェスカ〈停滞する時間〉で停滞を積む配線を選ばない」規則は 2026-11-12 #103 で撤去。 効果が端子を止める形に替わった)
-            float Score(CombatSystem.DiceTerminal[] w) => ScoreWithBuffers(w);
-
-            var assign = new CombatSystem.DiceTerminal[k];
-            var bestW = new CombatSystem.DiceTerminal[k];
-            float bestU = float.NegativeInfinity;
-            void SelectBest()
-            {
-                bestU = float.NegativeInfinity;
-                if (EffectiveWiringSkill == WiringSkill.Naive)
-                {
-                    // 素朴版: 出目降順の本数分割だけを見る (ADR-0010 以前と同じ探索)。
-                    for (int a = 0; a <= k; a++)
-                        for (int b = 0; b <= k - a; b++)
-                        {
-                            for (int i = 0; i < k; i++)
-                                assign[idx[i]] = (i < a) ? CombatSystem.DiceTerminal.Attack
-                                               : (i < a + b) ? CombatSystem.DiceTerminal.Block
-                                               : CombatSystem.DiceTerminal.Charge;
-                            if (tele.sealedTerminal >= 0)
-                            {
-                                bool used = false;
-                                for (int i = 0; i < k && !used; i++)
-                                    if ((int)assign[i] == tele.sealedTerminal) used = true;
-                                if (used) continue;
-                            }
-                            float u = Score(assign);
-                            if (u > bestU) { bestU = u; System.Array.Copy(assign, bestW, k); }
-                        }
-                }
-                else
-                {
-                    // 端子は 攻撃/ブロック/充電 の 3 種 (3^k)。
-                    const int termKinds = 3;
-                    // 〈綻び〉: 封印された端子は使えない。 **予告に載っているので配線前に読める**。
-                    int sealedTerm = tele.sealedTerminal;
-                    // 挑戦デバフ〈不器用〉(2026-08-10 リワーク) は端子の種類を縛らない。
-                    //   N 個以上挿すと**次のターン**その端子が半減するので、 合法性ではなく
-                    //   効用側で扱う (下の overload ペナルティ)。
-                    int termCap = 4;
-
-                    int total = 1;
-                    for (int i = 0; i < k; i++) total *= termKinds;
-                    optimalWiringDecisions++;
-                    optimalWiringCandidatesEvaluated += total;
-
-                    bool runParallel = parallelizeOptimalWiring && plan == null   // 先読みの memo は共有するので直列
-                        && total >= System.Math.Max(1, optimalWiringParallelMinCandidates)
-                        && System.Environment.ProcessorCount > 1;
-                    if (runParallel)
-                    {
-                        var scores = new float[total];
-                        int maxWorkers = optimalWiringMaxParallelism > 0
-                            ? optimalWiringMaxParallelism
-                            : System.Math.Min(8, System.Math.Max(1, System.Environment.ProcessorCount - 1));
-                        var options = new ParallelOptions { MaxDegreeOfParallelism = maxWorkers };
-                        Parallel.For(
-                            0, total, options,
-                            () => new OptimalWiringBuffers(k),
-                            (code, _, buffers) =>
-                            {
-                                scores[code] = float.NegativeInfinity;
-                                int t = code;
-                                for (int i = 0; i < k; i++)
-                                {
-                                    buffers.assign[i] = (CombatSystem.DiceTerminal)(t % termKinds);
-                                    t /= termKinds;
-                                }
-
-                                int distinct = 0;
-                                System.Array.Clear(buffers.termSeen, 0, buffers.termSeen.Length);
-                                for (int i = 0; i < k; i++)
-                                {
-                                    int ti = (int)buffers.assign[i];
-                                    if (!buffers.termSeen[ti]) { buffers.termSeen[ti] = true; distinct++; }
-                                }
-                                if (distinct > termCap) return buffers;
-                                if (sealedTerm >= 0)
-                                {
-                                    for (int i = 0; i < k; i++)
-                                        if ((int)buffers.assign[i] == sealedTerm) return buffers;
-                                }
-
-                                scores[code] = ScoreWithBuffers(buffers.assign);
-                                return buffers;
-                            },
-                            _ => { });
-
-                        // 評価順に集約し、従来の「最初の最大値」を厳密に維持する。
-                        for (int code = 0; code < total; code++)
-                        {
-                            float u = scores[code];
-                            if (u <= bestU) continue;
-                            bestU = u;
-                            int t = code;
-                            for (int i = 0; i < k; i++)
-                            {
-                                bestW[i] = (CombatSystem.DiceTerminal)(t % termKinds);
-                                t /= termKinds;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        for (int code = 0; code < total; code++)
-                        {
-                            int t = code;
-                            for (int i = 0; i < k; i++) { assign[i] = (CombatSystem.DiceTerminal)(t % termKinds); t /= termKinds; }
-
-                            // **制約を破る割り当てをそもそも評価しない**。
-                            int distinct = 0;
-                            _termSeen[0] = _termSeen[1] = _termSeen[2] = _termSeen[3] = false;
-                            for (int i = 0; i < k; i++)
-                            {
-                                int ti = (int)assign[i];
-                                if (!_termSeen[ti]) { _termSeen[ti] = true; distinct++; }
-                            }
-                            if (distinct > termCap) continue;
-                            if (sealedTerm >= 0)
-                            {
-                                bool usesSealed = false;
-                                for (int i = 0; i < k && !usesSealed; i++)
-                                    if ((int)assign[i] == sealedTerm) usesSealed = true;
-                                if (usesSealed) continue;
-                            }
-                            float u = Score(assign);
-                            if (u > bestU) { bestU = u; System.Array.Copy(assign, bestW, k); }
-                        }
-                    }
-                }
-            }
-            SelectBest();
-            // E1 (V3 rerollEv) が「この手の最良効用」として読む。 先読みの値は次ターン分を含むので、 今ターンの効用だけに戻す。
-            _lastBestU = plan != null ? OptimalUtility(in st, rolls, bestW) : bestU;
-            // [計装 2026-11-10] 選んだ配線が防ぎ切りの規則の対象だったか (実際の配線の時だけ MutualWiringPlanPolicy が数える)
-            OptimalUtility(in st, rolls, bestW, out var fbo);
-            _lastFreeBlock = fbo.freeBlock && !fbo.killsNow; _lastKillsNow = fbo.killsNow; _lastExpTaken = fbo.taken;
-            _lastPredOld = fbo.dmgOld; _lastPredNew = fbo.dmgNew; _lastPredA = fbo.aCount; _lastPredUsed = fbo.dmgUsed;
-            _lastPredRaw = fbo.rawNew; _lastPredCritP = st.critP; _lastPredCritMul = st.critMulEff; _lastPredOutMul = st.outMul;
-            return CombatSystem.WiringPlan.Of(bestW);
-        }
-
-        /// <summary>直近の <see cref="MutualWiringPolicy"/> が選んだ配線の効用。 読むだけ・判断には使わない (SuperV3 の実験用)。</summary>
+        /// <summary>直近に選んだ配線の効用 (山札の方策が書く)。 読むだけ・判断には使わない (SuperV3 の実験用)。</summary>
         private float _lastBestU;
         /// <summary>[計装 2026-11-10] 直近に選んだ配線が防ぎ切りの規則の対象か (今ターン撃破は除く) / 今ターン撃破か。</summary>
         private bool _lastFreeBlock, _lastKillsNow;

@@ -108,7 +108,6 @@ namespace AutoTest.ParallelSweep
                 //   24 コアを奪い合う。 実測で Super は単独 0.5 秒/ラン が、 22 並列では
                 //   3 分経っても 1 ラン も終わらなかった (50 ランごとの進捗が 0 のまま)。
                 runner.superAI.maxParallelism = 1;
-                runner.optimalWiringMaxParallelism = 1;
 
                 // **本体ループは空にする。** 逐次版と同じく、 アームは RunBatch 後段の
                 //   分岐から回す。 ここで runCount を立てると素の N ラン が余計に走る。
