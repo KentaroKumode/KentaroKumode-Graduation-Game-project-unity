@@ -126,6 +126,7 @@ crashlytics-build.properties
 /Tools/pixelfx/records/
 Tools/freemap_check/obj/
 Tools/event_branch_check/obj/
+Tools/event_page_check/obj/
 Tools/rules_check/obj/
 __pycache__/
 

@@ -51,6 +51,12 @@ namespace EventSystem
     {
         public static bool IsKnownTag(string tag) => tag == "追跡" || tag == "地図" || tag == "素材";
     }
+
+    /// <summary>ConvictionSystem.RiftRecordSeen が読む所だけ (検算は「裂け目の記録」を引かない)。</summary>
+    public static class EventDatabase
+    {
+        public static EventDefinition GetByName(string name) => null;
+    }
 }
 
 namespace MapSystem.FreeMove
@@ -75,6 +81,13 @@ namespace GameLoop
         public System.Collections.Generic.HashSet<string> seenPassiveItemIds = new System.Collections.Generic.HashSet<string>();
         public int convictionStage;
         public bool layer6Unlocked, layer7Unlocked;
+        public System.Collections.Generic.HashSet<string> seenOnceEvents = new System.Collections.Generic.HashSet<string>();
+    }
+
+    /// <summary>ConvictionSystem.RiftGateAtBoss が読む測定の口だけ。</summary>
+    public static class GameHooks
+    {
+        public static bool RiftRecordAtBoss = true;
     }
 
     public class GameManager
@@ -85,6 +98,7 @@ namespace GameLoop
         /// <summary>検算が場面ごとに決める: 差し出せる秘宝があるか・鍛える素材 (int.MaxValue = 終点)。</summary>
         public static bool TradeOk = true;
         public static int ForgeCost = 3;
+        public static bool SuppressEvents;
         public static bool CanTradePassive(RunState run) => TradeOk;
         public static int WeaponUpgradeCost(RunState run) => ForgeCost;
     }

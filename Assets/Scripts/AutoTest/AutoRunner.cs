@@ -180,6 +180,11 @@ namespace AutoTest
         /// true (既定) = どの層でも縄張りを踏まずに終点へ行ける道があるように縄張りを削る。 false = 削らない (2026-11-13 より前の作り・main と全件一致のはず)。
         /// 旧い作り (pursuerLeavesTerritory = true) では値によらず削らない。</summary>
         public bool territoryKeepBypass = true;
+        /// <summary>[測定 2026-11-13] 深さ 6 (画面の第 4 層) の「裂け目の記録」の置き方。 本体の GameHooks.RiftRecordAtBoss へ流す (ラン終了で true へ)。
+        /// true (既定) = ボスに隣り合う点を全部イベントにし、 最初に踏んだ 1 つで固定で起きる (踏まずにボスへ行けない)。 BOT は必ず最後の頁を開く
+        /// (イベントの選択のアブレーション ablateEvent でも、 この専用イベントだけは開く)。
+        /// false = 旧い作り (層の 3 分の 1 あたりの固定の点・踏まなくてもよい・BOT の選び方も元のまま = main と全件一致のはず)。</summary>
+        public bool riftRecordAtBoss = true;
         /// <summary>[2026-11-12] BOT が縄張りの宝を取りに行くしきい値: 「HP の割合 − 追跡者の戦闘で失う HP の見積もり」がこれ以上の時だけ取りに行く
         /// (<see cref="WantsTerritoryTreasure"/>)。 1 以上 = 取りに行かない。
         /// <para>既定 9 = 取りに行かない (2026-11-12)。 Super・3000 ラン・同じシードで、 0.35 (取りに行く) 596 勝 < 9 (行かない) 627 勝だった。
@@ -766,6 +771,7 @@ namespace AutoTest
                  + $"/ メタ 攻撃端子+{MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice()} "
                  + $"/ 追跡者 縄張りの外へ{(pursuerLeavesTerritory ? "出る (旧い作り)" : "出ない")} "
                  + $"/ 縄張りを避ける道の保証 {(pursuerLeavesTerritory ? "効かない (旧い作り)" : territoryKeepBypass ? "あり (縄張りを削る)" : "なし (削らない・旧い作り)")} (territoryKeepBypass={territoryKeepBypass}) "
+                 + $"/ 裂け目の記録 {(riftRecordAtBoss ? "ボスに隣り合う点を全部イベントに (踏まずにボスへ行けない)" : "固定の点 1 つ (旧い作り)")} (riftRecordAtBoss={riftRecordAtBoss}) "
                  + $"/ 端子の撃破のボーナス {(terminalKillNeedsAttack ? "攻撃したターンだけ (旧い条件)" : "経路を問わない")} "
                  + $"/ 手札 {(handCarry == CombatSystem.HandCarryMode.Pick ? "印を付けた端子だけ残す (Pick)" : handCarry == CombatSystem.HandCarryMode.All ? "挿さなかった端子は全部残る (All)" : "毎ターン捨てる (Off・旧い規則)")}"
                  + $"{(handCarry == CombatSystem.HandCarryMode.Pick ? " 残す方策 " + EffectiveHandKeepPolicy + " (handKeepPolicy=" + handKeepPolicy + ")" : "")} "

@@ -563,10 +563,10 @@ namespace MapSystem.FreeMove
         /// <summary>点 i で天候 k の効果が働いているか (前線の内側だけ)。</summary>
         public bool WeatherAt(int i, WeatherKind k) => Weather == k && InFront(i);
 
-        /// <summary>霧で「?」に戻っている点か (道で 2 歩以上離れた点。 始点と終点は隠れない)。</summary>
+        /// <summary>霧で「?」に戻っている点か (道で 2 歩以上離れた点。 始点と終点と、 深さ 6 の終点に隣り合う「裂け目の記録」の点は隠れない)。</summary>
         public bool FogHidden(int i, int[] hopsFromMe = null)
         {
-            if (!WeatherAt(i, WeatherKind.Fog) || i == Layout.goal || i == Layout.start) return false;
+            if (!WeatherAt(i, WeatherKind.Fog) || i == Layout.goal || i == Layout.start || Layout.riftGate.Contains(i)) return false;
             return (hopsFromMe ?? HopsFrom(Me))[i] >= 2;
         }
 

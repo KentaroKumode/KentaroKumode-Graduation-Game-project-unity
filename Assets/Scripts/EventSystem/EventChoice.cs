@@ -45,6 +45,24 @@ namespace EventSystem
         /// <summary>記録の文を分岐ごとに分けて書いてあるか (分けてある時だけ、 引いた分岐を戦記に残す)。</summary>
         public bool DigestSplitByBranch => digestByBranch != null;
 
+        /// <summary>選択肢の下に出す説明の文 (選べない理由・使うターン・補足中の捕まるまで)。 何も無ければ null。
+        /// 組み立ては <c>EventEncounter.DescribeCost</c> から呼ぶ (検算 Tools/event_page_check が最も長い形で窓の 2 行に収まるかを見る)。
+        /// etaTurns = 補足されている時の捕まるまでのターン (-1 = 補足されていない)。</summary>
+        public static string CostText(string why, int turns, int etaTurns)
+        {
+            var sb = new System.Text.StringBuilder();
+            if (why != null) sb.Append(why);
+            if (turns > 0)
+            {
+                if (sb.Length > 0) sb.Append("・");
+                sb.Append($"{turns} ターンを使う");
+                if (etaTurns >= 0)
+                    sb.Append(etaTurns <= turns ? $"（補足されている: {etaTurns} ターンで捕まる）"
+                                                : $"（補足されている: 最短 {etaTurns} ターンで捕まる）");
+            }
+            return sb.Length > 0 ? sb.ToString() : null;
+        }
+
         /// <summary>この選択肢が使うターン (効果「ターン+N」の合計・確率分岐の中は数えない)。 0 なら時間を使わない。</summary>
         public int TurnCost
         {

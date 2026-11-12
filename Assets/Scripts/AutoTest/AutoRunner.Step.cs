@@ -70,6 +70,7 @@ namespace AutoTest
             GameLoop.GameHooks.PursuerLeavesTerritory = pursuerLeavesTerritory;   // [測定 2026-11-12] 縄張りの作り
             GameLoop.GameHooks.TerritoryTreasure = territoryTreasure;
             GameLoop.GameHooks.TerritoryKeepBypass = territoryKeepBypass;          // [測定 2026-11-13] 縄張りを避ける道の保証
+            GameLoop.GameHooks.RiftRecordAtBoss = riftRecordAtBoss;                // [測定 2026-11-13] 深さ 6 の「裂け目の記録」の置き方
             GameLoop.GameHooks.TerminalHealMulOverride = System.Math.Max(0, terminalHealMul);   // [測定 2026-11-12・#102]
             GameLoop.GameHooks.TerminalArresterNeedOverride = System.Math.Max(0, terminalArresterNeed);
             GameLoop.GameHooks.TerminalFirstAidBattleOnly = terminalFirstAidBattleOnly;

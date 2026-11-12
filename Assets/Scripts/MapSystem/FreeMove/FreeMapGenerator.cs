@@ -44,20 +44,23 @@ namespace MapSystem.FreeMove
 
         private static double F(double v) => (float)v;   // float で確定
 
-        /// <summary>層を生成する。 山岳で分断され続けたら山岳なしで作る (試作と同じ)。</summary>
-        public static FreeMapLayout Generate(int floor)
+        /// <summary>層を生成する。 山岳で分断され続けたら山岳なしで作る (試作と同じ)。
+        /// <para><paramref name="riftAtBoss"/> は深さ 6 (画面の第 4 層) の「裂け目の記録」の置き方 (他の層では読まない):
+        /// true = 終点に隣り合う点を全部イベントマスにする (<see cref="PlaceRiftGate"/>・2026-11-13) / false = 旧い作り (層の 3 分の 1 あたりの固定の点 1 つ)。
+        /// <b>どちらも乱数を引かない</b> ── 点・道・山岳・縄張りと、 他の点の抽選は両方で同じ。</para></summary>
+        public static FreeMapLayout Generate(int floor, bool riftAtBoss = true)
         {
             if (floor == FloorPlan.LinearFloor) return GenerateLinear(floor);
             if (floor == FloorPlan.FarmFloor) return GenerateFarm(floor);
             var rnd = new Rnd(floor);
             for (int attempt = 0; attempt < FreeMapParams.GenerateAttempts; attempt++)
             {
-                var r = GenerateOnce(floor, rnd, withMountains: true);
+                var r = GenerateOnce(floor, rnd, withMountains: true, riftAtBoss);
                 if (r != null) return r;
             }
             for (int attempt = 0; attempt < FreeMapParams.GenerateAttempts; attempt++)
             {
-                var r = GenerateOnce(floor, rnd, withMountains: false);
+                var r = GenerateOnce(floor, rnd, withMountains: false, riftAtBoss);
                 if (r != null) return r;
             }
             throw new InvalidOperationException($"[FreeMapGenerator] {floor}層の生成に失敗した");
@@ -124,7 +127,7 @@ namespace MapSystem.FreeMove
             return L;
         }
 
-        private static FreeMapLayout GenerateOnce(int floor, Rnd rnd, bool withMountains)
+        private static FreeMapLayout GenerateOnce(int floor, Rnd rnd, bool withMountains, bool riftAtBoss)
         {
             const double W = FreeMapParams.Width, H = FreeMapParams.Height;
             var L = new FreeMapLayout { floor = floor };
@@ -275,8 +278,12 @@ namespace MapSystem.FreeMove
             for (int i = 2; i < n; i++)
                 if (L.types[i] == TileType.EliteBattle && FreeMapParams.BandOf((float)L.pos[i].x) == FreeMapParams.BandSafe) L.types[i] = TileType.Battle;
 
-            // ── 6 層の「裂け目の記録」: 縄張りの外で、 層の 3 分の 1 あたりに一番近い点 ──
-            if (floor == 6)
+            // ── 深さ 6 (画面の第 4 層) の「裂け目の記録」 (乱数は引かない) ──
+            //   今の作り (2026-11-13): 終点に隣り合う点を全部イベントマスにする (PlaceRiftGate・店と休憩の 1 つずつの保証は守る)。
+            //   旧い作り (riftAtBoss = false): 縄張りの外で、 層の 3 分の 1 あたりに一番近い点を固定の点にする (踏まずに終点へ行けた)。
+            if (floor == 6 && riftAtBoss)
+                PlaceRiftGate(L, others);
+            else if (floor == 6)
             {
                 var anchor = new Vec2(W * 0.35, H / 2);
                 int best = -1; double bd = double.MaxValue;
@@ -295,6 +302,34 @@ namespace MapSystem.FreeMove
             L.waypoints = way;
             L.home = center;
             return L;
+        }
+
+        /// <summary>
+        /// 深さ 6 (画面の第 4 層) の「裂け目の記録」の置き方 (2026-11-13・GAME.md §4-2)。 <b>乱数を引かない。</b>
+        /// <list type="number">
+        /// <item>終点 (ボス) に道で隣り合う点を<b>例外なく全部</b>イベントマスにする (<see cref="FreeMapLayout.riftGate"/>)。 元の種別 (店・休憩・戦闘・宝) は上書きする。
+        /// 道は後から増えない (天候は崩す・沈めるだけ) ので、 終点へは必ずこのどれかを通る。</item>
+        /// <item>上書きで層の店か休憩が 0 になったら、 「店と休憩は層に必ず 1 つずつ」(上の保証) と同じ候補 (始点から 2 歩以上・店と休憩以外。
+        /// 隣り合う点は除く) から、 消えた店 / 休憩があった点に一番近い点 (同点は添字の小さい方) へ置く。</item>
+        /// </list>
+        /// </summary>
+        private static void PlaceRiftGate(FreeMapLayout L, List<int> others)
+        {
+            var ring = L.adj[L.goal].Where(i => i != L.start).OrderBy(i => i).ToList();
+            var before = ring.ToDictionary(i => i, i => L.types[i]);
+            foreach (int i in ring) L.types[i] = TileType.Event;
+            L.riftGate = ring;
+
+            var ds = L.Hops(L.start);
+            foreach (var need in new[] { TileType.Shop, TileType.Rest })
+            {
+                if (others.Any(i => L.types[i] == need)) continue;
+                int lost = ring.FirstOrDefault(i => before[i] == need);   // 消えた点 (ring は添字の昇順)
+                var pool = others.Where(i => !ring.Contains(i) && ds[i] >= 2 && L.types[i] != TileType.Shop && L.types[i] != TileType.Rest).ToList();
+                if (pool.Count == 0) pool = others.Where(i => !ring.Contains(i) && L.types[i] != TileType.Shop && L.types[i] != TileType.Rest).ToList();
+                if (pool.Count == 0) continue;
+                L.types[pool.OrderBy(i => L.Dist(i, lost)).ThenBy(i => i).First()] = need;
+            }
         }
 
         /// <summary>

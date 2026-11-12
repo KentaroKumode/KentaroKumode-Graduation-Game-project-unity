@@ -44,8 +44,10 @@ namespace UI.Game2D
         public bool jp;
         /// <summary>題の下に出す本文 (イベントの文・結果の記録など)。 jp のときだけ。</summary>
         public string body;
-        /// <summary>本文の最大行数。</summary>
+        /// <summary>本文の最大行数。 超えた行は描かない ── 長い文は呼ぶ側が頁に割る (<see cref="JpTextLayout.Pages"/>・イベントは <see cref="EventPaging"/>)。</summary>
         public int bodyLines = 5;
+        /// <summary>題の行の右端に暗い字で出す頁の位置 (「2/4」など・jp のときだけ・2026-11-13)。 null は出さない。</summary>
+        public string pageMark;
         /// <summary>ボタンが押された (action, 選んでいる行)。 null なら見本の動き (トーストを出すだけ)。 設定した画面は Esc で閉じない。</summary>
         public System.Action<string, int> onAction;
         /// <summary>行の高さ (jp のときだけ・0 = 既定)。</summary>
@@ -90,6 +92,9 @@ namespace UI.Game2D
         private bool _dirty; private int _px, _py;
         /// <summary>伝説の枠を描いている間だけ 8 コマ/秒で描き直す (光を回すため)。 <see cref="_glintTick"/> が光の位置。</summary>
         private bool _glintOn; private int _glintTick;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private ScreenDef _warnedClip;
+#endif
 
         /// <summary>窓が出ている (閉じる途中も含む) か、 手引きの板 (<see cref="Game2DTutorial"/>) が出ている間 true。 後ろの画面 (地図・戦闘・帯) はこれを見て手を止める。</summary>
         public static bool Active { get => _active || Game2DTutorial.Blocking; private set => _active = value; }
@@ -363,24 +368,28 @@ namespace UI.Game2D
         // ── 日本語の窓 (実データの画面) ──
         //   1 行 16 ドットの字なので、 英数字の窓より行が高い。 題 → 本文 → 行 → 詳細 (選んだ行の説明 2 行) → 足元 → ボタン。
 
-        private const int JRowH = 20, JGap = 2, JDetail = 2;
+        private const int JRowH = ModalJpMetrics.JRowH, JGap = ModalJpMetrics.JGap, JDetail = ModalJpMetrics.JDetail;
         /// <summary>高さ h の行・ボタンの中で字を上下の真ん中に置く下げ幅 (字の高さ = Game2DJpFont.Cell・漢字は上 11 ドット)。</summary>
         private static int TextDy(int h) => (h - Game2DJpFont.Cell + 1) / 2;
         private static int JBtnDy => TextDy(22);
-        private static int RowHOf(ScreenDef d) => d.rowH > 0 ? d.rowH : JRowH;
-        private static int GapOf(ScreenDef d) => d.rowH > 0 && d.rowH < JRowH ? 1 : JGap;
+        private static int RowHOf(ScreenDef d) => ModalJpMetrics.RowHOf(d.rowH);
+        private static int GapOf(ScreenDef d) => ModalJpMetrics.GapOf(d.rowH);
 
         private static bool HasDetail(ScreenDef d) { foreach (var it in d.Items) if (!string.IsNullOrEmpty(it.desc)) return true; return false; }
 
+        /// <summary>本文の描く行数 (折り返した行数と bodyLines の小さい方)。</summary>
+        private static int BodyLinesOf(ScreenDef d)
+            => string.IsNullOrEmpty(d.body) ? 0 : Mathf.Min(d.bodyLines, Game2DJpFont.Lines(d.body, ModalJpMetrics.BodyW(d.w)).Count);
+
+        /// <summary>式は <see cref="ModalJpMetrics"/> の 1 か所 (検算 Tools/event_page_check と同じ)。</summary>
         private static int AutoHeightJp(ScreenDef d)
         {
-            int iw = d.w - 2 * Inset, y = Inset + 20 + 4;
-            if (!string.IsNullOrEmpty(d.body)) y += Mathf.Min(d.bodyLines, Game2DJpFont.Lines(d.body, iw - 4).Count) * Game2DJpFont.LineH + 4;
             int cols = Mathf.Max(1, d.cols), rows = (d.Items.Count + cols - 1) / cols;
-            y += rows * (RowHOf(d) + GapOf(d));
-            if (HasDetail(d)) y += JDetail * Game2DJpFont.LineH + 6;
-            y += 4 + Game2DJpFont.LineH + 4 + 22 + Inset;
-            return Mathf.Min(266, y);
+            int h = ModalJpMetrics.HeightUncapped(Game2DJpFont.LineH, !string.IsNullOrEmpty(d.body), BodyLinesOf(d), rows, d.rowH, HasDetail(d));
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (h > ModalJpMetrics.MaxH) Debug.LogWarning("[Game2DModal] 窓「" + d.title + "」の中身が高さ " + ModalJpMetrics.MaxH + " に収まらない (" + h + ")。 下の行が描かれない");
+#endif
+            return Mathf.Min(ModalJpMetrics.MaxH, h);
         }
 
         /// <summary>分離式ボタンの行: 名前 → 列にそろえたボタン → 今の効果。 押されたボタンは金で塗り、 字を暗くする。 戻り値 = 列ごとのボタンの位置。</summary>
@@ -507,16 +516,22 @@ namespace UI.Game2D
             int x0 = Inset, y = Inset - 4, iw = d.w - 2 * Inset, LH = Game2DJpFont.LineH, RH = RowHOf(d), RG = GapOf(d);
             // 題 (と、 その右に小さく副題)
             int tw = Game2DJpFont.Draw(p, d.title, x0, y, Game2DKit.Ink);
-            if (!string.IsNullOrEmpty(d.sub)) Game2DJpFont.Draw(p, Game2DJpFont.Clip(d.sub, iw - tw - 12), x0 + tw + 12, y, Game2DKit.Gold);
+            // 頁の位置 (右寄せ・暗い字・手引きの板と同じ置き方)
+            int pmW = string.IsNullOrEmpty(d.pageMark) ? 0 : Game2DJpFont.Width(d.pageMark);
+            if (pmW > 0) Game2DJpFont.Draw(p, d.pageMark, x0 + iw - pmW, y, Game2DKit.Dim);
+            if (!string.IsNullOrEmpty(d.sub)) Game2DJpFont.Draw(p, Game2DJpFont.Clip(d.sub, iw - tw - 12 - (pmW > 0 ? pmW + 8 : 0)), x0 + tw + 12, y, Game2DKit.Gold);
             y += 20; p.Rect(x0, y, iw, 1, Game2DKit.Faint); y += 4;
             // 本文
-            if (!string.IsNullOrEmpty(d.body)) { int n = Game2DJpFont.Wrap(p, d.body, x0 + 2, y, iw - 4, Game2DKit.Ink, d.bodyLines); y += n * LH + 4; }
+            if (!string.IsNullOrEmpty(d.body)) { int n = Game2DJpFont.Wrap(p, d.body, x0 + 2, y, ModalJpMetrics.BodyW(d.w), Game2DKit.Ink, d.bodyLines); y += n * LH + 4; }
             // 下から順に: ボタン → 足元 → 詳細
             int btnY = d.h - Inset - 22, footY = btnY - 4 - LH;
             bool detail = HasDetail(d); int detailY = footY - (detail ? JDetail * LH + 6 : 0), rowsBottom = detailY - 2;
             // 行
             var items = d.Items;
             int cols = Mathf.Max(1, d.cols), rw = (iw - (cols - 1) * 4) / cols, maxRows = Mathf.Max(1, (rowsBottom - y + RG) / (RH + RG));
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (items.Count > maxRows * cols && _warnedClip != d) { _warnedClip = d; Debug.LogWarning("[Game2DModal] 窓「" + d.title + "」の行 " + items.Count + " のうち " + (maxRows * cols) + " しか描けない (窓の高さ " + d.h + ")"); }
+#endif
             for (int i = 0; i < items.Count && i < maxRows * cols; i++)
             {
                 int cx = x0 + (i % cols) * (rw + 4), cy = y + (i / cols) * (RH + RG); var it = items[i]; var r = new RectInt(cx, cy, rw, RH); _rowR.Add(r);

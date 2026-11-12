@@ -17,6 +17,22 @@ namespace GameLoop
         public const int StageTruth   = 4;
         public const string Layer7RevelationEventName = "裂け目の記録";
 
+        /// <summary>深さ 6 (画面の第 4 層) の「裂け目の記録」を、 終点 (ボス) に隣り合う点に置くか (2026-11-13・GAME.md §4-2)。 層を作る時に読む。
+        /// <para>true = 今の作り: 隣り合う点を全部イベントマスにし、 最初に踏んだ 1 つで固定で起きる (踏まずにボスへ行けない)。
+        /// false = 旧い作り: 層の 3 分の 1 あたりの固定の点 1 つ (踏まずにボスへ行けた)。 どちらも乱数を引かない。</para>
+        /// <para>測定の口 <see cref="GameHooks.RiftRecordAtBoss"/> が false の時と、 層に入った時に〈真理〉を持っている時 (イベントなしの測定
+        /// <c>SuppressEvents</c> / <c>SuppressConvictionChain</c> は層に入る時に無償で配る) は旧い作り ── そのとき地図は今までと 1 点も変わらない。</para></summary>
+        public static bool RiftGateAtBoss(RunState run)
+            => GameHooks.RiftRecordAtBoss && !GameManager.SuppressEvents && !HasTruth(run);
+
+        /// <summary>このランで「裂け目の記録」の選択を済ませたか (最後の頁を開いた / 手記を閉じた)。 一度のみの記録 (<c>seenOnceEvents</c>・中断セーブに乗る) を読む。</summary>
+        public static bool RiftRecordSeen(RunState run)
+        {
+            if (run?.seenOnceEvents == null) return false;
+            var def = EventSystem.EventDatabase.GetByName(Layer7RevelationEventName);
+            return def != null && run.seenOnceEvents.Contains(def.id);
+        }
+
         /// <summary>〈決意〉以上を所持しているか (6F進入可能か)。</summary>
         public static bool HasResolveOrBetter(RunState run)
             => run != null && (run.layer6Unlocked || Owns(run, IdResolve) || Owns(run, IdTruth));
