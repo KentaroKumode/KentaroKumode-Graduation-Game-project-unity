@@ -1372,7 +1372,7 @@ namespace AutoTest
         public int RelicStatOffMaskApplied => ParseRelicStatOff(relicStatOff);
         /// <summary>[実効値] ランの始めに本体へ入れるセット効果の止め (ビット = セット × 2 + (3 個なら 1))。 監視リスト用。</summary>
         public int RelicSetBonusOffMaskApplied => ParseRelicSetBonusOff(relicSetBonusOff);
-        /// <summary>[実効値] 固定削りの差し替えの中身 (3 層・5 層・6 層のボスとヴェスカの初段・最終段の値を「id=値」で並べる・差し替えなしは空)。 監視リスト用。</summary>
+        /// <summary>[実効値] 固定削りの差し替えの中身 (3 層・5 層・6 層のボスとヴェスカの 4 段の値を「id=値」で並べる・差し替えなしは空)。 監視リスト用。</summary>
         public string EnemyArmorPenOverrideApplied
         {
             get
@@ -1381,7 +1381,7 @@ namespace AutoTest
                 if (f == null) return "";
                 var sb = new StringBuilder();
                 foreach (var id in new[] { BossIds.Layer3Marsh, BossIds.Layer3Goblin, BossIds.Layer3Mirror, BossIds.Layer5Judgment, BossIds.Layer6Ash,
-                                           BossIds.VescaP1, BossIds.VescaFinal })
+                                           BossIds.VescaP1, BossIds.VescaP2, BossIds.VescaP3, BossIds.VescaFinal })
                 {
                     var e = CombatSystem.EnemyDatabase.Get(id);
                     sb.Append(id).Append('=').Append(f(id, e != null ? Math.Max(0, e.armorPen) : 0)).Append(' ');
