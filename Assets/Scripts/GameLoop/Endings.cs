@@ -104,15 +104,12 @@ namespace GameLoop
                 "灰の中に残っているものは、小さかった。\n" +
                 "あなたが戦っていたものより、ずっと。";
 
-        /// <summary>§19-9 の段 1: 〈クェシナの怠惰〉を背負っている時だけ足す 1 行。 名前・罪は出さない。</summary>
-        public const string AshThroneSlothLine = "灰の底に、焼け残った金属がひとつ。辺境警備隊の階級章だった。";
-
-        /// <summary>層のクリアの窓に出す、 そのボスを倒した直後の場面。 無ければ null。</summary>
+        /// <summary>層のクリアの窓に出す、 そのボスを倒した直後の場面。 無ければ null。
+        /// (旧 §19-9 の段 1「〈クェシナの怠惰〉を背負っていれば階級章の 1 行を足す」は 2026-11-12 に廃止・GAME.md §24)</summary>
         public static string AftermathOf(RunState run)
         {
             if (run == null || run.lastBossId != BossIds.Layer6Ash) return null;
-            bool sloth = run.permanentDebuffs != null && run.permanentDebuffs.Contains(MetaProgression.PermanentDebuffIds.Sloth);
-            return AshThroneMoment + (sloth ? "\n\n" + AshThroneSlothLine : "");
+            return AshThroneMoment;
         }
 
         public static readonly Ending End3 = new Ending
