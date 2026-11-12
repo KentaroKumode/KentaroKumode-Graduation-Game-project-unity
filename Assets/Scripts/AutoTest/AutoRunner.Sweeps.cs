@@ -415,7 +415,7 @@ namespace AutoTest
                 { "Plunder", "ショップ強盗 解禁" },
                 { "Trade",   "99%引きの特売枠が出る" },
                 { "Supply",  "開幕パッシブが 2択" },
-                { "Lantern", "横移動の物資消費 5→2" },
+                { "Armor",   $"〈不動〉一撃の上限 (最大HP の {Math.Round(MetaProgression.MetaPanel.ArmorHitCapPct * 100)}%)" },
             };
 
             double baseClear = 0;

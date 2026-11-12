@@ -2162,10 +2162,10 @@ namespace AutoTest.EditorTools
             Launch(3000);
         }
 
-        /// <summary><b>r9 vs r10 の切り分け (2026-09-12)。</b> 既定は 外殻 と 兵站 ──
-        /// 前者は「+8.19pt はラストスタンドの取り分か、 外殻が強いだけか」、
-        /// 後者は「−5.37pt は横移動5→2 が悪いのか、 兵站に 10pt 使うのが悪いのか」。
-        /// どちらも**次に何をリワークするか**が変わるので測る価値がある。
+        /// <summary><b>r9 vs r10 の切り分け (2026-09-12)。</b> 既定は 外殻 と 装甲 ──
+        /// 外殻は「+8.19pt はラストスタンドの取り分か、 外殻が強いだけか」、
+        /// 装甲は「r10〈不動〉(一撃の上限) の取り分」。
+        /// (2026-11-12: 兵站は 2026-11-10 に枠から外した (MaxRank 0) ので、 既定から外して後継の装甲に替えた)
         /// 4 アーム × 3000ラン = 12,000ラン ≒ 950 秒。</summary>
         /// <summary><b>全軸 r9+r10+Balanced (2026-09-12)。</b> 17 アーム × 5000ラン = 85,000ラン ≒ 113 分。
         /// 判定基準 (r9 = Bal±2 / r10 = r9 超 かつ Bal±3) をレポートが直接出す。
@@ -2229,13 +2229,13 @@ namespace AutoTest.EditorTools
             Launch(1);
         }
 
-        [MenuItem("Tools/AutoRun/r9 vs r10 切り分け: 外殻・兵站 (4アーム×3000ラン ≒950秒)", priority = 8)]
+        [MenuItem("Tools/AutoRun/r9 vs r10 切り分け: 外殻・装甲 (4アーム×3000ラン ≒950秒)", priority = 8)]
         public static void RunRankMarginSweepMenu()
         {
             ClearBatchModeSessionState();
             SessionState.SetBool(RankMarginKey, true);
             SessionState.SetInt(RankMarginKey + ".Runs", 3000);
-            SessionState.SetString(RankMarginKey + ".Tracks", "Shell,Lantern");
+            SessionState.SetString(RankMarginKey + ".Tracks", "Shell,Armor");
             EditorPrefs.SetBool(LearnTierKey, false);
             EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(LearnAiKey, false);
@@ -2700,7 +2700,7 @@ namespace AutoTest.EditorTools
             if (runner.rankMarginSweep)
             {
                 runner.metaAblationRuns = SessionState.GetInt(RankMarginKey + ".Runs", 3000);
-                runner.rankMarginTracks = SessionState.GetString(RankMarginKey + ".Tracks", "Shell,Lantern");
+                runner.rankMarginTracks = SessionState.GetString(RankMarginKey + ".Tracks", "Shell,Armor");
                 runner.rankMarginRanks = SessionState.GetString(RankMarginKey + ".Ranks", "9,10");
                 SessionState.EraseInt(RankMarginKey + ".Runs");
                 SessionState.EraseString(RankMarginKey + ".Tracks");

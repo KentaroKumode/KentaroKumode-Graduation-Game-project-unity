@@ -1222,9 +1222,9 @@ namespace AutoTest
         /// 兵站に 10pt 使うのが悪いのかが不明のままだった。 同じトラックの r9 と r10 を並べれば
         /// 差が極点の取り分になる (r9 の余った 1pt は共通の埋め草へ行く)。</summary>
         public bool rankMarginSweep = false;
-        /// <summary>r9/r10 を比べるトラック名。 カンマ区切り (例 "Shell,Lantern")。
-        /// <c>"*"</c> または空で 10 段トラック全部。</summary>
-        public string rankMarginTracks = "Shell,Lantern";
+        /// <summary>r9/r10 を比べるトラック名。 カンマ区切り (例 "Shell,Armor")。
+        /// <c>"*"</c> または空で 10 段トラック全部。 10 段でないトラック (廃止した Lantern など) は警告を出して飛ばす。</summary>
+        public string rankMarginTracks = "Shell,Armor";
         /// <summary><b>スループット計測 (2026-09-13)。</b> <see cref="runsPerYield"/> を内部で振って
         /// ラン/秒 を実測する。
         ///
