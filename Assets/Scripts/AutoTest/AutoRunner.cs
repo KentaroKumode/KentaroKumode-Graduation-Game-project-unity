@@ -118,12 +118,11 @@ namespace AutoTest
             /// 軸に絞る買い方 (v3.axisCommitBuy)・難易度 10 の 6 層の店の全投入 (IsSuperTailMode)。
             /// 配線のミスなし (wiringMistakeRate=0) と防ぎ切りの規則 (FreeBlockRule) は、 山札の方策と HP の帳簿 (既定) では差にならない。</para></summary>
             Super,
-            /// <summary>厳密: 近似を入れない expectimax (<see cref="ExactCombatAI"/>)。
+            /// <summary>厳密: 旧い expectimax の参照実装 (ExactCombatAI) を差していた技量。
             ///
-            /// <para>**天井の位置を測るための参照実装**で、 バランス測定には使わない。
-            /// Super との差が「Super が理論値からどれだけ遠いか」になる。
-            /// 偶然ノードを全列挙するので**乱数を一切使わず**、 同じ盤面には同じ手を返す。
-            /// 速度は桁で落ちる ── ラン数は 3〜50 程度で回すこと。</para>
+            /// <para><b>2026-11-12 に ExactCombatAI を削除した。</b> 端子の山札 (2026-11-11) の後は、 配線もリロールも
+            /// AutoRunner.Combat で山札の方策に上書きされ、 ExactCombatAI の判断は 1 度も呼ばれていなかった。
+            /// 値はメニューと保存済みの設定のために残す (戦闘の判断は Optimal と同じ山札の方策)。</para>
             ///
             /// <para><b>末尾に足すこと。</b> 既存値の番号を動かすとセーブ/EditorPrefs が壊れる。</para></summary>
             Exact,
@@ -203,10 +202,6 @@ namespace AutoTest
         private bool IsAxisFocusItem(string itemId)
             => !string.IsNullOrEmpty(buyAxisFocus) && !string.IsNullOrEmpty(itemId)
             && ItemSystem.ItemDatabase.Instance?.GetItem(itemId)?.axis == buyAxisFocus;
-
-        /// <summary>厳密方策 (<see cref="WiringSkill.Exact"/> のときだけ使う)。
-        /// 天井の位置を測る参照実装で、 通常の測定には使わない。</summary>
-        public ExactCombatAI exactAI = new ExactCombatAI();
 
         [NonSerialized] private IUltraAutoRunController _ultraController;
         [NonSerialized] private UltraAutoRunProfile _ultraProfile;

@@ -22,7 +22,7 @@ namespace AutoTest
     {
         /// <summary>サマリーの「配線AI」の行。 <b>技量の名前だけでなく、 実際に戦闘の判断をしている方策を書く</b> (2026-11-12)。
         /// <para>端子の山札 (2026-11-11) の後は、 どの技量でも配線は <c>DeckWiringPlanPolicy</c>、 リロールは <c>MutualRerollPolicy</c>
-        /// (素朴版はリロールしない) に上書きされる (AutoRunner.Combat)。 <c>SuperCombatAI</c> / <c>ExactCombatAI</c> の配線とリロールは呼ばれない
+        /// (素朴版はリロールしない) に上書きされる (AutoRunner.Combat)。 <c>SuperCombatAI</c> の配線とリロールは呼ばれない (<c>ExactCombatAI</c> は 2026-11-12 に削除)
         /// (super_prof.txt は「配線 0 回 / リロール 0 回」)。 「Super = 先読み」は今は正しくない ── 先読みは <see cref="deckLookahead"/> (既定 OFF) だけ。</para></summary>
         private string WiringSkillLine()
         {
