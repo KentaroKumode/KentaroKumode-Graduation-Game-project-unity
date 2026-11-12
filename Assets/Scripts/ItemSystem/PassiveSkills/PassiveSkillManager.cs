@@ -29,14 +29,24 @@ namespace ItemSystem.PassiveSkills
     /// </summary>
     public class PassiveSkillManager : MonoBehaviour
     {
-        // ===== シングルトン =====
+        // ===== シングルトン (CLAUDE.md の規約: _shuttingDown + RuntimeInitializeOnLoadMethod・GameManager と同じ形) =====
         private static PassiveSkillManager instance;
-        private static bool isApplicationQuitting;
+        private static bool _shuttingDown;
+
+        /// <summary>ドメインリロード無効設定でも static を必ず初期状態へ戻す。</summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            instance = null;
+            _shuttingDown = false;
+        }
+
+        /// <summary>パッシブの単一窓口。 アプリ終了中は null を返す。 無ければ作る。</summary>
         public static PassiveSkillManager Instance
         {
             get
             {
-                if (isApplicationQuitting)
+                if (_shuttingDown)
                     return null;
 
                 if (instance == null)
@@ -89,6 +99,7 @@ namespace ItemSystem.PassiveSkills
                 Destroy(gameObject);
                 return;
             }
+            _shuttingDown = false;
             instance = this;
             DontDestroyOnLoad(gameObject);
         }
@@ -805,7 +816,7 @@ namespace ItemSystem.PassiveSkills
 
         void OnApplicationQuit()
         {
-            isApplicationQuitting = true;
+            _shuttingDown = true;
         }
     }
 }

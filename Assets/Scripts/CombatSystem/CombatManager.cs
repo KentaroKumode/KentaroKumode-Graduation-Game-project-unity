@@ -28,14 +28,24 @@ namespace CombatSystem
         /// <summary>直近の主攻撃の倍率 (%) = 最終の主攻撃 ÷ 倍率の前の攻撃値 (会心・与ダメ%・敵の防御を全部含む)。 攻撃しなかったら 0。 画面の表示用 (2026-11-11)。</summary>
         public int LastHitMultPct { get; private set; }
 
-        // ===== シングルトン =====
+        // ===== シングルトン (CLAUDE.md の規約: _shuttingDown + RuntimeInitializeOnLoadMethod・GameManager と同じ形) =====
         private static CombatManager instance;
-        private static bool isApplicationQuitting;
+        private static bool _shuttingDown;
+
+        /// <summary>ドメインリロード無効設定でも static を必ず初期状態へ戻す。</summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            instance = null;
+            _shuttingDown = false;
+        }
+
+        /// <summary>戦闘の単一窓口。 アプリ終了中は null を返す。 無ければシーンから探し、 それも無ければ作る。</summary>
         public static CombatManager Instance
         {
             get
             {
-                if (isApplicationQuitting)
+                if (_shuttingDown)
                     return null;
 
                 if (instance == null)
@@ -303,6 +313,7 @@ namespace CombatSystem
                 Destroy(gameObject);
                 return;
             }
+            _shuttingDown = false;
             instance = this;
             DontDestroyOnLoad(gameObject);
         }
@@ -944,7 +955,7 @@ namespace CombatSystem
         
         void OnApplicationQuit()
         {
-            isApplicationQuitting = true;
+            _shuttingDown = true;
             if (instance == this) instance = null;
         }
 
