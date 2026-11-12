@@ -51,7 +51,7 @@ namespace AutoTest
             // L1学習: プロファイル別サブディレクトリに分離して累積
             string learningRoot = TierLearningRoot;
             ItemLearningStats.StatsFile learnStats = null;
-            Debug.Log($"[AutoRunner] 学習: ボスチューナー={tuneBosses} / Tier={learnTier} / BOT AI={learnBotAi}");
+            Debug.Log($"[AutoRunner] 学習: Tier={learnTier} / BOT AI={learnBotAi}");
             if (UpdatesTier)
             {
                 try
@@ -79,12 +79,7 @@ namespace AutoTest
                 catch (Exception e) { Debug.LogWarning($"[AutoRunner] L2探索失敗: {e.Message}"); }
             }
 
-            // L3: ボス難易度オートチューナー (突破率→目標ファネルへ寄せる)。 他の学習と同時実行可。
-            if (BossAutoTune)
-            {
-                try { BossBalanceTuner.AssessAndAdjust(_records, MetaProfileHelper.CurrentDebuffOn, learningRoot, learnStats?.totalBatches ?? 0); }
-                catch (Exception e) { Debug.LogWarning($"[AutoRunner] L3ボス調整失敗: {e.Message}"); }
-            }
+            // (L3 ボス難易度オートチューナーは 2026-11-12 に削除・#126・GAME.md §24)
 
             // ファイル検索で最新サマリーを開きやすいよう、 summary に profile + 時刻を埋め込む
             string summaryName = $"summary_{TierOutputSuffix}_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
@@ -527,7 +522,7 @@ namespace AutoTest
                 if (r?.combats == null) continue;
                 foreach (var c in r.combats)
                 {
-                    if (c == null || string.IsNullOrEmpty(c.enemyId) || !BossTuning.IsBoss(c.enemyId)) continue;
+                    if (c == null || string.IsNullOrEmpty(c.enemyId) || !CombatSystem.BossParams.IsBoss(c.enemyId)) continue;
                     if (!agg.TryGetValue(c.enemyId, out var a)) { a = new BossWinAgg(); agg[c.enemyId] = a; }
                     a.enc++;
                     if (c.won) a.wins++;

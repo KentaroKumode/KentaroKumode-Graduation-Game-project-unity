@@ -122,7 +122,6 @@ namespace AutoTest.EditorTools
         private const string DebuffKey    = "AutoRun.EnableAllDebuffs"; // EditorPrefs
         private const string ItemModeKey  = "AutoRun.ItemPickMode";     // EditorPrefs (②)
         private const string RatioKey     = "AutoRun.PersonaRawTierRatio";
-        private const string TuneBossKey  = "AutoRun.LearnBoss";        // EditorPrefs (③)
         private const string LearnTierKey = "AutoRun.LearnTier";        // EditorPrefs (③)
         private const string LearnAiKey   = "AutoRun.LearnBotAi";       // EditorPrefs (③)
 
@@ -144,7 +143,6 @@ namespace AutoTest.EditorTools
         private const string M2B = "Tools/AutoRun/② アイテム選択/Tier軸に";
 
         // ---- ③ 学習 (同時選択可・単独可) ----
-        private const string M3A = "Tools/AutoRun/③ 学習/ボスチューナー ON";
         private const string M3B = "Tools/AutoRun/③ 学習/Tier学習 ON";
         private const string M3C = "Tools/AutoRun/③ 学習/BOT学習 ON";
 
@@ -289,11 +287,6 @@ namespace AutoTest.EditorTools
 
         // ===== ③ 学習 (同時選択可・単独可) =====
 
-        [MenuItem(M3A, priority = 300)] private static void SetM3A()
-        { EditorPrefs.SetBool(TuneBossKey, !EditorPrefs.GetBool(TuneBossKey, false)); }
-        [MenuItem(M3A, validate = true)] private static bool VM3A()
-        { Menu.SetChecked(M3A, EditorPrefs.GetBool(TuneBossKey, false)); return true; }
-
         [MenuItem(M3B, priority = 301)] private static void SetM3B()
         { EditorPrefs.SetBool(LearnTierKey, !EditorPrefs.GetBool(LearnTierKey, false)); }
         [MenuItem(M3B, validate = true)] private static bool VM3B()
@@ -417,7 +410,6 @@ namespace AutoTest.EditorTools
             ClearBatchModeSessionState();
             EditorPrefs.SetBool(LearnTierKey, true);      // item_stats.json を書くのはこちら
             EditorPrefs.SetBool(LearnAiKey, false);
-            EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(TheoRelicKey, false);
             EditorPrefs.SetBool(NoRelicKey, true);        // **明示的に遺物なし** (null = 触らない ではない)
             EditorPrefs.SetBool(SweepAxisKey, false);
@@ -1767,7 +1759,6 @@ namespace AutoTest.EditorTools
             //   これを走らせると存在しなかった `learning/buffOff_debuffOff/` が**作られる**ので、
             //   2 回目以降の床測定が「学習なし」でなくなる ── 4 点測定の 1 点目が自壊する。
             EditorPrefs.SetBool(LearnTierKey, false);
-            EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(LearnAiKey, false);
             EditorPrefs.SetBool(NoRelicKey, true);
             // **メタモードを必ず明示する。** EditorPrefs に残るので、 床測定 (Off) や
@@ -1796,7 +1787,6 @@ namespace AutoTest.EditorTools
             //   これを走らせると存在しなかった `learning/buffOff_debuffOff/` が**作られる**ので、
             //   2 回目以降の床測定が「学習なし」でなくなる ── 4 点測定の 1 点目が自壊する。
             EditorPrefs.SetBool(LearnTierKey, false);
-            EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(LearnAiKey, false);
             EditorPrefs.SetBool(NoRelicKey, true);
             MetaMode = AutoRunner.MetaBuffMode.Off;
@@ -1826,7 +1816,6 @@ namespace AutoTest.EditorTools
             //   これを走らせると存在しなかった `learning/buffOff_debuffOff/` が**作られる**ので、
             //   2 回目以降の床測定が「学習なし」でなくなる ── 4 点測定の 1 点目が自壊する。
             EditorPrefs.SetBool(LearnTierKey, false);
-            EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(LearnAiKey, false);
             EditorPrefs.SetBool(NoRelicKey, true);
             MetaMode = AutoRunner.MetaBuffMode.BuildFocused;
@@ -1854,7 +1843,6 @@ namespace AutoTest.EditorTools
             //   これを走らせると存在しなかった `learning/buffOff_debuffOff/` が**作られる**ので、
             //   2 回目以降の床測定が「学習なし」でなくなる ── 4 点測定の 1 点目が自壊する。
             EditorPrefs.SetBool(LearnTierKey, false);
-            EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(LearnAiKey, false);
             EditorPrefs.SetBool(NoRelicKey, true);
             MetaMode = AutoRunner.MetaBuffMode.Standard;
@@ -1910,7 +1898,6 @@ namespace AutoTest.EditorTools
             SessionState.SetBool(GrantTrialKey, true);
             SessionState.SetInt(GrantTrialRunsKey, 60000);
             EditorPrefs.SetBool(NoRelicKey, true);
-            EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(LearnAiKey, false);
             EditorPrefs.SetBool(IttKey, false);           // 採取中は旧優先度のままで良い
             // **武器家系の固定は切る (製品条件で測る)。** アイテム学習 本走 は
@@ -1968,7 +1955,6 @@ namespace AutoTest.EditorTools
             SessionState.SetBool(GrantAllKindsKey, true);
             SessionState.SetInt(GrantItemsKey, 700);      // 7.0 品/ラン (プール 1.8 倍ぶん)
             EditorPrefs.SetBool(NoRelicKey, true);
-            EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(LearnAiKey, false);
             EditorPrefs.SetBool(IttKey, false);           // 採取中は旧優先度のままで良い
             EditorPrefs.SetBool(LockFamKey, false);
@@ -1986,7 +1972,6 @@ namespace AutoTest.EditorTools
         {
             ClearBatchModeSessionState();
             EditorPrefs.SetBool(LearnTierKey, false);
-            EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(LearnAiKey, false);
             EditorPrefs.SetBool(NoRelicKey, true);
             EditorPrefs.SetBool(IttKey, true);
@@ -2014,7 +1999,6 @@ namespace AutoTest.EditorTools
         {
             ClearBatchModeSessionState();
             EditorPrefs.SetBool(LearnTierKey, false);
-            EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(LearnAiKey, false);
             EditorPrefs.SetBool(NoRelicKey, true);
             EditorPrefs.SetBool(IttKey, true);
@@ -2035,7 +2019,6 @@ namespace AutoTest.EditorTools
         {
             ClearBatchModeSessionState();
             EditorPrefs.SetBool(LearnTierKey, false);
-            EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(LearnAiKey, false);
             // **遺物は両方を明示する。** `forceNoRelic` が `forceTheoreticalRelic` より
             //   優先される実装 (AutoRunner) なので、 片方だけ立てると意図と逆になる。
@@ -2093,7 +2076,6 @@ namespace AutoTest.EditorTools
             SessionState.SetInt(GrantTrialRunsKey, 60000);
             EditorPrefs.SetBool(NoRelicKey, false);
             EditorPrefs.SetBool(TheoRelicKey, true);
-            EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(LearnAiKey, false);
             EditorPrefs.SetBool(IttKey, false);
             EditorPrefs.SetBool(LockFamKey, false);
@@ -2150,7 +2132,6 @@ namespace AutoTest.EditorTools
             EditorPrefs.SetString(RankSpecKey,
                 "Trade:10,AttackTerm:1,BlockTerm:1,Shell:6,Guard:5,Vault:4,Output:2");
             EditorPrefs.SetBool(LearnTierKey, false);
-            EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(LearnAiKey, false);
             EditorPrefs.SetBool(NoRelicKey, true);      // 極点比較と同条件
             EditorPrefs.SetBool(IttKey, true);          // BOT の質を固定
@@ -2198,7 +2179,6 @@ namespace AutoTest.EditorTools
             SessionState.SetBool(YieldBenchKey, true);
             SessionState.SetInt(YieldBenchKey + ".Runs", 600);
             EditorPrefs.SetBool(LearnTierKey, false);
-            EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(LearnAiKey, false);
             EditorPrefs.SetBool(NoRelicKey, true);
             EditorPrefs.SetBool(IttKey, true);
@@ -2217,7 +2197,6 @@ namespace AutoTest.EditorTools
             SessionState.SetString(RankMarginKey + ".Tracks", "*");
             SessionState.SetString(RankMarginKey + ".Ranks", ranks);
             EditorPrefs.SetBool(LearnTierKey, false);
-            EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(LearnAiKey, false);
             EditorPrefs.SetBool(NoRelicKey, true);
             EditorPrefs.SetBool(IttKey, true);
@@ -2236,7 +2215,6 @@ namespace AutoTest.EditorTools
             SessionState.SetInt(RankMarginKey + ".Runs", 3000);
             SessionState.SetString(RankMarginKey + ".Tracks", "Shell,Armor");
             EditorPrefs.SetBool(LearnTierKey, false);
-            EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(LearnAiKey, false);
             EditorPrefs.SetBool(NoRelicKey, true);
             EditorPrefs.SetBool(IttKey, true);
@@ -2258,7 +2236,6 @@ namespace AutoTest.EditorTools
             EditorPrefs.SetString(RankSpecKey,
                 "Output:10,AttackTerm:1,BlockTerm:1,Shell:6,Guard:5,Vault:4,Supply:2");
             EditorPrefs.SetBool(LearnTierKey, false);
-            EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(LearnAiKey, false);
             EditorPrefs.SetBool(NoRelicKey, true);
             EditorPrefs.SetBool(IttKey, true);
@@ -2282,7 +2259,6 @@ namespace AutoTest.EditorTools
             SessionState.SetString(RankMarginKey + ".Tracks", "*");   // 10 段トラック全部
             SessionState.SetString(RankMarginKey + ".Ranks", "9");    // r10 は既存データを使う
             EditorPrefs.SetBool(LearnTierKey, false);
-            EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(LearnAiKey, false);
             EditorPrefs.SetBool(NoRelicKey, true);
             EditorPrefs.SetBool(IttKey, true);
@@ -2351,7 +2327,6 @@ namespace AutoTest.EditorTools
             ClearBatchModeSessionState();
             EditorPrefs.SetString(RankSpecKey, spec);
             EditorPrefs.SetBool(LearnTierKey, false);
-            EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(LearnAiKey, false);
             EditorPrefs.SetBool(NoRelicKey, true);
             EditorPrefs.SetBool(IttKey, true);
@@ -2368,7 +2343,6 @@ namespace AutoTest.EditorTools
             SessionState.SetBool(KeystoneKey, true);
             SessionState.SetInt(KeystoneKey + ".Runs", runs);
             EditorPrefs.SetBool(LearnTierKey, false);
-            EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(LearnAiKey, false);
             EditorPrefs.SetBool(NoRelicKey, true);
             EditorPrefs.SetBool(IttKey, true);          // BOT の質を固定
@@ -2387,7 +2361,6 @@ namespace AutoTest.EditorTools
             SessionState.SetBool(MetaAblKey, true);
             SessionState.SetInt(MetaAblKey + ".Runs", 3000);
             EditorPrefs.SetBool(LearnTierKey, false);
-            EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(LearnAiKey, false);
             EditorPrefs.SetBool(NoRelicKey, true);      // 基準条件
             EditorPrefs.SetBool(IttKey, true);          // BOT の質を固定
@@ -2425,7 +2398,6 @@ namespace AutoTest.EditorTools
             SessionState.SetBool(GrantTrialKey, true);
             SessionState.SetInt(GrantTrialRunsKey, 60000);
             EditorPrefs.SetBool(NoRelicKey, true);
-            EditorPrefs.SetBool(TuneBossKey, false);
             EditorPrefs.SetBool(LearnAiKey, false);
             EditorPrefs.SetBool(IttKey, false);       // 採取中は旧優先度のままで良い
             EditorPrefs.SetBool(LockFamKey, false);
@@ -2539,8 +2511,7 @@ namespace AutoTest.EditorTools
             Debug.Log($"[AutoRunMenu] {modeLabel}予約 → PlayMode 開始"
                     + $"  ①メタバフ={MetaMode}{(MetaMode == AutoRunner.MetaBuffMode.BuildFocused ? $"({MetaAxis})" : "")}"
                     + $"  ②アイテム={ItemMode}"
-                    + $"  ③学習: ボス={EditorPrefs.GetBool(TuneBossKey, false)}"
-                    + $"/Tier={EditorPrefs.GetBool(LearnTierKey, false)}"
+                    + $"  ③学習: Tier={EditorPrefs.GetBool(LearnTierKey, false)}"
                     + $"/BOT={EditorPrefs.GetBool(LearnAiKey, false)}"
                     );
             EditorApplication.EnterPlaymode();
@@ -2672,7 +2643,6 @@ namespace AutoTest.EditorTools
             runner.sweepAllMetaAxes = EditorPrefs.GetBool(SweepAxisKey, false);
             runner.enableAllDebuffs = EditorPrefs.GetBool(DebuffKey, false);
             runner.itemPickMode  = ItemMode;
-            runner.tuneBosses = EditorPrefs.GetBool(TuneBossKey, false);
             runner.learnTier  = EditorPrefs.GetBool(LearnTierKey, false);
             runner.learnBotAi = EditorPrefs.GetBool(LearnAiKey, false);
             runner.wiringSkill = Skill;
@@ -2736,7 +2706,6 @@ namespace AutoTest.EditorTools
                 if (tierCalResume)
                     runner.tierCalibrationBatchCounts = new[] { 4, 10, 10 };
                 runner.learnTier = true;
-                runner.tuneBosses = false;
                 runner.learnBotAi = false;
                 runner.itemPickMode = AutoRunner.ItemPickMode.BuildFocused;
                 runner.wiringSkill = AutoRunner.WiringSkill.Optimal;
@@ -3124,7 +3093,7 @@ namespace AutoTest.EditorTools
             string startLabel = sweep ? "5Fボス勝率スイープ"
                               : loopBatches >= 2 ? $"自動周回 {count}ラン × {loopBatches}回"
                               : count + " ラン";
-            Debug.Log($"[AutoRunMenu] AutoRunner 起動 ({startLabel}) ①{runner.metaBuffMode} ②{runner.itemPickMode} ③ボス{runner.tuneBosses}/Tier{runner.learnTier}/BOT{runner.learnBotAi} ④技量{runner.wiringSkill}");
+            Debug.Log($"[AutoRunMenu] AutoRunner 起動 ({startLabel}) ①{runner.metaBuffMode} ②{runner.itemPickMode} ③Tier{runner.learnTier}/BOT{runner.learnBotAi} ④技量{runner.wiringSkill}");
         }
     }
 

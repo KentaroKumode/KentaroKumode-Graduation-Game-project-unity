@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace ItemSystem.PassiveSkills
 {
-    /// <summary>プレイヤーに止めを刺した致死メカニズムの分類 (ボス難易度オートチューナーの苦戦診断用)。</summary>
+    /// <summary>プレイヤーに止めを刺した致死メカニズムの分類 (死因の集計用)。</summary>
     public enum DeathCause
     {
         Normal,       // 通常ロール敗北の被ダメ
@@ -183,16 +183,6 @@ namespace ItemSystem.PassiveSkills
         public Dictionary<string, int> playerStatusStacks = new Dictionary<string, int>();
         /// <summary>[decay] (減衰は BeginNewTurn の直後に PassiveSkillManager が呼ぶ TickStatuses)</summary>
         public Dictionary<string, int> enemyStatusStacks = new Dictionary<string, int>();
-
-        // ===== 敵スタンス（毎ターン抽選・ロール前テレグラフ。ADR-0005） =====
-        /// <summary>[perTurn] 敵→プレイヤー被ダメ倍率（高火力>1/低火力<1）。ApplyLossDamageModifiers で乗算。毎ターン1.0リセット。
-        /// ロール力は kind を見て CombatManager がロール時に面を縮める（弱ロール=期待値約0.65倍）。</summary>
-        public float enemyStanceDamageMult = 1f;
-        /// <summary>[perTurn] テレグラフ表示用：0=なし / 1=高ロール・低ダメ / 2=低ロール・高ダメ。毎ターン0リセット。</summary>
-        public int enemyStanceKind;
-        /// <summary>[perTurn] 弱ロールスタンスの面縮小比（ボス別にチューナーが調整・基準0.65）。EnemyStance.Apply が設定、
-        /// CombatManager が弱ロール時の WeakRollMax/WeakRollFaces に渡す。毎ターン0.65リセット。</summary>
-        public float enemyStanceWeakRollRatio = 0.65f;
 
 
         // ===== 勝敗フラグ =====
@@ -431,7 +421,7 @@ namespace ItemSystem.PassiveSkills
             enemyMaxHP = value;
         }
 
-        /// <summary>[persistent] (戦闘開始・段の差し替えで設定) 現在の敵ボスid (boss_layer*)。 非ボス戦は空。 各ボススキルが BossTuning.Param(bossId, ...) を引くのに使う。
+        /// <summary>[persistent] (戦闘開始・段の差し替えで設定) 現在の敵ボスid (boss_layer*)。 非ボス戦は空。 各ボススキルが BossParams.Param(bossId, ...) を引くのに使う。
         /// 戦闘開始/形態swap時に CombatManager がセット。</summary>
         public string bossId = "";
 
@@ -439,7 +429,7 @@ namespace ItemSystem.PassiveSkills
         /// 各致死スキルが発動時にセット、 通常被ダメ経路は Normal。 プレイヤー死亡時の死因記録に使う。</summary>
         public DeathCause lastDamageCause = DeathCause.Normal;
 
-        /// <summary>この戦闘でプレイヤーが受けた総被ダメの **ソース別内訳** (ボス難易度チューナー用)。
+        /// <summary>この戦闘でプレイヤーが受けた総被ダメの **ソース別内訳** (診断用)。
         /// キル時の一撃ではなく「戦闘を通じてどのメカニズムが何割を占めたか」で診断するための集計。
         /// 特殊スキル(審判の炎/毒/反射/断罪/爆ぜ火 等)が自分の与ダメを加算。 通常被ダメ(ロール敗北等)は
         /// 戦闘終了時に総被ダメからの残差として Normal に計上する。 戦闘開始時にクリア。</summary>
@@ -1037,11 +1027,6 @@ namespace ItemSystem.PassiveSkills
 
             // ---------- Phase B: perTurn フィールドの一括リセット (単純に初期値へ戻す) ----------
 
-
-            // 敵スタンス（毎ターン抽選し直す。ADR-0005）/ プレイヤースタンス（既定=攻撃。ADR-0006）
-            enemyStanceDamageMult = 1f;
-            enemyStanceKind = 0;
-            enemyStanceWeakRollRatio = 0.65f;
 
             // ダメージ処理の単ターンフラグ
             nullifyAllDamage = false;

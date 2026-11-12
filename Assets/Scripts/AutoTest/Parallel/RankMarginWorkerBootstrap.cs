@@ -116,7 +116,6 @@ namespace AutoTest.ParallelSweep
                 //   書き戻すと**プロセスごとに違う学習が育つ**。
                 runner.learnBotAi = false;
                 runner.learnTier = false;
-                runner.tuneBosses = false;
                 runner.writeRunsJsonl = false;
                 runner.exitPlayModeWhenDone = false;
                 runner.stepsPerYield = 1000;

@@ -13,8 +13,7 @@ namespace CombatSystem
         // 基準値の正本は下の Spec()。 ここの「基準」は 2026-11-11 (#30) に Spec() へ合わせた写し。
         JudgmentDice,      // 6層 灰燼の王・〈業火の予兆〉の予兆ターンの敵攻撃上乗せ (旧〈業火の断罪〉と共用)。 基準8
         JudgmentCoefBase,  // 業火の断罪の係数基礎。 係数 = base + 2n。 基準2 (1回目=4)
-                           //   [読む敵なし] JudgmentBlaze はどの敵も持っていない (BOT のチューナーだけが動かす)
-        RobeStacks,        // [死にパラメータ・2026-10-17] 天衣無縫 (FlawlessRobe) を削除したので読む側が無い。 並びを保つため残置
+                           //   [読む敵なし] JudgmentBlaze はどの敵も持っていない (効果のクラスは残っている)
         ChipCap,           // 業火の審判官・審判の炎の 1 回 (毎ターン) あたりの上限。 基準10
         RegenReduction,    // 灰燼・灰塵の鎧の被ダメ軽減量 (タンク性/ジリ貧)。 基準9
                            //   [読む敵なし] AshArmor はどの敵も持っていない
@@ -25,17 +24,16 @@ namespace CombatSystem
         PoisonStackCap,    // 毒沼の主・毒の侵蝕の毒スタック上限 (DOTの最大強度)。 基準5
         MirrorReflectCap,  // 鏡の双子・鏡映の応答の反射ダメ上限。 基準9
         GoblinCall,        // ゴブリン王・号令の毎ターンの敵攻撃加算。 基準3
-        StanceAtkMult,     // 敵スタンス(ADR-0005)・高火力スタンスの被ダメ倍率 (=ボスの攻撃力)。 基準1.6
-                           //   [本体に読む側なし] 敵スタンスは ADR-0009 で廃止。 AutoTest のチューナーだけが参照
-        WeakRollRatio,     // 敵スタンス・弱ロールの面縮小比 (高いほどロールが弱まらない=強い)。 基準0.65
-                           //   [本体に読む側なし] 同上
+        // 2026-11-12 (#126): RobeStacks (天衣無縫・読む側なし)・StanceAtkMult / WeakRollRatio (敵スタンス ADR-0005・呼ぶ所なし) を削除。
+        //   番号で保存している所は無い (調整値の boss_tuning.json は名前で持ち、 L3 ボス調整器ごと削除)。
     }
 
     /// <summary>
     /// ボスの数値の正本 (機構パラメータの基準値・固有面ダイス) と、 敵データへの適用。
     ///
     /// <para><b>本体は基準値だけで完結する。</b> 外から値を差し替える口は <see cref="Overrides"/> だけで、
-    /// 既定は null (= 基準値)。 BOT のボス調整器 (AutoTest.BossTuning) は AutoRunner の起動時にだけここへ差し込む。
+    /// 既定は null (= 基準値)。 BOT・測定が値を差し込むときは AutoRunner の起動時にだけここへ入れる
+    /// (差し込んでいた L3 ボス調整器 AutoTest.BossTuning は 2026-11-12 に削除・#126。 いまは口だけで、 入れる側は無い)。
     /// 本体から AutoTest の型を参照しないための境界 (2026-10-29)。</para>
     /// </summary>
     public static class BossParams
@@ -60,7 +58,6 @@ namespace CombatSystem
                 //   (FloorManager.SpecialEncounterFloor 参照)。 7 で測っても 7層クリアは
                 //   5.9% → 5.8% と動かず、 効いたのは 5層ボス単体の勝率 (70.9→74.1%) だけ。
                 //   出現漏れを直した土俵で測り直してから是非を判断する。
-                case BossParam.RobeStacks:        return new ParamSpec(10f, 1f, 20f);
                 case BossParam.ChipCap:           return new ParamSpec(10f, 1f, 20f);
                 case BossParam.RegenReduction:    return new ParamSpec( 9f, 0f, 20f);
                 // 2026-11-12 (#103): 〈停滞する時間〉を「引いた端子 1 枚ごとに確率で止める」へ作り替え、 この値を
@@ -71,8 +68,6 @@ namespace CombatSystem
                 case BossParam.PoisonStackCap:    return new ParamSpec( 5f, 1f, 12f);
                 case BossParam.MirrorReflectCap:  return new ParamSpec( 9f, 0f, 15f);
                 case BossParam.GoblinCall:        return new ParamSpec( 3f, 0f, 12f);
-                case BossParam.StanceAtkMult:     return new ParamSpec(1.6f, 1.0f, 3.0f);
-                case BossParam.WeakRollRatio:     return new ParamSpec(0.65f, 0.40f, 0.90f);
                 default:                          return new ParamSpec( 1f, 0f,  1f);
             }
         }
@@ -99,7 +94,7 @@ namespace CombatSystem
             }
         }
 
-        // ===== 外からの差し替え (BOT のボス調整器だけが使う) =====
+        // ===== 外からの差し替え (BOT・測定の口) =====
 
         /// <summary>ボスの数値を差し替える口。 値を持たない項目は基準値に落ちる。</summary>
         public interface IOverrides

@@ -433,8 +433,6 @@ namespace AutoTest
 
         [Header("③ 学習 (同時選択可・単独可)")]
 
-        [Tooltip("ボス難易度オートチューナーを動かす (§13-3)")]
-        public bool tuneBosses = false;
         [Tooltip("Tier表 (item_stats / regression / BALANCE_TIER_LIST.md) を更新する")]
         public bool learnTier = false;
         /// <summary>並列アイテム学習のワーカーとして走る (2026-11-04)。 探索を学習バッチと同じに入れるだけで、
@@ -451,8 +449,6 @@ namespace AutoTest
         public bool UpdatesTier => learnTier;
         /// <summary>AIルーチンを成長させるか。</summary>
         public bool UpdatesAi => learnBotAi;
-        /// <summary>ボス難易度オートチューナーを動かすか。</summary>
-        public bool BossAutoTune => tuneBosses;
         /// <summary>ビルド軸ペルソナを使うか。</summary>
         public bool useBuildPersonas => itemPickMode == ItemPickMode.BuildFocused;
 
@@ -1774,8 +1770,7 @@ namespace AutoTest
                     + $" → 学習データ分離キー: {MetaProfileHelper.CurrentSuffix}");
             Debug.Log($"[AutoRunner] ② アイテム選択={itemPickMode}"
                     + (itemPickMode == ItemPickMode.BuildFocused ? $" (Tier信奉混率 {rawTierRatio:P0})" : ""));
-            Debug.Log($"[AutoRunner] ③ 学習: ボスチューナー={(tuneBosses ? "ON" : "OFF")}"
-                    + $" / Tier学習={(learnTier ? "ON" : "OFF")}"
+            Debug.Log($"[AutoRunner] ③ 学習: Tier学習={(learnTier ? "ON" : "OFF")}"
                     + $" / BOT学習={(learnBotAi ? "ON" : "OFF")}");
 
             // 5層裏ボス遮断。 各スイープのコルーチンはこの後で自分の値へ書き戻すので、
@@ -1979,7 +1974,6 @@ namespace AutoTest
             try { EventChoiceLearningStats.Reload(MetaProfileHelper.LearningRoot()); } catch { }
             try { LearnedPriorityProvider.Reload(TierLearningRoot, writeMarkdown: UpdatesTier); } catch { }
             try { EncounterDangerStats.Reload(TierLearningRoot); } catch { }
-            try { BossTuning.Reload(MetaProfileHelper.LearningRoot()); } catch { }
 
             // **学習データが欠けていたら黙って手書きの序列へ落とさない** (2026-11-12・#118)。
             //   難易度 2 (10 点) は帯 bot_band_1_15 を読むが、 そのフォルダは無い → 手書きの S/A だけで買い、 難易度 1〜3 のクリアが 0% になった。
@@ -2252,9 +2246,7 @@ namespace AutoTest
             string root = MetaProfileHelper.LearningRoot();
 
             // ── バッチ0回目(初期)スナップショット ──
-            try { BossTuning.Reload(root); } catch { }
             try { PolicyParameters.ReloadFromDisk(root); } catch { }
-            var bossStart   = SnapshotBossTuning();
             var policyStart = PolicyParameters.Current?.Clone();
             float firstClearRate = -1f, lastClearRate = -1f;
 
@@ -2286,7 +2278,7 @@ namespace AutoTest
             }
             catch { }
             // ── 周回サマリ: 初期 vs 最終の差分をチェンジログに追記 ──
-            try { AppendAutoLoopSummary(loops, bossStart, policyStart, firstClearRate, lastClearRate); }
+            try { AppendAutoLoopSummary(loops, policyStart, firstClearRate, lastClearRate); }
             catch (Exception e) { Debug.LogWarning($"[AutoRunner] 周回サマリ追記失敗: {e.Message}"); }
             Debug.Log($"[AutoRunner] === 自動周回モード END: {loops}周完了 (最終 Reload: {LearnedPriorityProvider.LastLoadedSummary}) ===");
             if (finalExit)
@@ -2311,32 +2303,8 @@ namespace AutoTest
             return valid > 0 ? (float)full / valid : 0f;
         }
 
-        /// <summary>現在のボス調整値を {key → {ラベル → 実数値}} で複製 (具体パラメータ + HP + Dice期待値)。</summary>
-        private static Dictionary<string, Dictionary<string, float>> SnapshotBossTuning()
-        {
-            var snap = new Dictionary<string, Dictionary<string, float>>();
-            try
-            {
-                foreach (var k in BossTuning.All())
-                {
-                    var m = new Dictionary<string, float>();
-                    foreach (BossParam p in System.Enum.GetValues(typeof(BossParam)))
-                        m[p.ToString()] = BossTuning.GetParam(k, p);
-                    m["HP"] = BossTuning.MaxHpFor(k.key);
-                    if (BossTuning.IsSignatureDiceBoss(k.key))
-                        m["SigE"] = BossTuning.SignatureExpected(BossTuning.SignatureFaces(k.key));
-                    else
-                        m["DiceE"] = BossTuning.CurrentDiceExpected(k.key);
-                    snap[k.key] = m;
-                }
-            }
-            catch { }
-            return snap;
-        }
-
         /// <summary>自動周回の初期(バッチ0)→最終(バッチN)差分を BALANCE_CHANGELOG_&lt;profile&gt;.md に追記。</summary>
         private void AppendAutoLoopSummary(int loops,
-            Dictionary<string, Dictionary<string, float>> bossStart,
             PolicyParameters policyStart, float firstClear, float lastClear)
         {
             var sb = new StringBuilder();
@@ -2345,61 +2313,13 @@ namespace AutoTest
             sb.AppendLine($"- **メタバフ**: {metaBuffMode}"
                 + (metaBuffMode == MetaBuffMode.BuildFocused ? $"({metaBuildAxis})" : "")
                 + $" / メタデバフ全ON: {enableAllDebuffs} / アイテム選択: {itemPickMode}");
-            sb.AppendLine($"- **学習**: ボスチューナー={(tuneBosses ? "ON" : "OFF")}"
-                + $" / Tier学習={(learnTier ? "ON" : "OFF")} / BOT学習={(learnBotAi ? "ON" : "OFF")}");
+            sb.AppendLine($"- **学習**: Tier学習={(learnTier ? "ON" : "OFF")} / BOT学習={(learnBotAi ? "ON" : "OFF")}");
             if (firstClear >= 0f && lastClear >= 0f)
             {
                 float d = lastClear - firstClear;
                 sb.AppendLine($"- **7層クリア率**: 初回 {firstClear:P2} → 最終 {lastClear:P2} ({d:+0.0%;-0.0%})");
             }
             sb.AppendLine();
-
-            // ボス難易度係数の差分 (変化した軸のみ)
-            if (BossAutoTune)
-            {
-                var bossEnd = SnapshotBossTuning();
-                var keys = new SortedSet<string>();
-                foreach (var k in bossStart.Keys) keys.Add(k);
-                foreach (var k in bossEnd.Keys) keys.Add(k);
-                var lines = new List<string>();
-                foreach (var key in keys)
-                {
-                    bossStart.TryGetValue(key, out var sa);
-                    bossEnd.TryGetValue(key, out var sb2);
-                    var parts = new List<string>();
-                    var labels = new SortedSet<string>();
-                    if (sa != null) foreach (var l in sa.Keys) labels.Add(l);
-                    if (sb2 != null) foreach (var l in sb2.Keys) labels.Add(l);
-                    foreach (var label in labels)
-                    {
-                        float av = (sa != null && sa.TryGetValue(label, out var v1)) ? v1 : 0f;
-                        float bv = (sb2 != null && sb2.TryGetValue(label, out var v2)) ? v2 : 0f;
-                        if (Mathf.Abs(bv - av) <= 0.05f) continue;
-                        if (label == "DiceE")
-                        {
-                            var (cnt, faces) = BossTuning.BestDiceConfig(bv > 0 ? bv : 1f);
-                            parts.Add($"Dice E{av:F1}→**E{bv:F1}({cnt}d{faces})**");
-                        }
-                        else if (label == "SigE")
-                            parts.Add($"固有面 E{av:F1}→**E{bv:F1}**");
-                        else if (label == "HP")
-                            parts.Add($"HP {av:F0}→**{bv:F0}**");
-                        else
-                            parts.Add($"{label} {av:0.#}→**{bv:0.#}**");
-                    }
-                    if (parts.Count > 0) lines.Add($"| `{key}` | {string.Join(", ", parts)} |");
-                }
-                sb.AppendLine("### ボス難易度パラメータ (変化した実数値のみ)");
-                sb.AppendLine();
-                if (lines.Count == 0) sb.AppendLine("*(変化なし)*");
-                else
-                {
-                    sb.AppendLine("| ボス | 変化したパラメータ |");
-                    sb.AppendLine("|---|---|");
-                    foreach (var l in lines) sb.AppendLine(l);
-                }
-                sb.AppendLine();
-            }
 
             // policy 差分
             if (UpdatesAi && policyStart != null)
@@ -2572,9 +2492,6 @@ namespace AutoTest
             if (navBlockCredit  >= 0f) BlockCreditRatio = navBlockCredit;
             if (navSafetyFights >= 0f) SafetyFights     = navSafetyFights;
             Debug.Log($"[AutoRunner] policy: {PolicyParameters.Current.Summary()}");
-            // L3: ボス難易度係数を読み込み (前バッチの自動調整を引き継ぐ)
-            BossTuning.Reload();
-            if (BossAutoTune) Debug.Log($"[AutoRunner] bossTuning: {BossTuning.Summary()}");
             // L2ペアテスト: 挑戦者ポリシーを生成 (バッチ内 paired diff 評価用)
             //  ・AIルーチン学習モード時のみ (TierOnly では policy 凍結)
             //  ・runCount が L2ゲート(200) 未満ならスキップ

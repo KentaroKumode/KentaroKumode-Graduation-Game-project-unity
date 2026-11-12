@@ -120,10 +120,6 @@ namespace CombatSystem
             _fleeRequested = true;
             return true;
         }
-        private long _fightPlayerRollSum;    // ボス難易度チューナー: この戦闘のプレイヤーロール合計の累計
-        private int _fightPlayerRollCount;   // 同 ロール回数 (平均出目 = sum/count)
-        // ボス難易度チューナー: スタンス別の「ボスがロール勝ちしたターン数 / そのスタンスの総ターン数」(強/弱で別レンジ管理)
-        private int _fightStrongTurns, _fightStrongBossWins, _fightWeakTurns, _fightWeakBossWins;
         private bool wrathDiceOverrideArmed; // 恒久デバフ「憤怒」: 1T目のダイス最大化トリガー
         private int playerDiceCount;
         private int playerDiceMax;
@@ -388,7 +384,7 @@ namespace CombatSystem
         public EnemyData SecondaryEnemy => secondaryEnemy;
         public bool IsPairEncounter => secondaryEnemy != null;
 
-        /// <summary>2 体目を私物化して整える。 1 体目と同じ前処理 (チューナー・厚い皮膚) を通す ──
+        /// <summary>2 体目を私物化して整える。 1 体目と同じ前処理 (BossParams.Apply・厚い皮膚) を通す ──
         /// 通さないと挑戦デバフが 1 体目にしか掛からず、 高難度ほどペアが相対的に軽くなる。
         /// <b>状態は書かない</b>。 呼び出し側 (<see cref="StartCombatInternal"/>) が
         /// パッシブ登録より前に据える必要があるため。</summary>
@@ -436,11 +432,11 @@ namespace CombatSystem
             // ADR-0011 〈富〉(目 9) の報酬加算は戦闘ごと。 持ち越さない。
             { var goldRun = GameLoop.GameManager.Instance?.Run; if (goldRun != null) goldRun.roleGoldBonusPct = 0; }
 
-            // ボス難易度オートチューナー: hpMul を maxHP に適用 (非ボスは素通り)
+            // ボスの数値 (固有面ダイス・BossParams.Overrides の差し替え) を適用 (非ボスは素通り)
             enemy = CombatSystem.BossParams.Apply(enemy);
 
             // **ここから下は enemy を書き換えてよい**、 という不変条件をこの1行で作る。
-            //   BossTuning.Apply が複製を返すのは署名ダイスボスだけで、 非ボスや調整値の無い
+            //   BossParams.Apply が複製を返すのは署名ダイスボスだけで、 非ボスや調整値の無い
             //   ボスでは **EnemyDatabase の共有インスタンスがそのまま返る**。 それを書き換えると
             //   遭遇ごとに効果が複利で積み上がり、 ラン間でも消えない (EnemyDatabase は再読込しない)。
             //   実測: 厚い皮膚 ×1.1 の直書きでスライムの maxHP が 72 → 2,068,124,672 → int 溢れ →
@@ -559,9 +555,6 @@ namespace CombatSystem
             turnLog.Clear();
             mutualWiring = null; // ADR-0009: 配線は戦闘単位でリセット (ラン跨ぎ既定値は W7 後段)
             BeginTerminalDeck();   // 端子の山札 (ADR-0014): ランの山札を写して切る
-            _fightPlayerRollSum = 0;
-            _fightPlayerRollCount = 0;
-            _fightStrongTurns = _fightStrongBossWins = _fightWeakTurns = _fightWeakBossWins = 0;
 
             // パッシブスキルマネージャーに敵スキルを登録
             var psm = PassiveSkillManager.Instance;
@@ -645,7 +638,7 @@ namespace CombatSystem
                 ctx.playerArmorPenBase = _weaponArmorPen;
                 ctx.playerDefense = ctx.playerDefenseBase;
                 ctx.playerArmorPen = ctx.playerArmorPenBase;
-                // ボス難易度オートチューナー: 軸別係数引き用にボスidを記録 (非ボスは空)
+                // ボスのパッシブが BossParams.Param(bossId, …) を引くためにボスidを記録 (非ボスは空)
                 ctx.bossId = CombatSystem.BossParams.IsBoss(enemy.id) ? enemy.id : "";
                 ctx.lastDamageCause = ItemSystem.PassiveSkills.DeathCause.Normal;
 
@@ -821,7 +814,7 @@ namespace CombatSystem
             if (!isCombatActive) { Debug.LogWarning("[CombatManager.SwapEnemy] 戦闘中でない"); return false; }
             var newEnemy = EnemyDatabase.Get(newEnemyId);
             if (newEnemy == null) { Debug.LogError($"[CombatManager.SwapEnemy] enemy not found: {newEnemyId}"); return false; }
-            // ボス難易度オートチューナー: ヴェスカ連戦の各形態にも hpMul を適用
+            // ヴェスカ連戦の各形態にも BossParams.Apply を掛ける
             newEnemy = CombatSystem.BossParams.Apply(newEnemy);
             // 挑戦 (敵の最大 HP・〈鋼の皮膚〉のボス HP) を連戦の全段に掛ける (2026-11-09)。 旧は 1 段目にしか掛かっていなかった。
             //   共有のインスタンスを書き換えると値が積み上がるので、 先に複製する。

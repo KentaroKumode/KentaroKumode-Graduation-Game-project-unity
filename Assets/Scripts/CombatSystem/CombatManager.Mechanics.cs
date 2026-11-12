@@ -69,21 +69,16 @@ namespace CombatSystem
             return true;
         }
 
-        private int[] RollEnemyAttack(EnemyData e, int extraDraws, bool weakRoll, float weakRatio)
+        private int[] RollEnemyAttack(EnemyData e, int extraDraws)
         {
             if (e == null) return new int[0];
             if (e.UsesAttackRoll)
-            {
-                int hi = weakRoll ? EnemyStance.WeakRollMax(e.attackRollMax, weakRatio) : e.attackRollMax;
-                return e.RollAttack(extraDraws, hi);
-            }
+                return e.RollAttack(extraDraws, e.attackRollMax);
             // ---- 旧ダイス方式 (互換パス) ----
             int[] faces = e.diceFaces;
             if (faces != null && faces.Length > 0)
-                return RollDice(Math.Max(0, e.diceCount + extraDraws), 0,
-                                weakRoll ? EnemyStance.WeakRollFaces(faces, weakRatio) : faces);
-            int mx = weakRoll ? EnemyStance.WeakRollMax(e.diceMaxValue, weakRatio) : e.diceMaxValue;
-            return RollDice(Math.Max(0, e.diceCount + extraDraws), mx);
+                return RollDice(Math.Max(0, e.diceCount + extraDraws), 0, faces);
+            return RollDice(Math.Max(0, e.diceCount + extraDraws), e.diceMaxValue);
         }
 
         private int[] RollDice(int count, int maxValue, int[] diceFaces = null)

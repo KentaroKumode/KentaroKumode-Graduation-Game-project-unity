@@ -70,15 +70,10 @@ namespace AutoTest
             // この戦闘時点の装備（武器×ダイス勝率集計用）。武器は family_tN まで（業物+段階は区別しない）。
             public string weaponId = "";
             public string diceId = "";
-            // ボス難易度オートチューナー: 敗北時の致死メカニズム (勝利時は Normal)
+            // 敗北時の致死メカニズム (勝利時は Normal)
             public ItemSystem.PassiveSkills.DeathCause deathCause;
-            // ボス難易度オートチューナー: プレイヤーロール合計と回数 (平均出目算出用)
-            public long playerRollSum;
-            public int playerRollCount;
-            // ボス難易度オートチューナー: この戦闘の総被ダメの ソース別内訳 (支配率診断用・キル時の一撃ではない)
+            // この戦闘の総被ダメの ソース別内訳 (支配率診断用・キル時の一撃ではない)
             public Dictionary<ItemSystem.PassiveSkills.DeathCause, int> playerDamageBySource;
-            // ボス難易度オートチューナー: スタンス別の「ボスがロール勝ちしたターン数/総ターン数」(強/弱別レンジ制御用)
-            public int strongRollTurns, strongRollBossWins, weakRollTurns, weakRollBossWins;
             // 緊張感曲線用: プレイヤー最大HP (戦闘終了時点)。 hpAfter / playerMaxHpEnd で残HP%
             public int playerMaxHpEnd;
             /// <summary>戦闘名の鍵 (層|種類|戦闘名・<see cref="EncounterDangerStats.KeyOf"/>)。 戦闘名が無い戦闘は空 (2026-11-05)。</summary>

@@ -29,7 +29,6 @@ namespace AutoTest.Ultra
             runner.sweepAllMetaAxes = profile.sweepAllMetaAxes;
 
             // ---- a benchmark must not rewrite learning or balance data ----
-            runner.tuneBosses = false;
             runner.learnTier = false;
             runner.learnBotAi = false;
 

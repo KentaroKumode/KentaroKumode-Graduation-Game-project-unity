@@ -407,7 +407,7 @@ namespace AutoTest.ParallelSweep
                 "enableAllDebuffs", "forceNoRelic", "forceTheoreticalRelic",
                 "shieldAbsorbsUnmitigable", "suppressFacePartOffers", "robberyBlocksShops",
                 "challengeScoreTarget", "masterSeed", "rawTierRatio",
-                "learnBotAi", "learnTier", "tuneBosses",
+                "learnBotAi", "learnTier",
                 // **2026-09-14: ここへ足し忘れて 60,000 ラン を捨てた。**
                 //   自作ドライバが useIttBeta を送っておらず、 既定 false のまま走った
                 //   (Editor の並列ランナーは True を運んでいた)。 アイテム評価の推定量が
