@@ -111,7 +111,7 @@ namespace UI.Game2D
                 if (s.guardIn == 0) plan.Add("このターンは構え (防御が上がる)"); else if (s.guardIn > 0) plan.Add("構えまで " + s.guardIn + " ターン");
                 if (s.heavyIn == 0) plan.Add("このターンは大技"); else if (s.heavyIn > 0) plan.Add("大技まで " + s.heavyIn + " ターン");
                 // ボスのダウン (2026-11-13): ダウン中・後に続くダウン・次の目盛りまでの残り
-                if (s.down) plan.Add("このターンはダウン (行動不能・受けるダメージ ×" + CombatSystem.BossDown.TakenMul.ToString("0.0") + ")");
+                if (s.down) plan.Add("このターンはダウン (攻撃しない・受けるダメージ ×" + CombatSystem.BossDown.TakenMul.ToString("0.0") + ")");
                 if (s.downPending > 0) plan.Add("ダウンはあと " + s.downPending + " ターン続く");
                 if (s.downNotchHp >= 0) plan.Add("次の目盛りまで " + System.Math.Max(0, cm.EnemyHP - s.downNotchHp));
                 if (plan.Count > 0) sb.Append(string.Join("・", plan)).Append('\n');

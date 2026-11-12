@@ -491,7 +491,7 @@ namespace CombatSystem
 
             // フロアデバフ: 敵の毎ターンHP回復 (旧法と同一)
             var floorMod = GameLoop.GameManager.Instance?.ActiveModifier;
-            if (floorMod != null && floorMod.enemyPerTurnHeal > 0 && enemyHP > 0 && !_down.downNow)   // ボスのダウンのターンは回復しない
+            if (floorMod != null && floorMod.enemyPerTurnHeal > 0 && enemyHP > 0)
             {
                 int heal = Mathf.Min(currentEnemy.maxHP - enemyHP, floorMod.enemyPerTurnHeal);
                 if (heal > 0)
@@ -504,7 +504,7 @@ namespace CombatSystem
             }
             // 挑戦カード〈再生〉: 敵が毎ターン最大 HP の N% を回復する / 〈敵のシールド〉: 最大 HP の N% までシールドを張り直す。
             //   シールドはヴェスカと同じ池 (ApplyVescaDefense が吸わせる・予告に出る)。 ヴェスカは自分の半減と抽選の後にここで底上げされる。
-            if (ctx != null && enemyHP > 0 && !_down.downNow)   // ボスのダウンのターンは〈再生〉もシールドの張り直しもしない
+            if (ctx != null && enemyHP > 0)
             {
                 int eMax = Math.Max(1, ctx.enemyMaxHP > 0 ? ctx.enemyMaxHP : currentEnemy.maxHP);
                 float regen = MetaProgression.MetaDebuffApplicator.GetEnemyRegenPct();
@@ -730,9 +730,9 @@ namespace CombatSystem
                 blazeStacks = ctx.accumulatedValues.TryGetValue(
                         ItemSystem.PassiveSkills.Effects.BlazeBrand.StackKey, out var _bz)
                     ? (int)_bz : 0,
-                blazePenalizesBlock = !_down.downNow && ctx.accumulatedValues.TryGetValue(
+                blazePenalizesBlock = ctx.accumulatedValues.TryGetValue(
                         ItemSystem.PassiveSkills.Effects.BlazeBrand.ActiveKey, out var _bza)
-                    && _bza > 0f,   // ダウンのターンは〈烈炎〉も止まるので、 守っても積まれない
+                    && _bza > 0f,
                 executeArmed = ctx.vescaExecuteArmed,
                 sealedTerminal = -1,   // 旧〈綻び〉(端子の封印) は 2026-11-10 に撤去
                 // ボスのダウン (2026-11-13): 目盛り・次の目盛りの HP・このターンと後に続くダウン

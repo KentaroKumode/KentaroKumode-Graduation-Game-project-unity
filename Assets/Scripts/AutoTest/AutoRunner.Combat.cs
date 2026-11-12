@@ -554,17 +554,6 @@ namespace AutoTest
         /// <summary>先のターンの被ダメの見積もりに使う敵の攻撃: 普段はこのターンの予告値。 ダウンのターンは予告が 0 なので、 ダウンが明けた後の見込み。</summary>
         private static int FutureEnemyAtk(in OptimalTurnState s) => s.enemyDown ? s.downNextAtk : s.enemyAtk;
 
-        /// <summary>[ボスのダウン] ダウンのターンは敵のパッシブが止まる (本体 CombatSystem.BossDownPassives・発火の入口で止める) ので、
-        /// 効用が読む敵のパッシブの効き目を全部 0 にする (攻撃が通った時の上乗せ・収支で入る軽減無視・〈吸血〉・次のターンへ積む分・〈多頭攻撃〉・〈烈炎〉の積み)。</summary>
-        private static void ClearEnemyPassivesForDown(ref OptimalTurnState s)
-        {
-            s.enemyHitBonus = 0; s.counterPendingNow = 0;
-            s.enemyChipOnPlus = 0; s.enemyChipOnMinus = 0; s.enemyLifesteal = 0;
-            s.nextHitOnPlus = 0; s.nextAtkOnPlus = 0f; s.enemyBalanceRead = false;
-            s.enemyDoubleOnBlockHeavy = false;
-            s.tele.blazePenalizesBlock = false;
-        }
-
         /// <summary>[ボスのダウン] 目盛りを割って次のターンをダウンにする価値の割合 (次のターンの敵の攻撃 × これ を今の HP で見る・仮・未測定)。
         /// 〈停止信号〉(DeckStunShare) と同じ形: 半分にするのは、 割らなくてもブロックで一部は受けられるから。</summary>
         private const float DownNextTurnShare = 0.5f;
@@ -1223,7 +1212,7 @@ namespace AutoTest
                 ns.downPendingNow = System.Math.Max(0, st.downPendingNow + (nb - st.downBroken) - (nd ? 1 : 0));
                 ns.enemyDown = nd;
                 ns.downNextAtk = st.downNextAtk;
-                if (nd) { ns.enemyAtk = 0; ns.tele.enemyAttackValue = 0; ns.atkGrowth = null; ClearEnemyPassivesForDown(ref ns); }
+                if (nd) { ns.enemyAtk = 0; ns.tele.enemyAttackValue = 0; ns.atkGrowth = null; }
             }
             // シールド: 今ターンの被弾で吸われ、 〈城壁〉で増え、 次のターン頭に半分 (切り捨て・DAMAGE_CALC_REFERENCE ③-D)
             int shield = o.bashSpent ? 0 : System.Math.Max(0, shieldPool - o.taken);
@@ -1483,8 +1472,6 @@ namespace AutoTest
                 st.enemyBalanceRead = st.enemyChipOnPlus > 0 || st.enemyChipOnMinus > 0 || st.enemyLifesteal > 0
                                    || st.nextHitOnPlus > 0 || st.nextAtkOnPlus > 0f;
             }
-            // ボスのダウン: このターンは敵のパッシブが止まっている
-            if (st.enemyDown) ClearEnemyPassivesForDown(ref st);
             // [V3 readOutgoingMult] 主攻撃の見積もりに与ダメの倍率を読む (Super で既定 ON)。 予測の照合 (predTrace) では両方を出す。
             bool readOutNow = ReadOutgoingMultEffective && EffectiveWiringSkill != WiringSkill.Naive;
             if ((readOutNow || predTrace) && ctxRoles != null)
