@@ -30,7 +30,7 @@ namespace MetaProgression.Relics
         CritRate = 8,        // 会心率 +N%
         BloodOffering = 9,   // 血贄 +N% (敵味方問わず、 出血が与えたダメージの N% を回復)
         EscalationDelay = 10,// 敵の段階の遅れ +N ターン
-        BlockDicePct = 11,   // ブロックに挿した出目 +N%
+        BlockDicePct = 11,   // 防御の端子を挿した出目 +N%
         OpeningBleed = 12,   // 開幕出血 +N
         OpeningPoison = 13,  // 開幕毒 +N
         Rinkai = 14,         // 爆発時に敵の現在 HP の N% を固定ダメ枠へ
@@ -146,7 +146,7 @@ namespace MetaProgression.Relics
                 case RelicStat.CritRate: return "会心率";
                 case RelicStat.BloodOffering: return "血贄";
                 case RelicStat.EscalationDelay: return "敵の段階の遅れ";
-                case RelicStat.BlockDicePct: return "ブロックに挿した出目";
+                case RelicStat.BlockDicePct: return "防御の端子を挿した出目";
                 case RelicStat.OpeningBleed: return "開幕出血";
                 case RelicStat.OpeningPoison: return "開幕毒";
                 case RelicStat.Rinkai: return "臨界";

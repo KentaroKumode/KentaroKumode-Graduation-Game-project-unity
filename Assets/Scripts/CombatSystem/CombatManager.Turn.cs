@@ -801,12 +801,12 @@ namespace CombatSystem
             int specialCount = term.supportDice;
             ApplyTerminalOutcome(ctx, term, ref enemyAtkValue);
             int _diagAtkRaw = attackSum;
-            // 遺物 (§15-5) 堅牢の環: ブロックに挿した出目 +N% (出目の合計に掛けて切り上げ・端子調律より前)
+            // 遺物 (§15-5) 堅牢の環: 防御の端子を挿した出目 +N% (出目の合計に掛けて切り上げ・端子調律より前)
             {
                 float rbp = MetaProgression.Relics.RelicApplicator.GetBlockDicePct();
                 if (rbp > 0f && blockSum > 0) blockSum += Mathf.CeilToInt(blockSum * rbp);
             }
-            // 大罪:傲慢 (挑戦カード IV・2026-11-10): ブロックに挿した出目 −N% (切り捨て)
+            // 大罪:傲慢 (挑戦カード IV・2026-11-10): 防御の端子を挿した出目 −N% (切り捨て)
             {
                 float cut = MetaProgression.MetaDebuffApplicator.GetSinBlockCutPct();
                 if (cut > 0f && blockSum > 0) blockSum = Mathf.FloorToInt(blockSum * (1f - cut / 100f));
@@ -944,7 +944,7 @@ namespace CombatSystem
             {
                 int diceScaled = Mathf.CeilToInt(attackSum * ctx.attackDicePct);
                 string prevSkill = ItemSystem.PassiveSkills.CombatContext.CurrentSkillId;
-                ItemSystem.PassiveSkills.CombatContext.CurrentSkillId = "攻撃に挿した出目 +%";
+                ItemSystem.PassiveSkills.CombatContext.CurrentSkillId = "攻撃の端子を挿した出目 +%";
                 ctx.AddPlayerAttackOrDiceBonus(diceScaled);
                 ItemSystem.PassiveSkills.CombatContext.CurrentSkillId = prevSkill;
                 ctx.diceDerivedAttack += diceScaled;

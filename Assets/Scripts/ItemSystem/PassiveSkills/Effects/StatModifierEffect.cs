@@ -24,7 +24,7 @@ namespace ItemSystem.PassiveSkills
         public const string Defense        = "def";         // 防御 +N (ADR-0013・敵の攻撃値に掛かる)
         public const string ArmorPen       = "pen";         // 貫通 +N (ADR-0013・敵の防御値を固定で削る)
         public const string ArmorPenNegate = "penNeg";      // 敵の固定削り −N (ADR-0013・剣〈間合〉)
-        public const string AttackDicePct  = "atkDicePct";  // 攻撃に挿した出目 +N% (2026-11-06・CombatContext.attackDicePct)
+        public const string AttackDicePct  = "atkDicePct";  // 攻撃の端子を挿した出目 +N% (2026-11-06・CombatContext.attackDicePct)
 
         public static readonly HashSet<string> All = new HashSet<string>
         { Attack, DamagePct, NonCritPct, CritPct, CritMul, CritSure, DamageTaken, DamageTakenPct, ShieldStart, Regen, Lifesteal,

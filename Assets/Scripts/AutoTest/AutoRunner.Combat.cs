@@ -949,7 +949,7 @@ namespace AutoTest
             // 攻撃に挿した出目への上乗せ率 (2026-11-06): 本体と同じく 攻撃の出目の合計 × 率 (切り上げ)
             if (s.diceAtkPct > 0f && aSum > 0)
                 aSum += Mathf.CeilToInt(aSum * s.diceAtkPct);
-            // 剣〈切り返し〉: 攻撃とブロックの両方に挿したターン、 ブロック × 0.5 を攻撃にも
+            // 剣〈切り返し〉: 攻撃と防御の端子を両方挿したターン、 ブロック × 0.5 を攻撃にも
             if (stepGuardCut && aCount > 0 && bCount > 0)
             { int gc = TurnRules.GuardCutBonus(blockRaw); aSum += gc; aSumNew += gc; }
             // 盾〈シールドバッシュ〉: 全部攻撃のターン、 シールドを使い切って × 率 を攻撃へ
@@ -960,7 +960,7 @@ namespace AutoTest
                 blockRaw += ItemSystem.PassiveSkills.Effects.SteadfastStance.Shield;
 
             int dmg = atkBase + aSum;
-            // 剣〈不滅の刃〉: 両方に挿したターンが続くたび与ダメ +8% (このターンで続けば streak+1)
+            // 剣〈不滅の刃〉: 両方の端子を挿したターンが続くたび与ダメ +8% (このターンで続けば streak+1)
             if (stepUndying && aCount > 0 && bCount > 0)
                 dmg = (int)(dmg * TurnRules.UndyingMul(undyingStreak + 1));
             // 端子の山札の与ダメの効果 (旧の式 = 会心を見ない式なので、 基準を非会心とみなして差分だけ足す)。 旧い配線では全部「なし」で素通し。
