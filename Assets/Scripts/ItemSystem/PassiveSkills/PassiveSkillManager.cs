@@ -286,8 +286,11 @@ namespace ItemSystem.PassiveSkills
             // 敵視点に反転
             SwapPerspective();
 
+            // ボスのダウン (2026-11-13): 「ダウン中は発動しない」を名乗ったパッシブだけを、 ダウンのターンに鳴らさない (一覧は BossDownPassives・いまは空)
+            bool down = CombatSystem.BossDown.ActiveNow;
             for (int i = 0; i < skills.Count; i++)
             {
+                if (down && CombatSystem.BossDownPassives.SkipsDuringDown(skills[i].SkillId)) continue;
                 try
                 {
                     CombatContext.CurrentSkillId = skills[i].SkillId;

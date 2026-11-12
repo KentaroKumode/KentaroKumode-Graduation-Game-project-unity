@@ -888,6 +888,8 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                主攻撃以外 = HpLossDiag.Lose (channel ≠ "通常攻撃") ── 固定ダメの枠 (毒の tick・臨界の爆発・品が預けた分・〈虚空〉など)・出血・役〈極〉・反射・仕込み刃・反撃固定・品の直接 (攻撃後)
                〈逆綴じの止血帯〉(ターン終了・ctx の HP を直接減らす) = AllPassiveSkillEffects.Wringing
                品の直接 (ターンの解決の外) = Kw.DamageEnemy
+           ・敵のパッシブ・エスカレーション・敵の回復は普段どおり動く (止まるのは攻撃だけ)。 例外は「ダウン中は発動しない」を名乗ったパッシブ
+             (BossDownPassives の一覧・PassiveSkillManager.FireEnemyTrigger の入口で鳴らさない・いまは空)。
            ・大技: そのターンが大技なら取り消し (攻撃しないので)。 大技の周期は次のターンから頭に戻す (Escalation.HeavyCycleOffset = このターン)。
              周期は「戦闘のターン − HeavyCycleOffset」で数える (既定 0 = 旧い数え方)。 構え (guardPeriod)・灰燼の王〈業火の予兆〉(EmberOmenTiming) も同じ起点を読む
              (予兆は起点 0 なら T1/1+p/…・ダウンの後は明けてから p ターン目)。
