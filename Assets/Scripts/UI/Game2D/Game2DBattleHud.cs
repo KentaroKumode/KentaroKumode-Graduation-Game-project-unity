@@ -26,6 +26,8 @@ namespace UI.Game2D
         private const int FrameB = 12;
         /// <summary>自分のステータス (会心率・攻撃・防御): 左下 (Ports と Ctl の間・左と同じばね)。</summary>
         private static readonly RectInt Stat = new RectInt(2, 162, 108, 48);
+        /// <summary>成立した役 (ADR-0011): Ports の上の空き (上の帯の左・左と同じばね)。 役が無いターンは出さない。</summary>
+        private static readonly RectInt RoleR = new RectInt(2, 20, 92, 37);
 
         // ── 端子の山札 (ADR-0014・2026-11-11) の配置 ──
         //   Ports (2,60,108,98)   = 出目と、 出目ごとの差し込み口 (挿した USB は横向きに挿さった絵で残る)。 3 個ずつ縦に並べ、 4 個目からは列を右へ足す。
@@ -50,7 +52,7 @@ namespace UI.Game2D
         private const int HandY = 18, HandStep = 28, HandPad = 6;
         private static readonly RectInt CReroll = new RectInt(5, 5, 56, 20), CAuto = new RectInt(63, 5, 40, 20),
             CItem = new RectInt(5, 27, 24, 20), CFlee = new RectInt(31, 27, 36, 20), CGo = new RectInt(69, 27, 34, 20);
-        private RectTransform _ports, _ctl, _hand, _tip, _drag; private Texture2D _tp, _tc, _th, _tt2, _td;
+        private RectTransform _ports, _ctl, _hand, _tip, _drag, _role; private Texture2D _tp, _tc, _th, _tt2, _td, _trl;
         private int _portsTexW = -1;
 
         /// <summary>端子のアイコン (16×16・行優先・左上から・0 = 透明 / 1 = 暗 / 2 = 中 / 3 = 明)。 無ければ null。</summary>
@@ -115,7 +117,7 @@ namespace UI.Game2D
 
         private void OnDestroy()
         {
-            foreach (var t in new[] { _tr, _tt, _ts, _tp, _tc, _th, _tt2, _td }) if (t != null) Destroy(t);
+            foreach (var t in new[] { _tr, _tt, _ts, _tp, _tc, _th, _tt2, _td, _trl }) if (t != null) Destroy(t);
             _busyDrag = false;
         }
 
@@ -127,6 +129,7 @@ namespace UI.Game2D
             if (_ports == null) _ports = Make("ports", Ports, out _tp);
             if (_ctl == null) _ctl = Make("ctl", Ctl, out _tc);
             if (_hand == null) _hand = Make("hand", Hand, out _th);
+            if (_role == null) _role = Make("role", RoleR, out _trl);
             if (_tip == null) _tip = Make("tip", new RectInt(0, 0, TipW, TipH), out _tt2);
             if (_drag == null) _drag = Make("drag", new RectInt(0, 0, UsbBody, UsbLong), out _td);
         }
@@ -152,6 +155,7 @@ namespace UI.Game2D
             _ports.anchoredPosition = new Vector2(Ports.x - inL, -Ports.y);
             _ctl.anchoredPosition = new Vector2(Ctl.x - inL, -Ctl.y);
             _hand.anchoredPosition = new Vector2(Hand.x + inR, -Hand.y);
+            _role.anchoredPosition = new Vector2(RoleR.x - inL, -RoleR.y);
             if (_spL.x < 0.95f) { Show(_tip, false); CancelDrag(); }      // 説明の帯・つかみは、 パネルが収まっている間だけ
         }
 
@@ -224,6 +228,31 @@ namespace UI.Game2D
             Show(_ports, true); Show(_ctl, true); Show(_hand, true); Show(_tip, tip && _slide > 0.95f);
             DrawRight(_tr); DrawTop(_tt);
             Ensure(ref _ts, _stat, Stat); DrawStat(_ts);
+            Ensure(ref _trl, _role, RoleR); Show(_role, DrawRole(_trl));
+        }
+
+        /// <summary>成立した役の板: 1 行目 = 「役」と名前 (目のテーマ・対 / 揃) / 2 行目 = そろった目。 役が無ければ描かずに false。
+        /// 役をつくる出目は Ports で金の縁を付ける (<see cref="DrawRoleMark"/>)。 状態は色だけで出す (大きさは変えない)。</summary>
+        private bool DrawRole(Texture2D t)
+        {
+            if (sim == null || !sim.rolled || sim.roles.Count == 0) return false;
+            var k = sim.roles[0];
+            int face = CombatSystem.YachtRoles.FaceOf(k);
+            var p = Frame(RoleR);
+            p.Text("役", 8, 5, Dim);
+            p.Text(CombatSystem.YachtRoles.NameOf(k), 8 + Game2DJpFont.Width("役 "), 5, Chg);
+            string f = face + "・" + face + (CombatSystem.YachtRoles.IsTriple(k) ? "・" + face : "");
+            p.Text("目 " + f, 8, 19, Ink);
+            p.Apply(t);
+            return true;
+        }
+
+        /// <summary>役をつくる出目の印: 金の縁 (〈猫の手〉の琥珀の縁と同じ形・色で分ける)。</summary>
+        private static void DrawRoleMark(KitPix p, int i)
+        {
+            var r = PDieR(i); var c = Game2DKit.Gold;
+            p.Rect(r.x - 1, r.y - 1, r.width + 2, 1, c); p.Rect(r.x - 1, r.y + r.height, r.width + 2, 1, c);
+            p.Rect(r.x - 1, r.y, 1, r.height, c); p.Rect(r.x + r.width, r.y, 1, r.height, c);
         }
 
         /// <summary>パネルを出す / 隠す。 絵がまだ無いパネルは出さない。</summary>
@@ -499,6 +528,7 @@ namespace UI.Game2D
             {
                 int x0 = PortX(i), y0 = PortY(i);
                 DrawDie(p, PDieR(i), sim.pd[i], false, !sim.rolled && sim.phase != Game2DBattleSim.P.PRoll);
+                if (sim.IsRoleDie(i)) DrawRoleMark(p, i);
                 if (sim.IsCatLocked(i)) DrawCatMark(p, i);
                 int s = dieSlot != null && i < dieSlot.Length ? dieSlot[i] : -1;
                 var d = s >= 0 && s < m ? CombatSystem.TerminalCards.Get(sim.board[s]) : null;

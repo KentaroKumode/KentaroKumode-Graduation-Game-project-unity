@@ -62,7 +62,7 @@ namespace AutoTest.EditorTests.Ultra
             // world / progression
             "convictionStage", "layer6Unlocked", "layer7Unlocked", "lastBossId",
             "defeatedSaintGeorges", "lostAtLayer7", "riftLeftOpen",
-            "philStoneUsed", "outpostUpgradeUsedThisFloor",
+            "philStoneUsed",
             // shop
             "shopRobberyDone", "shopRobberyInProgress", "robberyPendingItems", "nextShopHalfPrice",
             // armed consumable effects (the player spent an item for each of these)

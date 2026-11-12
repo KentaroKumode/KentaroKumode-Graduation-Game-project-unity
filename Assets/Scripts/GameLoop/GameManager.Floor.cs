@@ -120,10 +120,7 @@ namespace GameLoop
             // 旅団契約 AI (AutoRunner) 等のリスナーへ明示的に通知する。
             OnTileActivated?.Invoke(TileType.Outpost);
 
-            // 2026-05-31 v3: 前哨基地で武器強化を1回まで自動実行 (素材があり、 強化可能なら)。
-            // HPゲート無し (前哨基地は安全)。 BOT/プレイヤー共通の自動挙動 (UI 開発まで暫定)。
-            // 各層 1 回制限は OutpostUpgrade 側で outpostUpgradeUsedThisFloor フラグ管理。
-            OutpostUpgrade();
+            // (前哨基地の武器の自動強化 (各層 1 回・2026-05-31〜) は 2026-11-12 に削除・GAME.md §24。 武器の強化は休憩の「鍛える」だけ)
 
             // 挑戦デバフ〈補給断絶〉: 前哨基地の回復量 ×0.80 / ×0.60 / ×0.40 (§15-2 v3.0)。
             //   **v3.0 は前哨基地を消さない** ── 低効率でも経路を残す (challenge-debuff-plan §3)。

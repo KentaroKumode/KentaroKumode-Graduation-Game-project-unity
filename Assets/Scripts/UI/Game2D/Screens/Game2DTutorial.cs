@@ -42,6 +42,7 @@ namespace UI.Game2D
         public const string Origin = "出自";
         public const string LayerBoss = "層とボス";
         public const string MetaPanel = "整備パネル";
+        public const string Challenge = "挑戦";
     }
 
     /// <summary>手引きの文。 <b>文の正本は docs/handbook.md</b> ── 中身 (<see cref="All"/>) は Tools/sync_handbook.py が作る Game2DTutorialText.cs にある。
@@ -100,6 +101,8 @@ namespace UI.Game2D
         /// <item>端子を増やす / 装備と強化 (休憩・武器の入れ替え) / ショップ ── 場面の窓 (<see cref="Game2DPhaseScreens"/>)</item>
         /// <item>出自 ── 出自 (職業) の選択画面が出そろった時 (<see cref="UI.ClassSelect.ClassSelectView"/>)</item>
         /// <item>整備パネル ── 整備パネルの窓を開いた時 (<see cref="Game2DMetaPanel.Open"/>)</item>
+        /// <item>挑戦 ── 第三層 (内部の深さ <see cref="GameLoop.RunState.normalClearFloor"/>) を初めてクリアした後のタイトル (<see cref="Watch"/>)。
+        /// 挑戦の難易度 1 は最初から選べる (<see cref="Game2DChallengePanel"/> の「記録 +1 まで」) が、 作者の指示で第三層のクリアまで見せない</item>
         /// </list>
         /// </summary>
         private static readonly Topic[] Table =
@@ -134,6 +137,7 @@ namespace UI.Game2D
             new Topic(TutorialTopics.Origin, Scene.Any),
             new Topic(TutorialTopics.LayerBoss, Scene.Battle),
             new Topic(TutorialTopics.MetaPanel, Scene.Any),
+            new Topic(TutorialTopics.Challenge, Scene.Title),
         };
 
         // ── 待ち行列 (部品が無くても頼める・場面をまたいで残る) ──
@@ -252,7 +256,11 @@ namespace UI.Game2D
         private void Watch(GameManager gm)
         {
             var ph = gm.CurrentPhase;
-            if (ph == GameManager.GamePhase.Title) Request(TutorialTopics.RunAndReturn);
+            if (ph == GameManager.GamePhase.Title)
+            {
+                Request(TutorialTopics.RunAndReturn);
+                if (ClearedThirdLayerEver()) Request(TutorialTopics.Challenge);      // 「挑戦」: 第三層をクリアした記録がある (前の起動のクリアも拾う)
+            }
             else if (ph == GameManager.GamePhase.MapNavigation) Request(TutorialTopics.WalkLayer);
             var run = gm.Run;
             int owned = run?.ownedPassiveItems != null ? run.ownedPassiveItems.Count : -1;
@@ -291,6 +299,9 @@ namespace UI.Game2D
                 && MapSystem.MapManager.Instance != null && MapSystem.MapManager.Instance.CurrentNode != null
                 && MapSystem.MapManager.Instance.CurrentNode.type == MapSystem.TileType.Outpost)
                 Request(TutorialTopics.Outpost);
+            // 「挑戦」: このランで第三層のボスを倒した (〈決意〉で先へ進むランは、 エンドの記録が付かないのでここで頼む)。 出すのはタイトルに戻ってから (Scene.Title)
+            if (run.Depth > run.normalClearFloor || (run.Depth == run.normalClearFloor && run.bossDefeatedThisFloor))
+                Request(TutorialTopics.Challenge);
             // 「物資」: 地図の上で物資が減った (歩いた・照明を灯した)
             if (run.provision != _lastProv)
             {
@@ -308,6 +319,13 @@ namespace UI.Game2D
                 foreach (var p in run.diceFaceParts)
                     if (p.tier != GameLoop.DiceFaceParts.Tier.T1 || System.Array.IndexOf(GameLoop.DiceFaceParts.StartingFaces, p.face) < 0)
                     { Request(TutorialTopics.FacePart); break; }
+        }
+
+        /// <summary>第三層をクリアした記録がメタ進行にあるか: エンドの記録 (<see cref="Codex.VignetteUnlockState.OnRunClear"/>) か、 挑戦の踏破の記録。</summary>
+        private static bool ClearedThirdLayerEver()
+        {
+            var st = MetaProgression.MetaProgressManager.Instance?.State;
+            return st != null && ((st.endingClearKeys != null && st.endingClearKeys.Count > 0) || st.challengeBest > 0);
         }
 
         private static bool SceneOk(Scene s, GameManager gm, bool showing)

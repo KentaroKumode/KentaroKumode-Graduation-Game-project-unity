@@ -11,7 +11,8 @@ using MapSystem;
 
 namespace GameLoop
 {
-    /// <summary>GameManager: 休憩・武器の段の強化・面の除去・前哨基地の強化。</summary>
+    /// <summary>GameManager: 休憩・武器の段の強化・面の除去。
+    /// (前哨基地の武器の自動強化と、 休憩・前哨基地のダイス強化への回り道は 2026-11-12 に削除・GAME.md §24)</summary>
     public partial class GameManager
     {
         /// <summary>休憩でHP回復を選択（回復と強化は択一）。</summary>
@@ -194,22 +195,16 @@ namespace GameLoop
         {
             if (CurrentPhase != GamePhase.RestStop) return;
 
-            // 2026-05-31 v3: 1 Rest = 1 強化のみ (前哨基地強化 (各層1回) と組み合わせて運用)
-            // 2026-07-18: 武器が強化不可なら ダイス強化にフォールバック (共通素材)
+            // 1 回の休憩で 1 段だけ。 武器を強化できなければ回復に切り替える。
+            //   (旧: 2026-07-18〜 武器が強化不可ならダイス強化 (DiceEnhance) へ回っていたが、 ダイス強化は 2026-08-15 に止めてあり
+            //    TryUpgradeEquipped が常に false を返す死んだ回り道だった。 2026-11-12 に削除)
             int wcost = WeaponUpgradeCost(Run);
             bool weaponPossible = wcost != int.MaxValue && Run.weaponMaterials >= wcost;
             if (!weaponPossible)
             {
-                if (DiceEnhance.TryUpgradeEquipped(Run))
-                {
-                    Log($"武器強化不可 → ダイス強化: {Run.equippedDiceId} Lv{DiceEnhance.GetLevel(Run, Run.equippedDiceId)} (残素材 {Run.weaponMaterials})");
-                }
-                else
-                {
-                    Log($"武器強化 不可 (必要{wcost}/所持{Run.weaponMaterials}) → 回復に切替");
-                    RestHeal();
-                    return;
-                }
+                Log($"武器強化 不可 (必要{wcost}/所持{Run.weaponMaterials}) → 回復に切替");
+                RestHeal();
+                return;
             }
             else
             {
@@ -255,31 +250,5 @@ namespace GameLoop
             return true;
         }
 
-        /// <summary>前哨基地強化 (2026-05-31 新規): 各層 (Outpost マス) で 1 回のみ実行可能な武器強化。
-        /// 素材消費は通常の WeaponUpgradeCost に従う。 RestUpgrade とは独立してフラグ管理される。
-        /// 戻り値: true=強化成功、 false=既に使用済 or 素材不足 or 強化不可。</summary>
-        public bool OutpostUpgrade()
-        {
-            if (Run == null) return false;
-            if (Run.outpostUpgradeUsedThisFloor) return false;
-            int cost = WeaponUpgradeCost(Run);
-            if (cost != int.MaxValue && Run.weaponMaterials >= cost)
-            {
-                int before = Run.weaponMaterials;
-                if (!TryUpgradeWeapon(Run)) return false;
-                Run.outpostUpgradeUsedThisFloor = true;
-                int used = before - Run.weaponMaterials;
-                Log($"[前哨基地] 武器強化 ×1: {Run.equippedWeaponId}{(Run.weaponPlus > 0 ? "+" : "")} 業物Lv{Run.limitBreakStage} (素材-{used}, 残{Run.weaponMaterials})");
-                return true;
-            }
-            // 2026-07-18: 武器強化不可ならダイス強化にフォールバック
-            if (DiceEnhance.TryUpgradeEquipped(Run))
-            {
-                Run.outpostUpgradeUsedThisFloor = true;
-                Log($"[前哨基地] ダイス強化: {Run.equippedDiceId} Lv{DiceEnhance.GetLevel(Run, Run.equippedDiceId)} (残素材 {Run.weaponMaterials})");
-                return true;
-            }
-            return false;
-        }
     }
 }

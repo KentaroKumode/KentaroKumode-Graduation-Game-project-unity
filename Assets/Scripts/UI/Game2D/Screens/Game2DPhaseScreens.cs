@@ -224,7 +224,7 @@ namespace UI.Game2D
             int more = Mathf.RoundToInt(MapSystem.FreeMove.FreeMapParams.RestMoreRatio * 100);
             d.Items.Add(new ModalItem { name = "休む", desc = "HP を回復する。 ターンは進まない。" });
             d.Items.Add(new ModalItem { name = "多めに休む", value = "+" + MapSystem.FreeMove.FreeMapParams.RestMoreTurns + " ターン", desc = "最大 HP の " + more + "% を回復する。 代わりにターンが進む (追跡者が動く)。" });
-            d.Items.Add(new ModalItem { name = "鍛える", value = "素材 " + run.weaponMaterials, desc = "素材を使って武器を 1 段強化する (強化できなければダイス強化・それも無理なら休む)。" });
+            d.Items.Add(new ModalItem { name = "鍛える", value = "素材 " + run.weaponMaterials, desc = "素材を使って武器を 1 段強化する (強化できなければ休む)。" });
             bool canRemove = gm.TryGetFaceRemovalCost(out int g, out int m);
             d.Items.Add(new ModalItem { name = "面を外す", value = canRemove ? g + "G 素材" + m : "外せない", disabled = !canRemove,
                 desc = canRemove ? "ダイスの面を 1 枚外す (出目の合計と、 その目の役を失う)。 外す面を次に選ぶ。" : "面はこれ以上外せない。" });
@@ -566,7 +566,7 @@ namespace UI.Game2D
         /// <summary>武器の入れ替え (武器は 1 本だけ・2026-11-11)。 2 本目の武器を手に入れた時に、 どの場面でも先に聞く。</summary>
         private ScreenDef WeaponSwap(GameManager gm)
         {
-            Game2DTutorial.Request(TutorialTopics.Equip);      // 手引き「装備と強化」: 初めて武器を拾った (入れ替えの窓)
+            // (手引き「装備と強化」は休憩でだけ出す ── 作者の指示・2026-11-12。 武器を拾った時には出さない)
             var run = gm.Run; string cur = run.equippedWeaponId, next = run.pendingWeaponIds[0];
             var d = New("武器の入れ替え", "武器は 1 本しか持てない");
             d.Items.Add(new ModalItem { name = "装備中: " + WeaponLabel(cur), desc = WeaponLine(run, cur, true), icon = cur });

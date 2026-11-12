@@ -626,13 +626,11 @@ namespace GameLoop
             if (Depth >= maxFloor) return false;
             currentFloor++;
             bossDefeatedThisFloor = false;
-            outpostUpgradeUsedThisFloor = false; // 層が変わるたびに前哨基地強化を再解禁
             return true;
         }
 
-        /// <summary>この層の前哨基地で武器強化を1回使ったか。
-        /// EnterFloor / AdvanceFloor でリセットされる。</summary>
-        public bool outpostUpgradeUsedThisFloor;
+        // (旧 outpostUpgradeUsedThisFloor ── 前哨基地の武器の自動強化を層ごとに 1 回にする印 ── は 2026-11-12 に機構ごと削除。
+        //  JsonUtility は中断セーブに残った未知の欄を黙って捨てる)
 
         /// <summary>通常クリア（5層ボス撃破）</summary>
         public bool IsNormalClear => Depth >= normalClearFloor && bossDefeatedThisFloor && playerHP > 0;

@@ -215,7 +215,7 @@ namespace UI.Game2D.Battle
         private void BeginTurn(CombatManager cm)
         {
             _hpBefore = cm.PlayerHP; _enemyBefore = cm.EnemyHP; _enemyMaxBefore = cm.EnemyMaxHP;
-            rolled = false; _eHit = false;
+            rolled = false; _eHit = false; roles.Clear();
             _countDots = true; _poisonSeen = _bleedSeen = 0;
             bool paused = cm.BeginInteractiveTurn();
             // 端子の山札: このターンの場 (常設 + 手札) を写す。 判断なしで解決したターンも、 発動の表示はこの並びの添字で読む
@@ -247,6 +247,7 @@ namespace UI.Game2D.Battle
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             charge = ctx != null ? ctx.GetCharge() : 0;
             _shownDice = p.playerDice != null ? (int[])p.playerDice.Clone() : null;
+            TakeRoles(p, ctx);
             // ターンの頭は挿し方を空から (または おまかせ) / 振り直しの後は、 挿せなくなった出目だけ外す
             if (turnStart)
             {
@@ -324,6 +325,30 @@ namespace UI.Game2D.Battle
             cm.AnswerReroll(true);
             if (!cm.IsAwaitingDecision) { Resolve(cm); return; }
             phase = P.PRoll; t = 0; rolled = false; SyncDecision(cm, false); Touch();
+        }
+
+        // ── 役 (ADR-0011) の表示 ──
+        //   役は振り終えた出目と、 止まった面の段 (出目パーツの Tier) だけで決まる (端子の挿し方は関係しない)。 本体が役を適用するのは解決の時なので、
+        //   判断の間は同じ判定 (YachtRoles.Evaluate・封じられた役は除く) で見込みを出し、 解決の後は本体の結果 (ctx.firedRolesThisTurn) に置き換える。
+
+        /// <summary>このターンに成立する役 (判断の間は見込み・解決の後は適用された役)。 3 個の出目では高々 1 つ。 ターンの頭で空にする。</summary>
+        public readonly List<RoleKind> roles = new List<RoleKind>(2);
+
+        private void TakeRoles(TurnPause p, ItemSystem.PassiveSkills.CombatContext ctx)
+        {
+            roles.Clear();
+            if (p == null || ctx == null || p.playerDice == null) return;
+            YachtRoles.Evaluate(p.playerDice, p.playerFaceIdx, ctx.equippedFaceTiers, roles);
+            for (int i = roles.Count - 1; i >= 0; i--)
+                if ((ctx.sealedRoleMask & (1 << (int)roles[i])) != 0) roles.RemoveAt(i);      // 〈凶運〉で封じられた役は成立しても効かない (ResolveRoles と同じ)
+        }
+
+        /// <summary>出目 i が、 いま見せている役をつくる目か。</summary>
+        public bool IsRoleDie(int i)
+        {
+            if (!rolled || i < 0 || i >= pd.Length) return false;
+            foreach (var k in roles) if (YachtRoles.FaceOf(k) == pd[i]) return true;
+            return false;
         }
 
         // ── 消耗品・逃げる (配線の判断の間だけ) ──
@@ -671,6 +696,9 @@ namespace UI.Game2D.Battle
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             charge = ctx != null ? ctx.GetCharge() : charge;
             canReroll = false;
+            // 役: 解決の後は、 本体が実際に適用した役 (CombatManager.ResolveRoles が積む) に置き換える。
+            //   戦闘が閉じた (このターンで倒した・倒れた) 時は戦闘の情報が片付けられているので、 見込みのまま残す (役は解決の途中で適用済み)
+            if (ctx != null && cm.IsCombatActive) { roles.Clear(); roles.AddRange(ctx.firedRolesThisTurn); }
             _countDots = false;
             // 手引き (issue #86): 「解決の順番」は最初の解決・「会心」「確定会心」は初めて出た時 (確定会心 = 会心確定の効果が立っていたターンの会心)
             Game2DTutorial.Request(TutorialTopics.Order);
