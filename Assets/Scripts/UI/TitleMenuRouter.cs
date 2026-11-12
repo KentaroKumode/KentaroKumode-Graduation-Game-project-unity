@@ -5,8 +5,11 @@ namespace UI
 {
     /// <summary>
     /// タイトルメニューのボタン→ゲーム遷移を結ぶ薄い配線層。
-    /// SkillTree/Codex は専用 View 側で自己配線するため、 本ルーターは PlayButton(Run 開始)
-    /// と「GameOver/RunClear からタイトル復帰」をハンドルする。
+    /// Codex は専用 View 側で自己配線するため、 本ルーターは PlayButton(Run 開始)・
+    /// 「SKILL TREE」(整備パネルの窓を開く) と「GameOver/RunClear からタイトル復帰」をハンドルする。
+    ///
+    /// 2026-11-13 (#132): 「SKILL TREE」は旧 SkillTreeView (廃止した 58 段のトラックの画面) を経由していたが、
+    /// その画面を削除したので、 ここから <see cref="Game2D.Game2DMetaPanel"/> を直接開く。
     ///
     /// 2026-07-07: classSelect が配線されている場合、 PLAY → 職業選択 (Papers, Please 風) →
     /// 受理スタンプ → StartNewRun の順に挟む。 未配線なら従来通り即ラン開始。
@@ -17,6 +20,8 @@ namespace UI
         [Header("ボタン配線")]
         [Tooltip("Run を開始するボタン")]
         public SpriteButton playButton;
+        [Tooltip("整備パネルの窓を開くボタン (タイトルの「SKILL TREE」)。 未配線なら TitleMenuBootstrap が名前 SkillTreeButton で探して入れる。")]
+        public SpriteButton metaPanelButton;
 
         [Header("職業選択 (任意)")]
         [Tooltip("配線すると PLAY → 職業選択 → ラン開始 になる。 null なら即ラン開始。")]
@@ -39,6 +44,11 @@ namespace UI
                 playButton.Clicked -= OnPlayClicked;
                 playButton.Clicked += OnPlayClicked;
             }
+            if (metaPanelButton != null)
+            {
+                metaPanelButton.Clicked -= OnMetaPanelClicked;
+                metaPanelButton.Clicked += OnMetaPanelClicked;
+            }
             if (classSelect != null)
             {
                 classSelect.Decided -= OnClassDecided;
@@ -50,9 +60,21 @@ namespace UI
         {
             if (playButton != null)
                 playButton.Clicked -= OnPlayClicked;
+            if (metaPanelButton != null)
+                metaPanelButton.Clicked -= OnMetaPanelClicked;
             if (classSelect != null)
                 classSelect.Decided -= OnClassDecided;
             _classSelectOpen = false;
+        }
+
+        /// <summary>「SKILL TREE」: 整備パネルの窓を開く。 挑戦・遺物も同じ窓の頁。 ラン中・職業選択中は開かない。</summary>
+        private void OnMetaPanelClicked()
+        {
+            var gm = GameManager.Instance;
+            if (_classSelectOpen) return;
+            if (ignoreIfNotTitle && gm != null && gm.CurrentPhase != GameManager.GamePhase.Title) return;
+            if (!Game2D.Game2DMetaPanel.Open())
+                Debug.LogWarning("[TitleMenuRouter] 整備パネルの窓を開けない (Game2DModal か MetaProgressManager が無い)");
         }
 
         private void OnPlayClicked()

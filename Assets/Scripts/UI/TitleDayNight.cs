@@ -103,7 +103,7 @@ namespace UI
             var moons = FindObjectsOfType<MoonlightPulse>(includeInactive: true);
             foreach (var m in moons) if (m != null) m.enabled = night;
 
-            // BGM を昼夜に追従（スキルツリー中は SkillTreeView が上書きするので、 ここで上書きしても Close 後の復帰先が正しくなる）
+            // BGM を昼夜に追従
             if (Application.isPlaying)
             {
                 var bgm = FindObjectOfType<TitleBgm>();
