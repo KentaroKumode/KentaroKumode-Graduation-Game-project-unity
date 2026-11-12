@@ -38,7 +38,7 @@ namespace AutoTest
         /// <summary>エスカレーションを 1 ターン遅らせる価値 = 敵の攻撃の 1 割 × 残りターン (1 段の伸びを 1 割と見る・先の HP なので割り引く)。
         /// 〈冷却弾〉(段階を 1 つ戻す) はその 2 倍と見る。</summary>
         private const float DeckEscStepShare = 0.1f, DeckRetreatTurns = 2f;
-        /// <summary>次のターンに効く補助 (与ダメ相当): 条件を無視 (〈予熱器〉) 3 / 多く引く 1 枚につき 4 (〈配電盤〉は SwitchboardDraw 枚) / 手札に残す (〈保持器〉) 2。</summary>
+        /// <summary>次のターンに効く補助 (与ダメ相当): 条件を無視 (〈予熱器〉) 3 / 多く引く 1 枚につき 4 (〈配電盤〉は SwitchboardDraw 枚) / 手札に残す (〈呼び戻し〉) 2。</summary>
         private const float DeckPreheatDmg = 3f, DeckDrawDmg = 4f, DeckRetainDmg = 2f;
         /// <summary>〈写し取り〉: 基本以外を複製 6 / 基本を複製 1。 〈焼き切り〉: 基本を抜く 6 (山札が締まる) / 基本以外を抜く −4 (与ダメ相当)。</summary>
         private const float DeckCopyGoodDmg = 6f, DeckCopyBasicDmg = 1f, DeckBurnBasicDmg = 6f, DeckBurnGoodDmg = -4f;
@@ -54,7 +54,7 @@ namespace AutoTest
         /// <summary>〈停止信号〉: 次のターンの敵の攻撃 × 0.5 を今の HP で見る (2026-11-12)。 次のターンはほぼ確実に来るので先の割引 (帳簿の 0.2) は掛けない。
         /// 半分にするのは、 止めなくてもブロックで一部は受けられるから。 旧: × 0.9 × 先の割引 で、 使い捨ての費用を超えず一度も使われなかった。</summary>
         private const float DeckStunShare = 0.5f;
-        /// <summary>端子の「素の点」1 点 = 1 回使うたびの与ダメ相当 3.5 (出目 1 個の平均)。 写し取り・焼き切り・保持器の値付けに使う (2026-11-12)。
+        /// <summary>端子の「素の点」1 点 = 1 回使うたびの与ダメ相当 3.5 (出目 1 個の平均)。 写し取り・焼き切り・呼び戻しの値付けに使う (2026-11-12)。
         /// 素の点は 基本 1 / コモン 2 / レア 3 なので、 コモン 1 枚は基本より 1 回あたり 3.5 ほど得、 という見方。</summary>
         private const float DeckCardDmgPerPoint = 3.5f;
         /// <summary>撃破のボーナス (HP 相当・恒久なので割り引かない): 最大 HP +1 = 1.5 / 研ぎ澄まし +1 = 3 / ゴールド 1 = 0.15 / 報酬の選択肢 +1 = 1.5。</summary>
@@ -147,7 +147,7 @@ namespace AutoTest
                 ? DeckCardDmgPerPoint * Math.Max(0f, TargetWorth(TerminalCards.Get(board[slot]), runNow) - 1f) : 0f;
             // 次のターンにもう 1 回使える。 手札の持ち越し (TerminalCards.HandCarry) では挿さなかった端子は全部残るので、 残す効果に値打ちは無い
             if (o.retainTarget >= 0 && !TerminalCards.HandCarry) flat += (DeckRetainDmg + PerUse(o.retainTarget)) * dw;
-            // 〈保持器〉(持ち越しの規則): 捨て札から戻す 1 枚 (方策と同じ選び方) を、 次のターンにもう 1 回使える分として見る
+            // 〈呼び戻し〉(持ち越しの規則): 捨て札から戻す 1 枚 (方策と同じ選び方) を、 次のターンにもう 1 回使える分として見る
             if (o.recall)
             {
                 var disc = dkNow?.discard;
@@ -334,7 +334,7 @@ namespace AutoTest
         {
             after = ev.deck.state.Clone();
             o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after);
-            // 〈写し取り〉〈焼き切り〉〈保持器〉が発動する挿し方なら、 対象を方策で選び直して解き直す (対象は今ターンの攻防を変えない)
+            // 〈写し取り〉〈焼き切り〉〈呼び戻し〉が発動する挿し方なら、 対象を方策で選び直して解き直す (対象は今ターンの攻防を変えない)
             tgts = ChooseDeckTargets(ev.board, o, ev.run);
             if (tgts != null)
             {
@@ -361,11 +361,11 @@ namespace AutoTest
         }
 
         /// <summary>対象を取る端子の対象の方策 (読むだけ)。 写し取り = 山札に増やして一番得な端子 (素の点の最大) / 焼き切り = 一番要らない端子 (最小) /
-        /// 保持器 = 次のターンに一番使いたい端子 (最大)。 点は報酬の素の点 (<see cref="RewardBaseScore"/>)・基本の端子は 1。 対象を取る端子が発動しなければ null。</summary>
+        /// 呼び戻し = 次のターンに一番使いたい端子 (最大)。 点は報酬の素の点 (<see cref="RewardBaseScore"/>)・基本の端子は 1。 対象を取る端子が発動しなければ null。</summary>
         private static int[] ChooseDeckTargets(List<string> board, TerminalOutcome o, RunState run)
         {
             int[] res = null;
-            // 〈保持器〉(手札の持ち越しの規則): 捨て札から次のターンに一番使いたい 1 枚 (素の点の最大・同点は後に捨てた方) を選ぶ (値は捨て札の添字)
+            // 〈呼び戻し〉(手札の持ち越しの規則): 捨て札から次のターンに一番使いたい 1 枚 (素の点の最大・同点は後に捨てた方) を選ぶ (値は捨て札の添字)
             if (o.recall)
             {
                 var disc = CombatManager.Instance?.TerminalDeck?.discard;
@@ -396,7 +396,7 @@ namespace AutoTest
             return res;
         }
 
-        /// <summary>[〈保持器〉] 捨て札で素の点が最大の 1 枚の添字 (同点は後に捨てた方・空なら −1)。 先読みでも同じ選び方 (次のターンの効用での選び直しはしない・仮)。</summary>
+        /// <summary>[〈呼び戻し〉] 捨て札で素の点が最大の 1 枚の添字 (同点は後に捨てた方・空なら −1)。 先読みでも同じ選び方 (次のターンの効用での選び直しはしない・仮)。</summary>
         private static int RecallBest(List<string> disc, RunState run)
         {
             if (disc == null) return -1;
@@ -746,11 +746,11 @@ namespace AutoTest
             if (o.burnTarget >= 0 && o.burnTarget < board.Count) hand.Remove(board[o.burnTarget]);
             // ---- DrawTurn: 本体と同じ関数 (TerminalDeckState.SplitHand) で、 残す端子と捨て札へ送る端子に分ける ----
             //   手札の持ち越し (TerminalCards.HandCarry): 今ターンに挿した端子だけを捨て札へ・挿さなかった端子は残る。
-            //   旧い規則: 今ターンに止まっていた手札は残す・残す 1 枚 (〈保持器〉)・それ以外は捨て札へ。
+            //   旧い規則: 今ターンに止まっていた手札は残す・残す 1 枚 (〈呼び戻し〉)・それ以外は捨て札へ。
             var keep = new List<string>();
             TerminalDeckState.SplitHand(hand, board, perm.Count, dk.state.stopped, retain,
                                         TerminalDeckState.UsedFromHand(board, perm.Count, o), TerminalCards.HandCarry, keep, discard);
-            // 〈保持器〉(持ち越しの規則): 本体と同じ選び方・同じ関数で、 捨て札から 1 枚を手札へ戻す
+            // 〈呼び戻し〉(持ち越しの規則): 本体と同じ選び方・同じ関数で、 捨て札から 1 枚を手札へ戻す
             if (o.recall && TerminalCards.HandCarry)
                 TerminalDeckState.ApplyRecall(TerminalDeckState.RecallPick(dk.discard, RecallBest(dk.discard, GameManager.Instance?.Run)), keep, discard, size);
             hand.Clear(); hand.AddRange(keep);

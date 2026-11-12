@@ -40,7 +40,7 @@ namespace CombatSystem
         // ===== 答え (CombatManager が読む) =====
         internal bool reroll;
         internal int[] slots;
-        /// <summary>〈写し取り〉〈焼き切り〉〈保持器〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置・−1 = 選ばない)。 null あり。</summary>
+        /// <summary>〈写し取り〉〈焼き切り〉〈呼び戻し〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置・−1 = 選ばない)。 null あり。</summary>
         internal int[] targets;
         /// <summary>挑戦カード〈金で殴る〉(#6) で払う金額 (G)。 0 = 払わない。 画面はまだこの答えを出さない (#6 の残り)。</summary>
         internal int goldSpend;
@@ -95,7 +95,7 @@ namespace CombatSystem
         }
 
         /// <summary>端子の山札 (ADR-0014) の配線に答える。 出目ごとの挿し先 (場の端子の添字・−1 = 挿さない)。 規則に合わない挿し方は挿さなかった扱いになる。
-        /// targets = 〈写し取り〉〈焼き切り〉〈保持器〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置)。 null / −1 / 候補でない対象は左端の候補。
+        /// targets = 〈写し取り〉〈焼き切り〉〈呼び戻し〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置)。 null / −1 / 候補でない対象は左端の候補。
         /// goldSpend = 挑戦カード〈金で殴る〉で払う金額 (G・攻撃するターンだけ所持金まで払う・札が無ければ無視)。</summary>
         public void AnswerWiringSlots(int[] slots, int[] targets = null, int goldSpend = 0)
         {

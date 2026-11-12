@@ -348,7 +348,7 @@ namespace ItemSystem.PassiveSkills.Effects
     ///
     /// <para>止まった端子はそのターン挿せない (場には見えていて手札の枠を 1 つ使う)。 ターンの終わりに捨て札へ行かず手札に残り、
     /// 次のターンは解けて普通に使える (引いた物ではないので、 もう一度は止まらない ── その分 新しく引く枚数が 1 枚減る)。
-    /// 常設 (〈主幹〉) を引いて止まった時は、 そのターンだけ挿せない。 止まった端子は〈写し取り〉〈焼き切り〉〈保持器〉の対象にならない。</para>
+    /// 常設 (〈主幹〉) を引いて止まった時は、 そのターンだけ挿せない。 止まった端子は〈写し取り〉〈焼き切り〉〈呼び戻し〉の対象にならない。</para>
     ///
     /// <para>処理の場所: 引いて止めるのは <see cref="CombatSystem.TerminalDeckState.DrawTurn"/> (確率は <see cref="StopChance"/>・乱数は専用キー)、
     /// 止まった場所は <see cref="CombatSystem.TerminalBattleState.stopped"/>、 挿した出目を外すのは <see cref="CombatSystem.TerminalCards.Resolve"/>

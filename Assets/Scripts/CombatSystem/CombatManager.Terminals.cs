@@ -13,7 +13,7 @@ namespace CombatSystem
         private TerminalDeckState _deck;
         /// <summary>このターンの端子の結果 (配線の前は null)。</summary>
         private TerminalOutcome _termOutcome;
-        /// <summary>次のターンも手札に残す端子 (〈保持器〉)。</summary>
+        /// <summary>次のターンも手札に残す端子 (〈呼び戻し〉)。</summary>
         private string _termRetain;
         /// <summary>このターンの主攻撃に掛ける別枠の倍率 (〈増幅器〉〈共振器〉)。 毎ターン 1 に戻す。</summary>
         private float _termDamageMul = 1f;
@@ -44,6 +44,7 @@ namespace CombatSystem
             if (run != null)
             {
                 if (run.terminalDeck == null || run.terminalDeck.Count == 0) run.terminalDeck = TerminalCards.StartingDeck();
+                TerminalCards.NormalizeIds(run.terminalDeck);   // 旧 id (〈保持器〉など) を今の id へ
                 runDeck = run.terminalDeck;
             }
             else runDeck = TerminalCards.StartingDeck();
@@ -267,7 +268,7 @@ namespace CombatSystem
     /// <summary>挿し方の列挙と、 既定の挿し方 (方策も画面も答えを出さなかった時・人の「おまかせ」)。 ADR-0014。</summary>
     public static class TerminalWiring
     {
-        /// <summary>〈保持器〉(手札の持ち越しの規則) の対象として選ばれた捨て札の添字 (発動した〈保持器〉の場の位置の targets の値・選ばれていなければ −1)。</summary>
+        /// <summary>〈呼び戻し〉(手札の持ち越しの規則) の対象として選ばれた捨て札の添字 (発動した〈呼び戻し〉の場の位置の targets の値・選ばれていなければ −1)。</summary>
         public static int RecallWant(List<string> board, TerminalOutcome o, int[] targets)
         {
             if (board == null || o == null || targets == null) return -1;

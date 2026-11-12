@@ -89,11 +89,11 @@ static class T
             Check(dk.hand.Count == 6 && dk.LastDrawnCount == 0, $"規定の枚数を超えて残った手札は捨てない・引かない (手札 {dk.hand.Count}・引いた {dk.LastDrawnCount})");
             var rb = new List<string> { TerminalIds.Retainer, TerminalIds.Attack };
             var ro = TerminalCards.Resolve(rb, new[] { 0 }, new[] { 4 }, new TerminalEnv(), new TerminalBattleState());
-            Check(ro.retainTarget == -1 && ro.recall && ro.blockAdd == 4, "持ち越しの規則の〈保持器〉: 場の端子は対象に取らず、 出目をブロックに入れて捨て札から戻す");
+            Check(ro.retainTarget == -1 && ro.recall && ro.blockAdd == 4, "持ち越しの規則の〈呼び戻し〉: 場の端子は対象に取らず、 出目をブロックに入れて捨て札から戻す");
             // 戻す 1 枚: 選んだ添字 / 選ばなければ最後に捨てた 1 枚 / 空なら効果なし
             var disc = new List<string> { "攻撃", "定電圧", "防御" };
             Check(TerminalDeckState.RecallPick(disc, 1) == "定電圧" && TerminalDeckState.RecallPick(disc, -1) == "防御" && TerminalDeckState.RecallPick(disc, 9) == "防御"
-                  && TerminalDeckState.RecallPick(new List<string>(), 0) == null, "〈保持器〉の戻す 1 枚の選び方");
+                  && TerminalDeckState.RecallPick(new List<string>(), 0) == null, "〈呼び戻し〉の戻す 1 枚の選び方");
             {
                 var dk2 = new TerminalDeckState();
                 dk2.BeginBattle(new List<string> { "攻撃", "攻撃", "防御", "防御", "充電", "定電圧", "ヒューズ", "蓄電池", "検波器", "治癒", "接地" });
@@ -112,7 +112,7 @@ static class T
             }
             GameLoop.GameHooks.HandCarryDisabled = true;
             Check(TerminalCards.Resolve(rb, new[] { 0 }, new[] { 4 }, new TerminalEnv(), new TerminalBattleState()).retainTarget == 1,
-                  "旧い規則では〈保持器〉が空けた端子を残す");
+                  "旧い規則では〈呼び戻し〉が空けた端子を残す");
             GameLoop.GameHooks.HandCarryDisabled = false;
         }
 
@@ -136,6 +136,14 @@ static class T
                   "受けるダメージ ×1.5 (切り捨て)");
             var s3 = new BossDownState(); s3.Reset(null);
             Check(!s3.Enabled && s3.NoteTurnEnd(1, 1000) == 0 && !s3.BeginTurn(), "目盛りの無い敵はダウンしない");
+        }
+
+        // ---- 5. 端子の旧 id (〈保持器〉→〈呼び戻し〉) ----
+        {
+            var deckOld = new List<string> { "攻撃", "保持器", "防御" };
+            TerminalCards.NormalizeIds(deckOld);
+            Check(TerminalCards.Get("保持器")?.id == TerminalIds.Retainer && TerminalIds.Retainer == "呼び戻し" && deckOld[1] == "呼び戻し" && deckOld[0] == "攻撃",
+                  "旧 id「保持器」は〈呼び戻し〉に解決し、 山札の名前も揃う");
         }
 
         Console.WriteLine(fails == 0 ? "ALL OK" : fails + " FAILED");

@@ -280,6 +280,8 @@ namespace GameLoop
             }
             foreach (var name in live.Keys)
                 if (!seen.Contains(name)) throw new InvalidOperationException($"セーブに RunState.{name} が無い");
+            // 端子の改名 (2026-11-13・〈保持器〉→〈呼び戻し〉): 旧い名前で保存された山札を今の id に揃える
+            CombatSystem.TerminalCards.NormalizeIds(run.terminalDeck);
         }
 
         private static string Encode(string kind, object v)
