@@ -696,7 +696,7 @@ namespace CombatSystem
                 secondaryAtkBeforeDefense =
                     Math.Max(0, Escalation.EnemyAttackValue(secondaryEnemy, escTurn, secTotalTele, ctx.currentTurn));
                 _secondaryAtkThisTurn = ApplyPlayerDefense(ctx, secondaryAtkBeforeDefense,
-                    Math.Max(0, secondaryEnemy.armorPen));
+                    GameLoop.GameHooks.EnemyArmorPen(secondaryEnemy.id, secondaryEnemy.armorPen));
             }
             // 挑戦カード〈連撃〉: 単体の敵の攻撃が 2 回になる。 2 回目は 1 回目の N% の威力で、 2 体戦の 2 体目と同じパケット
             //   (予告に載る・ブロックは各パケットから全額引く)。 1 回目は今まで通りなので、 どう配線しても被ダメは減らない。

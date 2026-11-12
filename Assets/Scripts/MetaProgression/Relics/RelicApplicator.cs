@@ -32,6 +32,7 @@ namespace MetaProgression.Relics
         /// <summary>段を合計してから実数値にする (段の表は線形なので、 1 個ずつ足しても同じ)。 充電だけは別 (下)。</summary>
         private static int Value(RelicStat s)
         {
+            if (StatOff(s)) return 0;
             int v = 0;
             foreach (var r in Equipped())
             {
@@ -42,6 +43,11 @@ namespace MetaProgression.Relics
             return v;
         }
 
+        /// <summary>[測定] この接辞を止めているか (<see cref="GameLoop.GameHooks.RelicStatOffMask"/>・既定 0 = 止めない)。</summary>
+        private static bool StatOff(RelicStat s) => (GameLoop.GameHooks.RelicStatOffMask & (1 << (int)s)) != 0;
+        /// <summary>[測定] このセットの 2 個 (three = false) / 3 個 (three = true) の効果を止めているか (<see cref="GameLoop.GameHooks.RelicSetBonusOffMask"/>)。</summary>
+        private static bool SetBonusOff(RelicSet set, bool three) => (GameLoop.GameHooks.RelicSetBonusOffMask & (1 << ((int)set * 2 + (three ? 1 : 0)))) != 0;
+
         /// <summary>指定セットを何個持ち込んでいるか。</summary>
         public static int SetCount(RelicSet set)
         {
@@ -49,8 +55,8 @@ namespace MetaProgression.Relics
             foreach (var r in Equipped()) if (r != null && r.Set == set) n++;
             return n;
         }
-        public static bool Has2(RelicSet s) => SetCount(s) >= 2;
-        public static bool Has3(RelicSet s) => SetCount(s) >= 3;
+        public static bool Has2(RelicSet s) => SetCount(s) >= 2 && !SetBonusOff(s, false);
+        public static bool Has3(RelicSet s) => SetCount(s) >= 3 && !SetBonusOff(s, true);
 
         // ============================================================
         //  ラン開始・戦闘開始に 1 回
@@ -64,6 +70,7 @@ namespace MetaProgression.Relics
         public static int GetOpeningCharge(RunState run)
         {
             int v = 0;
+            if (StatOff(RelicStat.Charge)) return 0;
             foreach (var r in Equipped()) if (r != null && r.MainStat == RelicStat.Charge) v += RelicCatalog.ChargeOpening(r.MainStep);
             return v;
         }
@@ -115,7 +122,8 @@ namespace MetaProgression.Relics
         public static int GetChargePerTurn(RunState run, CombatContext ctx)
         {
             int v = Has2(RelicSet.Denryu) ? RelicCatalog.Denryu2ChargePerTurn : 0;
-            foreach (var r in Equipped()) if (r != null && r.MainStat == RelicStat.Charge) v += RelicCatalog.ChargePerTurn(r.MainStep);
+            if (!StatOff(RelicStat.Charge))
+                foreach (var r in Equipped()) if (r != null && r.MainStat == RelicStat.Charge) v += RelicCatalog.ChargePerTurn(r.MainStep);
             return v;
         }
 

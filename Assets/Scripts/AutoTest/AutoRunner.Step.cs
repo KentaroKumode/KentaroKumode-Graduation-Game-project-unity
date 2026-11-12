@@ -166,6 +166,9 @@ namespace AutoTest
                     GameHooks.ArmorShieldPerRankOverride = armorShieldPerRank;
                     GameHooks.ArmorFlatEveryOverride = armorFlatEvery;
                     MetaProgression.Relics.RelicApplicator.Override = RelicPresets.Parse(relicLoadoutSpec);
+                    GameHooks.RelicStatOffMask = ParseRelicStatOff(relicStatOff);           // [#95] 既定 "" = 0 (止めない)
+                    GameHooks.RelicSetBonusOffMask = ParseRelicSetBonusOff(relicSetBonusOff);
+                    GameHooks.EnemyArmorPenOverride = ParseEnemyArmorPen(enemyArmorPenSpec); // [#20/#41] 既定 "" = null (データの値)
                     GameHooks.ForcedChallengeCards = ParseChallengeForce(challengeForce);
                     GameHooks.ChooseChallengeCard = challengeCardPickByAxis ? BotHooks.ChooseChallengeByAxis : (System.Func<IReadOnlyList<string>, int>)null;
                 }
@@ -263,6 +266,7 @@ namespace AutoTest
                     }
                     _cur.metaRanks = string.Join(",", parts);
                 }
+                _cur.startClass = gm.Run != null ? gm.Run.playerClass.ToString() : "";
             }
 
             // [診断] 軸の品をまとめて開幕に配る (2026-11-07)。 軸に深く投資した構成が実際に強いかを因果で測る。

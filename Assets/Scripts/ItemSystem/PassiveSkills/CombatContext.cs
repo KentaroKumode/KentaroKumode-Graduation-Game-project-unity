@@ -736,11 +736,15 @@ namespace ItemSystem.PassiveSkills
                 // 遺物 (§15-5): シールドの獲得量 +N% (堅牢の符・堅牢 2 個)。 増えた分にだけ掛ける (切り捨て)
                 if (value > _consShield)
                 {
+                    int asked = value;
                     float sg = MetaProgression.Relics.RelicApplicator.GetShieldGainPct();
                     if (sg > 0f) value += (int)((value - _consShield) * sg);
                     // 大罪:傲慢 (挑戦カード IV): シールドの獲得 −N% (切り捨てた分を捨てる)
                     if (MetaProgression.MetaDebuffApplicator.GetSinBlockCutPct() > 0f)
                         value = _consShield + (int)((value - _consShield) * (1f - MetaProgression.ChallengeCards.SinPrideShieldCutPct / 100f));
+                    // [計装 2026-11-12・#95] 呼び出し側は頼んだ量だけを shieldGainedTotal へ足すので、 遺物の上乗せと傲慢の削りの差をここで足す
+                    //   (遺物なし・傲慢なしでは 0 ── 学習の条件では記録が変わらない)。 誓約の封じ (上の行) の分は従来どおり数えたまま。
+                    shieldGainedTotal += value - asked;
                 }
                 int gained = value - _consShield;
                 _consShield = value;

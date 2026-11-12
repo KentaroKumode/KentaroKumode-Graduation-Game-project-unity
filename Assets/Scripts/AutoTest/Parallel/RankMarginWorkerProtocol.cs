@@ -72,6 +72,8 @@ namespace AutoTest.ParallelSweep
         public int[] mapVisit = Array.Empty<int>();
         /// <summary>[計装 2026-11-10] ラン開始時に実際に入っていた整備パネルの段。</summary>
         public string metaRanks = "";
+        /// <summary>[計装 2026-11-12] ラン開始時の職業 (lockWeaponFamily の測定では武器の家系)。</summary>
+        public string startClass = "";
 
         public static LearnRunRow From(AutoRunner.RunRec r)
         {
@@ -99,6 +101,7 @@ namespace AutoTest.ParallelSweep
                 stateSnaps = r.stateSnaps != null ? r.stateSnaps.ToArray() : Array.Empty<int>(),
                 mapVisit = r.mapVisit != null ? r.mapVisit.ToArray() : Array.Empty<int>(),
                 metaRanks = r.metaRanks ?? "",
+                startClass = r.startClass ?? "",
             };
         }
 
@@ -455,6 +458,11 @@ namespace AutoTest.ParallelSweep
                 "challengeForce", "goldPunchHpPerGold", "goldPunchReserve",
                 // 2026-11-12 (#118): 挑戦の難易度 (v3_queue の腕が振る値) と、 BOT が読む学習の帯の固定・欠けたら止めるか
                 "challengeCardDifficulty", "botLearningBandOverride", "failOnMissingLearning",
+                // 2026-11-12 (#95 / #20 / #41 / #102 / #108): 腕ごとに切り替える測定の口。 送った値と、 ラン開始時に本体へ入れる値
+                "relicLoadoutSpec", "relicStatOff", "RelicStatOffMaskApplied", "relicSetBonusOff", "RelicSetBonusOffMaskApplied",
+                "enemyArmorPenSpec", "EnemyArmorPenOverrideApplied",
+                "challengeCardPickByAxis",
+                "terminalsLeaveDeck", "randomGrantTerminals", "armorDefPerRank", "armorFlatEvery",
             };
             var sb = new System.Text.StringBuilder();
             foreach (string name in watched)
