@@ -1203,7 +1203,9 @@ namespace AutoTest
                 if (!string.IsNullOrEmpty(r.finalWeaponTier))
                 {
                     tierCount[r.finalWeaponTier] = tierCount.TryGetValue(r.finalWeaponTier, out int c) ? c + 1 : 1;
-                    if (r.finalWeaponTier.EndsWith("_t4")) reachT4++;
+                    // 段は items.json の tier で読む。 finalWeaponTier の中身は武器の id (= 表示名) なので、
+                    //   以前の EndsWith("_t4") は 2026-09-22 以降一致せず、 T4 到達は常に 0 と印字されていた。
+                    if (ItemSystem.ItemDatabase.Instance?.GetItem(r.finalWeaponTier)?.tier == 4) reachT4++;
                 }
             }
             sb.AppendLine($"  強化発火合計   : {totalUpgrades} 回 ({(double)totalUpgrades / n:F2}/ラン)");
