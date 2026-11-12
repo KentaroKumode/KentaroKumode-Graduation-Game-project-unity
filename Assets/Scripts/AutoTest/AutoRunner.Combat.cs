@@ -238,45 +238,42 @@ namespace AutoTest
         public static long SuperTalismansUsed;
 
         /// <summary>配線のミスの率 (2026-11-06・0 = しない)。 Optimal を 10〜100 戦の経験者とみなす: 人は毎ターン同じ規則で最善を選べない。
-        /// ミスは「1 個を攻撃とブロックの反対へ挿す」形。 致死を見落とすミスはしない (予告を読めば分かるので経験者はしない)。
-        /// 乱数は局面から作る専用の値で、 GameRng を消費しない (同じシードの対比較を壊さない)。
-        /// <para><b>2026-11-12 時点で呼ぶ所が無い。</b> 呼んでいたのは旧い配線の包み (MutualWiringPlanPolicy) だけで、 端子の山札 (2026-11-11) の後は
-        /// その包みが必ず山札の方策に上書きされていた。 山札の方策 (DeckWiringPlanPolicy) へつなぐか消すかは未決 (つなぐと挙動が変わる)。
-        /// <see cref="turnAudit"/> も同じ。</para></summary>
+        /// <b>効くのは実効の技量が Optimal の時だけ</b> (Super・素朴版・Exact はミスの経路を通らず、 ミスの乱数も引かない)。
+        /// 値は Begin が <see cref="optimalMistakeRate"/> から入れる (Super は 0)。
+        ///
+        /// <para><b>2026-11-12 (#134) に山札の方策 (<see cref="DeckWiringPlanPolicy"/>) へつなぎ直した。</b>
+        /// 旧い配線 (攻撃・ブロック・充電の 3 端子) では「1 個を攻撃とブロックの反対へ挿す」形だったが、 山札では端子が手札ごとに違い、
+        /// 「攻撃の反対」が決まらないので、 <b>ミス = 効用が最良より真に低い挿し方のうち最良のもの (次点) を選ぶ</b> と定義し直した
+        /// (<see cref="PickMistakeIndex"/>)。 旧と同じく、 致死を見落とすミスはしない (次点が今ターンの被ダメの見込みで HP を失い切るなら、
+        /// その次を見る・全部致死ならミスしない)。 最良と同点の手しか無い時もミスしない (同点の入れ替えは損をしない = ミスではない)。</para>
+        ///
+        /// <para>判定の乱数は旧と同じく局面 (敵 HP・自 HP・ターン・ラン番号・出目) のハッシュから作る専用の値で、 <b>GameRng を消費しない</b>
+        /// (同じシードの対比較を壊さない)。 判定は 2 ターン先読み (<see cref="deckLookahead"/>) で選び直した後、 〈金で殴る〉の払い方の前。</para></summary>
         public float wiringMistakeRate = 0f;
 
-        private CombatSystem.WiringPlan MaybeMisWire(int[] rolls, CombatSystem.MutualTurnTelegraph tele, CombatSystem.WiringPlan plan)
+        /// <summary>このターンにミスするか (局面のハッシュ・GameRng を引かない)。 旧 MaybeMisWire と同じハッシュ。</summary>
+        private bool RollWiringMistake(int[] rolls, CombatSystem.MutualTurnTelegraph tele)
         {
-            var w = plan.main;
             var cm = CombatManager.Instance;
-            if (w == null || rolls == null || cm == null || rolls.Length < 2) return plan;
+            if (rolls == null || cm == null) return false;
             uint h = (uint)(cm.EnemyHP * 73856093) ^ (uint)(cm.PlayerHP * 19349663) ^ (uint)(tele.turn * 83492791) ^ (uint)((_cur?.index ?? 0) * 2654435761u);
             foreach (var d in rolls) h = h * 31u + (uint)d;
             h ^= h >> 13; h *= 1274126177u; h ^= h >> 16;
-            if ((h & 0xFFFF) / 65536f >= wiringMistakeRate) return plan;
-            int k = rolls.Length;
-            var m = (CombatSystem.DiceTerminal[])w.Clone();
-            // 攻撃かブロックの 1 個を反対へ挿し直す (見立てを誤った時の形。 2 個の入れ違いは目の差しか動かず、 ほぼ無害だった)
-            bool moved = false;
-            for (int off = 0; off < k && !moved; off++)
+            return (h & 0xFFFF) / 65536f < wiringMistakeRate;
+        }
+
+        /// <summary>ミスで選ぶ挿し方の添字 (次点)。 効用が <paramref name="best"/> より真に低い手のうち最良で、 今ターンの被ダメの見込みで
+        /// HP を失い切らないもの。 同点は列挙の順 (先の方)。 無ければ −1 (ミスしない)。</summary>
+        private static int PickMistakeIndex(float[] us, OptimalTurnOutcome[] outs, int best, int hp)
+        {
+            int alt = -1; float au = float.NegativeInfinity;
+            for (int i = 0; i < us.Length; i++)
             {
-                int i = (int)((h >> 16) % (uint)k + (uint)off) % k;
-                if (m[i] == CombatSystem.DiceTerminal.Attack) { m[i] = CombatSystem.DiceTerminal.Block; moved = true; }
-                else if (m[i] == CombatSystem.DiceTerminal.Block) { m[i] = CombatSystem.DiceTerminal.Attack; moved = true; }
+                if (i == best || !(us[i] < us[best])) continue;
+                if (hp > 0 && outs[i].taken >= hp) continue;      // 死ぬミスはしない
+                if (alt < 0 || us[i] > au) { alt = i; au = us[i]; }
             }
-            if (!moved) return plan;
-            int block = 0, aCnt = 0;
-            for (int i = 0; i < k; i++)
-            {
-                if (m[i] == CombatSystem.DiceTerminal.Block) block += rolls[i];
-                if (m[i] == CombatSystem.DiceTerminal.Attack) aCnt++;
-            }
-            if (aCnt == 0) return plan;
-            int shield = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context?.consShield ?? 0;
-            if (System.Math.Max(0, tele.enemyAttackValue - block) >= cm.PlayerHP + shield) return plan;   // 死ぬミスはしない
-            WiringMistakes++;
-            plan.main = m;
-            return plan;
+            return alt;
         }
         /// <summary>[計装] 配線のミスの回数 (バッチ累計)。</summary>
         public static long WiringMistakes;

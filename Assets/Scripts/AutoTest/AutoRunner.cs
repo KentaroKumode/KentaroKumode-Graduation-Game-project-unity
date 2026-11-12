@@ -116,7 +116,7 @@ namespace AutoTest
             /// 航行の計画 (v3.macroPlan)・戦闘名の危険度で避ける (v3.superNav → UseLearnedDanger)・無段階の序列 (superBuyTiers)・
             /// ITT の Super 版の序列と価格の差し引き (superOwnItt / superIttPriceK)・段階 3 の値順の購入 (v3.phase3Ranked)・
             /// 軸に絞る買い方 (v3.axisCommitBuy)・難易度 10 の 6 層の店の全投入 (IsSuperTailMode)。
-            /// 配線のミスなし (wiringMistakeRate=0) と防ぎ切りの規則 (FreeBlockRule) は、 山札の方策と HP の帳簿 (既定) では差にならない。</para></summary>
+            /// 配線のミスなし (Super は wiringMistakeRate=0・Optimal は 2026-11-12 #134 から optimalMistakeRate で次点を選ぶ) は Optimal との差になる。 防ぎ切りの規則 (FreeBlockRule) は、 山札の方策と HP の帳簿 (既定) では差にならない。</para></summary>
             Super,
             /// <summary>厳密: 旧い expectimax の参照実装 (ExactCombatAI) を差していた技量。
             ///
@@ -916,7 +916,8 @@ namespace AutoTest
         public string superTierRankCuts = "";
         /// <summary>[較正専用] 宝箱からパッシブが出る確率 (<see cref="GameLoop.CombatRewards.TreasurePassiveRate"/>)。 負なら触らない。</summary>
         public float treasurePassiveRate = -1f;
-        /// <summary>Optimal の配線のミスの率 (Super は 0)。</summary>
+        /// <summary>Optimal の配線のミスの率 (Super は 0・素朴版は経路を通らない)。 ミス = 次点の挿し方 (<see cref="wiringMistakeRate"/> の説明)。
+        /// 測る口: v3_queue の腕に <c>optimalMistakeRate=0</c> を書くと、 ミスを切った Optimal (2026-11-12 以前の main と同じ挙動) になる。</summary>
         public float optimalMistakeRate = 0.1f;
 
         /// <summary>[較正専用] エリート戦の報酬倍率 (CombatRewards.EliteRewardMul)。 <b>負 = 触らない。</b></summary>
