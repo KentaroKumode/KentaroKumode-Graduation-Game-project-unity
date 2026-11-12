@@ -52,6 +52,9 @@ namespace UI.Game2D
 
         private void Awake() { _instance = this; }
 
+        /// <summary>上の帯 (経過ターン・層・待つ) の RectTransform。 手引きの強調 (issue #109) が範囲を読む。 無ければ null。</summary>
+        public static RectTransform TopBar => _instance != null ? _instance._top : null;
+
         /// <summary>シーンを builder で作り直していない時に、 新しく足した欄 (状態の帯・右の列) を作る。</summary>
         private void EnsureParts()
         {

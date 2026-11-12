@@ -79,6 +79,23 @@ namespace UI.Game2D
         public static bool PointerBusy => _busyDrag || Time.frameCount <= _releaseFrame + 1;
         private static bool _busyDrag; private static int _releaseFrame = -10;
 
+        /// <summary>手引きの強調 (issue #109) が範囲を読む部品。</summary>
+        public enum Part { Intent, Top, Ports, Stat, Ctl, Hand }
+
+        /// <summary>部品の RectTransform (まだ作っていなければ null)。 位置はばねで動くので、 読む側が毎フレーム読み直す。</summary>
+        public RectTransform PartRect(Part p)
+        {
+            switch (p)
+            {
+                case Part.Intent: return _right;
+                case Part.Top: return _top;
+                case Part.Ports: return _ports;
+                case Part.Stat: return _stat;
+                case Part.Ctl: return _ctl;
+                default: return _hand;
+            }
+        }
+
         /// <summary>見た目を作る (builder から 1 度呼ぶ)。 親は 480×270 の格子の枠。</summary>
         public void Build()
         {
