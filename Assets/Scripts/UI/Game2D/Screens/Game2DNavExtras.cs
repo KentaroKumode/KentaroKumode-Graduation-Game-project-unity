@@ -281,7 +281,7 @@ namespace UI.Game2D
             int pages = Mathf.Max(1, (ids.Count + InvPerPage - 1) / InvPerPage); _invPage = Mathf.Clamp(_invPage, 0, pages - 1);
             int first = _invPage * InvPerPage, cnt = Mathf.Min(InvPerPage, ids.Count - first);
             var d = new ScreenDef { id = "inventory_jp", jp = true, w = 460, cols = 2,
-                title = _invPassives ? "所持品 ― パッシブ" : "所持品 ― 消耗品",
+                title = _invPassives ? "所持品 ― 秘宝" : "所持品 ― 消耗品",
                 sub = "HP " + run.playerHP + "/" + run.playerMaxHP + "  物資 " + run.provision + "/" + run.provisionCap + "  " + run.coins + "G" };
             for (int i = 0; i < cnt; i++)
             {
@@ -293,12 +293,12 @@ namespace UI.Game2D
                 d.Items.Add(new ModalItem { icon = id, rarity = data != null ? data.rarity : (ItemSystem.ItemRarity?)null,
                     name = ItemSystem.ItemDatabase.DisplayNameOf(data, id), value = _invPassives ? null : "x" + n, desc = desc, disabled = block != null });
             }
-            if (ids.Count == 0) d.body = _invPassives ? "パッシブを持っていない。" : "消耗品を持っていない。";
+            if (ids.Count == 0) d.body = _invPassives ? "秘宝を持っていない。" : "消耗品を持っていない。";
             if (!_invPassives) d.buttons.Add(new ModalBtn { label = "使う", action = "use", primary = true });
-            d.buttons.Add(new ModalBtn { label = _invPassives ? "ステータスへ" : "パッシブへ", action = "tab" });
+            d.buttons.Add(new ModalBtn { label = _invPassives ? "ステータスへ" : "秘宝へ", action = "tab" });
             if (pages > 1) d.buttons.Add(new ModalBtn { label = "次の頁 " + (_invPage + 1) + "/" + pages, action = "page" });
             d.buttons.Add(new ModalBtn { label = "閉じる", action = "close" });
-            d.footer = _invPassives ? "パッシブ " + ids.Count + " 個" : "使う品を選ぶ (シールド・油は次の戦闘の開幕に効く)";
+            d.footer = _invPassives ? "秘宝 " + ids.Count + " 個" : "使う品を選ぶ (シールド・油は次の戦闘の開幕に効く)";
             d.onAction = (a, sel) =>
             {
                 switch (a)

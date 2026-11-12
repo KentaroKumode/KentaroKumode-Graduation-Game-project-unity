@@ -60,10 +60,10 @@ namespace GameLoop
             }
         }
 
-        /// <summary>②で焚かれる遺物の数。</summary>
+        /// <summary>②で焚かれる秘宝 (ランの中の持ち物) の数。</summary>
         public const int GateRelicDemand = 2;
 
-        /// <summary>②「門を起動するために、いくつかの遺物が必要らしい」
+        /// <summary>②「門を起動するために、いくつかの秘宝が必要らしい」
         /// — 捧げる = <b>ランダムに</b>パッシブ 2 個を失う。 拒否/不足なら〈不完全な起動〉。
         ///
         /// <para><b>選べない。</b> 旧〈遺品の儀〉は「合計 30G 以上を満たす最小ペア」＝
@@ -80,8 +80,8 @@ namespace GameLoop
             {
                 Run.AddFlaw(GateFlaw.IncompleteIgnition);
                 Log(Run.lastStandActive
-                    ? "ラストスタンド中は遺物を手放せない。〈不完全な起動〉"
-                    : "起動に見合う遺物など無いと判断した。間に合わせの材料で起動したが、明らかに不完全だ。〈不完全な起動〉");
+                    ? "ラストスタンド中は秘宝を手放せない。〈不完全な起動〉"
+                    : "起動に見合う秘宝など無いと判断した。間に合わせの材料で起動したが、明らかに不完全だ。〈不完全な起動〉");
                 return;
             }
 
@@ -102,7 +102,7 @@ namespace GameLoop
             if (candidates.Count < GateRelicDemand)
             {
                 Run.AddFlaw(GateFlaw.IncompleteIgnition);
-                Log($"捧げられる遺物が {candidates.Count} 個しかない。〈不完全な起動〉");
+                Log($"捧げられる秘宝が {candidates.Count} 個しかない。〈不完全な起動〉");
                 return;
             }
 
@@ -123,7 +123,7 @@ namespace GameLoop
                 ItemSystem.Helpers.PassiveAddHelper.RemoveAt(Run, idx);
             }
             RunStats.GateRelicsPaid++; RunStats.GateRelicsBurned += names.Count;
-            Log($"遺物を門に捧げた。〈{string.Join("〉と〈", names)}〉は光を放った後、門の中で塵になって消えた。");
+            Log($"秘宝を門に捧げた。〈{string.Join("〉と〈", names)}〉は光を放った後、門の中で塵になって消えた。");
         }
 
         /// <summary>③で支払う物資。</summary>

@@ -284,11 +284,11 @@ namespace MetaProgression
                 case Steel: return "各戦闘 1 度、 敵が致命傷を HP1 で耐える・ボスの HP +" + SteelBossHpPct.ToString("0") + "%（鋼の皮膚）";
                 case SinPride: return "大罪:傲慢 ─ 防御の端子を挿した出目 −" + n + "%・シールドの獲得 −" + SinPrideShieldCutPct + "%";
                 case SinEnvy: return "大罪:嫉妬 ─ 残り HP の割合がこちらのほうが高い間、 敵の攻撃 +" + n + "%";
-                case SinGreed: return "大罪:強欲 ─ 所持金と消耗品をすべて失い、 最も高価なパッシブ " + SinGreedPassives + " 個を失う";
+                case SinGreed: return "大罪:強欲 ─ 所持金と消耗品をすべて失い、 最も高価な秘宝 " + SinGreedPassives + " 個を失う";
                 case SinWrath: return "大罪:憤怒 ─ ボスの各形態の最初のターン、 自ダイスが全て最大・現在 HP 半減";
                 case SinSloth: return "大罪:怠惰 ─ 全部の出目 −" + n + "（1 より小さくはならない）・与えるダメージ −" + SinSlothDamageCutPct + "%（毒・出血・爆発も）";
                 case SinGluttony: return "大罪:暴食 ─ 最大 HP −" + SinGluttonyMaxHpPct + "%・回復 −" + n + "%（吸血・層の入口の全回復にも）";
-                case SinLust: return "大罪:色欲 ─ 持っているパッシブ " + n + " 個（ランダム）が働かなくなる";
+                case SinLust: return "大罪:色欲 ─ 持っている秘宝 " + n + " 個（ランダム）が働かなくなる";
                 case Bag: return "消耗品は " + n + " 個までしか持てない";
                 case UseCap: return "1 戦闘で使える消耗品は " + n + " 個まで";
                 case Heal: return "回復 −" + n + "%（層の入口の全回復にも）";

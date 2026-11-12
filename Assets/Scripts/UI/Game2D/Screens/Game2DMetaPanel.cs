@@ -43,9 +43,9 @@ namespace UI.Game2D
             new Track { kind = MetaPanelKind.Output,  name = "出力", desc = "与ダメ +" + MetaPanel.OutputPct(1) + "%/段。 r10〈戦意〉: 戦闘に勝つたび与ダメ +" + N(MetaPanel.BattleSpiritPctPerWin) + "% (そのラン中)。" },
             new Track { kind = MetaPanelKind.Guard,   name = "剛胆", desc = "エリートが増える +" + Per(MetaPanel.ValorEliteUpgradePct) + "%/段・エリートの報酬ゴールド +" + Per(MetaPanel.ValorEliteGoldPct) + "%/段。 r10: エリートへの与ダメ +" + MetaPanel.ValorEliteSlayerPct + "%・残りシールドの " + N(MetaPanel.GuardShieldCarryRatio * 100f) + "% を次戦へ。" },
             new Track { kind = MetaPanelKind.Vault,   name = "金庫", desc = "開幕ゴールド +" + MetaPanel.VaultGold(1) + "/段。 r10: 宝箱のゴールドが復活・層を越えるたびに所持金が " + N(VaultBank.Multiplier) + " 倍 (" + VaultBank.Cap + "G までの分)。" },
-            new Track { kind = MetaPanelKind.Plunder, name = "強奪", desc = "ボス撃破の追加ゴールド +" + MetaPanel.PlunderBossGold(1) + "/段・通常の敵のパッシブドロップ +" + Per(MetaPanel.PlunderPassiveDropPct) + "%/段。 r10: ショップ強盗を解禁。" },
+            new Track { kind = MetaPanelKind.Plunder, name = "強奪", desc = "ボス撃破の追加ゴールド +" + MetaPanel.PlunderBossGold(1) + "/段・通常の敵の秘宝ドロップ +" + Per(MetaPanel.PlunderPassiveDropPct) + "%/段。 r10: ショップ強盗を解禁。" },
             new Track { kind = MetaPanelKind.Trade,   name = "商才", desc = "ショップの特売枠 +" + MetaPanel.TradeSaleSlots(1) + "/段 (" + SaleTiers(1) + "% 引き)。 r10: " + MetaPanel.TradeSaleTiers(10)[MetaPanel.TradeSaleTiers(10).Length - 1] + "% 引きの枠が出る。" },
-            new Track { kind = MetaPanelKind.Supply,  name = "宝物庫", desc = SupplySteps() + " で開幕パッシブ +1 本・段が上がるほどレア度が上寄り。 r10: 開幕パッシブが選択式。" },
+            new Track { kind = MetaPanelKind.Supply,  name = "宝物庫", desc = SupplySteps() + " で開幕の秘宝 +1 個・段が上がるほどレア度が上寄り。 r10: 開幕の秘宝が選択式。" },
             new Track { kind = MetaPanelKind.Armor,   name = "装甲", desc = "防御 +" + MetaPanel.ArmorDefense(1) + "/段・被ダメージ −1/" + MetaPanel.ArmorFlatEvery + " 段。 r10〈不動〉: 1 回の攻撃で受けるダメージは最大 HP の " + N(MetaPanel.ArmorHitCapPct * 100f) + "% まで。 防御は割合の軽減 (積むほど伸びは鈍る)、 被ダメージ −N は防御の後に引く。" },
         };
 
@@ -97,7 +97,7 @@ namespace UI.Game2D
                 case MetaPanelKind.Vault:   return "開幕 +" + MetaPanel.VaultGold(r) + "G" + (r >= 10 ? "・貸金庫" : "");
                 case MetaPanelKind.Plunder: return "ボス +" + MetaPanel.PlunderBossGold(r) + "G・ドロップ +" + MetaPanel.PlunderPassiveDropPct(r).ToString("0") + "%" + (r >= 10 ? "・強盗" : "");
                 case MetaPanelKind.Trade:   return "特売の枠 " + MetaPanel.TradeSaleSlots(r) + (r >= 10 ? "・99% 引き" : "");
-                case MetaPanelKind.Supply:  return "開幕パッシブ " + MetaPanel.SupplyStartingPassives(r) + " 本" + (r >= 10 ? "・選べる" : "");
+                case MetaPanelKind.Supply:  return "開幕の秘宝 " + MetaPanel.SupplyStartingPassives(r) + " 個" + (r >= 10 ? "・選べる" : "");
                 case MetaPanelKind.Armor:   return "防御 +" + MetaPanel.ArmorDefense(r) + "・被ダメ −" + MetaPanel.ArmorFlatReduction(r) + (r >= 10 ? "・不動" : "");
                 case MetaPanelKind.AttackTerm: return "挿した 1 個ごと +" + MetaPanel.AttackTerminalPerDice(r);
                 case MetaPanelKind.BlockTerm:  return "挿した 1 個ごと +" + MetaPanel.BlockTerminalPerDice(r);

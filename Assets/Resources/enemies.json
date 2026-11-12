@@ -1246,7 +1246,7 @@
         {
           "internalName": "GreedyMerchant",
           "skillName": "貪欲",
-          "description": "獲物が豊かなほど肥え太る。プレイヤーの所持パッシブ1つにつきHP+2、3つごとに攻撃+1",
+          "description": "獲物が豊かなほど肥え太る。プレイヤーの秘宝1つにつきHP+2、3つごとに攻撃+1",
           "flavorText": "「いいものをお持ちで。……ええ、ほんとうに」"
         }
       ],

@@ -128,7 +128,7 @@ namespace UI.Game2D
                 case GameManager.GamePhase.ExchangeTile:
                 {
                     var d = New("交換"); bool can = gm.CanExchangeTile;
-                    d.body = can ? "いちばん段の低いパッシブを 1 つ渡し、 上の段のものを 1 つ受け取る。" : "渡せるパッシブが無い。";
+                    d.body = can ? "いちばん段の低い秘宝を 1 つ渡し、 上の段のものを 1 つ受け取る。" : "渡せる秘宝が無い。";
                     if (can) d.buttons.Add(B("交換する", "swap", true));
                     d.buttons.Add(B("通り過ぎる", "skip", !can));
                     d.onAction = (a, _) => { if (a == "swap") gm.DoExchangeTile(); else gm.SkipExchangeTile(); Refresh(); };
@@ -172,13 +172,13 @@ namespace UI.Game2D
             }
         }
 
-        // ── 開幕パッシブの選択 (〈宝物庫〉r10: 何本目かで 2〜3 択) ──
+        // ── 開幕の秘宝 (開幕パッシブ) の選択 (〈宝物庫〉r10: 何本目かで 2〜3 択) ──
 
         private ScreenDef StartingPick(GameManager gm)
         {
             var cands = gm.PendingStartingPassiveChoices[0];
-            var d = New("開幕のパッシブ", "残り " + gm.PendingStartingPassiveChoices.Count, 420);
-            d.body = "このランに持っていくパッシブを 1 つ選ぶ。";
+            var d = New("開幕の秘宝", "残り " + gm.PendingStartingPassiveChoices.Count, 420);
+            d.body = "このランに持っていく秘宝を 1 つ選ぶ。";
             foreach (var id in cands)
             {
                 var data = ItemDatabase.Instance?.GetItem(id);
@@ -705,12 +705,12 @@ namespace UI.Game2D
 
         // ── 〈門〉 ──
 
-        private static readonly string[] GateName = { "血を捧げる", "遺物を焚く", "光に身を任せる" };
+        private static readonly string[] GateName = { "血を捧げる", "秘宝を焚く", "光に身を任せる" };
         private static readonly string[] GateDesc =
         {
             // 数は GameManager.Gate の定数から組み立てる (写しを持たない・#131)。
             "最大 HP −" + Mathf.RoundToInt(GameLoop.GameManager.GateBloodMaxHpPct * 100f) + "%。 拒むと〈不完全な修復〉を背負う。",
-            "遺物を " + GameLoop.GameManager.GateRelicDemand + " 個焚く。 拒むと〈不完全な起動〉を背負う。",
+            "秘宝を " + GameLoop.GameManager.GateRelicDemand + " 個焚く。 拒むと〈不完全な起動〉を背負う。",
             "物資 −" + GameLoop.GameManager.GateProvisionDemand + "。 拒むと〈不完全な転移〉を背負う。",
         };
 
