@@ -192,6 +192,9 @@ namespace AutoTest
         public int terminalHealMul = 0, terminalArresterNeed = 0;
         /// <summary>[測定 2026-11-12・#102] true = 〈応急箱〉を使ってもランの山札から抜かない (旧の作り)。 既定 false = 今の作り (使うと抜ける)。</summary>
         public bool terminalFirstAidBattleOnly = false;
+        /// <summary>[測定 2026-11-13・#117] true = 端子の撃破のボーナスを旧い条件で配る (攻撃の端子に挿したターンの、 主攻撃までの撃破だけ)。
+        /// 本体の GameHooks.TerminalKillBonusNeedsAttack と、 BOT の撃破のボーナスの見積もり (OptimalTurnCore) の両方を切り替える。 既定 false = 今の作り (経路を問わない)。</summary>
+        public bool terminalKillNeedsAttack = false;
         /// <summary>[測定 2026-11-12・#35] 航行の「恐れ」: 行き先の点が、 推定した追跡者の位置から <see cref="navFearRange"/> 歩より近いほど引く。
         /// 引く量 = 恐れ × (範囲 − 推定の歩数)。 Optimal の行き先選び (価値の単位) は navFear、 Super の計画 (対数オッズ) は navFearMacro。 0 = 使わない。</summary>
         public float navFear = 0f, navFearMacro = 0f;
@@ -751,6 +754,7 @@ namespace AutoTest
                  + $"/ 遺物 持ち込み {relicCount}個 計{relicPts}段 "
                  + $"/ メタ 攻撃端子+{MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice()} "
                  + $"/ 追跡者 縄張りの外へ{(pursuerLeavesTerritory ? "出る (旧い作り)" : "出ない")} "
+                 + $"/ 端子の撃破のボーナス {(terminalKillNeedsAttack ? "攻撃したターンだけ (旧い条件)" : "経路を問わない")} "
                  + $"/ 縄張りの宝 {territoryTreasure} (BOT のしきい値 {territoryTreasureHpMargin:0.##}) / 縄張りを避ける遠回り {(navTerritoryDetour < 0 ? "使わない" : "+" + navTerritoryDetour + "歩まで")}"
                  + (DeckLookaheadDiagLine().Length > 0 ? System.Environment.NewLine + DeckLookaheadDiagLine() : "");
         }

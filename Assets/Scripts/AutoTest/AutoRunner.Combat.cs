@@ -859,6 +859,9 @@ namespace AutoTest
             if (s.mainCorr > 0f && dmg > 0) dmg = Mathf.RoundToInt(dmg * s.mainCorr);
             // damageCapped ボス: 与ダメが閾値超えたら超過分を半減した見積もりで探索 (実挙動と一致)
             int effDmg = dmg;
+            // 攻撃の端子なしでも通る削りの見積もり (〈黎明〉・〈虚空〉)。 端子の撃破のボーナスを攻撃なしのターンに見る時に使う (#117)。
+            //   effDmg は攻撃なしでも武器の素火力 (atkBase) を含むので、 攻撃なしの撃破にはこちらを使う。
+            int noAtkDmg = 0;
             if (play.damageCapped && play.damageCapThreshold > 0 && dmg > play.damageCapThreshold)
                 effDmg = play.damageCapThreshold + (dmg - play.damageCapThreshold) / 2;
             // 反射ボス: 与ダメの reflectRatio 分が自HPに返る想定でペナルティ
@@ -911,7 +914,9 @@ namespace AutoTest
             // 盾〈黎明〉: 無傷で受け切ったら、 敵の攻撃 10 につき敵の最大 HP の 5% を削る
             if (stepDaybreak && taken == 0)
             {
-                effDmg += TurnRules.DaybreakDamage(enemyMaxHpNow, enemyAtk);   // 溜める形 (段 B の試験) のときは 0
+                int dbNow = TurnRules.DaybreakDamage(enemyMaxHpNow, enemyAtk);
+                effDmg += dbNow;   // 溜める形 (段 B の試験) のときは 0
+                noAtkDmg += dbNow;
                 // [2026-11-10 試験] 溜める形: 次の主攻撃に乗る +% の価値 = 先のターンの 1 ターンの与ダメの見込み × 溜まる率 (dFull が無い計算では 0)
                 effDmg += TurnRules.DaybreakDeferredValue(s.dFull, enemyAtk);
             }
@@ -930,6 +935,7 @@ namespace AutoTest
                     enemyHp * (ItemSystem.PassiveSkills.Effects.VoidStance.ChipBase
                              + ItemSystem.PassiveSkills.Effects.VoidStance.ChipPerStack * n) / 100f);
                 effDmg += chip;   // 殴らない代わりに通る軽減不可ダメージ
+                noAtkDmg += chip;
                 float shell = System.Math.Max(0,
                     90 - ItemSystem.PassiveSkills.Effects.VoidStance.ReducePerStack * n) / 100f;
                 if (shell > 0f) { taken = System.Math.Max(0, (int)(taken * (1f - shell))); shellKeep = 1f - shell; }
@@ -978,8 +984,12 @@ namespace AutoTest
                     + specFlat;
             // 端子の山札: 敵の攻撃の前に動いた HP (回復 − 払った HP)。 帳簿は HP の単位なのでそのまま、 旧の効用は守りの重みで。 旧い配線では 0。
             if (hpDelta != 0) u += s.ledger ? hpDelta : wDef * hpDelta;
-            // 端子の山札: 今ターン撃破で得る恒久のボーナス (攻撃したターンだけ・本体 FinishTerminalTurn と同じ条件)
-            if (ws.killBonus != 0f && aCount > 0 && effDmg >= enemyHp) u += ws.killBonus;
+            // 端子の山札: 今ターン撃破で得る恒久のボーナス (本体 FinishTerminalTurn と同じ条件・#117)。
+            //   今の作り = 撃破の経路を問わない。 攻撃の端子に挿していなければ、 攻撃なしでも通る削り (noAtkDmg) で倒れるかを見る
+            //   (攻撃の種類の撃破のボーナスの端子は発動すれば aCount > 0 なので、 攻撃なしで効くのは〈剥ぎ取り〉だけ)。
+            //   毒・出血・ターン終了時の削りは、 ここでは見ていない (主攻撃の見積もりと同じく)。
+            //   旧い条件 (terminalKillNeedsAttack) = 攻撃したターンだけ。
+            if (ws.killBonus != 0f && (aCount > 0 ? effDmg >= enemyHp : !terminalKillNeedsAttack && noAtkDmg >= enemyHp)) u += ws.killBonus;
             // 盾〈城壁〉: 完全に受け止めたら、 余ったブロック × 率 がシールドへ (次のターン以降の弾・毎ターン半減するので半値で見る)
             if (bulwarkRate > 0f)
                 u += 0.5f * wDef * TurnRules.BulwarkGain(block, enemyAtk, bulwarkRate);
