@@ -863,6 +863,9 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            (2026-11-06・攻撃の端子を挿した出目への上乗せ率。 品は OnPostRoll までに AddAttackDicePct で率を積み、 ここで 1 回だけ掛ける。
             攻撃端子 0 本なら 0。 ステータス `atkDicePct` / 〈間合〉〈一対一〉〈猛り〉など武器の段。
             [剣の舞] 4 種・刻みを使い切る 3 品・充電/出血/シールドの 5 品は 2026-11-10 に与ダメージ +% (`AddOutgoingPct` → outgoingDamageMultiplier) へ移した)
+         (式の上では消費の攻撃 consAtk と遺物の攻撃 relicAtk も同じ和に入る)
+         → 挑戦カード〈金で殴る〉(#6・2026-11-12): 攻撃するターンだけ、 払った金 G に対して atkBase += ChallengeCards.GoldPunchAttack(G)
+           (= floor(G × 札の値)・所持金まで・1 ターンの上限なし)。 攻撃+N の枠なので、 この後の麻痺毒の減算・〈不完全な起動〉・会心・与ダメ% ・防御がそのまま掛かる
          → 臨界爆発 (予約消費): rinkaiBurstActive なら fixedDamageToEnemy += rinkaiBurstDamage
            (rinkaiCritOnBurst なら forceCritical=true。消費後 false に戻す)
          → ProcessDamage(atkBase, pursuitDamage, playerCriticalNumerator)

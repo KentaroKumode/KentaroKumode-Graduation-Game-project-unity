@@ -771,6 +771,7 @@ namespace CombatSystem
             //   (旧い配線 ── 前ターンの配線の自動適用・1 つ装着の第 4 端子の接続制限 ── は 2026-11-11 に削除。 GAME.md §24)
             if (_deck == null) BeginTerminalDeck();
             TerminalOutcome term;
+            int goldAsk = 0;   // 挑戦カード〈金で殴る〉(#6): 払いたい金額 (人 = 画面 / BOT = 方策)。 払うのは下の「6. 解決」で、 攻撃するターンだけ
             {
                 var tenv = TerminalEnvNow(ctx, enemyAtkValue);
                 // 挑戦カード〈猫の手〉: 出目と予告が確定したここで、 1 組を先に挿す (人の画面・BOT の方策はこの 1 組を外せない)
@@ -782,9 +783,9 @@ namespace CombatSystem
                     _pause.board = _deck.board; _pause.terminalEnv = tenv; _pause.terminalState = _deck.state;
                     _pause.catDie = _catDie; _pause.catSlot = _catSlot;
                     yield return _pause;
-                    slots = _pause.slots; targets = _pause.targets;
+                    slots = _pause.slots; targets = _pause.targets; goldAsk = _pause.goldSpend;
                 }
-                else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; }
+                else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; goldAsk = plan.goldSpend; }
                 if (slots == null) slots = TerminalWiring.Auto(_deck.board, playerDice, tenv, _deck.state, _catDie, _catSlot);
                 // 猫の 1 組は答えに関わらず入れる (外した答え・同じ口に挿しすぎた答えは、 猫の組を残して直す)
                 if (_catDie >= 0) slots = TerminalWiring.WithPair(slots, playerDice.Length, _deck.board, _catDie, _catSlot);
@@ -974,6 +975,21 @@ namespace CombatSystem
                             + $"(素火力{playerAttackPower} 込み {atkBase} / 追撃 {ctx.pursuitDamage} を破棄)");
                 atkBase = 0;
                 ctx.pursuitDamage = 0;
+            }
+            // 挑戦カード〈金で殴る〉(#6): 攻撃するターンだけ、 払った金を攻撃+N にする (定義は ChallengeCards.GoldPunchAttack の 1 か所)。
+            //   攻撃+N の枠 (atkBase) へ足すので、 下の麻痺毒の減算・〈不完全な起動〉・会心・与ダメ% ・敵の防御は他の攻撃+N と同じに掛かる。
+            if (!skipAttack && goldAsk > 0 && MetaProgression.MetaBuffApplicator.HasGoldPunch())
+            {
+                var goldRun = GameLoop.GameManager.Instance?.Run;
+                int paid = goldRun != null ? Math.Min(goldAsk, Math.Max(0, goldRun.coins)) : 0;
+                int goldAtk = MetaProgression.ChallengeCards.GoldPunchAttack(paid);
+                if (paid > 0 && goldAtk > 0)
+                {
+                    goldRun.coins -= paid;
+                    atkBase += goldAtk;
+                    GoldPunchPaidTotal += paid; GoldPunchTurnsTotal++;   // [計装]
+                    Debug.Log($"[金で殴る] {paid}G を払って攻撃 +{goldAtk} (残り {goldRun.coins}G)");
+                }
             }
             // 7層ヴェスカ〈麻痺毒の小瓶〉・敵〈罠師〉〈呪縛〉: このターンのプレイヤー攻撃力を減算 (0 で床)。
             // 武器 attackPower は LEG でも 4〜8 なので実効は「武器素火力を消す」。 配線出目の分は残る。

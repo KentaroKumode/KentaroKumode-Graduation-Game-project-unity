@@ -28,9 +28,11 @@ namespace CombatSystem
         public int[] slots;
         /// <summary>端子の山札: 〈写し取り〉〈焼き切り〉〈保持器〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置・−1 = 選ばない)。 null = 左端の候補。</summary>
         public int[] targets;
+        /// <summary>挑戦カード〈金で殴る〉(#6): このターンに払う金額 (G)。 攻撃するターンだけ所持金まで払う (<see cref="MetaProgression.ChallengeCards.GoldPunchAttack"/>)。 0 = 払わない。</summary>
+        public int goldSpend;
 
         public static WiringPlan Of(DiceTerminal[] main) => new WiringPlan { main = main };
-        public static WiringPlan OfSlots(int[] slots, int[] targets = null) => new WiringPlan { slots = slots, targets = targets };
+        public static WiringPlan OfSlots(int[] slots, int[] targets = null, int goldSpend = 0) => new WiringPlan { slots = slots, targets = targets, goldSpend = goldSpend };
     }
 
     /// <summary>

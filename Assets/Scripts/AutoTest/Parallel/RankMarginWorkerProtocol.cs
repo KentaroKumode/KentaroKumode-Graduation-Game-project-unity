@@ -447,6 +447,8 @@ namespace AutoTest.ParallelSweep
                 "v3.readEnemyPassives", "ReadEnemyPassivesEffective", "v3.enemyPassiveMask",
                 // 2026-11-12 (#105): 山札の 2 ターン先読み (既定 OFF) と、 その範囲・候補数・標本数
                 "deckLookahead", "deckLookaheadBossOnly", "deckLookaheadTopK", "deckLookaheadSamples",
+                // 2026-11-12 (#6): 挑戦カードを 1 枚ずつ受ける測定の口と、〈金で殴る〉の BOT の金の値段・取り置き
+                "challengeForce", "goldPunchHpPerGold", "goldPunchReserve",
             };
             var sb = new System.Text.StringBuilder();
             foreach (string name in watched)

@@ -118,7 +118,28 @@ namespace MetaProgression
             // 猫の手 (#5・2026-11-12): 毎ターン N% の確率で、 配線の判断の頭に、 Super の評価で最良の挿し方の中から 1 組 (出目 1 個 → 端子 1 枚) を先に挿す。
             //   猫が挿した組はそのターン外せない。 値は仮置き・未測定 (CombatManager.ChooseCatPaw / GameHooks.CatPawPick)
             K(Cat, true, Family.None, T(25, 50, 75, 100));
-            K(GoldPunch, true, Family.None, T(null, null, 1, 1), pending: true);     // 金で殴る (BOT の方策ができてから)
+            // 金で殴る (#6・2026-11-12): 効果の定義は下の GoldPunchAttack の注記。 BOT の方策は実装済み (AutoRunner.Terminals の ChooseGoldPunch)。
+            //   pending を外すのは、 人の戦闘画面に払う金額を決める操作 (CombatManager.AnswerWiringSlots の goldSpend) を付けてから
+            //   ── 今外すと人には使えない札が配られる。 測定は challengeForce (例 "5:B:punch:3") で配らずに受けられる
+            K(GoldPunch, true, Family.None, T(null, null, 1, 1), pending: true);
+        }
+
+        /// <summary>〈金で殴る〉(#6): 払った <paramref name="gold"/> G で上がる攻撃 (攻撃+N)。 受けていなければ 0。
+        ///
+        /// <para><b>効果の定義 (最も素直な解釈・2026-11-12。 作者の判断で置き換える所はここの 1 か所)</b>:</para>
+        /// <list type="number">
+        /// <item>払う金額は毎ターン、 配線の判断の時に 0〜所持金で決める (1 ターンにも 1 戦闘にも上限を置かない・§23-25「ハードキャップで止めない」)。</item>
+        /// <item>払うのは攻撃するターン (攻撃の種類に 1 個以上挿した) だけ。 攻撃しないターン・逃げるターンは払わず、 金も減らない。</item>
+        /// <item>1G につき攻撃 +value (切り捨て)。 入る所は攻撃+N の枠 (武器の素火力・パッシブの攻撃+N・消耗品・遺物と同じ atkBase) ──
+        ///   そのため会心・与ダメ% が乗り、 敵の防御で軽減される (CombatManager.Turn の「6. 解決」)。</item>
+        /// <item>値は Tier III・IV とも 1 (仮置き・未測定)。</item>
+        /// </list>
+        /// 「倍率の乗らない固定ダメージにする」「1 ターンの上限を所持金の割合にする」などへ替えるときは、 ここと本体の 1 か所 (CombatManager.Turn の goldAtk) と、
+        /// BOT の見積もり (AutoRunner.Terminals の GoldPunchState) を一緒に直す。</summary>
+        public static int GoldPunchAttack(int gold)
+        {
+            if (gold <= 0) return 0;
+            return (int)System.Math.Floor(gold * (double)Value(GoldPunch));
         }
 
         /// <summary>充電の札の、 開幕の充電 (Tier ごと)。</summary>

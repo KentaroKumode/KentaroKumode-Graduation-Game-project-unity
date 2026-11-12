@@ -344,11 +344,123 @@ namespace AutoTest
             if (_fbPrevHp >= 0 && hpNow >= 0 && _fbPrevHp - hpNow > _fbPrevExpTaken) _fbUnavoidSeen = true;
             _lastFreeBlock = _lastKillsNow = false;
             var slots = ChooseDeckWiring(rolls, tele, out _, out var targets, lookahead: true);
+            // 挑戦カード〈金で殴る〉(#6): 払う金額 (札が無ければ 0・とどめに合わせて挿し方を替えることがある)。 計装の見積もり (_lastPred*) も金の分で上書きする
+            int gold = slots != null ? ChooseGoldPunch(rolls, tele, ref slots, ref targets) : 0;
             if (predTrace) BeginPredTrace(tele.turn);
             BeginMainCorrTurn(_lastPredA);
             _fbDecided++; if (_lastFreeBlock) _fbTurns++; if (_lastKillsNow) _fbKillTurns++;
             _fbPrevHp = hpNow; _fbPrevExpTaken = _lastExpTaken;
-            return slots != null ? WiringPlan.OfSlots(slots, targets) : default;      // null なら本体が既定 (TerminalWiring.Auto) で挿す
+            return slots != null ? WiringPlan.OfSlots(slots, targets, gold) : default;      // null なら本体が既定 (TerminalWiring.Auto) で挿す
+        }
+
+        // =====================================================================
+        //  挑戦カード〈金で殴る〉(#6・2026-11-12) の払い方 (効果の定義は ChallengeCards.GoldPunchAttack)
+        // =====================================================================
+        //  金の値段 = goldPunchHpPerGold (HP 相当 / 1G)。 既定 0.15 は〈戦利品箱〉の撃破ボーナスの値付け (DeckKillGoldWorth) と同じ ──
+        //  この BOT が金を HP に換える率は 1 つにそろえる。 効用 (HP の帳簿) で「金で上げた攻撃が減らす被ダメ」と「払った金 × 値段」を比べ、 得な方を取る。
+        //   A. とどめ: 攻撃する挿し方のうち、 所持金を全部払えば今ターン撃破できるものについて、 撃破に要る最小の金額 (二分探索) を払う案。
+        //      撃破のターンは敵が攻撃しないので、 今ターンの被ダメと先の被ダメの見込みが全部消える ── 金の主な使い道はここ。
+        //      とどめでは所持金を全部使ってよい (取り置き goldPunchReserve を割ってよい)。
+        //   B. 上乗せ: 貪欲で選んだ挿し方のまま、 (所持金 − 取り置き) の 1/4・1/2・全部を払う案。 撃破しない攻撃は、 1 ダメージが減らす
+        //      先の被ダメ (帳簿の ledgerFutureShare × 敵の攻撃 ÷ 1 ターンの与ダメ) が値段を超える時だけ得になる。
+        //   C. 払わない。
+        //  3 つの中で 効用 − 値段 × 払う金額 が最大の案。 計算量: 札を受けたランだけ、 1 判断で 挿し方 W 回の解き直し + 撃破できる挿し方ごとに二分探索 (≈ log2 所持金 回)。
+        //  未決 (作者の判断): 金の値段を店の残り (最後の店の後は 0 に近い) で変えるか・最後の戦闘で使い切るか。 今はどちらも見ない。
+
+        /// <summary>[#6] 〈金で殴る〉の金の値段 (HP 相当 / 1G・既定 0.15 = <see cref="DeckKillGoldWorth"/>)。 A/B で掃く口。</summary>
+        public float goldPunchHpPerGold = DeckKillGoldWorth;
+        /// <summary>[#6] 〈金で殴る〉の上乗せ (案 B) で残す所持金 (G・既定 40 = 店で端子を買う時の取り置き <see cref="TerminalShopReserve"/>)。 とどめ (案 A) には掛けない。</summary>
+        public int goldPunchReserve = TerminalShopReserve;
+
+        /// <summary>[#6 計装] 金を払った判断の数 / そのうち とどめ (案 A) / 払った金の累計。 ランをまたいで累計。</summary>
+        public int GoldPunchDecisions { get; private set; }
+        public int GoldPunchFinishers { get; private set; }
+        public long GoldPunchPaid { get; private set; }
+
+        /// <summary>払う金額を決める (読むだけ)。 とどめの案を選んだら <paramref name="slots"/> / <paramref name="targets"/> をその挿し方へ替える。 札が無い・素朴版・金が無いなら 0。</summary>
+        private int ChooseGoldPunch(int[] rolls, MutualTurnTelegraph tele, ref int[] slots, ref int[] targets)
+        {
+            if (!MetaProgression.MetaBuffApplicator.HasGoldPunch() || EffectiveWiringSkill == WiringSkill.Naive || rolls == null) return 0;
+            var run = GameManager.Instance?.Run;
+            int coins = run?.coins ?? 0;
+            var cm = CombatManager.Instance;
+            if (coins <= 0 || cm?.TerminalDeck == null) return 0;
+            var ev = PrepareDeckEval(rolls, tele);
+            float price = goldPunchHpPerGold * (ev.st.ledger ? 1f : ev.st.wDef);   // 帳簿は HP の単位・旧の効用は守りの重みで HP を測る (killBonus と同じ)
+
+            // C. 払わない (貪欲で選んだ挿し方のまま)
+            ResolveDeckCand(in ev, rolls, slots, out var o0, out var a0, out var t0);
+            int bestGold = 0; int[] bestSlots = slots, bestTgts = targets ?? t0;
+            float bestV = EvalWithGold(in ev, rolls, o0, a0, 0, out var bestOut);
+            bool finisher = false;
+
+            // B. 上乗せ (攻撃する挿し方の時だけ・本体は攻撃しないターンに払わない)
+            int spendable = Math.Max(0, coins - Math.Max(0, goldPunchReserve));
+            if (o0.attackDice > 0 && spendable > 0)
+                foreach (int g in new[] { spendable / 4, spendable / 2, spendable })
+                {
+                    if (g <= 0 || g == bestGold) continue;
+                    float v = EvalWithGold(in ev, rolls, o0, a0, g, out var oc) - price * g;
+                    if (v > bestV) { bestV = v; bestGold = g; bestOut = oc; }
+                }
+
+            // A. とどめ (全部払えば今ターン撃破できる挿し方だけ・撃破に要る最小の金額)
+            var cands = TerminalWiring.Enumerate(ev.board, rolls.Length, ev.deck.state, cm.CatPawDie, cm.CatPawSlot);
+            foreach (var c in cands)
+            {
+                ResolveDeckCand(in ev, rolls, c, out var o, out var a, out var tg);
+                if (o.attackDice <= 0) continue;
+                EvalWithGold(in ev, rolls, o, a, coins, out var full);
+                if (full.effDmg < ev.st.enemyHp) continue;
+                int lo = 0, hi = coins;      // 撃破できる最小の金額 (与ダメは金額に対して単調)
+                while (lo < hi)
+                {
+                    int mid = (lo + hi) / 2;
+                    EvalWithGold(in ev, rolls, o, a, mid, out var om);
+                    if (om.effDmg >= ev.st.enemyHp) hi = mid; else lo = mid + 1;
+                }
+                float v = EvalWithGold(in ev, rolls, o, a, lo, out var ol) - price * lo;
+                if (v > bestV) { bestV = v; bestGold = lo; bestSlots = c; bestTgts = tg; bestOut = ol; finisher = lo > 0; }
+            }
+
+            if (bestGold <= 0) return 0;
+            if (!ReferenceEquals(bestSlots, slots)) { slots = bestSlots; targets = bestTgts; }
+            // [計装] 選んだ案の見積もり (主攻撃の照合・防ぎ切りの数え) を金の分で上書きする
+            _lastKillsNow = bestOut.killsNow; _lastFreeBlock = bestOut.freeBlock && !bestOut.killsNow; _lastExpTaken = bestOut.taken;
+            _lastPredOld = bestOut.dmgOld; _lastPredNew = bestOut.dmgNew; _lastPredA = bestOut.aCount; _lastPredUsed = bestOut.dmgUsed; _lastPredRaw = bestOut.rawNew;
+            GoldPunchDecisions++; if (finisher) GoldPunchFinishers++; GoldPunchPaid += bestGold;
+            return bestGold;
+        }
+
+        /// <summary>挿し方 1 つを解く (端子の状態は写し・対象は方策で選び直す)。 <see cref="EvalDeckWiring"/> の前半と同じ。</summary>
+        private void ResolveDeckCand(in DeckEval ev, int[] rolls, int[] cand, out TerminalOutcome o, out TerminalBattleState after, out int[] tgts)
+        {
+            after = ev.deck.state.Clone();
+            o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after);
+            tgts = ChooseDeckTargets(ev.board, o, ev.run);
+            if (tgts != null)
+            {
+                after = ev.deck.state.Clone();
+                o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after, tgts);
+            }
+        }
+
+        /// <summary>解いた挿し方に <paramref name="gold"/> G を払った時の効用 (値段は引かない)。 金の攻撃は攻撃+N の枠 (本体の atkBase) へ入れる。</summary>
+        private float EvalWithGold(in DeckEval ev, int[] rolls, TerminalOutcome o, TerminalBattleState after, int gold, out OptimalTurnOutcome outc)
+        {
+            var st = GoldPunchState(in ev.st, gold);
+            var ws = DeckSums(in st, rolls, ev.board, o, ev.deck.state, after, in ev.env, ev.deckHasCounter);
+            return OptimalUtilityCore(in st, rolls.Length, in ws, out outc);
+        }
+
+        /// <summary>金の攻撃を足した盤面 (旧の式の素の攻撃力と、 倍率を読む式の攻撃+N の両方へ・本体の atkBase と同じ位置)。
+        /// 効果の定義を替えたらここも直す (<see cref="MetaProgression.ChallengeCards.GoldPunchAttack"/>)。</summary>
+        private static OptimalTurnState GoldPunchState(in OptimalTurnState s, int gold)
+        {
+            var t = s;
+            int a = MetaProgression.ChallengeCards.GoldPunchAttack(gold);
+            if (a > 0) { t.atkBase += a; t.atkFlat += a; }
+            return t;
         }
 
         // =====================================================================
