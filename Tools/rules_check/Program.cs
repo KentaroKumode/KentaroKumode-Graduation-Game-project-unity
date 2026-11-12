@@ -188,6 +188,8 @@ static class T
         // ---- 4b. 博士の「止まらない時計」(2026-11-13): ヴェスカの各段に目盛り 0.80 を 1 つ足す ----
         //   段ごとの目盛りと 0.80 は BossParams (UnityEngine 依存でここではコンパイルしない) の写し。 BossParams.DownNotches(id, true) は
         //   ヴェスカの段でだけ BossDown.WithExtraNotch(表の値, VescaClockNotch) を返し、 ダウンを止めた口 (bossDown=False) では表の値が null。
+        //   「時計あり」= 秘宝〈止まらない時計〉を持っている (VescaClock.Held = ownedPassiveItems・2026-11-13 にフラグから秘宝へ)。
+        //   持ち方 (items.json・除外の集合) の検算は Tools/event_branch_check の「時計:」の行。
         {
             const float clock = 0.80f;
             var stages = new[] { ("p1", new[] { 0.60f }), ("p2", new[] { 0.50f }), ("p3", new[] { 0.40f }), ("最終", new[] { 0.50f }) };
