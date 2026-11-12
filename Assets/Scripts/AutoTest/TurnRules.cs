@@ -21,8 +21,14 @@ namespace AutoTest
         /// <summary>盾〈シールドバッシュ〉: 全部攻撃のターン、 シールドを使い切って × 率 を攻撃へ。</summary>
         public static int BashBonus(int shield, float rate) => Mathf.CeilToInt(shield * rate);
 
-        /// <summary>剣〈不滅の刃〉の与ダメ倍率。 <paramref name="streakAfter"/> = このターンで続いた後の連続数。</summary>
-        public static float UndyingMul(int streakAfter) => 1f + UndyingBlade.PerTurn * streakAfter;
+        /// <summary>剣〈不滅の刃〉が与ダメ倍率の池へ足す量 (+0.08 × 連続数)。 <paramref name="streakAfter"/> = このターンで続いた後の連続数。
+        /// <b>本体は池 (ctx.outgoingDamageMultiplier・加算) へ足す</b> (WeaponFamilyEffects.UndyingBlade → Fam.Outgoing)。
+        /// 池と別に掛けると、 池が大きいほど過大になる (#122)。</summary>
+        public static float UndyingAdd(int streakAfter) => UndyingBlade.PerTurn * streakAfter;
+
+        /// <summary>剣〈不滅の刃〉の与ダメ倍率 (池が 1 のときの値 = 1 + <see cref="UndyingAdd"/>)。 池が 1 でないなら
+        /// <c>(池 + UndyingAdd) / 池</c> を使うこと (#122)。</summary>
+        public static float UndyingMul(int streakAfter) => 1f + UndyingAdd(streakAfter);
 
         /// <summary>盾〈城壁〉: 完全に受け止めたら (ブロック ≥ 敵の攻撃)、 余ったブロック × 率 をシールドへ。 受け止められなければ 0。</summary>
         public static int BulwarkGain(int block, int enemyAtk, float rate)

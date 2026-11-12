@@ -697,7 +697,7 @@ namespace AutoTest
             if (s.igCut > 0f && raw > 0) raw -= Mathf.FloorToInt(raw * s.igCut);
             raw += s.dmgBonus;
             float outMul = s.outMul;
-            if (s.stepUndying && bCount > 0) outMul += TurnRules.UndyingMul(s.undyingStreak + 1) - 1f;   // 本体は与ダメ倍率の池へ足す
+            if (s.stepUndying && bCount > 0) outMul += TurnRules.UndyingMul(s.undyingStreak + 1) - 1f;   // 本体は与ダメ倍率の池へ足す (式は今のまま: float の値を変えない)
             // 端子の山札 (旧い配線では全部「なし」): 与ダメ% は池へ足す (ctx.AddOutgoingPct)・会心倍率 +N・必ず会心・別枠の掛け算・防御の無視
             outMul += ws.outPctAdd;
             float termMul = ws.damageMul;
@@ -733,6 +733,25 @@ namespace AutoTest
             return Mathf.RoundToInt(e);
         }
 
+        /// <summary>与ダメ倍率の池: ApplyWinDamageModifiers と同じ足し方 (加算の池)。 読むだけ。
+        /// <see cref="FillReadOut"/> と、 旧の式の〈不滅の刃〉(#122) が使う。</summary>
+        private static float OutgoingPoolNow(ItemSystem.PassiveSkills.CombatContext ctx, GameLoop.RunState run)
+        {
+            float outMul = ctx.outgoingDamageMultiplier <= 0f ? 1f : ctx.outgoingDamageMultiplier;
+            int metaPct = MetaProgression.MetaBuffApplicator.GetOutgoingDamagePct()
+                        + MetaProgression.MetaBuffApplicator.GetBattleSpiritPct(run);
+            {
+                int slayer = MetaProgression.MetaBuffApplicator.GetEliteSlayerPct();
+                var node = MapSystem.MapManager.Instance?.CurrentNode;
+                if (slayer > 0 && node != null && node.EffectiveType.ToEnemyKind() == EnemyKind.Elite) metaPct += slayer;
+            }
+            outMul += metaPct * 0.01f;
+            outMul += MetaProgression.Relics.RelicApplicator.GetOutgoingPct(run, ctx);
+            if (ctx.polishArmed && !ctx.rollPurity) outMul += 1.5f;
+            if (ctx.consDmgMultPct > 0) outMul += ctx.consDmgMultPct / 100f;
+            return outMul;
+        }
+
         /// <summary>[V3 readOutgoingMult] 配線時点の盤面から、 主攻撃の倍率の入力を読む (読むだけ・書き換えない)。</summary>
         private void FillReadOut(ref OptimalTurnState st, CombatManager cm, ItemSystem.PassiveSkills.CombatContext ctx,
                                  GameLoop.RunState run, int atkPenalty)
@@ -761,20 +780,7 @@ namespace AutoTest
             st.critMulEff = cmul;
             st.nonCritMul = ctx.nonCritOutgoingMultiplier;
             st.pinpointCut = ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.PinpointEye.NonCritCutKey) > 0f;
-            // 与ダメ倍率の池: ApplyWinDamageModifiers と同じ足し方 (加算の池)
-            float outMul = ctx.outgoingDamageMultiplier <= 0f ? 1f : ctx.outgoingDamageMultiplier;
-            int metaPct = MetaProgression.MetaBuffApplicator.GetOutgoingDamagePct()
-                        + MetaProgression.MetaBuffApplicator.GetBattleSpiritPct(run);
-            {
-                int slayer = MetaProgression.MetaBuffApplicator.GetEliteSlayerPct();
-                var node = MapSystem.MapManager.Instance?.CurrentNode;
-                if (slayer > 0 && node != null && node.EffectiveType.ToEnemyKind() == EnemyKind.Elite) metaPct += slayer;
-            }
-            outMul += metaPct * 0.01f;
-            outMul += MetaProgression.Relics.RelicApplicator.GetOutgoingPct(run, ctx);
-            if (ctx.polishArmed && !ctx.rollPurity) outMul += 1.5f;
-            if (ctx.consDmgMultPct > 0) outMul += ctx.consDmgMultPct / 100f;
-            st.outMul = outMul;
+            st.outMul = OutgoingPoolNow(ctx, run);
             st.consBurst = ctx.consAtkBurst;
             st.critPen = ctx.critArmorPen;
             st.vitalIgnore = ItemSystem.PassiveSkills.Effects.VitalStrike.IgnoresDefense(ctx);
@@ -965,9 +971,14 @@ namespace AutoTest
                 blockRaw += ItemSystem.PassiveSkills.Effects.SteadfastStance.Shield;
 
             int dmg = atkBase + aSum;
-            // 剣〈不滅の刃〉: 両方の端子を挿したターンが続くたび与ダメ +8% (このターンで続けば streak+1)
+            // 剣〈不滅の刃〉: 両方の端子を挿したターンが続くたび与ダメ +8% (このターンで続けば streak+1)。
+            //   [#122] 本体は与ダメ倍率の池 (加算) へ足すので、 伸びは (池 + 0.08n) / 池 倍。 旧: 池と別に (1 + 0.08n) 倍を掛けていた。
+            //   旧の式は池そのものを掛けない (どの配線でも共通の係数) ので、 比だけを掛ける。 池が読めない (0) ときは 1 = 旧と同じ。
             if (stepUndying && aCount > 0 && bCount > 0)
-                dmg = (int)(dmg * TurnRules.UndyingMul(undyingStreak + 1));
+            {
+                float pool = s.outMul > 0f ? s.outMul : 1f;
+                dmg = (int)(dmg * ((pool + TurnRules.UndyingAdd(undyingStreak + 1)) / pool));
+            }
             // 端子の山札の与ダメの効果 (旧の式 = 会心を見ない式なので、 基準を非会心とみなして差分だけ足す)。 旧い配線では全部「なし」で素通し。
             if (aCount > 0 && dmg > 0)
             {
@@ -1650,6 +1661,8 @@ namespace AutoTest
                 st.readOut = readOutNow; st.traceBoth = predTrace;
                 FillReadOut(ref st, cm, ctxRoles, runForVoid, tele.playerAttackPenalty);
             }
+            // [#122] 旧の式でも〈不滅の刃〉の伸びを池との比で見るので、 池だけは読む (st.outMul を読むのは新しい式と〈不滅の刃〉だけ)
+            else if (st.stepUndying && ctxRoles != null) st.outMul = OutgoingPoolNow(ctxRoles, runForVoid);
             // [V3 mainCorr] 主攻撃の見積もりに実績の比を掛ける。 下の dFull (HP の帳簿の撃破までの見込み) の計算より前に入れる
             if (v3.mainCorr && EffectiveWiringSkill != WiringSkill.Naive) st.mainCorr = _mcRatioNow;
             // [V3 hpLedger] 先のターンの 1 ターンの与ダメの見込み: 今の手を全部攻撃に挿した時の値を、 面の平均で均す
