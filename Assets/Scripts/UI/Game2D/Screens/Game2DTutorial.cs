@@ -25,6 +25,8 @@ namespace UI.Game2D
         public const string GrowDeck = "端子を増やす";
         public const string Order = "解決の順番";
         public const string Long = "戦闘の長期化";
+        public const string FacePart = "出目パーツ";
+        public const string Role = "役";
         public const string Crit = "会心";
         public const string ForceCrit = "確定会心";
         public const string Keyword = "キーワード";
@@ -92,10 +94,11 @@ namespace UI.Game2D
         /// <summary>
         /// 契機の表 (並び = handbook の並び = 同時に頼まれた時に出す順)。 頼む所:
         /// <list type="bullet">
-        /// <item>ランと帰還 / 層の歩き方 / キーワード / 毒 / 出血 / 充電 / 臨界 ── この部品が状態を見て頼む (<see cref="Watch"/>)</item>
+        /// <item>ランと帰還 / 層の歩き方 / 前哨基地 / 出目パーツ / 役 / キーワード / 毒 / 出血 / 充電 / 臨界 / 物資 / 持ち物 ── この部品が状態を見て頼む (<see cref="Watch"/>)</item>
         /// <item>巡回するもの ── 魔石が初めて反応した時 (<see cref="Game2DRadar.SetStone"/>)</item>
-        /// <item>戦闘の形式 / 層とボス / 端子の山札 / 敵の予告 / 端子に挿す / 端子の種類 / 解決の順番 / 戦闘の長期化 / 会心 / 確定会心 / 逃げる ── 戦闘の流れ (<see cref="Game2DBattleSim"/>)</item>
-        /// <item>端子を増やす ── 戦闘の後の端子の報酬の窓 (<see cref="Game2DPhaseScreens"/>)</item>
+        /// <item>戦闘の形式 / 層とボス / 端子の山札 / ダイスを振る / 敵の予告 / 端子に挿す / 端子の種類 / 解決の順番 / 戦闘の長期化 / 会心 / 確定会心 / 逃げる ── 戦闘の流れ (<see cref="Game2DBattleSim"/>)</item>
+        /// <item>端子を増やす / 装備と強化 (休憩・武器の入れ替え) / ショップ ── 場面の窓 (<see cref="Game2DPhaseScreens"/>)</item>
+        /// <item>出自 ── 出自 (職業) の選択画面が出そろった時 (<see cref="UI.ClassSelect.ClassSelectView"/>)</item>
         /// <item>整備パネル ── 整備パネルの窓を開いた時 (<see cref="Game2DMetaPanel.Open"/>)</item>
         /// </list>
         /// </summary>
@@ -114,6 +117,8 @@ namespace UI.Game2D
             new Topic(TutorialTopics.GrowDeck, Scene.Any),
             new Topic(TutorialTopics.Order, Scene.Battle),
             new Topic(TutorialTopics.Long, Scene.Battle),
+            new Topic(TutorialTopics.FacePart, Scene.Any),
+            new Topic(TutorialTopics.Role, Scene.Battle),
             new Topic(TutorialTopics.Crit, Scene.Battle),
             new Topic(TutorialTopics.ForceCrit, Scene.Battle),
             new Topic(TutorialTopics.Keyword, Scene.Any),
@@ -126,7 +131,7 @@ namespace UI.Game2D
             new Topic(TutorialTopics.Inventory, Scene.Any),
             new Topic(TutorialTopics.Equip, Scene.Any),
             new Topic(TutorialTopics.Shop, Scene.Any),
-            new Topic(TutorialTopics.Origin, Scene.Any, "契機の場面 (出自の選択画面) が Game2D に無い"),
+            new Topic(TutorialTopics.Origin, Scene.Any),
             new Topic(TutorialTopics.LayerBoss, Scene.Battle),
             new Topic(TutorialTopics.MetaPanel, Scene.Any),
         };
@@ -258,6 +263,7 @@ namespace UI.Game2D
                     foreach (var axis in ItemSystem.PassiveSkills.AxisRules.Ranked)
                         if (ItemSystem.PassiveSkills.AxisRules.Count(run, axis) > 0) { Request(TutorialTopics.Keyword); break; }
             }
+            if (run != null) WatchRun(run, ph);
             if (Game2DBattleSim.Active)
             {
                 var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
@@ -267,8 +273,41 @@ namespace UI.Game2D
                     if (ctx.enemyBleedStacks > 0) Request(TutorialTopics.Bleed);
                     if (ctx.GetCharge() > 0) Request(TutorialTopics.Charge);
                     if (ctx.rinkaiMeter > 0) Request(TutorialTopics.Rinkai);
+                    if (ctx.firedRolesThisTurn.Count > 0) Request(TutorialTopics.Role);      // 「役」: 初めて役が成立した (CombatManager.ResolveRoles が積む・次のターンの頭で空になる)
                 }
             }
+        }
+
+        // ラン中の増減を見る節 (物資・持ち物) の前の値。 ランが替わったら (新しいラン・続きから) 取り直す。
+        private GameLoop.RunState _watchRun; private int _lastProv, _lastItems;
+
+        /// <summary>ランの状態を見て頼む節: 前哨基地 / 出目パーツ / 物資 / 持ち物。</summary>
+        private void WatchRun(GameLoop.RunState run, GameManager.GamePhase ph)
+        {
+            int items = (run.ownedPassiveItems != null ? run.ownedPassiveItems.Count : 0) + (run.ownedConsumables != null ? run.ownedConsumables.Count : 0);
+            if (run != _watchRun) { _watchRun = run; _lastProv = run.provision; _lastItems = items; }
+            // 「前哨基地」: 回復と補給のある層 (ファーム層の次から・GameManager.EnterFloor) の前哨基地に立っている
+            if (ph == GameManager.GamePhase.MapNavigation && !MapSystem.FreeMove.FloorPlan.IsFarm(run.Depth)
+                && MapSystem.MapManager.Instance != null && MapSystem.MapManager.Instance.CurrentNode != null
+                && MapSystem.MapManager.Instance.CurrentNode.type == MapSystem.TileType.Outpost)
+                Request(TutorialTopics.Outpost);
+            // 「物資」: 地図の上で物資が減った (歩いた・照明を灯した)
+            if (run.provision != _lastProv)
+            {
+                if (run.provision < _lastProv && ph == GameManager.GamePhase.MapNavigation) Request(TutorialTopics.Provision);
+                _lastProv = run.provision;
+            }
+            // 「持ち物」: ランの途中で品 (パッシブ・消耗品) が増えた ── 開始時に配られた分は数えない
+            if (items != _lastItems)
+            {
+                if (items > _lastItems) Request(TutorialTopics.Inventory);
+                _lastItems = items;
+            }
+            // 「出目パーツ」: 素の面 (DiceFaceParts.StartingParts) に無い面を持っている = 出目パーツを手にした
+            if (run.diceFaceParts != null && !TutorialSeen.Has(TutorialTopics.FacePart))
+                foreach (var p in run.diceFaceParts)
+                    if (p.tier != GameLoop.DiceFaceParts.Tier.T1 || System.Array.IndexOf(GameLoop.DiceFaceParts.StartingFaces, p.face) < 0)
+                    { Request(TutorialTopics.FacePart); break; }
         }
 
         private static bool SceneOk(Scene s, GameManager gm, bool showing)

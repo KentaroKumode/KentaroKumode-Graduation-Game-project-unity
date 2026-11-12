@@ -217,6 +217,7 @@ namespace UI.Game2D
         private ScreenDef Rest(GameManager gm)
         {
             var run = gm.Run;
+            Game2DTutorial.Request(TutorialTopics.Equip);      // 手引き「装備と強化」: 初めて休憩に入った (武器の強化・面を外す)
             if (_restFaces) return RestFaces(gm);
             if (_termPick == TermPick.Rest) return TerminalDeckList(gm);
             var d = New("休憩", "HP " + run.playerHP + "/" + run.playerMaxHP + "  素材 " + run.weaponMaterials);
@@ -308,6 +309,7 @@ namespace UI.Game2D
 
         private ScreenDef Shop(GameManager gm)
         {
+            Game2DTutorial.Request(TutorialTopics.Shop);      // 手引き「ショップ」: 初めてショップに入った
             if (_termPick != TermPick.None) return TerminalDeckList(gm);
             if (_shopTerm && !_shopSell) return ShopTerminals(gm);
             return _shopSell ? ShopSell(gm) : ShopBuy(gm);
@@ -564,6 +566,7 @@ namespace UI.Game2D
         /// <summary>武器の入れ替え (武器は 1 本だけ・2026-11-11)。 2 本目の武器を手に入れた時に、 どの場面でも先に聞く。</summary>
         private ScreenDef WeaponSwap(GameManager gm)
         {
+            Game2DTutorial.Request(TutorialTopics.Equip);      // 手引き「装備と強化」: 初めて武器を拾った (入れ替えの窓)
             var run = gm.Run; string cur = run.equippedWeaponId, next = run.pendingWeaponIds[0];
             var d = New("武器の入れ替え", "武器は 1 本しか持てない");
             d.Items.Add(new ModalItem { name = "装備中: " + WeaponLabel(cur), desc = WeaponLine(run, cur, true), icon = cur });

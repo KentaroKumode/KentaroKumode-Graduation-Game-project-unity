@@ -541,6 +541,9 @@ namespace UI.ClassSelect
             _detailPanel.SlideIn();
             yield return new WaitForSecondsRealtime(0.08f);
             _stampPanel.SlideIn();
+            // 手引き「出自」: 初めてこの画面が出た時 (パネルが出そろってから・見た節は何もしない)。 出している間はタブとスタンプ (SpriteButton) が止まる
+            yield return new WaitForSecondsRealtime(0.35f);
+            UI.Game2D.Game2DTutorial.Request(UI.Game2D.TutorialTopics.Origin);
         }
 
         // ============================================================

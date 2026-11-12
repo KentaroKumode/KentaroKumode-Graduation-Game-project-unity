@@ -192,9 +192,10 @@ namespace UI.Game2D.Battle
             if (foe != null && BossIds.IsBoss(foe.id)) Game2DTutorial.Request(TutorialTopics.LayerBoss);
         }
 
-        /// <summary>配線の判断に入った時の手引き: 「敵の予告」「端子に挿す」(初回戦闘)・「逃げる」(「端子に挿す」を読んだ後の、 逃げられる戦闘)。</summary>
+        /// <summary>配線の判断に入った時 (ダイスを振り終えた時) の手引き: 「ダイスを振る」「敵の予告」「端子に挿す」(初回戦闘)・「逃げる」(「端子に挿す」を読んだ後の、 逃げられる戦闘)。</summary>
         private void TutorialOnWire()
         {
+            Game2DTutorial.Request(TutorialTopics.RollDice);
             Game2DTutorial.Request(TutorialTopics.Telegraph);
             Game2DTutorial.Request(TutorialTopics.Plug);
             if (Game2DTutorial.Seen(TutorialTopics.Plug) && CanFlee) Game2DTutorial.Request(TutorialTopics.Flee);
