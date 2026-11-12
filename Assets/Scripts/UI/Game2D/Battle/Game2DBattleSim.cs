@@ -664,6 +664,40 @@ namespace UI.Game2D.Battle
             return any;
         }
 
+        // ── 〈呼び戻し〉(手札の持ち越しの規則): 捨て札から 1 枚を選ぶ ──
+        //   対象は場ではなく捨て札 (場に見えていない) なので、 画面は窓で選ぶ (Game2DBattleHud.OpenRecall)。 値は target[その端子の場の位置] = 捨て札の添字。
+        //   選ばなければ本体の既定 (最後に捨てた 1 枚・TerminalDeckState.RecallPick)。 選んだ値も既定も、 本体と同じ関数で読む。
+
+        /// <summary>今の捨て札 (読むだけ)。 null あり。</summary>
+        public List<string> Discard => CombatManager.Instance?.TerminalDeck?.discard;
+
+        /// <summary>場の s が、 見込みで発動する〈呼び戻し〉(捨て札から選ぶ) か。 捨て札が空なら false (選ぶ操作を出さない)。</summary>
+        public bool IsRecaller(int s)
+        {
+            var o = preview; var disc = Discard;
+            return o != null && !ShowingResult && s >= 0 && s < board.Count && TerminalCards.PicksDiscard(board[s]) && o.fired.Contains(s)
+                && disc != null && disc.Count > 0;
+        }
+
+        /// <summary>〈呼び戻し〉s が戻す捨て札の添字 (選んだ添字が正しければそれ・でなければ最後に捨てた 1 枚・空なら −1)。 本体の RecallPick と同じ選び方。</summary>
+        public int RecallOf(int s)
+        {
+            var disc = Discard; if (disc == null || disc.Count == 0) return -1;
+            int want = s >= 0 && s < target.Length ? target[s] : -1;
+            return want >= 0 && want < disc.Count ? want : disc.Count - 1;
+        }
+
+        /// <summary>〈呼び戻し〉s が戻す 1 枚を捨て札の添字 idx にする。 できなければ false。</summary>
+        public bool SetRecall(int s, int idx)
+        {
+            var disc = Discard;
+            if (!CanOperate || !IsRecaller(s) || disc == null || idx < 0 || idx >= disc.Count || s >= target.Length) return false;
+            target[s] = idx;
+            Game2DSfx.Play("wire", 1f, 1.25f);
+            Touch();
+            return true;
+        }
+
         /// <summary>候補 s を picker の対象にできるか (画面のドラッグ用)。</summary>
         public bool CanSetTarget(int picker, int s)
             => CanOperate && IsPicker(picker) && preview != null && TerminalCards.IsCandidate(board, preview, picker, s);

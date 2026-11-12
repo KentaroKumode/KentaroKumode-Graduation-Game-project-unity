@@ -402,14 +402,23 @@ namespace UI.Game2D
             int s = _dragS, from = _dragFrom; bool moved = _moved;
             bool[] tOk = _targetOk, tHand = _targetHand;
             CancelDrag();
-            if (!moved || s < 0) return;      // 押しただけ (動かしていない) なら何もしない
+            if (!moved || s < 0)
+            {
+                // 押しただけ: 挿してある〈呼び戻し〉なら、 戻す 1 枚を選ぶ窓を開く (それ以外は何もしない)
+                if (s >= 0 && from >= 0 && sim.IsRecaller(s)) OpenRecall(s);
+                return;
+            }
             // 対象を選ぶ (差し込み口の上 / 手札の抜け殻の上)
             if (port >= 0 && port < tOk.Length && tOk[port] && sim.SetTarget(sim.slot[port], s)) return;
             if (port < 0 && hand >= 0 && hand < tHand.Length && tHand[hand] && sim.SetTarget(hand, s)) return;
             if (port >= 0)
             {
                 if (port == from) return;
-                if (sim.Plug(port, s, from)) return;
+                if (sim.Plug(port, s, from))
+                {
+                    if (from < 0 && sim.IsRecaller(s)) OpenRecall(s);      // 〈呼び戻し〉を挿した: 捨て札から戻す 1 枚を選ぶ窓 (選ばずに閉じれば最後に捨てた 1 枚)
+                    return;
+                }
                 Game2DSfx.Play("ui_click");      // 落とせない口: 手札へ戻る
             }
             if (from >= 0) sim.Unplug(from);
@@ -687,6 +696,16 @@ namespace UI.Game2D
         private string TargetLine(int f)
         {
             string id = sim.board[f];
+            // 〈呼び戻し〉(手札の持ち越しの規則): 捨て札から戻す 1 枚
+            if (CombatSystem.TerminalCards.PicksDiscard(id))
+            {
+                if (sim.ShowingResult) return null;
+                var disc = sim.Discard;
+                if (disc == null || disc.Count == 0) return "捨て札が空 (戻す端子が無い)";
+                if (!sim.IsRecaller(f)) return "出目に挿すと、 捨て札から戻す 1 枚を選べる";
+                int r = sim.RecallOf(f);
+                return r >= 0 ? "戻す: 〈" + disc[r] + "〉 (押して選び直す)" : null;
+            }
             if (!CombatSystem.TerminalCards.PicksTarget(id)) return null;
             int t = -1;
             if (sim.ShowingResult)
@@ -761,6 +780,44 @@ namespace UI.Game2D
             var run = GameManager.Instance?.Run; if (run == null) return false;
             foreach (var r in CombatItems()) if (RowBlock(run, r) == null) return true;
             return false;
+        }
+
+        // ── 〈呼び戻し〉の窓 (捨て札から 1 枚・仮の見た目 = 道具の窓と同じ部品) ──
+        //   開く: 〈呼び戻し〉を出目に挿した時 / 挿してある〈呼び戻し〉を押した (動かさずに放した) 時。 捨て札が空なら開かない。
+        //   最初から「今戻る 1 枚」(選んでいなければ最後に捨てた 1 枚) を選んでおき、 その行に「戻す」の印を付ける。
+        //   [これを戻す] = 選んだ行に決める / [閉じる] = 今の 1 枚のまま。 決めた値は sim.target[〈呼び戻し〉の場の位置] = 捨て札の添字。
+
+        private void OpenRecall(int s)
+        {
+            if (!sim.CanOperate || !sim.IsRecaller(s)) return;
+            if (_modal == null) _modal = FindObjectOfType<Game2DModal>();
+            if (_modal == null) return;
+            _modal.Open(RecallDef(s));
+        }
+
+        private ScreenDef RecallDef(int s)
+        {
+            var disc = sim.Discard ?? new List<string>();
+            int cur = sim.RecallOf(s);
+            var d = new ScreenDef { id = "battle_recall", jp = true, title = "〈" + sim.board[s] + "〉: 戻す 1 枚", w = 460, cols = 2,
+                sub = "捨て札 " + disc.Count + " 枚から選ぶ (次のターンの手札に入る)", sel0 = Mathf.Max(0, cur) };
+            for (int i = 0; i < disc.Count; i++)
+            {
+                var td = CombatSystem.TerminalCards.Get(disc[i]);
+                d.Items.Add(new ModalItem { name = disc[i], value = i == cur ? "戻す" : "", desc = td?.description });
+            }
+            d.buttons.Add(new ModalBtn { label = "これを戻す", action = "pick", primary = true });
+            d.buttons.Add(new ModalBtn { label = "閉じる", action = "close" });
+            d.footer = "選ばずに閉じると、 最後に捨てた 1 枚が戻る";
+            d.onAction = (a, sel) =>
+            {
+                if (a == "close") { _modal.Close(); return; }
+                if (a != "pick") return;
+                if (!sim.SetRecall(s, sel)) { Game2DSfx.Play("ui_click"); _modal.ShowToast("今は選べない"); return; }
+                _drawn = -1;
+                _modal.Close();
+            };
+            return d;
         }
 
         private int _itemPage;
