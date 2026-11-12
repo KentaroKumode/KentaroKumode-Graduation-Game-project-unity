@@ -405,14 +405,6 @@ namespace ItemSystem.PassiveSkills.Effects
     internal static class BladeEdgeHelper
     {
         public const string EnemyShieldKey = "sg_shield"; // 現状は SaintGeorges 唯一
-        public static void Strip(CombatContext ctx, int amount)
-        {
-            float cur = ctx.GetAccumulated(EnemyShieldKey);
-            if (cur <= 0) return;
-            float after = System.Math.Max(0f, cur - amount);
-            ctx.accumulatedValues[EnemyShieldKey] = after;
-            UnityEngine.Debug.Log($"[利刃] 敵シールド -{amount} ({cur:F0}→{after:F0})");
-        }
     }
 
     // ============================================================
@@ -428,26 +420,6 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             var enemy = CombatSystem.CombatManager.Instance?.CurrentEnemy;
             return enemy != null && GameLoop.BossIds.IsBoss(enemy.id);
-        }
-        public static void Try(CombatContext ctx, int normalPct, int bossPct, int lv)
-        {
-            if (ctx.enemyCurrentHP <= 0 || ctx.enemyMaxHP <= 0) return;
-            int thresholdPct = IsBoss(ctx) ? bossPct : normalPct;
-            if (ctx.enemyCurrentHP * 100 > ctx.enemyMaxHP * thresholdPct) return;
-            if (!ctx.CanExecuteEnemy()) return;
-            ctx.enemyCurrentHP = 0;
-
-            int heal = UnityEngine.Mathf.CeilToInt(ctx.playerMaxHP * 0.03f * lv);
-            if (heal > 0)
-                ctx.playerCurrentHP = System.Math.Min(ctx.playerMaxHP, ctx.playerCurrentHP + heal);
-
-            int gold = lv; // Lv1-4 で +1/2/3/4 GOLD (全Tier獲得)
-            if (gold > 0)
-            {
-                var run = GameLoop.GameManager.Instance?.Run;
-                if (run != null) GameLoop.GoldIncome.Gain(run, gold, "賞金首狩り", applyLastStandFilter: false);
-            }
-            UnityEngine.Debug.Log($"[賞金首狩り] 敵HP{thresholdPct}%以下 → 処刑 (HP+{heal}, +{gold}G, ボス={IsBoss(ctx)})");
         }
     }
 
@@ -499,11 +471,6 @@ namespace ItemSystem.PassiveSkills.Effects
     {
         public const string Key = "conqueror_stack";
 
-        public static void OnWin(CombatContext ctx, int perWinPct, int capPct)
-        {
-            int s = (int)ctx.GetAccumulated(Key);
-            if (s < capPct) ctx.accumulatedValues[Key] = System.Math.Min(capPct, s + perWinPct);
-        }
         public static void OnDeal(CombatContext ctx)
         {
             if (ctx.finalDamage <= 0) return;

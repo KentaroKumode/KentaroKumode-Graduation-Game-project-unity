@@ -467,7 +467,7 @@ namespace Codex
                 // 2026-08-17: 旧 end4 (7層敗北エンド) は到達不能になったので gate を移した。
                 //   帝国が退避を勧告し、 予算が付かず「継続観測」で終わる報告書 ＝
                 //   **裂け目を閉じなかった世界**の後日談。 EndGood に接続するのが素直。
-                condition = new UnlockCondition { endingId = "end_good", tier = UnlockTier.FirstClear },
+                condition = new UnlockCondition { endingId = GameLoop.Endings.EndGoodId, tier = UnlockTier.FirstClear },
             },
 
             new Vignette
@@ -517,7 +517,7 @@ namespace Codex
                     "それが幾らに相当するのかは、誰にも勘定できなかった。\n" +
                     "街からは熱が過ぎ去ったが、人々は前を向いて、それぞれの人生を歩み始めた。",
                 // 街が十一年かけて死ぬ ＝ 遺物経済の破綻。 EndTrue〈帳尻〉の後日談。
-                condition = new UnlockCondition { endingId = "end_true", tier = UnlockTier.FirstClear },
+                condition = new UnlockCondition { endingId = GameLoop.Endings.EndTrueId, tier = UnlockTier.FirstClear },
             },
 
             new Vignette

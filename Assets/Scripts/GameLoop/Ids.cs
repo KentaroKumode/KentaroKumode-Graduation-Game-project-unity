@@ -25,6 +25,14 @@ namespace GameLoop
         /// <summary>合札: 同じショップで 2 品目以降を買うとき 10G 安い (ShopManager.TryBuy・2026-10-31)。</summary>
         public const string TrialTossToken = "合札";
 
+        // === 確信チェーンのフラグ品 (5F-6F の進路・2026-11-12 に定数化) ===
+        //   イベント文 (Resources/Events/event_list.txt) の [] 内の表記と一致必須。
+        //   チェーンのパッシブ (決意 / 根拠のない確信 / 真理) は ConvictionSystem.Id* が持つ。
+        /// <summary>苦難の予言: 預言者の石板で得るフラグ。 次段〈啓示〉の条件。</summary>
+        public const string HardshipProphecy = "苦難の予言";
+        /// <summary>苦難の確信: 〈啓示〉で得るフラグ。 次段〈災厄の予兆〉の条件。</summary>
+        public const string HardshipConviction = "苦難の確信";
+
         // === 初期装備 ===
         public const string DiceWood = "dice_wood";
 
@@ -97,7 +105,7 @@ namespace GameLoop
         {
             // 確信チェーン (5F-6F の進路フラグ・アイテム)
             ConvictionSystem.IdTruth, ConvictionSystem.IdResolve, ConvictionSystem.IdConviction,
-            "苦難の予言", "苦難の確信", "真理の予兆",
+            HardshipProphecy, HardshipConviction, "真理の予兆",
             // デフォルト/初期装備
             DiceWood,
             // 起動でしか取れないイベント専用アイテム
@@ -144,13 +152,6 @@ namespace GameLoop
             return d.tier >= 1 && d.tier <= ConsumableMaxTier ? d.tier : 0;
         }
 
-        /// <summary>その id が消費アイテム系統 (旧 cons_*) か。</summary>
-        public static bool IsConsumableFamilyItem(string itemId)
-        {
-            var d = string.IsNullOrEmpty(itemId) ? null : ItemSystem.ItemDatabase.Instance?.GetItem(itemId);
-            return d != null && !string.IsNullOrEmpty(d.consFamily);
-        }
-
         /// <summary>その id の消費アイテム系統 (heal/def/dmg/provision)。 消費アイテムでなければ null。
         /// <b>接頭辞では判定しない</b> (2026-09-22)。</summary>
         public static string ConsFamilyOf(string itemId)
@@ -159,12 +160,6 @@ namespace GameLoop
             return string.IsNullOrEmpty(d?.consFamily) ? null : d.consFamily;
         }
 
-        /// <summary>その id がユニーク品 (旧 uniq_*) か。 <b>昇華の対象外</b>。</summary>
-        public static bool IsUniqueItem(string itemId)
-        {
-            var d = string.IsNullOrEmpty(itemId) ? null : ItemSystem.ItemDatabase.Instance?.GetItem(itemId);
-            return d != null && d.unique;
-        }
     }
 
     /// <summary>ボス ID の prefix / 特定 ID。 「boss_layer」 直書き分岐の置き換え先。</summary>
@@ -208,6 +203,32 @@ namespace GameLoop
         public const string FarmBoss = "boss_layer0";
         /// <summary>0 層の雑魚: 古いクレート (HP1・攻撃なし)。</summary>
         public const string FarmCrate = "farm_crate";
+
+        /// <summary>ヴェスカの段の番号 (1〜4)。 ヴェスカでない id (null を含む) は 0。
+        /// <b>id → 段の表を引く。 綴り (末尾の _p2 など) で切らない</b> (issue #116)。</summary>
+        public static int VescaStageOf(string id)
+        {
+            switch (id)
+            {
+                case VescaP1: return 1;
+                case VescaP2: return 2;
+                case VescaP3: return 3;
+                case VescaFinal: return 4;
+                default: return 0;
+            }
+        }
+
+        /// <summary>ヴェスカの次の段の id。 最終段とヴェスカでない id は null。</summary>
+        public static string VescaNextStage(string id)
+        {
+            switch (VescaStageOf(id))
+            {
+                case 1: return VescaP2;
+                case 2: return VescaP3;
+                case 3: return VescaFinal;
+                default: return null;
+            }
+        }
 
         /// <summary>敵 ID がボスか (null 安全)。</summary>
         public static bool IsBoss(string enemyId)

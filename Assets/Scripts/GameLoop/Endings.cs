@@ -47,10 +47,10 @@ namespace GameLoop
             switch (b)
             {
                 // ヴェスカ撃破後の一択で分岐する。 これが唯一のエンディング分岐。
-                case "boss_layer7":        return run != null && run.riftLeftOpen ? EndGood : EndTrue;
-                case "boss_layer6":        return End3;
-                case "boss_layer5_hidden": return End2;
-                case "boss_layer5":        return End1;
+                case BossIds.VescaP1:        return run != null && run.riftLeftOpen ? EndGood : EndTrue;
+                case BossIds.Layer6Ash:      return End3;
+                case BossIds.Layer5Hidden:   return End2;
+                case BossIds.Layer5Judgment: return End1;
                 default:                   return End1; // 想定外はとりあえず帰還エンド
             }
         }
@@ -183,9 +183,12 @@ namespace GameLoop
         ///
         /// <para><b>額縁が成立するのはこちらだけ。</b> 数年後の調査で手記が見つかり、
         /// 『大穴』とその卓上遊戯翻案 ＝ 本作が作られる。 Epilogue「刊行史」はここに接続する。</para></summary>
+        /// <summary>EndTrue / EndGood の id。 図鑑の解禁条件 (VignetteUnlockState・WorldVignettes) とメタの記録のキー。</summary>
+        public const string EndTrueId = "end_true", EndGoodId = "end_good";
+
         public static readonly Ending EndTrue = new Ending
         {
-            id = "end_true", title = "帳尻",
+            id = EndTrueId, title = "帳尻",
             body =
                 "蔵が、向こう側へ落ちていった。\n" +
                 "膨大な歪を持った遺物が、あるべき場所へ戻っていく。\n" +
@@ -241,7 +244,7 @@ namespace GameLoop
         /// ── 額縁が閉じないので Epilogue へは接続しない。 それが GOOD END の代償にあたる。</para></summary>
         public static readonly Ending EndGood = new Ending
         {
-            id = "end_good", title = "見送り",
+            id = EndGoodId, title = "見送り",
             body =
                 "彼を向こうへ返したあと、あなたは縁に座って、しばらく数えていた。\n" +
                 "\n" +

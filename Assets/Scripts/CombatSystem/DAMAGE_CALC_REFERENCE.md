@@ -663,13 +663,7 @@ ProcessDamage の中の OnPreDealDamage は「その陣営が攻撃している�
 | CounterStance(反撃態勢) | OnRollLose/OnPreDealDamage | **[#104 修正]** 収支プラス（プレイヤー）の次のターン、**この敵の攻撃のダメージ +3**（`nextTurnBuffs["enemy.counterStance.dmgUp"]` → 次ターンの敵の OnPreDealDamage で finalDamage += ・剛力と同じ位置）。旧: 共有バフ `damageBonus` で次ターンのプレイヤーの主攻撃と敵の攻撃 2 経路の全部に +3 |
 | HoningDuel(研ぎ澄まし) | OnPreDealDamage | **[#104 修正]** この敵の攻撃が通るたび、ダメージ +currentTurn/3（剛力・闇技と同じ「勝利時の与ダメージ」の読み替え。トリガーを OnRollWin から OnPreDealDamage に替えた）。旧: 収支トリガーで currentBuffs["damageBonus"] に書き、次の BeginNewTurn の `currentBuffs.Clear()` で消えていた |
 | EliteVigor(精鋭・汎用) | OnBattleStart/OnPostRoll | enemyDefense +2（2026-10-28。旧: 被ダメ%軽減 +0.10） / 自ダイス += currentTurn/3 |
-| EliteSlime/EliteGoblin | OnPostRoll | 自ダイス +3 **[未装備]** |
-| EliteKobold(早業) | OnPostRoll/OnPreReceiveDamage | GOLD奪取 / 50%で被ダメ0 **[未装備]** |
-| EliteSkeleton(不死の軍勢) | OnTurnEnd/OnPostRoll | 致命時2回までHP全回復 / 自ダイス += 3×発動回数 **[未装備]** |
-| EliteWolf(血盟の疾走) | OnPostRoll/OnPreDealDamage | 自ダイス +2 / 勝利時 finalDamage +2 **[未装備]** |
-| EliteHarpy(死翔) | OnBattleStart/OnPostRoll | 消費ロック / 自ダイス += 3+currentTurn **[未装備]** |
 | EliteDecree13(死の重圧) | OnPostRoll | 宣告ターン中 自ダイス +13 |
-| EliteOrc(痛恨の一撃) | OnPreDealDamage他 | 勝利+8 / 敗北でダイス数+1(max3,extraDice)・勝利reset **[未装備]** |
 | EliteLizard(重甲) | OnBattleStart/OnRollLose | enemyDefense +4（硬鱗と合わせて 8・2026-10-28。旧: 被弾時 −2） / 収支プラス（プレイヤー）のターンに `EnemyDealUnmitigable(1)` の反射（**[#104 修正]** 尾撃と同じ） |
 | EliteWraith(霊体) | OnTurnStart/OnPreReceiveDamage | 奇数T 攻撃ロールを 1 回多く引く(extraDice=1) / 偶数T(霊体) 主攻撃の被ダメ=1 |
 | EliteGolem(巌の意志) | OnTurnEnd | 意志+1、撃破時 意志分を実プレイヤーへ確定ダメ |
@@ -682,8 +676,7 @@ ProcessDamage の中の OnPreDealDamage は「その陣営が攻撃している�
 | Lifesteal(吸血) | OnPostDealDamage | **[#104 修正]** 敵の攻撃の末尾で、自HP += この攻撃で実際に通った主攻撃のダメージ（ブロック・シールド・軽減の後）/2（ReduceEnemyHeal を通す）。CombatManager が鳴らす前に ctx の HP と `ctx.finalDamage = takenDmg` を揃え、鳴らした後に HP を拾う。旧: ctx にだけ書いた回復が同じターンの `ctx.enemyCurrentHP = enemyHP` で上書きされていた |
 | NightLord(夜の王) | OnTurnStart | T5以降 extraDice=1（攻撃ロールを 1 回多く引いて足す） |
 | DeathSentence(死の宣告) | OnTurnStart | T>10（＝11ターン目）で fixedDamageToEnemy +999(即死) |
-| ScratchAura | OnRollLose | no-op(脅威の削りは廃止) **[未装備]** |
-| IntimidatePlus/PlusPlus(威圧+/++) | OnBattleStart | **[#104 修正]** この敵の攻撃 +3/+5（戦闘を通して・ボスの威圧+は BossParam.IntimidateThreat）。足し先は `enemyDiceTotalBonus`（Escalation.EnemyAttackValue で基礎攻撃と同じく倍率が掛かる＝基礎攻撃 +N と同値・予告に出る）。「脅威」はいま基礎攻撃値の代わり（baseAttack 未指定時）としてしか使われないので、§9.6 の宿題どおり基礎攻撃値への加算と読んだ。旧: `ctx.enemyThreat` に足して読む処理が無かった（いまは enemyThreat へ書かない） |
+| IntimidatePlus(威圧+) | OnBattleStart | **[#104 修正]** この敵の攻撃 +3（戦闘を通して・ボスの威圧+は BossParam.IntimidateThreat）。足し先は `enemyDiceTotalBonus`（Escalation.EnemyAttackValue で基礎攻撃と同じく倍率が掛かる＝基礎攻撃 +N と同値・予告に出る）。「脅威」はいま基礎攻撃値の代わり（baseAttack 未指定時）としてしか使われないので、§9.6 の宿題どおり基礎攻撃値への加算と読んだ。旧: `ctx.enemyThreat` に足して読む処理が無かった（いまは enemyThreat へ書かない） |
 | GreedyMerchant(貪欲商人) | OnBattleStart | no-op(スケーリングは GameManager.StartFalseMerchantCombat: HP +2/個・攻撃 +1/3個) |
 | Berserk(狂暴化・全ボス付与) | OnTurnStart | T>50: healBlocked, enemyDamageTakenMultiplier=3, enemyDiceTotalBonus +=10(1回) |
 
@@ -698,18 +691,16 @@ ProcessDamage の中の OnPreDealDamage は「その陣営が攻撃している�
 | SkillId(表示) | Trigger | 効果 |
 |---|---|---|
 | GoblinKingsCall(号令) | OnPostRoll | 自ダイス + GoblinCall（基準 3） |
-| FrozenBardSong(凍えの旋律) | OnTurnEnd/OnPostRoll | 未使用streak++ / 自ダイス += min(8, streak−1) **[未装備]** |
 | MiasmaCorrosion(毒の侵蝕) | OnTurnEnd | 毒stack+1(max PoisonStackCap=5)、stack分を実プレイヤーへ軽減無視ダメ |
 | MirrorTwinsResponse(鏡映の応答) | OnPostReceiveDamage/OnTurnStart | 閾値 `Thr = max(12, ボス最大HP×4%)`。与ダメ<Thr で reflect=min(MirrorReflectCap=9, Thr−ダメ)を蓄積、次T開始で軽減無視の反射 |
 | JudgmentFlames(審判の炎) | OnTurnEnd | `dmg=min(ChipCap, 1+ceil(currentTurn/3)+罪)`、実プレイヤーへ軽減無視（罪=totalBattles/8,max2 / ChipCap 基準 10・BossTuning で可変）。ターン係数は 2026-07-28 に 1→1/2、2026-08-15 に 1/2→1/3 へ緩和（15T 累積 108→90・上限は T≥19 まで届かない）。**シールドは肩代わりする**（③-C） |
-| RoyalEmber / SinChain / EternalBurning / ReturnToAshes / JudgmentBlaze / AshArmor / ImmortalEmber / EmberAura / StarfireProliferation / ScorchedEarth / AshCarapace | — | 旧 6 層ボスの機構。**[未装備]**（6 層は下の 5 つで組み直した・数値はクラスの XML コメント） |
+| JudgmentBlaze / AshArmor / AshCarapace | — | 旧 6 層ボスの機構。**[未装備]**（6 層は下の 5 つで組み直した・数値はクラスの XML コメント）。同じ旧機構の RoyalEmber / SinChain / EternalBurning / ReturnToAshes / ImmortalEmber / EmberAura / StarfireProliferation / ScorchedEarth は 2026-11-12 に削除（GAME.md §24） |
 | EmberOmen(業火の予兆) | OnTurnStart | 予兆ターン = HP>50% は T1/5/9…（周期4）、HP≤50% は T1/4/7…（周期3）。予兆Tだけ攻撃 +JudgmentDice（基準 8）。**[#104 修正]** 焦土契約と同じ差分更新（自分の寄与 `ember_omen_applied` を毎T頭に「予兆なら JudgmentDice、それ以外 0」へ合わせて `enemyDiceTotalBonus` を足し引き）。旧: `+=` を戻す処理が無く、予兆のたびに積み上がっていた |
 | AshRegrowth(灰の再生) | OnTurnStart | HP>50% かつ非予兆T: 最大HPの2%回復（最低1） |
 | EmberFury(憤怒の残滓) | OnTurnStart | T頭の HP≤50% のT: 攻撃 +3（それ以外 0）。**[#104 修正]** 業火の予兆と同じ差分更新（`ember_fury_applied`）。旧: 毎ターン `+=` で積み上がっていた |
 | ScorchedPact(焦土契約) | OnRollWin/OnTurnStart | 収支負けでスタック+1（上限5）。毎T 差分更新で `enemyDiceTotalBonus` に現在スタック×1 を反映（累積しない） |
 | BlazeBrand(烈炎) | OnTurnEnd/OnTurnStart | ブロック端子へ 2 本以上のT終了時に烈炎+1 / T開始時に烈炎の数だけ軽減無視ダメ |
 | Decree13th(13番目の宣告) | OnTurnStart/OnTurnEnd | 1/13でフラグ、本体が生存していれば成就で ceil((playerDiceTotal+enemyDiceTotal)×2.0) を軽減無視で実プレイヤーへ（2.0 は定数。プレイヤーの criticalMultiplier は 2026-08-08 から読まない・シールドは肩代わり） |
-| StrongOne/Throne/Setsuna(強者/玉座/刹那) | OnBattleStart | bossDiceBonus = 4/8/12 ※**現在enemies.jsonから撤廃・未参照（クラスは残置）** |
 | SaintGeorgesPhases(シュヴァリエ) | 多数 | 開幕プリオリテ1。形態1: シールド = 140−28×プリオリテ（最低28）が主攻撃を吸う・収支プラスのTに (プレイヤーの出目の合計+プリオリテ×7) の不可避反撃＋シールド−25 / 形態2: 連勝報酬（次T ボスの攻撃+4、そのTも収支プラスならボスへ15）・ボスの収支 3 勝で形態1帰還 / 帰還ごとにプリオリテ+1。**[#104 修正]** 形態1の 0d0（`extraDice=−4`）: `EnemyData.RollAttack` が引く回数を max(0, 1 + extra) にしたので、形態1は攻撃ロールを引かない（**基礎攻撃 × 大技・段階の倍率は残る**・「攻撃しない」とは読んでいない）。反撃のHP減と形態2の「ボスへ15」: 収支トリガーの後に CombatManager が ctx の HP を拾う（§9.3）ので残る。旧: 引く回数が max(1, …) で負の値が効かず、HP の増減は FinishTurnCommon の書き戻しで消えていた |
 | RelicScholar(遺物学者) | OnTurnStart/OnTurnEnd | 毎T 遺物を 1 枚抽選（段の切り替え直後は新等級から・天与の才の次Tは 2 枚）。`enemyDiceTotalBonus` = 遺物 + 溜め打ち を `=` で一括代入（停滞の加算は 2026-11-12 #103 で無くなった）。OnTurnEnd で大出血の tick。抽選結果は `MutualTurnTelegraph.drawnRelics` に載るが画面は未配線 |
 | StagnantTime(停滞する時間) | —（トリガーなし） | **2026-11-12 #103 作り直し。** 端子を引くたび 1 枚ごとに確率 p で止める（`TerminalDeckState.DrawTurn`・乱数は専用キー `vesca.stagnant`）。p = `BossParam.Stagnation` %（基準 p1 10 / p2 15 / p3 20 / p4 25・範囲 0〜50）。止まった端子はそのターン挿せず（`Resolve` の 0. で外す）、捨て札に行かず次のターンも手札に残って解ける（もう一度は止まらない・その分 新しく引く枚数が減る）。止まった常設はそのターンだけ挿せない。**敵の攻撃・ダメージの式には何も足さない**。旧: 攻撃 < ブロックのTに停滞+1（上限10）・1 スタックあたり敵攻撃 +1 |
@@ -844,6 +835,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                             封じ T4: enemyPassivesDisabledTurns / 富 T4: 所持ゴールド 5% (最大 10) を mutualAttackBonus
            次ターンへ     … 封じ: currentBuffs["roleEnemyAtkCut"] (敵攻撃 −40%) / ["roleEnemyStun"] (敵が行動しない) /
                             特別: ["roleFreeReroll"] (無料リロール 2 回)
+           特別 T4        … 2 個そろいでも極を撃つ (面数×5%・ボス・ヴェスカは面数×2.5%)
            盤面フラグ (RoleOutcome)
                           … 極 (yachtFired + yachtChunkPct: 敵最大HP の 面数×30% (ボス・ヴェスカは ×15%) を軽減無視) /
                             追撃 (extraDamageRatio 0.3 / 1.0・ゾロ目は確定ダメージ・T4 は会心判定) /
@@ -1025,4 +1017,3 @@ ADR-0009 パイプラインでのパッシブ挙動のリワーク記録 (2026-0
 - パッシブ〈Parry〉の scratch 廃止に伴う効果差し替え (現状は KEEP 動作だが無意味に)。
   **タイミング判定のパリィとは別物**（そちらは 2026-08-09 に全廃・GAME.md §24）
 - ~~IntimidatePlus/PlusPlus の threat 加算を「基礎攻撃値」加算に統合~~ → 2026-11-11 #104 で敵の攻撃 +N（enemyDiceTotalBonus）にした（§4）
-- ScratchAura の正式削除

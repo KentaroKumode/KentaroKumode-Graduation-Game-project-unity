@@ -121,7 +121,9 @@ namespace AutoTest.Ultra
 
             float total = 0f;
             for (int i = 0; i < weights.Count; i++) total += weights[i].weight;
-            int lastRandomRow = MapGenerator.LastRandomRow(snapshot.floor);
+            // 旧 3 列マップの「ランダム抽選の最後の行」。 自由移動には行が無いので 0
+            //   (旧 MapGenerator.LastRandomRow は常に 0 を返すだけだったので 2026-11-12 に削除)。
+            const int lastRandomRow = 0;
 
             for (int i = 0; i < snapshot.nodes.Length; i++)
             {

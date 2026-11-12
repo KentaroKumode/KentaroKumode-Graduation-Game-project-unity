@@ -43,20 +43,6 @@ namespace MapSystem.FreeMove
             }
         }
 
-        public static string Description(this WeatherKind w)
-        {
-            switch (w)
-            {
-                case WeatherKind.Fog: return "前線の中では、道で2歩以上離れた点が「?」に戻る（近づけば戻る・中身は引き直さない）";
-                case WeatherKind.Sand: return "前線の中では、1歩の物資が1.5倍。痕跡は2倍早く消える";
-                case WeatherKind.Snow: return "前線の中では、移動に2ターンかかる（追跡者は2回動く）";
-                case WeatherKind.Hail: return "前線の中では、移動ごとにHP-1";
-                case WeatherKind.Crumble: return "前線が進むたび、前線の中の道が1本崩れる（終点へは必ずつながったまま）";
-                case WeatherKind.Sink: return "前線が進むたび、前線の中の未使用の点が1つ沈む（終点へは必ずつながったまま）";
-                default: return "";
-            }
-        }
-
         /// <summary>その層で引ける天候。 1 層は穏やかに天候なし。</summary>
         public static WeatherKind[] PoolFor(int floor)
             => floor <= 1 || floor == FloorPlan.LinearFloor     // 5 層 (直線) は道が 1 本なので、 崩れる・沈む天候を入れない

@@ -80,7 +80,7 @@ namespace GameLoop
             var c = ActiveCtx();
             string b = c != null ? c.bossId : null;
             if (string.IsNullOrEmpty(b) || !b.StartsWith(BossIds.Layer7Prefix)) return;
-            int i = b.EndsWith("_p4") ? 3 : b.EndsWith("_p3") ? 2 : b.EndsWith("_p2") ? 1 : 0;
+            int i = System.Math.Max(1, BossIds.VescaStageOf(b)) - 1;
             VescaPhaseConsumables[i]++;
         }
 
@@ -185,10 +185,6 @@ namespace GameLoop
             return ctx != null && ctx.GetAccumulated("player_contre") > 0;
         }
 
-        /// <summary>所持リストを介さず効果のみ適用（UI/グリッド経路用。削除はグリッド側が行う）。</summary>
-        public static bool ApplyDirect(RunState run, string id)
-            => run != null && !string.IsNullOrEmpty(id) && Apply(run, id);
-
         /// <summary>効果適用本体（リスト削除はしない）。</summary>
         private static bool Apply(RunState run, string id)
         {
@@ -199,18 +195,16 @@ namespace GameLoop
             string mapFamily = ItemIds.ConsFamilyOf(id);
             if (mapFamily == ItemIds.ConsLureFamily) return GameManager.Instance != null && GameManager.Instance.TryPlaceLure();
 
+            // 回復: 最大HP割合の即時回復。 割合の表は HealRatio の 1 か所だけ (BOT の選び方と共有)。
+            float healRatio = HealRatio(id);
+            if (healRatio > 0f) return HealPct(run, ctx, healRatio);
+
             switch (id)
             {
                 // ===== 3 系統 × Tier1〜4 (2026-08-04 再編。 詳細と経緯は ItemIds.ConsHealFamily 近傍) =====
                 //   **Tier 軸は効果量のみ。持続は全 Tier「その戦闘中」で固定。**
                 //   旧設計は「効果量↓ × 持続↑」だったため実効量が戦闘の長さで逆転し、
                 //   通常戦では高 Tier ほど弱いという状態になっていた。
-
-                // 回復: 最大HP割合の即時回復
-                case "小回復薬": return HealPct(run, ctx, 0.25f);
-                case "回復薬": return HealPct(run, ctx, 0.40f);
-                case "上回復薬": return HealPct(run, ctx, 0.60f);
-                case "完全回復薬": return HealPct(run, ctx, 1.00f);
 
                 // シールド: 戦闘中持続 (expireTurn=-1)。 **戦闘中にも使用できる** ──
                 //   通常戦が 3〜4T になり「削られてから張る」判断が成立するようになったため。
@@ -339,7 +333,8 @@ namespace GameLoop
 
         // ===== ボット支援: 種別判定 =====
 
-        /// <summary>id の即時回復割合（heal系以外は0）。</summary>
+        /// <summary>id の即時回復割合（heal系以外は0）。 <b>回復薬の効果量の正本</b> (Apply もここを引く)。
+        /// 値は float の定数のまま返す (実行時に割り算で作らない・Mono の float 精度の罠)。</summary>
         public static float HealRatio(string id)
         {
             switch (id)

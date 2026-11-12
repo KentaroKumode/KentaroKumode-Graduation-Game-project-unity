@@ -29,14 +29,24 @@ namespace ItemSystem.PassiveSkills
     /// </summary>
     public class PassiveSkillManager : MonoBehaviour
     {
-        // ===== シングルトン =====
+        // ===== シングルトン (CLAUDE.md の規約: _shuttingDown + RuntimeInitializeOnLoadMethod・GameManager と同じ形) =====
         private static PassiveSkillManager instance;
-        private static bool isApplicationQuitting;
+        private static bool _shuttingDown;
+
+        /// <summary>ドメインリロード無効設定でも static を必ず初期状態へ戻す。</summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            instance = null;
+            _shuttingDown = false;
+        }
+
+        /// <summary>パッシブの単一窓口。 アプリ終了中は null を返す。 無ければ作る。</summary>
         public static PassiveSkillManager Instance
         {
             get
             {
-                if (isApplicationQuitting)
+                if (_shuttingDown)
                     return null;
 
                 if (instance == null)
@@ -89,6 +99,7 @@ namespace ItemSystem.PassiveSkills
                 Destroy(gameObject);
                 return;
             }
+            _shuttingDown = false;
             instance = this;
             DontDestroyOnLoad(gameObject);
         }
@@ -208,25 +219,6 @@ namespace ItemSystem.PassiveSkills
             activeSkillsByTrigger.Clear();
             activeSkillNames.Clear();
             skillDisplayNames.Clear();
-        }
-
-        /// <summary>物資「迷妄」(絶望帯・ADR-0002): 戦闘開始時にプレイヤーのパッシブスキルを count 個
-        /// ランダムで無効化する。PassiveItem(佯狂者・記憶の砂時計 等)は別系統(PassiveItemManager)のため
-        /// activeSkillNames に含まれず、自動的に対象外。スキルは戦闘ごとに再登録されるため復元は不要。</summary>
-        public void DisableRandomPlayerSkills(int count)
-        {
-            if (count <= 0 || activeSkillNames.Count == 0) return;
-            var distinct = new List<string>(new HashSet<string>(activeSkillNames));
-            int n = System.Math.Min(count, distinct.Count);
-            for (int i = 0; i < n && distinct.Count > 0; i++)
-            {
-                int idx = GameLoop.GameRng.RangeAuto("PassiveSkillManager.3", 0, distinct.Count);
-                string name = distinct[idx];
-                distinct.RemoveAt(idx);
-                while (activeSkillNames.Contains(name)) UnregisterSkill(name);
-                string disp = skillDisplayNames.TryGetValue(name, out var d) ? d : name;
-                Debug.Log($"[迷妄] パッシブ「{disp}」を無効化 (絶望帯)");
-            }
         }
 
         // ===========================================================
@@ -824,7 +816,7 @@ namespace ItemSystem.PassiveSkills
 
         void OnApplicationQuit()
         {
-            isApplicationQuitting = true;
+            _shuttingDown = true;
         }
     }
 }

@@ -800,17 +800,8 @@ lore 的には「ギルド管轄も 5 層まで」「5 層を抜けた時点で�
 T1 = 無能力（素の面）／ T2 = 2 個そろいが発動 ／ T3 = ゾロ目も発動 ／ T4 = さらにその目固有の追加効果（§21-2）。
 素の面は {2,3,4,5}（全員 T1）で始まるので、**最初は役が一切無い**。
 
-| 目 | テーマ | 2 個そろい | ゾロ目 | T4 の固有効果 |
-|---|---|---|---|---|
-| 1 | 特別 | 次のリロール 2 回が無料 | 〈極〉: 敵最大 HP の（面数 × 30%）を軽減無視（ボス・ヴェスカは × 15%） | 2 個そろいでも〈極〉（面数 × 5%） |
-| 2 | 封じ | 敵の次の攻撃 −40% | 敵は次のターン行動しない | 敵のパッシブ・ターン効果も止まる |
-| 3 | 追撃 | 与ダメの 30% を追加ダメージ | 与ダメの 100% を追加確定ダメージ | 追加ダメージが会心判定を持つ |
-| 4 | 攻め | このターンの与ダメ +25% | ×1.5 ＋会心確定 | 敵の軽減を無視 |
-| 5 | 守り | このターンの被ダメ −25% | −75% | 軽減した分の半分をシールドに |
-| 6 | 時間 | エスカレーションの次の段階を 2 ターン先へ | 段階を 1 つ戻す | 現在の段階 × 2 を攻撃 +N |
-| 7 | 充電 | 充電 +3 | 充電を上限まで満たす | 上限超過分を攻撃 +N に |
-| 8 | 癒し | HP +2 | HP +6 | HP 上限超過分をシールドに |
-| 9 | 富 | この戦闘のゴールド報酬 +5% | +30% | 2 個そろい時、所持ゴールドの 5%（最大 10）を攻撃 +N |
+目ごとのテーマは 1 特別 / 2 封じ / 3 追撃 / 4 攻め / 5 守り / 6 時間 / 7 充電 / 8 癒し / 9 富。
+**効果の数値はここに写さない** ── 一覧は [DAMAGE_CALC_REFERENCE.md の「役」](../Assets/Scripts/CombatSystem/DAMAGE_CALC_REFERENCE.md)（§9.2 の「役 (ADR-0011・…)」の段）を見る。
 
 数値は叩き台（バランス調整で見直す）。**正本は実コード** [YachtRoles.cs](../Assets/Scripts/CombatSystem/YachtRoles.cs)（判定）・
 [YachtRoleEffects.cs](../Assets/Scripts/CombatSystem/YachtRoleEffects.cs)（効果）で、決定の経緯と却下案は
@@ -2736,7 +2727,7 @@ Tier ごとの正味（本番と同じく 2 枚配って選ぶ・各 1 万ラン
 
 3D のコイン演算（排出・プール・スタック・物理・チケット換算）はコードごと削除した。所持金は `RunState` の整数だけが持つ。
 
-> **ショップのビジュアルは未開通**（`ShopPurchaseDialog` は存在するがシーンセットアップ未完。
+> **ショップの 3D ビジュアルは無い**（どのシーンにも載っていなかった購入確認 `ShopPurchaseDialog` は 2026-11-12 に削除。
 > 旧 `ShopVisualizer`（3D 棚）は 2026-10-28、どのシーンにも無かった遷移演出 `MapTransitionController` は 2026-10-29 に削除）。ロジックは可動（§23）。
 
 ### 16-8. 消費アイテム（2026-08-08 再編）
@@ -4355,6 +4346,8 @@ BOT の払い方（`AutoRunner.Terminals` の `ChooseGoldPunch`）は実装済�
 
 | 対象 | 時期 | 理由 |
 |---|---|---|
+| **敵パッシブの未装備クラス 21 種（精鋭 Slime / Goblin / Kobold / Skeleton / Wolf / Harpy / Orc・ScratchAura・IntimidatePlusPlus・旧 3 層ボス FrozenBardSong・旧 6 層ボス RoyalEmber / SinChain / EternalBurning / ReturnToAshes / ImmortalEmber / EmberAura / StarfireProliferation / ScorchedEarth・ボス威風 StrongOne / Throne / Setsuna）** | 2026-11-12 | どの敵も持っておらず（enemies.json・BossParams・段の切り替え・AutoTest・シーン・json のどこからも id で引かれていない）、登録だけ残っていた。相互攻撃モデルで発火経路が壊れていたもの・説明が「ダイス合計」のままのものが多い。戻すなら相互攻撃モデルで書き直す |
+| **ショップの購入確認ダイアログ `ShopPurchaseDialog`（IMGUI・`GameManager` のキー入力の分岐ごと）** | 2026-11-12 | どのシーン・プレハブにも載っておらず `AddComponent` も無いので `Instance` は常に null だった。状態を `transform.localScale` 倍率で表す規約違反（×1.5）も抱えていた。購入は Game2D の画面が持つ |
 | **前哨基地の武器の自動強化（層に入った時に素材があれば武器を 1 段・各層 1 回・`GameManager.OutpostUpgrade`・`RunState.outpostUpgradeUsedThisFloor`）と、休憩・前哨基地の強化がダイス強化（`DiceEnhance.TryUpgradeEquipped`）へ回る経路** | 2026-11-12 | 作者の決定。2026-05-31 に「UI 開発まで暫定」の自動挙動として入れたもので、プレイヤーが選ばないまま素材が消え、休憩の「鍛える」と同じ強化が層の入口でも起きていた。武器の強化は休憩の「鍛える」だけにする。ダイス強化は 2026-08-15 に止めてあり（`TryUpgradeEquipped` は常に false）、回り道は何もしない死にコードだった。休憩の「鍛える」の説明から「ダイス強化」を外し、手引きの前哨基地の節から強化の文を消した。**BOT も前哨基地で強化されなくなるので、この変更より前のクリア率とは直接比べない**（素材の余り方が変わる）。`DiceEnhance` 本体と `CanSpendMaterials` のダイスの分岐は残っている |
 | **特殊端子（1 つ装着の第 4 端子・11 種・接続制限 N・層ボスの報酬の 2 択）と旧い配線の経路（攻撃・ブロック・充電の常設 3 端子・前ターンの配線の自動適用・未配置は攻撃へ自動合流）・切り替え `TerminalCards.Enabled`** | 2026-11-11 | **端子の山札（ADR-0014・§6-4）へ置き換えた。** 旧い配線では端子が出目を足し込むだけの受け皿で「6 は常に 3 より良い」＝配線が判断にならず、配線も前ターンのまま残るので毎ターンの判断が無かった。特殊端子は 1 つを装着して層ボスの 2 択で入れ替える形で、種類が効かなかった（ADR-0014「なぜ」）。削除: `SpecialTerminals.cs`・`RunState.equippedSpecialTerminalId`・`GameManager.SelectedSpecialTerminal` / `OfferSpecialTerminal` / `ResolveTerminalOffer`・`GameHooks.ChooseSpecialTerminal`・`CombatManager.ApplySpecialTerminal` / `SanitizeWiring`・BOT の特殊端子の見積もりと 2 択の方策・層ボスの 2 択の画面。`DiceTerminal.Special`（値 3）は「補助の種類の端子に挿した出目」として残す（並びを変えない）。BOT の旧い配線の方策（Exact・Super・旧い Optimal）は、山札の方策（`AutoRunner.Terminals`）が常に上書きするので戦闘の判断には使われない。**この変更より前のクリア率は全部比べられない**（基準値の測り直しは issue #102） |
 | **物資の段（充足・目減り・枯渇し始める・枯渇寸前）と段のデバフ（疲労・苦悩・迷妄）・戦闘の物資の損・物資払い（〈燈火〉r10）・天候〈沈む静寂〉** | 2026-11-09 | 物資を「移動の燃料。尽きたら HP で払う」だけにした。段は 1000 という大きな数の目盛りでしかなく、デバフは物資を減らさないための罰として二重に効いていた。物資払いは物資と金の境目をぼかし、判定が r1 から通っていた。同時にデノミ（1 歩 50 → 1・上限 1000 → 20）。沈む静寂は作り直し中の仮の天候で、抽選にも入っていなかった |

@@ -36,9 +36,6 @@ namespace UI.Game2D
         /// <summary>この画面が窓を使っているか。</summary>
         public bool IsShown => modal != null && _def != null && modal.IsOpen && modal.Current == _def;
 
-        /// <summary>ほかの所から開く (タイトルの記録の窓など)。 開けたら true。</summary>
-        public static bool OpenFromAnywhere() { if (_inst == null || _inst.modal == null || _inst.modal.IsOpen) return false; _inst.Open(); return true; }
-
         private static bool CanOpenNow()
         {
             if (Application.isBatchMode || GameHooks.BotDriving || Game2DLoadingScreen.Blocking || Game2DBoot.Waiting) return false;

@@ -185,7 +185,7 @@ namespace MetaProgression.Achievements
             CheckOverkill(result);
             CheckThirteenthEnd(state, result);
 
-            bool boss = !string.IsNullOrEmpty(result.enemyId) && result.enemyId.StartsWith("boss_layer", StringComparison.Ordinal);
+            bool boss = GameLoop.BossIds.IsBoss(result.enemyId);
             if (!boss) return;
             int floor = state.Depth;
             if (floor == 1) Unlock(AchievementCatalog.Boss1);
@@ -197,7 +197,7 @@ namespace MetaProgression.Achievements
             }
             if (result.damageTaken == 0) Unlock(AchievementCatalog.BossNoHpDamage);
             if (floor >= 3 && result.totalTurns <= 1) Unlock(AchievementCatalog.BossOneTurn);
-            if (floor == 5 && result.enemyId == "boss_layer5_hidden") Unlock(AchievementCatalog.HiddenSaintGeorges);
+            if (floor == 5 && result.enemyId == GameLoop.BossIds.Layer5Hidden) Unlock(AchievementCatalog.HiddenSaintGeorges);
             if (floor == 6)
             {
                 if (!run.purchased) Unlock(AchievementCatalog.NoPurchaseBoss6);

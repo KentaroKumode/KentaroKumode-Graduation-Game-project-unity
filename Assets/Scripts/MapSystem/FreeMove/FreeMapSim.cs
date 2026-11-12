@@ -406,14 +406,6 @@ namespace MapSystem.FreeMove
             return Turn - _trace[i] <= TraceLife(i);
         }
 
-        /// <summary>痕跡の鮮度 0..1 (1 = いま付いた)。 痕跡が無ければ 0。</summary>
-        public double TraceFreshness(int i)
-        {
-            if (!HasTrace(i)) return 0;
-            double a = 1.0 - (double)(Turn - _trace[i]) / (TraceLife(i) + 1);
-            return a < 0 ? 0 : a;
-        }
-
         private double TraceLife(int i)
         {
             double life = FreeMapParams.TraceLife * Perks.traceLifeMul;

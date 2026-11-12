@@ -158,9 +158,6 @@ namespace UI
             _xfActive = true;
         }
 
-        /// <summary>SetMode(PreviousMode) のショートカット。</summary>
-        public void RestorePreviousMode() { SetMode(PreviousMode); }
-
         /// <summary>BGM のミュート状態を設定する (PlayerPrefs にも保存)。</summary>
         public void SetMuted(bool m)
         {

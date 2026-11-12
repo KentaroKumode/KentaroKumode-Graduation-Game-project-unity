@@ -41,14 +41,6 @@ namespace UI.ClassSelect
             IsShown = false;
         }
 
-        /// <summary>即座に表示位置へスナップ。</summary>
-        public void SnapShown()
-        {
-            StopAnim();
-            transform.localPosition = shownLocalPos;
-            IsShown = true;
-        }
-
         public void SlideIn(System.Action onDone = null)
         {
             StopAnim();

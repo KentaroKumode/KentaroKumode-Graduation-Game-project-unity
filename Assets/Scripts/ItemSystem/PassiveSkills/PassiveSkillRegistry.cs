@@ -475,14 +475,7 @@ namespace ItemSystem.PassiveSkills
             Register(new HoningDuel());
             Register(new EliteVigor());
             // エリート固有パッシブ（基敵ごと・逆スケール）
-            Register(new EliteSlime());
-            Register(new EliteGoblin());
-            Register(new EliteKobold());
-            Register(new EliteSkeleton());
-            Register(new EliteWolf());
-            Register(new EliteHarpy());
             Register(new EliteDecree13());
-            Register(new EliteOrc());
             Register(new EliteLizard());
             Register(new EliteWraith());
             Register(new EliteGolem());
@@ -497,10 +490,8 @@ namespace ItemSystem.PassiveSkills
             Register(new Lifesteal());
             Register(new NightLord());
             Register(new DeathSentence());
-            Register(new ScratchAura());
             Register(new Berserk());
             Register(new IntimidatePlus());
-            Register(new IntimidatePlusPlus());
             Register(new GreedyMerchant());
 
             // 13番目の死
@@ -508,22 +499,13 @@ namespace ItemSystem.PassiveSkills
 
             // 各層ボス専用パッシブ
             Register(new GoblinKingsCall());
-            Register(new FrozenBardSong());
             Register(new MiasmaCorrosion());
             Register(new MirrorTwinsResponse());
             Register(new JudgmentFlames());
-            Register(new RoyalEmber());
             Register(new BlazeBrand());
-            Register(new SinChain());
-            Register(new EternalBurning());
-            Register(new ReturnToAshes());
             // 灰燼の王 リワーク（見切り＆カウンター型）※ADR-0009 相互攻撃モデル下で発火経路が壊れており deprecated
             Register(new JudgmentBlaze());
             Register(new AshArmor());
-            Register(new ImmortalEmber());
-            Register(new EmberAura());
-            Register(new StarfireProliferation());
-            Register(new ScorchedEarth()); // 焦土（敗北毎に被ダメの10%だけ最大HP減・シールド破壊。どの敵も未装備）
             // 灰燼の王 v2 リワーク (2026-07-16 ADR-0009 相互攻撃対応): 外殻半減/周期予兆/階段回復/収支負けスタック
             // 2026-07-16 二相型化: HP50% で Phase1(再生)→Phase2(火力連打) に切替 (AshRegrowth 停止 + EmberFury 発動 + Omen 周期3T)
             Register(new AshCarapace());
@@ -531,11 +513,6 @@ namespace ItemSystem.PassiveSkills
             Register(new AshRegrowth());
             Register(new EmberFury());
             Register(new ScorchedPact());
-            // ボス威風（ダイス合計バフ）※現在 enemies.json から撤廃済み・未参照。
-            // 再有効化が容易なよう登録は残置（参照されなければ発火しない）。
-            Register(new StrongOne());  // 強者 +4 (5層)
-            Register(new Throne());     // 玉座 +8 (6層)
-            Register(new Setsuna());    // 刹那 +12 (7層)
             // 5層裏ボス
             Register(new SaintGeorgesPhases());
             // 7層ボス: ヴェスカ（遺物学者）×4段連戦。 正本: docs/GAME.md §13-4

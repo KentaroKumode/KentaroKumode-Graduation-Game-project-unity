@@ -142,17 +142,5 @@ namespace GameLoop
                     + $"HP {run.playerHP} ({RevivalHpPct:P0}) で戦闘続行" + (isBossFight ? " (ボス戦)" : ""));
             return true;
         }
-
-        /// <summary>
-        /// 旧ガード処理の互換用パススルー（ラストスタンドは経済を制限しない）。
-        /// 既存呼び出し箇所を壊さないため残置。常に amount をそのまま返す。
-        /// </summary>
-        public static int FilterGoldGain(RunState run, int amount) => amount;
-
-        /// <summary>
-        /// 旧ガード処理の互換用パススルー（ラストスタンドは最大HP増加を妨げない）。
-        /// 既存呼び出し箇所を壊さないため残置。常に gain をそのまま返す。
-        /// </summary>
-        public static int FilterMaxHPGain(RunState run, int gain) => gain;
     }
 }

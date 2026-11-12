@@ -56,12 +56,6 @@ namespace UI.Game2D
             _host.Later(c, sec, vol * Volume, pitch);
         }
 
-        /// <summary>斬撃の当たり (肉を裂く): 音程のない雑音だけで作った 1 つの音 (ザ・シュ・ドスッ・ぐちゅ)。 会心は 2 発 + 重い余韻。 pitch = 低いほど重い武器。</summary>
-        public static void Slash(bool crit, float pitch = 1f)
-        {
-            Play(crit ? "hit_crit" : "hit_slash", 1f, pitch * Random.Range(0.97f, 1.03f));
-        }
-
         /// <summary>
         /// 武器の命中音 (fam = 武器の系統 / kind = 命中の種類)。 剣・短剣 = 斬る音 (通常 = hit_slash / 会心の最後 = hit_crit)、 斧 = 叩きつける音 (hit_axe / crit_axe)、 盾 = 金属板を叩く音 (hit_shield / crit_shield)。
         /// 剣・短剣の会心は、 斬撃痕 (cut) が出るたびに通常の命中音を鳴らし、 最後の会心の演出 (chop / finish) で hit_crit を鳴らす。

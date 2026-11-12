@@ -109,8 +109,6 @@ namespace UI.Game2D.Battle
         public int EnemyMax => _eMax;
         /// <summary>敵の HP を本物の値に合わせる (実戦闘につないだ時)。 攻撃の演出はここから dealt ぶん減らす。</summary>
         public void SetEnemyHp(int cur, int max) { _eMax = Mathf.Max(1, max); _ehp = Mathf.Clamp(cur, 0, _eMax); }
-        /// <summary>会心にするか (C キーの設定: 確率 20% / 常に / なし)。</summary>
-        public bool RollCrit() => _critMode == 1 || (_critMode == 0 && UnityEngine.Random.value < 0.2f);
 
         /// <summary>自分の攻撃の演出を始める。 dealt = 与ダメージ (数字に出す)。 竜閃は会心の時だけ専用の動き。</summary>
         public void PlayerAttack(int weaponIndex, bool crit, int dealt)

@@ -111,8 +111,7 @@ namespace CombatSystem
                 && ctxAtEnd.bossId.StartsWith(GameLoop.BossIds.Layer7Prefix))
             {
                 GameLoop.RunChronicle.NotePhaseDuration(
-                    ctxAtEnd.bossId.EndsWith("_p4") ? 4 : ctxAtEnd.bossId.EndsWith("_p3") ? 3
-                        : ctxAtEnd.bossId.EndsWith("_p2") ? 2 : 1,
+                    System.Math.Max(1, GameLoop.BossIds.VescaStageOf(ctxAtEnd.bossId)),
                     ctxAtEnd.phaseStartTurn, ctxAtEnd.currentTurn);
             }
             MetaProgression.Achievements.AchievementService.NoteCombatEnded(

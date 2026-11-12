@@ -14,7 +14,6 @@ namespace CombatSystem
     /// (2) 合計値の大きい方が勝利
     /// (3) 勝利者は [勝者合計 - 敗者合計] のメインダメージを与える
     /// (4) 追撃/反撃はパッシブスキル（PursuitI-III / CounterI-III）由来の固定値
-    /// (5) scratchは特定の敵パッシブ（ScratchAura）が付与する削りダメージ
     /// (6) すべてのダメージを合算後、クリティカル判定（1回、会心率% を加算して 0〜1 へクランプ）
     ///     クリティカル時は合算ダメージに倍率適用
     /// 
@@ -29,14 +28,24 @@ namespace CombatSystem
         /// <summary>直近の主攻撃の倍率 (%) = 最終の主攻撃 ÷ 倍率の前の攻撃値 (会心・与ダメ%・敵の防御を全部含む)。 攻撃しなかったら 0。 画面の表示用 (2026-11-11)。</summary>
         public int LastHitMultPct { get; private set; }
 
-        // ===== シングルトン =====
+        // ===== シングルトン (CLAUDE.md の規約: _shuttingDown + RuntimeInitializeOnLoadMethod・GameManager と同じ形) =====
         private static CombatManager instance;
-        private static bool isApplicationQuitting;
+        private static bool _shuttingDown;
+
+        /// <summary>ドメインリロード無効設定でも static を必ず初期状態へ戻す。</summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            instance = null;
+            _shuttingDown = false;
+        }
+
+        /// <summary>戦闘の単一窓口。 アプリ終了中は null を返す。 無ければシーンから探し、 それも無ければ作る。</summary>
         public static CombatManager Instance
         {
             get
             {
-                if (isApplicationQuitting)
+                if (_shuttingDown)
                     return null;
 
                 if (instance == null)
@@ -226,6 +235,24 @@ namespace CombatSystem
             if (heal > 0) HealPlayer(heal);
         }
 
+        /// <summary>ボスのマスの敵に〈狂暴化〉(<see cref="Berserk"/>) を足す (既に持っていれば何もしない)。
+        /// 戦闘の開始 (StartCombat) と、 ヴェスカの段の差し替え (SwapEnemy) の 2 か所が呼ぶ。
+        /// 説明文は Berserk の定数から組む ── 51 ターン目から、 この敵の攻撃 +10 (enemyDiceTotalBonus) ・
+        /// プレイヤーの回復を封じる (healBlocked) ・ この敵が受ける主攻撃のダメージ ×3 (enemyDamageTakenMultiplier)。</summary>
+        private static void AddBerserkIfBossNode(List<EnemyPassiveEntry> skills)
+        {
+            const string id = ItemSystem.PassiveSkills.Effects.Berserk.Id;
+            var node = MapSystem.MapManager.Instance?.CurrentNode;
+            if (node == null || node.type != MapSystem.TileType.Boss) return;
+            if (skills.Exists(e => e != null && e.internalName == id)) return;
+            skills.Add(new EnemyPassiveEntry
+            {
+                internalName = id,
+                skillName = "狂暴化",
+                description = $"{ItemSystem.PassiveSkills.Effects.Berserk.EnrageTurn}ターン経過後、攻撃+{ItemSystem.PassiveSkills.Effects.Berserk.DiceBonus}・相手の回復を封じる・受ける攻撃のダメージ{(int)ItemSystem.PassiveSkills.Effects.Berserk.EnemyDamageTakenMult}倍",
+            });
+        }
+
         public int HealPlayer(int amount)
         {
             if (amount <= 0) return 0;
@@ -286,6 +313,7 @@ namespace CombatSystem
                 Destroy(gameObject);
                 return;
             }
+            _shuttingDown = false;
             instance = this;
             DontDestroyOnLoad(gameObject);
         }
@@ -496,7 +524,7 @@ namespace CombatSystem
             EnemyHpLedger.BeginForm();   // [計装 2026-11-10] 予約を持ち越さない
             EnemyHpLedger.SourceScope = enemy.id != null && enemy.id.StartsWith(GameLoop.BossIds.Layer7Prefix) ? enemy.id : "他";
             // [計測] 7層連戦の 1 段目突入。 2 段目以降との比較の基準になる。
-            if (enemy != null && enemy.id == "boss_layer7")
+            if (enemy != null && enemy.id == GameLoop.BossIds.VescaP1)
                 BossDmgDiag.PhaseEntry(enemy.id, this.playerMaxHP > 0 ? (double)playerHP / this.playerMaxHP : 1.0);
             playerDiceCount = pDiceCount;
             playerDiceMax = pDiceMax;
@@ -549,17 +577,7 @@ namespace CombatSystem
                 : new List<EnemyPassiveEntry>();
 
             // ボスノードの敵には全員「狂暴化」を付与（50T後のエンレイジ）
-            var nodeForBerserk = MapSystem.MapManager.Instance?.CurrentNode;
-            if (nodeForBerserk != null && nodeForBerserk.type == MapSystem.TileType.Boss
-                && !enemySkills.Exists(e => e != null && e.internalName == "Berserk"))
-            {
-                enemySkills.Add(new EnemyPassiveEntry
-                {
-                    internalName = "Berserk",
-                    skillName = "狂暴化",
-                    description = "50ターン経過後、ダイス合計+10・回復封印・被ダメージ3倍",
-                });
-            }
+            AddBerserkIfBossNode(enemySkills);
             // ── 2 体戦 (2026-08-28): 2 体目のパッシブも登録する ──
             //   **同名パッシブは 1 回しか登録しない。** RegisterEnemySkills 側の
             //   `enemySkillNames.Contains` 判定がそのまま重複を弾くので、 単純に連結してよい。
@@ -816,10 +834,10 @@ namespace CombatSystem
             //   旧: TryAdvanceVescaChain 内でのみ記録していたが、 あれは OnTurnEnd より前に
             //   削り切った取りこぼし用の経路なので、 正常経路 (連続実験の予約 → SwapEnemy) を
             //   通る大多数が記録から漏れていた (実測 3380 件に対し 36 件しか拾えず)。
-            if (!string.IsNullOrEmpty(newEnemyId) && newEnemyId.StartsWith("boss_layer7") && playerMaxHP > 0)
+            if (!string.IsNullOrEmpty(newEnemyId) && newEnemyId.StartsWith(GameLoop.BossIds.Layer7Prefix) && playerMaxHP > 0)
             {
                 BossDmgDiag.PhaseEntry(newEnemyId, playerHP / (double)playerMaxHP);
-                if (newEnemyId == "boss_layer7_p4") BossDmgDiag.P4Entry(playerHP / (double)playerMaxHP);
+                if (newEnemyId == GameLoop.BossIds.VescaFinal) BossDmgDiag.P4Entry(playerHP / (double)playerMaxHP);
             }
 
             if (!isCombatActive) { Debug.LogWarning("[CombatManager.SwapEnemy] 戦闘中でない"); return false; }
@@ -858,16 +876,7 @@ namespace CombatSystem
             var swapSkills = newEnemy.passiveSkills != null
                 ? new List<EnemyPassiveEntry>(newEnemy.passiveSkills)
                 : new List<EnemyPassiveEntry>();
-            var nodeForSwapBerserk = MapSystem.MapManager.Instance?.CurrentNode;
-            if (nodeForSwapBerserk != null && nodeForSwapBerserk.type == MapSystem.TileType.Boss
-                && !swapSkills.Exists(e => e != null && e.internalName == "Berserk"))
-            {
-                swapSkills.Add(new EnemyPassiveEntry
-                {
-                    internalName = "Berserk", skillName = "狂暴化",
-                    description = "50ターン経過後、ダイス合計+10・回復封印・被ダメージ3倍",
-                });
-            }
+            AddBerserkIfBossNode(swapSkills);
             psm.RegisterEnemySkills(swapSkills);
 
             // 敵側固有 accumulatedValues キーを掃除（プレイヤー側補正は保持）
@@ -901,8 +910,7 @@ namespace CombatSystem
                     && ctx.bossId.StartsWith(GameLoop.BossIds.Layer7Prefix))
                 {
                     GameLoop.RunChronicle.NotePhaseDuration(
-                        ctx.bossId.EndsWith("_p4") ? 4 : ctx.bossId.EndsWith("_p3") ? 3
-                            : ctx.bossId.EndsWith("_p2") ? 2 : 1,
+                        Math.Max(1, GameLoop.BossIds.VescaStageOf(ctx.bossId)),
                         ctx.phaseStartTurn, ctx.currentTurn);
                 }
                 ctx.phaseStartTurn = ctx.currentTurn + 1;
@@ -947,7 +955,7 @@ namespace CombatSystem
         
         void OnApplicationQuit()
         {
-            isApplicationQuitting = true;
+            _shuttingDown = true;
             if (instance == this) instance = null;
         }
 
