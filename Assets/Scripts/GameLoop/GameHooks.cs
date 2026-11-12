@@ -101,6 +101,11 @@ namespace GameLoop
         /// (<see cref="ConvictionSystem.RiftGateAtBoss"/>・GAME.md §4-2)。 false = 旧い作り (層の 3 分の 1 あたりの固定の点・踏まずにボスへ行けた)。
         /// 層を作る時に読む (MapGenerator)。 AutoRunner.riftRecordAtBoss が毎ランの始めに入れ、 ラン終了で true へ戻す。</summary>
         public static bool RiftRecordAtBoss = true;
+        /// <summary>[測定 2026-11-13] true (既定) = 天候は「嵐」(<see cref="MapSystem.FreeMove.Storm"/>・GAME.md §5-12): 静かな時間のあとに輪が縮み、
+        /// 輪の外 (嵐の中) の点へ動くと HP を払う・嵐の中で始まった戦闘の敵は〈嵐〉・始点は最外周から選び直し・ボスの点は種別を隠す。
+        /// false = 旧い作り (左から右へ進む前線・崩れる地平と沈み続ける湖面あり・始点は左端・ボスは最初から見える)。 main と 1 ランも変わらない。
+        /// 層を作る時に読む (MapGenerator)。 AutoRunner.stormEnabled が毎ランの始めに入れ、 ラン終了で true へ戻す。</summary>
+        public static bool StormEnabled = true;
 
         /// <summary>[測定 2026-11-12・#95] 遺物の効果を止める接辞 (ビット = <c>(int)RelicStat</c>・0 = 何も止めない)。
         /// 主ステもサブも、 その接辞の分だけを 0 にする (段の値 1 つあたりの価値を、 理論値の持ち込みから 1 接辞ずつ抜いて測る口)。

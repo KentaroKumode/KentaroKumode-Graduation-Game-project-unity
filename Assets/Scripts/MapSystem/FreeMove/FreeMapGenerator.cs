@@ -47,8 +47,17 @@ namespace MapSystem.FreeMove
         /// <summary>層を生成する。 山岳で分断され続けたら山岳なしで作る (試作と同じ)。
         /// <para><paramref name="riftAtBoss"/> は深さ 6 (画面の第 4 層) の「裂け目の記録」の置き方 (他の層では読まない):
         /// true = 終点に隣り合う点を全部イベントマスにする (<see cref="PlaceRiftGate"/>・2026-11-13) / false = 旧い作り (層の 3 分の 1 あたりの固定の点 1 つ)。
-        /// <b>どちらも乱数を引かない</b> ── 点・道・山岳・縄張りと、 他の点の抽選は両方で同じ。</para></summary>
-        public static FreeMapLayout Generate(int floor, bool riftAtBoss = true)
+        /// <b>どちらも乱数を引かない</b> ── 点・道・山岳・縄張りと、 他の点の抽選は両方で同じ。</para>
+        /// <para><paramref name="storm"/> = 嵐の作り (2026-11-13・<see cref="Storm.Apply"/>): 嵐のある深さ (1/3/5/6) で、 生成した形の始点を最外周から選び直す
+        /// (点・道・山岳・縄張りと、 キー "map.free" の引く回数は変えない・乱数は専用のキー)。 false (測定の口 GameHooks.StormEnabled = False) では今までと 1 点も変わらない。</para></summary>
+        public static FreeMapLayout Generate(int floor, bool riftAtBoss = true, bool storm = false)
+        {
+            var L = GenerateShape(floor, riftAtBoss);
+            if (storm) Storm.Apply(L);
+            return L;
+        }
+
+        private static FreeMapLayout GenerateShape(int floor, bool riftAtBoss)
         {
             if (floor == FloorPlan.LinearFloor) return GenerateLinear(floor);
             if (floor == FloorPlan.FarmFloor) return GenerateFarm(floor);

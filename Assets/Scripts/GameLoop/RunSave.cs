@@ -61,6 +61,8 @@ namespace GameLoop
             public bool visited, activated, isFalseMerchant, revealed, encounterRevealed, freeMap, isFixedEvent;
             /// <summary>深さ 6 の終点に隣り合う「裂け目の記録」の点 (2026-11-13)。 これより前のセーブには無い (読むと false)。</summary>
             public bool isRiftGate;
+            /// <summary>危険の帯 (2026-11-13・MapNode.band)。 これより前のセーブには無い (読むと -1 = 横の位置から)。</summary>
+            public int band = -1;
             public string encounterId, encounterEnemyA, encounterEnemyB;   // null と "" を区別する (下の Has* で)
             public bool hasEncounterId, hasEnemyA, hasEnemyB;
             public int index = -1;
@@ -81,6 +83,9 @@ namespace GameLoop
             public int[] waypoints = new int[0];
             /// <summary>深さ 6 の終点に隣り合う「裂け目の記録」の点 (2026-11-13・FreeMapLayout.riftGate)。 これより前のセーブには無い (読むと空)。</summary>
             public int[] riftGate = new int[0];
+            /// <summary>嵐の層か・フェーズ 2 の終わりの輪の中心のずらし (2026-11-13・FreeMapLayout.storm / stormOffset)。 これより前のセーブには無い (読むと嵐なし)。</summary>
+            public bool storm;
+            public long stormOffX, stormOffY;
         }
 
         [Serializable]
@@ -407,7 +412,7 @@ namespace GameLoop
                 {
                     id = n.id, row = n.row, lane = n.lane, type = (int)n.type, resolvedType = n.resolvedType.HasValue ? (int)n.resolvedType.Value : -1,
                     visited = n.visited, activated = n.activated, isFalseMerchant = n.isFalseMerchant, revealed = n.revealed,
-                    encounterRevealed = n.encounterRevealed, freeMap = n.freeMap, isFixedEvent = n.isFixedEvent, isRiftGate = n.isRiftGate,
+                    encounterRevealed = n.encounterRevealed, freeMap = n.freeMap, isFixedEvent = n.isFixedEvent, isRiftGate = n.isRiftGate, band = n.band,
                     encounterId = n.encounterId ?? "", hasEncounterId = n.encounterId != null,
                     encounterEnemyA = n.encounterEnemyA ?? "", hasEnemyA = n.encounterEnemyA != null,
                     encounterEnemyB = n.encounterEnemyB ?? "", hasEnemyB = n.encounterEnemyB != null,
@@ -448,6 +453,7 @@ namespace GameLoop
             var terr = new List<int>(l.territory); terr.Sort(); o.territory = terr.ToArray();
             o.waypoints = l.waypoints.ToArray();
             o.riftGate = l.riftGate.ToArray();
+            o.storm = l.storm; o.stormOffX = Bits(l.stormOffset.x); o.stormOffY = Bits(l.stormOffset.y);
             return o;
         }
 
@@ -465,7 +471,7 @@ namespace GameLoop
                 {
                     resolvedType = s.resolvedType >= 0 ? (TileType?)(TileType)s.resolvedType : null,
                     visited = s.visited, activated = s.activated, isFalseMerchant = s.isFalseMerchant, revealed = s.revealed,
-                    encounterRevealed = s.encounterRevealed, freeMap = s.freeMap, isFixedEvent = s.isFixedEvent, isRiftGate = s.isRiftGate,
+                    encounterRevealed = s.encounterRevealed, freeMap = s.freeMap, isFixedEvent = s.isFixedEvent, isRiftGate = s.isRiftGate, band = s.band,
                     encounterId = s.hasEncounterId ? s.encounterId : null,
                     encounterEnemyA = s.hasEnemyA ? s.encounterEnemyA : null,
                     encounterEnemyB = s.hasEnemyB ? s.encounterEnemyB : null,
@@ -500,6 +506,7 @@ namespace GameLoop
             if (o.territory != null) foreach (int t in o.territory) l.territory.Add(t);
             if (o.waypoints != null) l.waypoints.AddRange(o.waypoints);
             if (o.riftGate != null) l.riftGate.AddRange(o.riftGate);
+            l.storm = o.storm; l.stormOffset = new Vec2(Dbl(o.stormOffX), Dbl(o.stormOffY));
             return l;
         }
 
