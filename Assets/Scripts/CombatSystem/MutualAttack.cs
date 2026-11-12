@@ -91,5 +91,17 @@ namespace CombatSystem
         //    これが無いと配線側は「守ると罰される」を判断できず、 一方的な税にしかならない。
         public int blazeStacks;             // 現在の烈炎スタック (次ターン開始時にこの値の軽減無視ダメ)
         public bool blazePenalizesBlock;    // ブロック端子への配線が閾値以上だとスタックが増える相手か
+
+        // ── ボスのダウン (HP の目盛り・2026-11-13・BossDown.cs)。 完全情報 (予告と同じく配線の前に開示する)。
+        /// <summary>このターン、 敵はダウンしている (攻撃しない・受けるダメージ ×<see cref="BossDown.TakenMul"/>)。 このとき <see cref="enemyAttackValue"/> は 0。</summary>
+        public bool enemyDown;
+        /// <summary>このターンの後にまだ続くダウンのターンの数 (割った目盛りの残り。 0 = 次のターンはダウンしない ── このターンに目盛りを割らなければ)。</summary>
+        public int downPending;
+        /// <summary>次に割る目盛りの HP (敵の HP がこれ以下になったら割れる・−1 = 目盛りが無い/残っていない)。</summary>
+        public int downNextNotchHp;
+        /// <summary>目盛りの一覧 (最大 HP の割合・大きい順・HP の棒の刻み)。 null = ダウンしない敵。 書き換えないこと。</summary>
+        public float[] downNotches;
+        /// <summary>割った目盛りの数 (<see cref="downNotches"/> の先頭から)。</summary>
+        public int downBroken;
     }
 }

@@ -152,6 +152,8 @@ namespace CombatSystem
 
             // ターン終了スキルによるHP変動をCombatManagerに反映（剣鎧等）
             SyncHPFromContext(ctx);
+            // ボスのダウン (2026-11-13): このターンに割った目盛りを数える (ターン終了時の削りを拾った後・段の交代の後 = 新しい段は満タンなので数えない)
+            NoteBossDownTurnEnd();
 
             // 消費: シールド残ターン減算（-1=無制限 / 0で失効）
             if (ctx.consShieldExpireTurn > 0)
@@ -381,6 +383,7 @@ namespace CombatSystem
             // ここからターンの最後の HP 同期までは、 品が入れる敵へのダメージを預かる (Kw.DamageEnemy)。
             if (ctx != null) ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.ResolvingKey] = 1;
             psm.BeginTurn();
+            BeginBossDownTurn(ctx);   // ボスのダウン (2026-11-13): 待っているダウンがあれば、 このターンは行動不能・受けるダメージ ×1.5 (ターン番号を進めた後・敵が振る前)
             DrawTerminalHand(ctx);   // 端子の山札 (ADR-0014): 5 枚引く (振り直しの判断より前 ── 手札を見て振り直すか決められる)
 
             // 装備維持費 (2026-08-15): **所持パッシブ 10 個につき充電 1** を毎ターン消費する。
@@ -690,6 +693,14 @@ namespace CombatSystem
                 }
             }
 
+            // ボスのダウン (2026-11-13): このターンは攻撃しない。 予告も 0 にする (見えている数字と盤上の結果を揃える・完全情報)。
+            //   敵の出目は振ってある (乱数の消費を変えない)。 〈連撃〉の 2 回目も同じ攻撃なので出さない。
+            if (_down.downNow)
+            {
+                enemyAtkValue = 0; enemyAtkBeforeDefense = 0;
+                _secondaryAtkThisTurn = 0; secondaryAtkBeforeDefense = 0; _twinStrikeThisTurn = false;
+            }
+
             var tele = new MutualTurnTelegraph
             {
                 turn = ctx.currentTurn,
@@ -724,6 +735,12 @@ namespace CombatSystem
                     && _bza > 0f,
                 executeArmed = ctx.vescaExecuteArmed,
                 sealedTerminal = -1,   // 旧〈綻び〉(端子の封印) は 2026-11-10 に撤去
+                // ボスのダウン (2026-11-13): 目盛り・次の目盛りの HP・このターンと後に続くダウン
+                enemyDown = _down.downNow,
+                downPending = _down.pending,
+                downNotches = _down.notches,
+                downBroken = _down.broken,
+                downNextNotchHp = currentEnemy != null ? _down.NextNotchHp(currentEnemy.maxHP) : -1,
             };
             if (ctx.bossId == GameLoop.BossIds.VescaFinal)
                 BossDmgDiag.P4Turn(ctx.playerHighDiceCrushed, ctx.vescaExecuteArmed,
@@ -1284,10 +1301,14 @@ namespace CombatSystem
             // 「見えている一撃を丸ごと踏み倒す」形になり、 予告の価値を壊さない。
             bool enemyStunnedThisTurn =
                 ctx.currentBuffs.TryGetValue(YachtRoleEffects.EnemyStunKey, out float stunFlag) && stunFlag > 0f;
+            // ボスのダウン (2026-11-13): 行動不能と同じ枝 (攻撃しない・仕込み刃と古い手紙はこのターン限りで失効)
+            bool downThisTurn = _down.downNow;
+            if (enemyHP > 0 && !enemyStunnedThisTurn && !downThisTurn && currentEnemy != null && Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn))
+                BossDownDiag.NoteHeavyTaken();   // [計装] 大技を受けた
 
-            if (enemyHP > 0 && enemyStunnedThisTurn)
+            if (enemyHP > 0 && (enemyStunnedThisTurn || downThisTurn))
             {
-                Debug.Log($"[役] 封じ・揃: 敵は行動不能 (予告されていた攻撃 {enemyAtkValue} は不発)");
+                Debug.Log(downThisTurn ? "[ダウン] 敵は行動不能 (攻撃しない)" : $"[役] 封じ・揃: 敵は行動不能 (予告されていた攻撃 {enemyAtkValue} は不発)");
                 ctx.daggerArmed = false;   // 仕込み刃はこのターン限り ── 攻撃が来なくても失効
                 ctx.accumulatedValues.Remove(GameLoop.Consumables.OldLetterGuardKey);   // 古い手紙も同じ
             }
