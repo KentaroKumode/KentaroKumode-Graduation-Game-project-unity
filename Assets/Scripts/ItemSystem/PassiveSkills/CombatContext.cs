@@ -10,7 +10,7 @@ namespace ItemSystem.PassiveSkills
         Reflect,      // 鏡の双子: 鏡映の応答 (旧: 覚者・無相)
         Burst,        // 業火・残響: 爆ぜ火 (敗北時固定ダメ)
         Chip,         // 業火の審判官: 審判の炎 (継続ダメ)
-        SuddenDeath,  // サドンデス (灰燼の烙印)
+        SuddenDeath,  // 欠番 (旧: サドンデス・灰燼の烙印)。 書く所は 0 件だが、 int の並びを保つために値は残す。
         Other,
         // **末尾に足すこと。** runs.jsonl へ int で載るので、 既存の並びを動かすと
         //   過去バッチと突き合わせたときに黙って別の死因へすり替わる。

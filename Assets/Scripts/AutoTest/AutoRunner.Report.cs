@@ -998,12 +998,13 @@ namespace AutoTest
             var sb = new StringBuilder();
             sb.AppendLine("【ゲーム体験③ 死因分布質 (Death Cause Quality)】");
             sb.AppendLine("  公平死 = Normal/Chip (累積攻撃や持続)");
-            sb.AppendLine("  理不尽死 = Reflect (反射自滅) / SuddenDeath (純運勝負) / Garyo (画竜点睛) / その他突発要因");
+            sb.AppendLine("  理不尽死 = Reflect (反射自滅) / Judgment (業火の断罪)");
             sb.AppendLine();
 
             // 死因の分類 (CombatRec.deathCause を使う、 deathCauseは戦闘の死因)
             // 公平: Normal, Chip
-            // 理不尽: Reflect, SuddenDeath, Garyo, Pursuit (突発反撃), Threat (脅威でハメ殺し)
+            // 理不尽: Reflect, Judgment
+            // (旧 SuddenDeath / Garyo / Pursuit / Threat は作られない死因なので比較から外した。 2026-11-12)
             var byFloor = new Dictionary<int, int[]>(); // [死戦闘総数, 公平, 理不尽]
             for (int i = 0; i < _records.Count; i++)
             {
@@ -1015,9 +1016,8 @@ namespace AutoTest
                     if (c == null || c.won) continue;
                     if (!c.isFightEnd) continue;
                     string dc = c.deathCause.ToString();
-                    bool fair = dc == "Normal" || dc == "Chip" || dc == "None";
-                    bool unfair = dc == "Reflect" || dc == "SuddenDeath" || dc == "Garyo"
-                               || dc == "Pursuit" || dc == "Threat" || dc == "Judgment";
+                    bool fair = dc == "Normal" || dc == "Chip";
+                    bool unfair = dc == "Reflect" || dc == "Judgment";
                     if (!byFloor.TryGetValue(c.floor, out var a)) { a = new int[3]; byFloor[c.floor] = a; }
                     a[0]++;
                     if (fair) a[1]++;
@@ -1035,7 +1035,7 @@ namespace AutoTest
                 float unfairPct = 100f * a[2] / a[0];
                 sb.AppendLine($"  {PadR(f.ToString()+"F",4)}{PadR(a[0].ToString(),7)}{PadR(a[1].ToString(),8)}{PadR(a[2].ToString(),10)}{PadR(unfairPct.ToString("F1")+"%",10)}");
             }
-            sb.AppendLine("  理不尽率が高い層は調整候補 (Reflect=反射火力過剰 / SuddenDeath=運勝負化過剰 等)");
+            sb.AppendLine("  理不尽率が高い層は調整候補 (Reflect=反射火力過剰 等)");
             return sb.ToString();
         }
 
