@@ -109,35 +109,7 @@ namespace MapSystem
             OnMapGenerated?.Invoke(CurrentMap);
         }
 
-        /// <summary>盤面を復元する。 **Ultra の worker が checkpoint から再開するためだけの口**で、
-        /// 通常のゲーム進行では呼ばれない。
-        ///
-        /// <para><see cref="GenerateFloor"/> との違いは 2 つ。 生成せずに与えられた盤面を据えること、
-        /// そして <b>視界を再計算しないこと</b> ── snapshot の <c>revealed</c> は
-        /// 「その時点でプレイヤーが何を見えていたか」の記録なので、 復元後に
-        /// 旧〈戦場の霧〉の視界制限 (2026-11-10 に撤去) を掛け直すと、 記録した可視状態を
-        /// 現在のデバフ状態で塗り替えてしまう。</para></summary>
-        public void RestoreState(FloorMap map, string currentNodeId)
-        {
-            if (map == null) throw new System.ArgumentNullException(nameof(map));
-            // 自由移動の層は位置・時間・徘徊エネミーの状態を持つが、 snapshot はノードしか保存しない。
-            //   座標まで保存する口は作っていない ── Ultra は自由移動の層では無効
-            //   (AutoRunner.DoNavigateFree は Ultra の決定点を通らない・UltraMapSnapshot.Capture も拒否する)。
-            //   ここへ来たら取り違え。
-            if (map.IsFreeMap)
-                throw new System.NotSupportedException("自由移動の層は Ultra の盤面復元に対応しない");
-            Sim = null;
-
-            CurrentMap = map;
-            CurrentNode = map.GetNode(currentNodeId) ?? map.GetNode(map.startNodeId);
-            if (CurrentNode == null)
-                throw new System.InvalidOperationException(
-                    "restored map has neither the requested node nor a start node");
-
-            OnMapGenerated?.Invoke(CurrentMap);
-        }
-
-        /// <summary>中断セーブ (issue #84) から盤面を戻す。 <see cref="RestoreState"/> と違い<b>航行マップの層を扱う</b>:
+        /// <summary>中断セーブ (issue #84) から盤面を戻す。 <b>航行マップの層を扱う</b> (旧 Ultra の rollout 用の RestoreState は航行マップを断っていた・2026-11-13 削除・#135):
         /// 形 (<see cref="FloorMap.layout"/>) はそのまま据え、 動く中身は <see cref="GenerateFloor"/> と同じ引数で作ってから写しを書き戻す
         /// (追跡者の性質・財布は作り直す。 性質は層と乱数の塩だけで決まるので、 塩を戻した後なら同じものが出る)。
         /// 視界は計算し直さない (写しの <c>Known</c> / <c>revealed</c> をそのまま使う)。</summary>
