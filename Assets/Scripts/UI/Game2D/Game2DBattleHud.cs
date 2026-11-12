@@ -75,6 +75,8 @@ namespace UI.Game2D
         /// <summary>対象を選ぶ印: 候補の縁 / 決まった対象の縁 (色と明度だけで出す・拡大しない)。</summary>
         private static readonly Color32 CandEdge = Game2DTerminalLook.Mix(Game2DKit.Ivory, Game2DKit.Off, 0.45f), ChosenEdge = Game2DKit.Ivory;
         /// <summary>ヴェスカ〈停滞する時間〉で止まった端子の印 (本体を横切る線と下の「停止」)。 暗くした本体の上で読める、 くすんだ青白。</summary>
+        /// <summary>手札の規則 Pick: 残す印の色 (仮)。</summary>
+        private static readonly Color32 KeepMark = Game2DTerminalLook.Mix(Game2DKit.Amber, Game2DKit.Ivory, 0.3f);
         private static readonly Color32 StopMark = Game2DTerminalLook.Mix(Game2DKit.Blue, Game2DKit.Ivory, 0.45f);
 
         /// <summary>手札・出目をつかんでいる間と、 離したフレーム (の次まで) は true。 敵の詳細の窓 (<see cref="Game2DEnemyPanel"/>) はこの間は開かない。</summary>
@@ -406,6 +408,8 @@ namespace UI.Game2D
             {
                 // 押しただけ: 挿してある〈呼び戻し〉なら、 戻す 1 枚を選ぶ窓を開く (それ以外は何もしない)
                 if (s >= 0 && from >= 0 && sim.IsRecaller(s)) OpenRecall(s);
+                // 手札の端子を押した: 手札の規則 Pick なら「次のターンも残す」の印を付け外し
+                else if (s >= 0 && from < 0) sim.ToggleKeep(s);
                 return;
             }
             // 対象を選ぶ (差し込み口の上 / 手札の抜け殻の上)
@@ -642,8 +646,10 @@ namespace UI.Game2D
                 }
                 DrawUsb(p, x, HandY, false, d, c.body, c.edge, c.metal);
                 if (stopped) p.Rect(x + 2, HandY + UsbConn + UsbBody / 2, UsbBody - 4, 1, StopMark);      // 本体を横切る 1 本の線 = 止まっている印
-                string label = stopped ? "停止" : cand ? (chosen ? "対象" : "候補") : d != null && d.capacity >= 2 ? "残" + rem : null;
-                if (label != null) p.Text(label, x + (UsbBody - Game2DJpFont.Width(label)) / 2, HandY + UsbLong + 1, stopped ? StopMark : cand && chosen ? Ink : Dim);
+                bool kept = op && sim.IsKept(s);      // 手札の規則 Pick: 次のターンも残す印 (仮の印 = 本体の上の 2 ドットの帯・色だけ・拡大縮小はしない)
+                if (kept) p.Rect(x + 1, HandY + UsbConn, UsbBody - 2, 2, KeepMark);
+                string label = stopped ? "停止" : cand ? (chosen ? "対象" : "候補") : kept ? "残す" : d != null && d.capacity >= 2 ? "残" + rem : null;
+                if (label != null) p.Text(label, x + (UsbBody - Game2DJpFont.Width(label)) / 2, HandY + UsbLong + 1, stopped ? StopMark : kept ? KeepMark : cand && chosen ? Ink : Dim);
             }
             p.Apply(t);
         }
@@ -666,6 +672,9 @@ namespace UI.Game2D
             if (sim.IsStopped(f))
                 extra.AddRange(Game2DJpFont.Lines(d.permanent ? "止まっている (このターンは挿せない)"
                                                               : "止まっている (このターンは挿せない・次のターンまで手札に残る)", iw));
+            // 手札の規則 Pick: 残す印の状態
+            if (sim.IsKept(f)) extra.AddRange(Game2DJpFont.Lines("次のターンも手札に残す (押して外す)", iw));
+            else if (sim.CanKeep(f) && !sim.ShowingResult && sim.Remaining(f) > 0) extra.AddRange(Game2DJpFont.Lines("押すと、 挿さなかった時に次のターンも手札に残す", iw));
             string tgt = TargetLine(f);
             if (tgt != null) extra.AddRange(Game2DJpFont.Lines(tgt, iw));
             for (int q = 0; q < m && !sim.ShowingResult; q++)

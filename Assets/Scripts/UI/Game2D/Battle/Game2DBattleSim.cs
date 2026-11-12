@@ -258,6 +258,7 @@ namespace UI.Game2D.Battle
             {
                 for (int i = 0; i < slot.Length; i++) slot[i] = -1;
                 for (int s = 0; s < target.Length; s++) target[s] = -1;
+                for (int s = 0; s < keepMark.Length; s++) keepMark[s] = false;
                 lastOutcome = null; focusSlot = -1;
                 if (AutoWireOnTurnStart) AutoWire(false);
             }
@@ -312,7 +313,7 @@ namespace UI.Game2D.Battle
                     {
                         Game2DSfx.Play("decide");
                         int n = p.playerDice != null ? p.playerDice.Length : 0;
-                        cm.AnswerWiringSlots(BuildSlots(n), (int[])target.Clone());
+                        cm.AnswerWiringSlots(BuildSlots(n), (int[])target.Clone(), 0, (bool[])keepMark.Clone());   // 残す印は本体が KeepFromMarks で直す (挿した端子には効かない)
                         if (!cm.IsAwaitingDecision) Resolve(cm);
                     }
                     break;
@@ -442,6 +443,8 @@ namespace UI.Game2D.Battle
         public int[] slot = { -1, -1, -1 };
         /// <summary>〈写し取り〉〈焼き切り〉〈呼び戻し〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置・−1 = 選んでいない = 左端の候補)。 長さ = 場の枚数。</summary>
         public int[] target = new int[0];
+        /// <summary>手札の規則 Pick (2026-11-13): 次のターンも手札に残す印 (添字 = 場の位置)。 挿していない手札の端子を押すと付け外しする。 長さ = 場の枚数。</summary>
+        public bool[] keepMark = new bool[0];
         /// <summary>このターンの場の写し (添字 = 挿し先)。</summary>
         public readonly List<string> board = new List<string>();
         /// <summary>今の挿し方の見込み。 解決した後は結果 (<see cref="lastOutcome"/> と同じ)。 null あり。</summary>
@@ -460,6 +463,7 @@ namespace UI.Game2D.Battle
             lastOutcome = null; preview = null;      // 前のターンの結果は前の場の添字なので持ち越さない
             for (int i = 0; i < slot.Length; i++) if (slot[i] >= board.Count) slot[i] = -1;
             target = new int[board.Count]; for (int s = 0; s < target.Length; s++) target[s] = -1;
+            keepMark = new bool[board.Count];
         }
 
         /// <summary>見積もりに要る入力。 本体が判断の写しに詰めた盤面 (振り直しの判断でも配線の判断でも入っている) を使う。</summary>
@@ -672,6 +676,37 @@ namespace UI.Game2D.Battle
         // ── 〈呼び戻し〉(手札の持ち越しの規則): 捨て札から 1 枚を選ぶ ──
         //   対象は場ではなく捨て札 (場に見えていない) なので、 画面は窓で選ぶ (Game2DBattleHud.OpenRecall)。 値は target[その端子の場の位置] = 捨て札の添字。
         //   選ばなければ本体の既定 (最後に捨てた 1 枚・TerminalDeckState.RecallPick)。 選んだ値も既定も、 本体と同じ関数で読む。
+
+        // ── 手札の規則 Pick: 残す印 ──
+        //   挿していない手札の端子を押す (つかんで動かさずに放す) と、 「次のターンも手札に残す」の印を付け外しする。
+        //   挿すと印は効かない (挿した端子は捨て札へ)。 止まっている端子は印が無くても残るので付けられない。 常設は手札に無いので付けられない。
+
+        /// <summary>手札の規則が Pick で、 場の s に残す印を付けられるか (手札の端子・止まっていない・判断の間)。</summary>
+        public bool CanKeep(int s)
+        {
+            var dk = CombatManager.Instance?.TerminalDeck;
+            if (!CanOperate || TerminalCards.CarryMode != HandCarryMode.Pick || dk == null || s < dk.permanent.Count || s >= board.Count || IsStopped(s)) return false;
+            var d = TerminalCards.Get(board[s]);
+            return d != null && !d.permanent;
+        }
+
+        /// <summary>場の s に残す印が付いていて、 いま挿していない (印が効く) か。</summary>
+        public bool IsKept(int s)
+        {
+            if (s < 0 || s >= keepMark.Length || !keepMark[s]) return false;
+            for (int i = 0; i < slot.Length; i++) if (slot[i] == s) return false;
+            return true;
+        }
+
+        /// <summary>場の s の残す印を付け外しする。 できなければ false。</summary>
+        public bool ToggleKeep(int s)
+        {
+            if (!CanKeep(s) || s >= keepMark.Length) return false;
+            keepMark[s] = !keepMark[s];
+            Game2DSfx.Play("ui_click", 1f, keepMark[s] ? 1.2f : 0.9f);
+            Touch();
+            return true;
+        }
 
         /// <summary>今の捨て札 (読むだけ)。 null あり。</summary>
         public List<string> Discard => CombatManager.Instance?.TerminalDeck?.discard;
