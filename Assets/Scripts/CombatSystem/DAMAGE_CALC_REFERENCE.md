@@ -49,6 +49,7 @@
 **2026-11-11 #104 で、敵パッシブはこの 3 キーに書かなくなった。** 次ターンへ持ち越す値は各クラスの専用キー
 （`enemy.trapper.atkDown` / `enemy.curse.atkDown` / `enemy.rampage.atkUp` / `enemy.counterStance.dmgUp`）で `nextTurnBuffs` に積み、
 同じクラスが次ターンに敵の側の計算で読む（§4）。新しく敵パッシブを書くときも共有キーへは書かない。
+`diceBonus` は 2026-11-12 に読む側（`RecomputeDiceTotals`）ごと削除した（最後の書き手だった加速の粉 `RunState.pendingFirstRollTotal` は書き込み元が無かった）。
 
 **敵パッシブが ctx の HP を動かすとき（2026-11-11 #104）**: CombatManager は `playerHP` / `enemyHP` を自分のフィールドで持ち、
 ctx の HP はフィールドから書き戻される。敵のトリガーを鳴らす前に ctx の HP をフィールドへ揃え、鳴らした後に
@@ -75,7 +76,6 @@ OnTurnEnd の 4 か所。これ以外の位置で敵パッシブが ctx の HP �
 
 ```
 playerDiceTotal = Σ(プレイヤー出目)
-                + buff "diceBonus"        ← rollPurity(無我無心)中は拒否
 enemyDiceTotal  = Σ(敵出目)
                 − buff "enemyDiceDebuff"
                 − consEnemyDiceDebuff      ← 消費:敵弱体
@@ -289,10 +289,10 @@ ShieldBash の空振り（盾 0）が 34.2% → 66.1%、1 機会あたりの攻�
 | `receivedDamageBonus` | 被ダメ増(亡者の招待+30%) | — |
 | `halveFirstEnemyAttack`/`playerDamageNegateCharges`/`nullifyFirstEnemyRoll` | 共助/獣の絆/獣の恩義 | フラグ消費 |
 | `truceThisTurn` | 停戦協定ターン(他効果抑止) | 毎T |
-| `rollPurity` | 無我無心(diceBonus等拒否) | 戦闘保持 |
+| `rollPurity` | 無我無心(メタの出目加算・消費アイテムの攻撃補正を拒否) | 戦闘保持 |
 | `garyoProc`/`garyoDieValue` | 画竜点睛発動/出目 | — |
 | `consShield`/`consReflect`/`consDmgMultPct`/`consAtkBurst`/`consCritPct`/`consDiceRoll`/`consEnemyDiceDebuff` | 消費アイテム由来 | 各種 |
-| buff `diceBonus`/`damageBonus`/`critRatePct`(小数)/`enemyDiceDebuff` | currentBuffs/nextTurnBuffs経由 | nextTurn→current移行 |
+| buff `damageBonus`/`critRatePct`(小数)/`enemyDiceDebuff` | currentBuffs/nextTurnBuffs経由 | nextTurn→current移行 |
 | `accumulatedValues["extraDice"]` | そのターンのダイス数増減(NightLord/精鋭/0d0等) | — |
 | `accumulatedValues["extraPursuitDice"]` | 追撃ダイス追加(多頭) | — |
 | `accumulatedValues["enemyMaxHPReduction"]` | 相手最大HP減(魔王の威圧) | — |
@@ -459,7 +459,7 @@ Hermes / Bloodlust / EvenEyes / MasterworkNotes / KaleidoDice。
 | Bloodlust(背水の狂刃) | OnPreDealDamage | HP≤50% → outgoing+=0.3、≤25% → +=0.8 (2026-05-31 outgoing移行) |
 | Hermes(ヘルメスの靴) | OnPostRoll | 初回ロール `AddPlayerAttackOrDiceBonus(5)`（攻撃+5・ステータス化 §2-C） |
 | GoldKingBlade(溶金の領主剣) | OnPreDealDamage | 攻撃が通る時 outgoing += 0.005×coinsSpent (200G で +1.0、 上限なし。 2026-11-11 に 0.002 から・ステータス化 §2-C 段 3: `dmgPct 0.5 per coinsSpent`) |
-| MugaMushin(無我無心) | OnBattleStart | rollPurity=true(diceBonus等の補正拒否) |
+| MugaMushin(無我無心) | OnBattleStart | rollPurity=true(メタの出目加算・消費アイテムの攻撃補正を拒否) |
 | GaryoTensei(画竜点睛) | OnPostRoll | 出目が最大面 → garyoProc=true,garyoDieValue。即勝利+(出目+10)×criticalMultiplier会心確定 |
 
 ### 3-B2. 武器家系 専用ラダー（`WeaponFamilyEffects.cs`・2026-09-05 / 2026-10-28 整理）

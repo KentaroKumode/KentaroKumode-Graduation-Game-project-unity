@@ -3946,7 +3946,10 @@ z 化はこの平均を引くだけなので、残るのは選択性の差にな
 | **佯狂者の杖** | [発狂]中、ダイス合計+（他の[佯狂者]数） | `ctx.playerDiceTotal += n` → 無効 |
 | ~~瞬間研磨剤~~ (剣士スターター) | **2026-07-27 解消** → 「次の 1 撃だけ 与ダメージ+150%」へリワーク（`ApplyWinDamageModifiers` で `outgoingDamageMultiplier += 1.5`） | — |
 
-> **2026-11-09 確認: 盟約・佯狂者の杖は items.json から消えている（アイテム再編）。この節は記録として残す。** 残骸として `RunState.pendingFirstRollTotal`（書き込み元なし）と `diceBonus` バフの経路がある。
+> **2026-11-09 確認: 盟約・佯狂者の杖は items.json から消えている（アイテム再編）。この節は記録として残す。**
+> ~~残骸として `RunState.pendingFirstRollTotal`（書き込み元なし）と `diceBonus` バフの経路がある~~ → **2026-11-12 に削除**。
+> `pendingFirstRollTotal` は書く側が 1 か所も無く（読むのは `CombatManager` の戦闘開始だけ）、`nextTurnBuffs["diceBonus"]` を書くのはその読み口だけだったので、
+> `PassiveSkillManager.RecomputeDiceTotals` の `GetBuff("diceBonus")` も一緒に外した（常に 0 を足していた・挙動は変わらない）。
 
 **転生先の候補**: `ctx.AddPlayerAttackOrDiceBonus(n)` helper 経由で `mutualAttackBonus` へ。
 ただし「他の佯狂者数」は攻撃力へ直接足すと威力が変わるため、値の再設計が要る。

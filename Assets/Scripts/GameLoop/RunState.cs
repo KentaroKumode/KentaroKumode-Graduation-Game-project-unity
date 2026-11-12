@@ -470,7 +470,6 @@ namespace GameLoop
         public int  pendingConsEnemyDiceDebuff;// 敵弱体: 敵ダイス合計-X
         public int  pendingEnemyStartHpCutPct; // 奇襲: 敵開始HP-X%
         public bool pendingGamblerDice;        // 賭博師: 50%全最大/50%全1
-        public int  pendingFirstRollTotal;     // 加速の粉: 次戦闘の初回ロールでダイス合計+X
 
         // === 2026-06-28: 職業スターター消耗品 (戦闘外で使用された場合の次戦闘持ち越し) ===
         public bool pendingPolishArmed;        // 瞬間研磨剤: 次戦闘の最初の1撃で 与ダメージ+150%
@@ -502,7 +501,6 @@ namespace GameLoop
             pendingConsDiceRollTurns = 0;
             pendingConsReflect = false; pendingConsEnemyDiceDebuff = 0;
             pendingEnemyStartHpCutPct = 0; pendingGamblerDice = false;
-            pendingFirstRollTotal = 0;
             // 2026-06-28: 職業スターター消耗品の pending フラグ ── 戦闘開始時に ctx へコピー後クリア
             pendingPolishArmed = false; pendingOathArmed = false; pendingDaggerArmed = false;
             // dice/crit/reduce は ConsumePendingAfterBattle 側で管理（残戦闘数 0 で初めてクリア）

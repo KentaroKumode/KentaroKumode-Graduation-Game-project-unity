@@ -798,7 +798,7 @@ namespace ItemSystem.PassiveSkills
         // ===========================================================
 
         /// <summary>
-        /// ダイス出目の合計を計算し、各種ダイス補正（diceBonus / enemyDiceDebuff /
+        /// ダイス出目の合計を計算し、各種ダイス補正（enemyDiceDebuff /
         /// consEnemyDiceDebuff / enemyDiceTotalBonus / bossDiceBonus）を適用する。
         /// 通常ロールと引分リロールで共通。OnPostRoll パッシブによる加算はここでは扱わない。
         /// </summary>
@@ -807,10 +807,6 @@ namespace ItemSystem.PassiveSkills
             context.playerDiceTotal = Sum(playerDice);
             context.enemyDiceTotal = Sum(enemyDice);
             context.rawEnemyDiceTotal = context.enemyDiceTotal;   // [計装] 加算前を控える
-
-            // バフによるダイスボーナス（無我無心: カスタムダイス以外の補正を拒否）
-            if (!context.rollPurity)
-                context.playerDiceTotal += (int)context.GetBuff("diceBonus");
 
             // 瞬間研磨剤 (剣士スターター) は 2026-07-27 に「与ダメージ+150%」へ変更。
             // 旧実装は playerDiceTotal 加算だったが、相互攻撃モデル (ADR-0009) では
