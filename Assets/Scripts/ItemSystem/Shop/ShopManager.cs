@@ -805,7 +805,6 @@ namespace ItemSystem.Shop
                 Current.materialPurchaseCount++;
                 slot.price = Current.CurrentMaterialPrice; // 表示価格を更新
                 Debug.Log($"[ShopManager] 強化素材購入: -{price}G (次回 {Current.CurrentMaterialPrice}G)");
-                MetaProgression.MetaBuffApplicator.RollRefund(price, run);
                 OnShopUpdated?.Invoke();
                 return true;
             }
@@ -890,7 +889,6 @@ namespace ItemSystem.Shop
             string label = data != null ? data.displayName
                          : (GameLoop.DiceFaceParts.LabelOfId(slot.itemId) ?? slot.itemId);
             Debug.Log($"[ShopManager] 購入: {label} -{slot.price}G");
-            MetaProgression.MetaBuffApplicator.RollRefund(slot.price, run);
             OnShopUpdated?.Invoke();
             return true;
         }
@@ -978,7 +976,6 @@ namespace ItemSystem.Shop
             if (RerollKeepsSale) ApplySaleDiscounts(Current, Current.rerollCount * 64);
 
             Debug.Log($"[ShopManager] リロール#{Current.rerollCount}: -{price}G / {rerolled}枠更新 / 次回{Current.CurrentRerollPrice}G");
-            MetaProgression.MetaBuffApplicator.RollRefund(price, run);
             OnShopUpdated?.Invoke();
             return true;
         }

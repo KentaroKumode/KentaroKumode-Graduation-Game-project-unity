@@ -2167,7 +2167,8 @@ CritDamageBonus / BossExtraRare 昇格 / **DiceTotalBonus（ダイス合計概�
 装甲 = 防御 `CombatManager.cs` の戦闘開始・被ダメ −N と r10 の一撃の上限 `CombatManager.Turn.cs` ／
 種火 = r1 `ShopManager.PickWithSparkBias`・r3 `GameManager.cs`・r2 充電 `CombatManager.cs` / `CombatContext.ChargeCap`・臨界 `CombatManager.Finish.cs` → `CombatManager.cs`・毒 `CombatContext.AddStatus`・出血 `CombatManager.Turn.cs`・シールド `CombatContext` の減衰 ／
 端子 = `CombatManager.Turn.cs` の配線合計。
-**常に 0 を返すだけの口**（読む側はあるが効果は無い）: `GetDiceTotalBonus`・`RollRefund`・`GetFloorClearHeal`・`GetArmorImmovableDefense`・`GetArmorOpeningShield`（刻み 0）・`GetProvisionCapBonus` / `IsSupplyLineUnlocked`（兵站は枠の外）・`GetCritDamageBonus`（会心の種火は枠の外）・`GetCritRatePctBonus` の精密の分（枠の外）。
+**常に 0 を返すだけの口**（読む側はあるが効果は無い）: `GetDiceTotalBonus`（本体からの呼び出しは 2026-11-12 に外した・AutoTest が参照）・`GetFloorClearHeal`・`GetArmorOpeningShield`（刻み 0）・`GetProvisionCapBonus` / `IsSupplyLineUnlocked`（兵站は枠の外）・`GetCritDamageBonus`（会心の種火は枠の外）・`GetCritRatePctBonus` の精密の分（枠の外）。
+`RollRefund`・`GetArmorImmovableDefense`・`GetSaleDiscountMin/MaxPct`・`GetProvisionLossReduction` は 2026-11-12 に削除（0 を返すだけ、または呼ぶ側が無かった）。
 
 ### 15-2. 挑戦デバフ — 配点ハイスコア方式（**2026-11-10 撤去・記録として残す**）
 

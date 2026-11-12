@@ -377,9 +377,6 @@ namespace ItemSystem.PassiveSkills
             triggeredPlayerSkills.Clear();
             triggeredEnemySkills.Clear();
 
-            // ターン開始時のバフを適用
-            ApplyCurrentTurnBuffs();
-
             FireTrigger(PassiveSkillTrigger.OnTurnStart);
         }
 
@@ -474,23 +471,6 @@ namespace ItemSystem.PassiveSkills
                 context.accumulatedValues[Keywords.Kw.AmountKey] = prevAmount;
                 _kwDepth--;
             }
-        }
-
-        // ===========================================================
-        //  バフ適用
-        // ===========================================================
-
-        /// <summary>
-        /// currentBuffsの値をCombatContextに反映
-        /// </summary>
-        private void ApplyCurrentTurnBuffs()
-        {
-            if (context == null) return;
-
-            // ダイスボーナス → ProcessPostRoll内でplayerDiceTotalに加算
-            // 会心ボーナス  → ProcessDamage内のOnCriticalCheckで加算
-            // ダメージボーナス → ProcessDamage内で加算
-            // ここでは追加の即時適用処理があれば記述
         }
 
         // ===========================================================

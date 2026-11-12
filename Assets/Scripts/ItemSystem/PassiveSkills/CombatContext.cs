@@ -1103,8 +1103,7 @@ namespace ItemSystem.PassiveSkills
             shieldOnWinPct = 0f;
             // 防御値と貫通 (ADR-0013): 土台へ戻す。 敵側 (enemyDefense / enemyArmorPen) は戦闘通して保持＝ここでは触らない
             playerDefense = playerDefenseBase;
-            // 整備パネル〈装甲〉r10〈不動〉: 失った HP 10% ごとに防御 +1 (最大 +9)。 ターンの始めの HP で数える (2026-11-10)
-            playerDefense += MetaProgression.MetaBuffApplicator.GetArmorImmovableDefense(playerCurrentHP, playerMaxHP);
+            // (旧 整備パネル〈装甲〉r10〈不動〉の「失った HP 10% ごとに防御 +1」は 2026-11-10 に一撃の上限へ差し替え済み。 常に 0 だった加算を 2026-11-12 に外した)
             playerArmorPen = playerArmorPenBase;
             enemyArmorPenNegate = 0;
 
