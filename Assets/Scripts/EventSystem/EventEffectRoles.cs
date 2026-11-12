@@ -69,6 +69,7 @@ namespace EventSystem
                 case EventEffectType.GainSpecificItem:
                 case EventEffectType.GainFlag:
                 case EventEffectType.ObservatoryTakeCopy:
+                case EventEffectType.VescaClockTake:   // ヴェスカのダウンの機会が増える ── 遊ぶ人の得
                 case EventEffectType.RevealMap:
                 case EventEffectType.RevealEncounters:
                 case EventEffectType.RevealSupplies:

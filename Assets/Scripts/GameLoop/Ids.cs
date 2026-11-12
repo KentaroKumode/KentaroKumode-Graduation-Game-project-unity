@@ -35,6 +35,11 @@ namespace GameLoop
         /// <summary>苦難の確信: 〈啓示〉で得るフラグ。 次段〈災厄の予兆〉の条件。</summary>
         public const string HardshipConviction = "苦難の確信";
 
+        // === 〈さびれた観測所〉の時計 (2026-11-13) ===
+        /// <summary>止まらない時計: 写しを持った再訪の 5 つ目の選択肢 (効果〈止まらない時計を預かる〉) で得るフラグ (RunState.ownedFlags・このランだけ)。
+        /// 持ったまま七層のヴェスカの戦闘に入ると、 各段のダウンの目盛りに 1 つ足す (<see cref="GameLoop.VescaClock"/>・CombatSystem.BossParams.VescaClockNotch)。</summary>
+        public const string VescaClock = "止まらない時計";
+
         // === 初期装備 ===
         public const string DiceWood = "dice_wood";
 
