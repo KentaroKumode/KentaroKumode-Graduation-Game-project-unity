@@ -202,7 +202,7 @@ namespace CombatSystem
         public const int CapacitorNeed = 12, CapacitorAttack = 40, ArresterNeed = 12, FoundryNeed = 10, CoolantNeed = 12;
         public const float AmplifierPerPip = 0.16f, ResonatorMul = 1.5f, VacuumCritMult = 2.0f;
         public const int CounterEvery = 10; public const float CounterPct = 0.10f;
-        public const int TwinShotMul = 3, DetonatorMul = 4, FirstAidMul = 2, HealMul = 2, BatteryBonus = 2, InsulatorBonus = 4;
+        public const int TwinShotMul = 3, DetonatorMul = 4, FirstAidMul = 2, HealMul = 1, BatteryBonus = 2, InsulatorBonus = 4;
         public const int HarvesterMaxHp = 2, WhetGain = 1, LootGold = 5;
         public const float SightPerRank = 0.2f, VitalPerRank = 0.1f, BloodTapPct = 0.05f, BigDischargePerRank = 0.10f, ShieldPushPerRank = 0.06f;
         public const int BloodTapPer = 5, PoisonScalePer = 10, PoisonScaleAttack = 3, AfterHeatPerBurst = 2;
@@ -211,8 +211,14 @@ namespace CombatSystem
         //     戦利品箱 +1.9 / +3.6 → 10G→5G・絶縁体 +1.7 / +2.7 → +6→+4。
         //   弱すぎ: 決死 −1.8 / −3.3 → 払う HP を出目の半分 (切り上げ) に・充填 −1.2 / −1.4 → 溜める量 15→12。
         //   主幹 (+4.9 / +6.8)・二股 (+3.2 / +4.0) はユーザーの指定した作りなので据え置き。 防御の割合の端子 (接地・避雷器) は弱いが原因が読めないので据え置き。
+        // 2026-11-12 (4): 同じ ITT の第 2 弾 (根拠は前回の調整の後の ITT・Optimal / Super の差と対数オッズ比)。
+        //   治癒 +2.35 / +6.15 → ×2→×1 (前回 ×4→×2 で倍率に素直に効いた)。
+        //   主幹は据え置き。 腕から元の値へ戻す口は GameHooks.Terminal* (AutoRunner.terminal*)。
         /// <summary>〈主幹〉: この戦闘で使うたび、 以後の攻撃 +N。 / 〈配電盤〉: 次のターンに多く引く枚数。</summary>
         public const int MainsPerUse = 1, SwitchboardDraw = 2;
+
+        /// <summary>〈治癒〉の倍率 (測定の口 <see cref="GameLoop.GameHooks.TerminalHealMulOverride"/> があればその値)。 効果はこれを読む。</summary>
+        public static int HealMulNow => GameLoop.GameHooks.TerminalHealMulOverride > 0 ? GameLoop.GameHooks.TerminalHealMulOverride : HealMul;
 
         private static TerminalDef D(string id, TerminalKind k, string desc, TerminalCond c = TerminalCond.None, string axis = null)
             => new TerminalDef { id = id, kind = k, cond = c, description = desc, axis = axis, condLabel = CondLabel(c) };
@@ -268,7 +274,7 @@ namespace CombatSystem
                 Cost(D(TerminalIds.Breaker, B, "充電 " + BreakerCost + " を払い、このターンの敵の攻撃 −" + BreakerCutPct + "%。"), BreakerCost),
                 D(TerminalIds.Rectifier, C, "充電 +出目 ×" + RectifierMul + "。", TerminalCond.Even),
                 D(TerminalIds.Battery, C, "充電 +出目 +" + BatteryBonus + "。"),
-                D(TerminalIds.Heal, S, "HP +出目 ×" + HealMul + "。", TerminalCond.AtMost3),
+                D(TerminalIds.Heal, S, (HealMul == 1 ? "HP +出目。" : "HP +出目 ×" + HealMul + "。"), TerminalCond.AtMost3),
                 D(TerminalIds.Capacitor, S, "出目を溜める。" + CapacitorNeed + " で次の攻撃 +" + CapacitorAttack + "。"),
                 D(TerminalIds.Arrester, S, "出目を溜める。" + ArresterNeed + " でそのターンの被ダメージ半分。"),
                 D(TerminalIds.Transformer, S, "攻撃の端子を挿した出目を 2 倍。"),
@@ -575,7 +581,7 @@ namespace CombatSystem
                 case TerminalIds.Breaker: o.enemyAttackMul *= 1f - BreakerCutPct / 100f; break;
                 case TerminalIds.Rectifier: o.chargeAdd += sum * RectifierMul; break;
                 case TerminalIds.Battery: o.chargeAdd += sum + BatteryBonus; break;
-                case TerminalIds.Heal: o.heal += sum * HealMul; break;
+                case TerminalIds.Heal: o.heal += sum * HealMulNow; break;
                 case TerminalIds.Capacitor: st.storedAttack += CapacitorAttack * Gauge(st, id, sum, CapacitorNeed); break;
                 case TerminalIds.Arrester: if (Gauge(st, id, sum, ArresterNeed) > 0) o.takenMul *= 0.5f; break;
                 case TerminalIds.Switchboard: st.extraDrawNext += SwitchboardDraw; break;

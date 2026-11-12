@@ -176,6 +176,9 @@ namespace AutoTest
         public bool pursuerNoReward = false;
         public float pursuerAtkMul = 0f, pursuerHpAdd = 0f;
         public int pursuerSupply = -1;
+        /// <summary>[測定 2026-11-12・#102] 端子の調整を元の値へ戻す腕。 本体の GameHooks.Terminal* へ流す (ラン終了で既定へ)。
+        /// terminalHealMul: 〈治癒〉の倍率 (0 = 差し替えない = 今の値・旧は 2)。</summary>
+        public int terminalHealMul = 0;
         /// <summary>[測定 2026-11-12・#35] 航行の「恐れ」: 行き先の点が、 推定した追跡者の位置から <see cref="navFearRange"/> 歩より近いほど引く。
         /// 引く量 = 恐れ × (範囲 − 推定の歩数)。 Optimal の行き先選び (価値の単位) は navFear、 Super の計画 (対数オッズ) は navFearMacro。 0 = 使わない。</summary>
         public float navFear = 0f, navFearMacro = 0f;

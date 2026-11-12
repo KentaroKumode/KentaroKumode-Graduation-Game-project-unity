@@ -502,6 +502,7 @@ namespace AutoTest
             GameLoop.GameHooks.PursuerAtkMulOverride = 0f;
             GameLoop.GameHooks.PursuerHpAdd = 0f;
             GameLoop.GameHooks.PursuerSupplyOverride = -1;
+            GameLoop.GameHooks.TerminalHealMulOverride = 0;                      // [測定 2026-11-12・#102]
             GameLoop.GameHooks.VescaDiceForce = 0;               // [測定 2026-11-11] 武器の段の上限を外す
             CombatSystem.EnemyHpLedger.ProbeMainMult = 1f;      // [測定用の物差し 2026-11-10] ラン終了で既定 (1) へ戻す
             CombatSystem.EnemyHpLedger.ProbePassiveMult = 1f;

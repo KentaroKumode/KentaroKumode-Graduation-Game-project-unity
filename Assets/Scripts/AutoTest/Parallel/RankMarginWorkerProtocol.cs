@@ -463,6 +463,8 @@ namespace AutoTest.ParallelSweep
                 "enemyArmorPenSpec", "EnemyArmorPenOverrideApplied",
                 "challengeCardPickByAxis",
                 "terminalsLeaveDeck", "randomGrantTerminals", "armorDefPerRank", "armorFlatEvery",
+                // 2026-11-12 (#102 第 2 弾): 端子の調整を元の値へ戻す腕 (0 / False = 今の値)
+                "terminalHealMul",
             };
             var sb = new System.Text.StringBuilder();
             foreach (string name in watched)

@@ -82,6 +82,11 @@ namespace GameLoop
         /// 引数 (敵の id, データの値) → 使う値。 null = 差し替えない (本番)。 AutoRunner.enemyArmorPenSpec が毎ランの始めに入れる。</summary>
         public static Func<string, int, int> EnemyArmorPenOverride;
 
+        /// <summary>[測定 2026-11-12・#102] 端子の調整を腕から元の値へ戻す口 (0 = 差し替えない = 今の値)。
+        /// 〈治癒〉の倍率 (<see cref="CombatSystem.TerminalCards.HealMul"/>)。
+        /// AutoRunner.terminalHealMul が毎ランの始めに入れ、 ラン終了で 0 へ戻す。 画面の説明文は今の値のまま (測定の口なので)。</summary>
+        public static int TerminalHealMulOverride;
+
         /// <summary>敵の固定削り (データの値・<see cref="EnemyArmorPenOverride"/> があればその値・下限 0)。</summary>
         public static int EnemyArmorPen(string enemyId, int dataValue)
         {
@@ -114,6 +119,7 @@ namespace GameLoop
             EnemyArmorPenOverride = null;
             RelicStatOffMask = 0;
             RelicSetBonusOffMask = 0;
+            TerminalHealMulOverride = 0;
         }
     }
 }
