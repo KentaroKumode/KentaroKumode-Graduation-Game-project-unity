@@ -12,7 +12,8 @@ namespace GameLoop
     ///
     /// <para><b>時間を進める口は「1 歩動く」「待つ」「偵察」「休憩で多めに回復」だけ。</b> どれも
     /// <see cref="FreeMapSim"/> の操作 1 回が 1 ターンぶん (雪の前線の内側は 2 ターン) で、
-    /// 戦闘・イベント・照明・囮罠はターンを使わない。 人も BOT も同じ口を同期的に叩く。</para>
+    /// 戦闘・イベント・照明・囮罠はターンを使わない。 イベントの「近道+N」の残りがある間の 1 歩は 0 ターン (<see cref="FreeMapSim.FreeMovesLeft"/>)。
+    /// 人も BOT も同じ口を同期的に叩く。</para>
     /// </summary>
     public partial class GameManager
     {
@@ -58,6 +59,7 @@ namespace GameLoop
                 Log("そこへは行けない（道がつながっていない）");
                 return false;
             }
+            if (sim.FreeMovesLeft > 0) Log($"近道（物資もターンも使わない・残り {sim.FreeMovesLeft - 1} 回）");
             RunFreeMapOp(s => s.MoveTo(node.index));
             return true;
         }

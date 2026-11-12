@@ -127,7 +127,7 @@ namespace UI.Game2D
         }
 
         // ── 経過ターン・補足中の警告 (issue #69 / #72) ──
-        //   1 行目 = 経過ターン (「ターン」とは書かない) と照明の残り。 2 行目 = 優先順に 「枠の説明 (乗せている時)」→「補足中の ETA」→「羅針の方角」。
+        //   1 行目 = 経過ターン (「ターン」とは書かない) と照明の残り・近道の残り (イベント「近道+N」・ただで動ける回数)。 2 行目 = 優先順に 「枠の説明 (乗せている時)」→「補足中の ETA」→「羅針の方角」。
         //   補給 (店) で動けない待ち時間は、 今の規則 (店は 0 ターン) では起きない。 まとめて進んだ分 (イベント・多めに休む) はターン数の横の「+N」(gui-needed.md #21)。
 
         private void RedrawStatus(GameManager gm, FreeMapSim sim, RunState run, bool blinkOn)
@@ -141,7 +141,14 @@ namespace UI.Game2D
             string tn = Mathf.Min(9999, sim.Turn).ToString(); int tx = 5 + Game2DJpFont.Width("ターン") + 4;
             p.Text(tn, tx, 3, Game2DKit.Ink);
             if (Time.unscaledTime < _jumpUntil) p.Text("+" + _jumpN, tx + Game2DJpFont.Width(tn) + 4, 3, Game2DKit.Amber);      // まとめて進んだ分
-            if (sim.FlareOn) p.TextR("照明 残り" + sim.FlareTurnsLeft, StatusR.width - 5, 3, Game2DKit.Amber);
+            // 右: 照明の残り (ターン) と近道の残り (ただで動ける回数)。 両方ある時は、 ターン数の字と重なるなら短く書く
+            string flare = sim.FlareOn ? "照明 残り" + sim.FlareTurnsLeft : null;
+            string cut = sim.FreeMovesLeft > 0 ? "近道 残り" + sim.FreeMovesLeft : null;
+            string right = flare != null && cut != null ? cut + " " + flare : flare ?? cut;
+            int leftEnd = tx + Game2DJpFont.Width(tn) + (Time.unscaledTime < _jumpUntil ? 4 + Game2DJpFont.Width("+" + _jumpN) : 0);
+            if (flare != null && cut != null && StatusR.width - 5 - Game2DJpFont.Width(right) < leftEnd + 6)
+                right = "近道" + sim.FreeMovesLeft + " 照明" + sim.FlareTurnsLeft;
+            if (right != null) p.TextR(right, StatusR.width - 5, 3, Game2DKit.Amber);
             string line = null; var col = Game2DKit.Dim;
             if (_hoverSlot >= 0) { line = SlotHint(gm, sim, run, _hoverSlot); col = Game2DKit.Ink; }
             else if (sim.FoeAlive && sim.FoeMode == FoeMode.Chase)

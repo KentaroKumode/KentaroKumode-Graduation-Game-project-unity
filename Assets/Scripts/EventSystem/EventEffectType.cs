@@ -56,7 +56,8 @@ namespace EventSystem
         PushPursuer,
         /// <summary>追跡者を呼ぶ+N (代償): 追跡者の本体が道で N 歩近づく (隣で止まる)。</summary>
         PullPursuer,
-        /// <summary>近道+N: 終点へ向かう道を N 歩先の点へ移る (途中の点は起動しない・着いた点は起動する)。</summary>
+        /// <summary>近道+N: この後の移動 N 回ぶん、 物資を使わずターンも進まない (どこへ動くかは遊ぶ人が選ぶ・自動では動かない)。
+        /// 待つ・偵察・〈補給線〉には効かない。 層を出たら残りは消える。 中身は <c>FreeMapSim.GrantFreeMoves</c>。</summary>
         Shortcut,
         /// <summary>前線を遠ざける+N / 前線を近づける+N: 天候の前線を N 段戻す / 進める。 amount は符号つき (近づける = 正)。</summary>
         ShiftFront,

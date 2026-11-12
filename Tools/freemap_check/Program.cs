@@ -178,6 +178,44 @@ static class T
             for (int i = 0; i < 8 && !s2.InFight; i++) { var ev = s2.Wait(); if ((ev & FreeMapEvent.FamiliarLaunched) != 0) launched = true; }
             Check(launched || s2.InFight, "召喚者は補足中に使い魔を放つ");
         }
+        // --- 近道 (イベント「近道+N」= ただで動ける回数・2026-11-12) ---
+        {
+            var w = new Wallet { Provision = 5 };
+            var s = Make(5, FoeProfile.Brute, WeatherKind.None, w);
+            s.UseFlare();
+            int p0 = w.Provision, t0 = s.Turn, foe0 = s.FoeNode, flare0 = s.FlareTurnsLeft;
+            s.GrantFreeMoves(2);
+            Check(s.FreeMovesLeft == 2 && s.Me == s.Layout.start, "近道: 受けただけでは動かない (残り 2)");
+            int a = s.Neighbors(s.Me)[0];
+            var ev1 = s.MoveTo(a);
+            Check(w.Provision == p0 && s.Turn == t0 && s.FoeNode == foe0 && s.FlareTurnsLeft == flare0 && s.FreeMovesLeft == 1
+                  && (ev1 & FreeMapEvent.TurnPassed) == 0 && (ev1 & FreeMapEvent.Arrived) != 0,
+                  $"近道: ただの 1 歩は物資もターンも減らず、追跡者も照明も動かない (物資 {p0}->{w.Provision}, ターン {t0}->{s.Turn}, 残り {s.FreeMovesLeft})");
+            Check(s.HasTrace(a), "近道: ただの 1 歩も痕跡は残す");
+            s.Wait();
+            Check(s.FreeMovesLeft == 1 && s.Turn == t0 + 1, "近道: 待つでは減らない");
+            s.Recon();
+            Check(s.FreeMovesLeft == 1 && s.Turn == t0 + 2, "近道: 偵察でも減らない");
+            int t1 = s.Turn, p1 = w.Provision;
+            s.MoveTo(s.Neighbors(s.Me)[0]);
+            Check(s.FreeMovesLeft == 0 && s.Turn == t1 && w.Provision == p1, "近道: 2 回目もただで、残りは 0");
+            int t2 = s.Turn, p2 = w.Provision;
+            if (!s.InFight) s.MoveTo(s.Neighbors(s.Me)[0]);
+            Check(s.InFight || (s.Turn == t2 + 1 && w.Provision == p2 - FreeMapParams.MoveSupply), "近道: 使い切った後の 1 歩は通常どおり払う");
+            GameLoop.GameRng.Salt = 5 * 104729;
+            var next = new FreeMapSim(FreeMapGenerator.Generate(6), new Wallet(), true, FoeProfile.Brute, WeatherKind.None);
+            Check(next.FreeMovesLeft == 0, "近道: 層を出ると (中身を作り直すと) 残りは消える");
+
+            // 追跡者の居る点へ自分から踏み込むと、ターンを進めずにその場で捕まる
+            var s2 = Make(5, FoeProfile.Brute, WeatherKind.None);
+            s2.PullFoe(99);
+            bool adj = s2.HopsFrom(s2.Me)[s2.FoeNode] == 1;
+            int t3 = s2.Turn;
+            s2.GrantFreeMoves(1);
+            var ev2 = adj ? s2.MoveTo(s2.FoeNode) : FreeMapEvent.None;
+            Check(adj && (ev2 & FreeMapEvent.Caught) != 0 && s2.Contact == FreeMapSim.ContactKind.Body && s2.Turn == t3 && s2.PendingArrival == s2.Me,
+                  $"近道: 追跡者の点へ踏み込むと、ターンを進めずに捕まる (隣={adj}, ターン {t3}->{s2.Turn})");
+        }
         // --- 魔石 ---
         {
             var s = Make(5, FoeProfile.Brute, WeatherKind.None);

@@ -101,7 +101,8 @@ namespace MapSystem.FreeMove
     /// 航行マップの動く中身 (ターン制・2026-10-18)。 参照実装は docs/design/map-grid-prototype.html。
     ///
     /// <para><b>移動は道でつながった隣の点へ 1 歩</b>。 自分が 1 歩動く (または待つ・偵察する) ごとに 1 ターンが進み、
-    /// 追跡者が 1 度動く。 戦闘・イベント・照明・囮罠はターンを使わない。 物資は距離によらず 1 歩ごとに一定。</para>
+    /// 追跡者が 1 度動く。 戦闘・イベント・照明・囮罠はターンを使わない。 物資は距離によらず 1 歩ごとに一定。
+    /// イベントの「近道+N」の残り (<see cref="FreeMovesLeft"/>) がある間の 1 歩だけは、 物資もターンも使わない。</para>
     ///
     /// <para>乱数は前線の天候 (道が崩れる・点が沈む) の選択だけで、
     /// <c>GameRng.Range(.., "map.free.weather", 層 × 100000 + ターン × 10 + 試行)</c> ── 同じ操作なら同じ結果になる。</para>
@@ -200,6 +201,20 @@ namespace MapSystem.FreeMove
         private bool _smokeGranted, _beaconGranted;
         /// <summary>〈渡り鳥の羅盤〉: 終点へ近づいた歩の数 (偶数番目の歩が無料)。</summary>
         private int _goalwardSteps;
+
+        // ── 近道 (イベント「近道+N」・2026-11-12 のユーザーの決定) ──
+        /// <summary>ただで動ける残りの回数。 1 以上の間、 隣への 1 歩 (<see cref="MoveTo"/>) は物資を払わず、 ターンも進めない
+        /// (追跡者・使い魔・前線・照明と囮罠の残りが動かない)。 1 歩ごとに 1 減る。 待つ・偵察・〈補給線〉では減らない。
+        /// 層を出ると Sim ごと消える (持ち越さない)。</summary>
+        public int FreeMovesLeft { get; private set; }
+
+        /// <summary>ただで動ける回数を足す (重ねたら足し合わせ)。</summary>
+        public void GrantFreeMoves(int n)
+        {
+            if (n <= 0) return;
+            FreeMovesLeft += n;
+            Version++;
+        }
 
         /// <summary>係数を差し替える。 回数のある品 (煙玉・前哨の旗) は、 層の中で初めて持った時に 1 度だけ回数を入れる。</summary>
         public void SetPerks(FreeMapPerks p)
@@ -325,6 +340,7 @@ namespace MapSystem.FreeMove
         /// 抽選は (ターン, 行き先) で決まる専用の鍵なので、 同じターンに何度聞いても同じ答え (予告・BOT の先読みと実際の支払いが一致する)。</summary>
         public int SupplyFor(int j)
         {
+            if (FreeMovesLeft > 0) return 0;   // 近道の残りがある間はただ
             int c = FreeMapParams.MoveSupply;
             if (!Perks.ignoreSand && (WeatherAt(j, WeatherKind.Sand) || WeatherAt(Me, WeatherKind.Sand))
                 && GameLoop.GameRng.Range(0, 1000, "map.free.sand", Turn * 1000 + j) < (int)(FreeMapParams.SandExtraChance * 1000))
@@ -341,8 +357,8 @@ namespace MapSystem.FreeMove
             return g[j] != int.MaxValue && g[j] < g[Me];
         }
 
-        /// <summary>点 j へ 1 歩動くのに進むターン (雪の前線の内側は 2)。</summary>
-        public int TurnsFor(int j) => WeatherAt(j, WeatherKind.Snow) || WeatherAt(Me, WeatherKind.Snow) ? 2 : 1;
+        /// <summary>点 j へ 1 歩動くのに進むターン (雪の前線の内側は 2・近道の残りがある間は 0)。</summary>
+        public int TurnsFor(int j) => FreeMovesLeft > 0 ? 0 : WeatherAt(j, WeatherKind.Snow) || WeatherAt(Me, WeatherKind.Snow) ? 2 : 1;
 
         /// <summary>点 j へ 1 歩動いた時の HP の損 (雹の前線の内側)。</summary>
         public int HpLossFor(int j) => WeatherAt(j, WeatherKind.Hail) ? 1 : 0;
@@ -437,12 +453,17 @@ namespace MapSystem.FreeMove
         public bool CanMoveTo(int j)
             => !Dead && !InFight && j >= 0 && j < _adj.Length && !_sunk[j] && _adj[Me].Contains(j);
 
-        /// <summary>隣の点 j へ 1 歩。 物資を払い、 痕跡を残し、 追跡者が動く。</summary>
+        /// <summary>隣の点 j へ 1 歩。 物資を払い、 痕跡を残し、 追跡者が動く。
+        /// <para>近道の残り (<see cref="FreeMovesLeft"/>) がある間は<b>ただの 1 歩</b>: 物資を払わず、 ターンを進めず (追跡者・使い魔・前線・
+        /// 照明と囮罠の残りが動かない)、 残りを 1 減らす。 雹の HP・痕跡・着いた点の起動は通常の 1 歩と同じ。 補足の判定は
+        /// 追跡者の手番 (= 次にターンが進んだ時) にしか無いので、 ここでは鳴らない。 追跡者・使い魔の居る点へ自分から踏み込んだ時だけ、 その場で接触する。</para></summary>
         public FreeMapEvent MoveTo(int j)
         {
             if (!CanMoveTo(j)) return FreeMapEvent.None;
+            bool free = FreeMovesLeft > 0;
             int cost = SupplyFor(j), turns = TurnsFor(j), hail = HpLossFor(j);
-            if (Perks.goalwardHalf && IsGoalward(j)) _goalwardSteps++;
+            // 〈渡り鳥の羅盤〉の「2 歩に 1 回安い」は払う歩だけを数える (ただの歩で順番をずらさない)
+            if (!free && Perks.goalwardHalf && IsGoalward(j)) _goalwardSteps++;
             var ev = FreeMapEvent.None;
             if (Pay(cost)) ev |= FreeMapEvent.Died;
             HpPayReason = "雹";
@@ -455,8 +476,32 @@ namespace MapSystem.FreeMove
             LastArrived = j;
             ev |= FreeMapEvent.Arrived;
             if ((ev & FreeMapEvent.Died) != 0) { Dead = true; return ev; }
-            ev |= PassTurns(turns);
+            if (free)
+            {
+                FreeMovesLeft--;
+                ev |= ContactWithoutTurn(j);
+                RevealView();
+            }
+            else ev |= PassTurns(turns);
             if ((ev & (FreeMapEvent.Caught | FreeMapEvent.FamiliarContact)) != 0) PendingArrival = j;
+            return ev;
+        }
+
+        /// <summary>ターンを進めずに点 j へ着いた時の接触: 追跡者の本体の居る点なら捕まる (補足もその場で入る)、
+        /// 使い魔・猟犬の居る点なら接触する。 補足の範囲に入っただけでは何も起きない (判定は次の追跡者の手番)。
+        /// 〈煙玉〉は補足を外す品で、 踏み込んだ接触には効かない。</summary>
+        private FreeMapEvent ContactWithoutTurn(int j)
+        {
+            var ev = FreeMapEvent.None;
+            if (FoeAlive && FoeNode == j)
+            {
+                if (FoeMode != FoeMode.Chase) { ev |= FreeMapEvent.Detected; _chaseTurns = 0; }
+                FoeMode = FoeMode.Chase; LastSeen = j; _lose = 0; _alertLure = -1;
+                Contact = ContactKind.Body;
+                return ev | FreeMapEvent.Caught;
+            }
+            foreach (var f in Familiars)
+                if (f.pos == j) { Contact = ContactKind.Familiar; ev |= FreeMapEvent.FamiliarContact; break; }
             return ev;
         }
 
@@ -620,30 +665,6 @@ namespace MapSystem.FreeMove
             }
             Version++;
             return FreeMapEvent.None;
-        }
-
-        /// <summary>近道: 終点へ向かう最短の道を steps 歩先の点へ移る (物資もターンも使わない)。 途中の点は通り過ぎるだけで起動しない
-        /// (使い切りにならず、 種類も明かさない)。 終点と追跡者の居る点の手前で止まる。 移れたら着いた扱い (<see cref="FreeMapEvent.Arrived"/>) で、
-        /// 着いた点は本体が起動する。 痕跡は着いた点にだけ残り、 追跡者が最後に補足した点は動かない。</summary>
-        public FreeMapEvent Shortcut(int steps)
-        {
-            if (Dead || InFight || steps <= 0) return FreeMapEvent.None;
-            int cur = Me, prev = PrevNode, moved = 0;
-            for (int k = 0; k < steps; k++)
-            {
-                int nx = StepToward(cur, Layout.goal);
-                if (nx == cur || nx == Layout.goal || (FoeAlive && nx == FoeNode)) break;
-                prev = cur; cur = nx; moved++;
-            }
-            if (moved == 0) return FreeMapEvent.None;
-            PrevNode = prev;
-            Me = cur;
-            Version++;
-            _trace[cur] = Turn;
-            Known[cur] = true;
-            LastArrived = cur;
-            RevealView();
-            return FreeMapEvent.Arrived;
         }
 
         /// <summary>天候の前線を動かす。 steps &gt; 0 = 近づける (前線が steps 回進む・崩れる地平と沈む湖面はその分だけ働く)、

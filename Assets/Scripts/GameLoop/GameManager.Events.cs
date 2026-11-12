@@ -195,11 +195,11 @@ namespace GameLoop
         private void PassEventTurns()
         {
             var ee = EventEncounter.Instance;
-            // 先に両方を取り出す ── 航行の効果 (近道) で着いた点がイベントだと、 次のイベントの開始が積み残しを捨てる
             int n = ee != null ? ee.TakePendingTurns() : 0;
             var nav = ee != null ? ee.TakePendingNav() : null;
             // 航行の効果 → ターンの順 (2026-11-12)。 「ターン+1,追跡者を撒く」は撒いてから時間が過ぎる。
-            //   近道で着いた点が戦闘・店などを起動したら、 残りの効果とターンは捨てる (地図の外では進められない)。
+            //   航行の効果はどれも自分を動かさない (近道も「この後の移動をただにする」だけ) ので、 ここで点が起動することは無い。
+            //   下の段の確認は地図の外へ出た時の守りだけ。
             if (nav != null)
                 foreach (var e in nav)
                 {
@@ -243,8 +243,12 @@ namespace GameLoop
                     RunFreeMapOp(s => s.PullFoe(e.amount));
                     break;
                 case EventSystem.EventEffectType.Shortcut:
-                    Log($"イベント: 近道（終点の方へ最大 {e.amount} 歩・物資もターンも使わない）");
-                    RunFreeMapOp(s => s.Shortcut(e.amount));
+                    RunFreeMapOp(s =>
+                    {
+                        s.GrantFreeMoves(e.amount);
+                        Log($"イベント: 近道 ── この後の移動 {e.amount} 回は物資もターンも使わない（残り {s.FreeMovesLeft} 回・待つ・偵察には効かない）");
+                        return MapSystem.FreeMove.FreeMapEvent.None;
+                    });
                     break;
                 case EventSystem.EventEffectType.ShiftFront:
                     RunFreeMapOp(s => s.ShiftFront(e.amount));

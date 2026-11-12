@@ -362,7 +362,7 @@ namespace EventSystem
                 case EventEffectType.ShakeOffPursuer:  return sim.FoeAlive ? "追跡者の目から外れる" : null;
                 case EventEffectType.PushPursuer:      return sim.FoeAlive ? $"追跡者が {eff.amount} 歩遠のく" : null;
                 case EventEffectType.PullPursuer:      return sim.FoeAlive ? $"追跡者が {eff.amount} 歩近づく" : null;
-                case EventEffectType.Shortcut:         return $"終点の方へ {eff.amount} 歩、抜け道を行く";
+                case EventEffectType.Shortcut:         return $"この後の移動 {eff.amount} 回は、物資もターンも使わない";
                 case EventEffectType.ShiftFront:
                     if (sim.Weather == MapSystem.FreeMove.WeatherKind.None) return null;
                     return eff.amount < 0 ? $"天候の前線が {-eff.amount} 段退く" : $"天候の前線が {eff.amount} 段迫る";
