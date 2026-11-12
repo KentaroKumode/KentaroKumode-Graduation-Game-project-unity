@@ -62,7 +62,7 @@ namespace AutoTest
 
         /// <summary>未来の与ダメ 1 の価値。 帳簿: 1 ダメージで撃破が早まり減る先の被ダメ (ledgerFutureShare × 敵の攻撃 ÷ 1 ターンの与ダメの見込み)。 旧の効用: wAtk。</summary>
         private float DeckDamageWorth(in OptimalTurnState s)
-            => s.ledger ? v3.ledgerFutureShare * Math.Max(0, s.enemyAtk) / Math.Max(1f, s.dFull) : s.wAtk;
+            => s.ledger ? v3.ledgerFutureShare * Math.Max(0, FutureEnemyAtk(in s)) / Math.Max(1f, s.dFull) : s.wAtk;   // ダウンのターンは明けた後の攻撃で見る
 
         /// <summary>先のターンの HP 1 の価値。 帳簿: ledgerFutureShare (帳簿が先の被ダメに掛ける割引と同じ)。 旧の効用: wDef。</summary>
         private float DeckFutureHpWorth(in OptimalTurnState s) => s.ledger ? v3.ledgerFutureShare : s.wDef;
@@ -676,7 +676,7 @@ namespace AutoTest
             var sb = new System.Text.StringBuilder(96);
             sb.Append(ns.enemyHp).Append(',').Append(ns.myHp).Append(',').Append(ns.myShield).Append(',').Append(ns.undyingStreak).Append(',')
               .Append(ns.steadfastReady ? 1 : 0).Append(',').Append(ns.eDefNow).Append(',').Append(ns.tele.blazeStacks * 2 + plusNext).Append(',')
-              .Append(ns.enemyAtk).Append(',').Append(ns.enemyHitBonus).Append('|')
+              .Append(ns.enemyAtk).Append(',').Append(ns.enemyHitBonus).Append(',').Append(ns.enemyDown ? 1 : 0).Append(',').Append(ns.downBroken).Append('|')
               .Append(env.charge).Append(',').Append(env.enemyPoison).Append(',').Append(env.enemyBleed).Append('|');
             string At(int s) => s >= 0 && s < board.Count ? board[s] : "-";
             sb.Append(At(o.retainTarget)).Append(',').Append(At(o.copyTarget)).Append(',').Append(At(o.burnTarget)).Append('|');

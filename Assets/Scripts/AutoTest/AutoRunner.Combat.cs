@@ -541,7 +541,22 @@ namespace AutoTest
             /// 「攻撃 0 本」の抑止 (−10000) は選べる時の手の形を決める装置なので、 選べないターンには掛けない
             /// (掛けると、 次のターンの手札の引きの差が −10000 ÷ 標本数の桁で先読みの値を支配する)。 既定 false = 今までどおり。</summary>
             public bool noAttackForced;
+            // ---- ボスのダウン (HP の目盛り・2026-11-13・規則は CombatSystem.BossDown) ----
+            /// <summary>このターン敵はダウン (攻撃しない・受けるダメージ ×BossDown.TakenMul)。 予告の enemyAttackValue は 0。</summary>
+            public bool enemyDown;
+            /// <summary>目盛り (null = ダウンしない敵) / 割った数 / 目盛りの HP を測る最大 HP / このターンの後に続くダウンの数。</summary>
+            public float[] downNotches;
+            public int downBroken, downMaxHp, downPendingNow;
+            /// <summary>次のターン (ダウンのターンなら、 ダウンが明けた後) の敵の攻撃の見込み (目盛りを割る価値・ダウン中の先の被ダメの見積もりに使う)。</summary>
+            public int downNextAtk;
         }
+
+        /// <summary>先のターンの被ダメの見積もりに使う敵の攻撃: 普段はこのターンの予告値。 ダウンのターンは予告が 0 なので、 ダウンが明けた後の見込み。</summary>
+        private static int FutureEnemyAtk(in OptimalTurnState s) => s.enemyDown ? s.downNextAtk : s.enemyAtk;
+
+        /// <summary>[ボスのダウン] 目盛りを割って次のターンをダウンにする価値の割合 (次のターンの敵の攻撃 × これ を今の HP で見る・仮・未測定)。
+        /// 〈停止信号〉(DeckStunShare) と同じ形: 半分にするのは、 割らなくてもブロックで一部は受けられるから。</summary>
+        private const float DownNextTurnShare = 0.5f;
 
         /// <summary>[V3 readOutgoingMult] 配線時点で分かる範囲で、 本体と同じ順に主攻撃 (ヴェスカの防御の前) の期待値を出す。
         /// 会心は確率で 2 通りを混ぜる。 配線の後で積まれる分 (OnWired・OnPreDealDamage・OnCriticalCheck・追撃・役の追撃・敵の軽減パッシブ・脆弱) は入らない。</summary>
@@ -559,7 +574,7 @@ namespace AutoTest
             float termMul = ws.damageMul;
             int minDmg = s.minDmg, consBurst = s.consBurst, eDef = ws.ignoreDefense ? 0 : s.eDefNow, pen = s.myPen, critPen = s.critPen;
             float critMulEff = s.critMulEff + ws.critMultAdd, nonCritMul = s.nonCritMul, berserk = s.berserkMul;
-            bool pinpoint = s.pinpointCut, vital = s.vitalIgnore;
+            bool pinpoint = s.pinpointCut, vital = s.vitalIgnore, down = s.enemyDown;
             float D(bool crit)
             {
                 int d = raw;
@@ -575,6 +590,7 @@ namespace AutoTest
                 if (termMul != 1f && d > 0) d = System.Math.Max(1, Mathf.RoundToInt(d * termMul));   // 〈増幅器〉〈共振器〉: 本体と同じ位置 (攻撃バーストの後・物差しの前)
                 d = CombatSystem.EnemyHpLedger.ProbeMain(d);   // [測定用の物差し 2026-11-10] 本体と同じ位置 (攻撃バーストの後・防御の前)
                 d = MetaProgression.MetaDebuffApplicator.ApplySlothCut(d);   // [#121] 〈大罪:怠惰〉: 本体と同じ位置 (物差しの直後・防御の前・CombatManager.Damage.cs)
+                d = CombatSystem.BossDown.ApplyTaken(d, down);               // ボスのダウン ×1.5: 本体と同じ位置 (怠惰の直後)
                 if (eDef > 0 && d > 0 && !(crit && vital))
                 {
                     int effDef = CombatSystem.DefenseFormula.Effective(eDef, pen + (crit ? critPen : 0));
@@ -666,7 +682,7 @@ namespace AutoTest
                     r -= dF;
                     if (r <= 0f) { n = j; break; }
                     float g = s.atkGrowth != null ? s.atkGrowth[System.Math.Min(j + 1, HorizonCapTurns)] : 1f;
-                    int hit = Mathf.RoundToInt(s.enemyAtk * g);
+                    int hit = Mathf.RoundToInt(FutureEnemyAtk(in s) * g);
                     r = System.Math.Min(System.Math.Max(r, s.enemyMaxHpNow), r + LifestealHeal(in s, hit));
                 }
             }
@@ -674,7 +690,7 @@ namespace AutoTest
             for (int j = 1; j <= n; j++)
             {
                 float g = s.atkGrowth != null ? s.atkGrowth[System.Math.Min(j + 1, HorizonCapTurns)] : 1f;
-                future += s.enemyAtk * g;
+                future += FutureEnemyAtk(in s) * g;
             }
             if (n >= 1) future += nextTurnExtra;   // 〈反撃態勢〉〈暴走〉: 次のターンも敵が生きていれば乗る
             return taken + v3.ledgerFutureShare * future;
@@ -850,6 +866,7 @@ namespace AutoTest
             }
             if (aCount > 0) dmg = CombatSystem.EnemyHpLedger.ProbeMain(dmg);   // [測定用の物差し 2026-11-10] 旧の式にも同じ位置で (防御の前)
             if (aCount > 0) dmg = MetaProgression.MetaDebuffApplicator.ApplySlothCut(dmg);   // [#121] 〈大罪:怠惰〉: 本体と同じ位置 (物差しの直後・防御の前)
+            if (aCount > 0) dmg = CombatSystem.BossDown.ApplyTaken(dmg, s.enemyDown);           // ボスのダウン ×1.5: 本体と同じ位置 (怠惰の直後)
             // 敵の防御 (このターンの値) で軽減
             if (aCount > 0 && eDefNow > 0)
                 dmg = CombatSystem.DefenseFormula.Apply(dmg, CombatSystem.DefenseFormula.Effective(eDefNow, myPen));
@@ -1000,6 +1017,13 @@ namespace AutoTest
             if (bashSpent) u -= wDef * System.Math.Min(myShield, System.Math.Max(0, enemyAtk - block));
             if (effDmg >= enemyHp && !s.ledger) u += 50f + enemyAtk; // 今ターン撃破 = 敵攻撃が消える (帳簿では先の被ダメ 0 として既に入っている)
             if (taken >= myHpEff) u -= 10000f;           // 致死回避を最優先 (山札の回復・払った HP の後の HP で見る)
+            // ボスのダウン (2026-11-13): この手で目盛りを割って次のターンをダウンにするなら、 次のターンの敵の攻撃の一部を今の HP で足す。
+            //   判定は本体と同じ関数 (BossDown.NextTurnIsDown)。 何もしなくても次がダウン (前に割った分が残っている) なら手の差にならないので足さない。
+            //   段取り (溜めのターンに合わせて割る) は 2 ターン先読み (deckLookahead) の役目 ── ここでは次のターンの 1 回分だけ。
+            if (s.downNotches != null && effDmg < enemyHp
+                && CombatSystem.BossDown.NextTurnIsDown(s.downNotches, s.downMaxHp, s.downBroken, s.downPendingNow, enemyHp - effDmg)
+                && !CombatSystem.BossDown.NextTurnIsDown(s.downNotches, s.downMaxHp, s.downBroken, s.downPendingNow, enemyHp))
+                u += DownNextTurnShare * System.Math.Max(0, s.downNextAtk) * (s.ledger ? 1f : wDef);
 
             // ===== 短期決戦の概念 (2026-08-04) =====
             //   従来の効用は **1 ターンぶんの収支しか見ていなかった**。 撃破ボーナスも
@@ -1176,6 +1200,20 @@ namespace AutoTest
                 }
             }
             ns.myHp = hpStart - o.taken;
+            // ボスのダウン (2026-11-13): この手で次のターンがダウンになるか (本体と同じ関数)。 なれば次のターンの敵の攻撃は 0・受けるダメージ ×1.5。
+            //   ダウンが明けた後の攻撃は今の見込み (downNextAtk) のまま。 ダウンのターンの次 (このターンがダウン) は plan.next の攻撃
+            //   (本体がこのターンの頭に大技の周期の起点を戻しているので、 見込みは周期の頭 = 溜め) になる。
+            if (st.downNotches != null)
+            {
+                int hpAfter = System.Math.Max(0, ns.enemyHp);
+                int nb = CombatSystem.BossDown.BrokenCount(st.downNotches, st.downMaxHp, hpAfter, st.downBroken);
+                bool nd = CombatSystem.BossDown.NextTurnIsDown(st.downNotches, st.downMaxHp, st.downBroken, st.downPendingNow, hpAfter);
+                ns.downBroken = nb;
+                ns.downPendingNow = System.Math.Max(0, st.downPendingNow + (nb - st.downBroken) - (nd ? 1 : 0));
+                ns.enemyDown = nd;
+                ns.downNextAtk = st.downNextAtk;
+                if (nd) { ns.enemyAtk = 0; ns.tele.enemyAttackValue = 0; ns.atkGrowth = null; }
+            }
             // シールド: 今ターンの被弾で吸われ、 〈城壁〉で増え、 次のターン頭に半分 (切り捨て・DAMAGE_CALC_REFERENCE ③-D)
             int shield = o.bashSpent ? 0 : System.Math.Max(0, shieldPool - o.taken);
             if (st.bulwarkRate > 0f) shield += TurnRules.BulwarkGain(o.block, st.enemyAtk, st.bulwarkRate);
@@ -1379,6 +1417,14 @@ namespace AutoTest
                 play = play, atkGrowth = atkGrowth,
                 diceAtkPct = ctxRoles?.attackDicePct ?? 0f,
             };
+            // ボスのダウン (2026-11-13): 予告で開示された目盛りとダウン。 次のターンの攻撃は公開規則の見込み (大技の周期は本体と同じ起点 Escalation.HeavyCycleOffset)
+            st.enemyDown = tele.enemyDown;
+            if (tele.downNotches != null && cm?.CurrentEnemy != null && ctxRoles != null)
+            {
+                st.downNotches = tele.downNotches; st.downBroken = tele.downBroken; st.downPendingNow = tele.downPending;
+                st.downMaxHp = System.Math.Max(1, cm.CurrentEnemy.maxHP);
+                st.downNextAtk = ExpectedEnemyAttackAt(cm.CurrentEnemy, ctxRoles, in tele, tele.turn + 1, 0);
+            }
             // 敵のパッシブ (2026-11-12・#104 で効くようにした物のうち、 被ダメを読み違える物)
             if (cm?.CurrentEnemy?.passiveSkills != null)
                 foreach (var ps in cm.CurrentEnemy.passiveSkills)
