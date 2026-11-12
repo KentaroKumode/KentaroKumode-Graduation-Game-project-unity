@@ -55,6 +55,7 @@ namespace GameLoop
         //   |                          |                                        | (直接) AutoTest.ItemLearningStats.ExcludedFromLift (BOT の学習から外す)  |
         //
         //   名指しで外す経路 (イベントの「廃棄」・灯火/フルーレ・バレエの自壊・剣の舞の集約) は集合を読まない。
+        //   〈ちいさな灯火〉〈シュヴァリエのレイピア〉は手放せない品ではなく、 売値 0G (items.json の noSellValue・BOT は売らない・ShopManager.SellsForNothing)。
 
         /// <summary>**預かり物** (2026-11-13): 人から預かった秘宝。 この集合が<b>単独で</b>決めるのは「記録 (図鑑) には手に入れるまで
         /// 「？？？」の枠も並べない」(超低確率のイベントの種明かしになるため・<see cref="HiddenInCodexUntilOwned"/>) だけ。
@@ -164,7 +165,7 @@ namespace GameLoop
         /// <summary>**進行用の品**: 強さではなく進行度や配布条件を表す品。 〈門〉で秘宝として捧げられない
         /// (<see cref="CanOfferAtGate"/>)・大罪 (強欲・色欲) の対象にならない (<see cref="CanBeTakenBySin"/>)。
         /// BOT の lift 評価もこれを除外する (AutoTest.ItemLearningStats.ExcludedFromLift)。
-        /// <b>売れる・取り替えに出せるかはこの集合では決まらない</b> (<see cref="Undroppable"/>) ── 〈ちいさな灯火〉〈シュヴァリエのレイピア〉は売れる。</summary>
+        /// <b>売れる・取り替えに出せるかはこの集合では決まらない</b> (<see cref="Undroppable"/>) ── 〈ちいさな灯火〉〈シュヴァリエのレイピア〉は売れる (売値 0G)。</summary>
         public static readonly System.Collections.Generic.HashSet<string> ProgressionItems =
             new System.Collections.Generic.HashSet<string>
         {

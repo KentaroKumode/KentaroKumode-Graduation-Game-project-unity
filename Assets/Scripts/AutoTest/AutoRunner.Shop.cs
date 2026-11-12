@@ -822,6 +822,9 @@ namespace AutoTest
                         // 手放せない品 (確信の 3 品・預かり物) は本体の TrySell が断る。 同じ判定で先に飛ばす (断られても次の品へ進むのは同じ・2026-11-13)。
                         //   確信は学習から外してあり点数 0 なので、 以前はここで毎回売っていた
                         if (!GameLoop.ItemIds.CanSell(id)) continue;
+                        // 売値 0G の品 (items.json の noSellValue: 灯火・レイピア) は売らない (2026-11-13)。 本体は売らせる (人は 0G でも売れる) ので CanSell とは別の条件。
+                        //   売っても金にならず、 品だけが消える
+                        if (ItemSystem.Shop.ShopManager.SellsForNothing(id)) continue;
                         if (AutoTest.LearnedPriorityProvider.Score(id) + PersonaBonus(id) > 0) continue;
                         // 2026-06-23c: 由来制限撤廃 (TrySellFromBot 内で符牒/ショップ滞在を統括判定)
                         if (AutoTest.BotSelling.TrySellFromBot(run, i)) return true;
