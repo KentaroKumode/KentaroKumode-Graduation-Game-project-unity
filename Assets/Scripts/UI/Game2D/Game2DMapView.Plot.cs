@@ -46,6 +46,19 @@ namespace UI.Game2D
         //   未到達 (疑問符) も到達済みの点と同じ色。 使い切った点は暗転 (暗い青灰)。
         private static readonly Color32 NodeInk = Hex("#e6f2fa"), NodeHot = Hex("#f0f8ff"), NodeDone = Hex("#364255");
 
+        // 縄張りの点の色 (2026-11-12・仮の印): 青白い点の色と同じくらいの明るさで、 赤みに振った (彩度で区別する)。 使い切った点は暗い赤灰。
+        private static readonly Color32 TerrInk = Hex("#f0a08c"), TerrDone = Hex("#553636");
+
+        /// <summary>縄張りの点の絵の色: 青白い点 (未到達・種別) は赤みのインクへ、 使い切った点は暗い赤灰へ。 もともと赤い絵 (エリート) はそのまま。</summary>
+        private static Color32 TerritoryTint(Color32 col)
+        {
+            if (Same(col, NodeInk) || Same(col, NodeHot)) return TerrInk;
+            if (Same(col, NodeDone)) return TerrDone;
+            return col;
+        }
+
+        private static bool Same(Color32 a, Color32 b) => a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
+
         private string[] IconFor(FreeMapSim sim, int i, out Color32 col)
         {
             var lay = sim.Layout; var t = lay.types[i];
@@ -121,7 +134,9 @@ namespace UI.Game2D
                 Ellipse(q, (float)m.a * _ls, (float)m.b * _ls, Mathf.Atan2((float)m.sin, (float)m.cos), _lc.landE);
             }
 
-            // 縄張り (2026-11-12・仮の印): 追跡者が生きている間、 縄張りの点どうしの道を暗い赤で引き、 縄張りの点に暗い赤の破線の輪を付ける。
+            // 縄張り (2026-11-12・仮の印): 追跡者が生きている間、 縄張りの点の絵そのものを赤みのインク (TerrInk) で描き、
+            //   縄張りの点どうしの道を赤で引き、 縄張りの点に赤の破線の輪を付ける。 点の絵が白いままだと、 道と輪を暗い赤にしても
+            //   白い道と「?」の光に負けて見分けにくかった (画面確認 2026-11-12)。 強調は彩度で (明度は上げない・原色は使わない)。
             //   追跡者は縄張りの外へ出ないので、 遊ぶ人が「どこから先が危ないか」を読めるように。 本番の絵は未定 (仮置き)
             bool showTerr = sim.HasFoe && sim.FoeAlive;
 
@@ -133,11 +148,11 @@ namespace UI.Game2D
                 if (L <= ma + mb) continue;
                 Vector2 u = (B - A) / L, A2 = A + u * ma, B2 = B - u * mb;
                 Line(A2 + Vector2.one, B2 + Vector2.one, _lc.shadow);
-                Line(A2, B2, showTerr && sim.InTerritory(a) && sim.InTerritory(b) ? _lc.redDim : _lc.frameHi);
+                Line(A2, B2, showTerr && sim.InTerritory(a) && sim.InTerritory(b) ? _lc.red : _lc.frameHi);
             }
             if (showTerr)
                 foreach (int i in lay.territory)
-                    if (!sim.IsSunk(i)) { var q = Sp(lay.pos[i]); float r = NodeMargin(sim, i) + 1; Ellipse(q, r, r, 0, _lc.redDim, new[] { 1, 2 }); }
+                    if (!sim.IsSunk(i)) { var q = Sp(lay.pos[i]); float r = NodeMargin(sim, i) + 1; Ellipse(q, r, r, 0, _lc.red, new[] { 1, 2 }); }
 
             // 自艦中心の距離環 (4 と 8)
             for (int r = 4; r <= 8; r += 4) Ellipse(_me, r * _ls, r * _ls, 0, _lc.grid);
@@ -176,6 +191,7 @@ namespace UI.Game2D
                 var q = Sp(lay.pos[i]);
                 var ic = IconFor(sim, i, out var col);
                 if (ic == IcoExit && !sim.Done[i]) col = BossPulse(q);
+                else if (showTerr && sim.InTerritory(i)) col = TerritoryTint(col);
                 Glyph(ic, q.x, q.y, col);
             }
 
