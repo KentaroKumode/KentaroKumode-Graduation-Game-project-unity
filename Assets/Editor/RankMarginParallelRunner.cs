@@ -158,12 +158,12 @@ namespace AutoTest.EditorTools
             string tracks = EditorPrefs.GetString(TracksKey, "*");
             string ranks = EditorPrefs.GetString(RanksKey, "10");
 
-            // Ultra は Begin() から専用の経路 (PrepareUltraAndRun) へ抜けるので、
-            //   RunBatch 後段の分岐に置いたワーカーモードに届かない。
+            // 旧 Ultra (4) は 2026-11-13 に削除した (#135)。 ワーカーの AutoRunner は Super として走るが、
+            //   EditorPrefs に古い番号が残っているだけのことが多いので、 腕の名前と中身がずれないよう止めて選び直させる。
             if (WiringSkillPref() == (int)AutoRunner.WiringSkill.Ultra)
             {
-                Debug.LogError("[並列] 配線技量が Ultra。 Ultra は自前の production worker を"
-                    + "持っており、 この経路では走らない。 ④ で Optimal などへ戻すこと");
+                Debug.LogError("[並列] 配線技量が旧 Ultra (4)。 Ultra は 2026-11-13 に削除した (#135)。"
+                    + " ④ で Naive / Optimal / Super を選び直すこと");
                 return;
             }
 

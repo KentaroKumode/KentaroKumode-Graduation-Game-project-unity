@@ -13,7 +13,6 @@ using MapSystem;
 using EventSystem;
 using ItemSystem;
 using ItemSystem.Shop;
-using AutoTest.Ultra;
 
 namespace AutoTest
 {
@@ -295,17 +294,6 @@ namespace AutoTest
             _deckLaRunSeed = index;   // [#105] 山札の先読みの専用乱数もラン番号だけで決める
             ResetAblationRng(index);
 
-            // --- Ultra: checkpoint からの再開 (§10 Phase E/G) ---
-            //   **null なら 1 命令も実行されない。** 通常のバッチは従来どおり
-            //   「StartNewRun した新規ラン」から始まる。
-            if (ultraResumeFrom != null && !TryApplyUltraResume(gm, out string resumeFailure))
-            {
-                // 復元に失敗したランを「普通のラン」として集計へ混ぜると、
-                // worker の故障が敗北として統計に入る。 明示的に落とす。
-                Finish(Outcome.Crash, "Ultra resume 失敗: " + resumeFailure);
-                yield break;
-            }
-
             _prevCoins = gm.Run != null ? gm.Run.coins : 0;
             _prevMaterials = gm.Run != null ? gm.Run.weaponMaterials : 0;
 
@@ -320,21 +308,10 @@ namespace AutoTest
             //   ── 実際、 戦闘数が止まったまま 15 万フレーム回り続けるランが出た。
             //   バッチが 1 ラン で永久に止まると、 測定そのものが成立しない。
             float runStartRt = Time.realtimeSinceStartup;
-            // **Ultra の思考時間は番犬から差し引く。** rollout は worker プロセスの完了を
-            //   同期で待つので、 1 決定あたり数秒ブロックする。 46 決定/ラン なら 1 ラン は
-            //   実時間で 2 分を超え、 20 秒の番犬に**全ラン**が DEADLOCK として刈られる
-            //   ── 5 時間走らせて中身が全部打切、 という形の事故になる。
-            //   番犬が捕まえたいのは「動き続ける固着」であって、 worker 待ちではない。
-            _ultraThinkingSeconds = 0f;
-            ClearUltraPending();   // 前ランの取り残しを持ち越さない
+            // (旧 Ultra の思考時間の控除と worker 待ちの空回りの除外は 2026-11-13 に削除・#135。 通常のランでは 0 / false だった)
 
             while (true)
             {
-                // 直前の Step が worker 待ちで空回りしたか。 **待機は「進展なし」ではない** ──
-                //   反復上限にもストール検出にも数えない。 数えると待機がそのまま
-                //   DEADLOCK 判定になり、 バッチ全体が打切で埋まる。
-                bool waitingForUltra = _ultraWaiting;
-
                 if (_exceptionFlag)
                 {
                     Finish(Outcome.Crash, $"例外: {_exceptionMsg}");
@@ -342,20 +319,19 @@ namespace AutoTest
                 }
                 // 到達した層の付与を配る。 計画は空のことがほとんどなので毎周でも安い。
                 if (_grantPlan.Count > 0 || _grantGoldAmount > 0) ApplyDueGrants(gm);
-                if (!waitingForUltra && iter++ > maxIterationsPerRun)
+                if (iter++ > maxIterationsPerRun)
                 {
                     Finish(Outcome.Deadlock, $"反復上限超過 phase={gm.CurrentPhase} node={CurrentNodeId()}");
                     yield break;
                 }
                 if (runWatchdogSeconds > 0f
-                    && Time.realtimeSinceStartup - runStartRt - _ultraThinkingSeconds > runWatchdogSeconds)
+                    && Time.realtimeSinceStartup - runStartRt > runWatchdogSeconds)
                 {
                     // **打ち切ったことを必ず残す。** 黙って捨てると、 集計だけ見て
                     //   「そういう分布なのだ」と読んでしまう。
                     Finish(Outcome.Deadlock,
                         $"番犬 {runWatchdogSeconds:F0}s 超過 phase={gm.CurrentPhase} node={CurrentNodeId()} "
-                      + $"floor={gm.Run?.Depth ?? -1} 戦闘={_cur?.totalCombats ?? -1}"
-                      + (_ultraThinkingSeconds > 0f ? $" Ultra思考={_ultraThinkingSeconds:F1}s(控除済)" : ""));
+                      + $"floor={gm.Run?.Depth ?? -1} 戦闘={_cur?.totalCombats ?? -1}");
                     yield break;
                 }
 
@@ -367,12 +343,7 @@ namespace AutoTest
                 string node = CurrentNodeId();
                 int fl = gm.Run?.Depth ?? 0;
                 int hp = gm.Run?.playerHP ?? 0;
-                if (waitingForUltra)
-                {
-                    // 盤面は意図的に止まっている。 stall は据え置き (0 にも戻さない ──
-                    // 待機前から続いていた停滞を待機で帳消しにしないため)。
-                }
-                else if (phase == lastPhase && node == lastNode && fl == lastFloor && hp == lastHp)
+                if (phase == lastPhase && node == lastNode && fl == lastFloor && hp == lastHp)
                 {
                     if (++stall > stallLimit)
                     {
@@ -416,16 +387,6 @@ namespace AutoTest
                 }
 
                 if (finished) yield break;
-
-                // **worker 待ちなら必ず 1 フレーム返す。** stepsPerYield は既定 1000 なので、
-                //   ここを通さないと 1 フレームに 1000 回ポーリングして Editor が固まる
-                //   ── 非同期にした意味がなくなる。
-                if (_ultraWaiting)
-                {
-                    _innerStepCount = 0;
-                    yield return null;
-                    continue;
-                }
 
                 // 高速化: 1フレームあたり複数 Step を回す。
                 // GameManager は同期遷移なので問題ないが、UI/演出が必要な場合は stepsPerYield=1 にする。
@@ -512,23 +473,6 @@ namespace AutoTest
                             bool fa = !ownsA && IsAxisFocusItem(ra), fb = !ownsB && IsAxisFocusItem(rb);
                             if (fa != fb) pick = fa ? 0 : 1;
                         }
-                        // Ultra: 2 択をそのまま委ねる。 sink 未接続なら pick は素通り。
-                        pick = UltraOverrideChoice(gm,
-                            AutoTest.Ultra.UltraDecisionPoint.RewardChoice,
-                            AutoTest.Ultra.UltraActionKind.ChooseReward,
-                            new AutoTest.Ultra.UltraChoiceView
-                            {
-                                kind = "reward",
-                                prompt = "戦闘後ドロップ",
-                                options = new[]
-                                {
-                                    new AutoTest.Ultra.UltraChoiceOption
-                                    { index = 0, id = ra ?? "", label = ra ?? "" },
-                                    new AutoTest.Ultra.UltraChoiceOption
-                                    { index = 1, id = rb ?? "", label = rb ?? "" },
-                                },
-                            },
-                            pick);
                         gm.ResolveRewardChoice(pick);
                     }
                     gm.ConfirmReward();
@@ -570,29 +514,6 @@ namespace AutoTest
                         restPick = RestUpgradeIndex;         // 中HP+素材有り → 強化優先
                     else
                         restPick = RestHealIndex;            // 満ちていれば回復で無駄なく（食事休憩は廃止）
-
-                    // Ultra: 強化は素材が足りるときだけ**選択肢として出す**。
-                    //   出したうえで本体に弾かれると、 controller が辞退した場合と区別が付かない。
-                    restPick = UltraOverrideChoice(gm,
-                        AutoTest.Ultra.UltraDecisionPoint.RestChoice,
-                        AutoTest.Ultra.UltraActionKind.ChooseRest,
-                        new AutoTest.Ultra.UltraChoiceView
-                        {
-                            kind = "rest",
-                            prompt = "休憩",
-                            options = new[]
-                            {
-                                new AutoTest.Ultra.UltraChoiceOption
-                                { index = RestHealIndex, id = "heal", label = "HP回復" },
-                                new AutoTest.Ultra.UltraChoiceOption
-                                {
-                                    index = RestUpgradeIndex, id = "upgrade", label = "武器強化",
-                                    available = canUpgrade,
-                                    cost = cost == int.MaxValue ? 0 : cost,
-                                },
-                            },
-                        },
-                        restPick);
 
                     // **`canUpgrade` で条件を足さないこと。** 元の分岐は
                     //   `richMaterials && hpR > 0.30f` で `RestUpgrade()` を呼んでおり、

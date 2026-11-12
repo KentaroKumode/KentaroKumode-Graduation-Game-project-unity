@@ -79,11 +79,7 @@ namespace AutoTest
         /// <summary>累積データを読み込み (直近 LoadRecentRows 行のみ)。 6F未到達も含む (フィルタは呼び出し側)。</summary>
         public static List<RunRow> LoadAll(string learningRoot)
         {
-            // 計装のみ (既定 OFF)。 回帰OLS の内数 ── パースが重いのか行列計算が重いのかで
-            // 打ち手 (キャッシュの粒度) が変わるので分けて測る。
-            long phase = AutoTest.Ultra.UltraPhaseClock.Begin();
-            try { return LoadAllCore(learningRoot); }
-            finally { AutoTest.Ultra.UltraPhaseClock.End("└ └ └ csv読込", phase); }
+            return LoadAllCore(learningRoot);
         }
 
         private static List<RunRow> LoadAllCore(string learningRoot)

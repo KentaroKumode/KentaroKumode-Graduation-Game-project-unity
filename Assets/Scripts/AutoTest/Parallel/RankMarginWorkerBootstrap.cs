@@ -30,7 +30,7 @@ namespace AutoTest.ParallelSweep
         private bool _terminalWritten;
 
         /// <summary>ワーカー (-batchmode の Player) は音を出さない (2026-11-04)。 -nographics でも音は鳴り、
-        /// 22 プロセスが同時に効果音を出していた。 r9/r10・学習・Ultra のどのワーカーもここを通る。
+        /// 22 プロセスが同時に効果音を出していた。 r9/r10・学習のどのワーカーもここを通る。
         /// pause は Game2DBoot が戻すので、 誰も触らない volume の方を 0 にする。</summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void MuteIfBatchPlayer()
@@ -41,7 +41,7 @@ namespace AutoTest.ParallelSweep
         /// <summary>ワーカー (-batchmode の Player) はメタ進行を PlayerPrefs へ保存せず、 PlayerPrefs から読まない (2026-11-12・#119)。
         /// PlayerPrefs は 22 プロセスで共有されるので、 前の測定のワーカーが終了時に保存した挑戦の難易度が、 次の測定のワーカーの
         /// バッチ開始時の読み込み (学習の帯・戦闘名の危険度) に持ち込まれ、 同じ設定の繰り返しで結果がワーカー単位で割れていた。
-        /// シーンの Awake (MetaProgressManager.Load) より前に立てる。 r9/r10・学習・Ultra のどのワーカーもここを通る。</summary>
+        /// シーンの Awake (MetaProgressManager.Load) より前に立てる。 r9/r10・学習のどのワーカーもここを通る。</summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void IsolateMetaIfBatchPlayer()
         {

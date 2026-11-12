@@ -13,7 +13,6 @@ using MapSystem;
 using EventSystem;
 using ItemSystem;
 using ItemSystem.Shop;
-using AutoTest.Ultra;
 
 namespace AutoTest
 {

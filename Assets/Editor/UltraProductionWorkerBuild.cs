@@ -29,6 +29,10 @@ namespace AutoTest.EditorTools
         public static string DescriptorPath => Path.Combine(BuildRoot,
             "ultra-production-worker.json");
 
+        /// <summary>descriptor の actionFingerprint に入れる固定の印 (2026-11-13〜・#135)。
+        /// 旧 Ultra の方策の組の候補集合のハッシュの代わり。 照合する側は無い。</summary>
+        public const string ActionFingerprintTag = "action:no-policy-portfolio-v1";
+
         /// <summary>コマンドライン (-batchmode -executeMethod) 用の入口。
         /// Editor を開かずに worker を作り直す ── スイープは worker でしか回らないので、
         /// Editor が落ちているとコード変更を測る手段が無くなる。 終了コード 0 = 成功。</summary>
@@ -177,8 +181,11 @@ namespace AutoTest.EditorTools
             string managed = Path.Combine(BuildRoot,
                 "UltraProductionWorker_Data", "Managed", "Assembly-CSharp.dll");
             string assemblyHash = File.Exists(managed) ? Sha256File(managed) : exeHash;
-            string actionHash = UltraPortfolioProtocol.ComputeCandidateSetHash(
-                UltraPortfolioProtocol.CanonicalCandidates());
+            // 旧: Ultra の方策の組の候補集合のハッシュ (UltraPortfolioProtocol.ComputeCandidateSetHash)。
+            //   技量の Ultra ごと候補集合を消した (2026-11-13・#135) ので、 固定の印のハッシュを置く。
+            //   照合している所は無く、 TryLoadDescriptor の書式検査 (16 進 64 桁) を通すためだけの値。
+            //   いまの測定が照合に使うのは buildFingerprint (exe と Assembly-CSharp.dll の hash) だけ。
+            string actionHash = Sha256Text(ActionFingerprintTag);
             return new UltraProductionWorkerDescriptor
             {
                 executableFile = Path.GetFileName(ExecutablePath),

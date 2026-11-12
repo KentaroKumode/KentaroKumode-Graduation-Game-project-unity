@@ -13,7 +13,6 @@ using MapSystem;
 using EventSystem;
 using ItemSystem;
 using ItemSystem.Shop;
-using AutoTest.Ultra;
 
 namespace AutoTest
 {
@@ -462,30 +461,10 @@ namespace AutoTest
             }
             _lastShopExitSeen = false; _lastShopExitCoins = 0; _lastShopExitFloor = 0; _floor7ShopEntryCoins = -1;
             _cur.deterministicDigest = ComputeRunDeterministicDigest(_cur, run);
-            var productionRecord = new UltraProductionRunRecord
-            {
-                runOrdinal = _ultraProductionRuns.Count,
-                runIndex = _cur.index,
-                scenarioSeed = _currentUltraProductionScenarioSeed,
-                scenarioSeedHex = _currentUltraProductionScenarioSeed.ToString("x16"),
-                valid = _cur.bandScore >= 0,
-                fullClear = _cur.bandScore >= 11,
-                crash = _cur.outcome == Outcome.Crash,
-                deadlock = _cur.outcome == Outcome.Deadlock,
-                fingerprint = _cur.fingerprint,
-                deterministicDigest = _cur.deterministicDigest,
-            };
-            _ultraProductionRuns.Add(productionRecord);
-            try { UltraProductionRunCompleted?.Invoke(productionRecord); }
-            catch (Exception ex)
-            {
-                Debug.LogError("[AutoRunner][UltraWorker] run completion callback failed: " + ex.Message);
-            }
             // L2ペアテスト記録
             _cur.policyVariant = _currentRunVariant;
             _cur.pairedSeed = _currentRunSeed;
             _records.Add(_cur);
-            AutoTest.Ultra.UltraDecisionCensus.NoteRunCompleted();
             RecordScreenRunCompletion(_cur);
             _curLog.Enqueue($"[AutoRunner] === RUN {_cur.index} 終了: {_cur.band} ({_cur.bandLabel}) — {note} ===");
             _curAttachLog(_cur);
@@ -506,6 +485,9 @@ namespace AutoTest
             CombatSystem.EnemyHpLedger.ProbePassiveMult = 1f;
         }
 
+        /// <summary>ラン 1 本の決定的な指紋 (同じシードの突き合わせ・Tools/digest_cmp.py)。
+        /// 先頭の印 <c>ultra-production-run-v1</c> は旧 Ultra の名残だが、 <b>変えると過去のラン・並列ワーカーの digest と
+        /// 全件が食い違う</b>ので残す (2026-11-13・#135)。</summary>
         private static string ComputeRunDeterministicDigest(RunRec rec, GameLoop.RunState run)
         {
             var sb = new StringBuilder(2048);
