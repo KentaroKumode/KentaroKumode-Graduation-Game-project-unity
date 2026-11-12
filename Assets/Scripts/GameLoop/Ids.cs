@@ -204,6 +204,32 @@ namespace GameLoop
         /// <summary>0 層の雑魚: 古いクレート (HP1・攻撃なし)。</summary>
         public const string FarmCrate = "farm_crate";
 
+        /// <summary>ヴェスカの段の番号 (1〜4)。 ヴェスカでない id (null を含む) は 0。
+        /// <b>id → 段の表を引く。 綴り (末尾の _p2 など) で切らない</b> (issue #116)。</summary>
+        public static int VescaStageOf(string id)
+        {
+            switch (id)
+            {
+                case VescaP1: return 1;
+                case VescaP2: return 2;
+                case VescaP3: return 3;
+                case VescaFinal: return 4;
+                default: return 0;
+            }
+        }
+
+        /// <summary>ヴェスカの次の段の id。 最終段とヴェスカでない id は null。</summary>
+        public static string VescaNextStage(string id)
+        {
+            switch (VescaStageOf(id))
+            {
+                case 1: return VescaP2;
+                case 2: return VescaP3;
+                case 3: return VescaFinal;
+                default: return null;
+            }
+        }
+
         /// <summary>敵 ID がボスか (null 安全)。</summary>
         public static bool IsBoss(string enemyId)
             => !string.IsNullOrEmpty(enemyId) && enemyId.StartsWith(LayerPrefix);

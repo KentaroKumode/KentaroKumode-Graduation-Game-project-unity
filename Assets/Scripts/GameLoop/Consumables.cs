@@ -80,7 +80,7 @@ namespace GameLoop
             var c = ActiveCtx();
             string b = c != null ? c.bossId : null;
             if (string.IsNullOrEmpty(b) || !b.StartsWith(BossIds.Layer7Prefix)) return;
-            int i = b.EndsWith("_p4") ? 3 : b.EndsWith("_p3") ? 2 : b.EndsWith("_p2") ? 1 : 0;
+            int i = System.Math.Max(1, BossIds.VescaStageOf(b)) - 1;
             VescaPhaseConsumables[i]++;
         }
 

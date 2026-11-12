@@ -47,10 +47,10 @@ namespace GameLoop
             switch (b)
             {
                 // ヴェスカ撃破後の一択で分岐する。 これが唯一のエンディング分岐。
-                case "boss_layer7":        return run != null && run.riftLeftOpen ? EndGood : EndTrue;
-                case "boss_layer6":        return End3;
-                case "boss_layer5_hidden": return End2;
-                case "boss_layer5":        return End1;
+                case BossIds.VescaP1:        return run != null && run.riftLeftOpen ? EndGood : EndTrue;
+                case BossIds.Layer6Ash:      return End3;
+                case BossIds.Layer5Hidden:   return End2;
+                case BossIds.Layer5Judgment: return End1;
                 default:                   return End1; // 想定外はとりあえず帰還エンド
             }
         }

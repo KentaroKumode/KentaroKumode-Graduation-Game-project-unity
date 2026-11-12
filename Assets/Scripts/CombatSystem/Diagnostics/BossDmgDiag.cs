@@ -51,7 +51,7 @@ namespace CombatSystem
         /// <c>DumpPhaseEntry</c> は文字列しか返さず、 しかもどこからも呼ばれていなかった。</summary>
         public static void ReadPhaseEntry(long[] n, double[] hpSum)
         {
-            var ids = new[]{ "boss_layer7", "boss_layer7_p2", "boss_layer7_p3", "boss_layer7_p4" };
+            var ids = new[]{ GameLoop.BossIds.VescaP1, GameLoop.BossIds.VescaP2, GameLoop.BossIds.VescaP3, GameLoop.BossIds.VescaFinal };
             for (int i = 0; i < ids.Length && i < n.Length && i < hpSum.Length; i++)
             {
                 _phaseN.TryGetValue(ids[i], out var c); n[i] = c;

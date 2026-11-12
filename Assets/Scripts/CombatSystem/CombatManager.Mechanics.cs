@@ -53,12 +53,12 @@ namespace CombatSystem
         {
             string id = currentEnemy?.id;
             if (string.IsNullOrEmpty(id)) return false;
-            string next = null, label = null;
-            switch (id)
+            string next = GameLoop.BossIds.VescaNextStage(id), label = null;
+            switch (GameLoop.BossIds.VescaStageOf(id))
             {
-                case "boss_layer7":    next = "boss_layer7_p2"; label = "第二段：遺物学者"; break;
-                case "boss_layer7_p2": next = "boss_layer7_p3"; label = "第三段：神話";     break;
-                case "boss_layer7_p3": next = "boss_layer7_p4"; label = "第四段：天与";     break;
+                case 1: label = "第二段：遺物学者"; break;
+                case 2: label = "第三段：神話";     break;
+                case 3: label = "第四段：天与";     break;
                 default: return false;   // p4 または非ヴェスカ
             }
             Debug.Log($"[ヴェスカ連戦] {id} 撃破 → {label} へ移行 (戦闘終了前に確定)");

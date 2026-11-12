@@ -842,9 +842,9 @@ namespace GameLoop
             if (!SuppressLayer5HiddenBoss
                 && Run.Depth == 5
                 && Run.ownedPassiveItems != null
-                && Run.ownedPassiveItems.Contains("シュヴァリエのレイピア"))
+                && Run.ownedPassiveItems.Contains(ItemIds.ChevalierRapier))
             {
-                bossId = "boss_layer5_hidden";
+                bossId = BossIds.Layer5Hidden;
                 Log("挑戦資格を満たす者の前にのみ現れる剣聖の影が形を成す ―");
             }
 

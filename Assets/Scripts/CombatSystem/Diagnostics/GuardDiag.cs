@@ -41,7 +41,7 @@ namespace CombatSystem
         public static void NoteStag7F(string bossId, int drawn, int stopped, int stoppedMains, int held)
         {
             if (bossId == null || !bossId.StartsWith(GameLoop.BossIds.Layer7Prefix)) return;
-            int st = bossId.EndsWith("_p2") ? 1 : bossId.EndsWith("_p3") ? 2 : bossId.EndsWith("_p4") ? 3 : 0, o = st * 8;
+            int st = System.Math.Max(1, GameLoop.BossIds.VescaStageOf(bossId)) - 1, o = st * 8;
             Stag7F[o]++; Stag7F[o + 1] += drawn; Stag7F[o + 2] += stopped; Stag7F[o + 3] += stoppedMains; Stag7F[o + 4] += held;
             if (stopped >= 1) Stag7F[o + 5]++;
             if (stopped >= 2) Stag7F[o + 6]++;

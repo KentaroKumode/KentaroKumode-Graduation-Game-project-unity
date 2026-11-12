@@ -513,7 +513,7 @@ namespace CombatSystem
             EnemyHpLedger.BeginForm();   // [計装 2026-11-10] 予約を持ち越さない
             EnemyHpLedger.SourceScope = enemy.id != null && enemy.id.StartsWith(GameLoop.BossIds.Layer7Prefix) ? enemy.id : "他";
             // [計測] 7層連戦の 1 段目突入。 2 段目以降との比較の基準になる。
-            if (enemy != null && enemy.id == "boss_layer7")
+            if (enemy != null && enemy.id == GameLoop.BossIds.VescaP1)
                 BossDmgDiag.PhaseEntry(enemy.id, this.playerMaxHP > 0 ? (double)playerHP / this.playerMaxHP : 1.0);
             playerDiceCount = pDiceCount;
             playerDiceMax = pDiceMax;
@@ -823,10 +823,10 @@ namespace CombatSystem
             //   旧: TryAdvanceVescaChain 内でのみ記録していたが、 あれは OnTurnEnd より前に
             //   削り切った取りこぼし用の経路なので、 正常経路 (連続実験の予約 → SwapEnemy) を
             //   通る大多数が記録から漏れていた (実測 3380 件に対し 36 件しか拾えず)。
-            if (!string.IsNullOrEmpty(newEnemyId) && newEnemyId.StartsWith("boss_layer7") && playerMaxHP > 0)
+            if (!string.IsNullOrEmpty(newEnemyId) && newEnemyId.StartsWith(GameLoop.BossIds.Layer7Prefix) && playerMaxHP > 0)
             {
                 BossDmgDiag.PhaseEntry(newEnemyId, playerHP / (double)playerMaxHP);
-                if (newEnemyId == "boss_layer7_p4") BossDmgDiag.P4Entry(playerHP / (double)playerMaxHP);
+                if (newEnemyId == GameLoop.BossIds.VescaFinal) BossDmgDiag.P4Entry(playerHP / (double)playerMaxHP);
             }
 
             if (!isCombatActive) { Debug.LogWarning("[CombatManager.SwapEnemy] 戦闘中でない"); return false; }
@@ -899,8 +899,7 @@ namespace CombatSystem
                     && ctx.bossId.StartsWith(GameLoop.BossIds.Layer7Prefix))
                 {
                     GameLoop.RunChronicle.NotePhaseDuration(
-                        ctx.bossId.EndsWith("_p4") ? 4 : ctx.bossId.EndsWith("_p3") ? 3
-                            : ctx.bossId.EndsWith("_p2") ? 2 : 1,
+                        Math.Max(1, GameLoop.BossIds.VescaStageOf(ctx.bossId)),
                         ctx.phaseStartTurn, ctx.currentTurn);
                 }
                 ctx.phaseStartTurn = ctx.currentTurn + 1;

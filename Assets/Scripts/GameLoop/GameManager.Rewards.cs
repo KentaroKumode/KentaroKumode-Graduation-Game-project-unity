@@ -162,7 +162,7 @@ namespace GameLoop
                 Run.lastBossId = CurrentEnemy?.id ?? Run.lastBossId; // エンディング分岐用（最後に撃破したボス）
 
                 // 5層裏ボス撃破フラグ: 以降のレイピア解除に会心+9 が付くようになる
-                if (CurrentEnemy != null && CurrentEnemy.id == "boss_layer5_hidden")
+                if (CurrentEnemy != null && CurrentEnemy.id == BossIds.Layer5Hidden)
                 {
                     Run.defeatedSaintGeorges = true;
                     Log("剣聖サン=ジョリオラを撃破 ― 真の決闘術が解放された。");

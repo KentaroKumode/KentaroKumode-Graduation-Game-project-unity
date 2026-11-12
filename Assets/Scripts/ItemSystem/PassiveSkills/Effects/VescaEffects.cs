@@ -200,15 +200,11 @@ namespace ItemSystem.PassiveSkills.Effects
             return list;
         }
 
-        /// <summary>enemies.json の id (boss_layer7_p1..p4) から段番号を取る。</summary>
+        /// <summary>今の敵の id から段番号 (1〜4) を取る (BossIds.VescaStageOf・綴りで切らない)。 取れなければ 1。</summary>
         public static int ResolveStage()
         {
             var e = CombatSystem.CombatManager.Instance?.CurrentEnemy;
-            string id = e?.id ?? "";
-            if (id.EndsWith("_p2")) return 2;
-            if (id.EndsWith("_p3")) return 3;
-            if (id.EndsWith("_p4")) return 4;
-            return 1;
+            return System.Math.Max(1, GameLoop.BossIds.VescaStageOf(e?.id));
         }
 
         /// <summary>現在の敵が〈天与の才〉を持つか (= 遺物を 2 枚引く)。</summary>
@@ -548,7 +544,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
         /// <summary>遷移先。 index = 現在の段 - 1。 最終段 (4) には次が無い。</summary>
         private static readonly string[] NextStageId =
-            { "boss_layer7_p2", "boss_layer7_p3", "boss_layer7_p4", null };
+            { GameLoop.BossIds.VescaP2, GameLoop.BossIds.VescaP3, GameLoop.BossIds.VescaFinal, null };
         private static readonly string[] NextStageLabel =
             { "第二段：遺物学者", "第三段：神話", "第四段：天与", null };
 

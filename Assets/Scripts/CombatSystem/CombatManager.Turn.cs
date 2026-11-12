@@ -747,10 +747,10 @@ namespace CombatSystem
                 executeArmed = ctx.vescaExecuteArmed,
                 sealedTerminal = -1,   // 旧〈綻び〉(端子の封印) は 2026-11-10 に撤去
             };
-            if (ctx.bossId == "boss_layer7_p4")
+            if (ctx.bossId == GameLoop.BossIds.VescaFinal)
                 BossDmgDiag.P4Turn(ctx.playerHighDiceCrushed, ctx.vescaExecuteArmed,
                                    ctx.vescaMaxHpBiteOnHit, ctx.vescaDrawnRelics);
-            if (!string.IsNullOrEmpty(ctx.bossId) && ctx.bossId.StartsWith("boss_layer7"))
+            if (!string.IsNullOrEmpty(ctx.bossId) && ctx.bossId.StartsWith(GameLoop.BossIds.Layer7Prefix))
                 BossDmgDiag.V7Turn(ctx.vescaDrawnRelics);
             Debug.Log($"[相互攻撃] T{tele.turn} 予告: 敵攻撃 {enemyAtkValue} (段階{tele.escalationStage}" +
                       $"{(tele.nextThresholdTurn > 0 ? $"・次段階T{tele.nextThresholdTurn}" : "・最終段階")})" +
@@ -1164,8 +1164,7 @@ namespace CombatSystem
                 //   p1 が過大・p4 が過小に偏る (実測: p4 の記録ターンが実際の 1/5 しか無かった)。
                 //   ctx.bossId は SwapEnemy が形態ごとに更新している。
                 GameLoop.RunChronicle.NotePhaseWiring(
-                    ctx.bossId.EndsWith("_p4") ? 4 : ctx.bossId.EndsWith("_p3") ? 3
-                        : ctx.bossId.EndsWith("_p2") ? 2 : 1,
+                    System.Math.Max(1, GameLoop.BossIds.VescaStageOf(ctx.bossId)),
                     (int)ctx.GetAccumulated("mutualAttackDiceCount"),
                     (int)ctx.GetAccumulated("mutualBlockDiceCount"),
                     attackSum, blockSum, dealtDmg + dealtFixed);
@@ -1434,7 +1433,7 @@ namespace CombatSystem
 
                 // [計測] 7層でこのターンにプレイヤーが落ちたなら、 出ていた遺物を致死側へ計上する。
                 if (playerHP <= 0 && !string.IsNullOrEmpty(ctx.bossId)
-                    && ctx.bossId.StartsWith("boss_layer7"))
+                    && ctx.bossId.StartsWith(GameLoop.BossIds.Layer7Prefix))
                     BossDmgDiag.V7Death(ctx.vescaDrawnRelics);
 
                 ctx.playerCurrentHP = playerHP;
