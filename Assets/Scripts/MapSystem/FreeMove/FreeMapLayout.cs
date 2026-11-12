@@ -60,8 +60,6 @@ namespace MapSystem.FreeMove
         /// 最初に踏んだ 1 つで「裂け目の記録」が起き、 残りは通常のイベントマスとして働く。 終点へは必ずどれかを通る。
         /// 旧い作り (<see cref="fixedEvent"/>) の層と、 他の層は空。</summary>
         public List<int> riftGate = new List<int>();
-        /// <summary>今の作りの深さ 6 で、 ボス前の休憩 (終点から 2 歩) とその隣の店を置けなかった (地図の形のせい)。 検算が数える。</summary>
-        public bool riftPrepFailed;
         /// <summary>5 層 (直線) の〈門〉のイベント点。 無い層は -1。 (効果は未実装 ── 旧い〈門〉の 3 つの代償を、 ここへ移す予定)</summary>
         public int gate = -1;
 

@@ -279,10 +279,10 @@ namespace MapSystem.FreeMove
                 if (L.types[i] == TileType.EliteBattle && FreeMapParams.BandOf((float)L.pos[i].x) == FreeMapParams.BandSafe) L.types[i] = TileType.Battle;
 
             // ── 深さ 6 (画面の第 4 層) の「裂け目の記録」 (乱数は引かない) ──
-            //   今の作り (2026-11-13): 終点に隣り合う点を全部イベントマスにし、 ボス前の休憩と店を 1 つ手前へ置く (PlaceRiftGate)。
+            //   今の作り (2026-11-13): 終点に隣り合う点を全部イベントマスにする (PlaceRiftGate・店と休憩の 1 つずつの保証は守る)。
             //   旧い作り (riftAtBoss = false): 縄張りの外で、 層の 3 分の 1 あたりに一番近い点を固定の点にする (踏まずに終点へ行けた)。
             if (floor == 6 && riftAtBoss)
-                PlaceRiftGate(L, terr);
+                PlaceRiftGate(L, others);
             else if (floor == 6)
             {
                 var anchor = new Vec2(W * 0.35, H / 2);
@@ -309,51 +309,26 @@ namespace MapSystem.FreeMove
         /// <list type="number">
         /// <item>終点 (ボス) に道で隣り合う点を<b>例外なく全部</b>イベントマスにする (<see cref="FreeMapLayout.riftGate"/>)。 元の種別 (店・休憩・戦闘・宝) は上書きする。
         /// 道は後から増えない (天候は崩す・沈めるだけ) ので、 終点へは必ずこのどれかを通る。</item>
-        /// <item>ボス前の休憩と店を 1 つ手前へ置く: 終点から 2 歩の点に休憩、 その休憩の隣 (終点から 2 歩以上) に店。 「店 → 休憩 → イベント → ボス」と通れる。
-        /// 既にその並びがあれば何も変えない。 無ければ休憩の点を (既に休憩の点 → 縄張りの外 → 終点に近い → 添字) の順で選び、 その隣の店の点を
-        /// (既に店の点 → 縄張りの外 → 休憩に近い → 添字) の順で選んで種別を上書きする。</item>
-        /// <item>形のせいで置けない層は <see cref="FreeMapLayout.riftPrepFailed"/> を立て、 「店と休憩は層に必ず 1 つずつ」(生成の決まり) だけは
-        /// 隣り合う点の外で終点に近い点へ置いて保つ。</item>
+        /// <item>上書きで層の店か休憩が 0 になったら、 「店と休憩は層に必ず 1 つずつ」(上の保証) と同じ候補 (始点から 2 歩以上・店と休憩以外。
+        /// 隣り合う点は除く) から、 消えた店 / 休憩があった点に一番近い点 (同点は添字の小さい方) へ置く。</item>
         /// </list>
         /// </summary>
-        private static void PlaceRiftGate(FreeMapLayout L, List<int> terr)
+        private static void PlaceRiftGate(FreeMapLayout L, List<int> others)
         {
-            int n = L.Count;
             var ring = L.adj[L.goal].Where(i => i != L.start).OrderBy(i => i).ToList();
+            var before = ring.ToDictionary(i => i, i => L.types[i]);
             foreach (int i in ring) L.types[i] = TileType.Event;
             L.riftGate = ring;
 
-            var hg = L.Hops(L.goal);
-            bool Free(int i) => i != L.start && i != L.goal && hg[i] >= 2 && hg[i] != int.MaxValue;
-            int InTerr(int i) => terr.Contains(i) ? 1 : 0;
-
-            // 既に「店 → 休憩 (終点から 2 歩)」が並んでいれば何もしない
-            for (int r = 0; r < n; r++)
-                if (Free(r) && hg[r] == 2 && L.types[r] == TileType.Rest)
-                    foreach (int s in L.adj[r])
-                        if (Free(s) && L.types[s] == TileType.Shop) return;
-
-            var restCand = Enumerable.Range(0, n).Where(i => Free(i) && hg[i] == 2)
-                .OrderBy(i => L.types[i] == TileType.Rest ? 0 : 1).ThenBy(InTerr).ThenBy(i => L.Dist(i, L.goal)).ThenBy(i => i).ToList();
-            foreach (int r in restCand)
-            {
-                var shopCand = L.adj[r].Where(s => s != r && Free(s))
-                    .OrderBy(s => L.types[s] == TileType.Shop ? 0 : 1).ThenBy(InTerr).ThenBy(s => L.Dist(s, r)).ThenBy(s => s).ToList();
-                if (shopCand.Count == 0) continue;
-                L.types[r] = TileType.Rest;
-                L.types[shopCand[0]] = TileType.Shop;
-                return;
-            }
-
-            L.riftPrepFailed = true;
+            var ds = L.Hops(L.start);
             foreach (var need in new[] { TileType.Shop, TileType.Rest })
             {
-                bool has = false;
-                for (int i = 2; i < n; i++) if (L.types[i] == need && !ring.Contains(i)) { has = true; break; }
-                if (has) continue;
-                int pick = Enumerable.Range(2, n - 2).Where(i => Free(i) && L.types[i] != TileType.Shop && L.types[i] != TileType.Rest)
-                    .OrderBy(i => L.Dist(i, L.goal)).ThenBy(i => i).DefaultIfEmpty(-1).First();
-                if (pick >= 0) L.types[pick] = need;
+                if (others.Any(i => L.types[i] == need)) continue;
+                int lost = ring.FirstOrDefault(i => before[i] == need);   // 消えた点 (ring は添字の昇順)
+                var pool = others.Where(i => !ring.Contains(i) && ds[i] >= 2 && L.types[i] != TileType.Shop && L.types[i] != TileType.Rest).ToList();
+                if (pool.Count == 0) pool = others.Where(i => !ring.Contains(i) && L.types[i] != TileType.Shop && L.types[i] != TileType.Rest).ToList();
+                if (pool.Count == 0) continue;
+                L.types[pool.OrderBy(i => L.Dist(i, lost)).ThenBy(i => i).First()] = need;
             }
         }
 

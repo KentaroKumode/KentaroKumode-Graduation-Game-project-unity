@@ -672,7 +672,7 @@ static class T
 
     /// <summary>深さ 6 (画面の第 4 層) の「裂け目の記録」(2026-11-13・RiftGate) の検算。
     /// 口 (riftAtBoss) によらず深さ 6 以外の地図は同じ・深さ 6 も形は同じで種別だけが変わる・隣り合う点は全部イベントで終点へは必ず通る・
-    /// ボス前の休憩と店が 1 つ手前に並ぶ・歩いて終点に着くまでに必ず 1 回だけ起き、 2 つ目の隣り合う点は通常のイベント・安全弁は 0。</summary>
+    /// 店と休憩は層に 1 つずつ残る・歩いて終点に着くまでに必ず 1 回だけ起き、 2 つ目の隣り合う点は通常のイベント・安全弁は 0。</summary>
     static void RiftGateReport()
     {
         const int Seeds = 3000;
@@ -690,7 +690,8 @@ static class T
             Check(diff == 0, $"裂け目の記録: 深さ 6 以外の地図は口によらず同じ ({layers} 層・食い違い {diff})");
         }
         // ── 深さ 6: 形は同じ・置き方の中身 ──
-        int n6 = 0, shapeDiff = 0, ringBad = 0, oldBad = 0, prepFail = 0, prepBad = 0, supplyBad = 0, typeDiffOutside = 0;
+        int n6 = 0, shapeDiff = 0, ringBad = 0, oldBad = 0, supplyBad = 0, typeDiffOutside = 0, moved = 0;
+        long shopB = 0, restB = 0, shopA = 0, restA = 0;
         var ringSize = new List<int>(); var changed = new List<int>(); var ringTerr = new List<int>(); var replaced = new int[32];
         int ringWithTreasurePoint = 0;
         for (int salt = 1; salt <= Seeds; salt++)
@@ -706,7 +707,7 @@ static class T
             if (ring.Contains(FreeMapSim.TreasurePointOf(A))) ringWithTreasurePoint++;
             // 旧い作り: 縄張りの外の固定の点 1 つ・隣り合う点の欄は空
             if (B.riftGate.Count != 0 || B.fixedEvent < 2 || B.types[B.fixedEvent] != TileType.Event || B.territory.Contains(B.fixedEvent)) oldBad++;
-            // 種別の差は「隣り合う点」「旧い固定の点」「ボス前の休憩と店」だけ
+            // 種別の差は「隣り合う点」「旧い固定の点」「消えた店・休憩を置き直した点」だけ
             var hg = A.Hops(A.goal);
             int diffN = 0;
             for (int i = 0; i < A.Count; i++)
@@ -717,13 +718,13 @@ static class T
                 if (!ok) typeDiffOutside++;
             }
             changed.Add(diffN);
-            // ボス前: 終点から 2 歩の休憩と、 その隣 (終点から 2 歩以上) の店 = 「店 → 休憩 → イベント → ボス」
-            bool prep = false;
-            for (int r = 2; r < A.Count && !prep; r++)
-                if (hg[r] == 2 && A.types[r] == TileType.Rest)
-                    foreach (int s2 in A.adj[r]) if (s2 >= 2 && hg[s2] >= 2 && A.types[s2] == TileType.Shop) { prep = true; break; }
-            if (A.riftPrepFailed) prepFail++;
-            else if (!prep) prepBad++;
+            // 店と休憩の数 (旧い作りの固定の点は店・休憩を上書きしないので、 B の数 = 置き換えの前の数)
+            for (int i = 2; i < A.Count; i++)
+            {
+                if (B.types[i] == TileType.Shop) shopB++; if (B.types[i] == TileType.Rest) restB++;
+                if (A.types[i] == TileType.Shop) shopA++; if (A.types[i] == TileType.Rest) restA++;
+                if (!ring.Contains(i) && A.types[i] != B.types[i] && (A.types[i] == TileType.Shop || A.types[i] == TileType.Rest)) { moved++; }
+            }
             // 店と休憩は層に必ず 1 つずつ (生成の決まり)
             bool hasShop = false, hasRest = false;
             for (int i = 2; i < A.Count; i++) { if (A.types[i] == TileType.Shop) hasShop = true; if (A.types[i] == TileType.Rest) hasRest = true; }
@@ -731,8 +732,9 @@ static class T
         }
         Check(shapeDiff == 0, $"裂け目の記録: 深さ 6 の形 (点・道・山岳・縄張り) は口によらず同じ ({n6} 層・食い違い {shapeDiff})");
         Check(ringBad == 0 && oldBad == 0, $"裂け目の記録: 今の作りは終点に隣り合う点が全部イベント・旧い作りは固定の点 1 つ (今の作りの異常 {ringBad} / 旧い作りの異常 {oldBad})");
-        Check(typeDiffOutside == 0, $"裂け目の記録: 種別が変わるのは隣り合う点・旧い固定の点・ボス前の休憩と店だけ (それ以外の差 {typeDiffOutside}・1 層あたり {Dist(changed)})");
-        Check(prepBad == 0 && supplyBad == 0, $"裂け目の記録: ボス前に「店 → 休憩 → イベント → ボス」が並ぶ (並ばない {prepBad} / 店か休憩の無い層 {supplyBad} / 形のせいで置けない層 {prepFail} = {100.0 * prepFail / n6:F2}%)");
+        Check(typeDiffOutside == 0, $"裂け目の記録: 種別が変わるのは隣り合う点・旧い固定の点・置き直した店と休憩だけ (それ以外の差 {typeDiffOutside}・1 層あたり {Dist(changed)})");
+        Check(supplyBad == 0, $"裂け目の記録: 深さ 6 で店 0 か休憩 0 の層は 0 (店か休憩の無い層 {supplyBad} / 消えたので置き直した点 {moved} ({n6} 層の合計))");
+        Console.WriteLine($"[裂け目の記録] 1 層あたりの店 {1.0 * shopB / n6:F3} → {1.0 * shopA / n6:F3} ({1.0 * (shopA - shopB) / n6:+0.000;-0.000}) / 休憩 {1.0 * restB / n6:F3} → {1.0 * restA / n6:F3} ({1.0 * (restA - restB) / n6:+0.000;-0.000}) (置き換えの前 → 後・{n6} 層)");
         Console.WriteLine($"[裂け目の記録] 隣り合う点の数 {Dist(ringSize)} / うち縄張りの中 {Dist(ringTerr)} / 縄張りの宝の点が隣り合う点に重なる層 {ringWithTreasurePoint} ({100.0 * ringWithTreasurePoint / n6:F1}%)");
         Console.WriteLine("[裂け目の記録] 隣り合う点に元々あった種別 (旧い作りの種別): " + string.Join(" / ", Enumerable.Range(0, 32).Where(t => replaced[t] > 0).Select(t => $"{(TileType)t} {replaced[t]}")));
 
