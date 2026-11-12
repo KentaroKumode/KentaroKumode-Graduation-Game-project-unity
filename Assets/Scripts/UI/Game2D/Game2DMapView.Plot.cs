@@ -59,11 +59,15 @@ namespace UI.Game2D
 
         private static bool Same(Color32 a, Color32 b) => a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
 
+        /// <summary>嵐の中の点の絵の色 (2026-11-13・仮置き): 明度を落とす (大きさは変えない)。</summary>
+        private static Color32 StormDim(Color32 c) => new Color32((byte)(c.r * 9 / 20), (byte)(c.g * 9 / 20), (byte)(c.b * 9 / 20), c.a);
+
         private string[] IconFor(FreeMapSim sim, int i, out Color32 col)
         {
             var lay = sim.Layout; var t = lay.types[i];
             bool isStart = i == lay.start, isGoal = i == lay.goal;
-            bool known = sim.Known[i] || isStart || isGoal;
+            // 嵐の層 (2026-11-13) の終点は、 照明・隣・嵐のフェーズ 3 で種別が分かるまで、 ほかの未確認の点と同じ「?」で描く
+            bool known = sim.Known[i] || isStart || (isGoal && !lay.storm);
             col = NodeInk;
             if (!known) return IcoUnknown;                                   // 種別が分からない点 = 疑問符 (色は到達済みと同じ)
             // 種別の絵 (使い切った点も同じ絵で、 暗転させるだけ)
@@ -154,6 +158,13 @@ namespace UI.Game2D
                 foreach (int i in sim.Territory)   // いま効いている縄張り (避ける道のために削った後・2026-11-13)。 形の縄張り (lay.territory) は描かない
                     if (!sim.IsSunk(i)) { var q = Sp(lay.pos[i]); float r = NodeMargin(sim, i) + 1; Ellipse(q, r, r, 0, _lc.red, new[] { 1, 2 }); }
 
+            // 嵐の輪 (2026-11-13・仮の印): 今の安全な円を破線で描く (静かな時間・フェーズ 4 は描かない)。 次の手番の輪は描かない
+            if (sim.StormRing(out var stormC, out double stormR))
+            {
+                float rr = (float)stormR * _ls;
+                Ellipse(Sp(stormC), rr, rr, 0, _lc.warn, new[] { 3, 2 });
+            }
+
             // 自艦中心の距離環 (4 と 8)
             for (int r = 4; r <= 8; r += 4) Ellipse(_me, r * _ls, r * _ls, 0, _lc.grid);
 
@@ -182,6 +193,9 @@ namespace UI.Game2D
                 if (!ok && GameLoop.GameManager.SupplyLineUnlocked && sim.CanRelayTo(_hover)) ok = true;
                 else if (ok) Line(_me, q, _lc.hot);
                 Bracket(q, 6, ok ? _lc.hot : _lc.dim);
+                // 嵐の中の点への移動の見積もり (2026-11-13): 払う HP を点の下に出す
+                int stormHp = ok ? sim.StormHpFor(_hover) : 0;
+                if (stormHp > 0) Text("HP-" + stormHp, q.x, q.y + 8 * Pxs, _lc.red);
             }
 
             // 点
@@ -192,6 +206,7 @@ namespace UI.Game2D
                 var ic = IconFor(sim, i, out var col);
                 if (ic == IcoExit && !sim.Done[i]) col = BossPulse(q);
                 else if (showTerr && sim.InTerritory(i)) col = TerritoryTint(col);
+                if (sim.InStorm(i)) col = StormDim(col);   // 嵐の中の点は暗く (2026-11-13)
                 Glyph(ic, q.x, q.y, col);
             }
 
@@ -317,23 +332,36 @@ namespace UI.Game2D
         {
             var lay = sim.Layout; var me = lay.pos[sim.Me]; var ex = lay.pos[lay.goal];
             // 出口のコンパス (16 方向): 出口の点が隠れていても、 方角だけ分かる。 距離は出さない
+            //   嵐の層 (2026-11-13) は、 ボスの点の種別が見えるまで方角も出さない (針を描かず「出口 ？」)
+            bool exitHidden = lay.storm && !sim.Known[lay.goal];
             float b = (Mathf.Atan2((float)(ex.x - me.x), -(float)(ex.y - me.y)) + Mathf.PI * 2) % (Mathf.PI * 2);
             int sec = Mathf.RoundToInt(b / (Mathf.PI * 2 / 16)) % 16;
             float ang = sec * Mathf.PI * 2 / 16 - Mathf.PI / 2;
             float cx0 = 96 + 118, cy0 = H - 17, Rr = 9;
             for (int k = 0; k < 16; k++) { float ak = k * Mathf.PI * 2 / 16 - Mathf.PI / 2; Put(Mathf.RoundToInt(cx0 + Mathf.Cos(ak) * Rr), Mathf.RoundToInt(cy0 + Mathf.Sin(ak) * Rr), _lc.dim); }
             Rect((int)cx0, (int)(cy0 - Rr - 1), 1, 2, _lc.hi);                                     // 北の目印
-            Rect(Mathf.RoundToInt(cx0 + Mathf.Cos(ang) * Rr) - 1, Mathf.RoundToInt(cy0 + Mathf.Sin(ang) * Rr) - 1, 3, 3, _lc.hot);
-            for (int r = 1; r < Rr - 1; r++) Put(Mathf.RoundToInt(cx0 + Mathf.Cos(ang) * r), Mathf.RoundToInt(cy0 + Mathf.Sin(ang) * r), _lc.dim);   // 針
-            Text("出口 " + Compass[sec], 96, H - 35, _lc.mid, Align.Left);
+            if (!exitHidden)
+            {
+                Rect(Mathf.RoundToInt(cx0 + Mathf.Cos(ang) * Rr) - 1, Mathf.RoundToInt(cy0 + Mathf.Sin(ang) * Rr) - 1, 3, 3, _lc.hot);
+                for (int r = 1; r < Rr - 1; r++) Put(Mathf.RoundToInt(cx0 + Mathf.Cos(ang) * r), Mathf.RoundToInt(cy0 + Mathf.Sin(ang) * r), _lc.dim);   // 針
+            }
+            Text("出口 " + (exitHidden ? "？" : Compass[sec]), 96, H - 35, _lc.mid, Align.Left);
             Text("縮尺 " + _zoom + "倍", 96, H - 22, _lc.dim, Align.Left);
             char col = (char)('A' + Mathf.Clamp(Mathf.FloorToInt((float)me.x / 2f), 0, 25));
             int row = Mathf.FloorToInt((float)me.y / 2f) + 1;
             Text("現在 " + col + row, 96, H - 9, _lc.dim, Align.Left);
             Text("ターン " + Mathf.Min(999, sim.Turn).ToString("000"), 96 + 8 * 4 * Pxs, H - 9, _lc.dim, Align.Left);      // 「ターン」とは書かない (2026-11-11)
 
-            bool calm = !(sim.Weather != WeatherKind.None && !double.IsNegativeInfinity(sim.Front));
-            Text("天気 " + (calm ? "凪" : sim.Weather.DisplayName()), W - 8 - 89, 8, calm ? _lc.dim : _lc.hi, Align.Right);
+            if (sim.StormMode)
+            {
+                // 嵐 (2026-11-13): 静かな時間は「嵐まで N」、 嵐の間は「嵐 フェーズ k・次まで N」と種類の名前
+                Text(StormLabel(sim), W - 8 - 89, 8, sim.StormPhase == 0 ? _lc.mid : _lc.warn, Align.Right);
+            }
+            else
+            {
+                bool calm = !(sim.Weather != WeatherKind.None && !double.IsNegativeInfinity(sim.Front));
+                Text("天気 " + (calm ? "凪" : sim.Weather.DisplayName()), W - 8 - 89, 8, calm ? _lc.dim : _lc.hi, Align.Right);
+            }
             // 縄張りの宝を取った後 (2026-11-12・仮置き): 何を得たかを左上に出す (航行のまま渡すので、 専用の画面は挟まない)
             //   液晶の上端 (y 0〜29) は x 96〜387 が上の帯 (Game2DNavExtras の TopR / StatusR) に覆われるので、 その真下に、
             //   地図の点や道と重なっても読めるよう地の色の下敷きを敷いて出す (y = 8 だと上の帯の裏で見えなかった)。
@@ -347,6 +375,15 @@ namespace UI.Game2D
                     Text(note, TreasureNoteX, TreasureNoteTop + th / 2f, _lc.warn, Align.Left);
                 }
             }
+        }
+
+        /// <summary>嵐の帯の文 (2026-11-13): 「霧 嵐まで 12」/「嵐 フェーズ 2・次まで 4 霧」/「嵐 フェーズ 4 霧」。 種類なしは「嵐」だけ。</summary>
+        internal static string StormLabel(FreeMapSim sim)
+        {
+            int ph = sim.StormPhase, n = sim.StormTurnsToNext;
+            string kind = sim.Weather == WeatherKind.None ? "" : " " + Storm.KindName(sim.Weather);
+            if (ph == 0) return "嵐まで " + n + kind;
+            return ph >= 4 ? "嵐 フェーズ " + ph + kind : "嵐 フェーズ " + ph + "・次まで " + n + kind;
         }
 
         private static string WxCode(WeatherKind k)

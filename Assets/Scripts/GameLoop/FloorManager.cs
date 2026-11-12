@@ -150,13 +150,13 @@ namespace GameLoop
             if (elite)
             {
                 node.encounterId = EncounterPresets.Generic.id;
-                node.encounterEnemyA = PickEnemyForNode(floor, idx, true, MapSystem.FreeMove.FreeMapParams.BandOf(node.x))?.id;
+                node.encounterEnemyA = PickEnemyForNode(floor, idx, true, node.Band)?.id;
                 node.encounterEnemyB = null;
                 return;
             }
 
             // 危険の帯 (2026-11-04): 始点側の安全な帯は 2 体戦を出さず、 脅威度の低い敵だけ。 終点側の危険な帯は脅威度の低い敵を外す
-            int band = MapSystem.FreeMove.FreeMapParams.BandOf(node.x);
+            int band = node.Band;   // 嵐の層は始点からの距離で決めた帯 (2026-11-13)・それ以外は横の位置
             var preset = band == MapSystem.FreeMove.FreeMapParams.BandSafe ? EncounterPresets.Generic : EncounterPresets.PickFor(floor, elite, idx);
 
             // ペアの 2 体目が DB に無ければ単体戦へ縮退する (プリセットの typo で戦闘が壊れないように)。

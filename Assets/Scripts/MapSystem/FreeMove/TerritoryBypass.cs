@@ -105,7 +105,7 @@ namespace MapSystem.FreeMove
                     // 形の縄張りが全部道の上: 道の上に無い点のうち、 元の中心に直線で一番近い点を中心にして、 足して作る
                     for (int i = 2; i < L.Count; i++)
                     {
-                        if (path.Contains(i) || L.Dist(i, L.start) < FreeMapParams.TerritoryStartClearance) continue;
+                        if (i == L.start || path.Contains(i) || L.Dist(i, L.start) < FreeMapParams.TerritoryStartClearance) continue;   // 嵐の層は始点が添字 0 とは限らない (2026-11-13)
                         double d = L.Dist(i, L.home);
                         if (d < bestD || (d == bestD && i < bestHome)) { bestD = d; bestHome = i; }
                     }
@@ -146,7 +146,7 @@ namespace MapSystem.FreeMove
                 foreach (int u in keep)
                     foreach (int v in L.adj[u])
                     {
-                        if (v <= 1 || keep.Contains(v) || path.Contains(v) || L.Dist(v, L.start) < FreeMapParams.TerritoryStartClearance) continue;
+                        if (v <= 1 || v == L.start || keep.Contains(v) || path.Contains(v) || L.Dist(v, L.start) < FreeMapParams.TerritoryStartClearance) continue;
                         double d = L.Dist(v, home);
                         if (d < pd || (d == pd && v < pick)) { pd = d; pick = v; }
                     }

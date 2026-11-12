@@ -41,6 +41,12 @@ namespace MapSystem
         /// <summary>深さ 6 (画面の第 4 層) の終点 (ボス) に隣り合うイベントマス (2026-11-13・<c>FreeMapLayout.riftGate</c>)。
         /// この層で「裂け目の記録」がまだ起きていなければ、 踏んだ時に固定でそれが起きる。 起きた後は通常のイベントマス。</summary>
         public bool isRiftGate;
+        /// <summary>危険の帯 (<see cref="FreeMove.FreeMapParams.BandSafe"/> ほか)。 -1 = 横の位置 <see cref="x"/> から決める (今までどおり)。
+        /// 嵐の層 (2026-11-13) は始点を選び直すので、 生成時に始点と終点からの距離で決めた帯 (<see cref="FreeMove.FreeMapLayout.BandOf"/>) を入れる。</summary>
+        public int band = -1;
+
+        /// <summary>この点の危険の帯 (<see cref="band"/> が無ければ横の位置から)。</summary>
+        public int Band => band >= 0 ? band : FreeMove.FreeMapParams.BandOf(x);
 
         /// <summary>このノードから移動可能なノードのID一覧。
         /// 自由移動の層では<b>道で結ばれた点</b>（双方向）── 移動そのものはどの点へも直接できる。</summary>

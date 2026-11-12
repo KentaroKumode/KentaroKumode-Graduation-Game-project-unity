@@ -373,6 +373,8 @@ namespace EventSystem
                 case EventEffectType.PullPursuer:      return sim.Leashed ? $"追跡者が{leash}{eff.amount} 歩まで近づく" : $"追跡者が {eff.amount} 歩近づく";
                 case EventEffectType.Shortcut:         return $"時限バフ獲得: 近道 ({eff.amount}回)";   // 時限バフと同じ言い方 (2026-11-13・作者の決定「近道というバフに統一」)
                 case EventEffectType.ShiftFront:
+                    if (sim.StormMode)   // 嵐 (2026-11-13): 嵐の時計を N 手番動かす
+                        return eff.amount < 0 ? $"嵐が {-eff.amount} 手番ぶん遠のく" : $"嵐が {eff.amount} 手番ぶん迫る";
                     return eff.amount < 0 ? $"天候の前線が {-eff.amount} 段退く" : $"天候の前線が {eff.amount} 段迫る";
             }
             return null;

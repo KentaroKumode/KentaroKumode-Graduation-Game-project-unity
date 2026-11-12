@@ -479,6 +479,7 @@ namespace AutoTest
             GameLoop.GameHooks.TerritoryTreasure = GameLoop.TerritoryTreasureKind.Forge;
             GameLoop.GameHooks.TerritoryKeepBypass = true;                       // [測定 2026-11-13] 縄張りを避ける道の保証を既定へ
             GameLoop.GameHooks.RiftRecordAtBoss = true;                          // [測定 2026-11-13] 深さ 6 の「裂け目の記録」の置き方を既定へ
+            GameLoop.GameHooks.StormEnabled = true;                              // [測定 2026-11-13] 天候の作りを既定 (嵐) へ
             GameLoop.GameHooks.TerminalHealMulOverride = 0;                      // [測定 2026-11-12・#102]
             GameLoop.GameHooks.TerminalArresterNeedOverride = 0;
             GameLoop.GameHooks.TerminalFirstAidBattleOnly = false;

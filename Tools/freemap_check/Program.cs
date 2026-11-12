@@ -12,7 +12,7 @@ class Wallet : IFreeMapWallet
     public bool PayHp(int a) { Hp -= a; return Hp <= 0; }
 }
 
-static class T
+static partial class T
 {
     static int fails = 0;
     static void Check(bool ok, string what) { Console.WriteLine((ok ? "OK   " : "FAIL ") + what); if (!ok) fails++; }
@@ -540,6 +540,7 @@ static class T
         }
         BypassReport();
         RiftGateReport();
+        StormReport();
         Console.WriteLine(fails == 0 ? "ALL OK" : $"FAILED {fails}");
     }
 

@@ -70,6 +70,25 @@ namespace MapSystem.FreeMove
         /// <summary>縄張りの中心 (追跡者の最初の居場所)。</summary>
         public int home;
 
+        // ── 嵐 (2026-11-13・<see cref="Storm"/>) ──
+        /// <summary>嵐の層か (<see cref="Storm.Apply"/> が立てる)。 立っていない層は旧い前線の作り (測定の口 GameHooks.StormEnabled = False・嵐の無い深さ)。
+        /// 立っている層では、 始点が最外周から選び直され、 終点 (ボス) の種別は最初は隠れている。</summary>
+        public bool storm;
+        /// <summary>嵐のフェーズ 2 の終わりの輪の中心の、 ボスの点からのずらし (層の生成時に決める)。</summary>
+        public Vec2 stormOffset;
+        /// <summary>[検算・計装] 始点の候補が 1 つも無く、 生成の始点のままにした (<see cref="Storm.Apply"/>)。 中断セーブには写さない。</summary>
+        public bool stormStartFallback;
+
+        /// <summary>点 i の危険の帯 (2026-11-04・<see cref="FreeMapParams.BandOf"/>)。 嵐の層では始点を選び直すので、 横の位置ではなく
+        /// 始点と終点への直線距離の比 (始点からの距離 ÷ (始点から + 終点から)) を 1/3 と 2/3 で切る。 嵐でない層は今までどおり横の位置。</summary>
+        public int BandOf(int i)
+        {
+            if (!storm) return FreeMapParams.BandOf((float)pos[i].x);
+            double ds = Dist(i, start), dg = Dist(i, goal);
+            float t = ds + dg <= 0 ? 0f : (float)(ds / (ds + dg));
+            return t < 1f / 3f ? FreeMapParams.BandSafe : t < 2f / 3f ? FreeMapParams.BandMiddle : FreeMapParams.BandDanger;
+        }
+
         public int Count => pos.Length;
 
         public double Dist(int i, int j) => Vec2.Dist(pos[i], pos[j]);

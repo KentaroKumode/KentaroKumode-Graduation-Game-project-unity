@@ -498,6 +498,14 @@ namespace AutoTest
         private static float ScoreFront(int steps, RunState run)
         {
             var sim = Sim;
+            if (sim != null && sim.StormMode)
+            {
+                // 嵐 (2026-11-13・最小の対応): 1 手番ぶんの値段 = 前線の 1 段の値段 ÷ 前線の 1 段の手番 (今ある定数だけ・新しい数値を作らない)。
+                //   嵐の中に居れば 2 倍 (前線の内側と同じ扱い)。 静かな時間でも動かせる (遅らせると嵐が来るのが遅れる)。 遠ざける (負) が得
+                if (steps == 0) return 0f;
+                float perTurn = V_FRONT_STEP * ProvisionPrice(run) * (sim.InStorm(sim.Me) ? 2f : 1f) / MapSystem.FreeMove.FreeMapParams.FrontEvery;
+                return -steps * perTurn;
+            }
             if (sim == null || steps == 0 || sim.Weather == MapSystem.FreeMove.WeatherKind.None) return 0f;
             if (steps < 0 && double.IsNegativeInfinity(sim.Front)) return 0f;   // まだ届いていない前線は戻せない
             float per = V_FRONT_STEP * ProvisionPrice(run) * (sim.InFront(sim.Me) ? 2f : 1f);

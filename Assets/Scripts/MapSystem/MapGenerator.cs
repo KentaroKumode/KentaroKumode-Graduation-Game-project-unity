@@ -39,7 +39,9 @@ namespace MapSystem
         {
             if (!FloorPlan.IsFreeMap(floor)) return GenerateBossOnly(floor);
             // 深さ 6 の「裂け目の記録」の置き方 (他の層では読まれない・どちらも乱数を引かない)。 正本は ConvictionSystem.RiftGateAtBoss
-            return FromLayout(FreeMapGenerator.Generate(floor, GameLoop.ConvictionSystem.RiftGateAtBoss(GameLoop.GameManager.Instance?.Run)));
+            //   嵐 (2026-11-13): 測定の口 GameHooks.StormEnabled が立っていれば、 嵐のある深さで始点を選び直す (FreeMove.Storm.Apply・乱数は専用のキー)
+            return FromLayout(FreeMapGenerator.Generate(floor, GameLoop.ConvictionSystem.RiftGateAtBoss(GameLoop.GameManager.Instance?.Run),
+                                                        GameLoop.GameHooks.StormEnabled));
         }
 
         /// <summary>?マスの実タイプを抽選（Mystery は廃止済み。互換のため残置、呼ばれても Battle を返す）。</summary>
@@ -64,9 +66,10 @@ namespace MapSystem
                     isFixedEvent = i == L.fixedEvent,
                     isRiftGate = L.riftGate.Contains(i),
                     freeMap = true,
+                    band = L.storm ? L.BandOf(i) : -1,   // 嵐の層は始点からの距離で決めた帯 (2026-11-13)
                     // 種別が最初から分かっている点: 始点・終点 (ボス / 門)・深さ 6 の「裂け目の記録」(ボスに隣り合う点 / 旧い作りの固定の点)。
-                    //   他は視界 (距離 1)・照明・偵察で見えるまで伏せる。
-                    revealed = i == L.start || i == L.goal || i == L.fixedEvent || L.riftGate.Contains(i),
+                    //   他は視界 (距離 1)・照明・偵察で見えるまで伏せる。 嵐の層 (2026-11-13) の終点は伏せる (照明・隣・嵐のフェーズ 3 で見える)。
+                    revealed = i == L.start || (i == L.goal && !L.storm) || i == L.fixedEvent || L.riftGate.Contains(i),
                 };
                 ApplyEliteUpgrade(L.floor, node);
                 map.AddNode(node);
@@ -87,7 +90,7 @@ namespace MapSystem
         {
             int roll = GameLoop.GameRng.Range(0, 100, "map.eliteUpgrade", floor * 100 + node.index);
             // 安全な帯 (層の左 1/3) は格上げしない (2026-11-04・危険の帯)。 引く回数は変えない
-            if (node.freeMap && FreeMove.FreeMapParams.BandOf(node.x) == FreeMove.FreeMapParams.BandSafe) return;
+            if (node.freeMap && node.Band == FreeMove.FreeMapParams.BandSafe) return;
             if (node.type == TileType.Battle && roll < MetaProgression.MetaBuffApplicator.GetEliteUpgradePct())
                 node.type = TileType.EliteBattle;
         }

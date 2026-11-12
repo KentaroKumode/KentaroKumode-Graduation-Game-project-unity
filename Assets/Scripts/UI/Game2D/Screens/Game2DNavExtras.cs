@@ -124,7 +124,7 @@ namespace UI.Game2D
             int h = floor * 7 + passives * 31 + cons * 131 + (run != null ? run.playerHP * 389 : 0) + weather * 17 + (foe + 2) * 1009 + (sim != null ? sim.Version * 7919 : 0) + blink * 104729 + (_hoverSlot + 2) * 15485863 + (jump ? 31 : 0);
             if (h == _hash && Time.unscaledTime < _next) return;
             _hash = h; _next = Time.unscaledTime + 0.5f;
-            Redraw(floor, passives, cons, weather, foe);
+            Redraw(floor, passives, cons, weather, foe, sim);
             RedrawStatus(gm, sim, run, blink == 0);
             RedrawSlots(gm, sim, run);
         }
@@ -423,7 +423,7 @@ namespace UI.Game2D
             return l;
         }
 
-        private void Redraw(int floor, int passives, int cons, int weather, int foe)
+        private void Redraw(int floor, int passives, int cons, int weather, int foe, FreeMapSim sim = null)
         {
             Ensure(ref _tt, _top, TopR); Ensure(ref _tl, _left, LeftR);
             // ── 上の帯 ──
@@ -431,8 +431,17 @@ namespace UI.Game2D
             Plate(p, 0, 2, 82, 28);                                                                    // 天気 (気圧計の代わり)
             string wn = weather >= 0 && weather < WeatherNames.Length ? WeatherNames[weather] : "W" + weather;
             p.AnyIcon(weather >= 0 && weather < WeatherIcons.Length ? WeatherIcons[weather] : "still", 3, 7, 18, Game2DKit.Ink);
-            p.Text("天気", 24, 3, Game2DKit.Dim); p.Text(wn, 48, 3, weather == 0 ? Game2DKit.Ink : Game2DKit.Amber);
-            p.Text("予報", 24, 16, Game2DKit.Dim); p.Text("???", 48, 16, Game2DKit.Faint);                // 予報は物資の段階で精度が変わる (未接続)
+            bool storm = sim != null && sim.StormMode;
+            if (storm && weather == 0) wn = "嵐";                                                   // 嵐の層の種類なし (素の嵐・2026-11-13)
+            p.Text("天気", 24, 3, Game2DKit.Dim); p.Text(wn, 48, 3, weather == 0 && !storm ? Game2DKit.Ink : Game2DKit.Amber);
+            if (storm)
+            {
+                // 嵐 (2026-11-13): 2 行目に嵐の時計 (静かな時間は「まで N」・嵐の間は「k あとN」)
+                int ph = sim.StormPhase, n = sim.StormTurnsToNext;
+                p.Text("嵐", 24, 16, Game2DKit.Dim);
+                p.Text(ph == 0 ? "まで" + n : ph >= 4 ? "段4" : "段" + ph + " " + n, 40, 16, ph == 0 ? Game2DKit.Ink : Game2DKit.Amber);
+            }
+            else { p.Text("予報", 24, 16, Game2DKit.Dim); p.Text("???", 48, 16, Game2DKit.Faint); }       // 予報は物資の段階で精度が変わる (未接続)
             // 待つ (その場で 1 ターン)。 旧: 見本の気圧計
             if (Game2DKit.Tab != null) p.NineSlice(Game2DKit.Tab, 5, Game2DKit.Well, WaitR.x, WaitR.y, WaitR.width, WaitR.height); else p.Box(WaitR.x, WaitR.y, WaitR.width, WaitR.height, Game2DKit.Off, Game2DKit.Dark);
             p.TextC("待つ", WaitR, Game2DKit.Ink);
