@@ -735,13 +735,8 @@ namespace CombatSystem
                     && _bza > 0f,
                 executeArmed = ctx.vescaExecuteArmed,
                 sealedTerminal = -1,   // 旧〈綻び〉(端子の封印) は 2026-11-10 に撤去
-                // ボスのダウン (2026-11-13): 目盛り・次の目盛りの HP・このターンと後に続くダウン
-                enemyDown = _down.downNow,
-                downPending = _down.pending,
-                downNotches = _down.notches,
-                downBroken = _down.broken,
-                downNextNotchHp = currentEnemy != null ? _down.NextNotchHp(currentEnemy.maxHP) : -1,
             };
+            FillDownTelegraph(ref tele);   // ボスのダウン (2026-11-13): 目盛り・次の目盛りの HP・このターンと後に続くダウン (振り直しの仮組みと同じ関数)
             if (ctx.bossId == GameLoop.BossIds.VescaFinal)
                 BossDmgDiag.P4Turn(ctx.playerHighDiceCrushed, ctx.vescaExecuteArmed,
                                    ctx.vescaMaxHpBiteOnHit, ctx.vescaDrawnRelics);

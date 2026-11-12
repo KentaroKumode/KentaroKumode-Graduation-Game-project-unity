@@ -295,13 +295,18 @@ namespace UI.Game2D.Battle
                     if (p.kind == TurnPauseKind.Reroll)
                     {
                         // 振り直さない → 配線の判断へ。 出目が変わっていなければ (ふつうはそのまま) 続けて配線を渡す
+                        int atkShown = eatk; bool downShown = down;
                         cm.AnswerReroll(false);
                         if (!cm.IsAwaitingDecision) { Resolve(cm); break; }
                         if (!SameDice(cm.PendingDecision.playerDice)) { SyncDecision(cm, false); Game2DSfx.Play("ui_tab"); Touch(); break; }
+                        // 振り直しから配線へ進む時は必ず予告を写し直す (振り直しの判断の予告は仮組みで、 配線の予告と数字が違うことがある)。
+                        //   攻撃の数字かダウンが変わったら、 人が見ないまま決めないよう、 写し直した所で止まる (もう一度押すと決まる)。
                         p = cm.PendingDecision;
-                        // 〈猫の手〉が挿した: 人が見ないまま決めないよう、 猫の 1 組を見せて止まる (もう一度押すと決まる)
-                        if (p.kind == TurnPauseKind.Wiring && p.catDie >= 0 && (p.catDie >= slot.Length || slot[p.catDie] != p.catSlot))
-                        { SyncDecision(cm, false); Game2DSfx.Play("wire", 1f, 1.1f); Touch(); break; }
+                        // 〈猫の手〉が挿した: 人が見ないまま決めないよう、 猫の 1 組を見せて止まる (もう一度押すと決まる)。 写し直す前の挿し方で見る
+                        bool catNew = p.kind == TurnPauseKind.Wiring && p.catDie >= 0 && (p.catDie >= slot.Length || slot[p.catDie] != p.catSlot);
+                        SyncDecision(cm, false); Touch();
+                        if (catNew) { Game2DSfx.Play("wire", 1f, 1.1f); break; }
+                        if (eatk != atkShown || down != downShown) { Game2DSfx.Play("ui_tab"); break; }
                     }
                     if (p.kind == TurnPauseKind.Wiring)
                     {

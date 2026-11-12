@@ -181,6 +181,9 @@ namespace CombatSystem
                 enemyDice = enemyDice,
                 enemyDiceTotal = rawEnemyTotal,
             };
+            // ボスのダウン (2026-11-13): 配線の予告と同じ関数で入れる (ダウンのターンは攻撃 0・目盛りの刻み・次の目盛りの HP)。
+            //   BOT の振り直しの値付け (MutualRerollPolicy → 山札の効用) もこの予告を読むので、 ダウンのターンの攻撃 0・与ダメ ×1.5 を見る。
+            FillDownTelegraph(ref tele);
 
             // 〈特別・対〉(前ターン成立): 次のリロール N 回 (既定 2) を無料にする。
             int freeRerolls = ctx.currentBuffs.TryGetValue(YachtRoleEffects.FreeRerollKey, out float freeFlag)

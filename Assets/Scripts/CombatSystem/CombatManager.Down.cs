@@ -38,6 +38,19 @@ namespace CombatSystem
                     + (_down.pending > 0 ? $" (あと {_down.pending} ターン続く)" : ""));
         }
 
+        /// <summary>予告にダウンの欄を入れる (振り直しの判断の仮組み・配線の判断の予告の 2 か所が呼ぶ・写しを持たない)。
+        /// ダウンのターンは敵の攻撃 (1 体目・2 体目 / 〈連撃〉の 2 回目) を 0 にする。 ダウンの無い敵では何も変えない
+        /// (欄は既定のまま: enemyDown=false・downNotches=null・downNextNotchHp=−1)。</summary>
+        private void FillDownTelegraph(ref MutualTurnTelegraph t)
+        {
+            t.enemyDown = _down.downNow;
+            t.downPending = _down.pending;
+            t.downNotches = _down.notches;
+            t.downBroken = _down.broken;
+            t.downNextNotchHp = currentEnemy != null ? _down.NextNotchHp(currentEnemy.maxHP) : -1;
+            if (_down.downNow) { t.enemyAttackValue = 0; t.secondaryAttackValue = 0; }
+        }
+
         /// <summary>ターンの終わり (ターン終了時の削りを拾った後): 新しく割った目盛りを数え、 その数だけ次のターンからダウンを待たせる。</summary>
         private void NoteBossDownTurnEnd()
         {
