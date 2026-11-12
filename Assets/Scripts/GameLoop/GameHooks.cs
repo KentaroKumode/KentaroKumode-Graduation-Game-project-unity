@@ -97,6 +97,10 @@ namespace GameLoop
         /// 縄張りを出ない追跡者の時だけ効く (旧い作り <see cref="PursuerLeavesTerritory"/> では削らない)。 層を作る時に読む (MapManager)。
         /// AutoRunner.territoryKeepBypass が毎ランの始めに入れ、 ラン終了で true へ戻す。</summary>
         public static bool TerritoryKeepBypass = true;
+        /// <summary>[測定 2026-11-13] true (既定) = 深さ 6 (画面の第 4 層) の「裂け目の記録」を、 終点 (ボス) に隣り合う点に置く
+        /// (<see cref="ConvictionSystem.RiftGateAtBoss"/>・GAME.md §4-2)。 false = 旧い作り (層の 3 分の 1 あたりの固定の点・踏まずにボスへ行けた)。
+        /// 層を作る時に読む (MapGenerator)。 AutoRunner.riftRecordAtBoss が毎ランの始めに入れ、 ラン終了で true へ戻す。</summary>
+        public static bool RiftRecordAtBoss = true;
 
         /// <summary>[測定 2026-11-12・#95] 遺物の効果を止める接辞 (ビット = <c>(int)RelicStat</c>・0 = 何も止めない)。
         /// 主ステもサブも、 その接辞の分だけを 0 にする (段の値 1 つあたりの価値を、 理論値の持ち込みから 1 接辞ずつ抜いて測る口)。

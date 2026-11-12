@@ -74,6 +74,11 @@ namespace AutoTest.ParallelSweep
         public string metaRanks = "";
         /// <summary>[計装 2026-11-12] ラン開始時の職業 (lockWeaponFamily の測定では武器の家系)。</summary>
         public string startClass = "";
+        /// <summary>[計装 2026-11-13] 深さ 6 (画面の第 4 層) の「裂け目の記録」: 0 = 起きていない / 1 = 地図の点で起きた / 2 = 終点で安全弁が出した (今の作りでは 0 件のはず)。</summary>
+        public int riftRecord;
+        /// <summary>[計装 2026-11-13] 起きた時の深さ 6 の航行のターン / 踏んだ点の数 (起きていなければ -1) と、 最後の頁を開いたか。</summary>
+        public int riftRecordTurn = -1, riftRecordSteps = -1;
+        public bool riftRecordOpened;
 
         public static LearnRunRow From(AutoRunner.RunRec r)
         {
@@ -102,6 +107,8 @@ namespace AutoTest.ParallelSweep
                 mapVisit = r.mapVisit != null ? r.mapVisit.ToArray() : Array.Empty<int>(),
                 metaRanks = r.metaRanks ?? "",
                 startClass = r.startClass ?? "",
+                riftRecord = r.riftRecord, riftRecordTurn = r.riftRecordTurn, riftRecordSteps = r.riftRecordSteps,
+                riftRecordOpened = r.riftRecordOpened,
             };
         }
 
@@ -452,6 +459,8 @@ namespace AutoTest.ParallelSweep
                 "pursuerLeavesTerritory", "territoryTreasure", "territoryTreasureHpMargin", "navTerritoryDetour",
                 // 2026-11-13: 縄張りを避ける道の保証 (縄張りを削るか)
                 "territoryKeepBypass",
+                // 2026-11-13: 深さ 6 の「裂け目の記録」の置き方 (True = ボスに隣り合う点を全部イベントに・False = 旧い固定の点で BOT の選び方も元のまま = main と同じ)
+                "riftRecordAtBoss",
                 // 2026-11-10: 測定用の物差し (主攻撃 / 毒・出血・爆発の倍率)。 送った値と、 ラン開始時に本体へ入れた値
                 "probeMainMult", "ProbeMainMultApplied", "probePassiveMult", "ProbePassiveMultApplied",
                 // 2026-11-12 (#107): 配線が収支で決まる敵のパッシブと〈吸血〉を読むか (−1 = 技量に従う) と実効値・内訳

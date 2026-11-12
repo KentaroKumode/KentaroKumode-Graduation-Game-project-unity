@@ -38,7 +38,8 @@ namespace MapSystem
         public static FloorMap Generate(int floor)
         {
             if (!FloorPlan.IsFreeMap(floor)) return GenerateBossOnly(floor);
-            return FromLayout(FreeMapGenerator.Generate(floor));
+            // 深さ 6 の「裂け目の記録」の置き方 (他の層では読まれない・どちらも乱数を引かない)。 正本は ConvictionSystem.RiftGateAtBoss
+            return FromLayout(FreeMapGenerator.Generate(floor, GameLoop.ConvictionSystem.RiftGateAtBoss(GameLoop.GameManager.Instance?.Run)));
         }
 
         /// <summary>?マスの実タイプを抽選（Mystery は廃止済み。互換のため残置、呼ばれても Battle を返す）。</summary>
@@ -61,10 +62,11 @@ namespace MapSystem
                     x = (float)L.pos[i].x,
                     y = (float)L.pos[i].y,
                     isFixedEvent = i == L.fixedEvent,
+                    isRiftGate = L.riftGate.Contains(i),
                     freeMap = true,
-                    // 種別が最初から分かっている点: 始点・終点 (ボス / 門)・6 層の「裂け目の記録」。
+                    // 種別が最初から分かっている点: 始点・終点 (ボス / 門)・深さ 6 の「裂け目の記録」(ボスに隣り合う点 / 旧い作りの固定の点)。
                     //   他は視界 (距離 1)・照明・偵察で見えるまで伏せる。
-                    revealed = i == L.start || i == L.goal || i == L.fixedEvent,
+                    revealed = i == L.start || i == L.goal || i == L.fixedEvent || L.riftGate.Contains(i),
                 };
                 ApplyEliteUpgrade(L.floor, node);
                 map.AddNode(node);

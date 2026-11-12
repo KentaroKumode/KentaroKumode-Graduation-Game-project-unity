@@ -36,8 +36,11 @@ namespace MapSystem
         public int index = -1;
         /// <summary>座標 (距離の単位。 点どうしの標準の間隔 ≒ 1)。 離散マップでは 0。</summary>
         public float x, y;
-        /// <summary>6 層の「裂け目の記録」の固定の点。</summary>
+        /// <summary>深さ 6 (画面の第 4 層) の「裂け目の記録」の固定の点 (旧い作り・<c>riftRecordAtBoss = False</c> の時だけ立つ)。</summary>
         public bool isFixedEvent;
+        /// <summary>深さ 6 (画面の第 4 層) の終点 (ボス) に隣り合うイベントマス (2026-11-13・<c>FreeMapLayout.riftGate</c>)。
+        /// この層で「裂け目の記録」がまだ起きていなければ、 踏んだ時に固定でそれが起きる。 起きた後は通常のイベントマス。</summary>
+        public bool isRiftGate;
 
         /// <summary>このノードから移動可能なノードのID一覧。
         /// 自由移動の層では<b>道で結ばれた点</b>（双方向）── 移動そのものはどの点へも直接できる。</summary>

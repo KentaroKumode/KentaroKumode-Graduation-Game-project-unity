@@ -42,8 +42,11 @@ namespace AutoTest
             if (!ReferenceEquals(cur, _lastResolvedEvent))
             {
                 int idx = PickSafeChoice(cur);
+                bool riftRecord = cur.name == GameLoop.ConvictionSystem.Layer7RevelationEventName;
                 // [アブレーション] イベントの選択判断を潰す (提示された選択肢から一様抽選)。
-                if (ablateEvent && cur.choices != null && cur.choices.Count > 1)
+                //   深さ 6 の「裂け目の記録」は今の作り (riftRecordAtBoss) では潰さない ── BOT は 7 層 (深さ 7) クリアを目指す主体として必ず最後の頁を開く
+                //   (2026-11-13)。 旧い作りへ戻した腕は元のまま (乱数 AblationRng を引く回数も元のまま)。
+                if (ablateEvent && cur.choices != null && cur.choices.Count > 1 && !(riftRecord && riftRecordAtBoss))
                     idx = AblationRng.Next(0, cur.choices.Count);
                 // 払えないゴールドの選択肢は本体が受け付けない (押しても進まず詰まる) ので、 選べる手へ戻す
                 if (!EventEncounter.IsChoiceSelectable(cur, idx, gm.Run)) idx = PickSafeChoice(cur);
@@ -51,7 +54,16 @@ namespace AutoTest
                 // L1.5: イベント学習用に「id|choiceIndex」を記録
                 if (_cur != null && cur != null && !string.IsNullOrEmpty(cur.id))
                     _cur.eventChoicesMade.Add(EventChoiceLearningStats.EventKey(cur.id) + "|" + idx);
+                if (riftRecord && _cur != null && _cur.riftRecord == 0 && gm.Run != null && gm.Run.Depth == 6)
+                {
+                    // [計装 2026-11-13] 起きた所 (終点 = 安全弁)・ターン・踏んだ点の数
+                    var here = MapManager.Instance?.CurrentNode;
+                    _cur.riftRecord = here != null && here.type == TileType.Boss ? 2 : 1;
+                    _cur.riftRecordTurn = gm.FreeMap != null ? gm.FreeMap.Turn : -1;
+                    _cur.riftRecordSteps = gm.Run.tilesThisFloor;
+                }
                 gm.ResolveEventChoice(idx);
+                if (riftRecord && _cur != null && GameLoop.ConvictionSystem.HasTruth(gm.Run)) _cur.riftRecordOpened = true;
             }
             else
             {
