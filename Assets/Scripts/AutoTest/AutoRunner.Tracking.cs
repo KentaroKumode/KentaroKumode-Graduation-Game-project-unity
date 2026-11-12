@@ -477,6 +477,7 @@ namespace AutoTest
             GameLoop.GameHooks.PursuerSupplyOverride = -1;
             GameLoop.GameHooks.PursuerLeavesTerritory = false;                  // [測定 2026-11-12] 縄張りの作りを既定へ
             GameLoop.GameHooks.TerritoryTreasure = GameLoop.TerritoryTreasureKind.Forge;
+            GameLoop.GameHooks.TerritoryKeepBypass = true;                       // [測定 2026-11-13] 縄張りを避ける道の保証を既定へ
             GameLoop.GameHooks.TerminalHealMulOverride = 0;                      // [測定 2026-11-12・#102]
             GameLoop.GameHooks.TerminalArresterNeedOverride = 0;
             GameLoop.GameHooks.TerminalFirstAidBattleOnly = false;
