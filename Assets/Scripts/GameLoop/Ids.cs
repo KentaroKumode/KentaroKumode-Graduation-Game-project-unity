@@ -170,7 +170,7 @@ namespace GameLoop
         {
             // 確信チェーン (5F-6F の進路フラグ・アイテム)
             ConvictionSystem.IdTruth, ConvictionSystem.IdResolve, ConvictionSystem.IdConviction,
-            HardshipProphecy, HardshipConviction, "真理の予兆",
+            HardshipProphecy, HardshipConviction,
             // デフォルト/初期装備
             DiceWood,
             // 起動でしか取れないイベント専用アイテム
