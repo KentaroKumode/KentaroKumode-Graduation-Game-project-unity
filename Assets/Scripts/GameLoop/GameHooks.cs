@@ -86,6 +86,9 @@ namespace GameLoop
         /// 〈治癒〉の倍率 (<see cref="CombatSystem.TerminalCards.HealMul"/>) / 〈避雷器〉の溜める量 (<see cref="CombatSystem.TerminalCards.ArresterNeed"/>)。
         /// AutoRunner.terminalHealMul / terminalArresterNeed が毎ランの始めに入れ、 ラン終了で 0 へ戻す。 画面の説明文は今の値のまま (測定の口なので)。</summary>
         public static int TerminalHealMulOverride, TerminalArresterNeedOverride;
+        /// <summary>[測定 2026-11-12・#102] true = 〈応急箱〉を使ってもランの山札から抜かない (旧の作り = その戦闘中だけ戻らない)。
+        /// AutoRunner.terminalFirstAidBattleOnly が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
+        public static bool TerminalFirstAidBattleOnly;
 
         /// <summary>敵の固定削り (データの値・<see cref="EnemyArmorPenOverride"/> があればその値・下限 0)。</summary>
         public static int EnemyArmorPen(string enemyId, int dataValue)
@@ -121,6 +124,7 @@ namespace GameLoop
             RelicSetBonusOffMask = 0;
             TerminalHealMulOverride = 0;
             TerminalArresterNeedOverride = 0;
+            TerminalFirstAidBattleOnly = false;
         }
     }
 }

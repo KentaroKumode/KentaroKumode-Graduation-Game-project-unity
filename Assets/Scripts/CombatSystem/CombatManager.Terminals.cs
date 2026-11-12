@@ -189,7 +189,25 @@ namespace CombatSystem
                 }
             }
             TerminalDiag.NoteTurn(_deck.board, o);   // [計装 2026-11-12] (FinishTurn が手札を書き換える前に)
+            RemoveUsedFromRunDeck(o);                // (FinishTurn が手札を書き換える前に ── 場の添字で読む)
             _termRetain = _deck.FinishTurn(o);
+        }
+
+        /// <summary>使うとランの山札から抜ける端子 (〈応急箱〉・<see cref="TerminalCards.LeavesRunDeck"/>) を、 使ったターンの終わりにランの山札から 1 枚ずつ抜く。
+        /// この戦闘の中は使い捨てと同じく戻らない (<see cref="TerminalDeckState.FinishTurn"/>)。 山札が <see cref="TerminalCards.MinDeckSize"/> 枚以下なら抜かない
+        /// (店・休憩の抜き方と同じ下限 ── 出目 3 個を挿す先が足りなくならない枚数)。</summary>
+        private void RemoveUsedFromRunDeck(TerminalOutcome o)
+        {
+            var deck = GameLoop.GameManager.Instance?.Run?.terminalDeck;
+            if (deck == null) return;
+            foreach (int s in o.fired)
+            {
+                if (s < 0 || s >= _deck.board.Count) continue;
+                string id = _deck.board[s];
+                if (!TerminalCards.LeavesRunDeck(TerminalCards.Get(id))) continue;
+                if (deck.Count <= TerminalCards.MinDeckSize) { Debug.Log($"[端子/{id}] 山札が {deck.Count} 枚なので、ランの山札からは抜かない"); continue; }
+                if (deck.Remove(id)) Debug.Log($"[端子/{id}] 使ったので、ランの山札から抜いた (山札 {deck.Count} 枚)");
+            }
         }
     }
 
