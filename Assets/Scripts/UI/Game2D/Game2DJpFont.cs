@@ -110,22 +110,11 @@ namespace UI.Game2D
             return n;
         }
 
-        /// <summary>折り返した行の一覧 (行頭の句読点は前の行へ寄せない簡易版)。</summary>
-        public static List<string> Lines(string s, int maxW)
-        {
-            var lines = new List<string>();
-            if (string.IsNullOrEmpty(s)) return lines;
-            var cur = new System.Text.StringBuilder(); int w = 0;
-            foreach (var ch in s)
-            {
-                if (ch == '\n') { lines.Add(cur.ToString()); cur.Clear(); w = 0; continue; }
-                int a = Advance(ch);
-                if (w + a > maxW && cur.Length > 0) { lines.Add(cur.ToString()); cur.Clear(); w = 0; if (ch == ' ' || ch == '　') continue; }
-                cur.Append(ch); w += a;
-            }
-            if (cur.Length > 0) lines.Add(cur.ToString());
-            return lines;
-        }
+        /// <summary>折り返した行の一覧 (行頭の句読点は前の行へ寄せない簡易版)。 規則の正本は <see cref="JpTextLayout.Lines"/>
+        /// (Unity に依存しない・検算 Tools/event_page_check と同じ関数)。</summary>
+        public static List<string> Lines(string s, int maxW) => JpTextLayout.Lines(s, maxW, _advance);
+
+        private static readonly System.Func<char, int> _advance = Advance;
 
         /// <summary>幅に収まらなければ末尾を「…」にして詰める。</summary>
         public static string Clip(string s, int maxW)

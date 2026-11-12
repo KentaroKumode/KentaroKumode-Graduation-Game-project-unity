@@ -215,20 +215,11 @@ namespace EventSystem
         public static string DescribeCost(EventChoice choice, RunState run)
         {
             if (choice == null) return null;
-            var sb = new System.Text.StringBuilder();
             string why = choice.UnavailableReason(run);   // 払えないゴールド・素材・差し出せる品が無い・鍛えられない (2026-11-12)
-            if (why != null) sb.Append(why);
             int t = choice.TurnCost;
-            if (t > 0)
-            {
-                if (sb.Length > 0) sb.Append("・");
-                sb.Append($"{t} ターンを使う");
-                var eta = CatchEtaNow();
-                if (eta.Valid)
-                    sb.Append(eta.turns <= t ? $"（補足されている: {eta.turns} ターンで捕まる）"
-                                             : $"（補足されている: 最短 {eta.turns} ターンで捕まる）");
-            }
-            return sb.Length > 0 ? sb.ToString() : null;
+            int etaTurns = -1;
+            if (t > 0) { var eta = CatchEtaNow(); if (eta.Valid) etaTurns = eta.turns; }
+            return EventChoice.CostText(why, t, etaTurns);
         }
     }
 }
