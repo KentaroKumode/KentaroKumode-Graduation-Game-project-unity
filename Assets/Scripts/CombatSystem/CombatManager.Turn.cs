@@ -335,7 +335,7 @@ namespace CombatSystem
 
             // 処刑は「攻撃終了時」判定なので、 このターンに被弾していなくても閾値を割っていれば発動する。
             if (ctx.vescaExecuteArmed && playerHP > 0
-                && playerHP <= Mathf.CeilToInt(playerMaxHP * 0.20f))
+                && CombatRules.ExecuteKills(playerHP, playerMaxHP))
             {
                 Debug.Log($"[処刑人の烙印] HP {playerHP}/{playerMaxHP} が 20% 以下 — 9999 の軽減不可ダメージ");
                 playerHP = 0;
@@ -943,7 +943,7 @@ namespace CombatSystem
             // 攻撃に挿した出目への上乗せ率 (2026-11-06・ctx.attackDicePct): 出目の合計 × 率 (切り上げ) を 1 回だけ足す
             if (ctx.attackDicePct > 0f && attackSum > 0)
             {
-                int diceScaled = Mathf.CeilToInt(attackSum * ctx.attackDicePct);
+                int diceScaled = CombatRules.AttackDiceScaled(attackSum, ctx.attackDicePct);
                 string prevSkill = ItemSystem.PassiveSkills.CombatContext.CurrentSkillId;
                 ItemSystem.PassiveSkills.CombatContext.CurrentSkillId = "攻撃の端子を挿した出目 +%";
                 ctx.AddPlayerAttackOrDiceBonus(diceScaled);

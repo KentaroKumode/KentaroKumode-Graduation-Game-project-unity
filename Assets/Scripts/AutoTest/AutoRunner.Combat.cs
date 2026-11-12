@@ -955,11 +955,11 @@ namespace AutoTest
             {
                 aSumNew += aCount * s.atkPerDie;
                 if (s.chgToAtk > 0f && chargeRaw > 0) aSumNew += Mathf.FloorToInt(chargeRaw * s.chgToAtk);
-                if (s.diceAtkPct > 0f && aSumNew > 0) aSumNew += Mathf.CeilToInt(aSumNew * s.diceAtkPct);
+                if (s.diceAtkPct > 0f && aSumNew > 0) aSumNew += CombatSystem.CombatRules.AttackDiceScaled(aSumNew, s.diceAtkPct);
             }
             // 攻撃に挿した出目への上乗せ率 (2026-11-06): 本体と同じく 攻撃の出目の合計 × 率 (切り上げ)
             if (s.diceAtkPct > 0f && aSum > 0)
-                aSum += Mathf.CeilToInt(aSum * s.diceAtkPct);
+                aSum += CombatSystem.CombatRules.AttackDiceScaled(aSum, s.diceAtkPct);
             // 剣〈切り返し〉: 攻撃と防御の端子を両方挿したターン、 ブロック × 0.5 を攻撃にも
             if (stepGuardCut && aCount > 0 && bCount > 0)
             { int gc = TurnRules.GuardCutBonus(blockRaw); aSum += gc; aSumNew += gc; }

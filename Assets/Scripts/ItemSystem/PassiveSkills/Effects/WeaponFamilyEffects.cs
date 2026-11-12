@@ -253,7 +253,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (!Fam.Split(ctx) || ctx.blockSumThisTurn <= 0) return;
-            int add = UnityEngine.Mathf.CeilToInt(ctx.blockSumThisTurn * Rate);
+            int add = CombatSystem.CombatRules.GuardCutBonus(ctx.blockSumThisTurn);
             ctx.AddPlayerAttackOrDiceBonus(add);
             ctx.diceDerivedAttack += add;   // [計装] ブロックに挿した出目から来た攻撃
             UnityEngine.Debug.Log($"[切り返し] ブロック{ctx.blockSumThisTurn} × {Rate} → 攻撃 +{add}");
@@ -311,7 +311,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (block <= 0) return;
             int enemyAtk = (int)ctx.GetAccumulated(MutualKeys.EnemyAtk);
             if (block < enemyAtk) return;
-            int gain = UnityEngine.Mathf.FloorToInt((block - enemyAtk) * rate);
+            int gain = CombatSystem.CombatRules.BulwarkGain(block, enemyAtk, rate);
             Fam.GainShield(ctx, gain, label);
         }
     }
@@ -353,7 +353,7 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             if (!Fam.AllAttack(ctx) || ctx.consShield <= 0) return;
             int spent = ctx.consShield;
-            int add = UnityEngine.Mathf.CeilToInt(spent * rate);
+            int add = CombatSystem.CombatRules.BashBonus(spent, rate);
             ctx.consShield = 0;
             ctx.AddPlayerAttackOrDiceBonus(add);
             UnityEngine.Debug.Log($"[{label}] シールド{spent} を使い切り × {rate} → 攻撃 +{add}");
@@ -465,7 +465,7 @@ namespace ItemSystem.PassiveSkills.Effects
                 UnityEngine.Debug.Log($"[黎明] 無傷で受け切った: 軽減前 {pre} → {units}×{perUnit * 100f:0}% を溜める (計 +{now * 100f:0}%)");
                 return;
             }
-            int dmg = System.Math.Max(1, ctx.enemyMaxHP * PctPerUnit * units / 100);
+            int dmg = CombatSystem.CombatRules.DaybreakCut(ctx.enemyMaxHP, units);
             int before = ctx.enemyCurrentHP;
             int after = DivineTalent.ClampToThreshold(ctx, System.Math.Max(0, before - dmg), ctx.enemyMaxHP);
             ctx.enemyCurrentHP = after;
