@@ -1793,6 +1793,13 @@ namespace AutoTest
         /// <summary>イベント選択のタイブレーク用。 **ラン開始ごとに RebuildRunRng() で作り直す** ──
         /// 決定論シード時に前ランの消費状態を持ち越すと再現性が壊れるため。</summary>
         private System.Random _rng = new System.Random();
+        /// <summary><see cref="_rng"/> をラン番号から作り直す (シード固定のときだけ・<see cref="GameLoop.GameRng.BeginRun"/> の直後に呼ぶ)。
+        /// 各スイープが同じ 2 行を写していたのを 1 か所にした (2026-11-12)。</summary>
+        private void RebuildRunRng(int runIndex)
+        {
+            if (GameLoop.GameRng.IsSeeded)
+                _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIndex));
+        }
         // 行動ルーチン分割: 前半50%=戦闘貪欲 / 後半50%=戦闘回避（航行Rankのみ差し替え）
         private bool _curCombatAverse;
         private bool _curBossNear;   // 直近のDoNavigateで判定したボス接近フラグ（休憩判断で参照）
@@ -2884,8 +2891,7 @@ namespace AutoTest
                 {
                     curRunInArm = i + 1;
                     GameLoop.GameRng.BeginRun(i);
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", i));
+                    RebuildRunRng(i);
                     if (paired)
                     {
                         // 同じペアシードを (i/2) で共有

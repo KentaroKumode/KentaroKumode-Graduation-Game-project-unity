@@ -255,8 +255,7 @@ namespace AutoTest
                 //   **同じ割り当てを引いて同じランを繰り返す** ── 行数だけ増えて情報は増えない。
                 int runIdx = 90000 + randomGrantStartIndex + i;
                 GameLoop.GameRng.BeginRun(runIdx);
-                if (GameLoop.GameRng.IsSeeded)
-                    _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
+                RebuildRunRng(runIdx);
                 yield return RunOne(runIdx);
                 RecordGrantRow();
                 if ((i + 1) % 10 == 0) { try { RankMarginArmProgress?.Invoke(i + 1); } catch { } }   // 進捗 (2026-11-10: 付与試行は何も書かず、 止まって見えた)

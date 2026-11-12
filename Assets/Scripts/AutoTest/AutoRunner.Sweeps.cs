@@ -72,8 +72,7 @@ namespace AutoTest
                             curRunInArm = i + 1;
                             int runIndex = batch * runs + i;
                             GameLoop.GameRng.BeginRun(runIndex);
-                            if (GameLoop.GameRng.IsSeeded)
-                                _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIndex));
+                            RebuildRunRng(runIndex);
                             _currentPersona = BuildPersona.Standard;
                             yield return RunOne(runIndex);
                             if ((i + 1) % Mathf.Max(1, runsPerYield) == 0)
@@ -212,8 +211,7 @@ namespace AutoTest
                         _currentUltraProductionScenarioSeed = 0UL;
                         GameLoop.GameRng.BeginRun(runIdx);
                     }
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
+                    RebuildRunRng(runIdx);
                     _currentPersona = BuildPersona.Standard;
                     yield return RunOne(runIdx);
                     var rec = _records.Count > 0 ? _records[_records.Count - 1] : null;
@@ -430,8 +428,7 @@ namespace AutoTest
                 {
                     int runIdx = 60000 + i;   // 全アーム共通シード
                     GameLoop.GameRng.BeginRun(runIdx);
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
+                    RebuildRunRng(runIdx);
                     yield return RunOne(runIdx);
                     var rec = _records.Count > 0 ? _records[_records.Count - 1] : null;
                     if (rec != null && rec.bandScore >= 0)
@@ -497,8 +494,7 @@ namespace AutoTest
                 {
                     int runIdx = 70000 + i;
                     GameLoop.GameRng.BeginRun(runIdx);
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
+                    RebuildRunRng(runIdx);
                     yield return RunOne(runIdx);
                     var rec = _records.Count > 0 ? _records[_records.Count - 1] : null;
                     if (rec != null && rec.bandScore >= 0) { valid++; if (rec.bandScore >= 11) clears++; }
@@ -747,9 +743,7 @@ namespace AutoTest
             //   **これは症状を揃えているだけで、 原因を直してはいない。**
             GameLoop.GameRng.BeginRun(RankMarginWarmupSeed);
             UnityEngine.Random.InitState(RankMarginWarmupSeed);
-            if (GameLoop.GameRng.IsSeeded)
-                _rng = new System.Random(GameLoop.GameRng.Range(
-                    0, int.MaxValue, "autorun.eventTiebreak", RankMarginWarmupSeed));
+            RebuildRunRng(RankMarginWarmupSeed);
             yield return RunOne(RankMarginWarmupSeed);
 
             for (int i = 0; i < runs; i++)
@@ -763,8 +757,7 @@ namespace AutoTest
                 //   **プロセスへ分割した瞬間に先頭ランだけ割れる** (実測 9/900・境界ちょうど)。
                 //   ここが抜けていると並列版と逐次版が一致しない。
                 UnityEngine.Random.InitState(runIdx);
-                if (GameLoop.GameRng.IsSeeded)
-                    _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
+                RebuildRunRng(runIdx);
                 yield return RunOne(runIdx);
                 var rec = _records.Count > 0 ? _records[_records.Count - 1] : null;
                 // **打ち切りは理由ごと残す。** 無効ランは母数から外れるので、
@@ -834,8 +827,7 @@ namespace AutoTest
                     // **全アームで同じ runIdx** ── ここを崩すと差にシード分散が丸ごと乗る。
                     int runIdx = 50000 + i;
                     GameLoop.GameRng.BeginRun(runIdx);
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
+                    RebuildRunRng(runIdx);
                     yield return RunOne(runIdx);
                     var rec = _records.Count > 0 ? _records[_records.Count - 1] : null;
                     if (rec != null && rec.bandScore >= 0)
@@ -902,8 +894,7 @@ namespace AutoTest
                     // **全アームで同じ runIdx。** ここを崩すと差にシード分散が丸ごと乗る。
                     int runIdx = 70000 + i;
                     GameLoop.GameRng.BeginRun(runIdx);
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
+                    RebuildRunRng(runIdx);
                     _pendingGrantItemId = grant;
                     yield return RunOne(runIdx);
 
@@ -1033,8 +1024,7 @@ namespace AutoTest
                     // **全ペルソナで同じ runIdx** ＝ ペア比較 (pi を混ぜない)。
                     int runIdx = 70000 + i;
                     GameLoop.GameRng.BeginRun(runIdx);
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
+                    RebuildRunRng(runIdx);
                     _currentPersona = persona;
                     _pendingChallengeDifficulty = loadout;
                     _pendingPresetRelic = null;
@@ -1199,8 +1189,7 @@ namespace AutoTest
                     //   スイープ内は呼び出し履歴が同一なので再現する (ノイズ床 0/300) 一方、
                     //   別のスイープ関数から回すと履歴が変わって同一シードのランが割れていた。
                     UnityEngine.Random.InitState(runIdx);
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
+                    RebuildRunRng(runIdx);
                     _currentPersona = BuildPersona.Standard;
                     _pendingPresetRelic = cmpRelic;
                     _pendingChallengeDifficulty = cmpLoadout;
@@ -1360,8 +1349,7 @@ namespace AutoTest
                     // **BeginRun を必ず呼ぶ** (理由は RunChallengeFixedSweep 側のコメント参照)。
                     int runIdx = pi * runs + i;
                     GameLoop.GameRng.BeginRun(runIdx);
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
+                    RebuildRunRng(runIdx);
                     _currentPersona = BuildPersona.Standard;
                     _pendingPresetRelic = relic;             // RunOne 内の ResetAll 直後に適用される
                     yield return RunOne(runIdx);
