@@ -354,8 +354,8 @@ namespace CombatSystem
         /// 充電は端子で溜めて振り直しで払う (accumulatedValues["mutualCharge"] は獲得の記録)。
         /// ADR-0009 柱5 の「ターン開始時の消費と停電」は 2026-11-04 に廃止 (GAME.md §24)。
         ///   - ボス固有機構: コントラタック (5 層裏ボスのレイピア) は移植済み。 サドンデス (灰燼の烙印) と妙覚は機構ごと廃止。
-        ///   - ProcessPostRoll 中の playerWonRoll はロール比較値 (収支確定前) — 出目参照系は
-        ///     従来どおり、勝敗参照系のみ解決後の再発火で拾う。
+        ///   - ProcessPostRoll 中の playerWonRoll は出目の合計の比較値 (収支確定前)。 読む側 (ProcessDamage の攻撃側フラグ・
+        ///     収支トリガー) より前に上書きされる。 収支トリガーを解決後に鳴らすのは**敵の側だけ** (プレイヤー側に OnRollWin/Lose の品は無い)。
         /// </summary>
         private TurnResult ExecuteTurnMutual()
         {

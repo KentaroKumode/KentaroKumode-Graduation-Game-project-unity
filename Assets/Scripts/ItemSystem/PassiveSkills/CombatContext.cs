@@ -189,12 +189,12 @@ namespace ItemSystem.PassiveSkills
 
 
         // ===== 勝敗フラグ =====
+        // 名前は旧ロール勝負の名残。 相互攻撃モデル (ADR-0009) では場面ごとに意味が変わる (2026-11-12 棚卸し・GAME.md §23-1):
+        //   - ProcessDamage の中: 「いま攻撃している側」(プレイヤーの攻撃 = true / 敵の攻撃 = false。 CombatManager.Turn.cs が計算の前に立てる)
+        //   - 収支の確定後 (収支トリガー・OnTurnEnd): 収支 (与ダメ − 被ダメ) の符号
+        //   - ProcessPostRoll の中だけは出目の合計の比較で立つが、 読む側より前に上書きされる
         public bool playerWonRoll;
         public bool playerLostRoll;
-
-        // ===== 連続カウンター =====
-        public int consecutiveWins;
-        public int consecutiveLosses;
 
         // ===== ダメージ無効化フラグ =====
         public bool nullifyAllDamage;

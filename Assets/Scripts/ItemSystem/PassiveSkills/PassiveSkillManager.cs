@@ -563,14 +563,10 @@ namespace ItemSystem.PassiveSkills
             // 勝敗トリガー発火
             if (context.playerWonRoll)
             {
-                context.consecutiveWins++;
-                context.consecutiveLosses = 0;
                 FireTrigger(PassiveSkillTrigger.OnRollWin);
             }
             else if (context.playerLostRoll)
             {
-                context.consecutiveLosses++;
-                context.consecutiveWins = 0;
                 FireTrigger(PassiveSkillTrigger.OnRollLose);
             }
             else
