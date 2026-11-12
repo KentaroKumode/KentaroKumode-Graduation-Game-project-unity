@@ -1228,12 +1228,6 @@ namespace ItemSystem.PassiveSkills
             outgoingDamageMultiplier += pct;
         }
 
-        /// <summary>[decay] 挑戦デバフ 軸10〈反響〉: **次のターン開始時に**プレイヤーへ入る反射ダメージ。
-        /// 敵から受けたダメージの一定割合をここへ溜め、 翌ターン頭で適用してから 0 に戻す。
-        /// 同ターン内に返すと通常の被弾と区別がつかず、 「反響」という遅延の意味が消えるため
-        /// 1 ターン遅らせている。 リセットは BeginNewTurn の Phase C (適用後に 0)。</summary>
-        public int echoPendingDamage;
-
         /// <summary>ADR-0009 [perTurn]: 敵攻撃値からの追加減算 (呪縛 等の敵ダイス弱化を新モデルで実装)。
         /// ExecuteTurnMutual が Escalation 計算後の enemyAtkValue から差し引く (下限0)。</summary>
         public int mutualEnemyAttackReduction;
