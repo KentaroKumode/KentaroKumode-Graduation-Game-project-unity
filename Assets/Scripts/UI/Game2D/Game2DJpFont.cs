@@ -79,6 +79,28 @@ namespace UI.Game2D
             return cx - x;
         }
 
+        /// <summary>大きい字の幅: 元の 1 ドットを k×k の点で打ち、 字の間に track ドットを空ける (<see cref="DrawLarge"/>)。</summary>
+        public static int WidthLarge(string s, int k, int track)
+        {
+            if (string.IsNullOrEmpty(s)) return 0;
+            return Width(s) * k + track * (s.Length - 1);
+        }
+
+        /// <summary>大きい字を描く (層の名前の帯・issue #111)。 同じドット字の 1 ドットを k×k の点としてテクスチャへ打つ
+        /// ── Transform の拡大 (localScale) ではなく、 打つ点そのものが大きい別の大きさの字。 字の間に track ドットを空ける。 戻り値 = 描いた幅。</summary>
+        public static int DrawLarge(KitPix p, string s, int x, int y, int k, int track, Color32 c)
+        {
+            if (string.IsNullOrEmpty(s)) return 0;
+            int cx = x;
+            for (int n = 0; n < s.Length; n++)
+            {
+                int ox = cx;
+                Draw((px, py) => { for (int j = 0; j < k; j++) for (int i = 0; i < k; i++) p.Set(ox + (px - ox) * k + i, y + (py - y) * k + j, c); }, s[n].ToString(), ox, y);
+                cx += Advance(s[n]) * k + (n < s.Length - 1 ? track : 0);
+            }
+            return cx - x;
+        }
+
         /// <summary>幅 maxW に収まるよう 1 字ずつ折り返して描く (改行文字でも改行)。 maxLines を超えた分は描かない。 戻り値 = 行数。</summary>
         public static int Wrap(KitPix p, string s, int x, int y, int maxW, Color32 c, int maxLines = 99)
         {
