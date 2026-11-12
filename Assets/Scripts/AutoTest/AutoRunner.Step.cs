@@ -550,10 +550,12 @@ namespace AutoTest
                     bool richMaterials = run.weaponMaterials >= cost * 2;
                     bool canUpgrade    = cost != int.MaxValue && run.weaponMaterials >= cost;
                     // T4 到達直前判定: 次の強化で T4 になる (現 T3+ → T4 等)
+                    //   段は items.json の tier で読む (#123)。 以前は id の綴り Contains("_t3") で読んでいて、
+                    //   id = 表示名 (2026-09-22) になってから常に false だった (CLAUDE.md「id から構造を読み取らない」)。
                     bool nextStepReachesT4 =
                         canUpgrade &&
                         !string.IsNullOrEmpty(run.equippedWeaponId) &&
-                        run.equippedWeaponId.Contains("_t3") &&
+                        ItemSystem.ItemDatabase.Instance?.GetItem(run.equippedWeaponId)?.tier == 3 &&
                         run.weaponPlus > 0;
                     int restPick;
                     if (nextStepReachesT4 && hpR > 0.25f)
