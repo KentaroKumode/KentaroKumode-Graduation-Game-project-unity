@@ -739,12 +739,19 @@ namespace UI.Game2D.Battle
             phase = won ? P.Won : P.Lost; Game2DSfx.Play(won ? "victory" : "defeat"); Touch();
         }
 
-        /// <summary>装備中の武器 → 演出の武器の絵 (名前が一致するもの。 無ければ先頭)。</summary>
+        /// <summary>装備中の武器 → 演出の武器の絵。 品名ではなく items.json の family / tier で選ぶ (id から構造を読まない・#130)。
+        /// 竜閃 (family を持たない) は <see cref="ItemIds.Ryusen"/> で判定する。 当たる行が無ければ先頭 (剣)。</summary>
         private static int WeaponIndexOf(string id)
         {
             if (string.IsNullOrEmpty(id)) return 0;
-            for (int i = 0; i < Game2DBattleFx.Weapons.Length; i++) if (Game2DBattleFx.Weapons[i].name == id) return i;
-            return 0;
+            int wi;
+            if (ItemSystem.ItemDatabase.ResolveLegacyId(id) == ItemIds.Ryusen) wi = Game2DBattleFx.IndexOf(null, 0, true);
+            else
+            {
+                var data = ItemSystem.ItemDatabase.Instance?.GetItem(id);
+                wi = data != null ? Game2DBattleFx.IndexOf(data.family, data.tier, false) : -1;
+            }
+            return wi >= 0 ? wi : 0;
         }
     }
 }

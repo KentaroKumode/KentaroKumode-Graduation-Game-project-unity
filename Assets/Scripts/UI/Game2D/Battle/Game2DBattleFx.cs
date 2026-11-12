@@ -18,7 +18,7 @@ namespace UI.Game2D.Battle
     {
         public MeshRenderer plotQuad;
         public Texture2D backdrop;
-        [Tooltip("武器の絵 (Weapons の並びと同じ 13 枚)")] public Texture2D[] weaponTex;
+        [Tooltip("武器の絵 (Weapons の並びと同じ 13 枚。 Game2DBuilder が sword_t2..shield_t4, dragon の順に入れる)")] public Texture2D[] weaponTex;
 
         /// <summary>演出を出している間 true (航行の地図は隠れる)。</summary>
         public static bool Showing { get; private set; }
@@ -27,17 +27,31 @@ namespace UI.Game2D.Battle
         private static readonly Col White = new Col(255, 255, 255);
 
         // ── 武器 (HTML の WEAPONS) ──
-        public struct Weapon { public string name, fam; public int atk; }
+        /// <summary>演出の武器の 1 行 = 絵 1 枚 (<see cref="weaponTex"/> と同じ並び)。 <b>品名を持たない</b> (2026-11-12・#130):
+        /// 装備中の品から行を選ぶときは items.json の family / tier を引く (<see cref="IndexOf"/>)。 竜閃は family を持たないので
+        /// <see cref="dragon"/> の行に当てる (判定は <c>ItemIds.Ryusen</c>)。 fam は絵の持ち方・モーション・音の家系で、 竜閃の行は剣の持ち方を借りる。
+        /// atk は試験用のキー (Space) の見かけの与ダメにだけ使う。</summary>
+        public struct Weapon { public string fam; public int tier, atk; public bool dragon; }
         public static readonly Weapon[] Weapons =
         {
-            new Weapon { name = "鍛鉄の剣", fam = "sword", atk = 3 }, new Weapon { name = "銀の長剣", fam = "sword", atk = 4 }, new Weapon { name = "デュランダル", fam = "sword", atk = 5 },
-            new Weapon { name = "盗賊の短刀", fam = "dagger", atk = 2 }, new Weapon { name = "処刑人の曲刀", fam = "dagger", atk = 3 }, new Weapon { name = "ノクタリア", fam = "dagger", atk = 4 },
-            new Weapon { name = "猛斧", fam = "axe", atk = 4 }, new Weapon { name = "血塗りの戦斧", fam = "axe", atk = 6 }, new Weapon { name = "血帝廻天", fam = "axe", atk = 8 },
-            new Weapon { name = "鉄盾", fam = "shield", atk = 2 }, new Weapon { name = "聖騎士の盾", fam = "shield", atk = 3 }, new Weapon { name = "ドーンブリンガー", fam = "shield", atk = 4 },
-            new Weapon { name = "竜閃", fam = "sword", atk = 3 },
+            new Weapon { fam = "sword", tier = 2, atk = 3 }, new Weapon { fam = "sword", tier = 3, atk = 4 }, new Weapon { fam = "sword", tier = 4, atk = 5 },
+            new Weapon { fam = "dagger", tier = 2, atk = 2 }, new Weapon { fam = "dagger", tier = 3, atk = 3 }, new Weapon { fam = "dagger", tier = 4, atk = 4 },
+            new Weapon { fam = "axe", tier = 2, atk = 4 }, new Weapon { fam = "axe", tier = 3, atk = 6 }, new Weapon { fam = "axe", tier = 4, atk = 8 },
+            new Weapon { fam = "shield", tier = 2, atk = 2 }, new Weapon { fam = "shield", tier = 3, atk = 3 }, new Weapon { fam = "shield", tier = 4, atk = 4 },
+            new Weapon { fam = "sword", atk = 3, dragon = true },
         };
-        public static readonly string[] WeaponIds = { "sword_t2", "sword_t3", "sword_t4", "dagger_t2", "dagger_t3", "dagger_t4", "axe_t2", "axe_t3", "axe_t4", "shield_t2", "shield_t3", "shield_t4", "dragon" };
-        private static bool IsDragon(int wi) => wi == Weapons.Length - 1;
+        private static bool IsDragon(int wi) => Weapons[wi].dragon;
+
+        /// <summary>家系と段 (items.json の family / tier) → 演出の行。 dragon = true なら竜閃の行。 当たる行が無ければ -1。</summary>
+        public static int IndexOf(string family, int tier, bool dragon)
+        {
+            for (int i = 0; i < Weapons.Length; i++)
+            {
+                var w = Weapons[i];
+                if (dragon ? w.dragon : (!w.dragon && w.fam == family && w.tier == tier)) return i;
+            }
+            return -1;
+        }
         private static readonly Dictionary<string, Vector2> Pivot = new Dictionary<string, Vector2> { { "sword", new Vector2(3, 29) }, { "dagger", new Vector2(3, 29) }, { "axe", new Vector2(29, 29) }, { "shield", new Vector2(16, 16) } };
 
         // ── 演出の部品 ──

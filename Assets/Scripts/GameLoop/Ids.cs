@@ -16,6 +16,8 @@ namespace GameLoop
         public const string GoldenKingSword = "溶金の領主剣";
         /// <summary>天工開物: GameManager の強化フックが参照。</summary>
         public const string HeavenlyCraft = "天工開物";
+        /// <summary>竜閃: items.json に family / tier を持たない特殊武器。 戦闘演出 (Game2DBattleSim) が竜閃の絵とモーションを選ぶ判定に使う。</summary>
+        public const string Ryusen = "竜閃";
         /// <summary>シュヴァリエのレイピア: コントラタック切替 (Consumables.TryUseRapier)。</summary>
         public const string ChevalierRapier = "シュヴァリエのレイピア";
 
