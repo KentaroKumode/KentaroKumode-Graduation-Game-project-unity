@@ -584,66 +584,7 @@ namespace GameLoop
             // このランで一度取得した(=売却/廃棄した物も含む)パッシブも再抽選しない（重複禁止・捨てた物も対象）。
             if (Run?.seenPassiveItemIds != null) set.UnionWith(Run.seenPassiveItemIds);
 
-            ExcludeObsoleteFamilyTiers(set, db);
             return set;
-        }
-
-        /// <summary>Lv 制家系（追撃 / 剛力 / 反攻 … 14 家系）のうち、
-        /// <b>既に到達した Lv 以下</b>を抽選から外す。
-        ///
-        /// <para><b>なぜ必要か（2026-09-01）。</b> 除外は所持 ID そのものしか見ていなかったため、
-        /// <b>追撃IV を装備していても店頭に追撃I が並んでいた</b>。
-        /// ゲーム側は下位 Lv が無意味だと既に知っている ──
-        /// <c>PassiveSkillRegistry.IsHigherTierPresent</c> も <c>InventoryPower</c> も、
-        /// 上位がある家系の下位を評価から飛ばしている。
-        /// <b>内部で死んでいると分かっているものを店頭に出していた</b>のが実態で、
-        /// パッシブ枠は 1 ショップ 3 枠しかない（§16-1）ので取りこぼしが重い。</para>
-        ///
-        /// <para><b>上位 Lv は絶対に外さないこと。</b> 下位を所持していると上位が 1G になる
-        /// 「上位互換アップグレード割引」（§16-3）が成立しなくなる ──
-        /// あれは<b>意図された進行経路</b>で、ここで塞ぐと家系が伸ばせなくなる。
-        /// 外すのは<b>到達済み Lv 以下</b>だけ。</para>
-        ///
-        /// <para>売却・廃棄した下位も対象にするため、判定には所持だけでなく
-        /// <c>seenPassiveItemIds</c> 由来の集合（＝引数の <paramref name="set"/>）も使う。
-        /// 「IV を買うために I を売った」後に I が再び並ぶのを防ぐ。</para></summary>
-        private void ExcludeObsoleteFamilyTiers(System.Collections.Generic.HashSet<string> set, ItemDatabase db)
-        {
-            if (db == null || set.Count == 0) return;
-
-            // 到達済みの家系 → 最大 Lv
-            var reached = new System.Collections.Generic.Dictionary<string, int>();
-            foreach (var id in set)
-            {
-                int lv = MaxFamilyLevelOf(db, id, out string fam);
-                if (lv <= 0) continue;
-                if (!reached.TryGetValue(fam, out int prev) || lv > prev) reached[fam] = lv;
-            }
-            if (reached.Count == 0) return;
-
-            foreach (var data in db.GetAllItems())
-            {
-                if (data == null || data.category != ItemCategory.Passive) continue;
-                int lv = MaxFamilyLevelOf(db, data.id, out string fam);
-                if (lv <= 0) continue;
-                if (reached.TryGetValue(fam, out int maxLv) && lv <= maxLv) set.Add(data.id);
-            }
-        }
-
-        /// <summary>アイテムが持つパッシブの家系名と最大 Lv。 Lv 制でなければ 0。</summary>
-        private static int MaxFamilyLevelOf(ItemDatabase db, string itemId, out string family)
-        {
-            family = null;
-            var data = db?.GetItem(itemId);
-            if (data?.passiveSkills == null) return 0;
-            int maxLv = 0;
-            foreach (var ps in data.passiveSkills)
-            {
-                if (string.IsNullOrEmpty(ps.internalName)) continue;
-                var (fam, lv) = ItemSystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(ps.internalName);
-                if (lv > maxLv) { maxLv = lv; family = fam; }
-            }
-            return maxLv;
         }
 
         // ---- 交換マス（パッシブ1つ → 上位Tierパッシブをランダム入手・任意） ----

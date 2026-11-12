@@ -140,22 +140,10 @@ namespace ItemSystem.PassiveSkills
             var uniqueIds = new HashSet<string>();
             foreach (var c in collected) uniqueIds.Add(c.id);
 
-            // 上位 Lv 抑制: 同家系で上位がいれば下位を捨てる
-            var finalIds = new HashSet<string>();
-            foreach (var id in uniqueIds)
-            {
-                if (PassiveSkillRegistry.IsHigherTierPresent(id, uniqueIds))
-                {
-                    Debug.Log($"[PassiveSkillManager] 上位互換抑制: {id} (同家系の上位 Lv が存在)");
-                    continue;
-                }
-                finalIds.Add(id);
-            }
-
             // 登録
             foreach (var c in collected)
             {
-                if (!finalIds.Contains(c.id)) continue;
+                if (!uniqueIds.Contains(c.id)) continue;
                 // dedup: 同一 ID は 1 回のみ登録 (重複は activeSkillNames が弾く)
                 if (activeSkillNames.Contains(c.id)) continue;
                 RegisterSkill(c.id);
@@ -163,7 +151,7 @@ namespace ItemSystem.PassiveSkills
                     skillDisplayNames[c.id] = c.display;
             }
 
-            Debug.Log($"[PassiveSkillManager] Active skills refreshed: {activeSkillNames.Count} skills (収集{collected.Count}, 同名抑制後{uniqueIds.Count}, 上位抑制後{finalIds.Count})");
+            Debug.Log($"[PassiveSkillManager] Active skills refreshed: {activeSkillNames.Count} skills (収集{collected.Count}, 同名抑制後{uniqueIds.Count})");
         }
 
         /// <summary>internalName を直接指定してスキルを登録（武器の段階式動的付与用）。</summary>
