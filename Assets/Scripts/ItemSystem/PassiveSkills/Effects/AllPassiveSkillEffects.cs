@@ -1,45 +1,7 @@
 namespace ItemSystem.PassiveSkills.Effects
 {
-    // ============================================================
-    //  汎用パッシブ — 追撃（Pursuit）: 与ダメージ追加
-    // ============================================================
-
-    // 追撃 I-IV: 与ダメの N% を追加 (乗算・筋力=加算と分離)
-    // 数値: I=+15% / II=+30% / III=+50% / IV=+100% (LEG は完全/万華等の outgoing+1.0 と同格)
-    // 実装: outgoingDamageMultiplier に加算 = 与ダメチェーン末端で乗算される
-    internal static class PursuitHelper
-    {
-        public static void Apply(CombatContext ctx, float pctNew)
-        {
-            if (ctx.outgoingDamageMultiplier <= 0f) ctx.outgoingDamageMultiplier = 1f;
-            ctx.outgoingDamageMultiplier += pctNew;
-        }
-    }
-
-    /// <summary>追撃I — 新: 与ダメ+15% (旧: +2 固定)</summary>
-    public class PursuitI : IPassiveSkillEffect
-    {
-        public string SkillId => "PursuitI";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => PursuitHelper.Apply(ctx, 0.15f);
-    }
-
-    /// <summary>追撃II — 新: 与ダメ+30% (旧: +4 固定)</summary>
-    public class PursuitII : IPassiveSkillEffect
-    {
-        public string SkillId => "PursuitII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => PursuitHelper.Apply(ctx, 0.30f);
-    }
-
-    /// <summary>追撃III — 新: 与ダメ+50% (旧: +6 固定)</summary>
-    public class PursuitIII : IPassiveSkillEffect
-    {
-        public string SkillId => "PursuitIII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => PursuitHelper.Apply(ctx, 0.50f);
-    }
-
+    // 追撃・剛力・堅忍・慧眼・不屈・治癒阻害の I〜IV、 天極・出血 (Sting)・腐蝕の一撃・遅効の呪・雷雲の効果クラス (英字の id) は
+    //   2026-11-12 削除。 スキル id が品の名前になった (2026-09-22) あと、 どの品もその id を持っていなかった。
 
     // ============================================================
     //  汎用パッシブ — 反撃（Counter）
@@ -61,83 +23,6 @@ namespace ItemSystem.PassiveSkills.Effects
 
 
 
-
-    // ============================================================
-    //  汎用パッシブ — 筋力（Might）: 各ダイス出目+N
-    // ============================================================
-
-    // 筋力I-IV: 攻撃力+N (配線後の atkBase に加算・AddPlayerAttackOrDiceBonus 経由)。
-
-    /// <summary>筋力II — 攻撃+3 (旧: ダイス合計+3)</summary>
-    public class MightII : IPassiveSkillEffect
-    {
-        public string SkillId => "MightII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            if (ctx.playerDice != null) ctx.AddPlayerAttackOrDiceBonus(3);
-        }
-    }
-
-    /// <summary>筋力III — 攻撃+4 (旧: ダイス合計+4)</summary>
-    public class MightIII : IPassiveSkillEffect
-    {
-        public string SkillId => "MightIII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            if (ctx.playerDice != null) ctx.AddPlayerAttackOrDiceBonus(4);
-        }
-    }
-
-    /// <summary>筋力IV — 攻撃+6 (旧: ダイス合計+6)</summary>
-    public class MightIV : IPassiveSkillEffect
-    {
-        public string SkillId => "MightIV";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            if (ctx.playerDice != null) ctx.AddPlayerAttackOrDiceBonus(6);
-        }
-    }
-
-    // ============================================================
-    //  汎用パッシブ — 頑強（Fortitude）
-    // ============================================================
-
-
-    /// <summary>頑強II — 被ダメージ-2</summary>
-    public class FortitudeII : IPassiveSkillEffect
-    {
-        public string SkillId => "FortitudeII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            if (ctx.finalDamage > 0) ctx.finalDamage = System.Math.Max(0, ctx.finalDamage - 2);
-        }
-    }
-
-    /// <summary>頑強III — 被ダメージ-3</summary>
-    public class FortitudeIII : IPassiveSkillEffect
-    {
-        public string SkillId => "FortitudeIII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            if (ctx.finalDamage > 0) ctx.finalDamage = System.Math.Max(0, ctx.finalDamage - 3);
-        }
-    }
-
-    /// <summary>頑強IV — 被ダメージ-4</summary>
-    public class FortitudeIV : IPassiveSkillEffect
-    {
-        public string SkillId => "FortitudeIV";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            if (ctx.finalDamage > 0) ctx.finalDamage = System.Math.Max(0, ctx.finalDamage - 4);
-        }
-    }
 
     // ============================================================
     //  素のステータス品 (2026-09-15)
@@ -166,32 +51,6 @@ namespace ItemSystem.PassiveSkills.Effects
 
 
 
-
-    // ============================================================
-    //  汎用パッシブ — 心眼（Insight）
-    // ============================================================
-
-
-
-    /// <summary>心眼III — 会心ダイス+3</summary>
-    public class InsightIII : IPassiveSkillEffect
-    {
-        public string SkillId => "InsightIII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalCheck };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { ctx.critRatePctAdd += 0.15f; }
-    }
-
-    /// <summary>心眼IV (2026-07-15 リワーク: 会心ダイス+5 → +4 + 会心ダメージ+20%) — 会心確率と会心倍率の両立LEG</summary>
-    public class InsightIV : IPassiveSkillEffect
-    {
-        public string SkillId => "InsightIV";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalCheck };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            ctx.critRatePctAdd += 0.20f;     // 会心率 +20%
-            ctx.criticalMultiplier += 0.2f;  // 会心倍率+0.2 (=会心ダメ+20%)
-        }
-    }
 
     // ============================================================
     //  汎用パッシブ — 活力（Vitality）
@@ -275,17 +134,6 @@ namespace ItemSystem.PassiveSkills.Effects
     // 〈処刑〉は items.json の stats だけになった (2026-10-28 にダイス潰しの固有部分を削除)。
     // 〈蝕夜〉(過剰ダメージ ×4 を次の戦闘へ持ち越す) は 2026-10-28 削除 (GAME.md §24)。
 
-    /// <summary>出血 — ダメージを与えるたび、敵に出血+1（ターン1回制限を撤廃）</summary>
-    public class Sting : IPassiveSkillEffect
-    {
-        public string SkillId => "Sting";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            ctx.AddEnemyBleed(1);
-        }
-    }
-
     // (Ignite / CurseBind / Abyss は 2026-07-18 削除: dead_staff / curse_t1〜t4 全廃に伴う死コード掃除)
 
     // ============================================================
@@ -304,42 +152,6 @@ namespace ItemSystem.PassiveSkills.Effects
     //  ctx.lifestealPct に加算し、CombatManager 勝利分岐が totalDmg×pct を HealPlayer で回復
     //  （負傷/回復封印/天衣無縫を尊重）。毎ターン0リセットのため OnTurnStart で再適用。
     // ============================================================
-
-    // ============================================================
-    //  汎用パッシブ — 不屈（Indomitable）リワーク 2026-07-15:
-    //  自HPが閾値以下の時、被ダメ-30%。Tier で発動閾値が広がる (低Tierほど窮地限定)。
-    //  Lv1: HP≤20% / Lv2: HP≤30% / Lv3: HP≤40% / Lv4: HP≤60%
-    // ============================================================
-    internal static class IndomitableHelper
-    {
-        public static void Apply(CombatContext ctx, int thresholdPct)
-        {
-            if (ctx.finalDamage <= 0 || ctx.playerMaxHP <= 0) return;
-            if (ctx.playerCurrentHP * 100 > ctx.playerMaxHP * thresholdPct) return;
-            ctx.finalDamage = UnityEngine.Mathf.CeilToInt(ctx.finalDamage * 0.7f);
-        }
-    }
-    /// <summary>不屈I — HP≤20% で被ダメ-30%</summary>
-    public class IndomitableI : IPassiveSkillEffect
-    {
-        public string SkillId => "IndomitableI";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => IndomitableHelper.Apply(ctx, 20);
-    }
-    /// <summary>不屈II — HP≤30% で被ダメ-30%</summary>
-    public class IndomitableII : IPassiveSkillEffect
-    {
-        public string SkillId => "IndomitableII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => IndomitableHelper.Apply(ctx, 30);
-    }
-    /// <summary>不屈IV — HP≤60% で被ダメ-30%</summary>
-    public class IndomitableIV : IPassiveSkillEffect
-    {
-        public string SkillId => "IndomitableIV";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPreReceiveDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx) => IndomitableHelper.Apply(ctx, 60);
-    }
 
     // ShieldBashI〜IV (IV = 旧〈内から落ちた城盾〉) は 2026-10-28 削除。 I〜III はどの品にも付いていなかった。
     //   「シールドを攻撃に変える」は盾家系の〈シールドバッシュ〉(WeaponFamilyEffects.cs) へ一本化した。
@@ -424,45 +236,6 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
 
-    /// <summary>治癒阻害（Silver）— 敵が得る回復量を50%減少。</summary>
-    public class GrievousI : IPassiveSkillEffect
-    {
-        public string SkillId => "GrievousI";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { ctx.enemyHealReductionPct = 0.5f; }
-    }
-    /// <summary>治癒遮断（Gold）— 敵が得る回復量を完全に無効化。</summary>
-    public class GrievousII : IPassiveSkillEffect
-    {
-        public string SkillId => "GrievousII";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx) { ctx.enemyHealReductionPct = 1.0f; }
-    }
-
-
-    /// <summary>天極 — 出目が全て同値（ゾロ目）なら会心を確定させ、会心倍率+1.0。
-    ///
-    /// <para><b>2026-09-05: 唯一の担い手だった〈六面天頂儀〉を削除したので、 現在この効果は発火経路が無い。</b>
-    /// 理由は発火率 ── 素の 6 面 × 5 個で <c>6/6^5 = 1/1296</c>、 1 ラン 260 ターン前後を回して
-    /// 期待 0.2 回 ＝ <b>5 ラン に 1 回</b>。 準パワー -0.74 は「弱い」のではなく「読まれていない」。
-    /// 旧・血令 (ゾロ目で ×2.5) / 旧・運命 (全ダイス最大で ×2) と同じ壊れ方で、 同日に 3 件まとめて処理した。</para>
-    ///
-    /// <para><b>全ダイス同値/全ダイス最大を発火条件にしないこと。</b> このダイス数では成立しない。
-    /// class は残置 (BuildPersona 等の id 参照が生きているため)。</para></summary>
-    public class ApexCrit : IPassiveSkillEffect
-    {
-        public string SkillId => "ApexCrit";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnCriticalCheck };
-        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
-        {
-            if (ctx.playerDice == null || ctx.playerDice.Length < 2) return;
-            int first = ctx.playerDice[0];
-            for (int i = 1; i < ctx.playerDice.Length; i++)
-                if (ctx.playerDice[i] != first) return; // ゾロ目でなければ無効
-            ctx.forceCritical = true;       // 会心確定
-            ctx.criticalMultiplier += 1.0f; // 会心倍率+1
-        }
-    }
 
     /// <summary>重畳 (2026-05-31 v5 %ベース) — ロール勝利毎に与ダメ倍率を加算。
     /// Lv1-4: 勝利毎 +2/4/5/10%、 上限 +20/40/60/80% (outgoing 加算)。
@@ -659,19 +432,6 @@ namespace ItemSystem.PassiveSkills.Effects
     // ============================================================
 
 
-    /// <summary>腐蝕の一撃 (CorrosiveStrike) — 攻撃時、10% で敵毒+1。稀だが継続で必ず積む。</summary>
-    public class CorrosiveStrike : IPassiveSkillEffect
-    {
-        public string SkillId => "CorrosiveStrike";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (ctx.finalDamage <= 0) return;
-            if (GameLoop.GameRng.Value("passive.poisonProc") < 0.10f)
-                ctx.AddStatus(StatusTarget.Enemy, "poison", 1);
-        }
-    }
-
     /// <summary>蛇の血 (SerpentBlood) — 会心時、敵毒+2。会心系と組んで加速。</summary>
     public class SerpentBlood : IPassiveSkillEffect
     {
@@ -701,19 +461,6 @@ namespace ItemSystem.PassiveSkills.Effects
             // 2026-10-31: 最大 −5。 毒が深くなるほど敵が無力化され、 伸ばすほど安全になる形を止める。
             // 2026-11-07: 毒 5 につき −1 (旧 毒 1 につき)。 毒 1 スタックの重みが 1/5 になったため。
             ctx.mutualEnemyAttackReduction += System.Math.Min(stacks / 5, MaxCut);
-        }
-    }
-
-    /// <summary>遅効の呪 (SlowVenomCurse) — T5以降、毎T敵毒+1 (長期戦保険)。
-    /// 減衰なしと相乗し、10Tあれば 5+初期分 = キャップ埋まりで毒殺判定へ。</summary>
-    public class SlowVenomCurse : IPassiveSkillEffect
-    {
-        public string SkillId => "SlowVenomCurse";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (ctx.currentTurn < 5) return;
-            ctx.AddStatus(StatusTarget.Enemy, "poison", 1);
         }
     }
 
@@ -812,17 +559,6 @@ namespace ItemSystem.PassiveSkills.Effects
 
 
 
-
-    /// <summary>雷雲 — ロール後、25% で充電+1 (自ロール毎に判定)。</summary>
-    public class Thundercloud : IPassiveSkillEffect
-    {
-        public string SkillId => "Thundercloud";
-        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostRoll };
-        public void Execute(PassiveSkillTrigger t, CombatContext ctx)
-        {
-            if (GameLoop.GameRng.Value("passive.chargeProc") < 0.25f) ctx.AddCharge(1);
-        }
-    }
 
 
 

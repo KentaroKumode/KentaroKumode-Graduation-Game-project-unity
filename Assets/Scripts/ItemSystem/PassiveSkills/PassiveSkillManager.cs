@@ -120,8 +120,7 @@ namespace ItemSystem.PassiveSkills
 
             // 2026-06-22 リワーク:
             //   同名パッシブ → 1 回のみ発動 (HashSet で dedup)
-            //   同家系の Lv 違い (例: MightI + MightII) → 最高 Lv のみ発動 (下位は抑制)
-            //   これにより 「弱い同名/下位互換を所持し続けるメリット = ゼロ」 が確定する。
+            //   (同家系の Lv 違いの抑制は 2026-11-12 に削除。 段付きの id を持つ品がもう無い)
             var seenItemIds = new HashSet<string>();
             var collected = new List<(string id, string display)>();
             foreach (var item in equippedItems)

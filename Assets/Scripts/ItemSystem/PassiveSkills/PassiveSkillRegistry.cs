@@ -158,57 +158,6 @@ namespace ItemSystem.PassiveSkills
             registry[effect.SkillId] = effect;
         }
 
-        // ============================================================
-        //  Lv 家系テーブル (2026-06-22 追加)
-        //  仕様: 同名パッシブは 1 回のみ発動。 同家系で複数 Lv 所持時は最高 Lv のみ発動。
-        //  例: MightI + MightII 同時所持 → MightII のみ発動 (MightI は無効化)
-        // ============================================================
-        /// <summary>Lv 制家系の一覧 (読み取り専用)。 計装が「0 段で終わった家系」も数えるために要る。
-        ///
-        /// <para><b>2026-09-03: 家系内の Lv 制は廃止した。</b> 14 家系はそれぞれ Lv1〜4 の
-        /// <b>どれか 1 段に固定</b>され、Tier は家系<b>間</b>の識別子（＝出現の稀少度と効果量）になった。
-        /// ID の接尾辞 (I/II/III/IV) と <see cref="GetFamilyLevel"/> は<b>互換のため残置</b>しているが、
-        /// <b>同一家系に複数段が同時に存在することはもう無い</b>。 これに依存していた機構
-        /// （上位互換アップグレード割引 / <see cref="IsHigherTierPresent"/> /
-        /// <c>TrySellLowerTierBefore</c> / <c>InventoryPower</c> の下位スキップ /
-        /// <c>GameManager.ExcludeObsoleteFamilyTiers</c>）は<b>すべて発火しない死んだ経路</b>である。
-        /// 測定の解釈にこれらを持ち出さないこと。</para></summary>
-        public static System.Collections.Generic.IReadOnlyList<string> LeveledFamilies => _leveledFamilies;
-
-        private static readonly string[] _leveledFamilies = {
-            "Pursuit", "Might", "Fortitude", "Insight", "Indomitable", "Grievous",
-            // ShieldBash は 2026-10-28、 Counter / Vitality / BladeEdge / BountyHunter / Conqueror / Lifesteal / LentTime は
-            //   2026-10-31 (アイテム再編) に家系ごと削除
-        };
-
-        /// <summary>skill ID から家系名 + Lv (1-4) を解析。 Lv 制でなければ (id, 0) を返す。</summary>
-        public static (string family, int level) GetFamilyLevel(string skillId)
-        {
-            if (string.IsNullOrEmpty(skillId)) return (skillId, 0);
-            foreach (var fam in _leveledFamilies)
-            {
-                if (!skillId.StartsWith(fam)) continue;
-                string suffix = skillId.Substring(fam.Length);
-                int lv = suffix switch { "I" => 1, "II" => 2, "III" => 3, "IV" => 4, _ => 0 };
-                if (lv > 0) return (fam, lv);
-            }
-            return (skillId, 0);
-        }
-
-        /// <summary>同家系の上位 Lv が指定 IDs 集合に存在するか。 上位ありなら true (=自分は抑制対象)。</summary>
-        public static bool IsHigherTierPresent(string skillId, System.Collections.Generic.IEnumerable<string> allSkillIds)
-        {
-            var (family, level) = GetFamilyLevel(skillId);
-            if (level <= 0) return false;
-            foreach (var id in allSkillIds)
-            {
-                if (id == skillId) continue;
-                var (fam2, lv2) = GetFamilyLevel(id);
-                if (fam2 == family && lv2 > level) return true;
-            }
-            return false;
-        }
-
         /// <summary>
         /// 全スキルを登録
         /// ★ 新スキル追加時はここに1行追加するだけ ★
@@ -310,32 +259,10 @@ namespace ItemSystem.PassiveSkills
             Register(new RivetPlate()); Register(new CatchBracer()); Register(new LayeredTagShield()); Register(new BrokenShieldGrudge());
 
             // ============================
-            //  汎用パッシブ（6種×3段階）
+            //  汎用パッシブ
             // ============================
-
-            // 追撃
-            Register(new PursuitI());
-            Register(new PursuitII());
-            Register(new PursuitIII());
-
-            // 反撃
-
-            // 剛力
-            // MightI はステータス化 (items.json の stats)
-            Register(new MightII());
-            Register(new MightIII());
-            Register(new MightIV());
-
-            // 堅忍
-            // FortitudeI はステータス化
-            Register(new FortitudeII());
-            Register(new FortitudeIII());
-            Register(new FortitudeIV());
-
-            // 慧眼
-            // InsightI / InsightII はステータス化
-            Register(new InsightIII());
-            Register(new InsightIV());
+            // 追撃・剛力・堅忍・慧眼・不屈・治癒阻害の I〜IV の効果クラス (英字の id) は 2026-11-12 削除。
+            //   スキル id が品の名前になった (2026-09-22) あと、 どの品もその id を持っていなかった。
 
             // 素のステータス品 (2026-09-15)。 **ラダーではない** ── 1 品 1 効果の独立品。
             //   BRONZE/SILVER に発動条件なしで乗る品が 3 / 1 しか無かった穴を埋める。
@@ -377,9 +304,6 @@ namespace ItemSystem.PassiveSkills
             // 剣系
             Register(new VoidStance());
 
-            // 斧系
-            Register(new Sting());
-
             // Ignite / CurseBind / Abyss は 2026-07-18 に class ごと削除 (dead_staff / curse 系列全廃)
 
             // ============================
@@ -390,14 +314,8 @@ namespace ItemSystem.PassiveSkills
             // (筋力とロールが重複)。クラス実装は AllPassiveSkillEffects に残置 = items.json 参照は将来的に別スキルへ差し替え要
 
             // 処刑・対タンク・役・触媒（2026-05-29 追加）
-            Register(new GrievousI());      // 治癒阻害（Silver）
-            Register(new GrievousII());     // 治癒遮断（Gold）
-            Register(new ApexCrit());       // 天極（ゾロ目→会心確定+倍率）
             // LifestealII はステータス化
-            Register(new IndomitableI());   // 不屈（敵threat軽減）
-            Register(new IndomitableII());
             // IndomitableIII はステータス化
-            Register(new IndomitableIV());
             // ShieldBashI〜IV (旧〈内から落ちた城盾〉) は 2026-10-28 削除。 盾家系の〈シールドバッシュ〉へ一本化した。
             // Bloodlust / Hermes はステータス化
             // 溶金の領主剣 はステータス化 (段 3・使ったゴールド 1 につき与ダメ +0.2%)
@@ -425,11 +343,9 @@ namespace ItemSystem.PassiveSkills
             // Stubbornness はステータス化
 
             // 2026-07-15 毒系 (新規 9 種・拘束/妨害中心のキーワードビルド)
-            Register(new CorrosiveStrike());  // 腐蝕の一撃 (攻撃10% 毒+1)
             Register(new SerpentBlood());     // 蛇の血 (会心で毒+2)
             Register(new Paralysis());        // 麻痺毒 (毒スタック分 敵攻撃-N・拘束中核)
             // VenomBlade はステータス化
-            Register(new SlowVenomCurse());   // 遅効の呪 (T5以降 毒+1/T)
 
             // 2026-07-15 炎上系 拡張 (既存 Ignite + 新 8種で計9のキーワードビルド化)
             // Burn (炎上) 系 2026-07-16 削除: Bleed と機構重複のため撤廃、「臨界」新軸に置換
@@ -444,7 +360,6 @@ namespace ItemSystem.PassiveSkills
             Register(new BloodFate());       // 血の宿命 (開幕 出血+2)
 
             // 2026-07-15 充電系 (ADR-0009 柱5・新パイプライン専用)
-            Register(new Thundercloud());     // 雷雲 (ロール後25%で+1)
             // Overload はステータス化
             // 雷神槍 (旧 ShortCircuit) はステータス化 (段 3・このターンに使った充電の半分を攻撃へ)
 
