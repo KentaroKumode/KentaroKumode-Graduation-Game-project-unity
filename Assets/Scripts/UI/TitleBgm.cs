@@ -3,12 +3,12 @@ using UnityEngine;
 namespace UI
 {
     /// <summary>
-    /// タイトル/スキルツリーの BGM 再生。 Day / Night / SkillTree の 3 モードを保持し、
+    /// タイトルの BGM 再生。 Day / Night の 2 モードを保持し、
     /// SetMode でクリップを切り替えてループ再生する。 切替は短いクロスフェード（2 AudioSource）。
     ///
     /// 連動:
     ///   ・<see cref="TitleDayNight"/> から SetMode(Day/Night) 呼び出し
-    ///   ・<see cref="SkillTree.SkillTreeView"/> の Open/Close で SetMode(SkillTree)/前のモード復帰
+    ///   ・旧スキルツリーの画面用の SkillTree モード (skill_tree.wav) は 2026-11-13 に画面ごと削除 (#132)
     ///
     /// 付け先: タイトル常駐の任意 GameObject。 既存の <c>clip</c> フィールドは Day BGM として継続利用。
     /// </summary>
@@ -16,15 +16,13 @@ namespace UI
     [RequireComponent(typeof(AudioSource))]
     public class TitleBgm : MonoBehaviour
     {
-        public enum BgmMode { Day, Night, SkillTree }
+        public enum BgmMode { Day, Night }
 
         [Header("クリップ")]
         [Tooltip("Day BGM（既存の title_bgm.wav）。 既存 Inspector 設定を温存するため名前は clip のまま。")]
         public AudioClip clip;
         [Tooltip("Night BGM（title_night.wav）")]
         public AudioClip nightClip;
-        [Tooltip("スキルツリー BGM（skill_tree.wav）")]
-        public AudioClip skillTreeClip;
 
         [Header("ボリューム / フェード")]
         [Range(0f, 1f)] public float volume = 0.2f;
@@ -85,7 +83,7 @@ namespace UI
                 isMuted = PlayerPrefs.GetInt(mutePrefKey, isMuted ? 1 : 0) != 0;
 
             // 全クリップを事前にロードしておく（モード切替時の初回 Play で固まらないように）
-            foreach (var pc in new[] { clip, nightClip, skillTreeClip })
+            foreach (var pc in new[] { clip, nightClip })
             {
                 if (pc == null) continue;
                 if (pc.loadState == AudioDataLoadState.Unloaded) pc.LoadAudioData();
@@ -125,7 +123,6 @@ namespace UI
             {
                 case BgmMode.Day: return clip;
                 case BgmMode.Night: return nightClip;
-                case BgmMode.SkillTree: return skillTreeClip;
             }
             return null;
         }
@@ -157,9 +154,6 @@ namespace UI
             _xfT = 0f;
             _xfActive = true;
         }
-
-        /// <summary>SetMode(PreviousMode) のショートカット。</summary>
-        public void RestorePreviousMode() { SetMode(PreviousMode); }
 
         /// <summary>BGM のミュート状態を設定する (PlayerPrefs にも保存)。</summary>
         public void SetMuted(bool m)

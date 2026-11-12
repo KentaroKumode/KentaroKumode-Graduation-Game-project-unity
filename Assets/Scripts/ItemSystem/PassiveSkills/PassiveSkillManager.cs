@@ -29,14 +29,24 @@ namespace ItemSystem.PassiveSkills
     /// </summary>
     public class PassiveSkillManager : MonoBehaviour
     {
-        // ===== シングルトン =====
+        // ===== シングルトン (CLAUDE.md の規約: _shuttingDown + RuntimeInitializeOnLoadMethod・GameManager と同じ形) =====
         private static PassiveSkillManager instance;
-        private static bool isApplicationQuitting;
+        private static bool _shuttingDown;
+
+        /// <summary>ドメインリロード無効設定でも static を必ず初期状態へ戻す。</summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            instance = null;
+            _shuttingDown = false;
+        }
+
+        /// <summary>パッシブの単一窓口。 アプリ終了中は null を返す。 無ければ作る。</summary>
         public static PassiveSkillManager Instance
         {
             get
             {
-                if (isApplicationQuitting)
+                if (_shuttingDown)
                     return null;
 
                 if (instance == null)
@@ -89,6 +99,7 @@ namespace ItemSystem.PassiveSkills
                 Destroy(gameObject);
                 return;
             }
+            _shuttingDown = false;
             instance = this;
             DontDestroyOnLoad(gameObject);
         }
@@ -109,8 +120,7 @@ namespace ItemSystem.PassiveSkills
 
             // 2026-06-22 リワーク:
             //   同名パッシブ → 1 回のみ発動 (HashSet で dedup)
-            //   同家系の Lv 違い (例: MightI + MightII) → 最高 Lv のみ発動 (下位は抑制)
-            //   これにより 「弱い同名/下位互換を所持し続けるメリット = ゼロ」 が確定する。
+            //   (同家系の Lv 違いの抑制は 2026-11-12 に削除。 段付きの id を持つ品がもう無い)
             var seenItemIds = new HashSet<string>();
             var collected = new List<(string id, string display)>();
             foreach (var item in equippedItems)
@@ -129,22 +139,10 @@ namespace ItemSystem.PassiveSkills
             var uniqueIds = new HashSet<string>();
             foreach (var c in collected) uniqueIds.Add(c.id);
 
-            // 上位 Lv 抑制: 同家系で上位がいれば下位を捨てる
-            var finalIds = new HashSet<string>();
-            foreach (var id in uniqueIds)
-            {
-                if (PassiveSkillRegistry.IsHigherTierPresent(id, uniqueIds))
-                {
-                    Debug.Log($"[PassiveSkillManager] 上位互換抑制: {id} (同家系の上位 Lv が存在)");
-                    continue;
-                }
-                finalIds.Add(id);
-            }
-
             // 登録
             foreach (var c in collected)
             {
-                if (!finalIds.Contains(c.id)) continue;
+                if (!uniqueIds.Contains(c.id)) continue;
                 // dedup: 同一 ID は 1 回のみ登録 (重複は activeSkillNames が弾く)
                 if (activeSkillNames.Contains(c.id)) continue;
                 RegisterSkill(c.id);
@@ -152,7 +150,7 @@ namespace ItemSystem.PassiveSkills
                     skillDisplayNames[c.id] = c.display;
             }
 
-            Debug.Log($"[PassiveSkillManager] Active skills refreshed: {activeSkillNames.Count} skills (収集{collected.Count}, 同名抑制後{uniqueIds.Count}, 上位抑制後{finalIds.Count})");
+            Debug.Log($"[PassiveSkillManager] Active skills refreshed: {activeSkillNames.Count} skills (収集{collected.Count}, 同名抑制後{uniqueIds.Count})");
         }
 
         /// <summary>internalName を直接指定してスキルを登録（武器の段階式動的付与用）。</summary>
@@ -208,25 +206,6 @@ namespace ItemSystem.PassiveSkills
             activeSkillsByTrigger.Clear();
             activeSkillNames.Clear();
             skillDisplayNames.Clear();
-        }
-
-        /// <summary>物資「迷妄」(絶望帯・ADR-0002): 戦闘開始時にプレイヤーのパッシブスキルを count 個
-        /// ランダムで無効化する。PassiveItem(佯狂者・記憶の砂時計 等)は別系統(PassiveItemManager)のため
-        /// activeSkillNames に含まれず、自動的に対象外。スキルは戦闘ごとに再登録されるため復元は不要。</summary>
-        public void DisableRandomPlayerSkills(int count)
-        {
-            if (count <= 0 || activeSkillNames.Count == 0) return;
-            var distinct = new List<string>(new HashSet<string>(activeSkillNames));
-            int n = System.Math.Min(count, distinct.Count);
-            for (int i = 0; i < n && distinct.Count > 0; i++)
-            {
-                int idx = GameLoop.GameRng.RangeAuto("PassiveSkillManager.3", 0, distinct.Count);
-                string name = distinct[idx];
-                distinct.RemoveAt(idx);
-                while (activeSkillNames.Contains(name)) UnregisterSkill(name);
-                string disp = skillDisplayNames.TryGetValue(name, out var d) ? d : name;
-                Debug.Log($"[迷妄] パッシブ「{disp}」を無効化 (絶望帯)");
-            }
         }
 
         // ===========================================================
@@ -377,9 +356,6 @@ namespace ItemSystem.PassiveSkills
             triggeredPlayerSkills.Clear();
             triggeredEnemySkills.Clear();
 
-            // ターン開始時のバフを適用
-            ApplyCurrentTurnBuffs();
-
             FireTrigger(PassiveSkillTrigger.OnTurnStart);
         }
 
@@ -477,23 +453,6 @@ namespace ItemSystem.PassiveSkills
         }
 
         // ===========================================================
-        //  バフ適用
-        // ===========================================================
-
-        /// <summary>
-        /// currentBuffsの値をCombatContextに反映
-        /// </summary>
-        private void ApplyCurrentTurnBuffs()
-        {
-            if (context == null) return;
-
-            // ダイスボーナス → ProcessPostRoll内でplayerDiceTotalに加算
-            // 会心ボーナス  → ProcessDamage内のOnCriticalCheckで加算
-            // ダメージボーナス → ProcessDamage内で加算
-            // ここでは追加の即時適用処理があれば記述
-        }
-
-        // ===========================================================
         //  ダイスロール統合
         // ===========================================================
 
@@ -509,16 +468,6 @@ namespace ItemSystem.PassiveSkills
             context.playerDice = playerDice;
             context.enemyDice = enemyDice;
 
-            // 消費: 賭博師のダイス（50%で全最大 / 50%で全1・消費）
-            if (context.gamblerArmed)
-            {
-                int pm = context.playerDiceMax > 0 ? context.playerDiceMax : 6;
-                int v = GameLoop.GameRng.Value("PassiveSkillManager.1") < 0.5f ? pm : 1;
-                for (int i = 0; i < playerDice.Length; i++) playerDice[i] = v;
-                context.gamblerArmed = false;
-                UnityEngine.Debug.Log($"[Consumables] 賭博師のダイス: 全ダイス→{v}");
-            }
-
             // 敵ダイスへの制約適用（処刑/正義への妄執）
             ApplyDiceOverrides(enemyDice);
 
@@ -528,55 +477,13 @@ namespace ItemSystem.PassiveSkills
             // パッシブスキル実行（OnPostRoll）
             FireTrigger(PassiveSkillTrigger.OnPostRoll);
 
-            // ダイス差は context.diceDifference（読み取り専用プロパティ）が常に最新を返す。
-
-            // 勝敗判定（消費「ダイス補正」は勝敗のみ＝ダメージ非加算。無我無心中は無効）
-            int effDiff = context.diceDifference + (context.rollPurity ? 0 : context.consDiceRoll);
-            context.playerWonRoll = effDiff > 0;
-            context.playerLostRoll = effDiff < 0;
-
-            // 引き分けは再ロール（脅威システム下では引分でも脅威被弾するため、引分自体を解消する）。
-            // OnPostRoll の再発火を避けるため、ダイスのみ振り直して合計・勝敗だけ再計算する。
-            int rerollGuard = 20;
-            while (!context.playerWonRoll && !context.playerLostRoll && !context.garyoProc && rerollGuard-- > 0)
-            {
-                RerollDiceForDraw(playerDice, enemyDice);
-                ApplyDiceOverrides(enemyDice);
-
-                // 素点＋各種ダイス補正を再集計（通常ロールと同じ集約関数）。
-                // 注意: OnPostRoll パッシブ(軽量/星導/号令 等)は再発火しないためここでは乗らない
-                //       ＝この refactor 前から同じ挙動。引分解消の素点判定のみを目的とする。
-                RecomputeDiceTotals(playerDice, enemyDice);
-
-                int reEff = context.diceDifference + (context.rollPurity ? 0 : context.consDiceRoll);
-                context.playerWonRoll = reEff > 0;
-                context.playerLostRoll = reEff < 0;
-            }
-
-            // 画竜点睛: 発動ターンはロール即勝利（敗北/引分を上書き）
-            if (context.garyoProc)
-            {
-                context.playerWonRoll = true;
-                context.playerLostRoll = false;
-            }
-
-            // 勝敗トリガー発火
-            if (context.playerWonRoll)
-            {
-                context.consecutiveWins++;
-                context.consecutiveLosses = 0;
-                FireTrigger(PassiveSkillTrigger.OnRollWin);
-            }
-            else if (context.playerLostRoll)
-            {
-                context.consecutiveLosses++;
-                context.consecutiveWins = 0;
-                FireTrigger(PassiveSkillTrigger.OnRollLose);
-            }
-            else
-            {
-                FireTrigger(PassiveSkillTrigger.OnRollDraw);
-            }
+            // ロール勝負は無い (ADR-0009 相互攻撃モデル・GAME.md §6)。 ここで出目の合計を比べて勝敗を決め、
+            //   引き分けなら両者のダイスを振り直していた処理は旧ロール勝負の残りなので外した (2026-11-12 #112)。
+            //   - 振り直しは RerollPhase (プレイヤーの判断) の後に出目を黙って入れ替え、 playerFaceIdx を同期せず、
+            //     怠惰・〈鋳造口〉・〈天与の指輪〉・メタの出目加算・OnPostRoll の加算も乗らなかった。
+            //   - playerWonRoll / playerLostRoll は CombatManager が攻撃の計算の直前と収支の確定後に上書きする
+            //     (CombatManager.Turn.cs の ExecuteTurnMutual)。 その間に読む効果は無い。
+            //   - プレイヤー側に OnRollWin/Lose/Draw を持つ効果は無い (敵の収支トリガーは CombatManager が FireEnemyTrigger で鳴らす)。
         }
 
         /// <summary>
@@ -798,19 +705,15 @@ namespace ItemSystem.PassiveSkills
         // ===========================================================
 
         /// <summary>
-        /// ダイス出目の合計を計算し、各種ダイス補正（diceBonus / enemyDiceDebuff /
-        /// consEnemyDiceDebuff / enemyDiceTotalBonus / bossDiceBonus）を適用する。
-        /// 通常ロールと引分リロールで共通。OnPostRoll パッシブによる加算はここでは扱わない。
+        /// ダイス出目の合計を計算し、各種ダイス補正（enemyDiceDebuff /
+        /// enemyDiceTotalBonus / bossDiceBonus）を適用する。
+        /// OnPostRoll パッシブによる加算はここでは扱わない。
         /// </summary>
         private void RecomputeDiceTotals(int[] playerDice, int[] enemyDice)
         {
             context.playerDiceTotal = Sum(playerDice);
             context.enemyDiceTotal = Sum(enemyDice);
             context.rawEnemyDiceTotal = context.enemyDiceTotal;   // [計装] 加算前を控える
-
-            // バフによるダイスボーナス（無我無心: カスタムダイス以外の補正を拒否）
-            if (!context.rollPurity)
-                context.playerDiceTotal += (int)context.GetBuff("diceBonus");
 
             // 瞬間研磨剤 (剣士スターター) は 2026-07-27 に「与ダメージ+150%」へ変更。
             // 旧実装は playerDiceTotal 加算だったが、相互攻撃モデル (ADR-0009) では
@@ -821,10 +724,6 @@ namespace ItemSystem.PassiveSkills
             int enemyDebuff = (int)context.GetBuff("enemyDiceDebuff");
             if (enemyDebuff > 0)
                 context.enemyDiceTotal = System.Math.Max(0, context.enemyDiceTotal - enemyDebuff);
-
-            // 消費: 敵弱体（敵ダイス合計-X・全戦闘）
-            if (context.consEnemyDiceDebuff > 0)
-                context.enemyDiceTotal = System.Math.Max(0, context.enemyDiceTotal - context.consEnemyDiceDebuff);
 
             // 沈黙の剣帯 等: 床なし減算（負値許容＝大差勝ち→基礎ダメ激増）
             if (context.enemyDiceTotalPenalty != 0)
@@ -880,33 +779,6 @@ namespace ItemSystem.PassiveSkills
             return total;
         }
 
-        /// <summary>引き分け解消用にダイス配列を in-place で振り直す。
-        /// コントラタック中はプレイヤーを1固定で維持する。
-        /// 装備ダイス面(equippedDiceFaces)があればプレイヤー側はそこから抽選。</summary>
-        private void RerollDiceForDraw(int[] playerDice, int[] enemyDice)
-        {
-            bool contre = context.GetAccumulated("player_contre") > 0;
-            int pMax = context.playerDiceMax > 0 ? context.playerDiceMax : 6;
-            int eMax = context.enemyDiceMax > 0 ? context.enemyDiceMax : 6;
-
-            if (playerDice != null && !contre)
-            {
-                for (int i = 0; i < playerDice.Length; i++)
-                {
-                    if (context.equippedDiceFaces != null && context.equippedDiceFaces.Length > 0)
-                        playerDice[i] = context.equippedDiceFaces[GameLoop.GameRng.RangeAuto("PassiveSkillManager.5", 0, context.equippedDiceFaces.Length)];
-                    else
-                        playerDice[i] = GameLoop.GameRng.RangeAuto("PassiveSkillManager.6", 1, pMax + 1);
-                }
-            }
-
-            if (enemyDice != null)
-            {
-                for (int i = 0; i < enemyDice.Length; i++)
-                    enemyDice[i] = GameLoop.GameRng.RangeAuto("PassiveSkillManager.8", 1, eMax + 1);
-            }
-        }
-
         /// <summary>戦闘中かどうか</summary>
         public bool IsInCombat => context != null;
 
@@ -917,7 +789,7 @@ namespace ItemSystem.PassiveSkills
 
         void OnApplicationQuit()
         {
-            isApplicationQuitting = true;
+            _shuttingDown = true;
         }
     }
 }

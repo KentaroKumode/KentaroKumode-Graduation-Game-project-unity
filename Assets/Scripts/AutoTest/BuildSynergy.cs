@@ -185,8 +185,6 @@ namespace AutoTest
                     {
                         case "十五年目の計測器":   n += 0.05f; break;
                         case "測量師の片眼鏡":  n += 0.10f; break;
-                        case "InsightIII": n += 0.15f; break;
-                        case "InsightIV":  n += 0.20f; break;
                     }
                 }
             }

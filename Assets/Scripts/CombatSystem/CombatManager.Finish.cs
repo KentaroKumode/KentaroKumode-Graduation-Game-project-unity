@@ -111,8 +111,7 @@ namespace CombatSystem
                 && ctxAtEnd.bossId.StartsWith(GameLoop.BossIds.Layer7Prefix))
             {
                 GameLoop.RunChronicle.NotePhaseDuration(
-                    ctxAtEnd.bossId.EndsWith("_p4") ? 4 : ctxAtEnd.bossId.EndsWith("_p3") ? 3
-                        : ctxAtEnd.bossId.EndsWith("_p2") ? 2 : 1,
+                    System.Math.Max(1, GameLoop.BossIds.VescaStageOf(ctxAtEnd.bossId)),
                     ctxAtEnd.phaseStartTurn, ctxAtEnd.currentTurn);
             }
             MetaProgression.Achievements.AchievementService.NoteCombatEnded(
@@ -167,9 +166,8 @@ namespace CombatSystem
                     if (ctxAtEnd != null && result.playerWon
                         && MetaProgression.MetaBuffApplicator.IsShieldCarryUnlocked())
                     {
-                        // **2026-09-13: 持ち越すのは残量の 30% (切り上げ)。** 全量 → 50% → 30%。
-                        //   50% でも 防御 r10 が Balanced +6.31pt で基準帯を超えていた。
-                        chRun.carriedShield = Mathf.CeilToInt(Math.Max(0, ctxAtEnd.consShield) * 0.30f);
+                        // **持ち越すのは残量の 30% (切り上げ)。** 割合の正本と経緯は MetaPanel.GuardShieldCarryRatio。
+                        chRun.carriedShield = Mathf.CeilToInt(Math.Max(0, ctxAtEnd.consShield) * MetaProgression.MetaPanel.GuardShieldCarryRatio);
                         if (chRun.carriedShield > 0)
                             Debug.Log($"[MetaBuff] シールド持ち越し保存 {chRun.carriedShield} (防御r10)");
                     }
@@ -233,13 +231,7 @@ namespace CombatSystem
                 // プレイヤー敗北時のみ死因を記録 (勝利時は Normal)
                 deathCause = (playerHP <= 0 && ctx != null) ? ctx.lastDamageCause
                            : ItemSystem.PassiveSkills.DeathCause.Normal,
-                playerRollSum = _fightPlayerRollSum,
-                playerRollCount = _fightPlayerRollCount,
                 playerDamageBySource = BuildDamageBreakdown(ctx),
-                strongRollTurns = _fightStrongTurns,
-                strongRollBossWins = _fightStrongBossWins,
-                weakRollTurns = _fightWeakTurns,
-                weakRollBossWins = _fightWeakBossWins,
             };
         }
 

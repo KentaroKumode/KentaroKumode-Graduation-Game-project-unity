@@ -22,6 +22,14 @@ namespace UI.Game2D
             _modal.Replace(Build());
         }
 
+        /// <summary>遺物の落ちる数の説明。 数は <see cref="RelicRoller.DropCount"/> から組み立てる (写しを持たない・#131)。
+        /// 層の区切り (3 以下 / 4 / 5) は DropCount の式の区切りと同じ。</summary>
+        private static string DropRule => "ランを終えると遺物が手に入る (3 層以下 " + RelicRoller.DropCount(3) + " 個 / 4 層 "
+            + RelicRoller.DropCount(4) + " 個 / 5 層到達 " + RelicRoller.DropCount(5) + " 個)。";
+
+        /// <summary>割合の言い方。 0.5 は「半分」、 それ以外は「N%」(#131)。</summary>
+        private static string RateWord(float rate) => rate == 0.5f ? "半分" : UnityEngine.Mathf.RoundToInt(rate * 100f) + "%";
+
         private static string SetBonusLine(MetaProgressState st)
         {
             var cnt = new int[RelicCatalog.SetCount];
@@ -65,7 +73,7 @@ namespace UI.Game2D
                 });
             }
             if (owned.Count == 0)
-                def.Items.Add(new ModalItem { name = "遺物なし", desc = "ランを終えると遺物が手に入る (3 層以下 1 個 / 4 層 2 個 / 5 層到達 3 個)。", disabled = true });
+                def.Items.Add(new ModalItem { name = "遺物なし", desc = DropRule, disabled = true });
 
             def.buttons.Add(new ModalBtn { label = "持ち込む", action = "equip", primary = true });
             def.buttons.Add(new ModalBtn { label = "強化 (素材1)", action = "enhance" });
@@ -74,7 +82,7 @@ namespace UI.Game2D
             def.buttons.Add(new ModalBtn { label = "指名を変える", action = "target" });
             if (pages > 1) def.buttons.Add(new ModalBtn { label = "次の頁", action = "page" });
             def.buttons.Add(new ModalBtn { label = "整備へ", action = "back" });
-            def.footer = "[持] = 持ち込み中 (部位ごとに 1 個)。 指名したセットはランの終わりに半分の確率で出る";
+            def.footer = "[持] = 持ち込み中 (部位ごとに 1 個)。 指名したセットはランの終わりに" + RateWord(RelicRoller.TargetSetRate) + "の確率で出る";
             def.onAction = (a, sel) =>
             {
                 int idx = sel >= 0 ? start + sel : -1;

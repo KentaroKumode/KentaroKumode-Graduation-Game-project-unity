@@ -16,6 +16,8 @@ namespace GameLoop
         public const string GoldenKingSword = "溶金の領主剣";
         /// <summary>天工開物: GameManager の強化フックが参照。</summary>
         public const string HeavenlyCraft = "天工開物";
+        /// <summary>竜閃: items.json に family / tier を持たない特殊武器。 戦闘演出 (Game2DBattleSim) が竜閃の絵とモーションを選ぶ判定に使う。</summary>
+        public const string Ryusen = "竜閃";
         /// <summary>シュヴァリエのレイピア: コントラタック切替 (Consumables.TryUseRapier)。</summary>
         public const string ChevalierRapier = "シュヴァリエのレイピア";
 
@@ -24,6 +26,14 @@ namespace GameLoop
         //   下の帯 (BRONZE/SILVER) に店の機能へ触る品が 1 つも無かったのを埋めるもの。
         /// <summary>合札: 同じショップで 2 品目以降を買うとき 10G 安い (ShopManager.TryBuy・2026-10-31)。</summary>
         public const string TrialTossToken = "合札";
+
+        // === 確信チェーンのフラグ品 (5F-6F の進路・2026-11-12 に定数化) ===
+        //   イベント文 (Resources/Events/event_list.txt) の [] 内の表記と一致必須。
+        //   チェーンのパッシブ (決意 / 根拠のない確信 / 真理) は ConvictionSystem.Id* が持つ。
+        /// <summary>苦難の予言: 預言者の石板で得るフラグ。 次段〈啓示〉の条件。</summary>
+        public const string HardshipProphecy = "苦難の予言";
+        /// <summary>苦難の確信: 〈啓示〉で得るフラグ。 次段〈災厄の予兆〉の条件。</summary>
+        public const string HardshipConviction = "苦難の確信";
 
         // === 初期装備 ===
         public const string DiceWood = "dice_wood";
@@ -48,6 +58,11 @@ namespace GameLoop
         public const string ConsHealFamily   = "heal";   // 回復:     最大HP の 25/40/60/100%
         public const string ConsShieldFamily = "def";    // シールド: 15/30/50/80 (戦闘中に使用可)
         public const string ConsPowerFamily  = "dmg";    // 攻撃強化: 与ダメ +15/30/50/75% (戦闘中)
+        //   各系統の 4 段の id (= 表示名)。 効果量の正本は Consumables (HealRatio / ShieldAmount / Apply の攻撃強化)。
+        //   BOT が段の順に選ぶので、 本体と BOT はこの定数で品を指す (2026-11-12・#129)。
+        public const string HealPotion1 = "小回復薬", HealPotion2 = "回復薬", HealPotion3 = "上回復薬", HealPotion4 = "完全回復薬";
+        public const string Talisman1 = "木の護符", Talisman2 = "鉄の護符", Talisman3 = "銀の護符", Talisman4 = "惜別の護符";
+        public const string PowerOil1 = "鬼火の油", PowerOil2 = "燐の油", PowerOil3 = "業火の膏薬", PowerOil4 = "天火の膏薬";
         //   物資回復の系統 (provision) は 2026-10-31 に廃止。 物資はショップの「物資の包」で買う
         //   (ShopManager.TryBuyProvisionPack)。 品を挟んで買わせる段は冗長だった。 4 品のうち
         //   〈古い手紙〉だけ効果を替えて残した (OldLetter)。
@@ -97,7 +112,7 @@ namespace GameLoop
         {
             // 確信チェーン (5F-6F の進路フラグ・アイテム)
             ConvictionSystem.IdTruth, ConvictionSystem.IdResolve, ConvictionSystem.IdConviction,
-            "苦難の予言", "苦難の確信", "真理の予兆",
+            HardshipProphecy, HardshipConviction, "真理の予兆",
             // デフォルト/初期装備
             DiceWood,
             // 起動でしか取れないイベント専用アイテム
@@ -144,13 +159,6 @@ namespace GameLoop
             return d.tier >= 1 && d.tier <= ConsumableMaxTier ? d.tier : 0;
         }
 
-        /// <summary>その id が消費アイテム系統 (旧 cons_*) か。</summary>
-        public static bool IsConsumableFamilyItem(string itemId)
-        {
-            var d = string.IsNullOrEmpty(itemId) ? null : ItemSystem.ItemDatabase.Instance?.GetItem(itemId);
-            return d != null && !string.IsNullOrEmpty(d.consFamily);
-        }
-
         /// <summary>その id の消費アイテム系統 (heal/def/dmg/provision)。 消費アイテムでなければ null。
         /// <b>接頭辞では判定しない</b> (2026-09-22)。</summary>
         public static string ConsFamilyOf(string itemId)
@@ -159,12 +167,6 @@ namespace GameLoop
             return string.IsNullOrEmpty(d?.consFamily) ? null : d.consFamily;
         }
 
-        /// <summary>その id がユニーク品 (旧 uniq_*) か。 <b>昇華の対象外</b>。</summary>
-        public static bool IsUniqueItem(string itemId)
-        {
-            var d = string.IsNullOrEmpty(itemId) ? null : ItemSystem.ItemDatabase.Instance?.GetItem(itemId);
-            return d != null && d.unique;
-        }
     }
 
     /// <summary>ボス ID の prefix / 特定 ID。 「boss_layer」 直書き分岐の置き換え先。</summary>
@@ -201,11 +203,39 @@ namespace GameLoop
         public const string Layer6Ash = "boss_layer6";
         /// <summary>最終段 (ヴェスカ・天与)。 8 層 Null Point。</summary>
         public const string VescaFinal = "boss_layer7_p4";
+        /// <summary>ヴェスカの段 1〜3 (段 4 は <see cref="VescaFinal"/>)。</summary>
+        public const string VescaP1 = "boss_layer7", VescaP2 = "boss_layer7_p2", VescaP3 = "boss_layer7_p3";
 
         /// <summary>0 層 (ファーム層・2026-11-05) のボス: 古い宝箱 (HP100・攻撃なし)。 <see cref="IsBoss"/> に掛かるよう prefix を揃えた。</summary>
         public const string FarmBoss = "boss_layer0";
         /// <summary>0 層の雑魚: 古いクレート (HP1・攻撃なし)。</summary>
         public const string FarmCrate = "farm_crate";
+
+        /// <summary>ヴェスカの段の番号 (1〜4)。 ヴェスカでない id (null を含む) は 0。
+        /// <b>id → 段の表を引く。 綴り (末尾の _p2 など) で切らない</b> (issue #116)。</summary>
+        public static int VescaStageOf(string id)
+        {
+            switch (id)
+            {
+                case VescaP1: return 1;
+                case VescaP2: return 2;
+                case VescaP3: return 3;
+                case VescaFinal: return 4;
+                default: return 0;
+            }
+        }
+
+        /// <summary>ヴェスカの次の段の id。 最終段とヴェスカでない id は null。</summary>
+        public static string VescaNextStage(string id)
+        {
+            switch (VescaStageOf(id))
+            {
+                case 1: return VescaP2;
+                case 2: return VescaP3;
+                case 3: return VescaFinal;
+                default: return null;
+            }
+        }
 
         /// <summary>敵 ID がボスか (null 安全)。</summary>
         public static bool IsBoss(string enemyId)

@@ -26,6 +26,8 @@ namespace UI.Game2D
         private const int FrameB = 12;
         /// <summary>自分のステータス (会心率・攻撃・防御): 左下 (Ports と Ctl の間・左と同じばね)。</summary>
         private static readonly RectInt Stat = new RectInt(2, 162, 108, 48);
+        /// <summary>成立した役 (ADR-0011): Ports の上の空き (上の帯の左・左と同じばね)。 役が無いターンは出さない。</summary>
+        private static readonly RectInt RoleR = new RectInt(2, 20, 92, 37);
 
         // ── 端子の山札 (ADR-0014・2026-11-11) の配置 ──
         //   Ports (2,60,108,98)   = 出目と、 出目ごとの差し込み口 (挿した USB は横向きに挿さった絵で残る)。 3 個ずつ縦に並べ、 4 個目からは列を右へ足す。
@@ -50,7 +52,7 @@ namespace UI.Game2D
         private const int HandY = 18, HandStep = 28, HandPad = 6;
         private static readonly RectInt CReroll = new RectInt(5, 5, 56, 20), CAuto = new RectInt(63, 5, 40, 20),
             CItem = new RectInt(5, 27, 24, 20), CFlee = new RectInt(31, 27, 36, 20), CGo = new RectInt(69, 27, 34, 20);
-        private RectTransform _ports, _ctl, _hand, _tip, _drag; private Texture2D _tp, _tc, _th, _tt2, _td;
+        private RectTransform _ports, _ctl, _hand, _tip, _drag, _role; private Texture2D _tp, _tc, _th, _tt2, _td, _trl;
         private int _portsTexW = -1;
 
         /// <summary>端子のアイコン (16×16・行優先・左上から・0 = 透明 / 1 = 暗 / 2 = 中 / 3 = 明)。 無ければ null。</summary>
@@ -72,10 +74,29 @@ namespace UI.Game2D
             Atk = Game2DKit.Red, Blk = Game2DKit.Blue, Chg = Game2DKit.Gold, Hp = new Color32(0xd1, 0x50, 0x3c, 255);
         /// <summary>対象を選ぶ印: 候補の縁 / 決まった対象の縁 (色と明度だけで出す・拡大しない)。</summary>
         private static readonly Color32 CandEdge = Game2DTerminalLook.Mix(Game2DKit.Ivory, Game2DKit.Off, 0.45f), ChosenEdge = Game2DKit.Ivory;
+        /// <summary>ヴェスカ〈停滞する時間〉で止まった端子の印 (本体を横切る線と下の「停止」)。 暗くした本体の上で読める、 くすんだ青白。</summary>
+        private static readonly Color32 StopMark = Game2DTerminalLook.Mix(Game2DKit.Blue, Game2DKit.Ivory, 0.45f);
 
         /// <summary>手札・出目をつかんでいる間と、 離したフレーム (の次まで) は true。 敵の詳細の窓 (<see cref="Game2DEnemyPanel"/>) はこの間は開かない。</summary>
         public static bool PointerBusy => _busyDrag || Time.frameCount <= _releaseFrame + 1;
         private static bool _busyDrag; private static int _releaseFrame = -10;
+
+        /// <summary>手引きの強調 (issue #109) が範囲を読む部品。</summary>
+        public enum Part { Intent, Top, Ports, Stat, Ctl, Hand }
+
+        /// <summary>部品の RectTransform (まだ作っていなければ null)。 位置はばねで動くので、 読む側が毎フレーム読み直す。</summary>
+        public RectTransform PartRect(Part p)
+        {
+            switch (p)
+            {
+                case Part.Intent: return _right;
+                case Part.Top: return _top;
+                case Part.Ports: return _ports;
+                case Part.Stat: return _stat;
+                case Part.Ctl: return _ctl;
+                default: return _hand;
+            }
+        }
 
         /// <summary>見た目を作る (builder から 1 度呼ぶ)。 親は 480×270 の格子の枠。</summary>
         public void Build()
@@ -96,7 +117,7 @@ namespace UI.Game2D
 
         private void OnDestroy()
         {
-            foreach (var t in new[] { _tr, _tt, _ts, _tp, _tc, _th, _tt2, _td }) if (t != null) Destroy(t);
+            foreach (var t in new[] { _tr, _tt, _ts, _tp, _tc, _th, _tt2, _td, _trl }) if (t != null) Destroy(t);
             _busyDrag = false;
         }
 
@@ -108,6 +129,7 @@ namespace UI.Game2D
             if (_ports == null) _ports = Make("ports", Ports, out _tp);
             if (_ctl == null) _ctl = Make("ctl", Ctl, out _tc);
             if (_hand == null) _hand = Make("hand", Hand, out _th);
+            if (_role == null) _role = Make("role", RoleR, out _trl);
             if (_tip == null) _tip = Make("tip", new RectInt(0, 0, TipW, TipH), out _tt2);
             if (_drag == null) _drag = Make("drag", new RectInt(0, 0, UsbBody, UsbLong), out _td);
         }
@@ -133,6 +155,7 @@ namespace UI.Game2D
             _ports.anchoredPosition = new Vector2(Ports.x - inL, -Ports.y);
             _ctl.anchoredPosition = new Vector2(Ctl.x - inL, -Ctl.y);
             _hand.anchoredPosition = new Vector2(Hand.x + inR, -Hand.y);
+            _role.anchoredPosition = new Vector2(RoleR.x - inL, -RoleR.y);
             if (_spL.x < 0.95f) { Show(_tip, false); CancelDrag(); }      // 説明の帯・つかみは、 パネルが収まっている間だけ
         }
 
@@ -149,7 +172,7 @@ namespace UI.Game2D
             if (sim.boardSerial != _dealSerial) { _dealSerial = sim.boardSerial; _dealT0 = Time.unscaledTime; }
             bool dealing = Time.unscaledTime - _dealT0 < DealTime(sim.board.Count);
             int ehp = fx != null ? fx.EnemyHp : 0, ver = sim.version * 31 + ehp * 7 + sim.charge
-                + (_hsKnown ? Mathf.RoundToInt(_hs.critRate * 1000f) * 131 + _hs.attack * 17 + _hs.outgoingPct * 7 + _hs.defense * 3 + _hs.pen : 0)
+                + (_hsKnown ? Mathf.RoundToInt(_hs.critRate * 1000f) * 131 + _hs.attack * 17 + _hs.outgoingPct * 7 + _hs.defense * 3 + _hs.pen + _hs.consOutgoingPct * 7919 : 0)
                 + 977 + DeckCountsHash() + sim.DiceCount * 7577 + (dealing ? Time.frameCount * 7919 : 0);
             if (ver != _drawn) { _drawn = ver; Redraw(); }
         }
@@ -205,6 +228,31 @@ namespace UI.Game2D
             Show(_ports, true); Show(_ctl, true); Show(_hand, true); Show(_tip, tip && _slide > 0.95f);
             DrawRight(_tr); DrawTop(_tt);
             Ensure(ref _ts, _stat, Stat); DrawStat(_ts);
+            Ensure(ref _trl, _role, RoleR); Show(_role, DrawRole(_trl));
+        }
+
+        /// <summary>成立した役の板: 1 行目 = 「役」と名前 (目のテーマ・対 / 揃) / 2 行目 = そろった目。 役が無ければ描かずに false。
+        /// 役をつくる出目は Ports で金の縁を付ける (<see cref="DrawRoleMark"/>)。 状態は色だけで出す (大きさは変えない)。</summary>
+        private bool DrawRole(Texture2D t)
+        {
+            if (sim == null || !sim.rolled || sim.roles.Count == 0) return false;
+            var k = sim.roles[0];
+            int face = CombatSystem.YachtRoles.FaceOf(k);
+            var p = Frame(RoleR);
+            p.Text("役", 8, 5, Dim);
+            p.Text(CombatSystem.YachtRoles.NameOf(k), 8 + Game2DJpFont.Width("役 "), 5, Chg);
+            string f = face + "・" + face + (CombatSystem.YachtRoles.IsTriple(k) ? "・" + face : "");
+            p.Text("目 " + f, 8, 19, Ink);
+            p.Apply(t);
+            return true;
+        }
+
+        /// <summary>役をつくる出目の印: 金の縁 (〈猫の手〉の琥珀の縁と同じ形・色で分ける)。</summary>
+        private static void DrawRoleMark(KitPix p, int i)
+        {
+            var r = PDieR(i); var c = Game2DKit.Gold;
+            p.Rect(r.x - 1, r.y - 1, r.width + 2, 1, c); p.Rect(r.x - 1, r.y + r.height, r.width + 2, 1, c);
+            p.Rect(r.x - 1, r.y, 1, r.height, c); p.Rect(r.x + r.width, r.y, 1, r.height, c);
         }
 
         /// <summary>パネルを出す / 隠す。 絵がまだ無いパネルは出さない。</summary>
@@ -223,6 +271,13 @@ namespace UI.Game2D
             bool k = _hsKnown && sim != null && Game2DBattleSim.Active;
             string crit = k ? "会心 " + Mathf.RoundToInt(_hs.critRate * 100f) + "% " + _hs.critMul.ToString("0.0") + "倍" : "会心 --";
             string atk = k ? "攻撃 " + _hs.attack : "攻撃 --";      // 与ダメの倍率は着弾の数字の横に出す (Game2DBattleFx・2026-11-11)
+            // 消耗品 (〈油・膏薬〉・立てた〈瞬間研磨剤〉) で足した与ダメ% だけは、 使った時にすぐ見えるよう攻撃の横に出す (issue #11)
+            if (k && _hs.consOutgoingPct > 0)
+            {
+                string add = " 与ダメ+" + _hs.consOutgoingPct + "%";
+                atk = Game2DJpFont.Width(atk + add) <= Stat.width - 14 ? atk + add : "攻撃" + _hs.attack + add;
+                atk = Game2DJpFont.Clip(atk, Stat.width - 14);
+            }
             string def = k ? "防御 " + _hs.defense + " 貫通 " + _hs.pen : "防御 --";
             p.Text(crit, 8, 5, Chg); p.Text(atk, 8, 18, Atk); p.Text(def, 8, 31, Blk);
             p.Apply(t);
@@ -297,7 +352,12 @@ namespace UI.Game2D
                 int pt = PortAt(d);
                 if (pt >= 0) { if (sim.CanOperate && sim.slot[pt] >= 0) StartDrag(sim.slot[pt], pt, d); return; }
                 int h = HandAt(d);
-                if (h >= 0) { if (sim.CanOperate && sim.Remaining(h) > 0) StartDrag(h, -1, d); return; }
+                if (h >= 0)
+                {
+                    if (sim.CanOperate && sim.IsStopped(h)) { Game2DSfx.Play("ui_click"); return; }      // 〈停滞する時間〉で止まった端子はつかめない
+                    if (sim.CanOperate && sim.Remaining(h) > 0) StartDrag(h, -1, d);
+                    return;
+                }
                 if (In(d, Ctl, CReroll)) { sim.Reroll(); return; }
                 if (In(d, Ctl, CAuto)) { sim.AutoWire(); return; }
                 if (In(d, Ctl, CItem)) { OpenItems(); return; }
@@ -468,6 +528,8 @@ namespace UI.Game2D
             {
                 int x0 = PortX(i), y0 = PortY(i);
                 DrawDie(p, PDieR(i), sim.pd[i], false, !sim.rolled && sim.phase != Game2DBattleSim.P.PRoll);
+                if (sim.IsRoleDie(i)) DrawRoleMark(p, i);
+                if (sim.IsCatLocked(i)) DrawCatMark(p, i);
                 int s = dieSlot != null && i < dieSlot.Length ? dieSlot[i] : -1;
                 var d = s >= 0 && s < m ? CombatSystem.TerminalCards.Get(sim.board[s]) : null;
                 bool used = d != null && o != null && i < o.slotOfDie.Length && o.slotOfDie[i] == s;      // 挿して発動に使われる出目
@@ -503,9 +565,31 @@ namespace UI.Game2D
             p.Apply(t);
         }
 
+        /// <summary>挑戦カード〈猫の手〉(#5) の印: 猫が先に挿した出目 (このターン動かせない) を琥珀の枠で囲み、 左の余白に肉球を置く。
+        /// 大きさは変えない (色と別の絵だけ)。</summary>
+        private static readonly string[] CatPaw =
+        {
+            "#.#.#",
+            ".....",
+            ".###.",
+            "#####",
+            ".###.",
+        };
+        private static void DrawCatMark(KitPix p, int i)
+        {
+            var r = PDieR(i); var c = Game2DKit.Amber;
+            p.Rect(r.x - 1, r.y - 1, r.width + 2, 1, c); p.Rect(r.x - 1, r.y + r.height, r.width + 2, 1, c);
+            p.Rect(r.x - 1, r.y, 1, r.height, c); p.Rect(r.x + r.width, r.y, 1, r.height, c);
+            int px = PortX(i) + 1, py = r.y + (r.height - CatPaw.Length) / 2;
+            for (int j = 0; j < CatPaw.Length; j++)
+                for (int k = 0; k < CatPaw[j].Length; k++)
+                    if (CatPaw[j][k] == '#') p.Set(px + k, py + j, c);
+        }
+
         /// <summary>Hand: 上 = 山/捨て(/外) の枚数 / 下 = 手札の USB (縦向き)。 ターンの頭に右から滑り込む (位置だけ・拡大しない)。
         /// 使い切った端子は抜け殻の枠だけ残す (並びが動かないように)。 2 個挿せる端子は残りの数を下に出す。 挿せる出目が無い端子は暗い。
-        /// 対象を選ぶ印: 候補 = 灰白の縁と下に「候補」/ 決まった対象 = 白の縁と下に「対象」。</summary>
+        /// 対象を選ぶ印: 候補 = 灰白の縁と下に「候補」/ 決まった対象 = 白の縁と下に「対象」。
+        /// 止まった端子 (ヴェスカ〈停滞する時間〉): いちばん暗い本体・縁と金具なし・本体を横切る青白の線と下に「停止」(つかめない)。</summary>
         private void DrawHand(Texture2D t)
         {
             var p = Frame(Hand);
@@ -535,13 +619,22 @@ namespace UI.Game2D
                     p.Box(x, HandY + UsbConn, UsbBody, UsbBody, tgt ? Game2DTerminalLook.Mix(ChosenEdge, Well, 0.8f) : Well, edge);
                     continue;
                 }
-                bool fits = !op || res || sim.HandFits(s);
+                bool stopped = sim.IsStopped(s);      // ヴェスカ〈停滞する時間〉: このターン挿せない
+                bool fits = !stopped && (!op || res || sim.HandFits(s));
                 var c = UsbColors(d, fits, false, _hoverPort < 0 && _hoverS == s, false);
                 bool chosen = false, cand = op && sim.IsTargetCandidate(s, out chosen);
                 if (cand && !(_hoverPort < 0 && _hoverS == s)) c.edge = chosen ? ChosenEdge : CandEdge;
+                if (stopped)
+                {
+                    // 止まった端子: 挿せない端子よりさらに暗く、 縁と金具を消す (色と明度だけ・拡大縮小はしない)
+                    var kc0 = d != null ? Game2DTerminalLook.KindColor(d.kind) : Dim;
+                    c.body = Game2DTerminalLook.Mix(kc0, Off, 0.92f); c.metal = Dark;
+                    if (!(_hoverPort < 0 && _hoverS == s)) c.edge = Off;
+                }
                 DrawUsb(p, x, HandY, false, d, c.body, c.edge, c.metal);
-                string label = cand ? (chosen ? "対象" : "候補") : d != null && d.capacity >= 2 ? "残" + rem : null;
-                if (label != null) p.Text(label, x + (UsbBody - Game2DJpFont.Width(label)) / 2, HandY + UsbLong + 1, cand && chosen ? Ink : Dim);
+                if (stopped) p.Rect(x + 2, HandY + UsbConn + UsbBody / 2, UsbBody - 4, 1, StopMark);      // 本体を横切る 1 本の線 = 止まっている印
+                string label = stopped ? "停止" : cand ? (chosen ? "対象" : "候補") : d != null && d.capacity >= 2 ? "残" + rem : null;
+                if (label != null) p.Text(label, x + (UsbBody - Game2DJpFont.Width(label)) / 2, HandY + UsbLong + 1, stopped ? StopMark : cand && chosen ? Ink : Dim);
             }
             p.Apply(t);
         }
@@ -561,6 +654,9 @@ namespace UI.Game2D
             var body = new List<string>(Game2DJpFont.Lines(d.description, iw));
             // 対象 (〈写し取り〉など) と誓約の封じの行
             var extra = new List<string>();
+            if (sim.IsStopped(f))
+                extra.AddRange(Game2DJpFont.Lines(d.permanent ? "止まっている (このターンは挿せない)"
+                                                              : "止まっている (このターンは挿せない・次のターンまで手札に残る)", iw));
             string tgt = TargetLine(f);
             if (tgt != null) extra.AddRange(Game2DJpFont.Lines(tgt, iw));
             for (int q = 0; q < m && !sim.ShowingResult; q++)
@@ -601,7 +697,7 @@ namespace UI.Game2D
             }
             else
             {
-                if (!sim.IsPicker(f)) return "出目を挿すと、 挿していない手札の端子を対象に選べる";
+                if (!sim.IsPicker(f)) return "出目に挿すと、 挿していない手札の端子を対象に選べる";
                 t = sim.TargetOf(f);
             }
             return t >= 0 && t < sim.board.Count ? "対象: 〈" + sim.board[t] + "〉" : "対象: なし (空けた端子が無い)";
@@ -616,7 +712,7 @@ namespace UI.Game2D
             SmallBtn(p, CReroll, rl, sim.CanRerollNow, Chg);
             SmallBtn(p, CAuto, "おまかせ", sim.CanOperate, Ink);
             if (!sim.CanFlee) _fleeArmed = false;
-            SmallBtn(p, CItem, "道具", sim.CanOperate && CombatItems().Count > 0, Chg);
+            SmallBtn(p, CItem, "道具", AnyUsable(), Chg);
             SmallBtn(p, CFlee, _fleeArmed ? "本当に?" : "逃げる", sim.CanFlee, _fleeArmed ? Atk : Ink);
             DrawGo(p, CGo, true);
             p.Apply(t);
@@ -632,41 +728,115 @@ namespace UI.Game2D
             p.TextC(label, r, on ? col : Dim);
         }
 
-        /// <summary>戦闘中に使える消耗品 (囮罠は航行の道具なので除く)。 同じ品は 1 行にまとめる。</summary>
-        private static List<string> CombatItems()
+        // ── 道具 (消耗品・issue #11・gui-needed.md #31) ──
+        //   [道具] = 所持品の消耗品の窓。 使えるのはターンの判断 (振り直し・配線) で止まっている間だけ (Game2DBattleSim.CanUseItems)。
+        //   使うのは本体の Consumables.Use (BOT と同じ関数)。 使えない品 (HP が満ちている・戦闘の外でだけ使える・死翔で封じられた 等) は
+        //   Consumables.BlockReason で暗く出し、 押すと理由を足元に出す。 囮罠は航行の道具なので並べない。
+        //   〈シュヴァリエのレイピア〉(パッシブ・消費しない) も同じ窓の先頭で切り替える (Consumables.TryUseRapier・BOT と同じ関数)。
+
+        /// <summary>窓の 1 行: 消耗品 (id・同じ品は 1 行) か、 レイピアの切り替え。</summary>
+        private struct ItemRow { public string id; public bool rapier; }
+
+        /// <summary>戦闘の窓に並べる品 (レイピア → 消耗品の持っている順・同じ品は 1 行・囮罠は除く)。</summary>
+        private static List<ItemRow> CombatItems()
         {
-            var l = new List<string>(); var run = GameManager.Instance?.Run;
-            if (run?.ownedConsumables == null) return l;
+            var l = new List<ItemRow>(); var run = GameManager.Instance?.Run;
+            if (run == null) return l;
+            if (run.ownedPassiveItems != null && run.ownedPassiveItems.Contains(ItemIds.ChevalierRapier)) l.Add(new ItemRow { id = ItemIds.ChevalierRapier, rapier = true });
+            if (run.ownedConsumables == null) return l;
+            var seen = new HashSet<string>();
             foreach (var id in run.ownedConsumables)
-                if (!l.Contains(id) && ItemIds.ConsFamilyOf(id) != ItemIds.ConsLureFamily) l.Add(id);
+                if (seen.Add(id) && ItemIds.ConsFamilyOf(id) != ItemIds.ConsLureFamily) l.Add(new ItemRow { id = id });
             return l;
         }
 
-        /// <summary>消耗品を選んで使う窓 (配線の判断の間だけ)。 使うと窓を閉じ、 HP などの表示を写し直す。</summary>
+        /// <summary>今その行を使えるか (使えなければ理由)。 段 (判断の間か) は呼び手が見る。</summary>
+        private static string RowBlock(RunState run, ItemRow r)
+            => r.rapier ? (Consumables.CanUseRapier(run) ? null : "今は切り替えられない") : Consumables.BlockReason(run, r.id);
+
+        /// <summary>[道具] を明るく出すか: 判断の間で、 使える品が 1 つでもある。</summary>
+        private bool AnyUsable()
+        {
+            if (!sim.CanUseItems) return false;
+            var run = GameManager.Instance?.Run; if (run == null) return false;
+            foreach (var r in CombatItems()) if (RowBlock(run, r) == null) return true;
+            return false;
+        }
+
+        private int _itemPage;
+        private const int ItemsPerPage = 10;
+
+        /// <summary>消耗品を選んで使う窓 (判断の間だけ)。 使っても窓は閉じずに中身を写し直す (続けて使える・HP とシールドは題の下に出す)。</summary>
         private void OpenItems()
         {
-            if (!sim.CanOperate) return;
+            if (!sim.CanUseItems) { Game2DSfx.Play("ui_click"); return; }
             if (_modal == null) _modal = FindObjectOfType<Game2DModal>();
-            var items = CombatItems(); var run = GameManager.Instance?.Run;
-            if (_modal == null || items.Count == 0 || run == null) { Game2DSfx.Play("ui_click"); return; }
-            var d = new ScreenDef { id = "battle_items", jp = true, title = "消耗品", sub = "HP " + sim.playerHp + "/" + sim.playerMax, w = 360 };
-            foreach (var id in items)
+            var run = GameManager.Instance?.Run;
+            if (_modal == null || run == null || CombatItems().Count == 0) { Game2DSfx.Play("ui_click"); return; }
+            _itemPage = 0;
+            _modal.Open(ItemsDef());
+        }
+
+        private ScreenDef ItemsDef()
+        {
+            var run = GameManager.Instance?.Run;
+            var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+            var all = CombatItems();
+            int pages = Mathf.Max(1, (all.Count + ItemsPerPage - 1) / ItemsPerPage); _itemPage = Mathf.Clamp(_itemPage, 0, pages - 1);
+            int first = _itemPage * ItemsPerPage, cnt = Mathf.Min(ItemsPerPage, all.Count - first);
+            int shield = ctx != null ? ctx.consShield : 0;
+            var d = new ScreenDef { id = "battle_items", jp = true, title = "道具", w = 460, cols = 2,
+                sub = "HP " + sim.playerHp + "/" + sim.playerMax + "  シールド " + shield };
+            var rows = new List<ItemRow>();
+            for (int i = 0; i < cnt; i++)
             {
-                int n = 0; foreach (var c in run.ownedConsumables) if (c == id) n++;
-                var data = ItemSystem.ItemDatabase.Instance?.GetItem(id);
-                d.Items.Add(new ModalItem { name = data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : id, value = "x" + n, desc = data?.description });
+                var r = all[first + i]; rows.Add(r);
+                var data = ItemSystem.ItemDatabase.Instance?.GetItem(r.id);
+                string name = ItemSystem.ItemDatabase.DisplayNameOf(data, r.id);
+                string block = run != null ? RowBlock(run, r) : "使えない";
+                string value;
+                if (r.rapier) value = Consumables.RapierContreOn() ? "構え中" : "";
+                else
+                {
+                    int n = 0; foreach (var c in run.ownedConsumables) if (c == r.id) n++;
+                    value = "x" + n;
+                }
+                string desc = data?.description;
+                if (!r.rapier && r.id == ItemIds.OldLetter)      // 1 枚で数回使える (使い切った時だけ所持から減る)
+                    desc = (desc ?? "") + "\n(今の 1 枚はあと " + Mathf.Max(1, ItemIds.OldLetterUses - run.oldLetterUsesSpent) + " 回)";
+                if (block != null) desc = string.IsNullOrEmpty(desc) ? "(" + block + ")" : desc + "\n(" + block + ")";
+                d.Items.Add(new ModalItem { icon = r.id, rarity = data != null ? data.rarity : (ItemSystem.ItemRarity?)null, name = name, value = value, desc = desc, disabled = block != null });
             }
+            if (cnt <= 0) d.body = "使える品を持っていない。";
             d.buttons.Add(new ModalBtn { label = "使う", action = "use", primary = true });
+            if (pages > 1) d.buttons.Add(new ModalBtn { label = "次の頁 " + (_itemPage + 1) + "/" + pages, action = "page" });
             d.buttons.Add(new ModalBtn { label = "閉じる", action = "close" });
-            d.footer = "使う品を選ぶ";
+            d.footer = "このターンの判断の間に使う (敵の攻撃より先に効く)";
             d.onAction = (a, sel) =>
             {
-                if (a == "close") { _modal.Close(); return; }
-                if (a != "use" || sel < 0 || sel >= items.Count) return;
-                if (sim.UseItem(items[sel])) { Game2DSfx.Play("ui_confirm"); _modal.Close(); _drawn = -1; }
-                else _modal.ShowToast("今は使えない");
+                switch (a)
+                {
+                    case "close": _modal.Close(); return;
+                    case "page": _itemPage = (_itemPage + 1) % pages; break;
+                    case "use":
+                    {
+                        if (sel < 0 || sel >= rows.Count) return;
+                        if (!sim.CanUseItems) { _modal.ShowToast("今は使えない"); return; }
+                        var r = rows[sel]; var rs = GameManager.Instance?.Run;
+                        string why = rs != null ? RowBlock(rs, r) : "使えない";
+                        if (why != null) { Game2DSfx.Play("ui_click"); _modal.ShowToast(why); return; }
+                        bool ok = r.rapier ? sim.UseRapier() : sim.UseItem(r.id);
+                        if (!ok) { Game2DSfx.Play("ui_click"); _modal.ShowToast("今は使えない"); return; }
+                        Game2DSfx.Play("ui_confirm"); _modal.ShowToast(r.rapier ? (Consumables.RapierContreOn() ? "構えた" : "構えを解いた") : "使った");
+                        _drawn = -1;
+                        if (CombatItems().Count == 0) { _modal.Close(); return; }
+                        break;
+                    }
+                    default: return;
+                }
+                _modal.Replace(ItemsDef());
             };
-            _modal.Open(d);
+            return d;
         }
 
         private void DrawRight(Texture2D t)

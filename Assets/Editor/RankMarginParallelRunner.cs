@@ -158,12 +158,12 @@ namespace AutoTest.EditorTools
             string tracks = EditorPrefs.GetString(TracksKey, "*");
             string ranks = EditorPrefs.GetString(RanksKey, "10");
 
-            // Ultra は Begin() から専用の経路 (PrepareUltraAndRun) へ抜けるので、
-            //   RunBatch 後段の分岐に置いたワーカーモードに届かない。
+            // 旧 Ultra (4) は 2026-11-13 に削除した (#135)。 ワーカーの AutoRunner は Super として走るが、
+            //   EditorPrefs に古い番号が残っているだけのことが多いので、 腕の名前と中身がずれないよう止めて選び直させる。
             if (WiringSkillPref() == (int)AutoRunner.WiringSkill.Ultra)
             {
-                Debug.LogError("[並列] 配線技量が Ultra。 Ultra は自前の production worker を"
-                    + "持っており、 この経路では走らない。 ④ で Optimal などへ戻すこと");
+                Debug.LogError("[並列] 配線技量が旧 Ultra (4)。 Ultra は 2026-11-13 に削除した (#135)。"
+                    + " ④ で Naive / Optimal / Super を選び直すこと");
                 return;
             }
 
@@ -623,6 +623,11 @@ namespace AutoTest.EditorTools
                 foreach (string line in s.response.effectiveState.Split('\n'))
                     if (line.Length > 0) sb.AppendLine("  " + line);
                 break;
+            }
+            {   // [2026-11-12 #118] 手書きの序列 (学習データなし) で走ったワーカーがあれば、 はっきり書く
+                int fb = 0, n = 0;
+                foreach (var s in _slots) { if (s.response == null) continue; n++; if (s.response.learningFallback) fb++; }
+                if (fb > 0) sb.AppendLine($"**学習データなし・手書きの序列で走った ({fb}/{n} ワーカー)**");
             }
             sb.AppendLine();
             sb.AppendLine("アーム                  |  クリア率 |  Bal比 |   r10−r9 | 判定 | 平均到達段 |     n");

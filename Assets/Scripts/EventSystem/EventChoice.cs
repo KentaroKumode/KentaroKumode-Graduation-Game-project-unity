@@ -114,7 +114,7 @@ namespace EventSystem
                 m += cost;
             }
             if (run.weaponMaterials < m) return $"素材が足りない（{m}）";
-            if (Has(EventEffectType.TradePassive) && !GameLoop.GameManager.CanTradePassive(run)) return "差し出せるパッシブが無い";
+            if (Has(EventEffectType.TradePassive) && !GameLoop.GameManager.CanTradePassive(run)) return "差し出せる秘宝が無い";
             return null;
         }
     }

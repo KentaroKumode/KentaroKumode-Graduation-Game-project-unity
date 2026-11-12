@@ -138,18 +138,6 @@ public class CameraMouseFollow : MonoBehaviour
         Debug.Log($"[CameraWASD] → {viewName}");
     }
     
-    /// <summary>カメラ移動をロック</summary>
-    public void LockCamera()
-    {
-        isLocked = true;
-    }
-    
-    /// <summary>カメラ移動をアンロック</summary>
-    public void UnlockCamera()
-    {
-        isLocked = false;
-    }
-    
     /// <summary>カメラ位置をリセット（viewpoint_baseへ）</summary>
     [ContextMenu("Reset Camera Position")]
     public void ResetPosition()

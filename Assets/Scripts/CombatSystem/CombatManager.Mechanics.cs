@@ -35,6 +35,12 @@ namespace CombatSystem
         /// これを飛ばすと同一シードのペア比較が成立しない (上記)。</summary>
         public void ResetRunCombatSequence() => _combatSeq = 0;
 
+        /// <summary>このランで始めた戦闘の数 (= 次の戦闘の乱数の通し番号)。 中断セーブが写す (issue #84)。</summary>
+        public int RunCombatSequence => _combatSeq;
+
+        /// <summary>中断セーブから再開する時に通し番号を戻す。 戻さないと再開後の戦闘の乱数列が、 中断しなかった時とずれる。</summary>
+        public void RestoreRunCombatSequence(int seq) => _combatSeq = Math.Max(0, seq);
+
         /// <summary>決定論的乱数の連番。 (戦闘番号, ターン, スロット) で一意になる。
         /// slot は同一ターン内で複数回引く場合の識別子 (ダイスの本数など)。</summary>
         private int RngIdx(int slot)
@@ -47,12 +53,12 @@ namespace CombatSystem
         {
             string id = currentEnemy?.id;
             if (string.IsNullOrEmpty(id)) return false;
-            string next = null, label = null;
-            switch (id)
+            string next = GameLoop.BossIds.VescaNextStage(id), label = null;
+            switch (GameLoop.BossIds.VescaStageOf(id))
             {
-                case "boss_layer7":    next = "boss_layer7_p2"; label = "第二段：遺物学者"; break;
-                case "boss_layer7_p2": next = "boss_layer7_p3"; label = "第三段：神話";     break;
-                case "boss_layer7_p3": next = "boss_layer7_p4"; label = "第四段：天与";     break;
+                case 1: label = "第二段：遺物学者"; break;
+                case 2: label = "第三段：神話";     break;
+                case 3: label = "第四段：天与";     break;
                 default: return false;   // p4 または非ヴェスカ
             }
             Debug.Log($"[ヴェスカ連戦] {id} 撃破 → {label} へ移行 (戦闘終了前に確定)");
@@ -63,21 +69,16 @@ namespace CombatSystem
             return true;
         }
 
-        private int[] RollEnemyAttack(EnemyData e, int extraDraws, bool weakRoll, float weakRatio)
+        private int[] RollEnemyAttack(EnemyData e, int extraDraws)
         {
             if (e == null) return new int[0];
             if (e.UsesAttackRoll)
-            {
-                int hi = weakRoll ? EnemyStance.WeakRollMax(e.attackRollMax, weakRatio) : e.attackRollMax;
-                return e.RollAttack(extraDraws, hi);
-            }
+                return e.RollAttack(extraDraws, e.attackRollMax);
             // ---- 旧ダイス方式 (互換パス) ----
             int[] faces = e.diceFaces;
             if (faces != null && faces.Length > 0)
-                return RollDice(Math.Max(0, e.diceCount + extraDraws), 0,
-                                weakRoll ? EnemyStance.WeakRollFaces(faces, weakRatio) : faces);
-            int mx = weakRoll ? EnemyStance.WeakRollMax(e.diceMaxValue, weakRatio) : e.diceMaxValue;
-            return RollDice(Math.Max(0, e.diceCount + extraDraws), mx);
+                return RollDice(Math.Max(0, e.diceCount + extraDraws), 0, faces);
+            return RollDice(Math.Max(0, e.diceCount + extraDraws), e.diceMaxValue);
         }
 
         private int[] RollDice(int count, int maxValue, int[] diceFaces = null)
@@ -387,8 +388,10 @@ namespace CombatSystem
 
         /// <summary>HUD に出すプレイヤーのステータス (2026-11-05)。 <b>配線を決める前に呼ぶ</b>こと
         /// (与ダメ補正の整備パネル分と戦闘中バフの会心率は、 まだ本判定に取り込まれていない前提で足している)。
-        /// <c>OnCriticalCheck</c> で発動する条件付きの会心率 (3 種) は本判定まで分からないので含まない。</summary>
-        public struct HudStats { public float critRate, critMul; public int attack, outgoingPct, defense, pen; }
+        /// <c>OnCriticalCheck</c> で発動する条件付きの会心率 (3 種) は本判定まで分からないので含まない。
+        /// <para>consOutgoingPct (2026-11-12) = そのうち消耗品 (〈油・膏薬〉と、 立てている〈瞬間研磨剤〉) が足す与ダメ%。
+        /// どちらも本判定 (<c>ApplyWinDamageModifiers</c>) で同じ加算プールへ入るので、 outgoingPct にも含める。 戦闘中に使った品を画面に出すため。</para></summary>
+        public struct HudStats { public float critRate, critMul; public int attack, outgoingPct, defense, pen, consOutgoingPct; }
 
         public HudStats PreviewHudStats()
         {
@@ -400,7 +403,9 @@ namespace CombatSystem
             float mul = ctx.outgoingDamageMultiplier <= 0f ? 1f : ctx.outgoingDamageMultiplier;
             int metaPct = MetaProgression.MetaBuffApplicator.GetOutgoingDamagePct()
                         + MetaProgression.MetaBuffApplicator.GetBattleSpiritPct(GameLoop.GameManager.Instance?.Run);
-            s.outgoingPct = Mathf.RoundToInt((mul - 1f) * 100f) + metaPct;
+            // 消耗品の分 (ApplyWinDamageModifiers の〈瞬間研磨剤〉+150%・〈油・膏薬〉consDmgMultPct と同じ条件)
+            s.consOutgoingPct = Mathf.Max(0, ctx.consDmgMultPct) + (ctx.polishArmed && !ctx.rollPurity ? 150 : 0);
+            s.outgoingPct = Mathf.RoundToInt((mul - 1f) * 100f) + metaPct + s.consOutgoingPct;
             s.defense = ctx.playerDefense;
             s.pen = ctx.playerArmorPen;
             return s;

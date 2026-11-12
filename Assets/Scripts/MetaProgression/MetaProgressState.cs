@@ -252,13 +252,37 @@ namespace MetaProgression
             if (currentLevel <= 0) return;
             int refund = 0;
             for (int lv = 1; lv <= currentLevel; lv++)
-                refund += MetaBuffTrack.CalcCost(lv);
+                refund += LegacyTrackStepCost(lv);
             tokens += refund;
             currentLevel = 0;
             panelPointsPurchased = 0;
             EnsurePanelInitialized();
             for (int i = 0; i < panelRanks.Length; i++) panelRanks[i] = 0;
             UnityEngine.Debug.Log($"[MetaMigrate] 旧 58 段トラックから配点方式へ移行: {refund} トークン返却");
+        }
+
+        /// <summary>旧 58 段トラックの lv 段目の購入コスト (トークン)。 返金の計算にだけ使う。
+        /// 旧 MetaBuffTrack.CalcCost の式 (2026-11-13 にトラックの定義ごと削除・#132)。</summary>
+        private static int LegacyTrackStepCost(int lv) => 30 + lv * 2;
+
+        /// <summary>保存済みの段を 0〜<see cref="MetaPanelKindExt.MaxRank"/> に丸める (#113)。
+        /// 枠から外したトラック (MaxRank 0 = 精密・会心の種火・兵站) は 0 になり、 その分の点は未配分へ戻る
+        /// (<see cref="UnassignedPoints"/> は購入済み − 配点なので、 段を消せば点が戻る)。
+        /// <see cref="SetRank"/> を通らない JsonUtility の復元で古い段が残るのを防ぐ。 呼び出しは Manager.Load 直後。 冪等。</summary>
+        public void ClampRanksToMax()
+        {
+            EnsurePanelInitialized();
+            var kinds = (MetaPanelKind[])System.Enum.GetValues(typeof(MetaPanelKind));
+            int freed = 0;
+            for (int i = 0; i < panelRanks.Length && i < kinds.Length; i++)
+            {
+                int clamped = UnityEngine.Mathf.Clamp(panelRanks[i], 0, kinds[i].MaxRank());
+                if (clamped == panelRanks[i]) continue;
+                freed += (panelRanks[i] - clamped) * MetaPanel.RankCost(kinds[i]);
+                panelRanks[i] = clamped;
+            }
+            if (freed != 0)
+                UnityEngine.Debug.Log($"[MetaMigrate] 上限を超える段・枠から外したトラックの段を丸めた: {freed}pt を未配分へ戻した");
         }
     }
 }

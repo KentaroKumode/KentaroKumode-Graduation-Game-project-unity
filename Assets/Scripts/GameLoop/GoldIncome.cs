@@ -9,10 +9,8 @@ namespace GameLoop
     /// **消費 (run.coins -= x) はここを通さない。** 収入だけを絞るのが目的で、
     /// 支払いに係数を掛けると価格デバフ (軸4 不足する物資) と二重計上になる。
     ///
-    /// <para><b>ラストスタンド濾過の不整合について</b> ──
-    /// 導入前から <see cref="LastStand.FilterGoldGain"/> を通す口 (9) と通さない口 (5) が
-    /// 混在していた。 集約時点ではその差をそのまま写している
-    /// (<paramref name="applyLastStandFilter"/>)。 統一するかどうかは別途決めること。</para>
+    /// <para>(旧: ラストスタンドの濾過 LastStand.FilterGoldGain を通す口と通さない口の区別
+    /// applyLastStandFilter があったが、 濾過は常に素通しだったので 2026-11-12 に区別ごと削除)</para>
     /// </summary>
     public static class GoldIncome
     {
@@ -42,12 +40,11 @@ namespace GameLoop
             RunByDepthSource[key] = rv + granted;
         }
 
-        public static int Gain(RunState run, int amount, string source,
-                               bool applyLastStandFilter = true)
+        public static int Gain(RunState run, int amount, string source)
         {
             if (run == null || amount <= 0) return 0;
 
-            int granted = applyLastStandFilter ? LastStand.FilterGoldGain(run, amount) : amount;
+            int granted = amount;
 
             // 挑戦デバフ 軸3〈偽の硬貨〉: GOLD 収入 −20% / −35% / −50%。
             //   **掛ける場所はここ 1 箇所だけ。** 呼び出し側では絶対に掛けないこと。
@@ -62,11 +59,10 @@ namespace GameLoop
 
         /// <summary>挑戦デバフの収入減を**受けない** GOLD 加算。
         /// 売却の代金 (収入ではなく資産の変換) と、 開幕所持金 (T4-D 破産 の管轄) に使う。</summary>
-        public static int GainExempt(RunState run, int amount, string source,
-                                     bool applyLastStandFilter = true)
+        public static int GainExempt(RunState run, int amount, string source)
         {
             if (run == null || amount <= 0) return 0;
-            int granted = applyLastStandFilter ? LastStand.FilterGoldGain(run, amount) : amount;
+            int granted = amount;
             if (granted <= 0) return 0;
             run.coins += granted;
             Note(run, source, granted);     // **免除経路も数える** (売却・開幕所持金)

@@ -7,8 +7,8 @@ namespace AutoTest.ParallelSweep
 {
     /// <summary>親プロセスが 1 ワーカーへ渡す指示。
     ///
-    /// <para>Ultra の <c>UltraPortfolioCandidateJob</c> とは別系統。 あちらは合成シードと
-    /// 候補ポリシーを配るためのもので、 こちらは<b>通常バッチと同じ <c>runIdx</c> の
+    /// <para>旧 Ultra の <c>UltraPortfolioCandidateJob</c> (合成シードと候補ポリシーを配っていた・2026-11-13 削除・#135)
+    /// と違い、 <b>通常バッチと同じ <c>runIdx</c> の
     /// 区間を切り出すだけ</b>。 シードの作り方を変えないことが、 逐次版と digest が
     /// 一致する (＝並列版が正しいと言える) 唯一の根拠になっている。</para></summary>
     [Serializable]
@@ -72,6 +72,8 @@ namespace AutoTest.ParallelSweep
         public int[] mapVisit = Array.Empty<int>();
         /// <summary>[計装 2026-11-10] ラン開始時に実際に入っていた整備パネルの段。</summary>
         public string metaRanks = "";
+        /// <summary>[計装 2026-11-12] ラン開始時の職業 (lockWeaponFamily の測定では武器の家系)。</summary>
+        public string startClass = "";
 
         public static LearnRunRow From(AutoRunner.RunRec r)
         {
@@ -99,6 +101,7 @@ namespace AutoTest.ParallelSweep
                 stateSnaps = r.stateSnaps != null ? r.stateSnaps.ToArray() : Array.Empty<int>(),
                 mapVisit = r.mapVisit != null ? r.mapVisit.ToArray() : Array.Empty<int>(),
                 metaRanks = r.metaRanks ?? "",
+                startClass = r.startClass ?? "",
             };
         }
 
@@ -200,6 +203,10 @@ namespace AutoTest.ParallelSweep
         /// 2026-09-13 に <c>useMutualAttackPipeline</c> の運び漏れで 170,000 ラン を
         /// 旧戦闘経路で測って捨てた ── 運搬は見えないと必ず漏れる。</summary>
         public string effectiveState = "";
+        /// <summary>[2026-11-12 #118] アームの終わりに BOT が読んでいた学習 (帯のフォルダ名・序列の出どころ・危険度)。</summary>
+        public string learningRead = "";
+        /// <summary>[2026-11-12 #118] 手書きの序列 (学習データなし) で走ったか。 親はサマリーにはっきり出す。</summary>
+        public bool learningFallback;
         // 救済の発動数。 **ログでは数えられない** ── バッチ中は logEnabled=false なので、
         //   「ログに出ていない＝発動していない」は成り立たない。 計数で返す。
         public long torchRevivals;
@@ -333,10 +340,14 @@ namespace AutoTest.ParallelSweep
         public double[] dmgSrcVesca = Array.Empty<double>();
         public double[] damageStages7F = Array.Empty<double>();
         public double[] cut7F = Array.Empty<double>();
+        /// <summary>[計装 2026-11-12 #103] ヴェスカ〈停滞する時間〉で止まった端子 (GuardDiag.Stag7F・段 × 8 の並びはそちらの注記)。</summary>
         public double[] stag7F = Array.Empty<double>();
         /// <summary>[計装 2026-11-12] 端子ごとの使われ方 (<see cref="CombatSystem.TerminalDiag"/>)。 名前 × TerminalDiag.Width を平らに並べる。</summary>
         public string[] termDiagNames = Array.Empty<string>();
         public double[] termDiag = Array.Empty<double>();
+        /// <summary>[計装 2026-11-12・#35] 追跡者に捕まった後の結果 (<see cref="GameLoop.NavDiag"/>)。 型の名前 × NavDiag.Width を平らに並べる。</summary>
+        public string[] navDiagNames = Array.Empty<string>();
+        public double[] navDiag = Array.Empty<double>();
     }
 
     /// <summary>AutoRunner の設定をプロセス間で運ぶ。
@@ -396,7 +407,7 @@ namespace AutoTest.ParallelSweep
                 "enableAllDebuffs", "forceNoRelic", "forceTheoreticalRelic",
                 "shieldAbsorbsUnmitigable", "suppressFacePartOffers", "robberyBlocksShops",
                 "challengeScoreTarget", "masterSeed", "rawTierRatio",
-                "learnBotAi", "learnTier", "tuneBosses",
+                "learnBotAi", "learnTier",
                 // **2026-09-14: ここへ足し忘れて 60,000 ラン を捨てた。**
                 //   自作ドライバが useIttBeta を送っておらず、 既定 false のまま走った
                 //   (Editor の並列ランナーは True を運んでいた)。 アイテム評価の推定量が
@@ -410,7 +421,7 @@ namespace AutoTest.ParallelSweep
                 //   ── 送ったつもりの値ではなく、 入っていた値を読む。
                 "gateBotPaysBlood", "gateBotPaysRelics", "gateBotPaysTransfer", "gateBotSkipsAll",
                 "gateRepairDrainPct", "gateIgnitionAttackCutPct", "gatePierceRate",
-                "gateProvisionReserveFromFloor", "saberWaltzShopBias", "enemyAttackSpec", "enemyAttackMul", "enemyHpSpec", "superRerollMode", "superLightRerollSamples", "superLightExactMaxDice", "logWiringDiff", "eliteUpgradePctOverride", "eliteRewardMul", "flatAttackMul",
+                "gateProvisionReserveFromFloor", "saberWaltzShopBias", "enemyAttackSpec", "enemyAttackMul", "enemyHpSpec", "eliteUpgradePctOverride", "eliteRewardMul", "flatAttackMul",
                 // 航行配点のエリート評価 (2026-09-15)。 BOT の手そのものを変えるので必ず印字する。
                 "eliteNavBase", "eliteNavHpBonus", "navEliteCost",
                 // 戦闘報酬の配分 (2026-09-15)。 **3 つはセットで意味を持つ** ので 3 つとも印字する
@@ -436,8 +447,32 @@ namespace AutoTest.ParallelSweep
                 "axisPackageAxis", "axisPackageCount", "v3.hpLedger", "v3.axisCommitBuy", "predTrace",
                 // 2026-11-10: 主攻撃の見積もりを実績の比で掛け直すか・黎明の溜める形 (送った値と、 ラン開始時に本体へ入れた値)
                 "v3.mainCorr", "daybreakNextAttackPct", "DaybreakNextAttackPctApplied", "weaponTierCap", "vescaDiceForce",
+                "pursuerNoReward", "pursuerAtkMul", "pursuerHpAdd", "pursuerSupply", "navFear", "navFearMacro", "navFearRange",
+                // 2026-11-12: 縄張りの作り (追跡者が縄張りの外へ出るか・縄張りの宝の中身・BOT が宝を取りに行くしきい値)
+                "pursuerLeavesTerritory", "territoryTreasure", "territoryTreasureHpMargin", "navTerritoryDetour",
                 // 2026-11-10: 測定用の物差し (主攻撃 / 毒・出血・爆発の倍率)。 送った値と、 ラン開始時に本体へ入れた値
                 "probeMainMult", "ProbeMainMultApplied", "probePassiveMult", "ProbePassiveMultApplied",
+                // 2026-11-12 (#107): 配線が収支で決まる敵のパッシブと〈吸血〉を読むか (−1 = 技量に従う) と実効値・内訳
+                "v3.readEnemyPassives", "ReadEnemyPassivesEffective", "v3.enemyPassiveMask",
+                // 2026-11-12 (#105): 山札の 2 ターン先読み (既定 OFF) と、 その範囲・候補数・標本数
+                "deckLookahead", "deckLookaheadBossOnly", "deckLookaheadTopK", "deckLookaheadSamples", "deckLookaheadProbe",
+                // 2026-11-12 (#6): 挑戦カードを 1 枚ずつ受ける測定の口と、〈金で殴る〉の BOT の金の値段・取り置き
+                "challengeForce", "goldPunchHpPerGold", "goldPunchReserve",
+                // 2026-11-12 (#118): 挑戦の難易度 (v3_queue の腕が振る値) と、 BOT が読む学習の帯の固定・欠けたら止めるか
+                "challengeCardDifficulty", "botLearningBandOverride", "failOnMissingLearning",
+                // 2026-11-12 (#95 / #20 / #41 / #102 / #108): 腕ごとに切り替える測定の口。 送った値と、 ラン開始時に本体へ入れる値
+                "relicLoadoutSpec", "relicStatOff", "RelicStatOffMaskApplied", "relicSetBonusOff", "RelicSetBonusOffMaskApplied",
+                "enemyArmorPenSpec", "EnemyArmorPenOverrideApplied",
+                "challengeCardPickByAxis",
+                "terminalsLeaveDeck", "randomGrantTerminals", "armorDefPerRank", "armorFlatEvery",
+                // 2026-11-12 (#102 第 2 弾): 端子の調整を元の値へ戻す腕 (0 / False = 今の値)
+                "terminalHealMul", "terminalArresterNeed", "terminalFirstAidBattleOnly",
+                // 2026-11-13 (#117): 端子の撃破のボーナスを旧い条件 (攻撃したターンの主攻撃までの撃破だけ) へ戻す腕 (False = 今の作り)
+                "terminalKillNeedsAttack",
+                // 2026-11-13: 配線の旧の式が、 攻撃の端子に挿さない手にも武器の素火力を数える旧い挙動へ戻す腕 (False = 直した挙動)
+                "v3.oldNoAttackBaseDmg",
+                // 2026-11-12 (#134): Optimal の配線のミスの率 (0 = ミスなし・Super と素朴版は経路を通らない)
+                "optimalMistakeRate",
             };
             var sb = new System.Text.StringBuilder();
             foreach (string name in watched)

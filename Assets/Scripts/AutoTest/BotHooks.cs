@@ -4,7 +4,8 @@ using GameLoop;
 namespace AutoTest
 {
     /// <summary>
-    /// 本体の差し込み口 (<see cref="GameHooks"/> / <see cref="CombatSystem.BossParams.Overrides"/>) へ BOT を繋ぐ。
+    /// 本体の差し込み口 (<see cref="GameHooks"/>) へ BOT を繋ぐ。 ボスの数値の差し替え口 <see cref="CombatSystem.BossParams.Overrides"/> は
+    /// 口だけ残っている (差し込んでいた L3 ボス調整器は 2026-11-12 に削除・#126)。
     /// AutoRunner の生成時に <see cref="Install"/>、 破棄時に <see cref="Uninstall"/>。
     /// </summary>
     public static class BotHooks
@@ -37,10 +38,6 @@ namespace AutoTest
             GameHooks.WeaponEvBonus = LearnedWeaponBonus;
             GameHooks.MeasureRunPower = InventoryPower.Compute;
             GameHooks.OnCritRateResolved = CritRateCensus.Note;
-            GameHooks.OnShopTierOffered = FamilyTierStats.NoteOffer;
-            GameHooks.OnShopUpgradeOffered = FamilyTierStats.NoteUpgradeOffered;
-            GameHooks.OnShopUpgradeBought = FamilyTierStats.NoteUpgradeBought;
-            BossTuning.Install();
         }
 
         /// <summary>挑戦カードの 2 枚から、 バフが自分の軸 (品の数が一番多い軸) に合う方を取る (2026-11-09)。
@@ -72,7 +69,6 @@ namespace AutoTest
         public static void Uninstall()
         {
             GameHooks.Clear();
-            BossTuning.Uninstall();
         }
 
         /// <summary>学習した購入スコアが最大の提示を選ぶ。 同点は先の方 (旧実装と同じ)。</summary>

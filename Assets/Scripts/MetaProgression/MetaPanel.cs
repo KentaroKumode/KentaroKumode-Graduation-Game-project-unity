@@ -201,6 +201,10 @@ namespace MetaProgression
         /// 防御トラックが「耐える」だけの軸でなくなる。</para></summary>
         public static bool GuardShieldCarryUnlocked(int rank) => rank >= 10;
 
+        /// <summary>剛胆 r10: 勝った戦闘の残りシールドのうち、 次の戦闘へ持ち越す割合 (切り上げ)。
+        /// 2026-09-13: 全量 → 50% → 30% (50% でも Balanced +6.31pt で基準帯を超えていた)。 適用は CombatManager.Finish。</summary>
+        public const float GuardShieldCarryRatio = 0.30f;
+
         /// <summary>金庫: 開幕ゴールド +5/段 (0..50)。</summary>
         public static int VaultGold(int rank) => Mathf.Clamp(rank, 0, 10) * 5;
 
@@ -211,7 +215,7 @@ namespace MetaProgression
         /// 2026-09-13 新設。 規則の正本は <see cref="VaultBank"/>。
         ///
         /// <para>宝箱ゴールド (<see cref="VaultTreasureUnlocked"/>) と同居させている。
-        /// 宝箱側は F1=3〜F7=12 の少額で、 貸金庫 (上限 150G) の横では誤差。
+        /// 宝箱側は F1=3〜F7=12 の少額で、 貸金庫 (<see cref="VaultBank.Cap"/>G までの分が層ごとに増える) の横では誤差。
         /// 分離すると Balanced の土台まで動いて基準が変わるので、 r10 にまとめた。</para></summary>
         public static bool VaultBankUnlocked(int rank) => rank >= 10;
 
@@ -286,12 +290,9 @@ namespace MetaProgression
         public static int[] TradeSaleWeights(int rank)
             => rank >= 10 ? new[] { 42, 35, 15, 8 } : new[] { 42, 38, 20 };
 
-        /// <b>【2026-09-10 廃止】常に 0。</b> 宝物庫が配るものを素材からパッシブへ変えた。
-        /// 理由: drop-one 実測で寄与が測定分解能未満 (0.013 対数オッズ/pt / 分解能 ±0.029)。
-        /// 原因は<b>素材が制約になっていない</b>こと ── ラン終了時の平均残が 12〜16 もあり、
-        /// 余っている資源を +2 増やしても何も変わらない。 精密 (二重減衰で価値が薄い) とは
-        /// 故障の種類が違い、 <b>需要のない資源を配っていた</b>。
-        public static int SupplyStartMaterial(int rank) => 0;
+        // (旧 SupplyStartMaterial: 宝物庫の開幕素材。 2026-09-10 廃止で常に 0 になり、 2026-11-12 に関数ごと削除。
+        //  理由: drop-one 実測で寄与が測定分解能未満 (0.013 対数オッズ/pt / 分解能 ±0.029)。 ラン終了時の平均残が 12〜16 もあり、
+        //  <b>需要のない資源を配っていた</b>。 宝物庫は開幕パッシブを配る)
 
         /// <summary><b>宝物庫: 開幕パッシブの本数 = r2/5/8 で +1 (0..3)、 r10 で +1 (計4)。</b>
         /// 2026-09-10 に素材から移行 ── 旧 r10 極点「開幕パッシブ1本」を刻んで前倒ししたもので、
@@ -341,8 +342,7 @@ namespace MetaProgression
         public static int SupplyStartingOffers(int rank, int itemIndex)
             => rank >= 10 ? Mathf.Clamp(itemIndex + 1, 1, 3) : 1;
 
-        /// <summary>兵站: 戦闘後の物資減少軽減。 2026-09-12 廃止 (常に 0)。 2026-11-09 に戦闘の物資の損そのものを撤去。</summary>
-        public static int LanternProvisionLossReduce(int rank) => 0;
+        // [削除 2026-11-12] LanternProvisionLossReduce ── 兵站の戦闘後の物資減少軽減。 2026-09-12 から常に 0・呼ぶ側も無かった。
 
         /// <summary>兵站 (旧〈燈火〉・2026-11-09 改名): 物資上限 +1/段 (r10 で +10)。
         /// <para>2026-11-09: 物資のデノミ (1 歩 = 1・素の上限 20)。 旧 +150/段 (1 歩 50) の 1/50。
@@ -350,7 +350,7 @@ namespace MetaProgression
         /// r10 の極点は〈補給線〉に差し替える (未実装・GAME.md §23-21)。</para></summary>
         public static int LanternProvisionCapBonus(int rank) => Mathf.Clamp(rank, 0, 10) * 1;   // 2026-11-09: 上限 5 に合わせて +1/段 (2026-11-10 に兵站ごと枠から外した・MaxRank 0)
 
-        /// <summary><b>装甲 (2026-11-10): 防御 +2/段</b> (r10 で +20)。 r10〈不動〉は <see cref="ArmorImmovable"/>。
+        /// <summary><b>装甲 (2026-11-10): 防御 +2/段</b> (r10 で +20)。 r10〈不動〉は <see cref="ArmorHitCap"/>。
         /// <para>2026-11-10: +1/段 では 7 点 (防御 5→12) が外殻・出力に負けた (−9.6) ので +2/段 へ。
         /// 防御は逓減式 Rmax·D/(D+K) で軽減率になる (ADR-0013・今は 0.6 / 10)。 初期の防御 2 で軽減 10%、 r3 (8) で約 27%、 r10 (22) で約 41%。
         /// 武器の防御はこれとは別に足される。 相手の貫通に固定値で削られる。</para>
@@ -363,8 +363,8 @@ namespace MetaProgression
         public static int ArmorOpeningShield(int rank)
             => Mathf.Clamp(rank, 0, 10) * (GameLoop.GameHooks.ArmorShieldPerRankOverride >= 0 ? GameLoop.GameHooks.ArmorShieldPerRankOverride : ArmorShieldPerRank);
 
-        /// <summary>[2026-11-10 撤去] 旧 r10〈不動〉(失った HP 10% ごとに防御 +1)。 防御は逓減式で効きが鈍るので、 r10 は「一撃の上限」へ差し替えた。 常に 0。</summary>
-        public static int ArmorImmovable(int rank, int hp, int maxHp) => 0;
+        // [2026-11-10 撤去] 旧 r10〈不動〉(失った HP 10% ごとに防御 +1)。 防御は逓減式で効きが鈍るので、 r10 は「一撃の上限」(ArmorHitCap) へ差し替えた。
+        //   常に 0 を返す ArmorImmovable は 2026-11-12 に呼び出しごと削除。
 
         /// <summary><b>装甲: 被ダメージ −1/段</b> (敵の攻撃を防御で減らした後に N 引く・下限 1)。 防御の逓減を受けない引き算。
         /// 強すぎたら 2 段ごと (<see cref="ArmorFlatEvery"/>)。 [2026-11-10] 当初の「固定ダメージ −N」は、 敵に固定ダメージが無く常に 0 だったので戻した。</summary>
@@ -380,30 +380,24 @@ namespace MetaProgression
         public const float ArmorHitCapPct = 0.35f;
         public static int ArmorHitCap(int rank, int maxHp) => rank >= 10 && maxHp > 0 ? Mathf.Max(1, Mathf.CeilToInt(maxHp * ArmorHitCapPct)) : 0;
 
-        /// <summary>【廃止】精密の「会心ダイス」補正。 常に 0。
-        ///
-        /// 会心率は % に統一済み (2026-09-19)。 2026-07-28 に精密の効果を
-        /// <see cref="PrecisionCritRatePct"/> の会心率(%) へ一本化した。</summary>
-        public static int PrecisionCritBonus(int rank) => 0;
-
-        /// <summary>精密: 会心率 **+5%/段** (r10 で +50%)。 数値系トラック共通の全段リニア
-        /// (外殻 +3HP/段、 出力 +5%/段、 防御 +3シールド/段、 金庫 +5G/段) と同じ形。
-        /// 極点は r10 の <see cref="PrecisionOverflowMultiplier"/>。
-        ///
-        /// 2026-07-26 は `rank × 0.55%` だったが、 逓減カーブ下では
-        /// **精密 9pt ≒ 期待与ダメ +23% に対し 出力 9pt = +45%** と 2 倍の開きがあり、
-        /// トラックとして選ばれる理由が無かった。 2026-07-28 に釣り合う水準へ増量 (§15-1)。
-        /// なお会心ダイス (分子) 経由は廃止済み ── 分子/分母モデル自体が存在しないため。</summary>
-        /// <b>【2026-09-10 廃止】常に 0。</b> 精密トラックを撤去した。
-        /// drop-one 実測で寄与が測定分解能未満 (−0.006 対数オッズ/pt / 分解能 ±0.049)。
-        /// 原因は二重減衰 ── 双曲線逓減で名目 +15% が実効 +9.2pt になり、 会心倍率 2.0 で
-        /// 与ダメ +6.9% にしかならない (出力の 46%)。 2026-07-28 の増量は会心倍率 3.0 を
-        /// 前提に較正されており、 08-03 の 3.0→2.0 差し戻しで宙に浮いていた。
-        /// <b>貫通軸への転換も検討したが棄却</b> ── 実効会心率の分布が P90/P10 = 1.46 倍 と狭く
-        /// (逓減が分散ごと潰している) 倍率化してもビルド条件依存が成立しない。 貫通 (playerArmorPen)
-        /// は敵軽減 0/15/35% に沿って条件依存するが、 「totalDmg に掛かる倍率」という点で
-        /// 出力と同種で、 9 本目のトラックを持つ理由にならないと判断した。
-        public static float PrecisionCritRatePct(int rank) => 0f;
+        // (旧 PrecisionCritRatePct: 2026-11-12 に関数ごと削除。 下は経緯の記録)
+        //  <summary>精密: 会心率 **+5%/段** (r10 で +50%)。 数値系トラック共通の全段リニア
+        //  (外殻 +3HP/段、 出力 +5%/段、 防御 +3シールド/段、 金庫 +5G/段) と同じ形。
+        //  極点は r10 の <see cref="PrecisionOverflowMultiplier"/>。
+        //
+        //  2026-07-26 は `rank × 0.55%` だったが、 逓減カーブ下では
+        //  **精密 9pt ≒ 期待与ダメ +23% に対し 出力 9pt = +45%** と 2 倍の開きがあり、
+        //  トラックとして選ばれる理由が無かった。 2026-07-28 に釣り合う水準へ増量 (§15-1)。
+        //  なお会心ダイス (分子) 経由は廃止済み ── 分子/分母モデル自体が存在しないため。</summary>
+        //  <b>【2026-09-10 廃止】常に 0。</b> 精密トラックを撤去した。
+        //  drop-one 実測で寄与が測定分解能未満 (−0.006 対数オッズ/pt / 分解能 ±0.049)。
+        //  原因は二重減衰 ── 双曲線逓減で名目 +15% が実効 +9.2pt になり、 会心倍率 2.0 で
+        //  与ダメ +6.9% にしかならない (出力の 46%)。 2026-07-28 の増量は会心倍率 3.0 を
+        //  前提に較正されており、 08-03 の 3.0→2.0 差し戻しで宙に浮いていた。
+        //  <b>貫通軸への転換も検討したが棄却</b> ── 実効会心率の分布が P90/P10 = 1.46 倍 と狭く
+        //  (逓減が分散ごと潰している) 倍率化してもビルド条件依存が成立しない。 貫通 (playerArmorPen)
+        //  は敵軽減 0/15/35% に沿って条件依存するが、 「totalDmg に掛かる倍率」という点で
+        //  出力と同種で、 9 本目のトラックを持つ理由にならないと判断した。
 
         /// <summary>精密 r10 の極点: **逓減で捨てられた会心率を、会心倍率へ変換する。**
         ///
@@ -454,9 +448,14 @@ namespace MetaProgression
         /// <summary>毒 r2 濃縮: 1 ターンに最初の 1 回だけ、 毒の付与に足すスタック (CombatContext.AddStatus)。 2026-11-07 に +2 → +5。</summary>
         public static int PoisonApplyBonus(int rank) => rank >= 2 ? 5 : 0;
 
-        /// <summary>出血 r2 失血衰弱: 出血 N 以上の敵の攻撃値 -M (閾値=3, 減算=4・2026-11-07 に 2 から)。閾値未到達なら 0。</summary>
+        /// <summary>出血 r2 失血衰弱: 出血 <see cref="BleedWeakenThreshold"/> 以上の敵の攻撃値 −<see cref="BleedWeakenAmount"/>。閾値未到達なら 0。</summary>
         public static int BleedWeakenAttack(int rank, int enemyBleedStacks)
-            => (rank >= 2 && enemyBleedStacks >= 3) ? 4 : 0;
+            => (rank >= 2 && enemyBleedStacks >= BleedWeakenThreshold) ? BleedWeakenAmount : 0;
+
+        /// <summary>出血 r2 失血衰弱が効き始める敵の出血。</summary>
+        public const int BleedWeakenThreshold = 3;
+        /// <summary>出血 r2 失血衰弱で引く敵の攻撃値 (2026-11-07 に 2 から 4)。</summary>
+        public const int BleedWeakenAmount = 4;
 
         /// <summary>会心 r2 研ぎ澄まし: 会心倍率 +0.8 (2026-11-07・+0.2 → +0.5 → +0.8)。</summary>
         public static float CritMulBonus(int rank) => rank >= 2 ? 0.8f : 0f;

@@ -9,6 +9,7 @@ namespace UI.Game2D
     /// 効かせるのは <see cref="Game2DSettingsApply"/>。 動かすとその場で効き、 閉じる時に保存する (次の起動でも効く)。
     /// <para>開き方: Esc (タイトル・航行・戦闘で、 ほかの窓が出ていない時)。 もう一度 Esc か「閉じる」で閉じる。
     /// 操作: バーを押す・引く / 選んだ行を [−] [+] か ← → (Shift で 10 ずつ)。 タイトルにはまだ設定のボタンの絵が無いので Esc だけ。</para>
+    /// <para>[手引きをもう一度] は手引き (<see cref="Game2DTutorial"/>・issue #86) の見た印を全部消す。</para>
     /// </summary>
     public class Game2DSettingsPanel : MonoBehaviour
     {
@@ -34,9 +35,6 @@ namespace UI.Game2D
 
         /// <summary>この画面が窓を使っているか。</summary>
         public bool IsShown => modal != null && _def != null && modal.IsOpen && modal.Current == _def;
-
-        /// <summary>ほかの所から開く (タイトルの記録の窓など)。 開けたら true。</summary>
-        public static bool OpenFromAnywhere() { if (_inst == null || _inst.modal == null || _inst.modal.IsOpen) return false; _inst.Open(); return true; }
 
         private static bool CanOpenNow()
         {
@@ -118,6 +116,11 @@ namespace UI.Game2D
             d.buttons.Add(new ModalBtn { label = "+", action = "inc" });
             d.buttons.Add(new ModalBtn { label = _page == 0 ? "音へ" : "画面へ", action = "page" });
             d.buttons.Add(new ModalBtn { label = "既定に戻す", action = "reset" });
+            // 中断セーブ (issue #84): 航行のマップで開いた時だけ。 押せない時 (選ぶものが残っている など) は押した時に理由を出す
+            var gmNow = GameManager.Instance;
+            bool canSuspendHere = gmNow != null && gmNow.CurrentPhase == GameManager.GamePhase.MapNavigation && gmNow.Run != null && gmNow.Run.isRunActive;
+            if (canSuspendHere) d.buttons.Add(new ModalBtn { label = "中断して終える", action = "suspend" });
+            d.buttons.Add(new ModalBtn { label = "手引きをもう一度", action = "tutorial" });
             d.buttons.Add(new ModalBtn { label = "閉じる", action = "close", primary = true });
             d.footer = "バーを押す・引く / ← → で 1 ずつ (Shift で 10 ずつ) / Esc で閉じる";
             d.onAction = (a, sel) =>
@@ -125,6 +128,14 @@ namespace UI.Game2D
                 switch (a)
                 {
                     case "close": Close(); return;
+                    case "suspend":
+                    {
+                        var gm = GameManager.Instance;
+                        if (gm == null) return;
+                        if (!gm.SuspendAndReturnToTitle(out var why)) { modal.ShowToast(why ?? "保存できない"); return; }
+                        Close();
+                        return;
+                    }
                     case "dec": Step(sel, -1); return;
                     case "inc": Step(sel, 1); return;
                     case "slide":
@@ -134,6 +145,10 @@ namespace UI.Game2D
                     case "reset":
                         foreach (var k in keys) GameSettings.Set(k, GameSettings.Defs[(int)k].def);
                         modal.ShowToast("この頁を既定に戻した");
+                        break;
+                    case "tutorial":      // 手引き (issue #86) の見た印を全部消す ── 次にその場面へ来た時にまた出る
+                        Game2DTutorial.ResetAll();
+                        modal.ShowToast("手引きの見た印を消した (その場面でまた出る)");
                         break;
                 }
                 Rebuild();

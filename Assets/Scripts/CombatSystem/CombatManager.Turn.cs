@@ -98,6 +98,10 @@ namespace CombatSystem
                 }
             }
 
+            // 端子の撃破のボーナス (#117): ターン終了の削り (〈絞り出し〉〈百断〉など・ctx の HP を直接減らす) で倒れたか。
+            //   段の移行 (SwapEnemy) が敵の HP を次の形態へ戻す前に見る。
+            SettleTerminalKillBonus(Math.Min(enemyHP, ctx.enemyCurrentHP), final: false);
+
             // ヴェスカ連戦: 敵パッシブが予約した SwapEnemy を perspective 復帰後に実行
             if (!string.IsNullOrEmpty(ctx.pendingEnemySwapId))
             {
@@ -149,15 +153,6 @@ namespace CombatSystem
             // ターン終了スキルによるHP変動をCombatManagerに反映（剣鎧等）
             SyncHPFromContext(ctx);
 
-            // 消費: 継続回復（毎ターン終了時 +consRegen → consRegen--）。狂暴化中は封印。
-            if (ctx.consRegen > 0 && playerHP > 0 && !ctx.healBlocked)
-            {
-                int regen = Math.Max(0, ctx.consRegen - ctx.healShieldReduction); // 天衣無縫減衰
-                int heal = Math.Min(playerMaxHP - playerHP, regen);
-                if (heal > 0) { playerHP += heal; ctx.playerCurrentHP = playerHP; ctx.healAppliedTotal += heal; }
-                Debug.Log($"[CombatManager] 継続回復 +{heal} (次T {ctx.consRegen - 1})");
-                ctx.consRegen--;
-            }
             // 消費: シールド残ターン減算（-1=無制限 / 0で失効）
             if (ctx.consShieldExpireTurn > 0)
             {
@@ -166,16 +161,6 @@ namespace CombatSystem
                 {
                     ctx.consShield = 0;
                     Debug.Log("[CombatManager] シールド失効");
-                }
-            }
-            // 2026-07-21 消費: 攻撃バフ (cons_atk_*) の残ターン減算
-            if (ctx.consDiceRollTurnsLeft > 0)
-            {
-                ctx.consDiceRollTurnsLeft--;
-                if (ctx.consDiceRollTurnsLeft == 0)
-                {
-                    ctx.consDiceRoll = 0;
-                    Debug.Log("[CombatManager] 攻撃バフ失効");
                 }
             }
             // 2026-07-21 消費: 与ダメ倍率 (cons_dmg_*) の残ターン減算
@@ -225,6 +210,8 @@ namespace CombatSystem
             //   なっていた (実測: 完全クリア 197 件のうち 93 件 = 47% が p1〜p3 撃破)。
             //   固定ダメージ・虚空の刻み・反射など、 敵パッシブを経由しない撃破経路が複数あるため、
             //   パッシブの発火順に頼らずここで確定させる。
+            // 端子の撃破のボーナス (#117): このターン最後の確かめ (ターン終了時の効果の削りを SyncHPFromContext で拾った後・次の形態へ移す前)
+            SettleTerminalKillBonus(enemyHP, final: true);
             if (enemyHP <= 0 && playerHP > 0) TryAdvanceVescaChain();
 
             // 2 体戦の締め。 SetSecondaryEnemy の不変条件 (2 体目の HP ≤ 1 体目) が成り立つ限り
@@ -335,7 +322,7 @@ namespace CombatSystem
 
             // 処刑は「攻撃終了時」判定なので、 このターンに被弾していなくても閾値を割っていれば発動する。
             if (ctx.vescaExecuteArmed && playerHP > 0
-                && playerHP <= Mathf.CeilToInt(playerMaxHP * 0.20f))
+                && CombatRules.ExecuteKills(playerHP, playerMaxHP))
             {
                 Debug.Log($"[処刑人の烙印] HP {playerHP}/{playerMaxHP} が 20% 以下 — 9999 の軽減不可ダメージ");
                 playerHP = 0;
@@ -354,8 +341,8 @@ namespace CombatSystem
         /// 充電は端子で溜めて振り直しで払う (accumulatedValues["mutualCharge"] は獲得の記録)。
         /// ADR-0009 柱5 の「ターン開始時の消費と停電」は 2026-11-04 に廃止 (GAME.md §24)。
         ///   - ボス固有機構: コントラタック (5 層裏ボスのレイピア) は移植済み。 サドンデス (灰燼の烙印) と妙覚は機構ごと廃止。
-        ///   - ProcessPostRoll 中の playerWonRoll はロール比較値 (収支確定前) — 出目参照系は
-        ///     従来どおり、勝敗参照系のみ解決後の再発火で拾う。
+        ///   - ProcessPostRoll は勝敗を決めない (出目の比較と引き分けの振り直しは 2026-11-12 #112 で削除)。
+        ///     playerWonRoll は攻撃の計算の直前 (自攻撃 = true) と収支の確定後に書く。
         /// </summary>
         private TurnResult ExecuteTurnMutual()
         {
@@ -483,12 +470,6 @@ namespace CombatSystem
             // 消費アイテム持続効果の毎ターン再適用 + 死因タグリセット (旧法と同一)
             if (ctx != null)
             {
-                if (ctx.consCritPct > 0f)
-                {
-                    ctx.critRatePctAdd += ctx.consCritPct;
-                    DmgSourceDiag.Note("消費〈会心率〉", DmgSourceDiag.CritRate, ctx.consCritPct);
-                }
-                if (ctx.consFlatReduce > 0) ctx.playerFlatDamageReduction += ctx.consFlatReduce;
                 // 整備パネル〈装甲〉: 被ダメージ −1/段 (防御の後に引く・逓減を受けない・2026-11-10)
                 ctx.playerFlatDamageReduction += MetaProgression.MetaBuffApplicator.GetArmorFlatReduction();
                 // 遺物 電流 3 個: 過充電の間、 被ダメ −3
@@ -554,7 +535,7 @@ namespace CombatSystem
 
             // --- 1. 敵ロール (スタンスなし = ADR-0005 は superseded) ---
             int actualPlayerDiceCount = playerDiceCount;
-            int[] enemyDice = RollEnemyAttack(currentEnemy, enemyExtraDice, false, 0f);
+            int[] enemyDice = RollEnemyAttack(currentEnemy, enemyExtraDice);
             int actualEnemyDiceCount = enemyDice.Length;
 
             // --- 3. 自ロール ---
@@ -653,28 +634,11 @@ namespace CombatSystem
             ItemSystem.PassiveItems.PassiveItemManager.OnRoll(
                 ctx, GameLoop.GameManager.Instance?.Run, this);
 
-            // メタバフ: ダイス合計値補正 (旧法と同一)
-            int metaDiceBonus = ctx.rollPurity ? 0 : MetaProgression.MetaBuffApplicator.GetDiceTotalBonus();
-            int safety = metaDiceBonus * playerDice.Length;
-            while (metaDiceBonus > 0 && safety-- > 0)
-            {
-                int minIdx = -1;
-                for (int j = 0; j < playerDice.Length; j++)
-                {
-                    if (playerDice[j] >= playerDiceMax) continue;
-                    if (minIdx < 0 || playerDice[j] < playerDice[minIdx]) minIdx = j;
-                }
-                if (minIdx < 0) break;
-                playerDice[minIdx]++;
-                metaDiceBonus--;
-            }
+            // (旧 メタバフのダイス合計値補正は v6 で廃止。 GetDiceTotalBonus は常に 0 で、 ここで出目を上げるループも関数も 2026-11-12 に外した)
 
             // パターン系パッシブ (ゾロ目/階段/全相異) + 合計確定
             psm.ProcessPostRoll(playerDice, enemyDice);
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnPostRoll);
-
-            _fightPlayerRollSum += ctx.playerDiceTotal;
-            _fightPlayerRollCount++;
 
             // --- 2. 予告 (柱3: 完全情報テレグラフ) ---
             // 〈冷却材〉(§6-5) の遅延を差し引いたターンで段階を引く。 予告にもそのまま出るので、
@@ -704,13 +668,13 @@ namespace CombatSystem
             int secondaryAtkBeforeDefense = 0;
             if (secondaryEnemy != null && secondaryHP > 0)
             {
-                var secDiceTele = RollEnemyAttack(secondaryEnemy, 0, false, 0f);
+                var secDiceTele = RollEnemyAttack(secondaryEnemy, 0);
                 int secTotalTele = 0;
                 for (int i = 0; i < secDiceTele.Length; i++) secTotalTele += secDiceTele[i];
                 secondaryAtkBeforeDefense =
                     Math.Max(0, Escalation.EnemyAttackValue(secondaryEnemy, escTurn, secTotalTele, ctx.currentTurn));
                 _secondaryAtkThisTurn = ApplyPlayerDefense(ctx, secondaryAtkBeforeDefense,
-                    Math.Max(0, secondaryEnemy.armorPen));
+                    GameLoop.GameHooks.EnemyArmorPen(secondaryEnemy.id, secondaryEnemy.armorPen));
             }
             // 挑戦カード〈連撃〉: 単体の敵の攻撃が 2 回になる。 2 回目は 1 回目の N% の威力で、 2 体戦の 2 体目と同じパケット
             //   (予告に載る・ブロックは各パケットから全額引く)。 1 回目は今まで通りなので、 どう配線しても被ダメは減らない。
@@ -761,10 +725,10 @@ namespace CombatSystem
                 executeArmed = ctx.vescaExecuteArmed,
                 sealedTerminal = -1,   // 旧〈綻び〉(端子の封印) は 2026-11-10 に撤去
             };
-            if (ctx.bossId == "boss_layer7_p4")
+            if (ctx.bossId == GameLoop.BossIds.VescaFinal)
                 BossDmgDiag.P4Turn(ctx.playerHighDiceCrushed, ctx.vescaExecuteArmed,
                                    ctx.vescaMaxHpBiteOnHit, ctx.vescaDrawnRelics);
-            if (!string.IsNullOrEmpty(ctx.bossId) && ctx.bossId.StartsWith("boss_layer7"))
+            if (!string.IsNullOrEmpty(ctx.bossId) && ctx.bossId.StartsWith(GameLoop.BossIds.Layer7Prefix))
                 BossDmgDiag.V7Turn(ctx.vescaDrawnRelics);
             Debug.Log($"[相互攻撃] T{tele.turn} 予告: 敵攻撃 {enemyAtkValue} (段階{tele.escalationStage}" +
                       $"{(tele.nextThresholdTurn > 0 ? $"・次段階T{tele.nextThresholdTurn}" : "・最終段階")})" +
@@ -785,18 +749,24 @@ namespace CombatSystem
             //   (旧い配線 ── 前ターンの配線の自動適用・1 つ装着の第 4 端子の接続制限 ── は 2026-11-11 に削除。 GAME.md §24)
             if (_deck == null) BeginTerminalDeck();
             TerminalOutcome term;
+            int goldAsk = 0;   // 挑戦カード〈金で殴る〉(#6): 払いたい金額 (人 = 画面 / BOT = 方策)。 払うのは下の「6. 解決」で、 攻撃するターンだけ
             {
                 var tenv = TerminalEnvNow(ctx, enemyAtkValue);
+                // 挑戦カード〈猫の手〉: 出目と予告が確定したここで、 1 組を先に挿す (人の画面・BOT の方策はこの 1 組を外せない)
+                ChooseCatPaw(playerDice, tele, tenv);
                 int[] slots = null, targets = null;
                 if (_interactiveTurn)
                 {
                     _pause.Set(TurnPauseKind.Wiring, playerDice, playerFaceIdx, tele);
                     _pause.board = _deck.board; _pause.terminalEnv = tenv; _pause.terminalState = _deck.state;
+                    _pause.catDie = _catDie; _pause.catSlot = _catSlot;
                     yield return _pause;
-                    slots = _pause.slots; targets = _pause.targets;
+                    slots = _pause.slots; targets = _pause.targets; goldAsk = _pause.goldSpend;
                 }
-                else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; }
-                if (slots == null) slots = TerminalWiring.Auto(_deck.board, playerDice, tenv, _deck.state);
+                else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; goldAsk = plan.goldSpend; }
+                if (slots == null) slots = TerminalWiring.Auto(_deck.board, playerDice, tenv, _deck.state, _catDie, _catSlot);
+                // 猫の 1 組は答えに関わらず入れる (外した答え・同じ口に挿しすぎた答えは、 猫の組を残して直す)
+                if (_catDie >= 0) slots = TerminalWiring.WithPair(slots, playerDice.Length, _deck.board, _catDie, _catSlot);
                 // 〈写し取り〉〈焼き切り〉〈保持器〉の対象: 人 = 画面で選んだ端子 / BOT = 方策 / どちらも無ければ左端の候補
                 term = TerminalCards.Resolve(_deck.board, slots, playerDice, tenv, _deck.state, targets);
                 mutualWiring = term.kindOfDie;
@@ -810,12 +780,12 @@ namespace CombatSystem
             int specialCount = term.supportDice;
             ApplyTerminalOutcome(ctx, term, ref enemyAtkValue);
             int _diagAtkRaw = attackSum;
-            // 遺物 (§15-5) 堅牢の環: ブロックに挿した出目 +N% (出目の合計に掛けて切り上げ・端子調律より前)
+            // 遺物 (§15-5) 堅牢の環: 防御の端子を挿した出目 +N% (出目の合計に掛けて切り上げ・端子調律より前)
             {
                 float rbp = MetaProgression.Relics.RelicApplicator.GetBlockDicePct();
                 if (rbp > 0f && blockSum > 0) blockSum += Mathf.CeilToInt(blockSum * rbp);
             }
-            // 大罪:傲慢 (挑戦カード IV・2026-11-10): ブロックに挿した出目 −N% (切り捨て)
+            // 大罪:傲慢 (挑戦カード IV・2026-11-10): 防御の端子を挿した出目 −N% (切り捨て)
             {
                 float cut = MetaProgression.MetaDebuffApplicator.GetSinBlockCutPct();
                 if (cut > 0f && blockSum > 0) blockSum = Mathf.FloorToInt(blockSum * (1f - cut / 100f));
@@ -905,6 +875,7 @@ namespace CombatSystem
             // 2026-07-29: ブロック本数も記録する。 〈停滞する時間〉が「攻撃0本」ではなく
             // 「守りに寄せたか (攻撃 ≦ ブロック)」で判定できるようにするため。
             // 攻撃に 1 本だけ挿して残りを全部ブロックへ回す ガン守りが、 旧条件では素通りしていた。
+            // (〈停滞する時間〉は 2026-11-12 #103 で端子を止める効果に替わり、 もうこの値を読まない。 他のパッシブ・敵〈多頭攻撃〉などが読む)
             ctx.accumulatedValues["mutualBlockDiceCount"] = blockDiceCount;
             // 2026-10-28: 充電・補助の端子の個数と予告の敵攻撃も載せ、 配線を条件にするパッシブ
             //   (剣〈切り返し〉〈不滅の刃〉・盾〈シールドバッシュ〉〈堅守の構え〉〈城壁〉) を OnWired で焚く。
@@ -950,9 +921,9 @@ namespace CombatSystem
             // 攻撃に挿した出目への上乗せ率 (2026-11-06・ctx.attackDicePct): 出目の合計 × 率 (切り上げ) を 1 回だけ足す
             if (ctx.attackDicePct > 0f && attackSum > 0)
             {
-                int diceScaled = Mathf.CeilToInt(attackSum * ctx.attackDicePct);
+                int diceScaled = CombatRules.AttackDiceScaled(attackSum, ctx.attackDicePct);
                 string prevSkill = ItemSystem.PassiveSkills.CombatContext.CurrentSkillId;
-                ItemSystem.PassiveSkills.CombatContext.CurrentSkillId = "攻撃に挿した出目 +%";
+                ItemSystem.PassiveSkills.CombatContext.CurrentSkillId = "攻撃の端子を挿した出目 +%";
                 ctx.AddPlayerAttackOrDiceBonus(diceScaled);
                 ItemSystem.PassiveSkills.CombatContext.CurrentSkillId = prevSkill;
                 ctx.diceDerivedAttack += diceScaled;
@@ -982,6 +953,21 @@ namespace CombatSystem
                             + $"(素火力{playerAttackPower} 込み {atkBase} / 追撃 {ctx.pursuitDamage} を破棄)");
                 atkBase = 0;
                 ctx.pursuitDamage = 0;
+            }
+            // 挑戦カード〈金で殴る〉(#6): 攻撃するターンだけ、 払った金を攻撃+N にする (定義は ChallengeCards.GoldPunchAttack の 1 か所)。
+            //   攻撃+N の枠 (atkBase) へ足すので、 下の麻痺毒の減算・〈不完全な起動〉・会心・与ダメ% ・敵の防御は他の攻撃+N と同じに掛かる。
+            if (!skipAttack && goldAsk > 0 && MetaProgression.MetaBuffApplicator.HasGoldPunch())
+            {
+                var goldRun = GameLoop.GameManager.Instance?.Run;
+                int paid = goldRun != null ? Math.Min(goldAsk, Math.Max(0, goldRun.coins)) : 0;
+                int goldAtk = MetaProgression.ChallengeCards.GoldPunchAttack(paid);
+                if (paid > 0 && goldAtk > 0)
+                {
+                    goldRun.coins -= paid;
+                    atkBase += goldAtk;
+                    GoldPunchPaidTotal += paid; GoldPunchTurnsTotal++;   // [計装]
+                    Debug.Log($"[金で殴る] {paid}G を払って攻撃 +{goldAtk} (残り {goldRun.coins}G)");
+                }
             }
             // 7層ヴェスカ〈麻痺毒の小瓶〉・敵〈罠師〉〈呪縛〉: このターンのプレイヤー攻撃力を減算 (0 で床)。
             // 武器 attackPower は LEG でも 4〜8 なので実効は「武器素火力を消す」。 配線出目の分は残る。
@@ -1156,8 +1142,7 @@ namespace CombatSystem
                 //   p1 が過大・p4 が過小に偏る (実測: p4 の記録ターンが実際の 1/5 しか無かった)。
                 //   ctx.bossId は SwapEnemy が形態ごとに更新している。
                 GameLoop.RunChronicle.NotePhaseWiring(
-                    ctx.bossId.EndsWith("_p4") ? 4 : ctx.bossId.EndsWith("_p3") ? 3
-                        : ctx.bossId.EndsWith("_p2") ? 2 : 1,
+                    System.Math.Max(1, GameLoop.BossIds.VescaStageOf(ctx.bossId)),
                     (int)ctx.GetAccumulated("mutualAttackDiceCount"),
                     (int)ctx.GetAccumulated("mutualBlockDiceCount"),
                     attackSum, blockSum, dealtDmg + dealtFixed);
@@ -1283,7 +1268,7 @@ namespace CombatSystem
             }
             if (ctx.shieldOnWinPct > 0f && dealtDmg > 0)
             {
-                int sh = Mathf.CeilToInt(dealtDmg * ctx.shieldOnWinPct) - ctx.healShieldReduction;
+                int sh = Mathf.CeilToInt(dealtDmg * ctx.shieldOnWinPct);
                 if (sh > 0)
                 {
                     ShieldDiag.Note("与ダメのシールド化", sh);
@@ -1343,13 +1328,13 @@ namespace CombatSystem
                 traceBossBonus = ctx.bossDiceBonus;
                 // [計装] 7層p4 だけ、 攻撃値の内訳をターン帯ごとに積む。
                 //   p1〜p3 が 9T で 7 しか削らないのに p4 が 14T で 90 削る理由を、
-                //   素火力 / ダイス合計 / 停滞 / 遺物 / ブロック貫通 に割って見る。
+                //   素火力 / ダイス合計 / 遺物 / ブロック貫通 に割って見る (と、 〈停滞する時間〉で止まった端子の枚数)。
                 if (ctx.bossId == GameLoop.BossIds.VescaFinal)
                     GameLoop.RunChronicle.NoteP4Turn(
                         ctx.currentTurn,
                         currentEnemy != null ? currentEnemy.EffectiveBaseAttack : 0,
                         ctx.enemyDiceTotal,
-                        ctx.stagnationStacks * ItemSystem.PassiveSkills.Effects.StagnantTime.DicePerStack(ctx),
+                        _deck != null ? _deck.state.StoppedCount : 0,      // 〈停滞する時間〉で止まった端子の枚数 (2026-11-12〜・ダイス計の内訳ではない)
                         (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.VescaRelicPool.KeyDiceBonusThisTurn),
                         enemyAtkValue, blockSum, lossBase, ctx.massiveBleedStacks);
                 ctx.playerWonRoll = false; ctx.playerLostRoll = true; // ProcessDamage 内で OnPreReceiveDamage を発火させる
@@ -1426,7 +1411,7 @@ namespace CombatSystem
 
                 // [計測] 7層でこのターンにプレイヤーが落ちたなら、 出ていた遺物を致死側へ計上する。
                 if (playerHP <= 0 && !string.IsNullOrEmpty(ctx.bossId)
-                    && ctx.bossId.StartsWith("boss_layer7"))
+                    && ctx.bossId.StartsWith(GameLoop.BossIds.Layer7Prefix))
                     BossDmgDiag.V7Death(ctx.vescaDrawnRelics);
 
                 ctx.playerCurrentHP = playerHP;

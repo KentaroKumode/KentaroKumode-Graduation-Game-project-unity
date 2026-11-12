@@ -191,7 +191,7 @@ namespace ItemSystem.PassiveSkills.Effects
     //  剣 — 攻防一体: 出目を攻めと守りに分け続けるほど伸びる (貫通・防御とも中)
     // ============================================================
 
-    /// <summary>間合 — 攻撃に挿した出目 +N% ／ 敵の固定削り −M。 常時・無条件。 II / III は items.json の stats。
+    /// <summary>間合 — 攻撃の端子を挿した出目 +N% ／ 敵の固定削り −M。 常時・無条件。 II / III は items.json の stats。
     /// 2026-11-06: 攻撃 +2/+3/+5 → 出目 +20/+30/+50% (上乗せが攻撃の 6 割を占め、 出目の比重が後半 6〜15% まで薄まっていた)。
     ///
     /// <para>剣の防御は盾ほど厚くないが、 <b>固定削りで剥がされない</b>。 固定削りの大きいボスの前で
@@ -207,7 +207,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>一対一 — <b>単体戦のときだけ</b> 攻撃に挿した出目 +N% / 防御 +M。 2 体戦では一切乗らない。
+    /// <summary>一対一 — <b>単体戦のときだけ</b> 攻撃の端子を挿した出目 +N% / 防御 +M。 2 体戦では一切乗らない。
     /// 2026-11-06: 攻撃 +3/+5/+8 → 出目 +30/+50/+80%。
     /// 防御は 2026-10-28 に被ダメ −M から置き換えた (ADR-0013)。 予告より前に乗せるため OnPostRoll で足す。
     ///
@@ -253,15 +253,15 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (!Fam.Split(ctx) || ctx.blockSumThisTurn <= 0) return;
-            int add = UnityEngine.Mathf.CeilToInt(ctx.blockSumThisTurn * Rate);
+            int add = CombatSystem.CombatRules.GuardCutBonus(ctx.blockSumThisTurn);
             ctx.AddPlayerAttackOrDiceBonus(add);
             ctx.diceDerivedAttack += add;   // [計装] ブロックに挿した出目から来た攻撃
             UnityEngine.Debug.Log($"[切り返し] ブロック{ctx.blockSumThisTurn} × {Rate} → 攻撃 +{add}");
         }
     }
 
-    /// <summary>不滅の刃 (2026-10-28・旧〈果たし合い〉の枠) — 攻撃とブロックの両方に挿したターンが<b>続くたび</b>
-    /// 与ダメ +8% (連続 n ターン目は +8%×n)。 両方に挿さなかったターンで 0 に戻る。
+    /// <summary>不滅の刃 (2026-10-28・旧〈果たし合い〉の枠) — 攻撃と防御の端子を両方挿したターンが<b>続くたび</b>
+    /// 与ダメ +8% (連続 n ターン目は +8%×n)。 両方の端子を挿さなかったターンで 0 に戻る。
     ///
     /// <para>長い戦闘ほど伸びる ＝ ボス戦 (10T+) 向きで、 雑魚戦 (2〜5T) では育ち切らない。
     /// とどめの全部攻撃・リロール用の全部充電で途切れるのが代償。 上限は置かない ──
@@ -311,7 +311,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (block <= 0) return;
             int enemyAtk = (int)ctx.GetAccumulated(MutualKeys.EnemyAtk);
             if (block < enemyAtk) return;
-            int gain = UnityEngine.Mathf.FloorToInt((block - enemyAtk) * rate);
+            int gain = CombatSystem.CombatRules.BulwarkGain(block, enemyAtk, rate);
             Fam.GainShield(ctx, gain, label);
         }
     }
@@ -337,7 +337,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => BulwarkHelper.Apply(ctx, BulwarkHelper.Rates[2], SkillId);
     }
 
-    /// <summary>シールドバッシュ (2026-10-28・旧〈反攻〉の枠) — <b>出目を全部攻撃端子に挿したターン</b>、
+    /// <summary>シールドバッシュ (2026-10-28・旧〈反攻〉の枠) — <b>全部の出目に攻撃の端子を挿したターン</b>、
     /// シールドを全部使い切り、 その量 × 0.5 / 1.0 / 1.5 を攻撃に加える。
     ///
     /// <para><b>攻撃値に入れる</b>ので、 倍率・会心・エスカレーションが全部乗る。 旧〈反攻〉は固定ダメの枠
@@ -353,7 +353,7 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             if (!Fam.AllAttack(ctx) || ctx.consShield <= 0) return;
             int spent = ctx.consShield;
-            int add = UnityEngine.Mathf.CeilToInt(spent * rate);
+            int add = CombatSystem.CombatRules.BashBonus(spent, rate);
             ctx.consShield = 0;
             ctx.AddPlayerAttackOrDiceBonus(add);
             UnityEngine.Debug.Log($"[{label}] シールド{spent} を使い切り × {rate} → 攻撃 +{add}");
@@ -381,7 +381,7 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ShieldBashHelper.Apply(ctx, ShieldBashHelper.Rates[2], SkillId);
     }
 
-    /// <summary>堅守の構え (2026-10-28・旧〈パリィ〉の枠) — <b>出目を全部ブロック端子に挿したターン</b>、
+    /// <summary>堅守の構え (2026-10-28・旧〈パリィ〉の枠) — <b>全部の出目に防御の端子を挿したターン</b>、
     /// 相互攻撃フェーズの開始時にシールド +15。 次の 2 ターンは発動しない。
     ///
     /// <para>旧〈パリィ〉は最初の被弾で自動発動し T1・T4・T7… と続くので、 5 層以降の大技 (T3・T6・T9) と
@@ -465,7 +465,7 @@ namespace ItemSystem.PassiveSkills.Effects
                 UnityEngine.Debug.Log($"[黎明] 無傷で受け切った: 軽減前 {pre} → {units}×{perUnit * 100f:0}% を溜める (計 +{now * 100f:0}%)");
                 return;
             }
-            int dmg = System.Math.Max(1, ctx.enemyMaxHP * PctPerUnit * units / 100);
+            int dmg = CombatSystem.CombatRules.DaybreakCut(ctx.enemyMaxHP, units);
             int before = ctx.enemyCurrentHP;
             int after = DivineTalent.ClampToThreshold(ctx, System.Math.Max(0, before - dmg), ctx.enemyMaxHP);
             ctx.enemyCurrentHP = after;
@@ -480,7 +480,7 @@ namespace ItemSystem.PassiveSkills.Effects
     //  斧 — 叩き割る: 殴るほど敵の防御が下がり、 自分の守りは捨てる (貫通高・防御低)
     // ============================================================
 
-    /// <summary>猛り — ターンが経つごとに 攻撃に挿した出目 +10% (上限 N 段)。 自己バフの本体。
+    /// <summary>猛り — ターンが経つごとに 攻撃の端子を挿した出目 +10% (上限 N 段)。 自己バフの本体。
     /// 2026-11-06: 攻撃 +1/ターン (上限 5/9/14) → 出目 +10%/ターン (上限 +50/+90/+140%)。
     ///
     /// <para>蓄積用の状態を持たず <see cref="CombatContext.currentTurn"/> から直に引く ──
@@ -505,7 +505,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // 〈猛りII〉は 2026-11-11 に items.json の skills 表の stats へ移した (段 3・per=turnsElapsed・perMax 9)。
 
-    // 〈猛りIII〉は同上 (perMax 14)。 〈猛りI〉はどの品の skills 表にも無い (T2 の武器を WeaponProgression.Compute が組むときだけ出る) のでクラスのまま。
+    // 〈猛りIII〉は同上 (perMax 14)。 〈猛りI〉はクラスのまま (skills 表には説明だけを置く・stats は持たない)。
 
     /// <summary>鎧砕き (2026-10-28・旧〈大鉈〉の枠) — 与ダメが通ったターンの終わりに、 敵の防御 −2 / −3 / −4。
     ///

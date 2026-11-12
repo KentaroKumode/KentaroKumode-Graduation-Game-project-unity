@@ -131,7 +131,7 @@ namespace UI.Game2D
                 case GameManager.GamePhase.ExchangeTile:
                 {
                     var d = New("交換"); bool can = gm.CanExchangeTile;
-                    d.body = can ? "いちばん段の低いパッシブを 1 つ渡し、 上の段のものを 1 つ受け取る。" : "渡せるパッシブが無い。";
+                    d.body = can ? "いちばん段の低い秘宝を 1 つ渡し、 上の段のものを 1 つ受け取る。" : "渡せる秘宝が無い。";
                     if (can) d.buttons.Add(B("交換する", "swap", true));
                     d.buttons.Add(B("通り過ぎる", "skip", !can));
                     d.onAction = (a, _) => { if (a == "swap") gm.DoExchangeTile(); else gm.SkipExchangeTile(); Refresh(); };
@@ -175,17 +175,17 @@ namespace UI.Game2D
             }
         }
 
-        // ── 開幕パッシブの選択 (〈宝物庫〉r10: 何本目かで 2〜3 択) ──
+        // ── 開幕の秘宝 (開幕パッシブ) の選択 (〈宝物庫〉r10: 何本目かで 2〜3 択) ──
 
         private ScreenDef StartingPick(GameManager gm)
         {
             var cands = gm.PendingStartingPassiveChoices[0];
-            var d = New("開幕のパッシブ", "残り " + gm.PendingStartingPassiveChoices.Count, 420);
-            d.body = "このランに持っていくパッシブを 1 つ選ぶ。";
+            var d = New("開幕の秘宝", "残り " + gm.PendingStartingPassiveChoices.Count, 420);
+            d.body = "このランに持っていく秘宝を 1 つ選ぶ。";
             foreach (var id in cands)
             {
                 var data = ItemDatabase.Instance?.GetItem(id);
-                d.Items.Add(new ModalItem { name = data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : id, desc = data?.description });
+                d.Items.Add(new ModalItem { name = ItemDatabase.DisplayNameOf(data, id), desc = data?.description });
             }
             d.buttons.Add(B("選ぶ", "pick", true));
             d.onAction = (a, sel) => { if (a == "pick") { gm.ResolveStartingPassive(Mathf.Clamp(sel, 0, cands.Count - 1)); Game2DSfx.Play("ui_confirm"); } Refresh(); };
@@ -237,13 +237,14 @@ namespace UI.Game2D
         private ScreenDef Rest(GameManager gm)
         {
             var run = gm.Run;
+            Game2DTutorial.Request(TutorialTopics.Equip);      // 手引き「装備と強化」: 初めて休憩に入った (武器の強化・面を外す)
             if (_restFaces) return RestFaces(gm);
             if (_termPick == TermPick.Rest) return TerminalDeckList(gm);
             var d = New("休憩", "HP " + run.playerHP + "/" + run.playerMaxHP + "  素材 " + run.weaponMaterials);
             int more = Mathf.RoundToInt(MapSystem.FreeMove.FreeMapParams.RestMoreRatio * 100);
             d.Items.Add(new ModalItem { name = "休む", desc = "HP を回復する。 ターンは進まない。" });
             d.Items.Add(new ModalItem { name = "多めに休む", value = "+" + MapSystem.FreeMove.FreeMapParams.RestMoreTurns + " ターン", desc = "最大 HP の " + more + "% を回復する。 代わりにターンが進む (追跡者が動く)。" });
-            d.Items.Add(new ModalItem { name = "鍛える", value = "素材 " + run.weaponMaterials, desc = "素材を使って武器を 1 段強化する (強化できなければダイス強化・それも無理なら休む)。" });
+            d.Items.Add(new ModalItem { name = "鍛える", value = "素材 " + run.weaponMaterials, desc = "素材を使って武器を 1 段強化する (強化できなければ休む)。" });
             bool canRemove = gm.TryGetFaceRemovalCost(out int g, out int m);
             d.Items.Add(new ModalItem { name = "面を外す", value = canRemove ? g + "G 素材" + m : "外せない", disabled = !canRemove,
                 desc = canRemove ? "ダイスの面を 1 枚外す (出目の合計と、 その目の役を失う)。 外す面を次に選ぶ。" : "面はこれ以上外せない。" });
@@ -323,11 +324,12 @@ namespace UI.Game2D
         private static SellEntry Entry(ShopManager.SellSource src, int i, string id)
         {
             var data = ItemDatabase.Instance?.GetItem(id);
-            return new SellEntry { src = src, index = i, name = data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : id, desc = data?.description, icon = data != null ? data.id : id, rarity = data != null ? data.rarity : (ItemRarity?)null };
+            return new SellEntry { src = src, index = i, name = ItemDatabase.DisplayNameOf(data, id), desc = data?.description, icon = data != null ? data.id : id, rarity = data != null ? data.rarity : (ItemRarity?)null };
         }
 
         private ScreenDef Shop(GameManager gm)
         {
+            Game2DTutorial.Request(TutorialTopics.Shop);      // 手引き「ショップ」: 初めてショップに入った
             if (_termPick != TermPick.None) return TerminalDeckList(gm);
             if (_shopTerm && !_shopSell) return ShopTerminals(gm);
             return _shopSell ? ShopSell(gm) : ShopBuy(gm);
@@ -422,7 +424,7 @@ namespace UI.Game2D
                 desc = "物資 +" + ShopManager.ProvisionPackAmount + "。 物資を補える売り物はこれだけ。 1 つの店で " + ShopManager.ProvisionPackStock + " 包まで。",
                 disabled = packs <= 0 || run.coins < packPrice || run.provision >= run.provisionCap,
             });
-            if (_shopSupply) d.Items.Add(new ModalItem { name = "囮罠", value = lurePrice + "G", icon = "", desc = "航行で置くと、 追跡者を罠の方へ引きつける。 在庫に限りは無い。", disabled = run.coins < lurePrice });
+            if (_shopSupply) d.Items.Add(new ModalItem { name = ItemDatabase.DisplayNameOf(ItemIds.Lure), value = lurePrice + "G", icon = "", desc = "航行で置くと、 追跡者を罠の方へ引きつける。 在庫に限りは無い。", disabled = run.coins < lurePrice });
             int packRow = _shopSupply ? 0 : -1, lureRow = _shopSupply ? 1 : -1;
 
             bool robOk = sm != null && !run.shopRobberyDone && MetaProgression.MetaBuffApplicator.IsShopRobberyUnlocked();
@@ -475,8 +477,7 @@ namespace UI.Game2D
         private static string WeaponLabel(string id)
         {
             if (string.IsNullOrEmpty(id)) return "なし";
-            var w = ItemDatabase.Instance?.GetItem(id);
-            return w != null && !string.IsNullOrEmpty(w.displayName) ? w.displayName : id;
+            return ItemDatabase.DisplayNameOf(id);
         }
 
         private static string WeaponLine(RunState run, string id, bool equipped)
@@ -498,6 +499,7 @@ namespace UI.Game2D
         private ScreenDef TerminalReward(GameManager gm)
         {
             if (_termDeckView) return TerminalDeckList(gm);
+            Game2DTutorial.Request(TutorialTopics.GrowDeck);      // 手引き「端子を増やす」: 初めて戦闘に勝って端子の報酬が出た (issue #86)
             var run = gm.Run; var offer = run.pendingTerminalOffer;
             var d = New("端子の報酬", "山札 " + (run.terminalDeck != null ? run.terminalDeck.Count : 0) + " 枚", 460);
             d.body = "1 枚を山札に加える。 加えなくてもよい。"; d.bodyLines = 1;
@@ -583,6 +585,7 @@ namespace UI.Game2D
         /// <summary>武器の入れ替え (武器は 1 本だけ・2026-11-11)。 2 本目の武器を手に入れた時に、 どの場面でも先に聞く。</summary>
         private ScreenDef WeaponSwap(GameManager gm)
         {
+            // (手引き「装備と強化」は休憩でだけ出す ── 作者の指示・2026-11-12。 武器を拾った時には出さない)
             var run = gm.Run; string cur = run.equippedWeaponId, next = run.pendingWeaponIds[0];
             var d = New("武器の入れ替え", "武器は 1 本しか持てない");
             d.Items.Add(new ModalItem { name = "装備中: " + WeaponLabel(cur), desc = WeaponLine(run, cur, true), icon = cur });
@@ -639,8 +642,7 @@ namespace UI.Game2D
                 case ShopSlotKind.FacePart: return "出目パーツ " + DiceFaceParts.Label(s.facePart);
             }
             if (string.IsNullOrEmpty(s.itemId)) return "(空)";
-            var data = ItemDatabase.Instance?.GetItem(s.itemId);
-            return data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : s.itemId;
+            return ItemDatabase.DisplayNameOf(s.itemId);
         }
 
         /// <summary>行の左のアイコン: 品は id (Resources/Icons/Items)、 素材・出目パーツは枠だけ ("")。</summary>
@@ -723,11 +725,12 @@ namespace UI.Game2D
 
         // ── 〈門〉 ──
 
-        private static readonly string[] GateName = { "血を捧げる", "遺物を焚く", "光に身を任せる" };
+        private static readonly string[] GateName = { "血を捧げる", "秘宝を焚く", "光に身を任せる" };
         private static readonly string[] GateDesc =
         {
-            "最大 HP −25%。 拒むと〈不完全な修復〉を背負う。",
-            "遺物を 2 個焚く。 拒むと〈不完全な起動〉を背負う。",
+            // 数は GameManager.Gate の定数から組み立てる (写しを持たない・#131)。
+            "最大 HP −" + Mathf.RoundToInt(GameLoop.GameManager.GateBloodMaxHpPct * 100f) + "%。 拒むと〈不完全な修復〉を背負う。",
+            "秘宝を " + GameLoop.GameManager.GateRelicDemand + " 個焚く。 拒むと〈不完全な起動〉を背負う。",
             "物資 −" + GameLoop.GameManager.GateProvisionDemand + "。 拒むと〈不完全な転移〉を背負う。",
         };
 

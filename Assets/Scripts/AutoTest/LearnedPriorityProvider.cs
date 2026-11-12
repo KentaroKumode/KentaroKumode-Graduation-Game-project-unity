@@ -219,6 +219,8 @@ namespace AutoTest
         // ===== 公開 API =====
         public static string LastLoadedSummary => _lastLoadedSummary;
         public static bool UsingFallback => _useFallback;
+        /// <summary>直近の Reload で読もうとした学習ルート (ファイルが無くても入る・2026-11-12 #118)。 実効状態の行に帯のフォルダ名を出すのに使う。</summary>
+        public static string LoadedRoot { get; private set; } = "";
 
         /// <summary>その id に**学習値があるか**。 false なら呼び出し側で
         /// 代替評価へ落とすこと (パーツは学習ゼロだと永久に買われない詰みが起きる)。</summary>
@@ -293,12 +295,7 @@ namespace AutoTest
         /// (AIルーチン学習モードで Tier表を凍結したまま BOT用の S/A/B だけ更新する用途)。</summary>
         public static void Reload(string learningRoot = null, bool writeMarkdown = true)
         {
-            // 計装のみ (既定 OFF)。 通常バッチはこの固定費を 1000 ラン に償却するが、
-            // rollout worker は 1 ラン にしか償却できないので、 同じコードが相対的に
-            // 桁違いに重い。 削る前に実測するための計時。
-            long phase = AutoTest.Ultra.UltraPhaseClock.Begin();
-            try { ReloadCore(learningRoot, writeMarkdown); }
-            finally { AutoTest.Ultra.UltraPhaseClock.End("└ 学習Reload", phase); }
+            ReloadCore(learningRoot, writeMarkdown);
         }
 
         private static void ReloadCore(string learningRoot, bool writeMarkdown)
@@ -317,15 +314,14 @@ namespace AutoTest
             {
                 if (string.IsNullOrEmpty(learningRoot))
                     learningRoot = MetaProfileHelper.LearningRoot();
+                LoadedRoot = Path.GetFullPath(learningRoot);
                 string path = Path.GetFullPath(Path.Combine(learningRoot, "item_stats.json"));
                 if (!File.Exists(path))
                 {
-                    _lastLoadedSummary = "item_stats.json なし → 手書きフォールバック";
+                    _lastLoadedSummary = $"item_stats.json なし ({Path.GetFileName(LoadedRoot.TrimEnd('\\', '/'))}) → 手書きフォールバック";
                     return;
                 }
-                long phaseStats = AutoTest.Ultra.UltraPhaseClock.Begin();   // 計装のみ
                 var sf = ItemLearningStats.LoadOrNew(path);
-                AutoTest.Ultra.UltraPhaseClock.End("└ └ item_stats読込", phaseStats);
                 long fileSize = new FileInfo(path).Length;
                 Debug.Log($"[LearnedPriorityProvider] item_stats.json size={fileSize / 1024}KB, items.Count={sf?.items?.Count ?? -1}, batches.Count={sf?.batches?.Count ?? -1}, totalRuns={sf?.totalRuns ?? -1}");
                 if (sf == null || sf.items == null || sf.items.Count == 0)
@@ -734,29 +730,6 @@ namespace AutoTest
         /// 0 以下に戻せば旧 −9 と同じ自己強化ループ（買われない→溜まらない→永久に未学習）が戻る。</para></summary>
         public static float Unlearned = 0.15f;
 
-        /// <summary>[廃止 2026-09-03] 家系内 Lv 補正 (LV1=0 / LV2=0.5 / LV3=1.0 / LV4=1.5)。
-        ///
-        /// <para><b>もう呼ばれていない。</b> 家系の Lv 制を廃し、
-        /// 14 家系それぞれを <b>Lv1〜4 のどれか 1 段に固定</b>した（Tier を家系<b>間</b>の識別子へ付け替え）ため、
-        /// 同一家系に複数段が同時に存在しなくなった。 この補正の役割は「同水準なら上位 Lv を選ぶ」ことで、
-        /// 比較相手が消えた以上、 残すと<b>ただの家系間の下駄</b>になる ──
-        /// 追撃(Lv4 固定) が剛力(Lv1 固定) より無条件に +1.5 されるのは、 学習が言っていないことである。</para>
-        ///
-        /// <para>メソッド自体は残置（将来 Lv 制を再導入するなら参照点になる）。 <b>PowerScore からは外した。</b></para></summary>
-        private static float FamilyLvBonus(string id)
-        {
-            var data = ItemSystem.ItemDatabase.Instance?.GetItem(id);
-            if (data?.passiveSkills == null) return 0f;
-            int maxLv = 0;
-            foreach (var ps in data.passiveSkills)
-            {
-                if (string.IsNullOrEmpty(ps.internalName)) continue;
-                var (_, lv) = ItemSystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(ps.internalName);
-                if (lv > maxLv) maxLv = lv;
-            }
-            return maxLv > 0 ? (maxLv - 1) * 0.5f : 0f;
-        }
-
         /// <summary>購入の序列を丸める段の数 (0 = 無段階・2026-11-06)。 Optimal は 3 段 = 10〜100 戦の経験者が持つティア表、
         /// Super は無段階 = 10 万ランの ITT を全部知っている。 AutoRunner が技量から流し込む。</summary>
         public static int BuyTierCount = 0;
@@ -824,21 +797,8 @@ namespace AutoTest
                 if (!_baseScore.TryGetValue(id, out v)) return Unlearned;
             }
             if (BuyTierCount > 0) return TierValue((float)v);
-            // [切り分け中 2026-09-03] 段固定化と同時に FamilyLvBonus を外したため、
-            //   7層クリア 20.6% → 7.5% の寄与が分離できていない。 **一度に 1 つだけ変える**ため、
-            //   この 1 行で戻せるようにしてある。 分離が済んだら片方を消すこと。
-            return (float)v + (DisableFamilyLvBonus ? 0f : FamilyLvBonus(id));
+            return (float)v;
         }
-
-        /// <summary>FamilyLvBonus を無効化するか。 <b>既定 true = 加算しない</b>（2026-09-03〜）。
-        ///
-        /// <para>段固定化により同一家系に複数段が同時存在しなくなったので、
-        /// この加算は「同水準なら上位 Lv」ではなく<b>家系間の恒久的な下駄</b>にしかならない
-        /// （追撃(Lv4固定) が剛力(Lv1固定) より無条件に +1.5）。
-        /// 実測でも寄与は <b>7層クリア +0.5pt（n=1000・SE 0.9pt ＝ 誤差）</b>で、
-        /// 20.6%→7.5% の低下とは無関係だと確認済み。 <b>ゼロ点に既知の恣意を残さないため既定を切る。</b>
-        /// false に戻せば旧挙動を再現できる。</para></summary>
-        public static bool DisableFamilyLvBonus = true;
 
         // ===== 探索 (2026-08-17) =====
         // 学習は「低評価 → 買わない → サンプルが増えない → 低評価のまま」で序列が固定する。
@@ -908,7 +868,7 @@ namespace AutoTest
             return baseScore - penalty;
         }
 
-        /// <summary>2026-06-22: 購入候補のパッシブが既に発動中 (同名 or 下位 Lv) ならペナルティ。
+        /// <summary>2026-06-22: 購入候補のパッシブが既に発動中 (同名) ならペナルティ。
         /// 全 passive が冗長 → -2、 一部冗長 → -1、 新規あり → 0。
         /// 修正 2026-06-22b: 判定対象アイテム自身を firing 集合から除外する (自分の passive が
         ///                   firing に含まれているせいで自分が冗長判定されるバグ防止)。</summary>
@@ -929,9 +889,7 @@ namespace AutoTest
             {
                 if (string.IsNullOrEmpty(ps.internalName)) continue;
                 totalSkills++;
-                if (firing.Contains(ps.internalName)) { redundantCount++; continue; }
-                if (ItemSystem.PassiveSkills.PassiveSkillRegistry.IsHigherTierPresent(ps.internalName, firing))
-                    redundantCount++;
+                if (firing.Contains(ps.internalName)) redundantCount++;
             }
             if (totalSkills == 0) return 0;
             if (redundantCount >= totalSkills) return 2;

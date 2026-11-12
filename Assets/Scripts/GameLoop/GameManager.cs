@@ -181,6 +181,18 @@ namespace GameLoop
             _shuttingDown = false;
             _instance = this;
             DontDestroyOnLoad(gameObject);
+            // 中断セーブ (issue #84): 閉じる直前 (各シングルトンがまだ生きている間) に、 セーブできる時点なら書く。
+            //   OnApplicationQuit では遅い ── 他のシングルトンが先に「終了中」へ入り Instance が null を返す。
+            //   エディタの再生停止では呼ばれない (開発中に止めるたびにセーブが残らないように)。
+            Application.wantsToQuit -= OnWantsToQuit;
+            Application.wantsToQuit += OnWantsToQuit;
+        }
+
+        private bool OnWantsToQuit()
+        {
+            try { AutoSuspendOnQuit(); }
+            catch (Exception e) { Debug.LogError($"[RunSave] 終了時の中断セーブで例外: {e}"); }
+            return true;   // 終了は止めない
         }
 
         void OnApplicationQuit() => _shuttingDown = true;
@@ -204,7 +216,7 @@ namespace GameLoop
                 CombatManager.Instance.OnCombatEnd -= HandleCombatEnd;
             // 自分が現役なら静的参照も畳む。 破棄済み参照を残すと Unity の擬似 null 経由で
             // 「非 null だが使えない Instance」になり、 原因の分かりにくい停止を生む。
-            if (_instance == this) _instance = null;
+            if (_instance == this) { _instance = null; Application.wantsToQuit -= OnWantsToQuit; }
         }
 
         // ============================================================
@@ -217,7 +229,7 @@ namespace GameLoop
             // **戦闘終了イベントの購読をここで確実にする。**
             //   購読は Start() で 1 回だけ張っていたが、 それだと
             //   「GameManager の Start より後に CombatManager の実体が入れ替わる」順序で
-            //   購読が宙に浮く。 実際 Ultra の episode worker で発生し、 戦闘は 13T 走って
+            //   購読が宙に浮く。 実際 旧 Ultra の episode worker (2026-11-13 削除) で発生し、 戦闘は 13T 走って
             //   勝っているのに**誰も聞いていない**のでフェーズが Combat のまま止まった。
             //   ラン開始ごとに張り直せば、 起動順に依存しなくなる。
             //   `-=` を先に呼ぶので二重購読にはならない (未購読への -= は無害)。
@@ -306,7 +318,7 @@ namespace GameLoop
                     if (Run.ownedPassiveItems == null)
                         Run.ownedPassiveItems = new System.Collections.Generic.List<string>();
                     ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
-                    Log($"メタ報酬: 開幕パッシブ「{id}」を獲得 ({sp + 1}/{startPassives})");
+                    Log($"メタ報酬: 開幕の秘宝「{id}」を獲得 ({sp + 1}/{startPassives})");
                 }
             }
 
@@ -321,7 +333,7 @@ namespace GameLoop
                     if (Run.ownedPassiveItems == null)
                         Run.ownedPassiveItems = new System.Collections.Generic.List<string>();
                     ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
-                    Log($"メタ報酬: 種火 [{kw}] 開幕パッシブ「{id}」を獲得 ({k + 1}/{MetaProgression.MetaPanel.SparkStartingItemCount})");
+                    Log($"メタ報酬: 種火 [{kw}] 開幕の秘宝「{id}」を獲得 ({k + 1}/{MetaProgression.MetaPanel.SparkStartingItemCount})");
                 }
             }
 
@@ -412,19 +424,6 @@ namespace GameLoop
             }
 
             ActivateTile(mm.CurrentNode);
-        }
-
-        /// <summary>Ultra worker 用: 復元済みの状態から指定フェーズへ入り直す。
-        /// **通常のゲーム進行では呼ばれない。**
-        ///
-        /// <para><see cref="StartNewRun"/> で正規に初期化した直後に、
-        /// <c>Run</c> の中身とマップを checkpoint で上書きしてから呼ぶ想定。
-        /// <see cref="SetPhase"/> をそのまま通すので、 ボスなし層のクリア判定など
-        /// フェーズ遷移に紐づく規則も**通常と同じように効く** ── ここだけ別経路にすると、
-        /// worker の中でだけ規則が違うという最悪の形になる。</para></summary>
-        public void ResumeAtPhase(GamePhase phase)
-        {
-            SetPhase(phase);
         }
 
         private void SetPhase(GamePhase newPhase)
@@ -568,17 +567,6 @@ namespace GameLoop
             // ShopVisit 中: Esc 退店、T 売買モード切替、S 売却対象切替、1-9 購入/売却
             if (CurrentPhase == GamePhase.ShopVisit)
             {
-                // 購入ダイアログ表示中はキー入力をダイアログ側に渡さない
-                var dialog = ItemSystem.Shop.Visual.ShopPurchaseDialog.Instance;
-                if (dialog != null && dialog.IsOpen)
-                {
-                    if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Y))
-                        dialog.ConfirmPurchase();
-                    else if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.N))
-                        dialog.Close();
-                    return;
-                }
-
                 if (Input.GetKeyDown(KeyCode.Escape))
                 {
                     ExitShop();

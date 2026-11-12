@@ -7,18 +7,6 @@ namespace UI.Game2D
     public sealed class KitSrc
     {
         public int w, h; public Color32[] px;
-        /// <summary>時計回りに 90° × quarter 回した複製 (丸ボタンの下向きの矢印を、 左・右・上向きにする)。</summary>
-        public KitSrc Rot(int quarter)
-        {
-            quarter = ((quarter % 4) + 4) % 4; var c = this;
-            for (int q = 0; q < quarter; q++)
-            {
-                var n = new KitSrc { w = c.h, h = c.w, px = new Color32[c.px.Length] };
-                for (int y = 0; y < c.h; y++) for (int x = 0; x < c.w; x++) n.px[x * n.w + (c.h - 1 - y)] = c.px[y * c.w + x];
-                c = n;
-            }
-            return c;
-        }
 
         public static KitSrc From(Texture2D t)
         {
@@ -139,20 +127,6 @@ namespace UI.Game2D
                     p.Set(x + pos % frame.w, y + pos / frame.w, new Color32(
                         (byte)Mathf.Min(255, c.r + 255f * a), (byte)Mathf.Min(255, c.g + 250f * a), (byte)Mathf.Min(255, c.b + 242f * a), 255));
                 }
-        }
-
-        // 3×5 の字に無い記号
-        private static readonly Dictionary<char, string> Extra = new Dictionary<char, string>
-        {
-            {'<',"001010100010001"},{'>',"100010001010100"},{'=',"000111000111000"},{'_',"000000000000111"},{'?',"110001010000010"},{'!',"010010010000010"},
-            {'(',"010100100100010"},{')',"010001001001010"},{'%',"101001010100101"},{',',"000000000010100"},{';',"000010000010100"},{'[',"110100100100110"},
-            {']',"011001001001011"},{'*',"000101010101000"},{'#',"101111101111101"},{'\'',"010010000000000"},{'"',"101101000000000"},{'~',"000011110000000"},{'$',"011110011011110"},
-        };
-
-        public static bool TryGlyph(char ch, out string g)
-        {
-            ch = char.ToUpperInvariant(ch);
-            return Game2DMapView.F35.TryGetValue(ch, out g) || Extra.TryGetValue(ch, out g);
         }
 
         /// <summary>字の幅 (既定のフォント・GameFont)。 scale は旧 3×5 の字の名残で、 今は使わない。</summary>

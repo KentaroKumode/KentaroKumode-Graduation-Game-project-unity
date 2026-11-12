@@ -46,6 +46,19 @@ namespace UI.Game2D
         //   未到達 (疑問符) も到達済みの点と同じ色。 使い切った点は暗転 (暗い青灰)。
         private static readonly Color32 NodeInk = Hex("#e6f2fa"), NodeHot = Hex("#f0f8ff"), NodeDone = Hex("#364255");
 
+        // 縄張りの点の色 (2026-11-12・仮の印): 青白い点の色と同じくらいの明るさで、 赤みに振った (彩度で区別する)。 使い切った点は暗い赤灰。
+        private static readonly Color32 TerrInk = Hex("#f0a08c"), TerrDone = Hex("#553636");
+
+        /// <summary>縄張りの点の絵の色: 青白い点 (未到達・種別) は赤みのインクへ、 使い切った点は暗い赤灰へ。 もともと赤い絵 (エリート) はそのまま。</summary>
+        private static Color32 TerritoryTint(Color32 col)
+        {
+            if (Same(col, NodeInk) || Same(col, NodeHot)) return TerrInk;
+            if (Same(col, NodeDone)) return TerrDone;
+            return col;
+        }
+
+        private static bool Same(Color32 a, Color32 b) => a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
+
         private string[] IconFor(FreeMapSim sim, int i, out Color32 col)
         {
             var lay = sim.Layout; var t = lay.types[i];
@@ -121,6 +134,12 @@ namespace UI.Game2D
                 Ellipse(q, (float)m.a * _ls, (float)m.b * _ls, Mathf.Atan2((float)m.sin, (float)m.cos), _lc.landE);
             }
 
+            // 縄張り (2026-11-12・仮の印): 追跡者が生きている間、 縄張りの点の絵そのものを赤みのインク (TerrInk) で描き、
+            //   縄張りの点どうしの道を赤で引き、 縄張りの点に赤の破線の輪を付ける。 点の絵が白いままだと、 道と輪を暗い赤にしても
+            //   白い道と「?」の光に負けて見分けにくかった (画面確認 2026-11-12)。 強調は彩度で (明度は上げない・原色は使わない)。
+            //   追跡者は縄張りの外へ出ないので、 遊ぶ人が「どこから先が危ないか」を読めるように。 本番の絵は未定 (仮置き)
+            bool showTerr = sim.HasFoe && sim.FoeAlive;
+
             // 航路: 影つきの細線。 点の絵の外側 1 dot より内側には引かない
             foreach (var (a, b) in sim.Roads())
             {
@@ -129,8 +148,11 @@ namespace UI.Game2D
                 if (L <= ma + mb) continue;
                 Vector2 u = (B - A) / L, A2 = A + u * ma, B2 = B - u * mb;
                 Line(A2 + Vector2.one, B2 + Vector2.one, _lc.shadow);
-                Line(A2, B2, _lc.frameHi);
+                Line(A2, B2, showTerr && sim.InTerritory(a) && sim.InTerritory(b) ? _lc.red : _lc.frameHi);
             }
+            if (showTerr)
+                foreach (int i in lay.territory)
+                    if (!sim.IsSunk(i)) { var q = Sp(lay.pos[i]); float r = NodeMargin(sim, i) + 1; Ellipse(q, r, r, 0, _lc.red, new[] { 1, 2 }); }
 
             // 自艦中心の距離環 (4 と 8)
             for (int r = 4; r <= 8; r += 4) Ellipse(_me, r * _ls, r * _ls, 0, _lc.grid);
@@ -169,7 +191,15 @@ namespace UI.Game2D
                 var q = Sp(lay.pos[i]);
                 var ic = IconFor(sim, i, out var col);
                 if (ic == IcoExit && !sim.Done[i]) col = BossPulse(q);
+                else if (showTerr && sim.InTerritory(i)) col = TerritoryTint(col);
                 Glyph(ic, q.x, q.y, col);
+            }
+
+            // 縄張りの宝 (2026-11-12・仮の印): 層に入った時から、 点の種類が見えていなくても「宝」の字だけを点の上に出す。 取ったら消す
+            if (sim.TreasureAvailable && !sim.IsSunk(sim.TreasureNode))
+            {
+                var q = Sp(lay.pos[sim.TreasureNode]);
+                Text("宝", q.x, q.y - 6 * Pxs, _lc.warn);
             }
 
             // 囮罠
@@ -280,6 +310,9 @@ namespace UI.Game2D
         // ── 読み出し (左下: EXIT の方角・縮尺・自艦の格子位置・経過ターン / 上: 天候) ──
         private static readonly string[] Compass = { "北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西" };
 
+        /// <summary>縄張りの宝の知らせの左上 (dot)。 上の帯 (高さ 30・Game2DNavExtras.TopR) の下 4 dot。</summary>
+        private const int TreasureNoteX = 96, TreasureNoteTop = 34;
+
         private void Readout(FreeMapSim sim)
         {
             var lay = sim.Layout; var me = lay.pos[sim.Me]; var ex = lay.pos[lay.goal];
@@ -301,6 +334,19 @@ namespace UI.Game2D
 
             bool calm = !(sim.Weather != WeatherKind.None && !double.IsNegativeInfinity(sim.Front));
             Text("天気 " + (calm ? "凪" : sim.Weather.DisplayName()), W - 8 - 89, 8, calm ? _lc.dim : _lc.hi, Align.Right);
+            // 縄張りの宝を取った後 (2026-11-12・仮置き): 何を得たかを左上に出す (航行のまま渡すので、 専用の画面は挟まない)
+            //   液晶の上端 (y 0〜29) は x 96〜387 が上の帯 (Game2DNavExtras の TopR / StatusR) に覆われるので、 その真下に、
+            //   地図の点や道と重なっても読めるよう地の色の下敷きを敷いて出す (y = 8 だと上の帯の裏で見えなかった)。
+            if (sim.TreasureTaken)
+            {
+                string note = GameLoop.GameManager.Instance?.TerritoryTreasureNote;
+                if (!string.IsNullOrEmpty(note))
+                {
+                    int tw = Game2DJpFont.Width(note), th = Game2DJpFont.Cell;
+                    Rect(TreasureNoteX - 2, TreasureNoteTop - 1, tw + 4, th + 2, _lc.bg);
+                    Text(note, TreasureNoteX, TreasureNoteTop + th / 2f, _lc.warn, Align.Left);
+                }
+            }
         }
 
         private static string WxCode(WeatherKind k)

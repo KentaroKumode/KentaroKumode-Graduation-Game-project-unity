@@ -277,7 +277,7 @@ namespace GameLoop
             int pick = chooser?.Invoke(cands) ?? 0;
             string id = cands[Math.Max(0, Math.Min(pick, cands.Count - 1))];
             ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
-            Log($"イベント: パッシブ「{id}」を {cands.Count} つから選んで獲得");
+            Log($"イベント: 秘宝「{id}」を {cands.Count} つから選んで獲得");
             return id;
         }
 
@@ -290,7 +290,7 @@ namespace GameLoop
             if (cands == null || cands.Count == 0) return;
             string id = cands[Math.Max(0, Math.Min(pick, cands.Count - 1))];
             ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
-            Log($"イベント: パッシブ「{id}」を選んで獲得");
+            Log($"イベント: 秘宝「{id}」を選んで獲得");
         }
 
         /// <summary>イベントから戦闘を開始する。</summary>

@@ -43,7 +43,7 @@ namespace UI.Game2D
             new Region("ITEMS",       "航行アイテム",                  430,  92,  50, 70, State.Temp),
             new Region("EXIT",        "脱出",                          440, 164,  40, 24, State.Temp),
             new Region("LEGEND",      "地図の凡例・ズーム",            440, 190,  40, 20, State.Temp),
-            new Region("PASSIVE",     "パッシブのアイコン列",            0, 252, 192, 18, State.Temp),
+            new Region("PASSIVE",     "秘宝のアイコン列"  ,            0, 252, 192, 18, State.Temp),
             new Region("CONSUME",     "消耗品",                          0, 228, 100, 22, State.Temp),
             new Region("WPN DICE",    "武器・ダイス",                  104, 228,  44, 22, State.Temp),
         };

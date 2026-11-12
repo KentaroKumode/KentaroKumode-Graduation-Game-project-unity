@@ -96,8 +96,8 @@ namespace EventSystem
             if (priority.Count > 0 && run.ownedFlags != null)
             {
                 string activeChainFlag = null;
-                if (run.ownedFlags.Contains("苦難の予言"))      activeChainFlag = "苦難の予言";
-                else if (run.ownedFlags.Contains("苦難の確信")) activeChainFlag = "苦難の確信";
+                if (run.ownedFlags.Contains(GameLoop.ItemIds.HardshipProphecy))        activeChainFlag = GameLoop.ItemIds.HardshipProphecy;
+                else if (run.ownedFlags.Contains(GameLoop.ItemIds.HardshipConviction)) activeChainFlag = GameLoop.ItemIds.HardshipConviction;
                 if (activeChainFlag != null)
                 {
                     var chainOnly = priority.FindAll(e =>

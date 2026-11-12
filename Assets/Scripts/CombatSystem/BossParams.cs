@@ -5,7 +5,7 @@ namespace CombatSystem
 {
     /// <summary>
     /// ボスの機構パラメータ。 **乗算係数(×1.xx)ではなく、 各パッシブの「具体的な数値」そのもの**
-    /// (断罪ダイス上乗せ・断罪係数の基礎・審判の炎の上限・灰塵の鎧の軽減量・停滞する時間の係数 ほか)。
+    /// (断罪ダイス上乗せ・断罪係数の基礎・審判の炎の上限・灰塵の鎧の軽減量・停滞する時間の止まる確率 ほか)。
     /// 値の正本は <see cref="BossParams.Spec"/> の基準値。
     /// </summary>
     public enum BossParam
@@ -13,29 +13,27 @@ namespace CombatSystem
         // 基準値の正本は下の Spec()。 ここの「基準」は 2026-11-11 (#30) に Spec() へ合わせた写し。
         JudgmentDice,      // 6層 灰燼の王・〈業火の予兆〉の予兆ターンの敵攻撃上乗せ (旧〈業火の断罪〉と共用)。 基準8
         JudgmentCoefBase,  // 業火の断罪の係数基礎。 係数 = base + 2n。 基準2 (1回目=4)
-                           //   [読む敵なし] JudgmentBlaze はどの敵も持っていない (BOT のチューナーだけが動かす)
-        RobeStacks,        // [死にパラメータ・2026-10-17] 天衣無縫 (FlawlessRobe) を削除したので読む側が無い。 並びを保つため残置
+                           //   [読む敵なし] JudgmentBlaze はどの敵も持っていない (効果のクラスは残っている)
         ChipCap,           // 業火の審判官・審判の炎の 1 回 (毎ターン) あたりの上限。 基準10
         RegenReduction,    // 灰燼・灰塵の鎧の被ダメ軽減量 (タンク性/ジリ貧)。 基準9
                            //   [読む敵なし] AshArmor はどの敵も持っていない
-        Stagnation,        // 停滞する時間: 攻撃 < ブロックの配線のTごとに積むスタック1つあたりの敵攻撃加算。 基準1
-                           //   → **7層ヴェスカの第一レバー** (docs/GAME.md §13-4)
+        Stagnation,        // 停滞する時間: 引いた端子 1 枚あたりの止まる確率 (%)。 基準は段ごと p1 10 / p2 15 / p3 20 / p4 25 (2026-11-12 #103〜)
+                           //   → **7層ヴェスカの第一レバー** (docs/GAME.md §13-4)。 旧 (〜11-11) は停滞スタック 1 つあたりの敵攻撃加算・基準 1
         IntimidateThreat,  // 威圧+ の加算。 基準3。 2026-11-11 (#104) から敵の攻撃 +N (enemyDiceTotalBonus・戦闘を通して) として効く
                            //   (それまでは ctx.enemyThreat に足して読む処理が無く、 効き先が無かった)
         PoisonStackCap,    // 毒沼の主・毒の侵蝕の毒スタック上限 (DOTの最大強度)。 基準5
         MirrorReflectCap,  // 鏡の双子・鏡映の応答の反射ダメ上限。 基準9
         GoblinCall,        // ゴブリン王・号令の毎ターンの敵攻撃加算。 基準3
-        StanceAtkMult,     // 敵スタンス(ADR-0005)・高火力スタンスの被ダメ倍率 (=ボスの攻撃力)。 基準1.6
-                           //   [本体に読む側なし] 敵スタンスは ADR-0009 で廃止。 AutoTest のチューナーだけが参照
-        WeakRollRatio,     // 敵スタンス・弱ロールの面縮小比 (高いほどロールが弱まらない=強い)。 基準0.65
-                           //   [本体に読む側なし] 同上
+        // 2026-11-12 (#126): RobeStacks (天衣無縫・読む側なし)・StanceAtkMult / WeakRollRatio (敵スタンス ADR-0005・呼ぶ所なし) を削除。
+        //   番号で保存している所は無い (調整値の boss_tuning.json は名前で持ち、 L3 ボス調整器ごと削除)。
     }
 
     /// <summary>
     /// ボスの数値の正本 (機構パラメータの基準値・固有面ダイス) と、 敵データへの適用。
     ///
     /// <para><b>本体は基準値だけで完結する。</b> 外から値を差し替える口は <see cref="Overrides"/> だけで、
-    /// 既定は null (= 基準値)。 BOT のボス調整器 (AutoTest.BossTuning) は AutoRunner の起動時にだけここへ差し込む。
+    /// 既定は null (= 基準値)。 BOT・測定が値を差し込むときは AutoRunner の起動時にだけここへ入れる
+    /// (差し込んでいた L3 ボス調整器 AutoTest.BossTuning は 2026-11-12 に削除・#126。 いまは口だけで、 入れる側は無い)。
     /// 本体から AutoTest の型を参照しないための境界 (2026-10-29)。</para>
     /// </summary>
     public static class BossParams
@@ -60,29 +58,43 @@ namespace CombatSystem
                 //   (FloorManager.SpecialEncounterFloor 参照)。 7 で測っても 7層クリアは
                 //   5.9% → 5.8% と動かず、 効いたのは 5層ボス単体の勝率 (70.9→74.1%) だけ。
                 //   出現漏れを直した土俵で測り直してから是非を判断する。
-                case BossParam.RobeStacks:        return new ParamSpec(10f, 1f, 20f);
                 case BossParam.ChipCap:           return new ParamSpec(10f, 1f, 20f);
                 case BossParam.RegenReduction:    return new ParamSpec( 9f, 0f, 20f);
-                // 2026-08-16: 基準 3 → 1。 〈停滞する時間〉の 1 スタックあたり敵出目加算。
-                //   実測 (7層p4 の攻撃値分解) で 15T+ の停滞寄与が 15.3 ＝ 5.1 スタック × 3 に達し、
-                //   敵ダイス合計 32.0 の 48% を占めていた。 そこへエスカレーション倍率が掛かるので
-                //   攻撃値 70.9 に対しブロック 19.2 ＝ 貫通 51.7 (プレイヤー最大HP 96 の半分超/T)。
-                //   なお StackCap(10) は 5.1 スタックまでしか積まないため**一度も効いていない** ──
-                //   99→10 に戻しても結果が 1 件も変わらなかった。 効くのはこちらの係数。
-                //   StagnantTime.DicePerStackBase(=1) はこの値に負けるので、
-                //   **コード側の定数を読んでも実効値は分からない**点に注意。
-                case BossParam.Stagnation:        return new ParamSpec( 1f, 0f, 12f);
+                // 2026-11-12 (#103): 〈停滞する時間〉を「引いた端子 1 枚ごとに確率で止める」へ作り替え、 この値を
+                //   **1 枚あたりの止まる確率 (%)** に読み替えた。 ここの 10 は id の無い時 (段 1) の基準。 段ごとの基準は下の Spec(p, id)。
+                //   (旧: 停滞スタック 1 つあたりの敵出目加算・基準 1・範囲 0〜12)
+                case BossParam.Stagnation:        return new ParamSpec(10f, 0f, 50f);
                 case BossParam.IntimidateThreat:  return new ParamSpec( 3f, 0f, 10f);
                 case BossParam.PoisonStackCap:    return new ParamSpec( 5f, 1f, 12f);
                 case BossParam.MirrorReflectCap:  return new ParamSpec( 9f, 0f, 15f);
                 case BossParam.GoblinCall:        return new ParamSpec( 3f, 0f, 12f);
-                case BossParam.StanceAtkMult:     return new ParamSpec(1.6f, 1.0f, 3.0f);
-                case BossParam.WeakRollRatio:     return new ParamSpec(0.65f, 0.40f, 0.90f);
                 default:                          return new ParamSpec( 1f, 0f,  1f);
             }
         }
 
-        // ===== 外からの差し替え (BOT のボス調整器だけが使う) =====
+        /// <summary>ボス id ごとの基準値と範囲。 基準が段で違う項目だけ <see cref="Spec(BossParam)"/> から差し替える
+        /// (今は〈停滞する時間〉だけ: boss_layer7 10% / _p2 15% / _p3 20% / _p4 25%)。 id が null なら <see cref="Spec(BossParam)"/> と同じ。</summary>
+        public static ParamSpec Spec(BossParam p, string id)
+        {
+            var s = Spec(p);
+            if (p == BossParam.Stagnation && !string.IsNullOrEmpty(id))
+                return new ParamSpec(StagnationBasePct(id), s.min, s.max);
+            return s;
+        }
+
+        /// <summary>〈停滞する時間〉の段ごとの基準 (引いた端子 1 枚あたりの止まる確率 %)。</summary>
+        private static float StagnationBasePct(string id)
+        {
+            switch (id)
+            {
+                case GameLoop.BossIds.VescaP2:    return 15f;
+                case GameLoop.BossIds.VescaP3:    return 20f;
+                case GameLoop.BossIds.VescaFinal: return 25f;
+                default:                          return 10f;      // 段 1 (VescaP1) と、 〈停滞する時間〉を持たない id
+            }
+        }
+
+        // ===== 外からの差し替え (BOT・測定の口) =====
 
         /// <summary>ボスの数値を差し替える口。 値を持たない項目は基準値に落ちる。</summary>
         public interface IOverrides
@@ -105,7 +117,7 @@ namespace CombatSystem
         /// <summary>id のボスの param 現在値 (差し替え or 基準)。 パッシブが直接引く。</summary>
         public static float Param(string id, BossParam p)
         {
-            var s = Spec(p);
+            var s = Spec(p, id);
             if (Overrides != null && !string.IsNullOrEmpty(id) && Overrides.TryGetParam(id, p, out float v))
                 return Mathf.Clamp(v, s.min, s.max);
             return s.baseValue;

@@ -62,9 +62,6 @@ namespace UI
 
         public static void Save() => PlayerPrefs.Save();
 
-        /// <summary>全項目を既定へ戻す。</summary>
-        public static void ResetDefaults() { for (int i = 0; i < Defs.Length; i++) Set((Key)i, Defs[i].def); }
-
         // ── 効かせる側が読む値 ──
         public static float Master01 => Get(Key.Master) / 100f;
         public static float Bgm01 => Get(Key.Bgm) / 100f;

@@ -156,7 +156,7 @@ namespace UI.Game2D.Battle
                         int fin = real != null && i < real.Length ? real[i] : 0;
                         if (k < 0.5f + i * 0.14f) { if (Random.value < 0.55f) pd[i] = Random.Range(1, 7); } else pd[i] = fin;
                     }
-                    if (t >= 0.5f) { SyncDecision(cm, false); phase = P.Wire; rolled = true; t = 0; }
+                    if (t >= 0.5f) { SyncDecision(cm, false); phase = P.Wire; rolled = true; t = 0; TutorialOnWire(); }
                     Touch(); break;
                 }
                 case P.PAttack:
@@ -186,6 +186,19 @@ namespace UI.Game2D.Battle
             for (int i = 0; i < slot.Length; i++) slot[i] = -1;
             board.Clear(); target = new int[0]; preview = null; lastOutcome = null; focusSlot = -1;
             Touch();
+            // 手引き (issue #86): 「戦闘の形式」は初回戦闘の直前・「層とボス」は層の底のボスに着いた時
+            Game2DTutorial.Request(TutorialTopics.CombatForm);
+            var foe = GameManager.Instance?.CurrentEnemy;
+            if (foe != null && BossIds.IsBoss(foe.id)) Game2DTutorial.Request(TutorialTopics.LayerBoss);
+        }
+
+        /// <summary>配線の判断に入った時 (ダイスを振り終えた時) の手引き: 「ダイスを振る」「敵の予告」「端子に挿す」(初回戦闘)・「逃げる」(「端子に挿す」を読んだ後の、 逃げられる戦闘)。</summary>
+        private void TutorialOnWire()
+        {
+            Game2DTutorial.Request(TutorialTopics.RollDice);
+            Game2DTutorial.Request(TutorialTopics.Telegraph);
+            Game2DTutorial.Request(TutorialTopics.Plug);
+            if (Game2DTutorial.Seen(TutorialTopics.Plug) && CanFlee) Game2DTutorial.Request(TutorialTopics.Flee);
         }
 
         /// <summary>出目の個数を n に合わせる (挿し先は持ち越せる分だけ持ち越す)。 個数の上限は置かない。</summary>
@@ -202,7 +215,7 @@ namespace UI.Game2D.Battle
         private void BeginTurn(CombatManager cm)
         {
             _hpBefore = cm.PlayerHP; _enemyBefore = cm.EnemyHP; _enemyMaxBefore = cm.EnemyMaxHP;
-            rolled = false; _eHit = false;
+            rolled = false; _eHit = false; roles.Clear();
             _countDots = true; _poisonSeen = _bleedSeen = 0;
             bool paused = cm.BeginInteractiveTurn();
             // 端子の山札: このターンの場 (常設 + 手札) を写す。 判断なしで解決したターンも、 発動の表示はこの並びの添字で読む
@@ -212,6 +225,7 @@ namespace UI.Game2D.Battle
             _poisonSeen = _bleedSeen = 0;      // ここから先は判断への答えで入った分 (Resolve で読む)
             if (_poisonShown > 0) fx.DotTick(false, _poisonShown);
             if (!paused) { Resolve(cm); return; }      // 判断なしで解決したターン (逃走・刻限など)
+            if (board.Count > 0) Game2DTutorial.Request(TutorialTopics.Deck);      // 手引き「端子の山札」: 最初の手札 (issue #86)
             SyncDecision(cm, true);
             Game2DSfx.DiceRoll(4, 0.45f, 0.55f);
             phase = P.PRoll; t = 0; Touch();
@@ -224,6 +238,7 @@ namespace UI.Game2D.Battle
             var tele = p.tele;
             turn = tele.turn; eatk = tele.enemyAttackValue; stage = tele.escalationStage; edef = tele.enemyDefense; guardIn = tele.turnsToGuard; heavyIn = tele.turnsToHeavy;
             nextStageIn = tele.nextThresholdTurn > 0 ? tele.nextThresholdTurn - tele.turn : -1;
+            if (stage >= 1) Game2DTutorial.Request(TutorialTopics.Long);      // 手引き「戦闘の長期化」: 敵の攻撃が初めて段を上げた (issue #86)
             var e = tele.enemyDice; enemyDiceCount = e != null ? Mathf.Min(3, e.Length) : 0;
             for (int i = 0; i < 3; i++) ed[i] = e != null && i < e.Length ? e[i] : 0;
             EnsureDice(p.playerDice != null ? p.playerDice.Length : 0);
@@ -232,6 +247,7 @@ namespace UI.Game2D.Battle
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             charge = ctx != null ? ctx.GetCharge() : 0;
             _shownDice = p.playerDice != null ? (int[])p.playerDice.Clone() : null;
+            TakeRoles(p, ctx);
             // ターンの頭は挿し方を空から (または おまかせ) / 振り直しの後は、 挿せなくなった出目だけ外す
             if (turnStart)
             {
@@ -241,6 +257,7 @@ namespace UI.Game2D.Battle
                 if (AutoWireOnTurnStart) AutoWire(false);
             }
             else ValidateSlots();
+            TakeCatPaw(p);
             RecomputePreview();
         }
 
@@ -277,6 +294,9 @@ namespace UI.Game2D.Battle
                         if (!cm.IsAwaitingDecision) { Resolve(cm); break; }
                         if (!SameDice(cm.PendingDecision.playerDice)) { SyncDecision(cm, false); Game2DSfx.Play("ui_tab"); Touch(); break; }
                         p = cm.PendingDecision;
+                        // 〈猫の手〉が挿した: 人が見ないまま決めないよう、 猫の 1 組を見せて止まる (もう一度押すと決まる)
+                        if (p.kind == TurnPauseKind.Wiring && p.catDie >= 0 && (p.catDie >= slot.Length || slot[p.catDie] != p.catSlot))
+                        { SyncDecision(cm, false); Game2DSfx.Play("wire", 1f, 1.1f); Touch(); break; }
                     }
                     if (p.kind == TurnPauseKind.Wiring)
                     {
@@ -307,6 +327,30 @@ namespace UI.Game2D.Battle
             phase = P.PRoll; t = 0; rolled = false; SyncDecision(cm, false); Touch();
         }
 
+        // ── 役 (ADR-0011) の表示 ──
+        //   役は振り終えた出目と、 止まった面の段 (出目パーツの Tier) だけで決まる (端子の挿し方は関係しない)。 本体が役を適用するのは解決の時なので、
+        //   判断の間は同じ判定 (YachtRoles.Evaluate・封じられた役は除く) で見込みを出し、 解決の後は本体の結果 (ctx.firedRolesThisTurn) に置き換える。
+
+        /// <summary>このターンに成立する役 (判断の間は見込み・解決の後は適用された役)。 3 個の出目では高々 1 つ。 ターンの頭で空にする。</summary>
+        public readonly List<RoleKind> roles = new List<RoleKind>(2);
+
+        private void TakeRoles(TurnPause p, ItemSystem.PassiveSkills.CombatContext ctx)
+        {
+            roles.Clear();
+            if (p == null || ctx == null || p.playerDice == null) return;
+            YachtRoles.Evaluate(p.playerDice, p.playerFaceIdx, ctx.equippedFaceTiers, roles);
+            for (int i = roles.Count - 1; i >= 0; i--)
+                if ((ctx.sealedRoleMask & (1 << (int)roles[i])) != 0) roles.RemoveAt(i);      // 〈凶運〉で封じられた役は成立しても効かない (ResolveRoles と同じ)
+        }
+
+        /// <summary>出目 i が、 いま見せている役をつくる目か。</summary>
+        public bool IsRoleDie(int i)
+        {
+            if (!rolled || i < 0 || i >= pd.Length) return false;
+            foreach (var k in roles) if (YachtRoles.FaceOf(k) == pd[i]) return true;
+            return false;
+        }
+
         // ── 消耗品・逃げる (配線の判断の間だけ) ──
 
         /// <summary>この戦闘で逃げられるか (層のボス・イベント戦は不可)。</summary>
@@ -329,17 +373,44 @@ namespace UI.Game2D.Battle
             return true;
         }
 
-        /// <summary>配線の判断の間に消耗品を使う。 使えたら HP・充電の表示を写し直す。</summary>
+        /// <summary>消耗品を使える段か: ターンの判断 (振り直し・配線) で止まっている間だけ。 本体は CombatManager.Interactive のイテレーターで待っている。
+        /// BOT が戦闘中に消耗品を使う所 (ターンの間・配線の方策の中) と同じく、 敵の攻撃が予告されてから、 そのターンが解決する前。</summary>
+        public bool CanUseItems
+        {
+            get { var cm = CombatManager.Instance; return CanOperate && cm != null && cm.IsCombatActive && cm.IsAwaitingDecision; }
+        }
+
+        /// <summary>判断の間に消耗品を使う。 <b>本体の <see cref="Consumables.Use"/> をそのまま呼ぶ</b> (BOT と同じ関数・画面は値を作らない)。
+        /// 使えたら HP・充電の表示を写し直す (シールド・与ダメは HUD が毎フレーム読み直す)。</summary>
         public bool UseItem(string id)
         {
-            var gm = GameManager.Instance; var cm = CombatManager.Instance;
-            if (!CanOperate || gm?.Run == null || cm == null) return false;
+            var gm = GameManager.Instance;
+            if (!CanUseItems || gm?.Run == null) return false;
+            int hp0 = CombatManager.Instance.PlayerHP;
             if (!Consumables.Use(gm.Run, id)) return false;
-            playerHp = cm.PlayerHP; playerMax = Mathf.Max(1, cm.PlayerMaxHP);
+            AfterItem(hp0);
+            return true;
+        }
+
+        /// <summary>〈シュヴァリエのレイピア〉のコントラタックを切り替える (消費しない)。 本体の <see cref="Consumables.TryUseRapier"/> を呼ぶ (BOT と同じ関数)。</summary>
+        public bool UseRapier()
+        {
+            var gm = GameManager.Instance;
+            if (!CanUseItems || gm?.Run == null) return false;
+            int hp0 = CombatManager.Instance.PlayerHP;
+            if (!Consumables.TryUseRapier(gm.Run)) return false;
+            AfterItem(hp0);
+            return true;
+        }
+
+        /// <summary>使った後の表示の写し。 回復した分はターンの頭の HP にも足す (敵の攻撃の演出で見せる被ダメ = 頭の HP − 解決後の HP を、 回復で小さく見せない)。</summary>
+        private void AfterItem(int hpBefore)
+        {
+            var cm = CombatManager.Instance;
+            if (cm != null) { _hpBefore += cm.PlayerHP - hpBefore; playerHp = cm.PlayerHP; playerMax = Mathf.Max(1, cm.PlayerMaxHP); }
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             if (ctx != null) charge = ctx.GetCharge();
             Touch();
-            return true;
         }
 
         /// <summary>出目 i の行き先を順に変える (dir = 1 で次・−1 で前)。 場の端子 → 挿さない の順で、 挿せない端子は飛ばす。</summary>
@@ -412,6 +483,7 @@ namespace UI.Game2D.Battle
         public bool Accepts(int i, int s)
         {
             if (!TermInputs(out var dice, out var env, out var st) || i < 0 || i >= dice.Length || i >= slot.Length || s < 0 || s >= board.Count) return false;
+            if (st.IsStopped(s)) return false;      // ヴェスカ〈停滞する時間〉で止まった端子は挿せない (Resolve も外す)
             var d = TerminalCards.Get(board[s]); if (d == null) return false;
             int used = 0;
             for (int j = 0; j < slot.Length; j++) if (j != i && slot[j] == s) used++;
@@ -433,6 +505,10 @@ namespace UI.Game2D.Battle
             }
         }
 
+        /// <summary>場の s が、 このターン止まっているか (ヴェスカ〈停滞する時間〉)。 画面が暗くして印を付けるのに使う。</summary>
+        public bool IsStopped(int s)
+            => TermInputs(out _, out _, out var st) ? st.IsStopped(s) : CombatManager.Instance?.TerminalDeck?.state.IsStopped(s) ?? false;
+
         /// <summary>端子 s にあと何個挿せるか (挿せる数 − 今挿している出目の数)。</summary>
         public int Remaining(int s)
         {
@@ -443,11 +519,34 @@ namespace UI.Game2D.Battle
 
         private bool IsDie(int i) => i >= 0 && i < slot.Length;
 
+        // ── 挑戦カード〈猫の手〉(#5) ──
+        //   本体が配線の判断の頭に 1 組 (出目 catDie → 場の catSlot) を先に挿したら、 その出目は動かせない (挿し替え・外す・おまかせでも残す)。
+
+        /// <summary>このターン〈猫の手〉が先に挿した出目 (−1 = 無し)。 画面の印に使う。</summary>
+        public int catDie = -1;
+        /// <summary>〈猫の手〉が挿した端子 (場の添字・−1 = 無し)。</summary>
+        public int catSlot = -1;
+
+        /// <summary>出目 i が〈猫の手〉に挿されていて動かせないか。</summary>
+        public bool IsCatLocked(int i) => catDie >= 0 && i == catDie;
+
+        /// <summary>判断の写しから猫の 1 組を読み、 挿し方に入れる (配線の判断の時だけ入る)。</summary>
+        private void TakeCatPaw(TurnPause p)
+        {
+            catDie = catSlot = -1;
+            if (p == null || p.kind != TurnPauseKind.Wiring || p.catDie < 0 || p.catSlot < 0 || p.catSlot >= board.Count || !IsDie(p.catDie)) return;
+            catDie = p.catDie; catSlot = p.catSlot;
+            // 猫の端子が挿せる数を超えるなら、 他の出目を後ろから外す (本体の TerminalWiring.WithPair と同じ規則)
+            var w = TerminalWiring.WithPair(slot, slot.Length, board, catDie, catSlot);
+            for (int i = 0; i < slot.Length; i++) slot[i] = w[i];
+        }
+
         /// <summary>出目 die へ端子 s を挿せるか (画面のドラッグ用)。 fromDie = つかんで動かしている元の出目 (手札からなら −1)。
         /// die に別の端子が挿さっていれば入れ替え (前の端子は手札へ戻る) とみなす。</summary>
         public bool CanPlug(int die, int s, int fromDie = -1)
         {
             if (!CanOperate || !IsDie(die) || s < 0 || s >= board.Count) return false;
+            if (IsCatLocked(die) || IsCatLocked(fromDie)) return false;      // 猫の出目は動かせない
             int keepFrom = IsDie(fromDie) ? slot[fromDie] : -1, keepDie = slot[die];
             if (IsDie(fromDie)) slot[fromDie] = -1;
             slot[die] = -1;
@@ -471,7 +570,7 @@ namespace UI.Game2D.Battle
         /// <summary>出目 die から端子を外す (手札へ戻す)。</summary>
         public void Unplug(int die)
         {
-            if (!CanOperate || !IsDie(die) || slot[die] < 0) return;
+            if (!CanOperate || !IsDie(die) || slot[die] < 0 || IsCatLocked(die)) return;
             slot[die] = -1; Game2DSfx.Play("wire", 1f, 0.85f);
             RecomputePreview(); Touch();
         }
@@ -486,16 +585,9 @@ namespace UI.Game2D.Battle
         /// <summary>場が新しくなるたびに増える (画面が引いてくる動きを始める合図)。</summary>
         public int boardSerial;
 
-        /// <summary>今の出目のどれかを端子 s に挿せるか (もう挿している出目があれば true)。 画面が挿せない端子を暗くするのに使う。</summary>
-        public bool AnyDieFits(int s)
-        {
-            for (int i = 0; i < slot.Length; i++) if (slot[i] == s || Accepts(i, s)) return true;
-            return false;
-        }
-
         private void CycleSlot(int i, int dir)
         {
-            int m = board.Count; if (m == 0 || !IsDie(i)) return;
+            int m = board.Count; if (m == 0 || !IsDie(i) || IsCatLocked(i)) return;
             int n = m + 1, cur = slot[i] < 0 || slot[i] >= m ? m : slot[i];      // 並び: 0..m-1 → 挿さない (= m)
             for (int k = 1; k <= n; k++)
             {
@@ -519,14 +611,18 @@ namespace UI.Game2D.Battle
         {
             if (sound && !CanOperate) return;
             if (!TermInputs(out var dice, out var env, out var st)) return;
-            var w = TerminalWiring.Auto(board, dice, env, st);
+            var w = TerminalWiring.Auto(board, dice, env, st, catDie, catSlot);      // 猫の 1 組は外さない
             for (int i = 0; i < slot.Length; i++) slot[i] = w != null && i < w.Length ? w[i] : -1;
             focusSlot = -1;
             if (sound) { Game2DSfx.Play("wire", 1f, 1.1f); RecomputePreview(); Touch(); }
         }
 
         /// <summary>説明を出す端子を選ぶ (画面が端子の行を押した時)。</summary>
-        public void Focus(int s) { focusSlot = s >= 0 && s < board.Count ? s : -1; Touch(); }
+        public void Focus(int s)
+        {
+            focusSlot = s >= 0 && s < board.Count ? s : -1; Touch();
+            if (focusSlot >= 0) Game2DTutorial.Request(TutorialTopics.Kinds);      // 手引き「端子の種類」: 初めて端子の説明を開いた (issue #86)
+        }
 
         // ── 〈写し取り〉〈焼き切り〉〈保持器〉の対象 ──
         //   これらに出目を挿すと (見込みで発動すると)、 手札の「挿していない端子」が候補になる。 候補の USB をその端子の上へ落とすと対象が決まる。
@@ -544,8 +640,8 @@ namespace UI.Game2D.Battle
         {
             var o = preview; if (o == null) return -1;
             int want = picker >= 0 && picker < target.Length ? target[picker] : -1;
-            if (TerminalCards.IsCandidate(board, o.slotOfDie, picker, want)) return want;
-            var c = TerminalCards.TargetCandidates(board, o.slotOfDie, picker);
+            if (TerminalCards.IsCandidate(board, o, picker, want)) return want;
+            var c = TerminalCards.TargetCandidates(board, o, picker);
             return c.Count > 0 ? c[0] : -1;
         }
 
@@ -556,7 +652,7 @@ namespace UI.Game2D.Battle
             if (o == null || ShowingResult) return false;
             for (int p = 0; p < board.Count; p++)
             {
-                if (!IsPicker(p) || !TerminalCards.IsCandidate(board, o.slotOfDie, p, s)) continue;
+                if (!IsPicker(p) || !TerminalCards.IsCandidate(board, o, p, s)) continue;
                 any = true;
                 if (TargetOf(p) == s) chosen = true;
             }
@@ -565,7 +661,7 @@ namespace UI.Game2D.Battle
 
         /// <summary>候補 s を picker の対象にできるか (画面のドラッグ用)。</summary>
         public bool CanSetTarget(int picker, int s)
-            => CanOperate && IsPicker(picker) && preview != null && TerminalCards.IsCandidate(board, preview.slotOfDie, picker, s);
+            => CanOperate && IsPicker(picker) && preview != null && TerminalCards.IsCandidate(board, preview, picker, s);
 
         /// <summary>候補 s を picker の対象にする (落とし直せば替わる)。 できなければ false。</summary>
         public bool SetTarget(int picker, int s)
@@ -593,7 +689,17 @@ namespace UI.Game2D.Battle
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             charge = ctx != null ? ctx.GetCharge() : charge;
             canReroll = false;
+            // 役: 解決の後は、 本体が実際に適用した役 (CombatManager.ResolveRoles が積む) に置き換える。
+            //   戦闘が閉じた (このターンで倒した・倒れた) 時は戦闘の情報が片付けられているので、 見込みのまま残す (役は解決の途中で適用済み)
+            if (ctx != null && cm.IsCombatActive) { roles.Clear(); roles.AddRange(ctx.firedRolesThisTurn); }
             _countDots = false;
+            // 手引き (issue #86): 「解決の順番」は最初の解決・「会心」「確定会心」は初めて出た時 (確定会心 = 会心確定の効果が立っていたターンの会心)
+            Game2DTutorial.Request(TutorialTopics.Order);
+            if (_tr.isCritical)
+            {
+                Game2DTutorial.Request(TutorialTopics.Crit);
+                if (ctx != null && ctx.forceCritical) Game2DTutorial.Request(TutorialTopics.ForceCrit);
+            }
             // 与ダメージは HP の差で見せる (固定ダメを含む)。 ターンの頭に見せた毒は差し引き、 出血・〈廃庭の霧吹き〉の毒は別の演出で見せる。
             // 形態が変わって HP が戻った時は結果の値で (出血・毒も分けない)
             int before = _enemyBefore - _poisonShown;
@@ -633,12 +739,19 @@ namespace UI.Game2D.Battle
             phase = won ? P.Won : P.Lost; Game2DSfx.Play(won ? "victory" : "defeat"); Touch();
         }
 
-        /// <summary>装備中の武器 → 演出の武器の絵 (名前が一致するもの。 無ければ先頭)。</summary>
+        /// <summary>装備中の武器 → 演出の武器の絵。 品名ではなく items.json の family / tier で選ぶ (id から構造を読まない・#130)。
+        /// 竜閃 (family を持たない) は <see cref="ItemIds.Ryusen"/> で判定する。 当たる行が無ければ先頭 (剣)。</summary>
         private static int WeaponIndexOf(string id)
         {
             if (string.IsNullOrEmpty(id)) return 0;
-            for (int i = 0; i < Game2DBattleFx.Weapons.Length; i++) if (Game2DBattleFx.Weapons[i].name == id) return i;
-            return 0;
+            int wi;
+            if (ItemSystem.ItemDatabase.ResolveLegacyId(id) == ItemIds.Ryusen) wi = Game2DBattleFx.IndexOf(null, 0, true);
+            else
+            {
+                var data = ItemSystem.ItemDatabase.Instance?.GetItem(id);
+                wi = data != null ? Game2DBattleFx.IndexOf(data.family, data.tier, false) : -1;
+            }
+            return wi >= 0 ? wi : 0;
         }
     }
 }

@@ -11,7 +11,7 @@ namespace GameLoop
 {
     /// <summary>
     /// マップベースゲームループの状態をIMGUIで表示するデバッグHUD。
-    /// マップ・空腹度・移動先・戦闘情報をテキスト表示。
+    /// マップ・物資・移動先・戦闘情報をテキスト表示。
     /// 本番UIに差し替え可能 — このコンポーネントを外すだけで消える。
     /// </summary>
     public class GameDebugHUD : MonoBehaviour
@@ -470,11 +470,11 @@ namespace GameLoop
                     break;
                 case GameManager.GamePhase.ExchangeTile:
                     helpText = (GameManager.Instance != null && GameManager.Instance.CanExchangeTile)
-                        ? "交換マス: [1] 最低Tierパッシブを渡し上位をrandom入手 / [Space] 通過"
-                        : "交換マス: 渡せるパッシブが無い [Space] 通過";
+                        ? "交換マス: [1] 最低Tier秘宝を渡し上位をrandom入手 / [Space] 通過"
+                        : "交換マス: 渡せる秘宝が無い [Space] 通過";
                     break;
                 case GameManager.GamePhase.GateRitual:
-                    helpText = "門: [1] 血を捧げる(最大HP-25%) [2] 遺物2個を焚く [3] 光に身を任せる(物資-40) → [Space] 起動\n"
+                    helpText = $"門: [1] 血を捧げる(最大HP-{GameManager.GateBloodMaxHpPct * 100f:0}%) [2] 秘宝2個を焚く [3] 光に身を任せる(物資-{GameManager.GateProvisionDemand}) → [Space] 起動\n"
                              + "  押下=捧げる / 未押下=拒む (拒んだ工程ぶん〈不完全な〜〉を背負う)";
                     break;
                 case GameManager.GamePhase.FloorClear:
@@ -565,7 +565,7 @@ namespace GameLoop
         {
             switch (k)
             {
-                case ShopSlotKind.Passive:        return "パッシブ";
+                case ShopSlotKind.Passive:        return "秘宝";
                 case ShopSlotKind.Consumable:     return "消費";
                 case ShopSlotKind.Weapon:         return "武器";
                 case ShopSlotKind.FacePart:       return "出目パーツ";
@@ -578,7 +578,7 @@ namespace GameLoop
         {
             switch (s)
             {
-                case ShopManager.SellSource.Passive:        return "パッシブ";
+                case ShopManager.SellSource.Passive:        return "秘宝";
                 case ShopManager.SellSource.Consumable:     return "消費";
                 case ShopManager.SellSource.WeaponMaterial: return "強化素材";
                 default: return "?";

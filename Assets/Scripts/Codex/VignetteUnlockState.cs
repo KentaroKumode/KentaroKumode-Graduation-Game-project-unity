@@ -118,10 +118,6 @@ namespace Codex
             }
         }
 
-        /// <summary>現在解禁済みのビネット一覧。</summary>
-        public static IEnumerable<WorldVignettes.Vignette> UnlockedVignettes()
-            => WorldVignettes.All.Where(IsUnlocked);
-
         // ----------------------------------------------------------------
         //  最高難度判定ヘルパー
         // ----------------------------------------------------------------
@@ -164,7 +160,7 @@ namespace Codex
             //   ここも "end_true" へ移した。 **EndGood は数えない** ── 閉じなかった側は額縁に繋がらない。
             // ※ AllEndingsMaxDifficulty 階層を使う vignette は現時点で無い (将来の専用 codex 用)。
             if (meta.endingMaxDiffCleared == null) return false;
-            return meta.endingMaxDiffCleared.Contains("end_true");
+            return meta.endingMaxDiffCleared.Contains(GameLoop.Endings.EndTrueId);
         }
     }
 }

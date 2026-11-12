@@ -30,12 +30,22 @@ namespace AutoTest.ParallelSweep
         private bool _terminalWritten;
 
         /// <summary>ワーカー (-batchmode の Player) は音を出さない (2026-11-04)。 -nographics でも音は鳴り、
-        /// 22 プロセスが同時に効果音を出していた。 r9/r10・学習・Ultra のどのワーカーもここを通る。
+        /// 22 プロセスが同時に効果音を出していた。 r9/r10・学習のどのワーカーもここを通る。
         /// pause は Game2DBoot が戻すので、 誰も触らない volume の方を 0 にする。</summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void MuteIfBatchPlayer()
         {
             if (Application.isBatchMode && !Application.isEditor) AudioListener.volume = 0f;
+        }
+
+        /// <summary>ワーカー (-batchmode の Player) はメタ進行を PlayerPrefs へ保存せず、 PlayerPrefs から読まない (2026-11-12・#119)。
+        /// PlayerPrefs は 22 プロセスで共有されるので、 前の測定のワーカーが終了時に保存した挑戦の難易度が、 次の測定のワーカーの
+        /// バッチ開始時の読み込み (学習の帯・戦闘名の危険度) に持ち込まれ、 同じ設定の繰り返しで結果がワーカー単位で割れていた。
+        /// シーンの Awake (MetaProgressManager.Load) より前に立てる。 r9/r10・学習のどのワーカーもここを通る。</summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void IsolateMetaIfBatchPlayer()
+        {
+            if (Application.isBatchMode && !Application.isEditor) GameLoop.GameHooks.MetaPersistenceDisabled = true;
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -66,6 +76,11 @@ namespace AutoTest.ParallelSweep
                     Path.GetFullPath(_job.responsePath)) ?? ".");
                 Directory.CreateDirectory(Path.GetFullPath(_job.outputRoot));
 
+                // **前の測定の残りを持ち込まない** (#119)。 BeforeSceneLoad で口は立ててあるが、 呼び出し順は保証されないので、
+                //   ここで改めて立ててメタ進行を読み直す (PlayerPrefs を読まない、 まっさらな状態)。 挑戦の難易度は Begin が腕の指定から入れる。
+                GameLoop.GameHooks.MetaPersistenceDisabled = true;
+                MetaProgression.MetaProgressManager.Instance?.Load();
+
                 var runnerObject = new GameObject("[RankMargin AutoRunner]");
                 DontDestroyOnLoad(runnerObject);
                 var runner = runnerObject.AddComponent<AutoRunner>();
@@ -87,16 +102,6 @@ namespace AutoTest.ParallelSweep
                     }
                     else spec = MetaAllocationPresets.Ranks(runner.metaAllocation);
                 }
-                // **worker 内ではスレッド並列を切る** (2026-09-19)。 並列化はプロセス数 (≒コア数) で
-                //   既に取っている。 Super は判断ごとに コア数−1 本、 Optimal の配線列挙は最大 8 本の
-                //   Parallel.For を立てるので、 22 プロセスが同時にやると 500 本超のスレッドが
-                //   24 コアを奪い合う。 実測で Super は単独 0.5 秒/ラン が、 22 並列では
-                //   3 分経っても 1 ラン も終わらなかった (50 ランごとの進捗が 0 のまま)。
-                runner.superAI.maxParallelism = 1;
-                runner.optimalWiringMaxParallelism = 1;
-                if (runner.logWiringDiff)
-                    runner.wiringDiffPath = Path.Combine(Path.GetDirectoryName(_job.responsePath) ?? ".", "wiring_diff.csv");
-
                 // **本体ループは空にする。** 逐次版と同じく、 アームは RunBatch 後段の
                 //   分岐から回す。 ここで runCount を立てると素の N ラン が余計に走る。
                 runner.runCount = 0;
@@ -104,7 +109,6 @@ namespace AutoTest.ParallelSweep
                 //   書き戻すと**プロセスごとに違う学習が育つ**。
                 runner.learnBotAi = false;
                 runner.learnTier = false;
-                runner.tuneBosses = false;
                 runner.writeRunsJsonl = false;
                 runner.exitPlayModeWhenDone = false;
                 runner.stepsPerYield = 1000;
@@ -132,6 +136,7 @@ namespace AutoTest.ParallelSweep
                     _effectiveState = RankMarginWorkerConfig.DescribeEffective(runner);
                     WriteProgress(0, "started");
                     runner.Begin();
+                    _effectiveState += "learningRead(開始時)=" + runner.LearningReadEffective + "\n" + "metaPersistenceDisabled=" + GameLoop.GameHooks.MetaPersistenceDisabled + "\n";
                     return;
                 }
 
@@ -148,12 +153,12 @@ namespace AutoTest.ParallelSweep
                 MetaProgression.VaultBank.ResetStats();
                 CombatSystem.GuardDiag.Reset();
                 CombatSystem.TerminalDiag.Reset();
+                GameLoop.NavDiag.Reset();
                 CombatSystem.SkillDiag.Reset();
                 CombatSystem.ShieldDiag.Reset();
                 CombatSystem.DmgSourceDiag.Reset();
                 CombatSystem.HpLossDiag.Reset();
                 GameLoop.HpOutsideDiag.Reset();
-                AutoTest.SuperCombatAI.ResetProf();
                 GameLoop.RunStats.PlunderDrops = 0;
                 GameLoop.RunStats.ValorEliteDrops = 0;
                 GameLoop.RunStats.ValorEliteFights = 0;
@@ -193,6 +198,15 @@ namespace AutoTest.ParallelSweep
 
                 WriteProgress(0, "started");
                 runner.Begin();
+                // **実際に読んだ学習の帯を残す** (2026-11-12・#118)。 Begin がバッチ開始時の学習を読んだ後の値。
+                //   帯のフォルダが無いと手書きの序列へ落ちるので、 送った設定と並べて必ず出す。
+                _effectiveState += "learningRead(開始時)=" + runner.LearningReadEffective + "\n" + "metaPersistenceDisabled=" + GameLoop.GameHooks.MetaPersistenceDisabled + "\n";
+            }
+            catch (AutoRunner.LearningMissingException ex)
+            {
+                // 学習データが欠けている測定は走らせない (failOnMissingLearning)。 親はこの失敗コードで腕ごと止まる。
+                WriteFailure("LEARNING_MISSING", ex.Message);
+                Application.Quit(3);
             }
             catch (Exception ex)
             {
@@ -241,6 +255,12 @@ namespace AutoTest.ParallelSweep
                     bandScores = new int[0],
                     effectiveState = _effectiveState,
                 };
+                var grantRunner = FindObjectOfType<AutoRunner>();
+                if (grantRunner != null)
+                {
+                    response.learningRead = grantRunner.LearningReadEffective;
+                    response.learningFallback = grantRunner.LearningFallbackEffective || grantRunner.FallbackRuns > 0;
+                }
                 File.WriteAllText(Path.GetFullPath(_job.responsePath),
                     JsonUtility.ToJson(response, true), new UTF8Encoding(false));
                 WriteProgress(_job.runs, "done");
@@ -268,7 +288,6 @@ namespace AutoTest.ParallelSweep
             foreach (var kv in GameLoop.GoldIncome.BySource)
                 ItemSystem.Helpers.PassiveSourceAudit.Counts["金:" + kv.Key] = (int)System.Math.Min(int.MaxValue, kv.Value);
             var runnerForDump = FindObjectOfType<AutoRunner>();
-            runnerForDump?.CloseWiringDiff();
             runnerForDump?.CloseTurnAudit();
             // 並列アイテム学習: 担当区間のラン記録を書き出す。 先頭の捨てラン 1 本は除く (末尾 runs 本だけ)。
             //   書けなければ失敗として返す ── 記録が欠けたまま「完了」にすると、 親は黙って薄い学習を積む。
@@ -288,13 +307,6 @@ namespace AutoTest.ParallelSweep
                     Debug.LogError("[RankMarginWorker] 学習記録の書き出しに失敗: " + ex.Message);
                 }
             }
-            // バッチ中は logEnabled=false なので Debug.Log は届かない。 結果の隣へファイルで残す。
-            try
-            {
-                File.WriteAllText(Path.Combine(Path.GetDirectoryName(_job.responsePath) ?? ".", "super_prof.txt"),
-                                  AutoTest.SuperCombatAI.DescribeProf());
-            }
-            catch { }
             try
             {
                 // [計装] ヴェスカ連戦の段別 突入数 / 突入時 残HP%。
@@ -402,6 +414,15 @@ namespace AutoTest.ParallelSweep
                                 ItemSystem.PassiveSkills.CombatContext.AttackBonusBySkill.Keys,
                                 k => ItemSystem.PassiveSkills.CombatContext.AttackBonusCalls[k])),
                     };
+                if (runnerForDump != null)
+                {
+                    // [2026-11-12 #118] アームの終わりに読んでいた学習。 手書きの序列で走ったランがあれば親がはっきり出す。
+                    response.learningRead = runnerForDump.LearningReadEffective;
+                    response.learningFallback = runnerForDump.LearningFallbackEffective || runnerForDump.FallbackRuns > 0;
+                    response.effectiveState = (response.effectiveState ?? "")
+                        + "learningRead(終了時)=" + response.learningRead + "\n"
+                        + "learningFallbackRuns=" + runnerForDump.FallbackRuns + "\n";
+                }
                 CombatSystem.BossCombatTrace.Flush();
                 CombatSystem.FightTrace.Flush();
                 CombatSystem.ShieldDiag.Export(out response.shieldSrcNames,
@@ -442,6 +463,13 @@ namespace AutoTest.ParallelSweep
                     response.damageStages7F = (double[])CombatSystem.CombatStats.DamageStages7F.Clone();
                     response.cut7F = (double[])CombatSystem.GuardDiag.Cut7F.Clone();
                     response.stag7F = (double[])CombatSystem.GuardDiag.Stag7F.Clone();
+                    {   // [計装 2026-11-12・#35] 追跡者に捕まった後
+                        var nn = new List<string>(GameLoop.NavDiag.Rows.Keys);
+                        int NW = GameLoop.NavDiag.Width;
+                        response.navDiagNames = nn.ToArray();
+                        response.navDiag = new double[nn.Count * NW];
+                        for (int i = 0; i < nn.Count; i++) Array.Copy(GameLoop.NavDiag.Rows[nn[i]], 0, response.navDiag, i * NW, NW);
+                    }
                     {   // [計装 2026-11-12] 端子ごとの使われ方
                         var tn = new List<string>(CombatSystem.TerminalDiag.Rows.Keys);
                         int TW = CombatSystem.TerminalDiag.Width;

@@ -12,7 +12,7 @@ namespace ItemSystem.PassiveSkills
     /// 汎用ステータス効果の定義（#3 統一フレーム）。
     ///
     /// スコープ（2026-06-05・加算的導入）:
-    /// - 既存の出血(enemyBleedStacks)/威圧(enemyThreat)/負傷(healShieldReduction)/敵ダイス減 等は
+    /// - 既存の出血(enemyBleedStacks)/威圧(enemyThreat)/敵ダイス減 等は
     ///   バランス済みのため現状フィールドのまま据え置く。
     /// - 本フレームは新ステータス用＋パイロットとして「炎上(burn)」のみを移行した。
     /// - スタック保持は <see cref="CombatContext.playerStatusStacks"/> / <see cref="CombatContext.enemyStatusStacks"/>。

@@ -35,9 +35,13 @@ My project — Unity 3D ローグライク（ボードゲーム調・ダイス�
 ## Workflow rules
 
 - ピクセル要素（PPU=32）の状態表現に `transform.localScale` 倍率を使わない（色/明度/別スプライト）。
-- ボス自動チューナー(L3)は隠し倍率禁止・実数値を直接調整（[docs/GAME.md](docs/GAME.md) §13-3）。
+- ボスの数値は隠し倍率禁止・実数値を直接調整（正本は [BossParams.cs](Assets/Scripts/CombatSystem/BossParams.cs)。
+  L3 ボス自動チューナーは 2026-11-12 に削除・[docs/GAME.md](docs/GAME.md) §13-3 / §24）。
 - 戦闘は **ADR-0009 相互攻撃モデル**（GAME.md §6）だけ。旧ロール勝負の経路と `UseMutualAttackPipeline` は
   2026-10-29 に削除（GAME.md §24）。
+- 呼び名: **ランの中の持ち物は「秘宝」、ラン外の装備（整備パネルの冠・環・符）は「遺物」**（2026-11-12〜）。
+  画面の文で持ち物を「パッシブ」「遺物」と呼ばない。敵の常時効果は「パッシブ」のまま。
+  識別子（`passive*`）・`event_list.txt` の効果の書式は変えない（GAME.md §2-7）。
 - 用語: 「ダイス合計+N」は**禁止語彙**。攻撃+N / 出目+N / 端子配線合計+N を使う（GAME.md §2-7）。
 - シングルトンは `_shuttingDown` + `[RuntimeInitializeOnLoadMethod]` パターンを守る。
 - **フォントの指定は [GameFont.cs](Assets/Scripts/UI/GameFont.cs) の 1 か所だけ**（2026-11-04〜）。画面ごとにフォントの欄を持たせない ──

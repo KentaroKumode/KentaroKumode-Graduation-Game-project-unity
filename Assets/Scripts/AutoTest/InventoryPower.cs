@@ -34,7 +34,7 @@ namespace AutoTest
 
         // 武器 Tier 係数。 2026-06-23c: items.json (正本) の rarity フィールドを直接参照する。
         // CLAUDE.md「アイテムカタログの正本は items.json」 に従い、 ID suffix パースを廃止。
-        // BRONZE=T1, SILVER=T2, GOLD=T3, LEGENDARY=T4。 取得不能時のみ ID suffix フォールバック。
+        // BRONZE=T1, SILVER=T2, GOLD=T3, LEGENDARY=T4。 取得不能時は中間値 5。
         private static int WeaponTierBonus(string weaponId)
         {
             if (string.IsNullOrEmpty(weaponId)) return 0;
@@ -51,11 +51,10 @@ namespace AutoTest
                     default:                   return 5;
                 }
             }
-            // フォールバック: ItemDatabase 未初期化時 (Editor テスト等) のみ ID suffix で推定
-            if (weaponId.EndsWith("_t1")) return 1;
-            if (weaponId.EndsWith("_t2")) return 3;
-            if (weaponId.EndsWith("_t3")) return 6;
-            if (weaponId.EndsWith("_t4")) return 10;
+            // カタログに無い (ItemDatabase 未初期化を含む) ときは中間値。
+            //   以前はここで id の綴り EndsWith("_t1".."_t4") から段を推定していたが、
+            //   id = 表示名 (2026-09-22) になってから一致する id が無く、 常に 5 に落ちていた
+            //   (CLAUDE.md「id から構造を読み取らない」)。
             return 5;
         }
 
@@ -280,20 +279,7 @@ namespace AutoTest
                 }
             }
 
-            // 上位 Lv 抑制 (2026-06-22 高速化: 旧版は O(skills²)、 family→maxLv マップで O(skills) に短縮)
-            var familyMaxLv = new Dictionary<string, int>();
-            foreach (var sid in allSkillIds)
-            {
-                var (fam, lv) = ItemSystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(sid);
-                if (lv > 0 && (!familyMaxLv.TryGetValue(fam, out int prev) || lv > prev))
-                    familyMaxLv[fam] = lv;
-            }
-            foreach (var sid in allSkillIds)
-            {
-                var (fam, lv) = ItemSystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(sid);
-                if (lv > 0 && familyMaxLv.TryGetValue(fam, out int maxLv) && maxLv > lv) continue;
-                result.Add(sid);
-            }
+            foreach (var sid in allSkillIds) result.Add(sid);
             return result;
         }
     }

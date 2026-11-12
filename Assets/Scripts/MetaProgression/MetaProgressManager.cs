@@ -8,8 +8,7 @@ namespace MetaProgression
     /// 2026-07-25 v6 移行:
     ///   ・購入モデル = 整備パネル (MetaPanel)。
     ///   ・トークン → ポイント購入 → トラックへランク配点。 ポイント上限 36。
-    ///   ・旧 TryPurchase (58 段トラック) は Deprecated (noop)。 呼び出し側は AutoRunner の
-    ///     MaxAllForTesting と ClassSelect UI 相当のみ、後者は v6 UI 実装時に置換予定。
+    ///   ・旧 58 段トラックの API (TryPurchase / NextLevel ほか) は 2026-11-13 に削除 (#132・読んでいたのは旧 SkillTreeView だけ)。
     /// </summary>
     public class MetaProgressManager : MonoBehaviour
     {
@@ -57,6 +56,8 @@ namespace MetaProgression
         public void Save()
         {
             if (State == null) return;
+            // 並列ワーカーは保存しない (PlayerPrefs は全プロセスで共有され、 次の測定へ状態が持ち込まれる・GameHooks の説明)
+            if (GameLoop.GameHooks.MetaPersistenceDisabled) return;
             var json = JsonUtility.ToJson(State);
             PlayerPrefs.SetString(PrefsKey, json);
             PlayerPrefs.Save();
@@ -72,6 +73,13 @@ namespace MetaProgression
             State.EnsurePanelInitialized();
             return;
 #else
+            // 並列ワーカーは PlayerPrefs を読まず、 まっさらな状態から始める (エディタ実行と同じ・GameHooks.MetaPersistenceDisabled)
+            if (GameLoop.GameHooks.MetaPersistenceDisabled)
+            {
+                State = new MetaProgressState();
+                State.EnsurePanelInitialized();
+                return;
+            }
             string json = PlayerPrefs.GetString(PrefsKey, "");
             if (string.IsNullOrEmpty(json))
             {
@@ -84,6 +92,7 @@ namespace MetaProgression
             }
             State.EnsurePanelInitialized();
             State.MigrateFromLegacyTrackIfNeeded();
+            State.ClampRanksToMax();   // #113: 枠から外したトラックの段が古いセーブから残って効くのを防ぐ
 #endif
         }
 
@@ -176,28 +185,7 @@ namespace MetaProgression
         //  挑戦 (docs/GAME.md §23-25)
         // ============================================================
 
-        /// <summary>挑戦の難易度を最大 (10) にする / 0 に戻す。 AutoRunner の最高難度モード用 (2026-11-10: 旧配点の満点から置き換え)。</summary>
-        public void SetChallengeMax(bool on)
-        {
-            if (State == null) return;
-            State.challengeDifficulty = on ? ChallengeCards.MaxDifficulty : 0;
-            OnStateChanged?.Invoke();
-            Save();
-        }
-
-        // ============================================================
-        //  レガシー API (互換のため残置・v6 では noop)
-        // ============================================================
-
-        [System.Obsolete("v6: 旧 58 段トラックは廃止。TryPurchasePoint + TryAssignRank を使用。")]
-        public int NextLevel => 0;
-        [System.Obsolete("v6: 旧 58 段トラックは廃止。NextPointCost を使用。")]
-        public int NextCost => int.MaxValue;
-        [System.Obsolete("v6: 旧 58 段トラックは廃止。IsPointCapReached を使用。")]
-        public bool IsTrackComplete => true;
-        [System.Obsolete("v6: 旧 58 段トラックは廃止。CanPurchasePoint を使用。")]
-        public bool CanPurchase() => false;
-        [System.Obsolete("v6: 旧 58 段トラックは廃止。TryPurchasePoint を使用。")]
-        public bool TryPurchase() => false;
+        // [削除 2026-11-12] SetChallengeMax ── 挑戦の難易度を最大 / 0 にする口。 呼ぶ所が 0 件だった
+        //   (AutoRunner は challengeDifficulty を直接書く)。
     }
 }

@@ -109,7 +109,6 @@ namespace EventSystem
                     // 2026-11-11 (issue #17): 文面の値は今の大きさ (戦闘 1 回 = 10G)。 収入を ×3/5 する読み替え
                     //   (2026-08-10 の経済リスケールの名残) は外した。 支払いは選べるかの判定 (EventChoice.IsAvailable) と同じ額。
                     int delta = eff.amount;
-                    if (delta > 0) delta = GameLoop.LastStand.FilterGoldGain(run, delta);
                     run.coins = Mathf.Max(0, run.coins + delta);
                     result.log.Add($"ゴールド{delta:+0;-0} (現在 {run.coins})");
                     break;
@@ -202,7 +201,7 @@ namespace EventSystem
                     if (!string.IsNullOrEmpty(id))
                     {
                         ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, id);
-                        result.log.Add($"パッシブアイテム獲得: {ResolveLabel(id)}");
+                        result.log.Add($"秘宝獲得: {ResolveLabel(id)}");      // 画面に出す言い方 (データの書式「パッシブアイテム獲得」は EventParser が読むので変えない)
                         ApplyPassiveAcquisitionBonus(run, id, result);
                     }
                     break;
@@ -252,7 +251,7 @@ namespace EventSystem
                         int idx = run.ownedPassiveItems.IndexOf(eff.param);
                         if (idx >= 0)
                             ItemSystem.Helpers.PassiveAddHelper.RemoveAt(run, idx);
-                        result.log.Add($"パッシブアイテム廃棄: {eff.param}");
+                        result.log.Add($"秘宝廃棄: {eff.param}");
                     }
                     break;
 
@@ -308,12 +307,12 @@ namespace EventSystem
                     {
                         // 人が遊んでいる時は地図へ戻ってからの選択画面へ預ける。 BOT は GameHooks で今選ぶ (乱数の消費は同じ)
                         string got = gm.OfferPassiveChoice(cands);
-                        result.log.Add(got == null ? $"パッシブを {cands.Count} つから 1 つ選ぶ" : $"パッシブアイテム獲得: {ResolveLabel(got)}");
+                        result.log.Add(got == null ? $"秘宝を {cands.Count} つから 1 つ選ぶ" : $"秘宝獲得: {ResolveLabel(got)}");
                     }
                     else
                     {
                         ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, cands[0]);
-                        result.log.Add($"パッシブアイテム獲得: {ResolveLabel(cands[0])}");
+                        result.log.Add($"秘宝獲得: {ResolveLabel(cands[0])}");
                     }
                     break;
                 }
@@ -488,13 +487,13 @@ namespace EventSystem
             if (run == null || string.IsNullOrEmpty(itemId)) return;
             switch (itemId)
             {
-                case "決意":
+                case GameLoop.ConvictionSystem.IdResolve:
                 {
                     int gain = GameLoop.GoldIncome.Gain(run, 1, "イベント(決意)");
                     result.log.Add($"決意の獲得ボーナス: +{gain}ゴールド");
                     break;
                 }
-                case "根拠のない確信":
+                case GameLoop.ConvictionSystem.IdConviction:
                 {
                     GameLoop.ConvictionSystem.OnFirstAcquired(run);
                     result.log.Add("根拠のない確信が芽吹いた (確信段階1)。エリート撃破毎に成長する。");

@@ -286,10 +286,6 @@ namespace CombatSystem
             //   前倒し (Escalation.StageOf) へ移した。 ボス戦のみ・最初の 3 撃という形は
             //   40 ターン級の戦闘では誤差にしかならず、 単独 T3 が実質無料だったため。
 
-            // 敵スタンス（ADR-0005）: 被ダメ倍率（高ダメ>1/低ダメ<1）。以降の軽減はスタンス後の値に効く。
-            if (ctx != null && Mathf.Abs(ctx.enemyStanceDamageMult - 1f) > 0.001f && totalDmg > 0)
-                totalDmg = Mathf.CeilToInt(totalDmg * ctx.enemyStanceDamageMult);
-
             // (2026-06-01) ボス被ダメ倍率(dmgMul)の直接操作は廃止。 硬化/易化は Dice/HP/機構軸で行う。
 
             // [削除 2026-09-13] メタバフの定額被ダメ軽減 ── 2026-08-15 に割合軽減へ移して以降
@@ -403,13 +399,6 @@ namespace CombatSystem
                     ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.ReflectKey] = 0;
                     Debug.Log($"[シールドの返し] {reflect} → 敵HP {enemyHP}");
                 }
-            }
-
-            // 消費: 鏡写しの水晶（吸収後の実被ダメと同量を敵へ反射）
-            if (ctx.consReflect && totalDmg > 0)
-            {
-                HpLossDiag.Lose(ref enemyHP, totalDmg, "反射(鏡写し)");
-                Debug.Log($"[CombatManager] 鏡写し反射 {totalDmg} → 敵HP {enemyHP}");
             }
 
             // 〈虚空〉の殻: 攻撃端子 0 本のターンだけ立つ。 積むほど薄くなり n=6 で消える。

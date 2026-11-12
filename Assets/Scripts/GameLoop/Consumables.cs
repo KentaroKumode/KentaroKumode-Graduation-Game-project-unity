@@ -80,7 +80,7 @@ namespace GameLoop
             var c = ActiveCtx();
             string b = c != null ? c.bossId : null;
             if (string.IsNullOrEmpty(b) || !b.StartsWith(BossIds.Layer7Prefix)) return;
-            int i = b.EndsWith("_p4") ? 3 : b.EndsWith("_p3") ? 2 : b.EndsWith("_p2") ? 1 : 0;
+            int i = System.Math.Max(1, BossIds.VescaStageOf(b)) - 1;
             VescaPhaseConsumables[i]++;
         }
 
@@ -125,9 +125,65 @@ namespace GameLoop
             return ok;
         }
 
-        /// <summary>所持リストを介さず効果のみ適用（UI/グリッド経路用。削除はグリッド側が行う）。</summary>
-        public static bool ApplyDirect(RunState run, string id)
-            => run != null && !string.IsNullOrEmpty(id) && Apply(run, id);
+        /// <summary>今 <see cref="Use"/> を呼んだら使えるか (使えれば null・使えなければ理由の短い文)。 画面が品を暗く出すための<b>読むだけ</b>の判定で、
+        /// 状態を変えない。 条件は <see cref="Use"/> と <see cref="Apply"/> が false を返す所の写し ── Apply の分岐を変えたらここも直す。
+        /// 使うのは必ず <see cref="Use"/> (人の画面も BOT も同じ関数)。 ここが null でも Use が false を返すことはある (その時は消費しない)。
+        /// <para>使えても効き目が無い場面 (〈狂暴化〉で回復が封じられている時の回復薬など) は、 Use が消費するので「使える」と答える。</para></summary>
+        public static string BlockReason(RunState run, string id)
+        {
+            if (run == null || string.IsNullOrEmpty(id)) return "使えない";
+            if (run.ownedConsumables == null || !run.ownedConsumables.Contains(id)) return "持っていない";
+            var ctx = ActiveCtx();
+            if (ctx != null && ctx.consumablesLocked) return "この戦闘では消耗品を使えない";
+            int useCap = MetaProgression.MetaDebuffApplicator.GetBattleConsumableCap();
+            if (useCap > 0 && ctx != null && ctx.GetAccumulated(BattleUseKey) >= useCap) return "この戦闘ではもう使えない (" + useCap + " 個まで)";
+
+            if (ItemIds.ConsFamilyOf(id) == ItemIds.ConsLureFamily)
+            {
+                if (ctx != null) return "戦闘中は使えない";
+                var gm = GameManager.Instance;
+                return gm != null && gm.CanPlaceLure ? null : "航行中だけ置ける";
+            }
+            if (HealRatio(id) > 0f)
+            {
+                var cm = CombatManager.Instance;
+                bool full = ctx != null ? (cm == null || cm.PlayerHP >= cm.PlayerMaxHP) : run.playerHP >= run.playerMaxHP;
+                return full ? "HP が満ちている" : null;
+            }
+            // シールド・攻撃強化の系統は、 戦闘の中でも外でも必ず効く (外なら次の戦闘の開幕へ持ち越す)。 系統で読む ── id の綴りは見ない
+            string fam = ItemIds.ConsFamilyOf(id);
+            if (fam == ItemIds.ConsShieldFamily || fam == ItemIds.ConsPowerFamily) return null;
+            switch (id)
+            {
+                case ClassStarter.PolishId: case ClassStarter.OathId: case ClassStarter.DaggerId:
+                    return null;
+                case ItemIds.OldLetter:
+                case ClassStarter.PainkillerId:
+                    return ctx != null ? null : "戦闘中だけ使える";
+                case ItemIds.PhilStone:
+                    return run.philStoneUsed >= 5 ? "もう使えない (ランで 5 回まで)" : null;
+                default:
+                    return "使えない";
+            }
+        }
+
+        /// <summary>今 <see cref="Use"/> で使えるか (<see cref="BlockReason"/> が null)。</summary>
+        public static bool CanUse(RunState run, string id) => BlockReason(run, id) == null;
+
+        /// <summary>〈シュヴァリエのレイピア〉を今 <see cref="TryUseRapier"/> で切り替えられるか (持っていて・戦闘中で・死翔で封じられていない)。</summary>
+        public static bool CanUseRapier(RunState run)
+        {
+            if (run?.ownedPassiveItems == null || !run.ownedPassiveItems.Contains(ItemIds.ChevalierRapier)) return false;
+            var ctx = ActiveCtx();
+            return ctx != null && !ctx.consumablesLocked;
+        }
+
+        /// <summary>〈シュヴァリエのレイピア〉のコントラタックが立っているか (戦闘中だけ意味がある)。</summary>
+        public static bool RapierContreOn()
+        {
+            var ctx = ActiveCtx();
+            return ctx != null && ctx.GetAccumulated("player_contre") > 0;
+        }
 
         /// <summary>効果適用本体（リスト削除はしない）。</summary>
         private static bool Apply(RunState run, string id)
@@ -139,6 +195,10 @@ namespace GameLoop
             string mapFamily = ItemIds.ConsFamilyOf(id);
             if (mapFamily == ItemIds.ConsLureFamily) return GameManager.Instance != null && GameManager.Instance.TryPlaceLure();
 
+            // 回復: 最大HP割合の即時回復。 割合の表は HealRatio の 1 か所だけ (BOT の選び方と共有)。
+            float healRatio = HealRatio(id);
+            if (healRatio > 0f) return HealPct(run, ctx, healRatio);
+
             switch (id)
             {
                 // ===== 3 系統 × Tier1〜4 (2026-08-04 再編。 詳細と経緯は ItemIds.ConsHealFamily 近傍) =====
@@ -146,25 +206,20 @@ namespace GameLoop
                 //   旧設計は「効果量↓ × 持続↑」だったため実効量が戦闘の長さで逆転し、
                 //   通常戦では高 Tier ほど弱いという状態になっていた。
 
-                // 回復: 最大HP割合の即時回復
-                case "小回復薬": return HealPct(run, ctx, 0.25f);
-                case "回復薬": return HealPct(run, ctx, 0.40f);
-                case "上回復薬": return HealPct(run, ctx, 0.60f);
-                case "完全回復薬": return HealPct(run, ctx, 1.00f);
-
                 // シールド: 戦闘中持続 (expireTurn=-1)。 **戦闘中にも使用できる** ──
                 //   通常戦が 3〜4T になり「削られてから張る」判断が成立するようになったため。
-                case "木の護符": return AddShield(run, ctx, 15);
-                case "鉄の護符": return AddShield(run, ctx, 30);
-                case "銀の護符": return AddShield(run, ctx, 50);
-                case "惜別の護符": return AddShield(run, ctx, 80);
+                //   量の表は ShieldAmount の 1 か所だけ (BOT の見積もりと共有)。
+                case ItemIds.Talisman1:
+                case ItemIds.Talisman2:
+                case ItemIds.Talisman3:
+                case ItemIds.Talisman4: return AddShield(run, ctx, ShieldAmount(id));
 
                 // 攻撃強化: 与ダメ +X% (その戦闘中)。 outgoingDamageMultiplier は**加算プール**
                 //   (実測 ×2.00) なので、 +75% でも最終与ダメは ×1.375 に薄まる。
-                case "鬼火の油": return AddTimedDmgMult(run, ctx, 15, -1);
-                case "燐の油": return AddTimedDmgMult(run, ctx, 30, -1);
-                case "業火の膏薬": return AddTimedDmgMult(run, ctx, 50, -1);
-                case "天火の膏薬": return AddTimedDmgMult(run, ctx, 75, -1);
+                case ItemIds.PowerOil1: return AddTimedDmgMult(run, ctx, 15, -1);
+                case ItemIds.PowerOil2: return AddTimedDmgMult(run, ctx, 30, -1);
+                case ItemIds.PowerOil3: return AddTimedDmgMult(run, ctx, 50, -1);
+                case ItemIds.PowerOil4: return AddTimedDmgMult(run, ctx, 75, -1);
 
                 // 古い手紙 (2026-10-31): 次のターンの被ダメを 0 にする。 戦闘中だけ使える。
                 //   仕込み刃と同じ位置 (CombatManager の敵攻撃の解決) で消す。 反撃は無い。
@@ -253,12 +308,12 @@ namespace GameLoop
             return true;
         }
 
-        /// <summary>開幕シールド (cons_def_*)。 戦闘中持続 (expireTurn=-1)、 天衣無縫減衰を適用。</summary>
+        /// <summary>開幕シールド (cons_def_*)。 戦闘中持続 (expireTurn=-1)。</summary>
         private static bool AddShield(RunState run, CombatContext ctx, int amount)
         {
             if (ctx != null)
             {
-                int gained = Mathf.Max(0, amount - ctx.healShieldReduction);
+                int gained = Mathf.Max(0, amount);
                 ctx.consShield += gained;
                 CombatSystem.ShieldDiag.Note("消耗品", gained);
                 ctx.shieldGainedTotal += gained;
@@ -279,16 +334,30 @@ namespace GameLoop
 
         // ===== ボット支援: 種別判定 =====
 
-        /// <summary>id の即時回復割合（heal系以外は0）。</summary>
+        /// <summary>id の即時回復割合（heal系以外は0）。 <b>回復薬の効果量の正本</b> (Apply もここを引く)。
+        /// 値は float の定数のまま返す (実行時に割り算で作らない・Mono の float 精度の罠)。</summary>
         public static float HealRatio(string id)
         {
             switch (id)
             {
-                case "小回復薬": return 0.25f;
-                case "回復薬": return 0.40f;
-                case "上回復薬": return 0.60f;
-                case "完全回復薬": return 1.00f;
+                case ItemIds.HealPotion1: return 0.25f;
+                case ItemIds.HealPotion2: return 0.40f;
+                case ItemIds.HealPotion3: return 0.60f;
+                case ItemIds.HealPotion4: return 1.00f;
                 default: return 0f;
+            }
+        }
+
+        /// <summary>護符のシールド量 (護符以外は 0)。 <b>護符の効果量の正本</b> (Apply もここを引く・BOT の見積もりと共有)。</summary>
+        public static int ShieldAmount(string id)
+        {
+            switch (id)
+            {
+                case ItemIds.Talisman1: return 15;
+                case ItemIds.Talisman2: return 30;
+                case ItemIds.Talisman3: return 50;
+                case ItemIds.Talisman4: return 80;
+                default: return 0;
             }
         }
 

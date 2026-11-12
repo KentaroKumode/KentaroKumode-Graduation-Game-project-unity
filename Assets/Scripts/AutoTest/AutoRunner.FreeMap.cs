@@ -21,6 +21,12 @@ namespace AutoTest
     /// <item>それ以外は、 まだ使っていない点のうち <b>既存のマス評価 (Rank) を歩数で割った価値</b>が最大の点へ。
     ///       種別の見えていない点は平均的な価値として扱う (見えていない種別を覗かない)。</item>
     /// <item>追跡者に捕まったら HP が少なければ逃げる (<see cref="ShouldFleePursuer"/>)。</item>
+    /// <item>縄張りの宝 (2026-11-12): 補給が要らない時、 HP の割合から追跡者の戦闘の損の見積もりを引いて
+    ///       <see cref="territoryTreasureHpMargin"/> 以上なら宝を行き先にする (<see cref="WantsTerritoryTreasure"/>・どの技量も同じ規則)。
+    ///       既定のしきい値は 9 = 取りに行かない (測定で行かない方が良かった・2026-11-12)。
+    ///       縄張りを出ない追跡者なら、 縄張りの外の点は避けない。</item>
+    /// <item>縄張りを横切らない (2026-11-12・回避ありの方策だけ): 縄張りを出ない追跡者の層では、 払える遠回り
+    ///       (<see cref="navTerritoryDetour"/> 歩まで・行った先から出口か店まで歩ける) なら縄張りの点を踏まない道を選ぶ (<see cref="TerritoryAwareStep"/>)。</item>
     /// </list>
     /// <para>照明・偵察・待つは使わない。 乱数は使わない (GameRng を消費しない)。</para>
     /// </summary>
@@ -318,6 +324,11 @@ namespace AutoTest
                           || hopsFromMe[L.goal] == int.MaxValue
                           || (!exitOk && !refuelOk);
             if (!toExit && !exitOk && refuelOk) target = refuel;   // 先に補給
+            else if (!toExit && WantsTerritoryTreasure(mm, sim, hopsFromMe, run, hpRatio))
+            {
+                target = sim.TreasureNode;                          // 縄張りの宝を取りに入る (取ったら下の行き先選びへ戻る = 出る)
+                if (_freeMapTreasureLayout != L) { _freeMapTreasureLayout = L; FreeNavTreasureTrips++; }
+            }
             else if (!toExit && v3.macroPlan)
             {
                 target = MacroTarget(gm, mm, sim, L, at, hopsFromMe, run);
@@ -325,6 +336,8 @@ namespace AutoTest
             }
             else if (!toExit)
             {
+                int fearR = navFear > 0f ? FearRange() : 0;
+                int[] fearHops = fearR > 0 ? FearFoeHops(sim, at) : null;   // [測定 2026-11-12・#35] 恐れ
                 float best = 0f;
                 foreach (var n in map.GetAllNodes())
                 {
@@ -338,6 +351,7 @@ namespace AutoTest
                     if (desire <= 0f) continue;
                     float cost = hopsFromMe[n.index] * FreeMapParams.MoveSupply;
                     float value = desire / (1f + cost / 100f);
+                    if (fearHops != null) value -= navFear * FearCloseness(fearHops, n.index, fearR);
                     // 同点は添字の小さい方 (決定的)
                     if (value > best + 1e-6f) { best = value; target = n.index; }
                 }
@@ -366,6 +380,8 @@ namespace AutoTest
             // 行動の上限 (の手前) を過ぎたら避けるのをやめて出口へ真っ直ぐ歩く ── 避け道の往復で層に閉じ込められない
             if (avoid && _freeMapActions <= MaxFreeMapActionsPerFloor)
             {
+                // 縄張りを出ない追跡者 (2026-11-12): 払える遠回りなら、 縄張りを横切らない道を選ぶ (行き先が縄張りの中なら、 踏む縄張りの点が一番少ない道)
+                hop = TerritoryAwareStep(mm, sim, run, at, target, hopsFromMe, hop);
                 // 新しい点へ着けないまま時間が過ぎたら、 その場の 1 歩の避け方ではなく行き先までの迂回路を引く (2026-11-04)
                 if (_freeMapDetourTarget != target) _freeMapDetourTarget = -1;
                 if (_freeMapDetourTarget < 0 && _freeMapSinceProgress >= FreeMapStallActions && sim.FoeAlive)
@@ -403,12 +419,141 @@ namespace AutoTest
             return false;
         }
 
+        // ── 縄張りの宝 (2026-11-12) ──
+        /// <summary>[計装] 縄張りの宝を取りに向かうと決めた層の数 (バッチ累計)。</summary>
+        public static long FreeNavTreasureTrips;
+        private FreeMapLayout _freeMapTreasureLayout;
+        /// <summary>追跡者の戦闘で失う HP の見積もり = その層のエリート戦の平均の損 × この倍率 (追跡者はその層のエリートを土台に強くした専用の敵・§5-9)。 仮置き。</summary>
+        private const float PursuerVsEliteHpLoss = 1.6f;
+        /// <summary>エリート戦の平均の損が学習から読めない時の値 (最大 HP の割合)。 仮置き。</summary>
+        private const double EliteHpLossFallback = 0.25;
+        /// <summary>通常の戦闘の平均の損が学習から読めない時の値 (最大 HP の割合)。 仮置き。</summary>
+        private const double NormalHpLossFallback = 0.10;
+
+        /// <summary>縄張りの宝を取りに行くか (最小の規則): 宝が残っていて・行った先から出口か店まで歩けて、
+        /// 「いまの HP の割合 − 追跡者の戦闘で失う HP の見積もり」が <see cref="territoryTreasureHpMargin"/> 以上の時だけ。
+        /// 追跡者を倒した後は見積もり 0。 追跡者の性質は読まない (見積もりは層のエリートから)。</summary>
+        private bool WantsTerritoryTreasure(MapManager mm, FreeMapSim sim, int[] hopsFromMe, RunState run, float hpRatio)
+        {
+            if (!sim.TreasureAvailable || territoryTreasureHpMargin >= 1f || _freeMapActions > MaxFreeMapActionsPerFloor) return false;
+            int t = sim.TreasureNode;
+            if (t == sim.Me || sim.IsSunk(t) || hopsFromMe[t] == int.MaxValue) return false;
+            if (!Sustainable(mm, sim, sim.HopsFrom(t), sim.Layout.goal, run.provision - hopsFromMe[t] * FreeMapParams.MoveSupply, run)) return false;
+            int layer = Mathf.Clamp(FloorPlan.OrdinalOf(run.Depth), 0, FloorPlan.LastOrdinal);
+            float loss = 0f;
+            if (sim.FoeAlive)
+            {
+                if (!EncounterDangerStats.TryGetKind(layer, 'E', out double mean, out _)) mean = EliteHpLossFallback;
+                loss = (float)mean * PursuerVsEliteHpLoss;
+            }
+            // 宝の点そのものの戦闘 (2026-11-12): 宝は点の起動の前に渡るが、 点が戦闘ならその戦闘も払う。 以前は数えていなかった
+            loss += TreasureNodeFightLoss(mm, t, layer, run);
+            return hpRatio - loss >= territoryTreasureHpMargin;
+        }
+
+        /// <summary>宝の点に着いた時の、 点そのものの戦闘で失う HP の見積もり (最大 HP の割合)。 見えている種別が戦闘・エリートならその見積もり
+        /// (戦闘名が開示されていればその名前の学習値)、 種別が見えていなければ通常の戦闘 × 0.7 (Super の計画の見えていない点と同じ扱い)、 それ以外は 0。
+        /// 使い切った点は起動しないので 0。</summary>
+        private static float TreasureNodeFightLoss(MapManager mm, int t, int layer, RunState run)
+        {
+            var map = mm?.CurrentMap;
+            var n = map?.GetNode(map.NodeIdAt(t));
+            if (n == null || n.activated) return 0f;
+            char kind; float w = 1f;
+            if (!n.revealed) { kind = 'N'; w = 0.7f; }
+            else if (n.EffectiveType == TileType.Battle) kind = 'N';
+            else if (n.EffectiveType == TileType.EliteBattle) kind = 'E';
+            else return 0f;
+            string key = n.revealed && n.encounterRevealed ? EncounterDangerStats.KeyOf(n, run.Depth) : null;
+            if (!(key != null && EncounterDangerStats.TryGet(key, out _, out double mean, out _, out _))
+                && !EncounterDangerStats.TryGetKind(layer, kind, out mean, out _))
+                mean = kind == 'E' ? EliteHpLossFallback : NormalHpLossFallback;
+            return (float)mean * w;
+        }
+
+        /// <summary>[計装] 縄張りを横切らない遠回りで、 最短の道の 1 歩と違う 1 歩を選んだ回数 / 遠回りが長すぎるか払えずに最短の道のまま縄張りを踏んだ回数 (バッチ累計)。</summary>
+        public static long FreeNavTerritoryDetours, FreeNavTerritoryDetourRefused;
+
+        /// <summary>縄張りを横切らない次の 1 歩 (2026-11-12)。 縄張りを出ない追跡者が生きている層で、
+        /// 踏む縄張りの点が一番少なく・その中で一番短い道 (<see cref="FreeMapSim.StepAvoidingTerritory"/>) を、
+        /// 最短の道より <see cref="navTerritoryDetour"/> 歩長いところまで・行った先から出口か店まで歩ける時 (<see cref="Sustainable"/>) だけ選ぶ。
+        /// 選べなければ <paramref name="direct"/> (最短の道の 1 歩) のまま。 旧い作り (<c>Leashed = false</c>) と −1 では何もしない。</summary>
+        private int TerritoryAwareStep(MapManager mm, FreeMapSim sim, RunState run, int at, int target, int[] hopsFromMe, int direct)
+        {
+            if (navTerritoryDetour < 0 || !sim.Leashed || !sim.FoeAlive || target < 0 || target == at) return direct;
+            if (hopsFromMe[target] == int.MaxValue) return direct;
+            int step = sim.StepAvoidingTerritory(at, target, out int hops, out int terr);
+            if (step == at || hops == int.MaxValue) return direct;
+            // 同じ 1 歩か、 最短の道より踏む縄張りの点が減らないなら最短のまま
+            if (step == direct || terr >= TerritoryStepsOnShortest(sim, at, target)) return direct;
+            int extra = hops - hopsFromMe[target];
+            bool afford = extra <= navTerritoryDetour
+                && Sustainable(mm, sim, sim.HopsFrom(target), sim.Layout.goal, run.provision - hops * FreeMapParams.MoveSupply, run);
+            if (!afford) { FreeNavTerritoryDetourRefused++; return direct; }
+            FreeNavTerritoryDetours++;
+            return step;
+        }
+
+        /// <summary>最短の道 (<see cref="FreeMapSim.StepToward"/> をたどった道) で踏む縄張りの点の数 (at を含めず target を含む)。</summary>
+        private static int TerritoryStepsOnShortest(FreeMapSim sim, int at, int target)
+        {
+            int c = 0, cur = at;
+            for (int guard = 0; guard < 200 && cur != target; guard++)
+            {
+                int nx = sim.StepToward(cur, target);
+                if (nx == cur) break;
+                cur = nx;
+                if (sim.InTerritory(cur)) c++;
+            }
+            return c;
+        }
+
+        /// <summary>[測定 2026-11-12・#35] 恐れの範囲 (歩)。 動かない追跡者はその点だけを怖がる。</summary>
+        private int FearRange() => FoeLooksStatic() ? 1 : System.Math.Max(1, navFearRange);
+
+        /// <summary>[測定 2026-11-12・#35] 恐れの重み: 推定した追跡者の位置から <paramref name="r"/> 歩より近いほど大きい (r − 歩数・0 以上)。</summary>
+        private static float FearCloseness(int[] foeHops, int node, int r)
+        {
+            int h = node >= 0 && node < foeHops.Length ? foeHops[node] : int.MaxValue;
+            return h == int.MaxValue ? 0f : System.Math.Max(0, r - h);
+        }
+
+        /// <summary>[測定 2026-11-12・#35] 推定した追跡者の位置から各点への歩数。 分からない (魔石に反応なし) なら null。
+        /// 見えていればその位置。 見えていなければ魔石の段と方角から推す: 方角が ±45° に収まる点のうち、
+        /// 自分からの歩数が段の目安 (遠い = <see cref="FreeMapParams.StoneFar"/>・かなり近い/察知 = <see cref="FreeMapParams.StoneNear"/>) に近い点。
+        /// 見えていない位置そのものは読まない (魔石と同じ情報だけ)。</summary>
+        private int[] FearFoeHops(FreeMapSim sim, int at)
+        {
+            if (!sim.FoeAlive) return null;
+            int foe = -1;
+            if (sim.FoeVisible) foe = sim.FoeNode;
+            else
+            {
+                var st = sim.Stone();
+                if (st.level <= 0) return null;
+                int want = st.level == 1 ? FreeMapParams.StoneFar : FreeMapParams.StoneNear;
+                var d = sim.HopsFrom(at);
+                int bestScore = int.MaxValue;
+                for (int i = 0; i < d.Length; i++)
+                {
+                    if (i == at || d[i] == int.MaxValue) continue;
+                    int bd = System.Math.Abs(sim.Bearing(at, i) - st.bearing); if (bd > 4) bd = 8 - bd;
+                    if (bd > 1) continue;
+                    int score = System.Math.Abs(d[i] - want) * 2 + bd;
+                    if (score < bestScore) { bestScore = score; foe = i; }   // 同点は添字の小さい方
+                }
+            }
+            return foe < 0 ? null : sim.HopsFrom(foe);
+        }
+
         /// <summary>見えている追跡者 / 魔石に出ている方角を避けて、 次の 1 歩を選び直す。
         /// 既定の一歩 <paramref name="preferred"/> が安全ならそのまま。 危ないなら、 行き先までの歩数が増えすぎない範囲で
         /// 追跡者から遠い隣へ。 追跡者の位置が分からない時は、 魔石の方角に向かう隣を避ける。</summary>
         private int AvoidFoeStep(FreeMapSim sim, int at, int target, int preferred)
         {
             if (!sim.FoeAlive) return preferred;
+            // 縄張りを出ない追跡者 (2026-11-12): 縄張りの外の点は追跡者も使い魔も来ないので、 そのまま踏む
+            if (sim.Leashed && !sim.InTerritory(preferred)) return preferred;
             var stone = sim.Stone();
             bool foeKnown = sim.FoeVisible;
             if (!foeKnown && stone.level < 2) return preferred;   // 遠い / 反応なしなら避けない
@@ -430,7 +575,8 @@ namespace AutoTest
                 if (!sim.CanMoveTo(c)) continue;
                 if (chased && c != preferred && !(toTarget[c] < baseline)) continue;
                 double danger;
-                if (foeKnown)
+                if (sim.Leashed && !sim.InTerritory(c)) danger = 0.0;   // 縄張りの外は来ない
+                else if (foeKnown)
                 {
                     var dFoe = sim.HopsFrom(sim.FoeNode);
                     int step = dFoe[c] == int.MaxValue ? 99 : dFoe[c];
@@ -472,7 +618,8 @@ namespace AutoTest
             int keep = FoeLooksStatic() ? 0 : FoeAvoidHops;
             var dFoe = sim.HopsFrom(foe);
             int n = dFoe.Length;
-            bool Blocked(int v) => v != target && dFoe[v] != int.MaxValue && dFoe[v] <= keep;
+            bool Blocked(int v) => v != target && dFoe[v] != int.MaxValue && dFoe[v] <= keep
+                                   && (!sim.Leashed || sim.InTerritory(v));   // 縄張りを出ない追跡者: 縄張りの外は塞がない
             // 行き先から逆に広げて、 自分の隣のうち一番近いものを選ぶ (決定的: 同点は添字の小さい方)
             var dist = new int[n];
             for (int i = 0; i < n; i++) dist[i] = int.MaxValue;

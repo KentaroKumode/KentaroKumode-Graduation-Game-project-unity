@@ -88,7 +88,7 @@ namespace ItemSystem.PassiveSkills.Effects
     //  臨界
     // ============================================================
 
-    /// <summary>過熱石: 3 個とも攻撃端子に挿したターン、 臨界 +15。</summary>
+    /// <summary>過熱石: 出目 3 個とも攻撃の端子を挿したターン、 臨界 +15。</summary>
     public class OverheatStone : IPassiveSkillEffect
     {
         public string SkillId => "過熱石";
@@ -437,7 +437,7 @@ namespace ItemSystem.PassiveSkills.Effects
     //  シールド
     // ============================================================
 
-    /// <summary>擦り減った小盾: ブロック端子に挿したダイス 1 個につきシールド +1 (2026-11-06・+2 から。 シールド全体の 30% を占めていた)。</summary>
+    /// <summary>擦り減った小盾: 防御の端子を挿したダイス 1 個につきシールド +1 (2026-11-06・+2 から。 シールド全体の 30% を占めていた)。</summary>
     public class WornBuckler : IPassiveSkillEffect
     {
         public string SkillId => "擦り減った小盾";
@@ -446,7 +446,7 @@ namespace ItemSystem.PassiveSkills.Effects
             => Rw.Shield(ctx, Rw.Count(ctx, MutualKeys.BlockDiceCount), SkillId);
     }
 
-    /// <summary>肩当て: 3 個ともブロック端子に挿したターン、 シールド +15 (2026-11-07: 旧 +8)。</summary>
+    /// <summary>肩当て: 出目 3 個とも防御の端子を挿したターン、 シールド +15 (2026-11-07: 旧 +8)。</summary>
     public class Pauldron : IPassiveSkillEffect
     {
         public string SkillId => "肩当て";
@@ -528,8 +528,8 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>敗残兵の部隊章: シールドを 5 失うたび (吸収・半減とも) 刻み +1。 攻撃に挿したターン、
-    /// 刻み 1 つにつき攻撃に挿した出目 +10% (使い切る)。
+    /// <summary>敗残兵の部隊章: シールドを 5 失うたび (吸収・半減とも) 刻み +1。 攻撃の端子を挿したターン、
+    /// 刻み 1 つにつき攻撃の端子を挿した出目 +10% (使い切る)。
     /// 2026-11-06: 旧「この戦闘中の攻撃 +1」は戦闘が長いほど積み上がり、 攻撃+N の 16% を占めた。</summary>
     public class VeteranPatch : IPassiveSkillEffect
     {
@@ -590,8 +590,8 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // 〈鎧縫いの針〉(敵の出血 1 につき貫通 +1・OnWired) は 2026-11-11 に items.json の stats へ移した (段 3・per=enemyBleed)。
 
-    /// <summary>力みの小手: シールドを合計 10 得るたび 刻み +1。 攻撃に挿したターン、
-    /// 刻み 1 つにつき攻撃に挿した出目 +10% (使い切る)。 2026-11-06: 旧「この戦闘中の攻撃 +1」。</summary>
+    /// <summary>力みの小手: シールドを合計 10 得るたび 刻み +1。 攻撃の端子を挿したターン、
+    /// 刻み 1 つにつき攻撃の端子を挿した出目 +10% (使い切る)。 2026-11-06: 旧「この戦闘中の攻撃 +1」。</summary>
     public class StrainGauntlet : IPassiveSkillEffect
     {
         public string SkillId => "力みの小手";

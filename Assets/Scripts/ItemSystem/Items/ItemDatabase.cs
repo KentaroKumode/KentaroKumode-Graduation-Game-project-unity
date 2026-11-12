@@ -527,6 +527,18 @@ namespace ItemSystem
         public static string ResolveLegacyId(string itemId)
             => itemId != null && LegacyIdMap.TryGetValue(itemId, out var newId) ? newId : itemId;
 
+        /// <summary>画面に出す品名。 items.json の name を引き、 無ければ id をそのまま返す (id 定数から表示名を引く口・#133)。</summary>
+        public static string DisplayNameOf(string itemId)
+        {
+            var data = string.IsNullOrEmpty(itemId) ? null : Instance?.GetItem(itemId);
+            return DisplayNameOf(data, itemId);
+        }
+
+        /// <summary>引いた品 <paramref name="data"/> の画面に出す品名。 null か name が空なら <paramref name="fallbackId"/> を返す
+        /// (品を引き済みの画面が、 同じ品をもう一度引かずに使う口・2026-11-12)。</summary>
+        public static string DisplayNameOf(CompleteItemData data, string fallbackId)
+            => data != null && !string.IsNullOrEmpty(data.displayName) ? data.displayName : fallbackId;
+
         /// <summary>
         /// アイテムを取得 (レガシー ID 自動変換対応)。
         /// </summary>

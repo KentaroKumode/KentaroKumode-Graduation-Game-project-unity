@@ -4,12 +4,15 @@ using UnityEngine;
 namespace UI.Lcd
 {
     /// <summary>
-    /// LCD 画面のフェーズ切替（タイトル⇄スキルツリー等）に挟む「走査線崩れ」風トランジション。
+    /// LCD 画面のフェーズ切替に挟む「走査線崩れ」風トランジション。
     /// contentCamera の前面に貼った Quad に procedural Texture を毎フレーム流し込み、
     /// 短時間（既定 0.35 秒）で「ノイズ強化 → ピーク（中身入替） → 沈静化」を実行する。
     ///
     /// 規約: localScale 倍率は使わず、 Quad のスケールは contentCamera の orthographicSize / aspect から
     /// 自動計算（液晶コンテンツ空間を完全に覆う）。 PPU=32 のピクセル要素には触らない。
+    ///
+    /// 2026-11-13 (#132) 時点で <see cref="Begin"/> を呼ぶ所は無い (唯一の呼び手だった旧スキルツリーの画面を削除した)。
+    /// Game2D.unity の TitleLcdRig に載っているので、 消すなら Unity でコンポーネントを外してから。
     /// </summary>
     [DisallowMultipleComponent]
     public class LcdTransition : MonoBehaviour

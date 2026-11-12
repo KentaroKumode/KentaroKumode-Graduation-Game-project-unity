@@ -13,7 +13,6 @@ using MapSystem;
 using EventSystem;
 using ItemSystem;
 using ItemSystem.Shop;
-using AutoTest.Ultra;
 
 namespace AutoTest
 {
@@ -23,8 +22,6 @@ namespace AutoTest
         private IEnumerator RunOne(int index)
         {
             var gm = GameManager.Instance;
-            // [計装] 家系 Tier の梯子。 ラン内カウンタだけ落とす (累計は保つ)。
-            AutoTest.FamilyTierStats.BeginRun();
             // 全ラン戦闘貪欲ルーチン（戦闘回避ルーチンは廃止）
             _curCombatAverse = false;
 
@@ -66,6 +63,16 @@ namespace AutoTest
             _daybreakApplied = ItemSystem.PassiveSkills.Effects.Daybreak.NextAttackPctPerUnit; _daybreakAppliedOnce = true;
             // [測定用の物差し 2026-11-10] 主攻撃 / 毒・出血・爆発・止血帯の倍率を本体へ (ラン終了時に 1 へ戻す)
             GameLoop.GameHooks.WeaponTierCap = System.Math.Max(0, weaponTierCap);
+            GameLoop.GameHooks.PursuerNoReward = pursuerNoReward;                 // [測定 2026-11-12・#35]
+            GameLoop.GameHooks.PursuerAtkMulOverride = pursuerAtkMul;
+            GameLoop.GameHooks.PursuerHpAdd = pursuerHpAdd;
+            GameLoop.GameHooks.PursuerSupplyOverride = pursuerSupply;
+            GameLoop.GameHooks.PursuerLeavesTerritory = pursuerLeavesTerritory;   // [測定 2026-11-12] 縄張りの作り
+            GameLoop.GameHooks.TerritoryTreasure = territoryTreasure;
+            GameLoop.GameHooks.TerminalHealMulOverride = System.Math.Max(0, terminalHealMul);   // [測定 2026-11-12・#102]
+            GameLoop.GameHooks.TerminalArresterNeedOverride = System.Math.Max(0, terminalArresterNeed);
+            GameLoop.GameHooks.TerminalFirstAidBattleOnly = terminalFirstAidBattleOnly;
+            GameLoop.GameHooks.TerminalKillBonusNeedsAttack = terminalKillNeedsAttack;   // [測定 2026-11-13・#117]
             GameLoop.GameHooks.VescaDiceForce = System.Math.Max(0, vescaDiceForce);   // [測定 2026-11-11]   // [測定 2026-11-11] 武器の段の上限 (ラン終了時に 0 へ)
             CombatSystem.EnemyHpLedger.ProbeMainMult = ProbeMultClamp(probeMainMult);
             CombatSystem.EnemyHpLedger.ProbePassiveMult = ProbeMultClamp(probePassiveMult);
@@ -145,9 +152,7 @@ namespace AutoTest
                 {
                     var stc = MetaProgression.MetaProgressManager.Instance?.State;
                     if (stc != null)
-                        stc.challengeDifficulty = _pendingChallengeDifficulty >= 0 ? _pendingChallengeDifficulty
-                                                : enableAllDebuffs ? MetaProgression.ChallengeCards.MaxDifficulty
-                                                : challengeCardDifficulty;
+                        stc.challengeDifficulty = IntendedChallengeDifficulty();   // Begin も同じ規則で先に入れる (#119)
                 }
                 else
                 {
@@ -164,6 +169,9 @@ namespace AutoTest
                     GameHooks.ArmorShieldPerRankOverride = armorShieldPerRank;
                     GameHooks.ArmorFlatEveryOverride = armorFlatEvery;
                     MetaProgression.Relics.RelicApplicator.Override = RelicPresets.Parse(relicLoadoutSpec);
+                    GameHooks.RelicStatOffMask = ParseRelicStatOff(relicStatOff);           // [#95] 既定 "" = 0 (止めない)
+                    GameHooks.RelicSetBonusOffMask = ParseRelicSetBonusOff(relicSetBonusOff);
+                    GameHooks.EnemyArmorPenOverride = ParseEnemyArmorPen(enemyArmorPenSpec); // [#20/#41] 既定 "" = null (データの値)
                     GameHooks.ForcedChallengeCards = ParseChallengeForce(challengeForce);
                     GameHooks.ChooseChallengeCard = challengeCardPickByAxis ? BotHooks.ChooseChallengeByAxis : (System.Func<IReadOnlyList<string>, int>)null;
                 }
@@ -217,8 +225,23 @@ namespace AutoTest
             //   **前のアームの序列で買い続ける**。 Tier 較正中は隔離領域を使うので触らない。
             if (!IsTierCalibration)
             {
-                try { LearnedPriorityProvider.SwitchToChallengeScore(CurrentChallengeScore()); }
+                // 帯の固定 (botLearningBandOverride・#118) があればその帯を読む。 無ければ今の挑戦の点数の帯。
+                try { LearnedPriorityProvider.SwitchToChallengeScore(BotLearningBandScore); }
                 catch (Exception e) { Debug.LogWarning($"[AutoRunner] 学習帯の切替失敗: {e.Message}"); }
+                // **手書きの序列で走ったランを数える** (#118)。 黙って落ちると、 帯のフォルダが無いだけでクリア率が 0% になる。
+                _bandSwitchRuns++;
+                if (LearnedPriorityProvider.UsingFallback) _fallbackRuns++;
+                // **戦闘名の危険度も同じ帯へ読み直す** (2026-11-12・#119)。 これまではバッチ開始時の 1 回だけで、
+                //   その時の帯 (前の測定が PlayerPrefs に残した難易度から決まる) のまま全ランを走っていた。
+                //   encounter_danger.json は帯 0 にしか無いので、 残りが帯 16 以上だと危険度が空になり、 ワーカー単位で結果が割れた。
+                //   帯が変わった時だけ読む (毎ランのファイル読みはしない)。
+                try
+                {
+                    string dangerRoot = System.IO.Path.GetFullPath(TierLearningRoot);
+                    if (!string.Equals(EncounterDangerStats.RequestedRoot, dangerRoot, StringComparison.OrdinalIgnoreCase))
+                        EncounterDangerStats.Reload(dangerRoot);
+                }
+                catch (Exception e) { Debug.LogWarning($"[AutoRunner] 戦闘名の危険度の切替失敗: {e.Message}"); }
             }
 
             // 2026-06-28: BOT は職業をランダムに選択 (BOT 学習で全 4 職を均等にサンプル)
@@ -246,6 +269,7 @@ namespace AutoTest
                     }
                     _cur.metaRanks = string.Join(",", parts);
                 }
+                _cur.startClass = gm.Run != null ? gm.Run.playerClass.ToString() : "";
             }
 
             // [診断] 軸の品をまとめて開幕に配る (2026-11-07)。 軸に深く投資した構成が実際に強いかを因果で測る。
@@ -268,21 +292,8 @@ namespace AutoTest
                                 + $"/メタ{metaBuffMode}"
                                 + $"/恒久:{pd}";
             }
-            // 先読み方策の内部乱数と較正をラン単位で戻す。 **ラン番号だけで決まる**ので、
-            // 同一シードの再実行で AI の判断まで同じ列を辿る (決定性検査の対象に入る)。
-            superAI.ResetForRun(index);
+            _deckLaRunSeed = index;   // [#105] 山札の先読みの専用乱数もラン番号だけで決める
             ResetAblationRng(index);
-
-            // --- Ultra: checkpoint からの再開 (§10 Phase E/G) ---
-            //   **null なら 1 命令も実行されない。** 通常のバッチは従来どおり
-            //   「StartNewRun した新規ラン」から始まる。
-            if (ultraResumeFrom != null && !TryApplyUltraResume(gm, out string resumeFailure))
-            {
-                // 復元に失敗したランを「普通のラン」として集計へ混ぜると、
-                // worker の故障が敗北として統計に入る。 明示的に落とす。
-                Finish(Outcome.Crash, "Ultra resume 失敗: " + resumeFailure);
-                yield break;
-            }
 
             _prevCoins = gm.Run != null ? gm.Run.coins : 0;
             _prevMaterials = gm.Run != null ? gm.Run.weaponMaterials : 0;
@@ -298,21 +309,10 @@ namespace AutoTest
             //   ── 実際、 戦闘数が止まったまま 15 万フレーム回り続けるランが出た。
             //   バッチが 1 ラン で永久に止まると、 測定そのものが成立しない。
             float runStartRt = Time.realtimeSinceStartup;
-            // **Ultra の思考時間は番犬から差し引く。** rollout は worker プロセスの完了を
-            //   同期で待つので、 1 決定あたり数秒ブロックする。 46 決定/ラン なら 1 ラン は
-            //   実時間で 2 分を超え、 20 秒の番犬に**全ラン**が DEADLOCK として刈られる
-            //   ── 5 時間走らせて中身が全部打切、 という形の事故になる。
-            //   番犬が捕まえたいのは「動き続ける固着」であって、 worker 待ちではない。
-            _ultraThinkingSeconds = 0f;
-            ClearUltraPending();   // 前ランの取り残しを持ち越さない
+            // (旧 Ultra の思考時間の控除と worker 待ちの空回りの除外は 2026-11-13 に削除・#135。 通常のランでは 0 / false だった)
 
             while (true)
             {
-                // 直前の Step が worker 待ちで空回りしたか。 **待機は「進展なし」ではない** ──
-                //   反復上限にもストール検出にも数えない。 数えると待機がそのまま
-                //   DEADLOCK 判定になり、 バッチ全体が打切で埋まる。
-                bool waitingForUltra = _ultraWaiting;
-
                 if (_exceptionFlag)
                 {
                     Finish(Outcome.Crash, $"例外: {_exceptionMsg}");
@@ -320,20 +320,19 @@ namespace AutoTest
                 }
                 // 到達した層の付与を配る。 計画は空のことがほとんどなので毎周でも安い。
                 if (_grantPlan.Count > 0 || _grantGoldAmount > 0) ApplyDueGrants(gm);
-                if (!waitingForUltra && iter++ > maxIterationsPerRun)
+                if (iter++ > maxIterationsPerRun)
                 {
                     Finish(Outcome.Deadlock, $"反復上限超過 phase={gm.CurrentPhase} node={CurrentNodeId()}");
                     yield break;
                 }
                 if (runWatchdogSeconds > 0f
-                    && Time.realtimeSinceStartup - runStartRt - _ultraThinkingSeconds > runWatchdogSeconds)
+                    && Time.realtimeSinceStartup - runStartRt > runWatchdogSeconds)
                 {
                     // **打ち切ったことを必ず残す。** 黙って捨てると、 集計だけ見て
                     //   「そういう分布なのだ」と読んでしまう。
                     Finish(Outcome.Deadlock,
                         $"番犬 {runWatchdogSeconds:F0}s 超過 phase={gm.CurrentPhase} node={CurrentNodeId()} "
-                      + $"floor={gm.Run?.Depth ?? -1} 戦闘={_cur?.totalCombats ?? -1}"
-                      + (_ultraThinkingSeconds > 0f ? $" Ultra思考={_ultraThinkingSeconds:F1}s(控除済)" : ""));
+                      + $"floor={gm.Run?.Depth ?? -1} 戦闘={_cur?.totalCombats ?? -1}");
                     yield break;
                 }
 
@@ -345,12 +344,7 @@ namespace AutoTest
                 string node = CurrentNodeId();
                 int fl = gm.Run?.Depth ?? 0;
                 int hp = gm.Run?.playerHP ?? 0;
-                if (waitingForUltra)
-                {
-                    // 盤面は意図的に止まっている。 stall は据え置き (0 にも戻さない ──
-                    // 待機前から続いていた停滞を待機で帳消しにしないため)。
-                }
-                else if (phase == lastPhase && node == lastNode && fl == lastFloor && hp == lastHp)
+                if (phase == lastPhase && node == lastNode && fl == lastFloor && hp == lastHp)
                 {
                     if (++stall > stallLimit)
                     {
@@ -372,8 +366,8 @@ namespace AutoTest
                     _cur.hadResolveAt5F     = owned != null && owned.Contains(GameLoop.ConvictionSystem.IdResolve);
                     _cur.hadTruthAt5F       = owned != null && owned.Contains(GameLoop.ConvictionSystem.IdTruth);
                     var flags = rs.ownedFlags;
-                    _cur.hadFlagYogenAt5F    = flags != null && flags.Contains("苦難の予言");
-                    _cur.hadFlagKakushinAt5F = flags != null && flags.Contains("苦難の確信");
+                    _cur.hadFlagYogenAt5F    = flags != null && flags.Contains(GameLoop.ItemIds.HardshipProphecy);
+                    _cur.hadFlagKakushinAt5F = flags != null && flags.Contains(GameLoop.ItemIds.HardshipConviction);
                 }
 
                 lastPhase = phase; lastNode = node; lastFloor = fl; lastHp = hp;
@@ -394,16 +388,6 @@ namespace AutoTest
                 }
 
                 if (finished) yield break;
-
-                // **worker 待ちなら必ず 1 フレーム返す。** stepsPerYield は既定 1000 なので、
-                //   ここを通さないと 1 フレームに 1000 回ポーリングして Editor が固まる
-                //   ── 非同期にした意味がなくなる。
-                if (_ultraWaiting)
-                {
-                    _innerStepCount = 0;
-                    yield return null;
-                    continue;
-                }
 
                 // 高速化: 1フレームあたり複数 Step を回す。
                 // GameManager は同期遷移なので問題ないが、UI/演出が必要な場合は stepsPerYield=1 にする。
@@ -490,23 +474,6 @@ namespace AutoTest
                             bool fa = !ownsA && IsAxisFocusItem(ra), fb = !ownsB && IsAxisFocusItem(rb);
                             if (fa != fb) pick = fa ? 0 : 1;
                         }
-                        // Ultra: 2 択をそのまま委ねる。 sink 未接続なら pick は素通り。
-                        pick = UltraOverrideChoice(gm,
-                            AutoTest.Ultra.UltraDecisionPoint.RewardChoice,
-                            AutoTest.Ultra.UltraActionKind.ChooseReward,
-                            new AutoTest.Ultra.UltraChoiceView
-                            {
-                                kind = "reward",
-                                prompt = "戦闘後ドロップ",
-                                options = new[]
-                                {
-                                    new AutoTest.Ultra.UltraChoiceOption
-                                    { index = 0, id = ra ?? "", label = ra ?? "" },
-                                    new AutoTest.Ultra.UltraChoiceOption
-                                    { index = 1, id = rb ?? "", label = rb ?? "" },
-                                },
-                            },
-                            pick);
                         gm.ResolveRewardChoice(pick);
                     }
                     gm.ConfirmReward();
@@ -528,10 +495,12 @@ namespace AutoTest
                     bool richMaterials = run.weaponMaterials >= cost * 2;
                     bool canUpgrade    = cost != int.MaxValue && run.weaponMaterials >= cost;
                     // T4 到達直前判定: 次の強化で T4 になる (現 T3+ → T4 等)
+                    //   段は items.json の tier で読む (#123)。 以前は id の綴り Contains("_t3") で読んでいて、
+                    //   id = 表示名 (2026-09-22) になってから常に false だった (CLAUDE.md「id から構造を読み取らない」)。
                     bool nextStepReachesT4 =
                         canUpgrade &&
                         !string.IsNullOrEmpty(run.equippedWeaponId) &&
-                        run.equippedWeaponId.Contains("_t3") &&
+                        ItemSystem.ItemDatabase.Instance?.GetItem(run.equippedWeaponId)?.tier == 3 &&
                         run.weaponPlus > 0;
                     int restPick;
                     if (nextStepReachesT4 && hpR > 0.25f)
@@ -546,29 +515,6 @@ namespace AutoTest
                         restPick = RestUpgradeIndex;         // 中HP+素材有り → 強化優先
                     else
                         restPick = RestHealIndex;            // 満ちていれば回復で無駄なく（食事休憩は廃止）
-
-                    // Ultra: 強化は素材が足りるときだけ**選択肢として出す**。
-                    //   出したうえで本体に弾かれると、 controller が辞退した場合と区別が付かない。
-                    restPick = UltraOverrideChoice(gm,
-                        AutoTest.Ultra.UltraDecisionPoint.RestChoice,
-                        AutoTest.Ultra.UltraActionKind.ChooseRest,
-                        new AutoTest.Ultra.UltraChoiceView
-                        {
-                            kind = "rest",
-                            prompt = "休憩",
-                            options = new[]
-                            {
-                                new AutoTest.Ultra.UltraChoiceOption
-                                { index = RestHealIndex, id = "heal", label = "HP回復" },
-                                new AutoTest.Ultra.UltraChoiceOption
-                                {
-                                    index = RestUpgradeIndex, id = "upgrade", label = "武器強化",
-                                    available = canUpgrade,
-                                    cost = cost == int.MaxValue ? 0 : cost,
-                                },
-                            },
-                        },
-                        restPick);
 
                     // **`canUpgrade` で条件を足さないこと。** 元の分岐は
                     //   `richMaterials && hpR > 0.30f` で `RestUpgrade()` を呼んでおり、

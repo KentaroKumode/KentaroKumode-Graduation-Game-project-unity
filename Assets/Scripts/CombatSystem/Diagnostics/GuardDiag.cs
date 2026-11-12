@@ -6,7 +6,7 @@ namespace CombatSystem
     /// 結果が変わらなかった。 原因として 2 つの説があり、 コードを読むだけでは決まらない。
     ///   ① 切り上げに飲まれている (オペランドが小さい)
     ///   ② そもそもこの経路を通る被ダメが一部でしかない
-    ///      (固定ダメージ / かすり / DOT / 停滞 は別経路)
+    ///      (固定ダメージ / かすり / DOT / 停滞 は別経路 ── 当時の〈停滞する時間〉は敵の攻撃への加算だった)
     /// 数字が無いまま「たぶん①」で直すと、 今日すでに 2 回やった
     /// 「読みだけで判断して外す」を繰り返す。 両方を分けて数える。</para>
     ///
@@ -33,15 +33,18 @@ namespace CombatSystem
         /// [8]最終的に HP が減った量 [9]ブロックの出目の合計。 [4] − [5] − [6] − [7] − [8] = その他 (役・虚空・仕込み刃・上限など)。</summary>
         public static readonly double[] Cut7F = new double[10];
 
-        /// <summary>[計装 2026-11-11] ヴェスカ連戦の配線と停滞。 段 (p1..p4) × 8: [0]ターン [1]停滞を積んだターン (攻撃 &lt; ブロック) [2]ターンの終わりの停滞スタックの合計
-        /// [3]攻撃の本数 [4]ブロックの本数 [5]充電の本数 [6]特殊の本数 [7]攻撃 0 本のターン。</summary>
+        /// <summary>[計装 2026-11-12 #103] ヴェスカ〈停滞する時間〉で止まった端子。 段 (p1..p4) × 8:
+        /// [0]ターン [1]新しく引いた枚数 [2]止まった枚数 [3]うち常設 (〈主幹〉) [4]前のターンに止まって手札に残った枚数
+        /// [5]1 枚以上止まったターン [6]2 枚以上止まったターン [7]予備 (0)。 1 枚あたりの止まる率 = [2] ÷ [1]。
+        /// (旧 2026-11-11 版は「配線と停滞スタック」を数えていた。 スタックの廃止で中身を入れ替えた)</summary>
         public static readonly double[] Stag7F = new double[32];
-        public static void NoteStag7F(string bossId, int atk, int blk, int chg, int spc, bool stacked, int stacks)
+        public static void NoteStag7F(string bossId, int drawn, int stopped, int stoppedMains, int held)
         {
             if (bossId == null || !bossId.StartsWith(GameLoop.BossIds.Layer7Prefix)) return;
-            int st = bossId.EndsWith("_p2") ? 1 : bossId.EndsWith("_p3") ? 2 : bossId.EndsWith("_p4") ? 3 : 0, o = st * 8;
-            Stag7F[o]++; if (stacked) Stag7F[o + 1]++; Stag7F[o + 2] += stacks;
-            Stag7F[o + 3] += atk; Stag7F[o + 4] += blk; Stag7F[o + 5] += chg; Stag7F[o + 6] += spc; if (atk <= 0) Stag7F[o + 7]++;
+            int st = System.Math.Max(1, GameLoop.BossIds.VescaStageOf(bossId)) - 1, o = st * 8;
+            Stag7F[o]++; Stag7F[o + 1] += drawn; Stag7F[o + 2] += stopped; Stag7F[o + 3] += stoppedMains; Stag7F[o + 4] += held;
+            if (stopped >= 1) Stag7F[o + 5]++;
+            if (stopped >= 2) Stag7F[o + 6]++;
         }
         public static bool InVesca()
         {

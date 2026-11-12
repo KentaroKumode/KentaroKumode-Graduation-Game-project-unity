@@ -12,9 +12,11 @@ namespace CombatSystem
     public static class TerminalDiag
     {
         /// <summary>列: [0] その端子が山札にあった戦闘数 / [1] 場に出たターン数 (手札 + 場に残る) / [2] 発動したターン数 /
-        /// [3] 撃破のボーナスが入った回数 / [4] 写し取りの対象 / [5] 焼き切りの対象 / [6] 保持器の対象。</summary>
-        public const int Width = 7;
-        public const int InDeck = 0, OnBoard = 1, Fired = 2, KillBonus = 3, AsCopy = 4, AsBurn = 5, AsRetain = 6;
+        /// [3] 撃破のボーナスが入った回数 / [4] 写し取りの対象 / [5] 焼き切りの対象 / [6] 保持器の対象 /
+        /// [7] 旧い条件 (攻撃の端子に挿したターンの、 主攻撃までの撃破だけ) では入らない撃破 (#117: 攻撃なしのターン・ターン終了時の撃破)。
+        /// [7] は旧い条件の腕 (GameHooks.TerminalKillBonusNeedsAttack) でも数える (= その腕で取りこぼした回数)。 新しい条件では [3] に含まれる。</summary>
+        public const int Width = 8;
+        public const int InDeck = 0, OnBoard = 1, Fired = 2, KillBonus = 3, AsCopy = 4, AsBurn = 5, AsRetain = 6, KillNewOnly = 7;
 
         public static readonly Dictionary<string, long[]> Rows = new Dictionary<string, long[]>();
 
@@ -43,6 +45,15 @@ namespace CombatSystem
             if (o.copyTarget >= 0 && o.copyTarget < board.Count) Note(board[o.copyTarget], AsCopy);
             if (o.burnTarget >= 0 && o.burnTarget < board.Count) Note(board[o.burnTarget], AsBurn);
             if (o.retainTarget >= 0 && o.retainTarget < board.Count) Note(board[o.retainTarget], AsRetain);
+        }
+
+        /// <summary>旧い条件では入らない撃破 (列 [7]) を、 発動していた撃破のボーナスの端子ごとに数える。</summary>
+        public static void NoteKillNewOnly(bool harvester, bool whet, bool loot, bool stripper)
+        {
+            if (harvester) Note(TerminalIds.Harvester, KillNewOnly);
+            if (whet) Note(TerminalIds.Whet, KillNewOnly);
+            if (loot) Note(TerminalIds.LootBox, KillNewOnly);
+            if (stripper) Note(TerminalIds.Stripper, KillNewOnly);
         }
 
         public static void Reset() => Rows.Clear();

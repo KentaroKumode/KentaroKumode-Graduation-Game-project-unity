@@ -186,12 +186,6 @@ namespace ItemSystem
         public int[] diceFaces;      // カスタムダイスの面配列 (例: {1,2,3,4,5,6})
         /// <summary>ADR-0010〈無銘の賽〉: このダイスでは端子役が成立しない。 詳細は ItemData 側。</summary>
         public bool suppressTerminalRoles;
-        /// <summary>強化 Lv 上限 (2026-07-18・0=強化不可)。 items.json で dice ごとに指定。
-        /// 未指定 (0) の場合は DiceEnhance.MaxLevelForItem() のレア別デフォルトが使われる。</summary>
-        public int enhanceMaxLevel;
-        /// <summary>強化コスト配列 (Lv1 になるためのコスト, Lv2 になるためのコスト, ...)。
-        /// 未指定 (null/空) の場合は DiceEnhance.CostForLevel() のレア別デフォルトが使われる。</summary>
-        public int[] enhanceCosts;
         public string roleName = "";         // ロール名（タンク/ナイト/バーサーカー/アサシン）
         public string roleDescription = "";  // ロール説明
 
@@ -239,7 +233,6 @@ namespace ItemSystem
         public bool IsQuest => category == ItemCategory.Quest;
         
         // 価格取得
-        public int GetCurrentBuyPrice() => buyPrice.GetRandomValue();
         public int GetCurrentSellPrice() => sellPrice.GetRandomValue();
         
         // 武器ダイス情報

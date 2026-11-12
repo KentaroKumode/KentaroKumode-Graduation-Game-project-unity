@@ -392,16 +392,6 @@ namespace GameLoop
         /// 絶対に区別できない ── 2026-08-10 に実際にそこで判断を誤った。</summary>
         public int lingeringWoundTriggers;
 
-        /// <summary>ダイス強化 Lv (2026-07-18): id → Lv (0=素、Max はレア別)。 素材消費で最も低い2面に+1/Lv。
-        /// 未登録なら Lv0 扱い。 セーブ時はそのままシリアライズ (Dictionary&lt;string,int&gt; は Unity JSON 未対応のため
-        /// キー配列+値配列の並行リストとして保持する run.diceEnhanceKeys/Values で永続化 → EnsureEnhanceDictSynced()）。</summary>
-        [System.NonSerialized]
-        public Dictionary<string, int> diceEnhanceLevels = new Dictionary<string, int>();
-        /// <summary>diceEnhanceLevels のシリアライズ用キー配列 (JsonUtility は Dictionary 未対応)。</summary>
-        public List<string> diceEnhanceKeys = new List<string>();
-        /// <summary>diceEnhanceLevels のシリアライズ用値配列。</summary>
-        public List<int> diceEnhanceValues = new List<int>();
-
         /// <summary>武器の"+"段階(0 or 1)。T_n と T_n+ を表す。休憩強化で 0→1、1の状態で次Tier武器へ置換し0に戻る。</summary>
         public int weaponPlus;
 
@@ -447,18 +437,9 @@ namespace GameLoop
         // === 消費アイテム: 次戦闘へ持ち越すバフ（マップ上で使用した場合） ===
         // 戦闘中に使用した場合は CombatContext へ直接書き込まれるため、これらは使われない。
         // 戦闘開始時に CombatContext へコピーされ、ここはクリアされる（1戦のみ）。
-        public int  pendingConsAtkBurst;       // 攻撃力: 次戦闘の最初の勝利ターンに与ダメ+X
-        public int  pendingConsDiceRoll;       // ダイス補正: 勝敗判定のみ+X（ダメージ非加算）
-        public int  pendingConsDiceRollBattles;// ダイス補正の残戦闘数（>0 で次戦闘へ持ち越し）
-        /// <summary>2026-07-21: cons_atk_* の残ターン数 (-1=戦闘中永続)。 出戦時に ctx.consDiceRollTurnsLeft へコピー。</summary>
-        public int  pendingConsDiceRollTurns;
+        // (2026-11-12: 書く所の無かった持ち越し ── 攻撃バースト・攻撃+X・継続回復・会心率・被ダメ軽減・反射・敵弱体・奇襲・賭博師 ── は削除。 #127)
         public int  pendingConsShield;         // シールド吸収量
         public int  pendingConsShieldTurns;    // シールド持続(>0)/無制限(-1)/無(0)
-        public int  pendingConsRegen;          // 継続回復: 初期値X（毎T後X回復しX-1）
-        public float pendingConsCritPct;       // 会心率 (小数) の持ち越し
-        public int  pendingConsCritBattles;    // 会心率の残戦闘数
-        public int  pendingConsFlatReduce;     // 被ダメ毎ターン定数-X
-        public int  pendingConsFlatReduceBattles; // 軽減の残戦闘数
         public int  pendingConsDmgMultPct;     // 与ダメ+X%（cons_dmg_*)
         /// <summary>2026-07-21: cons_dmg_* の残ターン数 (-1=戦闘中永続)。 出戦時に ctx.consDmgMultTurnsLeft へコピー。</summary>
         public int  pendingConsDmgMultTurns;
@@ -466,11 +447,6 @@ namespace GameLoop
         // === メタ v6: 種火の戦闘跨ぎ値 ===
         /// <summary>臨界 r2 保温炉: 前戦闘終了時に memored し次戦闘開始時に ctx.rinkaiMeter へ +する量。</summary>
         public int  pendingRinkaiCarryover;
-        public bool pendingConsReflect;        // 鏡写し: 被メインダメを敵に反射
-        public int  pendingConsEnemyDiceDebuff;// 敵弱体: 敵ダイス合計-X
-        public int  pendingEnemyStartHpCutPct; // 奇襲: 敵開始HP-X%
-        public bool pendingGamblerDice;        // 賭博師: 50%全最大/50%全1
-        public int  pendingFirstRollTotal;     // 加速の粉: 次戦闘の初回ロールでダイス合計+X
 
         // === 2026-06-28: 職業スターター消耗品 (戦闘外で使用された場合の次戦闘持ち越し) ===
         public bool pendingPolishArmed;        // 瞬間研磨剤: 次戦闘の最初の1撃で 与ダメージ+150%
@@ -497,31 +473,10 @@ namespace GameLoop
         /// <summary>次戦闘持ち越しバフをすべて消去（戦闘開始時にコピー後 or リセット時）。</summary>
         public void ClearPendingCombatConsumables()
         {
-            // 単発系は即クリア。 マルチバトル系（dice/crit/reduce）は ConsumePendingAfterBattle で
-            // 残戦闘数 > 0 の間は値を保持する。
-            pendingConsAtkBurst = 0;
             pendingConsShield = 0; pendingConsShieldTurns = 0;
-            pendingConsRegen = 0;
             pendingConsDmgMultPct = 0; pendingConsDmgMultTurns = 0;
-            pendingConsDiceRollTurns = 0;
-            pendingConsReflect = false; pendingConsEnemyDiceDebuff = 0;
-            pendingEnemyStartHpCutPct = 0; pendingGamblerDice = false;
-            pendingFirstRollTotal = 0;
             // 2026-06-28: 職業スターター消耗品の pending フラグ ── 戦闘開始時に ctx へコピー後クリア
             pendingPolishArmed = false; pendingOathArmed = false; pendingDaggerArmed = false;
-            // dice/crit/reduce は ConsumePendingAfterBattle 側で管理（残戦闘数 0 で初めてクリア）
-            ConsumeMultiBattleConsumablesAfterCopy();
-        }
-
-        /// <summary>マルチバトル持続バフ（dice/crit/reduce）の戦闘消費。 残数を 1 減らし、 0 到達時のみ値クリア。</summary>
-        private void ConsumeMultiBattleConsumablesAfterCopy()
-        {
-            if (pendingConsDiceRollBattles > 1) pendingConsDiceRollBattles--;
-            else { pendingConsDiceRoll = 0; pendingConsDiceRollBattles = 0; }
-            if (pendingConsCritBattles > 1) pendingConsCritBattles--;
-            else { pendingConsCritPct = 0f; pendingConsCritBattles = 0; }
-            if (pendingConsFlatReduceBattles > 1) pendingConsFlatReduceBattles--;
-            else { pendingConsFlatReduce = 0; pendingConsFlatReduceBattles = 0; }
         }
 
         // === 時限バフ・デバフ用ヘルパー ===
@@ -587,9 +542,6 @@ namespace GameLoop
             judgmentPostDamage = judgmentHealRequested = judgmentHealActual = judgmentHealPrevented = 0;
             breakdownCount = 0;
             lingeringWoundTriggers = 0;
-            diceEnhanceLevels = new Dictionary<string, int>();
-            diceEnhanceKeys.Clear();
-            diceEnhanceValues.Clear();
             weaponPlus = 0;
             limitBreakStage = 0;
             pendingWeaponIds.Clear();
@@ -632,13 +584,11 @@ namespace GameLoop
             if (Depth >= maxFloor) return false;
             currentFloor++;
             bossDefeatedThisFloor = false;
-            outpostUpgradeUsedThisFloor = false; // 層が変わるたびに前哨基地強化を再解禁
             return true;
         }
 
-        /// <summary>この層の前哨基地で武器強化を1回使ったか。
-        /// EnterFloor / AdvanceFloor でリセットされる。</summary>
-        public bool outpostUpgradeUsedThisFloor;
+        // (旧 outpostUpgradeUsedThisFloor ── 前哨基地の武器の自動強化を層ごとに 1 回にする印 ── は 2026-11-12 に機構ごと削除。
+        //  JsonUtility は中断セーブに残った未知の欄を黙って捨てる)
 
         /// <summary>通常クリア（5層ボス撃破）</summary>
         public bool IsNormalClear => Depth >= normalClearFloor && bossDefeatedThisFloor && playerHP > 0;

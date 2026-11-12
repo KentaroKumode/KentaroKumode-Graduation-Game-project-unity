@@ -107,6 +107,10 @@ namespace MapSystem.FreeMove
     /// <para>乱数は前線の天候 (道が崩れる・点が沈む) の選択だけで、
     /// <c>GameRng.Range(.., "map.free.weather", 層 × 100000 + ターン × 10 + 試行)</c> ── 同じ操作なら同じ結果になる。</para>
     ///
+    /// <para><b>追跡者は縄張りの番人 (2026-11-12)</b>: 既定では本体も使い魔も縄張り (<see cref="FreeMapLayout.territory"/>) の外へ出ず、
+    /// 縄張りの外に居るプレイヤーには気づかない。 縄張りの中には見えている宝 (<see cref="TreasureNode"/>) がある。
+    /// 旧い作り (層のどこまでも追う) は <see cref="ConfigureTerritory"/> の leashed = false (測定の口)。</para>
+    ///
     /// <para>UnityEngine に依存しない (BOT が同期的に回す・単体で検算できる)。</para>
     /// </summary>
     public sealed class FreeMapSim
@@ -167,6 +171,19 @@ namespace MapSystem.FreeMove
         public int FoeFreezeTurns { get; private set; }
         private int _alertLure = -1;
         public readonly List<Familiar> Familiars = new List<Familiar>();
+
+        // ── 縄張りと宝 (2026-11-12) ──
+        /// <summary>true = 追跡者 (本体と使い魔) は<b>縄張りの外へ出ない</b> (既定)。 縄張りの外に居るプレイヤーには気づかず、
+        /// 追跡の途中でもその先へは進まない (縁で止まり、 補足できないまま見失う)。
+        /// false = 旧い作り (層のどこまでも追う)。 本体 (MapManager) が層を作った時に <see cref="ConfigureTerritory"/> で決める。</summary>
+        public bool Leashed { get; private set; } = true;
+        /// <summary>縄張りの宝の点 (-1 = 無い)。 層に入った時から地図に印が見える (点の種類は見えないまま)。
+        /// 置き場所は <see cref="TreasurePointOf"/> (乱数を使わない)。</summary>
+        public int TreasureNode { get; private set; } = -1;
+        /// <summary>縄張りの宝を取ったか (1 層 1 回)。</summary>
+        public bool TreasureTaken { get; private set; }
+        /// <summary>縄張りの宝がまだ取れるか。</summary>
+        public bool TreasureAvailable => TreasureNode >= 0 && !TreasureTaken;
 
         // ── 補給線 (〈兵站〉r10・2026-11-09) ──
         private readonly HashSet<int> _relays = new HashSet<int>();
@@ -270,6 +287,146 @@ namespace MapSystem.FreeMove
             Reveal(Me, Perks.vision, false);
         }
 
+        /// <summary>縄張りの作りを決める (層を作った直後・最初の操作の前に 1 回)。 <paramref name="leashed"/> = 追跡者が縄張りの外へ出ないか、
+        /// <paramref name="treasure"/> = 縄張りの宝を置くか (追跡者が居る層だけ)。 乱数は引かない。</summary>
+        public void ConfigureTerritory(bool leashed, bool treasure)
+        {
+            Leashed = leashed;
+            TreasureNode = treasure && HasFoe ? TreasurePointOf(Layout) : -1;
+            Version++;
+        }
+
+        /// <summary>縄張りの宝の点: 縄張りの中心 (追跡者の最初の居場所) を除いた縄張りの点のうち、 中心に直線で一番近い点 (同点は添字の小さい方)。
+        /// 中心そのものは追跡者の居場所で、 動かない追跡者 (召喚者) だと取りに行く手が戦うしか無くなるので 1 つずらす。
+        /// 性質で置き場所を変えないのは、 置き場所から性質が読めないように。 乱数は使わない (地図の生成の消費を変えない)。</summary>
+        public static int TreasurePointOf(FreeMapLayout L)
+        {
+            int best = -1; double bd = double.MaxValue;
+            foreach (int i in L.territory)
+            {
+                if (i == L.home || i == L.start || i == L.goal) continue;
+                double d = L.Dist(i, L.home);
+                if (d < bd || (d == bd && i < best)) { bd = d; best = i; }
+            }
+            return best;
+        }
+
+        /// <summary>点 i が追跡者の縄張りか。</summary>
+        public bool InTerritory(int i) => i >= 0 && Layout.territory.Contains(i);
+
+        /// <summary>今いる点の縄張りの宝を取る (1 層 1 回)。 取れたら true。 中身を渡すのは本体 (GameManager)。</summary>
+        public bool TakeTreasure()
+        {
+            if (!TreasureAvailable || Me != TreasureNode || Dead || InFight) return false;
+            TreasureTaken = true;
+            Version++;
+            return true;
+        }
+
+        // =====================================================================
+        //  中断セーブ (issue #84)
+        // =====================================================================
+
+        /// <summary>動く中身の写し (JsonUtility で書ける形)。 形 (<see cref="Layout"/>)・追跡者の性質 (<see cref="Profile"/>)・
+        /// 航行アイテムの係数 (<see cref="Perks"/>) は持たない ── 形は別に写し、 性質と係数は作り直す時に同じものを渡す。
+        /// 実数 (前線の x) は丸めずに戻すため、 ビット列 (long) で持つ。</summary>
+        [Serializable]
+        public sealed class SavedState
+        {
+            public int count;
+            public int[] adjCounts = new int[0];
+            public int[] adjItems = new int[0];
+            public bool[] sunk = new bool[0], known = new bool[0], done = new bool[0], scouted = new bool[0];
+            public int[] trace = new int[0];
+            public int me, prevNode, lastArrived, turn, version, flareTurnsLeft;
+            public bool dead;
+            public string hpPayReason = "";
+            public bool hasFoe, foeAlive;
+            public int foeNode, foeMode, lastSeen, lose, chaseTurns, chaseRest, patrol, sinceSummon, foeFreezeTurns, alertLure;
+            public int[] famPos = new int[0], famTarget = new int[0];
+            public bool[] famHound = new bool[0];
+            public int[] relays = new int[0];
+            public int[] lureNode = new int[0], lureTurns = new int[0];
+            public int contact, pendingArrival;
+            public int weather;
+            public bool frontSet;
+            public long frontBits;
+            public int smokeLeft, beaconLeft, beacon, goalwardSteps;
+            public bool smokeGranted, beaconGranted;
+            /// <summary>縄張りの宝を取ったか (2026-11-12)。 宝の有無と追跡者が縄張りを出るかは写さない ── 作り直す時に <see cref="ConfigureTerritory"/> で同じものを決める。</summary>
+            public bool treasureTaken;
+        }
+
+        /// <summary>いまの中身を写す。</summary>
+        public SavedState CaptureState()
+        {
+            int n = _adj.Length;
+            var s = new SavedState { count = n, adjCounts = new int[n] };
+            var items = new List<int>();
+            for (int i = 0; i < n; i++) { s.adjCounts[i] = _adj[i].Count; items.AddRange(_adj[i]); }   // 並びも写す (経路の同点は並びで決まる)
+            s.adjItems = items.ToArray();
+            s.sunk = (bool[])_sunk.Clone(); s.known = (bool[])Known.Clone(); s.done = (bool[])Done.Clone(); s.scouted = (bool[])Scouted.Clone();
+            s.trace = (int[])_trace.Clone();
+            s.me = Me; s.prevNode = PrevNode; s.lastArrived = LastArrived; s.turn = Turn; s.version = Version; s.flareTurnsLeft = FlareTurnsLeft;
+            s.dead = Dead; s.hpPayReason = HpPayReason ?? "";
+            s.hasFoe = HasFoe; s.foeAlive = FoeAlive; s.foeNode = FoeNode; s.foeMode = (int)FoeMode; s.lastSeen = LastSeen;
+            s.lose = _lose; s.chaseTurns = _chaseTurns; s.chaseRest = _chaseRest; s.patrol = _patrol; s.sinceSummon = _sinceSummon;
+            s.foeFreezeTurns = FoeFreezeTurns; s.alertLure = _alertLure;
+            int fc = Familiars.Count;
+            s.famPos = new int[fc]; s.famTarget = new int[fc]; s.famHound = new bool[fc];
+            for (int i = 0; i < fc; i++) { s.famPos[i] = Familiars[i].pos; s.famTarget[i] = Familiars[i].target; s.famHound[i] = Familiars[i].hound; }
+            var relays = new List<int>(_relays); relays.Sort(); s.relays = relays.ToArray();
+            int lc = Lures.Count;
+            s.lureNode = new int[lc]; s.lureTurns = new int[lc];
+            for (int i = 0; i < lc; i++) { s.lureNode[i] = Lures[i].node; s.lureTurns[i] = Lures[i].turnsLeft; }   // 並びも写す (一番近い囮罠の同点は並びで決まる)
+            s.contact = (int)Contact; s.pendingArrival = PendingArrival;
+            s.weather = (int)Weather;
+            s.frontSet = !double.IsNegativeInfinity(Front);
+            s.frontBits = s.frontSet ? BitConverter.DoubleToInt64Bits(Front) : 0L;
+            s.smokeLeft = SmokeLeft; s.beaconLeft = BeaconLeft; s.beacon = Beacon; s.goalwardSteps = _goalwardSteps;
+            s.smokeGranted = _smokeGranted; s.beaconGranted = _beaconGranted;
+            s.treasureTaken = TreasureTaken;
+            return s;
+        }
+
+        /// <summary>写しを戻す。 同じ形 (<see cref="Layout"/>) と同じ性質で作った中身に対して呼ぶ。 点の数が合わなければ例外。
+        /// <paramref name="perks"/> は回数を入れ直さずにそのまま掛ける (回数は写しの残りを使う)。</summary>
+        public void LoadState(SavedState s, FreeMapPerks perks)
+        {
+            if (s == null) throw new ArgumentNullException(nameof(s));
+            int n = _adj.Length;
+            if (s.count != n || s.adjCounts == null || s.adjCounts.Length != n
+                || s.sunk?.Length != n || s.known?.Length != n || s.done?.Length != n || s.scouted?.Length != n || s.trace?.Length != n)
+                throw new InvalidOperationException($"航行の写しの点の数が形と合わない (写し {s.count} / 形 {n})");
+            int k = 0;
+            for (int i = 0; i < n; i++)
+            {
+                _adj[i].Clear();
+                for (int c = 0; c < s.adjCounts[i]; c++) _adj[i].Add(s.adjItems[k++]);
+            }
+            Array.Copy(s.sunk, _sunk, n); Array.Copy(s.known, Known, n); Array.Copy(s.done, Done, n); Array.Copy(s.scouted, Scouted, n);
+            Array.Copy(s.trace, _trace, n);
+            Me = s.me; PrevNode = s.prevNode; LastArrived = s.lastArrived; Turn = s.turn; Version = s.version + 1; FlareTurnsLeft = s.flareTurnsLeft;
+            Dead = s.dead; HpPayReason = s.hpPayReason ?? "";
+            HasFoe = s.hasFoe; FoeAlive = s.foeAlive; FoeNode = s.foeNode; FoeMode = (FoeMode)s.foeMode; LastSeen = s.lastSeen;
+            _lose = s.lose; _chaseTurns = s.chaseTurns; _chaseRest = s.chaseRest; _patrol = s.patrol; _sinceSummon = s.sinceSummon;
+            FoeFreezeTurns = s.foeFreezeTurns; _alertLure = s.alertLure;
+            Familiars.Clear();
+            for (int i = 0; i < (s.famPos?.Length ?? 0); i++)
+                Familiars.Add(new Familiar { pos = s.famPos[i], target = s.famTarget[i], hound = s.famHound[i] });
+            _relays.Clear();
+            if (s.relays != null) foreach (int r in s.relays) _relays.Add(r);
+            Lures.Clear();
+            for (int i = 0; i < (s.lureNode?.Length ?? 0); i++) Lures.Add(new Lure { node = s.lureNode[i], turnsLeft = s.lureTurns[i] });
+            Contact = (ContactKind)s.contact; PendingArrival = s.pendingArrival;
+            Weather = (WeatherKind)s.weather;
+            Front = s.frontSet ? BitConverter.Int64BitsToDouble(s.frontBits) : double.NegativeInfinity;
+            SmokeLeft = s.smokeLeft; BeaconLeft = s.beaconLeft; Beacon = s.beacon; _goalwardSteps = s.goalwardSteps;
+            _smokeGranted = s.smokeGranted; _beaconGranted = s.beaconGranted;
+            TreasureTaken = s.treasureTaken;
+            Perks = perks ?? FreeMapPerks.None;
+        }
+
         // =====================================================================
         //  読み取り
         // =====================================================================
@@ -293,6 +450,43 @@ namespace MapSystem.FreeMove
 
         /// <summary>from から to へ向かう次の 1 歩 (最短の道・崩れた道は通らない)。 着いている / 行けないなら from。</summary>
         public int StepToward(int from, int to) => FreeMapLayout.StepToward(_adj, from, to);
+
+        /// <summary>from から to へ、 <b>踏む縄張りの点の数が一番少なく</b>、 その中で一番短い道の最初の 1 歩 (2026-11-12・問い合わせだけ)。
+        /// 踏む数には to を含み from を含まない (縄張りの中から出る時は、 出るまでに踏む点が一番少ない道)。
+        /// <paramref name="hops"/> = その道の歩数・<paramref name="territorySteps"/> = その道で踏む縄張りの点の数。 行けなければ from を返し hops = int.MaxValue。
+        /// 同点は隣接表の並びが先の点 (<see cref="StepToward"/> と同じ決め方)。 状態は変えず、 乱数も使わない。
+        /// BOT の航行 (縄張りを横切らない道) と検算 (freemap_check) が使う。 遊ぶ人の規則には関わらない。</summary>
+        public int StepAvoidingTerritory(int from, int to, out int hops, out int territorySteps)
+        {
+            hops = int.MaxValue; territorySteps = int.MaxValue;
+            if (from == to) { hops = 0; territorySteps = 0; return from; }
+            int n = _adj.Length;
+            // 費用 = 踏む縄張りの点の数 × 1000 + 歩数 (点は 50 程度なので歩数は 1000 に届かない)。 to から逆に広げる
+            var cost = new int[n];
+            var done = new bool[n];
+            for (int i = 0; i < n; i++) cost[i] = int.MaxValue;
+            if (_sunk[to]) return from;
+            cost[to] = (InTerritory(to) ? 1000 : 0);
+            while (true)
+            {
+                int u = -1, cu = int.MaxValue;
+                for (int i = 0; i < n; i++) if (!done[i] && cost[i] < cu) { cu = cost[i]; u = i; }
+                if (u < 0) break;
+                done[u] = true;
+                if (u == from) continue;   // from から先へは広げない (from は踏む数に入れない)
+                foreach (int v in _adj[u])
+                {
+                    if (done[v] || _sunk[v]) continue;
+                    int c = cu + 1 + (v != from && InTerritory(v) ? 1000 : 0);
+                    if (c < cost[v]) cost[v] = c;
+                }
+            }
+            int best = from, bc = int.MaxValue;
+            foreach (int v in _adj[from]) if (!_sunk[v] && cost[v] < bc) { bc = cost[v]; best = v; }
+            if (best == from) return from;
+            hops = bc % 1000 + 1; territorySteps = bc / 1000;
+            return best;
+        }
 
         /// <summary>いま見える範囲 (道で何歩先まで)。 照明中は <see cref="FreeMapParams.FlareRange"/>。</summary>
         public int VisionRange => FlareOn ? Math.Max(FreeMapParams.FlareRange, Perks.vision) : Perks.vision;
@@ -319,14 +513,6 @@ namespace MapSystem.FreeMove
         {
             if (_trace[i] == NoTrace) return false;
             return Turn - _trace[i] <= TraceLife(i);
-        }
-
-        /// <summary>痕跡の鮮度 0..1 (1 = いま付いた)。 痕跡が無ければ 0。</summary>
-        public double TraceFreshness(int i)
-        {
-            if (!HasTrace(i)) return 0;
-            double a = 1.0 - (double)(Turn - _trace[i]) / (TraceLife(i) + 1);
-            return a < 0 ? 0 : a;
         }
 
         private double TraceLife(int i)
@@ -426,7 +612,9 @@ namespace MapSystem.FreeMove
         {
             var best = CatchEta.None;
             if (!FoeAlive || Contact != ContactKind.None) return best;
-            var d = HopsFrom(Me);
+            // 縄張りを出ない追跡者: 縄張りの外に居れば誰も来ない。 中に居れば、 縄張りの中の道だけで数える
+            if (Leashed && !InTerritory(Me)) return best;
+            var d = Leashed ? FreeMapLayout.Hops(TerritoryGraph(), Me) : HopsFrom(Me);
             if (FoeMode == FoeMode.Chase && Profile.foeSteps > 0 && d[FoeNode] != int.MaxValue)
             {
                 int t = Ceil(d[FoeNode], Profile.foeSteps);
@@ -525,7 +713,8 @@ namespace MapSystem.FreeMove
             _trace[j] = Turn;
             Known[j] = true;
             LastArrived = j;
-            if (FoeAlive && FoeMode == FoeMode.Chase) LastSeen = j;
+            // 縄張りの外へ跳んだ時は、 縄張りを出ない追跡者には追う先が無い (最後に見た点のまま・補足できずに見失う)
+            if (FoeAlive && FoeMode == FoeMode.Chase && (!Leashed || InTerritory(j))) LastSeen = j;
             ev |= FreeMapEvent.Arrived;
             if ((ev & FreeMapEvent.Died) != 0) { Dead = true; return ev; }
             RevealView();
@@ -843,7 +1032,9 @@ namespace MapSystem.FreeMove
                 var dMe = HopsFrom(Me);
                 int detect = DetectHops;
                 if (_chaseRest > 0) _chaseRest--;
-                if (_chaseRest == 0 && dMe[FoeNode] <= detect && FoeMode != FoeMode.Chase && SmokeLeft > 0)
+                // 縄張りを出ない追跡者は、 縄張りの外に居るプレイヤーには気づかない (追跡中なら、 補足できないまま見失う側へ数える)
+                bool sees = _chaseRest == 0 && dMe[FoeNode] <= detect && (!Leashed || InTerritory(Me));
+                if (sees && FoeMode != FoeMode.Chase && SmokeLeft > 0)
                 {
                     // 〈煙玉〉(層に 1 回・自動): 補足される代わりに、 追跡者は警戒へ落ちて痕跡をたどる (最後の位置 = 発動した地点)。
                     //   すぐ補足し直さないよう、 数ターンは補足しない。 その間にどこへ逃げるかは問われる (痕跡を踏まれれば追いつかれる)
@@ -851,7 +1042,7 @@ namespace MapSystem.FreeMove
                     FoeMode = FoeMode.Alert; _alertLure = -1; _chaseRest = FreeMapPerks.SmokeRestTurns;
                     ev |= FreeMapEvent.SmokeUsed;
                 }
-                else if (_chaseRest == 0 && dMe[FoeNode] <= detect)
+                else if (sees)
                 {
                     if (FoeMode != FoeMode.Chase) { ev |= FreeMapEvent.Detected; _chaseTurns = 0; }
                     FoeMode = FoeMode.Chase; LastSeen = Me; _lose = 0;
@@ -915,12 +1106,15 @@ namespace MapSystem.FreeMove
                 if (f.hound) f.target = FoeMode == FoeMode.Chase ? LastSeen : FoeNode;
                 for (int k = 0; k < Profile.familiarSteps; k++)
                 {
-                    if (HopsFrom(f.pos)[Me] <= Perks.familiarSee) f.target = Me;
+                    if (FamiliarSeesMe(f.pos)) f.target = Me;
                     if (f.target < 0) break;
-                    f.pos = FreeMapLayout.StepToward(_adj, f.pos, f.target);
+                    int np = FoeStepToward(f.pos, f.target);
+                    // 縄張りを出ない時、 縄張りの中では目標へ届かない使い魔 (猟犬でない方) は、 その場で見失う (下で消える)
+                    if (Leashed && np == f.pos && f.pos != f.target && !f.hound) { f.target = f.pos; break; }
+                    f.pos = np;
                     if (f.pos == Me) break;
                 }
-                if (!f.hound && f.pos == f.target && f.pos != Me && HopsFrom(f.pos)[Me] > Perks.familiarSee)
+                if (!f.hound && f.pos == f.target && f.pos != Me && !FamiliarSeesMe(f.pos))
                 {
                     f.target = -2;   // 消える印
                     vanished = true;
@@ -935,6 +1129,47 @@ namespace MapSystem.FreeMove
             foreach (var f in Familiars)
                 if (f.pos == Me && Contact == ContactKind.None) { Contact = ContactKind.Familiar; ev |= FreeMapEvent.FamiliarContact; break; }
             return ev;
+        }
+
+        /// <summary>使い魔が点 <paramref name="pos"/> からプレイヤーを見つけるか (縄張りを出ない時は、 縄張りの中のプレイヤーだけ)。</summary>
+        private bool FamiliarSeesMe(int pos) => HopsFrom(pos)[Me] <= Perks.familiarSee && (!Leashed || InTerritory(Me));
+
+        /// <summary>縄張りの点だけを残した道 (崩れた道・沈んだ点を反映)。</summary>
+        private List<int>[] TerritoryGraph()
+        {
+            var g = new List<int>[_adj.Length];
+            for (int i = 0; i < g.Length; i++)
+            {
+                g[i] = new List<int>();
+                if (!InTerritory(i)) continue;
+                foreach (int v in _adj[i]) if (InTerritory(v)) g[i].Add(v);
+            }
+            return g;
+        }
+
+        /// <summary>追跡者 (本体・使い魔) が from から to へ向かう次の 1 歩。 予告と実際の移動の両方がここを通る。
+        /// <para>縄張りを出ない時 (<see cref="Leashed"/>): 行き先が縄張りの中なら、 縄張りの中の道だけで最短を取る。
+        /// 行き先が縄張りの外 (囮罠) か、 縄張りの中の道では届かない時は、 縄張りの中の隣のうち行き先へ道で近づく点へ。
+        /// 近づける点が無ければ動かない ── 縄張りの縁で止まる。 縄張りの外に居る時 (旧い写しなど) は、 普通に歩いて戻る。</para></summary>
+        private int FoeStepToward(int from, int to)
+        {
+            if (!Leashed || !InTerritory(from)) return FreeMapLayout.StepToward(_adj, from, to);
+            if (from == to) return from;
+            if (InTerritory(to))
+            {
+                var g = TerritoryGraph();
+                var d = FreeMapLayout.Hops(g, to);
+                if (d[from] != int.MaxValue)
+                {
+                    int b = from;
+                    foreach (int v in g[from]) if (d[v] < d[b]) b = v;
+                    return b;
+                }
+            }
+            var dt = FreeMapLayout.Hops(_adj, to);
+            int best = from;
+            foreach (int v in _adj[from]) if (InTerritory(v) && dt[v] < dt[best]) best = v;
+            return best;
         }
 
         private int NearestLureFromFoe()
@@ -967,15 +1202,16 @@ namespace MapSystem.FreeMove
         private int ComputeFoeStep(ref FoeMode mode, ref int patrol)
         {
             if (mode == FoeMode.Chase)
-                return LastSeen >= 0 ? FreeMapLayout.StepToward(_adj, FoeNode, LastSeen) : FoeNode;
+                return LastSeen >= 0 ? FoeStepToward(FoeNode, LastSeen) : FoeNode;
             if (mode == FoeMode.Alert)
             {
-                if (_alertLure >= 0 && FoeNode != _alertLure)
-                    return FreeMapLayout.StepToward(_adj, FoeNode, _alertLure);
-                // 痕跡をたどる: いまの点より新しい痕跡のある隣へ
+                // 囮罠へ向かう。 縄張りを出ない時は、 効果の切れた囮罠は追わない (縄張りの外の囮罠の前で縁に立ち続けないように)
+                if (_alertLure >= 0 && FoeNode != _alertLure && (!Leashed || HasLureAt(_alertLure)))
+                    return FoeStepToward(FoeNode, _alertLure);
+                // 痕跡をたどる: いまの点より新しい痕跡のある隣へ (縄張りを出ない時は縄張りの中の隣だけ)
                 int best = -1, bt = _trace[FoeNode];
                 foreach (int v in _adj[FoeNode])
-                    if (HasTrace(v) && _trace[v] > bt) { bt = _trace[v]; best = v; }
+                    if (HasTrace(v) && _trace[v] > bt && (!Leashed || InTerritory(v))) { bt = _trace[v]; best = v; }
                 if (best >= 0) return best;
                 mode = FoeMode.Patrol;
             }
@@ -984,9 +1220,20 @@ namespace MapSystem.FreeMove
             if (FoeNode == t)
             {
                 patrol++;
-                return FreeMapLayout.StepToward(_adj, FoeNode, way.Count > 0 ? way[patrol % way.Count] : Layout.home);
+                t = way.Count > 0 ? way[patrol % way.Count] : Layout.home;
             }
-            return FreeMapLayout.StepToward(_adj, FoeNode, t);
+            int step = FoeStepToward(FoeNode, t);
+            // 縄張りを出ない時: 道が崩れて縄張りの中では届かない巡回の点は飛ばす (届く点が 1 つも無ければその場に留まる)
+            if (Leashed && step == FoeNode && FoeNode != t)
+                for (int k = 1; k < way.Count; k++)
+                {
+                    patrol++;
+                    t = way[patrol % way.Count];
+                    if (t == FoeNode) continue;
+                    step = FoeStepToward(FoeNode, t);
+                    if (step != FoeNode) break;
+                }
+            return step;
         }
 
         // =====================================================================
@@ -1027,7 +1274,7 @@ namespace MapSystem.FreeMove
         {
             var cand = new List<int>();
             for (int i = 0; i < _adj.Length; i++)
-                if (InFront(i) && !Done[i] && !_sunk[i] && i != Me && i != FoeNode && i != Layout.goal && i != Layout.start)
+                if (InFront(i) && !Done[i] && !_sunk[i] && i != Me && i != FoeNode && i != Layout.goal && i != Layout.start && i != TreasureNode)
                     cand.Add(i);
             for (int tries = 0; tries < 20 && cand.Count > 0; tries++)
             {

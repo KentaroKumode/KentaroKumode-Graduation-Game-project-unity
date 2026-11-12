@@ -13,7 +13,6 @@ using MapSystem;
 using EventSystem;
 using ItemSystem;
 using ItemSystem.Shop;
-using AutoTest.Ultra;
 
 namespace AutoTest
 {
@@ -72,8 +71,7 @@ namespace AutoTest
                             curRunInArm = i + 1;
                             int runIndex = batch * runs + i;
                             GameLoop.GameRng.BeginRun(runIndex);
-                            if (GameLoop.GameRng.IsSeeded)
-                                _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIndex));
+                            RebuildRunRng(runIndex);
                             _currentPersona = BuildPersona.Standard;
                             yield return RunOne(runIndex);
                             if ((i + 1) % Mathf.Max(1, runsPerYield) == 0)
@@ -96,38 +94,6 @@ namespace AutoTest
                 wiringSkill = prevSkill;
                 _activeTierCalibrationScore = -1;
             }
-        }
-
-        private void EmitUltraProductionBatchCompletion(string outputDirectory)
-        {
-            if (!ultraProductionWorkerMode && UltraProductionBatchCompleted == null) return;
-
-            int expected = ultraProductionExpectedRuns > 0
-                ? ultraProductionExpectedRuns
-                : _ultraProductionRuns.Count;
-            bool countMatches = _ultraProductionRuns.Count == expected;
-            var batch = new UltraProductionBatchRecord
-            {
-                policyId = ultraProductionPolicyId ?? "",
-                scenarioSeedVectorHash = ultraProductionScenarioSeedVectorHash ?? "",
-                runs = _ultraProductionRuns.ToArray(),
-                outputPath = outputDirectory ?? "",
-                artifactPath = _lastSummaryPath ?? "",
-                artifactSha256 = Sha256File(_lastSummaryPath),
-                completedNormally = countMatches,
-                failureCode = countMatches ? "" : "RUN_COUNT_MISMATCH",
-            };
-
-            try { UltraProductionBatchCompleted?.Invoke(batch); }
-            catch (Exception ex)
-            {
-                batch.completedNormally = false;
-                batch.failureCode = "COMPLETION_CALLBACK_FAILED";
-                Debug.LogError("[AutoRunner][UltraWorker] batch completion callback failed: " + ex.Message);
-            }
-
-            if (ultraProductionWorkerMode && !Application.isEditor)
-                Application.Quit(batch.completedNormally ? 0 : 2);
         }
 
         private IEnumerator RunChallengeFixedSweep()
@@ -159,7 +125,7 @@ namespace AutoTest
             var sb = new StringBuilder();
             sb.AppendLine("=== 固定難易度スイープ ===");
             sb.AppendLine($"日時    : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-            sb.AppendLine($"配線AI  : {wiringSkill}");
+            sb.AppendLine($"配線AI  : {WiringSkillLine()}");
             sb.AppendLine($"ペルソナ Standard 固定 / 遺物 "
                         + (forceNoRelic ? "**なし** (対照アーム)"
                            : "TheoreticalBest (心眼 3 個・30 段) 固定"));
@@ -185,35 +151,9 @@ namespace AutoTest
                     //   これが無いと GameRng の counters が clear されず run 塩も derive されない。
                     //   結果、 ラン間で乱数列が引き継がれて挙動が壊れる (2026-08-04 修正)。
                     int runIdx = 10000 + si * runs + i;
-                    if (_ultraBatchActive)
-                    {
-                        bool beganRun;
-                        string beginRunReason;
-                        try { beganRun = _ultraController.TryBeginRun(runIdx, out beginRunReason); }
-                        catch (Exception ex)
-                        {
-                            beganRun = false;
-                            beginRunReason = ex.GetType().Name + ": " + ex.Message;
-                        }
-                        if (!beganRun)
-                        {
-                            FailUltraDuringBatch("run " + runIdx + " rejected: " + beginRunReason);
-                            RestoreChallengeFixedSweepState(prevSuppress, prevPickMode, prevHidden5, prevBD);
-                            yield break;
-                        }
-                    }
-                    int productionOrdinal = si * runs + i;
-                    if (ultraProductionWorkerMode)
-                    {
-                        BeginUltraProductionScenario(productionOrdinal, runIdx);
-                    }
-                    else
-                    {
-                        _currentUltraProductionScenarioSeed = 0UL;
-                        GameLoop.GameRng.BeginRun(runIdx);
-                    }
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
+                    // (旧 Ultra の候補ワーカーはここで合成シードへ差し替えていた・2026-11-13 削除・#135)
+                    GameLoop.GameRng.BeginRun(runIdx);
+                    RebuildRunRng(runIdx);
                     _currentPersona = BuildPersona.Standard;
                     yield return RunOne(runIdx);
                     var rec = _records.Count > 0 ? _records[_records.Count - 1] : null;
@@ -223,23 +163,6 @@ namespace AutoTest
                     reach[Mathf.Clamp(reached, 0, 8)]++; sumFloor += reached;
                     if (cf >= 5) c5++;
                     if (cf >= 7) c7++;
-                    if (_ultraBatchActive)
-                    {
-                        int completedRuns = si * runs + i + 1;
-                        string runSummary = "run=" + runIdx
-                            + " floor=" + reached
-                            + " outcome=" + (rec != null ? rec.outcome.ToString() : "NO_RECORD");
-                        UltraProgressHub.ReportRunCompleted(
-                            _ultraProgressSession, completedRuns, runSummary);
-                        try { _ultraController.CompleteRun(runIdx, runSummary); }
-                        catch (Exception ex)
-                        {
-                            FailUltraDuringBatch("run completion callback failed: "
-                                + ex.GetType().Name + ": " + ex.Message);
-                            RestoreChallengeFixedSweepState(prevSuppress, prevPickMode, prevHidden5, prevBD);
-                            yield break;
-                        }
-                    }
                     if ((i + 1) == 1 || (i + 1) % 10 == 0 || (i + 1) == runs)
                     {
                         try
@@ -253,10 +176,7 @@ namespace AutoTest
                               + $"arm={si + 1}/{challengeSweepScores.Length}\n"
                               + $"runs={i + 1}/{runs}\nrecords={_records.Count}\n"
                               + $"elapsedSeconds={elapsed:F1}\netaSeconds={eta:F1}\n"
-                              + $"heartbeat={heartbeat}\nphase={lastPhaseSeen}\n"
-                              + $"superWiringDecisions={superAI.wiringDecisions}\n"
-                              + $"superRerollDecisions={superAI.rerollDecisions}\n"
-                              + $"superRolloutEvaluations={superAI.rolloutEvaluations}\n",
+                              + $"heartbeat={heartbeat}\nphase={lastPhaseSeen}\n",
                                 new UTF8Encoding(false));
                         }
                         catch (Exception ex)
@@ -294,31 +214,6 @@ namespace AutoTest
             MetaProgression.MetaBuffApplicator.SuppressRelicGrant = previousRelicSuppression;
             GameLoop.GameManager.SuppressLayer5HiddenBoss = previousHiddenBossSuppression;
             GameLoop.GameManager.GrantBladeDanceOnFloor5Clear = previousBladeDanceGrant;
-        }
-
-        private void CompleteUltraBatchIfActive(string summary)
-        {
-            if (!_ultraBatchActive) return;
-            UltraProgressHub.Complete(_ultraProgressSession, summary);
-            try { _ultraController?.CompleteBatch(summary); }
-            catch (Exception ex)
-            {
-                Debug.LogError("[AutoRunner][Ultra] completion callback failed: " + ex.Message);
-            }
-            try { _ultraController?.Dispose(); } catch { }
-            _ultraController = null;
-            _ultraBatchActive = false;
-        }
-
-        private void FailUltraDuringBatch(string reason)
-        {
-            string detail = string.IsNullOrEmpty(reason) ? "unknown Ultra batch failure" : reason;
-            UltraProgressHub.Fail(_ultraProgressSession, detail);
-            try { _ultraController?.Cancel(detail); } catch { }
-            try { _ultraController?.Dispose(); } catch { }
-            _ultraController = null;
-            _ultraBatchActive = false;
-            Debug.LogError("[AutoRunner][Ultra] BATCH ABORTED: " + detail);
         }
 
         /// <summary>遺物 単軸スイープ。 **軸 1 本だけを載せて、その軸の寄与を切り出す。**
@@ -415,7 +310,7 @@ namespace AutoTest
                 { "Plunder", "ショップ強盗 解禁" },
                 { "Trade",   "99%引きの特売枠が出る" },
                 { "Supply",  "開幕パッシブが 2択" },
-                { "Lantern", "横移動の物資消費 5→2" },
+                { "Armor",   $"〈不動〉一撃の上限 (最大HP の {Math.Round(MetaProgression.MetaPanel.ArmorHitCapPct * 100)}%)" },
             };
 
             double baseClear = 0;
@@ -430,8 +325,7 @@ namespace AutoTest
                 {
                     int runIdx = 60000 + i;   // 全アーム共通シード
                     GameLoop.GameRng.BeginRun(runIdx);
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
+                    RebuildRunRng(runIdx);
                     yield return RunOne(runIdx);
                     var rec = _records.Count > 0 ? _records[_records.Count - 1] : null;
                     if (rec != null && rec.bandScore >= 0)
@@ -497,8 +391,7 @@ namespace AutoTest
                 {
                     int runIdx = 70000 + i;
                     GameLoop.GameRng.BeginRun(runIdx);
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
+                    RebuildRunRng(runIdx);
                     yield return RunOne(runIdx);
                     var rec = _records.Count > 0 ? _records[_records.Count - 1] : null;
                     if (rec != null && rec.bandScore >= 0) { valid++; if (rec.bandScore >= 11) clears++; }
@@ -747,9 +640,7 @@ namespace AutoTest
             //   **これは症状を揃えているだけで、 原因を直してはいない。**
             GameLoop.GameRng.BeginRun(RankMarginWarmupSeed);
             UnityEngine.Random.InitState(RankMarginWarmupSeed);
-            if (GameLoop.GameRng.IsSeeded)
-                _rng = new System.Random(GameLoop.GameRng.Range(
-                    0, int.MaxValue, "autorun.eventTiebreak", RankMarginWarmupSeed));
+            RebuildRunRng(RankMarginWarmupSeed);
             yield return RunOne(RankMarginWarmupSeed);
 
             for (int i = 0; i < runs; i++)
@@ -763,8 +654,7 @@ namespace AutoTest
                 //   **プロセスへ分割した瞬間に先頭ランだけ割れる** (実測 9/900・境界ちょうど)。
                 //   ここが抜けていると並列版と逐次版が一致しない。
                 UnityEngine.Random.InitState(runIdx);
-                if (GameLoop.GameRng.IsSeeded)
-                    _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
+                RebuildRunRng(runIdx);
                 yield return RunOne(runIdx);
                 var rec = _records.Count > 0 ? _records[_records.Count - 1] : null;
                 // **打ち切りは理由ごと残す。** 無効ランは母数から外れるので、
@@ -834,8 +724,7 @@ namespace AutoTest
                     // **全アームで同じ runIdx** ── ここを崩すと差にシード分散が丸ごと乗る。
                     int runIdx = 50000 + i;
                     GameLoop.GameRng.BeginRun(runIdx);
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
+                    RebuildRunRng(runIdx);
                     yield return RunOne(runIdx);
                     var rec = _records.Count > 0 ? _records[_records.Count - 1] : null;
                     if (rec != null && rec.bandScore >= 0)
@@ -902,8 +791,7 @@ namespace AutoTest
                     // **全アームで同じ runIdx。** ここを崩すと差にシード分散が丸ごと乗る。
                     int runIdx = 70000 + i;
                     GameLoop.GameRng.BeginRun(runIdx);
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
+                    RebuildRunRng(runIdx);
                     _pendingGrantItemId = grant;
                     yield return RunOne(runIdx);
 
@@ -1033,8 +921,7 @@ namespace AutoTest
                     // **全ペルソナで同じ runIdx** ＝ ペア比較 (pi を混ぜない)。
                     int runIdx = 70000 + i;
                     GameLoop.GameRng.BeginRun(runIdx);
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
+                    RebuildRunRng(runIdx);
                     _currentPersona = persona;
                     _pendingChallengeDifficulty = loadout;
                     _pendingPresetRelic = null;
@@ -1199,8 +1086,7 @@ namespace AutoTest
                     //   スイープ内は呼び出し履歴が同一なので再現する (ノイズ床 0/300) 一方、
                     //   別のスイープ関数から回すと履歴が変わって同一シードのランが割れていた。
                     UnityEngine.Random.InitState(runIdx);
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
+                    RebuildRunRng(runIdx);
                     _currentPersona = BuildPersona.Standard;
                     _pendingPresetRelic = cmpRelic;
                     _pendingChallengeDifficulty = cmpLoadout;
@@ -1360,8 +1246,7 @@ namespace AutoTest
                     // **BeginRun を必ず呼ぶ** (理由は RunChallengeFixedSweep 側のコメント参照)。
                     int runIdx = pi * runs + i;
                     GameLoop.GameRng.BeginRun(runIdx);
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIdx));
+                    RebuildRunRng(runIdx);
                     _currentPersona = BuildPersona.Standard;
                     _pendingPresetRelic = relic;             // RunOne 内の ResetAll 直後に適用される
                     yield return RunOne(runIdx);
@@ -1442,12 +1327,12 @@ namespace AutoTest
             System.Array.Clear(CombatStats.RerollStats, 0,
                                CombatStats.RerollStats.Length);
             CombatStats.ResetDamageBreakdown();
-            SuperCombatAI.ResetSearchStats();
             ResetNavStats();
-            AutoTest.FamilyTierStats.Reset();
         }
 
-        /// <summary>実ランから5F到達ビルドを採取し、全(武器×ダイス)で5Fボス勝率を総当たり計測。</summary>
+        /// <summary>実ランから5F到達ビルドを採取し、全武器で5Fボス勝率を総当たり計測。
+        /// (2026-11-12: ダイスの品の廃止 (2026-08-17) に合わせてダイスの次元を外した。 それまでは有効なダイスが
+        ///  0 本で、 採取の後に必ず「有効な武器/ダイスIDがありません」で止まっていた)</summary>
         private IEnumerator RunBoss5Sweep(GameManager gm)
         {
             // --- Phase A: 実ランから「5F到達時ビルド」を採取 ---
@@ -1470,15 +1355,13 @@ namespace AutoTest
                 yield break;
             }
 
-            // --- 有効な武器/ダイスIDに絞る ---
+            // --- 有効な武器IDに絞る ---
             var db = ItemDatabase.Instance;
             var weapons = new List<string>();
             foreach (var w in simWeapons) if (db?.GetItem(w) != null) weapons.Add(w);
-            var dice = new List<string>();
-            foreach (var d in simDice) if (db?.GetItem(d) != null) dice.Add(d);
-            if (weapons.Count == 0 || dice.Count == 0)
+            if (weapons.Count == 0)
             {
-                _simReport = "有効な武器/ダイスIDがありません。simWeapons / simDice を確認してください。\n";
+                _simReport = "有効な武器IDがありません。simWeapons を確認してください。\n";
                 yield break;
             }
 
@@ -1487,119 +1370,59 @@ namespace AutoTest
             GameLoop.GameManager.SelectedClass = (GameLoop.ClassType)GameLoop.GameRng.RangeAuto("AutoRunner.2", 0, 4);
             gm.StartNewRun();
 
-            // --- Phase B: 全(武器×ダイス)スイープ ---
+            // --- Phase B: 全武器スイープ ---
             var winPct = new Dictionary<string, double>();
-            int comboCount = weapons.Count * dice.Count;
             int comboIdx = 0;
             foreach (var weapon in weapons)
             {
-                foreach (var d in dice)
+                int wins = 0;
+                for (int t = 0; t < simTrialsPerCombo; t++)
                 {
-                    int wins = 0;
-                    for (int t = 0; t < simTrialsPerCombo; t++)
-                    {
-                        var b = _simBases[t % _simBases.Count];
-                        var run = gm.Run;
-                        run.playerHP = simBaseHP;
-                        run.playerMaxHP = simBaseHP;
-                        run.weaponPlus = b.weaponPlus;
-                        run.limitBreakStage = b.limitBreakStage;
-                        run.equippedWeaponId = weapon;
-                        run.equippedDiceId = d;
-                        run.ownedPassiveItems = new List<string>(b.passives);
+                    var b = _simBases[t % _simBases.Count];
+                    var run = gm.Run;
+                    run.playerHP = simBaseHP;
+                    run.playerMaxHP = simBaseHP;
+                    run.weaponPlus = b.weaponPlus;
+                    run.limitBreakStage = b.limitBreakStage;
+                    run.equippedWeaponId = weapon;
+                    run.ownedPassiveItems = new List<string>(b.passives);
 
-                        var res = gm.SimulateBossFight(simBossFloor);
-                        if (res.playerWon) wins++;
+                    var res = gm.SimulateBossFight(simBossFloor);
+                    if (res.playerWon) wins++;
 
-                        if ((t & 127) == 0) yield return null; // フレーム譲り
-                    }
-                    winPct[weapon + "|" + d] = 100.0 * wins / Mathf.Max(1, simTrialsPerCombo);
-                    comboIdx++;
-                    if ((comboIdx & 3) == 0) Debug.Log($"[AutoRunner] スイープ {comboIdx}/{comboCount}");
-                    yield return null;
+                    if ((t & 127) == 0) yield return null; // フレーム譲り
                 }
+                winPct[weapon] = 100.0 * wins / Mathf.Max(1, simTrialsPerCombo);
+                comboIdx++;
+                if ((comboIdx & 3) == 0) Debug.Log($"[AutoRunner] スイープ {comboIdx}/{weapons.Count}");
+                yield return null;
             }
 
-            _simReport = BuildSweepReport(weapons, dice, winPct);
+            _simReport = BuildSweepReport(weapons, winPct);
         }
 
-        /// <summary>ダイスIDの短縮表示コード（マトリクス列見出し用）。</summary>
-        private static string DiceCode(string id)
-        {
-            switch (id)
-            {
-                case "dice_wood": return "Wo";
-                case "dice_bone": return "Bo";
-                case "dice_copper": return "Co";
-                case "dice_iron": return "Ir";
-                case "dice_biased": return "Bi";
-                case "dice_gem": return "Ge";
-                case "dice_flame": return "Fl";
-                case "dice_stable": return "Sb";
-                case "dice_twinsnake": return "Tw";
-                case "dice_star": return "Sr";
-                case "dice_destiny": return "De";
-                case "dice_greed": return "Gr";
-                case "dice_moroha": return "Mo";
-                case "dice_perfection": return "Pf";
-                default: return id.StartsWith("dice_") ? id.Substring(5, Math.Min(2, id.Length - 5)) : id;
-            }
-        }
-
-        private string BuildSweepReport(List<string> weapons, List<string> dice, Dictionary<string, double> winPct)
+        private string BuildSweepReport(List<string> weapons, Dictionary<string, double> winPct)
         {
             var sb = new StringBuilder();
             sb.AppendLine("================ 5Fボス 勝率スイープ ================");
             sb.AppendLine($"日時          : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             sb.AppendLine($"対象ボス      : boss_layer{simBossFloor}");
-            sb.AppendLine($"採取ビルド数  : {_simBases.Count}（実ランの5F到達時パッシブ/強化段階を土台。武器・ダイスのみ差し替え）");
+            sb.AppendLine($"採取ビルド数  : {_simBases.Count}（実ランの5F到達時パッシブ/強化段階を土台。武器のみ差し替え）");
             sb.AppendLine($"戦闘開始HP    : {simBaseHP}（固定。採取ビルドの現在HPは不使用）");
-            sb.AppendLine($"試行/組合せ   : {simTrialsPerCombo}（採取ビルドをラウンドロビンで均等使用）");
-            sb.AppendLine("※消費アイテムは不使用（武器×ダイスの素の勝率を比較）");
+            sb.AppendLine($"試行/武器     : {simTrialsPerCombo}（採取ビルドをラウンドロビンで均等使用）");
+            sb.AppendLine("※消費アイテムは不使用（武器の素の勝率を比較）");
             sb.AppendLine();
 
-            // 凡例
-            sb.AppendLine("---- ダイス略号 ----");
-            var legend = new StringBuilder("  ");
-            foreach (var d in dice) legend.Append($"{DiceCode(d)}={d.Replace("dice_", "")}  ");
-            sb.AppendLine(legend.ToString());
-            sb.AppendLine();
-
-            // マトリクス（行=武器, 列=ダイス, 値=勝率%）
-            sb.AppendLine("---- 勝率マトリクス（行=武器 / 列=ダイス） ----");
-            var header = new StringBuilder();
-            header.Append(PadR("武器", 12));
-            foreach (var d in dice) header.Append(PadL(DiceCode(d), 5));
-            sb.AppendLine(header.ToString());
-            foreach (var w in weapons)
+            // 勝率の高い順 (同率は simWeapons の並び)
+            var order = new List<string>(weapons);
+            order.Sort((a, b) =>
             {
-                var row = new StringBuilder();
-                row.Append(PadR(TruncDisp(w, 11), 12));
-                foreach (var d in dice)
-                {
-                    double v = winPct.TryGetValue(w + "|" + d, out var p) ? p : -1;
-                    row.Append(PadL(v < 0 ? "-" : v.ToString("F0") + "%", 5));
-                }
-                sb.AppendLine(row.ToString());
-            }
-            sb.AppendLine();
-
-            // 上位/下位 組み合わせ
-            var all = new List<KeyValuePair<string, double>>(winPct);
-            all.Sort((a, b) => b.Value.CompareTo(a.Value));
-            sb.AppendLine("---- 勝率トップ10（強コンボ） ----");
-            for (int i = 0; i < all.Count && i < 10; i++)
-            {
-                var k = all[i].Key; int bar = k.IndexOf('|');
-                sb.AppendLine($"  {PadR(k.Substring(0, bar), 12)}{PadR(k.Substring(bar + 1).Replace("dice_", ""), 14)}{PadL(all[i].Value.ToString("F0") + "%", 5)}");
-            }
-            sb.AppendLine();
-            sb.AppendLine("---- 勝率ワースト10（弱コンボ） ----");
-            for (int i = all.Count - 1; i >= 0 && i >= all.Count - 10; i--)
-            {
-                var k = all[i].Key; int bar = k.IndexOf('|');
-                sb.AppendLine($"  {PadR(k.Substring(0, bar), 12)}{PadR(k.Substring(bar + 1).Replace("dice_", ""), 14)}{PadL(all[i].Value.ToString("F0") + "%", 5)}");
-            }
+                int c = winPct[b].CompareTo(winPct[a]);
+                return c != 0 ? c : weapons.IndexOf(a).CompareTo(weapons.IndexOf(b));
+            });
+            sb.AppendLine("---- 武器別 勝率（高い順） ----");
+            foreach (var w in order)
+                sb.AppendLine($"  {PadR(TruncDisp(w, 11), 12)}{PadL(winPct[w].ToString("F0") + "%", 5)}");
             sb.AppendLine();
             return sb.ToString();
         }

@@ -112,9 +112,6 @@ namespace ItemSystem.PassiveSkills
             return result;
         }
 
-        /// <summary>表示名。 <b>id がそのまま表示名</b> (2026-09-22)。 呼び出し側の互換のために残す。</summary>
-        public static string DisplayName(string internalName) => internalName;
-
         /// <summary>その武器の家系キーと段を返す。 進行武器でなければ false。
         ///
         /// <para><b>id を綴りで切らない</b> (2026-09-22)。 items.json の <c>family</c> / <c>tier</c> を読む。

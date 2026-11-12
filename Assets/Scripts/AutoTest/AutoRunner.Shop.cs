@@ -13,7 +13,6 @@ using MapSystem;
 using EventSystem;
 using ItemSystem;
 using ItemSystem.Shop;
-using AutoTest.Ultra;
 
 namespace AutoTest
 {
@@ -230,39 +229,6 @@ namespace AutoTest
         }
 
         private readonly List<double> _exploreWeights = new List<double>();
-
-        /// <summary>[計装] ラン終了時の家系別最高段を <see cref="FamilyTierStats"/> へ渡す。
-        ///
-        /// <para><b>14 家系すべてを渡す。</b> 取得された家系だけを渡すと
-        /// 「0 段で終わった家系」が分母から落ち、 到達率が過大に出る。</para></summary>
-        private void NoteFamilyTierRunEnd()
-        {
-            var run = GameManager.Instance?.Run;
-            var db = ItemSystem.ItemDatabase.Instance;
-            var max = new Dictionary<string, int>();
-            foreach (var fam in ItemSystem.PassiveSkills.PassiveSkillRegistry.LeveledFamilies)
-                max[fam] = 0;
-
-            void Scan(string id)
-            {
-                var d = db?.GetItem(id);
-                if (d?.passiveSkills == null) return;
-                foreach (var ps in d.passiveSkills)
-                {
-                    if (string.IsNullOrEmpty(ps.internalName)) continue;
-                    var (f, lv) = ItemSystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(ps.internalName);
-                    if (lv > 0 && max.TryGetValue(f, out int prev) && lv > prev) max[f] = lv;
-                }
-            }
-            if (run != null)
-            {
-                if (run.ownedPassiveItems != null) foreach (var id in run.ownedPassiveItems) Scan(id);
-                Scan(run.equippedWeaponId);
-                // 昇華済みも「到達した段」として数える (1G 割引の根拠と揃える)。
-                if (run.ascendedPassiveIds != null) foreach (var id in run.ascendedPassiveIds) Scan(id);
-            }
-            AutoTest.FamilyTierStats.EndRun(max);
-        }
 
         private float Rank(MapNode node, float hpRatio, bool averse, bool preferRest, GameLoop.RunState run,
                            float lowBar)
@@ -569,12 +535,6 @@ namespace AutoTest
                         || s.price > GameLoop.ProvisionPayment.PolicyAffordable(run) - _shopReserve)
                         return false;
                     if (SealedPassive(s)) return false;   // 誓約が封じた軸の品 (価値を見ない第 3 段もここを通る)
-                    if (s.kind != ItemSystem.Shop.ShopSlotKind.WeaponMaterial
-                        && !string.IsNullOrEmpty(s.itemId))
-                    {
-                        // 2026-06-22 Phase C: 購入候補が現所持品の上位 Lv なら、 下位 Lv を先に売却 (装備武器は除く)
-                        TrySellLowerTierBefore(run, s.itemId);
-                    }
                     int before = run.coins;
                     string id = s.itemId;
                     gm.ShopBuy(i);
@@ -603,60 +563,6 @@ namespace AutoTest
                         return true;
                     }
                     return false;
-                }
-
-                // Phase C: 購入候補のパッシブが、 現所持品 (装備武器以外) の上位 Lv に該当するなら下位を売却
-                void TrySellLowerTierBefore(RunState rs, string candidateItemId)
-                {
-                    var db = ItemSystem.ItemDatabase.Instance;
-                    if (db == null || rs == null) return;
-                    var cdata = db.GetItem(candidateItemId);
-                    if (cdata?.passiveSkills == null) return;
-                    // 候補の各パッシブの (家系, Lv) を抽出
-                    var candidateFamilyLv = new Dictionary<string, int>();
-                    foreach (var ps in cdata.passiveSkills)
-                    {
-                        if (string.IsNullOrEmpty(ps.internalName)) continue;
-                        var (fam, lv) = ItemSystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(ps.internalName);
-                        if (lv > 0 && (!candidateFamilyLv.TryGetValue(fam, out int prev) || lv > prev))
-                            candidateFamilyLv[fam] = lv;
-                    }
-                    if (candidateFamilyLv.Count == 0) return;
-                    // 所持品 (装備武器・装備ダイス以外) を見て、 下位 Lv を持つアイテムを売却対象に
-                    int safety = 0;
-                    while (safety++ < 8)
-                    {
-                        int targetIdx = -1;
-                        for (int j = 0; j < rs.ownedPassiveItems.Count; j++)
-                        {
-                            string ownedId = rs.ownedPassiveItems[j];
-                            if (string.IsNullOrEmpty(ownedId)) continue;
-                            if (ownedId == rs.equippedWeaponId) continue; // 装備武器は除外
-                            if (ownedId == rs.equippedDiceId) continue;
-                            var odata = db.GetItem(ownedId);
-                            if (odata?.passiveSkills == null) continue;
-                            bool isLowerTier = false;
-                            foreach (var ops in odata.passiveSkills)
-                            {
-                                if (string.IsNullOrEmpty(ops.internalName)) continue;
-                                var (ofam, olv) = ItemSystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(ops.internalName);
-                                if (olv > 0 && candidateFamilyLv.TryGetValue(ofam, out int candLv) && candLv > olv)
-                                {
-                                    isLowerTier = true; break;
-                                }
-                            }
-                            if (!isLowerTier) continue;
-                            // 2026-06-23c: 由来制限撤廃 ── TrySellFromBot が「ショップ滞在中なら由来問わず売却可」 を統括
-                            targetIdx = j;
-                            break;
-                        }
-                        if (targetIdx < 0) break;
-                        string sellId = rs.ownedPassiveItems[targetIdx];
-                        int coinsBefore = rs.coins;
-                        if (AutoTest.BotSelling.TrySellFromBot(rs, targetIdx))
-                            UnityEngine.Debug.Log($"[Phase C] 上位購入前に下位 {sellId} を売却 (+{rs.coins - coinsBefore}G)");
-                        else break;
-                    }
                 }
 
                 // --- [アブレーション] ショップの購入判断を潰す ---
@@ -1662,37 +1568,8 @@ namespace AutoTest
             _lastShopExitFloor = gm.Run != null ? gm.Run.Depth : 0;
             _lastShopExitSeen = true;
             _shopReserve = 0;
-            NoteUpgradeDeclines(gm.Run);
             AuditShopExit(gm, inv);
             gm.ExitShop();
-        }
-
-        /// <summary>[計装] 店を出る時点で売れ残っている 1G アップグレード枠を、
-        /// **理由別に 1 スロット 1 回だけ**数える (§ FamilyTierStats ②)。
-        ///
-        /// <para><b>成約率だけでは「段の設計」を判定できない。</b> 購入の足切り
-        /// (<c>if (pw &lt; effMinPower) continue;</c>) は<b>価格を一切見ず</b>、
-        /// コスパ (<c>ΔPower/G</c>) は準パワー同点時のタイブレークにしか使われない。
-        /// つまり見送りは「より良い品を選んだ」とは限らず、
-        /// <b>学習スコアが閾値に届かなかっただけ</b>の可能性が高い。 そこを分ける。</para>
-        ///
-        /// <para>判定に使うのは<b>最も緩い帯</b> <c>PowerCuts[3]</c> ── 実際の購入ループが
-        /// 最後にそこまで緩めて回るので、 これを下回った品は<b>どの周回でも一度も候補に入っていない</b>。</para></summary>
-        private void NoteUpgradeDeclines(GameLoop.RunState run)
-        {
-            var inv = ItemSystem.Shop.ShopManager.Instance?.Current;
-            if (inv?.slots == null || run == null) return;
-            float loosest = AutoTest.LearnedPriorityProvider.PowerCuts[3];
-            for (int i = 0; i < inv.slots.Count; i++)
-            {
-                var s = inv.slots[i];
-                if (s == null || s.sold || s.upgradeStep <= 0) continue;
-                float pw = AutoTest.LearnedPriorityProvider.BuyScore(s.itemId)
-                         + (s.discountPct >= 60 ? 2 : (s.discountPct >= 40 ? 1 : 0));
-                if (pw < loosest) AutoTest.FamilyTierStats.NoteUpgradeDeclined(FamilyTierStats.DeclineCut);
-                else if (run.coins < s.price) AutoTest.FamilyTierStats.NoteUpgradeDeclined(FamilyTierStats.DeclineNoGold);
-                else AutoTest.FamilyTierStats.NoteUpgradeDeclined(FamilyTierStats.DeclineOutbid);
-            }
         }
     }
 }

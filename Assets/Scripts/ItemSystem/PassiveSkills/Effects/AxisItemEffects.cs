@@ -21,7 +21,6 @@ namespace ItemSystem.PassiveSkills.Effects
         public static int AtkDice(CombatContext ctx) => Count(ctx, MutualKeys.AttackDiceCount);
         public static int BlockDice(CombatContext ctx) => Count(ctx, MutualKeys.BlockDiceCount);
         public static int DiceTotal(CombatContext ctx) => ctx.playerDice != null ? ctx.playerDice.Length : 3;
-        public static int HalfUp(int n) => (n + 1) / 2;
     }
 
     /// <summary>誓約の封じ。 <b>戦闘の情報を作った直後</b>に所持品から立てる (PassiveSkillManager)。
@@ -343,7 +342,7 @@ namespace ItemSystem.PassiveSkills.Effects
     //  臨界 (炉温)
     // ============================================================
 
-    /// <summary>火守りの火搔き棒 (燃料): 攻撃に挿さなかったダイス 1 個につき臨界 +4。</summary>
+    /// <summary>火守りの火搔き棒 (燃料): 攻撃の端子を挿さなかったダイス 1 個につき臨界 +4。</summary>
     public class FirekeeperPoker : IPassiveSkillEffect
     {
         public string SkillId => "火守りの火搔き棒";
@@ -406,7 +405,7 @@ namespace ItemSystem.PassiveSkills.Effects
     //  充電 (電流)
     // ============================================================
 
-    /// <summary>継ぎ足しの蓄電瓶 (燃料): 充電端子に挿したダイス 1 個につき、 充電 +2。</summary>
+    /// <summary>継ぎ足しの蓄電瓶 (燃料): 充電の端子を挿したダイス 1 個につき、 充電 +2。</summary>
     public class ToppedJar : IPassiveSkillEffect
     {
         public string SkillId => "継ぎ足しの蓄電瓶";
@@ -427,7 +426,7 @@ namespace ItemSystem.PassiveSkills.Effects
             => ctx.AddCharge(ctx.AxisDepth(AxisRules.Charge), raiseOverflow: false);
     }
 
-    /// <summary>二股の端子 (②【規則】): 充電端子に挿した出目の「電流 × 12%」(最大 80%) が攻撃にも加わる (2026-11-07: 旧 ×8%) (CombatManager の配線集計)。</summary>
+    /// <summary>二股の端子 (②【規則】): 充電の端子を挿した出目の「電流 × 12%」(最大 80%) が攻撃にも加わる (2026-11-07: 旧 ×8%) (CombatManager の配線集計)。</summary>
     public class ForkedTerminal : IPassiveSkillEffect
     {
         public string SkillId => "二股の端子";
@@ -471,7 +470,7 @@ namespace ItemSystem.PassiveSkills.Effects
             => ctx.shieldKeepBonusPct = System.Math.Max(ctx.shieldKeepBonusPct, 5 * ctx.AxisDepth(AxisRules.Shield));
     }
 
-    /// <summary>盾押しの心得 (②【規則】): 攻撃に挿したターン、 シールドの「堅牢 × 5%」が攻撃に加わる (2026-11-11: 10% → 5%・2026-11-07: 2% → 10%)。 シールドは減らない。
+    /// <summary>盾押しの心得 (②【規則】): 攻撃の端子を挿したターン、 シールドの「堅牢 × 5%」が攻撃に加わる (2026-11-11: 10% → 5%・2026-11-07: 2% → 10%)。 シールドは減らない。
     /// 2026-11-11: ヴェスカ戦の主攻撃の基礎の 31% をこの 1 品が出していた (シールドは減らず、 毎ターン満額が乗る)。</summary>
     public class ShieldPushArt : IPassiveSkillEffect
     {

@@ -10,7 +10,7 @@ namespace UI
     /// 前提: 同 GameObject に Collider2D（BoxCollider2D 等）と SpriteRenderer。
     /// 透視カメラでも `ScreenPointToRay`＋`Physics2D.GetRayIntersection` でワールドのスプライトを正しく拾う。
     ///
-    /// 使い方: タイトルの PLAY / スキルツリーのスプライトに付け、 BoxCollider2D を絵に合わせる。 onClick に遷移処理を配線。
+    /// 使い方: タイトルの PLAY / SKILL TREE のスプライトに付け、 BoxCollider2D を絵に合わせる。 onClick に遷移処理を配線。
     /// </summary>
     [RequireComponent(typeof(Collider2D))]
     public class SpriteButton : MonoBehaviour

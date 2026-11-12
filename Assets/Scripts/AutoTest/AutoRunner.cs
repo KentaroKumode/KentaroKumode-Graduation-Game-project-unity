@@ -13,7 +13,6 @@ using MapSystem;
 using EventSystem;
 using ItemSystem;
 using ItemSystem.Shop;
-using AutoTest.Ultra;
 
 namespace AutoTest
 {
@@ -105,56 +104,53 @@ namespace AutoTest
             Naive,
             /// <summary>最適: 3^5 の割り当てを全列挙し役の価値も効用へ入れる。 リロールと役も使う。</summary>
             Optimal,
-            /// <summary>天井: 戦闘決着まで前向きに読む (<see cref="SuperCombatAI"/>)。
+            /// <summary>天井: 「攻略を知り尽くした人」(docs/GAME.md §13-7 の技量の梯子)。
             ///
-            /// Optimal との差が「1 ターン貪欲では届かない読みの深さ」＝ **技量帯の上半分**。
-            /// **未来の出目は読まない** ── ロールアウトは専用乱数で、 GameRng を消費しない。
-            /// 1 ターンあたりの計算量が 2 桁上がるので、 スイープは短めのラン数で。</summary>
+            /// <para><b>2026-11-12 時点の実態: 戦闘の判断は先読みしない。</b> 端子の山札 (2026-11-11) の後は、 どの技量でも配線は
+            /// <c>DeckWiringPlanPolicy</c>、 リロールは <c>MutualRerollPolicy</c> に上書きされる (AutoRunner.Combat)。
+            /// 旧 <c>SuperCombatAI</c> (戦闘決着までのロールアウト) は 2026-11-12 に削除した (#135)。
+            /// 先読みは山札の 2 ターン先読み <c>deckLookahead</c> (#105・既定 OFF) だけで、 技量とは別の口。</para>
+            /// <para>Super が Optimal と違うのは Begin が立てる次の物: 予告を読む防御 (重い攻撃の予告でリロール +1・v3.superDefense)・
+            /// 護符の使い時 (v3.superConsumables)・与ダメの倍率と敵のパッシブを配線の効用で読む (v3.readOutgoingMult / readEnemyPassives の −1)・
+            /// 航行の計画 (v3.macroPlan)・戦闘名の危険度で避ける (v3.superNav → UseLearnedDanger)・無段階の序列 (superBuyTiers)・
+            /// ITT の Super 版の序列と価格の差し引き (superOwnItt / superIttPriceK)・段階 3 の値順の購入 (v3.phase3Ranked)・
+            /// 軸に絞る買い方 (v3.axisCommitBuy)・難易度 10 の 6 層の店の全投入 (IsSuperTailMode)。
+            /// 配線のミスなし (Super は wiringMistakeRate=0・Optimal は 2026-11-12 #134 から optimalMistakeRate で次点を選ぶ) は Optimal との差になる。 防ぎ切りの規則 (FreeBlockRule) は、 山札の方策と HP の帳簿 (既定) では差にならない。</para></summary>
             Super,
-            /// <summary>厳密: 近似を入れない expectimax (<see cref="ExactCombatAI"/>)。
+            /// <summary>厳密: 旧い expectimax の参照実装 (ExactCombatAI) を差していた技量。
             ///
-            /// <para>**天井の位置を測るための参照実装**で、 バランス測定には使わない。
-            /// Super との差が「Super が理論値からどれだけ遠いか」になる。
-            /// 偶然ノードを全列挙するので**乱数を一切使わず**、 同じ盤面には同じ手を返す。
-            /// 速度は桁で落ちる ── ラン数は 3〜50 程度で回すこと。</para>
+            /// <para><b>2026-11-12 に ExactCombatAI を削除した。</b> 端子の山札 (2026-11-11) の後は、 配線もリロールも
+            /// AutoRunner.Combat で山札の方策に上書きされ、 ExactCombatAI の判断は 1 度も呼ばれていなかった。
+            /// 値は保存済みの設定 (EditorPrefs の番号) のために残す (戦闘の判断は Optimal と同じ山札の方策)。 2026-11-12 (#135) にメニューから選ぶ口を消した。</para>
             ///
             /// <para><b>末尾に足すこと。</b> 既存値の番号を動かすとセーブ/EditorPrefs が壊れる。</para></summary>
             Exact,
-            /// <summary>Production worker が実ゲームを使って Super の基準手を改善する方策。
-            /// 未登録・build不一致・checkpoint不完全では開始せず、実行中の個別判断失敗時だけ
-            /// 同じ状態で先に確保した Super の基準手へ戻る。</summary>
+            /// <summary>Ultra: 旧い「方策の組を並列ワーカーで測って最良を選び、 判断ごとに rollout で手を選ぶ」技量。
+            ///
+            /// <para><b>2026-11-13 に削除した (#135)。</b> 方策の組の中身は Super の設定違いで、 rollout の sink は
+            /// Ultra のメニューからしか立たなかった (通常のランでは 1 度も通っていない)。 値は保存済みの設定
+            /// (EditorPrefs の番号・並列ワーカーの config) のために残す。 選ばれていたら <see cref="Begin"/> が Super に読み替える。</para>
+            ///
+            /// <para><b>末尾に足すこと。</b> 既存値の番号を動かすとセーブ/EditorPrefs が壊れる。</para></summary>
             Ultra,
         }
         [Tooltip("配線方策の技量。同一シードで Naive/Optimal/Super を比較すると技量帯が測れる")]
         public WiringSkill wiringSkill = WiringSkill.Optimal;
-        [NonSerialized] private WiringSkill _ultraSelectedBaseSkill = WiringSkill.Super;
 
-        /// <summary>
-        /// Ultra が候補を採用できない判断で使う production baseline。
-        /// 表示・記録上の技量は <see cref="wiringSkill"/> の Ultra を維持する。
-        /// </summary>
+        /// <summary>判断に使う技量。 旧 Ultra (4) は <see cref="Begin"/> が Super に読み替えるので、 ここでも Super として読む。</summary>
         public WiringSkill EffectiveWiringSkill
-            => wiringSkill == WiringSkill.Ultra ? _ultraSelectedBaseSkill : wiringSkill;
+            => wiringSkill == WiringSkill.Ultra ? WiringSkill.Super : wiringSkill;
 
-        [Header("通常AI・並列評価")]
-        [Tooltip("【実験用】Optimal AI の配線候補評価を CPU 並列化する。長時間バッチで停止事例があるため既定OFF")]
-        public bool parallelizeOptimalWiring = false;
-        [Tooltip("この候補数以上で並列化する。小さい探索はスレッド起動コストを避けて直列実行")]
-        public int optimalWiringParallelMinCandidates = 128;
-        [Tooltip("並列ワーカー上限。0 は min(8, 論理CPU数-1)。小候補での過剰並列を防ぐ")]
-        public int optimalWiringMaxParallelism = 0;
-        [NonSerialized] public long optimalWiringDecisions;
-        [NonSerialized] public long optimalWiringCandidatesEvaluated;
-
-        /// <summary>技量帯の天井を担う先読み方策。 <see cref="WiringSkill.Super"/> のときだけ使う。
-        /// レバー (ロールアウト本数・候補数・深さ) はここから触る。</summary>
-        public SuperCombatAI superAI = new SuperCombatAI();
         /// <summary>SuperV3 の実験スイッチ (Optimal + 改善案)。 全 OFF なら Optimal と同一。</summary>
         public V3Flags v3 = new V3Flags();
 
         /// <summary>[2026-11-10] 配線の効用が与ダメの倍率を読むか (<see cref="V3Flags.readOutgoingMult"/> の実効値: −1 は Super だけ ON)。</summary>
         public bool ReadOutgoingMultEffective
             => v3.readOutgoingMult > 0 || (v3.readOutgoingMult < 0 && EffectiveWiringSkill == WiringSkill.Super);
+
+        /// <summary>[#107] 配線の効用が収支で決まる敵のパッシブと〈吸血〉を読むか (<see cref="V3Flags.readEnemyPassives"/> の実効値: −1 は Super だけ ON)。</summary>
+        public bool ReadEnemyPassivesEffective
+            => v3.readEnemyPassives > 0 || (v3.readEnemyPassives < 0 && EffectiveWiringSkill == WiringSkill.Super);
 
         /// <summary>[2026-11-10 試験] 盾〈黎明〉を「溜めて次の主攻撃 +%」にする形の率 (<see cref="ItemSystem.PassiveSkills.Effects.Daybreak.NextAttackPctPerUnit"/>)。
         /// 0 = 今の挙動 (最大 HP を直接削る)。 ラン開始時に本体の static へ入れ、 ラン終了時に 0 へ戻す。</summary>
@@ -170,6 +166,38 @@ namespace AutoTest
         public float probeMainMult = 1f;
         /// <summary>[測定 2026-11-11] 武器の段の上限 (0 = 上限なし)。 本体の <see cref="GameLoop.GameHooks.WeaponTierCap"/> へ流す。</summary>
         public int weaponTierCap = 0;
+        /// <summary>[測定 2026-11-12・#35] 追跡者の戦闘と報酬の差し替え。 本体の GameHooks.Pursuer* へ流す (ラン終了で既定へ)。
+        /// 攻撃倍率 0 以下・物資 負 = 差し替えない。</summary>
+        public bool pursuerNoReward = false;
+        public float pursuerAtkMul = 0f, pursuerHpAdd = 0f;
+        public int pursuerSupply = -1;
+        /// <summary>[測定 2026-11-12] 縄張りの作り。 本体の GameHooks.PursuerLeavesTerritory / TerritoryTreasure へ流す (ラン終了で既定へ)。
+        /// pursuerLeavesTerritory = true で旧い作り (追跡者は縄張りの外まで追う)。 territoryTreasure = None で宝を置かない。
+        /// 両方を旧い側 (True / None) にした腕は、 縄張りの作り直し (2026-11-12) より前と同じ動きになる。</summary>
+        public bool pursuerLeavesTerritory = false;
+        public GameLoop.TerritoryTreasureKind territoryTreasure = GameLoop.TerritoryTreasureKind.Forge;
+        /// <summary>[2026-11-12] BOT が縄張りの宝を取りに行くしきい値: 「HP の割合 − 追跡者の戦闘で失う HP の見積もり」がこれ以上の時だけ取りに行く
+        /// (<see cref="WantsTerritoryTreasure"/>)。 1 以上 = 取りに行かない。
+        /// <para>既定 9 = 取りに行かない (2026-11-12)。 Super・3000 ラン・同じシードで、 0.35 (取りに行く) 596 勝 < 9 (行かない) 627 勝だった。
+        /// その後に見積もりへ宝の点の戦闘を足した (直した規則は未測定)。 取りに行く規則を戻すのは、 0.35 / 0.5 / 0.7 の腕で行かない腕を上回ってから。
+        /// 取りに行かなくても、 道の途中で宝の点を踏めば宝は渡る。</para></summary>
+        public float territoryTreasureHpMargin = 9f;
+        /// <summary>[2026-11-12] 縄張りを出ない追跡者の層で、 縄張りを横切らない遠回り (<see cref="TerritoryAwareStep"/>) を、
+        /// 最短の道より何歩長いところまで選ぶか。 行った先から出口か店まで物資 (足りない分は HP) で歩ける時だけ選ぶ。
+        /// −1 = 縄張りを気にしない (この規則を入れる前の動き)。 追跡者を避けない方策 (Naive) と旧い作り (縄張りの外まで追う) には効かない。 仮置き。</summary>
+        public int navTerritoryDetour = 3;
+        /// <summary>[測定 2026-11-12・#102] 端子の調整を元の値へ戻す腕。 本体の GameHooks.Terminal* へ流す (ラン終了で既定へ)。
+        /// terminalHealMul: 〈治癒〉の倍率 (0 = 差し替えない = 今の値・旧は 2)。 terminalArresterNeed: 〈避雷器〉の溜める量 (0 = 今の値・旧は 12)。</summary>
+        public int terminalHealMul = 0, terminalArresterNeed = 0;
+        /// <summary>[測定 2026-11-12・#102] true = 〈応急箱〉を使ってもランの山札から抜かない (旧の作り)。 既定 false = 今の作り (使うと抜ける)。</summary>
+        public bool terminalFirstAidBattleOnly = false;
+        /// <summary>[測定 2026-11-13・#117] true = 端子の撃破のボーナスを旧い条件で配る (攻撃の端子に挿したターンの、 主攻撃までの撃破だけ)。
+        /// 本体の GameHooks.TerminalKillBonusNeedsAttack と、 BOT の撃破のボーナスの見積もり (OptimalTurnCore) の両方を切り替える。 既定 false = 今の作り (経路を問わない)。</summary>
+        public bool terminalKillNeedsAttack = false;
+        /// <summary>[測定 2026-11-12・#35] 航行の「恐れ」: 行き先の点が、 推定した追跡者の位置から <see cref="navFearRange"/> 歩より近いほど引く。
+        /// 引く量 = 恐れ × (範囲 − 推定の歩数)。 Optimal の行き先選び (価値の単位) は navFear、 Super の計画 (対数オッズ) は navFearMacro。 0 = 使わない。</summary>
+        public float navFear = 0f, navFearMacro = 0f;
+        public int navFearRange = 4;
         /// <summary>[測定 2026-11-11] ヴェスカ連戦の出目を固定する値 (0 = 触らない)。 本体の GameHooks.VescaDiceForce へ流す。</summary>
         public int vescaDiceForce = 0;
         /// <summary>[測定用の物差し 2026-11-10] 敵の HP に入る毒・出血・爆発・〈逆綴じの止血帯〉の量に掛ける倍率 (<see cref="CombatSystem.EnemyHpLedger.ProbePassiveMult"/>)。
@@ -193,50 +221,13 @@ namespace AutoTest
             => !string.IsNullOrEmpty(buyAxisFocus) && !string.IsNullOrEmpty(itemId)
             && ItemSystem.ItemDatabase.Instance?.GetItem(itemId)?.axis == buyAxisFocus;
 
-        /// <summary>厳密方策 (<see cref="WiringSkill.Exact"/> のときだけ使う)。
-        /// 天井の位置を測る参照実装で、 通常の測定には使わない。</summary>
-        public ExactCombatAI exactAI = new ExactCombatAI();
-
-        [NonSerialized] private IUltraAutoRunController _ultraController;
-        [NonSerialized] private UltraAutoRunProfile _ultraProfile;
-        [NonSerialized] private UltraProgressSession _ultraProgressSession;
-        [NonSerialized] private bool _ultraBatchActive;
-
         [Header("天井AI・最大難度ルーチン")]
         [Tooltip("満点難度のSuperだけ、6層固定ショップで所持金を高分散な再入荷へ全投入する")]
         public bool superHighDifficultyTailMode = true;
         [Tooltip("この実効挑戦スコア以上で専用ルーチンを起動")]
         public int superHighDifficultyMinScore = 50;
-        [Tooltip("満点難度の6層ボスだけ、同一シード実測で優位だった通常AIの戦闘方策を使う。7層ではSuper先読みに戻す")]
-        public bool superLayer6OptimalCombatRoutine = true;
-
-        /// <summary>**7層ヴェスカでも Optimal の戦闘方策を使う** (既定 OFF)。
-        ///
-        /// <para><b>一度採用し、同日に撤回した。</b> これは <c>StaticValue</c> の飽和という
-        /// 実際のバグへの**対症療法**だった。 根本 (<see cref="SuperCombatAI.ttdCapTurns"/>) を
-        /// 直したら Super の方が強くなり (74.9% 対 73.3%)、 併用しても上乗せが無い
-        /// (74.9% → 73.2% / p=0.0821)。 **原因を直したので逃がす必要がなくなった。**
-        /// フラグは対照アーム用に残す。</para>
-        ///
-        /// <para>採用時の実測 (参考):
-        ///
-        /// <para>採用の実測 (パーツ有り・同一シード・各1000ラン):
-        /// <b>0pt 遺物なし 31.1% → 33.9% (p=0.0056) / 0pt 遺物あり 70.9% → 73.3% (p=0.0250)</b>
-        /// ── **両条件とも有意で同じ向き**。 同日に階層DP は符号反転で、
-        /// `chargeRerollGain` はパーツ抑止の artifact で撤回しており、
-        /// 2 条件そろって効いたのはこれだけ。</para>
-        ///
-        /// <para>2026-08-22 実測: 同一シードで両 AI が 7層へ到達した 379 ラン に限ると
-        /// <b>Optimal だけクリア 71 / Super だけクリア 41 (p=0.0059)</b>。
-        /// 6F 突破時点の状態 (HP率 0.888 vs 0.878 / パッシブ 46.95 vs 46.71 / 武器Tier 3.855 vs 3.842)
-        /// は Super が僅かに**上**なので、 「弱いランを拾って着いている」では説明できない。</para>
-        ///
-        /// <para>心当たり: <c>SuperCombatAI.StaticValue</c> は期待ブロックが敵攻撃を上回ると
-        /// <c>ttd=999</c> → 勝率 p が 1 に飽和し、 **敵HP が評価から消える**
-        /// (飽和センサスで同点候補の 19.5%)。 8 ターンの通常戦なら「いま安全」はほぼ正しいが、
-        /// 7層は 4 連戦 40 ターン級でエスカレーションが ×2.3 まで伸びるので、
-        /// そこで飽和させるのが最も危ない。</para></summary>
-        [NonSerialized] public bool superLayer7OptimalCombatRoutine;
+        // (6 層・7 層だけ Optimal の戦闘方策へ逃がす superLayer6/7OptimalCombatRoutine は 2026-11-12 に削除・#135。
+        //  山札の後は配線が常に山札の方策に上書きされ、 どちらも読む所が無かった)
 
         private bool IsSuperTailMode
             => superHighDifficultyTailMode
@@ -422,8 +413,6 @@ namespace AutoTest
 
         [Header("③ 学習 (同時選択可・単独可)")]
 
-        [Tooltip("ボス難易度オートチューナーを動かす (§13-3)")]
-        public bool tuneBosses = false;
         [Tooltip("Tier表 (item_stats / regression / BALANCE_TIER_LIST.md) を更新する")]
         public bool learnTier = false;
         /// <summary>並列アイテム学習のワーカーとして走る (2026-11-04)。 探索を学習バッチと同じに入れるだけで、
@@ -440,8 +429,6 @@ namespace AutoTest
         public bool UpdatesTier => learnTier;
         /// <summary>AIルーチンを成長させるか。</summary>
         public bool UpdatesAi => learnBotAi;
-        /// <summary>ボス難易度オートチューナーを動かすか。</summary>
-        public bool BossAutoTune => tuneBosses;
         /// <summary>ビルド軸ペルソナを使うか。</summary>
         public bool useBuildPersonas => itemPickMode == ItemPickMode.BuildFocused;
 
@@ -500,15 +487,15 @@ namespace AutoTest
         public bool exitPlayModeWhenDone = false;
 
         [Header("5Fボス勝率スイープ (検証モード)")]
-        [Tooltip("true で通常バッチの代わりに『実ラン採取ビルド × 全武器×ダイス』の5Fボス勝率スイープを実行")]
+        [Tooltip("true で通常バッチの代わりに『実ラン採取ビルド × 全武器』の5Fボス勝率スイープを実行")]
         public bool simBoss5Sweep = false;
         [Tooltip("対象ボスのフロア(既定5)")]
         public int simBossFloor = 5;
-        [Tooltip("実ランから採取する『5F到達時ビルド』の数。武器・ダイス以外(パッシブ/強化段階)の土台になる。HPは simBaseHP で固定")]
+        [Tooltip("実ランから採取する『5F到達時ビルド』の数。武器以外(パッシブ/強化段階)の土台になる。HPは simBaseHP で固定")]
         public int simSampleBuilds = 10;
-        [Tooltip("各(武器×ダイス)組み合わせの試行回数")]
+        [Tooltip("各武器の試行回数")]
         public int simTrialsPerCombo = 300;
-        [Tooltip("戦闘開始HP(固定)。採取ビルドの現在HPは使わず、この値で統一して武器×ダイスを純粋比較する")]
+        [Tooltip("戦闘開始HP(固定)。採取ビルドの現在HPは使わず、この値で統一して武器を純粋比較する")]
         public int simBaseHP = 50;
         [Tooltip("スイープ対象武器(種別+Tier＋ユニーク)。存在しないIDは自動スキップ")]
         public string[] simWeapons = {
@@ -517,18 +504,10 @@ namespace AutoTest
             // ユニーク/特殊武器（非進行）
             "竜閃"
         };
-        [Tooltip("スイープ対象ダイス。存在しないIDは自動スキップ")]
-        public string[] simDice = {
-            "dice_wood","dice_bone","dice_copper","dice_iron","dice_biased",
-            "dice_gem","dice_flame","dice_stable","dice_twinsnake",
-            "dice_star","dice_destiny","dice_greed","dice_moroha","dice_perfection"
-        };
+        // [削除 2026-11-12] simDice ── スイープ対象のダイス。 ダイスの品は 2026-08-17 に廃止 (items.json に 0 件) で、
+        //   有効な ID が 0 本になり、 スイープ全体が「有効な武器/ダイスIDがありません」で止まっていた。
 
-        /// <summary>**[廃止 2026-10-28] 何も読まない。** 旧 Λ層の撤退条件 (周回マス数)。
-        /// Λ層は廃止したが、 Ultra の方策仕様 (<c>UltraPortfolioPolicySpec.lambdaFarmTiles</c>) が
-        /// 候補集合のハッシュと許可プロパティに含めて運んでいる値なので、 ワーカーとの取り決めを変えないよう残す。
-        /// 仕様側を作り直すときに一緒に消すこと。 Λ のファーム量スイープと lambdaLv3Risk は同日削除。</summary>
-        [HideInInspector] public int lambdaFarmTiles = 6;
+        // (旧 Λ層の撤退条件 lambdaFarmTiles は 2026-11-12 に削除・#135。 値だけ残っていた Ultra の方策仕様も 2026-11-13 に削除)
 
         [Header("固定難易度スイープ")]
         [Tooltip("true で 挑戦スコアを固定値ごとに振り、最良遺物で 7 層クリアが成立するかを測る")]
@@ -553,13 +532,15 @@ namespace AutoTest
         ///
         /// <para><b>読み書きで同じ帯を使うこと。</b> ここと
         /// <see cref="LearnedPriorityProvider.SwitchToChallengeScore"/> がずれると、
-        /// 「A の序列で買って B に記録する」という無意味な学習になる。</para></summary>
+        /// 「A の序列で買って B に記録する」という無意味な学習になる。</para>
+        /// <para>帯の固定 (<see cref="botLearningBandOverride"/>) もここに効く。 固定は学習を作る経路と併用できない (Begin で止める) ので、
+        /// 固定した帯へ書き込むことは無い。</para></summary>
         private string TierLearningRoot => _activeTierCalibrationScore >= 0
             ? MetaProfileHelper.TierLearningRoot(_activeTierCalibrationScore)
-            : MetaProfileHelper.BotLearningRoot(CurrentChallengeScore());
+            : MetaProfileHelper.BotLearningRoot(BotLearningBandScore);
 
         /// <summary>いまの挑戦の「点数」。 2026-11-10 に旧配点方式を撤去したので、 挑戦カードの難易度 × <see cref="ScorePerDifficulty"/> で読み替える
-        /// (学習の帯 `bot_band_*`・Ultra の基準 50 点・測定の口の点数をそのまま使えるようにするため)。</summary>
+        /// (学習の帯 `bot_band_*`・旧 Ultra の基準 50 点・測定の口の点数をそのまま使えるようにするため)。</summary>
         private static int CurrentChallengeScore()
             => (MetaProgression.MetaProgressManager.Instance?.State?.challengeDifficulty ?? 0) * ScorePerDifficulty;
         /// <summary>旧配点の点数と挑戦カードの難易度の読み替え (50 点 = 難易度 10)。</summary>
@@ -592,6 +573,15 @@ namespace AutoTest
         private string _challengeSweepReport;
         /// <summary>次ランに流し込む挑戦の難易度 (ResetAll 直後に State へ入れる)。 負 = 触らない。</summary>
         private int _pendingChallengeDifficulty = -1;
+
+        /// <summary>この腕がラン開始時に State へ入れる挑戦の難易度 (周回モード以外)。
+        /// 優先: スイープの固定値 (_pendingChallengeDifficulty) → enableAllDebuffs (難易度 10) → challengeCardDifficulty。
+        /// <para>ラン開始時 (AutoRunner.Step) と Begin が<b>同じ関数を呼ぶ</b> (2026-11-12・#119)。 Begin はこの値を先に State へ入れてから
+        /// バッチ開始時の学習を読む ── 入れないと、 前の測定が残した難易度 (ビルド版は PlayerPrefs から読む) の帯を読んでしまう。</para></summary>
+        private int IntendedChallengeDifficulty()
+            => _pendingChallengeDifficulty >= 0 ? _pendingChallengeDifficulty
+             : enableAllDebuffs ? MetaProgression.ChallengeCards.MaxDifficulty
+             : challengeCardDifficulty;
 
         [Header("遺物プリセットスイープ")]
         [Tooltip("true で ペルソナ/挑戦スコアを固定したまま遺物プリセットだけを振り、深度が動くかを測る")]
@@ -743,7 +733,7 @@ namespace AutoTest
         /// **null が「無し」ではなく「触らない」** を意味する構造なので、
         /// 設定したつもりの条件が実際には前の状態を引き継いでいる可能性がある。
         /// 推測で潰さず、 生きている State から直接読む。</summary>
-        private static string EffectiveStateLine()
+        private string EffectiveStateLine()
         {
             var st = MetaProgression.MetaProgressManager.Instance?.State;
             if (st == null) return "[実効状態] MetaProgressState が null";
@@ -751,9 +741,17 @@ namespace AutoTest
             int relicCount = eqRelics.Count;
             int relicPts = RelicPresets.TotalSteps(eqRelics);
             return $"[実効状態] 挑戦の難易度 {st.challengeDifficulty} "
+                 + $"/ 学習の帯 {(string.IsNullOrEmpty(LearnedPriorityProvider.LoadedRoot) ? "(未読み込み)" : BandFolderName(LearnedPriorityProvider.LoadedRoot))}"
+                 + $"{(LearnedPriorityProvider.UsingFallback ? " **手書きの序列 (学習データなし)**" : "")} "
+                 + $"/ 山札の先読み {(deckLookahead && EffectiveWiringSkill != WiringSkill.Naive ? "ON" : "OFF")} (deckLookahead={deckLookahead}) "
                  + $"/ 遺物 持ち込み {relicCount}個 計{relicPts}段 "
-                 + $"/ メタ ダイス合計+{MetaProgression.MetaBuffApplicator.GetDiceTotalBonus()} "
-                 + $"攻撃端子+{MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice()}";
+                 + $"/ メタ 攻撃端子+{MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice()} "
+                 + $"/ 追跡者 縄張りの外へ{(pursuerLeavesTerritory ? "出る (旧い作り)" : "出ない")} "
+                 + $"/ 端子の撃破のボーナス {(terminalKillNeedsAttack ? "攻撃したターンだけ (旧い条件)" : "経路を問わない")} "
+                 + $"/ 攻撃なしの手の主攻撃 (旧の式) {(v3.oldNoAttackBaseDmg ? "素火力を数える (旧い挙動)" : "0")} "
+                 + $"/ 縄張りの宝 {territoryTreasure} (BOT のしきい値 {territoryTreasureHpMargin:0.##}) / 縄張りを避ける遠回り {(navTerritoryDetour < 0 ? "使わない" : "+" + navTerritoryDetour + "歩まで")}"
+                 + (DeckLookaheadDiagLine().Length > 0 ? System.Environment.NewLine + DeckLookaheadDiagLine() : "")
+                 + (NoAttackChoiceLine().Length > 0 ? System.Environment.NewLine + NoAttackChoiceLine() : "");
         }
 
         /// <summary>次のボスに対する戦力ギャップ。 **天井 (Super) のときだけ効く** ──
@@ -774,7 +772,9 @@ namespace AutoTest
                 for (int i = 0; i < ctx.equippedDiceFaces.Length; i++) sum += ctx.equippedDiceFaces[i];
                 mean = sum / (float)ctx.equippedDiceFaces.Length;
             }
-            return RunPowerBudget.Gap(run, run.Depth, superAI.DmgMul, dice, mean);
+            // 与ダメの倍率は 1 で固定。 旧 Super の自己較正 (旧 SuperCombatAI._dmgMul) は配線の判断の中でしか
+            //   更新されず、 その判断は端子の山札の後は呼ばれないので、 常に初期値 1 だった (2026-11-12 に畳んだ)。
+            return RunPowerBudget.Gap(run, run.Depth, 1f, dice, mean);
         }
         private string _relicSweepReport;
         /// <summary>次ランに流し込む固定遺物。 ResetAll 直後に State へ入れる (周回モードと同じ位置)。</summary>
@@ -933,10 +933,9 @@ namespace AutoTest
         public string superTierRankCuts = "";
         /// <summary>[較正専用] 宝箱からパッシブが出る確率 (<see cref="GameLoop.CombatRewards.TreasurePassiveRate"/>)。 負なら触らない。</summary>
         public float treasurePassiveRate = -1f;
-        /// <summary>Optimal の配線のミスの率 (Super は 0)。</summary>
+        /// <summary>Optimal の配線のミスの率 (Super は 0・素朴版は経路を通らない)。 ミス = 次点の挿し方 (<see cref="wiringMistakeRate"/> の説明)。
+        /// 測る口: v3_queue の腕に <c>optimalMistakeRate=0</c> を書くと、 ミスを切った Optimal (2026-11-12 以前の main と同じ挙動) になる。</summary>
         public float optimalMistakeRate = 0.1f;
-        /// <summary>旧 SuperCombatAI を戦闘に使う (既定 false)。 2026-11-06 に Optimal 基準へ置き換えた。 比較用に残す。</summary>
-        public bool useOldSuperAI = false;
 
         /// <summary>[較正専用] エリート戦の報酬倍率 (CombatRewards.EliteRewardMul)。 <b>負 = 触らない。</b></summary>
         public float eliteRewardMul = -1f;
@@ -1096,6 +1095,78 @@ namespace AutoTest
         /// <c>[実効状態]</c> 行で確認すること ── 目標 pt と解決済み pt は一致しないことがある。</para></summary>
         public int challengeScoreTarget = 0;
 
+        /// <summary>[測定] BOT が読む学習の帯を固定する (2026-11-12・#118)。 <b>負 = 指定なし</b> (挑戦の難易度 × 5 の点数の帯を読む・今までどおり)。
+        /// 0 以上は「この点数が入る帯」を読む: 0 → 帯 0 (プロファイル直下) / 1〜15 → bot_band_1_15 / 16〜30 → bot_band_16_30 / 31〜 → bot_band_31up。
+        /// <para>変えるのは<b>読む学習</b> (買い物の序列・ITT の序列・戦闘名の危険度) だけで、 挑戦の難易度そのものは変えない。
+        /// 帯 1_15 のフォルダは無く、 16_30 / 31up は 2026-09-22 の古いデータなので、 難易度 1〜10 を今の学習で測るときは 0 を入れる。</para>
+        /// <para><b>学習を作る経路 (learnTier / learnBotAi・並列学習の回・ITT の付与試行・Tier 較正) とは併用できない</b> (Begin で止める) ──
+        /// 帯 0 の序列で買ったランを別の帯へ積む・別の難易度のランを帯 0 へ積む、 のどちらも学習を壊す。</para></summary>
+        public int botLearningBandOverride = -1;
+        /// <summary>[測定] 学習データ (item_stats.json・ITT の序列・戦闘名の危険度) が読めない時に、 その腕をエラーで止める (既定 true・2026-11-12・#118)。
+        /// これまでは帯のフォルダが無いと黙って手書きの S/A リストへ落ち、 難易度 1〜3 のクリア率が 0% になっていた。
+        /// <para>止めないのは、 学習を作る経路 (learnTier / learnBotAi・並列学習の回 (learningWorker で measureNoExplore でない)・ITT の付与試行・Tier 較正)。
+        /// 最初の学習の回は空から始めるので、 そこを止めると学習が作れない。 止めない時もサマリーと実効状態の行には必ず出す。</para></summary>
+        public bool failOnMissingLearning = true;
+
+        /// <summary>BOT が読む学習の帯の点数 (<see cref="botLearningBandOverride"/> があればそれ・無ければ今の挑戦の点数)。</summary>
+        private int BotLearningBandScore => botLearningBandOverride >= 0 ? botLearningBandOverride : CurrentChallengeScore();
+
+        /// <summary>学習を作る経路か (学習データが空でも止めない)。 <see cref="failOnMissingLearning"/> の対象外。</summary>
+        private bool ProducesLearning
+            => UpdatesTier || UpdatesAi || (learningWorker && !measureNoExplore) || randomGrantTrial || IsTierCalibration;
+
+        /// <summary>学習データが読めない時の例外。 並列ワーカーは失敗コード LEARNING_MISSING で返す。</summary>
+        public sealed class LearningMissingException : Exception
+        {
+            public LearningMissingException(string message) : base(message) { }
+        }
+
+        /// <summary>直近に調べた学習の欠け (空 = 欠けなし)。 サマリーと実効状態の行に出す。</summary>
+        private string _learningGaps = "";
+        /// <summary>手書きの序列で走ったラン数 (ラン開始時の帯の切替の後で数える・バッチ累計)。</summary>
+        private int _fallbackRuns, _bandSwitchRuns;
+        /// <summary>[計装] 手書きの序列で走ったラン数 (バッチ累計)。</summary>
+        public int FallbackRuns => _fallbackRuns;
+
+        /// <summary>[計装] いま BOT が読んでいる学習 (帯のフォルダ名・序列の出どころ・戦闘名の危険度)。 ワーカーの実効状態の行にも出す。</summary>
+        public string LearningReadEffective
+        {
+            get
+            {
+                string root = LearnedPriorityProvider.LoadedRoot;
+                string band = string.IsNullOrEmpty(root) ? "(未読み込み)" : BandFolderName(root);
+                string danger = string.IsNullOrEmpty(EncounterDangerStats.RequestedRoot) ? "(未読み込み)"
+                              : BandFolderName(EncounterDangerStats.RequestedRoot)
+                                + (string.IsNullOrEmpty(EncounterDangerStats.LoadedFrom) ? " (ファイル無し・空)" : "");
+                return $"帯 {band} / 序列 {(LearnedPriorityProvider.UsingFallback ? "**手書き (学習データなし)**" : "学習")}"
+                     + $" / 危険度 {danger}" + (string.IsNullOrEmpty(_learningGaps) ? "" : " / 欠け: " + _learningGaps);
+            }
+        }
+
+        /// <summary>[計装] いま手書きの序列 (学習データなし) で買っているか。</summary>
+        public bool LearningFallbackEffective => LearnedPriorityProvider.UsingFallback;
+
+        /// <summary>学習ルートの末尾 (帯 0 はプロファイル名、 それ以外は bot_band_*)。</summary>
+        private static string BandFolderName(string root)
+            => System.IO.Path.GetFileName((root ?? "").TrimEnd('\\', '/'));
+
+        /// <summary>学習ルート <paramref name="root"/> で、 この腕が読むはずのものが欠けていないか (Reload の後に呼ぶ)。</summary>
+        private List<string> LearningGaps(string root)
+        {
+            var gaps = new List<string>();
+            if (string.IsNullOrEmpty(root) || !System.IO.Directory.Exists(root))
+                gaps.Add($"帯のフォルダが無い ({BandFolderName(root)})");
+            if (LearnedPriorityProvider.UsingFallback)
+                gaps.Add("手書きの序列で走る: " + LearnedPriorityProvider.LastLoadedSummary);
+            if (useIttBeta && !string.IsNullOrEmpty(root) && !System.IO.File.Exists(GrantItt.ClearPath(root)))
+                gaps.Add($"{System.IO.Path.GetFileName(GrantItt.ClearPath(root))} が無い"
+                       + (ittStrict ? " (付与対象品が全て未学習)" : " (観測 regβ へ落ちる)"));
+            if ((navLearnedDanger || v3.superNav) && !string.IsNullOrEmpty(root)
+                && !System.IO.File.Exists(System.IO.Path.Combine(root, EncounterDangerStats.FileName)))
+                gaps.Add($"{EncounterDangerStats.FileName} が無い (戦闘名の危険度が空)");
+            return gaps;
+        }
+
         /// <summary><b>整備パネルの配分を直接指定する (2026-09-10)。</b> 空なら
         /// <see cref="metaAllocation"/> のプリセット。 形式は <c>"Shell:6,Output:6,Guard:5"</c>。
         /// 未記載の軸は 0 ＝ drop-one アブレーションが書ける。
@@ -1115,9 +1186,9 @@ namespace AutoTest
         /// 兵站に 10pt 使うのが悪いのかが不明のままだった。 同じトラックの r9 と r10 を並べれば
         /// 差が極点の取り分になる (r9 の余った 1pt は共通の埋め草へ行く)。</summary>
         public bool rankMarginSweep = false;
-        /// <summary>r9/r10 を比べるトラック名。 カンマ区切り (例 "Shell,Lantern")。
-        /// <c>"*"</c> または空で 10 段トラック全部。</summary>
-        public string rankMarginTracks = "Shell,Lantern";
+        /// <summary>r9/r10 を比べるトラック名。 カンマ区切り (例 "Shell,Armor")。
+        /// <c>"*"</c> または空で 10 段トラック全部。 10 段でないトラック (廃止した Lantern など) は警告を出して飛ばす。</summary>
+        public string rankMarginTracks = "Shell,Armor";
         /// <summary><b>スループット計測 (2026-09-13)。</b> <see cref="runsPerYield"/> を内部で振って
         /// ラン/秒 を実測する。
         ///
@@ -1253,6 +1324,97 @@ namespace AutoTest
             }
             return layer => byLayer.TryGetValue(layer, out var l) ? l : null;
         }
+
+        /// <summary>[測定 2026-11-12・#95] 止める遺物の接辞 (RelicStat の名前を , で並べる・例 "Defense,OpeningPoison")。 空 = 止めない。
+        /// 主ステもサブもその接辞の分だけ 0 になる (<see cref="GameHooks.RelicStatOffMask"/>)。 <see cref="relicLoadoutSpec"/> と組で使う。</summary>
+        public string relicStatOff = "";
+        /// <summary>[測定 2026-11-12・#95] 止める遺物のセット効果 ("セット:2" か "セット:3" を , で並べる・セットは RelicSet の名前か * = 全部・例 "Kenro:3" / "*:2")。
+        /// 空 = 止めない (<see cref="GameHooks.RelicSetBonusOffMask"/>)。</summary>
+        public string relicSetBonusOff = "";
+        /// <summary>[測定 2026-11-12・#20/#41] 敵の固定削り (プレイヤーの防御を固定値で引く) を差し替える。 "対象:値" を ; で並べる。
+        /// 対象 = 敵の id (例 "boss_layer6") か "boss" (ヴェスカの 4 段を含む全ボス・<see cref="GameLoop.BossIds.IsBoss"/>)。 id の指定が "boss" より先に効く。
+        /// 例 "boss_layer5:99;boss_layer6:99" / "boss:8"。 空 = 差し替えない (データの値)。 知らない id は腕ごと止める。</summary>
+        public string enemyArmorPenSpec = "";
+
+        /// <summary>[実効値] ランの始めに本体へ入れる遺物の接辞の止め (ビット = (int)RelicStat)。 監視リスト用 ── ワーカーは Begin() の前に読むので、
+        /// GameHooks の今の値ではなく、 入れる値をフィールドから作って返す (書式の誤りはここで例外になり、 腕が止まる)。</summary>
+        public int RelicStatOffMaskApplied => ParseRelicStatOff(relicStatOff);
+        /// <summary>[実効値] ランの始めに本体へ入れるセット効果の止め (ビット = セット × 2 + (3 個なら 1))。 監視リスト用。</summary>
+        public int RelicSetBonusOffMaskApplied => ParseRelicSetBonusOff(relicSetBonusOff);
+        /// <summary>[実効値] 固定削りの差し替えの中身 (3 層・5 層・6 層のボスとヴェスカの 4 段の値を「id=値」で並べる・差し替えなしは空)。 監視リスト用。</summary>
+        public string EnemyArmorPenOverrideApplied
+        {
+            get
+            {
+                var f = ParseEnemyArmorPen(enemyArmorPenSpec);
+                if (f == null) return "";
+                var sb = new StringBuilder();
+                foreach (var id in new[] { BossIds.Layer3Marsh, BossIds.Layer3Goblin, BossIds.Layer3Mirror, BossIds.Layer5Judgment, BossIds.Layer6Ash,
+                                           BossIds.VescaP1, BossIds.VescaP2, BossIds.VescaP3, BossIds.VescaFinal })
+                {
+                    var e = CombatSystem.EnemyDatabase.Get(id);
+                    sb.Append(id).Append('=').Append(f(id, e != null ? Math.Max(0, e.armorPen) : 0)).Append(' ');
+                }
+                return sb.ToString().TrimEnd();
+            }
+        }
+
+        private static int ParseRelicStatOff(string spec)
+        {
+            if (string.IsNullOrWhiteSpace(spec)) return 0;
+            int mask = 0;
+            foreach (var part in spec.Split(','))
+            {
+                var t = part.Trim(); if (t.Length == 0) continue;
+                if (!Enum.TryParse(t, true, out MetaProgression.Relics.RelicStat s) || !Enum.IsDefined(typeof(MetaProgression.Relics.RelicStat), s))
+                    throw new ArgumentException("[relicStatOff] 知らない接辞: " + t);
+                mask |= 1 << (int)s;
+            }
+            return mask;
+        }
+
+        private static int ParseRelicSetBonusOff(string spec)
+        {
+            if (string.IsNullOrWhiteSpace(spec)) return 0;
+            int mask = 0;
+            foreach (var part in spec.Split(','))
+            {
+                var t = part.Trim(); if (t.Length == 0) continue;
+                int colon = t.IndexOf(':');
+                if (colon <= 0 || !int.TryParse(t.Substring(colon + 1).Trim(), out int n) || (n != 2 && n != 3))
+                    throw new ArgumentException("[relicSetBonusOff] 書式は セット:2 か セット:3 : " + t);
+                string name = t.Substring(0, colon).Trim();
+                int bit = n == 3 ? 1 : 0;
+                if (name == "*") { for (int k = 0; k < MetaProgression.Relics.RelicCatalog.SetCount; k++) mask |= 1 << (k * 2 + bit); continue; }
+                if (!Enum.TryParse(name, true, out MetaProgression.Relics.RelicSet set) || !Enum.IsDefined(typeof(MetaProgression.Relics.RelicSet), set))
+                    throw new ArgumentException("[relicSetBonusOff] 知らないセット: " + name);
+                mask |= 1 << ((int)set * 2 + bit);
+            }
+            return mask;
+        }
+
+        private static Func<string, int, int> ParseEnemyArmorPen(string spec)
+        {
+            if (string.IsNullOrWhiteSpace(spec)) return null;
+            var byId = new Dictionary<string, int>(); int boss = -1;
+            foreach (var part in spec.Split(';'))
+            {
+                var t = part.Trim(); if (t.Length == 0) continue;
+                int colon = t.LastIndexOf(':');
+                if (colon <= 0 || !int.TryParse(t.Substring(colon + 1).Trim(), out int v) || v < 0)
+                    throw new ArgumentException("[enemyArmorPenSpec] 書式は 対象:値 (値は 0 以上) : " + t);
+                string key = t.Substring(0, colon).Trim();
+                if (key == "boss") { boss = v; continue; }
+                if (CombatSystem.EnemyDatabase.Get(key) == null) throw new ArgumentException("[enemyArmorPenSpec] 知らない敵: " + key);
+                byId[key] = v;
+            }
+            return (id, b) =>
+            {
+                if (id != null && byId.TryGetValue(id, out int v)) return v;
+                if (boss >= 0 && GameLoop.BossIds.IsBoss(id)) return boss;
+                return b;
+            };
+        }
         /// <summary>BOT が店で武器を買うか。 <b>既定は買わない</b> (2026-11-07)。 武器の ITT は「家系を乗り換える損得」を測っており
         /// (斧を渡すと −20 ポイント・家系ロックを入れると中立)、 期待値だけで決める購入は他系統の職業のランを悪くしていた。
         /// 強化素材で今の武器を育てる道 (WeaponMaterial) は残す。</summary>
@@ -1356,245 +1518,6 @@ namespace AutoTest
         private bool _simHarvestArmed;
         private string _simReport;
 
-        // ===== 集計分類 =====
-        public enum Outcome { GameOver, NormalClear, FullClear, Deadlock, Crash }
-        public enum DeathCause { None, CombatLoss, CombatPyrrhic, Starvation, Unknown }
-
-        [Serializable]
-        public class CombatRec
-        {
-            public string enemy;
-            public string enemyId;
-            public int floor;
-            public bool isBoss;
-            public bool won;
-            public int turns;
-            public int hpBefore;
-            public int hpAfter;
-            public bool afterLastStand;
-            // ターン内訳（非解決グラインドの原因特定用）
-            public int tWin;       // ロール勝利ターン数
-            public int tDraw;      // 引き分けターン数
-            public int tLoss;      // ロール敗北ターン数
-            public int tLossAbs;   // うちメインダメ0（シールド吸収/無効化で死を回避）
-            // 検証計測: この戦闘でプレイヤーが獲得した累計回復量／シールド量（OnBattleEnded のみ）
-            public int healApplied;
-            public int shieldGained;
-            // L1学習: 与ダメ・被ダメ・敵maxHP
-            public int damageDealt;
-            public int damageTaken;
-            public int enemyMaxHP;
-            /// <summary>[計装 2026-11-06] 与ダメの内訳 [武器, 攻撃の出目, 攻撃+N, 主攻撃の与ダメ, 固定ダメ, 追撃, 出目由来の攻撃, 毒, 出血, 臨界の爆発]。
-            /// 毒と爆発は固定ダメの内数、 出血は固定ダメの外。</summary>
-            public int[] dmgParts;
-            /// <summary>[計装 2026-11-10] 配線を決めたターン数 / うち防ぎ切りの規則の対象 (今ターン撃破を除く) / うち今ターン撃破。</summary>
-            public int fbDecided, fbTurns, fbKillTurns;
-            /// <summary>[計装 2026-11-10] 敵の HP を実際に減らした量の経路別 (<see cref="CombatSystem.EnemyHpLedger"/> の添字・この段の開始からの差分)。</summary>
-            public float[] hpLedger;
-            /// <summary>[計装 2026-11-10] 見せる層 (RunState.currentFloor)。 <see cref="floor"/> は深さ (Run.Depth)。</summary>
-            public int shownFloor;
-            /// <summary>[計装 2026-11-10] 戦闘 (段) の開始時の偏重 6 軸の品の数 (AxisRules.Ranked の順: 会心・出血・毒・臨界・充電・シールド)。</summary>
-            public int[] axisAtStart;
-            /// <summary>[計装 2026-11-10 V3 mainCorr] この段で攻撃したターンの 主攻撃の見積もり (比を掛ける前) / 比を掛けた見積もり (切り替えが OFF でも、 掛けたなら の値) /
-            /// 実際 (DamageBreakdown[7] の増分) の合計。</summary>
-            public float mainPred, mainPredCorr, mainActual;
-            /// <summary>[計装 2026-11-10] この段の配線のターン数を攻撃の本数 0/1/2/3+ で数えたもの。</summary>
-            public int[] atkHist;
-            /// <summary>[計装 2026-11-10 黎明の溜める形] 攻撃したターンに乗った溜め (%・1 回 1 値)。</summary>
-            public int[] dawnShots;
-            public bool isFightEnd; // OnBattleEnded で確定した1戦分か（チェーン途中形態は false）
-            // この戦闘時点の装備（武器×ダイス勝率集計用）。武器は family_tN まで（業物+段階は区別しない）。
-            public string weaponId = "";
-            public string diceId = "";
-            // ボス難易度オートチューナー: 敗北時の致死メカニズム (勝利時は Normal)
-            public ItemSystem.PassiveSkills.DeathCause deathCause;
-            // ボス難易度オートチューナー: プレイヤーロール合計と回数 (平均出目算出用)
-            public long playerRollSum;
-            public int playerRollCount;
-            // ボス難易度オートチューナー: この戦闘の総被ダメの ソース別内訳 (支配率診断用・キル時の一撃ではない)
-            public Dictionary<ItemSystem.PassiveSkills.DeathCause, int> playerDamageBySource;
-            // ボス難易度オートチューナー: スタンス別の「ボスがロール勝ちしたターン数/総ターン数」(強/弱別レンジ制御用)
-            public int strongRollTurns, strongRollBossWins, weakRollTurns, weakRollBossWins;
-            // 緊張感曲線用: プレイヤー最大HP (戦闘終了時点)。 hpAfter / playerMaxHpEnd で残HP%
-            public int playerMaxHpEnd;
-            /// <summary>戦闘名の鍵 (層|種類|戦闘名・<see cref="EncounterDangerStats.KeyOf"/>)。 戦闘名が無い戦闘は空 (2026-11-05)。</summary>
-            public string encounterKey = "";
-        }
-
-        [Serializable]
-        public class RunRec
-        {
-            public int index;
-            /// <summary>[計装 2026-11-10] ラン開始時に実際に入っていた整備パネルの段 ("種類:段" を , で連結・0 段は省く)。</summary>
-            public string metaRanks = "";
-            public Outcome outcome;
-            public DeathCause cause = DeathCause.None;
-            public int deathFloor;
-            /// <summary>[計装 2026-11-04] 戦えない HP (危険度の閾値未満) で、 戦闘マス/種別の見えていない点へ踏み込んだ 1 歩の理由別の回数。
-            /// 0 行き先そのもの / 1 行き先へ向かう途中 / 2 出口 (ボス) へ向かう途中 / 3 出口 (ボス) そのもの。</summary>
-            public int[] lowHpRiskSteps = new int[4];
-            public bool deathInBossFight;
-            public string fatalEnemy = "";
-            public int reachedFloor = 1;
-            public bool reached6F;
-            public int finalHP;
-            public int finalMaxHP;
-            public int finalCoins;
-            public int peakCoins;
-            public int totalGoldGained;
-            /// <summary>[計装 2026-11-06] 金の内訳 (キー = 「深さ|経路」)。</summary>
-            public string[] goldKeys;
-            /// <summary>[計装 2026-11-06] 状態の記録 (<see cref="SnapState"/> の 10 列を平らに並べる)。 マクロの価値 V の表の元。</summary>
-            public List<int> stateSnaps = new List<int>();
-            /// <summary>[計装 2026-11-09] 航行マップの層ごとの踏破: 4 列ずつ (深さ, マスの種別 TileType, 層にあった数, 踏んだ数)。</summary>
-            public List<int> mapVisit = new List<int>();
-            public int[] goldVals;
-            /// <summary>**このランでゲームが実際に見た挑戦スコア。**
-            /// 意図した構成が本当に適用されていたかを、 結果ではなく入力側で検証するために残す。</summary>
-            public int appliedChallengeScore;
-            public int materialsGainedTotal; // このランで得た強化素材の累計(全源: 戦闘/イベント/ショップ/賢者の石/天工開物/メタ)
-            public int starvationTotal;
-            public int starvationHits;
-            // 物資(ADR-0002): 最終/最低物資と発狂到達
-            public int finalProvision;
-            public int finalProvisionCap;
-            public int minProvision = GameLoop.ProvisionRules.Max;   // 2026-09-28: 物資 ×10
-            public bool reachedMadness;   // 物資0(払底)に到達したか (旧・発狂。 名前は集計の互換のため据え置き)
-            // 物資の発生源別 収支（ProvisionSystem.Stats を1ラン分キャプチャ）
-            public int provisionCombatLoss;
-            public int provisionComposureGain;
-            public int provisionLateralLoss;
-            public int provisionMarchLoss;
-            public int provisionEvilLoss;
-            public int provisionFoodGain;
-            public int provisionRerollLoss;   // ダイス振り直しコスト（#1）
-            public int totalCombats;
-            public int totalWins;
-            public int shopPurchases;
-            // 種別ごとの購入数。 **価格倍率に対する弾性が枠ごとに違う**ため、
-            //   合計だけでは「価格に鈍い枠が分母を薄めている」のか
-            //   「そもそも買う対象が尽きている」のかを区別できない (2026-08-10)。
-            //   リロールは倍率非適用、 強化素材は 3×2^N×倍率 で log 弾性、
-            //   特売品は 20〜60% 引きで値上げを吸収する ── いずれも合計に混ざる。
-            public int shopBuyPassive;
-            public int shopBuyConsumable;
-            public int shopBuyWeapon;
-            public int shopBuyDice;
-            public int shopBuyMaterial;
-            /// <summary>ラン中の総支出 (run.coinsSpent)。 残金 (finalCoins) と対で見る
-            /// ── 残金が積み上がっているなら「買えない」ではなく「買う物が無い」。</summary>
-            public int totalCoinsSpent;
-
-            /// <summary>〈長引く負傷〉の発動回数と、 失った最大HPの累計。 **計装専用**。</summary>
-            public int woundTriggers;
-            public int woundHpLost;
-
-            /// <summary>ランの**指紋**。 同一シード・同一設定なら一致するはずの値を 1 個に畳んだもの。
-            ///
-            /// **決定性の検査専用。** 2026-08-10、 設定が完全に同一・同一シードの 2 アームで
-            /// 7層クリアが 4.0pt (300 ラン中 66 ラン) 食い違った。 集計値だけでは
-            /// 「どのランがいつ分かれたか」が追えないので、 ラン単位で比較できる値を持たせる。</summary>
-            public int fingerprint;
-            /// <summary>公開chronicleと終端mechanical stateをSHA-256へ畳んだworker照合用digest。</summary>
-            public string deterministicDigest = "";
-            public int shopRerolls;
-            public int shopRerollCoins;
-            public int priorityItemsAcquired; // S/A 級を取得した回数
-            public int tierUpgradeCount;      // 強化で Tier ID が変わった回数 (T1→T2 等、 +昇格は含まず)
-            public string finalWeaponTier = ""; // 終了時の武器 Tier (例: "ドーンブリンガー")
-            public int finalLimitBreak;       // 終了時の業物 lv
-            public int totalTurns;
-            public bool lastStandUsed;
-            public int lastStandFloor;
-            public int combatsAfterLastStand;
-            public int winsAfterLastStand;
-            public string profile = "";    // 行動ルーチン: "貪欲"(戦闘貪欲) / "回避"(戦闘回避)
-            public string persona = "";    // ビルド軸ペルソナ名 (RawTier/Standard/Crit/Bleed/…)
-            public string metaAxis = "";   // このランで適用したメタバフ配分 (一斉走査時の集計キー)
-            public string band = "";       // R1..R10 / CRASH / DEADLOCK
-            public string bandLabel = "";
-
-            // 5F突入時点の確信チェーン状態スナップショット (-1=未到達)
-            public int convictionStageAt5F = -1;
-            public bool hadConvictionItem5F;       // 〈根拠のない確信〉所持
-            public bool hadResolveAt5F;            // 〈決意〉所持
-            public bool hadTruthAt5F;              // 〈真理〉所持
-            public bool hadFlagYogenAt5F;          // 苦難の予言 所持
-            public bool hadFlagKakushinAt5F;       // 苦難の確信 所持
-            // 実際に起動したタイル種別ごとの回数（再訪・消化済みは含まない＝ActivateTile 初回のみ）
-            public readonly Dictionary<TileType, int> tileVisits = new Dictionary<TileType, int>();
-
-            // [廃止] 旅団契約の計装一式 (2026-08-11 にシステムごと削除)
-            public string note = "";
-            public List<CombatRec> combats = new List<CombatRec>();
-            /// <summary>6F (灰燼の王) 撃破時点のビルド情報スナップショット。
-            /// 後から「どんな装備で6Fまで到達できたか」をサルベージするための行単位プレーンテキスト。
-            /// null = 6F未到達(または到達前にラン終了)。</summary>
-            public string clear6FSnapshot;
-
-            // =========================
-            // L1 学習用フィールド
-            // =========================
-            /// <summary>このランで「過去に1度でも所持/獲得した」アイテムIDの集合（売却や消費で消えたものも含む）。</summary>
-            public HashSet<string> acquiredItemsEver = new HashSet<string>();
-            /// <summary>このランで「ショップ等で1度でも提示された」アイテムIDの集合。
-            /// 取得有無に関わらず記録。 offeredLift = (提示されたラン群) - (提示されなかったラン群) の bandScore 差
-            /// により、出現バイアスを除いた純粋寄与の参考指標となる。</summary>
-            public HashSet<string> offeredItemsEver = new HashSet<string>();
-
-            // ===== ランダム化ホールドアウト (2026-08-17) =====
-            // 通常の lift は `取得群 − 未取得群` の**観測差**で、 BOT は「金がある」「順調」な
-            // ときに買うので **取得したこと自体が「うまくいっている」の代理変数**になる。
-            // 提示条件付け (offeredLift) と回帰で共取得は潰せるが、 方策自身の選択バイアスは残る。
-            //
-            // **ランダム化した決定だけを別系統で記録する。** 探索決定では足切りを通った候補から
-            // 一様に選ぶので、 その候補集合の中では取得/未取得が期待値で等質になり、
-            // 差がそのまま因果効果になる。 貪欲データ (方策の質) とは混ぜない。
-
-            /// <summary>探索決定の**候補集合**に 1 度でも入った id。 不偏 lift の母集団。</summary>
-            public HashSet<string> exploreOfferedEver = new HashSet<string>();
-            /// <summary>探索決定で**実際に選ばれた** id。 不偏 lift の処置群。</summary>
-            public HashSet<string> exploreAcquiredEver = new HashSet<string>();
-            /// <summary>このランで探索決定が起きた回数 (較正用)。</summary>
-            public int exploreDecisions;
-            /// <summary>**探索ランか。** true なら観測 lift の集計から丸ごと外す ──
-            /// 探索で買った品が「取得」として混ざると貪欲統計が汚れる。</summary>
-            public bool isExploreRun;
-            /// <summary>このランで実際に与えた累計ダメージ（全戦闘合算）。</summary>
-            public long totalDamageDealt;
-            /// <summary>このランで実際に受けた累計ダメージ（heal込みのgross）。</summary>
-            public long totalDamageTaken;
-            /// <summary>このランで獲得した回復量（healApplied）合算。</summary>
-            public long totalHealed;
-            /// <summary>このランで獲得したシールド量合算。</summary>
-            public long totalShieldGained;
-            /// <summary>ヴェスカ連戦で撃破した段の id 集合（boss_layer7 / _p2.._p4）。</summary>
-            public HashSet<string> awakenedFormsKilled = new HashSet<string>();
-            /// <summary>帯ランクの数値表記 (R1=1, R10=10, R11=11, CRASH=-1, DEADLOCK=-2)。集計用。</summary>
-            public int bandScore;
-            /// <summary>2026-06-22: 各層末時点の InventoryPower スナップショット (floor → power)。
-            /// ラン中の戦力推移、 売買コスパ計算、 Tier別ビルド比較に使う。</summary>
-            public Dictionary<int, int> inventoryPowerByFloor = new Dictionary<int, int>();
-            /// <summary>ラン終了時点 (死亡/クリア) の InventoryPower。</summary>
-            public int finalInventoryPower;
-            /// <summary>死亡時の抱え落ち診断。消耗品は戦闘中に即使用できる種類ごとに分離。</summary>
-            public int finalConsumableCount, finalHealCount, finalDamageBuffCount, finalShieldCount, finalProvisionCount;
-            public List<string> finalConsumableIds = new List<string>();
-            /// <summary>未使用素材と、その場で次の武器強化が可能だったか。</summary>
-            public int finalMaterials, finalUpgradeCost;
-            public bool finalUpgradeReady;
-            /// <summary>2026-06-23: ラン終了時点の所持アイテム ID 集合 (装備+所持+昇華、 dedup)。 保持率計算用。</summary>
-            public HashSet<string> finalOwnedItemIds = new HashSet<string>();
-            /// <summary>L1.5: このランで実施した「eventId|choiceIndex」一覧（重複あり）。
-            /// EventChoiceLearningStats が per-event-choice 集計に使う。</summary>
-            public List<string> eventChoicesMade = new List<string>();
-            /// <summary>L2 ペアテスト: このランで使われたポリシーバリアント。
-            /// "" / "baseline" / "challenger"。 PolicyExplorer がペア diff 計算に使う。</summary>
-            public string policyVariant = "";
-            /// <summary>L2 ペアテスト: このランで使われたシード値 (ペア識別用)。</summary>
-            public int pairedSeed;
-        }
-
         private readonly List<RunRec> _records = new List<RunRec>();
         private RunRec _cur;
         // Queue で O(1) Dequeue するためのリングバッファ用途。RemoveAt(0) を避ける。
@@ -1614,123 +1537,25 @@ namespace AutoTest
         /// <summary>イベント選択のタイブレーク用。 **ラン開始ごとに RebuildRunRng() で作り直す** ──
         /// 決定論シード時に前ランの消費状態を持ち越すと再現性が壊れるため。</summary>
         private System.Random _rng = new System.Random();
+        /// <summary><see cref="_rng"/> をラン番号から作り直す (シード固定のときだけ・<see cref="GameLoop.GameRng.BeginRun"/> の直後に呼ぶ)。
+        /// 各スイープが同じ 2 行を写していたのを 1 か所にした (2026-11-12)。</summary>
+        private void RebuildRunRng(int runIndex)
+        {
+            if (GameLoop.GameRng.IsSeeded)
+                _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", runIndex));
+        }
         // 行動ルーチン分割: 前半50%=戦闘貪欲 / 後半50%=戦闘回避（航行Rankのみ差し替え）
         private bool _curCombatAverse;
         private bool _curBossNear;   // 直近のDoNavigateで判定したボス接近フラグ（休憩判断で参照）
 
-        /// <summary>Ultra controller。 **null が既定**で、 null の間は決定経路に一切触れない
-        /// （既存の全基準値を保つため）。 差すと対応済みの決定点だけが委譲される。</summary>
-        [NonSerialized] public AutoTest.Ultra.IUltraDecisionSink ultraSink;
-        /// <summary>現ランで Ultra の評価に費やした実時間。 番犬から差し引く
-        /// (worker 待ちは「固着」ではない)。 集計には使わない診断値。</summary>
-        [NonSerialized] private float _ultraThinkingSeconds;
-        /// <summary>バッチ全体で Ultra の評価に費やした実時間。 サマリに出す。</summary>
-        [NonSerialized] private float _ultraThinkingSecondsTotal;
+        // (技量の Ultra の口 ── 判断を委ねる sink・フレームを跨ぐ決定の保留・思考時間の控除・checkpoint の採取と resume ──
+        //  は 2026-11-13 に削除・#135。 sink は Ultra のメニューからしか立たず、 通常のランでは null で何もしていなかった)
 
-        // ===== Ultra: フレームを跨ぐ決定 =====
-        //
-        //  worker を同期で待つとメインスレッドが数秒停車し、 Editor が 1 フレームも
-        //  描画しない。 決定を「開始」と「回収」に割り、 待っている間はフレームを返す。
-        /// <summary>進行中の Ultra 決定。 null でない間、 盤面を進めてはならない。</summary>
-        [NonSerialized] private AutoTest.Ultra.UltraPendingDecision _ultraPending;
-        /// <summary>保留中の決定が却下されたときに使う生産方策の手。
-        /// **待機中に再計算してはいけない** ── 探索経路は RNG を消費し得るので、
-        /// 毎フレーム引き直すと再現性が壊れる。</summary>
-        [NonSerialized] private MapNode _ultraPendingProductionChoice;
-        /// <summary>保留中の決定を発行した checkpoint。 回収時の commit 検証に要る。</summary>
-        [NonSerialized] private AutoTest.Ultra.UltraCheckpoint _ultraPendingCheckpoint;
-        [NonSerialized] private float _ultraWaitBeganRt;
-        /// <summary>run ループ用: 直前の Step が worker 待ちで空回りしたか。
-        /// ストール検出と反復上限から除外する ── 盤面は意図的に止まっているのであって
-        /// 固着ではない。 除外し忘れると待機がそのまま DEADLOCK になる。</summary>
-        [NonSerialized] private bool _ultraWaiting;
-        /// <summary>ラン内で単調増加する決定機会の番号。 stale な回答を弾く鍵。</summary>
-        private int _ultraEpoch;
-        /// <summary>直近に生産方策へ落ちた理由。 サマリへ出して「実は一度も効いていない」を可視化する。</summary>
-        private string _ultraLastFallbackReason;
-
-        /// <summary>休憩の 2 択。 添字を直書きしないための定数
-        /// （生産方策の分岐と Ultra の選択肢と適用の 3 箇所で一致している必要がある）。</summary>
+        /// <summary>休憩の 2 択。 添字を直書きしないための定数 (生産方策の分岐と適用で一致している必要がある)。</summary>
         private const int RestHealIndex = 0, RestUpgradeIndex = 1;
 
-        /// <summary>実ランの途中で checkpoint を 1 つ書き出す先。 **既定は空＝何もしない**。
-        ///
-        /// <para>合成した盤面では rollout のコストが測れない ── 手組みの <c>RunState</c> は
-        /// 装備もダイスも既定のままで、 戦闘に入った瞬間に固着する。
-        /// <c>RunState.Initialize</c> と <c>MapGenerator.Generate</c> は
-        /// メタ進行のシングルトンに触るため play mode 外では呼べないので、
-        /// **実ランの中で採る**しかない。</para></summary>
-        [NonSerialized] public string ultraCaptureCheckpointPath = "";
-        /// <summary>何回目のマップ航行で採るか。 序盤すぎると選択肢が乏しく、
-        /// 遅すぎるとランが終わっている。</summary>
-        [NonSerialized] public int ultraCaptureAtNavigation = 6;
-        private int _ultraNavSeen;
-        private bool _ultraCaptured;
         /// <summary>「戦闘フェーズなのに戦闘が動いていない」が連続した回数。 20 で 1 回だけ吠える。</summary>
         private int _combatInactiveStreak;
-        /// <summary>resume の実効状態。 サマリへ出す ── ラン中の Log は
-        /// <c>filterLogType=Error</c> で落ちるので、 これが唯一の記録になる。</summary>
-        private string _ultraResumeLine = "";
-
-        /// <summary>Ultra worker がラン途中から再開するための checkpoint。 **既定 null**。
-        /// null の間は <see cref="RunOne"/> は従来どおり新規ランから始まる。</summary>
-        [NonSerialized] public AutoTest.Ultra.UltraResumePayload ultraResumeFrom;
-        /// <summary>再開直後に 1 手だけ強制する行動 id。 空なら方策が普通に選ぶ。
-        /// rollout は「この手を打ったら」を測るので、 最初の 1 手だけ差し替える。</summary>
-        [NonSerialized] public string ultraResumeForcedActionId;
-
-        /// <summary>checkpoint をラン状態へ流し込む。
-        ///
-        /// <para><see cref="GameManager.StartNewRun"/> が正規に走った**後**に呼ぶ ──
-        /// パッシブレジストリのリセットや戦闘乱数の通し番号リセットといった
-        /// 「新規ランで必ず起きること」を飛ばしたくないため。 上書きするのは
-        /// <c>Run</c> の中身とマップだけで、 シングルトンの初期化経路には手を入れない。</para>
-        ///
-        /// <para><c>Run</c> オブジェクトは差し替えず**中身を書き換える**。 他所が
-        /// 参照を掴んでいても矛盾しないので、 差し替えより安全。</para></summary>
-        private bool TryApplyUltraResume(GameManager gm, out string failure)
-        {
-            failure = null;
-            var payload = ultraResumeFrom;
-            if (payload == null) { failure = "payload is null"; return false; }
-            if (gm?.Run == null) { failure = "run was not initialised"; return false; }
-
-            var mm = MapManager.Instance;
-            if (mm == null) { failure = "MapManager is unavailable"; return false; }
-
-            try
-            {
-                payload.run.RestoreInto(gm.Run);
-                mm.RestoreState(payload.map.BuildMap(), payload.map.currentNodeId);
-                gm.ResumeAtPhase(GameManager.GamePhase.MapNavigation);
-            }
-            catch (Exception ex)
-            {
-                failure = ex.GetType().Name + ": " + ex.Message;
-                return false;
-            }
-
-            // **成否を必ず印字する。** 失敗は Crash で落ちるので分かるが、 成功したのに
-            //   その後の挙動がおかしい場合、 復元されたのかどうかが分からないと切り分けられない。
-            //   実際 1 回目の実走で「戦闘が始まらない」を追うのに、 この行が無くて詰まった。
-            _ultraResumeLine = $"{gm.Run.Depth}層"
-                    + $" / 現在地 {mm.CurrentNode?.id ?? "?"} (要求 {payload.map.currentNodeId})"
-                    + $" / HP {gm.Run.playerHP}/{gm.Run.playerMaxHP}"
-                    + $" / 武器 {gm.Run.equippedWeaponId}+{gm.Run.weaponPlus}"
-                    + $" / パーツ {gm.Run.diceFaceParts?.Count ?? 0}"
-                    + $" / 強制手 '{ultraResumeForcedActionId}'"
-                    + $" / 合法手 {(mm.GetAvailableMoves()?.Count ?? -1)}";
-            Debug.Log("[AutoRunner][Ultra] resume 完了: " + _ultraResumeLine);
-
-            _ultraEpoch = payload.epoch;
-            // 再開直後の 1 手だけを固定する sink。 以降は通常の方策が打つ ──
-            //   rollout が測っているのは「この手を打った後、生産方策が最後まで打つ」なので、
-            //   2 手目以降まで固定すると別の量を測ることになる。
-            if (!string.IsNullOrEmpty(ultraResumeForcedActionId))
-                ultraSink = new AutoTest.Ultra.UltraForcedFirstActionSink(ultraResumeForcedActionId);
-
-            return true;
-        }
         // 現戦闘のターン内訳タリー（OnEnemyEncounteredでリセット、ExecuteTurnで加算）
         private int _cwWin, _cwDraw, _cwLoss, _cwLossAbs;
 
@@ -1748,26 +1573,18 @@ namespace AutoTest
         public static PolicyParameters PairedChallengerPolicy;
         /// <summary>ベースラインポリシーのスナップショット (バッチ開始時に固定)。</summary>
         private PolicyParameters _baselinePolicySnap;
-        /// <summary>
-        /// Standalone production workerまたはUltra run-start plannerが固定した方策。
-        /// RunBatch内のdisk reloadより後に適用し、バッチ中は同じcloneを使い続ける。
-        /// nullなら従来どおりdisk上の方策を使う。
-        /// </summary>
-        [NonSerialized] public PolicyParameters forcedPolicyParameters;
-        [NonSerialized] public bool ultraProductionWorkerMode;
-        [NonSerialized] public int ultraProductionExpectedRuns;
-        [NonSerialized] public string ultraProductionPolicyId = "";
-        [NonSerialized] public string ultraProductionScenarioSeedVectorHash = "";
-        [NonSerialized] public ulong[] ultraProductionScenarioSeeds;
+        // (Ultra の方策の組の候補ワーカー (合成シード・方策の固定 forcedPolicyParameters・ultraProduction*) は
+        //  2026-11-13 に削除・#135)
+        /// <summary>並列ワーカーの出力先 (空 = 通常の AutoRunLogs)。 RankMarginWorkerBootstrap が立てる。</summary>
         [NonSerialized] public string productionOutputRootOverride = "";
 
         /// <summary>r9/r10 比較の<b>並列ワーカー</b>モード。 1 プロセス = 1 アームのシード区間。
         ///
-        /// <para>Ultra の production worker と違い、 合成シードもポリシー固定も使わない。
+        /// <para>合成シードもポリシー固定も使わない。
         /// 通常バッチと**同じ <c>runIdx</c> のまま**区間だけを切り出すので、
         /// 逐次スイープと digest が一致する (それが唯一の検算手段)。</para>
         ///
-        /// <para>使い方は Ultra 側と同じで、 <c>runCount = 0</c> にして本体ループを空にし、
+        /// <para><c>runCount = 0</c> にして本体ループを空にし、
         /// このフラグで RunBatch 後段の分岐へ入る。</para></summary>
         [NonSerialized] public bool rankMarginWorkerMode;
         [NonSerialized] public string rankMarginWorkerLabel = "";
@@ -1784,12 +1601,7 @@ namespace AutoTest
         /// 停止しているのか走っているのか区別できない。</summary>
         public event Action<int> RankMarginArmProgress;
 
-        public event Action<UltraProductionRunRecord> UltraProductionRunCompleted;
-        public event Action<UltraProductionBatchRecord> UltraProductionBatchCompleted;
-        private readonly List<UltraProductionRunRecord> _ultraProductionRuns =
-            new List<UltraProductionRunRecord>();
         private string _lastSummaryPath = "";
-        private ulong _currentUltraProductionScenarioSeed;
         /// <summary>現ランがどちらのポリシーで実行されているか。</summary>
         private string _currentRunVariant = "";
         /// <summary>現ランのシード値。 ペアテスト時は (i/2) を共有して同一マップ・同一RNGを再現。</summary>
@@ -1806,11 +1618,11 @@ namespace AutoTest
 
         public void Begin()
         {
-            if (ultraProductionWorkerMode
-                && !TryValidateUltraProductionWorkerConfiguration(out string workerConfigError))
+            // 旧 Ultra (4) は 2026-11-13 に削除した (#135)。 保存済みの設定から来たら Super として走る (記録の技量も Super になる)。
+            if (wiringSkill == WiringSkill.Ultra)
             {
-                EmitUltraProductionConfigurationFailure(workerConfigError);
-                return;
+                Debug.LogWarning("[AutoRunner] 配線技量 Ultra は 2026-11-13 に削除した (#135)。 Super として走る");
+                wiringSkill = WiringSkill.Super;
             }
 
             // 2026-07-28: 依存の向きを反転した。 旧はプロファイルが metaPattern / enableAllDebuffs を
@@ -1823,8 +1635,7 @@ namespace AutoTest
                     + $" → 学習データ分離キー: {MetaProfileHelper.CurrentSuffix}");
             Debug.Log($"[AutoRunner] ② アイテム選択={itemPickMode}"
                     + (itemPickMode == ItemPickMode.BuildFocused ? $" (Tier信奉混率 {rawTierRatio:P0})" : ""));
-            Debug.Log($"[AutoRunner] ③ 学習: ボスチューナー={(tuneBosses ? "ON" : "OFF")}"
-                    + $" / Tier学習={(learnTier ? "ON" : "OFF")}"
+            Debug.Log($"[AutoRunner] ③ 学習: Tier学習={(learnTier ? "ON" : "OFF")}"
                     + $" / BOT学習={(learnBotAi ? "ON" : "OFF")}");
 
             // 5層裏ボス遮断。 各スイープのコルーチンはこの後で自分の値へ書き戻すので、
@@ -1918,6 +1729,16 @@ namespace AutoTest
                 Debug.Log($"[AutoRunner] 挑戦の難易度固定: {challengeScoreTarget}pt → 難易度 {_pendingChallengeDifficulty}"
                         + $" / 帯 {MetaProfileHelper.ChallengeBand(resolved)}");
             }
+            // **バッチ開始時の学習を読む前に、 この腕の難易度を State へ入れる** (2026-11-12・#119)。
+            //   これまでは State に残っていた値 (ビルド版のワーカーは MetaProgressManager.Load が PlayerPrefs から読む ──
+            //   22 プロセスで共有され、 前の測定が書いた難易度が残る) の帯で、 下の学習と戦闘名の危険度を読んでいた。
+            //   危険度はバッチ開始時の 1 回しか読まなかったので、 ワーカーごとに読んだ帯が違い、 同じ設定でも最初のランから結果が割れた。
+            //   周回モードは AscensionLoop が難易度を持つが、 Begin の時点では立っていない (スイープの中で立てる)。
+            if (!_ascensionPersonaLock)
+            {
+                var stBegin = MetaProgression.MetaProgressManager.Instance?.State;
+                if (stBegin != null) stBegin.challengeDifficulty = IntendedChallengeDifficulty();
+            }
 
             AutoTest.LearnedPriorityProvider.IttMode = ittRawPt
                 ? AutoTest.LearnedPriorityProvider.IttScoreMode.RawPt
@@ -1978,7 +1799,8 @@ namespace AutoTest
                 LearnedPriorityProvider.Reload(TierLearningRoot, writeMarkdown: false);
             }
             bool isSuperSkill = wiringSkill == WiringSkill.Super;
-            // Super = Optimal + 無段階の序列 + 激しい防御 + 消耗品の読み + 偵察と戦闘名の回避 (2026-11-06・同じシードで +4.86σ)
+            // Super = Optimal + 無段階の序列 + 激しい防御 + 消耗品の読み + 偵察と戦闘名の回避 (2026-11-06・同じシードで +4.86σ)。
+            //   **戦闘の先読みは含まない** (配線とリロールは山札の方策・先読みは deckLookahead だけ・2026-11-12 に確認)。
             if (isSuperSkill) { v3.superDefense = true; v3.superConsumables = true; v3.superNav = true; v3.macroPlan = true; v3.phase3Ranked = true; v3.axisCommitBuy = true; UseLearnedDanger = true; AvoidLoseRate = v3.avoidLoseRate; }
             // [2026-11-10] 軸に寄せる方策を本体の差し込み口 (開幕の品・挑戦カード) へも渡す。 空なら無効。
             BotHooks.AxisFocus = buyAxisFocus ?? "";
@@ -2005,249 +1827,44 @@ namespace AutoTest
             if (normalDropRate  >= 0f) GameLoop.CombatRewards.NormalDropRate = normalDropRate;
             if (combatGoldScale >  0)  GameLoop.CombatRewards.GoldScale      = combatGoldScale;
 
+            // 帯の固定は測定専用 (#118)。 学習を作る経路で使うと、 固定した帯の序列で買ったランを別の帯へ積む (または逆) ことになる。
+            if (botLearningBandOverride >= 0 && ProducesLearning)
+                throw new InvalidOperationException($"botLearningBandOverride={botLearningBandOverride} は学習を作る経路"
+                    + $" (learnTier={learnTier} / learnBotAi={learnBotAi} / learningWorker={learningWorker} measureNoExplore={measureNoExplore}"
+                    + $" / randomGrantTrial={randomGrantTrial} / Tier較正={IsTierCalibration}) とは併用できない");
+            _fallbackRuns = _bandSwitchRuns = 0;
+
             // プロファイル切替で参照先サブディレクトリが変わるため、 各キャッシュを再読み込み
             try { PolicyParameters.ReloadFromDisk(MetaProfileHelper.LearningRoot()); } catch { }
             try { EventChoiceLearningStats.Reload(MetaProfileHelper.LearningRoot()); } catch { }
             try { LearnedPriorityProvider.Reload(TierLearningRoot, writeMarkdown: UpdatesTier); } catch { }
             try { EncounterDangerStats.Reload(TierLearningRoot); } catch { }
-            try { BossTuning.Reload(MetaProfileHelper.LearningRoot()); } catch { }
 
-            if (wiringSkill == WiringSkill.Ultra)
+            // **学習データが欠けていたら黙って手書きの序列へ落とさない** (2026-11-12・#118)。
+            //   難易度 2 (10 点) は帯 bot_band_1_15 を読むが、 そのフォルダは無い → 手書きの S/A だけで買い、 難易度 1〜3 のクリアが 0% になった。
+            //   測定ではエラーで止める。 学習を作る経路 (最初の学習の回は空から始める) は止めずに印字だけ。
             {
-                StartCoroutine(PrepareUltraAndRun());
+                var gaps = LearningGaps(TierLearningRoot);
+                _learningGaps = string.Join(" / ", gaps);
+                if (gaps.Count > 0)
+                {
+                    string msg = $"[AutoRunner] **学習データなし** ({BandFolderName(TierLearningRoot)}・帯の固定={botLearningBandOverride}): {_learningGaps}";
+                    if (failOnMissingLearning && !ProducesLearning)
+                        throw new LearningMissingException(msg + " → failOnMissingLearning=true なので止める"
+                            + " (今の学習で測るなら botLearningBandOverride=0・意図して空で走らせるなら failOnMissingLearning=False)");
+                    Debug.LogWarning(msg + (ProducesLearning ? " (学習を作る経路なので続ける)" : " (failOnMissingLearning=false なので続ける)"));
+                }
             }
-            else if (autoLoopBatches >= 2)
+
+            if (autoLoopBatches >= 2)
                 StartCoroutine(RunAutoLoop());
             else
                 StartCoroutine(RunBatch());
         }
 
-        private bool TryValidateUltraProductionWorkerConfiguration(out string reason)
-        {
-            if (ultraProductionExpectedRuns <= 0)
-            {
-                reason = "expected run count must be positive";
-                return false;
-            }
-            if (ultraProductionScenarioSeeds == null
-                || ultraProductionScenarioSeeds.Length != ultraProductionExpectedRuns)
-            {
-                reason = "scenario seed vector length does not match expected runs";
-                return false;
-            }
-            if (forcedPolicyParameters == null)
-            {
-                reason = "forced production policy is missing";
-                return false;
-            }
-            if (string.IsNullOrEmpty(ultraProductionPolicyId)
-                || string.IsNullOrEmpty(ultraProductionScenarioSeedVectorHash))
-            {
-                reason = "policy id or scenario seed vector hash is missing";
-                return false;
-            }
-            if (string.IsNullOrWhiteSpace(productionOutputRootOverride))
-            {
-                reason = "isolated production output root is missing";
-                return false;
-            }
-            reason = string.Empty;
-            return true;
-        }
-
-        private void EmitUltraProductionConfigurationFailure(string reason)
-        {
-            var batch = new UltraProductionBatchRecord
-            {
-                policyId = ultraProductionPolicyId ?? "",
-                scenarioSeedVectorHash = ultraProductionScenarioSeedVectorHash ?? "",
-                runs = Array.Empty<UltraProductionRunRecord>(),
-                outputPath = productionOutputRootOverride ?? "",
-                artifactPath = "",
-                artifactSha256 = "",
-                completedNormally = false,
-                failureCode = "INVALID_WORKER_CONFIGURATION: " + reason,
-            };
-            try { UltraProductionBatchCompleted?.Invoke(batch); } catch { }
-            Debug.LogError("[AutoRunner][UltraWorker] START REJECTED: " + reason);
-            if (!Application.isEditor) Application.Quit(2);
-        }
-
-        /// <summary>
-        /// Apply one controller-owned synthetic seed to production GameRng. Every
-        /// policy candidate receives the same (ordinal, seed, runIndex) triples.
-        /// This method is worker-only; the live Ultra 10000-run batch never calls it.
-        /// </summary>
-        public UltraProductionScenarioBinding BeginUltraProductionScenario(
-            int ordinal,
-            int liveRunIndex)
-        {
-            if (!ultraProductionWorkerMode)
-                throw new InvalidOperationException("production scenario seeds are worker-only");
-            if (ultraProductionScenarioSeeds == null
-                || ordinal < 0 || ordinal >= ultraProductionScenarioSeeds.Length)
-                throw new ArgumentOutOfRangeException(nameof(ordinal));
-
-            ulong seed = ultraProductionScenarioSeeds[ordinal];
-            _currentUltraProductionScenarioSeed = seed;
-            GameLoop.GameRng.SetMasterSeed(seed);
-            GameLoop.GameRng.BeginRun(liveRunIndex);
-            return new UltraProductionScenarioBinding(ordinal, liveRunIndex, seed);
-        }
-
-        private IEnumerator PrepareUltraAndRun()
-        {
-            _ultraProfile = UltraAutoRunProfile.CreateStandard50WithRelic10000();
-            _ultraProgressSession = UltraProgressHub.Begin(new UltraProgressPlan
-            {
-                label = "Ultra Standard / relic / 50pt",
-                totalRuns = _ultraProfile.runCount,
-                workerCount = 0,
-            });
-            _ultraBatchActive = true;
-
-            if (!_ultraProfile.Matches(this, out string profileReason))
-            {
-                FailUltraBeforeRun("runtime profile mismatch: " + profileReason);
-                yield break;
-            }
-
-            if (!UltraAutoRunBridge.TryOpen(_ultraProfile, out _ultraController, out string openReason))
-            {
-                FailUltraBeforeRun(openReason);
-                yield break;
-            }
-
-            _ultraController.BindProgress(_ultraProgressSession);
-            UltraProgressHub.SetPhase(
-                _ultraProgressSession,
-                UltraProgressPhase.Preparing,
-                1,
-                "production full-run policy portfolio");
-
-            var request = new UltraPolicyPortfolioRequest
-            {
-                profile = _ultraProfile,
-                baselinePolicy = PolicyParameters.Current != null ? PolicyParameters.Current.Clone() : null,
-                productionRunsPerCandidate = 1000,
-                progressSession = _ultraProgressSession,
-            };
-
-            bool began;
-            string beginReason;
-            try { began = _ultraController.TryBeginPolicyPortfolio(request, out beginReason); }
-            catch (Exception ex)
-            {
-                began = false;
-                beginReason = ex.GetType().Name + ": " + ex.Message;
-            }
-            if (!began)
-            {
-                FailUltraBeforeRun("production portfolio start failed: " + beginReason);
-                yield break;
-            }
-
-            const float maxPlanningSeconds = 3600f;
-            float planningStarted = Time.realtimeSinceStartup;
-            UltraPolicyPortfolioResult selection = null;
-            while (selection == null)
-            {
-                bool polled;
-                bool completed;
-                string pollReason;
-                UltraPolicyPortfolioResult result;
-                try
-                {
-                    polled = _ultraController.TryPollPolicyPortfolio(
-                        out completed, out result, out pollReason);
-                }
-                catch (Exception ex)
-                {
-                    polled = false;
-                    completed = false;
-                    result = null;
-                    pollReason = ex.GetType().Name + ": " + ex.Message;
-                }
-
-                if (!polled)
-                {
-                    FailUltraBeforeRun("production portfolio polling failed: " + pollReason);
-                    yield break;
-                }
-                if (completed)
-                {
-                    selection = result;
-                    break;
-                }
-                if (Time.realtimeSinceStartup - planningStarted > maxPlanningSeconds)
-                {
-                    FailUltraBeforeRun("production portfolio timed out before run 1");
-                    yield break;
-                }
-
-                UltraProgressHub.Heartbeat(_ultraProgressSession, "waiting for production workers");
-                yield return null;
-            }
-
-            string selectionReason = "portfolio result is null";
-            if (selection == null || !selection.IsUsable(out selectionReason))
-            {
-                FailUltraBeforeRun("production portfolio result rejected: " + selectionReason);
-                yield break;
-            }
-
-            forcedPolicyParameters = selection.selectedPolicy.Clone();
-            UltraPortfolioPolicySpec selectedRunPolicy = selection.selectedRunPolicy;
-            _ultraSelectedBaseSkill = (WiringSkill)selectedRunPolicy.wiringSkill;
-            superHighDifficultyTailMode = selectedRunPolicy.superHighDifficultyTailMode;
-            superLayer6OptimalCombatRoutine = selectedRunPolicy.superLayer6OptimalCombatRoutine;
-            lambdaFarmTiles = selectedRunPolicy.lambdaFarmTiles;
-            UltraProgressHub.SetPhase(
-                _ultraProgressSession,
-                UltraProgressPhase.Executing,
-                _ultraProfile.runCount,
-                "selected=" + selection.selectedPolicyId
-                + " coverage=" + UltraPlanningCoverage.RunStartOnly);
-            Debug.Log("[AutoRunner][Ultra] production policy selected: "
-                    + selection.selectedPolicyId + " / " + selection.outputPath
-                    + " / coverage=RunStartOnly / " + selection.diagnostic);
-            // **候補が同一挙動なら、 選択そのものが無意味なので目立たせる。**
-            //   停止はしない ── 稀にしか到達しない分岐だけが違う候補は正当に高一致になりうる。
-            //   ただし「何も測れていない可能性」は必ず人間の目に入れる。
-            if (selection.configurationNoOpPolicyIds != null
-                && selection.configurationNoOpPolicyIds.Length > 0)
-                Debug.LogWarning("[AutoRunner][Ultra] "
-                    + AutoTest.Ultra.UltraPortfolioSelector.DescribeNoOpCheck(
-                        selection.configurationNoOpPolicyIds, selection.maxDigestAgreement)
-                    + " ── この portfolio の選択結果は信用できない可能性がある。");
-
-            yield return RunBatch();
-        }
-
-        private void FailUltraBeforeRun(string reason)
-        {
-            string detail = string.IsNullOrEmpty(reason) ? "unknown Ultra startup failure" : reason;
-            UltraProgressHub.Fail(_ultraProgressSession, detail);
-            try { _ultraController?.Cancel(detail); } catch { }
-            try { _ultraController?.Dispose(); } catch { }
-            _ultraController = null;
-            _ultraBatchActive = false;
-            Debug.LogError("[AutoRunner][Ultra] START REJECTED (0 runs): " + detail);
-#if UNITY_EDITOR
-            UnityEditor.EditorApplication.isPlaying = false;
-#endif
-        }
-
         private void OnDestroy()
         {
             BotHooks.Uninstall();
-            if (!_ultraBatchActive) return;
-            const string reason = "Ultra batch cancelled because AutoRunner was destroyed";
-            UltraProgressHub.Cancel(_ultraProgressSession, reason);
-            try { _ultraController?.Cancel(reason); } catch { }
-            try { _ultraController?.Dispose(); } catch { }
-            _ultraController = null;
-            _ultraBatchActive = false;
         }
 
         /// <summary>
@@ -2266,9 +1883,7 @@ namespace AutoTest
             string root = MetaProfileHelper.LearningRoot();
 
             // ── バッチ0回目(初期)スナップショット ──
-            try { BossTuning.Reload(root); } catch { }
             try { PolicyParameters.ReloadFromDisk(root); } catch { }
-            var bossStart   = SnapshotBossTuning();
             var policyStart = PolicyParameters.Current?.Clone();
             float firstClearRate = -1f, lastClearRate = -1f;
 
@@ -2300,7 +1915,7 @@ namespace AutoTest
             }
             catch { }
             // ── 周回サマリ: 初期 vs 最終の差分をチェンジログに追記 ──
-            try { AppendAutoLoopSummary(loops, bossStart, policyStart, firstClearRate, lastClearRate); }
+            try { AppendAutoLoopSummary(loops, policyStart, firstClearRate, lastClearRate); }
             catch (Exception e) { Debug.LogWarning($"[AutoRunner] 周回サマリ追記失敗: {e.Message}"); }
             Debug.Log($"[AutoRunner] === 自動周回モード END: {loops}周完了 (最終 Reload: {LearnedPriorityProvider.LastLoadedSummary}) ===");
             if (finalExit)
@@ -2325,32 +1940,8 @@ namespace AutoTest
             return valid > 0 ? (float)full / valid : 0f;
         }
 
-        /// <summary>現在のボス調整値を {key → {ラベル → 実数値}} で複製 (具体パラメータ + HP + Dice期待値)。</summary>
-        private static Dictionary<string, Dictionary<string, float>> SnapshotBossTuning()
-        {
-            var snap = new Dictionary<string, Dictionary<string, float>>();
-            try
-            {
-                foreach (var k in BossTuning.All())
-                {
-                    var m = new Dictionary<string, float>();
-                    foreach (BossParam p in System.Enum.GetValues(typeof(BossParam)))
-                        m[p.ToString()] = BossTuning.GetParam(k, p);
-                    m["HP"] = BossTuning.MaxHpFor(k.key);
-                    if (BossTuning.IsSignatureDiceBoss(k.key))
-                        m["SigE"] = BossTuning.SignatureExpected(BossTuning.SignatureFaces(k.key));
-                    else
-                        m["DiceE"] = BossTuning.CurrentDiceExpected(k.key);
-                    snap[k.key] = m;
-                }
-            }
-            catch { }
-            return snap;
-        }
-
         /// <summary>自動周回の初期(バッチ0)→最終(バッチN)差分を BALANCE_CHANGELOG_&lt;profile&gt;.md に追記。</summary>
         private void AppendAutoLoopSummary(int loops,
-            Dictionary<string, Dictionary<string, float>> bossStart,
             PolicyParameters policyStart, float firstClear, float lastClear)
         {
             var sb = new StringBuilder();
@@ -2359,61 +1950,13 @@ namespace AutoTest
             sb.AppendLine($"- **メタバフ**: {metaBuffMode}"
                 + (metaBuffMode == MetaBuffMode.BuildFocused ? $"({metaBuildAxis})" : "")
                 + $" / メタデバフ全ON: {enableAllDebuffs} / アイテム選択: {itemPickMode}");
-            sb.AppendLine($"- **学習**: ボスチューナー={(tuneBosses ? "ON" : "OFF")}"
-                + $" / Tier学習={(learnTier ? "ON" : "OFF")} / BOT学習={(learnBotAi ? "ON" : "OFF")}");
+            sb.AppendLine($"- **学習**: Tier学習={(learnTier ? "ON" : "OFF")} / BOT学習={(learnBotAi ? "ON" : "OFF")}");
             if (firstClear >= 0f && lastClear >= 0f)
             {
                 float d = lastClear - firstClear;
                 sb.AppendLine($"- **7層クリア率**: 初回 {firstClear:P2} → 最終 {lastClear:P2} ({d:+0.0%;-0.0%})");
             }
             sb.AppendLine();
-
-            // ボス難易度係数の差分 (変化した軸のみ)
-            if (BossAutoTune)
-            {
-                var bossEnd = SnapshotBossTuning();
-                var keys = new SortedSet<string>();
-                foreach (var k in bossStart.Keys) keys.Add(k);
-                foreach (var k in bossEnd.Keys) keys.Add(k);
-                var lines = new List<string>();
-                foreach (var key in keys)
-                {
-                    bossStart.TryGetValue(key, out var sa);
-                    bossEnd.TryGetValue(key, out var sb2);
-                    var parts = new List<string>();
-                    var labels = new SortedSet<string>();
-                    if (sa != null) foreach (var l in sa.Keys) labels.Add(l);
-                    if (sb2 != null) foreach (var l in sb2.Keys) labels.Add(l);
-                    foreach (var label in labels)
-                    {
-                        float av = (sa != null && sa.TryGetValue(label, out var v1)) ? v1 : 0f;
-                        float bv = (sb2 != null && sb2.TryGetValue(label, out var v2)) ? v2 : 0f;
-                        if (Mathf.Abs(bv - av) <= 0.05f) continue;
-                        if (label == "DiceE")
-                        {
-                            var (cnt, faces) = BossTuning.BestDiceConfig(bv > 0 ? bv : 1f);
-                            parts.Add($"Dice E{av:F1}→**E{bv:F1}({cnt}d{faces})**");
-                        }
-                        else if (label == "SigE")
-                            parts.Add($"固有面 E{av:F1}→**E{bv:F1}**");
-                        else if (label == "HP")
-                            parts.Add($"HP {av:F0}→**{bv:F0}**");
-                        else
-                            parts.Add($"{label} {av:0.#}→**{bv:0.#}**");
-                    }
-                    if (parts.Count > 0) lines.Add($"| `{key}` | {string.Join(", ", parts)} |");
-                }
-                sb.AppendLine("### ボス難易度パラメータ (変化した実数値のみ)");
-                sb.AppendLine();
-                if (lines.Count == 0) sb.AppendLine("*(変化なし)*");
-                else
-                {
-                    sb.AppendLine("| ボス | 変化したパラメータ |");
-                    sb.AppendLine("|---|---|");
-                    foreach (var l in lines) sb.AppendLine(l);
-                }
-                sb.AppendLine();
-            }
 
             // policy 差分
             if (UpdatesAi && policyStart != null)
@@ -2471,7 +2014,6 @@ namespace AutoTest
 
         private IEnumerator RunBatch()
         {
-            _ultraProductionRuns.Clear();
             _lastSummaryPath = "";
             ResetBatchStatics();
             Application.logMessageReceived += OnLog;
@@ -2548,11 +2090,6 @@ namespace AutoTest
             EventChoiceLearningStats.Reload();
             // L2: policy.json を読み込み (前バッチの摂動結果を引き継ぐ)
             PolicyParameters.ReloadFromDisk();
-            if (forcedPolicyParameters != null)
-            {
-                PolicyParameters.SetCurrent(forcedPolicyParameters.Clone());
-                Debug.Log("[AutoRunner][Ultra] production portfolioで選択した方策をreload後に固定適用");
-            }
             // [較正専用] 危険度の上書き。 static なのでアーム跨ぎで残る ── 毎回既定へ戻してから乗せる。
             BlockCreditRatio = 0.7f; SafetyFights = 2.0f; GoldComfort = 60f; DangerFloor = 0.25f;
             if (navDangerFloor  >= 0f) DangerFloor      = navDangerFloor;
@@ -2586,9 +2123,6 @@ namespace AutoTest
             if (navBlockCredit  >= 0f) BlockCreditRatio = navBlockCredit;
             if (navSafetyFights >= 0f) SafetyFights     = navSafetyFights;
             Debug.Log($"[AutoRunner] policy: {PolicyParameters.Current.Summary()}");
-            // L3: ボス難易度係数を読み込み (前バッチの自動調整を引き継ぐ)
-            BossTuning.Reload();
-            if (BossAutoTune) Debug.Log($"[AutoRunner] bossTuning: {BossTuning.Summary()}");
             // L2ペアテスト: 挑戦者ポリシーを生成 (バッチ内 paired diff 評価用)
             //  ・AIルーチン学習モード時のみ (TierOnly では policy 凍結)
             //  ・runCount が L2ゲート(200) 未満ならスキップ
@@ -2670,8 +2204,7 @@ namespace AutoTest
                 {
                     curRunInArm = i + 1;
                     GameLoop.GameRng.BeginRun(i);
-                    if (GameLoop.GameRng.IsSeeded)
-                        _rng = new System.Random(GameLoop.GameRng.Range(0, int.MaxValue, "autorun.eventTiebreak", i));
+                    RebuildRunRng(i);
                     if (paired)
                     {
                         // 同じペアシードを (i/2) で共有
@@ -2896,8 +2429,6 @@ namespace AutoTest
                 }
                 catch (Exception ex) { Debug.LogWarning($"[AutoRunner] ビルド別スイープ出力失敗: {ex.Message}"); }
             }
-            EmitUltraProductionBatchCompletion(dir);
-            CompleteUltraBatchIfActive("production batch completed / output=" + dir);
             Debug.Log($"[AutoRunner] バッチ完了。ログ出力先:\n{dir}");
             // 並列ワーカー用の終了フック (2026-09-17)。 rankMarginWorkerMode 以外の
             //   アーム (付与試行など) をワーカーで回すとき、 **プロセスを畳む合図がなかった**。

@@ -89,7 +89,11 @@ namespace UI.Game2D
         /// <summary>伝説の枠を描いている間だけ 8 コマ/秒で描き直す (光を回すため)。 <see cref="_glintTick"/> が光の位置。</summary>
         private bool _glintOn; private int _glintTick;
 
-        public static bool Active { get; private set; }
+        /// <summary>窓が出ている (閉じる途中も含む) か、 手引きの板 (<see cref="Game2DTutorial"/>) が出ている間 true。 後ろの画面 (地図・戦闘・帯) はこれを見て手を止める。</summary>
+        public static bool Active { get => _active || Game2DTutorial.Blocking; private set => _active = value; }
+        private static bool _active;
+        /// <summary>窓だけが出ているか (手引きの板を数えない・手引きが「窓が出ていない時」を見分けるのに使う)。</summary>
+        public static bool WindowActive => _active;
         private const int Inset = 16, RowH = 22, Gap = 2, FrameB = 12;
 
         /// <summary>窓の高さ (def.h が 0 の時): 題・注意書き・タブ・行 (一番多いタブに合わせる)・詳細・足元・ボタンが収まる高さ。</summary>
@@ -170,7 +174,7 @@ namespace UI.Game2D
                 if (!visible) { Active = false; }
                 else
                 {
-                    if (_open && _sp.x > 0.5f) HandlePointer();
+                    if (_open && _sp.x > 0.5f && !Game2DTutorial.Blocking) HandlePointer();      // 手引きの板が上にある間は押させない
                     if (_glintOn) { int g = (int)(Time.unscaledTime * 8f); if (g != _glintTick) { _glintTick = g; _dirty = true; } }
                     if (_dirty) { Redraw(); _dirty = false; }
                     _rt.anchoredPosition = new Vector2(_px, -(_py + Mathf.Round((1f - _sp.Value(60f)) * 60f)));
@@ -555,9 +559,13 @@ namespace UI.Game2D
             }
             // ボタン (右寄せ)
             int bx = d.w - Inset;
+            // 窓の幅に収まらない時は、 最小幅と余白と間隔を詰める (設定の窓は 7 個並ぶ・左端が窓の外へ切れていた)
+            int bMin = 52, bPad = 20, bGap = 5, bTotal = 0;
+            foreach (var b in d.buttons) bTotal += Mathf.Max(bMin, Game2DJpFont.Width(b.label) + bPad) + bGap;
+            if (bTotal - bGap > d.w - Inset * 2) { bMin = 28; bPad = 10; bGap = 3; }
             for (int i = d.buttons.Count - 1; i >= 0; i--)
             {
-                var b = d.buttons[i]; int bw = Mathf.Max(52, Game2DJpFont.Width(b.label) + 20); bx -= bw; _btnR.Insert(0, new RectInt(bx, btnY, bw, 22)); bx -= 5;
+                var b = d.buttons[i]; int bw = Mathf.Max(bMin, Game2DJpFont.Width(b.label) + bPad); bx -= bw; _btnR.Insert(0, new RectInt(bx, btnY, bw, 22)); bx -= bGap;
             }
             for (int i = 0; i < d.buttons.Count; i++)
             {

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace ItemSystem.PassiveSkills
 {
-    /// <summary>プレイヤーに止めを刺した致死メカニズムの分類 (ボス難易度オートチューナーの苦戦診断用)。</summary>
+    /// <summary>プレイヤーに止めを刺した致死メカニズムの分類 (死因の集計用)。</summary>
     public enum DeathCause
     {
         Normal,       // 通常ロール敗北の被ダメ
@@ -10,7 +10,7 @@ namespace ItemSystem.PassiveSkills
         Reflect,      // 鏡の双子: 鏡映の応答 (旧: 覚者・無相)
         Burst,        // 業火・残響: 爆ぜ火 (敗北時固定ダメ)
         Chip,         // 業火の審判官: 審判の炎 (継続ダメ)
-        SuddenDeath,  // サドンデス (灰燼の烙印)
+        SuddenDeath,  // 欠番 (旧: サドンデス・灰燼の烙印)。 書く所は 0 件だが、 int の並びを保つために値は残す。
         Other,
         // **末尾に足すこと。** runs.jsonl へ int で載るので、 既存の並びを動かすと
         //   過去バッチと突き合わせたときに黙って別の死因へすり替わる。
@@ -31,31 +31,35 @@ namespace ItemSystem.PassiveSkills
     public class CombatContext
     {
         // ===== プレイヤー状態 =====
+        /// <summary>[persistent] (CombatManager が HP を同期する)</summary>
         public int playerCurrentHP;
+        /// <summary>[persistent]</summary>
         public int playerMaxHP;
-        public int playerBaseMaxHP;     // 装備補正前の最大HP
+        public int playerBaseMaxHP;     // [persistent] 装備補正前の最大HP
 
         // ===== 敵状態 =====
+        /// <summary>[persistent] (CombatManager が HP を同期する)</summary>
         public int enemyCurrentHP;
+        /// <summary>[persistent]</summary>
         public int enemyMaxHP;
 
         // ===== ダイスロール結果 =====
-        public int[] playerDice;        // プレイヤーが振った各ダイスの値
-        public int[] enemyDice;         // 敵が振った各ダイスの値
-        public int playerDiceTotal;     // プレイヤーのダイス合計値
-        public int enemyDiceTotal;      // 敵のダイス合計値
+        public int[] playerDice;        // [persistent] (BeginNewTurn では戻さない。 毎ターンの振り (PassiveSkillManager) が上書きする) プレイヤーが振った各ダイスの値
+        public int[] enemyDice;         // [persistent] (BeginNewTurn では戻さない。 毎ターンの振り (PassiveSkillManager) が上書きする) 敵が振った各ダイスの値
+        public int playerDiceTotal;     // [persistent] (BeginNewTurn では戻さない。 毎ターンの振り (PassiveSkillManager) が上書きする) プレイヤーのダイス合計値
+        public int enemyDiceTotal;      // [persistent] (BeginNewTurn では戻さない。 毎ターンの振り (PassiveSkillManager) が上書きする) 敵のダイス合計値
         /// <summary>ダイス差（playerDiceTotal − enemyDiceTotal）。両合計から常に算出する読み取り専用プロパティ。
         /// 視点スワップ時も両合計が入れ替わるため符号が自動反転し、明示的な反転代入は不要。
         /// 常に最新値を返すため、OnPostRoll パッシブが合計を改変しても鮮度ズレが起きない。</summary>
         public int diceDifference => playerDiceTotal - enemyDiceTotal;
         
         // ===== ダイス設定値 =====  
-        public int playerDiceMax;       // プレイヤーのダイス最大出目（装備武器由来）
-        public int enemyDiceMax;        // 敵のダイス最大出目
+        public int playerDiceMax;       // [persistent] (戦闘開始で設定・CombatManager.Turn.cs が毎ターン入れ直す) プレイヤーのダイス最大出目（装備武器由来）
+        public int enemyDiceMax;        // [persistent] (戦闘開始・段の差し替えで設定) 敵のダイス最大出目
 
         // ===== ダイスカスタマイズ（装備ダイス） =====
         /// <summary>
-        /// 装備中ダイスの面配列。null時は通常ロール(1～diceMax)。
+        /// [persistent] (戦闘開始で設定) 装備中ダイスの面配列。null時は通常ロール(1～diceMax)。
         /// 全ダイス共通でこの面からランダム抽選。
         /// </summary>
         public int[] equippedDiceFaces;
@@ -91,9 +95,9 @@ namespace ItemSystem.PassiveSkills
         public readonly List<CombatSystem.RoleKind> firedRolesThisTurn = new List<CombatSystem.RoleKind>();
 
         // ===== ダメージ計算 =====
-        public int baseDamage;          // 基本ダメージ
-        public int finalDamage;         // 最終ダメージ（スキル補正後）
-        public int pursuitDamage;       // 追撃ダメージ（パッシブ由来の固定追撃）
+        public int baseDamage;          // [persistent] (ProcessDamage が計算のたびに上書きする作業値) 基本ダメージ
+        public int finalDamage;         // [persistent] (ProcessDamage が計算のたびに上書きする作業値) 最終ダメージ（スキル補正後）
+        public int pursuitDamage;       // [perTurn] 追撃ダメージ（パッシブ由来の固定追撃）
         /// <summary>[perTurn] このターン、 ブロック端子に 1 本以上配線したか。
         /// 遺物の刻印〈そのターン、ブロック端子に 1 本も配線していない〉の判定に使う (§15-5)。
         /// CombatManager の配線集計が毎ターン set し、 BeginNewTurn Phase B でリセットする。</summary>
@@ -115,118 +119,114 @@ namespace ItemSystem.PassiveSkills
         /// <b>会心率はすべてここへ足す</b> (2026-09-19 に旧「分子」を撤去して % へ統一)。
         /// 武器 + 層補正の素の会心率は ProcessDamage の引数 critBaseRate で別に渡る。 BeginNewTurn で 0 リセット。</summary>
         public float critRatePctAdd;
-        public bool isCritical;         // 会心判定結果
-        /// <summary>会心強制フラグ。true なら乱数判定を無視して会心確定（末那識など）。
+        public bool isCritical;         // [perTurn] 会心判定結果
+        /// <summary>[perTurn] 会心強制フラグ。true なら乱数判定を無視して会心確定（末那識など）。
         /// 会心率cap(注意散漫)下でも真に確定する。BeginNewTurn でリセット、毎ターン効果側が再set。</summary>
         public bool forceCritical;
         /// <summary>[perTurn] 会心封印フラグ。true なら会心率を 0 にする（無心の刃など）。
         /// forceCritical より優先度が低い（強制会心が立っていれば会心する）。BeginNewTurn でリセット。</summary>
         public bool critSuppressed;
-        public float criticalMultiplier; // 会心倍率（既定 2.0。2026-07-26 に 3.0 へ上げ、2026-08-03 に 2.0 へ差し戻し）
-        public bool damageReduced;      // ダメージ軽減が発生したか
+        public float criticalMultiplier; // [perTurn] (Phase B で基礎値 + メタ・遺物へ戻す) 会心倍率（既定 2.0。2026-07-26 に 3.0 へ上げ、2026-08-03 に 2.0 へ差し戻し）
+        public bool damageReduced;      // [perTurn] ダメージ軽減が発生したか
 
         // ===== Threat/Scratchシステム =====
-        /// <summary>敵の脅威値。毎ターン宣言される削りダメージの基準</summary>
+        /// <summary>[persistent] (戦闘開始・段の差し替えで設定) 敵の脅威値。毎ターン宣言される削りダメージの基準</summary>
         public int enemyThreat;
-        /// <summary>今ターンのscratchダメージ（勝利時: max(0, threat-diff)）</summary>
+        /// <summary>[perTurn] 今ターンのscratchダメージ（勝利時: max(0, threat-diff)）</summary>
         public int scratchDamage;
-        /// <summary>scratch無効化フラグ（パリィ等）</summary>
+        /// <summary>[perTurn] scratch無効化フラグ（パリィ等）</summary>
         public bool nullifyScratchDamage;
 
         // ===== 戦場修飾子 =====
-        /// <summary>この戦闘のアクティブな修飾子一覧</summary>
+        /// <summary>[persistent] この戦闘のアクティブな修飾子一覧</summary>
         public List<BattleModifier> activeModifiers = new List<BattleModifier>();
 
         // ===== ターン管理 =====
-        public int currentTurn;         // 現在のターン数（1始まり）
-        public bool isFirstRoll;        // 戦闘開始後の初回ロールか
+        public int currentTurn;         // [decay] (Phase A で +1 する通算のターン数 (0 へ向かう値ではない)) 現在のターン数（1始まり）
+        public bool isFirstRoll;        // [perTurn] (Phase A で currentTurn から決め直す) 戦闘開始後の初回ロールか
 
         // ===== 戦闘相手の種別（暗殺教団契約等で参照） =====
-        /// <summary>戦闘相手の種別 (Normal/Elite/Boss)。 マップタイル種別から StartCombat 時に設定。
+        /// <summary>[persistent] 戦闘相手の種別 (Normal/Elite/Boss)。 マップタイル種別から StartCombat 時に設定。
         /// 暗殺教団 (通常戦闘マスのみ発動) / 暗殺教団+戦術家協力 (エリートに拡張) で参照する。</summary>
         public CombatSystem.EnemyKind currentEnemyKind = CombatSystem.EnemyKind.Normal;
 
         // ===== 脆弱状態異常（狩猟旅団契約で敵に付与）=====
-        /// <summary>脆弱の倍率 (狩猟旅団 L1=0.15 / L2=0.30 / L3=0.45)。 0 なら契約なし。</summary>
+        /// <summary>[persistent] 脆弱の倍率 (狩猟旅団 L1=0.15 / L2=0.30 / L3=0.45)。 0 なら契約なし。</summary>
         public float enemyVulnerabilityMultiplier = 0f;
-        /// <summary>脆弱が armed (発動可能) 状態か。 会心ダメで消費、 ロール勝利時の非会心ダメで再点火。</summary>
+        /// <summary>[persistent] (VulnerabilityStatus が立てる・倒す) 脆弱が armed (発動可能) 状態か。 会心ダメで消費、 ロール勝利時の非会心ダメで再点火。</summary>
         public bool enemyVulnerabilityArmed = false;
 
         // ===== 蓄積/持続値（スキルが読み書き） =====
-        /// <summary>スキルごとの蓄積データ（キー = スキルID）</summary>
+        /// <summary>[persistent] (辞書は戦闘を通して保持。 一部のキー (ChargeSpentThisTurnKey 等) は Phase B で戻す) スキルごとの蓄積データ（キー = スキルID）</summary>
         public Dictionary<string, float> accumulatedValues = new Dictionary<string, float>();
 
-        /// <summary>次ターンへのバフ/デバフ転送用（キー = バフ名）</summary>
+        /// <summary>[decay] (Phase A で currentBuffs へ移して空にする) 次ターンへのバフ/デバフ転送用（キー = バフ名）</summary>
         public Dictionary<string, float> nextTurnBuffs = new Dictionary<string, float>();
         
-        /// <summary>現在ターンのバフ/デバフ</summary>
+        /// <summary>[perTurn] (Phase A で空にして nextTurnBuffs から入れ替える) 現在ターンのバフ/デバフ</summary>
         public Dictionary<string, float> currentBuffs = new Dictionary<string, float>();
 
         // ===== 敵のダイス制約（処刑用） =====
+        /// <summary>[perTurn]</summary>
         public Dictionary<int, int> enemyDiceOverrides = new Dictionary<int, int>();
+        /// <summary>[persistent] (積んだ要求は次の振りの適用 (PassiveSkillManager) で空になる)</summary>
         public List<DiceOverrideRequest> pendingDiceOverrides = new List<DiceOverrideRequest>();
 
         // ===== 出血・状態異常 =====
-        public int enemyBleedStacks;    // 敵の出血スタック数（※統一フレーム未移行・現状フィールドのまま）
+        public int enemyBleedStacks;    // [decay] 敵の出血スタック数（※統一フレーム未移行・現状フィールドのまま）
         /// <summary>[persistent] 止血阻害 (AntiClotting) が立てるフラグ。BeginNewTurn の出血自然減衰を無効化。</summary>
         public bool bleedDecayDisabled;
         // burnDecayHalved は 2026-07-18 削除 (Burn 全廃・EverBurning deregister に伴う死コード掃除)
 
-        /// <summary>汎用ステータス・スタック（#3 統一フレーム。id→stacks）。Player/Enemy は絶対視点（スワップしない）。
+        /// <summary>[decay] (減衰は BeginNewTurn の直後に PassiveSkillManager が呼ぶ TickStatuses) 汎用ステータス・スタック（#3 統一フレーム。id→stacks）。Player/Enemy は絶対視点（スワップしない）。
         /// 炎上(burn)はここへ移行済み。DOT/減衰は <see cref="TickStatuses"/> が一括処理する。</summary>
         public Dictionary<string, int> playerStatusStacks = new Dictionary<string, int>();
+        /// <summary>[decay] (減衰は BeginNewTurn の直後に PassiveSkillManager が呼ぶ TickStatuses)</summary>
         public Dictionary<string, int> enemyStatusStacks = new Dictionary<string, int>();
-
-        // ===== 敵スタンス（毎ターン抽選・ロール前テレグラフ。ADR-0005） =====
-        /// <summary>敵→プレイヤー被ダメ倍率（高火力>1/低火力<1）。ApplyLossDamageModifiers で乗算。毎ターン1.0リセット。
-        /// ロール力は kind を見て CombatManager がロール時に面を縮める（弱ロール=期待値約0.65倍）。</summary>
-        public float enemyStanceDamageMult = 1f;
-        /// <summary>テレグラフ表示用：0=なし / 1=高ロール・低ダメ / 2=低ロール・高ダメ。毎ターン0リセット。</summary>
-        public int enemyStanceKind;
-        /// <summary>弱ロールスタンスの面縮小比（ボス別にチューナーが調整・基準0.65）。EnemyStance.Apply が設定、
-        /// CombatManager が弱ロール時の WeakRollMax/WeakRollFaces に渡す。毎ターン0.65リセット。</summary>
-        public float enemyStanceWeakRollRatio = 0.65f;
 
 
         // ===== 勝敗フラグ =====
+        // 名前は旧ロール勝負の名残。 相互攻撃モデル (ADR-0009) では場面ごとに意味が変わる (2026-11-12 棚卸し・GAME.md §23-1):
+        //   - ProcessDamage の中: 「いま攻撃している側」(プレイヤーの攻撃 = true / 敵の攻撃 = false。 CombatManager.Turn.cs が計算の前に立てる)
+        //   - 収支の確定後 (収支トリガー・OnTurnEnd): 収支 (与ダメ − 被ダメ) の符号
+        //   - ProcessPostRoll は立てない (出目の合計の比較は 2026-11-12 #112 で削除)
+        /// <summary>[persistent] (BeginNewTurn では戻さない。 CombatManager.Turn.cs が攻撃の前後で切り替える)</summary>
         public bool playerWonRoll;
+        /// <summary>[persistent] (BeginNewTurn では戻さない。 CombatManager.Turn.cs が攻撃の前後で切り替える)</summary>
         public bool playerLostRoll;
 
-        // ===== 連続カウンター =====
-        public int consecutiveWins;
-        public int consecutiveLosses;
-
         // ===== ダメージ無効化フラグ =====
+        /// <summary>[perTurn]</summary>
         public bool nullifyAllDamage;
+        /// <summary>[perTurn]</summary>
         public bool nullifyPursuitDamage;
 
         // ===== オーバーダメージ蓄積 =====
+        /// <summary>[persistent] (CombatManager.Turn.cs が毎ターン上書きする)</summary>
         public int overDamageAccumulated;
 
         // ===== 固定ダメージ =====
-        public int fixedDamageToEnemy;  // プレイヤー→敵への軽減不可固定ダメージ
-        public int fixedDamageToPlayer; // 敵→プレイヤーへの軽減不可固定ダメージ
+        public int fixedDamageToEnemy;  // [perTurn] プレイヤー→敵への軽減不可固定ダメージ
+        public int fixedDamageToPlayer; // [perTurn] 敵→プレイヤーへの軽減不可固定ダメージ
 
         // ===== イベント由来時限バフ =====
-        /// <summary>共助: 1ターン目の敵の攻撃ダメージを半減（適用後にfalse）</summary>
+        /// <summary>[persistent] (戦闘開始で立て、 1 回使ったら false) 共助: 1ターン目の敵の攻撃ダメージを半減（適用後にfalse）</summary>
         public bool halveFirstEnemyAttack;
-        /// <summary>獣の絆: 被弾を回数分無効化（>0時、被弾時にデクリメント）</summary>
+        /// <summary>[persistent] (残り回数・被弾で減る) 獣の絆: 被弾を回数分無効化（>0時、被弾時にデクリメント）</summary>
         public int playerDamageNegateCharges;
-        /// <summary>獣の恩義: 1ターン目の敵ロールを0扱いに（適用後にfalse）</summary>
+        /// <summary>[persistent] (戦闘開始で立てる) 獣の恩義: 1ターン目の敵ロールを0扱いに（適用後にfalse）</summary>
         public bool nullifyFirstEnemyRoll;
-        /// <summary>呪いの渇き: HP回復効果半減</summary>
+        /// <summary>[persistent] 呪いの渇き: HP回復効果半減</summary>
         public bool healHalved;
-        /// <summary>狂暴化(ボス50T後): プレイヤーの回復を完全に封じる。毎ターン狂暴化パッシブが再set。BeginNewTurn でリセット。</summary>
+        /// <summary>[perTurn] 狂暴化(ボス50T後): プレイヤーの回復を完全に封じる。毎ターン狂暴化パッシブが再set。BeginNewTurn でリセット。</summary>
         public bool healBlocked;
-        /// <summary>狂暴化(ボス50T後): エネミーが受けるダメージ倍率（1.0=等倍, 狂暴化中3.0）。BeginNewTurn でリセット。</summary>
+        /// <summary>[perTurn] 狂暴化(ボス50T後): エネミーが受けるダメージ倍率（1.0=等倍, 狂暴化中3.0）。BeginNewTurn でリセット。</summary>
         public float enemyDamageTakenMultiplier = 1f;
-        /// <summary>プレイヤーが獲得する回復量・シールド量の減衰 (スタック分だけ減らす)。 戦闘を通じて持続。
-        /// <b>2026-10-17 時点で書き込む敵はいない</b> ── 唯一の書き手だった覚者〈天衣無縫〉を削除した。 機構だけ残してある。</summary>
-        public int healShieldReduction;
+        // (回復・シールドの減衰 healShieldReduction は、 書き手の〈天衣無縫〉が 2026-10-17 に消えたので 2026-11-12 に削除。 #128)
 
         // ===== 7層 ヴェスカ（遺物学者）。 正本: docs/GAME.md §13-4 =====
         // 4 段連戦を通じて CombatContext は使い回されるため、 [persistent] 指定のものは
-        // 段が変わっても引き継がれる（healShieldReduction と同じ扱い）。
+        // 段が変わっても引き継がれる。
 
         /// <summary>[persistent] ヴェスカのシールド。 §6-3 段0 で **半減(切り捨て) → 抽選付与** の順に処理する。
         /// 定常上限は「毎ターン収入 × 2」で自動的に決まるため別途キャップ不要。</summary>
@@ -259,9 +259,8 @@ namespace ItemSystem.PassiveSkills
         /// **通常・固定・軽減不可を問わず全ダメージを回避する**（既存のメタ俊敏回避と同じ挙動）。</summary>
         public float enemyDodgeChance;
 
-        /// <summary>[persistent] 停滞する時間のスタック。 プレイヤーが攻撃端子にダイスを 1 本も置かなかった
-        /// ターンごとに +1（上限あり）。 次ターン以降の敵攻撃へ加算される。 L3 チューナーの第一レバー。</summary>
-        public int stagnationStacks;
+        // 旧 stagnationStacks (停滞する時間のスタック) は 2026-11-12 #103 で削除。 今の〈停滞する時間〉は端子を止める効果で、
+        //   止まった場所は CombatSystem.TerminalBattleState.stopped (山札の状態) に持つ。
 
         /// <summary>[perTurn] 〈天与の指輪〉: このターン、 3 以上の出目をすべて 1〜2 へ再抽選する。
         /// 旧「全出目 1」は本数ぶんの手が完全に死に、 その前の「行動不可」と実質同じ重さだった。
@@ -307,52 +306,53 @@ namespace ItemSystem.PassiveSkills
         /// 9999 の軽減不可ダメージ。</summary>
         public bool vescaExecuteArmed;
 
-        /// <summary>検証用計測: この戦闘でプレイヤーが実際に獲得した累計回復量／シールド量。
+        /// <summary>[persistent] (戦闘の累計) 検証用計測: この戦闘でプレイヤーが実際に獲得した累計回復量／シールド量。
         /// AutoRunner が6/7層ボス戦で集計しサマリに記載する。戦闘ごとに新規生成でリセット。</summary>
         public int healAppliedTotal;
+        /// <summary>[persistent] (戦闘の累計)</summary>
         public int shieldGainedTotal;
-        /// <summary>L1学習用: 戦闘中にプレイヤーが敵に与えた総ダメージ（メイン+固定+出血+反射 等の合算）。
+        /// <summary>[persistent] (戦闘の累計) L1学習用: 戦闘中にプレイヤーが敵に与えた総ダメージ（メイン+固定+出血+反射 等の合算）。
         /// 戦闘開始時 enemyMaxHP からの最終 enemyCurrentHP 差分で簡易的に算出するため、
         /// 実体は OnBattleEnded で評価する。フィールド自体はオプションのインクリメント用。</summary>
         public int damageDealtTotal;
-        /// <summary>L1学習用: 戦闘中にプレイヤーが受けた総ダメージ（ヒール前の純粋な損失）。
+        /// <summary>[persistent] (戦闘の累計) L1学習用: 戦闘中にプレイヤーが受けた総ダメージ（ヒール前の純粋な損失）。
         /// 同じく OnBattleEnded 時に最終確定する。</summary>
         public int damageTakenTotal;
 
-        /// <summary>このターンにプレイヤーが実際に受けたダメージ量（メイン＋固定）。
+        /// <summary>[perTurn] このターンにプレイヤーが実際に受けたダメージ量（メイン＋固定）。
         /// 焦土〈最大HP -被ダメ10%〉が参照する。BeginNewTurn でリセット。</summary>
         public int playerDamageThisTurn;
-        /// <summary>亡者の招待: 被ダメ+30% (0.3 = +30%)</summary>
+        /// <summary>[persistent] 亡者の招待: 被ダメ+30% (0.3 = +30%)</summary>
         public float receivedDamageBonus;
-        /// <summary>激情の刃 等の与ダメ倍率（1.0 = 変化なし。BeginNewTurn でリセット）</summary>
+        /// <summary>[perTurn] 激情の刃 等の与ダメ倍率（1.0 = 変化なし。BeginNewTurn でリセット）</summary>
         public float outgoingDamageMultiplier = 1f;
 
-        /// <summary>貪欲のダイス: 与ダメージのこの割合をプレイヤーが回復（0=無し。BeginNewTurn でリセット、パッシブが毎ターン再適用）</summary>
+        /// <summary>[perTurn] 貪欲のダイス: 与ダメージのこの割合をプレイヤーが回復（0=無し。BeginNewTurn でリセット、パッシブが毎ターン再適用）</summary>
         public float lifestealPct;
 
-        /// <summary>停戦協定: このターンが「完全引き分け→停戦の一撃」で解決されたか。
+        /// <summary>[perTurn] 停戦協定: このターンが「完全引き分け→停戦の一撃」で解決されたか。
         /// true の間は引き分けブランチで出血など他の効果を発動させない。BeginNewTurn でリセット。</summary>
         public bool truceThisTurn;
 
-        /// <summary>苦難の刻印・不屈の鎧 等の被ダメ固定減算（複数アイテム合算）。CombatManager 敗北分岐で適用。BeginNewTurn でリセット。</summary>
+        /// <summary>[perTurn] 苦難の刻印・不屈の鎧 等の被ダメ固定減算（複数アイテム合算）。CombatManager 敗北分岐で適用。BeginNewTurn でリセット。</summary>
         public int playerFlatDamageReduction;
 
-        /// <summary>残り敵パッシブ無効化ターン数。> 0 のとき FireEnemyTrigger をスキップ。各ターン末に減算。</summary>
+        /// <summary>[decay] 残り敵パッシブ無効化ターン数。> 0 のとき FireEnemyTrigger をスキップ。各ターン末に減算。</summary>
         public int enemyPassivesDisabledTurns;
 
-        /// <summary>星火燎原 等: 敵(ボス)ダイス合計への加算ボーナス（累積。BeginNewTurn でリセットしない）。
+        /// <summary>[persistent] (段の差し替えで 0) 星火燎原 等: 敵(ボス)ダイス合計への加算ボーナス（累積。BeginNewTurn でリセットしない）。
         /// ProcessPostRoll の勝敗判定前に enemyDiceTotal へ加算される。</summary>
         public int enemyDiceTotalBonus;
 
-        /// <summary>沈黙の剣帯 等: 敵ダイス合計への「床なし」減算ペナルティ。
-        /// enemyDiceDebuff/consEnemyDiceDebuff は Math.Max(0) で0床処理されるが、こちらは床処理せず
+        /// <summary>[perTurn] 沈黙の剣帯 等: 敵ダイス合計への「床なし」減算ペナルティ。
+        /// enemyDiceDebuff は Math.Max(0) で0床処理されるが、こちらは床処理せず
         /// enemyDiceTotal を負値まで押し下げられる（=ロール大差勝ち＝基礎ダメ激増）。BeginNewTurn でリセット。</summary>
         public int enemyDiceTotalPenalty;
 
-        /// <summary>ボス強者バフ: ボス(boss_layer*)のダイス合計への固定加算。フロアに応じて戦闘開始/形態swap時に設定。
+        /// <summary>[persistent] (段の差し替えで 0) ボス強者バフ: ボス(boss_layer*)のダイス合計への固定加算。フロアに応じて戦闘開始/形態swap時に設定。
         /// enemyDiceTotalBonus とは別枠（星火燎原等の上書きと競合させないため）。勝敗判定前に enemyDiceTotal へ加算。</summary>
         public int bossDiceBonus;
-        /// <summary>[計装] 加算前の素の敵ダイス合計。 BossCombatTrace が内訳を出すため。
+        /// <summary>[persistent] [計装] 加算前の素の敵ダイス合計。 BossCombatTrace が内訳を出すため。
         /// <b>persistent 区分</b> ── RecomputeDiceTotals が毎ロール上書きする。</summary>
         public int rawEnemyDiceTotal;
 
@@ -374,7 +374,7 @@ namespace ItemSystem.PassiveSkills
         /// 戦闘開始時にパッシブが立て、 戦闘終了まで持続する (p4 は最終段なので段 swap は起きない)。</summary>
         public bool enemyRecurrentTruth;
 
-        /// <summary>[persistent・計装] いまの形態が始まったターン番号 (1 始まり)。
+        /// <summary>[persistent] (計装・段の差し替えで更新) いまの形態が始まったターン番号 (1 始まり)。
         /// 4 連戦は <c>currentTurn</c> をリセットしないので、 形態ごとの実長を出すには
         /// 開始点を控えるしかない。 <c>SwapEnemy</c> が次段の開始ターンへ更新し、
         /// 戦闘終了時に最終段ぶんを締める。 単段の戦闘では 1 のまま使われない。</summary>
@@ -395,12 +395,6 @@ namespace ItemSystem.PassiveSkills
         /// その後に走る加算 (メタ精密 r10 の還元・物資系) に押し流されて効かない。
         /// 会心倍率が実際に乗る 1 箇所 (PassiveSkillManager の isCritical 分岐) で引く。</para></summary>
         public float enemyCritMultReduction = 0f;
-
-        /// <summary>敵へ与える「最大 HP の割合」ダメージ量。
-        /// **割合ダメージを直接計算せず必ずここを通すこと**（新規実装も同様）。
-        /// 2026-07-29: 〈回帰性真理〉による 1 丸めは撤去した ── 割合ダメージは p4 にも通る。</summary>
-        public int RatioDamageToEnemy(float pct)
-            => System.Math.Max(1, UnityEngine.Mathf.CeilToInt(enemyMaxHP * pct));
 
         /// <summary>敵へ与える「**現在** HP の割合」ダメージ量。 〈虚空〉が使う。
         /// 現在 HP 基準なので指数的に減衰し、 **これ単独では敵を倒し切れない**（漸近するだけ）。
@@ -427,15 +421,15 @@ namespace ItemSystem.PassiveSkills
             enemyMaxHP = value;
         }
 
-        /// <summary>現在の敵ボスid (boss_layer*)。 非ボス戦は空。 各ボススキルが BossTuning.Param(bossId, ...) を引くのに使う。
+        /// <summary>[persistent] (戦闘開始・段の差し替えで設定) 現在の敵ボスid (boss_layer*)。 非ボス戦は空。 各ボススキルが BossParams.Param(bossId, ...) を引くのに使う。
         /// 戦闘開始/形態swap時に CombatManager がセット。</summary>
         public string bossId = "";
 
-        /// <summary>直近にプレイヤーへダメージを与えた致死メカニズムの分類。
+        /// <summary>[perTurn] 直近にプレイヤーへダメージを与えた致死メカニズムの分類。
         /// 各致死スキルが発動時にセット、 通常被ダメ経路は Normal。 プレイヤー死亡時の死因記録に使う。</summary>
         public DeathCause lastDamageCause = DeathCause.Normal;
 
-        /// <summary>この戦闘でプレイヤーが受けた総被ダメの **ソース別内訳** (ボス難易度チューナー用)。
+        /// <summary>この戦闘でプレイヤーが受けた総被ダメの **ソース別内訳** (診断用)。
         /// キル時の一撃ではなく「戦闘を通じてどのメカニズムが何割を占めたか」で診断するための集計。
         /// 特殊スキル(審判の炎/毒/反射/断罪/爆ぜ火 等)が自分の与ダメを加算。 通常被ダメ(ロール敗北等)は
         /// 戦闘終了時に総被ダメからの残差として Normal に計上する。 戦闘開始時にクリア。</summary>
@@ -541,19 +535,19 @@ namespace ItemSystem.PassiveSkills
         /// BeginNewTurn で 0 に戻る。 予告の前にプレイヤーの防御を掛けるとき、 削りから先に引く (下限 0)。</summary>
         public int enemyArmorPenNegate;
 
-        /// <summary>勝利時の与ダメ最低保証（基本1、利刃Lvで1/2/3/4）。
+        /// <summary>[perTurn] 勝利時の与ダメ最低保証（基本1、利刃Lvで1/2/3/4）。
         /// パッシブが OnPostRoll で再set。BeginNewTurn で 1 リセット。</summary>
         public int winMinDamage;
 
-        /// <summary>敵の回復量を減衰させる割合(0～1)。治癒阻害(0.5)/治癒遮断(1.0)が OnBattleStart で設定。
+        /// <summary>[persistent] 敵の回復量を減衰させる割合(0～1)。治癒阻害(0.5)/治癒遮断(1.0)が OnBattleStart で設定。
         /// 敵パッシブの回復は ReduceEnemyHeal() を通すことで適用される。BeginNewTurn でリセットしない。</summary>
         public float enemyHealReductionPct;
 
-        /// <summary>軽減無視ダメージ(fixedDamageToEnemy)の倍率。蒼白の槍騎士が設定(既定1.0)。
+        /// <summary>[persistent] 軽減無視ダメージ(fixedDamageToEnemy)の倍率。蒼白の槍騎士が設定(既定1.0)。
         /// 血令/反撃/業火/停戦 等の固定ダメに乗る。BeginNewTurn でリセットしない。</summary>
         public float fixedDamageMultiplier = 1f;
 
-        /// <summary>シールドバッシュ: ロール勝利時、与ダメのこの割合をシールド化(5/10/15/20%)。
+        /// <summary>[perTurn] シールドバッシュ: ロール勝利時、与ダメのこの割合をシールド化(5/10/15/20%)。
         /// パッシブが OnTurnStart で再set。BeginNewTurn で 0 リセット。</summary>
         public float shieldOnWinPct;
 
@@ -690,35 +684,34 @@ namespace ItemSystem.PassiveSkills
 
 
         // === 2026-06-28: 職業スターター消耗品の状態フラグ ===
-        /// <summary>[perTurn 相当・消費で armed] 瞬間研磨剤 (剣士): 次の 1 撃だけ 与ダメージ+150%。
+        /// <summary>[persistent] (1 撃使ったら CombatManager.Damage.cs が false) 瞬間研磨剤 (剣士): 次の 1 撃だけ 与ダメージ+150%。
         /// ApplyWinDamageModifiers で outgoingDamageMultiplier += 1.5 して disarm (2026-07-27 リワーク)。</summary>
         public bool polishArmed;
-        /// <summary>不抜の聖紋 (騎士): 戦闘中 HP 80% 以上を保っている間 被ダメ -40%。
+        /// <summary>[persistent] 不抜の聖紋 (騎士): 戦闘中 HP 80% 以上を保っている間 被ダメ -40%。
         /// 一度でも 80% を割ったら oathBroken=true で以後無効。 戦闘終了で破棄。</summary>
         public bool oathArmed;
+        /// <summary>[persistent]</summary>
         public bool oathBroken;
-        /// <summary>痛覚遮断剤 (狂戦士): 使用ターン 致命ダメで HP 1 踏みとどまり、
+        /// <summary>[perTurn] (Phase A で判定してから false (Phase B ではない)) 痛覚遮断剤 (狂戦士): 使用ターン 致命ダメで HP 1 踏みとどまり、
         /// 次ターン開始時 HP=1 ならダイス合計+10/基礎攻撃+10、 攻撃終了時に死亡。
         /// armedThisTurn=使用ターン中、 procced=次ターンに踏みとどまり判定済+強化バフ発動中。</summary>
         public bool painkillerArmedThisTurn;
+        /// <summary>[decay] (Phase A で立ち、 そのターンの攻撃の後に CombatManager.Turn.cs が倒す)</summary>
         public bool painkillerProcced;
-        /// <summary>仕込み刃 (暗殺者): 使ったターンの被ダメを 0 にし、 その
+        /// <summary>[perTurn] (戻すのは BeginNewTurn ではなく、 そのターンの敵の攻撃の解決 (CombatManager.Turn.cs)) 仕込み刃 (暗殺者): 使ったターンの被ダメを 0 にし、 その
         /// <see cref="CombatSystem.CombatManager.DaggerReflectMultiplier"/> 倍を軽減不可で敵に与える。
         /// <b>このターン限り</b>: 被弾の有無にかかわらず敵の攻撃処理 (行動不能を含む) で破棄。 persistent 区分。</summary>
         public bool daggerArmed;
 
-        /// <summary>ボス連戦 (ヴェスカ 4段): 次段の enemy id。敵パッシブ OnTurnEnd で設定され、
+        /// <summary>[persistent] (予約。 SwapEnemy で null) ボス連戦 (ヴェスカ 4段): 次段の enemy id。敵パッシブ OnTurnEnd で設定され、
         /// CombatManager が perspective 復帰後に SwapEnemy で消費 → null クリア。</summary>
         public string pendingEnemySwapId;
-        /// <summary>ヴェスカ連戦: 遷移ログラベル</summary>
+        /// <summary>[persistent] (予約。 SwapEnemy で null) ヴェスカ連戦: 遷移ログラベル</summary>
         public string pendingEnemySwapLabel;
 
         // ===== 消費アイテム由来（この1戦闘のみ。ctxは戦闘毎に生成→破棄で自動消去） =====
-        public int consAtkBurst;          // 次の勝利ターンで与ダメ+X（適用後0）
-        public int consDiceRoll;          // 勝敗判定のみ+X（ダメージには非加算）
-        /// <summary>[decay] cons_atk 効果の残ターン数。0=無効, -1=戦闘中永続, N=残 N ターン。
-        /// EndTurn で decrement し 0 になった瞬間 consDiceRoll を 0 化する。2026-07-21 追加。</summary>
-        public int consDiceRollTurnsLeft;
+        public int consAtkBurst;          // [persistent] (主攻撃で使ったら 0) 次の主攻撃で与ダメ+X（与ダメ倍率の後に足す・適用後0）
+        public int consDiceRoll;          // [persistent] 攻撃+X（CombatManager.Turn.cs が攻撃値へ足す）。 書くのは〈痛覚遮断剤〉の発動 (BeginNewTurn Phase A) だけ
         /// <summary>[persistent] この戦闘で払ったリロールの回数（2026-10-17〜）。 費用 = 振り直す個数 × (この値 + 1)。
         /// <b>ターンでは戻らない</b> ── 同じ戦闘で振り直すほど高くつく（続けるとジリ貧）。 ctx は戦闘ごとに作り直すので、
         /// 戦闘の頭で 0。 〈中階〉の無料リロールは数えない。</summary>
@@ -737,11 +730,15 @@ namespace ItemSystem.PassiveSkills
                 // 遺物 (§15-5): シールドの獲得量 +N% (堅牢の符・堅牢 2 個)。 増えた分にだけ掛ける (切り捨て)
                 if (value > _consShield)
                 {
+                    int asked = value;
                     float sg = MetaProgression.Relics.RelicApplicator.GetShieldGainPct();
                     if (sg > 0f) value += (int)((value - _consShield) * sg);
                     // 大罪:傲慢 (挑戦カード IV): シールドの獲得 −N% (切り捨てた分を捨てる)
                     if (MetaProgression.MetaDebuffApplicator.GetSinBlockCutPct() > 0f)
                         value = _consShield + (int)((value - _consShield) * (1f - MetaProgression.ChallengeCards.SinPrideShieldCutPct / 100f));
+                    // [計装 2026-11-12・#95] 呼び出し側は頼んだ量だけを shieldGainedTotal へ足すので、 遺物の上乗せと傲慢の削りの差をここで足す
+                    //   (遺物なし・傲慢なしでは 0 ── 学習の条件では記録が変わらない)。 誓約の封じ (上の行) の分は従来どおり数えたまま。
+                    shieldGainedTotal += value - asked;
                 }
                 int gained = value - _consShield;
                 _consShield = value;
@@ -749,25 +746,19 @@ namespace ItemSystem.PassiveSkills
             }
         }
         private int _consShield;
-        public int consShieldExpireTurn;  // この番号を超えるターンで失効。-1=無制限/0=無
-        public int consRegen;             // 毎ターン終了時 +consRegen 回復し consRegen--
-        public float consCritPct;         // 会心率 (小数) 永続（毎ターン critRatePctAdd へ再適用）
-        public int consFlatReduce;        // 被ダメ定数-X 永続（毎ターン再適用）
-        public int consDmgMultPct;        // 与ダメ +X%
+        public int consShieldExpireTurn;  // [decay] (減算は CombatManager.Turn.cs (BeginNewTurn の外)) この番号を超えるターンで失効。-1=無制限/0=無
+        public int consDmgMultPct;        // [decay] (残ターンが尽きると CombatManager.Turn.cs が 0 (BeginNewTurn の外)) 与ダメ +X%
         /// <summary>[decay] cons_dmg 効果の残ターン数。0=無効, -1=戦闘中永続, N=残 N ターン。
         /// EndTurn で decrement し 0 になった瞬間 consDmgMultPct を 0 化する。2026-07-21 追加。</summary>
         public int consDmgMultTurnsLeft;
-        public bool consReflect;          // 被メインダメと同量を敵へ反射
-        public int consEnemyDiceDebuff;   // 敵ダイス合計 -X（毎ロール）
-        public bool gamblerArmed;         // 賭博師のダイス（ロール時に発火・消費）
 
         // ===== エリート: 精鋭ハーピィ「死翔」 =====
-        public bool consumablesLocked;    // この戦闘中、消費アイテム使用不可（戦闘開始時に付与・戦闘ごとに新規生成でリセット）
+        public bool consumablesLocked;    // [persistent] この戦闘中、消費アイテム使用不可（戦闘開始時に付与・戦闘ごとに新規生成でリセット）
 
         // ===== 竜閃 =====
-        public bool rollPurity;           // 無我無心: カスタムダイス以外の補正を一切受けない（戦闘中持続）
-        public bool garyoProc;            // 画竜点睛: このターン発動したか（毎ターンリセット）
-        public int  garyoDieValue;        // 画竜点睛: 発動時の出目
+        public bool rollPurity;           // [persistent] 無我無心: カスタムダイス以外の補正を一切受けない（戦闘中持続）
+        public bool garyoProc;            // [perTurn] 画竜点睛: このターン発動したか（毎ターンリセット）
+        public int  garyoDieValue;        // [perTurn] 画竜点睛: 発動時の出目
 
         /// <summary>
         /// コンテキストを初期化
@@ -1016,10 +1007,10 @@ namespace ItemSystem.PassiveSkills
                 if (playerCurrentHP == 1)
                 {
                     painkillerProcced = true;
-                    // ダイス合計+10 / 基礎攻撃+10 (consDiceRoll / consAtkBurst を流用)
+                    // 攻撃+10 (consDiceRoll: 攻撃値へ加算) / 最終与ダメージ+10 (consAtkBurst: 与ダメ倍率の後に加算) を流用
                     consDiceRoll += 10;
                     consAtkBurst += 10;
-                    UnityEngine.Debug.Log("[痛覚遮断剤] HP=1 維持確認 → ダイス+10/攻撃+10。 攻撃終了時に死亡。");
+                    UnityEngine.Debug.Log("[痛覚遮断剤] HP=1 維持確認 → 攻撃+10/最終与ダメージ+10。 攻撃終了時に死亡。");
                 }
             }
 
@@ -1037,11 +1028,6 @@ namespace ItemSystem.PassiveSkills
             // ---------- Phase B: perTurn フィールドの一括リセット (単純に初期値へ戻す) ----------
 
 
-            // 敵スタンス（毎ターン抽選し直す。ADR-0005）/ プレイヤースタンス（既定=攻撃。ADR-0006）
-            enemyStanceDamageMult = 1f;
-            enemyStanceKind = 0;
-            enemyStanceWeakRollRatio = 0.65f;
-
             // ダメージ処理の単ターンフラグ
             nullifyAllDamage = false;
             nullifyPursuitDamage = false;
@@ -1057,7 +1043,7 @@ namespace ItemSystem.PassiveSkills
             lastDamageCause = DeathCause.Normal; // 断罪等の増幅タグが翌ターンへ残留しないように
 
             // 7層ヴェスカ (§13-4) の perTurn 分。 persistent 側 (vescaShield / massiveBleedStacks /
-            // enemyDodgeChance / stagnationStacks) は 4 連戦を通じて持続するのでここでは触らない。
+            // enemyDodgeChance) は 4 連戦を通じて持続するのでここでは触らない。
             playerHighDiceCrushed = false;
             vescaHalvesDamageThisTurn = false;
             playerAttackPowerPenalty = 0;
@@ -1104,8 +1090,7 @@ namespace ItemSystem.PassiveSkills
             shieldOnWinPct = 0f;
             // 防御値と貫通 (ADR-0013): 土台へ戻す。 敵側 (enemyDefense / enemyArmorPen) は戦闘通して保持＝ここでは触らない
             playerDefense = playerDefenseBase;
-            // 整備パネル〈装甲〉r10〈不動〉: 失った HP 10% ごとに防御 +1 (最大 +9)。 ターンの始めの HP で数える (2026-11-10)
-            playerDefense += MetaProgression.MetaBuffApplicator.GetArmorImmovableDefense(playerCurrentHP, playerMaxHP);
+            // (旧 整備パネル〈装甲〉r10〈不動〉の「失った HP 10% ごとに防御 +1」は 2026-11-10 に一撃の上限へ差し替え済み。 常に 0 だった加算を 2026-11-12 に外した)
             playerArmorPen = playerArmorPenBase;
             enemyArmorPenNegate = 0;
 
@@ -1190,8 +1175,6 @@ namespace ItemSystem.PassiveSkills
                     }
                 }
             }
-            // 軸10〈反響〉: 溜まった反射分は CombatManager がターン頭で適用して 0 に戻す。
-            // ここでは触らない (適用前にクリアすると効果が消えるため)。
         }
 
         // ============================================================
@@ -1229,12 +1212,6 @@ namespace ItemSystem.PassiveSkills
             if (outgoingDamageMultiplier <= 0f) outgoingDamageMultiplier = 1f;
             outgoingDamageMultiplier += pct;
         }
-
-        /// <summary>[decay] 挑戦デバフ 軸10〈反響〉: **次のターン開始時に**プレイヤーへ入る反射ダメージ。
-        /// 敵から受けたダメージの一定割合をここへ溜め、 翌ターン頭で適用してから 0 に戻す。
-        /// 同ターン内に返すと通常の被弾と区別がつかず、 「反響」という遅延の意味が消えるため
-        /// 1 ターン遅らせている。 リセットは BeginNewTurn の Phase C (適用後に 0)。</summary>
-        public int echoPendingDamage;
 
         /// <summary>ADR-0009 [perTurn]: 敵攻撃値からの追加減算 (呪縛 等の敵ダイス弱化を新モデルで実装)。
         /// ExecuteTurnMutual が Escalation 計算後の enemyAtkValue から差し引く (下限0)。</summary>

@@ -334,40 +334,8 @@ namespace ItemSystem.Shop
             //  完全な無効だった ── 陳列 12 枠に対し BOT は 1 ラン 20 個買うので、 枠を減らしても
             //  代わりの品が並ぶだけ。 軸は〈通行料〉へリワークし、 効果はショップの外へ移した。)
 
-            // 2026-06-23: 上位互換アップグレード割引 (同家系下位所持時、 1G/Tier段の超格安)
-            //   ── 上位 Tier を取らない方が得という設計上の罠を撲滅
-            ApplyUpgradeDiscounts(inv, GameLoop.GameManager.Instance?.Run);
-
             // 2026-06-22: メタバフ「特売品」 を 1/2/3 個ランダム枠に付与 (Passive/Consumable/Weapon/Dice のみ対象)
             ApplySaleDiscounts(inv);
-
-            // [計装] 家系品の提示を段別に数える (§ FamilyTierStats ①)。
-            //   取得の分布が「需要」なのか「供給」なのかを分けるための分母。
-            //   割引の後に置く ── 提示された事実だけを数えるので価格には依存しない。
-            {
-                var fdb = ItemDatabase.Instance;
-                for (int i = 0; i < inv.slots.Count; i++)
-                {
-                    var s = inv.slots[i];
-                    if (s == null || string.IsNullOrEmpty(s.itemId)) continue;
-                    // **パッシブ枠だけを数える (2026-09-03 修正)。** 初版はカテゴリを見ずに
-                    //   passiveSkills を走査していたため、 **武器枠を家系提示として数えていた** ──
-                    //   武器 17 品のうち多くが家系パッシブを内蔵しており (延べ 36 件で、
-                    //   パッシブ側の 15 件より多い)、 ① の数字は武器が支配していた。
-                    //   武器は 1 つしか装備できないので、 家系の入手経路としては別物。 混ぜない。
-                    if (s.kind != ShopSlotKind.Passive) continue;
-                    var data = fdb?.GetItem(s.itemId);
-                    if (data?.passiveSkills == null) continue;
-                    string fam = null; int lv = 0;
-                    foreach (var ps in data.passiveSkills)
-                    {
-                        if (string.IsNullOrEmpty(ps.internalName)) continue;
-                        var (f, l) = ItemSystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(ps.internalName);
-                        if (l > lv) { lv = l; fam = f; }
-                    }
-                    if (lv > 0) GameLoop.GameHooks.OnShopTierOffered?.Invoke(fam, lv);
-                }
-            }
 
             Current = inv;
             MetaProgression.Achievements.AchievementService.BeginShop();
@@ -375,76 +343,6 @@ namespace ItemSystem.Shop
             Debug.Log($"[ShopManager] 入店: フロア{floor}, スロット{inv.slots.Count}");
 
             return inv;
-        }
-
-        /// <summary>2026-06-23: 同家系下位 Lv を所持している場合の上位互換アップグレード割引。
-        /// 「Tier 1 段差 = 1G」 の超格安に。 上位を取らない方が得という設計上の罠を撲滅。
-        /// 例: LV2 (SILVER) 所持 + LV4 (LEGENDARY) 提示 → 価格 = 2G (差 2 段)。
-        /// 特売品との重複時は、 より安い方を採用 (= 通常 upgrade 割引が優位)。</summary>
-        private void ApplyUpgradeDiscounts(ShopInventory inv, GameLoop.RunState run)
-        {
-            if (run == null || inv?.slots == null) return;
-            var db = ItemDatabase.Instance;
-            if (db == null) return;
-            for (int i = 0; i < inv.slots.Count; i++)
-            {
-                var s = inv.slots[i];
-                if (s == null || s.sold) continue;
-                if (string.IsNullOrEmpty(s.itemId)) continue;
-                if (s.kind == ShopSlotKind.WeaponMaterial || s.kind == ShopSlotKind.FacePart) continue;   // 出目パーツは items.json に無い (引くと警告だけ出る)
-                var slotData = db.GetItem(s.itemId);
-                if (slotData?.passiveSkills == null) continue;
-
-                // 候補の家系→最高 Lv マップ
-                var candFamilyLv = new System.Collections.Generic.Dictionary<string, int>();
-                foreach (var ps in slotData.passiveSkills)
-                {
-                    if (string.IsNullOrEmpty(ps.internalName)) continue;
-                    var (fam, lv) = ItemSystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(ps.internalName);
-                    if (lv > 0 && (!candFamilyLv.TryGetValue(fam, out int prev) || lv > prev))
-                        candFamilyLv[fam] = lv;
-                }
-                if (candFamilyLv.Count == 0) continue;
-
-                // 所持品から同家系の最高 Lv を探す (装備武器/ダイス含む)
-                int maxStep = 0;
-                void CheckOwned(string ownedId)
-                {
-                    if (string.IsNullOrEmpty(ownedId)) return;
-                    var od = db.GetItem(ownedId);
-                    if (od?.passiveSkills == null) return;
-                    foreach (var ops in od.passiveSkills)
-                    {
-                        if (string.IsNullOrEmpty(ops.internalName)) continue;
-                        var (ofam, olv) = ItemSystem.PassiveSkills.PassiveSkillRegistry.GetFamilyLevel(ops.internalName);
-                        if (olv <= 0) continue;
-                        if (!candFamilyLv.TryGetValue(ofam, out int candLv)) continue;
-                        if (olv >= candLv) continue;
-                        int step = candLv - olv;
-                        if (step > maxStep) maxStep = step;
-                    }
-                }
-                CheckOwned(run.equippedWeaponId);
-                CheckOwned(run.equippedDiceId);
-                if (run.ownedPassiveItems != null)
-                    foreach (var id in run.ownedPassiveItems) CheckOwned(id);
-                // 2026-06-23c: 昇華 (ascended) 済み下位品も upgrade 割引の根拠とする
-                if (run.ascendedPassiveIds != null)
-                    foreach (var id in run.ascendedPassiveIds) CheckOwned(id);
-
-                if (maxStep <= 0) continue;
-                // 割引適用 (1G/Tier段、 最低 1G、 既存より安くなる場合のみ反映)
-                int newPrice = System.Math.Max(1, maxStep);
-                if (newPrice >= s.price) continue;
-                s.originalPrice = s.price;
-                s.discountPct = (int)(100f * (1f - (float)newPrice / s.price));
-                s.price = newPrice;
-                // [計装] 梯子が登られているか (§ FamilyTierStats)。 提示と購入を別に数える ──
-                //   差が「1G なのに見送られた」量で、 そこが大きいなら段は枠の問題ではなく需要の問題。
-                s.upgradeStep = maxStep;
-                GameLoop.GameHooks.OnShopUpgradeOffered?.Invoke();
-                Debug.Log($"[ShopManager] 上位互換アップグレード割引 slot={i} {s.itemId} ({maxStep}段差) {s.originalPrice}G→{s.price}G ({s.discountPct}%off)");
-            }
         }
 
         /// <summary>2026-06-22: メタバフ refundLevel に応じた個数の特売品をランダム選出。
@@ -738,7 +636,7 @@ namespace ItemSystem.Shop
             return picked;
         }
 
-        /// <summary>2026-07-25 v6: 種火 r1 で対応キーワード系アイテムの抽選重み +60%。
+        /// <summary>2026-07-25 v6: 種火 r1 で対応キーワード系アイテムの抽選重みを上げる (倍率の正本は MetaPanel.SparkAppearanceWeightMul)。
         /// Passive カテゴリのみに作用。 該当キーワードに属さないアイテムは重み 1.0 のまま。</summary>
         private CompleteItemData PickWithSparkBias(List<CompleteItemData> list, ShopSlotKind kind)
         {
@@ -812,7 +710,6 @@ namespace ItemSystem.Shop
                 Current.materialPurchaseCount++;
                 slot.price = Current.CurrentMaterialPrice; // 表示価格を更新
                 Debug.Log($"[ShopManager] 強化素材購入: -{price}G (次回 {Current.CurrentMaterialPrice}G)");
-                MetaProgression.MetaBuffApplicator.RollRefund(price, run);
                 OnShopUpdated?.Invoke();
                 return true;
             }
@@ -888,16 +785,12 @@ namespace ItemSystem.Shop
                 run.shopPurchasedCounts[slot.itemId] = prev + 1;
             }
             slot.sold = true;
-            // [計装] 1G アップグレードが**成約**した回数 (§ FamilyTierStats ②)。
-            //   提示だけ数えても「並んでいた」しか分からない。 梯子を登った回数はこちら。
-            if (slot.upgradeStep > 0) GameLoop.GameHooks.OnShopUpgradeBought?.Invoke(slot.upgradeStep);
 
             var data = ItemDatabase.Instance?.GetItem(slot.itemId);
             // パーツは ItemDatabase に無い ── GetItem は null を返すので表示名は自前で引く。
             string label = data != null ? data.displayName
                          : (GameLoop.DiceFaceParts.LabelOfId(slot.itemId) ?? slot.itemId);
             Debug.Log($"[ShopManager] 購入: {label} -{slot.price}G");
-            MetaProgression.MetaBuffApplicator.RollRefund(slot.price, run);
             OnShopUpdated?.Invoke();
             return true;
         }
@@ -985,7 +878,6 @@ namespace ItemSystem.Shop
             if (RerollKeepsSale) ApplySaleDiscounts(Current, Current.rerollCount * 64);
 
             Debug.Log($"[ShopManager] リロール#{Current.rerollCount}: -{price}G / {rerolled}枠更新 / 次回{Current.CurrentRerollPrice}G");
-            MetaProgression.MetaBuffApplicator.RollRefund(price, run);
             OnShopUpdated?.Invoke();
             return true;
         }

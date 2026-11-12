@@ -13,7 +13,6 @@ using MapSystem;
 using EventSystem;
 using ItemSystem;
 using ItemSystem.Shop;
-using AutoTest.Ultra;
 
 namespace AutoTest
 {
@@ -195,13 +194,7 @@ namespace AutoTest
                 weaponId = gm?.Run?.equippedWeaponId ?? "",
                 diceId = gm?.Run?.equippedDiceId ?? "",
                 deathCause = r.deathCause,
-                playerRollSum = r.playerRollSum,
-                playerRollCount = r.playerRollCount,
                 playerDamageBySource = r.playerDamageBySource,
-                strongRollTurns = r.strongRollTurns,
-                strongRollBossWins = r.strongRollBossWins,
-                weakRollTurns = r.weakRollTurns,
-                weakRollBossWins = r.weakRollBossWins,
                 playerMaxHpEnd = gm?.Run?.playerMaxHP ?? 0,
                 encounterKey = _pendingEncounterKey,
             };
@@ -371,13 +364,8 @@ namespace AutoTest
                 _cur.finalProvision = run.provision;
                 _cur.finalProvisionCap = run.provisionCap;
                 if (run.provision <= 0) _cur.reachedMadness = true;
-                _cur.provisionCombatLoss   = GameLoop.ProvisionSystem.Stats.combatLoss;
-                _cur.provisionComposureGain = GameLoop.ProvisionSystem.Stats.composureGain;
                 _cur.provisionLateralLoss  = GameLoop.ProvisionSystem.Stats.travelLoss;
-                _cur.provisionMarchLoss    = GameLoop.ProvisionSystem.Stats.marchLoss;
                 _cur.provisionEvilLoss     = GameLoop.ProvisionSystem.Stats.evilLoss;
-                _cur.provisionFoodGain     = GameLoop.ProvisionSystem.Stats.foodGain;
-                _cur.provisionRerollLoss   = GameLoop.ProvisionSystem.Stats.rerollLoss;
                 _cur.deathFloor = (o == Outcome.GameOver) ? run.Depth : 0;
                 _cur.appliedChallengeScore = CurrentChallengeScore();   // 難易度 × 5 (2026-11-10)
                 _cur.finalInventoryPower = InventoryPower.Compute(run);
@@ -473,42 +461,34 @@ namespace AutoTest
             }
             _lastShopExitSeen = false; _lastShopExitCoins = 0; _lastShopExitFloor = 0; _floor7ShopEntryCoins = -1;
             _cur.deterministicDigest = ComputeRunDeterministicDigest(_cur, run);
-            var productionRecord = new UltraProductionRunRecord
-            {
-                runOrdinal = _ultraProductionRuns.Count,
-                runIndex = _cur.index,
-                scenarioSeed = _currentUltraProductionScenarioSeed,
-                scenarioSeedHex = _currentUltraProductionScenarioSeed.ToString("x16"),
-                valid = _cur.bandScore >= 0,
-                fullClear = _cur.bandScore >= 11,
-                crash = _cur.outcome == Outcome.Crash,
-                deadlock = _cur.outcome == Outcome.Deadlock,
-                fingerprint = _cur.fingerprint,
-                deterministicDigest = _cur.deterministicDigest,
-            };
-            _ultraProductionRuns.Add(productionRecord);
-            try { UltraProductionRunCompleted?.Invoke(productionRecord); }
-            catch (Exception ex)
-            {
-                Debug.LogError("[AutoRunner][UltraWorker] run completion callback failed: " + ex.Message);
-            }
             // L2ペアテスト記録
             _cur.policyVariant = _currentRunVariant;
             _cur.pairedSeed = _currentRunSeed;
             _records.Add(_cur);
-            NoteFamilyTierRunEnd();
-            AutoTest.Ultra.UltraDecisionCensus.NoteRunCompleted();
             RecordScreenRunCompletion(_cur);
             _curLog.Enqueue($"[AutoRunner] === RUN {_cur.index} 終了: {_cur.band} ({_cur.bandLabel}) — {note} ===");
             _curAttachLog(_cur);
             _cur = null;
             ItemSystem.PassiveSkills.Effects.Daybreak.NextAttackPctPerUnit = 0f;   // [2026-11-10 試験] ラン終了で既定へ戻す
             GameLoop.GameHooks.WeaponTierCap = 0;
+            GameLoop.GameHooks.PursuerNoReward = false;                          // [測定 2026-11-12・#35]
+            GameLoop.GameHooks.PursuerAtkMulOverride = 0f;
+            GameLoop.GameHooks.PursuerHpAdd = 0f;
+            GameLoop.GameHooks.PursuerSupplyOverride = -1;
+            GameLoop.GameHooks.PursuerLeavesTerritory = false;                  // [測定 2026-11-12] 縄張りの作りを既定へ
+            GameLoop.GameHooks.TerritoryTreasure = GameLoop.TerritoryTreasureKind.Forge;
+            GameLoop.GameHooks.TerminalHealMulOverride = 0;                      // [測定 2026-11-12・#102]
+            GameLoop.GameHooks.TerminalArresterNeedOverride = 0;
+            GameLoop.GameHooks.TerminalFirstAidBattleOnly = false;
+            GameLoop.GameHooks.TerminalKillBonusNeedsAttack = false;            // [測定 2026-11-13・#117]
             GameLoop.GameHooks.VescaDiceForce = 0;               // [測定 2026-11-11] 武器の段の上限を外す
             CombatSystem.EnemyHpLedger.ProbeMainMult = 1f;      // [測定用の物差し 2026-11-10] ラン終了で既定 (1) へ戻す
             CombatSystem.EnemyHpLedger.ProbePassiveMult = 1f;
         }
 
+        /// <summary>ラン 1 本の決定的な指紋 (同じシードの突き合わせ・Tools/digest_cmp.py)。
+        /// 先頭の印 <c>ultra-production-run-v1</c> は旧 Ultra の名残だが、 <b>変えると過去のラン・並列ワーカーの digest と
+        /// 全件が食い違う</b>ので残す (2026-11-13・#135)。</summary>
         private static string ComputeRunDeterministicDigest(RunRec rec, GameLoop.RunState run)
         {
             var sb = new StringBuilder(2048);

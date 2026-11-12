@@ -39,7 +39,7 @@ namespace AutoTest
                 [BuildPersona.Standard] = new HashSet<string>(),
                 [BuildPersona.Crit] = new HashSet<string>
                 {
-                    "十五年目の計測器", "測量師の片眼鏡", "InsightIII", "InsightIV",
+                    "十五年目の計測器", "測量師の片眼鏡",
                     // TwinDice / SinglePoint / LifeFang は 2026-08-09 削除 (items.json に無い死にID)
                     // "ApexCrit" は 2026-09-05 削除 (六面天頂儀ごと撤去・下記)
                     "燧石の指輪",
@@ -48,7 +48,7 @@ namespace AutoTest
                 },
                 [BuildPersona.Bleed] = new HashSet<string>
                 {
-                    "Sting", "医家の反り刃",   // BloodPathBanner は 2026-08-09 削除 (死にID)
+                    "医家の反り刃",   // BloodPathBanner は 2026-08-09 削除 (死にID)
                     "血日に澄む佩玉", "鋸刃の山刀", "逆綴じの止血帯", "血桜",
                     "医書裏の開き針", "先血の腕輪",
                 },
@@ -63,9 +63,9 @@ namespace AutoTest
                 },
                 [BuildPersona.Poison] = new HashSet<string>
                 {
-                    "緑染みの小刀", "CorrosiveStrike", "蛇血瓶", "主より長い香炉",
+                    "緑染みの小刀", "蛇血瓶", "主より長い香炉",
                     "石抜きの毒指輪", "廃庭の霧吹き",
-                    "岸上げの麻痺瓶", "雷鯰の棘", "SlowVenomCurse",
+                    "岸上げの麻痺瓶", "雷鯰の棘",
                     // CurseBind は curse 系列 (2026-07-17 削除) 依存で参照消失、除去。
                 },
                 [BuildPersona.Bludgeon] = new HashSet<string>
@@ -73,28 +73,27 @@ namespace AutoTest
                     "鉛入りの握斧", "一人抱えの破城斧",
                     "研ぎ知らずの銑鉄棍", "毒棘の小盾",
                     "焦げ導線", "重増しの拳套", "避雷の鉢金",
-                    "帯電の胸甲", "MightII", "MightIII", "MightIV", // 基礎火力の土台
-                    "PursuitI", "PursuitII", "PursuitIII", "烈刃",
+                    "帯電の胸甲", "烈刃", // 基礎火力の土台
                 },
                 [BuildPersona.Charge] = new HashSet<string>
                 {
-                    "工廠の材料箱", "無限モーター", "呼雷粉", "Thundercloud",
+                    "工廠の材料箱", "無限モーター", "呼雷粉",
                     "焦げ柄の点火スパナ", "逆さ避雷針",
                     "過負荷チューナー", "雷神槍", "雷壷",
                 },
                 [BuildPersona.Shield] = new HashSet<string>
                 {
                     "二拍目の心臓",
-                    "IndomitableI", "IndomitableII", "敗残兵の部隊章", "IndomitableIV",
+                    "敗残兵の部隊章",
                     "シールドバッシュI", "シールドバッシュII", "シールドバッシュIII",   // 2026-10-28: 盾家系へ一本化
                     "鏡返しの小盾", "黎明", "堅守の構え",
-                    "燻りの革胸当て", "FortitudeII", "FortitudeIII", "FortitudeIV",
+                    "燻りの革胸当て",
                 },
                 [BuildPersona.Berserk] = new HashSet<string>
                 {
                     "腐し刃",
                     "避雷の鉢金", "二拍目の心臓", "捨て身", "血令",   // 2026-10-28: 衛士の慣い・復讐は削除
-                    "MightIV", "烈刃", "一人抱えの破城斧", // 火力積み合わせ
+                    "烈刃", "一人抱えの破城斧", // 火力積み合わせ
                     // Abyss は curse_t4 (2026-07-17 削除) 依存で参照消失、除去。
                 },
             };
@@ -143,8 +142,7 @@ namespace AutoTest
         /// Shield/Charge も攻撃力不足解消に寄与。</summary>
         private static readonly HashSet<string> UniversalBoost = new HashSet<string>
         {
-            "帯電の胸甲", "MightII", "MightIII", "MightIV",
-            "PursuitI", "PursuitII", "PursuitIII", "烈刃",
+            "帯電の胸甲", "烈刃",
         };
 
         /// <summary>アイテム ID からその内部の passive SkillId を列挙 (ItemDatabase 経由・null 安全)。</summary>

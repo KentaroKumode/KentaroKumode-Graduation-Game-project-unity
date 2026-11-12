@@ -13,13 +13,30 @@ using MapSystem;
 using EventSystem;
 using ItemSystem;
 using ItemSystem.Shop;
-using AutoTest.Ultra;
 
 namespace AutoTest
 {
     /// <summary>AutoRunner: ログ出力・サマリーの各ブロック・ゲーム体験メトリクス・整列ヘルパー。</summary>
     public partial class AutoRunner
     {
+        /// <summary>サマリーの「配線AI」の行。 <b>技量の名前だけでなく、 実際に戦闘の判断をしている方策を書く</b> (2026-11-12)。
+        /// <para>端子の山札 (2026-11-11) の後は、 どの技量でも配線は <c>DeckWiringPlanPolicy</c>、 リロールは <c>MutualRerollPolicy</c>
+        /// (素朴版はリロールしない) に上書きされる (AutoRunner.Combat)。 <c>SuperCombatAI</c> の配線とリロールは呼ばれない (<c>ExactCombatAI</c> は 2026-11-12 に削除)
+        /// (super_prof.txt は「配線 0 回 / リロール 0 回」)。 「Super = 先読み」は今は正しくない ── 先読みは <see cref="deckLookahead"/> (既定 OFF) だけ。</para></summary>
+        private string WiringSkillLine()
+        {
+            string la = deckLookahead && EffectiveWiringSkill != WiringSkill.Naive
+                ? $"山札の 2 ターン先読み ON (ボス戦だけ={deckLookaheadBossOnly}・上位 {deckLookaheadTopK} 本 × 標本 {deckLookaheadSamples})"
+                : "先読みなし (deckLookahead=" + deckLookahead + ")";
+            string policy = EffectiveWiringSkill == WiringSkill.Naive
+                ? "配線=山札の方策 (素朴)・リロールなし"
+                : "配線=山札の方策 (DeckWiringPlanPolicy)・リロール=MutualRerollPolicy";
+            string extra = EffectiveWiringSkill == WiringSkill.Super
+                ? " / Super の差: 予告を読む防御と護符・与ダメの倍率と敵のパッシブを読む・航行の計画と戦闘名の危険度・無段階の序列 (ITT super)"
+                : "";
+            return $"{wiringSkill} ({policy} / {la}{extra})";
+        }
+
         private string WriteLogs()
         {
             string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
@@ -33,7 +50,7 @@ namespace AutoTest
             // L1学習: プロファイル別サブディレクトリに分離して累積
             string learningRoot = TierLearningRoot;
             ItemLearningStats.StatsFile learnStats = null;
-            Debug.Log($"[AutoRunner] 学習: ボスチューナー={tuneBosses} / Tier={learnTier} / BOT AI={learnBotAi}");
+            Debug.Log($"[AutoRunner] 学習: Tier={learnTier} / BOT AI={learnBotAi}");
             if (UpdatesTier)
             {
                 try
@@ -61,12 +78,7 @@ namespace AutoTest
                 catch (Exception e) { Debug.LogWarning($"[AutoRunner] L2探索失敗: {e.Message}"); }
             }
 
-            // L3: ボス難易度オートチューナー (突破率→目標ファネルへ寄せる)。 他の学習と同時実行可。
-            if (BossAutoTune)
-            {
-                try { BossBalanceTuner.AssessAndAdjust(_records, MetaProfileHelper.CurrentDebuffOn, learningRoot, learnStats?.totalBatches ?? 0); }
-                catch (Exception e) { Debug.LogWarning($"[AutoRunner] L3ボス調整失敗: {e.Message}"); }
-            }
+            // (L3 ボス難易度オートチューナーは 2026-11-12 に削除・#126・GAME.md §24)
 
             // ファイル検索で最新サマリーを開きやすいよう、 summary に profile + 時刻を埋め込む
             string summaryName = $"summary_{TierOutputSuffix}_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
@@ -164,7 +176,7 @@ namespace AutoTest
             string metaLabel = metaPattern switch
             {
                 MetaPattern.Cowardly        => "臆病(メタ全リセット)",
-                MetaPattern.FullProgression => $"全有効化(メタLv{MetaProgression.MetaBuffTrack.TotalSteps})",
+                MetaPattern.FullProgression => "全有効化(整備パネル配分)",
                 MetaPattern.Untouched       => "保存値そのまま",
                 _                           => metaPattern.ToString(),
             };
@@ -173,37 +185,18 @@ namespace AutoTest
             sb.AppendLine($"メタ進行  : {metaLabel}");
             sb.AppendLine($"挑戦: {(enableAllDebuffs ? "難易度 10 (最高)" : "難易度 " + challengeCardDifficulty)}");
             sb.AppendLine($"実行設定  : メタ={metaBuffMode} / 軸={(sweepAllMetaAxes ? "全軸走査" : metaAllocation.ToString())} / アイテム={itemPickMode}");
-            sb.AppendLine($"配線AI    : {wiringSkill}");
+            sb.AppendLine($"配線AI    : {WiringSkillLine()}");
             // **実効状態を必ず印字する。** EditorPrefs 由来のトグルは黙って持ち越されるので、
             //   サマリを後から読んだときに条件が復元できないと測定が丸ごと無駄になる。
             //   (技量帯が別メニューの設定を持ち越したまま走った事故が実際に起きている)
             sb.AppendLine($"5層裏ボス : {(suppressLayer5HiddenBoss ? "遮断" : "出現あり")}"
                         + $" / 軽減無視の盾肩代わり: {(shieldAbsorbsUnmitigable ? "あり (製品挙動)" : "**なし (対照群)**")}");
             // **結果を変えるトグルを 1 行にまとめて必ず出す (2026-08-18)。**
-            //   Ultra の portfolio で、 worker 側が既定値のまま走り本ラン側は EditorPrefs 継承、
+            //   旧 Ultra の方策の組 (2026-11-13 削除・#135) で、 worker 側が既定値のまま走り本ラン側は EditorPrefs 継承、
             //   という不一致が起きた。 どちらも「正常に進行中」と表示され、 4 候補が同一挙動に
             //   なっていたことに **1000ラン×4 を回し終えるまで誰も気付かなかった**。
             //   個別の行から推測させる形 (パーツ抑止は「平均面数」から逆算する等) では
             //   後から条件を突き合わせられない。 **値そのものを書く。**
-            if (!string.IsNullOrEmpty(_ultraResumeLine))
-                sb.AppendLine("Ultra resume: " + _ultraResumeLine);
-            // Ultra の委譲が実際に効いたか。 **落ちても run は完走するので、
-            //   印字しないと「一度も効いていない Ultra」を成果と取り違える。**
-            if (AutoTest.Ultra.UltraDispatchStats.Offered > 0
-                || wiringSkill == WiringSkill.Ultra)
-                sb.AppendLine("Ultra委譲  : " + AutoTest.Ultra.UltraDispatchStats.Describe()
-                    + (string.IsNullOrEmpty(_ultraLastFallbackReason)
-                        ? "" : "  直近の落ちた理由=" + _ultraLastFallbackReason));
-            if (_ultraThinkingSecondsTotal > 0f)
-            {
-                sb.AppendLine($"Ultra思考  : 計 {_ultraThinkingSecondsTotal / 60f:F1}分"
-                    + $" ({_ultraThinkingSecondsTotal / Math.Max(1, _records.Count):F1}秒/ラン)"
-                    + "  ※番犬からは控除済み");
-                // **上書き率だけでは強さを読めない。** 全手0クリアの決定では 2 手の下限が
-                //   どちらも 0.000 の同点になり、 選ばれるのは「評価で勝った手」ではなく
-                //   「id が辞書順で先の手」。 差がついた件数を必ず並べて出す。
-                sb.AppendLine("Ultra評価  : " + AutoTest.Ultra.UltraRolloutEvaluator.DescribeCounters());
-            }
             sb.AppendLine($"実効トグル: パーツ陳列抑止={suppressFacePartOffers}"
                         + $" / 盾肩代わり={shieldAbsorbsUnmitigable}"
                         + $" / メタデバフ全ON={enableAllDebuffs}"
@@ -228,14 +221,15 @@ namespace AutoTest
             //   印字が無いと「遺物なしのつもりだった」を後から検証できない。
             //   2026-08-10 に同じ穴で 0pt 基準値が 53.3% / 16.6% に割れている。
             sb.AppendLine(EffectiveStateLine());
+            // **BOT が読んだ学習を必ず印字する** (2026-11-12・#118)。 帯のフォルダが無いと手書きの序列へ黙って落ち、
+            //   難易度 1〜3 のクリアが 0% になっていた。 落ちたランがあれば、 はっきり書く。
+            sb.AppendLine($"学習の読み: {LearningReadEffective} / 帯の固定={(botLearningBandOverride >= 0 ? botLearningBandOverride.ToString() : "なし")}"
+                        + $" / 欠けたら止める={failOnMissingLearning}");
+            if (_fallbackRuns > 0 || !string.IsNullOrEmpty(_learningGaps))
+                sb.AppendLine($"**学習データなし・手書きの序列で走った**: {_fallbackRuns}/{_bandSwitchRuns} ラン"
+                            + (string.IsNullOrEmpty(_learningGaps) ? "" : $" / バッチ開始時の欠け: {_learningGaps}"));
             sb.AppendLine("比較軸    : 航行Rankのみ差し替え（消費/ショップ/戦闘実行/イベントは共通固定）");
             sb.AppendLine("################################################");
-            if (AutoTest.Ultra.UltraDecisionCensus.Enabled
-                && AutoTest.Ultra.UltraDecisionCensus.Runs > 0)
-            {
-                sb.AppendLine();
-                sb.Append(AutoTest.Ultra.UltraDecisionCensus.Report());
-            }
             sb.AppendLine();
             sb.Append(BuildPersonaBlock());
             sb.AppendLine();
@@ -340,7 +334,6 @@ namespace AutoTest
                 long s = ItemSystem.PassiveSkills.CombatContext.ChargeSpentTotal;
                 long rrC = CombatStats.RerollStats[2];
                 double t = System.Math.Max(1, CombatSystem.YachtRoleEffects.TurnsEvaluated);
-                sb.Append(AutoTest.FamilyTierStats.Dump());
                 sb.AppendLine("【充電経済】");
                 sb.AppendLine($"  収入 {g:N0} (1ターン {g / t:F2}) / 上限で破棄 {w:N0} (1ターン {w / t:F2}"
                             + $" ・収入比 {(g + w > 0 ? 100.0 * w / (g + w) : 0):F1}%)");
@@ -395,8 +388,6 @@ namespace AutoTest
             var rr = CombatStats.RerollStats;
             sb.AppendLine($"  リロール: {rr[0]:N0} 回 / {rr[1]:N0} 個 / 充電 {rr[2]:N0}"
                         + (rr[0] > 0 ? $"  (1回あたり {rr[1] / (double)rr[0]:F2}個 / {rr[2] / (double)rr[0]:F2}充電)" : ""));
-            // 先読みが順位を変えているか。 Super 以外の技量では 0 件なので何も出ない。
-            sb.Append(SuperCombatAI.DescribeSearch());
             sb.Append(DescribeNavTies());
             sb.Append(DescribeDamageBreakdown7F());
             return sb.ToString();
@@ -503,7 +494,7 @@ namespace AutoTest
                 if (r?.combats == null) continue;
                 foreach (var c in r.combats)
                 {
-                    if (c == null || string.IsNullOrEmpty(c.enemyId) || !BossTuning.IsBoss(c.enemyId)) continue;
+                    if (c == null || string.IsNullOrEmpty(c.enemyId) || !CombatSystem.BossParams.IsBoss(c.enemyId)) continue;
                     if (!agg.TryGetValue(c.enemyId, out var a)) { a = new BossWinAgg(); agg[c.enemyId] = a; }
                     a.enc++;
                     if (c.won) a.wins++;
@@ -966,20 +957,20 @@ namespace AutoTest
             return sb.ToString();
         }
 
-        /// <summary>3. 死因分布質 ── 死因を「公平死 (累積攻撃/スリップ)」「理不尽死 (反射/サドンデス/烙印一撃)」 に分類し、
+        /// <summary>3. 死因分布質 ── 死因を「公平死 (累積攻撃/スリップ)」「理不尽死 (反射/断罪/処刑の一撃)」「未分類」 に分類し、
         /// 各層の理不尽死率を出す。 高い層 = 調整候補。</summary>
         private string BuildDeathCauseQualityBlock()
         {
             var sb = new StringBuilder();
             sb.AppendLine("【ゲーム体験③ 死因分布質 (Death Cause Quality)】");
-            sb.AppendLine("  公平死 = Normal/Chip (累積攻撃や持続)");
-            sb.AppendLine("  理不尽死 = Reflect (反射自滅) / SuddenDeath (純運勝負) / Garyo (画竜点睛) / その他突発要因");
+            sb.AppendLine("  公平死 = Normal/Chip/MassiveBleed/Rift/Erosion (累積攻撃や、 予告・開示された持続ダメージ)");
+            sb.AppendLine("  理不尽死 = Reflect (反射自滅) / Judgment (業火の断罪) / Other (処刑人の烙印の一撃) / Burst (爆ぜ火)");
+            sb.AppendLine("  未分類 = 上のどれでもない死因 (欠番の SuddenDeath・新しく足した死因)。 0 でなければ分類を足すこと");
             sb.AppendLine();
 
-            // 死因の分類 (CombatRec.deathCause を使う、 deathCauseは戦闘の死因)
-            // 公平: Normal, Chip
-            // 理不尽: Reflect, SuddenDeath, Garyo, Pursuit (突発反撃), Threat (脅威でハメ殺し)
-            var byFloor = new Dictionary<int, int[]>(); // [死戦闘総数, 公平, 理不尽]
+            // 死因の分類 (CombatRec.deathCause を使う、 deathCauseは戦闘の死因)。 分類は ClassifyDeathCause。
+            // (旧 SuddenDeath / Garyo / Pursuit / Threat は作られない死因なので比較から外した。 2026-11-12)
+            var byFloor = new Dictionary<int, int[]>(); // [死戦闘総数, 公平, 理不尽, 未分類]
             for (int i = 0; i < _records.Count; i++)
             {
                 var rr = _records[i];
@@ -989,29 +980,48 @@ namespace AutoTest
                     var c = rr.combats[ci];
                     if (c == null || c.won) continue;
                     if (!c.isFightEnd) continue;
-                    string dc = c.deathCause.ToString();
-                    bool fair = dc == "Normal" || dc == "Chip" || dc == "None";
-                    bool unfair = dc == "Reflect" || dc == "SuddenDeath" || dc == "Garyo"
-                               || dc == "Pursuit" || dc == "Threat" || dc == "Judgment";
-                    if (!byFloor.TryGetValue(c.floor, out var a)) { a = new int[3]; byFloor[c.floor] = a; }
+                    if (!byFloor.TryGetValue(c.floor, out var a)) { a = new int[4]; byFloor[c.floor] = a; }
                     a[0]++;
-                    if (fair) a[1]++;
-                    else if (unfair) a[2]++;
+                    a[ClassifyDeathCause(c.deathCause)]++;
                 }
             }
 
             var floors = new List<int>(byFloor.Keys);
             floors.Sort();
-            sb.AppendLine($"  {PadR("層",4)}{PadR("死戦闘",7)}{PadR("公平死",8)}{PadR("理不尽死",10)}{PadR("理不尽率",10)}");
+            sb.AppendLine($"  {PadR("層",4)}{PadR("死戦闘",7)}{PadR("公平死",8)}{PadR("理不尽死",10)}{PadR("未分類",8)}{PadR("理不尽率",10)}");
             foreach (int f in floors)
             {
                 var a = byFloor[f];
                 if (a[0] == 0) continue;
                 float unfairPct = 100f * a[2] / a[0];
-                sb.AppendLine($"  {PadR(f.ToString()+"F",4)}{PadR(a[0].ToString(),7)}{PadR(a[1].ToString(),8)}{PadR(a[2].ToString(),10)}{PadR(unfairPct.ToString("F1")+"%",10)}");
+                sb.AppendLine($"  {PadR(f.ToString()+"F",4)}{PadR(a[0].ToString(),7)}{PadR(a[1].ToString(),8)}{PadR(a[2].ToString(),10)}{PadR(a[3].ToString(),8)}{PadR(unfairPct.ToString("F1")+"%",10)}");
             }
-            sb.AppendLine("  理不尽率が高い層は調整候補 (Reflect=反射火力過剰 / SuddenDeath=運勝負化過剰 等)");
+            sb.AppendLine("  理不尽率が高い層は調整候補 (Reflect=反射火力過剰 等)");
             return sb.ToString();
+        }
+
+        /// <summary>死因の質の分類 (#124)。 戻り値は byFloor の列: 1 = 公平・2 = 理不尽・3 = 未分類。
+        /// 公平 = 累積の攻撃と、 予告・開示された持続ダメージ (審判の炎・大出血・裂け目・〈蝕み〉)。
+        /// 理不尽 = 反射の自滅・断罪・処刑の一撃 (Other は CombatManager.Turn の処刑人の烙印だけが書く)・爆ぜ火。
+        /// どれにも当たらない値は未分類へ落とし、 死戦闘の合計 = 公平 + 理不尽 + 未分類 を保つ。</summary>
+        private static int ClassifyDeathCause(ItemSystem.PassiveSkills.DeathCause dc)
+        {
+            switch (dc)
+            {
+                case ItemSystem.PassiveSkills.DeathCause.Normal:
+                case ItemSystem.PassiveSkills.DeathCause.Chip:
+                case ItemSystem.PassiveSkills.DeathCause.MassiveBleed:
+                case ItemSystem.PassiveSkills.DeathCause.Rift:
+                case ItemSystem.PassiveSkills.DeathCause.Erosion:
+                    return 1;
+                case ItemSystem.PassiveSkills.DeathCause.Reflect:
+                case ItemSystem.PassiveSkills.DeathCause.Judgment:
+                case ItemSystem.PassiveSkills.DeathCause.Other:
+                case ItemSystem.PassiveSkills.DeathCause.Burst:
+                    return 2;
+                default:
+                    return 3;
+            }
         }
 
         /// <summary>4. 選択意味度 ── イベント選択肢で「常に同じ選択肢」 = 等価/つまらない分岐、
@@ -1159,7 +1169,9 @@ namespace AutoTest
                 if (!string.IsNullOrEmpty(r.finalWeaponTier))
                 {
                     tierCount[r.finalWeaponTier] = tierCount.TryGetValue(r.finalWeaponTier, out int c) ? c + 1 : 1;
-                    if (r.finalWeaponTier.EndsWith("_t4")) reachT4++;
+                    // 段は items.json の tier で読む。 finalWeaponTier の中身は武器の id (= 表示名) なので、
+                    //   以前の EndsWith("_t4") は 2026-09-22 以降一致せず、 T4 到達は常に 0 と印字されていた。
+                    if (ItemSystem.ItemDatabase.Instance?.GetItem(r.finalWeaponTier)?.tier == 4) reachT4++;
                 }
             }
             sb.AppendLine($"  強化発火合計   : {totalUpgrades} 回 ({(double)totalUpgrades / n:F2}/ラン)");
@@ -1306,14 +1318,13 @@ namespace AutoTest
             double sCoins=0, sPeak=0, sGain=0, sStarv=0, sStarvHit=0, sShop=0;
             double sReroll=0, sRerollG=0, sPrio=0, sMatGain=0;
             double sFinalProvision=0, sMinProvision=0; int madnessCount=0;   // 物資(ADR-0002)
-            double sHCombat=0, sHComposure=0, sHLateral=0, sHMarch=0, sHEvil=0, sHFood=0, sHReroll=0; // 物資 発生源別収支
+            double sHLateral=0, sHEvil=0; // 物資 発生源別収支
             foreach (var r in recs)
             { sCoins+=r.finalCoins; sPeak+=r.peakCoins; sGain+=r.totalGoldGained;
               sStarv+=r.starvationTotal; sStarvHit+=r.starvationHits; sShop+=r.shopPurchases;
               sReroll+=r.shopRerolls; sRerollG+=r.shopRerollCoins; sPrio+=r.priorityItemsAcquired; sMatGain+=r.materialsGainedTotal;
               sFinalProvision+=r.finalProvision; sMinProvision+=r.minProvision; if (r.reachedMadness) madnessCount++;
-              sHCombat+=r.provisionCombatLoss; sHComposure+=r.provisionComposureGain; sHLateral+=r.provisionLateralLoss;
-              sHMarch+=r.provisionMarchLoss; sHEvil+=r.provisionEvilLoss; sHFood+=r.provisionFoodGain; sHReroll+=r.provisionRerollLoss; }
+              sHLateral+=r.provisionLateralLoss; sHEvil+=r.provisionEvilLoss; }
             int dn = Math.Max(1, n);
             sb.AppendLine($"  {PadR("平均最終ゴールド", 20)}: {(sCoins/dn):F1}");
             sb.AppendLine($"  {PadR("平均ピークゴールド", 20)}: {(sPeak/dn):F1}");
@@ -1332,10 +1343,7 @@ namespace AutoTest
             sb.AppendLine($"  {PadR("平均最終物資", 20)}: {(sFinalProvision/dn):F1}");
             sb.AppendLine($"  {PadR("平均最低物資", 20)}: {(sMinProvision/dn):F1}  (発狂到達 {madnessCount}/{n} = {Pct(madnessCount, n)})");
             sb.AppendLine($"  ── 物資 発生源別収支（1ラン平均・損は−） ──");
-            sb.AppendLine($"  {PadR("  戦闘損", 20)}: -{(sHCombat/dn):F1}   {PadR("被弾0回復", 12)}: +{(sHComposure/dn):F1}");
-            sb.AppendLine($"  {PadR("  横移動損", 20)}: -{(sHLateral/dn):F1}   {PadR("絶望進軍損", 12)}: -{(sHMarch/dn):F1}");
-            sb.AppendLine($"  {PadR("  悪選択損", 20)}: -{(sHEvil/dn):F1}   {PadR("食料回復", 12)}: +{(sHFood/dn):F1}");
-            sb.AppendLine($"  {PadR("  振り直し損", 20)}: -{(sHReroll/dn):F1}");
+            sb.AppendLine($"  {PadR("  移動損", 20)}: -{(sHLateral/dn):F1}   {PadR("悪選択損", 12)}: -{(sHEvil/dn):F1}");
             sb.AppendLine($"  {PadR("ショップ購入数", 20)}: {(sShop/dn):F2}");
             // --- パッシブ取得の経路別内訳 (2026-09-09) ---
             //   供給の 2/3 が無料経路で、 価格を上げても届かない。 どこが配っているかを出す。

@@ -5,7 +5,8 @@ namespace UI.ClassSelect
     /// <summary>
     /// 職業選択 UI の表示データ。 正本は items.json (スターター消耗品の説明/フレーバー) と
     /// docs/GAME.md §11。 ItemDatabase が未初期化のシーン (タイトル等) でも
-    /// 動くよう、 ここにフォールバック文字列を持つ。
+    /// 動くよう、 ここにフォールバック文字列を持つ。 <b>フォールバックの説明文は items.json の description と同じ文にしておく</b>
+    /// (ずれると、 DB が読めない時だけ古い言い方が画面に出る)。
     /// </summary>
     public static class ClassDossierData
     {
@@ -65,7 +66,7 @@ namespace UI.ClassSelect
                          "冬があなたを消すより先に、あなたは南へ戻る隊商に紛れ、氷原を去った。",
                 starterId = ClassStarter.PainkillerId,
                 starterNameFallback = "痛覚遮断剤",
-                starterDescFallback = "使用ターン、致命ダメージを受けてもHP1で踏みとどまる。次ターン開始時HP=1ならダイス合計+10/基礎攻撃+10、ただし攻撃終了時に死亡する。",
+                starterDescFallback = "使用ターン、致命ダメージを受けてもHP1で踏みとどまる。次ターン開始時HP=1なら攻撃+10・最終与ダメージ+10、ただし攻撃終了時に死亡する。",
                 flavorFallback = "「効いている間は死なない。切れた時に、まとめて来る」",
                 weaponNameFallback = "薪割りの斧",
                 traits = "攻撃特化の博打構成。配給品は致命傷を一手の猶予に変える決死の薬 ── 猶予の一手で削り切れなければ死ぬ。",

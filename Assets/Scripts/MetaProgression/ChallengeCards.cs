@@ -95,7 +95,7 @@ namespace MetaProgression
             K(Money, false, Family.Economy, T(20, null, null, null));     // 層を移るたび、 所持金の N% を失う
 
             // ── 七つの大罪 (IV 固有・2026-11-10・#93)。 Tier IV 相当、 大罪なのでかなり強くて良い (ユーザー)。 5 層 (エリート戦とヴェスカの 4 形態) に効く形へ作り直した。 値は仮置き
-            K(SinPride, false, Family.Hand, T(null, null, null, 75));        // ブロック −N%・シールドの獲得 −N%。 2026-11-10 測定: ブロックだけ 50% −3.9 / 75% −6.9 (BOT が殴りに寄せる) → シールドも        // 傲慢: ブロックに挿した出目 −N%
+            K(SinPride, false, Family.Hand, T(null, null, null, 75));        // ブロック −N%・シールドの獲得 −N%。 2026-11-10 測定: ブロックだけ 50% −3.9 / 75% −6.9 (BOT が殴りに寄せる) → シールドも        // 傲慢: 防御の端子を挿した出目 −N%
             K(SinEnvy, false, Family.Attack, T(null, null, null, 60));       // 嫉妬: 残り HP の割合がこちらのほうが高い間、 敵の攻撃 +N%
             K(SinGreed, false, Family.Economy, T(null, null, null, 1));      // 強欲: 受けた時、 所持金と消耗品をすべて失う
             K(SinWrath, false, Family.Attack, T(null, null, null, 1));       // 憤怒: ボスの各形態の最初のターン、 自ダイスが全て最大・現在 HP 半減
@@ -115,8 +115,31 @@ namespace MetaProgression
             K(TermBlk, true, Family.None, T(null, 1, 2, 3));              // ブロックの端子: 同上
             K(MaxHp, true, Family.None, T(5, 8, 12, 18));                 // 最大 HP +N% (受けた時に上げ、 上がった分だけ HP も増える)
             K(HealUp, true, Family.None, T(10, 15, 20, 30));              // 回復 +N% (回復の倍率に掛ける。 入口の全回復は満タンまでなので、 回復 −N% を打ち消す分だけ効く)
-            K(Cat, true, Family.None, T(2, null, null, null), pending: true);          // 猫の手 (予告と BOT の配線に先に見せる仕組みができてから)
-            K(GoldPunch, true, Family.None, T(null, null, 1, 1), pending: true);     // 金で殴る (BOT の方策ができてから)
+            // 猫の手 (#5・2026-11-12): 毎ターン N% の確率で、 配線の判断の頭に、 Super の評価で最良の挿し方の中から 1 組 (出目 1 個 → 端子 1 枚) を先に挿す。
+            //   猫が挿した組はそのターン外せない。 値は仮置き・未測定 (CombatManager.ChooseCatPaw / GameHooks.CatPawPick)
+            K(Cat, true, Family.None, T(25, 50, 75, 100));
+            // 金で殴る (#6・2026-11-12): 効果の定義は下の GoldPunchAttack の注記。 BOT の方策は実装済み (AutoRunner.Terminals の ChooseGoldPunch)。
+            //   pending を外すのは、 人の戦闘画面に払う金額を決める操作 (CombatManager.AnswerWiringSlots の goldSpend) を付けてから
+            //   ── 今外すと人には使えない札が配られる。 測定は challengeForce (例 "5:B:punch:3") で配らずに受けられる
+            K(GoldPunch, true, Family.None, T(null, null, 1, 1), pending: true);
+        }
+
+        /// <summary>〈金で殴る〉(#6): 払った <paramref name="gold"/> G で上がる攻撃 (攻撃+N)。 受けていなければ 0。
+        ///
+        /// <para><b>効果の定義 (最も素直な解釈・2026-11-12。 作者の判断で置き換える所はここの 1 か所)</b>:</para>
+        /// <list type="number">
+        /// <item>払う金額は毎ターン、 配線の判断の時に 0〜所持金で決める (1 ターンにも 1 戦闘にも上限を置かない・§23-25「ハードキャップで止めない」)。</item>
+        /// <item>払うのは攻撃するターン (出目 1 個以上に攻撃の端子を挿した) だけ。 攻撃しないターン・逃げるターンは払わず、 金も減らない。</item>
+        /// <item>1G につき攻撃 +value (切り捨て)。 入る所は攻撃+N の枠 (武器の素火力・パッシブの攻撃+N・消耗品・遺物と同じ atkBase) ──
+        ///   そのため会心・与ダメ% が乗り、 敵の防御で軽減される (CombatManager.Turn の「6. 解決」)。</item>
+        /// <item>値は Tier III・IV とも 1 (仮置き・未測定)。</item>
+        /// </list>
+        /// 「倍率の乗らない固定ダメージにする」「1 ターンの上限を所持金の割合にする」などへ替えるときは、 ここと本体の 1 か所 (CombatManager.Turn の goldAtk) と、
+        /// BOT の見積もり (AutoRunner.Terminals の GoldPunchState) を一緒に直す。</summary>
+        public static int GoldPunchAttack(int gold)
+        {
+            if (gold <= 0) return 0;
+            return (int)System.Math.Floor(gold * (double)Value(GoldPunch));
         }
 
         /// <summary>充電の札の、 開幕の充電 (Tier ごと)。</summary>
@@ -259,13 +282,13 @@ namespace MetaProgression
                 case EnemyHp: return "厚い皮 ─ 敵の最大 HP +" + n + "%";
                 case EnemyDef: return "敵の防御 +" + n;
                 case Steel: return "各戦闘 1 度、 敵が致命傷を HP1 で耐える・ボスの HP +" + SteelBossHpPct.ToString("0") + "%（鋼の皮膚）";
-                case SinPride: return "大罪:傲慢 ─ ブロックに挿した出目 −" + n + "%・シールドの獲得 −" + SinPrideShieldCutPct + "%";
+                case SinPride: return "大罪:傲慢 ─ 防御の端子を挿した出目 −" + n + "%・シールドの獲得 −" + SinPrideShieldCutPct + "%";
                 case SinEnvy: return "大罪:嫉妬 ─ 残り HP の割合がこちらのほうが高い間、 敵の攻撃 +" + n + "%";
-                case SinGreed: return "大罪:強欲 ─ 所持金と消耗品をすべて失い、 最も高価なパッシブ " + SinGreedPassives + " 個を失う";
+                case SinGreed: return "大罪:強欲 ─ 所持金と消耗品をすべて失い、 最も高価な秘宝 " + SinGreedPassives + " 個を失う";
                 case SinWrath: return "大罪:憤怒 ─ ボスの各形態の最初のターン、 自ダイスが全て最大・現在 HP 半減";
                 case SinSloth: return "大罪:怠惰 ─ 全部の出目 −" + n + "（1 より小さくはならない）・与えるダメージ −" + SinSlothDamageCutPct + "%（毒・出血・爆発も）";
                 case SinGluttony: return "大罪:暴食 ─ 最大 HP −" + SinGluttonyMaxHpPct + "%・回復 −" + n + "%（吸血・層の入口の全回復にも）";
-                case SinLust: return "大罪:色欲 ─ 持っているパッシブ " + n + " 個（ランダム）が働かなくなる";
+                case SinLust: return "大罪:色欲 ─ 持っている秘宝 " + n + " 個（ランダム）が働かなくなる";
                 case Bag: return "消耗品は " + n + " 個までしか持てない";
                 case UseCap: return "1 戦闘で使える消耗品は " + n + " 個まで";
                 case Heal: return "回復 −" + n + "%（層の入口の全回復にも）";
@@ -283,8 +306,8 @@ namespace MetaProgression
                 case WinGold: return "戦闘に勝つたびゴールド +" + n;
                 case MaxHp: return "最大 HP +" + n + "%";
                 case HealUp: return "回復 +" + n + "%";
-                case Cat: return "猫の手: 毎ターン、 ダイス 1 個を猫が配線する。 猫が挿したダイスは出目 +" + n;
-                case GoldPunch: return "金で殴る: 攻撃に金を挿せる（1G につき攻撃 +" + n + "）";
+                case Cat: return "猫の手: 毎ターン " + n + "% の確率で、 猫が一番得な端子を出目 1 個に先に挿す（そのターンは外せない）";
+                case GoldPunch: return "金で殴る: 金を攻撃に足せる（1G につき攻撃 +" + n + "）";
             }
             return c.kind;
         }

@@ -96,7 +96,20 @@ namespace AutoTest
         /// 掛けるのは主攻撃の項だけ (黎明・〈虚空〉の刻み・山札の先の得の見積もりには掛けない)。 hpLedger の「撃破までの見込み」(dFull) にも流れる。
         /// 実績は CombatStats.DamageBreakdown[7] の増分 (predTrace と同じ「実際」)。 ランをまたいで持ち越さない。</summary>
         public bool mainCorr;
-        /// <summary>ヴェスカ〈停滞する時間〉を持つ敵に、 停滞を積む配線 (攻撃の本数 &lt; ブロックの本数) を選ばせない (2026-11-11・既定 ON)。 例外は AutoRunner.Combat の MutualWiringPolicy。</summary>
-        public bool noStagWire = true;   // 2026-11-11 既定 ON (停滞の罰を帳簿が薄めて BOT が自分で p4 を重くしていた)
+        // noStagWire (ヴェスカ〈停滞する時間〉で停滞を積む配線を選ばせない・2026-11-11) は 2026-11-12 #103 で削除。
+        //   効果が「引いた端子を確率で止める」に替わり、 避ける配線が無くなった。 arm の設定に残っていても未知の項目として警告が出るだけ。
+        /// <summary>[#107 2026-11-12] 配線の効用に、 収支で決まる敵のパッシブ (〈尾撃〉〈重甲〉〈地獄の業火〉〈反撃態勢〉〈暴走〉) と〈吸血〉を読む。
+        /// −1 = 技量に従う (Super で ON・それ以外は OFF) / 0 = OFF / 1 = ON。 実効値は <see cref="AutoRunner.ReadEnemyPassivesEffective"/>。
+        /// Optimal (中堅の知識) で ON にすると 3000 ランの対で 12.9 → 11.8% (z −2.74・#103 の前の main)。 〈吸血〉の敵で戦闘が 9.35 → 9.50 ターンに伸びていた。
+        /// 内訳を 1 つずつ外すと (#103 の後の main・Optimal 12.2%) 吸血なし 12.0% (z −0.61)・吸血だけ 12.5% (z +0.81) でどれも有意でない。
+        /// 中堅の知識の範囲を超えるので Optimal には読ませない。 Super は 32.2 → 32.2% (z 0.00) で中立 (2026-11-12)。</summary>
+        public int readEnemyPassives = -1;
+        /// <summary>[#107 診断] readEnemyPassives で読む物の内訳 (ビット)。 1 = 〈吸血〉 / 2 = 次のターンへ乗る物 (〈反撃態勢〉〈暴走〉) / 4 = 収支の軽減無視 (〈尾撃〉〈重甲〉〈地獄の業火〉)。 既定 7 = 全部。</summary>
+        public int enemyPassiveMask = 7;
+        /// <summary>[2026-11-13 測定の口] 配線の効用の旧の式 (readOutgoingMult が OFF = 既定の Optimal) で、 攻撃の端子に 1 つも挿さない手にも
+        /// 武器の素火力 (atkBase) を主攻撃の与ダメとして数える (直す前の挙動)。 本体はその手で主攻撃をしない (skipAttack)。
+        /// 既定 false = 直した挙動 (主攻撃 0・〈黎明〉〈虚空〉など攻撃なしでも通る削りは残る)。 true の腕はこの修正の前の main と全件一致するはず。
+        /// 新しい式 (Super の既定) は前から 0 なので、 この口は効かない。</summary>
+        public bool oldNoAttackBaseDmg;
     }
 }

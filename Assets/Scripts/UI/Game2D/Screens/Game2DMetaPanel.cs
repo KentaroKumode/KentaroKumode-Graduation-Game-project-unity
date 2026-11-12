@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using MetaProgression;
 using UnityEngine;
 
@@ -14,27 +15,49 @@ namespace UI.Game2D
     {
         private struct Track { public MetaPanelKind kind; public string name, desc; }
 
+        // **説明文の数字は MetaPanel の式・定数から組む** (2026-11-12・#125)。 手書きの数字は調整のたびに古くなり、
+        //   種火 r1 (+60% のまま・実際は +100%)・毒/出血 r2・r3 の品の数・金庫 r10 が画面とコードで食い違っていた。
+        private static string N(float v) => v.ToString("0.#", CultureInfo.InvariantCulture);
+        /// <summary>1 段ごとの増分 (r1 の値)。</summary>
+        private static string Per(System.Func<int, float> f) => N(f(1));
+
+        /// <summary>宝物庫で開幕パッシブが 1 本増える段 (例 "r3/6/9")。</summary>
+        private static string SupplySteps()
+        {
+            var steps = new List<string>();
+            for (int r = 1; r <= 10; r++)
+                if (MetaPanel.SupplyStartingPassives(r) > MetaPanel.SupplyStartingPassives(r - 1)) steps.Add(r.ToString());
+            return "r" + string.Join("/", steps);
+        }
+
+        private static string SaleTiers(int rank) => string.Join("/", MetaPanel.TradeSaleTiers(rank));
+
+        /// <summary>種火 r1・r3 の共通の文。 r2 は呼ぶ側が渡す。</summary>
+        private static string SparkDesc(string kw, string r2)
+            => "r1: " + kw + "の品が出やすい (+" + N((MetaPanel.SparkAppearanceWeightMul(1) - 1f) * 100f) + "%)。 r2: " + r2
+             + "。 r3: " + kw + "の品を " + MetaPanel.SparkStartingItemCount + " つ開幕で持つ。";
+
         private static readonly Track[] Numeric =
         {
-            new Track { kind = MetaPanelKind.Shell,   name = "外殻", desc = "最大 HP +4/段 (r10 は +8)。 r10: ラストスタンド (その場で蘇生・最大 HP 半減の代償つき)。" },
-            new Track { kind = MetaPanelKind.Output,  name = "出力", desc = "与ダメ +7%/段。 r10〈戦意〉: 戦闘に勝つたび与ダメ +1.5% (そのラン中)。" },
-            new Track { kind = MetaPanelKind.Guard,   name = "剛胆", desc = "エリートが増える +5%/段・エリートの報酬ゴールド +10%/段。 r10: エリートへの与ダメ +10%・残りシールドの 30% を次戦へ。" },
-            new Track { kind = MetaPanelKind.Vault,   name = "金庫", desc = "開幕ゴールド +5/段。 r10: 宝箱のゴールドが復活・ゴールドをランを跨いで預ける (上限 150G)。" },
-            new Track { kind = MetaPanelKind.Plunder, name = "強奪", desc = "ボス撃破の追加ゴールド +1/段・通常の敵のパッシブドロップ +2%/段。 r10: ショップ強盗を解禁。" },
-            new Track { kind = MetaPanelKind.Trade,   name = "商才", desc = "ショップの特売枠 +1/段 (15/30/50% 引き)。 r10: 99% 引きの枠が出る。" },
-            new Track { kind = MetaPanelKind.Supply,  name = "宝物庫", desc = "r3/6/9 で開幕パッシブ +1 本・段が上がるほどレア度が上寄り。 r10: 開幕パッシブが選択式。" },
-            new Track { kind = MetaPanelKind.Armor,   name = "装甲", desc = "防御 +2/段・被ダメージ −1/2 段。 r10〈不動〉: 1 回の攻撃で受けるダメージは最大 HP の 35% まで。 防御は割合の軽減 (積むほど伸びは鈍る)、 被ダメージ −N は防御の後に引く。" },
+            new Track { kind = MetaPanelKind.Shell,   name = "外殻", desc = "最大 HP +" + MetaPanel.ShellHp(1) + "/段 (r10 は +" + (MetaPanel.ShellHp(10) - MetaPanel.ShellHp(9)) + ")。 r10: ラストスタンド (その場で蘇生・最大 HP 半減の代償つき)。" },
+            new Track { kind = MetaPanelKind.Output,  name = "出力", desc = "与ダメ +" + MetaPanel.OutputPct(1) + "%/段。 r10〈戦意〉: 戦闘に勝つたび与ダメ +" + N(MetaPanel.BattleSpiritPctPerWin) + "% (そのラン中)。" },
+            new Track { kind = MetaPanelKind.Guard,   name = "剛胆", desc = "エリートが増える +" + Per(MetaPanel.ValorEliteUpgradePct) + "%/段・エリートの報酬ゴールド +" + Per(MetaPanel.ValorEliteGoldPct) + "%/段。 r10: エリートへの与ダメ +" + MetaPanel.ValorEliteSlayerPct + "%・残りシールドの " + N(MetaPanel.GuardShieldCarryRatio * 100f) + "% を次戦へ。" },
+            new Track { kind = MetaPanelKind.Vault,   name = "金庫", desc = "開幕ゴールド +" + MetaPanel.VaultGold(1) + "/段。 r10: 宝箱のゴールドが復活・層を越えるたびに所持金が " + N(VaultBank.Multiplier) + " 倍 (" + VaultBank.Cap + "G までの分)。" },
+            new Track { kind = MetaPanelKind.Plunder, name = "強奪", desc = "ボス撃破の追加ゴールド +" + MetaPanel.PlunderBossGold(1) + "/段・通常の敵の秘宝ドロップ +" + Per(MetaPanel.PlunderPassiveDropPct) + "%/段。 r10: ショップ強盗を解禁。" },
+            new Track { kind = MetaPanelKind.Trade,   name = "商才", desc = "ショップの特売枠 +" + MetaPanel.TradeSaleSlots(1) + "/段 (" + SaleTiers(1) + "% 引き)。 r10: " + MetaPanel.TradeSaleTiers(10)[MetaPanel.TradeSaleTiers(10).Length - 1] + "% 引きの枠が出る。" },
+            new Track { kind = MetaPanelKind.Supply,  name = "宝物庫", desc = SupplySteps() + " で開幕の秘宝 +1 個・段が上がるほどレア度が上寄り。 r10: 開幕の秘宝が選択式。" },
+            new Track { kind = MetaPanelKind.Armor,   name = "装甲", desc = "防御 +" + MetaPanel.ArmorDefense(1) + "/段・被ダメージ −1/" + MetaPanel.ArmorFlatEvery + " 段。 r10〈不動〉: 1 回の攻撃で受けるダメージは最大 HP の " + N(MetaPanel.ArmorHitCapPct * 100f) + "% まで。 防御は割合の軽減 (積むほど伸びは鈍る)、 被ダメージ −N は防御の後に引く。" },
         };
 
         private static readonly Track[] Declare =
         {
-            new Track { kind = MetaPanelKind.SparkCharge, name = "種火・充電", desc = "r1: 充電の品が出やすい (+60%)。 r2: 充電の上限 +10・戦闘開始時の充電 +10。 r3: 充電の品 (BRONZE) を 1 つ開幕で持つ。" },
-            new Track { kind = MetaPanelKind.SparkRinkai, name = "種火・臨界", desc = "r1: 臨界の品が出やすい (+60%)。 r2: 戦闘の終わりの臨界の 50% を次の戦闘へ。 r3: 臨界の品を 1 つ開幕で持つ。" },
-            new Track { kind = MetaPanelKind.SparkPoison, name = "種火・毒",   desc = "r1: 毒の品が出やすい (+60%)。 r2: 毎ターン最初に与える毒 +2。 r3: 毒の品を 1 つ開幕で持つ。" },
-            new Track { kind = MetaPanelKind.SparkBleed,  name = "種火・出血", desc = "r1: 出血の品が出やすい (+60%)。 r2: 出血 3 以上の敵の攻撃値 −2。 r3: 出血の品を 1 つ開幕で持つ。" },
-            new Track { kind = MetaPanelKind.SparkShield, name = "種火・シールド", desc = "r1: シールドの品が出やすい (+60%)。 r2: ターン開始の減衰で残るシールド +10%。 r3: シールドの品を 1 つ開幕で持つ。" },
-            new Track { kind = MetaPanelKind.AttackTerm,  name = "攻撃端子",   desc = "攻撃端子へつないだダイス 1 本ごとに、 攻撃端子の配線合計 +1/段。" },
-            new Track { kind = MetaPanelKind.BlockTerm,   name = "防御端子",   desc = "防御端子へつないだダイス 1 本ごとに、 防御端子の配線合計 +1/段。" },
+            new Track { kind = MetaPanelKind.SparkCharge, name = "種火・充電", desc = SparkDesc("充電", "充電の上限 +" + MetaPanel.ChargeCapBonus(2) + "・戦闘開始時の充電 +" + MetaPanel.ChargeOpening(2)) },
+            new Track { kind = MetaPanelKind.SparkRinkai, name = "種火・臨界", desc = SparkDesc("臨界", "戦闘の終わりの臨界の " + N(MetaPanel.RinkaiCarryoverRatio(2) * 100f) + "% を次の戦闘へ") },
+            new Track { kind = MetaPanelKind.SparkPoison, name = "種火・毒",   desc = SparkDesc("毒", "毎ターン最初に与える毒 +" + MetaPanel.PoisonApplyBonus(2)) },
+            new Track { kind = MetaPanelKind.SparkBleed,  name = "種火・出血", desc = SparkDesc("出血", "出血 " + MetaPanel.BleedWeakenThreshold + " 以上の敵の攻撃値 −" + MetaPanel.BleedWeakenAmount) },
+            new Track { kind = MetaPanelKind.SparkShield, name = "種火・シールド", desc = SparkDesc("シールド", "ターン開始の減衰で残るシールド +" + MetaPanel.ShieldKeepBonusPct(2) + "%") },
+            new Track { kind = MetaPanelKind.AttackTerm,  name = "攻撃端子",   desc = "攻撃の端子を挿したダイス 1 個ごとに、 攻撃端子の配線合計 +" + MetaPanel.AttackTerminalPerDice(1) + "/段。" },
+            new Track { kind = MetaPanelKind.BlockTerm,   name = "防御端子",   desc = "防御の端子を挿したダイス 1 個ごとに、 防御端子の配線合計 +" + MetaPanel.BlockTerminalPerDice(1) + "/段。" },
         };
 
         private static int _page;
@@ -48,6 +71,7 @@ namespace UI.Game2D
             _page = 0;
             SpriteButton.InputLocked = true;      // 後ろのタイトルのボタンを押さない
             _modal.Open(Build());
+            Game2DTutorial.Request(TutorialTopics.MetaPanel);      // 手引き「整備パネル」: 初めて開いた時 (issue #86)
             return true;
         }
 
@@ -73,17 +97,17 @@ namespace UI.Game2D
                 case MetaPanelKind.Vault:   return "開幕 +" + MetaPanel.VaultGold(r) + "G" + (r >= 10 ? "・貸金庫" : "");
                 case MetaPanelKind.Plunder: return "ボス +" + MetaPanel.PlunderBossGold(r) + "G・ドロップ +" + MetaPanel.PlunderPassiveDropPct(r).ToString("0") + "%" + (r >= 10 ? "・強盗" : "");
                 case MetaPanelKind.Trade:   return "特売の枠 " + MetaPanel.TradeSaleSlots(r) + (r >= 10 ? "・99% 引き" : "");
-                case MetaPanelKind.Supply:  return "開幕パッシブ " + MetaPanel.SupplyStartingPassives(r) + " 本" + (r >= 10 ? "・選べる" : "");
+                case MetaPanelKind.Supply:  return "開幕の秘宝 " + MetaPanel.SupplyStartingPassives(r) + " 個" + (r >= 10 ? "・選べる" : "");
                 case MetaPanelKind.Armor:   return "防御 +" + MetaPanel.ArmorDefense(r) + "・被ダメ −" + MetaPanel.ArmorFlatReduction(r) + (r >= 10 ? "・不動" : "");
-                case MetaPanelKind.AttackTerm: return "つないだ 1 本ごと +" + MetaPanel.AttackTerminalPerDice(r);
-                case MetaPanelKind.BlockTerm:  return "つないだ 1 本ごと +" + MetaPanel.BlockTerminalPerDice(r);
+                case MetaPanelKind.AttackTerm: return "挿した 1 個ごと +" + MetaPanel.AttackTerminalPerDice(r);
+                case MetaPanelKind.BlockTerm:  return "挿した 1 個ごと +" + MetaPanel.BlockTerminalPerDice(r);
             }
             // 種火 6 本: r1 出やすい / r2 固有 / r3 開幕に 1 つ
             string r2 = k == MetaPanelKind.SparkCharge ? "上限 +" + MetaPanel.ChargeCapBonus(r)
                       : k == MetaPanelKind.SparkRinkai ? "持ち越し " + (MetaPanel.RinkaiCarryoverRatio(r) * 100f).ToString("0") + "%"
                       : k == MetaPanelKind.SparkPoison ? "毎ターン最初の付与 +" + MetaPanel.PoisonApplyBonus(r)
                       : k == MetaPanelKind.SparkShield ? "残るシールド +" + MetaPanel.ShieldKeepBonusPct(r) + "%"
-                      : "攻撃 -2";
+                      : "攻撃 −" + MetaPanel.BleedWeakenAmount;
             return "出やすい" + (r >= 2 ? "・" + r2 : "") + (MetaPanel.SparkStartingItemUnlocked(r) ? $"・開幕に {MetaPanel.SparkStartingItemCount} つ" : "");
         }
 

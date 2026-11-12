@@ -42,7 +42,7 @@ namespace MetaProgression
 
         // ── 七つの大罪 (IV 固有・2026-11-10・#93・GAME.md §15-4) ──
 
-        /// <summary>大罪:傲慢 ── ブロックに挿した出目の削り (%)。 シールドの獲得の削りは <see cref="ChallengeCards.SinPrideShieldCutPct"/>。</summary>
+        /// <summary>大罪:傲慢 ── 防御の端子を挿した出目の削り (%)。 シールドの獲得の削りは <see cref="ChallengeCards.SinPrideShieldCutPct"/>。</summary>
         public static float GetSinBlockCutPct() => CardV(ChallengeCards.SinPride);
         /// <summary>大罪:嫉妬 ── 残り HP の割合がこちらのほうが敵より高い間の、 敵の攻撃の上乗せ (%)。</summary>
         public static float GetEnvyPct()

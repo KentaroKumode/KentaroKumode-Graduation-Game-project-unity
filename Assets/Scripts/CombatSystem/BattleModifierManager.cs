@@ -22,11 +22,24 @@ namespace CombatSystem
     /// </summary>
     public class BattleModifierManager : MonoBehaviour
     {
+        // ===== シングルトン (CLAUDE.md の規約: _shuttingDown + RuntimeInitializeOnLoadMethod・GameManager と同じ形) =====
         private static BattleModifierManager instance;
+        private static bool _shuttingDown;
+
+        /// <summary>ドメインリロード無効設定でも static を必ず初期状態へ戻す。</summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            instance = null;
+            _shuttingDown = false;
+        }
+
+        /// <summary>アプリ終了中は null を返す (終了中に新しい GameObject を作らない)。</summary>
         public static BattleModifierManager Instance
         {
             get
             {
+                if (_shuttingDown) return null;
                 if (instance == null)
                 {
                     var go = new GameObject("[BattleModifierManager]");
@@ -40,9 +53,12 @@ namespace CombatSystem
         void Awake()
         {
             if (instance != null && instance != this) { Destroy(gameObject); return; }
+            _shuttingDown = false;
             instance = this;
             DontDestroyOnLoad(gameObject);
         }
+
+        void OnApplicationQuit() => _shuttingDown = true;
 
         /// <summary>修飾子プール（有効な修飾子の定義）</summary>
         private static readonly BattleModifier[] modifierPool = new BattleModifier[]

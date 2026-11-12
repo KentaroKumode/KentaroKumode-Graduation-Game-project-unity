@@ -8,7 +8,6 @@ namespace GameLoop
     /// 戦闘モデル: 毎ターン両者がダイス合計を振り、高い方がロール勝利→相手にダメージ。
     /// よって装備の優劣は「1ロールの期待合計」で評価するのが妥当。
     ///
-    ///   - ダイス: 出目テーブル(diceFaces)を差し替える。1ダイスの期待値 = mean(faces)。
     ///   - 武器  : 振る個数(count)・攻撃力(attackPower)・会心率(critRatePct)＋家系パッシブ。
     ///
     /// <para><b>武器EV = count × 面平均 + attackPower + critRatePct/5 + 学習済み準パワー×係数</b>
@@ -27,7 +26,8 @@ namespace GameLoop
     /// その論拠が消える。 旧実装は家系を見ずに段だけで乗り換えていたため、
     /// ショップに並んだ他家系の T3 を拾うたびに全員が同じ家系へ収束していた。</para>
     ///
-    /// ダイス は「1ダイス面平均」が現在値を上回る時のみ装備。
+    /// (旧: ダイスの品 (diceFaces) も面平均で自動装備・購入判定していたが、 ダイスの品は 2026-08-17 に廃止され
+    ///  ItemCategory.Dice の品が無いので分岐は通らなかった。 2026-11-12 削除)
     /// </summary>
     public static class Loadout
     {
@@ -35,7 +35,6 @@ namespace GameLoop
 
         // デフォルト（武器未装備）の戦闘値: 2d6 / 会心1
         private const int DefWeaponCount = 2;
-        private const int DefWeaponDiceMax = 6;
         private const int DefWeaponCrit = 1;
 
         // ============================================================
@@ -109,7 +108,7 @@ namespace GameLoop
             if (!string.IsNullOrEmpty(run.equippedWeaponId) && !owned.Contains(run.equippedWeaponId)) owned.Add(run.equippedWeaponId);
         }
 
-        /// <summary>武器なら期待値が上なら、ダイスなら面平均が上なら自動装備する。</summary>
+        /// <summary>武器の期待値が今の武器を上回れば自動装備する。</summary>
         public static void TryAutoEquip(RunState run, string itemId)
         {
             if (run == null || string.IsNullOrEmpty(itemId)) return;
@@ -127,11 +126,6 @@ namespace GameLoop
                 }
                 if (WeaponEV(item, run) > CurrentWeaponEV(run) + Eps)
                 { run.equippedWeaponId = itemId; run.weaponPlus = 0; }   // 強化の +N は武器に付く: 入れ替えたら +0 (2026-11-11)
-            }
-            else if (item.category == ItemCategory.Dice && item.diceFaces != null && item.diceFaces.Length > 0)
-            {
-                if (Mean(item.diceFaces) > CurrentPerDieMean(run) + Eps)
-                    run.equippedDiceId = itemId;
             }
         }
 
@@ -176,75 +170,7 @@ namespace GameLoop
                 if (LockWeaponFamily && curFam != null && !sameFamily) return false;
                 return WeaponEV(item, run) > CurrentWeaponEV(run) + Eps;
             }
-            if (item.category == ItemCategory.Dice && item.diceFaces != null && item.diceFaces.Length > 0)
-                return DiceWorthBuying(item, run);
             return false;
-        }
-
-        /// <summary>ダイスを**買う**価値があるか。 装備判定 (面平均だけ) より厳しい。
-        ///
-        /// 2026-08-10 の実測が発端。 挑戦デバフ〈売り渋り〉で陳列が 2 枠減り、
-        /// **ダイス購入が 6.16 回 → 0 回になったら 7層クリアが +9.4pt (p&lt;0.001)** 上がった。
-        /// 浮いた金がパッシブ +2.8 個・消耗品 +2.2 個に化けている ── つまり
-        /// **ダイスは同じ金額のパッシブに負けている**。 それでも買っていたのは、
-        /// 種別ごとに独立したゲートで貪欲に買っており、 **機会費用を見ていなかった**ため。
-        ///
-        /// 3 つの条件を課す:
-        ///   ① 面平均の改善が <see cref="DiceMinMeanGain"/> 以上 (小刻みな買い替えを止める)
-        ///   ② 階系 (小階/中階/大階) を失う持ち替えは <see cref="DiceRunLossMeanGain"/> 以上を要求。
-        ///      奇/偶/天 は**階系が原理的に不能**なのに平均が高いので、 面平均だけで選ぶと
-        ///      必ずここへ登り、 大階 (被ダメ0)・中階 (充電+12+無料リロール) を無自覚に捨てる
-        ///   ③ 端子役が成立しないダイス (無銘) は、 端子役 7 種の放棄に見合う差を要求</summary>
-        public const float DiceMinMeanGain = 1.0f;
-        public const float DiceRunLossMeanGain = 2.0f;
-
-        private static bool DiceWorthBuying(CompleteItemData item, RunState run)
-        {
-            float cur = CurrentPerDieMean(run);
-            float gain = Mean(item.diceFaces) - cur;
-            if (gain < DiceMinMeanGain) return false;
-
-            // ② 階系を失う持ち替えか (今は組めるのに、 新しい方では組めない)
-            bool curRuns = CurrentCanFormRuns(run);
-            bool newRuns = LongestStep1Run(item.diceFaces) >= 3;
-            if (curRuns && !newRuns && gain < DiceRunLossMeanGain) return false;
-
-            // ③ 端子役を殺すダイスは更に上乗せを要求
-            if (item.suppressTerminalRoles && gain < DiceRunLossMeanGain) return false;
-            return true;
-        }
-
-        /// <summary>今の面構成で 3 連番 (小階) 以上を組めるか。 装備ダイスが無ければ武器の素面で見る。</summary>
-        private static bool CurrentCanFormRuns(RunState run)
-        {
-            var d = string.IsNullOrEmpty(run.equippedDiceId)
-                  ? null : ItemDatabase.Instance?.GetItem(run.equippedDiceId);
-            if (d?.diceFaces != null && d.diceFaces.Length > 0)
-                return LongestStep1Run(d.diceFaces) >= 3;
-            return CurrentWeaponDiceMax(run) >= 3;   // 素の面は 1..N の連番なので N>=3 で可
-        }
-
-        /// <summary>面集合に含まれる最長の 1 刻み連番。</summary>
-        private static int LongestStep1Run(int[] faces)
-        {
-            if (faces == null || faces.Length == 0) return 0;
-            int best = 1;
-            for (int i = 0; i < faces.Length; i++)
-            {
-                bool hasPrev = false;
-                for (int j = 0; j < faces.Length; j++) if (faces[j] == faces[i] - 1) { hasPrev = true; break; }
-                if (hasPrev) continue;
-                int len = 1, next = faces[i] + 1;
-                while (true)
-                {
-                    bool found = false;
-                    for (int j = 0; j < faces.Length; j++) if (faces[j] == next) { found = true; break; }
-                    if (!found) break;
-                    len++; next++;
-                }
-                if (len > best) best = len;
-            }
-            return best;
         }
 
         /// <summary>武器 ID と + 段階から総合強化段階を出す。 進行武器でなければ -1。
@@ -258,31 +184,6 @@ namespace GameLoop
         }
 
         // ===== 期待値計算 =====
-
-        /// <summary>1ダイスあたりの現在期待値。カスタムダイス装備中はその面平均、
-        /// 無ければ装備中(or デフォルト)武器の素の面平均 (diceMax+1)/2。</summary>
-        private static float CurrentPerDieMean(RunState run)
-        {
-            float dm = EquippedDiceMean(run);
-            if (dm > 0f) return dm;
-            return (CurrentWeaponDiceMax(run) + 1) / 2f;
-        }
-
-        /// <summary>装備中カスタムダイスの面平均。無ければ 0。</summary>
-        private static float EquippedDiceMean(RunState run)
-        {
-            if (string.IsNullOrEmpty(run.equippedDiceId)) return 0f;
-            var d = ItemDatabase.Instance?.GetItem(run.equippedDiceId);
-            return (d?.diceFaces != null && d.diceFaces.Length > 0) ? Mean(d.diceFaces) : 0f;
-        }
-
-        private static int CurrentWeaponDiceMax(RunState run)
-        {
-            var w = string.IsNullOrEmpty(run.equippedWeaponId)
-                ? null : ItemDatabase.Instance?.GetItem(run.equippedWeaponId);
-            return (w != null && w.hasWeaponStats && w.weaponDice != null)
-                ? w.weaponDice.maxValue : DefWeaponDiceMax;
-        }
 
         /// <summary><b>家系の乗り換えを禁じる</b> (既定 OFF)。 計測用。
         ///
@@ -302,7 +203,7 @@ namespace GameLoop
         private static float WeaponEV(CompleteItemData w, RunState run)
         {
             if (w == null || !w.hasWeaponStats || w.weaponDice == null) return -1f;
-            float perDie = System.Math.Max(BaseFaceMean, EquippedDiceMean(run));
+            float perDie = BaseFaceMean;
             // 会心は 5% = 1 点で評価する (旧「分子」1 点と同じ桁)。
             float statEv = w.weaponDice.count * perDie + w.attackPower + w.critRatePct / 5f;
             // 家系パッシブの価値は素のステータスに現れない。 BOT は学習値をここへ足す (GameHooks.WeaponEvBonus)。
@@ -318,7 +219,7 @@ namespace GameLoop
                     return WeaponEV(cur, run);
             }
             // デフォルト武器 2d6/会心1 (attackPower なし)
-            float perDie = System.Math.Max(BaseFaceMean, EquippedDiceMean(run));
+            float perDie = BaseFaceMean;
             return DefWeaponCount * perDie + DefWeaponCrit;
         }
 
@@ -334,13 +235,5 @@ namespace GameLoop
         /// 家系は純 4 系のみになったので、 <b>プレフィックスの一致がそのまま系譜の一致</b>。</summary>
         private static bool SameLineage(string famA, string famB)
             => famA != null && famB != null && famA == famB;
-
-        private static float Mean(int[] faces)
-        {
-            if (faces == null || faces.Length == 0) return 0f;
-            long s = 0;
-            for (int i = 0; i < faces.Length; i++) s += faces[i];
-            return (float)s / faces.Length;
-        }
     }
 }

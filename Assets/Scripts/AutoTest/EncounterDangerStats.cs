@@ -32,6 +32,9 @@ namespace AutoTest
 
         private static readonly Dictionary<string, Entry> _byKey = new Dictionary<string, Entry>();
         public static string LoadedFrom = "";
+        /// <summary>直近の <see cref="Reload"/> で読もうとしたルート (ファイルが無くても入る・2026-11-12)。
+        /// <see cref="LoadedFrom"/> が空でこれが入っていれば「その帯には危険度のファイルが無く、 空で走った」。</summary>
+        public static string RequestedRoot = "";
 
         /// <summary>鍵を作る。 戦闘名が無い (追跡者・特殊戦) なら null。</summary>
         public static string KeyOf(MapSystem.MapNode node, int depth)
@@ -51,6 +54,7 @@ namespace AutoTest
         public static void Reload(string root)
         {
             _byKey.Clear(); _kindCache.Clear(); LoadedFrom = "";
+            RequestedRoot = string.IsNullOrEmpty(root) ? "" : Path.GetFullPath(root);
             try
             {
                 string path = Path.Combine(root, FileName);

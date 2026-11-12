@@ -58,6 +58,10 @@ namespace CombatSystem
         public bool rare;
         /// <summary>使い捨て: 使うと、 その戦闘中は山札に戻らない。</summary>
         public bool disposable;
+        /// <summary>使うと、 そのランの山札からも抜ける (〈応急箱〉・2026-11-12)。 <see cref="disposable"/> と組む (戦闘中も戻らない)。
+        /// 抜くのは本体の <c>CombatManager.FinishTerminalTurn</c>。 山札が <see cref="TerminalCards.MinDeckSize"/> 枚以下なら抜かない (店・休憩の抜き方と同じ下限)。
+        /// 判定は <see cref="TerminalCards.LeavesRunDeck"/> を通す (測定の口で旧の作りへ戻せる)。</summary>
+        public bool leavesRunDeck;
         /// <summary>常設: 一度引くとその戦闘中ずっと場に残り、 手札の枠を使わない。</summary>
         public bool permanent;
         /// <summary>軸 (AxisRules の名前)。 null = 軸なし。 強さがその軸の偏重で決まり、 報酬に出る確率も偏重で寄せる。</summary>
@@ -86,11 +90,24 @@ namespace CombatSystem
         public int foundryBonus;
         /// <summary>〈主幹〉をこの戦闘で使った回数。</summary>
         public int mainsUses;
+        /// <summary>ヴェスカ〈停滞する時間〉: このターン止まっている場の端子 (添字 = 場の位置・null = 止まっている端子なし)。
+        /// <see cref="TerminalDeckState.DrawTurn"/> が毎ターン作り直す。 止まった端子には挿せない (<see cref="TerminalCards.Resolve"/> が外す)。</summary>
+        public bool[] stopped;
+
+        /// <summary>場の s がこのターン止まっているか。</summary>
+        public bool IsStopped(int s) => stopped != null && s >= 0 && s < stopped.Length && stopped[s];
+
+        /// <summary>このターン止まっている端子の枚数。</summary>
+        public int StoppedCount
+        {
+            get { int n = 0; if (stopped != null) foreach (bool b in stopped) if (b) n++; return n; }
+        }
 
         public TerminalBattleState Clone()
         {
             var c = (TerminalBattleState)MemberwiseClone();
             c.gauge = new Dictionary<string, int>(gauge);
+            c.stopped = stopped != null ? (bool[])stopped.Clone() : null;
             return c;
         }
 
@@ -153,6 +170,9 @@ namespace CombatSystem
         public int retainTarget = -1, copyTarget = -1, burnTarget = -1;
         /// <summary>〈発振器〉の連続をこのターンもう数えたか。</summary>
         public bool oscCounted;
+        /// <summary>ヴェスカ〈停滞する時間〉で止まっている場の端子 (Resolve に渡した状態の写し・null = なし)。
+        /// 〈写し取り〉〈焼き切り〉〈保持器〉の候補から外す (<see cref="TerminalCards.IsCandidate"/>)。</summary>
+        public bool[] stopped;
 
         public bool Fired(List<string> board, string id)
         {
@@ -183,15 +203,36 @@ namespace CombatSystem
         public const int DetectorMul = 2, RectifierMul = 2;
         public const int IgniterAttack = 7, FuseBlock = 8, GroundCutPct = 60, BreakerCutPct = 75, ReliefCutPct = 90;
         public const int DischargeCost = 3, DischargeMul = 3, BreakerCost = 6, DeathwishMul = 3, RelayPerFired = 8, OscPerStreak = 5;
-        public const int CapacitorNeed = 15, CapacitorAttack = 40, ArresterNeed = 12, FoundryNeed = 10, CoolantNeed = 12;
+        public const int CapacitorNeed = 12, CapacitorAttack = 40, ArresterNeed = 8, FoundryNeed = 10, CoolantNeed = 12;
         public const float AmplifierPerPip = 0.16f, ResonatorMul = 1.5f, VacuumCritMult = 2.0f;
-        public const int CounterEvery = 10; public const float CounterPct = 0.20f;
-        public const int TwinShotMul = 3, DetonatorMul = 4, FirstAidMul = 3, HealMul = 4, BatteryBonus = 2, InsulatorBonus = 6;
-        public const int HarvesterMaxHp = 2, WhetGain = 1, LootGold = 10;
+        public const int CounterEvery = 10; public const float CounterPct = 0.10f;
+        public const int TwinShotMul = 3, DetonatorMul = 4, FirstAidMul = 2, HealMul = 1, BatteryBonus = 2, InsulatorBonus = 4;
+        public const int HarvesterMaxHp = 2, WhetGain = 1, LootGold = 5;
         public const float SightPerRank = 0.2f, VitalPerRank = 0.1f, BloodTapPct = 0.05f, BigDischargePerRank = 0.10f, ShieldPushPerRank = 0.06f;
         public const int BloodTapPer = 5, PoisonScalePer = 10, PoisonScaleAttack = 3, AfterHeatPerBurst = 2;
+        // 2026-11-12 (3): 端子の ITT (Optimal / Super・各 5 万ラン・AutoRunLogs/terminal_itt/) で、 両方そろって強すぎ・弱すぎの物だけを動かした。
+        //   強すぎ (Δクリア率 Optimal / Super): 応急箱 +13.0 / +16.0 → ×3→×2・治癒 +7.8 / +12.8 → ×4→×2・計数器 +2.9 / +5.6 → 20%→10%・
+        //     戦利品箱 +1.9 / +3.6 → 10G→5G・絶縁体 +1.7 / +2.7 → +6→+4。
+        //   弱すぎ: 決死 −1.8 / −3.3 → 払う HP を出目の半分 (切り上げ) に・充填 −1.2 / −1.4 → 溜める量 15→12。
+        //   主幹 (+4.9 / +6.8)・二股 (+3.2 / +4.0) はユーザーの指定した作りなので据え置き。 防御の割合の端子 (接地・避雷器) は弱いが原因が読めないので据え置き。
+        // 2026-11-12 (4): 同じ ITT の第 2 弾 (根拠は前回の調整の後の ITT・Optimal / Super の差と対数オッズ比)。
+        //   治癒 +2.35 / +6.15 → ×2→×1 (前回 ×4→×2 で倍率に素直に効いた)。
+        //   応急箱 +7.09 / +12.08 → 使うと、 そのランの山札から抜ける (第 1 弾の ×3→×2 は倍率をほとんど感じなかったので、 倍率でなく機会の少なさで止める)。
+        //   避雷器 −0.35 / −1.12 → 溜める量 12→8 (下げるほど発動が増える = 強くなる向き。 机上: 敵の攻撃 20 で出目 1 あたりの軽減が 2.9 → 4.4 になり、
+        //     基本の防御 (出目 1 個 = 平均 3.5) を少し上回る)。
+        //   主幹・決死・増圧・充填・接地・剥ぎ取り・焼き切りは据え置き。 腕から元の値へ戻す口は GameHooks.Terminal* (AutoRunner.terminal*)。
         /// <summary>〈主幹〉: この戦闘で使うたび、 以後の攻撃 +N。 / 〈配電盤〉: 次のターンに多く引く枚数。</summary>
         public const int MainsPerUse = 1, SwitchboardDraw = 2;
+
+        /// <summary>〈治癒〉の倍率 (測定の口 <see cref="GameLoop.GameHooks.TerminalHealMulOverride"/> があればその値)。 効果はこれを読む。</summary>
+        public static int HealMulNow => GameLoop.GameHooks.TerminalHealMulOverride > 0 ? GameLoop.GameHooks.TerminalHealMulOverride : HealMul;
+        /// <summary>〈避雷器〉の溜める量 (測定の口 <see cref="GameLoop.GameHooks.TerminalArresterNeedOverride"/> があればその値)。 効果と BOT はこれを読む。</summary>
+        public static int ArresterNeedNow => GameLoop.GameHooks.TerminalArresterNeedOverride > 0 ? GameLoop.GameHooks.TerminalArresterNeedOverride : ArresterNeed;
+
+        /// <summary>使った時に、 そのランの山札から抜けるか (<see cref="TerminalDef.leavesRunDeck"/>・測定の口
+        /// <see cref="GameLoop.GameHooks.TerminalFirstAidBattleOnly"/> が立っていれば抜けない)。 本体 (CombatManager.FinishTerminalTurn) と BOT が読む。</summary>
+        public static bool LeavesRunDeck(TerminalDef d)
+            => d != null && d.leavesRunDeck && !GameLoop.GameHooks.TerminalFirstAidBattleOnly;
 
         private static TerminalDef D(string id, TerminalKind k, string desc, TerminalCond c = TerminalCond.None, string axis = null)
             => new TerminalDef { id = id, kind = k, cond = c, description = desc, axis = axis, condLabel = CondLabel(c) };
@@ -214,6 +255,7 @@ namespace CombatSystem
         private static TerminalDef Basic(TerminalDef d) { d.basic = true; return d; }
         private static TerminalDef Rare(TerminalDef d) { d.rare = true; return d; }
         private static TerminalDef Once(TerminalDef d) { d.disposable = true; return d; }
+        private static TerminalDef RunOnce(TerminalDef d) { d.disposable = true; d.leavesRunDeck = true; return d; }
         private static TerminalDef Cost(TerminalDef d, int n) { d.chargeCost = n; return d; }
         private static TerminalDef Cap(TerminalDef d, int n) { d.capacity = n; return d; }
 
@@ -235,11 +277,11 @@ namespace CombatSystem
                 D(TerminalIds.Igniter, A, "攻撃 +" + IgniterAttack + "。", TerminalCond.AtMost3),
                 D(TerminalIds.Detector, A, "出目 ×" + DetectorMul + " を攻撃に。", TerminalCond.Odd),
                 Cost(D(TerminalIds.DischargeTube, A, "充電 " + DischargeCost + " を払い、出目 ×" + DischargeMul + " を攻撃に。"), DischargeCost),
-                D(TerminalIds.Deathwish, A, "出目ぶん HP を払い、出目 ×" + DeathwishMul + " を攻撃に。"),
+                D(TerminalIds.Deathwish, A, "出目の半分 (切り上げ) の HP を払い、出目 ×" + DeathwishMul + " を攻撃に。"),
                 D(TerminalIds.Relay, A, "出目を攻撃に。このターンに発動した基本以外の端子 1 つにつき攻撃 +" + RelayPerFired + "。"),
                 D(TerminalIds.Grinder, A, "出目を攻撃に。他の出目すべて +1。"),
-                D(TerminalIds.Oscillator, A, "出目を攻撃に。前にここへ挿した目と同じなら攻撃 +" + OscPerStreak + " × 連続回数。"),
-                Cap(D(TerminalIds.Twin, A, "出目を攻撃に。2 個まで挿せる。"), 2),
+                D(TerminalIds.Oscillator, A, "出目を攻撃に。前にこれを挿した目と同じなら攻撃 +" + OscPerStreak + " × 連続回数。"),
+                Cap(D(TerminalIds.Twin, A, "出目を攻撃に。出目 2 個まで挿せる。"), 2),
                 D(TerminalIds.Fuse, B, "ブロック +" + FuseBlock + "。", TerminalCond.AtMost3),
                 D(TerminalIds.Ground, B, "このターンの被ダメージ −" + GroundCutPct + "%。", TerminalCond.AtMost3),
                 D(TerminalIds.Insulator, B, "シールド +出目 +" + InsulatorBonus + "。", TerminalCond.Even),
@@ -247,10 +289,10 @@ namespace CombatSystem
                 Cost(D(TerminalIds.Breaker, B, "充電 " + BreakerCost + " を払い、このターンの敵の攻撃 −" + BreakerCutPct + "%。"), BreakerCost),
                 D(TerminalIds.Rectifier, C, "充電 +出目 ×" + RectifierMul + "。", TerminalCond.Even),
                 D(TerminalIds.Battery, C, "充電 +出目 +" + BatteryBonus + "。"),
-                D(TerminalIds.Heal, S, "HP +出目 ×" + HealMul + "。", TerminalCond.AtMost3),
+                D(TerminalIds.Heal, S, (HealMul == 1 ? "HP +出目。" : "HP +出目 ×" + HealMul + "。"), TerminalCond.AtMost3),
                 D(TerminalIds.Capacitor, S, "出目を溜める。" + CapacitorNeed + " で次の攻撃 +" + CapacitorAttack + "。"),
                 D(TerminalIds.Arrester, S, "出目を溜める。" + ArresterNeed + " でそのターンの被ダメージ半分。"),
-                D(TerminalIds.Transformer, S, "攻撃の端子に挿した出目を 2 倍。"),
+                D(TerminalIds.Transformer, S, "攻撃の端子を挿した出目を 2 倍。"),
                 D(TerminalIds.Switchboard, S, "次のターン、端子を " + SwitchboardDraw + " 枚多く引く。"),
                 // ── レア ──
                 Rare(D(TerminalIds.Amplifier, S, "出目 1 につき与ダメージ +" + (int)(AmplifierPerPip * 100) + "% (別枠)。", TerminalCond.AtLeast5)),
@@ -287,7 +329,7 @@ namespace CombatSystem
                 Once(D(TerminalIds.Detonator, A, "出目 ×" + DetonatorMul + " を攻撃に。")),
                 Once(D(TerminalIds.Piercer, A, "出目を攻撃に。このターン敵の防御を無視。")),
                 Once(D(TerminalIds.ReliefValve, B, "このターンの被ダメージ −" + ReliefCutPct + "%。")),
-                Once(D(TerminalIds.FirstAid, S, "HP +出目 ×" + FirstAidMul + "。")),
+                RunOnce(D(TerminalIds.FirstAid, S, "HP +出目 ×" + FirstAidMul + "。使うと、そのランの山札から抜ける。")),
                 Once(D(TerminalIds.FullCharge, C, "充電を上限まで満たす。")),
                 Once(D(TerminalIds.CoolShot, S, "エスカレーションの段階を 1 つ戻す。")),
                 Once(D(TerminalIds.Copier, S, "挿さずに空けた手札の端子を 1 枚、この戦闘中だけ複製して山札に加える。")),
@@ -349,17 +391,19 @@ namespace CombatSystem
         {
             int n = dice.Length, m = board.Count;
             var o = new TerminalOutcome { slotOfDie = new int[n], kindOfDie = new DiceTerminal[n] };
+            o.stopped = state.stopped != null ? (bool[])state.stopped.Clone() : null;
             var v = new int[n];
             for (int i = 0; i < n; i++) { v[i] = dice[i]; o.slotOfDie[i] = wantSlot != null && i < wantSlot.Length && wantSlot[i] >= 0 && wantSlot[i] < m ? wantSlot[i] : -1; }
             var defs = new TerminalDef[m];
             for (int s = 0; s < m; s++) defs[s] = Get(board[s]);
 
-            // ── 0. 挿せる数を超えた分を外す ──
+            // ── 0. 止まった端子 (ヴェスカ〈停滞する時間〉) と、 挿せる数を超えた分を外す ──
+            //   止まった端子に挿した出目は挿さなかった扱い。 本体も BOT も画面もここを通るので、 同じ計算になる。
             var cnt = new int[m];
             for (int i = 0; i < n; i++)
             {
                 int s = o.slotOfDie[i]; if (s < 0) continue;
-                if (defs[s] == null || cnt[s] >= defs[s].capacity) { o.slotOfDie[i] = -1; continue; }
+                if (defs[s] == null || state.IsStopped(s) || cnt[s] >= defs[s].capacity) { o.slotOfDie[i] = -1; continue; }
                 cnt[s]++;
             }
 
@@ -415,9 +459,9 @@ namespace CombatSystem
             int Empty(int self)
             {
                 int want = wantTarget != null && self >= 0 && self < wantTarget.Length ? wantTarget[self] : -1;
-                if (IsCandidate(board, o.slotOfDie, self, want)) return want;
+                if (IsCandidate(board, o, self, want)) return want;
                 for (int s = 0; s < m; s++)
-                    if (IsCandidate(board, o.slotOfDie, self, s)) return s;
+                    if (IsCandidate(board, o, self, s)) return s;
                 return -1;
             }
 
@@ -476,34 +520,23 @@ namespace CombatSystem
         /// <summary>挿さずに空けた手札の端子を対象に取る端子 (〈写し取り〉〈焼き切り〉〈保持器〉)。</summary>
         public static bool PicksTarget(string id) => id == TerminalIds.Copier || id == TerminalIds.BurnOut || id == TerminalIds.Retainer;
 
-        /// <summary>場の s が、 self (対象を取る端子) の対象の候補か: 自分でない・常設でない・出目が 1 個も挿さっていない手札の端子。
-        /// slotOfDie は挿し方を直した後の値 (<see cref="TerminalOutcome.slotOfDie"/>) を渡す ── 条件に合わず外れた端子も「空けた」に入る。</summary>
-        public static bool IsCandidate(List<string> board, int[] slotOfDie, int self, int s)
+        /// <summary>場の s が、 self (対象を取る端子) の対象の候補か: 自分でない・常設でない・止まっていない (ヴェスカ〈停滞する時間〉)・
+        /// 出目が 1 個も挿さっていない手札の端子。 o は解決の結果 ── 挿し方を直した後の <see cref="TerminalOutcome.slotOfDie"/>
+        /// (条件に合わず外れた端子も「空けた」に入る) と、 止まった端子 (<see cref="TerminalOutcome.stopped"/>) を読む。</summary>
+        public static bool IsCandidate(List<string> board, TerminalOutcome o, int self, int s)
         {
             if (board == null || s < 0 || s >= board.Count || s == self) return false;
+            if (o?.stopped != null && s < o.stopped.Length && o.stopped[s]) return false;
             var d = Get(board[s]);
-            return d != null && !d.permanent && (slotOfDie == null || !Plugged(slotOfDie, s));
+            return d != null && !d.permanent && (o?.slotOfDie == null || !Plugged(o.slotOfDie, s));
         }
 
         /// <summary>self の対象の候補 (場の添字・左から)。</summary>
-        public static List<int> TargetCandidates(List<string> board, int[] slotOfDie, int self)
+        public static List<int> TargetCandidates(List<string> board, TerminalOutcome o, int self)
         {
             var l = new List<int>();
-            if (board != null) for (int s = 0; s < board.Count; s++) if (IsCandidate(board, slotOfDie, self, s)) l.Add(s);
+            if (board != null) for (int s = 0; s < board.Count; s++) if (IsCandidate(board, o, self, s)) l.Add(s);
             return l;
-        }
-
-        /// <summary>軸の端子で、 その軸が誓約で封じられているか (封じた軸の資源を足す部分は効かない)。</summary>
-        public static bool AxisSealed(TerminalDef d, in TerminalEnv env)
-        {
-            if (d?.axis == null) return false;
-            if (d.axis == ItemSystem.PassiveSkills.AxisRules.Poison) return env.sealPoison;
-            if (d.axis == ItemSystem.PassiveSkills.AxisRules.Bleed) return env.sealBleed;
-            if (d.axis == ItemSystem.PassiveSkills.AxisRules.Heat) return env.sealHeat;
-            if (d.axis == ItemSystem.PassiveSkills.AxisRules.Charge) return env.sealCharge;
-            if (d.axis == ItemSystem.PassiveSkills.AxisRules.Shield) return env.sealShield;
-            if (d.axis == ItemSystem.PassiveSkills.AxisRules.Crit) return env.sealCrit;
-            return false;
         }
 
         private static bool Plugged(int[] slotOfDie, int s)
@@ -545,7 +578,7 @@ namespace CombatSystem
                 case TerminalIds.DischargeTube: o.attackAdd += sum * DischargeMul; break;
                 case TerminalIds.Deathwish:
                 {
-                    int self = Math.Min(sum, Math.Max(0, env.hp - 1 - o.selfDamage));
+                    int self = Math.Min((sum + 1) / 2, Math.Max(0, env.hp - 1 - o.selfDamage));   // 出目の半分 (切り上げ)・2026-11-12 (旧: 出目ぶん)
                     o.selfDamage += self; o.attackAdd += sum * DeathwishMul; break;
                 }
                 case TerminalIds.Oscillator:
@@ -563,9 +596,9 @@ namespace CombatSystem
                 case TerminalIds.Breaker: o.enemyAttackMul *= 1f - BreakerCutPct / 100f; break;
                 case TerminalIds.Rectifier: o.chargeAdd += sum * RectifierMul; break;
                 case TerminalIds.Battery: o.chargeAdd += sum + BatteryBonus; break;
-                case TerminalIds.Heal: o.heal += sum * HealMul; break;
+                case TerminalIds.Heal: o.heal += sum * HealMulNow; break;
                 case TerminalIds.Capacitor: st.storedAttack += CapacitorAttack * Gauge(st, id, sum, CapacitorNeed); break;
-                case TerminalIds.Arrester: if (Gauge(st, id, sum, ArresterNeed) > 0) o.takenMul *= 0.5f; break;
+                case TerminalIds.Arrester: if (Gauge(st, id, sum, ArresterNeedNow) > 0) o.takenMul *= 0.5f; break;
                 case TerminalIds.Switchboard: st.extraDrawNext += SwitchboardDraw; break;
                 // レア
                 case TerminalIds.Amplifier: o.damageMul *= 1f + AmplifierPerPip * sum; break;
@@ -660,9 +693,29 @@ namespace CombatSystem
             return id;
         }
 
-        /// <summary>ターンの始め: 前の手札を捨て (残す 1 枚は残し)、 手札が size 枚になるまで引く。 常設は場へ出して引き直す。</summary>
-        public void DrawTurn(int size, string retained = null)
+        /// <summary>ヴェスカ〈停滞する時間〉の乱数のキー (専用 ── 他の抽選の連番を動かさない)。</summary>
+        public const string StopRngKey = "vesca.stagnant";
+
+        /// <summary>ターンの始め: 前の手札を捨て (残す 1 枚と、 前のターンに止まっていた端子は残し)、 手札が size 枚になるまで引く。
+        /// 常設は場へ出して引き直す。
+        ///
+        /// <para><paramref name="stopChance"/> (0〜1) = ヴェスカ〈停滞する時間〉: <b>このターンに引いた</b>端子 1 枚ごとに、 この確率で止める
+        /// (常設を引いた時も・〈配電盤〉で多く引く分も)。 止まった端子はこのターン挿せず、 捨て札へ行かず次のターンも手札に残って普通に使える
+        /// (引いた物ではないのでもう一度は止まらない・その分 新しく引く枚数が減る)。 止まった常設は場に残り、 次のターンには解ける。
+        /// 止まった場所は <see cref="TerminalBattleState.stopped"/> (場の添字) に持つ ── BOT の写しにも乗る。</para></summary>
+        public void DrawTurn(int size, string retained = null, float stopChance = 0f)
         {
+            // 前のターンに止まっていた手札の端子 (前のターンの場と、 その時の常設の枚数から読む ── 常設は DrawTurn でしか増えない)。
+            // FinishTurn が使い捨て・焼き切りを手札から抜いて添字がずれるので、 名前で数えて同じ枚数を残す。
+            var held = new List<string>();
+            var prevStopped = state.stopped;
+            if (prevStopped != null)
+                for (int s = permanent.Count; s < board.Count && s < prevStopped.Length; s++)
+                    if (prevStopped[s]) held.Add(board[s]);
+            state.stopped = null;
+
+            var keep = new List<string>();
+            foreach (var id in held) if (hand.Remove(id)) keep.Add(id);
             bool kept = false;
             foreach (var id in hand)
             {
@@ -670,18 +723,40 @@ namespace CombatSystem
                 discard.Add(id);
             }
             hand.Clear();
+            hand.AddRange(keep);
             if (kept) hand.Add(retained);
-            int guard = 0;
+
+            // 引く (このターンに引いた物だけが止まる対象)
+            var stoppedPerm = new List<int>();   // permanent の添字
+            var stoppedHand = new List<int>();   // hand の添字
+            int guard = 0, drawn = 0;
             while (hand.Count < size && guard++ < 64)
             {
                 var id = DrawOne();
                 if (id == null) break;
+                drawn++;
+                bool stop = stopChance > 0f && GameLoop.GameRng.Chance(stopChance, StopRngKey);
                 var d = TerminalCards.Get(id);
-                if (d != null && d.permanent) { permanent.Add(id); continue; }
+                if (d != null && d.permanent) { if (stop) stoppedPerm.Add(permanent.Count); permanent.Add(id); continue; }
+                if (stop) stoppedHand.Add(hand.Count);
                 hand.Add(id);
             }
             board.Clear(); board.AddRange(permanent); board.AddRange(hand);
+            if (stoppedPerm.Count + stoppedHand.Count > 0)
+            {
+                state.stopped = new bool[board.Count];
+                foreach (int p in stoppedPerm) state.stopped[p] = true;
+                foreach (int h in stoppedHand) state.stopped[permanent.Count + h] = true;
+            }
+            LastDrawnCount = drawn; LastHeldCount = keep.Count;
+            LastStoppedCount = stoppedPerm.Count + stoppedHand.Count; LastStoppedMains = stoppedPerm.Count;
         }
+
+        /// <summary>直近の <see cref="DrawTurn"/> で 新しく引いた枚数 / 前のターンに止まっていて手札に残った枚数 / 止まった枚数 / うち常設 (計装・画面用)。</summary>
+        public int LastDrawnCount { get; private set; }
+        public int LastHeldCount { get; private set; }
+        public int LastStoppedCount { get; private set; }
+        public int LastStoppedMains { get; private set; }
 
         /// <summary>ターンの終わり: 結果を山札へ反映する (使い捨て・写し取り・焼き切り)。 戻り値 = 次のターンも手札に残す端子 (無ければ null)。</summary>
         public string FinishTurn(TerminalOutcome o)

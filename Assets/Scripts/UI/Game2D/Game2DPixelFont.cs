@@ -22,20 +22,6 @@ namespace UI.Game2D
             "111101111001110", // 9
         };
 
-        // 5×7: 35 文字
-        private static readonly string[] Big = {
-            "01110100011001110101110011000101110", // 0 (近似)
-            "00100011000010000100001000010001110", // 1
-            "01110100010000100010001000100011111", // 2
-            "11110000010000101110000010000111110", // 3
-            "00010001100101010010111110001000010", // 4
-            "11111100001111000001000011000101110", // 5
-            "00110010001000011110100011000101110", // 6
-            "11111000010000100010001000100001000", // 7
-            "01110100011000101110100011000101110", // 8
-            "01110100011000101111000010001001100", // 9
-        };
-
         /// <summary>数字を 3×5 で並べたテクスチャ (字間 1・背景は透明)。 点灯色 <paramref name="color"/>。</summary>
         public static Texture2D RenderSmall(string digits, Color color)
         {
@@ -48,23 +34,6 @@ namespace UI.Game2D
                 else { int d = digits[i] - '0'; if (d < 0 || d > 9) continue; g = Small[d]; }
                 for (int k = 0; k < 15; k++)
                     if (g[k] == '1') tex.SetPixel(i * 4 + k % 3, 4 - k / 3, color);
-            }
-            tex.Apply(false);
-            return tex;
-        }
-
-        /// <summary>数字を 5×7 で並べたテクスチャ (字間 1)。</summary>
-        public static Texture2D RenderBig(string digits, Color color)
-        {
-            int n = digits.Length;
-            var tex = NewTex(Mathf.Max(1, n * 6 - 1), 7);
-            for (int i = 0; i < n; i++)
-            {
-                int d = digits[i] - '0';
-                if (d < 0 || d > 9) continue;
-                var g = Big[d];
-                for (int k = 0; k < 35; k++)
-                    if (g[k] == '1') tex.SetPixel(i * 6 + k % 5, 6 - k / 5, color);
             }
             tex.Apply(false);
             return tex;

@@ -14,7 +14,6 @@ namespace CombatSystem
     /// (2) 合計値の大きい方が勝利
     /// (3) 勝利者は [勝者合計 - 敗者合計] のメインダメージを与える
     /// (4) 追撃/反撃はパッシブスキル（PursuitI-III / CounterI-III）由来の固定値
-    /// (5) scratchは特定の敵パッシブ（ScratchAura）が付与する削りダメージ
     /// (6) すべてのダメージを合算後、クリティカル判定（1回、会心率% を加算して 0〜1 へクランプ）
     ///     クリティカル時は合算ダメージに倍率適用
     /// 
@@ -29,14 +28,24 @@ namespace CombatSystem
         /// <summary>直近の主攻撃の倍率 (%) = 最終の主攻撃 ÷ 倍率の前の攻撃値 (会心・与ダメ%・敵の防御を全部含む)。 攻撃しなかったら 0。 画面の表示用 (2026-11-11)。</summary>
         public int LastHitMultPct { get; private set; }
 
-        // ===== シングルトン =====
+        // ===== シングルトン (CLAUDE.md の規約: _shuttingDown + RuntimeInitializeOnLoadMethod・GameManager と同じ形) =====
         private static CombatManager instance;
-        private static bool isApplicationQuitting;
+        private static bool _shuttingDown;
+
+        /// <summary>ドメインリロード無効設定でも static を必ず初期状態へ戻す。</summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            instance = null;
+            _shuttingDown = false;
+        }
+
+        /// <summary>戦闘の単一窓口。 アプリ終了中は null を返す。 無ければシーンから探し、 それも無ければ作る。</summary>
         public static CombatManager Instance
         {
             get
             {
-                if (isApplicationQuitting)
+                if (_shuttingDown)
                     return null;
 
                 if (instance == null)
@@ -111,10 +120,6 @@ namespace CombatSystem
             _fleeRequested = true;
             return true;
         }
-        private long _fightPlayerRollSum;    // ボス難易度チューナー: この戦闘のプレイヤーロール合計の累計
-        private int _fightPlayerRollCount;   // 同 ロール回数 (平均出目 = sum/count)
-        // ボス難易度チューナー: スタンス別の「ボスがロール勝ちしたターン数 / そのスタンスの総ターン数」(強/弱で別レンジ管理)
-        private int _fightStrongTurns, _fightStrongBossWins, _fightWeakTurns, _fightWeakBossWins;
         private bool wrathDiceOverrideArmed; // 恒久デバフ「憤怒」: 1T目のダイス最大化トリガー
         private int playerDiceCount;
         private int playerDiceMax;
@@ -201,7 +206,7 @@ namespace CombatSystem
         public int PlayerAttackPower => playerAttackPower;
         public int PlayerMaxHP => playerMaxHP;
         /// <summary>武器 + 層補正の会心率 (小数・0.15 = 15%)。
-        /// 先読み方策 (<see cref="AutoTest.SuperCombatAI"/>) が会心の期待値を組むのに要る。</summary>
+        /// BOT の方策が会心の期待値を組むのに要る (旧 SuperCombatAI は 2026-11-12 に削除)。</summary>
         public float PlayerCritBaseRate => playerCritBaseRate;
         public int EnemyHP => enemyHP;
         public int CurrentCombatTurn => PassiveSkillManager.Instance?.Context?.currentTurn ?? 0;
@@ -224,6 +229,24 @@ namespace CombatSystem
             if (p <= 0f) return;
             int heal = (int)(bleedDealt * p);
             if (heal > 0) HealPlayer(heal);
+        }
+
+        /// <summary>ボスのマスの敵に〈狂暴化〉(<see cref="Berserk"/>) を足す (既に持っていれば何もしない)。
+        /// 戦闘の開始 (StartCombat) と、 ヴェスカの段の差し替え (SwapEnemy) の 2 か所が呼ぶ。
+        /// 説明文は Berserk の定数から組む ── 51 ターン目から、 この敵の攻撃 +10 (enemyDiceTotalBonus) ・
+        /// プレイヤーの回復を封じる (healBlocked) ・ この敵が受ける主攻撃のダメージ ×3 (enemyDamageTakenMultiplier)。</summary>
+        private static void AddBerserkIfBossNode(List<EnemyPassiveEntry> skills)
+        {
+            const string id = ItemSystem.PassiveSkills.Effects.Berserk.Id;
+            var node = MapSystem.MapManager.Instance?.CurrentNode;
+            if (node == null || node.type != MapSystem.TileType.Boss) return;
+            if (skills.Exists(e => e != null && e.internalName == id)) return;
+            skills.Add(new EnemyPassiveEntry
+            {
+                internalName = id,
+                skillName = "狂暴化",
+                description = $"{ItemSystem.PassiveSkills.Effects.Berserk.EnrageTurn}ターン経過後、攻撃+{ItemSystem.PassiveSkills.Effects.Berserk.DiceBonus}・相手の回復を封じる・受ける攻撃のダメージ{(int)ItemSystem.PassiveSkills.Effects.Berserk.EnemyDamageTakenMult}倍",
+            });
         }
 
         public int HealPlayer(int amount)
@@ -253,13 +276,6 @@ namespace CombatSystem
             amount = GameLoop.GateFlaws.ApplyRepairPenalty(GameLoop.GameManager.Instance?.Run, amount);
             if (amount <= 0) return 0;
 
-            // 〈天衣無縫〉: 獲得回復量をスタック分減衰（0未満は0）
-            if (psmCtxForHeal != null && psmCtxForHeal.healShieldReduction > 0)
-            {
-                amount = Math.Max(0, amount - psmCtxForHeal.healShieldReduction);
-                if (amount <= 0) return 0;
-            }
-
             MetaProgression.Achievements.AchievementService.NoteHealRequested(amount);
             int oldHP = playerHP;
             int newHP = Math.Min(playerMaxHP, playerHP + amount);
@@ -286,6 +302,7 @@ namespace CombatSystem
                 Destroy(gameObject);
                 return;
             }
+            _shuttingDown = false;
             instance = this;
             DontDestroyOnLoad(gameObject);
         }
@@ -367,7 +384,7 @@ namespace CombatSystem
         public EnemyData SecondaryEnemy => secondaryEnemy;
         public bool IsPairEncounter => secondaryEnemy != null;
 
-        /// <summary>2 体目を私物化して整える。 1 体目と同じ前処理 (チューナー・厚い皮膚) を通す ──
+        /// <summary>2 体目を私物化して整える。 1 体目と同じ前処理 (BossParams.Apply・厚い皮膚) を通す ──
         /// 通さないと挑戦デバフが 1 体目にしか掛からず、 高難度ほどペアが相対的に軽くなる。
         /// <b>状態は書かない</b>。 呼び出し側 (<see cref="StartCombatInternal"/>) が
         /// パッシブ登録より前に据える必要があるため。</summary>
@@ -415,11 +432,11 @@ namespace CombatSystem
             // ADR-0011 〈富〉(目 9) の報酬加算は戦闘ごと。 持ち越さない。
             { var goldRun = GameLoop.GameManager.Instance?.Run; if (goldRun != null) goldRun.roleGoldBonusPct = 0; }
 
-            // ボス難易度オートチューナー: hpMul を maxHP に適用 (非ボスは素通り)
+            // ボスの数値 (固有面ダイス・BossParams.Overrides の差し替え) を適用 (非ボスは素通り)
             enemy = CombatSystem.BossParams.Apply(enemy);
 
             // **ここから下は enemy を書き換えてよい**、 という不変条件をこの1行で作る。
-            //   BossTuning.Apply が複製を返すのは署名ダイスボスだけで、 非ボスや調整値の無い
+            //   BossParams.Apply が複製を返すのは署名ダイスボスだけで、 非ボスや調整値の無い
             //   ボスでは **EnemyDatabase の共有インスタンスがそのまま返る**。 それを書き換えると
             //   遭遇ごとに効果が複利で積み上がり、 ラン間でも消えない (EnemyDatabase は再読込しない)。
             //   実測: 厚い皮膚 ×1.1 の直書きでスライムの maxHP が 72 → 2,068,124,672 → int 溢れ →
@@ -459,7 +476,7 @@ namespace CombatSystem
             //   ここから `isCombatActive = true` までの間で抜けると、 呼び出し側から見ると
             //   「フェーズは Combat なのに戦闘が動かない」＝ 無限ループになり、
             //   ストール検出が「phase=Combat」としか言わないので原因が残らない。
-            //   実際 Ultra の resume 実装でこれを踏み、 特定に丸一日かかった。
+            //   実際 旧 Ultra の resume 実装 (2026-11-13 削除) でこれを踏み、 特定に丸一日かかった。
             StartCombatEntered = _combatSeq;
 
             // ラン中所持パッシブと装備品を PassiveSkillManager に同期（戦闘ごとに再構築）
@@ -496,7 +513,7 @@ namespace CombatSystem
             EnemyHpLedger.BeginForm();   // [計装 2026-11-10] 予約を持ち越さない
             EnemyHpLedger.SourceScope = enemy.id != null && enemy.id.StartsWith(GameLoop.BossIds.Layer7Prefix) ? enemy.id : "他";
             // [計測] 7層連戦の 1 段目突入。 2 段目以降との比較の基準になる。
-            if (enemy != null && enemy.id == "boss_layer7")
+            if (enemy != null && enemy.id == GameLoop.BossIds.VescaP1)
                 BossDmgDiag.PhaseEntry(enemy.id, this.playerMaxHP > 0 ? (double)playerHP / this.playerMaxHP : 1.0);
             playerDiceCount = pDiceCount;
             playerDiceMax = pDiceMax;
@@ -538,9 +555,6 @@ namespace CombatSystem
             turnLog.Clear();
             mutualWiring = null; // ADR-0009: 配線は戦闘単位でリセット (ラン跨ぎ既定値は W7 後段)
             BeginTerminalDeck();   // 端子の山札 (ADR-0014): ランの山札を写して切る
-            _fightPlayerRollSum = 0;
-            _fightPlayerRollCount = 0;
-            _fightStrongTurns = _fightStrongBossWins = _fightWeakTurns = _fightWeakBossWins = 0;
 
             // パッシブスキルマネージャーに敵スキルを登録
             var psm = PassiveSkillManager.Instance;
@@ -549,17 +563,7 @@ namespace CombatSystem
                 : new List<EnemyPassiveEntry>();
 
             // ボスノードの敵には全員「狂暴化」を付与（50T後のエンレイジ）
-            var nodeForBerserk = MapSystem.MapManager.Instance?.CurrentNode;
-            if (nodeForBerserk != null && nodeForBerserk.type == MapSystem.TileType.Boss
-                && !enemySkills.Exists(e => e != null && e.internalName == "Berserk"))
-            {
-                enemySkills.Add(new EnemyPassiveEntry
-                {
-                    internalName = "Berserk",
-                    skillName = "狂暴化",
-                    description = "50ターン経過後、ダイス合計+10・回復封印・被ダメージ3倍",
-                });
-            }
+            AddBerserkIfBossNode(enemySkills);
             // ── 2 体戦 (2026-08-28): 2 体目のパッシブも登録する ──
             //   **同名パッシブは 1 回しか登録しない。** RegisterEnemySkills 側の
             //   `enemySkillNames.Contains` 判定がそのまま重複を弾くので、 単純に連結してよい。
@@ -628,13 +632,13 @@ namespace CombatSystem
             if (ctx != null)
             {
                 ctx.enemyDefense = Math.Max(0, enemy.defense) + MetaProgression.MetaDebuffApplicator.GetEnemyDefenseBonus();   // 挑戦カード: 敵の防御 +N
-                ctx.enemyArmorPen = Math.Max(0, enemy.armorPen);
+                ctx.enemyArmorPen = GameLoop.GameHooks.EnemyArmorPen(enemy.id, enemy.armorPen);   // [測定] 差し替えの口 (既定 null = データの値)
                 ctx.playerDefenseBase = DefenseFormula.PlayerBaseDefense + _weaponDefense + MetaProgression.MetaBuffApplicator.GetArmorDefense()
                                       + MetaProgression.Relics.RelicApplicator.GetDefense();   // 遺物 (§15-5) 防御 +N
                 ctx.playerArmorPenBase = _weaponArmorPen;
                 ctx.playerDefense = ctx.playerDefenseBase;
                 ctx.playerArmorPen = ctx.playerArmorPenBase;
-                // ボス難易度オートチューナー: 軸別係数引き用にボスidを記録 (非ボスは空)
+                // ボスのパッシブが BossParams.Param(bossId, …) を引くためにボスidを記録 (非ボスは空)
                 ctx.bossId = CombatSystem.BossParams.IsBoss(enemy.id) ? enemy.id : "";
                 ctx.lastDamageCause = ItemSystem.PassiveSkills.DeathCause.Normal;
 
@@ -647,32 +651,11 @@ namespace CombatSystem
                 var rs = GameLoop.GameManager.Instance?.Run;
                 if (rs != null)
                 {
-                    ctx.consAtkBurst        = rs.pendingConsAtkBurst;
-                    ctx.consDiceRoll        = rs.pendingConsDiceRoll;
-                    ctx.consDiceRollTurnsLeft = rs.pendingConsDiceRollTurns;
                     ctx.consShield          = rs.pendingConsShield;
                     ctx.shieldGainedTotal  += rs.pendingConsShield; // 検証計測
                     ctx.consShieldExpireTurn= rs.pendingConsShieldTurns;
-                    ctx.consRegen           = rs.pendingConsRegen;
-                    ctx.consCritPct         = rs.pendingConsCritPct;
-                    ctx.consFlatReduce      = rs.pendingConsFlatReduce;
                     ctx.consDmgMultPct      = rs.pendingConsDmgMultPct;
                     ctx.consDmgMultTurnsLeft = rs.pendingConsDmgMultTurns;
-                    ctx.consReflect         = rs.pendingConsReflect;
-                    ctx.consEnemyDiceDebuff = rs.pendingConsEnemyDiceDebuff;
-                    ctx.gamblerArmed        = rs.pendingGamblerDice;
-                    if (rs.pendingFirstRollTotal > 0)
-                    {
-                        // 加速の粉: 初回ロール(turn1)のダイス合計+X。nextTurnBuffs→turn1でcurrentBuffsへ移行し適用。
-                        ctx.nextTurnBuffs["diceBonus"] =
-                            (ctx.nextTurnBuffs.TryGetValue("diceBonus", out var db) ? db : 0f) + rs.pendingFirstRollTotal;
-                    }
-                    if (rs.pendingEnemyStartHpCutPct > 0)
-                    {
-                        int cut = Mathf.CeilToInt(enemy.maxHP * rs.pendingEnemyStartHpCutPct / 100f);
-                        HpLossDiag.Lose(ref enemyHP, cut, "奇襲", 1);
-                        Debug.Log($"[CombatManager] 奇襲: 敵開始HP-{cut} ({enemyHP}/{enemy.maxHP})");
-                    }
                     // 2026-06-28: 職業スターター消耗品の pending → ctx コピー
                     if (rs.pendingPolishArmed) ctx.polishArmed = true;
                     if (rs.pendingOathArmed)
@@ -705,7 +688,7 @@ namespace CombatSystem
                 }
                 if (openingShield > 0)
                 {
-                    int gained = Math.Max(0, openingShield - ctx.healShieldReduction); // 天衣無縫減衰
+                    int gained = openingShield;
                     ctx.consShield += gained;
                     ShieldDiag.Note("遺物・防御r10持ち越し", gained);
                     ctx.shieldGainedTotal += gained;
@@ -822,16 +805,16 @@ namespace CombatSystem
             //   旧: TryAdvanceVescaChain 内でのみ記録していたが、 あれは OnTurnEnd より前に
             //   削り切った取りこぼし用の経路なので、 正常経路 (連続実験の予約 → SwapEnemy) を
             //   通る大多数が記録から漏れていた (実測 3380 件に対し 36 件しか拾えず)。
-            if (!string.IsNullOrEmpty(newEnemyId) && newEnemyId.StartsWith("boss_layer7") && playerMaxHP > 0)
+            if (!string.IsNullOrEmpty(newEnemyId) && newEnemyId.StartsWith(GameLoop.BossIds.Layer7Prefix) && playerMaxHP > 0)
             {
                 BossDmgDiag.PhaseEntry(newEnemyId, playerHP / (double)playerMaxHP);
-                if (newEnemyId == "boss_layer7_p4") BossDmgDiag.P4Entry(playerHP / (double)playerMaxHP);
+                if (newEnemyId == GameLoop.BossIds.VescaFinal) BossDmgDiag.P4Entry(playerHP / (double)playerMaxHP);
             }
 
             if (!isCombatActive) { Debug.LogWarning("[CombatManager.SwapEnemy] 戦闘中でない"); return false; }
             var newEnemy = EnemyDatabase.Get(newEnemyId);
             if (newEnemy == null) { Debug.LogError($"[CombatManager.SwapEnemy] enemy not found: {newEnemyId}"); return false; }
-            // ボス難易度オートチューナー: ヴェスカ連戦の各形態にも hpMul を適用
+            // ヴェスカ連戦の各形態にも BossParams.Apply を掛ける
             newEnemy = CombatSystem.BossParams.Apply(newEnemy);
             // 挑戦 (敵の最大 HP・〈鋼の皮膚〉のボス HP) を連戦の全段に掛ける (2026-11-09)。 旧は 1 段目にしか掛かっていなかった。
             //   共有のインスタンスを書き換えると値が積み上がるので、 先に複製する。
@@ -864,16 +847,7 @@ namespace CombatSystem
             var swapSkills = newEnemy.passiveSkills != null
                 ? new List<EnemyPassiveEntry>(newEnemy.passiveSkills)
                 : new List<EnemyPassiveEntry>();
-            var nodeForSwapBerserk = MapSystem.MapManager.Instance?.CurrentNode;
-            if (nodeForSwapBerserk != null && nodeForSwapBerserk.type == MapSystem.TileType.Boss
-                && !swapSkills.Exists(e => e != null && e.internalName == "Berserk"))
-            {
-                swapSkills.Add(new EnemyPassiveEntry
-                {
-                    internalName = "Berserk", skillName = "狂暴化",
-                    description = "50ターン経過後、ダイス合計+10・回復封印・被ダメージ3倍",
-                });
-            }
+            AddBerserkIfBossNode(swapSkills);
             psm.RegisterEnemySkills(swapSkills);
 
             // 敵側固有 accumulatedValues キーを掃除（プレイヤー側補正は保持）
@@ -900,15 +874,14 @@ namespace CombatSystem
                 ctx.enemyDiceTotalBonus = 0;
                 ctx.bossDiceBonus = 0; // swapで一旦クリア。新形態の OnBattleStart パッシブ(刹那等)が再設定する
                 ctx.enemyDefense = Math.Max(0, newEnemy.defense) + MetaProgression.MetaDebuffApplicator.GetEnemyDefenseBonus();   // 新形態の防御値を反映 (ADR-0013)・挑戦カードの防御 +N も全段に
-                ctx.enemyArmorPen = Math.Max(0, newEnemy.armorPen);
+                ctx.enemyArmorPen = GameLoop.GameHooks.EnemyArmorPen(newEnemy.id, newEnemy.armorPen);
                 // [計装] 出ていく段の実長を締める。 currentTurn は連戦で通算なので、
                 //   開始点 (phaseStartTurn) との差でしか段の長さは出せない。
                 if (!string.IsNullOrEmpty(ctx.bossId)
                     && ctx.bossId.StartsWith(GameLoop.BossIds.Layer7Prefix))
                 {
                     GameLoop.RunChronicle.NotePhaseDuration(
-                        ctx.bossId.EndsWith("_p4") ? 4 : ctx.bossId.EndsWith("_p3") ? 3
-                            : ctx.bossId.EndsWith("_p2") ? 2 : 1,
+                        Math.Max(1, GameLoop.BossIds.VescaStageOf(ctx.bossId)),
                         ctx.phaseStartTurn, ctx.currentTurn);
                 }
                 ctx.phaseStartTurn = ctx.currentTurn + 1;
@@ -953,7 +926,7 @@ namespace CombatSystem
         
         void OnApplicationQuit()
         {
-            isApplicationQuitting = true;
+            _shuttingDown = true;
             if (instance == this) instance = null;
         }
 

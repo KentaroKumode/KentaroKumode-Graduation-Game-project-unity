@@ -110,6 +110,7 @@ namespace GameLoop
                     Log("7層で敗北 ── エンディング無し");
                 }
 
+                if (InPursuerCombat) NavDiag.End(NavDiag.Died, Run);   // [計装 2026-11-12・#35]
                 Run.EndRun();
                 SetPhase(GamePhase.GameOver);
                 OnGameOver?.Invoke(Run);
@@ -161,7 +162,7 @@ namespace GameLoop
                 Run.lastBossId = CurrentEnemy?.id ?? Run.lastBossId; // エンディング分岐用（最後に撃破したボス）
 
                 // 5層裏ボス撃破フラグ: 以降のレイピア解除に会心+9 が付くようになる
-                if (CurrentEnemy != null && CurrentEnemy.id == "boss_layer5_hidden")
+                if (CurrentEnemy != null && CurrentEnemy.id == BossIds.Layer5Hidden)
                 {
                     Run.defeatedSaintGeorges = true;
                     Log("剣聖サン=ジョリオラを撃破 ― 真の決闘術が解放された。");
@@ -307,7 +308,7 @@ namespace GameLoop
             string id = cands[System.Math.Max(0, System.Math.Min(pick, cands.Count - 1))];
             if (Run.ownedPassiveItems == null) Run.ownedPassiveItems = new System.Collections.Generic.List<string>();
             ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
-            Log($"メタ報酬: 開幕パッシブ「{id}」を選んで獲得");
+            Log($"メタ報酬: 開幕の秘宝「{id}」を選んで獲得");
         }
 
         private string PickStartingPassive(System.Collections.Generic.ICollection<string> alsoExclude = null)
@@ -414,6 +415,15 @@ namespace GameLoop
         /// <summary>宝箱マス到達時。ゴールドランダム + パッシブ/消費アイテム1個。</summary>
         private void OpenTreasure()
         {
+            LastTreasureSummary = GrantTreasureChestContents();
+            Log(LastTreasureSummary);
+            SetPhase(GamePhase.TreasureOpen);
+        }
+
+        /// <summary>宝箱の中身 (ゴールド・強化素材 +1・アイテム 1 個) を渡し、 要約の文を返す。 画面は変えない
+        /// (宝箱のマスは <see cref="OpenTreasure"/>、 縄張りの宝 (中身 = 宝箱) は航行のまま渡す)。</summary>
+        private string GrantTreasureChestContents()
+        {
             int floor = Run.Depth;
 
             // 宝箱はゴールド0(価値はアイテムのみ)が基準。1/5デノミ後、僅少な変動が無意味になるため撤廃済み。
@@ -444,9 +454,7 @@ namespace GameLoop
                 itemLabel = data != null ? data.displayName : itemId;
             }
 
-            LastTreasureSummary = $"宝箱: ゴールド+{gold}, {itemLabel}";
-            Log(LastTreasureSummary);
-            SetPhase(GamePhase.TreasureOpen);
+            return $"宝箱: ゴールド+{gold}, {itemLabel}";
         }
 
         /// <summary>宝箱から獲得するアイテムを ItemDatabase からレア度重み付きで1個選出。武器・クエスト・イベント限定は除外。</summary>

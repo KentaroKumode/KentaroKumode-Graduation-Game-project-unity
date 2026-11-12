@@ -722,7 +722,7 @@
         {
           "internalName": "MultiHead",
           "skillName": "多頭攻撃",
-          "description": "攻撃よりブロックに多く挿したターン、2回攻撃してくる",
+          "description": "攻撃より防御の端子を多く挿したターン、2回攻撃してくる",
           "flavorText": "「頭数」の欄が、版ごとに違う。"
         },
         {
@@ -751,7 +751,7 @@
         {
           "internalName": "MultiHead",
           "skillName": "多頭攻撃",
-          "description": "攻撃よりブロックに多く挿したターン、2回攻撃してくる",
+          "description": "攻撃より防御の端子を多く挿したターン、2回攻撃してくる",
           "flavorText": "「頭数」の欄が、版ごとに違う。"
         },
         {
@@ -1246,7 +1246,7 @@
         {
           "internalName": "GreedyMerchant",
           "skillName": "貪欲",
-          "description": "獲物が豊かなほど肥え太る。プレイヤーの所持パッシブ1つにつきHP+2、3つごとに攻撃+1",
+          "description": "獲物が豊かなほど肥え太る。プレイヤーの秘宝1つにつきHP+2、3つごとに攻撃+1",
           "flavorText": "「いいものをお持ちで。……ええ、ほんとうに」"
         }
       ],
@@ -1435,7 +1435,7 @@
         {
           "internalName": "BlazeBrand",
           "skillName": "烈炎",
-          "description": "ブロック端子へ2本以上配線したターン終了時、烈炎+1。ターン開始時、烈炎の数だけ軽減無視ダメージ。",
+          "description": "出目2個以上に防御の端子を挿したターン終了時、烈炎+1。ターン開始時、烈炎の数だけ軽減無視ダメージ。",
           "flavorText": "盾を構えるほど、灰は厚く積もる。焼かれているのは腕ではなく、迷っている時間の方だ。"
         }
       ],
@@ -1469,8 +1469,8 @@
         {
           "internalName": "StagnantTime",
           "skillName": "停滞する時間",
-          "description": "攻撃端子への配線がブロック端子より少なかったターン、以降の敵攻撃+1（累積・上限10スタック）。",
-          "flavorText": "「見ていないなら、貰っておくよ」"
+          "description": "端子を引くたび、10%の確率でその端子を止める。止まった端子はそのターン挿せず、捨て札に行かず次のターンまで手札に残る。",
+          "flavorText": "「急ぐことはない。時間なら、こちらにある」"
         },
         {
           "internalName": "AnalyticComputation",
@@ -1518,8 +1518,8 @@
         {
           "internalName": "StagnantTime",
           "skillName": "停滞する時間",
-          "description": "攻撃端子への配線がブロック端子より少なかったターン、以降の敵攻撃+1（累積・上限10スタック）。",
-          "flavorText": "「見ていないなら、貰っておくよ」"
+          "description": "端子を引くたび、15%の確率でその端子を止める。止まった端子はそのターン挿せず、捨て札に行かず次のターンまで手札に残る。",
+          "flavorText": "「急ぐことはない。時間なら、こちらにある」"
         },
         {
           "internalName": "AnalyticComputation",
@@ -1567,8 +1567,8 @@
         {
           "internalName": "StagnantTime",
           "skillName": "停滞する時間",
-          "description": "攻撃端子への配線がブロック端子より少なかったターン、以降の敵攻撃+1（累積・上限10スタック）。",
-          "flavorText": "「見ていないなら、貰っておくよ」"
+          "description": "端子を引くたび、20%の確率でその端子を止める。止まった端子はそのターン挿せず、捨て札に行かず次のターンまで手札に残る。",
+          "flavorText": "「急ぐことはない。時間なら、こちらにある」"
         },
         {
           "internalName": "AnalyticComputation",
@@ -1616,8 +1616,8 @@
         {
           "internalName": "StagnantTime",
           "skillName": "停滞する時間",
-          "description": "攻撃端子への配線がブロック端子より少なかったターン、以降の敵攻撃+1（累積・上限10スタック）。",
-          "flavorText": "「見ていないなら、貰っておくよ」"
+          "description": "端子を引くたび、25%の確率でその端子を止める。止まった端子はそのターン挿せず、捨て札に行かず次のターンまで手札に残る。",
+          "flavorText": "「急ぐことはない。時間なら、こちらにある」"
         },
         {
           "internalName": "DivineTalent",

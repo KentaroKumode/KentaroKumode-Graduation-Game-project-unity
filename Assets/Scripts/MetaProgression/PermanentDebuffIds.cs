@@ -20,6 +20,11 @@ namespace MetaProgression
         public const string Lust     = "クァディルの色欲";     // ショップ入店時、買える中で最も高価な品を強制購入
 
         // ===== UI/Codex 表示用の効果説明 =====
+        //
+        // 【注記 2026-11-12・#115】 下の短い説明と、 上の定数の行末コメントは、 旧〈七つの大罪〉
+        // (メタ層が run.permanentDebuffs に付与していた頃・c89b942 で撤去) の効果のまま。
+        // いまの大罪は挑戦カード IV の sin_* (ChallengeCards.cs) で、 効果はそちらが正本。
+        // GetShortDescription は本体から呼ぶ所が無い。 フレーバー本文 (flavorTexts) は今も正本。
 
         private static readonly Dictionary<string, string> shortDescriptions = new Dictionary<string, string>
         {

@@ -185,7 +185,7 @@ namespace MetaProgression.Achievements
             CheckOverkill(result);
             CheckThirteenthEnd(state, result);
 
-            bool boss = !string.IsNullOrEmpty(result.enemyId) && result.enemyId.StartsWith("boss_layer", StringComparison.Ordinal);
+            bool boss = GameLoop.BossIds.IsBoss(result.enemyId);
             if (!boss) return;
             int floor = state.Depth;
             if (floor == 1) Unlock(AchievementCatalog.Boss1);
@@ -197,7 +197,7 @@ namespace MetaProgression.Achievements
             }
             if (result.damageTaken == 0) Unlock(AchievementCatalog.BossNoHpDamage);
             if (floor >= 3 && result.totalTurns <= 1) Unlock(AchievementCatalog.BossOneTurn);
-            if (floor == 5 && result.enemyId == "boss_layer5_hidden") Unlock(AchievementCatalog.HiddenSaintGeorges);
+            if (floor == 5 && result.enemyId == GameLoop.BossIds.Layer5Hidden) Unlock(AchievementCatalog.HiddenSaintGeorges);
             if (floor == 6)
             {
                 if (!run.purchased) Unlock(AchievementCatalog.NoPurchaseBoss6);
@@ -298,5 +298,49 @@ namespace MetaProgression.Achievements
         }
 
         private static bool Ready => !Suppressed && run != null && run.active;
+
+        // ============================================================
+        //  中断セーブ (issue #84)
+        // ============================================================
+
+        /// <summary>ラン中の実績の進み具合の写し (JsonUtility で書ける形)。 「消耗品を使わずに」などの条件が、 中断を挟んでも続くように。</summary>
+        [Serializable]
+        public sealed class RunProgressState
+        {
+            public bool present;
+            public bool active, usedConsumable, purchased, rerolled, playerFled, relicEquipped, cursedRelicEquipped;
+            public int startMaxHp, damageTaken, combatRequestedHeal, hpOneStreak, shopPurchases, shopSales, shopRerolls, difficulty;
+            public List<string> escapedEnemyIds = new List<string>();
+        }
+
+        public static RunProgressState CaptureRun()
+        {
+            var s = new RunProgressState();
+            if (run == null) return s;
+            s.present = true;
+            s.active = run.active; s.usedConsumable = run.usedConsumable; s.purchased = run.purchased; s.rerolled = run.rerolled;
+            s.playerFled = run.playerFled; s.relicEquipped = run.relicEquipped; s.cursedRelicEquipped = run.cursedRelicEquipped;
+            s.startMaxHp = run.startMaxHp; s.damageTaken = run.damageTaken; s.combatRequestedHeal = run.combatRequestedHeal;
+            s.hpOneStreak = run.hpOneStreak; s.shopPurchases = run.shopPurchases; s.shopSales = run.shopSales;
+            s.shopRerolls = run.shopRerolls; s.difficulty = run.difficulty;
+            s.escapedEnemyIds.AddRange(run.escapedEnemyIds);
+            s.escapedEnemyIds.Sort(StringComparer.Ordinal);
+            return s;
+        }
+
+        /// <summary>写しを戻す。 <see cref="BeginRun"/> の代わりに呼ぶ (再開では「初めてのラン」の実績を鳴らし直さない)。</summary>
+        public static void RestoreRun(RunProgressState s)
+        {
+            if (Suppressed || s == null || !s.present) { run = null; return; }
+            run = new RunProgress
+            {
+                active = s.active, usedConsumable = s.usedConsumable, purchased = s.purchased, rerolled = s.rerolled,
+                playerFled = s.playerFled, relicEquipped = s.relicEquipped, cursedRelicEquipped = s.cursedRelicEquipped,
+                startMaxHp = s.startMaxHp, damageTaken = s.damageTaken, combatRequestedHeal = s.combatRequestedHeal,
+                hpOneStreak = s.hpOneStreak, shopPurchases = s.shopPurchases, shopSales = s.shopSales,
+                shopRerolls = s.shopRerolls, difficulty = s.difficulty,
+            };
+            if (s.escapedEnemyIds != null) foreach (var id in s.escapedEnemyIds) run.escapedEnemyIds.Add(id);
+        }
     }
 }
