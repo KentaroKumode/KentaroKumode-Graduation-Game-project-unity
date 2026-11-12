@@ -98,7 +98,7 @@ namespace MapSystem.FreeMove
         // ── 嵐 (2026-11-13・前線の置き換え・<see cref="Storm"/>) ─────────
         //   数値は全部最初の置き値 (動かす時は採否を取ってから測定する)。 測定の口 GameHooks.StormEnabled = False では読まない (前線のまま)。
         /// <summary>静かな時間 (嵐が来るまでの手番)。 深さ 6 (画面の第 4 層) は 0 (<see cref="Storm.QuietTurns"/>)。</summary>
-        public const int StormQuietTurns = 20;
+        public const int StormQuietTurns = 10;   // 2026-11-13 作者の決定で 20 → 10
         /// <summary>フェーズ 1〜3 の長さ (手番)。 フェーズ 4 はボスに入るまで続く。</summary>
         public const int StormPhase1Turns = 10, StormPhase2Turns = 10, StormPhase3Turns = 5;
         /// <summary>フェーズ 1 / 2 の終わりの輪の半径 (全部の点を含む半径に対する割合)。</summary>
