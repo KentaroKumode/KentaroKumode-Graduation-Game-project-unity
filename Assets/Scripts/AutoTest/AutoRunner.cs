@@ -566,10 +566,12 @@ namespace AutoTest
         ///
         /// <para><b>読み書きで同じ帯を使うこと。</b> ここと
         /// <see cref="LearnedPriorityProvider.SwitchToChallengeScore"/> がずれると、
-        /// 「A の序列で買って B に記録する」という無意味な学習になる。</para></summary>
+        /// 「A の序列で買って B に記録する」という無意味な学習になる。</para>
+        /// <para>帯の固定 (<see cref="botLearningBandOverride"/>) もここに効く。 固定は学習を作る経路と併用できない (Begin で止める) ので、
+        /// 固定した帯へ書き込むことは無い。</para></summary>
         private string TierLearningRoot => _activeTierCalibrationScore >= 0
             ? MetaProfileHelper.TierLearningRoot(_activeTierCalibrationScore)
-            : MetaProfileHelper.BotLearningRoot(CurrentChallengeScore());
+            : MetaProfileHelper.BotLearningRoot(BotLearningBandScore);
 
         /// <summary>いまの挑戦の「点数」。 2026-11-10 に旧配点方式を撤去したので、 挑戦カードの難易度 × <see cref="ScorePerDifficulty"/> で読み替える
         /// (学習の帯 `bot_band_*`・Ultra の基準 50 点・測定の口の点数をそのまま使えるようにするため)。</summary>
@@ -764,6 +766,8 @@ namespace AutoTest
             int relicCount = eqRelics.Count;
             int relicPts = RelicPresets.TotalSteps(eqRelics);
             return $"[実効状態] 挑戦の難易度 {st.challengeDifficulty} "
+                 + $"/ 学習の帯 {(string.IsNullOrEmpty(LearnedPriorityProvider.LoadedRoot) ? "(未読み込み)" : BandFolderName(LearnedPriorityProvider.LoadedRoot))}"
+                 + $"{(LearnedPriorityProvider.UsingFallback ? " **手書きの序列 (学習データなし)**" : "")} "
                  + $"/ 遺物 持ち込み {relicCount}個 計{relicPts}段 "
                  + $"/ メタ ダイス合計+{MetaProgression.MetaBuffApplicator.GetDiceTotalBonus()} "
                  + $"攻撃端子+{MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice()}";
@@ -1108,6 +1112,78 @@ namespace AutoTest
         /// <c>_pendingChallengeDifficulty</c> へ流し込む。 実効値は必ずサマリ冒頭の
         /// <c>[実効状態]</c> 行で確認すること ── 目標 pt と解決済み pt は一致しないことがある。</para></summary>
         public int challengeScoreTarget = 0;
+
+        /// <summary>[測定] BOT が読む学習の帯を固定する (2026-11-12・#118)。 <b>負 = 指定なし</b> (挑戦の難易度 × 5 の点数の帯を読む・今までどおり)。
+        /// 0 以上は「この点数が入る帯」を読む: 0 → 帯 0 (プロファイル直下) / 1〜15 → bot_band_1_15 / 16〜30 → bot_band_16_30 / 31〜 → bot_band_31up。
+        /// <para>変えるのは<b>読む学習</b> (買い物の序列・ITT の序列・戦闘名の危険度) だけで、 挑戦の難易度そのものは変えない。
+        /// 帯 1_15 のフォルダは無く、 16_30 / 31up は 2026-09-22 の古いデータなので、 難易度 1〜10 を今の学習で測るときは 0 を入れる。</para>
+        /// <para><b>学習を作る経路 (learnTier / learnBotAi・並列学習の回・ITT の付与試行・Tier 較正) とは併用できない</b> (Begin で止める) ──
+        /// 帯 0 の序列で買ったランを別の帯へ積む・別の難易度のランを帯 0 へ積む、 のどちらも学習を壊す。</para></summary>
+        public int botLearningBandOverride = -1;
+        /// <summary>[測定] 学習データ (item_stats.json・ITT の序列・戦闘名の危険度) が読めない時に、 その腕をエラーで止める (既定 true・2026-11-12・#118)。
+        /// これまでは帯のフォルダが無いと黙って手書きの S/A リストへ落ち、 難易度 1〜3 のクリア率が 0% になっていた。
+        /// <para>止めないのは、 学習を作る経路 (learnTier / learnBotAi・並列学習の回 (learningWorker で measureNoExplore でない)・ITT の付与試行・Tier 較正) と Ultra。
+        /// 最初の学習の回は空から始めるので、 そこを止めると学習が作れない。 止めない時もサマリーと実効状態の行には必ず出す。</para></summary>
+        public bool failOnMissingLearning = true;
+
+        /// <summary>BOT が読む学習の帯の点数 (<see cref="botLearningBandOverride"/> があればそれ・無ければ今の挑戦の点数)。</summary>
+        private int BotLearningBandScore => botLearningBandOverride >= 0 ? botLearningBandOverride : CurrentChallengeScore();
+
+        /// <summary>学習を作る経路か (学習データが空でも止めない)。 <see cref="failOnMissingLearning"/> の対象外。</summary>
+        private bool ProducesLearning
+            => UpdatesTier || UpdatesAi || (learningWorker && !measureNoExplore) || randomGrantTrial || IsTierCalibration;
+
+        /// <summary>学習データが読めない時の例外。 並列ワーカーは失敗コード LEARNING_MISSING で返す。</summary>
+        public sealed class LearningMissingException : Exception
+        {
+            public LearningMissingException(string message) : base(message) { }
+        }
+
+        /// <summary>直近に調べた学習の欠け (空 = 欠けなし)。 サマリーと実効状態の行に出す。</summary>
+        private string _learningGaps = "";
+        /// <summary>手書きの序列で走ったラン数 (ラン開始時の帯の切替の後で数える・バッチ累計)。</summary>
+        private int _fallbackRuns, _bandSwitchRuns;
+        /// <summary>[計装] 手書きの序列で走ったラン数 (バッチ累計)。</summary>
+        public int FallbackRuns => _fallbackRuns;
+
+        /// <summary>[計装] いま BOT が読んでいる学習 (帯のフォルダ名・序列の出どころ・戦闘名の危険度)。 ワーカーの実効状態の行にも出す。</summary>
+        public string LearningReadEffective
+        {
+            get
+            {
+                string root = LearnedPriorityProvider.LoadedRoot;
+                string band = string.IsNullOrEmpty(root) ? "(未読み込み)" : BandFolderName(root);
+                string danger = string.IsNullOrEmpty(EncounterDangerStats.RequestedRoot) ? "(未読み込み)"
+                              : BandFolderName(EncounterDangerStats.RequestedRoot)
+                                + (string.IsNullOrEmpty(EncounterDangerStats.LoadedFrom) ? " (ファイル無し・空)" : "");
+                return $"帯 {band} / 序列 {(LearnedPriorityProvider.UsingFallback ? "**手書き (学習データなし)**" : "学習")}"
+                     + $" / 危険度 {danger}" + (string.IsNullOrEmpty(_learningGaps) ? "" : " / 欠け: " + _learningGaps);
+            }
+        }
+
+        /// <summary>[計装] いま手書きの序列 (学習データなし) で買っているか。</summary>
+        public bool LearningFallbackEffective => LearnedPriorityProvider.UsingFallback;
+
+        /// <summary>学習ルートの末尾 (帯 0 はプロファイル名、 それ以外は bot_band_*)。</summary>
+        private static string BandFolderName(string root)
+            => System.IO.Path.GetFileName((root ?? "").TrimEnd('\\', '/'));
+
+        /// <summary>学習ルート <paramref name="root"/> で、 この腕が読むはずのものが欠けていないか (Reload の後に呼ぶ)。</summary>
+        private List<string> LearningGaps(string root)
+        {
+            var gaps = new List<string>();
+            if (string.IsNullOrEmpty(root) || !System.IO.Directory.Exists(root))
+                gaps.Add($"帯のフォルダが無い ({BandFolderName(root)})");
+            if (LearnedPriorityProvider.UsingFallback)
+                gaps.Add("手書きの序列で走る: " + LearnedPriorityProvider.LastLoadedSummary);
+            if (useIttBeta && !string.IsNullOrEmpty(root) && !System.IO.File.Exists(GrantItt.ClearPath(root)))
+                gaps.Add($"{System.IO.Path.GetFileName(GrantItt.ClearPath(root))} が無い"
+                       + (ittStrict ? " (付与対象品が全て未学習)" : " (観測 regβ へ落ちる)"));
+            if ((navLearnedDanger || v3.superNav) && !string.IsNullOrEmpty(root)
+                && !System.IO.File.Exists(System.IO.Path.Combine(root, EncounterDangerStats.FileName)))
+                gaps.Add($"{EncounterDangerStats.FileName} が無い (戦闘名の危険度が空)");
+            return gaps;
+        }
 
         /// <summary><b>整備パネルの配分を直接指定する (2026-09-10)。</b> 空なら
         /// <see cref="metaAllocation"/> のプリセット。 形式は <c>"Shell:6,Output:6,Guard:5"</c>。
@@ -2018,12 +2094,36 @@ namespace AutoTest
             if (normalDropRate  >= 0f) GameLoop.CombatRewards.NormalDropRate = normalDropRate;
             if (combatGoldScale >  0)  GameLoop.CombatRewards.GoldScale      = combatGoldScale;
 
+            // 帯の固定は測定専用 (#118)。 学習を作る経路で使うと、 固定した帯の序列で買ったランを別の帯へ積む (または逆) ことになる。
+            if (botLearningBandOverride >= 0 && ProducesLearning)
+                throw new InvalidOperationException($"botLearningBandOverride={botLearningBandOverride} は学習を作る経路"
+                    + $" (learnTier={learnTier} / learnBotAi={learnBotAi} / learningWorker={learningWorker} measureNoExplore={measureNoExplore}"
+                    + $" / randomGrantTrial={randomGrantTrial} / Tier較正={IsTierCalibration}) とは併用できない");
+            _fallbackRuns = _bandSwitchRuns = 0;
+
             // プロファイル切替で参照先サブディレクトリが変わるため、 各キャッシュを再読み込み
             try { PolicyParameters.ReloadFromDisk(MetaProfileHelper.LearningRoot()); } catch { }
             try { EventChoiceLearningStats.Reload(MetaProfileHelper.LearningRoot()); } catch { }
             try { LearnedPriorityProvider.Reload(TierLearningRoot, writeMarkdown: UpdatesTier); } catch { }
             try { EncounterDangerStats.Reload(TierLearningRoot); } catch { }
             try { BossTuning.Reload(MetaProfileHelper.LearningRoot()); } catch { }
+
+            // **学習データが欠けていたら黙って手書きの序列へ落とさない** (2026-11-12・#118)。
+            //   難易度 2 (10 点) は帯 bot_band_1_15 を読むが、 そのフォルダは無い → 手書きの S/A だけで買い、 難易度 1〜3 のクリアが 0% になった。
+            //   測定ではエラーで止める。 学習を作る経路 (最初の学習の回は空から始める) と Ultra は止めずに印字だけ。
+            {
+                var gaps = LearningGaps(TierLearningRoot);
+                _learningGaps = string.Join(" / ", gaps);
+                if (gaps.Count > 0)
+                {
+                    bool ultra = wiringSkill == WiringSkill.Ultra || ultraProductionWorkerMode;
+                    string msg = $"[AutoRunner] **学習データなし** ({BandFolderName(TierLearningRoot)}・帯の固定={botLearningBandOverride}): {_learningGaps}";
+                    if (failOnMissingLearning && !ProducesLearning && !ultra)
+                        throw new LearningMissingException(msg + " → failOnMissingLearning=true なので止める"
+                            + " (今の学習で測るなら botLearningBandOverride=0・意図して空で走らせるなら failOnMissingLearning=False)");
+                    Debug.LogWarning(msg + (ProducesLearning ? " (学習を作る経路なので続ける)" : ultra ? " (Ultra なので続ける)" : " (failOnMissingLearning=false なので続ける)"));
+                }
+            }
 
             if (wiringSkill == WiringSkill.Ultra)
             {

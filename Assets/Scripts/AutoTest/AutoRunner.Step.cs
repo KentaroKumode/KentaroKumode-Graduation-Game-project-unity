@@ -221,8 +221,12 @@ namespace AutoTest
             //   **前のアームの序列で買い続ける**。 Tier 較正中は隔離領域を使うので触らない。
             if (!IsTierCalibration)
             {
-                try { LearnedPriorityProvider.SwitchToChallengeScore(CurrentChallengeScore()); }
+                // 帯の固定 (botLearningBandOverride・#118) があればその帯を読む。 無ければ今の挑戦の点数の帯。
+                try { LearnedPriorityProvider.SwitchToChallengeScore(BotLearningBandScore); }
                 catch (Exception e) { Debug.LogWarning($"[AutoRunner] 学習帯の切替失敗: {e.Message}"); }
+                // **手書きの序列で走ったランを数える** (#118)。 黙って落ちると、 帯のフォルダが無いだけでクリア率が 0% になる。
+                _bandSwitchRuns++;
+                if (LearnedPriorityProvider.UsingFallback) _fallbackRuns++;
             }
 
             // 2026-06-28: BOT は職業をランダムに選択 (BOT 学習で全 4 職を均等にサンプル)

@@ -228,6 +228,13 @@ namespace AutoTest
             //   印字が無いと「遺物なしのつもりだった」を後から検証できない。
             //   2026-08-10 に同じ穴で 0pt 基準値が 53.3% / 16.6% に割れている。
             sb.AppendLine(EffectiveStateLine());
+            // **BOT が読んだ学習を必ず印字する** (2026-11-12・#118)。 帯のフォルダが無いと手書きの序列へ黙って落ち、
+            //   難易度 1〜3 のクリアが 0% になっていた。 落ちたランがあれば、 はっきり書く。
+            sb.AppendLine($"学習の読み: {LearningReadEffective} / 帯の固定={(botLearningBandOverride >= 0 ? botLearningBandOverride.ToString() : "なし")}"
+                        + $" / 欠けたら止める={failOnMissingLearning}");
+            if (_fallbackRuns > 0 || !string.IsNullOrEmpty(_learningGaps))
+                sb.AppendLine($"**学習データなし・手書きの序列で走った**: {_fallbackRuns}/{_bandSwitchRuns} ラン"
+                            + (string.IsNullOrEmpty(_learningGaps) ? "" : $" / バッチ開始時の欠け: {_learningGaps}"));
             sb.AppendLine("比較軸    : 航行Rankのみ差し替え（消費/ショップ/戦闘実行/イベントは共通固定）");
             sb.AppendLine("################################################");
             if (AutoTest.Ultra.UltraDecisionCensus.Enabled

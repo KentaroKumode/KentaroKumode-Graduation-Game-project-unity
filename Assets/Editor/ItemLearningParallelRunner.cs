@@ -61,6 +61,9 @@ namespace AutoTest.EditorTools
             public int runs;
             public Process process;
             public bool done, failed;
+            /// <summary>[#118] ワーカーが読んでいた学習と、 手書きの序列で走ったか (応答から写す)。</summary>
+            public string learningRead = "";
+            public bool learningFallback;
         }
 
         private static State _st;
@@ -502,6 +505,7 @@ namespace AutoTest.EditorTools
                     catch (IOException) { continue; }
                     var resp = JsonUtility.FromJson<RankMarginWorkerResponse>(respText);
                     s.done = true; done++;
+                    if (resp != null) { s.learningRead = resp.learningRead ?? ""; s.learningFallback = resp.learningFallback; }
                     bool ok = _st.mode == "itt" ? (resp != null && File.Exists(GrantCsvOf(s))) : (resp != null && resp.completedNormally && File.Exists(s.learnPath));
                     if (!ok)
                     {
@@ -570,7 +574,8 @@ namespace AutoTest.EditorTools
 
             double min = (DateTime.UtcNow - _roundStartUtc).TotalMinutes;
             string line = $"round {_st.round + 1}/{_st.rounds}: 有効 {valid}/{recs.Count} / 7層クリア {clears} ({100.0 * clears / Math.Max(1, valid):F1}%)"
-                        + $" / 学習 {stats?.totalBatches ?? 0} バッチ {stats?.totalRuns ?? 0} ラン / {min:F1} 分";
+                        + $" / 学習 {stats?.totalBatches ?? 0} バッチ {stats?.totalRuns ?? 0} ラン / {min:F1} 分"
+                        + LearningReadSummary();
             File.AppendAllText(Path.Combine(_root, "rounds.txt"), line + "\n", new UTF8Encoding(false));
             Debug.Log("[学習並列] " + line + "\n  " + LearnedPriorityProvider.LastLoadedSummary);
             // 記録 (learn_runs.json) は残す ── 死因・戦闘ごとの診断に読む。 生成物は prune_outputs.py が刈る。
@@ -579,6 +584,22 @@ namespace AutoTest.EditorTools
             SaveState();
             if (_st.round >= _st.rounds) { Stop("完了"); if (_st.noMerge) LaunchNextQueued(); return; }
             StartRound();
+        }
+
+        /// <summary>[#118] ワーカーが読んだ学習の帯 (異なる値の一覧) と、 手書きの序列で走ったワーカーの数。
+        /// 学習の回は空から始めることがあるので止めないが、 <b>黙って手書きの序列で走ったことは必ず書く</b>。</summary>
+        private static string LearningReadSummary()
+        {
+            int fb = 0;
+            var reads = new SortedSet<string>(StringComparer.Ordinal);
+            foreach (var s in _slots)
+            {
+                if (s.learningFallback) fb++;
+                if (!string.IsNullOrEmpty(s.learningRead)) reads.Add(s.learningRead);
+            }
+            string r = " / 学習の読み: " + (reads.Count == 0 ? "(応答に無い)" : string.Join(" | ", reads));
+            if (fb > 0) r += $" / **学習データなし・手書きの序列で走った ({fb}/{_slots.Count} ワーカー)**";
+            return r;
         }
 
         private static string GrantCsvOf(Slot s)
@@ -621,7 +642,7 @@ namespace AutoTest.EditorTools
             if (last || !ok2) GrantItt.Variant = "";
             if (terminalItt) GrantItt.Clear();   // 端子の係数を親の手元に残さない (次の逐次バッチが品の序列と取り違えないように)
             double min = (DateTime.UtcNow - _roundStartUtc).TotalMinutes;
-            string line = $"ITT {_st.round + 1}/{_st.rounds}: この回 {rows.Count:N0} 行 / 合算 {pooled:N0} 行 / 回帰 {(ok1 ? "OK" : "失敗")} / 生存 {(ok2 ? "OK" : "失敗")} / {min:F1} 分 / {csv}";
+            string line = $"ITT {_st.round + 1}/{_st.rounds}: この回 {rows.Count:N0} 行 / 合算 {pooled:N0} 行 / 回帰 {(ok1 ? "OK" : "失敗")} / 生存 {(ok2 ? "OK" : "失敗")} / {min:F1} 分 / {csv}" + LearningReadSummary();
             File.AppendAllText(Path.Combine(_root, "rounds.txt"), line + "\n", new UTF8Encoding(false));
             Debug.Log("[学習並列] " + line);
             _st.round++;

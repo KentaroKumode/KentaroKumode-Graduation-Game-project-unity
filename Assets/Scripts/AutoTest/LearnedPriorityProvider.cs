@@ -219,6 +219,8 @@ namespace AutoTest
         // ===== 公開 API =====
         public static string LastLoadedSummary => _lastLoadedSummary;
         public static bool UsingFallback => _useFallback;
+        /// <summary>直近の Reload で読もうとした学習ルート (ファイルが無くても入る・2026-11-12 #118)。 実効状態の行に帯のフォルダ名を出すのに使う。</summary>
+        public static string LoadedRoot { get; private set; } = "";
 
         /// <summary>その id に**学習値があるか**。 false なら呼び出し側で
         /// 代替評価へ落とすこと (パーツは学習ゼロだと永久に買われない詰みが起きる)。</summary>
@@ -317,10 +319,11 @@ namespace AutoTest
             {
                 if (string.IsNullOrEmpty(learningRoot))
                     learningRoot = MetaProfileHelper.LearningRoot();
+                LoadedRoot = Path.GetFullPath(learningRoot);
                 string path = Path.GetFullPath(Path.Combine(learningRoot, "item_stats.json"));
                 if (!File.Exists(path))
                 {
-                    _lastLoadedSummary = "item_stats.json なし → 手書きフォールバック";
+                    _lastLoadedSummary = $"item_stats.json なし ({Path.GetFileName(LoadedRoot.TrimEnd('\\', '/'))}) → 手書きフォールバック";
                     return;
                 }
                 long phaseStats = AutoTest.Ultra.UltraPhaseClock.Begin();   // 計装のみ

@@ -624,6 +624,11 @@ namespace AutoTest.EditorTools
                     if (line.Length > 0) sb.AppendLine("  " + line);
                 break;
             }
+            {   // [2026-11-12 #118] 手書きの序列 (学習データなし) で走ったワーカーがあれば、 はっきり書く
+                int fb = 0, n = 0;
+                foreach (var s in _slots) { if (s.response == null) continue; n++; if (s.response.learningFallback) fb++; }
+                if (fb > 0) sb.AppendLine($"**学習データなし・手書きの序列で走った ({fb}/{n} ワーカー)**");
+            }
             sb.AppendLine();
             sb.AppendLine("アーム                  |  クリア率 |  Bal比 |   r10−r9 | 判定 | 平均到達段 |     n");
 

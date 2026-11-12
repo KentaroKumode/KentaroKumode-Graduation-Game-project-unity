@@ -132,6 +132,7 @@ namespace AutoTest.ParallelSweep
                     _effectiveState = RankMarginWorkerConfig.DescribeEffective(runner);
                     WriteProgress(0, "started");
                     runner.Begin();
+                    _effectiveState += "learningRead(開始時)=" + runner.LearningReadEffective + "\n";
                     return;
                 }
 
@@ -194,6 +195,15 @@ namespace AutoTest.ParallelSweep
 
                 WriteProgress(0, "started");
                 runner.Begin();
+                // **実際に読んだ学習の帯を残す** (2026-11-12・#118)。 Begin がバッチ開始時の学習を読んだ後の値。
+                //   帯のフォルダが無いと手書きの序列へ落ちるので、 送った設定と並べて必ず出す。
+                _effectiveState += "learningRead(開始時)=" + runner.LearningReadEffective + "\n";
+            }
+            catch (AutoRunner.LearningMissingException ex)
+            {
+                // 学習データが欠けている測定は走らせない (failOnMissingLearning)。 親はこの失敗コードで腕ごと止まる。
+                WriteFailure("LEARNING_MISSING", ex.Message);
+                Application.Quit(3);
             }
             catch (Exception ex)
             {
@@ -242,6 +252,12 @@ namespace AutoTest.ParallelSweep
                     bandScores = new int[0],
                     effectiveState = _effectiveState,
                 };
+                var grantRunner = FindObjectOfType<AutoRunner>();
+                if (grantRunner != null)
+                {
+                    response.learningRead = grantRunner.LearningReadEffective;
+                    response.learningFallback = grantRunner.LearningFallbackEffective || grantRunner.FallbackRuns > 0;
+                }
                 File.WriteAllText(Path.GetFullPath(_job.responsePath),
                     JsonUtility.ToJson(response, true), new UTF8Encoding(false));
                 WriteProgress(_job.runs, "done");
@@ -403,6 +419,15 @@ namespace AutoTest.ParallelSweep
                                 ItemSystem.PassiveSkills.CombatContext.AttackBonusBySkill.Keys,
                                 k => ItemSystem.PassiveSkills.CombatContext.AttackBonusCalls[k])),
                     };
+                if (runnerForDump != null)
+                {
+                    // [2026-11-12 #118] アームの終わりに読んでいた学習。 手書きの序列で走ったランがあれば親がはっきり出す。
+                    response.learningRead = runnerForDump.LearningReadEffective;
+                    response.learningFallback = runnerForDump.LearningFallbackEffective || runnerForDump.FallbackRuns > 0;
+                    response.effectiveState = (response.effectiveState ?? "")
+                        + "learningRead(終了時)=" + response.learningRead + "\n"
+                        + "learningFallbackRuns=" + runnerForDump.FallbackRuns + "\n";
+                }
                 CombatSystem.BossCombatTrace.Flush();
                 CombatSystem.FightTrace.Flush();
                 CombatSystem.ShieldDiag.Export(out response.shieldSrcNames,
