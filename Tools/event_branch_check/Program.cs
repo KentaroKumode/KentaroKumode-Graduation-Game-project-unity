@@ -5,6 +5,7 @@
 //   3. 選べない選択肢の規則 (2026-11-13・EventEffectRoles / EventChoice.UnavailableReason): 暗くするのは払えない時と、
 //      得になる効果が何ひとつ起きない時だけ。 全イベントを本物の解析 (EventParser) で読み、 状況を総当たりして
 //      「暗くなり得る選択肢」の一覧と理由を出し、 全部が同時に暗くなり得るイベントが 0 件であることを見る
+//   4. 〈さびれた観測所〉3 本の選択肢と効果の並び・博士の時計が秘宝として items.json と除外の集合に入っているか (2026-11-13)
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -268,6 +269,42 @@ static class Program
         Check(seen.Count == 3, $"観測所: 3 本とも読めた ({seen.Count})");
     }
 
+    /// <summary>博士の時計は秘宝 (2026-11-13): items.json に同名の品があり、 発火する物を持たず、 配布の山・預かり物・進行用の品の 3 つに入っているか。
+    /// 本体の型 (ItemIds・EventOnlyItemFilter) は UnityEngine に依存するのでコンパイルせず、 定数と集合の中身を原文で確かめる。</summary>
+    static void ClockRelic(string root)
+    {
+        const string id = "止まらない時計";   // GameLoop.ItemIds.VescaClock の写し (下で原文と突き合わせる)
+        string ids = File.ReadAllText(Path.Combine(root, "Assets/Scripts/GameLoop/Ids.cs"));
+        Check(ids.Contains($"public const string VescaClock = \"{id}\";"), "時計: ItemIds.VescaClock の値 = 「止まらない時計」");
+
+        using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "Assets/Data/InventorySystem/items.json")));
+        System.Text.Json.JsonElement item = default; int n = 0;
+        foreach (var it in doc.RootElement.GetProperty("items").EnumerateArray())
+            if (it.GetProperty("id").GetString() == id) { item = it; n++; }
+        Check(n == 1, $"時計: items.json に 1 品だけある ({n})");
+        if (n != 1) return;
+        string Str(string k) => item.TryGetProperty(k, out var v) && v.ValueKind == System.Text.Json.JsonValueKind.String ? v.GetString() : null;
+        bool unique = item.TryGetProperty("unique", out var u) && u.ValueKind == System.Text.Json.JsonValueKind.True;
+        Check(Str("name") == id && Str("category") == "Passive" && unique, "時計: id = 表示名・秘宝 (Passive)・unique");
+        Check(Str("skill") == null && Str("axis") == null && !item.TryGetProperty("skills", out _) && !item.TryGetProperty("stats", out _),
+              "時計: 発火する物を持たない (skill・skills・stats・axis なし ── 偏重にも数えられない)");
+        Check(!string.IsNullOrEmpty(Str("description")) && !string.IsNullOrEmpty(Str("flavorText")), "時計: 説明とフレーバーがある");
+
+        string filter = File.ReadAllText(Path.Combine(root, "Assets/Scripts/ItemSystem/Shop/EventOnlyItemFilter.cs"));
+        Check(filter.Contains("GameLoop.ItemIds.VescaClock,"), "時計: 配布の山から外す (EventOnlyItemFilter.ExcludedIds)");
+        int prog = ids.IndexOf("ProgressionItems =", StringComparison.Ordinal);
+        int progEnd = prog < 0 ? -1 : ids.IndexOf("};", prog, StringComparison.Ordinal);
+        Check(prog >= 0 && progEnd > prog && Regex.IsMatch(ids.Substring(prog, progEnd - prog), @"^\s*VescaClock,", RegexOptions.Multiline),
+              "時計: 進行用の品 (ItemIds.ProgressionItems: 〈門〉・大罪・BOT の学習から外す)");
+        Check(Regex.IsMatch(ids, @"Entrusted\s*=\s*new System\.Collections\.Generic\.HashSet<string> \{ VescaClock \}"),
+              "時計: 預かり物 (ItemIds.Entrusted: 売れない・取り替えに出さない・ランダムに失わない・図鑑は手に入れるまで出さない)");
+        string clock = File.ReadAllText(Path.Combine(root, "Assets/Scripts/GameLoop/VescaClock.cs"));
+        Check(clock.Contains("ownedPassiveItems.Contains(ItemIds.VescaClock)") && clock.Contains("PassiveAddHelper.AddPassiveItem(run, ItemIds.VescaClock)")
+              && !clock.Contains("ownedFlags.Add"), "時計: 持っているか = 秘宝の所持 (ownedFlags は使わない)");
+        Check(!clock.Contains("VescaLine") && !File.ReadAllText(Path.Combine(root, "Assets/Scripts/CombatSystem/CombatManager.Down.cs")).Contains("[ヴェスカ]"),
+              "時計: ヴェスカの台詞は置かない (作者の決定)");
+    }
+
     static int Main(string[] args)
     {
         Console.OutputEncoding = new System.Text.UTF8Encoding(false);
@@ -277,6 +314,7 @@ static class Program
         RoleRules();
         Selectability(dir);
         Observatory(dir);
+        ClockRelic(Path.GetFullPath(Path.Combine(dir, "../../..")));   // dir = <root>/Assets/Resources/Events
         Console.WriteLine(fails == 0 ? "ALL OK" : $"{fails} 件 NG");
         return fails == 0 ? 0 : 1;
     }

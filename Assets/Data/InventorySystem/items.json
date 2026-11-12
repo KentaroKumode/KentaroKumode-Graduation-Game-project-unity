@@ -2628,6 +2628,16 @@
       "category": "Passive",
       "rarity": "LEGENDARY",
       "basePrice": 10
+    },
+    {
+      "id": "止まらない時計",
+      "name": "止まらない時計",
+      "description": "ヴェスカとの戦闘で、ダウンの目盛りが各段に 1 つ増える。",
+      "flavorText": "古い台帳には二個一組の片方と記されている。老いた学者からの預かり品。底にいる者の前でも停止しない。",
+      "category": "Passive",
+      "rarity": "GOLD",
+      "basePrice": 9,
+      "unique": true
     }
   ]
 }

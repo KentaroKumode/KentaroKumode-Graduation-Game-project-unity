@@ -36,9 +36,17 @@ namespace GameLoop
         public const string HardshipConviction = "苦難の確信";
 
         // === 〈さびれた観測所〉の時計 (2026-11-13) ===
-        /// <summary>止まらない時計: 写しを持った再訪の 5 つ目の選択肢 (効果〈止まらない時計を預かる〉) で得るフラグ (RunState.ownedFlags・このランだけ)。
-        /// 持ったまま七層のヴェスカの戦闘に入ると、 各段のダウンの目盛りに 1 つ足す (<see cref="GameLoop.VescaClock"/>・CombatSystem.BossParams.VescaClockNotch)。</summary>
+        /// <summary>止まらない時計: 写しを持った再訪の 5 つ目の選択肢 (効果〈止まらない時計を預かる〉) で得る<b>秘宝</b> (items.json の同名の品・
+        /// RunState.ownedPassiveItems・2026-11-13 にフラグから秘宝へ)。 持ったまま七層のヴェスカの戦闘に入ると、 各段のダウンの目盛りに 1 つ足す
+        /// (<see cref="GameLoop.VescaClock"/>・CombatSystem.BossParams.VescaClockNotch)。 配布の山には出ない (EventOnlyItemFilter)・預かり物 (<see cref="Entrusted"/>)。</summary>
         public const string VescaClock = "止まらない時計";
+
+        /// <summary>**預かり物** (2026-11-13): 人から預かった秘宝。 売れない (ShopManager.TrySell・売る画面)・取り替えに出さない
+        /// (交換マス・イベントの取り替え = GameManager.LowestTierPassiveIndex)・ランダムに失わない (GameManager.LoseRandomPassiveItem)・
+        /// 記録 (図鑑) には手に入れるまで並べない (超低確率のイベントの種明かしになるため・Game2DCodexPanel)。
+        /// 〈門〉・大罪 (強欲・色欲)・BOT の学習から外すのは <see cref="ProgressionItems"/> の側 (両方に入れる)。</summary>
+        public static readonly System.Collections.Generic.HashSet<string> Entrusted =
+            new System.Collections.Generic.HashSet<string> { VescaClock };
 
         // === 初期装備 ===
         public const string DiceWood = "dice_wood";
@@ -122,6 +130,8 @@ namespace GameLoop
             DiceWood,
             // 起動でしか取れないイベント専用アイテム
             ItemSystem.PassiveItems.TorchRevival.TorchId,
+            // 預かり物 (2026-11-13・Entrusted): 博士の時計。 効くのはヴェスカの戦闘だけで、 出る条件が数百ランに 1 度 ── 学習に乗せても何も言えない
+            VescaClock,
             // フラグ系武器 (進路条件で配布)
             ChevalierRapier,
             // 武器階梯 T2/T3 (職業配布と進化の途中段)。 T4 は終端なので含めない

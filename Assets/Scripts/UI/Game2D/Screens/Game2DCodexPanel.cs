@@ -135,6 +135,7 @@ namespace UI.Game2D
                         {
                             if (it == null || it.category != kind) continue;
                             bool open = CodexRecord.ItemOwned(it.id);
+                            if (!open && ItemIds.Entrusted.Contains(it.id)) continue;   // 預かり物 (博士の時計) は手に入れるまで「？？？」の枠も出さない (超低確率のイベントの種明かしになる)
                             string nm = string.IsNullOrEmpty(it.displayName) ? it.id : it.displayName;
                             string tag = kind == ItemSystem.ItemCategory.Weapon ? "武器" : kind == ItemSystem.ItemCategory.Consumable ? "消耗品" : null;
                             string body = nm + "\n\n" + it.description + (string.IsNullOrEmpty(it.flavorText) ? "" : "\n\n" + it.flavorText);

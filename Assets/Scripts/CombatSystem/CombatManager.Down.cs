@@ -22,12 +22,9 @@ namespace CombatSystem
             bool clock = GameLoop.VescaClock.Held(GameLoop.GameManager.Instance?.Run);
             _down.Reset(BossParams.DownNotches(enemy?.id, clock));
             VescaClockActive = clock && _down.Enabled && GameLoop.BossIds.VescaStageOf(enemy?.id) > 0;   // ダウンを止めた測定の口では効かない
+            // 戦闘の始めの地の文 (最初の段だけ 1 回)。 戦闘の画面に文の欄が無いので戦闘ログの行として出す (2026-11-13)。 ヴェスカの台詞は置かない (作者の決定)
             if (VescaClockActive && newCombat && enemy?.id == GameLoop.BossIds.VescaP1)
-            {
-                // 戦闘の始めの文 (最初の段だけ 1 回)。 戦闘の画面に文の欄が無いので戦闘ログの行として出す (2026-11-13)
                 Debug.Log("[戦闘] " + GameLoop.VescaClock.BattleLine);
-                Debug.Log("[ヴェスカ] " + GameLoop.VescaClock.VescaLine);
-            }
             if (VescaClockActive) Debug.Log($"[ダウン] 〈{GameLoop.VescaClock.Name}〉: {enemy?.displayName} の目盛りに {BossParams.VescaClockNotch * 100f:0}% を足した");
             BossDown.ActiveNow = false;
             if (newCombat) Escalation.HeavyCycleOffset = 0;
