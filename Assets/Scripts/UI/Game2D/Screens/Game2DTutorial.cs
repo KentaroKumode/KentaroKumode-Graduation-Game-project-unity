@@ -195,7 +195,7 @@ namespace UI.Game2D
         private readonly List<string> _btnA = new List<string>();
         private bool _locked, _prevLock;
 
-        private const int W = 408, Pad = 12, TopY = 7, TitleH = 14, BtnH = 22, MaxLines = 10, ParaGap = 5, Hang = 10;
+        private const int W = 408, Pad = 12, TopY = 7, TitleH = 14, BtnH = 22, MaxLines = 10, Hang = 10;
         private const float InDur = 0.18f, DimIn = 0.3f;
         private static readonly int[] Bayer = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
 
@@ -529,7 +529,7 @@ namespace UI.Game2D
         }
 
         // ── ページ割り ──
-        //   段落 (\n 区切り) ごとに折り返し、 1 ページ MaxLines 行に収める。 段落が入り切らなければ次のページへ送る (1 段落がページより長い時だけ途中で切る)。
+        //   段落 (\n 区切り・handbook の空行の区切り) 1 つが 1 ページ (issue #110: 1 ページで覚えることを 1 つに)。 折り返して MaxLines 行を超える段落だけ途中で次のページへ送る。
         //   板の高さは全ページで一番高いページに合わせる (ページ送りで板の大きさが変わらない)。
 
         private int BodyW => _winW - Pad * 2 - Hang;
@@ -543,9 +543,7 @@ namespace UI.Game2D
             {
                 var lines = WrapEm(para, BodyW);
                 if (lines.Count == 0) continue;
-                int need = lines.Count * LH + (cur.lines.Count > 0 ? ParaGap : 0);
-                if (cur.lines.Count > 0 && y + need > cap) { _pages.Add(cur); cur = new Page(); y = 0; }
-                if (cur.lines.Count > 0) y += ParaGap;
+                if (cur.lines.Count > 0) { _pages.Add(cur); cur = new Page(); y = 0; }      // 段落ごとに改ページ
                 foreach (var ln in lines)
                 {
                     if (y + LH > cap && cur.lines.Count > 0) { _pages.Add(cur); cur = new Page(); y = 0; }
