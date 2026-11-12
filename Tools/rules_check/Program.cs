@@ -185,6 +185,40 @@ static class T
             Check(!s3.Enabled && s3.NoteTurnEnd(1, 1000) == 0 && !s3.BeginTurn(), "目盛りの無い敵はダウンしない");
         }
 
+        // ---- 4b. 博士の「止まらない時計」(2026-11-13): ヴェスカの各段に目盛り 0.80 を 1 つ足す ----
+        //   段ごとの目盛りと 0.80 は BossParams (UnityEngine 依存でここではコンパイルしない) の写し。 BossParams.DownNotches(id, true) は
+        //   ヴェスカの段でだけ BossDown.WithExtraNotch(表の値, VescaClockNotch) を返し、 ダウンを止めた口 (bossDown=False) では表の値が null。
+        {
+            const float clock = 0.80f;
+            var stages = new[] { ("p1", new[] { 0.60f }), ("p2", new[] { 0.50f }), ("p3", new[] { 0.40f }), ("最終", new[] { 0.50f }) };
+            const int maxHp = 2000;
+            foreach (var (name, baseN) in stages)
+            {
+                var withClock = BossDown.WithExtraNotch(baseN, clock);
+                Check(withClock.Length == baseN.Length + 1 && withClock[0] == clock && withClock[1] == baseN[0] && baseN.Length == 1 && baseN[0] != clock,
+                      $"時計あり {name}: 目盛りが 1 つ増え、 80% が先頭 (大きい順)・元の表は書き換えない");
+                // 時計あり: 80% を下回ったターンの次のターンにダウン
+                var a = new BossDownState(); a.Reset(withClock);
+                bool before = a.NoteTurnEnd(BossDown.NotchHp(maxHp, clock) + 1, maxHp) == 0 && !a.BeginTurn();
+                bool hit = a.NoteTurnEnd(BossDown.NotchHp(maxHp, clock) - 1, maxHp) == 1 && a.BeginTurn() && a.pending == 0;
+                bool next = a.NoteTurnEnd(BossDown.NotchHp(maxHp, baseN[0]), maxHp) == 1 && a.BeginTurn();
+                Check(before && hit && next, $"時計あり {name}: 80% の手前ではダウンせず・下回った次のターンにダウン・元の目盛りでももう一度ダウン");
+                // 時計なし: 今までと同じ (80% を下回ってもダウンしない・元の目盛りで 1 回)
+                var b = new BossDownState(); b.Reset(baseN);
+                Check(b.NoteTurnEnd(BossDown.NotchHp(maxHp, clock) - 1, maxHp) == 0 && !b.BeginTurn()
+                      && b.NoteTurnEnd(BossDown.NotchHp(maxHp, baseN[0]), maxHp) == 1 && b.BeginTurn() && b.notches.Length == 1,
+                      $"時計なし {name}: 今までと同じ (80% では何も起きない)");
+            }
+            // bossDown=False (目盛りの表が null): 時計があっても何も足さない
+            var off = BossDown.WithExtraNotch(null, clock);
+            var c = new BossDownState(); c.Reset(off);
+            Check(off == null && !c.Enabled && c.NoteTurnEnd(1, maxHp) == 0 && !c.BeginTurn(), "bossDown=False: 時計があっても目盛りは生えず、 ダウンしない");
+            // 足す位置: 大きい順を保つ (途中・末尾)
+            var mid = BossDown.WithExtraNotch(new[] { 0.9f, 0.5f }, clock);
+            var tail = BossDown.WithExtraNotch(new[] { 0.9f, 0.85f }, clock);
+            Check(mid.Length == 3 && mid[0] == 0.9f && mid[1] == clock && mid[2] == 0.5f && tail[2] == clock, "足す目盛りは大きい順の位置に入る");
+        }
+
         // ---- 5. 端子の旧 id (〈保持器〉→〈呼び戻し〉) ----
         {
             var deckOld = new List<string> { "攻撃", "保持器", "防御" };

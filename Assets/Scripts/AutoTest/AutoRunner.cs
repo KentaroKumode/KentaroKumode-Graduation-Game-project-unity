@@ -213,6 +213,10 @@ namespace AutoTest
         /// <summary>[測定 2026-11-13] 深さ 3 のボス 3 体の大技の周期 (CombatSystem.BossParams.Depth3Heavy)。 既定 true = 足す。 false = 旧い作り (大技なし)。
         /// 本体の GameHooks.Depth3HeavyDisabled へ流す。</summary>
         public bool depth3Heavy = true;
+        /// <summary>[測定 2026-11-13] true = ランの最初から博士の「止まらない時計」を預かった状態にする (七層のヴェスカの各段にダウンの目盛り 80% が 1 つ増える)。
+        /// 既定 false = 預からない (〈さびれた観測所・再訪・写し〉の 5 つ目で選んだ時だけ・BOT はふだん選ばない)。 本体の GameHooks.VescaClockHeldAtStart へ流す。
+        /// 時計あり/なしを同じシードで比べる腕。</summary>
+        public bool vescaClockHeld = false;
         /// <summary>[測定 2026-11-12・#35] 航行の「恐れ」: 行き先の点が、 推定した追跡者の位置から <see cref="navFearRange"/> 歩より近いほど引く。
         /// 引く量 = 恐れ × (範囲 − 推定の歩数)。 Optimal の行き先選び (価値の単位) は navFear、 Super の計画 (対数オッズ) は navFearMacro。 0 = 使わない。</summary>
         public float navFear = 0f, navFearMacro = 0f;
@@ -773,6 +777,7 @@ namespace AutoTest
                  + $"{(handCarry == CombatSystem.HandCarryMode.Pick ? " 残す方策 " + EffectiveHandKeepPolicy + " (handKeepPolicy=" + handKeepPolicy + ")" : "")} "
                  + $"/ ボスのダウン {(bossDown ? "あり" : "なし (旧い作り)")} "
                  + $"/ 深さ 3 のボスの大技 {(depth3Heavy ? "あり" : "なし (旧い作り)")} "
+                 + $"/ 博士の時計 {(vescaClockHeld ? "ランの最初から預かる (ヴェスカの各段に目盛り +" + CombatSystem.BossParams.VescaClockNotch.ToString("0.00") + ")" : "預からない (イベントで選んだ時だけ)")} (vescaClockHeld={vescaClockHeld}) "
                  + $"/ 攻撃なしの手の主攻撃 (旧の式) {(v3.oldNoAttackBaseDmg ? "素火力を数える (旧い挙動)" : "0")} "
                  + $"/ 縄張りの宝 {territoryTreasure} (BOT のしきい値 {territoryTreasureHpMargin:0.##}) / 縄張りを避ける遠回り {(navTerritoryDetour < 0 ? "使わない" : "+" + navTerritoryDetour + "歩まで")}"
                  + (DeckLookaheadDiagLine().Length > 0 ? System.Environment.NewLine + DeckLookaheadDiagLine() : "")

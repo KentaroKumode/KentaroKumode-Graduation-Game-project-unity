@@ -132,6 +132,8 @@ namespace UI.Game2D
                 foreach (var ps in e.passiveSkills)
                     if (ps != null && !string.IsNullOrEmpty(ps.skillName))
                         d.Items.Add(new ModalItem { name = "〈" + ps.skillName + "〉", desc = ps.description });
+            // 博士の「止まらない時計」(2026-11-13): 預かったランのヴェスカの各段に付く不利な効果 (目盛りは上の「ダウンの目盛り」の行に足されて出る)
+            if (cm.VescaClockActive) d.Items.Add(new ModalItem { name = "〈" + GameLoop.VescaClock.Name + "〉", desc = GameLoop.VescaClock.Description });
             if (d.Items.Count == 0) d.Items.Add(new ModalItem { name = "パッシブなし", desc = "この敵は特別な力を持たない。", disabled = true });
             if (d.Items.Count > 3) d.cols = 2;      // 多い敵は 2 列 (窓の高さに収める)
             d.buttons.Add(new ModalBtn { label = "閉じる", action = "close", primary = true });

@@ -33,6 +33,23 @@ namespace CombatSystem
             return broken;
         }
 
+        /// <summary>目盛りの並び <paramref name="notches"/> (大きい順) に <paramref name="extra"/> を 1 つ足した新しい並び (大きい順を保つ)。
+        /// <paramref name="notches"/> が null (ダウンの無い敵・測定の口で止めた) なら null のまま ── 目盛りの無い戦闘に目盛りを生やさない。
+        /// 元の配列は書き換えない (<c>BossParams</c> の表を共有しているため)。 使う所: ヴェスカの「止まらない時計」(<c>BossParams.DownNotches</c>)。</summary>
+        public static float[] WithExtraNotch(float[] notches, float extra)
+        {
+            if (notches == null || notches.Length == 0) return notches;
+            var r = new float[notches.Length + 1];
+            int j = 0; bool put = false;
+            for (int i = 0; i < notches.Length; i++)
+            {
+                if (!put && extra > notches[i]) { r[j++] = extra; put = true; }
+                r[j++] = notches[i];
+            }
+            if (!put) r[j] = extra;
+            return r;
+        }
+
         /// <summary>次に割る目盛りの HP (−1 = もう目盛りが無い・ダウンの無い敵)。</summary>
         public static int NextNotchHp(float[] notches, int maxHp, int broken)
             => notches != null && broken >= 0 && broken < notches.Length ? NotchHp(maxHp, notches[broken]) : -1;

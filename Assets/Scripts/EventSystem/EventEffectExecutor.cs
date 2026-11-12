@@ -233,6 +233,11 @@ namespace EventSystem
                     result.log.Add("観測所の写しを持ち帰った");
                     break;
 
+                case EventEffectType.VescaClockTake:
+                    GameLoop.VescaClock.Take(run);
+                    result.log.Add("止まらない時計を預かった");
+                    break;
+
                 case EventEffectType.DiscardFlag:
                     run.ownedFlags.Remove(eff.param);
                     result.log.Add($"フラグアイテム廃棄: {eff.param}");

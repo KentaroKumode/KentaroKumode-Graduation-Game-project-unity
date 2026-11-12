@@ -231,6 +231,43 @@ static class Program
         Check(allDark == 0, $"選べるか: 全部の選択肢が同時に暗くなり得るイベント {allDark} 件 (安全弁 EventEncounter.IsChoiceSelectable は残す)");
     }
 
+    /// <summary>〈さびれた観測所〉3 本 (2026-11-13 作り直し): 選択肢の数 (4・4・5) と効果の並び。 時計の 5 つ目は時計だけ (ふだんの荷は無い)・得として扱う。</summary>
+    static void Observatory(string dir)
+    {
+        var want = new Dictionary<string, string[]>
+        {
+            ["さびれた観測所"] = new[] { "MaterialDelta,GainPassiveItem,GoldDelta", "MaxHpDelta,HpFullHeal,GainConsumableItem,GainConsumableItem",
+                                       "GainPassiveItem,GainPassiveItem,GainPassiveItem,GoldDelta", "ObservatoryTakeCopy,MaterialDelta,ProvisionDelta" },
+            ["さびれた観測所・再訪"] = new[] { "MaterialDelta,GainPassiveItem,GoldDelta", "MaxHpDelta,HpFullHeal,GainConsumableItem,GainConsumableItem",
+                                       "GainPassiveItem,GainPassiveItem,GainPassiveItem,GoldDelta", "ObservatoryTakeCopy,MaterialDelta,ProvisionDelta" },
+            ["さびれた観測所・再訪・写し"] = new[] { "MaterialDelta,GainPassiveItem,GoldDelta", "MaxHpDelta,HpFullHeal,GainConsumableItem,GainConsumableItem",
+                                       "GainPassiveItem,GainPassiveItem,GainPassiveItem,GoldDelta", "ObservatoryTakeCopy,MaterialDelta,ProvisionDelta", "VescaClockTake" },
+        };
+        var labels = new Dictionary<string, string>
+        {
+            ["さびれた観測所"] = "向こうへ行けるのか聞く", ["さびれた観測所・再訪"] = "自分も渡れるのか聞く", ["さびれた観測所・再訪・写し"] = "時計を預かる",
+        };
+        var seen = new HashSet<string>();
+        string path = Path.Combine(dir, "event_list_observatory.txt");
+        foreach (var ev in EventSystem.EventParser.ParseAll(File.ReadAllText(path)))
+        {
+            if (!want.TryGetValue(ev.name, out var w)) continue;
+            seen.Add(ev.name);
+            bool ok = ev.choices.Count == w.Length;
+            for (int i = 0; ok && i < w.Length; i++)
+            {
+                var got = string.Join(",", ev.choices[i].effects.ConvertAll(e => e.type.ToString()));
+                if (got != w[i]) { ok = false; Console.WriteLine($"  〈{ev.name}〉{i + 1} つ目: {got} (期待 {w[i]})"); }
+            }
+            string last = ev.choices.Count > 0 ? ev.choices[ev.choices.Count - 1].text : "";
+            Check(ok && last == labels[ev.name], $"観測所: 〈{ev.name}〉 選択肢 {ev.choices.Count} つ・効果の並びが元のまま・最後は「{last}」");
+            if (ev.name == "さびれた観測所・再訪・写し" && ev.choices.Count == 5)
+                Check(EventSystem.EventEffectRoles.RoleOf(ev.choices[4].effects[0]) == EventSystem.EventEffectRole.Benefit,
+                      "観測所: 〈止まらない時計を預かる〉は得として扱う (選べる)");
+        }
+        Check(seen.Count == 3, $"観測所: 3 本とも読めた ({seen.Count})");
+    }
+
     static int Main(string[] args)
     {
         Console.OutputEncoding = new System.Text.UTF8Encoding(false);
@@ -239,6 +276,7 @@ static class Program
         Scan(dir);
         RoleRules();
         Selectability(dir);
+        Observatory(dir);
         Console.WriteLine(fails == 0 ? "ALL OK" : $"{fails} 件 NG");
         return fails == 0 ? 0 : 1;
     }
