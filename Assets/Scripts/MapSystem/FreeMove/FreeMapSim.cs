@@ -368,6 +368,10 @@ namespace MapSystem.FreeMove
         /// <summary>点 i が追跡者の縄張りか。</summary>
         public bool InTerritory(int i) => i >= 0 && _territory.Contains(i);
 
+        /// <summary>縄張りを出ない追跡者 (<see cref="Leashed"/>) で、 自分が縄張りの外に居る (= 追跡者は自分に気づかず、 来ることもない)。
+        /// 追跡者が居ない層でも Leashed と自分の位置だけで決まる (居るかは <see cref="FoeAlive"/> で別に見る)。 BOT の値付けとイベントの重みが読む (2026-11-13)。</summary>
+        public bool OutsideFoeReach => Leashed && !InTerritory(Me);
+
         /// <summary>今いる点の縄張りの宝を取る (1 層 1 回)。 取れたら true。 中身を渡すのは本体 (GameManager)。</summary>
         public bool TakeTreasure()
         {
@@ -880,16 +884,19 @@ namespace MapSystem.FreeMove
 
         /// <summary>追跡者の本体を道で steps 歩、 自分から遠ざける (毎歩、 自分からの歩数がいちばん増える隣へ・同点は隣接表の並び)。
         /// これ以上離れられなければそこで止まる。 動かない性質 (召喚者) も動かす ── 本体の性質ではなく、 イベントの出来事として動く。
-        /// 猟犬は本体の元へ戻る。 追跡中なら追跡は続く (最後に補足した点へ向かう)。</summary>
+        /// 猟犬は本体の元へ戻る。 追跡中なら追跡は続く (最後に補足した点へ向かう)。
+        /// <para>縄張りを出ない追跡者 (<see cref="Leashed"/>・既定) は、 縄張りの中の隣へしか動かさない ── 縄張りの縁で止まる (2026-11-13)。
+        /// 自分からの歩数は層の全部の道で数える (縄張りの中で、 自分から一番遠い側へ寄る)。 旧い作り (縄張りの外まで追う) の動きは変えない。</para></summary>
         public FreeMapEvent PushFoe(int steps)
         {
             if (!FoeAlive || steps <= 0) return FreeMapEvent.None;
             var d = HopsFrom(Me);
+            bool leash = Leashed && InTerritory(FoeNode);   // 縄張りの外に居る時 (旧い写しなど) は今までどおり
             for (int k = 0; k < steps; k++)
             {
                 int best = FoeNode;
                 foreach (int v in _adj[FoeNode])
-                    if (d[v] != int.MaxValue && d[v] > d[best]) best = v;
+                    if (d[v] != int.MaxValue && d[v] > d[best] && (!leash || InTerritory(v))) best = v;
                 if (best == FoeNode) break;
                 FoeNode = best;
             }
@@ -900,13 +907,15 @@ namespace MapSystem.FreeMove
         }
 
         /// <summary>追跡者の本体を道で steps 歩、 自分へ近づける (代償の効果)。 自分の隣で止まる (この効果では捕まらない)。
-        /// 補足するかどうかは次のターンの追跡者の手番が決める。</summary>
+        /// 補足するかどうかは次のターンの追跡者の手番が決める。
+        /// <para>縄張りを出ない追跡者 (<see cref="Leashed"/>・既定) は、 追跡者が歩く時と同じ道 (<see cref="FoeStepToward"/>) で寄せる ──
+        /// 自分が縄張りの外に居れば、 縄張りの縁 (自分へ道で一番近づける点) で止まる (2026-11-13)。 旧い作りの動きは変えない。</para></summary>
         public FreeMapEvent PullFoe(int steps)
         {
             if (!FoeAlive || steps <= 0) return FreeMapEvent.None;
             for (int k = 0; k < steps; k++)
             {
-                int nx = StepToward(FoeNode, Me);
+                int nx = Leashed ? FoeStepToward(FoeNode, Me) : StepToward(FoeNode, Me);
                 if (nx == FoeNode || nx == Me) break;
                 FoeNode = nx;
             }

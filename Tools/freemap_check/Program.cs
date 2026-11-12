@@ -305,6 +305,67 @@ static class T
                     }
             Check(outside == 0 && caughtOutside == 0, $"縄張り: 追跡者と使い魔は縄張りの外へ出ない・外で捕まらない ({runs} 層・外 {outside} 手・外で接触 {caughtOutside})");
         }
+        // --- イベントの「追跡者を呼ぶ+N」「追跡者を遠ざける+N」(2026-11-13): 縄張りを出ない追跡者は、 縄張りの中の道だけで動く (縁で止まる) ---
+        //   自分の居場所を、 縄張りの外 (縁の隣・離れた所) と中で変えて、 呼ぶ+3・遠ざける+4 の後に本体と猟犬が縄張りの外に居る層を数える。
+        //   旧い作り (縄張りの外まで追う) は、 2026-11-12 の動き (縄張りを見ない) と同じ点へ動くことも確かめる。
+        {
+            var profiles = new[] { FoeProfile.Summoner, FoeProfile.Houndmaster, FoeProfile.Sprinter, FoeProfile.Brute };
+            int layers = 0, pullOut = 0, pushOut = 0, pullMoved = 0, pushMoved = 0, oldDiff = 0, oldLayers = 0, pullOutsideMe = 0;
+            foreach (var pr in profiles)
+                for (int salt = 1; salt <= 50; salt++)
+                    for (int where = 0; where < 3; where++)
+                    {
+                        // where: 0 = 始点のまま (縄張りの外・離れた所) / 1 = 縄張りの縁の外 / 2 = 縄張りの中 (中心の隣へ歩く)
+                        var s = Make(salt, pr, WeatherKind.None, leashed: true, treasure: true);
+                        if (!s.FoeAlive) continue;
+                        if (where == 1)
+                        {
+                            int b = BorderOutside(s); if (b < 0) continue;
+                            for (int g = 0; g < 60 && s.Me != b && !s.InFight; g++) { int nx = StepAvoidingTerritory(s, s.Me, b); if (nx == s.Me) break; s.GrantFreeMoves(1); s.MoveTo(nx); }
+                            if (s.Me != b || s.InFight) continue;
+                        }
+                        else if (where == 2)
+                        {
+                            for (int g = 0; g < 60 && !s.InTerritory(s.Me) && !s.InFight; g++) { int nx = s.StepToward(s.Me, s.Layout.home); if (nx == s.Me) break; s.GrantFreeMoves(1); s.MoveTo(nx); }
+                            if (!s.InTerritory(s.Me) || s.InFight) continue;
+                        }
+                        layers++;
+                        if (!s.InTerritory(s.Me)) pullOutsideMe++;
+                        var save = s.CaptureState();
+                        int f0 = s.FoeNode;
+                        s.PullFoe(3);
+                        if (s.FoeNode != f0) pullMoved++;
+                        if (!FoeInsideTerritory(s)) pullOut++;
+                        s.LoadState(save, s.Perks);
+                        s.PushFoe(4);
+                        if (s.FoeNode != f0) pushMoved++;
+                        if (!FoeInsideTerritory(s)) pushOut++;
+                    }
+            Check(layers > 0 && pullOut == 0 && pushOut == 0,
+                  $"イベントの呼ぶ+3・遠ざける+4 (縄張りを出ない追跡者): 後に番人が縄張りの外に居る層 0 (試 {layers}・うち自分が縄張りの外 {pullOutsideMe} / 外へ出た 呼ぶ {pullOut}・遠ざける {pushOut} / 動いた 呼ぶ {pullMoved}・遠ざける {pushMoved})");
+
+            // 旧い作り: 縄張りを見ない 2026-11-12 の動きと同じ点へ (呼ぶ = 自分への最短の道を隣の手前まで / 遠ざける = 自分からの歩数がいちばん増える隣)
+            foreach (var pr in profiles)
+                for (int salt = 1; salt <= 50; salt++)
+                {
+                    var s = Make(salt, pr, WeatherKind.None);
+                    if (!s.FoeAlive) continue;
+                    for (int g = 0; g < salt % 7 && !s.InFight; g++) { s.GrantFreeMoves(1); s.MoveTo(s.Neighbors(s.Me)[0]); }
+                    if (s.InFight) continue;
+                    oldLayers++;
+                    var save = s.CaptureState();
+                    int exp = s.FoeNode;
+                    for (int k = 0; k < 3; k++) { int nx = s.StepToward(exp, s.Me); if (nx == exp || nx == s.Me) break; exp = nx; }
+                    s.PullFoe(3);
+                    if (s.FoeNode != exp) oldDiff++;
+                    s.LoadState(save, s.Perks);
+                    var d = s.HopsFrom(s.Me); exp = s.FoeNode;
+                    for (int k = 0; k < 4; k++) { int best = exp; foreach (int v in s.Neighbors(exp)) if (d[v] != int.MaxValue && d[v] > d[best]) best = v; if (best == exp) break; exp = best; }
+                    s.PushFoe(4);
+                    if (s.FoeNode != exp) oldDiff++;
+                }
+            Check(oldLayers > 0 && oldDiff == 0, $"イベントの呼ぶ・遠ざける (旧い作り): 縄張りを見ない動きのまま ({oldLayers} 層・食い違い {oldDiff})");
+        }
         // --- 縄張りの外に居れば補足されない・外の囮罠には縁まで引かれて踏まない ---
         foreach (var pr in new[] { FoeProfile.Summoner, FoeProfile.Houndmaster, FoeProfile.Sprinter, FoeProfile.Brute })
         {
