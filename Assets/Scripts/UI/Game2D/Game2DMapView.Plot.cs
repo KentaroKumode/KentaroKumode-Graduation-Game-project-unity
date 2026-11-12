@@ -294,6 +294,9 @@ namespace UI.Game2D
         // ── 読み出し (左下: EXIT の方角・縮尺・自艦の格子位置・経過ターン / 上: 天候) ──
         private static readonly string[] Compass = { "北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西" };
 
+        /// <summary>縄張りの宝の知らせの左上 (dot)。 上の帯 (高さ 30・Game2DNavExtras.TopR) の下 4 dot。</summary>
+        private const int TreasureNoteX = 96, TreasureNoteTop = 34;
+
         private void Readout(FreeMapSim sim)
         {
             var lay = sim.Layout; var me = lay.pos[sim.Me]; var ex = lay.pos[lay.goal];
@@ -316,10 +319,17 @@ namespace UI.Game2D
             bool calm = !(sim.Weather != WeatherKind.None && !double.IsNegativeInfinity(sim.Front));
             Text("天気 " + (calm ? "凪" : sim.Weather.DisplayName()), W - 8 - 89, 8, calm ? _lc.dim : _lc.hi, Align.Right);
             // 縄張りの宝を取った後 (2026-11-12・仮置き): 何を得たかを左上に出す (航行のまま渡すので、 専用の画面は挟まない)
+            //   液晶の上端 (y 0〜29) は x 96〜387 が上の帯 (Game2DNavExtras の TopR / StatusR) に覆われるので、 その真下に、
+            //   地図の点や道と重なっても読めるよう地の色の下敷きを敷いて出す (y = 8 だと上の帯の裏で見えなかった)。
             if (sim.TreasureTaken)
             {
                 string note = GameLoop.GameManager.Instance?.TerritoryTreasureNote;
-                if (!string.IsNullOrEmpty(note)) Text(note, 96, 8, _lc.warn, Align.Left);
+                if (!string.IsNullOrEmpty(note))
+                {
+                    int tw = Game2DJpFont.Width(note), th = Game2DJpFont.Cell;
+                    Rect(TreasureNoteX - 2, TreasureNoteTop - 1, tw + 4, th + 2, _lc.bg);
+                    Text(note, TreasureNoteX, TreasureNoteTop + th / 2f, _lc.warn, Align.Left);
+                }
             }
         }
 
