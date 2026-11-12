@@ -34,6 +34,7 @@ namespace AutoTest
         {
             GameHooks.BotDriving = true;
             GameHooks.ChooseStartingPassive = ChooseByBuyScore;
+            GameHooks.ChooseOfferedPassive = ChooseByBuyScore;   // イベントの「Nつから選ぶ」(2026-11-12)。 開幕の品と同じ買いの点で選ぶ
             GameHooks.WeaponEvBonus = LearnedWeaponBonus;
             GameHooks.MeasureRunPower = InventoryPower.Compute;
             GameHooks.OnCritRateResolved = CritRateCensus.Note;

@@ -55,6 +55,7 @@ namespace GameLoop
                 return;
             }
             ee.TakePendingTurns();   // 前のイベントで進め損ねた分は持ち越さない
+            ee.TakePendingNav();     // 航行の効果も同じ (戦闘になった選択肢など・2026-11-12)
 
             // 6層の固定の点「裂け目の記録」は〈真理〉へ至る専用イベントにする (2026-09-28: 自由移動の層では
             //   「最初に踏んだイベントマス」ではなく生成時に決めた固定の点 ── MapNode.isFixedEvent)。
@@ -195,9 +196,101 @@ namespace GameLoop
         {
             var ee = EventEncounter.Instance;
             int n = ee != null ? ee.TakePendingTurns() : 0;
+            var nav = ee != null ? ee.TakePendingNav() : null;
+            // 航行の効果 → ターンの順 (2026-11-12)。 「ターン+1,追跡者を撒く」は撒いてから時間が過ぎる。
+            //   航行の効果はどれも自分を動かさない (近道も「この後の移動をただにする」だけ) ので、 ここで点が起動することは無い。
+            //   下の段の確認は地図の外へ出た時の守りだけ。
+            if (nav != null)
+                foreach (var e in nav)
+                {
+                    if (CurrentPhase != GamePhase.MapNavigation || FreeMap == null) break;
+                    ApplyEventNav(e);
+                }
             if (n <= 0 || CurrentPhase != GamePhase.MapNavigation || FreeMap == null) return;
             Log($"イベントで {n} ターンを使った");
             RunFreeMapOp(s => s.PassTurnsExternal(n));
+        }
+
+        /// <summary>イベントの航行の効果を 1 つ適用する (2026-11-12・docs/GAME.md §17)。 中身は <see cref="MapSystem.FreeMove.FreeMapSim"/> の汎用の動詞で、
+        /// 着いた点の起動・捕まった時の戦闘は他の操作と同じ <see cref="RunFreeMapOp"/> が処理する。 航行マップの無い層では呼ばれない。</summary>
+        private void ApplyEventNav(EventSystem.EventEffect e)
+        {
+            switch (e.type)
+            {
+                case EventSystem.EventEffectType.RevealMap:
+                    RunFreeMapOp(s => { int k = s.RevealAround(e.amount, false); Log($"イベント: 周り {e.amount} 歩の点が分かった（新しく {k} 点）"); return MapSystem.FreeMove.FreeMapEvent.None; });
+                    break;
+                case EventSystem.EventEffectType.RevealEncounters:
+                    RunFreeMapOp(s => { s.RevealAround(e.amount, true); Log($"イベント: 周り {e.amount} 歩の戦闘の相手が分かった"); return MapSystem.FreeMove.FreeMapEvent.None; });
+                    break;
+                case EventSystem.EventEffectType.RevealSupplies:
+                {
+                    var pts = new List<int>();
+                    var map = MapManager.Instance?.CurrentMap;
+                    if (map != null)
+                        foreach (var node in map.GetAllNodes())
+                            if (node != null && node.index >= 0 && (node.type == TileType.Shop || node.type == TileType.Rest)) pts.Add(node.index);
+                    RunFreeMapOp(s => { s.RevealPoints(pts); Log($"イベント: この層の店と休憩の場所が分かった（{pts.Count} か所）"); return MapSystem.FreeMove.FreeMapEvent.None; });
+                    break;
+                }
+                case EventSystem.EventEffectType.ShakeOffPursuer:
+                    RunFreeMapOp(s => s.ShakeOff());
+                    break;
+                case EventSystem.EventEffectType.PushPursuer:
+                    RunFreeMapOp(s => s.PushFoe(e.amount));
+                    break;
+                case EventSystem.EventEffectType.PullPursuer:
+                    RunFreeMapOp(s => s.PullFoe(e.amount));
+                    break;
+                case EventSystem.EventEffectType.Shortcut:
+                    RunFreeMapOp(s =>
+                    {
+                        s.GrantFreeMoves(e.amount);
+                        Log($"イベント: 時限バフ「近道」+{e.amount}（残り {s.FreeMovesLeft} 回・移動の物資とターンを使わない・待つ・偵察には効かない・層を出ると消える）");
+                        return MapSystem.FreeMove.FreeMapEvent.None;
+                    });
+                    break;
+                case EventSystem.EventEffectType.ShiftFront:
+                    RunFreeMapOp(s => s.ShiftFront(e.amount));
+                    break;
+            }
+        }
+
+        // =====================================================================
+        //  選べる品 (イベント「パッシブアイテムをNつから選ぶ」・2026-11-12)
+        // =====================================================================
+
+        /// <summary>選ぶのを預かっているイベントの品の提示 (人が遊んでいる時だけ)。 地図へ戻ると選択画面が出る (Game2DPhaseScreens)。 先頭から順に選ぶ。</summary>
+        public readonly List<List<string>> PendingEventPassiveOffers = new List<List<string>>();
+
+        /// <summary>品の提示を受ける。 BOT (GameHooks.ChooseOfferedPassive・無ければ開幕パッシブの口) はこの場で選び、 選んだ品の id を返す。
+        /// 人が遊んでいる時は選択画面へ預けて null を返す (提示の抽選は呼ぶ側で済んでいるので、 乱数の消費は BOT と同じ)。</summary>
+        public string OfferPassiveChoice(List<string> cands)
+        {
+            if (Run == null || cands == null || cands.Count == 0) return null;
+            var chooser = GameHooks.ChooseOfferedPassive ?? GameHooks.ChooseStartingPassive;
+            if (cands.Count > 1 && chooser == null && !GameHooks.BotDriving && !Application.isBatchMode)
+            {
+                PendingEventPassiveOffers.Add(new List<string>(cands));
+                return null;
+            }
+            int pick = chooser?.Invoke(cands) ?? 0;
+            string id = cands[Math.Max(0, Math.Min(pick, cands.Count - 1))];
+            ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
+            Log($"イベント: 秘宝「{id}」を {cands.Count} つから選んで獲得");
+            return id;
+        }
+
+        /// <summary>預かっているイベントの品の提示の先頭から 1 つ選んで所持する (選択画面から呼ぶ)。</summary>
+        public void ResolveEventPassiveOffer(int pick)
+        {
+            if (Run == null || PendingEventPassiveOffers.Count == 0) return;
+            var cands = PendingEventPassiveOffers[0];
+            PendingEventPassiveOffers.RemoveAt(0);
+            if (cands == null || cands.Count == 0) return;
+            string id = cands[Math.Max(0, Math.Min(pick, cands.Count - 1))];
+            ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
+            Log($"イベント: 秘宝「{id}」を選んで獲得");
         }
 
         /// <summary>イベントから戦闘を開始する。</summary>

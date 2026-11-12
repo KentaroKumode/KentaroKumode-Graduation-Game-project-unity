@@ -212,6 +212,70 @@ static class T
             for (int i = 0; i < 8 && !s2.InFight; i++) { var ev = s2.Wait(); if ((ev & FreeMapEvent.FamiliarLaunched) != 0) launched = true; }
             Check(launched || s2.InFight, "召喚者は補足中に使い魔を放つ");
         }
+        // --- 近道 (イベント「近道+N」= ただで動ける回数・2026-11-12) ---
+        {
+            var w = new Wallet { Provision = 5 };
+            var s = Make(5, FoeProfile.Brute, WeatherKind.None, w);
+            s.UseFlare();
+            int p0 = w.Provision, t0 = s.Turn, foe0 = s.FoeNode, flare0 = s.FlareTurnsLeft;
+            s.GrantFreeMoves(2);
+            Check(s.FreeMovesLeft == 2 && s.Me == s.Layout.start, "近道: 受けただけでは動かない (残り 2)");
+            int a = s.Neighbors(s.Me)[0];
+            var ev1 = s.MoveTo(a);
+            Check(w.Provision == p0 && s.Turn == t0 && s.FoeNode == foe0 && s.FlareTurnsLeft == flare0 && s.FreeMovesLeft == 1
+                  && (ev1 & FreeMapEvent.TurnPassed) == 0 && (ev1 & FreeMapEvent.Arrived) != 0,
+                  $"近道: ただの 1 歩は物資もターンも減らず、追跡者も照明も動かない (物資 {p0}->{w.Provision}, ターン {t0}->{s.Turn}, 残り {s.FreeMovesLeft})");
+            Check(s.HasTrace(a), "近道: ただの 1 歩も痕跡は残す");
+            s.Wait();
+            Check(s.FreeMovesLeft == 1 && s.Turn == t0 + 1, "近道: 待つでは減らない");
+            s.Recon();
+            Check(s.FreeMovesLeft == 1 && s.Turn == t0 + 2, "近道: 偵察でも減らない");
+            int t1 = s.Turn, p1 = w.Provision;
+            s.MoveTo(s.Neighbors(s.Me)[0]);
+            Check(s.FreeMovesLeft == 0 && s.Turn == t1 && w.Provision == p1, "近道: 2 回目もただで、残りは 0");
+            int t2 = s.Turn, p2 = w.Provision;
+            if (!s.InFight) s.MoveTo(s.Neighbors(s.Me)[0]);
+            Check(s.InFight || (s.Turn == t2 + 1 && w.Provision == p2 - FreeMapParams.MoveSupply), "近道: 使い切った後の 1 歩は通常どおり払う");
+            GameLoop.GameRng.Salt = 5 * 104729;
+            var next = new FreeMapSim(FreeMapGenerator.Generate(6), new Wallet(), true, FoeProfile.Brute, WeatherKind.None);
+            Check(next.FreeMovesLeft == 0, "近道: 層を出ると (中身を作り直すと) 残りは消える");
+
+            // 中断セーブを跨ぐ (2026-11-13): 残りの回数を写して戻し、 戻した後の 1 歩もただ
+            var sv = Make(5, FoeProfile.Brute, WeatherKind.None, new Wallet { Provision = 5 });
+            sv.GrantFreeMoves(3);
+            sv.MoveTo(sv.Neighbors(sv.Me)[0]);
+            var saved = sv.CaptureState();
+            var w4 = new Wallet { Provision = 5 };
+            var rs = Make(5, FoeProfile.Brute, WeatherKind.None, w4); rs.LoadState(saved, null);
+            int t4 = rs.Turn;
+            Check(rs.FreeMovesLeft == 2, $"近道: 中断セーブを跨いで残りが戻る (残り {rs.FreeMovesLeft})");
+            if (!rs.InFight) rs.MoveTo(rs.Neighbors(rs.Me)[0]);
+            Check(rs.InFight || (rs.FreeMovesLeft == 1 && rs.Turn == t4 && w4.Provision == 5), $"近道: 戻した後の 1 歩もただ (残り {rs.FreeMovesLeft}, ターン {t4}->{rs.Turn}, 物資 {w4.Provision})");
+
+            // 雹の前線の内側: ただの 1 歩は HP −1 を払わない (2026-11-13・作者の決定)。 通常の 1 歩は払う
+            var wh = new Wallet { Hp = 100 };
+            var sh = Make(5, FoeProfile.Brute, WeatherKind.Hail, wh);
+            sh.ShiftFront(999);                                     // 前線を層の端まで進める (全部の点が内側)
+            int hp0 = wh.Hp;
+            sh.GrantFreeMoves(1);
+            int hj = sh.Neighbors(sh.Me)[0];
+            bool hailHere = sh.WeatherAt(hj, WeatherKind.Hail);
+            sh.MoveTo(hj);
+            Check(hailHere && wh.Hp == hp0, $"近道: 雹の前線の内側でも、 ただの 1 歩は HP を払わない (雹={hailHere}, HP {hp0}->{wh.Hp})");
+            int hp1 = wh.Hp;
+            if (!sh.InFight) sh.MoveTo(sh.Neighbors(sh.Me)[0]);
+            Check(sh.InFight || wh.Hp == hp1 - 1, $"近道: 使い切った後の雹の 1 歩は HP −1 (HP {hp1}->{wh.Hp})");
+
+            // 追跡者の居る点へ自分から踏み込むと、ターンを進めずにその場で捕まる
+            var s2 = Make(5, FoeProfile.Brute, WeatherKind.None);
+            s2.PullFoe(99);
+            bool adj = s2.HopsFrom(s2.Me)[s2.FoeNode] == 1;
+            int t3 = s2.Turn;
+            s2.GrantFreeMoves(1);
+            var ev2 = adj ? s2.MoveTo(s2.FoeNode) : FreeMapEvent.None;
+            Check(adj && (ev2 & FreeMapEvent.Caught) != 0 && s2.Contact == FreeMapSim.ContactKind.Body && s2.Turn == t3 && s2.PendingArrival == s2.Me,
+                  $"近道: 追跡者の点へ踏み込むと、ターンを進めずに捕まる (隣={adj}, ターン {t3}->{s2.Turn})");
+        }
         // --- 魔石 ---
         {
             var s = Make(5, FoeProfile.Brute, WeatherKind.None);
@@ -240,6 +304,67 @@ static class T
                         }
                     }
             Check(outside == 0 && caughtOutside == 0, $"縄張り: 追跡者と使い魔は縄張りの外へ出ない・外で捕まらない ({runs} 層・外 {outside} 手・外で接触 {caughtOutside})");
+        }
+        // --- イベントの「追跡者を呼ぶ+N」「追跡者を遠ざける+N」(2026-11-13): 縄張りを出ない追跡者は、 縄張りの中の道だけで動く (縁で止まる) ---
+        //   自分の居場所を、 縄張りの外 (縁の隣・離れた所) と中で変えて、 呼ぶ+3・遠ざける+4 の後に本体と猟犬が縄張りの外に居る層を数える。
+        //   旧い作り (縄張りの外まで追う) は、 2026-11-12 の動き (縄張りを見ない) と同じ点へ動くことも確かめる。
+        {
+            var profiles = new[] { FoeProfile.Summoner, FoeProfile.Houndmaster, FoeProfile.Sprinter, FoeProfile.Brute };
+            int layers = 0, pullOut = 0, pushOut = 0, pullMoved = 0, pushMoved = 0, oldDiff = 0, oldLayers = 0, pullOutsideMe = 0;
+            foreach (var pr in profiles)
+                for (int salt = 1; salt <= 50; salt++)
+                    for (int where = 0; where < 3; where++)
+                    {
+                        // where: 0 = 始点のまま (縄張りの外・離れた所) / 1 = 縄張りの縁の外 / 2 = 縄張りの中 (中心の隣へ歩く)
+                        var s = Make(salt, pr, WeatherKind.None, leashed: true, treasure: true);
+                        if (!s.FoeAlive) continue;
+                        if (where == 1)
+                        {
+                            int b = BorderOutside(s); if (b < 0) continue;
+                            for (int g = 0; g < 60 && s.Me != b && !s.InFight; g++) { int nx = StepAvoidingTerritory(s, s.Me, b); if (nx == s.Me) break; s.GrantFreeMoves(1); s.MoveTo(nx); }
+                            if (s.Me != b || s.InFight) continue;
+                        }
+                        else if (where == 2)
+                        {
+                            for (int g = 0; g < 60 && !s.InTerritory(s.Me) && !s.InFight; g++) { int nx = s.StepToward(s.Me, s.Layout.home); if (nx == s.Me) break; s.GrantFreeMoves(1); s.MoveTo(nx); }
+                            if (!s.InTerritory(s.Me) || s.InFight) continue;
+                        }
+                        layers++;
+                        if (!s.InTerritory(s.Me)) pullOutsideMe++;
+                        var save = s.CaptureState();
+                        int f0 = s.FoeNode;
+                        s.PullFoe(3);
+                        if (s.FoeNode != f0) pullMoved++;
+                        if (!FoeInsideTerritory(s)) pullOut++;
+                        s.LoadState(save, s.Perks);
+                        s.PushFoe(4);
+                        if (s.FoeNode != f0) pushMoved++;
+                        if (!FoeInsideTerritory(s)) pushOut++;
+                    }
+            Check(layers > 0 && pullOut == 0 && pushOut == 0,
+                  $"イベントの呼ぶ+3・遠ざける+4 (縄張りを出ない追跡者): 後に番人が縄張りの外に居る層 0 (試 {layers}・うち自分が縄張りの外 {pullOutsideMe} / 外へ出た 呼ぶ {pullOut}・遠ざける {pushOut} / 動いた 呼ぶ {pullMoved}・遠ざける {pushMoved})");
+
+            // 旧い作り: 縄張りを見ない 2026-11-12 の動きと同じ点へ (呼ぶ = 自分への最短の道を隣の手前まで / 遠ざける = 自分からの歩数がいちばん増える隣)
+            foreach (var pr in profiles)
+                for (int salt = 1; salt <= 50; salt++)
+                {
+                    var s = Make(salt, pr, WeatherKind.None);
+                    if (!s.FoeAlive) continue;
+                    for (int g = 0; g < salt % 7 && !s.InFight; g++) { s.GrantFreeMoves(1); s.MoveTo(s.Neighbors(s.Me)[0]); }
+                    if (s.InFight) continue;
+                    oldLayers++;
+                    var save = s.CaptureState();
+                    int exp = s.FoeNode;
+                    for (int k = 0; k < 3; k++) { int nx = s.StepToward(exp, s.Me); if (nx == exp || nx == s.Me) break; exp = nx; }
+                    s.PullFoe(3);
+                    if (s.FoeNode != exp) oldDiff++;
+                    s.LoadState(save, s.Perks);
+                    var d = s.HopsFrom(s.Me); exp = s.FoeNode;
+                    for (int k = 0; k < 4; k++) { int best = exp; foreach (int v in s.Neighbors(exp)) if (d[v] != int.MaxValue && d[v] > d[best]) best = v; if (best == exp) break; exp = best; }
+                    s.PushFoe(4);
+                    if (s.FoeNode != exp) oldDiff++;
+                }
+            Check(oldLayers > 0 && oldDiff == 0, $"イベントの呼ぶ・遠ざける (旧い作り): 縄張りを見ない動きのまま ({oldLayers} 層・食い違い {oldDiff})");
         }
         // --- 縄張りの外に居れば補足されない・外の囮罠には縁まで引かれて踏まない ---
         foreach (var pr in new[] { FoeProfile.Summoner, FoeProfile.Houndmaster, FoeProfile.Sprinter, FoeProfile.Brute })

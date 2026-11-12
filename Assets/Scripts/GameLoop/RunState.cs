@@ -456,6 +456,10 @@ namespace GameLoop
         // === 消費アイテム: 戦闘外ユーティリティ用フラグ/カウンタ ===
         public int  nextLootMinRarity = -1;    // 鑑定の眼鏡: 次の宝箱/ショップ最低レア(ItemRarity int)。-1=無
         public bool nextShopHalfPrice;         // 商人の鈴: 次ショップ全価格半額
+        /// <summary>イベント「次の店の値段-N%」(2026-11-12): 次に入る店の全価格に掛ける倍率 (1 = なし)。 重ねたら掛け合わせ。 店の生成で使って 1 に戻す。</summary>
+        public float nextShopPriceMul = 1f;
+        /// <summary>イベント「次の休憩の回復+N%」(2026-11-12): 次に休憩で回復する時、 回復量に足す最大 HP の割合 (%)。 重ねたら足し合わせ。 回復した時に 0 に戻す。</summary>
+        public int  nextRestHealBonusPct;
         public int  philStoneUsed;             // 賢者の石: このランでの使用回数(最大5)
         public int  oldLetterUsesSpent;        // 古い手紙: 手元の 1 枚を使った回数。 ItemIds.OldLetterUses に達したら手放して 0 に戻す
 
@@ -558,6 +562,8 @@ namespace GameLoop
             ClearPendingCombatConsumables();
             nextLootMinRarity = -1;
             nextShopHalfPrice = false;
+            nextShopPriceMul = 1f;
+            nextRestHealBonusPct = 0;
             philStoneUsed = 0;
         }
 

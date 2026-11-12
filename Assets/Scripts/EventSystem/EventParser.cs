@@ -8,6 +8,7 @@ namespace EventSystem
     /// <summary>
     /// イベントテキストフォーマットをパースする。
     /// フォーマット: イベント名:出現条件:フレーバー:選択肢-結果-選択後フレ/選択肢-結果-選択後フレ
+    /// 確率分岐のある選択肢は、 選択後フレと記録の文 (@@ の後ろ) を <c>||</c> で分岐ごとに分けられる (<see cref="EventBranchText"/>)。
     /// コメント行は # で始まる行、または 「###」「━━」を含む見出し行は無視。
     /// </summary>
     public static class EventParser
@@ -113,6 +114,7 @@ namespace EventSystem
         private static readonly Regex floorSingleRegex = new Regex(@"^(\d+)層$");
         private static readonly Regex flagRegex = new Regex(@"^フラグ:\[(.+?)\]$");
         private static readonly Regex passiveCondRegex = new Regex(@"^パッシブ:\[(.+?)\]$");
+        private static readonly Regex weightTagRegex = new Regex(@"^重み\[(.+?)\]$");
 
         private static EventCondition ParseCondition(string s)
         {
@@ -159,6 +161,16 @@ namespace EventSystem
                 if (m.Success)
                 {
                     c.requiredPassiveItems.Add(m.Groups[1].Value);
+                    continue;
+                }
+
+                // 出やすさの重み (2026-11-12): 「重み[追跡]」「重み[地図]」「重み[素材]」。 倍率は EventWeights の 1 か所。
+                m = weightTagRegex.Match(t);
+                if (m.Success)
+                {
+                    string tag = m.Groups[1].Value;
+                    if (EventWeights.IsKnownTag(tag)) c.weightTags.Add(tag);
+                    else Debug.LogWarning($"[EventParser] 未知の重み: '{tag}'");
                     continue;
                 }
             }
@@ -222,14 +234,39 @@ namespace EventSystem
             ChoicesParsed++;
             if (digest != null) ChoicesWithDigest++;
 
+            var effects = ParseEffects(resultStr);
+
+            // 確率分岐ごとの文 (2026-11-12): 「文A||文B@@記録A||記録B」。 数が合わなければ警告して先頭の文を全分岐に使う
+            int nBranch = CountBranches(effects);
+            var afterBy = EventBranchText.Split(postFlavor, nBranch, out string afterFirst, out string afterProblem);
+            if (afterProblem != null) Debug.LogWarning($"[EventParser] 選んだ後の文: {afterProblem} ({choiceText})");
+            List<string> digestBy = null;
+            if (digest != null)
+            {
+                digestBy = EventBranchText.Split(digest, nBranch, out string digestFirst, out string digestProblem);
+                if (digestProblem != null) Debug.LogWarning($"[EventParser] 記録の文: {digestProblem} ({choiceText})");
+                digest = string.IsNullOrEmpty(digestFirst) ? null : digestFirst;
+            }
+
             var choice = new EventChoice
             {
                 text = choiceText,
-                postFlavor = postFlavor,
+                postFlavor = afterFirst,
+                postFlavorByBranch = afterBy,
                 digest = digest,
-                effects = ParseEffects(resultStr),
+                digestByBranch = digestBy,
+                effects = effects,
             };
             return choice;
+        }
+
+        /// <summary>選択肢の確率分岐の数 (確率分岐が無ければ 0)。 解析は 1 選択肢に確率分岐を 1 つしか作らない。</summary>
+        private static int CountBranches(List<EventEffect> effects)
+        {
+            if (effects == null) return 0;
+            foreach (var e in effects)
+                if (e != null && e.type == EventEffectType.Probability && e.branches != null) return e.branches.Count;
+            return 0;
         }
 
         /// <summary>パースした選択肢の総数と、 ダイジェスト文が記入済みの数。
@@ -327,6 +364,17 @@ namespace EventSystem
         private static readonly Regex flagDiscard  = new Regex(@"^フラグアイテム\[(.+?)\]を廃棄$");
         private static readonly Regex passiveDiscard = new Regex(@"^パッシブアイテム\[(.+?)\]を廃棄$");
         private static readonly Regex rareLead     = new Regex(@"^レアな");
+        // 2026-11-12: 報酬を多様にする汎用の動詞 (EventEffectType の末尾・docs/GAME.md §17)
+        private static readonly Regex revealMap    = new Regex(@"^地図を明かす\+(\d+)$");
+        private static readonly Regex revealEnc    = new Regex(@"^戦闘を見抜く\+(\d+)$");
+        private static readonly Regex pushFoe      = new Regex(@"^追跡者を遠ざける\+(\d+)$");
+        private static readonly Regex pullFoe      = new Regex(@"^追跡者を呼ぶ\+(\d+)$");
+        private static readonly Regex shortcut     = new Regex(@"^近道\+(\d+)$");
+        private static readonly Regex frontAway    = new Regex(@"^前線を遠ざける\+(\d+)$");
+        private static readonly Regex frontNear    = new Regex(@"^前線を近づける\+(\d+)$");
+        private static readonly Regex offerPassive = new Regex(@"^パッシブアイテムを(\d+)つから選ぶ$");
+        private static readonly Regex nextShop     = new Regex(@"^次の店の値段-(\d+)%$");
+        private static readonly Regex nextRest     = new Regex(@"^次の休憩の回復\+(\d+)%$");
 
         private static EventEffect ParseSingleEffect(string t)
         {
@@ -375,6 +423,22 @@ namespace EventSystem
             m = flagGain.Match(t);     if (m.Success) return Eff(EventEffectType.GainFlag, param: m.Groups[1].Value, postCombat: postCombat);
             m = flagDiscard.Match(t);  if (m.Success) return Eff(EventEffectType.DiscardFlag, param: m.Groups[1].Value, postCombat: postCombat);
             m = passiveDiscard.Match(t); if (m.Success) return Eff(EventEffectType.DiscardPassiveItem, param: m.Groups[1].Value, postCombat: postCombat);
+
+            // 2026-11-12: 報酬を多様にする汎用の動詞
+            if (t == "補給の場所が分かる") return Eff(EventEffectType.RevealSupplies, postCombat: postCombat);
+            if (t == "追跡者を撒く")       return Eff(EventEffectType.ShakeOffPursuer, postCombat: postCombat);
+            if (t == "パッシブを差し出して替える") return Eff(EventEffectType.TradePassive, postCombat: postCombat);
+            if (t == "武器を鍛える")       return Eff(EventEffectType.ForgeWeapon, postCombat: postCombat);
+            m = revealMap.Match(t);    if (m.Success) return Eff(EventEffectType.RevealMap, amount: int.Parse(m.Groups[1].Value), postCombat: postCombat);
+            m = revealEnc.Match(t);    if (m.Success) return Eff(EventEffectType.RevealEncounters, amount: int.Parse(m.Groups[1].Value), postCombat: postCombat);
+            m = pushFoe.Match(t);      if (m.Success) return Eff(EventEffectType.PushPursuer, amount: int.Parse(m.Groups[1].Value), postCombat: postCombat);
+            m = pullFoe.Match(t);      if (m.Success) return Eff(EventEffectType.PullPursuer, amount: int.Parse(m.Groups[1].Value), postCombat: postCombat);
+            m = shortcut.Match(t);     if (m.Success) return Eff(EventEffectType.Shortcut, amount: int.Parse(m.Groups[1].Value), postCombat: postCombat);
+            m = frontAway.Match(t);    if (m.Success) return Eff(EventEffectType.ShiftFront, amount: -int.Parse(m.Groups[1].Value), postCombat: postCombat);
+            m = frontNear.Match(t);    if (m.Success) return Eff(EventEffectType.ShiftFront, amount: int.Parse(m.Groups[1].Value), postCombat: postCombat);
+            m = offerPassive.Match(t); if (m.Success) return Eff(EventEffectType.OfferPassives, amount: int.Parse(m.Groups[1].Value), postCombat: postCombat);
+            m = nextShop.Match(t);     if (m.Success) return Eff(EventEffectType.NextShopDiscount, amount: int.Parse(m.Groups[1].Value), postCombat: postCombat);
+            m = nextRest.Match(t);     if (m.Success) return Eff(EventEffectType.NextRestBonus, amount: int.Parse(m.Groups[1].Value), postCombat: postCombat);
 
             // 未知の表現はログのみ。フレーバー的な記述はスキップ。
             Debug.LogWarning($"[EventParser] 未認識の効果: '{t}'");

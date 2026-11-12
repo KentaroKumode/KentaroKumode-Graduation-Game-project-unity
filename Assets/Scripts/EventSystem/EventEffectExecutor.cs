@@ -21,10 +21,17 @@ namespace EventSystem
             /// <summary>この選択で使うターン (効果「ターン+N」の合計)。 実行はここではせず、
             /// イベントを閉じて地図へ戻った時に GameManager が進める (追跡者が動き、 捕まれば戦闘になる)。</summary>
             public int turnsToPass;
+            /// <summary>航行の効果 (地図を明かす・追跡者を撒く・近道・前線 …・2026-11-12)。 ターンと同じく、 ここでは実行せず
+            /// イベントを閉じて地図へ戻った時に GameManager が適用する (<c>GameManager.ApplyEventNav</c>)。 並びは書いた順。</summary>
+            public List<EventEffect> navEffects = new List<EventEffect>();
             /// <summary>戦闘勝利後に再適用すべき効果（「勝利後...」プレフィックス付き）</summary>
             public List<EventEffect> postCombatEffects = new List<EventEffect>();
             /// <summary>UI 表示用ログ</summary>
             public List<string> log = new List<string>();
+            /// <summary>引いた確率分岐の添字 (結果の欄の「N%で」の順・0 始まり)。 確率分岐が無ければ -1 (2026-11-12)。
+            /// 画面 (選んだ後の文) と戦記 (記録の文) が分岐ごとの文を選ぶのに使う (<c>EventChoice.PostFlavorFor</c> / <c>DigestFor</c>)。
+            /// 1 選択肢に確率分岐は 1 つ (解析がそう作る) なので、 最初に引いたものを残す。</summary>
+            public int pickedBranch = -1;
         }
 
         /// <summary>
@@ -129,23 +136,16 @@ namespace EventSystem
                     }
                     else if (amount < 0)
                     {
-                        // 足りない分は HP で払う (航行の「物資が足りない分は HP で払う」と同じ交換比)。
-                        //   **この効果では死なない** (HP は 1 で止まる)。 払えないから選べない、 にはしない ──
-                        //   物資が尽きている時ほど、 物資を払う選択が HP の選択に変わる。
+                        // 2026-11-13 (作者の決定): **HP では払わない**。 選択肢の支払いの物資-N は、 足りなければ選べない
+                        //   (EventChoice.UnavailableReason)。 ここで足りないのは確率分岐の中の「結果として失う」物資と、
+                        //   全部が選べない時の安全弁で選んだ時だけ ── どちらも、 ある分だけ失う (文が「糧食を失った」と言うのと食い違わない)。
+                        //   旧: 足りない分を HP で払っていた (物資 1 = HP 5・この効果では死なない)。
                         int need = -amount;
                         int paid = System.Math.Min(need, run.provision);
                         GameLoop.ProvisionSystem.Reduce(run, paid);
-                        int shortfall = need - paid;
-                        if (shortfall > 0)
-                        {
-                            int hpBefore = run.playerHP;
-                            int hpCost = shortfall * MapSystem.FreeMove.FreeMapParams.HpPerSupply;
-                            run.playerHP = Mathf.Max(1, run.playerHP - hpCost);
-                            GameLoop.HpOutsideDiag.Add("イベント:物資不足", hpBefore - run.playerHP);
-                            result.log.Add($"物資-{paid}、足りない {shortfall} を HP で払った (HP {hpBefore} → {run.playerHP})");
-                        }
-                        else
-                            result.log.Add($"物資-{paid} (現在 {run.provision}/{run.provisionCap})");
+                        result.log.Add(paid == 0    ? "物資は手持ちが無く、 失わなかった"
+                                     : paid < need ? $"物資-{paid} (手持ちの分だけ・現在 {run.provision}/{run.provisionCap})"
+                                                   : $"物資-{paid} (現在 {run.provision}/{run.provisionCap})");
                     }
                     break;
                 }
@@ -270,7 +270,107 @@ namespace EventSystem
                 case EventEffectType.CircusHandover:
                     ExecuteCircusHandover(run, result);
                     break;
+
+                // ── 2026-11-12: 報酬を多様にする汎用の動詞 ──
+
+                case EventEffectType.RevealMap:
+                case EventEffectType.RevealEncounters:
+                case EventEffectType.RevealSupplies:
+                case EventEffectType.ShakeOffPursuer:
+                case EventEffectType.PushPursuer:
+                case EventEffectType.PullPursuer:
+                case EventEffectType.Shortcut:
+                case EventEffectType.ShiftFront:
+                    // 航行の効果は地図へ戻った時に (ターン+N と同じ口)。 画面の文はここで出す (地図へ戻った直後に必ず適用されるので)
+                    result.navEffects.Add(eff);
+                    { string s = DescribeNav(eff, run); if (s != null) result.log.Add(s); }
+                    break;
+
+                case EventEffectType.OfferPassives:
+                {
+                    var cands = new List<string>();
+                    for (int k = 0; k < Mathf.Max(1, eff.amount); k++)
+                    {
+                        string id = PickRandomItemId(ItemCategory.Passive, run, cands);
+                        if (!string.IsNullOrEmpty(id) && !cands.Contains(id)) cands.Add(id);
+                    }
+                    if (cands.Count == 0) break;
+                    var gm = GameLoop.GameManager.Instance;
+                    if (gm != null)
+                    {
+                        // 人が遊んでいる時は地図へ戻ってからの選択画面へ預ける。 BOT は GameHooks で今選ぶ (乱数の消費は同じ)
+                        string got = gm.OfferPassiveChoice(cands);
+                        result.log.Add(got == null ? $"秘宝を {cands.Count} つから 1 つ選ぶ" : $"秘宝獲得: {ResolveLabel(got)}");
+                    }
+                    else
+                    {
+                        ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, cands[0]);
+                        result.log.Add($"秘宝獲得: {ResolveLabel(cands[0])}");
+                    }
+                    break;
+                }
+
+                case EventEffectType.TradePassive:
+                {
+                    if (GameLoop.GameManager.TradeLowestPassive(run, out string given, out string got))
+                        result.log.Add($"「{ResolveLabel(given)}」を渡し、「{ResolveLabel(got)}」を受け取った");
+                    else
+                        result.log.Add("取り替えは成り立たなかった");
+                    break;
+                }
+
+                case EventEffectType.ForgeWeapon:
+                {
+                    int before = run.weaponMaterials;
+                    if (GameLoop.GameManager.TryUpgradeWeapon(run))
+                        result.log.Add($"武器を 1 段鍛えた: {ResolveLabel(run.equippedWeaponId)}{(run.weaponPlus > 0 ? "+" : "")} (素材-{before - run.weaponMaterials})");
+                    else
+                        result.log.Add("武器は鍛えられなかった");
+                    break;
+                }
+
+                case EventEffectType.NextShopDiscount:
+                {
+                    // 重ねたら掛け合わせ (足し合わせて 100% を超える、 を上限で止めない形)。 小数は float へ確定させて持つ (Mono の精度)
+                    float f = 1f - Mathf.Clamp(eff.amount, 0, 100) / 100f;
+                    run.nextShopPriceMul *= f;
+                    result.log.Add($"次の店の値段 -{eff.amount}%");
+                    break;
+                }
+
+                case EventEffectType.NextRestBonus:
+                    run.nextRestHealBonusPct += Mathf.Max(0, eff.amount);
+                    result.log.Add($"次の休憩の回復 +{eff.amount}%（最大 HP の）");
+                    break;
             }
+        }
+
+        /// <summary>航行の効果の画面の文 (選んだ直後の結果に並べる)。
+        /// <para>2026-11-13: 起きない効果 (追跡者の居ない層の「追跡者を呼ぶ」など) は、 起きない理由を 1 行出す (「この層に追跡者は居ない」)。
+        /// 選べるかの判定 (<c>EventChoice.UnavailableReason</c>) と同じ規則・同じ文 (<see cref="EventEffectRoles.NotHappeningReason"/>)。
+        /// 代償だけが起きない選択肢・得の一部だけが起きない選択肢は選べるので、 ここで起きなかったことを見せる。
+        /// 本体のランでない (航行を判定できない) 時は、 地図が無ければ何も書かない (これまでどおり)。</para></summary>
+        private static string DescribeNav(EventEffect eff, RunState run)
+        {
+            string not = EventEffectRoles.NotHappeningReason(eff, EventChoice.Situation(run, false, false));
+            if (not != null) return not;
+            var sim = GameLoop.GameManager.Instance != null ? GameLoop.GameManager.Instance.FreeMap : null;
+            if (sim == null) return null;
+            // 縄張りを出ない番人 (既定) は、 縄張りの中の道だけで動く (FreeMapSim.PushFoe / PullFoe・縁で止まる)
+            string leash = sim.Leashed ? "縄張りの中で " : "";
+            switch (eff.type)
+            {
+                case EventEffectType.RevealMap:        return $"周りの {eff.amount} 歩先まで、点の種類が分かる";
+                case EventEffectType.RevealEncounters: return $"周りの {eff.amount} 歩先まで、戦闘の相手が分かる";
+                case EventEffectType.RevealSupplies:   return "この層の店と休憩の場所が分かる";
+                case EventEffectType.ShakeOffPursuer:  return "追跡者の目から外れる";
+                case EventEffectType.PushPursuer:      return sim.Leashed ? $"追跡者が{leash}{eff.amount} 歩まで遠のく" : $"追跡者が {eff.amount} 歩遠のく";
+                case EventEffectType.PullPursuer:      return sim.Leashed ? $"追跡者が{leash}{eff.amount} 歩まで近づく" : $"追跡者が {eff.amount} 歩近づく";
+                case EventEffectType.Shortcut:         return $"時限バフ獲得: 近道 ({eff.amount}回)";   // 時限バフと同じ言い方 (2026-11-13・作者の決定「近道というバフに統一」)
+                case EventEffectType.ShiftFront:
+                    return eff.amount < 0 ? $"天候の前線が {-eff.amount} 段退く" : $"天候の前線が {eff.amount} 段迫る";
+            }
+            return null;
         }
 
         /// <summary>[廃止] サーカス団引渡し。 旅団契約システムを 2026-08-11 に削除したため、
@@ -299,6 +399,7 @@ namespace EventSystem
 
             int pct = Mathf.RoundToInt(eff.branchWeights[picked] * 100f);
             result.log.Add($"確率分岐: {pct}% 抽選");
+            if (result.pickedBranch < 0) result.pickedBranch = picked;   // 引き方はそのまま、 どれを引いたかを渡すだけ
 
             foreach (var sub in eff.branches[picked])
                 ExecuteOne(sub, run, result);
@@ -341,7 +442,7 @@ namespace EventSystem
                                 + " / 素材+8 / ゴールド+60 / 全回復");
         }
 
-        private static string PickRandomItemId(ItemCategory category, GameLoop.RunState run = null)
+        private static string PickRandomItemId(ItemCategory category, GameLoop.RunState run = null, List<string> alsoExclude = null)
         {
             var db = ItemDatabase.Instance;
             if (db == null) return null;
@@ -360,6 +461,12 @@ namespace EventSystem
                 if (run.seenPassiveItemIds != null) owned.UnionWith(run.seenPassiveItemIds);
                 var dd = filtered.FindAll(it => !owned.Contains(it.internalName));
                 if (dd.Count > 0) filtered = dd;
+            }
+            // 同じ提示に同じ品を並べない (パッシブアイテムをNつから選ぶ・2026-11-12)
+            if (alsoExclude != null && alsoExclude.Count > 0)
+            {
+                var ex = filtered.FindAll(it => !alsoExclude.Contains(it.internalName));
+                if (ex.Count > 0) filtered = ex;
             }
 
             var picked = ItemSystem.RarityWeightedPicker.Pick(filtered);

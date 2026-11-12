@@ -102,9 +102,40 @@ namespace GameLoop
             => CurrentPhase == GamePhase.ExchangeTile && FindLowestTierOwnedPassiveIndex() >= 0;
 
         /// <summary>所持パッシブのうち最も低Tierのものの index。無ければ -1。</summary>
-        private int FindLowestTierOwnedPassiveIndex()
+        private int FindLowestTierOwnedPassiveIndex() => LowestTierPassiveIndex(Run);
+
+        /// <summary>取り替え (交換マス・イベント「パッシブを差し出して替える」) で渡せる秘宝があるか。</summary>
+        public static bool CanTradePassive(RunState run) => LowestTierPassiveIndex(run) >= 0;
+
+        /// <summary>取り替え: いちばん段の低い秘宝を渡し、 上の段の秘宝を 1 つ受け取る (交換マスと同じ処理・2026-11-12 にイベントからも呼ぶ)。
+        /// 成り立たなければ false (何も失わない)。</summary>
+        public static bool TradeLowestPassive(RunState run, out string givenId, out string resultId)
         {
-            var owned = Run?.ownedPassiveItems;
+            givenId = resultId = null;
+            var gm = Instance;
+            if (gm == null || run == null || !ReferenceEquals(gm.Run, run)) return false;
+            return gm.TradeLowestPassiveCore(out givenId, out resultId);
+        }
+
+        private bool TradeLowestPassiveCore(out string givenId, out string resultId)
+        {
+            givenId = resultId = null;
+            int idx = FindLowestTierOwnedPassiveIndex();
+            if (idx < 0) return false;
+            var db = ItemDatabase.Instance;
+            givenId = Run.ownedPassiveItems[idx];
+            var given = db?.GetItem(givenId);
+            if (given == null) return false;
+            resultId = PickHigherTierPassive(given.rarity);
+            if (string.IsNullOrEmpty(resultId)) return false;
+            ItemSystem.Helpers.PassiveAddHelper.RemoveAt(Run, idx);
+            Loadout.Gain(Run, resultId);
+            return true;
+        }
+
+        private static int LowestTierPassiveIndex(RunState run)
+        {
+            var owned = run?.ownedPassiveItems;
             if (owned == null) return -1;
             var db = ItemDatabase.Instance;
             int bestIdx = -1;
@@ -122,26 +153,16 @@ namespace GameLoop
         public void DoExchangeTile()
         {
             if (CurrentPhase != GamePhase.ExchangeTile) return;
-            int idx = FindLowestTierOwnedPassiveIndex();
-            if (idx < 0) { SetPhase(GamePhase.MapNavigation); return; }
-
             var db = ItemDatabase.Instance;
-            string givenId = Run.ownedPassiveItems[idx];
-            var given = db?.GetItem(givenId);
-            if (given == null) { SetPhase(GamePhase.MapNavigation); return; }
-
-            string resultId = PickHigherTierPassive(given.rarity);
-            if (string.IsNullOrEmpty(resultId))
+            if (!TradeLowestPassiveCore(out string givenId, out string resultId))
             {
-                Log("交換: 上位Tierの秘宝が無く成立せず");
+                if (givenId != null) Log("交換: 上位Tierの秘宝が無く成立せず");
                 SetPhase(GamePhase.MapNavigation);
                 return;
             }
-
-            ItemSystem.Helpers.PassiveAddHelper.RemoveAt(Run, idx);
-            Loadout.Gain(Run, resultId);
+            var given = db?.GetItem(givenId);
             var rd = db?.GetItem(resultId);
-            Log($"交換マス: 「{given.displayName}」を渡し「{(rd != null ? rd.displayName : resultId)}」を入手");
+            Log($"交換マス: 「{(given != null ? given.displayName : givenId)}」を渡し「{(rd != null ? rd.displayName : resultId)}」を入手");
             SetPhase(GamePhase.MapNavigation);
         }
 

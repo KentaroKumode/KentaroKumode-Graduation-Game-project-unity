@@ -101,7 +101,8 @@ namespace MapSystem.FreeMove
     /// 航行マップの動く中身 (ターン制・2026-10-18)。 参照実装は docs/design/map-grid-prototype.html。
     ///
     /// <para><b>移動は道でつながった隣の点へ 1 歩</b>。 自分が 1 歩動く (または待つ・偵察する) ごとに 1 ターンが進み、
-    /// 追跡者が 1 度動く。 戦闘・イベント・照明・囮罠はターンを使わない。 物資は距離によらず 1 歩ごとに一定。</para>
+    /// 追跡者が 1 度動く。 戦闘・イベント・照明・囮罠はターンを使わない。 物資は距離によらず 1 歩ごとに一定。
+    /// イベントの「近道+N」の残り (<see cref="FreeMovesLeft"/>) がある間の 1 歩だけは、 物資もターンも使わない。</para>
     ///
     /// <para>乱数は前線の天候 (道が崩れる・点が沈む) の選択だけで、
     /// <c>GameRng.Range(.., "map.free.weather", 層 × 100000 + ターン × 10 + 試行)</c> ── 同じ操作なら同じ結果になる。</para>
@@ -222,6 +223,8 @@ namespace MapSystem.FreeMove
         public WeatherKind Weather { get; private set; }
         /// <summary>前線の x (左端からの距離)。 まだ届いていなければ負の無限大。</summary>
         public double Front { get; private set; } = double.NegativeInfinity;
+        /// <summary>前線がもう層に届いているか (届いていなければ <see cref="ShiftFront"/> の遠ざけるは何も起きない)。</summary>
+        public bool FrontArrived => !double.IsNegativeInfinity(Front);
 
         // ── 航行アイテムの係数 (2026-11-11・nav-items.md) ──
         /// <summary>いま掛かっている係数。 本体が操作のたびに <see cref="SetPerks"/> で差し替える (層の途中で品を得た時も効くように)。</summary>
@@ -235,6 +238,20 @@ namespace MapSystem.FreeMove
         private bool _smokeGranted, _beaconGranted;
         /// <summary>〈渡り鳥の羅盤〉: 終点へ近づいた歩の数 (偶数番目の歩が無料)。</summary>
         private int _goalwardSteps;
+
+        // ── 近道 (イベント「近道+N」・2026-11-12 のユーザーの決定) ──
+        /// <summary>ただで動ける残りの回数。 1 以上の間、 隣への 1 歩 (<see cref="MoveTo"/>) は物資を払わず、 ターンも進めない
+        /// (追跡者・使い魔・前線・照明と囮罠の残りが動かない)。 1 歩ごとに 1 減る。 待つ・偵察・〈補給線〉では減らない。
+        /// 層を出ると Sim ごと消える (持ち越さない)。</summary>
+        public int FreeMovesLeft { get; private set; }
+
+        /// <summary>ただで動ける回数を足す (重ねたら足し合わせ)。</summary>
+        public void GrantFreeMoves(int n)
+        {
+            if (n <= 0) return;
+            FreeMovesLeft += n;
+            Version++;
+        }
 
         /// <summary>係数を差し替える。 回数のある品 (煙玉・前哨の旗) は、 層の中で初めて持った時に 1 度だけ回数を入れる。</summary>
         public void SetPerks(FreeMapPerks p)
@@ -351,6 +368,10 @@ namespace MapSystem.FreeMove
         /// <summary>点 i が追跡者の縄張りか。</summary>
         public bool InTerritory(int i) => i >= 0 && _territory.Contains(i);
 
+        /// <summary>縄張りを出ない追跡者 (<see cref="Leashed"/>) で、 自分が縄張りの外に居る (= 追跡者は自分に気づかず、 来ることもない)。
+        /// 追跡者が居ない層でも Leashed と自分の位置だけで決まる (居るかは <see cref="FoeAlive"/> で別に見る)。 BOT の値付けとイベントの重みが読む (2026-11-13)。</summary>
+        public bool OutsideFoeReach => Leashed && !InTerritory(Me);
+
         /// <summary>今いる点の縄張りの宝を取る (1 層 1 回)。 取れたら true。 中身を渡すのは本体 (GameManager)。</summary>
         public bool TakeTreasure()
         {
@@ -392,6 +413,8 @@ namespace MapSystem.FreeMove
             public bool smokeGranted, beaconGranted;
             /// <summary>縄張りの宝を取ったか (2026-11-12)。 宝の有無と追跡者が縄張りを出るかは写さない ── 作り直す時に <see cref="ConfigureTerritory"/> で同じものを決める。</summary>
             public bool treasureTaken;
+            /// <summary>近道 (時限バフ「近道」) の残りの回数 (2026-11-13)。 古いセーブには無い欄なので 0 で戻る。</summary>
+            public int freeMovesLeft;
         }
 
         /// <summary>いまの中身を写す。</summary>
@@ -423,6 +446,7 @@ namespace MapSystem.FreeMove
             s.smokeLeft = SmokeLeft; s.beaconLeft = BeaconLeft; s.beacon = Beacon; s.goalwardSteps = _goalwardSteps;
             s.smokeGranted = _smokeGranted; s.beaconGranted = _beaconGranted;
             s.treasureTaken = TreasureTaken;
+            s.freeMovesLeft = FreeMovesLeft;
             return s;
         }
 
@@ -461,6 +485,7 @@ namespace MapSystem.FreeMove
             SmokeLeft = s.smokeLeft; BeaconLeft = s.beaconLeft; Beacon = s.beacon; _goalwardSteps = s.goalwardSteps;
             _smokeGranted = s.smokeGranted; _beaconGranted = s.beaconGranted;
             TreasureTaken = s.treasureTaken;
+            FreeMovesLeft = System.Math.Max(0, s.freeMovesLeft);
             Perks = perks ?? FreeMapPerks.None;
         }
 
@@ -563,6 +588,7 @@ namespace MapSystem.FreeMove
         /// 抽選は (ターン, 行き先) で決まる専用の鍵なので、 同じターンに何度聞いても同じ答え (予告・BOT の先読みと実際の支払いが一致する)。</summary>
         public int SupplyFor(int j)
         {
+            if (FreeMovesLeft > 0) return 0;   // 近道の残りがある間はただ
             int c = FreeMapParams.MoveSupply;
             if (!Perks.ignoreSand && (WeatherAt(j, WeatherKind.Sand) || WeatherAt(Me, WeatherKind.Sand))
                 && GameLoop.GameRng.Range(0, 1000, "map.free.sand", Turn * 1000 + j) < (int)(FreeMapParams.SandExtraChance * 1000))
@@ -579,11 +605,11 @@ namespace MapSystem.FreeMove
             return g[j] != int.MaxValue && g[j] < g[Me];
         }
 
-        /// <summary>点 j へ 1 歩動くのに進むターン (雪の前線の内側は 2)。</summary>
-        public int TurnsFor(int j) => WeatherAt(j, WeatherKind.Snow) || WeatherAt(Me, WeatherKind.Snow) ? 2 : 1;
+        /// <summary>点 j へ 1 歩動くのに進むターン (雪の前線の内側は 2・近道の残りがある間は 0)。</summary>
+        public int TurnsFor(int j) => FreeMovesLeft > 0 ? 0 : WeatherAt(j, WeatherKind.Snow) || WeatherAt(Me, WeatherKind.Snow) ? 2 : 1;
 
-        /// <summary>点 j へ 1 歩動いた時の HP の損 (雹の前線の内側)。</summary>
-        public int HpLossFor(int j) => WeatherAt(j, WeatherKind.Hail) ? 1 : 0;
+        /// <summary>点 j へ 1 歩動いた時の HP の損 (雹の前線の内側)。 近道の残りがある間の 1 歩は 0 (2026-11-13・作者の決定「ただで動いた時は払わない」)。</summary>
+        public int HpLossFor(int j) => FreeMovesLeft > 0 ? 0 : WeatherAt(j, WeatherKind.Hail) ? 1 : 0;
 
         /// <summary>追跡者がいま補足に使う歩数 (性質と照明で変わる)。 表示 (気配の輪) もこれを読む。</summary>
         public int DetectHops
@@ -677,12 +703,17 @@ namespace MapSystem.FreeMove
         public bool CanMoveTo(int j)
             => !Dead && !InFight && j >= 0 && j < _adj.Length && !_sunk[j] && _adj[Me].Contains(j);
 
-        /// <summary>隣の点 j へ 1 歩。 物資を払い、 痕跡を残し、 追跡者が動く。</summary>
+        /// <summary>隣の点 j へ 1 歩。 物資を払い、 痕跡を残し、 追跡者が動く。
+        /// <para>近道の残り (<see cref="FreeMovesLeft"/>) がある間は<b>ただの 1 歩</b>: 物資を払わず、 ターンを進めず (追跡者・使い魔・前線・
+        /// 照明と囮罠の残りが動かない)、 雹の HP も払わず (2026-11-13)、 残りを 1 減らす。 痕跡・着いた点の起動は通常の 1 歩と同じ。 補足の判定は
+        /// 追跡者の手番 (= 次にターンが進んだ時) にしか無いので、 ここでは鳴らない。 追跡者・使い魔の居る点へ自分から踏み込んだ時だけ、 その場で接触する。</para></summary>
         public FreeMapEvent MoveTo(int j)
         {
             if (!CanMoveTo(j)) return FreeMapEvent.None;
+            bool free = FreeMovesLeft > 0;
             int cost = SupplyFor(j), turns = TurnsFor(j), hail = HpLossFor(j);
-            if (Perks.goalwardHalf && IsGoalward(j)) _goalwardSteps++;
+            // 〈渡り鳥の羅盤〉の「2 歩に 1 回安い」は払う歩だけを数える (ただの歩で順番をずらさない)
+            if (!free && Perks.goalwardHalf && IsGoalward(j)) _goalwardSteps++;
             var ev = FreeMapEvent.None;
             if (Pay(cost)) ev |= FreeMapEvent.Died;
             HpPayReason = "雹";
@@ -695,8 +726,32 @@ namespace MapSystem.FreeMove
             LastArrived = j;
             ev |= FreeMapEvent.Arrived;
             if ((ev & FreeMapEvent.Died) != 0) { Dead = true; return ev; }
-            ev |= PassTurns(turns);
+            if (free)
+            {
+                FreeMovesLeft--;
+                ev |= ContactWithoutTurn(j);
+                RevealView();
+            }
+            else ev |= PassTurns(turns);
             if ((ev & (FreeMapEvent.Caught | FreeMapEvent.FamiliarContact)) != 0) PendingArrival = j;
+            return ev;
+        }
+
+        /// <summary>ターンを進めずに点 j へ着いた時の接触: 追跡者の本体の居る点なら捕まる (補足もその場で入る)、
+        /// 使い魔・猟犬の居る点なら接触する。 補足の範囲に入っただけでは何も起きない (判定は次の追跡者の手番)。
+        /// 〈煙玉〉は補足を外す品で、 踏み込んだ接触には効かない。</summary>
+        private FreeMapEvent ContactWithoutTurn(int j)
+        {
+            var ev = FreeMapEvent.None;
+            if (FoeAlive && FoeNode == j)
+            {
+                if (FoeMode != FoeMode.Chase) { ev |= FreeMapEvent.Detected; _chaseTurns = 0; }
+                FoeMode = FoeMode.Chase; LastSeen = j; _lose = 0; _alertLure = -1;
+                Contact = ContactKind.Body;
+                return ev | FreeMapEvent.Caught;
+            }
+            foreach (var f in Familiars)
+                if (f.pos == j) { Contact = ContactKind.Familiar; ev |= FreeMapEvent.FamiliarContact; break; }
             return ev;
         }
 
@@ -763,6 +818,132 @@ namespace MapSystem.FreeMove
 
         /// <summary>多めに回復する休憩など、 ターンだけを進める。</summary>
         public FreeMapEvent PassTurnsExternal(int n) => Dead || InFight ? FreeMapEvent.None : PassTurns(n);
+
+        // =====================================================================
+        //  イベントの航行の効果 (2026-11-12・docs/GAME.md §17)
+        //  どれもターンを使わない。 本体はイベントを閉じて地図へ戻った時に 1 つずつ呼ぶ (GameManager.ApplyEventNav)。
+        //  イベント専用の分岐を本体の他の処理に持たせないため、 動詞は「地図の上で何が起きるか」だけで書く。
+        // =====================================================================
+
+        /// <summary>この層で種類が分かっている点の割合 (0..1)。 イベントの出やすさ (地図の系) が読む。</summary>
+        public double KnownFraction
+        {
+            get
+            {
+                int k = 0;
+                for (int i = 0; i < Known.Length; i++) if (Known[i]) k++;
+                return Known.Length > 0 ? (double)k / Known.Length : 1.0;
+            }
+        }
+
+        /// <summary>今いる点から道で range 歩以内の点を明かす。 scouting = 戦闘名まで (偵察と同じ完全公開)。 新しく種類が分かった点の数を返す。</summary>
+        public int RevealAround(int range, bool scouting)
+        {
+            if (range <= 0) return 0;
+            var d = HopsFrom(Me);
+            int fresh = 0;
+            for (int i = 0; i < d.Length; i++)
+            {
+                if (d[i] > range) continue;
+                if (!Known[i]) fresh++;
+                Known[i] = true;
+                if (scouting) Scouted[i] = true;
+            }
+            Version++;
+            return fresh;
+        }
+
+        /// <summary>指定した点を完全公開する (種類と戦闘名)。 沈んだ点は飛ばす。</summary>
+        public int RevealPoints(IEnumerable<int> points)
+        {
+            int fresh = 0;
+            if (points == null) return 0;
+            foreach (int i in points)
+            {
+                if (i < 0 || i >= Known.Length || _sunk[i]) continue;
+                if (!Known[i]) fresh++;
+                Known[i] = true; Scouted[i] = true;
+            }
+            Version++;
+            return fresh;
+        }
+
+        /// <summary>補足を外す: 追跡者は見失って巡回へ戻り、 <see cref="FreeMapParams.ChaseRest"/> ターンは補足しない
+        /// (追跡の上限で諦めた時と同じ休み)。 放たれた使い魔は消え、 猟犬は本体の元へ戻る。 追跡者が居なければ何もしない。</summary>
+        public FreeMapEvent ShakeOff()
+        {
+            if (!FoeAlive) return FreeMapEvent.None;
+            bool was = FoeMode != FoeMode.Patrol || Familiars.Exists(f => !f.hound);
+            FoeMode = FoeMode.Patrol; _lose = 0; _chaseTurns = 0; _alertLure = -1;
+            _chaseRest = Math.Max(_chaseRest, FreeMapParams.ChaseRest);
+            Familiars.RemoveAll(f => !f.hound);
+            for (int i = 0; i < Familiars.Count; i++) { var f = Familiars[i]; f.pos = FoeNode; f.target = -1; Familiars[i] = f; }
+            Version++;
+            return was ? FreeMapEvent.FoeLost : FreeMapEvent.None;
+        }
+
+        /// <summary>追跡者の本体を道で steps 歩、 自分から遠ざける (毎歩、 自分からの歩数がいちばん増える隣へ・同点は隣接表の並び)。
+        /// これ以上離れられなければそこで止まる。 動かない性質 (召喚者) も動かす ── 本体の性質ではなく、 イベントの出来事として動く。
+        /// 猟犬は本体の元へ戻る。 追跡中なら追跡は続く (最後に補足した点へ向かう)。
+        /// <para>縄張りを出ない追跡者 (<see cref="Leashed"/>・既定) は、 縄張りの中の隣へしか動かさない ── 縄張りの縁で止まる (2026-11-13)。
+        /// 自分からの歩数は層の全部の道で数える (縄張りの中で、 自分から一番遠い側へ寄る)。 旧い作り (縄張りの外まで追う) の動きは変えない。</para></summary>
+        public FreeMapEvent PushFoe(int steps)
+        {
+            if (!FoeAlive || steps <= 0) return FreeMapEvent.None;
+            var d = HopsFrom(Me);
+            bool leash = Leashed && InTerritory(FoeNode);   // 縄張りの外に居る時 (旧い写しなど) は今までどおり
+            for (int k = 0; k < steps; k++)
+            {
+                int best = FoeNode;
+                foreach (int v in _adj[FoeNode])
+                    if (d[v] != int.MaxValue && d[v] > d[best] && (!leash || InTerritory(v))) best = v;
+                if (best == FoeNode) break;
+                FoeNode = best;
+            }
+            for (int i = 0; i < Familiars.Count; i++)
+                if (Familiars[i].hound) { var f = Familiars[i]; f.pos = FoeNode; Familiars[i] = f; }
+            Version++;
+            return FreeMapEvent.None;
+        }
+
+        /// <summary>追跡者の本体を道で steps 歩、 自分へ近づける (代償の効果)。 自分の隣で止まる (この効果では捕まらない)。
+        /// 補足するかどうかは次のターンの追跡者の手番が決める。
+        /// <para>縄張りを出ない追跡者 (<see cref="Leashed"/>・既定) は、 追跡者が歩く時と同じ道 (<see cref="FoeStepToward"/>) で寄せる ──
+        /// 自分が縄張りの外に居れば、 縄張りの縁 (自分へ道で一番近づける点) で止まる (2026-11-13)。 旧い作りの動きは変えない。</para></summary>
+        public FreeMapEvent PullFoe(int steps)
+        {
+            if (!FoeAlive || steps <= 0) return FreeMapEvent.None;
+            for (int k = 0; k < steps; k++)
+            {
+                int nx = Leashed ? FoeStepToward(FoeNode, Me) : StepToward(FoeNode, Me);
+                if (nx == FoeNode || nx == Me) break;
+                FoeNode = nx;
+            }
+            Version++;
+            return FreeMapEvent.None;
+        }
+
+        /// <summary>天候の前線を動かす。 steps &gt; 0 = 近づける (前線が steps 回進む・崩れる地平と沈む湖面はその分だけ働く)、
+        /// steps &lt; 0 = 遠ざける (前線を |steps| × <see cref="FreeMapParams.FrontStep"/> だけ左へ戻す・まだ届いていない所まで戻ったら未到達に戻す)。
+        /// 天候の無い層・まだ前線が来ていない時に遠ざけるのは何も起きない。</summary>
+        public FreeMapEvent ShiftFront(int steps)
+        {
+            if (Weather == WeatherKind.None || steps == 0) return FreeMapEvent.None;
+            var ev = FreeMapEvent.None;
+            if (steps > 0)
+            {
+                for (int k = 0; k < steps; k++) ev |= AdvanceFront();
+            }
+            else if (!double.IsNegativeInfinity(Front))
+            {
+                double f = Math.Min(Front, FreeMapParams.Width) + steps * (double)FreeMapParams.FrontStep;
+                Front = f < FreeMapParams.FrontStep ? double.NegativeInfinity : f;
+                // 戻した時は FrontAdvanced を立てない (「前線が進んだ」の知らせを鳴らさない)
+            }
+            Version++;
+            RevealView();
+            return ev;
+        }
 
         /// <summary>囮罠を今いる点に置く (ターンは使わない)。 近くの追跡者は気を引かれて向かい、 踏むと足止めされる。</summary>
         public FreeMapEvent PlaceLure()

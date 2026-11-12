@@ -72,9 +72,14 @@ def render(events, src, out):
         for c in e['choices']:
             w('**▸ %s**\n\n' % c['label'])
             w('　　`%s`\n\n' % c['effects'])
-            w('　　%s\n\n' % c['after'])
+            # 確率分岐ごとの文は || 区切り (結果の欄の「N%で」の順・2026-11-12)
+            afters = c['after'].split('||')
+            for i, a in enumerate(afters):
+                w('　　%s%s\n\n' % ('（分岐%d）' % (i + 1) if len(afters) > 1 else '', a.strip()))
             if c['chronicle']:
-                w('　　*年代記: %s*\n\n' % c['chronicle'])
+                chs = c['chronicle'].split('||')
+                for i, a in enumerate(chs):
+                    w('　　*年代記%s: %s*\n\n' % ('（分岐%d）' % (i + 1) if len(chs) > 1 else '', a.strip()))
 
 
 def main():

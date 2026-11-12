@@ -22,6 +22,29 @@ namespace EventSystem
         /// <c>-</c> 区切りは結果セクションの <c>HP-5</c> と衝突するので使えない。</para></summary>
         public string digest;
 
+        /// <summary>確率分岐ごとの選んだ後の文 (2026-11-12)。 並びは結果の欄の「N%で」の順。
+        /// event_list.txt で <c>||</c> 区切りに分けて書いた時だけ埋まる ── 分けていなければ null で、
+        /// 全分岐で <see cref="postFlavor"/> を出す。 分けた時の <see cref="postFlavor"/> は先頭の分岐の文。
+        /// 読む側は <see cref="PostFlavorFor"/> を通す。</summary>
+        public List<string> postFlavorByBranch;
+
+        /// <summary>確率分岐ごとの記録の文 (2026-11-12)。 <see cref="postFlavorByBranch"/> と同じ扱い。
+        /// 空の分岐は「その分岐では記録に載せない」 (未記入と同じく沈黙する)。</summary>
+        public List<string> digestByBranch;
+
+        /// <summary>引いた分岐 <paramref name="branch"/> (<c>ExecutionResult.pickedBranch</c>・引いていなければ -1) の選んだ後の文。</summary>
+        public string PostFlavorFor(int branch) => EventBranchText.For(postFlavorByBranch, branch, postFlavor);
+
+        /// <summary>引いた分岐の記録の文。 未記入なら null。</summary>
+        public string DigestFor(int branch)
+        {
+            string d = EventBranchText.For(digestByBranch, branch, digest);
+            return string.IsNullOrEmpty(d) ? null : d;
+        }
+
+        /// <summary>記録の文を分岐ごとに分けて書いてあるか (分けてある時だけ、 引いた分岐を戦記に残す)。</summary>
+        public bool DigestSplitByBranch => digestByBranch != null;
+
         /// <summary>この選択肢が使うターン (効果「ターン+N」の合計・確率分岐の中は数えない)。 0 なら時間を使わない。</summary>
         public int TurnCost
         {
@@ -48,9 +71,90 @@ namespace EventSystem
             }
         }
 
+        /// <summary>この選択肢で払う強化素材 (効果「武器強化素材-N」の合計・確率分岐の中は数えない)。 2026-11-12。</summary>
+        public int MaterialCost
+        {
+            get
+            {
+                int n = 0;
+                if (effects != null)
+                    foreach (var e in effects)
+                        if (e != null && !e.postCombat && e.type == EventEffectType.MaterialDelta && e.amount < 0) n -= e.amount;
+                return n;
+            }
+        }
+
+        /// <summary>この選択肢で払う物資 (効果「物資-N」の合計・確率分岐の中と「勝利後」は数えない)。 2026-11-13。
+        /// 足りなければ選べない (<see cref="UnavailableReason"/>)。 確率分岐の中の物資-N は支払いでなく結果として失う物なので、 ここには入れない。</summary>
+        public int ProvisionCost
+        {
+            get
+            {
+                int n = 0;
+                if (effects != null)
+                    foreach (var e in effects)
+                        if (e != null && !e.postCombat && (e.type == EventEffectType.ProvisionDelta || e.type == EventEffectType.HungerDelta) && e.amount < 0) n -= e.amount;
+                return n;
+            }
+        }
+
+        /// <summary>この選択肢が効果 type を (確率分岐の外に) 持つか。</summary>
+        public bool Has(EventEffectType type)
+        {
+            if (effects != null)
+                foreach (var e in effects)
+                    if (e != null && !e.postCombat && e.type == type) return true;
+            return false;
+        }
+
         /// <summary>選べるか。 **払えないゴールドの支払いは選べない** (2026-11-11 まで、 所持金 0 でも
-        /// 「20 ゴールドで品を買う」が通り、 所持金が 0 で止まるだけだった)。 物資は足りなくても選べる
-        /// (足りない分は HP で払う ── 航行と同じ規則)。 run が null なら常に true。</summary>
-        public bool IsAvailable(GameLoop.RunState run) => run == null || run.coins >= GoldCost;
+        /// 「20 ゴールドで品を買う」が通り、 所持金が 0 で止まるだけだった)。 run が null なら常に true。
+        /// <para>2026-11-12: 払えない強化素材・差し出せる秘宝が無い取り替え・鍛えられない武器 (素材が足りない / 終点) も選べない。</para>
+        /// <para>2026-11-13 (作者の決定): 暗くするのは (a) 払えない時 (ゴールド・物資・素材) と、 (b) <b>得になる効果が何ひとつ起きない時</b>だけ
+        /// (<see cref="EventEffectRoles.NothingGainedReason"/>)。 起きない効果が代償 (追跡者を呼ぶ・前線を近づける) だけなら選べる
+        /// (作者「いないならいないで OK」)。 得の一部だけが起きない時も選べる。 起きなかった効果は結果の行に出す (<c>EventEffectExecutor</c>)。
+        /// HP が満ちている時の HP+N は選べる。 理由の文は <see cref="UnavailableReason"/>。</para></summary>
+        public bool IsAvailable(GameLoop.RunState run) => UnavailableReason(run) == null;
+
+        /// <summary>選べない理由 (画面に出す短い文)。 選べるなら null。
+        /// 判定の順は (a) ゴールド → 物資 → 素材 (鍛える素材を含む)、 (b) 得になる効果が何ひとつ起きない (最初に書かれた得の効果の理由)。</summary>
+        public string UnavailableReason(GameLoop.RunState run)
+        {
+            if (run == null) return null;
+            int g = GoldCost;
+            if (run.coins < g) return $"ゴールドが足りない（{g}G）";
+            int p = ProvisionCost;
+            if (run.provision < p) return $"物資が足りない（{p}）";
+            int m = MaterialCost;
+            if (Has(EventEffectType.ForgeWeapon))
+            {
+                int cost = GameLoop.GameManager.WeaponUpgradeCost(run);
+                if (cost != int.MaxValue) m += cost;   // 終点 (鍛えられない) は (b) の側で見る
+            }
+            if (run.weaponMaterials < m) return $"素材が足りない（{m}）";
+            return EventEffectRoles.NothingGainedReason(effects, Situation(run, Has(EventEffectType.TradePassive), Has(EventEffectType.ForgeWeapon)));
+        }
+
+        /// <summary>効果が起きるかを決める今の状況 (2026-11-13)。 航行の効果は地図へ戻った時に適用するが (<c>GameManager.PassEventTurns</c>)、
+        /// イベントの間に追跡者・前線・地図の有無は変わらないので、 選ぶ時の状態で決める。
+        /// 航行は本体の今の航行マップ (<c>GameManager.FreeMap</c>) を読む ── run が本体のランでなければ航行は判定しない (起きるとみなす)。
+        /// 結果の行 (<c>EventEffectExecutor</c>) も同じ状況で「起きなかった」を書く。 <paramref name="trade"/> / <paramref name="forge"/> = 取り替え・鍛えるを読むか (持たない選択肢では手間を省く)。</summary>
+        public static EventEffectSituation Situation(GameLoop.RunState run, bool trade = true, bool forge = true)
+        {
+            var s = new EventEffectSituation
+            {
+                canTrade = trade && run != null && GameLoop.GameManager.CanTradePassive(run),
+                canForge = forge && run != null && GameLoop.GameManager.WeaponUpgradeCost(run) != int.MaxValue,
+            };
+            var gm = GameLoop.GameManager.Instance;
+            if (run == null || gm == null || !ReferenceEquals(gm.Run, run)) return s;
+            var sim = gm.FreeMap;
+            s.navKnown = true;
+            s.map = sim != null;
+            s.foe = sim != null && sim.FoeAlive;
+            s.weather = sim != null && sim.Weather != MapSystem.FreeMove.WeatherKind.None;
+            s.frontArrived = sim != null && sim.FrontArrived;
+            return s;
+        }
     }
 }

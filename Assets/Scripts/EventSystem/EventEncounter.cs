@@ -107,27 +107,32 @@ namespace EventSystem
             int chGold = run != null ? run.coins : 0;
             int chHp   = run != null ? run.playerHP : 0;
             int chProv = run != null ? run.provision : 0;
+            int chMat  = run != null ? run.weaponMaterials : 0;
 
             var execResult = EventEffectExecutor.Execute(choice.effects, run);
 
             if (run != null)
             {
-                // 物資と時間も代償に数える (2026-11-11・ターンを使う選択肢)
-                bool paid = run.coins < chGold || run.playerHP < chHp || run.provision < chProv || execResult.turnsToPass > 0;
+                // 物資と時間も代償に数える (2026-11-11・ターンを使う選択肢)。 素材も (2026-11-12・素材を払う選択肢)
+                bool paid = run.coins < chGold || run.playerHP < chHp || run.provision < chProv || run.weaponMaterials < chMat
+                         || execResult.turnsToPass > 0;
                 bool empty = choice.effects == null || choice.effects.Count == 0;
                 string code = empty  ? RunChronicle.EventRefuse
                             : paid   ? RunChronicle.EventPrice
                                      : RunChronicle.EventTake;
-                RunChronicle.Event(run, code, Current.id, index);
+                // 記録の文を分岐ごとに分けた選択肢だけ、 引いた分岐も残す (分けていない選択肢の行は今までと 1 字も変えない
+                //   ── 戦記はワーカー照合の digest に畳まれるので)
+                RunChronicle.Event(run, code, Current.id, index, choice.DigestSplitByBranch ? execResult.pickedBranch : -1);
             }
 
             // 一度のみイベントの記録
             if (Current.condition.onceOnly && run != null)
                 run.seenOnceEvents.Add(Current.id);
 
-            LastPostFlavor = choice.postFlavor;
+            LastPostFlavor = choice.PostFlavorFor(execResult.pickedBranch);   // 確率分岐は引いた分岐の文 (2026-11-12)
             LastResult = execResult;
             PendingTurns += execResult.turnsToPass;   // ランダムなイベントへ振り直した時は両方の分を積む
+            PendingNav.AddRange(execResult.navEffects);   // 航行の効果も同じく地図へ戻った時に (2026-11-12)
 
             // 戦闘勝利後の効果を保存
             PendingPostCombatEffects = new List<EventEffect>(execResult.postCombatEffects);
@@ -172,6 +177,13 @@ namespace EventSystem
         /// <summary>まだ進めていないターンを取り出して 0 に戻す。</summary>
         public int TakePendingTurns() { int n = PendingTurns; PendingTurns = 0; return n; }
 
+        /// <summary>選んだ選択肢の航行の効果 (地図を明かす・追跡者を撒く・近道・前線 …) のうち、 まだ適用していない分 (2026-11-12)。
+        /// ターンと同じく、 GameManager がイベントを閉じて地図へ戻った時に <see cref="TakePendingNav"/> で取り出して適用する。</summary>
+        public List<EventEffect> PendingNav { get; } = new List<EventEffect>();
+
+        /// <summary>まだ適用していない航行の効果を取り出して空にする。</summary>
+        public List<EventEffect> TakePendingNav() { var l = new List<EventEffect>(PendingNav); PendingNav.Clear(); return l; }
+
         /// <summary>選択肢 index を選べるか。 **全部が選べない時は全部を選べる扱いにする** (詰み防止)。</summary>
         public static bool IsChoiceSelectable(EventDefinition ev, int index, RunState run)
         {
@@ -204,7 +216,8 @@ namespace EventSystem
         {
             if (choice == null) return null;
             var sb = new System.Text.StringBuilder();
-            if (!choice.IsAvailable(run)) sb.Append($"ゴールドが足りない（{choice.GoldCost}G）");
+            string why = choice.UnavailableReason(run);   // 払えないゴールド・素材・差し出せる品が無い・鍛えられない (2026-11-12)
+            if (why != null) sb.Append(why);
             int t = choice.TurnCost;
             if (t > 0)
             {
