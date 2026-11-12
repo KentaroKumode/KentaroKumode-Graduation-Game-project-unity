@@ -27,7 +27,9 @@ def load(d):
 
 
 def cleared(x):
-    return x["deathFloor"] == 0
+    # 7 層クリア = bandScore >= 11 (ItemLearningParallelRunner の rounds.txt と同じ数え方)。
+    # deathFloor == 0 は「死ななかった」で、 イベントありだと 6 層で終わる結末 (7 層へ進む資格なし) も含んでしまう。
+    return x.get("bandScore", -1) >= 11 if "bandScore" in x else x["deathFloor"] == 0
 
 
 def layer_rates(rows, idx):
