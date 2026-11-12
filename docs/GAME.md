@@ -2202,7 +2202,7 @@ bot は数値カーブ検証のみに限定し、**選択の正解を統計に�
 CritDamageBonus / BossExtraRare 昇格 / **DiceTotalBonus（ダイス合計概念の消滅）**
 ── いずれも Applicator の互換 stub 経由で `0/false` を返す。
 
-> **SkillTreeView（旧 58 段 UI）は Obsolete API 経由で残置。** v6 の配点は Game2D の `Game2DMetaPanel` が担う（§23-5）。
+> **旧 58 段 UI（`SkillTreeView`）と段の定義（`MetaBuffStep` / `MetaBuffTrack` / `MetaBuffKind`）は 2026-11-13 に削除（§24・#132）。** v6 の配点は Game2D の `Game2DMetaPanel` が担う（タイトルの「SKILL TREE」→ `TitleMenuRouter.metaPanelButton`・§23-5）。移行の返金の式（30 + 段×2）は `MetaProgressState.LegacyTrackStepCost` に残す。
 
 **適用箇所の追跡（2026-11-12・§23-7）**: 枠に残る 15 本（数値 8・種火 5・端子 2）の段効果は、すべて本番の経路から読まれている。
 読む所: 外殻 = `MetaBuffApplicator.ApplyToRunStart`（`GameManager.cs` のラン開始）・r10 `LastStand.cs` ／ 出力 = `CombatManager.Damage.cs`・`Mechanics.cs` の与ダメ%・〈戦意〉の勝利数 `GameManager.Combat.cs` ／
@@ -4072,7 +4072,7 @@ SampleScene / Game2D から該当オブジェクトを外した（§24）。`Ite
 |---|---|
 | ショップビジュアル | ~~ロジック可動・シーンセットアップ未完~~ → 2026-11-12 確認: Game2D の場面の画面（`Game2DPhaseScreens` の `Shop`・仮置き）で買う・売る。固有の絵は無い |
 | ~~層タイトルバナー~~ | 2026-11-11: Game2D の `Game2DLayerBanner` が `LayerTitles.OnShow` を購読して出す（コード描画の板＋ドット字・仮置き。固有の絵は無い） |
-| 整備パネル v6 の本 UI | 2026-11-04: Game2D の `Game2DMetaPanel`（タイトルの「SKILL TREE」から開く・仮置き）が v6 の配点を担う。挑戦・遺物は同じ窓の頁。旧 `SkillTreeView`（58 段の一直線・Obsolete API 経由）はコードに残置（`TitleBgm` / `TitleDayNight` が参照） |
+| 整備パネル v6 の本 UI | 2026-11-04: Game2D の `Game2DMetaPanel`（タイトルの「SKILL TREE」から開く・仮置き）が v6 の配点を担う。挑戦・遺物は同じ窓の頁。旧 `SkillTreeView`（58 段の一直線）は 2026-11-13 に削除（§24・#132）。ボタンは `TitleMenuRouter` が窓を開く |
 | 中断セーブ（§4-5・#84） | 2026-11-12: 中断 = 設定の窓の「中断して終える」、再開 = 「はじめる」の後の窓（`Game2DResumePanel`・仮置き）。タイトルに専用の「続きから」ボタンの絵は無い。2026-11-12 に Game2D の再生で確認（中断 → 「はじめる」→ 続きから で RunState・位置・ターンが一致、 新しく始める で記録が消える） |
 | 手引き (handbook を画面へ) | 2026-11-12: `Game2DTutorial` が契機ごとに 1 度だけ出す（コード描画の板＋ドット字・仮置き・§0-2）。 2026-11-12 に Game2D の再生で確認（タイトル・地図・戦闘で出る、 閉じると印が付く、 設定の「手引きをもう一度」で消える） |
 
@@ -4472,6 +4472,7 @@ BOT の払い方（`AutoRunner.Terminals` の `ChooseGoldPunch`）は実装済�
 | **低使用ユニーク 18 品** | 2026-07-17 | 記憶の砂時計 / 死神の数珠 / 嵐の徽章 / 沈黙の剣帯 / 狂乱のメダリオン / 静寂のローブ / 黒煙の符 / 蒼穹の眼 / 守護天使の鈴 ほか |
 | **停戦協定（Truce）** | ADR-0009 | 収支 0 が頻発するため no-op 化。再設計待ち |
 | **旧メタ 58 段トラック** | 2026-07-25 | 整備パネル v6（固定予算配点）へ置換 |
+| **旧スキルツリーの画面（`SkillTreeView`・星座の 58 段）と段の定義（`MetaBuffStep` / `MetaBuffTrack` / `MetaBuffKind`）・`MetaProgressManager` の Obsolete stub・`TitleBgm` の SkillTree モード・専用の絵 21 枚** | 2026-11-13 | 2026-11-04 から「SKILL TREE」は整備パネルの窓を開き、旧画面は窓が開けない時の予備でしか出なかった。廃止した効果の説明（禁止語彙「ダイス合計 +1」の Lv42 ほか）を持ったまま残っていた（#132）。ボタンは `TitleMenuRouter.metaPanelButton` から `Game2DMetaPanel.Open` を呼ぶ。セーブ移行の返金の式だけ `MetaProgressState.LegacyTrackStepCost` に移して残す |
 | **メタ「神の加護」/ 進行度機能解放レーン / 較正ボーナス / 賽筋** | 2026-07-25 | v6 設計時に削除。賽筋は「ダイス合計」概念が相互攻撃モデルに存在しないため |
 | **Hades 鏡式 A/B 二択メタ** | 2026-07-25 | 「不均衡なら答え探し / 均衡ならコイントス」のジレンマ |
 | **会心の「分子/9」モデル** | 2026-07-26 | 11% 刻みが粗く、分子 9 で常時会心が成立していた。逓減カーブ + ×3.0 へ（逓減はのちに撤去・下行） |

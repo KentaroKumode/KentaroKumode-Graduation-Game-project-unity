@@ -238,7 +238,30 @@ namespace AutoTest
                 }
                 DeckLookaheadDecisions++;
                 if (laBest != best && us[laBest] < us[best]) DeckLookaheadChanged++;   // 同点の入れ替えは数えない (上書き率 ≠ 強さ)
-                best = laBest;
+                // [#105 診断] 「挿し方に読みの深さがあるか」を数える。 貪欲の手 (best) と先読みの手 (laBest) の、 今の損と先の得。
+                {
+                    bool boss = BossIds.IsBoss(cm.CurrentEnemy.id);
+                    var dg = boss ? _laDiagBoss : _laDiagOther;
+                    dg.decisions++;
+                    dg.cands += n;
+                    // 貪欲の 1 位と 2 位 (効用が違う最初の手) の差 = 今のターンだけで手がどれだけ決まっているか
+                    float second = float.NaN;
+                    for (int r = 1; r < n; r++) if (us[order[r]] < us[order[0]] - 1e-4f) { second = us[order[r]]; break; }
+                    if (float.IsNaN(second)) dg.allTied++;
+                    else { float gap = us[order[0]] - second; if (gap >= 500f) dg.forced++; else dg.gapSum += gap; }
+                    int tiedTop = 0;
+                    for (int r = 0; r < n; r++) if (us[order[r]] >= us[order[0]] - 1e-4f) tiedTop++;
+                    dg.tiedTopSum += tiedTop;
+                    if (laBest != best && us[laBest] < us[best] - 1e-4f)
+                    {
+                        float nowLoss = us[best] - us[laBest];
+                        float futGain = DeckNextValue(in ev, la, rolls, touts[laBest], afters[laBest], in outs[laBest])
+                                      - DeckNextValue(in ev, la, rolls, touts[best], afters[best], in outs[best]);   // memo に載っているので軽い
+                        if (nowLoss >= 500f || futGain >= 500f) dg.changedBig++;
+                        else { dg.changed++; dg.nowLossSum += nowLoss; dg.futGainSum += futGain; }
+                    }
+                }
+                if (!deckLookaheadProbe) best = laBest;   // 診断だけの時は手を変えない (基準のランと全件一致のまま数える)
             }
 
             bestU = us[best];
@@ -507,6 +530,32 @@ namespace AutoTest
         public int deckLookaheadTopK = 3;
         /// <summary>[#105] 次のターンの (手札, 出目) の標本の数 (既定 6)。</summary>
         public int deckLookaheadSamples = 6;
+        /// <summary>[#105 診断] true = 先読みを計算して数えるだけで、 手は変えない (貪欲の手のまま = 基準のランと同じ結果)。</summary>
+        public bool deckLookaheadProbe = false;
+
+        /// <summary>[#105 診断] 先読みを掛けた判断の内訳 (ランをまたいで累計)。</summary>
+        private sealed class LaDiag
+        {
+            public long decisions, cands, tiedTopSum, allTied, forced, changed, changedBig;
+            public double gapSum, nowLossSum, futGainSum;
+            public string Line(string tag)
+            {
+                if (decisions == 0) return tag + " 判断 0";
+                long free = decisions - allTied - forced;
+                return $"{tag} 判断 {decisions} / 候補の平均 {(double)cands / decisions:0.0} / 1 位と同点の手の平均 {(double)tiedTopSum / decisions:0.0} "
+                     + $"/ 全部同点 {allTied} ({100.0 * allTied / decisions:0.0}%) / 2 位との差が 500 以上 (生死) {forced} ({100.0 * forced / decisions:0.0}%) "
+                     + $"/ 残りの 1 位と 2 位の差の平均 {(free > 0 ? gapSum / free : 0):0.00} "
+                     + $"/ 先読みが手を変えた {changed} ({100.0 * changed / decisions:0.00}%) 今の損の平均 {(changed > 0 ? nowLossSum / changed : 0):0.00} 先の得の平均 {(changed > 0 ? futGainSum / changed : 0):0.00} "
+                     + $"/ 生死がらみで変えた {changedBig} ({100.0 * changedBig / decisions:0.00}%)";
+            }
+        }
+        private readonly LaDiag _laDiagBoss = new LaDiag(), _laDiagOther = new LaDiag();
+        /// <summary>[#105 診断] サマリーに出す行 (先読みを掛けていなければ空)。</summary>
+        public string DeckLookaheadDiagLine()
+            => _laDiagBoss.decisions + _laDiagOther.decisions == 0 ? ""
+             : "[先読みの診断] " + (deckLookaheadProbe ? "数えるだけ (手は貪欲のまま)" : "先読みの手を使う")
+               + System.Environment.NewLine + "  " + _laDiagBoss.Line("ボス戦:")
+               + System.Environment.NewLine + "  " + _laDiagOther.Line("それ以外:");
 
         /// <summary>[#105 計装] 先読みを掛けた判断の数 / そのうち今の効用が最良でない挿し方に変えた数 (同点の入れ替えは数えない)。 ランをまたいで累計。</summary>
         public int DeckLookaheadDecisions { get; private set; }

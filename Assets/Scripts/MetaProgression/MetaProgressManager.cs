@@ -8,8 +8,7 @@ namespace MetaProgression
     /// 2026-07-25 v6 移行:
     ///   ・購入モデル = 整備パネル (MetaPanel)。
     ///   ・トークン → ポイント購入 → トラックへランク配点。 ポイント上限 36。
-    ///   ・旧 TryPurchase (58 段トラック) は Deprecated (noop)。 呼び出し側は AutoRunner の
-    ///     MaxAllForTesting と ClassSelect UI 相当のみ、後者は v6 UI 実装時に置換予定。
+    ///   ・旧 58 段トラックの API (TryPurchase / NextLevel ほか) は 2026-11-13 に削除 (#132・読んでいたのは旧 SkillTreeView だけ)。
     /// </summary>
     public class MetaProgressManager : MonoBehaviour
     {
@@ -188,20 +187,5 @@ namespace MetaProgression
 
         // [削除 2026-11-12] SetChallengeMax ── 挑戦の難易度を最大 / 0 にする口。 呼ぶ所が 0 件だった
         //   (AutoRunner は challengeDifficulty を直接書く)。
-
-        // ============================================================
-        //  レガシー API (互換のため残置・v6 では noop)
-        // ============================================================
-
-        [System.Obsolete("v6: 旧 58 段トラックは廃止。TryPurchasePoint + TryAssignRank を使用。")]
-        public int NextLevel => 0;
-        [System.Obsolete("v6: 旧 58 段トラックは廃止。NextPointCost を使用。")]
-        public int NextCost => int.MaxValue;
-        [System.Obsolete("v6: 旧 58 段トラックは廃止。IsPointCapReached を使用。")]
-        public bool IsTrackComplete => true;
-        [System.Obsolete("v6: 旧 58 段トラックは廃止。CanPurchasePoint を使用。")]
-        public bool CanPurchase() => false;
-        [System.Obsolete("v6: 旧 58 段トラックは廃止。TryPurchasePoint を使用。")]
-        public bool TryPurchase() => false;
     }
 }
