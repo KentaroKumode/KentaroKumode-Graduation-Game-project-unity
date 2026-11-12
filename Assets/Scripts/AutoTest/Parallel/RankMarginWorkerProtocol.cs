@@ -7,8 +7,8 @@ namespace AutoTest.ParallelSweep
 {
     /// <summary>親プロセスが 1 ワーカーへ渡す指示。
     ///
-    /// <para>Ultra の <c>UltraPortfolioCandidateJob</c> とは別系統。 あちらは合成シードと
-    /// 候補ポリシーを配るためのもので、 こちらは<b>通常バッチと同じ <c>runIdx</c> の
+    /// <para>旧 Ultra の <c>UltraPortfolioCandidateJob</c> (合成シードと候補ポリシーを配っていた・2026-11-13 削除・#135)
+    /// と違い、 <b>通常バッチと同じ <c>runIdx</c> の
     /// 区間を切り出すだけ</b>。 シードの作り方を変えないことが、 逐次版と digest が
     /// 一致する (＝並列版が正しいと言える) 唯一の根拠になっている。</para></summary>
     [Serializable]

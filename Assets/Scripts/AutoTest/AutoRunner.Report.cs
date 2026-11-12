@@ -13,7 +13,6 @@ using MapSystem;
 using EventSystem;
 using ItemSystem;
 using ItemSystem.Shop;
-using AutoTest.Ultra;
 
 namespace AutoTest
 {
@@ -193,30 +192,11 @@ namespace AutoTest
             sb.AppendLine($"5層裏ボス : {(suppressLayer5HiddenBoss ? "遮断" : "出現あり")}"
                         + $" / 軽減無視の盾肩代わり: {(shieldAbsorbsUnmitigable ? "あり (製品挙動)" : "**なし (対照群)**")}");
             // **結果を変えるトグルを 1 行にまとめて必ず出す (2026-08-18)。**
-            //   Ultra の portfolio で、 worker 側が既定値のまま走り本ラン側は EditorPrefs 継承、
+            //   旧 Ultra の方策の組 (2026-11-13 削除・#135) で、 worker 側が既定値のまま走り本ラン側は EditorPrefs 継承、
             //   という不一致が起きた。 どちらも「正常に進行中」と表示され、 4 候補が同一挙動に
             //   なっていたことに **1000ラン×4 を回し終えるまで誰も気付かなかった**。
             //   個別の行から推測させる形 (パーツ抑止は「平均面数」から逆算する等) では
             //   後から条件を突き合わせられない。 **値そのものを書く。**
-            if (!string.IsNullOrEmpty(_ultraResumeLine))
-                sb.AppendLine("Ultra resume: " + _ultraResumeLine);
-            // Ultra の委譲が実際に効いたか。 **落ちても run は完走するので、
-            //   印字しないと「一度も効いていない Ultra」を成果と取り違える。**
-            if (AutoTest.Ultra.UltraDispatchStats.Offered > 0
-                || wiringSkill == WiringSkill.Ultra)
-                sb.AppendLine("Ultra委譲  : " + AutoTest.Ultra.UltraDispatchStats.Describe()
-                    + (string.IsNullOrEmpty(_ultraLastFallbackReason)
-                        ? "" : "  直近の落ちた理由=" + _ultraLastFallbackReason));
-            if (_ultraThinkingSecondsTotal > 0f)
-            {
-                sb.AppendLine($"Ultra思考  : 計 {_ultraThinkingSecondsTotal / 60f:F1}分"
-                    + $" ({_ultraThinkingSecondsTotal / Math.Max(1, _records.Count):F1}秒/ラン)"
-                    + "  ※番犬からは控除済み");
-                // **上書き率だけでは強さを読めない。** 全手0クリアの決定では 2 手の下限が
-                //   どちらも 0.000 の同点になり、 選ばれるのは「評価で勝った手」ではなく
-                //   「id が辞書順で先の手」。 差がついた件数を必ず並べて出す。
-                sb.AppendLine("Ultra評価  : " + AutoTest.Ultra.UltraRolloutEvaluator.DescribeCounters());
-            }
             sb.AppendLine($"実効トグル: パーツ陳列抑止={suppressFacePartOffers}"
                         + $" / 盾肩代わり={shieldAbsorbsUnmitigable}"
                         + $" / メタデバフ全ON={enableAllDebuffs}"
@@ -250,12 +230,6 @@ namespace AutoTest
                             + (string.IsNullOrEmpty(_learningGaps) ? "" : $" / バッチ開始時の欠け: {_learningGaps}"));
             sb.AppendLine("比較軸    : 航行Rankのみ差し替え（消費/ショップ/戦闘実行/イベントは共通固定）");
             sb.AppendLine("################################################");
-            if (AutoTest.Ultra.UltraDecisionCensus.Enabled
-                && AutoTest.Ultra.UltraDecisionCensus.Runs > 0)
-            {
-                sb.AppendLine();
-                sb.Append(AutoTest.Ultra.UltraDecisionCensus.Report());
-            }
             sb.AppendLine();
             sb.Append(BuildPersonaBlock());
             sb.AppendLine();

@@ -3,7 +3,6 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using AutoTest;
-using AutoTest.Ultra;
 
 namespace AutoTest.EditorTools
 {
@@ -71,19 +70,8 @@ namespace AutoTest.EditorTools
         private const string TierCalRunsKey  = "AutoRun.TierCalibrationRuns";
         private const string TierCalBatchesKey = "AutoRun.TierCalibrationBatches";
         private const string TierCalResumeKey = "AutoRun.TierCalibrationResumeAfterReload";
-        private const string UltraStandard50WithRelic10KKey = "AutoRun.UltraStandard50WithRelic10K";
-        /// <summary>診断: Ultra の dispatch 経路に smoke sink を差す (0=なし/1=先頭/2=末尾)。</summary>
-        private const string UltraSmokeSinkKey = "AutoRun.UltraSmokeSink";
-        /// <summary>診断: 実ランの途中で checkpoint を書き出す先。</summary>
-        private const string UltraCaptureKey = "AutoRun.UltraCaptureCheckpoint";
-        /// <summary>診断: checkpoint から resume する (Editor 内・コンソールが見える)。</summary>
-        private const string UltraResumeKey = "AutoRun.UltraResumeCheckpoint";
-        /// <summary>診断: マクロ決定を数えるだけ (判断は一切変えない)。</summary>
-        private const string UltraCensusKey = "AutoRun.UltraDecisionCensus";
-        /// <summary>本番: rollout で決める実バッチのラン数 (0=使わない)。</summary>
-        private const string UltraRolloutRunsKey = "AutoRun.UltraRolloutRuns";
-        /// <summary>本番: 1 手あたりの rollout 本数。</summary>
-        private const string UltraRolloutPerActionKey = "AutoRun.UltraRolloutPerAction";
+        // (技量の Ultra の SessionState キー AutoRun.UltraStandard50WithRelic10K / UltraSmokeSink / UltraCaptureCheckpoint /
+        //  UltraResumeCheckpoint / UltraDecisionCensus / UltraRolloutRuns / UltraRolloutPerAction は 2026-11-13 に削除・#135)
         /// <summary>階層DP航行の割引率 ×100 (0 = 使わない)。</summary>
         private const string FloorDpKey = "AutoRun.FloorDpDiscountPct";
         /// <summary>階層DP航行の HP 量子化帯数 (0 = 既定 11)。</summary>
@@ -133,7 +121,6 @@ namespace AutoTest.EditorTools
         private const string M4N = "Tools/AutoRun/④ 配線技量/素朴 (役もリロールも使わない・対照群)";
         private const string M4O = "Tools/AutoRun/④ 配線技量/最適 (3^5全列挙・役とリロールを使う)";
         private const string M4S = "Tools/AutoRun/④ 配線技量/天井 (戦闘決着まで先読み・未来の出目は読まない)";
-        private const string M4U = "Tools/AutoRun/④ 配線技量/Ultra (production worker・ラン全体最適化)";
         private const string WiringSkillKey = "AutoRun.WiringSkill";
 
         // ---- 対照群スイッチ: 軽減無視をシールドで肩代わりするか (2026-08-15) ----
@@ -303,9 +290,7 @@ namespace AutoTest.EditorTools
         [MenuItem(M4S, validate = true)] private static bool VM4S()
         { Menu.SetChecked(M4S, Skill == AutoRunner.WiringSkill.Super); return true; }
         // 厳密 (Exact) の選択メニューは 2026-11-12 に削除 (#135)。 ExactCombatAI は削除済みで、 戦闘の判断は Optimal と同じだった。
-        [MenuItem(M4U, priority = 404)] private static void SetM4U() { Skill = AutoRunner.WiringSkill.Ultra; }
-        [MenuItem(M4U, validate = true)] private static bool VM4U()
-        { Menu.SetChecked(M4U, Skill == AutoRunner.WiringSkill.Ultra); return true; }
+        // Ultra (rollout で手を選ぶ方策の組) の選択メニューは 2026-11-13 に技量ごと削除 (#135)。 保存済みの 4 は Super として走る。
 
 
         // ===== ラン起動 =====
@@ -707,264 +692,16 @@ namespace AutoTest.EditorTools
             Launch(1);
         }
 
-        /// <summary>
-        /// Ultra production benchmark. Runtime applies and re-validates the complete
-        /// profile instead of trusting the current menu toggles. If the production
-        /// worker/checkpoint gate is not ready, AutoRunner fails closed before run 1.
-        /// </summary>
-        [MenuItem("Tools/AutoRun/Ultra AI/遺物アリ Standard 50pt × 10000ラン", priority = 10)]
-        public static void RunUltra50WithRelic()
-        {
-            if (!UltraProductionWorkerBuild.EnsureBuilt(out string workerBuildError))
-            {
-                Debug.LogError("[AutoRunMenu][Ultra] worker build failed; run not started: "
-                    + workerBuildError);
-                return;
-            }
-            // **Clear every batch-mode key first.** Launch() reads SessionState before
-            // ApplyTo runs, so a leftover key from a previous menu action would configure a
-            // competing sweep. ApplyTo forces those fields off again, but erasing here also
-            // stops the keys from surviving into the *next* run — which is how a stale
-            // toggle silently changes a measurement.
-            //
-            // EditorPrefs are deliberately **not** rewritten here. Launch() reads them into
-            // the runner first, then ApplyTo overwrites every field the profile owns and
-            // Matches re-verifies it, so correctness does not depend on them. Silently
-            // flipping the user's saved menu toggles would change unrelated later batches.
-            ClearBatchModeSessionState();
-            EditorPrefs.SetBool(NoRelicKey, false);
-            Skill = AutoRunner.WiringSkill.Ultra;
-            SessionState.SetBool(UltraStandard50WithRelic10KKey, true);
-            Launch(1);
-        }
+        // (Ultra AI のメニュー ── 遺物アリ 50pt × 10000 の方策の組・dispatch 疎通・影響力測定・checkpoint の採取と resume・
+        //  マクロ決定の国勢調査・rollout 方策 ── は 2026-11-13 に技量の Ultra ごと削除・#135)
 
-        /// <summary>Ultra の dispatch 経路を実際に通す。 **強さの測定ではなく配管の確認。**
-        ///
-        /// 先頭手の sink と末尾手の sink を同一シードで走らせ、 結果が**違う**ことを見る。
-        /// 同じなら「hook は呼ばれているが選択がゲームへ届いていない」。
-        /// 全く動かないなら hook 自体が呼ばれていない。 どちらも
-        /// 「controller が毎回 baseline に同意した」場合と結果が区別できないので、
-        /// 意図的に**弱くて偏った** sink を使う。</summary>
-        [MenuItem("Tools/AutoRun/Ultra AI/診断: dispatch 疎通 (先頭手・30ラン)", priority = 30)]
-        public static void RunUltraDispatchSmokeFirst() => LaunchUltraSmoke(1);
-
-        [MenuItem("Tools/AutoRun/Ultra AI/診断: dispatch 疎通 (末尾手・30ラン)", priority = 31)]
-        public static void RunUltraDispatchSmokeLast() => LaunchUltraSmoke(2);
-
-        /// <summary>**マップ航行にそもそも影響力があるかを測る。** 天井を探す前に、
-        /// 探す価値がある層かを確かめる。
-        ///
-        /// <para>わざと下手なマップ方策（先頭手 / 末尾手）を Super と同一シード・同一ラン数で
-        /// 走らせ、クリア率がどれだけ落ちるかを見る。<b>下手に打っても落ちないなら、
-        /// 完璧に打っても上がらない</b> ── その層に天井は存在せず、rollout の予算を何倍に
-        /// しても無駄だと事前に分かる。</para>
-        ///
-        /// <para>rollout を撃たないので通常バッチ速度。1手32本 に増やして 20 時間かけた末に
-        /// 「本数が足りないのか天井が無いのか区別できない」に着地するのを避けるための、
-        /// 先に払う 10 分。</para></summary>
-        [MenuItem("Tools/AutoRun/Ultra AI/影響力測定: マップ方策 先頭手 (0pt・100ラン)", priority = 40)]
-        public static void RunMapLeverageFirst() => LaunchUltraSmoke(1, 100);
-
-        [MenuItem("Tools/AutoRun/Ultra AI/影響力測定: マップ方策 末尾手 (0pt・100ラン)", priority = 41)]
-        public static void RunMapLeverageLast() => LaunchUltraSmoke(2, 100);
-
-        /// <summary>実ランの途中から checkpoint を 1 つ採る。 rollout のコスト実測に要る。
-        ///
-        /// <para>合成盤面では測れない ── 手組みの `RunState` は装備もダイスも既定で、
-        /// 戦闘に入った瞬間に固着する。 `RunState.Initialize` も `MapGenerator.Generate` も
-        /// メタ進行のシングルトンに触るので play mode 外では呼べない。</para></summary>
-        [MenuItem("Tools/AutoRun/Ultra AI/診断: 実ランから checkpoint を採取 (1ラン)", priority = 33)]
-        public static void CaptureUltraCheckpoint()
-        {
-            ClearBatchModeSessionState();
-            EditorPrefs.SetBool(NoRelicKey, true);
-            Skill = AutoRunner.WiringSkill.Super;
-            SessionState.SetString(UltraCaptureKey, UltraCheckpointFile);
-            SessionState.SetInt(ChalOneScoreKey, 0);
-            SessionState.SetInt(ChalOneRunsKey, 1);
-            SessionState.SetBool(ChalSweepKey, true);
-            Launch(1);
-        }
-
-        /// <summary>採取した checkpoint を **Editor の中で** resume する。
-        ///
-        /// <para>worker で追えないため。 <see cref="AutoRunner"/> はラン中の <c>Debug.Log</c> を
-        /// 内部バッファへ回すので、 ヘッドレス worker の log にはラン中の行が 1 つも出ない。
-        /// 同じ resume を Editor で走らせればコンソールに全部出る。</para></summary>
-        [MenuItem("Tools/AutoRun/Ultra AI/診断: 採取した checkpoint から resume (1ラン)", priority = 34)]
-        public static void ResumeFromUltraCheckpoint()
-        {
-            if (!System.IO.File.Exists(UltraCheckpointFile))
-            {
-                Debug.LogError("[AutoRunMenu][Ultra] checkpoint が無い。 先に採取メニューを実行: "
-                    + UltraCheckpointFile);
-                return;
-            }
-            ClearBatchModeSessionState();
-            EditorPrefs.SetBool(NoRelicKey, true);
-            Skill = AutoRunner.WiringSkill.Super;
-            SessionState.SetString(UltraResumeKey, UltraCheckpointFile);
-            SessionState.SetInt(ChalOneScoreKey, 0);
-            SessionState.SetInt(ChalOneRunsKey, 1);
-            SessionState.SetBool(ChalSweepKey, true);
-            Launch(1);
-        }
-
-        /// <summary>checkpoint の現在地から出ている最初の移動手の action id。
-        /// 評価器が候補として並べるものと同じ形。</summary>
-        private static string FirstMoveActionId(AutoTest.Ultra.UltraResumePayload payload)
-        {
-            var nodes = payload?.map?.nodes;
-            if (nodes == null) return "";
-            for (int i = 0; i < nodes.Length; i++)
-            {
-                if (nodes[i] == null
-                    || !string.Equals(nodes[i].id, payload.map.currentNodeId,
-                                      System.StringComparison.Ordinal)) continue;
-                string[] links = nodes[i].connections;
-                if (links == null || links.Length == 0) return "";
-                var sorted = new System.Collections.Generic.List<string>(links);
-                sorted.Sort(System.StringComparer.Ordinal);
-                return AutoTest.Ultra.UltraLegalAction.Of(
-                    AutoTest.Ultra.UltraActionKind.MoveTo, sorted[0]).ActionId;
-            }
-            return "";
-        }
-
-        /// <summary>採取した checkpoint の置き場。 コスト実測メニューが読む。</summary>
-        public static string UltraCheckpointFile =>
-            System.IO.Path.Combine(
-                System.IO.Path.GetFullPath("AutoRunLogs"), "ultra_checkpoint.json");
-
-        /// <summary>マクロ決定が 1 ラン に何回あるのかを数える。 **判断は一切変えない。**
-        ///
-        /// <para>コスト外挿がずっと使ってきた「マクロ決定 30 回/ラン」は実測ではなく、
-        /// コスト計測メニューに直書きされた定数。 rollout をどの決定点で撃つか絞る話は
-        /// 全部この数に乗っているので、 絞る前に数える。</para>
-        ///
-        /// <para>特に見たいのは **手が 1 つしかない決定点の割合**。 そこは何本 rollout を
-        /// 撃っても選ぶ手が変わらないので、 発見的な間引きではなく定義上ただ働きになる。</para></summary>
-        [MenuItem("Tools/AutoRun/Ultra AI/診断: マクロ決定の国勢調査 (0pt・30ラン)", priority = 35)]
-        public static void RunUltraDecisionCensus()
-        {
-            ClearBatchModeSessionState();
-            EditorPrefs.SetBool(NoRelicKey, true);
-            Skill = AutoRunner.WiringSkill.Super;   // 生産方策のまま。 数えるだけ
-            SessionState.SetBool(UltraCensusKey, true);
-            SessionState.SetInt(ChalOneScoreKey, 0);
-            SessionState.SetInt(ChalOneRunsKey, 30);
-            SessionState.SetBool(ChalSweepKey, true);
-            Launch(1);
-        }
-
-        /// <summary>**rollout で実際に手を決めるバッチ。** ここまでの Ultra 実装が
-        /// 初めて方策として走る唯一の経路。
-        ///
-        /// <para>撃つのは <c>MapNavigation</c> だけ ── 国勢調査の実測で、決定の 62% が
-        /// ここに集まり、6-7層 にはそもそも決めるべき事がほとんど無い (手=1 が 8 割) と
-        /// 分かったため。絞りは**方策の一部**であって最適化ではないので、
-        /// どこで撃ったかはサマリに残る。</para>
-        ///
-        /// <para><b>Editor は決定のたび数秒固まる。</b> worker プロセスの完了を同期で待つ。
-        /// 番犬 (20秒/ラン) はこの待ち時間を控除するので DEADLOCK にはならないが、
-        /// 見た目は「応答なし」に近い。止めたければ Play を切ること。</para></summary>
-        private static bool TryInstallRolloutSink(AutoRunner runner, int rolloutsPerAction)
-        {
-            // **ここでビルドはしない。** この関数は Play Mode に入った後の
-            // OnPlayModeChanged から呼ばれるが、 BuildPipeline は Play Mode 中に走らない
-            // (EnsureBuilt は "must finish before Play Mode" で断る)。
-            // ビルドは LaunchUltraRollout が Play Mode に入る前に済ませてある。
-            // ここは「本当に出来ているか」の確認だけ。
-            if (!UltraProductionWorkerBuild.TryLoadDescriptor(out _, out string buildError))
-            {
-                Debug.LogError("[AutoRunMenu][Ultra] worker が使えない; rollout 経路は起動しない: "
-                    + buildError + " ── 先に Play Mode を抜けてメニューから起動し直すこと");
-                return false;
-            }
-
-            string workRoot = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(), "ultra_rollout_" + DateTime.Now.ToString("HHmmss"));
-
-            // **profile は実バッチ側と揃える。** ここがずれると、本ランは 0pt・遺物なしで
-            // 走っているのに rollout だけ 50pt・理論値遺物の未来を評価する、という
-            // 2026-08-17 の portfolio 障害と同型の事故になる。
-            UltraPortfolioProfileSpec profile = UltraPortfolioProtocol.CanonicalProfile();
-            profile.challengeScore = 0;
-            profile.theoreticalBestCursedRelic = false;
-
-            var oracle = new UltraProcessEpisodeOracle(
-                UltraProductionWorkerBuild.ExecutablePath,
-                UltraProductionWorkerBuild.BuildRoot,
-                workRoot, profile, UltraPortfolioProtocol.CanonicalCandidates()[0],
-                AutoTest.PolicyParameters.Current?.Clone(),
-                new string('a', 64))
-            {
-                EpisodeTimeoutSeconds = 300,
-            };
-            if (!oracle.IsHealthy)
-            {
-                Debug.LogError("[AutoRunMenu][Ultra] oracle unhealthy: worker が無い "
-                    + UltraProductionWorkerBuild.ExecutablePath);
-                return false;
-            }
-
-            var evaluator = new AutoTest.Ultra.UltraRolloutEvaluator(oracle)
-            {
-                RolloutsPerAction = Math.Max(1, rolloutsPerAction),
-            };
-            AutoTest.Ultra.UltraRolloutEvaluator.ResetCounters();
-
-            // payload は **決定のたびに現在の盤面から** 作る。sink 生成時に固定すると、
-            // ラン中の全決定を同じ古い盤面から評価することになる。
-            var sink = new AutoTest.Ultra.UltraRolloutSink(
-                evaluator,
-                (checkpoint, veilSeed) =>
-                {
-                    var gm = GameLoop.GameManager.Instance;
-                    var mm = MapSystem.MapManager.Instance;
-                    if (gm?.Run == null || mm == null) return null;
-                    return AutoTest.Ultra.UltraResumePayload.Create(
-                        gm.Run, mm, checkpoint.epoch, checkpoint.point, veilSeed, out _);
-                },
-                0xD1CEB0A5D1CEB0A5UL);
-            sink.AllowedPoints.Add(AutoTest.Ultra.UltraDecisionPoint.MapNavigation);
-            runner.ultraSink = sink;
-
-            Debug.LogWarning("[AutoRunMenu][Ultra] **rollout 方策で走る**: 1手 "
-                + evaluator.RolloutsPerAction + " 本 / 撃つ決定点 = MapNavigation のみ"
-                + " / worker 一時領域 " + workRoot
-                + "  ── 決定ごとに Editor が数秒固まる。番犬は思考時間を控除する");
-            return true;
-        }
-
-        /// <summary>疎通: rollout 方策が Super と**違う手を打つか**を見るだけ。
-        /// 委譲率がほぼ 0% なら、どの規模で回しても何も測れないことが先に分かる。</summary>
-        [MenuItem("Tools/AutoRun/Ultra AI/rollout 方策: 疎通 (0pt・10ラン・1手4本)", priority = 36)]
-        public static void RunUltraRolloutSmoke() => LaunchUltraRollout(10, 4);
-
-        /// <summary>本番と同じ本数で、同点率だけを先に見る。
-        ///
-        /// <para>1手4本 の疎通では評価 335 件のうち **52.8% が同点** で、そこは辞退に回る。
-        /// 本数を倍にして同点がどれだけ減るかは事前に読めない ── クリア率 13% の 0/1 報酬
-        /// では 8 本でも期待クリア数が 1 程度しかない。5.3 時間を投じる前に 30 分で確かめる。</para></summary>
-        [MenuItem("Tools/AutoRun/Ultra AI/rollout 方策: 疎通 (0pt・10ラン・1手8本)", priority = 37)]
-        public static void RunUltraRolloutSmoke8() => LaunchUltraRollout(10, 8);
-
-        [MenuItem("Tools/AutoRun/Ultra AI/rollout 方策: 本番 (0pt・100ラン・1手8本)", priority = 38)]
-        public static void RunUltraRolloutMain() => LaunchUltraRollout(100, 8);
-
-        /// <summary>ペア比較の対照群。 **rollout 以外は 1 ビットも変えない。**
-        ///
-        /// <para>同じ起動経路を通すことが要点で、 別メニューで似た条件を組み直すのは避ける ──
-        /// 遺物・挑戦pt・技量・ラン数のどれか 1 つがずれただけで比較は無意味になり、
-        /// しかもサマリを後から読んでも気付けない。2026-08-10 に 0pt 基準値が
-        /// 53.3% / 16.6% に割れたのがこの形。</para></summary>
-        [MenuItem("Tools/AutoRun/Ultra AI/rollout 方策: 対照 Super (0pt・100ラン・rollout なし)",
-            priority = 39)]
-        public static void RunUltraRolloutBaseline() => LaunchUltraRollout(100, 0);
+        /// <summary>階層DP航行の対照 (0pt・遺物なし・Super・100 ラン)。 2026-11-13 までは Ultra の
+        /// 「rollout 方策: 対照 Super」 が同じ条件でこの役をしていた (#135 で Ultra ごと削除)。</summary>
+        [MenuItem("Tools/AutoRun/階層DP航行: 対照 Super (0pt・100ラン)", priority = 48)]
+        public static void RunFloorDpBaseline() => LaunchFloorDp(0);
 
         /// <summary>階層DP航行 (④) の掃引。 対照は
-        /// 「rollout 方策: 対照 Super」 と**同一シード・同一条件**（同じ起動経路を通す）。
+        /// 上の 「対照 Super」 と**同一シード・同一条件**（同じ起動経路を通す）。
         ///
         /// <para><b>割引率が本体。</b> 既定の 0.6 のままだと 10 行先は 0.6^10 ≒ 0.006 で、
         /// 実質 1 手先読みと変わらない ── 構造を入れただけでは何も変わらないので、
@@ -1162,47 +899,8 @@ namespace AutoTest.EditorTools
             Launch(1);
         }
 
-        /// <summary><paramref name="rolloutsPerAction"/> が 0 以下なら sink を差さない対照群。</summary>
-        private static void LaunchUltraRollout(int runs, int rolloutsPerAction)
-        {
-            bool useRollout = rolloutsPerAction > 0;
-            // **worker のビルドは Play Mode に入る前に済ませる。** BuildPipeline は
-            // Play Mode 中には走らないので、 sink を差す OnPlayModeChanged の中では手遅れ。
-            if (useRollout && !UltraProductionWorkerBuild.EnsureBuilt(out string buildError))
-            {
-                Debug.LogError("[AutoRunMenu][Ultra] worker build failed; rollout バッチを起動しない: "
-                    + buildError);
-                return;
-            }
-            ClearBatchModeSessionState();
-            EditorPrefs.SetBool(NoRelicKey, true);
-            Skill = AutoRunner.WiringSkill.Super;   // 戦闘は据え置き。 差し替えるのはマクロ側
-            if (useRollout)
-            {
-                SessionState.SetInt(UltraRolloutRunsKey, runs);
-                SessionState.SetInt(UltraRolloutPerActionKey, rolloutsPerAction);
-            }
-            SessionState.SetInt(ChalOneScoreKey, 0);
-            SessionState.SetInt(ChalOneRunsKey, runs);
-            SessionState.SetBool(ChalSweepKey, true);
-            Launch(1);
-        }
-
-        private static void LaunchUltraSmoke(int sinkKind, int runs = 30)
-        {
-            ClearBatchModeSessionState();
-            EditorPrefs.SetBool(NoRelicKey, true);
-            Skill = AutoRunner.WiringSkill.Super;   // 戦闘は据え置き。 見たいのはマクロ側の疎通
-            SessionState.SetInt(UltraSmokeSinkKey, sinkKind);
-            SessionState.SetInt(ChalOneScoreKey, 0);
-            SessionState.SetInt(ChalOneRunsKey, runs);
-            SessionState.SetBool(ChalSweepKey, true);
-            Launch(1);
-        }
-
         /// <summary>Erase the SessionState keys that select an alternative batch mode or
-        /// override the loadout. Used by the Ultra entry point so the profile is the only
-        /// thing that decides the conditions.</summary>
+        /// override the loadout. 測定メニューが条件を自分で決めるために、 起動の前に呼ぶ。</summary>
         private static void ClearBatchModeSessionState()
         {
             // **出目パーツは EditorPrefs なのでセッションを跨いで残る。**
@@ -1229,7 +927,6 @@ namespace AutoTest.EditorTools
             // 強盗の罰も EditorPrefs (2026-09-12)。 **既定は製品挙動 = 価格割増**。
             //   切り分け用の「旧出禁」を立てっぱなしにすると、 以降の全バッチが旧仕様で走る。
             EditorPrefs.SetBool(RobBlockKey, false);
-            SessionState.EraseBool(UltraCensusKey);
             SessionState.EraseInt(FloorDpKey);
             SessionState.EraseInt(FloorDpBandsKey);
             SessionState.EraseInt(AblateKey);
@@ -1237,8 +934,6 @@ namespace AutoTest.EditorTools
             SessionState.EraseString(SeedOverrideKey);
             // **static なので前バッチから残る。** 毎回既定 (混ぜない) へ戻す。
             AutoTest.LearnedPriorityProvider.ExploreBlendK = 0f;
-            SessionState.EraseInt(UltraRolloutRunsKey);
-            SessionState.EraseInt(UltraRolloutPerActionKey);
             SessionState.EraseBool(ChalSweepKey);
             SessionState.EraseBool(SkillCmpKey);
             SessionState.EraseBool(SkillCmp3Key);
@@ -2157,7 +1852,7 @@ namespace AutoTest.EditorTools
             SessionState.SetString(ItemAblIdsKey, "共鳴,発火,無心の刃");
             SessionState.SetInt(ItemAblRunsKey, 500);
             EditorPrefs.SetBool(NoRelicKey, true);   // 基準条件 (遺物なし) で測る
-            // **配線技量を Optimal に固定する。** 前の作業で Super/Ultra のままだと
+            // **配線技量を Optimal に固定する。** 前の作業で Super のままだと
             //   1 ラン 5〜10 秒 ＝ 2,500 ラン で数時間かかり、 エディタが無応答に見える。
             //   学習バッチと同じ条件でもある。
             Skill = AutoRunner.WiringSkill.Optimal;
@@ -2283,19 +1978,6 @@ namespace AutoTest.EditorTools
             int tierCalRuns = SessionState.GetInt(TierCalRunsKey, 0);
             int tierCalBatches = SessionState.GetInt(TierCalBatchesKey, 1);
             bool tierCalResume = SessionState.GetBool(TierCalResumeKey, false);
-            bool ultraStandard50WithRelic10K = SessionState.GetBool(UltraStandard50WithRelic10KKey, false);
-            int ultraSmokeSink = SessionState.GetInt(UltraSmokeSinkKey, 0);
-            SessionState.EraseInt(UltraSmokeSinkKey);
-            string ultraCapturePath = SessionState.GetString(UltraCaptureKey, "");
-            SessionState.EraseString(UltraCaptureKey);
-            string ultraResumePath = SessionState.GetString(UltraResumeKey, "");
-            SessionState.EraseString(UltraResumeKey);
-            bool ultraCensus = SessionState.GetBool(UltraCensusKey, false);
-            SessionState.EraseBool(UltraCensusKey);
-            int ultraRolloutRuns = SessionState.GetInt(UltraRolloutRunsKey, 0);
-            SessionState.EraseInt(UltraRolloutRunsKey);
-            int ultraRolloutPerAction = SessionState.GetInt(UltraRolloutPerActionKey, 0);
-            SessionState.EraseInt(UltraRolloutPerActionKey);
             int floorDpPct = SessionState.GetInt(FloorDpKey, 0);
             SessionState.EraseInt(FloorDpKey);
             int floorDpBands = SessionState.GetInt(FloorDpBandsKey, 0);
@@ -2308,7 +1990,6 @@ namespace AutoTest.EditorTools
             SessionState.EraseInt(TierCalRunsKey);
             SessionState.EraseInt(TierCalBatchesKey);
             SessionState.EraseBool(TierCalResumeKey);
-            SessionState.EraseBool(UltraStandard50WithRelic10KKey);
             int loopBatches = SessionState.GetInt(LoopKey, 1);
             SessionState.EraseInt(PendingKey);
             SessionState.EraseBool(SweepKey);
@@ -2623,42 +2304,6 @@ namespace AutoTest.EditorTools
                 Debug.Log($"[AutoRunMenu] 周回モード: 10ペルソナ × {runner.ascensionRunsPerPersona} ラン "
                         + $"= {runner.ascensionRunsPerPersona * 10} ラン / ポリシー {runner.ascensionPolicy}");
             }
-            if (ultraStandard50WithRelic10K)
-            {
-                UltraAutoRunProfile profile = UltraAutoRunProfile.CreateStandard50WithRelic10000();
-                profile.ApplyTo(runner);
-                if (!profile.Matches(runner, out string profileError))
-                {
-                    Debug.LogError("[AutoRunMenu][Ultra] runtime profile validation failed: " + profileError);
-                    EditorApplication.isPlaying = false;
-                    return;
-                }
-            }
-
-            // 診断: dispatch 経路に smoke sink を差す。 **既定では絶対に差さない**
-            //   (差した状態で測ると基準値が壊れるため、 キーは 1 回で消費する)。
-            // **撃つ決定点を rollout アームと揃える。** 揃えないと、 マップ選択の影響力を
-            //   測っているつもりで「マクロ判断を全部潰した結果」を測ることになる
-            //   ── 2026-08-21 に実際にやった (先頭手が全決定点を乗っ取り、 全ラン 1層で死亡)。
-            //   rollout sink は AllowedPoints で MapNavigation のみに絞っているので、
-            //   対照も同じ 1 点だけを差し替える。
-            var smokeOnly = new[] { AutoTest.Ultra.UltraDecisionPoint.MapNavigation };
-            if (ultraSmokeSink == 1)
-            {
-                runner.ultraSink = new AutoTest.Ultra.UltraFirstLegalSink { answerOnly = smokeOnly };
-                Debug.LogWarning("[AutoRunMenu][Ultra] smoke sink = 先頭の合法手 (MapNavigation のみ) "
-                    + "── **これは配管確認用で、 方策としては弱い**");
-            }
-            else if (ultraSmokeSink == 2)
-            {
-                runner.ultraSink = new AutoTest.Ultra.UltraLastLegalSink { answerOnly = smokeOnly };
-                Debug.LogWarning("[AutoRunMenu][Ultra] smoke sink = 末尾の合法手 (MapNavigation のみ)");
-            }
-            if (ultraRolloutRuns > 0 && !TryInstallRolloutSink(runner, ultraRolloutPerAction))
-            {
-                EditorApplication.isPlaying = false;
-                return;
-            }
             // 階層DP航行 (④)。 **キーが無ければ 1 命令も変わらない** ── 既定 OFF を保つ。
             if (floorDpPct > 0)
             {
@@ -2693,45 +2338,6 @@ namespace AutoTest.EditorTools
                 AutoTest.LearnedPriorityProvider.ExploreBlendK = exploreK;
                 Debug.LogWarning("[AutoRunMenu] 不偏lift混入 K=" + exploreK
                     + " ── **購入序列が変わる。 既存の基準値と混ぜないこと**");
-            }
-
-            AutoTest.Ultra.UltraDispatchStats.Reset();
-
-            // 国勢調査は **数えるだけ**。 一度で消費するキーにしてあるので、 次のバッチへ
-            // 持ち越して基準値の測定に紛れ込むことはない。
-            AutoTest.Ultra.UltraDecisionCensus.Reset();
-            AutoTest.Ultra.UltraDecisionCensus.Enabled = ultraCensus;
-            if (ultraCensus)
-                Debug.Log("[AutoRunMenu][Ultra] マクロ決定の国勢調査 ON "
-                    + "── 判断は変えない。 サマリ末尾に集計を出す");
-
-            if (!string.IsNullOrEmpty(ultraCapturePath))
-            {
-                runner.ultraCaptureCheckpointPath = ultraCapturePath;
-                Debug.Log("[AutoRunMenu][Ultra] checkpoint 採取モード → " + ultraCapturePath);
-            }
-            if (!string.IsNullOrEmpty(ultraResumePath))
-            {
-                try
-                {
-                    var payload = JsonUtility.FromJson<AutoTest.Ultra.UltraResumePayload>(
-                        System.IO.File.ReadAllText(ultraResumePath, System.Text.Encoding.UTF8));
-                    runner.ultraResumeFrom = payload;
-                    // **強制手も worker と同じ形で入れる。** 入れずに再現すると
-                    //   「Editor では動くのに worker では止まる」の差分が消えてしまう。
-                    string forced = FirstMoveActionId(payload);
-                    runner.ultraResumeForcedActionId = forced;
-                    Debug.Log("[AutoRunMenu][Ultra] resume モード ← " + ultraResumePath
-                        + "  現在地=" + payload.map.currentNodeId
-                        + " ノード=" + payload.map.nodes.Length
-                        + " 強制手='" + forced + "'");
-                }
-                catch (System.Exception ex)
-                {
-                    Debug.LogError("[AutoRunMenu][Ultra] checkpoint 読み込み失敗: " + ex.Message);
-                    EditorApplication.isPlaying = false;
-                    return;
-                }
             }
 
             runner.Begin();

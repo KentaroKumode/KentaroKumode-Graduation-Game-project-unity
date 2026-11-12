@@ -125,10 +125,8 @@ namespace AutoTest
             // fit は同じ行集合に対して完全に決定的なので、 スキップしても係数は同一 ──
             // BOT の判断は 1 ビットも変わらない。
             //
-            // これが効くのは rollout worker。 通常バッチはこの固定費を 1000 ラン に償却するが、
-            // worker は 1 ラン にしか償却できず、 しかも 学習Reload は 1 プロセスに 4 回走る。
-            long phase = AutoTest.Ultra.UltraPhaseClock.Begin();
-            try
+            // 並列ワーカーは 1 プロセスで数百ランしか回さないので、 起動のたびの固定費が相対的に重い
+            // (2026-11-13 に旧 Ultra の rollout worker 用の計時 UltraPhaseClock は外した・#135)。
             {
                 string key = FitInputKey(learningRoot);
                 if (key.Length > 0 && key == _fitInputKey && _coefs.Count > 0)
@@ -150,7 +148,6 @@ namespace AutoTest
                 _fitInputKey = key;
                 if (key.Length > 0) TrySaveFit(learningRoot, key);
             }
-            finally { AutoTest.Ultra.UltraPhaseClock.End("└ └ 回帰OLS", phase); }
         }
 
         /// <summary>ディスクキャッシュ命中回数 (診断用)。</summary>

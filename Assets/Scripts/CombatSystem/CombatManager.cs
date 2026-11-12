@@ -476,7 +476,7 @@ namespace CombatSystem
             //   ここから `isCombatActive = true` までの間で抜けると、 呼び出し側から見ると
             //   「フェーズは Combat なのに戦闘が動かない」＝ 無限ループになり、
             //   ストール検出が「phase=Combat」としか言わないので原因が残らない。
-            //   実際 Ultra の resume 実装でこれを踏み、 特定に丸一日かかった。
+            //   実際 旧 Ultra の resume 実装 (2026-11-13 削除) でこれを踏み、 特定に丸一日かかった。
             StartCombatEntered = _combatSeq;
 
             // ラン中所持パッシブと装備品を PassiveSkillManager に同期（戦闘ごとに再構築）

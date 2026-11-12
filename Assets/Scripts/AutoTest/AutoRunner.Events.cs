@@ -13,7 +13,6 @@ using MapSystem;
 using EventSystem;
 using ItemSystem;
 using ItemSystem.Shop;
-using AutoTest.Ultra;
 
 namespace AutoTest
 {
@@ -46,12 +45,6 @@ namespace AutoTest
                 // [アブレーション] イベントの選択判断を潰す (提示された選択肢から一様抽選)。
                 if (ablateEvent && cur.choices != null && cur.choices.Count > 1)
                     idx = AblationRng.Next(0, cur.choices.Count);
-                // Ultra: 提示された分を合法手として渡す。 選べるかの条件は払えないゴールドだけ
-                //   (2026-11-11・EventChoice.IsAvailable) で、 外れた手は直後に選べる手へ戻す。
-                idx = UltraOverrideChoice(gm,
-                    AutoTest.Ultra.UltraDecisionPoint.EventChoice,
-                    AutoTest.Ultra.UltraActionKind.ChooseEventOption,
-                    BuildEventChoiceView(cur), idx);
                 // 払えないゴールドの選択肢は本体が受け付けない (押しても進まず詰まる) ので、 選べる手へ戻す
                 if (!EventEncounter.IsChoiceSelectable(cur, idx, gm.Run)) idx = PickSafeChoice(cur);
                 _lastResolvedEvent = cur;
@@ -65,32 +58,6 @@ namespace AutoTest
                 // フレーバー読了 or 戦闘トリガ後の復帰待ち
                 gm.ConfirmEventEncounter();
             }
-        }
-
-        /// <summary>イベントの選択肢を観測用の形へ写す。
-        ///
-        /// <para>選択肢の**文面をそのまま**ラベルに載せる ── プレイヤーが読んでいるのは
-        /// これであって、 効果の内部表現ではない。 効果の要約 (<c>EventChoiceScorer</c> が
-        /// 使うような数値) を渡すと、 盤面に出ていない情報を渡すことになる。</para></summary>
-        private static AutoTest.Ultra.UltraChoiceView BuildEventChoiceView(EventDefinition def)
-        {
-            var view = new AutoTest.Ultra.UltraChoiceView
-            {
-                kind = "event",
-                prompt = def != null ? (def.name ?? def.id ?? "") : "",
-            };
-            if (def?.choices == null || def.choices.Count == 0) return view;
-
-            var options = new AutoTest.Ultra.UltraChoiceOption[def.choices.Count];
-            for (int i = 0; i < def.choices.Count; i++)
-                options[i] = new AutoTest.Ultra.UltraChoiceOption
-                {
-                    index = i,
-                    id = "",                       // 安定 ID は無いので添字で識別する
-                    label = def.choices[i]?.text ?? "",
-                };
-            view.options = options;
-            return view;
         }
 
         private int PickSafeChoice(EventDefinition def)
