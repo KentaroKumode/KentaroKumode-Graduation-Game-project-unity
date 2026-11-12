@@ -95,6 +95,7 @@ namespace MapSystem
                 Sim = new FreeMapSim(CurrentMap.layout, new RunWallet(), withFoe,
                                      withFoe ? FoeProfile.ForFloor(floor) : null, null,
                                      GameLoop.NavItems.PerksFor(GameLoop.GameManager.Instance?.Run));
+                ConfigureTerritory(Sim);
                 // 〈補給線〉: 層の開始点 (前哨基地) は「着いた」処理を通らないので、 ここで中継点にする
                 if (IsRelayType(CurrentMap.layout.types[CurrentMap.layout.start])) Sim.AddRelayPoint(CurrentMap.layout.start);
                 SyncFreeKnowledge();
@@ -149,6 +150,7 @@ namespace MapSystem
                 bool withFoe = FloorPlan.HasWanderer(depth);
                 var perks = GameLoop.NavItems.PerksFor(GameLoop.GameManager.Instance?.Run);
                 Sim = new FreeMapSim(map.layout, new RunWallet(), withFoe, withFoe ? FoeProfile.ForFloor(depth) : null, null, perks);
+                ConfigureTerritory(Sim);
                 Sim.LoadState(simState, perks);
             }
             else Sim = null;
@@ -160,6 +162,12 @@ namespace MapSystem
 
             OnMapGenerated?.Invoke(CurrentMap);
         }
+
+        /// <summary>縄張りの作り (2026-11-12): 追跡者が縄張りの外へ出るか・縄張りの宝を置くか。 既定は「出ない・宝あり」で、
+        /// 測定の口 (<see cref="GameLoop.GameHooks.PursuerLeavesTerritory"/> / <see cref="GameLoop.GameHooks.TerritoryTreasure"/>) で旧い作りへ戻せる。</summary>
+        private static void ConfigureTerritory(FreeMapSim sim)
+            => sim.ConfigureTerritory(!GameLoop.GameHooks.PursuerLeavesTerritory,
+                                      GameLoop.GameHooks.TerritoryTreasure != GameLoop.TerritoryTreasureKind.None);
 
         /// <summary>現在位置から移動可能なノード一覧。 航行マップでは<b>いま道がつながっている隣</b>
         /// (前線の天候で崩れた道・沈んだ点は含まない)。</summary>

@@ -17,12 +17,40 @@ static class T
     static int fails = 0;
     static void Check(bool ok, string what) { Console.WriteLine((ok ? "OK   " : "FAIL ") + what); if (!ok) fails++; }
 
-    static FreeMapSim Make(int salt, FoeProfile pr, WeatherKind wx, Wallet w = null, int floor = 5)
+    /// <summary>既定は旧い作り (追跡者は縄張りの外まで追う・宝なし)。 下の「縄張り」の検算だけが leashed = true で作る。</summary>
+    static FreeMapSim Make(int salt, FoeProfile pr, WeatherKind wx, Wallet w = null, int floor = 5, bool leashed = false, bool treasure = false)
     {
         GameLoop.GameRng.Salt = (ulong)salt * 104729;
         var L = FreeMapGenerator.Generate(floor);
-        return new FreeMapSim(L, w ?? new Wallet(), true, pr, wx);
+        var s = new FreeMapSim(L, w ?? new Wallet(), true, pr, wx);
+        s.ConfigureTerritory(leashed, treasure);
+        return s;
     }
+
+    /// <summary>縄張りを通らずに from から to へ向かう次の 1 歩 (通れなければ from)。</summary>
+    static int StepAvoidingTerritory(FreeMapSim s, int from, int to)
+    {
+        int n = s.Layout.Count; var d = new int[n];
+        for (int i = 0; i < n; i++) d[i] = int.MaxValue;
+        var q = new Queue<int>(); d[to] = 0; q.Enqueue(to);
+        while (q.Count > 0) { int u = q.Dequeue(); foreach (int v in s.Neighbors(u)) if (d[v] == int.MaxValue && !s.InTerritory(v)) { d[v] = d[u] + 1; q.Enqueue(v); } }
+        if (from == to) return from;
+        int best = from, bd = int.MaxValue;
+        foreach (int v in s.Neighbors(from)) if (!s.InTerritory(v) && d[v] < bd) { bd = d[v]; best = v; }
+        return best;
+    }
+
+    /// <summary>縄張りの外で、 縄張りの点と道で隣り合う点 (始点から縄張りを通らずに行けるもの)。 無ければ -1。</summary>
+    static int BorderOutside(FreeMapSim s)
+    {
+        foreach (int t in s.Layout.territory.OrderBy(i => i))
+            foreach (int v in s.Neighbors(t))
+                if (!s.InTerritory(v) && v != s.Layout.goal && (v == s.Me || StepAvoidingTerritory(s, s.Me, v) != s.Me)) return v;
+        return -1;
+    }
+
+    static bool FoeInsideTerritory(FreeMapSim s)
+        => !s.FoeAlive || (s.InTerritory(s.FoeNode) && s.Familiars.All(f => s.InTerritory(f.pos)));
 
     static void Main()
     {
@@ -182,13 +210,87 @@ static class T
             var st = s.Stone();
             Check(st.level >= 0 && st.level <= 3, $"魔石 level={st.level} {st.Text}");
         }
-        // --- 素朴な BOT の捕まり率 (直行) ---
+        // --- 縄張り (2026-11-12): 追跡者 (本体・使い魔) は縄張りの外へ出ない ---
+        {
+            var profiles = new[] { FoeProfile.Summoner, FoeProfile.Houndmaster, FoeProfile.Sprinter, FoeProfile.Brute };
+            int outside = 0, runs = 0, caughtOutside = 0;
+            foreach (var pr in profiles)
+                foreach (var wx in new[] { WeatherKind.None, WeatherKind.Crumble, WeatherKind.Sink })
+                    for (int salt = 1; salt <= 40; salt++)
+                    {
+                        var s = Make(salt, pr, wx, leashed: true); runs++;
+                        // 中心へ歩いて (捕まれば逃げて) から、 終点へ直行する
+                        for (int step = 0; step < 120 && !s.Dead; step++)
+                        {
+                            int goal = step < 40 ? s.Layout.home : s.Layout.goal;
+                            int nx = s.StepToward(s.Me, goal);
+                            var ev = nx == s.Me ? s.Wait() : s.MoveTo(nx);
+                            if (!FoeInsideTerritory(s)) outside++;
+                            if ((ev & FreeMapEvent.Caught) != 0) { if (!s.InTerritory(s.Me)) caughtOutside++; s.ResolveBodyFled(); }
+                            if ((ev & FreeMapEvent.FamiliarContact) != 0) { if (!s.InTerritory(s.Me)) caughtOutside++; s.ResolveFamiliarFight(true); }
+                            if (s.Me == s.Layout.goal) break;
+                        }
+                    }
+            Check(outside == 0 && caughtOutside == 0, $"縄張り: 追跡者と使い魔は縄張りの外へ出ない・外で捕まらない ({runs} 層・外 {outside} 手・外で接触 {caughtOutside})");
+        }
+        // --- 縄張りの外に居れば補足されない・外の囮罠には縁まで引かれて踏まない ---
+        foreach (var pr in new[] { FoeProfile.Summoner, FoeProfile.Houndmaster, FoeProfile.Sprinter, FoeProfile.Brute })
+        {
+            int tested = 0, detected = 0, leftT = 0, lureTrig = 0, alerted = 0, backToPatrol = 0;
+            for (int salt = 1; salt <= 60; salt++)
+            {
+                var s = Make(salt, pr, WeatherKind.None, leashed: true);
+                int border = BorderOutside(s); if (border < 0) continue;
+                for (int g = 0; g < 60 && s.Me != border && !s.InFight; g++) { int nx = StepAvoidingTerritory(s, s.Me, border); if (nx == s.Me) break; s.MoveTo(nx); }
+                if (s.Me != border || s.InFight) continue;
+                tested++;
+                var ev0 = s.PlaceLure();
+                if ((ev0 & FreeMapEvent.FoeAlerted) != 0) alerted++;
+                for (int i = 0; i < 30; i++)
+                {
+                    var ev = s.Wait();
+                    if ((ev & (FreeMapEvent.Detected | FreeMapEvent.Caught | FreeMapEvent.FamiliarContact)) != 0) detected++;
+                    if ((ev & FreeMapEvent.LureTriggered) != 0) lureTrig++;
+                    if (!FoeInsideTerritory(s)) leftT++;
+                }
+                if (s.FoeMode == FoeMode.Patrol) backToPatrol++;
+            }
+            Check(tested > 0 && detected == 0 && leftT == 0 && lureTrig == 0 && (pr.foeSteps == 0 || backToPatrol == tested),   // 動かない召喚者は警戒のまま (旧い作りと同じ)
+                $"縄張りの外 ({pr.id}): 補足されない・外の囮罠は踏まない・囮罠が切れたら巡回へ戻る (試 {tested} / 補足 {detected} / 外へ {leftT} / 踏む {lureTrig} / 気を引かれた {alerted} / 巡回へ {backToPatrol})");
+        }
+        // --- 縄張りの宝 ---
+        {
+            int bad = 0, taken = 0, layers = 0;
+            for (int salt = 1; salt <= 120; salt++)
+            {
+                var s = Make(salt, FoeProfile.Brute, WeatherKind.None, leashed: true, treasure: true); layers++;
+                int t = s.TreasureNode;
+                if (t < 0 || !s.InTerritory(t) || t == s.Layout.home || t != FreeMapSim.TreasurePointOf(s.Layout)) { bad++; continue; }
+                var none = Make(salt, FoeProfile.Brute, WeatherKind.None, leashed: true, treasure: false);
+                if (none.TreasureNode != -1 || !none.Layout.roads.SequenceEqual(s.Layout.roads) || !none.Layout.types.SequenceEqual(s.Layout.types)) bad++;   // 宝の有無で地図は変わらない
+                if (s.TakeTreasure()) bad++;                                   // 宝の点に居なければ取れない
+                for (int g = 0; g < 80 && s.Me != t && !s.Dead; g++)
+                {
+                    var ev = s.MoveTo(s.StepToward(s.Me, t));
+                    if ((ev & FreeMapEvent.Caught) != 0) s.ResolveBodyWon();
+                    if ((ev & FreeMapEvent.FamiliarContact) != 0) s.ResolveFamiliarFight(false);
+                }
+                if (s.Me != t) continue;
+                if (!s.TakeTreasure() || s.TakeTreasure() || s.TreasureAvailable) bad++; else taken++;   // 1 層 1 回
+                var saved = s.CaptureState();
+                var r = Make(salt, FoeProfile.Brute, WeatherKind.None, leashed: true, treasure: true); r.LoadState(saved, null);
+                if (!r.TreasureTaken) bad++;                                    // 中断セーブを跨ぐ
+            }
+            Check(bad == 0 && taken > 0, $"縄張りの宝: 縄張りの中 (中心の隣) に置かれ、 1 層 1 回だけ取れる (層 {layers} / 取った {taken} / 異常 {bad})");
+        }
+        // --- 素朴な BOT の捕まり率 (直行・旧い作り / 縄張りを出ない) ---
+        foreach (bool leash in new[] { false, true })
         foreach (var pr in new[] { FoeProfile.Summoner, FoeProfile.Houndmaster, FoeProfile.Sprinter, FoeProfile.Brute })
         {
             int caught = 0, reached = 0, N = 300;
             for (int salt = 1; salt <= N; salt++)
             {
-                var s = Make(salt, pr, WeatherKind.None);
+                var s = Make(salt, pr, WeatherKind.None, leashed: leash);
                 for (int step = 0; step < 80 && !s.Dead; step++)
                 {
                     int next = s.StepToward(s.Me, s.Layout.goal);
@@ -198,7 +300,7 @@ static class T
                     if (s.Me == s.Layout.goal) { reached++; break; }
                 }
             }
-            Console.WriteLine($"直行BOT {pr.id,-10}: 捕まる {100.0 * caught / N:F0}% / 到達 {100.0 * reached / N:F0}%");
+            Console.WriteLine($"直行BOT {(leash ? "縄張り" : "旧い作り")} {pr.id,-10}: 捕まる {100.0 * caught / N:F0}% / 到達 {100.0 * reached / N:F0}%");
         }
         Console.WriteLine(fails == 0 ? "ALL OK" : $"FAILED {fails}");
     }

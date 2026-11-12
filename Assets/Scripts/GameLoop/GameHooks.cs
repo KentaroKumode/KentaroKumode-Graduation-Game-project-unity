@@ -3,6 +3,17 @@ using System.Collections.Generic;
 
 namespace GameLoop
 {
+    /// <summary>縄張りの宝の中身 (2026-11-12・GAME.md §5-9)。 並びは測定の口が番号でも受けるので変えない。</summary>
+    public enum TerritoryTreasureKind
+    {
+        /// <summary>宝を置かない (旧い作り)。</summary>
+        None = 0,
+        /// <summary>武器を 1 段鍛える (休憩の「鍛える」と同じ強化・素材は取らない)。 鍛えられない武器なら宝箱の中身。</summary>
+        Forge = 1,
+        /// <summary>通常の宝箱と同じ中身。</summary>
+        Chest = 2,
+    }
+
     /// <summary>
     /// 本体が外 (BOT・計測) へ判断や記録を委ねる口。 <b>本体は AutoTest の型を参照しない</b> (2026-10-29)。
     ///
@@ -70,6 +81,14 @@ namespace GameLoop
         public static float PursuerHpAdd;
         /// <summary>[測定 2026-11-12・#35] 追跡者に勝った時の物資を差し替える (負 = 差し替えない)。</summary>
         public static int PursuerSupplyOverride = -1;
+
+        /// <summary>[測定 2026-11-12] true = 旧い作り (追跡者は追跡の状態なら縄張りの外まで層のどこまでも追う)。
+        /// 既定 false = 縄張りの外へ出ない (縄張りを守る番人・GAME.md §5-9)。 層を作る時に読む (MapManager)。
+        /// AutoRunner.pursuerLeavesTerritory が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
+        public static bool PursuerLeavesTerritory;
+        /// <summary>縄張りの宝の中身 (2026-11-12)。 既定 <see cref="TerritoryTreasureKind.Forge"/>。 None = 宝を置かない (旧い作り)。
+        /// 層を作る時 (置くか) と取った時 (中身) に読む。 AutoRunner.territoryTreasure が毎ランの始めに入れ、 ラン終了で既定へ戻す。</summary>
+        public static TerritoryTreasureKind TerritoryTreasure = TerritoryTreasureKind.Forge;
 
         /// <summary>[測定 2026-11-12・#95] 遺物の効果を止める接辞 (ビット = <c>(int)RelicStat</c>・0 = 何も止めない)。
         /// 主ステもサブも、 その接辞の分だけを 0 にする (段の値 1 つあたりの価値を、 理論値の持ち込みから 1 接辞ずつ抜いて測る口)。
