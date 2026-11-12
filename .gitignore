@@ -128,6 +128,7 @@ Tools/freemap_check/obj/
 Tools/event_branch_check/obj/
 Tools/event_page_check/obj/
 Tools/rules_check/obj/
+Tools/save_check/obj/
 __pycache__/
 
 # HTML / PDF (生成物・資料)
