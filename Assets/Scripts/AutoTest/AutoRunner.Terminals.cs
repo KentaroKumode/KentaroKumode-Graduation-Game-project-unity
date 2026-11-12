@@ -16,7 +16,7 @@ namespace AutoTest
     /// 先のターンに効く分の見積もり (下の定数) だけを持つ。</para>
     ///
     /// <para>旧い配線との違い: 2 ターン先読み (v3.lookahead2) と配線のミス (wiringMistakeRate)・ターンの記録 (turnAudit) は山札では通らない
-    /// (どちらも旧い 3 種/4 種の端子の列挙が前提)。</para>
+    /// (どちらも旧い 3 種/4 種の端子の列挙が前提)。 山札の 2 ターン先読みは別の口 <see cref="deckLookahead"/> (#105・既定 OFF)。</para>
     /// </summary>
     public partial class AutoRunner
     {
@@ -171,8 +171,9 @@ namespace AutoTest
         }
 
         /// <summary>山札の挿し方を選ぶ (読むだけ・山札の状態は写しに掛ける)。 戻り値 = 出目ごとの挿し先 (場の添字・−1 = 挿さない)。
-        /// <paramref name="bestU"/> = 選んだ挿し方の効用 (リロールの値付けが読む)。 山札で戦っていなければ null。</summary>
-        private int[] ChooseDeckWiring(int[] rolls, MutualTurnTelegraph tele, out float bestU, out int[] targets)
+        /// <paramref name="bestU"/> = 選んだ挿し方の効用 (リロールの値付けが読む)。 山札で戦っていなければ null。
+        /// <paramref name="lookahead"/> = 実際の配線の判断の時だけ true (#105 の先読みを掛けてよい)。 振り直しの値付けと〈猫の手〉は false (重いので掛けない)。</summary>
+        private int[] ChooseDeckWiring(int[] rolls, MutualTurnTelegraph tele, out float bestU, out int[] targets, bool lookahead = false)
         {
             bestU = float.NegativeInfinity; targets = null;
             var cm = CombatManager.Instance;
@@ -198,9 +199,11 @@ namespace AutoTest
             var us = new float[n];
             var outs = new OptimalTurnOutcome[n];
             var tgts = new int[n][];
+            var touts = new TerminalOutcome[n];
+            var afters = new TerminalBattleState[n];
             for (int i = 0; i < n; i++)
             {
-                us[i] = EvalDeckWiring(ev, rolls, cands[i], out outs[i], out _, out tgts[i]);
+                us[i] = EvalDeckWiring(ev, rolls, cands[i], out outs[i], out touts[i], out tgts[i], out afters[i]);
             }
             var st = ev.st;
 
@@ -208,6 +211,26 @@ namespace AutoTest
             for (int i = 0; i < n; i++)
                 if (best < 0 || us[i] > bu) { best = i; bu = us[i]; }
             if (best < 0) return null;
+
+            // [#105] 山札の 2 ターン先読み (deckLookahead・既定 OFF): 今の効用の上位 K 本だけに、 次のターンの最良効用の期待値を足して選び直す
+            var la = lookahead ? BuildDeckLookahead(in ev, rolls, tele) : null;
+            if (la != null && n > 1)
+            {
+                var order = new int[n];
+                for (int i = 0; i < n; i++) order[i] = i;
+                System.Array.Sort(order, (a, b) => { int c = us[b].CompareTo(us[a]); return c != 0 ? c : a.CompareTo(b); });   // 同点は列挙の順 (貪欲と同じ)
+                int kk = Math.Min(n, Math.Max(1, deckLookaheadTopK));
+                int laBest = -1; float laV = float.NegativeInfinity;
+                for (int r = 0; r < kk; r++)
+                {
+                    int i = order[r];
+                    float v = us[i] + DeckNextValue(in ev, la, rolls, touts[i], afters[i], in outs[i]);
+                    if (laBest < 0 || v > laV) { laBest = i; laV = v; }
+                }
+                DeckLookaheadDecisions++;
+                if (laBest != best && us[laBest] < us[best]) DeckLookaheadChanged++;   // 同点の入れ替えは数えない (上書き率 ≠ 強さ)
+                best = laBest;
+            }
 
             bestU = us[best];
             // [計装] 旧い配線と同じ値を残す (防ぎ切りの規則の数え・主攻撃の見積もりの照合)
@@ -251,8 +274,13 @@ namespace AutoTest
 
         /// <summary>挿し方 1 つの効用 (山札の状態は写しに掛ける・読むだけ)。 <paramref name="o"/> = 端子の結果・<paramref name="tgts"/> = 方策が選んだ対象 (null あり)。</summary>
         private float EvalDeckWiring(in DeckEval ev, int[] rolls, int[] cand, out OptimalTurnOutcome outc, out TerminalOutcome o, out int[] tgts)
+            => EvalDeckWiring(in ev, rolls, cand, out outc, out o, out tgts, out _);
+
+        /// <summary>同上。 <paramref name="after"/> = この挿し方で解いた後の端子の状態の写し (先読み #105 が次のターンを組むのに使う)。</summary>
+        private float EvalDeckWiring(in DeckEval ev, int[] rolls, int[] cand, out OptimalTurnOutcome outc, out TerminalOutcome o, out int[] tgts,
+                                     out TerminalBattleState after)
         {
-            var after = ev.deck.state.Clone();
+            after = ev.deck.state.Clone();
             o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after);
             // 〈写し取り〉〈焼き切り〉〈保持器〉が発動する挿し方なら、 対象を方策で選び直して解き直す (対象は今ターンの攻防を変えない)
             tgts = ChooseDeckTargets(ev.board, o, ev.run);
@@ -315,12 +343,251 @@ namespace AutoTest
             int hpNow = CombatManager.Instance != null ? CombatManager.Instance.PlayerHP : -1;
             if (_fbPrevHp >= 0 && hpNow >= 0 && _fbPrevHp - hpNow > _fbPrevExpTaken) _fbUnavoidSeen = true;
             _lastFreeBlock = _lastKillsNow = false;
-            var slots = ChooseDeckWiring(rolls, tele, out _, out var targets);
+            var slots = ChooseDeckWiring(rolls, tele, out _, out var targets, lookahead: true);
             if (predTrace) BeginPredTrace(tele.turn);
             BeginMainCorrTurn(_lastPredA);
             _fbDecided++; if (_lastFreeBlock) _fbTurns++; if (_lastKillsNow) _fbKillTurns++;
             _fbPrevHp = hpNow; _fbPrevExpTaken = _lastExpTaken;
             return slots != null ? WiringPlan.OfSlots(slots, targets) : default;      // null なら本体が既定 (TerminalWiring.Auto) で挿す
+        }
+
+        // =====================================================================
+        //  #105 山札の 2 ターン先読み (2026-11-12・既定 OFF)
+        // =====================================================================
+        //  旧い配線の E8 (v3.lookahead2・AutoRunner.Combat の LookaheadValue) を山札へ移したもの。 E8 と同じ形:
+        //    挿し方 w の値 = 今ターンの効用 U_now(w) + 次のターンの最良効用の期待値 E[max U_next]。 割引なし・新しい重みなし。
+        //    今ターンで撃破・死亡する挿し方は先読みせず U_now のまま。 振り直しは次のターンの見積もりに入れない。
+        //  次のターンの盤面は w で今ターンを解いた後 (E8 と同じ NextTurnStateFrom) に、 山札の状態を足したもの:
+        //    端子の状態 (溜まり・〈予熱器〉・〈配電盤〉の多く引く・〈受け太刀〉〈充填〉の溜め・〈鋳造口〉…) = Resolve の写し (after) に BeginTurn を掛ける
+        //    山札 = 本体の FinishTurn (使い捨て・写し取り・焼き切り・保持) と DrawTurn (止まっていた手札を残す・捨てる・引く・常設は場へ) を写しで回す
+        //    盤面の数 (充電・シールド・HP・毒・出血・敵の攻撃) = 今ターンの結果から (敵の攻撃は E8 と同じ公開規則の期待値)
+        //  **先の情報は知らない**: 山の並び (GameRng で切った順) は読まず、 山の中身 (枚数と種類 = 人も数えられる) から一様に引く。
+        //    次の出目も面から引く。 どちらも専用の System.Random (ランの番号・ターン・HP・出目から作る種) で、 GameRng を消費しない。
+        //    同じ判断の中では、 候補ごとに同じ種の標本を使う (共通乱数 ── 候補の差だけが値の差に出る)。
+        //  計算量の見積もり (1 判断):
+        //    今: 挿し方 W ≈ 136 本 (場 5 枚・出目 3 個) を 1 回ずつ解く。
+        //    先読み: 上位 K 本 × 標本 S × 次のターンの挿し方 W' (同じ目の入れ替えを除くと ≈ 100〜136) を解く = 既定 K 3 × S 6 × ≈ 130 ≈ 2,300 回。
+        //    同じ次の盤面 (山札に効かない候補どうし) は memo で 1 回。 既定はボス戦だけ (E8 の lookaheadBossOnly と同じ) なので、
+        //    1 ランの増分は ボス戦のターン数 (≈ 50) × 2,300 ≈ 12 万回の解決。 E8 (4 × 56 面 × 27 本 ≈ 6,000 回 / 判断) より軽い。
+
+        /// <summary>[#105] 山札の 2 ターン先読みを使う (既定 OFF)。 技量が素朴版のときは使わない。 A/B の腕では <c>deckLookahead=True</c> と <c>_skill=Super</c>。</summary>
+        public bool deckLookahead = false;
+        /// <summary>[#105] 先読みをボス戦 (<see cref="BossIds.IsBoss"/>) だけに掛ける (既定 true・E8 の lookaheadBossOnly と同じ)。 false なら全戦闘。</summary>
+        public bool deckLookaheadBossOnly = true;
+        /// <summary>[#105] 先読みにかける候補の数 = 今の効用の上位 K 本 (既定 3)。</summary>
+        public int deckLookaheadTopK = 3;
+        /// <summary>[#105] 次のターンの (手札, 出目) の標本の数 (既定 6)。</summary>
+        public int deckLookaheadSamples = 6;
+
+        /// <summary>[#105 計装] 先読みを掛けた判断の数 / そのうち今の効用が最良でない挿し方に変えた数 (同点の入れ替えは数えない)。 ランをまたいで累計。</summary>
+        public int DeckLookaheadDecisions { get; private set; }
+        public int DeckLookaheadChanged { get; private set; }
+
+        /// <summary>[#105] 先読みの乱数の種のもと (ラン番号・<see cref="SuperCombatAI.ResetForRun"/> と同じ所で入れる)。</summary>
+        private int _deckLaRunSeed;
+
+        /// <summary>1 回の判断のあいだ変わらない、 先読みの前提と memo。</summary>
+        private sealed class DeckLookahead
+        {
+            public NextTurnPlan plan;          // 次のターンの盤面の雛形 (E8 と同じ BuildNextTurnPlan)
+            public int seed;                   // 標本 j の種 = seed + j × 7919
+            public float stopChance;           // ヴェスカ〈停滞する時間〉の止まる確率 (持たない敵は 0)
+            public readonly Dictionary<string, float> memo = new Dictionary<string, float>(8);
+        }
+
+        /// <summary>先読みの前提を組む。 掛けない (OFF・ボス戦でない・盤面が読めない) なら null。</summary>
+        private DeckLookahead BuildDeckLookahead(in DeckEval ev, int[] rolls, MutualTurnTelegraph tele)
+        {
+            if (!deckLookahead || EffectiveWiringSkill == WiringSkill.Naive || deckLookaheadSamples <= 0) return null;
+            var cm = CombatManager.Instance;
+            var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+            if (cm?.CurrentEnemy == null || ctx == null || ev.deck == null) return null;
+            if (deckLookaheadBossOnly && !BossIds.IsBoss(cm.CurrentEnemy.id)) return null;
+            var la = new DeckLookahead
+            {
+                plan = BuildNextTurnPlan(in ev.st, cm, ctx, ev.run, rolls.Length),
+                stopChance = ItemSystem.PassiveSkills.Effects.StagnantTime.StopChance(cm.CurrentEnemy),
+            };
+            unchecked
+            {
+                int h = _deckLaRunSeed * 1103515245 + 12345;
+                h = h * 31 + tele.turn; h = h * 31 + ev.st.enemyHp; h = h * 31 + ev.st.myHp;
+                foreach (int r in rolls) h = h * 31 + r;
+                la.seed = h & 0x7FFFFFFF;
+            }
+            return la;
+        }
+
+        /// <summary>挿し方 1 つの、 次のターンの最良効用の期待値 (今ターンで撃破・死亡するなら 0)。 読むだけ。</summary>
+        private float DeckNextValue(in DeckEval ev, DeckLookahead la, int[] rolls, TerminalOutcome o, TerminalBattleState after, in OptimalTurnOutcome outc)
+        {
+            var st = ev.st;
+            int k = rolls.Length;
+            // 敵の攻撃の前の HP とシールド (効用の Core と同じ: 払った HP は 1 未満にならない・回復は最大まで / 〈盾押し口〉で払う分を先に引く)
+            int hpStart = Math.Min(st.myMaxHp, Math.Max(1, st.myHp - o.selfDamage) + o.heal);
+            if (outc.effDmg >= st.enemyHp || outc.taken >= hpStart) return 0f;
+            int pool = Math.Max(0, st.myShield - o.shieldSpend) + o.shield;
+            var ns = NextTurnStateFrom(in st, la.plan, in outc, k, hpStart, pool, out int plusNext);
+            TerminalWeights(in ns.play, la.plan.turn + 1, ns.enemyHp / la.plan.enemyMaxHp, out float wa, out float wd, out float wc);
+            ns.wAtk = wa; ns.wDef = wd; ns.wChg = wc;
+
+            // 次のターンの端子の盤面 (充電は DeckSums と同じ順: 払う → 満たす → 足す・上限で止まる)
+            var env = ev.env;
+            env.hp = ns.myHp; env.shield = ns.myShield; env.enemyAttack = ns.enemyAtk;
+            int cap = env.chargeCap > 0 ? env.chargeCap : 9999;
+            int ch = Math.Max(0, env.charge - o.chargeSpend);
+            if (o.chargeFill) ch = Math.Max(ch, cap);
+            env.charge = Math.Min(cap, ch + o.chargeAdd);
+            env.enemyPoison += o.poison;                       // 毒の減衰は見ない (控えめな近似)
+            if (o.attackDice > 0) env.enemyBleed += o.bleedOnHit;
+
+            string key = DeckNextKey(in ns, plusNext, ev.board, o, after, in env);
+            if (la.memo.TryGetValue(key, out float memoV)) return memoV;
+
+            int samples = deckLookaheadSamples;
+            var faces = la.plan.faces;
+            double acc = 0;
+            for (int j = 0; j < samples; j++)
+            {
+                var rng = new System.Random(unchecked(la.seed + j * 7919));
+                var nst = after.Clone();
+                int extra = nst.BeginTurn();
+                var nb = SampleNextBoard(ev.deck, ev.board, o, TerminalCards.HandSize + extra, la.stopChance, rng, out var stopped);
+                nst.stopped = stopped;
+                // 〈鋳造口〉の出目 +N は振った後に足される (本体 DrawTerminalHand → FoundryBonusKey)
+                var dice = new int[k];
+                for (int i = 0; i < k; i++) dice[i] = faces[rng.Next(faces.Length)] + nst.foundryBonus;
+                System.Array.Sort(dice);
+                acc += BestDeckUtilityOver(in ns, nb, dice, in env, nst, in ev);
+            }
+            float v = (float)(acc / samples);
+            la.memo[key] = v;
+            return v;
+        }
+
+        /// <summary>次のターンの盤面の memo の鍵 (同じ鍵なら次のターンの期待値は同じ)。 盤面の数・山札に効いた結果・端子の状態。</summary>
+        private static string DeckNextKey(in OptimalTurnState ns, int plusNext, List<string> board, TerminalOutcome o, TerminalBattleState after, in TerminalEnv env)
+        {
+            var sb = new System.Text.StringBuilder(96);
+            sb.Append(ns.enemyHp).Append(',').Append(ns.myHp).Append(',').Append(ns.myShield).Append(',').Append(ns.undyingStreak).Append(',')
+              .Append(ns.steadfastReady ? 1 : 0).Append(',').Append(ns.eDefNow).Append(',').Append(ns.tele.blazeStacks * 2 + plusNext).Append(',')
+              .Append(ns.enemyAtk).Append(',').Append(ns.enemyHitBonus).Append('|')
+              .Append(env.charge).Append(',').Append(env.enemyPoison).Append(',').Append(env.enemyBleed).Append('|');
+            string At(int s) => s >= 0 && s < board.Count ? board[s] : "-";
+            sb.Append(At(o.retainTarget)).Append(',').Append(At(o.copyTarget)).Append(',').Append(At(o.burnTarget)).Append('|');
+            foreach (int s in o.fired) { var d = TerminalCards.Get(board[s]); if (d != null && d.disposable) sb.Append(board[s]).Append(','); }
+            sb.Append('|').Append(after.oscLast).Append(',').Append(after.oscStreak).Append(',').Append(after.firedTotal).Append(',')
+              .Append(after.ignoreCondNext ? 1 : 0).Append(',').Append(after.storedAttack).Append(',').Append(after.storedAttackNext).Append(',')
+              .Append(after.extraDrawNext).Append(',').Append(after.foundryBonus).Append(',').Append(after.mainsUses).Append('|');
+            if (after.gauge.Count > 0)
+            {
+                var keys = new List<string>(after.gauge.Keys); keys.Sort(StringComparer.Ordinal);
+                foreach (var g in keys) sb.Append(g).Append('=').Append(after.gauge[g]).Append(',');
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>次のターンの場 (常設 + 手札) を 1 つ引く (写しで回す・本体の山札は書き換えない・専用の乱数)。
+        /// 本体の <see cref="TerminalDeckState.FinishTurn"/> → <see cref="TerminalDeckState.DrawTurn"/> と同じ順。 違いは、 山の並びを読まずに中身から一様に引くことだけ。
+        /// <paramref name="stopped"/> = ヴェスカ〈停滞する時間〉で止まった場の端子 (null = なし)。</summary>
+        private static List<string> SampleNextBoard(TerminalDeckState dk, List<string> board, TerminalOutcome o, int size, float stopChance,
+                                                    System.Random rng, out bool[] stopped)
+        {
+            var draw = new List<string>(dk.draw);
+            var discard = new List<string>(dk.discard);
+            var hand = new List<string>(dk.hand);
+            var perm = new List<string>(dk.permanent);
+            // ---- FinishTurn: 残す 1 枚・写し取り (捨て札へ複製)・使い捨てと焼き切り (この戦闘から外す) ----
+            string retain = o.retainTarget >= 0 && o.retainTarget < board.Count ? board[o.retainTarget] : null;
+            if (o.copyTarget >= 0 && o.copyTarget < board.Count) discard.Add(board[o.copyTarget]);
+            foreach (int s in o.fired)
+            {
+                var d = TerminalCards.Get(board[s]);
+                if (d != null && d.disposable) hand.Remove(board[s]);
+            }
+            if (o.burnTarget >= 0 && o.burnTarget < board.Count) hand.Remove(board[o.burnTarget]);
+            // ---- DrawTurn: 前のターン (= 今ターン) に止まっていた手札は残す・残す 1 枚・それ以外は捨て札へ ----
+            var keep = new List<string>();
+            var prev = dk.state.stopped;
+            if (prev != null)
+                for (int s = perm.Count; s < board.Count && s < prev.Length; s++)
+                    if (prev[s] && hand.Remove(board[s])) keep.Add(board[s]);
+            bool kept = false;
+            foreach (var id in hand)
+            {
+                if (!kept && retain != null && id == retain) { kept = true; continue; }
+                discard.Add(id);
+            }
+            hand.Clear(); hand.AddRange(keep);
+            if (kept) hand.Add(retain);
+            // ---- 引く (山が尽きたら捨て札を混ぜて続ける・常設は場へ出して引き直す・引いた物だけが止まる対象) ----
+            var stopPerm = new List<int>(); var stopHand = new List<int>();
+            int guard = 0;
+            while (hand.Count < size && guard++ < 64)
+            {
+                if (draw.Count == 0)
+                {
+                    if (discard.Count == 0) break;
+                    draw.AddRange(discard); discard.Clear();
+                }
+                int j = rng.Next(draw.Count);
+                var id = draw[j]; draw[j] = draw[draw.Count - 1]; draw.RemoveAt(draw.Count - 1);
+                bool stop = stopChance > 0f && rng.NextDouble() < stopChance;
+                var d = TerminalCards.Get(id);
+                if (d != null && d.permanent) { if (stop) stopPerm.Add(perm.Count); perm.Add(id); continue; }
+                if (stop) stopHand.Add(hand.Count);
+                hand.Add(id);
+            }
+            var nb = new List<string>(perm.Count + hand.Count);
+            nb.AddRange(perm); nb.AddRange(hand);
+            stopped = null;
+            if (stopPerm.Count + stopHand.Count > 0)
+            {
+                stopped = new bool[nb.Count];
+                foreach (int p in stopPerm) stopped[p] = true;
+                foreach (int h in stopHand) stopped[perm.Count + h] = true;
+            }
+            return nb;
+        }
+
+        /// <summary>次のターンの場 <paramref name="board"/> と出目 <paramref name="dice"/> (昇順) での最良効用 (今ターンと同じ列挙・同じ効用)。
+        /// 同じ目どうしを入れ替えただけの挿し方は 1 回だけ解く。 攻撃に挿せる手が 1 つも無い場では「攻撃 0 本」の抑止を外して比べる
+        /// (<see cref="OptimalTurnState.noAttackForced"/>)。</summary>
+        private float BestDeckUtilityOver(in OptimalTurnState ns, List<string> board, int[] dice, in TerminalEnv env, TerminalBattleState state, in DeckEval ev)
+        {
+            int k = dice.Length;
+            var cands = TerminalWiring.Enumerate(board, k, state);
+            var sums = new List<WiredSums>(cands.Count);
+            float best = float.NegativeInfinity;
+            bool anyAttack = false;
+            foreach (var w in cands)
+            {
+                bool dup = false;
+                for (int i = 1; i < k && !dup; i++) if (dice[i] == dice[i - 1] && w[i] < w[i - 1]) dup = true;
+                if (dup) continue;
+                var after = state.Clone();
+                var o = TerminalCards.Resolve(board, w, dice, env, after);
+                var tg = ChooseDeckTargets(board, o, ev.run);
+                if (tg != null) { after = state.Clone(); o = TerminalCards.Resolve(board, w, dice, env, after, tg); }
+                var ws = DeckSums(in ns, dice, board, o, state, after, in env, ev.deckHasCounter);
+                if (ws.aCount > 0) anyAttack = true;
+                sums.Add(ws);
+                float u = OptimalUtilityCore(in ns, k, in ws, out _);
+                if (u > best) best = u;
+            }
+            if (sums.Count == 0) return 0f;
+            if (!anyAttack)
+            {
+                var nf = ns; nf.noAttackForced = true;
+                best = float.NegativeInfinity;
+                foreach (var ws in sums)
+                {
+                    var w2 = ws;
+                    float u = OptimalUtilityCore(in nf, k, in w2, out _);
+                    if (u > best) best = u;
+                }
+            }
+            return best;
         }
 
         // =====================================================================

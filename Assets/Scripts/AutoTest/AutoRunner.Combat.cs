@@ -681,6 +681,10 @@ namespace AutoTest
             public bool vitalIgnore;           // 短剣〈急所〉: 会心は防御を無視
             public int minDmg;                 // 勝利時の与ダメ最低保証
             public float berserkMul;           // 狂暴化 (敵の被ダメ倍率)
+            /// <summary>[#105 山札の先読み] 攻撃の種類に挿せる手が 1 つも無い (手札に攻撃の端子が無い・条件に合わない) 次のターン。
+            /// 「攻撃 0 本」の抑止 (−10000) は選べる時の手の形を決める装置なので、 選べないターンには掛けない
+            /// (掛けると、 次のターンの手札の引きの差が −10000 ÷ 標本数の桁で先読みの値を支配する)。 既定 false = 今までどおり。</summary>
+            public bool noAttackForced;
         }
 
         /// <summary>[V3 readOutgoingMult] 配線時点で分かる範囲で、 本体と同じ順に主攻撃 (ヴェスカの防御の前) の期待値を出す。
@@ -1169,7 +1173,7 @@ namespace AutoTest
             //   よって「攻撃 0 本」は、 その 1 本を防御へ回さないと死ぬ場合にのみ選ぶ。
             //   ※〈虚空〉持ちもこの抑止の対象 (2026-07-29)。 刻みの価値は effDmg に足してあるので、
             //     本当に得なら抑止を越えて選ばれる。
-            if (aCount == 0)
+            if (aCount == 0 && !s.noAttackForced)
             {
                 // 「ブロックの最大目を 1 本だけ攻撃へ回す」場合の被弾と比較する。
                 int takenIfAttackOne = System.Math.Max(0, enemyAtk - (block - maxBlockDie));
@@ -1304,6 +1308,26 @@ namespace AutoTest
             if (uNow < plan.cutoff) return float.NegativeInfinity;      // 上位 K 本に入らない配線は読まない
             if (o.effDmg >= st.enemyHp || o.taken >= st.myHp) return uNow;
 
+            var ns = NextTurnStateFrom(in st, plan, in o, rolls.Length, st.myHp, st.myShield, out int plusNext);
+            var key = (ns.enemyHp, ns.myHp, ns.myShield, ns.undyingStreak, ns.steadfastReady ? 1 : 0, ns.eDefNow, ns.tele.blazeStacks * 2 + plusNext);
+            if (!plan.memo.TryGetValue(key, out float e))
+            {
+                // 端子の重みは次ターンの敵 HP 比で決まる (予兆ターンの Phase)
+                TerminalWeights(in ns.play, plan.turn + 1, ns.enemyHp / plan.enemyMaxHp, out float wa, out float wd, out float wc);
+                ns.wAtk = wa; ns.wDef = wd; ns.wChg = wc;
+                e = ExpectedBestNextUtility(in ns, plan, rolls.Length);
+                plan.memo[key] = e;
+            }
+            return uNow + e;
+        }
+
+        /// <summary>このターンを解いた結果 <paramref name="o"/> から、 次のターンの盤面を組む (E8 と山札の先読み #105 が共通で使う)。
+        /// <paramref name="hpStart"/> = 敵の攻撃の前の自 HP (旧い配線は今の HP・山札は回復と払った HP の後)、
+        /// <paramref name="shieldPool"/> = 敵の攻撃の前のシールド (旧い配線は持ち越し分・山札はこのターンの端子の分も)。
+        /// <paramref name="plusNext"/> = [#107] 次のターンに〈反撃態勢〉〈暴走〉が乗るか (memo の鍵の一部)。</summary>
+        private OptimalTurnState NextTurnStateFrom(in OptimalTurnState st, NextTurnPlan plan, in OptimalTurnOutcome o, int k,
+                                                   int hpStart, int shieldPool, out int plusNext)
+        {
             var ns = plan.next;
             ns.enemyHp = st.enemyHp - System.Math.Min(o.effDmg, st.enemyHp) + o.enemyHeal;   // [#107] 〈吸血〉の戻り (撃破しないときだけ・最大 HP まで)
             // [#107] 収支プラスなら次のターン〈反撃態勢〉(通った時 +N)・〈暴走〉(攻撃 +N)
@@ -1316,15 +1340,14 @@ namespace AutoTest
                     ns.tele.enemyAttackValue = ns.enemyAtk;
                 }
             }
-            ns.myHp = st.myHp - o.taken;
+            ns.myHp = hpStart - o.taken;
             // シールド: 今ターンの被弾で吸われ、 〈城壁〉で増え、 次のターン頭に半分 (切り捨て・DAMAGE_CALC_REFERENCE ③-D)
-            int shield = o.bashSpent ? 0 : System.Math.Max(0, st.myShield - o.taken);
+            int shield = o.bashSpent ? 0 : System.Math.Max(0, shieldPool - o.taken);
             if (st.bulwarkRate > 0f) shield += TurnRules.BulwarkGain(o.block, st.enemyAtk, st.bulwarkRate);
             ns.myShield = shield / 2;
             // 剣〈不滅の刃〉: 攻撃とブロックの両方に挿したターンが続く
             ns.undyingStreak = (st.stepUndying && o.aCount > 0 && o.bCount > 0) ? st.undyingStreak + 1 : 0;
             // 盾〈堅守の構え〉: 全部ブロックで使うと次の 2 ターンは使えない
-            int k = rolls.Length;
             int readyTurn = (plan.steadfastOn && st.steadfastReady && o.bCount == k)
                 ? plan.turn + ItemSystem.PassiveSkills.Effects.SteadfastStance.Cooldown : plan.steadfastReadyTurn;
             ns.steadfastReady = plan.steadfastOn && plan.turn + 1 >= readyTurn;
@@ -1334,18 +1357,9 @@ namespace AutoTest
             ns.tele.blazeStacks = plan.nextBlazeBase
                 + ((st.tele.blazePenalizesBlock && o.bCount >= ItemSystem.PassiveSkills.Effects.BlazeBrand.BlockDiceThreshold) ? 1 : 0);
 
-            // 最後の要素: 烈炎のスタック × 2 + [#107] 次のターンに〈反撃態勢〉〈暴走〉が乗るか
-            int plusNext = (o.balancePlus && (st.nextHitOnPlus > 0 || st.nextAtkOnPlus > 0f)) ? 1 : 0;
-            var key = (ns.enemyHp, ns.myHp, ns.myShield, ns.undyingStreak, ns.steadfastReady ? 1 : 0, ns.eDefNow, ns.tele.blazeStacks * 2 + plusNext);
-            if (!plan.memo.TryGetValue(key, out float e))
-            {
-                // 端子の重みは次ターンの敵 HP 比で決まる (予兆ターンの Phase)
-                TerminalWeights(in ns.play, plan.turn + 1, ns.enemyHp / plan.enemyMaxHp, out float wa, out float wd, out float wc);
-                ns.wAtk = wa; ns.wDef = wd; ns.wChg = wc;
-                e = ExpectedBestNextUtility(in ns, plan, k);
-                plan.memo[key] = e;
-            }
-            return uNow + e;
+            // memo の鍵の最後の要素: 烈炎のスタック × 2 + [#107] 次のターンに〈反撃態勢〉〈暴走〉が乗るか
+            plusNext = (o.balancePlus && (st.nextHitOnPlus > 0 || st.nextAtkOnPlus > 0f)) ? 1 : 0;
+            return ns;
         }
 
         /// <summary>次ターンの盤面 <paramref name="ns"/> で、 出目の全列挙 (面^個数・同じ多重集合は 1 回だけ評価) の最良効用の期待値。</summary>

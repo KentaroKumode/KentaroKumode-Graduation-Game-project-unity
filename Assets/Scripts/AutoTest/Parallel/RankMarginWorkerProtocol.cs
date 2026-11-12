@@ -445,6 +445,8 @@ namespace AutoTest.ParallelSweep
                 "probeMainMult", "ProbeMainMultApplied", "probePassiveMult", "ProbePassiveMultApplied",
                 // 2026-11-12 (#107): 配線が収支で決まる敵のパッシブと〈吸血〉を読むか (−1 = 技量に従う) と実効値・内訳
                 "v3.readEnemyPassives", "ReadEnemyPassivesEffective", "v3.enemyPassiveMask",
+                // 2026-11-12 (#105): 山札の 2 ターン先読み (既定 OFF) と、 その範囲・候補数・標本数
+                "deckLookahead", "deckLookaheadBossOnly", "deckLookaheadTopK", "deckLookaheadSamples",
             };
             var sb = new System.Text.StringBuilder();
             foreach (string name in watched)
