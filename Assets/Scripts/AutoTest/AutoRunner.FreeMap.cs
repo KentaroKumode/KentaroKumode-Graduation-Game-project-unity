@@ -139,6 +139,11 @@ namespace AutoTest
             return best;
         }
 
+        /// <summary>歩く計画に使う物資 = 手持ち + 近道の残り (ただで動ける回数 × 1 歩の物資)。
+        /// h 歩歩いた後の残りは「手持ち − max(0, h − 残り) + max(0, 残り − h)」= この値 − h で、 ただの歩を先に使うことと同じになる。</summary>
+        private static int NavSupply(RunState run, FreeMapSim sim)
+            => run.provision + (sim != null ? sim.FreeMovesLeft * FreeMapParams.MoveSupply : 0);
+
         /// <summary>[2026-11-10] HP で払って歩ける歩数 (物資が尽きた後・1 歩 HP <see cref="FreeMapParams.HpPerSupply"/>)。
         /// HP は層を移るたびに全回復するので、 ボスのいない層では HP を燃料として使い切ってよい (最大 HP の 25% を残す)。
         /// ボスのいる層ではボス戦の分を残す (最大 HP の 75%)。</summary>
@@ -268,7 +273,7 @@ namespace AutoTest
                 bool foeNear = sim.FoeAlive && (sim.FoeVisible || sim.Stone().level >= 2);
                 int exitCost = hopsFromMe[L.goal] == int.MaxValue ? 0 : hopsFromMe[L.goal] * FreeMapParams.MoveSupply;
                 if (!sim.FlareOn && !chased && !foeNear
-                    && run.provision >= exitCost + FreeMapExitMargin + FreeMapParams.FlareSupply
+                    && NavSupply(run, sim) >= exitCost + FreeMapExitMargin + FreeMapParams.FlareSupply
                     && Unscouted(FreeMapParams.FlareRange) >= FlareMinUnscouted
                     && gm.UseFlare())
                 {
@@ -293,10 +298,10 @@ namespace AutoTest
             //   ・補給に行くのは満タンでない時だけ・今いる点は除く
             //   ・満タンでも出口に届かない時は、 今より出口に近い店へ (店を伝って出口へ進む)。 無ければ出口へ (足りない分は HP)
             bool full = run.provision >= run.provisionCap;
-            bool exitOk = hopsFromMe[L.goal] != int.MaxValue && run.provision + HpWalkSteps(run, mm) >= hopsFromMe[L.goal] * FreeMapParams.MoveSupply + FreeMapExitMargin;
+            bool exitOk = hopsFromMe[L.goal] != int.MaxValue && NavSupply(run, sim) + HpWalkSteps(run, mm) >= hopsFromMe[L.goal] * FreeMapParams.MoveSupply + FreeMapExitMargin;
             int refuel = full ? NearestRefuel(mm, sim, hopsFromMe, run, at, sim.HopsFrom(L.goal), sim.HopsFrom(L.goal)[at])
                               : NearestRefuel(mm, sim, hopsFromMe, run, at);
-            bool refuelOk = refuel >= 0 && run.provision >= hopsFromMe[refuel] * FreeMapParams.MoveSupply;
+            bool refuelOk = refuel >= 0 && NavSupply(run, sim) >= hopsFromMe[refuel] * FreeMapParams.MoveSupply;
             if (refuel < 0 && !sim.FlareOn && !(sim.FoeAlive && sim.FoeMode == FoeMode.Chase)
                 && run.coins >= FreeMapParams.ProvisionPrice && run.provision > FreeMapParams.FlareSupply
                 && _freeMapActions <= MaxFreeMapActionsPerFloor)
@@ -327,7 +332,7 @@ namespace AutoTest
                     if (n.activated || sim.IsSunk(n.index)) continue;             // 使い切った点・沈んだ点
                     if (hopsFromMe[n.index] == int.MaxValue) continue;
                     // 行った先から出口か補給できる店まで歩けない点は寄らない
-                    if (!Sustainable(mm, sim, sim.HopsFrom(n.index), L.goal, run.provision - hopsFromMe[n.index] * FreeMapParams.MoveSupply, run)) continue;
+                    if (!Sustainable(mm, sim, sim.HopsFrom(n.index), L.goal, NavSupply(run, sim) - hopsFromMe[n.index] * FreeMapParams.MoveSupply, run)) continue;
                     float desire = !n.revealed ? UnknownNodeDesire
                                  : RankCeil - Rank(n, hpRatio, _curCombatAverse, false, run, dangerTarget);
                     if (desire <= 0f) continue;

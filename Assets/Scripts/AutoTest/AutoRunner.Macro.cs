@@ -62,7 +62,7 @@ namespace AutoTest
             {
                 hp = run.playerMaxHP > 0 ? (float)run.playerHP / run.playerMaxHP : 1f,
                 coins = run.coins,
-                supply = run.provision,
+                supply = NavSupply(run, sim),      // 近道の残り (ただで動ける回数) を含める
                 cap = run.provisionCap,
             };
             // 補給できる店 (まだ入っていない・種別が見えている)。 計画の中で寄った店は used で外れる

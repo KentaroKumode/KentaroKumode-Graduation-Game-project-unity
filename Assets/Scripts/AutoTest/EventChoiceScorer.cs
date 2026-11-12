@@ -402,9 +402,6 @@ namespace AutoTest
         const float V_SHAKE_NEAR = 2.0f;
         /// <summary>追跡者を遠ざける: 補足中は 1 歩 = 補足中の 1 ターンぶん (V_TURN_CHASED)、 巡回中は 1 歩 0.3。</summary>
         const float V_PUSH_PATROL = 0.3f;
-        /// <summary>近道: 1 歩 = 物資 1 の 6 割 (飛ばした点の報酬も逃すので満額ではない)。 補足中は距離も稼ぐ (1 歩 +2)。</summary>
-        const float V_SHORTCUT_STEP = 0.6f;
-        const float V_SHORTCUT_CHASED = 2.0f;
         /// <summary>前線 1 段 (= 5 ターンぶんの前線の進み) = 物資 0.5。 今いる所に前線が届いていれば倍。</summary>
         const float V_FRONT_STEP = 0.5f;
         /// <summary>N つから選ぶ: 1 つ増えるごとにパッシブの値段の +15%。</summary>
@@ -477,16 +474,18 @@ namespace AutoTest
             return V_TURN_FOE_PATROL * steps;
         }
 
+        /// <summary>近道+N (2026-11-12 に作り替え): この後の移動 N 回ぶん、 物資を使わずターンも進まない。
+        /// 1 回 = 物資 1 の値段 + 1 ターンぶんの値段 (ターンを使う時の値段の符号を返したもの: 補足中 3・巡回中 1・追跡者なし 0.3)。
+        /// 層を出たら残りは消えるので、 数えるのは終点までの歩数まで。</summary>
         private static float ScoreShortcut(int steps, RunState run)
         {
             var sim = Sim;
             if (sim == null || steps <= 0) return 0f;
             int toGoal = sim.HopsFrom(sim.Layout.goal)[sim.Me];
             if (toGoal == int.MaxValue) return 0f;
-            int n = UnityEngine.Mathf.Min(steps, UnityEngine.Mathf.Max(0, toGoal - 1));   // 終点の手前で止まる
-            float v = n * V_SHORTCUT_STEP * ProvisionPrice(run);
-            if (sim.Eta().Valid) v += n * V_SHORTCUT_CHASED;
-            return v;
+            int n = UnityEngine.Mathf.Min(steps, toGoal);
+            float turn = sim.Eta().Valid ? -V_TURN_CHASED : sim.FoeAlive ? -V_TURN_FOE_PATROL : -V_TURN_NO_FOE;
+            return n * (MapSystem.FreeMove.FreeMapParams.MoveSupply * ProvisionPrice(run) + turn);
         }
 
         private static float ScoreFront(int steps, RunState run)
