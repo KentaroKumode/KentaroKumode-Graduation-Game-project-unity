@@ -13,7 +13,7 @@ namespace EventSystem
         MaxHpDelta,              // 最大HP+N / 最大HP-N
         GoldDelta,               // ゴールド+N / ゴールド-N
         HungerDelta,             // 空腹度+N / 空腹度-N (旧表記、物資±N と等価)
-        ProvisionDelta,          // 物資+N / 物資-N (今の単位: 1 歩 = 1。 足りない分は HP で払う)
+        ProvisionDelta,          // 物資+N / 物資-N (今の単位: 1 歩 = 1。 支払いが足りなければ選べない・確率分岐の中はある分だけ失う・2026-11-13)
         MaterialDelta,           // 武器強化素材+N / 武器強化素材-N
         ArmorDurabilityLoss,     // 防具の耐久値減少
         TimedBuff,               // 時限バフ[xxx]を獲得

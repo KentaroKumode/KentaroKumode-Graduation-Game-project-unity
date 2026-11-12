@@ -84,6 +84,20 @@ namespace EventSystem
             }
         }
 
+        /// <summary>この選択肢で払う物資 (効果「物資-N」の合計・確率分岐の中と「勝利後」は数えない)。 2026-11-13。
+        /// 足りなければ選べない (<see cref="UnavailableReason"/>)。 確率分岐の中の物資-N は支払いでなく結果として失う物なので、 ここには入れない。</summary>
+        public int ProvisionCost
+        {
+            get
+            {
+                int n = 0;
+                if (effects != null)
+                    foreach (var e in effects)
+                        if (e != null && !e.postCombat && (e.type == EventEffectType.ProvisionDelta || e.type == EventEffectType.HungerDelta) && e.amount < 0) n -= e.amount;
+                return n;
+            }
+        }
+
         /// <summary>この選択肢が効果 type を (確率分岐の外に) 持つか。</summary>
         public bool Has(EventEffectType type)
         {
@@ -94,18 +108,22 @@ namespace EventSystem
         }
 
         /// <summary>選べるか。 **払えないゴールドの支払いは選べない** (2026-11-11 まで、 所持金 0 でも
-        /// 「20 ゴールドで品を買う」が通り、 所持金が 0 で止まるだけだった)。 物資は足りなくても選べる
-        /// (足りない分は HP で払う ── 航行と同じ規則)。 run が null なら常に true。
-        /// <para>2026-11-12: 払えない強化素材・差し出せるパッシブが無い取り替え・鍛えられない武器 (素材が足りない / 終点) も選べない。
-        /// 理由の文は <see cref="UnavailableReason"/>。</para></summary>
+        /// 「20 ゴールドで品を買う」が通り、 所持金が 0 で止まるだけだった)。 run が null なら常に true。
+        /// <para>2026-11-12: 払えない強化素材・差し出せる秘宝が無い取り替え・鍛えられない武器 (素材が足りない / 終点) も選べない。</para>
+        /// <para>2026-11-13 (作者の決定「選択肢をブラックアウトさせて、 選択不可にする」): 状況で効果が起きない選択肢も選べない ──
+        /// 払えない物資 (旧: 足りない分を HP で払っていた)・追跡者の居ない層の追跡者の効果・前線の無い層の前線の効果・航行マップの無い層の地図と近道。
+        /// 起きない効果を「起きたように」書いた文を出さないため。 理由の文は <see cref="UnavailableReason"/>。</para></summary>
         public bool IsAvailable(GameLoop.RunState run) => UnavailableReason(run) == null;
 
-        /// <summary>選べない理由 (画面に出す短い文)。 選べるなら null。 判定の順は ゴールド → 素材 → 取り替え → 鍛える。</summary>
+        /// <summary>選べない理由 (画面に出す短い文)。 選べるなら null。
+        /// 判定の順は ゴールド → 物資 → 素材 → 取り替え → 鍛える → 航行 (地図・近道 → 追跡者 → 前線)。</summary>
         public string UnavailableReason(GameLoop.RunState run)
         {
             if (run == null) return null;
             int g = GoldCost;
             if (run.coins < g) return $"ゴールドが足りない（{g}G）";
+            int p = ProvisionCost;
+            if (run.provision < p) return $"物資が足りない（{p}）";
             int m = MaterialCost;
             if (Has(EventEffectType.ForgeWeapon))
             {
@@ -115,7 +133,39 @@ namespace EventSystem
             }
             if (run.weaponMaterials < m) return $"素材が足りない（{m}）";
             if (Has(EventEffectType.TradePassive) && !GameLoop.GameManager.CanTradePassive(run)) return "差し出せる秘宝が無い";
+            return NavUnavailableReason(run);
+        }
+
+        /// <summary>航行の効果が起きない理由 (2026-11-13)。 起きるなら null。 航行の効果は地図へ戻った時に適用するが
+        /// (<c>GameManager.PassEventTurns</c>)、 イベントの間に追跡者・前線・地図の有無は変わらないので、 選ぶ時の状態で決める。
+        /// 地図は本体の今の航行マップ (<c>GameManager.FreeMap</c>) を読む ── run が本体のランでなければ判定しない。</summary>
+        private string NavUnavailableReason(GameLoop.RunState run)
+        {
+            bool map = Has(EventEffectType.RevealMap) || Has(EventEffectType.RevealEncounters) || Has(EventEffectType.RevealSupplies) || Has(EventEffectType.Shortcut);
+            bool foe = Has(EventEffectType.ShakeOffPursuer) || Has(EventEffectType.PushPursuer) || Has(EventEffectType.PullPursuer);
+            bool front = Has(EventEffectType.ShiftFront);
+            if (!map && !foe && !front) return null;
+            var gm = GameLoop.GameManager.Instance;
+            if (gm == null || !ReferenceEquals(gm.Run, run)) return null;
+            var sim = gm.FreeMap;
+            if (map && sim == null) return "この層に地図は無い";
+            if (foe && (sim == null || !sim.FoeAlive)) return "この層に追跡者は居ない";
+            if (front)
+            {
+                if (sim == null || sim.Weather == MapSystem.FreeMove.WeatherKind.None) return "この層に前線は無い";
+                // 遠ざける (amount < 0) は、 前線がまだ来ていなければ何も起きない (FreeMapSim.ShiftFront)
+                if (!sim.FrontArrived && PushesFrontAway()) return "前線はまだ来ていない";
+            }
             return null;
+        }
+
+        /// <summary>前線を遠ざける効果 (前線を遠ざける+N) を持つか。</summary>
+        private bool PushesFrontAway()
+        {
+            if (effects != null)
+                foreach (var e in effects)
+                    if (e != null && !e.postCombat && e.type == EventEffectType.ShiftFront && e.amount < 0) return true;
+            return false;
         }
     }
 }

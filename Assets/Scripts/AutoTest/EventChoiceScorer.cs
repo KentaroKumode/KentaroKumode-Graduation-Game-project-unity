@@ -71,7 +71,7 @@ namespace AutoTest
         //  致死はどんな報酬でも覆せない値。 二撃で死ぬは「パッシブ 2 個ぶん」(層の物価で 44〜158G) ── 品 1 つでは覆らない。
         const float V_LETHAL_VETO = -400f;   // 選んだ直後の一撃で死ぬ
         static float FragilePenalty(RunState run) => -2f * PassivePrice(run);   // 二撃で死ぬ
-        /// <summary>選べない選択肢 (払えないゴールド)。 致死の拒否権より下に置く。</summary>
+        /// <summary>選べない選択肢 (払えないゴールド・物資・素材、 起きない航行の効果 など <see cref="EventChoice.UnavailableReason"/>)。 致死の拒否権より下に置く。</summary>
         public const float V_UNAVAILABLE = -10000f;
 
         /// <summary>〈観測所の写し〉の評価。 上乗せ (パッシブ×1+素材+8+金+60+全回復) は
@@ -90,7 +90,7 @@ namespace AutoTest
         public static float Score(EventChoice choice, RunState run)
         {
             if (choice?.effects == null || choice.effects.Count == 0) return 0f;
-            // 払えないゴールドの選択肢は選べない (本体も弾く)。 どの加点でも覆らない値にする。
+            // 選べない選択肢 (払えない・効果が起きない) は本体も弾く。 どの加点でも覆らない値にする。
             if (!choice.IsAvailable(run)) return V_UNAVAILABLE;
             // 航行の効果はターンより先に適用される (GameManager.PassEventTurns)。 撒く・遠ざけるが付いた選択肢のターンは、 その後の見込みで値段を付ける
             _turnShaken = choice.Has(EventEffectType.ShakeOffPursuer);
@@ -139,12 +139,8 @@ namespace AutoTest
                 case EventEffectType.ProvisionDelta:
                 case EventEffectType.HungerDelta:
                     if (e.amount >= 0) { prov += e.amount; break; }
-                    {
-                        // 足りない分は HP で払う (本体: EventEffectExecutor・HP は 1 で止まる)
-                        int need = -e.amount, paid = UnityEngine.Mathf.Min(need, UnityEngine.Mathf.Max(0, prov));
-                        prov -= paid;
-                        if (need > paid) hp = UnityEngine.Mathf.Max(1, hp - (need - paid) * MapSystem.FreeMove.FreeMapParams.HpPerSupply);
-                    }
+                    // 足りなければ、 ある分だけ失う (2026-11-13・HP では払わない。 支払いの物資-N が足りない選択肢は選べない)
+                    prov -= UnityEngine.Mathf.Min(-e.amount, UnityEngine.Mathf.Max(0, prov));
                     break;
                 case EventEffectType.HpDelta:    hp = UnityEngine.Mathf.Clamp(hp + e.amount, 0, maxHp); break;
                 case EventEffectType.HpFullHeal: hp = maxHp; break;
@@ -280,9 +276,8 @@ namespace AutoTest
                         return eff * ProvisionPrice(run) * (low ? 2f : 1f);
                     }
                     int need = -e.amount;
-                    int paid = UnityEngine.Mathf.Min(need, UnityEngine.Mathf.Max(0, provisionVal));
-                    int shortHp = (need - paid) * MapSystem.FreeMove.FreeMapParams.HpPerSupply;   // 足りない分は HP で払う
-                    return -paid * ProvisionPrice(run) * (provisionVal - need <= PROVISION_LOW ? 2f : 1f) - shortHp * HpPrice(run) * HP_LOSS_PREMIUM;
+                    int paid = UnityEngine.Mathf.Min(need, UnityEngine.Mathf.Max(0, provisionVal));   // 足りなければ、 ある分だけ失う (2026-11-13・HP では払わない)
+                    return -paid * ProvisionPrice(run) * (provisionVal - need <= PROVISION_LOW ? 2f : 1f);
                 }
 
                 case EventEffectType.TurnsPass:

@@ -136,23 +136,16 @@ namespace EventSystem
                     }
                     else if (amount < 0)
                     {
-                        // 足りない分は HP で払う (航行の「物資が足りない分は HP で払う」と同じ交換比)。
-                        //   **この効果では死なない** (HP は 1 で止まる)。 払えないから選べない、 にはしない ──
-                        //   物資が尽きている時ほど、 物資を払う選択が HP の選択に変わる。
+                        // 2026-11-13 (作者の決定): **HP では払わない**。 選択肢の支払いの物資-N は、 足りなければ選べない
+                        //   (EventChoice.UnavailableReason)。 ここで足りないのは確率分岐の中の「結果として失う」物資と、
+                        //   全部が選べない時の安全弁で選んだ時だけ ── どちらも、 ある分だけ失う (文が「糧食を失った」と言うのと食い違わない)。
+                        //   旧: 足りない分を HP で払っていた (物資 1 = HP 5・この効果では死なない)。
                         int need = -amount;
                         int paid = System.Math.Min(need, run.provision);
                         GameLoop.ProvisionSystem.Reduce(run, paid);
-                        int shortfall = need - paid;
-                        if (shortfall > 0)
-                        {
-                            int hpBefore = run.playerHP;
-                            int hpCost = shortfall * MapSystem.FreeMove.FreeMapParams.HpPerSupply;
-                            run.playerHP = Mathf.Max(1, run.playerHP - hpCost);
-                            GameLoop.HpOutsideDiag.Add("イベント:物資不足", hpBefore - run.playerHP);
-                            result.log.Add($"物資-{paid}、足りない {shortfall} を HP で払った (HP {hpBefore} → {run.playerHP})");
-                        }
-                        else
-                            result.log.Add($"物資-{paid} (現在 {run.provision}/{run.provisionCap})");
+                        result.log.Add(paid == 0    ? "物資は手持ちが無く、 失わなかった"
+                                     : paid < need ? $"物資-{paid} (手持ちの分だけ・現在 {run.provision}/{run.provisionCap})"
+                                                   : $"物資-{paid} (現在 {run.provision}/{run.provisionCap})");
                     }
                     break;
                 }

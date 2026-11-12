@@ -205,6 +205,8 @@ namespace MapSystem.FreeMove
         public WeatherKind Weather { get; private set; }
         /// <summary>前線の x (左端からの距離)。 まだ届いていなければ負の無限大。</summary>
         public double Front { get; private set; } = double.NegativeInfinity;
+        /// <summary>前線がもう層に届いているか (届いていなければ <see cref="ShiftFront"/> の遠ざけるは何も起きない)。</summary>
+        public bool FrontArrived => !double.IsNegativeInfinity(Front);
 
         // ── 航行アイテムの係数 (2026-11-11・nav-items.md) ──
         /// <summary>いま掛かっている係数。 本体が操作のたびに <see cref="SetPerks"/> で差し替える (層の途中で品を得た時も効くように)。</summary>
