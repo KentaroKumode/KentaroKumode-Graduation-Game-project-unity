@@ -26,7 +26,6 @@ namespace UI.Game2D
         public const string Order = "解決の順番";
         public const string Long = "戦闘の長期化";
         public const string Crit = "会心";
-        public const string CritCurve = "会心率の伸び";
         public const string ForceCrit = "確定会心";
         public const string Keyword = "キーワード";
         public const string Poison = "毒";
@@ -39,9 +38,7 @@ namespace UI.Game2D
         public const string Equip = "装備と強化";
         public const string Shop = "ショップ";
         public const string Origin = "出自";
-        public const string Contract = "旅団契約";
         public const string LayerBoss = "層とボス";
-        public const string Rift = "時間の狭間";
         public const string MetaPanel = "整備パネル";
     }
 
@@ -95,7 +92,7 @@ namespace UI.Game2D
         /// <summary>
         /// 契機の表 (並び = handbook の並び = 同時に頼まれた時に出す順)。 頼む所:
         /// <list type="bullet">
-        /// <item>ランと帰還 / 層の歩き方 / キーワード / 出血 / 充電 / 臨界 ── この部品が状態を見て頼む (<see cref="Watch"/>)</item>
+        /// <item>ランと帰還 / 層の歩き方 / キーワード / 毒 / 出血 / 充電 / 臨界 ── この部品が状態を見て頼む (<see cref="Watch"/>)</item>
         /// <item>巡回するもの ── 魔石が初めて反応した時 (<see cref="Game2DRadar.SetStone"/>)</item>
         /// <item>戦闘の形式 / 層とボス / 端子の山札 / 敵の予告 / 端子に挿す / 端子の種類 / 解決の順番 / 戦闘の長期化 / 会心 / 確定会心 / 逃げる ── 戦闘の流れ (<see cref="Game2DBattleSim"/>)</item>
         /// <item>端子を増やす ── 戦闘の後の端子の報酬の窓 (<see cref="Game2DPhaseScreens"/>)</item>
@@ -107,9 +104,9 @@ namespace UI.Game2D
             new Topic(TutorialTopics.RunAndReturn, Scene.Title),
             new Topic(TutorialTopics.WalkLayer, Scene.Map),
             new Topic(TutorialTopics.Patrol, Scene.Map),
-            new Topic(TutorialTopics.Outpost, Scene.Map, "旅団との契約 (2026-08-11 に削除) を挙げている。 前哨基地は立ち寄る画面が無い (層に入ると自動で回復・強化)"),
+            new Topic(TutorialTopics.Outpost, Scene.Map),
             new Topic(TutorialTopics.CombatForm, Scene.Battle),
-            new Topic(TutorialTopics.RollDice, Scene.Battle, "振り直しは物資ではなく充電を払う (CombatManager.Mechanics の rerollCost)。 「目の内容はダイスが決める」は出目パーツ化 (2026-08-17) で古い"),
+            new Topic(TutorialTopics.RollDice, Scene.Battle),
             new Topic(TutorialTopics.Telegraph, Scene.Battle),
             new Topic(TutorialTopics.Plug, Scene.Battle),
             new Topic(TutorialTopics.Deck, Scene.Battle),
@@ -118,22 +115,19 @@ namespace UI.Game2D
             new Topic(TutorialTopics.Order, Scene.Battle),
             new Topic(TutorialTopics.Long, Scene.Battle),
             new Topic(TutorialTopics.Crit, Scene.Battle),
-            new Topic(TutorialTopics.CritCurve, Scene.Battle, "会心率の逓減は 2026-09-15 に撤去 (DAMAGE_CALC_REFERENCE §2-B)。 「100% には届かない」も今は違う"),
             new Topic(TutorialTopics.ForceCrit, Scene.Battle),
             new Topic(TutorialTopics.Keyword, Scene.Any),
-            new Topic(TutorialTopics.Poison, Scene.Battle, "「自然には減らない・戦闘が終わるまで残る」が今の毒 (ダメージを出すたびに残りが半減) と逆"),
+            new Topic(TutorialTopics.Poison, Scene.Battle),
             new Topic(TutorialTopics.Bleed, Scene.Battle),
             new Topic(TutorialTopics.Charge, Scene.Battle),
             new Topic(TutorialTopics.Rinkai, Scene.Battle),
-            new Topic(TutorialTopics.Provision, Scene.Map, "物資の段階ごとの不調は無い (ProvisionRules.TierOf は 足りる / 尽きた の 2 つだけ)"),
+            new Topic(TutorialTopics.Provision, Scene.Map),
             new Topic(TutorialTopics.Flee, Scene.Battle),
-            new Topic(TutorialTopics.Inventory, Scene.Any, "持ち物の格子・広さの上限は無い"),
-            new Topic(TutorialTopics.Equip, Scene.Any, "「ダイス」の品は廃止 (出目パーツ・2026-08-17)"),
-            new Topic(TutorialTopics.Shop, Scene.Any, "「ダイス」の品・持ち物の領域の拡張を挙げている (どちらも今は無い)"),
+            new Topic(TutorialTopics.Inventory, Scene.Any),
+            new Topic(TutorialTopics.Equip, Scene.Any),
+            new Topic(TutorialTopics.Shop, Scene.Any),
             new Topic(TutorialTopics.Origin, Scene.Any, "契機の場面 (出自の選択画面) が Game2D に無い"),
-            new Topic(TutorialTopics.Contract, Scene.Any, "旅団契約は 2026-08-11 にシステムごと削除"),
             new Topic(TutorialTopics.LayerBoss, Scene.Battle),
-            new Topic(TutorialTopics.Rift, Scene.Any, "時間の狭間はコードに無い"),
             new Topic(TutorialTopics.MetaPanel, Scene.Any),
         };
 
@@ -269,6 +263,7 @@ namespace UI.Game2D
                 var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
                 if (ctx != null)
                 {
+                    if (ctx.EnemyPoison > 0) Request(TutorialTopics.Poison);
                     if (ctx.enemyBleedStacks > 0) Request(TutorialTopics.Bleed);
                     if (ctx.GetCharge() > 0) Request(TutorialTopics.Charge);
                     if (ctx.rinkaiMeter > 0) Request(TutorialTopics.Rinkai);
