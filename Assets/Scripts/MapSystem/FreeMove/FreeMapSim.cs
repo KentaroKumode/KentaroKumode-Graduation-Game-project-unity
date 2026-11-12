@@ -357,6 +357,8 @@ namespace MapSystem.FreeMove
             public bool smokeGranted, beaconGranted;
             /// <summary>縄張りの宝を取ったか (2026-11-12)。 宝の有無と追跡者が縄張りを出るかは写さない ── 作り直す時に <see cref="ConfigureTerritory"/> で同じものを決める。</summary>
             public bool treasureTaken;
+            /// <summary>近道 (時限バフ「近道」) の残りの回数 (2026-11-13)。 古いセーブには無い欄なので 0 で戻る。</summary>
+            public int freeMovesLeft;
         }
 
         /// <summary>いまの中身を写す。</summary>
@@ -388,6 +390,7 @@ namespace MapSystem.FreeMove
             s.smokeLeft = SmokeLeft; s.beaconLeft = BeaconLeft; s.beacon = Beacon; s.goalwardSteps = _goalwardSteps;
             s.smokeGranted = _smokeGranted; s.beaconGranted = _beaconGranted;
             s.treasureTaken = TreasureTaken;
+            s.freeMovesLeft = FreeMovesLeft;
             return s;
         }
 
@@ -426,6 +429,7 @@ namespace MapSystem.FreeMove
             SmokeLeft = s.smokeLeft; BeaconLeft = s.beaconLeft; Beacon = s.beacon; _goalwardSteps = s.goalwardSteps;
             _smokeGranted = s.smokeGranted; _beaconGranted = s.beaconGranted;
             TreasureTaken = s.treasureTaken;
+            FreeMovesLeft = System.Math.Max(0, s.freeMovesLeft);
             Perks = perks ?? FreeMapPerks.None;
         }
 
@@ -548,8 +552,8 @@ namespace MapSystem.FreeMove
         /// <summary>点 j へ 1 歩動くのに進むターン (雪の前線の内側は 2・近道の残りがある間は 0)。</summary>
         public int TurnsFor(int j) => FreeMovesLeft > 0 ? 0 : WeatherAt(j, WeatherKind.Snow) || WeatherAt(Me, WeatherKind.Snow) ? 2 : 1;
 
-        /// <summary>点 j へ 1 歩動いた時の HP の損 (雹の前線の内側)。</summary>
-        public int HpLossFor(int j) => WeatherAt(j, WeatherKind.Hail) ? 1 : 0;
+        /// <summary>点 j へ 1 歩動いた時の HP の損 (雹の前線の内側)。 近道の残りがある間の 1 歩は 0 (2026-11-13・作者の決定「ただで動いた時は払わない」)。</summary>
+        public int HpLossFor(int j) => FreeMovesLeft > 0 ? 0 : WeatherAt(j, WeatherKind.Hail) ? 1 : 0;
 
         /// <summary>追跡者がいま補足に使う歩数 (性質と照明で変わる)。 表示 (気配の輪) もこれを読む。</summary>
         public int DetectHops
@@ -645,7 +649,7 @@ namespace MapSystem.FreeMove
 
         /// <summary>隣の点 j へ 1 歩。 物資を払い、 痕跡を残し、 追跡者が動く。
         /// <para>近道の残り (<see cref="FreeMovesLeft"/>) がある間は<b>ただの 1 歩</b>: 物資を払わず、 ターンを進めず (追跡者・使い魔・前線・
-        /// 照明と囮罠の残りが動かない)、 残りを 1 減らす。 雹の HP・痕跡・着いた点の起動は通常の 1 歩と同じ。 補足の判定は
+        /// 照明と囮罠の残りが動かない)、 雹の HP も払わず (2026-11-13)、 残りを 1 減らす。 痕跡・着いた点の起動は通常の 1 歩と同じ。 補足の判定は
         /// 追跡者の手番 (= 次にターンが進んだ時) にしか無いので、 ここでは鳴らない。 追跡者・使い魔の居る点へ自分から踏み込んだ時だけ、 その場で接触する。</para></summary>
         public FreeMapEvent MoveTo(int j)
         {

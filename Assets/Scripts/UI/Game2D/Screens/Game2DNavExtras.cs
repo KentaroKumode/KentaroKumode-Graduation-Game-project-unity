@@ -146,11 +146,11 @@ namespace UI.Game2D
             if (Time.unscaledTime < _jumpUntil) p.Text("+" + _jumpN, tx + Game2DJpFont.Width(tn) + 4, 3, Game2DKit.Amber);      // まとめて進んだ分
             // 右: 照明の残り (ターン) と近道の残り (ただで動ける回数)。 両方ある時は、 ターン数の字と重なるなら短く書く
             string flare = sim.FlareOn ? "照明 残り" + sim.FlareTurnsLeft : null;
-            string cut = sim.FreeMovesLeft > 0 ? "近道 残り" + sim.FreeMovesLeft : null;
+            string cut = sim.FreeMovesLeft > 0 ? "近道 " + sim.FreeMovesLeft + "回" : null;      // 時限バフ「近道」の残り (時限バフの「(N回)」と同じ数え方)
             string right = flare != null && cut != null ? cut + " " + flare : flare ?? cut;
             int leftEnd = tx + Game2DJpFont.Width(tn) + (Time.unscaledTime < _jumpUntil ? 4 + Game2DJpFont.Width("+" + _jumpN) : 0);
             if (flare != null && cut != null && StatusR.width - 5 - Game2DJpFont.Width(right) < leftEnd + 6)
-                right = "近道" + sim.FreeMovesLeft + " 照明" + sim.FlareTurnsLeft;
+                right = "近道" + sim.FreeMovesLeft + "回 照明" + sim.FlareTurnsLeft;
             if (right != null) p.TextR(right, StatusR.width - 5, 3, Game2DKit.Amber);
             string line = null; var col = Game2DKit.Dim;
             if (_hoverSlot >= 0) { line = SlotHint(gm, sim, run, _hoverSlot); col = Game2DKit.Ink; }

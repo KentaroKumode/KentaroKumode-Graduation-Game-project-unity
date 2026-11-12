@@ -59,7 +59,7 @@ namespace GameLoop
                 Log("そこへは行けない（道がつながっていない）");
                 return false;
             }
-            if (sim.FreeMovesLeft > 0) Log($"近道（物資もターンも使わない・残り {sim.FreeMovesLeft - 1} 回）");
+            if (sim.FreeMovesLeft > 0) Log($"時限バフ「近道」を使った（物資もターンも使わない・残り {sim.FreeMovesLeft - 1} 回）");
             RunFreeMapOp(s => s.MoveTo(node.index));
             return true;
         }

@@ -2867,7 +2867,7 @@ OfferPassives / TradePassive / ForgeWeapon / NextShopDiscount / NextRestBonus
 | `追跡者を撒く` | 補足を外す: 巡回へ戻り、`ChaseRest`（4）ターンは補足しない。放たれた使い魔は消え、猟犬は本体へ戻る | `FreeMapSim.ShakeOff` |
 | `追跡者を遠ざける+N` | 本体を道で N 歩、自分から遠ざける（追跡中なら追跡は続く・動かない召喚者も動く） | `FreeMapSim.PushFoe` |
 | `追跡者を呼ぶ+N`（代償） | 本体が道で N 歩近づく（隣で止まる・補足は次のターンの手番が決める） | `FreeMapSim.PullFoe` |
-| `近道+N` | **この後の移動 N 回ぶん、物資を使わずターンも進まない**（2026-11-12 のユーザーの決定で作り替え）。自動では動かない ── どこへ動くかは遊ぶ人が選ぶ。待つ・偵察・〈補給線〉には効かない。重ねたら足し合わせ。層を出たら残りは消える。地図の上の帯（経過ターンの帯の右）に「近道 残りN」。ただの 1 歩の扱いは下の表 | `FreeMapSim.GrantFreeMoves` → `FreeMapSim.MoveTo` |
+| `近道+N` | **この後の移動 N 回ぶん、物資を使わずターンも進まない**（2026-11-12 のユーザーの決定で作り替え）。自動では動かない ── どこへ動くかは遊ぶ人が選ぶ。待つ・偵察・〈補給線〉には効かない。重ねたら足し合わせ。層を出たら残りは消える。**見せ方は時限バフ「近道」（残り N 回）に統一**（2026-11-13・作者の決定）: イベントの結果の行は時限バフと同じ「時限バフ獲得: 近道 (N回)」、地図の上の帯（経過ターンの帯の右）は「近道 N回」、ログは「時限バフ「近道」」。残りは中断セーブに写す（`SavedState.freeMovesLeft`）。ただの 1 歩の扱いは下の表 | `FreeMapSim.GrantFreeMoves` → `FreeMapSim.MoveTo` |
 | `前線を遠ざける+N` / `前線を近づける+N` | 天候の前線を N 段（1 段 = 2.4 = 5 ターンぶん）戻す / 進める。近づけると崩れる地平・沈む湖面がその回数働く。天候の無い層・前線が来ていない時に遠ざけるのは何も起きない | `FreeMapSim.ShiftFront` |
 | `パッシブアイテムをNつから選ぶ` | N 個を引いて 1 つ選ぶ（同じ提示に同じ品は並べない・ラン重複は除く）。人は地図へ戻った時の選択画面（開幕パッシブの選択と同じ形）、BOT は `GameHooks.ChooseOfferedPassive`。提示の抽選は選ぶ前に済むので乱数の消費は人と BOT で同じ | `GameManager.OfferPassiveChoice` |
 | `パッシブを差し出して替える` | 交換マスと同じ取り替え（いちばん段の低いパッシブ → 上の段のパッシブ） | `GameManager.TradeLowestPassive`（交換マスもここを通す） |
@@ -2887,7 +2887,7 @@ OfferPassives / TradePassive / ForgeWeapon / NextShopDiscount / NextRestBonus
   | ターン | 0（雪の前線の内側でも 0） | 1（雪 2） |
   | 追跡者・使い魔・猟犬 | 動かない | 1 ターンぶん動く |
   | 前線・天候の崩れと沈み | 進まない | 5 ターンごとに進む |
-  | 雹 | **HP −1 は払う**（時間でなく、その点に入る損） | HP −1 |
+  | 雹 | **払わない**（2026-11-13・作者の決定。旧: 時間でなくその点に入る損として HP −1 を払っていた） | HP −1 |
   | 痕跡 | 残す（今のターンの印。続けて動いた点は同じ新しさになるので、警戒の追跡者は先をたどれない） | 残す |
   | 着いた点の起動 | 通常どおり起動する | 起動する |
   | 補足の判定 | **鳴らない**（判定は追跡者の手番 = 次にターンが進んだ時。補足の範囲に入ってもその場では補足されない） | 毎ターン |
@@ -4550,7 +4550,7 @@ BOT の払い方（`AutoRunner.Terminals` の `ChooseGoldPunch`）は実装済�
 
 - **測定していない**（イベントはまだ測定に戻さない・ユーザーの判断）。値段表の追加の行・重みの倍率・選択肢の値は全部仮置き。
 - **画面の確認をしていない**: 「Nつから選ぶ」の選択画面（開幕パッシブの選択と同じ形を地図の上に出す）・選べない理由の表示・
-  近道の残りの表示（地図の上の帯の「近道 残りN」）・前線を戻した時の表示（前線の描画が戻るか）。
+  近道の残りの表示（地図の上の帯の「近道 N回」・2026-11-13 に時限バフの言い方へ）・前線を戻した時の表示（前線の描画が戻るか）。
 - 航行のイベント 7 個と〈流れの鍛冶〉、置き換えで直した選択肢の文は**仮置き**（書き手が書き直す予定）。
 - BOT の航行（`AutoRunner.FreeMap`）は明かした点を `MapNode.revealed` / `Scouted` 経由で今の方策のまま読む（明かすための専用の方策は足していない）。
 - **既存の不具合（直していない）**: 凍結した時計塔「砂時計を持ち帰る」の〈記憶の砂時計〉と、呪われた泉「汲んで持ち帰る」の〈怪しい水〉は 2026-07-17 に削除済みの品で、選んでも何も入らない（`items.json` に無く `LegacyIdMap` にも無い）。
@@ -4563,6 +4563,7 @@ BOT の払い方（`AutoRunner.Terminals` の `ChooseGoldPunch`）は実装済�
 
 | 対象 | 時期 | 理由 |
 |---|---|---|
+| **近道のただの 1 歩で雹の HP −1 を払うこと** | 2026-11-13 | 作者の決定「雹の中をただで動いた時、HP −1 は払わない」。ただの 1 歩は時間も物資も使わない「バフ」として見せるので、その点に入る損だけが残るのは分かりにくかった（§17 の表） |
 | **イベントの「物資-N」の不足を HP で払うこと（物資 1 = HP 5・この効果では死なない）と、効果が起きない選択肢を選べたこと** | 2026-11-13 | 作者の決定「選択肢をブラックアウトさせて、選択不可にする」。追跡者の居ない層で「追跡者を撒く」、天候の無い層で「前線を遠ざける」などが選べて、起きていない効果を起きたように書いた文を出していた。支払いの物資が足りない選択肢・起きない航行の効果を持つ選択肢は暗くして選べなくする（§17）。確率分岐の中の物資-N はある分だけ失う |
 | **技量の Ultra（`WiringSkill.Ultra` の中身）: 方策の組（`UltraPolicyPortfolio`・候補の並列ワーカー `UltraProductionWorkerBootstrap`・選んで回す `PrepareUltraAndRun` / `UltraAutoRunBridge` / `UltraAutoRunProfile`）・判断ごとの rollout（`UltraRolloutSink` / `UltraRolloutEvaluator`・`UltraCheckpoint`・`UltraObservation`・`UltraDispatch`・国勢調査 `UltraDecisionCensus`・`UltraRunSnapshot` / `UltraMapSnapshot` / veil・episode ワーカー・`UltraWorkerProtocol`）・進捗 HUD・計時 `UltraPhaseClock`・本体の rollout 用の復元口（`MapManager.RestoreState`・`GameManager.ResumeAtPhase`・`MapGenerator.RandomRowTileWeights`）・メニュー「Ultra AI」一式と ④ の Ultra・Ultra の部品のテスト・設計書 `docs/design-ultra-ai.md` / `docs/HANDOFF-ULTRA-AI-20260818.md`** | 2026-11-13 | 作者の決定（#135「作り直していい。Ultra はすでに個別プロファイルとして存在しないので、利用しているプロファイルに統合」）。方策の組の候補は Super の設定違いで、rollout の sink は Ultra のメニューからしか立たず、通常のランでは一度も判断を変えていなかった（国勢調査は既定 OFF で数えるだけ）。`WiringSkill.Ultra` の値（番号 4）は保存済みの設定のために残し、選ばれていたら `AutoRunner.Begin` が Super に読み替える（並列ランナーは腕の名前と中身がずれないよう起動前に止める）。並列ワーカーの凍結ビルド（`UltraProductionWorkerBuild`・descriptor `ultra-production-worker.json`・`UltraWorkerBuildManifest`）は今の測定が使うので名前ごと残す。descriptor の `actionFingerprint` は候補集合のハッシュから固定の印 `action:no-policy-portfolio-v1` のハッシュに替えた（照合する所は無い・並列ランナーが照合するのは `buildFingerprint` と exe の hash だけ）。ラン 1 本の digest の印 `ultra-production-run-v1` は過去のランと突き合わせるため変えない。中断セーブ（`RunSave`）は別の口（`MapManager.RestoreFromSave`・`GameRng.RestoreState`）を使うので触っていない |
 | **近道+N の自動の移動（終点へ向かう最短の道を N 歩先の点へ移る・途中の点は起動しない・`FreeMapSim.Shortcut`）と、それに伴う「近道とターン+N を同じ選択肢に置かない」の制約** | 2026-11-12 | 同じ日に入れた作りを、ユーザーの決定で「この後の移動 N 回は物資もターンも使わない」へ作り替えた（§17）。行き先を自動で決めると遊ぶ人の道順の選択を奪い、途中の点を起動しない例外が点の起動の規則（§5-8）に穴を開けていた。自分を動かさない形なので、近道で着いた点が起動して残りの効果を捨てる場合も無くなった |

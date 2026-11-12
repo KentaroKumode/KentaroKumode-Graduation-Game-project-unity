@@ -240,6 +240,32 @@ static class T
             var next = new FreeMapSim(FreeMapGenerator.Generate(6), new Wallet(), true, FoeProfile.Brute, WeatherKind.None);
             Check(next.FreeMovesLeft == 0, "近道: 層を出ると (中身を作り直すと) 残りは消える");
 
+            // 中断セーブを跨ぐ (2026-11-13): 残りの回数を写して戻し、 戻した後の 1 歩もただ
+            var sv = Make(5, FoeProfile.Brute, WeatherKind.None, new Wallet { Provision = 5 });
+            sv.GrantFreeMoves(3);
+            sv.MoveTo(sv.Neighbors(sv.Me)[0]);
+            var saved = sv.CaptureState();
+            var w4 = new Wallet { Provision = 5 };
+            var rs = Make(5, FoeProfile.Brute, WeatherKind.None, w4); rs.LoadState(saved, null);
+            int t4 = rs.Turn;
+            Check(rs.FreeMovesLeft == 2, $"近道: 中断セーブを跨いで残りが戻る (残り {rs.FreeMovesLeft})");
+            if (!rs.InFight) rs.MoveTo(rs.Neighbors(rs.Me)[0]);
+            Check(rs.InFight || (rs.FreeMovesLeft == 1 && rs.Turn == t4 && w4.Provision == 5), $"近道: 戻した後の 1 歩もただ (残り {rs.FreeMovesLeft}, ターン {t4}->{rs.Turn}, 物資 {w4.Provision})");
+
+            // 雹の前線の内側: ただの 1 歩は HP −1 を払わない (2026-11-13・作者の決定)。 通常の 1 歩は払う
+            var wh = new Wallet { Hp = 100 };
+            var sh = Make(5, FoeProfile.Brute, WeatherKind.Hail, wh);
+            sh.ShiftFront(999);                                     // 前線を層の端まで進める (全部の点が内側)
+            int hp0 = wh.Hp;
+            sh.GrantFreeMoves(1);
+            int hj = sh.Neighbors(sh.Me)[0];
+            bool hailHere = sh.WeatherAt(hj, WeatherKind.Hail);
+            sh.MoveTo(hj);
+            Check(hailHere && wh.Hp == hp0, $"近道: 雹の前線の内側でも、 ただの 1 歩は HP を払わない (雹={hailHere}, HP {hp0}->{wh.Hp})");
+            int hp1 = wh.Hp;
+            if (!sh.InFight) sh.MoveTo(sh.Neighbors(sh.Me)[0]);
+            Check(sh.InFight || wh.Hp == hp1 - 1, $"近道: 使い切った後の雹の 1 歩は HP −1 (HP {hp1}->{wh.Hp})");
+
             // 追跡者の居る点へ自分から踏み込むと、ターンを進めずにその場で捕まる
             var s2 = Make(5, FoeProfile.Brute, WeatherKind.None);
             s2.PullFoe(99);

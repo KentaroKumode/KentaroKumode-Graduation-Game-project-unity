@@ -358,7 +358,7 @@ namespace EventSystem
                 case EventEffectType.ShakeOffPursuer:  return sim.FoeAlive ? "追跡者の目から外れる" : null;
                 case EventEffectType.PushPursuer:      return sim.FoeAlive ? $"追跡者が {eff.amount} 歩遠のく" : null;
                 case EventEffectType.PullPursuer:      return sim.FoeAlive ? $"追跡者が {eff.amount} 歩近づく" : null;
-                case EventEffectType.Shortcut:         return $"この後の移動 {eff.amount} 回は、物資もターンも使わない";
+                case EventEffectType.Shortcut:         return $"時限バフ獲得: 近道 ({eff.amount}回)";   // 時限バフと同じ言い方 (2026-11-13・作者の決定「近道というバフに統一」)
                 case EventEffectType.ShiftFront:
                     if (sim.Weather == MapSystem.FreeMove.WeatherKind.None) return null;
                     return eff.amount < 0 ? $"天候の前線が {-eff.amount} 段退く" : $"天候の前線が {eff.amount} 段迫る";
