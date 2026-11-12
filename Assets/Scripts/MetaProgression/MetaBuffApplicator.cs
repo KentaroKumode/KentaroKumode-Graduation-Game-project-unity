@@ -331,6 +331,10 @@ namespace MetaProgression
         public static float GetCatPawChance()
             => System.Math.Max(0f, System.Math.Min(1f, ChallengeCards.Value(ChallengeCards.Cat) / 100f));
 
+        /// <summary>挑戦カード〈金で殴る〉(#6) を受けているか (払う金額を決める判断が要るか)。 効果の量は <see cref="ChallengeCards.GoldPunchAttack"/>。</summary>
+        public static bool HasGoldPunch()
+            => ChallengeCards.Value(ChallengeCards.GoldPunch) > 0f;
+
         // === 種火共通 (r1 出現重み・r3 開幕所持) ===
 
         /// <summary>キーワード → 対応する種火 MetaPanelKind。</summary>

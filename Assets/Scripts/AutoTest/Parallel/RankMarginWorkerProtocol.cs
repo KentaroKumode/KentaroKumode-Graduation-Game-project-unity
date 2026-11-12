@@ -445,6 +445,8 @@ namespace AutoTest.ParallelSweep
                 "probeMainMult", "ProbeMainMultApplied", "probePassiveMult", "ProbePassiveMultApplied",
                 // 2026-11-12 (#107): 配線が収支で決まる敵のパッシブと〈吸血〉を読むか (−1 = 技量に従う) と実効値・内訳
                 "v3.readEnemyPassives", "ReadEnemyPassivesEffective", "v3.enemyPassiveMask",
+                // 2026-11-12 (#6): 挑戦カードを 1 枚ずつ受ける測定の口と、〈金で殴る〉の BOT の金の値段・取り置き
+                "challengeForce", "goldPunchHpPerGold", "goldPunchReserve",
             };
             var sb = new System.Text.StringBuilder();
             foreach (string name in watched)

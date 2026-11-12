@@ -22,6 +22,9 @@ namespace CombatSystem
         /// ターンの始め (<see cref="DrawTerminalHand"/>) に外し、 配線の判断の頭 (<see cref="ChooseCatPaw"/>) で決める。</summary>
         private int _catDie = -1, _catSlot = -1;
 
+        /// <summary>[計装 #6] 挑戦カード〈金で殴る〉で払った金の累計 (G) / 払ったターンの累計。 プロセスの中で累計し続ける (読む側が差分を取る)。</summary>
+        public static long GoldPunchPaidTotal, GoldPunchTurnsTotal;
+
         /// <summary>〈猫の手〉がこのターン先に挿した出目 (−1 = 無し)。 BOT の挿し方の方策はこの 1 組を固定として扱う (外さない)。</summary>
         public int CatPawDie => _catDie;
         /// <summary>〈猫の手〉がこのターン先に挿した端子 (場の添字・−1 = 無し)。</summary>
