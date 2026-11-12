@@ -39,12 +39,10 @@ namespace MetaProgression
             run.playerHP    = hp;
 
             int startGold = UnityEngine.Mathf.Max(0, MetaPanel.VaultGold(Rank(MetaPanelKind.Vault)));
-            GoldIncome.GainExempt(run, startGold, "整備パネル(金庫)", applyLastStandFilter: false);
+            GoldIncome.GainExempt(run, startGold, "整備パネル(金庫)");
 
             // 2026-09-10: 宝物庫は素材ではなく開幕パッシブを配る (MetaPanel.SupplyStartingPassives)。
-            //   実際の付与は GameManager 側 (アイテムDB と重複排除が要るため)。
-            int material = MetaPanel.SupplyStartMaterial(Rank(MetaPanelKind.Supply));   // 常に 0
-            run.weaponMaterials += material;
+            //   実際の付与は GameManager 側 (アイテムDB と重複排除が要るため)。 開幕の素材は配らない。
 
             Debug.Log($"[MetaBuff] 開幕補正: HP {baseHP}→{hp} (遺物 +{relicHp}), "
                     + $"Gold +{startGold}, 開幕パッシブ {GetStartingPassiveCount()} 本");
@@ -289,10 +287,11 @@ namespace MetaProgression
             => MetaPanel.ValorEliteSlayerUnlocked(Rank(MetaPanelKind.Guard))
                 ? MetaPanel.ValorEliteSlayerPct : 0;
 
-        /// <summary>【2026-07-28 廃止】精密の段あたり会心率加算。 常に 0。
-        /// 較正段規約 (r1/2/4/5/7/8 は効果なし) を破っていたため撤去。 詳細は MetaPanel 側。</summary>
+        /// <summary>会心率の加算 (%)。 挑戦カードの会心率 +N% だけ (小数で足す)。
+        /// (旧: 精密トラックの段あたり会心率 MetaPanel.PrecisionCritRatePct を足していたが、 2026-09-10 の撤去で常に 0f だった。
+        ///  0f + x は x と同じ値なので 2026-11-12 に外した)</summary>
         public static float GetCritRatePctBonus()
-            => MetaPanel.PrecisionCritRatePct(Rank(MetaPanelKind.Precision)) + ChallengeCards.Value(ChallengeCards.Crit) / 100f;   // 挑戦カード: 会心率 +N% (小数で足す)
+            => ChallengeCards.Value(ChallengeCards.Crit) / 100f;
 
         /// <summary>攻撃端子 配線合計への加算 (0..3)。</summary>
         /// <summary>攻撃端子: 接続ダイス 1 本あたりの加算 (0..3)。 呼び出し側で本数を掛けること。</summary>

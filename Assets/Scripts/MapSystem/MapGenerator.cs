@@ -22,10 +22,6 @@ namespace MapSystem
         public static IReadOnlyList<(TileType type, float weight)> RandomRowTileWeights(int floor)
             => FreeMapGenerator.TileWeights;
 
-        /// <summary>旧 3 列マップの「ランダム抽選の最後の行」。 自由移動には行が無いので常に 0。
-        /// Ultra の veil (自由移動では無効) がコンパイルを通すためだけに残している。</summary>
-        public static int LastRandomRow(int floor) => 0;
-
         /// <summary>ボスノードを置くフロア (1/3/5/6/8)。 正本は <see cref="FloorPlan.HasBoss"/>。
         /// 7 層の終点は〈門〉で、 ヴェスカは門の転移先 (8 層) に座る。</summary>
         public static bool HasBoss(int floor) => FloorPlan.HasBoss(floor);

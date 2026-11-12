@@ -81,7 +81,7 @@ namespace ItemSystem.PassiveSkills
             {
                 int plus = run?.weaponPlus ?? 0;
                 foreach (var id in WeaponProgression.Compute(weaponId, plus))
-                    PassiveSkillManager.Instance?.AddSkillById(id, WeaponProgression.DisplayName(id));
+                    PassiveSkillManager.Instance?.AddSkillById(id, id);   // id = 表示名 (2026-09-22)
             }
         }
 

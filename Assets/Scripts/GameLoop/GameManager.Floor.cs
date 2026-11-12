@@ -298,7 +298,7 @@ namespace GameLoop
                         Run.robberyPendingItems.Clear();
                     }
                     int gold = GameLoop.GameRng.RangeAuto("GameManager.4", 90, 181);   // 2026-08-10 収入 ×3
-                    gold = GoldIncome.Gain(Run, gold, "値下げ交渉", applyLastStandFilter: false);
+                    gold = GoldIncome.Gain(Run, gold, "値下げ交渉");
                     Run.playerHP = Mathf.Max(1, result.playerHPRemaining);
                     RunStats.RobberyWins++;
                     RunStats.RobberyLootTotal += loot;

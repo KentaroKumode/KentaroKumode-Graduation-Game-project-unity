@@ -445,7 +445,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (gold > 0)
             {
                 var run = GameLoop.GameManager.Instance?.Run;
-                if (run != null) GameLoop.GoldIncome.Gain(run, gold, "賞金首狩り", applyLastStandFilter: false);
+                if (run != null) GameLoop.GoldIncome.Gain(run, gold, "賞金首狩り");
             }
             UnityEngine.Debug.Log($"[賞金首狩り] 敵HP{thresholdPct}%以下 → 処刑 (HP+{heal}, +{gold}G, ボス={IsBoss(ctx)})");
         }
