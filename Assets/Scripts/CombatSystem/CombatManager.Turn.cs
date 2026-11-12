@@ -653,7 +653,7 @@ namespace CombatSystem
             ItemSystem.PassiveItems.PassiveItemManager.OnRoll(
                 ctx, GameLoop.GameManager.Instance?.Run, this);
 
-            // (旧 メタバフのダイス合計値補正は v6 で廃止。 GetDiceTotalBonus は常に 0 で、 ここで出目を上げるループは 2026-11-12 に外した)
+            // (旧 メタバフのダイス合計値補正は v6 で廃止。 GetDiceTotalBonus は常に 0 で、 ここで出目を上げるループも関数も 2026-11-12 に外した)
 
             // パターン系パッシブ (ゾロ目/階段/全相異) + 合計確定
             psm.ProcessPostRoll(playerDice, enemyDice);

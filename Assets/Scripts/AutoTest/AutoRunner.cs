@@ -783,8 +783,7 @@ namespace AutoTest
                  + $"{(LearnedPriorityProvider.UsingFallback ? " **手書きの序列 (学習データなし)**" : "")} "
                  + $"/ 山札の先読み {(deckLookahead && EffectiveWiringSkill != WiringSkill.Naive ? "ON" : "OFF")} (deckLookahead={deckLookahead}) "
                  + $"/ 遺物 持ち込み {relicCount}個 計{relicPts}段 "
-                 + $"/ メタ ダイス合計+{MetaProgression.MetaBuffApplicator.GetDiceTotalBonus()} "
-                 + $"攻撃端子+{MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice()}";
+                 + $"/ メタ 攻撃端子+{MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice()}";
         }
 
         /// <summary>次のボスに対する戦力ギャップ。 **天井 (Super) のときだけ効く** ──

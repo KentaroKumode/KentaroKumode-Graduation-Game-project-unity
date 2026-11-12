@@ -96,9 +96,7 @@ namespace MetaProgression
         public static float GetPlunderPassiveDropPct()
             => MetaPanel.PlunderPassiveDropPct(Rank(MetaPanelKind.Plunder));
 
-        /// <summary>【v6 廃止】ダイス合計値補正。 相互攻撃モデルで「ダイス合計」概念自体が消滅したため常に 0。
-        /// 互換のため残置 (本体からの呼び出しは 2026-11-12 に外した。 AutoTest が参照している)。</summary>
-        public static int GetDiceTotalBonus() => 0;
+        // [削除 2026-11-12] GetDiceTotalBonus ── v6 で廃止した出目の補正。 常に 0 を返し、 読む所は AutoRunner の実効状態の表示だけだった。
 
         // ============================================================
         //  物資ゲージ減少の軽減 (ADR-0002)
