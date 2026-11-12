@@ -335,7 +335,7 @@ namespace AutoTest
         private static float TargetWorth(TerminalDef d, RunState run)
             => d == null ? 0f : d.basic ? 1f : RewardBaseScore(d, run);
 
-        /// <summary>山札で戦う戦闘の配線方策 (<see cref="CombatManager.WiringPolicy"/> へ差す)。 包みの処理は MutualWiringPlanPolicy と同じ。</summary>
+        /// <summary>山札で戦う戦闘の配線方策 (<see cref="CombatManager.WiringPolicy"/> へ差す)。 前のターンの観測・計装の包みもここで持つ (旧い配線の包み MutualWiringPlanPolicy は 2026-11-12 に削除)。</summary>
         private WiringPlan DeckWiringPlanPolicy(int[] rolls, MutualTurnTelegraph tele)
         {
             RefreshMainCorr();   // [V3 mainCorr]

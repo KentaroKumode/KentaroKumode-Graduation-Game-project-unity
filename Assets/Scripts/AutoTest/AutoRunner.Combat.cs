@@ -98,51 +98,19 @@ namespace AutoTest
                                  && !string.IsNullOrEmpty(e0.id)
                                  && e0.id.StartsWith(GameLoop.BossIds.Layer7Prefix);
             bool useOptimalRoutine = useLayer6Routine || useLayer7Routine;
-            if (effectiveSkill == WiringSkill.Exact)
-            {
-                // 厳密版。 (ADR-0011: 役は自動で効くので、 発動方策の注入は無い。 役の効果は先読みしていない。)
-                exactAI.BeginCombat(e0 != null ? e0.id : "");
-                cm.WiringPolicy = exactAI.ChooseWiringPlan;
-                cm.RerollPolicy = exactAI.ChooseReroll;
-            }
-            else if (useOldSuperAI && effectiveSkill == WiringSkill.Super && !useOptimalRoutine)
-            {
-                // 天井版は配線とリロールを一つの価値関数で決める。 **両方差し替える** ──
-                // 配線だけ先読みにしてリロールを貪欲のままにすると、 探索の前提と食い違う。
-                cm.WiringPolicy = logWiringDiff
-                    ? (System.Func<int[], CombatSystem.MutualTurnTelegraph, CombatSystem.WiringPlan>)SuperWiringWithDiff
-                    : superAI.ChooseWiringPlan;
-                // [計測 2026-09-19] Super のリロール判断を軽いものへ差し替えられるようにする。
-                //   Super の所要時間の 98% がリロールの全列挙なので、 近似で強さがどれだけ落ちるかを測る。
-                //   0 = 全列挙 (既定) / 1 = Optimal のリロール方策 / 2 = 全列挙を軽く (標本・厳密範囲を絞る)
-                if (superRerollMode == 2)
-                {
-                    superAI.rerollSamples = superLightRerollSamples;
-                    superAI.exactRerollMaxDice = superLightExactMaxDice;
-                }
-                cm.RerollPolicy = superRerollMode == 1
-                    ? (System.Func<int[], CombatSystem.MutualTurnTelegraph, int, int[]>)MutualRerollPolicy
-                    : superAI.ChooseReroll;
-            }
-            else
-            {
-                // 50pt・同一10000シードで、両AIが6層へ遭遇した2322件に限定すると
-                // Optimalだけ勝利425 / Superだけ勝利267。Superの未来近似は灰の再生・
-                // 周期予兆・烈炎の複合戦で局所的に劣るため、ここだけ実測上位方策へ切替える。
-                // 7層はSuperだけ完全クリア300 / Optimalだけ173なので切り替えない。
-                //   ↑ **この 7層の判断は 2026-08-22 に覆った** (上の useLayer7Routine 参照)。
-                if (useOptimalRoutine) superAI.BeginCombat(e0.id);
-                cm.WiringPolicy = MutualWiringPlanPolicy;
-                cm.RerollPolicy = effectiveSkill == WiringSkill.Naive ? null
-                                : (System.Func<int[], CombatSystem.MutualTurnTelegraph, int, int[]>)MutualRerollPolicy;
-            }
-            // 端子の山札 (ADR-0014): どの技量の方策を差していても、 配線は山札用の方策へ流す (AutoRunner.Terminals)。
-            //   戦闘は常に山札で戦う (旧い配線の経路は 2026-11-11 に本体から削除)。 山札に未対応の方策 (Exact・Super・旧い配線の Optimal)
-            //   は WiringPlan.main しか返さず、 本体はもう main を読まないので、 ここで必ず差し替える。 リロールも Exact / Super の方策は
-            //   旧い配線で値付けするので、 Optimal のリロール (山札の効用で値付けする) へ替える。 素朴版はリロールしないまま。
-            //   ※ 上の分岐の Exact / Super の配線とリロールは、 ここで上書きされるので戦闘の判断には使われない (BeginCombat の副作用だけ残る)。
+            // 50pt・同一10000シードで、両AIが6層へ遭遇した2322件に限定すると
+            // Optimalだけ勝利425 / Superだけ勝利267。Superの未来近似は灰の再生・
+            // 周期予兆・烈炎の複合戦で局所的に劣るため、ここだけ実測上位方策へ切替える。
+            //   (7層の切り替えは 2026-08-22 に足した: 上の useLayer7Routine 参照)
+            // Exact / Super の BeginCombat は、 旧い配線の方策を差していた頃の副作用だけを残している
+            //   (方策の差し込み・旧い Super の配線・リロールの切り替えは 2026-11-12 に削除。 下で必ず山札の方策に上書きされていた)。
+            if (effectiveSkill == WiringSkill.Exact) exactAI.BeginCombat(e0 != null ? e0.id : "");
+            else if (useOptimalRoutine) superAI.BeginCombat(e0.id);
+            // 端子の山札 (ADR-0014): どの技量でも、 配線は山札用の方策 (AutoRunner.Terminals)、 リロールは Optimal の方策
+            //   (山札の効用で値付けする) を差す。 素朴版はリロールしない。
             cm.WiringPolicy = DeckWiringPlanPolicy;
-            if (effectiveSkill != WiringSkill.Naive) cm.RerollPolicy = MutualRerollPolicy;
+            cm.RerollPolicy = effectiveSkill == WiringSkill.Naive ? null
+                            : (System.Func<int[], CombatSystem.MutualTurnTelegraph, int, int[]>)MutualRerollPolicy;
 
             _fbDecided = _fbTurns = _fbKillTurns = 0;   // [計装] 防ぎ切りの規則の数え直し
             EndCombatMainCorr();   // [V3 mainCorr] 前の戦闘の残りを締めてから、 この戦闘の累計を 0 から
@@ -238,33 +206,6 @@ namespace AutoTest
                 sb.Append($"\n      門の欠陥: {run.gateFlaws}");
             sb.Append($"\n      LS使用済: {run.lastStandActive} | サン=ジョリオラ撃破: {run.defeatedSaintGeorges}");
             _cur.clear6FSnapshot = sb.ToString();
-        }
-
-        /// <summary>
-        /// ADR-0009 配線ポリシー (完全情報・交換レート最大化)。
-        /// tools/adr0009_sim.py の choose_wiring と同じロジックを C# 移植:
-        ///   出目降順で「攻撃 a 本 / ブロック b 本 / 充電 c 本」を全列挙 (O(k^2)) し、
-        ///   効用 U = w_atk × min(dmg, enemyHP) + w_def × min(block, enemyAtk)
-        ///          + 撃破ボーナス − 致死ペナルティ + 充電価値 で最大化。
-        /// ビルド重みはシミュレータのバランス型 (1.0/1.0/0.6) を既定にする。
-        /// </summary>
-        /// <summary>配線方策を <see cref="CombatSystem.WiringPlan"/> として返す薄い包み。</summary>
-        private CombatSystem.WiringPlan MutualWiringPlanPolicy(int[] rolls, CombatSystem.MutualTurnTelegraph tele)
-        {
-            RefreshMainCorr();   // [V3 mainCorr] 前のターンの実際を締めて比を出し直す (計装は切り替えに関わらず)
-            PrepareSuperTurn(rolls, tele);
-            // 予告の外のダメージの観測: 前のターンに見込んだ被ダメより HP が多く減っていたら、 この戦闘にはそれがある
-            int hpNow = CombatSystem.CombatManager.Instance != null ? CombatSystem.CombatManager.Instance.PlayerHP : -1;
-            if (_fbPrevHp >= 0 && hpNow >= 0 && _fbPrevHp - hpNow > _fbPrevExpTaken) _fbUnavoidSeen = true;
-            _lastFreeBlock = _lastKillsNow = false;
-            var plan = MutualWiringPolicy(rolls, tele);
-            if (predTrace) BeginPredTrace(tele.turn);   // [計装] この配線の主攻撃の見積もり (旧/新) と、 次の判断の時点で実際の主攻撃を並べる
-            BeginMainCorrTurn(_lastPredA);
-            _fbDecided++; if (_lastFreeBlock) _fbTurns++; if (_lastKillsNow) _fbKillTurns++;
-            _fbPrevHp = hpNow; _fbPrevExpTaken = _lastExpTaken;
-            if (wiringMistakeRate > 0f) plan = MaybeMisWire(rolls, tele, plan);
-            if (turnAudit) WriteTurnAudit(rolls, tele, plan.main);
-            return plan;
         }
 
         /// <summary>このターンの被ダメの罰の倍率 (S2: 大きい攻撃の予告で 3 倍)。</summary>
@@ -549,75 +490,6 @@ namespace AutoTest
         // ============================================================
         //  [計装 2026-09-19] 先読み (Super) と 1 ターン最善 (Optimal) の配線の食い違い
         // ============================================================
-        /// <summary>true のとき、 Super の配線判断ごとに<b>同じ局面で Optimal ならどう配線したか</b>も計算し、
-        /// 局面の特徴と一緒に CSV へ書く。 Optimal の方策は乱数を使わないので、 呼んでもゲームは変わらない。
-        /// 目的は「先読みで何が得られているか」を局面で特定すること (エリート戦の死亡率 5.2% → 3.9%)。</summary>
-        public bool logWiringDiff;
-
-        /// <summary>[計測] Super のリロール判断。 0 = 全列挙 (既定) / 1 = Optimal の方策 / 2 = 軽い全列挙。</summary>
-        public int superRerollMode = 0;
-        /// <summary>superRerollMode=2 のときの標本数と、 厳密に全列挙する振り直し個数の上限。</summary>
-        public int superLightRerollSamples = 4;
-        public int superLightExactMaxDice = 0;
-        [NonSerialized] public string wiringDiffPath;
-        private System.IO.StreamWriter _wiringDiffWriter;
-
-        private CombatSystem.WiringPlan SuperWiringWithDiff(int[] rolls, CombatSystem.MutualTurnTelegraph tele)
-        {
-            var sp = superAI.ChooseWiringPlan(rolls, tele);
-            try
-            {
-                var op = MutualWiringPolicy(rolls, tele);
-                WriteWiringDiff(rolls, tele, sp.main, op.main);
-            }
-            catch (Exception ex) { Debug.LogWarning("[WiringDiff] " + ex.Message); }
-            return sp;
-        }
-
-        private void WriteWiringDiff(int[] rolls, CombatSystem.MutualTurnTelegraph tele,
-                                     CombatSystem.DiceTerminal[] sw, CombatSystem.DiceTerminal[] ow)
-        {
-            if (string.IsNullOrEmpty(wiringDiffPath) || rolls == null) return;
-            if (_wiringDiffWriter == null)
-            {
-                _wiringDiffWriter = new System.IO.StreamWriter(wiringDiffPath, false, new System.Text.UTF8Encoding(false));
-                _wiringDiffWriter.WriteLine("run,kind,enemy,turn,stage,nextThr,enemyAtk,pHp,pMax,eHp,eMax,shield,charge,diceSum,"
-                    + "sAtk,sBlk,sChg,sOth,oAtk,oBlk,oChg,oOth");
-            }
-            var cm = CombatManager.Instance;
-            var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
-            var e = cm?.CurrentEnemy;
-            int kind = GameLoop.BossIds.IsBoss(e?.id) ? 2
-                     : MapSystem.MapManager.Instance?.CurrentNode?.EffectiveType.ToEnemyKind() == EnemyKind.Elite ? 1 : 0;
-            int dsum = 0; foreach (var d in rolls) dsum += d;
-            void Sums(CombatSystem.DiceTerminal[] w, out int a, out int b, out int c, out int o)
-            {
-                a = b = c = o = 0;
-                if (w == null) return;
-                for (int i = 0; i < rolls.Length && i < w.Length; i++)
-                    switch (w[i])
-                    {
-                        case CombatSystem.DiceTerminal.Attack: a += rolls[i]; break;
-                        case CombatSystem.DiceTerminal.Block:  b += rolls[i]; break;
-                        case CombatSystem.DiceTerminal.Charge: c += rolls[i]; break;
-                        default: o += rolls[i]; break;
-                    }
-            }
-            Sums(sw, out int sa, out int sb, out int sc, out int so);
-            Sums(ow, out int oa, out int ob, out int oc, out int oo);
-            _wiringDiffWriter.WriteLine(string.Join(",", new object[] {
-                _cur?.index ?? -1, kind, e?.id ?? "", tele.turn, tele.escalationStage, tele.nextThresholdTurn, tele.enemyAttackValue,
-                cm?.PlayerHP ?? 0, cm?.PlayerMaxHP ?? 0, cm?.EnemyHP ?? 0, cm?.EnemyMaxHP ?? 0,
-                ctx?.consShield ?? 0, ctx?.GetCharge() ?? 0, dsum, sa, sb, sc, so, oa, ob, oc, oo }));
-        }
-
-        /// <summary>バッチ終了時に閉じる (worker が呼ぶ)。</summary>
-        public void CloseWiringDiff()
-        {
-            try { _wiringDiffWriter?.Flush(); _wiringDiffWriter?.Dispose(); } catch { }
-            _wiringDiffWriter = null;
-        }
-
         /// <summary>防ぎ切りの規則 (2026-11-05)。 このターンのブロックで、 エスカレーションで強くなった後の敵の攻撃まで
         /// 撃破までずっと防ぎ切れる配線 (または今ターンで倒せる配線) を、 それ以外より優先する。
         ///

@@ -965,8 +965,6 @@ namespace AutoTest
         public float treasurePassiveRate = -1f;
         /// <summary>Optimal の配線のミスの率 (Super は 0)。</summary>
         public float optimalMistakeRate = 0.1f;
-        /// <summary>旧 SuperCombatAI を戦闘に使う (既定 false)。 2026-11-06 に Optimal 基準へ置き換えた。 比較用に残す。</summary>
-        public bool useOldSuperAI = false;
 
         /// <summary>[較正専用] エリート戦の報酬倍率 (CombatRewards.EliteRewardMul)。 <b>負 = 触らない。</b></summary>
         public float eliteRewardMul = -1f;

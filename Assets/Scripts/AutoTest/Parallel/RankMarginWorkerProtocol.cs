@@ -421,7 +421,7 @@ namespace AutoTest.ParallelSweep
                 //   ── 送ったつもりの値ではなく、 入っていた値を読む。
                 "gateBotPaysBlood", "gateBotPaysRelics", "gateBotPaysTransfer", "gateBotSkipsAll",
                 "gateRepairDrainPct", "gateIgnitionAttackCutPct", "gatePierceRate",
-                "gateProvisionReserveFromFloor", "saberWaltzShopBias", "enemyAttackSpec", "enemyAttackMul", "enemyHpSpec", "superRerollMode", "superLightRerollSamples", "superLightExactMaxDice", "logWiringDiff", "eliteUpgradePctOverride", "eliteRewardMul", "flatAttackMul",
+                "gateProvisionReserveFromFloor", "saberWaltzShopBias", "enemyAttackSpec", "enemyAttackMul", "enemyHpSpec", "eliteUpgradePctOverride", "eliteRewardMul", "flatAttackMul",
                 // 航行配点のエリート評価 (2026-09-15)。 BOT の手そのものを変えるので必ず印字する。
                 "eliteNavBase", "eliteNavHpBonus", "navEliteCost",
                 // 戦闘報酬の配分 (2026-09-15)。 **3 つはセットで意味を持つ** ので 3 つとも印字する

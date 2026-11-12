@@ -109,8 +109,6 @@ namespace AutoTest.ParallelSweep
                 //   3 分経っても 1 ラン も終わらなかった (50 ランごとの進捗が 0 のまま)。
                 runner.superAI.maxParallelism = 1;
                 runner.optimalWiringMaxParallelism = 1;
-                if (runner.logWiringDiff)
-                    runner.wiringDiffPath = Path.Combine(Path.GetDirectoryName(_job.responsePath) ?? ".", "wiring_diff.csv");
 
                 // **本体ループは空にする。** 逐次版と同じく、 アームは RunBatch 後段の
                 //   分岐から回す。 ここで runCount を立てると素の N ラン が余計に走る。
@@ -300,7 +298,6 @@ namespace AutoTest.ParallelSweep
             foreach (var kv in GameLoop.GoldIncome.BySource)
                 ItemSystem.Helpers.PassiveSourceAudit.Counts["金:" + kv.Key] = (int)System.Math.Min(int.MaxValue, kv.Value);
             var runnerForDump = FindObjectOfType<AutoRunner>();
-            runnerForDump?.CloseWiringDiff();
             runnerForDump?.CloseTurnAudit();
             // 並列アイテム学習: 担当区間のラン記録を書き出す。 先頭の捨てラン 1 本は除く (末尾 runs 本だけ)。
             //   書けなければ失敗として返す ── 記録が欠けたまま「完了」にすると、 親は黙って薄い学習を積む。
