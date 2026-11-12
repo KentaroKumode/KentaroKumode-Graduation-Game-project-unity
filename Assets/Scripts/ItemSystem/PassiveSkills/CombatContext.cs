@@ -1009,10 +1009,10 @@ namespace ItemSystem.PassiveSkills
                 if (playerCurrentHP == 1)
                 {
                     painkillerProcced = true;
-                    // ダイス合計+10 / 基礎攻撃+10 (consDiceRoll / consAtkBurst を流用)
+                    // 攻撃+10 (consDiceRoll: 攻撃値へ加算) / 最終与ダメージ+10 (consAtkBurst: 与ダメ倍率の後に加算) を流用
                     consDiceRoll += 10;
                     consAtkBurst += 10;
-                    UnityEngine.Debug.Log("[痛覚遮断剤] HP=1 維持確認 → ダイス+10/攻撃+10。 攻撃終了時に死亡。");
+                    UnityEngine.Debug.Log("[痛覚遮断剤] HP=1 維持確認 → 攻撃+10/最終与ダメージ+10。 攻撃終了時に死亡。");
                 }
             }
 
