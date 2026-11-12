@@ -991,21 +991,20 @@ namespace AutoTest
             return sb.ToString();
         }
 
-        /// <summary>3. 死因分布質 ── 死因を「公平死 (累積攻撃/スリップ)」「理不尽死 (反射/サドンデス/烙印一撃)」 に分類し、
+        /// <summary>3. 死因分布質 ── 死因を「公平死 (累積攻撃/スリップ)」「理不尽死 (反射/断罪/処刑の一撃)」「未分類」 に分類し、
         /// 各層の理不尽死率を出す。 高い層 = 調整候補。</summary>
         private string BuildDeathCauseQualityBlock()
         {
             var sb = new StringBuilder();
             sb.AppendLine("【ゲーム体験③ 死因分布質 (Death Cause Quality)】");
-            sb.AppendLine("  公平死 = Normal/Chip (累積攻撃や持続)");
-            sb.AppendLine("  理不尽死 = Reflect (反射自滅) / Judgment (業火の断罪)");
+            sb.AppendLine("  公平死 = Normal/Chip/MassiveBleed/Rift/Erosion (累積攻撃や、 予告・開示された持続ダメージ)");
+            sb.AppendLine("  理不尽死 = Reflect (反射自滅) / Judgment (業火の断罪) / Other (処刑人の烙印の一撃) / Burst (爆ぜ火)");
+            sb.AppendLine("  未分類 = 上のどれでもない死因 (欠番の SuddenDeath・新しく足した死因)。 0 でなければ分類を足すこと");
             sb.AppendLine();
 
-            // 死因の分類 (CombatRec.deathCause を使う、 deathCauseは戦闘の死因)
-            // 公平: Normal, Chip
-            // 理不尽: Reflect, Judgment
+            // 死因の分類 (CombatRec.deathCause を使う、 deathCauseは戦闘の死因)。 分類は ClassifyDeathCause。
             // (旧 SuddenDeath / Garyo / Pursuit / Threat は作られない死因なので比較から外した。 2026-11-12)
-            var byFloor = new Dictionary<int, int[]>(); // [死戦闘総数, 公平, 理不尽]
+            var byFloor = new Dictionary<int, int[]>(); // [死戦闘総数, 公平, 理不尽, 未分類]
             for (int i = 0; i < _records.Count; i++)
             {
                 var rr = _records[i];
@@ -1015,28 +1014,48 @@ namespace AutoTest
                     var c = rr.combats[ci];
                     if (c == null || c.won) continue;
                     if (!c.isFightEnd) continue;
-                    string dc = c.deathCause.ToString();
-                    bool fair = dc == "Normal" || dc == "Chip";
-                    bool unfair = dc == "Reflect" || dc == "Judgment";
-                    if (!byFloor.TryGetValue(c.floor, out var a)) { a = new int[3]; byFloor[c.floor] = a; }
+                    if (!byFloor.TryGetValue(c.floor, out var a)) { a = new int[4]; byFloor[c.floor] = a; }
                     a[0]++;
-                    if (fair) a[1]++;
-                    else if (unfair) a[2]++;
+                    a[ClassifyDeathCause(c.deathCause)]++;
                 }
             }
 
             var floors = new List<int>(byFloor.Keys);
             floors.Sort();
-            sb.AppendLine($"  {PadR("層",4)}{PadR("死戦闘",7)}{PadR("公平死",8)}{PadR("理不尽死",10)}{PadR("理不尽率",10)}");
+            sb.AppendLine($"  {PadR("層",4)}{PadR("死戦闘",7)}{PadR("公平死",8)}{PadR("理不尽死",10)}{PadR("未分類",8)}{PadR("理不尽率",10)}");
             foreach (int f in floors)
             {
                 var a = byFloor[f];
                 if (a[0] == 0) continue;
                 float unfairPct = 100f * a[2] / a[0];
-                sb.AppendLine($"  {PadR(f.ToString()+"F",4)}{PadR(a[0].ToString(),7)}{PadR(a[1].ToString(),8)}{PadR(a[2].ToString(),10)}{PadR(unfairPct.ToString("F1")+"%",10)}");
+                sb.AppendLine($"  {PadR(f.ToString()+"F",4)}{PadR(a[0].ToString(),7)}{PadR(a[1].ToString(),8)}{PadR(a[2].ToString(),10)}{PadR(a[3].ToString(),8)}{PadR(unfairPct.ToString("F1")+"%",10)}");
             }
             sb.AppendLine("  理不尽率が高い層は調整候補 (Reflect=反射火力過剰 等)");
             return sb.ToString();
+        }
+
+        /// <summary>死因の質の分類 (#124)。 戻り値は byFloor の列: 1 = 公平・2 = 理不尽・3 = 未分類。
+        /// 公平 = 累積の攻撃と、 予告・開示された持続ダメージ (審判の炎・大出血・裂け目・〈蝕み〉)。
+        /// 理不尽 = 反射の自滅・断罪・処刑の一撃 (Other は CombatManager.Turn の処刑人の烙印だけが書く)・爆ぜ火。
+        /// どれにも当たらない値は未分類へ落とし、 死戦闘の合計 = 公平 + 理不尽 + 未分類 を保つ。</summary>
+        private static int ClassifyDeathCause(ItemSystem.PassiveSkills.DeathCause dc)
+        {
+            switch (dc)
+            {
+                case ItemSystem.PassiveSkills.DeathCause.Normal:
+                case ItemSystem.PassiveSkills.DeathCause.Chip:
+                case ItemSystem.PassiveSkills.DeathCause.MassiveBleed:
+                case ItemSystem.PassiveSkills.DeathCause.Rift:
+                case ItemSystem.PassiveSkills.DeathCause.Erosion:
+                    return 1;
+                case ItemSystem.PassiveSkills.DeathCause.Reflect:
+                case ItemSystem.PassiveSkills.DeathCause.Judgment:
+                case ItemSystem.PassiveSkills.DeathCause.Other:
+                case ItemSystem.PassiveSkills.DeathCause.Burst:
+                    return 2;
+                default:
+                    return 3;
+            }
         }
 
         /// <summary>4. 選択意味度 ── イベント選択肢で「常に同じ選択肢」 = 等価/つまらない分岐、
