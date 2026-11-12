@@ -216,8 +216,8 @@ namespace ItemSystem.PassiveSkills.Effects
     public class Rampage : IPassiveSkillEffect
     {
         public const int Bonus = 3;
-        /// <summary>nextTurnBuffs の専用キー (このクラスだけが読み書きする)。</summary>
-        private const string NextTurnKey = "enemy.rampage.atkUp";
+        /// <summary>nextTurnBuffs の専用キー (書くのはこのクラスだけ。 BOT の先読みが読む)。</summary>
+        public const string NextTurnKey = "enemy.rampage.atkUp";
         public string SkillId => "Rampage";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollLose, PassiveSkillTrigger.OnPostRoll };
 
@@ -289,8 +289,8 @@ namespace ItemSystem.PassiveSkills.Effects
     public class CounterStance : IPassiveSkillEffect
     {
         public const int Bonus = 3;
-        /// <summary>nextTurnBuffs の専用キー (このクラスだけが読み書きする)。</summary>
-        private const string NextTurnKey = "enemy.counterStance.dmgUp";
+        /// <summary>nextTurnBuffs の専用キー (書くのはこのクラスだけ。 BOT の先読みが読む)。</summary>
+        public const string NextTurnKey = "enemy.counterStance.dmgUp";
         public string SkillId => "CounterStance";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnRollLose, PassiveSkillTrigger.OnPreDealDamage };
 

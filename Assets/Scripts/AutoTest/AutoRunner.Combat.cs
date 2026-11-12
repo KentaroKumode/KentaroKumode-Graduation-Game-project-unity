@@ -1293,10 +1293,10 @@ namespace AutoTest
         }
 
         /// <summary>[#107] 前のターンに積まれた〈暴走〉のこのターンの分 (本体: EnemyPassiveSkillEffects.Rampage が次のターンの敵の OnPostRoll で
-        /// 敵の出目の合計へ足す → 予告の enemyDiceTotal に入っている)。 nextTurnBuffs の専用キーは本体の private 定数の写し。</summary>
-        private const string RampageNextTurnKey = "enemy.rampage.atkUp";
+        /// 敵の出目の合計へ足す → 予告の enemyDiceTotal に入っている)。 nextTurnBuffs の専用キーは本体の定数を読む (写しを持たない)。</summary>
+        private const string RampageNextTurnKey = ItemSystem.PassiveSkills.Effects.Rampage.NextTurnKey;
         /// <summary>[#107] 同じく〈反撃態勢〉(本体: EnemyPassiveSkillEffects.CounterStance・次のターンの敵の OnPreDealDamage で finalDamage += )。</summary>
-        private const string CounterStanceNextTurnKey = "enemy.counterStance.dmgUp";
+        private const string CounterStanceNextTurnKey = ItemSystem.PassiveSkills.Effects.CounterStance.NextTurnKey;
 
         /// <summary>ターン <paramref name="turn"/> の敵の攻撃の見込み (プレイヤーの防御の後)。 公開規則 (Escalation.EnemyAttackValue) に、 敵ダイスは面の平均を入れる。
         /// ダイス合計のパッシブ補正は今ターンの予告との差で見る (前のターンの〈暴走〉はこのターン限りなので除く・#107)。
