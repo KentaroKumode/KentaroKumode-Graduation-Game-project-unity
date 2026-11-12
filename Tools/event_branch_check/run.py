@@ -22,6 +22,8 @@ RUNTIME = 'C:/Program Files/dotnet/shared/Microsoft.NETCore.App'
 EV = 'Assets/Scripts/EventSystem/'
 SOURCES = [EV + n + '.cs' for n in ('EventBranchText', 'EventEffectType', 'EventEffect', 'EventEffectRoles', 'EventChoice',
                                      'EventDefinition', 'EventCondition', 'EventParser')]
+# 手放せない品の判定 (ItemIds.CanSell ほか) と確信の書き換え (2026-11-13)。 Unity の型は Stubs.cs の代役
+SOURCES += ['Assets/Scripts/GameLoop/Ids.cs', 'Assets/Scripts/GameLoop/ConvictionSystem.cs']
 
 
 def fwd(p):
