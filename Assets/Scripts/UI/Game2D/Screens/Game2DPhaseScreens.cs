@@ -710,8 +710,9 @@ namespace UI.Game2D
         private static readonly string[] GateName = { "血を捧げる", "遺物を焚く", "光に身を任せる" };
         private static readonly string[] GateDesc =
         {
-            "最大 HP −25%。 拒むと〈不完全な修復〉を背負う。",
-            "遺物を 2 個焚く。 拒むと〈不完全な起動〉を背負う。",
+            // 数は GameManager.Gate の定数から組み立てる (写しを持たない・#131)。
+            "最大 HP −" + Mathf.RoundToInt(GameLoop.GameManager.GateBloodMaxHpPct * 100f) + "%。 拒むと〈不完全な修復〉を背負う。",
+            "遺物を " + GameLoop.GameManager.GateRelicDemand + " 個焚く。 拒むと〈不完全な起動〉を背負う。",
             "物資 −" + GameLoop.GameManager.GateProvisionDemand + "。 拒むと〈不完全な転移〉を背負う。",
         };
 
