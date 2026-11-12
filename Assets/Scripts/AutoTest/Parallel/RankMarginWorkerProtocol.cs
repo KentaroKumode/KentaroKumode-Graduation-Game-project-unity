@@ -445,6 +445,11 @@ namespace AutoTest.ParallelSweep
                 "probeMainMult", "ProbeMainMultApplied", "probePassiveMult", "ProbePassiveMultApplied",
                 // 2026-11-12 (#107): 配線が収支で決まる敵のパッシブと〈吸血〉を読むか (−1 = 技量に従う) と実効値・内訳
                 "v3.readEnemyPassives", "ReadEnemyPassivesEffective", "v3.enemyPassiveMask",
+                // 2026-11-12 (#95 / #20 / #41 / #102 / #108): 腕ごとに切り替える測定の口。 送った値と、 ラン開始時に本体へ入れる値
+                "relicLoadoutSpec", "relicStatOff", "RelicStatOffMaskApplied", "relicSetBonusOff", "RelicSetBonusOffMaskApplied",
+                "enemyArmorPenSpec", "EnemyArmorPenOverrideApplied",
+                "challengeCardDifficulty", "challengeForce", "challengeCardPickByAxis",
+                "terminalsLeaveDeck", "randomGrantTerminals", "armorDefPerRank", "armorFlatEvery",
             };
             var sb = new System.Text.StringBuilder();
             foreach (string name in watched)

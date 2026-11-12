@@ -1266,6 +1266,97 @@ namespace AutoTest
             }
             return layer => byLayer.TryGetValue(layer, out var l) ? l : null;
         }
+
+        /// <summary>[測定 2026-11-12・#95] 止める遺物の接辞 (RelicStat の名前を , で並べる・例 "Defense,OpeningPoison")。 空 = 止めない。
+        /// 主ステもサブもその接辞の分だけ 0 になる (<see cref="GameHooks.RelicStatOffMask"/>)。 <see cref="relicLoadoutSpec"/> と組で使う。</summary>
+        public string relicStatOff = "";
+        /// <summary>[測定 2026-11-12・#95] 止める遺物のセット効果 ("セット:2" か "セット:3" を , で並べる・セットは RelicSet の名前か * = 全部・例 "Kenro:3" / "*:2")。
+        /// 空 = 止めない (<see cref="GameHooks.RelicSetBonusOffMask"/>)。</summary>
+        public string relicSetBonusOff = "";
+        /// <summary>[測定 2026-11-12・#20/#41] 敵の固定削り (プレイヤーの防御を固定値で引く) を差し替える。 "対象:値" を ; で並べる。
+        /// 対象 = 敵の id (例 "boss_layer6") か "boss" (ヴェスカの 4 段を含む全ボス・<see cref="GameLoop.BossIds.IsBoss"/>)。 id の指定が "boss" より先に効く。
+        /// 例 "boss_layer5:99;boss_layer6:99" / "boss:8"。 空 = 差し替えない (データの値)。 知らない id は腕ごと止める。</summary>
+        public string enemyArmorPenSpec = "";
+
+        /// <summary>[実効値] ランの始めに本体へ入れる遺物の接辞の止め (ビット = (int)RelicStat)。 監視リスト用 ── ワーカーは Begin() の前に読むので、
+        /// GameHooks の今の値ではなく、 入れる値をフィールドから作って返す (書式の誤りはここで例外になり、 腕が止まる)。</summary>
+        public int RelicStatOffMaskApplied => ParseRelicStatOff(relicStatOff);
+        /// <summary>[実効値] ランの始めに本体へ入れるセット効果の止め (ビット = セット × 2 + (3 個なら 1))。 監視リスト用。</summary>
+        public int RelicSetBonusOffMaskApplied => ParseRelicSetBonusOff(relicSetBonusOff);
+        /// <summary>[実効値] 固定削りの差し替えの中身 (3 層・5 層・6 層のボスとヴェスカの初段・最終段の値を「id=値」で並べる・差し替えなしは空)。 監視リスト用。</summary>
+        public string EnemyArmorPenOverrideApplied
+        {
+            get
+            {
+                var f = ParseEnemyArmorPen(enemyArmorPenSpec);
+                if (f == null) return "";
+                var sb = new StringBuilder();
+                foreach (var id in new[] { BossIds.Layer3Marsh, BossIds.Layer3Goblin, BossIds.Layer3Mirror, BossIds.Layer5Judgment, BossIds.Layer6Ash,
+                                           BossIds.VescaP1, BossIds.VescaFinal })
+                {
+                    var e = CombatSystem.EnemyDatabase.Get(id);
+                    sb.Append(id).Append('=').Append(f(id, e != null ? Math.Max(0, e.armorPen) : 0)).Append(' ');
+                }
+                return sb.ToString().TrimEnd();
+            }
+        }
+
+        private static int ParseRelicStatOff(string spec)
+        {
+            if (string.IsNullOrWhiteSpace(spec)) return 0;
+            int mask = 0;
+            foreach (var part in spec.Split(','))
+            {
+                var t = part.Trim(); if (t.Length == 0) continue;
+                if (!Enum.TryParse(t, true, out MetaProgression.Relics.RelicStat s) || !Enum.IsDefined(typeof(MetaProgression.Relics.RelicStat), s))
+                    throw new ArgumentException("[relicStatOff] 知らない接辞: " + t);
+                mask |= 1 << (int)s;
+            }
+            return mask;
+        }
+
+        private static int ParseRelicSetBonusOff(string spec)
+        {
+            if (string.IsNullOrWhiteSpace(spec)) return 0;
+            int mask = 0;
+            foreach (var part in spec.Split(','))
+            {
+                var t = part.Trim(); if (t.Length == 0) continue;
+                int colon = t.IndexOf(':');
+                if (colon <= 0 || !int.TryParse(t.Substring(colon + 1).Trim(), out int n) || (n != 2 && n != 3))
+                    throw new ArgumentException("[relicSetBonusOff] 書式は セット:2 か セット:3 : " + t);
+                string name = t.Substring(0, colon).Trim();
+                int bit = n == 3 ? 1 : 0;
+                if (name == "*") { for (int k = 0; k < MetaProgression.Relics.RelicCatalog.SetCount; k++) mask |= 1 << (k * 2 + bit); continue; }
+                if (!Enum.TryParse(name, true, out MetaProgression.Relics.RelicSet set) || !Enum.IsDefined(typeof(MetaProgression.Relics.RelicSet), set))
+                    throw new ArgumentException("[relicSetBonusOff] 知らないセット: " + name);
+                mask |= 1 << ((int)set * 2 + bit);
+            }
+            return mask;
+        }
+
+        private static Func<string, int, int> ParseEnemyArmorPen(string spec)
+        {
+            if (string.IsNullOrWhiteSpace(spec)) return null;
+            var byId = new Dictionary<string, int>(); int boss = -1;
+            foreach (var part in spec.Split(';'))
+            {
+                var t = part.Trim(); if (t.Length == 0) continue;
+                int colon = t.LastIndexOf(':');
+                if (colon <= 0 || !int.TryParse(t.Substring(colon + 1).Trim(), out int v) || v < 0)
+                    throw new ArgumentException("[enemyArmorPenSpec] 書式は 対象:値 (値は 0 以上) : " + t);
+                string key = t.Substring(0, colon).Trim();
+                if (key == "boss") { boss = v; continue; }
+                if (CombatSystem.EnemyDatabase.Get(key) == null) throw new ArgumentException("[enemyArmorPenSpec] 知らない敵: " + key);
+                byId[key] = v;
+            }
+            return (id, b) =>
+            {
+                if (id != null && byId.TryGetValue(id, out int v)) return v;
+                if (boss >= 0 && GameLoop.BossIds.IsBoss(id)) return boss;
+                return b;
+            };
+        }
         /// <summary>BOT が店で武器を買うか。 <b>既定は買わない</b> (2026-11-07)。 武器の ITT は「家系を乗り換える損得」を測っており
         /// (斧を渡すと −20 ポイント・家系ロックを入れると中立)、 期待値だけで決める購入は他系統の職業のランを悪くしていた。
         /// 強化素材で今の武器を育てる道 (WeaponMaterial) は残す。</summary>

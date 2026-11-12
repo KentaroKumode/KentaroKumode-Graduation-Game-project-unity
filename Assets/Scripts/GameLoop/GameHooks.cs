@@ -65,6 +65,24 @@ namespace GameLoop
         /// <summary>[測定 2026-11-12・#35] 追跡者に勝った時の物資を差し替える (負 = 差し替えない)。</summary>
         public static int PursuerSupplyOverride = -1;
 
+        /// <summary>[測定 2026-11-12・#95] 遺物の効果を止める接辞 (ビット = <c>(int)RelicStat</c>・0 = 何も止めない)。
+        /// 主ステもサブも、 その接辞の分だけを 0 にする (段の値 1 つあたりの価値を、 理論値の持ち込みから 1 接辞ずつ抜いて測る口)。
+        /// AutoRunner.relicStatOff が毎ランの始めに入れる。</summary>
+        public static int RelicStatOffMask;
+        /// <summary>[測定 2026-11-12・#95] 遺物のセット効果を止める (ビット = セット × 2 が 2 個の効果・セット × 2 + 1 が 3 個の効果・0 = 止めない)。
+        /// AutoRunner.relicSetBonusOff が毎ランの始めに入れる。</summary>
+        public static int RelicSetBonusOffMask;
+        /// <summary>[測定 2026-11-12・#20/#41] 敵がプレイヤーの防御を削る固定値 (EnemyData.armorPen) を差し替える。
+        /// 引数 (敵の id, データの値) → 使う値。 null = 差し替えない (本番)。 AutoRunner.enemyArmorPenSpec が毎ランの始めに入れる。</summary>
+        public static Func<string, int, int> EnemyArmorPenOverride;
+
+        /// <summary>敵の固定削り (データの値・<see cref="EnemyArmorPenOverride"/> があればその値・下限 0)。</summary>
+        public static int EnemyArmorPen(string enemyId, int dataValue)
+        {
+            int b = Math.Max(0, dataValue);
+            return EnemyArmorPenOverride != null ? Math.Max(0, EnemyArmorPenOverride(enemyId, b)) : b;
+        }
+
         /// <summary>物資の素の上限 (差し替えがあればそれ)。</summary>
         public static int ProvisionBaseMax => ProvisionMaxOverride > 0 ? ProvisionMaxOverride : ProvisionRules.Max;
 
@@ -99,6 +117,9 @@ namespace GameLoop
             OnShopTierOffered = null;
             OnShopUpgradeOffered = null;
             OnShopUpgradeBought = null;
+            EnemyArmorPenOverride = null;
+            RelicStatOffMask = 0;
+            RelicSetBonusOffMask = 0;
         }
     }
 }

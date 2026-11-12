@@ -628,7 +628,7 @@ namespace CombatSystem
             if (ctx != null)
             {
                 ctx.enemyDefense = Math.Max(0, enemy.defense) + MetaProgression.MetaDebuffApplicator.GetEnemyDefenseBonus();   // 挑戦カード: 敵の防御 +N
-                ctx.enemyArmorPen = Math.Max(0, enemy.armorPen);
+                ctx.enemyArmorPen = GameLoop.GameHooks.EnemyArmorPen(enemy.id, enemy.armorPen);   // [測定] 差し替えの口 (既定 null = データの値)
                 ctx.playerDefenseBase = DefenseFormula.PlayerBaseDefense + _weaponDefense + MetaProgression.MetaBuffApplicator.GetArmorDefense()
                                       + MetaProgression.Relics.RelicApplicator.GetDefense();   // 遺物 (§15-5) 防御 +N
                 ctx.playerArmorPenBase = _weaponArmorPen;
@@ -900,7 +900,7 @@ namespace CombatSystem
                 ctx.enemyDiceTotalBonus = 0;
                 ctx.bossDiceBonus = 0; // swapで一旦クリア。新形態の OnBattleStart パッシブ(刹那等)が再設定する
                 ctx.enemyDefense = Math.Max(0, newEnemy.defense) + MetaProgression.MetaDebuffApplicator.GetEnemyDefenseBonus();   // 新形態の防御値を反映 (ADR-0013)・挑戦カードの防御 +N も全段に
-                ctx.enemyArmorPen = Math.Max(0, newEnemy.armorPen);
+                ctx.enemyArmorPen = GameLoop.GameHooks.EnemyArmorPen(newEnemy.id, newEnemy.armorPen);
                 // [計装] 出ていく段の実長を締める。 currentTurn は連戦で通算なので、
                 //   開始点 (phaseStartTurn) との差でしか段の長さは出せない。
                 if (!string.IsNullOrEmpty(ctx.bossId)

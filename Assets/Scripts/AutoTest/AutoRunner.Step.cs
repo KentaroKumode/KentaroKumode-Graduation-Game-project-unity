@@ -168,6 +168,9 @@ namespace AutoTest
                     GameHooks.ArmorShieldPerRankOverride = armorShieldPerRank;
                     GameHooks.ArmorFlatEveryOverride = armorFlatEvery;
                     MetaProgression.Relics.RelicApplicator.Override = RelicPresets.Parse(relicLoadoutSpec);
+                    GameHooks.RelicStatOffMask = ParseRelicStatOff(relicStatOff);           // [#95] 既定 "" = 0 (止めない)
+                    GameHooks.RelicSetBonusOffMask = ParseRelicSetBonusOff(relicSetBonusOff);
+                    GameHooks.EnemyArmorPenOverride = ParseEnemyArmorPen(enemyArmorPenSpec); // [#20/#41] 既定 "" = null (データの値)
                     GameHooks.ForcedChallengeCards = ParseChallengeForce(challengeForce);
                     GameHooks.ChooseChallengeCard = challengeCardPickByAxis ? BotHooks.ChooseChallengeByAxis : (System.Func<IReadOnlyList<string>, int>)null;
                 }
