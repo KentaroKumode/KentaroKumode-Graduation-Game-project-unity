@@ -2096,7 +2096,7 @@ bot は数値カーブ検証のみに限定し、**選択の正解を統計に�
 | 4 | Vault（金庫） | 開幕ゴールド +5/段 | **宝箱ゴールド復活**＋**貸金庫**（ゴールドをランを跨いで持ち越す・上限 150G） |
 | 5 | Plunder（強奪） | ボス撃破の追加ゴールド +1/段（ボスのみ）・通常敵撃破の追加パッシブドロップ +2%/段 | **ショップ強盗 解禁**（§16-6） |
 | 6 | Trade（商才） | 特売枠 +1/段（最大 10）。割引は 15/30/50%（重み 42:38:20） | **99% 引きの枠が出る**（15/30/50/99%・重み 42:35:15:8） |
-| 7 | Supply（宝物庫） | 開幕パッシブ r3/6/9 で +1 本（計 3）・段が上がるほど開幕パッシブのレア度が上寄り | **開幕パッシブが 2 択** |
+| 7 | Supply（宝物庫） | 開幕パッシブ r3/6/9 で +1 本（計 3）・段が上がるほど開幕パッシブのレア度が上寄り | **開幕パッシブを選べる**（1 本目 1 択 / 2 本目 2 択 / 3 本目 3 択・`MetaPanel.SupplyStartingOffers`） |
 | 8 | Armor（装甲・2026-11-10） | **防御 +2/段**（r10 で +20・逓減式で軽減率になる。初期 2 で 10%・r3 で約 27%・r10 で約 41%）・**被ダメージ −1/2 段**（防御の後に引く・下限 1・逓減を受けない。1 段ごとだと他から 7 点移して +2.9/+2.3 と強すぎ、2 段ごとで +1.1/−1.5 ＝釣り合い・2026-11-10） | **〈不動〉**: 1 回の攻撃で受けるダメージは最大 HP の 35% まで（条件なし）。旧案「失った HP 10% ごとに防御 +1」は逓減で効かず差し替え。「固定ダメージ −N」も試したが、敵に固定ダメージが無く常に 0 だったので被ダメージ −N に戻した（2026-11-10） |
 
 撤去済みのトラック: 精密（2026-09-10・寄与が測定分解能未満）・兵站（旧〈燈火〉・2026-11-10。物資の上限の価値が「頭打ちの手前か後か」で反転し、段の効き目を制御できなかった。素の上限 8 で r3→r10 の 7 点は −11〜−20、素の上限 5 なら +2〜+4。r10〈補給線〉のコードは残置）。
@@ -2122,16 +2122,16 @@ bot は数値カーブ検証のみに限定し、**選択の正解を統計に�
 
 | 段 | 効果 |
 |---|---|
-| 1 | 対応キーワードアイテムの**出現重み +100%**（11-07 に +60% から） |
+| 1 | 対応キーワードアイテムの**出現重み +100%**（11-07 に +60% から）。**店のパッシブ枠の抽選だけ**に掛かる（`ShopManager.PickWithSparkBias`。報酬・ドロップ・宝箱には掛からない） |
 | 2 | **固有効果**（下表） |
 | 3 | 対応キーワードアイテム **2 つ**（LEGENDARY を除く・11-07 に 1 つから）を**所持してランスタート** |
 
 | キーワード | r2 固有効果 | 機構上の根拠 |
 |---|---|---|
-| 充電 | **拡張バッテリー**: 充電上限 +5（30→35） | 容量拡張が溜め込み型を開放 |
+| 充電 | **拡張バッテリー**: 充電上限 +10（30→40）・戦闘開始時に充電 +10（2026-11-07・`MetaPanel.ChargeCapBonus` / `ChargeOpening`） | 容量拡張が溜め込み型を開放 |
 | 臨界 | **保温炉**: 戦闘終了時、メーターの 50% を次戦闘へ持ち越し | ラン単位の熱管理という新しい遊び |
-| 毒 | **濃縮**: 毎ターン最初に与える毒 +2（2026-11-07 に「付与のたび +1」から変更。入り口が増えて全付与が 2 倍になったため） | 回転率がそのまま伸びる |
-| 出血 | **失血衰弱**: 出血 3 以上の敵は攻撃 −2 | 耐久面を支援（止血阻害とは別ベクトル） |
+| 毒 | **濃縮**: 毎ターン最初に与える毒 +5（2026-11-07 に「付与のたび +1」から変更。入り口が増えて全付与が 2 倍になったため。同日 +2 → +5・`MetaPanel.PoisonApplyBonus`） | 回転率がそのまま伸びる |
+| 出血 | **失血衰弱**: 出血 3 以上の敵は攻撃 −4（2026-11-07 に −2 から・`MetaPanel.BleedWeakenAttack`） | 耐久面を支援（止血阻害とは別ベクトル） |
 | シールド | **厚手の芯**: ターン開始の減衰で残るシールド +10%（2026-11-07・仮・残る割合の上限 80% は共通） | 積み上げ型の盾に持ち越しを与える |
 
 固有効果は**既存パッシブとの重複を避けて選定**（重複すると「メタで取ったからアイテム不要」の
@@ -2149,7 +2149,7 @@ bot は数値カーブ検証のみに限定し、**選択の正解を統計に�
 | `MetaProgressManager.cs` | `TryPurchasePoint` / `TryAssignRank` / `TryRefundRank` / `RespecAllRanks` |
 | `MetaBuffApplicator.cs` | 全 getter を Panel 参照に |
 | `SparkStarterPicker.cs` | キーワード→BRONZE ピッカー（分類表は item-dex.html の KW_MAP と同期対象） |
-| ~~`MetaProgressDebugHUD.cs`~~ | 2026-10-28 削除（どのシーンにも載っていないデバッグ表示だった）。パネル UI は `SkillTreeView` |
+| ~~`MetaProgressDebugHUD.cs`~~ | 2026-10-28 削除（どのシーンにも載っていないデバッグ表示だった）。パネル UI は Game2D の `Game2DMetaPanel`（仮置き・2026-11-04） |
 
 **移行**: 旧 58 段の消費トークンを全額返却 → ポイント購入に充当（`MigrateFromLegacyTrackIfNeeded`）。
 
@@ -2157,7 +2157,17 @@ bot は数値カーブ検証のみに限定し、**選択の正解を統計に�
 CritDamageBonus / BossExtraRare 昇格 / **DiceTotalBonus（ダイス合計概念の消滅）**
 ── いずれも Applicator の互換 stub 経由で `0/false` を返す。
 
-> **SkillTreeView（旧 58 段 UI）は Obsolete API 経由で残置。** v6 パネル UI 実装で置換予定（§23）。
+> **SkillTreeView（旧 58 段 UI）は Obsolete API 経由で残置。** v6 の配点は Game2D の `Game2DMetaPanel` が担う（§23-5）。
+
+**適用箇所の追跡（2026-11-12・§23-7）**: 枠に残る 15 本（数値 8・種火 5・端子 2）の段効果は、すべて本番の経路から読まれている。
+読む所: 外殻 = `MetaBuffApplicator.ApplyToRunStart`（`GameManager.cs` のラン開始）・r10 `LastStand.cs` ／ 出力 = `CombatManager.Damage.cs`・`Mechanics.cs` の与ダメ%・〈戦意〉の勝利数 `GameManager.Floor.cs` ／
+剛胆 = エリート格上げ `MapGenerator.ApplyEliteUpgrade`（航行マップの `FromLayout`）・報酬 `GameManager.Rewards.cs`・ドロップ `GameManager.Floor.cs`・r10 与ダメ `CombatManager.Damage.cs`・シールド持ち越し `CombatManager.Finish.cs` → 開幕 `CombatManager.cs` ／
+金庫 = 開幕ゴールド・r10 宝箱 `GameManager.Rewards.cs`・貸金庫 `VaultBank.cs` ／ 強奪 = ボス `GameManager.Rewards.cs`・ドロップ `GameManager.Floor.cs`・r10 強盗 `ShopManager.cs` と `Game2DPhaseScreens.cs` ／
+商才 = 特売枠と割引の抽選 `ShopManager.cs` ／ 宝物庫 = 本数・選択 `GameManager.cs`・レア度 `GameManager.Rewards.cs` ／
+装甲 = 防御 `CombatManager.cs` の戦闘開始・被ダメ −N と r10 の一撃の上限 `CombatManager.Turn.cs` ／
+種火 = r1 `ShopManager.PickWithSparkBias`・r3 `GameManager.cs`・r2 充電 `CombatManager.cs` / `CombatContext.ChargeCap`・臨界 `CombatManager.Finish.cs` → `CombatManager.cs`・毒 `CombatContext.AddStatus`・出血 `CombatManager.Turn.cs`・シールド `CombatContext` の減衰 ／
+端子 = `CombatManager.Turn.cs` の配線合計。
+**常に 0 を返すだけの口**（読む側はあるが効果は無い）: `GetDiceTotalBonus`・`RollRefund`・`GetFloorClearHeal`・`GetArmorImmovableDefense`・`GetArmorOpeningShield`（刻み 0）・`GetProvisionCapBonus` / `IsSupplyLineUnlocked`（兵站は枠の外）・`GetCritDamageBonus`（会心の種火は枠の外）・`GetCritRatePctBonus` の精密の分（枠の外）。
 
 ### 15-2. 挑戦デバフ — 配点ハイスコア方式（**2026-11-10 撤去・記録として残す**）
 
@@ -4054,7 +4064,9 @@ SampleScene / Game2D から該当オブジェクトを外した（§24）。`Ite
 - 端子の山札（§6-4・ADR-0014）の数値は仮（1 枚ずつの合否は 2026-11-11 に済み）。基準値は 2026-11-12 に測り直し（Optimal 13.7% / Super 33.3%・各 3,000 ラン）、
   端子ごとの ITT とバランス調整は issue #102。端子の名前は 定電圧（旧 点火栓）・増圧（旧 研磨盤）・充填（旧 蓄電器）に変えた（2026-11-11）。
 - ADR-0004 の attackPower 各値は暫定（BOT 較正前提）。
-- メタ進行の効果適用箇所の網羅追跡（enum/定数は事実確認済だが、実フックまでの追跡が未完）。
+- ~~メタ進行の効果適用箇所の網羅追跡（enum/定数は事実確認済だが、実フックまでの追跡が未完）。~~ → **2026-11-12 に実施**（結果は §15-1 末尾）。枠に残る 15 本の段効果に、読まれていない（死んでいる）ものは無かった。
+  ただし種火 r1 の出現重みは店のパッシブ枠だけに掛かる（報酬・ドロップ・宝箱には掛からない）── 仕様の「出現重み」がどこまでを指すかは要判断
+  別件: 枠から外したトラック（兵站・会心の種火・精密）の段は、古いセーブを読むと丸められずに残って効く → issue #113
 
 ### 23-8. lore の未適用 TODO
 
