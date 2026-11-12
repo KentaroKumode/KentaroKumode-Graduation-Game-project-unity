@@ -449,7 +449,7 @@ namespace AutoTest.ParallelSweep
                 "v3.mainCorr", "daybreakNextAttackPct", "DaybreakNextAttackPctApplied", "weaponTierCap", "vescaDiceForce",
                 "pursuerNoReward", "pursuerAtkMul", "pursuerHpAdd", "pursuerSupply", "navFear", "navFearMacro", "navFearRange",
                 // 2026-11-12: 縄張りの作り (追跡者が縄張りの外へ出るか・縄張りの宝の中身・BOT が宝を取りに行くしきい値)
-                "pursuerLeavesTerritory", "territoryTreasure", "territoryTreasureHpMargin",
+                "pursuerLeavesTerritory", "territoryTreasure", "territoryTreasureHpMargin", "navTerritoryDetour",
                 // 2026-11-10: 測定用の物差し (主攻撃 / 毒・出血・爆発の倍率)。 送った値と、 ラン開始時に本体へ入れた値
                 "probeMainMult", "ProbeMainMultApplied", "probePassiveMult", "ProbePassiveMultApplied",
                 // 2026-11-12 (#107): 配線が収支で決まる敵のパッシブと〈吸血〉を読むか (−1 = 技量に従う) と実効値・内訳

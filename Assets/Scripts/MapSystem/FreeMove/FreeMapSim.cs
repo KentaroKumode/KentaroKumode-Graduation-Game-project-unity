@@ -436,6 +436,43 @@ namespace MapSystem.FreeMove
         /// <summary>from から to へ向かう次の 1 歩 (最短の道・崩れた道は通らない)。 着いている / 行けないなら from。</summary>
         public int StepToward(int from, int to) => FreeMapLayout.StepToward(_adj, from, to);
 
+        /// <summary>from から to へ、 <b>踏む縄張りの点の数が一番少なく</b>、 その中で一番短い道の最初の 1 歩 (2026-11-12・問い合わせだけ)。
+        /// 踏む数には to を含み from を含まない (縄張りの中から出る時は、 出るまでに踏む点が一番少ない道)。
+        /// <paramref name="hops"/> = その道の歩数・<paramref name="territorySteps"/> = その道で踏む縄張りの点の数。 行けなければ from を返し hops = int.MaxValue。
+        /// 同点は隣接表の並びが先の点 (<see cref="StepToward"/> と同じ決め方)。 状態は変えず、 乱数も使わない。
+        /// BOT の航行 (縄張りを横切らない道) と検算 (freemap_check) が使う。 遊ぶ人の規則には関わらない。</summary>
+        public int StepAvoidingTerritory(int from, int to, out int hops, out int territorySteps)
+        {
+            hops = int.MaxValue; territorySteps = int.MaxValue;
+            if (from == to) { hops = 0; territorySteps = 0; return from; }
+            int n = _adj.Length;
+            // 費用 = 踏む縄張りの点の数 × 1000 + 歩数 (点は 50 程度なので歩数は 1000 に届かない)。 to から逆に広げる
+            var cost = new int[n];
+            var done = new bool[n];
+            for (int i = 0; i < n; i++) cost[i] = int.MaxValue;
+            if (_sunk[to]) return from;
+            cost[to] = (InTerritory(to) ? 1000 : 0);
+            while (true)
+            {
+                int u = -1, cu = int.MaxValue;
+                for (int i = 0; i < n; i++) if (!done[i] && cost[i] < cu) { cu = cost[i]; u = i; }
+                if (u < 0) break;
+                done[u] = true;
+                if (u == from) continue;   // from から先へは広げない (from は踏む数に入れない)
+                foreach (int v in _adj[u])
+                {
+                    if (done[v] || _sunk[v]) continue;
+                    int c = cu + 1 + (v != from && InTerritory(v) ? 1000 : 0);
+                    if (c < cost[v]) cost[v] = c;
+                }
+            }
+            int best = from, bc = int.MaxValue;
+            foreach (int v in _adj[from]) if (!_sunk[v] && cost[v] < bc) { bc = cost[v]; best = v; }
+            if (best == from) return from;
+            hops = bc % 1000 + 1; territorySteps = bc / 1000;
+            return best;
+        }
+
         /// <summary>いま見える範囲 (道で何歩先まで)。 照明中は <see cref="FreeMapParams.FlareRange"/>。</summary>
         public int VisionRange => FlareOn ? Math.Max(FreeMapParams.FlareRange, Perks.vision) : Perks.vision;
 

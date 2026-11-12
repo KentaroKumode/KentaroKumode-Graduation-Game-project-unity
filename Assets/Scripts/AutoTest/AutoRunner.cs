@@ -184,6 +184,10 @@ namespace AutoTest
         /// <summary>[2026-11-12] BOT が縄張りの宝を取りに行くしきい値: 「HP の割合 − 追跡者の戦闘で失う HP の見積もり」がこれ以上の時だけ取りに行く
         /// (<see cref="WantsTerritoryTreasure"/>)。 1 以上 = 取りに行かない。 仮置き。</summary>
         public float territoryTreasureHpMargin = 0.35f;
+        /// <summary>[2026-11-12] 縄張りを出ない追跡者の層で、 縄張りを横切らない遠回り (<see cref="TerritoryAwareStep"/>) を、
+        /// 最短の道より何歩長いところまで選ぶか。 行った先から出口か店まで物資 (足りない分は HP) で歩ける時だけ選ぶ。
+        /// −1 = 縄張りを気にしない (この規則を入れる前の動き)。 追跡者を避けない方策 (Naive) と旧い作り (縄張りの外まで追う) には効かない。 仮置き。</summary>
+        public int navTerritoryDetour = 3;
         /// <summary>[測定 2026-11-12・#102] 端子の調整を元の値へ戻す腕。 本体の GameHooks.Terminal* へ流す (ラン終了で既定へ)。
         /// terminalHealMul: 〈治癒〉の倍率 (0 = 差し替えない = 今の値・旧は 2)。 terminalArresterNeed: 〈避雷器〉の溜める量 (0 = 今の値・旧は 12)。</summary>
         public int terminalHealMul = 0, terminalArresterNeed = 0;
@@ -783,7 +787,7 @@ namespace AutoTest
                  + $"/ 遺物 持ち込み {relicCount}個 計{relicPts}段 "
                  + $"/ メタ 攻撃端子+{MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice()} "
                  + $"/ 追跡者 縄張りの外へ{(pursuerLeavesTerritory ? "出る (旧い作り)" : "出ない")} "
-                 + $"/ 縄張りの宝 {territoryTreasure} (BOT のしきい値 {territoryTreasureHpMargin:0.##})";
+                 + $"/ 縄張りの宝 {territoryTreasure} (BOT のしきい値 {territoryTreasureHpMargin:0.##}) / 縄張りを避ける遠回り {(navTerritoryDetour < 0 ? "使わない" : "+" + navTerritoryDetour + "歩まで")}";
         }
 
         /// <summary>次のボスに対する戦力ギャップ。 **天井 (Super) のときだけ効く** ──

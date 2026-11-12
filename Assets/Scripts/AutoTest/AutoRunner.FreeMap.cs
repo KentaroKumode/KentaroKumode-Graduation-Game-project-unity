@@ -24,6 +24,8 @@ namespace AutoTest
     /// <item>縄張りの宝 (2026-11-12): 補給が要らない時、 HP の割合から追跡者の戦闘の損の見積もりを引いて
     ///       <see cref="territoryTreasureHpMargin"/> 以上なら宝を行き先にする (<see cref="WantsTerritoryTreasure"/>・どの技量も同じ規則)。
     ///       縄張りを出ない追跡者なら、 縄張りの外の点は避けない。</item>
+    /// <item>縄張りを横切らない (2026-11-12・回避ありの方策だけ): 縄張りを出ない追跡者の層では、 払える遠回り
+    ///       (<see cref="navTerritoryDetour"/> 歩まで・行った先から出口か店まで歩ける) なら縄張りの点を踏まない道を選ぶ (<see cref="TerritoryAwareStep"/>)。</item>
     /// </list>
     /// <para>照明・偵察・待つは使わない。 乱数は使わない (GameRng を消費しない)。</para>
     /// </summary>
@@ -372,6 +374,8 @@ namespace AutoTest
             // 行動の上限 (の手前) を過ぎたら避けるのをやめて出口へ真っ直ぐ歩く ── 避け道の往復で層に閉じ込められない
             if (avoid && _freeMapActions <= MaxFreeMapActionsPerFloor)
             {
+                // 縄張りを出ない追跡者 (2026-11-12): 払える遠回りなら、 縄張りを横切らない道を選ぶ (行き先が縄張りの中なら、 踏む縄張りの点が一番少ない道)
+                hop = TerritoryAwareStep(mm, sim, run, at, target, hopsFromMe, hop);
                 // 新しい点へ着けないまま時間が過ぎたら、 その場の 1 歩の避け方ではなく行き先までの迂回路を引く (2026-11-04)
                 if (_freeMapDetourTarget != target) _freeMapDetourTarget = -1;
                 if (_freeMapDetourTarget < 0 && _freeMapSinceProgress >= FreeMapStallActions && sim.FoeAlive)
@@ -435,6 +439,43 @@ namespace AutoTest
                 loss = (float)mean * PursuerVsEliteHpLoss;
             }
             return hpRatio - loss >= territoryTreasureHpMargin;
+        }
+
+        /// <summary>[計装] 縄張りを横切らない遠回りで、 最短の道の 1 歩と違う 1 歩を選んだ回数 / 遠回りが長すぎるか払えずに最短の道のまま縄張りを踏んだ回数 (バッチ累計)。</summary>
+        public static long FreeNavTerritoryDetours, FreeNavTerritoryDetourRefused;
+
+        /// <summary>縄張りを横切らない次の 1 歩 (2026-11-12)。 縄張りを出ない追跡者が生きている層で、
+        /// 踏む縄張りの点が一番少なく・その中で一番短い道 (<see cref="FreeMapSim.StepAvoidingTerritory"/>) を、
+        /// 最短の道より <see cref="navTerritoryDetour"/> 歩長いところまで・行った先から出口か店まで歩ける時 (<see cref="Sustainable"/>) だけ選ぶ。
+        /// 選べなければ <paramref name="direct"/> (最短の道の 1 歩) のまま。 旧い作り (<c>Leashed = false</c>) と −1 では何もしない。</summary>
+        private int TerritoryAwareStep(MapManager mm, FreeMapSim sim, RunState run, int at, int target, int[] hopsFromMe, int direct)
+        {
+            if (navTerritoryDetour < 0 || !sim.Leashed || !sim.FoeAlive || target < 0 || target == at) return direct;
+            if (hopsFromMe[target] == int.MaxValue) return direct;
+            int step = sim.StepAvoidingTerritory(at, target, out int hops, out int terr);
+            if (step == at || hops == int.MaxValue) return direct;
+            // 同じ 1 歩か、 最短の道より踏む縄張りの点が減らないなら最短のまま
+            if (step == direct || terr >= TerritoryStepsOnShortest(sim, at, target)) return direct;
+            int extra = hops - hopsFromMe[target];
+            bool afford = extra <= navTerritoryDetour
+                && Sustainable(mm, sim, sim.HopsFrom(target), sim.Layout.goal, run.provision - hops * FreeMapParams.MoveSupply, run);
+            if (!afford) { FreeNavTerritoryDetourRefused++; return direct; }
+            FreeNavTerritoryDetours++;
+            return step;
+        }
+
+        /// <summary>最短の道 (<see cref="FreeMapSim.StepToward"/> をたどった道) で踏む縄張りの点の数 (at を含めず target を含む)。</summary>
+        private static int TerritoryStepsOnShortest(FreeMapSim sim, int at, int target)
+        {
+            int c = 0, cur = at;
+            for (int guard = 0; guard < 200 && cur != target; guard++)
+            {
+                int nx = sim.StepToward(cur, target);
+                if (nx == cur) break;
+                cur = nx;
+                if (sim.InTerritory(cur)) c++;
+            }
+            return c;
         }
 
         /// <summary>[測定 2026-11-12・#35] 恐れの範囲 (歩)。 動かない追跡者はその点だけを怖がる。</summary>
