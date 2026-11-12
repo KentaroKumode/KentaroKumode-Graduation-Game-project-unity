@@ -1689,7 +1689,7 @@ L3 調整器（`AutoTest/BossTuning.cs`・`BossBalanceTuner.cs`・メニュー�
 > 2 層の十三番の札は『回避可能な罠枠』なので、難しいままにする（調整対象にしない）。
 > 測定の注意: 学習データは 1 バッチ増えるごとに約 8% のランの結果が変わる。日をまたいだ・間を置いた測定はペア比較しても完全一致にならない。
 > 並列ワーカーは 2026-11-05 まで `metaBuffMode` を無視して常に Balanced を注入していた（配点を変える並列測定はそれ以前すべて無効）。
-> **2026-11-12 (#118)**: 挑戦の難易度 1〜3 は学習の帯 `bot_band_1_15` を読むが、そのフォルダは無く、黙って手書きの序列で買っていた（クリア 0%）。帯 16_30 / 31up は 2026-09-22 の古いデータ。今は帯の欠けを見つけると測定を止める（`failOnMissingLearning`・既定 ON・学習を作る経路と Ultra は止めない）。今の学習で難易度を振るときは `botLearningBandOverride=0`（帯 0 を読む・難易度は変えない）。読んだ帯はサマリーの「学習の読み」と `[実効状態]` 行に出る。
+> **2026-11-12 (#118)**: 挑戦の難易度 1〜3 は学習の帯 `bot_band_1_15` を読むが、そのフォルダは無く、黙って手書きの序列で買っていた（クリア 0%）。帯 16_30 / 31up は 2026-09-22 の古いデータ。今は帯の欠けを見つけると測定を止める（`failOnMissingLearning`・既定 ON・学習を作る経路は止めない）。今の学習で難易度を振るときは `botLearningBandOverride=0`（帯 0 を読む・難易度は変えない）。読んだ帯はサマリーの「学習の読み」と `[実効状態]` 行に出る。
 > **2026-11-12 (#119)**: 並列ワーカーは、前の測定が PlayerPrefs に残した挑戦の難易度で、バッチ開始時の学習と戦闘名の危険度を読んでいた（同じ設定の繰り返しがワーカー単位で割れた）。今はワーカーがメタ進行を PlayerPrefs から読まず書かず（`GameHooks.MetaPersistenceDisabled`）、Begin が腕の難易度を先に入れ、危険度もラン開始時に帯を合わせる。**これより前の、難易度を変えた並列測定は比べられない。**
 > **2026-11-05 (SuperV3 の A/B)**: Optimal の効用に被ダメージの罰 (`v3.takenCost`) を足すと、同じ条件のクリアが **25.0% → 43〜45%**（罰 4〜32・z>24）。
 > 基準 BOT を強くすると、同じゲームでもクリア率が高く出る。 バランスの基準を置き換えるか、 別の技量として並べるかは未決（§23-24）。
@@ -2059,6 +2059,10 @@ HP は「必要な総ダメージ量が増える」だけで **1 撃の価値を
 
 **技量の梯子**（`AutoRunner.Begin` が技量から設定）:
 
+> **2026-11-13（#135）: 技量の Ultra（方策の組を並列ワーカーで測って選ぶ・判断ごとに rollout で手を選ぶ）は削除した。** 梯子は Naive / Optimal / Super の 3 段。
+> `WiringSkill.Ultra`（番号 4）は保存済みの設定のために残し、選ばれていたら Super として走る。経緯は §24。
+
+
 | | Optimal（10〜100 戦の経験者） | Super（攻略を知り尽くした人） |
 |---|---|---|
 | 購入の序列 | ITT を **3 段**に丸める（同じ段は安い方） | ITT を**無段階**・効果 − 価格 × 0.02 |
@@ -2085,8 +2089,8 @@ HP は「必要な総ダメージ量が増える」だけで **1 撃の価値を
   画面で止めたいときは `ConfirmFloorClear` を遅らせる。
 - **世界観**: Λ という場所は無くなった。時空のずれは**大穴全体**にあり、5 層を越えると揃わなくなる（§19-10-1）。
 - **7 種の Λ デバフ**: 挑戦デバフの軸を作り直すときの素材として §23-23 に保留。
-- **保存互換**: `TileType.LambdaRing/LambdaExit`・`RelicAxis.LambdaResonance`・`UltraTileView` の該当値は
-  序数を保つため enum に残す（使う箇所は無い）。台帳の F1〜F3 は再利用しない。
+- **保存互換**: `TileType.LambdaRing/LambdaExit`・`RelicAxis.LambdaResonance` の該当値は
+  序数を保つため enum に残す（使う箇所は無い。`UltraTileView` は 2026-11-13 に技量の Ultra ごと削除・§24）。台帳の F1〜F3 は再利用しない。
 
 ---
 
@@ -4257,7 +4261,7 @@ Unity 側は規則（`FreeMap/*`）・統合（`GameManager.FreeMap.cs`）・表
 - **BOT**: 航行は Naive（直行）と回避あり（見えている追跡者・魔石の方角を避ける・補足されたら囮罠）の 2 系統。照明・偵察・待つは使わない。
   縄張りの宝（2026-11-12）はどの技量も同じ最小の規則で取りに行く（上の未決）。縄張りを出ない追跡者なら、縄張りの外の点は避けない。
   宝を取りに入る時に、囮罠を縄張りの外へ置いて番人を引き寄せる・巡回の隙を待つ、といった盗み方は**しない**
-  Ultra は航行マップの層では無効（盤面に座標・手番・敵の状態を保存する口が無い）
+  （旧 Ultra は航行マップの層では無効だった。2026-11-13 に技量ごと削除・§24）
 - **バランス**: §13-5 の層ごとの目標は「1 層あたりの戦闘数がほぼ一定」という前提だったので、**全層やり直し**
 
 ### 23-22. 防御力と貫通（2026-10-28・ADR-0013 の未決と残作業）
@@ -4410,9 +4414,10 @@ BOT の払い方（`AutoRunner.Terminals` の `ChooseGoldPunch`）は実装済�
 
 | 対象 | 時期 | 理由 |
 |---|---|---|
+| **技量の Ultra（`WiringSkill.Ultra` の中身）: 方策の組（`UltraPolicyPortfolio`・候補の並列ワーカー `UltraProductionWorkerBootstrap`・選んで回す `PrepareUltraAndRun` / `UltraAutoRunBridge` / `UltraAutoRunProfile`）・判断ごとの rollout（`UltraRolloutSink` / `UltraRolloutEvaluator`・`UltraCheckpoint`・`UltraObservation`・`UltraDispatch`・国勢調査 `UltraDecisionCensus`・`UltraRunSnapshot` / `UltraMapSnapshot` / veil・episode ワーカー・`UltraWorkerProtocol`）・進捗 HUD・計時 `UltraPhaseClock`・本体の rollout 用の復元口（`MapManager.RestoreState`・`GameManager.ResumeAtPhase`・`MapGenerator.RandomRowTileWeights`）・メニュー「Ultra AI」一式と ④ の Ultra・Ultra の部品のテスト・設計書 `docs/design-ultra-ai.md` / `docs/HANDOFF-ULTRA-AI-20260818.md`** | 2026-11-13 | 作者の決定（#135「作り直していい。Ultra はすでに個別プロファイルとして存在しないので、利用しているプロファイルに統合」）。方策の組の候補は Super の設定違いで、rollout の sink は Ultra のメニューからしか立たず、通常のランでは一度も判断を変えていなかった（国勢調査は既定 OFF で数えるだけ）。`WiringSkill.Ultra` の値（番号 4）は保存済みの設定のために残し、選ばれていたら `AutoRunner.Begin` が Super に読み替える（並列ランナーは腕の名前と中身がずれないよう起動前に止める）。並列ワーカーの凍結ビルド（`UltraProductionWorkerBuild`・descriptor `ultra-production-worker.json`・`UltraWorkerBuildManifest`）は今の測定が使うので名前ごと残す。descriptor の `actionFingerprint` は候補集合のハッシュから固定の印 `action:no-policy-portfolio-v1` のハッシュに替えた（照合する所は無い・並列ランナーが照合するのは `buildFingerprint` と exe の hash だけ）。ラン 1 本の digest の印 `ultra-production-run-v1` は過去のランと突き合わせるため変えない。中断セーブ（`RunSave`）は別の口（`MapManager.RestoreFromSave`・`GameRng.RestoreState`）を使うので触っていない |
 | **画面の呼び名「パッシブ」「パッシブアイテム」と、ランの中の持ち物を「遺物」と呼ぶこと（〈門〉の「遺物を焚く」など）** | 2026-11-12 | 作者の決定。「遺物」がランの中の持ち物とラン外の装備（§15-5）の 2 つに使われて紛れていた。ランの中の持ち物は**秘宝**、ラン外の装備は**遺物**、点の種類の「秘宝」はそのまま（§2-7）。画面・〈門〉・手引き・イベントの結果の行・GameManager のログを直した。識別子・データ・`event_list.txt` の効果の書式・敵のパッシブは変えていない。イベントの文面で持ち物を「遺物」と呼ぶ所と、TRUE END の「自分と遺物の山」は未決（作者に確認中） |
 | **追跡者が層じゅうを追う作り（補足したら縄張りの外まで、層のどこまでも追う）** | 2026-11-12 | 作者の決定。測定で、追跡者は避けるのが常に正解・捕まるのは失敗でしかない「クリア率を下げるだけの装置」だった（§23-21）。縄張りを守る番人にして（外へ出ない）、縄張りの中に見えている宝を置き、踏み込むかを選ばせる（§5-9）。旧い作りは測定の口 `pursuerLeavesTerritory=True` で戻る |
-| **`SuperCombatAI` の残り（レバーの公開フィールド `superAI.*`・計装 `DescribeSearch` / `DescribeProf`（`super_prof.txt`）・進捗行 `superWiringDecisions` ほか）と、それを振るメニュー（同点拡張・充電値付け・ttd 頭打ち・ttk 価格・残 HP 値付け・リロール全列挙・飽和センサス・並列の superAI.* 診断 3 本）・技量「厳密 (Exact)」を選ぶメニューと速度計測・`superLayer6OptimalCombatRoutine` / `superLayer7OptimalCombatRoutine`（6・7 層だけ Optimal へ逃がす切替）・`AutoRunner.lambdaFarmTiles`** | 2026-11-12 | 作者の決定（#135「作り直していい」）。端子の山札（2026-11-11）の後はどの技量でも配線が山札の方策に上書きされ、どれも読む所が無く、計装は常に 0 だった。A/B の腕に使うと差が出ない理由を取り違える。`WiringSkill.Exact` の値（番号 3）は保存済みの設定のために残す（選べない・Optimal と同じ）。Ultra の方策仕様 `UltraPortfolioPolicySpec` の `superLayer6OptimalCombatRoutine` / `lambdaFarmTiles` は、候補集合のハッシュがワーカーの `actionFingerprint` に入るので値だけ残した（受け取る側は無い） |
+| **`SuperCombatAI` の残り（レバーの公開フィールド `superAI.*`・計装 `DescribeSearch` / `DescribeProf`（`super_prof.txt`）・進捗行 `superWiringDecisions` ほか）と、それを振るメニュー（同点拡張・充電値付け・ttd 頭打ち・ttk 価格・残 HP 値付け・リロール全列挙・飽和センサス・並列の superAI.* 診断 3 本）・技量「厳密 (Exact)」を選ぶメニューと速度計測・`superLayer6OptimalCombatRoutine` / `superLayer7OptimalCombatRoutine`（6・7 層だけ Optimal へ逃がす切替）・`AutoRunner.lambdaFarmTiles`** | 2026-11-12 | 作者の決定（#135「作り直していい」）。端子の山札（2026-11-11）の後はどの技量でも配線が山札の方策に上書きされ、どれも読む所が無く、計装は常に 0 だった。A/B の腕に使うと差が出ない理由を取り違える。`WiringSkill.Exact` の値（番号 3）は保存済みの設定のために残す（選べない・Optimal と同じ）。Ultra の方策仕様 `UltraPortfolioPolicySpec` の `superLayer6OptimalCombatRoutine` / `lambdaFarmTiles` は、候補集合のハッシュがワーカーの `actionFingerprint` に入るので値だけ残した（受け取る側は無い。2026-11-13 に Ultra ごと削除・上の行） |
 | **ボス自動チューナー L3（`BossTuning`・`BossBalanceTuner`・メニュー「③ 学習/ボスチューナー ON」・`AutoRunner.tuneBosses`・計装 `playerRollSum` / スタンス別のロール勝ち数）と、敵スタンス（ADR-0005）の残り（`EnemyStance`・`ctx.enemyStanceDamageMult` / `enemyStanceKind` / `enemyStanceWeakRollRatio`・`BossParam.StanceAtkMult` / `WeakRollRatio` / `RobeStacks`）** | 2026-11-12 | 作者の決定（#126「オートチューナーは削除でいい」）。調整値ファイルは 7/28 から空で、測定は既定 OFF。効かない値（呼ぶ所の無い敵スタンスの 2 値・読む敵のいない値）を飽和するまで動かして「調整した」と記録し、効く HP まで降りない欠陥があった。ボスの数値は `BossParams` の実数値を手で直す。差し込み口 `BossParams.Overrides` は残す（§13-3） |
 | **灰燼の王の撃破の場面に足す階級章の 1 行（§19-9 の段 1・`Endings.AshThroneSlothLine`・〈クェシナの怠惰〉を背負った周だけ）** | 2026-11-12 | 作者の決定（#115 の案 c）。条件の `RunState.permanentDebuffs` に怠惰を入れる所が c89b942（旧配点方式の撤去・#9）で無くなり、分岐が通らなくなっていた。挑戦カード〈怠惰〉（`sin_sloth`）への付け替えは採らず、段 0（椅子）だけを全員に見せる。`PermanentDebuffIds` のフレーバー本文は正本のまま残す |
 | **クリア率の基準を Optimal に置く決まり（§13-7 の条件「基準 BOT のクリア 10〜15%」・2026-11-06）** | 2026-11-12 | 作者の決定。クリア率の目標 20〜25% は Super で測る（§13-5）。高難易度を Optimal で合わせると難易度 0 が大幅に易しくなる。Optimal は参考値として測り続ける（同日の実測: 難易度 0 で Super 20.2% / Optimal 6.7% / Naive 5.7%） |

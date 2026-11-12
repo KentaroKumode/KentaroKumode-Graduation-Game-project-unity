@@ -5,9 +5,9 @@ using NUnit.Framework;
 namespace AutoTest.EditorTests.Ultra
 {
     /// <summary>
-    /// Ultra が依存する本番乱数の分離契約を固定する回帰テスト。
-    /// Ultra の探索器そのものは GameRng を呼ばず、production workerだけが
-    /// episode開始時にseedを設定して以後の本番抽選を実行する。
+    /// 本番乱数 (GameRng) のキー別の分離契約を固定する回帰テスト。
+    /// もとは旧 Ultra (2026-11-13 削除・#135) のために書いたが、 同じシードの突き合わせ (BOT の測定・中断セーブ) が同じ契約に乗っている。
+    /// (名前空間とキーの文字列 "ultra.*" はテストの中だけの名前なので残す)
     /// </summary>
     [TestFixture]
     public sealed class GameRngDeterminismTests
