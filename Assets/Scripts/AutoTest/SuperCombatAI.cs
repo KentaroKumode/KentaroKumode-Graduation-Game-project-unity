@@ -18,7 +18,6 @@ namespace AutoTest
     ///         「superAI.winHpWeight」のような名前) が名前で指しているので、 消すかどうかは別に判断する</item>
     ///   <item>計装の口 (<see cref="DescribeSearch"/> / <see cref="DescribeProf"/> とラン単位の数) ──
     ///         レポートと worker の出力の書式を保つため。 数は常に 0</item>
-    ///   <item><see cref="DmgMul"/> ── ラン全体の戦力見積もり (RunPowerBudget) が読む</item>
     /// </list></para>
     /// </summary>
     [System.Serializable]
@@ -216,17 +215,10 @@ namespace AutoTest
         //  ラン単位の状態
         // ============================================================
 
-        /// <summary>「攻撃端子合計 + 素火力」1 に対して実際に敵 HP がいくら減るか (旧い自己較正の値)。
-        /// 書き換えていた較正 (Observe) は配線の判断の中にあったので、 判断と一緒に消えた。</summary>
-        private float _dmgMul = 1f;
-
-        /// <summary>較正済みの与ダメ倍率。 ラン全体の戦力見積もり (<see cref="RunPowerBudget"/>) が使う。</summary>
-        public float DmgMul => _dmgMul;
-
-        /// <summary>ラン開始時に呼ぶ。 ラン単位の数と較正を戻す。</summary>
+        /// <summary>ラン開始時に呼ぶ。 ラン単位の数を戻す。
+        /// (旧い自己較正の与ダメ倍率 DmgMul は常に 1 だったので、 2026-11-12 に読む側 (AutoRunner.PowerGap) を 1 に畳んだ。)</summary>
         public void ResetForRun(int runSeed)
         {
-            _dmgMul = 1f;
             wiringDecisions = rerollDecisions = rolloutEvaluations = 0;
         }
     }

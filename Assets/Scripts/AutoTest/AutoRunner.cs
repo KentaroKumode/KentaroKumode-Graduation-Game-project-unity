@@ -789,7 +789,9 @@ namespace AutoTest
                 for (int i = 0; i < ctx.equippedDiceFaces.Length; i++) sum += ctx.equippedDiceFaces[i];
                 mean = sum / (float)ctx.equippedDiceFaces.Length;
             }
-            return RunPowerBudget.Gap(run, run.Depth, superAI.DmgMul, dice, mean);
+            // 与ダメの倍率は 1 で固定。 旧 Super の自己較正 (SuperCombatAI._dmgMul) は配線の判断の中でしか
+            //   更新されず、 その判断は端子の山札の後は呼ばれないので、 常に初期値 1 だった (2026-11-12 に畳んだ)。
+            return RunPowerBudget.Gap(run, run.Depth, 1f, dice, mean);
         }
         private string _relicSweepReport;
         /// <summary>次ランに流し込む固定遺物。 ResetAll 直後に State へ入れる (周回モードと同じ位置)。</summary>
