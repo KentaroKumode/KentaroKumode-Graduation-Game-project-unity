@@ -121,6 +121,10 @@ namespace UI.Game2D
                 Ellipse(q, (float)m.a * _ls, (float)m.b * _ls, Mathf.Atan2((float)m.sin, (float)m.cos), _lc.landE);
             }
 
+            // 縄張り (2026-11-12・仮の印): 追跡者が生きている間、 縄張りの点どうしの道を暗い赤で引き、 縄張りの点に暗い赤の破線の輪を付ける。
+            //   追跡者は縄張りの外へ出ないので、 遊ぶ人が「どこから先が危ないか」を読めるように。 本番の絵は未定 (仮置き)
+            bool showTerr = sim.HasFoe && sim.FoeAlive;
+
             // 航路: 影つきの細線。 点の絵の外側 1 dot より内側には引かない
             foreach (var (a, b) in sim.Roads())
             {
@@ -129,8 +133,11 @@ namespace UI.Game2D
                 if (L <= ma + mb) continue;
                 Vector2 u = (B - A) / L, A2 = A + u * ma, B2 = B - u * mb;
                 Line(A2 + Vector2.one, B2 + Vector2.one, _lc.shadow);
-                Line(A2, B2, _lc.frameHi);
+                Line(A2, B2, showTerr && sim.InTerritory(a) && sim.InTerritory(b) ? _lc.redDim : _lc.frameHi);
             }
+            if (showTerr)
+                foreach (int i in lay.territory)
+                    if (!sim.IsSunk(i)) { var q = Sp(lay.pos[i]); float r = NodeMargin(sim, i) + 1; Ellipse(q, r, r, 0, _lc.redDim, new[] { 1, 2 }); }
 
             // 自艦中心の距離環 (4 と 8)
             for (int r = 4; r <= 8; r += 4) Ellipse(_me, r * _ls, r * _ls, 0, _lc.grid);
@@ -170,6 +177,13 @@ namespace UI.Game2D
                 var ic = IconFor(sim, i, out var col);
                 if (ic == IcoExit && !sim.Done[i]) col = BossPulse(q);
                 Glyph(ic, q.x, q.y, col);
+            }
+
+            // 縄張りの宝 (2026-11-12・仮の印): 層に入った時から、 点の種類が見えていなくても「宝」の字だけを点の上に出す。 取ったら消す
+            if (sim.TreasureAvailable && !sim.IsSunk(sim.TreasureNode))
+            {
+                var q = Sp(lay.pos[sim.TreasureNode]);
+                Text("宝", q.x, q.y - 6 * Pxs, _lc.warn);
             }
 
             // 囮罠
@@ -301,6 +315,12 @@ namespace UI.Game2D
 
             bool calm = !(sim.Weather != WeatherKind.None && !double.IsNegativeInfinity(sim.Front));
             Text("天気 " + (calm ? "凪" : sim.Weather.DisplayName()), W - 8 - 89, 8, calm ? _lc.dim : _lc.hi, Align.Right);
+            // 縄張りの宝を取った後 (2026-11-12・仮置き): 何を得たかを左上に出す (航行のまま渡すので、 専用の画面は挟まない)
+            if (sim.TreasureTaken)
+            {
+                string note = GameLoop.GameManager.Instance?.TerritoryTreasureNote;
+                if (!string.IsNullOrEmpty(note)) Text(note, 96, 8, _lc.warn, Align.Left);
+            }
         }
 
         private static string WxCode(WeatherKind k)

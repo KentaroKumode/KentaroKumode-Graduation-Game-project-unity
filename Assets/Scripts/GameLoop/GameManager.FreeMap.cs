@@ -245,8 +245,35 @@ namespace GameLoop
         {
             var node = MapManager.Instance.NoteFreeArrival(index);
             if (node == null) return;
+            TakeTerritoryTreasure();
             BeforeNodeEntered();
             AfterNodeEntered();
+        }
+
+        // =====================================================================
+        //  縄張りの宝 (2026-11-12・§5-9)
+        // =====================================================================
+
+        /// <summary>直近に取った縄張りの宝の中身 (地図の画面が、 その層の宝を取った後 (<see cref="FreeMapSim.TreasureTaken"/>) だけ出す)。</summary>
+        public string TerritoryTreasureNote { get; private set; } = "";
+
+        /// <summary>着いた点が縄張りの宝なら取る (1 層 1 回・点の起動の前)。 中身は <see cref="GameHooks.TerritoryTreasure"/>:
+        /// 鍛える = 武器を 1 段 (休憩の「鍛える」と同じ強化・素材は取らない。 鍛えられない武器なら宝箱の中身) / 宝箱 = 通常の宝箱と同じ中身。
+        /// 画面は変えない (点の起動がそのまま続く)。 追跡者の動きは変えない。</summary>
+        private void TakeTerritoryTreasure()
+        {
+            var sim = FreeMap;
+            if (sim == null || !sim.TakeTreasure()) return;
+            if (GameHooks.TerritoryTreasure == TerritoryTreasureKind.Forge && TryUpgradeWeapon(Run, free: true))
+            {
+                TerritoryTreasureNote = "宝: 武器を鍛えた";
+                Log($"縄張りの宝: 武器を鍛えた（{Run.equippedWeaponId}{(Run.weaponPlus > 0 ? "+" : "")}・素材は使わない）");
+            }
+            else
+            {
+                TerritoryTreasureNote = "宝: 宝箱を開けた";
+                Log("縄張りの宝: " + GrantTreasureChestContents());
+            }
         }
 
         /// <summary>点に着いたターンに捕まっていたら、 戦闘が終わった今その点を発動させる。
