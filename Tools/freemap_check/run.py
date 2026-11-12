@@ -18,7 +18,7 @@ DOTNET_UNITY = UNITY + '/NetCoreRuntime/dotnet.exe'
 CSC = UNITY + '/DotNetSdkRoslyn/csc.dll'
 RUNTIME = 'C:/Program Files/dotnet/shared/Microsoft.NETCore.App'
 FREEMOVE = 'Assets/Scripts/MapSystem'
-SOURCES = ['FreeMapParams', 'FreeMapLayout', 'FreeMapGenerator', 'FoeProfile', 'Weather', 'FreeMapSim', 'FreeMapPerks', 'FloorPlan']
+SOURCES = ['FreeMapParams', 'FreeMapLayout', 'FreeMapGenerator', 'FoeProfile', 'Weather', 'FreeMapSim', 'FreeMapPerks', 'FloorPlan', 'TerritoryBypass']
 
 
 def fwd(p):
