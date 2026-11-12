@@ -528,55 +528,13 @@ namespace ItemSystem.PassiveSkills
             // パッシブスキル実行（OnPostRoll）
             FireTrigger(PassiveSkillTrigger.OnPostRoll);
 
-            // ダイス差は context.diceDifference（読み取り専用プロパティ）が常に最新を返す。
-
-            // 勝敗判定（消費「ダイス補正」は勝敗のみ＝ダメージ非加算。無我無心中は無効）
-            int effDiff = context.diceDifference + (context.rollPurity ? 0 : context.consDiceRoll);
-            context.playerWonRoll = effDiff > 0;
-            context.playerLostRoll = effDiff < 0;
-
-            // 引き分けは再ロール（脅威システム下では引分でも脅威被弾するため、引分自体を解消する）。
-            // OnPostRoll の再発火を避けるため、ダイスのみ振り直して合計・勝敗だけ再計算する。
-            int rerollGuard = 20;
-            while (!context.playerWonRoll && !context.playerLostRoll && !context.garyoProc && rerollGuard-- > 0)
-            {
-                RerollDiceForDraw(playerDice, enemyDice);
-                ApplyDiceOverrides(enemyDice);
-
-                // 素点＋各種ダイス補正を再集計（通常ロールと同じ集約関数）。
-                // 注意: OnPostRoll パッシブ(軽量/星導/号令 等)は再発火しないためここでは乗らない
-                //       ＝この refactor 前から同じ挙動。引分解消の素点判定のみを目的とする。
-                RecomputeDiceTotals(playerDice, enemyDice);
-
-                int reEff = context.diceDifference + (context.rollPurity ? 0 : context.consDiceRoll);
-                context.playerWonRoll = reEff > 0;
-                context.playerLostRoll = reEff < 0;
-            }
-
-            // 画竜点睛: 発動ターンはロール即勝利（敗北/引分を上書き）
-            if (context.garyoProc)
-            {
-                context.playerWonRoll = true;
-                context.playerLostRoll = false;
-            }
-
-            // 勝敗トリガー発火
-            if (context.playerWonRoll)
-            {
-                context.consecutiveWins++;
-                context.consecutiveLosses = 0;
-                FireTrigger(PassiveSkillTrigger.OnRollWin);
-            }
-            else if (context.playerLostRoll)
-            {
-                context.consecutiveLosses++;
-                context.consecutiveWins = 0;
-                FireTrigger(PassiveSkillTrigger.OnRollLose);
-            }
-            else
-            {
-                FireTrigger(PassiveSkillTrigger.OnRollDraw);
-            }
+            // ロール勝負は無い (ADR-0009 相互攻撃モデル・GAME.md §6)。 ここで出目の合計を比べて勝敗を決め、
+            //   引き分けなら両者のダイスを振り直していた処理は旧ロール勝負の残りなので外した (2026-11-12 #112)。
+            //   - 振り直しは RerollPhase (プレイヤーの判断) の後に出目を黙って入れ替え、 playerFaceIdx を同期せず、
+            //     怠惰・〈鋳造口〉・〈天与の指輪〉・メタの出目加算・OnPostRoll の加算も乗らなかった。
+            //   - playerWonRoll / playerLostRoll は CombatManager が攻撃の計算の直前と収支の確定後に上書きする
+            //     (CombatManager.Turn.cs の ExecuteTurnMutual)。 その間に読む効果は無い。
+            //   - プレイヤー側に OnRollWin/Lose/Draw を持つ効果は無い (敵の収支トリガーは CombatManager が FireEnemyTrigger で鳴らす)。
         }
 
         /// <summary>
@@ -800,7 +758,7 @@ namespace ItemSystem.PassiveSkills
         /// <summary>
         /// ダイス出目の合計を計算し、各種ダイス補正（diceBonus / enemyDiceDebuff /
         /// consEnemyDiceDebuff / enemyDiceTotalBonus / bossDiceBonus）を適用する。
-        /// 通常ロールと引分リロールで共通。OnPostRoll パッシブによる加算はここでは扱わない。
+        /// OnPostRoll パッシブによる加算はここでは扱わない。
         /// </summary>
         private void RecomputeDiceTotals(int[] playerDice, int[] enemyDice)
         {
@@ -878,33 +836,6 @@ namespace ItemSystem.PassiveSkills
             for (int i = 0; i < arr.Length; i++)
                 total += arr[i];
             return total;
-        }
-
-        /// <summary>引き分け解消用にダイス配列を in-place で振り直す。
-        /// コントラタック中はプレイヤーを1固定で維持する。
-        /// 装備ダイス面(equippedDiceFaces)があればプレイヤー側はそこから抽選。</summary>
-        private void RerollDiceForDraw(int[] playerDice, int[] enemyDice)
-        {
-            bool contre = context.GetAccumulated("player_contre") > 0;
-            int pMax = context.playerDiceMax > 0 ? context.playerDiceMax : 6;
-            int eMax = context.enemyDiceMax > 0 ? context.enemyDiceMax : 6;
-
-            if (playerDice != null && !contre)
-            {
-                for (int i = 0; i < playerDice.Length; i++)
-                {
-                    if (context.equippedDiceFaces != null && context.equippedDiceFaces.Length > 0)
-                        playerDice[i] = context.equippedDiceFaces[GameLoop.GameRng.RangeAuto("PassiveSkillManager.5", 0, context.equippedDiceFaces.Length)];
-                    else
-                        playerDice[i] = GameLoop.GameRng.RangeAuto("PassiveSkillManager.6", 1, pMax + 1);
-                }
-            }
-
-            if (enemyDice != null)
-            {
-                for (int i = 0; i < enemyDice.Length; i++)
-                    enemyDice[i] = GameLoop.GameRng.RangeAuto("PassiveSkillManager.8", 1, eMax + 1);
-            }
         }
 
         /// <summary>戦闘中かどうか</summary>

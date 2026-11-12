@@ -192,10 +192,6 @@ namespace ItemSystem.PassiveSkills
         public bool playerWonRoll;
         public bool playerLostRoll;
 
-        // ===== 連続カウンター =====
-        public int consecutiveWins;
-        public int consecutiveLosses;
-
         // ===== ダメージ無効化フラグ =====
         public bool nullifyAllDamage;
         public bool nullifyPursuitDamage;
