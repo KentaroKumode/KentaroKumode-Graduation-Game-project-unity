@@ -25,7 +25,8 @@ namespace EventSystem
         // ── 追跡 ──
         /// <summary>補足されている (追跡者・猟犬・使い魔に追われている) 時の倍率。</summary>
         public const float PursuitChasedMul = 3f;
-        /// <summary>補足はされていないが、 追跡者が魔石の反応する距離 (道で <see cref="FreeMapParams.StoneFar"/> 歩以内) に居る時の倍率。</summary>
+        /// <summary>補足はされていないが、 追跡者が魔石の反応する距離 (道で <see cref="FreeMapParams.StoneFar"/> 歩以内) に居る時の倍率。
+        /// 縄張りを出ない番人 (既定) では、 自分が縄張りの中に居る時だけ (外では補足されないので・2026-11-13)。</summary>
         public const float PursuitNearMul = 2f;
 
         // ── 地図 ──
@@ -60,7 +61,8 @@ namespace EventSystem
                 {
                     if (sim == null || !sim.FoeAlive) return 1f;
                     if (sim.Eta().Valid) return PursuitChasedMul;
-                    return sim.Stone().level >= 1 ? PursuitNearMul : 1f;
+                    // 補足されていないが近い: 補足は縄張りの中でしか起きないので、 縄張りの外に居る時は掛けない (2026-11-13・縄張りの番人)
+                    return sim.Stone().level >= 1 && !sim.OutsideFoeReach ? PursuitNearMul : 1f;
                 }
                 case TagMap:
                     return sim != null && sim.KnownFraction < MapLowFraction ? MapLowMul : 1f;

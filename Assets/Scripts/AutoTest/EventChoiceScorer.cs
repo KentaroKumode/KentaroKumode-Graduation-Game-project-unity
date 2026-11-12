@@ -71,7 +71,8 @@ namespace AutoTest
         //  致死はどんな報酬でも覆せない値。 二撃で死ぬは「パッシブ 2 個ぶん」(層の物価で 44〜158G) ── 品 1 つでは覆らない。
         const float V_LETHAL_VETO = -400f;   // 選んだ直後の一撃で死ぬ
         static float FragilePenalty(RunState run) => -2f * PassivePrice(run);   // 二撃で死ぬ
-        /// <summary>選べない選択肢 (払えないゴールド・物資・素材、 起きない航行の効果 など <see cref="EventChoice.UnavailableReason"/>)。 致死の拒否権より下に置く。</summary>
+        /// <summary>選べない選択肢 (払えないゴールド・物資・素材、 得になる効果が何ひとつ起きない など <see cref="EventChoice.UnavailableReason"/>)。 致死の拒否権より下に置く。
+        /// 本体と同じ規則 (2026-11-13): 起きない効果が代償 (追跡者を呼ぶ・前線を近づける) だけの選択肢は選べる ── 起きない代償は下の値付けで 0 になる。</summary>
         public const float V_UNAVAILABLE = -10000f;
 
         /// <summary>〈観測所の写し〉の評価。 上乗せ (パッシブ×1+素材+8+金+60+全回復) は
@@ -447,13 +448,15 @@ namespace AutoTest
                 float hpPct = run != null ? (float)run.playerHP / UnityEngine.Mathf.Max(1, run.playerMaxHP) : 1f;
                 return -V_CAUGHT_BODY * V_SHAKE_CHASED * (hpPct < 0.65f ? 1.8f : 1f);
             }
-            return sim.Stone().level >= 1 ? V_SHAKE_NEAR : 0f;
+            // 補足は縄張りの中でしか起きない (2026-11-13・縄張りの番人): 縄張りの外に居れば「近い」は撒く理由にならない
+            return sim.Stone().level >= 1 && !sim.OutsideFoeReach ? V_SHAKE_NEAR : 0f;
         }
 
         private static float ScorePush(int steps)
         {
             var sim = Sim;
             if (sim == null || !sim.FoeAlive || steps <= 0) return 0f;
+            if (sim.OutsideFoeReach) return 0f;   // 縄張りの外に居れば、 番人を縄張りの中で動かしても得は無い (2026-11-13)
             return sim.Eta().Valid ? -V_TURN_CHASED * steps : V_PUSH_PATROL * steps;
         }
 
@@ -461,6 +464,7 @@ namespace AutoTest
         {
             var sim = Sim;
             if (sim == null || !sim.FoeAlive || steps <= 0) return 0f;
+            if (sim.OutsideFoeReach) return 0f;   // 縄張りの外に居れば、 呼んでも縄張りの縁で止まって気づかれない (2026-11-13)
             if (sim.Eta().Valid) return V_TURN_CHASED * steps;
             int d = sim.HopsFrom(sim.Me)[sim.FoeNode];
             int after = d == int.MaxValue ? int.MaxValue : UnityEngine.Mathf.Max(1, d - steps);
@@ -470,7 +474,8 @@ namespace AutoTest
         }
 
         /// <summary>近道+N (2026-11-12 に作り替え): この後の移動 N 回ぶん、 物資を使わずターンも進まない。
-        /// 1 回 = 物資 1 の値段 + 1 ターンぶんの値段 (ターンを使う時の値段の符号を返したもの: 補足中 3・巡回中 1・追跡者なし 0.3)。
+        /// 1 回 = 物資 1 の値段 + 1 ターンぶんの値段 (ターンを使う時の値段の符号を返したもの: 補足中 3・巡回中 1・追跡者なし 0.3。
+        /// 縄張りを出ない番人で自分が縄張りの外なら、 追跡者なしと同じ 0.3)。
         /// 層を出たら残りは消えるので、 数えるのは終点までの歩数まで。</summary>
         private static float ScoreShortcut(int steps, RunState run)
         {
@@ -479,7 +484,7 @@ namespace AutoTest
             int toGoal = sim.HopsFrom(sim.Layout.goal)[sim.Me];
             if (toGoal == int.MaxValue) return 0f;
             int n = UnityEngine.Mathf.Min(steps, toGoal);
-            float turn = sim.Eta().Valid ? -V_TURN_CHASED : sim.FoeAlive ? -V_TURN_FOE_PATROL : -V_TURN_NO_FOE;
+            float turn = sim.Eta().Valid ? -V_TURN_CHASED : sim.FoeAlive && !sim.OutsideFoeReach ? -V_TURN_FOE_PATROL : -V_TURN_NO_FOE;   // 縄張りの外は追跡者なしと同じ (2026-11-13)
             return n * (MapSystem.FreeMove.FreeMapParams.MoveSupply * ProvisionPrice(run) + turn);
         }
 
@@ -514,7 +519,8 @@ namespace AutoTest
                 }
                 return V_TURN_CHASED * turns;
             }
-            return (sim.FoeAlive ? V_TURN_FOE_PATROL : V_TURN_NO_FOE) * turns;
+            // 縄張りの外に居れば、 巡回の番人は通りかからない ── 追跡者なしと同じ値 (2026-11-13・縄張りの番人)
+            return (sim.FoeAlive && !sim.OutsideFoeReach ? V_TURN_FOE_PATROL : V_TURN_NO_FOE) * turns;
         }
 
         /// <summary>L1.5 学習リフトの加算重み。 観測 lift1点 ≈ 数値スコア何点ぶんに相当させるか。</summary>
