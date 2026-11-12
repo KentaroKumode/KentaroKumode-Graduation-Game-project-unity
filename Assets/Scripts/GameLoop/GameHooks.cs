@@ -92,6 +92,11 @@ namespace GameLoop
         /// <summary>縄張りの宝の中身 (2026-11-12)。 既定 <see cref="TerritoryTreasureKind.Forge"/>。 None = 宝を置かない (旧い作り)。
         /// 層を作る時 (置くか) と取った時 (中身) に読む。 AutoRunner.territoryTreasure が毎ランの始めに入れ、 ラン終了で既定へ戻す。</summary>
         public static TerritoryTreasureKind TerritoryTreasure = TerritoryTreasureKind.Forge;
+        /// <summary>[測定 2026-11-13] true (既定) = どの層でも縄張りを踏まずに終点へ行ける道があるように、 縄張りの側を削る
+        /// (<see cref="MapSystem.FreeMove.TerritoryBypass"/>・GAME.md §5-9)。 false = 削らない (2026-11-13 より前の作り)。
+        /// 縄張りを出ない追跡者の時だけ効く (旧い作り <see cref="PursuerLeavesTerritory"/> では削らない)。 層を作る時に読む (MapManager)。
+        /// AutoRunner.territoryKeepBypass が毎ランの始めに入れ、 ラン終了で true へ戻す。</summary>
+        public static bool TerritoryKeepBypass = true;
 
         /// <summary>[測定 2026-11-12・#95] 遺物の効果を止める接辞 (ビット = <c>(int)RelicStat</c>・0 = 何も止めない)。
         /// 主ステもサブも、 その接辞の分だけを 0 にする (段の値 1 つあたりの価値を、 理論値の持ち込みから 1 接辞ずつ抜いて測る口)。

@@ -136,10 +136,13 @@ namespace MapSystem
         }
 
         /// <summary>縄張りの作り (2026-11-12): 追跡者が縄張りの外へ出るか・縄張りの宝を置くか。 既定は「出ない・宝あり」で、
-        /// 測定の口 (<see cref="GameLoop.GameHooks.PursuerLeavesTerritory"/> / <see cref="GameLoop.GameHooks.TerritoryTreasure"/>) で旧い作りへ戻せる。</summary>
+        /// 測定の口 (<see cref="GameLoop.GameHooks.PursuerLeavesTerritory"/> / <see cref="GameLoop.GameHooks.TerritoryTreasure"/>) で旧い作りへ戻せる。
+        /// 縄張りを避ける道の保証 (2026-11-13・<see cref="TerritoryBypass"/>) も既定で入り、 <see cref="GameLoop.GameHooks.TerritoryKeepBypass"/> で外せる。
+        /// 中断セーブから戻す時も同じ計算をする (形の縄張りは削らずに写してあるので、 戻した後も同じ縄張りになる)。</summary>
         private static void ConfigureTerritory(FreeMapSim sim)
             => sim.ConfigureTerritory(!GameLoop.GameHooks.PursuerLeavesTerritory,
-                                      GameLoop.GameHooks.TerritoryTreasure != GameLoop.TerritoryTreasureKind.None);
+                                      GameLoop.GameHooks.TerritoryTreasure != GameLoop.TerritoryTreasureKind.None,
+                                      GameLoop.GameHooks.TerritoryKeepBypass);
 
         /// <summary>現在位置から移動可能なノード一覧。 航行マップでは<b>いま道がつながっている隣</b>
         /// (前線の天候で崩れた道・沈んだ点は含まない)。</summary>

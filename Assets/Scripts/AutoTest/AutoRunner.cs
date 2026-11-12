@@ -176,6 +176,10 @@ namespace AutoTest
         /// 両方を旧い側 (True / None) にした腕は、 縄張りの作り直し (2026-11-12) より前と同じ動きになる。</summary>
         public bool pursuerLeavesTerritory = false;
         public GameLoop.TerritoryTreasureKind territoryTreasure = GameLoop.TerritoryTreasureKind.Forge;
+        /// <summary>[測定 2026-11-13] 縄張りを避ける道の保証。 本体の GameHooks.TerritoryKeepBypass へ流す (ラン終了で true へ)。
+        /// true (既定) = どの層でも縄張りを踏まずに終点へ行ける道があるように縄張りを削る。 false = 削らない (2026-11-13 より前の作り・main と全件一致のはず)。
+        /// 旧い作り (pursuerLeavesTerritory = true) では値によらず削らない。</summary>
+        public bool territoryKeepBypass = true;
         /// <summary>[2026-11-12] BOT が縄張りの宝を取りに行くしきい値: 「HP の割合 − 追跡者の戦闘で失う HP の見積もり」がこれ以上の時だけ取りに行く
         /// (<see cref="WantsTerritoryTreasure"/>)。 1 以上 = 取りに行かない。
         /// <para>既定 9 = 取りに行かない (2026-11-12)。 Super・3000 ラン・同じシードで、 0.35 (取りに行く) 596 勝 < 9 (行かない) 627 勝だった。
@@ -757,6 +761,7 @@ namespace AutoTest
                  + $"/ 遺物 持ち込み {relicCount}個 計{relicPts}段 "
                  + $"/ メタ 攻撃端子+{MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice()} "
                  + $"/ 追跡者 縄張りの外へ{(pursuerLeavesTerritory ? "出る (旧い作り)" : "出ない")} "
+                 + $"/ 縄張りを避ける道の保証 {(pursuerLeavesTerritory ? "効かない (旧い作り)" : territoryKeepBypass ? "あり (縄張りを削る)" : "なし (削らない・旧い作り)")} (territoryKeepBypass={territoryKeepBypass}) "
                  + $"/ 端子の撃破のボーナス {(terminalKillNeedsAttack ? "攻撃したターンだけ (旧い条件)" : "経路を問わない")} "
                  + $"/ 手札 {(handCarry == CombatSystem.HandCarryMode.Pick ? "印を付けた端子だけ残す (Pick)" : handCarry == CombatSystem.HandCarryMode.All ? "挿さなかった端子は全部残る (All)" : "毎ターン捨てる (Off・旧い規則)")}"
                  + $"{(handCarry == CombatSystem.HandCarryMode.Pick ? " 残す方策 " + EffectiveHandKeepPolicy + " (handKeepPolicy=" + handKeepPolicy + ")" : "")} "

@@ -43,7 +43,7 @@ static class T
     /// <summary>縄張りの外で、 縄張りの点と道で隣り合う点 (始点から縄張りを通らずに行けるもの)。 無ければ -1。</summary>
     static int BorderOutside(FreeMapSim s)
     {
-        foreach (int t in s.Layout.territory.OrderBy(i => i))
+        foreach (int t in s.Territory.OrderBy(i => i))
             foreach (int v in s.Neighbors(t))
                 if (!s.InTerritory(v) && v != s.Layout.goal && (v == s.Me || StepAvoidingTerritory(s, s.Me, v) != s.Me)) return v;
         return -1;
@@ -94,7 +94,7 @@ static class T
             var s = Make(11, FoeProfile.Brute, WeatherKind.None);
             var seen = new HashSet<int>();
             for (int i = 0; i < 120 && !s.InFight; i++) { s.Wait(); seen.Add(s.FoeNode); }
-            Check(seen.Count >= 3, $"巡回: 追跡者は {seen.Count} 点を回った（縄張り {s.Layout.territory.Count}）");
+            Check(seen.Count >= 3, $"巡回: 追跡者は {seen.Count} 点を回った（縄張り {s.Territory.Count}）");
         }
         // --- 補足→追跡→捕まる / ETA ---
         {
@@ -337,7 +337,8 @@ static class T
             {
                 var s = Make(salt, FoeProfile.Brute, WeatherKind.None, leashed: true, treasure: true); layers++;
                 int t = s.TreasureNode;
-                if (t < 0 || !s.InTerritory(t) || t == s.Layout.home || t != FreeMapSim.TreasurePointOf(s.Layout)) { bad++; continue; }
+                if (!s.HasFoe) continue;   // 避ける道のために追跡者を置かなかった層 (TerritoryBypass の ④)
+                if (t < 0 || !s.InTerritory(t) || t == s.Home) { bad++; continue; }
                 var none = Make(salt, FoeProfile.Brute, WeatherKind.None, leashed: true, treasure: false);
                 if (none.TreasureNode != -1 || !none.Layout.roads.SequenceEqual(s.Layout.roads) || !none.Layout.types.SequenceEqual(s.Layout.types)) bad++;   // 宝の有無で地図は変わらない
                 if (s.TakeTreasure()) bad++;                                   // 宝の点に居なければ取れない
@@ -398,7 +399,7 @@ static class T
         }
         // --- 縄張りを避ける BOT の捕まり率 (AutoRunner.TerritoryAwareStep と同じ決め方・物資は数えない) ---
         //   遠回りの上限 0 = 直行と同じ。 縄張りの外では捕まらないので、 捕まる率は「縄張りを踏まずに済まなかった層」の分だけ残る
-        foreach (int detour in new[] { 0, 3, 99 })
+        foreach (int detour in new[] { 0, 3, 5, 8, 99 })
         foreach (var pr in new[] { FoeProfile.Summoner, FoeProfile.Houndmaster, FoeProfile.Sprinter, FoeProfile.Brute })
         {
             int caught = 0, reached = 0, entered = 0, N = 300, caughtOut = 0;
@@ -427,6 +428,168 @@ static class T
             Console.WriteLine($"避けるBOT 遠回り+{detour,-2} {pr.id,-10}: 捕まる {100.0 * caught / N:F0}% / 縄張りに入った {100.0 * entered / N:F0}% / 到達 {100.0 * reached / N:F0}%");
             if (caughtOut > 0) Check(false, $"避けるBOT: 縄張りの外で捕まった ({pr.id} {caughtOut})");
         }
+        // --- 縄張りを避ける道の保証 (2026-11-13): 旧い作り・削らない口は今までと同じ動き / 避ける道を歩けば気づかれない ---
+        {
+            int diff = 0, refBad = 0, layers = 0;
+            foreach (int floor in new[] { 3, 5, 6 })
+                for (int salt = 1; salt <= 100; salt++)
+                {
+                    GameLoop.GameRng.Salt = (ulong)salt * 104729;
+                    var L = FreeMapGenerator.Generate(floor);
+                    var a = new FreeMapSim(L, new Wallet(), true, FoeProfile.Houndmaster, WeatherKind.Crumble);
+                    var b = new FreeMapSim(L, new Wallet(), true, FoeProfile.Houndmaster, WeatherKind.Crumble);
+                    a.ConfigureTerritory(false, true, keepBypass: true); b.ConfigureTerritory(false, true, keepBypass: false);   // 旧い作り: 口によらず同じ
+                    var c = new FreeMapSim(L, new Wallet(), true, FoeProfile.Houndmaster, WeatherKind.Crumble);
+                    c.ConfigureTerritory(true, true, keepBypass: false);                                                       // 削らない口: 形の縄張りそのもの
+                    if (!ReferenceEquals(c.Territory, L.territory) || !ReferenceEquals(c.Waypoints, L.waypoints) || c.Home != L.home
+                        || !ReferenceEquals(a.Territory, L.territory) || a.Home != L.home || a.TreasureNode != FreeMapSim.TreasurePointOf(L)) refBad++;
+                    layers++;
+                    for (int k = 0; k < 60 && !a.InFight && !b.InFight; k++)
+                    {
+                        int nx = a.StepToward(a.Me, k < 30 ? L.home : L.goal);
+                        if (nx == a.Me) { a.Wait(); b.Wait(); } else { a.MoveTo(nx); b.MoveTo(nx); }
+                        if (a.FoeNode != b.FoeNode || a.FoeMode != b.FoeMode || a.Me != b.Me || a.Familiars.Count != b.Familiars.Count) { diff++; break; }
+                    }
+                }
+            Check(diff == 0 && refBad == 0, $"避ける道の保証: 旧い作りは口によらず同じ動き・削らない口は形の縄張りそのもの ({layers} 層・食い違い {diff} / 参照 {refBad})");
+        }
+        foreach (var pr in new[] { FoeProfile.Summoner, FoeProfile.Houndmaster, FoeProfile.Sprinter, FoeProfile.Brute })
+        {
+            int noticed = 0, reached = 0, layers = 0, stepped = 0;
+            foreach (int floor in new[] { 3, 5, 6 })
+                for (int salt = 1; salt <= 150; salt++)
+                {
+                    GameLoop.GameRng.Salt = (ulong)salt * 31337 + (ulong)floor;
+                    var L = FreeMapGenerator.Generate(floor);
+                    var s = new FreeMapSim(L, new Wallet(), true, pr, WeatherKind.None);
+                    s.ConfigureTerritory(true, true); layers++;
+                    s.UseFlare();   // 照明で補足の歩数を伸ばしても (3 歩・召喚者は 5 歩)、 縄張りの外なら気づかれない
+                    for (int g = 0; g < 80 && s.Me != L.goal; g++)
+                    {
+                        int nx = s.StepAvoidingTerritory(s.Me, L.goal, out _, out int terr);
+                        if (nx == s.Me || terr > 0) break;
+                        if (g % 6 == 2) s.UseFlare();
+                        var ev = s.MoveTo(nx);
+                        if (s.InTerritory(s.Me)) stepped++;
+                        if ((ev & (FreeMapEvent.Detected | FreeMapEvent.Caught | FreeMapEvent.FamiliarContact | FreeMapEvent.SmokeUsed)) != 0 || s.FoeMode == FoeMode.Chase) { noticed++; break; }
+                    }
+                    if (s.Me == L.goal) reached++;
+                }
+            Check(reached == layers && noticed == 0 && stepped == 0, $"避ける道を歩く ({pr.id}・照明つき): 全層で縄張りを踏まずに終点へ・気づかれない ({reached}/{layers} 到達 / 気づかれた {noticed} / 踏んだ {stepped})");
+        }
+        BypassReport();
         Console.WriteLine(fails == 0 ? "ALL OK" : $"FAILED {fails}");
+    }
+
+    /// <summary>形の道で、 avoid の点を通らない from からの歩数 (avoid = null なら全部通れる)。</summary>
+    static int[] HopsAvoiding(FreeMapLayout L, int from, ICollection<int> avoid)
+    {
+        var d = new int[L.Count]; for (int i = 0; i < d.Length; i++) d[i] = int.MaxValue;
+        var q = new Queue<int>(); d[from] = 0; q.Enqueue(from);
+        while (q.Count > 0) { int u = q.Dequeue(); foreach (int v in L.adj[u]) if (d[v] == int.MaxValue && (avoid == null || !avoid.Contains(v))) { d[v] = d[u] + 1; q.Enqueue(v); } }
+        return d;
+    }
+
+    /// <summary>物資だけで (HP で払わずに) 始点から終点へ着けるか。 層に入る時 startProv・店 (avoid の外) に着いたら上限 cap まで買い足せる (金は数えない)。
+    /// 区間 (始点・店・終点の間) の歩数は avoid の点を通らない道で数える。</summary>
+    static bool Refuelable(FreeMapLayout L, ICollection<int> avoid, int startProv, int cap)
+    {
+        var pts = new List<int> { L.start };
+        for (int i = 2; i < L.Count; i++) if (L.types[i] == MapSystem.TileType.Shop && (avoid == null || !avoid.Contains(i))) pts.Add(i);
+        var reached = new HashSet<int> { L.start }; var q = new Queue<int>(); q.Enqueue(L.start);
+        while (q.Count > 0)
+        {
+            int u = q.Dequeue(); int fuel = u == L.start ? startProv : cap;
+            var d = HopsAvoiding(L, u, avoid);
+            if (d[L.goal] <= fuel) return true;
+            foreach (int p in pts) if (!reached.Contains(p) && d[p] <= fuel) { reached.Add(p); q.Enqueue(p); }
+        }
+        return false;
+    }
+
+    static string Dist(List<int> xs)
+    {
+        if (xs.Count == 0) return "(なし)";
+        var a = xs.OrderBy(x => x).ToList();
+        int P(double p) => a[Math.Min(a.Count - 1, (int)Math.Floor(p * (a.Count - 1) + 0.5))];
+        return $"中央値 {P(0.5)} / 90% 点 {P(0.9)} / 最大 {a[a.Count - 1]} / 平均 {a.Average():F2} (n={a.Count})";
+    }
+
+    /// <summary>縄張りを避ける道の保証 (2026-11-13・TerritoryBypass) の検算: 追跡者の居る層 (深さ 3/5/6) の全部で、 多数の種。</summary>
+    static void BypassReport()
+    {
+        const int Seeds = 3000;
+        const int Cap = 10;   // 物資の素の上限 (ProvisionRules.Max・GAME.md §10-1)。 層に入る時は前の層のボス +3 と前哨基地 +4 を足して上限で切る
+        int layers = 0, before = 0, after = 0, blocked = 0, trimmed = 0, treasureMoved = 0, treasureLost = 0, homeLost = 0, disconnected = 0;
+        var sizeBefore = new List<int>(); var sizeAfter = new List<int>(); var sizeAfterTrimmed = new List<int>(); var sizeBeforeTrimmed = new List<int>();
+        var hist = new int[12]; var removedN = new List<int>(); var stages = new int[5]; int addedLayers = 0, homeMoved = 0; var addedN = new List<int>();
+        var extraAll = new List<int>(); var extraTrimmed = new List<int>(); var bypassHops = new List<int>(); var directHops = new List<int>();
+        int overCap = 0, overCapDirect = 0, overCapTrimmed = 0; var feasDirect = new int[2]; var feasBypass = new int[2]; var lostByBypass = new int[2]; var lostByBypassTrimmed = new int[2];
+        var perFloor = new Dictionary<int, (int n, int before, int trimmed)>();
+        foreach (int floor in new[] { 3, 5, 6 })
+            for (int salt = 1; salt <= Seeds; salt++)
+            {
+                GameLoop.GameRng.Salt = (ulong)salt * 7919 + (ulong)floor;
+                var L = FreeMapGenerator.Generate(floor);
+                var s = new FreeMapSim(L, new Wallet(), true, FoeProfile.Brute, WeatherKind.None);
+                int t0 = FreeMapSim.TreasurePointOf(L);
+                s.ConfigureTerritory(true, true);
+                layers++;
+                var terr = new HashSet<int>(s.Territory);
+                bool had = TerritoryBypass.HasBypass(L, L.territory), has = TerritoryBypass.HasBypass(L, terr);
+                if (had) before++;
+                if (has) after++;
+                if (s.TerritoryFoeRemoved) blocked++;
+                stages[s.TerritoryBypassStage]++;
+                if (s.TerritoryAdded > 0) { addedLayers++; addedN.Add(s.TerritoryAdded); }
+                if (s.Home != L.home) homeMoved++;
+                bool cut = s.TerritoryTrimmed > 0;
+                if (cut) { trimmed++; removedN.Add(s.TerritoryTrimmed); sizeBeforeTrimmed.Add(L.territory.Count); sizeAfterTrimmed.Add(terr.Count); }
+                var pf = perFloor.TryGetValue(floor, out var v0) ? v0 : (n: 0, before: 0, trimmed: 0);
+                perFloor[floor] = (pf.n + 1, pf.before + (had ? 1 : 0), pf.trimmed + (cut ? 1 : 0));
+                sizeBefore.Add(L.territory.Count); sizeAfter.Add(terr.Count);
+                if (cut) hist[Math.Min(terr.Count, 11)]++;
+                if (s.TreasureNode != t0) treasureMoved++;
+                if (s.HasFoe && (s.TreasureNode < 0 || !terr.Contains(s.TreasureNode) || s.TreasureNode == s.Home)) treasureLost++;
+                if (s.HasFoe && (!terr.Contains(s.Home) || s.FoeNode != s.Home)) homeLost++;
+                // 縄張りが道でつながったまとまりのままか
+                var seen = new HashSet<int>(); if (terr.Count > 0) seen.Add(s.Home); var q = new Queue<int>(); q.Enqueue(s.Home);
+                while (q.Count > 0) { int u = q.Dequeue(); foreach (int w in L.adj[u]) if (terr.Contains(w) && seen.Add(w)) q.Enqueue(w); }
+                if (seen.Count != terr.Count) disconnected++;
+                if (!has) continue;
+                int direct = L.Hops(L.start)[L.goal];
+                var dA = HopsAvoiding(L, L.start, terr); int by = dA[L.goal];
+                extraAll.Add(by - direct); if (cut) extraTrimmed.Add(by - direct);
+                bypassHops.Add(by); directHops.Add(direct);
+                if (direct > Cap) overCapDirect++;
+                if (by > Cap) { overCap++; if (cut) overCapTrimmed++; }
+                foreach (int startProv in new[] { Cap, 4 })
+                {
+                    bool fd = Refuelable(L, null, startProv, Cap), fb = Refuelable(L, terr, startProv, Cap);
+                    int k = startProv == Cap ? 0 : 1;
+                    if (fd) feasDirect[k]++;
+                    if (fb) feasBypass[k]++;
+                    if (fd && !fb) { lostByBypass[k]++; if (cut) lostByBypassTrimmed[k]++; }
+                }
+            }
+        Check(after == layers, $"縄張りを避ける道: 削った後は全部の層にある ({after}/{layers} = {100.0 * after / layers:F1}%・削る前 {100.0 * before / layers:F1}%・追跡者を置かなかった {blocked} = {100.0 * blocked / layers:F2}%)");
+        Check(homeLost == 0 && treasureLost == 0 && disconnected == 0,
+            $"縄張りを削っても: 追跡者は中心に居て・宝の点は縄張りの中 (中心以外)・道でつながったまとまり (中心の外れ {homeLost} / 宝の外れ {treasureLost} / 割れる {disconnected})");
+        Console.WriteLine($"[避ける道] 宝の位置が変わった層 {treasureMoved}/{layers} ({100.0 * treasureMoved / layers:F2}%)・中心を移した層 {homeMoved} ({100.0 * homeMoved / layers:F2}%)・下限 {FreeMapParams.TerritoryTrimMin} 点まで足した層 {addedLayers} ({100.0 * addedLayers / layers:F2}%・足した点 {Dist(addedN)})");
+        Console.WriteLine($"[避ける道] 層ごと: " + string.Join(" / ", perFloor.OrderBy(k => k.Key).Select(k => $"深さ{k.Key} 削る前にある {100.0 * k.Value.before / k.Value.n:F1}%・削った {100.0 * k.Value.trimmed / k.Value.n:F1}%")));
+        Console.WriteLine($"[避ける道] 削り方: 削らない {stages[0]} / 中心と宝を残す {stages[1]} / 中心だけ残す (宝を決め直す) {stages[2]} / 中心を移す {stages[3]} / 追跡者を置かない {stages[4]}");
+        Console.WriteLine($"[避ける道] 削った層 {trimmed}/{layers} ({100.0 * trimmed / layers:F1}%)・外した点の数 {Dist(removedN)}");
+        Console.WriteLine($"[避ける道] 縄張りの大きさ 削る前 {Dist(sizeBefore)}");
+        Console.WriteLine($"[避ける道] 縄張りの大きさ 削った後 {Dist(sizeAfter)}");
+        Console.WriteLine($"[避ける道]   削った層だけ: 前 {Dist(sizeBeforeTrimmed)} → 後 {Dist(sizeAfterTrimmed)}");
+        Console.WriteLine($"[避ける道]   削った層の大きさの分布: " + string.Join(" ", Enumerable.Range(0, 12).Select(k => $"{k}点{(k == 0 ? " (追跡者なし)" : "")} {hist[k]}")));
+        Console.WriteLine($"[避ける道] 最短の道より何歩長いか (全部の層) {Dist(extraAll)}");
+        Console.WriteLine($"[避ける道]   削った層だけ {Dist(extraTrimmed)}");
+        Console.WriteLine($"[避ける道] 歩数 最短の道 {Dist(directHops)} / 避ける道 {Dist(bypassHops)}");
+        Console.WriteLine($"[避ける道] 物資 (上限 {Cap}): 最短の道が上限を超える層 {100.0 * overCapDirect / layers:F1}% / 避ける道が上限を超える層 {100.0 * overCap / layers:F1}% (うち削った層 {overCapTrimmed})"
+                          );
+        for (int k = 0; k < 2; k++)
+            Console.WriteLine($"[避ける道] 物資で賄えるか (層に入る時 {(k == 0 ? Cap : 4)}・店で上限まで買い足す・HP で払わない): 縄張りを通ってよい道 {100.0 * feasDirect[k] / layers:F1}% / 避ける道 {100.0 * feasBypass[k] / layers:F1}%"
+                              + $" / 通ってよいなら賄えるのに避けると賄えない層 {100.0 * lostByBypass[k] / layers:F2}% ({lostByBypass[k]}・うち削った層 {lostByBypassTrimmed[k]})");
     }
 }

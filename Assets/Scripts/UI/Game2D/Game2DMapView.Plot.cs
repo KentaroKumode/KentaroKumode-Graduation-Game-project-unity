@@ -151,7 +151,7 @@ namespace UI.Game2D
                 Line(A2, B2, showTerr && sim.InTerritory(a) && sim.InTerritory(b) ? _lc.red : _lc.frameHi);
             }
             if (showTerr)
-                foreach (int i in lay.territory)
+                foreach (int i in sim.Territory)   // いま効いている縄張り (避ける道のために削った後・2026-11-13)。 形の縄張り (lay.territory) は描かない
                     if (!sim.IsSunk(i)) { var q = Sp(lay.pos[i]); float r = NodeMargin(sim, i) + 1; Ellipse(q, r, r, 0, _lc.red, new[] { 1, 2 }); }
 
             // 自艦中心の距離環 (4 と 8)

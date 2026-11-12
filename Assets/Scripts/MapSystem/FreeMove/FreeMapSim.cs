@@ -107,7 +107,7 @@ namespace MapSystem.FreeMove
     /// <para>乱数は前線の天候 (道が崩れる・点が沈む) の選択だけで、
     /// <c>GameRng.Range(.., "map.free.weather", 層 × 100000 + ターン × 10 + 試行)</c> ── 同じ操作なら同じ結果になる。</para>
     ///
-    /// <para><b>追跡者は縄張りの番人 (2026-11-12)</b>: 既定では本体も使い魔も縄張り (<see cref="FreeMapLayout.territory"/>) の外へ出ず、
+    /// <para><b>追跡者は縄張りの番人 (2026-11-12)</b>: 既定では本体も使い魔も縄張り (<see cref="Territory"/>) の外へ出ず、
     /// 縄張りの外に居るプレイヤーには気づかない。 縄張りの中には見えている宝 (<see cref="TreasureNode"/>) がある。
     /// 旧い作り (層のどこまでも追う) は <see cref="ConfigureTerritory"/> の leashed = false (測定の口)。</para>
     ///
@@ -184,6 +184,24 @@ namespace MapSystem.FreeMove
         public bool TreasureTaken { get; private set; }
         /// <summary>縄張りの宝がまだ取れるか。</summary>
         public bool TreasureAvailable => TreasureNode >= 0 && !TreasureTaken;
+        /// <summary>いま効いている縄張り (2026-11-13)。 既定は形の縄張り (<see cref="FreeMapLayout.territory"/>) を、 縄張りを避ける道が残るように削ったもの
+        /// (<see cref="TerritoryBypass"/>)。 旧い作り (縄張りの外まで追う) と、 削らない測定の口では形の縄張りそのもの。 表示も BOT もこれを読む。</summary>
+        public IReadOnlyCollection<int> Territory => _territory;
+        /// <summary>いま効いている巡回の輪 (削った時は、 削った後の縄張りを生成と同じ規則で並べ直したもの)。</summary>
+        public IReadOnlyList<int> Waypoints => _waypoints;
+        private HashSet<int> _territory;
+        private List<int> _waypoints;
+        /// <summary>いま効いている縄張りの中心 (追跡者の最初の居場所)。 形の中心 (<see cref="FreeMapLayout.home"/>) と違うのは、
+        /// 中心を通らないと終点へ行けない層で、 避ける道のために中心を移した時だけ (<see cref="TerritoryBypass"/> の ③)。</summary>
+        public int Home { get; private set; }
+        /// <summary>[検算・計装] 縄張りを避ける道のために縄張りから外した点の数 (0 = 削っていない)。</summary>
+        public int TerritoryTrimmed { get; private set; }
+        /// <summary>[検算・計装] 避ける道を残すと縄張りが小さくなりすぎるので、 この層には追跡者を置かなかった (<see cref="TerritoryBypass"/> の ④)。</summary>
+        public bool TerritoryFoeRemoved { get; private set; }
+        /// <summary>[検算・計装] 削り方 (<see cref="TerritoryBypass.Result.stage"/>)。</summary>
+        public int TerritoryBypassStage { get; private set; }
+        /// <summary>[検算・計装] 下限 (<see cref="FreeMapParams.TerritoryTrimMin"/>) に満たずに足した、 形の縄張りの外の点の数。</summary>
+        public int TerritoryAdded { get; private set; }
 
         // ── 補給線 (〈兵站〉r10・2026-11-09) ──
         private readonly HashSet<int> _relays = new HashSet<int>();
@@ -267,6 +285,9 @@ namespace MapSystem.FreeMove
             Done[layout.start] = true;
             _trace[Me] = 0;
             Weather = weather ?? WeatherInfo.ForFloor(Floor);
+            _territory = layout.territory;
+            _waypoints = layout.waypoints;
+            Home = layout.home;
 
             HasFoe = withFoe && layout.waypoints.Count > 0;
             FoeAlive = HasFoe;
@@ -290,31 +311,62 @@ namespace MapSystem.FreeMove
         }
 
         /// <summary>縄張りの作りを決める (層を作った直後・最初の操作の前に 1 回)。 <paramref name="leashed"/> = 追跡者が縄張りの外へ出ないか、
-        /// <paramref name="treasure"/> = 縄張りの宝を置くか (追跡者が居る層だけ)。 乱数は引かない。</summary>
-        public void ConfigureTerritory(bool leashed, bool treasure)
+        /// <paramref name="treasure"/> = 縄張りの宝を置くか (追跡者が居る層だけ)、
+        /// <paramref name="keepBypass"/> = 縄張りを避ける道が残るように縄張りを削るか (2026-11-13・既定。 <see cref="TerritoryBypass"/>)。
+        /// 削るのは縄張りを出ない追跡者 (<paramref name="leashed"/>) の時だけ ── 旧い作りでは巡回の輪を変えないように削らない。
+        /// 宝の点は削る前の縄張りで決め (<see cref="TreasurePointOf(FreeMapLayout)"/>)、 削る時もなるべく残す (残せない層・中心を移した層だけ決め直す・検算で 6.3%)。
+        /// 削り方は宝の有無 (<paramref name="treasure"/>) によらない。 乱数は引かない。</summary>
+        public void ConfigureTerritory(bool leashed, bool treasure, bool keepBypass = true)
         {
             Leashed = leashed;
-            TreasureNode = treasure && HasFoe ? TreasurePointOf(Layout) : -1;
+            _territory = Layout.territory; _waypoints = Layout.waypoints;
+            TerritoryTrimmed = TerritoryAdded = TerritoryBypassStage = 0; TerritoryFoeRemoved = false;
+            int point = TreasurePointOf(Layout);
+            int home = Layout.home;
+            if (leashed && keepBypass)
+            {
+                var r = TerritoryBypass.Compute(Layout, point);
+                _territory = r.territory; _waypoints = r.waypoints; home = r.home; point = r.treasure;
+                TerritoryTrimmed = r.removed; TerritoryAdded = r.added; TerritoryBypassStage = r.stage; TerritoryFoeRemoved = r.stage == 4;
+            }
+            if (TerritoryFoeRemoved && HasFoe)
+            {
+                // 避ける道に囲まれて縄張りが小さすぎる層 (TerritoryBypass の ④): 追跡者を置かない (宝も無い)
+                HasFoe = FoeAlive = false;
+                Familiars.Clear();
+            }
+            else if (home != Home)
+            {
+                // 中心を移した (③): 最初の操作の前なので、 追跡者と猟犬を新しい中心へ置き直す (中断セーブから戻す時は、 この後の LoadState が写しの位置で上書きする)
+                Home = home;
+                FoeNode = home;
+                for (int i = 0; i < Familiars.Count; i++) { var f = Familiars[i]; f.pos = home; Familiars[i] = f; }
+            }
+            TreasureNode = treasure && HasFoe ? point : -1;
             Version++;
         }
 
         /// <summary>縄張りの宝の点: 縄張りの中心 (追跡者の最初の居場所) を除いた縄張りの点のうち、 中心に直線で一番近い点 (同点は添字の小さい方)。
         /// 中心そのものは追跡者の居場所で、 動かない追跡者 (召喚者) だと取りに行く手が戦うしか無くなるので 1 つずらす。
         /// 性質で置き場所を変えないのは、 置き場所から性質が読めないように。 乱数は使わない (地図の生成の消費を変えない)。</summary>
-        public static int TreasurePointOf(FreeMapLayout L)
+        public static int TreasurePointOf(FreeMapLayout L) => TreasurePointOf(L, L.territory, L.home);
+
+        /// <summary>縄張り <paramref name="territory"/>・中心 <paramref name="home"/> での宝の点 (決め方は上と同じ)。
+        /// 避ける道のために宝の点まで縄張りから外した時・中心を移した時に決め直す (<see cref="TerritoryBypass"/>)。</summary>
+        public static int TreasurePointOf(FreeMapLayout L, IEnumerable<int> territory, int home)
         {
             int best = -1; double bd = double.MaxValue;
-            foreach (int i in L.territory)
+            foreach (int i in territory)
             {
-                if (i == L.home || i == L.start || i == L.goal) continue;
-                double d = L.Dist(i, L.home);
+                if (i == home || i == L.start || i == L.goal) continue;
+                double d = L.Dist(i, home);
                 if (d < bd || (d == bd && i < best)) { bd = d; best = i; }
             }
             return best;
         }
 
         /// <summary>点 i が追跡者の縄張りか。</summary>
-        public bool InTerritory(int i) => i >= 0 && Layout.territory.Contains(i);
+        public bool InTerritory(int i) => i >= 0 && _territory.Contains(i);
 
         /// <summary>今いる点の縄張りの宝を取る (1 層 1 回)。 取れたら true。 中身を渡すのは本体 (GameManager)。</summary>
         public bool TakeTreasure()
@@ -1221,12 +1273,12 @@ namespace MapSystem.FreeMove
                 if (best >= 0) return best;
                 mode = FoeMode.Patrol;
             }
-            var way = Layout.waypoints;
-            int t = way.Count > 0 ? way[patrol % way.Count] : Layout.home;
+            var way = _waypoints;
+            int t = way.Count > 0 ? way[patrol % way.Count] : Home;
             if (FoeNode == t)
             {
                 patrol++;
-                t = way.Count > 0 ? way[patrol % way.Count] : Layout.home;
+                t = way.Count > 0 ? way[patrol % way.Count] : Home;
             }
             int step = FoeStepToward(FoeNode, t);
             // 縄張りを出ない時: 道が崩れて縄張りの中では届かない巡回の点は飛ばす (届く点が 1 つも無ければその場に留まる)

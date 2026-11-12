@@ -103,6 +103,11 @@ namespace MapSystem.FreeMove
         public const float TerritoryCenterMarginRight = 2.8f;
         /// <summary>縄張りに入れない始点からの距離。</summary>
         public const float TerritoryStartClearance = 3f;
+        /// <summary>縄張りを避ける道のために縄張りを削った時の下限 (2026-11-13・<see cref="TerritoryBypass"/>)。 これに満たなければ、
+        /// 縄張りに隣り合う点を中心に近い順に足す。 削らなかった層には効かない (生成の 3〜11 点のまま)。 仮置き。</summary>
+        public const int TerritoryTrimMin = 5;
+        /// <summary>削って足しても、 縄張りがこれに満たなければ、 その層には追跡者を置かない (2026-11-13)。 生成が受け入れる最小 (3 点) と同じ。</summary>
+        public const int TerritoryHardMin = 3;
 
         // ── 休憩 ───────────────────────────────────────────────
         /// <summary>多めに回復する休憩 (+1 ターン) の回復割合。 通常は層の修飾 (restHealMultiplier・既定 0.3) で 0 ターン。</summary>
