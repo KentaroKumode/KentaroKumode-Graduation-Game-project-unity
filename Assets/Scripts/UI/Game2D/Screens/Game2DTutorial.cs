@@ -74,7 +74,9 @@ namespace UI.Game2D
     /// GameManager のキー (<see cref="GameManager.InputBlockedByScreen"/>) を止める ── 戦闘も地図も進まない。 閉じたフレームまで止め続ける
     /// (同じ Space / Esc が後ろの画面へ流れないように)。 操作: Space / Enter / → / クリックで次へ・← で前へ・Esc でその節を閉じる。</para>
     /// <para><b>BOT がランを動かしている間</b> (<see cref="GameHooks.BotDriving"/>・バッチ実行) は頼まれても積まず、 出していれば印を付けずに下げる。
-    /// 板は 480×270 の格子の中央。 大きさ・位置で状態を表さない (入りは網目で出す)。 字は <see cref="Game2DJpFont"/> だけ。</para>
+    /// 字は <see cref="Game2DJpFont"/> だけ。 大きさで状態を表さない (入りは網目と幕の濃さで出す)。</para>
+    /// <para><b>強調</b> (issue #109): 出している間は画面全体を幕で暗くし、 節ごとに決めた部品 (<see cref="FocusOf"/>) の範囲だけ幕を抜いて枠で囲む。
+    /// 範囲は部品の RectTransform から毎フレーム求める (座標はここに書かない)。 板は範囲に重ならない所 (上下 → 左右) に置き、 部品の無い節は中央。</para>
     /// </summary>
     public class Game2DTutorial : MonoBehaviour
     {
@@ -179,7 +181,12 @@ namespace UI.Game2D
         }
 
         public Game2DModal modal;
+        // 2 枚重ね (issue #109): この部品の RawImage = 画面全体を暗くする幕 (強調の範囲だけ穴と枠)、 子の「Window」 = 文面の板
+        private RawImage _dimImg; private RectTransform _dimRt; private Texture2D _dimTex;
         private RawImage _img; private RectTransform _rt; private Texture2D _tex;
+        private RectInt? _focus; private int _stable; private string _probe; private RectInt? _probeRect; private float _probeT;
+        private Game2DBattleHud _hud; private Game2DRadar _radar;
+        private int _winW = W;
         private Game2DTutorialText.Entry _entry;
         private readonly List<Page> _pages = new List<Page>();
         private int _page, _w, _h, _px, _py, _hoverBtn = -1, _lastOwned = -1;
@@ -189,7 +196,7 @@ namespace UI.Game2D
         private bool _locked, _prevLock;
 
         private const int W = 408, Pad = 12, TopY = 7, TitleH = 14, BtnH = 22, MaxLines = 10, ParaGap = 5, Hang = 10;
-        private const float InDur = 0.18f;
+        private const float InDur = 0.18f, DimIn = 0.3f;
         private static readonly int[] Bayer = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
 
         private struct Line { public string s; public bool[] em; public int y; }
@@ -198,8 +205,16 @@ namespace UI.Game2D
         private void Awake()
         {
             _inst = this;
-            _rt = (RectTransform)transform;
-            _img = gameObject.AddComponent<RawImage>(); _img.raycastTarget = false; _img.enabled = false;
+            // 幕: 格子いっぱい (左上が原点)
+            _dimRt = (RectTransform)transform;
+            _dimRt.anchorMin = _dimRt.anchorMax = _dimRt.pivot = new Vector2(0, 1);
+            _dimRt.anchoredPosition = Vector2.zero; _dimRt.sizeDelta = new Vector2(Game2DLayout.Width, Game2DLayout.Height);
+            _dimImg = gameObject.AddComponent<RawImage>(); _dimImg.raycastTarget = false; _dimImg.enabled = false;
+            // 板: 幕の子 (幕より手前に描く)
+            var win = new GameObject("Window", typeof(RectTransform)); win.layer = 5;
+            _rt = (RectTransform)win.transform; _rt.SetParent(transform, false);
+            _rt.anchorMin = _rt.anchorMax = _rt.pivot = new Vector2(0, 1); _rt.sizeDelta = new Vector2(1, 1);
+            _img = win.AddComponent<RawImage>(); _img.raycastTarget = false; _img.enabled = false;
 #if UNITY_EDITOR
             foreach (var tp in Table) if (Game2DTutorialText.Find(tp.title) == null)
                 Debug.LogWarning("[Game2DTutorial] 手引きの文に「" + tp.title + "」が無い (handbook の見出しを変えた? python Tools/sync_handbook.py を回して TutorialTopics を合わせる)");
@@ -210,6 +225,7 @@ namespace UI.Game2D
         {
             if (_inst == this) _inst = null;
             if (_tex != null) Destroy(_tex);
+            if (_dimTex != null) Destroy(_dimTex);
             ReleaseInput();
             _cur = null;
         }
@@ -227,7 +243,8 @@ namespace UI.Game2D
             Watch(gm);
             if (_cur != null && !SceneOk(Table[IndexOf(_cur)].scene, gm, true)) Hide();      // 場面が消えた (ロード画面が始まった・戦闘が閉じた): 下げて頼み直しを待つ
             if (_cur == null) TryStart(gm);
-            if (_cur != null) { HandleInput(); Draw(); }
+            if (_cur != null) { HandleInput(); }
+            if (_cur != null) { Track(); Draw(); }
             SyncInput();
         }
 
@@ -283,6 +300,7 @@ namespace UI.Game2D
                 if (k < best && SceneOk(Table[k].scene, gm, false)) { best = k; pick = q; }
             }
             if (pick == null) return;
+            if (!FocusReady(pick)) return;                                 // 強調する部品がばねで入ってくる途中なら、 止まるまで待つ
             _queue.Remove(pick);
             Show(pick);
         }
@@ -291,21 +309,173 @@ namespace UI.Game2D
         {
             _entry = Game2DTutorialText.Find(title); if (_entry == null) return;
             _cur = title; _page = 0; _t = 0f; _hoverBtn = -1; _dirty = true;
-            Paginate();
+            _focus = FocusRect(title);
+            Layout();
+            _dimImg.enabled = true;
+            transform.SetAsLastSibling();
+            Game2DSfx.Play("ui_open", 0.8f);
+        }
+
+        /// <summary>下げる (印は付けない)。</summary>
+        private void Hide() { _cur = null; _entry = null; _img.enabled = false; _dimImg.enabled = false; _closeFrame = Time.frameCount; }
+
+        // ── 強調 (issue #109) ──
+        //   節ごとに「見てほしい部品」を決め、 その RectTransform の四隅から 480×270 の格子での範囲を求める (座標は部品の側が持つ)。
+        //   画面全体を幕で暗くし、 範囲の内側だけ幕を抜いて枠で囲む。 文面の板は範囲に重ならない所へ置く。 部品が無い節は幕だけ (板は中央)。
+
+        /// <summary>強調する部品の種類。</summary>
+        private enum Focus { None, NavTop, Radar, Intent, BattleTop, Ports, Stat, Ctl, Hand }
+
+        /// <summary>節 → 強調する部品。 ここに無い節は強調しない (幕だけ)。</summary>
+        private static Focus FocusOf(string title)
+        {
+            switch (title)
+            {
+                case TutorialTopics.WalkLayer: return Focus.NavTop;        // 手番・待つ の帯
+                case TutorialTopics.Patrol: return Focus.Radar;            // 魔石
+                case TutorialTopics.Telegraph: return Focus.Intent;        // 予告の枠
+                case TutorialTopics.Plug: return Focus.Ports;              // 出目と差し込み口
+                case TutorialTopics.Deck:
+                case TutorialTopics.Kinds: return Focus.Hand;              // 手札の端子
+                case TutorialTopics.Long:
+                case TutorialTopics.Charge: return Focus.BattleTop;        // 充電・エスカレーション・敵 HP の帯
+                case TutorialTopics.Crit:
+                case TutorialTopics.ForceCrit: return Focus.Stat;          // 会心率
+                case TutorialTopics.Flee: return Focus.Ctl;                // 逃げる のボタン
+                default: return Focus.None;
+            }
+        }
+
+        private static bool HasFocus(string title) => FocusOf(title) != Focus.None;
+
+        /// <summary>節の強調に使う部品の RectTransform。 強調しない節・部品がまだ無い時は null。</summary>
+        private RectTransform FocusSource(string title)
+        {
+            var f = FocusOf(title);
+            if (f == Focus.None) return null;
+            if (f == Focus.NavTop) return Game2DNavExtras.TopBar;
+            if (f == Focus.Radar) { if (_radar == null) _radar = FindObjectOfType<Game2DRadar>(); return _radar != null ? (RectTransform)_radar.transform : null; }
+            if (_hud == null) _hud = FindObjectOfType<Game2DBattleHud>();
+            if (_hud == null) return null;
+            switch (f)
+            {
+                case Focus.Intent: return _hud.PartRect(Game2DBattleHud.Part.Intent);
+                case Focus.BattleTop: return _hud.PartRect(Game2DBattleHud.Part.Top);
+                case Focus.Ports: return _hud.PartRect(Game2DBattleHud.Part.Ports);
+                case Focus.Stat: return _hud.PartRect(Game2DBattleHud.Part.Stat);
+                case Focus.Ctl: return _hud.PartRect(Game2DBattleHud.Part.Ctl);
+                default: return _hud.PartRect(Game2DBattleHud.Part.Hand);
+            }
+        }
+
+        private const int FocusPad = 2;
+
+        /// <summary>部品の範囲 (格子の dot・左上が原点・余白 <see cref="FocusPad"/> 込み・画面の内側に切る)。 部品が無い・隠れている・ほとんど画面の外なら null。</summary>
+        private RectInt? FocusRect(string title)
+        {
+            var src = FocusSource(title);
+            if (src == null || !src.gameObject.activeInHierarchy) return null;
+            var grid = transform.parent as RectTransform; if (grid == null) return null;
+            var c = new Vector3[4]; src.GetWorldCorners(c);
+            float x0 = float.MaxValue, y0 = float.MaxValue, x1 = float.MinValue, y1 = float.MinValue;
+            foreach (var w in c)
+            {
+                var l = grid.InverseTransformPoint(w);                                // 格子の原点 = 左上 (pivot 0,1)・y は上向き
+                x0 = Mathf.Min(x0, l.x); x1 = Mathf.Max(x1, l.x); y0 = Mathf.Min(y0, -l.y); y1 = Mathf.Max(y1, -l.y);
+            }
+            int ix0 = Mathf.FloorToInt(x0) - FocusPad, iy0 = Mathf.FloorToInt(y0) - FocusPad, ix1 = Mathf.CeilToInt(x1) + FocusPad, iy1 = Mathf.CeilToInt(y1) + FocusPad;
+            float full = (ix1 - ix0) * (float)(iy1 - iy0);
+            ix0 = Mathf.Max(0, ix0); iy0 = Mathf.Max(0, iy0); ix1 = Mathf.Min(Game2DLayout.Width, ix1); iy1 = Mathf.Min(Game2DLayout.Height, iy1);
+            if (ix1 - ix0 < 4 || iy1 - iy0 < 4 || (ix1 - ix0) * (float)(iy1 - iy0) < full * 0.8f) return null;      // 8 割が画面の外 = まだ入ってきていない
+            return new RectInt(ix0, iy0, ix1 - ix0, iy1 - iy0);
+        }
+
+        /// <summary>強調する部品が 3 フレーム続けて同じ所にある (ばねが止まった) か。 1 秒待っても止まらなければ出す。 部品の無い節はすぐ true。</summary>
+        private bool FocusReady(string title)
+        {
+            if (!HasFocus(title)) return true;
+            var r = FocusRect(title);
+            if (_probe != title) { _probe = title; _probeRect = r; _stable = 0; _probeT = 0f; return false; }
+            _probeT += Time.unscaledDeltaTime;
+            if (r.HasValue && _probeRect.HasValue && r.Value.Equals(_probeRect.Value)) _stable++; else { _stable = 0; _probeRect = r; }
+            if (_stable >= 3 || _probeT > 1f) { _probe = null; return true; }
+            return false;
+        }
+
+        /// <summary>出している間、 部品の範囲を読み直す (ばね・画面の出入りで動く)。 変わったら板を置き直し、 幕を描き直す。</summary>
+        private void Track()
+        {
+            var r = FocusRect(_cur);
+            if (r.HasValue == _focus.HasValue && (!r.HasValue || r.Value.Equals(_focus.Value))) return;
+            _focus = r; Layout(); _dirty = true;
+        }
+
+        /// <summary>板の大きさと位置を決める。 範囲の上か下に入ればそこ (空きの広い側から)・入らなければ左右の空き (幅を詰めて折り返し直す)・
+        /// どこにも入らなければ空きの広い側に寄せる。 範囲が無ければ中央。</summary>
+        private void Layout()
+        {
+            const int Gap = 6, MinSideW = 220, Edge = 2;
+            int SW = Game2DLayout.Width, SH = Game2DLayout.Height;
+            _winW = W; Paginate();
+            _px = (SW - _w) / 2; _py = (SH - _h) / 2;
+            if (_focus.HasValue)
+            {
+                var f = _focus.Value;
+                int above = f.y - Gap - Edge, below = SH - f.yMax - Gap - Edge;
+                bool placed = false;
+                foreach (bool down in below >= above ? new[] { true, false } : new[] { false, true })
+                {
+                    int room = down ? below : above;
+                    if (room < _h) continue;
+                    _py = down ? f.yMax + Gap + (room - _h) / 2 : Edge + (room - _h) / 2;
+                    placed = true; break;
+                }
+                if (!placed)
+                {
+                    int left = f.x - Gap - Edge, right = SW - f.xMax - Gap - Edge;
+                    int room = Mathf.Max(left, right);
+                    if (room >= MinSideW)
+                    {
+                        _winW = Mathf.Min(W, room); Paginate();
+                        _px = right >= left ? f.xMax + Gap + (room - _w) / 2 : Edge + (room - _w) / 2;
+                        _py = Mathf.Clamp(f.y + (f.height - _h) / 2, Edge, SH - Edge - _h);
+                    }
+                    else _py = below >= above ? SH - Edge - _h : Edge;          // どこにも入らない: 空きの広い側の端へ (少し重なる)
+                }
+            }
             if (_tex == null || _tex.width != _w || _tex.height != _h)
             {
                 if (_tex != null) Destroy(_tex);
                 _tex = new Texture2D(_w, _h, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp, name = "Game2DTutorial" };
             }
             _img.texture = _tex; _img.enabled = true;
-            _px = (Game2DLayout.Width - _w) / 2; _py = (Game2DLayout.Height - _h) / 2;
             _rt.sizeDelta = new Vector2(_w, _h); _rt.anchoredPosition = new Vector2(_px, -_py);
-            _rt.SetAsLastSibling();
-            Game2DSfx.Play("ui_open", 0.8f);
+            _page = Mathf.Clamp(_page, 0, _pages.Count - 1);
+            DrawDim();
         }
 
-        /// <summary>下げる (印は付けない)。</summary>
-        private void Hide() { _cur = null; _entry = null; _img.enabled = false; _closeFrame = Time.frameCount; }
+        /// <summary>幕の色 (暗さ) と枠の色。 枠は控えめな象牙色 (原色にしない)、 外側に 1 dot の暗い縁を付けて地図の上でも読めるように。</summary>
+        private static readonly Color32 DimCol = new Color32(0x05, 0x04, 0x03, 168), FrameCol = Game2DKit.Ivory, FrameShadow = new Color32(0x05, 0x03, 0x02, 230);
+
+        private void DrawDim()
+        {
+            int SW = Game2DLayout.Width, SH = Game2DLayout.Height;
+            if (_dimTex == null)
+            {
+                _dimTex = new Texture2D(SW, SH, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp, name = "Game2DTutorialDim" };
+                _dimImg.texture = _dimTex;
+            }
+            var p = new KitPix(SW, SH);
+            p.Rect(0, 0, SW, SH, DimCol);
+            if (_focus.HasValue)
+            {
+                var f = _focus.Value;
+                p.Rect(f.x - 1, f.y - 1, f.width + 2, f.height + 2, FrameShadow);   // 外の暗い縁
+                p.Rect(f.x, f.y, f.width, f.height, FrameCol);                      // 枠
+                p.Rect(f.x + 1, f.y + 1, f.width - 2, f.height - 2, default);       // 内側は抜く (暗くしない)
+            }
+            p.Apply(_dimTex);
+        }
 
         /// <summary>読み終えた: 印を付けて閉じ、 続けて出せる節があれば出す。</summary>
         private void Finish()
@@ -362,7 +532,7 @@ namespace UI.Game2D
         //   段落 (\n 区切り) ごとに折り返し、 1 ページ MaxLines 行に収める。 段落が入り切らなければ次のページへ送る (1 段落がページより長い時だけ途中で切る)。
         //   板の高さは全ページで一番高いページに合わせる (ページ送りで板の大きさが変わらない)。
 
-        private int BodyW => W - Pad * 2 - Hang;
+        private int BodyW => _winW - Pad * 2 - Hang;
 
         private void Paginate()
         {
@@ -384,7 +554,7 @@ namespace UI.Game2D
             }
             if (cur.lines.Count > 0 || _pages.Count == 0) _pages.Add(cur);
             int maxH = LH; foreach (var p in _pages) maxH = Mathf.Max(maxH, p.h);
-            _w = W; _h = Mathf.Min(Game2DLayout.Height - 4, BodyY + maxH + 8 + BtnH + Pad);
+            _w = _winW; _h = Mathf.Min(Game2DLayout.Height - 4, BodyY + maxH + 8 + BtnH + Pad);
         }
 
         private const int BodyY = TopY + TitleH + 7;
@@ -422,7 +592,8 @@ namespace UI.Game2D
         private void Draw()
         {
             float dt = Mathf.Min(0.05f, Time.unscaledDeltaTime);
-            bool entering = _t < InDur; _t += dt;
+            bool entering = _t < DimIn; _t += dt;
+            _dimImg.color = new Color(1f, 1f, 1f, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(_t / DimIn)));      // 幕はゆっくり降りる (板は網目で入る)
             if (!_dirty && !entering) return;
             _dirty = false;
             var p = new KitPix(_w, _h);
