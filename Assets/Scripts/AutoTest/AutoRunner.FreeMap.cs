@@ -23,6 +23,7 @@ namespace AutoTest
     /// <item>追跡者に捕まったら HP が少なければ逃げる (<see cref="ShouldFleePursuer"/>)。</item>
     /// <item>縄張りの宝 (2026-11-12): 補給が要らない時、 HP の割合から追跡者の戦闘の損の見積もりを引いて
     ///       <see cref="territoryTreasureHpMargin"/> 以上なら宝を行き先にする (<see cref="WantsTerritoryTreasure"/>・どの技量も同じ規則)。
+    ///       既定のしきい値は 9 = 取りに行かない (測定で行かない方が良かった・2026-11-12)。
     ///       縄張りを出ない追跡者なら、 縄張りの外の点は避けない。</item>
     /// <item>縄張りを横切らない (2026-11-12・回避ありの方策だけ): 縄張りを出ない追跡者の層では、 払える遠回り
     ///       (<see cref="navTerritoryDetour"/> 歩まで・行った先から出口か店まで歩ける) なら縄張りの点を踏まない道を選ぶ (<see cref="TerritoryAwareStep"/>)。</item>

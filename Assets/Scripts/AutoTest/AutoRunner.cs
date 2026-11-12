@@ -182,8 +182,11 @@ namespace AutoTest
         public bool pursuerLeavesTerritory = false;
         public GameLoop.TerritoryTreasureKind territoryTreasure = GameLoop.TerritoryTreasureKind.Forge;
         /// <summary>[2026-11-12] BOT が縄張りの宝を取りに行くしきい値: 「HP の割合 − 追跡者の戦闘で失う HP の見積もり」がこれ以上の時だけ取りに行く
-        /// (<see cref="WantsTerritoryTreasure"/>)。 1 以上 = 取りに行かない。 仮置き。</summary>
-        public float territoryTreasureHpMargin = 0.35f;
+        /// (<see cref="WantsTerritoryTreasure"/>)。 1 以上 = 取りに行かない。
+        /// <para>既定 9 = 取りに行かない (2026-11-12)。 Super・3000 ラン・同じシードで、 0.35 (取りに行く) 596 勝 < 9 (行かない) 627 勝だった。
+        /// その後に見積もりへ宝の点の戦闘を足した (直した規則は未測定)。 取りに行く規則を戻すのは、 0.35 / 0.5 / 0.7 の腕で行かない腕を上回ってから。
+        /// 取りに行かなくても、 道の途中で宝の点を踏めば宝は渡る。</para></summary>
+        public float territoryTreasureHpMargin = 9f;
         /// <summary>[2026-11-12] 縄張りを出ない追跡者の層で、 縄張りを横切らない遠回り (<see cref="TerritoryAwareStep"/>) を、
         /// 最短の道より何歩長いところまで選ぶか。 行った先から出口か店まで物資 (足りない分は HP) で歩ける時だけ選ぶ。
         /// −1 = 縄張りを気にしない (この規則を入れる前の動き)。 追跡者を避けない方策 (Naive) と旧い作り (縄張りの外まで追う) には効かない。 仮置き。</summary>
