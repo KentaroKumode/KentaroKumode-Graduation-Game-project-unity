@@ -651,7 +651,7 @@ lore 的には「ギルド管轄も 5 層まで」「5 層を抜けた時点で�
   - 規則の正本は `TerminalDeckState.SplitHand`（本体の `DrawTurn` と BOT の先読みが同じ関数を呼ぶ）。測定の口 `handCarry` = `Off`（旧い規則・印の仕組みも無い・〈呼び戻し〉は旧〈保持器〉の動き）/
     `All`（挿さなかった端子は全部残る・取り下げた形・§24）/ `Pick`（既定）。旧い `True` / `False` は `All` / `Off` と読む。
   - BOT の残す方策 `handKeepPolicy`: `None`（残さない）/ `Greedy`（素の点が山と捨て札の平均より高い端子・次のターンが大技なら防御の種類も）/
-    `Lookahead`（残さない・1 枚ずつ・Greedy の組を、次のターンの最良効用の期待値で比べる）。既定 `Auto` = 素朴版 None・`deckLookahead` なら Lookahead・それ以外 Greedy。
+    `Lookahead`（残さない・1 枚ずつ・Greedy の組を、次のターンの最良効用の期待値で比べる）。**既定 `Auto` = どの技量でも None**（2026-11-13 の測定・§23-27）。
   - 残す印の扱い:
 
     | 端子 | 残す印 |
@@ -4504,6 +4504,10 @@ BOT の払い方（`AutoRunner.Terminals` の `ChooseGoldPunch`）は実装済�
 
 §6-15・§6-4。実装と型チェック・Unity なしの検算（`python Tools/rules_check/run.py`）まで。残り:
 
+- **BOT の残す方策（2026-11-13 の 2 回目の測定・Super・難易度 0・各 3000 ラン・同じ種・0e7e68c）**: 旧い規則 634 勝（21.1%）/ ダウン + 深さ 3 の大技・手札 Off 749（25.0%）/
+  Pick・None 745（24.8%・ダウンだけの腕と 95.3% 一致）/ Pick・Greedy 479（16.0%・ダウンだけに対して z −10.77）/ Pick・Lookahead 581（19.4%・z −6.69）/ Off + 先読み 757（25.2%・z 0.49）。
+  Optimal: 旧い規則 222 → Pick・Greedy 151（z −4.82）。残した端子を次のターンに使った割合は Greedy 29.6%・Lookahead 33.0%。
+  人には「残さない」手が常にあるので規則は損にならず、BOT の残し方が悪い。**BOT の残し方が出来るまで、基準の BOT は残さない**（`handKeepPolicy` の既定を None に）。
 - **測定**: 腕は v3_queue の `handCarry`（Off / All / Pick）・`handKeepPolicy`（None / Greedy / Lookahead）・`bossDown` / `depth3Heavy`（`handCarry=Off bossDown=False depth3Heavy=False` = main と全件一致のはず）と `deckLookahead` / `deckLookaheadProbe`。
   深さ 3 の死亡率（いま約 33%・目標 12〜15%）を、大技で上がる分とダウンで下がる分で差し引いて決める。目盛りの位置・BOT の割る価値（0.5）も仮。
 - **〈呼び戻し〉**（旧〈保持器〉）: 「捨て札から 1 枚戻す」に作り替え・改名済み（§6-4）。残り = BOT が先読みの効用で戻す 1 枚を選ぶこと（いまは素の点）。

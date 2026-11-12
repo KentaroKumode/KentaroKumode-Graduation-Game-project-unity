@@ -412,17 +412,19 @@ namespace AutoTest
         // =====================================================================
         //  手札の規則 Pick (2026-11-13): 次のターンも手札に残す端子の方策
         // =====================================================================
-        /// <summary>残す印の BOT の方策。 Auto = 技量で決める (素朴版 None / それ以外 Greedy / deckLookahead が ON なら Lookahead)。</summary>
+        /// <summary>残す印の BOT の方策。 Auto = 既定 (どの技量でも None・2026-11-13 の 2 回目の測定から)。 Greedy / Lookahead は腕で明示した時だけ。</summary>
         public enum HandKeepPolicy { Auto = -1, None = 0, Greedy = 1, Lookahead = 2 }
 
         /// <summary>[測定 2026-11-13] 残す印の方策 (手札の規則 Pick の時だけ効く)。 None = 何も残さない (Off と同じ結果になるはず)。</summary>
         public HandKeepPolicy handKeepPolicy = HandKeepPolicy.Auto;
 
         /// <summary>実効の方策 (Auto を技量で解いた値)。</summary>
+        /// <para><b>既定は None (2026-11-13)</b>: Super・難易度 0・各 3000 ラン・同じ種 (0e7e68c) で、 Pick・None 745 勝 (24.8%) に対し
+        /// Greedy 479 勝 (16.0%・ダウンだけの腕に対して +179/−449・z −10.77)・Lookahead 581 勝 (19.4%・z −6.69)。 Optimal も Greedy で 222 → 151 (z −4.82)。
+        /// 残した端子を次のターンに使ったのは Greedy 29.6%・Lookahead 33.0% (1 ターン平均 1.60 / 1.37 枚)。
+        /// 人には「残さない」手が常にあるので規則は損にならない (None はダウンだけの腕と 95.3% 一致)。 BOT の残し方が出来るまで、 基準の BOT は残さない。</para>
         public HandKeepPolicy EffectiveHandKeepPolicy
-            => handKeepPolicy != HandKeepPolicy.Auto ? handKeepPolicy
-             : EffectiveWiringSkill == WiringSkill.Naive ? HandKeepPolicy.None
-             : deckLookahead ? HandKeepPolicy.Lookahead : HandKeepPolicy.Greedy;
+            => handKeepPolicy != HandKeepPolicy.Auto ? handKeepPolicy : HandKeepPolicy.None;
 
         /// <summary>
         /// 次のターンも手札に残す印を決める (読むだけ・手札の規則 Pick の時だけ・それ以外は null)。 残せるのは挿さなかった手札の端子だけ
