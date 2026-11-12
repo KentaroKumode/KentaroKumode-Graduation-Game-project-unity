@@ -279,6 +279,10 @@ namespace AutoTest
                 int alt = PickMistakeIndex(us, outs, best, cm.PlayerHP);
                 if (alt >= 0) { WiringMistakes++; best = alt; }
             }
+            // [計装 2026-11-13] 選んだ手が攻撃の端子に 1 つも挿さないか / 攻撃の端子に挿せる手が候補にあったか (判断は変えない)
+            _lastChosenA = outs[best].aCount;
+            _lastAttackCandExists = false;
+            for (int i = 0; i < n && !_lastAttackCandExists; i++) if (outs[i].aCount > 0) _lastAttackCandExists = true;
             targets = tgts[best];
             return cands[best];
         }
@@ -383,9 +387,16 @@ namespace AutoTest
             int hpNow = CombatManager.Instance != null ? CombatManager.Instance.PlayerHP : -1;
             if (_fbPrevHp >= 0 && hpNow >= 0 && _fbPrevHp - hpNow > _fbPrevExpTaken) _fbUnavoidSeen = true;
             _lastFreeBlock = _lastKillsNow = false;
+            _lastChosenA = -1; _lastAttackCandExists = false;
             var slots = ChooseDeckWiring(rolls, tele, out _, out var targets, lookahead: true, mayMistake: true);
             // 挑戦カード〈金で殴る〉(#6): 払う金額 (札が無ければ 0・とどめに合わせて挿し方を替えることがある)。 計装の見積もり (_lastPred*) も金の分で上書きする
             int gold = slots != null ? ChooseGoldPunch(rolls, tele, ref slots, ref targets) : 0;
+            // [計装 2026-11-13] 攻撃の端子に挿さない手を選んだ割合 (素朴版は効用で選ばないので数えない)
+            if (_lastChosenA >= 0)
+            {
+                NoAttackDecisions++;
+                if (_lastChosenA == 0) { NoAttackChosen++; if (!_lastAttackCandExists) NoAttackNoChoice++; }
+            }
             if (predTrace) BeginPredTrace(tele.turn);
             BeginMainCorrTurn(_lastPredA);
             _fbDecided++; if (_lastFreeBlock) _fbTurns++; if (_lastKillsNow) _fbKillTurns++;
@@ -468,6 +479,7 @@ namespace AutoTest
             // [計装] 選んだ案の見積もり (主攻撃の照合・防ぎ切りの数え) を金の分で上書きする
             _lastKillsNow = bestOut.killsNow; _lastFreeBlock = bestOut.freeBlock && !bestOut.killsNow; _lastExpTaken = bestOut.taken;
             _lastPredOld = bestOut.dmgOld; _lastPredNew = bestOut.dmgNew; _lastPredA = bestOut.aCount; _lastPredUsed = bestOut.dmgUsed; _lastPredRaw = bestOut.rawNew;
+            _lastChosenA = bestOut.aCount;
             GoldPunchDecisions++; if (finisher) GoldPunchFinishers++; GoldPunchPaid += bestGold;
             return bestGold;
         }
@@ -559,6 +571,20 @@ namespace AutoTest
 
         /// <summary>[#105 計装] 先読みを掛けた判断の数 / そのうち今の効用が最良でない挿し方に変えた数 (同点の入れ替えは数えない)。 ランをまたいで累計。</summary>
         public int DeckLookaheadDecisions { get; private set; }
+
+        /// <summary>[計装 2026-11-13] 直近の配線の判断で選んだ手の攻撃の端子の個数 (−1 = 効用で選んでいない) / 攻撃の端子に挿せる手が候補にあったか。</summary>
+        private int _lastChosenA = -1;
+        private bool _lastAttackCandExists;
+        /// <summary>[計装 2026-11-13] 効用で選んだ配線の判断の数 / そのうち攻撃の端子に 1 つも挿さない手 / そのうち攻撃に挿せる手が候補に無かった数。 ランをまたいで累計。</summary>
+        public int NoAttackDecisions { get; private set; }
+        public int NoAttackChosen { get; private set; }
+        public int NoAttackNoChoice { get; private set; }
+        /// <summary>[計装 2026-11-13] サマリーに出す行 (判断が無ければ空)。</summary>
+        public string NoAttackChoiceLine()
+            => NoAttackDecisions == 0 ? ""
+             : $"[攻撃なしの手] 配線の判断 {NoAttackDecisions} 回のうち、 攻撃の端子に挿さない手 {NoAttackChosen} 回 "
+             + $"({100.0 * NoAttackChosen / NoAttackDecisions:0.00}%) / うち攻撃に挿せる手が無かった {NoAttackNoChoice} 回 "
+             + $"/ 選べたのに選んだ {NoAttackChosen - NoAttackNoChoice} 回 ({100.0 * (NoAttackChosen - NoAttackNoChoice) / NoAttackDecisions:0.00}%)";
         public int DeckLookaheadChanged { get; private set; }
 
         /// <summary>[#105] 先読みの乱数の種のもと (ラン番号・ラン開始時に入れる)。</summary>

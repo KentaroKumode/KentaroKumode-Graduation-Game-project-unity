@@ -755,8 +755,10 @@ namespace AutoTest
                  + $"/ メタ 攻撃端子+{MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice()} "
                  + $"/ 追跡者 縄張りの外へ{(pursuerLeavesTerritory ? "出る (旧い作り)" : "出ない")} "
                  + $"/ 端子の撃破のボーナス {(terminalKillNeedsAttack ? "攻撃したターンだけ (旧い条件)" : "経路を問わない")} "
+                 + $"/ 攻撃なしの手の主攻撃 (旧の式) {(v3.oldNoAttackBaseDmg ? "素火力を数える (旧い挙動)" : "0")} "
                  + $"/ 縄張りの宝 {territoryTreasure} (BOT のしきい値 {territoryTreasureHpMargin:0.##}) / 縄張りを避ける遠回り {(navTerritoryDetour < 0 ? "使わない" : "+" + navTerritoryDetour + "歩まで")}"
-                 + (DeckLookaheadDiagLine().Length > 0 ? System.Environment.NewLine + DeckLookaheadDiagLine() : "");
+                 + (DeckLookaheadDiagLine().Length > 0 ? System.Environment.NewLine + DeckLookaheadDiagLine() : "")
+                 + (NoAttackChoiceLine().Length > 0 ? System.Environment.NewLine + NoAttackChoiceLine() : "");
         }
 
         /// <summary>次のボスに対する戦力ギャップ。 **天井 (Super) のときだけ効く** ──

@@ -106,5 +106,10 @@ namespace AutoTest
         public int readEnemyPassives = -1;
         /// <summary>[#107 診断] readEnemyPassives で読む物の内訳 (ビット)。 1 = 〈吸血〉 / 2 = 次のターンへ乗る物 (〈反撃態勢〉〈暴走〉) / 4 = 収支の軽減無視 (〈尾撃〉〈重甲〉〈地獄の業火〉)。 既定 7 = 全部。</summary>
         public int enemyPassiveMask = 7;
+        /// <summary>[2026-11-13 測定の口] 配線の効用の旧の式 (readOutgoingMult が OFF = 既定の Optimal) で、 攻撃の端子に 1 つも挿さない手にも
+        /// 武器の素火力 (atkBase) を主攻撃の与ダメとして数える (直す前の挙動)。 本体はその手で主攻撃をしない (skipAttack)。
+        /// 既定 false = 直した挙動 (主攻撃 0・〈黎明〉〈虚空〉など攻撃なしでも通る削りは残る)。 true の腕はこの修正の前の main と全件一致するはず。
+        /// 新しい式 (Super の既定) は前から 0 なので、 この口は効かない。</summary>
+        public bool oldNoAttackBaseDmg;
     }
 }

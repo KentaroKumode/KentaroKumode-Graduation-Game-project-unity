@@ -827,7 +827,11 @@ namespace AutoTest
             if (steadfastReady && bCount == k)
                 blockRaw += ItemSystem.PassiveSkills.Effects.SteadfastStance.Shield;
 
-            int dmg = atkBase + aSum;
+            // 攻撃の端子に 1 つも挿さない手は主攻撃をしない (本体 CombatManager.Turn の skipAttack = attackDiceCount <= 0)。
+            //   2026-11-13 まで旧の式はこの手でも武器の素火力 (atkBase) を与ダメに数えていた (新しい式 ReadOutMainDamage は 0)。
+            //   攻撃なしでも通る削り (〈黎明〉〈虚空〉) は下で effDmg / noAtkDmg へ別に足すので、 ここで 0 にしても消えない。
+            //   v3.oldNoAttackBaseDmg = true で旧い挙動 (素火力を数える) に戻す (測定の口)。
+            int dmg = (aCount > 0 || v3.oldNoAttackBaseDmg) ? atkBase + aSum : 0;
             // 剣〈不滅の刃〉: 両方の端子を挿したターンが続くたび与ダメ +8% (このターンで続けば streak+1)。
             //   [#122] 本体は与ダメ倍率の池 (加算) へ足すので、 伸びは (池 + 0.08n) / 池 倍。 旧: 池と別に (1 + 0.08n) 倍を掛けていた。
             //   旧の式は池そのものを掛けない (どの配線でも共通の係数) ので、 比だけを掛ける。 池が読めない (0) ときは 1 = 旧と同じ。
@@ -860,7 +864,7 @@ namespace AutoTest
             // damageCapped ボス: 与ダメが閾値超えたら超過分を半減した見積もりで探索 (実挙動と一致)
             int effDmg = dmg;
             // 攻撃の端子なしでも通る削りの見積もり (〈黎明〉・〈虚空〉)。 端子の撃破のボーナスを攻撃なしのターンに見る時に使う (#117)。
-            //   effDmg は攻撃なしでも武器の素火力 (atkBase) を含むので、 攻撃なしの撃破にはこちらを使う。
+            //   旧い挙動 (v3.oldNoAttackBaseDmg) では effDmg が攻撃なしでも武器の素火力 (atkBase) を含むので、 攻撃なしの撃破にはこちらを使う。
             int noAtkDmg = 0;
             if (play.damageCapped && play.damageCapThreshold > 0 && dmg > play.damageCapThreshold)
                 effDmg = play.damageCapThreshold + (dmg - play.damageCapThreshold) / 2;
