@@ -115,8 +115,10 @@ namespace MapSystem.FreeMove
         public const int StormSnowTurns = 2;
         /// <summary>嵐の中の点で始まった戦闘の敵の〈嵐〉: 敵の攻撃 +N (戦闘を通して)。</summary>
         public const int StormEnemyAttack = 3;
-        /// <summary>選び直した始点から終点までの道の歩数の下限 (2026-11-13・実装役の決定)。 これより近い外周の点は始点にしない。</summary>
-        public const int StormStartMinHops = 7;
+        /// <summary>嵐の層のボスの点 (内側から選ぶ・2026-11-13) の、 始点からの道の歩数の下限 (実装役の決定)。 満たす内側の点が無い層は 1 歩ずつ下げる。</summary>
+        public const int StormBossMinHops = 5;
+        /// <summary>外周の層 (凸包) の辺から、 これ以内の直線距離にある点も外周として扱う (辺にほぼ乗っていて見た目で外周に見える点・2026-11-13・点の最小間隔 1.15 の約 1/4)。</summary>
+        public const double StormOuterEdgeSlack = 0.3;
 
         // ── 縄張り ─────────────────────────────────────────────
         public const int TerritoryMin = 7;

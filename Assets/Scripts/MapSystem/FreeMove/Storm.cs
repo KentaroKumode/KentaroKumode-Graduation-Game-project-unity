@@ -126,21 +126,25 @@ namespace MapSystem.FreeMove
         /// <summary>
         /// 嵐の層の形を整える (生成の後・<see cref="FreeMapGenerator.Generate"/> の storm = true の時だけ)。 点と道は作り直さない。
         /// <list type="number">
-        /// <item><b>始点を選び直す</b>: 点の凸包の頂点 (地図の最外周) のうち、 道が 2 本以上・終点から道で <see cref="FreeMapParams.StormStartMinHops"/> 歩以上・
-        /// 追跡者の居る深さでは縄張りの全部の点から直線で <see cref="FreeMapParams.TerritoryStartClearance"/> 以上離れた点 (生成の始点と同じ条件) から、 専用の乱数で 1 つ。
-        /// 候補が無ければ生成の始点のまま (検算で件数を出す)。 選んだ点と生成の始点 (添字 0) の種別を入れ替える (前哨基地を移す・他の種別の数は変えない)。</item>
-        /// <item><b>危険の帯を始点からの距離で読み直す</b> (<see cref="FreeMapLayout.BandOf"/>)。 新しい安全な帯のエリートは通常の戦闘へ替える (生成と同じ・乱数なし)。</item>
-        /// <item><b>フェーズ 2 の終わりの輪の中心のずらし</b> (<see cref="FreeMapLayout.stormOffset"/>) を決める: 長さはフェーズ 2 の終わりの半径 ×
-        /// [<see cref="FreeMapParams.StormOffsetMin"/>, <see cref="FreeMapParams.StormOffsetMax"/>)、 向きは全周から (三角関数を使わない有理の向き)。
-        /// 半径より短いので、 ボスの点はフェーズ 2 の終わりの輪の中にある。</item>
+        /// <item><b>始点を選び直す</b>: 点の凸包の頂点 (外周の 1 層目) のうち、 生成の終点 (右端) でない・道が 2 本以上・
+        /// 追跡者の居る深さでは縄張りの全部の点から直線で <see cref="FreeMapParams.TerritoryStartClearance"/> 以上の点から、 専用の乱数 (<see cref="RngKey"/>) で 1 つ。
+        /// 候補が無ければ生成の始点のまま。 選んだ点と生成の始点 (添字 0) の種別を入れ替える。</item>
+        /// <item><b>ボスの点 (終点) を選び直す</b> (2026-11-13・作者「外周 2 ノードではないノードで、 ランダムに」): 外周の 1 層目・2 層目 (<see cref="OuterRings"/>) に入らない「内側」の点のうち、
+        /// 始点でない・縄張りの中でない・道が 2 本以上・(深さ 6 の旧い作りの) 固定の点でない・始点から道で <see cref="FreeMapParams.StormBossMinHops"/> 歩以上の点から、
+        /// 専用の乱数 (<see cref="BossRngKey"/>) で 1 つ。 満たす点が無ければ下限を 1 歩ずつ下げる (<see cref="FreeMapLayout.stormBossHopsUsed"/>)。
+        /// 内側の点が無ければ生成の終点のまま。 選んだ点と生成の終点 (添字 1) の種別を入れ替える。 始点を先に決め、 距離の下限はボスの側だけで確かめる (順序を循環させない)。</item>
+        /// <item><b>危険の帯を始点と終点からの距離で読み直す</b> (<see cref="FreeMapLayout.BandOf"/>)。 新しい安全な帯のエリートは通常の戦闘へ替える。</item>
+        /// <item><b>フェーズ 2 の終わりの輪の中心のずらし</b> (<see cref="FreeMapLayout.stormOffset"/>)。</item>
         /// </list>
-        /// 縄張りを避ける道 (<see cref="TerritoryBypass"/>) と「裂け目の記録」(深さ 6) は始点・終点を <see cref="FreeMapLayout.start"/> / <see cref="FreeMapLayout.goal"/> で読むので、 新しい始点でそのまま働く。
+        /// 深さ 6 の「裂け目の記録」(ボスに隣り合う点を全部イベントに) は、 この後に生成器が新しい終点で置く (<see cref="FreeMapGenerator.Generate"/>)。
+        /// 縄張りを避ける道 (<see cref="TerritoryBypass"/>) は始点・終点を <see cref="FreeMapLayout.start"/> / <see cref="FreeMapLayout.goal"/> で読むので、 新しい点でそのまま働く。
         /// </summary>
         public static void Apply(FreeMapLayout L)
         {
             if (L == null || !HasStorm(L.floor)) return;
             L.storm = true;
-            int floor = L.floor, oldStart = L.start;
+            int floor = L.floor, oldStart = L.start, oldGoal = L.goal;
+            var rings = OuterRings(L);
             var cand = StartCandidates(L);
             L.stormStartFallback = cand.Count == 0;
             if (cand.Count > 0)
@@ -150,6 +154,24 @@ namespace MapSystem.FreeMove
                 {
                     var t = L.types[pick]; L.types[pick] = L.types[oldStart]; L.types[oldStart] = t;
                     L.start = pick;
+                }
+            }
+            // ボスの点: 内側の点から (始点からの下限を満たす点が無ければ 1 歩ずつ下げる)
+            var inner = BossCandidates(L, rings);
+            L.stormBossInner = inner.Count;
+            L.stormBossHopsUsed = -1;
+            if (inner.Count > 0)
+            {
+                var hs = L.Hops(L.start);
+                for (int th = FreeMapParams.StormBossMinHops; th >= 1; th--)
+                {
+                    var ok = inner.Where(i => hs[i] != int.MaxValue && hs[i] >= th).ToList();
+                    if (ok.Count == 0) continue;
+                    int pick = ok[GameLoop.GameRng.Range(0, ok.Count, BossRngKey, floor * 100 + 0)];
+                    var t = L.types[pick]; L.types[pick] = L.types[oldGoal]; L.types[oldGoal] = t;
+                    L.goal = pick;
+                    L.stormBossHopsUsed = th;
+                    break;
                 }
             }
             // 新しい安全な帯 (始点の側) のエリートは通常の戦闘へ (生成と同じ規則・乱数なし)
@@ -165,30 +187,78 @@ namespace MapSystem.FreeMove
             L.stormOffset = new Vec2((float)(cx * f * r2), (float)(cy * f * r2));
         }
 
-        /// <summary>始点の候補 (添字の昇順): 凸包の頂点のうち、 終点でない・道が 2 本以上・終点から <see cref="FreeMapParams.StormStartMinHops"/> 歩以上・
-        /// 追跡者の居る深さでは縄張りの点から直線で <see cref="FreeMapParams.TerritoryStartClearance"/> 以上。</summary>
+        /// <summary>ボスの点を選ぶ乱数のキー (2026-11-13・新しいキー。 既存のキーの引く回数を変えない)。</summary>
+        public const string BossRngKey = "map.free.storm.boss";
+
+        /// <summary>外周の 1 層目と 2 層目 (2026-11-13)。 k 層目 = 残りの点の凸包の頂点と、 その凸包の辺から直線で
+        /// <see cref="FreeMapParams.StormOuterEdgeSlack"/> 以内の残りの点 (辺にほぼ乗っていて、 見た目で外周に見える点)。 1 層目を除いた残りで 2 層目を作る。
+        /// 戻り値は点ごとの層 (1 / 2 / 0 = 内側)。</summary>
+        public static int[] OuterRings(FreeMapLayout L)
+        {
+            var ring = new int[L.Count];
+            var rest = Enumerable.Range(0, L.Count).ToList();
+            for (int k = 1; k <= 2 && rest.Count > 0; k++)
+            {
+                var hull = Hull(L, rest);
+                var layer = new HashSet<int>(hull);
+                if (hull.Count >= 2)
+                    foreach (int i in rest)
+                    {
+                        if (layer.Contains(i)) continue;
+                        for (int e = 0; e < hull.Count; e++)
+                            if (SegDist(L.pos[i], L.pos[hull[e]], L.pos[hull[(e + 1) % hull.Count]]) <= FreeMapParams.StormOuterEdgeSlack) { layer.Add(i); break; }
+                    }
+                foreach (int i in layer) ring[i] = k;
+                rest = rest.Where(i => !layer.Contains(i)).ToList();
+            }
+            return ring;
+        }
+
+        /// <summary>点 p から線分 ab までの直線距離 (平方根だけ)。</summary>
+        private static double SegDist(Vec2 p, Vec2 a, Vec2 b)
+        {
+            double dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+            double t = l2 <= 0 ? 0 : Math.Max(0, Math.Min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2));
+            return Vec2.Dist(p, new Vec2(a.x + dx * t, a.y + dy * t));
+        }
+
+        /// <summary>始点の候補 (添字の昇順): 凸包の頂点 (外周の 1 層目) のうち、 生成の終点でない・道が 2 本以上・
+        /// 追跡者の居る深さでは縄張りの点から直線で <see cref="FreeMapParams.TerritoryStartClearance"/> 以上。 終点からの距離は、 ボスを選ぶ側で確かめる。</summary>
         public static List<int> StartCandidates(FreeMapLayout L)
         {
             var hull = Hull(L);
-            var hg = L.Hops(L.goal);
             bool foe = FloorPlan.HasWanderer(L.floor);
             var res = new List<int>();
             foreach (int i in hull.OrderBy(i => i))
             {
                 if (i == L.goal || L.adj[i].Count < 2) continue;
-                if (hg[i] == int.MaxValue || hg[i] < FreeMapParams.StormStartMinHops) continue;
                 if (foe && L.territory.Any(t => L.Dist(t, i) < FreeMapParams.TerritoryStartClearance)) continue;
                 res.Add(i);
             }
             return res;
         }
 
-        /// <summary>点の凸包の頂点 (地図の最外周)。 アンドリューの単調鎖 (座標の大小と外積だけ・三角関数なし)。 一直線上の点は頂点に入れない。</summary>
-        public static List<int> Hull(FreeMapLayout L)
+        /// <summary>ボスの点の候補 (添字の昇順・始点からの距離の下限は呼ぶ側): 外周の 1 層目・2 層目に入らない点のうち、 始点でない・縄張りの中でない・
+        /// 道が 2 本以上・深さ 6 の旧い作りの固定の点でない。</summary>
+        public static List<int> BossCandidates(FreeMapLayout L, int[] rings)
         {
-            int n = L.Count;
-            var idx = Enumerable.Range(0, n).OrderBy(i => L.pos[i].x).ThenBy(i => L.pos[i].y).ThenBy(i => i).ToList();
-            if (n < 3) return idx;
+            var res = new List<int>();
+            for (int i = 0; i < L.Count; i++)
+            {
+                if (rings[i] != 0 || i == L.start || L.adj[i].Count < 2 || L.territory.Contains(i) || i == L.fixedEvent) continue;
+                res.Add(i);
+            }
+            return res;
+        }
+
+        /// <summary>点の凸包の頂点 (全部の点・地図の最外周)。</summary>
+        public static List<int> Hull(FreeMapLayout L) => Hull(L, Enumerable.Range(0, L.Count).ToList());
+
+        /// <summary>点 <paramref name="pts"/> の凸包の頂点。 アンドリューの単調鎖 (座標の大小と外積だけ・三角関数なし)。 一直線上の点は頂点に入れない。</summary>
+        public static List<int> Hull(FreeMapLayout L, List<int> pts)
+        {
+            var idx = pts.OrderBy(i => L.pos[i].x).ThenBy(i => L.pos[i].y).ThenBy(i => i).ToList();
+            if (idx.Count < 3) return idx;
             double Cross(int o, int a, int b)
                 => (L.pos[a].x - L.pos[o].x) * (L.pos[b].y - L.pos[o].y) - (L.pos[a].y - L.pos[o].y) * (L.pos[b].x - L.pos[o].x);
             var h = new List<int>();
