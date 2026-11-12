@@ -79,32 +79,10 @@ namespace AutoTest
             //   素朴版は **リロールと役を一切使わない** ＝ ADR-0010 以前と同じ打ち方。
             //   最適版との差が「役システムが開けた技量帯の幅」そのものになる (Verification ①)。
             WiringSkill effectiveSkill = EffectiveWiringSkill;
-            bool useLayer6Routine = effectiveSkill == WiringSkill.Super
-                                 && IsSuperTailMode
-                                 && superLayer6OptimalCombatRoutine
-                                 && e0 != null
-                                 && e0.id == "boss_layer6";
-            // [2026-08-22] **7層でも Optimal 方策へ切り替える** (既定 OFF)。
-            //   下のコメントは「7層は Super が勝つので切り替えない」と書いているが、
-            //   **それは古い測定**。 役の出目依存化・役札の連戦持ち越し・パーツ有りの
-            //   現行条件で測り直すと符号が反転している:
-            //     両AIが7層へ到達した 379 ラン に限定して Optimalだけクリア 71 /
-            //     Superだけクリア 41 (p=0.0059)。 到達時点の状態 (HP率・パッシブ数・
-            //     武器Tier・物資) は Super が僅かに上なので、 選択バイアスでは説明できない。
-            //   IsSuperTailMode で絞らない ── 0pt で観測した差なので難度条件を付けない。
-            bool useLayer7Routine = effectiveSkill == WiringSkill.Super
-                                 && superLayer7OptimalCombatRoutine
-                                 && e0 != null
-                                 && !string.IsNullOrEmpty(e0.id)
-                                 && e0.id.StartsWith(GameLoop.BossIds.Layer7Prefix);
-            bool useOptimalRoutine = useLayer6Routine || useLayer7Routine;
-            // 50pt・同一10000シードで、両AIが6層へ遭遇した2322件に限定すると
-            // Optimalだけ勝利425 / Superだけ勝利267。Superの未来近似は灰の再生・
-            // 周期予兆・烈炎の複合戦で局所的に劣るため、ここだけ実測上位方策へ切替える。
-            //   (7層の切り替えは 2026-08-22 に足した: 上の useLayer7Routine 参照)
-            // 旧い先読み方策 (ExactCombatAI・SuperCombatAI) の BeginCombat は 2026-11-12 に呼び出しごと削除した。
-            //   どちらも自分の中のメモと観測を消すだけで、 共有の状態にも乱数にも触れていなかった
-            //   (配線とリロールは下で必ず山札の方策に上書きされ、 そのメモを読む判断が呼ばれなかった)。
+            // 6 層・7 層のボス戦で Super を Optimal の方策へ切り替える分岐 (superLayer6/7OptimalCombatRoutine) と、
+            //   旧い先読み方策 (ExactCombatAI・SuperCombatAI) の BeginCombat は 2026-11-12 に削除した。
+            //   切り替えの先も元も、 下で必ず同じ山札の方策に上書きされていたので、 分岐の結果を読む所が無かった。
+            //   BeginCombat は自分の中のメモと観測を消すだけで、 共有の状態にも乱数にも触れていなかった。
             // 端子の山札 (ADR-0014): どの技量でも、 配線は山札用の方策 (AutoRunner.Terminals)、 リロールは Optimal の方策
             //   (山札の効用で値付けする) を差す。 素朴版はリロールしない。
             cm.WiringPolicy = DeckWiringPlanPolicy;
