@@ -845,13 +845,19 @@ namespace UI.Game2D
             bool live = sim != null && Game2DBattleSim.Active; bool known = live && sim.phase != Game2DBattleSim.P.ERoll;
             int en = live ? sim.enemyDiceCount : 3;
             for (int i = 0; i < en; i++) DrawDie(p, new RectInt(14 + i * 20, 16, 17, 17), live ? sim.ed[i] : i + 3, true);
-            p.Text(known ? "攻撃 " + sim.eatk : "攻撃 ??", 14, 36, known ? Atk : Dim);
+            if (known && sim.down) p.Text("ダウン", 14, 36, MarkHeavyHud);      // ボスのダウン (2026-11-13): 攻撃しない
+            else p.Text(known ? "攻撃 " + sim.eatk : "攻撃 ??", 14, 36, known ? Atk : Dim);
             if (known) p.Text("出目 " + sim.EnemyDiceSum, 14, 49, Dim);
             if (known && sim.edef > 0) p.Text("防御 " + sim.edef, 14, 62, Ink);      // 敵の防御 (構え・割れる/積み上がる装甲を反映した今の値)
             // 予告 (攻撃・大技・構え) と毒・出血は敵の周りに出す (Game2DBattleFx.DrawMarks・2026-11-11)。 ここは次の構え・大技の前触れだけ
             string next = known ? (sim.guardIn == 1 && sim.heavyIn == 1 ? "次: 構え・大技" : sim.guardIn == 1 ? "次: 構え" : sim.heavyIn == 1 ? "次: 大技" : null) : null;
-            if (next != null) p.Text(next, 14, 75, sim.heavyIn == 1 ? MarkHeavyHud : Dim);
+            // ボスのダウン (2026-11-13): 後に続くダウンが決まっていれば「次: ダウン」(大技・構えの前触れより先に出す)
+            if (known && sim.downPending > 0) next = "次: ダウン";
+            if (next != null) p.Text(next, 14, 75, sim.heavyIn == 1 || (known && sim.downPending > 0) ? MarkHeavyHud : Dim);
             if (live) p.Text("ターン " + sim.turn + "  段階 " + sim.Stage, 14, 90, Dim);
+            // ボスのダウン: ダウン中は受けるダメージの倍率、 そうでなければ次の目盛りまでの残り (HP がこの点数だけ減れば割れる)
+            if (known && sim.down) p.Text("被ダメ×" + CombatSystem.BossDown.TakenMul.ToString("0.0"), 14, 103, MarkHeavyHud);
+            else if (known && sim.downNotchHp >= 0 && fx != null) p.Text("目盛りまで " + Mathf.Max(0, fx.EnemyHp - sim.downNotchHp), 14, 103, Ink);
             p.Apply(t);
         }
 
@@ -875,6 +881,13 @@ namespace UI.Game2D
             if (live) for (int i = 0; i < 5; i++) DrawLamp(p, 214 + i * 10, 14, 10, i < sim.Stage, Atk);
             int cur = fx != null ? fx.EnemyHp : 56, max = fx != null ? fx.EnemyMax : 80;
             p.Text("敵", 14, 29, Ink); p.GaugeBar(Game2DKit.Gauge, 30, 31, 192, 10, Mathf.Clamp01(cur / (float)Mathf.Max(1, max)), Hp);
+            // ボスのダウンの目盛り (2026-11-13・仮の印): 棒に 1 ドットの刻み。 まだ割っていない目盛りは明るく、 割った目盛りは暗く (状態は色で表す)
+            if (live && sim.downNotches != null)
+                for (int i = 0; i < sim.downNotches.Length; i++)
+                {
+                    int nx = 30 + Mathf.Clamp(Mathf.RoundToInt(192 * sim.downNotches[i]), 1, 190);
+                    p.Rect(nx, 30, 1, 12, i < sim.downBroken ? Dim : MarkHeavyHud);
+                }
             p.Text(cur + "/" + max, 228, 29, Ink);
             p.Apply(t);
         }
