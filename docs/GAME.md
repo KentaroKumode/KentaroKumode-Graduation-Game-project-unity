@@ -2696,10 +2696,7 @@ Tier ごとの正味（本番と同じく 2 枚配って選ぶ・各 1 万ラン
 
 - フロアモディファイア由来で **5 層 +40%**。
 - 商人の符牒所持で半額、商人の鈴で次ショップ半額。
-- **上位互換アップグレード割引**: 同家系の下位 Lv を所持（昇華済み含む）していると、
-  上位互換の価格が Tier 1 段差 = 1G に。
 - **特売品**: 商才トラック 1 段ごとに特売枠 +1（最大 10 枠）。割引は 15/30/50%（r10 で 99% 枠が加わる・§15-1）。
-  アップグレード割引済みスロットとは重複しない。
 
 ### 16-4. 売却
 
@@ -4346,6 +4343,7 @@ BOT の払い方（`AutoRunner.Terminals` の `ChooseGoldPunch`）は実装済�
 
 | 対象 | 時期 | 理由 |
 |---|---|---|
+| **Lv 家系（追撃・剛力・堅忍・慧眼・不屈・治癒阻害の I〜IV）の仕組み一式: 上位互換アップグレード割引（下位 Lv を持っていると上位が 1G）・上位 Lv だけ発動・到達済み Lv 以下の抽選除外・BOT の下位 Lv の売却と段の計装 `FamilyTierStats`・英字 id の効果クラス 21 種** | 2026-11-12 | 2026-09-03 に家系を 1 段に固定し、2026-09-22 にスキル id を品の名前にしたので、段を持つ id（`MightII` など）がどの品にも無くなり、全部が発火しない死んだ経路だった。段の判定は id の綴り（接尾辞 I〜IV）を読んでいて、id から構造を読まない規約にも反していた。戻すなら items.json の `family` / `tier` で書く |
 | **敵パッシブの未装備クラス 21 種（精鋭 Slime / Goblin / Kobold / Skeleton / Wolf / Harpy / Orc・ScratchAura・IntimidatePlusPlus・旧 3 層ボス FrozenBardSong・旧 6 層ボス RoyalEmber / SinChain / EternalBurning / ReturnToAshes / ImmortalEmber / EmberAura / StarfireProliferation / ScorchedEarth・ボス威風 StrongOne / Throne / Setsuna）** | 2026-11-12 | どの敵も持っておらず（enemies.json・BossParams・段の切り替え・AutoTest・シーン・json のどこからも id で引かれていない）、登録だけ残っていた。相互攻撃モデルで発火経路が壊れていたもの・説明が「ダイス合計」のままのものが多い。戻すなら相互攻撃モデルで書き直す |
 | **ショップの購入確認ダイアログ `ShopPurchaseDialog`（IMGUI・`GameManager` のキー入力の分岐ごと）** | 2026-11-12 | どのシーン・プレハブにも載っておらず `AddComponent` も無いので `Instance` は常に null だった。状態を `transform.localScale` 倍率で表す規約違反（×1.5）も抱えていた。購入は Game2D の画面が持つ |
 | **前哨基地の武器の自動強化（層に入った時に素材があれば武器を 1 段・各層 1 回・`GameManager.OutpostUpgrade`・`RunState.outpostUpgradeUsedThisFloor`）と、休憩・前哨基地の強化がダイス強化（`DiceEnhance.TryUpgradeEquipped`）へ回る経路** | 2026-11-12 | 作者の決定。2026-05-31 に「UI 開発まで暫定」の自動挙動として入れたもので、プレイヤーが選ばないまま素材が消え、休憩の「鍛える」と同じ強化が層の入口でも起きていた。武器の強化は休憩の「鍛える」だけにする。ダイス強化は 2026-08-15 に止めてあり（`TryUpgradeEquipped` は常に false）、回り道は何もしない死にコードだった。休憩の「鍛える」の説明から「ダイス強化」を外し、手引きの前哨基地の節から強化の文を消した。**BOT も前哨基地で強化されなくなるので、この変更より前のクリア率とは直接比べない**（素材の余り方が変わる）。`DiceEnhance` 本体と `CanSpendMaterials` のダイスの分岐は残っている |
