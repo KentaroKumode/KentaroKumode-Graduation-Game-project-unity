@@ -72,6 +72,8 @@ namespace AutoTest.ParallelSweep
         public int[] mapVisit = Array.Empty<int>();
         /// <summary>[計装 2026-11-10] ラン開始時に実際に入っていた整備パネルの段。</summary>
         public string metaRanks = "";
+        /// <summary>[計装 2026-11-12] ラン開始時の職業 (lockWeaponFamily の測定では武器の家系)。</summary>
+        public string startClass = "";
 
         public static LearnRunRow From(AutoRunner.RunRec r)
         {
@@ -99,6 +101,7 @@ namespace AutoTest.ParallelSweep
                 stateSnaps = r.stateSnaps != null ? r.stateSnaps.ToArray() : Array.Empty<int>(),
                 mapVisit = r.mapVisit != null ? r.mapVisit.ToArray() : Array.Empty<int>(),
                 metaRanks = r.metaRanks ?? "",
+                startClass = r.startClass ?? "",
             };
         }
 

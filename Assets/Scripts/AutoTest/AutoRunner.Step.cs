@@ -253,6 +253,7 @@ namespace AutoTest
                     }
                     _cur.metaRanks = string.Join(",", parts);
                 }
+                _cur.startClass = gm.Run != null ? gm.Run.playerClass.ToString() : "";
             }
 
             // [診断] 軸の品をまとめて開幕に配る (2026-11-07)。 軸に深く投資した構成が実際に強いかを因果で測る。

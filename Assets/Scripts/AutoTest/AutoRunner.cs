@@ -1531,6 +1531,9 @@ namespace AutoTest
             public int index;
             /// <summary>[計装 2026-11-10] ラン開始時に実際に入っていた整備パネルの段 ("種類:段" を , で連結・0 段は省く)。</summary>
             public string metaRanks = "";
+            /// <summary>[計装 2026-11-12・#20/#41] ラン開始時の職業 (ClassType の名前)。 lockWeaponFamily の測定では武器の家系と同じ ──
+            /// 家系ごとの被ダメ・クリアを、 早く死んだランも落とさずに分けるため (強化した武器の id で分けると、 強化前に死んだランが抜ける)。</summary>
+            public string startClass = "";
             public Outcome outcome;
             public DeathCause cause = DeathCause.None;
             public int deathFloor;
