@@ -21,6 +21,9 @@ namespace AutoTest
     /// <item>それ以外は、 まだ使っていない点のうち <b>既存のマス評価 (Rank) を歩数で割った価値</b>が最大の点へ。
     ///       種別の見えていない点は平均的な価値として扱う (見えていない種別を覗かない)。</item>
     /// <item>追跡者に捕まったら HP が少なければ逃げる (<see cref="ShouldFleePursuer"/>)。</item>
+    /// <item>縄張りの宝 (2026-11-12): 補給が要らない時、 HP の割合から追跡者の戦闘の損の見積もりを引いて
+    ///       <see cref="territoryTreasureHpMargin"/> 以上なら宝を行き先にする (<see cref="WantsTerritoryTreasure"/>・どの技量も同じ規則)。
+    ///       縄張りを出ない追跡者なら、 縄張りの外の点は避けない。</item>
     /// </list>
     /// <para>照明・偵察・待つは使わない。 乱数は使わない (GameRng を消費しない)。</para>
     /// </summary>
@@ -313,6 +316,11 @@ namespace AutoTest
                           || hopsFromMe[L.goal] == int.MaxValue
                           || (!exitOk && !refuelOk);
             if (!toExit && !exitOk && refuelOk) target = refuel;   // 先に補給
+            else if (!toExit && WantsTerritoryTreasure(mm, sim, hopsFromMe, run, hpRatio))
+            {
+                target = sim.TreasureNode;                          // 縄張りの宝を取りに入る (取ったら下の行き先選びへ戻る = 出る)
+                if (_freeMapTreasureLayout != L) { _freeMapTreasureLayout = L; FreeNavTreasureTrips++; }
+            }
             else if (!toExit && v3.macroPlan)
             {
                 target = MacroTarget(gm, mm, sim, L, at, hopsFromMe, run);
@@ -401,6 +409,34 @@ namespace AutoTest
             return false;
         }
 
+        // ── 縄張りの宝 (2026-11-12) ──
+        /// <summary>[計装] 縄張りの宝を取りに向かうと決めた層の数 (バッチ累計)。</summary>
+        public static long FreeNavTreasureTrips;
+        private FreeMapLayout _freeMapTreasureLayout;
+        /// <summary>追跡者の戦闘で失う HP の見積もり = その層のエリート戦の平均の損 × この倍率 (追跡者はその層のエリートを土台に強くした専用の敵・§5-9)。 仮置き。</summary>
+        private const float PursuerVsEliteHpLoss = 1.6f;
+        /// <summary>エリート戦の平均の損が学習から読めない時の値 (最大 HP の割合)。 仮置き。</summary>
+        private const double EliteHpLossFallback = 0.25;
+
+        /// <summary>縄張りの宝を取りに行くか (最小の規則): 宝が残っていて・行った先から出口か店まで歩けて、
+        /// 「いまの HP の割合 − 追跡者の戦闘で失う HP の見積もり」が <see cref="territoryTreasureHpMargin"/> 以上の時だけ。
+        /// 追跡者を倒した後は見積もり 0。 追跡者の性質は読まない (見積もりは層のエリートから)。</summary>
+        private bool WantsTerritoryTreasure(MapManager mm, FreeMapSim sim, int[] hopsFromMe, RunState run, float hpRatio)
+        {
+            if (!sim.TreasureAvailable || territoryTreasureHpMargin >= 1f || _freeMapActions > MaxFreeMapActionsPerFloor) return false;
+            int t = sim.TreasureNode;
+            if (t == sim.Me || sim.IsSunk(t) || hopsFromMe[t] == int.MaxValue) return false;
+            if (!Sustainable(mm, sim, sim.HopsFrom(t), sim.Layout.goal, run.provision - hopsFromMe[t] * FreeMapParams.MoveSupply, run)) return false;
+            float loss = 0f;
+            if (sim.FoeAlive)
+            {
+                int layer = Mathf.Clamp(FloorPlan.OrdinalOf(run.Depth), 0, FloorPlan.LastOrdinal);
+                if (!EncounterDangerStats.TryGetKind(layer, 'E', out double mean, out _)) mean = EliteHpLossFallback;
+                loss = (float)mean * PursuerVsEliteHpLoss;
+            }
+            return hpRatio - loss >= territoryTreasureHpMargin;
+        }
+
         /// <summary>[測定 2026-11-12・#35] 恐れの範囲 (歩)。 動かない追跡者はその点だけを怖がる。</summary>
         private int FearRange() => FoeLooksStatic() ? 1 : System.Math.Max(1, navFearRange);
 
@@ -445,6 +481,8 @@ namespace AutoTest
         private int AvoidFoeStep(FreeMapSim sim, int at, int target, int preferred)
         {
             if (!sim.FoeAlive) return preferred;
+            // 縄張りを出ない追跡者 (2026-11-12): 縄張りの外の点は追跡者も使い魔も来ないので、 そのまま踏む
+            if (sim.Leashed && !sim.InTerritory(preferred)) return preferred;
             var stone = sim.Stone();
             bool foeKnown = sim.FoeVisible;
             if (!foeKnown && stone.level < 2) return preferred;   // 遠い / 反応なしなら避けない
@@ -466,7 +504,8 @@ namespace AutoTest
                 if (!sim.CanMoveTo(c)) continue;
                 if (chased && c != preferred && !(toTarget[c] < baseline)) continue;
                 double danger;
-                if (foeKnown)
+                if (sim.Leashed && !sim.InTerritory(c)) danger = 0.0;   // 縄張りの外は来ない
+                else if (foeKnown)
                 {
                     var dFoe = sim.HopsFrom(sim.FoeNode);
                     int step = dFoe[c] == int.MaxValue ? 99 : dFoe[c];
@@ -508,7 +547,8 @@ namespace AutoTest
             int keep = FoeLooksStatic() ? 0 : FoeAvoidHops;
             var dFoe = sim.HopsFrom(foe);
             int n = dFoe.Length;
-            bool Blocked(int v) => v != target && dFoe[v] != int.MaxValue && dFoe[v] <= keep;
+            bool Blocked(int v) => v != target && dFoe[v] != int.MaxValue && dFoe[v] <= keep
+                                   && (!sim.Leashed || sim.InTerritory(v));   // 縄張りを出ない追跡者: 縄張りの外は塞がない
             // 行き先から逆に広げて、 自分の隣のうち一番近いものを選ぶ (決定的: 同点は添字の小さい方)
             var dist = new int[n];
             for (int i = 0; i < n; i++) dist[i] = int.MaxValue;

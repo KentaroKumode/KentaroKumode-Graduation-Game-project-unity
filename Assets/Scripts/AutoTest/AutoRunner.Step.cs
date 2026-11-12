@@ -68,6 +68,8 @@ namespace AutoTest
             GameLoop.GameHooks.PursuerAtkMulOverride = pursuerAtkMul;
             GameLoop.GameHooks.PursuerHpAdd = pursuerHpAdd;
             GameLoop.GameHooks.PursuerSupplyOverride = pursuerSupply;
+            GameLoop.GameHooks.PursuerLeavesTerritory = pursuerLeavesTerritory;   // [測定 2026-11-12] 縄張りの作り
+            GameLoop.GameHooks.TerritoryTreasure = territoryTreasure;
             GameLoop.GameHooks.TerminalHealMulOverride = System.Math.Max(0, terminalHealMul);   // [測定 2026-11-12・#102]
             GameLoop.GameHooks.TerminalArresterNeedOverride = System.Math.Max(0, terminalArresterNeed);
             GameLoop.GameHooks.TerminalFirstAidBattleOnly = terminalFirstAidBattleOnly;

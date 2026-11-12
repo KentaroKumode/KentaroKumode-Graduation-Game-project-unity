@@ -176,6 +176,14 @@ namespace AutoTest
         public bool pursuerNoReward = false;
         public float pursuerAtkMul = 0f, pursuerHpAdd = 0f;
         public int pursuerSupply = -1;
+        /// <summary>[測定 2026-11-12] 縄張りの作り。 本体の GameHooks.PursuerLeavesTerritory / TerritoryTreasure へ流す (ラン終了で既定へ)。
+        /// pursuerLeavesTerritory = true で旧い作り (追跡者は縄張りの外まで追う)。 territoryTreasure = None で宝を置かない。
+        /// 両方を旧い側 (True / None) にした腕は、 縄張りの作り直し (2026-11-12) より前と同じ動きになる。</summary>
+        public bool pursuerLeavesTerritory = false;
+        public GameLoop.TerritoryTreasureKind territoryTreasure = GameLoop.TerritoryTreasureKind.Forge;
+        /// <summary>[2026-11-12] BOT が縄張りの宝を取りに行くしきい値: 「HP の割合 − 追跡者の戦闘で失う HP の見積もり」がこれ以上の時だけ取りに行く
+        /// (<see cref="WantsTerritoryTreasure"/>)。 1 以上 = 取りに行かない。 仮置き。</summary>
+        public float territoryTreasureHpMargin = 0.35f;
         /// <summary>[測定 2026-11-12・#102] 端子の調整を元の値へ戻す腕。 本体の GameHooks.Terminal* へ流す (ラン終了で既定へ)。
         /// terminalHealMul: 〈治癒〉の倍率 (0 = 差し替えない = 今の値・旧は 2)。 terminalArresterNeed: 〈避雷器〉の溜める量 (0 = 今の値・旧は 12)。</summary>
         public int terminalHealMul = 0, terminalArresterNeed = 0;
@@ -773,7 +781,9 @@ namespace AutoTest
                  + $"{(LearnedPriorityProvider.UsingFallback ? " **手書きの序列 (学習データなし)**" : "")} "
                  + $"/ 山札の先読み {(deckLookahead && EffectiveWiringSkill != WiringSkill.Naive ? "ON" : "OFF")} (deckLookahead={deckLookahead}) "
                  + $"/ 遺物 持ち込み {relicCount}個 計{relicPts}段 "
-                 + $"/ メタ 攻撃端子+{MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice()}";
+                 + $"/ メタ 攻撃端子+{MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice()} "
+                 + $"/ 追跡者 縄張りの外へ{(pursuerLeavesTerritory ? "出る (旧い作り)" : "出ない")} "
+                 + $"/ 縄張りの宝 {territoryTreasure} (BOT のしきい値 {territoryTreasureHpMargin:0.##})";
         }
 
         /// <summary>次のボスに対する戦力ギャップ。 **天井 (Super) のときだけ効く** ──
