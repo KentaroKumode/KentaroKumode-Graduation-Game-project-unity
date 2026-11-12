@@ -54,13 +54,13 @@ namespace AutoTest
                 //   desperate: T4 から / 通常: T2 以下 (上位を温存)。
                 if (desperate)
                 {
-                    UseFirst(run, "天火の膏薬", "業火の膏薬", "燐の油", "鬼火の油");
-                    if (!v3.superConsumables) UseFirst(run, "惜別の護符", "銀の護符", "鉄の護符", "木の護符");
+                    UseFirst(run, ItemIds.PowerOil4, ItemIds.PowerOil3, ItemIds.PowerOil2, ItemIds.PowerOil1);
+                    if (!v3.superConsumables) UseFirst(run, ItemIds.Talisman4, ItemIds.Talisman3, ItemIds.Talisman2, ItemIds.Talisman1);
                 }
                 else
                 {
-                    UseFirst(run, "燐の油", "鬼火の油");
-                    if (!v3.superConsumables) UseFirst(run, "鉄の護符", "木の護符");
+                    UseFirst(run, ItemIds.PowerOil2, ItemIds.PowerOil1);
+                    if (!v3.superConsumables) UseFirst(run, ItemIds.Talisman2, ItemIds.Talisman1);
                 }
 
                 // 2026-06-28: 職業スターター消耗品の使い時判定
@@ -187,7 +187,7 @@ namespace AutoTest
                     {
                         // 死なないが削れている場面。 ここは従来どおり小さいものだけ使う
                         //   (大きい回復を上限で溢れさせない、 という温存の本来の意図)。
-                        UseFirst(run, "回復薬", "小回復薬");
+                        UseFirst(run, ItemIds.HealPotion2, ItemIds.HealPotion1);
                     }
                 }
                 // 逃げる (2026-09-28): 追跡者の戦闘は、 頭で HP が少なければ逃げる。
@@ -307,7 +307,15 @@ namespace AutoTest
             }
             if (shortfall >= cm.PlayerHP) UseBestHeal(run, cm.PlayerHP, shortfall);
         }
-        private static readonly (string id, int amount)[] SuperTalismans = { ("木の護符", 15), ("鉄の護符", 30), ("銀の護符", 50), ("惜別の護符", 80) };
+        /// <summary>護符の段 (昇順)。 量は本体の <see cref="GameLoop.Consumables.ShieldAmount"/> を引く (写しを持たない・#129)。</summary>
+        private static readonly (string id, int amount)[] SuperTalismans = TiersOf(GameLoop.Consumables.ShieldAmount,
+            ItemIds.Talisman1, ItemIds.Talisman2, ItemIds.Talisman3, ItemIds.Talisman4);
+        private static (string id, T value)[] TiersOf<T>(Func<string, T> amountOf, params string[] ids)
+        {
+            var a = new (string id, T value)[ids.Length];
+            for (int i = 0; i < ids.Length; i++) a[i] = (ids[i], amountOf(ids[i]));
+            return a;
+        }
         /// <summary>[計装] Super が予告を読んで使った護符の数 (バッチ累計)。</summary>
         public static long SuperTalismansUsed;
 
@@ -1996,12 +2004,10 @@ namespace AutoTest
         }
 
         /// <summary>所持consumableから優先順に最初の1個を使用（戦闘中＝ctx即時適用）。</summary>
-        /// <summary>回復量 (最大HP 比)。 <c>ItemIds.ConsHealFamily</c> の 4 段。 昇順で持つこと。</summary>
-        private static readonly (string id, float pct)[] HealTiers =
-        {
-            ("小回復薬", 0.25f), ("回復薬", 0.40f),
-            ("上回復薬", 0.60f), ("完全回復薬", 1.00f),
-        };
+        /// <summary>回復量 (最大HP 比)。 <c>ItemIds.ConsHealFamily</c> の 4 段。 昇順で持つこと。
+        /// 割合は本体の <see cref="GameLoop.Consumables.HealRatio"/> を引く (写しを持たない・#129)。 float の定数がそのまま入る。</summary>
+        private static readonly (string id, float pct)[] HealTiers = TiersOf(GameLoop.Consumables.HealRatio,
+            ItemIds.HealPotion1, ItemIds.HealPotion2, ItemIds.HealPotion3, ItemIds.HealPotion4);
 
         /// <summary>**死ぬ場面**で飲む 1 本を選ぶ。 温存しない。
         ///

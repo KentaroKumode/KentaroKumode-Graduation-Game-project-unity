@@ -56,6 +56,11 @@ namespace GameLoop
         public const string ConsHealFamily   = "heal";   // 回復:     最大HP の 25/40/60/100%
         public const string ConsShieldFamily = "def";    // シールド: 15/30/50/80 (戦闘中に使用可)
         public const string ConsPowerFamily  = "dmg";    // 攻撃強化: 与ダメ +15/30/50/75% (戦闘中)
+        //   各系統の 4 段の id (= 表示名)。 効果量の正本は Consumables (HealRatio / ShieldAmount / Apply の攻撃強化)。
+        //   BOT が段の順に選ぶので、 本体と BOT はこの定数で品を指す (2026-11-12・#129)。
+        public const string HealPotion1 = "小回復薬", HealPotion2 = "回復薬", HealPotion3 = "上回復薬", HealPotion4 = "完全回復薬";
+        public const string Talisman1 = "木の護符", Talisman2 = "鉄の護符", Talisman3 = "銀の護符", Talisman4 = "惜別の護符";
+        public const string PowerOil1 = "鬼火の油", PowerOil2 = "燐の油", PowerOil3 = "業火の膏薬", PowerOil4 = "天火の膏薬";
         //   物資回復の系統 (provision) は 2026-10-31 に廃止。 物資はショップの「物資の包」で買う
         //   (ShopManager.TryBuyProvisionPack)。 品を挟んで買わせる段は冗長だった。 4 品のうち
         //   〈古い手紙〉だけ効果を替えて残した (OldLetter)。

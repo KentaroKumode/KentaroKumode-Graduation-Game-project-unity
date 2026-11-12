@@ -208,17 +208,18 @@ namespace GameLoop
 
                 // シールド: 戦闘中持続 (expireTurn=-1)。 **戦闘中にも使用できる** ──
                 //   通常戦が 3〜4T になり「削られてから張る」判断が成立するようになったため。
-                case "木の護符": return AddShield(run, ctx, 15);
-                case "鉄の護符": return AddShield(run, ctx, 30);
-                case "銀の護符": return AddShield(run, ctx, 50);
-                case "惜別の護符": return AddShield(run, ctx, 80);
+                //   量の表は ShieldAmount の 1 か所だけ (BOT の見積もりと共有)。
+                case ItemIds.Talisman1:
+                case ItemIds.Talisman2:
+                case ItemIds.Talisman3:
+                case ItemIds.Talisman4: return AddShield(run, ctx, ShieldAmount(id));
 
                 // 攻撃強化: 与ダメ +X% (その戦闘中)。 outgoingDamageMultiplier は**加算プール**
                 //   (実測 ×2.00) なので、 +75% でも最終与ダメは ×1.375 に薄まる。
-                case "鬼火の油": return AddTimedDmgMult(run, ctx, 15, -1);
-                case "燐の油": return AddTimedDmgMult(run, ctx, 30, -1);
-                case "業火の膏薬": return AddTimedDmgMult(run, ctx, 50, -1);
-                case "天火の膏薬": return AddTimedDmgMult(run, ctx, 75, -1);
+                case ItemIds.PowerOil1: return AddTimedDmgMult(run, ctx, 15, -1);
+                case ItemIds.PowerOil2: return AddTimedDmgMult(run, ctx, 30, -1);
+                case ItemIds.PowerOil3: return AddTimedDmgMult(run, ctx, 50, -1);
+                case ItemIds.PowerOil4: return AddTimedDmgMult(run, ctx, 75, -1);
 
                 // 古い手紙 (2026-10-31): 次のターンの被ダメを 0 にする。 戦闘中だけ使える。
                 //   仕込み刃と同じ位置 (CombatManager の敵攻撃の解決) で消す。 反撃は無い。
@@ -339,11 +340,24 @@ namespace GameLoop
         {
             switch (id)
             {
-                case "小回復薬": return 0.25f;
-                case "回復薬": return 0.40f;
-                case "上回復薬": return 0.60f;
-                case "完全回復薬": return 1.00f;
+                case ItemIds.HealPotion1: return 0.25f;
+                case ItemIds.HealPotion2: return 0.40f;
+                case ItemIds.HealPotion3: return 0.60f;
+                case ItemIds.HealPotion4: return 1.00f;
                 default: return 0f;
+            }
+        }
+
+        /// <summary>護符のシールド量 (護符以外は 0)。 <b>護符の効果量の正本</b> (Apply もここを引く・BOT の見積もりと共有)。</summary>
+        public static int ShieldAmount(string id)
+        {
+            switch (id)
+            {
+                case ItemIds.Talisman1: return 15;
+                case ItemIds.Talisman2: return 30;
+                case ItemIds.Talisman3: return 50;
+                case ItemIds.Talisman4: return 80;
+                default: return 0;
             }
         }
 
