@@ -657,7 +657,8 @@ namespace AutoTest
                 var rng = new System.Random(unchecked(la.seed + j * 7919));
                 var nst = after.Clone();
                 int extra = nst.BeginTurn();
-                var nb = SampleNextBoard(ev.deck, ev.board, o, TerminalCards.HandSize + extra, la.stopChance, rng, out var stopped);
+                // ダウンのターンは〈停滞する時間〉も止まる (本体 DrawTerminalHand と同じ)
+                var nb = SampleNextBoard(ev.deck, ev.board, o, TerminalCards.HandSize + extra, ns.enemyDown ? 0f : la.stopChance, rng, out var stopped);
                 nst.stopped = stopped;
                 // 〈鋳造口〉の出目 +N は振った後に足される (本体 DrawTerminalHand → FoundryBonusKey)
                 var dice = new int[k];

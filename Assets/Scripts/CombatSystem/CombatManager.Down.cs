@@ -31,6 +31,10 @@ namespace CombatSystem
             bool hadHeavy = currentEnemy != null && currentEnemy.heavyPeriod > 0;
             bool canceled = hadHeavy && Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn);   // 起点を戻す前に見る
             Escalation.HeavyCycleOffset = ctx.currentTurn;
+            // エスカレーション (ターンで進む敵の段階) もダウンのターンは進めない: 冷却材と同じ遅延の口に 1 ターン足す (予告・BOT の見込みも同じ口を読む)
+            YachtRoleEffects.AddEscalationDelay(ctx, 1);
+            // 〈遺物学者〉の抽選も止まる (OnTurnStart を鳴らさない) ので、 前のターンの抽選の名前を予告に残さない
+            ctx.vescaDrawnRelics = new System.Collections.Generic.List<string>();
             BossDown.ActiveNow = true;
             BossDownDiag.NoteDown(hadHeavy, canceled);
             Debug.Log($"[ダウン] T{ctx.currentTurn} {currentEnemy?.displayName}: 行動不能・受けるダメージ ×{BossDown.TakenMul:0.0}"

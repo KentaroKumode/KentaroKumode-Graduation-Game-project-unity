@@ -60,7 +60,7 @@ namespace CombatSystem
             if (_deck == null) return;
             int extra = _deck.state.BeginTurn();
             // ヴェスカ〈停滞する時間〉: 引いた端子 1 枚ごとに確率で止める (持たない敵は 0)
-            float stop = ItemSystem.PassiveSkills.Effects.StagnantTime.StopChance(currentEnemy);
+            float stop = _down.downNow ? 0f : ItemSystem.PassiveSkills.Effects.StagnantTime.StopChance(currentEnemy);   // ダウンのターンは〈停滞する時間〉も止まる
             _deck.DrawTurn(TerminalCards.HandSize + extra, _termRetain, stop);
             if (TerminalCards.HandCarry && ctx != null && ctx.currentTurn > 1) BossDownDiag.NoteCarry(_deck.LastCarriedCount);   // [計装 2026-11-13] 持ち越した枚数 (戦闘の 1 ターン目は除く)
             if (stop > 0f)

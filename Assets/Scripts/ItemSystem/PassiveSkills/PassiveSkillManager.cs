@@ -286,8 +286,11 @@ namespace ItemSystem.PassiveSkills
             // 敵視点に反転
             SwapPerspective();
 
+            // ボスのダウン (2026-11-13): ダウンのターンは敵のパッシブを止める (止めない物は BossDownPassives の 1 か所に表)
+            bool down = CombatSystem.BossDown.ActiveNow;
             for (int i = 0; i < skills.Count; i++)
             {
+                if (down && !CombatSystem.BossDownPassives.Fires(skills[i].SkillId, trigger)) continue;
                 try
                 {
                     CombatContext.CurrentSkillId = skills[i].SkillId;
