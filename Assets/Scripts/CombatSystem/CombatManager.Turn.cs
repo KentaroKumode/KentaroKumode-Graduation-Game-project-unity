@@ -958,7 +958,7 @@ namespace CombatSystem
             {
                 int diceScaled = Mathf.CeilToInt(attackSum * ctx.attackDicePct);
                 string prevSkill = ItemSystem.PassiveSkills.CombatContext.CurrentSkillId;
-                ItemSystem.PassiveSkills.CombatContext.CurrentSkillId = "攻撃に挿した出目 +%";
+                ItemSystem.PassiveSkills.CombatContext.CurrentSkillId = "攻撃の端子を挿した出目 +%";
                 ctx.AddPlayerAttackOrDiceBonus(diceScaled);
                 ItemSystem.PassiveSkills.CombatContext.CurrentSkillId = prevSkill;
                 ctx.diceDerivedAttack += diceScaled;

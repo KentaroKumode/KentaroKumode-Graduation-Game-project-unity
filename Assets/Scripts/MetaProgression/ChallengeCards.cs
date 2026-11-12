@@ -261,7 +261,7 @@ namespace MetaProgression
                 case EnemyHp: return "厚い皮 ─ 敵の最大 HP +" + n + "%";
                 case EnemyDef: return "敵の防御 +" + n;
                 case Steel: return "各戦闘 1 度、 敵が致命傷を HP1 で耐える・ボスの HP +" + SteelBossHpPct.ToString("0") + "%（鋼の皮膚）";
-                case SinPride: return "大罪:傲慢 ─ ブロックに挿した出目 −" + n + "%・シールドの獲得 −" + SinPrideShieldCutPct + "%";
+                case SinPride: return "大罪:傲慢 ─ 防御の端子を挿した出目 −" + n + "%・シールドの獲得 −" + SinPrideShieldCutPct + "%";
                 case SinEnvy: return "大罪:嫉妬 ─ 残り HP の割合がこちらのほうが高い間、 敵の攻撃 +" + n + "%";
                 case SinGreed: return "大罪:強欲 ─ 所持金と消耗品をすべて失い、 最も高価なパッシブ " + SinGreedPassives + " 個を失う";
                 case SinWrath: return "大罪:憤怒 ─ ボスの各形態の最初のターン、 自ダイスが全て最大・現在 HP 半減";
@@ -285,8 +285,8 @@ namespace MetaProgression
                 case WinGold: return "戦闘に勝つたびゴールド +" + n;
                 case MaxHp: return "最大 HP +" + n + "%";
                 case HealUp: return "回復 +" + n + "%";
-                case Cat: return "猫の手: 毎ターン " + n + "% の確率で、 猫が出目 1 個を一番得な端子に先に挿す（そのターンは外せない）";
-                case GoldPunch: return "金で殴る: 攻撃に金を挿せる（1G につき攻撃 +" + n + "）";
+                case Cat: return "猫の手: 毎ターン " + n + "% の確率で、 猫が一番得な端子を出目 1 個に先に挿す（そのターンは外せない）";
+                case GoldPunch: return "金で殴る: 金を攻撃に足せる（1G につき攻撃 +" + n + "）";
             }
             return c.kind;
         }

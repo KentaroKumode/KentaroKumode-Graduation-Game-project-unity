@@ -697,7 +697,7 @@ namespace UI.Game2D
             }
             else
             {
-                if (!sim.IsPicker(f)) return "出目を挿すと、 挿していない手札の端子を対象に選べる";
+                if (!sim.IsPicker(f)) return "出目に挿すと、 挿していない手札の端子を対象に選べる";
                 t = sim.TargetOf(f);
             }
             return t >= 0 && t < sim.board.Count ? "対象: 〈" + sim.board[t] + "〉" : "対象: なし (空けた端子が無い)";

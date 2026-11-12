@@ -33,8 +33,8 @@ namespace UI.Game2D
             new Track { kind = MetaPanelKind.SparkPoison, name = "種火・毒",   desc = "r1: 毒の品が出やすい (+60%)。 r2: 毎ターン最初に与える毒 +2。 r3: 毒の品を 1 つ開幕で持つ。" },
             new Track { kind = MetaPanelKind.SparkBleed,  name = "種火・出血", desc = "r1: 出血の品が出やすい (+60%)。 r2: 出血 3 以上の敵の攻撃値 −2。 r3: 出血の品を 1 つ開幕で持つ。" },
             new Track { kind = MetaPanelKind.SparkShield, name = "種火・シールド", desc = "r1: シールドの品が出やすい (+60%)。 r2: ターン開始の減衰で残るシールド +10%。 r3: シールドの品を 1 つ開幕で持つ。" },
-            new Track { kind = MetaPanelKind.AttackTerm,  name = "攻撃端子",   desc = "攻撃端子へつないだダイス 1 本ごとに、 攻撃端子の配線合計 +1/段。" },
-            new Track { kind = MetaPanelKind.BlockTerm,   name = "防御端子",   desc = "防御端子へつないだダイス 1 本ごとに、 防御端子の配線合計 +1/段。" },
+            new Track { kind = MetaPanelKind.AttackTerm,  name = "攻撃端子",   desc = "攻撃の端子を挿したダイス 1 個ごとに、 攻撃端子の配線合計 +1/段。" },
+            new Track { kind = MetaPanelKind.BlockTerm,   name = "防御端子",   desc = "防御の端子を挿したダイス 1 個ごとに、 防御端子の配線合計 +1/段。" },
         };
 
         private static int _page;
@@ -76,8 +76,8 @@ namespace UI.Game2D
                 case MetaPanelKind.Trade:   return "特売の枠 " + MetaPanel.TradeSaleSlots(r) + (r >= 10 ? "・99% 引き" : "");
                 case MetaPanelKind.Supply:  return "開幕パッシブ " + MetaPanel.SupplyStartingPassives(r) + " 本" + (r >= 10 ? "・選べる" : "");
                 case MetaPanelKind.Armor:   return "防御 +" + MetaPanel.ArmorDefense(r) + "・被ダメ −" + MetaPanel.ArmorFlatReduction(r) + (r >= 10 ? "・不動" : "");
-                case MetaPanelKind.AttackTerm: return "つないだ 1 本ごと +" + MetaPanel.AttackTerminalPerDice(r);
-                case MetaPanelKind.BlockTerm:  return "つないだ 1 本ごと +" + MetaPanel.BlockTerminalPerDice(r);
+                case MetaPanelKind.AttackTerm: return "挿した 1 個ごと +" + MetaPanel.AttackTerminalPerDice(r);
+                case MetaPanelKind.BlockTerm:  return "挿した 1 個ごと +" + MetaPanel.BlockTerminalPerDice(r);
             }
             // 種火 6 本: r1 出やすい / r2 固有 / r3 開幕に 1 つ
             string r2 = k == MetaPanelKind.SparkCharge ? "上限 +" + MetaPanel.ChargeCapBonus(r)

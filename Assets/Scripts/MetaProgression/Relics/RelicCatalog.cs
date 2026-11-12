@@ -146,7 +146,7 @@ namespace MetaProgression.Relics
                 case RelicStat.CritRate: return "会心率";
                 case RelicStat.BloodOffering: return "血贄";
                 case RelicStat.EscalationDelay: return "敵の段階の遅れ";
-                case RelicStat.BlockDicePct: return "ブロックに挿した出目";
+                case RelicStat.BlockDicePct: return "防御の端子を挿した出目";
                 case RelicStat.OpeningBleed: return "開幕出血";
                 case RelicStat.OpeningPoison: return "開幕毒";
                 case RelicStat.Rinkai: return "臨界";
