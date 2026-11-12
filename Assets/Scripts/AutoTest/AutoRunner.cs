@@ -208,7 +208,7 @@ namespace AutoTest
         /// <summary>[測定 2026-11-13] 深さ 3 のボス 3 体の大技の周期 (CombatSystem.BossParams.Depth3Heavy)。 既定 true = 足す。 false = 旧い作り (大技なし)。
         /// 本体の GameHooks.Depth3HeavyDisabled へ流す。</summary>
         public bool depth3Heavy = true;
-        /// <summary>[測定 2026-11-13] true = ランの最初から博士の「止まらない時計」を預かった状態にする (七層のヴェスカの各段にダウンの目盛り 80% が 1 つ増える)。
+        /// <summary>[測定 2026-11-13] true = ランの最初から博士の「止まらない時計」を秘宝として持たせる (開幕の秘宝の後に足す・七層のヴェスカの各段にダウンの目盛り 80% が 1 つ増える)。
         /// 既定 false = 預からない (〈さびれた観測所・再訪・写し〉の 5 つ目で選んだ時だけ・BOT はふだん選ばない)。 本体の GameHooks.VescaClockHeldAtStart へ流す。
         /// 時計あり/なしを同じシードで比べる腕。</summary>
         public bool vescaClockHeld = false;

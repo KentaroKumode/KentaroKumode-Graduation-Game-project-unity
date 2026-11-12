@@ -1000,6 +1000,8 @@ namespace ItemSystem.Shop
             if (list == null || listIndex < 0 || listIndex >= list.Count) return false;
 
             string id = list[listIndex];
+            // 預かり物 (博士の時計・2026-11-13) は売れない。 売る画面は並べず、 BOT の売却 (BotSelling) もここで断られて次の品へ進む
+            if (source == SellSource.Passive && GameLoop.ItemIds.Entrusted.Contains(id)) { Log("預かった品は売れない"); return false; }
             // T4-D〈破産〉: 売却額 −50% (§15-2 v3.0)。 **売却不能にはしない** ── 経路は残す。
             int price = Mathf.Max(1, Mathf.RoundToInt(
                 ResolveSellPrice(id)));
