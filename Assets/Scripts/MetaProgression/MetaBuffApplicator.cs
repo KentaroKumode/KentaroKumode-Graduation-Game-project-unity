@@ -180,7 +180,7 @@ namespace MetaProgression
         public static int GetStartingPassiveOffers(int itemIndex)
             => MetaPanel.SupplyStartingOffers(Rank(MetaPanelKind.Supply), itemIndex);
 
-        /// <summary>金庫 r10: 貸金庫 (ランを跨ぐ預金) を使えるか。</summary>
+        /// <summary>金庫 r10: 貸金庫 (層を突破するたびに所持金が増える・<see cref="VaultBank"/>) を使えるか。</summary>
         public static bool IsVaultBankUnlocked()
             => MetaPanel.VaultBankUnlocked(Rank(MetaPanelKind.Vault));
 
@@ -352,7 +352,7 @@ namespace MetaProgression
         public static int GetPoisonApplyBonus()
             => MetaPanel.PoisonApplyBonus(Rank(MetaPanelKind.SparkPoison));
 
-        /// <summary>出血 r2: 敵の出血 3 以上で敵攻撃値 -N (0 or 2)。 CombatManager 予告後・敵攻撃前で減算。</summary>
+        /// <summary>出血 r2: 敵の出血が閾値以上で敵攻撃値 −N (<see cref="MetaPanel.BleedWeakenAttack"/>)。 CombatManager 予告後・敵攻撃前で減算。</summary>
         public static int GetBleedWeakenAttack(int enemyBleedStacks)
             => MetaPanel.BleedWeakenAttack(Rank(MetaPanelKind.SparkBleed), enemyBleedStacks)
                + System.Math.Min((int)ChallengeCards.Value(ChallengeCards.Bleed), enemyBleedStacks / 2);   // 挑戦カード: 出血 2 につき −1 (最大はカードの値)

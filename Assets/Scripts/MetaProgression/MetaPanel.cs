@@ -201,6 +201,10 @@ namespace MetaProgression
         /// 防御トラックが「耐える」だけの軸でなくなる。</para></summary>
         public static bool GuardShieldCarryUnlocked(int rank) => rank >= 10;
 
+        /// <summary>剛胆 r10: 勝った戦闘の残りシールドのうち、 次の戦闘へ持ち越す割合 (切り上げ)。
+        /// 2026-09-13: 全量 → 50% → 30% (50% でも Balanced +6.31pt で基準帯を超えていた)。 適用は CombatManager.Finish。</summary>
+        public const float GuardShieldCarryRatio = 0.30f;
+
         /// <summary>金庫: 開幕ゴールド +5/段 (0..50)。</summary>
         public static int VaultGold(int rank) => Mathf.Clamp(rank, 0, 10) * 5;
 
@@ -211,7 +215,7 @@ namespace MetaProgression
         /// 2026-09-13 新設。 規則の正本は <see cref="VaultBank"/>。
         ///
         /// <para>宝箱ゴールド (<see cref="VaultTreasureUnlocked"/>) と同居させている。
-        /// 宝箱側は F1=3〜F7=12 の少額で、 貸金庫 (上限 150G) の横では誤差。
+        /// 宝箱側は F1=3〜F7=12 の少額で、 貸金庫 (<see cref="VaultBank.Cap"/>G までの分が層ごとに増える) の横では誤差。
         /// 分離すると Balanced の土台まで動いて基準が変わるので、 r10 にまとめた。</para></summary>
         public static bool VaultBankUnlocked(int rank) => rank >= 10;
 
@@ -444,9 +448,14 @@ namespace MetaProgression
         /// <summary>毒 r2 濃縮: 1 ターンに最初の 1 回だけ、 毒の付与に足すスタック (CombatContext.AddStatus)。 2026-11-07 に +2 → +5。</summary>
         public static int PoisonApplyBonus(int rank) => rank >= 2 ? 5 : 0;
 
-        /// <summary>出血 r2 失血衰弱: 出血 N 以上の敵の攻撃値 -M (閾値=3, 減算=4・2026-11-07 に 2 から)。閾値未到達なら 0。</summary>
+        /// <summary>出血 r2 失血衰弱: 出血 <see cref="BleedWeakenThreshold"/> 以上の敵の攻撃値 −<see cref="BleedWeakenAmount"/>。閾値未到達なら 0。</summary>
         public static int BleedWeakenAttack(int rank, int enemyBleedStacks)
-            => (rank >= 2 && enemyBleedStacks >= 3) ? 4 : 0;
+            => (rank >= 2 && enemyBleedStacks >= BleedWeakenThreshold) ? BleedWeakenAmount : 0;
+
+        /// <summary>出血 r2 失血衰弱が効き始める敵の出血。</summary>
+        public const int BleedWeakenThreshold = 3;
+        /// <summary>出血 r2 失血衰弱で引く敵の攻撃値 (2026-11-07 に 2 から 4)。</summary>
+        public const int BleedWeakenAmount = 4;
 
         /// <summary>会心 r2 研ぎ澄まし: 会心倍率 +0.8 (2026-11-07・+0.2 → +0.5 → +0.8)。</summary>
         public static float CritMulBonus(int rank) => rank >= 2 ? 0.8f : 0f;

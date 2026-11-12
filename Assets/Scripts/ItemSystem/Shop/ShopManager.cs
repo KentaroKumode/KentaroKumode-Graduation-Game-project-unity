@@ -731,7 +731,7 @@ namespace ItemSystem.Shop
             return picked;
         }
 
-        /// <summary>2026-07-25 v6: 種火 r1 で対応キーワード系アイテムの抽選重み +60%。
+        /// <summary>2026-07-25 v6: 種火 r1 で対応キーワード系アイテムの抽選重みを上げる (倍率の正本は MetaPanel.SparkAppearanceWeightMul)。
         /// Passive カテゴリのみに作用。 該当キーワードに属さないアイテムは重み 1.0 のまま。</summary>
         private CompleteItemData PickWithSparkBias(List<CompleteItemData> list, ShopSlotKind kind)
         {
