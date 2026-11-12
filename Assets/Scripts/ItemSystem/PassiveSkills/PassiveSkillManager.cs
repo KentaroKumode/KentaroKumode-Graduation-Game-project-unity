@@ -377,9 +377,6 @@ namespace ItemSystem.PassiveSkills
             triggeredPlayerSkills.Clear();
             triggeredEnemySkills.Clear();
 
-            // ターン開始時のバフを適用
-            ApplyCurrentTurnBuffs();
-
             FireTrigger(PassiveSkillTrigger.OnTurnStart);
         }
 
@@ -477,23 +474,6 @@ namespace ItemSystem.PassiveSkills
         }
 
         // ===========================================================
-        //  バフ適用
-        // ===========================================================
-
-        /// <summary>
-        /// currentBuffsの値をCombatContextに反映
-        /// </summary>
-        private void ApplyCurrentTurnBuffs()
-        {
-            if (context == null) return;
-
-            // ダイスボーナス → ProcessPostRoll内でplayerDiceTotalに加算
-            // 会心ボーナス  → ProcessDamage内のOnCriticalCheckで加算
-            // ダメージボーナス → ProcessDamage内で加算
-            // ここでは追加の即時適用処理があれば記述
-        }
-
-        // ===========================================================
         //  ダイスロール統合
         // ===========================================================
 
@@ -563,14 +543,10 @@ namespace ItemSystem.PassiveSkills
             // 勝敗トリガー発火
             if (context.playerWonRoll)
             {
-                context.consecutiveWins++;
-                context.consecutiveLosses = 0;
                 FireTrigger(PassiveSkillTrigger.OnRollWin);
             }
             else if (context.playerLostRoll)
             {
-                context.consecutiveLosses++;
-                context.consecutiveWins = 0;
                 FireTrigger(PassiveSkillTrigger.OnRollLose);
             }
             else
@@ -798,7 +774,7 @@ namespace ItemSystem.PassiveSkills
         // ===========================================================
 
         /// <summary>
-        /// ダイス出目の合計を計算し、各種ダイス補正（diceBonus / enemyDiceDebuff /
+        /// ダイス出目の合計を計算し、各種ダイス補正（enemyDiceDebuff /
         /// consEnemyDiceDebuff / enemyDiceTotalBonus / bossDiceBonus）を適用する。
         /// 通常ロールと引分リロールで共通。OnPostRoll パッシブによる加算はここでは扱わない。
         /// </summary>
@@ -807,10 +783,6 @@ namespace ItemSystem.PassiveSkills
             context.playerDiceTotal = Sum(playerDice);
             context.enemyDiceTotal = Sum(enemyDice);
             context.rawEnemyDiceTotal = context.enemyDiceTotal;   // [計装] 加算前を控える
-
-            // バフによるダイスボーナス（無我無心: カスタムダイス以外の補正を拒否）
-            if (!context.rollPurity)
-                context.playerDiceTotal += (int)context.GetBuff("diceBonus");
 
             // 瞬間研磨剤 (剣士スターター) は 2026-07-27 に「与ダメージ+150%」へ変更。
             // 旧実装は playerDiceTotal 加算だったが、相互攻撃モデル (ADR-0009) では

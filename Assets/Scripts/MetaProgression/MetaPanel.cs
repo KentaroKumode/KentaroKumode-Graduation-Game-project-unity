@@ -341,8 +341,7 @@ namespace MetaProgression
         public static int SupplyStartingOffers(int rank, int itemIndex)
             => rank >= 10 ? Mathf.Clamp(itemIndex + 1, 1, 3) : 1;
 
-        /// <summary>兵站: 戦闘後の物資減少軽減。 2026-09-12 廃止 (常に 0)。 2026-11-09 に戦闘の物資の損そのものを撤去。</summary>
-        public static int LanternProvisionLossReduce(int rank) => 0;
+        // [削除 2026-11-12] LanternProvisionLossReduce ── 兵站の戦闘後の物資減少軽減。 2026-09-12 から常に 0・呼ぶ側も無かった。
 
         /// <summary>兵站 (旧〈燈火〉・2026-11-09 改名): 物資上限 +1/段 (r10 で +10)。
         /// <para>2026-11-09: 物資のデノミ (1 歩 = 1・素の上限 20)。 旧 +150/段 (1 歩 50) の 1/50。
@@ -350,7 +349,7 @@ namespace MetaProgression
         /// r10 の極点は〈補給線〉に差し替える (未実装・GAME.md §23-21)。</para></summary>
         public static int LanternProvisionCapBonus(int rank) => Mathf.Clamp(rank, 0, 10) * 1;   // 2026-11-09: 上限 5 に合わせて +1/段 (2026-11-10 に兵站ごと枠から外した・MaxRank 0)
 
-        /// <summary><b>装甲 (2026-11-10): 防御 +2/段</b> (r10 で +20)。 r10〈不動〉は <see cref="ArmorImmovable"/>。
+        /// <summary><b>装甲 (2026-11-10): 防御 +2/段</b> (r10 で +20)。 r10〈不動〉は <see cref="ArmorHitCap"/>。
         /// <para>2026-11-10: +1/段 では 7 点 (防御 5→12) が外殻・出力に負けた (−9.6) ので +2/段 へ。
         /// 防御は逓減式 Rmax·D/(D+K) で軽減率になる (ADR-0013・今は 0.6 / 10)。 初期の防御 2 で軽減 10%、 r3 (8) で約 27%、 r10 (22) で約 41%。
         /// 武器の防御はこれとは別に足される。 相手の貫通に固定値で削られる。</para>
@@ -363,8 +362,8 @@ namespace MetaProgression
         public static int ArmorOpeningShield(int rank)
             => Mathf.Clamp(rank, 0, 10) * (GameLoop.GameHooks.ArmorShieldPerRankOverride >= 0 ? GameLoop.GameHooks.ArmorShieldPerRankOverride : ArmorShieldPerRank);
 
-        /// <summary>[2026-11-10 撤去] 旧 r10〈不動〉(失った HP 10% ごとに防御 +1)。 防御は逓減式で効きが鈍るので、 r10 は「一撃の上限」へ差し替えた。 常に 0。</summary>
-        public static int ArmorImmovable(int rank, int hp, int maxHp) => 0;
+        // [2026-11-10 撤去] 旧 r10〈不動〉(失った HP 10% ごとに防御 +1)。 防御は逓減式で効きが鈍るので、 r10 は「一撃の上限」(ArmorHitCap) へ差し替えた。
+        //   常に 0 を返す ArmorImmovable は 2026-11-12 に呼び出しごと削除。
 
         /// <summary><b>装甲: 被ダメージ −1/段</b> (敵の攻撃を防御で減らした後に N 引く・下限 1)。 防御の逓減を受けない引き算。
         /// 強すぎたら 2 段ごと (<see cref="ArmorFlatEvery"/>)。 [2026-11-10] 当初の「固定ダメージ −N」は、 敵に固定ダメージが無く常に 0 だったので戻した。</summary>

@@ -99,17 +99,12 @@ namespace MetaProgression
             => MetaPanel.PlunderPassiveDropPct(Rank(MetaPanelKind.Plunder));
 
         /// <summary>【v6 廃止】ダイス合計値補正。 相互攻撃モデルで「ダイス合計」概念自体が消滅したため常に 0。
-        /// 互換のため残置 (CombatManager 側の呼び出しはブランチガード込みで維持)。</summary>
+        /// 互換のため残置 (本体からの呼び出しは 2026-11-12 に外した。 AutoTest が参照している)。</summary>
         public static int GetDiceTotalBonus() => 0;
 
         // ============================================================
         //  物資ゲージ減少の軽減 (ADR-0002)
         // ============================================================
-
-        /// <summary>戦闘後の物資ゲージ減少の軽減量。 <b>2026-09-12 以降 常に 0</b>
-        /// (兵站の効果を物資上限へ移したため)。 呼び出し側の互換のため残置。</summary>
-        public static int GetProvisionLossReduction()
-            => MetaPanel.LanternProvisionLossReduce(Rank(MetaPanelKind.Lantern));
 
         /// <summary>兵站 r10〈補給線〉: この層で一度着いた前哨基地・店のあいだを物資 1 で跳べる (ターンを使わない・2026-11-09)。</summary>
         public static bool IsSupplyLineUnlocked() => Rank(MetaPanelKind.Lantern) >= 10;
@@ -126,9 +121,6 @@ namespace MetaProgression
         /// <summary>装甲: 開幕シールド (段 × 刻み)。</summary>
         public static int GetArmorOpeningShield() => MetaPanel.ArmorOpeningShield(Rank(MetaPanelKind.Armor));
 
-        /// <summary>装甲 r10〈不動〉: 失った HP 10% ごとに防御 +1 (最大 +9)。 r10 未満は 0。</summary>
-        public static int GetArmorImmovableDefense(int hp, int maxHp) => MetaPanel.ArmorImmovable(Rank(MetaPanelKind.Armor), hp, maxHp);
-
         /// <summary>兵站: 物資上限 +1/段 (0..10)。 2026-11-10 に枠から外した (常に 0)。</summary>
         public static int GetProvisionCapBonus()
             => MetaPanel.LanternProvisionCapBonus(Rank(MetaPanelKind.Lantern));
@@ -140,17 +132,6 @@ namespace MetaProgression
         /// <summary>特売品出現数 (0..3, 商才 r3/6/9)。</summary>
         public static int GetSaleItemCount()
             => MetaPanel.TradeSaleSlots(Rank(MetaPanelKind.Trade));
-
-        /// <summary>特売割引率の最小値 (%)。 表示用 (段テーブルの先頭)。</summary>
-        public static int GetSaleDiscountMinPct()
-            => MetaPanel.TradeSaleTiers(Rank(MetaPanelKind.Trade))[0];
-
-        /// <summary>特売割引率の最大値 (%)。 表示用 (段テーブルの末尾。 商才 r10 で 99)。</summary>
-        public static int GetSaleDiscountMaxPct()
-        {
-            var t = MetaPanel.TradeSaleTiers(Rank(MetaPanelKind.Trade));
-            return t[t.Length - 1];
-        }
 
         /// <summary>特売の割引率を重み付きで 1 つ引く (2026-09-12)。
         /// 段は <see cref="MetaPanel.TradeSaleTiers"/> (既定 {15,30,50} / r10 で 99 が加わる)。
@@ -171,9 +152,6 @@ namespace MetaProgression
             }
             return tiers[tiers.Length - 1];
         }
-
-        /// <summary>互換用: 旧 RollRefund は no-op (特売機構へ移行済)。</summary>
-        public static int RollRefund(int paidAmount, RunState run) => 0;
 
         // [廃止 2026-09-12] ボス追加報酬 (旧 強奪 r10)。
         //   単体で r10−r9 = +7.02pt と目標帯 (±3pt) の倍以上あり、

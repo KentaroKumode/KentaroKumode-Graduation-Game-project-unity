@@ -33,7 +33,7 @@ namespace AutoTest.EditorTests.Ultra
         /// and grows as later phases need it.</para>
         ///
         /// <para>Note on the <c>pending*</c> family: every one of them is an effect the
-        /// player armed by consuming an item (鑑定の眼鏡 / 加速の粉 / 奇襲 / 賭博師 …). Knowing
+        /// player armed by consuming an item (鑑定の眼鏡 / 奇襲 / 賭博師 …). Knowing
         /// "I used a thing and it is still queued" is not future knowledge ── the player used
         /// it. They are visible.</para></summary>
         private static readonly HashSet<string> PlayerVisibleFields = new HashSet<string>(StringComparer.Ordinal)
@@ -66,7 +66,7 @@ namespace AutoTest.EditorTests.Ultra
             // shop
             "shopRobberyDone", "shopRobberyInProgress", "robberyPendingItems", "nextShopHalfPrice",
             // armed consumable effects (the player spent an item for each of these)
-            "nextLootMinRarity", "pendingFirstRollTotal", "pendingEnemyStartHpCutPct",
+            "nextLootMinRarity", "pendingEnemyStartHpCutPct",
             "pendingGamblerDice", "pendingDaggerArmed", "pendingOathArmed",
             "pendingPolishArmed", "pendingRinkaiCarryover",
             "pendingConsAtkBurst", "pendingConsCrit", "pendingConsCritBattles",

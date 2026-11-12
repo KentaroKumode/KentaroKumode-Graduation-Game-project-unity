@@ -661,12 +661,6 @@ namespace CombatSystem
                     ctx.consReflect         = rs.pendingConsReflect;
                     ctx.consEnemyDiceDebuff = rs.pendingConsEnemyDiceDebuff;
                     ctx.gamblerArmed        = rs.pendingGamblerDice;
-                    if (rs.pendingFirstRollTotal > 0)
-                    {
-                        // 加速の粉: 初回ロール(turn1)のダイス合計+X。nextTurnBuffs→turn1でcurrentBuffsへ移行し適用。
-                        ctx.nextTurnBuffs["diceBonus"] =
-                            (ctx.nextTurnBuffs.TryGetValue("diceBonus", out var db) ? db : 0f) + rs.pendingFirstRollTotal;
-                    }
                     if (rs.pendingEnemyStartHpCutPct > 0)
                     {
                         int cut = Mathf.CeilToInt(enemy.maxHP * rs.pendingEnemyStartHpCutPct / 100f);
