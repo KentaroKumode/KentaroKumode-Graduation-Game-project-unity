@@ -47,6 +47,7 @@ namespace GameLoop
         {
             _instance = null;
             _shuttingDown = false;
+            EventKeysByScreen = false;
         }
 
         /// <summary>2026-06-28: 次ラン開始時に適用する職業。 UI / BOT が StartNewRun 前に書き込む。 デフォルト = 剣士。</summary>
@@ -494,6 +495,11 @@ namespace GameLoop
         /// <summary>画面が入力を丸ごと受けている間 true (ロード画面など)。 この間はキー入力を全部止める。</summary>
         public static bool InputBlockedByScreen;
 
+        /// <summary>イベントのキー (1〜9 で選ぶ・Space で結果を閉じる) を画面 (Game2DPhaseScreens の頁送り) が受けている間 true (2026-11-13)。
+        /// この間は下の EventEncounter のキーを読まない ── 読むと Space が結果の頁を飛ばして地図へ戻し、 数字が見えていない頁の選択肢を選ぶ。
+        /// 選ぶ・閉じるは画面が同じ関数 (<see cref="ResolveEventChoice"/> / <see cref="ConfirmEventEncounter"/>) を呼ぶ。 BOT はキーを使わないので関わらない。</summary>
+        public static bool EventKeysByScreen;
+
         /// <summary>戦闘の結果 (BattleResult) を画面がまだ見せている間 true (2026-11-11)。 戦闘はとどめの攻撃を解決した瞬間に
         /// BattleResult へ移るが、 画面はそこから攻撃・撃破の演出を流す。 この間に Space の確定が通ると、 演出の途中で報酬・層の終わりへ飛んでいた。</summary>
         public static bool BattleResultHeldByScreen;
@@ -596,9 +602,10 @@ namespace GameLoop
                 return;
             }
 
-            // EventEncounter 中: 1～9 で選択肢、Space でフレーバー読了
+            // EventEncounter 中: 1～9 で選択肢、Space でフレーバー読了 (画面が頁送りで受けている間は画面に任せる)
             if (CurrentPhase == GamePhase.EventEncounter)
             {
+                if (EventKeysByScreen) return;
                 if (!eventChoiceResolved)
                 {
                     var ev = EventEncounter.Instance?.Current;
