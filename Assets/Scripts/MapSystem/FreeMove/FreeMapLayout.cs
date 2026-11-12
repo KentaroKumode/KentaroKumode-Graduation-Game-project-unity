@@ -53,8 +53,15 @@ namespace MapSystem.FreeMove
         public List<Mountain> mountains = new List<Mountain>();
         public int start;
         public int goal;
-        /// <summary>6 層の「裂け目の記録」の点。 無い層は -1。</summary>
+        /// <summary>深さ 6 (画面の第 4 層) の「裂け目の記録」の固定の点 ── <b>旧い作り</b> (層の 3 分の 1 あたりの 1 点・踏まずに終点へ行けた)。
+        /// 今の作り (<see cref="riftGate"/>) の層と、 無い層は -1。</summary>
         public int fixedEvent = -1;
+        /// <summary>深さ 6 (画面の第 4 層) の終点 (ボス) に道で隣り合う点の全部 (2026-11-13・GAME.md §4-2)。 どれもイベントマスで、
+        /// 最初に踏んだ 1 つで「裂け目の記録」が起き、 残りは通常のイベントマスとして働く。 終点へは必ずどれかを通る。
+        /// 旧い作り (<see cref="fixedEvent"/>) の層と、 他の層は空。</summary>
+        public List<int> riftGate = new List<int>();
+        /// <summary>今の作りの深さ 6 で、 ボス前の休憩 (終点から 2 歩) とその隣の店を置けなかった (地図の形のせい)。 検算が数える。</summary>
+        public bool riftPrepFailed;
         /// <summary>5 層 (直線) の〈門〉のイベント点。 無い層は -1。 (効果は未実装 ── 旧い〈門〉の 3 つの代償を、 ここへ移す予定)</summary>
         public int gate = -1;
 
