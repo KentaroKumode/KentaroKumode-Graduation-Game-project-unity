@@ -308,7 +308,7 @@ namespace GameLoop
             string id = cands[System.Math.Max(0, System.Math.Min(pick, cands.Count - 1))];
             if (Run.ownedPassiveItems == null) Run.ownedPassiveItems = new System.Collections.Generic.List<string>();
             ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
-            Log($"メタ報酬: 開幕パッシブ「{id}」を選んで獲得");
+            Log($"メタ報酬: 開幕の秘宝「{id}」を選んで獲得");
         }
 
         private string PickStartingPassive(System.Collections.Generic.ICollection<string> alsoExclude = null)

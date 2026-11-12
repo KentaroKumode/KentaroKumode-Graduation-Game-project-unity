@@ -317,7 +317,7 @@ namespace GameLoop
                     if (Run.ownedPassiveItems == null)
                         Run.ownedPassiveItems = new System.Collections.Generic.List<string>();
                     ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
-                    Log($"メタ報酬: 開幕パッシブ「{id}」を獲得 ({sp + 1}/{startPassives})");
+                    Log($"メタ報酬: 開幕の秘宝「{id}」を獲得 ({sp + 1}/{startPassives})");
                 }
             }
 
@@ -332,7 +332,7 @@ namespace GameLoop
                     if (Run.ownedPassiveItems == null)
                         Run.ownedPassiveItems = new System.Collections.Generic.List<string>();
                     ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, id);
-                    Log($"メタ報酬: 種火 [{kw}] 開幕パッシブ「{id}」を獲得 ({k + 1}/{MetaProgression.MetaPanel.SparkStartingItemCount})");
+                    Log($"メタ報酬: 種火 [{kw}] 開幕の秘宝「{id}」を獲得 ({k + 1}/{MetaProgression.MetaPanel.SparkStartingItemCount})");
                 }
             }
 

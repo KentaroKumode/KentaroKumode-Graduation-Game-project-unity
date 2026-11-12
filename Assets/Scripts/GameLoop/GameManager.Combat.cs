@@ -250,7 +250,7 @@ namespace GameLoop
             int diceTotalBonus = passiveCount / 3;
             var enemy = baseEnemy.Clone();
             enemy.maxHP += hpBonus;
-            Log($"偽の商人[貪欲]: 所持パッシブ{passiveCount}個 → HP {baseEnemy.maxHP}→{enemy.maxHP}, ダイス合計+{diceTotalBonus}/ロール");
+            Log($"偽の商人[貪欲]: 所持する秘宝 {passiveCount}個 → HP {baseEnemy.maxHP}→{enemy.maxHP}, ダイス合計+{diceTotalBonus}/ロール");
 
             inFalseMerchantCombat = true;
             CurrentEnemy = enemy;

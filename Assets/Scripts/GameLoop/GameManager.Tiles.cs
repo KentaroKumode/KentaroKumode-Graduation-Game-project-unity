@@ -133,7 +133,7 @@ namespace GameLoop
             string resultId = PickHigherTierPassive(given.rarity);
             if (string.IsNullOrEmpty(resultId))
             {
-                Log("交換: 上位Tierのパッシブが無く成立せず");
+                Log("交換: 上位Tierの秘宝が無く成立せず");
                 SetPhase(GamePhase.MapNavigation);
                 return;
             }
