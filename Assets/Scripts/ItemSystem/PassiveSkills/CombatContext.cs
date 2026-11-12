@@ -232,13 +232,11 @@ namespace ItemSystem.PassiveSkills
         public bool healBlocked;
         /// <summary>[perTurn] 狂暴化(ボス50T後): エネミーが受けるダメージ倍率（1.0=等倍, 狂暴化中3.0）。BeginNewTurn でリセット。</summary>
         public float enemyDamageTakenMultiplier = 1f;
-        /// <summary>[persistent] プレイヤーが獲得する回復量・シールド量の減衰 (スタック分だけ減らす)。 戦闘を通じて持続。
-        /// <b>2026-10-17 時点で書き込む敵はいない</b> ── 唯一の書き手だった覚者〈天衣無縫〉を削除した。 機構だけ残してある。</summary>
-        public int healShieldReduction;
+        // (回復・シールドの減衰 healShieldReduction は、 書き手の〈天衣無縫〉が 2026-10-17 に消えたので 2026-11-12 に削除。 #128)
 
         // ===== 7層 ヴェスカ（遺物学者）。 正本: docs/GAME.md §13-4 =====
         // 4 段連戦を通じて CombatContext は使い回されるため、 [persistent] 指定のものは
-        // 段が変わっても引き継がれる（healShieldReduction と同じ扱い）。
+        // 段が変わっても引き継がれる。
 
         /// <summary>[persistent] ヴェスカのシールド。 §6-3 段0 で **半減(切り捨て) → 抽選付与** の順に処理する。
         /// 定常上限は「毎ターン収入 × 2」で自動的に決まるため別途キャップ不要。</summary>

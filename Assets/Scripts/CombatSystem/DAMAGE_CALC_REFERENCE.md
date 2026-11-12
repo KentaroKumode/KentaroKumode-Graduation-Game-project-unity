@@ -38,7 +38,7 @@
 
 **スワップされない共有フィールド**（敵パッシブが書くと実値に直接効く）:
 `enemyDiceTotalBonus` / `bossDiceBonus` / `enemyDefense` / `enemyArmorPen` / `enemyThreat` /
-`enemyDamageTakenMultiplier` / `healBlocked` / `healShieldReduction` / `accumulatedValues` /
+`enemyDamageTakenMultiplier` / `healBlocked` / `accumulatedValues` /
 `currentBuffs` / `nextTurnBuffs` / `pendingEnemySwapId`
 （`ashenSuddenDeath` / `myokakuSuddenDeath` はコードから消えている。）
 
@@ -282,7 +282,7 @@ ShieldBash の空振り（盾 0）が 34.2% → 66.1%、1 機会あたりの攻�
 | `fixedDamageMultiplier`【新】 | 軽減無視ダメ倍率(蒼白の槍騎士1.5)。ProcessDamage末＆引分分岐で fixedDamageToEnemy に乗算 | 戦闘保持(既定1.0) |
 | `outgoingDamageMultiplier` | プレイヤー与ダメ倍率(激情の刃) | 毎T1.0 |
 | `enemyDamageTakenMultiplier` | 敵被ダメ倍率(狂暴化×3) | 毎T1.0 |
-| `healBlocked`/`healShieldReduction`/`lifestealPct` | 回復封印/回復・シールド減衰量/与ダメ回復% | healBlocked毎T,lifesteal毎T,reductionは戦闘保持 |
+| `healBlocked`/`lifestealPct` | 回復封印/与ダメ回復% | 毎T |
 | `playerFlatDamageReduction` | 被ダメ定額減(不屈の鎧/苦難の刻印) | BeginNewTurn |
 | `receivedDamageBonus` | 被ダメ増(亡者の招待+30%) | — |
 | `halveFirstEnemyAttack`/`playerDamageNegateCharges`/`nullifyFirstEnemyRoll` | 共助/獣の絆/獣の恩義 | フラグ消費 |
@@ -573,8 +573,7 @@ Passive カテゴリのシナジー武器群。4枚がインベントリに揃�
 
 ### 3-G. ステータス統一フレーム（2026-06-05・`StatusEffectSystem.cs` ＋ `CombatContext`）
 
-汎用ステータス層（#3）。**加算的導入**：既存の出血(`enemyBleedStacks`)/威圧(`enemyThreat`)/負傷
-(`healShieldReduction`)/敵ダイス減 等は**バランス済みのため現状フィールドのまま据え置き**、本フレームは
+汎用ステータス層（#3）。**加算的導入**：既存の出血(`enemyBleedStacks`)/威圧(`enemyThreat`)/敵ダイス減 等は**バランス済みのため現状フィールドのまま据え置き**、本フレームは
 新ステータス用＋パイロットとして **炎上(burn) のみ移行**した。
 
 - 保持: `CombatContext.playerStatusStacks` / `enemyStatusStacks`（id→stacks・**絶対視点**＝視点スワップしない）。

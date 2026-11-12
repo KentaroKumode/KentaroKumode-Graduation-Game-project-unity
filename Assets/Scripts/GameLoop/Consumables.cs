@@ -307,12 +307,12 @@ namespace GameLoop
             return true;
         }
 
-        /// <summary>開幕シールド (cons_def_*)。 戦闘中持続 (expireTurn=-1)、 天衣無縫減衰を適用。</summary>
+        /// <summary>開幕シールド (cons_def_*)。 戦闘中持続 (expireTurn=-1)。</summary>
         private static bool AddShield(RunState run, CombatContext ctx, int amount)
         {
             if (ctx != null)
             {
-                int gained = Mathf.Max(0, amount - ctx.healShieldReduction);
+                int gained = Mathf.Max(0, amount);
                 ctx.consShield += gained;
                 CombatSystem.ShieldDiag.Note("消耗品", gained);
                 ctx.shieldGainedTotal += gained;

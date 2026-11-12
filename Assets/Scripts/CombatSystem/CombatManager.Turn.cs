@@ -1265,7 +1265,7 @@ namespace CombatSystem
             }
             if (ctx.shieldOnWinPct > 0f && dealtDmg > 0)
             {
-                int sh = Mathf.CeilToInt(dealtDmg * ctx.shieldOnWinPct) - ctx.healShieldReduction;
+                int sh = Mathf.CeilToInt(dealtDmg * ctx.shieldOnWinPct);
                 if (sh > 0)
                 {
                     ShieldDiag.Note("与ダメのシールド化", sh);

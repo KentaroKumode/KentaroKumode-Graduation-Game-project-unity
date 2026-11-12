@@ -785,7 +785,7 @@ lore 的には「ギルド管轄も 5 層まで」「5 層を抜けた時点で�
 
 **スワップされない共有フィールド**（敵が書くと実値に直接効く）:
 `enemyDiceTotalBonus` / `bossDiceBonus` / `enemyDamageReductionPct` / `enemyThreat` /
-`enemyDamageTakenMultiplier` / `healBlocked` / `healShieldReduction` / `accumulatedValues` /
+`enemyDamageTakenMultiplier` / `healBlocked` / `accumulatedValues` /
 `ashenSuddenDeath` / `myokakuSuddenDeath` / `pendingEnemySwapId`
 
 ---

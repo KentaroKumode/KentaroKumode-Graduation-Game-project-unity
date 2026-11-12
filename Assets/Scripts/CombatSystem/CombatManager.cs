@@ -280,13 +280,6 @@ namespace CombatSystem
             amount = GameLoop.GateFlaws.ApplyRepairPenalty(GameLoop.GameManager.Instance?.Run, amount);
             if (amount <= 0) return 0;
 
-            // 〈天衣無縫〉: 獲得回復量をスタック分減衰（0未満は0）
-            if (psmCtxForHeal != null && psmCtxForHeal.healShieldReduction > 0)
-            {
-                amount = Math.Max(0, amount - psmCtxForHeal.healShieldReduction);
-                if (amount <= 0) return 0;
-            }
-
             MetaProgression.Achievements.AchievementService.NoteHealRequested(amount);
             int oldHP = playerHP;
             int newHP = Math.Min(playerMaxHP, playerHP + amount);
@@ -702,7 +695,7 @@ namespace CombatSystem
                 }
                 if (openingShield > 0)
                 {
-                    int gained = Math.Max(0, openingShield - ctx.healShieldReduction); // 天衣無縫減衰
+                    int gained = openingShield;
                     ctx.consShield += gained;
                     ShieldDiag.Note("遺物・防御r10持ち越し", gained);
                     ctx.shieldGainedTotal += gained;
