@@ -13,7 +13,6 @@ using MapSystem;
 using EventSystem;
 using ItemSystem;
 using ItemSystem.Shop;
-using AutoTest.Ultra;
 
 namespace AutoTest
 {
@@ -97,38 +96,6 @@ namespace AutoTest
             }
         }
 
-        private void EmitUltraProductionBatchCompletion(string outputDirectory)
-        {
-            if (!ultraProductionWorkerMode && UltraProductionBatchCompleted == null) return;
-
-            int expected = ultraProductionExpectedRuns > 0
-                ? ultraProductionExpectedRuns
-                : _ultraProductionRuns.Count;
-            bool countMatches = _ultraProductionRuns.Count == expected;
-            var batch = new UltraProductionBatchRecord
-            {
-                policyId = ultraProductionPolicyId ?? "",
-                scenarioSeedVectorHash = ultraProductionScenarioSeedVectorHash ?? "",
-                runs = _ultraProductionRuns.ToArray(),
-                outputPath = outputDirectory ?? "",
-                artifactPath = _lastSummaryPath ?? "",
-                artifactSha256 = Sha256File(_lastSummaryPath),
-                completedNormally = countMatches,
-                failureCode = countMatches ? "" : "RUN_COUNT_MISMATCH",
-            };
-
-            try { UltraProductionBatchCompleted?.Invoke(batch); }
-            catch (Exception ex)
-            {
-                batch.completedNormally = false;
-                batch.failureCode = "COMPLETION_CALLBACK_FAILED";
-                Debug.LogError("[AutoRunner][UltraWorker] batch completion callback failed: " + ex.Message);
-            }
-
-            if (ultraProductionWorkerMode && !Application.isEditor)
-                Application.Quit(batch.completedNormally ? 0 : 2);
-        }
-
         private IEnumerator RunChallengeFixedSweep()
         {
             bool prevSuppress = MetaProgression.MetaBuffApplicator.SuppressRelicGrant;
@@ -184,33 +151,8 @@ namespace AutoTest
                     //   これが無いと GameRng の counters が clear されず run 塩も derive されない。
                     //   結果、 ラン間で乱数列が引き継がれて挙動が壊れる (2026-08-04 修正)。
                     int runIdx = 10000 + si * runs + i;
-                    if (_ultraBatchActive)
-                    {
-                        bool beganRun;
-                        string beginRunReason;
-                        try { beganRun = _ultraController.TryBeginRun(runIdx, out beginRunReason); }
-                        catch (Exception ex)
-                        {
-                            beganRun = false;
-                            beginRunReason = ex.GetType().Name + ": " + ex.Message;
-                        }
-                        if (!beganRun)
-                        {
-                            FailUltraDuringBatch("run " + runIdx + " rejected: " + beginRunReason);
-                            RestoreChallengeFixedSweepState(prevSuppress, prevPickMode, prevHidden5, prevBD);
-                            yield break;
-                        }
-                    }
-                    int productionOrdinal = si * runs + i;
-                    if (ultraProductionWorkerMode)
-                    {
-                        BeginUltraProductionScenario(productionOrdinal, runIdx);
-                    }
-                    else
-                    {
-                        _currentUltraProductionScenarioSeed = 0UL;
-                        GameLoop.GameRng.BeginRun(runIdx);
-                    }
+                    // (旧 Ultra の候補ワーカーはここで合成シードへ差し替えていた・2026-11-13 削除・#135)
+                    GameLoop.GameRng.BeginRun(runIdx);
                     RebuildRunRng(runIdx);
                     _currentPersona = BuildPersona.Standard;
                     yield return RunOne(runIdx);
@@ -221,23 +163,6 @@ namespace AutoTest
                     reach[Mathf.Clamp(reached, 0, 8)]++; sumFloor += reached;
                     if (cf >= 5) c5++;
                     if (cf >= 7) c7++;
-                    if (_ultraBatchActive)
-                    {
-                        int completedRuns = si * runs + i + 1;
-                        string runSummary = "run=" + runIdx
-                            + " floor=" + reached
-                            + " outcome=" + (rec != null ? rec.outcome.ToString() : "NO_RECORD");
-                        UltraProgressHub.ReportRunCompleted(
-                            _ultraProgressSession, completedRuns, runSummary);
-                        try { _ultraController.CompleteRun(runIdx, runSummary); }
-                        catch (Exception ex)
-                        {
-                            FailUltraDuringBatch("run completion callback failed: "
-                                + ex.GetType().Name + ": " + ex.Message);
-                            RestoreChallengeFixedSweepState(prevSuppress, prevPickMode, prevHidden5, prevBD);
-                            yield break;
-                        }
-                    }
                     if ((i + 1) == 1 || (i + 1) % 10 == 0 || (i + 1) == runs)
                     {
                         try
@@ -289,31 +214,6 @@ namespace AutoTest
             MetaProgression.MetaBuffApplicator.SuppressRelicGrant = previousRelicSuppression;
             GameLoop.GameManager.SuppressLayer5HiddenBoss = previousHiddenBossSuppression;
             GameLoop.GameManager.GrantBladeDanceOnFloor5Clear = previousBladeDanceGrant;
-        }
-
-        private void CompleteUltraBatchIfActive(string summary)
-        {
-            if (!_ultraBatchActive) return;
-            UltraProgressHub.Complete(_ultraProgressSession, summary);
-            try { _ultraController?.CompleteBatch(summary); }
-            catch (Exception ex)
-            {
-                Debug.LogError("[AutoRunner][Ultra] completion callback failed: " + ex.Message);
-            }
-            try { _ultraController?.Dispose(); } catch { }
-            _ultraController = null;
-            _ultraBatchActive = false;
-        }
-
-        private void FailUltraDuringBatch(string reason)
-        {
-            string detail = string.IsNullOrEmpty(reason) ? "unknown Ultra batch failure" : reason;
-            UltraProgressHub.Fail(_ultraProgressSession, detail);
-            try { _ultraController?.Cancel(detail); } catch { }
-            try { _ultraController?.Dispose(); } catch { }
-            _ultraController = null;
-            _ultraBatchActive = false;
-            Debug.LogError("[AutoRunner][Ultra] BATCH ABORTED: " + detail);
         }
 
         /// <summary>遺物 単軸スイープ。 **軸 1 本だけを載せて、その軸の寄与を切り出す。**

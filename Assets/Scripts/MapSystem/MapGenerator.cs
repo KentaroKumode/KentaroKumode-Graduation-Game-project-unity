@@ -17,11 +17,6 @@ namespace MapSystem
     /// </summary>
     public static class MapGenerator
     {
-        /// <summary>マスの抽選重み（読み取り専用）。 層によらず同じ表。
-        /// Ultra の veil が同じ分布から引き直すために公開している（自由移動の層では veil 自体が無効）。</summary>
-        public static IReadOnlyList<(TileType type, float weight)> RandomRowTileWeights(int floor)
-            => FreeMapGenerator.TileWeights;
-
         /// <summary>ボスノードを置くフロア (1/3/5/6/8)。 正本は <see cref="FloorPlan.HasBoss"/>。
         /// 7 層の終点は〈門〉で、 ヴェスカは門の転移先 (8 層) に座る。</summary>
         public static bool HasBoss(int floor) => FloorPlan.HasBoss(floor);

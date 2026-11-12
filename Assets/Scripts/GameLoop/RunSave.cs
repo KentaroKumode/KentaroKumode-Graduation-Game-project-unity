@@ -23,7 +23,7 @@ namespace GameLoop
     /// <para><b>決定性:</b> 乱数 (<see cref="GameRng"/>) は塩とキー別カウンタを、 戦闘の通し番号 (<c>CombatManager._combatSeq</c>) も写す。
     /// 中断せずに続けた場合と同じ乱数の続きになる (BOT の同一シード比較の前提を壊さない)。</para>
     ///
-    /// <para><b>RunState はリフレクションで全部写す</b> (Ultra の <c>UltraRunSnapshot</c> と同じ考え方)。 手書きの一覧にすると、
+    /// <para><b>RunState はリフレクションで全部写す</b> (旧 Ultra の <c>UltraRunSnapshot</c> (2026-11-13 削除・#135) と同じ考え方)。 手書きの一覧にすると、
     /// 新しく足したフィールドが黙って抜け落ち、 再開したランが「別のラン」になっても誰も気付けない。 写せない型のフィールドが
     /// 足されたらセーブを断って error を出す。 フィールドの名前と型の並びの指紋 (<see cref="Data.schema"/>) が違うセーブは読まずに捨てる。</para>
     ///

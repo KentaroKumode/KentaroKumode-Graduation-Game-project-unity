@@ -229,7 +229,7 @@ namespace GameLoop
             // **戦闘終了イベントの購読をここで確実にする。**
             //   購読は Start() で 1 回だけ張っていたが、 それだと
             //   「GameManager の Start より後に CombatManager の実体が入れ替わる」順序で
-            //   購読が宙に浮く。 実際 Ultra の episode worker で発生し、 戦闘は 13T 走って
+            //   購読が宙に浮く。 実際 旧 Ultra の episode worker (2026-11-13 削除) で発生し、 戦闘は 13T 走って
             //   勝っているのに**誰も聞いていない**のでフェーズが Combat のまま止まった。
             //   ラン開始ごとに張り直せば、 起動順に依存しなくなる。
             //   `-=` を先に呼ぶので二重購読にはならない (未購読への -= は無害)。
@@ -423,19 +423,6 @@ namespace GameLoop
             }
 
             ActivateTile(mm.CurrentNode);
-        }
-
-        /// <summary>Ultra worker 用: 復元済みの状態から指定フェーズへ入り直す。
-        /// **通常のゲーム進行では呼ばれない。**
-        ///
-        /// <para><see cref="StartNewRun"/> で正規に初期化した直後に、
-        /// <c>Run</c> の中身とマップを checkpoint で上書きしてから呼ぶ想定。
-        /// <see cref="SetPhase"/> をそのまま通すので、 ボスなし層のクリア判定など
-        /// フェーズ遷移に紐づく規則も**通常と同じように効く** ── ここだけ別経路にすると、
-        /// worker の中でだけ規則が違うという最悪の形になる。</para></summary>
-        public void ResumeAtPhase(GamePhase phase)
-        {
-            SetPhase(phase);
         }
 
         private void SetPhase(GamePhase newPhase)

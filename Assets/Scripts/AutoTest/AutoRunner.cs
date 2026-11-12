@@ -13,7 +13,6 @@ using MapSystem;
 using EventSystem;
 using ItemSystem;
 using ItemSystem.Shop;
-using AutoTest.Ultra;
 
 namespace AutoTest
 {
@@ -126,21 +125,21 @@ namespace AutoTest
             ///
             /// <para><b>末尾に足すこと。</b> 既存値の番号を動かすとセーブ/EditorPrefs が壊れる。</para></summary>
             Exact,
-            /// <summary>Production worker が実ゲームを使って Super の基準手を改善する方策。
-            /// 未登録・build不一致・checkpoint不完全では開始せず、実行中の個別判断失敗時だけ
-            /// 同じ状態で先に確保した Super の基準手へ戻る。</summary>
+            /// <summary>Ultra: 旧い「方策の組を並列ワーカーで測って最良を選び、 判断ごとに rollout で手を選ぶ」技量。
+            ///
+            /// <para><b>2026-11-13 に削除した (#135)。</b> 方策の組の中身は Super の設定違いで、 rollout の sink は
+            /// Ultra のメニューからしか立たなかった (通常のランでは 1 度も通っていない)。 値は保存済みの設定
+            /// (EditorPrefs の番号・並列ワーカーの config) のために残す。 選ばれていたら <see cref="Begin"/> が Super に読み替える。</para>
+            ///
+            /// <para><b>末尾に足すこと。</b> 既存値の番号を動かすとセーブ/EditorPrefs が壊れる。</para></summary>
             Ultra,
         }
         [Tooltip("配線方策の技量。同一シードで Naive/Optimal/Super を比較すると技量帯が測れる")]
         public WiringSkill wiringSkill = WiringSkill.Optimal;
-        [NonSerialized] private WiringSkill _ultraSelectedBaseSkill = WiringSkill.Super;
 
-        /// <summary>
-        /// Ultra が候補を採用できない判断で使う production baseline。
-        /// 表示・記録上の技量は <see cref="wiringSkill"/> の Ultra を維持する。
-        /// </summary>
+        /// <summary>判断に使う技量。 旧 Ultra (4) は <see cref="Begin"/> が Super に読み替えるので、 ここでも Super として読む。</summary>
         public WiringSkill EffectiveWiringSkill
-            => wiringSkill == WiringSkill.Ultra ? _ultraSelectedBaseSkill : wiringSkill;
+            => wiringSkill == WiringSkill.Ultra ? WiringSkill.Super : wiringSkill;
 
         /// <summary>SuperV3 の実験スイッチ (Optimal + 改善案)。 全 OFF なら Optimal と同一。</summary>
         public V3Flags v3 = new V3Flags();
@@ -221,11 +220,6 @@ namespace AutoTest
         private bool IsAxisFocusItem(string itemId)
             => !string.IsNullOrEmpty(buyAxisFocus) && !string.IsNullOrEmpty(itemId)
             && ItemSystem.ItemDatabase.Instance?.GetItem(itemId)?.axis == buyAxisFocus;
-
-        [NonSerialized] private IUltraAutoRunController _ultraController;
-        [NonSerialized] private UltraAutoRunProfile _ultraProfile;
-        [NonSerialized] private UltraProgressSession _ultraProgressSession;
-        [NonSerialized] private bool _ultraBatchActive;
 
         [Header("天井AI・最大難度ルーチン")]
         [Tooltip("満点難度のSuperだけ、6層固定ショップで所持金を高分散な再入荷へ全投入する")]
@@ -513,8 +507,7 @@ namespace AutoTest
         // [削除 2026-11-12] simDice ── スイープ対象のダイス。 ダイスの品は 2026-08-17 に廃止 (items.json に 0 件) で、
         //   有効な ID が 0 本になり、 スイープ全体が「有効な武器/ダイスIDがありません」で止まっていた。
 
-        // (旧 Λ層の撤退条件 lambdaFarmTiles は 2026-11-12 に削除・#135。 Ultra の方策仕様 UltraPortfolioPolicySpec には
-        //  ワーカーとの取り決め (候補集合のハッシュ = ワーカーの actionFingerprint) として値だけ残っている)
+        // (旧 Λ層の撤退条件 lambdaFarmTiles は 2026-11-12 に削除・#135。 値だけ残っていた Ultra の方策仕様も 2026-11-13 に削除)
 
         [Header("固定難易度スイープ")]
         [Tooltip("true で 挑戦スコアを固定値ごとに振り、最良遺物で 7 層クリアが成立するかを測る")]
@@ -547,7 +540,7 @@ namespace AutoTest
             : MetaProfileHelper.BotLearningRoot(BotLearningBandScore);
 
         /// <summary>いまの挑戦の「点数」。 2026-11-10 に旧配点方式を撤去したので、 挑戦カードの難易度 × <see cref="ScorePerDifficulty"/> で読み替える
-        /// (学習の帯 `bot_band_*`・Ultra の基準 50 点・測定の口の点数をそのまま使えるようにするため)。</summary>
+        /// (学習の帯 `bot_band_*`・旧 Ultra の基準 50 点・測定の口の点数をそのまま使えるようにするため)。</summary>
         private static int CurrentChallengeScore()
             => (MetaProgression.MetaProgressManager.Instance?.State?.challengeDifficulty ?? 0) * ScorePerDifficulty;
         /// <summary>旧配点の点数と挑戦カードの難易度の読み替え (50 点 = 難易度 10)。</summary>
@@ -1111,7 +1104,7 @@ namespace AutoTest
         public int botLearningBandOverride = -1;
         /// <summary>[測定] 学習データ (item_stats.json・ITT の序列・戦闘名の危険度) が読めない時に、 その腕をエラーで止める (既定 true・2026-11-12・#118)。
         /// これまでは帯のフォルダが無いと黙って手書きの S/A リストへ落ち、 難易度 1〜3 のクリア率が 0% になっていた。
-        /// <para>止めないのは、 学習を作る経路 (learnTier / learnBotAi・並列学習の回 (learningWorker で measureNoExplore でない)・ITT の付与試行・Tier 較正) と Ultra。
+        /// <para>止めないのは、 学習を作る経路 (learnTier / learnBotAi・並列学習の回 (learningWorker で measureNoExplore でない)・ITT の付与試行・Tier 較正)。
         /// 最初の学習の回は空から始めるので、 そこを止めると学習が作れない。 止めない時もサマリーと実効状態の行には必ず出す。</para></summary>
         public bool failOnMissingLearning = true;
 
@@ -1555,119 +1548,14 @@ namespace AutoTest
         private bool _curCombatAverse;
         private bool _curBossNear;   // 直近のDoNavigateで判定したボス接近フラグ（休憩判断で参照）
 
-        /// <summary>Ultra controller。 **null が既定**で、 null の間は決定経路に一切触れない
-        /// （既存の全基準値を保つため）。 差すと対応済みの決定点だけが委譲される。</summary>
-        [NonSerialized] public AutoTest.Ultra.IUltraDecisionSink ultraSink;
-        /// <summary>現ランで Ultra の評価に費やした実時間。 番犬から差し引く
-        /// (worker 待ちは「固着」ではない)。 集計には使わない診断値。</summary>
-        [NonSerialized] private float _ultraThinkingSeconds;
-        /// <summary>バッチ全体で Ultra の評価に費やした実時間。 サマリに出す。</summary>
-        [NonSerialized] private float _ultraThinkingSecondsTotal;
+        // (技量の Ultra の口 ── 判断を委ねる sink・フレームを跨ぐ決定の保留・思考時間の控除・checkpoint の採取と resume ──
+        //  は 2026-11-13 に削除・#135。 sink は Ultra のメニューからしか立たず、 通常のランでは null で何もしていなかった)
 
-        // ===== Ultra: フレームを跨ぐ決定 =====
-        //
-        //  worker を同期で待つとメインスレッドが数秒停車し、 Editor が 1 フレームも
-        //  描画しない。 決定を「開始」と「回収」に割り、 待っている間はフレームを返す。
-        /// <summary>進行中の Ultra 決定。 null でない間、 盤面を進めてはならない。</summary>
-        [NonSerialized] private AutoTest.Ultra.UltraPendingDecision _ultraPending;
-        /// <summary>保留中の決定が却下されたときに使う生産方策の手。
-        /// **待機中に再計算してはいけない** ── 探索経路は RNG を消費し得るので、
-        /// 毎フレーム引き直すと再現性が壊れる。</summary>
-        [NonSerialized] private MapNode _ultraPendingProductionChoice;
-        /// <summary>保留中の決定を発行した checkpoint。 回収時の commit 検証に要る。</summary>
-        [NonSerialized] private AutoTest.Ultra.UltraCheckpoint _ultraPendingCheckpoint;
-        [NonSerialized] private float _ultraWaitBeganRt;
-        /// <summary>run ループ用: 直前の Step が worker 待ちで空回りしたか。
-        /// ストール検出と反復上限から除外する ── 盤面は意図的に止まっているのであって
-        /// 固着ではない。 除外し忘れると待機がそのまま DEADLOCK になる。</summary>
-        [NonSerialized] private bool _ultraWaiting;
-        /// <summary>ラン内で単調増加する決定機会の番号。 stale な回答を弾く鍵。</summary>
-        private int _ultraEpoch;
-        /// <summary>直近に生産方策へ落ちた理由。 サマリへ出して「実は一度も効いていない」を可視化する。</summary>
-        private string _ultraLastFallbackReason;
-
-        /// <summary>休憩の 2 択。 添字を直書きしないための定数
-        /// （生産方策の分岐と Ultra の選択肢と適用の 3 箇所で一致している必要がある）。</summary>
+        /// <summary>休憩の 2 択。 添字を直書きしないための定数 (生産方策の分岐と適用で一致している必要がある)。</summary>
         private const int RestHealIndex = 0, RestUpgradeIndex = 1;
 
-        /// <summary>実ランの途中で checkpoint を 1 つ書き出す先。 **既定は空＝何もしない**。
-        ///
-        /// <para>合成した盤面では rollout のコストが測れない ── 手組みの <c>RunState</c> は
-        /// 装備もダイスも既定のままで、 戦闘に入った瞬間に固着する。
-        /// <c>RunState.Initialize</c> と <c>MapGenerator.Generate</c> は
-        /// メタ進行のシングルトンに触るため play mode 外では呼べないので、
-        /// **実ランの中で採る**しかない。</para></summary>
-        [NonSerialized] public string ultraCaptureCheckpointPath = "";
-        /// <summary>何回目のマップ航行で採るか。 序盤すぎると選択肢が乏しく、
-        /// 遅すぎるとランが終わっている。</summary>
-        [NonSerialized] public int ultraCaptureAtNavigation = 6;
-        private int _ultraNavSeen;
-        private bool _ultraCaptured;
         /// <summary>「戦闘フェーズなのに戦闘が動いていない」が連続した回数。 20 で 1 回だけ吠える。</summary>
         private int _combatInactiveStreak;
-        /// <summary>resume の実効状態。 サマリへ出す ── ラン中の Log は
-        /// <c>filterLogType=Error</c> で落ちるので、 これが唯一の記録になる。</summary>
-        private string _ultraResumeLine = "";
-
-        /// <summary>Ultra worker がラン途中から再開するための checkpoint。 **既定 null**。
-        /// null の間は <see cref="RunOne"/> は従来どおり新規ランから始まる。</summary>
-        [NonSerialized] public AutoTest.Ultra.UltraResumePayload ultraResumeFrom;
-        /// <summary>再開直後に 1 手だけ強制する行動 id。 空なら方策が普通に選ぶ。
-        /// rollout は「この手を打ったら」を測るので、 最初の 1 手だけ差し替える。</summary>
-        [NonSerialized] public string ultraResumeForcedActionId;
-
-        /// <summary>checkpoint をラン状態へ流し込む。
-        ///
-        /// <para><see cref="GameManager.StartNewRun"/> が正規に走った**後**に呼ぶ ──
-        /// パッシブレジストリのリセットや戦闘乱数の通し番号リセットといった
-        /// 「新規ランで必ず起きること」を飛ばしたくないため。 上書きするのは
-        /// <c>Run</c> の中身とマップだけで、 シングルトンの初期化経路には手を入れない。</para>
-        ///
-        /// <para><c>Run</c> オブジェクトは差し替えず**中身を書き換える**。 他所が
-        /// 参照を掴んでいても矛盾しないので、 差し替えより安全。</para></summary>
-        private bool TryApplyUltraResume(GameManager gm, out string failure)
-        {
-            failure = null;
-            var payload = ultraResumeFrom;
-            if (payload == null) { failure = "payload is null"; return false; }
-            if (gm?.Run == null) { failure = "run was not initialised"; return false; }
-
-            var mm = MapManager.Instance;
-            if (mm == null) { failure = "MapManager is unavailable"; return false; }
-
-            try
-            {
-                payload.run.RestoreInto(gm.Run);
-                mm.RestoreState(payload.map.BuildMap(), payload.map.currentNodeId);
-                gm.ResumeAtPhase(GameManager.GamePhase.MapNavigation);
-            }
-            catch (Exception ex)
-            {
-                failure = ex.GetType().Name + ": " + ex.Message;
-                return false;
-            }
-
-            // **成否を必ず印字する。** 失敗は Crash で落ちるので分かるが、 成功したのに
-            //   その後の挙動がおかしい場合、 復元されたのかどうかが分からないと切り分けられない。
-            //   実際 1 回目の実走で「戦闘が始まらない」を追うのに、 この行が無くて詰まった。
-            _ultraResumeLine = $"{gm.Run.Depth}層"
-                    + $" / 現在地 {mm.CurrentNode?.id ?? "?"} (要求 {payload.map.currentNodeId})"
-                    + $" / HP {gm.Run.playerHP}/{gm.Run.playerMaxHP}"
-                    + $" / 武器 {gm.Run.equippedWeaponId}+{gm.Run.weaponPlus}"
-                    + $" / パーツ {gm.Run.diceFaceParts?.Count ?? 0}"
-                    + $" / 強制手 '{ultraResumeForcedActionId}'"
-                    + $" / 合法手 {(mm.GetAvailableMoves()?.Count ?? -1)}";
-            Debug.Log("[AutoRunner][Ultra] resume 完了: " + _ultraResumeLine);
-
-            _ultraEpoch = payload.epoch;
-            // 再開直後の 1 手だけを固定する sink。 以降は通常の方策が打つ ──
-            //   rollout が測っているのは「この手を打った後、生産方策が最後まで打つ」なので、
-            //   2 手目以降まで固定すると別の量を測ることになる。
-            if (!string.IsNullOrEmpty(ultraResumeForcedActionId))
-                ultraSink = new AutoTest.Ultra.UltraForcedFirstActionSink(ultraResumeForcedActionId);
-
-            return true;
-        }
         // 現戦闘のターン内訳タリー（OnEnemyEncounteredでリセット、ExecuteTurnで加算）
         private int _cwWin, _cwDraw, _cwLoss, _cwLossAbs;
 
@@ -1685,26 +1573,18 @@ namespace AutoTest
         public static PolicyParameters PairedChallengerPolicy;
         /// <summary>ベースラインポリシーのスナップショット (バッチ開始時に固定)。</summary>
         private PolicyParameters _baselinePolicySnap;
-        /// <summary>
-        /// Standalone production workerまたはUltra run-start plannerが固定した方策。
-        /// RunBatch内のdisk reloadより後に適用し、バッチ中は同じcloneを使い続ける。
-        /// nullなら従来どおりdisk上の方策を使う。
-        /// </summary>
-        [NonSerialized] public PolicyParameters forcedPolicyParameters;
-        [NonSerialized] public bool ultraProductionWorkerMode;
-        [NonSerialized] public int ultraProductionExpectedRuns;
-        [NonSerialized] public string ultraProductionPolicyId = "";
-        [NonSerialized] public string ultraProductionScenarioSeedVectorHash = "";
-        [NonSerialized] public ulong[] ultraProductionScenarioSeeds;
+        // (Ultra の方策の組の候補ワーカー (合成シード・方策の固定 forcedPolicyParameters・ultraProduction*) は
+        //  2026-11-13 に削除・#135)
+        /// <summary>並列ワーカーの出力先 (空 = 通常の AutoRunLogs)。 RankMarginWorkerBootstrap が立てる。</summary>
         [NonSerialized] public string productionOutputRootOverride = "";
 
         /// <summary>r9/r10 比較の<b>並列ワーカー</b>モード。 1 プロセス = 1 アームのシード区間。
         ///
-        /// <para>Ultra の production worker と違い、 合成シードもポリシー固定も使わない。
+        /// <para>合成シードもポリシー固定も使わない。
         /// 通常バッチと**同じ <c>runIdx</c> のまま**区間だけを切り出すので、
         /// 逐次スイープと digest が一致する (それが唯一の検算手段)。</para>
         ///
-        /// <para>使い方は Ultra 側と同じで、 <c>runCount = 0</c> にして本体ループを空にし、
+        /// <para><c>runCount = 0</c> にして本体ループを空にし、
         /// このフラグで RunBatch 後段の分岐へ入る。</para></summary>
         [NonSerialized] public bool rankMarginWorkerMode;
         [NonSerialized] public string rankMarginWorkerLabel = "";
@@ -1721,12 +1601,7 @@ namespace AutoTest
         /// 停止しているのか走っているのか区別できない。</summary>
         public event Action<int> RankMarginArmProgress;
 
-        public event Action<UltraProductionRunRecord> UltraProductionRunCompleted;
-        public event Action<UltraProductionBatchRecord> UltraProductionBatchCompleted;
-        private readonly List<UltraProductionRunRecord> _ultraProductionRuns =
-            new List<UltraProductionRunRecord>();
         private string _lastSummaryPath = "";
-        private ulong _currentUltraProductionScenarioSeed;
         /// <summary>現ランがどちらのポリシーで実行されているか。</summary>
         private string _currentRunVariant = "";
         /// <summary>現ランのシード値。 ペアテスト時は (i/2) を共有して同一マップ・同一RNGを再現。</summary>
@@ -1743,11 +1618,11 @@ namespace AutoTest
 
         public void Begin()
         {
-            if (ultraProductionWorkerMode
-                && !TryValidateUltraProductionWorkerConfiguration(out string workerConfigError))
+            // 旧 Ultra (4) は 2026-11-13 に削除した (#135)。 保存済みの設定から来たら Super として走る (記録の技量も Super になる)。
+            if (wiringSkill == WiringSkill.Ultra)
             {
-                EmitUltraProductionConfigurationFailure(workerConfigError);
-                return;
+                Debug.LogWarning("[AutoRunner] 配線技量 Ultra は 2026-11-13 に削除した (#135)。 Super として走る");
+                wiringSkill = WiringSkill.Super;
             }
 
             // 2026-07-28: 依存の向きを反転した。 旧はプロファイルが metaPattern / enableAllDebuffs を
@@ -1967,255 +1842,29 @@ namespace AutoTest
 
             // **学習データが欠けていたら黙って手書きの序列へ落とさない** (2026-11-12・#118)。
             //   難易度 2 (10 点) は帯 bot_band_1_15 を読むが、 そのフォルダは無い → 手書きの S/A だけで買い、 難易度 1〜3 のクリアが 0% になった。
-            //   測定ではエラーで止める。 学習を作る経路 (最初の学習の回は空から始める) と Ultra は止めずに印字だけ。
+            //   測定ではエラーで止める。 学習を作る経路 (最初の学習の回は空から始める) は止めずに印字だけ。
             {
                 var gaps = LearningGaps(TierLearningRoot);
                 _learningGaps = string.Join(" / ", gaps);
                 if (gaps.Count > 0)
                 {
-                    bool ultra = wiringSkill == WiringSkill.Ultra || ultraProductionWorkerMode;
                     string msg = $"[AutoRunner] **学習データなし** ({BandFolderName(TierLearningRoot)}・帯の固定={botLearningBandOverride}): {_learningGaps}";
-                    if (failOnMissingLearning && !ProducesLearning && !ultra)
+                    if (failOnMissingLearning && !ProducesLearning)
                         throw new LearningMissingException(msg + " → failOnMissingLearning=true なので止める"
                             + " (今の学習で測るなら botLearningBandOverride=0・意図して空で走らせるなら failOnMissingLearning=False)");
-                    Debug.LogWarning(msg + (ProducesLearning ? " (学習を作る経路なので続ける)" : ultra ? " (Ultra なので続ける)" : " (failOnMissingLearning=false なので続ける)"));
+                    Debug.LogWarning(msg + (ProducesLearning ? " (学習を作る経路なので続ける)" : " (failOnMissingLearning=false なので続ける)"));
                 }
             }
 
-            if (wiringSkill == WiringSkill.Ultra)
-            {
-                StartCoroutine(PrepareUltraAndRun());
-            }
-            else if (autoLoopBatches >= 2)
+            if (autoLoopBatches >= 2)
                 StartCoroutine(RunAutoLoop());
             else
                 StartCoroutine(RunBatch());
         }
 
-        private bool TryValidateUltraProductionWorkerConfiguration(out string reason)
-        {
-            if (ultraProductionExpectedRuns <= 0)
-            {
-                reason = "expected run count must be positive";
-                return false;
-            }
-            if (ultraProductionScenarioSeeds == null
-                || ultraProductionScenarioSeeds.Length != ultraProductionExpectedRuns)
-            {
-                reason = "scenario seed vector length does not match expected runs";
-                return false;
-            }
-            if (forcedPolicyParameters == null)
-            {
-                reason = "forced production policy is missing";
-                return false;
-            }
-            if (string.IsNullOrEmpty(ultraProductionPolicyId)
-                || string.IsNullOrEmpty(ultraProductionScenarioSeedVectorHash))
-            {
-                reason = "policy id or scenario seed vector hash is missing";
-                return false;
-            }
-            if (string.IsNullOrWhiteSpace(productionOutputRootOverride))
-            {
-                reason = "isolated production output root is missing";
-                return false;
-            }
-            reason = string.Empty;
-            return true;
-        }
-
-        private void EmitUltraProductionConfigurationFailure(string reason)
-        {
-            var batch = new UltraProductionBatchRecord
-            {
-                policyId = ultraProductionPolicyId ?? "",
-                scenarioSeedVectorHash = ultraProductionScenarioSeedVectorHash ?? "",
-                runs = Array.Empty<UltraProductionRunRecord>(),
-                outputPath = productionOutputRootOverride ?? "",
-                artifactPath = "",
-                artifactSha256 = "",
-                completedNormally = false,
-                failureCode = "INVALID_WORKER_CONFIGURATION: " + reason,
-            };
-            try { UltraProductionBatchCompleted?.Invoke(batch); } catch { }
-            Debug.LogError("[AutoRunner][UltraWorker] START REJECTED: " + reason);
-            if (!Application.isEditor) Application.Quit(2);
-        }
-
-        /// <summary>
-        /// Apply one controller-owned synthetic seed to production GameRng. Every
-        /// policy candidate receives the same (ordinal, seed, runIndex) triples.
-        /// This method is worker-only; the live Ultra 10000-run batch never calls it.
-        /// </summary>
-        public UltraProductionScenarioBinding BeginUltraProductionScenario(
-            int ordinal,
-            int liveRunIndex)
-        {
-            if (!ultraProductionWorkerMode)
-                throw new InvalidOperationException("production scenario seeds are worker-only");
-            if (ultraProductionScenarioSeeds == null
-                || ordinal < 0 || ordinal >= ultraProductionScenarioSeeds.Length)
-                throw new ArgumentOutOfRangeException(nameof(ordinal));
-
-            ulong seed = ultraProductionScenarioSeeds[ordinal];
-            _currentUltraProductionScenarioSeed = seed;
-            GameLoop.GameRng.SetMasterSeed(seed);
-            GameLoop.GameRng.BeginRun(liveRunIndex);
-            return new UltraProductionScenarioBinding(ordinal, liveRunIndex, seed);
-        }
-
-        private IEnumerator PrepareUltraAndRun()
-        {
-            _ultraProfile = UltraAutoRunProfile.CreateStandard50WithRelic10000();
-            _ultraProgressSession = UltraProgressHub.Begin(new UltraProgressPlan
-            {
-                label = "Ultra Standard / relic / 50pt",
-                totalRuns = _ultraProfile.runCount,
-                workerCount = 0,
-            });
-            _ultraBatchActive = true;
-
-            if (!_ultraProfile.Matches(this, out string profileReason))
-            {
-                FailUltraBeforeRun("runtime profile mismatch: " + profileReason);
-                yield break;
-            }
-
-            if (!UltraAutoRunBridge.TryOpen(_ultraProfile, out _ultraController, out string openReason))
-            {
-                FailUltraBeforeRun(openReason);
-                yield break;
-            }
-
-            _ultraController.BindProgress(_ultraProgressSession);
-            UltraProgressHub.SetPhase(
-                _ultraProgressSession,
-                UltraProgressPhase.Preparing,
-                1,
-                "production full-run policy portfolio");
-
-            var request = new UltraPolicyPortfolioRequest
-            {
-                profile = _ultraProfile,
-                baselinePolicy = PolicyParameters.Current != null ? PolicyParameters.Current.Clone() : null,
-                productionRunsPerCandidate = 1000,
-                progressSession = _ultraProgressSession,
-            };
-
-            bool began;
-            string beginReason;
-            try { began = _ultraController.TryBeginPolicyPortfolio(request, out beginReason); }
-            catch (Exception ex)
-            {
-                began = false;
-                beginReason = ex.GetType().Name + ": " + ex.Message;
-            }
-            if (!began)
-            {
-                FailUltraBeforeRun("production portfolio start failed: " + beginReason);
-                yield break;
-            }
-
-            const float maxPlanningSeconds = 3600f;
-            float planningStarted = Time.realtimeSinceStartup;
-            UltraPolicyPortfolioResult selection = null;
-            while (selection == null)
-            {
-                bool polled;
-                bool completed;
-                string pollReason;
-                UltraPolicyPortfolioResult result;
-                try
-                {
-                    polled = _ultraController.TryPollPolicyPortfolio(
-                        out completed, out result, out pollReason);
-                }
-                catch (Exception ex)
-                {
-                    polled = false;
-                    completed = false;
-                    result = null;
-                    pollReason = ex.GetType().Name + ": " + ex.Message;
-                }
-
-                if (!polled)
-                {
-                    FailUltraBeforeRun("production portfolio polling failed: " + pollReason);
-                    yield break;
-                }
-                if (completed)
-                {
-                    selection = result;
-                    break;
-                }
-                if (Time.realtimeSinceStartup - planningStarted > maxPlanningSeconds)
-                {
-                    FailUltraBeforeRun("production portfolio timed out before run 1");
-                    yield break;
-                }
-
-                UltraProgressHub.Heartbeat(_ultraProgressSession, "waiting for production workers");
-                yield return null;
-            }
-
-            string selectionReason = "portfolio result is null";
-            if (selection == null || !selection.IsUsable(out selectionReason))
-            {
-                FailUltraBeforeRun("production portfolio result rejected: " + selectionReason);
-                yield break;
-            }
-
-            forcedPolicyParameters = selection.selectedPolicy.Clone();
-            UltraPortfolioPolicySpec selectedRunPolicy = selection.selectedRunPolicy;
-            _ultraSelectedBaseSkill = (WiringSkill)selectedRunPolicy.wiringSkill;
-            superHighDifficultyTailMode = selectedRunPolicy.superHighDifficultyTailMode;
-            UltraProgressHub.SetPhase(
-                _ultraProgressSession,
-                UltraProgressPhase.Executing,
-                _ultraProfile.runCount,
-                "selected=" + selection.selectedPolicyId
-                + " coverage=" + UltraPlanningCoverage.RunStartOnly);
-            Debug.Log("[AutoRunner][Ultra] production policy selected: "
-                    + selection.selectedPolicyId + " / " + selection.outputPath
-                    + " / coverage=RunStartOnly / " + selection.diagnostic);
-            // **候補が同一挙動なら、 選択そのものが無意味なので目立たせる。**
-            //   停止はしない ── 稀にしか到達しない分岐だけが違う候補は正当に高一致になりうる。
-            //   ただし「何も測れていない可能性」は必ず人間の目に入れる。
-            if (selection.configurationNoOpPolicyIds != null
-                && selection.configurationNoOpPolicyIds.Length > 0)
-                Debug.LogWarning("[AutoRunner][Ultra] "
-                    + AutoTest.Ultra.UltraPortfolioSelector.DescribeNoOpCheck(
-                        selection.configurationNoOpPolicyIds, selection.maxDigestAgreement)
-                    + " ── この portfolio の選択結果は信用できない可能性がある。");
-
-            yield return RunBatch();
-        }
-
-        private void FailUltraBeforeRun(string reason)
-        {
-            string detail = string.IsNullOrEmpty(reason) ? "unknown Ultra startup failure" : reason;
-            UltraProgressHub.Fail(_ultraProgressSession, detail);
-            try { _ultraController?.Cancel(detail); } catch { }
-            try { _ultraController?.Dispose(); } catch { }
-            _ultraController = null;
-            _ultraBatchActive = false;
-            Debug.LogError("[AutoRunner][Ultra] START REJECTED (0 runs): " + detail);
-#if UNITY_EDITOR
-            UnityEditor.EditorApplication.isPlaying = false;
-#endif
-        }
-
         private void OnDestroy()
         {
             BotHooks.Uninstall();
-            if (!_ultraBatchActive) return;
-            const string reason = "Ultra batch cancelled because AutoRunner was destroyed";
-            UltraProgressHub.Cancel(_ultraProgressSession, reason);
-            try { _ultraController?.Cancel(reason); } catch { }
-            try { _ultraController?.Dispose(); } catch { }
-            _ultraController = null;
-            _ultraBatchActive = false;
         }
 
         /// <summary>
@@ -2365,7 +2014,6 @@ namespace AutoTest
 
         private IEnumerator RunBatch()
         {
-            _ultraProductionRuns.Clear();
             _lastSummaryPath = "";
             ResetBatchStatics();
             Application.logMessageReceived += OnLog;
@@ -2442,11 +2090,6 @@ namespace AutoTest
             EventChoiceLearningStats.Reload();
             // L2: policy.json を読み込み (前バッチの摂動結果を引き継ぐ)
             PolicyParameters.ReloadFromDisk();
-            if (forcedPolicyParameters != null)
-            {
-                PolicyParameters.SetCurrent(forcedPolicyParameters.Clone());
-                Debug.Log("[AutoRunner][Ultra] production portfolioで選択した方策をreload後に固定適用");
-            }
             // [較正専用] 危険度の上書き。 static なのでアーム跨ぎで残る ── 毎回既定へ戻してから乗せる。
             BlockCreditRatio = 0.7f; SafetyFights = 2.0f; GoldComfort = 60f; DangerFloor = 0.25f;
             if (navDangerFloor  >= 0f) DangerFloor      = navDangerFloor;
@@ -2786,8 +2429,6 @@ namespace AutoTest
                 }
                 catch (Exception ex) { Debug.LogWarning($"[AutoRunner] ビルド別スイープ出力失敗: {ex.Message}"); }
             }
-            EmitUltraProductionBatchCompletion(dir);
-            CompleteUltraBatchIfActive("production batch completed / output=" + dir);
             Debug.Log($"[AutoRunner] バッチ完了。ログ出力先:\n{dir}");
             // 並列ワーカー用の終了フック (2026-09-17)。 rankMarginWorkerMode 以外の
             //   アーム (付与試行など) をワーカーで回すとき、 **プロセスを畳む合図がなかった**。

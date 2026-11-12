@@ -295,12 +295,7 @@ namespace AutoTest
         /// (AIルーチン学習モードで Tier表を凍結したまま BOT用の S/A/B だけ更新する用途)。</summary>
         public static void Reload(string learningRoot = null, bool writeMarkdown = true)
         {
-            // 計装のみ (既定 OFF)。 通常バッチはこの固定費を 1000 ラン に償却するが、
-            // rollout worker は 1 ラン にしか償却できないので、 同じコードが相対的に
-            // 桁違いに重い。 削る前に実測するための計時。
-            long phase = AutoTest.Ultra.UltraPhaseClock.Begin();
-            try { ReloadCore(learningRoot, writeMarkdown); }
-            finally { AutoTest.Ultra.UltraPhaseClock.End("└ 学習Reload", phase); }
+            ReloadCore(learningRoot, writeMarkdown);
         }
 
         private static void ReloadCore(string learningRoot, bool writeMarkdown)
@@ -326,9 +321,7 @@ namespace AutoTest
                     _lastLoadedSummary = $"item_stats.json なし ({Path.GetFileName(LoadedRoot.TrimEnd('\\', '/'))}) → 手書きフォールバック";
                     return;
                 }
-                long phaseStats = AutoTest.Ultra.UltraPhaseClock.Begin();   // 計装のみ
                 var sf = ItemLearningStats.LoadOrNew(path);
-                AutoTest.Ultra.UltraPhaseClock.End("└ └ item_stats読込", phaseStats);
                 long fileSize = new FileInfo(path).Length;
                 Debug.Log($"[LearnedPriorityProvider] item_stats.json size={fileSize / 1024}KB, items.Count={sf?.items?.Count ?? -1}, batches.Count={sf?.batches?.Count ?? -1}, totalRuns={sf?.totalRuns ?? -1}");
                 if (sf == null || sf.items == null || sf.items.Count == 0)

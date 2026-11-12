@@ -206,8 +206,8 @@ namespace GameLoop
 
         /// <summary>この生成器から値を引いた累計回数。 **診断専用で抽選には一切影響しない。**
         ///
-        /// <para>Ultra の RNG 契約「思考の前後で本ランの <see cref="GameRng"/> を呼ばない・
-        /// 進めない」を**検査可能にする**ために置いてある。 <c>_counters</c> はキー別なので、
+        /// <para>もとは旧 Ultra (2026-11-13 削除・#135) の RNG 契約「思考の前後で本ランの <see cref="GameRng"/> を呼ばない・
+        /// 進めない」を**検査可能にする**ために置いた。 いまは中断セーブが写す診断値 (<see cref="State"/>)。 <c>_counters</c> はキー別なので、
         /// 外から「何かを消費したか」を見る手段が他に無い ── 別キーを消費されても
         /// 気付けないと、 契約は「守っているつもり」で終わる。</para></summary>
         public static long TotalDraws { get; private set; }

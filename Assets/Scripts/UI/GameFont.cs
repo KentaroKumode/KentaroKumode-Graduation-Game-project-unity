@@ -8,7 +8,7 @@ namespace UI
     ///
     /// <para>字は 2 通りの描き方で出る。 どちらも同じフォント (x8y12pxDenkiChip) から作る。</para>
     /// <list type="bullet">
-    /// <item>TextMesh Pro の字 (<see cref="Tmp"/>): 起動の「TOUCH DISPLAY」・職業選択・図鑑・スキルツリー・層のタイトル。
+    /// <item>TextMesh Pro の字 (<see cref="Tmp"/>): 起動の「TOUCH DISPLAY」・職業選択・図鑑・層のタイトル。
     ///   各画面はフォントの欄を持たず、 文字を作る時に <see cref="Apply"/> を呼ぶ。</item>
     /// <item>液晶の GUI のドット字 (<see cref="Game2D.Game2DJpFont"/>): 航行・戦闘・ロード画面・場面の画面。 テクスチャへ 1 ドットずつ打つので SDF ではなく、
     ///   <see cref="TmpPath"/> の元の ttf を <see cref="DotPx"/> で 2 値に焼いた <see cref="DotPath"/> を読む。
