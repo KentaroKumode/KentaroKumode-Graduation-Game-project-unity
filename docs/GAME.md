@@ -333,6 +333,15 @@ lore 的には「ギルド管轄も 5 層まで」「5 層を抜けた時点で�
 - **混ぜない物**: メタ進行（整備パネル・遺物・実績の解除済み）は従来どおり `MetaProgressManager`（PlayerPrefs）。中断セーブは
   `Application.persistentDataPath/run_suspend.json`。中断中に整備パネル・遺物・難易度を変えると、再開したランには今の設定が効く（警告をログに出すだけ）。
 - **版**: `RunSave.Version`（形式の版）と `RunState` のフィールドの名前・型の指紋。どちらかが違うセーブは読まずに捨てて新しく始める。
+- **書き込みの安全**（2026-11-13・spec-gaps G-24）: 書きかけ `run_suspend.json.tmp` に書いてディスクまで落とす → 本番を控え `.bak` へ名前を変えて退ける →
+  書きかけを本番へ名前を変える → 控えを消す（[SafeFile.cs](../Assets/Scripts/GameLoop/SafeFile.cs)）。どこで落ちても完全な記録が 1 つ残る。
+  読む時は本番が無い・使えない（JSON として読めない・版や指紋が違う）と控え → 書きかけの順に試し、読めたら本番の名前へ戻してログに出す。
+  **消す時は 3 つとも消す**（控えが残ると、終わったランが次の起動で生き返る）。ファイルを開けなかった時（他のプロセスが掴んでいる等）は消さない。
+  検算は `python Tools/save_check/run.py`。
+- **メタ進行の記録の安全**（2026-11-13・spec-gaps G-25）: `MetaProgressState_v1` は保存のたびに 1 つ前の値を `MetaProgressState_v1.bak` に残す
+  （[BackedPrefs.cs](../Assets/Scripts/MetaProgression/BackedPrefs.cs)・製品版だけ）。鍵があるのに読めない時は、壊れた値を `MetaProgressState_v1.corrupt` へ退避して控えから読み、
+  控えも駄目なら空で始める（どちらもログ・画面への知らせは未実装）。鍵が無い時は初回なので控えを見ない。エディタ（毎回空で始める）と
+  並列ワーカー（`GameHooks.MetaPersistenceDisabled`）の動きは変えていない。
 - **BOT はセーブしない**: `GameHooks.BotDriving`・バッチ実行・遺物の付与を止めた計測の間は、保存・読み込み・削除のどれもしない。
 
 ---
