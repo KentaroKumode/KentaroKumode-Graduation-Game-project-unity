@@ -500,6 +500,7 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             if (ctx.enemyBleedStacks <= 0 || ctx.enemyCurrentHP <= 0) return;
             int dmg = MetaProgression.MetaDebuffApplicator.ApplySlothCut(CombatSystem.EnemyHpLedger.ProbePassive(ctx.enemyBleedStacks * 2));   // [測定用の物差し 2026-11-10] 既定 1 = 素通し
+            dmg = CombatSystem.BossDown.ApplyTakenNow(dmg);   // ボスのダウン (2026-11-13): 受けるダメージ ×1.5
             ctx.enemyCurrentHP = System.Math.Max(0, ctx.enemyCurrentHP - dmg);
             UnityEngine.Debug.Log($"[絞り出し] 敵出血×2 = {dmg} 追加ダメ (軽減無視) → 敵HP={ctx.enemyCurrentHP}");
         }

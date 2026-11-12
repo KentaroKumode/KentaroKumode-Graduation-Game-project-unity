@@ -61,6 +61,8 @@ namespace CombatSystem
             // 大罪:怠惰 (2026-11-11): プレイヤーが敵に与えるダメージを全部 −30%。 ここは CombatManager が敵の HP を減らす唯一の口。
             //   主攻撃 ("通常攻撃") は倍率の後・敵の防御の前に掛け済み (ApplyWinDamageModifiers) なので二重に掛けない。
             if (channel != "通常攻撃") dmg = MetaProgression.MetaDebuffApplicator.ApplySlothCut(dmg);
+            // ボスのダウン (2026-11-13): 受けるダメージ ×1.5。 主攻撃は ApplyWinDamageModifiers で掛け済み (怠惰と同じ扱い)
+            if (channel != "通常攻撃") dmg = BossDown.ApplyTakenNow(dmg);
             int before = hp;
             hp = Math.Max(floor, hp - dmg);
             Add("経路:" + channel, before - hp);

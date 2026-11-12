@@ -77,12 +77,8 @@ namespace AutoTest
                 switch (ps.internalName)
                 {
                     case "EmberOmen":
-                        pb.omenPredicate = (t, hp) =>
-                        {
-                            if (t < 1) return false;
-                            int period = hp <= 0.5f ? 3 : 4;
-                            return ((t - 1) % period) == 0;
-                        };
+                        // 本体と同じ関数 (ボスのダウンで周期の起点が戻るのも同じ・2026-11-13)
+                        pb.omenPredicate = (t, hp) => ItemSystem.PassiveSkills.Effects.EmberOmenTiming.IsOmen(t, hp);
                         pb.omenDefBoost = 1.8f; pb.omenAtkDamp = 0.7f;
                         break;
                     case "AshCarapace":

@@ -188,6 +188,9 @@ namespace CombatSystem
             totalDmg = EnemyHpLedger.ProbeMain(totalDmg);
             // 大罪:怠惰 (挑戦カード IV・2026-11-11): 主攻撃の最終ダメージ −N% (すべての倍率の後・敵の防御の前)
             totalDmg = MetaProgression.MetaDebuffApplicator.ApplySlothCut(totalDmg);   // 主攻撃以外は敵の HP を減らす口 (HpLossDiag.Lose) で掛ける
+            // ボスのダウン (2026-11-13): 受けるダメージ ×1.5 (別枠の掛け算・与ダメ% の池に足さない)。 怠惰の直後 = すべての倍率の後・敵の軽減パッシブと防御の前。
+            //   主攻撃以外 (毒・爆発・品の預けた分 = 固定ダメの枠・出血・反射・役〈極〉・仕込み刃・反撃固定・品の直接) は HpLossDiag.Lose で同じく掛ける
+            totalDmg = BossDown.ApplyTakenNow(totalDmg);
 
             // 敵側のダメージ軽減パッシブを発火（前後で ctx.finalDamage と totalDmg を同期し、
             // 敵パッシブ（AshArmor 等やシュヴァリエのシールド経由処理）が

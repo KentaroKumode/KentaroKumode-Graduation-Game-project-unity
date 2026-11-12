@@ -153,6 +153,7 @@ namespace AutoTest.ParallelSweep
                 MetaProgression.VaultBank.ResetStats();
                 CombatSystem.GuardDiag.Reset();
                 CombatSystem.TerminalDiag.Reset();
+                CombatSystem.BossDownDiag.Reset();
                 GameLoop.NavDiag.Reset();
                 CombatSystem.SkillDiag.Reset();
                 CombatSystem.ShieldDiag.Reset();

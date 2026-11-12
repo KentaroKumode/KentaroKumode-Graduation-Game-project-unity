@@ -152,6 +152,8 @@ namespace CombatSystem
 
             // ターン終了スキルによるHP変動をCombatManagerに反映（剣鎧等）
             SyncHPFromContext(ctx);
+            // ボスのダウン (2026-11-13): このターンに割った目盛りを数える (ターン終了時の削りを拾った後・段の交代の後 = 新しい段は満タンなので数えない)
+            NoteBossDownTurnEnd();
 
             // 消費: シールド残ターン減算（-1=無制限 / 0で失効）
             if (ctx.consShieldExpireTurn > 0)
@@ -381,6 +383,7 @@ namespace CombatSystem
             // ここからターンの最後の HP 同期までは、 品が入れる敵へのダメージを預かる (Kw.DamageEnemy)。
             if (ctx != null) ctx.accumulatedValues[ItemSystem.PassiveSkills.Keywords.Kw.ResolvingKey] = 1;
             psm.BeginTurn();
+            BeginBossDownTurn(ctx);   // ボスのダウン (2026-11-13): 待っているダウンがあれば、 このターンは行動不能・受けるダメージ ×1.5 (ターン番号を進めた後・敵が振る前)
             DrawTerminalHand(ctx);   // 端子の山札 (ADR-0014): 5 枚引く (振り直しの判断より前 ── 手札を見て振り直すか決められる)
 
             // 装備維持費 (2026-08-15): **所持パッシブ 10 個につき充電 1** を毎ターン消費する。
@@ -690,6 +693,14 @@ namespace CombatSystem
                 }
             }
 
+            // ボスのダウン (2026-11-13): このターンは攻撃しない。 予告も 0 にする (見えている数字と盤上の結果を揃える・完全情報)。
+            //   敵の出目は振ってある (乱数の消費を変えない)。 〈連撃〉の 2 回目も同じ攻撃なので出さない。
+            if (_down.downNow)
+            {
+                enemyAtkValue = 0; enemyAtkBeforeDefense = 0;
+                _secondaryAtkThisTurn = 0; secondaryAtkBeforeDefense = 0; _twinStrikeThisTurn = false;
+            }
+
             var tele = new MutualTurnTelegraph
             {
                 turn = ctx.currentTurn,
@@ -725,6 +736,7 @@ namespace CombatSystem
                 executeArmed = ctx.vescaExecuteArmed,
                 sealedTerminal = -1,   // 旧〈綻び〉(端子の封印) は 2026-11-10 に撤去
             };
+            FillDownTelegraph(ref tele);   // ボスのダウン (2026-11-13): 目盛り・次の目盛りの HP・このターンと後に続くダウン (振り直しの仮組みと同じ関数)
             if (ctx.bossId == GameLoop.BossIds.VescaFinal)
                 BossDmgDiag.P4Turn(ctx.playerHighDiceCrushed, ctx.vescaExecuteArmed,
                                    ctx.vescaMaxHpBiteOnHit, ctx.vescaDrawnRelics);
@@ -754,23 +766,29 @@ namespace CombatSystem
                 var tenv = TerminalEnvNow(ctx, enemyAtkValue);
                 // 挑戦カード〈猫の手〉: 出目と予告が確定したここで、 1 組を先に挿す (人の画面・BOT の方策はこの 1 組を外せない)
                 ChooseCatPaw(playerDice, tele, tenv);
-                int[] slots = null, targets = null;
+                int[] slots = null, targets = null; bool[] keepMarks = null;
                 if (_interactiveTurn)
                 {
                     _pause.Set(TurnPauseKind.Wiring, playerDice, playerFaceIdx, tele);
                     _pause.board = _deck.board; _pause.terminalEnv = tenv; _pause.terminalState = _deck.state;
                     _pause.catDie = _catDie; _pause.catSlot = _catSlot;
                     yield return _pause;
-                    slots = _pause.slots; targets = _pause.targets; goldAsk = _pause.goldSpend;
+                    slots = _pause.slots; targets = _pause.targets; goldAsk = _pause.goldSpend; keepMarks = _pause.keep;
                 }
-                else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; goldAsk = plan.goldSpend; }
+                else if (WiringPolicy != null) { var plan = WiringPolicy(playerDice, tele); slots = plan.slots; targets = plan.targets; goldAsk = plan.goldSpend; keepMarks = plan.keep; }
                 if (slots == null) slots = TerminalWiring.Auto(_deck.board, playerDice, tenv, _deck.state, _catDie, _catSlot);
                 // 猫の 1 組は答えに関わらず入れる (外した答え・同じ口に挿しすぎた答えは、 猫の組を残して直す)
                 if (_catDie >= 0) slots = TerminalWiring.WithPair(slots, playerDice.Length, _deck.board, _catDie, _catSlot);
-                // 〈写し取り〉〈焼き切り〉〈保持器〉の対象: 人 = 画面で選んだ端子 / BOT = 方策 / どちらも無ければ左端の候補
+                // 〈写し取り〉〈焼き切り〉〈呼び戻し〉の対象: 人 = 画面で選んだ端子 / BOT = 方策 / どちらも無ければ左端の候補
                 term = TerminalCards.Resolve(_deck.board, slots, playerDice, tenv, _deck.state, targets);
                 mutualWiring = term.kindOfDie;
                 _termOutcome = term;
+                // 〈呼び戻し〉(手札の持ち越しの規則): 捨て札から次のターンの手札に戻す 1 枚。 対象 (targets の値) は捨て札の添字・選ばなければ最後に捨てた 1 枚
+                _deck.recallNext = term.recall ? TerminalDeckState.RecallPick(_deck.discard, TerminalWiring.RecallWant(_deck.board, term, targets)) : null;
+                // 手札の規則 Pick: 残す印 (挿さなかった手札の端子だけ・人 = 画面 / BOT = 方策)。 Off・All では読まない
+                _deck.keepNext.Clear();
+                if (TerminalCards.CarryMode == HandCarryMode.Pick && keepMarks != null)
+                    _deck.keepNext.AddRange(TerminalDeckState.KeepFromMarks(_deck.board, _deck.permanent.Count, term, keepMarks));
             }
 
             // 端子の山札: 合計も個数も端子の結果から (出目をそのまま足さない ── 端子ごとに入る量が違う)
@@ -1284,10 +1302,14 @@ namespace CombatSystem
             // 「見えている一撃を丸ごと踏み倒す」形になり、 予告の価値を壊さない。
             bool enemyStunnedThisTurn =
                 ctx.currentBuffs.TryGetValue(YachtRoleEffects.EnemyStunKey, out float stunFlag) && stunFlag > 0f;
+            // ボスのダウン (2026-11-13): 行動不能と同じ枝 (攻撃しない・仕込み刃と古い手紙はこのターン限りで失効)
+            bool downThisTurn = _down.downNow;
+            if (enemyHP > 0 && !enemyStunnedThisTurn && !downThisTurn && currentEnemy != null && Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn))
+                BossDownDiag.NoteHeavyTaken();   // [計装] 大技を受けた
 
-            if (enemyHP > 0 && enemyStunnedThisTurn)
+            if (enemyHP > 0 && (enemyStunnedThisTurn || downThisTurn))
             {
-                Debug.Log($"[役] 封じ・揃: 敵は行動不能 (予告されていた攻撃 {enemyAtkValue} は不発)");
+                Debug.Log(downThisTurn ? "[ダウン] 敵は行動不能 (攻撃しない)" : $"[役] 封じ・揃: 敵は行動不能 (予告されていた攻撃 {enemyAtkValue} は不発)");
                 ctx.daggerArmed = false;   // 仕込み刃はこのターン限り ── 攻撃が来なくても失効
                 ctx.accumulatedValues.Remove(GameLoop.Consumables.OldLetterGuardKey);   // 古い手紙も同じ
             }

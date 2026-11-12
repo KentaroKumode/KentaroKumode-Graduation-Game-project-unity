@@ -46,6 +46,7 @@ namespace CombatSystem
             //   という形で現れた (実測 10,000 ラン: 戦闘側 9,478 / ラン側 8,591)。
             //   `isCombatActive = false` は元からこの関数の末尾にあるので、 それを入口の番人にする。
             if (!isCombatActive) { SkillDiag.FinishCombatReentry++; return; }
+            BossDownDiag.EndFight();   // [計装 2026-11-13] ボスのダウン
 
             // [計装] 対象層のボス戦の締め。 既定は無効。
             CombatSystem.BossCombatTrace.EndFight(enemyHP <= 0 && playerHP > 0,
@@ -97,6 +98,7 @@ namespace CombatSystem
             }
 
             isCombatActive = false;
+            EndBossDown();   // ボスのダウン (2026-11-13): 受けるダメージの倍率と大技の周期の起点を戻す
 
             // (挑戦デバフ〈長引く負傷〉は 2026-11-10 に旧配点方式ごと撤去・#9)
 

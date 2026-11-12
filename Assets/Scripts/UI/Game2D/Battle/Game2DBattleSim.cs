@@ -11,7 +11,7 @@ namespace UI.Game2D.Battle
     /// 1 ターン: 敵の攻撃が予告される → 自分のダイスが出る → (充電を払って振り直す) → 配線 → [GO!] → 自分の攻撃 → 敵の攻撃 → 次のターン。
     /// HP・出目・配線・ダメージはすべて本物で、 この部品は値を作らない (見せる順番と間だけを持つ)。
     /// 操作: [GO! / NEXT] ボタンか Space / 出目のクリックか 1〜9 / [REROLL] ボタンか E / Q = おまかせ。
-    /// 端子の山札 (ADR-0014): 出目ごとの挿し先 (<see cref="slot"/>) と、 〈写し取り〉〈焼き切り〉〈保持器〉の対象 (<see cref="target"/>) を持ち、
+    /// 端子の山札 (ADR-0014): 出目ごとの挿し先 (<see cref="slot"/>) と、 〈写し取り〉〈焼き切り〉〈呼び戻し〉の対象 (<see cref="target"/>) を持ち、
     /// 決定で AnswerWiringSlots へ渡す。 出目の個数に上限は置かない (振った個数だけ並べる)。
     /// BOT がランを動かしている間 (<see cref="GameHooks.BotDriving"/>) は手を出さない。
     /// </summary>
@@ -36,6 +36,9 @@ namespace UI.Game2D.Battle
         public int edef, guardIn = -1;
         /// <summary>次の大技までのターン (0 = このターンが大技 / −1 = 大技を持たない)。</summary>
         public int heavyIn = -1;
+        /// <summary>ボスのダウン (2026-11-13・予告 MutualTurnTelegraph の写し): このターンはダウン / 後に続くダウンのターン数 /
+        /// 次の目盛りの HP (−1 = 無し) / 目盛り (最大 HP の割合・null = ダウンしない敵) / 割った目盛りの数。</summary>
+        public bool down; public int downPending, downNotchHp = -1, downBroken; public float[] downNotches;
         public int version;
         public bool rolled;                  // 今のターンのダイスが出ているか (合計の表示に使う)
         /// <summary>振り直しの判断で止まっているか / 払う充電。</summary>
@@ -59,7 +62,7 @@ namespace UI.Game2D.Battle
         {
             var m = new Game2DBattleFx.Marks();
             bool known = phase != P.ERoll && phase != P.Won && phase != P.Lost;
-            if (known) { m.intent = heavyIn == 0 ? 2 : 1; m.atk = eatk; m.guard = guardIn == 0; }
+            if (known && !down) { m.intent = heavyIn == 0 ? 2 : 1; m.atk = eatk; m.guard = guardIn == 0; }   // ダウンのターンは攻撃の予告を出さない (ダウンの印は絵が要る・仮置きは右の枠の文字)
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             if (ctx != null) { m.poison = ctx.EnemyPoison; m.bleed = ctx.enemyBleedStacks; }
             return m;
@@ -237,6 +240,8 @@ namespace UI.Game2D.Battle
             var p = cm.PendingDecision; if (p == null) return;
             var tele = p.tele;
             turn = tele.turn; eatk = tele.enemyAttackValue; stage = tele.escalationStage; edef = tele.enemyDefense; guardIn = tele.turnsToGuard; heavyIn = tele.turnsToHeavy;
+            down = tele.enemyDown; downPending = tele.downPending; downNotchHp = tele.downNextNotchHp; downNotches = tele.downNotches; downBroken = tele.downBroken;
+            if (downNotches != null) Game2DTutorial.Request(TutorialTopics.BossDown);      // 手引き「ボスのダウン」: 目盛りのあるボスとの初めての戦闘 (第 2 層のボスから)
             nextStageIn = tele.nextThresholdTurn > 0 ? tele.nextThresholdTurn - tele.turn : -1;
             if (stage >= 1) Game2DTutorial.Request(TutorialTopics.Long);      // 手引き「戦闘の長期化」: 敵の攻撃が初めて段を上げた (issue #86)
             var e = tele.enemyDice; enemyDiceCount = e != null ? Mathf.Min(3, e.Length) : 0;
@@ -253,6 +258,7 @@ namespace UI.Game2D.Battle
             {
                 for (int i = 0; i < slot.Length; i++) slot[i] = -1;
                 for (int s = 0; s < target.Length; s++) target[s] = -1;
+                for (int s = 0; s < keepMark.Length; s++) keepMark[s] = false;
                 lastOutcome = null; focusSlot = -1;
                 if (AutoWireOnTurnStart) AutoWire(false);
             }
@@ -290,19 +296,24 @@ namespace UI.Game2D.Battle
                     if (p.kind == TurnPauseKind.Reroll)
                     {
                         // 振り直さない → 配線の判断へ。 出目が変わっていなければ (ふつうはそのまま) 続けて配線を渡す
+                        int atkShown = eatk; bool downShown = down;
                         cm.AnswerReroll(false);
                         if (!cm.IsAwaitingDecision) { Resolve(cm); break; }
                         if (!SameDice(cm.PendingDecision.playerDice)) { SyncDecision(cm, false); Game2DSfx.Play("ui_tab"); Touch(); break; }
+                        // 振り直しから配線へ進む時は必ず予告を写し直す (振り直しの判断の予告は仮組みで、 配線の予告と数字が違うことがある)。
+                        //   攻撃の数字かダウンが変わったら、 人が見ないまま決めないよう、 写し直した所で止まる (もう一度押すと決まる)。
                         p = cm.PendingDecision;
-                        // 〈猫の手〉が挿した: 人が見ないまま決めないよう、 猫の 1 組を見せて止まる (もう一度押すと決まる)
-                        if (p.kind == TurnPauseKind.Wiring && p.catDie >= 0 && (p.catDie >= slot.Length || slot[p.catDie] != p.catSlot))
-                        { SyncDecision(cm, false); Game2DSfx.Play("wire", 1f, 1.1f); Touch(); break; }
+                        // 〈猫の手〉が挿した: 人が見ないまま決めないよう、 猫の 1 組を見せて止まる (もう一度押すと決まる)。 写し直す前の挿し方で見る
+                        bool catNew = p.kind == TurnPauseKind.Wiring && p.catDie >= 0 && (p.catDie >= slot.Length || slot[p.catDie] != p.catSlot);
+                        SyncDecision(cm, false); Touch();
+                        if (catNew) { Game2DSfx.Play("wire", 1f, 1.1f); break; }
+                        if (eatk != atkShown || down != downShown) { Game2DSfx.Play("ui_tab"); break; }
                     }
                     if (p.kind == TurnPauseKind.Wiring)
                     {
                         Game2DSfx.Play("decide");
                         int n = p.playerDice != null ? p.playerDice.Length : 0;
-                        cm.AnswerWiringSlots(BuildSlots(n), (int[])target.Clone());
+                        cm.AnswerWiringSlots(BuildSlots(n), (int[])target.Clone(), 0, (bool[])keepMark.Clone());   // 残す印は本体が KeepFromMarks で直す (挿した端子には効かない)
                         if (!cm.IsAwaitingDecision) Resolve(cm);
                     }
                     break;
@@ -430,8 +441,10 @@ namespace UI.Game2D.Battle
 
         /// <summary>出目ごとの挿し先 (場の添字・−1 = 挿さない)。 長さ = 出目の個数。</summary>
         public int[] slot = { -1, -1, -1 };
-        /// <summary>〈写し取り〉〈焼き切り〉〈保持器〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置・−1 = 選んでいない = 左端の候補)。 長さ = 場の枚数。</summary>
+        /// <summary>〈写し取り〉〈焼き切り〉〈呼び戻し〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置・−1 = 選んでいない = 左端の候補)。 長さ = 場の枚数。</summary>
         public int[] target = new int[0];
+        /// <summary>手札の規則 Pick (2026-11-13): 次のターンも手札に残す印 (添字 = 場の位置)。 挿していない手札の端子を押すと付け外しする。 長さ = 場の枚数。</summary>
+        public bool[] keepMark = new bool[0];
         /// <summary>このターンの場の写し (添字 = 挿し先)。</summary>
         public readonly List<string> board = new List<string>();
         /// <summary>今の挿し方の見込み。 解決した後は結果 (<see cref="lastOutcome"/> と同じ)。 null あり。</summary>
@@ -450,6 +463,7 @@ namespace UI.Game2D.Battle
             lastOutcome = null; preview = null;      // 前のターンの結果は前の場の添字なので持ち越さない
             for (int i = 0; i < slot.Length; i++) if (slot[i] >= board.Count) slot[i] = -1;
             target = new int[board.Count]; for (int s = 0; s < target.Length; s++) target[s] = -1;
+            keepMark = new bool[board.Count];
         }
 
         /// <summary>見積もりに要る入力。 本体が判断の写しに詰めた盤面 (振り直しの判断でも配線の判断でも入っている) を使う。</summary>
@@ -624,7 +638,7 @@ namespace UI.Game2D.Battle
             if (focusSlot >= 0) Game2DTutorial.Request(TutorialTopics.Kinds);      // 手引き「端子の種類」: 初めて端子の説明を開いた (issue #86)
         }
 
-        // ── 〈写し取り〉〈焼き切り〉〈保持器〉の対象 ──
+        // ── 〈写し取り〉〈焼き切り〉〈呼び戻し〉の対象 ──
         //   これらに出目を挿すと (見込みで発動すると)、 手札の「挿していない端子」が候補になる。 候補の USB をその端子の上へ落とすと対象が決まる。
         //   選んでいない・選んだ端子が候補でなくなった時は左端の候補 (候補が 1 枚なら自動でそれ)。 判定は見込み (Resolve) と同じ関数で行う。
 
@@ -657,6 +671,71 @@ namespace UI.Game2D.Battle
                 if (TargetOf(p) == s) chosen = true;
             }
             return any;
+        }
+
+        // ── 〈呼び戻し〉(手札の持ち越しの規則): 捨て札から 1 枚を選ぶ ──
+        //   対象は場ではなく捨て札 (場に見えていない) なので、 画面は窓で選ぶ (Game2DBattleHud.OpenRecall)。 値は target[その端子の場の位置] = 捨て札の添字。
+        //   選ばなければ本体の既定 (最後に捨てた 1 枚・TerminalDeckState.RecallPick)。 選んだ値も既定も、 本体と同じ関数で読む。
+
+        // ── 手札の規則 Pick: 残す印 ──
+        //   挿していない手札の端子を押す (つかんで動かさずに放す) と、 「次のターンも手札に残す」の印を付け外しする。
+        //   挿すと印は効かない (挿した端子は捨て札へ)。 止まっている端子は印が無くても残るので付けられない。 常設は手札に無いので付けられない。
+
+        /// <summary>手札の規則が Pick で、 場の s に残す印を付けられるか (手札の端子・止まっていない・判断の間)。</summary>
+        public bool CanKeep(int s)
+        {
+            var dk = CombatManager.Instance?.TerminalDeck;
+            if (!CanOperate || TerminalCards.CarryMode != HandCarryMode.Pick || dk == null || s < dk.permanent.Count || s >= board.Count || IsStopped(s)) return false;
+            var d = TerminalCards.Get(board[s]);
+            return d != null && !d.permanent;
+        }
+
+        /// <summary>場の s に残す印が付いていて、 いま挿していない (印が効く) か。</summary>
+        public bool IsKept(int s)
+        {
+            if (s < 0 || s >= keepMark.Length || !keepMark[s]) return false;
+            for (int i = 0; i < slot.Length; i++) if (slot[i] == s) return false;
+            return true;
+        }
+
+        /// <summary>場の s の残す印を付け外しする。 できなければ false。</summary>
+        public bool ToggleKeep(int s)
+        {
+            if (!CanKeep(s) || s >= keepMark.Length) return false;
+            keepMark[s] = !keepMark[s];
+            Game2DSfx.Play("ui_click", 1f, keepMark[s] ? 1.2f : 0.9f);
+            Touch();
+            return true;
+        }
+
+        /// <summary>今の捨て札 (読むだけ)。 null あり。</summary>
+        public List<string> Discard => CombatManager.Instance?.TerminalDeck?.discard;
+
+        /// <summary>場の s が、 見込みで発動する〈呼び戻し〉(捨て札から選ぶ) か。 捨て札が空なら false (選ぶ操作を出さない)。</summary>
+        public bool IsRecaller(int s)
+        {
+            var o = preview; var disc = Discard;
+            return o != null && !ShowingResult && s >= 0 && s < board.Count && TerminalCards.PicksDiscard(board[s]) && o.fired.Contains(s)
+                && disc != null && disc.Count > 0;
+        }
+
+        /// <summary>〈呼び戻し〉s が戻す捨て札の添字 (選んだ添字が正しければそれ・でなければ最後に捨てた 1 枚・空なら −1)。 本体の RecallPick と同じ選び方。</summary>
+        public int RecallOf(int s)
+        {
+            var disc = Discard; if (disc == null || disc.Count == 0) return -1;
+            int want = s >= 0 && s < target.Length ? target[s] : -1;
+            return want >= 0 && want < disc.Count ? want : disc.Count - 1;
+        }
+
+        /// <summary>〈呼び戻し〉s が戻す 1 枚を捨て札の添字 idx にする。 できなければ false。</summary>
+        public bool SetRecall(int s, int idx)
+        {
+            var disc = Discard;
+            if (!CanOperate || !IsRecaller(s) || disc == null || idx < 0 || idx >= disc.Count || s >= target.Length) return false;
+            target[s] = idx;
+            Game2DSfx.Play("wire", 1f, 1.25f);
+            Touch();
+            return true;
         }
 
         /// <summary>候補 s を picker の対象にできるか (画面のドラッグ用)。</summary>

@@ -26,13 +26,15 @@ namespace CombatSystem
         public DiceTerminal[] main;
         /// <summary>端子の山札 (ADR-0014): 出目ごとの挿し先 (場の端子の添字・−1 = 挿さない)。 山札で戦う時はこちらを読む。</summary>
         public int[] slots;
-        /// <summary>端子の山札: 〈写し取り〉〈焼き切り〉〈保持器〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置・−1 = 選ばない)。 null = 左端の候補。</summary>
+        /// <summary>端子の山札: 〈写し取り〉〈焼き切り〉〈呼び戻し〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置・−1 = 選ばない)。 null = 左端の候補。</summary>
         public int[] targets;
         /// <summary>挑戦カード〈金で殴る〉(#6): このターンに払う金額 (G)。 攻撃するターンだけ所持金まで払う (<see cref="MetaProgression.ChallengeCards.GoldPunchAttack"/>)。 0 = 払わない。</summary>
         public int goldSpend;
+        /// <summary>手札の規則 Pick (2026-11-13): 次のターンも手札に残す印 (添字 = 場の位置)。 残せるのは挿さなかった手札の端子だけ (本体が KeepFromMarks で直す)。 null = 何も残さない。</summary>
+        public bool[] keep;
 
         public static WiringPlan Of(DiceTerminal[] main) => new WiringPlan { main = main };
-        public static WiringPlan OfSlots(int[] slots, int[] targets = null, int goldSpend = 0) => new WiringPlan { slots = slots, targets = targets, goldSpend = goldSpend };
+        public static WiringPlan OfSlots(int[] slots, int[] targets = null, int goldSpend = 0, bool[] keep = null) => new WiringPlan { slots = slots, targets = targets, goldSpend = goldSpend, keep = keep };
     }
 
     /// <summary>
@@ -91,5 +93,17 @@ namespace CombatSystem
         //    これが無いと配線側は「守ると罰される」を判断できず、 一方的な税にしかならない。
         public int blazeStacks;             // 現在の烈炎スタック (次ターン開始時にこの値の軽減無視ダメ)
         public bool blazePenalizesBlock;    // ブロック端子への配線が閾値以上だとスタックが増える相手か
+
+        // ── ボスのダウン (HP の目盛り・2026-11-13・BossDown.cs)。 完全情報 (予告と同じく配線の前に開示する)。
+        /// <summary>このターン、 敵はダウンしている (攻撃しない・受けるダメージ ×<see cref="BossDown.TakenMul"/>)。 このとき <see cref="enemyAttackValue"/> は 0。</summary>
+        public bool enemyDown;
+        /// <summary>このターンの後にまだ続くダウンのターンの数 (割った目盛りの残り。 0 = 次のターンはダウンしない ── このターンに目盛りを割らなければ)。</summary>
+        public int downPending;
+        /// <summary>次に割る目盛りの HP (敵の HP がこれ以下になったら割れる・−1 = 目盛りが無い/残っていない)。</summary>
+        public int downNextNotchHp;
+        /// <summary>目盛りの一覧 (最大 HP の割合・大きい順・HP の棒の刻み)。 null = ダウンしない敵。 書き換えないこと。</summary>
+        public float[] downNotches;
+        /// <summary>割った目盛りの数 (<see cref="downNotches"/> の先頭から)。</summary>
+        public int downBroken;
     }
 }

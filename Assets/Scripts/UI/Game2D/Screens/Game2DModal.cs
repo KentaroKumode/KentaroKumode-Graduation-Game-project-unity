@@ -31,7 +31,9 @@ namespace UI.Game2D
     public sealed class ScreenDef
     {
         public string id, title, sub, icon, footer;
-        public int w = 360, h = 0, cols = 1, budget;       // h = 0 は中身から自動で決める       // budget > 0 の時は、 行の count の合計 / budget を足元に出す (整備パネル)
+        public int w = 360, h = 0, cols = 1, budget;
+        /// <summary>開いた時に選んでいる行 (既定 0)。 〈呼び戻し〉の窓が、 選ばずに確定した時に戻る 1 枚を最初から選んでおくのに使う。</summary>
+        public int sel0;       // h = 0 は中身から自動で決める       // budget > 0 の時は、 行の count の合計 / budget を足元に出す (整備パネル)
         public string[] tabs; public int tab;
         public List<List<ModalItem>> tabItems = new List<List<ModalItem>>();
         public List<ModalBtn> buttons = new List<ModalBtn>();
@@ -126,7 +128,7 @@ namespace UI.Game2D
         {
             if (def == null || _rt == null) return;
             if (def.h <= 0) def.h = AutoHeight(def);
-            _def = def; _sel = 0; _hoverRow = _hoverTab = _hoverBtn = -1; _toast = ""; _open = true; Active = true; _dirty = true;
+            _def = def; _sel = Mathf.Clamp(def.sel0, 0, Mathf.Max(0, def.Items.Count - 1)); _hoverRow = _hoverTab = _hoverBtn = -1; _toast = ""; _open = true; Active = true; _dirty = true;
             if (_img == null) _img = _rt.GetComponent<RawImage>();
             _tex = Resize(_tex, def.w, def.h); _img.texture = _tex; _img.enabled = true; _rt.sizeDelta = new Vector2(def.w, def.h);
             _px = (Game2DLayout.Width - def.w) / 2; _py = (Game2DLayout.Height - def.h) / 2;

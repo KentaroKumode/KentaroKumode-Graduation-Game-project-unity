@@ -41,6 +41,8 @@ namespace UI.Game2D
         public const string Shop = "ショップ";
         public const string Origin = "出自";
         public const string LayerBoss = "層とボス";
+        /// <summary>目盛りのあるボスとの初めての戦闘 (2026-11-13・ボスのダウン)。</summary>
+        public const string BossDown = "ボスのダウン";
         public const string MetaPanel = "整備パネル";
         public const string Challenge = "挑戦";
     }

@@ -78,7 +78,7 @@ namespace UI.Game2D
                 h = h * 31 + (cm != null ? cm.EnemyHP : 0);
                 h = h * 31 + (cm != null ? cm.SecondaryEnemyHP : 0);
                 if (ctx != null) { h = h * 31 + ctx.enemyDefense; h = h * 31 + ctx.EnemyPoison; h = h * 31 + ctx.enemyBleedStacks; }
-                if (s != null) { h = h * 31 + s.turn; h = h * 31 + s.eatk; h = h * 31 + s.Stage; h = h * 31 + s.guardIn; h = h * 31 + s.heavyIn; h = h * 31 + (int)s.phase; }
+                if (s != null) { h = h * 31 + s.turn; h = h * 31 + s.eatk; h = h * 31 + s.Stage; h = h * 31 + s.guardIn; h = h * 31 + s.heavyIn; h = h * 31 + (int)s.phase; h = h * 31 + s.downPending + (s.down ? 7 : 0) + s.downBroken * 13; }
                 return h;
             }
         }
@@ -110,7 +110,18 @@ namespace UI.Game2D
                 var plan = new System.Collections.Generic.List<string>();
                 if (s.guardIn == 0) plan.Add("このターンは構え (防御が上がる)"); else if (s.guardIn > 0) plan.Add("構えまで " + s.guardIn + " ターン");
                 if (s.heavyIn == 0) plan.Add("このターンは大技"); else if (s.heavyIn > 0) plan.Add("大技まで " + s.heavyIn + " ターン");
+                // ボスのダウン (2026-11-13): ダウン中・後に続くダウン・次の目盛りまでの残り
+                if (s.down) plan.Add("このターンはダウン (攻撃しない・受けるダメージ ×" + CombatSystem.BossDown.TakenMul.ToString("0.0")
+                                     + (e.heavyPeriod > 0 ? "・溜めていた大技は取り消し" : "") + ")");
+                if (s.downPending > 0) plan.Add("ダウンはあと " + s.downPending + " ターン続く");
+                if (s.downNotchHp >= 0) plan.Add("次の目盛りまで " + System.Math.Max(0, cm.EnemyHP - s.downNotchHp));
                 if (plan.Count > 0) sb.Append(string.Join("・", plan)).Append('\n');
+                if (s.downNotches != null)
+                {
+                    var ns = new System.Collections.Generic.List<string>();
+                    for (int i = 0; i < s.downNotches.Length; i++) ns.Add(Mathf.RoundToInt(s.downNotches[i] * 100f) + "%" + (i < s.downBroken ? " (割った)" : ""));
+                    sb.Append("ダウンの目盛り: ").Append(string.Join("・", ns)).Append('\n');
+                }
             }
             int poison = ctx != null ? ctx.EnemyPoison : 0, bleed = ctx != null ? ctx.enemyBleedStacks : 0;
             sb.Append("状態: ").Append(poison > 0 || bleed > 0 ? (poison > 0 ? "毒 " + poison : "") + (poison > 0 && bleed > 0 ? "・" : "") + (bleed > 0 ? "出血 " + bleed : "") : "なし");

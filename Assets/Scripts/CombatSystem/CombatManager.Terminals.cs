@@ -13,7 +13,7 @@ namespace CombatSystem
         private TerminalDeckState _deck;
         /// <summary>このターンの端子の結果 (配線の前は null)。</summary>
         private TerminalOutcome _termOutcome;
-        /// <summary>次のターンも手札に残す端子 (〈保持器〉)。</summary>
+        /// <summary>次のターンも手札に残す端子 (〈呼び戻し〉)。</summary>
         private string _termRetain;
         /// <summary>このターンの主攻撃に掛ける別枠の倍率 (〈増幅器〉〈共振器〉)。 毎ターン 1 に戻す。</summary>
         private float _termDamageMul = 1f;
@@ -44,6 +44,7 @@ namespace CombatSystem
             if (run != null)
             {
                 if (run.terminalDeck == null || run.terminalDeck.Count == 0) run.terminalDeck = TerminalCards.StartingDeck();
+                TerminalCards.NormalizeIds(run.terminalDeck);   // 旧 id (〈保持器〉など) を今の id へ
                 runDeck = run.terminalDeck;
             }
             else runDeck = TerminalCards.StartingDeck();
@@ -62,6 +63,7 @@ namespace CombatSystem
             // ヴェスカ〈停滞する時間〉: 引いた端子 1 枚ごとに確率で止める (持たない敵は 0)
             float stop = ItemSystem.PassiveSkills.Effects.StagnantTime.StopChance(currentEnemy);
             _deck.DrawTurn(TerminalCards.HandSize + extra, _termRetain, stop);
+            if (TerminalCards.HandCarry && ctx != null && ctx.currentTurn > 1) BossDownDiag.NoteCarry(_deck.LastCarriedCount);   // [計装 2026-11-13] 持ち越した枚数 (戦闘の 1 ターン目は除く)
             if (stop > 0f)
             {
                 GuardDiag.NoteStag7F(currentEnemy?.id, _deck.LastDrawnCount, _deck.LastStoppedCount, _deck.LastStoppedMains, _deck.LastHeldCount);   // [計装]
@@ -206,6 +208,13 @@ namespace CombatSystem
                 else _termKillPending = kb;
             }
             TerminalDiag.NoteTurn(_deck.board, o);   // [計装 2026-11-12] (FinishTurn が手札を書き換える前に)
+            if (_deck.LastKept.Count > 0)            // [計装 2026-11-13] 残す印で残した端子を、 このターンに使ったか
+            {
+                var usedNames = TerminalDeckState.UsedFromHand(_deck.board, _deck.permanent.Count, o);
+                int usedKept = 0;
+                foreach (var id in _deck.LastKept) if (usedNames.Remove(id)) usedKept++;
+                BossDownDiag.NoteKeptUse(_deck.LastKept.Count, usedKept);
+            }
             RemoveUsedFromRunDeck(o);                // (FinishTurn が手札を書き換える前に ── 場の添字で読む)
             _termRetain = _deck.FinishTurn(o);
         }
@@ -266,6 +275,15 @@ namespace CombatSystem
     /// <summary>挿し方の列挙と、 既定の挿し方 (方策も画面も答えを出さなかった時・人の「おまかせ」)。 ADR-0014。</summary>
     public static class TerminalWiring
     {
+        /// <summary>〈呼び戻し〉(手札の持ち越しの規則) の対象として選ばれた捨て札の添字 (発動した〈呼び戻し〉の場の位置の targets の値・選ばれていなければ −1)。</summary>
+        public static int RecallWant(List<string> board, TerminalOutcome o, int[] targets)
+        {
+            if (board == null || o == null || targets == null) return -1;
+            foreach (int s in o.fired)
+                if (s >= 0 && s < board.Count && s < targets.Length && board[s] == TerminalIds.Retainer) return targets[s];
+            return -1;
+        }
+
         /// <summary>規則上ありうる挿し方をすべて返す (出目ごとの挿し先・−1 = 挿さない)。 挿せる数だけ見る (条件・充電は <see cref="TerminalCards.Resolve"/> が直す)。
         /// state を渡すと、 止まった端子 (ヴェスカ〈停滞する時間〉) へ挿す手は出さない (Resolve が外すのと同じ結果になる手を数え直さないため)。
         /// <paramref name="fixedDie"/> ≥ 0 なら、 その出目は <paramref name="fixedSlot"/> に挿した挿し方だけ (〈猫の手〉が先に挿した 1 組)。</summary>

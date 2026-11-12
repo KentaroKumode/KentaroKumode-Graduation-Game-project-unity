@@ -40,15 +40,17 @@ namespace CombatSystem
         // ===== 答え (CombatManager が読む) =====
         internal bool reroll;
         internal int[] slots;
-        /// <summary>〈写し取り〉〈焼き切り〉〈保持器〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置・−1 = 選ばない)。 null あり。</summary>
+        /// <summary>〈写し取り〉〈焼き切り〉〈呼び戻し〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置・−1 = 選ばない)。 null あり。</summary>
         internal int[] targets;
         /// <summary>挑戦カード〈金で殴る〉(#6) で払う金額 (G)。 0 = 払わない。 画面はまだこの答えを出さない (#6 の残り)。</summary>
         internal int goldSpend;
+        /// <summary>手札の規則 Pick: 次のターンも手札に残す印 (添字 = 場の位置)。 null = 何も残さない。</summary>
+        internal bool[] keep;
 
         internal void Set(TurnPauseKind k, int[] dice, int[] faceIdx, MutualTurnTelegraph t)
         {
             kind = k; playerDice = dice; playerFaceIdx = faceIdx; tele = t;
-            rerollCost = 0; reroll = false; slots = null; targets = null; goldSpend = 0; board = null; terminalEnv = default; terminalState = null;
+            rerollCost = 0; reroll = false; slots = null; targets = null; goldSpend = 0; keep = null; board = null; terminalEnv = default; terminalState = null;
             catDie = catSlot = -1;
         }
     }
@@ -95,12 +97,13 @@ namespace CombatSystem
         }
 
         /// <summary>端子の山札 (ADR-0014) の配線に答える。 出目ごとの挿し先 (場の端子の添字・−1 = 挿さない)。 規則に合わない挿し方は挿さなかった扱いになる。
-        /// targets = 〈写し取り〉〈焼き切り〉〈保持器〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置)。 null / −1 / 候補でない対象は左端の候補。
+        /// targets = 〈写し取り〉〈焼き切り〉〈呼び戻し〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置)。 null / −1 / 候補でない対象は左端の候補。
         /// goldSpend = 挑戦カード〈金で殴る〉で払う金額 (G・攻撃するターンだけ所持金まで払う・札が無ければ無視)。</summary>
-        public void AnswerWiringSlots(int[] slots, int[] targets = null, int goldSpend = 0)
+        /// keep = 手札の規則 Pick の、 次のターンも手札に残す印 (添字 = 場の位置・null = 何も残さない)。 BOT の WiringPlan.keep と同じ口。
+        public void AnswerWiringSlots(int[] slots, int[] targets = null, int goldSpend = 0, bool[] keep = null)
         {
             if (_activeTurn == null || _pause.kind != TurnPauseKind.Wiring) return;
-            _pause.slots = slots; _pause.targets = targets; _pause.goldSpend = goldSpend;
+            _pause.slots = slots; _pause.targets = targets; _pause.goldSpend = goldSpend; _pause.keep = keep;
             Advance();
         }
 
