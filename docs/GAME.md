@@ -2158,9 +2158,9 @@ CritDamageBonus / BossExtraRare 昇格 / **DiceTotalBonus（ダイス合計概�
 > **SkillTreeView（旧 58 段 UI）は Obsolete API 経由で残置。** v6 の配点は Game2D の `Game2DMetaPanel` が担う（§23-5）。
 
 **適用箇所の追跡（2026-11-12・§23-7）**: 枠に残る 15 本（数値 8・種火 5・端子 2）の段効果は、すべて本番の経路から読まれている。
-読む所: 外殻 = `MetaBuffApplicator.ApplyToRunStart`（`GameManager.cs` のラン開始）・r10 `LastStand.cs` ／ 出力 = `CombatManager.Damage.cs`・`Mechanics.cs` の与ダメ%・〈戦意〉の勝利数 `GameManager.Floor.cs` ／
-剛胆 = エリート格上げ `MapGenerator.ApplyEliteUpgrade`（航行マップの `FromLayout`）・報酬 `GameManager.Rewards.cs`・ドロップ `GameManager.Floor.cs`・r10 与ダメ `CombatManager.Damage.cs`・シールド持ち越し `CombatManager.Finish.cs` → 開幕 `CombatManager.cs` ／
-金庫 = 開幕ゴールド・r10 宝箱 `GameManager.Rewards.cs`・貸金庫 `VaultBank.cs` ／ 強奪 = ボス `GameManager.Rewards.cs`・ドロップ `GameManager.Floor.cs`・r10 強盗 `ShopManager.cs` と `Game2DPhaseScreens.cs` ／
+読む所: 外殻 = `MetaBuffApplicator.ApplyToRunStart`（`GameManager.cs` のラン開始）・r10 `LastStand.cs` ／ 出力 = `CombatManager.Damage.cs`・`Mechanics.cs` の与ダメ%・〈戦意〉の勝利数 `GameManager.Combat.cs` ／
+剛胆 = エリート格上げ `MapGenerator.ApplyEliteUpgrade`（航行マップの `FromLayout`）・報酬 `GameManager.Rewards.cs`・ドロップ `GameManager.Combat.cs`・r10 与ダメ `CombatManager.Damage.cs`・シールド持ち越し `CombatManager.Finish.cs` → 開幕 `CombatManager.cs` ／
+金庫 = 開幕ゴールド・r10 宝箱 `GameManager.Rewards.cs`・貸金庫 `VaultBank.cs` ／ 強奪 = ボス `GameManager.Rewards.cs`・ドロップ `GameManager.Combat.cs`・r10 強盗 `ShopManager.cs` と `Game2DPhaseScreens.cs` ／
 商才 = 特売枠と割引の抽選 `ShopManager.cs` ／ 宝物庫 = 本数・選択 `GameManager.cs`・レア度 `GameManager.Rewards.cs` ／
 装甲 = 防御 `CombatManager.cs` の戦闘開始・被ダメ −N と r10 の一撃の上限 `CombatManager.Turn.cs` ／
 種火 = r1 `ShopManager.PickWithSparkBias`・r3 `GameManager.cs`・r2 充電 `CombatManager.cs` / `CombatContext.ChargeCap`・臨界 `CombatManager.Finish.cs` → `CombatManager.cs`・毒 `CombatContext.AddStatus`・出血 `CombatManager.Turn.cs`・シールド `CombatContext` の減衰 ／
@@ -2822,7 +2822,7 @@ ObservatoryTakeCopy / **TurnsPass（ターン+N）** / Probability（確率分�
 |---|---|---|
 | 戦闘 1 回の金 | 10G（エリート 20G・2 体戦 ×2）。層によらない | `FloorManager.cs:296-297`（`ceil((7 + 深さ/2)/5) × GoldScale 5` = 2 × 5）・`CombatRewards.cs:51,57` |
 | 戦闘 1 回の HP の純減（実測） | 通常 2.4 / 4.6 / 2.1 / 11.6、エリート 3.6 / 9.9 / 6.4 / 13.1 | 2026-11-11 の runs.jsonl（Optimal・n=10 ラン・378 戦。小さい標本） |
-| 戦闘のドロップ | 通常 0%・エリート 10%（パッシブ）・素材 +1（エリート +2） | `CombatRewards.cs:30,37`・`GameManager.Floor.cs:224-227` |
+| 戦闘のドロップ | 通常 0%・エリート 10%（パッシブ）・素材 +1（エリート +2） | `CombatRewards.cs:30,37`・`GameManager.Combat.cs:37-40` |
 | イベントの戦闘 | **金も報酬も無い**（HP の損だけ）。「エリートとの戦闘」も敵は通常の抽選 | `GameManager.Rewards.cs:120-128`・`GameManager.Events.cs:206` |
 | ランダムなパッシブ 1 個 | 22 / 29 / 41 / 58G | 店頭価格 = 基準価格 × 抽選の幅 1.0〜1.25 × 2 ×（1 + 0.25 × レア度）× 物価（`ShopManager.cs:190,196,526`・`ItemDatabase.cs:250-251`）をレア度の抽選重み 54/35/10/1%（`RarityWeightedPicker.cs:16-19`）で平均 |
 | ランダムな消耗品 1 個 | 15 / 20 / 28 / 39G | 同じ式（基準価格 4〜8・items.json） |
