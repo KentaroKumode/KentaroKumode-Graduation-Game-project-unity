@@ -46,6 +46,10 @@ namespace AutoTest
         /// <summary>使い捨ての端子を使う費用 (この戦闘ではもう使えない): 攻撃の種類は与ダメ相当 8 (出目 2 個ぶん)・それ以外は HP 相当 3。
         /// 弱い目で起爆筒を切らず、 良い目・危ないターンに回すための足切り。</summary>
         private const float DeckDisposableDmgCost = 8f, DeckDisposableHpCost = 3f;
+        /// <summary>使うとランの山札から抜ける端子 (〈応急箱〉) を使う費用の上乗せ (HP 相当・今の HP の単位・2026-11-12・仮・未測定)。
+        /// 先の戦闘で使える 1 回の回復の見込み (出目の平均 3.5 × <see cref="TerminalCards.FirstAidMul"/>) の半分 ── 引けない・満タンで余る分を半分と見る。
+        /// これを超える回復 (最大 HP で切った後の量) が出るターンにだけ使う。</summary>
+        private const float DeckRunLeaveHpCost = 3.5f * TerminalCards.FirstAidMul * 0.5f;
         /// <summary>〈停止信号〉: 次のターンの敵の攻撃 × 0.5 を今の HP で見る (2026-11-12)。 次のターンはほぼ確実に来るので先の割引 (帳簿の 0.2) は掛けない。
         /// 半分にするのは、 止めなくてもブロックで一部は受けられるから。 旧: × 0.9 × 先の割引 で、 使い捨ての費用を超えず一度も使われなかった。</summary>
         private const float DeckStunShare = 0.5f;
@@ -157,6 +161,10 @@ namespace AutoTest
                 if (d == null || !d.disposable) continue;
                 // 使い捨てを失うのはこの戦闘の残りだけ (次の戦闘では山札に戻る)。 攻撃以外の費用は先の HP の価値で見る (2026-11-12・旧: 今の HP で見て高すぎた)
                 flat -= d.kind == TerminalKind.Attack ? DeckDisposableDmgCost * dw : DeckDisposableHpCost * fw;
+                // 使うとランの山札から抜ける端子 (〈応急箱〉・2026-11-12): 先の戦闘で使えた 1 回ぶんも失う。 今の HP の単位で引く
+                //   (戦闘をまたいで HP は残るので、 先の戦闘の回復も今の HP と同じ重さ)。 小さな傷に切って捨てないための足切り。
+                if (TerminalCards.LeavesRunDeck(d) && (runNow?.terminalDeck?.Count ?? 0) > TerminalCards.MinDeckSize)
+                    flat -= DeckRunLeaveHpCost * hpUnit;
             }
             ws.specFlat = flat;
 
