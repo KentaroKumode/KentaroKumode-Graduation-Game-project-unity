@@ -207,7 +207,8 @@ namespace UI.Game2D
             _wxBuilt = true;
         }
 
-        private static bool On(FreeMapSim sim, WeatherKind k) => sim.Weather == k && !double.IsNegativeInfinity(sim.Front);
+        /// <summary>天候の演出を出すか: 前線が届いてから (嵐の層は嵐が来てから・2026-11-13)。 演出は画面全体 (嵐の中だけに絞らない・仮置き)。</summary>
+        private static bool On(FreeMapSim sim, WeatherKind k) => sim.Weather == k && (sim.StormMode ? sim.StormPhase >= 1 : !double.IsNegativeInfinity(sim.Front));
 
         /// <summary>ピクセルの輪: 2×2 の四角をおきに並べた破線の輪。 半径は 3 dot 刻みで段階的に、 位置は 2 dot の格子に合わせる。</summary>
         private void BlockRing(float cx0, float cy0, float rx, float ry, Color32 col)

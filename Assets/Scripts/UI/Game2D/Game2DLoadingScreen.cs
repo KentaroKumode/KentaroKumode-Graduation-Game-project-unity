@@ -69,7 +69,7 @@ namespace UI.Game2D
             "偵察は1ターンを使い、マップの" + FreeMapParams.ReconRange + "歩先まで見る。追跡者も動くので、注意が必要だ。",
             "照明は物資" + FreeMapParams.FlareSupply + "で、" + FreeMapParams.FlareTurns + "ターンのあいだ" + FreeMapParams.FlareRange + "歩先まで見える。ただし、追跡者にも見つかりやすい。",
             "店と休憩は、どの層にも必ず1つずつある。よく探そう。",
-            "天候は前線として西側から進んでくる。効果が起きるのは前線の内側だけ。",
+            "静かな時間が過ぎると嵐が来る。輪の外は嵐の中で、そこへ歩くたびにHPが減る。輪はボスの方へ縮んでいく。",
             // ── 物資 ──
             "物資には上限がある。層に入った時や店で補給できる。",
             "物資が0の間は、歩くたびにHPが減る。",
@@ -103,7 +103,7 @@ namespace UI.Game2D
         private Stage _stage = Stage.Off; private float _stageT;
         private bool _active; private float _t; private int _drawnStep = -1;
         private int _lastFloor = int.MinValue; private RunState _lastRun;
-        private string _title, _tip;
+        private string _title, _tip, _stormLine;
 
         // 測る地図 (Play の時に写す): 点の画面座標・走査線から見た角度・道
         private Vector2[] _pts; private float[] _ang; private bool[] _skip; private (int a, int b)[] _roads;
@@ -282,7 +282,8 @@ namespace UI.Game2D
                 _skip[i] = sim.IsSunk(i);
             }
             _roads = new System.Collections.Generic.List<(int a, int b)>(sim.Roads()).ToArray();
-            _me = sim.Me; _goal = lay.goal;
+            _me = sim.Me; _goal = lay.storm && !sim.Known[lay.goal] ? -1 : lay.goal;   // 嵐の層はボスの点を伏せる (2026-11-13)
+            _stormLine = sim.StormMode ? Game2DMapView.StormLabel(sim) : null;
         }
 
         // ── 描画 (既定は画面のフレームごと・fps > 0 ならその回数だけ) ──
@@ -336,6 +337,7 @@ namespace UI.Game2D
             int total = 0; foreach (var s in _skip) if (!s) total++;
             string count = "PLOT " + seen.ToString("00") + "/" + total.ToString("00");
             Jp(count, MapBox.xMax - Game2DJpFont.Width(count), HeadY, Dim);
+            if (!string.IsNullOrEmpty(_stormLine)) Jp(_stormLine, TipBox.x, HeadY, Amber);      // 嵐の種類と時計 (2026-11-13)
 
             // 右の余白: ヒント (行数は「クリックで進む」の上までに収まる分だけ)
             Jp("ヒント", TipBox.x, TipBox.y + 4, Amber);
