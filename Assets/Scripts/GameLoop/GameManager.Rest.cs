@@ -113,20 +113,16 @@ namespace GameLoop
             return int.MaxValue;
         }
 
-        /// <summary>素材を消費できる先が残っているか (武器強化 or 装備ダイス強化)。
+        /// <summary>素材を消費できる先 (武器強化) が残っているか。
         ///
         /// **業物廃止 (2026-08-10) で必要になった判定。** T4+ 到達後の進行武器は素材を
-        /// 受け付けなくなったので、 ダイス強化も上限なら素材は完全な死に資源になる。
-        /// ショップは在庫無限で売り続けるため、 **買う側**がここを見て止まること。</summary>
+        /// 受け付けなくなったので、 素材は完全な死に資源になる。
+        /// ショップは在庫無限で売り続けるため、 **買う側**がここを見て止まること。
+        /// (旧: 装備ダイスの強化 DiceEnhance も消費先に数えていたが、 ダイスの品が無いので常に false だった。 2026-11-12 削除)</summary>
         public static bool CanSpendMaterials(RunState run)
         {
             if (run == null) return false;
-            if (WeaponUpgradeCost(run) != int.MaxValue) return true;
-            var d = ItemSystem.ItemDatabase.Instance?.GetItem(run.equippedDiceId);
-            if (d == null) return false;
-            int cur = DiceEnhance.GetLevel(run, run.equippedDiceId);
-            return cur < DiceEnhance.MaxLevelForItem(d)
-                && DiceEnhance.CostForNextLevel(d, cur + 1) != int.MaxValue;
+            return WeaponUpgradeCost(run) != int.MaxValue;
         }
 
         /// <summary>武器強化で Tier が進んだ際に通知される (旧ID, 新ID)。

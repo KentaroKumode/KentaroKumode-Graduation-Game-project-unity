@@ -392,16 +392,6 @@ namespace GameLoop
         /// 絶対に区別できない ── 2026-08-10 に実際にそこで判断を誤った。</summary>
         public int lingeringWoundTriggers;
 
-        /// <summary>ダイス強化 Lv (2026-07-18): id → Lv (0=素、Max はレア別)。 素材消費で最も低い2面に+1/Lv。
-        /// 未登録なら Lv0 扱い。 セーブ時はそのままシリアライズ (Dictionary&lt;string,int&gt; は Unity JSON 未対応のため
-        /// キー配列+値配列の並行リストとして保持する run.diceEnhanceKeys/Values で永続化 → EnsureEnhanceDictSynced()）。</summary>
-        [System.NonSerialized]
-        public Dictionary<string, int> diceEnhanceLevels = new Dictionary<string, int>();
-        /// <summary>diceEnhanceLevels のシリアライズ用キー配列 (JsonUtility は Dictionary 未対応)。</summary>
-        public List<string> diceEnhanceKeys = new List<string>();
-        /// <summary>diceEnhanceLevels のシリアライズ用値配列。</summary>
-        public List<int> diceEnhanceValues = new List<int>();
-
         /// <summary>武器の"+"段階(0 or 1)。T_n と T_n+ を表す。休憩強化で 0→1、1の状態で次Tier武器へ置換し0に戻る。</summary>
         public int weaponPlus;
 
@@ -581,9 +571,6 @@ namespace GameLoop
             judgmentPostDamage = judgmentHealRequested = judgmentHealActual = judgmentHealPrevented = 0;
             breakdownCount = 0;
             lingeringWoundTriggers = 0;
-            diceEnhanceLevels = new Dictionary<string, int>();
-            diceEnhanceKeys.Clear();
-            diceEnhanceValues.Clear();
             weaponPlus = 0;
             limitBreakStage = 0;
             pendingWeaponIds.Clear();
