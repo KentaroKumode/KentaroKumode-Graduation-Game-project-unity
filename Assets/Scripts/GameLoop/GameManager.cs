@@ -579,17 +579,6 @@ namespace GameLoop
             // ShopVisit 中: Esc 退店、T 売買モード切替、S 売却対象切替、1-9 購入/売却
             if (CurrentPhase == GamePhase.ShopVisit)
             {
-                // 購入ダイアログ表示中はキー入力をダイアログ側に渡さない
-                var dialog = ItemSystem.Shop.Visual.ShopPurchaseDialog.Instance;
-                if (dialog != null && dialog.IsOpen)
-                {
-                    if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Y))
-                        dialog.ConfirmPurchase();
-                    else if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.N))
-                        dialog.Close();
-                    return;
-                }
-
                 if (Input.GetKeyDown(KeyCode.Escape))
                 {
                     ExitShop();
