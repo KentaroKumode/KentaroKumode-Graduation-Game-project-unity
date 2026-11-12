@@ -200,6 +200,9 @@ namespace AutoTest
         /// <summary>[測定 2026-11-13] ボスのダウン (HP の目盛り・CombatSystem.BossDown)。 既定 true = 新しい規則。 false = 目盛りを置かない旧い作り。
         /// 本体の GameHooks.BossDownDisabled へ流す (目盛りが無ければ BOT の見積もりも自然にダウンを見ない)。</summary>
         public bool bossDown = true;
+        /// <summary>[測定 2026-11-13] 深さ 3 のボス 3 体の大技の周期 (CombatSystem.BossParams.Depth3Heavy)。 既定 true = 足す。 false = 旧い作り (大技なし)。
+        /// 本体の GameHooks.Depth3HeavyDisabled へ流す。</summary>
+        public bool depth3Heavy = true;
         /// <summary>[測定 2026-11-12・#35] 航行の「恐れ」: 行き先の点が、 推定した追跡者の位置から <see cref="navFearRange"/> 歩より近いほど引く。
         /// 引く量 = 恐れ × (範囲 − 推定の歩数)。 Optimal の行き先選び (価値の単位) は navFear、 Super の計画 (対数オッズ) は navFearMacro。 0 = 使わない。</summary>
         public float navFear = 0f, navFearMacro = 0f;
@@ -756,6 +759,7 @@ namespace AutoTest
                  + $"/ 端子の撃破のボーナス {(terminalKillNeedsAttack ? "攻撃したターンだけ (旧い条件)" : "経路を問わない")} "
                  + $"/ 手札 {(handCarry ? "持ち越し (挿さなかった端子は残る)" : "毎ターン捨てる (旧い規則)")} "
                  + $"/ ボスのダウン {(bossDown ? "あり" : "なし (旧い作り)")} "
+                 + $"/ 深さ 3 のボスの大技 {(depth3Heavy ? "あり" : "なし (旧い作り)")} "
                  + $"/ 攻撃なしの手の主攻撃 (旧の式) {(v3.oldNoAttackBaseDmg ? "素火力を数える (旧い挙動)" : "0")} "
                  + $"/ 縄張りの宝 {territoryTreasure} (BOT のしきい値 {territoryTreasureHpMargin:0.##}) / 縄張りを避ける遠回り {(navTerritoryDetour < 0 ? "使わない" : "+" + navTerritoryDetour + "歩まで")}"
                  + (DeckLookaheadDiagLine().Length > 0 ? System.Environment.NewLine + DeckLookaheadDiagLine() : "")

@@ -268,8 +268,10 @@ namespace CombatSystem
             float diceOv = Overrides?.DiceExpected(e.id) ?? 0f;
             bool changeHp = hpOv > 0 && hpOv != e.maxHP;
             bool changeDice = diceOv > 0f;
-            if (!changeHp && !changeDice) return e;
+            bool addHeavy = Depth3Heavy(e.id) && e.heavyPeriod <= 0;   // 深さ 3 のボスの大技 (2026-11-13・測定の口で止められる)
+            if (!changeHp && !changeDice && !addHeavy) return e;
             var cc = e.Clone();
+            if (addHeavy) { cc.heavyPeriod = Depth3HeavyPeriod; cc.heavyMul = Depth3HeavyMul; cc.heavyWindupMul = Depth3HeavyWindupMul; }
             if (changeHp) cc.maxHP = Mathf.Max(1, hpOv);
             if (changeDice)
             {
