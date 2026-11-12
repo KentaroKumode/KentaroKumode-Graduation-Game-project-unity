@@ -375,11 +375,5 @@ namespace GameLoop
             return b;
         }
 
-        /// <summary>最後に終了したランを 1 本、物語として出す。</summary>
-        public static string RenderLastRun()
-        {
-            _seq = 0;
-            return Render(RunChronicle.LastRun);
-        }
     }
 }

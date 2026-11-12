@@ -185,10 +185,6 @@ namespace GameLoop
             return ctx != null && ctx.GetAccumulated("player_contre") > 0;
         }
 
-        /// <summary>所持リストを介さず効果のみ適用（UI/グリッド経路用。削除はグリッド側が行う）。</summary>
-        public static bool ApplyDirect(RunState run, string id)
-            => run != null && !string.IsNullOrEmpty(id) && Apply(run, id);
-
         /// <summary>効果適用本体（リスト削除はしない）。</summary>
         private static bool Apply(RunState run, string id)
         {

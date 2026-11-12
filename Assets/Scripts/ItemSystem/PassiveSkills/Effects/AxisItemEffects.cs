@@ -21,7 +21,6 @@ namespace ItemSystem.PassiveSkills.Effects
         public static int AtkDice(CombatContext ctx) => Count(ctx, MutualKeys.AttackDiceCount);
         public static int BlockDice(CombatContext ctx) => Count(ctx, MutualKeys.BlockDiceCount);
         public static int DiceTotal(CombatContext ctx) => ctx.playerDice != null ? ctx.playerDice.Length : 3;
-        public static int HalfUp(int n) => (n + 1) / 2;
     }
 
     /// <summary>誓約の封じ。 <b>戦闘の情報を作った直後</b>に所持品から立てる (PassiveSkillManager)。

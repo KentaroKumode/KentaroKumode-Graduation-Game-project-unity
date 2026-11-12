@@ -395,12 +395,6 @@ namespace ItemSystem.PassiveSkills
         /// 会心倍率が実際に乗る 1 箇所 (PassiveSkillManager の isCritical 分岐) で引く。</para></summary>
         public float enemyCritMultReduction = 0f;
 
-        /// <summary>敵へ与える「最大 HP の割合」ダメージ量。
-        /// **割合ダメージを直接計算せず必ずここを通すこと**（新規実装も同様）。
-        /// 2026-07-29: 〈回帰性真理〉による 1 丸めは撤去した ── 割合ダメージは p4 にも通る。</summary>
-        public int RatioDamageToEnemy(float pct)
-            => System.Math.Max(1, UnityEngine.Mathf.CeilToInt(enemyMaxHP * pct));
-
         /// <summary>敵へ与える「**現在** HP の割合」ダメージ量。 〈虚空〉が使う。
         /// 現在 HP 基準なので指数的に減衰し、 **これ単独では敵を倒し切れない**（漸近するだけ）。
         /// 最後は必ず通常攻撃で仕留める必要がある、 という設計上の制約になる。</summary>

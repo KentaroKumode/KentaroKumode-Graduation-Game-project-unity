@@ -233,7 +233,6 @@ namespace ItemSystem
         public bool IsQuest => category == ItemCategory.Quest;
         
         // 価格取得
-        public int GetCurrentBuyPrice() => buyPrice.GetRandomValue();
         public int GetCurrentSellPrice() => sellPrice.GetRandomValue();
         
         // 武器ダイス情報

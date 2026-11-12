@@ -118,10 +118,6 @@ namespace Codex
             }
         }
 
-        /// <summary>現在解禁済みのビネット一覧。</summary>
-        public static IEnumerable<WorldVignettes.Vignette> UnlockedVignettes()
-            => WorldVignettes.All.Where(IsUnlocked);
-
         // ----------------------------------------------------------------
         //  最高難度判定ヘルパー
         // ----------------------------------------------------------------

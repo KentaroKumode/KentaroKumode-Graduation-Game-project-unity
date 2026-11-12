@@ -518,19 +518,6 @@ namespace CombatSystem
             return l;
         }
 
-        /// <summary>軸の端子で、 その軸が誓約で封じられているか (封じた軸の資源を足す部分は効かない)。</summary>
-        public static bool AxisSealed(TerminalDef d, in TerminalEnv env)
-        {
-            if (d?.axis == null) return false;
-            if (d.axis == ItemSystem.PassiveSkills.AxisRules.Poison) return env.sealPoison;
-            if (d.axis == ItemSystem.PassiveSkills.AxisRules.Bleed) return env.sealBleed;
-            if (d.axis == ItemSystem.PassiveSkills.AxisRules.Heat) return env.sealHeat;
-            if (d.axis == ItemSystem.PassiveSkills.AxisRules.Charge) return env.sealCharge;
-            if (d.axis == ItemSystem.PassiveSkills.AxisRules.Shield) return env.sealShield;
-            if (d.axis == ItemSystem.PassiveSkills.AxisRules.Crit) return env.sealCrit;
-            return false;
-        }
-
         private static bool Plugged(int[] slotOfDie, int s)
         {
             for (int i = 0; i < slotOfDie.Length; i++) if (slotOfDie[i] == s) return true;

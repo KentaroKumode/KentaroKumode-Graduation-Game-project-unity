@@ -25,18 +25,6 @@ namespace UI.Game2D
         public static string KindShort(TerminalKind k)
             => k == TerminalKind.Attack ? "攻" : k == TerminalKind.Block ? "防" : k == TerminalKind.Charge ? "充" : "補";
 
-        /// <summary>戦闘画面の行に出す短い条件 (出目の条件 → 払う充電 → 常設 / 使い捨て の順で 1 つ)。 無ければ null。</summary>
-        public static string CondShort(TerminalDef d)
-        {
-            if (d == null) return null;
-            if (!string.IsNullOrEmpty(d.condLabel)) return d.condLabel;
-            if (d.chargeCost > 0) return "充電" + d.chargeCost;
-            if (d.id == TerminalIds.BigDischarge) return "充電すべて";
-            if (d.permanent) return "常設";
-            if (d.disposable) return "使い捨て";
-            return null;
-        }
-
         /// <summary>印の並び (種類・条件・レア・使い捨て・常設・軸)。 例: 「攻撃・3以下・レア」。</summary>
         public static string Marks(TerminalDef d, RunState run, bool withKind = true)
         {

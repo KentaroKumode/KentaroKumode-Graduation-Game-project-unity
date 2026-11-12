@@ -144,13 +144,6 @@ namespace GameLoop
             return d.tier >= 1 && d.tier <= ConsumableMaxTier ? d.tier : 0;
         }
 
-        /// <summary>その id が消費アイテム系統 (旧 cons_*) か。</summary>
-        public static bool IsConsumableFamilyItem(string itemId)
-        {
-            var d = string.IsNullOrEmpty(itemId) ? null : ItemSystem.ItemDatabase.Instance?.GetItem(itemId);
-            return d != null && !string.IsNullOrEmpty(d.consFamily);
-        }
-
         /// <summary>その id の消費アイテム系統 (heal/def/dmg/provision)。 消費アイテムでなければ null。
         /// <b>接頭辞では判定しない</b> (2026-09-22)。</summary>
         public static string ConsFamilyOf(string itemId)
@@ -159,12 +152,6 @@ namespace GameLoop
             return string.IsNullOrEmpty(d?.consFamily) ? null : d.consFamily;
         }
 
-        /// <summary>その id がユニーク品 (旧 uniq_*) か。 <b>昇華の対象外</b>。</summary>
-        public static bool IsUniqueItem(string itemId)
-        {
-            var d = string.IsNullOrEmpty(itemId) ? null : ItemSystem.ItemDatabase.Instance?.GetItem(itemId);
-            return d != null && d.unique;
-        }
     }
 
     /// <summary>ボス ID の prefix / 特定 ID。 「boss_layer」 直書き分岐の置き換え先。</summary>

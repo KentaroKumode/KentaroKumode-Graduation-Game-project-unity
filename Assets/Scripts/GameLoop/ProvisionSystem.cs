@@ -124,13 +124,6 @@ namespace GameLoop
             int b = run.provision; Reduce(run, amount); Stats.evilLoss += b - run.provision;
         }
 
-        /// <summary>食料アイテム等による物資回復。</summary>
-        public static void ApplyFood(RunState run, int amount)
-        {
-            if (run == null) return;
-            int b = run.provision; Recover(run, amount); Stats.foodGain += run.provision - b;
-        }
-
         // === 内部 ===
 
         /// <summary>佯狂者の冠: 払底したらこのラン物資0固定。</summary>

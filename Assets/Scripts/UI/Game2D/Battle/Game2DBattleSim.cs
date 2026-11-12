@@ -585,13 +585,6 @@ namespace UI.Game2D.Battle
         /// <summary>場が新しくなるたびに増える (画面が引いてくる動きを始める合図)。</summary>
         public int boardSerial;
 
-        /// <summary>今の出目のどれかを端子 s に挿せるか (もう挿している出目があれば true)。 画面が挿せない端子を暗くするのに使う。</summary>
-        public bool AnyDieFits(int s)
-        {
-            for (int i = 0; i < slot.Length; i++) if (slot[i] == s || Accepts(i, s)) return true;
-            return false;
-        }
-
         private void CycleSlot(int i, int dir)
         {
             int m = board.Count; if (m == 0 || !IsDie(i) || IsCatLocked(i)) return;

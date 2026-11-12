@@ -210,25 +210,6 @@ namespace ItemSystem.PassiveSkills
             skillDisplayNames.Clear();
         }
 
-        /// <summary>物資「迷妄」(絶望帯・ADR-0002): 戦闘開始時にプレイヤーのパッシブスキルを count 個
-        /// ランダムで無効化する。PassiveItem(佯狂者・記憶の砂時計 等)は別系統(PassiveItemManager)のため
-        /// activeSkillNames に含まれず、自動的に対象外。スキルは戦闘ごとに再登録されるため復元は不要。</summary>
-        public void DisableRandomPlayerSkills(int count)
-        {
-            if (count <= 0 || activeSkillNames.Count == 0) return;
-            var distinct = new List<string>(new HashSet<string>(activeSkillNames));
-            int n = System.Math.Min(count, distinct.Count);
-            for (int i = 0; i < n && distinct.Count > 0; i++)
-            {
-                int idx = GameLoop.GameRng.RangeAuto("PassiveSkillManager.3", 0, distinct.Count);
-                string name = distinct[idx];
-                distinct.RemoveAt(idx);
-                while (activeSkillNames.Contains(name)) UnregisterSkill(name);
-                string disp = skillDisplayNames.TryGetValue(name, out var d) ? d : name;
-                Debug.Log($"[迷妄] パッシブ「{disp}」を無効化 (絶望帯)");
-            }
-        }
-
         // ===========================================================
         //  戦闘ライフサイクル
         // ===========================================================
