@@ -538,17 +538,15 @@ namespace AutoTest
         }
 
         /// <summary>L1学習用: 帯ラベルから数値スコアを返す。
-        /// CRASH=-1, DEADLOCK=-2, R1a..R10/R11 を 1..11 にマップ（先頭文字 R+数字部）。</summary>
+        /// CRASH=-1, DEADLOCK=-2, R1a..R11 を 1..11 にマップ（先頭文字 R+数字部）。 段の表は <see cref="Classify"/> の上。</summary>
         private int ComputeBandScore(RunRec r)
         {
             if (string.IsNullOrEmpty(r.band)) return 0;
             if (r.band == "CRASH") return -1;
             if (r.band == "DEADLOCK") return -2;
-            // "R11" → 11, "R8b" → 8 等
+            // "R11" → 11, "R10b" → 10 等。 小文字 a/b/c/d は細分しない (数字部だけ読む)。
             int v = 0; int i = 1;
             while (i < r.band.Length && char.IsDigit(r.band[i])) { v = v * 10 + (r.band[i] - '0'); i++; }
-            // 小文字 a/b で 0.5 単位の細分はしないが、6Fクリアは R8b(=8) のまま、5Fクリアは R8(=8) で同点
-            // 7層クリア(R11)が最高。死亡 R1a..R10。
             return v;
         }
 
@@ -559,9 +557,31 @@ namespace AutoTest
             _detail[r.index] = list;
         }
 
-        /// <summary>結果を10段階バンド + CRASH/DEADLOCK に分類。
-        /// R1:2F以前(道中/ボス問わず) R2:3F道中 R3:3Fボス R4:4F道中 R5:4Fボス
-        /// R6:5F道中 R7:5Fボス R8:5Fクリア R9:6Fボスで死亡 R10:6層クリア。</summary>
+        /// <summary>結果を帯 + CRASH/DEADLOCK に分類。 f は Run.Depth (深さ 0/1/3/5/6/7/8 = 画面 序層/1/2/3/4/5/5 の最終段)。
+        /// <code>
+        /// 帯    点  条件
+        /// R1a    1  深さ 1 以下の道中で死亡 (深さ 0 の序層・不明の深さも)
+        /// R1b    1  深さ 1 のボス戦で死亡
+        /// R1c/d  1  深さ 2 (今は無い層)
+        /// R2     2  深さ 3 (画面 第 2 層) の道中で死亡
+        /// R3     3  深さ 3 のボス戦で死亡
+        /// R4/R5  4/5 深さ 4 (今は無い層)
+        /// R6     6  深さ 5 (画面 第 3 層) の道中で死亡
+        /// R7     7  深さ 5 のボス戦で死亡
+        /// R8     8  深さ 5 を倒して生きて終了 (〈決意〉が無い・第 3 層の結末)
+        /// R9     9  深さ 6 (画面 第 4 層・灰燼の王) で死亡 (道中もボス戦も)
+        /// R10b  10  深さ 6 を倒して生きて終了 (〈真理〉が無い・第 4 層の結末)  ← 2026-11-13 #137 で R8b (=8) から上げた
+        /// R10   10  深さ 7 以上 (画面 第 5 層・Null Point のヴェスカ) で死亡
+        /// R11   11  ヴェスカ撃破 (完全クリア)。 「クリア」の数え方 bandScore &gt;= 11 はこれだけ
+        /// </code>
+        /// <para><b>R10b (#137)。</b> 旧 R8b は 8 点で、 灰燼の王に負けた R9 (9 点) より低かった。 生きて第 4 層の結末へ着いたランは
+        /// 灰燼の王を越えているので R9 より上、 ヴェスカは倒していないので R11 より下の 10 点 (R10 と同点) に置く。
+        /// <b>既定の測定 (riftRecordAtBoss = True) ではこの帯に入るランは無い</b>: 深さ 6 は〈決意〉を持って入る層で、
+        /// 終点に隣り合う点は全部「裂け目の記録」の口になり (ConvictionSystem.RiftGateAtBoss・FreeMapGenerator)、
+        /// 踏まずに終点へ着いても安全弁がボス戦の前に出す (GameManager.StartBossTileOrRiftRecord)。 BOT は必ず最後の頁 (選択肢 0) を
+        /// 開くので (PickSafeChoice・アブレーションでも潰さない) 〈真理〉が立ち、 HandleFloorClear の「深さ 6 で〈真理〉なし」の終了を通らない。
+        /// イベントなしの測定 (SuppressEvents / SuppressConvictionChain) は深さ 6 に入る時に〈真理〉を配る。
+        /// 入るのは旧い作りへ戻した腕 (riftRecordAtBoss = False) だけ。</para></summary>
         private void Classify(RunRec r)
         {
             if (r.outcome == Outcome.Crash) { r.band = "CRASH"; r.bandLabel = "クラッシュ(例外)"; return; }
@@ -573,8 +593,9 @@ namespace AutoTest
             }
             if (r.outcome == Outcome.NormalClear)
             {
-                // 6F クリア (〈真理〉未所持で 7F 進入不可) と 5F クリア (〈決意〉未所持で 6F 進入不可) を区別
-                if (r.reachedFloor >= 6) { r.band = "R8b"; r.bandLabel = "6Fクリア(真理未所持)"; }
+                // 深さ 6 クリア (〈真理〉未所持で深さ 7 へ進めない) と 深さ 5 クリア (〈決意〉未所持で深さ 6 へ進めない) を区別。
+                //   深さ 6 クリアは灰燼の王を越えているので R9 (深さ 6 で死亡) より上の R10b (#137・旧 R8b = 8)。
+                if (r.reachedFloor >= 6) { r.band = "R10b"; r.bandLabel = "第4層クリアで終了(真理未所持)"; }
                 else                     { r.band = "R8"; r.bandLabel = "5Fクリア(決意未所持)"; }
                 return;
             }
