@@ -88,8 +88,28 @@ static class T
             dk.DrawTurn(TerminalCards.HandSize);
             Check(dk.hand.Count == 6 && dk.LastDrawnCount == 0, $"規定の枚数を超えて残った手札は捨てない・引かない (手札 {dk.hand.Count}・引いた {dk.LastDrawnCount})");
             var rb = new List<string> { TerminalIds.Retainer, TerminalIds.Attack };
-            Check(TerminalCards.Resolve(rb, new[] { 0 }, new[] { 4 }, new TerminalEnv(), new TerminalBattleState()).retainTarget == -1,
-                  "持ち越しの規則では〈保持器〉は対象を取らない (仮の形)");
+            var ro = TerminalCards.Resolve(rb, new[] { 0 }, new[] { 4 }, new TerminalEnv(), new TerminalBattleState());
+            Check(ro.retainTarget == -1 && ro.recall && ro.blockAdd == 4, "持ち越しの規則の〈保持器〉: 場の端子は対象に取らず、 出目をブロックに入れて捨て札から戻す");
+            // 戻す 1 枚: 選んだ添字 / 選ばなければ最後に捨てた 1 枚 / 空なら効果なし
+            var disc = new List<string> { "攻撃", "定電圧", "防御" };
+            Check(TerminalDeckState.RecallPick(disc, 1) == "定電圧" && TerminalDeckState.RecallPick(disc, -1) == "防御" && TerminalDeckState.RecallPick(disc, 9) == "防御"
+                  && TerminalDeckState.RecallPick(new List<string>(), 0) == null, "〈保持器〉の戻す 1 枚の選び方");
+            {
+                var dk2 = new TerminalDeckState();
+                dk2.BeginBattle(new List<string> { "攻撃", "攻撃", "防御", "防御", "充電", "定電圧", "ヒューズ", "蓄電池", "検波器", "治癒", "接地" });
+                dk2.DrawTurn(TerminalCards.HandSize);
+                dk2.FinishTurn(Fired(0, 1, 2));
+                dk2.DrawTurn(TerminalCards.HandSize);          // 3 枚が捨て札へ
+                string want = dk2.discard[0];
+                int discBefore = dk2.discard.Count;
+                dk2.recallNext = TerminalDeckState.RecallPick(dk2.discard, 0);
+                dk2.FinishTurn(Fired(0));
+                dk2.DrawTurn(TerminalCards.HandSize);
+                Check(dk2.hand.Count == TerminalCards.HandSize && dk2.hand.Contains(want) && dk2.LastDrawnCount == 0 && dk2.discard.Count == discBefore,
+                      $"戻した端子は手札の枚数に数える (引いた {dk2.LastDrawnCount} 枚・捨て札 {discBefore}→{dk2.discard.Count})");
+                var keep = new List<string> { "a", "b", "c", "d", "e" }; var d3 = new List<string> { "x" };
+                Check(!TerminalDeckState.ApplyRecall("x", keep, d3, 5) && d3.Count == 1 && keep.Count == 5, "手札が規定の枚数なら戻さない (上限を超えない)");
+            }
             GameLoop.GameHooks.HandCarryDisabled = true;
             Check(TerminalCards.Resolve(rb, new[] { 0 }, new[] { 4 }, new TerminalEnv(), new TerminalBattleState()).retainTarget == 1,
                   "旧い規則では〈保持器〉が空けた端子を残す");

@@ -788,6 +788,8 @@ namespace CombatSystem
                 term = TerminalCards.Resolve(_deck.board, slots, playerDice, tenv, _deck.state, targets);
                 mutualWiring = term.kindOfDie;
                 _termOutcome = term;
+                // 〈保持器〉(手札の持ち越しの規則): 捨て札から次のターンの手札に戻す 1 枚。 対象 (targets の値) は捨て札の添字・選ばなければ最後に捨てた 1 枚
+                _deck.recallNext = term.recall ? TerminalDeckState.RecallPick(_deck.discard, TerminalWiring.RecallWant(_deck.board, term, targets)) : null;
             }
 
             // 端子の山札: 合計も個数も端子の結果から (出目をそのまま足さない ── 端子ごとに入る量が違う)

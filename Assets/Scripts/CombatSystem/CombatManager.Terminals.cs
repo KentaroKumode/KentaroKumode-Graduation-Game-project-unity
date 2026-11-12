@@ -267,6 +267,15 @@ namespace CombatSystem
     /// <summary>挿し方の列挙と、 既定の挿し方 (方策も画面も答えを出さなかった時・人の「おまかせ」)。 ADR-0014。</summary>
     public static class TerminalWiring
     {
+        /// <summary>〈保持器〉(手札の持ち越しの規則) の対象として選ばれた捨て札の添字 (発動した〈保持器〉の場の位置の targets の値・選ばれていなければ −1)。</summary>
+        public static int RecallWant(List<string> board, TerminalOutcome o, int[] targets)
+        {
+            if (board == null || o == null || targets == null) return -1;
+            foreach (int s in o.fired)
+                if (s >= 0 && s < board.Count && s < targets.Length && board[s] == TerminalIds.Retainer) return targets[s];
+            return -1;
+        }
+
         /// <summary>規則上ありうる挿し方をすべて返す (出目ごとの挿し先・−1 = 挿さない)。 挿せる数だけ見る (条件・充電は <see cref="TerminalCards.Resolve"/> が直す)。
         /// state を渡すと、 止まった端子 (ヴェスカ〈停滞する時間〉) へ挿す手は出さない (Resolve が外すのと同じ結果になる手を数え直さないため)。
         /// <paramref name="fixedDie"/> ≥ 0 なら、 その出目は <paramref name="fixedSlot"/> に挿した挿し方だけ (〈猫の手〉が先に挿した 1 組)。</summary>

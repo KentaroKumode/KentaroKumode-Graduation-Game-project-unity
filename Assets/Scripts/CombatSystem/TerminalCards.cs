@@ -168,6 +168,8 @@ namespace CombatSystem
         /// <summary>〈保持器〉〈写し取り〉〈焼き切り〉の対象 (場の添字・−1 = なし)。 選んだ対象 (Resolve の wantTarget) が候補なら それ、
         /// でなければ左端の候補 (<see cref="TerminalCards.TargetCandidates"/> の先頭)。</summary>
         public int retainTarget = -1, copyTarget = -1, burnTarget = -1;
+        /// <summary>〈保持器〉(手札の持ち越しの規則): 捨て札から 1 枚、 次のターンの手札に戻す (戻す 1 枚は <see cref="TerminalDeckState.RecallPick"/>)。</summary>
+        public bool recall;
         /// <summary>〈発振器〉の連続をこのターンもう数えたか。</summary>
         public bool oscCounted;
         /// <summary>ヴェスカ〈停滞する時間〉で止まっている場の端子 (Resolve に渡した状態の写し・null = なし)。
@@ -314,9 +316,11 @@ namespace CombatSystem
                 Rare(D(TerminalIds.LootBox, A, "出目を攻撃に。このターンに敵を倒すとゴールド +" + LootGold + "。")),
                 Rare(D(TerminalIds.Stripper, S, "このターンに敵を倒すと、戦闘後の端子の選択肢が 1 つ増える。")),
                 Rare(D(TerminalIds.Doubler, S, "このターン、他の端子の効果を 2 回発動させる。", TerminalCond.AtLeast6)),
-                // 〈保持器〉: 手札の持ち越し (2026-11-13・HandCarry) で挿さなかった端子は全部残るので、 「1 枚残す」は役目を失った。
-                //   作り替えまでの仮の形 = 残す効果を止める (出目をブロックに入れるだけ)。 測定の口で旧い規則に戻した腕では残す効果が働く (説明文は今の規則のまま)。
-                Rare(D(TerminalIds.Retainer, B, "出目をブロックに。")),
+                // 〈保持器〉: 手札の持ち越し (2026-11-13・HandCarry) で「空けた端子を 1 枚残す」は役目を失ったので、
+                //   「捨て札から選んだ 1 枚を、 次のターンの手札に戻す」に作り替えた (ユーザーの決定)。 出目をブロックに入れるのは残す
+                //   (ADR-0014 の値付けの規則 2: 準備役は挿した出目を素の端子と同じに入れたうえで効果を足す)。
+                //   測定の口で旧い規則に戻した腕では、 元の「空けた端子を 1 枚残す」が働く (説明文は今の規則のまま)。
+                Rare(D(TerminalIds.Retainer, B, "出目をブロックに。捨て札から 1 枚、次のターンの手札に戻す。")),
                 Rare(Once(D(TerminalIds.StopSignal, S, "敵は次のターン行動しない。"))),
                 Rare(D(TerminalIds.Fork, A, "出目を攻撃とブロックの両方に入れる。")),
                 // ── 軸 ──
@@ -524,7 +528,10 @@ namespace CombatSystem
             return o;
         }
 
-        /// <summary>挿さずに空けた手札の端子を対象に取る端子 (〈写し取り〉〈焼き切り〉〈保持器〉)。</summary>
+        /// <summary>捨て札の 1 枚を対象に取る端子 (手札の持ち越しの規則の〈保持器〉)。 対象 (挿し方の targets の値) は捨て札の添字。</summary>
+        public static bool PicksDiscard(string id) => id == TerminalIds.Retainer && HandCarry;
+
+        /// <summary>挿さずに空けた手札の端子を対象に取る端子 (〈写し取り〉〈焼き切り〉・旧い規則の〈保持器〉)。</summary>
         public static bool PicksTarget(string id) => id == TerminalIds.Copier || id == TerminalIds.BurnOut || (id == TerminalIds.Retainer && !HandCarry);
 
         /// <summary>場の s が、 self (対象を取る端子) の対象の候補か: 自分でない・常設でない・止まっていない (ヴェスカ〈停滞する時間〉)・
@@ -618,7 +625,7 @@ namespace CombatSystem
                 case TerminalIds.TwinShot: o.attackAdd += sum * TwinShotMul; break;
                 case TerminalIds.Whet: o.attackAdd += sum + env.whetBonus; break;
                 // 変圧器 (6. で足す)・剥ぎ取り (撃破した時)・倍電圧 (5. の頭で見る) は、 ここでは何もしない
-                case TerminalIds.Retainer: o.blockAdd += sum; if (!HandCarry) o.retainTarget = empty(slot); break;   // 持ち越しの規則では残す効果を止める (仮)
+                case TerminalIds.Retainer: o.blockAdd += sum; if (!HandCarry) o.retainTarget = empty(slot); else o.recall = true; break;   // 持ち越しの規則では捨て札から 1 枚戻す (対象は RecallPick)
                 case TerminalIds.StopSignal: o.enemyStunNext = true; break;
                 case TerminalIds.Fork: o.attackAdd += sum; o.blockAdd += sum; break;
                 // 軸
@@ -675,7 +682,7 @@ namespace CombatSystem
         /// <summary>戦闘の始め: ランの山札を写して切る。</summary>
         public void BeginBattle(List<string> runDeck)
         {
-            draw.Clear(); discard.Clear(); hand.Clear(); permanent.Clear(); exiled.Clear(); board.Clear(); _usedLastTurn.Clear();
+            draw.Clear(); discard.Clear(); hand.Clear(); permanent.Clear(); exiled.Clear(); board.Clear(); _usedLastTurn.Clear(); recallNext = null;
             if (runDeck != null) draw.AddRange(runDeck);
             Shuffle(draw);
         }
@@ -721,9 +728,12 @@ namespace CombatSystem
             state.stopped = null;
             _usedLastTurn.Clear();
             discard.AddRange(toDiscard);
+            int carried = keep.Count;
+            if (carry) ApplyRecall(recallNext, keep, discard, size);   // 〈保持器〉: 捨て札から 1 枚戻す (手札の枚数に数える)
+            recallNext = null;
             hand.Clear();
             hand.AddRange(keep);
-            LastCarriedCount = carry ? keep.Count : 0;
+            LastCarriedCount = carry ? carried : 0;
 
             // 引く (このターンに引いた物だけが止まる対象)
             var stoppedPerm = new List<int>();   // permanent の添字
@@ -758,6 +768,27 @@ namespace CombatSystem
         public int LastStoppedMains { get; private set; }
         /// <summary>直近の <see cref="DrawTurn"/> で、 手札の持ち越し (<see cref="TerminalCards.HandCarry"/>) で前のターンから残った枚数 (旧い規則では 0・計装・画面用)。</summary>
         public int LastCarriedCount { get; private set; }
+
+        /// <summary>〈保持器〉(手札の持ち越しの規則) が次のターンの手札に戻す端子 (null = 戻さない)。 配線の後に CombatManager が
+        /// <see cref="RecallPick"/> で決め、 次の <see cref="DrawTurn"/> が捨て札から手札へ移して空にする。</summary>
+        public string recallNext;
+
+        /// <summary>〈保持器〉が戻す 1 枚: <paramref name="want"/> が捨て札の添字として正しければそれ、 でなければ最後に捨てた 1 枚 (捨て札の末尾)。 捨て札が空なら null (効果なし)。
+        /// 使い捨てで外れた端子・焼き切った端子は捨て札に無いので選べない。 本体と BOT が同じ関数を呼ぶ。</summary>
+        public static string RecallPick(List<string> discard, int want)
+        {
+            if (discard == null || discard.Count == 0) return null;
+            return want >= 0 && want < discard.Count ? discard[want] : discard[discard.Count - 1];
+        }
+
+        /// <summary>〈保持器〉の戻す 1 枚を、 残した手札へ足す (手札が <paramref name="size"/> 枚に満たない時だけ・上限を超えない)。 捨て札から 1 枚抜く。 本体の DrawTurn と BOT の先読みが同じ関数を呼ぶ。
+        /// 戻り値 = 戻したか。</summary>
+        public static bool ApplyRecall(string recall, List<string> keep, List<string> discard, int size)
+        {
+            if (recall == null || keep.Count >= size || !discard.Remove(recall)) return false;
+            keep.Add(recall);
+            return true;
+        }
 
         /// <summary>前のターンに手札から挿した (発動した) 端子の名前 (<see cref="FinishTurn"/> が控え、 次の <see cref="DrawTurn"/> が捨て札へ送って空にする)。
         /// 使い捨て・焼き切りは FinishTurn が手札から外すので入れない。 旧い規則では読まない (控えるだけ)。</summary>

@@ -147,6 +147,13 @@ namespace AutoTest
                 ? DeckCardDmgPerPoint * Math.Max(0f, TargetWorth(TerminalCards.Get(board[slot]), runNow) - 1f) : 0f;
             // 次のターンにもう 1 回使える。 手札の持ち越し (TerminalCards.HandCarry) では挿さなかった端子は全部残るので、 残す効果に値打ちは無い
             if (o.retainTarget >= 0 && !TerminalCards.HandCarry) flat += (DeckRetainDmg + PerUse(o.retainTarget)) * dw;
+            // 〈保持器〉(持ち越しの規則): 捨て札から戻す 1 枚 (方策と同じ選び方) を、 次のターンにもう 1 回使える分として見る
+            if (o.recall)
+            {
+                var disc = dkNow?.discard;
+                int rp = RecallBest(disc, runNow);
+                if (rp >= 0) flat += (DeckRetainDmg + DeckCardDmgPerPoint * Math.Max(0f, TargetWorth(TerminalCards.Get(disc[rp]), runNow) - 1f)) * dw;
+            }
             if (o.copyTarget >= 0 && o.copyTarget < board.Count) flat += draws * PerUse(o.copyTarget) * dw;
             if (o.burnTarget >= 0 && o.burnTarget < board.Count && runNow?.terminalDeck != null && runNow.terminalDeck.Count > 0)
             {
@@ -358,6 +365,19 @@ namespace AutoTest
         private static int[] ChooseDeckTargets(List<string> board, TerminalOutcome o, RunState run)
         {
             int[] res = null;
+            // 〈保持器〉(手札の持ち越しの規則): 捨て札から次のターンに一番使いたい 1 枚 (素の点の最大・同点は後に捨てた方) を選ぶ (値は捨て札の添字)
+            if (o.recall)
+            {
+                var disc = CombatManager.Instance?.TerminalDeck?.discard;
+                int pick = RecallBest(disc, run);
+                if (pick >= 0)
+                    for (int p = 0; p < board.Count; p++)
+                        if (board[p] == TerminalIds.Retainer && o.fired.Contains(p))
+                        {
+                            if (res == null) { res = new int[board.Count]; for (int q = 0; q < res.Length; q++) res[q] = -1; }
+                            res[p] = pick;
+                        }
+            }
             for (int p = 0; p < board.Count; p++)
             {
                 if (!TerminalCards.PicksTarget(board[p]) || !o.fired.Contains(p)) continue;
@@ -374,6 +394,19 @@ namespace AutoTest
                 res[p] = pick;
             }
             return res;
+        }
+
+        /// <summary>[〈保持器〉] 捨て札で素の点が最大の 1 枚の添字 (同点は後に捨てた方・空なら −1)。 先読みでも同じ選び方 (次のターンの効用での選び直しはしない・仮)。</summary>
+        private static int RecallBest(List<string> disc, RunState run)
+        {
+            if (disc == null) return -1;
+            int pick = -1; float best = 0f;
+            for (int i = 0; i < disc.Count; i++)
+            {
+                float sc = TargetWorth(TerminalCards.Get(disc[i]), run);
+                if (pick < 0 || sc >= best) { pick = i; best = sc; }
+            }
+            return pick;
         }
 
         /// <summary>対象の点: 基本の端子 1 (報酬の足切りと同じ見方)・それ以外は報酬の素の点。</summary>
@@ -680,7 +713,7 @@ namespace AutoTest
               .Append(ns.enemyAtk).Append(',').Append(ns.enemyHitBonus).Append(',').Append(ns.enemyDown ? 1 : 0).Append(',').Append(ns.downBroken).Append('|')
               .Append(env.charge).Append(',').Append(env.enemyPoison).Append(',').Append(env.enemyBleed).Append('|');
             string At(int s) => s >= 0 && s < board.Count ? board[s] : "-";
-            sb.Append(At(o.retainTarget)).Append(',').Append(At(o.copyTarget)).Append(',').Append(At(o.burnTarget)).Append('|');
+            sb.Append(At(o.retainTarget)).Append(',').Append(At(o.copyTarget)).Append(',').Append(At(o.burnTarget)).Append(o.recall ? ",R" : "").Append('|');
             foreach (int s in o.fired) { var d = TerminalCards.Get(board[s]); if (d != null && d.disposable) sb.Append(board[s]).Append(','); }
             sb.Append('|').Append(after.oscLast).Append(',').Append(after.oscStreak).Append(',').Append(after.firedTotal).Append(',')
               .Append(after.ignoreCondNext ? 1 : 0).Append(',').Append(after.storedAttack).Append(',').Append(after.storedAttackNext).Append(',')
@@ -718,6 +751,9 @@ namespace AutoTest
             var keep = new List<string>();
             TerminalDeckState.SplitHand(hand, board, perm.Count, dk.state.stopped, retain,
                                         TerminalDeckState.UsedFromHand(board, perm.Count, o), TerminalCards.HandCarry, keep, discard);
+            // 〈保持器〉(持ち越しの規則): 本体と同じ選び方・同じ関数で、 捨て札から 1 枚を手札へ戻す
+            if (o.recall && TerminalCards.HandCarry)
+                TerminalDeckState.ApplyRecall(TerminalDeckState.RecallPick(dk.discard, RecallBest(dk.discard, GameManager.Instance?.Run)), keep, discard, size);
             hand.Clear(); hand.AddRange(keep);
             // ---- 引く (山が尽きたら捨て札を混ぜて続ける・常設は場へ出して引き直す・引いた物だけが止まる対象) ----
             var stopPerm = new List<int>(); var stopHand = new List<int>();
