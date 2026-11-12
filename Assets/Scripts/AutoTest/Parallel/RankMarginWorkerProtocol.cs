@@ -407,7 +407,7 @@ namespace AutoTest.ParallelSweep
                 "enableAllDebuffs", "forceNoRelic", "forceTheoreticalRelic",
                 "shieldAbsorbsUnmitigable", "suppressFacePartOffers", "robberyBlocksShops",
                 "challengeScoreTarget", "masterSeed", "rawTierRatio",
-                "learnBotAi", "learnTier", "tuneBosses",
+                "learnBotAi", "learnTier",
                 // **2026-09-14: ここへ足し忘れて 60,000 ラン を捨てた。**
                 //   自作ドライバが useIttBeta を送っておらず、 既定 false のまま走った
                 //   (Editor の並列ランナーは True を運んでいた)。 アイテム評価の推定量が
@@ -467,6 +467,8 @@ namespace AutoTest.ParallelSweep
                 "terminalsLeaveDeck", "randomGrantTerminals", "armorDefPerRank", "armorFlatEvery",
                 // 2026-11-12 (#102 第 2 弾): 端子の調整を元の値へ戻す腕 (0 / False = 今の値)
                 "terminalHealMul", "terminalArresterNeed", "terminalFirstAidBattleOnly",
+                // 2026-11-12 (#134): Optimal の配線のミスの率 (0 = ミスなし・Super と素朴版は経路を通らない)
+                "optimalMistakeRate",
             };
             var sb = new System.Text.StringBuilder();
             foreach (string name in watched)

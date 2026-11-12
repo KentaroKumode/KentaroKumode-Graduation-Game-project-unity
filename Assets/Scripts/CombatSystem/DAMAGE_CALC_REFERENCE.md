@@ -81,8 +81,6 @@ enemyDiceTotal  = Σ(敵出目)
                 − enemyDiceTotalPenalty    ← 床なし減算(負値許容)。沈黙の剣帯=1T目-99
                 + enemyDiceTotalBonus      ← 星火燎原/業火の遺志/狂暴化 等(累積)
                 + bossDiceBonus            ← 強者/玉座/刹那(※現在enemies.jsonから撤廃・常時0)
-   ※敵スタンス弱ロール(ADR-0005)は CombatManager の RollDice 時に敵ダイスの最大出目を縮めて実際に振る
-     （期待値≈0.65倍・結果の事後倍率ではない）→ Σ(敵出目) に既に反映。強ロールは基準(縮小なし)。
 
 → FireTrigger(OnPostRoll)  ← ここで OnPostRoll パッシブが両合計を加算改変
    (軽量/熟練/技量/筋力/星導/永劫/ヘルメス/黄金卿/復讐/Abyss/画竜点睛 など、
@@ -174,7 +172,6 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
 ※堅忍/鉄壁/頑強/天命/Destiny/Perfection等の被ダメ軽減は②のProcessDamage内で適用済み
 total = ProcessDamage結果
 × メタデバフ天変地異(×2.0)
-× enemyStanceDamageMult       ← 敵スタンス(ADR-0005・高ダメ>1/低ダメ<1)。以降の軽減はスタンス後の値に効く
 − メタバフ被ダメ軽減(最大−2,最低1)
 − playerFlatDamageReduction(不屈の鎧/苦難の刻印 合算, 最低1)
 不抜の聖紋【職業/騎士 2026-06-28】: oathArmed && !oathBroken && HP≥80% → total −= ceil(total×0.4)。
@@ -268,8 +265,6 @@ ShieldBash の空振り（盾 0）が 34.2% → 66.1%、1 機会あたりの攻�
 | `enemyBurnTurns`/`enemyBurnDamage` | 炎上（業火） | 戦闘保持 |
 | `enemyDiceTotalBonus` | 敵合計への加算（判定前・累積） | **BeginNewTurnでリセットしない** |
 | `enemyDiceTotalPenalty`【新】 | 敵合計への床なし減算（負値許容＝大差勝ち）。沈黙の剣帯=1T目99 | BeginNewTurnで0 |
-| `enemyStanceDamageMult`【新】 | 敵スタンスの被ダメ倍率(高火力>1/低火力<1)。ApplyLossDamageModifiersで乗算 | BeginNewTurnで1.0 |
-| `enemyStanceKind`【新】 | 0なし/1強ロール低火力/2弱ロール高火力。弱(=2)は RollDice時に敵ダイス最大出目を`EnemyStance.WeakRollMax`へ縮小。`OnTelegraph`でUI後付け | BeginNewTurnで0 |
 | `bossDiceBonus` | 強者/玉座/刹那(現在未使用) | swapで0 |
 | `enemyDefense`【2026-10-28】 | 敵の防御値。EnemyData.defense + 精鋭+2 / 硬鱗+4 / 重甲+4 (OnBattleStart)。 戦闘中に動くもの: 割れる装甲 −4 / 積み上がる装甲 +3 (OnTurnEnd)・構え (ターンの頭・`ApplyGuardCycle`)・鎧砕き | **戦闘保持**(start/swapで設定) |
 | `enemyArmorPen`【2026-10-28】 | 敵がプレイヤーの防御を固定で削る量。EnemyData.armorPen | **戦闘保持**(start/swapで設定) |
@@ -690,7 +685,7 @@ ProcessDamage の中の OnPreDealDamage は「その陣営が攻撃している�
 | GoblinKingsCall(号令) | OnPostRoll | 自ダイス + GoblinCall（基準 3） |
 | MiasmaCorrosion(毒の侵蝕) | OnTurnEnd | 毒stack+1(max PoisonStackCap=5)、stack分を実プレイヤーへ軽減無視ダメ |
 | MirrorTwinsResponse(鏡映の応答) | OnPostReceiveDamage/OnTurnStart | 閾値 `Thr = max(12, ボス最大HP×4%)`。与ダメ<Thr で reflect=min(MirrorReflectCap=9, Thr−ダメ)を蓄積、次T開始で軽減無視の反射 |
-| JudgmentFlames(審判の炎) | OnTurnEnd | `dmg=min(ChipCap, 1+ceil(currentTurn/3)+罪)`、実プレイヤーへ軽減無視（罪=totalBattles/8,max2 / ChipCap 基準 10・BossTuning で可変）。ターン係数は 2026-07-28 に 1→1/2、2026-08-15 に 1/2→1/3 へ緩和（15T 累積 108→90・上限は T≥19 まで届かない）。**シールドは肩代わりする**（③-C） |
+| JudgmentFlames(審判の炎) | OnTurnEnd | `dmg=min(ChipCap, 1+ceil(currentTurn/3)+罪)`、実プレイヤーへ軽減無視（罪=totalBattles/8,max2 / ChipCap 基準 10・`BossParams` の基準値）。ターン係数は 2026-07-28 に 1→1/2、2026-08-15 に 1/2→1/3 へ緩和（15T 累積 108→90・上限は T≥19 まで届かない）。**シールドは肩代わりする**（③-C） |
 | JudgmentBlaze / AshArmor / AshCarapace | — | 旧 6 層ボスの機構。**[未装備]**（6 層は下の 5 つで組み直した・数値はクラスの XML コメント）。同じ旧機構の RoyalEmber / SinChain / EternalBurning / ReturnToAshes / ImmortalEmber / EmberAura / StarfireProliferation / ScorchedEarth は 2026-11-12 に削除（GAME.md §24） |
 | EmberOmen(業火の予兆) | OnTurnStart | 予兆ターン = HP>50% は T1/5/9…（周期4）、HP≤50% は T1/4/7…（周期3）。予兆Tだけ攻撃 +JudgmentDice（基準 8）。**[#104 修正]** 焦土契約と同じ差分更新（自分の寄与 `ember_omen_applied` を毎T頭に「予兆なら JudgmentDice、それ以外 0」へ合わせて `enemyDiceTotalBonus` を足し引き）。旧: `+=` を戻す処理が無く、予兆のたびに積み上がっていた |
 | AshRegrowth(灰の再生) | OnTurnStart | HP>50% かつ非予兆T: 最大HPの2%回復（最低1） |

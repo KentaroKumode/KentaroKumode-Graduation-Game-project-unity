@@ -15,8 +15,9 @@ namespace AutoTest
     /// 端子の式は Resolve、 効用の式は OptimalUtilityCore の 1 か所ずつ ── ここは結果を「合計と個数」へ詰め直すのと、
     /// 先のターンに効く分の見積もり (下の定数) だけを持つ。</para>
     ///
-    /// <para>旧い配線との違い: 2 ターン先読み (v3.lookahead2) と配線のミス (wiringMistakeRate)・ターンの記録 (turnAudit) は山札では通らない
-    /// (どちらも旧い 3 種/4 種の端子の列挙が前提)。 山札の 2 ターン先読みは別の口 <see cref="deckLookahead"/> (#105・既定 OFF)。</para>
+    /// <para>旧い配線との違い: 2 ターン先読み (v3.lookahead2) とターンの記録 (turnAudit) は山札では通らない
+    /// (旧い 3 種/4 種の端子の列挙が前提)。 山札の 2 ターン先読みは別の口 <see cref="deckLookahead"/> (#105・既定 OFF)。
+    /// 配線のミス (wiringMistakeRate) は 2026-11-12 (#134) に「次点の挿し方を選ぶ」形で山札へつなぎ直した (Optimal だけ)。</para>
     /// </summary>
     public partial class AutoRunner
     {
@@ -181,7 +182,7 @@ namespace AutoTest
         /// <summary>山札の挿し方を選ぶ (読むだけ・山札の状態は写しに掛ける)。 戻り値 = 出目ごとの挿し先 (場の添字・−1 = 挿さない)。
         /// <paramref name="bestU"/> = 選んだ挿し方の効用 (リロールの値付けが読む)。 山札で戦っていなければ null。
         /// <paramref name="lookahead"/> = 実際の配線の判断の時だけ true (#105 の先読みを掛けてよい)。 振り直しの値付けと〈猫の手〉は false (重いので掛けない)。</summary>
-        private int[] ChooseDeckWiring(int[] rolls, MutualTurnTelegraph tele, out float bestU, out int[] targets, bool lookahead = false)
+        private int[] ChooseDeckWiring(int[] rolls, MutualTurnTelegraph tele, out float bestU, out int[] targets, bool lookahead = false, bool mayMistake = false)
         {
             bestU = float.NegativeInfinity; targets = null;
             var cm = CombatManager.Instance;
@@ -247,6 +248,14 @@ namespace AutoTest
             _lastFreeBlock = fbo.freeBlock && !fbo.killsNow; _lastKillsNow = fbo.killsNow; _lastExpTaken = fbo.taken;
             _lastPredOld = fbo.dmgOld; _lastPredNew = fbo.dmgNew; _lastPredA = fbo.aCount; _lastPredUsed = fbo.dmgUsed;
             _lastPredRaw = fbo.rawNew; _lastPredCritP = st.critP; _lastPredCritMul = st.critMulEff; _lastPredOutMul = st.outMul;
+            // [#134] Optimal の配線のミス (wiringMistakeRate): 次点の挿し方を選ぶ。 計装 (上の _last*) は旧と同じく意図した最良の手のまま。
+            //   Super・素朴版・Exact はここを通らない (判定の乱数も引かない)。
+            if (mayMistake && wiringMistakeRate > 0f && EffectiveWiringSkill == WiringSkill.Optimal && n > 1
+                && RollWiringMistake(rolls, tele))
+            {
+                int alt = PickMistakeIndex(us, outs, best, cm.PlayerHP);
+                if (alt >= 0) { WiringMistakes++; best = alt; }
+            }
             targets = tgts[best];
             return cands[best];
         }
@@ -351,7 +360,7 @@ namespace AutoTest
             int hpNow = CombatManager.Instance != null ? CombatManager.Instance.PlayerHP : -1;
             if (_fbPrevHp >= 0 && hpNow >= 0 && _fbPrevHp - hpNow > _fbPrevExpTaken) _fbUnavoidSeen = true;
             _lastFreeBlock = _lastKillsNow = false;
-            var slots = ChooseDeckWiring(rolls, tele, out _, out var targets, lookahead: true);
+            var slots = ChooseDeckWiring(rolls, tele, out _, out var targets, lookahead: true, mayMistake: true);
             // 挑戦カード〈金で殴る〉(#6): 払う金額 (札が無ければ 0・とどめに合わせて挿し方を替えることがある)。 計装の見積もり (_lastPred*) も金の分で上書きする
             int gold = slots != null ? ChooseGoldPunch(rolls, tele, ref slots, ref targets) : 0;
             if (predTrace) BeginPredTrace(tele.turn);
@@ -503,7 +512,7 @@ namespace AutoTest
         public int DeckLookaheadDecisions { get; private set; }
         public int DeckLookaheadChanged { get; private set; }
 
-        /// <summary>[#105] 先読みの乱数の種のもと (ラン番号・<see cref="SuperCombatAI.ResetForRun"/> と同じ所で入れる)。</summary>
+        /// <summary>[#105] 先読みの乱数の種のもと (ラン番号・ラン開始時に入れる)。</summary>
         private int _deckLaRunSeed;
 
         /// <summary>1 回の判断のあいだ変わらない、 先読みの前提と memo。</summary>

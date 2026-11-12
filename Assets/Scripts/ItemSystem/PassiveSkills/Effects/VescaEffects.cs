@@ -354,7 +354,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 止まった場所は <see cref="CombatSystem.TerminalBattleState.stopped"/>、 挿した出目を外すのは <see cref="CombatSystem.TerminalCards.Resolve"/>
     /// (本体も BOT も画面も同じ関数)。 このパッシブ自身はトリガーで何もしない ── 敵のパッシブ欄に出して効果を読ませるための登録。</para>
     ///
-    /// <para><b>p は L3 チューナーの第一レバー</b> (<c>BossParam.Stagnation</c> = 1 枚あたりの止まる確率 %)。
+    /// <para><b>p はヴェスカの第一レバー</b> (<c>BossParam.Stagnation</c> = 1 枚あたりの止まる確率 %)。
     /// 基準は段ごとに p1 10% / p2 15% / p3 20% / p4 25% (<see cref="CombatSystem.BossParams.Spec(CombatSystem.BossParam, string)"/>)。
     /// 実数値なので §13-3 の隠し倍率禁止に適合。</para>
     ///

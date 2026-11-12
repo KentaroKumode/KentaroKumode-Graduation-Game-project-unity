@@ -195,13 +195,7 @@ namespace AutoTest
                 weaponId = gm?.Run?.equippedWeaponId ?? "",
                 diceId = gm?.Run?.equippedDiceId ?? "",
                 deathCause = r.deathCause,
-                playerRollSum = r.playerRollSum,
-                playerRollCount = r.playerRollCount,
                 playerDamageBySource = r.playerDamageBySource,
-                strongRollTurns = r.strongRollTurns,
-                strongRollBossWins = r.strongRollBossWins,
-                weakRollTurns = r.weakRollTurns,
-                weakRollBossWins = r.weakRollBossWins,
                 playerMaxHpEnd = gm?.Run?.playerMaxHP ?? 0,
                 encounterKey = _pendingEncounterKey,
             };

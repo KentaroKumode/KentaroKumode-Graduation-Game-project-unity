@@ -83,7 +83,7 @@ namespace AutoTest.EditorTests.Ultra
                 Assert.That(runner.challengeSweepScores, Is.EqualTo(new[] { 50 }));
                 Assert.That(runner.challengeSweepRuns, Is.EqualTo(10000));
                 Assert.That(runner.forceNoRelic, Is.False);
-                Assert.That(runner.tuneBosses || runner.learnTier || runner.learnBotAi, Is.False,
+                Assert.That(runner.learnTier || runner.learnBotAi, Is.False,
                     "a benchmark must not mutate learning or balance data");
 
                 Assert.That(runner.suppressFacePartOffers, Is.False);

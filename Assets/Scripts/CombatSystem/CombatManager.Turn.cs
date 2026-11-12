@@ -529,7 +529,7 @@ namespace CombatSystem
 
             // --- 1. 敵ロール (スタンスなし = ADR-0005 は superseded) ---
             int actualPlayerDiceCount = playerDiceCount;
-            int[] enemyDice = RollEnemyAttack(currentEnemy, enemyExtraDice, false, 0f);
+            int[] enemyDice = RollEnemyAttack(currentEnemy, enemyExtraDice);
             int actualEnemyDiceCount = enemyDice.Length;
 
             // --- 3. 自ロール ---
@@ -634,9 +634,6 @@ namespace CombatSystem
             psm.ProcessPostRoll(playerDice, enemyDice);
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnPostRoll);
 
-            _fightPlayerRollSum += ctx.playerDiceTotal;
-            _fightPlayerRollCount++;
-
             // --- 2. 予告 (柱3: 完全情報テレグラフ) ---
             // 〈冷却材〉(§6-5) の遅延を差し引いたターンで段階を引く。 予告にもそのまま出るので、
             // 「何ターン稼いだか」が盤面から読める (完全情報テレグラフ・柱3)。
@@ -665,7 +662,7 @@ namespace CombatSystem
             int secondaryAtkBeforeDefense = 0;
             if (secondaryEnemy != null && secondaryHP > 0)
             {
-                var secDiceTele = RollEnemyAttack(secondaryEnemy, 0, false, 0f);
+                var secDiceTele = RollEnemyAttack(secondaryEnemy, 0);
                 int secTotalTele = 0;
                 for (int i = 0; i < secDiceTele.Length; i++) secTotalTele += secDiceTele[i];
                 secondaryAtkBeforeDefense =

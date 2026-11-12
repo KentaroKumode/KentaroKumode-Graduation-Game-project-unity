@@ -109,20 +109,20 @@ namespace AutoTest
             ///
             /// <para><b>2026-11-12 時点の実態: 戦闘の判断は先読みしない。</b> 端子の山札 (2026-11-11) の後は、 どの技量でも配線は
             /// <c>DeckWiringPlanPolicy</c>、 リロールは <c>MutualRerollPolicy</c> に上書きされる (AutoRunner.Combat)。
-            /// 旧 <see cref="SuperCombatAI"/> (戦闘決着までのロールアウト) の配線とリロールは呼ばれない。
+            /// 旧 <c>SuperCombatAI</c> (戦闘決着までのロールアウト) は 2026-11-12 に削除した (#135)。
             /// 先読みは山札の 2 ターン先読み <c>deckLookahead</c> (#105・既定 OFF) だけで、 技量とは別の口。</para>
             /// <para>Super が Optimal と違うのは Begin が立てる次の物: 予告を読む防御 (重い攻撃の予告でリロール +1・v3.superDefense)・
             /// 護符の使い時 (v3.superConsumables)・与ダメの倍率と敵のパッシブを配線の効用で読む (v3.readOutgoingMult / readEnemyPassives の −1)・
             /// 航行の計画 (v3.macroPlan)・戦闘名の危険度で避ける (v3.superNav → UseLearnedDanger)・無段階の序列 (superBuyTiers)・
             /// ITT の Super 版の序列と価格の差し引き (superOwnItt / superIttPriceK)・段階 3 の値順の購入 (v3.phase3Ranked)・
             /// 軸に絞る買い方 (v3.axisCommitBuy)・難易度 10 の 6 層の店の全投入 (IsSuperTailMode)。
-            /// 配線のミスなし (wiringMistakeRate=0) と防ぎ切りの規則 (FreeBlockRule) は、 山札の方策と HP の帳簿 (既定) では差にならない。</para></summary>
+            /// 配線のミスなし (Super は wiringMistakeRate=0・Optimal は 2026-11-12 #134 から optimalMistakeRate で次点を選ぶ) は Optimal との差になる。 防ぎ切りの規則 (FreeBlockRule) は、 山札の方策と HP の帳簿 (既定) では差にならない。</para></summary>
             Super,
             /// <summary>厳密: 旧い expectimax の参照実装 (ExactCombatAI) を差していた技量。
             ///
             /// <para><b>2026-11-12 に ExactCombatAI を削除した。</b> 端子の山札 (2026-11-11) の後は、 配線もリロールも
             /// AutoRunner.Combat で山札の方策に上書きされ、 ExactCombatAI の判断は 1 度も呼ばれていなかった。
-            /// 値はメニューと保存済みの設定のために残す (戦闘の判断は Optimal と同じ山札の方策)。</para>
+            /// 値は保存済みの設定 (EditorPrefs の番号) のために残す (戦闘の判断は Optimal と同じ山札の方策)。 2026-11-12 (#135) にメニューから選ぶ口を消した。</para>
             ///
             /// <para><b>末尾に足すこと。</b> 既存値の番号を動かすとセーブ/EditorPrefs が壊れる。</para></summary>
             Exact,
@@ -142,10 +142,6 @@ namespace AutoTest
         public WiringSkill EffectiveWiringSkill
             => wiringSkill == WiringSkill.Ultra ? _ultraSelectedBaseSkill : wiringSkill;
 
-        /// <summary>旧い先読み方策 (戦闘決着までのロールアウト)。 <b>端子の山札 (2026-11-11) の後は戦闘の判断に使わない</b> ──
-        /// 配線とリロールは AutoRunner.Combat で山札の方策に上書きされ、 ここは <c>ResetForRun</c> / <c>BeginCombat</c> の副作用だけが残る
-        /// (super_prof.txt は「配線 0 回 / リロール 0 回」)。 <see cref="WiringSkill.Super"/> の実態はその enum の説明を読むこと。</summary>
-        public SuperCombatAI superAI = new SuperCombatAI();
         /// <summary>SuperV3 の実験スイッチ (Optimal + 改善案)。 全 OFF なら Optimal と同一。</summary>
         public V3Flags v3 = new V3Flags();
 
@@ -233,36 +229,8 @@ namespace AutoTest
         public bool superHighDifficultyTailMode = true;
         [Tooltip("この実効挑戦スコア以上で専用ルーチンを起動")]
         public int superHighDifficultyMinScore = 50;
-        [Tooltip("満点難度の6層ボスだけ、通常AIの戦闘方策を使う (旧い先読みの時代の切替)。山札の後は配線が常に山札の方策に上書きされるので、戦闘の判断は変わらない")]
-        public bool superLayer6OptimalCombatRoutine = true;
-
-        /// <summary>**7層ヴェスカでも Optimal の戦闘方策を使う** (既定 OFF)。
-        ///
-        /// <para><b>一度採用し、同日に撤回した。</b> これは <c>StaticValue</c> の飽和という
-        /// 実際のバグへの**対症療法**だった。 根本 (<see cref="SuperCombatAI.ttdCapTurns"/>) を
-        /// 直したら Super の方が強くなり (74.9% 対 73.3%)、 併用しても上乗せが無い
-        /// (74.9% → 73.2% / p=0.0821)。 **原因を直したので逃がす必要がなくなった。**
-        /// フラグは対照アーム用に残す。</para>
-        ///
-        /// <para>採用時の実測 (参考):
-        ///
-        /// <para>採用の実測 (パーツ有り・同一シード・各1000ラン):
-        /// <b>0pt 遺物なし 31.1% → 33.9% (p=0.0056) / 0pt 遺物あり 70.9% → 73.3% (p=0.0250)</b>
-        /// ── **両条件とも有意で同じ向き**。 同日に階層DP は符号反転で、
-        /// `chargeRerollGain` はパーツ抑止の artifact で撤回しており、
-        /// 2 条件そろって効いたのはこれだけ。</para>
-        ///
-        /// <para>2026-08-22 実測: 同一シードで両 AI が 7層へ到達した 379 ラン に限ると
-        /// <b>Optimal だけクリア 71 / Super だけクリア 41 (p=0.0059)</b>。
-        /// 6F 突破時点の状態 (HP率 0.888 vs 0.878 / パッシブ 46.95 vs 46.71 / 武器Tier 3.855 vs 3.842)
-        /// は Super が僅かに**上**なので、 「弱いランを拾って着いている」では説明できない。</para>
-        ///
-        /// <para>心当たり: <c>SuperCombatAI.StaticValue</c> は期待ブロックが敵攻撃を上回ると
-        /// <c>ttd=999</c> → 勝率 p が 1 に飽和し、 **敵HP が評価から消える**
-        /// (飽和センサスで同点候補の 19.5%)。 8 ターンの通常戦なら「いま安全」はほぼ正しいが、
-        /// 7層は 4 連戦 40 ターン級でエスカレーションが ×2.3 まで伸びるので、
-        /// そこで飽和させるのが最も危ない。</para></summary>
-        [NonSerialized] public bool superLayer7OptimalCombatRoutine;
+        // (6 層・7 層だけ Optimal の戦闘方策へ逃がす superLayer6/7OptimalCombatRoutine は 2026-11-12 に削除・#135。
+        //  山札の後は配線が常に山札の方策に上書きされ、 どちらも読む所が無かった)
 
         private bool IsSuperTailMode
             => superHighDifficultyTailMode
@@ -448,8 +416,6 @@ namespace AutoTest
 
         [Header("③ 学習 (同時選択可・単独可)")]
 
-        [Tooltip("ボス難易度オートチューナーを動かす (§13-3)")]
-        public bool tuneBosses = false;
         [Tooltip("Tier表 (item_stats / regression / BALANCE_TIER_LIST.md) を更新する")]
         public bool learnTier = false;
         /// <summary>並列アイテム学習のワーカーとして走る (2026-11-04)。 探索を学習バッチと同じに入れるだけで、
@@ -466,8 +432,6 @@ namespace AutoTest
         public bool UpdatesTier => learnTier;
         /// <summary>AIルーチンを成長させるか。</summary>
         public bool UpdatesAi => learnBotAi;
-        /// <summary>ボス難易度オートチューナーを動かすか。</summary>
-        public bool BossAutoTune => tuneBosses;
         /// <summary>ビルド軸ペルソナを使うか。</summary>
         public bool useBuildPersonas => itemPickMode == ItemPickMode.BuildFocused;
 
@@ -546,11 +510,8 @@ namespace AutoTest
         // [削除 2026-11-12] simDice ── スイープ対象のダイス。 ダイスの品は 2026-08-17 に廃止 (items.json に 0 件) で、
         //   有効な ID が 0 本になり、 スイープ全体が「有効な武器/ダイスIDがありません」で止まっていた。
 
-        /// <summary>**[廃止 2026-10-28] 何も読まない。** 旧 Λ層の撤退条件 (周回マス数)。
-        /// Λ層は廃止したが、 Ultra の方策仕様 (<c>UltraPortfolioPolicySpec.lambdaFarmTiles</c>) が
-        /// 候補集合のハッシュと許可プロパティに含めて運んでいる値なので、 ワーカーとの取り決めを変えないよう残す。
-        /// 仕様側を作り直すときに一緒に消すこと。 Λ のファーム量スイープと lambdaLv3Risk は同日削除。</summary>
-        [HideInInspector] public int lambdaFarmTiles = 6;
+        // (旧 Λ層の撤退条件 lambdaFarmTiles は 2026-11-12 に削除・#135。 Ultra の方策仕様 UltraPortfolioPolicySpec には
+        //  ワーカーとの取り決め (候補集合のハッシュ = ワーカーの actionFingerprint) として値だけ残っている)
 
         [Header("固定難易度スイープ")]
         [Tooltip("true で 挑戦スコアを固定値ごとに振り、最良遺物で 7 層クリアが成立するかを測る")]
@@ -811,7 +772,7 @@ namespace AutoTest
                 for (int i = 0; i < ctx.equippedDiceFaces.Length; i++) sum += ctx.equippedDiceFaces[i];
                 mean = sum / (float)ctx.equippedDiceFaces.Length;
             }
-            // 与ダメの倍率は 1 で固定。 旧 Super の自己較正 (SuperCombatAI._dmgMul) は配線の判断の中でしか
+            // 与ダメの倍率は 1 で固定。 旧 Super の自己較正 (旧 SuperCombatAI._dmgMul) は配線の判断の中でしか
             //   更新されず、 その判断は端子の山札の後は呼ばれないので、 常に初期値 1 だった (2026-11-12 に畳んだ)。
             return RunPowerBudget.Gap(run, run.Depth, 1f, dice, mean);
         }
@@ -972,7 +933,8 @@ namespace AutoTest
         public string superTierRankCuts = "";
         /// <summary>[較正専用] 宝箱からパッシブが出る確率 (<see cref="GameLoop.CombatRewards.TreasurePassiveRate"/>)。 負なら触らない。</summary>
         public float treasurePassiveRate = -1f;
-        /// <summary>Optimal の配線のミスの率 (Super は 0)。</summary>
+        /// <summary>Optimal の配線のミスの率 (Super は 0・素朴版は経路を通らない)。 ミス = 次点の挿し方 (<see cref="wiringMistakeRate"/> の説明)。
+        /// 測る口: v3_queue の腕に <c>optimalMistakeRate=0</c> を書くと、 ミスを切った Optimal (2026-11-12 以前の main と同じ挙動) になる。</summary>
         public float optimalMistakeRate = 0.1f;
 
         /// <summary>[較正専用] エリート戦の報酬倍率 (CombatRewards.EliteRewardMul)。 <b>負 = 触らない。</b></summary>
@@ -1791,8 +1753,7 @@ namespace AutoTest
                     + $" → 学習データ分離キー: {MetaProfileHelper.CurrentSuffix}");
             Debug.Log($"[AutoRunner] ② アイテム選択={itemPickMode}"
                     + (itemPickMode == ItemPickMode.BuildFocused ? $" (Tier信奉混率 {rawTierRatio:P0})" : ""));
-            Debug.Log($"[AutoRunner] ③ 学習: ボスチューナー={(tuneBosses ? "ON" : "OFF")}"
-                    + $" / Tier学習={(learnTier ? "ON" : "OFF")}"
+            Debug.Log($"[AutoRunner] ③ 学習: Tier学習={(learnTier ? "ON" : "OFF")}"
                     + $" / BOT学習={(learnBotAi ? "ON" : "OFF")}");
 
             // 5層裏ボス遮断。 各スイープのコルーチンはこの後で自分の値へ書き戻すので、
@@ -1996,7 +1957,6 @@ namespace AutoTest
             try { EventChoiceLearningStats.Reload(MetaProfileHelper.LearningRoot()); } catch { }
             try { LearnedPriorityProvider.Reload(TierLearningRoot, writeMarkdown: UpdatesTier); } catch { }
             try { EncounterDangerStats.Reload(TierLearningRoot); } catch { }
-            try { BossTuning.Reload(MetaProfileHelper.LearningRoot()); } catch { }
 
             // **学習データが欠けていたら黙って手書きの序列へ落とさない** (2026-11-12・#118)。
             //   難易度 2 (10 点) は帯 bot_band_1_15 を読むが、 そのフォルダは無い → 手書きの S/A だけで買い、 難易度 1〜3 のクリアが 0% になった。
@@ -2203,8 +2163,6 @@ namespace AutoTest
             UltraPortfolioPolicySpec selectedRunPolicy = selection.selectedRunPolicy;
             _ultraSelectedBaseSkill = (WiringSkill)selectedRunPolicy.wiringSkill;
             superHighDifficultyTailMode = selectedRunPolicy.superHighDifficultyTailMode;
-            superLayer6OptimalCombatRoutine = selectedRunPolicy.superLayer6OptimalCombatRoutine;
-            lambdaFarmTiles = selectedRunPolicy.lambdaFarmTiles;
             UltraProgressHub.SetPhase(
                 _ultraProgressSession,
                 UltraProgressPhase.Executing,
@@ -2269,9 +2227,7 @@ namespace AutoTest
             string root = MetaProfileHelper.LearningRoot();
 
             // ── バッチ0回目(初期)スナップショット ──
-            try { BossTuning.Reload(root); } catch { }
             try { PolicyParameters.ReloadFromDisk(root); } catch { }
-            var bossStart   = SnapshotBossTuning();
             var policyStart = PolicyParameters.Current?.Clone();
             float firstClearRate = -1f, lastClearRate = -1f;
 
@@ -2303,7 +2259,7 @@ namespace AutoTest
             }
             catch { }
             // ── 周回サマリ: 初期 vs 最終の差分をチェンジログに追記 ──
-            try { AppendAutoLoopSummary(loops, bossStart, policyStart, firstClearRate, lastClearRate); }
+            try { AppendAutoLoopSummary(loops, policyStart, firstClearRate, lastClearRate); }
             catch (Exception e) { Debug.LogWarning($"[AutoRunner] 周回サマリ追記失敗: {e.Message}"); }
             Debug.Log($"[AutoRunner] === 自動周回モード END: {loops}周完了 (最終 Reload: {LearnedPriorityProvider.LastLoadedSummary}) ===");
             if (finalExit)
@@ -2328,32 +2284,8 @@ namespace AutoTest
             return valid > 0 ? (float)full / valid : 0f;
         }
 
-        /// <summary>現在のボス調整値を {key → {ラベル → 実数値}} で複製 (具体パラメータ + HP + Dice期待値)。</summary>
-        private static Dictionary<string, Dictionary<string, float>> SnapshotBossTuning()
-        {
-            var snap = new Dictionary<string, Dictionary<string, float>>();
-            try
-            {
-                foreach (var k in BossTuning.All())
-                {
-                    var m = new Dictionary<string, float>();
-                    foreach (BossParam p in System.Enum.GetValues(typeof(BossParam)))
-                        m[p.ToString()] = BossTuning.GetParam(k, p);
-                    m["HP"] = BossTuning.MaxHpFor(k.key);
-                    if (BossTuning.IsSignatureDiceBoss(k.key))
-                        m["SigE"] = BossTuning.SignatureExpected(BossTuning.SignatureFaces(k.key));
-                    else
-                        m["DiceE"] = BossTuning.CurrentDiceExpected(k.key);
-                    snap[k.key] = m;
-                }
-            }
-            catch { }
-            return snap;
-        }
-
         /// <summary>自動周回の初期(バッチ0)→最終(バッチN)差分を BALANCE_CHANGELOG_&lt;profile&gt;.md に追記。</summary>
         private void AppendAutoLoopSummary(int loops,
-            Dictionary<string, Dictionary<string, float>> bossStart,
             PolicyParameters policyStart, float firstClear, float lastClear)
         {
             var sb = new StringBuilder();
@@ -2362,61 +2294,13 @@ namespace AutoTest
             sb.AppendLine($"- **メタバフ**: {metaBuffMode}"
                 + (metaBuffMode == MetaBuffMode.BuildFocused ? $"({metaBuildAxis})" : "")
                 + $" / メタデバフ全ON: {enableAllDebuffs} / アイテム選択: {itemPickMode}");
-            sb.AppendLine($"- **学習**: ボスチューナー={(tuneBosses ? "ON" : "OFF")}"
-                + $" / Tier学習={(learnTier ? "ON" : "OFF")} / BOT学習={(learnBotAi ? "ON" : "OFF")}");
+            sb.AppendLine($"- **学習**: Tier学習={(learnTier ? "ON" : "OFF")} / BOT学習={(learnBotAi ? "ON" : "OFF")}");
             if (firstClear >= 0f && lastClear >= 0f)
             {
                 float d = lastClear - firstClear;
                 sb.AppendLine($"- **7層クリア率**: 初回 {firstClear:P2} → 最終 {lastClear:P2} ({d:+0.0%;-0.0%})");
             }
             sb.AppendLine();
-
-            // ボス難易度係数の差分 (変化した軸のみ)
-            if (BossAutoTune)
-            {
-                var bossEnd = SnapshotBossTuning();
-                var keys = new SortedSet<string>();
-                foreach (var k in bossStart.Keys) keys.Add(k);
-                foreach (var k in bossEnd.Keys) keys.Add(k);
-                var lines = new List<string>();
-                foreach (var key in keys)
-                {
-                    bossStart.TryGetValue(key, out var sa);
-                    bossEnd.TryGetValue(key, out var sb2);
-                    var parts = new List<string>();
-                    var labels = new SortedSet<string>();
-                    if (sa != null) foreach (var l in sa.Keys) labels.Add(l);
-                    if (sb2 != null) foreach (var l in sb2.Keys) labels.Add(l);
-                    foreach (var label in labels)
-                    {
-                        float av = (sa != null && sa.TryGetValue(label, out var v1)) ? v1 : 0f;
-                        float bv = (sb2 != null && sb2.TryGetValue(label, out var v2)) ? v2 : 0f;
-                        if (Mathf.Abs(bv - av) <= 0.05f) continue;
-                        if (label == "DiceE")
-                        {
-                            var (cnt, faces) = BossTuning.BestDiceConfig(bv > 0 ? bv : 1f);
-                            parts.Add($"Dice E{av:F1}→**E{bv:F1}({cnt}d{faces})**");
-                        }
-                        else if (label == "SigE")
-                            parts.Add($"固有面 E{av:F1}→**E{bv:F1}**");
-                        else if (label == "HP")
-                            parts.Add($"HP {av:F0}→**{bv:F0}**");
-                        else
-                            parts.Add($"{label} {av:0.#}→**{bv:0.#}**");
-                    }
-                    if (parts.Count > 0) lines.Add($"| `{key}` | {string.Join(", ", parts)} |");
-                }
-                sb.AppendLine("### ボス難易度パラメータ (変化した実数値のみ)");
-                sb.AppendLine();
-                if (lines.Count == 0) sb.AppendLine("*(変化なし)*");
-                else
-                {
-                    sb.AppendLine("| ボス | 変化したパラメータ |");
-                    sb.AppendLine("|---|---|");
-                    foreach (var l in lines) sb.AppendLine(l);
-                }
-                sb.AppendLine();
-            }
 
             // policy 差分
             if (UpdatesAi && policyStart != null)
@@ -2589,9 +2473,6 @@ namespace AutoTest
             if (navBlockCredit  >= 0f) BlockCreditRatio = navBlockCredit;
             if (navSafetyFights >= 0f) SafetyFights     = navSafetyFights;
             Debug.Log($"[AutoRunner] policy: {PolicyParameters.Current.Summary()}");
-            // L3: ボス難易度係数を読み込み (前バッチの自動調整を引き継ぐ)
-            BossTuning.Reload();
-            if (BossAutoTune) Debug.Log($"[AutoRunner] bossTuning: {BossTuning.Summary()}");
             // L2ペアテスト: 挑戦者ポリシーを生成 (バッチ内 paired diff 評価用)
             //  ・AIルーチン学習モード時のみ (TierOnly では policy 凍結)
             //  ・runCount が L2ゲート(200) 未満ならスキップ

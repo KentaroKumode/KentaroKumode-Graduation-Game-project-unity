@@ -231,13 +231,7 @@ namespace CombatSystem
                 // プレイヤー敗北時のみ死因を記録 (勝利時は Normal)
                 deathCause = (playerHP <= 0 && ctx != null) ? ctx.lastDamageCause
                            : ItemSystem.PassiveSkills.DeathCause.Normal,
-                playerRollSum = _fightPlayerRollSum,
-                playerRollCount = _fightPlayerRollCount,
                 playerDamageBySource = BuildDamageBreakdown(ctx),
-                strongRollTurns = _fightStrongTurns,
-                strongRollBossWins = _fightStrongBossWins,
-                weakRollTurns = _fightWeakTurns,
-                weakRollBossWins = _fightWeakBossWins,
             };
         }
 

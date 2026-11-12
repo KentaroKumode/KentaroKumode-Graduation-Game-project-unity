@@ -82,7 +82,6 @@ namespace AutoTest.Ultra
             // A benchmark must not rewrite the policy, item tiers, or boss balance
             // after the measurement. The fixed sweep itself locks the run persona to
             // Standard and installs TheoreticalBestCursed after every ResetAll.
-            runner.tuneBosses = false;
             runner.learnTier = false;
             runner.learnBotAi = false;
             runner.autoLoopBatches = 1;

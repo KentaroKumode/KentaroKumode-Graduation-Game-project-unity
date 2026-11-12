@@ -286,10 +286,6 @@ namespace CombatSystem
             //   前倒し (Escalation.StageOf) へ移した。 ボス戦のみ・最初の 3 撃という形は
             //   40 ターン級の戦闘では誤差にしかならず、 単独 T3 が実質無料だったため。
 
-            // 敵スタンス（ADR-0005）: 被ダメ倍率（高ダメ>1/低ダメ<1）。以降の軽減はスタンス後の値に効く。
-            if (ctx != null && Mathf.Abs(ctx.enemyStanceDamageMult - 1f) > 0.001f && totalDmg > 0)
-                totalDmg = Mathf.CeilToInt(totalDmg * ctx.enemyStanceDamageMult);
-
             // (2026-06-01) ボス被ダメ倍率(dmgMul)の直接操作は廃止。 硬化/易化は Dice/HP/機構軸で行う。
 
             // [削除 2026-09-13] メタバフの定額被ダメ軽減 ── 2026-08-15 に割合軽減へ移して以降

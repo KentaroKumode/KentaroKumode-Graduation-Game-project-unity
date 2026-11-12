@@ -337,7 +337,6 @@ namespace AutoTest
             sb.AppendLine();
             sb.AppendLine("=== 役の成立/発動 (ADR-0010 Verification ④) ===");
             sb.AppendLine(CombatSystem.YachtRoleEffects.DescribeStats());
-            sb.Append(SuperCombatAI.DescribeSearch());
 
             sb.AppendLine();
             sb.AppendLine(GameLoop.RunChronicle.DescribeCounts(_ascensionTraces.Count));

@@ -102,13 +102,6 @@ namespace AutoTest.ParallelSweep
                     }
                     else spec = MetaAllocationPresets.Ranks(runner.metaAllocation);
                 }
-                // **worker 内ではスレッド並列を切る** (2026-09-19)。 並列化はプロセス数 (≒コア数) で
-                //   既に取っている。 Super は判断ごとに コア数−1 本、 Optimal の配線列挙は最大 8 本の
-                //   Parallel.For を立てるので、 22 プロセスが同時にやると 500 本超のスレッドが
-                //   24 コアを奪い合う。 実測で Super は単独 0.5 秒/ラン が、 22 並列では
-                //   3 分経っても 1 ラン も終わらなかった (50 ランごとの進捗が 0 のまま)。
-                runner.superAI.maxParallelism = 1;
-
                 // **本体ループは空にする。** 逐次版と同じく、 アームは RunBatch 後段の
                 //   分岐から回す。 ここで runCount を立てると素の N ラン が余計に走る。
                 runner.runCount = 0;
@@ -116,7 +109,6 @@ namespace AutoTest.ParallelSweep
                 //   書き戻すと**プロセスごとに違う学習が育つ**。
                 runner.learnBotAi = false;
                 runner.learnTier = false;
-                runner.tuneBosses = false;
                 runner.writeRunsJsonl = false;
                 runner.exitPlayModeWhenDone = false;
                 runner.stepsPerYield = 1000;
@@ -167,7 +159,6 @@ namespace AutoTest.ParallelSweep
                 CombatSystem.DmgSourceDiag.Reset();
                 CombatSystem.HpLossDiag.Reset();
                 GameLoop.HpOutsideDiag.Reset();
-                AutoTest.SuperCombatAI.ResetProf();
                 GameLoop.RunStats.PlunderDrops = 0;
                 GameLoop.RunStats.ValorEliteDrops = 0;
                 GameLoop.RunStats.ValorEliteFights = 0;
@@ -316,13 +307,6 @@ namespace AutoTest.ParallelSweep
                     Debug.LogError("[RankMarginWorker] 学習記録の書き出しに失敗: " + ex.Message);
                 }
             }
-            // バッチ中は logEnabled=false なので Debug.Log は届かない。 結果の隣へファイルで残す。
-            try
-            {
-                File.WriteAllText(Path.Combine(Path.GetDirectoryName(_job.responsePath) ?? ".", "super_prof.txt"),
-                                  AutoTest.SuperCombatAI.DescribeProf());
-            }
-            catch { }
             try
             {
                 // [計装] ヴェスカ連戦の段別 突入数 / 突入時 残HP%。

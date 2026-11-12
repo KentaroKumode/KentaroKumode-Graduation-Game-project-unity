@@ -38,7 +38,7 @@ namespace CombatSystem
         public int EffectiveRollCount => UsesAttackRoll ? 1 : diceCount;
         /// <summary>1 個あたりの取りうる最大値。 新方式は attackRollMax。</summary>
         public int EffectiveRollMax => UsesAttackRoll ? attackRollMax : diceMaxValue;
-        /// <summary>攻撃ロールの期待値。 予告・診断・チューナーの基準に使う。</summary>
+        /// <summary>攻撃ロールの期待値。 予告・診断の基準に使う。</summary>
         public float AttackRollExpected => UsesAttackRoll
             ? (Math.Max(0, attackRollMin) + attackRollMax) / 2f
             : (diceFaces != null && diceFaces.Length > 0

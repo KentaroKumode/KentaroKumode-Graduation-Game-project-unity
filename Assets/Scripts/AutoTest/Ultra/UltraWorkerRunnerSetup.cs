@@ -29,7 +29,6 @@ namespace AutoTest.Ultra
             runner.sweepAllMetaAxes = profile.sweepAllMetaAxes;
 
             // ---- a benchmark must not rewrite learning or balance data ----
-            runner.tuneBosses = false;
             runner.learnTier = false;
             runner.learnBotAi = false;
 
@@ -59,8 +58,8 @@ namespace AutoTest.Ultra
 
             runner.wiringSkill = (AutoRunner.WiringSkill)policy.wiringSkill;
             runner.superHighDifficultyTailMode = policy.superHighDifficultyTailMode;
-            runner.superLayer6OptimalCombatRoutine = policy.superLayer6OptimalCombatRoutine;
-            runner.lambdaFarmTiles = policy.lambdaFarmTiles;
+            // policy.superLayer6OptimalCombatRoutine / lambdaFarmTiles は受け取る側が無い (2026-11-12 #135 で AutoRunner から削除)。
+            //   候補集合のハッシュ (ワーカーの actionFingerprint) に入るので、 仕様の側には残している。
         }
     }
 }
