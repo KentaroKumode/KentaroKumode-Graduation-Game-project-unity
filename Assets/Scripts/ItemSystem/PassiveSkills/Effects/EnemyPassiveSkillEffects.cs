@@ -612,11 +612,13 @@ namespace ItemSystem.PassiveSkills.Effects
     /// エネミーが受けるダメージ3倍（プレイヤーが押し切る窓は残す）。</summary>
     public class Berserk : IPassiveSkillEffect
     {
+        /// <summary>スキル id。 ボスのマスの敵に CombatManager が足す (enemies.json には書かない)。</summary>
+        public const string Id = "Berserk";
         public const int EnrageTurn = 50;
         public const int DiceBonus = 10;
         public const float EnemyDamageTakenMult = 3f;
 
-        public string SkillId => "Berserk";
+        public string SkillId => Id;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {

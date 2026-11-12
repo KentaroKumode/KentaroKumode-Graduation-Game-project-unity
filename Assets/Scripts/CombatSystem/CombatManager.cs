@@ -225,6 +225,24 @@ namespace CombatSystem
             if (heal > 0) HealPlayer(heal);
         }
 
+        /// <summary>ボスのマスの敵に〈狂暴化〉(<see cref="Berserk"/>) を足す (既に持っていれば何もしない)。
+        /// 戦闘の開始 (StartCombat) と、 ヴェスカの段の差し替え (SwapEnemy) の 2 か所が呼ぶ。
+        /// 説明文は Berserk の定数から組む ── 51 ターン目から、 この敵の攻撃 +10 (enemyDiceTotalBonus) ・
+        /// プレイヤーの回復を封じる (healBlocked) ・ この敵が受ける主攻撃のダメージ ×3 (enemyDamageTakenMultiplier)。</summary>
+        private static void AddBerserkIfBossNode(List<EnemyPassiveEntry> skills)
+        {
+            const string id = ItemSystem.PassiveSkills.Effects.Berserk.Id;
+            var node = MapSystem.MapManager.Instance?.CurrentNode;
+            if (node == null || node.type != MapSystem.TileType.Boss) return;
+            if (skills.Exists(e => e != null && e.internalName == id)) return;
+            skills.Add(new EnemyPassiveEntry
+            {
+                internalName = id,
+                skillName = "狂暴化",
+                description = $"{ItemSystem.PassiveSkills.Effects.Berserk.EnrageTurn}ターン経過後、攻撃+{ItemSystem.PassiveSkills.Effects.Berserk.DiceBonus}・相手の回復を封じる・受ける攻撃のダメージ{(int)ItemSystem.PassiveSkills.Effects.Berserk.EnemyDamageTakenMult}倍",
+            });
+        }
+
         public int HealPlayer(int amount)
         {
             if (amount <= 0) return 0;
@@ -548,17 +566,7 @@ namespace CombatSystem
                 : new List<EnemyPassiveEntry>();
 
             // ボスノードの敵には全員「狂暴化」を付与（50T後のエンレイジ）
-            var nodeForBerserk = MapSystem.MapManager.Instance?.CurrentNode;
-            if (nodeForBerserk != null && nodeForBerserk.type == MapSystem.TileType.Boss
-                && !enemySkills.Exists(e => e != null && e.internalName == "Berserk"))
-            {
-                enemySkills.Add(new EnemyPassiveEntry
-                {
-                    internalName = "Berserk",
-                    skillName = "狂暴化",
-                    description = "50ターン経過後、ダイス合計+10・回復封印・被ダメージ3倍",
-                });
-            }
+            AddBerserkIfBossNode(enemySkills);
             // ── 2 体戦 (2026-08-28): 2 体目のパッシブも登録する ──
             //   **同名パッシブは 1 回しか登録しない。** RegisterEnemySkills 側の
             //   `enemySkillNames.Contains` 判定がそのまま重複を弾くので、 単純に連結してよい。
@@ -857,16 +865,7 @@ namespace CombatSystem
             var swapSkills = newEnemy.passiveSkills != null
                 ? new List<EnemyPassiveEntry>(newEnemy.passiveSkills)
                 : new List<EnemyPassiveEntry>();
-            var nodeForSwapBerserk = MapSystem.MapManager.Instance?.CurrentNode;
-            if (nodeForSwapBerserk != null && nodeForSwapBerserk.type == MapSystem.TileType.Boss
-                && !swapSkills.Exists(e => e != null && e.internalName == "Berserk"))
-            {
-                swapSkills.Add(new EnemyPassiveEntry
-                {
-                    internalName = "Berserk", skillName = "狂暴化",
-                    description = "50ターン経過後、ダイス合計+10・回復封印・被ダメージ3倍",
-                });
-            }
+            AddBerserkIfBossNode(swapSkills);
             psm.RegisterEnemySkills(swapSkills);
 
             // 敵側固有 accumulatedValues キーを掃除（プレイヤー側補正は保持）
