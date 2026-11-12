@@ -521,15 +521,15 @@ namespace AutoTest
         public bool exitPlayModeWhenDone = false;
 
         [Header("5Fボス勝率スイープ (検証モード)")]
-        [Tooltip("true で通常バッチの代わりに『実ラン採取ビルド × 全武器×ダイス』の5Fボス勝率スイープを実行")]
+        [Tooltip("true で通常バッチの代わりに『実ラン採取ビルド × 全武器』の5Fボス勝率スイープを実行")]
         public bool simBoss5Sweep = false;
         [Tooltip("対象ボスのフロア(既定5)")]
         public int simBossFloor = 5;
-        [Tooltip("実ランから採取する『5F到達時ビルド』の数。武器・ダイス以外(パッシブ/強化段階)の土台になる。HPは simBaseHP で固定")]
+        [Tooltip("実ランから採取する『5F到達時ビルド』の数。武器以外(パッシブ/強化段階)の土台になる。HPは simBaseHP で固定")]
         public int simSampleBuilds = 10;
-        [Tooltip("各(武器×ダイス)組み合わせの試行回数")]
+        [Tooltip("各武器の試行回数")]
         public int simTrialsPerCombo = 300;
-        [Tooltip("戦闘開始HP(固定)。採取ビルドの現在HPは使わず、この値で統一して武器×ダイスを純粋比較する")]
+        [Tooltip("戦闘開始HP(固定)。採取ビルドの現在HPは使わず、この値で統一して武器を純粋比較する")]
         public int simBaseHP = 50;
         [Tooltip("スイープ対象武器(種別+Tier＋ユニーク)。存在しないIDは自動スキップ")]
         public string[] simWeapons = {
@@ -538,12 +538,8 @@ namespace AutoTest
             // ユニーク/特殊武器（非進行）
             "竜閃"
         };
-        [Tooltip("スイープ対象ダイス。存在しないIDは自動スキップ")]
-        public string[] simDice = {
-            "dice_wood","dice_bone","dice_copper","dice_iron","dice_biased",
-            "dice_gem","dice_flame","dice_stable","dice_twinsnake",
-            "dice_star","dice_destiny","dice_greed","dice_moroha","dice_perfection"
-        };
+        // [削除 2026-11-12] simDice ── スイープ対象のダイス。 ダイスの品は 2026-08-17 に廃止 (items.json に 0 件) で、
+        //   有効な ID が 0 本になり、 スイープ全体が「有効な武器/ダイスIDがありません」で止まっていた。
 
         /// <summary>**[廃止 2026-10-28] 何も読まない。** 旧 Λ層の撤退条件 (周回マス数)。
         /// Λ層は廃止したが、 Ultra の方策仕様 (<c>UltraPortfolioPolicySpec.lambdaFarmTiles</c>) が

@@ -1447,7 +1447,9 @@ namespace AutoTest
             AutoTest.FamilyTierStats.Reset();
         }
 
-        /// <summary>実ランから5F到達ビルドを採取し、全(武器×ダイス)で5Fボス勝率を総当たり計測。</summary>
+        /// <summary>実ランから5F到達ビルドを採取し、全武器で5Fボス勝率を総当たり計測。
+        /// (2026-11-12: ダイスの品の廃止 (2026-08-17) に合わせてダイスの次元を外した。 それまでは有効なダイスが
+        ///  0 本で、 採取の後に必ず「有効な武器/ダイスIDがありません」で止まっていた)</summary>
         private IEnumerator RunBoss5Sweep(GameManager gm)
         {
             // --- Phase A: 実ランから「5F到達時ビルド」を採取 ---
@@ -1470,15 +1472,13 @@ namespace AutoTest
                 yield break;
             }
 
-            // --- 有効な武器/ダイスIDに絞る ---
+            // --- 有効な武器IDに絞る ---
             var db = ItemDatabase.Instance;
             var weapons = new List<string>();
             foreach (var w in simWeapons) if (db?.GetItem(w) != null) weapons.Add(w);
-            var dice = new List<string>();
-            foreach (var d in simDice) if (db?.GetItem(d) != null) dice.Add(d);
-            if (weapons.Count == 0 || dice.Count == 0)
+            if (weapons.Count == 0)
             {
-                _simReport = "有効な武器/ダイスIDがありません。simWeapons / simDice を確認してください。\n";
+                _simReport = "有効な武器IDがありません。simWeapons を確認してください。\n";
                 yield break;
             }
 
@@ -1487,119 +1487,59 @@ namespace AutoTest
             GameLoop.GameManager.SelectedClass = (GameLoop.ClassType)GameLoop.GameRng.RangeAuto("AutoRunner.2", 0, 4);
             gm.StartNewRun();
 
-            // --- Phase B: 全(武器×ダイス)スイープ ---
+            // --- Phase B: 全武器スイープ ---
             var winPct = new Dictionary<string, double>();
-            int comboCount = weapons.Count * dice.Count;
             int comboIdx = 0;
             foreach (var weapon in weapons)
             {
-                foreach (var d in dice)
+                int wins = 0;
+                for (int t = 0; t < simTrialsPerCombo; t++)
                 {
-                    int wins = 0;
-                    for (int t = 0; t < simTrialsPerCombo; t++)
-                    {
-                        var b = _simBases[t % _simBases.Count];
-                        var run = gm.Run;
-                        run.playerHP = simBaseHP;
-                        run.playerMaxHP = simBaseHP;
-                        run.weaponPlus = b.weaponPlus;
-                        run.limitBreakStage = b.limitBreakStage;
-                        run.equippedWeaponId = weapon;
-                        run.equippedDiceId = d;
-                        run.ownedPassiveItems = new List<string>(b.passives);
+                    var b = _simBases[t % _simBases.Count];
+                    var run = gm.Run;
+                    run.playerHP = simBaseHP;
+                    run.playerMaxHP = simBaseHP;
+                    run.weaponPlus = b.weaponPlus;
+                    run.limitBreakStage = b.limitBreakStage;
+                    run.equippedWeaponId = weapon;
+                    run.ownedPassiveItems = new List<string>(b.passives);
 
-                        var res = gm.SimulateBossFight(simBossFloor);
-                        if (res.playerWon) wins++;
+                    var res = gm.SimulateBossFight(simBossFloor);
+                    if (res.playerWon) wins++;
 
-                        if ((t & 127) == 0) yield return null; // フレーム譲り
-                    }
-                    winPct[weapon + "|" + d] = 100.0 * wins / Mathf.Max(1, simTrialsPerCombo);
-                    comboIdx++;
-                    if ((comboIdx & 3) == 0) Debug.Log($"[AutoRunner] スイープ {comboIdx}/{comboCount}");
-                    yield return null;
+                    if ((t & 127) == 0) yield return null; // フレーム譲り
                 }
+                winPct[weapon] = 100.0 * wins / Mathf.Max(1, simTrialsPerCombo);
+                comboIdx++;
+                if ((comboIdx & 3) == 0) Debug.Log($"[AutoRunner] スイープ {comboIdx}/{weapons.Count}");
+                yield return null;
             }
 
-            _simReport = BuildSweepReport(weapons, dice, winPct);
+            _simReport = BuildSweepReport(weapons, winPct);
         }
 
-        /// <summary>ダイスIDの短縮表示コード（マトリクス列見出し用）。</summary>
-        private static string DiceCode(string id)
-        {
-            switch (id)
-            {
-                case "dice_wood": return "Wo";
-                case "dice_bone": return "Bo";
-                case "dice_copper": return "Co";
-                case "dice_iron": return "Ir";
-                case "dice_biased": return "Bi";
-                case "dice_gem": return "Ge";
-                case "dice_flame": return "Fl";
-                case "dice_stable": return "Sb";
-                case "dice_twinsnake": return "Tw";
-                case "dice_star": return "Sr";
-                case "dice_destiny": return "De";
-                case "dice_greed": return "Gr";
-                case "dice_moroha": return "Mo";
-                case "dice_perfection": return "Pf";
-                default: return id.StartsWith("dice_") ? id.Substring(5, Math.Min(2, id.Length - 5)) : id;
-            }
-        }
-
-        private string BuildSweepReport(List<string> weapons, List<string> dice, Dictionary<string, double> winPct)
+        private string BuildSweepReport(List<string> weapons, Dictionary<string, double> winPct)
         {
             var sb = new StringBuilder();
             sb.AppendLine("================ 5Fボス 勝率スイープ ================");
             sb.AppendLine($"日時          : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             sb.AppendLine($"対象ボス      : boss_layer{simBossFloor}");
-            sb.AppendLine($"採取ビルド数  : {_simBases.Count}（実ランの5F到達時パッシブ/強化段階を土台。武器・ダイスのみ差し替え）");
+            sb.AppendLine($"採取ビルド数  : {_simBases.Count}（実ランの5F到達時パッシブ/強化段階を土台。武器のみ差し替え）");
             sb.AppendLine($"戦闘開始HP    : {simBaseHP}（固定。採取ビルドの現在HPは不使用）");
-            sb.AppendLine($"試行/組合せ   : {simTrialsPerCombo}（採取ビルドをラウンドロビンで均等使用）");
-            sb.AppendLine("※消費アイテムは不使用（武器×ダイスの素の勝率を比較）");
+            sb.AppendLine($"試行/武器     : {simTrialsPerCombo}（採取ビルドをラウンドロビンで均等使用）");
+            sb.AppendLine("※消費アイテムは不使用（武器の素の勝率を比較）");
             sb.AppendLine();
 
-            // 凡例
-            sb.AppendLine("---- ダイス略号 ----");
-            var legend = new StringBuilder("  ");
-            foreach (var d in dice) legend.Append($"{DiceCode(d)}={d.Replace("dice_", "")}  ");
-            sb.AppendLine(legend.ToString());
-            sb.AppendLine();
-
-            // マトリクス（行=武器, 列=ダイス, 値=勝率%）
-            sb.AppendLine("---- 勝率マトリクス（行=武器 / 列=ダイス） ----");
-            var header = new StringBuilder();
-            header.Append(PadR("武器", 12));
-            foreach (var d in dice) header.Append(PadL(DiceCode(d), 5));
-            sb.AppendLine(header.ToString());
-            foreach (var w in weapons)
+            // 勝率の高い順 (同率は simWeapons の並び)
+            var order = new List<string>(weapons);
+            order.Sort((a, b) =>
             {
-                var row = new StringBuilder();
-                row.Append(PadR(TruncDisp(w, 11), 12));
-                foreach (var d in dice)
-                {
-                    double v = winPct.TryGetValue(w + "|" + d, out var p) ? p : -1;
-                    row.Append(PadL(v < 0 ? "-" : v.ToString("F0") + "%", 5));
-                }
-                sb.AppendLine(row.ToString());
-            }
-            sb.AppendLine();
-
-            // 上位/下位 組み合わせ
-            var all = new List<KeyValuePair<string, double>>(winPct);
-            all.Sort((a, b) => b.Value.CompareTo(a.Value));
-            sb.AppendLine("---- 勝率トップ10（強コンボ） ----");
-            for (int i = 0; i < all.Count && i < 10; i++)
-            {
-                var k = all[i].Key; int bar = k.IndexOf('|');
-                sb.AppendLine($"  {PadR(k.Substring(0, bar), 12)}{PadR(k.Substring(bar + 1).Replace("dice_", ""), 14)}{PadL(all[i].Value.ToString("F0") + "%", 5)}");
-            }
-            sb.AppendLine();
-            sb.AppendLine("---- 勝率ワースト10（弱コンボ） ----");
-            for (int i = all.Count - 1; i >= 0 && i >= all.Count - 10; i--)
-            {
-                var k = all[i].Key; int bar = k.IndexOf('|');
-                sb.AppendLine($"  {PadR(k.Substring(0, bar), 12)}{PadR(k.Substring(bar + 1).Replace("dice_", ""), 14)}{PadL(all[i].Value.ToString("F0") + "%", 5)}");
-            }
+                int c = winPct[b].CompareTo(winPct[a]);
+                return c != 0 ? c : weapons.IndexOf(a).CompareTo(weapons.IndexOf(b));
+            });
+            sb.AppendLine("---- 武器別 勝率（高い順） ----");
+            foreach (var w in order)
+                sb.AppendLine($"  {PadR(TruncDisp(w, 11), 12)}{PadL(winPct[w].ToString("F0") + "%", 5)}");
             sb.AppendLine();
             return sb.ToString();
         }
