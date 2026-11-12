@@ -145,7 +145,8 @@ namespace AutoTest
             float draws = Math.Min(turns, turns * (float)TerminalCards.HandSize / deckN);
             float PerUse(int slot) => slot >= 0 && slot < board.Count
                 ? DeckCardDmgPerPoint * Math.Max(0f, TargetWorth(TerminalCards.Get(board[slot]), runNow) - 1f) : 0f;
-            if (o.retainTarget >= 0) flat += (DeckRetainDmg + PerUse(o.retainTarget)) * dw;          // 次のターンにもう 1 回使える
+            // 次のターンにもう 1 回使える。 手札の持ち越し (TerminalCards.HandCarry) では挿さなかった端子は全部残るので、 残す効果に値打ちは無い
+            if (o.retainTarget >= 0 && !TerminalCards.HandCarry) flat += (DeckRetainDmg + PerUse(o.retainTarget)) * dw;
             if (o.copyTarget >= 0 && o.copyTarget < board.Count) flat += draws * PerUse(o.copyTarget) * dw;
             if (o.burnTarget >= 0 && o.burnTarget < board.Count && runNow?.terminalDeck != null && runNow.terminalDeck.Count > 0)
             {
@@ -710,20 +711,13 @@ namespace AutoTest
                 if (d != null && d.disposable) hand.Remove(board[s]);
             }
             if (o.burnTarget >= 0 && o.burnTarget < board.Count) hand.Remove(board[o.burnTarget]);
-            // ---- DrawTurn: 前のターン (= 今ターン) に止まっていた手札は残す・残す 1 枚・それ以外は捨て札へ ----
+            // ---- DrawTurn: 本体と同じ関数 (TerminalDeckState.SplitHand) で、 残す端子と捨て札へ送る端子に分ける ----
+            //   手札の持ち越し (TerminalCards.HandCarry): 今ターンに挿した端子だけを捨て札へ・挿さなかった端子は残る。
+            //   旧い規則: 今ターンに止まっていた手札は残す・残す 1 枚 (〈保持器〉)・それ以外は捨て札へ。
             var keep = new List<string>();
-            var prev = dk.state.stopped;
-            if (prev != null)
-                for (int s = perm.Count; s < board.Count && s < prev.Length; s++)
-                    if (prev[s] && hand.Remove(board[s])) keep.Add(board[s]);
-            bool kept = false;
-            foreach (var id in hand)
-            {
-                if (!kept && retain != null && id == retain) { kept = true; continue; }
-                discard.Add(id);
-            }
+            TerminalDeckState.SplitHand(hand, board, perm.Count, dk.state.stopped, retain,
+                                        TerminalDeckState.UsedFromHand(board, perm.Count, o), TerminalCards.HandCarry, keep, discard);
             hand.Clear(); hand.AddRange(keep);
-            if (kept) hand.Add(retain);
             // ---- 引く (山が尽きたら捨て札を混ぜて続ける・常設は場へ出して引き直す・引いた物だけが止まる対象) ----
             var stopPerm = new List<int>(); var stopHand = new List<int>();
             int guard = 0;

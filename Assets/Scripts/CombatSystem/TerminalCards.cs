@@ -234,6 +234,11 @@ namespace CombatSystem
         public static bool LeavesRunDeck(TerminalDef d)
             => d != null && d.leavesRunDeck && !GameLoop.GameHooks.TerminalFirstAidBattleOnly;
 
+        /// <summary>手札の持ち越し (2026-11-13): 挿さなかった端子は捨て札へ行かず、 次のターンも手札に残る。 次のターンは手札が規定の枚数になるまで引く。
+        /// 測定の口 <see cref="GameLoop.GameHooks.HandCarryDisabled"/> が立っていれば旧い規則 (前の手札を全部捨てて引き直す)。
+        /// 本体 (<see cref="TerminalDeckState.DrawTurn"/>) と BOT の先読みが <see cref="TerminalDeckState.SplitHand"/> を通して同じ規則を読む。</summary>
+        public static bool HandCarry => !GameLoop.GameHooks.HandCarryDisabled;
+
         private static TerminalDef D(string id, TerminalKind k, string desc, TerminalCond c = TerminalCond.None, string axis = null)
             => new TerminalDef { id = id, kind = k, cond = c, description = desc, axis = axis, condLabel = CondLabel(c) };
 
@@ -309,7 +314,9 @@ namespace CombatSystem
                 Rare(D(TerminalIds.LootBox, A, "出目を攻撃に。このターンに敵を倒すとゴールド +" + LootGold + "。")),
                 Rare(D(TerminalIds.Stripper, S, "このターンに敵を倒すと、戦闘後の端子の選択肢が 1 つ増える。")),
                 Rare(D(TerminalIds.Doubler, S, "このターン、他の端子の効果を 2 回発動させる。", TerminalCond.AtLeast6)),
-                Rare(D(TerminalIds.Retainer, B, "出目をブロックに。挿さずに空けた手札の端子を 1 枚、次のターンも手札に残す。")),
+                // 〈保持器〉: 手札の持ち越し (2026-11-13・HandCarry) で挿さなかった端子は全部残るので、 「1 枚残す」は役目を失った。
+                //   作り替えまでの仮の形 = 残す効果を止める (出目をブロックに入れるだけ)。 測定の口で旧い規則に戻した腕では残す効果が働く (説明文は今の規則のまま)。
+                Rare(D(TerminalIds.Retainer, B, "出目をブロックに。")),
                 Rare(Once(D(TerminalIds.StopSignal, S, "敵は次のターン行動しない。"))),
                 Rare(D(TerminalIds.Fork, A, "出目を攻撃とブロックの両方に入れる。")),
                 // ── 軸 ──
@@ -518,7 +525,7 @@ namespace CombatSystem
         }
 
         /// <summary>挿さずに空けた手札の端子を対象に取る端子 (〈写し取り〉〈焼き切り〉〈保持器〉)。</summary>
-        public static bool PicksTarget(string id) => id == TerminalIds.Copier || id == TerminalIds.BurnOut || id == TerminalIds.Retainer;
+        public static bool PicksTarget(string id) => id == TerminalIds.Copier || id == TerminalIds.BurnOut || (id == TerminalIds.Retainer && !HandCarry);
 
         /// <summary>場の s が、 self (対象を取る端子) の対象の候補か: 自分でない・常設でない・止まっていない (ヴェスカ〈停滞する時間〉)・
         /// 出目が 1 個も挿さっていない手札の端子。 o は解決の結果 ── 挿し方を直した後の <see cref="TerminalOutcome.slotOfDie"/>
@@ -611,7 +618,7 @@ namespace CombatSystem
                 case TerminalIds.TwinShot: o.attackAdd += sum * TwinShotMul; break;
                 case TerminalIds.Whet: o.attackAdd += sum + env.whetBonus; break;
                 // 変圧器 (6. で足す)・剥ぎ取り (撃破した時)・倍電圧 (5. の頭で見る) は、 ここでは何もしない
-                case TerminalIds.Retainer: o.blockAdd += sum; o.retainTarget = empty(slot); break;
+                case TerminalIds.Retainer: o.blockAdd += sum; if (!HandCarry) o.retainTarget = empty(slot); break;   // 持ち越しの規則では残す効果を止める (仮)
                 case TerminalIds.StopSignal: o.enemyStunNext = true; break;
                 case TerminalIds.Fork: o.attackAdd += sum; o.blockAdd += sum; break;
                 // 軸
@@ -668,7 +675,7 @@ namespace CombatSystem
         /// <summary>戦闘の始め: ランの山札を写して切る。</summary>
         public void BeginBattle(List<string> runDeck)
         {
-            draw.Clear(); discard.Clear(); hand.Clear(); permanent.Clear(); exiled.Clear(); board.Clear();
+            draw.Clear(); discard.Clear(); hand.Clear(); permanent.Clear(); exiled.Clear(); board.Clear(); _usedLastTurn.Clear();
             if (runDeck != null) draw.AddRange(runDeck);
             Shuffle(draw);
         }
@@ -696,8 +703,9 @@ namespace CombatSystem
         /// <summary>ヴェスカ〈停滞する時間〉の乱数のキー (専用 ── 他の抽選の連番を動かさない)。</summary>
         public const string StopRngKey = "vesca.stagnant";
 
-        /// <summary>ターンの始め: 前の手札を捨て (残す 1 枚と、 前のターンに止まっていた端子は残し)、 手札が size 枚になるまで引く。
-        /// 常設は場へ出して引き直す。
+        /// <summary>ターンの始め: 前の手札のうち、 挿した端子を捨て札へ送り (手札の持ち越し・<see cref="TerminalCards.HandCarry"/>。
+        /// 旧い規則では前の手札を全部捨て、 残す 1 枚と前のターンに止まっていた端子だけを残す ── <see cref="SplitHand"/>)、 手札が size 枚になるまで引く。
+        /// 持ち越しで size 枚以上残っていれば引かない (上限で捨てない)。 常設は場へ出して引き直す。
         ///
         /// <para><paramref name="stopChance"/> (0〜1) = ヴェスカ〈停滞する時間〉: <b>このターンに引いた</b>端子 1 枚ごとに、 この確率で止める
         /// (常設を引いた時も・〈配電盤〉で多く引く分も)。 止まった端子はこのターン挿せず、 捨て札へ行かず次のターンも手札に残って普通に使える
@@ -705,26 +713,17 @@ namespace CombatSystem
         /// 止まった場所は <see cref="TerminalBattleState.stopped"/> (場の添字) に持つ ── BOT の写しにも乗る。</para></summary>
         public void DrawTurn(int size, string retained = null, float stopChance = 0f)
         {
-            // 前のターンに止まっていた手札の端子 (前のターンの場と、 その時の常設の枚数から読む ── 常設は DrawTurn でしか増えない)。
-            // FinishTurn が使い捨て・焼き切りを手札から抜いて添字がずれるので、 名前で数えて同じ枚数を残す。
-            var held = new List<string>();
-            var prevStopped = state.stopped;
-            if (prevStopped != null)
-                for (int s = permanent.Count; s < board.Count && s < prevStopped.Length; s++)
-                    if (prevStopped[s]) held.Add(board[s]);
-            state.stopped = null;
-
+            // 前のターンの手札を、 残す端子と捨て札へ送る端子に分ける (規則は SplitHand の 1 か所・BOT の先読みも同じ関数を呼ぶ)
+            bool carry = TerminalCards.HandCarry;
             var keep = new List<string>();
-            foreach (var id in held) if (hand.Remove(id)) keep.Add(id);
-            bool kept = false;
-            foreach (var id in hand)
-            {
-                if (!kept && retained != null && id == retained) { kept = true; continue; }
-                discard.Add(id);
-            }
+            var toDiscard = new List<string>();
+            int heldStopped = SplitHand(hand, board, permanent.Count, state.stopped, retained, _usedLastTurn, carry, keep, toDiscard);
+            state.stopped = null;
+            _usedLastTurn.Clear();
+            discard.AddRange(toDiscard);
             hand.Clear();
             hand.AddRange(keep);
-            if (kept) hand.Add(retained);
+            LastCarriedCount = carry ? keep.Count : 0;
 
             // 引く (このターンに引いた物だけが止まる対象)
             var stoppedPerm = new List<int>();   // permanent の添字
@@ -748,7 +747,7 @@ namespace CombatSystem
                 foreach (int p in stoppedPerm) state.stopped[p] = true;
                 foreach (int h in stoppedHand) state.stopped[permanent.Count + h] = true;
             }
-            LastDrawnCount = drawn; LastHeldCount = keep.Count;
+            LastDrawnCount = drawn; LastHeldCount = heldStopped;
             LastStoppedCount = stoppedPerm.Count + stoppedHand.Count; LastStoppedMains = stoppedPerm.Count;
         }
 
@@ -757,10 +756,79 @@ namespace CombatSystem
         public int LastHeldCount { get; private set; }
         public int LastStoppedCount { get; private set; }
         public int LastStoppedMains { get; private set; }
+        /// <summary>直近の <see cref="DrawTurn"/> で、 手札の持ち越し (<see cref="TerminalCards.HandCarry"/>) で前のターンから残った枚数 (旧い規則では 0・計装・画面用)。</summary>
+        public int LastCarriedCount { get; private set; }
+
+        /// <summary>前のターンに手札から挿した (発動した) 端子の名前 (<see cref="FinishTurn"/> が控え、 次の <see cref="DrawTurn"/> が捨て札へ送って空にする)。
+        /// 使い捨て・焼き切りは FinishTurn が手札から外すので入れない。 旧い規則では読まない (控えるだけ)。</summary>
+        private readonly List<string> _usedLastTurn = new List<string>();
+
+        /// <summary>前のターンに手札から挿した端子の名前 (<paramref name="board"/> の添字 ≥ <paramref name="permCount"/>・使い捨てを除く)。
+        /// 本体の <see cref="FinishTurn"/> と BOT の先読みが同じ規則で数える。</summary>
+        public static List<string> UsedFromHand(List<string> board, int permCount, TerminalOutcome o)
+        {
+            var used = new List<string>();
+            if (board == null || o == null) return used;
+            foreach (int s in o.fired)
+            {
+                if (s < permCount || s >= board.Count) continue;
+                var d = TerminalCards.Get(board[s]);
+                if (d == null || d.disposable) continue;
+                used.Add(board[s]);
+            }
+            return used;
+        }
+
+        /// <summary>
+        /// 前のターンの手札 <paramref name="hand"/> (FinishTurn の後 = 使い捨て・焼き切りを外した後) を、 次のターンに残す端子 <paramref name="keep"/> と
+        /// 捨て札へ送る端子 <paramref name="toDiscard"/> に分ける。 <b>手札の規則の正本</b> ── 本体の <see cref="DrawTurn"/> と BOT の先読み
+        /// (AutoRunner.Terminals の SampleNextBoard) が同じ関数を呼ぶ。 <paramref name="hand"/> は書き換えない。
+        /// <list type="bullet">
+        /// <item><b>持ち越し</b> (<paramref name="carry"/> = <see cref="TerminalCards.HandCarry"/>): 前のターンに挿した端子 (<paramref name="used"/>) だけを捨て札へ、
+        /// 残りは手札の順のまま残す (止まっていた端子・〈保持器〉の対象も、 挿していないので残る)。</item>
+        /// <item><b>旧い規則</b>: 前のターンに止まっていた端子 (ヴェスカ〈停滞する時間〉・<paramref name="prevStopped"/> は前のターンの場の添字) と、
+        /// 〈保持器〉が残す 1 枚 (<paramref name="retained"/>) だけを残し、 残りは手札の順に捨て札へ。</item>
+        /// </list>
+        /// 戻り値 = 前のターンに止まっていて残った枚数 (計装)。
+        /// </summary>
+        public static int SplitHand(List<string> hand, List<string> prevBoard, int prevPermCount, bool[] prevStopped, string retained,
+                                    List<string> used, bool carry, List<string> keep, List<string> toDiscard)
+        {
+            // 前のターンに止まっていた手札の端子 (前のターンの場と、 その時の常設の枚数から読む ── 常設は DrawTurn でしか増えない)。
+            // FinishTurn が使い捨て・焼き切りを手札から抜いて添字がずれるので、 名前で数えて同じ枚数を残す。
+            var rest = new List<string>(hand);
+            var held = new List<string>();
+            if (prevStopped != null && prevBoard != null)
+                for (int s = prevPermCount; s < prevBoard.Count && s < prevStopped.Length; s++)
+                    if (prevStopped[s]) held.Add(prevBoard[s]);
+            int heldCount = 0;
+            if (carry)
+            {
+                foreach (var id in held) if (rest.Contains(id)) heldCount++;
+                var usedLeft = used != null ? new List<string>(used) : new List<string>();
+                foreach (var id in rest)
+                {
+                    if (usedLeft.Remove(id)) toDiscard.Add(id);
+                    else keep.Add(id);
+                }
+                return heldCount;
+            }
+            foreach (var id in held) if (rest.Remove(id)) { keep.Add(id); heldCount++; }
+            bool kept = false;
+            foreach (var id in rest)
+            {
+                if (!kept && retained != null && id == retained) { kept = true; continue; }
+                toDiscard.Add(id);
+            }
+            if (kept) keep.Add(retained);
+            return heldCount;
+        }
 
         /// <summary>ターンの終わり: 結果を山札へ反映する (使い捨て・写し取り・焼き切り)。 戻り値 = 次のターンも手札に残す端子 (無ければ null)。</summary>
         public string FinishTurn(TerminalOutcome o)
         {
+            _usedLastTurn.Clear();
+            _usedLastTurn.AddRange(UsedFromHand(board, permanent.Count, o));
             string retain = o.retainTarget >= 0 && o.retainTarget < board.Count ? board[o.retainTarget] : null;
             if (o.copyTarget >= 0 && o.copyTarget < board.Count) discard.Add(board[o.copyTarget]);
             string burn = o.burnTarget >= 0 && o.burnTarget < board.Count ? board[o.burnTarget] : null;

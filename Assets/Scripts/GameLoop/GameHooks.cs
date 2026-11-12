@@ -112,6 +112,15 @@ namespace GameLoop
         /// (攻撃の端子に出目を挿したターンの、 主攻撃までの撃破だけ・ターン終了時の撃破には配らない)。 既定 false = 説明文どおり、 撃破の経路を問わない。
         /// AutoRunner.terminalKillNeedsAttack が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
         public static bool TerminalKillBonusNeedsAttack;
+        /// <summary>[測定 2026-11-13] true = 旧い手札の規則 (ターンの頭に前の手札を全部捨てて引き直す)。 既定 false = 挿さなかった端子は手札に残る
+        /// (<see cref="CombatSystem.TerminalCards.HandCarry"/>・GAME.md §6-4)。 AutoRunner.handCarry が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
+        public static bool HandCarryDisabled;
+        /// <summary>[測定 2026-11-13] true = ボスのダウン (HP の目盛り・<see cref="CombatSystem.BossDown"/>) を入れない旧い作り。 既定 false = ダウンあり。
+        /// AutoRunner.bossDown が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
+        public static bool BossDownDisabled;
+        /// <summary>[測定 2026-11-13] true = 深さ 3 のボス 3 体に大技の周期を足さない旧い作り。 既定 false = 足す
+        /// (<see cref="CombatSystem.BossParams.Depth3Heavy"/>)。 AutoRunner.depth3Heavy が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
+        public static bool Depth3HeavyDisabled;
 
         /// <summary>敵の固定削り (データの値・<see cref="EnemyArmorPenOverride"/> があればその値・下限 0)。</summary>
         public static int EnemyArmorPen(string enemyId, int dataValue)
@@ -149,6 +158,9 @@ namespace GameLoop
             TerminalArresterNeedOverride = 0;
             TerminalFirstAidBattleOnly = false;
             TerminalKillBonusNeedsAttack = false;
+            HandCarryDisabled = false;
+            BossDownDisabled = false;
+            Depth3HeavyDisabled = false;
         }
     }
 }
