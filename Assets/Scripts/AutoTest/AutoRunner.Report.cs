@@ -177,7 +177,7 @@ namespace AutoTest
             string metaLabel = metaPattern switch
             {
                 MetaPattern.Cowardly        => "臆病(メタ全リセット)",
-                MetaPattern.FullProgression => $"全有効化(メタLv{MetaProgression.MetaBuffTrack.TotalSteps})",
+                MetaPattern.FullProgression => "全有効化(メタLv58)",
                 MetaPattern.Untouched       => "保存値そのまま",
                 _                           => metaPattern.ToString(),
             };
