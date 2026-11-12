@@ -313,7 +313,7 @@ namespace UI.Game2D
             if (run.ownedPassiveItems != null)
                 for (int i = 0; i < run.ownedPassiveItems.Count; i++)
                     if (run.ownedPassiveItems[i] != run.equippedWeaponId      // 装備中の武器は売らせない (武器もパッシブの一覧に入っている)
-                        && !ItemIds.Entrusted.Contains(run.ownedPassiveItems[i]))   // 預かり物 (博士の時計) は売れない (ShopManager.TrySell)
+                        && ItemIds.CanSell(run.ownedPassiveItems[i]))   // 手放せない品 (確信の 3 品・預かり物) は売れない (ShopManager.TrySell と同じ判定)
                         l.Add(Entry(ShopManager.SellSource.Passive, i, run.ownedPassiveItems[i]));
             if (run.ownedConsumables != null)
                 for (int i = 0; i < run.ownedConsumables.Count; i++) l.Add(Entry(ShopManager.SellSource.Consumable, i, run.ownedConsumables[i]));

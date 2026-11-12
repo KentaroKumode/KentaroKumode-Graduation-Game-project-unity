@@ -117,7 +117,7 @@ namespace GameLoop
                     for (int i = 0; i < Run.ownedPassiveItems.Count; i++)
                     {
                         string id = Run.ownedPassiveItems[i];
-                        if (string.IsNullOrEmpty(id) || ItemIds.ProgressionItems.Contains(id)) continue;
+                        if (!ItemIds.CanBeTakenBySin(id)) continue;
                         var it = db.GetItem(id);
                         if (it == null || it.category == ItemSystem.ItemCategory.Weapon) continue;
                         if (it.basePrice > bestPrice) { bestPrice = it.basePrice; best = i; }
@@ -133,7 +133,7 @@ namespace GameLoop
                 var cands = new List<string>();
                 if (Run.ownedPassiveItems != null)
                     foreach (var id in Run.ownedPassiveItems)
-                        if (!string.IsNullOrEmpty(id) && !ItemIds.ProgressionItems.Contains(id) && !Run.sinSealedPassives.Contains(id) && !cands.Contains(id)) cands.Add(id);
+                        if (ItemIds.CanBeTakenBySin(id) && !Run.sinSealedPassives.Contains(id) && !cands.Contains(id)) cands.Add(id);
                 for (int k = 0; k < (int)deb.value && cands.Count > 0; k++)
                 {
                     int at = GameRng.Range(0, cands.Count, "challenge.lust", k);

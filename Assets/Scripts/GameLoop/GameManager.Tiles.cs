@@ -144,7 +144,7 @@ namespace GameLoop
             {
                 var it = db?.GetItem(owned[i]);
                 if (it == null || it.category != ItemCategory.Passive) continue;
-                if (ItemIds.Entrusted.Contains(owned[i])) continue;   // 預かり物 (博士の時計) は取り替えに出さない
+                if (!ItemIds.CanTradeAway(owned[i])) continue;   // 手放せない品 (確信の 3 品・預かり物) は取り替えに出さない
                 if (bestIdx < 0 || it.rarity < bestR) { bestR = it.rarity; bestIdx = i; }
             }
             return bestIdx;
@@ -216,9 +216,9 @@ namespace GameLoop
         {
             var owned = Run?.ownedPassiveItems;
             if (owned == null || owned.Count == 0) return -1;
-            // 預かり物 (博士の時計・ItemIds.Entrusted) は失わない。 預かり物を持っていなければ候補は 0..Count-1 のまま = 引く値も選ぶ品も今までと同じ
+            // 手放せない品 (確信の 3 品・預かり物・ItemIds.CanBeLost) は失わない。 持っていなければ候補は 0..Count-1 のまま = 引く値も選ぶ品も今までと同じ
             var cands = new System.Collections.Generic.List<int>(owned.Count);
-            for (int i = 0; i < owned.Count; i++) if (!ItemIds.Entrusted.Contains(owned[i])) cands.Add(i);
+            for (int i = 0; i < owned.Count; i++) if (ItemIds.CanBeLost(owned[i])) cands.Add(i);
             if (cands.Count == 0) return -1;
             int idx = cands[GameLoop.GameRng.RangeAuto("GameManager.5", 0, cands.Count)];
             string lostId = owned[idx];

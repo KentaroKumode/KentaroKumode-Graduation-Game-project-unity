@@ -41,12 +41,55 @@ namespace GameLoop
         /// (<see cref="GameLoop.VescaClock"/>・CombatSystem.BossParams.VescaClockNotch)。 配布の山には出ない (EventOnlyItemFilter)・預かり物 (<see cref="Entrusted"/>)。</summary>
         public const string VescaClock = "止まらない時計";
 
-        /// <summary>**預かり物** (2026-11-13): 人から預かった秘宝。 売れない (ShopManager.TrySell・売る画面)・取り替えに出さない
-        /// (交換マス・イベントの取り替え = GameManager.LowestTierPassiveIndex)・ランダムに失わない (GameManager.LoseRandomPassiveItem)・
-        /// 記録 (図鑑) には手に入れるまで並べない (超低確率のイベントの種明かしになるため・Game2DCodexPanel)。
+        // === 秘宝の守りの 3 つの集合 (2026-11-13 に整理) ===
+        //   経路の側は集合を直接読まず、 下の判定メソッドを呼ぶ (集合の取り違えを防ぐため)。 id の綴りでは判定しない。
+        //
+        //   | 集合                     | 中身                                   | 読む判定 → 経路                                                          |
+        //   |--------------------------|----------------------------------------|--------------------------------------------------------------------------|
+        //   | Undroppable (手放せない) | 確信の 3 品 + Entrusted                | CanSell      → ShopManager.TrySell (人・BOT・キー操作)・売る画面 SellList |
+        //   |                          |                                        | CanTradeAway → GameManager.LowestTierPassiveIndex (交換マス・イベントの取り替え) |
+        //   |                          |                                        | CanBeLost    → GameManager.LoseRandomPassiveItem (偽の商人に敗北)           |
+        //   | Entrusted (預かり物)     | 止まらない時計                         | HiddenInCodexUntilOwned → Game2DCodexPanel (手に入れるまで枠も出さない)    |
+        //   | ProgressionItems (進行用) | 確信の 3 品・時計・灯火・レイピア・    | CanOfferAtGate   → GameManager.OfferGateRelics (〈門〉で捧げない)          |
+        //   |                          | 初期装備・武器階梯 T2/T3 ほか          | CanBeTakenBySin  → GameManager.Challenge (大罪の強欲・色欲)               |
+        //   |                          |                                        | (直接) AutoTest.ItemLearningStats.ExcludedFromLift (BOT の学習から外す)  |
+        //
+        //   名指しで外す経路 (イベントの「廃棄」・灯火/フルーレ・バレエの自壊・剣の舞の集約) は集合を読まない。
+
+        /// <summary>**預かり物** (2026-11-13): 人から預かった秘宝。 この集合が<b>単独で</b>決めるのは「記録 (図鑑) には手に入れるまで
+        /// 「？？？」の枠も並べない」(超低確率のイベントの種明かしになるため・<see cref="HiddenInCodexUntilOwned"/>) だけ。
+        /// 売れない・取り替えに出さない・ランダムに失わないは <see cref="Undroppable"/> (この集合を含む) が決める。
         /// 〈門〉・大罪 (強欲・色欲)・BOT の学習から外すのは <see cref="ProgressionItems"/> の側 (両方に入れる)。</summary>
         public static readonly System.Collections.Generic.HashSet<string> Entrusted =
             new System.Collections.Generic.HashSet<string> { VescaClock };
+
+        /// <summary>**手放せない品** (2026-11-13): 売れない (<see cref="CanSell"/>)・売る画面に並ばない・取り替えに出さない
+        /// (<see cref="CanTradeAway"/>)・ランダムに失わない (<see cref="CanBeLost"/>)。 中身は確信の 3 品 (〈根拠のない確信〉〈決意〉〈真理〉・
+        /// 進行の資格を表す品) と預かり物 (<see cref="Entrusted"/>)。 確信の 3 品は図鑑で枠を隠さない (Entrusted には入れない)。
+        /// <para>資格そのものはフラグ (<c>layer6Unlocked</c>・<c>layer7Unlocked</c>・<c>convictionStage</c>) が持つ。 2026-11-13 までは
+        /// 確信を売っても資格は残り、 品だけが消えて〈決意〉〈真理〉が持ち物と図鑑に出なかった (GAME.md §24)。</para>
+        /// <para><see cref="Entrusted"/> より後に置く (静的フィールドの初期化は書いた順)。</para></summary>
+        public static readonly System.Collections.Generic.HashSet<string> Undroppable =
+            new System.Collections.Generic.HashSet<string>(Entrusted)
+        {
+            ConvictionSystem.IdConviction, ConvictionSystem.IdResolve, ConvictionSystem.IdTruth,
+        };
+
+        /// <summary>店で売れるか (ShopManager.TrySell・売る画面)。 手放せない品 (<see cref="Undroppable"/>) は false。</summary>
+        public static bool CanSell(string id) => !string.IsNullOrEmpty(id) && !Undroppable.Contains(id);
+        /// <summary>売れない時の断りの文 (売れるなら null)。 預かり物は「預かった品は売れない」、 確信の 3 品は「これは手放せない」。</summary>
+        public static string RefuseSellText(string id)
+            => CanSell(id) ? null : Entrusted.Contains(id) ? "預かった品は売れない" : "これは手放せない";
+        /// <summary>取り替え (交換マス・イベント「パッシブを差し出して替える」) に出せるか。 手放せない品は false。</summary>
+        public static bool CanTradeAway(string id) => !string.IsNullOrEmpty(id) && !Undroppable.Contains(id);
+        /// <summary>ランダムな喪失 (偽の商人に敗北) で失われ得るか。 手放せない品は false。</summary>
+        public static bool CanBeLost(string id) => !string.IsNullOrEmpty(id) && !Undroppable.Contains(id);
+        /// <summary>図鑑で、 手に入れるまで「？？？」の枠も出さない品か (預かり物 <see cref="Entrusted"/> だけ)。</summary>
+        public static bool HiddenInCodexUntilOwned(string id) => !string.IsNullOrEmpty(id) && Entrusted.Contains(id);
+        /// <summary>〈門〉で秘宝として捧げられるか。 進行用の品 (<see cref="ProgressionItems"/>) は false。</summary>
+        public static bool CanOfferAtGate(string id) => !string.IsNullOrEmpty(id) && !ProgressionItems.Contains(id);
+        /// <summary>大罪 (強欲・色欲) が封じる・奪う対象になり得るか。 進行用の品 (<see cref="ProgressionItems"/>) は false。</summary>
+        public static bool CanBeTakenBySin(string id) => !string.IsNullOrEmpty(id) && !ProgressionItems.Contains(id);
 
         // === 初期装備 ===
         public const string DiceWood = "dice_wood";
@@ -118,8 +161,10 @@ namespace GameLoop
         };
 
         // === 進行用の品 ===
-        /// <summary>**進行用の品**: 強さではなく進行度や配布条件を表す品。 〈門〉で遺物として捧げられない
-        /// (GameManager.OfferGateRelics)。 BOT の lift 評価もこれを除外する (AutoTest.ItemLearningStats)。</summary>
+        /// <summary>**進行用の品**: 強さではなく進行度や配布条件を表す品。 〈門〉で秘宝として捧げられない
+        /// (<see cref="CanOfferAtGate"/>)・大罪 (強欲・色欲) の対象にならない (<see cref="CanBeTakenBySin"/>)。
+        /// BOT の lift 評価もこれを除外する (AutoTest.ItemLearningStats.ExcludedFromLift)。
+        /// <b>売れる・取り替えに出せるかはこの集合では決まらない</b> (<see cref="Undroppable"/>) ── 〈ちいさな灯火〉〈シュヴァリエのレイピア〉は売れる。</summary>
         public static readonly System.Collections.Generic.HashSet<string> ProgressionItems =
             new System.Collections.Generic.HashSet<string>
         {
