@@ -461,6 +461,8 @@ namespace AutoTest.ParallelSweep
                 "territoryKeepBypass",
                 // 2026-11-13: 深さ 6 の「裂け目の記録」の置き方 (True = ボスに隣り合う点を全部イベントに・False = 旧い固定の点で BOT の選び方も元のまま = main と同じ)
                 "riftRecordAtBoss",
+                // 2026-11-13: 天候の作り (True = 嵐・False = 旧い前線で始点は左端 = main と同じ)
+                "stormEnabled",
                 // 2026-11-10: 測定用の物差し (主攻撃 / 毒・出血・爆発の倍率)。 送った値と、 ラン開始時に本体へ入れた値
                 "probeMainMult", "ProbeMainMultApplied", "probePassiveMult", "ProbePassiveMultApplied",
                 // 2026-11-12 (#107): 配線が収支で決まる敵のパッシブと〈吸血〉を読むか (−1 = 技量に従う) と実効値・内訳

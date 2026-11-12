@@ -161,6 +161,30 @@ namespace AutoTest
             return Mathf.Max(0, Mathf.FloorToInt((hp - reserve) / FreeMapParams.HpPerSupply));
         }
 
+        /// <summary>[嵐 2026-11-13・BOT の最小の対応 (b)] from から to への最短の道 (<see cref="FreeMapSim.StepToward"/> をたどる) で払う嵐の HP の合計。
+        /// 輪は今の手番のまま数える (先の縮みは見込まない)。 嵐の層でなければ 0。</summary>
+        private static int StormHpOnPath(FreeMapSim sim, int from, int to)
+        {
+            if (sim == null || !sim.StormMode || from < 0 || to < 0) return 0;
+            int hp = 0, cur = from;
+            for (int guard = 0; guard < 200 && cur != to; guard++)
+            {
+                int nx = sim.StepToward(cur, to);
+                if (nx == cur) break;
+                hp += sim.StormHpFor(nx);
+                cur = nx;
+            }
+            return hp;
+        }
+
+        /// <summary>[嵐 2026-11-13・(b)] HP で払って歩ける歩数 (<see cref="HpWalkSteps"/>) から、 道の上で払う嵐の HP を先に引いたもの。
+        /// 嵐の HP が 0 なら <see cref="HpWalkSteps"/> そのもの (嵐の無い層・測定の口 stormEnabled = False の動きを変えない)。</summary>
+        private static int HpWalkStepsAfterStorm(RunState run, MapManager mm, int stormHp)
+        {
+            if (stormHp <= 0 || run == null || run.playerMaxHP <= 0) return HpWalkSteps(run, mm);
+            return HpWalkSteps(run, mm, Mathf.Max(0, run.playerHP - stormHp) / (float)run.playerMaxHP);
+        }
+
         /// <summary>今の層の終点がボスか。</summary>
         private static bool LayerHasBoss(MapManager mm)
         {
@@ -173,7 +197,9 @@ namespace AutoTest
         /// 2026-11-10: 出口までは HP で払って歩く分も数える (<see cref="HpWalkSteps"/>)。</summary>
         private static bool Sustainable(MapManager mm, FreeMapSim sim, int[] hopsFromThere, int goal, int supply, RunState run)
         {
-            if (hopsFromThere[goal] != int.MaxValue && supply + HpWalkSteps(run, mm) >= hopsFromThere[goal] * FreeMapParams.MoveSupply + FreeMapExitMargin) return true;
+            // 嵐 (2026-11-13・(b)): そこから出口までの道で払う嵐の HP を、 HP で歩ける分から先に引く
+            int stormHp = sim != null && sim.StormMode ? StormHpOnPath(sim, System.Array.IndexOf(hopsFromThere, 0), goal) : 0;
+            if (hopsFromThere[goal] != int.MaxValue && supply + HpWalkStepsAfterStorm(run, mm, stormHp) >= hopsFromThere[goal] * FreeMapParams.MoveSupply + FreeMapExitMargin) return true;
             if (hopsFromThere[goal] != int.MaxValue && supply >= hopsFromThere[goal] * FreeMapParams.MoveSupply + FreeMapExitMargin) return true;
             int shop = NearestRefuel(mm, sim, hopsFromThere, run);
             return shop >= 0 && hopsFromThere[shop] != int.MaxValue && supply >= hopsFromThere[shop] * FreeMapParams.MoveSupply;
@@ -304,7 +330,8 @@ namespace AutoTest
             //   ・補給に行くのは満タンでない時だけ・今いる点は除く
             //   ・満タンでも出口に届かない時は、 今より出口に近い店へ (店を伝って出口へ進む)。 無ければ出口へ (足りない分は HP)
             bool full = run.provision >= run.provisionCap;
-            bool exitOk = hopsFromMe[L.goal] != int.MaxValue && NavSupply(run, sim) + HpWalkSteps(run, mm) >= hopsFromMe[L.goal] * FreeMapParams.MoveSupply + FreeMapExitMargin;
+            // 嵐 (2026-11-13・(b)): 出口までの道で払う嵐の HP を、 HP で歩ける分から先に引く (嵐の無い層では 0 = 今までどおり)
+            bool exitOk = hopsFromMe[L.goal] != int.MaxValue && NavSupply(run, sim) + HpWalkStepsAfterStorm(run, mm, StormHpOnPath(sim, at, L.goal)) >= hopsFromMe[L.goal] * FreeMapParams.MoveSupply + FreeMapExitMargin;
             int refuel = full ? NearestRefuel(mm, sim, hopsFromMe, run, at, sim.HopsFrom(L.goal), sim.HopsFrom(L.goal)[at])
                               : NearestRefuel(mm, sim, hopsFromMe, run, at);
             bool refuelOk = refuel >= 0 && NavSupply(run, sim) >= hopsFromMe[refuel] * FreeMapParams.MoveSupply;
@@ -322,7 +349,8 @@ namespace AutoTest
             }
             bool toExit = _freeMapActions > MaxFreeMapActionsPerFloor
                           || hopsFromMe[L.goal] == int.MaxValue
-                          || (!exitOk && !refuelOk);
+                          || (!exitOk && !refuelOk)
+                          || (sim.StormMode && sim.StormPhase >= 3);   // 嵐 (2026-11-13・(a)): フェーズ 3 に入ったら出口へ (輪がボスの点へ縮み、 フェーズ 4 はボスの点のほか全部が嵐の中)
             if (!toExit && !exitOk && refuelOk) target = refuel;   // 先に補給
             else if (!toExit && WantsTerritoryTreasure(mm, sim, hopsFromMe, run, hpRatio))
             {
