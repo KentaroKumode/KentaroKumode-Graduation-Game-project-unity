@@ -20,6 +20,24 @@ namespace AutoTest
     /// <summary>AutoRunner: ログ出力・サマリーの各ブロック・ゲーム体験メトリクス・整列ヘルパー。</summary>
     public partial class AutoRunner
     {
+        /// <summary>サマリーの「配線AI」の行。 <b>技量の名前だけでなく、 実際に戦闘の判断をしている方策を書く</b> (2026-11-12)。
+        /// <para>端子の山札 (2026-11-11) の後は、 どの技量でも配線は <c>DeckWiringPlanPolicy</c>、 リロールは <c>MutualRerollPolicy</c>
+        /// (素朴版はリロールしない) に上書きされる (AutoRunner.Combat)。 <c>SuperCombatAI</c> / <c>ExactCombatAI</c> の配線とリロールは呼ばれない
+        /// (super_prof.txt は「配線 0 回 / リロール 0 回」)。 「Super = 先読み」は今は正しくない ── 先読みは <see cref="deckLookahead"/> (既定 OFF) だけ。</para></summary>
+        private string WiringSkillLine()
+        {
+            string la = deckLookahead && EffectiveWiringSkill != WiringSkill.Naive
+                ? $"山札の 2 ターン先読み ON (ボス戦だけ={deckLookaheadBossOnly}・上位 {deckLookaheadTopK} 本 × 標本 {deckLookaheadSamples})"
+                : "先読みなし (deckLookahead=" + deckLookahead + ")";
+            string policy = EffectiveWiringSkill == WiringSkill.Naive
+                ? "配線=山札の方策 (素朴)・リロールなし"
+                : "配線=山札の方策 (DeckWiringPlanPolicy)・リロール=MutualRerollPolicy";
+            string extra = EffectiveWiringSkill == WiringSkill.Super
+                ? " / Super の差: 予告を読む防御と護符・与ダメの倍率と敵のパッシブを読む・航行の計画と戦闘名の危険度・無段階の序列 (ITT super)"
+                : "";
+            return $"{wiringSkill} ({policy} / {la}{extra})";
+        }
+
         private string WriteLogs()
         {
             string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
@@ -173,7 +191,7 @@ namespace AutoTest
             sb.AppendLine($"メタ進行  : {metaLabel}");
             sb.AppendLine($"挑戦: {(enableAllDebuffs ? "難易度 10 (最高)" : "難易度 " + challengeCardDifficulty)}");
             sb.AppendLine($"実行設定  : メタ={metaBuffMode} / 軸={(sweepAllMetaAxes ? "全軸走査" : metaAllocation.ToString())} / アイテム={itemPickMode}");
-            sb.AppendLine($"配線AI    : {wiringSkill}");
+            sb.AppendLine($"配線AI    : {WiringSkillLine()}");
             // **実効状態を必ず印字する。** EditorPrefs 由来のトグルは黙って持ち越されるので、
             //   サマリを後から読んだときに条件が復元できないと測定が丸ごと無駄になる。
             //   (技量帯が別メニューの設定を持ち越したまま走った事故が実際に起きている)
@@ -228,6 +246,13 @@ namespace AutoTest
             //   印字が無いと「遺物なしのつもりだった」を後から検証できない。
             //   2026-08-10 に同じ穴で 0pt 基準値が 53.3% / 16.6% に割れている。
             sb.AppendLine(EffectiveStateLine());
+            // **BOT が読んだ学習を必ず印字する** (2026-11-12・#118)。 帯のフォルダが無いと手書きの序列へ黙って落ち、
+            //   難易度 1〜3 のクリアが 0% になっていた。 落ちたランがあれば、 はっきり書く。
+            sb.AppendLine($"学習の読み: {LearningReadEffective} / 帯の固定={(botLearningBandOverride >= 0 ? botLearningBandOverride.ToString() : "なし")}"
+                        + $" / 欠けたら止める={failOnMissingLearning}");
+            if (_fallbackRuns > 0 || !string.IsNullOrEmpty(_learningGaps))
+                sb.AppendLine($"**学習データなし・手書きの序列で走った**: {_fallbackRuns}/{_bandSwitchRuns} ラン"
+                            + (string.IsNullOrEmpty(_learningGaps) ? "" : $" / バッチ開始時の欠け: {_learningGaps}"));
             sb.AppendLine("比較軸    : 航行Rankのみ差し替え（消費/ショップ/戦闘実行/イベントは共通固定）");
             sb.AppendLine("################################################");
             if (AutoTest.Ultra.UltraDecisionCensus.Enabled

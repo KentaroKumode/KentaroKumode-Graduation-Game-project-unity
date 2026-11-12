@@ -159,7 +159,7 @@ namespace AutoTest
             var sb = new StringBuilder();
             sb.AppendLine("=== 固定難易度スイープ ===");
             sb.AppendLine($"日時    : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-            sb.AppendLine($"配線AI  : {wiringSkill}");
+            sb.AppendLine($"配線AI  : {WiringSkillLine()}");
             sb.AppendLine($"ペルソナ Standard 固定 / 遺物 "
                         + (forceNoRelic ? "**なし** (対照アーム)"
                            : "TheoreticalBest (心眼 3 個・30 段) 固定"));

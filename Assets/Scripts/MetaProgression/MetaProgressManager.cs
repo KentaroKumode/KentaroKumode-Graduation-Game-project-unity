@@ -57,6 +57,8 @@ namespace MetaProgression
         public void Save()
         {
             if (State == null) return;
+            // 並列ワーカーは保存しない (PlayerPrefs は全プロセスで共有され、 次の測定へ状態が持ち込まれる・GameHooks の説明)
+            if (GameLoop.GameHooks.MetaPersistenceDisabled) return;
             var json = JsonUtility.ToJson(State);
             PlayerPrefs.SetString(PrefsKey, json);
             PlayerPrefs.Save();
@@ -72,6 +74,13 @@ namespace MetaProgression
             State.EnsurePanelInitialized();
             return;
 #else
+            // 並列ワーカーは PlayerPrefs を読まず、 まっさらな状態から始める (エディタ実行と同じ・GameHooks.MetaPersistenceDisabled)
+            if (GameLoop.GameHooks.MetaPersistenceDisabled)
+            {
+                State = new MetaProgressState();
+                State.EnsurePanelInitialized();
+                return;
+            }
             string json = PlayerPrefs.GetString(PrefsKey, "");
             if (string.IsNullOrEmpty(json))
             {

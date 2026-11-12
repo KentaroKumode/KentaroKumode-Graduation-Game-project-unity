@@ -200,6 +200,10 @@ namespace AutoTest.ParallelSweep
         /// 2026-09-13 に <c>useMutualAttackPipeline</c> の運び漏れで 170,000 ラン を
         /// 旧戦闘経路で測って捨てた ── 運搬は見えないと必ず漏れる。</summary>
         public string effectiveState = "";
+        /// <summary>[2026-11-12 #118] アームの終わりに BOT が読んでいた学習 (帯のフォルダ名・序列の出どころ・危険度)。</summary>
+        public string learningRead = "";
+        /// <summary>[2026-11-12 #118] 手書きの序列 (学習データなし) で走ったか。 親はサマリーにはっきり出す。</summary>
+        public bool learningFallback;
         // 救済の発動数。 **ログでは数えられない** ── バッチ中は logEnabled=false なので、
         //   「ログに出ていない＝発動していない」は成り立たない。 計数で返す。
         public long torchRevivals;
@@ -449,6 +453,8 @@ namespace AutoTest.ParallelSweep
                 "deckLookahead", "deckLookaheadBossOnly", "deckLookaheadTopK", "deckLookaheadSamples",
                 // 2026-11-12 (#6): 挑戦カードを 1 枚ずつ受ける測定の口と、〈金で殴る〉の BOT の金の値段・取り置き
                 "challengeForce", "goldPunchHpPerGold", "goldPunchReserve",
+                // 2026-11-12 (#118): 挑戦の難易度 (v3_queue の腕が振る値) と、 BOT が読む学習の帯の固定・欠けたら止めるか
+                "challengeCardDifficulty", "botLearningBandOverride", "failOnMissingLearning",
             };
             var sb = new System.Text.StringBuilder();
             foreach (string name in watched)

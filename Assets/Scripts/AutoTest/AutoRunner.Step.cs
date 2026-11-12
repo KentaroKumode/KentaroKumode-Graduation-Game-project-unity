@@ -149,9 +149,7 @@ namespace AutoTest
                 {
                     var stc = MetaProgression.MetaProgressManager.Instance?.State;
                     if (stc != null)
-                        stc.challengeDifficulty = _pendingChallengeDifficulty >= 0 ? _pendingChallengeDifficulty
-                                                : enableAllDebuffs ? MetaProgression.ChallengeCards.MaxDifficulty
-                                                : challengeCardDifficulty;
+                        stc.challengeDifficulty = IntendedChallengeDifficulty();   // Begin も同じ規則で先に入れる (#119)
                 }
                 else
                 {
@@ -221,8 +219,23 @@ namespace AutoTest
             //   **前のアームの序列で買い続ける**。 Tier 較正中は隔離領域を使うので触らない。
             if (!IsTierCalibration)
             {
-                try { LearnedPriorityProvider.SwitchToChallengeScore(CurrentChallengeScore()); }
+                // 帯の固定 (botLearningBandOverride・#118) があればその帯を読む。 無ければ今の挑戦の点数の帯。
+                try { LearnedPriorityProvider.SwitchToChallengeScore(BotLearningBandScore); }
                 catch (Exception e) { Debug.LogWarning($"[AutoRunner] 学習帯の切替失敗: {e.Message}"); }
+                // **手書きの序列で走ったランを数える** (#118)。 黙って落ちると、 帯のフォルダが無いだけでクリア率が 0% になる。
+                _bandSwitchRuns++;
+                if (LearnedPriorityProvider.UsingFallback) _fallbackRuns++;
+                // **戦闘名の危険度も同じ帯へ読み直す** (2026-11-12・#119)。 これまではバッチ開始時の 1 回だけで、
+                //   その時の帯 (前の測定が PlayerPrefs に残した難易度から決まる) のまま全ランを走っていた。
+                //   encounter_danger.json は帯 0 にしか無いので、 残りが帯 16 以上だと危険度が空になり、 ワーカー単位で結果が割れた。
+                //   帯が変わった時だけ読む (毎ランのファイル読みはしない)。
+                try
+                {
+                    string dangerRoot = System.IO.Path.GetFullPath(TierLearningRoot);
+                    if (!string.Equals(EncounterDangerStats.RequestedRoot, dangerRoot, StringComparison.OrdinalIgnoreCase))
+                        EncounterDangerStats.Reload(dangerRoot);
+                }
+                catch (Exception e) { Debug.LogWarning($"[AutoRunner] 戦闘名の危険度の切替失敗: {e.Message}"); }
             }
 
             // 2026-06-28: BOT は職業をランダムに選択 (BOT 学習で全 4 職を均等にサンプル)
