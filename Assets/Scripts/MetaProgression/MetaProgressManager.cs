@@ -84,6 +84,7 @@ namespace MetaProgression
             }
             State.EnsurePanelInitialized();
             State.MigrateFromLegacyTrackIfNeeded();
+            State.ClampRanksToMax();   // #113: 枠から外したトラックの段が古いセーブから残って効くのを防ぐ
 #endif
         }
 
