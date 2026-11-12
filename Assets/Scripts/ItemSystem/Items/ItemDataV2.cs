@@ -154,7 +154,10 @@ namespace ItemSystem
         [Header("価格設定")]
         public PriceRange buyPrice;
         public PriceRange sellPrice;
-        
+        /// <summary>売値 0G の品 (items.json の noSellValue・2026-11-13)。 売値は <see cref="sellPrice"/> を直接読まず
+        /// ShopManager.SellRange を通す (この欄を見落とさないため)。 sellPrice 自体は basePrice から作ったまま残す。</summary>
+        public bool noSellValue;
+
         [Header("武器データ（武器のみ）")]
         public DiceConfig weaponDice;
         /// <summary>武器の会心率 (%)。 15 = 15%。 5% 刻み (2026-09-19)。</summary>

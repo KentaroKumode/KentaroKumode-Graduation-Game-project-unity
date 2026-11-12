@@ -987,9 +987,8 @@ namespace ItemSystem.Shop
             if (source == SellSource.WeaponMaterial)
             {
                 if (run.weaponMaterials <= 0) { Log("素材がない"); return false; }
-                int sellPrice = 15; // 基準売値（後で調整可）
                 run.weaponMaterials--;
-                int gain = GameLoop.GoldIncome.GainExempt(run, sellPrice, "強化素材売却");
+                int gain = GameLoop.GoldIncome.GainExempt(run, WeaponMaterialSellPrice, "強化素材売却");
                 MetaProgression.Achievements.AchievementService.NoteShopSale();
                 Debug.Log($"[ShopManager] 強化素材売却: +{gain}G");
                 OnShopUpdated?.Invoke();
@@ -1003,9 +1002,8 @@ namespace ItemSystem.Shop
             // 手放せない品 (確信の 3 品・預かり物・GameLoop.ItemIds.Undroppable・2026-11-13) は売れない。 売る画面は並べず、
             //   キー操作 (GameManager.ShopSell) と BOT の売却 (BotSelling) もここで断られる (BOT は次の品へ進む)。 乱数を引く前に断る
             if (source == SellSource.Passive && !GameLoop.ItemIds.CanSell(id)) { Log(GameLoop.ItemIds.RefuseSellText(id)); return false; }
-            // T4-D〈破産〉: 売却額 −50% (§15-2 v3.0)。 **売却不能にはしない** ── 経路は残す。
-            int price = Mathf.Max(1, Mathf.RoundToInt(
-                ResolveSellPrice(id)));
+            // 売値 0G の品 (items.json の noSellValue) も売れる (0G が入る)。 BOT は売らない (AutoRunner の SellOneScore0 が SellsForNothing で飛ばす)
+            int price = ResolveSellPrice(id);
             // 除去は PassiveAddHelper.RemoveAt に寄せる
             if (source == SellSource.Passive)
                 ItemSystem.Helpers.PassiveAddHelper.RemoveAt(run, listIndex);
@@ -1029,45 +1027,45 @@ namespace ItemSystem.Shop
             if (slotIndex < 0 || slotIndex >= Current.slots.Count) return 0;
             var slot = Current.slots[slotIndex];
             if (slot.kind != ShopSlotKind.Weapon || string.IsNullOrEmpty(run.equippedWeaponId) || run.equippedWeaponId == slot.itemId) return 0;
-            var data = ItemDatabase.Instance?.GetItem(run.equippedWeaponId);
-            if (data == null) return 0;
-            if (data.sellPrice != null) return Mathf.Max(0, data.sellPrice.min);
-            return RaritySellPrice(data.rarity);
+            if (ItemDatabase.Instance?.GetItem(run.equippedWeaponId) == null) return 0;
+            SellRange(run.equippedWeaponId, out int min, out _);
+            return min;
         }
 
-        private static int RaritySellPrice(ItemRarity r)
+        /// <summary>強化素材 1 つの売値。</summary>
+        public const int WeaponMaterialSellPrice = 15;
+
+        /// <summary>品の売値の幅 (2026-11-13 に 1 つへまとめた)。 売却 (<see cref="TrySell"/>)・下取り・売る画面・BOT・デバッグ表示は全部ここを通る。
+        /// 規則は <see cref="SellPriceRule"/>: items.json の <c>noSellValue</c> なら 0G、 それ以外は <c>basePrice</c> の ×0.50〜×0.75 (下限 1G)。
+        /// <para>2026-11-13 まで: 「sellPrice が無ければレア度で BRONZE 3G〜MYTHIC 12G」の分岐があったが、 sellPrice は
+        /// ItemDataV2 の構築子が必ず作るので一度も通らない死んだ経路だった (basePrice の無い品は幅 0〜0 → 売却の Max(1) で 1G)。 消した。</para></summary>
+        public static void SellRange(string id, out int min, out int max)
         {
-            switch (r)
-            {
-                case ItemRarity.BRONZE:    return 3;
-                case ItemRarity.SILVER:    return 5;
-                case ItemRarity.GOLD:      return 7;
-                case ItemRarity.LEGENDARY: return 9;
-                case ItemRarity.MYTHIC:    return 12;
-                default:                   return 3;
-            }
+            var data = string.IsNullOrEmpty(id) ? null : ItemDatabase.Instance?.GetItem(id);
+            if (data == null) { min = max = SellPriceRule.UnknownItem; return; }
+            SellPriceRule.Range(data.noSellValue, data.sellPrice != null ? data.sellPrice.min : 0, data.sellPrice != null ? data.sellPrice.max : 0, out min, out max);
         }
 
-        /// <summary>2026-06-23: 売却額をレアリティに応じてスケール。
-        /// 個別 sellPrice が定義されていれば優先 (旧仕様維持)。
-        /// 未定義時は BRONZE 3G / SILVER 5G / GOLD 7G / LEGENDARY 9G を返す。
-        /// 圧縮後の購入価格 (8/10/12/14) に対して おおよそ 37-64% の回収率。</summary>
+        /// <summary>売っても 0G の品か (BOT はこの品を売らない・人は売れる)。 売れるか (<see cref="GameLoop.ItemIds.CanSell"/>) とは別の条件。</summary>
+        public static bool SellsForNothing(string id)
+        {
+            SellRange(id, out _, out int max);
+            return max <= 0;
+        }
+
+        /// <summary>売る画面に出す売値 (「4G」「4〜6G」)。</summary>
+        public static string SellPriceLabel(string id)
+        {
+            SellRange(id, out int min, out int max);
+            return min == max ? min + "G" : min + "〜" + max + "G";
+        }
+
+        /// <summary>売却で実際に入る額。 <see cref="SellRange"/> の幅から乱数で 1 つ引く (幅が 1 点でも引く ── 乱数の消費を品で変えない)。</summary>
         private int ResolveSellPrice(string id)
         {
-            if (string.IsNullOrEmpty(id)) return 3;
-            var data = ItemDatabase.Instance?.GetItem(id);
-            if (data == null) return 3;
-            if (data.sellPrice != null)
-                return GameLoop.GameRng.Range(data.sellPrice.min, data.sellPrice.max + 1, "shop.sellPrice");
-            switch (data.rarity)
-            {
-                case ItemRarity.BRONZE:    return 3;
-                case ItemRarity.SILVER:    return 5;
-                case ItemRarity.GOLD:      return 7;
-                case ItemRarity.LEGENDARY: return 9;
-                case ItemRarity.MYTHIC:    return 12;
-                default:                   return 3;
-            }
+            SellRange(id, out int min, out int max);
+            if (ItemDatabase.Instance?.GetItem(id) == null) return min;
+            return GameLoop.GameRng.Range(min, max + 1, "shop.sellPrice");
         }
 
         // ============================================================
