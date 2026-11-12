@@ -404,7 +404,7 @@ namespace UI.Game2D
                 desc = "物資 +" + ShopManager.ProvisionPackAmount + "。 物資を補える売り物はこれだけ。 1 つの店で " + ShopManager.ProvisionPackStock + " 包まで。",
                 disabled = packs <= 0 || run.coins < packPrice || run.provision >= run.provisionCap,
             });
-            if (_shopSupply) d.Items.Add(new ModalItem { name = "囮罠", value = lurePrice + "G", icon = "", desc = "航行で置くと、 追跡者を罠の方へ引きつける。 在庫に限りは無い。", disabled = run.coins < lurePrice });
+            if (_shopSupply) d.Items.Add(new ModalItem { name = ItemDatabase.DisplayNameOf(ItemIds.Lure), value = lurePrice + "G", icon = "", desc = "航行で置くと、 追跡者を罠の方へ引きつける。 在庫に限りは無い。", disabled = run.coins < lurePrice });
             int packRow = _shopSupply ? 0 : -1, lureRow = _shopSupply ? 1 : -1;
 
             bool robOk = sm != null && !run.shopRobberyDone && MetaProgression.MetaBuffApplicator.IsShopRobberyUnlocked();

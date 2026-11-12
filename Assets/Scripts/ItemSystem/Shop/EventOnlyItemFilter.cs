@@ -19,7 +19,7 @@ namespace ItemSystem.Shop
         public static readonly HashSet<string> ExcludedIds = new HashSet<string>
         {
             // 名前付き固有パッシブ（イベント限定獲得）
-            "ちいさな灯火",
+            ItemSystem.PassiveItems.TorchRevival.TorchId,
             GameLoop.ConvictionSystem.IdResolve,
             GameLoop.ConvictionSystem.IdConviction,
             GameLoop.ConvictionSystem.IdTruth,
