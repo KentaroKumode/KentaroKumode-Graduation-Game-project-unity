@@ -72,5 +72,10 @@ namespace EventSystem
         NextShopDiscount,
         /// <summary>次の休憩の回復+N%: 次に休憩で回復する時、 回復量に最大 HP の N% を足す (重ねたら足し合わせ)。</summary>
         NextRestBonus,
+
+        /// <summary>止まらない時計を預かる (2026-11-13・〈さびれた観測所・再訪・写し〉の 5 つ目の選択肢だけ): このランの間、
+        /// フラグ <see cref="GameLoop.ItemIds.VescaClock"/> を持つ。 持ったまま七層のヴェスカの戦闘に入ると、 各段のダウンの目盛りが 1 つ増える
+        /// (<see cref="GameLoop.VescaClock"/>)。 次の潜行には持ち越さない (ownedFlags はランの始めに空になる・中断セーブには残る)。</summary>
+        VescaClockTake,
     }
 }

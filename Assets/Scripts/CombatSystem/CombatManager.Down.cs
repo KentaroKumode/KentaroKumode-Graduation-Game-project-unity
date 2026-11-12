@@ -12,10 +12,23 @@ namespace CombatSystem
         /// <summary>ダウンの状態 (画面・BOT が読む)。 書き換えないこと。</summary>
         public BossDownState Down => _down;
 
-        /// <summary>戦闘の始め・形態の交代: 敵の目盛りを入れ直す (目盛りの無い敵・測定の口で止めた時は無し)。</summary>
+        /// <summary>この段で博士の「止まらない時計」が効いている (目盛りを 1 つ足した・<see cref="GameLoop.VescaClock"/>)。 画面のヴェスカの状態の欄が読む。</summary>
+        public bool VescaClockActive { get; private set; }
+
+        /// <summary>戦闘の始め・形態の交代: 敵の目盛りを入れ直す (目盛りの無い敵・測定の口で止めた時は無し)。
+        /// **目盛りの並びを作るのはここ 1 か所** (時計の目盛りもここで足す)。 画面・BOT は <see cref="Down"/> の並びを読む。</summary>
         private void ResetBossDown(EnemyData enemy, bool newCombat)
         {
-            _down.Reset(BossParams.DownNotches(enemy?.id));
+            bool clock = GameLoop.VescaClock.Held(GameLoop.GameManager.Instance?.Run);
+            _down.Reset(BossParams.DownNotches(enemy?.id, clock));
+            VescaClockActive = clock && _down.Enabled && GameLoop.BossIds.VescaStageOf(enemy?.id) > 0;   // ダウンを止めた測定の口では効かない
+            if (VescaClockActive && newCombat && enemy?.id == GameLoop.BossIds.VescaP1)
+            {
+                // 戦闘の始めの文 (最初の段だけ 1 回)。 戦闘の画面に文の欄が無いので戦闘ログの行として出す (2026-11-13)
+                Debug.Log("[戦闘] " + GameLoop.VescaClock.BattleLine);
+                Debug.Log("[ヴェスカ] " + GameLoop.VescaClock.VescaLine);
+            }
+            if (VescaClockActive) Debug.Log($"[ダウン] 〈{GameLoop.VescaClock.Name}〉: {enemy?.displayName} の目盛りに {BossParams.VescaClockNotch * 100f:0}% を足した");
             BossDown.ActiveNow = false;
             if (newCombat) Escalation.HeavyCycleOffset = 0;
             BossDownDiag.BeginFight(enemy?.id, _down.Enabled);

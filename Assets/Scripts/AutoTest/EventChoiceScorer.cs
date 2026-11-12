@@ -325,6 +325,13 @@ namespace AutoTest
                     return V_OBSERVATORY_COPY;
                 }
 
+                case EventEffectType.VescaClockTake:
+                    // 博士の時計 (2026-11-13): 価値は七層のヴェスカに着いた時だけ・出る条件は数百ランに 1 度で学習に乗らない。
+                    //   新しい値を作らず、 いちばん安い得の単位 (強化素材 1 つ) を仮に置く ── 0 より少し上・ほかの 4 つの荷 (品や薬) よりずっと下なので、
+                    //   BOT はふだん選ばない (次点にもならないので探索の枠でも選ばれない)。 時計あり/なしは測定の口 vescaClockHeld で比べる。
+                    if (GameLoop.VescaClock.Held(run)) return 0f;
+                    return PRICE_MATERIAL;
+
                 case EventEffectType.GainFlag:
                 {
                     // 既所持なら冗長

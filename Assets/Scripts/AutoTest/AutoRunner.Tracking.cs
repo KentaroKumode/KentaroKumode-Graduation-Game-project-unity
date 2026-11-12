@@ -485,6 +485,7 @@ namespace AutoTest
             GameLoop.GameHooks.HandCarry = CombatSystem.HandCarryMode.Pick;     // [測定 2026-11-13] 手札の規則を既定 (Pick) へ
             GameLoop.GameHooks.BossDownDisabled = false;                        // [測定 2026-11-13] ボスのダウンを既定 (あり) へ
             GameLoop.GameHooks.Depth3HeavyDisabled = false;                     // [測定 2026-11-13] 深さ 3 のボスの大技を既定 (あり) へ
+            GameLoop.GameHooks.VescaClockHeldAtStart = false;                   // [測定 2026-11-13] 博士の時計を既定 (預からない) へ
             GameLoop.GameHooks.VescaDiceForce = 0;               // [測定 2026-11-11] 武器の段の上限を外す
             CombatSystem.EnemyHpLedger.ProbeMainMult = 1f;      // [測定用の物差し 2026-11-10] ラン終了で既定 (1) へ戻す
             CombatSystem.EnemyHpLedger.ProbePassiveMult = 1f;

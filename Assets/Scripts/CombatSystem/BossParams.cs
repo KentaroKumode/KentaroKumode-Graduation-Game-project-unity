@@ -223,6 +223,21 @@ namespace CombatSystem
             return _downNotches.TryGetValue(id, out var n) ? n : null;
         }
 
+        /// <summary>博士の「止まらない時計」(2026-11-13・<see cref="GameLoop.VescaClock"/>) を預かっている時、 ヴェスカの 4 つの段それぞれに足す目盛り
+        /// (最大 HP の割合・全段とも同じ)。 **隠し倍率ではなく実数値の目盛りを 1 つ足す**。 上の段ごとの目盛り (p1 60%・p2 50%・p3 40%・最終 50%) とも、
+        /// 〈天与の才〉の踏みとどまり (66%・33%) とも重ならない位置。 数値は仮置き・未測定 (docs/GAME.md §23)。</summary>
+        public const float VescaClockNotch = 0.80f;
+
+        /// <summary>戦闘 (ヴェスカは段) の始めに入れる目盛りの並び。 <paramref name="vescaClock"/> = このランで時計を預かっている
+        /// (<see cref="GameLoop.VescaClock.Held"/>) なら、 ヴェスカの段に <see cref="VescaClockNotch"/> を 1 つ足す。 ダウンを止めた測定の口
+        /// (<see cref="GameLoop.GameHooks.BossDownDisabled"/>) の時は、 時計があっても何も足さない (null のまま)。
+        /// 呼ぶ所は <c>CombatManager.ResetBossDown</c> の 1 か所だけ ── 画面の目盛り・次の目盛りまでの残り・BOT の見積もりは、 戦闘が持つこの並びを読む。</summary>
+        public static float[] DownNotches(string id, bool vescaClock)
+        {
+            var n = DownNotches(id);
+            return vescaClock && GameLoop.BossIds.VescaStageOf(id) > 0 ? BossDown.WithExtraNotch(n, VescaClockNotch) : n;
+        }
+
         // ===== 深さ 3 のボスの大技の周期 (2026-11-13・仮置き) =====
         //  深さ 5 以降と同じ形 (EnemyData.heavyPeriod / heavyMul / heavyWindupMul・式は Escalation.HeavyFactor) を、 軽めの値で足す。
         //  json ではなくここに置くのは、 測定の口 (GameHooks.Depth3HeavyDisabled) で旧い作りへ戻せるようにするため。
