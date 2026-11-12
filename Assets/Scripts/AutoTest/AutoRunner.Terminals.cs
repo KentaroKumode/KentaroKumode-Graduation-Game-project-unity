@@ -663,7 +663,7 @@ namespace AutoTest
         }
 
         /// <summary>次のターンの場 <paramref name="board"/> と出目 <paramref name="dice"/> (昇順) での最良効用 (今ターンと同じ列挙・同じ効用)。
-        /// 同じ目どうしを入れ替えただけの挿し方は 1 回だけ解く。 攻撃に挿せる手が 1 つも無い場では「攻撃 0 本」の抑止を外して比べる
+        /// 同じ目どうしを入れ替えただけの挿し方は 1 回だけ解く。 攻撃の端子を挿せる手が 1 つも無い場では「攻撃 0 本」の抑止を外して比べる
         /// (<see cref="OptimalTurnState.noAttackForced"/>)。</summary>
         private float BestDeckUtilityOver(in OptimalTurnState ns, List<string> board, int[] dice, in TerminalEnv env, TerminalBattleState state, in DeckEval ev)
         {

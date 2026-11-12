@@ -165,8 +165,7 @@ namespace MetaProgression
         public static int GetStartingPassiveCount()
             => MetaPanel.SupplyStartingPassives(Rank(MetaPanelKind.Supply));
 
-        /// <summary>【v6 廃止】フロアクリア時の追加回復。 常に 0。</summary>
-        public static int GetFloorClearHeal() => 0;
+        // [削除 2026-11-12] GetFloorClearHeal ── v6 で廃止したフロアクリア時の追加回復。 常に 0 を返していたので呼び出し (GameManager.Floor の HandleFloorClear) ごと外した。
 
         /// <summary>出力 r10: オーバーロード (1戦闘1度・与ダメ2倍・反動あり) が使えるか。</summary>
         // [撤去 2026-09-13] IsOverloadUnlocked ── 出力 r10 は〈戦意〉へ差し替え。

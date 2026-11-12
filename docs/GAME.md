@@ -613,7 +613,9 @@ lore 的には「ギルド管轄も 5 層まで」「5 層を抜けた時点で�
   山札が手札の枚数を下回る抜き方はできない（`GameManager.Terminals`・数値は仮）。
 - **対象を取る端子**（〈写し取り〉〈焼き切り〉〈保持器〉）は、挿していない手札の端子から対象を選ぶ（選ばなければ左端）。
 - **アイコン**: 17×17・2 色（明るい主役＋後ろの暗めの飾り・主役の中の線は抜き）。物の絵に限らず意味を表す記号でよい（2026-11-11 確定・`Game2DTerminalIcons.cs`）。
-- **BOT**（`AutoRunner.Terminals`）: 挿し方は全列挙して効用で選ぶ（Super も山札では同じ・先読みは通らない）。撃破のボーナス・対象・使い捨ては
+- **BOT**（`AutoRunner.Terminals`）: 挿し方は全列挙して効用で選ぶ（Super も山札では同じ）。先読みは既定では通らない ──
+  切り替え式の 2 ターン先読み `deckLookahead`（既定 OFF・素朴版では使わない・既定はボス戦だけ `deckLookaheadBossOnly`・上位 `deckLookaheadTopK` 3 本 × 標本 `deckLookaheadSamples` 6）を
+  入れると、挿し方の値が「今ターンの効用 + 次のターンの最良効用の期待値」になる（#105・2026-11-12・効き目は未測定）。振り直しの値付けと〈猫の手〉には掛けない。撃破のボーナス・対象・使い捨ては
   「この戦闘であと何回引くか」などから値付けする（2026-11-12）。端子ごとの使われ方は `CombatSystem.TerminalDiag`（`Tools/terminal_diag_report.py`）、
   効き目は端子だけを配る ITT（並列メニュー「■ ITT 並列 (端子 57 種)」・結果は `AutoRunLogs/terminal_itt/`）で測る。
 - **誓約の封じ**は山札の端子にも及ぶ: 封じた軸の資源を足す部分だけが効かない（品と同じ口で止まる・攻撃とブロックへ入る出目は残る）。
@@ -2167,8 +2169,8 @@ CritDamageBonus / BossExtraRare 昇格 / **DiceTotalBonus（ダイス合計概�
 装甲 = 防御 `CombatManager.cs` の戦闘開始・被ダメ −N と r10 の一撃の上限 `CombatManager.Turn.cs` ／
 種火 = r1 `ShopManager.PickWithSparkBias`・r3 `GameManager.cs`・r2 充電 `CombatManager.cs` / `CombatContext.ChargeCap`・臨界 `CombatManager.Finish.cs` → `CombatManager.cs`・毒 `CombatContext.AddStatus`・出血 `CombatManager.Turn.cs`・シールド `CombatContext` の減衰 ／
 端子 = `CombatManager.Turn.cs` の配線合計。
-**常に 0 を返すだけの口**（読む側はあるが効果は無い）: `GetDiceTotalBonus`（本体からの呼び出しは 2026-11-12 に外した・AutoTest が参照）・`GetFloorClearHeal`・`GetArmorOpeningShield`（刻み 0）・`GetProvisionCapBonus` / `IsSupplyLineUnlocked`（兵站は枠の外）・`GetCritDamageBonus`（会心の種火は枠の外）・`GetCritRatePctBonus` の精密の分（枠の外）。
-`RollRefund`・`GetArmorImmovableDefense`・`GetSaleDiscountMin/MaxPct`・`GetProvisionLossReduction` は 2026-11-12 に削除（0 を返すだけ、または呼ぶ側が無かった）。
+**常に 0 を返すだけの口**（読む側はあるが効果は無い）: `GetDiceTotalBonus`（本体からの呼び出しは 2026-11-12 に外した・AutoTest が参照）・`GetArmorOpeningShield`（刻み 0）・`GetProvisionCapBonus` / `IsSupplyLineUnlocked`（兵站は枠の外）・`GetCritDamageBonus`（会心の種火は枠の外）・`GetCritRatePctBonus` の精密の分（枠の外）。
+`RollRefund`・`GetArmorImmovableDefense`・`GetSaleDiscountMin/MaxPct`・`GetProvisionLossReduction`・`GetFloorClearHeal` は 2026-11-12 に削除（0 を返すだけ、または呼ぶ側が無かった）。
 
 ### 15-2. 挑戦デバフ — 配点ハイスコア方式（**2026-11-10 撤去・記録として残す**）
 
@@ -4037,7 +4039,8 @@ SampleScene / Game2D から該当オブジェクトを外した（§24）。`Ite
 ### 23-6. データ・ドキュメントのドリフト
 
 - ~~items.json の効果説明文に旧表記が残存~~ → **2026-07-27 に実コード突き合わせで修正済み**
-  （100 箇所）。残る 4 箇所は §23-2b の機能していない 3 パッシブのみ。
+  （100 箇所）。当時残した §23-2b の機能していないパッシブ（盟約・佯狂者の杖）は、アイテム再編で items.json から消えた
+  （2026-11-12 確認: 両品の名前も「ダイス合計」の旧表記も items.json に 0 件）。
 - ~~ランダム Trap マスの抽選除外~~ → **2026-07-27 完了**（§5-2）。
 - ~~武器 Tier 段階補正の items.json 参照の残り~~ → 2026-11-09 確認: 参照は残っていない。
 - ~~`docs/items_catalog.md` / `items_uniques.md` が陳腐化~~ → **2026-11-09 削除**（カタログは不要と判断。正本は items.json）。以下は当時の記録。「自動生成」と明記されているが
@@ -4332,7 +4335,11 @@ Super (先読み) が Optimal に届かない件は未解決（V2 は 14.7%・`S
 - 画面: 猫が挿した出目は琥珀の枠と肉球の印（`Game2DBattleHud.DrawCatMark`）。
 - 曲線への影響（2026-11-12・Super 各 5000 ランの対比較・配る札に猫を入れた／入れない）: 難易度 5 は 11.6 → 12.2%（z +1.25）、 難易度 10 は 0.3 → 0.4%（z +0.73）。 どちらも有意でない。 BOT が猫を何回受けたかは記録に無い。
 
-**未決**: 1 戦闘で使える消耗品の数と〈最後の審判〉の刻限（計装してから）・〈金で殴る〉（BOT の方策ができてから）・遺物（§15-5）の難易度ボーナスとのつなぎ。
+**〈金で殴る〉（#6・2026-11-12）**: 本体の効果（攻撃するターンだけ、払った金を攻撃+N の枠へ足す・`ChallengeCards.GoldPunchAttack`・`CombatManager.Turn`）と
+BOT の払い方（`AutoRunner.Terminals` の `ChooseGoldPunch`）は実装済み。人の戦闘画面に払う金額を決める操作が無いので、札は **pending のまま**（配らない）。
+測定は `challengeForce` で配らずに受ける。
+
+**未決**: 1 戦闘で使える消耗品の数と〈最後の審判〉の刻限（計装してから）・〈金で殴る〉の人の画面の操作（付けたら pending を外す）・遺物（§15-5）の難易度ボーナスとのつなぎ。
 ---
 
 ## 24. 廃止・削除の記録

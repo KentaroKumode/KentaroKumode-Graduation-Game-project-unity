@@ -913,15 +913,6 @@ namespace GameLoop
             // 金庫 r10 (極点): 層を跨ぐたびに所持金が倍になる。
             MetaProgression.VaultBank.OnFloorCleared(Run);
 
-            // メタバフ〈フロアクリア回復〉: 階突破時の HP 回復（次層への持ち越し前に適用）
-            int fch = MetaProgression.MetaBuffApplicator.GetFloorClearHeal();
-            if (fch > 0 && Run != null && Run.playerHP > 0 && Run.playerHP < Run.playerMaxHP)
-            {
-                int before = Run.playerHP;
-                Run.playerHP = Mathf.Min(Run.playerMaxHP, Run.playerHP + fch);
-                Log($"メタ恩恵: フロアクリア回復 +{Run.playerHP - before} ({Run.playerHP}/{Run.playerMaxHP})");
-            }
-
             // 5層クリア時: 〈決意〉以上未所持なら 5層クリアエンディング(NormalClear) で終了
             if (Run.IsNormalClear && Run.Depth == Run.normalClearFloor)
             {
