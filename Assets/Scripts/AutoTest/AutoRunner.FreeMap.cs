@@ -421,6 +421,8 @@ namespace AutoTest
         private const float PursuerVsEliteHpLoss = 1.6f;
         /// <summary>エリート戦の平均の損が学習から読めない時の値 (最大 HP の割合)。 仮置き。</summary>
         private const double EliteHpLossFallback = 0.25;
+        /// <summary>通常の戦闘の平均の損が学習から読めない時の値 (最大 HP の割合)。 仮置き。</summary>
+        private const double NormalHpLossFallback = 0.10;
 
         /// <summary>縄張りの宝を取りに行くか (最小の規則): 宝が残っていて・行った先から出口か店まで歩けて、
         /// 「いまの HP の割合 − 追跡者の戦闘で失う HP の見積もり」が <see cref="territoryTreasureHpMargin"/> 以上の時だけ。
@@ -431,14 +433,36 @@ namespace AutoTest
             int t = sim.TreasureNode;
             if (t == sim.Me || sim.IsSunk(t) || hopsFromMe[t] == int.MaxValue) return false;
             if (!Sustainable(mm, sim, sim.HopsFrom(t), sim.Layout.goal, run.provision - hopsFromMe[t] * FreeMapParams.MoveSupply, run)) return false;
+            int layer = Mathf.Clamp(FloorPlan.OrdinalOf(run.Depth), 0, FloorPlan.LastOrdinal);
             float loss = 0f;
             if (sim.FoeAlive)
             {
-                int layer = Mathf.Clamp(FloorPlan.OrdinalOf(run.Depth), 0, FloorPlan.LastOrdinal);
                 if (!EncounterDangerStats.TryGetKind(layer, 'E', out double mean, out _)) mean = EliteHpLossFallback;
                 loss = (float)mean * PursuerVsEliteHpLoss;
             }
+            // 宝の点そのものの戦闘 (2026-11-12): 宝は点の起動の前に渡るが、 点が戦闘ならその戦闘も払う。 以前は数えていなかった
+            loss += TreasureNodeFightLoss(mm, t, layer, run);
             return hpRatio - loss >= territoryTreasureHpMargin;
+        }
+
+        /// <summary>宝の点に着いた時の、 点そのものの戦闘で失う HP の見積もり (最大 HP の割合)。 見えている種別が戦闘・エリートならその見積もり
+        /// (戦闘名が開示されていればその名前の学習値)、 種別が見えていなければ通常の戦闘 × 0.7 (Super の計画の見えていない点と同じ扱い)、 それ以外は 0。
+        /// 使い切った点は起動しないので 0。</summary>
+        private static float TreasureNodeFightLoss(MapManager mm, int t, int layer, RunState run)
+        {
+            var map = mm?.CurrentMap;
+            var n = map?.GetNode(map.NodeIdAt(t));
+            if (n == null || n.activated) return 0f;
+            char kind; float w = 1f;
+            if (!n.revealed) { kind = 'N'; w = 0.7f; }
+            else if (n.EffectiveType == TileType.Battle) kind = 'N';
+            else if (n.EffectiveType == TileType.EliteBattle) kind = 'E';
+            else return 0f;
+            string key = n.revealed && n.encounterRevealed ? EncounterDangerStats.KeyOf(n, run.Depth) : null;
+            if (!(key != null && EncounterDangerStats.TryGet(key, out _, out double mean, out _, out _))
+                && !EncounterDangerStats.TryGetKind(layer, kind, out mean, out _))
+                mean = kind == 'E' ? EliteHpLossFallback : NormalHpLossFallback;
+            return (float)mean * w;
         }
 
         /// <summary>[計装] 縄張りを横切らない遠回りで、 最短の道の 1 歩と違う 1 歩を選んだ回数 / 遠回りが長すぎるか払えずに最短の道のまま縄張りを踏んだ回数 (バッチ累計)。</summary>
