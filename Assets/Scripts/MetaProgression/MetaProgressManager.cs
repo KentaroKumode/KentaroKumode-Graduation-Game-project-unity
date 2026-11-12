@@ -186,14 +186,8 @@ namespace MetaProgression
         //  挑戦 (docs/GAME.md §23-25)
         // ============================================================
 
-        /// <summary>挑戦の難易度を最大 (10) にする / 0 に戻す。 AutoRunner の最高難度モード用 (2026-11-10: 旧配点の満点から置き換え)。</summary>
-        public void SetChallengeMax(bool on)
-        {
-            if (State == null) return;
-            State.challengeDifficulty = on ? ChallengeCards.MaxDifficulty : 0;
-            OnStateChanged?.Invoke();
-            Save();
-        }
+        // [削除 2026-11-12] SetChallengeMax ── 挑戦の難易度を最大 / 0 にする口。 呼ぶ所が 0 件だった
+        //   (AutoRunner は challengeDifficulty を直接書く)。
 
         // ============================================================
         //  レガシー API (互換のため残置・v6 では noop)
