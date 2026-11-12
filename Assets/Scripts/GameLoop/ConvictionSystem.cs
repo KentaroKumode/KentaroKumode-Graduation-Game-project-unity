@@ -62,16 +62,21 @@ namespace GameLoop
             return true;
         }
 
-        /// <summary>エリート戦勝利時に呼ぶ。確信パッシブを所持していれば段階を上げ、
-        /// アイテム名のマイルストーン変化 (3で決意 / 6で真理) を反映する。</summary>
+        /// <summary>エリート戦勝利時に呼ぶ。災厄の予兆を受けたラン (段が 1 以上) なら段階を上げ (GAME.md §4-2)、
+        /// 確信の品を持っていれば名前を資格に合わせる。
+        /// <para><b>品の有無では判定しない</b> (2026-11-13)。 資格の正本はフラグと段で、 品は手放せない
+        /// (<see cref="ItemIds.Undroppable"/>) が、 古い中断セーブには品を売ってしまったランが残り得る。</para></summary>
         public static void OnEliteDefeated(RunState run)
         {
-            if (run?.ownedPassiveItems == null) return;
-            // 何らかの確信系を所持しているかチェック
-            int idx = FindAnyConvictionIndex(run);
-            if (idx < 0) return;
+            if (run == null || run.convictionStage < 1) return;
 
             run.convictionStage++;
+            int idx = run.ownedPassiveItems != null ? FindAnyConvictionIndex(run) : -1;
+            if (idx < 0)
+            {
+                Debug.Log($"[Conviction] エリート撃破 → stage{run.convictionStage} (確信の品なし)");
+                return;
+            }
             // エリート撃破は確信の強さだけを積む。層ゲートの名称変化は
             // 5層ボス／6層専用イベントという物語上の試練でのみ起こす。
             string newId = run.layer7Unlocked ? IdTruth
@@ -103,10 +108,21 @@ namespace GameLoop
         private static bool Owns(RunState run, string id)
             => run?.ownedPassiveItems != null && run.ownedPassiveItems.Contains(id);
 
+        /// <summary>確信の品を <paramref name="newId"/> へ書き換える。 書き換える元の品が無く、 資格 (段が 1 以上・<c>layer6Unlocked</c>・
+        /// <c>layer7Unlocked</c>) がある時は <paramref name="newId"/> を<b>足す</b> (2026-11-13)。
+        /// <para>品は手放せない (<see cref="ItemIds.Undroppable"/>) ので、 足すのは古い中断セーブで既に確信を売ってしまったランが戻って来た時だけ。
+        /// 足すのは <c>PassiveAddHelper.AddPassiveItem</c> (重複の判定・取得の記録) で、 取得時の副作用 (<see cref="OnFirstAcquired"/>・
+        /// 〈決意〉の獲得ボーナス) はイベントの獲得の側 (EventEffectExecutor.ApplyPassiveAcquisitionBonus) にあるのでここでは走らない。
+        /// このランで一度持って手放した品 (<c>seenPassiveItemIds</c>) は足せない (ログだけ)。</para></summary>
         private static void ReplaceConvictionItem(RunState run, string newId)
         {
+            if (run?.ownedPassiveItems == null) return;
             int idx = FindAnyConvictionIndex(run);
-            if (idx >= 0) run.ownedPassiveItems[idx] = newId;
+            if (idx >= 0) { run.ownedPassiveItems[idx] = newId; return; }
+            if (run.convictionStage < 1 && !run.layer6Unlocked && !run.layer7Unlocked) return;
+            bool added = ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, newId);
+            Debug.Log(added ? $"[Conviction] 確信の品が無いので「{newId}」を足した (資格は段・フラグが持つ)"
+                            : $"[Conviction] 確信の品が無く「{newId}」も足せなかった (このランで手放し済み)");
         }
 
         /// <summary>イベント由来で〈根拠のない確信〉を初取得した瞬間に呼ぶ。stage を 1 に正規化。</summary>

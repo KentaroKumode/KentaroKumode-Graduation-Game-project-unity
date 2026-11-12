@@ -94,7 +94,7 @@ namespace GameLoop
                 {
                     string id = owned[i];
                     if (string.IsNullOrEmpty(id)) continue;
-                    if (ItemIds.ProgressionItems.Contains(id)) continue;
+                    if (!ItemIds.CanOfferAtGate(id)) continue;
                     candidates.Add(i);
                 }
             }

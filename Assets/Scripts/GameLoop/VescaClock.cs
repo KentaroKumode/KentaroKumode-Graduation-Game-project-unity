@@ -9,8 +9,8 @@ namespace GameLoop
     /// 2026-11-13 にフラグ (ownedFlags) から秘宝へ変えた ── 持ち物の画面に見えるように。 秘宝なのでランの始めに空になり、 次の潜行には持ち越さない。
     /// 中断セーブ (<see cref="RunSave"/>) は RunState を全部写すので、 戻しても残る。 入れるのは <see cref="Take"/> の 1 か所
     /// (イベント効果〈止まらない時計を預かる〉と測定の口 <see cref="GameHooks.VescaClockHeldAtStart"/>)。
-    /// 配布の山に出ない (<c>ItemSystem.Shop.EventOnlyItemFilter</c>)・預かり物 (<see cref="ItemIds.Entrusted"/>: 売れない・取り替えに出さない・
-    /// ランダムに失わない)・進行用の品 (<see cref="ItemIds.ProgressionItems"/>: 〈門〉・大罪・BOT の学習から外す)。</para>
+    /// 配布の山に出ない (<c>ItemSystem.Shop.EventOnlyItemFilter</c>)・預かり物 (<see cref="ItemIds.Entrusted"/>: 図鑑は手に入れるまで枠も出さない)・
+    /// 手放せない品 (<see cref="ItemIds.Undroppable"/>: 売れない・取り替えに出さない・ランダムに失わない)・進行用の品 (<see cref="ItemIds.ProgressionItems"/>: 〈門〉・大罪・BOT の学習から外す)。</para>
     ///
     /// <para><b>効き目</b>: 品そのものは何も発火しない (skill も axis も持たない)。 持ったまま七層のヴェスカの戦闘 (4 つの段) に入ると、
     /// その段のダウンの目盛りに HP 80% の目盛りを 1 つ足す (値の正本は <c>CombatSystem.BossParams.VescaClockNotch</c>・
