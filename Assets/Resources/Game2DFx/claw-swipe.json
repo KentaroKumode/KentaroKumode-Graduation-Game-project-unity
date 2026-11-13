@@ -1,0 +1,138 @@
+{
+ "frames": [
+  {
+   "filename": "claw-swipe 0",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 128,
+    "h": 96
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 96
+   },
+   "duration": 125
+  },
+  {
+   "filename": "claw-swipe 1",
+   "frame": {
+    "x": 128,
+    "y": 0,
+    "w": 128,
+    "h": 96
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 96
+   },
+   "duration": 125
+  },
+  {
+   "filename": "claw-swipe 2",
+   "frame": {
+    "x": 256,
+    "y": 0,
+    "w": 128,
+    "h": 96
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 96
+   },
+   "duration": 125
+  },
+  {
+   "filename": "claw-swipe 3",
+   "frame": {
+    "x": 0,
+    "y": 96,
+    "w": 128,
+    "h": 96
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 96
+   },
+   "duration": 125
+  },
+  {
+   "filename": "claw-swipe 4",
+   "frame": {
+    "x": 128,
+    "y": 96,
+    "w": 128,
+    "h": 96
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 96
+   },
+   "duration": 125
+  },
+  {
+   "filename": "claw-swipe 5",
+   "frame": {
+    "x": 256,
+    "y": 96,
+    "w": 128,
+    "h": 96
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 96
+   },
+   "duration": 125
+  },
+  {
+   "filename": "claw-swipe 6",
+   "frame": {
+    "x": 0,
+    "y": 192,
+    "w": 128,
+    "h": 96
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 96
+   },
+   "duration": 125
+  },
+  {
+   "filename": "claw-swipe 7",
+   "frame": {
+    "x": 128,
+    "y": 192,
+    "w": 128,
+    "h": 96
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 96
+   },
+   "duration": 125
+  }
+ ],
+ "meta": {
+  "app": "pixelfx + lcd_export",
+  "image": "claw-swipe.png",
+  "size": {
+   "w": 384,
+   "h": 288
+  },
+  "pixelfx": {
+   "id": "melee/claw-swipe",
+   "fps": 8,
+   "frames": 8,
+   "frameSize": [
+    128,
+    96
+   ],
+   "pivot": [
+    36,
+    84
+   ],
+   "loop": false
+  }
+ }
+}

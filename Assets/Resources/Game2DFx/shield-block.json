@@ -1,0 +1,166 @@
+{
+ "frames": [
+  {
+   "filename": "shield-block 0",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 148,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 148,
+    "h": 104
+   },
+   "duration": 125
+  },
+  {
+   "filename": "shield-block 1",
+   "frame": {
+    "x": 148,
+    "y": 0,
+    "w": 148,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 148,
+    "h": 104
+   },
+   "duration": 125
+  },
+  {
+   "filename": "shield-block 2",
+   "frame": {
+    "x": 296,
+    "y": 0,
+    "w": 148,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 148,
+    "h": 104
+   },
+   "duration": 125
+  },
+  {
+   "filename": "shield-block 3",
+   "frame": {
+    "x": 0,
+    "y": 104,
+    "w": 148,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 148,
+    "h": 104
+   },
+   "duration": 125
+  },
+  {
+   "filename": "shield-block 4",
+   "frame": {
+    "x": 148,
+    "y": 104,
+    "w": 148,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 148,
+    "h": 104
+   },
+   "duration": 125
+  },
+  {
+   "filename": "shield-block 5",
+   "frame": {
+    "x": 296,
+    "y": 104,
+    "w": 148,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 148,
+    "h": 104
+   },
+   "duration": 125
+  },
+  {
+   "filename": "shield-block 6",
+   "frame": {
+    "x": 0,
+    "y": 208,
+    "w": 148,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 148,
+    "h": 104
+   },
+   "duration": 125
+  },
+  {
+   "filename": "shield-block 7",
+   "frame": {
+    "x": 148,
+    "y": 208,
+    "w": 148,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 148,
+    "h": 104
+   },
+   "duration": 125
+  },
+  {
+   "filename": "shield-block 8",
+   "frame": {
+    "x": 296,
+    "y": 208,
+    "w": 148,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 148,
+    "h": 104
+   },
+   "duration": 125
+  },
+  {
+   "filename": "shield-block 9",
+   "frame": {
+    "x": 0,
+    "y": 312,
+    "w": 148,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 148,
+    "h": 104
+   },
+   "duration": 125
+  }
+ ],
+ "meta": {
+  "app": "pixelfx + lcd_export",
+  "image": "shield-block.png",
+  "size": {
+   "w": 444,
+   "h": 416
+  },
+  "pixelfx": {
+   "id": "impacts/shield-block",
+   "fps": 8,
+   "frames": 10,
+   "frameSize": [
+    148,
+    104
+   ],
+   "pivot": [
+    40,
+    88
+   ],
+   "loop": false
+  }
+ }
+}

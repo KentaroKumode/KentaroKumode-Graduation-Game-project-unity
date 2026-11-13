@@ -95,6 +95,17 @@ namespace UI.Game2D.Battle
         private const int CritFxLift = 26;      // crit-hit の星は基準点 (足もと) から 26 dot 上 (書き出しの height)
         // 毒・出血が効いた瞬間 (2026-11-02): poison-tick / bleed-tick を敵の足もとに上から塗り、 粒がはじける拍子でダメージを数字に出して HP を減らす
         private FxSheet _poisonFx, _bleedFx;
+        /// <summary>命中の瞬間に、 書き出した絵 (pixelfx) を重ねるか (2026-11-14)。 false = 線の演出だけ (見比べ用)。</summary>
+        public static bool SheetFx = true;
+
+        /// <summary>書き出した絵を、 絵の山場の中心が (cx, cy) に来るように 1 回流す。 dx・up = 山場の中心が絵の基準点 (足もと) から右・上へ何 dot か
+        /// (書き出した絵ごとに決まる・拡縮しない)。 skip = 頭のコマを飛ばす数 (振りかぶりを飛ばして、 着弾の拍子に山場を合わせる)。</summary>
+        private void PlayFx(string name, float cx, float cy, int dx, int up, int skip = 0)
+        {
+            if (!SheetFx) return;
+            var s = FxSheet.Load(name); if (s == null) return;
+            _fx.Add(new FxPlay { s = s, t = skip * s.FrameSeconds, x = Mathf.RoundToInt(cx) - dx, y = Mathf.RoundToInt(cy) + up });
+        }
         private int _dotDmg; private float _dotHitAt, _dotEnd; private bool _dotPending; private Col _dotCol;
 
         private BattleCanvas _c;
@@ -362,12 +373,14 @@ namespace UI.Game2D.Battle
                 {
                     _streaks.RemoveAll(x => x.hold); foreach (var m in _marks) _streaks.Add(new Streak { a = m.a, life = 0.3f, w = 5, cx = m.cx, cy = m.cy, bow = m.bow }); _marks.Clear();
                     _rings.Add(new Ring { x = EX, y = EY, life = 0.45f, r0 = 6, r1 = 120 }); _rings.Add(new Ring { x = EX, y = EY, life = 0.3f, r0 = 4, r1 = 70 }); _flashW = 0.9f;
+                    PlayFx("double-slash", EX, EY, 38, 30, 2);      // 締め: 交差が閉じたコマから
                 }
                 else if (h.kind == "slam")
                 {
                     _rings.Add(new Ring { x = EX, y = EY + 14, life = 0.42f, r0 = 8, r1 = 100 }); _rings.Add(new Ring { x = EX, y = EY + 14, life = 0.3f, r0 = 8, r1 = 64 });
                     if (_crit) _rings.Add(new Ring { x = EX, y = EY + 14, life = 0.55f, r0 = 8, r1 = 150 });
                     _flashW = _crit ? 0.9f : 0.5f;
+                    PlayFx("blunt-hit", EX, EY + 14, 0, 24);
                 }
                 else if (h.kind == "chop")
                 {
@@ -375,11 +388,14 @@ namespace UI.Game2D.Battle
                     _streaks.RemoveAll(x => x.hold); _marks.Clear();
                     _streaks.Add(new Streak { a = h.angFixed ? h.ang : isSword ? BattleMotion.TipAngle(A, h.t) : 90, sc = isSword ? 2 : 1, life = 0.3f, w = _crit ? 7 : 5 });
                     _rings.Add(new Ring { x = EX, y = FLOOR - 4, life = 0.4f, r0 = 6, r1 = _crit ? 130 : 90 }); _flashW = _crit ? 0.9f : 0.45f;
+                    if (A.fam == "axe") PlayFx("heavy-cleave", EX, FLOOR, 28, 0, 3);      // 叩き割り: 振り下ろしのコマを飛ばし、 床に当たったコマから (亀裂と土煙)
+                    else PlayFx("sword-slash", EX, EY, 18, 28, 1);
                 }
                 else
                 {
                     var o = h.off ?? new float[] { 0, 0, 15 };
                     _streaks.Add(new Streak { a = h.ang, life = 0.22f, w = 3, cx = EX + o[0], cy = EY + o[1], bow = o[2] });
+                    PlayFx("hit-spark", EX + o[0], EY + o[1], 3, 20);
                 }
             }
             if (_t >= A.total) { _ghosts.Clear(); _cp.Clear(); if (_ehp <= 0) { _phase = Phase.Dying; _t = 0; } else { _phase = Phase.Idle; _t = 0; } }
@@ -442,6 +458,7 @@ namespace UI.Game2D.Battle
                 _dmgs.Add(new Dmg { x = EX, y = 178, v = _taken, c = Col.Hex("#ff6a5a") });
                 _streaks.Add(new Streak { a = 28, life = 0.3f, w = 3, red = true, low = true }); _streaks.Add(new Streak { a = 34, t = -0.04f, life = 0.3f, w = 3, red = true, low = true }); _streaks.Add(new Streak { a = 22, t = -0.08f, life = 0.3f, w = 3, red = true, low = true });
                 Burst(EX, 205, 14, RedC);
+                if (_taken > 0) PlayFx("claw-swipe", EX, 205, 34, 20, 1); else PlayFx("shield-block", EX, 205, 22, 22);
             }
             if (_t >= EWind + ELunge + ERecover) { _phase = Phase.Idle; _t = 0; }
         }

@@ -1,0 +1,124 @@
+{
+ "frames": [
+  {
+   "filename": "sword-slash 0",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 136,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 136,
+    "h": 104
+   },
+   "duration": 125
+  },
+  {
+   "filename": "sword-slash 1",
+   "frame": {
+    "x": 136,
+    "y": 0,
+    "w": 136,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 136,
+    "h": 104
+   },
+   "duration": 125
+  },
+  {
+   "filename": "sword-slash 2",
+   "frame": {
+    "x": 272,
+    "y": 0,
+    "w": 136,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 136,
+    "h": 104
+   },
+   "duration": 125
+  },
+  {
+   "filename": "sword-slash 3",
+   "frame": {
+    "x": 0,
+    "y": 104,
+    "w": 136,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 136,
+    "h": 104
+   },
+   "duration": 125
+  },
+  {
+   "filename": "sword-slash 4",
+   "frame": {
+    "x": 136,
+    "y": 104,
+    "w": 136,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 136,
+    "h": 104
+   },
+   "duration": 125
+  },
+  {
+   "filename": "sword-slash 5",
+   "frame": {
+    "x": 272,
+    "y": 104,
+    "w": 136,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 136,
+    "h": 104
+   },
+   "duration": 125
+  },
+  {
+   "filename": "sword-slash 6",
+   "frame": {
+    "x": 0,
+    "y": 208,
+    "w": 136,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 136,
+    "h": 104
+   },
+   "duration": 125
+  }
+ ],
+ "meta": {
+  "app": "pixelfx + lcd_export",
+  "image": "sword-slash.png",
+  "size": {
+   "w": 408,
+   "h": 312
+  },
+  "pixelfx": {
+   "id": "melee/sword-slash",
+   "fps": 8,
+   "frames": 7,
+   "frameSize": [
+    136,
+    104
+   ],
+   "pivot": [
+    44,
+    92
+   ],
+   "loop": false
+  }
+ }
+}

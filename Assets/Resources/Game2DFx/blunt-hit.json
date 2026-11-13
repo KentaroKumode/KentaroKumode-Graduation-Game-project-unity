@@ -1,0 +1,138 @@
+{
+ "frames": [
+  {
+   "filename": "blunt-hit 0",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 128,
+    "h": 88
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 88
+   },
+   "duration": 125
+  },
+  {
+   "filename": "blunt-hit 1",
+   "frame": {
+    "x": 128,
+    "y": 0,
+    "w": 128,
+    "h": 88
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 88
+   },
+   "duration": 125
+  },
+  {
+   "filename": "blunt-hit 2",
+   "frame": {
+    "x": 256,
+    "y": 0,
+    "w": 128,
+    "h": 88
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 88
+   },
+   "duration": 125
+  },
+  {
+   "filename": "blunt-hit 3",
+   "frame": {
+    "x": 0,
+    "y": 88,
+    "w": 128,
+    "h": 88
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 88
+   },
+   "duration": 125
+  },
+  {
+   "filename": "blunt-hit 4",
+   "frame": {
+    "x": 128,
+    "y": 88,
+    "w": 128,
+    "h": 88
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 88
+   },
+   "duration": 125
+  },
+  {
+   "filename": "blunt-hit 5",
+   "frame": {
+    "x": 256,
+    "y": 88,
+    "w": 128,
+    "h": 88
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 88
+   },
+   "duration": 125
+  },
+  {
+   "filename": "blunt-hit 6",
+   "frame": {
+    "x": 0,
+    "y": 176,
+    "w": 128,
+    "h": 88
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 88
+   },
+   "duration": 125
+  },
+  {
+   "filename": "blunt-hit 7",
+   "frame": {
+    "x": 128,
+    "y": 176,
+    "w": 128,
+    "h": 88
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 88
+   },
+   "duration": 125
+  }
+ ],
+ "meta": {
+  "app": "pixelfx + lcd_export",
+  "image": "blunt-hit.png",
+  "size": {
+   "w": 384,
+   "h": 264
+  },
+  "pixelfx": {
+   "id": "impacts/blunt-hit",
+   "fps": 8,
+   "frames": 8,
+   "frameSize": [
+    128,
+    88
+   ],
+   "pivot": [
+    64,
+    72
+   ],
+   "loop": false
+  }
+ }
+}

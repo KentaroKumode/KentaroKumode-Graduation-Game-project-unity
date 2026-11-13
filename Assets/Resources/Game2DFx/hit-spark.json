@@ -1,0 +1,96 @@
+{
+ "frames": [
+  {
+   "filename": "hit-spark 0",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 136,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 136,
+    "h": 80
+   },
+   "duration": 125
+  },
+  {
+   "filename": "hit-spark 1",
+   "frame": {
+    "x": 136,
+    "y": 0,
+    "w": 136,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 136,
+    "h": 80
+   },
+   "duration": 125
+  },
+  {
+   "filename": "hit-spark 2",
+   "frame": {
+    "x": 0,
+    "y": 80,
+    "w": 136,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 136,
+    "h": 80
+   },
+   "duration": 125
+  },
+  {
+   "filename": "hit-spark 3",
+   "frame": {
+    "x": 136,
+    "y": 80,
+    "w": 136,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 136,
+    "h": 80
+   },
+   "duration": 125
+  },
+  {
+   "filename": "hit-spark 4",
+   "frame": {
+    "x": 0,
+    "y": 160,
+    "w": 136,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 136,
+    "h": 80
+   },
+   "duration": 125
+  }
+ ],
+ "meta": {
+  "app": "pixelfx + lcd_export",
+  "image": "hit-spark.png",
+  "size": {
+   "w": 272,
+   "h": 240
+  },
+  "pixelfx": {
+   "id": "impacts/hit-spark",
+   "fps": 8,
+   "frames": 5,
+   "frameSize": [
+    136,
+    80
+   ],
+   "pivot": [
+    44,
+    64
+   ],
+   "loop": false
+  }
+ }
+}

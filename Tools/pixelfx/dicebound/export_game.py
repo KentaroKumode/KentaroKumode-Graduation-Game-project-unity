@@ -17,6 +17,14 @@ GAME_FX = [
     # 毒・出血が効いた瞬間 (Game2DBattleFx.DotTick)。 形は今の仮の敵 (豆腐)。 敵の絵が入ったら --actor で敵ごとに書き出す
     ("poison-tick", "dicebound/poison-tick", "poison", ["--tofu"]),
     ("bleed-tick", "dicebound/bleed-tick", "blood", ["--tofu"]),
+    # 命中の瞬間に重ねる絵 (2026-11-14・Game2DBattleFx.PlayFx)。 線の演出 (斬撃痕・輪・火花) はそのまま残し、 着弾の厚みだけを足す
+    ("hit-spark", "impacts/hit-spark", "warm", []),        # ふつうの命中 (十字の閃光)
+    ("blunt-hit", "impacts/blunt-hit", "warm", []),        # 盾の叩きつけ (鈍い打撃)
+    ("sword-slash", "melee/sword-slash", "warm", []),      # 剣の振り下ろし (三日月)
+    ("double-slash", "melee/double-slash", "warm", []),    # 連撃の締め (交差する二段)
+    ("heavy-cleave", "melee/heavy-cleave", "warm", []),    # 斧の叩き割り (床の亀裂と土煙)
+    ("claw-swipe", "melee/claw-swipe", "red", []),         # 敵の攻撃が通った (赤い爪痕)
+    ("shield-block", "impacts/shield-block", "warm", []),  # 敵の攻撃を防ぎ切った
 ]
 
 

@@ -1,0 +1,124 @@
+{
+ "frames": [
+  {
+   "filename": "double-slash 0",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 164,
+    "h": 108
+   },
+   "sourceSize": {
+    "w": 164,
+    "h": 108
+   },
+   "duration": 125
+  },
+  {
+   "filename": "double-slash 1",
+   "frame": {
+    "x": 164,
+    "y": 0,
+    "w": 164,
+    "h": 108
+   },
+   "sourceSize": {
+    "w": 164,
+    "h": 108
+   },
+   "duration": 125
+  },
+  {
+   "filename": "double-slash 2",
+   "frame": {
+    "x": 328,
+    "y": 0,
+    "w": 164,
+    "h": 108
+   },
+   "sourceSize": {
+    "w": 164,
+    "h": 108
+   },
+   "duration": 125
+  },
+  {
+   "filename": "double-slash 3",
+   "frame": {
+    "x": 0,
+    "y": 108,
+    "w": 164,
+    "h": 108
+   },
+   "sourceSize": {
+    "w": 164,
+    "h": 108
+   },
+   "duration": 125
+  },
+  {
+   "filename": "double-slash 4",
+   "frame": {
+    "x": 164,
+    "y": 108,
+    "w": 164,
+    "h": 108
+   },
+   "sourceSize": {
+    "w": 164,
+    "h": 108
+   },
+   "duration": 125
+  },
+  {
+   "filename": "double-slash 5",
+   "frame": {
+    "x": 328,
+    "y": 108,
+    "w": 164,
+    "h": 108
+   },
+   "sourceSize": {
+    "w": 164,
+    "h": 108
+   },
+   "duration": 125
+  },
+  {
+   "filename": "double-slash 6",
+   "frame": {
+    "x": 0,
+    "y": 216,
+    "w": 164,
+    "h": 108
+   },
+   "sourceSize": {
+    "w": 164,
+    "h": 108
+   },
+   "duration": 125
+  }
+ ],
+ "meta": {
+  "app": "pixelfx + lcd_export",
+  "image": "double-slash.png",
+  "size": {
+   "w": 492,
+   "h": 324
+  },
+  "pixelfx": {
+   "id": "melee/double-slash",
+   "fps": 8,
+   "frames": 7,
+   "frameSize": [
+    164,
+    108
+   ],
+   "pivot": [
+    44,
+    92
+   ],
+   "loop": false
+  }
+ }
+}

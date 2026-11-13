@@ -1,0 +1,250 @@
+{
+ "frames": [
+  {
+   "filename": "heavy-cleave 0",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 208,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 208,
+    "h": 116
+   },
+   "duration": 125
+  },
+  {
+   "filename": "heavy-cleave 1",
+   "frame": {
+    "x": 208,
+    "y": 0,
+    "w": 208,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 208,
+    "h": 116
+   },
+   "duration": 125
+  },
+  {
+   "filename": "heavy-cleave 2",
+   "frame": {
+    "x": 416,
+    "y": 0,
+    "w": 208,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 208,
+    "h": 116
+   },
+   "duration": 125
+  },
+  {
+   "filename": "heavy-cleave 3",
+   "frame": {
+    "x": 0,
+    "y": 116,
+    "w": 208,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 208,
+    "h": 116
+   },
+   "duration": 125
+  },
+  {
+   "filename": "heavy-cleave 4",
+   "frame": {
+    "x": 208,
+    "y": 116,
+    "w": 208,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 208,
+    "h": 116
+   },
+   "duration": 125
+  },
+  {
+   "filename": "heavy-cleave 5",
+   "frame": {
+    "x": 416,
+    "y": 116,
+    "w": 208,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 208,
+    "h": 116
+   },
+   "duration": 125
+  },
+  {
+   "filename": "heavy-cleave 6",
+   "frame": {
+    "x": 0,
+    "y": 232,
+    "w": 208,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 208,
+    "h": 116
+   },
+   "duration": 125
+  },
+  {
+   "filename": "heavy-cleave 7",
+   "frame": {
+    "x": 208,
+    "y": 232,
+    "w": 208,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 208,
+    "h": 116
+   },
+   "duration": 125
+  },
+  {
+   "filename": "heavy-cleave 8",
+   "frame": {
+    "x": 416,
+    "y": 232,
+    "w": 208,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 208,
+    "h": 116
+   },
+   "duration": 125
+  },
+  {
+   "filename": "heavy-cleave 9",
+   "frame": {
+    "x": 0,
+    "y": 348,
+    "w": 208,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 208,
+    "h": 116
+   },
+   "duration": 125
+  },
+  {
+   "filename": "heavy-cleave 10",
+   "frame": {
+    "x": 208,
+    "y": 348,
+    "w": 208,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 208,
+    "h": 116
+   },
+   "duration": 125
+  },
+  {
+   "filename": "heavy-cleave 11",
+   "frame": {
+    "x": 416,
+    "y": 348,
+    "w": 208,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 208,
+    "h": 116
+   },
+   "duration": 125
+  },
+  {
+   "filename": "heavy-cleave 12",
+   "frame": {
+    "x": 0,
+    "y": 464,
+    "w": 208,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 208,
+    "h": 116
+   },
+   "duration": 125
+  },
+  {
+   "filename": "heavy-cleave 13",
+   "frame": {
+    "x": 208,
+    "y": 464,
+    "w": 208,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 208,
+    "h": 116
+   },
+   "duration": 125
+  },
+  {
+   "filename": "heavy-cleave 14",
+   "frame": {
+    "x": 416,
+    "y": 464,
+    "w": 208,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 208,
+    "h": 116
+   },
+   "duration": 125
+  },
+  {
+   "filename": "heavy-cleave 15",
+   "frame": {
+    "x": 0,
+    "y": 580,
+    "w": 208,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 208,
+    "h": 116
+   },
+   "duration": 125
+  }
+ ],
+ "meta": {
+  "app": "pixelfx + lcd_export",
+  "image": "heavy-cleave.png",
+  "size": {
+   "w": 624,
+   "h": 696
+  },
+  "pixelfx": {
+   "id": "melee/heavy-cleave",
+   "fps": 8,
+   "frames": 16,
+   "frameSize": [
+    208,
+    116
+   ],
+   "pivot": [
+    68,
+    96
+   ],
+   "loop": false
+  }
+ }
+}
