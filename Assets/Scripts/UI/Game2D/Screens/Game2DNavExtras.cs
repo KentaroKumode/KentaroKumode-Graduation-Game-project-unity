@@ -439,7 +439,9 @@ namespace UI.Game2D
                 // 嵐 (2026-11-13): 2 行目に嵐の時計 (静かな時間は「まで N」・嵐の間は「k あとN」)
                 int ph = sim.StormPhase, n = sim.StormTurnsToNext;
                 p.Text("嵐", 24, 16, Game2DKit.Dim);
-                p.Text(ph == 0 ? "まで" + n : ph >= 4 ? "段4" : "段" + ph + " " + n, 40, 16, ph == 0 ? Game2DKit.Ink : Game2DKit.Amber);
+                // 二版 (不安定化の時計): 静かな間は「不安定の累計/崩れ始める境目」、 崩れ始めたら段と次の段までの不安定化ポイント
+                string v = ph == 0 ? (sim.InstabilityMode ? sim.Instability + "/" + FreeMapParams.InstabilityPhase1At : "まで" + n) : ph >= 4 ? "段4" : "段" + ph + " " + n;
+                p.Text(v, 40, 16, ph == 0 ? Game2DKit.Ink : Game2DKit.Amber);
             }
             else { p.Text("予報", 24, 16, Game2DKit.Dim); p.Text("???", 48, 16, Game2DKit.Faint); }       // 予報は物資の段階で精度が変わる (未接続)
             // 待つ (その場で 1 ターン)。 旧: 見本の気圧計
