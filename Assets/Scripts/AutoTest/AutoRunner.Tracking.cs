@@ -379,6 +379,11 @@ namespace AutoTest
                 _cur.goldVals = new int[_cur.goldKeys.Length];
                 { int gi = 0; foreach (var kv in GameLoop.GoldIncome.RunByDepthSource) { _cur.goldKeys[gi] = kv.Key; _cur.goldVals[gi++] = kv.Value; } }
                 _cur.finalProvision = run.provision;
+                // [計装 2026-11-14] 〈徒労〉の記録 (RunStats はラン開始で 0 に戻している)
+                _cur.toilNothingBattles = GameLoop.RunStats.ToilNothingBattles;
+                _cur.toilBlockedDrops = GameLoop.RunStats.ToilBlockedDrops;
+                _cur.chestsOpened = GameLoop.RunStats.ChestsOpened;
+                _cur.toilEmptyChests = GameLoop.RunStats.ToilEmptyChests;
                 _cur.finalProvisionCap = run.provisionCap;
                 if (run.provision <= 0) _cur.reachedMadness = true;
                 _cur.provisionLateralLoss  = GameLoop.ProvisionSystem.Stats.travelLoss;
@@ -496,6 +501,8 @@ namespace AutoTest
             GameLoop.GameHooks.TerritoryTreasure = GameLoop.TerritoryTreasureKind.Forge;
             GameLoop.GameHooks.TerritoryKeepBypass = true;                       // [測定 2026-11-13] 縄張りを避ける道の保証を既定へ
             GameLoop.GameHooks.AshKingBeatenEver = null;                         // [測定 2026-11-13] 灰燼の王を倒した記録の扱いを既定 (ランの外の記録を読む) へ
+            GameLoop.GameHooks.ToilMode = EventSystem.TimedEffects.ToilMode.Stacks;   // [測定 2026-11-14] 〈徒労〉の形を既定 (今の形) へ
+            GameLoop.GameHooks.ToilChestEmptyPct = EventSystem.TimedEffects.BattleBoonRule.DefaultChestEmptyPct;
             GameLoop.GameHooks.StormEnabled = true;                              // [測定 2026-11-13] 天候の作りを既定 (嵐) へ
             GameLoop.GameHooks.StormClock = MapSystem.FreeMove.StormClock.Instability;   // [測定 2026-11-13 二版] 嵐の時計を既定 (不安定化) へ
             GameLoop.GameHooks.TerminalHealMulOverride = 0;                      // [測定 2026-11-12・#102]

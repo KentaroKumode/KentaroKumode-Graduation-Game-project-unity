@@ -127,6 +127,9 @@ namespace AutoTest
             public bool ashBaseRevisit;
             public int ashBaseChoice = -1, ashBaseTurn = -1;
             public bool ashBaseOpened;
+            /// <summary>[計装 2026-11-14] 〈徒労〉: 掛かった通常の戦闘の勝ちの数 (今の形 = 何も得られなかった戦闘 / 別の形 = 品を落とさなかった戦闘)・
+            /// 止めた品のドロップ (当たったが配らなかった数・戦闘のドロップと強奪)・開けた宝箱 (宝の点・縄張りの宝・形によらない)・そのうち〈徒労〉で空だった数。</summary>
+            public int toilNothingBattles, toilBlockedDrops, chestsOpened, toilEmptyChests;
             public int[] goldVals;
             /// <summary>**このランでゲームが実際に見た挑戦スコア。**
             /// 意図した構成が本当に適用されていたかを、 結果ではなく入力側で検証するために残す。</summary>

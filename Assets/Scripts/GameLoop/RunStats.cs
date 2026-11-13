@@ -77,5 +77,13 @@ namespace GameLoop
 
         /// <summary>[計装] エリート戦に入った回数 (格上げが効いているかを見る)。</summary>
         public static long ValorEliteFights;
+
+        /// <summary>[計装 2026-11-14] 〈徒労〉の記録 (<b>1 ラン単位</b>・AutoRunner がラン開始で <see cref="ResetToil"/> し、 ラン終了で RunRec へ写す)。 数えるだけで動きは変えない。
+        /// ToilNothingBattles = 〈徒労〉が掛かった通常の戦闘の勝ちの数 (今の形 = 何も得られなかった戦闘・別の形 = 品を落とさなかった戦闘)。
+        /// ToilBlockedDrops = 〈徒労〉で止めた品のドロップ (抽選は当たったが配らなかった数・戦闘のドロップと強奪の戦利品)。
+        /// ChestsOpened = 開けた宝箱 (宝の点・縄張りの宝・形によらず数える) / ToilEmptyChests = そのうち〈徒労〉で空だった数。</summary>
+        public static int ToilNothingBattles, ToilBlockedDrops, ChestsOpened, ToilEmptyChests;
+
+        public static void ResetToil() { ToilNothingBattles = 0; ToilBlockedDrops = 0; ChestsOpened = 0; ToilEmptyChests = 0; }
     }
 }

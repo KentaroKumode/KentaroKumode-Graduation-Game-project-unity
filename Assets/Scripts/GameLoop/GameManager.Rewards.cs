@@ -235,7 +235,7 @@ namespace GameLoop
             // ADR-0011 〈富〉(目 9): 戦闘中に積んだ報酬加算 (%)。 割合先 (メタの定額 +N の前)。
             coins = ApplyRoleGoldBonus(coins);
             coins += metaWinGold;
-            // 〈徒労〉0 /〈開眼〉2 倍 (2026-11-13・通常の戦闘だけ・判定は TakeNormalBattleBoon)。 挑戦デバフの収入減より前 (GoldIncome.Gain の中) に掛ける
+            // 〈徒労〉0 (別の形 LayerLong はそのまま) /〈開眼〉2 倍 (2026-11-13・通常の戦闘だけ・判定は TakeNormalBattleBoon)。 挑戦デバフの収入減より前 (GoldIncome.Gain の中) に掛ける
             coins = ScaleByBattleBoon(coins);
             coins = GoldIncome.Gain(Run, coins, "戦闘報酬");
             IsEliteSecondFight = false;
@@ -244,8 +244,8 @@ namespace GameLoop
 
             // 物資の補給 (2026-09-28): 通常 +30 / エリート +80。 払底したら戦って奪うしかない
             //   (Highfleet の「追ってきた敵から燃料を奪う」)。
-            //   〈徒労〉の戦闘は 0 (〈開眼〉は物資を増やさない ── 倍にするのはゴールド・ドロップ・強化素材だけ)。
-            if (EventSystem.TimedEffects.BattleBoonRule.GrantsProvision(LastBattleBoon))
+            //   〈徒労〉の戦闘は 0 (別の形 LayerLong は止めない) (〈開眼〉は物資を増やさない ── 倍にするのはゴールド・ドロップ・強化素材だけ)。
+            if (EventSystem.TimedEffects.BattleBoonRule.GrantsProvision(LastBattleBoon, GameHooks.ToilMode))
                 ProvisionSystem.Supply(Run, eliteNodeReward
                     ? MapSystem.FreeMove.FreeMapParams.RewardElite : MapSystem.FreeMove.FreeMapParams.RewardBattle);
             // (ターン制の航行マップでは戦闘はターンを使わず、 物音も立てない。)
@@ -275,7 +275,7 @@ namespace GameLoop
             //   同時に供給の 45% が無料経路という状態を作っていた。 削った現物は
             //   CombatRewards.GoldScale で金にして返す ── 店での購入という選択へ寄せる。
             float rate = eliteWin ? CombatRewards.EliteDropRate : CombatRewards.NormalDropRate;
-            // 〈徒労〉: 抽選は引く (乱数の列を変えない) が 0 個。 〈開眼〉: 抽選を 2 回引く (乱数 "GameManager.1" を余分に 1 回引く)
+            // 〈徒労〉: 抽選は引く (乱数の列を変えない) が 0 個 (今の形・別の形 LayerLong とも)。 〈開眼〉: 抽選を 2 回引く (乱数 "GameManager.1" を余分に 1 回引く)
             int drops = 0;
             for (int k = 0, rolls = EventSystem.TimedEffects.BattleBoonRule.DropRolls(LastBattleBoon); k < rolls; k++)
             {
@@ -284,7 +284,7 @@ namespace GameLoop
                 else          { CombatRewards.NormalRolls++; if (dropped) CombatRewards.NormalDrops++; }
                 if (dropped) drops++;
             }
-            if (!EventSystem.TimedEffects.BattleBoonRule.GrantsDrops(LastBattleBoon)) drops = 0;
+            if (!EventSystem.TimedEffects.BattleBoonRule.GrantsDrops(LastBattleBoon)) { RunStats.ToilBlockedDrops += drops; drops = 0; }   // [計装 2026-11-14] 止めた数を数えるだけ
             if (LastBattleBoon != EventSystem.TimedEffects.BattleBoon.None) Log(BattleBoonLine);
 
             // 各ドロップを「同カテゴリ・同レア度の2択」として保留。
@@ -324,7 +324,10 @@ namespace GameLoop
                 const string T = EventSystem.TimedEffects.BattleBoonRule.ToilName, R = EventSystem.TimedEffects.BattleBoonRule.InsightName;
                 switch (LastBattleBoon)
                 {
-                    case EventSystem.TimedEffects.BattleBoon.Toil:      return $"〈{T}〉のせいで、 この戦闘では何も得られなかった（残り {Left(Run?.timedDebuffs, T)}）";
+                    case EventSystem.TimedEffects.BattleBoon.Toil:
+                        return GameHooks.ToilMode == EventSystem.TimedEffects.ToilMode.LayerLong
+                            ? $"〈{T}〉のせいで、 この戦闘では品が出なかった"   // 別の形 (2026-11-14・測定用): ゴールド・強化素材・物資は出る・層の間ずっと
+                            : $"〈{T}〉のせいで、 この戦闘では何も得られなかった（残り {Left(Run?.timedDebuffs, T)}）";
                     case EventSystem.TimedEffects.BattleBoon.Insight: return $"〈{R}〉で、 ゴールドとドロップと強化素材が {EventSystem.TimedEffects.BattleBoonRule.InsightMultiplier} 倍（残り {Left(Run?.timedBuffs, R)}）";
                     default:                                            return null;
                 }
@@ -334,11 +337,11 @@ namespace GameLoop
         private static int Left(Dictionary<string, int> d, string id) => d != null && d.TryGetValue(id, out int n) ? n : 0;
 
         private string BattleBoonTag()
-            => LastBattleBoon == EventSystem.TimedEffects.BattleBoon.Toil ? $"（〈{EventSystem.TimedEffects.BattleBoonRule.ToilName}〉で 0）"
+            => LastBattleBoon == EventSystem.TimedEffects.BattleBoon.Toil ? (GameHooks.ToilMode == EventSystem.TimedEffects.ToilMode.LayerLong ? "" : $"（〈{EventSystem.TimedEffects.BattleBoonRule.ToilName}〉で 0）")
              : LastBattleBoon == EventSystem.TimedEffects.BattleBoon.Insight ? $"（〈{EventSystem.TimedEffects.BattleBoonRule.InsightName}〉で {EventSystem.TimedEffects.BattleBoonRule.InsightMultiplier} 倍）" : "";
 
-        /// <summary>報酬の量に〈徒労〉(0) /〈開眼〉(×2) を掛ける。 掛かっていなければそのまま。</summary>
-        private int ScaleByBattleBoon(int amount) => EventSystem.TimedEffects.BattleBoonRule.Scale(LastBattleBoon, amount);
+        /// <summary>報酬の量に〈徒労〉(0・別の形 LayerLong はそのまま) /〈開眼〉(×2) を掛ける。 掛かっていなければそのまま。</summary>
+        private int ScaleByBattleBoon(int amount) => EventSystem.TimedEffects.BattleBoonRule.Scale(LastBattleBoon, amount, GameHooks.ToilMode);
 
         /// <summary>今終わった戦闘が「通常の戦闘」か: 地図の戦闘マス (エリート・ボスでない) の戦闘で、 追跡者・使い魔・イベントの戦闘・偽の商人・値下げ交渉でない。</summary>
         private bool IsNormalBattleNow()
@@ -359,8 +362,13 @@ namespace GameLoop
                         Left(Run.timedDebuffs, EventSystem.TimedEffects.BattleBoonRule.ToilName),
                         Left(Run.timedBuffs, EventSystem.TimedEffects.BattleBoonRule.InsightName));
             if (b == EventSystem.TimedEffects.BattleBoon.None) return;
+            // 別の形 (LayerLong・2026-11-14): 〈徒労〉は層にいる間ずっと続く ── 減らす前の残りを覚えて戻す (〈開眼〉は今までどおり減る)
+            const string T = EventSystem.TimedEffects.BattleBoonRule.ToilName;
+            int keepToil = EventSystem.TimedEffects.BattleBoonRule.ToilCountsDown(GameHooks.ToilMode) ? 0 : Left(Run.timedDebuffs, T);
             EventSystem.TimedEffects.TimedEffectManager.OnNormalBattleWon(Run);   // 持っている〈徒労〉〈開眼〉をそれぞれ 1 つ減らす (既存の時限効果の減らし方)
+            if (keepToil > 0 && Run.timedDebuffs != null) Run.timedDebuffs[T] = keepToil;
             LastBattleBoon = b;
+            if (b == EventSystem.TimedEffects.BattleBoon.Toil) RunStats.ToilNothingBattles++;   // [計装 2026-11-14] 数えるだけ
         }
 
         /// <summary>ボス撃破ボーナス用のパッシブ抽選。wantRare=true で GOLD 以上のみ、レア度重み付き。</summary>
@@ -489,7 +497,7 @@ namespace GameLoop
         /// <summary>宝箱マス到達時。ゴールドランダム + パッシブ/消費アイテム1個。</summary>
         private void OpenTreasure()
         {
-            LastTreasureSummary = GrantTreasureChestContents();
+            LastTreasureSummary = ToilEmptiesChest() ? "宝箱: " + ToilEmptyChestLine : GrantTreasureChestContents();
             Log(LastTreasureSummary);
             // 不安定化 (2026-11-13): 宝の点を開けた +3 (中身の品が秘宝でも重ねない ── 宝の点は開けた時の +3 だけ)
             string inst = InstabilityLine(AddInstability(MapSystem.FreeMove.InstabilitySource.Treasure, 1, "宝の点"));
@@ -532,6 +540,23 @@ namespace GameLoop
             }
 
             return $"宝箱: ゴールド+{gold}, {itemLabel}";
+        }
+
+        /// <summary>宝箱が空だった時の文 (〈徒労〉の別の形・2026-11-14)。 宝の点の画面と縄張りの宝の記録に出す。</summary>
+        private const string ToilEmptyChestLine = "空だった（〈" + EventSystem.TimedEffects.BattleBoonRule.ToilName + "〉のせいで、 何も入っていない）";
+
+        /// <summary>宝箱 (宝の点・縄張りの宝) を開ける時に 1 回呼ぶ。 開けた数を数え (形によらない・数えるだけ)、 〈徒労〉の別の形 (LayerLong) で〈徒労〉を持っている時だけ
+        /// 専用の乱数 (キー toil.chestEmpty) を引いて、 <see cref="GameHooks.ToilChestEmptyPct"/> % で空にする (true = 空・何も渡さない)。
+        /// 今の形 (Stacks) と〈徒労〉を持っていない時は乱数を引かない (= main と同じ列)。 空でも不安定化の「宝を開ける」は呼び出し側で溜まる。</summary>
+        private bool ToilEmptiesChest()
+        {
+            RunStats.ChestsOpened++;
+            var mode = GameHooks.ToilMode;
+            bool hasToil = Left(Run?.timedDebuffs, EventSystem.TimedEffects.BattleBoonRule.ToilName) > 0;
+            if (mode != EventSystem.TimedEffects.ToilMode.LayerLong || !hasToil) return false;
+            if (!EventSystem.TimedEffects.BattleBoonRule.ChestEmpty(mode, hasToil, GameLoop.GameRng.Value("toil.chestEmpty"), GameHooks.ToilChestEmptyPct)) return false;
+            RunStats.ToilEmptyChests++;
+            return true;
         }
 
         /// <summary>宝箱から獲得するアイテムを ItemDatabase からレア度重み付きで1個選出。武器・クエスト・イベント限定は除外。</summary>

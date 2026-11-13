@@ -270,7 +270,12 @@ namespace GameLoop
             var sim = FreeMap;
             if (sim == null || !sim.TakeTreasure()) return;
             AddInstability(InstabilitySource.Treasure, 1, "縄張りの宝");   // 不安定化 +3 (2026-11-13・中身によらない)
-            if (GameHooks.TerritoryTreasure == TerritoryTreasureKind.Forge && TryUpgradeWeapon(Run, free: true))
+            if (ToilEmptiesChest())   // 〈徒労〉の別の形 (LayerLong・2026-11-14): 確率で空 (鍛えるも宝箱の中身も無し)
+            {
+                TerritoryTreasureNote = "宝: 空だった〈" + EventSystem.TimedEffects.BattleBoonRule.ToilName + "〉";
+                Log("縄張りの宝: " + ToilEmptyChestLine);
+            }
+            else if (GameHooks.TerritoryTreasure == TerritoryTreasureKind.Forge && TryUpgradeWeapon(Run, free: true))
             {
                 TerritoryTreasureNote = "宝: 武器を鍛えた";
                 Log($"縄張りの宝: 武器を鍛えた（{Run.equippedWeaponId}{(Run.weaponPlus > 0 ? "+" : "")}・素材は使わない）");

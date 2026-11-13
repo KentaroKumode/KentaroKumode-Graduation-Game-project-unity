@@ -187,7 +187,9 @@ namespace UI.Game2D
                 {
                     if (kv.Value <= 0) continue;
                     string desc = EventSystem.TimedEffects.TimedEffectRegistry.DescriptionOf(kv.Key);
-                    if (desc != null) return "〈" + kv.Key + "〉残り" + kv.Value + " " + desc;
+                    if (desc != null)   // 〈徒労〉の別の形 (LayerLong・2026-11-14) は減らないので残りを出さない
+                        return EventSystem.TimedEffects.BattleBoonRule.ShowsCharges(kv.Key, GameLoop.GameHooks.ToilMode)
+                            ? "〈" + kv.Key + "〉残り" + kv.Value + " " + desc : "〈" + kv.Key + "〉 " + desc;
                 }
             }
             return null;
