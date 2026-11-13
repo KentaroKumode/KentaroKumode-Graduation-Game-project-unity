@@ -22,6 +22,7 @@ namespace GameLoop
             var offer = RollTerminalReward(Run, n, boss);
             if (offer.Count == 0) return;
             Run.pendingTerminalOffer = offer;
+            TerminalDiag.NoteOffer(boss ? TerminalDiag.SceneBoss : elite ? TerminalDiag.SceneElite : TerminalDiag.SceneNormal, offer);   // [計装 #106]
             if (GameHooks.ChooseTerminalReward == null && Loadout.HumanPlaying) return;      // 人: 画面が出す
             ResolveTerminalReward(GameHooks.ChooseTerminalReward?.Invoke(offer) ?? 0);
         }
@@ -30,6 +31,7 @@ namespace GameLoop
         public void ResolveTerminalReward(int index)
         {
             if (Run == null || Run.pendingTerminalOffer.Count == 0) return;
+            TerminalDiag.NoteResolve(Run.pendingTerminalOffer, index);   // [計装 #106]
             if (index >= 0 && index < Run.pendingTerminalOffer.Count)
             {
                 string id = Run.pendingTerminalOffer[index];
@@ -107,6 +109,8 @@ namespace GameLoop
                 int basePrice = d.rare ? TerminalShopPriceRare : d.disposable ? TerminalShopPriceDisposable : TerminalShopPriceCommon;
                 TerminalShop.Add(new TerminalShopSlot { id = id, price = Mathf.Max(1, Mathf.CeilToInt(basePrice * mul)) });
             }
+            var shelf = new List<string>(); foreach (var s in TerminalShop) shelf.Add(s.id);
+            TerminalDiag.NoteShopShelf(shelf);   // [計装 #106]
         }
 
         /// <summary>店の端子の棚の i 枠目を買って山札に加える。</summary>
@@ -118,6 +122,7 @@ namespace GameLoop
             if (!ProvisionPayment.TryPay(Run, s.price, "端子を買う")) return false;
             s.sold = true;
             Run.terminalDeck.Add(s.id);
+            TerminalDiag.NoteShopBuy(s.id);   // [計装 #106]
             Log($"端子を買った: {s.id} (-{s.price}G・山札 {Run.terminalDeck.Count} 枚)");
             return true;
         }
@@ -137,6 +142,7 @@ namespace GameLoop
             string id = Run.terminalDeck[deckIndex];
             Run.terminalDeck.RemoveAt(deckIndex);
             Run.terminalShopRemovals++;
+            TerminalDiag.NoteRemoved(id, TerminalDiag.RemovedShop);   // [計装 #106]
             Log($"山札から抜いた (店): {id} (-{price}G・店で {Run.terminalShopRemovals} 回目・山札 {Run.terminalDeck.Count} 枚)");
             return true;
         }
@@ -147,6 +153,7 @@ namespace GameLoop
             if (CurrentPhase != GamePhase.RestStop || !CanRemoveTerminal || deckIndex < 0 || deckIndex >= Run.terminalDeck.Count) return false;
             string id = Run.terminalDeck[deckIndex];
             Run.terminalDeck.RemoveAt(deckIndex);
+            TerminalDiag.NoteRemoved(id, TerminalDiag.RemovedRest);   // [計装 #106]
             Log($"山札から抜いた (休憩): {id} (山札 {Run.terminalDeck.Count} 枚)");
             ReturnToMapOrClearFloor();
             return true;

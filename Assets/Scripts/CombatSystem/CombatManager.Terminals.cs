@@ -17,6 +17,8 @@ namespace CombatSystem
         private string _termRetain;
         /// <summary>このターンの主攻撃に掛ける別枠の倍率 (〈増幅器〉〈共振器〉)。 毎ターン 1 に戻す。</summary>
         private float _termDamageMul = 1f;
+        /// <summary>[計装 #106] このターンに方策 / 画面が返した挿し方 (Resolve が直す前)。 ターンの始めに null へ戻す。 判断には使わない。</summary>
+        private int[] _termWanted;
 
         /// <summary>挑戦カード〈猫の手〉: このターン猫が先に挿した 1 組 (出目の添字 → 場の添字)。 −1 = 挿していない。
         /// ターンの始め (<see cref="DrawTerminalHand"/>) に外し、 配線の判断の頭 (<see cref="ChooseCatPaw"/>) で決める。</summary>
@@ -58,11 +60,13 @@ namespace CombatSystem
         {
             _catDie = _catSlot = -1;      // 〈猫の手〉は配線の判断の頭で挿し直す (振り直しの判断の間は無い)
             _termKillPending = null;
+            _termWanted = null;
             if (_deck == null) return;
             int extra = _deck.state.BeginTurn();
             // ヴェスカ〈停滞する時間〉: 引いた端子 1 枚ごとに確率で止める (持たない敵は 0)
             float stop = ItemSystem.PassiveSkills.Effects.StagnantTime.StopChance(currentEnemy);
             _deck.DrawTurn(TerminalCards.HandSize + extra, _termRetain, stop);
+            TerminalDiag.NoteDrawn(_deck.LastDrawnIds);   // [計装 #106] 新しく引いた端子
             if (TerminalCards.HandCarry && ctx != null && ctx.currentTurn > 1) BossDownDiag.NoteCarry(_deck.LastCarriedCount);   // [計装 2026-11-13] 持ち越した枚数 (戦闘の 1 ターン目は除く)
             if (stop > 0f)
             {
@@ -207,7 +211,7 @@ namespace CombatSystem
                 }
                 else _termKillPending = kb;
             }
-            TerminalDiag.NoteTurn(_deck.board, o);   // [計装 2026-11-12] (FinishTurn が手札を書き換える前に)
+            TerminalDiag.NoteTurn(_deck.board, o, _termWanted);   // [計装 2026-11-12・#106 内訳] (FinishTurn が手札を書き換える前に)
             if (_deck.LastKept.Count > 0)            // [計装 2026-11-13] 残す印で残した端子を、 このターンに使ったか
             {
                 var usedNames = TerminalDeckState.UsedFromHand(_deck.board, _deck.permanent.Count, o);
@@ -267,7 +271,9 @@ namespace CombatSystem
                 string id = _deck.board[s];
                 if (!TerminalCards.LeavesRunDeck(TerminalCards.Get(id))) continue;
                 if (deck.Count <= TerminalCards.MinDeckSize) { Debug.Log($"[端子/{id}] 山札が {deck.Count} 枚なので、ランの山札からは抜かない"); continue; }
-                if (deck.Remove(id)) Debug.Log($"[端子/{id}] 使ったので、ランの山札から抜いた (山札 {deck.Count} 枚)");
+                if (deck.Remove(id)) TerminalDiag.NoteRemoved(id, TerminalDiag.LeftRunDeck);   // [計装 #106]
+                else continue;
+                Debug.Log($"[端子/{id}] 使ったので、ランの山札から抜いた (山札 {deck.Count} 枚)");
             }
         }
     }

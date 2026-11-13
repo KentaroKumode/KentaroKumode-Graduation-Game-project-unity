@@ -352,6 +352,14 @@ namespace AutoTest.ParallelSweep
         /// <summary>[計装 2026-11-12] 端子ごとの使われ方 (<see cref="CombatSystem.TerminalDiag"/>)。 名前 × TerminalDiag.Width を平らに並べる。</summary>
         public string[] termDiagNames = Array.Empty<string>();
         public double[] termDiag = Array.Empty<double>();
+        /// <summary>[計装 #106] 場面 (通常・エリート・ボス・店) ごとの [提示, 何も取らなかった] と、 末尾に終わったラン数 (<see cref="CombatSystem.TerminalDiag.Scenes"/>)。</summary>
+        public long[] termScenes = Array.Empty<long>();
+        /// <summary>[計装 #106] 「取られなかった端子 + タブ + 代わりに取られた端子」と回数 (<see cref="CombatSystem.TerminalDiag.Pairs"/>)。</summary>
+        public string[] termPairKeys = Array.Empty<string>();
+        public long[] termPairCounts = Array.Empty<long>();
+        /// <summary>[計装 #106] BOT の端子の値付け (<see cref="TerminalPolicyDiag"/>)。 名前 × TerminalPolicyDiag.Width を平らに並べる。</summary>
+        public string[] termPolicyNames = Array.Empty<string>();
+        public double[] termPolicy = Array.Empty<double>();
         /// <summary>[計装 2026-11-12・#35] 追跡者に捕まった後の結果 (<see cref="GameLoop.NavDiag"/>)。 型の名前 × NavDiag.Width を平らに並べる。</summary>
         public string[] navDiagNames = Array.Empty<string>();
         public double[] navDiag = Array.Empty<double>();

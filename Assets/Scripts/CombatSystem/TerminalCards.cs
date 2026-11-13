@@ -775,11 +775,13 @@ namespace CombatSystem
             var stoppedPerm = new List<int>();   // permanent の添字
             var stoppedHand = new List<int>();   // hand の添字
             int guard = 0, drawn = 0;
+            LastDrawnIds.Clear();
             while (hand.Count < size && guard++ < 64)
             {
                 var id = DrawOne();
                 if (id == null) break;
                 drawn++;
+                LastDrawnIds.Add(id);   // [計装 #106]
                 bool stop = stopChance > 0f && GameLoop.GameRng.Chance(stopChance, StopRngKey);
                 var d = TerminalCards.Get(id);
                 if (d != null && d.permanent) { if (stop) stoppedPerm.Add(permanent.Count); permanent.Add(id); continue; }
@@ -799,6 +801,8 @@ namespace CombatSystem
 
         /// <summary>直近の <see cref="DrawTurn"/> で 新しく引いた枚数 / 前のターンに止まっていて手札に残った枚数 / 止まった枚数 / うち常設 (計装・画面用)。</summary>
         public int LastDrawnCount { get; private set; }
+        /// <summary>[計装 #106] 直近の <see cref="DrawTurn"/> で新しく引いた端子の名前 (常設も含む)。</summary>
+        public readonly List<string> LastDrawnIds = new List<string>();
         public int LastHeldCount { get; private set; }
         public int LastStoppedCount { get; private set; }
         public int LastStoppedMains { get; private set; }
