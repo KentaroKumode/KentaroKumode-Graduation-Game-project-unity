@@ -37,7 +37,7 @@ namespace GameLoop
 
                 bool elite = MapSystem.MapManager.Instance?.CurrentNode != null
                              && MapSystem.MapManager.Instance.CurrentNode.EffectiveType == MapSystem.TileType.EliteBattle;
-                int mat = ScaleByBattleBoon(elite ? 2 : 1);   // 〈徒労〉0 /〈開眼〉2 倍 (通常の戦闘だけ・エリートには掛からない)
+                int mat = ScaleByBattleBoon(elite ? 2 : 1);   // 〈徒労〉0 (別の形 LayerLong はそのまま) /〈開眼〉2 倍 (通常の戦闘だけ・エリートには掛からない)
                 Run.weaponMaterials += mat;
                 Log($"[戦闘報酬] 強化素材+{mat}{BattleBoonTag()}");
 
@@ -48,13 +48,13 @@ namespace GameLoop
                     && MapSystem.MapManager.Instance.CurrentNode.type == MapSystem.TileType.Boss;
                 float dropPct = bossNodeForDrop
                     ? 0f : MetaProgression.MetaBuffApplicator.GetPlunderPassiveDropPct();
-                // 〈徒労〉: 抽選は引く (乱数の列を変えない) が配らない。 〈開眼〉: 抽選を 2 回引く (乱数を余分に引く)
+                // 〈徒労〉: 抽選は引く (乱数の列を変えない) が配らない (今の形・別の形 LayerLong とも)。 〈開眼〉: 抽選を 2 回引く (乱数を余分に引く)
                 for (int k = 0, rolls = EventSystem.TimedEffects.BattleBoonRule.DropRolls(LastBattleBoon); k < rolls; k++)
                 {
                     if (dropPct > 0f
-                        && GameLoop.GameRng.Value("plunder.drop") * 100f < dropPct
-                        && EventSystem.TimedEffects.BattleBoonRule.GrantsDrops(LastBattleBoon))
+                        && GameLoop.GameRng.Value("plunder.drop") * 100f < dropPct)
                     {
+                        if (!EventSystem.TimedEffects.BattleBoonRule.GrantsDrops(LastBattleBoon)) { RunStats.ToilBlockedDrops++; continue; }   // [計装 2026-11-14] 〈徒労〉で止めた戦利品 (数えるだけ)
                         string pid = PickPassiveItemForBossExtra(false);
                         if (!string.IsNullOrEmpty(pid))
                         {

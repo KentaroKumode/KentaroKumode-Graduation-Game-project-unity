@@ -37,6 +37,11 @@ namespace GameLoop
                 }
             }
 
+            // 〈徒労〉の別の形 (LayerLong・2026-11-14・測定用): 層 (深さ 6) にいる間だけ続く ── 層を出たら消す。 今の形 (Stacks) では何もしない
+            if (EventSystem.TimedEffects.BattleBoonRule.ToilClearsOnLeavingLayer(GameHooks.ToilMode)
+                && Run.timedDebuffs != null && Run.timedDebuffs.Remove(EventSystem.TimedEffects.BattleBoonRule.ToilName))
+                Log($"〈{EventSystem.TimedEffects.BattleBoonRule.ToilName}〉が晴れた (層を出た)");
+
             if (!Run.AdvanceFloor())
             {
                 ReturnToTitle();
