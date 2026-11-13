@@ -50,6 +50,7 @@ namespace GameLoop
         //   |                          |                                        | CanTradeAway → GameManager.LowestTierPassiveIndex (交換マス・イベントの取り替え) |
         //   |                          |                                        | CanBeLost    → GameManager.LoseRandomPassiveItem (偽の商人に敗北)           |
         //   | Entrusted (預かり物)     | 止まらない時計                         | HiddenInCodexUntilOwned → Game2DCodexPanel (手に入れるまで枠も出さない)    |
+        //   |                          |                                        | IsEntrusted  → ItemCards (持ち物の画面の印「預かり物」)                    |
         //   | ProgressionItems (進行用) | 確信の 3 品・時計・灯火・レイピア・    | CanOfferAtGate   → GameManager.OfferGateRelics (〈門〉で捧げない)          |
         //   |                          | 初期装備・武器階梯 T2/T3 ほか          | CanBeTakenBySin  → GameManager.Challenge (大罪の強欲・色欲)               |
         //   |                          |                                        | (直接) AutoTest.ItemLearningStats.ExcludedFromLift (BOT の学習から外す)  |
@@ -85,6 +86,8 @@ namespace GameLoop
         public static bool CanTradeAway(string id) => !string.IsNullOrEmpty(id) && !Undroppable.Contains(id);
         /// <summary>ランダムな喪失 (偽の商人に敗北) で失われ得るか。 手放せない品は false。</summary>
         public static bool CanBeLost(string id) => !string.IsNullOrEmpty(id) && !Undroppable.Contains(id);
+        /// <summary>預かり物か (<see cref="Entrusted"/>)。 持ち物の画面の詳細の欄が印「預かり物」を出すのに読む (2026-11-13)。 売れるか等は <see cref="CanSell"/> の側。</summary>
+        public static bool IsEntrusted(string id) => !string.IsNullOrEmpty(id) && Entrusted.Contains(id);
         /// <summary>図鑑で、 手に入れるまで「？？？」の枠も出さない品か (預かり物 <see cref="Entrusted"/> だけ)。</summary>
         public static bool HiddenInCodexUntilOwned(string id) => !string.IsNullOrEmpty(id) && Entrusted.Contains(id);
         /// <summary>〈門〉で秘宝として捧げられるか。 進行用の品 (<see cref="ProgressionItems"/>) は false。</summary>

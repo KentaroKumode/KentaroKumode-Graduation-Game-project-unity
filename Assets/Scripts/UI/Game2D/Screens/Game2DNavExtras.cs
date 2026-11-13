@@ -11,7 +11,7 @@ namespace UI.Game2D
     /// 航行の計器の足りない分 (<b>仮置き</b>・2026-10-24)。 docs/design/gui-needed.md の「未実装」の航行の項目を、 枠・ボタンの仮の絵と文字で並べたもの。
     /// 上の帯 = 天気 (今)・層 (今の層 / 最終層)・警告ランプ (追跡者が警戒・追跡中で点灯)・待つボタン / 左下 = 職業・状態異常・消耗品・パッシブ / 右 = 航行アイテムの枠 3 つ・脱出ボタン。
     /// 層・追跡者・天気・所持品 (左下の 10 枠は品のアイコン・2026-11-12) は実際の値、 予報は見本。 戦闘中は 3 方向へ引っ込む (<see cref="Drive"/>)。
-    /// <para>操作 (2026-11-04): 上の帯の [WAIT] = 待つ (その場で 1 ターン・Space と同じ) / 左下の ITEMS の欄 = 所持品の窓 (消耗品を使う・パッシブを見る)。</para>
+    /// <para>操作 (2026-11-04): 上の帯の [WAIT] = 待つ (その場で 1 ターン・Space と同じ) / 左下の ITEMS の欄 = 持ち物の画面 (2026-11-13 に升目の画面へ・品の詳細を読む・消耗品を使う)。</para>
     /// <para>2026-11-11: 上の帯の右隣に「経過ターン・補足中の警告 (ETA)・照明の残り」の帯、 右の列に航行アイテムの 3 枠 (V / B / N・〈前哨の旗〉を立てる)、
     /// 終点 (ボス・〈門〉) へ踏み出す前の確認の窓 (<see cref="ConfirmExit"/>) を足した。</para>
     /// </summary>
@@ -36,10 +36,9 @@ namespace UI.Game2D
         private static readonly RectInt WaitR = new RectInt(84, 4, 38, 22);      // 上の帯の中 (帯の左上が原点)
         private static bool _shown;
         private static Game2DNavExtras _instance;
-        private bool _invPassives; private int _invPage;
-        /// <summary>所持品の窓の頁: 0 = 消耗品 / 1 = パッシブ / 2 = ステータス (2026-11-09)。 _invPassives は 1 の時だけ立つ。</summary>
+        private int _invPage;
+        /// <summary>持ち物の画面の頁: 0 = 升目 (2026-11-13) / 2 = ステータス (2026-11-09)。 ステータスの頁の _invPage は挑戦カードの頁。</summary>
         private int _invTab;
-        private const int InvPerPage = 10;
 
         /// <summary>この dot (GUI の 480×270) がボタン・計器の上か (地図のクリック・ドラッグに渡さない)。</summary>
         public static bool Consumes(Vector2 d) => _shown && (In(d, TopR) || In(d, LeftR) || In(d, StatusR) || In(d, RightR));
@@ -94,6 +93,7 @@ namespace UI.Game2D
 
         private void Update()
         {
+            SyncInventoryInput();
             if (_top == null || _e > 0.5f) return;
             var gm = GameManager.Instance; if (gm == null) return;
             var sim = gm.CurrentPhase == GameManager.GamePhase.MapNavigation ? gm.FreeMap : null;
@@ -195,7 +195,7 @@ namespace UI.Game2D
 
         // ── 航行アイテムの 3 枠 (issue #10・gui-needed.md #20) ──
         //   枠に入るのは「使う」か「回数のある」航行アイテムだけ: 〈前哨の旗〉(押すと立てる)・〈煙玉〉(補足された時に自動で弾ける・押しても何もしない)。
-        //   ほかの 11 品は持っているだけで効くので、 所持品の窓 (パッシブ) で読む。 絵は無いので、 名前の頭の 1 字で出す。
+        //   ほかの 11 品は持っているだけで効くので、 持ち物の画面 (秘宝) で読む。 絵は無いので、 名前の頭の 1 字で出す。
 
         private int _hoverSlot = -1;
         private FreeMapSim _lastSim; private int _lastTurn, _jumpN; private float _jumpUntil;
@@ -291,58 +291,75 @@ namespace UI.Game2D
             return true;
         }
 
-        // ── 所持品の窓 (航行中) ──
-        //   消耗品: 選んで使う (回復はその場で・シールドや油は次の戦闘の開幕へ・囮罠はこの点に置く)。 パッシブ: 説明を読む。 頁で送る。
+        // ── 持ち物の画面 (航行中・2026-11-13 に升目の画面へ置き換え) ──
+        //   持っている物を全部、 種類ごとの見出しの下にアイコンの升目で並べる (InventoryGridView)。 升目に乗せると吹き出し (品名 + 効果の説明文)、
+        //   押すとフォーカスして右の欄に詳細 (フレーバー文まで)。 消耗品にフォーカスしている時だけ [使う] (回復はその場で・シールドや油は次の戦闘の開幕へ・囮罠はこの点に置く)。
+        //   [ステータス] で今までのステータスの頁へ。 見るだけ ── 使う以外は状態を書かない。 BOT が動かしている間は開かない (開いていたら閉じる)。
+        //   開いている間は GameManager のキー (Space で待つ・R・F・L・数字で動く) を止める (SyncInventoryInput)。
+
+        private InventoryGridView _grid;
+        private bool _invLocked; private int _invShownFrame = -1;
 
         private void OpenInventory(GameManager gm)
         {
-            if (modal == null || gm.Run == null) return;
-            _invPassives = false; _invPage = 0; _invTab = 0;
+            if (modal == null || gm.Run == null || GameHooks.BotDriving) return;
+            _invTab = 0; _invPage = 0;
+            if (_grid == null) _grid = new InventoryGridView { onClose = () => modal.Close(), onFocusChanged = () => { if (InventoryShown) modal.Replace(Inventory(GameManager.Instance)); } };
+            _grid.ResetView();
             modal.Open(Inventory(gm));
+        }
+
+        /// <summary>持ち物の画面 (升目かステータスの頁) が出ているか。</summary>
+        private bool InventoryShown => modal != null && modal.IsOpen && modal.Current != null && _grid != null
+                                       && (modal.Current.canvas == _grid || modal.Current.id == "status_jp");
+
+        /// <summary>出ている間は GameManager のキーを止める (毎フレーム立て直す ── 手引きの板が閉じる時に下ろしても戻す)。 BOT が動き出したら閉じる。</summary>
+        private void SyncInventoryInput()
+        {
+            bool shown = InventoryShown;
+            if (shown && GameHooks.BotDriving) { modal.Close(); shown = false; }
+            if (shown)
+            {
+                GameManager.InputBlockedByScreen = true; _invLocked = true; _invShownFrame = Time.frameCount;
+                // ステータスの頁の Esc は升目へ戻る (升目の Esc は InventoryGridView が閉じる)
+                if (modal.Current.id == "status_jp" && !Game2DTutorial.Blocking && Input.GetKeyDown(KeyCode.Escape)) { _invTab = 0; _invPage = 0; modal.Replace(Inventory(GameManager.Instance)); }
+            }
+            else if (_invLocked && Time.frameCount > _invShownFrame + 1)      // 閉じた次のフレームまで止め続ける (閉じた時の Esc・Space が GameManager に届かない)
+            {
+                _invLocked = false;
+                if (!Game2DLoadingScreen.Blocking && !Game2DTutorial.Blocking) GameManager.InputBlockedByScreen = false;      // ほかの画面が立てている時は触らない
+            }
         }
 
         private ScreenDef Inventory(GameManager gm)
         {
             if (_invTab == 2) return Status(gm);
             var run = gm.Run;
-            var ids = new List<string>();
-            var src = _invPassives ? run.ownedPassiveItems : run.ownedConsumables;
-            if (src != null) foreach (var id in src) if (_invPassives || !ids.Contains(id)) ids.Add(id);
-            int pages = Mathf.Max(1, (ids.Count + InvPerPage - 1) / InvPerPage); _invPage = Mathf.Clamp(_invPage, 0, pages - 1);
-            int first = _invPage * InvPerPage, cnt = Mathf.Min(InvPerPage, ids.Count - first);
-            var d = new ScreenDef { id = "inventory_jp", jp = true, w = 460, cols = 2,
-                title = _invPassives ? "所持品 ― 秘宝" : "所持品 ― 消耗品",
+            _grid.SetItems(ItemCards.Collect(run));
+            var d = new ScreenDef { id = "inventory_grid", jp = true, w = InventoryLayout.W, h = InventoryLayout.H, canvas = _grid,
+                title = "持ち物",
                 sub = "HP " + run.playerHP + "/" + run.playerMaxHP + "  物資 " + run.provision + "/" + run.provisionCap + "  " + run.coins + "G" };
-            for (int i = 0; i < cnt; i++)
-            {
-                string id = ids[first + i]; var data = ItemSystem.ItemDatabase.Instance?.GetItem(id);
-                int n = 0; if (!_invPassives) foreach (var c in run.ownedConsumables) if (c == id) n++;
-                string block = _invPassives ? null : Consumables.BlockReason(run, id);      // 今は使えない消耗品は暗く・理由は説明の下に
-                string desc = data?.description;
-                if (block != null) desc = string.IsNullOrEmpty(desc) ? "(" + block + ")" : desc + "\n(" + block + ")";
-                d.Items.Add(new ModalItem { icon = id, rarity = data != null ? data.rarity : (ItemSystem.ItemRarity?)null,
-                    name = ItemSystem.ItemDatabase.DisplayNameOf(data, id), value = _invPassives ? null : "x" + n, desc = desc, disabled = block != null });
-            }
-            if (ids.Count == 0) d.body = _invPassives ? "秘宝を持っていない。" : "消耗品を持っていない。";
-            if (!_invPassives) d.buttons.Add(new ModalBtn { label = "使う", action = "use", primary = true });
-            d.buttons.Add(new ModalBtn { label = _invPassives ? "ステータスへ" : "秘宝へ", action = "tab" });
-            if (pages > 1) d.buttons.Add(new ModalBtn { label = "次の頁 " + (_invPage + 1) + "/" + pages, action = "page" });
+            var f = _grid.Focused;
+            if (f != null && f.usable) d.buttons.Add(new ModalBtn { label = "使う", action = "use", primary = true });
+            d.buttons.Add(new ModalBtn { label = "ステータス", action = "tab" });
             d.buttons.Add(new ModalBtn { label = "閉じる", action = "close" });
-            d.footer = _invPassives ? "秘宝 " + ids.Count + " 個" : "使う品を選ぶ (シールド・油は次の戦闘の開幕に効く)";
-            d.onAction = (a, sel) =>
+            d.footer = "矢印で選ぶ  Space で詳細を送る  Esc で閉じる";
+            d.onAction = (a, _) =>
             {
                 switch (a)
                 {
                     case "close": modal.Close(); return;
-                    case "tab": _invTab = (_invTab + 1) % 3; _invPassives = _invTab == 1; _invPage = 0; break;
-                    case "page": _invPage = (_invPage + 1) % pages; break;
+                    case "tab": _invTab = 2; _invPage = 0; break;
                     case "use":
-                        if (sel < 0 || sel >= cnt) return;
-                        string why = Consumables.BlockReason(run, ids[first + sel]);
+                    {
+                        var c = _grid.Focused;
+                        if (c == null || !c.usable) return;
+                        string why = Consumables.BlockReason(run, c.key);
                         if (why != null) { Game2DSfx.Play("ui_click"); modal.ShowToast(why); return; }
-                        if (Consumables.Use(run, ids[first + sel])) { Game2DSfx.Play("ui_confirm"); modal.ShowToast("使った"); }
+                        if (Consumables.Use(run, c.key)) { Game2DSfx.Play("ui_confirm"); modal.ShowToast("使った"); }
                         else { modal.ShowToast("今は使えない"); return; }
                         break;
+                    }
                 }
                 modal.Replace(Inventory(gm));
             };
@@ -383,13 +400,13 @@ namespace UI.Game2D
                 d.footer = "受けている挑戦カード " + run.challengePicks.Count + " 枚 (同じ種類はランで 1 度だけ)";
             }
             else d.footer = "挑戦カードはまだ受けていない";
-            d.buttons.Add(new ModalBtn { label = "消耗品へ", action = "tab", primary = true });
+            d.buttons.Add(new ModalBtn { label = "持ち物へ", action = "tab", primary = true });
             if (pages > 1) d.buttons.Add(new ModalBtn { label = "次の頁 " + (_invPage + 1) + "/" + pages, action = "page" });
             d.buttons.Add(new ModalBtn { label = "閉じる", action = "close" });
             d.onAction = (a, sel) =>
             {
                 if (a == "close") { modal.Close(); return; }
-                if (a == "tab") { _invTab = 0; _invPassives = false; _invPage = 0; }
+                if (a == "tab") { _invTab = 0; _invPage = 0; }
                 if (a == "page") _invPage = (_invPage + 1) % pages;
                 modal.Replace(Inventory(gm));
             };
