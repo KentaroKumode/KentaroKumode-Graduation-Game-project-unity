@@ -83,6 +83,8 @@ namespace AutoTest.ParallelSweep
         public bool ashBaseRevisit;
         public int ashBaseChoice = -1, ashBaseTurn = -1;
         public bool ashBaseOpened;
+        /// <summary>[計装 2026-11-14] 〈徒労〉の記録 (AutoRunner.RunRec と同じ意味): 掛かった通常の戦闘の勝ち・止めた品のドロップ・開けた宝箱・〈徒労〉で空だった宝箱。</summary>
+        public int toilNothingBattles, toilBlockedDrops, chestsOpened, toilEmptyChests;
 
         public static LearnRunRow From(AutoRunner.RunRec r)
         {
@@ -114,6 +116,7 @@ namespace AutoTest.ParallelSweep
                 startClass = r.startClass ?? "",
                 ashBase = r.ashBase, ashBaseRevisit = r.ashBaseRevisit, ashBaseChoice = r.ashBaseChoice, ashBaseTurn = r.ashBaseTurn,
                 ashBaseOpened = r.ashBaseOpened,
+                toilNothingBattles = r.toilNothingBattles, toilBlockedDrops = r.toilBlockedDrops, chestsOpened = r.chestsOpened, toilEmptyChests = r.toilEmptyChests,
             };
         }
 
@@ -504,6 +507,8 @@ namespace AutoTest.ParallelSweep
                 "handCarry", "handKeepPolicy", "EffectiveHandKeepPolicy", "bossDown", "depth3Heavy",
                 // 2026-11-13: 博士の時計をランの最初から預かる腕 (False = 既定・イベントで選んだ時だけ)
                 "vescaClockHeld",
+                // 2026-11-14: 〈徒労〉の形 (Stacks = 今の形・既定 / LayerLong = 層の間ずっと) と、 別の形で宝箱が空になる確率 (%)
+                "toilMode", "toilChestEmptyPct",
                 // 2026-11-13: 配線の旧の式が、 攻撃の端子に挿さない手にも武器の素火力を数える旧い挙動へ戻す腕 (False = 直した挙動)
                 "v3.oldNoAttackBaseDmg",
                 // 2026-11-12 (#134): Optimal の配線のミスの率 (0 = ミスなし・Super と素朴版は経路を通らない)

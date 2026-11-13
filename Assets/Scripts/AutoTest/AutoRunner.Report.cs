@@ -1966,8 +1966,19 @@ namespace AutoTest
             }
             turns.Sort();
             string med = turns.Count > 0 ? turns[turns.Count / 2].ToString() : "-";
+            // [計装 2026-11-14] 〈徒労〉の記録 (全ラン): 掛かった通常の戦闘の勝ち・止めた品のドロップ・開けた宝箱・〈徒労〉で空だった宝箱
+            long toilFights = 0, toilDrops = 0, chests = 0, emptyChests = 0; int toilRuns = 0;
+            foreach (var r in _records)
+            {
+                if (r == null) continue;
+                toilFights += r.toilNothingBattles; toilDrops += r.toilBlockedDrops; chests += r.chestsOpened; emptyChests += r.toilEmptyChests;
+                if (r.toilNothingBattles > 0 || r.toilEmptyChests > 0) toilRuns++;
+            }
             return $"灰に埋もれた基地 (深さ 6 = 画面の第 4 層): 深さ 6 へ届いた {reached} ラン / 起きた {fired} (うち再訪の版 {revisit}・終点の安全弁 {valve}・起きた手番の中央値 {med}) / 起きなかった {missed} / 手記の最後の頁を開いた {opened}"
-                 + $" (ashKingBeatenEver={ashKingBeatenEver}・suppressEvents={suppressEvents}・安全弁のプロセス通算 {GameLoop.GameManager.AshBaseValveCount})";
+                 + $" (ashKingBeatenEver={ashKingBeatenEver}・suppressEvents={suppressEvents}・安全弁のプロセス通算 {GameLoop.GameManager.AshBaseValveCount})"
+                 + System.Environment.NewLine
+                 + $"〈徒労〉({toilMode}・宝箱が空 {toilChestEmptyPct}%): 掛かったラン {toilRuns} / 掛かった通常の戦闘の勝ち {toilFights} (今の形 = 何も得られなかった・別の形 = 品が出なかった)"
+                 + $" / 止めた品のドロップ {toilDrops} / 開けた宝箱 {chests} (全ラン・うち〈徒労〉で空 {emptyChests})";
         }
     }
 }
