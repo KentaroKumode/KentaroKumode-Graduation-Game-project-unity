@@ -153,6 +153,7 @@ namespace AutoTest.ParallelSweep
                 MetaProgression.VaultBank.ResetStats();
                 CombatSystem.GuardDiag.Reset();
                 CombatSystem.TerminalDiag.Reset();
+                TerminalPolicyDiag.Reset();
                 CombatSystem.BossDownDiag.Reset();
                 GameLoop.NavDiag.Reset();
                 CombatSystem.SkillDiag.Reset();
@@ -472,11 +473,23 @@ namespace AutoTest.ParallelSweep
                         for (int i = 0; i < nn.Count; i++) Array.Copy(GameLoop.NavDiag.Rows[nn[i]], 0, response.navDiag, i * NW, NW);
                     }
                     {   // [計装 2026-11-12] 端子ごとの使われ方
+                        CombatSystem.TerminalDiag.FlushShop();   // [#106] 開いている来店を閉じてから写す
                         var tn = new List<string>(CombatSystem.TerminalDiag.Rows.Keys);
                         int TW = CombatSystem.TerminalDiag.Width;
                         response.termDiagNames = tn.ToArray();
                         response.termDiag = new double[tn.Count * TW];
                         for (int i = 0; i < tn.Count; i++) { var r = CombatSystem.TerminalDiag.Rows[tn[i]]; for (int c = 0; c < TW; c++) response.termDiag[i * TW + c] = r[c]; }
+                        // [計装 #106] 場面ごとの提示・見送り / 代わりに取られた端子の組 / BOT の値付け
+                        response.termScenes = (long[])CombatSystem.TerminalDiag.Scenes.Clone();
+                        var pk = new List<string>(CombatSystem.TerminalDiag.Pairs.Keys);
+                        response.termPairKeys = pk.ToArray();
+                        response.termPairCounts = new long[pk.Count];
+                        for (int i = 0; i < pk.Count; i++) response.termPairCounts[i] = CombatSystem.TerminalDiag.Pairs[pk[i]];
+                        var pn = new List<string>(TerminalPolicyDiag.Rows.Keys);
+                        int PW = TerminalPolicyDiag.Width;
+                        response.termPolicyNames = pn.ToArray();
+                        response.termPolicy = new double[pn.Count * PW];
+                        for (int i = 0; i < pn.Count; i++) Array.Copy(TerminalPolicyDiag.Rows[pn[i]], 0, response.termPolicy, i * PW, PW);
                     }
                     for (int i = 0; i < dsn.Count; i++)
                     {

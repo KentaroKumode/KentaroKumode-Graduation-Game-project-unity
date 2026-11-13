@@ -279,6 +279,7 @@ namespace AutoTest
             _lastFreeBlock = fbo.freeBlock && !fbo.killsNow; _lastKillsNow = fbo.killsNow; _lastExpTaken = fbo.taken;
             _lastPredOld = fbo.dmgOld; _lastPredNew = fbo.dmgNew; _lastPredA = fbo.aCount; _lastPredUsed = fbo.dmgUsed;
             _lastPredRaw = fbo.rawNew; _lastPredCritP = st.critP; _lastPredCritMul = st.critMulEff; _lastPredOutMul = st.outMul;
+            int bestPre = best;   // [計装 #106] ミスの前の手
             // [#134] Optimal の配線のミス (wiringMistakeRate): 次点の挿し方を選ぶ。 計装 (上の _last*) は旧と同じく意図した最良の手のまま。
             //   Super・素朴版・Exact はここを通らない (判定の乱数も引かない)。
             if (mayMistake && wiringMistakeRate > 0f && EffectiveWiringSkill == WiringSkill.Optimal && n > 1
@@ -292,7 +293,58 @@ namespace AutoTest
             _lastAttackCandExists = false;
             for (int i = 0; i < n && !_lastAttackCandExists; i++) if (outs[i].aCount > 0) _lastAttackCandExists = true;
             targets = tgts[best];
+            if (mayMistake) NoteDeckPolicyDiag(in ev, k, board, deck, cands, us, touts, best, bestPre);   // [計装 #106] 実際の配線の判断だけ
             return cands[best];
+        }
+
+        /// <summary>[計装 #106] 場の端子ごとに、 選んだ手で発動したか・しなかった理由 (<see cref="TerminalPolicyDiag"/> の [10〜22])。
+        /// 読むだけ ── 列挙と効用は <see cref="ChooseDeckWiring"/> が出した配列をそのまま読む (解き直さない・乱数を引かない)。</summary>
+        private void NoteDeckPolicyDiag(in DeckEval ev, int k, List<string> board, TerminalDeckState deck, List<int[]> cands, float[] us,
+                                        TerminalOutcome[] touts, int best, int bestPre)
+        {
+            float dw = DeckDamageWorth(in ev.st), fw = DeckFutureHpWorth(in ev.st);
+            int turns = DeckEstTurns(in ev.st, k);
+            float draws = Math.Min(turns, turns * (float)TerminalCards.HandSize / Math.Max(1, deck.Remaining));
+            int n = us.Length;
+            for (int s = 0; s < board.Count; s++)
+            {
+                if (deck.state.IsStopped(s)) continue;
+                string id = board[s];
+                var r = TerminalPolicyDiag.Row(id);
+                r[TerminalPolicyDiag.HandTurns]++;
+                r[TerminalPolicyDiag.DwSum] += dw; r[TerminalPolicyDiag.FwSum] += fw; r[TerminalPolicyDiag.DrawsSum] += draws;
+                if (touts[best].fired.Contains(s))
+                {
+                    r[TerminalPolicyDiag.ChosenFire]++;
+                    if (bestPre != best && !touts[bestPre].fired.Contains(s)) r[TerminalPolicyDiag.MistakeFire]++;
+                    continue;
+                }
+                if (Array.IndexOf(cands[best], s) >= 0) { r[TerminalPolicyDiag.PlugNoFire]++; continue; }
+                bool needTarget = TerminalCards.PicksTarget(id);
+                float bestWith = float.NegativeInfinity; bool any = false, firesNoTarget = false;
+                for (int i = 0; i < n; i++)
+                {
+                    var o = touts[i];
+                    if (!o.fired.Contains(s)) continue;
+                    if (needTarget)
+                    {
+                        int t = id == TerminalIds.Copier ? o.copyTarget : id == TerminalIds.BurnOut ? o.burnTarget : o.retainTarget;
+                        if (t < 0) { firesNoTarget = true; continue; }
+                    }
+                    if (!any || us[i] > bestWith) { bestWith = us[i]; any = true; }
+                }
+                if (!any)
+                {
+                    r[TerminalPolicyDiag.NoFeasible]++;
+                    if (firesNoTarget) r[TerminalPolicyDiag.FiresNoTarget]++;
+                    continue;
+                }
+                r[TerminalPolicyDiag.NotChosen]++;
+                float gap = us[best] - bestWith;
+                if (gap <= 1e-4f) r[TerminalPolicyDiag.Tied]++;
+                else if (gap >= 500f) r[TerminalPolicyDiag.Forced]++;
+                else r[TerminalPolicyDiag.GapSum] += gap;
+            }
         }
 
         /// <summary>山札の挿し方の効用の入力 (盤面を 1 回だけ読んだもの)。 <see cref="ChooseDeckWiring"/> と〈猫の手〉の評価 (<see cref="CatPawPick"/>) が使う。</summary>
@@ -928,8 +980,11 @@ namespace AutoTest
         /// 「端子を取ると得か」の対照の腕。 並列の A/B (v3_arm.txt) で <c>terminalsLeaveDeck=True</c>。</summary>
         public bool terminalsLeaveDeck = false;
 
-        /// <summary>報酬の候補 (端子の名前の並び) から 1 つ選ぶ。 戻り値 = 添字・負 = 受け取らない。</summary>
-        private int ChooseTerminalReward(IReadOnlyList<string> offer)
+        /// <summary>報酬の候補 (端子の名前の並び) から 1 つ選ぶ。 戻り値 = 添字・負 = 受け取らない。 (戦闘後の報酬の口 GameHooks.ChooseTerminalReward)</summary>
+        private int ChooseTerminalReward(IReadOnlyList<string> offer) => ChooseTerminalReward(offer, false);
+
+        /// <summary>同上。 <paramref name="shop"/> = 店の棚から選ぶ (計装 #106 の区分だけ・選び方は同じ)。</summary>
+        private int ChooseTerminalReward(IReadOnlyList<string> offer, bool shop)
         {
             if (offer == null || offer.Count == 0 || terminalsLeaveDeck) return -1;
             var run = GameManager.Instance?.Run;
@@ -941,8 +996,10 @@ namespace AutoTest
             float threshold = RewardRejectBelow + RewardThresholdPerCard * Math.Max(0, total - RewardThresholdFreeSize);
 
             int best = -1; float bestScore = float.NegativeInfinity;
+            var diagSc = new float[offer.Count];   // [計装 #106] 候補ごとの点 (判断には使わない)
             for (int i = 0; i < offer.Count; i++)
             {
+                diagSc[i] = float.NegativeInfinity;
                 var d = TerminalCards.Get(offer[i]);
                 if (d == null) continue;
                 float sc = RewardBaseScore(d, run);
@@ -956,9 +1013,12 @@ namespace AutoTest
                 int copies = 0;
                 if (deck != null) foreach (var id in deck) if (id == d.id) copies++;
                 sc -= RewardDupPenalty * copies;
+                diagSc[i] = sc;
                 if (sc > bestScore) { bestScore = sc; best = i; }
             }
-            return bestScore >= threshold ? best : -1;
+            int pick = bestScore >= threshold ? best : -1;
+            TerminalPolicyDiag.NoteReward(offer, diagSc, pick, best, shop);   // [計装 #106]
+            return pick;
         }
 
         /// <summary>端子の素の点 (規則 1)。</summary>
@@ -1006,7 +1066,7 @@ namespace AutoTest
                     if (!s.sold && run.coins - s.price >= TerminalShopReserve) { idx.Add(i); ids.Add(s.id); }
                 }
                 if (ids.Count == 0) break;
-                int pick = ChooseTerminalReward(ids);
+                int pick = ChooseTerminalReward(ids, true);
                 if (pick < 0 || !gm.ShopBuyTerminal(idx[pick])) break;
             }
             // 抜く

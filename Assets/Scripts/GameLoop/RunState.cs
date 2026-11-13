@@ -609,6 +609,7 @@ namespace GameLoop
         {
             if (!isRunActive) return;   // 二重終了で遺物が 2 個出るのを防ぐ
             isRunActive = false;
+            CombatSystem.TerminalDiag.NoteRunEnd(terminalDeck);   // [計装 #106] ランの終わりの山札
             MetaProgression.MetaBuffApplicator.GrantRelicOnRunEnd(currentFloor, bossDefeatedThisFloor);
         }
     }
