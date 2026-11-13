@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using CombatSystem;
+using ItemSystem.PassiveSkills.Effects;
 
 static class T
 {
@@ -541,6 +542,42 @@ static class T
                   && !AutoTest.DownKeepRules.HoldEligibleChargeOrHeavy(true, 2, true, true, false, 760, 750, 30f)
                   && !AutoTest.DownKeepRules.HoldEligibleChargeOrHeavy(false, 2, false, true, false, 760, 750, 30f),
                   "新しい規則の待つ手の条件 (待つとダウンがチャージか大技に重なる = T+1 から見て大技まで 2 か 1)");
+        }
+
+        // 12. 灰燼の王の大技〈業火〉(2026-11-14・作者の決定): 周期は旧〈業火の予兆〉の数え方・1 ターン前はチャージ (攻撃しない)・業火 = 攻撃 ×2 + 烈炎 × 5 (軽減無視)・撃ったら烈炎 0
+        {
+            Escalation.HeavyCycleOffset = 0;
+            Check(HeavyCycle.BlazeBurst(0, 5) == 0 && HeavyCycle.BlazeBurst(3, 5) == 15 && HeavyCycle.BlazeBurst(6, 5) == 30,
+                  "業火の烈炎の分 = 烈炎の数 × 5 (0 / 3 / 6 → 0 / 15 / 30)");
+            float heavyF = HeavyCycle.FactorAt(4, 0, 2.0f, 2.0f, 1.0f, true);
+            int atk = 21;
+            Check(heavyF == 2.0f && (int)(atk * heavyF) + HeavyCycle.BlazeBurst(3, 5) == 57,
+                  $"業火のダメージ = 攻撃 ×2 + 烈炎 × 5 (攻撃 21・烈炎 3 → 42 + 15 = {(int)(atk * heavyF) + HeavyCycle.BlazeBurst(3, 5)})");
+            Check(HeavyCycle.BlazeStacksAfter(6, true) == 0 && HeavyCycle.BlazeStacksAfter(6, false) == 6, "撃った後は烈炎 0・撃たなかった (ダウンで取り消し) 時は持ち越す");
+            string Row(float r, int n)
+            {
+                var L = new List<string>();
+                for (int t = 1; t <= n; t++)
+                {
+                    int to = EmberOmenTiming.TurnsToOmen(t, r);
+                    float f = HeavyCycle.FactorAt(EmberOmenTiming.PeriodFor(r), to, 2.0f, 2.0f, 1.0f, true);
+                    L.Add(to == 0 ? "業火" : f == 0f ? "チャージ" : "小");
+                }
+                return string.Join("|", L);
+            }
+            string hi = Row(0.8f, 9), lo = Row(0.5f, 7);
+            Check(hi == "業火|小|小|チャージ|業火|小|小|チャージ|業火", "HP > 50%: 4 ターンごと (T1/5/9)・1 ターン前はチャージ (攻撃 0) → " + hi);
+            Check(lo == "業火|小|チャージ|業火|小|チャージ|業火", "HP ≤ 50%: 3 ターンごと (T1/4/7) に加速 → " + lo);
+            // ダウン: チャージ (T4) のダウンは業火を取り消し、 周期は明けたターンから頭 (次の業火は T8)。 小技 (T2) のダウンは周期そのまま (次の業火は T5)
+            bool c4 = BossDown.CancelsCycle(DownCancelRule.ChargeOrHeavy, EmberOmenTiming.TurnsToOmen(4, 0.8f), -1, EmberOmenTiming.TurnsToOmen(4, 0.8f));
+            bool c2 = BossDown.CancelsCycle(DownCancelRule.ChargeOrHeavy, EmberOmenTiming.TurnsToOmen(2, 0.8f), -1, EmberOmenTiming.TurnsToOmen(2, 0.8f));
+            int next2 = EmberOmenTiming.NextOmen(2, 0.8f);
+            Escalation.HeavyCycleOffset = 4;
+            int next4 = EmberOmenTiming.NextOmen(4, 0.8f);
+            bool t5 = EmberOmenTiming.IsOmen(5, 0.8f), t8 = EmberOmenTiming.IsOmen(8, 0.8f), ch7 = EmberOmenTiming.TurnsToOmen(7, 0.8f) == 1;
+            Escalation.HeavyCycleOffset = 0;
+            Check(c4 && !c2 && next2 == 5 && next4 == 8 && !t5 && t8 && ch7,
+                  "王のダウン: チャージのターンのダウンは業火を取り消して T8 へ (T7 がチャージ)・小技のダウンは周期そのまま (T5)");
         }
 
         Console.WriteLine(fails == 0 ? "ALL OK" : fails + " FAILED");

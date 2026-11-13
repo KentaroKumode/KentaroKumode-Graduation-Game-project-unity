@@ -1429,6 +1429,9 @@ namespace CombatSystem
                     ctx.AddPlayerDamageSource(ctx.lastDamageCause, fixedTaken);
                 }
 
+                // 灰燼の王の大技〈業火〉(2026-11-14): 烈炎の数 × BlazeBurstPerStack を軽減無視で入れ、 烈炎を 0 に (業火のターンだけ・旧い形では大技が無いので何もしない)
+                takenApplied += ApplyBlazeBurst(ctx);
+
                 // 痛覚遮断剤 (狂戦士) post-clamp (旧法と同一)
                 if (ctx.painkillerArmedThisTurn && playerHP <= 0)
                 {

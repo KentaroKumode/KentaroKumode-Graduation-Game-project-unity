@@ -27,6 +27,11 @@ namespace GameLoop
         public static void Reset() => _n.Clear();
     }
 }
+namespace CombatSystem
+{
+    /// <summary>EmberOmenTiming が読む周期の起点だけ (本物は Escalation.cs・UnityEngine に依存する)。</summary>
+    public static class Escalation { public static int HeavyCycleOffset; }
+}
 namespace ItemSystem.PassiveSkills
 {
     public static class AxisRules { public const string Crit = "会心", Bleed = "出血", Poison = "毒", Heat = "臨界", Charge = "充電", Shield = "シールド"; }

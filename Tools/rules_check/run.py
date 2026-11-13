@@ -19,7 +19,9 @@ RUNTIME = 'C:/Program Files/dotnet/shared/Microsoft.NETCore.App'
 COMBAT = 'Assets/Scripts/CombatSystem'
 SOURCES = ['TerminalCards', 'BossDown', 'MutualAttack', 'HeavyCycle']
 # BOT の判断のうち純粋な部分 (#141・ダウンの狙いと残す印)。 UnityEngine に依存しない
-EXTRA = ['Assets/Scripts/AutoTest/DownKeepRules.cs']
+EXTRA = ['Assets/Scripts/AutoTest/DownKeepRules.cs',
+         # 灰燼の王の〈業火〉の周期 (旧〈業火の予兆〉の数え方・2026-11-14)。 Escalation.HeavyCycleOffset だけ Stubs.cs の代用品を読む
+         'Assets/Scripts/ItemSystem/PassiveSkills/Effects/EmberOmenTiming.cs']
 
 
 def fwd(p):

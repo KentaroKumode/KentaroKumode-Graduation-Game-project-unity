@@ -27,7 +27,7 @@ namespace CombatSystem
                 Debug.Log("[戦闘] " + GameLoop.VescaClock.BattleLine);
             if (VescaClockActive) Debug.Log($"[ダウン] 〈{GameLoop.VescaClock.Name}〉: {enemy?.displayName} の目盛りに {BossParams.VescaClockNotch * 100f:0}% を足した");
             BossDown.ActiveNow = false;
-            if (newCombat) Escalation.HeavyCycleOffset = 0;
+            if (newCombat) { Escalation.HeavyCycleOffset = 0; Escalation.HeavyHpRatio = 1f; }
             BossDownDiag.BeginFight(enemy?.id, _down.Enabled);
         }
 
@@ -50,6 +50,8 @@ namespace CombatSystem
         /// (<see cref="Escalation.HeavyCycleOffset"/>・<see cref="DownCancelsCycleAt"/>・2026-11-14 の作者の決定)。 それ以外のダウンは周期に触らない。</summary>
         private void BeginBossDownTurn(CombatContext ctx)
         {
+            // 灰燼の王の〈業火〉の周期は HP 50% で 4 → 3 ターン (2026-11-14)。 このターンの周期の数え方に使う HP の割合をターンの頭に決める (取り消しの判定より前)
+            Escalation.HeavyHpRatio = currentEnemy != null ? enemyHP / (float)System.Math.Max(1, EnemyMaxHP) : 1f;
             BossDown.ActiveNow = false;
             if (!_down.Enabled || ctx == null) { _down.downNow = false; return; }
             if (!_down.BeginTurn()) return;
@@ -58,7 +60,7 @@ namespace CombatSystem
             // 起点を動かす前に見る。 計装の「取り消した」: 新しい規則 = 大技のチャージか大技のターンに重なった / 旧い規則 (Always) = 今までどおり大技のターンだけ数える
             bool canceled = hadHeavy && (always ? Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn)
                                                 : BossDown.IsChargeOrClimax(Escalation.TurnsToHeavy(currentEnemy, ctx.currentTurn)));
-            if (DownCancelsCycleAt(currentEnemy, ctx.currentTurn, enemyHP / (float)System.Math.Max(1, EnemyMaxHP)))
+            if (DownCancelsCycleAt(currentEnemy, ctx.currentTurn, Escalation.HeavyHpRatio))
                 Escalation.HeavyCycleOffset = ctx.currentTurn;
             _down.heavyCanceledNow = hadHeavy && (always || canceled);   // 画面の「大技は取り消し」(旧い規則はどのダウンでも大技が先へ延びる)
             BossDown.ActiveNow = true;
@@ -81,6 +83,8 @@ namespace CombatSystem
             if (_down.downNow) { t.enemyAttackValue = 0; t.secondaryAttackValue = 0; }
             // 大技のチャージ (2026-11-14): 攻撃しない。 攻撃値は Escalation.HeavyFactor が 0 にしてある (予告も BOT の見込みも同じ関数)。 ここは画面の印だけ
             t.enemyCharging = !_down.downNow && Escalation.IsChargeNoAttack(currentEnemy, t.turn);
+            // 灰燼の王の〈業火〉(2026-11-14): このターンが業火なら、 烈炎の分 (軽減無視・撃ったら烈炎 0)。 ダウンのターンは撃たない
+            t.heavyBurst = _down.downNow ? 0 : BlazeBurstAt(currentEnemy, t.turn, BlazeStacks(ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context));
         }
 
         /// <summary>ターンの終わり (ターン終了時の削りを拾った後): 新しく割った目盛りを数え、 その数だけ次のターンからダウンを待たせる。</summary>
@@ -97,6 +101,52 @@ namespace CombatSystem
             BossDown.ActiveNow = false;
             _down.downNow = false;
             Escalation.HeavyCycleOffset = 0;
+            Escalation.HeavyHpRatio = 1f;
+        }
+
+        // ===== 灰燼の王の大技〈業火〉の烈炎の分 (2026-11-14・作者の決定) =====
+
+        /// <summary>この敵が〈烈炎〉を持ち、 大技を持つ (= 〈業火〉で烈炎を返す) か。 旧い形 (ashKingHeavy=False) では大技が無いので偽。</summary>
+        private static bool HasBlazeBurst(EnemyData e)
+        {
+            if (e == null || e.heavyPeriod <= 0 || e.passiveSkills == null) return false;
+            foreach (var ps in e.passiveSkills)
+                if (ps != null && ps.internalName == ItemSystem.PassiveSkills.Effects.BlazeBrand.Id) return true;
+            return false;
+        }
+
+        /// <summary>ターン <paramref name="turn"/> が〈業火〉なら、 烈炎の分 (軽減無視) = 烈炎の数 × BlazeBurstPerStack。 それ以外・烈炎の無い敵は 0。
+        /// 予告 (<see cref="MutualTurnTelegraph.heavyBurst"/>)・解決 (<see cref="ApplyBlazeBurst"/>)・BOT が同じ関数を読む。</summary>
+        public static int BlazeBurstAt(EnemyData e, int turn, int stacks)
+            => HasBlazeBurst(e) && Escalation.IsHeavyTurn(e, turn)
+             ? HeavyCycle.BlazeBurst(stacks, BossParams.ParamInt(e.id, BossParam.BlazeBurstPerStack)) : 0;
+
+        /// <summary>今の烈炎の数 (戦闘を通して積もる・<see cref="ItemSystem.PassiveSkills.Effects.BlazeBrand.StackKey"/>)。</summary>
+        private static int BlazeStacks(CombatContext ctx)
+            => ctx != null && ctx.accumulatedValues.TryGetValue(ItemSystem.PassiveSkills.Effects.BlazeBrand.StackKey, out var v) ? (int)v : 0;
+
+        /// <summary>〈業火〉を撃ったターン (攻撃の枝・主攻撃の後): 烈炎の分を軽減無視で入れ (シールドは肩代わりする規則に従う・〈蝕み〉と同じ扱い)、 烈炎を 0 に戻す。
+        /// ダウン・チャージ・〈封じ・揃〉のターンは攻撃の枝を通らないので呼ばれない (烈炎は持ち越す)。 戻り値 = HP に入った量。</summary>
+        private int ApplyBlazeBurst(CombatContext ctx)
+        {
+            if (ctx == null || currentEnemy == null || playerHP <= 0) return 0;
+            int raw = BlazeBurstAt(currentEnemy, ctx.currentTurn, BlazeStacks(ctx));
+            if (raw <= 0) return 0;
+            int stacks = BlazeStacks(ctx);
+            ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.BlazeBrand.StackKey] = HeavyCycle.BlazeStacksAfter(stacks, true);
+            int absorbed = CombatContext.ShieldAbsorbsUnmitigable && ctx.consShield > 0
+                ? ItemSystem.PassiveSkills.Keywords.Kw.AbsorbShield(ctx, raw, isAttack: false) : 0;
+            int dmg = raw - absorbed;
+            if (dmg > 0)
+            {
+                playerHP = System.Math.Max(0, playerHP - dmg);
+                ctx.playerCurrentHP = playerHP;
+                ctx.playerDamageThisTurn += dmg;
+                ctx.AddPlayerDamageSource(DeathCause.Judgment, dmg);
+                if (playerHP <= 0) ctx.lastDamageCause = DeathCause.Judgment;
+            }
+            Debug.Log($"[業火] 烈炎 {stacks} × {BossParams.ParamInt(currentEnemy.id, BossParam.BlazeBurstPerStack)} = {raw} (軽減無視・シールド {absorbed} 肩代わり) → HP {playerHP} / 烈炎は 0 へ");
+            return dmg;
         }
     }
 }

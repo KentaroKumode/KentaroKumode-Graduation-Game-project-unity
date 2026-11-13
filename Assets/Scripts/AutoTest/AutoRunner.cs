@@ -246,6 +246,11 @@ namespace AutoTest
         /// <summary>[測定 2026-11-14] 大技の周期の倍率の上書き ("id:小技:大技,…"・id に * で大技を持つ敵全部・CombatSystem.EnemyDatabase.HeavyOverrideSpec)。
         /// 空 (既定) = enemies.json のまま。 旧い値 (2e76c46 の main) は "boss_layer5:0.7:2.0,boss_layer5_hidden:0.7:2.0,boss_layer7:0.7:1.75,boss_layer7_p2:0.7:1.75,boss_layer7_p3:0.7:1.75,boss_layer7_p4:0.7:1.75"。</summary>
         public string enemyHeavySpec = "";
+        /// <summary>[測定 2026-11-14] 灰燼の王の大技〈業火〉(既定 true)。 false = 旧い形 (大技なし・〈業火の予兆〉の予兆ターンに攻撃 +JudgmentDice)。 本体の GameHooks.AshKingHeavyDisabled へ流す。
+        /// 2e76c46 の main と同じ王は <c>ashKingHeavy=False blazeTickEachTurn=True</c>。</summary>
+        public bool ashKingHeavy = true;
+        /// <summary>[測定 2026-11-14] 〈烈炎〉のターン開始時の削り (烈炎の数だけ軽減無視) を残すか。 既定 false = 削らない (業火でまとめて返る)。 本体の GameHooks.BlazeTickEachTurn へ流す。</summary>
+        public bool blazeTickEachTurn = false;
         /// <summary>[測定 2026-11-13] 深さ 3 のボス 3 体の大技の周期 (CombatSystem.BossParams.Depth3Heavy)。 既定 true = 足す。 false = 旧い作り (大技なし)。
         /// 本体の GameHooks.Depth3HeavyDisabled へ流す。</summary>
         public bool depth3Heavy = true;
@@ -820,6 +825,8 @@ namespace AutoTest
                  + $"/ ダウンの大技の取り消し {(downCancelRule == CombatSystem.DownCancelRule.Always ? "どのダウンでも周期を頭に戻す (旧い規則)" : "チャージか大技のターンに重なった時だけ")} (downCancelRule={downCancelRule}) "
                  + $"/ 大技のチャージ {(heavyChargeNoAttack ? "攻撃しない" : "小技の倍率で攻撃する (旧い作り)")} (heavyChargeNoAttack={heavyChargeNoAttack}) "
                  + $"/ 大技の倍率 {(string.IsNullOrEmpty(enemyHeavySpec) ? "enemies.json のまま" : "上書き")} (enemyHeavySpec='{enemyHeavySpec}') "
+                 + $"/ 灰燼の王 {(ashKingHeavy ? "大技〈業火〉(攻撃 ×大技 + 烈炎 × 業火の倍率・チャージは攻撃しない)" : "旧い形 (予兆のターンに攻撃 +N)")} (ashKingHeavy={ashKingHeavy}) "
+                 + $"/ 烈炎の毎ターンの削り {(blazeTickEachTurn ? "あり (旧い形)" : "なし")} (blazeTickEachTurn={blazeTickEachTurn}) "
                  + $"/ ダウンの狙い {(downAimPolicy == DownAimPolicy.Aim ? (downCancelRule == CombatSystem.DownCancelRule.Always ? "大技が 2 ターン後なら待って大技に重ねる手も比べる" : "待つとダウンがチャージか大技に重なるなら待つ手も比べる") : "割れる時に割る (今まで)")} (downAimPolicy={downAimPolicy}) "
                  + $"/ 深さ 3 のボスの大技 {(depth3Heavy ? "あり" : "なし (旧い作り)")} "
                  + $"/ 博士の時計 {(vescaClockHeld ? "ランの最初から預かる (ヴェスカの各段に目盛り +" + CombatSystem.BossParams.VescaClockNotch.ToString("0.00") + ")" : "預からない (イベントで選んだ時だけ)")} (vescaClockHeld={vescaClockHeld}) "
@@ -1139,7 +1146,8 @@ namespace AutoTest
             var e = CombatSystem.EnemyDatabase.Get(id);
             var ci = System.Globalization.CultureInfo.InvariantCulture;
             return $"/ 灰燼の王 (上書きあり) 基礎の攻撃 {(e != null ? e.baseAttack.ToString() : "?")} 最大 HP {(e != null ? e.maxHP.ToString() : "?")}"
-                 + $" 予兆 +{BossParamSpec.Effective(o, id, CombatSystem.BossParam.JudgmentDice).ToString("0.##", ci)}"
+                 + $" 予兆 +{BossParamSpec.Effective(o, id, CombatSystem.BossParam.JudgmentDice).ToString("0.##", ci)}{(ashKingHeavy ? " (業火の形では使わない)" : "")}"
+                 + $" 業火の烈炎 1 つあたり {BossParamSpec.Effective(o, id, CombatSystem.BossParam.BlazeBurstPerStack).ToString("0.##", ci)}{(ashKingHeavy ? "" : " (旧い形では使わない)")}"
                  + $" 憤怒 +{BossParamSpec.Effective(o, id, CombatSystem.BossParam.FuryAttack).ToString("0.##", ci)}"
                  + $" 再生 {(BossParamSpec.Effective(o, id, CombatSystem.BossParam.RegrowthRate) * 100f).ToString("0.##", ci)}%"
                  + $" (enemyAttackSpec='{enemyAttackSpec}' enemyHpSpec='{enemyHpSpec}' bossParamSpec='{bossParamSpec}') ";

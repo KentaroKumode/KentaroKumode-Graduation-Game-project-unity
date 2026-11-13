@@ -84,6 +84,8 @@ namespace AutoTest
             GameLoop.GameHooks.BossDownDisabled = !bossDown;                             // [測定 2026-11-13] ボスのダウン
             GameLoop.GameHooks.DownCancel = downCancelRule;                              // [測定 2026-11-14] ダウンが周期を取り消す条件
             GameLoop.GameHooks.HeavyChargeNoAttack = heavyChargeNoAttack;                // [測定 2026-11-14] 大技のチャージは攻撃しない
+            GameLoop.GameHooks.AshKingHeavyDisabled = !ashKingHeavy;                     // [測定 2026-11-14] 灰燼の王の大技〈業火〉
+            GameLoop.GameHooks.BlazeTickEachTurn = blazeTickEachTurn;                    // [測定 2026-11-14] 烈炎の毎ターンの削り
             GameLoop.GameHooks.Depth3HeavyDisabled = !depth3Heavy;                       // [測定 2026-11-13] 深さ 3 のボスの大技
             GameLoop.GameHooks.VescaClockHeldAtStart = vescaClockHeld;                   // [測定 2026-11-13] 博士の時計 (StartNewRun が読む)
             CombatSystem.BossParams.Overrides = BossParamOverrides;                      // [測定 2026-11-14] ボスの機構の値 (bossParamSpec・空なら null = 本番と同じ)

@@ -78,7 +78,7 @@ namespace UI.Game2D
                 h = h * 31 + (cm != null ? cm.EnemyHP : 0);
                 h = h * 31 + (cm != null ? cm.SecondaryEnemyHP : 0);
                 if (ctx != null) { h = h * 31 + ctx.enemyDefense; h = h * 31 + ctx.EnemyPoison; h = h * 31 + ctx.enemyBleedStacks; }
-                if (s != null) { h = h * 31 + s.turn; h = h * 31 + s.eatk; h = h * 31 + s.Stage; h = h * 31 + s.guardIn; h = h * 31 + s.heavyIn; h = h * 31 + (int)s.phase; h = h * 31 + s.downPending + (s.down ? 7 : 0) + (s.charging ? 3 : 0) + s.downBroken * 13; }
+                if (s != null) { h = h * 31 + s.turn; h = h * 31 + s.eatk; h = h * 31 + s.Stage; h = h * 31 + s.guardIn; h = h * 31 + s.heavyIn; h = h * 31 + (int)s.phase; h = h * 31 + s.downPending + (s.down ? 7 : 0) + (s.charging ? 3 : 0) + s.burst * 17 + s.downBroken * 13; }
                 return h;
             }
         }
@@ -109,7 +109,7 @@ namespace UI.Game2D
                 sb.Append(s.turn).Append(" ターン目   激化の段階 ").Append(s.Stage).Append(s.NextStageIn >= 0 ? " (次の段階まで " + s.NextStageIn + " ターン)" : " (最大)").Append('\n');
                 var plan = new System.Collections.Generic.List<string>();
                 if (s.guardIn == 0) plan.Add("このターンは構え (防御が上がる)"); else if (s.guardIn > 0) plan.Add("構えまで " + s.guardIn + " ターン");
-                if (s.heavyIn == 0) plan.Add("このターンは大技"); else if (s.charging) plan.Add("このターンはチャージ (攻撃しない・次のターンが大技)"); else if (s.heavyIn > 0) plan.Add("大技まで " + s.heavyIn + " ターン");
+                if (s.heavyIn == 0) plan.Add("このターンは大技" + (s.burst > 0 ? " (烈炎の分 " + s.burst + " は軽減無視)" : "")); else if (s.charging) plan.Add("このターンはチャージ (攻撃しない・次のターンが大技)"); else if (s.heavyIn > 0) plan.Add("大技まで " + s.heavyIn + " ターン");
                 // ボスのダウン (2026-11-13): ダウン中・後に続くダウン・次の目盛りまでの残り。 大技の取り消しはチャージか大技のターンに重なった時だけ (2026-11-14)
                 if (s.down) plan.Add("このターンはダウン (攻撃しない・受けるダメージ ×" + CombatSystem.BossDown.TakenMul.ToString("0.0")
                                      + (e.heavyPeriod > 0 && cm.Down.heavyCanceledNow ? "・大技は取り消し" : "") + ")");

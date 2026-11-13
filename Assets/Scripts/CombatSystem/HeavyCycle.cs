@@ -26,11 +26,22 @@ namespace CombatSystem
         /// <paramref name="lightMul"/> = 小技の倍率・0 以下なら 1 / <paramref name="chargeNoAttack"/> = チャージは攻撃しない (既定 true)。
         /// 大技を持たない敵 (周期 0 以下) は 1。</summary>
         public static float Factor(int period, int cycleTurn, float heavyMul, float heavyMulWithBonus, float lightMul, bool chargeNoAttack)
+            => FactorAt(period, TurnsToHeavy(period, cycleTurn), heavyMul, heavyMulWithBonus, lightMul, chargeNoAttack);
+
+        /// <summary><see cref="Factor"/> を「大技まで何ターンか」(<paramref name="turnsToHeavy"/>) から引く形。 周期の数え方が標準でない敵
+        /// (灰燼の王の〈業火〉・HP で周期が変わる) も同じ式を通す。 <paramref name="period"/> は「チャージのターンがあるか」(2 以上) と「大技を持つか」(1 以上) だけに使う。</summary>
+        public static float FactorAt(int period, int turnsToHeavy, float heavyMul, float heavyMulWithBonus, float lightMul, bool chargeNoAttack)
         {
             if (period <= 0) return 1f;
-            if (TurnsToHeavy(period, cycleTurn) == 0) return heavyMul > 0f ? heavyMulWithBonus : 1f;
-            if (chargeNoAttack && IsCharge(period, cycleTurn)) return 0f;
+            if (turnsToHeavy == 0) return heavyMul > 0f ? heavyMulWithBonus : 1f;
+            if (chargeNoAttack && period >= 2 && turnsToHeavy == 1) return 0f;
             return lightMul > 0f ? lightMul : 1f;
         }
+
+        /// <summary>灰燼の王の〈業火〉のうち、 烈炎の分 (軽減無視) = 烈炎の数 × <paramref name="perStack"/>。 撃った後、 烈炎は 0 に戻る。 負は 0。</summary>
+        public static int BlazeBurst(int stacks, int perStack) => stacks > 0 && perStack > 0 ? stacks * perStack : 0;
+
+        /// <summary>〈業火〉のターンの後の烈炎: 撃った (<paramref name="fired"/>) なら 0、 撃たなかった (ダウン・チャージ・〈封じ・揃〉で攻撃しなかった) なら持ち越す。</summary>
+        public static int BlazeStacksAfter(int stacks, bool fired) => fired ? 0 : stacks;
     }
 }

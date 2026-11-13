@@ -695,11 +695,11 @@ ProcessDamage の中の OnPreDealDamage は「その陣営が攻撃している�
 | MirrorTwinsResponse(鏡映の応答) | OnPostReceiveDamage/OnTurnStart | 閾値 `Thr = max(12, ボス最大HP×4%)`。与ダメ<Thr で reflect=min(MirrorReflectCap=9, Thr−ダメ)を蓄積、次T開始で軽減無視の反射 |
 | JudgmentFlames(審判の炎) | OnTurnEnd | `dmg=min(ChipCap, 1+ceil(currentTurn/3)+罪)`、実プレイヤーへ軽減無視（罪=totalBattles/8,max2 / ChipCap 基準 10・`BossParams` の基準値）。ターン係数は 2026-07-28 に 1→1/2、2026-08-15 に 1/2→1/3 へ緩和（15T 累積 108→90・上限は T≥19 まで届かない）。**シールドは肩代わりする**（③-C） |
 | JudgmentBlaze / AshArmor / AshCarapace | — | 旧 6 層ボスの機構。**[未装備]**（6 層は下の 5 つで組み直した・数値はクラスの XML コメント）。同じ旧機構の RoyalEmber / SinChain / EternalBurning / ReturnToAshes / ImmortalEmber / EmberAura / StarfireProliferation / ScorchedEarth は 2026-11-12 に削除（GAME.md §24） |
-| EmberOmen(業火の予兆) | OnTurnStart | 予兆ターン = HP>50% は T1/5/9…（周期4）、HP≤50% は T1/4/7…（周期3）。予兆Tだけ攻撃 +JudgmentDice（基準 12・2026-11-14 に 8 から）。**[#104 修正]** 焦土契約と同じ差分更新（自分の寄与 `ember_omen_applied` を毎T頭に「予兆なら JudgmentDice、それ以外 0」へ合わせて `enemyDiceTotalBonus` を足し引き）。旧: `+=` を戻す処理が無く、予兆のたびに積み上がっていた |
-| AshRegrowth(灰の再生) | OnTurnStart | HP>50% かつ非予兆T: 最大HP × RegrowthRate（基準 0.03 = 3%・`BossParams`）回復（切り捨て・最低1）。2026-11-14 に直書きの 0.02f を `BossParam.RegrowthRate` へ移し（式は同じ）、同日 0.03 へ |
+| EmberOmen(業火・旧 業火の予兆) | OnTurnStart | **2026-11-14〜 王の大技〈業火〉の周期**（`EnemyData.heavyCycle = ember`・`Escalation.TurnsToHeavy` が `EmberOmenTiming` を読む）: 業火のターン = 旧予兆ターン（HP>50% は T1/5/9…・HP≤50% は T1/4/7…・HP の割合はターンの頭の `Escalation.HeavyHpRatio`）。1 ターン前はチャージ（攻撃しない）。業火 = 攻撃 × heavyMul（2.0）+ 烈炎 × `BlazeBurstPerStack`（基準 5・軽減無視・シールドは肩代わり・撃ったら烈炎 0・`CombatManager.ApplyBlazeBurst`）。小技 × heavyLightMul（1.0）。このパッシブ自身は攻撃 +N を積まない。旧い形（口 `ashKingHeavy=False`）: 予兆ターン = HP>50% は T1/5/9…（周期4）、HP≤50% は T1/4/7…（周期3）。予兆Tだけ攻撃 +JudgmentDice（基準 12・2026-11-14 に 8 から）。**[#104 修正]** 焦土契約と同じ差分更新（自分の寄与 `ember_omen_applied` を毎T頭に「予兆なら JudgmentDice、それ以外 0」へ合わせて `enemyDiceTotalBonus` を足し引き）。旧: `+=` を戻す処理が無く、予兆のたびに積み上がっていた |
+| AshRegrowth(灰の再生) | OnTurnStart | HP>50% かつ非予兆T（= 業火でないターン・チャージのターンは回復する）: 最大HP × RegrowthRate（基準 0.03 = 3%・`BossParams`）回復（切り捨て・最低1）。2026-11-14 に直書きの 0.02f を `BossParam.RegrowthRate` へ移し（式は同じ）、同日 0.03 へ |
 | EmberFury(憤怒の残滓) | OnTurnStart | T頭の HP≤50% のT: 攻撃 +FuryAttack（基準 5・2026-11-14 に定数 `EmberFury.Bonus` = 3 から `BossParam.FuryAttack` へ移し、同日 5 へ）（それ以外 0）。**[#104 修正]** 業火の予兆と同じ差分更新（`ember_fury_applied`）。旧: 毎ターン `+=` で積み上がっていた |
 | ScorchedPact(焦土契約) | OnRollWin/OnTurnStart | 収支負けでスタック+1（上限5）。毎T 差分更新で `enemyDiceTotalBonus` に現在スタック×1 を反映（累積しない） |
-| BlazeBrand(烈炎) | OnTurnEnd/OnTurnStart | ブロック端子へ 2 本以上のT終了時に烈炎+1 / T開始時に烈炎の数だけ軽減無視ダメ |
+| BlazeBrand(烈炎) | OnTurnEnd/OnTurnStart | ブロック端子へ 2 本以上のT終了時に烈炎+1。2026-11-14〜: T開始時の削りは無し（積もった烈炎は〈業火〉で × BlazeBurstPerStack にまとめて返り、撃ったら 0。業火がダウン・〈封じ・揃〉で撃たれなければ持ち越す）。口 `blazeTickEachTurn=True` で旧い削り（T開始時に烈炎の数だけ軽減無視ダメ）も残す |
 | Decree13th(13番目の宣告) | OnTurnStart/OnTurnEnd | 1/13でフラグ、本体が生存していれば成就で ceil((playerDiceTotal+enemyDiceTotal)×2.0) を軽減無視で実プレイヤーへ（2.0 は定数。プレイヤーの criticalMultiplier は 2026-08-08 から読まない・シールドは肩代わり） |
 | SaintGeorgesPhases(シュヴァリエ) | 多数 | 開幕プリオリテ1。形態1: シールド = 140−28×プリオリテ（最低28）が主攻撃を吸う・収支プラスのTに (プレイヤーの出目の合計+プリオリテ×7) の不可避反撃＋シールド−25 / 形態2: 連勝報酬（次T ボスの攻撃+4、そのTも収支プラスならボスへ15）・ボスの収支 3 勝で形態1帰還 / 帰還ごとにプリオリテ+1。**[#104 修正]** 形態1の 0d0（`extraDice=−4`）: `EnemyData.RollAttack` が引く回数を max(0, 1 + extra) にしたので、形態1は攻撃ロールを引かない（**基礎攻撃 × 大技・段階の倍率は残る**・「攻撃しない」とは読んでいない）。反撃のHP減と形態2の「ボスへ15」: 収支トリガーの後に CombatManager が ctx の HP を拾う（§9.3）ので残る。旧: 引く回数が max(1, …) で負の値が効かず、HP の増減は FinishTurnCommon の書き戻しで消えていた |
 | RelicScholar(遺物学者) | OnTurnStart/OnTurnEnd | 毎T 遺物を 1 枚抽選（段の切り替え直後は新等級から・天与の才の次Tは 2 枚）。`enemyDiceTotalBonus` = 遺物 + 溜め打ち を `=` で一括代入（停滞の加算は 2026-11-12 #103 で無くなった）。OnTurnEnd で大出血の tick。抽選結果は `MutualTurnTelegraph.drawnRelics` に載るが画面は未配線 |
@@ -922,7 +922,9 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                        値 (2026-11-14・仮置き): 5 層・5 層裏・ヴェスカ p1〜p4 = 周期 3・小技 ×0.8・チャージ 攻撃なし・大技 ×3.0
                          (それまで 小技 = チャージ ×0.7・大技 ×2.0 / ヴェスカ ×1.75)。 深さ 3 のボス = 周期 3・小技 ×0.6・大技 ×2.0 (BossParams.Depth3Heavy*)。
                        測定の口 enemyHeavySpec="id:小技:大技,…" (id に * で大技を持つ全員) で上書き。
-                       対象: 5 層以降のボス (5 層・5 層裏・ヴェスカ p1〜p4)。 6 層は〈業火の予兆〉が同じ役なので無し。
+                       対象: 5 層以降のボス (5 層・5 層裏・ヴェスカ p1〜p4)・深さ 3 のボス (BossParams.Depth3Heavy)・6 層 灰燼の王 (2026-11-14〜 大技〈業火〉:
+                         周期は旧〈業火の予兆〉の数え方 (heavyCycle = ember・HP で 4 / 3)・小技 ×1.0・大技 ×2.0・業火のターンは別に烈炎 × BlazeBurstPerStack の軽減無視。
+                         測定の口 ashKingHeavy=False で旧い形 = 大技なし・予兆ターンに攻撃 +JudgmentDice)。
                      × 構え倍率 (2026-11-04・EnemyData.guardPeriod > 0 の敵だけ): currentTurn % guardPeriod == 0 → guardAttackMul
                      × 先手倍率 (2026-11-04・EnemyData.openingTurns > 0 の敵だけ): currentTurn ≤ openingTurns → openingAttackMul
                      ボス倍率 = 挑戦〈天変地異〉(ボスのみ)

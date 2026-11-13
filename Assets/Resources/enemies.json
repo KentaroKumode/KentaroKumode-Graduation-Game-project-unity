@@ -1410,14 +1410,14 @@
       "passiveSkills": [
         {
           "internalName": "EmberOmen",
-          "skillName": "業火の予兆",
-          "description": "HP>50%は周期4T (T1/5/9...)、HP≤50%は周期3T (T1/4/7...) に加速。予兆ターンは攻撃+{JudgmentDice}。",
+          "skillName": "業火",
+          "description": "大技。HP>50%は4ターンごと (T1/5/9...)、HP≤50%は3ターンごと (T1/4/7...)。業火の1ターン前はチャージで、攻撃しない。業火は攻撃×2に加え、烈炎の数×{BlazeBurstPerStack}の軽減無視ダメージ。撃つと烈炎は0に戻る。",
           "flavorText": "火が小さくなる。次に大きくなるまでの間だけ、息ができる。"
         },
         {
           "internalName": "AshRegrowth",
           "skillName": "灰の再生",
-          "description": "HP>50%のとき毎ターン最大HPの{RegrowthRate%}%回復（Phase1: 灰をまといながら耐える）。予兆ターンは回復なし。",
+          "description": "HP>50%のとき毎ターン最大HPの{RegrowthRate%}%回復（Phase1: 灰をまといながら耐える）。業火のターンは回復なし。",
           "flavorText": "削った分が灰になり、灰がまた形を取る。順番が変わっただけだった。"
         },
         {
@@ -1435,13 +1435,17 @@
         {
           "internalName": "BlazeBrand",
           "skillName": "烈炎",
-          "description": "出目2個以上に防御の端子を挿したターン終了時、烈炎+1。ターン開始時、烈炎の数だけ軽減無視ダメージ。",
+          "description": "出目2個以上に防御の端子を挿したターン終了時、烈炎+1。積もった烈炎は業火で返ってくる。",
           "flavorText": "盾を構えるほど、灰は厚く積もる。焼かれているのは腕ではなく、迷っている時間の方だ。"
         }
       ],
       "baseAttack": 21,
       "attackRollMin": 2,
-      "attackRollMax": 6
+      "attackRollMax": 6,
+      "heavyPeriod": 4,
+      "heavyMul": 2.0,
+      "heavyLightMul": 1.0,
+      "heavyCycle": "ember"
     },
     {
       "id": "boss_layer7",

@@ -719,8 +719,9 @@ namespace AutoTest
             }
             if (!any) return false;
             // 次のターンから 1 周期ぶんの敵の攻撃の見込み (本体の式 Escalation.EnemyAttackValue を通す・BOT は写しを持たない)
-            var cyc = new List<int>(enemy.heavyPeriod);
-            for (int j = 0; j < enemy.heavyPeriod; j++) cyc.Add(ExpectedEnemyAttackAt(enemy, ctx, in tele, tele.turn + 1 + j, 0));
+            int cycLen = oldRule ? enemy.heavyPeriod : Math.Max(1, Escalation.HeavyPeriodNow(enemy));   // 王の〈業火〉は HP で 4 / 3 (旧い規則の式は今までどおり)
+            var cyc = new List<int>(cycLen);
+            for (int j = 0; j < cycLen; j++) cyc.Add(ExpectedEnemyAttackAt(enemy, ctx, in tele, tele.turn + 1 + j, 0));
             int nextAtk = cyc[0];
             float hpUnit = st.ledger ? 1f : st.wDef;
             float downValue = DownNextTurnShare * Math.Max(0, nextAtk) * hpUnit;     // 割る手が OptimalUtilityCore で得るのと同じ (ダウンは失わず 1 ターン後へ)
