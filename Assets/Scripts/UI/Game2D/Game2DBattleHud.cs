@@ -924,6 +924,9 @@ namespace UI.Game2D
             // ボスのダウン: ダウン中は受けるダメージの倍率、 そうでなければ次の目盛りまでの残り (HP がこの点数だけ減れば割れる)
             if (known && sim.down) p.Text("被ダメ×" + CombatSystem.BossDown.TakenMul.ToString("0.0"), 14, 103, MarkHeavyHud);
             else if (known && sim.downNotchHp >= 0 && fx != null) p.Text("目盛りまで " + Mathf.Max(0, fx.EnemyHp - sim.downNotchHp), 14, 103, Ink);
+            // 不安定化 (2026-11-13・GAME.md §5-12): 激化の段が上がるたびに不安定 +1 (ボス戦では溜まらない・この戦闘で溜まった分)。 段の表示 (上の行) のすぐ下
+            else if (live && GameLoop.GameManager.Instance != null && GameLoop.GameManager.Instance.InstabilityFromEscalationThisCombat > 0)
+                p.Text("不安定 +" + GameLoop.GameManager.Instance.InstabilityFromEscalationThisCombat, 14, 103, MarkHeavyHud);
             p.Apply(t);
         }
 

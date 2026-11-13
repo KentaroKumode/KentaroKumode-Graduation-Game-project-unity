@@ -162,7 +162,9 @@ namespace GameLoop
             var sim = FreeMap;
             if (sim == null) return FreeMapEvent.None;
             sim.SetPerks(NavItems.PerksFor(Run));      // 層の途中で航行アイテムを得た・封じられた時も、 次の操作から効く
+            var parts0 = sim.InstabilityMode ? (int[])sim.InstabilityParts.Clone() : null;
             var ev = op(sim);
+            if (parts0 != null) NoteSimInstability(sim, parts0);   // 不安定化: 歩く・待つ・偵察・イベントのターン・嵐を動かす で溜まった分をログと記録へ
             MapManager.Instance?.SyncFreeKnowledge();
             if (ev != FreeMapEvent.None) OnFreeMapEvent?.Invoke(ev);
             HandleFreeMapEvent(sim, ev);
@@ -184,15 +186,7 @@ namespace GameLoop
             if ((ev & FreeMapEvent.FrontAdvanced) != 0 && sim.Weather != WeatherKind.None)
                 Log($"前線が左から {System.Math.Min(sim.Front, FreeMapParams.Width):0.0} まで届いた（{sim.Weather.DisplayName()}）");
             if ((ev & FreeMapEvent.MapChanged) != 0) Log(sim.Weather == WeatherKind.Crumble ? "（道が1本崩れた）" : "（点が1つ沈んだ）");
-            if ((ev & FreeMapEvent.StormAdvanced) != 0 && sim.StormMode)
-            {
-                int ph = sim.StormPhase;
-                string kind = Storm.KindName(sim.Weather);
-                Log(ph == 0 ? $"嵐が遠のいた（{kind}・嵐まで {sim.StormTurnsToNext}）"
-                    : ph == 3 ? $"嵐 フェーズ {ph}（{kind}）── ボスの居場所が見えた"
-                    : ph == 4 ? $"嵐 フェーズ {ph}（{kind}）── ボスの点のほかは全部が嵐の中"
-                    : $"嵐 フェーズ {ph}（{kind}・次まで {sim.StormTurnsToNext}）");
-            }
+            if ((ev & FreeMapEvent.StormAdvanced) != 0 && sim.StormMode) LogStormAdvanced(sim);
 
             if ((ev & FreeMapEvent.Died) != 0)
             {
@@ -275,6 +269,7 @@ namespace GameLoop
         {
             var sim = FreeMap;
             if (sim == null || !sim.TakeTreasure()) return;
+            AddInstability(InstabilitySource.Treasure, 1, "縄張りの宝");   // 不安定化 +3 (2026-11-13・中身によらない)
             if (GameHooks.TerritoryTreasure == TerritoryTreasureKind.Forge && TryUpgradeWeapon(Run, free: true))
             {
                 TerritoryTreasureNote = "宝: 武器を鍛えた";
@@ -454,6 +449,7 @@ namespace GameLoop
             _inPursuerFight = false;
             NavDiag.End(NavDiag.Won, Run);   // [計装]
             FreeMap?.ResolveBodyWon();
+            AddBattleWinInstability(elite: false, pursuer: true);   // 不安定化: 番人を倒した +2 (報酬の秘宝は GrantRewardItem で +3)
             int before = Run.provision;
             int supply = GameHooks.PursuerSupplyOverride >= 0 ? GameHooks.PursuerSupplyOverride : NavItems.PursuerSupply(Run);   // [測定 #35]
             if (!GameHooks.PursuerNoReward) ProvisionSystem.Supply(Run, supply);      // 〈追っ手殺しの刃〉で ×1.5
@@ -533,6 +529,7 @@ namespace GameLoop
         {
             ProvisionSystem.Supply(Run, FreeMapParams.RewardBattle);
             Log("使い魔を退けた");
+            AddBattleWinInstability(elite: false, pursuer: false);   // 不安定化: 通常の戦闘と同じ +1 (2026-11-13)
             EndFamiliarFight(fled: false);
         }
 

@@ -97,7 +97,8 @@ namespace MapSystem.FreeMove
 
         // ── 嵐 (2026-11-13・前線の置き換え・<see cref="Storm"/>) ─────────
         //   数値は全部最初の置き値 (動かす時は採否を取ってから測定する)。 測定の口 GameHooks.StormEnabled = False では読まない (前線のまま)。
-        /// <summary>静かな時間 (嵐が来るまでの手番)。 深さ 6 (画面の第 4 層) は 0 (<see cref="Storm.QuietTurns"/>)。</summary>
+        /// <summary>静かな時間 (嵐が来るまでの手番)。 深さ 6 (画面の第 4 層) は 0 (<see cref="Storm.QuietTurns"/>)。
+        /// 手番で進む嵐 (測定の口 GameHooks.StormClock = Turns) だけが読む。 既定の不安定化の時計は下の「不安定化」。</summary>
         public const int StormQuietTurns = 10;   // 2026-11-13 作者の決定で 20 → 10
         /// <summary>フェーズ 1〜3 の長さ (手番)。 フェーズ 4 はボスに入るまで続く。</summary>
         public const int StormPhase1Turns = 10, StormPhase2Turns = 10, StormPhase3Turns = 5;
@@ -119,6 +120,24 @@ namespace MapSystem.FreeMove
         public const int StormBossMinHops = 5;
         /// <summary>外周の層 (凸包) の辺から、 これ以内の直線距離にある点も外周として扱う (辺にほぼ乗っていて見た目で外周に見える点・2026-11-13・点の最小間隔 1.15 の約 1/4)。</summary>
         public const double StormOuterEdgeSlack = 0.3;
+
+        // ── 不安定化 (2026-11-13・嵐の時計を「取るほど進む」に・<see cref="Instability"/>・GAME.md §5-12) ─────────
+        //   嵐を進めるのは手番ではなく、 大穴から物を取るたびに溜まる「不安定化ポイント」の累計。 数値は全部最初の置き値。
+        //   測定の口 GameHooks.StormClock = Turns では読まない (手番で進む嵐のまま)。
+        /// <summary>宝の点を開ける・縄張りの宝を取る・秘宝を 1 つ得る (イベント・戦闘の報酬・番人の報酬)。</summary>
+        public const int InstabilityTake = 3;
+        /// <summary>エリートを倒す・追跡者 (番人) を倒す。</summary>
+        public const int InstabilityKill = 2;
+        /// <summary>通常の戦闘 (使い魔・イベントの戦闘も) に勝つ・イベントで何かを得る (秘宝を得た時は <see cref="InstabilityTake"/> だけを数え、 これは重ねない)。</summary>
+        public const int InstabilityWin = 1;
+        /// <summary>戦闘の中で、 エスカレーションの段が 1 つ上がるごと (ボス戦では溜めない)。</summary>
+        public const int InstabilityEscalation = 1;
+        /// <summary>崩れ始めた後 (累計が <see cref="InstabilityPhase1At"/> 以上) の 1 歩・待つ・偵察。 朱の雪の嵐の中への 1 歩は手番の数 (2) だけ。</summary>
+        public const int InstabilityWalk = 1;
+        /// <summary>フェーズの境目 (累計)。 0〜9 = 静か・10〜 = フェーズ 1 (崩れ始める)・20〜 = 2・30〜 = 3・35〜 = 4。</summary>
+        public const int InstabilityPhase1At = 10, InstabilityPhase2At = 20, InstabilityPhase3At = 30, InstabilityPhase4At = 35;
+        /// <summary>深さ 6 (画面の第 4 層) の累計の始まり (入った時から崩れ始めている)。</summary>
+        public const int InstabilityDepth6Start = 10;
 
         // ── 縄張り ─────────────────────────────────────────────
         public const int TerritoryMin = 7;

@@ -783,6 +783,8 @@ namespace UI.Game2D
                 return d;
             }
             d.body = _lastCoinsGained > 0 ? _lastCoinsGained + "G を手に入れた。" : "戦利品を手に入れた。";
+            string inst = gm.BattleInstabilityLine();      // 不安定化 (2026-11-13): この戦闘で溜まった分 (エスカレーション・勝ち・報酬の秘宝)
+            if (inst != null) d.body += "\n" + inst;
             d.buttons.Add(B("次へ", "ok", true));
             d.onAction = (act, _) => { _lastCoinsGained = 0; gm.ConfirmReward(); Refresh(); };
             return d;

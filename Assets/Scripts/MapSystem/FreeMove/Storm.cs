@@ -7,14 +7,19 @@ namespace MapSystem.FreeMove
     /// <summary>
     /// 嵐 (2026-11-13・天候の作り直し・docs/GAME.md §5-12)。 旧い「前線」(左から右へ進む壁) の置き換え。
     ///
-    /// <para>層に入ると、 静かな時間 (<see cref="FreeMapParams.StormQuietTurns"/> 手番・深さ 6 は 0) のあとに嵐が来る。
+    /// <para><b>2026-11-13 (二版): 嵐を進めるのは「不安定化ポイント」の累計</b> (<see cref="Instability"/>・取るほど不安定になる)。
+    /// 累計 10 で崩れ始め (フェーズ 1)、 20 でフェーズ 2・30 で 3・35 で 4。 輪の形と段の中身は下のとおりで、 時計の単位だけが違う。
+    /// 手番で進む嵐 (下の段落) は測定の口 GameHooks.StormClock = Turns で残してある。</para>
+    ///
+    /// <para>(手番の時計) 層に入ると、 静かな時間 (<see cref="FreeMapParams.StormQuietTurns"/> 手番・深さ 6 は 0) のあとに嵐が来る。
     /// <b>輪 (安全な円)</b> の外が「嵐の中」で、 輪は 4 つの段で縮む:
     /// フェーズ 1 = 地図の中心のまま、 全部の点を含む大きさ → その 60% /
     /// フェーズ 2 = 中心がボスの点の近く (少しずらした位置) へ寄りながら 60% → 30% /
     /// フェーズ 3 = 中心がボスの点へ移り、 30% → ボスの点とその隣の点が入る大きさ (この段に入るとボスの点の種別が見える) /
     /// フェーズ 4 = ボスの点のほかは全部が嵐の中。</para>
     ///
-    /// <para><b>点が嵐の中か</b>は、 点の座標と、 その時の嵐の時計 (= 手番 + イベントのずらし) だけで決まる純粋な関数 (<see cref="InStorm"/>)。
+    /// <para><b>点が嵐の中か</b>は、 点の座標と、 その時の嵐の時計 (不安定化の累計 − 10 / 手番の時計なら 手番 + イベントのずらし − 静かな時間) と
+    /// 段の長さ (<see cref="Schedule"/>) だけで決まる純粋な関数 (<see cref="InStorm(FreeMapLayout, int, int, Schedule)"/>)。
     /// 点・道・種別には触らない (作者の決定:「地図のノードに干渉するのは禁止」)。 <b>ボスの点 (終点) は常に嵐の外</b>。</para>
     ///
     /// <para>層の形への手当て (<see cref="Apply"/>): 始点を地図の最外周 (点の凸包の頂点) から選び直す。 点と道は作り直さない。
@@ -44,18 +49,37 @@ namespace MapSystem.FreeMove
         //  段
         // =====================================================================
 
-        /// <summary>段の境目 (嵐が来てからの手番)。 フェーズ 1 の始まり = 0。</summary>
-        public static int Phase2Start => FreeMapParams.StormPhase1Turns;
-        public static int Phase3Start => FreeMapParams.StormPhase1Turns + FreeMapParams.StormPhase2Turns;
-        public static int Phase4Start => Phase3Start + FreeMapParams.StormPhase3Turns;
+        /// <summary>段の長さ (フェーズ 1〜3)。 嵐の時計の単位 (手番 / 不安定化ポイント) によらず、 輪の補間はこれだけで決まる (2026-11-13)。</summary>
+        public readonly struct Schedule
+        {
+            public readonly int len1, len2, len3;
+            public Schedule(int len1, int len2, int len3) { this.len1 = len1; this.len2 = len2; this.len3 = len3; }
+            public int Phase2Start => len1;
+            public int Phase3Start => len1 + len2;
+            public int Phase4Start => len1 + len2 + len3;
+        }
+
+        /// <summary>手番で進む嵐の段の長さ (<see cref="FreeMapParams.StormPhase1Turns"/> ほか・測定の口 GameHooks.StormClock = Turns)。</summary>
+        public static Schedule TurnSchedule => new Schedule(FreeMapParams.StormPhase1Turns, FreeMapParams.StormPhase2Turns, FreeMapParams.StormPhase3Turns);
+
+        /// <summary>段の境目 (嵐が来てからの手番)。 フェーズ 1 の始まり = 0。 手番で進む嵐の値 (不安定化の時計は <see cref="Instability.Schedule"/>)。</summary>
+        public static int Phase2Start => TurnSchedule.Phase2Start;
+        public static int Phase3Start => TurnSchedule.Phase3Start;
+        public static int Phase4Start => TurnSchedule.Phase4Start;
 
         /// <summary>嵐が来てからの手番 <paramref name="s"/> (負 = 静かな時間) → 段 (0 = 静かな時間 / 1〜4)。</summary>
-        public static int PhaseOf(int s)
-            => s < 0 ? 0 : s < Phase2Start ? 1 : s < Phase3Start ? 2 : s < Phase4Start ? 3 : 4;
+        public static int PhaseOf(int s) => PhaseOf(s, TurnSchedule);
+
+        /// <summary>嵐が来てからの時計 <paramref name="s"/> (負 = 静か) → 段 (0 / 1〜4)。 段の長さは <paramref name="k"/>。</summary>
+        public static int PhaseOf(int s, Schedule k)
+            => s < 0 ? 0 : s < k.Phase2Start ? 1 : s < k.Phase3Start ? 2 : s < k.Phase4Start ? 3 : 4;
 
         /// <summary>次の段までの手番 (静かな時間なら嵐まで)。 フェーズ 4 は 0。</summary>
-        public static int TurnsToNext(int s)
-            => s < 0 ? -s : s < Phase2Start ? Phase2Start - s : s < Phase3Start ? Phase3Start - s : s < Phase4Start ? Phase4Start - s : 0;
+        public static int TurnsToNext(int s) => TurnsToNext(s, TurnSchedule);
+
+        /// <summary>次の段までの時計の量 (静かなら崩れ始めるまで)。 フェーズ 4 は 0。</summary>
+        public static int TurnsToNext(int s, Schedule k)
+            => s < 0 ? -s : s < k.Phase2Start ? k.Phase2Start - s : s < k.Phase3Start ? k.Phase3Start - s : s < k.Phase4Start ? k.Phase4Start - s : 0;
 
         // =====================================================================
         //  輪 (安全な円)
@@ -83,39 +107,46 @@ namespace MapSystem.FreeMove
         /// <summary>フェーズ 2 の終わりの輪の中心 (ボスの点を、 層の生成時に決めた量だけずらした位置・<see cref="FreeMapLayout.stormOffset"/>)。</summary>
         public static Vec2 Phase2Center(FreeMapLayout L) => L.pos[L.goal] + L.stormOffset;
 
-        /// <summary>嵐が来てから <paramref name="s"/> 手番の輪。 静かな時間 (s &lt; 0) はフェーズ 1 の始まりと同じ (全部が輪の中)。
-        /// フェーズ 4 は半径 0 (ボスの点の外は全部が嵐の中・<see cref="InStorm"/> はボスの点を別に扱う)。 段の途中は線形に補間する。</summary>
-        public static void RingAt(FreeMapLayout L, int s, out Vec2 center, out double radius)
+        /// <summary>嵐が来てから <paramref name="s"/> 手番の輪 (手番で進む嵐の段の長さ)。</summary>
+        public static void RingAt(FreeMapLayout L, int s, out Vec2 center, out double radius) => RingAt(L, s, TurnSchedule, out center, out radius);
+
+        /// <summary>嵐の時計 <paramref name="s"/> の輪。 静か (s &lt;= 0) はフェーズ 1 の始まりと同じ (全部が輪の中)。
+        /// フェーズ 4 は半径 0 (ボスの点の外は全部が嵐の中・<see cref="InStorm(FreeMapLayout, int, int, Schedule)"/> はボスの点を別に扱う)。
+        /// 段の途中は線形に補間する。 時計の単位 (手番 / 不安定化ポイント) によらず、 段の長さ <paramref name="k"/> だけで決まる。</summary>
+        public static void RingAt(FreeMapLayout L, int s, Schedule k, out Vec2 center, out double radius)
         {
             double r0 = FullRadius(L);
             var c0 = MapCenter; var c2 = Phase2Center(L); var b = L.pos[L.goal];
             double r1 = r0 * FreeMapParams.StormPhase1EndRadius, r2 = r0 * FreeMapParams.StormPhase2EndRadius, r3 = FinalRadius(L);
             if (s <= 0) { center = c0; radius = r0; return; }
-            if (s < Phase2Start)
+            if (s < k.Phase2Start)
             {
-                double u = (double)s / FreeMapParams.StormPhase1Turns;
+                double u = (double)s / k.len1;
                 center = c0; radius = r0 + (r1 - r0) * u; return;
             }
-            if (s < Phase3Start)
+            if (s < k.Phase3Start)
             {
-                double u = (double)(s - Phase2Start) / FreeMapParams.StormPhase2Turns;
+                double u = (double)(s - k.Phase2Start) / k.len2;
                 center = Vec2.Lerp(c0, c2, u); radius = r1 + (r2 - r1) * u; return;
             }
-            if (s < Phase4Start)
+            if (s < k.Phase4Start)
             {
-                double u = (double)(s - Phase3Start) / FreeMapParams.StormPhase3Turns;
+                double u = (double)(s - k.Phase3Start) / k.len3;
                 center = Vec2.Lerp(c2, b, u); radius = r2 + (r3 - r2) * u; return;
             }
             center = b; radius = 0;
         }
 
-        /// <summary>点 i が、 嵐が来てから <paramref name="s"/> 手番の時に嵐の中か。 ボスの点 (終点) は常に外。 静かな時間は全部外。
-        /// フェーズ 4 はボスの点のほかの全部。 それ以外は輪 (<see cref="RingAt"/>) の外 (中心からの距離が半径より大きい) の点。</summary>
-        public static bool InStorm(FreeMapLayout L, int i, int s)
+        /// <summary>点 i が、 嵐が来てから <paramref name="s"/> 手番の時に嵐の中か (手番で進む嵐の段の長さ)。</summary>
+        public static bool InStorm(FreeMapLayout L, int i, int s) => InStorm(L, i, s, TurnSchedule);
+
+        /// <summary>点 i が、 嵐の時計 <paramref name="s"/> の時に嵐の中か。 ボスの点 (終点) は常に外。 静か (s &lt; 0) は全部外。
+        /// フェーズ 4 はボスの点のほかの全部。 それ以外は輪 (<see cref="RingAt(FreeMapLayout, int, Schedule, out Vec2, out double)"/>) の外 (中心からの距離が半径より大きい) の点。</summary>
+        public static bool InStorm(FreeMapLayout L, int i, int s, Schedule k)
         {
             if (i == L.goal || s < 0) return false;
-            if (s >= Phase4Start) return true;
-            RingAt(L, s, out var c, out double r);
+            if (s >= k.Phase4Start) return true;
+            RingAt(L, s, k, out var c, out double r);
             return Vec2.Dist(L.pos[i], c) > r;
         }
 

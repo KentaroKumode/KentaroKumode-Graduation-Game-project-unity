@@ -439,6 +439,20 @@ namespace CombatSystem
                     + (outcome.extraDamageTrue ? " (確定)" : "") + (crit ? " 会心" : ""));
         }
 
+        /// <summary>この戦闘で予告に出た一番高いエスカレーションの段 (不安定化の数え口・戦闘が始まる時に 0)。 〈冷却材〉で段が下がって
+        /// また上がっても、 一度数えた段は数え直さない (一番高い段を超えた分だけを数える)。</summary>
+        private int _instabilityEscStage;
+
+        /// <summary>予告の段 <paramref name="stage"/> が、 この戦闘で見た一番高い段を超えたら、 超えた段の数だけ本体へ知らせる
+        /// (不安定化 +1 / 段・2026-11-13・GAME.md §5-12)。 ボス戦は本体が数えない (<see cref="Escalation.BossFight"/>)。 戦闘の規則には何も効かない。</summary>
+        private void NoteEscalationForInstability(int stage)
+        {
+            if (stage <= _instabilityEscStage) return;
+            int rises = stage - _instabilityEscStage;
+            _instabilityEscStage = stage;
+            GameLoop.GameManager.Instance?.NoteEscalationRise(rises, Escalation.BossFight);
+        }
+
         /// <summary>エスカレーション判定に使うターン。 〈冷却材〉の遅延を差し引く。
         /// **1 を下回らせない** ── 段階 0 より前は存在しない。</summary>
         private int EscalationTurn(CombatContext ctx)

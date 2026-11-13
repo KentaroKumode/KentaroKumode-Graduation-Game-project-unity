@@ -18,37 +18,44 @@ DOTNET_UNITY = UNITY + '/NetCoreRuntime/dotnet.exe'
 CSC = UNITY + '/DotNetSdkRoslyn/csc.dll'
 RUNTIME = 'C:/Program Files/dotnet/shared/Microsoft.NETCore.App'
 FREEMOVE = 'Assets/Scripts/MapSystem'
-SOURCES = ['FreeMapParams', 'FreeMapLayout', 'FreeMapGenerator', 'FoeProfile', 'Weather', 'FreeMapSim', 'FreeMapPerks', 'FloorPlan', 'TerritoryBypass', 'RiftGate', 'Storm']
+SOURCES = ['FreeMapParams', 'FreeMapLayout', 'FreeMapGenerator', 'FoeProfile', 'Weather', 'FreeMapSim', 'FreeMapPerks', 'FloorPlan', 'TerritoryBypass', 'RiftGate', 'Storm', 'Instability']
 
 
 def fwd(p):
     return p.replace(BS, '/')
 
 
-MAIN_REF = os.environ.get('FREEMAP_MAIN_REF', 'origin/main')
+# 比べる版 (2026-11-13 二版):
+#   MAIN_REF = 嵐の前の main (b7bbc01・storm をマージする前)。 測定の口 stormEnabled = False が 1 点も変わらないかを見る。
+#   TURN_REF = 手番で進む嵐 (storm-boss・6b055e8)。 測定の口 stormClock = Turns が 1 手も変わらないかを見る。
+MAIN_REF = os.environ.get('FREEMAP_MAIN_REF', 'b7bbc01')
+TURN_REF = os.environ.get('FREEMAP_TURN_REF', '6b055e8')
 
 
-def main_reference(out):
-    """嵐の口 (GameHooks.StormEnabled = False) が main と 1 点も変わらないかを確かめるため、 main の FreeMove を
-    名前空間 MainRef.FreeMove へ移して一緒にコンパイルする (2026-11-13・StormCheck.cs)。 比べる版は環境変数 FREEMAP_MAIN_REF (既定 origin/main)。"""
-    d = os.path.join(out, 'mainref')
+def reference(out, ref, ns, dirname):
+    """版 ref の FreeMove を名前空間 ns へ移して一緒にコンパイルする (StormCheck.cs / InstabilityCheck.cs が今の FreeMove と突き合わせる)。"""
+    d = os.path.join(out, dirname)
     os.makedirs(d, exist_ok=True)
     paths = []
     for n in SOURCES:
-        r = subprocess.run(['git', 'show', '%s:%s/FreeMove/%s.cs' % (MAIN_REF, FREEMOVE, n)], capture_output=True)
+        r = subprocess.run(['git', 'show', '%s:%s/FreeMove/%s.cs' % (ref, FREEMOVE, n)], capture_output=True)
         if r.returncode != 0:
-            continue   # main に無いファイル (Storm.cs など)
+            continue   # その版に無いファイル (Storm.cs / Instability.cs など)
         src = r.stdout.decode('utf-8-sig')
         if 'namespace MapSystem.FreeMove' not in src:
-            sys.exit('main の %s.cs に namespace MapSystem.FreeMove が無い' % n)
-        src = 'using MapSystem;\n' + src.replace('namespace MapSystem.FreeMove', 'namespace MainRef.FreeMove')
+            sys.exit('%s の %s.cs に namespace MapSystem.FreeMove が無い' % (ref, n))
+        src = 'using MapSystem;\n' + src.replace('namespace MapSystem.FreeMove', 'namespace %s' % ns)
         path = os.path.join(d, n + '.cs')
         with open(path, 'w', encoding='utf-8') as f:
             f.write(src)
         paths.append(path)
     if not paths:
-        sys.exit('main (%s) の FreeMove を git から取れない' % MAIN_REF)
+        sys.exit('%s の FreeMove を git から取れない' % ref)
     return paths
+
+
+def main_reference(out):
+    return reference(out, MAIN_REF, 'MainRef.FreeMove', 'mainref') + reference(out, TURN_REF, 'TurnRef.FreeMove', 'turnref')
 
 
 def main():
@@ -67,7 +74,7 @@ def main():
             for d in glob.glob(rt + '/' + pat):
                 if 'Native' not in d:
                     f.write('-r:"%s"\n' % fwd(d))
-        for name in ('Stubs.cs', 'Program.cs', 'StormCheck.cs'):
+        for name in ('Stubs.cs', 'Program.cs', 'StormCheck.cs', 'InstabilityCheck.cs'):
             f.write('"%s"\n' % fwd(os.path.join(here, name)))
         for path in main_reference(out):
             f.write('"%s"\n' % fwd(path))
