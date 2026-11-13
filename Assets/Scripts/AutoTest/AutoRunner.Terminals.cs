@@ -155,7 +155,10 @@ namespace AutoTest
                 int rp = RecallBest(disc, runNow);
                 if (rp >= 0) flat += (DeckRetainDmg + DeckCardDmgPerPoint * Math.Max(0f, TargetWorth(TerminalCards.Get(disc[rp]), runNow) - 1f)) * dw;
             }
-            if (o.copyTarget >= 0 && o.copyTarget < board.Count) flat += draws * PerUse(o.copyTarget) * dw;
+            // 〈写し取り〉(2026-11-14): 写しは次のターンの手札に入る ── 次のターンに必ず 1 回使える (戦闘が続けば・残りターン 1 なら 0)。
+            //   その後は捨て札からこの戦闘の山札を回るので、 引く回数 (draws) の分も足す。 全体は残りターン − 1 (次のターン以降) で頭打ち。
+            //   旧 (捨て札へ入れた時): draws × 1 回あたりの得 (山札を一巡しないと引けなかった)。
+            if (o.copyTarget >= 0 && o.copyTarget < board.Count) flat += Math.Min(turns - 1, 1f + draws) * PerUse(o.copyTarget) * dw;
             if (o.burnTarget >= 0 && o.burnTarget < board.Count && runNow?.terminalDeck != null && runNow.terminalDeck.Count > 0)
             {
                 // 抜いた分だけ、 山札の平均の端子を引く回数が増える (対象が平均より悪いほど得・良い端子を抜けば損)
@@ -870,9 +873,9 @@ namespace AutoTest
             var discard = new List<string>(dk.discard);
             var hand = new List<string>(dk.hand);
             var perm = new List<string>(dk.permanent);
-            // ---- FinishTurn: 残す 1 枚・写し取り (捨て札へ複製)・使い捨てと焼き切り (この戦闘から外す) ----
+            // ---- FinishTurn: 残す 1 枚・写し取り (次のターンの手札へ・引いた後に足す)・使い捨てと焼き切り (この戦闘から外す) ----
             string retain = o.retainTarget >= 0 && o.retainTarget < board.Count ? board[o.retainTarget] : null;
-            if (o.copyTarget >= 0 && o.copyTarget < board.Count) discard.Add(board[o.copyTarget]);
+            string copy = o.copyTarget >= 0 && o.copyTarget < board.Count ? board[o.copyTarget] : null;
             foreach (int s in o.fired)
             {
                 var d = TerminalCards.Get(board[s]);
@@ -906,6 +909,7 @@ namespace AutoTest
                 if (stop) stopHand.Add(hand.Count);
                 hand.Add(id);
             }
+            if (copy != null) hand.Add(copy);      // 〈写し取り〉の写し: 本体の DrawTurn と同じく、 引く枚数とは別に手札の最後へ
             var nb = new List<string>(perm.Count + hand.Count);
             nb.AddRange(perm); nb.AddRange(hand);
             stopped = null;

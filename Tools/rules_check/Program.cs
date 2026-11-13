@@ -254,6 +254,7 @@ static class T
 
         // ---- 7. 使い捨て (2026-11-14・作者の決定): 使った戦闘の間は山札に戻らず、 次の戦闘ではまた山札にある (〈応急箱〉も同じ) ----
         {
+            GameLoop.GameHooks.HandCarry = HandCarryMode.Pick; GameLoop.GameRng.Reset();   // 既定の手札の規則 (上の項目が切り替えたまま)
             var once = TerminalCards.All.Where(d => d.disposable).Select(d => d.id).ToList();
             Check(TerminalCards.All.All(d => !TerminalCards.LeavesRunDeck(d)),
                   "既定では、 使ってランの山札から抜ける端子は無い (使い捨て " + once.Count + " 種: " + string.Join("・", once) + ")");
@@ -278,6 +279,45 @@ static class T
             dk.BeginBattle(runDeck);
             Check(dk.draw.Contains(TerminalIds.FirstAid) && dk.exiled.Count == 0, "〈応急箱〉: 次の戦闘ではまた山札にある");
             Check(!TerminalCards.Get(TerminalIds.FirstAid).description.Contains("抜ける"), "〈応急箱〉の説明文に「ランの山札から抜ける」が無い");
+        }
+
+        // ---- 8. 〈写し取り〉(2026-11-14): 写しは次のターンの手札に入る (引く 5 枚とは別・次のターンは 1 枚多い) ----
+        {
+            GameLoop.GameHooks.HandCarry = HandCarryMode.Pick; GameLoop.GameRng.Reset();   // 既定の手札の規則 (上の項目が切り替えたまま)
+            var runDeck = new List<string> { TerminalIds.Copier, TerminalIds.Igniter, TerminalIds.Attack, TerminalIds.Block, TerminalIds.Charge,
+                                             TerminalIds.Attack, TerminalIds.Block };
+            var dk = new TerminalDeckState();
+            dk.BeginBattle(runDeck);
+            bool done = false;
+            for (int t = 0; t < 20 && !done; t++)
+            {
+                dk.DrawTurn(TerminalCards.HandSize);
+                int cp = dk.board.IndexOf(TerminalIds.Copier);
+                int tg = dk.board.IndexOf(TerminalIds.Igniter);
+                if (cp < 0 || tg < 0) { dk.FinishTurn(TerminalCards.Resolve(dk.board, new[] { -1, -1, -1 }, new[] { 1, 2, 3 }, new TerminalEnv(), dk.state)); continue; }
+                var want = new int[dk.board.Count]; for (int i = 0; i < want.Length; i++) want[i] = -1; want[cp] = tg;
+                var o = TerminalCards.Resolve(dk.board, new[] { cp, -1, -1 }, new[] { 4, 2, 3 }, new TerminalEnv(), dk.state, want);
+                Check(o.Fired(dk.board, TerminalIds.Copier) && o.copyTarget == tg, "〈写し取り〉が選んだ対象 (〈定電圧〉) を写す");
+                int discBefore = dk.discard.Count;
+                dk.FinishTurn(o);
+                Check(dk.discard.Count == discBefore && dk.copyNext == TerminalIds.Igniter, "写しは捨て札へ入らず、 次のターンの手札へ控える");
+                dk.DrawTurn(TerminalCards.HandSize);
+                Check(dk.hand.Count == TerminalCards.HandSize + 1 && dk.LastDrawnCount == TerminalCards.HandSize && dk.hand[dk.hand.Count - 1] == TerminalIds.Igniter
+                      && dk.copyNext == null,
+                      $"次のターンは 5 枚引いたうえで写しが 1 枚足される (手札 {dk.hand.Count} 枚・引いた {dk.LastDrawnCount} 枚・最後 〈{dk.hand[dk.hand.Count - 1]}〉)");
+                int igBefore = dk.hand.Count(x => x == TerminalIds.Igniter);
+                dk.FinishTurn(TerminalCards.Resolve(dk.board, new[] { -1, -1, -1 }, new[] { 1, 2, 3 }, new TerminalEnv(), dk.state));
+                dk.DrawTurn(TerminalCards.HandSize);
+                Check(dk.hand.Count == TerminalCards.HandSize, "使わなければ、 その次のターンはほかの手札と同じに捨て札へ (手札は 5 枚に戻る)");
+                int total = dk.draw.Count(x => x == TerminalIds.Igniter) + dk.discard.Count(x => x == TerminalIds.Igniter) + dk.hand.Count(x => x == TerminalIds.Igniter);
+                Check(total == 2 && igBefore >= 1, $"写しはこの戦闘の山札に残る (〈定電圧〉が山・捨て札・手札に {total} 枚)");
+                dk.BeginBattle(runDeck);
+                Check(dk.draw.Count(x => x == TerminalIds.Igniter) == 1 && dk.copyNext == null, "戦闘が終われば写しは消える (次の戦闘の山札は元のまま)");
+                done = true;
+            }
+            Check(done, "〈写し取り〉と〈定電圧〉が同じ手札に来た");
+            Check(!TerminalCards.Get(TerminalIds.Copier).description.Contains("山札に加える") && TerminalCards.Get(TerminalIds.Copier).description.Contains("次のターンの手札"),
+                  "〈写し取り〉の説明文は「次のターンの手札に加える」");
         }
 
         Console.WriteLine(fails == 0 ? "ALL OK" : fails + " FAILED");
