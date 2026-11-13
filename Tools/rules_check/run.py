@@ -18,6 +18,8 @@ CSC = UNITY + '/DotNetSdkRoslyn/csc.dll'
 RUNTIME = 'C:/Program Files/dotnet/shared/Microsoft.NETCore.App'
 COMBAT = 'Assets/Scripts/CombatSystem'
 SOURCES = ['TerminalCards', 'BossDown', 'MutualAttack']
+# BOT の判断のうち純粋な部分 (#141・ダウンの狙いと残す印)。 UnityEngine に依存しない
+EXTRA = ['Assets/Scripts/AutoTest/DownKeepRules.cs']
 
 
 def fwd(p):
@@ -44,6 +46,8 @@ def main():
             f.write('"%s"\n' % fwd(os.path.join(here, name)))
         for n in SOURCES:
             f.write('"%s/%s.cs"\n' % (COMBAT, n))
+        for p in EXTRA:
+            f.write('"%s"\n' % p)
     p = subprocess.run([DOTNET_UNITY, CSC, '@' + rsp], capture_output=True, text=True, errors='replace')
     errs = [l for l in (p.stdout + p.stderr).splitlines() if 'error CS' in l]
     if errs:
