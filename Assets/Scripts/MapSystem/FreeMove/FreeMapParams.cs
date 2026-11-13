@@ -95,6 +95,31 @@ namespace MapSystem.FreeMove
         public const int FrontEvery = 5;
         public const float FrontStep = 2.4f;
 
+        // ── 嵐 (2026-11-13・前線の置き換え・<see cref="Storm"/>) ─────────
+        //   数値は全部最初の置き値 (動かす時は採否を取ってから測定する)。 測定の口 GameHooks.StormEnabled = False では読まない (前線のまま)。
+        /// <summary>静かな時間 (嵐が来るまでの手番)。 深さ 6 (画面の第 4 層) は 0 (<see cref="Storm.QuietTurns"/>)。</summary>
+        public const int StormQuietTurns = 10;   // 2026-11-13 作者の決定で 20 → 10
+        /// <summary>フェーズ 1〜3 の長さ (手番)。 フェーズ 4 はボスに入るまで続く。</summary>
+        public const int StormPhase1Turns = 10, StormPhase2Turns = 10, StormPhase3Turns = 5;
+        /// <summary>フェーズ 1 / 2 の終わりの輪の半径 (全部の点を含む半径に対する割合)。</summary>
+        public const double StormPhase1EndRadius = 0.6, StormPhase2EndRadius = 0.3;
+        /// <summary>フェーズ 2 の終わりの輪の中心を、 ボスの点からずらす長さ (フェーズ 2 の終わりの半径に対する割合の幅)。 1 未満なので、 ボスの点は輪の中に残る。</summary>
+        public const double StormOffsetMin = 0.3, StormOffsetMax = 0.7;
+        /// <summary>嵐の中の点へ動く (・嵐の中で待つ / 偵察する) たびに払う HP。</summary>
+        public const int StormHp = 3;
+        /// <summary>落石のような雹の嵐: 嵐の中の点への 1 歩の HP の追加。</summary>
+        public const int StormHailHp = 1;
+        /// <summary>削る砂の嵐: 嵐の中の点への 1 歩の物資の追加 (確定・乱数を引かない)。</summary>
+        public const int StormSandSupply = 1;
+        /// <summary>朱の雪の嵐: 嵐の中の点への 1 歩にかかる手番。</summary>
+        public const int StormSnowTurns = 2;
+        /// <summary>嵐の中の点で始まった戦闘の敵の〈嵐〉: 敵の攻撃 +N (戦闘を通して)。</summary>
+        public const int StormEnemyAttack = 3;
+        /// <summary>嵐の層のボスの点 (内側から選ぶ・2026-11-13) の、 始点からの道の歩数の下限 (実装役の決定)。 満たす内側の点が無い層は 1 歩ずつ下げる。</summary>
+        public const int StormBossMinHops = 5;
+        /// <summary>外周の層 (凸包) の辺から、 これ以内の直線距離にある点も外周として扱う (辺にほぼ乗っていて見た目で外周に見える点・2026-11-13・点の最小間隔 1.15 の約 1/4)。</summary>
+        public const double StormOuterEdgeSlack = 0.3;
+
         // ── 縄張り ─────────────────────────────────────────────
         public const int TerritoryMin = 7;
         public const int TerritoryMax = 11;

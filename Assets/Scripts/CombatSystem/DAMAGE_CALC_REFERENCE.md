@@ -673,6 +673,7 @@ ProcessDamage の中の OnPreDealDamage は「その陣営が攻撃している�
 | DeathSentence(死の宣告) | OnTurnStart | T>10（＝11ターン目）で fixedDamageToEnemy +999(即死) |
 | IntimidatePlus(威圧+) | OnBattleStart | **[#104 修正]** この敵の攻撃 +3（戦闘を通して・ボスの威圧+は BossParam.IntimidateThreat）。足し先は `enemyDiceTotalBonus`（Escalation.EnemyAttackValue で基礎攻撃と同じく倍率が掛かる＝基礎攻撃 +N と同値・予告に出る）。「脅威」はいま基礎攻撃値の代わり（baseAttack 未指定時）としてしか使われないので、§9.6 の宿題どおり基礎攻撃値への加算と読んだ。旧: `ctx.enemyThreat` に足して読む処理が無かった（いまは enemyThreat へ書かない） |
 | GreedyMerchant(貪欲商人) | OnBattleStart | no-op(スケーリングは GameManager.StartFalseMerchantCombat: HP +2/個・攻撃 +1/3個) |
+| Storm(嵐・2026-11-13) | OnBattleStart | 航行の地図で**嵐の中の点に居る時に始まった戦闘**だけ、 1 体目の敵に付く（`CombatManager.StartCombatInternal` が付ける・ボスには付かない）。この敵の攻撃 +`FreeMapParams.StormEnemyAttack`（3・戦闘を通して）。足し先は威圧+ と同じ `enemyDiceTotalBonus`（基礎攻撃 +N と同値・予告に出る）。仕様は GAME.md §5-12 |
 | Berserk(狂暴化・全ボス付与) | OnTurnStart | T>50: healBlocked, enemyDamageTakenMultiplier=3, enemyDiceTotalBonus +=10(1回) |
 
 （FlawlessRobe 天衣無縫は 2026-10-17 にクラスごと削除。）

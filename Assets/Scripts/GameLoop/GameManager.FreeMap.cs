@@ -184,10 +184,19 @@ namespace GameLoop
             if ((ev & FreeMapEvent.FrontAdvanced) != 0 && sim.Weather != WeatherKind.None)
                 Log($"前線が左から {System.Math.Min(sim.Front, FreeMapParams.Width):0.0} まで届いた（{sim.Weather.DisplayName()}）");
             if ((ev & FreeMapEvent.MapChanged) != 0) Log(sim.Weather == WeatherKind.Crumble ? "（道が1本崩れた）" : "（点が1つ沈んだ）");
+            if ((ev & FreeMapEvent.StormAdvanced) != 0 && sim.StormMode)
+            {
+                int ph = sim.StormPhase;
+                string kind = Storm.KindName(sim.Weather);
+                Log(ph == 0 ? $"嵐が遠のいた（{kind}・嵐まで {sim.StormTurnsToNext}）"
+                    : ph == 3 ? $"嵐 フェーズ {ph}（{kind}）── ボスの居場所が見えた"
+                    : ph == 4 ? $"嵐 フェーズ {ph}（{kind}）── ボスの点のほかは全部が嵐の中"
+                    : $"嵐 フェーズ {ph}（{kind}・次まで {sim.StormTurnsToNext}）");
+            }
 
             if ((ev & FreeMapEvent.Died) != 0)
             {
-                Log("物資が尽き、歩き続けた末に倒れた");
+                Log(sim.HpPayReason == FreeMapSim.HpReasonStorm ? "嵐の中で力尽きた" : "物資が尽き、歩き続けた末に倒れた");
                 Run.EndRun();
                 SetPhase(GamePhase.GameOver);
                 OnGameOver?.Invoke(Run);

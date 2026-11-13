@@ -27,6 +27,10 @@ namespace EventSystem
         public bool weather;
         /// <summary>前線がもう層に届いているか。</summary>
         public bool frontArrived;
+        /// <summary>天候が「嵐」の作りか (2026-11-13・測定の口 GameHooks.StormEnabled)。 true なら「前線」の効果は嵐の時計を動かし、 文も「嵐」で言う。</summary>
+        public bool stormRules;
+        /// <summary>この層に嵐があるか (嵐の作りの時だけ読む・深さ 1/3/5/6)。</summary>
+        public bool storm;
         /// <summary>差し出せる秘宝があるか (取り替えが成り立つか)。</summary>
         public bool canTrade;
         /// <summary>武器をまだ鍛えられるか (終点でない)。 素材が足りるかは支払いの側で見る。</summary>
@@ -139,6 +143,8 @@ namespace EventSystem
                 case EventEffectType.PullPursuer:
                     return s.map && s.foe ? null : "この層に追跡者は居ない";
                 case EventEffectType.ShiftFront:
+                    // 嵐の作り (2026-11-13): 嵐のある層なら、 静かな時間でも嵐の時計を動かせる (遠ざけると嵐が来るのが遅れる) ── 「まだ来ていない」で選べなくしない
+                    if (s.stormRules) return s.map && s.storm ? null : "この層に嵐は無い";
                     if (!s.map || !s.weather) return "この層に前線は無い";
                     // 遠ざける (amount < 0) は、 前線がまだ来ていなければ何も起きない (FreeMapSim.ShiftFront)
                     if (e.amount < 0 && !s.frontArrived) return "前線はまだ来ていない";
