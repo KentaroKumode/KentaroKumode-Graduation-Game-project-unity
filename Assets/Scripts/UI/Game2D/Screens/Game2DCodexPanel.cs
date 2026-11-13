@@ -164,7 +164,7 @@ namespace UI.Game2D
                 foreach (var ps in e.passiveSkills)
                 {
                     if (ps == null || string.IsNullOrEmpty(ps.skillName)) continue;
-                    sb.Append("\n\n〈").Append(ps.skillName).Append("〉 ").Append(ps.description);
+                    sb.Append("\n\n〈").Append(ps.skillName).Append("〉 ").Append(BossParams.Describe(e.id, ps.description));   // 数字の印 ({JudgmentDice} ほか) を今の値で埋める
                     if (!string.IsNullOrEmpty(ps.flavorText)) sb.Append('\n').Append(ps.flavorText);
                 }
             return sb.ToString();

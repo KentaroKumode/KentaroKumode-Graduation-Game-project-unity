@@ -1411,19 +1411,19 @@
         {
           "internalName": "EmberOmen",
           "skillName": "業火の予兆",
-          "description": "HP>50%は周期4T (T1/5/9...)、HP≤50%は周期3T (T1/4/7...) に加速。予兆ターンは攻撃+8。",
+          "description": "HP>50%は周期4T (T1/5/9...)、HP≤50%は周期3T (T1/4/7...) に加速。予兆ターンは攻撃+{JudgmentDice}。",
           "flavorText": "火が小さくなる。次に大きくなるまでの間だけ、息ができる。"
         },
         {
           "internalName": "AshRegrowth",
           "skillName": "灰の再生",
-          "description": "HP>50%のとき毎ターン最大HPの2%回復（Phase1: 灰をまといながら耐える）。予兆ターンは回復なし。",
+          "description": "HP>50%のとき毎ターン最大HPの{RegrowthRate%}%回復（Phase1: 灰をまといながら耐える）。予兆ターンは回復なし。",
           "flavorText": "削った分が灰になり、灰がまた形を取る。順番が変わっただけだった。"
         },
         {
           "internalName": "EmberFury",
           "skillName": "憤怒の残滓",
-          "description": "HP≤50%のとき攻撃+3（Phase2: 再生ゼロ・高火力連打の決着期）。",
+          "description": "HP≤50%のとき攻撃+{FuryAttack}（Phase2: 再生ゼロ・高火力連打の決着期）。",
           "flavorText": "燃え残りの方が熱い。もう惜しむものが無いからだ。"
         },
         {
