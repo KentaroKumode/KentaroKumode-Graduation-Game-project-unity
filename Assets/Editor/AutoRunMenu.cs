@@ -1844,12 +1844,14 @@ namespace AutoTest.EditorTools
         /// ペアリングが前提から崩れる。 対象品は推定量が割れているものを選んである:
         /// 共鳴 (LEG / lift +0.933 vs regβ +0.087 ＝ 最大の食い違い) /
         /// 発火 (BRONZE / lift +0.284 vs regβ +0.253 ＝ 両者一致) /
-        /// 無心の刃 (GOLD / regβ −0.168 ＝ regβ が最下位に置いた品)。</para></summary>
+        /// 無心の刃 (GOLD / regβ −0.168 ＝ regβ が最下位に置いた品)。
+        /// 3 品とも改名済みなので今の id で渡す (共鳴 → 灼線鞭・発火 → 乾き火口箱・無心の刃 → 毒棘の小盾。 2026-11-14 に旧 id の対応表を削除)。
+        /// 上の数値は 2026-09 の旧名の時の測定。</para></summary>
         [MenuItem("Tools/AutoRun/アイテム アブレーション (A/A + 3品 × 各500対)", priority = 12)]
         public static void RunItemAblation()
         {
             SessionState.SetBool(ItemAblKey, true);
-            SessionState.SetString(ItemAblIdsKey, "共鳴,発火,無心の刃");
+            SessionState.SetString(ItemAblIdsKey, "灼線鞭,乾き火口箱,毒棘の小盾");
             SessionState.SetInt(ItemAblRunsKey, 500);
             EditorPrefs.SetBool(NoRelicKey, true);   // 基準条件 (遺物なし) で測る
             // **配線技量を Optimal に固定する。** 前の作業で Super のままだと

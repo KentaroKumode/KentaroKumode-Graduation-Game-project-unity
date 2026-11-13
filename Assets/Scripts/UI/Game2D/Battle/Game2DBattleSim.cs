@@ -824,7 +824,7 @@ namespace UI.Game2D.Battle
         {
             if (string.IsNullOrEmpty(id)) return 0;
             int wi;
-            if (ItemSystem.ItemDatabase.ResolveLegacyId(id) == ItemIds.Ryusen) wi = Game2DBattleFx.IndexOf(null, 0, true);
+            if (id == ItemIds.Ryusen) wi = Game2DBattleFx.IndexOf(null, 0, true);
             else
             {
                 var data = ItemSystem.ItemDatabase.Instance?.GetItem(id);

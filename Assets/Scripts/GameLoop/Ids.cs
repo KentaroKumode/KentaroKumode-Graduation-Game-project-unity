@@ -145,7 +145,7 @@ namespace GameLoop
         //   **系統で判定する** (ConsFamilyOf)。 下の id 定数は「開始時に配る」「店で買う」の
         //   跨ファイル参照のためだけにあり、 効果の分岐には使わない。
         public const string ConsLureFamily = "lure";   // 囮罠: 近くの追跡者の気を引き、 踏んだ追跡者を足止めする
-        /// <summary>囮罠 (items.json の id ＝ 表示名)。 旧〈囮〉〈罠〉は LegacyIdMap が解決する。</summary>
+        /// <summary>囮罠 (items.json の id ＝ 表示名)。 2026-10-18 に旧〈囮〉〈罠〉を統合 (旧 id の対応表は 2026-11-14 に削除)。</summary>
         public const string Lure = "囮罠";
 
         // === 航行アイテム 13 品 (2026-11-11・docs/design/nav-items.md) ===

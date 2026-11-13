@@ -312,8 +312,10 @@ namespace GameLoop
             }
             foreach (var name in live.Keys)
                 if (!seen.Contains(name)) throw new InvalidOperationException($"セーブに RunState.{name} が無い");
-            // 端子の改名 (2026-11-13・〈保持器〉→〈呼び戻し〉): 旧い名前で保存された山札を今の id に揃える
-            CombatSystem.TerminalCards.NormalizeIds(run.terminalDeck);
+            // 山札に今の端子に無い名前 (改名前の旧 id など・対応表は 2026-11-14 に削除) があれば外す。 品の id は外さない
+            //   ── 品の消費側は ItemDatabase.GetItem の null (警告) を「無い品」として読み飛ばす
+            int droppedTerminals = CombatSystem.TerminalCards.DropUnknownIds(run.terminalDeck);
+            if (droppedTerminals > 0) Debug.LogWarning($"[RunSave] 山札から今の端子に無い名前を {droppedTerminals} 枚外した (旧い版のセーブ)");
         }
 
         private static string Encode(string kind, object v)

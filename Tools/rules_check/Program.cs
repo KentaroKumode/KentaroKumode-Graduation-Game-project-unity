@@ -221,12 +221,16 @@ static class T
             Check(mid.Length == 3 && mid[0] == 0.9f && mid[1] == clock && mid[2] == 0.5f && tail[2] == clock, "足す目盛りは大きい順の位置に入る");
         }
 
-        // ---- 5. 端子の旧 id (〈保持器〉→〈呼び戻し〉) ----
+        // ---- 5. 端子の旧 id (対応表は 2026-11-14 に削除): 旧い名前は無い端子・山札から外れる ----
         {
             var deckOld = new List<string> { "攻撃", "保持器", "防御" };
-            TerminalCards.NormalizeIds(deckOld);
-            Check(TerminalCards.Get("保持器")?.id == TerminalIds.Retainer && TerminalIds.Retainer == "呼び戻し" && deckOld[1] == "呼び戻し" && deckOld[0] == "攻撃",
-                  "旧 id「保持器」は〈呼び戻し〉に解決し、 山札の名前も揃う");
+            int dropped = TerminalCards.DropUnknownIds(deckOld);
+            var deckNow = TerminalCards.StartingDeck(); deckNow.Add(TerminalIds.Retainer);
+            int keptNow = deckNow.Count;
+            Check(TerminalCards.Get("保持器") == null && TerminalCards.Get(TerminalIds.Retainer) != null
+                  && dropped == 1 && deckOld.Count == 2 && deckOld[0] == "攻撃" && deckOld[1] == "防御"
+                  && TerminalCards.DropUnknownIds(deckNow) == 0 && deckNow.Count == keptNow,
+                  "旧 id「保持器」は無い端子 (解決しない)。 山札から外れ、 今の id だけの山札は変わらない");
         }
 
         // ---- 6. 〈剥ぎ取り〉は攻撃の端子 (2026-11-13・ユーザーの決定) ----

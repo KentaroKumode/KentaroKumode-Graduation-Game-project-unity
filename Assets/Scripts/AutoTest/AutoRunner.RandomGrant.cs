@@ -154,7 +154,6 @@ namespace AutoTest
             // 端子 (2026-11-12): ランの山札へ足す (報酬で受け取るのと同じ・GameManager.ResolveTerminalReward)。
             if (terminal)
             {
-                id = CombatSystem.TerminalCards.ResolveId(id);   // 測定のキューに旧 id (〈保持器〉) が書かれていても今の id で配る
                 if (CombatSystem.TerminalCards.Get(id) == null) { NoteGrant(4, false); return; }
                 if (run.terminalDeck == null || run.terminalDeck.Count == 0) run.terminalDeck = CombatSystem.TerminalCards.StartingDeck();
                 run.terminalDeck.Add(id);

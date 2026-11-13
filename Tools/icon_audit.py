@@ -11,7 +11,7 @@
     2026-09-14 の時点では「id を日本語へ寄せる案は採らなかった」── id に構造が乗っていた
     (`sword_t2` を家系+Tier として切る / `cons_heal_1` を prefix+tier で組む / `uniq_*` で昇華可否)。
     2026-09-22 に**構造を items.json の明示フィールド (family / tier / consFamily / unique) へ出し**、
-    id を綴りで切る箇所をゼロにしてから統一した。 旧 id は ItemDatabase.LegacyIdMap が解決する。
+    id を綴りで切る箇所をゼロにしてから統一した。 旧 id の対応表 (ItemDatabase.LegacyIdMap) は 2026-11-14 に削除 (発売前・後方互換なし)。
 
     **表示名を変えたら、 png のファイル名も変える。** このスクリプトが「欠落」「余分」として
     必ず検出するので、 黙って壊れることはない。

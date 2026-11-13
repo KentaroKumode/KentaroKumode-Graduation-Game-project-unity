@@ -163,7 +163,7 @@ base: origin/main 6ea741d
 | F-F-09 | 消耗品 | 回復・護符・油 各 4 段・囮罠・古い手紙 | `items.json`（Consumable）・`GameLoop/Consumables.cs` | 18 品（うち職業 4）[^items] | 両 | 食（G-14） | 固 |
 | F-F-10 | 職業スターター | 瞬間研磨剤・不抜の聖紋・痛覚遮断剤・仕込み刃（店に出ない） | `ClassStarter`・`EventOnlyItemFilter` | 4 | 両 | 仕（§11） | 固 |
 | F-F-11 | 出目パーツ | 目 1〜9 × Tier 1〜4・同じ目は 1 枚・素の面 {2,3,4,5} | `GameLoop/DiceFaceParts.cs` | 36 | 両 | 仕（§21-2） | 固（0回） |
-| F-F-12 | 旧 id の読み替え | 名前を変えた品の旧 id を新 id へ | `ItemDatabase.cs:331` `LegacyIdMap`・`TerminalCards.cs:379` | 品 171 組・端子 未確認[^legacy] | ロ | 食（G-31） | 固 |
+| F-F-12 | 旧 id の読み替え（**2026-11-14 に削除**・GAME.md §24） | 名前を変えた品の旧 id を新 id へ | `ItemDatabase.cs:331` `LegacyIdMap`・`TerminalCards.cs:379` | 品 171 組・端子 未確認[^legacy] | ロ | 食（G-31） | 固 |
 
 ## G. 経済（店・報酬・休憩・物資）
 

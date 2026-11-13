@@ -43,7 +43,7 @@ namespace CombatSystem
         // レア
         public const string Amplifier = "増幅器", VacuumTube = "真空管", Resonator = "共振器", Foundry = "鋳造口", Coolant = "冷却材",
             Counter = "計数器", Preheater = "予熱器", Mains = "主幹", TwinShot = "双発", Harvester = "収穫機", Whet = "研ぎ澄まし",
-            LootBox = "戦利品箱", Stripper = "剥ぎ取り", Doubler = "倍電圧", Retainer = "呼び戻し" /* 2026-11-13 に〈保持器〉から改名 (旧 id は LegacyIdMap) */, StopSignal = "停止信号", Fork = "二股";
+            LootBox = "戦利品箱", Stripper = "剥ぎ取り", Doubler = "倍電圧", Retainer = "呼び戻し" /* 2026-11-13 に〈保持器〉から改名 */, StopSignal = "停止信号", Fork = "二股";
         // 軸
         public const string Sight = "照星", VitalRead = "急所読み", Barb = "返し針", BloodTap = "血抜き栓", Mister = "霧吹き口",
             PoisonScale = "毒見の秤", Stoker = "焚き口", AfterHeat = "余熱板", Leak = "漏電口", BigDischarge = "大放電",
@@ -382,26 +382,15 @@ namespace CombatSystem
             return d;
         }
 
+        /// <summary>今の id の端子。 無い id は null (旧 id の対応表は 2026-11-14 に削除・docs/GAME.md §24)。</summary>
         public static TerminalDef Get(string id)
-            => id != null && _byId.TryGetValue(ResolveId(id), out var d) ? d : null;
+            => id != null && _byId.TryGetValue(id, out var d) ? d : null;
 
-        // ===== 旧 id の解決 (端子の id = 表示名・改名しても旧い名前で保存された山札・測定のキューを読めるように) =====
-
-        /// <summary>旧 id → 今の id。 **消さない** (中断セーブの山札・測定の口の文字列・過去の計装の表に旧い名前が残る)。 品の ItemDatabase.LegacyIdMap と同じ考え方。</summary>
-        private static readonly Dictionary<string, string> LegacyIdMap = new Dictionary<string, string>
-        {
-            { "保持器", TerminalIds.Retainer },   // 2026-11-13: 〈保持器〉→〈呼び戻し〉(効果を「捨て札から 1 枚戻す」に作り替えた時)
-        };
-
-        /// <summary>旧 id なら今の id、 それ以外はそのまま。</summary>
-        public static string ResolveId(string id) => id != null && LegacyIdMap.TryGetValue(id, out var n) ? n : id;
-
-        /// <summary>ランの山札などの端子の名前の一覧を、 その場で今の id に揃える (旧 id を書き換える)。 null は何もしない。</summary>
-        public static void NormalizeIds(List<string> ids)
-        {
-            if (ids == null) return;
-            for (int i = 0; i < ids.Count; i++) ids[i] = ResolveId(ids[i]);
-        }
+        /// <summary>端子の名前の一覧 (ランの山札など) から、 今の端子に無い名前を外す。 外した数を返す。 null は何もしない。
+        /// <para>中断セーブの読み込み口 (<see cref="GameLoop.RunSave"/>) が使う ── 改名前の名前 (例: 2026-11-13 までの〈保持器〉) が
+        /// 山札に残っていても、 引いた先で「無い端子」として場に出さない。 今の id だけの一覧は何も変わらない。</para></summary>
+        public static int DropUnknownIds(List<string> ids)
+            => ids == null ? 0 : ids.RemoveAll(id => id == null || !_byId.ContainsKey(id));
 
         /// <summary>ランの持ち物 (誓約) で、 この端子の軸が封じられているか (戦闘の外 ── 報酬・店・山札の一覧)。 軸の無い端子は false。</summary>
         public static bool AxisSealedByRun(TerminalDef d, GameLoop.RunState run)
