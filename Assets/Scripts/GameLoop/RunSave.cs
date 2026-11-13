@@ -30,6 +30,9 @@ namespace GameLoop
     /// <para>メタ進行 (整備パネル・遺物・実績の解除済み) は <c>MetaProgressManager</c> が PlayerPrefs に持つ。 ここはそれと混ぜない
     /// (別ファイル・<see cref="Application.persistentDataPath"/>)。 BOT の実行中 (<see cref="GameHooks.BotDriving"/>・バッチ実行・
     /// 遺物の付与を止めた計測) は保存も読み込みも削除もしない。</para>
+    ///
+    /// <para><b>書き込みの安全</b> (2026-11-13・G-24): 書きかけ (.tmp) → 控え (.bak) → 本番の順に名前を変える (<see cref="SafeFile"/>)。
+    /// 読む時は本番が無い・壊れていれば控え → 書きかけの順に試し、 消す時は 3 つとも消す。</para>
     /// </summary>
     public static class RunSave
     {
@@ -132,43 +135,70 @@ namespace GameLoop
         public static bool Disabled
             => Application.isBatchMode || GameHooks.BotDriving || MetaProgression.MetaBuffApplicator.SuppressRelicGrant;
 
-        /// <summary>中断セーブのファイルがあるか (中身が読めるかは <see cref="TryRead"/> で確かめる)。</summary>
+        /// <summary>中断セーブのファイル (本番・控え・書きかけのどれか) があるか (中身が読めるかは <see cref="TryRead"/> で確かめる)。
+        /// 控え・書きかけだけが残るのは、 書き込みの途中で落ちた時 (<see cref="Write"/>)。</summary>
         public static bool Exists
         {
             get
             {
                 if (Disabled) return false;
-                try { return File.Exists(FilePath); } catch { return false; }
+                try { return SafeFile.AnyExists(FilePath); } catch { return false; }
             }
         }
 
-        /// <summary>中断セーブを消す (新しいランを始める時・読み込んだ後)。</summary>
+        /// <summary>中断セーブを消す (新しいランを始める時・読み込んだ後)。 <b>本番・控え (.bak)・書きかけ (.tmp) を全部消す</b>
+        /// ── 控えが残ると、 次の起動で読み込みが控えから復帰して、 終わったランが生き返る。</summary>
         public static void Delete()
         {
             if (Disabled) return;
-            try { if (File.Exists(FilePath)) File.Delete(FilePath); }
-            catch (Exception e) { Debug.LogWarning($"[RunSave] 中断セーブを消せない: {e.Message}"); }
+            if (!SafeFile.DeleteAll(FilePath, out var err)) Debug.LogWarning($"[RunSave] 中断セーブを消せない: {err}");
         }
 
-        /// <summary>ファイルを読む。 無い・壊れている・版や指紋が違う時は false (壊れたファイルは消す)。</summary>
+        /// <summary>ファイルを読む。 無い・壊れている・版や指紋が違う時は false (壊れたファイルは消す)。
+        /// <para>本番が無い・読めない (JSON として読めない・版や指紋が違う) 時は、 控え (.bak) → 書きかけ (.tmp) の順に試す
+        /// (<see cref="Write"/> の途中で落ちた時に残る)。 控えから読めたら、 それを本番の名前へ戻してログに出す。</para></summary>
         public static bool TryRead(out Data data, out string why)
         {
             data = null; why = null;
             if (Disabled) { why = "BOT の実行中"; return false; }
-            string json;
-            try
+            string schema = Schema();
+            Data parsed = null;
+            var res = SafeFile.TryReadFirst(FilePath, json => Validate(json, schema, out parsed), out _, out var used, out var label, out var firstWhy,
+                                            w => Debug.LogWarning($"[RunSave] {w}"));
+            switch (res)
             {
-                if (!File.Exists(FilePath)) { why = "中断セーブが無い"; return false; }
-                json = File.ReadAllText(FilePath);
+                case SafeFile.ReadResult.Ok:
+                    data = parsed;
+                    if (used != FilePath)
+                    {
+                        Debug.LogWarning($"[RunSave] 本番の中断セーブが無い・壊れているので、 {label} ({Path.GetFileName(used)}) から復帰した");
+                        if (!SafeFile.Promote(FilePath, used, out var perr)) Debug.LogWarning($"[RunSave] 復帰した記録を本番の名前へ戻せない (中身は使う): {perr}");
+                    }
+                    return true;
+                case SafeFile.ReadResult.Missing:
+                    why = "中断セーブが無い";
+                    return false;
+                case SafeFile.ReadResult.IoError:
+                    // ファイルを開けなかった (他のプロセスが掴んでいる等)。 次の起動で読めるかもしれないので消さない (旧い作りと同じ)。
+                    why = firstWhy;
+                    return false;
+                default:
+                    why = firstWhy ?? "形式が壊れている";
+                    Discard(why);   // 本番・控え・書きかけのどれも中身が使えない
+                    return false;
             }
-            catch (Exception e) { why = "読めない: " + e.Message; return false; }
+        }
 
+        /// <summary>JSON を Data にして版と指紋を確かめる。 使えなければ理由、 使えれば null。</summary>
+        private static string Validate(string json, string schema, out Data data)
+        {
+            data = null;
             try { data = JsonUtility.FromJson<Data>(json); }
-            catch (Exception e) { data = null; why = "形式が壊れている: " + e.Message; }
-            if (data == null) { why ??= "形式が壊れている"; Discard(why); return false; }
-            if (data.version != Version) { why = $"版が違う (ファイル {data.version} / いま {Version})"; Discard(why); data = null; return false; }
-            if (data.schema != Schema()) { why = "ランの中身の形が変わった (このセーブを作った版とフィールドが違う)"; Discard(why); data = null; return false; }
-            return true;
+            catch (Exception e) { data = null; return "形式が壊れている: " + e.Message; }
+            if (data == null) return "形式が壊れている";
+            if (data.version != Version) { int v = data.version; data = null; return $"版が違う (ファイル {v} / いま {Version})"; }
+            if (data.schema != schema) { data = null; return "ランの中身の形が変わった (このセーブを作った版とフィールドが違う)"; }
+            return null;
         }
 
         private static void Discard(string why)
@@ -177,18 +207,15 @@ namespace GameLoop
             Delete();
         }
 
-        /// <summary>書く。 一時ファイルに書いてから差し替える (書いている途中で落ちても前のファイルが壊れない)。</summary>
+        /// <summary>書く。 書きかけ (.tmp) に書いて<b>ディスクまで落としてから</b>、 元を控え (.bak) へ退け、 書きかけを本番へ移し、 控えを消す
+        /// (<see cref="SafeFile.WriteAtomic"/>)。 どの時点で落ちても、 本番・控え・書きかけのどれかに完全な記録が残る。</summary>
         public static bool Write(Data data, out string why)
         {
             why = null;
             if (Disabled) { why = "BOT の実行中"; return false; }
             try
             {
-                string json = JsonUtility.ToJson(data);
-                string path = FilePath, tmp = path + ".tmp";
-                File.WriteAllText(tmp, json);
-                if (File.Exists(path)) File.Delete(path);
-                File.Move(tmp, path);
+                SafeFile.WriteAtomic(FilePath, JsonUtility.ToJson(data));
                 return true;
             }
             catch (Exception e) { why = "書けない: " + e.Message; Debug.LogError($"[RunSave] {why}"); return false; }
