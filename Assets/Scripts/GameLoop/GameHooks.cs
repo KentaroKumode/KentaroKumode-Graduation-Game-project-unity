@@ -154,6 +154,13 @@ namespace GameLoop
         /// <summary>[測定 2026-11-13] true = ボスのダウン (HP の目盛り・<see cref="CombatSystem.BossDown"/>) を入れない旧い作り。 既定 false = ダウンあり。
         /// AutoRunner.bossDown が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
         public static bool BossDownDisabled;
+        /// <summary>[測定 2026-11-14] ダウンが敵の周期 (大技・構え・予兆) を取り消す条件 (<see cref="CombatSystem.BossDown.CancelsCycle"/>)。
+        /// 既定 ChargeOrHeavy = チャージのターンか山場のターンに重なった時だけ (作者の決定)。 Always = どのダウンでも周期を頭に戻す (旧い規則)。
+        /// AutoRunner.downCancelRule が毎ランの始めに入れ、 ラン終了で既定へ戻す。</summary>
+        public static CombatSystem.DownCancelRule DownCancel = CombatSystem.DownCancelRule.ChargeOrHeavy;
+        /// <summary>[測定 2026-11-14] true (既定) = 大技のチャージのターン (大技の 1 ターン前) は敵が攻撃しない (<see cref="CombatSystem.Escalation.IsChargeNoAttack"/>・作者の決定)。
+        /// false = 旧い作り (チャージのターンも小技の倍率で攻撃する)。 AutoRunner.heavyChargeNoAttack が毎ランの始めに入れ、 ラン終了で true へ戻す。</summary>
+        public static bool HeavyChargeNoAttack = true;
         /// <summary>[測定 2026-11-13] true = 深さ 3 のボス 3 体に大技の周期を足さない旧い作り。 既定 false = 足す
         /// (<see cref="CombatSystem.BossParams.Depth3Heavy"/>)。 AutoRunner.depth3Heavy が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
         public static bool Depth3HeavyDisabled;
@@ -201,6 +208,8 @@ namespace GameLoop
             TerminalKillBonusNeedsAttack = false;
             HandCarry = CombatSystem.HandCarryMode.Pick;
             BossDownDisabled = false;
+            DownCancel = CombatSystem.DownCancelRule.ChargeOrHeavy;
+            HeavyChargeNoAttack = true;
             Depth3HeavyDisabled = false;
             VescaClockHeldAtStart = false;
             AshKingBeatenEver = null;

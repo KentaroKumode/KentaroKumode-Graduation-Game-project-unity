@@ -1035,6 +1035,9 @@ namespace ItemSystem.PassiveSkills.Effects
             int rel = Rel(turn, p);
             return turn + (rel == 0 ? p : (p - rel));
         }
+        /// <summary>次の予兆まで何ターンか (0 = このターンが予兆・1 = 次のターンが予兆)。 ボスのダウンが予兆を取り消すかの判定
+        /// (<see cref="CombatSystem.BossDown.CancelsCycle"/>・2026-11-14) が読む。 大技と同じく「予兆のターンか、 その 1 ターン前」に重なったダウンだけが周期を頭に戻す。</summary>
+        public static int TurnsToOmen(int turn, float hpRatio) => IsOmen(turn, hpRatio) ? 0 : NextOmen(turn, hpRatio) - turn;
     }
 
     /// <summary>灰塵の外殻 — 被ダメが15を超えた分を半減 (例: 30→22, 50→32)。
@@ -1065,7 +1068,9 @@ namespace ItemSystem.PassiveSkills.Effects
     {
         /// <summary>前ターンに自分が enemyDiceTotalBonus へ積んだ量 (差分更新用)。 "ember_" 始まりなので形態の差し替えで消える。</summary>
         private const string KeyApplied = "ember_omen_applied";
-        public string SkillId => "EmberOmen";
+        /// <summary>パッシブの id (enemies.json の internalName)。 ボスのダウンの判定 (CombatManager.Down) も読む。</summary>
+        public const string Id = "EmberOmen";
+        public string SkillId => Id;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {

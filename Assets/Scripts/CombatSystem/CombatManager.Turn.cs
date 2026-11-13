@@ -1309,9 +1309,13 @@ namespace CombatSystem
             if (enemyHP > 0 && !enemyStunnedThisTurn && !downThisTurn && currentEnemy != null && Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn))
                 BossDownDiag.NoteHeavyTaken();   // [計装] 大技を受けた
 
-            if (enemyHP > 0 && (enemyStunnedThisTurn || downThisTurn))
+            // 大技のチャージ (2026-11-14・作者の決定): 攻撃しない。 攻撃値は既に 0 (Escalation.HeavyFactor) で、 ダウンと同じ「攻撃しない」の枝を通す
+            //   (敵の「ダメージを与える時/与えた時」のパッシブ・〈廃庭の霧吹き〉の毒・〈多頭攻撃〉の 2 回目は鳴らない)。 口 GameHooks.HeavyChargeNoAttack=false なら旧い作り。
+            bool chargeThisTurn = !downThisTurn && currentEnemy != null && Escalation.IsChargeNoAttack(currentEnemy, ctx.currentTurn);
+            if (enemyHP > 0 && (enemyStunnedThisTurn || downThisTurn || chargeThisTurn))
             {
-                Debug.Log(downThisTurn ? "[ダウン] 敵は行動不能 (攻撃しない)" : $"[役] 封じ・揃: 敵は行動不能 (予告されていた攻撃 {enemyAtkValue} は不発)");
+                Debug.Log(downThisTurn ? "[ダウン] 敵は行動不能 (攻撃しない)" : enemyStunnedThisTurn ? $"[役] 封じ・揃: 敵は行動不能 (予告されていた攻撃 {enemyAtkValue} は不発)"
+                        : "[大技] チャージ: 敵は攻撃しない (次のターンが大技)");
                 ctx.daggerArmed = false;   // 仕込み刃はこのターン限り ── 攻撃が来なくても失効
                 ctx.accumulatedValues.Remove(GameLoop.Consumables.OldLetterGuardKey);   // 古い手紙も同じ
             }

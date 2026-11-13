@@ -270,10 +270,10 @@ namespace CombatSystem
         }
 
         // ===== 深さ 3 のボスの大技の周期 (2026-11-13・仮置き) =====
-        //  深さ 5 以降と同じ形 (EnemyData.heavyPeriod / heavyMul / heavyWindupMul・式は Escalation.HeavyFactor) を、 軽めの値で足す。
+        //  深さ 5 以降と同じ形 (EnemyData.heavyPeriod / heavyMul / heavyLightMul・式は Escalation.HeavyFactor) を、 軽めの値で足す。
         //  json ではなくここに置くのは、 測定の口 (GameHooks.Depth3HeavyDisabled) で旧い作りへ戻せるようにするため。
         public const int Depth3HeavyPeriod = 3;
-        public const float Depth3HeavyMul = 2.0f, Depth3HeavyWindupMul = 0.6f;
+        public const float Depth3HeavyMul = 2.0f, Depth3HeavyLightMul = 0.6f;   // 小技 ×0.6 (2026-11-14 に Depth3HeavyWindupMul から改名・値は同じ)。 チャージのターンは攻撃しない (Escalation.IsChargeNoAttack)
 
         /// <summary>id が深さ 3 のボス 3 体 (ゴブリン王・毒沼の主・鏡の双子) で、 大技の周期を足すか。</summary>
         public static bool Depth3Heavy(string id)
@@ -317,7 +317,7 @@ namespace CombatSystem
             bool addHeavy = Depth3Heavy(e.id) && e.heavyPeriod <= 0;   // 深さ 3 のボスの大技 (2026-11-13・測定の口で止められる)
             if (!changeHp && !changeDice && !addHeavy) return e;
             var cc = e.Clone();
-            if (addHeavy) { cc.heavyPeriod = Depth3HeavyPeriod; cc.heavyMul = Depth3HeavyMul; cc.heavyWindupMul = Depth3HeavyWindupMul; }
+            if (addHeavy) { cc.heavyPeriod = Depth3HeavyPeriod; cc.heavyMul = Depth3HeavyMul; cc.heavyLightMul = Depth3HeavyLightMul; }
             if (changeHp) cc.maxHP = Mathf.Max(1, hpOv);
             if (changeDice)
             {

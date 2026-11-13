@@ -141,8 +141,9 @@ namespace CombatSystem
         // ---- 大技サイクル (EnemyData.heavyPeriod・2026-09-19) ----
 
         /// <summary>敵の周期の起点のずれ (2026-11-13・ボスのダウン)。 大技・構え・灰燼の王〈業火の予兆〉の周期は <c>戦闘のターン − これ</c> で数える。
-        /// 既定 0 (= 戦闘のターンのまま・旧い作りと同じ)。 ボスがダウンしたターンの頭に CombatManager がそのターン番号を入れる
-        /// (ダウンが明けた次のターンが周期の 1 ターン目)。 戦闘の始めに 0 へ戻す。 BOT の見積もりも同じ値を読む。</summary>
+        /// 既定 0 (= 戦闘のターンのまま・旧い作りと同じ)。 ボスのダウンのターンがチャージか山場のターンに重なった時 (<see cref="BossDown.CancelsCycle"/>)、
+        /// そのターンの頭に CombatManager がそのターン番号を入れる (ダウンが明けた次のターンが周期の 1 ターン目)。 それ以外のダウンでは触らない (2026-11-14〜)。
+        /// 戦闘の始めに 0 へ戻す。 BOT の見積もりも同じ値を読む。</summary>
         public static int HeavyCycleOffset;
 
         /// <summary>周期を数えるターン (戦闘のターンから <see cref="HeavyCycleOffset"/> を引いた値)。</summary>
@@ -157,16 +158,11 @@ namespace CombatSystem
 
         /// <summary>次の大技まで何ターンか (0 = このターンが大技 / −1 = 大技なし・ダウンのターン)。</summary>
         public static int TurnsToHeavy(EnemyData e, int combatTurn)
-        {
-            int c = HeavyCycleTurn(combatTurn);
-            if (e == null || e.heavyPeriod <= 0 || c <= 0) return -1;
-            int r = c % e.heavyPeriod;
-            return r == 0 ? 0 : e.heavyPeriod - r;
-        }
+            => e == null ? -1 : HeavyCycle.TurnsToHeavy(e.heavyPeriod, HeavyCycleTurn(combatTurn));   // 式は HeavyCycle (Unity なしの検算と共有)
 
         // ---- 構え (EnemyData.guardPeriod・2026-11-04) ----
 
-        //   構えの周期も、 ボスのダウンが明けたら頭から (大技と同じ起点 HeavyCycleOffset を読む・2026-11-13。 起点 0 なら今までどおり)。
+        //   構えの周期も、 大技と同じ起点 HeavyCycleOffset を読む (2026-11-13。 起点 0 なら今までどおり)。 ボスのダウンが構えか、 その 1 ターン前に重なった時だけ頭に戻る (2026-11-14・BossDown.CancelsCycle)。
 
         /// <summary>そのターンに構えているか。 周期 N なら (起点から数えて) T = N, 2N …。</summary>
         public static bool IsGuardTurn(EnemyData e, int combatTurn)
@@ -199,12 +195,26 @@ namespace CombatSystem
         public static float OpeningFactor(EnemyData e, int combatTurn)
             => e != null && e.openingTurns > 0 && combatTurn > 0 && combatTurn <= e.openingTurns && e.openingAttackMul > 0f ? e.openingAttackMul : 1f;
 
-        /// <summary>攻撃値へ掛ける大技サイクルの倍率。 大技なしの敵は 1。</summary>
+        /// <summary>チャージのターンか (大技の 1 ターン前 = <see cref="TurnsToHeavy"/> が 1)。 画面の「次: 大技」・予告の turnsToHeavy = 1 と同じターン。
+        /// 周期が 1 の敵 (毎ターン大技) にはチャージのターンが無い。</summary>
+        public static bool IsChargeTurn(EnemyData e, int combatTurn)
+            => e != null && HeavyCycle.IsCharge(e.heavyPeriod, HeavyCycleTurn(combatTurn));
+
+        /// <summary>このターンはチャージで、 敵が攻撃しないか (2026-11-14・作者の決定「チャージは攻撃しないでいい」・測定の口 <c>GameHooks.HeavyChargeNoAttack</c>)。
+        /// 真なら <see cref="HeavyFactor"/> が 0 (攻撃値 = 予告 = 0) で、 CombatManager はダウンと同じ「攻撃しない」の枝を通す。</summary>
+        public static bool IsChargeNoAttack(EnemyData e, int combatTurn)
+            => GameLoop.GameHooks.HeavyChargeNoAttack && IsChargeTurn(e, combatTurn);
+
+        /// <summary>攻撃値へ掛ける大技サイクルの倍率。 大技なしの敵は 1。
+        /// 周期の 3 つのターン: 大技 = <see cref="EnemyData.heavyMul"/> (+ 挑戦カードの大技の倍率 +N)・チャージ = 0 (攻撃しない・<see cref="IsChargeNoAttack"/>)・
+        /// 小技 (どちらでもないターン) = <see cref="EnemyData.heavyLightMul"/>。 口でチャージの攻撃を戻した時 (旧い作り) は、 チャージも小技の倍率。</summary>
         public static float HeavyFactor(EnemyData e, int combatTurn)
         {
             if (e == null || e.heavyPeriod <= 0) return 1f;
-            if (IsHeavyTurn(e, combatTurn)) return e.heavyMul > 0f ? e.heavyMul + MetaProgression.MetaDebuffApplicator.GetHeavyMulBonus() : 1f;   // 挑戦カード: 大技の倍率 +N
-            return e.heavyWindupMul > 0f ? e.heavyWindupMul : 1f;
+            int c = HeavyCycleTurn(combatTurn);
+            float heavyWithBonus = HeavyCycle.TurnsToHeavy(e.heavyPeriod, c) == 0 && e.heavyMul > 0f
+                ? e.heavyMul + MetaProgression.MetaDebuffApplicator.GetHeavyMulBonus() : 0f;   // 挑戦カード: 大技の倍率 +N
+            return HeavyCycle.Factor(e.heavyPeriod, c, e.heavyMul, heavyWithBonus, e.heavyLightMul, GameLoop.GameHooks.HeavyChargeNoAttack);
         }
     }
 }

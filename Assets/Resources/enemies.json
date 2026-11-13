@@ -1363,8 +1363,8 @@
       "attackRollMin": 2,
       "attackRollMax": 4,
       "heavyPeriod": 3,
-      "heavyMul": 2.0,
-      "heavyWindupMul": 0.7
+      "heavyMul": 3.0,
+      "heavyLightMul": 0.8
     },
     {
       "id": "boss_layer5_hidden",
@@ -1394,8 +1394,8 @@
       "attackRollMin": 2,
       "attackRollMax": 3,
       "heavyPeriod": 3,
-      "heavyMul": 2.0,
-      "heavyWindupMul": 0.7
+      "heavyMul": 3.0,
+      "heavyLightMul": 0.8
     },
     {
       "id": "boss_layer6",
@@ -1489,8 +1489,8 @@
       "attackRollMin": 2,
       "attackRollMax": 6,
       "heavyPeriod": 3,
-      "heavyMul": 1.75,
-      "heavyWindupMul": 0.7
+      "heavyMul": 3.0,
+      "heavyLightMul": 0.8
     },
     {
       "id": "boss_layer7_p2",
@@ -1538,8 +1538,8 @@
       "attackRollMin": 2,
       "attackRollMax": 5,
       "heavyPeriod": 3,
-      "heavyMul": 1.75,
-      "heavyWindupMul": 0.7
+      "heavyMul": 3.0,
+      "heavyLightMul": 0.8
     },
     {
       "id": "boss_layer7_p3",
@@ -1587,8 +1587,8 @@
       "attackRollMin": 2,
       "attackRollMax": 7,
       "heavyPeriod": 3,
-      "heavyMul": 1.75,
-      "heavyWindupMul": 0.7
+      "heavyMul": 3.0,
+      "heavyLightMul": 0.8
     },
     {
       "id": "boss_layer7_p4",
@@ -1636,8 +1636,8 @@
       "attackRollMin": 2,
       "attackRollMax": 9,
       "heavyPeriod": 3,
-      "heavyMul": 1.75,
-      "heavyWindupMul": 0.7
+      "heavyMul": 3.0,
+      "heavyLightMul": 0.8
     }
   ]
 }
