@@ -15,7 +15,7 @@ namespace GameLoop
     /// <item>鏡の護符 ── 使い魔の探知 1 歩 → 0 歩 (重ならない限り見つからない)</item>
     /// <item>補給商の割符 ── 補給庫が無い → 前哨基地の物資 ×1.5 ＋ 物資の購入金額 −50%</item>
     /// <item>渡り鳥の羅盤 ── 1 歩 = 物資 1 なので ×0.5 は「終点へ近づく歩の 2 歩に 1 回が無料」</item>
-    /// <item>羅針の針 ── 魔石の方角を計器の上に 8 方位の字で出す (レーダーは 4 方向の扇)</item>
+    /// <item>羅盤の針 ── 魔石の方角を計器の上に 8 方位の字で出す (レーダーは 4 方向の扇)</item>
     /// <item>追っ手殺しの刃 ── 連戦が無い → 追跡者の戦闘の 2 体目 (手下・猟犬) が付かない ＋ 勝った物資 ×1.5</item>
     /// </list>
     /// </summary>
@@ -101,7 +101,7 @@ namespace GameLoop
         public static int PursuerSupply(RunState run)
             => Has(run, ItemIds.NavHunterBlade) ? (int)System.Math.Ceiling(FreeMapParams.RewardPursuer * HunterSupplyMul) : FreeMapParams.RewardPursuer;
 
-        /// <summary>〈羅針の針〉: 魔石の方角を 8 方位の字で計器に出す。</summary>
+        /// <summary>〈羅盤の針〉: 魔石の方角を 8 方位の字で計器に出す。</summary>
         public static bool FineBearing(RunState run) => Has(run, ItemIds.NavCompassNeedle);
     }
 }

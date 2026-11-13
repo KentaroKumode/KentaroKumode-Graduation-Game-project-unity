@@ -326,12 +326,12 @@ namespace ItemSystem.PassiveSkills
             // 2026-06-05 会心バリエーション（OnCriticalDamage / OnCriticalCheck）
             Register(new LacerationCore());   // 裂傷の刃心（会心→出血+2、会心倍率連動）
 
-            // 2026-06-04 [剣の舞] セット（4枚集約→ブレイドダンスに変化）
+            // 2026-06-04 [剣の舞] セット（4枚集約→無銘の剣舞譜に変化）
             Register(new SaberWaltz());       // サーベル・ワルツ（ダイス+1／孤剣時HP半減）
             Register(new EspadaPasodoble());  // エスパーダ・パソドブレ（自他ダイス+5／与被ダメ+20%）
             Register(new FleuretBallet());    // フルーレ・バレエ（ダイス+3／敗北時自壊は救済チェーン）
             Register(new FalconTango());      // ファコン・タンゴ（戦闘終了時 廃棄+全カテゴリ獲得）
-            Register(new BladeDance());       // ブレイドダンス（剣先スタック：ダイス/回復/反射）
+            Register(new BladeDance());       // 無銘の剣舞譜（剣先スタック：ダイス/回復/反射）
 
             // 竜閃（ユニーク武器）
             Register(new MugaMushin());

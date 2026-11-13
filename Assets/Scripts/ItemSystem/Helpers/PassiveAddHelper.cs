@@ -123,8 +123,8 @@ namespace ItemSystem.Helpers
             run.seenPassiveItemIds?.Add(itemId); // 以後の重複取得を禁止（廃棄後も残す）
             PassiveSourceAudit.Note(run);        // どの経路から入ったかを数える (計装)
 
-            // [剣の舞] を取得し、インベントリに4枚揃ったら〈ブレイドダンス〉へ変化させる。
-            // （Finale=ブレイドダンスは IsDance=false のため再帰しない）
+            // [剣の舞] を取得し、インベントリに4枚揃ったら〈無銘の剣舞譜〉へ変化させる。
+            // （Finale=無銘の剣舞譜は IsDance=false のため再帰しない）
             if (SwordDanceSet.IsDance(itemId))
             {
                 SwordDanceSet.Acquired++;   // [計装] 提示と取得を分けて数える

@@ -618,13 +618,13 @@ namespace ItemSystem.PassiveSkills
                 context.isCritical = critRate > 0f && GameLoop.GameRng.Value("PassiveSkillManager.2") < critRate;
                 context.lastCritAddPct = critAdd;
 
-                // 〈研ぎ知らずの銑鉄棍〉: 会心は出ない。 会心になるはずだった攻撃は敵の防御を無視し、 敵の防御を 1 下げる。
+                // 〈銑鉄棍〉: 会心は出ない。 会心になるはずだった攻撃は敵の防御を無視し、 敵の防御を 1 下げる。
                 if (context.critBecomesArmorBreak && context.isCritical)
                 {
                     context.isCritical = false;
                     context.suppressedCritProc = true;
                     context.enemyDefense = System.Math.Max(0, context.enemyDefense - 1);
-                    Debug.Log($"[研ぎ知らずの銑鉄棍] 会心の代わりに防御を砕く (敵の防御 → {context.enemyDefense})");
+                    Debug.Log($"[銑鉄棍] 会心の代わりに防御を砕く (敵の防御 → {context.enemyDefense})");
                 }
             }
             }   // ← if (attackerIsEnemy) の else 閉じ

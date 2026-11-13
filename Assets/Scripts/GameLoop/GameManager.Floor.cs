@@ -352,7 +352,7 @@ namespace GameLoop
                 // 災厄の予兆を受けた事実を、5層ボス撃破によって〈決意〉へ昇格させる。
                 // エリート撃破数は6層ゲートに使わない。
                 ConvictionSystem.PromoteForLayer6(Run);
-                // **計測専用**: 5層撃破時点で〈ブレイドダンス〉を強制付与する (既定 false)。
+                // **計測専用**: 5層撃破時点で〈無銘の剣舞譜〉を強制付与する (既定 false)。
                 //   「剣の舞 4 枚を完成させれば高難易度を通せるのか」を切り分けるための実験用。
                 //   通常は 4 枚集約でしか手に入らず、 高難易度ほど揃う前に死ぬので実測できない。
                 //   製品挙動は変えない。 AutoRunner の固定難易度スイープだけが true にする。
@@ -360,7 +360,7 @@ namespace GameLoop
                     && !Run.ownedPassiveItems.Contains(SwordDanceSet.Finale))
                 {
                     ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, SwordDanceSet.Finale);
-                    Log("[計測] 5層撃破 → 〈ブレイドダンス〉を強制付与");
+                    Log("[計測] 5層撃破 → 〈無銘の剣舞譜〉を強制付与");
                 }
 
                 RecordChallengeClear();   // 5 層の踏破 = 挑戦の難易度の記録

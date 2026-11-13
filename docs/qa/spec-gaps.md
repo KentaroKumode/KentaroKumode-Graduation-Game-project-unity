@@ -92,7 +92,7 @@ base: origin/main 6ea741d
 
 | 番号 | 種類 | 重さ | 中身 | 場所 |
 |---|---|---|---|---|
-| G-07 | 食 | 中 | 秘宝の基準価格。§16-3 は BRONZE 4・SILVER 6・GOLD 8・LEGENDARY 10G。items.json は 7・8・9・10（〈ブレイドダンス〉0）。§23-21 の航行アイテムの「7〜10G」とは合う | GAME.md:2846-2849 ／ items.json（Passive の `basePrice`） |
+| G-07 | 食 | 中 | 秘宝の基準価格。§16-3 は BRONZE 4・SILVER 6・GOLD 8・LEGENDARY 10G。items.json は 7・8・9・10（〈無銘の剣舞譜〉0）。§23-21 の航行アイテムの「7〜10G」とは合う | GAME.md:2846-2849 ／ items.json（Passive の `basePrice`） |
 | G-08 | 食 | 軽 | 軸ごとの品の数。§8-7 は毒 25、items.json は 24（他は一致: 臨界 25・充電 25・出血 24・シールド 20・会心 18・金 7）。軸なし 24 品 | GAME.md:1212 ／ items.json `axis` |
 | G-09 | 矛 | 軽 | パッシブの総数。§0-1・§8-2 は「全 166 種（プレイヤー 102 / 敵 64）」。items.json の秘宝は 167 品、enemies.json の敵の能力は 49 種（数え方が違う可能性あり） | GAME.md:26・1108 |
 | G-10 | 食 | 中 | 職業の開始武器。§11 は 訓練用の剣・端材の盾・薪割りの斧・懐刀。コードは段 2 の 鍛鉄の剣・鉄盾・猛斧・盗賊の短刀（2026-09-05 に T1 → T2）。職業の書類画面の `weaponNameFallback` は §11 の名前のまま（使う所は未確認） | GAME.md:1513-1518 ／ `GameLoop/RunState.cs:63-73`・`UI/ClassSelect/ClassDossierData.cs:41,56,71,86` |

@@ -163,7 +163,7 @@ namespace UI.Game2D
             }
             else if (NavItems.FineBearing(run))
             {
-                var st = sim.Stone();      // 〈羅針の針〉: 魔石の方角を 8 方位の字で (レーダーは 4 方向の扇)
+                var st = sim.Stone();      // 〈羅盤の針〉: 魔石の方角を 8 方位の字で (レーダーは 4 方向の扇)
                 if (st.level > 0 && st.bearing >= 0) { line = "魔石 " + StoneReading.BearingNames[st.bearing]; col = st.level >= 2 ? Game2DKit.Amber : Game2DKit.Dim; }
             }
             if (string.IsNullOrEmpty(line))

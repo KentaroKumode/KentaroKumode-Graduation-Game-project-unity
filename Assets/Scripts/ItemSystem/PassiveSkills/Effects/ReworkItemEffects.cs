@@ -219,10 +219,10 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>焦げ柄の点火スパナ: 爆発のたび充電 +5。</summary>
+    /// <summary>点火スパナ: 爆発のたび充電 +5。</summary>
     public class IgnitionSpanner : IPassiveSkillEffect
     {
-        public string SkillId => "焦げ柄の点火スパナ";
+        public string SkillId => "点火スパナ";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnRinkaiBurst };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -509,10 +509,10 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>騎士団の切り札: 敵の HP が 30% 以下になったターン、 シールドを最大 <see cref="MaxSpend"/> 使い、 使った量 × 2 を攻撃に加える (1 戦闘 1 回)。</summary>
+    /// <summary>重装兵の隠し刃: 敵の HP が 30% 以下になったターン、 シールドを最大 <see cref="MaxSpend"/> 使い、 使った量 × 2 を攻撃に加える (1 戦闘 1 回)。</summary>
     public class KnightsTrump : IPassiveSkillEffect
     {
-        public string SkillId => "騎士団の切り札";
+        public string SkillId => "重装兵の隠し刃";
         /// <summary>1 回に使うシールドの上限 (2026-11-04・仮置き)。 全部使う形だと平均 40 使って攻撃 +80 になり、
         /// 攻撃の加算全体の 15% をこの 1 品が占めていた。 使わなかった分のシールドは残る。</summary>
         public const int MaxSpend = 20;
@@ -524,7 +524,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (sh <= 0 || !Rw.OncePerBattle(ctx, "rw.trump")) return;
             ctx.consShield -= sh;
             ctx.AddPlayerAttackOrDiceBonus(sh * 2);
-            Rw.Log($"[騎士団の切り札] シールド {sh} を使い 攻撃 +{sh * 2}");
+            Rw.Log($"[重装兵の隠し刃] シールド {sh} を使い 攻撃 +{sh * 2}");
         }
     }
 
@@ -680,10 +680,10 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>百一人切りの鉈: ターン終了時、 敵 HP が「毒 5 につき 1%」以下なら倒す (ボスはその半分)。</summary>
+    /// <summary>百人切りの鉈: ターン終了時、 敵 HP が「毒 5 につき 1%」以下なら倒す (ボスはその半分)。</summary>
     public class HundredCleaver : IPassiveSkillEffect
     {
-        public string SkillId => "百一人切りの鉈";
+        public string SkillId => "百人切りの鉈";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -693,7 +693,7 @@ namespace ItemSystem.PassiveSkills.Effects
             if (pct <= 0 || ctx.enemyCurrentHP * 100 > ctx.enemyMaxHP * pct) return;
             if (!ctx.CanExecuteEnemy()) return;
             ctx.enemyCurrentHP = 0;
-            Rw.Log($"[百一人切りの鉈] 敵HP {pct}% 以下 → 処刑");
+            Rw.Log($"[百人切りの鉈] 敵HP {pct}% 以下 → 処刑");
         }
     }
 
@@ -724,12 +724,12 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>重増しの拳套: 攻撃が通るたび (1 ターンに 1 回) 刻み +1。 刻み 1 つにつき与ダメージ +3%。 戦闘が終わると刻みは 0 に戻る。
+    /// <summary>加重の拳套: 攻撃が通るたび (1 ターンに 1 回) 刻み +1。 刻み 1 つにつき与ダメージ +3%。 戦闘が終わると刻みは 0 に戻る。
     /// 2026-11-11 (#100): 毒の品から作り直した ── 拳套なのに毒で、 名前・フレーバー (「留め紐は一撃ごとに長くなる。 外すと元へ戻る」) と
     /// 効果が合っていなかった。 軸なし。 数値は仮置き (未測定)。 旧効果は「敵の毒が 5 増えるたび刻み +1・攻撃に挿したターンに使い切る」。</summary>
     public class WeightingGauntlet : IPassiveSkillEffect
     {
-        public string SkillId => "重増しの拳套";
+        public string SkillId => "加重の拳套";
         public const float PctPerStack = 0.03f;
         /// <summary>[persistent・戦闘開始で 0] 刻みの数。</summary>
         private const string Stk = "rw.weightStacks";
@@ -780,17 +780,17 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => Kw.DamageEnemy(ctx, 3 * Kw.EventAmount(ctx));
     }
 
-    /// <summary>一人抱えの破城斧: シールドが 10 以上あるターン、 シールドを 10 使って、 その攻撃は敵の防御を無視する。</summary>
+    /// <summary>破城斧: シールドが 10 以上あるターン、 シールドを 10 使って、 その攻撃は敵の防御を無視する。</summary>
     public class SiegeAxe : IPassiveSkillEffect
     {
-        public string SkillId => "一人抱えの破城斧";
+        public string SkillId => "破城斧";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
             if (ctx.consShield < 10 || ctx.enemyDefense <= 0) return;   // 防御の無い敵に盾を払わない
             ctx.consShield -= 10;
             ctx.playerArmorPen += CombatSystem.DefenseFormula.IgnoreAll;
-            Rw.Log("[一人抱えの破城斧] シールド 10 を使い、 この攻撃は敵の防御を無視");
+            Rw.Log("[破城斧] シールド 10 を使い、 この攻撃は敵の防御を無視");
         }
     }
 
@@ -885,10 +885,10 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>爆破コンテストの賞金: 臨界の爆発でとどめを刺すたび +4G。</summary>
+    /// <summary>爆破祭の小切手: 臨界の爆発でとどめを刺すたび +4G。</summary>
     public class BlastPrize : IPassiveSkillEffect
     {
-        public string SkillId => "爆破コンテストの賞金";
+        public string SkillId => "爆破祭の小切手";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnBattleEnd };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -977,10 +977,10 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.critOverflowToMultiplier = true;
     }
 
-    /// <summary>研ぎ知らずの銑鉄棍【規則】: 会心が出なくなる。 会心になるはずだった攻撃は敵の防御を無視し、 この戦闘中の敵の防御を 1 下げる。</summary>
+    /// <summary>銑鉄棍【規則】: 会心が出なくなる。 会心になるはずだった攻撃は敵の防御を無視し、 この戦闘中の敵の防御を 1 下げる。</summary>
     public class UnwhettedClub : IPassiveSkillEffect
     {
-        public string SkillId => "研ぎ知らずの銑鉄棍";
+        public string SkillId => "銑鉄棍";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.critBecomesArmorBreak = true;
     }

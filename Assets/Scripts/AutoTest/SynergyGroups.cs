@@ -26,7 +26,7 @@ namespace AutoTest
         public static readonly Group[] All =
         {
             new Group("sword_dance", "[剣の舞]", GameLoop.SwordDanceSet.All,
-                "4枚集約で〈ブレイドダンス〉へ変化。サーベルは単独だと戦闘開始HP半減のリスクを負うため、soloΔが負・synΔが正なら設計通り（集める価値が立証される）。"),
+                "4枚集約で〈無銘の剣舞譜〉へ変化。サーベルは単独だと戦闘開始HP半減のリスクを負うため、soloΔが負・synΔが正なら設計通り（集める価値が立証される）。"),
             new Group("yokyo", "[佯狂者]", GameLoop.YokyoSet.All,
                 "発狂(物資0)連動。フルセットで燃え尽き＋スケール。k増加でbandが伸びるほど、組み立てる価値が高い。"),
         };

@@ -319,7 +319,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
     // ============================================================
     //  [剣の舞] セット（2026-06-04）— Passive カテゴリのシナジー武器群。
-    //  4枚インベントリ集約で〈ブレイドダンス〉(BladeDance) に変化（GameLoop.SwordDanceSet）。
+    //  4枚インベントリ集約で〈無銘の剣舞譜〉(BladeDance) に変化（GameLoop.SwordDanceSet）。
     //  ダイス合計加算は OnPostRoll（RecomputeDiceTotals 後＝確実に効く）で行う。
     //  run 参照は GameLoop.GameManager.Instance.Run（StepHeal/Eternal と同じ手法）。
     // ============================================================
@@ -329,7 +329,7 @@ namespace ItemSystem.PassiveSkills.Effects
     /// ショップでの[剣の舞]出現率上昇は ShopManager 側のフックで処理。</summary>
     public class SaberWaltz : IPassiveSkillEffect
     {
-        public string SkillId => "剣舞譜「円舞」";
+        public string SkillId => "サーベル・ワルツ";
         public PassiveSkillTrigger[] Triggers => new[]
         {
             PassiveSkillTrigger.OnBattleStart,
@@ -623,12 +623,12 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>ブレイドダンス (特殊・4枚集約の変化先): 戦闘突入ごとに[剣先]スタック+1（最大99・ラン中持続）。
+    /// <summary>無銘の剣舞譜 (特殊・4枚集約の変化先): 戦闘突入ごとに[剣先]スタック+1（最大99・ラン中持続）。
     /// ダイス合計に剣先スタック分を加算。与ダメージ時に剣先スタック分HP回復、被ダメージ時に剣先スタック分の
     /// 軽減不可ダメージを相手へ。スタックはランを跨がず IRunResettable でリセット。</summary>
     public class BladeDance : IPassiveSkillEffect, IRunResettable, IRunStatePersistent
     {
-        public string SkillId => "ブレイドダンス";
+        public string SkillId => "無銘の剣舞譜";
         private int kensaki = 0; // 剣先スタック（ラン中持続）
 
         public void ResetRunState() { kensaki = 0; }
@@ -649,7 +649,7 @@ namespace ItemSystem.PassiveSkills.Effects
         {
             int seed = System.Math.Min(99, System.Math.Max(0, floor) * 5);
             if (seed > kensaki) kensaki = seed;
-            UnityEngine.Debug.Log($"[ブレイドダンス] 取得時シード: floor={floor} → kensaki={kensaki}");
+            UnityEngine.Debug.Log($"[無銘の剣舞譜] 取得時シード: floor={floor} → kensaki={kensaki}");
         }
 
         public PassiveSkillTrigger[] Triggers => new[]
@@ -665,7 +665,7 @@ namespace ItemSystem.PassiveSkills.Effects
             {
                 case PassiveSkillTrigger.OnBattleStart:
                     kensaki = System.Math.Min(99, kensaki + 1);
-                    UnityEngine.Debug.Log($"[ブレイドダンス] 戦闘突入: 剣先スタック → {kensaki}");
+                    UnityEngine.Debug.Log($"[無銘の剣舞譜] 戦闘突入: 剣先スタック → {kensaki}");
                     break;
                 case PassiveSkillTrigger.OnPostRoll:
                     // 旧: ダイス合計+剣先 / 新: 攻撃+剣先

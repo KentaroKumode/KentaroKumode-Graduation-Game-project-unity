@@ -155,7 +155,7 @@ base: origin/main 6ea741d
 | F-F-01 | 秘宝（全品） | 品そのものが 1 つの常時効果 | `items.json`（category Passive）・各 `*Effects.cs` | 167 品（BRONZE 47・SILVER 44・GOLD 42・LEGENDARY 34）[^items] | 両 | 食（G-07・G-09） | 動（16回） |
 | F-F-02 | 秘宝の重複禁止 | 同じ品はラン中 1 個きり（手放しても再取得不可） | `PassiveAddHelper.AddPassiveItem`・`seenPassiveItemIds` | ― | ロ | 仕（§9-3） | 固 |
 | F-F-03 | ステータスで書いた秘宝 | `stats`・`per`・`perEvery`・`perMax`・`on` | `StatModifierEffect`・DCR §2-C | 9 品[^items] | ロ | 仕（§9-2b） | 固 |
-| F-F-04 | 剣の舞セット | 4 枚集めて〈ブレイドダンス〉（0G の非売品） | `GameLoop/SwordDanceSet.cs` | 4＋1 | 両 | 仕（§8-2） | 固 |
+| F-F-04 | 剣の舞セット | 4 枚集めて〈無銘の剣舞譜〉（0G の非売品） | `GameLoop/SwordDanceSet.cs` | 4＋1 | 両 | 仕（§8-2） | 固 |
 | F-F-05 | 武器 | 家系 4 × 段 2〜4 ＋〈竜閃〉。1 本だけ持つ | `items.json`（Weapon）・`Loadout.Gain` | 13 品[^items] | 両 | 食（G-10） | 動 |
 | F-F-06 | 武器の段の効果 | 家系の専用ラダー（共有 skills 表） | `WeaponFamilyEffects.cs`・`WeaponProgression.Compute` | skills 30 段[^items] | ロ | 仕（§9-4b） | 仮（#43） |
 | F-F-07 | 武器の "+" と強化 | +0/+1・T4+ が終点・入れ替えで +0 | `weaponPlus`・`GameManager.Rest.cs` | 段 2 × 3 | 両 | 仕（§9-4） | 固 |

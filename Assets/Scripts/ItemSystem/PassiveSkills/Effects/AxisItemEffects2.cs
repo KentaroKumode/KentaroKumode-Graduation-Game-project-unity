@@ -83,10 +83,10 @@ namespace ItemSystem.PassiveSkills.Effects
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.critArmorPen += 10;
     }
 
-    /// <summary>外れ続きの賽: 会心が出なかった攻撃のたび会心率 +15% (会心が出ると 0 に戻る・2026-11-07: 旧 +10%)。</summary>
+    /// <summary>負け越しの賽: 会心が出なかった攻撃のたび会心率 +15% (会心が出ると 0 に戻る・2026-11-07: 旧 +10%)。</summary>
     public class LosingStreakDie : IPassiveSkillEffect
     {
-        public string SkillId => "外れ続きの賽";
+        public string SkillId => "負け越しの賽";
         private const string Key = "ax2.streak";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnPostDealDamage, PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -184,10 +184,10 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>振り直しの撃鉄: リロールしたターン、 与ダメージ +15% (2026-11-10: 旧 出目 +25%)。</summary>
+    /// <summary>引き直しの撃鉄: リロールしたターン、 与ダメージ +15% (2026-11-10: 旧 出目 +25%)。</summary>
     public class RerollHammer : IPassiveSkillEffect
     {
-        public string SkillId => "振り直しの撃鉄";
+        public string SkillId => "引き直しの撃鉄";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnWired };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
         {
@@ -302,10 +302,10 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>涸れぬ泉の血晶: 血晶 1 につき、 戦闘開始時に敵へ出血 +2。</summary>
+    /// <summary>涸れぬ血晶: 血晶 1 につき、 戦闘開始時に敵へ出血 +2。</summary>
     public class EndlessSpringCrystal : IPassiveSkillEffect
     {
-        public string SkillId => "涸れぬ泉の血晶";
+        public string SkillId => "涸れぬ血晶";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx) => ctx.AddEnemyBleed(2 * ctx.AxisDepth(AxisRules.Bleed));
     }
