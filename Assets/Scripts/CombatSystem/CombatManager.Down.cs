@@ -58,13 +58,14 @@ namespace CombatSystem
             bool hadHeavy = currentEnemy != null && currentEnemy.heavyPeriod > 0;
             bool always = GameLoop.GameHooks.DownCancel == DownCancelRule.Always;
             // 起点を動かす前に見る。 計装の「取り消した」: 新しい規則 = 大技のチャージか大技のターンに重なった / 旧い規則 (Always) = 今までどおり大技のターンだけ数える
+            int toHeavyAtDown = hadHeavy ? Escalation.TurnsToHeavy(currentEnemy, ctx.currentTurn) : -1;   // [診断] ダウンのターンの周期の位置 (起点を動かす前)
             bool canceled = hadHeavy && (always ? Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn)
-                                                : BossDown.IsChargeOrClimax(Escalation.TurnsToHeavy(currentEnemy, ctx.currentTurn)));
+                                                : BossDown.IsChargeOrClimax(toHeavyAtDown));
             if (DownCancelsCycleAt(currentEnemy, ctx.currentTurn, Escalation.HeavyHpRatio))
                 Escalation.HeavyCycleOffset = ctx.currentTurn;
             _down.heavyCanceledNow = hadHeavy && (always || canceled);   // 画面の「大技は取り消し」(旧い規則はどのダウンでも大技が先へ延びる)
             BossDown.ActiveNow = true;
-            BossDownDiag.NoteDown(hadHeavy, canceled);
+            BossDownDiag.NoteDown(hadHeavy, canceled, toHeavyAtDown);
             Debug.Log($"[ダウン] T{ctx.currentTurn} {currentEnemy?.displayName}: 行動不能・受けるダメージ ×{BossDown.TakenMul:0.0}"
                     + (canceled ? "・大技は取り消し (周期は頭から)" : hadHeavy ? (always ? "・(大技は溜まっていない)" : "・大技の周期はそのまま進む") : "")
                     + (_down.pending > 0 ? $" (あと {_down.pending} ターン続く)" : ""));

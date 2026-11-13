@@ -1308,6 +1308,10 @@ namespace CombatSystem
             bool downThisTurn = _down.downNow;
             if (enemyHP > 0 && !enemyStunnedThisTurn && !downThisTurn && currentEnemy != null && Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn))
                 BossDownDiag.NoteHeavyTaken();   // [計装] 大技を受けた
+            // [診断 2026-11-14] このターンの敵の行動 (大技 0 / チャージ 1 / 小技 2・ダウンと〈封じ・揃〉と大技なしは −1)。 ターンの被ダメ (takenApplied) と合わせて下で数える
+            int diagHeavyKind = enemyHP <= 0 || enemyStunnedThisTurn || downThisTurn || currentEnemy == null || currentEnemy.heavyPeriod <= 0 ? -1
+                              : Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn) ? 0
+                              : Escalation.IsChargeNoAttack(currentEnemy, ctx.currentTurn) ? 1 : 2;
 
             // 大技のチャージ (2026-11-14・作者の決定): 攻撃しない。 攻撃値は既に 0 (Escalation.HeavyFactor) で、 ダウンと同じ「攻撃しない」の枝を通す
             //   (敵の「ダメージを与える時/与えた時」のパッシブ・〈廃庭の霧吹き〉の毒・〈多頭攻撃〉の 2 回目は鳴らない)。 口 GameHooks.HeavyChargeNoAttack=false なら旧い作り。
@@ -1541,6 +1545,7 @@ namespace CombatSystem
             ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.EnemyAtkPreDefense] =
                 (primaryAttacked ? enemyAtkBeforeDefense : 0) + (secondaryAttacked ? secondaryAtkBeforeDefense : 0);
             ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.HpLossFromEnemy] = takenApplied;
+            BossDownDiag.NoteEnemyTurn(diagHeavyKind, takenApplied);   // [診断 2026-11-14] 大技 / 小技のターンの被ダメ (防御・シールドの後)
 
             // 踏みとどまり 2 回目 ── 反射 (返しの盾/コントラタック/鏡写し) と反撃固定ダメは
             //   敵の攻撃解決の**中**でヴェスカの HP を削るため、 1 回目の clamp より後に走る。

@@ -310,6 +310,7 @@ namespace AutoTest
                 if (aimPreBroke && !chosenBreaks) DownAimHeld++;
             }
             if (mayMistake) NoteDeckPolicyDiag(in ev, k, board, deck, cands, us, touts, best, bestPre);   // [計装 #106] 実際の配線の判断だけ
+            if (mayMistake) NoteDownBreakDiag(in ev, tele, k, outs, best);                                // [診断 2026-11-14] 目盛りの割り時 (方策に関係なく数える)
             return cands[best];
         }
 
@@ -755,6 +756,75 @@ namespace AutoTest
             return true;
         }
         private float _downAimLastGain;
+
+        // =====================================================================
+        //  [診断 2026-11-14] 目盛りの割り時 (「待ってダウンを重ねる」得が測定に出ない理由の切り分け・判断は変えない・乱数を引かない)
+        // =====================================================================
+        /// <summary>[0] 今のターンに目盛りを割れる手 (見込み) があった判断 / [1..4] そのうち次のターン (= 今割った時のダウンのターン) が 小技・チャージ・大技・大技なし /
+        /// [5] 待つ手の条件 (DownKeepRules.HoldEligibleChargeOrHeavy) を満たす手があった / [6] 割らない手を選んだ / [7] 待つ手の条件を満たす手を選んだ /
+        /// [8] 待つ手が無い理由: 次が大技 (今割るのが最善) か大技なし / [9] 待つ手が無い理由: 何もしなくても次はダウン / [10] 待つ手が無い理由: 目盛りの手前で止まり次のターンに割れる手が無い /
+        /// [11] 割ると見込んだ手を選んだ → 次のターンの頭の予告で確かめた数 / [12] そのうち実際にダウン / [13] 割らないと見込んだ手を選んだ → 確かめた数 / [14] そのうち実際にダウン
+        /// (毒・出血・ターン終了時の削り・会心のぶれで割れた)。 ランをまたいで累計。</summary>
+        private readonly long[] _downBreakDiag = new long[15];
+        /// <summary>前の判断の見込み (1 = 割る・2 = 割らない・0 = 確かめない) と、 そのターン・敵 (次の判断で予告と突き合わせる)。</summary>
+        private int _dbdPredict, _dbdTurn = -99; private string _dbdEnemy;
+
+        private void NoteDownBreakDiag(in DeckEval ev, MutualTurnTelegraph tele, int k, OptimalTurnOutcome[] outs, int best)
+        {
+            var st = ev.st;
+            var enemy = CombatManager.Instance?.CurrentEnemy;
+            // 前の判断の答え合わせ: 同じ敵の次のターンの予告がダウンか
+            if (_dbdPredict != 0 && enemy != null && enemy.id == _dbdEnemy && tele.turn == _dbdTurn + 1)
+            {
+                if (_dbdPredict == 1) { _downBreakDiag[11]++; if (tele.enemyDown) _downBreakDiag[12]++; }
+                else { _downBreakDiag[13]++; if (tele.enemyDown) _downBreakDiag[14]++; }
+            }
+            _dbdPredict = 0;
+            if (st.downNotches == null || st.enemyDown || enemy == null) return;
+            int hp = st.enemyHp, n = outs.Length;
+            bool downAnyway = BossDown.NextTurnIsDown(st.downNotches, st.downMaxHp, st.downBroken, st.downPendingNow, hp);
+            var breaks = new bool[n]; bool any = false;
+            for (int i = 0; i < n; i++)
+            {
+                int ha = hp - Math.Min(outs[i].effDmg, hp);
+                breaks[i] = ha > 0 && BossDown.NextTurnIsDown(st.downNotches, st.downMaxHp, st.downBroken, st.downPendingNow, ha);
+                any |= breaks[i];
+            }
+            if (!any) return;
+            _downBreakDiag[0]++;
+            int t1 = tele.turn + 1;
+            int toHeavyNext = enemy.heavyPeriod > 0 ? Escalation.TurnsToHeavy(enemy, t1) : -1;
+            _downBreakDiag[toHeavyNext < 0 ? 4 : toHeavyNext == 0 ? 3 : toHeavyNext == 1 ? 2 : 1]++;
+            int notch = BossDown.NextNotchHp(st.downNotches, st.downMaxHp, st.downBroken);
+            float perTurn = DeckPerTurnDamage(in st, k);
+            bool eligible = false, chosenEligible = false;
+            for (int i = 0; i < n; i++)
+            {
+                int ha = hp - Math.Min(outs[i].effDmg, hp);
+                bool e = DownKeepRules.HoldEligibleChargeOrHeavy(enemy.heavyPeriod > 0, toHeavyNext, downAnyway, true, breaks[i], ha, notch, perTurn);
+                eligible |= e; if (i == best) chosenEligible = e;
+            }
+            if (eligible) _downBreakDiag[5]++;
+            else if (toHeavyNext <= 0) _downBreakDiag[8]++;
+            else if (downAnyway) _downBreakDiag[9]++;
+            else _downBreakDiag[10]++;
+            if (!breaks[best]) _downBreakDiag[6]++;
+            if (chosenEligible) _downBreakDiag[7]++;
+            if (!downAnyway) { _dbdPredict = breaks[best] ? 1 : 2; _dbdTurn = tele.turn; _dbdEnemy = enemy.id; }
+        }
+
+        /// <summary>[診断 2026-11-14] サマリーに出す行 (判断が無ければ空)。</summary>
+        public string DownBreakDiagLine()
+        {
+            var a = _downBreakDiag;
+            if (a[0] == 0) return "";
+            string P(long x, long of) => of > 0 ? $"{100.0 * x / of:0.0}%" : "-";
+            return $"[ダウンの割り時] 割れる手があった判断 {a[0]} 回 (今割るとダウンが 小技 {a[1]}・チャージ {a[2]}・大技 {a[3]}・大技なし {a[4]})"
+                 + $" / 待つ手の条件を満たす手があった {a[5]} ({P(a[5], a[0])})・割らない手を選んだ {a[6]}・条件を満たす待つ手を選んだ {a[7]}"
+                 + $" / 待つ手が無い理由: 次が大技か大技なし {a[8]}・何もしなくても次はダウン {a[9]}・目盛りの手前で止まって次に割れる手が無い {a[10]}"
+                 + $" / 見込みの答え合わせ: 割ると見込んだ手 → 次のターンにダウン {a[12]}/{a[11]} ({P(a[12], a[11])})"
+                 + $"・割らないと見込んだ手 → それでもダウン {a[14]}/{a[13]} ({P(a[14], a[13])}・毒・出血・削り・会心のぶれ)";
+        }
 
         /// <summary>[#141 計装] サマリーに出す行 (判断が無ければ空)。</summary>
         public string DownAimLine()

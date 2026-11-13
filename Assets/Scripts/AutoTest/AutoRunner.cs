@@ -843,6 +843,7 @@ namespace AutoTest
                  + (CombatSystem.BossDownDiag.Line().Length > 0 ? System.Environment.NewLine + CombatSystem.BossDownDiag.Line() : "")
                  + (NoAttackChoiceLine().Length > 0 ? System.Environment.NewLine + NoAttackChoiceLine() : "")
                  + (DownAimLine().Length > 0 ? System.Environment.NewLine + DownAimLine() : "")                 // [#141]
+                 + (DownBreakDiagLine().Length > 0 ? System.Environment.NewLine + DownBreakDiagLine() : "")     // [診断 2026-11-14] 目盛りの割り時
                  + (HandKeepPlanLine().Length > 0 ? System.Environment.NewLine + HandKeepPlanLine() : "");      // [#141]
         }
 
