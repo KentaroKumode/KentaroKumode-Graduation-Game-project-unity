@@ -95,36 +95,40 @@ namespace CombatSystem
             ApplyHeavySpec();
         }
 
-        /// <summary>[測定 2026-11-14] 大技の周期の倍率の上書き。 <c>"id:小技:大技,…"</c> (例 <c>"boss_layer7:0.7:1.75"</c>)。 id に <c>*</c> で、
-        /// 大技の周期を持つ敵 (enemies.json の heavyPeriod &gt; 0) 全部。 前から順に入れる (後の指定が勝つ)。 値は実数値 (倍率に掛ける倍率ではない)。
+        /// <summary>[測定 2026-11-14] 大技の周期の倍率と周期の上書き。 <c>"id:小技:大技[:周期],…"</c> (例 <c>"boss_layer7:0.7:1.75"</c>・<c>"*:0.8:3.0:4"</c>)。
+        /// id に <c>*</c> で、 大技の周期を持つ敵 (enemies.json の heavyPeriod &gt; 0) 全部。 前から順に入れる (後の指定が勝つ)。 値は実数値 (倍率に掛ける倍率ではない)。
+        /// 周期 (4 つ目) は省略できる (省略 = enemies.json の周期)。 1 以上の整数 (2 = チャージ・大技 / 4 = 小技・小技・チャージ・大技)。
+        /// 灰燼の王の〈業火〉(heavyCycle = ember・周期は HP で 4 / 3) の周期は変えない (倍率は今までどおり上書きする)。
         /// 空 = enemies.json のまま。 書き換えるのは <c>AutoRunner.enemyHeavySpec</c> だけ。 決まった値は enemies.json へ書き戻すこと。
-        /// 深さ 3 のボスの大技 (<see cref="BossParams.Depth3Heavy"/>・データではなく定数で足す) には効かない。</summary>
+        /// 深さ 3 のボスの大技 (<see cref="BossParams.Depth3Heavy"/>・データではなく定数で足す) には効かない。 読み方は <see cref="HeavyCycle.ParseSpec"/>。</summary>
         public static string HeavyOverrideSpec = "";
 
         private static void ApplyHeavySpec()
         {
             if (string.IsNullOrEmpty(HeavyOverrideSpec)) return;
             var ci = System.Globalization.CultureInfo.InvariantCulture;
-            foreach (var tok in HeavyOverrideSpec.Split(','))
+            var bad = new List<string>();
+            foreach (var sp in HeavyCycle.ParseSpec(HeavyOverrideSpec, bad))
             {
-                var kv = tok.Split(':');
-                if (kv.Length != 3
-                    || !float.TryParse(kv[1].Trim(), System.Globalization.NumberStyles.Float, ci, out float light)
-                    || !float.TryParse(kv[2].Trim(), System.Globalization.NumberStyles.Float, ci, out float heavy))
-                {
-                    if (tok.Trim().Length > 0) Debug.LogWarning($"[EnemyDatabase] 大技の倍率の指定が読めない: {tok}");
-                    continue;
-                }
-                string id = kv[0].Trim();
-                int n = 0;
+                int n = 0, np = 0;
                 foreach (var e in database.Values)
                 {
-                    if (e == null || e.heavyPeriod <= 0 || (id != "*" && e.id != id)) continue;
-                    e.heavyLightMul = light; e.heavyMul = heavy; n++;
+                    if (e == null || e.heavyPeriod <= 0 || (sp.id != "*" && e.id != sp.id)) continue;
+                    e.heavyLightMul = sp.light; e.heavyMul = sp.heavy; n++;
+                    if (sp.period > 0)
+                    {
+                        if (e.heavyCycle == EnemyData.HeavyCycleEmber)
+                        {
+                            if (sp.id != "*") Debug.LogWarning($"[EnemyDatabase] {e.id} の周期は HP で決まる (〈業火〉) ので、 周期 {sp.period} の指定は使わない (倍率だけ上書き)");
+                        }
+                        else { e.heavyPeriod = sp.period; np++; }
+                    }
                 }
-                if (n == 0) Debug.LogWarning($"[EnemyDatabase] 大技の倍率の上書き対象が居ない (大技の周期を持たない): {id}");
-                else Debug.Log($"[EnemyDatabase] 大技の倍率 {id}: 小技 ×{light.ToString(ci)}・大技 ×{heavy.ToString(ci)} ({n} 体)");
+                if (n == 0) Debug.LogWarning($"[EnemyDatabase] 大技の倍率の上書き対象が居ない (大技の周期を持たない): {sp.id}");
+                else Debug.Log($"[EnemyDatabase] 大技の倍率 {sp.id}: 小技 ×{sp.light.ToString(ci)}・大技 ×{sp.heavy.ToString(ci)} ({n} 体)"
+                             + (sp.period > 0 ? $"・周期 {sp.period} ({np} 体)" : "・周期はデータのまま"));
             }
+            foreach (var tok in bad) Debug.LogWarning($"[EnemyDatabase] 大技の倍率の指定が読めない: {tok}");
         }
 
         private static void ApplyHpSpec()

@@ -43,5 +43,48 @@ namespace CombatSystem
 
         /// <summary>〈業火〉のターンの後の烈炎: 撃った (<paramref name="fired"/>) なら 0、 撃たなかった (ダウン・チャージ・〈封じ・揃〉で攻撃しなかった) なら持ち越す。</summary>
         public static int BlazeStacksAfter(int stacks, bool fired) => fired ? 0 : stacks;
+
+        // ---- 測定の口 enemyHeavySpec の読み方 (2026-11-14・Unity なしの検算と共有) ----
+
+        /// <summary>enemyHeavySpec の 1 項目。 <see cref="period"/> = 0 なら周期は敵データのまま。</summary>
+        public struct SpecEntry
+        {
+            public string id;        // 敵 id か "*" (大技を持つ全員)
+            public float light, heavy;
+            public int period;       // 0 = 省略 (データのまま)
+        }
+
+        /// <summary><c>"id:小技:大技[:周期],…"</c> を読む (例 <c>"*:0.8:3.0:4"</c>・<c>"boss_layer7:0.8:3.0"</c>)。 周期は省略できる (省略 = 敵データの周期)。
+        /// 周期は 1 以上の整数 (1 = 毎ターン大技・チャージなし / 2 = チャージ・大技 / 3 = 小技・チャージ・大技 / 4 = 小技・小技・チャージ・大技 …)。
+        /// 読めない項目は <paramref name="bad"/> に入れて飛ばす (前から順に入れ、 後の指定が勝つ)。 倍率は実数値 (倍率に掛ける倍率ではない)。</summary>
+        public static System.Collections.Generic.List<SpecEntry> ParseSpec(string spec, System.Collections.Generic.List<string> bad = null)
+        {
+            var res = new System.Collections.Generic.List<SpecEntry>();
+            if (string.IsNullOrEmpty(spec)) return res;
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            foreach (var raw in spec.Split(','))
+            {
+                string tok = raw.Trim();
+                if (tok.Length == 0) continue;
+                var kv = tok.Split(':');
+                int period = 0; float light = 0f, heavy = 0f;
+                bool ok = (kv.Length == 3 || kv.Length == 4) && kv[0].Trim().Length > 0;
+                if (ok) ok = float.TryParse(kv[1].Trim(), System.Globalization.NumberStyles.Float, ci, out light)
+                          && float.TryParse(kv[2].Trim(), System.Globalization.NumberStyles.Float, ci, out heavy);
+                if (ok && kv.Length == 4) ok = int.TryParse(kv[3].Trim(), System.Globalization.NumberStyles.Integer, ci, out period) && period >= 1;
+                if (!ok) { bad?.Add(tok); continue; }
+                res.Add(new SpecEntry { id = kv[0].Trim(), light = light, heavy = heavy, period = period });
+            }
+            return res;
+        }
+
+        /// <summary>1 周期の攻撃の倍率の平均 (チャージは攻撃しない規則のとき 0)。 周期 3・小技 0.8・大技 3.0 → 1.27 / 周期 4 → 1.15 / 周期 5 → 1.08。 画面には出さない (実効状態の行・検算)。</summary>
+        public static float CycleMean(int period, float lightMul, float heavyMul, bool chargeNoAttack)
+        {
+            if (period <= 0) return 1f;
+            float sum = 0f;
+            for (int c = 1; c <= period; c++) sum += Factor(period, c, heavyMul, heavyMul, lightMul, chargeNoAttack);
+            return sum / period;
+        }
     }
 }

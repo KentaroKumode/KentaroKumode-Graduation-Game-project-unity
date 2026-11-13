@@ -580,6 +580,81 @@ static class T
                   "王のダウン: チャージのターンのダウンは業火を取り消して T8 へ (T7 がチャージ)・小技のダウンは周期そのまま (T5)");
         }
 
+        // 13. 大技の周期の口 (2026-11-14・enemyHeavySpec の 4 つ目): 周期 2・4・5 の並び・ダウンの取り消し・待つ得・口の読み方
+        {
+            Escalation.HeavyCycleOffset = 0;
+            string Row(int P, int n)
+            {
+                var L = new List<string>();
+                for (int c = 1; c <= n; c++)
+                {
+                    float f = HeavyCycle.Factor(P, c, 3.0f, 3.0f, 0.8f, true);
+                    L.Add(HeavyCycle.TurnsToHeavy(P, c) == 0 ? "大" : f == 0f ? "チャージ(0)" : "小");
+                }
+                return string.Join("|", L);
+            }
+            string r4 = Row(4, 8), r5 = Row(5, 10), r2 = Row(2, 4);
+            Check(r4 == "小|小|チャージ(0)|大|小|小|チャージ(0)|大", "周期 4: 小・小・チャージ(0)・大 → " + r4);
+            Check(r5 == "小|小|小|チャージ(0)|大|小|小|小|チャージ(0)|大", "周期 5: 小・小・小・チャージ(0)・大 → " + r5);
+            Check(r2 == "チャージ(0)|大|チャージ(0)|大", "周期 2: チャージ(0)・大 (小技なし) → " + r2);
+            float m3 = HeavyCycle.CycleMean(3, 0.8f, 3.0f, true), m4 = HeavyCycle.CycleMean(4, 0.8f, 3.0f, true), m5 = HeavyCycle.CycleMean(5, 0.8f, 3.0f, true);
+            Check(Math.Abs(m3 - 3.8f / 3) < 1e-4 && Math.Abs(m4 - 4.6f / 4) < 1e-4 && Math.Abs(m5 - 5.4f / 5) < 1e-4,
+                  $"1 周期の平均: 周期 3 ×{m3:0.00}・4 ×{m4:0.00}・5 ×{m5:0.00} (大技の山 ×3.0 は残る)");
+            // ダウンの取り消し: チャージか大技のターンだけ (周期 4・5 でも)
+            bool Cancels(int P, int c) => BossDown.CancelsCycle(DownCancelRule.ChargeOrHeavy, HeavyCycle.TurnsToHeavy(P, c), -1, -1);
+            Check(!Cancels(4, 1) && !Cancels(4, 2) && Cancels(4, 3) && Cancels(4, 4) && !Cancels(5, 1) && !Cancels(5, 3) && Cancels(5, 4) && Cancels(5, 5)
+                  && Cancels(2, 1) && Cancels(2, 2),
+                  "ダウンの取り消し (周期 4・5・2): 小技のターンは取り消さない・チャージと大技は取り消す (周期 2 はどのターンも)");
+            // 本体の進め方の写し (11 の Seq と同じ): 周期 5 でチャージのダウン → 明けてから 小・小・小・チャージ・大
+            string Seq(int P, int n, int[] downs)
+            {
+                int off = 0; var r = new List<string>();
+                for (int t = 1; t <= n; t++)
+                {
+                    int c = t - off;
+                    if (downs.Contains(t)) { if (BossDown.CancelsCycle(DownCancelRule.ChargeOrHeavy, HeavyCycle.TurnsToHeavy(P, c), -1, -1)) off = t; r.Add("ダウン"); continue; }
+                    r.Add(HeavyCycle.TurnsToHeavy(P, c) == 0 ? "大" : HeavyCycle.IsCharge(P, c) ? "チャージ" : "小");
+                }
+                return string.Join("|", r);
+            }
+            string s5 = Seq(5, 10, new[] { 4 }), s5b = Seq(5, 10, new[] { 2 }), s2 = Seq(2, 6, new[] { 1 });
+            Check(s5 == "小|小|小|ダウン|小|小|小|チャージ|大|小", "周期 5・チャージのダウン: 大技は消え、 明けたターンから頭 → " + s5);
+            Check(s5b == "小|ダウン|小|チャージ|大|小|小|小|チャージ|大", "周期 5・小技のダウン: 周期はそのまま → " + s5b);
+            Check(s2 == "ダウン|チャージ|大|チャージ|大|チャージ", "周期 2・チャージのダウン: 頭から (チャージ・大) → " + s2);
+            // 待つ得の式 (DownKeepRules.HoldGainChargeOrHeavy) は周期によらずシミュレーションの平均と一致する
+            foreach (int P in new[] { 2, 4, 5 })
+            {
+                float Base(int c) => HeavyCycle.TurnsToHeavy(P, c) == 0 ? 30f : HeavyCycle.IsCharge(P, c) ? 0f : 8f;
+                for (int c1 = 1; c1 <= P; c1++)
+                {
+                    float Sum(int d, int nEnd)
+                    {
+                        int off = 0; float sum = 0f; int T0 = c1 - 1;
+                        for (int t = T0 + 1; t <= T0 + nEnd; t++)
+                        {
+                            int c = t - off;
+                            if (t == d) { if (BossDown.CancelsCycle(DownCancelRule.ChargeOrHeavy, HeavyCycle.TurnsToHeavy(P, c), -1, -1)) off = t; continue; }
+                            sum += Base(c);
+                        }
+                        return sum;
+                    }
+                    double mean = 0;
+                    for (int nEnd = 20; nEnd < 20 + P; nEnd++) mean += Sum(c1, nEnd) - Sum(c1 + 1, nEnd);
+                    mean /= P;
+                    var cyc = new List<int>(); for (int j = 0; j < P; j++) cyc.Add((int)Base(c1 + j));
+                    float g = AutoTest.DownKeepRules.HoldGainChargeOrHeavy((int)Base(c1), (int)Base(c1 + 1), (int)Base(c1 + 2), cyc,
+                                                                           HeavyCycle.IsCharge(P, c1), HeavyCycle.IsCharge(P, c1 + 1), 1f);
+                    Check(Math.Abs(g - mean) < 1e-3, $"周期 {P}・待つ得 (次のターンが周期の {c1} ターン目) {g:0.00} = シミュレーションの平均 {mean:0.00}");
+                }
+            }
+            // 口の読み方: 周期は省略できる・1 以上の整数だけ・読めない項目は飛ばす
+            var bad = new List<string>();
+            var sp = HeavyCycle.ParseSpec("*:0.8:3.0:4, boss_layer7:0.7:1.75 ,boss_layer5:0.8:3:0,x:1:2:2.5,y:1,boss_layer5_hidden:0.8:3.0:2", bad);
+            Check(sp.Count == 3 && sp[0].id == "*" && sp[0].period == 4 && sp[0].heavy == 3.0f && sp[1].id == "boss_layer7" && sp[1].period == 0 && sp[1].light == 0.7f
+                  && sp[2].period == 2 && bad.Count == 3,
+                  $"enemyHeavySpec の読み方: 周期 4 / 省略 (= データのまま) / 周期 2 を読み、 周期 0・小数・欄不足の 3 項目は飛ばす (読めた {sp.Count}・飛ばした {bad.Count})");
+        }
+
         Console.WriteLine(fails == 0 ? "ALL OK" : fails + " FAILED");
         return fails == 0 ? 0 : 1;
     }
