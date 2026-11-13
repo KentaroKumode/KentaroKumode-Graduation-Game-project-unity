@@ -234,13 +234,17 @@ namespace GameLoop
             // ADR-0011 〈富〉(目 9): 戦闘中に積んだ報酬加算 (%)。 割合先 (メタの定額 +N の前)。
             coins = ApplyRoleGoldBonus(coins);
             coins += metaWinGold;
+            // 〈徒労〉0 /〈覚悟〉2 倍 (2026-11-13・通常の戦闘だけ・判定は TakeNormalBattleBoon)。 挑戦デバフの収入減より前 (GoldIncome.Gain の中) に掛ける
+            coins = ScaleByBattleBoon(coins);
             coins = GoldIncome.Gain(Run, coins, "戦闘報酬");
             IsEliteSecondFight = false;
 
             // 物資の補給 (2026-09-28): 通常 +30 / エリート +80。 払底したら戦って奪うしかない
             //   (Highfleet の「追ってきた敵から燃料を奪う」)。
-            ProvisionSystem.Supply(Run, eliteNodeReward
-                ? MapSystem.FreeMove.FreeMapParams.RewardElite : MapSystem.FreeMove.FreeMapParams.RewardBattle);
+            //   〈徒労〉の戦闘は 0 (〈覚悟〉は物資を増やさない ── 倍にするのはゴールド・ドロップ・強化素材だけ)。
+            if (LastBattleBoon != BattleBoon.Toil)
+                ProvisionSystem.Supply(Run, eliteNodeReward
+                    ? MapSystem.FreeMove.FreeMapParams.RewardElite : MapSystem.FreeMove.FreeMapParams.RewardBattle);
             // (ターン制の航行マップでは戦闘はターンを使わず、 物音も立てない。)
 
             // 戦闘勝利報酬: **エリートは確定 1 個 / 通常は 15%** (2026-09-09 変更)。
@@ -268,10 +272,17 @@ namespace GameLoop
             //   同時に供給の 45% が無料経路という状態を作っていた。 削った現物は
             //   CombatRewards.GoldScale で金にして返す ── 店での購入という選択へ寄せる。
             float rate = eliteWin ? CombatRewards.EliteDropRate : CombatRewards.NormalDropRate;
-            bool dropped = GameLoop.GameRng.Value("GameManager.1") < rate;
-            if (eliteWin) { CombatRewards.EliteRolls++; if (dropped) CombatRewards.EliteDrops++; }
-            else          { CombatRewards.NormalRolls++; if (dropped) CombatRewards.NormalDrops++; }
-            int drops = dropped ? 1 : 0;
+            // 〈徒労〉: 抽選は引く (乱数の列を変えない) が 0 個。 〈覚悟〉: 抽選を 2 回引く (乱数 "GameManager.1" を余分に 1 回引く)
+            int drops = 0;
+            for (int k = 0, rolls = LastBattleBoon == BattleBoon.Readiness ? ReadinessBuffEffectMultiplier : 1; k < rolls; k++)
+            {
+                bool dropped = GameLoop.GameRng.Value("GameManager.1") < rate;
+                if (eliteWin) { CombatRewards.EliteRolls++; if (dropped) CombatRewards.EliteDrops++; }
+                else          { CombatRewards.NormalRolls++; if (dropped) CombatRewards.NormalDrops++; }
+                if (dropped) drops++;
+            }
+            if (LastBattleBoon == BattleBoon.Toil) drops = 0;
+            if (LastBattleBoon != BattleBoon.None) Log(BattleBoonLine);
 
             // 各ドロップを「同カテゴリ・同レア度の2択」として保留。
             // 相方候補が無い場合のみ即時付与（単体ドロップにフォールバック）。
@@ -291,6 +302,69 @@ namespace GameLoop
 
             SetPhase(GamePhase.Reward);
             OnRewardGranted?.Invoke(coins);
+        }
+
+        // =====================================================================
+        //  時限デバフ〈徒労〉/ 時限バフ〈覚悟〉(2026-11-13・docs/GAME.md §17)
+        // =====================================================================
+
+        /// <summary>この戦闘の報酬に掛かった時限効果。</summary>
+        public enum BattleBoon { None, Toil, Readiness }
+
+        /// <summary>〈覚悟〉の倍率 (正本は ReadinessBuffEffect.Multiplier)。</summary>
+        private const int ReadinessBuffEffectMultiplier = EventSystem.TimedEffects.Effects.ReadinessBuffEffect.Multiplier;
+
+        /// <summary>直近の戦闘の報酬に掛かった時限効果 (戦闘の終わりに決める・報酬の画面と BOT の計装が読む)。</summary>
+        public BattleBoon LastBattleBoon { get; private set; }
+
+        /// <summary>直近の戦闘の報酬に掛かった〈徒労〉/〈覚悟〉の結果の行 (掛かっていなければ null)。 報酬の画面と行動の記録に出す。</summary>
+        public string BattleBoonLine
+        {
+            get
+            {
+                var T = EventSystem.TimedEffects.Effects.ToilDebuffEffect.Name;
+                var R = EventSystem.TimedEffects.Effects.ReadinessBuffEffect.Name;
+                switch (LastBattleBoon)
+                {
+                    case BattleBoon.Toil:      return $"〈{T}〉のせいで、 この戦闘では何も得られなかった（残り {Left(Run?.timedDebuffs, T)}）";
+                    case BattleBoon.Readiness: return $"〈{R}〉で、 ゴールドとドロップと強化素材が {ReadinessBuffEffectMultiplier} 倍（残り {Left(Run?.timedBuffs, R)}）";
+                    default:                   return null;
+                }
+            }
+        }
+
+        private static int Left(Dictionary<string, int> d, string id) => d != null && d.TryGetValue(id, out int n) ? n : 0;
+
+        private string BattleBoonTag()
+            => LastBattleBoon == BattleBoon.Toil ? $"（〈{EventSystem.TimedEffects.Effects.ToilDebuffEffect.Name}〉で 0）"
+             : LastBattleBoon == BattleBoon.Readiness ? $"（〈{EventSystem.TimedEffects.Effects.ReadinessBuffEffect.Name}〉で {ReadinessBuffEffectMultiplier} 倍）" : "";
+
+        /// <summary>報酬の量に〈徒労〉(0) /〈覚悟〉(×2) を掛ける。 掛かっていなければそのまま。</summary>
+        private int ScaleByBattleBoon(int amount)
+            => LastBattleBoon == BattleBoon.Toil ? 0
+             : LastBattleBoon == BattleBoon.Readiness ? amount * ReadinessBuffEffectMultiplier
+             : amount;
+
+        /// <summary>今終わった戦闘が「通常の戦闘」か: 地図の戦闘マス (エリート・ボスでない) の戦闘で、 追跡者・使い魔・イベントの戦闘・偽の商人・値下げ交渉でない。</summary>
+        private bool IsNormalBattleNow()
+        {
+            if (Run == null || InMapEncounterCombat || returnToMapAfterEventCombat || inFalseMerchantCombat || Run.shopRobberyInProgress) return false;
+            var node = MapManager.Instance?.CurrentNode;
+            return node != null && node.type != TileType.Boss && node.EffectiveType == TileType.Battle;
+        }
+
+        /// <summary>〈徒労〉/〈覚悟〉の判定 (<b>報酬の 0 / 2 倍を決めるのはここ 1 か所</b>)。 戦闘の終わり (HandleCombatEnd) に毎戦 1 回呼ぶ。
+        /// 通常の戦闘に勝った時だけ、 持っている〈徒労〉/〈覚悟〉を 1 つ減らし (TimedEffectManager.OnNormalBattleWon)、 減らす前に持っていた方を
+        /// <see cref="LastBattleBoon"/> に残す (両方ある時は〈徒労〉が勝つ = 何も得られない)。 逃げた・負けた・エリート・ボスほかの戦闘は減らさない。</summary>
+        private void TakeNormalBattleBoon(CombatResult result)
+        {
+            LastBattleBoon = BattleBoon.None;
+            if (Run == null || !result.playerWon || result.playerFled || !IsNormalBattleNow()) return;
+            bool toil = Left(Run.timedDebuffs, EventSystem.TimedEffects.Effects.ToilDebuffEffect.Name) > 0;
+            bool ready = Left(Run.timedBuffs, EventSystem.TimedEffects.Effects.ReadinessBuffEffect.Name) > 0;
+            if (!toil && !ready) return;
+            EventSystem.TimedEffects.TimedEffectManager.OnNormalBattleWon(Run);
+            LastBattleBoon = toil ? BattleBoon.Toil : BattleBoon.Readiness;
         }
 
         /// <summary>ボス撃破ボーナス用のパッシブ抽選。wantRare=true で GOLD 以上のみ、レア度重み付き。</summary>
