@@ -898,11 +898,15 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                品の直接 (ターンの解決の外) = Kw.DamageEnemy
            ・敵のパッシブ・エスカレーション・敵の回復は普段どおり動く (止まるのは攻撃だけ)。 例外は「ダウン中は発動しない」を名乗ったパッシブ
              (BossDownPassives の一覧・PassiveSkillManager.FireEnemyTrigger の入口で鳴らさない・いまは空)。
-           ・大技: そのターンが大技なら取り消し (攻撃しないので)。 大技の周期は次のターンから頭に戻す (Escalation.HeavyCycleOffset = このターン)。
+           ・大技 (2026-11-14・作者の決定): ダウンのターンが大技のチャージのターン (大技まで 1) か大技のターン (大技まで 0) に重なった時だけ、 その大技は取り消し、
+             周期は次のターンから頭に戻す (Escalation.HeavyCycleOffset = このターン)。 それ以外 (小技のターン) のダウンは、 そのターンの攻撃を潰すだけで周期は進み続ける。
+             判定は起点を動かす前の周期で BossDown.CancelsCycle (CombatManager.DownCancelsCycleAt)。 構え・〈業火の予兆〉も同じ (山場か、 その 1 ターン前)。
+             起点は 1 つなので、 どれかで取り消すと全部の周期が頭に戻る。 測定の口 downCancelRule=Always で旧い規則 (どのダウンでも頭に戻す)。
              周期は「戦闘のターン − HeavyCycleOffset」で数える (既定 0 = 旧い数え方)。 構え (guardPeriod)・灰燼の王〈業火の予兆〉(EmberOmenTiming) も同じ起点を読む
-             (予兆は起点 0 なら T1/1+p/…・ダウンの後は明けてから p ターン目)。
+             (予兆は起点 0 なら T1/1+p/…・頭に戻した後は明けてから p ターン目)。
 
-敵攻撃   〈封じ・揃〉が前ターンに成立していれば **このターンの敵攻撃は丸ごと不発**
+敵攻撃   〈封じ・揃〉が前ターンに成立していれば **このターンの敵攻撃は丸ごと不発**。 ボスのダウンのターン・大技のチャージのターン (2026-11-14) も同じ枝
+         (敵の OnPreDealDamage / OnPostDealDamage・〈廃庭の霧吹き〉の毒・〈多頭攻撃〉の 2 回目・プレイヤーの状態の固定ダメ fixedDamageToPlayer の適用は、 攻撃の枝の中にあるので鳴らない)
          (currentBuffs["roleEnemyStun"])。 予告は既に出ているので「見えている一撃を踏み倒す」形。
          〈封じ・対〉は予告値そのものを −40% する (currentBuffs["roleEnemyAtkCut"]・予告にも反映される)。
          被ダメ側の役は〈守り〉(ApplyRoleGuard)。 〈虚空〉と同じ位置・同じ対象 (敵の直接攻撃パケット) に置く。
@@ -910,8 +914,14 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          enemyAtk  = Escalation.EnemyAttackValue(e, escTurn, enemyDiceTotal, currentTurn)
                     = round(段階倍率(escTurn) × (baseAttack + enemyDiceTotal) × 大技倍率(currentTurn) × ボス倍率)
                      大技倍率 (2026-09-19・EnemyData.heavyPeriod > 0 の敵だけ):
-                       (currentTurn − HeavyCycleOffset) % heavyPeriod == 0 → heavyMul (大技) / それ以外 → heavyWindupMul (溜め)
-                       周期は冷却材の遅延を受けない実ターンで数える (ボスのダウンで起点が戻る・上)。 予告に turnsToHeavy / heavyMul を出す。
+                       c = currentTurn − HeavyCycleOffset。 c % heavyPeriod == 0 → heavyMul (大技・挑戦カードの大技の倍率 +N を足す)
+                         / 大技の 1 ターン前 (チャージ・予告 turnsToHeavy = 1) → 0 (攻撃しない・2026-11-14・口 heavyChargeNoAttack=False で小技の倍率に戻る)
+                         / それ以外 → heavyLightMul (小技・2026-11-14 に heavyWindupMul から改名。 それまでは大技以外の全ターン = チャージも含めた倍率だった)
+                       式の正本は HeavyCycle.Factor。 チャージのターンは攻撃値 0 で、 解決はダウンと同じ「攻撃しない」の枝 (下の「敵攻撃」)。
+                       周期は冷却材の遅延を受けない実ターンで数える (ボスのダウンで起点が戻る・上)。 予告に turnsToHeavy / heavyMul / enemyCharging を出す。
+                       値 (2026-11-14・仮置き): 5 層・5 層裏・ヴェスカ p1〜p4 = 周期 3・小技 ×0.8・チャージ 攻撃なし・大技 ×3.0
+                         (それまで 小技 = チャージ ×0.7・大技 ×2.0 / ヴェスカ ×1.75)。 深さ 3 のボス = 周期 3・小技 ×0.6・大技 ×2.0 (BossParams.Depth3Heavy*)。
+                       測定の口 enemyHeavySpec="id:小技:大技,…" (id に * で大技を持つ全員) で上書き。
                        対象: 5 層以降のボス (5 層・5 層裏・ヴェスカ p1〜p4)。 6 層は〈業火の予兆〉が同じ役なので無し。
                      × 構え倍率 (2026-11-04・EnemyData.guardPeriod > 0 の敵だけ): currentTurn % guardPeriod == 0 → guardAttackMul
                      × 先手倍率 (2026-11-04・EnemyData.openingTurns > 0 の敵だけ): currentTurn ≤ openingTurns → openingAttackMul

@@ -17,7 +17,7 @@ DOTNET_UNITY = UNITY + '/NetCoreRuntime/dotnet.exe'
 CSC = UNITY + '/DotNetSdkRoslyn/csc.dll'
 RUNTIME = 'C:/Program Files/dotnet/shared/Microsoft.NETCore.App'
 COMBAT = 'Assets/Scripts/CombatSystem'
-SOURCES = ['TerminalCards', 'BossDown', 'MutualAttack']
+SOURCES = ['TerminalCards', 'BossDown', 'MutualAttack', 'HeavyCycle']
 # BOT の判断のうち純粋な部分 (#141・ダウンの狙いと残す印)。 UnityEngine に依存しない
 EXTRA = ['Assets/Scripts/AutoTest/DownKeepRules.cs']
 

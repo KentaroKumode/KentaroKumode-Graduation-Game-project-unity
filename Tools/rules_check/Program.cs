@@ -402,7 +402,7 @@ static class T
             Check(dk.LastKept.Count == 2 && dk.LastDrawnCount == TerminalCards.HandSize - 2 && dk.hand.Count == TerminalCards.HandSize,
                   $"残す印で 2 枚残すと、 次のターンに新しく引くのは {dk.LastDrawnCount} 枚 (手札 {dk.hand.Count} 枚)");
 
-            // 10b. 待つ得の式 = シミュレーションの平均 (戦闘の終わりを周期の中で一様と見る)。 本体の周期の規則 (Escalation.IsHeavyTurn・ダウンで起点が戻る) の写し
+            // 10b. 旧い規則 (downCancelRule = Always・どのダウンでも起点が戻る) の待つ得の式 = シミュレーションの平均 (戦闘の終わりを周期の中で一様と見る)。 旧い周期の規則の写し
             const int P = 3; const float H = 2.0f, W = 0.7f, B = 10f;
             float F(int c) => c > 0 && c % P == 0 ? H * B : W * B;      // 周期の c ターン目の攻撃
             foreach (int c1 in new[] { 1, 2, 3 })                         // 次のターン (T+1) の周期の位置
@@ -419,12 +419,12 @@ static class T
                 mean /= P;
                 var cyc = new List<int>(); for (int j = 0; j < P; j++) cyc.Add((int)F(c1 + j));
                 float g = AutoTest.DownKeepRules.HoldGain((int)F(c1), cyc, 1f);
-                Check(Math.Abs(g - mean) < 1e-3, $"待つ得の式 (次のターンが周期の {c1} ターン目) {g:0.00} = シミュレーションの平均 {mean:0.00}");
+                Check(Math.Abs(g - mean) < 1e-3, $"旧い規則 (Always) の待つ得の式 (次のターンが周期の {c1} ターン目) {g:0.00} = シミュレーションの平均 {mean:0.00}");
             }
             var cy = new List<int> { 7, 20, 7 };
             Check(AutoTest.DownKeepRules.HoldGain(7, cy, 0.2f) > 0f && AutoTest.DownKeepRules.HoldGain(20, new List<int> { 20, 7, 7 }, 0.2f) < 0f
                   && Math.Abs(AutoTest.DownKeepRules.HoldGain(7, cy, 0.2f) - 0.2f * (34f / 3f - 7f)) < 1e-4,
-                  "待つ得: 次のターンが溜めなら正・大技なら負・帳簿の割引を掛ける");
+                  "旧い規則 (Always) の待つ得: 次のターンが溜めなら正・大技なら負・帳簿の割引を掛ける");
             Check(AutoTest.DownKeepRules.HoldEligible(true, 2, false, true, false, 760, 750, 30f)
                   && !AutoTest.DownKeepRules.HoldEligible(true, 1, false, true, false, 760, 750, 30f)      // 大技が次のターン = 今割れば重なる
                   && !AutoTest.DownKeepRules.HoldEligible(true, 2, false, false, false, 760, 750, 30f)     // 今割れる手が無い
@@ -432,7 +432,7 @@ static class T
                   && !AutoTest.DownKeepRules.HoldEligible(true, 2, false, true, false, 790, 750, 30f)      // 次のターンに割れる見込みが無い
                   && !AutoTest.DownKeepRules.HoldEligible(true, 2, true, true, false, 760, 750, 30f)       // 何もしなくても次はダウン
                   && !AutoTest.DownKeepRules.HoldEligible(false, 2, false, true, false, 760, 750, 30f),    // 大技の無い敵
-                  "待つ手の条件 (大技が 2 ターン後・今割れる手がある・この手は割らない・次のターンに割れる見込み)");
+                  "旧い規則 (Always) の待つ手の条件 (大技が 2 ターン後・今割れる手がある・この手は割らない・次のターンに割れる見込み)");
 
             // 10c. 残す印 Planned
             Check(AutoTest.DownKeepRules.BlockSlotsNeeded(20, 3.5f, 3) == 3 && AutoTest.DownKeepRules.BlockSlotsNeeded(6, 3.5f, 3) == 2
@@ -465,6 +465,82 @@ static class T
                   && AutoTest.DownKeepRules.RecallIndex(kinds, worths, TerminalKind.Charge) == 2
                   && AutoTest.DownKeepRules.RecallIndex(new List<TerminalKind>(), new List<float>(), TerminalKind.Attack) == -1,
                   "〈呼び戻し〉: 当ての種類の中で点の最大 (同点は後に捨てた方)・無ければ全体で・当てが無ければ今までと同じ");
+        }
+
+        // 11. ダウンの大技の取り消し (2026-11-14・作者の決定): チャージか大技のターンに重なったダウンだけが大技を消し、 周期を頭に戻す
+        {
+            Check(!BossDown.CancelsCycle(DownCancelRule.ChargeOrHeavy, 2, -1, -1) && !BossDown.CancelsCycle(DownCancelRule.ChargeOrHeavy, 3, -1, -1)
+                  && BossDown.CancelsCycle(DownCancelRule.ChargeOrHeavy, 1, -1, -1) && BossDown.CancelsCycle(DownCancelRule.ChargeOrHeavy, 0, -1, -1)
+                  && !BossDown.CancelsCycle(DownCancelRule.ChargeOrHeavy, -1, -1, -1)
+                  && BossDown.CancelsCycle(DownCancelRule.ChargeOrHeavy, 2, 1, -1) && BossDown.CancelsCycle(DownCancelRule.ChargeOrHeavy, -1, -1, 0)
+                  && BossDown.CancelsCycle(DownCancelRule.Always, 2, -1, -1) && BossDown.CancelsCycle(DownCancelRule.Always, -1, -1, -1),
+                  "取り消す条件: 小技のターン (大技まで 2 以上) は取り消さない・チャージ (1) と大技 (0) は取り消す・構えと予兆も同じ・Always はいつも");
+            // 本体の進め方の写し (CombatManager.BeginBossDownTurn): ダウンのターンの頭に、 起点を動かす前の周期で判定し、 取り消すなら起点 = そのターン
+            string Seq(int P, int n, int[] downs, DownCancelRule rule)
+            {
+                int off = 0; var r = new List<string>();
+                for (int t = 1; t <= n; t++)
+                {
+                    int c = t - off;
+                    if (downs.Contains(t)) { if (BossDown.CancelsCycle(rule, HeavyCycle.TurnsToHeavy(P, c), -1, -1)) off = t; r.Add("ダウン"); continue; }
+                    r.Add(HeavyCycle.TurnsToHeavy(P, c) == 0 ? "大" : HeavyCycle.IsCharge(P, c) ? "チャージ" : "小");
+                }
+                return string.Join("|", r);
+            }
+            string a1 = Seq(4, 8, new[] { 2 }, DownCancelRule.ChargeOrHeavy);
+            Check(a1 == "小|ダウン|チャージ|大|小|小|チャージ|大", "作者の例 (周期 4 = 小|小|チャージ|大): 1 ターン目に割る → " + a1 + " (次の小技だけ消え、 チャージ・大技は予定どおり)");
+            string a2 = Seq(4, 8, new[] { 3 }, DownCancelRule.ChargeOrHeavy);
+            Check(a2 == "小|小|ダウン|小|小|チャージ|大|小", "チャージのターンのダウン: 大技は消え、 周期は明けたターンから頭 → " + a2);
+            string a3 = Seq(4, 8, new[] { 4 }, DownCancelRule.ChargeOrHeavy);
+            Check(a3 == "小|小|チャージ|ダウン|小|小|チャージ|大", "大技のターンのダウン: 大技は消え、 周期は明けたターンから頭 → " + a3);
+            string a4 = Seq(4, 9, new[] { 2, 3 }, DownCancelRule.ChargeOrHeavy);
+            Check(a4 == "小|ダウン|ダウン|小|小|チャージ|大|小|小", "2 ターン続くダウンは 1 ターンずつ判定 (小技のダウンは周期そのまま・次のチャージのダウンで取り消し) → " + a4);
+            string o1 = Seq(4, 8, new[] { 2 }, DownCancelRule.Always);
+            Check(o1 == "小|ダウン|小|小|チャージ|大|小|小", "Always (旧い規則): どのダウンでも周期は頭から → " + o1);
+            string p3 = Seq(3, 7, new[] { 1 }, DownCancelRule.ChargeOrHeavy);
+            Check(p3 == "ダウン|チャージ|大|小|チャージ|大|小", "周期 3: 小技のターンのダウンは周期を動かさない → " + p3);
+
+            // 周期の倍率: 小技 → チャージ (攻撃しない = 0) → 大技。 旧い値・旧い作り (チャージも攻撃) に戻すと旧い並び
+            float[] F(float hm, float lm, bool noAtk) => new[] { 1, 2, 3, 4 }.Select(c => HeavyCycle.Factor(3, c, hm, hm, lm, noAtk)).ToArray();
+            var fn = F(3.0f, 0.8f, true); var fo = F(2.0f, 0.7f, false);
+            Check(fn[0] == 0.8f && fn[1] == 0f && fn[2] == 3.0f && fn[3] == 0.8f, $"新しい並び (周期 3): 小技 ×{fn[0]}・チャージ ×{fn[1]} (攻撃しない)・大技 ×{fn[2]}");
+            Check(fo[0] == 0.7f && fo[1] == 0.7f && fo[2] == 2.0f, $"旧い値と旧い作り: ×{fo[0]}・×{fo[1]}・×{fo[2]} (チャージも小技の倍率で攻撃)");
+            Check(HeavyCycle.Factor(0, 2, 3f, 3f, 0.8f, true) == 1f && HeavyCycle.Factor(3, 0, 3f, 3f, 0.8f, true) == 0.8f && HeavyCycle.TurnsToHeavy(3, 0) == -1
+                  && !HeavyCycle.IsCharge(1, 1) && HeavyCycle.Factor(1, 1, 3f, 3f, 0.8f, true) == 3f,
+                  "大技の無い敵は 1・起点のターン (周期の 0 番目) は小技・周期 1 にはチャージが無い");
+
+            // 新しい規則の待つ得 = シミュレーションの平均 (戦闘の終わりを周期の中で一様と見る)
+            const int P = 3; const float Hh = 30f, Wl = 8f;
+            float Base(int c) => HeavyCycle.TurnsToHeavy(P, c) == 0 ? Hh : HeavyCycle.IsCharge(P, c) ? 0f : Wl;
+            foreach (int c1 in new[] { 1, 2, 3 })
+            {
+                // T+1 の周期の位置が c1 (起点 0 として T = c1 − 1)。 ダウン d の後の攻撃を本体の進め方で並べる
+                float Sum(int d, int nEnd)
+                {
+                    int off = 0; float sum = 0f; int T0 = c1 - 1;
+                    for (int t = T0 + 1; t <= T0 + nEnd; t++)
+                    {
+                        int c = t - off;
+                        if (t == d) { if (BossDown.CancelsCycle(DownCancelRule.ChargeOrHeavy, HeavyCycle.TurnsToHeavy(P, c), -1, -1)) off = t; continue; }
+                        sum += Base(c);
+                    }
+                    return sum;
+                }
+                double mean = 0;
+                for (int nEnd = 12; nEnd < 12 + P; nEnd++) mean += Sum(c1, nEnd) - Sum(c1 + 1, nEnd);
+                mean /= P;
+                var cyc = new List<int>(); for (int j = 0; j < P; j++) cyc.Add((int)Base(c1 + j));
+                float g = AutoTest.DownKeepRules.HoldGainChargeOrHeavy((int)Base(c1), (int)Base(c1 + 1), (int)Base(c1 + 2), cyc,
+                                                                       HeavyCycle.IsCharge(P, c1), HeavyCycle.IsCharge(P, c1 + 1), 1f);
+                Check(Math.Abs(g - mean) < 1e-3, $"新しい規則の待つ得 (次のターンが周期の {c1} ターン目) {g:0.00} = シミュレーションの平均 {mean:0.00}");
+            }
+            Check(AutoTest.DownKeepRules.HoldEligibleChargeOrHeavy(true, 2, false, true, false, 760, 750, 30f)
+                  && AutoTest.DownKeepRules.HoldEligibleChargeOrHeavy(true, 1, false, true, false, 760, 750, 30f)
+                  && !AutoTest.DownKeepRules.HoldEligibleChargeOrHeavy(true, 0, false, true, false, 760, 750, 30f)       // 次のターンが大技 = 待つとダウンは小技に落ちる
+                  && !AutoTest.DownKeepRules.HoldEligibleChargeOrHeavy(true, 3, false, true, false, 760, 750, 30f)       // 待っても小技に落ちる
+                  && !AutoTest.DownKeepRules.HoldEligibleChargeOrHeavy(true, 2, true, true, false, 760, 750, 30f)
+                  && !AutoTest.DownKeepRules.HoldEligibleChargeOrHeavy(false, 2, false, true, false, 760, 750, 30f),
+                  "新しい規則の待つ手の条件 (待つとダウンがチャージか大技に重なる = T+1 から見て大技まで 2 か 1)");
         }
 
         Console.WriteLine(fails == 0 ? "ALL OK" : fails + " FAILED");
