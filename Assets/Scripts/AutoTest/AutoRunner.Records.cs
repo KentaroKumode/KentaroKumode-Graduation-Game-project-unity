@@ -80,6 +80,8 @@ namespace AutoTest
             /// <summary>[計装 2026-11-13] この戦闘でエスカレーションの段が上がった数 (ボス戦も・GameManager.EscalationRisesThisCombat) と、
             /// そこから溜まった不安定化ポイント (ボス戦・嵐の無い層・stormClock=Turns は 0)。 戦闘の終わり (isFightEnd) の記録だけが持つ (チェーンの途中は 0)。</summary>
             public int escRises, instEsc;
+            /// <summary>[計装 2026-11-14] この戦闘 (ヴェスカは段) でボスがダウンしたターンの数 (BossDownDiag.TotalDowns の差)。</summary>
+            public int downs;
         }
 
         /// <summary><see cref="RunRec.stormLayers"/> の 1 層の列の数。</summary>

@@ -126,6 +126,7 @@ namespace AutoTest
             System.Array.Copy(CombatSystem.CombatStats.DamageBreakdown, _bdAtStart, _bdAtStart.Length);
             System.Array.Copy(CombatSystem.EnemyHpLedger.Cum, _ledAtStart, _ledAtStart.Length);
             _pendingShownFloor = gm?.Run?.currentFloor ?? 0;
+            _downsAtStart = CombatSystem.BossDownDiag.TotalDowns;   // [計装 2026-11-14] この戦闘 (段) のダウンの数は終わりとの差
             _pendingAxis = new int[ItemSystem.PassiveSkills.AxisRules.Ranked.Length];
             for (int ai = 0; ai < _pendingAxis.Length; ai++)
                 _pendingAxis[ai] = ItemSystem.PassiveSkills.AxisRules.Count(gm?.Run, ItemSystem.PassiveSkills.AxisRules.Ranked[ai]);
@@ -142,6 +143,7 @@ namespace AutoTest
         // [計装 2026-11-10] 経路別の入った量 (EnemyHpLedger) の段の開始時点・見せる層・偏重 6 軸の数
         private readonly double[] _ledAtStart = new double[CombatSystem.EnemyHpLedger.Length];
         private int _pendingShownFloor;
+        private long _downsAtStart;
         private int[] _pendingAxis;
 
         private float[] LedgerSinceStart()
@@ -214,6 +216,7 @@ namespace AutoTest
                 playerMaxHpEnd = gm?.Run?.playerMaxHP ?? 0,
                 encounterKey = _pendingEncounterKey,
                 escRises = gm?.EscalationRisesThisCombat ?? 0, instEsc = gm?.InstabilityFromEscalationThisCombat ?? 0,   // [計装 2026-11-13]
+                downs = (int)(CombatSystem.BossDownDiag.TotalDowns - _downsAtStart),   // [計装 2026-11-14]
             };
             _cur.combats.Add(rec);
             _cur.totalCombats++;

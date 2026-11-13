@@ -139,7 +139,7 @@ namespace AutoTest.ParallelSweep
                     axisAtStart = c.axisAtStart ?? Array.Empty<int>(),
                     mainPred = c.mainPred, mainPredCorr = c.mainPredCorr, mainActual = c.mainActual,
                     atkHist = c.atkHist ?? Array.Empty<int>(), dawnShots = c.dawnShots ?? Array.Empty<int>(),
-                    escRises = c.escRises, instEsc = c.instEsc,
+                    escRises = c.escRises, instEsc = c.instEsc, downs = c.downs,
                 };
             }
             return a;
@@ -190,6 +190,8 @@ namespace AutoTest.ParallelSweep
         public int[] dawnShots;
         /// <summary>[計装 2026-11-13] この戦闘でエスカレーションの段が上がった数 (ボス戦も) / そこから溜まった不安定化ポイント (end の行だけ)。</summary>
         public int escRises, instEsc;
+        /// <summary>[計装 2026-11-14] この戦闘 (ヴェスカは段) でボスがダウンしたターンの数。 Tools/boss_loss_report.py が読む。</summary>
+        public int downs;
     }
 
     [Serializable]

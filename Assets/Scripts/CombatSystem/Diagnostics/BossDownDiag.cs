@@ -30,8 +30,12 @@ namespace CombatSystem
 
         public static void EndFight() { _cur = null; }
 
+        /// <summary>[計装 2026-11-14] ダウンしたターンの通算 (プロセスを通して増えるだけ・Reset で戻さない)。 戦闘ごとの数は、 読む側が戦闘の始めとの差で取る。</summary>
+        public static long TotalDowns;
+
         public static void NoteDown(bool hasHeavy, bool canceled)
         {
+            TotalDowns++;
             if (_cur == null) return;
             _cur[2]++;
             if (!hasHeavy) _cur[5]++;
