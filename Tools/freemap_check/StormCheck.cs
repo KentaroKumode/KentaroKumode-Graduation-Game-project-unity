@@ -54,6 +54,7 @@ static partial class T
     static string StateDiff(FreeMapSim.SavedState a, M.FreeMapSim.SavedState b)
     {
         if (a.stormShift != 0) return "stormShift";
+        if (a.instability != 0 || (a.instabilityParts != null && a.instabilityParts.Any(x => x != 0))) return "instability";
         foreach (var fb in b.GetType().GetFields())
         {
             var fa = a.GetType().GetField(fb.Name);
@@ -123,12 +124,14 @@ static partial class T
         return bad;
     }
 
-    static FreeMapSim MakeStorm(int salt, int floor, Wallet w = null, WeatherKind? wx = null)
+    /// <summary>嵐の層の中身。 既定は手番の時計 (このファイルの検算は手番で進む嵐 = storm-boss の作りを見る・不安定化の時計は InstabilityCheck.cs)。</summary>
+    static FreeMapSim MakeStorm(int salt, int floor, Wallet w = null, WeatherKind? wx = null, StormClock clock = StormClock.Turns)
     {
         GameLoop.GameRng.Salt = (ulong)salt * 7919;
         var L = FreeMapGenerator.Generate(floor, true, true);
         var s = new FreeMapSim(L, w ?? new Wallet(), FloorPlan.HasWanderer(floor), null, wx, null);
         s.ConfigureTerritory(true, true, true);
+        s.ConfigureStorm(clock);
         return s;
     }
 
@@ -489,7 +492,7 @@ static partial class T
                     s.ShiftFront(-4);
                     var saved = s.CaptureState();
                     var r = new FreeMapSim(s.Layout, new Wallet(), FloorPlan.HasWanderer(floor), null, null, null);
-                    r.ConfigureTerritory(true, true, true); r.LoadState(saved, null);
+                    r.ConfigureTerritory(true, true, true); r.ConfigureStorm(StormClock.Turns); r.LoadState(saved, null);
                     if (r.StormTime != s.StormTime || r.StormShift != s.StormShift || r.StormPhase != s.StormPhase || r.Weather != s.Weather
                         || Enumerable.Range(0, s.Layout.Count).Any(i => r.InStorm(i) != s.InStorm(i) || r.Known[i] != s.Known[i])) saveBad++;
                     // 終点へ歩く (嵐の HP を払って)
@@ -519,7 +522,7 @@ static partial class T
             Console.WriteLine($"[嵐の歩き]   踏んだ点 {Dist(visited)} / 嵐の中の歩数 {Dist(ss)} / 嵐で払った HP {Dist(hp)}");
             Check(reached == 1000, $"嵐の歩き: 深さ{floor} は全層で終点に着く ({reached}/1000)");
         }
-        WalkCompare();
+        InstabilityReport();   // 不安定化の時計 (2026-11-13 二版・InstabilityCheck.cs): 手番の時計と storm-boss の一致・溜まり方・歩き方の比べ
     }
 
     // =====================================================================
