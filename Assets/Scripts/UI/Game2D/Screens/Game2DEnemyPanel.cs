@@ -16,7 +16,7 @@ namespace UI.Game2D
     {
         public Game2DModal modal;
         /// <summary>敵の絵の範囲 (GUI の dot)。 戦闘の演出の敵は中心 x 240・足元 y 204・100×120 (BattleMotion)。</summary>
-        private static readonly RectInt EnemyArea = new RectInt(190, 84, 100, 120);
+        private static readonly RectInt EnemyArea = new RectInt(BattleHudLayout.Enemy.x, BattleHudLayout.Enemy.y, BattleHudLayout.Enemy.w, BattleHudLayout.Enemy.h);   // 場所は BattleHudLayout (検算 Tools/inventory_check)
 
         private ScreenDef _def;
         private Game2DBattleSim _sim; private Game2DScreen _screen;

@@ -238,17 +238,22 @@ namespace MapSystem.FreeMove
         public StormClock Clock { get; private set; } = StormClock.Instability;
         /// <summary>嵐が不安定化ポイントで進む層か (嵐の層で、 時計が <see cref="StormClock.Instability"/>)。</summary>
         public bool InstabilityMode => StormMode && Clock == StormClock.Instability;
-        /// <summary>不安定化ポイントの累計 (2026-11-13・0 以上)。 深さ 6 は 10 から始まる。 不安定化の時計でない時は 0 のまま。 中断セーブに写す。</summary>
+        /// <summary>不安定化ポイントの累計 (2026-11-13・0 以上)。 深さ 6 は InstabilityDepth6Start (= 崩れ始める境目 15) から始まる。 不安定化の時計でない時は 0 のまま。 中断セーブに写す。</summary>
         public int Instability { get; private set; }
-        /// <summary>累計の内訳 (<see cref="Instability.PartTake"/> ほか・この層で溜まった分。 深さ 6 の始まりの 10 は入らない)。 中断セーブに写す。</summary>
+        /// <summary>累計の内訳 (<see cref="Instability.PartTake"/> ほか・この層で溜まった分。 深さ 6 の始まりの分は入らない)。 中断セーブに写す。</summary>
         public int[] InstabilityParts { get; } = new int[MapSystem.FreeMove.Instability.Parts];
         /// <summary>崩れ始めたか (不安定化の累計が最初の境目以上)。 ここから先は 1 歩・待つ・偵察でも溜まる。 不安定化の時計でなければ false。</summary>
         public bool Collapsing => InstabilityMode && MapSystem.FreeMove.Instability.Collapsing(Instability);
+        /// <summary>[計装 2026-11-13] 崩れ始めた手番 (<see cref="Turn"/>・まだなら -1・深さ 6 は 0)。 数えるだけで動きに使わない。 中断セーブには写さない (戻した時は今の状態から数え直す)。</summary>
+        public int CollapseTurn { get; private set; } = -1;
+        /// <summary>[計装 2026-11-13] この層で嵐の中の点へ動いた歩数 (1 歩・〈補給線〉) と、 嵐で払った HP (歩く・待つ・偵察・〈補給線〉)。 数えるだけ・中断セーブには写さない。</summary>
+        public int StormStepsTaken { get; private set; }
+        public int StormHpPaid { get; private set; }
         /// <summary>イベントの「前線を遠ざける / 近づける」で動かした嵐の時計のずらし (手番・正 = 進めた)。 中断セーブに写す。 手番の時計だけが使う。</summary>
         public int StormShift { get; private set; }
         /// <summary>段の長さ (時計の単位ごと)。</summary>
         private Storm.Schedule StormSched => InstabilityMode ? MapSystem.FreeMove.Instability.Schedule : Storm.TurnSchedule;
-        /// <summary>嵐の時計 (負 = 静か・崩れ始めるまでの残り)。 不安定化の時計 = 累計 − 10。 手番の時計 = 手番 + ずらし − 静かな時間。 嵐の層でなければ int.MinValue。</summary>
+        /// <summary>嵐の時計 (負 = 静か・崩れ始めるまでの残り)。 不安定化の時計 = 累計 − 崩れ始める境目 (FreeMapParams.InstabilityPhase1At)。 手番の時計 = 手番 + ずらし − 静かな時間。 嵐の層でなければ int.MinValue。</summary>
         public int StormTime => !StormMode ? int.MinValue
             : InstabilityMode ? MapSystem.FreeMove.Instability.TimeOf(Instability)
             : Turn + StormShift - Storm.QuietTurns(Floor);
@@ -286,6 +291,7 @@ namespace MapSystem.FreeMove
             Clock = clock;
             Instability = InstabilityMode ? MapSystem.FreeMove.Instability.StartOf(Floor) : 0;
             Array.Clear(InstabilityParts, 0, InstabilityParts.Length);
+            CollapseTurn = Collapsing ? Turn : -1;   // [計装]
         }
 
         /// <summary>不安定化ポイントを足す (2026-11-13・<see cref="Instability.PointsOf"/> の表)。 理由 <paramref name="src"/> を <paramref name="n"/> 回ぶん
@@ -303,6 +309,7 @@ namespace MapSystem.FreeMove
             delta = Instability - before;
             if (delta == 0) return FreeMapEvent.None;
             InstabilityParts[MapSystem.FreeMove.Instability.PartOf(src)] += delta;
+            if (CollapseTurn < 0 && Collapsing) CollapseTurn = Turn;   // [計装] 崩れ始めた手番 (遠ざけて戻っても最初の 1 回)
             Version++;
             RevealView();
             return StormPhase != phase ? FreeMapEvent.StormAdvanced : FreeMapEvent.None;
@@ -383,6 +390,7 @@ namespace MapSystem.FreeMove
             Weather = weather ?? WeatherInfo.ForFloor(Floor);
             if (layout.storm) Weather = Storm.KindOf(Weather);   // 崩れる地平・沈み続ける湖面は素の嵐 (引く回数は変えない)
             Instability = InstabilityMode ? MapSystem.FreeMove.Instability.StartOf(Floor) : 0;   // 深さ 6 は崩れ始めた所から (2026-11-13)
+            CollapseTurn = Collapsing ? Turn : -1;   // [計装]
             _territory = layout.territory;
             _waypoints = layout.waypoints;
             Home = layout.home;
@@ -601,6 +609,7 @@ namespace MapSystem.FreeMove
                 for (int i = 0; i < Math.Min(InstabilityParts.Length, s.instabilityParts.Length); i++) InstabilityParts[i] = InstabilityMode ? s.instabilityParts[i] : 0;
             }
             else Instability = InstabilityMode ? MapSystem.FreeMove.Instability.StartOf(Floor) : 0;   // これより前のセーブ: 層の始まりから数え直す
+            CollapseTurn = Collapsing ? Turn : -1;   // [計装] 写さない欄: 戻した時点から数え直す
             Perks = perks ?? FreeMapPerks.None;
         }
 
@@ -842,6 +851,7 @@ namespace MapSystem.FreeMove
             if (Pay(cost)) ev |= FreeMapEvent.Died;
             if (!StormMode) HpPayReason = "雹";
             else if (hail > 0) HpPayReason = HpReasonStorm;   // 嵐の層: 物資切れで倒れた時の理由を上書きしない
+            if (StormMode && hail > 0) { StormStepsTaken++; StormHpPaid += hail; }   // [計装] 嵐の中の点への 1 歩
             if (hail > 0 && _wallet.PayHp(hail)) ev |= FreeMapEvent.Died;
             PrevNode = Me;
             Me = j;
@@ -896,7 +906,7 @@ namespace MapSystem.FreeMove
             var ev = FreeMapEvent.None;
             int storm = StormHpFor(j);   // 嵐の層 (2026-11-13): 嵐の中の点へ跳んでも嵐の HP を払う (嵐の層でなければ 0)
             if (Pay(FreeMapParams.RelaySupply)) ev |= FreeMapEvent.Died;
-            if (storm > 0) { HpPayReason = HpReasonStorm; if (_wallet.PayHp(storm)) ev |= FreeMapEvent.Died; }
+            if (storm > 0) { StormStepsTaken++; StormHpPaid += storm; HpPayReason = HpReasonStorm; if (_wallet.PayHp(storm)) ev |= FreeMapEvent.Died; }
             PrevNode = Me;
             Me = j;
             Version++;
@@ -927,6 +937,7 @@ namespace MapSystem.FreeMove
             int hp = StormWaitHp;
             if (hp <= 0) return false;
             HpPayReason = HpReasonStorm;
+            StormHpPaid += hp;   // [計装]
             Version++;
             if (!_wallet.PayHp(hp)) return false;
             Dead = true;

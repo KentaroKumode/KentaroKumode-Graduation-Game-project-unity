@@ -60,9 +60,22 @@ static partial class T
     static bool FoeInsideTerritory(FreeMapSim s)
         => !s.FoeAlive || (s.InTerritory(s.FoeNode) && s.Familiars.All(f => s.InTerritory(f.pos)));
 
-    static void Main()
+    /// <summary>口の一致を全数で回す (run.py --full)。 ふだんは層の数を絞る (確認役の待ちを 3 分以内に・2026-11-13)。</summary>
+    static bool Full;
+    /// <summary>層の数: ふだんは <paramref name="quick"/>、 --full では <paramref name="full"/>。</summary>
+    static int N(int full, int quick) => Full ? full : quick;
+
+    static void Main(string[] args)
     {
         Console.OutputEncoding = System.Text.Encoding.UTF8;
+        Full = args.Contains("--full");
+        if (args.Contains("--walk"))
+        {
+            // 歩かせる検算 (歩き方 A/B/C × 時計 × 4 層 × 1000 層・10 分前後)。 ふだんの検算からは外した (2026-11-13)。
+            WalkCompareInstability();
+            Console.WriteLine(fails == 0 ? "ALL OK" : $"FAILED {fails}");
+            return;
+        }
         // --- 生成の不変条件 ---
         {
             int bad = 0; var shortest = new List<int>(); int edgesSum = 0;
@@ -540,6 +553,7 @@ static partial class T
         }
         BypassReport();
         AshBaseReport();
+        AshBaseInstability();
         StormReport();
         Console.WriteLine(fails == 0 ? "ALL OK" : $"FAILED {fails}");
     }
@@ -669,6 +683,33 @@ static partial class T
             if (m.x != k.x || m.y != k.y || m.a != k.a || m.b != k.b || m.cos != k.cos || m.sin != k.sin) return false;
         }
         return a.territory.SetEquals(b.territory) && a.waypoints.SequenceEqual(b.waypoints);
+    }
+
+    /// <summary>〈灰に埋もれた基地〉と嵐の不安定化の噛み合わせ (2026-11-13): 基地の選択肢 (〈徒労〉= 時限デバフ / 〈真理〉+〈開眼〉= 時限バフ) は
+    /// 持ち物が増えない得なので不安定 +0・〈徒労〉で何も得られなかった通常の戦闘の勝ちは +1 のまま。 規則 (Instability) は本物、
+    /// 効果の読み替え (EventEffectExecutor) と戦闘の勝ちの口 (GameManager.Rewards) は UnityEngine に依存するので原文で見る。</summary>
+    static void AshBaseInstability()
+    {
+        string exe = System.IO.File.ReadAllText("Assets/Scripts/EventSystem/EventEffectExecutor.cs");
+        string Case(string name)
+        {
+            int a = exe.IndexOf("case EventEffectType." + name + ":", StringComparison.Ordinal);
+            if (a < 0) return null;
+            int b = exe.IndexOf("case EventEffectType.", a + 10, StringComparison.Ordinal);
+            return exe.Substring(a, (b < 0 ? exe.Length : b) - a);
+        }
+        string buff = Case("TimedBuff"), debuff = Case("TimedDebuff"), truth = Case("GainTruth");
+        bool buffOk = buff != null && buff.Contains("NoteGain(MapSystem.FreeMove.EventGainKind.TimedBuff)") && !buff.Contains("relicsGained");
+        bool debuffOk = debuff != null && !debuff.Contains("NoteGain") && !debuff.Contains("relicsGained");
+        bool truthOk = truth != null && !truth.Contains("NoteGain") && !truth.Contains("relicsGained");
+        bool rule = !Instability.CountsAsEventGain(EventGainKind.TimedBuff) && Instability.EventPoints(0, false, false) == 0;
+        Check(buffOk && debuffOk && truthOk && rule,
+              $"灰に埋もれた基地と不安定化: 「手記を閉じて立ち去る」(〈徒労〉) も「手記の最後の頁を開く」(真理を得る +〈開眼〉) も持ち物が増えない得で +0 (時限バフ {buffOk}・時限デバフ {debuffOk}・真理 {truthOk}・規則 {rule})");
+        string rw = System.IO.File.ReadAllText("Assets/Scripts/GameLoop/GameManager.Rewards.cs");
+        int sc = rw.IndexOf("coins = ScaleByBattleBoon(coins);", StringComparison.Ordinal);
+        int win = sc < 0 ? -1 : rw.IndexOf("AddBattleWinInstability(eliteNodeReward, pursuer: false);", sc, StringComparison.Ordinal);
+        Check(win > sc && sc > 0 && Instability.PointsOf(InstabilitySource.Battle, 1) > 0,
+              "灰に埋もれた基地と不安定化: 〈徒労〉で何も得られなかった通常の戦闘の勝ちも、 不安定化 (勝ち +1) は〈徒労〉に関わらず溜まる");
     }
 
     /// <summary>深さ 6 (画面の第 4 層) の〈灰に埋もれた基地〉(2026-11-13・AshBase) の検算。

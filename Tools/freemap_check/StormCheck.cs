@@ -226,7 +226,7 @@ static partial class T
         {
             int layers = 0, diff = 0, drawDiff = 0; string firstDiff = null;
             foreach (int floor in new[] { 0, 1, 3, 5, 6, 7 })
-                for (int salt = 1; salt <= 5000; salt++)
+                for (int salt = 1; salt <= N(5000, 1500); salt++)
                 {
                     // 深さ 6 は 2 つの形: ふだん (固定の点なし・main とは隣の点の種別だけ違ってよい) と、 イベントなしの測定 (固定の点・main と 1 点も変わらない)
                     foreach (bool fp in floor == AshBase.Depth && salt <= 500 ? new[] { false, true } : new[] { false })
@@ -247,7 +247,7 @@ static partial class T
         {
             int runs = 0, bad = 0, drawBad = 0; string first = null;
             foreach (int floor in StormDepths)
-                for (int salt = 1; salt <= 1000; salt++)
+                for (int salt = 1; salt <= N(1000, 400); salt++)
                 {
                     GameLoop.GameRng.Draws.Clear();
                     bad += ReplayDiff(salt, floor, 160, out string f);
@@ -279,7 +279,7 @@ static partial class T
             var startsDistinct = new HashSet<int>(); var goalsDistinct = new HashSet<int>();
             foreach (int floor in StormDepths) { hopsStorm[floor] = new List<int>(); hopsOld[floor] = new List<int>(); }
             foreach (int floor in StormDepths)
-                for (int salt = 1; salt <= 3000; salt++)
+                for (int salt = 1; salt <= N(3000, 1000); salt++)
                 {
                     GameLoop.GameRng.Salt = (ulong)salt * 7919;
                     var Lo = FreeMapGenerator.Generate(floor, false, false);

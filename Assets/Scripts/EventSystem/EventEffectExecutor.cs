@@ -34,9 +34,17 @@ namespace EventSystem
             public int pickedBranch = -1;
             /// <summary>不安定化 (2026-11-13・GAME.md §5-12): この実行で得た秘宝の数 (秘宝を得る・N つから選ぶ・止まらない時計・品の指定で秘宝)。</summary>
             public int relicsGained;
-            /// <summary>不安定化: この実行で起きた、 秘宝のほかの得の効果の数 (<see cref="EventEffectRoles.RoleOf"/> が得の効果で、 実際に起きたもの)。
-            /// 数えない得: 嵐を遠ざける (それ自体が累計 −N)・秘宝を差し出して替える (交換)・武器を鍛える (自分の素材を払う・休憩の鍛えると同じ)。</summary>
+            /// <summary>不安定化: この実行で起きた、 秘宝のほかの<b>持ち物が増える</b>得の効果の数 (<see cref="NoteGain"/> 経由・
+            /// 数えるかは <see cref="MapSystem.FreeMove.Instability.CountsAsEventGain"/> の 1 か所・2026-11-13 三版)。
+            /// 数えない得: HP の回復・最大 HP・時限バフ・航行の効果・店の値引き・休憩の上乗せ・観測所の写し。
+            /// 得として渡さない: 嵐を遠ざける (それ自体が累計 −N)・秘宝を差し出して替える (交換)・武器を鍛える (自分の素材を払う・休憩の鍛えると同じ)。</summary>
             public int otherGains;
+
+            /// <summary>得の効果が 1 つ起きた (種類 <paramref name="k"/>)。 持ち物が増える種類だけ <see cref="otherGains"/> に数える。</summary>
+            public void NoteGain(MapSystem.FreeMove.EventGainKind k)
+            {
+                if (MapSystem.FreeMove.Instability.CountsAsEventGain(k)) otherGains++;
+            }
         }
 
         /// <summary>
@@ -77,13 +85,13 @@ namespace EventSystem
                     GameLoop.HpOutsideDiag.Add("イベント:HP減", hpBefore - run.playerHP);   // [計装 2026-11-05]
                 }
                     result.log.Add($"HP{eff.amount:+0;-0} (現在 {run.playerHP}/{run.playerMaxHP})");
-                    if (eff.amount > 0) result.otherGains++;
+                    if (eff.amount > 0) result.NoteGain(MapSystem.FreeMove.EventGainKind.Heal);
                     break;
 
                 case EventEffectType.HpFullHeal:
                     run.playerHP = run.playerMaxHP;
                     result.log.Add($"HP全回復 ({run.playerHP}/{run.playerMaxHP})");
-                    result.otherGains++;
+                    result.NoteGain(MapSystem.FreeMove.EventGainKind.Heal);
                     break;
 
                 case EventEffectType.HpSetTo:
@@ -109,7 +117,7 @@ namespace EventSystem
                     run.playerMaxHP = Mathf.Max(1, run.playerMaxHP + eff.amount);
                     run.playerHP = Mathf.Min(run.playerHP, run.playerMaxHP);
                     result.log.Add($"最大HP{eff.amount:+0;-0} → {run.playerMaxHP}");
-                    if (eff.amount > 0) result.otherGains++;
+                    if (eff.amount > 0) result.NoteGain(MapSystem.FreeMove.EventGainKind.MaxHp);
                     break;
 
                 case EventEffectType.GoldDelta:
@@ -119,7 +127,7 @@ namespace EventSystem
                     int delta = eff.amount;
                     run.coins = Mathf.Max(0, run.coins + delta);
                     result.log.Add($"ゴールド{delta:+0;-0} (現在 {run.coins})");
-                    if (delta > 0) result.otherGains++;
+                    if (delta > 0) result.NoteGain(MapSystem.FreeMove.EventGainKind.Gold);
                     break;
                 }
 
@@ -131,7 +139,7 @@ namespace EventSystem
                     if (amount > 0) GameLoop.ProvisionSystem.Recover(run, amount);
                     else if (amount < 0) GameLoop.ProvisionSystem.Reduce(run, -amount);
                     result.log.Add($"物資{amount:+0;-0} (現在 {run.provision}/{run.provisionCap})");
-                    if (amount > 0) result.otherGains++;
+                    if (amount > 0) result.NoteGain(MapSystem.FreeMove.EventGainKind.Provision);
                     break;
                 }
 
@@ -143,7 +151,7 @@ namespace EventSystem
                     {
                         GameLoop.ProvisionSystem.Recover(run, amount);
                         result.log.Add($"物資{amount:+0} (現在 {run.provision}/{run.provisionCap})");
-                        result.otherGains++;
+                        result.NoteGain(MapSystem.FreeMove.EventGainKind.Provision);
                     }
                     else if (amount < 0)
                     {
@@ -169,7 +177,7 @@ namespace EventSystem
                 case EventEffectType.MaterialDelta:
                     run.weaponMaterials = Mathf.Max(0, run.weaponMaterials + eff.amount);
                     result.log.Add($"武器強化素材{eff.amount:+0;-0} (現在 {run.weaponMaterials})");
-                    if (eff.amount > 0) result.otherGains++;
+                    if (eff.amount > 0) result.NoteGain(MapSystem.FreeMove.EventGainKind.Material);
                     break;
 
                 case EventEffectType.ArmorDurabilityLoss:
@@ -182,7 +190,7 @@ namespace EventSystem
                     int charges = TimedEffectRegistry.GetDefaultCharges(eff.param);
                     AddOrIncrement(run.timedBuffs, eff.param, charges);
                     result.log.Add($"時限バフ獲得: {eff.param} ({charges}回)");
-                    result.otherGains++;
+                    result.NoteGain(MapSystem.FreeMove.EventGainKind.TimedBuff);
                     break;
                 }
 
@@ -223,7 +231,7 @@ namespace EventSystem
                     {
                         run.TryAddConsumable(id);
                         result.log.Add($"消費アイテム獲得: {ResolveLabel(id)}");
-                        result.otherGains++;
+                        result.NoteGain(MapSystem.FreeMove.EventGainKind.Consumable);
                     }
                     break;
                 }
@@ -234,8 +242,8 @@ namespace EventSystem
                     {
                         GameLoop.Loadout.Gain(run, eff.param);   // 武器なら 1 本だけ (入れ替えるかを聞く・2026-11-11)
                         result.log.Add($"アイテム獲得: {ResolveLabel(eff.param)}");
-                        if (ItemDatabase.Instance?.GetItem(eff.param)?.category == ItemCategory.Passive) { if (GameLoop.ItemIds.CountsAsTakenRelic(eff.param)) result.relicsGained++; }
-                        else result.otherGains++;
+                        if (ItemDatabase.Instance?.GetItem(eff.param)?.category == ItemCategory.Passive) { if (GameLoop.ItemIds.CountsAsTakenRelic(eff.param)) result.relicsGained++; }   // 進行の資格の品は数えない
+                        else result.NoteGain(MapSystem.FreeMove.EventGainKind.Item);
                         ApplyPassiveAcquisitionBonus(run, eff.param, result);
                     }
                     break;
@@ -243,13 +251,13 @@ namespace EventSystem
                 case EventEffectType.GainFlag:
                     run.ownedFlags.Add(eff.param);
                     result.log.Add($"フラグアイテム獲得: {eff.param}");
-                    result.otherGains++;
+                    result.NoteGain(MapSystem.FreeMove.EventGainKind.Flag);
                     break;
 
                 case EventEffectType.ObservatoryTakeCopy:
                     GameLoop.ObservatoryState.TakeCopy();
                     result.log.Add("観測所の写しを持ち帰った");
-                    result.otherGains++;
+                    result.NoteGain(MapSystem.FreeMove.EventGainKind.ObservatoryCopy);
                     break;
 
                 case EventEffectType.VescaClockTake:
@@ -317,10 +325,11 @@ namespace EventSystem
                     // 航行の効果は地図へ戻った時に (ターン+N と同じ口)。 画面の文はここで出す (地図へ戻った直後に必ず適用されるので)
                     result.navEffects.Add(eff);
                     { string s = DescribeNav(eff, run); if (s != null) result.log.Add(s); }
-                    // 不安定化: 起きる得の航行の効果 (明かす・撒く・遠ざける (追跡者)・近道) は「何かを得た」。 嵐を動かす効果は数えない (それ自体が累計を動かす)
+                    // 不安定化: 起きる得の航行の効果 (明かす・撒く・遠ざける (追跡者)・近道) は物が増えない得 (2026-11-13 三版: 数えない・Instability.CountsAsEventGain)。
+                    //   嵐を動かす効果はそもそも得として渡さない (それ自体が累計を動かす)
                     if (eff.type != EventEffectType.ShiftFront && EventEffectRoles.RoleOf(eff) == EventEffectRole.Benefit
                         && EventEffectRoles.NotHappeningReason(eff, EventChoice.Situation(run, false, false)) == null)
-                        result.otherGains++;
+                        result.NoteGain(MapSystem.FreeMove.EventGainKind.Navigation);
                     break;
 
                 case EventEffectType.OfferPassives:
@@ -373,14 +382,14 @@ namespace EventSystem
                     float f = 1f - Mathf.Clamp(eff.amount, 0, 100) / 100f;
                     run.nextShopPriceMul *= f;
                     result.log.Add($"次の店の値段 -{eff.amount}%");
-                    result.otherGains++;
+                    result.NoteGain(MapSystem.FreeMove.EventGainKind.ShopDiscount);
                     break;
                 }
 
                 case EventEffectType.NextRestBonus:
                     run.nextRestHealBonusPct += Mathf.Max(0, eff.amount);
                     result.log.Add($"次の休憩の回復 +{eff.amount}%（最大 HP の）");
-                    result.otherGains++;
+                    result.NoteGain(MapSystem.FreeMove.EventGainKind.RestBonus);
                     break;
             }
         }

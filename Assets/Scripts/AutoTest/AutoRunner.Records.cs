@@ -77,7 +77,13 @@ namespace AutoTest
             public int playerMaxHpEnd;
             /// <summary>戦闘名の鍵 (層|種類|戦闘名・<see cref="EncounterDangerStats.KeyOf"/>)。 戦闘名が無い戦闘は空 (2026-11-05)。</summary>
             public string encounterKey = "";
+            /// <summary>[計装 2026-11-13] この戦闘でエスカレーションの段が上がった数 (ボス戦も・GameManager.EscalationRisesThisCombat) と、
+            /// そこから溜まった不安定化ポイント (ボス戦・嵐の無い層・stormClock=Turns は 0)。 戦闘の終わり (isFightEnd) の記録だけが持つ (チェーンの途中は 0)。</summary>
+            public int escRises, instEsc;
         }
+
+        /// <summary><see cref="RunRec.stormLayers"/> の 1 層の列の数。</summary>
+        public const int StormLayerCols = 12;
 
         [Serializable]
         public class RunRec
@@ -109,6 +115,10 @@ namespace AutoTest
             public List<int> stateSnaps = new List<int>();
             /// <summary>[計装 2026-11-09] 航行マップの層ごとの踏破: 4 列ずつ (深さ, マスの種別 TileType, 層にあった数, 踏んだ数)。</summary>
             public List<int> mapVisit = new List<int>();
+            /// <summary>[計装 2026-11-13] 嵐の層の不安定化: 層ごとに <see cref="StormLayerCols"/> (= 12) 列ずつ。 ボスの点の戦闘に入った時 (= 層を抜けた時) の値:
+            /// (深さ, 累計, フェーズ 0〜4, 内訳 取る, 激化, 歩く, イベントのターン, 嵐を動かす, 崩れ始めた手番 (-1 = 崩れなかった・深さ 6 は 0), 嵐の中を歩いた歩数, 嵐で払った HP, 航行の手番)。
+            /// 内訳は層で溜まった分だけ (深さ 6 の始まりの分は入らない = 累計 − 内訳の和)。 stormEnabled=False・stormClock=Turns の層と、 ボスへ届かなかった層は載らない。</summary>
+            public List<int> stormLayers = new List<int>();
             /// <summary>[計装 2026-11-13] 深さ 6 (画面の第 4 層) の〈灰に埋もれた基地〉: 0 = 起きていない / 1 = 最初に踏んだイベントマスで起きた
             /// / 2 = イベントマスを踏まずに終点へ着き、 安全弁がボス戦の前に出した。 深さ 6 へ届かなかったランと、 イベントなしの測定は 0。</summary>
             public int ashBase;

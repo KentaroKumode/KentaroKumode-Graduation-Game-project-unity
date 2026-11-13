@@ -70,6 +70,9 @@ namespace AutoTest.ParallelSweep
         public int[] stateSnaps = Array.Empty<int>();
         /// <summary>航行マップの層ごとの踏破 (4 列ずつ: 深さ, TileType, 数, 踏んだ数・2026-11-09)。</summary>
         public int[] mapVisit = Array.Empty<int>();
+        /// <summary>[計装 2026-11-13] 嵐の層の不安定化 (12 列ずつ: 深さ, 累計, フェーズ, 内訳 取る / 激化 / 歩く / イベントのターン / 嵐を動かす,
+        /// 崩れ始めた手番 (-1 = 崩れなかった), 嵐の中を歩いた歩数, 嵐で払った HP, 航行の手番・ボスの点の戦闘に入った時の値・AutoRunner.RunRec.stormLayers)。</summary>
+        public int[] stormLayers = Array.Empty<int>();
         /// <summary>[計装 2026-11-10] ラン開始時に実際に入っていた整備パネルの段。</summary>
         public string metaRanks = "";
         /// <summary>[計装 2026-11-12] ラン開始時の職業 (lockWeaponFamily の測定では武器の家系)。</summary>
@@ -106,6 +109,7 @@ namespace AutoTest.ParallelSweep
                 goldKeys = r.goldKeys ?? Array.Empty<string>(), goldVals = r.goldVals ?? Array.Empty<int>(),
                 stateSnaps = r.stateSnaps != null ? r.stateSnaps.ToArray() : Array.Empty<int>(),
                 mapVisit = r.mapVisit != null ? r.mapVisit.ToArray() : Array.Empty<int>(),
+                stormLayers = r.stormLayers != null ? r.stormLayers.ToArray() : Array.Empty<int>(),
                 metaRanks = r.metaRanks ?? "",
                 startClass = r.startClass ?? "",
                 ashBase = r.ashBase, ashBaseRevisit = r.ashBaseRevisit, ashBaseChoice = r.ashBaseChoice, ashBaseTurn = r.ashBaseTurn,
@@ -132,6 +136,7 @@ namespace AutoTest.ParallelSweep
                     axisAtStart = c.axisAtStart ?? Array.Empty<int>(),
                     mainPred = c.mainPred, mainPredCorr = c.mainPredCorr, mainActual = c.mainActual,
                     atkHist = c.atkHist ?? Array.Empty<int>(), dawnShots = c.dawnShots ?? Array.Empty<int>(),
+                    escRises = c.escRises, instEsc = c.instEsc,
                 };
             }
             return a;
@@ -180,6 +185,8 @@ namespace AutoTest.ParallelSweep
         public int[] atkHist;
         /// <summary>[計装 2026-11-10] 黎明の溜める形で、 攻撃したターンに乗った溜め (%)。</summary>
         public int[] dawnShots;
+        /// <summary>[計装 2026-11-13] この戦闘でエスカレーションの段が上がった数 (ボス戦も) / そこから溜まった不安定化ポイント (end の行だけ)。</summary>
+        public int escRises, instEsc;
     }
 
     [Serializable]

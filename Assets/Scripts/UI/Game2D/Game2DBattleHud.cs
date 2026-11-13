@@ -22,12 +22,16 @@ namespace UI.Game2D
     {
         // 配置 (dot)
         // 2026-11-11: 字を既定のフォント (高さ 12) にしたので、 右の枠を広げ、 上の帯を高くし、 右は帯の下から始める
-        private static readonly RectInt Right = new RectInt(370, 60, 108, 120), Top = new RectInt(96, 2, 288, 56);
+        //   場所の値は BattleHudLayout (Unity 非依存・検算 Tools/inventory_check が入口 [持ち物] とほかの部品の重なりを数える)
+        private static RectInt R(InventoryLayout.Box b) => new RectInt(b.x, b.y, b.w, b.h);
+        private static readonly RectInt Right = R(BattleHudLayout.Right), Top = R(BattleHudLayout.Top);
         private const int FrameB = 12;
         /// <summary>自分のステータス (会心率・攻撃・防御): 左下 (Ports と Ctl の間・左と同じばね)。</summary>
-        private static readonly RectInt Stat = new RectInt(2, 162, 108, 48);
+        private static readonly RectInt Stat = R(BattleHudLayout.Stat);
         /// <summary>成立した役 (ADR-0011): Ports の上の空き (上の帯の左・左と同じばね)。 役が無いターンは出さない。</summary>
-        private static readonly RectInt RoleR = new RectInt(2, 20, 92, 37);
+        private static readonly RectInt RoleR = R(BattleHudLayout.Role);
+        /// <summary>持ち物の画面の入口 [持ち物] (2026-11-13): 役の板の上の空き (上の帯の左・左と同じばね)。 キー I でも開く。 見るだけ (Game2DNavExtras.OpenInventoryInBattle)。</summary>
+        private static readonly RectInt InvR = R(BattleHudLayout.Inv);
 
         // ── 端子の山札 (ADR-0014・2026-11-11) の配置 ──
         //   Ports (2,60,108,98)   = 出目と、 出目ごとの差し込み口 (挿した USB は横向きに挿さった絵で残る)。 3 個ずつ縦に並べ、 4 個目からは列を右へ足す。
@@ -36,10 +40,10 @@ namespace UI.Game2D
         //   Hand (318,184,160,80) = このターンに引いた端子 (縦向きの USB・左から) と常設 (右の端・仕切りの右)・山/捨ての枚数。 敵 (x 190〜290) と予告の枠 (Right・y 〜180) の外。
         //   Tip (幅 200)          = USB にマウスを乗せた時だけ。 予告の枠 (Right) と敵の頭上の予告 (y 〜78) に重ねない:
         //                           差し込み口の USB は Ports の右・口の高さ (y は TipMinY から)、 手札の USB は Hand の上で、 右端を予告の枠の左に揃える。
-        private static readonly RectInt Ports = new RectInt(2, 60, 108, 98), Ctl = new RectInt(2, 214, 108, 52), Hand = new RectInt(318, 184, 160, 80);
+        private static readonly RectInt Ports = R(BattleHudLayout.Ports), Ctl = R(BattleHudLayout.Ctl), Hand = R(BattleHudLayout.Hand);
         private const int TipW = 200, TipLinesMax = 6, TipH = 6 + TipLinesMax * 13 + 3, TipMinY = 82, TipMaxY = 214;
         // 差し込み口の行 (Ports の中): 出目 → 配線 → 口 (USB の差し込み部が口に入る) → 本体 → ランプ。 1 列 3 個・列の幅 76
-        private const int PortRows = 3, PortColW = 76;
+        private const int PortRows = BattleHudLayout.PortRows, PortColW = BattleHudLayout.PortColW;
         private static int PortCols(int n) => Mathf.Max(1, (n + PortRows - 1) / PortRows);
         private static int PortsW(int n) => Ports.width + (PortCols(n) - 1) * PortColW;
         private static int PortX(int i) => (i / PortRows) * PortColW;
@@ -52,7 +56,7 @@ namespace UI.Game2D
         private const int HandY = 18, HandStep = 28, HandPad = 6;
         private static readonly RectInt CReroll = new RectInt(5, 5, 56, 20), CAuto = new RectInt(63, 5, 40, 20),
             CItem = new RectInt(5, 27, 24, 20), CFlee = new RectInt(31, 27, 36, 20), CGo = new RectInt(69, 27, 34, 20);
-        private RectTransform _ports, _ctl, _hand, _tip, _drag, _role; private Texture2D _tp, _tc, _th, _tt2, _td, _trl;
+        private RectTransform _ports, _ctl, _hand, _tip, _drag, _role, _inv; private Texture2D _tp, _tc, _th, _tt2, _td, _trl, _tinv;
         private int _portsTexW = -1;
 
         /// <summary>端子のアイコン (16×16・行優先・左上から・0 = 透明 / 1 = 暗 / 2 = 中 / 3 = 明)。 無ければ null。</summary>
@@ -119,7 +123,7 @@ namespace UI.Game2D
 
         private void OnDestroy()
         {
-            foreach (var t in new[] { _tr, _tt, _ts, _tp, _tc, _th, _tt2, _td, _trl }) if (t != null) Destroy(t);
+            foreach (var t in new[] { _tr, _tt, _ts, _tp, _tc, _th, _tt2, _td, _trl, _tinv }) if (t != null) Destroy(t);
             _busyDrag = false;
         }
 
@@ -132,6 +136,7 @@ namespace UI.Game2D
             if (_ctl == null) _ctl = Make("ctl", Ctl, out _tc);
             if (_hand == null) _hand = Make("hand", Hand, out _th);
             if (_role == null) _role = Make("role", RoleR, out _trl);
+            if (_inv == null) _inv = Make("inv", InvR, out _tinv);
             if (_tip == null) _tip = Make("tip", new RectInt(0, 0, TipW, TipH), out _tt2);
             if (_drag == null) _drag = Make("drag", new RectInt(0, 0, UsbBody, UsbLong), out _td);
         }
@@ -158,6 +163,7 @@ namespace UI.Game2D
             _ctl.anchoredPosition = new Vector2(Ctl.x - inL, -Ctl.y);
             _hand.anchoredPosition = new Vector2(Hand.x + inR, -Hand.y);
             _role.anchoredPosition = new Vector2(RoleR.x - inL, -RoleR.y);
+            _inv.anchoredPosition = new Vector2(InvR.x - inL, -InvR.y);
             if (_spL.x < 0.95f) { Show(_tip, false); CancelDrag(); }      // 説明の帯・つかみは、 パネルが収まっている間だけ
         }
 
@@ -168,6 +174,8 @@ namespace UI.Game2D
             if (sim.CanOperate && CombatSystem.CombatManager.Instance != null)
             { _hs = CombatSystem.CombatManager.Instance.PreviewHudStats(); _hsKnown = true; }
             bool ptr = _slide > 0.95f && !Game2DModal.Active && screen != null;
+            // 持ち物の画面 (見るだけ・2026-11-13): キー I。 窓が出ている間・つかんでいる間・BOT が動かしている間は開かない
+            if (_slide > 0.95f && !Game2DModal.Active && !PointerBusy && !Game2DTutorial.Blocking && Input.GetKeyDown(KeyCode.I)) OpenInventory();
             Vector2 d = default; bool hasDot = ptr && Game2DPointer.TryDot(screen, out d);
             DeckPointer(hasDot, d);
             // 引いてくる動きの間は毎フレーム描き直す
@@ -231,6 +239,7 @@ namespace UI.Game2D
             DrawRight(_tr); DrawTop(_tt);
             Ensure(ref _ts, _stat, Stat); DrawStat(_ts);
             Ensure(ref _trl, _role, RoleR); Show(_role, DrawRole(_trl));
+            Ensure(ref _tinv, _inv, InvR); DrawInv(_tinv); Show(_inv, true);
         }
 
         /// <summary>成立した役の板: 1 行目 = 「役」と名前 (目のテーマ・対 / 揃) / 2 行目 = そろった目。 役が無ければ描かずに false。
@@ -247,6 +256,21 @@ namespace UI.Game2D
             p.Text("目 " + f, 8, 19, Ink);
             p.Apply(t);
             return true;
+        }
+
+        /// <summary>持ち物の画面の入口 [持ち物] (2026-11-13)。 BOT が動かしている間は暗く出す (押しても開かない)。</summary>
+        private void DrawInv(Texture2D t)
+        {
+            var p = new KitPix(InvR.width, InvR.height);
+            SmallBtn(p, new RectInt(0, 0, InvR.width, InvR.height), BattleHudLayout.InvLabel, !GameHooks.BotDriving, Ink);
+            p.Apply(t);
+        }
+
+        /// <summary>持ち物の画面を開く (見るだけ・消耗品の [使う] は出さない ── 戦闘中に使うのは [道具] の窓)。 戦闘の進行・乱数・判断待ちには触らない。</summary>
+        private void OpenInventory()
+        {
+            if (GameHooks.BotDriving || Game2DModal.Active) return;
+            if (Game2DNavExtras.OpenInventoryInBattle(GameManager.Instance)) Game2DSfx.Play("ui_click");
         }
 
         /// <summary>役をつくる出目の印: 金の縁 (〈猫の手〉の琥珀の縁と同じ形・色で分ける)。</summary>
@@ -363,6 +387,7 @@ namespace UI.Game2D
                 if (In(d, Ctl, CReroll)) { sim.Reroll(); return; }
                 if (In(d, Ctl, CAuto)) { sim.AutoWire(); return; }
                 if (In(d, Ctl, CItem)) { OpenItems(); return; }
+                if (In(d, new RectInt(0, 0, Game2DLayout.Width, Game2DLayout.Height), InvR)) { OpenInventory(); return; }
                 if (In(d, Ctl, CFlee)) { PressFlee(); return; }
                 if (In(d, Ctl, CGo)) { if (sim.ButtonEnabled) sim.Button(); }
             }
