@@ -3,14 +3,18 @@ namespace EventSystem.TimedEffects
     /// <summary>直近の戦闘の報酬に掛かった時限効果 (2026-11-13・〈徒労〉〈開眼〉)。</summary>
     public enum BattleBoon { None, Toil, Insight }
 
-    /// <summary>[測定 2026-11-14] 〈徒労〉の形 (GameHooks.ToilMode・AutoRunner.toilMode)。 既定 <see cref="Stacks"/> = 今の形。</summary>
+    /// <summary>〈徒労〉の形 (GameHooks.ToilMode・AutoRunner.toilMode)。 既定は <see cref="UntilKing"/> (2026-11-14・作者の決定)。 値の並びを変えない (enum の 0 は Stacks のまま)。</summary>
     public enum ToilMode
     {
-        /// <summary>今の形 (既定): 3 つ持ち、 通常の戦闘に勝つたびに 1 つ減り、 その戦闘では何も得られない (ゴールド・ドロップ・強化素材・物資 0)。</summary>
+        /// <summary>旧い形 (2026-11-13〜11-14 の既定・測定で比べる口): 3 つ持ち、 通常の戦闘に勝つたびに 1 つ減り、 その戦闘では何も得られない (ゴールド・ドロップ・強化素材・物資 0)。</summary>
         Stacks,
         /// <summary>別の形 (測定用・採否は未決): 深さ 6 (画面の第 4 層) にいる間ずっと続き (勝っても減らない)、 層を出たら消える。
         /// 通常の戦闘は品を一切落とさない (ゴールド・強化素材・物資は出る)。 宝箱 (宝の点・縄張りの宝) は確率で空になる。</summary>
         LayerLong,
+        /// <summary>既定 (2026-11-14・作者の決定「徒労は王を倒すまで永続化」): 通常の戦闘に勝っても減らず、 灰燼の王 (深さ 6 のボス) を倒した時に消える
+        /// (念のため深さ 7 に入った時にも消す)。 効いている間、 通常の戦闘は勝っても何も得られない (中身は <see cref="Stacks"/> と同じ: ゴールド・ドロップ・強化素材・物資 0)。
+        /// 宝箱はそのまま (空にしない)。 残りの数は画面に出さない。</summary>
+        UntilKing,
     }
 
     /// <summary>
@@ -22,8 +26,9 @@ namespace EventSystem.TimedEffects
     /// 〈徒労〉= 報酬が全部 0 (ゴールド・ドロップ・強化素材・物資・強奪のドロップ)。 〈開眼〉= ゴールド・ドロップ・強化素材が <see cref="InsightMultiplier"/> 倍
     /// (ドロップは抽選を <see cref="InsightMultiplier"/> 回引く・物資は増やさない)。 両方ある時は〈徒労〉が勝つ (両方減る)。
     /// 逃げた・負けた戦闘と、 通常でない戦闘は減らさず、 報酬も普通に出る。 層を出ても残る。</para>
+    /// <para>2026-11-14: 〈徒労〉の既定の形は <see cref="ToilMode.UntilKing"/> (減らず、 灰燼の王を倒すまで続く・報酬の中身は上と同じ)。 上の「1 つ減らす」は旧い形 Stacks の規則。</para>
     /// <para>[測定 2026-11-14] 〈徒労〉には測定用の別の形 (<see cref="ToilMode.LayerLong"/>・GameHooks.ToilMode) がある。 形を見る版の関数 (引数 mode) は、
-    /// mode = <see cref="ToilMode.Stacks"/> (既定) なら形を見ない版と同じ値を返す (検算 Tools/event_branch_check の「徒労 (既定の形 Stacks)」)。</para>
+    /// mode = <see cref="ToilMode.Stacks"/> (旧い形) なら形を見ない版と同じ値を返す (検算 Tools/event_branch_check の「徒労 (既定の形 Stacks)」)。</para>
     /// <para>呼ぶのは GameManager.TakeNormalBattleBoon (判定の 1 か所) と、 その結果を読む報酬の各所 (素材・強奪・ゴールド・物資・ドロップ)。</para>
     /// </summary>
     public static class BattleBoonRule
@@ -32,8 +37,12 @@ namespace EventSystem.TimedEffects
         public const string ToilName = "徒労";
         /// <summary>〈徒労〉を受けた時に持つ数 (= 報われない通常の戦闘の数)。</summary>
         public const int ToilCharges = 3;
-        /// <summary>〈徒労〉の画面の説明 (作者の確定文・2026-11-13)。</summary>
+        /// <summary>〈徒労〉の画面の説明 (旧い形 <see cref="ToilMode.Stacks"/>・作者の確定文・2026-11-13)。</summary>
         public const string ToilDescription = "この後の通常の戦闘三回は、勝っても何も得られない。";
+        /// <summary>〈徒労〉の画面の説明 (既定の形 <see cref="ToilMode.UntilKing"/>・2026-11-14)。</summary>
+        public const string ToilUntilKingDescription = "灰燼の王を倒すまで、通常の戦闘は勝っても何も得られない。";
+        /// <summary>灰燼の王の深さ (深さ 6 = 画面の第 4 層)。 既定の形の〈徒労〉は、 これより深い層に入った時にも消す (王を倒さずに深さ 6 を出る道は無いはずだが念のため)。</summary>
+        public const int AshKingDepth = 6;
 
         /// <summary>〈徒労〉の別の形 (<see cref="ToilMode.LayerLong"/>) の画面の説明 (仮の文・2026-11-14)。</summary>
         public const string ToilLayerDescription = "この層の間、通常の戦闘は品を落とさず、宝箱は空のことがある。";
@@ -86,8 +95,14 @@ namespace EventSystem.TimedEffects
         public static bool GrantsProvision(BattleBoon b, ToilMode mode)
             => b == BattleBoon.Toil && mode == ToilMode.LayerLong ? true : GrantsProvision(b);
 
-        /// <summary>通常の戦闘に勝った時に〈徒労〉を 1 つ減らすか (今の形だけ・別の形は層にいる間ずっと続く)。</summary>
+        /// <summary>通常の戦闘に勝った時に〈徒労〉を 1 つ減らすか (旧い形 Stacks だけ・LayerLong は層にいる間ずっと・UntilKing は王を倒すまで続く)。</summary>
         public static bool ToilCountsDown(ToilMode mode) => mode == ToilMode.Stacks;
+
+        /// <summary>灰燼の王を倒した時に〈徒労〉を消すか (既定の形 UntilKing だけ)。</summary>
+        public static bool ToilClearsOnKingBeaten(ToilMode mode) => mode == ToilMode.UntilKing;
+
+        /// <summary>深さ <paramref name="depthEntered"/> の層に入った時に〈徒労〉を消すか (既定の形 UntilKing で、 灰燼の王の層より深い = 深さ 7 以降)。</summary>
+        public static bool ToilClearsOnEnteringDepth(ToilMode mode, int depthEntered) => mode == ToilMode.UntilKing && depthEntered > AshKingDepth;
 
         /// <summary>層を出た時に〈徒労〉を消すか (別の形だけ)。</summary>
         public static bool ToilClearsOnLeavingLayer(ToilMode mode) => mode == ToilMode.LayerLong;
@@ -96,11 +111,12 @@ namespace EventSystem.TimedEffects
         public static bool ChestEmpty(ToilMode mode, bool hasToil, double roll01, int emptyPct)
             => mode == ToilMode.LayerLong && hasToil && roll01 * 100.0 < emptyPct;
 
-        /// <summary>画面に出す説明 (形を見る版)。 別の形の〈徒労〉は層の間の説明に切り替える。</summary>
+        /// <summary>画面に出す説明 (形を見る版)。 〈徒労〉は形ごとの文 (UntilKing = 王を倒すまで・LayerLong = 層の間・Stacks = 三回)。</summary>
         public static string DescriptionOf(string id, ToilMode mode)
-            => id == ToilName && mode == ToilMode.LayerLong ? ToilLayerDescription : DescriptionOf(id);
+            => id == ToilName && mode == ToilMode.LayerLong ? ToilLayerDescription
+             : id == ToilName && mode == ToilMode.UntilKing ? ToilUntilKingDescription : DescriptionOf(id);
 
-        /// <summary>画面に残りの数を出すか (別の形の〈徒労〉は減らないので出さない)。</summary>
-        public static bool ShowsCharges(string id, ToilMode mode) => !(id == ToilName && mode == ToilMode.LayerLong);
+        /// <summary>画面に残りの数を出すか (減らない形の〈徒労〉 = LayerLong・UntilKing は出さない)。</summary>
+        public static bool ShowsCharges(string id, ToilMode mode) => !(id == ToilName && mode != ToilMode.Stacks);
     }
 }

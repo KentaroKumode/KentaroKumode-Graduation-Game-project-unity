@@ -805,8 +805,8 @@ namespace UI.Game2D
             d.body = _lastCoinsGained > 0 ? _lastCoinsGained + "G を手に入れた。" : "戦利品を手に入れた。";
             // 時限デバフ〈徒労〉/ 時限バフ〈開眼〉が掛かった戦闘 (2026-11-13): 何も得られなかったのが〈徒労〉のせいだと分かる 1 行 / 2 倍になった 1 行
             string boon = gm.BattleBoonLine;
-            //   〈徒労〉の別の形 (LayerLong・2026-11-14) はゴールドが出るので、 〈開眼〉と同じく後ろに足す
-            bool toilNothing = gm.LastBattleBoon == EventSystem.TimedEffects.BattleBoon.Toil && GameHooks.ToilMode == EventSystem.TimedEffects.ToilMode.Stacks;
+            //   〈徒労〉の別の形 (LayerLong・2026-11-14) はゴールドが出るので、 〈開眼〉と同じく後ろに足す。 既定の形 (UntilKing) と旧い形 (Stacks) は何も得られないので置き換える
+            bool toilNothing = gm.LastBattleBoon == EventSystem.TimedEffects.BattleBoon.Toil && GameHooks.ToilMode != EventSystem.TimedEffects.ToilMode.LayerLong;
             if (boon != null) d.body = toilNothing ? boon + "。" : d.body + "\n" + boon + "。";
             AddInstabilityLine(gm, d, 0);      // 不安定化 (2026-11-13): この戦闘で溜まった分 (エスカレーション・勝ち・報酬の秘宝)
             d.buttons.Add(B("次へ", "ok", true));

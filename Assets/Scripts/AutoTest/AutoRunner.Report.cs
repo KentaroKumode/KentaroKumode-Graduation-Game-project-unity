@@ -1977,7 +1977,7 @@ namespace AutoTest
             return $"灰に埋もれた基地 (深さ 6 = 画面の第 4 層): 深さ 6 へ届いた {reached} ラン / 起きた {fired} (うち再訪の版 {revisit}・終点の安全弁 {valve}・起きた手番の中央値 {med}) / 起きなかった {missed} / 手記の最後の頁を開いた {opened}"
                  + $" (ashKingBeatenEver={ashKingBeatenEver}・suppressEvents={suppressEvents}・安全弁のプロセス通算 {GameLoop.GameManager.AshBaseValveCount})"
                  + System.Environment.NewLine
-                 + $"〈徒労〉({toilMode}・宝箱が空 {toilChestEmptyPct}%): 掛かったラン {toilRuns} / 掛かった通常の戦闘の勝ち {toilFights} (今の形 = 何も得られなかった・別の形 = 品が出なかった)"
+                 + $"〈徒労〉({toilMode}・宝箱が空 {toilChestEmptyPct}%): 掛かったラン {toilRuns} / 掛かった通常の戦闘の勝ち {toilFights} (UntilKing・Stacks = 何も得られなかった・LayerLong = 品が出なかった)"
                  + $" / 止めた品のドロップ {toilDrops} / 開けた宝箱 {chests} (全ラン・うち〈徒労〉で空 {emptyChests})";
         }
     }

@@ -47,6 +47,11 @@ namespace GameLoop
                 ReturnToTitle();
                 return;
             }
+            // 〈徒労〉の既定の形 (UntilKing・2026-11-14): 灰燼の王を倒した時に消える (GameManager.Rewards)。 王を倒さずに深さ 6 を出る道は無いはずだが、
+            //   念のため深さ 7 以降に入った時にも消す。 旧い形 (Stacks)・別の形 (LayerLong) では何もしない
+            if (EventSystem.TimedEffects.BattleBoonRule.ToilClearsOnEnteringDepth(GameHooks.ToilMode, Run.Depth)
+                && Run.timedDebuffs != null && Run.timedDebuffs.Remove(EventSystem.TimedEffects.BattleBoonRule.ToilName))
+                Log($"〈{EventSystem.TimedEffects.BattleBoonRule.ToilName}〉が晴れた (深さ {Run.Depth} に入った)");
             EnterFloor();
         }
 

@@ -507,7 +507,7 @@ namespace AutoTest.ParallelSweep
                 "handCarry", "handKeepPolicy", "EffectiveHandKeepPolicy", "bossDown", "depth3Heavy",
                 // 2026-11-13: 博士の時計をランの最初から預かる腕 (False = 既定・イベントで選んだ時だけ)
                 "vescaClockHeld",
-                // 2026-11-14: 〈徒労〉の形 (Stacks = 今の形・既定 / LayerLong = 層の間ずっと) と、 別の形で宝箱が空になる確率 (%)
+                // 2026-11-14: 〈徒労〉の形 (UntilKing = 灰燼の王を倒すまで・既定 / Stacks = 旧い 3 つ持ち / LayerLong = 層の間ずっと) と、 別の形で宝箱が空になる確率 (%)
                 "toilMode", "toilChestEmptyPct",
                 // 2026-11-13: 配線の旧の式が、 攻撃の端子に挿さない手にも武器の素火力を数える旧い挙動へ戻す腕 (False = 直した挙動)
                 "v3.oldNoAttackBaseDmg",

@@ -349,7 +349,7 @@ static class Program
             string got = string.Join(" ", log);
             string want = "E:10G/2素/1落/1物/残3 B:10G/1素/1落/1物/残3 P:10G/1素/1落/1物/残3 F:0G/0素/0落/0物/残3 L:0G/0素/0落/0物/残3 "
                         + "N:0G/0素/0落/0物/残2 N:0G/0素/0落/0物/残1 E:10G/2素/1落/1物/残1 N:0G/0素/0落/0物/残0 N:10G/1素/1落/1物/残0";
-            Check(got == want, "徒労: 通常の戦闘の勝ちだけで 1 つ減り、 その戦闘は何も得られない (ゴールド・素材・ドロップ・物資 0)・エリート/ボス/追跡者/逃げた/負けたは減らない・3 勝で晴れる"
+            Check(got == want, "徒労 (旧い形 Stacks・形を見ない版): 通常の戦闘の勝ちだけで 1 つ減り、 その戦闘は何も得られない (ゴールド・素材・ドロップ・物資 0)・エリート/ボス/追跡者/逃げた/負けたは減らない・3 勝で晴れる"
                                + (got == want ? "" : $"\n    実際 {got}\n    期待 {want}"));
         }
         // 〈開眼〉: 通常の戦闘でゴールド・素材 2 倍・ドロップは 2 回引く・物資は増やさない / 3 勝で消える / 〈徒労〉と両方なら〈徒労〉が勝つ
@@ -380,9 +380,78 @@ static class Program
               && rw.Contains("BattleBoonRule.Scale(LastBattleBoon, amount, GameHooks.ToilMode)"),
               "徒労・開眼: 報酬の各所 (ゴールド・物資・ドロップ・強化素材・強奪) が判定の結果を読む (量と物資は〈徒労〉の形も見る)");
         ToilLayerLong(root);
+        ToilUntilKing(root);
     }
 
-    /// <summary>〈徒労〉の別の形 (toilMode=LayerLong・2026-11-14・測定用): 規則 (BattleBoonRule は本物をコンパイル) と、 既定の形 (Stacks) が今の規則と変わらないこと。</summary>
+    /// <summary>〈徒労〉の既定の形 (toilMode=UntilKing・2026-11-14・作者の決定「徒労は王を倒すまで永続化」): 勝っても減らず、 通常の戦闘は何も得られない (中身は旧い形 Stacks と同じ)・
+    /// エリート/ボス/追跡者/逃げた/負けたは対象外・宝箱は空にしない・残りの数は出さない・灰燼の王を倒すと消える (念のため深さ 7 に入っても消える)。</summary>
+    static void ToilUntilKing(string root)
+    {
+        const string T = EventSystem.TimedEffects.BattleBoonRule.ToilName, R = EventSystem.TimedEffects.BattleBoonRule.InsightName;
+        var U = EventSystem.TimedEffects.ToilMode.UntilKing;
+        // 戦闘の列: N = 通常 / E = エリート / B = ボス (王でない) / P = 追跡者 / F = 逃げた通常 / L = 負けた通常 / X = 層を出る (深さ 5→6) / K = 灰燼の王を倒す / D = 深さ 7 に入る
+        string Run(string seq)
+        {
+            var deb = new Dictionary<string, int> { [T] = EventSystem.TimedEffects.BattleBoonRule.ToilCharges };
+            int Left(string id) => deb.TryGetValue(id, out int n) ? n : 0;
+            var log = new List<string>();
+            foreach (char k in seq)
+            {
+                if (k == 'X') { if (EventSystem.TimedEffects.BattleBoonRule.ToilClearsOnLeavingLayer(U) || EventSystem.TimedEffects.BattleBoonRule.ToilClearsOnEnteringDepth(U, 6)) deb.Remove(T); log.Add($"X:残{Left(T)}"); continue; }
+                if (k == 'K') { if (EventSystem.TimedEffects.BattleBoonRule.ToilClearsOnKingBeaten(U)) deb.Remove(T); log.Add($"K:残{Left(T)}"); continue; }
+                if (k == 'D') { if (EventSystem.TimedEffects.BattleBoonRule.ToilClearsOnEnteringDepth(U, 7)) deb.Remove(T); log.Add($"D:残{Left(T)}"); continue; }
+                bool normal = k == 'N' || k == 'F' || k == 'L', won = k != 'L', fled = k == 'F';
+                var b = EventSystem.TimedEffects.BattleBoonRule.Decide(won, fled, normal, Left(T), 0);
+                if (b == EventSystem.TimedEffects.BattleBoon.Toil && EventSystem.TimedEffects.BattleBoonRule.ToilCountsDown(U)) { deb[T]--; if (deb[T] <= 0) deb.Remove(T); }
+                if (!won || fled) { log.Add($"{k}:0G/0素/0落/0物/残{Left(T)}"); continue; }
+                int drops = EventSystem.TimedEffects.BattleBoonRule.DropRolls(b);
+                if (!EventSystem.TimedEffects.BattleBoonRule.GrantsDrops(b)) drops = 0;
+                log.Add($"{k}:{EventSystem.TimedEffects.BattleBoonRule.Scale(b, 10, U)}G/{EventSystem.TimedEffects.BattleBoonRule.Scale(b, k == 'E' ? 2 : 1, U)}素/{drops}落/"
+                        + $"{(EventSystem.TimedEffects.BattleBoonRule.GrantsProvision(b, U) ? 1 : 0)}物/残{Left(T)}");
+            }
+            return string.Join(" ", log);
+        }
+        {
+            string got = Run("EBPFLNNNNNXNKN");
+            string want = "E:10G/2素/1落/1物/残3 B:10G/1素/1落/1物/残3 P:10G/1素/1落/1物/残3 F:0G/0素/0落/0物/残3 L:0G/0素/0落/0物/残3 "
+                        + "N:0G/0素/0落/0物/残3 N:0G/0素/0落/0物/残3 N:0G/0素/0落/0物/残3 N:0G/0素/0落/0物/残3 N:0G/0素/0落/0物/残3 X:残3 N:0G/0素/0落/0物/残3 K:残0 N:10G/1素/1落/1物/残0";
+            Check(got == want, "徒労 (既定の形 UntilKing): 通常の戦闘は何も得られない・エリート/ボス/追跡者は対象外・何勝しても減らない・層を出ても残る・灰燼の王を倒すと消える"
+                               + (got == want ? "" : $"\n    実際 {got}\n    期待 {want}"));
+            string got2 = Run("NNDN");
+            Check(got2 == "N:0G/0素/0落/0物/残3 N:0G/0素/0落/0物/残3 D:残0 N:10G/1素/1落/1物/残0", "徒労 (既定の形): 念のため深さ 7 に入った時にも消える (" + got2 + ")");
+        }
+        {
+            bool chest = true;
+            for (int i = 0; i < 100; i++) chest &= !EventSystem.TimedEffects.BattleBoonRule.ChestEmpty(U, true, i / 100.0, 100);
+            Check(chest, "徒労 (既定の形): 宝箱は空にしない");
+            Check(EventSystem.TimedEffects.BattleBoonRule.DescriptionOf(T, U) == EventSystem.TimedEffects.BattleBoonRule.ToilUntilKingDescription
+                  && EventSystem.TimedEffects.BattleBoonRule.ToilUntilKingDescription == "灰燼の王を倒すまで、通常の戦闘は勝っても何も得られない。"
+                  && EventSystem.TimedEffects.BattleBoonRule.DescriptionOf(R, U) == EventSystem.TimedEffects.BattleBoonRule.InsightDescription
+                  && !EventSystem.TimedEffects.BattleBoonRule.ShowsCharges(T, U) && EventSystem.TimedEffects.BattleBoonRule.ShowsCharges(R, U),
+                  "徒労 (既定の形): 説明は「灰燼の王を倒すまで…」・残りの数は出さない (〈開眼〉は変わらない)");
+            Check(!EventSystem.TimedEffects.BattleBoonRule.ToilClearsOnKingBeaten(EventSystem.TimedEffects.ToilMode.Stacks)
+                  && !EventSystem.TimedEffects.BattleBoonRule.ToilClearsOnKingBeaten(EventSystem.TimedEffects.ToilMode.LayerLong)
+                  && !EventSystem.TimedEffects.BattleBoonRule.ToilClearsOnEnteringDepth(EventSystem.TimedEffects.ToilMode.Stacks, 7)
+                  && !EventSystem.TimedEffects.BattleBoonRule.ToilClearsOnEnteringDepth(EventSystem.TimedEffects.ToilMode.LayerLong, 7)
+                  && !EventSystem.TimedEffects.BattleBoonRule.ToilClearsOnEnteringDepth(U, 6),
+                  "徒労: 王を倒して消える・深さ 7 で消えるのは既定の形だけ (Stacks・LayerLong は今までどおり)");
+        }
+        // 本体の口 (原文): 既定は UntilKing (本体の口・BOT の口・ラン終了の戻し)・王を倒した所で消す・深さ 7 に入った所で消す・報酬の画面の 1 行は残りを出さない
+        string Src(string p) => File.ReadAllText(Path.Combine(root, p));
+        string hooks = Src("Assets/Scripts/GameLoop/GameHooks.cs"), ar = Src("Assets/Scripts/AutoTest/AutoRunner.cs"), tr = Src("Assets/Scripts/AutoTest/AutoRunner.Tracking.cs");
+        string rw = Src("Assets/Scripts/GameLoop/GameManager.Rewards.cs"), fl = Src("Assets/Scripts/GameLoop/GameManager.Floor.cs"), ui = Src("Assets/Scripts/UI/Game2D/Screens/Game2DPhaseScreens.cs");
+        Check(hooks.Contains("ToilMode ToilMode = EventSystem.TimedEffects.ToilMode.UntilKing;") && ar.Contains("toilMode = EventSystem.TimedEffects.ToilMode.UntilKing;")
+              && tr.Contains("GameHooks.ToilMode = EventSystem.TimedEffects.ToilMode.UntilKing;"),
+              "徒労: 既定の形は UntilKing (本体の口・BOT の口・ラン終了の戻し)");
+        int king = rw.IndexOf("AshBaseEvent.NoteAshKingBeaten();"), clear = rw.IndexOf("BattleBoonRule.ToilClearsOnKingBeaten(GameHooks.ToilMode)");
+        Check(king > 0 && clear > king && clear - king < 600, "徒労 (既定の形): 灰燼の王を倒した記録を立てる所 (NoteAshKingBeaten) の直後で消す");
+        int adv = fl.IndexOf("if (!Run.AdvanceFloor())"), depth = fl.IndexOf("BattleBoonRule.ToilClearsOnEnteringDepth(GameHooks.ToilMode, Run.Depth)");
+        Check(adv > 0 && depth > adv, "徒労 (既定の形): 層を進めた後 (新しい深さ) で、 深さ 7 以降なら消す");
+        Check(rw.Contains("GameHooks.ToilMode == EventSystem.TimedEffects.ToilMode.UntilKing") && ui.Contains("GameHooks.ToilMode != EventSystem.TimedEffects.ToilMode.LayerLong"),
+              "徒労 (既定の形): 報酬の画面の 1 行は「何も得られなかった」(残りを出さない)・ゴールドの行を置き換える");
+    }
+
+    /// <summary>〈徒労〉の別の形 (toilMode=LayerLong・2026-11-14・測定用): 規則 (BattleBoonRule は本物をコンパイル) と、 旧い形 (Stacks) が形を見ない版の規則と変わらないこと。</summary>
     static void ToilLayerLong(string root)
     {
         const string T = EventSystem.TimedEffects.BattleBoonRule.ToilName, R = EventSystem.TimedEffects.BattleBoonRule.InsightName;
@@ -399,8 +468,8 @@ static class Program
                       && EventSystem.TimedEffects.BattleBoonRule.ShowsCharges(id, S);
             same &= EventSystem.TimedEffects.BattleBoonRule.ToilCountsDown(S) && !EventSystem.TimedEffects.BattleBoonRule.ToilClearsOnLeavingLayer(S);
             for (int i = 0; i < 100; i++) same &= !EventSystem.TimedEffects.BattleBoonRule.ChestEmpty(S, true, i / 100.0, 100);
-            Check(same, "徒労 (既定の形 Stacks): 量・物資・説明・残りの表示・減り方・層を出ても残る・宝箱は空にならない ── 形を見ない版 (今の規則) と全部同じ");
-            Check(default(EventSystem.TimedEffects.ToilMode) == S, "徒労: 形の既定値 (enum の 0) は Stacks");
+            Check(same, "徒労 (旧い形 Stacks): 量・物資・説明・残りの表示・減り方・層を出ても残る・宝箱は空にならない ── 形を見ない版 (今の規則) と全部同じ");
+            Check(default(EventSystem.TimedEffects.ToilMode) == S, "徒労: enum の 0 は Stacks (値の並びは変えない・既定の形は口の初期値 UntilKing)");
         }
         // 別の形 (LayerLong) の戦闘の列: 種類 (N = 通常 / E = エリート / B = ボス / P = 追跡者 / F = 逃げた通常 / L = 負けた通常 / X = 層を出る)
         {
@@ -431,7 +500,7 @@ static class Program
             { int n = 0; for (int i = 0; i < 1000; i++) if (EventSystem.TimedEffects.BattleBoonRule.ChestEmpty(m, has, i / 1000.0, pct)) n++; return n; }
             Check(Empties(L, true, 50) == 500 && Empties(L, true, 0) == 0 && Empties(L, true, 100) == 1000 && Empties(L, true, 25) == 250
                   && Empties(L, false, 100) == 0 && Empties(S, true, 100) == 0 && EventSystem.TimedEffects.BattleBoonRule.DefaultChestEmptyPct == 50,
-                  "徒労 (別の形): 宝箱は toilChestEmptyPct % で空 (既定 50)・〈徒労〉が無ければ空にならない・今の形では空にならない");
+                  "徒労 (別の形): 宝箱は toilChestEmptyPct % で空 (既定 50)・〈徒労〉が無ければ空にならない・旧い形では空にならない");
             Check(EventSystem.TimedEffects.BattleBoonRule.DescriptionOf(T, L) == EventSystem.TimedEffects.BattleBoonRule.ToilLayerDescription
                   && EventSystem.TimedEffects.BattleBoonRule.DescriptionOf(R, L) == EventSystem.TimedEffects.BattleBoonRule.InsightDescription
                   && !EventSystem.TimedEffects.BattleBoonRule.ShowsCharges(T, L) && EventSystem.TimedEffects.BattleBoonRule.ShowsCharges(R, L),
@@ -449,7 +518,7 @@ static class Program
         }
         int guard = rw.IndexOf("if (mode != EventSystem.TimedEffects.ToilMode.LayerLong || !hasToil) return false;"), draw = rw.IndexOf("GameRng.Value(" + Key + ")");
         Check(keyUses == 1 && guard > 0 && draw > guard,
-              "徒労 (別の形): 宝箱の空の抽選は専用キー toil.chestEmpty の 1 か所・今の形と〈徒労〉なしでは引かない (= main と同じ乱数の列)");
+              "徒労 (別の形): 宝箱の空の抽選は専用キー toil.chestEmpty の 1 か所・LayerLong 以外の形と〈徒労〉なしでは引かない");
         Check(rw.Contains("ToilEmptiesChest() ? ") && fm.Contains("if (ToilEmptiesChest())"),
               "徒労 (別の形): 宝の点 (OpenTreasure) と縄張りの宝 (TakeTerritoryTreasure) の両方で空になり得る");
         Check(fl.Contains("BattleBoonRule.ToilClearsOnLeavingLayer(GameHooks.ToilMode)") && rw.Contains("BattleBoonRule.ToilCountsDown(GameHooks.ToilMode)"),

@@ -185,11 +185,12 @@ namespace AutoTest
         /// true (既定) = 倒したことがある: 深さ 6 の〈灰に埋もれた基地〉は再訪の版で、 BOT は必ず手記の最後の頁を開く (〈真理〉+〈開眼〉→ 深さ 7 へ)。
         /// 目標のクリア率はこの条件で測る。 false = はじめて: 基地は〈徒労〉の 1 択・灰燼の王を倒すと第 4 層のクリアの結末で終わる。</summary>
         public bool ashKingBeatenEver = true;
-        /// <summary>[測定 2026-11-14] 〈徒労〉の形。 本体の GameHooks.ToilMode へ流す (ラン終了で Stacks へ)。 Stacks (既定) = 今の形 (3 つ持ち・通常の戦闘の勝ちで 1 つ減り・その戦闘は何も得られない)。
+        /// <summary>[測定 2026-11-14] 〈徒労〉の形。 本体の GameHooks.ToilMode へ流す (ラン終了で UntilKing へ)。 UntilKing (既定・2026-11-14 の作者の決定) = 勝っても減らず、
+        /// 灰燼の王を倒すまで通常の戦闘は何も得られない (宝箱はそのまま)。 Stacks = 旧い形 (3 つ持ち・通常の戦闘の勝ちで 1 つ減り・その戦闘は何も得られない)。
         /// LayerLong = 深さ 6 にいる間ずっと・通常の戦闘は品を落とさない (ゴールド・強化素材・物資は出る)・宝箱は <see cref="toilChestEmptyPct"/> % で空・層を出たら消える。
         /// 〈徒労〉を受けるのは「はじめて」の版だけなので、 ashKingBeatenEver = False の腕で振る。 BOT はどちらの形でも〈徒労〉を値付けに入れない。</summary>
-        public EventSystem.TimedEffects.ToilMode toilMode = EventSystem.TimedEffects.ToilMode.Stacks;
-        /// <summary>[測定 2026-11-14] 〈徒労〉の別の形 (LayerLong) で宝箱が空になる確率 (%・既定 50)。 本体の GameHooks.ToilChestEmptyPct へ流す。 Stacks では効かない。</summary>
+        public EventSystem.TimedEffects.ToilMode toilMode = EventSystem.TimedEffects.ToilMode.UntilKing;
+        /// <summary>[測定 2026-11-14] 〈徒労〉の別の形 (LayerLong) で宝箱が空になる確率 (%・既定 50)。 本体の GameHooks.ToilChestEmptyPct へ流す。 Stacks・UntilKing では効かない。</summary>
         public int toilChestEmptyPct = EventSystem.TimedEffects.BattleBoonRule.DefaultChestEmptyPct;
         /// <summary>[測定 2026-11-13] 天候の作り。 本体の GameHooks.StormEnabled へ流す (ラン終了で true へ)。
         /// true (既定) = 嵐 (静かな時間のあとに輪が縮む・嵐の中の点への移動で HP・嵐の中の戦闘は敵に〈嵐〉・始点は最外周から・ボスの点は伏せる・GAME.md §5-12)。
@@ -788,7 +789,7 @@ namespace AutoTest
                  + $"/ 追跡者 縄張りの外へ{(pursuerLeavesTerritory ? "出る (旧い作り)" : "出ない")} "
                  + $"/ 縄張りを避ける道の保証 {(pursuerLeavesTerritory ? "効かない (旧い作り)" : territoryKeepBypass ? "あり (縄張りを削る)" : "なし (削らない・旧い作り)")} (territoryKeepBypass={territoryKeepBypass}) "
                  + $"/ 灰燼の王を倒した記録 {(ashKingBeatenEver ? "あり (深さ 6 の基地は再訪の版・手記を開いて深さ 7 へ)" : "なし (基地は〈徒労〉の 1 択・第 4 層のクリアで終わる)")} (ashKingBeatenEver={ashKingBeatenEver}) "
-                 + $"/ 〈徒労〉の形 {(toilMode == EventSystem.TimedEffects.ToilMode.LayerLong ? "層の間ずっと (通常の戦闘は品を落とさない・宝箱は " + toilChestEmptyPct + "% で空)" : "3 つ持ち (今の形・勝つたび 1 つ減り何も得られない)")} (toilMode={toilMode}・toilChestEmptyPct={toilChestEmptyPct}) "
+                 + $"/ 〈徒労〉の形 {(toilMode == EventSystem.TimedEffects.ToilMode.LayerLong ? "層の間ずっと (通常の戦闘は品を落とさない・宝箱は " + toilChestEmptyPct + "% で空)" : toilMode == EventSystem.TimedEffects.ToilMode.Stacks ? "3 つ持ち (旧い形・勝つたび 1 つ減り何も得られない)" : "灰燼の王を倒すまで (既定・通常の戦闘は何も得られない)")} (toilMode={toilMode}・toilChestEmptyPct={toilChestEmptyPct}) "
                  + $"/ 天候 {(stormEnabled ? "嵐 (輪が縮む・始点は外周・ボスは伏せる)" : "前線 (旧い作り)")} (stormEnabled={stormEnabled}) "
                  + $"/ 嵐の時計 {(!stormEnabled ? "効かない (前線)" : stormClock == MapSystem.FreeMove.StormClock.Turns ? "手番 (storm-boss の作り)" : "不安定化 (取るほど進む)")} (stormClock={stormClock}) "
                  + $"/ 端子の撃破のボーナス {(terminalKillNeedsAttack ? "攻撃したターンだけ (旧い条件)" : "経路を問わない")} "
