@@ -393,13 +393,15 @@ namespace CombatSystem
         /// (与ダメ補正の整備パネル分と戦闘中バフの会心率は、 まだ本判定に取り込まれていない前提で足している)。
         /// <c>OnCriticalCheck</c> で発動する条件付きの会心率 (3 種) は本判定まで分からないので含まない。
         /// <para>consOutgoingPct (2026-11-12) = そのうち消耗品 (〈油・膏薬〉と、 立てている〈瞬間研磨剤〉) が足す与ダメ%。
-        /// どちらも本判定 (<c>ApplyWinDamageModifiers</c>) で同じ加算プールへ入るので、 outgoingPct にも含める。 戦闘中に使った品を画面に出すため。</para></summary>
-        public struct HudStats { public float critRate, critMul; public int attack, outgoingPct, defense, pen, consOutgoingPct; }
+        /// どちらも本判定 (<c>ApplyWinDamageModifiers</c>) で同じ加算プールへ入るので、 outgoingPct にも含める。 戦闘中に使った品を画面に出すため。</para>
+        /// <para>toilCutPct (2026-11-14) = 〈徒労〉の戦闘のデバフ (与えるダメージ −N%・<see cref="MetaProgression.MetaDebuffApplicator.GetToilDamageCutPct"/>)。
+        /// 与ダメ% の加算プールとは別の掛け算 (すべての倍率の後) なので outgoingPct には含めない。 0 = 持っていない / 口が 0。</para></summary>
+        public struct HudStats { public float critRate, critMul; public int attack, outgoingPct, defense, pen, consOutgoingPct, toilCutPct; }
 
         public HudStats PreviewHudStats()
         {
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
-            var s = new HudStats { attack = playerAttackPower };
+            var s = new HudStats { attack = playerAttackPower, toilCutPct = MetaProgression.MetaDebuffApplicator.GetToilDamageCutPct() };
             if (ctx == null) return s;
             s.critRate = CritRateOf(ctx, pendingBuff: true);
             s.critMul = ctx.criticalMultiplier;

@@ -182,7 +182,7 @@ namespace UI.Game2D
             if (sim.boardSerial != _dealSerial) { _dealSerial = sim.boardSerial; _dealT0 = Time.unscaledTime; }
             bool dealing = Time.unscaledTime - _dealT0 < DealTime(sim.board.Count);
             int ehp = fx != null ? fx.EnemyHp : 0, ver = sim.version * 31 + ehp * 7 + sim.charge
-                + (_hsKnown ? Mathf.RoundToInt(_hs.critRate * 1000f) * 131 + _hs.attack * 17 + _hs.outgoingPct * 7 + _hs.defense * 3 + _hs.pen + _hs.consOutgoingPct * 7919 : 0)
+                + (_hsKnown ? Mathf.RoundToInt(_hs.critRate * 1000f) * 131 + _hs.attack * 17 + _hs.outgoingPct * 7 + _hs.defense * 3 + _hs.pen + _hs.consOutgoingPct * 7919 + _hs.toilCutPct * 104729 : 0)
                 + 977 + DeckCountsHash() + sim.DiceCount * 7577 + (dealing ? Time.frameCount * 7919 : 0);
             if (ver != _drawn) { _drawn = ver; Redraw(); }
         }
@@ -298,9 +298,11 @@ namespace UI.Game2D
             string crit = k ? "会心 " + Mathf.RoundToInt(_hs.critRate * 100f) + "% " + _hs.critMul.ToString("0.0") + "倍" : "会心 --";
             string atk = k ? "攻撃 " + _hs.attack : "攻撃 --";      // 与ダメの倍率は着弾の数字の横に出す (Game2DBattleFx・2026-11-11)
             // 消耗品 (〈油・膏薬〉・立てた〈瞬間研磨剤〉) で足した与ダメ% だけは、 使った時にすぐ見えるよう攻撃の横に出す (issue #11)
-            if (k && _hs.consOutgoingPct > 0)
+            // 〈徒労〉の戦闘のデバフ (2026-11-14): 持っている間は攻撃の横に「徒労−N%」(与えるダメージ −N%・隠し倍率にしない)。 口が 0 なら出さない
+            if (k && (_hs.consOutgoingPct > 0 || _hs.toilCutPct > 0))
             {
-                string add = " 与ダメ+" + _hs.consOutgoingPct + "%";
+                string add = (_hs.consOutgoingPct > 0 ? " 与ダメ+" + _hs.consOutgoingPct + "%" : "")
+                           + (_hs.toilCutPct > 0 ? " " + EventSystem.TimedEffects.BattleBoonRule.ToilName + "−" + _hs.toilCutPct + "%" : "");
                 atk = Game2DJpFont.Width(atk + add) <= Stat.width - 14 ? atk + add : "攻撃" + _hs.attack + add;
                 atk = Game2DJpFont.Clip(atk, Stat.width - 14);
             }
