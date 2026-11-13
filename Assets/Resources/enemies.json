@@ -1417,7 +1417,7 @@
         {
           "internalName": "AshRegrowth",
           "skillName": "灰の再生",
-          "description": "HP>50%のとき毎ターン最大HPの{RegrowthRate%}%回復（Phase1: 灰をまといながら耐える）。業火のターンは回復なし。",
+          "description": "HP>50%のとき毎ターン最大HPの{RegrowthRate%}%回復（Phase1: 灰をまといながら耐える）。業火のターンと、その1ターン前のチャージのターンは回復なし。",
           "flavorText": "削った分が灰になり、灰がまた形を取る。順番が変わっただけだった。"
         },
         {
