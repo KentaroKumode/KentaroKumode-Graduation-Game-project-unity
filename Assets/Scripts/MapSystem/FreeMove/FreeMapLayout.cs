@@ -78,6 +78,8 @@ namespace MapSystem.FreeMove
         public Vec2 stormOffset;
         /// <summary>[検算・計装] 始点の候補が 1 つも無く、 生成の始点のままにした (<see cref="Storm.Apply"/>)。 中断セーブには写さない。</summary>
         public bool stormStartFallback;
+        /// <summary>[検算・計装] ボスの点の候補 (内側の点) の数と、 選んだ時の始点からの歩数の下限 (-1 = 内側の点が無く生成の終点のまま)。 中断セーブには写さない。</summary>
+        public int stormBossInner, stormBossHopsUsed = -1;
 
         /// <summary>点 i の危険の帯 (2026-11-04・<see cref="FreeMapParams.BandOf"/>)。 嵐の層では始点を選び直すので、 横の位置ではなく
         /// 始点と終点への直線距離の比 (始点からの距離 ÷ (始点から + 終点から)) を 1/3 と 2/3 で切る。 嵐でない層は今までどおり横の位置。</summary>

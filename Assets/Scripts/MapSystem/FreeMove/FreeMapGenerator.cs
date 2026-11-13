@@ -52,24 +52,31 @@ namespace MapSystem.FreeMove
         /// (点・道・山岳・縄張りと、 キー "map.free" の引く回数は変えない・乱数は専用のキー)。 false (測定の口 GameHooks.StormEnabled = False) では今までと 1 点も変わらない。</para></summary>
         public static FreeMapLayout Generate(int floor, bool riftAtBoss = true, bool storm = false)
         {
-            var L = GenerateShape(floor, riftAtBoss);
-            if (storm) Storm.Apply(L);
+            bool stormShape = storm && Storm.HasStorm(floor);
+            // 嵐の層 (2026-11-13): 深さ 6 の「裂け目の記録」は、 ボスの点を選び直した後に新しい終点の隣で置く (PlaceRiftGate は乱数を引かないので、 後ろへずらしても他の点は変わらない)
+            var L = GenerateShape(floor, riftAtBoss, deferRift: stormShape);
+            if (stormShape)
+            {
+                Storm.Apply(L);
+                if (floor == RiftGate.Depth && riftAtBoss)
+                    PlaceRiftGate(L, Enumerable.Range(0, L.Count).Where(i => i != L.start && i != L.goal).ToList());
+            }
             return L;
         }
 
-        private static FreeMapLayout GenerateShape(int floor, bool riftAtBoss)
+        private static FreeMapLayout GenerateShape(int floor, bool riftAtBoss, bool deferRift = false)
         {
             if (floor == FloorPlan.LinearFloor) return GenerateLinear(floor);
             if (floor == FloorPlan.FarmFloor) return GenerateFarm(floor);
             var rnd = new Rnd(floor);
             for (int attempt = 0; attempt < FreeMapParams.GenerateAttempts; attempt++)
             {
-                var r = GenerateOnce(floor, rnd, withMountains: true, riftAtBoss);
+                var r = GenerateOnce(floor, rnd, withMountains: true, riftAtBoss, deferRift);
                 if (r != null) return r;
             }
             for (int attempt = 0; attempt < FreeMapParams.GenerateAttempts; attempt++)
             {
-                var r = GenerateOnce(floor, rnd, withMountains: false, riftAtBoss);
+                var r = GenerateOnce(floor, rnd, withMountains: false, riftAtBoss, deferRift);
                 if (r != null) return r;
             }
             throw new InvalidOperationException($"[FreeMapGenerator] {floor}層の生成に失敗した");
@@ -136,7 +143,7 @@ namespace MapSystem.FreeMove
             return L;
         }
 
-        private static FreeMapLayout GenerateOnce(int floor, Rnd rnd, bool withMountains, bool riftAtBoss)
+        private static FreeMapLayout GenerateOnce(int floor, Rnd rnd, bool withMountains, bool riftAtBoss, bool deferRift = false)
         {
             const double W = FreeMapParams.Width, H = FreeMapParams.Height;
             var L = new FreeMapLayout { floor = floor };
@@ -291,7 +298,9 @@ namespace MapSystem.FreeMove
             //   今の作り (2026-11-13): 終点に隣り合う点を全部イベントマスにする (PlaceRiftGate・店と休憩の 1 つずつの保証は守る)。
             //   旧い作り (riftAtBoss = false): 縄張りの外で、 層の 3 分の 1 あたりに一番近い点を固定の点にする (踏まずに終点へ行けた)。
             if (floor == 6 && riftAtBoss)
-                PlaceRiftGate(L, others);
+            {
+                if (!deferRift) PlaceRiftGate(L, others);   // 嵐の層は終点を選び直した後に置く (Generate)
+            }
             else if (floor == 6)
             {
                 var anchor = new Vec2(W * 0.35, H / 2);

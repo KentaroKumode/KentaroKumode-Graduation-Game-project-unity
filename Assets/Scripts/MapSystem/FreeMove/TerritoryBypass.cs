@@ -146,7 +146,7 @@ namespace MapSystem.FreeMove
                 foreach (int u in keep)
                     foreach (int v in L.adj[u])
                     {
-                        if (v <= 1 || v == L.start || keep.Contains(v) || path.Contains(v) || L.Dist(v, L.start) < FreeMapParams.TerritoryStartClearance) continue;
+                        if (v <= 1 || v == L.start || v == L.goal || keep.Contains(v) || path.Contains(v) || L.Dist(v, L.start) < FreeMapParams.TerritoryStartClearance) continue;
                         double d = L.Dist(v, home);
                         if (d < pd || (d == pd && v < pick)) { pd = d; pick = v; }
                     }

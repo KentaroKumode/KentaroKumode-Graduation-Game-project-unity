@@ -211,12 +211,13 @@ static partial class T
             Check(bad == 0 && drawBad == 0, $"嵐の口 False: 航行の中身は main と同じ動き ({runs} 層 × 160 手・違い {bad}{(first != null ? " 最初 " + first : "")}・引く回数の違い {drawBad}/800)");
         }
 
-        // ── 3. 口を開けた形: 始点・距離・方角・保証 ──
+        // ── 3. 口を開けた形: 始点 (外周)・ボス (内側)・距離・方角・保証 ──
         {
-            int layers = 0, startBad = 0, shapeBad = 0, fallback = 0, shopRestBad = 0, terrBad = 0, bypassBad = 0, foeRemoved = 0, riftBad = 0, nearSupply = 0, nearSupplyOld = 0;
+            int layers = 0, startBad = 0, bossBad = 0, shapeBad = 0, fallback = 0, bossKept = 0, shopRestBad = 0, terrBad = 0, bypassBad = 0, foeRemoved = 0, riftBad = 0, riftSkip = 0, nearSupply = 0, nearSupplyOld = 0;
             var hopsStorm = new Dictionary<int, List<int>>(); var hopsOld = new Dictionary<int, List<int>>();
             var bearStorm = new int[8]; var bearOld = new int[8]; int bypassBefore = 0, wandererLayers = 0, trimmed = 0;
-            var startsDistinct = new HashSet<int>();
+            var lowered = new Dictionary<int, int>(); var innerN = new List<int>(); var ring1N = new List<int>(); var ring2N = new List<int>(); var goalDeg = new List<int>();
+            var startsDistinct = new HashSet<int>(); var goalsDistinct = new HashSet<int>();
             foreach (int floor in StormDepths) { hopsStorm[floor] = new List<int>(); hopsOld[floor] = new List<int>(); }
             foreach (int floor in StormDepths)
                 for (int salt = 1; salt <= 3000; salt++)
@@ -227,18 +228,32 @@ static partial class T
                     layers++;
                     if (L.stormStartFallback) fallback++;
                     var hull = Storm.Hull(L);
+                    var rings = Storm.OuterRings(L);
+                    innerN.Add(rings.Count(r => r == 0)); ring1N.Add(rings.Count(r => r == 1)); ring2N.Add(rings.Count(r => r == 2));
                     int hg = L.Hops(L.goal)[L.start];
-                    if (!L.storm || (!L.stormStartFallback && (!hull.Contains(L.start) || L.adj[L.start].Count < 2 || hg < FreeMapParams.StormStartMinHops))) startBad++;
-                    // 点・道は 1 つも変わらない。 種別は始点と添字 0 の入れ替えと、 新しい安全な帯のエリート → 戦闘だけ
-                    bool same = Lo.Count == L.Count && Lo.roads.SequenceEqual(L.roads) && Enumerable.Range(0, L.Count).All(i => Lo.pos[i].x == L.pos[i].x && Lo.pos[i].y == L.pos[i].y && Lo.adj[i].SequenceEqual(L.adj[i]))
-                                && Lo.territory.SetEquals(L.territory) && Lo.riftGate.SequenceEqual(L.riftGate) && Lo.goal == L.goal;
-                    for (int i = 0; i < L.Count && same; i++)
+                    if (!L.storm || (!L.stormStartFallback && (!hull.Contains(L.start) || L.adj[L.start].Count < 2))) startBad++;
+                    if (L.stormBossHopsUsed < 0) bossKept++;
+                    else
                     {
-                        var to = i == L.start ? Lo.types[Lo.start] : i == Lo.start ? Lo.types[L.start] : Lo.types[i];
-                        if (L.types[i] != to && !(to == TileType.EliteBattle && L.types[i] == TileType.Battle)) same = false;
+                        if (rings[L.goal] != 0 || L.territory.Contains(L.goal) || L.adj[L.goal].Count < 2 || hg < L.stormBossHopsUsed) bossBad++;
+                        if (L.stormBossHopsUsed < FreeMapParams.StormBossMinHops) { lowered.TryGetValue(L.stormBossHopsUsed, out int c); lowered[L.stormBossHopsUsed] = c + 1; }
+                    }
+                    goalDeg.Add(L.adj[L.goal].Count);
+                    // 点・道・縄張りは 1 つも変わらない。 種別は 始点⇔添字 0・終点⇔添字 1 の入れ替えと、 新しい安全な帯のエリート → 戦闘だけ
+                    //   (深さ 6 はボスに隣り合う点を新しい終点で置くので、 種別は比べずに下の riftBad で見る)
+                    bool same = Lo.Count == L.Count && Lo.roads.SequenceEqual(L.roads) && Enumerable.Range(0, L.Count).All(i => Lo.pos[i].x == L.pos[i].x && Lo.pos[i].y == L.pos[i].y && Lo.adj[i].SequenceEqual(L.adj[i]))
+                                && Lo.territory.SetEquals(L.territory);
+                    if (floor != 6)
+                    {
+                        var e = (TileType[])Lo.types.Clone();
+                        void Sw(int x, int y) { var t = e[x]; e[x] = e[y]; e[y] = t; }
+                        if (L.start != Lo.start) Sw(L.start, Lo.start);
+                        if (L.goal != Lo.goal) Sw(L.goal, Lo.goal);
+                        for (int i = 0; i < L.Count && same; i++)
+                            if (L.types[i] != e[i] && !(e[i] == TileType.EliteBattle && L.types[i] == TileType.Battle)) same = false;
                     }
                     if (!same) shapeBad++;
-                    if (L.types[L.start] != TileType.Outpost || L.types[L.goal] != TileType.Boss) shapeBad++;
+                    if (L.types[L.start] != TileType.Outpost || L.types[L.goal] != TileType.Boss || L.types.Count(t => t == TileType.Boss) != 1 || L.types.Count(t => t == TileType.Outpost) != 1) shapeBad++;
                     int shops = 0, rests = 0; var ds = L.Hops(L.start); bool near = false;
                     for (int i = 0; i < L.Count; i++)
                     {
@@ -248,38 +263,50 @@ static partial class T
                     if (shops < 1 || rests < 1) shopRestBad++;
                     if (near) nearSupply++;
                     { var dso = Lo.Hops(Lo.start); if (Enumerable.Range(0, Lo.Count).Any(i => (Lo.types[i] == TileType.Shop || Lo.types[i] == TileType.Rest) && dso[i] < 2)) nearSupplyOld++; }
-                    if (floor == 6 && (L.riftGate.Contains(L.start) || L.riftGate.Any(r => L.types[r] != TileType.Event))) riftBad++;
+                    if (floor == 6)
+                    {
+                        // 隣り合う点 = 新しい終点の隣 (始点を除く) が全部イベント。 旧い右端の隣は強制しない。 隣り合う点を踏まずに始点から終点へ着けない
+                        var want = L.adj[L.goal].Where(i => i != L.start).OrderBy(i => i).ToList();
+                        if (!L.riftGate.SequenceEqual(want) || L.riftGate.Any(r => L.types[r] != TileType.Event) || L.riftGate.Contains(L.start)) riftBad++;
+                        var seen = new bool[L.Count]; var q = new Queue<int>(); seen[L.start] = true; q.Enqueue(L.start); bool reach = false;
+                        while (q.Count > 0) { int u = q.Dequeue(); foreach (int v in L.adj[u]) { if (v == L.goal) reach = true; if (!seen[v] && v != L.goal && !L.riftGate.Contains(v)) { seen[v] = true; q.Enqueue(v); } } }
+                        if (reach) riftSkip++;
+                    }
                     if (FloorPlan.HasWanderer(floor))
                     {
                         wandererLayers++;
                         if (L.territory.Contains(L.start) || (!L.stormStartFallback && L.territory.Any(t => L.Dist(t, L.start) < FreeMapParams.TerritoryStartClearance))) terrBad++;
+                        if (L.territory.Contains(L.goal)) terrBad++;
                         if (TerritoryBypass.HasBypass(L, L.territory)) bypassBefore++;
                         if (s.TerritoryTrimmed > 0) trimmed++;
                         if (s.TerritoryFoeRemoved) foeRemoved++;
-                        else if (!TerritoryBypass.HasBypass(L, s.Territory.ToList()) || s.InTerritory(L.start)) bypassBad++;
+                        else if (!TerritoryBypass.HasBypass(L, s.Territory.ToList()) || s.InTerritory(L.start) || s.InTerritory(L.goal)) bypassBad++;
                     }
                     hopsStorm[floor].Add(hg); hopsOld[floor].Add(Lo.Hops(Lo.goal)[Lo.start]);
                     bearStorm[s.Bearing(L.start, L.goal)]++;
                     var so = new FreeMapSim(Lo, new Wallet(), false, null, WeatherKind.None, null); bearOld[so.Bearing(Lo.start, Lo.goal)]++;
-                    if (salt <= 50) startsDistinct.Add(floor * 1000 + L.start);
+                    if (salt <= 50) { startsDistinct.Add(floor * 1000 + L.start); goalsDistinct.Add(floor * 1000 + L.goal); }
                 }
-            Check(startBad == 0 && shapeBad == 0, $"嵐: 始点は最外周 (凸包の頂点)・道 2 本以上・終点から {FreeMapParams.StormStartMinHops} 歩以上 / 点・道・縄張りは変わらず種別は入れ替えと安全な帯のエリートだけ ({layers} 層・始点の違反 {startBad}・形の違反 {shapeBad})");
-            Check(fallback * 100 <= layers, $"嵐: 始点の候補が無く生成の始点のままの層 {fallback}/{layers} ({100.0 * fallback / layers:F2}%)");
+            Check(startBad == 0 && bossBad == 0 && shapeBad == 0, $"嵐: 始点は最外周 (凸包の頂点)・道 2 本以上 / ボスは外周 2 層の外・縄張りの外・道 2 本以上・始点から下限以上 / 点・道・縄張りは変わらず種別は入れ替えと安全な帯のエリートだけ ({layers} 層・違反 {startBad}/{bossBad}/{shapeBad})");
+            Check(fallback * 100 <= layers && bossKept * 100 <= layers, $"嵐: 始点の候補が無い層 {fallback}・内側の点が無くボスが生成の終点のままの層 {bossKept} ({layers} 層)");
+            Console.WriteLine($"[嵐] ボスの下限 {FreeMapParams.StormBossMinHops} 歩を満たす内側の点が無く、 下げた層: {(lowered.Count == 0 ? "0" : string.Join(" ", lowered.OrderByDescending(k => k.Key).Select(k => $"{k.Key}歩:{k.Value}")))} ({layers} 層)");
+            Console.WriteLine($"[嵐] 外周の層の点の数 (辺から {FreeMapParams.StormOuterEdgeSlack} 以内も外周): 1 層目 {Dist(ring1N)} / 2 層目 {Dist(ring2N)} / 内側 (ボスの候補の元) {Dist(innerN)}");
+            Console.WriteLine($"[嵐] ボスに隣り合う点の数 {Dist(goalDeg)} 分布 {string.Join(" ", goalDeg.GroupBy(x => x).OrderBy(g => g.Key).Select(g => $"{g.Key}:{g.Count()}"))}");
             Check(shopRestBad == 0, $"嵐: 店と休憩は層に 1 つずつ以上 (違反 {shopRestBad}/{layers})・店か休憩が始点の隣にある層 嵐 {100.0 * nearSupply / layers:F1}% / 旧い始点 {100.0 * nearSupplyOld / layers:F1}%");
-            Check(riftBad == 0, $"嵐: 深さ 6 のボスに隣り合う点は全部イベントのまま・始点にならない (違反 {riftBad})");
-            Check(terrBad == 0 && bypassBad == 0, $"嵐: 始点は縄張りの外で縄張りの点から {FreeMapParams.TerritoryStartClearance} 以上・縄張りを避ける道が全層にある (追跡者の居る層 {wandererLayers}・違反 {terrBad}/{bypassBad}・削る前にある {100.0 * bypassBefore / Math.Max(1, wandererLayers):F1}%・削った {100.0 * trimmed / Math.Max(1, wandererLayers):F1}%・追跡者を置かない {foeRemoved})");
+            Check(riftBad == 0 && riftSkip == 0, $"嵐: 深さ 6 は新しいボスの点の隣が全部イベント (旧い右端の隣は変えない)・踏まずにボスへ着ける層 0 (違反 {riftBad}・踏まずに着ける {riftSkip})");
+            Check(terrBad == 0 && bypassBad == 0, $"嵐: 始点とボスは縄張りの外・縄張りを避ける道が全層にある (追跡者の居る層 {wandererLayers}・違反 {terrBad}/{bypassBad}・削る前にある {100.0 * bypassBefore / Math.Max(1, wandererLayers):F1}%・削った {100.0 * trimmed / Math.Max(1, wandererLayers):F1}%・追跡者を置かない {foeRemoved})");
             foreach (int floor in StormDepths)
-                Console.WriteLine($"[嵐] 深さ{floor} 始点→終点の歩数: 嵐 {Dist(hopsStorm[floor])} / 旧い始点 {Dist(hopsOld[floor])}");
+                Console.WriteLine($"[嵐] 深さ{floor} 始点→終点の歩数: 嵐 {Dist(hopsStorm[floor])} / 旧い始点と終点 {Dist(hopsOld[floor])}");
             var all = hopsStorm.Values.SelectMany(x => x).ToList();
             var hist = all.GroupBy(x => x).OrderBy(g => g.Key).Select(g => $"{g.Key}:{g.Count()}");
             Console.WriteLine($"[嵐] 始点→終点の歩数の分布 (全深さ {all.Count} 層): {string.Join(" ", hist)}");
-            Console.WriteLine($"[嵐] 始点から見た終点の方角 (東 北東 北 北西 西 南西 南 南東): 嵐 {string.Join(" ", bearStorm)} / 旧い始点 {string.Join(" ", bearOld)}");
-            Console.WriteLine($"[嵐] 50 種 × 4 深さで選ばれた始点の添字の種類 {startsDistinct.Count}");
+            Console.WriteLine($"[嵐] 始点から見た終点の方角 (東 北東 北 北西 西 南西 南 南東): 嵐 {string.Join(" ", bearStorm)} / 旧い {string.Join(" ", bearOld)}");
+            Console.WriteLine($"[嵐] 50 種 × 4 深さで選ばれた始点の添字の種類 {startsDistinct.Count}・ボスの添字の種類 {goalsDistinct.Count}");
         }
 
         // ── 4. 輪の段の境目の半径・フェーズ 4・ボスの点 ──
         {
-            int layers = 0, bad = 0; string first = null; int phase3Extra = 0, grew = 0;
+            int layers = 0, bad = 0; string first = null; int phase3Extra = 0, grew = 0, bossOutP1 = 0, bossOutP1End = 0, bossOutP2End = 0, bossOutP2 = 0;
             foreach (int floor in StormDepths)
                 for (int salt = 1; salt <= 1000; salt++)
                 {
@@ -305,12 +332,22 @@ static partial class T
                     if (r3 > r0 * FreeMapParams.StormPhase2EndRadius) grew++;
                     var nb = new HashSet<int>(L.adj[L.goal]) { L.goal };
                     phase3Extra += Enumerable.Range(0, L.Count).Count(i => !nb.Contains(i) && L.Dist(i, L.goal) <= r3);
+                    // 「ボスの点は常に外」の扱いが無かったら、 ボスの点が輪の外 (嵐の中) にある層 (フェーズ 1 の途中のどこか・終わり・フェーズ 2 の終わり)
+                    bool anyP1 = false;
+                    for (int t = 0; t <= Storm.Phase2Start; t++) { Storm.RingAt(L, t, out var ct, out double rt); if (Vec2.Dist(B, ct) > rt) anyP1 = true; }
+                    if (anyP1) bossOutP1++;
+                    if (Vec2.Dist(B, c1) > rb) bossOutP1End++;
+                    if (Vec2.Dist(B, c2) > rc) bossOutP2End++;
+                    bool anyP2 = false;
+                    for (int t = Storm.Phase2Start; t <= Storm.Phase3Start; t++) { Storm.RingAt(L, t, out var ct, out double rt); if (Vec2.Dist(B, ct) > rt) anyP2 = true; }
+                    if (anyP2) bossOutP2++;
                 }
             Check(bad == 0, $"嵐: 段の境目の輪 (s=0 全点を含む・s=10 60%・s=20 30% で中心はボスをずらした点・ボスは輪の中)・静かな時間は嵐なし・フェーズ 4 はボスの点だけが外・ボスの点はいつも外 ({layers} 層・違反 {bad}{(first != null ? " 最初 " + first : "")})");
             Console.WriteLine($"[嵐] フェーズ 3 の終わりの輪に、 ボスの隣でない点が入る数の合計 {phase3Extra} ({layers} 層)・終わりの半径がフェーズ 2 の終わりより大きい層 {grew}");
+            Console.WriteLine($"[嵐] 特別扱いが無ければボスの点が輪の外 (嵐の中) になる層: フェーズ 1 の途中のどこか {100.0 * bossOutP1 / layers:F1}%・フェーズ 1 の終わり {100.0 * bossOutP1End / layers:F1}%・フェーズ 2 の途中のどこか {100.0 * bossOutP2 / layers:F1}%・フェーズ 2 の終わり {100.0 * bossOutP2End / layers:F1}% ({layers} 層)");
         }
 
-        // ── 5. 層の出方: 深さ 0/7 に嵐は無い・深さ 6 は手番 0 からフェーズ 1・他は 20 手番の静かな時間 ──
+        // ── 5. 層の出方: 深さ 0/7 に嵐は無い・深さ 6 は手番 0 からフェーズ 1・他は静かな時間 (StormQuietTurns) のあと ──
         {
             bool ok = true;
             foreach (int floor in new[] { 0, 7 })
@@ -333,7 +370,7 @@ static partial class T
                 q &= s.StormPhase == 1 && (ev & FreeMapEvent.StormAdvanced) != 0;
                 ok &= q;
             }
-            Check(ok, "嵐: 深さ 0/7 に嵐も天候も無い (始点は左端・ボスは見える)・深さ 6 は手番 0 からフェーズ 1・深さ 1/3/5 は 20 手番の静かな時間のあとフェーズ 1 (段の変わり目を知らせる)");
+            Check(ok, $"嵐: 深さ 0/7 に嵐も天候も無い (始点は左端・ボスは見える)・深さ 6 は手番 0 からフェーズ 1・深さ 1/3/5 は {FreeMapParams.StormQuietTurns} 手番の静かな時間のあとフェーズ 1 (段の変わり目を知らせる)");
         }
 
         // ── 6. 嵐の HP・種類 (雹・砂・雪)・近道・待つ ──
@@ -481,6 +518,165 @@ static partial class T
             Console.WriteLine($"[嵐の歩き] 深さ{floor} (静かな時間は近い未踏の点・嵐が来たら終点へ・1000 層・着いた {reached}): 手番 {Dist(turns)}");
             Console.WriteLine($"[嵐の歩き]   踏んだ点 {Dist(visited)} / 嵐の中の歩数 {Dist(ss)} / 嵐で払った HP {Dist(hp)}");
             Check(reached == 1000, $"嵐の歩き: 深さ{floor} は全層で終点に着く ({reached}/1000)");
+        }
+        WalkCompare();
+    }
+
+    // =====================================================================
+    //  歩き方の比べ (2026-11-13): 嵐が「稼げる量」をどれだけ縛っているか
+    //    A = 静かな時間は近い未踏の点・嵐が来たら終点へ (上の StormWalk)
+    //    B = 輪の中で粘る: 嵐の外の未踏の点を近い順に踏み続ける。 行って、 そこから終点まで嵐の中を歩かずに着ける点だけ。 無くなったら終点へ
+    //    C = 嵐を踏んででも全部踏む: 未踏の点を近い順に全部踏んでから終点へ
+    //  B と C は終点を通り道にしない (着いたら層が終わるので)。 戦闘は全部勝ったことにする (追跡者に捕まったら倒した扱い・使い魔も勝ち)。
+    //  物資は数えない (財布は尽きない)。 HP は尽きない財布で払った量を数え、 C の死亡は「払った HP の累計が最大 HP 以上になった層」で数える。
+    // =====================================================================
+
+    static readonly TileType[] WalkKinds = { TileType.Shop, TileType.Rest, TileType.Treasure, TileType.Battle, TileType.EliteBattle, TileType.Event };
+
+    sealed class WalkResult
+    {
+        public bool reached; public int turns, steps, visited, stormSteps, stormHp, maxPaidBeforeGoal;
+        public int[] kinds = new int[WalkKinds.Length];
+    }
+
+    /// <summary>to までの歩数 (終点は to の時だけ通れる・沈んだ点は通らない)。</summary>
+    static int[] HopsTo(FreeMapSim s, int to)
+    {
+        var L = s.Layout; int n = L.Count; var d = new int[n];
+        for (int i = 0; i < n; i++) d[i] = int.MaxValue;
+        if (s.IsSunk(to)) return d;
+        var q = new Queue<int>(); d[to] = 0; q.Enqueue(to);
+        while (q.Count > 0)
+        {
+            int u = q.Dequeue();
+            foreach (int v in s.Neighbors(u))
+            {
+                if ((v == L.goal && v != to) || s.IsSunk(v) || d[v] != int.MaxValue) continue;
+                if (u == L.goal && u != to) continue;
+                d[v] = d[u] + 1; q.Enqueue(v);
+            }
+        }
+        return d;
+    }
+
+    /// <summary>from から to への次の 1 歩 (d = HopsTo(to)・同点は隣接表の並び)。</summary>
+    static int NextStep(FreeMapSim s, int from, int[] d)
+    {
+        int best = from;
+        foreach (int v in s.Neighbors(from)) if (d[v] < d[best]) best = v;
+        return best;
+    }
+
+    /// <summary>from から to へ d に沿って歩いた時、 嵐が来てから t 手番の時から歩き出して、 嵐の中の点に 1 度も入らないか。 着いた時の手番を返す。</summary>
+    static bool SafeRoute(FreeMapSim s, int from, int[] d, int t, out int tEnd)
+    {
+        var L = s.Layout; int cur = from; tEnd = t;
+        for (int g = 0; g < 200 && d[cur] > 0; g++)
+        {
+            int nx = NextStep(s, cur, d);
+            if (nx == cur) return false;
+            if (Storm.InStorm(L, nx, tEnd)) return false;
+            tEnd++; cur = nx;
+        }
+        return d[cur] == 0;
+    }
+
+    static WalkResult WalkBC(FreeMapSim s, Wallet w, bool stayInRing)
+    {
+        var L = s.Layout; var r = new WalkResult(); var seen = new HashSet<int> { s.Me };
+        int hp0 = w.Hp;
+        var dGoal = HopsTo(s, L.goal);
+        for (int guard = 0; guard < 800 && !s.Dead; guard++)
+        {
+            if (s.InFight)
+            {
+                if (s.Contact == FreeMapSim.ContactKind.Body) s.ResolveBodyWon(); else s.ResolveFamiliarFight(false);
+                s.TakePendingArrival();
+                continue;
+            }
+            if (s.Me == L.goal) break;
+            int target = L.goal; int[] dT = dGoal;
+            var dMe = HopsTo(s, s.Me);
+            var order = Enumerable.Range(0, L.Count).Where(i => i != L.goal && !seen.Contains(i) && dMe[i] != int.MaxValue).OrderBy(i => dMe[i]).ThenBy(i => i);
+            foreach (int i in order)
+            {
+                var di = HopsTo(s, i);
+                if (stayInRing)
+                {
+                    int st = s.StormMode ? s.StormTime : int.MinValue / 2;
+                    if (s.StormMode)
+                    {
+                        if (s.InStorm(i)) continue;
+                        if (!SafeRoute(s, s.Me, di, st, out int tArr)) continue;
+                        if (!SafeRoute(s, i, HopsTo(s, L.goal), tArr, out _)) continue;
+                    }
+                }
+                target = i; dT = di; break;
+            }
+            if (target == L.goal) dT = HopsTo(s, L.goal);
+            int nx = NextStep(s, s.Me, dT);
+            if (nx == s.Me) break;
+            bool inStorm = s.InStorm(nx); int before = w.Hp; int t0 = s.Turn;
+            s.MoveTo(nx); s.MarkDone(nx); r.steps++;
+            if (seen.Add(nx) && nx != L.goal)
+            {
+                r.visited++;
+                int k = Array.IndexOf(WalkKinds, L.types[nx]);
+                if (k >= 0) r.kinds[k]++;
+            }
+            int paid = before - w.Hp;
+            if (inStorm) { r.stormSteps++; r.stormHp += paid; }
+            if (nx != L.goal) r.maxPaidBeforeGoal = hp0 - w.Hp;
+        }
+        r.reached = s.Me == L.goal; r.turns = s.Turn;
+        return r;
+    }
+
+    static string Pct(List<int> xs, int n) => $"平均 {xs.Average():F2}・中央値 {Q(xs, 0.5)}・90% 点 {Q(xs, 0.9)}・最大 {xs.Max()}";
+    static int Q(List<int> xs, double p) { var a = xs.OrderBy(x => x).ToList(); return a[Math.Min(a.Count - 1, (int)Math.Floor(p * (a.Count - 1) + 0.5))]; }
+
+    static void WalkCompare()
+    {
+        // C の死亡に使う最大 HP: 開始 HP 30 (RunState.Initialize・GAME.md §1) と、 GAME.md §17 の HP の値段の表が使う代表値 85 の 2 つで数える
+        int[] maxHps = { 30, 85 };
+        foreach (int floor in StormDepths)
+        {
+            var rows = new List<string>();
+            foreach (var mode in new[] { "A", "B", "C", "C旧" })
+            {
+                var turns = new List<int>(); var steps = new List<int>(); var vis = new List<int>(); var ss = new List<int>(); var hp = new List<int>();
+                var kinds = new long[WalkKinds.Length]; var dead = new int[maxHps.Length]; int reached = 0, total = 0;
+                for (int salt = 1; salt <= 1000; salt++)
+                {
+                    var w = new Wallet { Provision = 100000000, Hp = 100000000 };
+                    FreeMapSim s;
+                    if (mode == "C旧")
+                    {
+                        GameLoop.GameRng.Salt = (ulong)salt * 7919;
+                        s = new FreeMapSim(FreeMapGenerator.Generate(floor, true, false), w, FloorPlan.HasWanderer(floor), null, null, null);
+                        s.ConfigureTerritory(true, true, true);
+                    }
+                    else s = MakeStorm(salt, floor, w);
+                    total += s.Layout.Count - 2;
+                    WalkResult r;
+                    if (mode == "A")
+                    {
+                        var a = StormWalk(s, w);
+                        r = new WalkResult { reached = a.reached, turns = a.turns, steps = a.turns, visited = a.visited - 1 - (a.reached ? 1 : 0), stormSteps = a.stormSteps, stormHp = a.stormHp };
+                    }
+                    else r = WalkBC(s, w, mode == "B");
+                    if (r.reached) reached++;
+                    turns.Add(r.turns); steps.Add(r.steps); vis.Add(r.visited); ss.Add(r.stormSteps); hp.Add(mode == "C旧" ? 100000000 - w.Hp : r.stormHp);
+                    for (int k = 0; k < kinds.Length; k++) kinds[k] += r.kinds[k];
+                    int paidAll = 100000000 - w.Hp;
+                    for (int m = 0; m < maxHps.Length; m++) if (paidAll >= maxHps[m]) dead[m]++;
+                }
+                string kindText = mode == "A" ? "" : " / 種別 (1 層の平均) " + string.Join(" ", WalkKinds.Select((k, i) => $"{k}:{kinds[i] / 1000.0:F2}"));
+                string deadText = mode.StartsWith("C") ? $" / 死んだ層 (最大 HP 30 で {dead[0] / 10.0:F1}%・85 で {dead[1] / 10.0:F1}%)" : "";
+                rows.Add($"[歩き方 {mode}] 深さ{floor}: 着いた {reached}/1000 / 手番 {Pct(turns, 0)} / 歩数 {Pct(steps, 0)} / 踏んだ点 {Pct(vis, 0)} (全部の点の {100.0 * vis.Sum() / total:F1}%)"
+                       + $" / 嵐の中の歩数 {Pct(ss, 0)} / {(mode == "C旧" ? "雹で払った HP" : "嵐で払った HP")} {Pct(hp, 0)}{deadText}{kindText}");
+            }
+            foreach (var l in rows) Console.WriteLine(l);
         }
     }
 }
