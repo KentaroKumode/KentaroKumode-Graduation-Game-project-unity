@@ -519,5 +519,164 @@ static partial class T
             Console.WriteLine($"[嵐の歩き]   踏んだ点 {Dist(visited)} / 嵐の中の歩数 {Dist(ss)} / 嵐で払った HP {Dist(hp)}");
             Check(reached == 1000, $"嵐の歩き: 深さ{floor} は全層で終点に着く ({reached}/1000)");
         }
+        WalkCompare();
+    }
+
+    // =====================================================================
+    //  歩き方の比べ (2026-11-13): 嵐が「稼げる量」をどれだけ縛っているか
+    //    A = 静かな時間は近い未踏の点・嵐が来たら終点へ (上の StormWalk)
+    //    B = 輪の中で粘る: 嵐の外の未踏の点を近い順に踏み続ける。 行って、 そこから終点まで嵐の中を歩かずに着ける点だけ。 無くなったら終点へ
+    //    C = 嵐を踏んででも全部踏む: 未踏の点を近い順に全部踏んでから終点へ
+    //  B と C は終点を通り道にしない (着いたら層が終わるので)。 戦闘は全部勝ったことにする (追跡者に捕まったら倒した扱い・使い魔も勝ち)。
+    //  物資は数えない (財布は尽きない)。 HP は尽きない財布で払った量を数え、 C の死亡は「払った HP の累計が最大 HP 以上になった層」で数える。
+    // =====================================================================
+
+    static readonly TileType[] WalkKinds = { TileType.Shop, TileType.Rest, TileType.Treasure, TileType.Battle, TileType.EliteBattle, TileType.Event };
+
+    sealed class WalkResult
+    {
+        public bool reached; public int turns, steps, visited, stormSteps, stormHp, maxPaidBeforeGoal;
+        public int[] kinds = new int[WalkKinds.Length];
+    }
+
+    /// <summary>to までの歩数 (終点は to の時だけ通れる・沈んだ点は通らない)。</summary>
+    static int[] HopsTo(FreeMapSim s, int to)
+    {
+        var L = s.Layout; int n = L.Count; var d = new int[n];
+        for (int i = 0; i < n; i++) d[i] = int.MaxValue;
+        if (s.IsSunk(to)) return d;
+        var q = new Queue<int>(); d[to] = 0; q.Enqueue(to);
+        while (q.Count > 0)
+        {
+            int u = q.Dequeue();
+            foreach (int v in s.Neighbors(u))
+            {
+                if ((v == L.goal && v != to) || s.IsSunk(v) || d[v] != int.MaxValue) continue;
+                if (u == L.goal && u != to) continue;
+                d[v] = d[u] + 1; q.Enqueue(v);
+            }
+        }
+        return d;
+    }
+
+    /// <summary>from から to への次の 1 歩 (d = HopsTo(to)・同点は隣接表の並び)。</summary>
+    static int NextStep(FreeMapSim s, int from, int[] d)
+    {
+        int best = from;
+        foreach (int v in s.Neighbors(from)) if (d[v] < d[best]) best = v;
+        return best;
+    }
+
+    /// <summary>from から to へ d に沿って歩いた時、 嵐が来てから t 手番の時から歩き出して、 嵐の中の点に 1 度も入らないか。 着いた時の手番を返す。</summary>
+    static bool SafeRoute(FreeMapSim s, int from, int[] d, int t, out int tEnd)
+    {
+        var L = s.Layout; int cur = from; tEnd = t;
+        for (int g = 0; g < 200 && d[cur] > 0; g++)
+        {
+            int nx = NextStep(s, cur, d);
+            if (nx == cur) return false;
+            if (Storm.InStorm(L, nx, tEnd)) return false;
+            tEnd++; cur = nx;
+        }
+        return d[cur] == 0;
+    }
+
+    static WalkResult WalkBC(FreeMapSim s, Wallet w, bool stayInRing)
+    {
+        var L = s.Layout; var r = new WalkResult(); var seen = new HashSet<int> { s.Me };
+        int hp0 = w.Hp;
+        var dGoal = HopsTo(s, L.goal);
+        for (int guard = 0; guard < 800 && !s.Dead; guard++)
+        {
+            if (s.InFight)
+            {
+                if (s.Contact == FreeMapSim.ContactKind.Body) s.ResolveBodyWon(); else s.ResolveFamiliarFight(false);
+                s.TakePendingArrival();
+                continue;
+            }
+            if (s.Me == L.goal) break;
+            int target = L.goal; int[] dT = dGoal;
+            var dMe = HopsTo(s, s.Me);
+            var order = Enumerable.Range(0, L.Count).Where(i => i != L.goal && !seen.Contains(i) && dMe[i] != int.MaxValue).OrderBy(i => dMe[i]).ThenBy(i => i);
+            foreach (int i in order)
+            {
+                var di = HopsTo(s, i);
+                if (stayInRing)
+                {
+                    int st = s.StormMode ? s.StormTime : int.MinValue / 2;
+                    if (s.StormMode)
+                    {
+                        if (s.InStorm(i)) continue;
+                        if (!SafeRoute(s, s.Me, di, st, out int tArr)) continue;
+                        if (!SafeRoute(s, i, HopsTo(s, L.goal), tArr, out _)) continue;
+                    }
+                }
+                target = i; dT = di; break;
+            }
+            if (target == L.goal) dT = HopsTo(s, L.goal);
+            int nx = NextStep(s, s.Me, dT);
+            if (nx == s.Me) break;
+            bool inStorm = s.InStorm(nx); int before = w.Hp; int t0 = s.Turn;
+            s.MoveTo(nx); s.MarkDone(nx); r.steps++;
+            if (seen.Add(nx) && nx != L.goal)
+            {
+                r.visited++;
+                int k = Array.IndexOf(WalkKinds, L.types[nx]);
+                if (k >= 0) r.kinds[k]++;
+            }
+            int paid = before - w.Hp;
+            if (inStorm) { r.stormSteps++; r.stormHp += paid; }
+            if (nx != L.goal) r.maxPaidBeforeGoal = hp0 - w.Hp;
+        }
+        r.reached = s.Me == L.goal; r.turns = s.Turn;
+        return r;
+    }
+
+    static string Pct(List<int> xs, int n) => $"平均 {xs.Average():F2}・中央値 {Q(xs, 0.5)}・90% 点 {Q(xs, 0.9)}・最大 {xs.Max()}";
+    static int Q(List<int> xs, double p) { var a = xs.OrderBy(x => x).ToList(); return a[Math.Min(a.Count - 1, (int)Math.Floor(p * (a.Count - 1) + 0.5))]; }
+
+    static void WalkCompare()
+    {
+        // C の死亡に使う最大 HP: 開始 HP 30 (RunState.Initialize・GAME.md §1) と、 GAME.md §17 の HP の値段の表が使う代表値 85 の 2 つで数える
+        int[] maxHps = { 30, 85 };
+        foreach (int floor in StormDepths)
+        {
+            var rows = new List<string>();
+            foreach (var mode in new[] { "A", "B", "C", "C旧" })
+            {
+                var turns = new List<int>(); var steps = new List<int>(); var vis = new List<int>(); var ss = new List<int>(); var hp = new List<int>();
+                var kinds = new long[WalkKinds.Length]; var dead = new int[maxHps.Length]; int reached = 0, total = 0;
+                for (int salt = 1; salt <= 1000; salt++)
+                {
+                    var w = new Wallet { Provision = 100000000, Hp = 100000000 };
+                    FreeMapSim s;
+                    if (mode == "C旧")
+                    {
+                        GameLoop.GameRng.Salt = (ulong)salt * 7919;
+                        s = new FreeMapSim(FreeMapGenerator.Generate(floor, true, false), w, FloorPlan.HasWanderer(floor), null, null, null);
+                        s.ConfigureTerritory(true, true, true);
+                    }
+                    else s = MakeStorm(salt, floor, w);
+                    total += s.Layout.Count - 2;
+                    WalkResult r;
+                    if (mode == "A")
+                    {
+                        var a = StormWalk(s, w);
+                        r = new WalkResult { reached = a.reached, turns = a.turns, steps = a.turns, visited = a.visited - 1 - (a.reached ? 1 : 0), stormSteps = a.stormSteps, stormHp = a.stormHp };
+                    }
+                    else r = WalkBC(s, w, mode == "B");
+                    if (r.reached) reached++;
+                    turns.Add(r.turns); steps.Add(r.steps); vis.Add(r.visited); ss.Add(r.stormSteps); hp.Add(mode == "C旧" ? 100000000 - w.Hp : r.stormHp);
+                    for (int k = 0; k < kinds.Length; k++) kinds[k] += r.kinds[k];
+                    int paidAll = 100000000 - w.Hp;
+                    for (int m = 0; m < maxHps.Length; m++) if (paidAll >= maxHps[m]) dead[m]++;
+                }
+                string kindText = mode == "A" ? "" : " / 種別 (1 層の平均) " + string.Join(" ", WalkKinds.Select((k, i) => $"{k}:{kinds[i] / 1000.0:F2}"));
+                string deadText = mode.StartsWith("C") ? $" / 死んだ層 (最大 HP 30 で {dead[0] / 10.0:F1}%・85 で {dead[1] / 10.0:F1}%)" : "";
+                rows.Add($"[歩き方 {mode}] 深さ{floor}: 着いた {reached}/1000 / 手番 {Pct(turns, 0)} / 歩数 {Pct(steps, 0)} / 踏んだ点 {Pct(vis, 0)} (全部の点の {100.0 * vis.Sum() / total:F1}%)"
+                       + $" / 嵐の中の歩数 {Pct(ss, 0)} / {(mode == "C旧" ? "雹で払った HP" : "嵐で払った HP")} {Pct(hp, 0)}{deadText}{kindText}");
+            }
+            foreach (var l in rows) Console.WriteLine(l);
+        }
     }
 }
