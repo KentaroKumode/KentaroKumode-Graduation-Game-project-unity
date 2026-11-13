@@ -223,6 +223,8 @@ namespace AutoTest
         /// <summary>[計装] この層の航行の判断の記録 (<see cref="RunRec.stormNav"/>・層が変わると戻す)。</summary>
         private FreeMapLayout _stormNavLayout;
         private int _stormNavCutPts = -1, _stormNavCutTurn = -1, _stormNavBossTurn = -1, _stormNavSearchSteps;
+        /// <summary>[計装 第 2 巡] 切り上げた時の HP (%)・出口までの嵐の HP の BOT の見込み (嵐の見方の時だけ・-1)・その時までに嵐で払った HP。</summary>
+        private int _stormNavCutHpPct = -1, _stormNavCutExitEst = -1, _stormNavCutStormHp;
         /// <summary>ランの始まりの不安定化の理由ごとの通算 (<see cref="GameManager.InstabilityTotals"/> の写し)。 このランの差から戦闘 1 回あたりの激化を見る。</summary>
         private readonly long[] _runInstabilityAtStart = new long[GameManager.InstabilityTotals.Length];
 
@@ -249,6 +251,7 @@ namespace AutoTest
             {
                 _stormNavLayout = sim.Layout;
                 _stormNavCutPts = _stormNavCutTurn = _stormNavBossTurn = -1; _stormNavSearchSteps = 0;
+                _stormNavCutHpPct = _stormNavCutExitEst = -1; _stormNavCutStormHp = 0;
             }
             if (!sim.InstabilityMode || _stormNavBossTurn >= 0) return;
             foreach (var n in map.GetAllNodes())
@@ -285,6 +288,24 @@ namespace AutoTest
             return fights > 0 ? Per(InstabilitySource.Escalation) / fights : 0.0;
         }
 
+        /// <summary>[第 2 巡・口 navStormFightModel] このランで見た、 種類 <paramref name="kind"/> ('N' 通常 / 'E' 精鋭) の戦闘 1 回のターン数の平均。
+        /// 同じ深さの戦闘を優先し、 無ければどの深さでも同じ種類、 それも無ければ 0 (= 呼ぶ側が第 1 巡の式に戻る)。 終わった戦闘 (isFightEnd) だけ・ボス戦は除く。
+        /// 自分の記録 (画面で見た戦闘) だけを読む・乱数を引かない。</summary>
+        private double StormFightTurns(int depth, char kind)
+        {
+            if (_cur?.combats == null) return 0;
+            double sumD = 0, sumA = 0; int nD = 0, nA = 0;
+            foreach (var c in _cur.combats)
+            {
+                if (c == null || !c.isFightEnd || c.isBoss || string.IsNullOrEmpty(c.encounterKey)) continue;
+                var k = c.encounterKey; int p = k.IndexOf('|');
+                if (p < 0 || p + 1 >= k.Length || k[p + 1] != kind) continue;
+                sumA += c.turns; nA++;
+                if (c.floor == depth) { sumD += c.turns; nD++; }
+            }
+            return nD > 0 ? sumD / nD : nA > 0 ? sumA / nA : 0;
+        }
+
         /// <summary>
         /// Optimal (Rank の貪欲) の嵐の代償 (2026-11-14・口 navStormAware)。 Super の計画と同じ式 (<see cref="StormCostCtx"/>) で、 1 点先だけを見る:
         /// 代償 (対数オッズ) = (嵐の中の戦闘で増える損) + (歩く間の嵐の HP の損) + (その点に立った後の出口の代償 − 今の出口の代償)。
@@ -305,11 +326,13 @@ namespace AutoTest
                 _r = r; _run = run; _at = at;
                 _layer = Mathf.Clamp(FloorPlan.OrdinalOf(run.Depth), 0, MacroHpPer10.Length - 1);
                 _ctx = new StormCostCtx(r, sv, run, _layer);
-                _s0 = new MacroSim
+                var s0 = new MacroSim
                 {
                     hp = hpRatio, coins = run.coins, supply = NavSupply(run, sim), cap = run.provisionCap,
                     toil = r.NavToilRewardless(run), pts = sv.Points,
                 };
+                _ctx.Prepare(ref s0);   // 第 2 巡の口 (戦闘の死を HP に合わせる・HP の散らばりを数える)
+                _s0 = s0;
                 _exit0 = _ctx.ExitCost(at, _s0);
                 // 交換の比: 宝の点 (種別が見えている) の Rank の値 ÷ Super の値
                 var t = new MapNode("", 0, -1, TileType.Treasure) { revealed = true };
@@ -323,8 +346,8 @@ namespace AutoTest
             public float Penalty(MapNode n)
             {
                 var s = _s0;
-                if (!_ctx.Walk(_at, n.index, ref s, out float walk)) return float.MaxValue;
-                var sNo = s; sNo.stormMul = 0f;
+                if (!_ctx.Walk(_at, n.index, n, ref s, out float walk)) return float.MaxValue;
+                var sNo = s; sNo.stormMul = 0f; sNo.stormAdd = 0f;
                 float gNo = _r.MacroGain(n, _layer, _run, ref sNo);
                 var sSt = s;
                 float gSt = _r.MacroGain(n, _layer, _run, ref sSt);
@@ -537,7 +560,13 @@ namespace AutoTest
                     if (sv.Boss < 0) _stormNavSearchSteps++;
                 }
                 FreeNavExits[mode]++;
-                if (sim.InstabilityMode && _stormNavCutPts < 0) { _stormNavCutPts = sim.Instability; _stormNavCutTurn = sim.Turn; }   // [計装] 切り上げた時
+                if (sim.InstabilityMode && _stormNavCutPts < 0)   // [計装] 切り上げた時
+                {
+                    _stormNavCutPts = sim.Instability; _stormNavCutTurn = sim.Turn;
+                    _stormNavCutHpPct = run.playerMaxHP > 0 ? run.playerHP * 100 / run.playerMaxHP : -1;
+                    _stormNavCutExitEst = sv != null ? exitStormHp : -1;
+                    _stormNavCutStormHp = sim.StormHpPaid;
+                }
             }
 
             // S4: 次に向かう点の戦闘名が分からず、 近ければ偵察してから決める (同じ点では 1 回まで・追われている時はしない)

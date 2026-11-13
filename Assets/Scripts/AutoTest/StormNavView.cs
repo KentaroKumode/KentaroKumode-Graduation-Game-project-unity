@@ -47,7 +47,26 @@ namespace AutoTest
         private readonly Dictionary<long, Est> _exitMemo = new Dictionary<long, Est>();
 
         /// <summary>出口までの見込み (嵐で払う HP・歩数。 ボスが見えていなければ候補の平均)。</summary>
-        public struct Est { public double hp; public double hops; public bool reachable; }
+        public struct Est { public double hp; public double hops; public bool reachable; public double hpVar; }
+
+        /// <summary>標準正規分布の累積分布 Φ(x) (Abramowitz–Stegun 7.1.26・誤差 1.5e-7)。</summary>
+        public static double NormalCdf(double x)
+        {
+            double z = Math.Abs(x) / Math.Sqrt(2.0);
+            double t = 1.0 / (1.0 + 0.3275911 * z);
+            double erf = 1.0 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.Exp(-z * z);
+            return x >= 0 ? 0.5 * (1.0 + erf) : 0.5 * (1.0 - erf);
+        }
+
+        /// <summary>HP の割合 <paramref name="hp"/> (見込みの平均) で、 これから <paramref name="need"/> (割合) を払った時に 0 以下になる確率。
+        /// HP の見込みの散らばり (分散 <paramref name="var"/>・割合²) を正規で見る: Φ((need − hp) ÷ √var)。 散らばりが無ければ hp ≦ need の時 1・ほかは 0。
+        /// HP が減るほど (need に近づくほど) 確率は増え、 HP が need より上の間は hp について凸 (1 の HP の重みが増える)。</summary>
+        public static double DeathProb(double hp, double need, double var)
+        {
+            if (need <= 0) return hp <= 0 ? 1.0 : 0.0;
+            if (var <= 1e-12) return hp <= need ? 1.0 : 0.0;
+            return NormalCdf((need - hp) / Math.Sqrt(var));
+        }
 
         // 外周の層は層の形だけで決まるので、 層ごとに 1 回だけ求める
         [ThreadStatic] private static FreeMapLayout _ringsFor;
@@ -202,14 +221,15 @@ namespace AutoTest
         {
             long key = (long)from * 100003 + pts;
             if (_exitMemo.TryGetValue(key, out var e)) return e;
-            double hp = 0, hops = 0; int n = 0;
+            double hp = 0, hp2 = 0, hops = 0; int n = 0;
             foreach (int c in Candidates)
             {
                 int h = WalkCost(from, c, pts, true, out _, out int k);
                 if (k < 0) continue;
-                hp += h; hops += k; n++;
+                hp += h; hp2 += (double)h * h; hops += k; n++;
             }
-            e = n == 0 ? new Est { reachable = false } : new Est { hp = hp / n, hops = hops / n, reachable = true };
+            e = n == 0 ? new Est { reachable = false }
+              : new Est { hp = hp / n, hops = hops / n, reachable = true, hpVar = Math.Max(0.0, hp2 / n - (hp / n) * (hp / n)) };
             _exitMemo[key] = e;
             return e;
         }

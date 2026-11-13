@@ -174,6 +174,34 @@ static partial class T
                 }
             Check(bad == 0, $"嵐の航行 (5): 静か〜フェーズ 1 では、 出口の嵐の HP の見込みはポイントが増えて減らない ({bad}/{cmp}) {first}");
         }
+
+        // ── (6) 第 2 巡: 歩いて / 戦って HP が尽きる確率 (正規の裾) ──
+        {
+            bool cdf = Math.Abs(StormNavView.NormalCdf(0) - 0.5) < 1e-7 && Math.Abs(StormNavView.NormalCdf(1.959964) - 0.975) < 1e-6
+                    && Math.Abs(StormNavView.NormalCdf(-1) - 0.158655) < 1e-6;
+            // 散らばりなし = 段: HP が払う分以下なら 1・ほかは 0
+            bool step = StormNavView.DeathProb(0.10, 0.10, 0) == 1 && StormNavView.DeathProb(0.11, 0.10, 0) == 0 && StormNavView.DeathProb(0.5, 0, 0) == 0;
+            // HP が減るほど増え、 HP が払う分より上の間は凸 (2 階差分が正): 1 の HP の重みは HP が減るほど増える
+            bool mono = true, convex = true; double var = 0.08 * 0.08;
+            for (double h = 0.11; h < 0.9; h += 0.01)
+            {
+                double a = StormNavView.DeathProb(h - 0.01, 0.10, var), b = StormNavView.DeathProb(h, 0.10, var), c = StormNavView.DeathProb(h + 0.01, 0.10, var);
+                if (!(a >= b && b >= c)) mono = false;
+                if (a + c - 2 * b < -1e-12) convex = false;
+            }
+            // 出口の散らばり: ボスが見えていれば 0
+            int varBad = 0;
+            foreach (int floor in floors)
+                for (int salt = 1; salt <= 20; salt++)
+                {
+                    var s = MakeNavStorm(salt, floor);
+                    s.AddInstability(InstabilitySource.Shift, FreeMapParams.InstabilityPhase3At - s.Instability);
+                    var v = View(s);
+                    if (v.Boss >= 0 && v.Exit(s.Me, s.Instability).hpVar != 0) varBad++;
+                }
+            Check(cdf && step && mono && convex && varBad == 0,
+                $"嵐の航行 (6): HP が尽きる確率 Φ((払う分 − HP) ÷ 散らばり) (正規の累積・段・HP について単調で払う分より上は凸・ボスが見えていれば出口の散らばり 0) (cdf {cdf} 段 {step} 単調 {mono} 凸 {convex} 散らばり {varBad})");
+        }
     }
 
     /// <summary>エリートの報酬の秘宝の率の代わり (検算は本体の CombatRewards をコンパイルしない・値は何でもよい)。</summary>

@@ -283,6 +283,7 @@ namespace AutoTest.ParallelSweep
             // [計装 2026-11-04] 金の入手経路 (バッチ累計) を経路の集計に「金:」付きで混ぜて返す
             ItemSystem.Helpers.PassiveSourceAudit.Counts["航行:偵察"] = (int)AutoTest.AutoRunner.FreeNavRecons;   // [計装 2026-11-05]
             ItemSystem.Helpers.PassiveSourceAudit.Counts["航行:照明"] = (int)AutoTest.AutoRunner.FreeNavFlares;
+            ItemSystem.Helpers.PassiveSourceAudit.Counts["航行:嵐の探す先なし"] = (int)AutoTest.AutoRunner.FreeNavStormSearchFallback;   // [計装 2026-11-14] 0 のはず
             foreach (var kv in GameLoop.HpOutsideDiag.Amount)   // [計装 2026-11-05] 戦闘の外の HP 減少
                 ItemSystem.Helpers.PassiveSourceAudit.Counts["HP外:" + kv.Key] = (int)System.Math.Min(int.MaxValue, kv.Value);
             foreach (var kv in GameLoop.HpOutsideDiag.Hits)
