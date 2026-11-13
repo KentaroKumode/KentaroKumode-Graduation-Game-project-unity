@@ -201,6 +201,11 @@ namespace AutoTest
         /// Rank の航行は避けたい点 (averse と同じ 90) にする。 行き先に選ばないだけで、 出口への道の上の点は踏む (禁止ではない)。
         /// false = 今までと完全に同じ動き。 乱数は引かない。 エリート・宝・店・休憩・イベントの値付けは変えない。</summary>
         public bool navToilAware = true;
+        /// <summary>[2026-11-14・#140 の 2] 航行が嵐 (不安定化の時計) を読むか。 false (既定) = 今までと完全に同じ動き (乱数の消費も同じ・終点の位置を知っている・フェーズ 3 で出口へ)。
+        /// true = Optimal / Super (追跡者を避ける方策) が、 嵐の層で <see cref="StormNavView"/> の見方を使う ──
+        /// 隠れたボスの点を読まない (候補から探す)・点を取る価値から「溜まるポイントで嵐が早まる代償」を引く・「まだ取る」と「出口へ」を値で比べる (フェーズ 3 の規則は外す)・
+        /// 嵐の中の 1 歩の HP を道の費用に入れる。 Naive は読まない (嵐を読まない下限)。 手番の時計 (stormClock=Turns)・嵐の無い層では効かない。 乱数は引かない。</summary>
+        public bool navStormAware = false;
         /// <summary>[測定 2026-11-13] 天候の作り。 本体の GameHooks.StormEnabled へ流す (ラン終了で true へ)。
         /// true (既定) = 嵐 (静かな時間のあとに輪が縮む・嵐の中の点への移動で HP・嵐の中の戦闘は敵に〈嵐〉・始点は最外周から・ボスの点は伏せる・GAME.md §5-12)。
         /// BOT は終点の位置を今までどおり知っていて、 フェーズ 3 で出口へ切り替え、 出口までの見積もりに嵐の HP を足す (最小の対応)。
@@ -803,6 +808,7 @@ namespace AutoTest
                  + $"/ 航行の〈徒労〉 {(navToilAware ? "読む (持っている間 通常の戦闘の点は報酬なし・損だけ)" : "読まない (旧い動き)")} (navToilAware={navToilAware}) "
                  + $"/ 天候 {(stormEnabled ? "嵐 (輪が縮む・始点は外周・ボスは伏せる)" : "前線 (旧い作り)")} (stormEnabled={stormEnabled}) "
                  + $"/ 嵐の時計 {(!stormEnabled ? "効かない (前線)" : stormClock == MapSystem.FreeMove.StormClock.Turns ? "手番 (storm-boss の作り)" : "不安定化 (取るほど進む)")} (stormClock={stormClock}) "
+                 + $"/ 航行の嵐 {(navStormAware ? (stormEnabled && stormClock == MapSystem.FreeMove.StormClock.Instability ? "読む (隠れたボスを探す・取る代償・値で切り上げ・嵐の HP を道の費用に・Naive は読まない)" : "読む (ただし嵐の時計でないので効かない)") : "読まない (旧い動き・終点を知っている・フェーズ 3 で出口へ)")} (navStormAware={navStormAware}) "
                  + $"/ 端子の撃破のボーナス {(terminalKillNeedsAttack ? "攻撃したターンだけ (旧い条件)" : "経路を問わない")} "
                  + $"/ 手札 {(handCarry == CombatSystem.HandCarryMode.Pick ? "印を付けた端子だけ残す (Pick)" : handCarry == CombatSystem.HandCarryMode.All ? "挿さなかった端子は全部残る (All)" : "毎ターン捨てる (Off・旧い規則)")}"
                  + $"{(handCarry == CombatSystem.HandCarryMode.Pick ? " 残す方策 " + EffectiveHandKeepPolicy + " (handKeepPolicy=" + handKeepPolicy + ")" : "")} "

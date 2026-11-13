@@ -99,6 +99,7 @@ namespace AutoTest
             };
             GameLoop.ProvisionSystem.Stats.Reset(); // 物資の発生源別収支を1ラン単位で集計
             GameLoop.RunStats.ResetToil();          // [計装 2026-11-14] 〈徒労〉の記録を 1 ラン単位で
+            Array.Copy(GameManager.InstabilityTotals, _runInstabilityAtStart, _runInstabilityAtStart.Length);   // [2026-11-14] 嵐の航行: このランの戦闘 1 回あたりの激化の見込み (読むだけ)
             _curLog.Clear();
             _exceptionFlag = false;
             _exceptionMsg = null;

@@ -32,6 +32,10 @@ namespace AutoTest
                 p[MapSystem.FreeMove.Instability.PartTake], p[MapSystem.FreeMove.Instability.PartEscalation], p[MapSystem.FreeMove.Instability.PartWalk],
                 p[MapSystem.FreeMove.Instability.PartEventTurns], p[MapSystem.FreeMove.Instability.PartShift],
                 sim.CollapseTurn, sim.StormStepsTaken, sim.StormHpPaid, sim.Turn });
+            // [計装 2026-11-14] 航行の判断 (切り上げ・ボスが見えた手番・探した歩数)。 この層の航行の判断を見ていなければ -1 のまま
+            bool same = ReferenceEquals(_stormNavLayout, sim.Layout);
+            _cur.stormNav.AddRange(new[] { depth, same ? _stormNavCutPts : -1, same ? _stormNavCutTurn : -1,
+                same ? _stormNavBossTurn : -1, same ? _stormNavSearchSteps : 0 });
         }
 
         private void OnEnemyEncountered(EnemyData e)
