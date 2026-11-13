@@ -32,10 +32,22 @@ namespace AutoTest
                 p[MapSystem.FreeMove.Instability.PartTake], p[MapSystem.FreeMove.Instability.PartEscalation], p[MapSystem.FreeMove.Instability.PartWalk],
                 p[MapSystem.FreeMove.Instability.PartEventTurns], p[MapSystem.FreeMove.Instability.PartShift],
                 sim.CollapseTurn, sim.StormStepsTaken, sim.StormHpPaid, sim.Turn });
-            // [計装 2026-11-14] 航行の判断 (切り上げ・ボスが見えた手番・探した歩数)。 この層の航行の判断を見ていなければ -1 のまま
+            RecordStormNav(gm, true);
+        }
+
+        /// <summary>[計装 2026-11-14] 嵐の層の航行の判断を <see cref="RunRec.stormNav"/> へ 1 層ぶん足す (ボスに入った時と、 その層で死んだ時)。 同じ深さの 2 度目は足さない。
+        /// この層の航行の判断を見ていなければ -1 のまま。 読むだけ。</summary>
+        private void RecordStormNav(GameManager gm, bool atBoss)
+        {
+            var sim = gm?.FreeMap;
+            if (_cur == null || sim == null || !sim.InstabilityMode || gm.Run == null) return;
+            int depth = gm.Run.Depth;
+            for (int i = 0; i + StormNavCols <= _cur.stormNav.Count; i += StormNavCols) if (_cur.stormNav[i] == depth) return;
             bool same = ReferenceEquals(_stormNavLayout, sim.Layout);
             _cur.stormNav.AddRange(new[] { depth, same ? _stormNavCutPts : -1, same ? _stormNavCutTurn : -1,
-                same ? _stormNavBossTurn : -1, same ? _stormNavSearchSteps : 0 });
+                same ? _stormNavBossTurn : -1, same ? _stormNavSearchSteps : 0, atBoss ? 1 : 0,
+                same ? _stormNavCutHpPct : -1, same ? _stormNavCutExitEst : -1,
+                same && _stormNavCutPts >= 0 ? sim.StormHpPaid - _stormNavCutStormHp : 0, sim.StormHpPaid });
         }
 
         private void OnEnemyEncountered(EnemyData e)
@@ -127,6 +139,15 @@ namespace AutoTest
             // 次フォーム開始時点の現在HP。チェーン中は CombatManager のライブHPを使う
             // （Run.playerHP は戦闘終了まで更新されないため、これが無いと各フォームの被ダメが常に0と誤計測される）。
             _pendingEnemyHpBefore = (cm != null && cm.IsCombatActive) ? cm.PlayerHP : (gm?.Run?.playerHP ?? 0);
+            // [計装 2026-11-14・嵐の航行] 戦闘が始まった時の嵐 (チェーンの次の形態は最初の形態の値のまま)
+            if (!isChainSwap)
+            {
+                var fsim = gm?.FreeMap;
+                bool inst = fsim != null && fsim.InstabilityMode;
+                _pendingStormIn = !inst ? -1 : fsim.InStorm(fsim.Me) ? 1 : 0;
+                _pendingStormPhase = inst ? fsim.StormPhase : 0;
+                _pendingStormInst = inst ? fsim.Instability : 0;
+            }
             System.Array.Copy(CombatSystem.CombatStats.DamageBreakdown, _bdAtStart, _bdAtStart.Length);
             System.Array.Copy(CombatSystem.EnemyHpLedger.Cum, _ledAtStart, _ledAtStart.Length);
             _pendingShownFloor = gm?.Run?.currentFloor ?? 0;
@@ -149,6 +170,7 @@ namespace AutoTest
         // [計装 2026-11-10] 経路別の入った量 (EnemyHpLedger) の段の開始時点・見せる層・偏重 6 軸の数
         private readonly double[] _ledAtStart = new double[CombatSystem.EnemyHpLedger.Length];
         private int _pendingShownFloor;
+        private int _pendingStormIn = -1, _pendingStormPhase, _pendingStormInst;
         private long _downsAtStart;
         private long _heavyHitsAtStart, _heavyTakenAtStart;
         private int[] _pendingAxis;
@@ -227,6 +249,7 @@ namespace AutoTest
                 heavyHits = (int)(CombatSystem.HeavyHitDiag.TotalHeavyHits - _heavyHitsAtStart),   // [計装 2026-11-14] 大技の被ダメ
                 heavyTaken = (int)(CombatSystem.HeavyHitDiag.TotalHeavyTaken - _heavyTakenAtStart),
                 heavyMax = CombatSystem.HeavyHitDiag.SegmentHeavyMax,
+                stormIn = _pendingStormIn, stormPhase = _pendingStormPhase, stormInst = _pendingStormInst,   // [計装 2026-11-14・嵐の航行]
             };
             _cur.combats.Add(rec);
             _cur.totalCombats++;
@@ -361,6 +384,7 @@ namespace AutoTest
             {
                 _cur.deathInBossFight = bossFight;
                 _cur.fatalEnemy = fatal;
+                if (!bossFight) RecordStormNav(GameManager.Instance, false);   // [計装 2026-11-14] 死んだ嵐の層の航行の判断 (ボス戦の死はボスに入った時に載っている)
             }
             Finish(Outcome.GameOver, $"敗北 cause={cause}", cause);
         }

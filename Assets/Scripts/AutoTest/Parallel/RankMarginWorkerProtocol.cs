@@ -73,8 +73,7 @@ namespace AutoTest.ParallelSweep
         /// <summary>[計装 2026-11-13] 嵐の層の不安定化 (12 列ずつ: 深さ, 累計, フェーズ, 内訳 取る / 激化 / 歩く / イベントのターン / 嵐を動かす,
         /// 崩れ始めた手番 (-1 = 崩れなかった), 嵐の中を歩いた歩数, 嵐で払った HP, 航行の手番・ボスの点の戦闘に入った時の値・AutoRunner.RunRec.stormLayers)。</summary>
         public int[] stormLayers = Array.Empty<int>();
-        /// <summary>[計装 2026-11-14] 嵐の層の航行の判断 (5 列ずつ: 深さ, 出口へ切り上げた時の累計 (-1 = 切り上げなかった), その時の航行の手番,
-        /// ボスの点が見えた航行の手番 (-1 = 見えないまま), ボスを探して歩いた歩数・ボスの点の戦闘に入った時の値・AutoRunner.RunRec.stormNav)。</summary>
+        /// <summary>[計装 2026-11-14] 嵐の層の航行の判断 (10 列ずつ・列は AutoRunner.RunRec.stormNav と同じ。 第 2 巡で 5 → 10 列: ボスに入ったか・死んだ層も載る)。</summary>
         public int[] stormNav = Array.Empty<int>();
         /// <summary>[計装 2026-11-10] ラン開始時に実際に入っていた整備パネルの段。</summary>
         public string metaRanks = "";
@@ -145,6 +144,7 @@ namespace AutoTest.ParallelSweep
                     atkHist = c.atkHist ?? Array.Empty<int>(), dawnShots = c.dawnShots ?? Array.Empty<int>(),
                     escRises = c.escRises, instEsc = c.instEsc, downs = c.downs,
                     heavyHits = c.heavyHits, heavyTaken = c.heavyTaken, heavyMax = c.heavyMax,
+                    stormIn = c.stormIn, stormPhase = c.stormPhase, stormInst = c.stormInst,
                 };
             }
             return a;
@@ -199,6 +199,8 @@ namespace AutoTest.ParallelSweep
         public int downs;
         /// <summary>[計装 2026-11-14] この戦闘 (段) で撃たれた大技を受けた回数 / 大技で受けた HP の合計 (防御・シールドの後) / 最大の 1 発 (AutoRunner.CombatRecord と同じ)。</summary>
         public int heavyHits, heavyTaken, heavyMax;
+        /// <summary>[計装 2026-11-14・嵐の航行] 戦闘が始まった時の嵐: -1 = 不安定化の時計の層でない / 0 = 嵐の外 / 1 = 嵐の中 (敵に〈嵐〉)。 と、 その時のフェーズ (0〜4)・不安定化の累計。</summary>
+        public int stormIn = -1, stormPhase, stormInst;
     }
 
     [Serializable]
@@ -532,6 +534,8 @@ namespace AutoTest.ParallelSweep
                 "navToilAware",
                 // 2026-11-14 (#140 の 2): 航行が嵐を読むか (False = 既定・旧い動き / True = 隠れたボスを探す・取る代償・値で切り上げ・嵐の HP を道の費用に)
                 "navStormAware",
+                // 2026-11-14 (#140 の 2 第 2 巡): 嵐の航行の直し (道の死・嵐の中の戦闘の見積もり・戦闘の死・嵐の HP の重みの倍率)。 False / 1 = 第 1 巡と同じ
+                "navStormExitDeath", "navStormFightModel", "navStormFightDeath", "navStormHpWeightMul",
                 // 2026-11-14: ボスの機構の値の差し替え (id:名前:値・灰燼の王の予兆 JudgmentDice / 憤怒 FuryAttack / 再生 RegrowthRate)。
                 //   灰燼の王の基礎の攻撃・最大 HP は上の enemyAttackSpec / enemyHpSpec (boss_layer6:N)。 足りなかった enemyHpMul も並べる
                 "bossParamSpec", "enemyHpMul",
