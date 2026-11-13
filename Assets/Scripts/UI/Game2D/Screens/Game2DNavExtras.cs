@@ -168,7 +168,7 @@ namespace UI.Game2D
             }
             if (string.IsNullOrEmpty(line))
             {
-                // 時限バフ / デバフ (説明を持つもの・2026-11-13・〈徒労〉〈覚悟〉): 名前・残り・説明。 ほかに出す行が無い時だけ (いちばん後ろの優先)
+                // 時限バフ / デバフ (説明を持つもの・2026-11-13・〈徒労〉〈開眼〉): 名前・残り・説明。 ほかに出す行が無い時だけ (いちばん後ろの優先)
                 string tl = TimedEffectLine(run);
                 if (tl != null) { line = tl; col = Game2DKit.Amber; }
             }

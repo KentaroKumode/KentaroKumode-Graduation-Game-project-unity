@@ -11,7 +11,7 @@
 //   6. 売値 0G の品 (灯火・レイピア・items.json の noSellValue): 売値の規則 (SellPriceRule は本物をコンパイル)・BOT は売らない・人は売れる
 //   7. 出る層 (2026-11-13): 条件は今ある深さ (1・3・5・6・7) だけで書く・深さごとの抽選のプールの数・連鎖の順 (前の段 ≦ 後の段)・
 //      確信の連鎖は深さ 1〜5・深さ 7 (一本道・追跡者と天候なし) に出るイベントは選べる選択肢がある
-//   8. 〈灰に埋もれた基地〉2 本 (選択肢の数・効果・版の選び方・〈真理〉は効果で立つ) と〈徒労〉〈覚悟〉の規則 (2026-11-13・AshBaseEvent / BattleBoonRule は本物をコンパイル)
+//   8. 〈灰に埋もれた基地〉2 本 (選択肢の数・効果・版の選び方・〈真理〉は効果で立つ) と〈徒労〉〈開眼〉の規則 (2026-11-13・AshBaseEvent / BattleBoonRule は本物をコンパイル)
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -262,13 +262,13 @@ static class Program
             Check(ev.condition.summonOnly && ev.condition.onceOnly, $"基地: 〈{ev.name}〉は召喚専用・一度のみ (通常の抽選に出ない・1 ランに 1 回)");
         string Fx(EventChoice c) => string.Join(",", c.effects.ConvertAll(e => e.type + (string.IsNullOrEmpty(e.param) ? "" : "[" + e.param + "]")));
         const string toil = "TimedDebuff[" + EventSystem.TimedEffects.BattleBoonRule.ToilName + "]";
-        const string ready = "TimedBuff[" + EventSystem.TimedEffects.BattleBoonRule.ReadinessName + "]";
+        const string ready = "TimedBuff[" + EventSystem.TimedEffects.BattleBoonRule.InsightName + "]";
         Check(first.choices.Count == 1 && Fx(first.choices[0]) == toil,
               $"基地 (はじめて): 選択肢 1 つ・〈徒労〉を受けるだけ・手記を開く選択肢は無い ({first.choices.Count} つ: {string.Join(" / ", first.choices.ConvertAll(Fx))})");
         int open = revisit.choices.FindIndex(c => c.Has(EventEffectType.GainTruth));
         int other = open == 0 ? 1 : 0;
         Check(revisit.choices.Count == 2 && open >= 0 && Fx(revisit.choices[open]) == "GainTruth," + ready && Fx(revisit.choices[other]) == toil,
-              $"基地 (再訪): 選択肢 2 つ・「{(open >= 0 ? revisit.choices[open].text : "?")}」= 真理を得る +〈覚悟〉(〈徒労〉なし) / もう 1 つ = 〈徒労〉 ({string.Join(" / ", revisit.choices.ConvertAll(Fx))})");
+              $"基地 (再訪): 選択肢 2 つ・「{(open >= 0 ? revisit.choices[open].text : "?")}」= 真理を得る +〈開眼〉(〈徒労〉なし) / もう 1 つ = 〈徒労〉 ({string.Join(" / ", revisit.choices.ConvertAll(Fx))})");
         Check(!first.choices.Exists(c => c.Has(EventEffectType.GainTruth)), "基地 (はじめて): 〈真理〉を得る選択肢は無い");
         // 選べるか (代償だけの選択肢も選べる・暗くならない)
         var run = new GameLoop.RunState();
@@ -310,13 +310,13 @@ static class Program
               "基地: 〈真理〉は選択肢の並び (index == 0) でなく効果「真理を得る」(EventEffectExecutor) が立てる");
     }
 
-    /// <summary>時限デバフ〈徒労〉/ 時限バフ〈覚悟〉(2026-11-13): 規則 (BattleBoonRule は本物をコンパイル) を戦闘の列で回す。
+    /// <summary>時限デバフ〈徒労〉/ 時限バフ〈開眼〉(2026-11-13): 規則 (BattleBoonRule は本物をコンパイル) を戦闘の列で回す。
     /// 減らし方は TimedEffectManager.ApplyDictByTrigger (decrement) と同じ「残り −1・0 で消える」を写す (本体は UnityEngine に依存するので原文で口を確かめる)。</summary>
-    static void ToilReadiness(string root)
+    static void ToilInsight(string root)
     {
-        const string T = EventSystem.TimedEffects.BattleBoonRule.ToilName, R = EventSystem.TimedEffects.BattleBoonRule.ReadinessName;
-        Check(EventSystem.TimedEffects.BattleBoonRule.ToilCharges == 3 && EventSystem.TimedEffects.BattleBoonRule.ReadinessCharges == 3
-              && EventSystem.TimedEffects.BattleBoonRule.ReadinessMultiplier == 2, "徒労・覚悟: 置き値 (3 つ・3 つ・2 倍) は定数");
+        const string T = EventSystem.TimedEffects.BattleBoonRule.ToilName, R = EventSystem.TimedEffects.BattleBoonRule.InsightName;
+        Check(EventSystem.TimedEffects.BattleBoonRule.ToilCharges == 3 && EventSystem.TimedEffects.BattleBoonRule.InsightCharges == 3
+              && EventSystem.TimedEffects.BattleBoonRule.InsightMultiplier == 2, "徒労・開眼: 置き値 (3 つ・3 つ・2 倍) は定数");
         // 戦闘の列: 種類 (N = 通常 / E = エリート / B = ボス / P = 追跡者 / F = 逃げた通常 / L = 負けた通常)
         (int coins, int mats, int drops, int prov, int left) Fight(Dictionary<string, int> deb, Dictionary<string, int> buf, char kind, double[] rolls, ref int ri)
         {
@@ -352,17 +352,17 @@ static class Program
             Check(got == want, "徒労: 通常の戦闘の勝ちだけで 1 つ減り、 その戦闘は何も得られない (ゴールド・素材・ドロップ・物資 0)・エリート/ボス/追跡者/逃げた/負けたは減らない・3 勝で晴れる"
                                + (got == want ? "" : $"\n    実際 {got}\n    期待 {want}"));
         }
-        // 〈覚悟〉: 通常の戦闘でゴールド・素材 2 倍・ドロップは 2 回引く・物資は増やさない / 3 勝で消える / 〈徒労〉と両方なら〈徒労〉が勝つ
+        // 〈開眼〉: 通常の戦闘でゴールド・素材 2 倍・ドロップは 2 回引く・物資は増やさない / 3 勝で消える / 〈徒労〉と両方なら〈徒労〉が勝つ
         {
-            var deb = new Dictionary<string, int>(); var buf = new Dictionary<string, int> { [R] = EventSystem.TimedEffects.BattleBoonRule.ReadinessCharges };
+            var deb = new Dictionary<string, int>(); var buf = new Dictionary<string, int> { [R] = EventSystem.TimedEffects.BattleBoonRule.InsightCharges };
             int ri = 0; var log = new List<string>();
             foreach (char k in "NENNN") { var r = Fight(deb, buf, k, rollsAllHit, ref ri); log.Add($"{k}:{r.coins}G/{r.mats}素/{r.drops}落/{r.prov}物/残{r.left}"); }
             string got = string.Join(" ", log);
             string want = "N:20G/2素/2落/1物/残2 E:10G/2素/1落/1物/残2 N:20G/2素/2落/1物/残1 N:20G/2素/2落/1物/残0 N:10G/1素/1落/1物/残0";
-            Check(got == want, "覚悟: 通常の戦闘の勝ちでゴールド・素材 2 倍・ドロップは抽選 2 回・物資はそのまま・エリートには掛からない・3 勝で消える"
+            Check(got == want, "開眼: 通常の戦闘の勝ちでゴールド・素材 2 倍・ドロップは抽選 2 回・物資はそのまま・エリートには掛からない・3 勝で消える"
                                + (got == want ? "" : $"\n    実際 {got}\n    期待 {want}"));
             var both = EventSystem.TimedEffects.BattleBoonRule.Decide(true, false, true, 1, 1);
-            Check(both == EventSystem.TimedEffects.BattleBoon.Toil, "徒労・覚悟: 両方ある時は〈徒労〉 (何も得られない)");
+            Check(both == EventSystem.TimedEffects.BattleBoon.Toil, "徒労・開眼: 両方ある時は〈徒労〉 (何も得られない)");
         }
         // 本体の口 (原文): 判定は 1 か所・既存の時限効果の減らし方に乗る・登録と数
         string Src(string p) => File.ReadAllText(Path.Combine(root, p));
@@ -370,14 +370,14 @@ static class Program
         string reg = Src("Assets/Scripts/EventSystem/TimedEffects/TimedEffectRegistry.cs"), fx = Src("Assets/Scripts/EventSystem/TimedEffects/Effects/BattleRewardEffects.cs");
         Check(rw.Contains("BattleBoonRule.Decide(") && rw.Contains("TimedEffectManager.OnNormalBattleWon(Run)") && cb.Contains("TakeNormalBattleBoon(result);")
               && System.Text.RegularExpressions.Regex.Matches(rw + cb, @"BattleBoonRule\.Decide\(").Count == 1,
-              "徒労・覚悟: 判定は GameManager.TakeNormalBattleBoon の 1 か所 (戦闘の終わりに呼ぶ)・減らすのは TimedEffectManager.OnNormalBattleWon");
-        Check(reg.Contains("new Effects.ToilDebuffEffect()") && reg.Contains("new Effects.ReadinessBuffEffect()")
-              && reg.Contains("BattleBoonRule.ToilCharges") && reg.Contains("BattleBoonRule.ReadinessCharges")
+              "徒労・開眼: 判定は GameManager.TakeNormalBattleBoon の 1 か所 (戦闘の終わりに呼ぶ)・減らすのは TimedEffectManager.OnNormalBattleWon");
+        Check(reg.Contains("new Effects.ToilDebuffEffect()") && reg.Contains("new Effects.InsightBuffEffect()")
+              && reg.Contains("BattleBoonRule.ToilCharges") && reg.Contains("BattleBoonRule.InsightCharges")
               && System.Text.RegularExpressions.Regex.Matches(fx, @"TimedEffectTrigger\.NormalBattleWon").Count == 2,
-              "徒労・覚悟: 時限効果として登録・持つ数は定数・どちらも「通常の戦闘に勝った時」で減る");
+              "徒労・開眼: 時限効果として登録・持つ数は定数・どちらも「通常の戦闘に勝った時」で減る");
         Check(rw.Contains("ScaleByBattleBoon(coins)") && rw.Contains("BattleBoonRule.GrantsProvision(LastBattleBoon)") && rw.Contains("BattleBoonRule.DropRolls(LastBattleBoon)")
               && cb.Contains("ScaleByBattleBoon(elite ? 2 : 1)") && cb.Contains("BattleBoonRule.GrantsDrops(LastBattleBoon)"),
-              "徒労・覚悟: 報酬の各所 (ゴールド・物資・ドロップ・強化素材・強奪) が判定の結果を読む");
+              "徒労・開眼: 報酬の各所 (ゴールド・物資・ドロップ・強化素材・強奪) が判定の結果を読む");
     }
 
     // ===== 7. 出る層 (2026-11-13・docs/GAME.md §17「出る層」) =====
@@ -697,7 +697,7 @@ static class Program
         Selectability(dir);
         Observatory(dir);
         AshBase(dir);
-        ToilReadiness(Path.GetFullPath(Path.Combine(dir, "../../..")));
+        ToilInsight(Path.GetFullPath(Path.Combine(dir, "../../..")));
         Layers(dir);
         ClockRelic(Path.GetFullPath(Path.Combine(dir, "../../..")));   // dir = <root>/Assets/Resources/Events
         KeepConviction(Path.GetFullPath(Path.Combine(dir, "../../..")));

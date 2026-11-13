@@ -40,7 +40,7 @@ namespace EventSystem.TimedEffects
             DecrementByTrigger(TimedEffectTrigger.OnTurnEnd, run);
         }
 
-        /// <summary>通常の戦闘に勝った時に呼ぶ (2026-11-13・〈徒労〉〈覚悟〉)。 NormalBattleWon 系を適用してチャージ-1。
+        /// <summary>通常の戦闘に勝った時に呼ぶ (2026-11-13・〈徒労〉〈開眼〉)。 NormalBattleWon 系を適用してチャージ-1。
         /// 呼ぶのは <c>GameManager.TakeNormalBattleBoon</c> だけ (通常の戦闘かの判定もそこ)。</summary>
         public static void OnNormalBattleWon(RunState run)
         {

@@ -18,7 +18,7 @@ namespace EventSystem.TimedEffects
         /// <summary>層に入った時に適用 (2026-09-15)。 **1 ランに 8 回しか鳴らない**ので、
         /// 1 回あたりの量はマップ移動系より大きくてよい (移動は 1 ラン 30〜40 回)。</summary>
         OnFloorEnter,
-        /// <summary>通常の戦闘 (エリート・ボス・追跡者・使い魔・イベントの戦闘・偽の商人・値下げ交渉でない) に勝った時に 1 減る (2026-11-13・〈徒労〉〈覚悟〉)。
+        /// <summary>通常の戦闘 (エリート・ボス・追跡者・使い魔・イベントの戦闘・偽の商人・値下げ交渉でない) に勝った時に 1 減る (2026-11-13・〈徒労〉〈開眼〉)。
         /// 逃げた戦闘・負けた戦闘では鳴らない。 効果は報酬を配る側 (<c>GameManager.TakeNormalBattleBoon</c>) が減らす前の残りを見て決める。
         /// 鳴らすのは <see cref="TimedEffectManager.OnNormalBattleWon"/> だけ。</summary>
         NormalBattleWon,

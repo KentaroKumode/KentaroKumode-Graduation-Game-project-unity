@@ -17,13 +17,13 @@ namespace EventSystem.TimedEffects.Effects
     }
 
     /// <summary>
-    /// 〈覚悟〉(時限バフ・名前は仮・2026-11-13・docs/GAME.md §17): 〈徒労〉の対。 〈灰に埋もれた基地・再訪〉で手記の最後の頁を開くと得る。
-    /// <see cref="BattleBoonRule.ReadinessCharges"/> つ持った状態になり、 <b>通常の戦闘に勝つたびに 1 つ減り、 その戦闘で得るゴールドとドロップと強化素材が
-    /// <see cref="BattleBoonRule.ReadinessMultiplier"/> 倍</b>。 隠し倍率ではない ── 名前と説明を画面に出し、 報酬の結果の行にも出す。 規則と数値の正本は <see cref="BattleBoonRule"/>。
+    /// 〈開眼〉(時限バフ・2026-11-13・docs/GAME.md §17): 〈徒労〉の対。 〈灰に埋もれた基地・再訪〉で手記の最後の頁を開くと得る。
+    /// <see cref="BattleBoonRule.InsightCharges"/> つ持った状態になり、 <b>通常の戦闘に勝つたびに 1 つ減り、 その戦闘で得るゴールドとドロップと強化素材が
+    /// <see cref="BattleBoonRule.InsightMultiplier"/> 倍</b>。 隠し倍率ではない ── 名前と説明を画面に出し、 報酬の結果の行にも出す。 規則と数値の正本は <see cref="BattleBoonRule"/>。
     /// </summary>
-    public class ReadinessBuffEffect : ITimedEffect
+    public class InsightBuffEffect : ITimedEffect
     {
-        public string Id => BattleBoonRule.ReadinessName;
+        public string Id => BattleBoonRule.InsightName;
         public TimedEffectTrigger Trigger => TimedEffectTrigger.NormalBattleWon;
         public void Apply(CombatContext ctx, RunState run, CombatSystem.CombatManager combat) { }
     }

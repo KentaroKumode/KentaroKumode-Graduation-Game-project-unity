@@ -25,7 +25,7 @@ namespace GameLoop
 
             // 2026-06-04: 素材経済の潤沢化（武器フル強化＋昇華5-10レンジを狙う）。
             // 旧 25%×1 → 戦闘勝利で確定+1、エリート勝利はさらに+1。
-            // 時限デバフ〈徒労〉/ 時限バフ〈覚悟〉(2026-11-13): 通常の戦闘に勝った時だけ 1 つ減り、 この戦闘の報酬を 0 / 2 倍にする。
+            // 時限デバフ〈徒労〉/ 時限バフ〈開眼〉(2026-11-13): 通常の戦闘に勝った時だけ 1 つ減り、 この戦闘の報酬を 0 / 2 倍にする。
             //   判定はここで 1 回だけ (GameManager.Rewards.cs の TakeNormalBattleBoon)。 素材・強奪 (下) とゴールド・物資・ドロップ (ConfirmBattleResult) が結果を読む。
             TakeNormalBattleBoon(result);
 
@@ -37,7 +37,7 @@ namespace GameLoop
 
                 bool elite = MapSystem.MapManager.Instance?.CurrentNode != null
                              && MapSystem.MapManager.Instance.CurrentNode.EffectiveType == MapSystem.TileType.EliteBattle;
-                int mat = ScaleByBattleBoon(elite ? 2 : 1);   // 〈徒労〉0 /〈覚悟〉2 倍 (通常の戦闘だけ・エリートには掛からない)
+                int mat = ScaleByBattleBoon(elite ? 2 : 1);   // 〈徒労〉0 /〈開眼〉2 倍 (通常の戦闘だけ・エリートには掛からない)
                 Run.weaponMaterials += mat;
                 Log($"[戦闘報酬] 強化素材+{mat}{BattleBoonTag()}");
 
@@ -48,7 +48,7 @@ namespace GameLoop
                     && MapSystem.MapManager.Instance.CurrentNode.type == MapSystem.TileType.Boss;
                 float dropPct = bossNodeForDrop
                     ? 0f : MetaProgression.MetaBuffApplicator.GetPlunderPassiveDropPct();
-                // 〈徒労〉: 抽選は引く (乱数の列を変えない) が配らない。 〈覚悟〉: 抽選を 2 回引く (乱数を余分に引く)
+                // 〈徒労〉: 抽選は引く (乱数の列を変えない) が配らない。 〈開眼〉: 抽選を 2 回引く (乱数を余分に引く)
                 for (int k = 0, rolls = EventSystem.TimedEffects.BattleBoonRule.DropRolls(LastBattleBoon); k < rolls; k++)
                 {
                     if (dropPct > 0f

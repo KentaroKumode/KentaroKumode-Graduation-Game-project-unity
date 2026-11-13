@@ -182,7 +182,7 @@ namespace AutoTest
         public bool territoryKeepBypass = true;
         /// <summary>[測定 2026-11-13] 灰燼の王 (深さ 6 = 画面の第 4 層のボス) を倒したことがある記録として走るか。 本体の GameHooks.AshKingBeatenEver へ流す
         /// (ラン終了で null = ランの外の記録を読む へ)。 BOT は毎回空の記録で走るので、 口が無いと「はじめて」扱いで 1 本もヴェスカに届かない。
-        /// true (既定) = 倒したことがある: 深さ 6 の〈灰に埋もれた基地〉は再訪の版で、 BOT は必ず手記の最後の頁を開く (〈真理〉+〈覚悟〉→ 深さ 7 へ)。
+        /// true (既定) = 倒したことがある: 深さ 6 の〈灰に埋もれた基地〉は再訪の版で、 BOT は必ず手記の最後の頁を開く (〈真理〉+〈開眼〉→ 深さ 7 へ)。
         /// 目標のクリア率はこの条件で測る。 false = はじめて: 基地は〈徒労〉の 1 択・灰燼の王を倒すと第 4 層のクリアの結末で終わる。</summary>
         public bool ashKingBeatenEver = true;
         /// <summary>[測定 2026-11-13] 天候の作り。 本体の GameHooks.StormEnabled へ流す (ラン終了で true へ)。
