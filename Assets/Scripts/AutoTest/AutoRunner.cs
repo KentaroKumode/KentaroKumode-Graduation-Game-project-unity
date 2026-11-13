@@ -807,6 +807,7 @@ namespace AutoTest
                  + $"/ 手札 {(handCarry == CombatSystem.HandCarryMode.Pick ? "印を付けた端子だけ残す (Pick)" : handCarry == CombatSystem.HandCarryMode.All ? "挿さなかった端子は全部残る (All)" : "毎ターン捨てる (Off・旧い規則)")}"
                  + $"{(handCarry == CombatSystem.HandCarryMode.Pick ? " 残す方策 " + EffectiveHandKeepPolicy + " (handKeepPolicy=" + handKeepPolicy + ")" : "")} "
                  + $"/ ボスのダウン {(bossDown ? "あり" : "なし (旧い作り)")} "
+                 + $"/ ダウンの狙い {(downAimPolicy == DownAimPolicy.Aim ? "大技が 2 ターン後なら待って大技に重ねる手も比べる" : "割れる時に割る (今まで)")} (downAimPolicy={downAimPolicy}) "
                  + $"/ 深さ 3 のボスの大技 {(depth3Heavy ? "あり" : "なし (旧い作り)")} "
                  + $"/ 博士の時計 {(vescaClockHeld ? "ランの最初から預かる (ヴェスカの各段に目盛り +" + CombatSystem.BossParams.VescaClockNotch.ToString("0.00") + ")" : "預からない (イベントで選んだ時だけ)")} (vescaClockHeld={vescaClockHeld}) "
                  + $"/ 攻撃なしの手の主攻撃 (旧の式) {(v3.oldNoAttackBaseDmg ? "素火力を数える (旧い挙動)" : "0")} "
@@ -814,7 +815,9 @@ namespace AutoTest
                  + $"/ 縄張りの宝 {territoryTreasure} (BOT のしきい値 {territoryTreasureHpMargin:0.##}) / 縄張りを避ける遠回り {(navTerritoryDetour < 0 ? "使わない" : "+" + navTerritoryDetour + "歩まで")}"
                  + (DeckLookaheadDiagLine().Length > 0 ? System.Environment.NewLine + DeckLookaheadDiagLine() : "")
                  + (CombatSystem.BossDownDiag.Line().Length > 0 ? System.Environment.NewLine + CombatSystem.BossDownDiag.Line() : "")
-                 + (NoAttackChoiceLine().Length > 0 ? System.Environment.NewLine + NoAttackChoiceLine() : "");
+                 + (NoAttackChoiceLine().Length > 0 ? System.Environment.NewLine + NoAttackChoiceLine() : "")
+                 + (DownAimLine().Length > 0 ? System.Environment.NewLine + DownAimLine() : "")                 // [#141]
+                 + (HandKeepPlanLine().Length > 0 ? System.Environment.NewLine + HandKeepPlanLine() : "");      // [#141]
         }
 
         /// <summary>次のボスに対する戦力ギャップ。 **天井 (Super) のときだけ効く** ──

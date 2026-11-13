@@ -385,6 +385,88 @@ static class T
                   $"重なり (出目 4): 単独 {alone} / +〈変圧器〉 {tf} / +〈倍電圧〉 {db} (外すのは 1 枚 = 〈{(dbo.burnTarget >= 0 ? "充電" : "-")}〉) / +両方 {both} / +〈増圧〉(出目 2 を挿す・他の出目 +1 → (4+1)×2 + 2) {gr}");
         }
 
+        // ---- 10. #141 BOT のダウンの狙いと残す印 (AutoTest.DownKeepRules は本物をコンパイル) ----
+        {
+            // 10a. 残した端子は次のターンに引く枚数を減らす (本体の DrawTurn: 手札が規定の枚数になるまでしか引かない)
+            GameLoop.GameHooks.HandCarry = HandCarryMode.Pick; GameLoop.GameRng.Reset();
+            var dk = new TerminalDeckState();
+            var runDeck = new List<string>();
+            for (int i = 0; i < 4; i++) { runDeck.Add(TerminalIds.Attack); runDeck.Add(TerminalIds.Block); runDeck.Add(TerminalIds.Charge); }
+            dk.BeginBattle(runDeck);
+            dk.DrawTurn(TerminalCards.HandSize);
+            var o = TerminalCards.Resolve(dk.board, new[] { 0, -1, -1 }, new[] { 3, 1, 1 }, new TerminalEnv(), dk.state);
+            var marks = new bool[dk.board.Count]; marks[1] = marks[2] = true;
+            dk.keepNext.AddRange(TerminalDeckState.KeepFromMarks(dk.board, dk.permanent.Count, o, marks));
+            dk.FinishTurn(o);
+            dk.DrawTurn(TerminalCards.HandSize);
+            Check(dk.LastKept.Count == 2 && dk.LastDrawnCount == TerminalCards.HandSize - 2 && dk.hand.Count == TerminalCards.HandSize,
+                  $"残す印で 2 枚残すと、 次のターンに新しく引くのは {dk.LastDrawnCount} 枚 (手札 {dk.hand.Count} 枚)");
+
+            // 10b. 待つ得の式 = シミュレーションの平均 (戦闘の終わりを周期の中で一様と見る)。 本体の周期の規則 (Escalation.IsHeavyTurn・ダウンで起点が戻る) の写し
+            const int P = 3; const float H = 2.0f, W = 0.7f, B = 10f;
+            float F(int c) => c > 0 && c % P == 0 ? H * B : W * B;      // 周期の c ターン目の攻撃
+            foreach (int c1 in new[] { 1, 2, 3 })                         // 次のターン (T+1) の周期の位置
+            {
+                // 今割る: T+1 がダウン (0)・T+1+j は周期の j ターン目。 待つ: T+1 は c1・T+2 がダウン・T+2+j は j ターン目
+                float Seq(bool hold, int j) => hold ? (j == 1 ? F(c1) : j == 2 ? 0f : F(j - 2)) : (j == 1 ? 0f : F(j - 1));
+                double mean = 0;
+                for (int nEnd = 2; nEnd <= P + 1; nEnd++)
+                {
+                    double a = 0, h = 0;
+                    for (int j = 1; j <= nEnd; j++) { a += Seq(false, j); h += Seq(true, j); }
+                    mean += a - h;
+                }
+                mean /= P;
+                var cyc = new List<int>(); for (int j = 0; j < P; j++) cyc.Add((int)F(c1 + j));
+                float g = AutoTest.DownKeepRules.HoldGain((int)F(c1), cyc, 1f);
+                Check(Math.Abs(g - mean) < 1e-3, $"待つ得の式 (次のターンが周期の {c1} ターン目) {g:0.00} = シミュレーションの平均 {mean:0.00}");
+            }
+            var cy = new List<int> { 7, 20, 7 };
+            Check(AutoTest.DownKeepRules.HoldGain(7, cy, 0.2f) > 0f && AutoTest.DownKeepRules.HoldGain(20, new List<int> { 20, 7, 7 }, 0.2f) < 0f
+                  && Math.Abs(AutoTest.DownKeepRules.HoldGain(7, cy, 0.2f) - 0.2f * (34f / 3f - 7f)) < 1e-4,
+                  "待つ得: 次のターンが溜めなら正・大技なら負・帳簿の割引を掛ける");
+            Check(AutoTest.DownKeepRules.HoldEligible(true, 2, false, true, false, 760, 750, 30f)
+                  && !AutoTest.DownKeepRules.HoldEligible(true, 1, false, true, false, 760, 750, 30f)      // 大技が次のターン = 今割れば重なる
+                  && !AutoTest.DownKeepRules.HoldEligible(true, 2, false, false, false, 760, 750, 30f)     // 今割れる手が無い
+                  && !AutoTest.DownKeepRules.HoldEligible(true, 2, false, true, true, 740, 750, 30f)       // この手は割る
+                  && !AutoTest.DownKeepRules.HoldEligible(true, 2, false, true, false, 790, 750, 30f)      // 次のターンに割れる見込みが無い
+                  && !AutoTest.DownKeepRules.HoldEligible(true, 2, true, true, false, 760, 750, 30f)       // 何もしなくても次はダウン
+                  && !AutoTest.DownKeepRules.HoldEligible(false, 2, false, true, false, 760, 750, 30f),    // 大技の無い敵
+                  "待つ手の条件 (大技が 2 ターン後・今割れる手がある・この手は割らない・次のターンに割れる見込み)");
+
+            // 10c. 残す印 Planned
+            Check(AutoTest.DownKeepRules.BlockSlotsNeeded(20, 3.5f, 3) == 3 && AutoTest.DownKeepRules.BlockSlotsNeeded(6, 3.5f, 3) == 2
+                  && AutoTest.DownKeepRules.BlockSlotsNeeded(0, 3.5f, 3) == 0, "大技の守りに要る口の数 (攻撃 ÷ 出目の平均・出目の数まで)");
+            AutoTest.DownKeepRules.KeepCard C(int slot, TerminalKind kind, float worth, bool condFree = true, bool before = false, int cap = 1)
+                => new AutoTest.DownKeepRules.KeepCard { slot = slot, kind = kind, worth = worth, condFree = condFree, keptBeforeUnused = before, capacity = cap };
+            var R = AutoTest.DownKeepRules.KeepReason.None;
+            var cards = new List<AutoTest.DownKeepRules.KeepCard>
+                { C(1, TerminalKind.Attack, 1f), C(2, TerminalKind.Attack, 3f), C(3, TerminalKind.Block, 2f), C(4, TerminalKind.Attack, 2f, before: true), C(5, TerminalKind.Support, 3f) };
+            var r1 = AutoTest.DownKeepRules.PlanKeep(cards, 3, true, false, 1, 0, 0, 1.5f, true);
+            Check(r1[0] == AutoTest.DownKeepRules.KeepReason.DownAttack && r1[1] == AutoTest.DownKeepRules.KeepReason.DownAttack && r1[2] == R && r1[3] == R && r1[4] == R,
+                  "次がダウン: 攻撃の端子を常設と合わせて出目の数まで (点の高い順)・前に残して使わなかった端子とほかの種類は残さない");
+            var r2 = AutoTest.DownKeepRules.PlanKeep(cards, 3, false, true, 0, 0, 2, 1.5f, true);
+            Check(r2[2] == AutoTest.DownKeepRules.KeepReason.HeavyBlock && r2[4] == AutoTest.DownKeepRules.KeepReason.Leftover && r2[1] == AutoTest.DownKeepRules.KeepReason.Leftover
+                  && r2[0] == R && r2[3] == R,
+                  "次が大技: 防御の端子 (常設と合わせて要る口まで) + 出目を挿し切って余った、 平均より点の高い端子 (残す口は出目の数まで)");
+            var r3 = AutoTest.DownKeepRules.PlanKeep(cards, 3, false, false, 0, 0, 0, 1.5f, false);
+            Check(r3.All(x => x == R), "当てが無い (ダウンでも大技でもなく、 出目が余っていた) なら何も残さない");
+            var many = new List<AutoTest.DownKeepRules.KeepCard>();
+            for (int i = 0; i < 6; i++) many.Add(C(i, TerminalKind.Support, 3f));
+            many.Add(C(6, TerminalKind.Attack, 3f, condFree: false));
+            var r4 = AutoTest.DownKeepRules.PlanKeep(many, 3, false, false, 0, 0, 0, 1.5f, true);
+            Check(r4.Count(x => x != R) == 3 && r4[6] == R, "余った端子を残すのは出目の数まで・条件のある端子は残さない");
+
+            // 10d. 〈呼び戻し〉の当て
+            var kinds = new List<TerminalKind> { TerminalKind.Attack, TerminalKind.Block, TerminalKind.Support, TerminalKind.Block };
+            var worths = new List<float> { 2f, 1f, 3f, 1f };
+            Check(AutoTest.DownKeepRules.RecallIndex(kinds, worths, null) == 2 && AutoTest.DownKeepRules.RecallIndex(kinds, worths, TerminalKind.Attack) == 0
+                  && AutoTest.DownKeepRules.RecallIndex(kinds, worths, TerminalKind.Block) == 3
+                  && AutoTest.DownKeepRules.RecallIndex(kinds, worths, TerminalKind.Charge) == 2
+                  && AutoTest.DownKeepRules.RecallIndex(new List<TerminalKind>(), new List<float>(), TerminalKind.Attack) == -1,
+                  "〈呼び戻し〉: 当ての種類の中で点の最大 (同点は後に捨てた方)・無ければ全体で・当てが無ければ今までと同じ");
+        }
+
         Console.WriteLine(fails == 0 ? "ALL OK" : fails + " FAILED");
         return fails == 0 ? 0 : 1;
     }

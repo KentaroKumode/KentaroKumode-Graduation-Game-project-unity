@@ -507,6 +507,8 @@ namespace AutoTest.ParallelSweep
                 "terminalKillNeedsAttack",
                 // 2026-11-13: 戦闘の規則の 3 つの口 (True = 新しい規則・3 つとも False = 旧い規則 = main と同じ)
                 "handCarry", "handKeepPolicy", "EffectiveHandKeepPolicy", "bossDown", "depth3Heavy",
+                // 2026-11-14 (#141): ボスのダウンの狙い方 (None = 既定・今まで / Aim = 大技が 2 ターン後なら待つ手も比べる)。 残す印の Planned は上の handKeepPolicy
+                "downAimPolicy",
                 // 2026-11-13: 博士の時計をランの最初から預かる腕 (False = 既定・イベントで選んだ時だけ)
                 "vescaClockHeld",
                 // 2026-11-14: 〈徒労〉の形 (UntilKing = 灰燼の王を倒すまで・既定 / Stacks = 旧い 3 つ持ち / LayerLong = 層の間ずっと) と、 別の形で宝箱が空になる確率 (%)
