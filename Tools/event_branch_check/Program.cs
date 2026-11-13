@@ -12,6 +12,7 @@
 //   7. 出る層 (2026-11-13): 条件は今ある深さ (1・3・5・6・7) だけで書く・深さごとの抽選のプールの数・連鎖の順 (前の段 ≦ 後の段)・
 //      確信の連鎖は深さ 1〜5・深さ 7 (一本道・追跡者と天候なし) に出るイベントは選べる選択肢がある
 //   8. 〈灰に埋もれた基地〉2 本 (選択肢の数・効果・版の選び方・〈真理〉は効果で立つ) と〈徒労〉〈開眼〉の規則 (2026-11-13・AshBaseEvent / BattleBoonRule は本物をコンパイル)
+//      〈徒労〉の戦闘のデバフ (2026-11-14・与えるダメージ −N%・既定 0・怠惰と同じ枠・王を倒すと消える)
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -381,6 +382,82 @@ static class Program
               "徒労・開眼: 報酬の各所 (ゴールド・物資・ドロップ・強化素材・強奪) が判定の結果を読む (量と物資は〈徒労〉の形も見る)");
         ToilLayerLong(root);
         ToilUntilKing(root);
+        ToilCombat(root);
+    }
+
+    /// <summary>〈徒労〉の戦闘のデバフ (2026-11-14・測定の口 toilDamageDownPct・既定 0): 持っている間、 すべての戦闘で与えるダメージ −N%。
+    /// 枠は大罪:怠惰と同じ (重なったら厳しい方)・持っていない時と N = 0 の時は今の式と同じ・灰燼の王を倒すと消える。</summary>
+    static void ToilCombat(string root)
+    {
+        const string T = EventSystem.TimedEffects.BattleBoonRule.ToilName, R = EventSystem.TimedEffects.BattleBoonRule.InsightName;
+        var U = EventSystem.TimedEffects.ToilMode.UntilKing;
+        int Pct(bool has, int n) => EventSystem.TimedEffects.BattleBoonRule.ToilDamageDownPct(has, n);
+        int Cut(int d, int sloth, int toil) => EventSystem.TimedEffects.BattleBoonRule.ApplyOutgoingCut(d, EventSystem.TimedEffects.BattleBoonRule.OutgoingCutPct(sloth, toil));
+        Check(EventSystem.TimedEffects.BattleBoonRule.DefaultToilDamageDownPct == 0, "徒労 (戦闘): 口の既定は 0 (デバフなし)");
+        // 持っていない時・N = 0 の時は、 今の式 (怠惰なし = 素通し / 怠惰あり = d × (100 − 30) / 100) と全部同じ
+        {
+            bool same = true;
+            for (int d = -3; d <= 600; d++)
+                foreach (int n in new[] { 0, 15, 30, 45 })
+                {
+                    same &= Cut(d, 0, Pct(false, n)) == d && Cut(d, 0, Pct(true, 0)) == d;
+                    int oldSloth = d > 0 ? d * (100 - 30) / 100 : d;
+                    same &= Cut(d, 30, Pct(false, n)) == oldSloth && Cut(d, 30, Pct(true, 0)) == oldSloth;
+                }
+            Check(same, "徒労 (戦闘): 持っていない時と N = 0 の時は与ダメージが変わらない (怠惰あり・なしとも今の式と同じ)");
+        }
+        // 持っている時は −N% (切り捨て)・怠惰と重なったら厳しい方 1 つ (足さない・掛けない)
+        {
+            bool ok = true;
+            foreach (int n in new[] { 15, 30, 45 })
+                for (int d = 1; d <= 600; d++)
+                {
+                    ok &= Cut(d, 0, Pct(true, n)) == d * (100 - n) / 100;
+                    ok &= Cut(d, 30, Pct(true, n)) == d * (100 - Math.Max(30, n)) / 100;
+                }
+            ok &= Cut(100, 0, Pct(true, 15)) == 85 && Cut(100, 0, Pct(true, 45)) == 55 && Cut(100, 30, Pct(true, 15)) == 70 && Cut(100, 30, Pct(true, 45)) == 55;
+            ok &= Pct(true, 150) == 100 && Pct(true, -5) == 0 && Cut(100, 0, Pct(true, 150)) == 0 && Cut(0, 0, 45) == 0;
+            Check(ok, "徒労 (戦闘): 持っている間は与えるダメージ −N% (切り捨て)・怠惰と重なったら厳しい方 (100 → 15%:85 / 45%:55 / 怠惰 30 と 15%:70 / 怠惰 30 と 45%:55)");
+        }
+        // 戦闘の列 (既定の形 UntilKing・N = 30・主攻撃 100): N = 通常 / E = エリート / B = ボス / P = 追跡者 / K = 灰燼の王を倒す (その戦闘は削られる・倒した後に消える)
+        {
+            var deb = new Dictionary<string, int> { [T] = EventSystem.TimedEffects.BattleBoonRule.ToilCharges };
+            int Left(string id) => deb.TryGetValue(id, out int v) ? v : 0;
+            var log = new List<string>();
+            foreach (char k in "NEBPKNEB")
+            {
+                int dealt = Cut(100, 0, Pct(Left(T) > 0, 30));
+                if (k == 'K' && EventSystem.TimedEffects.BattleBoonRule.ToilClearsOnKingBeaten(U)) deb.Remove(T);
+                log.Add($"{k}:{dealt}");
+            }
+            string got = string.Join(" ", log), want = "N:70 E:70 B:70 P:70 K:70 N:100 E:100 B:100";
+            Check(got == want, "徒労 (戦闘): 通常・エリート・ボス・追跡者・灰燼の王の戦闘で −30%・王を倒すと消えて元に戻る" + (got == want ? "" : $"\n    実際 {got}\n    期待 {want}"));
+        }
+        // 説明: N > 0 なら「与えるダメージ −N%。」を後ろに付ける・0 なら今の文のまま・〈開眼〉は変わらない
+        Check(EventSystem.TimedEffects.BattleBoonRule.DescriptionOf(T, U, 0) == EventSystem.TimedEffects.BattleBoonRule.DescriptionOf(T, U)
+              && EventSystem.TimedEffects.BattleBoonRule.DescriptionOf(T, U, 15) == EventSystem.TimedEffects.BattleBoonRule.ToilUntilKingDescription + "与えるダメージ −15%。"
+              && EventSystem.TimedEffects.BattleBoonRule.DescriptionOf(R, U, 15) == EventSystem.TimedEffects.BattleBoonRule.InsightDescription
+              && EventSystem.TimedEffects.BattleBoonRule.DescriptionOf("啓示", U, 15) == null,
+              "徒労 (戦闘): 説明に「与えるダメージ −N%。」(N は値から・0 なら句を出さない)・〈開眼〉には付けない");
+        // 本体の口 (原文): 枠は 1 つの関数 (旧 ApplySlothCut を改名)・敵の HP を減らす口がそれを通る・口の既定と戻し・BOT の見積もりも同じ関数
+        string Src(string p) => File.ReadAllText(Path.Combine(root, p));
+        string meta = Src("Assets/Scripts/MetaProgression/MetaDebuffApplicator.cs"), dmg = Src("Assets/Scripts/CombatSystem/CombatManager.Damage.cs");
+        string diag = Src("Assets/Scripts/CombatSystem/Diagnostics/HpLossDiag.cs"), kw = Src("Assets/Scripts/ItemSystem/PassiveSkills/Keywords.cs");
+        string arc = Src("Assets/Scripts/AutoTest/AutoRunner.Combat.cs"), hooks = Src("Assets/Scripts/GameLoop/GameHooks.cs");
+        string st = Src("Assets/Scripts/AutoTest/AutoRunner.Step.cs"), tr = Src("Assets/Scripts/AutoTest/AutoRunner.Tracking.cs"), ar = Src("Assets/Scripts/AutoTest/AutoRunner.cs");
+        int stale = 0;
+        foreach (var f in Directory.GetFiles(Path.Combine(root, "Assets/Scripts"), "*.cs", SearchOption.AllDirectories))
+            if (File.ReadAllText(f).Contains("ApplySlothCut(")) stale++;
+        Check(stale == 0 && meta.Contains("BattleBoonRule.ApplyOutgoingCut(dmg, GetOutgoingCutPct())") && meta.Contains("BattleBoonRule.OutgoingCutPct(GetSlothDamageCutPct(), GetToilDamageCutPct())"),
+              "徒労 (戦闘): 枠は MetaDebuffApplicator.ApplyOutgoingCut の 1 つ (怠惰と〈徒労〉の厳しい方・旧 ApplySlothCut の呼び出しは残っていない)");
+        Check(dmg.Contains("ApplyOutgoingCut(totalDmg)") && diag.Contains("if (channel != \"通常攻撃\") dmg = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(dmg);")
+              && kw.Contains("ApplyOutgoingCut(dmg)") && Regex.Matches(arc, @"ApplyOutgoingCut\(").Count == 2,
+              "徒労 (戦闘): 主攻撃 (ApplyWinDamageModifiers)・主攻撃以外 (HpLossDiag.Lose)・品の直接 (Kw.DamageEnemy)・BOT の主攻撃の見積もり 2 か所が同じ枠を通る");
+        Check(hooks.Contains("public static int ToilDamageDownPct = EventSystem.TimedEffects.BattleBoonRule.DefaultToilDamageDownPct;")
+              && ar.Contains("public int toilDamageDownPct = EventSystem.TimedEffects.BattleBoonRule.DefaultToilDamageDownPct;")
+              && st.Contains("GameLoop.GameHooks.ToilDamageDownPct = System.Math.Max(0, toilDamageDownPct);")
+              && tr.Contains("GameLoop.GameHooks.ToilDamageDownPct = EventSystem.TimedEffects.BattleBoonRule.DefaultToilDamageDownPct;"),
+              "徒労 (戦闘): 口の既定 0 (本体・BOT)・毎ランの始めに入れ・ラン終了で戻す");
     }
 
     /// <summary>〈徒労〉の既定の形 (toilMode=UntilKing・2026-11-14・作者の決定「徒労は王を倒すまで永続化」): 勝っても減らず、 通常の戦闘は何も得られない (中身は旧い形 Stacks と同じ)・
