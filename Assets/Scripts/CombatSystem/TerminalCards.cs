@@ -221,6 +221,8 @@ namespace CombatSystem
         public const float AmplifierPerPip = 0.16f, ResonatorMul = 1.5f, VacuumCritMult = 2.0f;
         public const int CounterEvery = 10; public const float CounterPct = 0.10f;
         public const int TwinShotMul = 3, DetonatorMul = 4, FirstAidMul = 2, HealMul = 1, BatteryBonus = 2, InsulatorBonus = 4;
+        /// <summary>〈焼き切り〉: 挿した出目の合計に掛けて攻撃に足す倍率 (2026-11-14・作者の決定)。</summary>
+        public const int BurnOutMul = 2;
         public const int HarvesterMaxHp = 2, WhetGain = 1, LootGold = 5;
         /// <summary>〈剥ぎ取り〉: 撃破したターンに、 戦闘後の端子の選択肢が増える数 (RunState.terminalExtraChoices に足す)。</summary>
         public const int StripperChoices = 1;
@@ -366,7 +368,9 @@ namespace CombatSystem
                 Once(D(TerminalIds.FullCharge, C, "充電を上限まで満たす。")),
                 Once(D(TerminalIds.CoolShot, S, "エスカレーションの段階を 1 つ戻す。")),
                 Once(D(TerminalIds.Copier, S, "挿さずに空けた手札の端子を 1 枚、この戦闘中だけ複製して、次のターンの手札に加える。")),
-                Once(D(TerminalIds.BurnOut, S, "挿さずに空けた手札の端子を 1 枚、この戦闘中だけ山札から取り除く。")),
+                // 〈焼き切り〉: 2026-11-14 に作り直し (作者の決定)。 旧: 補助で「空けた端子を 1 枚この戦闘から外す」だけ (測定で発動 1.7%・GAME.md §24)。
+                //   外す端子が無いターン (候補 0) は挿しても不発 (Resolve の 4.)・使い捨ても消費しない
+                Once(D(TerminalIds.BurnOut, A, "出目 ×" + BurnOutMul + " を攻撃に。挿さずに空けた手札の端子を 1 枚、この戦闘から外す。")),
             };
         }
 
@@ -515,6 +519,10 @@ namespace CombatSystem
                     if (IsCandidate(board, o, self, s)) return s;
                 return -1;
             }
+            //   〈焼き切り〉(2026-11-14): 外す端子 (候補) が無ければ不発 ── 挿した出目を外す (条件に合わない・充電が足りない時と同じ扱い・使い捨ても消費しない)。
+            //   〈写し取り〉と旧い規則の〈呼び戻し〉は今までどおり、 対象が無くても発動する (効果が無いだけ)。
+            for (int s = 0; s < m; s++)
+                if (board[s] == TerminalIds.BurnOut && Plugged(o.slotOfDie, s) && Empty(s) < 0) Unplug(o.slotOfDie, s);
 
             // ── 5. 効果 ──
             bool doubler = false;
@@ -697,7 +705,7 @@ namespace CombatSystem
                 case TerminalIds.FullCharge: o.chargeFill = true; break;
                 case TerminalIds.CoolShot: o.retreatStage = true; break;
                 case TerminalIds.Copier: o.copyTarget = empty(slot); break;
-                case TerminalIds.BurnOut: o.burnTarget = empty(slot); break;
+                case TerminalIds.BurnOut: o.attackAdd += sum * BurnOutMul; o.burnTarget = empty(slot); break;   // 候補は 4. で確かめ済み (無ければ不発)
             }
         }
     }

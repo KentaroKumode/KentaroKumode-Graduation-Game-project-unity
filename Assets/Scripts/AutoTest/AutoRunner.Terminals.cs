@@ -161,7 +161,9 @@ namespace AutoTest
             if (o.copyTarget >= 0 && o.copyTarget < board.Count) flat += Math.Min(turns - 1, 1f + draws) * PerUse(o.copyTarget) * dw;
             if (o.burnTarget >= 0 && o.burnTarget < board.Count && runNow?.terminalDeck != null && runNow.terminalDeck.Count > 0)
             {
-                // 抜いた分だけ、 山札の平均の端子を引く回数が増える (対象が平均より悪いほど得・良い端子を抜けば損)
+                // 抜いた分だけ、 山札の平均の端子を引く回数が増える (対象が平均より悪いほど得・良い端子を抜けば損)。
+                //   2026-11-14 の作り直しの後も同じ物差し (外すのは必ず起きる・外す端子が無ければ Resolve が不発にする)。 出目 ×2 の攻撃は ws.aSum に入って効用の Core が見る。
+                //   使い捨ての費用は攻撃の種類 (DeckDisposableDmgCost × dw・〈起爆筒〉〈貫通弾〉と同じ) になった (旧: 補助で DeckDisposableHpCost × fw)
                 float avg = 0f; foreach (var id in runNow.terminalDeck) avg += TargetWorth(TerminalCards.Get(id), runNow);
                 avg /= runNow.terminalDeck.Count;
                 flat += draws * DeckCardDmgPerPoint * (avg - TargetWorth(TerminalCards.Get(board[o.burnTarget]), runNow)) * dw;
@@ -1045,6 +1047,7 @@ namespace AutoTest
                 case TerminalIds.Switchboard: return 1.5f;
             }
             if (d.rare) return d.disposable ? 2.5f : 3f;
+            // 使い捨てのコモンは 1.5。 〈焼き切り〉(2026-11-14 に攻撃の端子へ作り直し) もここで、 使い捨ての攻撃の端子〈起爆筒〉(出目 ×4)・〈貫通弾〉と同じ点
             return d.disposable ? 1.5f : 2f;
         }
 

@@ -320,6 +320,67 @@ static class T
                   "〈写し取り〉の説明文は「次のターンの手札に加える」");
         }
 
+        // ---- 9. 〈焼き切り〉(2026-11-14・作者の決定): 出目 ×2 を攻撃に・空けた手札の端子を 1 枚この戦闘から外す・候補 0 では不発で消費しない ----
+        {
+            GameLoop.GameHooks.HandCarry = HandCarryMode.Pick; GameLoop.GameRng.Reset();
+            var bd = TerminalCards.Get(TerminalIds.BurnOut);
+            Check(bd != null && bd.kind == TerminalKind.Attack && bd.disposable && !bd.rare && TerminalCards.BurnOutMul == 2
+                  && bd.description == "出目 ×2 を攻撃に。挿さずに空けた手札の端子を 1 枚、この戦闘から外す。",
+                  "〈焼き切り〉: 攻撃の種類・使い捨て・コモン・説明文");
+            var env = new TerminalEnv();
+            // 挿すと出目 ×2 が攻撃に入り、 選んだ空けた端子が外れる
+            var b = new List<string> { TerminalIds.BurnOut, TerminalIds.Charge, TerminalIds.Block };
+            var o = TerminalCards.Resolve(b, new[] { 0, 2, -1 }, new[] { 5, 3, 1 }, env, new TerminalBattleState(), new[] { 1, -1, -1 });
+            Check(o.Fired(b, TerminalIds.BurnOut) && o.attackAdd == 10 && o.attackDice == 1 && o.supportDice == 0 && o.burnTarget == 1 && o.kindOfDie[0] == DiceTerminal.Attack,
+                  $"出目 5 → 攻撃 {o.attackAdd} (×2)・攻撃の個数 {o.attackDice}・外す 〈{(o.burnTarget >= 0 ? b[o.burnTarget] : "-")}〉");
+            // 山札で: 外した端子と〈焼き切り〉はこの戦闘から外れ、 次の戦闘では両方戻る
+            var dk = new TerminalDeckState();
+            var runDeck = new List<string> { TerminalIds.BurnOut, TerminalIds.Charge, TerminalIds.Block };
+            dk.BeginBattle(runDeck);
+            dk.DrawTurn(TerminalCards.HandSize);
+            int bs = dk.board.IndexOf(TerminalIds.BurnOut), cs = dk.board.IndexOf(TerminalIds.Charge), ks = dk.board.IndexOf(TerminalIds.Block);
+            var want = new int[dk.board.Count]; for (int i = 0; i < want.Length; i++) want[i] = -1; want[bs] = cs;
+            var od = TerminalCards.Resolve(dk.board, new[] { bs, ks, -1 }, new[] { 4, 2, 6 }, env, dk.state, want);
+            dk.FinishTurn(od);
+            Check(od.attackAdd == 8 && dk.exiled.Contains(TerminalIds.BurnOut) && dk.exiled.Contains(TerminalIds.Charge) && !dk.hand.Contains(TerminalIds.Charge),
+                  "対象の端子と〈焼き切り〉がこの戦闘から外れる");
+            dk.DrawTurn(TerminalCards.HandSize);
+            Check(!dk.board.Contains(TerminalIds.Charge) && !dk.board.Contains(TerminalIds.BurnOut), "この戦闘の次のターンには出てこない");
+            dk.BeginBattle(runDeck);
+            Check(dk.draw.Count == 3 && dk.exiled.Count == 0, "次の戦闘では両方とも山札にある");
+            // 候補 0: 外す端子が無いターンは不発 (出目を外す・攻撃にならない・使い捨てを消費しない)
+            var b0 = new List<string> { TerminalIds.BurnOut, TerminalIds.Attack };
+            var o0 = TerminalCards.Resolve(b0, new[] { 0, 1, -1 }, new[] { 5, 3, 1 }, env, new TerminalBattleState());
+            Check(!o0.Fired(b0, TerminalIds.BurnOut) && o0.slotOfDie[0] == -1 && o0.attackAdd == 3 && o0.attackDice == 1 && o0.burnTarget == -1,
+                  $"候補 0 では不発 (出目は外れる・攻撃は〈攻撃〉の 3 だけ = {o0.attackAdd})");
+            var dk0 = new TerminalDeckState();
+            dk0.BeginBattle(new List<string> { TerminalIds.BurnOut, TerminalIds.Attack });
+            dk0.DrawTurn(TerminalCards.HandSize);
+            int b0s = dk0.board.IndexOf(TerminalIds.BurnOut), a0s = dk0.board.IndexOf(TerminalIds.Attack);
+            var w0 = new int[] { b0s, a0s, -1 };
+            var od0 = TerminalCards.Resolve(dk0.board, w0, new[] { 5, 3, 1 }, env, dk0.state);
+            dk0.FinishTurn(od0);
+            Check(!dk0.exiled.Contains(TerminalIds.BurnOut) && dk0.exiled.Count == 0, "不発の時は使い捨てを消費しない (この戦闘から外れない)");
+            // 常設・止まった端子は候補にならない (今の IsCandidate のまま)
+            var bp = new List<string> { TerminalIds.Mains, TerminalIds.BurnOut };
+            var op = TerminalCards.Resolve(bp, new[] { 1, -1, -1 }, new[] { 4, 1, 1 }, env, new TerminalBattleState());
+            Check(!op.Fired(bp, TerminalIds.BurnOut) && op.attackAdd == 0, "常設 (〈主幹〉) しか空いていなければ不発");
+            var stS = new TerminalBattleState { stopped = new[] { false, true } };
+            var bst = new List<string> { TerminalIds.BurnOut, TerminalIds.Charge };
+            var ost = TerminalCards.Resolve(bst, new[] { 0, -1, -1 }, new[] { 4, 1, 1 }, env, stS);
+            Check(!ost.Fired(bst, TerminalIds.BurnOut), "止まった端子しか空いていなければ不発");
+            // ほかの「倍にする」端子との重なり (出目 4 を〈焼き切り〉に・空けた〈充電〉を外す)
+            int Atk(List<string> bb, int[] w, int[] dice) => TerminalCards.Resolve(bb, w, dice, env, new TerminalBattleState()).attackAdd;
+            int alone = Atk(new List<string> { TerminalIds.BurnOut, TerminalIds.Charge }, new[] { 0, -1, -1 }, new[] { 4, 1, 1 });
+            int tf = Atk(new List<string> { TerminalIds.BurnOut, TerminalIds.Transformer, TerminalIds.Charge }, new[] { 0, 1, -1 }, new[] { 4, 2, 1 });
+            int db = Atk(new List<string> { TerminalIds.BurnOut, TerminalIds.Doubler, TerminalIds.Charge }, new[] { 0, 1, -1 }, new[] { 4, 6, 1 });
+            int both = Atk(new List<string> { TerminalIds.BurnOut, TerminalIds.Doubler, TerminalIds.Transformer, TerminalIds.Charge }, new[] { 0, 1, 2 }, new[] { 4, 6, 2 });
+            int gr = Atk(new List<string> { TerminalIds.BurnOut, TerminalIds.Grinder, TerminalIds.Charge }, new[] { 0, 1, -1 }, new[] { 4, 2, 1 });
+            var dbo = TerminalCards.Resolve(new List<string> { TerminalIds.BurnOut, TerminalIds.Doubler, TerminalIds.Charge, TerminalIds.Block }, new[] { 0, 1, -1 }, new[] { 4, 6, 1 }, env, new TerminalBattleState());
+            Check(alone == 8 && tf == 12 && db == 16 && both == 24 && gr == 12 && dbo.burnTarget == 2,
+                  $"重なり (出目 4): 単独 {alone} / +〈変圧器〉 {tf} / +〈倍電圧〉 {db} (外すのは 1 枚 = 〈{(dbo.burnTarget >= 0 ? "充電" : "-")}〉) / +両方 {both} / +〈増圧〉(出目 2 を挿す・他の出目 +1 → (4+1)×2 + 2) {gr}");
+        }
+
         Console.WriteLine(fails == 0 ? "ALL OK" : fails + " FAILED");
         return fails == 0 ? 0 : 1;
     }
