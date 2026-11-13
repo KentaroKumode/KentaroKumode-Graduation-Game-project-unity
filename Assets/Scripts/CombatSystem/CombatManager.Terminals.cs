@@ -189,7 +189,8 @@ namespace CombatSystem
         /// 撃破のボーナスは「このターンに敵を倒すと」(説明文) のとおり、 撃破の経路を問わない (#117・2026-11-13)。
         /// 主攻撃までに倒れていればここで配り、 まだ倒れていなければターン終了時の削りを待つ (<see cref="SettleTerminalKillBonus"/>)。
         /// 旧: 攻撃の端子に出目を挿したターンの、 ここまでの撃破だけ (<see cref="GameLoop.GameHooks.TerminalKillBonusNeedsAttack"/> で戻せる)。
-        /// 攻撃の種類の端子は発動すれば攻撃に挿しているので、 旧い条件で落ちていたのは〈剥ぎ取り〉の攻撃なしの撃破と、 4 種すべてのターン終了時の撃破。</summary>
+        /// 4 種とも攻撃の種類 (〈剥ぎ取り〉は 2026-11-13 に補助から攻撃へ) なので、 発動すれば攻撃に挿している。 旧い条件で落ちるのは 4 種すべてのターン終了時の撃破
+        /// (2026-11-13 より前は〈剥ぎ取り〉の攻撃なしの撃破も落ちていた)。</summary>
         private void FinishTerminalTurn(TerminalOutcome o)
         {
             if (_deck == null) return;
@@ -205,7 +206,8 @@ namespace CombatSystem
                 if (enemyHP <= 0 && o.attackDice > 0) GrantTerminalKillBonus(kb);   // 旧い条件でも入る撃破
                 else if (enemyHP <= 0)
                 {
-                    // 攻撃の端子なしで倒れた (毒・出血・爆発・反撃・品の直接ダメージなど)。 ここへ来るのは〈剥ぎ取り〉だけ
+                    // 攻撃の端子なしで倒れた (毒・出血・爆発・反撃・品の直接ダメージなど)。 4 種とも攻撃の種類なので、 発動していればここへは来ない
+                    // (〈剥ぎ取り〉が補助だった 2026-11-13 まではここへ来た)。 守りとして残す
                     TerminalDiag.NoteKillNewOnly(kb.harvester, kb.whet, kb.loot, kb.stripper);   // [計装]
                     if (!GameLoop.GameHooks.TerminalKillBonusNeedsAttack) GrantTerminalKillBonus(kb);
                 }
@@ -255,7 +257,7 @@ namespace CombatSystem
             }
             if (kb.whet) { TerminalDiag.Note(TerminalIds.Whet, TerminalDiag.KillBonus); run.terminalWhetBonus += TerminalCards.WhetGain; Debug.Log($"[端子/研ぎ澄まし] 攻撃 +{TerminalCards.WhetGain} (計 {run.terminalWhetBonus})"); }
             if (kb.loot) { TerminalDiag.Note(TerminalIds.LootBox, TerminalDiag.KillBonus); run.coins += TerminalCards.LootGold; Debug.Log($"[端子/戦利品箱] ゴールド +{TerminalCards.LootGold}"); }
-            if (kb.stripper) { TerminalDiag.Note(TerminalIds.Stripper, TerminalDiag.KillBonus); run.terminalExtraChoices++; Debug.Log($"[端子/剥ぎ取り] 戦闘後の端子の選択肢 +1 (計 +{run.terminalExtraChoices})"); }
+            if (kb.stripper) { TerminalDiag.Note(TerminalIds.Stripper, TerminalDiag.KillBonus); run.terminalExtraChoices += TerminalCards.StripperChoices; Debug.Log($"[端子/剥ぎ取り] 戦闘後の端子の選択肢 +{TerminalCards.StripperChoices} (計 +{run.terminalExtraChoices})"); }
         }
 
         /// <summary>使うとランの山札から抜ける端子 (〈応急箱〉・<see cref="TerminalCards.LeavesRunDeck"/>) を、 使ったターンの終わりにランの山札から 1 枚ずつ抜く。

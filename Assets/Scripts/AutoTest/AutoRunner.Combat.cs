@@ -1006,7 +1006,7 @@ namespace AutoTest
             if (hpDelta != 0) u += s.ledger ? hpDelta : wDef * hpDelta;
             // 端子の山札: 今ターン撃破で得る恒久のボーナス (本体 FinishTerminalTurn と同じ条件・#117)。
             //   今の作り = 撃破の経路を問わない。 攻撃の端子に挿していなければ、 攻撃なしでも通る削り (noAtkDmg) で倒れるかを見る
-            //   (攻撃の種類の撃破のボーナスの端子は発動すれば aCount > 0 なので、 攻撃なしで効くのは〈剥ぎ取り〉だけ)。
+            //   (撃破のボーナスの端子は 4 種とも攻撃の種類 ── 〈剥ぎ取り〉は 2026-11-13 に補助から攻撃へ ── なので、 発動すれば aCount > 0。 下の攻撃なしの枝は守り)。
             //   毒・出血・ターン終了時の削りは、 ここでは見ていない (主攻撃の見積もりと同じく)。
             //   旧い条件 (terminalKillNeedsAttack) = 攻撃したターンだけ。
             if (ws.killBonus != 0f && (aCount > 0 ? effDmg >= enemyHp : !terminalKillNeedsAttack && noAtkDmg >= enemyHp)) u += ws.killBonus;
