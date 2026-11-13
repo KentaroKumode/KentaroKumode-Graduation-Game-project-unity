@@ -172,6 +172,8 @@ namespace EventSystem
             s.foe = sim != null && sim.FoeAlive;
             s.weather = sim != null && sim.Weather != MapSystem.FreeMove.WeatherKind.None;
             s.frontArrived = sim != null && sim.FrontArrived;
+            s.stormRules = GameLoop.GameHooks.StormEnabled;
+            s.storm = sim != null && sim.StormMode;
             return s;
         }
     }

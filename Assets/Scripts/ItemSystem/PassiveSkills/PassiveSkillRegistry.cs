@@ -407,6 +407,7 @@ namespace ItemSystem.PassiveSkills
             Register(new DeathSentence());
             Register(new Berserk());
             Register(new IntimidatePlus());
+            Register(new StormEnemy());   // 嵐の中で始まった戦闘 (2026-11-13)
             Register(new GreedyMerchant());
 
             // 13番目の死

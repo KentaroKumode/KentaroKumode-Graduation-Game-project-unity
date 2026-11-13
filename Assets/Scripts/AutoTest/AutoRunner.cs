@@ -185,6 +185,11 @@ namespace AutoTest
         /// (イベントの選択のアブレーション ablateEvent でも、 この専用イベントだけは開く)。
         /// false = 旧い作り (層の 3 分の 1 あたりの固定の点・踏まなくてもよい・BOT の選び方も元のまま = main と全件一致のはず)。</summary>
         public bool riftRecordAtBoss = true;
+        /// <summary>[測定 2026-11-13] 天候の作り。 本体の GameHooks.StormEnabled へ流す (ラン終了で true へ)。
+        /// true (既定) = 嵐 (静かな時間のあとに輪が縮む・嵐の中の点への移動で HP・嵐の中の戦闘は敵に〈嵐〉・始点は最外周から・ボスの点は伏せる・GAME.md §5-12)。
+        /// BOT は終点の位置を今までどおり知っていて、 フェーズ 3 で出口へ切り替え、 出口までの見積もりに嵐の HP を足す (最小の対応)。
+        /// false = 旧い作り (左から右へ進む前線・崩れる地平と沈み続ける湖面あり・始点は左端 = main と全件一致のはず)。</summary>
+        public bool stormEnabled = true;
         /// <summary>[2026-11-12] BOT が縄張りの宝を取りに行くしきい値: 「HP の割合 − 追跡者の戦闘で失う HP の見積もり」がこれ以上の時だけ取りに行く
         /// (<see cref="WantsTerritoryTreasure"/>)。 1 以上 = 取りに行かない。
         /// <para>既定 9 = 取りに行かない (2026-11-12)。 Super・3000 ラン・同じシードで、 0.35 (取りに行く) 596 勝 < 9 (行かない) 627 勝だった。
@@ -772,6 +777,7 @@ namespace AutoTest
                  + $"/ 追跡者 縄張りの外へ{(pursuerLeavesTerritory ? "出る (旧い作り)" : "出ない")} "
                  + $"/ 縄張りを避ける道の保証 {(pursuerLeavesTerritory ? "効かない (旧い作り)" : territoryKeepBypass ? "あり (縄張りを削る)" : "なし (削らない・旧い作り)")} (territoryKeepBypass={territoryKeepBypass}) "
                  + $"/ 裂け目の記録 {(riftRecordAtBoss ? "ボスに隣り合う点を全部イベントに (踏まずにボスへ行けない)" : "固定の点 1 つ (旧い作り)")} (riftRecordAtBoss={riftRecordAtBoss}) "
+                 + $"/ 天候 {(stormEnabled ? "嵐 (輪が縮む・始点は外周・ボスは伏せる)" : "前線 (旧い作り)")} (stormEnabled={stormEnabled}) "
                  + $"/ 端子の撃破のボーナス {(terminalKillNeedsAttack ? "攻撃したターンだけ (旧い条件)" : "経路を問わない")} "
                  + $"/ 手札 {(handCarry == CombatSystem.HandCarryMode.Pick ? "印を付けた端子だけ残す (Pick)" : handCarry == CombatSystem.HandCarryMode.All ? "挿さなかった端子は全部残る (All)" : "毎ターン捨てる (Off・旧い規則)")}"
                  + $"{(handCarry == CombatSystem.HandCarryMode.Pick ? " 残す方策 " + EffectiveHandKeepPolicy + " (handKeepPolicy=" + handKeepPolicy + ")" : "")} "

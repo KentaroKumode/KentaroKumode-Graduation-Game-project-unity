@@ -597,6 +597,20 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
+    /// <summary>嵐 (2026-11-13・GAME.md §5-12): 航行の地図で嵐の中の点に居る時に始まった戦闘で、 敵に付く (CombatManager.StartCombatInternal が付ける)。
+    /// 戦闘開始時に、 この敵の攻撃 +<see cref="MapSystem.FreeMove.FreeMapParams.StormEnemyAttack"/> (戦闘を通して)。 足し先は威圧+ と同じ <c>enemyDiceTotalBonus</c>
+    /// (persistent・Escalation.EnemyAttackValue で基礎攻撃と同じく倍率が掛かり、 予告に出る)。 隠し倍率ではなく、 敵のパッシブの欄に〈嵐〉として見える。</summary>
+    public class StormEnemy : IPassiveSkillEffect
+    {
+        public const string Id = "Storm";
+        public string SkillId => Id;
+        public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
+        public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
+        {
+            ctx.enemyDiceTotalBonus += MapSystem.FreeMove.FreeMapParams.StormEnemyAttack;
+        }
+    }
+
     /// <summary>貪欲(偽の商人): 表示専用マーカー。実際のスケーリング(プレイヤー所持パッシブ数に応じた
     /// HP+2/個・攻撃+1/3個)は GameManager.StartFalseMerchantCombat が戦闘開始時に適用する
     /// （HP は複製データ、攻撃は ctx.enemyDiceTotalBonus 経由）。</summary>

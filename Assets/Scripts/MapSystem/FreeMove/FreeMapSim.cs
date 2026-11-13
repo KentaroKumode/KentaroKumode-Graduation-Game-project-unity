@@ -47,6 +47,8 @@ namespace MapSystem.FreeMove
         Died = 1 << 12,
         /// <summary>〈煙玉〉が発動した (補足される代わりに、 追跡者は警戒へ落ちた)。 Detected は立たない。</summary>
         SmokeUsed = 1 << 13,
+        /// <summary>嵐の段が変わった (2026-11-13・<see cref="FreeMapSim.StormPhase"/>)。 嵐の層だけで鳴る。</summary>
+        StormAdvanced = 1 << 14,
     }
 
     /// <summary>使い魔。 本体の手先で、 プレイヤーの最後に分かった位置へ向かう。 猟犬は倒しても消えず本体の元へ戻る。</summary>
@@ -147,6 +149,8 @@ namespace MapSystem.FreeMove
         /// <summary>[計装] いま財布へ HP を払わせている理由 (物資切れの歩行 / 雹)。 財布の側が記録に使う (2026-11-05)。
         /// このクラスは本体 (GameLoop) を参照しない ── 単体の検算 (Tools/freemap_check) で動かすため。</summary>
         public string HpPayReason { get; private set; } = "";
+        /// <summary><see cref="HpPayReason"/> の「嵐の HP」(2026-11-13)。 本体が死因の文を分けるのに読む。</summary>
+        public const string HpReasonStorm = "嵐";
 
         // ── 痕跡 ──
         private readonly int[] _trace;
@@ -223,8 +227,36 @@ namespace MapSystem.FreeMove
         public WeatherKind Weather { get; private set; }
         /// <summary>前線の x (左端からの距離)。 まだ届いていなければ負の無限大。</summary>
         public double Front { get; private set; } = double.NegativeInfinity;
-        /// <summary>前線がもう層に届いているか (届いていなければ <see cref="ShiftFront"/> の遠ざけるは何も起きない)。</summary>
+        /// <summary>前線がもう層に届いているか (届いていなければ <see cref="ShiftFront"/> の遠ざけるは何も起きない)。 嵐の層では常に false (前線は無い)。</summary>
         public bool FrontArrived => !double.IsNegativeInfinity(Front);
+
+        // ── 嵐 (2026-11-13・<see cref="Storm"/>・GAME.md §5-12) ──
+        /// <summary>嵐の層か (形の <see cref="FreeMapLayout.storm"/>)。 false なら旧い前線の作りで、 下の嵐の読み取りは全部「嵐なし」を返す。</summary>
+        public bool StormMode => Layout.storm;
+        /// <summary>イベントの「前線を遠ざける / 近づける」で動かした嵐の時計のずらし (手番・正 = 進めた)。 中断セーブに写す。</summary>
+        public int StormShift { get; private set; }
+        /// <summary>嵐が来てからの手番 (負 = 静かな時間の残り)。 = 手番 + ずらし − 静かな時間。 嵐の層でなければ int.MinValue。</summary>
+        public int StormTime => StormMode ? Turn + StormShift - Storm.QuietTurns(Floor) : int.MinValue;
+        /// <summary>嵐の段 (0 = 静かな時間 / 1〜4)。 嵐の層でなければ 0。</summary>
+        public int StormPhase => StormMode ? Storm.PhaseOf(StormTime) : 0;
+        /// <summary>次の段まで (静かな時間なら嵐まで) の手番。 フェーズ 4 と嵐の層でない時は 0。</summary>
+        public int StormTurnsToNext => StormMode ? Storm.TurnsToNext(StormTime) : 0;
+        /// <summary>点 i が今の手番で嵐の中か (ボスの点は常に外・静かな時間は全部外)。 嵐の層でなければ false。</summary>
+        public bool InStorm(int i) => StormMode && i >= 0 && i < Layout.Count && Storm.InStorm(Layout, i, StormTime);
+        /// <summary>今の輪 (安全な円)。 嵐の層でない・静かな時間・フェーズ 4 は false。</summary>
+        public bool StormRing(out Vec2 center, out double radius)
+        {
+            center = default; radius = 0;
+            int ph = StormPhase;
+            if (ph < 1 || ph > 3) return false;
+            Storm.RingAt(Layout, StormTime, out center, out radius);
+            return true;
+        }
+        /// <summary>点 j へ 1 歩動いた時に払う嵐の HP (嵐の中の点へなら <see cref="FreeMapParams.StormHp"/>、 雹の嵐はさらに <see cref="FreeMapParams.StormHailHp"/>)。
+        /// 近道の残りがある間も払う (近道が消すのは手番と物資だけ)。 嵐の層でなければ 0。</summary>
+        public int StormHpFor(int j) => !InStorm(j) ? 0 : FreeMapParams.StormHp + (Weather == WeatherKind.Hail ? FreeMapParams.StormHailHp : 0);
+        /// <summary>その場で 1 手番を過ごす (待つ・偵察) 時に払う嵐の HP (今いる点が嵐の中なら <see cref="FreeMapParams.StormHp"/>)。</summary>
+        public int StormWaitHp => InStorm(Me) ? FreeMapParams.StormHp : 0;
 
         // ── 航行アイテムの係数 (2026-11-11・nav-items.md) ──
         /// <summary>いま掛かっている係数。 本体が操作のたびに <see cref="SetPerks"/> で差し替える (層の途中で品を得た時も効くように)。</summary>
@@ -281,10 +313,11 @@ namespace MapSystem.FreeMove
 
             Me = PrevNode = layout.start;
             Known[layout.start] = true;
-            Known[layout.goal] = true;
+            Known[layout.goal] = !layout.storm;   // 嵐の層は終点 (ボス) の種別を隠す (照明・隣・フェーズ 3 で見える)
             Done[layout.start] = true;
             _trace[Me] = 0;
             Weather = weather ?? WeatherInfo.ForFloor(Floor);
+            if (layout.storm) Weather = Storm.KindOf(Weather);   // 崩れる地平・沈み続ける湖面は素の嵐 (引く回数は変えない)
             _territory = layout.territory;
             _waypoints = layout.waypoints;
             Home = layout.home;
@@ -415,6 +448,8 @@ namespace MapSystem.FreeMove
             public bool treasureTaken;
             /// <summary>近道 (時限バフ「近道」) の残りの回数 (2026-11-13)。 古いセーブには無い欄なので 0 で戻る。</summary>
             public int freeMovesLeft;
+            /// <summary>嵐の時計のずらし (2026-11-13・<see cref="StormShift"/>)。 古いセーブには無い欄なので 0 で戻る。</summary>
+            public int stormShift;
         }
 
         /// <summary>いまの中身を写す。</summary>
@@ -447,6 +482,7 @@ namespace MapSystem.FreeMove
             s.smokeGranted = _smokeGranted; s.beaconGranted = _beaconGranted;
             s.treasureTaken = TreasureTaken;
             s.freeMovesLeft = FreeMovesLeft;
+            s.stormShift = StormShift;
             return s;
         }
 
@@ -486,6 +522,7 @@ namespace MapSystem.FreeMove
             _smokeGranted = s.smokeGranted; _beaconGranted = s.beaconGranted;
             TreasureTaken = s.treasureTaken;
             FreeMovesLeft = System.Math.Max(0, s.freeMovesLeft);
+            StormShift = s.stormShift;
             Perks = perks ?? FreeMapPerks.None;
         }
 
@@ -560,8 +597,8 @@ namespace MapSystem.FreeMove
         /// <summary>点 i が前線の内側か。</summary>
         public bool InFront(int i) => Layout.pos[i].x <= Front;
 
-        /// <summary>点 i で天候 k の効果が働いているか (前線の内側だけ)。</summary>
-        public bool WeatherAt(int i, WeatherKind k) => Weather == k && InFront(i);
+        /// <summary>点 i で天候 k の効果が働いているか (前線の内側だけ・嵐の層では嵐の中だけ)。</summary>
+        public bool WeatherAt(int i, WeatherKind k) => Weather == k && (StormMode ? InStorm(i) : InFront(i));
 
         /// <summary>霧で「?」に戻っている点か (道で 2 歩以上離れた点。 始点と終点と、 深さ 6 の終点に隣り合う「裂け目の記録」の点は隠れない)。</summary>
         public bool FogHidden(int i, int[] hopsFromMe = null)
@@ -590,7 +627,12 @@ namespace MapSystem.FreeMove
         {
             if (FreeMovesLeft > 0) return 0;   // 近道の残りがある間はただ
             int c = FreeMapParams.MoveSupply;
-            if (!Perks.ignoreSand && (WeatherAt(j, WeatherKind.Sand) || WeatherAt(Me, WeatherKind.Sand))
+            if (StormMode)
+            {
+                // 嵐の層 (2026-11-13): 削る砂の嵐の中の点への 1 歩は物資 +1 (確定・乱数を引かない)
+                if (!Perks.ignoreSand && WeatherAt(j, WeatherKind.Sand)) c += FreeMapParams.StormSandSupply;
+            }
+            else if (!Perks.ignoreSand && (WeatherAt(j, WeatherKind.Sand) || WeatherAt(Me, WeatherKind.Sand))
                 && GameLoop.GameRng.Range(0, 1000, "map.free.sand", Turn * 1000 + j) < (int)(FreeMapParams.SandExtraChance * 1000))
                 c += 1;
             // 〈渡り鳥の羅盤〉: 終点へ近づく歩は 2 歩に 1 回 1 安い (×0.5 を 1 歩 = 1 の物資で表す・偶数番目の歩が安い)
@@ -605,11 +647,15 @@ namespace MapSystem.FreeMove
             return g[j] != int.MaxValue && g[j] < g[Me];
         }
 
-        /// <summary>点 j へ 1 歩動くのに進むターン (雪の前線の内側は 2・近道の残りがある間は 0)。</summary>
-        public int TurnsFor(int j) => FreeMovesLeft > 0 ? 0 : WeatherAt(j, WeatherKind.Snow) || WeatherAt(Me, WeatherKind.Snow) ? 2 : 1;
+        /// <summary>点 j へ 1 歩動くのに進むターン (雪の前線の内側は 2・近道の残りがある間は 0)。
+        /// 嵐の層では、 朱の雪の嵐の中の点への 1 歩が <see cref="FreeMapParams.StormSnowTurns"/> (追跡者は 2 回動き、 嵐の時計も 2 進む)。</summary>
+        public int TurnsFor(int j) => FreeMovesLeft > 0 ? 0
+            : StormMode ? (WeatherAt(j, WeatherKind.Snow) ? FreeMapParams.StormSnowTurns : 1)
+            : WeatherAt(j, WeatherKind.Snow) || WeatherAt(Me, WeatherKind.Snow) ? 2 : 1;
 
         /// <summary>点 j へ 1 歩動いた時の HP の損 (雹の前線の内側)。 近道の残りがある間の 1 歩は 0 (2026-11-13・作者の決定「ただで動いた時は払わない」)。</summary>
-        public int HpLossFor(int j) => FreeMovesLeft > 0 ? 0 : WeatherAt(j, WeatherKind.Hail) ? 1 : 0;
+        /// <remarks>嵐の層 (2026-11-13) では嵐の HP (<see cref="StormHpFor"/>) ── 近道の残りがある間も払う。</remarks>
+        public int HpLossFor(int j) => StormMode ? StormHpFor(j) : FreeMovesLeft > 0 ? 0 : WeatherAt(j, WeatherKind.Hail) ? 1 : 0;
 
         /// <summary>追跡者がいま補足に使う歩数 (性質と照明で変わる)。 表示 (気配の輪) もこれを読む。</summary>
         public int DetectHops
@@ -716,7 +762,8 @@ namespace MapSystem.FreeMove
             if (!free && Perks.goalwardHalf && IsGoalward(j)) _goalwardSteps++;
             var ev = FreeMapEvent.None;
             if (Pay(cost)) ev |= FreeMapEvent.Died;
-            HpPayReason = "雹";
+            if (!StormMode) HpPayReason = "雹";
+            else if (hail > 0) HpPayReason = HpReasonStorm;   // 嵐の層: 物資切れで倒れた時の理由を上書きしない
             if (hail > 0 && _wallet.PayHp(hail)) ev |= FreeMapEvent.Died;
             PrevNode = Me;
             Me = j;
@@ -768,7 +815,9 @@ namespace MapSystem.FreeMove
         {
             if (!CanRelayTo(j)) return FreeMapEvent.None;
             var ev = FreeMapEvent.None;
+            int storm = StormHpFor(j);   // 嵐の層 (2026-11-13): 嵐の中の点へ跳んでも嵐の HP を払う (嵐の層でなければ 0)
             if (Pay(FreeMapParams.RelaySupply)) ev |= FreeMapEvent.Died;
+            if (storm > 0) { HpPayReason = HpReasonStorm; if (_wallet.PayHp(storm)) ev |= FreeMapEvent.Died; }
             PrevNode = Me;
             Me = j;
             Version++;
@@ -783,13 +832,31 @@ namespace MapSystem.FreeMove
             return ev;
         }
 
-        /// <summary>待つ (1 ターン)。</summary>
-        public FreeMapEvent Wait() => Dead || InFight ? FreeMapEvent.None : PassTurns(1);
+        /// <summary>待つ (1 ターン)。 嵐の中で待つと <see cref="StormWaitHp"/> を払う (2026-11-13)。</summary>
+        public FreeMapEvent Wait()
+        {
+            if (Dead || InFight) return FreeMapEvent.None;
+            if (PayStormWait()) return FreeMapEvent.Died;
+            return PassTurns(1);
+        }
+
+        /// <summary>嵐の中で 1 手番を過ごす (待つ・偵察) HP を払う。 尽きたら true (Dead を立てる)。 嵐の層でなければ何もしない。</summary>
+        private bool PayStormWait()
+        {
+            int hp = StormWaitHp;
+            if (hp <= 0) return false;
+            HpPayReason = HpReasonStorm;
+            Version++;
+            if (!_wallet.PayHp(hp)) return false;
+            Dead = true;
+            return true;
+        }
 
         /// <summary>偵察 (1 ターン): 道で <see cref="FreeMapParams.ReconRange"/> 歩先まで見える。</summary>
         public FreeMapEvent Recon()
         {
             if (Dead || InFight) return FreeMapEvent.None;
+            if (PayStormWait()) return FreeMapEvent.Died;   // 嵐の中の偵察は待つのと同じ HP (2026-11-13)
             Reveal(Me, FreeMapParams.ReconRange, true);
             return PassTurns(1);
         }
@@ -928,6 +995,7 @@ namespace MapSystem.FreeMove
         /// 天候の無い層・まだ前線が来ていない時に遠ざけるのは何も起きない。</summary>
         public FreeMapEvent ShiftFront(int steps)
         {
+            if (StormMode) return ShiftStorm(steps);   // 嵐の層 (2026-11-13): 嵐の時計を |steps| 手番動かす
             if (Weather == WeatherKind.None || steps == 0) return FreeMapEvent.None;
             var ev = FreeMapEvent.None;
             if (steps > 0)
@@ -943,6 +1011,19 @@ namespace MapSystem.FreeMove
             Version++;
             RevealView();
             return ev;
+        }
+
+        /// <summary>嵐の時計を steps 手番動かす (2026-11-13・イベントの「前線を近づける+N」= 正 / 「前線を遠ざける+N」= 負)。
+        /// 静かな時間が残っていれば縮み (延び)、 嵐が来ていれば輪が N 手番ぶん進む (戻る)。 手番は進めない (追跡者は動かない・HP も払わない)。
+        /// 段が変わったら <see cref="FreeMapEvent.StormAdvanced"/>。 フェーズ 3 に入ったらボスの点の種別が見える。 下限・上限は設けない。</summary>
+        public FreeMapEvent ShiftStorm(int steps)
+        {
+            if (!StormMode || steps == 0) return FreeMapEvent.None;
+            int before = StormPhase;
+            StormShift += steps;
+            Version++;
+            RevealView();
+            return StormPhase != before ? FreeMapEvent.StormAdvanced : FreeMapEvent.None;
         }
 
         /// <summary>囮罠を今いる点に置く (ターンは使わない)。 近くの追跡者は気を引かれて向かい、 踏むと足止めされる。</summary>
@@ -1051,6 +1132,7 @@ namespace MapSystem.FreeMove
         {
             Reveal(Me, VisionRange, FlareOn);
             if (Beacon >= 0) Reveal(Beacon, Perks.beaconRange, true);
+            if (StormMode && StormPhase >= 3) Known[Layout.goal] = true;   // 嵐のフェーズ 3 でボスの点の種別が見える (2026-11-13)
         }
 
         /// <summary>〈前哨の旗〉: 今いる点に偵察拠点を置く (ターンは使わない・層に 1 回)。 その層にいる間、 拠点から
@@ -1075,7 +1157,12 @@ namespace MapSystem.FreeMove
                 ev |= FreeMapEvent.TurnPassed;
                 ev |= FoeTurn();
                 TickLures();
-                if (Turn % FreeMapParams.FrontEvery == 0) ev |= AdvanceFront();
+                if (StormMode)
+                {
+                    int st = StormTime;   // 嵐の層 (2026-11-13): 前線は無い。 段の境目に着いた手番で知らせる
+                    if (st == 0 || st == Storm.Phase2Start || st == Storm.Phase3Start || st == Storm.Phase4Start) ev |= FreeMapEvent.StormAdvanced;
+                }
+                else if (Turn % FreeMapParams.FrontEvery == 0) ev |= AdvanceFront();
                 if (Contact != ContactKind.None) break;
             }
             RevealView();

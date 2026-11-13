@@ -144,6 +144,15 @@ static class Program
         var front = new EventEffectSituation { navKnown = true, map = true, foe = true, weather = true, frontArrived = false, canTrade = true, canForge = true };
         Check(EventEffectRoles.NotHappeningReason(E(EventEffectType.ShiftFront, -2), front) == "前線はまだ来ていない"
               && EventEffectRoles.NotHappeningReason(E(EventEffectType.ShiftFront, 2), front) == null, "規則: まだ来ていない前線は遠ざけられない・近づけるのは起きる");
+        // 嵐 (2026-11-13): 「前線を遠ざける/近づける」は嵐の時計を動かす。 静かな時間でも遠ざけられる (まだ来ていないで選べなくしない)・嵐の無い層は「この層に嵐は無い」
+        var quiet = new EventEffectSituation { navKnown = true, map = true, foe = true, weather = false, frontArrived = false, stormRules = true, storm = true, canTrade = true, canForge = true };
+        var noStorm = new EventEffectSituation { navKnown = true, map = true, foe = false, weather = false, stormRules = true, storm = false, canTrade = true, canForge = true };
+        Check(EventEffectRoles.NotHappeningReason(E(EventEffectType.ShiftFront, -2), quiet) == null
+              && EventEffectRoles.NotHappeningReason(E(EventEffectType.ShiftFront, 2), quiet) == null
+              && EventEffectRoles.NotHappeningReason(E(EventEffectType.ShiftFront, -2), noStorm) == "この層に嵐は無い"
+              && EventEffectRoles.NothingGainedReason(new List<EventEffect> { E(EventEffectType.ShiftFront, -2) }, noStorm) == "この層に嵐は無い"
+              && EventEffectRoles.NothingGainedReason(new List<EventEffect> { E(EventEffectType.ShiftFront, -2) }, quiet) == null,
+              "規則 (嵐): 嵐のある層は静かな時間でも遠ざけられる・嵐の無い層は「この層に嵐は無い」で選べない");
     }
 
     sealed class Scene
@@ -316,16 +325,20 @@ static class Program
             Check(ev != null && ev.condition.floorMin == 1 && ev.condition.floorMax == 5, $"出る層: 確信の連鎖〈{n}〉は深さ 1〜5 ({(ev == null ? "無い" : Range(ev))})");
         }
 
-        // 5. 深さ 7 (画面の第 5 層) は一本道: 地図はあるが追跡者・天候が無い。 そこに出るイベントは選べる選択肢を 1 つ以上残す
+        // 5. 深さ 7 (画面の第 5 層) は一本道: 地図はあるが追跡者が居ず、 嵐も旧い前線の天候も無い (Storm.HasStorm・Weather.PoolFor)。
+        //    そこに出るイベントは選べる選択肢を 1 つ以上残す。 嵐の作り (本体の既定・GameHooks.StormEnabled) と旧い前線の作りの両方で見る
         var gm = new GameLoop.GameManager { Run = new GameLoop.RunState() };
         GameLoop.GameManager.Instance = gm;
         var noGain = new List<string>(); var dark = new List<string>();
         foreach (var ev in draw)
         {
             if (!Covers(ev, 7)) continue;
+            foreach (bool stormRules in new[] { true, false })
             foreach (bool rich in new[] { true, false })
             {
+                GameLoop.GameHooks.StormEnabled = stormRules;
                 Apply(new Scene { rich = rich, map = true, foe = false, weather = false, trade = true, forge = true }, gm);
+                gm.FreeMap.StormMode = false;
                 int ok = 0, gain = 0;
                 foreach (var c in ev.choices)
                 {
@@ -333,12 +346,14 @@ static class Program
                     ok++;
                     foreach (var e in c.effects) if (EventEffectRoles.RoleOf(e) == EventEffectRole.Benefit) { gain++; break; }
                 }
-                if (ok == 0) dark.Add($"〈{ev.name}〉({(rich ? "手持ち十分" : "手持ち 0")})");
-                if (rich && gain == 0) noGain.Add($"〈{ev.name}〉");
+                string how = (stormRules ? "嵐の作り" : "前線の作り") + "・" + (rich ? "手持ち十分" : "手持ち 0");
+                if (ok == 0) dark.Add($"〈{ev.name}〉({how})");
+                if (rich && gain == 0) noGain.Add($"〈{ev.name}〉({how})");
             }
         }
+        GameLoop.GameHooks.StormEnabled = false;
         GameLoop.GameManager.Instance = null;
-        Check(dark.Count == 0, "出る層: 深さ 7 に出るイベントは選べる選択肢が 1 つ以上ある (追跡者なし・天候なし)" + (dark.Count > 0 ? " ── " + string.Join(" / ", dark) : ""));
+        Check(dark.Count == 0, "出る層: 深さ 7 に出るイベントは選べる選択肢が 1 つ以上ある (追跡者なし・嵐も前線も無し)" + (dark.Count > 0 ? " ── " + string.Join(" / ", dark) : ""));
         Check(noGain.Count == 0, "出る層: 深さ 7 に出るイベントは、 手持ちが十分なら得のある選択肢を選べる" + (noGain.Count > 0 ? " ── " + string.Join(" / ", noGain) : ""));
     }
 

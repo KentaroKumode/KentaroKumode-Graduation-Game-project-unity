@@ -424,7 +424,7 @@ namespace AutoTest
                 {
                     if (r.band != null && r.band.StartsWith("R"))
                     {
-                        // 数字部分のみ抽出 ("R8b" 等の接尾辞付きも拾う。旧 TryParse は R8b をパース失敗で全集計から除外していた)
+                        // 数字部分のみ抽出 ("R10b" 等の接尾辞付きも拾う。旧 TryParse は接尾辞付き (旧 R8b) をパース失敗で全集計から除外していた)
                         int rn = 0, ci = 1;
                         while (ci < r.band.Length && char.IsDigit(r.band[ci])) { rn = rn * 10 + (r.band[ci] - '0'); ci++; }
                         if (rn > 0)
@@ -1197,10 +1197,10 @@ namespace AutoTest
             sb.AppendLine();
             if (n == 0) { sb.AppendLine("（該当ランなし）"); return sb.ToString(); }
 
-            // --- バンド分布 (R1-R11, R8b 含む) ---
-            // R8b = 6Fクリアして 7F進入不可で終了 (真理未所持) を R9 と R10 の間に挿入。
+            // --- バンド分布 (R1-R11, R10b 含む) ---
+            // R10b = 深さ 6 (第 4 層) をクリアして〈真理〉が無く終了 (#137・旧 R8b)。 R9 と R10 の間 (点は R10 と同じ 10)。
             sb.AppendLine("---- 結果バンド分布（上位%＝その結果『以上』に到達したランの割合） ----");
-            string[] bands = { "R1a","R1b","R1c","R1d","R2","R3","R4","R5","R6","R7","R8","R9","R8b","R10","R11" };
+            string[] bands = { "R1a","R1b","R1c","R1d","R2","R3","R4","R5","R6","R7","R8","R9","R10b","R10","R11" };
             string[] labels = {
                 "1F道中で死亡","1Fボスで死亡","2F道中で死亡","2Fボスで死亡",
                 "3F道中で死亡","3Fボスで死亡","4F道中で死亡","4Fボスで死亡",

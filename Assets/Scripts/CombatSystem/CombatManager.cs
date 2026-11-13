@@ -469,6 +469,21 @@ namespace CombatSystem
                 }
             }
 
+            // 嵐 (2026-11-13・GAME.md §5-12): 航行の地図で嵐の中の点に居る時に始まった戦闘は、 敵に〈嵐〉(攻撃 +N・戦闘を通して) を付ける。
+            //   隠し倍率にしない ── 敵のパッシブの欄に名前と説明が出る (効果は StormEnemy・足し先は enemyDiceTotalBonus)。 ボスの点は常に嵐の外なのでボスには付かない。
+            //   2 体戦は 1 体目に付ける (敵側の状態は 1 体目のもの・同名のパッシブは 1 回だけ登録)。
+            if (enemy != null && !GameLoop.BossIds.IsBoss(enemy.id))
+            {
+                var stormSim = GameLoop.GameManager.Instance?.FreeMap;
+                if (stormSim != null && stormSim.StormMode && stormSim.InStorm(stormSim.Me))
+                {
+                    var list = enemy.passiveSkills != null ? new System.Collections.Generic.List<EnemyPassiveEntry>(enemy.passiveSkills) : new System.Collections.Generic.List<EnemyPassiveEntry>();
+                    list.Add(new EnemyPassiveEntry { internalName = ItemSystem.PassiveSkills.Effects.StormEnemy.Id, skillName = "嵐",
+                                                     description = $"嵐の中で戦っている。攻撃 +{MapSystem.FreeMove.FreeMapParams.StormEnemyAttack}" });
+                    enemy.passiveSkills = list;
+                }
+            }
+
             // 業物廃止 (2026-08-10) の代償は **enemies.json の基礎 maxHP を直接下げる**形で入れた
             //   (4層以降の敵を ×0.90)。 ランタイム倍率にすると、 表示される敵HPと実HPが
             //   ずれて調整の基準が二重になる。 §13-3 の「隠し倍率禁止・実数値を直接調整」と同じ理由。
