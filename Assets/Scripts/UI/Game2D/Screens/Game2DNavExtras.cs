@@ -276,15 +276,32 @@ namespace UI.Game2D
 
         private InventoryGridView _grid;
         private bool _invLocked; private int _invShownFrame = -1;
+        /// <summary>戦闘の画面から開いた (2026-11-13): 見るだけ。 消耗品の [使う] は出さない (戦闘中に使うのは [道具] の窓・二重の入口にしない)。</summary>
+        private bool _invBattle;
 
-        private void OpenInventory(GameManager gm)
+        /// <summary>戦闘の画面 (<see cref="Game2DBattleHud"/> の [持ち物]・キー I) から持ち物の画面を開く。 開いたら true。
+        /// 戦闘の進行・乱数・判断待ちには触らない ── 窓が出ている間は戦闘の画面と <see cref="Battle.Game2DBattleSim"/> が窓を見て止まり、
+        /// GameManager のキーは <see cref="SyncInventoryInput"/> が止める (地図と同じ作り)。 BOT が動かしている間は開かない。</summary>
+        public static bool OpenInventoryInBattle(GameManager gm)
         {
-            if (modal == null || gm.Run == null || GameHooks.BotDriving) return;
+            var me = _instance;
+            if (me == null || gm == null || gm.CurrentPhase != GameManager.GamePhase.Combat) return false;
+            return me.OpenInventory(gm, battle: true);
+        }
+
+        private bool OpenInventory(GameManager gm, bool battle = false)
+        {
+            if (modal == null || gm.Run == null || GameHooks.BotDriving) return false;
+            _invBattle = battle;
             _invTab = 0; _invPage = 0;
             if (_grid == null) _grid = new InventoryGridView { onClose = () => modal.Close(), onFocusChanged = () => { if (InventoryShown) modal.Replace(Inventory(GameManager.Instance)); } };
             _grid.ResetView();
             modal.Open(Inventory(gm));
+            return true;
         }
+
+        /// <summary>戦闘中の 1 行 (消耗品の詳細の欄の「今は使えない:」の後ろ)。</summary>
+        public const string BattleUseNote = "戦闘中は [道具] から使う";
 
         /// <summary>持ち物の画面 (升目かステータスの頁) が出ているか。</summary>
         private bool InventoryShown => modal != null && modal.IsOpen && modal.Current != null && _grid != null
@@ -312,7 +329,10 @@ namespace UI.Game2D
         {
             if (_invTab == 2) return Status(gm);
             var run = gm.Run;
-            _grid.SetItems(ItemCards.Collect(run));
+            var cards = ItemCards.Collect(run);
+            if (_invBattle)      // 戦闘中: [使う] を出さない。 消耗品の詳細の欄に「戦闘中は [道具] から使う」
+                foreach (var sec in cards) foreach (var c in sec) if (c.usable) { c.usable = false; c.block = BattleUseNote; }
+            _grid.SetItems(cards);
             var d = new ScreenDef { id = "inventory_grid", jp = true, w = InventoryLayout.W, h = InventoryLayout.H, canvas = _grid,
                 title = "持ち物",
                 sub = "HP " + run.playerHP + "/" + run.playerMaxHP + "  物資 " + run.provision + "/" + run.provisionCap + "  " + run.coins + "G" };

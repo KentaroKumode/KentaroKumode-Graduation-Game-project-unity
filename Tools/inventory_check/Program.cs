@@ -5,6 +5,7 @@
 //      全部の品に、 矢印と送りで届く・吹き出しが窓の中 (= 480×270 の中) で升目に重ならない
 //   3. items.json の全件: 詳細の欄 (説明文 + フレーバー文・売値と印は最長の形) が、 欄の幅で折り返して頁に割っても字を 1 つも落とさない・
 //      吹き出し (品名 + 説明文) が窓の高さに入る
+//   5. 戦闘の画面の入口 [持ち物] (BattleHudLayout.Inv): 480×270 の中で、 ほかの部品 (予告の枠・上の帯・ステータス・役・出目・操作・手札・敵) に重ならず、 字が入る
 //   4. アイコンの無い品 (Resources/Icons/Items/<id>.png が無い品) の仮の字: 升目の内側に収まり、 アイコンの無い品どうしで (字・レア度) が重ならない
 using System;
 using System.Collections.Generic;
@@ -74,6 +75,18 @@ static class Program
         string sub = "HP 9999/9999  物資 999/999  99999G";
         int titleW = Width("持ち物");
         Check(titleW + 12 + Width(sub) <= c.w, $"題と副題 {titleW + 12 + Width(sub)} dot ≦ {c.w}");
+    }
+
+    // ===== 5. 戦闘の画面の入口 =====
+    static void BattleEntry()
+    {
+        var screen = new Box(0, 0, InventoryLayout.ScreenW, InventoryLayout.ScreenH);
+        var inv = BattleHudLayout.Inv;
+        var hit = BattleHudLayout.Others.Where(o => inv.Overlaps(o)).ToList();
+        Console.WriteLine($"戦闘の画面の入口 [{BattleHudLayout.InvLabel}] {inv} (キー {BattleHudLayout.InvKeyName})");
+        Check(inv.Inside(screen), $"戦闘の画面の入口 {inv} が 480×270 の中");
+        Check(hit.Count == 0, "戦闘の画面の入口が、 予告の枠・上の帯・ステータス・役・出目 (9 個の幅)・操作・手札・敵に重ならない" + (hit.Count > 0 ? ": " + string.Join(" ", hit) : ""));
+        Check(Width(BattleHudLayout.InvLabel) + 6 <= inv.w && LineH <= inv.h + 1, $"入口の字「{BattleHudLayout.InvLabel}」{Width(BattleHudLayout.InvLabel)} dot が入口 ({inv.w}×{inv.h}) に入る");
     }
 
     // ===== 2. 品の数 =====
@@ -243,13 +256,15 @@ static class Program
         string root = args.Length > 0 ? args[0] : ".";
         LoadFont(root);
         Frame();
+        BattleEntry();
         var items = LoadItems(root);
         var tipCard = AllItems(items, out string tipWhat);
         Counts(tipWhat, tipCard);
         Placeholders(root, items);
         // 画面で足した字 (見出し・案内・付記・印・空の時の字) がドット字にある
         string ui = string.Concat(ItemCardInfo.KindNames) + "持ち物ステータス使う閉じる矢印で選ぶSpace詳細を送るEsc升目を押すと、ここに詳しく出る。何も持っていない。"
-                  + "軸家系段個数売値手放せない預かり物今は使えない:強化素材休憩で武器を強化する時に払う。銅銀金伝説剣斧短剣盾・×〜G()1/2持ち物へ";
+                  + "軸家系段個数売値手放せない預かり物今は使えない:強化素材休憩で武器を強化する時に払う。銅銀金伝説剣斧短剣盾・×〜G()1/2持ち物へ"
+                  + "戦闘中は [道具] から使う";
         var miss = ui.Where(ch => ch > ' ' && !Have.Contains(ch)).Distinct().ToList();
         Check(miss.Count == 0, "画面で足した字がドット字にある" + (miss.Count > 0 ? ": " + string.Concat(miss) : ""));
         Console.WriteLine(fails == 0 ? "ALL OK" : $"{fails} 件 NG");
