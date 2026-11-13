@@ -18,7 +18,7 @@ namespace AutoTest
         // ---- 配線で決まる軸の品 (2026-11-07)。 本体は OnWired で足すので ctx.attackDicePct (配線前) には入らない ----
         /// <summary>〈当て布の籠手〉: ブロック 2 個以上でシールド +3 (敵の攻撃の前に入る)。</summary>
         public bool paddedBracer;
-        /// <summary>〈二股の端子〉: 充電端子の出目のこの割合が攻撃にも加わる (ctx.chargeToAttackPct)。</summary>
+        /// <summary>〈二股の導線〉: 充電端子の出目のこの割合が攻撃にも加わる (ctx.chargeToAttackPct)。</summary>
         public float chargeToAtkPct;
         /// <summary>〈盾押しの心得〉: 攻撃の端子を挿したターン、 シールドのこの割合が攻撃に加わる (堅牢 × 2%)。</summary>
         public float shieldPushPct;

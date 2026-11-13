@@ -152,7 +152,7 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
                                      〈徒労〉の戦闘のデバフ【2026-11-14・GameHooks.ToilDamageDownPct・既定 50 (BattleBoonRule.DefaultToilDamageDownPct・作者の決定)・測定の口 toilDamageDownPct で 0 にすれば切れる】も同じ枠: 〈徒労〉を持っている間 −N% (既定 −50%)。
                                      実体は MetaDebuffApplicator.ApplyOutgoingCut の 1 つで、 怠惰と重なったら厳しい方 1 つ (× (100 − max(30, N))/100・足さない・掛けない)。
                                      この枠を通らない経路: 盾〈黎明〉の削り (WeaponFamilyEffects.Daybreak が ctx.enemyCurrentHP を直接減らす・ボスのダウンも乗らない)・
-                                     処刑 (〈百一人切りの鉈〉〈賞金首狩り〉= HP を 0 にする)。 2 体目は 1 体目の減った量を写すので削られた後の値が入る
+                                     処刑 (〈百人切りの鉈〉〈賞金首狩り〉= HP を 0 にする)。 2 体目は 1 体目の減った量を写すので削られた後の値が入る
 × 1.5 (切り捨て)                    ← ボスのダウン【2026-11-13】: ボスがダウンしているターンだけ (BossDown.ApplyTakenNow・定数 BossDown.TakenMul)。
                                      怠惰の直後 = すべての倍率の後・敵の軽減パッシブと敵の防御の前。 与ダメ% の池には足さない (別枠の掛け算)。
                                      主攻撃以外も全部掛かる (下の「ボスのダウン」)
@@ -447,7 +447,7 @@ Hermes / Bloodlust / EvenEyes / MasterworkNotes / KaleidoDice。
 |---|---|---|
 | ~~パリィ / 衛士の慣い / 復讐 / 果たし合い / 蝕夜~~ | — | **2026-10-28 削除**（武器家系の整理・GAME.md §24）。後継は §3-B2 の〈堅守の構え〉〈黎明〉〈不滅の刃〉。〈切り返し〉〈血令〉〈処刑〉は同名のまま §3-B2 で中身が変わった |
 | VoidStance(虚空) | OnPostRoll | ｜playerDiceTotal−enemyDiceTotal｜≤3 → nullifyAllDamage + fixedDamageToEnemy +=3（自前で差を算出） |
-| 騎士団の切り札 | OnTurnStart | **2026-10-28 リワーク**: 戦闘に 1 回、ターン頭に HP < 最大の 30% なら `consShield += shieldGainedTotal × 50%`。旧「倒せる攻撃のときシールドを全部使って同じ量を攻撃に加える（盾解放）」は盾家系〈シールドバッシュ〉と重なった |
+| 重装兵の隠し刃 | OnTurnStart | **2026-10-28 リワーク**: 戦闘に 1 回、ターン頭に HP < 最大の 30% なら `consShield += shieldGainedTotal × 50%`。旧「倒せる攻撃のときシールドを全部使って同じ量を攻撃に加える（盾解放）」は盾家系〈シールドバッシュ〉と重なった |
 | Sting(出血) | OnPostDealDamage | enemyBleedStacks++ |
 | 脆弱(契約・狩猟旅団) | OnBattleStart (Apply) + 防御後最終ダメ | armed状態で会心ダメ時 ×(1+0.15/0.30/0.45) 倍率→consumed / 非会心ロール勝利で再armed。 戦闘終了で剥がれる。 仕様: docs/GAME.md §12 |
 | ApexCrit(天極) | OnCriticalCheck | ゾロ目(全同値)なら **forceCritical=true**(会心確定)＋criticalMultiplier+1.0 |
@@ -542,7 +542,7 @@ OnPreDealDamage で `mutualAttackBonus` を足しても**一切乗らない**。
 
 ### 3-E. [剣の舞] セット（2026-06-04・`AllPassiveSkillEffects.cs`・PassiveSkillRegistry 登録）
 
-Passive カテゴリのシナジー武器群。4枚がインベントリに揃うと全消滅し〈ブレイドダンス〉に変化（`GameLoop.SwordDanceSet`）。
+Passive カテゴリのシナジー武器群。4枚がインベントリに揃うと全消滅し〈無銘の剣舞譜〉に変化（`GameLoop.SwordDanceSet`）。
 ダイス合計加算は OnPostRoll（RecomputeDiceTotals 後で確実に効く）。run 参照は `GameManager.Instance.Run`。
 
 | SkillId(表示) | レア | Trigger | 効果(ctx操作) |
@@ -551,10 +551,10 @@ Passive カテゴリのシナジー武器群。4枚がインベントリに揃�
 | EspadaPasodoble(エスパーダ・パソドブレ) | S | OnPostRoll / OnPreReceiveDamage | outgoing +=0.4（2026-11-10・旧 出目 +50% と outgoing +0.2）／被弾時 finalDamage ×1.2（被ダメ+20%） |
 | FleuretBallet(フルーレ・バレエ) | B | OnPostRoll | outgoing +=0.25（2026-11-10・旧 出目 +30%）。敗北時の自壊+最大HP1生還は `LastStand.TryConsumeRevival`（灯火→ラストスタンド→フルーレ の順） |
 | FalconTango(ファコン・タンゴ) | L | OnPostRoll | outgoing +=0.2（2026-11-10・旧 出目 +20%・[剣の舞]。4 枚揃うと〈無銘の剣舞譜〉へ変化） |
-| BladeDance(ブレイドダンス) | L(特殊) | OnBattleStart / OnPostRoll / OnPostDealDamage / OnPostReceiveDamage | 開戦毎に剣先スタック+1(最大99・ラン中持続/IRunResettable)。playerDiceTotal +剣先／与ダメ時 剣先分HP回復／被ダメ時 fixedDamageToEnemy +剣先 |
+| BladeDance(無銘の剣舞譜) | L(特殊) | OnBattleStart / OnPostRoll / OnPostDealDamage / OnPostReceiveDamage | 開戦毎に剣先スタック+1(最大99・ラン中持続/IRunResettable)。playerDiceTotal +剣先／与ダメ時 剣先分HP回復／被ダメ時 fixedDamageToEnemy +剣先 |
 
 > 条件の差（仕様厳守）: サーベルの孤剣判定＝`OwnsPassive`（昇華込み）/ 4枚変化判定＝`ownedPassiveItems`のみ（昇華除外）。
-> ブレイドダンスは `EventOnlyItemFilter` 除外でショップ・ランダム配布に出ない（変化でのみ入手）。
+> 無銘の剣舞譜は `EventOnlyItemFilter` 除外でショップ・ランダム配布に出ない（変化でのみ入手）。
 
 ### 3-F. 会心バリエーション（2026-06-05・`AllPassiveSkillEffects.cs`・PassiveSkillRegistry 登録）
 
@@ -610,7 +610,7 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 
 **会心の規則。**
 - 〈寸鉄〉: 会心ダメージ時、 会心率の加算合計が 100% を超えた分 /100 を倍率に足す (`lastCritAddPct`)。
-- 〈研ぎ知らずの銑鉄棍〉: 会心の判定は通常どおり行い、 会心になった攻撃は会心にせず `suppressedCritProc` を立てて
+- 〈銑鉄棍〉: 会心の判定は通常どおり行い、 会心になった攻撃は会心にせず `suppressedCritProc` を立てて
   敵の防御を無視 (§③-A の防御の前) し、 敵の防御を 1 下げる (戦闘中)。
 - 会心の回数は `Kw.CritCountKey` に積む (〈戦果の天秤〉)。
 
@@ -623,13 +623,13 @@ CombatManager に預け、 プレイヤーの攻撃の直前に固定ダメ枠�
 
 | 計算の位置 | 式 |
 |---|---|
-| 爆発 1 回の基礎 (`Kw.BurstBase`) | `burstCritRule ? 15 + 炉温 / 2 : rinkaiBurstDamage (既定 30)` → 〈炉心の誓約〉で ×2 → `+ burstStackBonus` (〈焼き増しの雷管〉が爆発のたび +5 (2026-11-10: 旧 +6)・ターン開始時に 1/4 を失う)。 2026-11-07: 既定 50 → 30 |
+| 爆発 1 回の基礎 (`Kw.BurstBase`) | `burstCritRule ? 15 + 炉温 / 2 : rinkaiBurstDamage (既定 30)` → 〈炉心の誓約〉で ×2 → `+ burstStackBonus` (〈二度詰めの雷管〉が爆発のたび +5 (2026-11-10: 旧 +6)・ターン開始時に 1/4 を失う)。 2026-11-07: 既定 50 → 30 |
 | 爆発に会心 (〈火花読みの眼鏡〉) | 主攻撃の会心の判定後、 この攻撃が爆発を使っていれば `dealtFixed += floor(爆発 × max(0, criticalMultiplier / 2 − 1))` (2026-11-10: 会心倍率の半分で乗る・旧 `criticalMultiplier − 1`) |
 | 臨界を得る (`Kw.AddHeat`) | `n + heatGainBonus` (〈焚き足しの炭〉で +1)。 閾値は 50 固定 (〈早沸かし釜〉は −15) |
 | 重ね会心 (〈重ね斬りの型〉) | 会心時、 会心率の加算合計 > 100% なら `(合計 − 100) / 100` の確率で会心倍率 +1.0 (`PassiveSkillManager`) |
 | 出血のダメージ | `ApplyBleedModifiers`: `floor(出血 × (1 + bleedDamagePct))` (〈血止め知らずの針箱〉が 血晶 × 3%) |
-| シールドの減衰 | 残る割合 `min(80, 50 + shieldKeepBonusPct)`% (〈油を引いた盾革〉が 堅牢 × 5) |
-| 充電端子 → 攻撃 (〈二股の端子〉) | 配線集計で `attackSum += floor(充電端子の出目の合計 × chargeToAttackPct)` (上乗せ率の前・電流 × 12%・最大 80%) |
+| シールドの減衰 | 残る割合 `min(80, 50 + shieldKeepBonusPct)`% (〈油染みの盾革〉が 堅牢 × 5) |
+| 充電端子 → 攻撃 (〈二股の導線〉) | 配線集計で `attackSum += floor(充電端子の出目の合計 × chargeToAttackPct)` (上乗せ率の前・電流 × 12%・最大 80%) |
 | 盾押し (〈盾押しの心得〉) | OnWired・攻撃の端子を挿したターン: 攻撃 + `floor(シールド × 堅牢 × 5%)`（2026-11-11 に 10% から） |
 | 誓約の封じ (`OathSeals.Apply`) | 戦闘の情報を作った直後に所持品から立てる。 入口で捨てる: 毒 (AddStatus) / 出血 (AddEnemyBleed) / 臨界 (Kw.AddHeat と臨界の持ち越し) / 充電 (AddCharge) / シールド (consShield の setter の増加) / 会心 (会心確定の後で落とす) |
 | 入り口 (`EntryEffect`) | 毒・臨界の軸の既存品 22 品に、 決まった機会 (ターン開始 / 攻撃が通る / 敵の攻撃 / 受けきり / ブロックのダイス 1 個) で毒 +1〜2・臨界 +3 を重ねる。 表は `EntryEffect.Table`。 2026-11-10 から 13 品に**偏重の条件**が付く: `AtLeast n` (軸の品が n 個以上) / `Top n` (`CombatContext.AxisRank` < n ＝ その軸より品の多い軸が n 未満・同数は満たす・比べるのは金を除く 6 軸)。 条件を満たさない機会は何も足さない (品の本来の効果は動く) |

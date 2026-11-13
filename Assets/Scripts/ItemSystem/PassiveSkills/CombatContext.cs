@@ -623,7 +623,7 @@ namespace ItemSystem.PassiveSkills
         public bool burstCritRule;
         /// <summary>[persistent] 〈炉心の誓約〉: 爆発の基礎が 2 倍。</summary>
         public bool burstDoubled;
-        /// <summary>[decay] 爆発への上乗せ (〈焼き増しの雷管〉が爆発のたびに積み、 ターン開始時に 1/4 を失う)。</summary>
+        /// <summary>[decay] 爆発への上乗せ (〈二度詰めの雷管〉が爆発のたびに積み、 ターン開始時に 1/4 を失う)。</summary>
         public int burstStackBonus;
         /// <summary>[persistent] ターン開始の減衰で残るシールドへの上乗せ (% ポイント)。 〈堅牢〉の①。 残る割合は最大 80%。</summary>
         public int shieldKeepBonusPct;
@@ -664,10 +664,10 @@ namespace ItemSystem.PassiveSkills
         }
         /// <summary>[persistent] 〈寸鉄〉: 会心率が 100% を超えた分が会心ダメージの倍率になる (超えた 10% につき +0.1)。</summary>
         public bool critOverflowToMultiplier;
-        /// <summary>[persistent] 〈研ぎ知らずの銑鉄棍〉: 会心が出なくなる。 会心になるはずだった攻撃は敵の防御を無視し、
+        /// <summary>[persistent] 〈銑鉄棍〉: 会心が出なくなる。 会心になるはずだった攻撃は敵の防御を無視し、
         /// この戦闘中の敵の防御を 1 下げる。</summary>
         public bool critBecomesArmorBreak;
-        /// <summary>[perTurn] 会心になるはずだったが〈研ぎ知らずの銑鉄棍〉で止めた (この攻撃は敵の防御を無視する)。
+        /// <summary>[perTurn] 会心になるはずだったが〈銑鉄棍〉で止めた (この攻撃は敵の防御を無視する)。
         /// ProcessDamage が立て、 BeginNewTurn の Phase B で戻す。</summary>
         public bool suppressedCritProc;
         /// <summary>[perTurn] 直近のプレイヤーの攻撃で合算した会心率 (%・100 超えもそのまま)。 〈寸鉄〉が読む。
@@ -1141,7 +1141,7 @@ namespace ItemSystem.PassiveSkills
                 if (enemyBleedStacks == 0) Keywords.Kw.Raise(this, PassiveSkillTrigger.OnBleedZero, 1);
             }
             if (enemyPassivesDisabledTurns > 0) enemyPassivesDisabledTurns--; // 敵パッシブ無効化 残ターン
-            burstStackBonus -= burstStackBonus / 4;   // 〈焼き増しの雷管〉の上乗せは毎ターン 1/4 を失う (ヴェスカ 4 段で積み上がらない)
+            burstStackBonus -= burstStackBonus / 4;   // 〈二度詰めの雷管〉の上乗せは毎ターン 1/4 を失う (ヴェスカ 4 段で積み上がらない)
             // プレイヤーのシールドは毎ターン半減 (切り捨て。 1 → 0 で確実に消える)。 ヴェスカのシールド規約と同じ (GAME.md §13-4)。
             // T1 は戦闘開始時の付与 (開幕シールド等) をそのまま使うので半減しない。 そのターンの付与は OnTurnStart 以降なので「半減 → 付与」の順になる。
             // 〈脈なしの鋼心臓〉で止まる。 失った分を〈半減で失った〉出来事として配る (2026-10-31)。

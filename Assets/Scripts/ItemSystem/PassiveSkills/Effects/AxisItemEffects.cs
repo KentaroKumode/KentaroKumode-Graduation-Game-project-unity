@@ -73,11 +73,11 @@ namespace ItemSystem.PassiveSkills.Effects
             ["血止め知らずの針箱"] = (AxisRules.Bleed, Kind.Count), ["凝血の小瓶"] = (AxisRules.Bleed, Kind.Rule),      [RustOath.Id] = (AxisRules.Bleed, Kind.Oath),
             ["瘴気溜まりの壺"] = (AxisRules.Poison, Kind.Count),   ["腐れ沼の苔玉"] = (AxisRules.Poison, Kind.Rule),   [DregsOath.Id] = (AxisRules.Poison, Kind.Oath),
             ["焚き足しの炭"] = (AxisRules.Heat, Kind.Count),         ["火花読みの眼鏡"] = (AxisRules.Heat, Kind.Rule),    [CoreOath.Id] = (AxisRules.Heat, Kind.Oath),
-            ["漏電する銅線"] = (AxisRules.Charge, Kind.Count),     ["二股の端子"] = (AxisRules.Charge, Kind.Rule),     [SpriteOath.Id] = (AxisRules.Charge, Kind.Oath),
-            ["油を引いた盾革"] = (AxisRules.Shield, Kind.Count),   [ShieldPushArt.Id] = (AxisRules.Shield, Kind.Rule), [WardenOath.Id] = (AxisRules.Shield, Kind.Oath),
+            ["漏電する銅線"] = (AxisRules.Charge, Kind.Count),     ["二股の導線"] = (AxisRules.Charge, Kind.Rule),     [SpriteOath.Id] = (AxisRules.Charge, Kind.Oath),
+            ["油染みの盾革"] = (AxisRules.Shield, Kind.Count),   [ShieldPushArt.Id] = (AxisRules.Shield, Kind.Rule), [WardenOath.Id] = (AxisRules.Shield, Kind.Oath),
             // 追加 34 品のうち軸の品の数を読む品 (AxisItemEffects2.cs)
             ["千里眼の水晶"] = (AxisRules.Crit, Kind.Count), ["雷鳴の太鼓"] = (AxisRules.Charge, Kind.Count),
-            ["涸れぬ泉の血晶"] = (AxisRules.Bleed, Kind.Count), ["瘴気の外套"] = (AxisRules.Poison, Kind.Count),
+            ["涸れぬ血晶"] = (AxisRules.Bleed, Kind.Count), ["瘴気の外套"] = (AxisRules.Poison, Kind.Count),
         };
     }
 
@@ -170,7 +170,7 @@ namespace ItemSystem.PassiveSkills.Effects
             ("廃庭の霧吹き", When.EnemyAttacked, false, 1, Gate.AtLeast, 8),
             ("石抜きの毒指輪", When.EnemyAttacked, false, 1, Gate.AtLeast, 6),
             ("岸上げの麻痺瓶", When.BlockedAll,    false, 2, Gate.Free, 0),
-            ("百一人切りの鉈", When.PlayerHit,     false, 1, Gate.Free, 0),
+            ("百人切りの鉈", When.PlayerHit,     false, 1, Gate.Free, 0),
             ("腐し刃", When.PlayerHit,     false, 1, Gate.Free, 0),
             ("遅効の毒刃", When.PlayerHit,     false, 1, Gate.Free, 0),
             // 臨界の軸 (炉温・自分では臨界を作らない品)
@@ -185,7 +185,7 @@ namespace ItemSystem.PassiveSkills.Effects
             ("溢れ取りの鋳型", When.PlayerHit,     true, 3, Gate.Free, 0),
             ("烈刃", When.PlayerHit,     true, 3, Gate.Free, 0),
             ("二度目の打金", When.PlayerHit,     true, 3, Gate.Free, 0),
-            ("焦げ柄の点火スパナ", When.PlayerHit,     true, 3, Gate.Free, 0),
+            ("点火スパナ", When.PlayerHit,     true, 3, Gate.Free, 0),
         };
     }
 
@@ -379,10 +379,10 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>焼き増しの雷管: 爆発のたび、 爆発のダメージ +5 が 1 つ積もる (2026-11-10: 旧 +6)。 ターン開始時に積もった分の 1/4 を失う (CombatContext.burstStackBonus)。</summary>
+    /// <summary>二度詰めの雷管: 爆発のたび、 爆発のダメージ +5 が 1 つ積もる (2026-11-10: 旧 +6)。 ターン開始時に積もった分の 1/4 を失う (CombatContext.burstStackBonus)。</summary>
     public class RefiredPrimer : IPassiveSkillEffect
     {
-        public string SkillId => "焼き増しの雷管";
+        public string SkillId => "二度詰めの雷管";
         public const int PerBurst = 5;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart, PassiveSkillTrigger.OnRinkaiBurst };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
@@ -426,10 +426,10 @@ namespace ItemSystem.PassiveSkills.Effects
             => ctx.AddCharge(ctx.AxisDepth(AxisRules.Charge), raiseOverflow: false);
     }
 
-    /// <summary>二股の端子 (②【規則】): 充電の端子を挿した出目の「電流 × 12%」(最大 80%) が攻撃にも加わる (2026-11-07: 旧 ×8%) (CombatManager の配線集計)。</summary>
+    /// <summary>二股の導線 (②【規則】): 充電の端子を挿した出目の「電流 × 12%」(最大 80%) が攻撃にも加わる (2026-11-07: 旧 ×8%) (CombatManager の配線集計)。</summary>
     public class ForkedTerminal : IPassiveSkillEffect
     {
-        public string SkillId => "二股の端子";
+        public string SkillId => "二股の導線";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
             => ctx.chargeToAttackPct = System.Math.Min(0.8f, 0.12f * ctx.AxisDepth(AxisRules.Charge));
@@ -461,10 +461,10 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>油を引いた盾革 (①): 堅牢 1 につき、 ターン開始の減衰で残るシールド +5% (残る割合は最大 80%・2026-11-07: 旧 +3%)。</summary>
+    /// <summary>油染みの盾革 (①): 堅牢 1 につき、 ターン開始の減衰で残るシールド +5% (残る割合は最大 80%・2026-11-07: 旧 +3%)。</summary>
     public class OiledShieldLeather : IPassiveSkillEffect
     {
-        public string SkillId => "油を引いた盾革";
+        public string SkillId => "油染みの盾革";
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnBattleStart };
         public void Execute(PassiveSkillTrigger t, CombatContext ctx)
             => ctx.shieldKeepBonusPct = System.Math.Max(ctx.shieldKeepBonusPct, 5 * ctx.AxisDepth(AxisRules.Shield));

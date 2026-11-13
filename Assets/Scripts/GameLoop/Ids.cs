@@ -155,7 +155,7 @@ namespace GameLoop
         public const string NavOiledBoots   = "油布の靴";
         public const string NavStoneShard   = "魔石の欠片";
         public const string NavMapSketch    = "地図売りの走り書き";
-        public const string NavCompassNeedle = "羅針の針";
+        public const string NavCompassNeedle = "羅盤の針";
         public const string NavStealthCloak = "忍びの外套";
         public const string NavMirrorCharm  = "鏡の護符";
         public const string NavNightRing    = "夜目の指輪";

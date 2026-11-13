@@ -41,7 +41,7 @@ namespace ItemSystem.PassiveSkills.Keywords
         public const string BurstExcessKey = "kw.burstExcess";
         /// <summary>爆発に上乗せするダメージ (品が積む。 爆発を使ったら 0)。</summary>
         public const string BurstBonusKey = "kw.burstBonus";
-        /// <summary>この攻撃が爆発を使った (〈荒砥〉〈爆破コンテストの賞金〉が読む)。 毎ターン攻撃の前に書き直す。</summary>
+        /// <summary>この攻撃が爆発を使った (〈荒砥〉〈爆破祭の小切手〉が読む)。 毎ターン攻撃の前に書き直す。</summary>
         public const string BurstThisAttackKey = "kw.burstThisAttack";
         /// <summary>直近に爆発を使ったターンと、 そのダメージ (〈二度目の打金〉が読む)。</summary>
         public const string BurstAppliedTurnKey = "kw.burstAppliedTurn";
@@ -55,7 +55,7 @@ namespace ItemSystem.PassiveSkills.Keywords
         }
 
         /// <summary>爆発 1 回の基礎 (2026-11-07)。 〈炉温〉の②なら 15 + 炉温 / 2、 なければ 30。 〈炉心の誓約〉で 2 倍、
-        /// 〈焼き増しの雷管〉の上乗せを足す。 品は ctx.rinkaiBurstDamage を直接書かない ── 書く品どうしの順番で値が変わったため。</summary>
+        /// 〈二度詰めの雷管〉の上乗せを足す。 品は ctx.rinkaiBurstDamage を直接書かない ── 書く品どうしの順番で値が変わったため。</summary>
         public static int BurstBase(CombatContext ctx)
         {
             int b = ctx.burstCritRule ? 15 + ctx.AxisDepth(AxisRules.Heat) / 2 : ctx.rinkaiBurstDamage;

@@ -616,7 +616,7 @@ namespace AutoTest
         public int challengeSweepRuns = 300;
         [Tooltip("軸単独試験と組み合わせ試験も回す。 汚染バグ追跡用の足場で、 ラン数が 2.25 倍になる")]
         public bool challengeSweepDiagnostics = false;
-        [Tooltip("**計測専用**: 5層撃破時に〈ブレイドダンス〉を強制付与する。"
+        [Tooltip("**計測専用**: 5層撃破時に〈無銘の剣舞譜〉を強制付与する。"
                + "剣の舞4枚完成で高難易度を通せるかの切り分け用")]
         public bool challengeSweepGrantBladeDance = false;
         private string _challengeSweepReport;

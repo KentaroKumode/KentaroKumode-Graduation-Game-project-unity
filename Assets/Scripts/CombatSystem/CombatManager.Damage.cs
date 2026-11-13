@@ -214,7 +214,7 @@ namespace CombatSystem
             }
             else if (ctx.enemyDefense > 0 && totalDmg > 0 && ctx.suppressedCritProc)
             {
-                Debug.Log($"[研ぎ知らずの銑鉄棍] 会心の代わりに敵の防御{ctx.enemyDefense} を無視");
+                Debug.Log($"[銑鉄棍] 会心の代わりに敵の防御{ctx.enemyDefense} を無視");
             }
             else if (ctx.enemyDefense > 0 && totalDmg > 0)
             {

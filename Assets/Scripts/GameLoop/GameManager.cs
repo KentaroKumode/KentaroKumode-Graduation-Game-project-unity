@@ -59,7 +59,7 @@ namespace GameLoop
         /// 分散源=ノイズになる。 AutoRunner の基準値測定だけが true にする (2026-08-05)。</summary>
         public static bool SuppressLayer5HiddenBoss = false;
 
-        /// <summary>**計測専用**: 5層撃破時に〈ブレイドダンス〉を強制付与する (既定 false・製品挙動は不変)。
+        /// <summary>**計測専用**: 5層撃破時に〈無銘の剣舞譜〉を強制付与する (既定 false・製品挙動は不変)。
         /// 「剣の舞 4 枚が完成すれば高難易度の 7 層を通せるのか」を切り分けるための実験用フラグ。
         /// 通常は 4 枚集約でしか入手できず、高難易度ほど揃う前に死ぬため自然発生を待って測れない。</summary>
         public static bool GrantBladeDanceOnFloor5Clear = false;
