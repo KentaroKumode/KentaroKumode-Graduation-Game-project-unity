@@ -27,6 +27,22 @@ namespace UI.Game2D
 
     public sealed class ModalBtn { public string label, action; public bool primary; }
 
+    /// <summary>
+    /// 窓の中身を自分で描く部品 (2026-11-13・持ち物の升目 <see cref="InventoryGridView"/>)。 <see cref="ScreenDef.canvas"/> に置くと、
+    /// 窓は題・足元・ボタンだけを描き、 その間 (行の場所) をこの部品に任せる。 jp の窓だけ。
+    /// </summary>
+    public interface IModalCanvas
+    {
+        /// <summary>中身を描く。 area = 行の場所 (窓の座標)。 伝説の枠の光を描いたら true (窓が 8 コマ/秒で描き直す)。</summary>
+        bool Draw(KitPix p, RectInt area, int glintTick);
+        /// <summary>ボタン・足元の後に、 上に重ねて描く (吹き出し)。</summary>
+        void DrawOverlay(KitPix p);
+        /// <summary>ポインタ。 local = 窓の左上が原点の dot (inside = false はポインタが画面の外)。 click = ボタンの上でない左クリック。 戻り値 = 描き直しが要る。</summary>
+        bool Pointer(Vector2 local, bool inside, bool click);
+        /// <summary>キー (窓が出ていて、 手引きの板が上に無い間、 毎フレーム)。 戻り値 = 描き直しが要る。</summary>
+        bool Keys();
+    }
+
     /// <summary>仮置きの画面 1 枚ぶんの中身 (題・タブ・行・ボタン)。</summary>
     public sealed class ScreenDef
     {
@@ -64,6 +80,8 @@ namespace UI.Game2D
         public bool segments;
         /// <summary>分離式ボタン 1 つの幅 (dot)。</summary>
         public int segW = 34;
+        /// <summary>中身を自分で描く部品 (jp・2026-11-13)。 置くと行 (Items) の代わりにこれが描く。 h は呼ぶ側が決める (自動の高さは行を数えるので)。</summary>
+        public IModalCanvas canvas;
     }
 
     /// <summary>
@@ -182,6 +200,8 @@ namespace UI.Game2D
                 else
                 {
                     if (_open && _sp.x > 0.5f && !Game2DTutorial.Blocking) HandlePointer();      // 手引きの板が上にある間は押させない
+                    var cv = _def?.canvas;
+                    if (cv != null && _open && _sp.x > 0.5f && !Game2DTutorial.Blocking && cv.Keys() && _def != null && _def.canvas == cv) _dirty = true;
                     if (_glintOn) { int g = (int)(Time.unscaledTime * 8f); if (g != _glintTick) { _glintTick = g; _dirty = true; } }
                     if (_dirty) { Redraw(); _dirty = false; }
                     _rt.anchoredPosition = new Vector2(_px, -(_py + Mathf.Round((1f - _sp.Value(60f)) * 60f)));
@@ -215,12 +235,19 @@ namespace UI.Game2D
 
         private void HandlePointer()
         {
-            if (screen == null || !Game2DPointer.TryDot(screen, out var d)) { SetHover(-1, -1, -1); return; }
+            if (screen == null || !Game2DPointer.TryDot(screen, out var d)) { SetHover(-1, -1, -1); if (_def.canvas != null && _def.canvas.Pointer(default, false, false)) _dirty = true; return; }
             int hr = -1, ht = -1, hb = -1;
             for (int i = 0; i < _rowR.Count; i++) if (Hit(d, _rowR[i])) { hr = i; break; }
             for (int i = 0; i < _tabR.Count; i++) if (Hit(d, _tabR[i])) { ht = i; break; }
             for (int i = 0; i < _btnR.Count; i++) if (Hit(d, _btnR[i])) { hb = i; break; }
             SetHover(hr, ht, hb);
+            if (_def.canvas != null)
+            {
+                var cv = _def.canvas;
+                bool click = Input.GetMouseButtonDown(0) && hb < 0;
+                if (cv.Pointer(new Vector2(d.x - _px, d.y - _py), true, click)) _dirty = true;
+                if (click || _def == null || _def.canvas != cv) return;      // 押したのは中身 (か、 中身が窓を替えた)
+            }
             if (Seg(d)) return;
             if (Slide(d)) return;
             if (!Input.GetMouseButtonDown(0)) return;
@@ -525,7 +552,9 @@ namespace UI.Game2D
             if (!string.IsNullOrEmpty(d.body)) { int n = Game2DJpFont.Wrap(p, d.body, x0 + 2, y, ModalJpMetrics.BodyW(d.w), Game2DKit.Ink, d.bodyLines); y += n * LH + 4; }
             // 下から順に: ボタン → 足元 → 詳細
             int btnY = d.h - Inset - 22, footY = btnY - 4 - LH;
-            bool detail = HasDetail(d); int detailY = footY - (detail ? JDetail * LH + 6 : 0), rowsBottom = detailY - 2;
+            bool detail = d.canvas == null && HasDetail(d); int detailY = footY - (detail ? JDetail * LH + 6 : 0), rowsBottom = detailY - 2;
+            // 中身を自分で描く部品 (持ち物の升目): 行の場所をまるごと渡す
+            if (d.canvas != null && d.canvas.Draw(p, new RectInt(x0, y, iw, rowsBottom - y), _glintTick)) _glintOn = true;
             // 行
             var items = d.Items;
             int cols = Mathf.Max(1, d.cols), rw = (iw - (cols - 1) * 4) / cols, maxRows = Mathf.Max(1, (rowsBottom - y + RG) / (RH + RG));
@@ -594,6 +623,7 @@ namespace UI.Game2D
             // 足元 (トーストが優先)
             string foot = _toast.Length > 0 ? _toast : d.footer;
             if (!string.IsNullOrEmpty(foot)) Game2DJpFont.Draw(p, Game2DJpFont.Clip(foot, iw - 4), x0 + 2, footY, _toast.Length > 0 ? Game2DKit.Amber : Game2DKit.Dim);
+            d.canvas?.DrawOverlay(p);
             p.Apply(_tex);
         }
     }
