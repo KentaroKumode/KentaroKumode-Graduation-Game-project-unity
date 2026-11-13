@@ -127,13 +127,24 @@ namespace UI.Game2D
             void Add(string s, int role) { foreach (var x in JpTextLayout.Lines(s, width, advance)) l.Add(new DetailLine { text = x, role = role }); }
             void Blank() { if (l.Count > 0 && l[l.Count - 1].text.Length > 0) l.Add(new DetailLine { text = "", role = 1 }); }
             Add(name, 0);
-            Add(string.Join("  ", MetaParts()), 1);
+            // 付記は項目 (「売値 2〜3G」など) の区切りで折り返す ── 字の途中で切ると単位だけが次の行へこぼれる (2026-11-13)。 1 項目で幅を超える時だけ字で折る
+            string cur = "";
+            foreach (var part in MetaParts())
+            {
+                string cand = cur.Length == 0 ? part : cur + "  " + part;
+                if (Width(cand, advance) <= width) { cur = cand; continue; }
+                if (cur.Length > 0) l.Add(new DetailLine { text = cur, role = 1 });
+                if (Width(part, advance) <= width) cur = part; else { Add(part, 1); cur = ""; }
+            }
+            if (cur.Length > 0) l.Add(new DetailLine { text = cur, role = 1 });
             if (mark != null) Add(mark, 4);
             if (block != null) Add("今は使えない: " + block, 4);
             if (!string.IsNullOrEmpty(description)) { Blank(); Add(description, 2); }
             if (!string.IsNullOrEmpty(flavor)) { Blank(); Add(flavor, 3); }
             return l;
         }
+
+        private static int Width(string s, Func<char, int> advance) { int w = 0; foreach (var ch in s) w += advance(ch); return w; }
 
         /// <summary>ホバーの吹き出しの行: 品名 → 効果の説明文 (フレーバー文は出さない)。 幅 <paramref name="width"/> で折り返す。</summary>
         public List<DetailLine> TooltipLines(int width, Func<char, int> advance)

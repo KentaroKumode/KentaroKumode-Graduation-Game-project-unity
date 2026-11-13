@@ -10,7 +10,7 @@ namespace UI.Game2D
     /// 「升目・見出し・詳細の欄・吹き出しが 480×270 の中に収まる」「全部の品の詳細が切り捨てなく読める」を数える。
     /// 単位は 480×270 の格子の dot。 座標は窓の左上が原点 (窓は格子の真ん中に置く・<see cref="WindowX"/>)。 字の行送りは呼ぶ側が渡す。
     ///
-    /// <para>窓の中 (幅 472・高さ 266):
+    /// <para>窓の中 (幅 472・高さ 258):
     /// <code>
     ///  題「持ち物」 ………………………………… HP・物資・所持金
     ///  ──────────────────────────────
@@ -28,8 +28,10 @@ namespace UI.Game2D
     /// </summary>
     public static class InventoryLayout
     {
-        /// <summary>窓の幅・高さ (高さは日本語の窓の上限 <see cref="ModalJpMetrics.MaxH"/>)。</summary>
-        public const int W = 472, H = ModalJpMetrics.MaxH;
+        /// <summary>窓の上下の余白 (格子の端から窓の縁まで・2026-11-13: 上限 266 の窓は上端 2 dot に張り付いて見えたので 6 dot 空ける)。</summary>
+        public const int MarginY = 6;
+        /// <summary>窓の幅・高さ (高さ = 格子の高さ − 上下の余白)。</summary>
+        public const int W = 472, H = ScreenH - 2 * MarginY;
         /// <summary>GUI の格子 (Game2DLayout と同じ値・検算が使う)。</summary>
         public const int ScreenW = 480, ScreenH = 270;
         /// <summary>窓の左上 (格子の中・Game2DModal が真ん中に置く)。</summary>
@@ -183,12 +185,19 @@ namespace UI.Game2D
             w = Math.Min(TipMaxW, mw + 2 * Pad); h = lines.Count * lineH + 2 * Pad - 1;
         }
 
-        /// <summary>吹き出しの置き場: 升目の右 (入らなければ左)、 上端は升目の上端にそろえ、 窓の内側 (<see cref="TipBounds"/>) へ寄せる。</summary>
+        /// <summary>升目の欄の右端 (送りの棒の手前)。 吹き出しを升目の右へ出す時は、 ここを越えない (送りの棒と詳細の欄に重ねない)。</summary>
+        public static int GridTipRight => W - ModalJpMetrics.Inset - DetailW - PaneGap - BarW - 1;
+
+        /// <summary>吹き出しの置き場: 升目の右 (送りの棒の手前 <see cref="GridTipRight"/> までに入る時)、 入らなければ左 (窓の内側に入る時)、
+        /// どちらにも入らなければ広い方の側。 上端は升目の上端にそろえ、 窓の内側 (<see cref="TipBounds"/>) へ寄せる。
+        /// 2026-11-13: 右端の列の升目で吹き出しが右に出て、 送りの棒と詳細の欄に重なっていた (窓の右端までを入る範囲にしていた)。</summary>
         public static Box TipBox(Box anchor, int w, int h)
         {
             var b = TipBounds;
-            int x = anchor.Right + 3;
-            if (x + w > b.Right) x = anchor.x - 3 - w;
+            int right = anchor.Right + 3, left = anchor.x - 3 - w;
+            bool rightOk = anchor.Right <= GridTipRight ? right + w <= GridTipRight : right + w <= b.Right;
+            bool leftOk = left >= b.x;
+            int x = rightOk ? right : leftOk ? left : (b.Right - anchor.Right >= anchor.x - b.x ? right : left);
             x = Math.Max(b.x, Math.Min(x, b.Right - w));
             int y = Math.Max(b.y, Math.Min(anchor.y, b.Bottom - h));
             return new Box(x, y, w, h);
