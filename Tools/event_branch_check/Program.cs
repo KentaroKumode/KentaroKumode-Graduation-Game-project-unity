@@ -9,6 +9,8 @@
 //   5. 手放せない品 (確信の 3 品・預かり物・ItemIds.Undroppable): 売却・取り替え・偽の商人のどの経路でも残るか・
 //      確信を売ってしまったランで深さ 5 のボスを倒すと〈決意〉が足されるか (2026-11-13・Ids.cs と ConvictionSystem.cs は本物をコンパイル)
 //   6. 売値 0G の品 (灯火・レイピア・items.json の noSellValue): 売値の規則 (SellPriceRule は本物をコンパイル)・BOT は売らない・人は売れる
+//   7. 出る層 (2026-11-13): 条件は今ある深さ (1・3・5・6・7) だけで書く・深さごとの抽選のプールの数・連鎖の順 (前の段 ≦ 後の段)・
+//      確信の連鎖は深さ 1〜5・深さ 7 (一本道・追跡者と天候なし) に出るイベントは選べる選択肢がある
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -244,6 +246,117 @@ static class Program
         Check(allDark == 0, $"選べるか: 全部の選択肢が同時に暗くなり得るイベント {allDark} 件 (安全弁 EventEncounter.IsChoiceSelectable は残す)");
     }
 
+    // ===== 7. 出る層 (2026-11-13・docs/GAME.md §17「出る層」) =====
+
+    static readonly int[] Depths = { 1, 3, 5, 6, 7 };   // 今ある深さ (MapSystem.FreeMove.FloorPlan.Exists の 0 以外・深さ 0 にはイベントの点が無い)
+    static bool DepthExists(int d) => Array.IndexOf(Depths, d) >= 0;
+    static bool Covers(EventDefinition ev, int d) => ev.condition.MatchesFloor(d);
+    static string Range(EventDefinition ev) => ev.condition.floorMin == 1 && ev.condition.floorMax == 99 ? "全"
+        : ev.condition.floorMin == ev.condition.floorMax ? $"{ev.condition.floorMin}層" : $"{ev.condition.floorMin}-{ev.condition.floorMax}層";
+
+    static void IEnumerableChoicesOf(EventDefinition ev, Action<EventEffect> f)
+    {
+        foreach (var c in ev.choices)
+            foreach (var e in c.effects)
+            {
+                f(e);
+                if (e.branches != null) foreach (var br in e.branches) if (br != null) foreach (var x in br) f(x);
+            }
+    }
+
+    static void Layers(string dir)
+    {
+        var all = new List<EventDefinition>();
+        foreach (var path in Directory.GetFiles(dir, "*.txt"))
+            all.AddRange(EventSystem.EventParser.ParseAll(File.ReadAllText(path)));
+
+        // 1. 書いた深さ: 「全」以外は、 範囲の両端が今ある深さで、 7 より上を書かない
+        var bad = new List<string>();
+        foreach (var ev in all)
+        {
+            var c = ev.condition;
+            if (c.floorMin == 1 && c.floorMax == 99) continue;
+            if (!DepthExists(c.floorMin) || !DepthExists(c.floorMax) || c.floorMin > c.floorMax) bad.Add($"〈{ev.name}〉{Range(ev)}");
+        }
+        Check(bad.Count == 0, "出る層: 条件は今ある深さ (1・3・5・6・7) だけで書かれている" + (bad.Count > 0 ? " ── " + string.Join(" / ", bad) : ""));
+
+        // 2. 深さごとの抽選のプール (召喚専用を除く)。 「条件なし」= フラグ・秘宝の持ち物を要らない (ふだんの抽選に並ぶ)
+        var draw = all.FindAll(e => !e.condition.summonOnly);
+        int lo = int.MaxValue, hi = 0;
+        Console.WriteLine($"[出る層] 抽選に出るイベント {draw.Count} (召喚専用 {all.Count - draw.Count} を除く)。 深さごとのプール:");
+        foreach (int d in Depths)
+        {
+            var pool = draw.FindAll(e => Covers(e, d));
+            var plain = pool.FindAll(e => e.condition.requiredFlags.Count == 0 && e.condition.requiredPassiveItems.Count == 0);
+            var own = plain.FindAll(e => Range(e) != "全");
+            lo = Math.Min(lo, plain.Count); hi = Math.Max(hi, plain.Count);
+            Console.WriteLine($"  深さ {d} (画面の第 {Array.IndexOf(Depths, d) + 1} 層): {pool.Count} (条件なし {plain.Count}・うち「全」以外 {own.Count}: {string.Join("・", own.ConvertAll(e => e.name))})");
+        }
+        Check(lo * 4 >= hi * 3, $"出る層: 深さごとの条件なしのプールが大きく偏らない (最小 {lo} ≧ 最大 {hi} の 3/4)");
+        foreach (int d in new[] { 6, 7 })
+        {
+            int own = draw.FindAll(e => Covers(e, d) && Range(e) != "全" && e.condition.requiredFlags.Count == 0 && e.condition.requiredPassiveItems.Count == 0).Count;
+            Check(own >= 5, $"出る層: 深さ {d} に「全」以外のイベントが 5 件以上ある ({own})");
+        }
+
+        // 3. 連鎖の順: フラグを要るイベントは、 そのフラグを渡すイベントより浅く始まらず、 浅く終わらない (前の段 ≦ 後の段)
+        int links = 0; var order = new List<string>();
+        foreach (var ev in draw)
+            foreach (var flag in ev.condition.requiredFlags)
+                foreach (var g in all)
+                {
+                    bool gives = false;
+                    IEnumerableChoicesOf(g, e => { if (e.type == EventEffectType.GainFlag && e.param == flag) gives = true; });
+                    if (!gives) continue;
+                    links++;
+                    var a = g.condition; var b = ev.condition;
+                    bool ok = a.floorMin <= b.floorMin && a.floorMax <= b.floorMax;
+                    order.Add($"  {(ok ? "ok" : "NG")} 〈{g.name}〉{Range(g)} →[{flag}]→ 〈{ev.name}〉{Range(ev)}");
+                    if (!ok) fails++;
+                }
+        Console.WriteLine($"[出る層] 連鎖 {links} 本:");
+        foreach (var l in order) Console.WriteLine(l);
+        Check(links >= 4, $"出る層: 連鎖を見つけた ({links} 本・確信 2 本と犬 2 本)");
+
+        // 4. 確信の連鎖 (石板 → 啓示 → 災厄の予兆) は深さ 1・3・5 のどこでも出て、 深さ 5 (画面の第 3 層) のボスまでに終わる (§4-2)
+        foreach (var n in new[] { "預言者の石板", "啓示", "災厄の予兆" })
+        {
+            var ev = all.Find(e => e.name == n);
+            Check(ev != null && ev.condition.floorMin == 1 && ev.condition.floorMax == 5, $"出る層: 確信の連鎖〈{n}〉は深さ 1〜5 ({(ev == null ? "無い" : Range(ev))})");
+        }
+
+        // 5. 深さ 7 (画面の第 5 層) は一本道: 地図はあるが追跡者が居ず、 嵐も旧い前線の天候も無い (Storm.HasStorm・Weather.PoolFor)。
+        //    そこに出るイベントは選べる選択肢を 1 つ以上残す。 嵐の作り (本体の既定・GameHooks.StormEnabled) と旧い前線の作りの両方で見る
+        var gm = new GameLoop.GameManager { Run = new GameLoop.RunState() };
+        GameLoop.GameManager.Instance = gm;
+        var noGain = new List<string>(); var dark = new List<string>();
+        foreach (var ev in draw)
+        {
+            if (!Covers(ev, 7)) continue;
+            foreach (bool stormRules in new[] { true, false })
+            foreach (bool rich in new[] { true, false })
+            {
+                GameLoop.GameHooks.StormEnabled = stormRules;
+                Apply(new Scene { rich = rich, map = true, foe = false, weather = false, trade = true, forge = true }, gm);
+                gm.FreeMap.StormMode = false;
+                int ok = 0, gain = 0;
+                foreach (var c in ev.choices)
+                {
+                    if (!c.IsAvailable(gm.Run)) continue;
+                    ok++;
+                    foreach (var e in c.effects) if (EventEffectRoles.RoleOf(e) == EventEffectRole.Benefit) { gain++; break; }
+                }
+                string how = (stormRules ? "嵐の作り" : "前線の作り") + "・" + (rich ? "手持ち十分" : "手持ち 0");
+                if (ok == 0) dark.Add($"〈{ev.name}〉({how})");
+                if (rich && gain == 0) noGain.Add($"〈{ev.name}〉({how})");
+            }
+        }
+        GameLoop.GameHooks.StormEnabled = false;
+        GameLoop.GameManager.Instance = null;
+        Check(dark.Count == 0, "出る層: 深さ 7 に出るイベントは選べる選択肢が 1 つ以上ある (追跡者なし・嵐も前線も無し)" + (dark.Count > 0 ? " ── " + string.Join(" / ", dark) : ""));
+        Check(noGain.Count == 0, "出る層: 深さ 7 に出るイベントは、 手持ちが十分なら得のある選択肢を選べる" + (noGain.Count > 0 ? " ── " + string.Join(" / ", noGain) : ""));
+    }
+
     /// <summary>〈さびれた観測所〉3 本 (2026-11-13 作り直し): 選択肢の数 (4・4・5) と効果の並び。 時計の 5 つ目は時計だけ (ふだんの荷は無い)・得として扱う。</summary>
     static void Observatory(string dir)
     {
@@ -449,6 +562,7 @@ static class Program
         RoleRules();
         Selectability(dir);
         Observatory(dir);
+        Layers(dir);
         ClockRelic(Path.GetFullPath(Path.Combine(dir, "../../..")));   // dir = <root>/Assets/Resources/Events
         KeepConviction(Path.GetFullPath(Path.Combine(dir, "../../..")));
         ZeroSellPrice(Path.GetFullPath(Path.Combine(dir, "../../..")));
