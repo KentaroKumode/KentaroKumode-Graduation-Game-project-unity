@@ -507,7 +507,7 @@ namespace AutoTest
             GameLoop.GameHooks.StormClock = MapSystem.FreeMove.StormClock.Instability;   // [測定 2026-11-13 二版] 嵐の時計を既定 (不安定化) へ
             GameLoop.GameHooks.TerminalHealMulOverride = 0;                      // [測定 2026-11-12・#102]
             GameLoop.GameHooks.TerminalArresterNeedOverride = 0;
-            GameLoop.GameHooks.TerminalFirstAidBattleOnly = false;
+            GameLoop.GameHooks.TerminalFirstAidLeavesRunDeck = false;
             GameLoop.GameHooks.TerminalKillBonusNeedsAttack = false;            // [測定 2026-11-13・#117]
             GameLoop.GameHooks.HandCarry = CombatSystem.HandCarryMode.Pick;     // [測定 2026-11-13] 手札の規則を既定 (Pick) へ
             GameLoop.GameHooks.BossDownDisabled = false;                        // [測定 2026-11-13] ボスのダウンを既定 (あり) へ

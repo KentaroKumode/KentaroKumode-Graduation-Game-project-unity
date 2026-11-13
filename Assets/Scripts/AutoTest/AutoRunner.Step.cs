@@ -77,7 +77,7 @@ namespace AutoTest
             GameLoop.GameHooks.StormClock = stormClock;                            // [測定 2026-11-13 二版] 嵐の時計 (不安定化 / 手番)
             GameLoop.GameHooks.TerminalHealMulOverride = System.Math.Max(0, terminalHealMul);   // [測定 2026-11-12・#102]
             GameLoop.GameHooks.TerminalArresterNeedOverride = System.Math.Max(0, terminalArresterNeed);
-            GameLoop.GameHooks.TerminalFirstAidBattleOnly = terminalFirstAidBattleOnly;
+            GameLoop.GameHooks.TerminalFirstAidLeavesRunDeck = terminalFirstAidLeavesRunDeck;
             GameLoop.GameHooks.TerminalKillBonusNeedsAttack = terminalKillNeedsAttack;   // [測定 2026-11-13・#117]
             GameLoop.GameHooks.HandCarry = handCarry;                           // [測定 2026-11-13] 手札の持ち越し
             GameLoop.GameHooks.BossDownDisabled = !bossDown;                             // [測定 2026-11-13] ボスのダウン

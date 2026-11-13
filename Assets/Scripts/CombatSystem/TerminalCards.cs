@@ -67,11 +67,12 @@ namespace CombatSystem
         public bool basic;
         /// <summary>層ボスの報酬に出る。</summary>
         public bool rare;
-        /// <summary>使い捨て: 使うと、 その戦闘中は山札に戻らない。</summary>
+        /// <summary>使い捨て: 使うと、 その戦闘中は山札に戻らない (次の戦闘ではまた山札に入っている)。 使い捨ての決まりはこれだけ (2026-11-14・作者の決定)。</summary>
         public bool disposable;
-        /// <summary>使うと、 そのランの山札からも抜ける (〈応急箱〉・2026-11-12)。 <see cref="disposable"/> と組む (戦闘中も戻らない)。
+        /// <summary>[測定用] 測定の口 <see cref="GameLoop.GameHooks.TerminalFirstAidLeavesRunDeck"/> が立っている時だけ、 使うとそのランの山札からも抜ける
+        /// (〈応急箱〉の 2026-11-12〜11-14 の決まり・2026-11-14 に取り下げ = 既定では使い捨てと同じ)。 <see cref="disposable"/> と組む。
         /// 抜くのは本体の <c>CombatManager.FinishTerminalTurn</c>。 山札が <see cref="TerminalCards.MinDeckSize"/> 枚以下なら抜かない (店・休憩の抜き方と同じ下限)。
-        /// 判定は <see cref="TerminalCards.LeavesRunDeck"/> を通す (測定の口で旧の作りへ戻せる)。</summary>
+        /// 判定は <see cref="TerminalCards.LeavesRunDeck"/> を通す。</summary>
         public bool leavesRunDeck;
         /// <summary>常設: 一度引くとその戦闘中ずっと場に残り、 手札の枠を使わない。</summary>
         public bool permanent;
@@ -236,6 +237,8 @@ namespace CombatSystem
         //   避雷器 −0.35 / −1.12 → 溜める量 12→8 (下げるほど発動が増える = 強くなる向き。 机上: 敵の攻撃 20 で出目 1 あたりの軽減が 2.9 → 4.4 になり、
         //     基本の防御 (出目 1 個 = 平均 3.5) を少し上回る)。
         //   主幹・決死・増圧・充填・接地・剥ぎ取り・焼き切りは据え置き。 腕から元の値へ戻す口は GameHooks.Terminal* (AutoRunner.terminal*)。
+        // 2026-11-14: 〈応急箱〉の「使うとランの山札から抜ける」を取り下げた (作者の決定:「使い捨ては全部『その戦闘で山札に戻らない』でいい」)。
+        //   使い捨ての決まりは disposable だけ。 旧い決まりへ戻す測定の口は GameHooks.TerminalFirstAidLeavesRunDeck (AutoRunner.terminalFirstAidLeavesRunDeck)。
         /// <summary>〈主幹〉: この戦闘で使うたび、 以後の攻撃 +N。 / 〈配電盤〉: 次のターンに多く引く枚数。</summary>
         public const int MainsPerUse = 1, SwitchboardDraw = 2;
 
@@ -244,10 +247,11 @@ namespace CombatSystem
         /// <summary>〈避雷器〉の溜める量 (測定の口 <see cref="GameLoop.GameHooks.TerminalArresterNeedOverride"/> があればその値)。 効果と BOT はこれを読む。</summary>
         public static int ArresterNeedNow => GameLoop.GameHooks.TerminalArresterNeedOverride > 0 ? GameLoop.GameHooks.TerminalArresterNeedOverride : ArresterNeed;
 
-        /// <summary>使った時に、 そのランの山札から抜けるか (<see cref="TerminalDef.leavesRunDeck"/>・測定の口
-        /// <see cref="GameLoop.GameHooks.TerminalFirstAidBattleOnly"/> が立っていれば抜けない)。 本体 (CombatManager.FinishTerminalTurn) と BOT が読む。</summary>
+        /// <summary>使った時に、 そのランの山札から抜けるか。 既定では抜けない (2026-11-14〜・使い捨ては全部「その戦闘で山札に戻らない」だけ)。
+        /// 測定の口 <see cref="GameLoop.GameHooks.TerminalFirstAidLeavesRunDeck"/> が立っていれば、 <see cref="TerminalDef.leavesRunDeck"/> の端子 (〈応急箱〉) は
+        /// 旧い決まり (2026-11-12) どおり抜ける。 本体 (CombatManager.FinishTerminalTurn) と BOT が読む。</summary>
         public static bool LeavesRunDeck(TerminalDef d)
-            => d != null && d.leavesRunDeck && !GameLoop.GameHooks.TerminalFirstAidBattleOnly;
+            => d != null && d.leavesRunDeck && GameLoop.GameHooks.TerminalFirstAidLeavesRunDeck;
 
         /// <summary>手札の持ち越し (2026-11-13): 挿さなかった端子は捨て札へ行かず、 次のターンも手札に残る。 次のターンは手札が規定の枚数になるまで引く。
         /// 測定の口 <see cref="GameLoop.GameHooks.HandCarryDisabled"/> が立っていれば旧い規則 (前の手札を全部捨てて引き直す)。
@@ -278,6 +282,7 @@ namespace CombatSystem
         private static TerminalDef Basic(TerminalDef d) { d.basic = true; return d; }
         private static TerminalDef Rare(TerminalDef d) { d.rare = true; return d; }
         private static TerminalDef Once(TerminalDef d) { d.disposable = true; return d; }
+        /// <summary>使い捨て + 測定の口で旧い決まり (使うとランの山札から抜ける) へ戻せる印。 既定の挙動は <see cref="Once"/> と同じ。</summary>
         private static TerminalDef RunOnce(TerminalDef d) { d.disposable = true; d.leavesRunDeck = true; return d; }
         private static TerminalDef Cost(TerminalDef d, int n) { d.chargeCost = n; return d; }
         private static TerminalDef Cap(TerminalDef d, int n) { d.capacity = n; return d; }
@@ -357,7 +362,7 @@ namespace CombatSystem
                 Once(D(TerminalIds.Detonator, A, "出目 ×" + DetonatorMul + " を攻撃に。")),
                 Once(D(TerminalIds.Piercer, A, "出目を攻撃に。このターン敵の防御を無視。")),
                 Once(D(TerminalIds.ReliefValve, B, "このターンの被ダメージ −" + ReliefCutPct + "%。")),
-                RunOnce(D(TerminalIds.FirstAid, S, "HP +出目 ×" + FirstAidMul + "。使うと、そのランの山札から抜ける。")),
+                RunOnce(D(TerminalIds.FirstAid, S, "HP +出目 ×" + FirstAidMul + "。")),
                 Once(D(TerminalIds.FullCharge, C, "充電を上限まで満たす。")),
                 Once(D(TerminalIds.CoolShot, S, "エスカレーションの段階を 1 つ戻す。")),
                 Once(D(TerminalIds.Copier, S, "挿さずに空けた手札の端子を 1 枚、この戦闘中だけ複製して山札に加える。")),

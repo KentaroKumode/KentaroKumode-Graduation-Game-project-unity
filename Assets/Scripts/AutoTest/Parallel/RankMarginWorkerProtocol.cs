@@ -500,7 +500,7 @@ namespace AutoTest.ParallelSweep
                 "challengeCardPickByAxis",
                 "terminalsLeaveDeck", "randomGrantTerminals", "armorDefPerRank", "armorFlatEvery",
                 // 2026-11-12 (#102 第 2 弾): 端子の調整を元の値へ戻す腕 (0 / False = 今の値)
-                "terminalHealMul", "terminalArresterNeed", "terminalFirstAidBattleOnly",
+                "terminalHealMul", "terminalArresterNeed", "terminalFirstAidLeavesRunDeck",
                 // 2026-11-13 (#117): 端子の撃破のボーナスを旧い条件 (攻撃したターンの主攻撃までの撃破だけ) へ戻す腕 (False = 今の作り)
                 "terminalKillNeedsAttack",
                 // 2026-11-13: 戦闘の規則の 3 つの口 (True = 新しい規則・3 つとも False = 旧い規則 = main と同じ)

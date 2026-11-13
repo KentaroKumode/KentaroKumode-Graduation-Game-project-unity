@@ -252,6 +252,34 @@ static class T
             Check(TerminalCards.StripperChoices == 1, "倒すと増える選択肢の数は 1");
         }
 
+        // ---- 7. 使い捨て (2026-11-14・作者の決定): 使った戦闘の間は山札に戻らず、 次の戦闘ではまた山札にある (〈応急箱〉も同じ) ----
+        {
+            var once = TerminalCards.All.Where(d => d.disposable).Select(d => d.id).ToList();
+            Check(TerminalCards.All.All(d => !TerminalCards.LeavesRunDeck(d)),
+                  "既定では、 使ってランの山札から抜ける端子は無い (使い捨て " + once.Count + " 種: " + string.Join("・", once) + ")");
+            var runDeck = new List<string> { TerminalIds.FirstAid, TerminalIds.Attack, TerminalIds.Block, TerminalIds.Attack, TerminalIds.Block, TerminalIds.Charge, TerminalIds.Attack };
+            var dk = new TerminalDeckState();
+            dk.BeginBattle(runDeck);
+            bool used = false, cameBack = false;
+            for (int t = 0; t < 12; t++)
+            {
+                dk.DrawTurn(TerminalCards.HandSize);
+                if (used && dk.board.Contains(TerminalIds.FirstAid)) cameBack = true;
+                int fa = dk.board.IndexOf(TerminalIds.FirstAid);
+                var w = new int[] { -1, -1, -1 };
+                if (fa >= 0 && !used) w[0] = fa;
+                var o = TerminalCards.Resolve(dk.board, w, new[] { 3, 2, 1 }, new TerminalEnv { hp = 10, maxHp = 50 }, dk.state);
+                if (fa >= 0 && !used) used = o.Fired(dk.board, TerminalIds.FirstAid) && o.heal == 3 * TerminalCards.FirstAidMul;
+                dk.FinishTurn(o);
+            }
+            Check(used && !cameBack && dk.exiled.Contains(TerminalIds.FirstAid) && !dk.draw.Contains(TerminalIds.FirstAid) && !dk.discard.Contains(TerminalIds.FirstAid),
+                  "〈応急箱〉: 使った戦闘の間は山札・捨て札・手札に戻らない");
+            Check(runDeck.Count == 7 && runDeck.Contains(TerminalIds.FirstAid), "〈応急箱〉: ランの山札からは抜けない");
+            dk.BeginBattle(runDeck);
+            Check(dk.draw.Contains(TerminalIds.FirstAid) && dk.exiled.Count == 0, "〈応急箱〉: 次の戦闘ではまた山札にある");
+            Check(!TerminalCards.Get(TerminalIds.FirstAid).description.Contains("抜ける"), "〈応急箱〉の説明文に「ランの山札から抜ける」が無い");
+        }
+
         Console.WriteLine(fails == 0 ? "ALL OK" : fails + " FAILED");
         return fails == 0 ? 0 : 1;
     }
