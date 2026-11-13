@@ -515,6 +515,8 @@ namespace AutoTest.ParallelSweep
                 "downAimPolicy",
                 // 2026-11-14: ダウンが大技を取り消す条件 (ChargeOrHeavy = 既定 / Always = 旧い規則)・大技のチャージは攻撃しない (True = 既定)・大技の倍率の上書き (id:小技:大技)
                 "downCancelRule", "heavyChargeNoAttack", "enemyHeavySpec",
+                // 2026-11-14: 目盛りの割れ方 (MainAttackOnly = 既定・通常攻撃だけ / AnyDamage = 旧い判定)・ひびの猶予 (1 = 既定・0 = すぐ・−1 = ひびでは割れない)・ひびのダウンは弱い (True = 既定)
+                "downBreakRule", "downCrackGrace", "downCrackWeak",
                 // 2026-11-14: 灰燼の王の大技〈業火〉(True = 既定 / False = 旧い予兆の形)・〈烈炎〉の毎ターンの削り (False = 既定 / True = 旧い形)
                 "ashKingHeavy", "blazeTickEachTurn",
                 // 2026-11-13: 博士の時計をランの最初から預かる腕 (False = 既定・イベントで選んだ時だけ)

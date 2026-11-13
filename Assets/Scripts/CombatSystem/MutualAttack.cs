@@ -105,6 +105,14 @@ namespace CombatSystem
         public bool enemyDown;
         /// <summary>このターンの後にまだ続くダウンのターンの数 (割った目盛りの残り。 0 = 次のターンはダウンしない ── このターンに目盛りを割らなければ)。</summary>
         public int downPending;
+        /// <summary>このターンのダウンは弱い (ひびで割れた・受けるダメージ ×1.5 なし・2026-11-14)。</summary>
+        public bool enemyDownWeak;
+        /// <summary>後に続くダウンの先頭が弱いか (次のターンのダウンの種類)。</summary>
+        public bool downPendingHeadWeak;
+        /// <summary>目盛りごとのひびの入ったターン (−1 = ひびなし・本体の状態を読むだけ・書き換えない)。 null = 目盛りなし。</summary>
+        public int[] downCrackTurns;
+        /// <summary>まだ割っていない一番上の目盛りのひびが、 ひとりでに割れるターン (そのターンの終わり・−1 = ひびなし)。</summary>
+        public int downCrackBreakTurn;
         /// <summary>次に割る目盛りの HP (敵の HP がこれ以下になったら割れる・−1 = 目盛りが無い/残っていない)。</summary>
         public int downNextNotchHp;
         /// <summary>目盛りの一覧 (最大 HP の割合・大きい順・HP の棒の刻み)。 null = ダウンしない敵。 書き換えないこと。</summary>

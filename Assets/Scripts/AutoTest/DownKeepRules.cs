@@ -88,11 +88,13 @@ namespace AutoTest
         /// <summary>新しい規則 (ChargeOrHeavy) で、 この挿し方を「1 ターン待つ手」として扱うか。 待つと、 ダウン (T+2) がチャージか大技のターンに重なる時
         /// (= <paramref name="turnsToHeavyNext"/> = T+1 から見た大技までのターンが 2 (T+2 がチャージ) か 1 (T+2 が大技))。
         /// 前者は今割ると小技のターン (T+1) がダウンになり大技は消えない手、 後者は今割るとチャージ (攻撃しないターン) をダウンで潰す手で、 どちらも割るターンを選ぶ意味がある。
-        /// ほかの条件は旧い規則の <see cref="HoldEligible"/> と同じ。</summary>
+        /// ほかの条件は旧い規則の <see cref="HoldEligible"/> と同じ。
+        /// 2026-11-14: 待った後の HP は「0 より上」だけを見る (旧: 目盛りの上)。 目盛りを割れるのが通常攻撃だけになり (口 downBreakRule)、 毒・出血で目盛りの下にいても
+        /// 割れていない手 (= ひびが入る手) が待つ手になるため。 旧い判定 (AnyDamage) では「割らない手」は必ず目盛りの上なので、 今までと同じ答え。</summary>
         public static bool HoldEligibleChargeOrHeavy(bool hasHeavy, int turnsToHeavyNext, bool downNextAnyway, bool someCandBreaks, bool candBreaks,
                                                      int hpAfter, int nextNotchHp, float perTurnDmg)
             => hasHeavy && (turnsToHeavyNext == 1 || turnsToHeavyNext == 2) && !downNextAnyway && someCandBreaks && !candBreaks
-            && nextNotchHp >= 0 && hpAfter > nextNotchHp && hpAfter - nextNotchHp <= perTurnDmg;
+            && nextNotchHp >= 0 && hpAfter > 0 && hpAfter - nextNotchHp <= perTurnDmg;
 
         // =====================================================================
         //  残す印

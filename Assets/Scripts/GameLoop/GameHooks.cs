@@ -158,6 +158,16 @@ namespace GameLoop
         /// 既定 ChargeOrHeavy = チャージのターンか山場のターンに重なった時だけ (作者の決定)。 Always = どのダウンでも周期を頭に戻す (旧い規則)。
         /// AutoRunner.downCancelRule が毎ランの始めに入れ、 ラン終了で既定へ戻す。</summary>
         public static CombatSystem.DownCancelRule DownCancel = CombatSystem.DownCancelRule.ChargeOrHeavy;
+        /// <summary>[測定 2026-11-14] 目盛りの割れ方 (<see cref="CombatSystem.DownBreakRule"/>)。 既定 MainAttackOnly = 通常攻撃 (主攻撃) が当たった時だけ割れる (作者の決定)・
+        /// 通常攻撃以外で下回った目盛りはひびが入り、 猶予 (<see cref="DownCrackGrace"/>) の後にひとりでに割れる。 AnyDamage = 旧い判定 (ターンの終わりの HP で割る)。
+        /// AutoRunner.downBreakRule が毎ランの始めに入れ、 ラン終了で既定へ戻す。</summary>
+        public static CombatSystem.DownBreakRule DownBreak = CombatSystem.DownBreakRule.MainAttackOnly;
+        /// <summary>[測定 2026-11-14] ひびの猶予 (ターン数・既定 <see cref="CombatSystem.BossDown.CrackGraceTurns"/> = 1)。 0 = ひびが入ったターンの終わりにすぐ割れる・負 = ひびでは割れない。
+        /// AutoRunner.downCrackGrace が毎ランの始めに入れ、 ラン終了で既定へ戻す。</summary>
+        public static int DownCrackGrace = CombatSystem.BossDown.CrackGraceTurns;
+        /// <summary>[測定 2026-11-14] true (既定) = ひびで割れた目盛りのダウンは弱い (受けるダメージ ×1.5 なし)。 false = ひびのダウンも ×1.5。
+        /// AutoRunner.downCrackWeak が毎ランの始めに入れ、 ラン終了で true へ戻す。</summary>
+        public static bool DownCrackWeak = true;
         /// <summary>[測定 2026-11-14] true (既定) = 大技のチャージのターン (大技の 1 ターン前) は敵が攻撃しない (<see cref="CombatSystem.Escalation.IsChargeNoAttack"/>・作者の決定)。
         /// false = 旧い作り (チャージのターンも小技の倍率で攻撃する)。 AutoRunner.heavyChargeNoAttack が毎ランの始めに入れ、 ラン終了で true へ戻す。</summary>
         public static bool HeavyChargeNoAttack = true;
@@ -216,6 +226,9 @@ namespace GameLoop
             HandCarry = CombatSystem.HandCarryMode.Pick;
             BossDownDisabled = false;
             DownCancel = CombatSystem.DownCancelRule.ChargeOrHeavy;
+            DownBreak = CombatSystem.DownBreakRule.MainAttackOnly;
+            DownCrackGrace = CombatSystem.BossDown.CrackGraceTurns;
+            DownCrackWeak = true;
             HeavyChargeNoAttack = true;
             AshKingHeavyDisabled = false;
             BlazeTickEachTurn = false;

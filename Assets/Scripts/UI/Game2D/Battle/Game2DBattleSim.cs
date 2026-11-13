@@ -39,6 +39,9 @@ namespace UI.Game2D.Battle
         /// <summary>ボスのダウン (2026-11-13・予告 MutualTurnTelegraph の写し): このターンはダウン / 後に続くダウンのターン数 /
         /// 次の目盛りの HP (−1 = 無し) / 目盛り (最大 HP の割合・null = ダウンしない敵) / 割った目盛りの数。</summary>
         public bool down; public int downPending, downNotchHp = -1, downBroken; public float[] downNotches;
+        /// <summary>このターンのダウンは弱い (ひびで割れた・被ダメ ×1.5 なし) / 次のダウンは弱い / 目盛りごとのひびの入ったターン (−1 = なし) /
+        /// 一番上のひびがひとりでに割れるターン (−1 = なし)・予告の写し (2026-11-14)。</summary>
+        public bool downWeak, downNextWeak; public int[] downCracks; public int crackBreakTurn = -1;
         /// <summary>このターンは大技のチャージで、 敵は攻撃しない (予告 MutualTurnTelegraph.enemyCharging の写し・2026-11-14)。</summary>
         public bool charging;
         /// <summary>灰燼の王の〈業火〉のターンの烈炎の分 (軽減無視・予告 MutualTurnTelegraph.heavyBurst の写し・2026-11-14)。 0 = 無し。</summary>
@@ -246,6 +249,7 @@ namespace UI.Game2D.Battle
             var tele = p.tele;
             turn = tele.turn; eatk = tele.enemyAttackValue; stage = tele.escalationStage; edef = tele.enemyDefense; guardIn = tele.turnsToGuard; heavyIn = tele.turnsToHeavy;
             down = tele.enemyDown; charging = tele.enemyCharging; burst = tele.heavyBurst; downPending = tele.downPending; downNotchHp = tele.downNextNotchHp; downNotches = tele.downNotches; downBroken = tele.downBroken;
+            downWeak = tele.enemyDownWeak; downNextWeak = tele.downPendingHeadWeak; downCracks = tele.downCrackTurns; crackBreakTurn = tele.downCrackBreakTurn;
             if (downNotches != null) Game2DTutorial.Request(TutorialTopics.BossDown);      // 手引き「ボスのダウン」: 目盛りのあるボスとの初めての戦闘 (第 2 層のボスから)
             nextStageIn = tele.nextThresholdTurn > 0 ? tele.nextThresholdTurn - tele.turn : -1;
             if (stage >= 1) Game2DTutorial.Request(TutorialTopics.Long);      // 手引き「戦闘の長期化」: 敵の攻撃が初めて段を上げた (issue #86)

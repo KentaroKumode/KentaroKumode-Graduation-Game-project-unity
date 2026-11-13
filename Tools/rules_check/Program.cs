@@ -655,6 +655,96 @@ static class T
                   $"enemyHeavySpec の読み方: 周期 4 / 省略 (= データのまま) / 周期 2 を読み、 周期 0・小数・欄不足の 3 項目は飛ばす (読めた {sp.Count}・飛ばした {bad.Count})");
         }
 
+        // 14. 目盛りを割れるのは通常攻撃だけ・ひび・弱いダウン (2026-11-14・作者の決定)
+        {
+            var NN = new[] { 0.75f, 0.5f }; const int M = 1000;
+            // 毒で下回っても割れない → 次のターンの通常攻撃で割れる (満額)
+            var a = new BossDownState(); a.Reset(NN);
+            int c1 = a.NoteTurnEndCracks(740, M, 3, 1, true, out int nc1, out _);
+            bool noDown1 = !a.BeginTurn();
+            int m1 = a.NoteMainHit(735, M, 5, 4, out int cb1, out int cw1);
+            bool down1 = a.BeginTurn() && !a.downWeakNow;
+            Check(c1 == 0 && nc1 == 1 && noDown1 && m1 == 1 && cb1 == 1 && cw1 == 1 && down1,
+                  "毒で目盛りを下回ってもその場では割れない (ひび) → 次のターンの通常攻撃で割れ、 満額のダウン (ひびから 1 ターン)");
+            // 主攻撃のダメージ 0 (回避) では割れない → 猶予 1 が切れて、 次のターンの終わりにひとりでに割れる (弱いダウン)
+            var b = new BossDownState(); b.Reset(NN);
+            b.NoteTurnEndCracks(740, M, 3, 1, true, out _, out _); b.BeginTurn();
+            int m2 = b.NoteMainHit(740, M, 0, 4, out _, out _);
+            int c2 = b.NoteTurnEndCracks(738, M, 4, 1, true, out _, out _);
+            bool weak2 = b.BeginTurn() && b.downWeakNow;
+            Check(m2 == 0 && c2 == 1 && weak2 && b.broken == 1, "主攻撃 0 では割れない・ひびは次のターンの終わりにひとりでに割れ、 弱いダウン (被ダメ ×1.5 なし)");
+            // 回復で目盛りの上へ戻ればひびは消える (猶予の数え直し)
+            var h = new BossDownState(); h.Reset(NN);
+            h.NoteTurnEndCracks(740, M, 3, 1, true, out _, out _);
+            int c3 = h.NoteTurnEndCracks(760, M, 4, 1, true, out _, out int healed);
+            int c3b = h.NoteTurnEndCracks(745, M, 5, 1, true, out int nc3, out _);
+            int c3c = h.NoteTurnEndCracks(745, M, 6, 1, true, out _, out _);
+            Check(c3 == 0 && healed == 1 && c3b == 0 && nc3 == 1 && c3c == 1, "回復で目盛りの上へ戻るとひびは消え、 また下回ったターンから数え直す (T5 にひび → T6 の終わりに割れる)");
+            // 猶予 2 / 猶予 0 / ひびでは割れない (負)
+            var g2 = new BossDownState(); g2.Reset(NN);
+            bool g2a = g2.NoteTurnEndCracks(740, M, 3, 2, true, out _, out _) == 0 && g2.NoteTurnEndCracks(740, M, 4, 2, true, out _, out _) == 0
+                    && g2.NoteTurnEndCracks(740, M, 5, 2, true, out _, out _) == 1;
+            var g0 = new BossDownState(); g0.Reset(NN);
+            bool g0a = g0.NoteTurnEndCracks(740, M, 3, 0, true, out _, out _) == 1 && g0.BeginTurn() && g0.downWeakNow;
+            var gn = new BossDownState(); gn.Reset(NN);
+            bool gna = gn.NoteTurnEndCracks(740, M, 3, -1, true, out _, out _) == 0 && gn.NoteTurnEndCracks(700, M, 9, -1, true, out _, out _) == 0
+                    && gn.TopCracked && gn.NoteMainHit(690, M, 10, 10, out _, out _) == 1 && gn.BeginTurn() && !gn.downWeakNow;
+            Check(g2a && g0a && gna, "猶予 2 = 2 ターン後の終わりに割れる・猶予 0 = そのターンの終わりに割れる (弱い)・負 = ひびでは割れず、 通常攻撃で割れる (満額)");
+            // downCrackWeak=False: ひびのダウンも満額
+            var w = new BossDownState(); w.Reset(NN);
+            bool wa = w.NoteTurnEndCracks(740, M, 3, 0, false, out _, out _) == 1 && w.BeginTurn() && !w.downWeakNow;
+            Check(wa, "downCrackWeak=False: ひびで割れたダウンも被ダメ ×1.5 (満額)");
+            // 1 回の主攻撃で 2 つまたぐ → 2 ターン続けて満額のダウン / 通常攻撃 → ひびの順に積む
+            var t2 = new BossDownState(); t2.Reset(NN);
+            bool two = t2.NoteMainHit(400, M, 600, 1, out _, out _) == 2 && t2.BeginTurn() && !t2.downWeakNow && t2.BeginTurn() && !t2.downWeakNow && !t2.BeginTurn();
+            var mix = new BossDownState(); mix.Reset(NN);
+            bool mixed = mix.NoteMainHit(700, M, 300, 1, out _, out _) == 1 && mix.NoteTurnEndCracks(480, M, 1, 0, true, out _, out _) == 1
+                      && mix.BeginTurn() && !mix.downWeakNow && mix.BeginTurn() && mix.downWeakNow;
+            Check(two && mixed, "1 回の主攻撃で 2 つまたぐと 2 ターン続けて満額のダウン・同じターンの通常攻撃とひびは割れた順 (満額 → 弱い)");
+            // 撃破した主攻撃・倒れたターンは割らない
+            var k = new BossDownState(); k.Reset(NN);
+            Check(k.NoteMainHit(0, M, 999, 1, out _, out _) == 0 && k.NoteTurnEndCracks(0, M, 1, 0, true, out _, out _) == 0, "倒した主攻撃・倒れたターンでは割らない");
+            // 旧い判定 (AnyDamage): ターンの終わりの HP で割る・満額
+            var o = new BossDownState(); o.Reset(NN);
+            Check(o.NoteTurnEnd(740, M) == 1 && o.BeginTurn() && !o.downWeakNow, "AnyDamage (旧い判定): 毒で下回っても、 ターンの終わりの HP で割れて満額のダウン");
+            // ForecastTurn (BOT の見込み) は本体の状態の進め方と一致する: 乱数の並び 3000 ターン (猶予 −1 / 0 / 1 / 2・弱い / 満額)
+            var rng = new Random(7);
+            int mism = 0, steps = 0;
+            foreach (int grace in new[] { -1, 0, 1, 2 })
+                foreach (bool weak in new[] { true, false })
+                    for (int fight = 0; fight < 40; fight++)
+                    {
+                        var s = new BossDownState(); s.Reset(new[] { 0.8f, 0.6f, 0.35f });
+                        int hp = M;
+                        for (int turn = 1; turn <= 20 && hp > 0; turn++)
+                        {
+                            s.BeginTurn();
+                            int main = rng.Next(4) == 0 ? 0 : rng.Next(0, 120), chip = rng.Next(3) == 0 ? rng.Next(0, 90) : 0, heal = rng.Next(5) == 0 ? rng.Next(0, 60) : 0;
+                            var f = BossDown.ForecastTurn(DownBreakRule.MainAttackOnly, grace, weak, s.notches, M, s.broken, s.pending, s.PendingHeadWeak,
+                                                          (int[])s.crackTurn.Clone(), turn, hp, main, chip - heal, true);
+                            // 本体の進め方 (主攻撃 → 通常攻撃以外 → ターンの終わり)
+                            hp -= main;
+                            s.NoteMainHit(hp, M, main, turn, out _, out _);
+                            hp = Math.Min(M, hp - chip + heal);
+                            if (hp <= 0) break;
+                            s.NoteTurnEndCracks(hp, M, turn, grace, weak, out _, out _);
+                            steps++;
+                            bool nextDown = s.pending > 0, nextWeak = nextDown && s.PendingHeadWeak;
+                            bool eq = f.nextDown == nextDown && f.nextWeak == nextWeak && f.brokenAfter == s.broken;
+                            for (int i = s.broken; i < s.notches.Length && eq; i++) eq = f.cracksAfter[i] == s.crackTurn[i];
+                            if (!eq) mism++;
+                        }
+                    }
+            Check(mism == 0 && steps > 1000, $"BOT の見込み BossDown.ForecastTurn = 本体の進め方 (不一致 {mism} / {steps} ターン・回復を含む)");
+            // ForecastTurn の AnyDamage は旧い NextTurnIsDown と同じ
+            bool anySame = true;
+            for (int hp0 = 600; hp0 <= 900; hp0 += 7)
+                for (int dmg = 0; dmg <= 300; dmg += 13)
+                    anySame &= BossDown.ForecastTurn(DownBreakRule.AnyDamage, 1, true, NN, M, 0, 0, false, null, 1, hp0, dmg / 2, dmg - dmg / 2).nextDown
+                               == BossDown.NextTurnIsDown(NN, M, 0, 0, hp0 - dmg);
+            Check(anySame, "ForecastTurn (AnyDamage) = 旧い NextTurnIsDown (与ダメの後の HP で判定)");
+        }
+
         Console.WriteLine(fails == 0 ? "ALL OK" : fails + " FAILED");
         return fails == 0 ? 0 : 1;
     }

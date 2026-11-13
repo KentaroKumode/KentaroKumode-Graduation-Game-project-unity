@@ -941,7 +941,7 @@ namespace UI.Game2D
             bool live = sim != null && Game2DBattleSim.Active; bool known = live && sim.phase != Game2DBattleSim.P.ERoll;
             int en = live ? sim.enemyDiceCount : 3;
             for (int i = 0; i < en; i++) DrawDie(p, new RectInt(14 + i * 20, 16, 17, 17), live ? sim.ed[i] : i + 3, true);
-            if (known && sim.down) p.Text("ダウン:攻撃なし", 14, 36, MarkHeavyHud);      // ボスのダウン (2026-11-13): 止まるのは攻撃だけ (パッシブは動く)
+            if (known && sim.down) p.Text(sim.downWeak ? "ダウン(ひび):攻撃なし" : "ダウン:攻撃なし", 14, 36, MarkHeavyHud);      // ボスのダウン (2026-11-13): 止まるのは攻撃だけ (パッシブは動く)・ひびで割れた弱いダウンは (ひび) (2026-11-14)
             else if (known && sim.charging) p.Text("チャージ:攻撃なし", 14, 36, MarkHeavyHud);   // 大技のチャージ (2026-11-14): 攻撃しない (次のターンが大技・下の「次: 大技」)
             else p.Text(known ? "攻撃 " + sim.eatk + (sim.burst > 0 ? "+" + sim.burst : "") : "攻撃 ??", 14, 36, known ? Atk : Dim);   // 〈業火〉の烈炎の分は軽減無視なので足し算で別に見せる
             if (known) p.Text("出目 " + sim.EnemyDiceSum, 14, 49, Dim);
@@ -949,11 +949,15 @@ namespace UI.Game2D
             // 予告 (攻撃・大技・構え) と毒・出血は敵の周りに出す (Game2DBattleFx.DrawMarks・2026-11-11)。 ここは次の構え・大技の前触れだけ
             string next = known ? (sim.guardIn == 1 && sim.heavyIn == 1 ? "次: 構え・大技" : sim.guardIn == 1 ? "次: 構え" : sim.heavyIn == 1 ? "次: 大技" : null) : null;
             // ボスのダウン (2026-11-13): 後に続くダウンが決まっていれば「次: ダウン」(大技・構えの前触れより先に出す)
-            if (known && sim.downPending > 0) next = "次: ダウン";
+            if (known && sim.downPending > 0) next = sim.downNextWeak ? "次: ダウン(ひび)" : "次: ダウン";
             if (next != null) p.Text(next, 14, 75, sim.heavyIn == 1 || (known && sim.downPending > 0) ? MarkHeavyHud : Dim);
             if (live) p.Text("ターン " + sim.turn + "  段階 " + sim.Stage, 14, 90, Dim);
             // ボスのダウン: ダウン中は受けるダメージの倍率、 そうでなければ次の目盛りまでの残り (HP がこの点数だけ減れば割れる)
-            if (known && sim.down) p.Text("被ダメ×" + CombatSystem.BossDown.TakenMul.ToString("0.0"), 14, 103, MarkHeavyHud);
+            if (known && sim.down && !sim.downWeak) p.Text("被ダメ×" + CombatSystem.BossDown.TakenMul.ToString("0.0"), 14, 103, MarkHeavyHud);
+            // ひび (2026-11-14): 通常攻撃以外で目盛りを下回った。 通常攻撃が当たれば割れる・当たらなくても猶予が切れるとひとりでに割れる
+            else if (known && sim.crackBreakTurn >= 0) p.Text(sim.crackBreakTurn <= sim.turn ? "ひび:このターンで割れる" : "ひび:あと " + (sim.crackBreakTurn - sim.turn + 1) + " ターン", 14, 103, MarkHeavyHud);
+            else if (known && sim.downNotchHp >= 0 && fx != null && sim.downCracks != null && sim.downBroken < sim.downCracks.Length && sim.downCracks[sim.downBroken] >= 0)
+                p.Text("ひび:通常攻撃で割れる", 14, 103, MarkHeavyHud);   // ひびでは割れない設定 (口 downCrackGrace < 0)
             else if (known && sim.downNotchHp >= 0 && fx != null) p.Text("目盛りまで " + Mathf.Max(0, fx.EnemyHp - sim.downNotchHp), 14, 103, Ink);
             // 不安定化 (2026-11-13・GAME.md §5-12): 激化の段が上がるたびに不安定 +1 (ボス戦では溜まらない・この戦闘で溜まった分)。 段の表示 (上の行) のすぐ下
             else if (live && GameLoop.GameManager.Instance != null && GameLoop.GameManager.Instance.InstabilityFromEscalationThisCombat > 0)
@@ -986,7 +990,9 @@ namespace UI.Game2D
                 for (int i = 0; i < sim.downNotches.Length; i++)
                 {
                     int nx = 30 + Mathf.Clamp(Mathf.RoundToInt(192 * sim.downNotches[i]), 1, 190);
-                    p.Rect(nx, 30, 1, 12, i < sim.downBroken ? Dim : MarkHeavyHud);
+                    bool cracked = i >= sim.downBroken && sim.downCracks != null && i < sim.downCracks.Length && sim.downCracks[i] >= 0;
+                    if (cracked) { p.Rect(nx, 30, 1, 4, MarkHeavyHud); p.Rect(nx, 38, 1, 4, MarkHeavyHud); }   // ひび (2026-11-14): 刻みの中ほどを欠く (状態は形で表す・倍率は使わない)
+                    else p.Rect(nx, 30, 1, 12, i < sim.downBroken ? Dim : MarkHeavyHud);
                 }
             p.Text(cur + "/" + max, 228, 29, Ink);
             p.Apply(t);

@@ -547,6 +547,12 @@ namespace AutoTest
             /// <summary>目盛り (null = ダウンしない敵) / 割った数 / 目盛りの HP を測る最大 HP / このターンの後に続くダウンの数。</summary>
             public float[] downNotches;
             public int downBroken, downMaxHp, downPendingNow;
+            /// <summary>[2026-11-14] このターンのダウンは弱い (ひびで割れた・受けるダメージ ×1.5 なし) / 後に続くダウンの先頭が弱い。</summary>
+            public bool enemyDownWeak, downPendingHeadWeak;
+            /// <summary>[2026-11-14] 目盛りごとのひびの入ったターン (−1 = なし・null 可・書き換えない) / このターンの番号 /
+            /// このターンに主攻撃の後で入る通常攻撃以外の削りの見込み (固定ダメの枠に溜まった分 (毒など) + 出血・ひびの見込みに使う・旧い判定では 0)。</summary>
+            public int[] downCrackTurns;
+            public int downTurn, downChip;
             /// <summary>次のターン (ダウンのターンなら、 ダウンが明けた後) の敵の攻撃の見込み (目盛りを割る価値・ダウン中の先の被ダメの見積もりに使う)。</summary>
             public int downNextAtk;
             /// <summary>[2026-11-14] 次のターンをダウンにした時に受けずに済む攻撃 (目盛りを割る価値の元)。 旧い規則 (口 downCancelRule=Always) は <see cref="downNextAtk"/> と同じ。
@@ -591,7 +597,7 @@ namespace AutoTest
             float termMul = ws.damageMul;
             int minDmg = s.minDmg, consBurst = s.consBurst, eDef = ws.ignoreDefense ? 0 : s.eDefNow, pen = s.myPen, critPen = s.critPen;
             float critMulEff = s.critMulEff + ws.critMultAdd, nonCritMul = s.nonCritMul, berserk = s.berserkMul;
-            bool pinpoint = s.pinpointCut, vital = s.vitalIgnore, down = s.enemyDown;
+            bool pinpoint = s.pinpointCut, vital = s.vitalIgnore, down = s.enemyDown && !s.enemyDownWeak;   // ひびの弱いダウン (2026-11-14) は ×1.5 なし
             float D(bool crit)
             {
                 int d = raw;
@@ -744,6 +750,7 @@ namespace AutoTest
         private struct OptimalTurnOutcome
         {
             public int effDmg;      // 敵 HP を減らす量の見積もり (撃破判定に使う値と同じ)
+            public int mainDmg;     // [2026-11-14] そのうち主攻撃 (目盛りを割れる分・黎明・虚空の削りを除く)
             public int taken;       // 自 HP の減少の見積もり
             public int block;
             public int aCount, bCount;
@@ -883,7 +890,7 @@ namespace AutoTest
             }
             if (aCount > 0) dmg = CombatSystem.EnemyHpLedger.ProbeMain(dmg);   // [測定用の物差し 2026-11-10] 旧の式にも同じ位置で (防御の前)
             if (aCount > 0) dmg = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(dmg);   // [#121] 〈大罪:怠惰〉: 本体と同じ位置 (物差しの直後・防御の前)
-            if (aCount > 0) dmg = CombatSystem.BossDown.ApplyTaken(dmg, s.enemyDown);           // ボスのダウン ×1.5: 本体と同じ位置 (怠惰の直後)
+            if (aCount > 0) dmg = CombatSystem.BossDown.ApplyTaken(dmg, s.enemyDown && !s.enemyDownWeak);   // ボスのダウン ×1.5: 本体と同じ位置 (怠惰の直後・ひびの弱いダウンは無し)
             // 敵の防御 (このターンの値) で軽減
             if (aCount > 0 && eDefNow > 0)
                 dmg = CombatSystem.DefenseFormula.Apply(dmg, CombatSystem.DefenseFormula.Effective(eDefNow, myPen));
@@ -927,6 +934,7 @@ namespace AutoTest
                 }
             }
 
+            int mainEff = aCount > 0 ? System.Math.Max(0, effDmg) : 0;   // [2026-11-14] 目盛りを割れる主攻撃の見込み (黎明・虚空の削りは入れない)
             int block = blockRaw;
             // 〈貫きの錐〉: 敵攻撃値 1 につきブロックを 2 削る (予告済み)。
             if (tele.playerBlockIgnored)
@@ -1037,9 +1045,11 @@ namespace AutoTest
             // ボスのダウン (2026-11-13): この手で目盛りを割って次のターンをダウンにするなら、 次のターンの敵の攻撃の一部を今の HP で足す。
             //   判定は本体と同じ関数 (BossDown.NextTurnIsDown)。 何もしなくても次がダウン (前に割った分が残っている) なら手の差にならないので足さない。
             //   段取り (溜めのターンに合わせて割る) は 2 ターン先読み (deckLookahead) の役目 ── ここでは次のターンの 1 回分だけ。
+            //   [2026-11-14] 割れるかは本体と同じ規則 (BossDown.ForecastTurn・口 downBreakRule)。 新しい判定 = 主攻撃 (mainEff) だけで割れる・通常攻撃以外の削り (downChip) はひび。
+            //   旧い判定 (AnyDamage) は今までどおり 与ダメの見込み (effDmg) の後の HP で数える (NextTurnIsDown と同じ)。
             if (s.downNotches != null && effDmg < enemyHp
-                && CombatSystem.BossDown.NextTurnIsDown(s.downNotches, s.downMaxHp, s.downBroken, s.downPendingNow, enemyHp - effDmg)
-                && !CombatSystem.BossDown.NextTurnIsDown(s.downNotches, s.downMaxHp, s.downBroken, s.downPendingNow, enemyHp))
+                && DownForecast(in s, enemyHp, mainEff, effDmg).nextDown
+                && !DownForecast(in s, enemyHp, 0, 0).nextDown)
                 u += DownNextTurnShare * System.Math.Max(0, s.downEraseAtk) * (s.ledger ? 1f : wDef);   // 旧い規則では downEraseAtk = downNextAtk (今までと同じ)
 
             // ===== 短期決戦の概念 (2026-08-04) =====
@@ -1119,7 +1129,7 @@ namespace AutoTest
                 bool onlySurvivesByNotAttacking = (takenIfAttackOne >= myHpEff) && (taken < myHpEff);
                 if (!onlySurvivesByNotAttacking) u -= 10000f;
             }
-            outcome = new OptimalTurnOutcome { effDmg = effDmg, taken = taken, block = block, aCount = aCount, bCount = bCount, bashSpent = bashSpent,
+            outcome = new OptimalTurnOutcome { effDmg = effDmg, mainDmg = mainEff, taken = taken, block = block, aCount = aCount, bCount = bCount, bashSpent = bashSpent,
                                                freeBlock = fbCovers, killsNow = fbKills, dmgOld = dmgOld, dmgNew = dmgNew, rawNew = rawNew,
                                                dmgUsed = aCount > 0 ? dmgUsed : 0, enemyHeal = enemyHeal, balancePlus = balancePlus };
             return u;
@@ -1205,6 +1215,28 @@ namespace AutoTest
         /// <summary>[#107] 同じく〈反撃態勢〉(本体: EnemyPassiveSkillEffects.CounterStance・次のターンの敵の OnPreDealDamage で finalDamage += )。</summary>
         private const string CounterStanceNextTurnKey = ItemSystem.PassiveSkills.Effects.CounterStance.NextTurnKey;
 
+        /// <summary>[2026-11-14] 目盛りの割れ方の見込み (本体と同じ規則 BossDown.ForecastTurn を、 口 GameHooks.DownBreak / DownCrackGrace / DownCrackWeak で呼ぶ)。
+        /// <paramref name="mainDmg"/> = 主攻撃の見込み / <paramref name="totalDmg"/> = このターンの与ダメの見込み (旧い判定はこの後の HP で数える = NextTurnIsDown と同じ)。
+        /// 新しい判定では、 主攻撃の後に入る通常攻撃以外の削りを <see cref="OptimalTurnState.downChip"/> (固定ダメの枠の毒など + 出血) と、 与ダメの見込みのうち主攻撃以外の分の大きい方で見る。</summary>
+        private static CombatSystem.BossDown.Forecast DownForecast(in OptimalTurnState s, int hpStart, int mainDmg, int totalDmg, bool wantCracks = false)
+        {
+            var rule = GameLoop.GameHooks.DownBreak;
+            int afterMain = rule == CombatSystem.DownBreakRule.AnyDamage ? System.Math.Max(0, totalDmg - mainDmg)
+                          : System.Math.Max(s.downChip, System.Math.Max(0, totalDmg - mainDmg));
+            return CombatSystem.BossDown.ForecastTurn(rule, GameLoop.GameHooks.DownCrackGrace, GameLoop.GameHooks.DownCrackWeak,
+                                                      s.downNotches, s.downMaxHp, s.downBroken, s.downPendingNow, s.downPendingHeadWeak,
+                                                      s.downCrackTurns, s.downTurn, hpStart, mainDmg, afterMain, wantCracks);
+        }
+
+        /// <summary>[2026-11-14] このターンに主攻撃の後で敵の HP に入る、 通常攻撃以外の削りの見込み: 固定ダメの枠に溜まった分 (ターン頭の毒・品が預けた分) + 出血 (本体の式)。
+        /// 読むだけ (乱数を引かない)。 ターン終了時の削り・反射・品の攻撃後の直接は入れない (見立て)。</summary>
+        private static int DownChipEstimate(ItemSystem.PassiveSkills.CombatContext ctx)
+        {
+            if (ctx == null) return 0;
+            int bleed = ctx.enemyBleedStacks > 0 ? CombatSystem.BattleModifierManager.ApplyBleedModifiers(ctx, ctx.enemyBleedStacks) : 0;
+            return System.Math.Max(0, ctx.fixedDamageToEnemy) + System.Math.Max(0, bleed);
+        }
+
         /// <summary>ターン <paramref name="turn"/> の敵の攻撃の見込み (プレイヤーの防御の後)。 公開規則 (Escalation.EnemyAttackValue) に、 敵ダイスは面の平均を入れる。
         /// ダイス合計のパッシブ補正は今ターンの予告との差で見る (前のターンの〈暴走〉はこのターン限りなので除く・#107)。
         /// <paramref name="extraDice"/> = 敵の出目の合計へさらに足す分 (〈暴走〉の +3 の見積もり)。 プレイヤーの防御は本体と同じ関数を通す。</summary>
@@ -1274,8 +1306,27 @@ namespace AutoTest
             // ボスのダウン (2026-11-13): この手で次のターンがダウンになるか (本体と同じ関数)。 なれば次のターンの敵の攻撃は 0・受けるダメージ ×1.5。
             //   ダウンが明けた後の攻撃は downAfterAtk (新しい規則: チャージか大技に重なれば周期を頭に戻して数える・旧い規則: 今の見込み downNextAtk のまま)。
             //   ダウンのターンの次 (このターンがダウン) は plan.next の攻撃 (本体がこのターンの頭に起点を動かした後の値) になる。
-            if (st.downNotches != null)
+            if (st.downNotches != null && GameLoop.GameHooks.DownBreak != CombatSystem.DownBreakRule.AnyDamage)
             {
+                // 新しい判定 (2026-11-14): 主攻撃だけで割れる・通常攻撃以外の削りはひび (猶予の後に弱いダウン)。 本体と同じ規則 (BossDown.ForecastTurn)
+                var f = DownForecast(in st, st.enemyHp, o.mainDmg, System.Math.Min(o.effDmg, st.enemyHp) - o.enemyHeal, wantCracks: true);
+                bool nd = f.nextDown;
+                int added = f.fullAdded + f.crackAdded;
+                ns.downBroken = f.brokenAfter;
+                ns.downCrackTurns = f.cracksAfter;
+                ns.downTurn = st.downTurn + 1;
+                ns.enemyDown = nd; ns.enemyDownWeak = nd && f.nextWeak;
+                ns.downPendingNow = System.Math.Max(0, st.downPendingNow + added - (nd ? 1 : 0));
+                // 次のターンの後に残るダウンの先頭の種類 (近似: 今残っている物が先・今のターンに割れた物は 通常攻撃 → ひび の順)
+                ns.downPendingHeadWeak = ns.downPendingNow > 0
+                    && (st.downPendingNow > 1 ? st.downPendingHeadWeak
+                        : (st.downPendingNow == 1 ? f.fullAdded == 0 : f.fullAdded <= 1) && f.crackAdded > 0 && GameLoop.GameHooks.DownCrackWeak);
+                ns.downNextAtk = nd ? st.downAfterAtk : st.downNextAtk;
+                if (nd) { ns.enemyAtk = 0; ns.tele.enemyAttackValue = 0; ns.atkGrowth = null; }
+            }
+            else if (st.downNotches != null)
+            {
+                // 旧い判定 (AnyDamage・2e76c46 の式のまま)
                 int hpAfter = System.Math.Max(0, ns.enemyHp);
                 int nb = CombatSystem.BossDown.BrokenCount(st.downNotches, st.downMaxHp, hpAfter, st.downBroken);
                 bool nd = CombatSystem.BossDown.NextTurnIsDown(st.downNotches, st.downMaxHp, st.downBroken, st.downPendingNow, hpAfter);
@@ -1493,6 +1544,9 @@ namespace AutoTest
             if (tele.downNotches != null && cm?.CurrentEnemy != null && ctxRoles != null)
             {
                 st.downNotches = tele.downNotches; st.downBroken = tele.downBroken; st.downPendingNow = tele.downPending;
+                st.enemyDownWeak = tele.enemyDownWeak; st.downPendingHeadWeak = tele.downPendingHeadWeak;
+                st.downCrackTurns = tele.downCrackTurns; st.downTurn = tele.turn;
+                st.downChip = GameLoop.GameHooks.DownBreak == CombatSystem.DownBreakRule.AnyDamage ? 0 : DownChipEstimate(ctxRoles);
                 st.downMaxHp = System.Math.Max(1, cm.CurrentEnemy.maxHP);
                 st.downNextAtk = ExpectedEnemyAttackAt(cm.CurrentEnemy, ctxRoles, in tele, tele.turn + 1, 0);
                 st.downEraseAtk = st.downNextAtk; st.downAfterAtk = st.downNextAtk;

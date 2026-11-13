@@ -245,6 +245,14 @@ namespace AutoTest
         /// 既定 ChargeOrHeavy = ダウンがチャージのターンか山場のターンに重なった時だけ (作者の決定)。 Always = どのダウンでも周期を頭に戻す (旧い規則 = 2e76c46 の main)。
         /// 本体の GameHooks.DownCancel へ流す。 BOT の待つ得 (downAimPolicy=Aim) も同じ口で式を切り替える。</summary>
         public CombatSystem.DownCancelRule downCancelRule = CombatSystem.DownCancelRule.ChargeOrHeavy;
+        /// <summary>[測定 2026-11-14] 目盛りの割れ方 (CombatSystem.DownBreakRule)。 既定 MainAttackOnly = 通常攻撃 (主攻撃) が当たった時だけ割れる (作者の決定)・
+        /// 通常攻撃以外で下回った目盛りはひびが入り、 猶予 (downCrackGrace) の後にひとりでに割れる。 AnyDamage = 旧い判定 (ターンの終わりの HP で割る・ひびなし)。
+        /// 本体の GameHooks.DownBreak へ流す。 BOT の見込み (BossDown.ForecastTurn) も同じ口で切り替わる。</summary>
+        public CombatSystem.DownBreakRule downBreakRule = CombatSystem.DownBreakRule.MainAttackOnly;
+        /// <summary>[測定 2026-11-14] ひびの猶予 (ターン数・既定 1 = ひびが入ったターンの次のターンの終わりに割れる)。 0 = すぐ割れる・負 (−1) = ひびでは割れない。 本体の GameHooks.DownCrackGrace へ流す。</summary>
+        public int downCrackGrace = CombatSystem.BossDown.CrackGraceTurns;
+        /// <summary>[測定 2026-11-14] true (既定) = ひびで割れた目盛りのダウンは弱い (受けるダメージ ×1.5 なし)。 false = ひびのダウンも ×1.5。 本体の GameHooks.DownCrackWeak へ流す。</summary>
+        public bool downCrackWeak = true;
         /// <summary>[測定 2026-11-14] true (既定) = 大技のチャージのターン (大技の 1 ターン前) は敵が攻撃しない (作者の決定)。 false = 旧い作り (チャージも小技の倍率で攻撃)。
         /// 本体の GameHooks.HeavyChargeNoAttack へ流す (BOT の見込みは本体の Escalation.EnemyAttackValue を通るので自然に読む)。</summary>
         public bool heavyChargeNoAttack = true;
@@ -847,6 +855,7 @@ namespace AutoTest
                  + $"{(handCarry == CombatSystem.HandCarryMode.Pick ? " 残す方策 " + EffectiveHandKeepPolicy + " (handKeepPolicy=" + handKeepPolicy + ")" : "")} "
                  + $"/ ボスのダウン {(bossDown ? "あり" : "なし (旧い作り)")} "
                  + $"/ ダウンの大技の取り消し {(downCancelRule == CombatSystem.DownCancelRule.Always ? "どのダウンでも周期を頭に戻す (旧い規則)" : "チャージか大技のターンに重なった時だけ")} (downCancelRule={downCancelRule}) "
+                 + $"/ 目盛りの割れ方 {(downBreakRule == CombatSystem.DownBreakRule.AnyDamage ? "ターンの終わりの HP で割る (旧い判定・ひびなし)" : "通常攻撃だけ・それ以外で下回るとひび → " + (downCrackGrace < 0 ? "ひびでは割れない" : downCrackGrace == 0 ? "そのターンの終わりに割れる" : downCrackGrace + " ターン後のターンの終わりに割れる") + (downCrackWeak ? "・ひびのダウンは被ダメ ×1.5 なし" : "・ひびのダウンも被ダメ ×1.5"))} (downBreakRule={downBreakRule}・downCrackGrace={downCrackGrace}・downCrackWeak={downCrackWeak}) "
                  + $"/ 大技のチャージ {(heavyChargeNoAttack ? "攻撃しない" : "小技の倍率で攻撃する (旧い作り)")} (heavyChargeNoAttack={heavyChargeNoAttack}) "
                  + $"/ 大技の倍率と周期 {HeavySpecEffectiveText()} (enemyHeavySpec='{enemyHeavySpec}') "
                  + $"/ 灰燼の王 {(ashKingHeavy ? "大技〈業火〉(攻撃 ×大技 + 烈炎 × 業火の倍率・チャージは攻撃しない)" : "旧い形 (予兆のターンに攻撃 +N)")} (ashKingHeavy={ashKingHeavy}) "

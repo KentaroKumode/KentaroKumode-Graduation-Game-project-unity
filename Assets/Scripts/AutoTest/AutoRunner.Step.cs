@@ -83,6 +83,9 @@ namespace AutoTest
             GameLoop.GameHooks.HandCarry = handCarry;                           // [測定 2026-11-13] 手札の持ち越し
             GameLoop.GameHooks.BossDownDisabled = !bossDown;                             // [測定 2026-11-13] ボスのダウン
             GameLoop.GameHooks.DownCancel = downCancelRule;                              // [測定 2026-11-14] ダウンが周期を取り消す条件
+            GameLoop.GameHooks.DownBreak = downBreakRule;                                // [測定 2026-11-14] 目盛りの割れ方 (通常攻撃だけ / 旧い判定)
+            GameLoop.GameHooks.DownCrackGrace = downCrackGrace;                          // [測定 2026-11-14] ひびの猶予
+            GameLoop.GameHooks.DownCrackWeak = downCrackWeak;                            // [測定 2026-11-14] ひびのダウンは弱い
             GameLoop.GameHooks.HeavyChargeNoAttack = heavyChargeNoAttack;                // [測定 2026-11-14] 大技のチャージは攻撃しない
             GameLoop.GameHooks.AshKingHeavyDisabled = !ashKingHeavy;                     // [測定 2026-11-14] 灰燼の王の大技〈業火〉
             GameLoop.GameHooks.BlazeTickEachTurn = blazeTickEachTurn;                    // [測定 2026-11-14] 烈炎の毎ターンの削り

@@ -305,8 +305,7 @@ namespace AutoTest
             if (mayMistake && aimAdded)   // [#141 計装] 実際の配線の判断だけ
             {
                 DownAimDecisions++; _downAimGainSum += _downAimLastGain;
-                int ha = st.enemyHp - Math.Min(outs[best].effDmg, st.enemyHp);
-                bool chosenBreaks = ha > 0 && BossDown.NextTurnIsDown(st.downNotches, st.downMaxHp, st.downBroken, st.downPendingNow, ha);
+                bool chosenBreaks = DownForecast(in st, st.enemyHp, outs[best].mainDmg, Math.Min(outs[best].effDmg, st.enemyHp)).nextDown;
                 if (aimPreBroke && !chosenBreaks) DownAimHeld++;
             }
             if (mayMistake) NoteDeckPolicyDiag(in ev, k, board, deck, cands, us, touts, best, bestPre);   // [計装 #106] 実際の配線の判断だけ
@@ -613,7 +612,7 @@ namespace AutoTest
             int k = rolls.Length;
             // 2. 次のターンの当て (本体と同じ関数で、 選んだ挿し方の後に次のターンがダウンか)
             bool downNext = st.downNotches != null
-                && BossDown.NextTurnIsDown(st.downNotches, st.downMaxHp, st.downBroken, st.downPendingNow, st.enemyHp - Math.Max(0, outc.effDmg));
+                && DownForecast(in st, st.enemyHp, outc.mainDmg, Math.Max(0, outc.effDmg)).nextDown;
             bool heavyNext = !downNext && !tele.enemyDown && tele.turnsToHeavy == 1;
             int permAtk = 0, permBlk = 0;
             for (int s = 0; s < perm && s < board.Count; s++)
@@ -708,14 +707,14 @@ namespace AutoTest
             int toHeavyNext = Escalation.TurnsToHeavy(enemy, t1);   // 新しい規則: T+1 から見た大技まで (今の起点で数える = 本体と同じ)
             if (!oldRule && toHeavyNext != 1 && toHeavyNext != 2) return false;
             int hp = st.enemyHp, n = us.Length;
-            bool downAnyway = BossDown.NextTurnIsDown(st.downNotches, st.downMaxHp, st.downBroken, st.downPendingNow, hp);
+            // 割れるか・何もしなくても次はダウンか (ひびの猶予切れ) は本体と同じ規則 (BossDown.ForecastTurn・口 downBreakRule / downCrackGrace / downCrackWeak・2026-11-14)
+            bool downAnyway = DownForecast(in st, hp, 0, 0).nextDown;
             if (downAnyway) return false;
             int notch = BossDown.NextNotchHp(st.downNotches, st.downMaxHp, st.downBroken);
             var breaks = new bool[n]; bool any = false;
             for (int i = 0; i < n; i++)
             {
-                int ha = hp - Math.Min(outs[i].effDmg, hp);
-                breaks[i] = ha > 0 && BossDown.NextTurnIsDown(st.downNotches, st.downMaxHp, st.downBroken, st.downPendingNow, ha);
+                breaks[i] = DownForecast(in st, hp, outs[i].mainDmg, Math.Min(outs[i].effDmg, hp)).nextDown;
                 any |= breaks[i];
             }
             if (!any) return false;
@@ -744,7 +743,8 @@ namespace AutoTest
             bool added = false;
             for (int i = 0; i < n; i++)
             {
-                int ha = hp - Math.Min(outs[i].effDmg, hp);
+                // 待った後の HP (新しい判定では通常攻撃以外の削り downChip も引く ── 目盛りの下ならひびが入り、 次のターンに通常攻撃で割れる・猶予が切れれば弱いダウン)
+                int ha = hp - Math.Min(GameLoop.GameHooks.DownBreak == DownBreakRule.AnyDamage ? outs[i].effDmg : Math.Max(outs[i].effDmg, outs[i].mainDmg + st.downChip), hp);
                 if (oldRule ? !DownKeepRules.HoldEligible(true, tele.turnsToHeavy, downAnyway, any, breaks[i], ha, notch, perTurn)
                             : !DownKeepRules.HoldEligibleChargeOrHeavy(true, toHeavyNext, downAnyway, any, breaks[i], ha, notch, perTurn)) continue;
                 us[i] += downValue + gain;
@@ -782,12 +782,11 @@ namespace AutoTest
             _dbdPredict = 0;
             if (st.downNotches == null || st.enemyDown || enemy == null) return;
             int hp = st.enemyHp, n = outs.Length;
-            bool downAnyway = BossDown.NextTurnIsDown(st.downNotches, st.downMaxHp, st.downBroken, st.downPendingNow, hp);
+            bool downAnyway = DownForecast(in st, hp, 0, 0).nextDown;
             var breaks = new bool[n]; bool any = false;
             for (int i = 0; i < n; i++)
             {
-                int ha = hp - Math.Min(outs[i].effDmg, hp);
-                breaks[i] = ha > 0 && BossDown.NextTurnIsDown(st.downNotches, st.downMaxHp, st.downBroken, st.downPendingNow, ha);
+                breaks[i] = DownForecast(in st, hp, outs[i].mainDmg, Math.Min(outs[i].effDmg, hp)).nextDown;
                 any |= breaks[i];
             }
             if (!any) return;
@@ -800,7 +799,7 @@ namespace AutoTest
             bool eligible = false, chosenEligible = false;
             for (int i = 0; i < n; i++)
             {
-                int ha = hp - Math.Min(outs[i].effDmg, hp);
+                int ha = hp - Math.Min(GameLoop.GameHooks.DownBreak == DownBreakRule.AnyDamage ? outs[i].effDmg : Math.Max(outs[i].effDmg, outs[i].mainDmg + st.downChip), hp);
                 bool e = DownKeepRules.HoldEligibleChargeOrHeavy(enemy.heavyPeriod > 0, toHeavyNext, downAnyway, true, breaks[i], ha, notch, perTurn);
                 eligible |= e; if (i == best) chosenEligible = e;
             }
@@ -1136,7 +1135,7 @@ namespace AutoTest
             var sb = new System.Text.StringBuilder(96);
             sb.Append(ns.enemyHp).Append(',').Append(ns.myHp).Append(',').Append(ns.myShield).Append(',').Append(ns.undyingStreak).Append(',')
               .Append(ns.steadfastReady ? 1 : 0).Append(',').Append(ns.eDefNow).Append(',').Append(ns.tele.blazeStacks * 2 + plusNext).Append(',')
-              .Append(ns.enemyAtk).Append(',').Append(ns.enemyHitBonus).Append(',').Append(ns.enemyDown ? 1 : 0).Append(',').Append(ns.downBroken).Append('|')
+              .Append(ns.enemyAtk).Append(',').Append(ns.enemyHitBonus).Append(',').Append(ns.enemyDown ? (ns.enemyDownWeak ? 2 : 1) : 0).Append(',').Append(ns.downBroken).Append('|')
               .Append(env.charge).Append(',').Append(env.enemyPoison).Append(',').Append(env.enemyBleed).Append('|');
             string At(int s) => s >= 0 && s < board.Count ? board[s] : "-";
             sb.Append(At(o.retainTarget)).Append(',').Append(At(o.copyTarget)).Append(',').Append(At(o.burnTarget)).Append(o.recall ? ",R" : "").Append('|');

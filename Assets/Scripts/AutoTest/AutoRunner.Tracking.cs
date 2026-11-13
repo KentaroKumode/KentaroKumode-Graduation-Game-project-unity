@@ -520,6 +520,9 @@ namespace AutoTest
             GameLoop.GameHooks.HandCarry = CombatSystem.HandCarryMode.Pick;     // [測定 2026-11-13] 手札の規則を既定 (Pick) へ
             GameLoop.GameHooks.BossDownDisabled = false;                        // [測定 2026-11-13] ボスのダウンを既定 (あり) へ
             GameLoop.GameHooks.DownCancel = CombatSystem.DownCancelRule.ChargeOrHeavy;   // [測定 2026-11-14] ダウンの取り消しの規則を既定へ
+            GameLoop.GameHooks.DownBreak = CombatSystem.DownBreakRule.MainAttackOnly;     // [測定 2026-11-14] 目盛りの割れ方を既定 (通常攻撃だけ) へ
+            GameLoop.GameHooks.DownCrackGrace = CombatSystem.BossDown.CrackGraceTurns;    // [測定 2026-11-14] ひびの猶予を既定 (1) へ
+            GameLoop.GameHooks.DownCrackWeak = true;                                     // [測定 2026-11-14] ひびのダウンは弱い (既定) へ
             GameLoop.GameHooks.HeavyChargeNoAttack = true;                      // [測定 2026-11-14] チャージは攻撃しない (既定) へ
             GameLoop.GameHooks.AshKingHeavyDisabled = false;                    // [測定 2026-11-14] 灰燼の王の大技〈業火〉を既定 (あり) へ
             GameLoop.GameHooks.BlazeTickEachTurn = false;                       // [測定 2026-11-14] 烈炎の毎ターンの削りを既定 (なし) へ

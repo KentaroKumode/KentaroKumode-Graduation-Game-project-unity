@@ -1169,6 +1169,7 @@ namespace CombatSystem
             }
 
             HpLossDiag.Lose(ref enemyHP, dealtDmg, "通常攻撃");
+            NoteBossDownMainHit(dealtDmg, ctx.currentTurn);   // ボスのダウン (2026-11-14): 目盛りを割れるのは通常攻撃だけ (固定ダメの枠より前の HP で判定)
             HpLossDiag.Lose(ref enemyHP, dealtFixed, "固定ダメ");
             if (_diagKind == SkillDiag.Boss && currentEnemy != null)
             {

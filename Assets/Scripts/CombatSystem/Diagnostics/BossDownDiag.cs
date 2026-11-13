@@ -42,14 +42,20 @@ namespace CombatSystem
         {
             public const int DownAtLight = 7, DownAtCharge = 8, DownAtHeavy = 9;
             public const int HeavyTurns = 10, HeavyTaken = 11, LightTurns = 12, LightTaken = 13, ChargeTurns = 14;
-            public const int Length = 15;
+            // 割れ方 (2026-11-14・目盛りを割れるのは通常攻撃だけ・ひび)
+            public const int MainBroken = 15, CrackBroken = 16, MainDownCanceled = 17, CrackDownCanceled = 18;
+            public const int CrackThenMain = 19, CrackWaitSum = 20, CracksMade = 21, CracksHealed = 22;
+            // 旧い判定 (AnyDamage) の時: ターンの終わりに割れた数 / そのうち主攻撃だけでは割れていなかった数 (主攻撃以外で割れた)
+            public const int AnyBreaks = 23, AnyNonMainBreaks = 24;
+            public const int Length = 25;
         }
 
         /// <summary>ダウンのターン。 <paramref name="turnsToHeavy"/> = 起点を動かす前の周期で数えた「大技まで何ターンか」(0 = 大技・1 = チャージ・2 以上 = 小技・−1 = 大技なし)。</summary>
-        public static void NoteDown(bool hasHeavy, bool canceled, int turnsToHeavy = -1)
+        public static void NoteDown(bool hasHeavy, bool canceled, int turnsToHeavy = -1, bool weak = false)
         {
             TotalDowns++;
             if (_cur == null) return;
+            if (hasHeavy && canceled) _cur[weak ? Slot.CrackDownCanceled : Slot.MainDownCanceled]++;
             _cur[2]++;
             if (!hasHeavy) _cur[5]++;
             else if (canceled) _cur[3]++;
@@ -65,6 +71,27 @@ namespace CombatSystem
             if (kind == 0) { _cur[Slot.HeavyTurns]++; _cur[Slot.HeavyTaken] += System.Math.Max(0, taken); }
             else if (kind == 2) { _cur[Slot.LightTurns]++; _cur[Slot.LightTaken] += System.Math.Max(0, taken); }
             else if (kind == 1) _cur[Slot.ChargeTurns]++;
+        }
+
+        /// <summary>通常攻撃で <paramref name="d"/> 個割った (うち <paramref name="crackedBroken"/> 個はひびが入っていた・ひびから割るまでのターン数の合計 <paramref name="waitSum"/>)。</summary>
+        public static void NoteMainBreak(int d, int crackedBroken, int waitSum)
+        {
+            if (_cur == null) return;
+            _cur[Slot.MainBroken] += d; _cur[Slot.CrackThenMain] += crackedBroken; _cur[Slot.CrackWaitSum] += waitSum;
+        }
+
+        /// <summary>ターンの終わり: 新しく入ったひび / 回復で消えたひび / ひびの猶予が切れて割れた数。</summary>
+        public static void NoteCracks(int made, int healed, int crackBroken)
+        {
+            if (_cur == null) return;
+            _cur[Slot.CracksMade] += made; _cur[Slot.CracksHealed] += healed; _cur[Slot.CrackBroken] += crackBroken;
+        }
+
+        /// <summary>旧い判定 (AnyDamage): ターンの終わりに <paramref name="d"/> 個割れ、 そのうち主攻撃の直後の HP で割れていたのは <paramref name="byMain"/> 個。</summary>
+        public static void NoteAnyDamageBreak(int d, int byMain)
+        {
+            if (_cur == null) return;
+            _cur[Slot.AnyBreaks] += d; _cur[Slot.AnyNonMainBreaks] += System.Math.Max(0, d - byMain);
         }
 
         public static void NoteHeavyTaken() { if (_cur != null) _cur[6]++; }
@@ -102,6 +129,16 @@ namespace CombatSystem
                       .Append($" / 被ダメ (防御の後) 大技のターン 平均 {hAvg:0.0} ({ht} T)・小技のターン 平均 {lAvg:0.0} ({lt} T)・チャージ {ct} T・1 周期の平均 {cyc:0.0}")
                       .Append($" / ダウンで浮いた被ダメの見込み 1 戦 {saved / a[0]:0.0}");
                 }
+                // 割れ方 (2026-11-14)
+                if (a[Slot.MainBroken] + a[Slot.CrackBroken] + a[Slot.CracksMade] > 0)
+                    sb.Append(System.Environment.NewLine).Append("    ")
+                      .Append($"割れ方 通常攻撃 {a[Slot.MainBroken]} (そのダウンで大技を消した {a[Slot.MainDownCanceled]})・ひび {a[Slot.CrackBroken]} (大技を消した {a[Slot.CrackDownCanceled]})")
+                      .Append($" / 通常攻撃以外で下回った (ひび) {a[Slot.CracksMade]}・回復で消えた {a[Slot.CracksHealed]}")
+                      .Append($"・ひびの後に通常攻撃で割った {a[Slot.CrackThenMain]} (平均 {(a[Slot.CrackThenMain] > 0 ? (double)a[Slot.CrackWaitSum] / a[Slot.CrackThenMain] : 0):0.00} ターン後)");
+                if (a[Slot.AnyBreaks] > 0)
+                    sb.Append(System.Environment.NewLine).Append("    ")
+                      .Append($"割れ方 (旧い判定 AnyDamage) 割れた {a[Slot.AnyBreaks]}・うち主攻撃の直後には割れておらず通常攻撃以外で割れた {a[Slot.AnyNonMainBreaks]}")
+                      .Append($" ({100.0 * a[Slot.AnyNonMainBreaks] / a[Slot.AnyBreaks]:0.0}%)");
             }
             return sb.ToString();
         }

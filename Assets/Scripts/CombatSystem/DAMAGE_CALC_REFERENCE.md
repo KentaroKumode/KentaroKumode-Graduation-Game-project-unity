@@ -153,7 +153,8 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
                                      実体は MetaDebuffApplicator.ApplyOutgoingCut の 1 つで、 怠惰と重なったら厳しい方 1 つ (× (100 − max(30, N))/100・足さない・掛けない)。
                                      この枠を通らない経路: 盾〈黎明〉の削り (WeaponFamilyEffects.Daybreak が ctx.enemyCurrentHP を直接減らす・ボスのダウンも乗らない)・
                                      処刑 (〈百人切りの鉈〉〈賞金首狩り〉= HP を 0 にする)。 2 体目は 1 体目の減った量を写すので削られた後の値が入る
-× 1.5 (切り捨て)                    ← ボスのダウン【2026-11-13】: ボスがダウンしているターンだけ (BossDown.ApplyTakenNow・定数 BossDown.TakenMul)。
+× 1.5 (切り捨て)                    ← ボスのダウン【2026-11-13】: ボスが満額のダウンをしているターンだけ (BossDown.ApplyTakenNow・定数 BossDown.TakenMul)。
+                                     ひびで割れた弱いダウン (2026-11-14) では掛けない (BossDown.TakenMulNow = false)。
                                      怠惰の直後 = すべての倍率の後・敵の軽減パッシブと敵の防御の前。 与ダメ% の池には足さない (別枠の掛け算)。
                                      主攻撃以外も全部掛かる (下の「ボスのダウン」)
 ─ FireEnemyTrigger(OnPreReceiveDamage): 灰塵の鎧/Ethereal/各敵被ダメ軽減
@@ -885,13 +886,20 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            敵攻撃側で返るのは、 これ以降に足された分 (被弾で発動する反撃・反射) だけ。
 
 ボスのダウン (2026-11-13・規則の正本 BossDown.cs・目盛りの値は BossParams.DownNotches)
-         ターンの終わり (FinishTurnCommon のターン終了時の削りを拾った後): 敵の HP ≤ floor(最大 HP × 目盛り) になった目盛りの数だけ、 次のターンからダウンを待たせる
-         (1 ターンで 2 つ割れば 2 ターン・ダウン中に次を割ればもう 1 ターン。 上限なし)。 ヴェスカは段ごとに目盛りを入れ直す (待ちは持ち越さない)。
+         割れ方 (2026-11-14・作者の決定・口 downBreakRule・既定 MainAttackOnly):
+           ・通常攻撃 (主攻撃) が 1 以上のダメージで当たった直後 (HpLossDiag.Lose(…, "通常攻撃") の直後・固定ダメの枠より前・CombatManager.NoteBossDownMainHit) の
+             敵の HP ≤ floor(最大 HP × 目盛り) の、 まだ割っていない目盛りを全部割る (満額のダウン)。 回避・吸収で 0・撃破 (HP 0) では割らない。
+           ・ターンの終わり (FinishTurnCommon のターン終了時の削りを拾った後・NoteBossDownTurnEnd): HP が未割りの目盛り以下ならひびを入れる (そのターン)・目盛りの上なら消す。
+             ひびが入ったターン c から、 c + 猶予 (BossDown.CrackGraceTurns = 1・口 downCrackGrace・負 = ひびでは割れない) のターンの終わりに、 上から順にひとりでに割れる
+             (弱いダウン = 攻撃しないが ×1.5 なし・口 downCrackWeak=False で満額)。 1 ターンに両方割れたら、 通常攻撃の分が先・ひびの分が後 (BossDownState.pendingWeak)。
+           ・BOT の見込みは同じ規則の BossDown.ForecastTurn (本体の進め方との一致は Tools/rules_check の 14)。
+           ・口 downBreakRule=AnyDamage = 旧い判定: ターンの終わりの敵の HP ≤ floor(最大 HP × 目盛り) になった目盛りの数だけ、 次のターンからダウンを待たせる (全部 満額)。
+         割った目盛りの数だけ、 次のターンからダウンが続く (1 ターンで 2 つ割れば 2 ターン・ダウン中に次を割ればもう 1 ターン。 上限なし)。 ヴェスカは段ごとに目盛りを入れ直す (待ちは持ち越さない)。
          博士の「止まらない時計」を秘宝として持っているラン (GameLoop.VescaClock.Held = ownedPassiveItems・2026-11-13) は、 ヴェスカの 4 つの段それぞれの目盛りに
          BossParams.VescaClockNotch (0.80) を 1 つ足す (BossParams.DownNotches(id, true)・大きい順に入れる)。 bossDown=False では足さない。
          ダウンのターン (ターンの頭・敵が振る前に立つ):
            ・敵の攻撃 (予告値) = 0 ・〈連撃〉の 2 回目も 0。 敵の出目は振る (乱数の消費は変えない)。 攻撃の枝は〈封じ・揃〉と同じ (下の「敵攻撃」)
-           ・受けるダメージ ×1.5 (切り捨て・BossDown.ApplyTaken)。 掛ける口は 4 つで、 大罪:怠惰と同じ所:
+           ・受けるダメージ ×1.5 (切り捨て・BossDown.ApplyTaken・満額のダウンだけ = BossDown.TakenMulNow)。 掛ける口は 4 つで、 大罪:怠惰と同じ所:
                主攻撃 = ApplyWinDamageModifiers の怠惰の直後 (CombatManager.Damage.cs)
                主攻撃以外 = HpLossDiag.Lose (channel ≠ "通常攻撃") ── 固定ダメの枠 (毒の tick・臨界の爆発・品が預けた分・〈虚空〉など)・出血・役〈極〉・反射・仕込み刃・反撃固定・品の直接 (攻撃後)
                〈逆綴じの止血帯〉(ターン終了・ctx の HP を直接減らす) = AllPassiveSkillEffects.Wringing
