@@ -149,7 +149,7 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
 + メタ会心ボーナス(会心時)
 − メタデバフ向かい風(最低1)
 × (100 − 30)/100                  ← 大罪:怠惰 (挑戦カード IV) を受けている時だけ・与えるダメージ −30%【2026-11-11】(主攻撃はすべての倍率の後・敵の防御の前・切り捨て。 毒・出血・爆発・固定ダメ・反射・品の直接は敵の HP を減らす口 HpLossDiag.Lose で同じく −30%)
-                                     〈徒労〉の戦闘のデバフ【2026-11-14・測定の口 GameHooks.ToilDamageDownPct・既定 0】も同じ枠: 〈徒労〉を持っている間 −N%。
+                                     〈徒労〉の戦闘のデバフ【2026-11-14・GameHooks.ToilDamageDownPct・既定 50 (BattleBoonRule.DefaultToilDamageDownPct・作者の決定)・測定の口 toilDamageDownPct で 0 にすれば切れる】も同じ枠: 〈徒労〉を持っている間 −N% (既定 −50%)。
                                      実体は MetaDebuffApplicator.ApplyOutgoingCut の 1 つで、 怠惰と重なったら厳しい方 1 つ (× (100 − max(30, N))/100・足さない・掛けない)。
                                      この枠を通らない経路: 盾〈黎明〉の削り (WeaponFamilyEffects.Daybreak が ctx.enemyCurrentHP を直接減らす・ボスのダウンも乗らない)・
                                      処刑 (〈百一人切りの鉈〉〈賞金首狩り〉= HP を 0 にする)。 2 体目は 1 体目の減った量を写すので削られた後の値が入る
@@ -695,9 +695,9 @@ ProcessDamage の中の OnPreDealDamage は「その陣営が攻撃している�
 | MirrorTwinsResponse(鏡映の応答) | OnPostReceiveDamage/OnTurnStart | 閾値 `Thr = max(12, ボス最大HP×4%)`。与ダメ<Thr で reflect=min(MirrorReflectCap=9, Thr−ダメ)を蓄積、次T開始で軽減無視の反射 |
 | JudgmentFlames(審判の炎) | OnTurnEnd | `dmg=min(ChipCap, 1+ceil(currentTurn/3)+罪)`、実プレイヤーへ軽減無視（罪=totalBattles/8,max2 / ChipCap 基準 10・`BossParams` の基準値）。ターン係数は 2026-07-28 に 1→1/2、2026-08-15 に 1/2→1/3 へ緩和（15T 累積 108→90・上限は T≥19 まで届かない）。**シールドは肩代わりする**（③-C） |
 | JudgmentBlaze / AshArmor / AshCarapace | — | 旧 6 層ボスの機構。**[未装備]**（6 層は下の 5 つで組み直した・数値はクラスの XML コメント）。同じ旧機構の RoyalEmber / SinChain / EternalBurning / ReturnToAshes / ImmortalEmber / EmberAura / StarfireProliferation / ScorchedEarth は 2026-11-12 に削除（GAME.md §24） |
-| EmberOmen(業火の予兆) | OnTurnStart | 予兆ターン = HP>50% は T1/5/9…（周期4）、HP≤50% は T1/4/7…（周期3）。予兆Tだけ攻撃 +JudgmentDice（基準 8）。**[#104 修正]** 焦土契約と同じ差分更新（自分の寄与 `ember_omen_applied` を毎T頭に「予兆なら JudgmentDice、それ以外 0」へ合わせて `enemyDiceTotalBonus` を足し引き）。旧: `+=` を戻す処理が無く、予兆のたびに積み上がっていた |
-| AshRegrowth(灰の再生) | OnTurnStart | HP>50% かつ非予兆T: 最大HP × RegrowthRate（基準 0.02 = 2%・`BossParams`）回復（切り捨て・最低1）。2026-11-14 に直書きの 0.02f を `BossParam.RegrowthRate` へ移した（式は同じ） |
-| EmberFury(憤怒の残滓) | OnTurnStart | T頭の HP≤50% のT: 攻撃 +FuryAttack（基準 3・2026-11-14 に定数 `EmberFury.Bonus` から `BossParam.FuryAttack` へ移した）（それ以外 0）。**[#104 修正]** 業火の予兆と同じ差分更新（`ember_fury_applied`）。旧: 毎ターン `+=` で積み上がっていた |
+| EmberOmen(業火の予兆) | OnTurnStart | 予兆ターン = HP>50% は T1/5/9…（周期4）、HP≤50% は T1/4/7…（周期3）。予兆Tだけ攻撃 +JudgmentDice（基準 12・2026-11-14 に 8 から）。**[#104 修正]** 焦土契約と同じ差分更新（自分の寄与 `ember_omen_applied` を毎T頭に「予兆なら JudgmentDice、それ以外 0」へ合わせて `enemyDiceTotalBonus` を足し引き）。旧: `+=` を戻す処理が無く、予兆のたびに積み上がっていた |
+| AshRegrowth(灰の再生) | OnTurnStart | HP>50% かつ非予兆T: 最大HP × RegrowthRate（基準 0.03 = 3%・`BossParams`）回復（切り捨て・最低1）。2026-11-14 に直書きの 0.02f を `BossParam.RegrowthRate` へ移し（式は同じ）、同日 0.03 へ |
+| EmberFury(憤怒の残滓) | OnTurnStart | T頭の HP≤50% のT: 攻撃 +FuryAttack（基準 5・2026-11-14 に定数 `EmberFury.Bonus` = 3 から `BossParam.FuryAttack` へ移し、同日 5 へ）（それ以外 0）。**[#104 修正]** 業火の予兆と同じ差分更新（`ember_fury_applied`）。旧: 毎ターン `+=` で積み上がっていた |
 | ScorchedPact(焦土契約) | OnRollWin/OnTurnStart | 収支負けでスタック+1（上限5）。毎T 差分更新で `enemyDiceTotalBonus` に現在スタック×1 を反映（累積しない） |
 | BlazeBrand(烈炎) | OnTurnEnd/OnTurnStart | ブロック端子へ 2 本以上のT終了時に烈炎+1 / T開始時に烈炎の数だけ軽減無視ダメ |
 | Decree13th(13番目の宣告) | OnTurnStart/OnTurnEnd | 1/13でフラグ、本体が生存していれば成就で ceil((playerDiceTotal+enemyDiceTotal)×2.0) を軽減無視で実プレイヤーへ（2.0 は定数。プレイヤーの criticalMultiplier は 2026-08-08 から読まない・シールドは肩代わり） |
