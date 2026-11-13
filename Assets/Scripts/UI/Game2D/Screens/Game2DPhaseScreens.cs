@@ -524,6 +524,9 @@ namespace UI.Game2D
             d.buttons.Add(B("受け取らない", "skip"));
             d.buttons.Add(B("山札を見る", "deck"));
             d.footer = "受け取らないと、 候補はすべて流れる";
+            // 不安定化 (2026-11-13): 戦闘に勝った後の最初の窓はこれ (通常・エリート・番人・使い魔・イベントの戦闘)。 この戦闘で溜まった分を出す。
+            //   本文の 2 行目に足す。 候補が多くて (〈剥ぎ取り〉の上乗せ) 窓の高さ (ModalJpMetrics.MaxH) を超えるなら、 題の右の副題へ回す
+            AddInstabilityLine(gm, d, offer.Count);
             d.onAction = (a, sel) =>
             {
                 switch (a)
@@ -764,6 +767,22 @@ namespace UI.Game2D
                 if (Input.GetKeyDown(KeyCode.Alpha1 + i)) { gm.ResolveEventChoice(i); Refresh(); return; }
         }
 
+        /// <summary>報酬の窓に「不安定 +N（累計 M）」(この戦闘で溜まった分・<see cref="GameManager.BattleInstabilityLine"/>) を足す。 溜まっていなければ何もしない。
+        /// 本文の行を 1 つ増やしても窓の高さ (<see cref="ModalJpMetrics.MaxH"/>) に収まるなら本文の最後の行へ、 収まらなければ副題の後ろへ。</summary>
+        private static void AddInstabilityLine(GameManager gm, ScreenDef d, int rows)
+        {
+            string inst = gm.BattleInstabilityLine();
+            if (inst == null) return;
+            bool detail = false; foreach (var it in d.Items) if (!string.IsNullOrEmpty(it.desc)) { detail = true; break; }
+            int lines = (string.IsNullOrEmpty(d.body) ? 0 : Game2DJpFont.Lines(d.body, ModalJpMetrics.BodyW(d.w)).Count) + 1;
+            if (ModalJpMetrics.HeightUncapped(Game2DJpFont.LineH, true, lines, rows, d.rowH, detail) <= ModalJpMetrics.MaxH)
+            {
+                d.body = string.IsNullOrEmpty(d.body) ? inst : d.body + "\n" + inst;
+                d.bodyLines = Mathf.Max(d.bodyLines, lines);
+            }
+            else d.sub = string.IsNullOrEmpty(d.sub) ? inst : d.sub + "・" + inst;
+        }
+
         // ── 報酬 ──
 
         private ScreenDef Reward(GameManager gm)
@@ -778,13 +797,13 @@ namespace UI.Game2D
                     var data = ItemDatabase.Instance?.GetItem(id);
                     d.Items.Add(new ModalItem { name = data != null ? data.displayName : id, desc = data?.description });
                 }
+                AddInstabilityLine(gm, d, d.Items.Count);   // 不安定化: 2 つから選ぶ報酬の窓にも (2026-11-13)
                 d.buttons.Add(B("受け取る", "pick", true));
                 d.onAction = (act, sel) => { if (act == "pick") gm.ResolveRewardChoice(Mathf.Clamp(sel, 0, 1)); Refresh(); };
                 return d;
             }
             d.body = _lastCoinsGained > 0 ? _lastCoinsGained + "G を手に入れた。" : "戦利品を手に入れた。";
-            string inst = gm.BattleInstabilityLine();      // 不安定化 (2026-11-13): この戦闘で溜まった分 (エスカレーション・勝ち・報酬の秘宝)
-            if (inst != null) d.body += "\n" + inst;
+            AddInstabilityLine(gm, d, 0);      // 不安定化 (2026-11-13): この戦闘で溜まった分 (エスカレーション・勝ち・報酬の秘宝)
             d.buttons.Add(B("次へ", "ok", true));
             d.onAction = (act, _) => { _lastCoinsGained = 0; gm.ConfirmReward(); Refresh(); };
             return d;
