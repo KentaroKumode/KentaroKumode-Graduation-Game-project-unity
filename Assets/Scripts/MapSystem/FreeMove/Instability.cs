@@ -23,7 +23,7 @@ namespace MapSystem.FreeMove
         Pursuer,
         /// <summary>通常の戦闘 (使い魔・イベントの戦闘も) に勝った。</summary>
         Battle,
-        /// <summary>イベントで何かを得た (秘宝のほか)。</summary>
+        /// <summary>イベントで持ち物が増えた (秘宝のほか・<see cref="Instability.CountsAsEventGain"/>)。</summary>
         EventGain,
         /// <summary>戦闘の中でエスカレーションの段が上がった (1 段ごと)。</summary>
         Escalation,
@@ -33,6 +33,40 @@ namespace MapSystem.FreeMove
         Walk,
         /// <summary>イベントの「嵐を遠ざける / 近づける+N」(符号つき)。</summary>
         Shift,
+    }
+
+    /// <summary>イベントの得の種類 (<see cref="Instability.CountsAsEventGain"/> が「何かを得た +1」に数えるかを決める・2026-11-13 三版)。
+    /// イベントの効果の種類 (EventEffectType) をこの種類へ読み替えるのは EventEffectExecutor (綴りでは判定しない)。</summary>
+    public enum EventGainKind
+    {
+        // ── 持ち物が増える (数える) ──
+        /// <summary>ゴールド。</summary>
+        Gold,
+        /// <summary>消耗品。</summary>
+        Consumable,
+        /// <summary>武器の強化素材。</summary>
+        Material,
+        /// <summary>物資 (糧食)。</summary>
+        Provision,
+        /// <summary>名指しの品 (秘宝でないもの: 武器・出目パーツ・消耗品など)。 秘宝は <see cref="InstabilitySource.Relic"/> の +3 の側。</summary>
+        Item,
+        /// <summary>フラグアイテム (鍵などの持ち物)。</summary>
+        Flag,
+        // ── 物が増えない得 (数えない) ──
+        /// <summary>HP の回復 (全回復も)。</summary>
+        Heal,
+        /// <summary>最大 HP の増加。</summary>
+        MaxHp,
+        /// <summary>時限バフ。</summary>
+        TimedBuff,
+        /// <summary>航行の効果 (地図を明かす・偵察の類・追跡者を撒く / 遠ざける・近道)。</summary>
+        Navigation,
+        /// <summary>次の店の値引き。</summary>
+        ShopDiscount,
+        /// <summary>次の休憩の回復の上乗せ。</summary>
+        RestBonus,
+        /// <summary>観測所の写し (次の再訪で効く約束・ランの持ち物の欄には入らない)。</summary>
+        ObservatoryCopy,
     }
 
     /// <summary>
@@ -100,8 +134,26 @@ namespace MapSystem.FreeMove
             return src.ToString();
         }
 
+        /// <summary>イベントの得 <paramref name="k"/> を「何かを得た +1」(<see cref="InstabilitySource.EventGain"/>) に数えるか (2026-11-13 三版・作者の決定)。
+        /// <b>持ち物が増えた時だけ</b>数える (ゴールド・消耗品・素材・物資・品・フラグ)。 HP の回復・最大 HP・時限バフ・航行の効果・店の値引き・休憩の上乗せ・観測所の写しは数えない。
+        /// 嵐を遠ざける / 近づける・武器を鍛える・秘宝の交換は、 そもそも得として渡されない (ここへ来ない)。 秘宝は +3 の側 (<see cref="EventPoints"/>)。</summary>
+        public static bool CountsAsEventGain(EventGainKind k)
+        {
+            switch (k)
+            {
+                case EventGainKind.Gold:
+                case EventGainKind.Consumable:
+                case EventGainKind.Material:
+                case EventGainKind.Provision:
+                case EventGainKind.Item:
+                case EventGainKind.Flag:
+                    return true;
+            }
+            return false;
+        }
+
         /// <summary>イベント 1 回 (選んだ効果・勝利後の効果のそれぞれ) で溜まるポイント: 秘宝 1 つにつき <see cref="FreeMapParams.InstabilityTake"/>。
-        /// 秘宝が無く、 ほかの得が 1 つ以上起きた時だけ <see cref="FreeMapParams.InstabilityWin"/> (重ねない)。 <paramref name="otherAlreadyCounted"/> = 同じイベントで既に +1 (か秘宝) を数えた。</summary>
+        /// 秘宝が無く、 ほかの得 (<see cref="CountsAsEventGain"/> が数える、 持ち物が増える得) が 1 つ以上起きた時だけ <see cref="FreeMapParams.InstabilityWin"/> (重ねない)。 <paramref name="otherAlreadyCounted"/> = 同じイベントで既に +1 (か秘宝) を数えた。</summary>
         public static int EventPoints(int relics, bool otherGain, bool otherAlreadyCounted)
             => relics > 0 ? PointsOf(InstabilitySource.Relic, relics)
              : otherGain && !otherAlreadyCounted ? PointsOf(InstabilitySource.EventGain) : 0;

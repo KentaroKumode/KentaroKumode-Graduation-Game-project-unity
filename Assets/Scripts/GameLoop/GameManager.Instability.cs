@@ -13,7 +13,7 @@ namespace GameLoop
     /// 秘宝を 1 つ得る → <see cref="InstabilitySource.Relic"/> (イベント・戦闘の報酬・番人の報酬・〈剛胆〉の精鋭の戦利品)・
     /// エリート / 番人を倒す → <see cref="InstabilitySource.Elite"/> / <see cref="InstabilitySource.Pursuer"/>・
     /// 通常の戦闘 (使い魔・イベントの戦闘) に勝つ → <see cref="InstabilitySource.Battle"/>・
-    /// イベントで何かを得る → <see cref="InstabilitySource.EventGain"/> (秘宝を得た時は数えない)・
+    /// イベントで持ち物が増える (ゴールド・消耗品・素材・物資・品・フラグ・Instability.CountsAsEventGain) → <see cref="InstabilitySource.EventGain"/> (秘宝を得た時は数えない)・
     /// 戦闘のエスカレーションの段が上がる → <see cref="InstabilitySource.Escalation"/> (ボス戦は除く)・
     /// イベントの「ターン+N」→ <see cref="InstabilitySource.EventTurns"/>。 歩く・待つ・偵察・嵐を動かす は <see cref="FreeMapSim"/> の中で溜まる。</para>
     ///

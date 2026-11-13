@@ -182,7 +182,10 @@ static partial class T
                    && Instability.ArrivalPoints(TileType.Event, out bool m3) == 0 && m3
                    && Instability.ArrivalPoints(TileType.Shop, out bool m4) == 0 && !m4 && Instability.ArrivalPoints(TileType.Rest, out _) == 0
                    && Instability.ArrivalPoints(TileType.Exchange, out _) == 0 && Instability.ArrivalPoints(TileType.Boss, out _) == 0;
-            Check(ok, "不安定化: 表のとおり (宝・秘宝 +3 / エリート・番人 +2 / 通常の戦闘・イベントの得 +1 (秘宝を得たイベントは +3 だけ・+1 は重ねない) / 激化 +1 段ごと・ボス戦 0 / イベントのターン +N / 歩く +手番 / 嵐を動かす ±N / 店・休憩・交換・ボスの点 0)");
+            // イベントの「何かを得た +1」は持ち物が増えた時だけ (2026-11-13 三版)
+            var counted = new[] { EventGainKind.Gold, EventGainKind.Consumable, EventGainKind.Material, EventGainKind.Provision, EventGainKind.Item, EventGainKind.Flag };
+            bool gainOk = ((EventGainKind[])Enum.GetValues(typeof(EventGainKind))).All(g => Instability.CountsAsEventGain(g) == counted.Contains(g));
+            Check(ok && gainOk, "不安定化: 表のとおり (宝・秘宝 +3 / エリート・番人 +2 / 通常の戦闘・イベントの得 +1 (持ち物が増えた時だけ = ゴールド・消耗品・素材・物資・品・フラグ。 HP・最大 HP・時限バフ・航行・値引き・休憩の上乗せ・観測所の写しは 0 / 秘宝を得たイベントは +3 だけ・+1 は重ねない) / 激化 +1 段ごと・ボス戦 0 / イベントのターン +N / 歩く +手番 / 嵐を動かす ±N / 店・休憩・交換・ボスの点 0)");
         }
 
         // ── 4. 境目と輪 (累計 → 段 → 輪・段の途中は線形) ──
