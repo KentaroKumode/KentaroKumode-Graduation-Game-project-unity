@@ -686,6 +686,11 @@ namespace AutoTest
         /// <summary>[#141] ダウンの狙い方 (既定 None = 今までと同じ手・同じ乱数)。</summary>
         public DownAimPolicy downAimPolicy = DownAimPolicy.None;
 
+        /// <summary>[診断 2026-11-14] Aim の待つ得に掛ける割引 (HP の帳簿の先の割引)。 負 (既定 −1) = 帳簿と同じ v3.ledgerFutureShare (0.2・今まで)。
+        /// 1 = 割り引かない。 帳簿全体 (v3.ledgerFutureShare) を動かさずに、 待つ得の物差しだけを振る測定の口 (仮説 4 の切り分け)。</summary>
+        public float downAimGainShare = -1f;
+        private float AimGainShare => downAimGainShare >= 0f ? downAimGainShare : v3.ledgerFutureShare;
+
         /// <summary>[#141 計装] 待つ手を比べた判断の数 / そのうち、 足す前の最良は目盛りを割る手だったのに待つ手を選んだ数 / 待つ手に足した値の合計。 ランをまたいで累計。</summary>
         public int DownAimDecisions { get; private set; }
         public int DownAimHeld { get; private set; }
@@ -726,7 +731,7 @@ namespace AutoTest
             float hpUnit = st.ledger ? 1f : st.wDef;
             float downValue = DownNextTurnShare * Math.Max(0, nextAtk) * hpUnit;     // 割る手が OptimalUtilityCore で得るのと同じ (ダウンは失わず 1 ターン後へ)
             float gain;
-            if (oldRule) gain = DownKeepRules.HoldGain(nextAtk, cyc, v3.ledgerFutureShare) * hpUnit;
+            if (oldRule) gain = DownKeepRules.HoldGain(nextAtk, cyc, AimGainShare) * hpUnit;
             else
             {
                 // 新しい規則: ダウンがチャージのターンに重なると、 次の大技が並びから抜けて後ろが 1 ターン遅れる (DownKeepRules の式)。 取り消すかは本体と同じ関数
@@ -735,7 +740,7 @@ namespace AutoTest
                 int s3 = cyc.Count > 2 ? cyc[2] : ExpectedEnemyAttackAt(enemy, ctx, in tele, t1 + 2, 0);
                 bool shiftNow = Escalation.IsChargeTurn(enemy, t1) && CombatManager.DownCancelsCycleAt(enemy, t1, ratio);
                 bool shiftHold = Escalation.IsChargeTurn(enemy, t1 + 1) && CombatManager.DownCancelsCycleAt(enemy, t1 + 1, ratio);
-                gain = DownKeepRules.HoldGainChargeOrHeavy(nextAtk, s2, s3, cyc, shiftNow, shiftHold, v3.ledgerFutureShare) * hpUnit;
+                gain = DownKeepRules.HoldGainChargeOrHeavy(nextAtk, s2, s3, cyc, shiftNow, shiftHold, AimGainShare) * hpUnit;
             }
             float perTurn = DeckPerTurnDamage(in st, k);
             int pre = 0;

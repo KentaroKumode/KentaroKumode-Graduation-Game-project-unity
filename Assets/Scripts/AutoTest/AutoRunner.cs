@@ -860,7 +860,7 @@ namespace AutoTest
                  + $"/ 大技の倍率と周期 {HeavySpecEffectiveText()} (enemyHeavySpec='{enemyHeavySpec}') "
                  + $"/ 灰燼の王 {(ashKingHeavy ? "大技〈業火〉(攻撃 ×大技 + 烈炎 × 業火の倍率・チャージは攻撃しない)" : "旧い形 (予兆のターンに攻撃 +N)")} (ashKingHeavy={ashKingHeavy}) "
                  + $"/ 烈炎の毎ターンの削り {(blazeTickEachTurn ? "あり (旧い形)" : "なし")} (blazeTickEachTurn={blazeTickEachTurn}) "
-                 + $"/ ダウンの狙い {(downAimPolicy == DownAimPolicy.Aim ? (downCancelRule == CombatSystem.DownCancelRule.Always ? "大技が 2 ターン後なら待って大技に重ねる手も比べる" : "待つとダウンがチャージか大技に重なるなら待つ手も比べる") : "割れる時に割る (今まで)")} (downAimPolicy={downAimPolicy}) "
+                 + $"/ ダウンの狙い {(downAimPolicy == DownAimPolicy.Aim ? (downCancelRule == CombatSystem.DownCancelRule.Always ? "大技が 2 ターン後なら待って大技に重ねる手も比べる" : "待つとダウンがチャージか大技に重なるなら待つ手も比べる") : "割れる時に割る (今まで)")} (downAimPolicy={downAimPolicy}・待つ得の割引 {(downAimGainShare >= 0f ? downAimGainShare.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) : "帳簿と同じ " + v3.ledgerFutureShare.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))} (downAimGainShare={downAimGainShare.ToString(System.Globalization.CultureInfo.InvariantCulture)})) "
                  + $"/ 深さ 3 のボスの大技 {(depth3Heavy ? "あり" : "なし (旧い作り)")} "
                  + $"/ 博士の時計 {(vescaClockHeld ? "ランの最初から預かる (ヴェスカの各段に目盛り +" + CombatSystem.BossParams.VescaClockNotch.ToString("0.00") + ")" : "預からない (イベントで選んだ時だけ)")} (vescaClockHeld={vescaClockHeld}) "
                  + $"/ 攻撃なしの手の主攻撃 (旧の式) {(v3.oldNoAttackBaseDmg ? "素火力を数える (旧い挙動)" : "0")} "

@@ -512,7 +512,7 @@ namespace AutoTest.ParallelSweep
                 // 2026-11-13: 戦闘の規則の 3 つの口 (True = 新しい規則・3 つとも False = 旧い規則 = main と同じ)
                 "handCarry", "handKeepPolicy", "EffectiveHandKeepPolicy", "bossDown", "depth3Heavy",
                 // 2026-11-14 (#141): ボスのダウンの狙い方 (None = 既定・今まで / Aim = 大技が 2 ターン後なら待つ手も比べる)。 残す印の Planned は上の handKeepPolicy
-                "downAimPolicy",
+                "downAimPolicy", "downAimGainShare",
                 // 2026-11-14: ダウンが大技を取り消す条件 (ChargeOrHeavy = 既定 / Always = 旧い規則)・大技のチャージは攻撃しない (True = 既定)・大技の倍率の上書き (id:小技:大技)
                 "downCancelRule", "heavyChargeNoAttack", "enemyHeavySpec",
                 // 2026-11-14: 目盛りの割れ方 (MainAttackOnly = 既定・通常攻撃だけ / AnyDamage = 旧い判定)・ひびの猶予 (1 = 既定・0 = すぐ・−1 = ひびでは割れない)・ひびのダウンは弱い (True = 既定)
