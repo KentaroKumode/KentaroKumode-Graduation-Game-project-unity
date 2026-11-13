@@ -406,6 +406,7 @@ namespace UI.Game2D
             d.body = known
                 ? "武器 " + wname + "  攻撃 " + hs.attack + "  会心率 " + Mathf.RoundToInt(hs.critRate * 100f) + "%  会心倍率 ×" + hs.critMul.ToString("0.0")
                   + "\n与ダメ " + (hs.outgoingPct >= 0 ? "+" : "") + hs.outgoingPct + "%  防御 " + hs.defense + "  貫通 " + hs.pen
+                  + (hs.toilCutPct > 0 ? "  〈" + EventSystem.TimedEffects.BattleBoonRule.ToilName + "〉与ダメ −" + hs.toilCutPct + "%" : "")   // 〈徒労〉の戦闘のデバフ (2026-11-14)
                 : "武器 " + wname + "  攻撃 ―  会心率 ―  会心倍率 ―\n与ダメ ―  防御 ―  貫通 ―  (戦闘に入ると出る)";
             d.bodyLines = 2;
             int pages = 1;

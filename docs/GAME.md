@@ -3527,6 +3527,9 @@ OfferPassives / TradePassive / ForgeWeapon / NextShopDiscount / NextRestBonus /
     メタのトークン・〈戦意〉の勝利数・実績の勝利数は減らさない（報酬ではないので掛けない・実装役の決定）。BOT は〈徒労〉を値付けに入れない（今のまま）。
     - **旧い形**（`toilMode=Stacks`・2026-11-13〜11-14 の既定・測定で比べる口）: 3 つ持った状態になり、通常の戦闘に勝つたびに 1 つ減る（中身は同じ・3 勝で晴れる）。
       逃げた・負けた戦闘は減らさない。層を出ても残る。説明は作者の確定文「この後の通常の戦闘三回は、勝っても何も得られない。」。
+    - **戦闘のデバフ**（2026-11-14・ブランチ toil-combat・測定の口 `toilDamageDownPct`・**既定 0 = なし・値は未決**）: 持っている間（形を問わない）、**すべての戦闘**で与えるダメージ −N%。
+      枠は大罪:怠惰と同じ `MetaDebuffApplicator.ApplyOutgoingCut`（重なったら厳しい方・式と掛からない経路は [DAMAGE_CALC_REFERENCE](../Assets/Scripts/CombatSystem/DAMAGE_CALC_REFERENCE.md) §③-A）。
+      N > 0 の時だけ説明の後ろに「与えるダメージ −N%。」、戦闘の自分のステータス欄の攻撃の横に「徒労−N%」。狙いは灰燼の王の勝率を〈徒労〉あり 50% / なし（〈開眼〉）75%。〈開眼〉には戦闘の効果を足さない。
   - **〈開眼〉**（時限バフ）: 〈徒労〉の対。3 つ持った状態になり、通常の戦闘に勝つたびに 1 つ減り、**その戦闘のゴールドと強化素材が 2 倍・ドロップは抽選を 2 回引く**
     （乱数 `GameManager.1` / `plunder.drop` を余分に 1 回引く）。物資は増やさない。両方を持っている時は〈徒労〉が勝つ（両方減る）。
   - 仕組み: 既存の時限効果（`RunState.timedDebuffs` / `timedBuffs`・`TimedEffectRegistry`）に、減る時機「通常の戦闘に勝った時」（`TimedEffectTrigger.NormalBattleWon`・
