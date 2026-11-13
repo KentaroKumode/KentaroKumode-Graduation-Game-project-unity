@@ -258,12 +258,38 @@ namespace AutoTest
         /// 既定 ChargeOrHeavy = ダウンがチャージのターンか山場のターンに重なった時だけ (作者の決定)。 Always = どのダウンでも周期を頭に戻す (旧い規則 = 2e76c46 の main)。
         /// 本体の GameHooks.DownCancel へ流す。 BOT の待つ得 (downAimPolicy=Aim) も同じ口で式を切り替える。</summary>
         public CombatSystem.DownCancelRule downCancelRule = CombatSystem.DownCancelRule.ChargeOrHeavy;
+        /// <summary>[測定 2026-11-14] 目盛りの割れ方 (CombatSystem.DownBreakRule)。 既定 MainAttackOnly = 通常攻撃 (主攻撃) が当たった時だけ割れる (作者の決定)・
+        /// 通常攻撃以外で下回った目盛りはひびが入り、 猶予 (downCrackGrace) の後にひとりでに割れる。 AnyDamage = 旧い判定 (ターンの終わりの HP で割る・ひびなし)。
+        /// 本体の GameHooks.DownBreak へ流す。 BOT の見込み (BossDown.ForecastTurn) も同じ口で切り替わる。</summary>
+        public CombatSystem.DownBreakRule downBreakRule = CombatSystem.DownBreakRule.MainAttackOnly;
+        /// <summary>[測定 2026-11-14] ひびの猶予 (ターン数・既定 1 = ひびが入ったターンの次のターンの終わりに割れる)。 0 = すぐ割れる・負 (−1) = ひびでは割れない。 本体の GameHooks.DownCrackGrace へ流す。</summary>
+        public int downCrackGrace = CombatSystem.BossDown.CrackGraceTurns;
+        /// <summary>[測定 2026-11-14] true (既定) = ひびで割れた目盛りのダウンは弱い (受けるダメージ ×1.5 なし)。 false = ひびのダウンも ×1.5。 本体の GameHooks.DownCrackWeak へ流す。</summary>
+        public bool downCrackWeak = true;
         /// <summary>[測定 2026-11-14] true (既定) = 大技のチャージのターン (大技の 1 ターン前) は敵が攻撃しない (作者の決定)。 false = 旧い作り (チャージも小技の倍率で攻撃)。
         /// 本体の GameHooks.HeavyChargeNoAttack へ流す (BOT の見込みは本体の Escalation.EnemyAttackValue を通るので自然に読む)。</summary>
         public bool heavyChargeNoAttack = true;
-        /// <summary>[測定 2026-11-14] 大技の周期の倍率の上書き ("id:小技:大技,…"・id に * で大技を持つ敵全部・CombatSystem.EnemyDatabase.HeavyOverrideSpec)。
+        /// <summary>[測定 2026-11-14] 大技の周期の倍率と周期の上書き ("id:小技:大技[:周期],…"・id に * で大技を持つ敵全部・周期は省略可・CombatSystem.EnemyDatabase.HeavyOverrideSpec)。
+        /// 例 "*:0.8:3.0:4" = 大技を持つ全員を周期 4 (小技・小技・チャージ・大技) に (灰燼の王の周期は変えない)。
         /// 空 (既定) = enemies.json のまま。 旧い値 (2e76c46 の main) は "boss_layer5:0.7:2.0,boss_layer5_hidden:0.7:2.0,boss_layer7:0.7:1.75,boss_layer7_p2:0.7:1.75,boss_layer7_p3:0.7:1.75,boss_layer7_p4:0.7:1.75"。</summary>
         public string enemyHeavySpec = "";
+
+        /// <summary>[測定 2026-11-14] 実効状態の行の「大技の倍率と周期」: 項目ごとに 小技・大技・周期 (省略はデータのまま) と 1 周期の平均の倍率。</summary>
+        private string HeavySpecEffectiveText()
+        {
+            if (string.IsNullOrEmpty(enemyHeavySpec)) return "enemies.json のまま (周期 3・灰燼の王は HP で 4 / 3)";
+            var bad = new List<string>();
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            var parts = new List<string>();
+            foreach (var sp in CombatSystem.HeavyCycle.ParseSpec(enemyHeavySpec, bad))
+            {
+                string per = sp.period > 0 ? "周期 " + sp.period : "周期はデータのまま";
+                string mean = sp.period > 0 ? $"・1 周期の平均 ×{CombatSystem.HeavyCycle.CycleMean(sp.period, sp.light, sp.heavy, heavyChargeNoAttack).ToString("0.00", ci)}" : "";
+                parts.Add($"{sp.id}: 小技 ×{sp.light.ToString(ci)}・大技 ×{sp.heavy.ToString(ci)}・{per}{mean}");
+            }
+            if (bad.Count > 0) parts.Add("読めない: " + string.Join(" ", bad));
+            return "上書き [" + string.Join(" / ", parts) + "] (灰燼の王の周期は変えない・深さ 3 のボスには効かない)";
+        }
         /// <summary>[測定 2026-11-14] 灰燼の王の大技〈業火〉(既定 true)。 false = 旧い形 (大技なし・〈業火の予兆〉の予兆ターンに攻撃 +JudgmentDice)。 本体の GameHooks.AshKingHeavyDisabled へ流す。
         /// 2e76c46 の main と同じ王は <c>ashKingHeavy=False blazeTickEachTurn=True</c>。</summary>
         public bool ashKingHeavy = true;
@@ -846,11 +872,12 @@ namespace AutoTest
                  + $"{(handCarry == CombatSystem.HandCarryMode.Pick ? " 残す方策 " + EffectiveHandKeepPolicy + " (handKeepPolicy=" + handKeepPolicy + ")" : "")} "
                  + $"/ ボスのダウン {(bossDown ? "あり" : "なし (旧い作り)")} "
                  + $"/ ダウンの大技の取り消し {(downCancelRule == CombatSystem.DownCancelRule.Always ? "どのダウンでも周期を頭に戻す (旧い規則)" : "チャージか大技のターンに重なった時だけ")} (downCancelRule={downCancelRule}) "
+                 + $"/ 目盛りの割れ方 {(downBreakRule == CombatSystem.DownBreakRule.AnyDamage ? "ターンの終わりの HP で割る (旧い判定・ひびなし)" : "通常攻撃だけ・それ以外で下回るとひび → " + (downCrackGrace < 0 ? "ひびでは割れない" : downCrackGrace == 0 ? "そのターンの終わりに割れる" : downCrackGrace + " ターン後のターンの終わりに割れる") + (downCrackWeak ? "・ひびのダウンは被ダメ ×1.5 なし" : "・ひびのダウンも被ダメ ×1.5"))} (downBreakRule={downBreakRule}・downCrackGrace={downCrackGrace}・downCrackWeak={downCrackWeak}) "
                  + $"/ 大技のチャージ {(heavyChargeNoAttack ? "攻撃しない" : "小技の倍率で攻撃する (旧い作り)")} (heavyChargeNoAttack={heavyChargeNoAttack}) "
-                 + $"/ 大技の倍率 {(string.IsNullOrEmpty(enemyHeavySpec) ? "enemies.json のまま" : "上書き")} (enemyHeavySpec='{enemyHeavySpec}') "
+                 + $"/ 大技の倍率と周期 {HeavySpecEffectiveText()} (enemyHeavySpec='{enemyHeavySpec}') "
                  + $"/ 灰燼の王 {(ashKingHeavy ? "大技〈業火〉(攻撃 ×大技 + 烈炎 × 業火の倍率・チャージは攻撃しない)" : "旧い形 (予兆のターンに攻撃 +N)")} (ashKingHeavy={ashKingHeavy}) "
                  + $"/ 烈炎の毎ターンの削り {(blazeTickEachTurn ? "あり (旧い形)" : "なし")} (blazeTickEachTurn={blazeTickEachTurn}) "
-                 + $"/ ダウンの狙い {(downAimPolicy == DownAimPolicy.Aim ? (downCancelRule == CombatSystem.DownCancelRule.Always ? "大技が 2 ターン後なら待って大技に重ねる手も比べる" : "待つとダウンがチャージか大技に重なるなら待つ手も比べる") : "割れる時に割る (今まで)")} (downAimPolicy={downAimPolicy}) "
+                 + $"/ ダウンの狙い {(downAimPolicy == DownAimPolicy.Aim ? (downCancelRule == CombatSystem.DownCancelRule.Always ? "大技が 2 ターン後なら待って大技に重ねる手も比べる" : "待つとダウンがチャージか大技に重なるなら待つ手も比べる") : "割れる時に割る (今まで)")} (downAimPolicy={downAimPolicy}・待つ得の割引 {(downAimGainShare >= 0f ? downAimGainShare.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) : "帳簿と同じ " + v3.ledgerFutureShare.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))} (downAimGainShare={downAimGainShare.ToString(System.Globalization.CultureInfo.InvariantCulture)})) "
                  + $"/ 深さ 3 のボスの大技 {(depth3Heavy ? "あり" : "なし (旧い作り)")} "
                  + $"/ 博士の時計 {(vescaClockHeld ? "ランの最初から預かる (ヴェスカの各段に目盛り +" + CombatSystem.BossParams.VescaClockNotch.ToString("0.00") + ")" : "預からない (イベントで選んだ時だけ)")} (vescaClockHeld={vescaClockHeld}) "
                  + $"/ 攻撃なしの手の主攻撃 (旧の式) {(v3.oldNoAttackBaseDmg ? "素火力を数える (旧い挙動)" : "0")} "
@@ -858,8 +885,10 @@ namespace AutoTest
                  + $"/ 縄張りの宝 {territoryTreasure} (BOT のしきい値 {territoryTreasureHpMargin:0.##}) / 縄張りを避ける遠回り {(navTerritoryDetour < 0 ? "使わない" : "+" + navTerritoryDetour + "歩まで")}"
                  + (DeckLookaheadDiagLine().Length > 0 ? System.Environment.NewLine + DeckLookaheadDiagLine() : "")
                  + (CombatSystem.BossDownDiag.Line().Length > 0 ? System.Environment.NewLine + CombatSystem.BossDownDiag.Line() : "")
+                 + (CombatSystem.HeavyHitDiag.Line().Length > 0 ? System.Environment.NewLine + CombatSystem.HeavyHitDiag.Line() : "")   // [計装 2026-11-14] 大技の被ダメ
                  + (NoAttackChoiceLine().Length > 0 ? System.Environment.NewLine + NoAttackChoiceLine() : "")
                  + (DownAimLine().Length > 0 ? System.Environment.NewLine + DownAimLine() : "")                 // [#141]
+                 + (DownBreakDiagLine().Length > 0 ? System.Environment.NewLine + DownBreakDiagLine() : "")     // [診断 2026-11-14] 目盛りの割り時
                  + (HandKeepPlanLine().Length > 0 ? System.Environment.NewLine + HandKeepPlanLine() : "");      // [#141]
         }
 

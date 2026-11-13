@@ -1169,6 +1169,7 @@ namespace CombatSystem
             }
 
             HpLossDiag.Lose(ref enemyHP, dealtDmg, "通常攻撃");
+            NoteBossDownMainHit(dealtDmg, ctx.currentTurn);   // ボスのダウン (2026-11-14): 目盛りを割れるのは通常攻撃だけ (固定ダメの枠より前の HP で判定)
             HpLossDiag.Lose(ref enemyHP, dealtFixed, "固定ダメ");
             if (_diagKind == SkillDiag.Boss && currentEnemy != null)
             {
@@ -1308,6 +1309,11 @@ namespace CombatSystem
             bool downThisTurn = _down.downNow;
             if (enemyHP > 0 && !enemyStunnedThisTurn && !downThisTurn && currentEnemy != null && Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn))
                 BossDownDiag.NoteHeavyTaken();   // [計装] 大技を受けた
+            // [診断 2026-11-14] このターンの敵の行動 (大技 0 / チャージ 1 / 小技 2・ダウンと〈封じ・揃〉と大技なしは −1)。 ターンの被ダメ (takenApplied) と合わせて下で数える
+            int diagHeavyKind = enemyHP <= 0 || enemyStunnedThisTurn || downThisTurn || currentEnemy == null || currentEnemy.heavyPeriod <= 0 ? -1
+                              : Escalation.IsHeavyTurn(currentEnemy, ctx.currentTurn) ? 0
+                              : Escalation.IsChargeNoAttack(currentEnemy, ctx.currentTurn) ? 1 : 2;
+            int diagHpBeforeEnemy = playerHP, diagHitMain = 0, diagBurst = 0, diagBlazeStacks = 0;   // [計装 2026-11-14] 大技の被ダメ (HeavyHitDiag)
 
             // 大技のチャージ (2026-11-14・作者の決定): 攻撃しない。 攻撃値は既に 0 (Escalation.HeavyFactor) で、 ダウンと同じ「攻撃しない」の枝を通す
             //   (敵の「ダメージを与える時/与えた時」のパッシブ・〈廃庭の霧吹き〉の毒・〈多頭攻撃〉の 2 回目は鳴らない)。 口 GameHooks.HeavyChargeNoAttack=false なら旧い作り。
@@ -1409,6 +1415,7 @@ namespace CombatSystem
                 { int cap = MetaProgression.MetaBuffApplicator.GetArmorHitCap(playerMaxHP); if (cap > 0 && takenDmg > cap) takenDmg = cap; }
                 playerHP = Math.Max(0, playerHP - takenDmg);
                 takenApplied = takenDmg;
+                diagHitMain = takenDmg;   // [計装] 大技の被ダメ: 主攻撃の分 (防御・シールドの後)
                 GuardDiag.NoteCut7F(enemyAtkRaw, enemyAtkBeforeDefense, enemyAtkValue, blockSum, lossBase, takenDmg);   // [計装 2026-11-11]
                 // 〈長引く負傷〉: ラン中の累計被ダメを積む。 **最大HP の減少はここからは行わない** ──
                 //   戦闘中に最大HP を削ると、 予告に無い形でその場の生死が変わる。 精算は戦闘終了時。
@@ -1430,7 +1437,9 @@ namespace CombatSystem
                 }
 
                 // 灰燼の王の大技〈業火〉(2026-11-14): 烈炎の数 × BlazeBurstPerStack を軽減無視で入れ、 烈炎を 0 に (業火のターンだけ・旧い形では大技が無いので何もしない)
-                takenApplied += ApplyBlazeBurst(ctx);
+                diagBlazeStacks = BlazeStacks(ctx);   // [計装] 撃つ前の烈炎の数 (読むだけ)
+                diagBurst = ApplyBlazeBurst(ctx);
+                takenApplied += diagBurst;
 
                 // 痛覚遮断剤 (狂戦士) post-clamp (旧法と同一)
                 if (ctx.painkillerArmedThisTurn && playerHP <= 0)
@@ -1541,6 +1550,11 @@ namespace CombatSystem
             ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.EnemyAtkPreDefense] =
                 (primaryAttacked ? enemyAtkBeforeDefense : 0) + (secondaryAttacked ? secondaryAtkBeforeDefense : 0);
             ctx.accumulatedValues[ItemSystem.PassiveSkills.Effects.MutualKeys.HpLossFromEnemy] = takenApplied;
+            BossDownDiag.NoteEnemyTurn(diagHeavyKind, takenApplied);   // [診断 2026-11-14] 大技 / 小技のターンの被ダメ (防御・シールドの後)
+            if ((diagHeavyKind == 0 || diagHeavyKind == 2) && primaryAttacked)   // [計装 2026-11-14] 大技の被ダメ (実際に撃った大技 / 小技のターン)
+                HeavyHitDiag.NoteHit(diagHeavyKind, enemyAtkBeforeDefense, takenApplied, playerMaxHP, diagHpBeforeEnemy, playerHP <= 0, blockDiceCount,
+                                     diagHitMain, diagBurst, diagHeavyKind == 0 ? diagBlazeStacks : 0);
+            _diagChargeTurn = diagHeavyKind == 1;
 
             // 踏みとどまり 2 回目 ── 反射 (返しの盾/コントラタック/鏡写し) と反撃固定ダメは
             //   敵の攻撃解決の**中**でヴェスカの HP を削るため、 1 回目の clamp より後に走る。

@@ -1088,7 +1088,8 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 5% の頃は HP1200 に対し 60/T の再生で、 これを上回る素ダメージが出ないビルドは
     /// **HP を 1 も削れない**二値の壁になっていた (6層勝率 5.7%)。 2% まで下げ、難度は攻撃側で担保する。
     /// HP≤50% で回復完全停止 (Phase2: 「決着期」に突入 = プレイヤーの削り勝ちが可視化)。
-    /// 予兆ターンは回復なし = 集中砲火で HP50% ラインを越える窓。</summary>
+    /// 予兆ターンは回復なし = 集中砲火で HP50% ラインを越える窓。
+    /// 2026-11-14〜 (大技〈業火〉の形): 業火のターンと、 その 1 ターン前のチャージのターンは回復なし (作者の決定)。 旧い形 (ashKingHeavy=False) は予兆ターンだけ。</summary>
     public class AshRegrowth : IPassiveSkillEffect
     {
         public string SkillId => "AshRegrowth";
@@ -1100,7 +1101,9 @@ namespace ItemSystem.PassiveSkills.Effects
             float r = (float)ctx.playerCurrentHP / ctx.playerMaxHP;
             if (r <= 0.5f) return; // Phase2: 再生停止
 
-            if (EmberOmenTiming.IsOmen(ctx.currentTurn, r)) return; // 予兆Tは回復なし
+            if (EmberOmenTiming.IsOmen(ctx.currentTurn, r)) return; // 予兆T (= 業火のターン) は回復なし
+            // 2026-11-14 (作者の決定): 大技〈業火〉の形では、 チャージのターン (業火の 1 ターン前) も回復なし。 旧い形 (口 ashKingHeavy=False) は今までどおり予兆Tだけ
+            if (!GameLoop.GameHooks.AshKingHeavyDisabled && EmberOmenTiming.TurnsToOmen(ctx.currentTurn, r) == 1) return;
 
             // 割合は BossParam.RegrowthRate (基準 0.03f = 3%・2026-11-14 に直書き 0.02f から移し、 同日 0.03 へ・測定の口で差し替えられる)
             float rate = CombatSystem.BossParams.Param(ctx.bossId, CombatSystem.BossParam.RegrowthRate);

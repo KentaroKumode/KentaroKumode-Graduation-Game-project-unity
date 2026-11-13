@@ -111,16 +111,21 @@ namespace UI.Game2D
                 if (s.guardIn == 0) plan.Add("このターンは構え (防御が上がる)"); else if (s.guardIn > 0) plan.Add("構えまで " + s.guardIn + " ターン");
                 if (s.heavyIn == 0) plan.Add("このターンは大技" + (s.burst > 0 ? " (烈炎の分 " + s.burst + " は軽減無視)" : "")); else if (s.charging) plan.Add("このターンはチャージ (攻撃しない・次のターンが大技)"); else if (s.heavyIn > 0) plan.Add("大技まで " + s.heavyIn + " ターン");
                 // ボスのダウン (2026-11-13): ダウン中・後に続くダウン・次の目盛りまでの残り。 大技の取り消しはチャージか大技のターンに重なった時だけ (2026-11-14)
-                if (s.down) plan.Add("このターンはダウン (攻撃しない・受けるダメージ ×" + CombatSystem.BossDown.TakenMul.ToString("0.0")
+                if (s.down) plan.Add((s.downWeak ? "このターンはひびのダウン (攻撃しない" : "このターンはダウン (攻撃しない・受けるダメージ ×" + CombatSystem.BossDown.TakenMul.ToString("0.0"))
                                      + (e.heavyPeriod > 0 && cm.Down.heavyCanceledNow ? "・大技は取り消し" : "") + ")");
-                if (s.downPending > 0) plan.Add("ダウンはあと " + s.downPending + " ターン続く");
+                if (s.downPending > 0) plan.Add("ダウンはあと " + s.downPending + " ターン続く" + (s.downNextWeak ? " (次はひびのダウン)" : ""));
+                // ひび (2026-11-14): 通常攻撃以外で下回った目盛り。 通常攻撃が当たれば割れる・猶予が切れるとひとりでに割れる (受けるダメージ ×1.5 は付かない)
+                if (s.crackBreakTurn >= 0) plan.Add(s.crackBreakTurn <= s.turn ? "ひびの目盛りはこのターンの終わりにひとりでに割れる" : "ひびの目盛りは " + (s.crackBreakTurn - s.turn + 1) + " ターン後の終わりにひとりでに割れる");
                 if (s.downNotchHp >= 0) plan.Add("次の目盛りまで " + System.Math.Max(0, cm.EnemyHP - s.downNotchHp));
                 if (plan.Count > 0) sb.Append(string.Join("・", plan)).Append('\n');
                 if (s.downNotches != null)
                 {
                     var ns = new System.Collections.Generic.List<string>();
-                    for (int i = 0; i < s.downNotches.Length; i++) ns.Add(Mathf.RoundToInt(s.downNotches[i] * 100f) + "%" + (i < s.downBroken ? " (割った)" : ""));
+                    for (int i = 0; i < s.downNotches.Length; i++)
+                        ns.Add(Mathf.RoundToInt(s.downNotches[i] * 100f) + "%" + (i < s.downBroken ? " (割った)"
+                               : s.downCracks != null && i < s.downCracks.Length && s.downCracks[i] >= 0 ? " (ひび)" : ""));
                     sb.Append("ダウンの目盛り: ").Append(string.Join("・", ns)).Append('\n');
+                    sb.Append("目盛りを割れるのは通常攻撃だけ。 通常攻撃以外で下回るとひびが入り、 しばらくするとひとりでに割れる (このダウンは受けるダメージが増えない)。").Append('\n');
                 }
             }
             int poison = ctx != null ? ctx.EnemyPoison : 0, bleed = ctx != null ? ctx.enemyBleedStacks : 0;

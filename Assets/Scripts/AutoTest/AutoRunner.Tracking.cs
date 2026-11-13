@@ -152,6 +152,8 @@ namespace AutoTest
             System.Array.Copy(CombatSystem.EnemyHpLedger.Cum, _ledAtStart, _ledAtStart.Length);
             _pendingShownFloor = gm?.Run?.currentFloor ?? 0;
             _downsAtStart = CombatSystem.BossDownDiag.TotalDowns;   // [計装 2026-11-14] この戦闘 (段) のダウンの数は終わりとの差
+            _heavyHitsAtStart = CombatSystem.HeavyHitDiag.TotalHeavyHits; _heavyTakenAtStart = CombatSystem.HeavyHitDiag.TotalHeavyTaken;   // [計装 2026-11-14] 大技の被ダメ
+            CombatSystem.HeavyHitDiag.SegmentHeavyMax = 0;
             _pendingAxis = new int[ItemSystem.PassiveSkills.AxisRules.Ranked.Length];
             for (int ai = 0; ai < _pendingAxis.Length; ai++)
                 _pendingAxis[ai] = ItemSystem.PassiveSkills.AxisRules.Count(gm?.Run, ItemSystem.PassiveSkills.AxisRules.Ranked[ai]);
@@ -170,6 +172,7 @@ namespace AutoTest
         private int _pendingShownFloor;
         private int _pendingStormIn = -1, _pendingStormPhase, _pendingStormInst;
         private long _downsAtStart;
+        private long _heavyHitsAtStart, _heavyTakenAtStart;
         private int[] _pendingAxis;
 
         private float[] LedgerSinceStart()
@@ -243,6 +246,9 @@ namespace AutoTest
                 encounterKey = _pendingEncounterKey,
                 escRises = gm?.EscalationRisesThisCombat ?? 0, instEsc = gm?.InstabilityFromEscalationThisCombat ?? 0,   // [計装 2026-11-13]
                 downs = (int)(CombatSystem.BossDownDiag.TotalDowns - _downsAtStart),   // [計装 2026-11-14]
+                heavyHits = (int)(CombatSystem.HeavyHitDiag.TotalHeavyHits - _heavyHitsAtStart),   // [計装 2026-11-14] 大技の被ダメ
+                heavyTaken = (int)(CombatSystem.HeavyHitDiag.TotalHeavyTaken - _heavyTakenAtStart),
+                heavyMax = CombatSystem.HeavyHitDiag.SegmentHeavyMax,
                 stormIn = _pendingStormIn, stormPhase = _pendingStormPhase, stormInst = _pendingStormInst,   // [計装 2026-11-14・嵐の航行]
             };
             _cur.combats.Add(rec);
@@ -544,6 +550,9 @@ namespace AutoTest
             GameLoop.GameHooks.HandCarry = CombatSystem.HandCarryMode.Pick;     // [測定 2026-11-13] 手札の規則を既定 (Pick) へ
             GameLoop.GameHooks.BossDownDisabled = false;                        // [測定 2026-11-13] ボスのダウンを既定 (あり) へ
             GameLoop.GameHooks.DownCancel = CombatSystem.DownCancelRule.ChargeOrHeavy;   // [測定 2026-11-14] ダウンの取り消しの規則を既定へ
+            GameLoop.GameHooks.DownBreak = CombatSystem.DownBreakRule.MainAttackOnly;     // [測定 2026-11-14] 目盛りの割れ方を既定 (通常攻撃だけ) へ
+            GameLoop.GameHooks.DownCrackGrace = CombatSystem.BossDown.CrackGraceTurns;    // [測定 2026-11-14] ひびの猶予を既定 (1) へ
+            GameLoop.GameHooks.DownCrackWeak = true;                                     // [測定 2026-11-14] ひびのダウンは弱い (既定) へ
             GameLoop.GameHooks.HeavyChargeNoAttack = true;                      // [測定 2026-11-14] チャージは攻撃しない (既定) へ
             GameLoop.GameHooks.AshKingHeavyDisabled = false;                    // [測定 2026-11-14] 灰燼の王の大技〈業火〉を既定 (あり) へ
             GameLoop.GameHooks.BlazeTickEachTurn = false;                       // [測定 2026-11-14] 烈炎の毎ターンの削りを既定 (なし) へ

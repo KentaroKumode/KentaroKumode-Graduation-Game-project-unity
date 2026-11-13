@@ -305,11 +305,11 @@ namespace AutoTest
             if (mayMistake && aimAdded)   // [#141 計装] 実際の配線の判断だけ
             {
                 DownAimDecisions++; _downAimGainSum += _downAimLastGain;
-                int ha = st.enemyHp - Math.Min(outs[best].effDmg, st.enemyHp);
-                bool chosenBreaks = ha > 0 && BossDown.NextTurnIsDown(st.downNotches, st.downMaxHp, st.downBroken, st.downPendingNow, ha);
+                bool chosenBreaks = DownForecast(in st, st.enemyHp, outs[best].mainDmg, Math.Min(outs[best].effDmg, st.enemyHp)).nextDown;
                 if (aimPreBroke && !chosenBreaks) DownAimHeld++;
             }
             if (mayMistake) NoteDeckPolicyDiag(in ev, k, board, deck, cands, us, touts, best, bestPre);   // [計装 #106] 実際の配線の判断だけ
+            if (mayMistake) NoteDownBreakDiag(in ev, tele, k, outs, best);                                // [診断 2026-11-14] 目盛りの割り時 (方策に関係なく数える)
             return cands[best];
         }
 
@@ -612,7 +612,7 @@ namespace AutoTest
             int k = rolls.Length;
             // 2. 次のターンの当て (本体と同じ関数で、 選んだ挿し方の後に次のターンがダウンか)
             bool downNext = st.downNotches != null
-                && BossDown.NextTurnIsDown(st.downNotches, st.downMaxHp, st.downBroken, st.downPendingNow, st.enemyHp - Math.Max(0, outc.effDmg));
+                && DownForecast(in st, st.enemyHp, outc.mainDmg, Math.Max(0, outc.effDmg)).nextDown;
             bool heavyNext = !downNext && !tele.enemyDown && tele.turnsToHeavy == 1;
             int permAtk = 0, permBlk = 0;
             for (int s = 0; s < perm && s < board.Count; s++)
@@ -686,6 +686,11 @@ namespace AutoTest
         /// <summary>[#141] ダウンの狙い方 (既定 None = 今までと同じ手・同じ乱数)。</summary>
         public DownAimPolicy downAimPolicy = DownAimPolicy.None;
 
+        /// <summary>[診断 2026-11-14] Aim の待つ得に掛ける割引 (HP の帳簿の先の割引)。 負 (既定 −1) = 帳簿と同じ v3.ledgerFutureShare (0.2・今まで)。
+        /// 1 = 割り引かない。 帳簿全体 (v3.ledgerFutureShare) を動かさずに、 待つ得の物差しだけを振る測定の口 (仮説 4 の切り分け)。</summary>
+        public float downAimGainShare = -1f;
+        private float AimGainShare => downAimGainShare >= 0f ? downAimGainShare : v3.ledgerFutureShare;
+
         /// <summary>[#141 計装] 待つ手を比べた判断の数 / そのうち、 足す前の最良は目盛りを割る手だったのに待つ手を選んだ数 / 待つ手に足した値の合計。 ランをまたいで累計。</summary>
         public int DownAimDecisions { get; private set; }
         public int DownAimHeld { get; private set; }
@@ -707,14 +712,14 @@ namespace AutoTest
             int toHeavyNext = Escalation.TurnsToHeavy(enemy, t1);   // 新しい規則: T+1 から見た大技まで (今の起点で数える = 本体と同じ)
             if (!oldRule && toHeavyNext != 1 && toHeavyNext != 2) return false;
             int hp = st.enemyHp, n = us.Length;
-            bool downAnyway = BossDown.NextTurnIsDown(st.downNotches, st.downMaxHp, st.downBroken, st.downPendingNow, hp);
+            // 割れるか・何もしなくても次はダウンか (ひびの猶予切れ) は本体と同じ規則 (BossDown.ForecastTurn・口 downBreakRule / downCrackGrace / downCrackWeak・2026-11-14)
+            bool downAnyway = DownForecast(in st, hp, 0, 0).nextDown;
             if (downAnyway) return false;
             int notch = BossDown.NextNotchHp(st.downNotches, st.downMaxHp, st.downBroken);
             var breaks = new bool[n]; bool any = false;
             for (int i = 0; i < n; i++)
             {
-                int ha = hp - Math.Min(outs[i].effDmg, hp);
-                breaks[i] = ha > 0 && BossDown.NextTurnIsDown(st.downNotches, st.downMaxHp, st.downBroken, st.downPendingNow, ha);
+                breaks[i] = DownForecast(in st, hp, outs[i].mainDmg, Math.Min(outs[i].effDmg, hp)).nextDown;
                 any |= breaks[i];
             }
             if (!any) return false;
@@ -726,7 +731,7 @@ namespace AutoTest
             float hpUnit = st.ledger ? 1f : st.wDef;
             float downValue = DownNextTurnShare * Math.Max(0, nextAtk) * hpUnit;     // 割る手が OptimalUtilityCore で得るのと同じ (ダウンは失わず 1 ターン後へ)
             float gain;
-            if (oldRule) gain = DownKeepRules.HoldGain(nextAtk, cyc, v3.ledgerFutureShare) * hpUnit;
+            if (oldRule) gain = DownKeepRules.HoldGain(nextAtk, cyc, AimGainShare) * hpUnit;
             else
             {
                 // 新しい規則: ダウンがチャージのターンに重なると、 次の大技が並びから抜けて後ろが 1 ターン遅れる (DownKeepRules の式)。 取り消すかは本体と同じ関数
@@ -735,7 +740,7 @@ namespace AutoTest
                 int s3 = cyc.Count > 2 ? cyc[2] : ExpectedEnemyAttackAt(enemy, ctx, in tele, t1 + 2, 0);
                 bool shiftNow = Escalation.IsChargeTurn(enemy, t1) && CombatManager.DownCancelsCycleAt(enemy, t1, ratio);
                 bool shiftHold = Escalation.IsChargeTurn(enemy, t1 + 1) && CombatManager.DownCancelsCycleAt(enemy, t1 + 1, ratio);
-                gain = DownKeepRules.HoldGainChargeOrHeavy(nextAtk, s2, s3, cyc, shiftNow, shiftHold, v3.ledgerFutureShare) * hpUnit;
+                gain = DownKeepRules.HoldGainChargeOrHeavy(nextAtk, s2, s3, cyc, shiftNow, shiftHold, AimGainShare) * hpUnit;
             }
             float perTurn = DeckPerTurnDamage(in st, k);
             int pre = 0;
@@ -743,7 +748,8 @@ namespace AutoTest
             bool added = false;
             for (int i = 0; i < n; i++)
             {
-                int ha = hp - Math.Min(outs[i].effDmg, hp);
+                // 待った後の HP (新しい判定では通常攻撃以外の削り downChip も引く ── 目盛りの下ならひびが入り、 次のターンに通常攻撃で割れる・猶予が切れれば弱いダウン)
+                int ha = hp - Math.Min(GameLoop.GameHooks.DownBreak == DownBreakRule.AnyDamage ? outs[i].effDmg : Math.Max(outs[i].effDmg, outs[i].mainDmg + st.downChip), hp);
                 if (oldRule ? !DownKeepRules.HoldEligible(true, tele.turnsToHeavy, downAnyway, any, breaks[i], ha, notch, perTurn)
                             : !DownKeepRules.HoldEligibleChargeOrHeavy(true, toHeavyNext, downAnyway, any, breaks[i], ha, notch, perTurn)) continue;
                 us[i] += downValue + gain;
@@ -755,6 +761,74 @@ namespace AutoTest
             return true;
         }
         private float _downAimLastGain;
+
+        // =====================================================================
+        //  [診断 2026-11-14] 目盛りの割り時 (「待ってダウンを重ねる」得が測定に出ない理由の切り分け・判断は変えない・乱数を引かない)
+        // =====================================================================
+        /// <summary>[0] 今のターンに目盛りを割れる手 (見込み) があった判断 / [1..4] そのうち次のターン (= 今割った時のダウンのターン) が 小技・チャージ・大技・大技なし /
+        /// [5] 待つ手の条件 (DownKeepRules.HoldEligibleChargeOrHeavy) を満たす手があった / [6] 割らない手を選んだ / [7] 待つ手の条件を満たす手を選んだ /
+        /// [8] 待つ手が無い理由: 次が大技 (今割るのが最善) か大技なし / [9] 待つ手が無い理由: 何もしなくても次はダウン / [10] 待つ手が無い理由: 目盛りの手前で止まり次のターンに割れる手が無い /
+        /// [11] 割ると見込んだ手を選んだ → 次のターンの頭の予告で確かめた数 / [12] そのうち実際にダウン / [13] 割らないと見込んだ手を選んだ → 確かめた数 / [14] そのうち実際にダウン
+        /// (毒・出血・ターン終了時の削り・会心のぶれで割れた)。 ランをまたいで累計。</summary>
+        private readonly long[] _downBreakDiag = new long[15];
+        /// <summary>前の判断の見込み (1 = 割る・2 = 割らない・0 = 確かめない) と、 そのターン・敵 (次の判断で予告と突き合わせる)。</summary>
+        private int _dbdPredict, _dbdTurn = -99; private string _dbdEnemy;
+
+        private void NoteDownBreakDiag(in DeckEval ev, MutualTurnTelegraph tele, int k, OptimalTurnOutcome[] outs, int best)
+        {
+            var st = ev.st;
+            var enemy = CombatManager.Instance?.CurrentEnemy;
+            // 前の判断の答え合わせ: 同じ敵の次のターンの予告がダウンか
+            if (_dbdPredict != 0 && enemy != null && enemy.id == _dbdEnemy && tele.turn == _dbdTurn + 1)
+            {
+                if (_dbdPredict == 1) { _downBreakDiag[11]++; if (tele.enemyDown) _downBreakDiag[12]++; }
+                else { _downBreakDiag[13]++; if (tele.enemyDown) _downBreakDiag[14]++; }
+            }
+            _dbdPredict = 0;
+            if (st.downNotches == null || st.enemyDown || enemy == null) return;
+            int hp = st.enemyHp, n = outs.Length;
+            bool downAnyway = DownForecast(in st, hp, 0, 0).nextDown;
+            var breaks = new bool[n]; bool any = false;
+            for (int i = 0; i < n; i++)
+            {
+                breaks[i] = DownForecast(in st, hp, outs[i].mainDmg, Math.Min(outs[i].effDmg, hp)).nextDown;
+                any |= breaks[i];
+            }
+            if (!any) return;
+            _downBreakDiag[0]++;
+            int t1 = tele.turn + 1;
+            int toHeavyNext = enemy.heavyPeriod > 0 ? Escalation.TurnsToHeavy(enemy, t1) : -1;
+            _downBreakDiag[toHeavyNext < 0 ? 4 : toHeavyNext == 0 ? 3 : toHeavyNext == 1 ? 2 : 1]++;
+            int notch = BossDown.NextNotchHp(st.downNotches, st.downMaxHp, st.downBroken);
+            float perTurn = DeckPerTurnDamage(in st, k);
+            bool eligible = false, chosenEligible = false;
+            for (int i = 0; i < n; i++)
+            {
+                int ha = hp - Math.Min(GameLoop.GameHooks.DownBreak == DownBreakRule.AnyDamage ? outs[i].effDmg : Math.Max(outs[i].effDmg, outs[i].mainDmg + st.downChip), hp);
+                bool e = DownKeepRules.HoldEligibleChargeOrHeavy(enemy.heavyPeriod > 0, toHeavyNext, downAnyway, true, breaks[i], ha, notch, perTurn);
+                eligible |= e; if (i == best) chosenEligible = e;
+            }
+            if (eligible) _downBreakDiag[5]++;
+            else if (toHeavyNext <= 0) _downBreakDiag[8]++;
+            else if (downAnyway) _downBreakDiag[9]++;
+            else _downBreakDiag[10]++;
+            if (!breaks[best]) _downBreakDiag[6]++;
+            if (chosenEligible) _downBreakDiag[7]++;
+            if (!downAnyway) { _dbdPredict = breaks[best] ? 1 : 2; _dbdTurn = tele.turn; _dbdEnemy = enemy.id; }
+        }
+
+        /// <summary>[診断 2026-11-14] サマリーに出す行 (判断が無ければ空)。</summary>
+        public string DownBreakDiagLine()
+        {
+            var a = _downBreakDiag;
+            if (a[0] == 0) return "";
+            string P(long x, long of) => of > 0 ? $"{100.0 * x / of:0.0}%" : "-";
+            return $"[ダウンの割り時] 割れる手があった判断 {a[0]} 回 (今割るとダウンが 小技 {a[1]}・チャージ {a[2]}・大技 {a[3]}・大技なし {a[4]})"
+                 + $" / 待つ手の条件を満たす手があった {a[5]} ({P(a[5], a[0])})・割らない手を選んだ {a[6]}・条件を満たす待つ手を選んだ {a[7]}"
+                 + $" / 待つ手が無い理由: 次が大技か大技なし {a[8]}・何もしなくても次はダウン {a[9]}・目盛りの手前で止まって次に割れる手が無い {a[10]}"
+                 + $" / 見込みの答え合わせ: 割ると見込んだ手 → 次のターンにダウン {a[12]}/{a[11]} ({P(a[12], a[11])})"
+                 + $"・割らないと見込んだ手 → それでもダウン {a[14]}/{a[13]} ({P(a[14], a[13])}・毒・出血・削り・会心のぶれ)";
+        }
 
         /// <summary>[#141 計装] サマリーに出す行 (判断が無ければ空)。</summary>
         public string DownAimLine()
@@ -1066,7 +1140,7 @@ namespace AutoTest
             var sb = new System.Text.StringBuilder(96);
             sb.Append(ns.enemyHp).Append(',').Append(ns.myHp).Append(',').Append(ns.myShield).Append(',').Append(ns.undyingStreak).Append(',')
               .Append(ns.steadfastReady ? 1 : 0).Append(',').Append(ns.eDefNow).Append(',').Append(ns.tele.blazeStacks * 2 + plusNext).Append(',')
-              .Append(ns.enemyAtk).Append(',').Append(ns.enemyHitBonus).Append(',').Append(ns.enemyDown ? 1 : 0).Append(',').Append(ns.downBroken).Append('|')
+              .Append(ns.enemyAtk).Append(',').Append(ns.enemyHitBonus).Append(',').Append(ns.enemyDown ? (ns.enemyDownWeak ? 2 : 1) : 0).Append(',').Append(ns.downBroken).Append('|')
               .Append(env.charge).Append(',').Append(env.enemyPoison).Append(',').Append(env.enemyBleed).Append('|');
             string At(int s) => s >= 0 && s < board.Count ? board[s] : "-";
             sb.Append(At(o.retainTarget)).Append(',').Append(At(o.copyTarget)).Append(',').Append(At(o.burnTarget)).Append(o.recall ? ",R" : "").Append('|');

@@ -155,6 +155,7 @@ namespace AutoTest.ParallelSweep
                 CombatSystem.TerminalDiag.Reset();
                 TerminalPolicyDiag.Reset();
                 CombatSystem.BossDownDiag.Reset();
+                CombatSystem.HeavyHitDiag.Reset();   // [計装 2026-11-14] 大技の被ダメ
                 GameLoop.NavDiag.Reset();
                 CombatSystem.SkillDiag.Reset();
                 CombatSystem.ShieldDiag.Reset();

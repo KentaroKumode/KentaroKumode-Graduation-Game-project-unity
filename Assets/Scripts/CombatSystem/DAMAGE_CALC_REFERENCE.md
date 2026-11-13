@@ -153,7 +153,8 @@ outgoingDamageMultiplier += メタ% + 遺物% + 研磨剤1.5 + consDmgMultPct/10
                                      実体は MetaDebuffApplicator.ApplyOutgoingCut の 1 つで、 怠惰と重なったら厳しい方 1 つ (× (100 − max(30, N))/100・足さない・掛けない)。
                                      この枠を通らない経路: 盾〈黎明〉の削り (WeaponFamilyEffects.Daybreak が ctx.enemyCurrentHP を直接減らす・ボスのダウンも乗らない)・
                                      処刑 (〈百人切りの鉈〉〈賞金首狩り〉= HP を 0 にする)。 2 体目は 1 体目の減った量を写すので削られた後の値が入る
-× 1.5 (切り捨て)                    ← ボスのダウン【2026-11-13】: ボスがダウンしているターンだけ (BossDown.ApplyTakenNow・定数 BossDown.TakenMul)。
+× 1.5 (切り捨て)                    ← ボスのダウン【2026-11-13】: ボスが満額のダウンをしているターンだけ (BossDown.ApplyTakenNow・定数 BossDown.TakenMul)。
+                                     ひびで割れた弱いダウン (2026-11-14) では掛けない (BossDown.TakenMulNow = false)。
                                      怠惰の直後 = すべての倍率の後・敵の軽減パッシブと敵の防御の前。 与ダメ% の池には足さない (別枠の掛け算)。
                                      主攻撃以外も全部掛かる (下の「ボスのダウン」)
 ─ FireEnemyTrigger(OnPreReceiveDamage): 灰塵の鎧/Ethereal/各敵被ダメ軽減
@@ -696,7 +697,7 @@ ProcessDamage の中の OnPreDealDamage は「その陣営が攻撃している�
 | JudgmentFlames(審判の炎) | OnTurnEnd | `dmg=min(ChipCap, 1+ceil(currentTurn/3)+罪)`、実プレイヤーへ軽減無視（罪=totalBattles/8,max2 / ChipCap 基準 10・`BossParams` の基準値）。ターン係数は 2026-07-28 に 1→1/2、2026-08-15 に 1/2→1/3 へ緩和（15T 累積 108→90・上限は T≥19 まで届かない）。**シールドは肩代わりする**（③-C） |
 | JudgmentBlaze / AshArmor / AshCarapace | — | 旧 6 層ボスの機構。**[未装備]**（6 層は下の 5 つで組み直した・数値はクラスの XML コメント）。同じ旧機構の RoyalEmber / SinChain / EternalBurning / ReturnToAshes / ImmortalEmber / EmberAura / StarfireProliferation / ScorchedEarth は 2026-11-12 に削除（GAME.md §24） |
 | EmberOmen(業火・旧 業火の予兆) | OnTurnStart | **2026-11-14〜 王の大技〈業火〉の周期**（`EnemyData.heavyCycle = ember`・`Escalation.TurnsToHeavy` が `EmberOmenTiming` を読む）: 業火のターン = 旧予兆ターン（HP>50% は T1/5/9…・HP≤50% は T1/4/7…・HP の割合はターンの頭の `Escalation.HeavyHpRatio`）。1 ターン前はチャージ（攻撃しない）。業火 = 攻撃 × heavyMul（2.0）+ 烈炎 × `BlazeBurstPerStack`（基準 5・軽減無視・シールドは肩代わり・撃ったら烈炎 0・`CombatManager.ApplyBlazeBurst`）。小技 × heavyLightMul（1.0）。このパッシブ自身は攻撃 +N を積まない。旧い形（口 `ashKingHeavy=False`）: 予兆ターン = HP>50% は T1/5/9…（周期4）、HP≤50% は T1/4/7…（周期3）。予兆Tだけ攻撃 +JudgmentDice（基準 12・2026-11-14 に 8 から）。**[#104 修正]** 焦土契約と同じ差分更新（自分の寄与 `ember_omen_applied` を毎T頭に「予兆なら JudgmentDice、それ以外 0」へ合わせて `enemyDiceTotalBonus` を足し引き）。旧: `+=` を戻す処理が無く、予兆のたびに積み上がっていた |
-| AshRegrowth(灰の再生) | OnTurnStart | HP>50% かつ非予兆T（= 業火でないターン・チャージのターンは回復する）: 最大HP × RegrowthRate（基準 0.03 = 3%・`BossParams`）回復（切り捨て・最低1）。2026-11-14 に直書きの 0.02f を `BossParam.RegrowthRate` へ移し（式は同じ）、同日 0.03 へ |
+| AshRegrowth(灰の再生) | OnTurnStart | HP>50% かつ業火でもチャージでもないT（2026-11-14〜・作者の決定: 業火のターンとその 1 ターン前のチャージのターンは回復なし。旧い形 = 口 `ashKingHeavy=False` は予兆Tだけ回復なし）: 最大HP × RegrowthRate（基準 0.03 = 3%・`BossParams`）回復（切り捨て・最低1）。2026-11-14 に直書きの 0.02f を `BossParam.RegrowthRate` へ移し（式は同じ）、同日 0.03 へ |
 | EmberFury(憤怒の残滓) | OnTurnStart | T頭の HP≤50% のT: 攻撃 +FuryAttack（基準 5・2026-11-14 に定数 `EmberFury.Bonus` = 3 から `BossParam.FuryAttack` へ移し、同日 5 へ）（それ以外 0）。**[#104 修正]** 業火の予兆と同じ差分更新（`ember_fury_applied`）。旧: 毎ターン `+=` で積み上がっていた |
 | ScorchedPact(焦土契約) | OnRollWin/OnTurnStart | 収支負けでスタック+1（上限5）。毎T 差分更新で `enemyDiceTotalBonus` に現在スタック×1 を反映（累積しない） |
 | BlazeBrand(烈炎) | OnTurnEnd/OnTurnStart | ブロック端子へ 2 本以上のT終了時に烈炎+1。2026-11-14〜: T開始時の削りは無し（積もった烈炎は〈業火〉で × BlazeBurstPerStack にまとめて返り、撃ったら 0。業火がダウン・〈封じ・揃〉で撃たれなければ持ち越す）。口 `blazeTickEachTurn=True` で旧い削り（T開始時に烈炎の数だけ軽減無視ダメ）も残す |
@@ -885,13 +886,20 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
            敵攻撃側で返るのは、 これ以降に足された分 (被弾で発動する反撃・反射) だけ。
 
 ボスのダウン (2026-11-13・規則の正本 BossDown.cs・目盛りの値は BossParams.DownNotches)
-         ターンの終わり (FinishTurnCommon のターン終了時の削りを拾った後): 敵の HP ≤ floor(最大 HP × 目盛り) になった目盛りの数だけ、 次のターンからダウンを待たせる
-         (1 ターンで 2 つ割れば 2 ターン・ダウン中に次を割ればもう 1 ターン。 上限なし)。 ヴェスカは段ごとに目盛りを入れ直す (待ちは持ち越さない)。
+         割れ方 (2026-11-14・作者の決定・口 downBreakRule・既定 MainAttackOnly):
+           ・通常攻撃 (主攻撃) が 1 以上のダメージで当たった直後 (HpLossDiag.Lose(…, "通常攻撃") の直後・固定ダメの枠より前・CombatManager.NoteBossDownMainHit) の
+             敵の HP ≤ floor(最大 HP × 目盛り) の、 まだ割っていない目盛りを全部割る (満額のダウン)。 回避・吸収で 0・撃破 (HP 0) では割らない。
+           ・ターンの終わり (FinishTurnCommon のターン終了時の削りを拾った後・NoteBossDownTurnEnd): HP が未割りの目盛り以下ならひびを入れる (そのターン)。 一度入ったひびは回復で目盛りの上へ戻っても消えない (2026-11-14・作者の決定)。
+             ひびが入ったターン c から、 c + 猶予 (BossDown.CrackGraceTurns = 1・口 downCrackGrace・負 = ひびでは割れない) のターンの終わりに、 上から順にひとりでに割れる
+             (弱いダウン = 攻撃しないが ×1.5 なし・口 downCrackWeak=False で満額)。 1 ターンに両方割れたら、 通常攻撃の分が先・ひびの分が後 (BossDownState.pendingWeak)。
+           ・BOT の見込みは同じ規則の BossDown.ForecastTurn (本体の進め方との一致は Tools/rules_check の 14)。
+           ・口 downBreakRule=AnyDamage = 旧い判定: ターンの終わりの敵の HP ≤ floor(最大 HP × 目盛り) になった目盛りの数だけ、 次のターンからダウンを待たせる (全部 満額)。
+         割った目盛りの数だけ、 次のターンからダウンが続く (1 ターンで 2 つ割れば 2 ターン・ダウン中に次を割ればもう 1 ターン。 上限なし)。 ヴェスカは段ごとに目盛りを入れ直す (待ちは持ち越さない)。
          博士の「止まらない時計」を秘宝として持っているラン (GameLoop.VescaClock.Held = ownedPassiveItems・2026-11-13) は、 ヴェスカの 4 つの段それぞれの目盛りに
          BossParams.VescaClockNotch (0.80) を 1 つ足す (BossParams.DownNotches(id, true)・大きい順に入れる)。 bossDown=False では足さない。
          ダウンのターン (ターンの頭・敵が振る前に立つ):
            ・敵の攻撃 (予告値) = 0 ・〈連撃〉の 2 回目も 0。 敵の出目は振る (乱数の消費は変えない)。 攻撃の枝は〈封じ・揃〉と同じ (下の「敵攻撃」)
-           ・受けるダメージ ×1.5 (切り捨て・BossDown.ApplyTaken)。 掛ける口は 4 つで、 大罪:怠惰と同じ所:
+           ・受けるダメージ ×1.5 (切り捨て・BossDown.ApplyTaken・満額のダウンだけ = BossDown.TakenMulNow)。 掛ける口は 4 つで、 大罪:怠惰と同じ所:
                主攻撃 = ApplyWinDamageModifiers の怠惰の直後 (CombatManager.Damage.cs)
                主攻撃以外 = HpLossDiag.Lose (channel ≠ "通常攻撃") ── 固定ダメの枠 (毒の tick・臨界の爆発・品が預けた分・〈虚空〉など)・出血・役〈極〉・反射・仕込み刃・反撃固定・品の直接 (攻撃後)
                〈逆綴じの止血帯〉(ターン終了・ctx の HP を直接減らす) = AllPassiveSkillEffects.Wringing
@@ -921,7 +929,9 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                        周期は冷却材の遅延を受けない実ターンで数える (ボスのダウンで起点が戻る・上)。 予告に turnsToHeavy / heavyMul / enemyCharging を出す。
                        値 (2026-11-14・仮置き): 5 層・5 層裏・ヴェスカ p1〜p4 = 周期 3・小技 ×0.8・チャージ 攻撃なし・大技 ×3.0
                          (それまで 小技 = チャージ ×0.7・大技 ×2.0 / ヴェスカ ×1.75)。 深さ 3 のボス = 周期 3・小技 ×0.6・大技 ×2.0 (BossParams.Depth3Heavy*)。
-                       測定の口 enemyHeavySpec="id:小技:大技,…" (id に * で大技を持つ全員) で上書き。
+                       測定の口 enemyHeavySpec="id:小技:大技[:周期],…" (id に * で大技を持つ全員・周期は省略可 = データのまま・2026-11-14) で上書き。
+                         周期 N の並びは「小技 × (N−2)・チャージ・大技」(N = 2 はチャージ・大技 / N = 1 は毎ターン大技でチャージなし)。
+                         1 周期の平均 (小技 0.8・大技 3.0・チャージ 0): 周期 3 = ×1.27 / 4 = ×1.15 / 5 = ×1.08 (HeavyCycle.CycleMean)。 灰燼の王の周期 (ember) は変えない。
                        対象: 5 層以降のボス (5 層・5 層裏・ヴェスカ p1〜p4)・深さ 3 のボス (BossParams.Depth3Heavy)・6 層 灰燼の王 (2026-11-14〜 大技〈業火〉:
                          周期は旧〈業火の予兆〉の数え方 (heavyCycle = ember・HP で 4 / 3)・小技 ×1.0・大技 ×2.0・業火のターンは別に烈炎 × BlazeBurstPerStack の軽減無視。
                          測定の口 ashKingHeavy=False で旧い形 = 大技なし・予兆ターンに攻撃 +JudgmentDice)。

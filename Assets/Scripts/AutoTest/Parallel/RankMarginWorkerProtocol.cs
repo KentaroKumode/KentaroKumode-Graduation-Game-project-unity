@@ -143,6 +143,7 @@ namespace AutoTest.ParallelSweep
                     mainPred = c.mainPred, mainPredCorr = c.mainPredCorr, mainActual = c.mainActual,
                     atkHist = c.atkHist ?? Array.Empty<int>(), dawnShots = c.dawnShots ?? Array.Empty<int>(),
                     escRises = c.escRises, instEsc = c.instEsc, downs = c.downs,
+                    heavyHits = c.heavyHits, heavyTaken = c.heavyTaken, heavyMax = c.heavyMax,
                     stormIn = c.stormIn, stormPhase = c.stormPhase, stormInst = c.stormInst,
                 };
             }
@@ -196,6 +197,8 @@ namespace AutoTest.ParallelSweep
         public int escRises, instEsc;
         /// <summary>[計装 2026-11-14] この戦闘 (ヴェスカは段) でボスがダウンしたターンの数。 Tools/boss_loss_report.py が読む。</summary>
         public int downs;
+        /// <summary>[計装 2026-11-14] この戦闘 (段) で撃たれた大技を受けた回数 / 大技で受けた HP の合計 (防御・シールドの後) / 最大の 1 発 (AutoRunner.CombatRecord と同じ)。</summary>
+        public int heavyHits, heavyTaken, heavyMax;
         /// <summary>[計装 2026-11-14・嵐の航行] 戦闘が始まった時の嵐: -1 = 不安定化の時計の層でない / 0 = 嵐の外 / 1 = 嵐の中 (敵に〈嵐〉)。 と、 その時のフェーズ (0〜4)・不安定化の累計。</summary>
         public int stormIn = -1, stormPhase, stormInst;
     }
@@ -514,9 +517,11 @@ namespace AutoTest.ParallelSweep
                 // 2026-11-13: 戦闘の規則の 3 つの口 (True = 新しい規則・3 つとも False = 旧い規則 = main と同じ)
                 "handCarry", "handKeepPolicy", "EffectiveHandKeepPolicy", "bossDown", "depth3Heavy",
                 // 2026-11-14 (#141): ボスのダウンの狙い方 (None = 既定・今まで / Aim = 大技が 2 ターン後なら待つ手も比べる)。 残す印の Planned は上の handKeepPolicy
-                "downAimPolicy",
+                "downAimPolicy", "downAimGainShare",
                 // 2026-11-14: ダウンが大技を取り消す条件 (ChargeOrHeavy = 既定 / Always = 旧い規則)・大技のチャージは攻撃しない (True = 既定)・大技の倍率の上書き (id:小技:大技)
                 "downCancelRule", "heavyChargeNoAttack", "enemyHeavySpec",
+                // 2026-11-14: 目盛りの割れ方 (MainAttackOnly = 既定・通常攻撃だけ / AnyDamage = 旧い判定)・ひびの猶予 (1 = 既定・0 = すぐ・−1 = ひびでは割れない)・ひびのダウンは弱い (True = 既定)
+                "downBreakRule", "downCrackGrace", "downCrackWeak",
                 // 2026-11-14: 灰燼の王の大技〈業火〉(True = 既定 / False = 旧い予兆の形)・〈烈炎〉の毎ターンの削り (False = 既定 / True = 旧い形)
                 "ashKingHeavy", "blazeTickEachTurn",
                 // 2026-11-13: 博士の時計をランの最初から預かる腕 (False = 既定・イベントで選んだ時だけ)
