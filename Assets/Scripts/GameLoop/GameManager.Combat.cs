@@ -49,11 +49,11 @@ namespace GameLoop
                 float dropPct = bossNodeForDrop
                     ? 0f : MetaProgression.MetaBuffApplicator.GetPlunderPassiveDropPct();
                 // 〈徒労〉: 抽選は引く (乱数の列を変えない) が配らない。 〈覚悟〉: 抽選を 2 回引く (乱数を余分に引く)
-                for (int k = 0, rolls = LastBattleBoon == BattleBoon.Readiness ? ReadinessBuffEffectMultiplier : 1; k < rolls; k++)
+                for (int k = 0, rolls = EventSystem.TimedEffects.BattleBoonRule.DropRolls(LastBattleBoon); k < rolls; k++)
                 {
                     if (dropPct > 0f
                         && GameLoop.GameRng.Value("plunder.drop") * 100f < dropPct
-                        && LastBattleBoon != BattleBoon.Toil)
+                        && EventSystem.TimedEffects.BattleBoonRule.GrantsDrops(LastBattleBoon))
                     {
                         string pid = PickPassiveItemForBossExtra(false);
                         if (!string.IsNullOrEmpty(pid))

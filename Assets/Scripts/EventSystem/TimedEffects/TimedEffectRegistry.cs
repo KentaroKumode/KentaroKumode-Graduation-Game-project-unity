@@ -21,16 +21,14 @@ namespace EventSystem.TimedEffects
             {
                 { "啓示", 3 },   // 次の3戦闘
                 { "中毒", 2 },   // 次の2戦闘
-                { Effects.ToilDebuffEffect.Name,    Effects.ToilDebuffEffect.Charges },      // 通常の戦闘の勝ち 3 回 (2026-11-13)
-                { Effects.ReadinessBuffEffect.Name, Effects.ReadinessBuffEffect.Charges },   // 同上
+                { BattleBoonRule.ToilName,      BattleBoonRule.ToilCharges },        // 通常の戦闘の勝ち 3 回 (2026-11-13)
+                { BattleBoonRule.ReadinessName, BattleBoonRule.ReadinessCharges },   // 同上
             };
 
         /// <summary>画面に出す説明 (名前・残りと並べる)。 説明を持つ時限効果だけ (2026-11-13・〈徒労〉〈覚悟〉)。 無ければ null。</summary>
         public static string DescriptionOf(string id)
         {
-            if (id == Effects.ToilDebuffEffect.Name) return Effects.ToilDebuffEffect.Description;
-            if (id == Effects.ReadinessBuffEffect.Name) return Effects.ReadinessBuffEffect.Description;
-            return null;
+            return BattleBoonRule.DescriptionOf(id);
         }
 
         private static bool initialized;
