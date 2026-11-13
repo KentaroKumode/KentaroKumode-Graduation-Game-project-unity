@@ -942,6 +942,7 @@ namespace UI.Game2D
             int en = live ? sim.enemyDiceCount : 3;
             for (int i = 0; i < en; i++) DrawDie(p, new RectInt(14 + i * 20, 16, 17, 17), live ? sim.ed[i] : i + 3, true);
             if (known && sim.down) p.Text("ダウン:攻撃なし", 14, 36, MarkHeavyHud);      // ボスのダウン (2026-11-13): 止まるのは攻撃だけ (パッシブは動く)
+            else if (known && sim.charging) p.Text("チャージ:攻撃なし", 14, 36, MarkHeavyHud);   // 大技のチャージ (2026-11-14): 攻撃しない (次のターンが大技・下の「次: 大技」)
             else p.Text(known ? "攻撃 " + sim.eatk : "攻撃 ??", 14, 36, known ? Atk : Dim);
             if (known) p.Text("出目 " + sim.EnemyDiceSum, 14, 49, Dim);
             if (known && sim.edef > 0) p.Text("防御 " + sim.edef, 14, 62, Ink);      // 敵の防御 (構え・割れる/積み上がる装甲を反映した今の値)
