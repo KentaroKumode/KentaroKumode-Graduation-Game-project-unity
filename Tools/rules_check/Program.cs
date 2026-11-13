@@ -229,6 +229,29 @@ static class T
                   "旧 id「保持器」は〈呼び戻し〉に解決し、 山札の名前も揃う");
         }
 
+        // ---- 6. 〈剥ぎ取り〉は攻撃の端子 (2026-11-13・ユーザーの決定) ----
+        //   撃破のボーナスを配る所 (CombatManager.FinishTerminalTurn / GrantTerminalKillBonus) は UnityEngine 依存でここでは動かせない。
+        //   ここで見るのは、 その判定が読む値 (発動・攻撃の個数) が〈戦利品箱〉ほか 3 つと同じになること。
+        {
+            var sd = TerminalCards.Get(TerminalIds.Stripper);
+            Check(sd != null && sd.kind == TerminalKind.Attack && sd.rare && !sd.disposable && sd.cond == TerminalCond.None
+                  && sd.description.StartsWith("出目を攻撃に。") && sd.description.Contains(TerminalCards.StripperChoices + " つ増える"),
+                  "〈剥ぎ取り〉: 攻撃の種類・レア・条件なし・説明文は「出目を攻撃に。…」");
+            var b = new List<string> { TerminalIds.Stripper, TerminalIds.LootBox, TerminalIds.Block };
+            var o1 = TerminalCards.Resolve(b, new[] { 0, -1, 2 }, new[] { 5, 3, 4 }, new TerminalEnv(), new TerminalBattleState());
+            Check(o1.attackAdd == 5 && o1.attackDice == 1 && o1.supportDice == 0 && o1.kindOfDie[0] == DiceTerminal.Attack && o1.Fired(b, TerminalIds.Stripper),
+                  $"挿すと出目が攻撃になる (攻撃 {o1.attackAdd}・攻撃の個数 {o1.attackDice})");
+            var o2 = TerminalCards.Resolve(b, new[] { 1, -1, 2 }, new[] { 5, 3, 4 }, new TerminalEnv(), new TerminalBattleState());
+            Check(o1.attackDice > 0 && o2.attackDice > 0 && o2.Fired(b, TerminalIds.LootBox),
+                  "撃破のボーナスを主攻撃で配る条件 (発動・攻撃の個数 > 0) が〈戦利品箱〉と同じ");
+            var o3 = TerminalCards.Resolve(b, new[] { -1, -1, 2 }, new[] { 5, 3, 4 }, new TerminalEnv(), new TerminalBattleState());
+            Check(!o3.Fired(b, TerminalIds.Stripper) && o3.attackDice == 0, "挿さなければ発動しない (撃破のボーナスの印が立たない = 選択肢は増えない)");
+            var bt = new List<string> { TerminalIds.Stripper, TerminalIds.Transformer };
+            var o4 = TerminalCards.Resolve(bt, new[] { 0, 1 }, new[] { 4, 2 }, new TerminalEnv(), new TerminalBattleState());
+            Check(o4.attackAdd == 8, $"〈変圧器〉が攻撃の端子として 2 倍にする (攻撃 {o4.attackAdd})");
+            Check(TerminalCards.StripperChoices == 1, "倒すと増える選択肢の数は 1");
+        }
+
         Console.WriteLine(fails == 0 ? "ALL OK" : fails + " FAILED");
         return fails == 0 ? 0 : 1;
     }

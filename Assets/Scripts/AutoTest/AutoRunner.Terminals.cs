@@ -182,7 +182,7 @@ namespace AutoTest
             if (o.Fired(board, TerminalIds.Harvester)) kill += TerminalCards.HarvesterMaxHp * DeckKillMaxHpWorth;
             if (o.Fired(board, TerminalIds.Whet))      kill += TerminalCards.WhetGain * DeckKillWhetWorth;
             if (o.Fired(board, TerminalIds.LootBox))   kill += TerminalCards.LootGold * DeckKillGoldWorth;
-            if (o.Fired(board, TerminalIds.Stripper))  kill += DeckKillExtraChoiceWorth;
+            if (o.Fired(board, TerminalIds.Stripper))  kill += TerminalCards.StripperChoices * DeckKillExtraChoiceWorth;
             ws.killBonus = kill * hpUnit;
             return ws;
         }
@@ -1031,7 +1031,8 @@ namespace AutoTest
             }
             switch (d.id)
             {
-                case TerminalIds.Stripper:    return 1.5f;      // 倒したターンにしか効かない (2026-11-12: 1.0 では一度も取られなかった)
+                // 〈剥ぎ取り〉: 2026-11-13 に攻撃の端子になったので、 ほかの撃破のボーナスの端子 (収穫機・研ぎ澄まし・戦利品箱) と同じくレアの 3 (下の既定)。
+                //   撃破のボーナスの価値は挿す時の値付け (DeckSums の DeckKillExtraChoiceWorth) で見る。 旧: 補助で 1.5 (1.0 では一度も取られなかった)
                 case TerminalIds.Retainer:    return 2.0f;      // 出目をブロックに入れたうえで 1 枚残す (2026-11-12 の作り替えの後・旧 1.0)
                 case TerminalIds.Heal:        return 1.2f;      // 3 以下だけ・攻撃にならない
                 case TerminalIds.DischargeTube:

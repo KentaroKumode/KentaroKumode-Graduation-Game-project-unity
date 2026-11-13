@@ -221,6 +221,8 @@ namespace CombatSystem
         public const int CounterEvery = 10; public const float CounterPct = 0.10f;
         public const int TwinShotMul = 3, DetonatorMul = 4, FirstAidMul = 2, HealMul = 1, BatteryBonus = 2, InsulatorBonus = 4;
         public const int HarvesterMaxHp = 2, WhetGain = 1, LootGold = 5;
+        /// <summary>〈剥ぎ取り〉: 撃破したターンに、 戦闘後の端子の選択肢が増える数 (RunState.terminalExtraChoices に足す)。</summary>
+        public const int StripperChoices = 1;
         public const float SightPerRank = 0.2f, VitalPerRank = 0.1f, BloodTapPct = 0.05f, BigDischargePerRank = 0.10f, ShieldPushPerRank = 0.06f;
         public const int BloodTapPer = 5, PoisonScalePer = 10, PoisonScaleAttack = 3, AfterHeatPerBurst = 2;
         // 2026-11-12 (3): 端子の ITT (Optimal / Super・各 5 万ラン・AutoRunLogs/terminal_itt/) で、 両方そろって強すぎ・弱すぎの物だけを動かした。
@@ -328,7 +330,8 @@ namespace CombatSystem
                 Rare(D(TerminalIds.Harvester, A, "出目を攻撃に。このターンに敵を倒すと最大 HP +" + HarvesterMaxHp + " (恒久)。")),
                 Rare(D(TerminalIds.Whet, A, "出目を攻撃に。このターンに敵を倒すと、この端子の攻撃が恒久に +" + WhetGain + "。")),
                 Rare(D(TerminalIds.LootBox, A, "出目を攻撃に。このターンに敵を倒すとゴールド +" + LootGold + "。")),
-                Rare(D(TerminalIds.Stripper, S, "このターンに敵を倒すと、戦闘後の端子の選択肢が 1 つ増える。")),
+                // 〈剥ぎ取り〉: 2026-11-13 に補助から攻撃へ (ユーザーの決定)。 補助のままでは挿しても攻撃にならず、 レアの 3 択でほかに負け続けた (GAME.md §24)
+                Rare(D(TerminalIds.Stripper, A, "出目を攻撃に。このターンに敵を倒すと、戦闘後の端子の選択肢が " + StripperChoices + " つ増える。")),
                 Rare(D(TerminalIds.Doubler, S, "このターン、他の端子の効果を 2 回発動させる。", TerminalCond.AtLeast6)),
                 // 〈呼び戻し〉: 手札の持ち越し (2026-11-13・HandCarry) で「空けた端子を 1 枚残す」は役目を失ったので、
                 //   「捨て札から選んだ 1 枚を、 次のターンの手札に戻す」に作り替えた (ユーザーの決定)。 出目をブロックに入れるのは残す
@@ -612,9 +615,9 @@ namespace CombatSystem
                 case TerminalIds.Attack:
                 // 出目をそのまま攻撃に入れるだけの端子。 上乗せは別の所で付く:
                 //   増圧 = 解決の前に他の出目 +1 / 継電器 = 下の「6. 他の端子を見る効果」/ 計数器 = 本体 (DrawTerminalHand) /
-                //   収穫機・戦利品箱 = 撃破した時 (CombatManager.FinishTerminalTurn)
+                //   収穫機・戦利品箱・剥ぎ取り = 撃破した時 (CombatManager.FinishTerminalTurn)
                 case TerminalIds.Relay: case TerminalIds.Grinder: case TerminalIds.Twin: case TerminalIds.Counter:
-                case TerminalIds.Harvester: case TerminalIds.LootBox:
+                case TerminalIds.Harvester: case TerminalIds.LootBox: case TerminalIds.Stripper:
                     o.attackAdd += sum; break;
                 case TerminalIds.Block: o.blockAdd += sum; break;
                 case TerminalIds.Charge: o.chargeAdd += sum; break;
@@ -656,7 +659,7 @@ namespace CombatSystem
                 case TerminalIds.Mains: o.attackAdd += sum + MainsPerUse * st.mainsUses; st.mainsUses++; break;
                 case TerminalIds.TwinShot: o.attackAdd += sum * TwinShotMul; break;
                 case TerminalIds.Whet: o.attackAdd += sum + env.whetBonus; break;
-                // 変圧器 (6. で足す)・剥ぎ取り (撃破した時)・倍電圧 (5. の頭で見る) は、 ここでは何もしない
+                // 変圧器 (6. で足す)・倍電圧 (5. の頭で見る) は、 ここでは何もしない
                 case TerminalIds.Retainer: o.blockAdd += sum; if (!HandCarry) o.retainTarget = empty(slot); else o.recall = true; break;   // 持ち越しの規則では捨て札から 1 枚戻す (対象は RecallPick)
                 case TerminalIds.StopSignal: o.enemyStunNext = true; break;
                 case TerminalIds.Fork: o.attackAdd += sum; o.blockAdd += sum; break;
