@@ -119,13 +119,13 @@ namespace EventSystem.TimedEffects
         /// <summary>画面に残りの数を出すか (減らない形の〈徒労〉 = LayerLong・UntilKing は出さない)。</summary>
         public static bool ShowsCharges(string id, ToilMode mode) => !(id == ToilName && mode != ToilMode.Stacks);
 
-        // ── 〈徒労〉の戦闘のデバフ (2026-11-14・測定の口 GameHooks.ToilDamageDownPct・既定 0 = デバフなし・値は未決) ──
+        // ── 〈徒労〉の戦闘のデバフ (2026-11-14・GameHooks.ToilDamageDownPct・既定 50 = 与えるダメージ −50%・作者の決定・測定の口 AutoRunner.toilDamageDownPct で 0 にすれば切れる) ──
         //   持っている間、 すべての戦闘でプレイヤーが敵に与えるダメージ −N%。 枠は大罪:怠惰の「与えるダメージ −N%」と同じ
         //   (MetaDebuffApplicator.ApplyOutgoingCut・主攻撃はすべての倍率の後・敵の防御の前、 主攻撃以外は敵の HP を減らす口)。
         //   同じ枠の決まり (CombatManager.Damage.cs の〈練度不足〉の注記「同種のデバフは重ねがけせず厳しい方 1 つ」) に合わせ、 怠惰と重なった時は大きい方だけ。
 
-        /// <summary>〈徒労〉の戦闘のデバフの既定 (%)。 0 = デバフなし (2026-11-14 までの〈徒労〉と同じ)。</summary>
-        public const int DefaultToilDamageDownPct = 0;
+        /// <summary>〈徒労〉の戦闘のデバフの既定 (%)。 50 = 持っている間、 与えるダメージ −50% (2026-11-14・作者の決定。 同日の測定までは 0 = デバフなし)。</summary>
+        public const int DefaultToilDamageDownPct = 50;
 
         /// <summary>〈徒労〉による与ダメージの削り (%)。 持っていなければ 0。 値は 0〜100 に収める。</summary>
         public static int ToilDamageDownPct(bool hasToil, int pct) => hasToil ? System.Math.Max(0, System.Math.Min(100, pct)) : 0;

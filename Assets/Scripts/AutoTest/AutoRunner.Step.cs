@@ -73,7 +73,7 @@ namespace AutoTest
             GameLoop.GameHooks.AshKingBeatenEver = ashKingBeatenEver;              // [測定 2026-11-13] 灰燼の王を倒したことがある記録として走るか (深さ 6 の基地の版)
             GameLoop.GameHooks.ToilMode = toilMode;                                // [測定 2026-11-14] 〈徒労〉の形 (王を倒すまで・既定 / 3 つ持ち / 層の間ずっと)
             GameLoop.GameHooks.ToilChestEmptyPct = toilChestEmptyPct;
-            GameLoop.GameHooks.ToilDamageDownPct = System.Math.Max(0, toilDamageDownPct);   // [測定 2026-11-14] 〈徒労〉の戦闘のデバフ (与えるダメージ −N%・既定 0)
+            GameLoop.GameHooks.ToilDamageDownPct = System.Math.Max(0, toilDamageDownPct);   // [測定 2026-11-14] 〈徒労〉の戦闘のデバフ (与えるダメージ −N%・既定 50・0 で切れる)
             GameLoop.GameHooks.StormEnabled = stormEnabled;                        // [測定 2026-11-13] 天候の作り (嵐 / 旧い前線)
             GameLoop.GameHooks.StormClock = stormClock;                            // [測定 2026-11-13 二版] 嵐の時計 (不安定化 / 手番)
             GameLoop.GameHooks.TerminalHealMulOverride = System.Math.Max(0, terminalHealMul);   // [測定 2026-11-12・#102]

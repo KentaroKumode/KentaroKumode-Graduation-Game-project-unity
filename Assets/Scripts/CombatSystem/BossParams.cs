@@ -11,7 +11,7 @@ namespace CombatSystem
     public enum BossParam
     {
         // 基準値の正本は下の Spec()。 ここの「基準」は 2026-11-11 (#30) に Spec() へ合わせた写し。
-        JudgmentDice,      // 6層 灰燼の王・〈業火の予兆〉の予兆ターンの敵攻撃上乗せ (旧〈業火の断罪〉と共用)。 基準8
+        JudgmentDice,      // 6層 灰燼の王・〈業火の予兆〉の予兆ターンの敵攻撃上乗せ (旧〈業火の断罪〉と共用)。 基準12 (2026-11-14〜・旧 8)
         JudgmentCoefBase,  // 業火の断罪の係数基礎。 係数 = base + 2n。 基準2 (1回目=4)
                            //   [読む敵なし] JudgmentBlaze はどの敵も持っていない (効果のクラスは残っている)
         ChipCap,           // 業火の審判官・審判の炎の 1 回 (毎ターン) あたりの上限。 基準10
@@ -25,8 +25,8 @@ namespace CombatSystem
         MirrorReflectCap,  // 鏡の双子・鏡映の応答の反射ダメ上限。 基準9
         GoblinCall,        // ゴブリン王・号令の毎ターンの敵攻撃加算。 基準3
         // 2026-11-14 (灰燼の王の測定の口): 末尾に足す (番号で保存している所は無いが、 並びは動かさない)
-        FuryAttack,        // 6層 灰燼の王・〈憤怒の残滓〉の HP 50% 以下のターンの敵攻撃上乗せ。 基準3 (旧 EmberFury.Bonus)
-        RegrowthRate,      // 6層 灰燼の王・〈灰の再生〉の毎ターンの回復 = 最大 HP × この値 (割合・%ではない)。 基準0.02 (= 2%)
+        FuryAttack,        // 6層 灰燼の王・〈憤怒の残滓〉の HP 50% 以下のターンの敵攻撃上乗せ。 基準5 (2026-11-14〜・旧 3・旧 EmberFury.Bonus)
+        RegrowthRate,      // 6層 灰燼の王・〈灰の再生〉の毎ターンの回復 = 最大 HP × この値 (割合・%ではない)。 基準0.03 (= 3%・2026-11-14〜・旧 0.02)
         // 2026-11-12 (#126): RobeStacks (天衣無縫・読む側なし)・StanceAtkMult / WeakRollRatio (敵スタンス ADR-0005・呼ぶ所なし) を削除。
         //   番号で保存している所は無い (調整値の boss_tuning.json は名前で持ち、 L3 ボス調整器ごと削除)。
     }
@@ -55,7 +55,7 @@ namespace CombatSystem
             switch (p)
             {
                 //                                             base  min   max
-                case BossParam.JudgmentDice:      return new ParamSpec(8f, 0f, 30f);    // 2026-11-06: 15 → 8 (敵の攻撃を出目の幅へ戻した時に据え置いていた)
+                case BossParam.JudgmentDice:      return new ParamSpec(12f, 0f, 30f);   // 2026-11-06: 15 → 8 (敵の攻撃を出目の幅へ戻した時に据え置いていた)。 2026-11-14: 8 → 12 (下の灰燼の王の注記)
                 case BossParam.JudgmentCoefBase:  return new ParamSpec( 2f, 0f,  8f);
                 // 2026-08-15: 一度 10 → 7 にしたが **10 へ戻した**。 「5層の主死因が Chip 95〜98%」
                 //   という根拠自体が、 〈怪しい商人〉が 5層の通常抽選に混ざっていた汚染下の測定だった
@@ -72,11 +72,13 @@ namespace CombatSystem
                 case BossParam.PoisonStackCap:    return new ParamSpec( 5f, 1f, 12f);
                 case BossParam.MirrorReflectCap:  return new ParamSpec( 9f, 0f, 15f);
                 case BossParam.GoblinCall:        return new ParamSpec( 3f, 0f, 12f);
-                // 2026-11-14: 灰燼の王の 2 つ (今までの直書きの値を基準へ移しただけ・値は変えていない)。
-                //   RegrowthRate は割合のまま持つ ── 基準を 0.02f の同じ定数にしておくと、 回復量の式 (最大 HP × 割合) が 1 ビットも変わらない
+                // 2026-11-14: 灰燼の王の 2 つ (直書きの値を基準へ移した)。 同日、 測定の口 (AutoRunner.bossParamSpec) で測った値を作者の承認で基準へ:
+                //   予兆 JudgmentDice 8 → 12・憤怒 FuryAttack 3 → 5・再生 RegrowthRate 0.02 → 0.03 (基礎の攻撃 6 → 21・最大 HP 1945 → 3800 は enemies.json)。
+                //   根拠: 2026-11-14 測定 (Super・3000 ラン・嵐なし) で王の勝率 〈徒労〉なし 74.1% (docs/GAME.md §13 の灰燼の王)。
+                //   RegrowthRate は割合のまま持つ ── 測定の口が読んだ "0.03" と同じ float 定数 0.03f にしておくと、 回復量の式 (最大 HP × 割合) が口で振った時と 1 ビットも変わらない
                 //   (% で持って実行時に /100f すると Mono の float で丸めが割れることがある)。
-                case BossParam.FuryAttack:        return new ParamSpec( 3f, 0f, 20f);
-                case BossParam.RegrowthRate:      return new ParamSpec(0.02f, 0f, 0.10f);
+                case BossParam.FuryAttack:        return new ParamSpec( 5f, 0f, 20f);
+                case BossParam.RegrowthRate:      return new ParamSpec(0.03f, 0f, 0.10f);
                 default:                          return new ParamSpec( 1f, 0f,  1f);
             }
         }
@@ -136,7 +138,7 @@ namespace CombatSystem
         public static int ParamInt(string id, BossParam p) => Mathf.RoundToInt(Param(id, p));
 
         /// <summary>敵のパッシブの説明文の数字を、 その敵の param の今の値で埋める (2026-11-14)。
-        /// <c>{名前}</c> = <see cref="Param"/> の値 (例 <c>{JudgmentDice}</c> → 8)、 <c>{名前%}</c> = 値 ×100 の % の数 (例 <c>{RegrowthRate%}</c> → 2)。
+        /// <c>{名前}</c> = <see cref="Param"/> の値 (例 <c>{JudgmentDice}</c> → 12)、 <c>{名前%}</c> = 値 ×100 の % の数 (例 <c>{RegrowthRate%}</c> → 3)。
         /// enemies.json の説明文は数字を直書きせずこの印で持つ ── 測定の口で値を変えても、 画面の数字が実際の値と食い違わない。
         /// 印の無い文はそのまま返す。 id は敵の id (ボスでなければ基準値で埋まる)。</summary>
         public static string Describe(string id, string text)
@@ -235,7 +237,7 @@ namespace CombatSystem
             // 深さ 5 (HP 1835): 10 ターン前後
             { GameLoop.BossIds.Layer5Judgment, new[] { 0.75f, 0.50f, 0.25f } },   // 毎ターンの〈審判の炎〉に耐える長丁場 → 目盛り 3 つ
             { GameLoop.BossIds.Layer5Hidden,   new[] { 0.65f, 0.30f } },          // 形態の循環で間合いが変わる → 少なめ
-            // 深さ 6 (HP 1945): 50% は段の切り替え (再生が止まり予兆が速まる) なので避ける
+            // 深さ 6 (HP 3800・2026-11-14〜・目盛りの位置は 1945 の時のまま): 50% は段の切り替え (再生が止まり予兆が速まる) なので避ける
             { GameLoop.BossIds.Layer6Ash, new[] { 0.80f, 0.30f } },
             // 深さ 7 ヴェスカ: 4 段で段ごとに HP が別 → 段ごとに 1 つ。 天与 (p4) は 66% / 33% が〈天与の才〉なので 50%
             { GameLoop.BossIds.VescaP1,    new[] { 0.60f } },
