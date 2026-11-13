@@ -121,6 +121,7 @@ namespace GameLoop
             if (returnToMapAfterEventCombat)
             {
                 returnToMapAfterEventCombat = false;
+                AddBattleWinInstability(elite: false, pursuer: false);   // 不安定化: イベントの戦闘も通常の戦闘と同じ +1 (2026-11-13)
                 EventEncounter.Instance?.ApplyPostCombatEffects();
                 EventEncounter.Instance?.Clear();
                 SetPhase(GamePhase.MapNavigation);
@@ -232,6 +233,8 @@ namespace GameLoop
             coins += metaWinGold;
             coins = GoldIncome.Gain(Run, coins, "戦闘報酬");
             IsEliteSecondFight = false;
+            // 不安定化 (2026-11-13・GAME.md §5-12): エリート +2 / 通常の戦闘 +1 (ボスは上で抜けている)。 報酬の秘宝は GrantRewardItem で +3 ずつ
+            AddBattleWinInstability(eliteNodeReward, pursuer: false);
 
             // 物資の補給 (2026-09-28): 通常 +30 / エリート +80。 払底したら戦って奪うしかない
             //   (Highfleet の「追ってきた敵から燃料を奪う」)。
@@ -417,6 +420,9 @@ namespace GameLoop
         {
             LastTreasureSummary = GrantTreasureChestContents();
             Log(LastTreasureSummary);
+            // 不安定化 (2026-11-13): 宝の点を開けた +3 (中身の品が秘宝でも重ねない ── 宝の点は開けた時の +3 だけ)
+            string inst = InstabilityLine(AddInstability(MapSystem.FreeMove.InstabilitySource.Treasure, 1, "宝の点"));
+            if (inst != null) LastTreasureSummary += "\n" + inst;
             SetPhase(GamePhase.TreasureOpen);
         }
 
@@ -556,6 +562,7 @@ namespace GameLoop
             Loadout.Gain(Run, itemId);
             var dd = ItemDatabase.Instance?.GetItem(itemId);
             Log($"戦闘勝利報酬: {(dd != null ? dd.displayName : itemId)} を獲得{(eliteWin ? "（精鋭）" : "")}");
+            AddRelicInstabilityIfPassive(itemId);   // 不安定化: 報酬で秘宝を得た +3 (2026-11-13)
         }
 
         // ---- 戦闘後ドロップ2択: 公開API（UI / Bot から使用）----

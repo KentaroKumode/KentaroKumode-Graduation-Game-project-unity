@@ -463,6 +463,8 @@ namespace AutoTest.ParallelSweep
                 "riftRecordAtBoss",
                 // 2026-11-13: 天候の作り (True = 嵐・False = 旧い前線で始点は左端 = main と同じ)
                 "stormEnabled",
+                // 2026-11-13 二版: 嵐の時計 (Instability = 不安定化ポイント・Turns = 手番で進む storm-boss の作り)
+                "stormClock",
                 // 2026-11-10: 測定用の物差し (主攻撃 / 毒・出血・爆発の倍率)。 送った値と、 ラン開始時に本体へ入れた値
                 "probeMainMult", "ProbeMainMultApplied", "probePassiveMult", "ProbePassiveMultApplied",
                 // 2026-11-12 (#107): 配線が収支で決まる敵のパッシブと〈吸血〉を読むか (−1 = 技量に従う) と実効値・内訳

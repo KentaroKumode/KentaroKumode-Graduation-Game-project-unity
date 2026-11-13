@@ -647,6 +647,7 @@ namespace CombatSystem
             // 〈冷却材〉(§6-5) の遅延を差し引いたターンで段階を引く。 予告にもそのまま出るので、
             // 「何ターン稼いだか」が盤面から読める (完全情報テレグラフ・柱3)。
             int escTurn = EscalationTurn(ctx);
+            NoteEscalationForInstability(Escalation.StageOf(escTurn));
             int enemyAtkValue = Escalation.EnemyAttackValue(currentEnemy, escTurn, ctx.enemyDiceTotal, ctx.currentTurn);
             int enemyAtkRaw = enemyAtkValue;   // [計装 2026-11-11] 敵の攻撃を下げる効果の前
             // ADR-0009 D群: 敵攻撃値-N (呪縛 等の敵ダイス弱化系の転生先)

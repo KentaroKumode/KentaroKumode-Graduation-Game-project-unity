@@ -448,6 +448,9 @@ namespace CombatSystem
             // エスカレーションの「ボス戦」の旗 (挑戦カード「ボス戦ではエスカレーションが毎ターン進む」)
             Escalation.BossFight = enemy != null && GameLoop.BossIds.IsBoss(enemy.id);
             Escalation.PhaseStartTurn = 1;
+            // 不安定化 (2026-11-13・GAME.md §5-12): エスカレーションの段が上がるたびに +1 (ボス戦は除く)。 この戦闘で見た一番高い段を 0 から数える
+            _instabilityEscStage = 0;
+            GameLoop.GameManager.Instance?.NoteCombatStartedForInstability();
             // ボスのダウン (2026-11-13・HP の目盛り): 目盛りを入れ、 大技の周期の起点を 0 に戻す (目盛りの無い敵は何もしない)
             ResetBossDown(enemy, newCombat: true);
             // 挑戦デバフ〈厚い皮膚〉: 敵の最大HP ×1.10 / ×1.20 / ×1.30。
