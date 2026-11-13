@@ -152,7 +152,7 @@ namespace AutoTest
             if (o.recall)
             {
                 var disc = dkNow?.discard;
-                int rp = RecallBest(disc, runNow);
+                int rp = RecallBest(disc, runNow, _recallPrefer);
                 if (rp >= 0) flat += (DeckRetainDmg + DeckCardDmgPerPoint * Math.Max(0f, TargetWorth(TerminalCards.Get(disc[rp]), runNow) - 1f)) * dw;
             }
             // 〈写し取り〉(2026-11-14): 写しは次のターンの手札に入る ── 次のターンに必ず 1 回使える (戦闘が続けば・残りターン 1 なら 0)。
@@ -229,6 +229,9 @@ namespace AutoTest
                 us[i] = EvalDeckWiring(ev, rolls, cands[i], out outs[i], out touts[i], out tgts[i], out afters[i]);
             }
             var st = ev.st;
+            // [#141] ダウンの狙い (口 downAimPolicy・既定 None では通らない): 待つ手にダウンの価値と待つ得を足す
+            bool aimAdded = false, aimPreBroke = false;
+            if (downAimPolicy == DownAimPolicy.Aim) aimAdded = ApplyDownAim(in ev, tele, k, us, outs, out aimPreBroke);
 
             int best = -1; float bu = float.NegativeInfinity;
             for (int i = 0; i < n; i++)
@@ -299,6 +302,13 @@ namespace AutoTest
             _lastAttackCandExists = false;
             for (int i = 0; i < n && !_lastAttackCandExists; i++) if (outs[i].aCount > 0) _lastAttackCandExists = true;
             targets = tgts[best];
+            if (mayMistake && aimAdded)   // [#141 計装] 実際の配線の判断だけ
+            {
+                DownAimDecisions++; _downAimGainSum += _downAimLastGain;
+                int ha = st.enemyHp - Math.Min(outs[best].effDmg, st.enemyHp);
+                bool chosenBreaks = ha > 0 && BossDown.NextTurnIsDown(st.downNotches, st.downMaxHp, st.downBroken, st.downPendingNow, ha);
+                if (aimPreBroke && !chosenBreaks) DownAimHeld++;
+            }
             if (mayMistake) NoteDeckPolicyDiag(in ev, k, board, deck, cands, us, touts, best, bestPre);   // [計装 #106] 実際の配線の判断だけ
             return cands[best];
         }
@@ -377,6 +387,7 @@ namespace AutoTest
                 st = BuildOptimalTurnState(rolls, tele),
                 deckHasCounter = run?.terminalDeck != null && run.terminalDeck.Contains(TerminalIds.Counter),
             };
+            _recallPrefer = RecallPreferFor(tele);   // [#141] 〈呼び戻し〉の当て (方策 Planned の時だけ・それ以外は null = 今までの選び方)
             // 会心の効果 (〈真空管〉〈照星〉〈急所読み〉) を旧の式でも見積もれるよう、 会心率と倍率は常に読む (readOut の切り替えは変えない)
             if (ctx != null && !ev.st.readOut && !ev.st.traceBoth) FillReadOut(ref ev.st, cm, ctx, run, tele.playerAttackPenalty);
             return ev;
@@ -393,7 +404,7 @@ namespace AutoTest
             after = ev.deck.state.Clone();
             o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after);
             // 〈写し取り〉〈焼き切り〉〈呼び戻し〉が発動する挿し方なら、 対象を方策で選び直して解き直す (対象は今ターンの攻防を変えない)
-            tgts = ChooseDeckTargets(ev.board, o, ev.run);
+            tgts = ChooseDeckTargets(ev.board, o, ev.run, _recallPrefer);
             if (tgts != null)
             {
                 after = ev.deck.state.Clone();
@@ -420,14 +431,15 @@ namespace AutoTest
 
         /// <summary>対象を取る端子の対象の方策 (読むだけ)。 写し取り = 山札に増やして一番得な端子 (素の点の最大) / 焼き切り = 一番要らない端子 (最小) /
         /// 呼び戻し = 次のターンに一番使いたい端子 (最大)。 点は報酬の素の点 (<see cref="RewardBaseScore"/>)・基本の端子は 1。 対象を取る端子が発動しなければ null。</summary>
-        private static int[] ChooseDeckTargets(List<string> board, TerminalOutcome o, RunState run)
+        private static int[] ChooseDeckTargets(List<string> board, TerminalOutcome o, RunState run, TerminalKind? recallPrefer = null)
         {
             int[] res = null;
             // 〈呼び戻し〉(手札の持ち越しの規則): 捨て札から次のターンに一番使いたい 1 枚 (素の点の最大・同点は後に捨てた方) を選ぶ (値は捨て札の添字)
+            //   [#141] 方策 Planned の時は、 次のターンの当ての種類 (recallPrefer) の中で点の最大 (無ければ全体で)
             if (o.recall)
             {
                 var disc = CombatManager.Instance?.TerminalDeck?.discard;
-                int pick = RecallBest(disc, run);
+                int pick = RecallBest(disc, run, recallPrefer);
                 if (pick >= 0)
                     for (int p = 0; p < board.Count; p++)
                         if (board[p] == TerminalIds.Retainer && o.fired.Contains(p))
@@ -455,9 +467,16 @@ namespace AutoTest
         }
 
         /// <summary>[〈呼び戻し〉] 捨て札で素の点が最大の 1 枚の添字 (同点は後に捨てた方・空なら −1)。 先読みでも同じ選び方 (次のターンの効用での選び直しはしない・仮)。</summary>
-        private static int RecallBest(List<string> disc, RunState run)
+        private static int RecallBest(List<string> disc, RunState run, TerminalKind? prefer = null)
         {
             if (disc == null) return -1;
+            if (prefer.HasValue)
+            {
+                // [#141] 次のターンの当て (方策 Planned): 選び方は DownKeepRules.RecallIndex (当ての種類の中で点の最大・無ければ全体で)
+                var kinds = new List<TerminalKind>(disc.Count); var worths = new List<float>(disc.Count);
+                foreach (var id in disc) { var d = TerminalCards.Get(id); kinds.Add(d?.kind ?? TerminalKind.Support); worths.Add(TargetWorth(d, run)); }
+                return DownKeepRules.RecallIndex(kinds, worths, prefer);
+            }
             int pick = -1; float best = 0f;
             for (int i = 0; i < disc.Count; i++)
             {
@@ -467,11 +486,26 @@ namespace AutoTest
             return pick;
         }
 
+        /// <summary>[#141] 〈呼び戻し〉の当ての種類 (この 1 回の判断のあいだ持つ)。 null = 今までの選び方 (方策 Planned 以外は必ず null)。</summary>
+        private TerminalKind? _recallPrefer;
+
+        /// <summary>[#141] 〈呼び戻し〉の当て (方策 Planned の時だけ): 次のターンがダウン (前に割った分が残っている・予告の downPending) なら攻撃、
+        /// 次のターンが大技 (予告の turnsToHeavy = 1) なら防御、 どちらでもなければ null (点の最大)。
+        /// このターンの挿し方で目盛りを割って次がダウンになる場合は見ない (挿し方ごとに当てが変わり、 対象の選び直しが挿し方の評価と絡むため・仮)。</summary>
+        private TerminalKind? RecallPreferFor(MutualTurnTelegraph tele)
+        {
+            if (EffectiveHandKeepPolicy != HandKeepPolicy.Planned || !TerminalCards.HandCarry) return null;
+            if (tele.downPending > 0) return TerminalKind.Attack;
+            if (!tele.enemyDown && tele.turnsToHeavy == 1) return TerminalKind.Block;
+            return null;
+        }
+
         // =====================================================================
         //  手札の規則 Pick (2026-11-13): 次のターンも手札に残す端子の方策
         // =====================================================================
-        /// <summary>残す印の BOT の方策。 Auto = 既定 (どの技量でも None・2026-11-13 の 2 回目の測定から)。 Greedy / Lookahead は腕で明示した時だけ。</summary>
-        public enum HandKeepPolicy { Auto = -1, None = 0, Greedy = 1, Lookahead = 2 }
+        /// <summary>残す印の BOT の方策。 Auto = 既定 (どの技量でも None・2026-11-13 の 2 回目の測定から)。 Greedy / Lookahead / Planned は腕で明示した時だけ。
+        /// Planned (#141・2026-11-14) = 次のターンに使う当てがある端子だけ残す (<see cref="DownKeepRules.PlanKeep"/>)。 〈呼び戻し〉の選び方も同じ当てで選ぶ。</summary>
+        public enum HandKeepPolicy { Auto = -1, None = 0, Greedy = 1, Lookahead = 2, Planned = 3 }
 
         /// <summary>[測定 2026-11-13] 残す印の方策 (手札の規則 Pick の時だけ効く)。 None = 何も残さない (Off と同じ結果になるはず)。</summary>
         public HandKeepPolicy handKeepPolicy = HandKeepPolicy.Auto;
@@ -509,6 +543,7 @@ namespace AutoTest
             var cand = new List<int>();
             for (int s = perm; s < board.Count; s++)
                 if (!o.fired.Contains(s) && !deck.state.IsStopped(s)) cand.Add(s);
+            if (pol == HandKeepPolicy.Planned) return ChooseHandKeepPlanned(rolls, tele, in ev, o, in outc, cand);
             if (cand.Count == 0) return null;
             // Greedy の組
             float avg = 0f; int n = 0;
@@ -544,6 +579,168 @@ namespace AutoTest
             foreach (int s in pick) marks[s] = true;
             return marks;
         }
+
+        // ---- [#141] 残す印 Planned: 次のターンに使う当てがある端子だけ残す ----
+        /// <summary>[#141] 前のターンに Planned で残した端子 (名前・理由) と、 そのターン番号・敵 (次のターンの使われ方を数えるのと、 使わなかった端子を残し直さないため)。</summary>
+        private readonly List<KeyValuePair<string, DownKeepRules.KeepReason>> _keepPrev = new List<KeyValuePair<string, DownKeepRules.KeepReason>>();
+        private int _keepPrevTurn = -99;
+        private EnemyData _keepPrevEnemy;
+        /// <summary>[#141 計装] Planned で残した端子の数 / そのうち次のターンに挿した数 (添字 = <see cref="DownKeepRules.KeepReason"/>)。 ランをまたいで累計。</summary>
+        public readonly long[] KeepPlanKept = new long[4], KeepPlanUsed = new long[4];
+
+        /// <summary>[#141] 残す印 Planned (<see cref="DownKeepRules.PlanKeep"/>)。 <paramref name="o"/> / <paramref name="outc"/> = 選んだ挿し方の結果、
+        /// <paramref name="cand"/> = 残せる端子 (挿していない・止まっていない手札)。 読むだけ・乱数を引かない。</summary>
+        private bool[] ChooseHandKeepPlanned(int[] rolls, MutualTurnTelegraph tele, in DeckEval ev, TerminalOutcome o, in OptimalTurnOutcome outc, List<int> cand)
+        {
+            var board = ev.board; var deck = ev.deck; int perm = deck.permanent.Count; var run = ev.run; var st = ev.st;
+            var cm = CombatManager.Instance; var enemy = cm?.CurrentEnemy;
+            // 1. 前のターンに残した端子を、 このターンに挿したか (計装)。 挿さなかった物は残し直さない
+            var unusedPrev = new List<string>();
+            if (_keepPrev.Count > 0 && _keepPrevTurn == tele.turn - 1 && ReferenceEquals(_keepPrevEnemy, enemy))
+            {
+                var firedNames = new List<string>();
+                foreach (int s in o.fired) if (s >= perm && s < board.Count) firedNames.Add(board[s]);
+                foreach (var kv in _keepPrev)
+                {
+                    KeepPlanKept[(int)kv.Value]++;
+                    if (firedNames.Remove(kv.Key)) KeepPlanUsed[(int)kv.Value]++; else unusedPrev.Add(kv.Key);
+                }
+            }
+            _keepPrev.Clear(); _keepPrevTurn = tele.turn; _keepPrevEnemy = enemy;
+            if (cand.Count == 0 || outc.effDmg >= st.enemyHp) return null;   // 倒すなら次のターンは無い
+
+            int k = rolls.Length;
+            // 2. 次のターンの当て (本体と同じ関数で、 選んだ挿し方の後に次のターンがダウンか)
+            bool downNext = st.downNotches != null
+                && BossDown.NextTurnIsDown(st.downNotches, st.downMaxHp, st.downBroken, st.downPendingNow, st.enemyHp - Math.Max(0, outc.effDmg));
+            bool heavyNext = !downNext && !tele.enemyDown && tele.turnsToHeavy == 1;
+            int permAtk = 0, permBlk = 0;
+            for (int s = 0; s < perm && s < board.Count; s++)
+            {
+                var d = TerminalCards.Get(board[s]); if (d == null) continue;
+                if (d.kind == TerminalKind.Attack) permAtk += d.capacity; else if (d.kind == TerminalKind.Block) permBlk += d.capacity;
+            }
+            int blockNeed = 0;
+            if (heavyNext && enemy != null)
+            {
+                var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+                if (ctx != null)
+                {
+                    var faces = ctx.equippedDiceFaces != null && ctx.equippedDiceFaces.Length > 0 ? ctx.equippedDiceFaces : new[] { 1, 2, 3, 4, 5, 6 };
+                    float mean = 0f; foreach (int f in faces) mean += f; mean /= faces.Length;
+                    blockNeed = DownKeepRules.BlockSlotsNeeded(ExpectedEnemyAttackAt(enemy, ctx, in tele, tele.turn + 1, 0), mean, k);
+                }
+            }
+            // これから引ける端子の点の平均 (Greedy と同じ見方)
+            float avg = 0f; int n = 0;
+            foreach (var id in deck.draw) { avg += TargetWorth(TerminalCards.Get(id), run); n++; }
+            foreach (var id in deck.discard) { avg += TargetWorth(TerminalCards.Get(id), run); n++; }
+            avg = n > 0 ? avg / n : 1f;
+            bool exhausted = o.slotOfDie != null && o.slotOfDie.Length == k;
+            if (exhausted) foreach (int s in o.slotOfDie) if (s < 0) { exhausted = false; break; }
+
+            var cards = new List<DownKeepRules.KeepCard>(cand.Count);
+            foreach (int s in cand)
+            {
+                var d = TerminalCards.Get(board[s]);
+                cards.Add(new DownKeepRules.KeepCard
+                {
+                    slot = s, kind = d?.kind ?? TerminalKind.Support, capacity = d?.capacity ?? 1, worth = TargetWorth(d, run),
+                    condFree = d != null && d.cond == TerminalCond.None, keptBeforeUnused = unusedPrev.Remove(board[s]),
+                });
+            }
+            var why = DownKeepRules.PlanKeep(cards, k, downNext, heavyNext, permAtk, permBlk, blockNeed, avg, exhausted);
+            bool[] marks = null;
+            for (int i = 0; i < why.Length; i++)
+            {
+                if (why[i] == DownKeepRules.KeepReason.None) continue;
+                if (marks == null) marks = new bool[board.Count];
+                marks[cards[i].slot] = true;
+                _keepPrev.Add(new KeyValuePair<string, DownKeepRules.KeepReason>(board[cards[i].slot], why[i]));
+            }
+            return marks;
+        }
+
+        /// <summary>[#141 計装] サマリーに出す行 (Planned で 1 枚も残していなければ空)。</summary>
+        public string HandKeepPlanLine()
+        {
+            long all = 0; foreach (var v in KeepPlanKept) all += v;
+            if (all == 0) return "";
+            var sb = new System.Text.StringBuilder("[残す印 Planned] 次のターンに挿した / 残した: ");
+            string[] names = { "", "ダウンの攻撃", "大技の守り", "余った端子" };
+            for (int r = 1; r < 4; r++)
+                sb.Append(names[r]).Append(' ').Append(KeepPlanUsed[r]).Append('/').Append(KeepPlanKept[r])
+                  .Append(KeepPlanKept[r] > 0 ? $" ({100.0 * KeepPlanUsed[r] / KeepPlanKept[r]:0.0}%)" : "").Append(r < 3 ? " ・ " : "");
+            return sb.ToString();
+        }
+
+        // =====================================================================
+        //  [#141] ボスのダウンの狙い方 (口 downAimPolicy・既定 None)
+        // =====================================================================
+        /// <summary>ダウンの狙い方。 None = 今まで (目盛りを割る手に次のターンの攻撃 × <see cref="DownNextTurnShare"/> を足すだけ)。
+        /// Aim = 大技が 2 ターン後の時、 「1 ターン待って、 大技のターンにダウンを重ねる」手にも同じダウンの価値と待つ得 (<see cref="DownKeepRules.HoldGain"/>) を足して比べる。</summary>
+        public enum DownAimPolicy { None = 0, Aim = 1 }
+
+        /// <summary>[#141] ダウンの狙い方 (既定 None = 今までと同じ手・同じ乱数)。</summary>
+        public DownAimPolicy downAimPolicy = DownAimPolicy.None;
+
+        /// <summary>[#141 計装] 待つ手を比べた判断の数 / そのうち、 足す前の最良は目盛りを割る手だったのに待つ手を選んだ数 / 待つ手に足した値の合計。 ランをまたいで累計。</summary>
+        public int DownAimDecisions { get; private set; }
+        public int DownAimHeld { get; private set; }
+        private double _downAimGainSum;
+
+        /// <summary>[#141] 待つ手の効用に、 ダウンの価値 (割る手が得るのと同じ) と待つ得を足す (<paramref name="us"/> を書き換える)。 Aim の時だけ呼ぶ。
+        /// 戻り値 = 足したか。 <paramref name="preBroke"/> = 足す前の最良の手が目盛りを割る手だった (計装用)。 読むだけ・乱数を引かない。</summary>
+        private bool ApplyDownAim(in DeckEval ev, MutualTurnTelegraph tele, int k, float[] us, OptimalTurnOutcome[] outs, out bool preBroke)
+        {
+            preBroke = false;
+            var st = ev.st;
+            if (st.downNotches == null || st.enemyDown || tele.turnsToHeavy != 2) return false;
+            var cm = CombatManager.Instance; var enemy = cm?.CurrentEnemy;
+            var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+            if (enemy == null || ctx == null || enemy.heavyPeriod <= 0) return false;
+            int hp = st.enemyHp, n = us.Length;
+            bool downAnyway = BossDown.NextTurnIsDown(st.downNotches, st.downMaxHp, st.downBroken, st.downPendingNow, hp);
+            if (downAnyway) return false;
+            int notch = BossDown.NextNotchHp(st.downNotches, st.downMaxHp, st.downBroken);
+            var breaks = new bool[n]; bool any = false;
+            for (int i = 0; i < n; i++)
+            {
+                int ha = hp - Math.Min(outs[i].effDmg, hp);
+                breaks[i] = ha > 0 && BossDown.NextTurnIsDown(st.downNotches, st.downMaxHp, st.downBroken, st.downPendingNow, ha);
+                any |= breaks[i];
+            }
+            if (!any) return false;
+            // 次のターンから 1 周期ぶんの敵の攻撃の見込み (本体の式 Escalation.EnemyAttackValue を通す・BOT は写しを持たない)
+            var cyc = new List<int>(enemy.heavyPeriod);
+            for (int j = 0; j < enemy.heavyPeriod; j++) cyc.Add(ExpectedEnemyAttackAt(enemy, ctx, in tele, tele.turn + 1 + j, 0));
+            int nextAtk = cyc[0];
+            float hpUnit = st.ledger ? 1f : st.wDef;
+            float downValue = DownNextTurnShare * Math.Max(0, nextAtk) * hpUnit;     // 割る手が OptimalUtilityCore で得るのと同じ (ダウンは失わず 1 ターン後へ)
+            float gain = DownKeepRules.HoldGain(nextAtk, cyc, v3.ledgerFutureShare) * hpUnit;
+            float perTurn = DeckPerTurnDamage(in st, k);
+            int pre = 0;
+            for (int i = 1; i < n; i++) if (us[i] > us[pre]) pre = i;
+            bool added = false;
+            for (int i = 0; i < n; i++)
+            {
+                int ha = hp - Math.Min(outs[i].effDmg, hp);
+                if (!DownKeepRules.HoldEligible(true, tele.turnsToHeavy, downAnyway, any, breaks[i], ha, notch, perTurn)) continue;
+                us[i] += downValue + gain;
+                added = true;
+            }
+            if (!added) return false;
+            _downAimLastGain = downValue + gain;
+            preBroke = breaks[pre];
+            return true;
+        }
+        private float _downAimLastGain;
+
+        /// <summary>[#141 計装] サマリーに出す行 (判断が無ければ空)。</summary>
+        public string DownAimLine()
+            => DownAimDecisions == 0 ? ""
+             : $"[ダウンの狙い Aim] 待つ手を比べた判断 {DownAimDecisions} 回 / 足す前の最良は割る手だったのに待った {DownAimHeld} 回 "
+             + $"({100.0 * DownAimHeld / DownAimDecisions:0.0}%) / 待つ手に足した値の平均 {_downAimGainSum / DownAimDecisions:0.00} (HP 相当)";
 
         /// <summary>対象の点: 基本の端子 1 (報酬の足切りと同じ見方)・それ以外は報酬の素の点。</summary>
         private static float TargetWorth(TerminalDef d, RunState run)
@@ -661,7 +858,7 @@ namespace AutoTest
         {
             after = ev.deck.state.Clone();
             o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after);
-            tgts = ChooseDeckTargets(ev.board, o, ev.run);
+            tgts = ChooseDeckTargets(ev.board, o, ev.run, _recallPrefer);
             if (tgts != null)
             {
                 after = ev.deck.state.Clone();
@@ -830,7 +1027,7 @@ namespace AutoTest
                 var rng = new System.Random(unchecked(la.seed + j * 7919));
                 var nst = after.Clone();
                 int extra = nst.BeginTurn();
-                var nb = SampleNextBoard(ev.deck, ev.board, o, TerminalCards.HandSize + extra, la.stopChance, rng, out var stopped, keep);
+                var nb = SampleNextBoard(ev.deck, ev.board, o, TerminalCards.HandSize + extra, la.stopChance, rng, out var stopped, keep, _recallPrefer);
                 nst.stopped = stopped;
                 // 〈鋳造口〉の出目 +N は振った後に足される (本体 DrawTerminalHand → FoundryBonusKey)
                 var dice = new int[k];
@@ -869,7 +1066,7 @@ namespace AutoTest
         /// 本体の <see cref="TerminalDeckState.FinishTurn"/> → <see cref="TerminalDeckState.DrawTurn"/> と同じ順。 違いは、 山の並びを読まずに中身から一様に引くことだけ。
         /// <paramref name="stopped"/> = ヴェスカ〈停滞する時間〉で止まった場の端子 (null = なし)。</summary>
         private static List<string> SampleNextBoard(TerminalDeckState dk, List<string> board, TerminalOutcome o, int size, float stopChance,
-                                                    System.Random rng, out bool[] stopped, List<string> keep = null)
+                                                    System.Random rng, out bool[] stopped, List<string> keep = null, TerminalKind? recallPrefer = null)
         {
             var draw = new List<string>(dk.draw);
             var discard = new List<string>(dk.discard);
@@ -891,7 +1088,7 @@ namespace AutoTest
                                         TerminalDeckState.UsedFromHand(board, perm.Count, o), TerminalCards.CarryMode, kept, discard, keep);
             // 〈呼び戻し〉(持ち越しの規則): 本体と同じ選び方・同じ関数で、 捨て札から 1 枚を手札へ戻す
             if (o.recall && TerminalCards.HandCarry)
-                TerminalDeckState.ApplyRecall(TerminalDeckState.RecallPick(dk.discard, RecallBest(dk.discard, GameManager.Instance?.Run)), kept, discard, size);
+                TerminalDeckState.ApplyRecall(TerminalDeckState.RecallPick(dk.discard, RecallBest(dk.discard, GameManager.Instance?.Run, recallPrefer)), kept, discard, size);
             hand.Clear(); hand.AddRange(kept);
             // ---- 引く (山が尽きたら捨て札を混ぜて続ける・常設は場へ出して引き直す・引いた物だけが止まる対象) ----
             var stopPerm = new List<int>(); var stopHand = new List<int>();
@@ -941,7 +1138,7 @@ namespace AutoTest
                 if (dup) continue;
                 var after = state.Clone();
                 var o = TerminalCards.Resolve(board, w, dice, env, after);
-                var tg = ChooseDeckTargets(board, o, ev.run);
+                var tg = ChooseDeckTargets(board, o, ev.run, _recallPrefer);
                 if (tg != null) { after = state.Clone(); o = TerminalCards.Resolve(board, w, dice, env, after, tg); }
                 var ws = DeckSums(in ns, dice, board, o, state, after, in env, ev.deckHasCounter);
                 if (ws.aCount > 0) anyAttack = true;
