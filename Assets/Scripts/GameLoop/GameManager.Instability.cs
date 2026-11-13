@@ -23,7 +23,7 @@ namespace GameLoop
     {
         /// <summary>[計装] 理由ごとに溜まったポイント (プロセス通算・<see cref="InstabilitySource"/> の順)。 AutoRunner の実効状態の行が読む。</summary>
         public static readonly long[] InstabilityTotals = new long[System.Enum.GetValues(typeof(InstabilitySource)).Length];
-        /// <summary>[計装] 嵐の層を抜けた (次の層へ進んだ) 時の累計の合計と層の数・段ごとの層の数 (プロセス通算)。</summary>
+        /// <summary>[計装] 嵐の層を抜けた (ボスの点の戦闘に入った・<see cref="NoteBossEntryInstability"/>) 時の累計の合計と層の数・段ごとの層の数 (プロセス通算)。</summary>
         public static long InstabilityLayerSum, InstabilityLayers;
         public static readonly long[] InstabilityLayerPhase = new long[5];
 
@@ -102,11 +102,16 @@ namespace GameLoop
         // =====================================================================
 
         /// <summary>戦闘が始まった (CombatManager.StartCombat から)。 この戦闘のエスカレーションの分を 0 に戻す。</summary>
-        public void NoteCombatStartedForInstability() { InstabilityFromEscalationThisCombat = 0; InstabilityThisBattle = 0; }
+        public void NoteCombatStartedForInstability() { InstabilityFromEscalationThisCombat = 0; InstabilityThisBattle = 0; EscalationRisesThisCombat = 0; }
+
+        /// <summary>[計装 2026-11-13] この戦闘でエスカレーションの段が上がった数 (ボス戦も・嵐の無い層も数える・〈冷却材〉で下がってまた上がった段は数え直さない)。
+        /// 数えるだけで動きに使わない (AutoRunner が戦闘の記録に写す)。 戦闘が始まる時に 0。</summary>
+        public int EscalationRisesThisCombat { get; private set; }
 
         /// <summary>戦闘の中でエスカレーションの段が <paramref name="rises"/> 段上がった (CombatManager の予告から)。 ボス戦では溜めない。</summary>
         public void NoteEscalationRise(int rises, bool bossFight)
         {
+            if (rises > 0) EscalationRisesThisCombat += rises;   // [計装] 生の段の数
             if (Instability.EscalationPoints(rises, bossFight) <= 0) return;   // ボス戦では溜めない (規則は Instability の 1 か所)
             int d = AddInstability(InstabilitySource.Escalation, rises);
             InstabilityFromEscalationThisCombat += d;
@@ -122,6 +127,15 @@ namespace GameLoop
             if (string.IsNullOrEmpty(itemId)) return 0;
             var d = ItemSystem.ItemDatabase.Instance?.GetItem(itemId);
             return d != null && d.category == ItemSystem.ItemCategory.Passive ? AddInstability(InstabilitySource.Relic, 1, "秘宝 " + d.displayName) : 0;
+        }
+
+        /// <summary>[計装 2026-11-13] ボスの点の戦闘に入った (= 層を抜けた) 時の累計と段をプロセス通算へ足す (<c>StartBossTile</c> から)。 数えるだけ。</summary>
+        private void NoteBossEntryInstability()
+        {
+            var sim = FreeMap;
+            if (sim == null || !sim.InstabilityMode) return;
+            InstabilityLayerSum += sim.Instability; InstabilityLayers++;
+            InstabilityLayerPhase[Mathf.Clamp(sim.StormPhase, 0, InstabilityLayerPhase.Length - 1)]++;
         }
 
         // =====================================================================

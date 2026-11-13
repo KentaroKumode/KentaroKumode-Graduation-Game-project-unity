@@ -222,6 +222,7 @@ namespace AutoTest
             //   2026-08-10 に同じ穴で 0pt 基準値が 53.3% / 16.6% に割れている。
             sb.AppendLine(EffectiveStateLine());
             sb.AppendLine(RiftRecordLine());
+            sb.AppendLine(StormInstabilityLine());   // [計装 2026-11-13] 不安定化の内訳・激化の段
             // **BOT が読んだ学習を必ず印字する** (2026-11-12・#118)。 帯のフォルダが無いと手書きの序列へ黙って落ち、
             //   難易度 1〜3 のクリアが 0% になっていた。 落ちたランがあれば、 はっきり書く。
             sb.AppendLine($"学習の読み: {LearningReadEffective} / 帯の固定={(botLearningBandOverride >= 0 ? botLearningBandOverride.ToString() : "なし")}"
@@ -1893,6 +1894,59 @@ namespace AutoTest
                 sb.AppendLine();
             }
             return sb.ToString();
+        }
+
+        /// <summary>[計装 2026-11-13] 嵐の不安定化の集計 (2 行)。 1 行目 = 層ごとの、 抜けた時 (ボスの点の戦闘に入った時) の累計の平均・フェーズの分布・内訳の平均ほか
+        /// (<see cref="RunRec.stormLayers"/>)。 2 行目 = 戦闘 1 回あたりのエスカレーションの段の平均 (ボス以外 / ボス) と、 そこから溜まった不安定化。
+        /// 並列の測定 (ItemLearningParallelRunner のラウンドの行) も同じ関数を通す。</summary>
+        public static string StormInstabilityLines(IEnumerable<IList<int>> stormLayers, IEnumerable<(int escRises, int instEsc, bool isBoss)> fights)
+        {
+            int[] depths = { 1, 3, 5, 6 }; string[] shown = { "1", "2", "3", "4" };
+            var sb = new StringBuilder("不安定化 (層を抜けた時 = ボスに入った時・平均):");
+            bool any = false;
+            for (int k = 0; k < depths.Length; k++)
+            {
+                int n = 0, collapsed = 0; long tot = 0, cTurn = 0, steps = 0, hp = 0, turns = 0; var parts = new long[5]; var ph = new int[5];
+                foreach (var row in stormLayers)
+                    for (int i = 0; row != null && i + StormLayerCols <= row.Count; i += StormLayerCols)
+                    {
+                        if (row[i] != depths[k]) continue;
+                        n++; tot += row[i + 1]; ph[System.Math.Max(0, System.Math.Min(4, row[i + 2]))]++;
+                        for (int q = 0; q < 5; q++) parts[q] += row[i + 3 + q];
+                        if (row[i + 8] >= 0) { collapsed++; cTurn += row[i + 8]; }
+                        steps += row[i + 9]; hp += row[i + 10]; turns += row[i + 11];
+                    }
+                if (n == 0) continue;
+                any = true;
+                double d = n;
+                sb.Append($" | 深さ {depths[k]} (画面の第 {shown[k]} 層) {n} 層: 累計 {tot / d:F1}・フェーズ 0/1/2/3/4 = {string.Join("/", ph)}"
+                        + $"・内訳 取る {parts[0] / d:F1} / 激化 {parts[1] / d:F1} / 歩く {parts[2] / d:F1} / イベントのターン {parts[3] / d:F1} / 嵐を動かす {parts[4] / d:F1}"
+                        + $"・崩れ始めた手番 {(collapsed > 0 ? (cTurn / (double)collapsed).ToString("F1") : "-")} ({collapsed} 層)・嵐の中の歩数 {steps / d:F1}・嵐の HP {hp / d:F1}・手番 {turns / d:F1}");
+            }
+            if (!any) sb.Append(" (嵐の層の記録なし ── stormEnabled=False・stormClock=Turns か、 ボスへ届いたランが無い)");
+            int nN = 0, nB = 0; long eN = 0, eB = 0, iN = 0;
+            foreach (var f in fights)
+            {
+                if (f.isBoss) { nB++; eB += f.escRises; }
+                else { nN++; eN += f.escRises; iN += f.instEsc; }
+            }
+            sb.AppendLine();
+            sb.Append($"激化 (戦闘 1 回あたりの段の数): ボス以外 {(nN > 0 ? (eN / (double)nN).ToString("F2") : "-")} ({nN} 戦・不安定化 {(nN > 0 ? (iN / (double)nN).ToString("F2") : "-")})"
+                    + $" / ボス {(nB > 0 ? (eB / (double)nB).ToString("F2") : "-")} ({nB} 戦・不安定化は溜めない)");
+            return sb.ToString();
+        }
+
+        /// <summary>この実行の記録 (<see cref="_records"/>) の <see cref="StormInstabilityLines"/>。</summary>
+        private string StormInstabilityLine()
+        {
+            var layers = new List<IList<int>>(); var fights = new List<(int, int, bool)>();
+            foreach (var r in _records)
+            {
+                if (r == null) continue;
+                layers.Add(r.stormLayers);
+                if (r.combats != null) foreach (var c in r.combats) if (c.isFightEnd) fights.Add((c.escRises, c.instEsc, c.isBoss));
+            }
+            return StormInstabilityLines(layers, fights);
         }
 
         /// <summary>[計装 2026-11-13] 深さ 6 (画面の第 4 層) の「裂け目の記録」の集計。 「深さ 6 へ届いたのに起きなかったラン」と「安全弁が出したラン」は今の作りでは 0 のはず。</summary>

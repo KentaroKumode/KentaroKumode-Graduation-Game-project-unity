@@ -19,6 +19,21 @@ namespace AutoTest
     /// <summary>AutoRunner: 計測フック・ラン終了処理・ログ購読・初期化補助。</summary>
     public partial class AutoRunner
     {
+        /// <summary>[計装 2026-11-13] ボスの点の戦闘に入った時 (= 層を抜けた時) の不安定化を <see cref="RunRec.stormLayers"/> へ 1 層ぶん足す。
+        /// 本体の欄を読むだけ (乱数・動きに触らない)。 不安定化の時計でない層 (嵐なし・stormClock=Turns・深さ 0/7/8) と、 同じ深さの 2 度目は足さない。</summary>
+        private void RecordStormLayer(GameManager gm)
+        {
+            var sim = gm?.FreeMap;
+            if (_cur == null || sim == null || !sim.InstabilityMode || gm.Run == null) return;
+            int depth = gm.Run.Depth;
+            for (int i = 0; i + StormLayerCols <= _cur.stormLayers.Count; i += StormLayerCols) if (_cur.stormLayers[i] == depth) return;
+            var p = sim.InstabilityParts;
+            _cur.stormLayers.AddRange(new[] { depth, sim.Instability, sim.StormPhase,
+                p[MapSystem.FreeMove.Instability.PartTake], p[MapSystem.FreeMove.Instability.PartEscalation], p[MapSystem.FreeMove.Instability.PartWalk],
+                p[MapSystem.FreeMove.Instability.PartEventTurns], p[MapSystem.FreeMove.Instability.PartShift],
+                sim.CollapseTurn, sim.StormStepsTaken, sim.StormHpPaid, sim.Turn });
+        }
+
         private void OnEnemyEncountered(EnemyData e)
         {
             var gm = GameManager.Instance;
@@ -101,6 +116,7 @@ namespace AutoTest
             _pendingEnemyId = e != null && e.id != null ? e.id : "";
             // ボス判定は敵IDのみで厳密に行う（ノード種別フォールバックは誤検出の元）
             _pendingEnemyIsBoss = GameLoop.BossIds.IsBoss(_pendingEnemyId);
+            if (_pendingEnemyIsBoss && !isChainSwap) RecordStormLayer(gm);   // [計装 2026-11-13] 層を抜けた時の不安定化 (読むだけ)
             // 戦闘名の鍵 (追跡者の戦闘は点に載っていないので鍵なし)
             _pendingEncounterKey = (gm != null && !gm.InPursuerCombat)
                 ? (EncounterDangerStats.KeyOf(MapSystem.MapManager.Instance?.CurrentNode, gm.Run?.Depth ?? 1) ?? "") : "";
@@ -197,6 +213,7 @@ namespace AutoTest
                 playerDamageBySource = r.playerDamageBySource,
                 playerMaxHpEnd = gm?.Run?.playerMaxHP ?? 0,
                 encounterKey = _pendingEncounterKey,
+                escRises = gm?.EscalationRisesThisCombat ?? 0, instEsc = gm?.InstabilityFromEscalationThisCombat ?? 0,   // [計装 2026-11-13]
             };
             _cur.combats.Add(rec);
             _cur.totalCombats++;
