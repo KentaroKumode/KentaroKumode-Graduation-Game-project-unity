@@ -88,8 +88,10 @@ def main():
             for d in glob.glob(rt + '/' + pat):
                 if 'Native' not in d:
                     f.write('-r:"%s"\n' % fwd(d))
-        for name in ('Stubs.cs', 'Program.cs', 'StormCheck.cs', 'InstabilityCheck.cs'):
+        for name in ('Stubs.cs', 'Program.cs', 'StormCheck.cs', 'InstabilityCheck.cs', 'StormNavCheck.cs'):
             f.write('"%s"\n' % fwd(os.path.join(here, name)))
+        # BOT の嵐の航行の見方 (2026-11-14・口 navStormAware)。 UnityEngine に依存しない本物をコンパイルする
+        f.write('"%s"\n' % 'Assets/Scripts/AutoTest/StormNavView.cs')
         refs, defines = main_reference(out)
         for dname in defines:
             f.write('-define:%s\n' % dname)

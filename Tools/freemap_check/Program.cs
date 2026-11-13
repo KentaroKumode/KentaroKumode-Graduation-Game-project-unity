@@ -555,6 +555,7 @@ static partial class T
         AshBaseReport();
         AshBaseInstability();
         StormReport();
+        StormNavReport();
         Console.WriteLine(fails == 0 ? "ALL OK" : $"FAILED {fails}");
     }
 
