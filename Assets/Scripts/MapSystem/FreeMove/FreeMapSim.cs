@@ -238,9 +238,9 @@ namespace MapSystem.FreeMove
         public StormClock Clock { get; private set; } = StormClock.Instability;
         /// <summary>嵐が不安定化ポイントで進む層か (嵐の層で、 時計が <see cref="StormClock.Instability"/>)。</summary>
         public bool InstabilityMode => StormMode && Clock == StormClock.Instability;
-        /// <summary>不安定化ポイントの累計 (2026-11-13・0 以上)。 深さ 6 は 10 から始まる。 不安定化の時計でない時は 0 のまま。 中断セーブに写す。</summary>
+        /// <summary>不安定化ポイントの累計 (2026-11-13・0 以上)。 深さ 6 は InstabilityDepth6Start (= 崩れ始める境目 15) から始まる。 不安定化の時計でない時は 0 のまま。 中断セーブに写す。</summary>
         public int Instability { get; private set; }
-        /// <summary>累計の内訳 (<see cref="Instability.PartTake"/> ほか・この層で溜まった分。 深さ 6 の始まりの 10 は入らない)。 中断セーブに写す。</summary>
+        /// <summary>累計の内訳 (<see cref="Instability.PartTake"/> ほか・この層で溜まった分。 深さ 6 の始まりの分は入らない)。 中断セーブに写す。</summary>
         public int[] InstabilityParts { get; } = new int[MapSystem.FreeMove.Instability.Parts];
         /// <summary>崩れ始めたか (不安定化の累計が最初の境目以上)。 ここから先は 1 歩・待つ・偵察でも溜まる。 不安定化の時計でなければ false。</summary>
         public bool Collapsing => InstabilityMode && MapSystem.FreeMove.Instability.Collapsing(Instability);
@@ -248,7 +248,7 @@ namespace MapSystem.FreeMove
         public int StormShift { get; private set; }
         /// <summary>段の長さ (時計の単位ごと)。</summary>
         private Storm.Schedule StormSched => InstabilityMode ? MapSystem.FreeMove.Instability.Schedule : Storm.TurnSchedule;
-        /// <summary>嵐の時計 (負 = 静か・崩れ始めるまでの残り)。 不安定化の時計 = 累計 − 10。 手番の時計 = 手番 + ずらし − 静かな時間。 嵐の層でなければ int.MinValue。</summary>
+        /// <summary>嵐の時計 (負 = 静か・崩れ始めるまでの残り)。 不安定化の時計 = 累計 − 崩れ始める境目 (FreeMapParams.InstabilityPhase1At)。 手番の時計 = 手番 + ずらし − 静かな時間。 嵐の層でなければ int.MinValue。</summary>
         public int StormTime => !StormMode ? int.MinValue
             : InstabilityMode ? MapSystem.FreeMove.Instability.TimeOf(Instability)
             : Turn + StormShift - Storm.QuietTurns(Floor);

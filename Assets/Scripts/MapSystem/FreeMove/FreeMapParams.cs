@@ -134,10 +134,12 @@ namespace MapSystem.FreeMove
         public const int InstabilityEscalation = 1;
         /// <summary>崩れ始めた後 (累計が <see cref="InstabilityPhase1At"/> 以上) の 1 歩・待つ・偵察。 朱の雪の嵐の中への 1 歩は手番の数 (2) だけ。</summary>
         public const int InstabilityWalk = 1;
-        /// <summary>フェーズの境目 (累計)。 0〜9 = 静か・10〜 = フェーズ 1 (崩れ始める)・20〜 = 2・30〜 = 3・35〜 = 4。</summary>
-        public const int InstabilityPhase1At = 10, InstabilityPhase2At = 20, InstabilityPhase3At = 30, InstabilityPhase4At = 35;
-        /// <summary>深さ 6 (画面の第 4 層) の累計の始まり (入った時から崩れ始めている)。</summary>
-        public const int InstabilityDepth6Start = 10;
+        /// <summary>フェーズの境目 (累計)。 0〜14 = 静か・15〜 = フェーズ 1 (崩れ始める)・30〜 = 2・45〜 = 3・50〜 = 4。
+        /// 2026-11-13 作者の決定で 10/20/30/35 → 15/30/45/50 (2 度目の置き値・輪の中で粘っても 1 層に 12〜19 点しか踏めなかったため)。
+        /// 手番の時計 (stormClock = Turns) の段の長さは上の <see cref="StormQuietTurns"/> / <see cref="StormPhase1Turns"/> ほかで、 これとは共有しない。</summary>
+        public const int InstabilityPhase1At = 15, InstabilityPhase2At = 30, InstabilityPhase3At = 45, InstabilityPhase4At = 50;
+        /// <summary>深さ 6 (画面の第 4 層) の累計の始まり (入った時から崩れ始めている = <see cref="InstabilityPhase1At"/>)。</summary>
+        public const int InstabilityDepth6Start = InstabilityPhase1At;
 
         // ── 縄張り ─────────────────────────────────────────────
         public const int TerritoryMin = 7;

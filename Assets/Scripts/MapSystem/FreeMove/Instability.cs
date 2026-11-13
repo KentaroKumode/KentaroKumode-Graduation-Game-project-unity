@@ -112,7 +112,7 @@ namespace MapSystem.FreeMove
         /// <summary>層に入った時の累計 (深さ 6 = 画面の第 4 層は <see cref="FreeMapParams.InstabilityDepth6Start"/>・ほかは 0)。</summary>
         public static int StartOf(int depth) => depth == 6 ? FreeMapParams.InstabilityDepth6Start : 0;
 
-        /// <summary>累計の段の長さ (フェーズ 1 = 10・2 = 10・3 = 5)。 輪の補間に使う (<see cref="Storm.RingAt(FreeMapLayout, int, Storm.Schedule, out Vec2, out double)"/>)。</summary>
+        /// <summary>累計の段の長さ (フェーズ 1 = 15・2 = 15・3 = 5・境目の差から出す)。 輪の補間に使う (<see cref="Storm.RingAt(FreeMapLayout, int, Storm.Schedule, out Vec2, out double)"/>)。</summary>
         public static Storm.Schedule Schedule => new Storm.Schedule(
             FreeMapParams.InstabilityPhase2At - FreeMapParams.InstabilityPhase1At,
             FreeMapParams.InstabilityPhase3At - FreeMapParams.InstabilityPhase2At,
