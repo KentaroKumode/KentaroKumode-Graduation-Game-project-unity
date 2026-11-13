@@ -385,7 +385,7 @@ static class Program
         ToilCombat(root);
     }
 
-    /// <summary>〈徒労〉の戦闘のデバフ (2026-11-14・測定の口 toilDamageDownPct・既定 0): 持っている間、 すべての戦闘で与えるダメージ −N%。
+    /// <summary>〈徒労〉の戦闘のデバフ (2026-11-14・GameHooks.ToilDamageDownPct・既定 50・測定の口 toilDamageDownPct で 0 にすれば切れる): 持っている間、 すべての戦闘で与えるダメージ −N%。
     /// 枠は大罪:怠惰と同じ (重なったら厳しい方)・持っていない時と N = 0 の時は今の式と同じ・灰燼の王を倒すと消える。</summary>
     static void ToilCombat(string root)
     {
@@ -393,7 +393,10 @@ static class Program
         var U = EventSystem.TimedEffects.ToilMode.UntilKing;
         int Pct(bool has, int n) => EventSystem.TimedEffects.BattleBoonRule.ToilDamageDownPct(has, n);
         int Cut(int d, int sloth, int toil) => EventSystem.TimedEffects.BattleBoonRule.ApplyOutgoingCut(d, EventSystem.TimedEffects.BattleBoonRule.OutgoingCutPct(sloth, toil));
-        Check(EventSystem.TimedEffects.BattleBoonRule.DefaultToilDamageDownPct == 0, "徒労 (戦闘): 口の既定は 0 (デバフなし)");
+        Check(EventSystem.TimedEffects.BattleBoonRule.DefaultToilDamageDownPct == 50, "徒労 (戦闘): 既定は 50 (与えるダメージ −50%・2026-11-14 作者の決定)");
+        Check(Cut(100, 0, Pct(true, EventSystem.TimedEffects.BattleBoonRule.DefaultToilDamageDownPct)) == 50 && Cut(100, 30, Pct(true, EventSystem.TimedEffects.BattleBoonRule.DefaultToilDamageDownPct)) == 50
+              && Cut(100, 0, Pct(false, EventSystem.TimedEffects.BattleBoonRule.DefaultToilDamageDownPct)) == 100,
+              "徒労 (戦闘): 既定のまま持っている間は 100 → 50 (怠惰 30 と重なっても厳しい方の 50)・持っていなければ 100");
         // 持っていない時・N = 0 の時は、 今の式 (怠惰なし = 素通し / 怠惰あり = d × (100 − 30) / 100) と全部同じ
         {
             bool same = true;
@@ -457,7 +460,7 @@ static class Program
               && ar.Contains("public int toilDamageDownPct = EventSystem.TimedEffects.BattleBoonRule.DefaultToilDamageDownPct;")
               && st.Contains("GameLoop.GameHooks.ToilDamageDownPct = System.Math.Max(0, toilDamageDownPct);")
               && tr.Contains("GameLoop.GameHooks.ToilDamageDownPct = EventSystem.TimedEffects.BattleBoonRule.DefaultToilDamageDownPct;"),
-              "徒労 (戦闘): 口の既定 0 (本体・BOT)・毎ランの始めに入れ・ラン終了で戻す");
+              "徒労 (戦闘): 本体と BOT の既定は同じ定数 (50)・毎ランの始めに口の値を入れ・ラン終了で既定へ戻す");
     }
 
     /// <summary>〈徒労〉の既定の形 (toilMode=UntilKing・2026-11-14・作者の決定「徒労は王を倒すまで永続化」): 勝っても減らず、 通常の戦闘は何も得られない (中身は旧い形 Stacks と同じ)・
