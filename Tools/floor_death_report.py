@@ -12,8 +12,8 @@
 
 帯 (bandScore): 1=1〜2F / 2=3F道中 / 3=3Fボス / 4,5=4F / 6=5F道中 / 7=5Fボス
 / 8=5Fクリア(門不通過) / 9=6F / 10=Null Point(ヴェスカ) / 11=完全クリア。
-(#137・2026-11-13〜: 6F クリアで〈真理〉無しの終了 (R10b) は 8 でなく 10。 既定の測定 riftRecordAtBoss=True では
- 出ない。 riftRecordAtBoss=False の腕では 10 の行に「ヴェスカ戦の死亡」でない終了が混ざる。)
+(#137・2026-11-13〜: 6F クリアで〈真理〉無しの終了 (R10b) は 8 でなく 10。 既定の測定 ashKingBeatenEver=True では
+ 出ない。 ashKingBeatenEver=False の腕では 10 の行に「ヴェスカ戦の死亡」でない終了が混ざる。)
 1F と 2F は帯では分かれないので 1F ボス到達数 (bossEntryCount[1]) で割る。
 
 使い方: python Tools/floor_death_report.py <session>[#<arm>] ...

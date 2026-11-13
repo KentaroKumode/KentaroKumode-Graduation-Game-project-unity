@@ -166,8 +166,31 @@ namespace UI.Game2D
                 var st = sim.Stone();      // 〈羅針の針〉: 魔石の方角を 8 方位の字で (レーダーは 4 方向の扇)
                 if (st.level > 0 && st.bearing >= 0) { line = "魔石 " + StoneReading.BearingNames[st.bearing]; col = st.level >= 2 ? Game2DKit.Amber : Game2DKit.Dim; }
             }
+            if (string.IsNullOrEmpty(line))
+            {
+                // 時限バフ / デバフ (説明を持つもの・2026-11-13・〈徒労〉〈開眼〉): 名前・残り・説明。 ほかに出す行が無い時だけ (いちばん後ろの優先)
+                string tl = TimedEffectLine(run);
+                if (tl != null) { line = tl; col = Game2DKit.Amber; }
+            }
             if (!string.IsNullOrEmpty(line)) p.Text(Game2DJpFont.Clip(line, StatusR.width - 10), 5, 16, col);
             p.Apply(_ts);
+        }
+
+        /// <summary>持っている時限デバフ → 時限バフの順で、 説明を持つ最初の 1 つを「〈名〉残りN 説明」の 1 行にする (無ければ null)。</summary>
+        private static string TimedEffectLine(RunState run)
+        {
+            if (run == null) return null;
+            foreach (var d in new[] { run.timedDebuffs, run.timedBuffs })
+            {
+                if (d == null) continue;
+                foreach (var kv in d)
+                {
+                    if (kv.Value <= 0) continue;
+                    string desc = EventSystem.TimedEffects.TimedEffectRegistry.DescriptionOf(kv.Key);
+                    if (desc != null) return "〈" + kv.Key + "〉残り" + kv.Value + " " + desc;
+                }
+            }
+            return null;
         }
 
         // ── 航行アイテムの 3 枠 (issue #10・gui-needed.md #20) ──

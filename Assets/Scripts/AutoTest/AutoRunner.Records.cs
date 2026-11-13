@@ -119,13 +119,14 @@ namespace AutoTest
             /// (深さ, 累計, フェーズ 0〜4, 内訳 取る, 激化, 歩く, イベントのターン, 嵐を動かす, 崩れ始めた手番 (-1 = 崩れなかった・深さ 6 は 0), 嵐の中を歩いた歩数, 嵐で払った HP, 航行の手番)。
             /// 内訳は層で溜まった分だけ (深さ 6 の始まりの分は入らない = 累計 − 内訳の和)。 stormEnabled=False・stormClock=Turns の層と、 ボスへ届かなかった層は載らない。</summary>
             public List<int> stormLayers = new List<int>();
-            /// <summary>[計装 2026-11-13] 深さ 6 (画面の第 4 層) の「裂け目の記録」: 0 = 起きていない / 1 = 地図の点で起きた (今の作りの隣り合う点・旧い作りの固定の点)
-            /// / 2 = 終点に着いてから安全弁で起きた (今の作りでは 0 件のはず)。 深さ 6 へ届かなかったランも 0。</summary>
-            public int riftRecord;
-            /// <summary>[計装 2026-11-13] 「裂け目の記録」が起きた時の、 深さ 6 の航行のターンと踏んだ点の数 (起きていなければ -1)。</summary>
-            public int riftRecordTurn = -1, riftRecordSteps = -1;
-            /// <summary>[計装 2026-11-13] 「裂け目の記録」で最後の頁を開いた (〈真理〉を得た)。</summary>
-            public bool riftRecordOpened;
+            /// <summary>[計装 2026-11-13] 深さ 6 (画面の第 4 層) の〈灰に埋もれた基地〉: 0 = 起きていない / 1 = 最初に踏んだイベントマスで起きた
+            /// / 2 = イベントマスを踏まずに終点へ着き、 安全弁がボス戦の前に出した。 深さ 6 へ届かなかったランと、 イベントなしの測定は 0。</summary>
+            public int ashBase;
+            /// <summary>[計装 2026-11-13] 基地の版 (true = 再訪 = 灰燼の王を倒したことがある記録 / false = はじめて)・選んだ選択肢の添字 (起きていなければ -1)・
+            /// 起きた時の深さ 6 の航行の手番 (起きていなければ -1)・手記の最後の頁を開いた (〈真理〉を得た)。</summary>
+            public bool ashBaseRevisit;
+            public int ashBaseChoice = -1, ashBaseTurn = -1;
+            public bool ashBaseOpened;
             public int[] goldVals;
             /// <summary>**このランでゲームが実際に見た挑戦スコア。**
             /// 意図した構成が本当に適用されていたかを、 結果ではなく入力側で検証するために残す。</summary>

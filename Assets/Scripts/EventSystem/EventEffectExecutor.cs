@@ -216,7 +216,7 @@ namespace EventSystem
                     {
                         ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, id);
                         result.log.Add($"秘宝獲得: {ResolveLabel(id)}");      // 画面に出す言い方 (データの書式「パッシブアイテム獲得」は EventParser が読むので変えない)
-                        result.relicsGained++;
+                        if (GameLoop.ItemIds.CountsAsTakenRelic(id)) result.relicsGained++;   // 進行の資格の品 (確信の 3 品) は不安定化に数えない (2026-11-13)
                         ApplyPassiveAcquisitionBonus(run, id, result);
                     }
                     break;
@@ -242,7 +242,8 @@ namespace EventSystem
                     {
                         GameLoop.Loadout.Gain(run, eff.param);   // 武器なら 1 本だけ (入れ替えるかを聞く・2026-11-11)
                         result.log.Add($"アイテム獲得: {ResolveLabel(eff.param)}");
-                        if (ItemDatabase.Instance?.GetItem(eff.param)?.category == ItemCategory.Passive) result.relicsGained++; else result.NoteGain(MapSystem.FreeMove.EventGainKind.Item);
+                        if (ItemDatabase.Instance?.GetItem(eff.param)?.category == ItemCategory.Passive) { if (GameLoop.ItemIds.CountsAsTakenRelic(eff.param)) result.relicsGained++; }   // 進行の資格の品は数えない
+                        else result.NoteGain(MapSystem.FreeMove.EventGainKind.Item);
                         ApplyPassiveAcquisitionBonus(run, eff.param, result);
                     }
                     break;
@@ -262,6 +263,15 @@ namespace EventSystem
                 case EventEffectType.VescaClockTake:
                     // 秘宝として持つ (2026-11-13)。 結果の行はほかの「秘宝を得た」行と同じ書式 (GainPassiveItem)
                     if (GameLoop.VescaClock.Take(run)) { result.log.Add($"秘宝獲得: {ResolveLabel(GameLoop.ItemIds.VescaClock)}"); result.relicsGained++; }
+                    break;
+
+                case EventEffectType.GainTruth:
+                    // 〈灰に埋もれた基地・再訪〉の「手記の最後の頁を開く」(2026-11-13)。 〈決意〉が無いラン (起きないはず) では何もしない
+                    if (GameLoop.ConvictionSystem.RevealTruthInLayer6(run))
+                    {
+                        MetaProgression.Achievements.AchievementService.NoteFinalPageOpened();
+                        result.log.Add($"〈{GameLoop.ConvictionSystem.IdResolve}〉が〈{GameLoop.ConvictionSystem.IdTruth}〉に変わった（七層へ進める）");
+                    }
                     break;
 
                 case EventEffectType.DiscardFlag:

@@ -552,7 +552,8 @@ static partial class T
             Check(reached == layers && noticed == 0 && stepped == 0, $"避ける道を歩く ({pr.id}・照明つき): 全層で縄張りを踏まずに終点へ・気づかれない ({reached}/{layers} 到達 / 気づかれた {noticed} / 踏んだ {stepped})");
         }
         BypassReport();
-        RiftGateReport();
+        AshBaseReport();
+        AshBaseInstability();
         StormReport();
         Console.WriteLine(fails == 0 ? "ALL OK" : $"FAILED {fails}");
     }
@@ -684,10 +685,38 @@ static partial class T
         return a.territory.SetEquals(b.territory) && a.waypoints.SequenceEqual(b.waypoints);
     }
 
-    /// <summary>深さ 6 (画面の第 4 層) の「裂け目の記録」(2026-11-13・RiftGate) の検算。
-    /// 口 (riftAtBoss) によらず深さ 6 以外の地図は同じ・深さ 6 も形は同じで種別だけが変わる・隣り合う点は全部イベントで終点へは必ず通る・
-    /// 店と休憩は層に 1 つずつ残る・歩いて終点に着くまでに必ず 1 回だけ起き、 2 つ目の隣り合う点は通常のイベント・安全弁は 0。</summary>
-    static void RiftGateReport()
+    /// <summary>〈灰に埋もれた基地〉と嵐の不安定化の噛み合わせ (2026-11-13): 基地の選択肢 (〈徒労〉= 時限デバフ / 〈真理〉+〈開眼〉= 時限バフ) は
+    /// 持ち物が増えない得なので不安定 +0・〈徒労〉で何も得られなかった通常の戦闘の勝ちは +1 のまま。 規則 (Instability) は本物、
+    /// 効果の読み替え (EventEffectExecutor) と戦闘の勝ちの口 (GameManager.Rewards) は UnityEngine に依存するので原文で見る。</summary>
+    static void AshBaseInstability()
+    {
+        string exe = System.IO.File.ReadAllText("Assets/Scripts/EventSystem/EventEffectExecutor.cs");
+        string Case(string name)
+        {
+            int a = exe.IndexOf("case EventEffectType." + name + ":", StringComparison.Ordinal);
+            if (a < 0) return null;
+            int b = exe.IndexOf("case EventEffectType.", a + 10, StringComparison.Ordinal);
+            return exe.Substring(a, (b < 0 ? exe.Length : b) - a);
+        }
+        string buff = Case("TimedBuff"), debuff = Case("TimedDebuff"), truth = Case("GainTruth");
+        bool buffOk = buff != null && buff.Contains("NoteGain(MapSystem.FreeMove.EventGainKind.TimedBuff)") && !buff.Contains("relicsGained");
+        bool debuffOk = debuff != null && !debuff.Contains("NoteGain") && !debuff.Contains("relicsGained");
+        bool truthOk = truth != null && !truth.Contains("NoteGain") && !truth.Contains("relicsGained");
+        bool rule = !Instability.CountsAsEventGain(EventGainKind.TimedBuff) && Instability.EventPoints(0, false, false) == 0;
+        Check(buffOk && debuffOk && truthOk && rule,
+              $"灰に埋もれた基地と不安定化: 「手記を閉じて立ち去る」(〈徒労〉) も「手記の最後の頁を開く」(真理を得る +〈開眼〉) も持ち物が増えない得で +0 (時限バフ {buffOk}・時限デバフ {debuffOk}・真理 {truthOk}・規則 {rule})");
+        string rw = System.IO.File.ReadAllText("Assets/Scripts/GameLoop/GameManager.Rewards.cs");
+        int sc = rw.IndexOf("coins = ScaleByBattleBoon(coins);", StringComparison.Ordinal);
+        int win = sc < 0 ? -1 : rw.IndexOf("AddBattleWinInstability(eliteNodeReward, pursuer: false);", sc, StringComparison.Ordinal);
+        Check(win > sc && sc > 0 && Instability.PointsOf(InstabilitySource.Battle, 1) > 0,
+              "灰に埋もれた基地と不安定化: 〈徒労〉で何も得られなかった通常の戦闘の勝ちも、 不安定化 (勝ち +1) は〈徒労〉に関わらず溜まる");
+    }
+
+    /// <summary>深さ 6 (画面の第 4 層) の〈灰に埋もれた基地〉(2026-11-13・AshBase) の検算。
+    /// 口 (fixedEventPoint = イベントなしの測定の固定の点) によらず深さ 6 以外の地図は同じ・深さ 6 も形は同じで種別の差は固定の点だけ・
+    /// ふだんの層のボスの隣の点は生成どおりの種別 (イベントに書き換えない)・歩いて終点に着くまでに基地は必ず 1 回だけ起き、
+    /// 最初のイベントマスで起き・2 つ目以降は通常のイベント・イベントを踏まずに終点に着くと安全弁で起きる・イベントなしの測定では起きない。</summary>
+    static void AshBaseReport()
     {
         const int Seeds = 3000;
         // ── 口によらず、 深さ 6 以外の層は全く同じ ──
@@ -697,75 +726,51 @@ static partial class T
                 for (int salt = 1; salt <= 600; salt++)
                 {
                     GameLoop.GameRng.Salt = (ulong)salt * 7919 + (ulong)floor;
-                    var a = FreeMapGenerator.Generate(floor, true); var b = FreeMapGenerator.Generate(floor, false);
+                    var a = FreeMapGenerator.Generate(floor, false); var b = FreeMapGenerator.Generate(floor, true);
                     layers++;
-                    if (!SameShape(a, b) || !a.types.SequenceEqual(b.types) || a.fixedEvent != b.fixedEvent || a.riftGate.Count != 0 || b.riftGate.Count != 0) diff++;
+                    if (!SameShape(a, b) || !a.types.SequenceEqual(b.types) || a.fixedEvent != -1 || b.fixedEvent != -1) diff++;
                 }
-            Check(diff == 0, $"裂け目の記録: 深さ 6 以外の地図は口によらず同じ ({layers} 層・食い違い {diff})");
+            Check(diff == 0, $"灰に埋もれた基地: 深さ 6 以外の地図は口 (固定の点) によらず同じ・固定の点も無い ({layers} 層・食い違い {diff})");
         }
-        // ── 深さ 6: 形は同じ・置き方の中身 ──
-        int n6 = 0, shapeDiff = 0, ringBad = 0, oldBad = 0, supplyBad = 0, typeDiffOutside = 0, moved = 0;
-        long shopB = 0, restB = 0, shopA = 0, restA = 0;
-        var ringSize = new List<int>(); var changed = new List<int>(); var ringTerr = new List<int>(); var replaced = new int[32];
-        int ringWithTreasurePoint = 0;
+        // ── 深さ 6: 形は同じ・ふだんの層は固定の点が無く、 ボスの隣は生成どおり ──
+        int n6 = 0, shapeDiff = 0, fixedBad = 0, typeDiffOutside = 0, ringAllEvent = 0, supplyBad = 0;
+        var ringTypes = new int[32]; var ringSize = new List<int>();
         for (int salt = 1; salt <= Seeds; salt++)
         {
             GameLoop.GameRng.Salt = (ulong)salt * 7919 + 6UL;
-            var A = FreeMapGenerator.Generate(6, true); var B = FreeMapGenerator.Generate(6, false);
+            var A = FreeMapGenerator.Generate(6, false); var B = FreeMapGenerator.Generate(6, true);
             n6++;
             if (!SameShape(A, B)) { shapeDiff++; continue; }
-            var ring = A.adj[A.goal].Where(i => i != A.start).OrderBy(i => i).ToList();
-            if (A.fixedEvent != -1 || !A.riftGate.SequenceEqual(ring) || ring.Count < 1 || ring.Any(i => A.types[i] != TileType.Event)) ringBad++;
-            ringSize.Add(ring.Count); ringTerr.Add(ring.Count(i => A.territory.Contains(i)));
-            foreach (int i in ring) replaced[(int)B.types[i]]++;
-            if (ring.Contains(FreeMapSim.TreasurePointOf(A))) ringWithTreasurePoint++;
-            // 旧い作り: 縄張りの外の固定の点 1 つ・隣り合う点の欄は空
-            if (B.riftGate.Count != 0 || B.fixedEvent < 2 || B.types[B.fixedEvent] != TileType.Event || B.territory.Contains(B.fixedEvent)) oldBad++;
-            // 種別の差は「隣り合う点」「旧い固定の点」「消えた店・休憩を置き直した点」だけ
-            var hg = A.Hops(A.goal);
-            int diffN = 0;
-            for (int i = 0; i < A.Count; i++)
-            {
-                if (A.types[i] == B.types[i]) continue;
-                diffN++;
-                bool ok = ring.Contains(i) || i == B.fixedEvent || A.types[i] == TileType.Rest || A.types[i] == TileType.Shop;
-                if (!ok) typeDiffOutside++;
-            }
-            changed.Add(diffN);
-            // 店と休憩の数 (旧い作りの固定の点は店・休憩を上書きしないので、 B の数 = 置き換えの前の数)
-            for (int i = 2; i < A.Count; i++)
-            {
-                if (B.types[i] == TileType.Shop) shopB++; if (B.types[i] == TileType.Rest) restB++;
-                if (A.types[i] == TileType.Shop) shopA++; if (A.types[i] == TileType.Rest) restA++;
-                if (!ring.Contains(i) && A.types[i] != B.types[i] && (A.types[i] == TileType.Shop || A.types[i] == TileType.Rest)) { moved++; }
-            }
-            // 店と休憩は層に必ず 1 つずつ (生成の決まり)
+            if (A.fixedEvent != -1 || B.fixedEvent < 2 || B.types[B.fixedEvent] != TileType.Event || B.territory.Contains(B.fixedEvent)) fixedBad++;
+            for (int i = 0; i < A.Count; i++) if (A.types[i] != B.types[i] && i != B.fixedEvent) typeDiffOutside++;
+            var ring = A.adj[A.goal].Where(i => i != A.start).ToList();
+            ringSize.Add(ring.Count);
+            foreach (int i in ring) ringTypes[(int)A.types[i]]++;
+            if (ring.Count > 0 && ring.All(i => A.types[i] == TileType.Event)) ringAllEvent++;
             bool hasShop = false, hasRest = false;
             for (int i = 2; i < A.Count; i++) { if (A.types[i] == TileType.Shop) hasShop = true; if (A.types[i] == TileType.Rest) hasRest = true; }
             if (!hasShop || !hasRest) supplyBad++;
         }
-        Check(shapeDiff == 0, $"裂け目の記録: 深さ 6 の形 (点・道・山岳・縄張り) は口によらず同じ ({n6} 層・食い違い {shapeDiff})");
-        Check(ringBad == 0 && oldBad == 0, $"裂け目の記録: 今の作りは終点に隣り合う点が全部イベント・旧い作りは固定の点 1 つ (今の作りの異常 {ringBad} / 旧い作りの異常 {oldBad})");
-        Check(typeDiffOutside == 0, $"裂け目の記録: 種別が変わるのは隣り合う点・旧い固定の点・置き直した店と休憩だけ (それ以外の差 {typeDiffOutside}・1 層あたり {Dist(changed)})");
-        Check(supplyBad == 0, $"裂け目の記録: 深さ 6 で店 0 か休憩 0 の層は 0 (店か休憩の無い層 {supplyBad} / 消えたので置き直した点 {moved} ({n6} 層の合計))");
-        Console.WriteLine($"[裂け目の記録] 1 層あたりの店 {1.0 * shopB / n6:F3} → {1.0 * shopA / n6:F3} ({1.0 * (shopA - shopB) / n6:+0.000;-0.000}) / 休憩 {1.0 * restB / n6:F3} → {1.0 * restA / n6:F3} ({1.0 * (restA - restB) / n6:+0.000;-0.000}) (置き換えの前 → 後・{n6} 層)");
-        Console.WriteLine($"[裂け目の記録] 隣り合う点の数 {Dist(ringSize)} / うち縄張りの中 {Dist(ringTerr)} / 縄張りの宝の点が隣り合う点に重なる層 {ringWithTreasurePoint} ({100.0 * ringWithTreasurePoint / n6:F1}%)");
-        Console.WriteLine("[裂け目の記録] 隣り合う点に元々あった種別 (旧い作りの種別): " + string.Join(" / ", Enumerable.Range(0, 32).Where(t => replaced[t] > 0).Select(t => $"{(TileType)t} {replaced[t]}")));
+        Check(shapeDiff == 0, $"灰に埋もれた基地: 深さ 6 の形 (点・道・山岳・縄張り) は口によらず同じ ({n6} 層・食い違い {shapeDiff})");
+        Check(fixedBad == 0 && typeDiffOutside == 0,
+              $"灰に埋もれた基地: ふだんの深さ 6 に固定の点は無く、 イベントなしの測定の層は縄張りの外の固定の点 1 つ・種別の差はその点だけ (異常 {fixedBad} / それ以外の差 {typeDiffOutside})");
+        Check(supplyBad == 0, $"灰に埋もれた基地: 深さ 6 で店 0 か休憩 0 の層は 0 ({supplyBad}/{n6})");
+        Check(ringAllEvent * 10 < n6, $"灰に埋もれた基地: ボスの隣の点はイベントに書き換えない (全部がイベントの層 {ringAllEvent}/{n6} = 生成どおりの偶然だけ)");
+        Console.WriteLine($"[灰に埋もれた基地] ボスの隣の点の数 {Dist(ringSize)} / 種別: " + string.Join(" / ", Enumerable.Range(0, 32).Where(t => ringTypes[t] > 0).Select(t => $"{(TileType)t} {ringTypes[t]}")));
 
-        // ── 歩く: 終点に着くまでに必ず 1 回だけ起きる・2 つ目の隣り合う点は通常のイベント・安全弁 0 (天候あり) ──
-        foreach (bool atBoss in new[] { true, false })
+        // ── 歩く: 最初のイベントマスで起き・2 つ目以降は通常のイベント・踏まずに着けば安全弁・二重に起きない (天候あり) ──
         {
-            int walks = 0, reached = 0, firedOnce = 0, firedTwice = 0, valve = 0, secondNormal = 0, missed = 0;
-            var turnsAt = new List<int>();
+            int walks = 0, reached = 0, firedOnce = 0, firedTwice = 0, valve = 0, atFirstEvent = 0, secondNormal = 0, notFirst = 0;
+            var turnsAt = new List<int>(); var stepsAt = new List<int>();
             foreach (var wx in new[] { WeatherKind.None, WeatherKind.Sink, WeatherKind.Crumble, WeatherKind.Fog })
                 for (int salt = 1; salt <= 400; salt++)
                 {
                     GameLoop.GameRng.Salt = (ulong)salt * 104729 + 6UL;
-                    var L = FreeMapGenerator.Generate(6, atBoss);
+                    var L = FreeMapGenerator.Generate(6, false);
                     var s = new FreeMapSim(L, new Wallet(), false, null, wx);
                     var rng = new Random(salt * 31 + (int)wx);
                     var activated = new HashSet<int>();
-                    bool seen = false; int fired = 0; walks++;
+                    bool seen = false; int fired = 0, eventsStepped = 0, steps = 0; walks++;
                     for (int g = 0; g < 400 && s.Me != L.goal && !s.Dead; g++)
                     {
                         // 終点へ向かう 1 歩 (6 割) か、 寄り道 (隣のどれか) か、 待つ (前線を進める)
@@ -773,48 +778,43 @@ static partial class T
                         var nb = s.Neighbors(s.Me);
                         int nx = r < 0.6 ? s.StepToward(s.Me, L.goal) : r < 0.9 && nb.Count > 0 ? nb[rng.Next(nb.Count)] : s.Me;
                         if (nx == s.Me || !s.CanMoveTo(nx)) { s.Wait(); continue; }
-                        s.MoveTo(nx); s.MarkDone(s.Me);
+                        s.MoveTo(nx); s.MarkDone(s.Me); steps++;
                         int at = s.Me;
                         if (at == L.goal)
                         {
-                            if (RiftGate.ValveNeeded(6, false, L, seen, true, false)) valve++;
-                            if (!seen) missed++;
+                            // 終点: まだ起きていなければボス戦の前に出す (安全弁・GameManager.StartBossTileOrAshBase と同じ式)
+                            if (AshBase.Forces(6, false, seen, true, false)) { valve++; fired++; seen = true; turnsAt.Add(s.Turn); stepsAt.Add(steps); }
                             break;
                         }
                         // 点の起動は一度きり (2 回目の到着は何も起きない)
                         if (L.types[at] != TileType.Event || !activated.Add(at)) continue;
-                        bool isRing = L.riftGate.Contains(at), isFixed = at == L.fixedEvent;
-                        if (RiftGate.ForcesRecord(6, true, isFixed, isRing, false, seen, true, false)) { fired++; seen = true; turnsAt.Add(s.Turn); }
-                        else if (isRing && seen) secondNormal++;
+                        eventsStepped++;
+                        if (AshBase.Forces(6, false, seen, true, false))
+                        {
+                            fired++; seen = true; turnsAt.Add(s.Turn); stepsAt.Add(steps);
+                            if (eventsStepped == 1) atFirstEvent++; else notFirst++;
+                        }
+                        else secondNormal++;
                     }
                     if (s.Me == L.goal) reached++;
                     if (fired == 1) firedOnce++;
                     if (fired > 1) firedTwice++;
                 }
-            if (atBoss)
-            {
-                Check(reached == walks && firedOnce == walks && firedTwice == 0 && valve == 0 && missed == 0 && secondNormal > 0,
-                    $"裂け目の記録 (今の作り・天候 4 種で歩く): 全部の層で終点に着き、 着くまでに 1 回だけ起き、 安全弁は 0 (着いた {reached}/{walks} / 1 回 {firedOnce} / 2 回以上 {firedTwice} / 安全弁 {valve} / 踏まずに着いた {missed} / 2 つ目の隣り合う点で通常のイベント {secondNormal} 回)");
-                Console.WriteLine($"[裂け目の記録] 起きた時の航行のターン {Dist(turnsAt)}");
-            }
-            else
-            {
-                Console.WriteLine($"[裂け目の記録] 旧い作りで同じように歩くと、 踏まずに終点へ着いた層 {missed}/{walks} ({100.0 * missed / walks:F1}%)");
-                Check(valve == 0 && firedTwice == 0, $"裂け目の記録 (旧い作り): 安全弁は働かず、 二度は起きない (安全弁 {valve} / 2 回以上 {firedTwice})");
-            }
+            Check(reached == walks && firedOnce == walks && firedTwice == 0 && notFirst == 0 && secondNormal > 0,
+                $"灰に埋もれた基地 (天候 4 種で歩く): 全部の層で終点に着き、 基地は 1 回だけ・最初のイベントマスか終点の安全弁で起き、 2 つ目以降のイベントマスは通常のイベント"
+                + $" (着いた {reached}/{walks} / 1 回 {firedOnce} / 2 回以上 {firedTwice} / 最初のイベントマス {atFirstEvent} / 安全弁 {valve} / 最初でないマスで起きた {notFirst} / 通常のイベント {secondNormal} 回)");
+            Console.WriteLine($"[灰に埋もれた基地] イベントマスを踏まずに終点へ着いて安全弁で出た層 {valve}/{walks} ({100.0 * valve / walks:F1}%) / 起きた時の航行の手番 {Dist(turnsAt)} / 歩数 {Dist(stepsAt)}");
         }
-        // ── 規則: 済んだ後・〈真理〉を持っている時・他の深さでは出さない ──
+        // ── 規則: 済んだ後・〈真理〉を持っている時・他の深さ・イベントなしの測定では出さない ──
         {
-            bool ok = RiftGate.ForcesRecord(6, true, false, true, false, false, true, false)
-                   && !RiftGate.ForcesRecord(6, true, false, true, false, true, true, false)    // 済んだ後は通常のイベント
-                   && !RiftGate.ForcesRecord(6, true, false, true, false, false, true, true)    // 〈真理〉を持っている
-                   && !RiftGate.ForcesRecord(5, true, false, true, false, false, true, false)   // 他の深さ
-                   && !RiftGate.ForcesRecord(6, true, false, false, false, false, true, false)  // 隣り合う点でない普通のイベント
-                   && RiftGate.ForcesRecord(6, true, true, false, false, true, true, false)     // 旧い作りの固定の点 (main と同じ: 済んだかは見ない)
-                   && RiftGate.ForcesRecord(6, true, false, false, true, false, true, false)    // 安全弁
-                   && !RiftGate.ValveNeeded(6, true, FreeMapGenerator.Generate(6, true), false, true, false)    // イベントなしの測定では出さない
-                   && !RiftGate.ValveNeeded(6, false, FreeMapGenerator.Generate(6, false), false, true, false); // 旧い作りでは出さない
-            Check(ok, "裂け目の記録: 規則 (済んだ後・〈真理〉あり・他の深さ・普通のイベントでは出さない / 旧い固定の点と安全弁では出す / イベントなしと旧い作りでは安全弁なし)");
+            bool ok = AshBase.Forces(6, false, false, true, false)
+                   && !AshBase.Forces(6, false, true, true, false)    // 済んだ後 (2 つ目以降・終点) は出さない
+                   && !AshBase.Forces(6, false, false, true, true)    // 〈真理〉を持っている (イベントなしの測定の配り物)
+                   && !AshBase.Forces(6, false, false, false, false)  // 〈決意〉が無い (深さ 6 には来ない)
+                   && !AshBase.Forces(5, false, false, true, false)   // 他の深さ
+                   && !AshBase.Forces(7, false, false, true, false)
+                   && !AshBase.Forces(6, true, false, true, false);   // イベントなしの測定 (マスでも終点の安全弁でも出さない)
+            Check(ok, "灰に埋もれた基地: 規則 (はじめの 1 回だけ出す / 済んだ後・〈真理〉あり・〈決意〉なし・他の深さ・イベントなしの測定では出さない)");
         }
     }
 }

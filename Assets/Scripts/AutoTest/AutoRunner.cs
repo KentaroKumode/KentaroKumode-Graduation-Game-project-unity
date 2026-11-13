@@ -180,11 +180,11 @@ namespace AutoTest
         /// true (既定) = どの層でも縄張りを踏まずに終点へ行ける道があるように縄張りを削る。 false = 削らない (2026-11-13 より前の作り・main と全件一致のはず)。
         /// 旧い作り (pursuerLeavesTerritory = true) では値によらず削らない。</summary>
         public bool territoryKeepBypass = true;
-        /// <summary>[測定 2026-11-13] 深さ 6 (画面の第 4 層) の「裂け目の記録」の置き方。 本体の GameHooks.RiftRecordAtBoss へ流す (ラン終了で true へ)。
-        /// true (既定) = ボスに隣り合う点を全部イベントにし、 最初に踏んだ 1 つで固定で起きる (踏まずにボスへ行けない)。 BOT は必ず最後の頁を開く
-        /// (イベントの選択のアブレーション ablateEvent でも、 この専用イベントだけは開く)。
-        /// false = 旧い作り (層の 3 分の 1 あたりの固定の点・踏まなくてもよい・BOT の選び方も元のまま = main と全件一致のはず)。</summary>
-        public bool riftRecordAtBoss = true;
+        /// <summary>[測定 2026-11-13] 灰燼の王 (深さ 6 = 画面の第 4 層のボス) を倒したことがある記録として走るか。 本体の GameHooks.AshKingBeatenEver へ流す
+        /// (ラン終了で null = ランの外の記録を読む へ)。 BOT は毎回空の記録で走るので、 口が無いと「はじめて」扱いで 1 本もヴェスカに届かない。
+        /// true (既定) = 倒したことがある: 深さ 6 の〈灰に埋もれた基地〉は再訪の版で、 BOT は必ず手記の最後の頁を開く (〈真理〉+〈開眼〉→ 深さ 7 へ)。
+        /// 目標のクリア率はこの条件で測る。 false = はじめて: 基地は〈徒労〉の 1 択・灰燼の王を倒すと第 4 層のクリアの結末で終わる。</summary>
+        public bool ashKingBeatenEver = true;
         /// <summary>[測定 2026-11-13] 天候の作り。 本体の GameHooks.StormEnabled へ流す (ラン終了で true へ)。
         /// true (既定) = 嵐 (静かな時間のあとに輪が縮む・嵐の中の点への移動で HP・嵐の中の戦闘は敵に〈嵐〉・始点は最外周から・ボスの点は伏せる・GAME.md §5-12)。
         /// BOT は終点の位置を今までどおり知っていて、 フェーズ 3 で出口へ切り替え、 出口までの見積もりに嵐の HP を足す (最小の対応)。
@@ -780,7 +780,7 @@ namespace AutoTest
                  + $"/ メタ 攻撃端子+{MetaProgression.MetaBuffApplicator.GetAttackTerminalPerDice()} "
                  + $"/ 追跡者 縄張りの外へ{(pursuerLeavesTerritory ? "出る (旧い作り)" : "出ない")} "
                  + $"/ 縄張りを避ける道の保証 {(pursuerLeavesTerritory ? "効かない (旧い作り)" : territoryKeepBypass ? "あり (縄張りを削る)" : "なし (削らない・旧い作り)")} (territoryKeepBypass={territoryKeepBypass}) "
-                 + $"/ 裂け目の記録 {(riftRecordAtBoss ? "ボスに隣り合う点を全部イベントに (踏まずにボスへ行けない)" : "固定の点 1 つ (旧い作り)")} (riftRecordAtBoss={riftRecordAtBoss}) "
+                 + $"/ 灰燼の王を倒した記録 {(ashKingBeatenEver ? "あり (深さ 6 の基地は再訪の版・手記を開いて深さ 7 へ)" : "なし (基地は〈徒労〉の 1 択・第 4 層のクリアで終わる)")} (ashKingBeatenEver={ashKingBeatenEver}) "
                  + $"/ 天候 {(stormEnabled ? "嵐 (輪が縮む・始点は外周・ボスは伏せる)" : "前線 (旧い作り)")} (stormEnabled={stormEnabled}) "
                  + $"/ 嵐の時計 {(!stormEnabled ? "効かない (前線)" : stormClock == MapSystem.FreeMove.StormClock.Turns ? "手番 (storm-boss の作り)" : "不安定化 (取るほど進む)")} (stormClock={stormClock}) "
                  + $"/ 端子の撃破のボーナス {(terminalKillNeedsAttack ? "攻撃したターンだけ (旧い条件)" : "経路を問わない")} "

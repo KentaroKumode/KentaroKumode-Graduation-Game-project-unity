@@ -97,10 +97,11 @@ namespace GameLoop
         /// 縄張りを出ない追跡者の時だけ効く (旧い作り <see cref="PursuerLeavesTerritory"/> では削らない)。 層を作る時に読む (MapManager)。
         /// AutoRunner.territoryKeepBypass が毎ランの始めに入れ、 ラン終了で true へ戻す。</summary>
         public static bool TerritoryKeepBypass = true;
-        /// <summary>[測定 2026-11-13] true (既定) = 深さ 6 (画面の第 4 層) の「裂け目の記録」を、 終点 (ボス) に隣り合う点に置く
-        /// (<see cref="ConvictionSystem.RiftGateAtBoss"/>・GAME.md §4-2)。 false = 旧い作り (層の 3 分の 1 あたりの固定の点・踏まずにボスへ行けた)。
-        /// 層を作る時に読む (MapGenerator)。 AutoRunner.riftRecordAtBoss が毎ランの始めに入れ、 ラン終了で true へ戻す。</summary>
-        public static bool RiftRecordAtBoss = true;
+        /// <summary>[測定 2026-11-13] 灰燼の王 (深さ 6 = 画面の第 4 層のボス) を倒したことがある記録として扱うか (<see cref="AshBaseEvent.AshKingBeatenEver"/>・GAME.md §4-2)。
+        /// null (既定・本番) = ランの外の記録 (<c>MetaProgressState.ashKingBeaten</c>) を読む。 true = 倒したことがある (〈灰に埋もれた基地・再訪〉で手記を開ける = 深さ 7 へ進める)
+        /// / false = はじめて (基地は〈徒労〉の 1 択・第 4 層のクリアで終わる)。 BOT は毎回空の記録で走るので、 AutoRunner.ashKingBeatenEver (既定 True) が毎ランの始めに入れ、
+        /// ラン終了で null へ戻す。</summary>
+        public static bool? AshKingBeatenEver;
         /// <summary>[測定 2026-11-13] true (既定) = 天候は「嵐」(<see cref="MapSystem.FreeMove.Storm"/>・GAME.md §5-12): 静かな時間のあとに輪が縮み、
         /// 輪の外 (嵐の中) の点へ動くと HP を払う・嵐の中で始まった戦闘の敵は〈嵐〉・始点は最外周から選び直し・ボスの点は種別を隠す。
         /// false = 旧い作り (左から右へ進む前線・崩れる地平と沈み続ける湖面あり・始点は左端・ボスは最初から見える)。 main と 1 ランも変わらない。
@@ -189,6 +190,7 @@ namespace GameLoop
             BossDownDisabled = false;
             Depth3HeavyDisabled = false;
             VescaClockHeldAtStart = false;
+            AshKingBeatenEver = null;
         }
     }
 }

@@ -256,7 +256,7 @@ namespace AutoTest
                 && GameLoop.ConvictionSystem.HasResolveOrBetter(run)
                 && !GameLoop.ConvictionSystem.HasTruth(run)
                 && t == TileType.Event
-                && (!node.freeMap || node.isFixedEvent))   // 自由移動の層では固定の点「裂け目の記録」だけ
+                && (!node.freeMap || node.isFixedEvent))   // 自由移動の層では固定のイベントの点だけ (〈真理〉を持って入った層にしか無いので、 今は鳴らない・値付けは変えない)
                 return -20;
             if (convStage == 0)
             {

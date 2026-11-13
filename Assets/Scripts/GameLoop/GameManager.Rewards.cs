@@ -162,6 +162,10 @@ namespace GameLoop
                 Run.bossDefeatedThisFloor = true;
                 Run.lastBossId = CurrentEnemy?.id ?? Run.lastBossId; // エンディング分岐用（最後に撃破したボス）
 
+                // 灰燼の王 (深さ 6 = 画面の第 4 層のボス) を倒した瞬間に、 ランの外の記録へ立てる (2026-11-13・結末の種類によらない)。
+                //   次のランから深さ 6 の〈灰に埋もれた基地〉が再訪の版になる (AshBaseEvent)
+                if (CurrentEnemy != null && CurrentEnemy.id == BossIds.Layer6Ash) AshBaseEvent.NoteAshKingBeaten();
+
                 // 5層裏ボス撃破フラグ: 以降のレイピア解除に会心+9 が付くようになる
                 if (CurrentEnemy != null && CurrentEnemy.id == BossIds.Layer5Hidden)
                 {
@@ -231,6 +235,8 @@ namespace GameLoop
             // ADR-0011 〈富〉(目 9): 戦闘中に積んだ報酬加算 (%)。 割合先 (メタの定額 +N の前)。
             coins = ApplyRoleGoldBonus(coins);
             coins += metaWinGold;
+            // 〈徒労〉0 /〈開眼〉2 倍 (2026-11-13・通常の戦闘だけ・判定は TakeNormalBattleBoon)。 挑戦デバフの収入減より前 (GoldIncome.Gain の中) に掛ける
+            coins = ScaleByBattleBoon(coins);
             coins = GoldIncome.Gain(Run, coins, "戦闘報酬");
             IsEliteSecondFight = false;
             // 不安定化 (2026-11-13・GAME.md §5-12): エリート +2 / 通常の戦闘 +1 (ボスは上で抜けている)。 報酬の秘宝は GrantRewardItem で +3 ずつ
@@ -238,8 +244,10 @@ namespace GameLoop
 
             // 物資の補給 (2026-09-28): 通常 +30 / エリート +80。 払底したら戦って奪うしかない
             //   (Highfleet の「追ってきた敵から燃料を奪う」)。
-            ProvisionSystem.Supply(Run, eliteNodeReward
-                ? MapSystem.FreeMove.FreeMapParams.RewardElite : MapSystem.FreeMove.FreeMapParams.RewardBattle);
+            //   〈徒労〉の戦闘は 0 (〈開眼〉は物資を増やさない ── 倍にするのはゴールド・ドロップ・強化素材だけ)。
+            if (EventSystem.TimedEffects.BattleBoonRule.GrantsProvision(LastBattleBoon))
+                ProvisionSystem.Supply(Run, eliteNodeReward
+                    ? MapSystem.FreeMove.FreeMapParams.RewardElite : MapSystem.FreeMove.FreeMapParams.RewardBattle);
             // (ターン制の航行マップでは戦闘はターンを使わず、 物音も立てない。)
 
             // 戦闘勝利報酬: **エリートは確定 1 個 / 通常は 15%** (2026-09-09 変更)。
@@ -267,10 +275,17 @@ namespace GameLoop
             //   同時に供給の 45% が無料経路という状態を作っていた。 削った現物は
             //   CombatRewards.GoldScale で金にして返す ── 店での購入という選択へ寄せる。
             float rate = eliteWin ? CombatRewards.EliteDropRate : CombatRewards.NormalDropRate;
-            bool dropped = GameLoop.GameRng.Value("GameManager.1") < rate;
-            if (eliteWin) { CombatRewards.EliteRolls++; if (dropped) CombatRewards.EliteDrops++; }
-            else          { CombatRewards.NormalRolls++; if (dropped) CombatRewards.NormalDrops++; }
-            int drops = dropped ? 1 : 0;
+            // 〈徒労〉: 抽選は引く (乱数の列を変えない) が 0 個。 〈開眼〉: 抽選を 2 回引く (乱数 "GameManager.1" を余分に 1 回引く)
+            int drops = 0;
+            for (int k = 0, rolls = EventSystem.TimedEffects.BattleBoonRule.DropRolls(LastBattleBoon); k < rolls; k++)
+            {
+                bool dropped = GameLoop.GameRng.Value("GameManager.1") < rate;
+                if (eliteWin) { CombatRewards.EliteRolls++; if (dropped) CombatRewards.EliteDrops++; }
+                else          { CombatRewards.NormalRolls++; if (dropped) CombatRewards.NormalDrops++; }
+                if (dropped) drops++;
+            }
+            if (!EventSystem.TimedEffects.BattleBoonRule.GrantsDrops(LastBattleBoon)) drops = 0;
+            if (LastBattleBoon != EventSystem.TimedEffects.BattleBoon.None) Log(BattleBoonLine);
 
             // 各ドロップを「同カテゴリ・同レア度の2択」として保留。
             // 相方候補が無い場合のみ即時付与（単体ドロップにフォールバック）。
@@ -290,6 +305,62 @@ namespace GameLoop
 
             SetPhase(GamePhase.Reward);
             OnRewardGranted?.Invoke(coins);
+        }
+
+        // =====================================================================
+        //  時限デバフ〈徒労〉/ 時限バフ〈開眼〉(2026-11-13・docs/GAME.md §17)
+        // =====================================================================
+
+        //   規則と数値 (3 つ・2 倍) の正本は EventSystem.TimedEffects.BattleBoonRule (UnityEngine に依存しない・検算 Tools/event_branch_check)。
+
+        /// <summary>直近の戦闘の報酬に掛かった時限効果 (戦闘の終わりに決める・報酬の画面と BOT の計装が読む)。</summary>
+        public EventSystem.TimedEffects.BattleBoon LastBattleBoon { get; private set; }
+
+        /// <summary>直近の戦闘の報酬に掛かった〈徒労〉/〈開眼〉の結果の行 (掛かっていなければ null)。 報酬の画面と行動の記録に出す。</summary>
+        public string BattleBoonLine
+        {
+            get
+            {
+                const string T = EventSystem.TimedEffects.BattleBoonRule.ToilName, R = EventSystem.TimedEffects.BattleBoonRule.InsightName;
+                switch (LastBattleBoon)
+                {
+                    case EventSystem.TimedEffects.BattleBoon.Toil:      return $"〈{T}〉のせいで、 この戦闘では何も得られなかった（残り {Left(Run?.timedDebuffs, T)}）";
+                    case EventSystem.TimedEffects.BattleBoon.Insight: return $"〈{R}〉で、 ゴールドとドロップと強化素材が {EventSystem.TimedEffects.BattleBoonRule.InsightMultiplier} 倍（残り {Left(Run?.timedBuffs, R)}）";
+                    default:                                            return null;
+                }
+            }
+        }
+
+        private static int Left(Dictionary<string, int> d, string id) => d != null && d.TryGetValue(id, out int n) ? n : 0;
+
+        private string BattleBoonTag()
+            => LastBattleBoon == EventSystem.TimedEffects.BattleBoon.Toil ? $"（〈{EventSystem.TimedEffects.BattleBoonRule.ToilName}〉で 0）"
+             : LastBattleBoon == EventSystem.TimedEffects.BattleBoon.Insight ? $"（〈{EventSystem.TimedEffects.BattleBoonRule.InsightName}〉で {EventSystem.TimedEffects.BattleBoonRule.InsightMultiplier} 倍）" : "";
+
+        /// <summary>報酬の量に〈徒労〉(0) /〈開眼〉(×2) を掛ける。 掛かっていなければそのまま。</summary>
+        private int ScaleByBattleBoon(int amount) => EventSystem.TimedEffects.BattleBoonRule.Scale(LastBattleBoon, amount);
+
+        /// <summary>今終わった戦闘が「通常の戦闘」か: 地図の戦闘マス (エリート・ボスでない) の戦闘で、 追跡者・使い魔・イベントの戦闘・偽の商人・値下げ交渉でない。</summary>
+        private bool IsNormalBattleNow()
+        {
+            if (Run == null || InMapEncounterCombat || returnToMapAfterEventCombat || inFalseMerchantCombat || Run.shopRobberyInProgress) return false;
+            var node = MapManager.Instance?.CurrentNode;
+            return node != null && node.type != TileType.Boss && node.EffectiveType == TileType.Battle;
+        }
+
+        /// <summary>〈徒労〉/〈開眼〉の判定 (<b>報酬の 0 / 2 倍を決めるのはここ 1 か所</b>)。 戦闘の終わり (HandleCombatEnd) に毎戦 1 回呼ぶ。
+        /// 通常の戦闘に勝った時だけ、 持っている〈徒労〉/〈開眼〉を 1 つ減らし (TimedEffectManager.OnNormalBattleWon)、 減らす前に持っていた方を
+        /// <see cref="LastBattleBoon"/> に残す (両方ある時は〈徒労〉が勝つ = 何も得られない)。 逃げた・負けた・エリート・ボスほかの戦闘は減らさない。</summary>
+        private void TakeNormalBattleBoon(CombatResult result)
+        {
+            LastBattleBoon = EventSystem.TimedEffects.BattleBoon.None;
+            if (Run == null) return;
+            var b = EventSystem.TimedEffects.BattleBoonRule.Decide(result.playerWon, result.playerFled, IsNormalBattleNow(),
+                        Left(Run.timedDebuffs, EventSystem.TimedEffects.BattleBoonRule.ToilName),
+                        Left(Run.timedBuffs, EventSystem.TimedEffects.BattleBoonRule.InsightName));
+            if (b == EventSystem.TimedEffects.BattleBoon.None) return;
+            EventSystem.TimedEffects.TimedEffectManager.OnNormalBattleWon(Run);   // 持っている〈徒労〉〈開眼〉をそれぞれ 1 つ減らす (既存の時限効果の減らし方)
+            LastBattleBoon = b;
         }
 
         /// <summary>ボス撃破ボーナス用のパッシブ抽選。wantRare=true で GOLD 以上のみ、レア度重み付き。</summary>

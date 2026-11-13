@@ -70,7 +70,7 @@ base: origin/main 6ea741d
 | F-B-05 | 層に入る | HP 全回復・前哨基地の物資・層効果・天候・層題のバナー | `GameManager.EnterFloor`（`GameManager.Floor.cs`） | ― | 両 | 仕（§10-3・§5-5） | 動 |
 | F-B-06 | 層効果 | 深さ 3 瘴気侵蝕／5 地獄門／6 深淵の洗礼 | `MapSystem/FloorModifier.cs` | 3[^mod] | ロ | 仕（§5-5） | 固 |
 | F-B-07 | 〈確信〉の段 | 災厄の予兆で 1・エリート勝利で +1 | `GameLoop/ConvictionSystem.cs` | ― | ロ | 仕（§4-2） | 固 |
-| F-B-08 | 6 層・7 層の解錠 | 〈決意〉で 6 層・「裂け目の記録」で 7 層 | `layer6Unlocked`/`layer7Unlocked`・`GameManager.HandleFloorClear` | 2 つの門 | 両 | 仕（§4-2・§14） | 固 |
+| F-B-08 | 6 層・7 層の解錠 | 〈決意〉で 6 層・〈灰に埋もれた基地・再訪〉(灰燼の王を倒したことがある記録) で手記を開き 7 層 | `layer6Unlocked`/`layer7Unlocked`・`GameManager.HandleFloorClear` | 2 つの門 | 両 | 仕（§4-2・§14） | 固 |
 | F-B-09 | 〈門〉の 3 工程 | 血（最大 HP −25%）・秘宝 2 個・物資 4。払わない工程は欠陥 | `GameManager.Gate.cs`・`GameLoop/GateFlaws.cs` | 工程 3・欠陥 3 | 両 | 食（G-01） | 仮（未計測） |
 | F-B-10 | 5 層裏ボス | シュヴァリエの出現と撃破フラグ | `defeatedSaintGeorges`・`SuppressLayer5HiddenBoss` | 1 | 両 | 仕（§4-4・§23-7） | 未（遮断の恒久化） |
 | F-B-11 | ヴェスカ撃破後の一択 | `RiftChoice` で待つ・閉じる/閉じない | `GameManager.Gate.cs:176` `ChooseRiftFate`・`Game2DPhaseScreens.cs:151` | 2 択 | 画 | 食（G-28） | 固 |

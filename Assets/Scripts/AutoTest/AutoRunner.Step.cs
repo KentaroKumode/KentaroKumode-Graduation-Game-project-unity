@@ -70,7 +70,7 @@ namespace AutoTest
             GameLoop.GameHooks.PursuerLeavesTerritory = pursuerLeavesTerritory;   // [測定 2026-11-12] 縄張りの作り
             GameLoop.GameHooks.TerritoryTreasure = territoryTreasure;
             GameLoop.GameHooks.TerritoryKeepBypass = territoryKeepBypass;          // [測定 2026-11-13] 縄張りを避ける道の保証
-            GameLoop.GameHooks.RiftRecordAtBoss = riftRecordAtBoss;                // [測定 2026-11-13] 深さ 6 の「裂け目の記録」の置き方
+            GameLoop.GameHooks.AshKingBeatenEver = ashKingBeatenEver;              // [測定 2026-11-13] 灰燼の王を倒したことがある記録として走るか (深さ 6 の基地の版)
             GameLoop.GameHooks.StormEnabled = stormEnabled;                        // [測定 2026-11-13] 天候の作り (嵐 / 旧い前線)
             GameLoop.GameHooks.StormClock = stormClock;                            // [測定 2026-11-13 二版] 嵐の時計 (不安定化 / 手番)
             GameLoop.GameHooks.TerminalHealMulOverride = System.Math.Max(0, terminalHealMul);   // [測定 2026-11-12・#102]

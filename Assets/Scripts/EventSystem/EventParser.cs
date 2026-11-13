@@ -361,6 +361,7 @@ namespace EventSystem
         private static readonly Regex itemNamed    = new Regex(@"^アイテム\[(.+?)\](?:を獲得)?$");
         private static readonly Regex obsCopy      = new Regex(@"^観測所の写しを持ち帰る$");
         private static readonly Regex vescaClock   = new Regex(@"^止まらない時計を預かる$");
+        private static readonly Regex gainTruth    = new Regex(@"^真理を得る$");
         private static readonly Regex flagGain     = new Regex(@"^フラグアイテム\[(.+?)\]を獲得$");
         private static readonly Regex flagDiscard  = new Regex(@"^フラグアイテム\[(.+?)\]を廃棄$");
         private static readonly Regex passiveDiscard = new Regex(@"^パッシブアイテム\[(.+?)\]を廃棄$");
@@ -422,6 +423,7 @@ namespace EventSystem
             m = itemNamed.Match(t);    if (m.Success) return Eff(EventEffectType.GainSpecificItem, param: m.Groups[1].Value, postCombat: postCombat);
             m = obsCopy.Match(t);      if (m.Success) return Eff(EventEffectType.ObservatoryTakeCopy, postCombat: postCombat);
             m = vescaClock.Match(t);   if (m.Success) return Eff(EventEffectType.VescaClockTake, postCombat: postCombat);
+            m = gainTruth.Match(t);    if (m.Success) return Eff(EventEffectType.GainTruth, postCombat: postCombat);
             m = flagGain.Match(t);     if (m.Success) return Eff(EventEffectType.GainFlag, param: m.Groups[1].Value, postCombat: postCombat);
             m = flagDiscard.Match(t);  if (m.Success) return Eff(EventEffectType.DiscardFlag, param: m.Groups[1].Value, postCombat: postCombat);
             m = passiveDiscard.Match(t); if (m.Success) return Eff(EventEffectType.DiscardPassiveItem, param: m.Groups[1].Value, postCombat: postCombat);

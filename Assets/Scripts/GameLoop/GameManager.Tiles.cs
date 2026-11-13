@@ -52,7 +52,7 @@ namespace GameLoop
                     StartBattleTile();
                     break;
                 case TileType.Boss:
-                    StartBossTileOrRiftRecord();   // 深さ 6 で「裂け目の記録」がまだなら先に出す (安全弁・GameManager.Events.cs)
+                    StartBossTileOrAshBase();   // 深さ 6 で〈灰に埋もれた基地〉がまだなら先に出す (安全弁・GameManager.Events.cs)
                     break;
                 case TileType.Rest:
                     SetPhase(GamePhase.RestStop);

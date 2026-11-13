@@ -42,7 +42,12 @@ static partial class T
         foreach (var fb in b.GetType().GetFields(BindingFlags.Public | BindingFlags.Instance))
         {
             var fa = ta.GetField(fb.Name, BindingFlags.Public | BindingFlags.Instance);
-            if (fa == null) return path + "." + fb.Name + "(無い)";
+            if (fa == null)
+            {
+                // 〈灰に埋もれた基地〉の前の版にだけある欄 (riftGate = ボスの隣の点) は、 空なら同じとみなす (深さ 6 はイベントなしの測定の形で比べる・TurnGen)
+                if (fb.Name == "riftGate" && fb.GetValue(b) is System.Collections.ICollection rc && rc.Count == 0) continue;
+                return path + "." + fb.Name + "(無い)";
+            }
             var d = Deep(fa.GetValue(a), fb.GetValue(b), path + "." + fb.Name, depth + 1);
             if (d != null) return d;
         }
@@ -51,13 +56,26 @@ static partial class T
 
     /// <summary>手番の時計の中身 (今の FreeMove) と storm-boss の中身へ同じ操作列を流し、 1 手ごとに起きたこと・写し・財布を比べる。
     /// 今の側には不安定化の口 (AddInstability / PassEventTurns) も混ぜて叩く ── 手番の時計では何もしない (PassEventTurns は PassTurnsExternal と同じ) はず。</summary>
+    /// <summary>storm-boss の生成器で、 今の生成器の <paramref name="fixedPt"/> (深さ 6 の固定のイベントの点 = イベントなしの測定) と同じ形を作る。
+    /// storm-boss は「ボスの隣を全部イベントに」の作り (TURNREF_RING) なので、 口 (riftAtBoss) を裏返して渡す。 深さ 6 はイベントなしの測定の形で比べる
+    /// (ふだんの形はボスの隣の点の種別だけが違う ── StormCheck の LayoutDiffAsh6 が main と比べて見る)。</summary>
+    static TR.FreeMapLayout TurnGen(int floor, bool fixedPt, bool storm)
+    {
+#if TURNREF_RING
+        return TR.FreeMapGenerator.Generate(floor, !fixedPt, storm);
+#else
+        return TR.FreeMapGenerator.Generate(floor, fixedPt, storm);
+#endif
+    }
+
     static int ReplayTurns(int salt, int floor, int steps, out string first)
     {
         first = null;
+        bool fp = floor == AshBase.Depth;
         GameLoop.GameRng.Salt = (ulong)salt * 7919;
-        var La = FreeMapGenerator.Generate(floor, true, true);
+        var La = FreeMapGenerator.Generate(floor, fp, true);
         GameLoop.GameRng.Salt = (ulong)salt * 7919;
-        var Lb = TR.FreeMapGenerator.Generate(floor, true, true);
+        var Lb = TurnGen(floor, fp, true);
         bool foe = FloorPlan.HasWanderer(floor);
         var wa = new Wallet { Provision = 8, Hp = 60 }; var wb = new TurnWallet { Provision = 8, Hp = 60 };
         var a = new FreeMapSim(La, wa, foe, null, null, null);
@@ -126,9 +144,10 @@ static partial class T
                 for (int salt = 1; salt <= N(3000, 1000); salt++)
                 {
                     GameLoop.GameRng.Salt = (ulong)salt * 7919; GameLoop.GameRng.Draws.Clear();
-                    var La = FreeMapGenerator.Generate(floor, true, true); var da = SnapDraws();
+                    bool fp = floor == AshBase.Depth;   // 深さ 6 はイベントなしの測定の形 (TurnGen)
+                    var La = FreeMapGenerator.Generate(floor, fp, true); var da = SnapDraws();
                     GameLoop.GameRng.Draws.Clear();
-                    var Lb = TR.FreeMapGenerator.Generate(floor, true, true); var db = SnapDraws();
+                    var Lb = TurnGen(floor, fp, true); var db = SnapDraws();
                     layers++;
                     string d = Deep(La, Lb, "layout");
                     if (d != null) { diff++; firstDiff ??= $"深さ{floor} 種{salt} {d}"; }
@@ -150,12 +169,12 @@ static partial class T
                 foreach (int floor in StormDepths)
                 {
                     GameLoop.GameRng.Salt = (ulong)salt * 7919; GameLoop.GameRng.Draws.Clear();
-                    var a = new FreeMapSim(FreeMapGenerator.Generate(floor, true, true), new Wallet(), FloorPlan.HasWanderer(floor), null, null, null);
+                    var a = new FreeMapSim(FreeMapGenerator.Generate(floor, floor == AshBase.Depth, true), new Wallet(), FloorPlan.HasWanderer(floor), null, null, null);
                     a.ConfigureStorm(StormClock.Turns);
                     for (int k = 0; k < 60 && !a.InFight; k++) { var nb = a.Neighbors(a.Me); a.MoveTo(nb[H(salt, floor, k) % nb.Count]); }
                     var da = SnapDraws();
                     GameLoop.GameRng.Salt = (ulong)salt * 7919; GameLoop.GameRng.Draws.Clear();
-                    var b = new TR.FreeMapSim(TR.FreeMapGenerator.Generate(floor, true, true), new TurnWallet(), FloorPlan.HasWanderer(floor), null, null, null);
+                    var b = new TR.FreeMapSim(TurnGen(floor, floor == AshBase.Depth, true), new TurnWallet(), FloorPlan.HasWanderer(floor), null, null, null);
                     for (int k = 0; k < 60 && !b.InFight; k++) { var nb = b.Neighbors(b.Me); b.MoveTo(nb[H(salt, floor, k) % nb.Count]); }
                     if (!SameDraws(da, SnapDraws())) drawBad++;
                 }
@@ -288,7 +307,7 @@ static partial class T
             foreach (int floor in new[] { 0, 7 })
             {
                 GameLoop.GameRng.Salt = 77;
-                var s = new FreeMapSim(FreeMapGenerator.Generate(floor, true, true), new Wallet(), false, null, null, null);
+                var s = new FreeMapSim(FreeMapGenerator.Generate(floor, false, true), new Wallet(), false, null, null, null);
                 s.ConfigureStorm(StormClock.Instability);
                 foreach (InstabilitySource src in Enum.GetValues(typeof(InstabilitySource))) s.AddInstability(src, 5);
                 for (int k = 0; k < 20; k++) s.Wait();

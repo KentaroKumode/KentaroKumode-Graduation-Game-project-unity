@@ -42,11 +42,10 @@ namespace AutoTest
             if (!ReferenceEquals(cur, _lastResolvedEvent))
             {
                 int idx = PickSafeChoice(cur);
-                bool riftRecord = cur.name == GameLoop.ConvictionSystem.Layer7RevelationEventName;
+                bool ashBase = GameLoop.AshBaseEvent.IsBase(cur);
                 // [アブレーション] イベントの選択判断を潰す (提示された選択肢から一様抽選)。
-                //   深さ 6 の「裂け目の記録」は今の作り (riftRecordAtBoss) では潰さない ── BOT は 7 層 (深さ 7) クリアを目指す主体として必ず最後の頁を開く
-                //   (2026-11-13)。 旧い作りへ戻した腕は元のまま (乱数 AblationRng を引く回数も元のまま)。
-                if (ablateEvent && cur.choices != null && cur.choices.Count > 1 && !(riftRecord && riftRecordAtBoss))
+                //   深さ 6 の〈灰に埋もれた基地〉は潰さない ── BOT は七層 (深さ 7) クリアを目指す主体として必ず手記の最後の頁を開く (2026-11-13)。
+                if (ablateEvent && cur.choices != null && cur.choices.Count > 1 && !ashBase)
                     idx = AblationRng.Next(0, cur.choices.Count);
                 // 払えないゴールドの選択肢は本体が受け付けない (押しても進まず詰まる) ので、 選べる手へ戻す
                 if (!EventEncounter.IsChoiceSelectable(cur, idx, gm.Run)) idx = PickSafeChoice(cur);
@@ -54,16 +53,17 @@ namespace AutoTest
                 // L1.5: イベント学習用に「id|choiceIndex」を記録
                 if (_cur != null && cur != null && !string.IsNullOrEmpty(cur.id))
                     _cur.eventChoicesMade.Add(EventChoiceLearningStats.EventKey(cur.id) + "|" + idx);
-                if (riftRecord && _cur != null && _cur.riftRecord == 0 && gm.Run != null && gm.Run.Depth == 6)
+                if (ashBase && _cur != null && _cur.ashBase == 0 && gm.Run != null)
                 {
-                    // [計装 2026-11-13] 起きた所 (終点 = 安全弁)・ターン・踏んだ点の数
+                    // [計装 2026-11-13] 起きた所 (終点 = 安全弁)・版・選んだ選択肢・手番
                     var here = MapManager.Instance?.CurrentNode;
-                    _cur.riftRecord = here != null && here.type == TileType.Boss ? 2 : 1;
-                    _cur.riftRecordTurn = gm.FreeMap != null ? gm.FreeMap.Turn : -1;
-                    _cur.riftRecordSteps = gm.Run.tilesThisFloor;
+                    _cur.ashBase = here != null && here.type == TileType.Boss ? 2 : 1;
+                    _cur.ashBaseRevisit = cur.name == GameLoop.AshBaseEvent.RevisitName;
+                    _cur.ashBaseChoice = idx;
+                    _cur.ashBaseTurn = gm.FreeMap != null ? gm.FreeMap.Turn : -1;
                 }
                 gm.ResolveEventChoice(idx);
-                if (riftRecord && _cur != null && GameLoop.ConvictionSystem.HasTruth(gm.Run)) _cur.riftRecordOpened = true;
+                if (ashBase && _cur != null && GameLoop.ConvictionSystem.HasTruth(gm.Run)) _cur.ashBaseOpened = true;
             }
             else
             {
@@ -78,10 +78,14 @@ namespace AutoTest
 
             var run = GameLoop.GameManager.Instance?.Run;
 
-            // 7層を目指す方策では、6層の専用イベントで〈真理〉を得る選択を明示的に選ぶ。
-            // 効果欄は「なし」なので、通常の数値スコアだけでは離脱択と同点になってしまう。
-            if (def.name == GameLoop.ConvictionSystem.Layer7RevelationEventName)
+            // 7層を目指す方策では、6層の〈灰に埋もれた基地〉で〈真理〉を得る選択 (効果「真理を得る」= 手記の最後の頁を開く) を必ず選ぶ (2026-11-13)。
+            //   はじめての版は選択肢が 1 つ (〈徒労〉) なのでそれ。 〈徒労〉を値付けに入れる判断は入れていない (通常の戦闘を避ける/こなすの判断も無い)。
+            if (GameLoop.AshBaseEvent.IsBase(def))
+            {
+                for (int i = 0; i < def.choices.Count; i++)
+                    if (def.choices[i] != null && def.choices[i].Has(EventEffectType.GainTruth)) return i;
                 return 0;
+            }
 
             // ① フラグ進路は依然として「ほぼ無条件で進める」（チェーン進路は数値スコア以上に価値が高い）
             int progressIdx = PickFlagProgressChoice(def);

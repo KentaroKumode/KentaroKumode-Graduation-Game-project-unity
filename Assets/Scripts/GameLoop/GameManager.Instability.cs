@@ -121,10 +121,10 @@ namespace GameLoop
         private int AddBattleWinInstability(bool elite, bool pursuer)
             => AddInstability(pursuer ? InstabilitySource.Pursuer : elite ? InstabilitySource.Elite : InstabilitySource.Battle);
 
-        /// <summary>報酬・宝で得た品が秘宝なら +3 (秘宝 = パッシブの品・items.json の category で判定)。</summary>
+        /// <summary>報酬・宝で得た品が秘宝なら +3 (秘宝 = パッシブの品・items.json の category で判定)。 進行の資格の品 (確信の 3 品・ItemIds.QualificationItems) は数えない。</summary>
         private int AddRelicInstabilityIfPassive(string itemId)
         {
-            if (string.IsNullOrEmpty(itemId)) return 0;
+            if (!ItemIds.CountsAsTakenRelic(itemId)) return 0;
             var d = ItemSystem.ItemDatabase.Instance?.GetItem(itemId);
             return d != null && d.category == ItemSystem.ItemCategory.Passive ? AddInstability(InstabilitySource.Relic, 1, "秘宝 " + d.displayName) : 0;
         }

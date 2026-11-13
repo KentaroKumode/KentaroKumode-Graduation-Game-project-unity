@@ -38,9 +38,9 @@ namespace MapSystem
         public static FloorMap Generate(int floor)
         {
             if (!FloorPlan.IsFreeMap(floor)) return GenerateBossOnly(floor);
-            // 深さ 6 の「裂け目の記録」の置き方 (他の層では読まれない・どちらも乱数を引かない)。 正本は ConvictionSystem.RiftGateAtBoss
+            // 深さ 6 の固定のイベントの点 (〈真理〉を持って入った層 = イベントなしの測定だけ・乱数を引かない・他の層では読まれない)。 正本は ConvictionSystem.KeepsFixedEventPoint
             //   嵐 (2026-11-13): 測定の口 GameHooks.StormEnabled が立っていれば、 嵐のある深さで始点を選び直す (FreeMove.Storm.Apply・乱数は専用のキー)
-            return FromLayout(FreeMapGenerator.Generate(floor, GameLoop.ConvictionSystem.RiftGateAtBoss(GameLoop.GameManager.Instance?.Run),
+            return FromLayout(FreeMapGenerator.Generate(floor, GameLoop.ConvictionSystem.KeepsFixedEventPoint(GameLoop.GameManager.Instance?.Run),
                                                         GameLoop.GameHooks.StormEnabled));
         }
 
@@ -64,12 +64,11 @@ namespace MapSystem
                     x = (float)L.pos[i].x,
                     y = (float)L.pos[i].y,
                     isFixedEvent = i == L.fixedEvent,
-                    isRiftGate = L.riftGate.Contains(i),
                     freeMap = true,
                     band = L.storm ? L.BandOf(i) : -1,   // 嵐の層は始点からの距離で決めた帯 (2026-11-13)
-                    // 種別が最初から分かっている点: 始点・終点 (ボス / 門)・深さ 6 の「裂け目の記録」(ボスに隣り合う点 / 旧い作りの固定の点)。
+                    // 種別が最初から分かっている点: 始点・終点 (ボス / 門)・深さ 6 の固定のイベントの点 (イベントなしの測定の層だけ)。
                     //   他は視界 (距離 1)・照明・偵察で見えるまで伏せる。 嵐の層 (2026-11-13) の終点は伏せる (照明・隣・嵐のフェーズ 3 で見える)。
-                    revealed = i == L.start || (i == L.goal && !L.storm) || i == L.fixedEvent || L.riftGate.Contains(i),
+                    revealed = i == L.start || (i == L.goal && !L.storm) || i == L.fixedEvent,
                 };
                 ApplyEliteUpgrade(L.floor, node);
                 map.AddNode(node);

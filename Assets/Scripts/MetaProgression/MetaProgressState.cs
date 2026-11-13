@@ -54,6 +54,12 @@ namespace MetaProgression
         // 双蛇のダイス〈永劫〉: 勝利した戦闘数をランを跨いで永続蓄積。パネルとは独立。
         public int eternalStacks;
 
+        /// <summary>灰燼の王 (深さ 6 = 画面の第 4 層のボス) を倒したことがあるか (2026-11-13・docs/GAME.md §4-2)。 倒した瞬間に立てる (結末の種類によらない)。
+        /// 立っていると、 深さ 6 の〈灰に埋もれた基地〉が再訪の版になり、 手記の最後の頁を開いて〈真理〉(深さ 7 への資格) を得られる。
+        /// 読み書きは <see cref="GameLoop.AshBaseEvent"/> だけ (測定の口 GameHooks.AshKingBeatenEver が値を持てばそちらが優先)。
+        /// 図鑑の敵 (<see cref="codexEnemies"/>) は「戦ったことがある」なので代わりに使えない。</summary>
+        public bool ashKingBeaten;
+
         /// <summary>〈さびれた観測所〉で博士に会った回数。 **ランを跨いで数える。**
         /// 0 = 初対面 / 1 以上 = 再訪の文面に切り替わる。
         ///

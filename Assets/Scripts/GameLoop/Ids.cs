@@ -77,6 +77,15 @@ namespace GameLoop
             ConvictionSystem.IdConviction, ConvictionSystem.IdResolve, ConvictionSystem.IdTruth,
         };
 
+        /// <summary>**進行の資格を表す品** (2026-11-13): 確信の 3 品 (〈根拠のない確信〉〈決意〉〈真理〉)。 <see cref="Undroppable"/> の一部。
+        /// 嵐の不安定化 (GAME.md §5-12) で「秘宝を得た +3」に数えない (<see cref="CountsAsTakenRelic"/>) ── 大穴から取った物ではなく、 資格を見せる物なので。</summary>
+        public static readonly System.Collections.Generic.HashSet<string> QualificationItems =
+            new System.Collections.Generic.HashSet<string> { ConvictionSystem.IdConviction, ConvictionSystem.IdResolve, ConvictionSystem.IdTruth };
+
+        /// <summary>得た秘宝を、 嵐の不安定化の「秘宝を得た」に数えるか。 進行の資格の品 (<see cref="QualificationItems"/>) は数えない。
+        /// 秘宝か (category) は呼ぶ側が見る。</summary>
+        public static bool CountsAsTakenRelic(string id) => !string.IsNullOrEmpty(id) && !QualificationItems.Contains(id);
+
         /// <summary>店で売れるか (ShopManager.TrySell・売る画面)。 手放せない品 (<see cref="Undroppable"/>) は false。</summary>
         public static bool CanSell(string id) => !string.IsNullOrEmpty(id) && !Undroppable.Contains(id);
         /// <summary>売れない時の断りの文 (売れるなら null)。 預かり物は「預かった品は売れない」、 確信の 3 品は「これは手放せない」。</summary>

@@ -24,6 +24,8 @@ SOURCES = [EV + n + '.cs' for n in ('EventBranchText', 'EventEffectType', 'Event
                                      'EventDefinition', 'EventCondition', 'EventParser')]
 # 手放せない品の判定 (ItemIds.CanSell ほか) と確信の書き換え (2026-11-13)。 Unity の型は Stubs.cs の代役
 SOURCES += ['Assets/Scripts/GameLoop/Ids.cs', 'Assets/Scripts/GameLoop/ConvictionSystem.cs']
+# 〈灰に埋もれた基地〉の版の選び方と〈徒労〉〈開眼〉の規則 (2026-11-13)。 Unity の型は Stubs.cs の代役
+SOURCES += ['Assets/Scripts/GameLoop/AshBaseEvent.cs', 'Assets/Scripts/EventSystem/TimedEffects/BattleBoonRule.cs']
 # 売値の規則 (2026-11-13・売値 0G の品)。 UnityEngine に依存しない
 SOURCES += ['Assets/Scripts/ItemSystem/Shop/SellPriceRule.cs']
 
