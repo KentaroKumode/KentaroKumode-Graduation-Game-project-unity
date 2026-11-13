@@ -39,8 +39,14 @@ namespace AutoTest
         private const float MacroUnknownWeight = 0.7f;
 
         /// <summary>toil = 〈徒労〉で通常の戦闘の報酬が止まっている残り (<see cref="NavToilRewardless"/>・0 = 止まっていない)。 計画の中で通常の戦闘に勝つと形に従って減る。
-        /// pts / stormMul = 嵐の航行 (口 navStormAware) だけが使う: 計画の中の不安定化の累計の見込みと、 その点の戦闘が嵐の中で始まる時の被ダメの倍率 (0 = 嵐の外・口が切れている)。</summary>
-        private struct MacroSim { public float hp; public float coins; public float supply; public float cap; public int toil; public float pts; public float stormMul; }
+        /// pts / stormMul = 嵐の航行 (口 navStormAware) だけが使う: 計画の中の不安定化の累計の見込みと、 その点の戦闘が嵐の中で始まる時の被ダメの倍率 (0 = 嵐の外・口が切れている)。
+        /// 第 2 巡 (口 navStormFightModel / navStormFightDeath / navStormExitDeath・既定は全部 0 / false = 第 1 巡と同じ):
+        /// stormAdd = 嵐の中の戦闘で増える損 (最大 HP の割合・倍率の代わり)・hpTail = 戦闘の死を HP に合わせて読む・trackVar = 計画の中の HP の散らばりを数える・var = その分散 (割合²)。</summary>
+        private struct MacroSim
+        {
+            public float hp; public float coins; public float supply; public float cap; public int toil; public float pts; public float stormMul;
+            public float stormAdd; public bool hpTail, trackVar; public float var;
+        }
 
         /// <summary>次に向かう点。 どの回り方も得にならなければ -1 (層を出る)。
         /// <paramref name="sv"/> = 嵐の見方 (口 navStormAware・嵐の層だけ・null = 今までと同じ計算)。 渡された時は、 隠れたボスの点を読まず (出口の歩数は <see cref="StormNavView.ExitHops"/>)、
@@ -76,6 +82,7 @@ namespace AutoTest
             };
             // ── 嵐の航行 (2026-11-14・口 navStormAware): 判断ごとに 1 回だけ求める ──
             var storm = sv != null ? new StormCostCtx(this, sv, run, layer) : null;
+            if (storm != null) storm.Prepare(ref start);   // 第 2 巡の口 (既定は何もしない)
             float exit0 = storm != null ? storm.ExitCost(at, start) : 0f;
             // 補給できる店 (まだ入っていない・種別が見えている)。 計画の中で寄った店は used で外れる
             var shops = new List<int>();
@@ -120,7 +127,7 @@ namespace AutoTest
                     }
                     // 嵐の航行: 歩く間の嵐の HP (輪の縮みを歩数ごとに)・着いた点の戦闘が嵐の中か
                     float stormWalk = 0f;
-                    if (storm != null && !storm.Walk(from, c, ref ns, out stormWalk)) continue;
+                    if (storm != null && !storm.Walk(from, c, candNode[i], ref ns, out stormWalk)) continue;
                     float gain = MacroGain(candNode[i], layer, run, ref ns) - steps * MacroStepCost - stormWalk;
                     if (storm != null) storm.Arrive(candNode[i], ref ns);
                     if (fearHops != null) gain -= navFearMacro * FearCloseness(fearHops, c, fearR);
@@ -189,41 +196,72 @@ namespace AutoTest
             private readonly RunState _run;
             private readonly float _maxHp, _wHp, _stormMul;
             private readonly double _bossLose, _esc;
+            // 第 2 巡の口 (既定は全部切 = 第 1 巡と同じ)
+            private readonly bool _exitDeath, _fightModel, _fightDeath;
+            /// <summary>[navStormFightModel] 嵐の中の戦闘で増える損 (最大 HP の割合) = 攻撃の上乗せ × このランで見たその種類の戦闘のターン数 ÷ 最大 HP。 0 = まだ見ていない (第 1 巡の倍率に戻る)。</summary>
+            private readonly float _addN, _addE;
 
             public StormCostCtx(AutoRunner r, StormNavView sv, RunState run, int layer)
             {
                 _r = r; _sv = sv; _run = run;
                 _maxHp = Mathf.Max(1f, run.playerMaxHP);
-                _wHp = MacroHpPer10[layer] * 10f;
+                _wHp = MacroHpPer10[layer] * 10f * r.navStormHpWeightMul;
                 float hit = Mathf.Max(FreeMapParams.StormEnemyAttack, EstimateFloorMaxHit(run));
                 _stormMul = 1f + FreeMapParams.StormEnemyAttack / hit;
                 if (!EncounterDangerStats.TryGetKind(layer, 'B', out _, out _bossLose)) _bossLose = 0.01;
                 _esc = r.StormEscalationPerFight();
+                _exitDeath = r.navStormExitDeath; _fightModel = r.navStormFightModel; _fightDeath = r.navStormFightDeath;
+                if (_fightModel)
+                {
+                    _addN = (float)(FreeMapParams.StormEnemyAttack * r.StormFightTurns(run.Depth, 'N') / _maxHp);
+                    _addE = (float)(FreeMapParams.StormEnemyAttack * r.StormFightTurns(run.Depth, 'E') / _maxHp);
+                }
             }
 
             private static int P(float pts) => Mathf.RoundToInt(pts);
 
-            /// <summary>from から c へ歩く。 嵐の HP を HP から引き、 累計を進め、 その損 (対数オッズ) を返す。 HP が尽きるなら false。</summary>
-            public bool Walk(int from, int c, ref MacroSim s, out float loss)
+            /// <summary>計画の始まりの状態に第 2 巡の口を立てる (戦闘の死を HP に合わせる・HP の散らばりを数える)。 口が全部切なら何もしない。</summary>
+            public void Prepare(ref MacroSim s)
+            {
+                s.hpTail = _fightDeath;
+                s.trackVar = _fightDeath || _exitDeath;
+            }
+
+            /// <summary>from から c (点 <paramref name="n"/>) へ歩く。 嵐の HP を HP から引き、 累計を進め、 その損 (対数オッズ) を返す。 HP の見込みが尽きるなら false。
+            /// 口 navStormExitDeath: 歩いて HP が尽きる確率 × 死の損も足す。</summary>
+            public bool Walk(int from, int c, MapNode n, ref MacroSim s, out float loss)
             {
                 int hp = _sv.WalkCost(from, c, P(s.pts), c == _sv.Boss, out int pEnd, out _);
                 s.pts += pEnd - P(s.pts);
-                MarkFight(c, ref s);
+                MarkFight(c, n, ref s);
                 loss = 0f;
                 if (hp <= 0) return true;
                 float frac = hp / _maxHp;
+                if (_exitDeath) loss += (float)StormNavView.DeathProb(s.hp, frac, s.var) * MacroDeathCost;
                 s.hp -= frac;
-                loss = _wHp * frac;
+                loss += _wHp * frac;
                 return s.hp > 0f;
             }
 
-            /// <summary>着いた点の戦闘が嵐の中で始まるなら被ダメの倍率を立てる (<see cref="MacroGain"/> の前)。</summary>
-            public void MarkFight(int c, ref MacroSim s) => s.stormMul = _sv.InStormAt(c, P(s.pts)) ? _stormMul : 0f;
+            /// <summary>着いた点の戦闘が嵐の中で始まるなら、 敵の〈嵐〉の見積もりを立てる (<see cref="MacroGain"/> の前)。
+            /// 既定 = 被ダメの倍率 (第 1 巡)。 口 navStormFightModel = 損に足す量 (上乗せ × その種類のターン数・まだ見ていなければ倍率)。</summary>
+            public void MarkFight(int c, MapNode n, ref MacroSim s)
+            {
+                bool inStorm = _sv.InStormAt(c, P(s.pts));
+                s.stormMul = 0f; s.stormAdd = 0f;
+                if (!inStorm) return;
+                if (_fightModel && n != null)
+                {
+                    float add = !n.revealed || n.EffectiveType == TileType.Battle ? _addN : n.EffectiveType == TileType.EliteBattle ? _addE : 0f;
+                    if (add > 0f) { s.stormAdd = add; return; }
+                }
+                s.stormMul = _stormMul;
+            }
 
             /// <summary>着いた点で溜まるポイントを足す (<see cref="MacroGain"/> の後)。</summary>
             public void Arrive(MapNode n, ref MacroSim s)
             {
-                s.stormMul = 0f;
+                s.stormMul = 0f; s.stormAdd = 0f;
                 if (n == null) return;
                 s.pts += (float)StormNavView.ExpectedArrivalPoints(n.EffectiveType, n.revealed, _esc,
                     CombatRewards.EliteDropRate, CombatRewards.NormalDropRate, MacroUnknownWeight);
@@ -236,12 +274,17 @@ namespace AutoTest
                 return e.reachable ? (float)e.hp / _maxHp : 0f;
             }
 
-            /// <summary>出口の代償 (対数オッズ): 出口までの嵐の HP × HP の重み + その分ボス戦の死の見込みが増える分。</summary>
+            /// <summary>出口の代償 (対数オッズ): 出口までの嵐の HP × HP の重み + その分ボス戦の死の見込みが増える分。
+            /// 口 navStormExitDeath: + 出口までの道で HP が尽きる確率 × 死の損 (散らばり = 計画の中の戦闘の分 + ボスが隠れている時の候補の間の分)。</summary>
             public float ExitCost(int c, MacroSim s)
             {
-                float frac = ExitHpFrac(c, s);
+                var e = _sv.Exit(c, P(s.pts));
+                float frac = e.reachable ? (float)e.hp / _maxHp : 0f;
                 if (frac <= 0f) return 0f;
-                return _wHp * frac + MacroDeathRisk(_bossLose, s.hp - frac) - MacroDeathRisk(_bossLose, s.hp);
+                float cost = _wHp * frac + MacroDeathRisk(_bossLose, s.hp - frac) - MacroDeathRisk(_bossLose, s.hp);
+                if (_exitDeath)
+                    cost += (float)StormNavView.DeathProb(s.hp, frac, s.var + e.hpVar / ((double)_maxHp * _maxHp)) * MacroDeathCost;
+                return cost;
             }
         }
 
@@ -304,15 +347,25 @@ namespace AutoTest
         /// <summary><paramref name="noReward"/> = 報酬が出ない戦闘 (〈徒労〉の通常の戦闘): 報酬のゴールドを 0 と見る (被ダメ・死の項はそのまま)。</summary>
         private static float MacroFight(int layer, char kind, string key, float wHp, float wGold, float bonus, ref MacroSim s, bool noReward = false)
         {
-            double mean, lose;
-            if (!(key != null && EncounterDangerStats.TryGet(key, out _, out mean, out _, out lose))
+            double mean, lose, sdKey = 0; bool keyHit = false;
+            if (!(key != null && (keyHit = EncounterDangerStats.TryGet(key, out _, out mean, out sdKey, out lose)))
                 && !EncounterDangerStats.TryGetKind(layer, kind, out mean, out lose))
             { mean = 0.05; lose = 0.01; }
             // 嵐の航行 (2026-11-14・口 navStormAware): 嵐の中で始まる戦闘は敵に〈嵐〉(攻撃の上乗せ) ── 被ダメと敗北率を倍率で見る (口が切れていれば 0 = 何もしない)
             if (s.stormMul > 0f) { mean *= s.stormMul; lose = System.Math.Min(1.0, lose * s.stormMul); }
+            // 第 2 巡 (口 navStormFightModel): 倍率の代わりに損へ足す (上乗せ × ターン数)。 敗北率は損の増えた比で増やす
+            if (s.stormAdd > 0f) { double m0 = mean; mean += s.stormAdd; lose = System.Math.Min(1.0, lose * mean / System.Math.Max(m0, 1e-6)); }
             float gold = noReward ? 0f : kind == 'E' ? 20f : 10f;
             float hp0 = Mathf.Max(0.05f, s.hp);
             float death = (float)lose * MacroDeathCost * Mathf.Clamp(0.8f / hp0, 0.5f, 4f);
+            // 第 2 巡 (口 navStormFightDeath / navStormExitDeath): 1 戦の損の散らばり (学習の標準偏差) を読む
+            if (s.hpTail || s.trackVar)
+            {
+                double sd = keyHit ? sdKey : EncounterDangerStats.TryGetKindSd(layer, kind, out double sk) ? sk : 0.0;
+                // 死の確率 = max(学習の敗北率, 損が今の HP を超える確率 Φ((損の平均 − HP) ÷ √(損の分散 + HP の見込みの分散)))
+                if (s.hpTail) death = Mathf.Max(death, (float)System.Math.Max(lose, StormNavView.DeathProb(s.hp, mean, sd * sd + s.var)) * MacroDeathCost);
+                if (s.trackVar) s.var += (float)(sd * sd);
+            }
             s.hp = Mathf.Max(0f, s.hp - (float)mean);
             s.coins += gold;
             return gold * wGold + bonus - wHp * (float)mean - death;

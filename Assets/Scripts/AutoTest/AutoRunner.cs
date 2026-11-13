@@ -206,6 +206,19 @@ namespace AutoTest
         /// 隠れたボスの点を読まない (候補から探す)・点を取る価値から「溜まるポイントで嵐が早まる代償」を引く・「まだ取る」と「出口へ」を値で比べる (フェーズ 3 の規則は外す)・
         /// 嵐の中の 1 歩の HP を道の費用に入れる。 Naive は読まない (嵐を読まない下限)。 手番の時計 (stormClock=Turns)・嵐の無い層では効かない。 乱数は引かない。</summary>
         public bool navStormAware = false;
+        /// <summary>[2026-11-14・#140 の 2 第 2 巡] 嵐の航行 (navStormAware) が、 出口までの道と計画の中の道で「歩いて HP が尽きる」確率を値付けするか。
+        /// true = 確率 Φ((道の嵐の HP − 見込みの HP) ÷ 散らばり) × 死の損 (<c>MacroDeathCost</c>) を代償に足す。 散らばり = 計画の中の戦闘の損の分散 (学習の種類ごとの標準偏差) + ボスが隠れている時の候補の間の道の HP の分散。
+        /// false (既定) = 第 1 巡と同じ (道の死を数えない)。 根拠: 第 1 巡の測定で、 戦闘の後に歩いて死んだランが Super 665 / 3000 (読まない時 265・嵐なし 101)。</summary>
+        public bool navStormExitDeath = false;
+        /// <summary>[2026-11-14・第 2 巡] 嵐の中の戦闘の敵の〈嵐〉の見積もりを、 攻撃の上乗せ (<c>FreeMapParams.StormEnemyAttack</c>) × その種類の戦闘のターン数 (このランで見た平均) に替えるか。
+        /// false (既定) = 第 1 巡の「被ダメ × (1 + 上乗せ ÷ 層の最大の 1 発)」。 このランでまだその種類と戦っていなければ第 1 巡の式のまま。</summary>
+        public bool navStormFightModel = false;
+        /// <summary>[2026-11-14・第 2 巡] 嵐の航行の計画で、 戦闘の死の見込みを HP に合わせて読むか。 true = 死の確率 = max(学習の敗北率, Φ((戦闘の損の平均 − 今の HP) ÷ 標準偏差)) × 死の損。
+        /// false (既定) = 第 1 巡と同じ (敗北率 × 死の損 × HP の余裕の逆数・HP 20% で頭打ち)。 根拠: 第 1 巡の測定で、 負けた通常の戦闘に入った時の HP の割合が 6% 前後。</summary>
+        public bool navStormFightDeath = false;
+        /// <summary>[2026-11-14・第 2 巡] 嵐の航行の代償のうち、 嵐の HP の損 (歩く間・出口まで) に掛ける HP の重み (Super の計画の層ごとの HP の重み) の倍率。 既定 1 = 第 1 巡と同じ。
+        /// 測定で振るつまみ (隠し倍率ではない・実効状態の行に出る)。 死の確率の項 (navStormExitDeath) には掛からない。</summary>
+        public float navStormHpWeightMul = 1f;
         /// <summary>[測定 2026-11-13] 天候の作り。 本体の GameHooks.StormEnabled へ流す (ラン終了で true へ)。
         /// true (既定) = 嵐 (静かな時間のあとに輪が縮む・嵐の中の点への移動で HP・嵐の中の戦闘は敵に〈嵐〉・始点は最外周から・ボスの点は伏せる・GAME.md §5-12)。
         /// BOT は終点の位置を今までどおり知っていて、 フェーズ 3 で出口へ切り替え、 出口までの見積もりに嵐の HP を足す (最小の対応)。
@@ -824,6 +837,10 @@ namespace AutoTest
                  + $"/ 天候 {(stormEnabled ? "嵐 (輪が縮む・始点は外周・ボスは伏せる)" : "前線 (旧い作り)")} (stormEnabled={stormEnabled}) "
                  + $"/ 嵐の時計 {(!stormEnabled ? "効かない (前線)" : stormClock == MapSystem.FreeMove.StormClock.Turns ? "手番 (storm-boss の作り)" : "不安定化 (取るほど進む)")} (stormClock={stormClock}) "
                  + $"/ 航行の嵐 {(navStormAware ? (stormEnabled && stormClock == MapSystem.FreeMove.StormClock.Instability ? "読む (隠れたボスを探す・取る代償・値で切り上げ・嵐の HP を道の費用に・Naive は読まない)" : "読む (ただし嵐の時計でないので効かない)") : "読まない (旧い動き・終点を知っている・フェーズ 3 で出口へ)")} (navStormAware={navStormAware}) "
+                 + $"/ 嵐の航行の直し 道の死 {(navStormExitDeath ? "数える" : "数えない")} (navStormExitDeath={navStormExitDeath})"
+                 + $"・嵐の中の戦闘 {(navStormFightModel ? "上乗せ × ターン数" : "最大の 1 発の比")} (navStormFightModel={navStormFightModel})"
+                 + $"・戦闘の死 {(navStormFightDeath ? "HP に合わせる" : "第 1 巡の式")} (navStormFightDeath={navStormFightDeath})"
+                 + $"・嵐の HP の重み ×{navStormHpWeightMul:0.##} (navStormHpWeightMul={navStormHpWeightMul:0.##}) "
                  + $"/ 端子の撃破のボーナス {(terminalKillNeedsAttack ? "攻撃したターンだけ (旧い条件)" : "経路を問わない")} "
                  + $"/ 手札 {(handCarry == CombatSystem.HandCarryMode.Pick ? "印を付けた端子だけ残す (Pick)" : handCarry == CombatSystem.HandCarryMode.All ? "挿さなかった端子は全部残る (All)" : "毎ターン捨てる (Off・旧い規則)")}"
                  + $"{(handCarry == CombatSystem.HandCarryMode.Pick ? " 残す方策 " + EffectiveHandKeepPolicy + " (handKeepPolicy=" + handKeepPolicy + ")" : "")} "

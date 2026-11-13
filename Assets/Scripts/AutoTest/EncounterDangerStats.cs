@@ -53,7 +53,7 @@ namespace AutoTest
 
         public static void Reload(string root)
         {
-            _byKey.Clear(); _kindCache.Clear(); LoadedFrom = "";
+            _byKey.Clear(); _kindCache.Clear(); _kindSdCache.Clear(); LoadedFrom = "";
             RequestedRoot = string.IsNullOrEmpty(root) ? "" : Path.GetFullPath(root);
             try
             {
@@ -124,6 +124,27 @@ namespace AutoTest
             return true;
         }
         private static readonly Dictionary<string, (int, double, double)> _kindCache = new Dictionary<string, (int, double, double)>();
+
+        /// <summary>[2026-11-14・嵐の航行] 層と種類の、 1 戦の HP の損 (最大 HP の割合) の標準偏差 (全戦闘名を合わせた散らばり)。
+        /// 「この HP で次の戦闘・出口までの道を越えられるか」の確率の見込み (BOT の嵐の航行・口 navStormExitDeath / navStormFightDeath) に使う。 戦闘数が足りなければ false。</summary>
+        public static bool TryGetKindSd(int layer, char kind, out double sd)
+        {
+            sd = 0;
+            string prefix = layer + "|" + kind + "|";
+            if (!_kindSdCache.TryGetValue(prefix, out var c))
+            {
+                double sum = 0, sumSq = 0; int n = 0;
+                foreach (var kv in _byKey)
+                    if (kv.Key.StartsWith(prefix, StringComparison.Ordinal)) { sum += kv.Value.sum; sumSq += kv.Value.sumSq; n += kv.Value.n; }
+                double m = n > 0 ? sum / n : 0.0;
+                c = (n, n > 0 ? Math.Sqrt(Math.Max(0.0, sumSq / n - m * m)) : 0.0);
+                _kindSdCache[prefix] = c;
+            }
+            if (c.Item1 < MinSamples) return false;
+            sd = c.Item2;
+            return true;
+        }
+        private static readonly Dictionary<string, (int, double)> _kindSdCache = new Dictionary<string, (int, double)>();
 
         public static bool TryGet(string key, out int n, out double mean, out double sd, out double loseRate)
         {
