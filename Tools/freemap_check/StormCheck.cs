@@ -45,7 +45,60 @@ static partial class T
             if (p.x != q.x || p.y != q.y || p.a != q.a || p.b != q.b || p.cos != q.cos || p.sin != q.sin) return "mountain";
         }
         if (!a.territory.SetEquals(b.territory) || !a.waypoints.SequenceEqual(b.waypoints)) return "territory";
-        if (!a.riftGate.SequenceEqual(b.riftGate)) return "riftGate";
+#if MAINREF_RING
+        if (b.riftGate.Count != 0) return "main.riftGate";
+#endif
+        if (a.storm) return "storm";
+        return null;
+    }
+
+    /// <summary>main の生成器で、 今の生成器の <paramref name="fixedPt"/> (深さ 6 の固定のイベントの点 = イベントなしの測定) と同じ形を作る。
+    /// main が〈灰に埋もれた基地〉の前の作り (MAINREF_RING・2026-11-13 の「ボスの隣を全部イベントに」) なら、 main の口は riftAtBoss
+    /// (true = 隣を全部イベント / false = 固定の点) なので裏返して渡す。 run.py が main の FreeMapGenerator.cs を見て MAINREF_RING を決める。</summary>
+    static M.FreeMapLayout MainGen(int floor, bool fixedPt)
+    {
+#if MAINREF_RING
+        return M.FreeMapGenerator.Generate(floor, !fixedPt);
+#else
+        return M.FreeMapGenerator.Generate(floor, fixedPt);
+#endif
+    }
+
+    /// <summary>深さ 6 のふだんの層 (固定の点なし) と main の深さ 6 の比べ: main が「ボスの隣を全部イベントに」の作り (MAINREF_RING) なら、
+    /// 種別の違いは main のボスの隣の点 (main.riftGate) と、 そこで消えたので main が置き直した店・休憩の点だけ。 ほかは 1 点も変わらない。
+    /// main が基地の作りなら <see cref="LayoutDiff"/> と同じ。</summary>
+    static string LayoutDiffAsh6(FreeMapLayout a, M.FreeMapLayout b)
+    {
+#if MAINREF_RING
+        var bt = (TileType[])b.types.Clone();
+        for (int i = 0; i < a.Count && i < bt.Length; i++)
+        {
+            if (a.types[i] == bt[i]) continue;
+            bool ring = b.riftGate.Contains(i);
+            bool moved = bt[i] == TileType.Shop || bt[i] == TileType.Rest;
+            if (!ring && !moved) return "types (main の隣の点・置き直した店と休憩の外)";
+        }
+        return LayoutDiffShapeOnly(a, b);
+#else
+        return LayoutDiff(a, b);
+#endif
+    }
+
+    /// <summary><see cref="LayoutDiff"/> のうち、 種別と main.riftGate を見ない比べ (点・道・山岳・縄張り・始点と終点・固定の点)。</summary>
+    static string LayoutDiffShapeOnly(FreeMapLayout a, M.FreeMapLayout b)
+    {
+        if (a.floor != b.floor) return "floor";
+        if (a.start != b.start || a.goal != b.goal) return "start/goal";
+        if (a.fixedEvent != b.fixedEvent || a.gate != b.gate || a.home != b.home) return "fixed/gate/home";
+        if (a.Count != b.Count) return "count";
+        for (int i = 0; i < a.Count; i++)
+        {
+            if (a.pos[i].x != b.pos[i].x || a.pos[i].y != b.pos[i].y) return "pos";
+            if (!a.adj[i].SequenceEqual(b.adj[i])) return "adj";
+        }
+        if (!a.roads.SequenceEqual(b.roads)) return "roads";
+        if (a.mountains.Count != b.mountains.Count) return "mountains";
+        if (!a.territory.SetEquals(b.territory) || !a.waypoints.SequenceEqual(b.waypoints)) return "territory";
         if (a.storm) return "storm";
         return null;
     }
@@ -77,8 +130,10 @@ static partial class T
     {
         first = null;
         GameLoop.GameRng.Salt = (ulong)salt * 7919;
-        var La = FreeMapGenerator.Generate(floor, true, false);
-        var Lb = M.FreeMapGenerator.Generate(floor, true);
+        // 深さ 6 はイベントなしの測定の形 (固定の点) で比べる ── ふだんの形は main (ボスの隣を全部イベントに) と種別が違う (下の 1. の LayoutDiffAsh6 で見る)
+        bool fp = floor == AshBase.Depth;
+        var La = FreeMapGenerator.Generate(floor, fp, false);
+        var Lb = MainGen(floor, fp);
         bool foe = FloorPlan.HasWanderer(floor);
         var wa = new Wallet { Provision = 8, Hp = 60 }; var wb = new MainWallet { Provision = 8, Hp = 60 };
         var a = new FreeMapSim(La, wa, foe, null, null, null);
@@ -126,7 +181,7 @@ static partial class T
     static FreeMapSim MakeStorm(int salt, int floor, Wallet w = null, WeatherKind? wx = null)
     {
         GameLoop.GameRng.Salt = (ulong)salt * 7919;
-        var L = FreeMapGenerator.Generate(floor, true, true);
+        var L = FreeMapGenerator.Generate(floor, false, true);
         var s = new FreeMapSim(L, w ?? new Wallet(), FloorPlan.HasWanderer(floor), null, wx, null);
         s.ConfigureTerritory(true, true, true);
         return s;
@@ -170,19 +225,20 @@ static partial class T
             foreach (int floor in new[] { 0, 1, 3, 5, 6, 7 })
                 for (int salt = 1; salt <= 5000; salt++)
                 {
-                    foreach (bool rift in floor == 6 && salt <= 500 ? new[] { true, false } : new[] { true })
+                    // 深さ 6 は 2 つの形: ふだん (固定の点なし・main とは隣の点の種別だけ違ってよい) と、 イベントなしの測定 (固定の点・main と 1 点も変わらない)
+                    foreach (bool fp in floor == AshBase.Depth && salt <= 500 ? new[] { false, true } : new[] { false })
                     {
                         GameLoop.GameRng.Salt = (ulong)salt * 7919; GameLoop.GameRng.Draws.Clear();
-                        var La = FreeMapGenerator.Generate(floor, rift, false); var da = SnapDraws();
+                        var La = FreeMapGenerator.Generate(floor, fp, false); var da = SnapDraws();
                         GameLoop.GameRng.Draws.Clear();
-                        var Lb = M.FreeMapGenerator.Generate(floor, rift); var db = SnapDraws();
+                        var Lb = MainGen(floor, fp); var db = SnapDraws();
                         layers++;
-                        string d = LayoutDiff(La, Lb);
+                        string d = floor == AshBase.Depth && !fp ? LayoutDiffAsh6(La, Lb) : LayoutDiff(La, Lb);
                         if (d != null) { diff++; firstDiff ??= $"深さ{floor} 種{salt} {d}"; }
                         if (!SameDraws(da, db)) drawDiff++;
                     }
                 }
-            Check(diff == 0 && drawDiff == 0, $"嵐の口 False: 生成は main と 1 点も変わらない ({layers} 層・形の違い {diff}{(firstDiff != null ? " 最初 " + firstDiff : "")}・乱数の引く回数の違い {drawDiff})");
+            Check(diff == 0 && drawDiff == 0, $"嵐の口 False: 生成は main と 1 点も変わらない (深さ 6 のふだんの形だけは main のボスの隣の点と置き直した店・休憩の種別を除く・{layers} 層・形の違い {diff}{(firstDiff != null ? " 最初 " + firstDiff : "")}・乱数の引く回数の違い {drawDiff})");
         }
         // ── 2. 口を閉じた中身は main と同じ動き (同じ操作列・1 手ごとに起きたこと・写し・財布・引く回数) ──
         {
@@ -200,20 +256,20 @@ static partial class T
                 foreach (int floor in StormDepths)
                 {
                     GameLoop.GameRng.Salt = (ulong)salt * 7919; GameLoop.GameRng.Draws.Clear();
-                    var a = new FreeMapSim(FreeMapGenerator.Generate(floor, true, false), new Wallet(), FloorPlan.HasWanderer(floor), null, null, null);
+                    var a = new FreeMapSim(FreeMapGenerator.Generate(floor, floor == AshBase.Depth, false), new Wallet(), FloorPlan.HasWanderer(floor), null, null, null);
                     for (int k = 0; k < 60 && !a.InFight; k++) { var nb = a.Neighbors(a.Me); a.MoveTo(nb[H(salt, floor, k) % nb.Count]); }
                     var da = SnapDraws();
                     GameLoop.GameRng.Draws.Clear();
-                    var b = new M.FreeMapSim(M.FreeMapGenerator.Generate(floor, true), new MainWallet(), FloorPlan.HasWanderer(floor), null, null, null);
+                    var b = new M.FreeMapSim(MainGen(floor, floor == AshBase.Depth), new MainWallet(), FloorPlan.HasWanderer(floor), null, null, null);
                     for (int k = 0; k < 60 && !b.InFight; k++) { var nb = b.Neighbors(b.Me); b.MoveTo(nb[H(salt, floor, k) % nb.Count]); }
                     if (!SameDraws(da, SnapDraws())) drawBad++;
                 }
-            Check(bad == 0 && drawBad == 0, $"嵐の口 False: 航行の中身は main と同じ動き ({runs} 層 × 160 手・違い {bad}{(first != null ? " 最初 " + first : "")}・引く回数の違い {drawBad}/800)");
+            Check(bad == 0 && drawBad == 0, $"嵐の口 False: 航行の中身は main と同じ動き (深さ 6 はイベントなしの測定の形・{runs} 層 × 160 手・違い {bad}{(first != null ? " 最初 " + first : "")}・引く回数の違い {drawBad}/800)");
         }
 
         // ── 3. 口を開けた形: 始点 (外周)・ボス (内側)・距離・方角・保証 ──
         {
-            int layers = 0, startBad = 0, bossBad = 0, shapeBad = 0, fallback = 0, bossKept = 0, shopRestBad = 0, terrBad = 0, bypassBad = 0, foeRemoved = 0, riftBad = 0, riftSkip = 0, nearSupply = 0, nearSupplyOld = 0;
+            int layers = 0, startBad = 0, bossBad = 0, shapeBad = 0, fallback = 0, bossKept = 0, shopRestBad = 0, terrBad = 0, bypassBad = 0, foeRemoved = 0, nearSupply = 0, nearSupplyOld = 0;
             var hopsStorm = new Dictionary<int, List<int>>(); var hopsOld = new Dictionary<int, List<int>>();
             var bearStorm = new int[8]; var bearOld = new int[8]; int bypassBefore = 0, wandererLayers = 0, trimmed = 0;
             var lowered = new Dictionary<int, int>(); var innerN = new List<int>(); var ring1N = new List<int>(); var ring2N = new List<int>(); var goalDeg = new List<int>();
@@ -223,7 +279,7 @@ static partial class T
                 for (int salt = 1; salt <= 3000; salt++)
                 {
                     GameLoop.GameRng.Salt = (ulong)salt * 7919;
-                    var Lo = FreeMapGenerator.Generate(floor, true, false);
+                    var Lo = FreeMapGenerator.Generate(floor, false, false);
                     var s = MakeStorm(salt, floor); var L = s.Layout;
                     layers++;
                     if (L.stormStartFallback) fallback++;
@@ -240,10 +296,9 @@ static partial class T
                     }
                     goalDeg.Add(L.adj[L.goal].Count);
                     // 点・道・縄張りは 1 つも変わらない。 種別は 始点⇔添字 0・終点⇔添字 1 の入れ替えと、 新しい安全な帯のエリート → 戦闘だけ
-                    //   (深さ 6 はボスに隣り合う点を新しい終点で置くので、 種別は比べずに下の riftBad で見る)
+                    //   (深さ 6 も同じ ── ボスの隣の点を書き換えないので・2026-11-13 の〈灰に埋もれた基地〉から)
                     bool same = Lo.Count == L.Count && Lo.roads.SequenceEqual(L.roads) && Enumerable.Range(0, L.Count).All(i => Lo.pos[i].x == L.pos[i].x && Lo.pos[i].y == L.pos[i].y && Lo.adj[i].SequenceEqual(L.adj[i]))
                                 && Lo.territory.SetEquals(L.territory);
-                    if (floor != 6)
                     {
                         var e = (TileType[])Lo.types.Clone();
                         void Sw(int x, int y) { var t = e[x]; e[x] = e[y]; e[y] = t; }
@@ -263,15 +318,6 @@ static partial class T
                     if (shops < 1 || rests < 1) shopRestBad++;
                     if (near) nearSupply++;
                     { var dso = Lo.Hops(Lo.start); if (Enumerable.Range(0, Lo.Count).Any(i => (Lo.types[i] == TileType.Shop || Lo.types[i] == TileType.Rest) && dso[i] < 2)) nearSupplyOld++; }
-                    if (floor == 6)
-                    {
-                        // 隣り合う点 = 新しい終点の隣 (始点を除く) が全部イベント。 旧い右端の隣は強制しない。 隣り合う点を踏まずに始点から終点へ着けない
-                        var want = L.adj[L.goal].Where(i => i != L.start).OrderBy(i => i).ToList();
-                        if (!L.riftGate.SequenceEqual(want) || L.riftGate.Any(r => L.types[r] != TileType.Event) || L.riftGate.Contains(L.start)) riftBad++;
-                        var seen = new bool[L.Count]; var q = new Queue<int>(); seen[L.start] = true; q.Enqueue(L.start); bool reach = false;
-                        while (q.Count > 0) { int u = q.Dequeue(); foreach (int v in L.adj[u]) { if (v == L.goal) reach = true; if (!seen[v] && v != L.goal && !L.riftGate.Contains(v)) { seen[v] = true; q.Enqueue(v); } } }
-                        if (reach) riftSkip++;
-                    }
                     if (FloorPlan.HasWanderer(floor))
                     {
                         wandererLayers++;
@@ -293,7 +339,6 @@ static partial class T
             Console.WriteLine($"[嵐] 外周の層の点の数 (辺から {FreeMapParams.StormOuterEdgeSlack} 以内も外周): 1 層目 {Dist(ring1N)} / 2 層目 {Dist(ring2N)} / 内側 (ボスの候補の元) {Dist(innerN)}");
             Console.WriteLine($"[嵐] ボスに隣り合う点の数 {Dist(goalDeg)} 分布 {string.Join(" ", goalDeg.GroupBy(x => x).OrderBy(g => g.Key).Select(g => $"{g.Key}:{g.Count()}"))}");
             Check(shopRestBad == 0, $"嵐: 店と休憩は層に 1 つずつ以上 (違反 {shopRestBad}/{layers})・店か休憩が始点の隣にある層 嵐 {100.0 * nearSupply / layers:F1}% / 旧い始点 {100.0 * nearSupplyOld / layers:F1}%");
-            Check(riftBad == 0 && riftSkip == 0, $"嵐: 深さ 6 は新しいボスの点の隣が全部イベント (旧い右端の隣は変えない)・踏まずにボスへ着ける層 0 (違反 {riftBad}・踏まずに着ける {riftSkip})");
             Check(terrBad == 0 && bypassBad == 0, $"嵐: 始点とボスは縄張りの外・縄張りを避ける道が全層にある (追跡者の居る層 {wandererLayers}・違反 {terrBad}/{bypassBad}・削る前にある {100.0 * bypassBefore / Math.Max(1, wandererLayers):F1}%・削った {100.0 * trimmed / Math.Max(1, wandererLayers):F1}%・追跡者を置かない {foeRemoved})");
             foreach (int floor in StormDepths)
                 Console.WriteLine($"[嵐] 深さ{floor} 始点→終点の歩数: 嵐 {Dist(hopsStorm[floor])} / 旧い始点と終点 {Dist(hopsOld[floor])}");
@@ -311,7 +356,7 @@ static partial class T
                 for (int salt = 1; salt <= 1000; salt++)
                 {
                     GameLoop.GameRng.Salt = (ulong)salt * 7919;
-                    var L = FreeMapGenerator.Generate(floor, true, true); layers++;
+                    var L = FreeMapGenerator.Generate(floor, false, true); layers++;
                     double r0 = Storm.FullRadius(L);
                     Storm.RingAt(L, 0, out var c0, out double ra);
                     Storm.RingAt(L, Storm.Phase2Start, out var c1, out double rb);
@@ -353,7 +398,7 @@ static partial class T
             foreach (int floor in new[] { 0, 7 })
             {
                 GameLoop.GameRng.Salt = 77;
-                var L = FreeMapGenerator.Generate(floor, true, true);
+                var L = FreeMapGenerator.Generate(floor, false, true);
                 var s = new FreeMapSim(L, new Wallet(), false, null, null, null);
                 for (int k = 0; k < 40; k++) s.Wait();
                 ok &= !L.storm && !s.StormMode && s.StormPhase == 0 && Enumerable.Range(0, L.Count).All(i => !s.InStorm(i)) && s.Weather == WeatherKind.None && L.start == 0 && s.Known[L.goal];
@@ -449,13 +494,6 @@ static partial class T
                 }
                 ok &= s.Known[s.Layout.goal] && !s.FogHidden(s.Layout.goal);
             }
-            // 深さ 6: ボスに隣り合うイベントマスは霧でも隠れない
-            for (int salt = 1; salt <= 40; salt++)
-            {
-                var s = MakeStorm(salt, 6, null, WeatherKind.Fog);
-                s.ShiftFront(Storm.Phase4Start);
-                foreach (int r in s.Layout.riftGate) ok &= !s.FogHidden(r);
-            }
             // 照明・隣で見える
             int lit = 0, adj = 0;
             for (int salt = 1; salt <= 200; salt++)
@@ -471,7 +509,7 @@ static partial class T
                     if (s.Known[s.Layout.goal]) { if (s.HopsFrom(s.Me)[s.Layout.goal] == 1) adj++; break; }
                 }
             }
-            Check(ok && lit > 0 && adj > 0, $"嵐: ボスの点は最初は伏せられ (照明で {lit}・隣で {adj} 層が見えた・フェーズ 3 で必ず見える)・霧は嵐の中の 2 歩以上離れた点だけを「?」に (隠れた点 {hidden})・ボスの点と深さ 6 の隣り合う点は隠れない");
+            Check(ok && lit > 0 && adj > 0, $"嵐: ボスの点は最初は伏せられ (照明で {lit}・隣で {adj} 層が見えた・フェーズ 3 で必ず見える)・霧は嵐の中の 2 歩以上離れた点だけを「?」に (隠れた点 {hidden})・ボスの点は隠れない");
         }
 
         // ── 9. 点も道も 1 つも消えない・終点へ必ず着ける・中断セーブの往復 ──
@@ -653,7 +691,7 @@ static partial class T
                     if (mode == "C旧")
                     {
                         GameLoop.GameRng.Salt = (ulong)salt * 7919;
-                        s = new FreeMapSim(FreeMapGenerator.Generate(floor, true, false), w, FloorPlan.HasWanderer(floor), null, null, null);
+                        s = new FreeMapSim(FreeMapGenerator.Generate(floor, false, false), w, FloorPlan.HasWanderer(floor), null, null, null);
                         s.ConfigureTerritory(true, true, true);
                     }
                     else s = MakeStorm(salt, floor, w);

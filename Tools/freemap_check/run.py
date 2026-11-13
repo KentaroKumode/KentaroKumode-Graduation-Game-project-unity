@@ -18,7 +18,9 @@ DOTNET_UNITY = UNITY + '/NetCoreRuntime/dotnet.exe'
 CSC = UNITY + '/DotNetSdkRoslyn/csc.dll'
 RUNTIME = 'C:/Program Files/dotnet/shared/Microsoft.NETCore.App'
 FREEMOVE = 'Assets/Scripts/MapSystem'
-SOURCES = ['FreeMapParams', 'FreeMapLayout', 'FreeMapGenerator', 'FoeProfile', 'Weather', 'FreeMapSim', 'FreeMapPerks', 'FloorPlan', 'TerritoryBypass', 'RiftGate', 'Storm']
+SOURCES = ['FreeMapParams', 'FreeMapLayout', 'FreeMapGenerator', 'FoeProfile', 'Weather', 'FreeMapSim', 'FreeMapPerks', 'FloorPlan', 'TerritoryBypass', 'AshBase', 'Storm']
+# main 側で取るファイル: 今の一覧と、 〈灰に埋もれた基地〉の前の main にある RiftGate.cs (2026-11-13 に AshBase.cs へ置き換えた)。 無いファイルは飛ばす
+MAIN_SOURCES = SOURCES + ['RiftGate']
 
 
 def fwd(p):
@@ -33,14 +35,19 @@ def main_reference(out):
     名前空間 MainRef.FreeMove へ移して一緒にコンパイルする (2026-11-13・StormCheck.cs)。 比べる版は環境変数 FREEMAP_MAIN_REF (既定 origin/main)。"""
     d = os.path.join(out, 'mainref')
     os.makedirs(d, exist_ok=True)
+    for old in glob.glob(os.path.join(d, '*.cs')):
+        os.remove(old)   # 前の回に取った main のファイルを残さない (main から消えたファイルを混ぜない)
     paths = []
-    for n in SOURCES:
+    ring = False
+    for n in MAIN_SOURCES:
         r = subprocess.run(['git', 'show', '%s:%s/FreeMove/%s.cs' % (MAIN_REF, FREEMOVE, n)], capture_output=True)
         if r.returncode != 0:
             continue   # main に無いファイル (Storm.cs など)
         src = r.stdout.decode('utf-8-sig')
         if 'namespace MapSystem.FreeMove' not in src:
             sys.exit('main の %s.cs に namespace MapSystem.FreeMove が無い' % n)
+        if n == 'FreeMapGenerator' and 'PlaceRiftGate' in src:
+            ring = True   # main は「ボスの隣を全部イベントに」の作り (〈灰に埋もれた基地〉の前) ── 生成の口の意味が裏返し (StormCheck.MainGen)
         src = 'using MapSystem;\n' + src.replace('namespace MapSystem.FreeMove', 'namespace MainRef.FreeMove')
         path = os.path.join(d, n + '.cs')
         with open(path, 'w', encoding='utf-8') as f:
@@ -48,7 +55,7 @@ def main_reference(out):
         paths.append(path)
     if not paths:
         sys.exit('main (%s) の FreeMove を git から取れない' % MAIN_REF)
-    return paths
+    return paths, ring
 
 
 def main():
@@ -69,7 +76,11 @@ def main():
                     f.write('-r:"%s"\n' % fwd(d))
         for name in ('Stubs.cs', 'Program.cs', 'StormCheck.cs'):
             f.write('"%s"\n' % fwd(os.path.join(here, name)))
-        for path in main_reference(out):
+        mpaths, ring = main_reference(out)
+        if ring:
+            f.write('-define:MAINREF_RING\n')
+        print('比べる main: %s (%s)' % (MAIN_REF, 'ボスの隣を全部イベントにする作り = 〈灰に埋もれた基地〉の前' if ring else '〈灰に埋もれた基地〉の作り'))
+        for path in mpaths:
             f.write('"%s"\n' % fwd(path))
         f.write('"%s/TileType.cs"\n' % FREEMOVE)
         for n in SOURCES:

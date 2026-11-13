@@ -52,10 +52,24 @@ namespace EventSystem
         public static bool IsKnownTag(string tag) => tag == "追跡" || tag == "地図" || tag == "素材";
     }
 
-    /// <summary>ConvictionSystem.RiftRecordSeen が読む所だけ (検算は「裂け目の記録」を引かない)。</summary>
+    /// <summary>AshBaseEvent.Seen が読む所だけ。 検算が場面ごとに引き先を入れる (null = 無い)。</summary>
     public static class EventDatabase
     {
-        public static EventDefinition GetByName(string name) => null;
+        public static System.Func<string, EventDefinition> Lookup;
+        public static EventDefinition GetByName(string name) => Lookup?.Invoke(name);
+    }
+}
+
+namespace MetaProgression
+{
+    /// <summary>AshBaseEvent が読み書きするランの外の記録の代役 (灰燼の王を倒したか・保存の回数)。</summary>
+    public class MetaProgressState { public bool ashKingBeaten; }
+    public class MetaProgressManager
+    {
+        public static MetaProgressManager Instance = new MetaProgressManager();
+        public MetaProgressState State = new MetaProgressState();
+        public int Saves;
+        public void Save() { Saves++; }
     }
 }
 
@@ -85,10 +99,10 @@ namespace GameLoop
         public System.Collections.Generic.HashSet<string> seenOnceEvents = new System.Collections.Generic.HashSet<string>();
     }
 
-    /// <summary>ConvictionSystem.RiftGateAtBoss が読む測定の口だけ。</summary>
+    /// <summary>AshBaseEvent が読む測定の口と、 選べるかの判定が読む口だけ。</summary>
     public static class GameHooks
     {
-        public static bool RiftRecordAtBoss = true;
+        public static bool? AshKingBeatenEver;
         /// <summary>検算が場面ごとに決める: 天候が「嵐」の作りか (本体の既定は true・ここでは旧い前線の規則を既定にする)。</summary>
         public static bool StormEnabled = false;
     }
