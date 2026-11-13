@@ -185,6 +185,15 @@ namespace AutoTest
             return HpWalkSteps(run, mm, Mathf.Max(0, run.playerHP - stormHp) / (float)run.playerMaxHP);
         }
 
+        /// <summary>[2026-11-14] 〈徒労〉で通常の戦闘の報酬が止まっている残り (<see cref="ToilNavRule.RewardlessLeft"/>)。 0 = 止まっていない・口 <see cref="navToilAware"/> が切れている。
+        /// 航行の値付け (Rank・MacroGain) が読む。 乱数は引かない。</summary>
+        private int NavToilRewardless(RunState run)
+        {
+            if (!navToilAware || run?.timedDebuffs == null) return 0;
+            run.timedDebuffs.TryGetValue(EventSystem.TimedEffects.BattleBoonRule.ToilName, out int left);
+            return ToilNavRule.RewardlessLeft(true, left, GameHooks.ToilMode);
+        }
+
         /// <summary>今の層の終点がボスか。</summary>
         private static bool LayerHasBoss(MapManager mm)
         {

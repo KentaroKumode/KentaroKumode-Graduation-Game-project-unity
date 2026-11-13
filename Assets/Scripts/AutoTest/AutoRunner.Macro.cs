@@ -35,7 +35,8 @@ namespace AutoTest
         private const float MacroDeathCost = 3f;
         private const float MacroStepCost = 0.004f;
 
-        private struct MacroSim { public float hp; public float coins; public float supply; public float cap; }
+        /// <summary>toil = 〈徒労〉で通常の戦闘の報酬が止まっている残り (<see cref="NavToilRewardless"/>・0 = 止まっていない)。 計画の中で通常の戦闘に勝つと形に従って減る。</summary>
+        private struct MacroSim { public float hp; public float coins; public float supply; public float cap; public int toil; }
 
         /// <summary>次に向かう点。 どの回り方も得にならなければ -1 (層を出る)。</summary>
         private int MacroTarget(GameManager gm, MapManager mm, FreeMapSim sim, FreeMapLayout L, int at, int[] hopsFromMe, RunState run)
@@ -64,6 +65,7 @@ namespace AutoTest
                 coins = run.coins,
                 supply = NavSupply(run, sim),      // 近道の残り (ただで動ける回数) を含める
                 cap = run.provisionCap,
+                toil = NavToilRewardless(run),     // 〈徒労〉(2026-11-14・口 navToilAware): 通常の戦闘の報酬を 0 と見る残り
             };
             // 補給できる店 (まだ入っていない・種別が見えている)。 計画の中で寄った店は used で外れる
             var shops = new List<int>();
@@ -156,7 +158,10 @@ namespace AutoTest
                 case TileType.Battle:
                 {
                     string key = n.encounterRevealed ? EncounterDangerStats.KeyOf(n, run.Depth) : null;
-                    return MacroFight(layer, 'N', key, wHp, wGold, 0f, ref s);
+                    // 〈徒労〉(2026-11-14): 報酬が止まっていれば報酬のゴールドの見込みを 0 にする (被ダメ・死の見込みは残す = 正味で損)
+                    bool noReward = s.toil > 0;
+                    if (noReward) s.toil = ToilNavRule.AfterNormalWin(s.toil, GameHooks.ToilMode);
+                    return MacroFight(layer, 'N', key, wHp, wGold, 0f, ref s, noReward);
                 }
                 case TileType.EliteBattle:
                 {
@@ -191,13 +196,14 @@ namespace AutoTest
             }
         }
 
-        private static float MacroFight(int layer, char kind, string key, float wHp, float wGold, float bonus, ref MacroSim s)
+        /// <summary><paramref name="noReward"/> = 報酬が出ない戦闘 (〈徒労〉の通常の戦闘): 報酬のゴールドを 0 と見る (被ダメ・死の項はそのまま)。</summary>
+        private static float MacroFight(int layer, char kind, string key, float wHp, float wGold, float bonus, ref MacroSim s, bool noReward = false)
         {
             double mean, lose;
             if (!(key != null && EncounterDangerStats.TryGet(key, out _, out mean, out _, out lose))
                 && !EncounterDangerStats.TryGetKind(layer, kind, out mean, out lose))
             { mean = 0.05; lose = 0.01; }
-            float gold = kind == 'E' ? 20f : 10f;
+            float gold = noReward ? 0f : kind == 'E' ? 20f : 10f;
             float hp0 = Mathf.Max(0.05f, s.hp);
             float death = (float)lose * MacroDeathCost * Mathf.Clamp(0.8f / hp0, 0.5f, 4f);
             s.hp = Mathf.Max(0f, s.hp - (float)mean);
