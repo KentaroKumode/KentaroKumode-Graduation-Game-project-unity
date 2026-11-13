@@ -51,6 +51,12 @@ namespace CombatSystem
         public int turnsToHeavy;
         /// <summary>大技ターンの攻撃倍率 (予告表示用)。</summary>
         public float heavyMul;
+        /// <summary>このターンは大技のチャージで、 敵は攻撃しない (<see cref="Escalation.IsChargeNoAttack"/>・2026-11-14)。 攻撃値は 0 で載っている。
+        /// ダウンのターンは false (ダウンの欄が出る)。</summary>
+        public bool enemyCharging;
+        /// <summary>このターンが灰燼の王の大技〈業火〉なら、 主攻撃とは別に入る烈炎の分 (烈炎の数 × BossParam.BlazeBurstPerStack・軽減無視・撃ったら烈炎 0・2026-11-14)。
+        /// それ以外は 0。 <see cref="enemyAttackValue"/> には含まない (ブロックで減らない)。</summary>
+        public int heavyBurst;
         /// <summary>次の構えまで何ターンか (0 = このターンは構え / −1 = 構えない)。 EnemyData.guardPeriod。</summary>
         public int turnsToGuard;
         /// <summary>このターンの敵の防御 (構え・割れる装甲・積み上がる装甲を反映した後)。</summary>

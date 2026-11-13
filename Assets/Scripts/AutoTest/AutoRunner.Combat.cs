@@ -549,10 +549,27 @@ namespace AutoTest
             public int downBroken, downMaxHp, downPendingNow;
             /// <summary>次のターン (ダウンのターンなら、 ダウンが明けた後) の敵の攻撃の見込み (目盛りを割る価値・ダウン中の先の被ダメの見積もりに使う)。</summary>
             public int downNextAtk;
+            /// <summary>[2026-11-14] 次のターンをダウンにした時に受けずに済む攻撃 (目盛りを割る価値の元)。 旧い規則 (口 downCancelRule=Always) は <see cref="downNextAtk"/> と同じ。
+            /// 新しい規則: 次のターンの攻撃 + (次のターンがチャージで大技を取り消すなら、 抜ける大技 − 周期の平均 = DownKeepRules の式と同じ考え)。</summary>
+            public int downEraseAtk;
+            /// <summary>[2026-11-14] 次のターンがダウンになった時、 ダウンが明けたターン (2 ターン後) の敵の攻撃の見込み (本体と同じ取り消しの規則で周期を数える)。
+            /// 旧い規則は <see cref="downNextAtk"/> と同じ (今までの見込みのまま)。</summary>
+            public int downAfterAtk;
+            // ---- 大技のチャージ (2026-11-14・敵は攻撃しない) ----
+            /// <summary>このターンは大技のチャージ (予告の攻撃は 0)。 口 heavyChargeNoAttack=False (旧い作り) では立たない。</summary>
+            public bool charging;
+            /// <summary>チャージのターンの、 次のターン (= 大技) の敵の攻撃の見込み。 帳簿の「撃破までの被ダメの見込み」が、 予告 0 の代わりに読む
+            /// (ダウンのターンが明けた後の見込みを読むのと同じ扱い。 先のターンを「見えている最大の攻撃」で伸ばす今の帳簿の流儀に合わせて、 大技の値を使う)。</summary>
+            public int chargeNextAtk;
+            // ---- 灰燼の王の大技〈業火〉の烈炎 (2026-11-14) ----
+            /// <summary>烈炎は〈業火〉でまとめて返る (王が大技を持つ・烈炎を持つ)。 旧い形 (ashKingHeavy=False) では false。</summary>
+            public bool blazeBurst;
+            /// <summary>烈炎 1 つあたりの業火の軽減無視ダメージ (BossParam.BlazeBurstPerStack・本体と同じ値) / いまの業火の周期 (Escalation.HeavyPeriodNow)。</summary>
+            public int blazeBurstPer, heavyPeriodNow;
         }
 
         /// <summary>先のターンの被ダメの見積もりに使う敵の攻撃: 普段はこのターンの予告値。 ダウンのターンは予告が 0 なので、 ダウンが明けた後の見込み。</summary>
-        private static int FutureEnemyAtk(in OptimalTurnState s) => s.enemyDown ? s.downNextAtk : s.enemyAtk;
+        private static int FutureEnemyAtk(in OptimalTurnState s) => s.enemyDown ? s.downNextAtk : s.charging ? s.chargeNextAtk : s.enemyAtk;
 
         /// <summary>[ボスのダウン] 目盛りを割って次のターンをダウンにする価値の割合 (次のターンの敵の攻撃 × これ を今の HP で見る・仮・未測定)。
         /// 〈停止信号〉(DeckStunShare) と同じ形: 半分にするのは、 割らなくてもブロックで一部は受けられるから。</summary>
@@ -1023,7 +1040,7 @@ namespace AutoTest
             if (s.downNotches != null && effDmg < enemyHp
                 && CombatSystem.BossDown.NextTurnIsDown(s.downNotches, s.downMaxHp, s.downBroken, s.downPendingNow, enemyHp - effDmg)
                 && !CombatSystem.BossDown.NextTurnIsDown(s.downNotches, s.downMaxHp, s.downBroken, s.downPendingNow, enemyHp))
-                u += DownNextTurnShare * System.Math.Max(0, s.downNextAtk) * (s.ledger ? 1f : wDef);
+                u += DownNextTurnShare * System.Math.Max(0, s.downEraseAtk) * (s.ledger ? 1f : wDef);   // 旧い規則では downEraseAtk = downNextAtk (今までと同じ)
 
             // ===== 短期決戦の概念 (2026-08-04) =====
             //   従来の効用は **1 ターンぶんの収支しか見ていなかった**。 撃破ボーナスも
@@ -1064,13 +1081,28 @@ namespace AutoTest
             // 烈炎 (6 層ボス): ブロック端子へ閾値以上配線すると毎ターン スタック+1、
             //   ターン開始時にスタック分の軽減無視ダメ。 **配線側がこれを見られないと
             //   ただの一方的な税になる**ので、 撃破までの累積を効用へ入れる。
+            //   2026-11-14〜: 毎ターンの削りは既定で無し (口 blazeTickEachTurn=True で残す)。 代わりに積もった烈炎は王の大技〈業火〉で
+            //   × BlazeBurstPerStack にまとめて返り、 撃ったら 0 (本体 CombatManager.ApplyBlazeBurst)。 値付けは「撃破より前に業火が来るなら、 その時の烈炎 × 1 つあたり」。
             if (tele.blazePenalizesBlock)
             {
                 int s0 = tele.blazeStacks;
-                float blaze = (bCount >= ItemSystem.PassiveSkills.Effects.BlazeBrand.BlockDiceThreshold)
-                            ? s0 * ttk + ttk * (ttk + 1) * 0.5f   // 積み続ける
-                            : s0 * ttk;                            // 据え置き
-                u -= blaze;
+                bool adds = bCount >= ItemSystem.PassiveSkills.Effects.BlazeBrand.BlockDiceThreshold;
+                if (GameLoop.GameHooks.BlazeTickEachTurn)
+                {
+                    float blaze = adds
+                                ? s0 * ttk + ttk * (ttk + 1) * 0.5f   // 積み続ける
+                                : s0 * ttk;                            // 据え置き
+                    u -= blaze;
+                }
+                if (s.blazeBurst && tele.turnsToHeavy >= 0 && !s.enemyDown)
+                {
+                    int th = tele.turnsToHeavy;
+                    // このターンが業火: 撃つ前に倒せなければ、 今の烈炎がこのターンに返る (軽減無視)。 撃った後の烈炎は 0 から
+                    if (th == 0 && effDmg < enemyHp) u -= s0 * s.blazeBurstPer;
+                    int nextIn = th == 0 ? System.Math.Max(1, s.heavyPeriodNow) : th;
+                    int stacksThen = (th == 0 ? 0 : s0) + (adds ? 1 : 0);
+                    if (nextIn <= ttk) u -= stacksThen * s.blazeBurstPer;   // 次の業火まで生きている見込みなら、 そこで返る
+                }
             }
             u += wChg * v3.chargeMul * c * 2f;           // 充電価値 (リロールの原資)
             if (v3.takenCost != 0f && !s.ledger) u -= v3.takenCost * _takenMulNow * taken;     // E5 (V3)
@@ -1143,6 +1175,12 @@ namespace AutoTest
             tele.playerBlockIgnored = false;
             tele.sealedTerminal = -1;
             plan.nextBlazeBase = tele.blazeStacks;
+            // [2026-11-14] 王の〈業火〉: このターンが業火 (ダウンでない) なら撃った後の烈炎は 0。 次のターンの大技までも数え直す (旧い形では通らない)
+            if (st.blazeBurst)
+            {
+                if (st.tele.turnsToHeavy == 0 && !st.enemyDown) plan.nextBlazeBase = 0;
+                tele.turnsToHeavy = CombatSystem.Escalation.TurnsToHeavy(enemy, nt);
+            }
 
             var ns = st;
             ns.tele = tele;
@@ -1150,6 +1188,10 @@ namespace AutoTest
             ns.atkBase = System.Math.Max(0, cm.PlayerAttackPower);
             ns.atkPower = System.Math.Max(0, cm.PlayerAttackPower); ns.atkPenalty = 0;   // [readOutgoingMult] 次ターンの麻痺毒は未知
             ns.atkGrowth = (FreeBlockRule && nextAtk > 0) ? BuildAtkGrowth(enemy, ctx, nt) : null;
+            // [2026-11-14] 次のターンが大技のチャージなら (予告 0)、 その先の被ダメは次の次 (大技) の見込みで伸ばす
+            ns.charging = CombatSystem.Escalation.IsChargeNoAttack(enemy, nt);
+            ns.tele.enemyCharging = ns.charging;
+            ns.chargeNextAtk = ns.charging ? ExpectedEnemyAttackAt(enemy, ctx, in st.tele, nt + 1, 0) : 0;
             // [#107] 前のターンに積まれた〈反撃態勢〉はこのターンだけ。 次のターンへ乗るかは今ターンの収支で決まる (LookaheadValue)
             ns.enemyHitBonus = System.Math.Max(0, st.enemyHitBonus - st.counterPendingNow);
             ns.counterPendingNow = 0;
@@ -1180,6 +1222,35 @@ namespace AutoTest
         }
 
 
+        /// <summary>[2026-11-14] 新しい取り消しの規則 (チャージか大技のターンに重なったダウンだけが周期を頭に戻す) で、 次のターン (T+1) をダウンにした時の
+        /// 受けずに済む攻撃 <paramref name="erase"/> と、 明けたターン (T+2) の攻撃の見込み <paramref name="after"/>。 取り消すかは本体と同じ関数
+        /// (<see cref="CombatSystem.CombatManager.DownCancelsCycleAt"/>)、 攻撃は本体の式 (<see cref="ExpectedEnemyAttackAt"/>)。
+        /// 取り消す時の T+2 は、 周期の起点を T+1 に置いた時の値 (起点を一時的に置き換えて本体の式を通し、 戻す・乱数は引かない)。</summary>
+        private static void DownSequenceAfterNextTurn(EnemyData enemy, ItemSystem.PassiveSkills.CombatContext ctx, in CombatSystem.MutualTurnTelegraph tele,
+                                                      int s1, float bossHpRatio, out int erase, out int after)
+        {
+            int t1 = tele.turn + 1;
+            erase = s1;
+            after = ExpectedEnemyAttackAt(enemy, ctx, in tele, t1 + 1, 0);
+            if (enemy == null || !CombatSystem.CombatManager.DownCancelsCycleAt(enemy, t1, bossHpRatio)) return;
+            // チャージのターンのダウン: 次の大技 s(T+2) が並びから抜け、 後ろが 1 ターン遅れる (DownKeepRules.HoldGainChargeOrHeavy と同じ考え・遅れた分は周期の平均で置く)
+            if (enemy.heavyPeriod > 0 && CombatSystem.Escalation.IsChargeTurn(enemy, t1))
+            {
+                float avg = 0f;
+                int per = System.Math.Max(1, CombatSystem.Escalation.HeavyPeriodNow(enemy));   // 王の〈業火〉は HP で 4 / 3
+                for (int j = 0; j < per; j++) avg += ExpectedEnemyAttackAt(enemy, ctx, in tele, t1 + j, 0);
+                avg /= per;
+                erase = s1 + Mathf.RoundToInt(after - avg);
+            }
+            int saved = CombatSystem.Escalation.HeavyCycleOffset;
+            try
+            {
+                CombatSystem.Escalation.HeavyCycleOffset = t1;
+                after = ExpectedEnemyAttackAt(enemy, ctx, in tele, t1 + 1, 0);
+            }
+            finally { CombatSystem.Escalation.HeavyCycleOffset = saved; }
+        }
+
         /// <summary>このターンを解いた結果 <paramref name="o"/> から、 次のターンの盤面を組む (E8 と山札の先読み #105 が共通で使う)。
         /// <paramref name="hpStart"/> = 敵の攻撃の前の自 HP (旧い配線は今の HP・山札は回復と払った HP の後)、
         /// <paramref name="shieldPool"/> = 敵の攻撃の前のシールド (旧い配線は持ち越し分・山札はこのターンの端子の分も)。
@@ -1201,8 +1272,8 @@ namespace AutoTest
             }
             ns.myHp = hpStart - o.taken;
             // ボスのダウン (2026-11-13): この手で次のターンがダウンになるか (本体と同じ関数)。 なれば次のターンの敵の攻撃は 0・受けるダメージ ×1.5。
-            //   ダウンが明けた後の攻撃は今の見込み (downNextAtk) のまま。 ダウンのターンの次 (このターンがダウン) は plan.next の攻撃
-            //   (本体がこのターンの頭に大技の周期の起点を戻しているので、 見込みは周期の頭 = 溜め) になる。
+            //   ダウンが明けた後の攻撃は downAfterAtk (新しい規則: チャージか大技に重なれば周期を頭に戻して数える・旧い規則: 今の見込み downNextAtk のまま)。
+            //   ダウンのターンの次 (このターンがダウン) は plan.next の攻撃 (本体がこのターンの頭に起点を動かした後の値) になる。
             if (st.downNotches != null)
             {
                 int hpAfter = System.Math.Max(0, ns.enemyHp);
@@ -1211,7 +1282,7 @@ namespace AutoTest
                 ns.downBroken = nb;
                 ns.downPendingNow = System.Math.Max(0, st.downPendingNow + (nb - st.downBroken) - (nd ? 1 : 0));
                 ns.enemyDown = nd;
-                ns.downNextAtk = st.downNextAtk;
+                ns.downNextAtk = nd ? st.downAfterAtk : st.downNextAtk;   // [2026-11-14] 明けた後の見込み (旧い規則では downAfterAtk = downNextAtk で今までと同じ)
                 if (nd) { ns.enemyAtk = 0; ns.tele.enemyAttackValue = 0; ns.atkGrowth = null; }
             }
             // シールド: 今ターンの被弾で吸われ、 〈城壁〉で増え、 次のターン頭に半分 (切り捨て・DAMAGE_CALC_REFERENCE ③-D)
@@ -1424,7 +1495,22 @@ namespace AutoTest
                 st.downNotches = tele.downNotches; st.downBroken = tele.downBroken; st.downPendingNow = tele.downPending;
                 st.downMaxHp = System.Math.Max(1, cm.CurrentEnemy.maxHP);
                 st.downNextAtk = ExpectedEnemyAttackAt(cm.CurrentEnemy, ctxRoles, in tele, tele.turn + 1, 0);
+                st.downEraseAtk = st.downNextAtk; st.downAfterAtk = st.downNextAtk;
+                if (GameLoop.GameHooks.DownCancel != CombatSystem.DownCancelRule.Always)
+                    DownSequenceAfterNextTurn(cm.CurrentEnemy, ctxRoles, in tele, st.downNextAtk, (float)cm.EnemyHP / st.downMaxHp,
+                                              out st.downEraseAtk, out st.downAfterAtk);
             }
+            // 灰燼の王の大技〈業火〉(2026-11-14): 烈炎は業火で返る。 1 つあたりと周期は本体と同じ値
+            if (cm?.CurrentEnemy != null && tele.blazePenalizesBlock && !GameLoop.GameHooks.AshKingHeavyDisabled && cm.CurrentEnemy.heavyPeriod > 0)
+            {
+                st.blazeBurst = true;
+                st.blazeBurstPer = CombatSystem.BossParams.ParamInt(cm.CurrentEnemy.id, CombatSystem.BossParam.BlazeBurstPerStack);
+                st.heavyPeriodNow = CombatSystem.Escalation.HeavyPeriodNow(cm.CurrentEnemy);
+            }
+            // 大技のチャージ (2026-11-14): 予告は 0。 帳簿の先の被ダメは次のターン (大技) の見込みで伸ばす (本体の式)
+            st.charging = tele.enemyCharging;
+            if (st.charging && cm?.CurrentEnemy != null && ctxRoles != null)
+                st.chargeNextAtk = ExpectedEnemyAttackAt(cm.CurrentEnemy, ctxRoles, in tele, tele.turn + 1, 0);
             // 敵のパッシブ (2026-11-12・#104 で効くようにした物のうち、 被ダメを読み違える物)
             if (cm?.CurrentEnemy?.passiveSkills != null)
                 foreach (var ps in cm.CurrentEnemy.passiveSkills)

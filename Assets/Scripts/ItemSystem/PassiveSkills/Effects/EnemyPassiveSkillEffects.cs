@@ -836,7 +836,9 @@ namespace ItemSystem.PassiveSkills.Effects
 
     /// <summary>灰燼の王 — 烈炎 (2026-08-04): **亀戦法への罰**。
     ///   ・ブロック端子へ <see cref="BlockDiceThreshold"/> 本以上配線したターン終了時、 烈炎スタック +1
-    ///   ・ターン開始時、 スタック分の軽減無視ダメージ
+    ///   ・2026-11-14〜: 積もった烈炎は王の大技〈業火〉で「烈炎の数 × BlazeBurstPerStack」の軽減無視ダメージになって返り、 撃ったら 0
+    ///     (CombatManager.ApplyBlazeBurst)。 業火がダウンで取り消された時は 0 に戻さない (次の業火へ持ち越す)。
+    ///   ・旧: ターン開始時、 スタック分の軽減無視ダメージ (測定の口 blazeTickEachTurn=True で残せる)
     ///
     /// 導入の経緯: 6 層ボス戦は防御配線率 95%・遮断率 59% で「守れば止まる」が完全に成立しており、
     /// 層別死亡率 9.2% (目標 50%) と通過儀礼になっていた。 攻撃力や HP を上げても、
@@ -848,7 +850,9 @@ namespace ItemSystem.PassiveSkills.Effects
     /// 「知らないうちに焼かれる」にはならない。</summary>
     public class BlazeBrand : IPassiveSkillEffect
     {
-        public string SkillId => "BlazeBrand";
+        /// <summary>パッシブの id (enemies.json の internalName)。 〈業火〉で烈炎を返す CombatManager も読む。</summary>
+        public const string Id = "BlazeBrand";
+        public string SkillId => Id;
         public PassiveSkillTrigger[] Triggers => new[] {
             PassiveSkillTrigger.OnTurnStart, PassiveSkillTrigger.OnTurnEnd,
         };
@@ -866,6 +870,9 @@ namespace ItemSystem.PassiveSkills.Effects
                 // テレグラフ生成は OnTurnStart の後なので、 ここで所持フラグを立てておく。
                 ctx.accumulatedValues[ActiveKey] = 1f;
 
+                // 2026-11-14〜 既定: ターン開始時の削りは無し (積もった烈炎は王の大技〈業火〉で × BlazeBurstPerStack にまとめて返る・CombatManager.ApplyBlazeBurst)。
+                //   測定の口 blazeTickEachTurn=True (GameHooks.BlazeTickEachTurn) で今までの毎ターンの削りを残す。
+                if (!GameLoop.GameHooks.BlazeTickEachTurn) return;
                 ctx.accumulatedValues.TryGetValue(StackKey, out var stack);
                 int dmg = (int)stack;
                 if (dmg > 0)
@@ -1008,34 +1015,7 @@ namespace ItemSystem.PassiveSkills.Effects
     //  以下 5 パッシブで再構築: OnTurnStart / OnPreReceiveDamage / OnRollWin に集約。
     // ================================================================
 
-    /// <summary>予兆ターン判定 (2026-07-16 二相化): Phase1 (HP>50%) は周期4T (T1/5/9/13...)、
-    /// Phase2 (HP≤50%) は周期3T (T1/4/7...) に加速。</summary>
-    /// <para><b>ボスのダウン (2026-11-13)</b>: ダウンが明けたら予兆の周期も頭から (<see cref="CombatSystem.Escalation.HeavyCycleOffset"/> を大技と同じく読む)。
-    /// 起点を戻した後は、 大技と同じく「1 周期ぶん溜めてから予兆」(明けたターン = 周期の 1 ターン目・予兆は p ターン目)。
-    /// 起点が 0 (ダウンが無い・旧い作り) の時は今までどおり T1/1+p/… 。 BOT の BossPlaybook も同じ関数を呼ぶ。</para>
-    public static class EmberOmenTiming
-    {
-        public static int PeriodFor(float hpRatio) => hpRatio <= 0.5f ? 3 : 4;
-        /// <summary>周期の 1 ターン目からの位置 (0 始まり)。 起点 0 なら T1 が 0、 ダウンで起点を戻した後は明けたターンが 1 (予兆は p の倍数)。</summary>
-        private static int Rel(int turn, int p)
-        {
-            int off = CombatSystem.Escalation.HeavyCycleOffset;
-            return off <= 0 ? (turn - 1) % p : (turn - off) % p;
-        }
-        public static bool IsOmen(int turn, float hpRatio)
-        {
-            if (turn < 1 || turn - CombatSystem.Escalation.HeavyCycleOffset < 1) return false;
-            int p = PeriodFor(hpRatio);
-            return Rel(turn, p) == 0;
-        }
-        public static int NextOmen(int turn, float hpRatio)
-        {
-            int p = PeriodFor(hpRatio);
-            if (turn - CombatSystem.Escalation.HeavyCycleOffset < 1) return CombatSystem.Escalation.HeavyCycleOffset + p;   // ダウンのターン: 明けてから p ターン目
-            int rel = Rel(turn, p);
-            return turn + (rel == 0 ? p : (p - rel));
-        }
-    }
+    // EmberOmenTiming (予兆 = 王の大技〈業火〉のターンの数え方) は EmberOmenTiming.cs へ移した (2026-11-14・Unity なしの検算 Tools/rules_check がコンパイルするため)。
 
     /// <summary>灰塵の外殻 — 被ダメが15を超えた分を半減 (例: 30→22, 50→32)。
     /// 大玉より小玉連打が有利という設計信号。 会心一撃を丸ごと通さず、 かつ通常火力は素通し。</summary>
@@ -1065,7 +1045,9 @@ namespace ItemSystem.PassiveSkills.Effects
     {
         /// <summary>前ターンに自分が enemyDiceTotalBonus へ積んだ量 (差分更新用)。 "ember_" 始まりなので形態の差し替えで消える。</summary>
         private const string KeyApplied = "ember_omen_applied";
-        public string SkillId => "EmberOmen";
+        /// <summary>パッシブの id (enemies.json の internalName)。 ボスのダウンの判定 (CombatManager.Down) も読む。</summary>
+        public const string Id = "EmberOmen";
+        public string SkillId => Id;
         public PassiveSkillTrigger[] Triggers => new[] { PassiveSkillTrigger.OnTurnStart };
         public void Execute(PassiveSkillTrigger trigger, CombatContext ctx)
         {
@@ -1078,6 +1060,15 @@ namespace ItemSystem.PassiveSkills.Effects
                 + $" period={EmberOmenTiming.PeriodFor(hpRatio)}"
                 + $" fired={EmberOmenTiming.IsOmen(ctx.currentTurn, hpRatio)}");
             bool omen = EmberOmenTiming.IsOmen(ctx.currentTurn, hpRatio);
+            // 2026-11-14〜 既定の形: 予兆のターンは王の大技〈業火〉(EnemyData.heavyCycle = ember・攻撃 ×heavyMul + 烈炎 × BlazeBurstPerStack)。 攻撃 +N は積まない。
+            //   旧い形 (測定の口 ashKingHeavy=False・GameHooks.AshKingHeavyDisabled) だけ、 今までどおり予兆のターンに攻撃 +JudgmentDice。
+            if (!GameLoop.GameHooks.AshKingHeavyDisabled)
+            {
+                EmberBonus.SetApplied(ctx, KeyApplied, 0);
+                UnityEngine.Debug.Log(omen ? $"[業火] T{ctx.currentTurn} 業火のターン (周期{EmberOmenTiming.PeriodFor(hpRatio)}T)"
+                                           : $"[業火] T{ctx.currentTurn} 次の業火はT{EmberOmenTiming.NextOmen(ctx.currentTurn, hpRatio)} (周期{EmberOmenTiming.PeriodFor(hpRatio)}T)");
+                return;
+            }
             EmberBonus.SetApplied(ctx, KeyApplied, omen ? bonus : 0);
             if (omen)
             {

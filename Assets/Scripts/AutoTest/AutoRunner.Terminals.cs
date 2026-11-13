@@ -678,7 +678,9 @@ namespace AutoTest
         //  [#141] ボスのダウンの狙い方 (口 downAimPolicy・既定 None)
         // =====================================================================
         /// <summary>ダウンの狙い方。 None = 今まで (目盛りを割る手に次のターンの攻撃 × <see cref="DownNextTurnShare"/> を足すだけ)。
-        /// Aim = 大技が 2 ターン後の時、 「1 ターン待って、 大技のターンにダウンを重ねる」手にも同じダウンの価値と待つ得 (<see cref="DownKeepRules.HoldGain"/>) を足して比べる。</summary>
+        /// Aim = 「1 ターン待って割る」手にも同じダウンの価値と待つ得を足して比べる。 掛かる条件と待つ得は本体の規則 (口 downCancelRule) に合わせる:
+        /// 既定 ChargeOrHeavy = 待つとダウンがチャージか大技のターンに重なる時 (<see cref="DownKeepRules.HoldEligibleChargeOrHeavy"/> / <see cref="DownKeepRules.HoldGainChargeOrHeavy"/>)・
+        /// Always (旧い規則) = 大技が 2 ターン後の時 (<see cref="DownKeepRules.HoldEligible"/> / <see cref="DownKeepRules.HoldGain"/>)。</summary>
         public enum DownAimPolicy { None = 0, Aim = 1 }
 
         /// <summary>[#141] ダウンの狙い方 (既定 None = 今までと同じ手・同じ乱数)。</summary>
@@ -695,10 +697,15 @@ namespace AutoTest
         {
             preBroke = false;
             var st = ev.st;
-            if (st.downNotches == null || st.enemyDown || tele.turnsToHeavy != 2) return false;
+            // 規則は本体と同じ口 (GameHooks.DownCancel)。 旧い規則 (Always) は 2e76c46 の式のまま (条件も同じ)
+            bool oldRule = GameLoop.GameHooks.DownCancel == DownCancelRule.Always;
+            if (st.downNotches == null || st.enemyDown || (oldRule && tele.turnsToHeavy != 2)) return false;
             var cm = CombatManager.Instance; var enemy = cm?.CurrentEnemy;
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             if (enemy == null || ctx == null || enemy.heavyPeriod <= 0) return false;
+            int t1 = tele.turn + 1;
+            int toHeavyNext = Escalation.TurnsToHeavy(enemy, t1);   // 新しい規則: T+1 から見た大技まで (今の起点で数える = 本体と同じ)
+            if (!oldRule && toHeavyNext != 1 && toHeavyNext != 2) return false;
             int hp = st.enemyHp, n = us.Length;
             bool downAnyway = BossDown.NextTurnIsDown(st.downNotches, st.downMaxHp, st.downBroken, st.downPendingNow, hp);
             if (downAnyway) return false;
@@ -712,12 +719,24 @@ namespace AutoTest
             }
             if (!any) return false;
             // 次のターンから 1 周期ぶんの敵の攻撃の見込み (本体の式 Escalation.EnemyAttackValue を通す・BOT は写しを持たない)
-            var cyc = new List<int>(enemy.heavyPeriod);
-            for (int j = 0; j < enemy.heavyPeriod; j++) cyc.Add(ExpectedEnemyAttackAt(enemy, ctx, in tele, tele.turn + 1 + j, 0));
+            int cycLen = oldRule ? enemy.heavyPeriod : Math.Max(1, Escalation.HeavyPeriodNow(enemy));   // 王の〈業火〉は HP で 4 / 3 (旧い規則の式は今までどおり)
+            var cyc = new List<int>(cycLen);
+            for (int j = 0; j < cycLen; j++) cyc.Add(ExpectedEnemyAttackAt(enemy, ctx, in tele, tele.turn + 1 + j, 0));
             int nextAtk = cyc[0];
             float hpUnit = st.ledger ? 1f : st.wDef;
             float downValue = DownNextTurnShare * Math.Max(0, nextAtk) * hpUnit;     // 割る手が OptimalUtilityCore で得るのと同じ (ダウンは失わず 1 ターン後へ)
-            float gain = DownKeepRules.HoldGain(nextAtk, cyc, v3.ledgerFutureShare) * hpUnit;
+            float gain;
+            if (oldRule) gain = DownKeepRules.HoldGain(nextAtk, cyc, v3.ledgerFutureShare) * hpUnit;
+            else
+            {
+                // 新しい規則: ダウンがチャージのターンに重なると、 次の大技が並びから抜けて後ろが 1 ターン遅れる (DownKeepRules の式)。 取り消すかは本体と同じ関数
+                float ratio = st.enemyHp / (float)Math.Max(1, st.downMaxHp);
+                int s2 = cyc.Count > 1 ? cyc[1] : ExpectedEnemyAttackAt(enemy, ctx, in tele, t1 + 1, 0);
+                int s3 = cyc.Count > 2 ? cyc[2] : ExpectedEnemyAttackAt(enemy, ctx, in tele, t1 + 2, 0);
+                bool shiftNow = Escalation.IsChargeTurn(enemy, t1) && CombatManager.DownCancelsCycleAt(enemy, t1, ratio);
+                bool shiftHold = Escalation.IsChargeTurn(enemy, t1 + 1) && CombatManager.DownCancelsCycleAt(enemy, t1 + 1, ratio);
+                gain = DownKeepRules.HoldGainChargeOrHeavy(nextAtk, s2, s3, cyc, shiftNow, shiftHold, v3.ledgerFutureShare) * hpUnit;
+            }
             float perTurn = DeckPerTurnDamage(in st, k);
             int pre = 0;
             for (int i = 1; i < n; i++) if (us[i] > us[pre]) pre = i;
@@ -725,7 +744,8 @@ namespace AutoTest
             for (int i = 0; i < n; i++)
             {
                 int ha = hp - Math.Min(outs[i].effDmg, hp);
-                if (!DownKeepRules.HoldEligible(true, tele.turnsToHeavy, downAnyway, any, breaks[i], ha, notch, perTurn)) continue;
+                if (oldRule ? !DownKeepRules.HoldEligible(true, tele.turnsToHeavy, downAnyway, any, breaks[i], ha, notch, perTurn)
+                            : !DownKeepRules.HoldEligibleChargeOrHeavy(true, toHeavyNext, downAnyway, any, breaks[i], ha, notch, perTurn)) continue;
                 us[i] += downValue + gain;
                 added = true;
             }

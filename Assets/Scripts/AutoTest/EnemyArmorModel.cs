@@ -73,8 +73,10 @@ namespace AutoTest
         public float AvgCycleFactor()
         {
             if (enemy == null) return 1f;
+            // 周期 = 小技 × (N−2) + チャージ (攻撃しない = 0・2026-11-14〜) + 大技。 口でチャージの攻撃を戻した旧い作りは 小技 × (N−1) + 大技
+            int lightTurns = enemy.heavyPeriod - (enemy.heavyPeriod >= 2 && GameLoop.GameHooks.HeavyChargeNoAttack ? 2 : 1);
             float heavy = enemy.heavyPeriod <= 0 ? 1f
-                : ((enemy.heavyPeriod - 1) * (enemy.heavyWindupMul > 0f ? enemy.heavyWindupMul : 1f) + (enemy.heavyMul > 0f ? enemy.heavyMul : 1f)) / enemy.heavyPeriod;
+                : (lightTurns * (enemy.heavyLightMul > 0f ? enemy.heavyLightMul : 1f) + (enemy.heavyMul > 0f ? enemy.heavyMul : 1f)) / enemy.heavyPeriod;
             float guard = enemy.guardPeriod <= 0 ? 1f
                 : ((enemy.guardPeriod - 1) + (enemy.guardAttackMul > 0f ? enemy.guardAttackMul : 1f)) / enemy.guardPeriod;
             return heavy * guard;

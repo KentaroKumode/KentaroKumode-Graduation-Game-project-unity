@@ -86,7 +86,7 @@ namespace CombatSystem
         public string escalationProfile; // エスカレーション型 "std"|"rush"|"gentle"|"spike"。空なら "std"
 
         // ---- 大技サイクル (5 層以降のボス・2026-09-19) ----
-        //   heavyPeriod ターンごと (T = N, 2N, 3N …) に大技、 その直前の N−1 ターンは溜め。
+        //   heavyPeriod ターンごと (T = N, 2N, 3N …) に大技、 その 1 ターン前はチャージ (攻撃しない・2026-11-14〜)、 残りは小技 (heavyLightMul)。
         //   周期は公開規則なので、 予告に「あと何ターンで大技か」を出す (柱3 完全情報)。
         //   狙い: 「溜めの間に倒し切る / 充電を貯めて大技でリロール / HP で受ける」という
         //   戦闘全体の資源配分をボス戦で問う (先読み BOT が 1 ターン最善に勝っている中身がこれ)。
@@ -94,8 +94,16 @@ namespace CombatSystem
         public int heavyPeriod;
         /// <summary>大技ターンの攻撃倍率 (段階倍率・ボス倍率と掛け合わせる)。</summary>
         public float heavyMul;
-        /// <summary>溜めターン (大技以外のターン) の攻撃倍率。</summary>
-        public float heavyWindupMul;
+        /// <summary>小技のターン (大技でもチャージでもないターン) の攻撃倍率 (2026-11-14 に heavyWindupMul から改名・意味を絞った)。
+        /// チャージのターン (大技の 1 ターン前) は攻撃しない (<see cref="Escalation.IsChargeNoAttack"/>・倍率の欄は持たない)。
+        /// 測定の口で「チャージも攻撃する」旧い作りに戻した時は、 チャージのターンもこの倍率。</summary>
+        public float heavyLightMul;
+        /// <summary>大技の周期の数え方 (2026-11-14)。 空 = 標準 (起点から heavyPeriod ごと・<see cref="HeavyCycle"/>)。
+        /// <see cref="HeavyCycleEmber"/> = 灰燼の王の〈業火〉: 旧〈業火の予兆〉の数え方 (HP &gt; 50% は 4 ターンごと・≤ 50% は 3 ターンごと・起点 0 なら T1 から・
+        /// <c>EmberOmenTiming</c>)。 この時 heavyPeriod は名目 (4・静的評価用) で、 実際の周期はボスの HP で決まる。</summary>
+        public string heavyCycle;
+        /// <summary><see cref="heavyCycle"/> の値: 灰燼の王の〈業火〉の数え方。</summary>
+        public const string HeavyCycleEmber = "ember";
 
         // ---- 構え (予告つきの装甲・2026-11-04) ----
         //   guardPeriod ターンごと (T = N, 2N …) に構える。 構えのターンは防御 +guardDefense・攻撃 ×guardAttackMul、

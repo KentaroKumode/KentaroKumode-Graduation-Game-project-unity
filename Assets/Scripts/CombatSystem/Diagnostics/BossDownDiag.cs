@@ -4,12 +4,14 @@ namespace CombatSystem
 {
     /// <summary>
     /// [計装 2026-11-13] ボスのダウンと手札の持ち越しの数え (バッチ累計・結果を変えない・乱数も引かない)。
-    /// ボス戦ごとに: ダウンの回数・うち大技を取り消した回数・空振り (大技が溜まっていない時のダウン)・大技を受けた回数。
+    /// ボス戦ごとに: ダウンの回数・うち大技を取り消した回数 (ダウンが大技のチャージのターンか大技のターンに重なった・2026-11-14〜)・
+    /// 空振り (重ならなかった = 大技の周期はそのまま進む)・大技を受けた回数。 口 downCancelRule=Always (旧い規則) の時は、 今までどおり
+    /// 「取り消した」= 大技のターンのダウンだけを数える (旧い測定と同じ数え方)。
     /// 手札の持ち越し: ターンあたりの持ち越した枚数。 AutoRunner のサマリーが <see cref="Line"/> を出す。
     /// </summary>
     public static class BossDownDiag
     {
-        /// <summary>ボス id → [戦闘数, 目盛りのある戦闘, ダウン, 大技を取り消した, 空振り (大技を持つ敵で溜まっていない), 大技を持たない敵のダウン, 大技を受けた]。</summary>
+        /// <summary>ボス id → [戦闘数, 目盛りのある戦闘, ダウン, 大技を取り消した (チャージか大技のターンに重なった), 空振り (大技を持つ敵で重ならなかった), 大技を持たない敵のダウン, 大技を受けた]。</summary>
         public static readonly Dictionary<string, long[]> ByBoss = new Dictionary<string, long[]>();
         /// <summary>手札の持ち越し: ターン数 / 持ち越した枚数の合計。</summary>
         public static long CarryTurns, CarryCards;
@@ -65,7 +67,7 @@ namespace CombatSystem
                 if (a[0] == 0) continue;
                 sb.Append(System.Environment.NewLine).Append("  ").Append(id)
                   .Append($": 戦闘 {a[0]} (目盛りあり {a[1]}) / ダウン {a[2]} (1 戦 {(double)a[2] / a[0]:0.00})")
-                  .Append($" うち大技を取り消した {a[3]}・空振り {a[4]}・大技なしの敵 {a[5]} / 大技を受けた {a[6]} (1 戦 {(double)a[6] / a[0]:0.00})");
+                  .Append($" うち大技を取り消した (チャージか大技に重なった) {a[3]}・空振り (重ならず周期はそのまま) {a[4]}・大技なしの敵 {a[5]} / 大技を受けた {a[6]} (1 戦 {(double)a[6] / a[0]:0.00})");
             }
             return sb.ToString();
         }

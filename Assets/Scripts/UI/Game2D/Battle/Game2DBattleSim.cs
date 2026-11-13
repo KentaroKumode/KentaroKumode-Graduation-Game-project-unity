@@ -39,6 +39,10 @@ namespace UI.Game2D.Battle
         /// <summary>ボスのダウン (2026-11-13・予告 MutualTurnTelegraph の写し): このターンはダウン / 後に続くダウンのターン数 /
         /// 次の目盛りの HP (−1 = 無し) / 目盛り (最大 HP の割合・null = ダウンしない敵) / 割った目盛りの数。</summary>
         public bool down; public int downPending, downNotchHp = -1, downBroken; public float[] downNotches;
+        /// <summary>このターンは大技のチャージで、 敵は攻撃しない (予告 MutualTurnTelegraph.enemyCharging の写し・2026-11-14)。</summary>
+        public bool charging;
+        /// <summary>灰燼の王の〈業火〉のターンの烈炎の分 (軽減無視・予告 MutualTurnTelegraph.heavyBurst の写し・2026-11-14)。 0 = 無し。</summary>
+        public int burst;
         public int version;
         public bool rolled;                  // 今のターンのダイスが出ているか (合計の表示に使う)
         /// <summary>振り直しの判断で止まっているか / 払う充電。</summary>
@@ -62,7 +66,8 @@ namespace UI.Game2D.Battle
         {
             var m = new Game2DBattleFx.Marks();
             bool known = phase != P.ERoll && phase != P.Won && phase != P.Lost;
-            if (known && !down) { m.intent = heavyIn == 0 ? 2 : 1; m.atk = eatk; m.guard = guardIn == 0; }   // ダウンのターンは攻撃の予告を出さない (ダウンの印は絵が要る・仮置きは右の枠の文字)
+            if (known && !down && !charging) { m.intent = heavyIn == 0 ? 2 : 1; m.atk = eatk; m.guard = guardIn == 0; }   // ダウンとチャージのターンは攻撃の予告を出さない (印は絵が要る・仮置きは右の枠の文字)
+            else if (known && charging) m.guard = guardIn == 0;
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             if (ctx != null) { m.poison = ctx.EnemyPoison; m.bleed = ctx.enemyBleedStacks; }
             return m;
@@ -240,7 +245,7 @@ namespace UI.Game2D.Battle
             var p = cm.PendingDecision; if (p == null) return;
             var tele = p.tele;
             turn = tele.turn; eatk = tele.enemyAttackValue; stage = tele.escalationStage; edef = tele.enemyDefense; guardIn = tele.turnsToGuard; heavyIn = tele.turnsToHeavy;
-            down = tele.enemyDown; downPending = tele.downPending; downNotchHp = tele.downNextNotchHp; downNotches = tele.downNotches; downBroken = tele.downBroken;
+            down = tele.enemyDown; charging = tele.enemyCharging; burst = tele.heavyBurst; downPending = tele.downPending; downNotchHp = tele.downNextNotchHp; downNotches = tele.downNotches; downBroken = tele.downBroken;
             if (downNotches != null) Game2DTutorial.Request(TutorialTopics.BossDown);      // 手引き「ボスのダウン」: 目盛りのあるボスとの初めての戦闘 (第 2 層のボスから)
             nextStageIn = tele.nextThresholdTurn > 0 ? tele.nextThresholdTurn - tele.turn : -1;
             if (stage >= 1) Game2DTutorial.Request(TutorialTopics.Long);      // 手引き「戦闘の長期化」: 敵の攻撃が初めて段を上げた (issue #86)

@@ -154,6 +154,20 @@ namespace GameLoop
         /// <summary>[測定 2026-11-13] true = ボスのダウン (HP の目盛り・<see cref="CombatSystem.BossDown"/>) を入れない旧い作り。 既定 false = ダウンあり。
         /// AutoRunner.bossDown が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
         public static bool BossDownDisabled;
+        /// <summary>[測定 2026-11-14] ダウンが敵の周期 (大技・構え・予兆) を取り消す条件 (<see cref="CombatSystem.BossDown.CancelsCycle"/>)。
+        /// 既定 ChargeOrHeavy = チャージのターンか山場のターンに重なった時だけ (作者の決定)。 Always = どのダウンでも周期を頭に戻す (旧い規則)。
+        /// AutoRunner.downCancelRule が毎ランの始めに入れ、 ラン終了で既定へ戻す。</summary>
+        public static CombatSystem.DownCancelRule DownCancel = CombatSystem.DownCancelRule.ChargeOrHeavy;
+        /// <summary>[測定 2026-11-14] true (既定) = 大技のチャージのターン (大技の 1 ターン前) は敵が攻撃しない (<see cref="CombatSystem.Escalation.IsChargeNoAttack"/>・作者の決定)。
+        /// false = 旧い作り (チャージのターンも小技の倍率で攻撃する)。 AutoRunner.heavyChargeNoAttack が毎ランの始めに入れ、 ラン終了で true へ戻す。</summary>
+        public static bool HeavyChargeNoAttack = true;
+        /// <summary>[測定 2026-11-14] true = 灰燼の王を旧い形に戻す: 大技〈業火〉を持たせない (チャージなし)・〈業火の予兆〉の予兆ターンに攻撃 +JudgmentDice・烈炎は業火で返らない。
+        /// 既定 false = 新しい形 (〈業火〉= 攻撃 ×heavyMul + 烈炎 × BlazeBurstPerStack の軽減無視・撃ったら烈炎 0)。 烈炎の毎ターンの削りは <see cref="BlazeTickEachTurn"/>。
+        /// AutoRunner.ashKingHeavy が毎ランの始めに入れ (!ashKingHeavy)、 ラン終了で false へ戻す。</summary>
+        public static bool AshKingHeavyDisabled;
+        /// <summary>[測定 2026-11-14] true = 〈烈炎〉のターン開始時の削り (烈炎の数だけ軽減無視) を残す (旧い形)。 既定 false = 削らない (積もった烈炎は〈業火〉でまとめて返る)。
+        /// AutoRunner.blazeTickEachTurn が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
+        public static bool BlazeTickEachTurn;
         /// <summary>[測定 2026-11-13] true = 深さ 3 のボス 3 体に大技の周期を足さない旧い作り。 既定 false = 足す
         /// (<see cref="CombatSystem.BossParams.Depth3Heavy"/>)。 AutoRunner.depth3Heavy が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
         public static bool Depth3HeavyDisabled;
@@ -201,6 +215,10 @@ namespace GameLoop
             TerminalKillBonusNeedsAttack = false;
             HandCarry = CombatSystem.HandCarryMode.Pick;
             BossDownDisabled = false;
+            DownCancel = CombatSystem.DownCancelRule.ChargeOrHeavy;
+            HeavyChargeNoAttack = true;
+            AshKingHeavyDisabled = false;
+            BlazeTickEachTurn = false;
             Depth3HeavyDisabled = false;
             VescaClockHeldAtStart = false;
             AshKingBeatenEver = null;

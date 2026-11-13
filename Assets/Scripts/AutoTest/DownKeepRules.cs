@@ -9,7 +9,10 @@ namespace AutoTest
     /// UnityEngine に依存しない (検算 <c>Tools/rules_check</c> が本物をコンパイルして確かめる)。 乱数は引かない。
     /// 盤面の読み出し (敵の攻撃の見込み・端子の点) は <c>AutoRunner.Terminals</c> が行い、 ここへ数で渡す。
     ///
-    /// <para><b>ダウンの狙い (口 <c>AutoRunner.downAimPolicy</c>)</b>。 本体の規則 (<see cref="BossDown"/>・<c>CombatManager.BeginBossDownTurn</c>):
+    /// <para><b>ダウンの狙い (口 <c>AutoRunner.downAimPolicy</c>)</b>。 2026-11-14 から本体の既定の規則は「チャージか大技のターンに重なったダウンだけが大技を消す」
+    /// (<see cref="BossDown.CancelsCycle"/>)。 その規則での待つ得は <see cref="HoldGainChargeOrHeavy"/> / <see cref="HoldEligibleChargeOrHeavy"/>。
+    /// 以下は旧い規則 (口 <c>downCancelRule = Always</c>) の導き方で、 <see cref="HoldGain"/> / <see cref="HoldEligible"/> がそれ。
+    /// 旧い規則 (<see cref="BossDown"/>・<c>CombatManager.BeginBossDownTurn</c>):
     /// ダウンしたターンの頭に大技の周期の起点がそのターンへ戻る (<c>Escalation.HeavyCycleOffset</c>)。 だから<b>どのターンのダウンでも</b>、
     /// その後の敵の攻撃は「ダウン (0) → 周期の 1 ターン目 → …」と同じ並びになる。 目盛りを今割る (ダウンは次のターン) か、
     /// 1 ターン待って割る (ダウンは 2 ターン後) かの違いは、 待つ方が「次のターンの攻撃を 1 回受けて、 その後の並びが 1 ターン後ろへずれる」ことだけ:
@@ -56,6 +59,39 @@ namespace AutoTest
         public static bool HoldEligible(bool hasHeavy, int turnsToHeavy, bool downNextAnyway, bool someCandBreaks, bool candBreaks,
                                         int hpAfter, int nextNotchHp, float perTurnDmg)
             => hasHeavy && turnsToHeavy == 2 && !downNextAnyway && someCandBreaks && !candBreaks
+            && nextNotchHp >= 0 && hpAfter > nextNotchHp && hpAfter - nextNotchHp <= perTurnDmg;
+
+        // ---- 新しい規則 (2026-11-14・口 downCancelRule = ChargeOrHeavy): ダウンがチャージか大技のターンに重なった時だけ大技が消える ----
+        //
+        //  今割る = ダウンは T+1、 1 ターン待つ = ダウンは T+2。 s(t) = 何もしない時の (周期をそのまま進めた) 敵の攻撃の見込み。
+        //  ダウンのターン d の効き目 (何もしない並びに比べて受けない量):
+        //    ・どのダウンでも、 そのターンの攻撃 s(d) を受けない。 周期が進み続けるダウン (小技のターン) はこれだけ。
+        //    ・大技のターンのダウン: 取り消して周期を頭に戻すが、 戻した後の並びは何もしない並びと同じ位置 (d が周期の 0 番目) なので、 足す物は無い。
+        //    ・チャージのターンのダウン: 取り消して周期を頭に戻す = 次のターン d+1 の大技 s(d+1) が並びから抜け、 後ろが 1 ターンずつ遅れる。
+        //      後ろへずれる分は戦闘の終わりのターンに 1 つ足されるので、 終わりが周期のどこに来るかを一様と見て周期の平均 avg で置く: 受けない量 = s(d+1) − avg。
+        //  待つ得 D = 受ける量 (今割る) − 受ける量 (待つ)
+        //           = [s2 − s1] + [待つダウンがチャージ ? s3 − avg : 0] − [今割るダウンがチャージ ? s2 − avg : 0]  (sk = s(T+k))
+        //  これを HP の帳簿の先の割引 futureShare で HP 相当にする (旧い規則の待つ得と同じ物差し・新しい重みは無い)。
+
+        /// <summary>新しい規則 (ChargeOrHeavy) で目盛りを 1 ターン待つ得 (HP の単位)。 式は上のコメント。
+        /// <paramref name="s1"/>〜<paramref name="s3"/> = T+1〜T+3 の敵の攻撃の見込み (チャージのターンは 0・本体の式から) /
+        /// <paramref name="cycleAtks"/> = T+1 から 1 周期ぶん (平均を取る) /
+        /// <paramref name="shiftNow"/> = 今割った時のダウン (T+1) がチャージのターンで大技を取り消す / <paramref name="shiftHold"/> = 待った時のダウン (T+2) が同じ。</summary>
+        public static float HoldGainChargeOrHeavy(int s1, int s2, int s3, IReadOnlyList<int> cycleAtks, bool shiftNow, bool shiftHold, float futureShare)
+        {
+            float avg = 0f;
+            if (cycleAtks != null && cycleAtks.Count > 0) { for (int i = 0; i < cycleAtks.Count; i++) avg += cycleAtks[i]; avg /= cycleAtks.Count; }
+            float d = (s2 - s1) + (shiftHold ? s3 - avg : 0f) - (shiftNow ? s2 - avg : 0f);
+            return futureShare * d;
+        }
+
+        /// <summary>新しい規則 (ChargeOrHeavy) で、 この挿し方を「1 ターン待つ手」として扱うか。 待つと、 ダウン (T+2) がチャージか大技のターンに重なる時
+        /// (= <paramref name="turnsToHeavyNext"/> = T+1 から見た大技までのターンが 2 (T+2 がチャージ) か 1 (T+2 が大技))。
+        /// 前者は今割ると小技のターン (T+1) がダウンになり大技は消えない手、 後者は今割るとチャージ (攻撃しないターン) をダウンで潰す手で、 どちらも割るターンを選ぶ意味がある。
+        /// ほかの条件は旧い規則の <see cref="HoldEligible"/> と同じ。</summary>
+        public static bool HoldEligibleChargeOrHeavy(bool hasHeavy, int turnsToHeavyNext, bool downNextAnyway, bool someCandBreaks, bool candBreaks,
+                                                     int hpAfter, int nextNotchHp, float perTurnDmg)
+            => hasHeavy && (turnsToHeavyNext == 1 || turnsToHeavyNext == 2) && !downNextAnyway && someCandBreaks && !candBreaks
             && nextNotchHp >= 0 && hpAfter > nextNotchHp && hpAfter - nextNotchHp <= perTurnDmg;
 
         // =====================================================================

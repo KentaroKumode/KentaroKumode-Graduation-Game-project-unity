@@ -7,7 +7,9 @@ namespace CombatSystem
     ///
     /// <para>ボスの HP の棒に目盛り (最大 HP の割合の一覧・<see cref="BossParams.DownNotches"/>) を置く。 HP が目盛り以下になったターンの
     /// <b>次のターン</b>、 ボスはダウンする: 攻撃しない・受けるダメージ ×<see cref="TakenMul"/> (主攻撃・毒・出血・爆発・固定ダメージの枠・反射・品の直接、 全部)・
-    /// 溜めていた大技は取り消し。 ダウンが明けると大技の周期は頭から (<see cref="Escalation.HeavyCycleOffset"/>)。</para>
+    /// ダウンのターンが大技の<b>チャージのターン (大技の 1 ターン前・画面に「次: 大技」) か大技のターン</b>に重なった時だけ、 その大技は取り消し、
+    /// 周期はダウンの次のターンから頭に戻す (<see cref="Escalation.HeavyCycleOffset"/>)。 それ以外のダウンは、 そのターンの敵の行動を 1 つ潰すだけで、
+    /// 周期は進み続ける (2026-11-14・作者の決定・<see cref="CancelsCycle"/>)。</para>
     ///
     /// <para><b>連続</b>: 割った目盛りの数だけダウンのターンが続く (1 ターンで 2 つ割れば 2 ターン・ダウン中に次を割ればもう 1 ターン)。
     /// 上限で止めない。</para>
@@ -68,6 +70,31 @@ namespace CombatSystem
 
         /// <summary>このターンがダウンなら ×<see cref="TakenMul"/>。</summary>
         public static int ApplyTakenNow(int dmg) => ApplyTaken(dmg, ActiveNow);
+
+        /// <summary>ダウンのターンが、 敵の周期の山場を取り消すか (= 周期の起点をそのターンへ置き直すか・2026-11-14 の作者の決定)。
+        /// 引数は、 起点を動かす前の周期で数えた「山場まで何ターンか」(0 = このターンが山場・1 = 次のターンが山場 = チャージのターン・−1 = その周期を持たない)。
+        /// 山場は 大技 (<see cref="Escalation.TurnsToHeavy"/>)・構え (<see cref="Escalation.TurnsToGuard"/>)・灰燼の王〈業火の予兆〉の予兆のターン。
+        /// <list type="bullet">
+        /// <item><see cref="DownCancelRule.ChargeOrHeavy"/> (既定): どれかの山場が 0 か 1 の時だけ取り消す。 それ以外は周期に触らない
+        /// (小技のターンのダウンは、 その小技を潰すだけ ── 次のターンは予定どおりチャージ、 その次に大技)。</item>
+        /// <item><see cref="DownCancelRule.Always"/>: 2026-11-13〜11-14 の旧い規則。 どのダウンでも起点を置き直す (測定の口)。</item>
+        /// </list>
+        /// 起点は 1 つ (<see cref="Escalation.HeavyCycleOffset"/>) なので、 取り消すと、 敵が持つ周期は全部そろって頭に戻る。
+        /// 本体 (<c>CombatManager.BeginBossDownTurn</c>) と BOT の見積もり (<c>AutoRunner</c>) が同じ関数を呼ぶ。</summary>
+        public static bool CancelsCycle(DownCancelRule rule, int turnsToHeavy, int turnsToGuard, int turnsToOmen)
+            => rule == DownCancelRule.Always || IsChargeOrClimax(turnsToHeavy) || IsChargeOrClimax(turnsToGuard) || IsChargeOrClimax(turnsToOmen);
+
+        /// <summary>「山場まで何ターンか」が、 山場のターン (0) か、 その 1 ターン前のチャージ (1) か。</summary>
+        public static bool IsChargeOrClimax(int turnsTo) => turnsTo == 0 || turnsTo == 1;
+    }
+
+    /// <summary>ダウンが敵の周期を取り消す条件 (<see cref="BossDown.CancelsCycle"/>・測定の口 <c>GameHooks.DownCancel</c> / <c>AutoRunner.downCancelRule</c>)。</summary>
+    public enum DownCancelRule
+    {
+        /// <summary>既定 (2026-11-14〜): ダウンがチャージのターンか山場 (大技・構え・予兆) のターンに重なった時だけ取り消し、 周期を頭に戻す。</summary>
+        ChargeOrHeavy = 0,
+        /// <summary>旧い規則 (2026-11-13〜11-14): どのダウンでも周期を頭に戻す。</summary>
+        Always = 1,
     }
 
     /// <summary>1 戦闘 (ヴェスカは 1 段) のダウンの状態。 CombatManager が持つ (BOT は読むだけ)。 区分はすべて persistent (戦闘を通して持つ・形態の交代で作り直す)。</summary>
@@ -81,15 +108,18 @@ namespace CombatSystem
         public int pending;
         /// <summary>このターンはダウン。</summary>
         public bool downNow;
+        /// <summary>このターンのダウンが大技を取り消した (<see cref="BossDown.CancelsCycle"/> が真で、 敵が大技を持つ)。 CombatManager が立てる・画面が読む。</summary>
+        public bool heavyCanceledNow;
 
         public bool Enabled => notches != null && notches.Length > 0;
 
         /// <summary>戦闘の始め・形態の交代: 目盛りを入れ直し、 割った数と待ちを 0 に。</summary>
-        public void Reset(float[] n) { notches = n != null && n.Length > 0 ? n : null; broken = 0; pending = 0; downNow = false; }
+        public void Reset(float[] n) { notches = n != null && n.Length > 0 ? n : null; broken = 0; pending = 0; downNow = false; heavyCanceledNow = false; }
 
         /// <summary>ターンの頭: 待ちがあればこのターンをダウンにして 1 つ使う。 戻り値 = このターンはダウンか。</summary>
         public bool BeginTurn()
         {
+            heavyCanceledNow = false;
             downNow = pending > 0;
             if (downNow) pending--;
             return downNow;
