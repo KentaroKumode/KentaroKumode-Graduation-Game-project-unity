@@ -131,7 +131,7 @@ namespace UI.Game2D
             if (e.passiveSkills != null)
                 foreach (var ps in e.passiveSkills)
                     if (ps != null && !string.IsNullOrEmpty(ps.skillName))
-                        d.Items.Add(new ModalItem { name = "〈" + ps.skillName + "〉", desc = ps.description });
+                        d.Items.Add(new ModalItem { name = "〈" + ps.skillName + "〉", desc = CombatSystem.BossParams.Describe(e.id, ps.description) });   // 数字の印 ({JudgmentDice} ほか) を今の値で埋める
             // 博士の「止まらない時計」(2026-11-13): 預かったランのヴェスカの各段に付く不利な効果 (目盛りは上の「ダウンの目盛り」の行に足されて出る)
             if (cm.VescaClockActive) d.Items.Add(new ModalItem { name = "〈" + GameLoop.VescaClock.Name + "〉", desc = GameLoop.VescaClock.Description });
             if (d.Items.Count == 0) d.Items.Add(new ModalItem { name = "パッシブなし", desc = "この敵は特別な力を持たない。", disabled = true });

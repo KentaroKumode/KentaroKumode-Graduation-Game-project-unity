@@ -692,8 +692,8 @@ ProcessDamage の中の OnPreDealDamage は「その陣営が攻撃している�
 | JudgmentFlames(審判の炎) | OnTurnEnd | `dmg=min(ChipCap, 1+ceil(currentTurn/3)+罪)`、実プレイヤーへ軽減無視（罪=totalBattles/8,max2 / ChipCap 基準 10・`BossParams` の基準値）。ターン係数は 2026-07-28 に 1→1/2、2026-08-15 に 1/2→1/3 へ緩和（15T 累積 108→90・上限は T≥19 まで届かない）。**シールドは肩代わりする**（③-C） |
 | JudgmentBlaze / AshArmor / AshCarapace | — | 旧 6 層ボスの機構。**[未装備]**（6 層は下の 5 つで組み直した・数値はクラスの XML コメント）。同じ旧機構の RoyalEmber / SinChain / EternalBurning / ReturnToAshes / ImmortalEmber / EmberAura / StarfireProliferation / ScorchedEarth は 2026-11-12 に削除（GAME.md §24） |
 | EmberOmen(業火の予兆) | OnTurnStart | 予兆ターン = HP>50% は T1/5/9…（周期4）、HP≤50% は T1/4/7…（周期3）。予兆Tだけ攻撃 +JudgmentDice（基準 8）。**[#104 修正]** 焦土契約と同じ差分更新（自分の寄与 `ember_omen_applied` を毎T頭に「予兆なら JudgmentDice、それ以外 0」へ合わせて `enemyDiceTotalBonus` を足し引き）。旧: `+=` を戻す処理が無く、予兆のたびに積み上がっていた |
-| AshRegrowth(灰の再生) | OnTurnStart | HP>50% かつ非予兆T: 最大HPの2%回復（最低1） |
-| EmberFury(憤怒の残滓) | OnTurnStart | T頭の HP≤50% のT: 攻撃 +3（それ以外 0）。**[#104 修正]** 業火の予兆と同じ差分更新（`ember_fury_applied`）。旧: 毎ターン `+=` で積み上がっていた |
+| AshRegrowth(灰の再生) | OnTurnStart | HP>50% かつ非予兆T: 最大HP × RegrowthRate（基準 0.02 = 2%・`BossParams`）回復（切り捨て・最低1）。2026-11-14 に直書きの 0.02f を `BossParam.RegrowthRate` へ移した（式は同じ） |
+| EmberFury(憤怒の残滓) | OnTurnStart | T頭の HP≤50% のT: 攻撃 +FuryAttack（基準 3・2026-11-14 に定数 `EmberFury.Bonus` から `BossParam.FuryAttack` へ移した）（それ以外 0）。**[#104 修正]** 業火の予兆と同じ差分更新（`ember_fury_applied`）。旧: 毎ターン `+=` で積み上がっていた |
 | ScorchedPact(焦土契約) | OnRollWin/OnTurnStart | 収支負けでスタック+1（上限5）。毎T 差分更新で `enemyDiceTotalBonus` に現在スタック×1 を反映（累積しない） |
 | BlazeBrand(烈炎) | OnTurnEnd/OnTurnStart | ブロック端子へ 2 本以上のT終了時に烈炎+1 / T開始時に烈炎の数だけ軽減無視ダメ |
 | Decree13th(13番目の宣告) | OnTurnStart/OnTurnEnd | 1/13でフラグ、本体が生存していれば成就で ceil((playerDiceTotal+enemyDiceTotal)×2.0) を軽減無視で実プレイヤーへ（2.0 は定数。プレイヤーの criticalMultiplier は 2026-08-08 から読まない・シールドは肩代わり） |

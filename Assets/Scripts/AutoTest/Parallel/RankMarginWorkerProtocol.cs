@@ -139,7 +139,7 @@ namespace AutoTest.ParallelSweep
                     axisAtStart = c.axisAtStart ?? Array.Empty<int>(),
                     mainPred = c.mainPred, mainPredCorr = c.mainPredCorr, mainActual = c.mainActual,
                     atkHist = c.atkHist ?? Array.Empty<int>(), dawnShots = c.dawnShots ?? Array.Empty<int>(),
-                    escRises = c.escRises, instEsc = c.instEsc,
+                    escRises = c.escRises, instEsc = c.instEsc, downs = c.downs,
                 };
             }
             return a;
@@ -190,6 +190,8 @@ namespace AutoTest.ParallelSweep
         public int[] dawnShots;
         /// <summary>[計装 2026-11-13] この戦闘でエスカレーションの段が上がった数 (ボス戦も) / そこから溜まった不安定化ポイント (end の行だけ)。</summary>
         public int escRises, instEsc;
+        /// <summary>[計装 2026-11-14] この戦闘 (ヴェスカは段) でボスがダウンしたターンの数。 Tools/boss_loss_report.py が読む。</summary>
+        public int downs;
     }
 
     [Serializable]
@@ -509,6 +511,9 @@ namespace AutoTest.ParallelSweep
                 "vescaClockHeld",
                 // 2026-11-14: 〈徒労〉の形 (UntilKing = 灰燼の王を倒すまで・既定 / Stacks = 旧い 3 つ持ち / LayerLong = 層の間ずっと) と、 別の形で宝箱が空になる確率 (%)
                 "toilMode", "toilChestEmptyPct",
+                // 2026-11-14: ボスの機構の値の差し替え (id:名前:値・灰燼の王の予兆 JudgmentDice / 憤怒 FuryAttack / 再生 RegrowthRate)。
+                //   灰燼の王の基礎の攻撃・最大 HP は上の enemyAttackSpec / enemyHpSpec (boss_layer6:N)。 足りなかった enemyHpMul も並べる
+                "bossParamSpec", "enemyHpMul",
                 // 2026-11-13: 配線の旧の式が、 攻撃の端子に挿さない手にも武器の素火力を数える旧い挙動へ戻す腕 (False = 直した挙動)
                 "v3.oldNoAttackBaseDmg",
                 // 2026-11-12 (#134): Optimal の配線のミスの率 (0 = ミスなし・Super と素朴版は経路を通らない)

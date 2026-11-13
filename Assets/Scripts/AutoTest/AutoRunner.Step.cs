@@ -83,6 +83,7 @@ namespace AutoTest
             GameLoop.GameHooks.BossDownDisabled = !bossDown;                             // [測定 2026-11-13] ボスのダウン
             GameLoop.GameHooks.Depth3HeavyDisabled = !depth3Heavy;                       // [測定 2026-11-13] 深さ 3 のボスの大技
             GameLoop.GameHooks.VescaClockHeldAtStart = vescaClockHeld;                   // [測定 2026-11-13] 博士の時計 (StartNewRun が読む)
+            CombatSystem.BossParams.Overrides = BossParamOverrides;                      // [測定 2026-11-14] ボスの機構の値 (bossParamSpec・空なら null = 本番と同じ)
             GameLoop.GameHooks.VescaDiceForce = System.Math.Max(0, vescaDiceForce);   // [測定 2026-11-11]   // [測定 2026-11-11] 武器の段の上限 (ラン終了時に 0 へ)
             CombatSystem.EnemyHpLedger.ProbeMainMult = ProbeMultClamp(probeMainMult);
             CombatSystem.EnemyHpLedger.ProbePassiveMult = ProbeMultClamp(probePassiveMult);

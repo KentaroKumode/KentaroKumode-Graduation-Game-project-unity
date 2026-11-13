@@ -24,6 +24,9 @@ namespace CombatSystem
         PoisonStackCap,    // 毒沼の主・毒の侵蝕の毒スタック上限 (DOTの最大強度)。 基準5
         MirrorReflectCap,  // 鏡の双子・鏡映の応答の反射ダメ上限。 基準9
         GoblinCall,        // ゴブリン王・号令の毎ターンの敵攻撃加算。 基準3
+        // 2026-11-14 (灰燼の王の測定の口): 末尾に足す (番号で保存している所は無いが、 並びは動かさない)
+        FuryAttack,        // 6層 灰燼の王・〈憤怒の残滓〉の HP 50% 以下のターンの敵攻撃上乗せ。 基準3 (旧 EmberFury.Bonus)
+        RegrowthRate,      // 6層 灰燼の王・〈灰の再生〉の毎ターンの回復 = 最大 HP × この値 (割合・%ではない)。 基準0.02 (= 2%)
         // 2026-11-12 (#126): RobeStacks (天衣無縫・読む側なし)・StanceAtkMult / WeakRollRatio (敵スタンス ADR-0005・呼ぶ所なし) を削除。
         //   番号で保存している所は無い (調整値の boss_tuning.json は名前で持ち、 L3 ボス調整器ごと削除)。
     }
@@ -32,8 +35,9 @@ namespace CombatSystem
     /// ボスの数値の正本 (機構パラメータの基準値・固有面ダイス) と、 敵データへの適用。
     ///
     /// <para><b>本体は基準値だけで完結する。</b> 外から値を差し替える口は <see cref="Overrides"/> だけで、
-    /// 既定は null (= 基準値)。 BOT・測定が値を差し込むときは AutoRunner の起動時にだけここへ入れる
-    /// (差し込んでいた L3 ボス調整器 AutoTest.BossTuning は 2026-11-12 に削除・#126。 いまは口だけで、 入れる側は無い)。
+    /// 既定は null (= 基準値)。 BOT・測定が値を差し込むときは AutoRunner の側からだけここへ入れる
+    /// (差し込んでいた L3 ボス調整器 AutoTest.BossTuning は 2026-11-12 に削除・#126。 2026-11-14 から測定の口 AutoRunner.bossParamSpec が
+    /// 毎ランの始めに入れ、 ラン終了で null へ戻す ── 書式は "id:名前:値"・実数値)。
     /// 本体から AutoTest の型を参照しないための境界 (2026-10-29)。</para>
     /// </summary>
     public static class BossParams
@@ -68,6 +72,11 @@ namespace CombatSystem
                 case BossParam.PoisonStackCap:    return new ParamSpec( 5f, 1f, 12f);
                 case BossParam.MirrorReflectCap:  return new ParamSpec( 9f, 0f, 15f);
                 case BossParam.GoblinCall:        return new ParamSpec( 3f, 0f, 12f);
+                // 2026-11-14: 灰燼の王の 2 つ (今までの直書きの値を基準へ移しただけ・値は変えていない)。
+                //   RegrowthRate は割合のまま持つ ── 基準を 0.02f の同じ定数にしておくと、 回復量の式 (最大 HP × 割合) が 1 ビットも変わらない
+                //   (% で持って実行時に /100f すると Mono の float で丸めが割れることがある)。
+                case BossParam.FuryAttack:        return new ParamSpec( 3f, 0f, 20f);
+                case BossParam.RegrowthRate:      return new ParamSpec(0.02f, 0f, 0.10f);
                 default:                          return new ParamSpec( 1f, 0f,  1f);
             }
         }
@@ -125,6 +134,26 @@ namespace CombatSystem
 
         /// <summary>id のボスの param を丸めた整数値。</summary>
         public static int ParamInt(string id, BossParam p) => Mathf.RoundToInt(Param(id, p));
+
+        /// <summary>敵のパッシブの説明文の数字を、 その敵の param の今の値で埋める (2026-11-14)。
+        /// <c>{名前}</c> = <see cref="Param"/> の値 (例 <c>{JudgmentDice}</c> → 8)、 <c>{名前%}</c> = 値 ×100 の % の数 (例 <c>{RegrowthRate%}</c> → 2)。
+        /// enemies.json の説明文は数字を直書きせずこの印で持つ ── 測定の口で値を変えても、 画面の数字が実際の値と食い違わない。
+        /// 印の無い文はそのまま返す。 id は敵の id (ボスでなければ基準値で埋まる)。</summary>
+        public static string Describe(string id, string text)
+        {
+            if (string.IsNullOrEmpty(text) || text.IndexOf('{') < 0) return text;
+            foreach (BossParam p in System.Enum.GetValues(typeof(BossParam)))
+            {
+                string name = p.ToString();
+                if (text.IndexOf("{" + name, System.StringComparison.Ordinal) < 0) continue;
+                float v = Param(id, p);
+                text = text.Replace("{" + name + "%}", Fmt(v * 100f)).Replace("{" + name + "}", Fmt(v));
+            }
+            return text;
+        }
+
+        private static string Fmt(float v)
+            => (Mathf.Round(v * 100f) / 100f).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
         // ===== 素ダイス (期待値ベース) =====
         // ダイス期待値の範囲 (1d1=1 〜 5d9=25)。 ダイス個数≤5・最高出目≤9 の制約。

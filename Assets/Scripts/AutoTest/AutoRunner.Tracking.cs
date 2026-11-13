@@ -126,6 +126,7 @@ namespace AutoTest
             System.Array.Copy(CombatSystem.CombatStats.DamageBreakdown, _bdAtStart, _bdAtStart.Length);
             System.Array.Copy(CombatSystem.EnemyHpLedger.Cum, _ledAtStart, _ledAtStart.Length);
             _pendingShownFloor = gm?.Run?.currentFloor ?? 0;
+            _downsAtStart = CombatSystem.BossDownDiag.TotalDowns;   // [計装 2026-11-14] この戦闘 (段) のダウンの数は終わりとの差
             _pendingAxis = new int[ItemSystem.PassiveSkills.AxisRules.Ranked.Length];
             for (int ai = 0; ai < _pendingAxis.Length; ai++)
                 _pendingAxis[ai] = ItemSystem.PassiveSkills.AxisRules.Count(gm?.Run, ItemSystem.PassiveSkills.AxisRules.Ranked[ai]);
@@ -142,6 +143,7 @@ namespace AutoTest
         // [計装 2026-11-10] 経路別の入った量 (EnemyHpLedger) の段の開始時点・見せる層・偏重 6 軸の数
         private readonly double[] _ledAtStart = new double[CombatSystem.EnemyHpLedger.Length];
         private int _pendingShownFloor;
+        private long _downsAtStart;
         private int[] _pendingAxis;
 
         private float[] LedgerSinceStart()
@@ -214,6 +216,7 @@ namespace AutoTest
                 playerMaxHpEnd = gm?.Run?.playerMaxHP ?? 0,
                 encounterKey = _pendingEncounterKey,
                 escRises = gm?.EscalationRisesThisCombat ?? 0, instEsc = gm?.InstabilityFromEscalationThisCombat ?? 0,   // [計装 2026-11-13]
+                downs = (int)(CombatSystem.BossDownDiag.TotalDowns - _downsAtStart),   // [計装 2026-11-14]
             };
             _cur.combats.Add(rec);
             _cur.totalCombats++;
@@ -513,6 +516,7 @@ namespace AutoTest
             GameLoop.GameHooks.BossDownDisabled = false;                        // [測定 2026-11-13] ボスのダウンを既定 (あり) へ
             GameLoop.GameHooks.Depth3HeavyDisabled = false;                     // [測定 2026-11-13] 深さ 3 のボスの大技を既定 (あり) へ
             GameLoop.GameHooks.VescaClockHeldAtStart = false;                   // [測定 2026-11-13] 博士の時計を既定 (預からない) へ
+            CombatSystem.BossParams.Overrides = null;                           // [測定 2026-11-14] ボスの機構の値を既定 (基準値) へ
             GameLoop.GameHooks.VescaDiceForce = 0;               // [測定 2026-11-11] 武器の段の上限を外す
             CombatSystem.EnemyHpLedger.ProbeMainMult = 1f;      // [測定用の物差し 2026-11-10] ラン終了で既定 (1) へ戻す
             CombatSystem.EnemyHpLedger.ProbePassiveMult = 1f;

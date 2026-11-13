@@ -1824,6 +1824,11 @@ items.json 側は誤読防止のため全武器 `6` に揃えてある。
 - 旧 JudgmentBlaze/AshArmor/ImmortalEmber/EmberAura/StarfireProliferation/ScorchedEarth は
   **相互攻撃パイプで発火経路が壊れる**ため全廃（OnPreDealDamage 依存だった）。
 
+> **2026-11-14: 灰燼の王（深さ 6・画面の第 4 層）の 5 つの値に測定の口を付けた（既定の値は変えていない）。** 測定（Super・嵐なし・イベントあり・3,000 ラン）で勝率 97.2%・10.9 ターン・予想損失 5.9%（第 3 層のボス 92.2% / 7.4%・ヴェスカ p4 78.1% / 24.8%）と軽く、作者が「もっと強くしていい」と決めた。
+> 口: 基礎の攻撃 `enemyAttackSpec=boss_layer6:N`（今 6 / 案 9）・最大 HP `enemyHpSpec=boss_layer6:N`（1945 / 2300）・`bossParamSpec="id:名前:値,…"` で〈業火の予兆〉`JudgmentDice`（+8 / +12）・〈憤怒の残滓〉`FuryAttack`（+3 / +5）・〈灰の再生〉`RegrowthRate`（0.02 / 0.03・最大 HP の割合）。値は `BossParams.Spec` が正本で、説明文の数字は enemies.json の印（`{JudgmentDice}` ほか）を `BossParams.Describe` が今の値で埋める。
+> 測定の計画（Super・挑戦 0・嵐なし・イベントあり・各 3,000 ラン）: K0 口なし / K-atk 攻撃 9 だけ / K-all 攻撃 9・予兆 +12・憤怒 +5・再生 3% / K-all-hp K-all + HP 2300 / K-hp HP 2300 だけ。物差しは予想損失（`Tools/boss_loss_report.py <実行ディレクトリ> …`・ダウンの回数も出る）とクリア率。採る値は結果を見て作者が決め、決まったら `enemies.json`・`BossParams.Spec` へ実数値で書き込む。
+> ダウンの目盛り（80%・30%）・段の切り替え（50%）・再生は最大 HP の割合なので、HP を上げても同じ位置で働く（2300 なら目盛り 1840 / 690・段の切り替え 1150）。
+
 **全ボス共通**: ボスノードの敵に「狂暴化」を自動付与（T50 で回復封印・敵被ダメ×3・ダイス+10）。
 
 ### 13-2. ボス署名ダイス（ADR-0007）
