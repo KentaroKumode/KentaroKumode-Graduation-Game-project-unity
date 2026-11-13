@@ -97,10 +97,14 @@ namespace MapSystem.FreeMove
         }
 
         /// <summary>フェーズ 3 の終わりの半径: ボスの点から一番遠い隣の点まで (ボスの点とその隣の点が全部入る)。</summary>
-        public static double FinalRadius(FreeMapLayout L)
+        public static double FinalRadius(FreeMapLayout L) => FinalRadiusAt(L, L.goal);
+
+        /// <summary>点 <paramref name="b"/> をボスの点とした時のフェーズ 3 の終わりの半径 (b から一番遠い隣の点まで)。
+        /// BOT がボスの点を知らないまま輪を先読みする時に、 候補の点ごとに使う (2026-11-14・式は <see cref="FinalRadius"/> と同じ)。</summary>
+        public static double FinalRadiusAt(FreeMapLayout L, int b)
         {
             double r = 0;
-            foreach (int v in L.adj[L.goal]) r = Math.Max(r, L.Dist(L.goal, v));
+            foreach (int v in L.adj[b]) r = Math.Max(r, L.Dist(b, v));
             return r + 1e-6;
         }
 
@@ -114,10 +118,15 @@ namespace MapSystem.FreeMove
         /// フェーズ 4 は半径 0 (ボスの点の外は全部が嵐の中・<see cref="InStorm(FreeMapLayout, int, int, Schedule)"/> はボスの点を別に扱う)。
         /// 段の途中は線形に補間する。 時計の単位 (手番 / 不安定化ポイント) によらず、 段の長さ <paramref name="k"/> だけで決まる。</summary>
         public static void RingAt(FreeMapLayout L, int s, Schedule k, out Vec2 center, out double radius)
+            => RingAt(L, s, k, Phase2Center(L), L.pos[L.goal], FinalRadius(L), out center, out radius);
+
+        /// <summary>輪の式そのもの。 フェーズ 2 の終わりの中心 <paramref name="c2"/>・ボスの点の位置 <paramref name="b"/>・フェーズ 3 の終わりの半径 <paramref name="r3"/> を外から渡す
+        /// (2026-11-14・BOT が隠れたボスの点を読まずに輪を先読みするため。 本体は上の版から層の値を渡す = 動きは変わらない)。</summary>
+        public static void RingAt(FreeMapLayout L, int s, Schedule k, Vec2 c2, Vec2 b, double r3, out Vec2 center, out double radius)
         {
             double r0 = FullRadius(L);
-            var c0 = MapCenter; var c2 = Phase2Center(L); var b = L.pos[L.goal];
-            double r1 = r0 * FreeMapParams.StormPhase1EndRadius, r2 = r0 * FreeMapParams.StormPhase2EndRadius, r3 = FinalRadius(L);
+            var c0 = MapCenter;
+            double r1 = r0 * FreeMapParams.StormPhase1EndRadius, r2 = r0 * FreeMapParams.StormPhase2EndRadius;
             if (s <= 0) { center = c0; radius = r0; return; }
             if (s < k.Phase2Start)
             {

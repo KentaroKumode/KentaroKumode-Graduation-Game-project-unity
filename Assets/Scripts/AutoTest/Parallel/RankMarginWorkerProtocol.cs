@@ -73,6 +73,9 @@ namespace AutoTest.ParallelSweep
         /// <summary>[計装 2026-11-13] 嵐の層の不安定化 (12 列ずつ: 深さ, 累計, フェーズ, 内訳 取る / 激化 / 歩く / イベントのターン / 嵐を動かす,
         /// 崩れ始めた手番 (-1 = 崩れなかった), 嵐の中を歩いた歩数, 嵐で払った HP, 航行の手番・ボスの点の戦闘に入った時の値・AutoRunner.RunRec.stormLayers)。</summary>
         public int[] stormLayers = Array.Empty<int>();
+        /// <summary>[計装 2026-11-14] 嵐の層の航行の判断 (5 列ずつ: 深さ, 出口へ切り上げた時の累計 (-1 = 切り上げなかった), その時の航行の手番,
+        /// ボスの点が見えた航行の手番 (-1 = 見えないまま), ボスを探して歩いた歩数・ボスの点の戦闘に入った時の値・AutoRunner.RunRec.stormNav)。</summary>
+        public int[] stormNav = Array.Empty<int>();
         /// <summary>[計装 2026-11-10] ラン開始時に実際に入っていた整備パネルの段。</summary>
         public string metaRanks = "";
         /// <summary>[計装 2026-11-12] ラン開始時の職業 (lockWeaponFamily の測定では武器の家系)。</summary>
@@ -112,6 +115,7 @@ namespace AutoTest.ParallelSweep
                 stateSnaps = r.stateSnaps != null ? r.stateSnaps.ToArray() : Array.Empty<int>(),
                 mapVisit = r.mapVisit != null ? r.mapVisit.ToArray() : Array.Empty<int>(),
                 stormLayers = r.stormLayers != null ? r.stormLayers.ToArray() : Array.Empty<int>(),
+                stormNav = r.stormNav != null ? r.stormNav.ToArray() : Array.Empty<int>(),
                 metaRanks = r.metaRanks ?? "",
                 startClass = r.startClass ?? "",
                 ashBase = r.ashBase, ashBaseRevisit = r.ashBaseRevisit, ashBaseChoice = r.ashBaseChoice, ashBaseTurn = r.ashBaseTurn,
@@ -517,6 +521,8 @@ namespace AutoTest.ParallelSweep
                 "toilDamageDownPct",
                 // 2026-11-14: 航行が〈徒労〉を読むか (True = 既定・持っている間 通常の戦闘の点は報酬なし・False = 旧い動き)
                 "navToilAware",
+                // 2026-11-14 (#140 の 2): 航行が嵐を読むか (False = 既定・旧い動き / True = 隠れたボスを探す・取る代償・値で切り上げ・嵐の HP を道の費用に)
+                "navStormAware",
                 // 2026-11-14: ボスの機構の値の差し替え (id:名前:値・灰燼の王の予兆 JudgmentDice / 憤怒 FuryAttack / 再生 RegrowthRate)。
                 //   灰燼の王の基礎の攻撃・最大 HP は上の enemyAttackSpec / enemyHpSpec (boss_layer6:N)。 足りなかった enemyHpMul も並べる
                 "bossParamSpec", "enemyHpMul",

@@ -214,6 +214,126 @@ namespace AutoTest
             return shop >= 0 && hopsFromThere[shop] != int.MaxValue && supply >= hopsFromThere[shop] * FreeMapParams.MoveSupply;
         }
 
+        // =====================================================================
+        //  嵐の航行 (2026-11-14・#140 の 2・口 navStormAware)
+        // =====================================================================
+
+        /// <summary>[計装] 嵐の見方で探す行き先の候補が尽きて、 終点の位置へ向かった回数 (バッチ累計・0 のはず)。</summary>
+        public static long FreeNavStormSearchFallback;
+        /// <summary>[計装] この層の航行の判断の記録 (<see cref="RunRec.stormNav"/>・層が変わると戻す)。</summary>
+        private FreeMapLayout _stormNavLayout;
+        private int _stormNavCutPts = -1, _stormNavCutTurn = -1, _stormNavBossTurn = -1, _stormNavSearchSteps;
+        /// <summary>ランの始まりの不安定化の理由ごとの通算 (<see cref="GameManager.InstabilityTotals"/> の写し)。 このランの差から戦闘 1 回あたりの激化を見る。</summary>
+        private readonly long[] _runInstabilityAtStart = new long[GameManager.InstabilityTotals.Length];
+
+        /// <summary>この判断で嵐の見方を使うか (口 navStormAware・回避ありの方策・不安定化の時計の層)。 使わなければ null。</summary>
+        private StormNavView StormNavFor(FloorMap map, FreeMapSim sim, bool avoid)
+        {
+            if (!navStormAware || !avoid || sim == null || !sim.InstabilityMode) return null;
+            var revealed = new bool[sim.Layout.Count];
+            int boss = -1;
+            foreach (var n in map.GetAllNodes())
+            {
+                int i = n.index;
+                if (i < 0 || i >= revealed.Length) continue;
+                revealed[i] = n.revealed;
+                if (n.revealed && n.EffectiveType == TileType.Boss) boss = i;
+            }
+            return new StormNavView(sim, revealed, boss);
+        }
+
+        /// <summary>[計装] 層が変わったら判断の記録を戻し、 ボスの点が見えた手番を記録する (種別が見えている点だけを見る・口によらない)。</summary>
+        private void StormNavObserve(FloorMap map, FreeMapSim sim)
+        {
+            if (!ReferenceEquals(_stormNavLayout, sim.Layout))
+            {
+                _stormNavLayout = sim.Layout;
+                _stormNavCutPts = _stormNavCutTurn = _stormNavBossTurn = -1; _stormNavSearchSteps = 0;
+            }
+            if (!sim.InstabilityMode || _stormNavBossTurn >= 0) return;
+            foreach (var n in map.GetAllNodes())
+                if (n.index >= 0 && n.revealed && n.EffectiveType == TileType.Boss) { _stormNavBossTurn = sim.Turn; return; }
+        }
+
+        /// <summary>今いる点から出口へ歩いた時に払う嵐の HP の見込み (切り上げ・ボスが見えていなければ候補の平均)。</summary>
+        private static int StormExitHp(StormNavView sv, int at)
+        {
+            var e = sv.Exit(at, sv.Points);
+            return e.reachable ? (int)System.Math.Ceiling(e.hp - 1e-9) : 0;
+        }
+
+        /// <summary><see cref="Sustainable"/> の点の版。 <paramref name="sv"/> が null なら今までと同じ呼び方 (終点の位置を読む)。
+        /// 嵐の見方では、 出口までの歩数を <see cref="StormNavView.ExitHops"/>、 道の上の嵐の HP を <see cref="StormNavView.Exit"/> から読む (隠れたボスの点を読まない)。</summary>
+        private static bool SustainableAt(MapManager mm, FreeMapSim sim, int node, int supply, RunState run, StormNavView sv)
+        {
+            if (sv == null) return Sustainable(mm, sim, sim.HopsFrom(node), sim.Layout.goal, supply, run);
+            int eh = sv.ExitHops[node];
+            if (eh != int.MaxValue && supply + HpWalkStepsAfterStorm(run, mm, StormExitHp(sv, node)) >= eh * FreeMapParams.MoveSupply + FreeMapExitMargin) return true;
+            if (eh != int.MaxValue && supply >= eh * FreeMapParams.MoveSupply + FreeMapExitMargin) return true;
+            var h = sim.HopsFrom(node);
+            int shop = NearestRefuel(mm, sim, h, run);
+            return shop >= 0 && h[shop] != int.MaxValue && supply >= h[shop] * FreeMapParams.MoveSupply;
+        }
+
+        /// <summary>このランで見た、 戦闘 1 回あたりのエスカレーションの段の数 (画面の「不安定 +N」と同じ情報・このランの通算の差から)。
+        /// 戦闘の数 = 勝ちで溜まった分 ÷ 1 回の量 (通常・エリート・番人)。 まだ戦っていなければ 0 (下限)。 乱数を引かない・ランの中で決まる (シードの対を崩さない)。</summary>
+        private double StormEscalationPerFight()
+        {
+            long D(InstabilitySource s) => GameManager.InstabilityTotals[(int)s] - _runInstabilityAtStart[(int)s];
+            double Per(InstabilitySource s) { int p = Instability.PointsOf(s); return p > 0 ? (double)D(s) / p : 0.0; }
+            double fights = Per(InstabilitySource.Battle) + Per(InstabilitySource.Elite) + Per(InstabilitySource.Pursuer);
+            return fights > 0 ? Per(InstabilitySource.Escalation) / fights : 0.0;
+        }
+
+        /// <summary>
+        /// Optimal (Rank の貪欲) の嵐の代償 (2026-11-14・口 navStormAware)。 Super の計画と同じ式 (<see cref="StormCostCtx"/>) で、 1 点先だけを見る:
+        /// 代償 (対数オッズ) = (嵐の中の戦闘で増える損) + (歩く間の嵐の HP の損) + (その点に立った後の出口の代償 − 今の出口の代償)。
+        /// Rank の点数へは、 <b>宝の点の値で釣り合わせて</b>直す: 1 対数オッズ = (宝の点の Rank の値) ÷ (宝の点の Super の値) (今の HP で)。 新しい重みは足さない。
+        /// 代償を引いて値が 0 以下になった点は行き先にしない ── どの点も残らなければ出口へ (猶予が尽きた)。
+        /// </summary>
+        private sealed class StormRankCtx
+        {
+            private readonly AutoRunner _r;
+            private readonly StormCostCtx _ctx;
+            private readonly RunState _run;
+            private readonly int _at, _layer;
+            private readonly MacroSim _s0;
+            private readonly float _exit0, _rate;
+
+            public StormRankCtx(AutoRunner r, StormNavView sv, FreeMapSim sim, RunState run, int at, float hpRatio, float dangerTarget)
+            {
+                _r = r; _run = run; _at = at;
+                _layer = Mathf.Clamp(FloorPlan.OrdinalOf(run.Depth), 0, MacroHpPer10.Length - 1);
+                _ctx = new StormCostCtx(r, sv, run, _layer);
+                _s0 = new MacroSim
+                {
+                    hp = hpRatio, coins = run.coins, supply = NavSupply(run, sim), cap = run.provisionCap,
+                    toil = r.NavToilRewardless(run), pts = sv.Points,
+                };
+                _exit0 = _ctx.ExitCost(at, _s0);
+                // 交換の比: 宝の点 (種別が見えている) の Rank の値 ÷ Super の値
+                var t = new MapNode("", 0, -1, TileType.Treasure) { revealed = true };
+                float desireT = RankCeil - r.Rank(t, hpRatio, r._curCombatAverse, false, run, dangerTarget);
+                var tmp = _s0;
+                float gainT = r.MacroGain(t, _layer, run, ref tmp);
+                _rate = gainT > 1e-6f ? Mathf.Max(0f, desireT) / gainT : 0f;
+            }
+
+            /// <summary>点 n の嵐の代償 (Rank の点数)。 歩く途中で HP が尽きるなら大きな値 (行き先にしない)。</summary>
+            public float Penalty(MapNode n)
+            {
+                var s = _s0;
+                if (!_ctx.Walk(_at, n.index, ref s, out float walk)) return float.MaxValue;
+                var sNo = s; sNo.stormMul = 0f;
+                float gNo = _r.MacroGain(n, _layer, _run, ref sNo);
+                var sSt = s;
+                float gSt = _r.MacroGain(n, _layer, _run, ref sSt);
+                _ctx.Arrive(n, ref sSt);
+                float cost = (gNo - gSt) + walk + _ctx.ExitCost(n.index, sSt) - _exit0;
+                return cost * _rate;
+            }
+        }
+
         private bool DoNavigateFree(GameManager gm, MapManager mm)
         {
             var run = gm.Run;
@@ -261,6 +381,11 @@ namespace AutoTest
             int mode = avoid ? 1 : 0;
             FreeNavDecisions[mode]++;
             var hopsFromMe = sim.HopsFrom(at);
+            // ── 嵐の見方 (2026-11-14・口 navStormAware・回避ありの方策の嵐の層だけ。 null = 今までと同じ動き) ──
+            StormNavView sv = StormNavFor(map, sim, avoid);
+            StormNavObserve(map, sim);   // [計装] ボスの点が見えた手番 (読むだけ)
+            //   出口までの歩数: 嵐の見方ではボスの点を読まない (見えていなければ候補の平均)
+            int exitHopsAt = sv != null ? sv.ExitHops[at] : hopsFromMe[L.goal];
 
             // [計装 2026-11-04] 戦えない HP か (Rank の低 HP ゲートと同じ閾値)。 下の踏み込みの計数だけが読む。
             //   (同日に試した「重み付きの道」「出口までの HP 取り置き」は、 同一シード 5,000 ラン でクリア率を
@@ -312,7 +437,7 @@ namespace AutoTest
                 }
                 bool chased = sim.FoeAlive && sim.FoeMode == FoeMode.Chase;
                 bool foeNear = sim.FoeAlive && (sim.FoeVisible || sim.Stone().level >= 2);
-                int exitCost = hopsFromMe[L.goal] == int.MaxValue ? 0 : hopsFromMe[L.goal] * FreeMapParams.MoveSupply;
+                int exitCost = exitHopsAt == int.MaxValue ? 0 : exitHopsAt * FreeMapParams.MoveSupply;
                 if (!sim.FlareOn && !chased && !foeNear
                     && NavSupply(run, sim) >= exitCost + FreeMapExitMargin + FreeMapParams.FlareSupply
                     && Unscouted(FreeMapParams.FlareRange) >= FlareMinUnscouted
@@ -340,8 +465,11 @@ namespace AutoTest
             //   ・満タンでも出口に届かない時は、 今より出口に近い店へ (店を伝って出口へ進む)。 無ければ出口へ (足りない分は HP)
             bool full = run.provision >= run.provisionCap;
             // 嵐 (2026-11-13・(b)): 出口までの道で払う嵐の HP を、 HP で歩ける分から先に引く (嵐の無い層では 0 = 今までどおり)
-            bool exitOk = hopsFromMe[L.goal] != int.MaxValue && NavSupply(run, sim) + HpWalkStepsAfterStorm(run, mm, StormHpOnPath(sim, at, L.goal)) >= hopsFromMe[L.goal] * FreeMapParams.MoveSupply + FreeMapExitMargin;
-            int refuel = full ? NearestRefuel(mm, sim, hopsFromMe, run, at, sim.HopsFrom(L.goal), sim.HopsFrom(L.goal)[at])
+            //   嵐の見方 (口 navStormAware): 道の上の嵐の HP は、 歩く間に溜まる分で輪が縮むのを数えた見込み (ボスが見えていなければ候補の平均)
+            int exitStormHp = sv != null ? StormExitHp(sv, at) : StormHpOnPath(sim, at, L.goal);
+            bool exitOk = exitHopsAt != int.MaxValue && NavSupply(run, sim) + HpWalkStepsAfterStorm(run, mm, exitStormHp) >= exitHopsAt * FreeMapParams.MoveSupply + FreeMapExitMargin;
+            int[] toGoalArr = full ? (sv != null ? sv.ExitHops : sim.HopsFrom(L.goal)) : null;
+            int refuel = full ? NearestRefuel(mm, sim, hopsFromMe, run, at, toGoalArr, toGoalArr[at])
                               : NearestRefuel(mm, sim, hopsFromMe, run, at);
             bool refuelOk = refuel >= 0 && NavSupply(run, sim) >= hopsFromMe[refuel] * FreeMapParams.MoveSupply;
             if (refuel < 0 && !sim.FlareOn && !(sim.FoeAlive && sim.FoeMode == FoeMode.Chase)
@@ -357,34 +485,37 @@ namespace AutoTest
                 if (unknown >= 2 && gm.UseFlare()) { FreeMapShopFlares++; FreeNavFlares++; return false; }
             }
             bool toExit = _freeMapActions > MaxFreeMapActionsPerFloor
-                          || hopsFromMe[L.goal] == int.MaxValue
+                          || exitHopsAt == int.MaxValue
                           || (!exitOk && !refuelOk)
-                          || (sim.StormMode && sim.StormPhase >= 3);   // 嵐 (2026-11-13・(a)): フェーズ 3 に入ったら出口へ (輪がボスの点へ縮み、 フェーズ 4 はボスの点のほか全部が嵐の中)
+                          || (sv == null && sim.StormMode && sim.StormPhase >= 3);   // 嵐 (2026-11-13・(a)): フェーズ 3 に入ったら出口へ (輪がボスの点へ縮み、 フェーズ 4 はボスの点のほか全部が嵐の中)。
+                                                                                     //   嵐の見方 (口 navStormAware) では外す ── 切り上げは下の値の比較 (取る価値 − 嵐の代償 ≦ 0) で出る
             if (!toExit && !exitOk && refuelOk) target = refuel;   // 先に補給
-            else if (!toExit && WantsTerritoryTreasure(mm, sim, hopsFromMe, run, hpRatio))
+            else if (!toExit && WantsTerritoryTreasure(mm, sim, hopsFromMe, run, hpRatio, sv))
             {
                 target = sim.TreasureNode;                          // 縄張りの宝を取りに入る (取ったら下の行き先選びへ戻る = 出る)
                 if (_freeMapTreasureLayout != L) { _freeMapTreasureLayout = L; FreeNavTreasureTrips++; }
             }
             else if (!toExit && v3.macroPlan)
             {
-                target = MacroTarget(gm, mm, sim, L, at, hopsFromMe, run);
+                target = MacroTarget(gm, mm, sim, L, at, hopsFromMe, run, sv);
                 if (target < 0) toExit = true;
             }
             else if (!toExit)
             {
                 int fearR = navFear > 0f ? FearRange() : 0;
                 int[] fearHops = fearR > 0 ? FearFoeHops(sim, at) : null;   // [測定 2026-11-12・#35] 恐れ
+                var rankStorm = sv != null ? new StormRankCtx(this, sv, sim, run, at, hpRatio, dangerTarget) : null;   // 嵐の見方: 点の値から嵐の代償を引く
                 float best = 0f;
                 foreach (var n in map.GetAllNodes())
                 {
-                    if (n.index < 0 || n.index == at || n.index == L.goal || n.index == L.start) continue;
+                    if (n.index < 0 || n.index == at || n.index == (sv == null ? L.goal : sv.Boss) || n.index == L.start) continue;
                     if (n.activated || sim.IsSunk(n.index)) continue;             // 使い切った点・沈んだ点
                     if (hopsFromMe[n.index] == int.MaxValue) continue;
                     // 行った先から出口か補給できる店まで歩けない点は寄らない
-                    if (!Sustainable(mm, sim, sim.HopsFrom(n.index), L.goal, NavSupply(run, sim) - hopsFromMe[n.index] * FreeMapParams.MoveSupply, run)) continue;
+                    if (!SustainableAt(mm, sim, n.index, NavSupply(run, sim) - hopsFromMe[n.index] * FreeMapParams.MoveSupply, run, sv)) continue;
                     float desire = !n.revealed ? UnknownNodeDesire
                                  : RankCeil - Rank(n, hpRatio, _curCombatAverse, false, run, dangerTarget);
+                    if (rankStorm != null) desire -= rankStorm.Penalty(n);
                     if (desire <= 0f) continue;
                     float cost = hopsFromMe[n.index] * FreeMapParams.MoveSupply;
                     float value = desire / (1f + cost / 100f);
@@ -394,7 +525,20 @@ namespace AutoTest
                 }
                 if (target < 0) toExit = true;   // 近くの未使用の点が 1 つも無ければ出口へ
             }
-            if (toExit) { target = L.goal; _curBossNear = true; FreeNavExits[mode]++; }
+            if (toExit)
+            {
+                if (sv == null) { target = L.goal; _curBossNear = true; }
+                else
+                {
+                    // 嵐の見方: ボスの点が見えていればそこへ。 見えていなければ、 候補が一番よく見える点へ探しに行く (隠れた位置は読まない)
+                    target = sv.Boss >= 0 ? sv.Boss : sv.SearchTarget(at);
+                    if (target < 0) { target = L.goal; FreeNavStormSearchFallback++; }   // 候補が尽きた (起きないはず・検算)
+                    _curBossNear = sv.Boss >= 0;
+                    if (sv.Boss < 0) _stormNavSearchSteps++;
+                }
+                FreeNavExits[mode]++;
+                if (sim.InstabilityMode && _stormNavCutPts < 0) { _stormNavCutPts = sim.Instability; _stormNavCutTurn = sim.Turn; }   // [計装] 切り上げた時
+            }
 
             // S4: 次に向かう点の戦闘名が分からず、 近ければ偵察してから決める (同じ点では 1 回まで・追われている時はしない)
             if (v3.superNav && !toExit && target >= 0 && _freeMapActions <= MaxFreeMapActionsPerFloor
@@ -413,12 +557,13 @@ namespace AutoTest
             }
 
             // ── 次の 1 歩 ──
-            int hop = sim.StepToward(at, target);
+            //   嵐の見方: 嵐の中の 1 歩の HP を道の費用に入れる (外を回る道と中を突っ切る道を比べる)
+            int hop = sv != null ? sv.StormStep(at, target) : sim.StepToward(at, target);
             // 行動の上限 (の手前) を過ぎたら避けるのをやめて出口へ真っ直ぐ歩く ── 避け道の往復で層に閉じ込められない
             if (avoid && _freeMapActions <= MaxFreeMapActionsPerFloor)
             {
                 // 縄張りを出ない追跡者 (2026-11-12): 払える遠回りなら、 縄張りを横切らない道を選ぶ (行き先が縄張りの中なら、 踏む縄張りの点が一番少ない道)
-                hop = TerritoryAwareStep(mm, sim, run, at, target, hopsFromMe, hop);
+                hop = TerritoryAwareStep(mm, sim, run, at, target, hopsFromMe, hop, sv);
                 // 新しい点へ着けないまま時間が過ぎたら、 その場の 1 歩の避け方ではなく行き先までの迂回路を引く (2026-11-04)
                 if (_freeMapDetourTarget != target) _freeMapDetourTarget = -1;
                 if (_freeMapDetourTarget < 0 && _freeMapSinceProgress >= FreeMapStallActions && sim.FoeAlive)
@@ -470,12 +615,12 @@ namespace AutoTest
         /// <summary>縄張りの宝を取りに行くか (最小の規則): 宝が残っていて・行った先から出口か店まで歩けて、
         /// 「いまの HP の割合 − 追跡者の戦闘で失う HP の見積もり」が <see cref="territoryTreasureHpMargin"/> 以上の時だけ。
         /// 追跡者を倒した後は見積もり 0。 追跡者の性質は読まない (見積もりは層のエリートから)。</summary>
-        private bool WantsTerritoryTreasure(MapManager mm, FreeMapSim sim, int[] hopsFromMe, RunState run, float hpRatio)
+        private bool WantsTerritoryTreasure(MapManager mm, FreeMapSim sim, int[] hopsFromMe, RunState run, float hpRatio, StormNavView sv = null)
         {
             if (!sim.TreasureAvailable || territoryTreasureHpMargin >= 1f || _freeMapActions > MaxFreeMapActionsPerFloor) return false;
             int t = sim.TreasureNode;
             if (t == sim.Me || sim.IsSunk(t) || hopsFromMe[t] == int.MaxValue) return false;
-            if (!Sustainable(mm, sim, sim.HopsFrom(t), sim.Layout.goal, run.provision - hopsFromMe[t] * FreeMapParams.MoveSupply, run)) return false;
+            if (!SustainableAt(mm, sim, t, run.provision - hopsFromMe[t] * FreeMapParams.MoveSupply, run, sv)) return false;
             int layer = Mathf.Clamp(FloorPlan.OrdinalOf(run.Depth), 0, FloorPlan.LastOrdinal);
             float loss = 0f;
             if (sim.FoeAlive)
@@ -515,7 +660,7 @@ namespace AutoTest
         /// 踏む縄張りの点が一番少なく・その中で一番短い道 (<see cref="FreeMapSim.StepAvoidingTerritory"/>) を、
         /// 最短の道より <see cref="navTerritoryDetour"/> 歩長いところまで・行った先から出口か店まで歩ける時 (<see cref="Sustainable"/>) だけ選ぶ。
         /// 選べなければ <paramref name="direct"/> (最短の道の 1 歩) のまま。 旧い作り (<c>Leashed = false</c>) と −1 では何もしない。</summary>
-        private int TerritoryAwareStep(MapManager mm, FreeMapSim sim, RunState run, int at, int target, int[] hopsFromMe, int direct)
+        private int TerritoryAwareStep(MapManager mm, FreeMapSim sim, RunState run, int at, int target, int[] hopsFromMe, int direct, StormNavView sv = null)
         {
             if (navTerritoryDetour < 0 || !sim.Leashed || !sim.FoeAlive || target < 0 || target == at) return direct;
             if (hopsFromMe[target] == int.MaxValue) return direct;
@@ -525,7 +670,7 @@ namespace AutoTest
             if (step == direct || terr >= TerritoryStepsOnShortest(sim, at, target)) return direct;
             int extra = hops - hopsFromMe[target];
             bool afford = extra <= navTerritoryDetour
-                && Sustainable(mm, sim, sim.HopsFrom(target), sim.Layout.goal, run.provision - hops * FreeMapParams.MoveSupply, run);
+                && SustainableAt(mm, sim, target, run.provision - hops * FreeMapParams.MoveSupply, run, sv);
             if (!afford) { FreeNavTerritoryDetourRefused++; return direct; }
             FreeNavTerritoryDetours++;
             return step;

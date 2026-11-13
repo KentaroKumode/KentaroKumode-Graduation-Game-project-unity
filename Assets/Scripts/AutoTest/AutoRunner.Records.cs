@@ -84,6 +84,9 @@ namespace AutoTest
             public int downs;
         }
 
+        /// <summary><see cref="RunRec.stormNav"/> の 1 層の列の数。</summary>
+        public const int StormNavCols = 5;
+
         /// <summary><see cref="RunRec.stormLayers"/> の 1 層の列の数。</summary>
         public const int StormLayerCols = 12;
 
@@ -121,6 +124,11 @@ namespace AutoTest
             /// (深さ, 累計, フェーズ 0〜4, 内訳 取る, 激化, 歩く, イベントのターン, 嵐を動かす, 崩れ始めた手番 (-1 = 崩れなかった・深さ 6 は 0), 嵐の中を歩いた歩数, 嵐で払った HP, 航行の手番)。
             /// 内訳は層で溜まった分だけ (深さ 6 の始まりの分は入らない = 累計 − 内訳の和)。 stormEnabled=False・stormClock=Turns の層と、 ボスへ届かなかった層は載らない。</summary>
             public List<int> stormLayers = new List<int>();
+            /// <summary>[計装 2026-11-14] 嵐の層の航行の判断: 層ごとに <see cref="StormNavCols"/> (= 5) 列ずつ。 ボスの点の戦闘に入った時の値:
+            /// (深さ, 出口へ切り上げた時の累計 (-1 = 切り上げなかった = 行動の上限か点が尽きた以外で出口へ向かわなかった), その時の航行の手番 (-1),
+            /// ボスの点が見えた航行の手番 (-1 = 見えないまま入った), ボスを探して歩いた歩数 (口 navStormAware でボスが見えないまま出口へ向かった歩))。
+            /// stormLayers と同じく、 不安定化の時計でない層とボスへ届かなかった層は載らない。 口 navStormAware が切れていても、 判断の時点は同じ定義で記録する。</summary>
+            public List<int> stormNav = new List<int>();
             /// <summary>[計装 2026-11-13] 深さ 6 (画面の第 4 層) の〈灰に埋もれた基地〉: 0 = 起きていない / 1 = 最初に踏んだイベントマスで起きた
             /// / 2 = イベントマスを踏まずに終点へ着き、 安全弁がボス戦の前に出した。 深さ 6 へ届かなかったランと、 イベントなしの測定は 0。</summary>
             public int ashBase;
