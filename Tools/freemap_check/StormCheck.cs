@@ -223,7 +223,7 @@ static partial class T
             var startsDistinct = new HashSet<int>(); var goalsDistinct = new HashSet<int>();
             foreach (int floor in StormDepths) { hopsStorm[floor] = new List<int>(); hopsOld[floor] = new List<int>(); }
             foreach (int floor in StormDepths)
-                for (int salt = 1; salt <= 3000; salt++)
+                for (int salt = 1; salt <= N(3000, 1000); salt++)
                 {
                     GameLoop.GameRng.Salt = (ulong)salt * 7919;
                     var Lo = FreeMapGenerator.Generate(floor, true, false);
