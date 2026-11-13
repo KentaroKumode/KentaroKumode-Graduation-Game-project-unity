@@ -107,6 +107,10 @@ namespace GameLoop
         /// false = 旧い作り (左から右へ進む前線・崩れる地平と沈み続ける湖面あり・始点は左端・ボスは最初から見える)。 main と 1 ランも変わらない。
         /// 層を作る時に読む (MapGenerator)。 AutoRunner.stormEnabled が毎ランの始めに入れ、 ラン終了で true へ戻す。</summary>
         public static bool StormEnabled = true;
+        /// <summary>[測定 2026-11-13 二版] 嵐の時計の種類 (<see cref="MapSystem.FreeMove.StormClock"/>)。 既定 = Instability (不安定化ポイントの累計で進む・
+        /// 取るほど不安定になる・GAME.md §5-12)。 Turns = 手番で進む嵐 (ブランチ storm-boss の作り・1 ランも変わらない)。 <see cref="StormEnabled"/> = False の時は読まない。
+        /// 層を作る時と中断セーブから戻す時に読む (MapManager)。 AutoRunner.stormClock が毎ランの始めに入れ、 ラン終了で Instability へ戻す。</summary>
+        public static MapSystem.FreeMove.StormClock StormClock = MapSystem.FreeMove.StormClock.Instability;
 
         /// <summary>[測定 2026-11-12・#95] 遺物の効果を止める接辞 (ビット = <c>(int)RelicStat</c>・0 = 何も止めない)。
         /// 主ステもサブも、 その接辞の分だけを 0 にする (段の値 1 つあたりの価値を、 理論値の持ち込みから 1 接辞ずつ抜いて測る口)。

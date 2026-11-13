@@ -135,6 +135,7 @@ namespace GameLoop
                         //   どの択を選んでも入る (4つ目の択にすると通常択と排他になり、
                         //   パッシブが逆に 1 個減るという逆転が起きていた)。
                         EventSystem.EventEffectExecutor.GrantObservatoryCopyBonus(Run);
+                        AddInstability(MapSystem.FreeMove.InstabilitySource.Relic, 1, "観測所の写しの上乗せ");   // 不安定化: 上乗せの秘宝 (2026-11-13)
                         ObservatoryState.ConsumeCopy();            // 次の再訪 1 回だけ
                     }
                 }
@@ -240,7 +241,8 @@ namespace GameLoop
                 }
             if (n <= 0 || CurrentPhase != GamePhase.MapNavigation || FreeMap == null) return;
             Log($"イベントで {n} ターンを使った");
-            RunFreeMapOp(s => s.PassTurnsExternal(n));
+            // 不安定化 (2026-11-13): イベントの「ターン+N」は +N (不安定化の時計の時だけ・休憩の「多めに回復」は 0)。 地図の知らせ・ログは RunFreeMapOp が出す
+            RunFreeMapOp(s => s.InstabilityMode ? s.PassEventTurns(n) : s.PassTurnsExternal(n));
         }
 
         /// <summary>イベントの航行の効果を 1 つ適用する (2026-11-12・docs/GAME.md §17)。 中身は <see cref="MapSystem.FreeMove.FreeMapSim"/> の汎用の動詞で、

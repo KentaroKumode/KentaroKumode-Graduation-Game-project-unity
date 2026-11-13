@@ -158,12 +158,9 @@ namespace UI.Game2D
                 foreach (int i in sim.Territory)   // いま効いている縄張り (避ける道のために削った後・2026-11-13)。 形の縄張り (lay.territory) は描かない
                     if (!sim.IsSunk(i)) { var q = Sp(lay.pos[i]); float r = NodeMargin(sim, i) + 1; Ellipse(q, r, r, 0, _lc.red, new[] { 1, 2 }); }
 
-            // 嵐の輪 (2026-11-13・仮の印): 今の安全な円を破線で描く (静かな時間・フェーズ 4 は描かない)。 次の手番の輪は描かない
-            if (sim.StormRing(out var stormC, out double stormR))
-            {
-                float rr = (float)stormR * _ls;
-                Ellipse(Sp(stormC), rr, rr, 0, _lc.warn, new[] { 3, 2 });
-            }
+            // 嵐の輪 (2026-11-13・仮の印): 今の安全な円を破線で描く (静か・フェーズ 4 は描かない)。 次の輪は描かない。
+            //   二版 (2026-11-13): 崩れ始めた後は、 輪の線と嵐の中の領域を絶えずうごめかせ、 輪が縮む時は 0.5 秒かけて縮む (Game2DMapView.Storm.cs・見た目だけ)
+            StormRingFx(sim);
 
             // 自艦中心の距離環 (4 と 8)
             for (int r = 4; r <= 8; r += 4) Ellipse(_me, r * _ls, r * _ls, 0, _lc.grid);
@@ -195,7 +192,15 @@ namespace UI.Game2D
                 Bracket(q, 6, ok ? _lc.hot : _lc.dim);
                 // 嵐の中の点への移動の見積もり (2026-11-13): 払う HP を点の下に出す
                 int stormHp = ok ? sim.StormHpFor(_hover) : 0;
-                if (stormHp > 0) Text("HP-" + stormHp, q.x, q.y + 8 * Pxs, _lc.red);
+                float ly = q.y + 8 * Pxs;
+                if (stormHp > 0) { Text("HP-" + stormHp, q.x, ly, _lc.red); ly += Game2DJpFont.Cell + 1; }
+                // 不安定化の見積もり (2026-11-13 二版): その点を踏む / 開けると何ポイント溜まるか。 境目を越えるなら「崩れ始める」「フェーズ k へ」
+                if (ok && sim.InstabilityMode)
+                {
+                    string est = InstabilityEstimate(sim, _hover, out string cross);
+                    if (est != null) { Text(est, q.x, ly, _lc.warn); ly += Game2DJpFont.Cell + 1; }
+                    if (cross != null) Text(cross, q.x, ly, StormHot);
+                }
             }
 
             // 点
@@ -377,11 +382,13 @@ namespace UI.Game2D
             }
         }
 
-        /// <summary>嵐の帯の文 (2026-11-13): 「霧 嵐まで 12」/「嵐 フェーズ 2・次まで 4 霧」/「嵐 フェーズ 4 霧」。 種類なしは「嵐」だけ。</summary>
+        /// <summary>嵐の帯の文 (2026-11-13): 「霧 嵐まで 12」/「嵐 フェーズ 2・次まで 4 霧」/「嵐 フェーズ 4 霧」。 種類なしは「嵐」だけ。
+        /// 二版 (不安定化の時計): 静かな間は「不安定 7/10」(あと 3 で崩れ始める)、 崩れ始めたら「嵐 フェーズ k・次まで N」(N は不安定化ポイント)。</summary>
         internal static string StormLabel(FreeMapSim sim)
         {
             int ph = sim.StormPhase, n = sim.StormTurnsToNext;
             string kind = sim.Weather == WeatherKind.None ? "" : " " + Storm.KindName(sim.Weather);
+            if (ph == 0 && sim.InstabilityMode) return "不安定 " + sim.Instability + "/" + FreeMapParams.InstabilityPhase1At + kind;
             if (ph == 0) return "嵐まで " + n + kind;
             return ph >= 4 ? "嵐 フェーズ " + ph + kind : "嵐 フェーズ " + ph + "・次まで " + n + kind;
         }

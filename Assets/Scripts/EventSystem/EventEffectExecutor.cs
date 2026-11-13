@@ -32,6 +32,11 @@ namespace EventSystem
             /// 画面 (選んだ後の文) と戦記 (記録の文) が分岐ごとの文を選ぶのに使う (<c>EventChoice.PostFlavorFor</c> / <c>DigestFor</c>)。
             /// 1 選択肢に確率分岐は 1 つ (解析がそう作る) なので、 最初に引いたものを残す。</summary>
             public int pickedBranch = -1;
+            /// <summary>不安定化 (2026-11-13・GAME.md §5-12): この実行で得た秘宝の数 (秘宝を得る・N つから選ぶ・止まらない時計・品の指定で秘宝)。</summary>
+            public int relicsGained;
+            /// <summary>不安定化: この実行で起きた、 秘宝のほかの得の効果の数 (<see cref="EventEffectRoles.RoleOf"/> が得の効果で、 実際に起きたもの)。
+            /// 数えない得: 嵐を遠ざける (それ自体が累計 −N)・秘宝を差し出して替える (交換)・武器を鍛える (自分の素材を払う・休憩の鍛えると同じ)。</summary>
+            public int otherGains;
         }
 
         /// <summary>
@@ -72,11 +77,13 @@ namespace EventSystem
                     GameLoop.HpOutsideDiag.Add("イベント:HP減", hpBefore - run.playerHP);   // [計装 2026-11-05]
                 }
                     result.log.Add($"HP{eff.amount:+0;-0} (現在 {run.playerHP}/{run.playerMaxHP})");
+                    if (eff.amount > 0) result.otherGains++;
                     break;
 
                 case EventEffectType.HpFullHeal:
                     run.playerHP = run.playerMaxHP;
                     result.log.Add($"HP全回復 ({run.playerHP}/{run.playerMaxHP})");
+                    result.otherGains++;
                     break;
 
                 case EventEffectType.HpSetTo:
@@ -102,6 +109,7 @@ namespace EventSystem
                     run.playerMaxHP = Mathf.Max(1, run.playerMaxHP + eff.amount);
                     run.playerHP = Mathf.Min(run.playerHP, run.playerMaxHP);
                     result.log.Add($"最大HP{eff.amount:+0;-0} → {run.playerMaxHP}");
+                    if (eff.amount > 0) result.otherGains++;
                     break;
 
                 case EventEffectType.GoldDelta:
@@ -111,6 +119,7 @@ namespace EventSystem
                     int delta = eff.amount;
                     run.coins = Mathf.Max(0, run.coins + delta);
                     result.log.Add($"ゴールド{delta:+0;-0} (現在 {run.coins})");
+                    if (delta > 0) result.otherGains++;
                     break;
                 }
 
@@ -122,6 +131,7 @@ namespace EventSystem
                     if (amount > 0) GameLoop.ProvisionSystem.Recover(run, amount);
                     else if (amount < 0) GameLoop.ProvisionSystem.Reduce(run, -amount);
                     result.log.Add($"物資{amount:+0;-0} (現在 {run.provision}/{run.provisionCap})");
+                    if (amount > 0) result.otherGains++;
                     break;
                 }
 
@@ -133,6 +143,7 @@ namespace EventSystem
                     {
                         GameLoop.ProvisionSystem.Recover(run, amount);
                         result.log.Add($"物資{amount:+0} (現在 {run.provision}/{run.provisionCap})");
+                        result.otherGains++;
                     }
                     else if (amount < 0)
                     {
@@ -158,6 +169,7 @@ namespace EventSystem
                 case EventEffectType.MaterialDelta:
                     run.weaponMaterials = Mathf.Max(0, run.weaponMaterials + eff.amount);
                     result.log.Add($"武器強化素材{eff.amount:+0;-0} (現在 {run.weaponMaterials})");
+                    if (eff.amount > 0) result.otherGains++;
                     break;
 
                 case EventEffectType.ArmorDurabilityLoss:
@@ -170,6 +182,7 @@ namespace EventSystem
                     int charges = TimedEffectRegistry.GetDefaultCharges(eff.param);
                     AddOrIncrement(run.timedBuffs, eff.param, charges);
                     result.log.Add($"時限バフ獲得: {eff.param} ({charges}回)");
+                    result.otherGains++;
                     break;
                 }
 
@@ -195,6 +208,7 @@ namespace EventSystem
                     {
                         ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, id);
                         result.log.Add($"秘宝獲得: {ResolveLabel(id)}");      // 画面に出す言い方 (データの書式「パッシブアイテム獲得」は EventParser が読むので変えない)
+                        result.relicsGained++;
                         ApplyPassiveAcquisitionBonus(run, id, result);
                     }
                     break;
@@ -209,6 +223,7 @@ namespace EventSystem
                     {
                         run.TryAddConsumable(id);
                         result.log.Add($"消費アイテム獲得: {ResolveLabel(id)}");
+                        result.otherGains++;
                     }
                     break;
                 }
@@ -219,6 +234,7 @@ namespace EventSystem
                     {
                         GameLoop.Loadout.Gain(run, eff.param);   // 武器なら 1 本だけ (入れ替えるかを聞く・2026-11-11)
                         result.log.Add($"アイテム獲得: {ResolveLabel(eff.param)}");
+                        if (ItemDatabase.Instance?.GetItem(eff.param)?.category == ItemCategory.Passive) result.relicsGained++; else result.otherGains++;
                         ApplyPassiveAcquisitionBonus(run, eff.param, result);
                     }
                     break;
@@ -226,16 +242,18 @@ namespace EventSystem
                 case EventEffectType.GainFlag:
                     run.ownedFlags.Add(eff.param);
                     result.log.Add($"フラグアイテム獲得: {eff.param}");
+                    result.otherGains++;
                     break;
 
                 case EventEffectType.ObservatoryTakeCopy:
                     GameLoop.ObservatoryState.TakeCopy();
                     result.log.Add("観測所の写しを持ち帰った");
+                    result.otherGains++;
                     break;
 
                 case EventEffectType.VescaClockTake:
                     // 秘宝として持つ (2026-11-13)。 結果の行はほかの「秘宝を得た」行と同じ書式 (GainPassiveItem)
-                    if (GameLoop.VescaClock.Take(run)) result.log.Add($"秘宝獲得: {ResolveLabel(GameLoop.ItemIds.VescaClock)}");
+                    if (GameLoop.VescaClock.Take(run)) { result.log.Add($"秘宝獲得: {ResolveLabel(GameLoop.ItemIds.VescaClock)}"); result.relicsGained++; }
                     break;
 
                 case EventEffectType.GainTruth:
@@ -298,6 +316,10 @@ namespace EventSystem
                     // 航行の効果は地図へ戻った時に (ターン+N と同じ口)。 画面の文はここで出す (地図へ戻った直後に必ず適用されるので)
                     result.navEffects.Add(eff);
                     { string s = DescribeNav(eff, run); if (s != null) result.log.Add(s); }
+                    // 不安定化: 起きる得の航行の効果 (明かす・撒く・遠ざける (追跡者)・近道) は「何かを得た」。 嵐を動かす効果は数えない (それ自体が累計を動かす)
+                    if (eff.type != EventEffectType.ShiftFront && EventEffectRoles.RoleOf(eff) == EventEffectRole.Benefit
+                        && EventEffectRoles.NotHappeningReason(eff, EventChoice.Situation(run, false, false)) == null)
+                        result.otherGains++;
                     break;
 
                 case EventEffectType.OfferPassives:
@@ -309,6 +331,7 @@ namespace EventSystem
                         if (!string.IsNullOrEmpty(id) && !cands.Contains(id)) cands.Add(id);
                     }
                     if (cands.Count == 0) break;
+                    result.relicsGained++;   // 不安定化: 人が後で選ぶ時も、 提示した時点で 1 つ得たと数える
                     var gm = GameLoop.GameManager.Instance;
                     if (gm != null)
                     {
@@ -349,12 +372,14 @@ namespace EventSystem
                     float f = 1f - Mathf.Clamp(eff.amount, 0, 100) / 100f;
                     run.nextShopPriceMul *= f;
                     result.log.Add($"次の店の値段 -{eff.amount}%");
+                    result.otherGains++;
                     break;
                 }
 
                 case EventEffectType.NextRestBonus:
                     run.nextRestHealBonusPct += Mathf.Max(0, eff.amount);
                     result.log.Add($"次の休憩の回復 +{eff.amount}%（最大 HP の）");
+                    result.otherGains++;
                     break;
             }
         }
@@ -382,7 +407,9 @@ namespace EventSystem
                 case EventEffectType.PullPursuer:      return sim.Leashed ? $"追跡者が{leash}{eff.amount} 歩まで近づく" : $"追跡者が {eff.amount} 歩近づく";
                 case EventEffectType.Shortcut:         return $"時限バフ獲得: 近道 ({eff.amount}回)";   // 時限バフと同じ言い方 (2026-11-13・作者の決定「近道というバフに統一」)
                 case EventEffectType.ShiftFront:
-                    if (sim.StormMode)   // 嵐 (2026-11-13): 嵐の時計を N 手番動かす
+                    if (sim.InstabilityMode)   // 嵐 (2026-11-13 二版): 不安定化の累計を N 動かす (遠ざける = 減る・0 未満にはならない)
+                        return eff.amount < 0 ? $"嵐が遠のく（不安定 -{-eff.amount}）" : $"嵐が迫る（不安定 +{eff.amount}）";
+                    if (sim.StormMode)   // 嵐 (2026-11-13): 嵐の時計を N 手番動かす (手番の時計)
                         return eff.amount < 0 ? $"嵐が {-eff.amount} 手番ぶん遠のく" : $"嵐が {eff.amount} 手番ぶん迫る";
                     return eff.amount < 0 ? $"天候の前線が {-eff.amount} 段退く" : $"天候の前線が {eff.amount} 段迫る";
             }

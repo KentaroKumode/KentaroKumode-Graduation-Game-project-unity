@@ -140,9 +140,13 @@ namespace MapSystem
         /// 縄張りを避ける道の保証 (2026-11-13・<see cref="TerritoryBypass"/>) も既定で入り、 <see cref="GameLoop.GameHooks.TerritoryKeepBypass"/> で外せる。
         /// 中断セーブから戻す時も同じ計算をする (形の縄張りは削らずに写してあるので、 戻した後も同じ縄張りになる)。</summary>
         private static void ConfigureTerritory(FreeMapSim sim)
-            => sim.ConfigureTerritory(!GameLoop.GameHooks.PursuerLeavesTerritory,
-                                      GameLoop.GameHooks.TerritoryTreasure != GameLoop.TerritoryTreasureKind.None,
-                                      GameLoop.GameHooks.TerritoryKeepBypass);
+        {
+            sim.ConfigureTerritory(!GameLoop.GameHooks.PursuerLeavesTerritory,
+                                   GameLoop.GameHooks.TerritoryTreasure != GameLoop.TerritoryTreasureKind.None,
+                                   GameLoop.GameHooks.TerritoryKeepBypass);
+            // 嵐の時計 (2026-11-13 二版): 既定は不安定化ポイント・測定の口 GameHooks.StormClock = Turns で手番の時計。 中断セーブから戻す時も、 写しを書き戻す前に同じ口で決める
+            sim.ConfigureStorm(GameLoop.GameHooks.StormClock);
+        }
 
         /// <summary>現在位置から移動可能なノード一覧。 航行マップでは<b>いま道がつながっている隣</b>
         /// (前線の天候で崩れた道・沈んだ点は含まない)。</summary>

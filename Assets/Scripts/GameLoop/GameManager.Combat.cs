@@ -61,6 +61,7 @@ namespace GameLoop
                             ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, pid);
                             RunStats.PlunderDrops++;
                             Log($"[強奪] 戦利品: {pid}{BattleBoonTag()}");
+                            AddRelicInstabilityIfPassive(pid);   // 不安定化: 報酬で秘宝を得た (2026-11-13)
                         }
                     }
                 }
@@ -81,6 +82,7 @@ namespace GameLoop
                         ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(Run, pid);
                         RunStats.ValorEliteDrops++;
                         Log($"[剛胆] 精鋭の戦利品: {pid}");
+                        AddRelicInstabilityIfPassive(pid);   // 不安定化: 報酬で秘宝を得た (2026-11-13)
                     }
                 }
             }

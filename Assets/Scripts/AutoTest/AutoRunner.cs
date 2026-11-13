@@ -190,6 +190,10 @@ namespace AutoTest
         /// BOT は終点の位置を今までどおり知っていて、 フェーズ 3 で出口へ切り替え、 出口までの見積もりに嵐の HP を足す (最小の対応)。
         /// false = 旧い作り (左から右へ進む前線・崩れる地平と沈み続ける湖面あり・始点は左端 = main と全件一致のはず)。</summary>
         public bool stormEnabled = true;
+        /// <summary>[測定 2026-11-13 二版] 嵐の時計の種類。 本体の GameHooks.StormClock へ流す (ラン終了で Instability へ)。
+        /// Instability (既定) = 不安定化ポイントの累計で進む (宝 +3・エリートと番人 +2・通常の戦闘とイベントの得 +1・エスカレーションの段 +1・イベントのターン +N・崩れ始めた後の 1 歩 +1)。
+        /// Turns = 手番で進む嵐 (storm-boss の作り = 1 ランも変わらないはず)。 stormEnabled = False の時は効かない。</summary>
+        public MapSystem.FreeMove.StormClock stormClock = MapSystem.FreeMove.StormClock.Instability;
         /// <summary>[2026-11-12] BOT が縄張りの宝を取りに行くしきい値: 「HP の割合 − 追跡者の戦闘で失う HP の見積もり」がこれ以上の時だけ取りに行く
         /// (<see cref="WantsTerritoryTreasure"/>)。 1 以上 = 取りに行かない。
         /// <para>既定 9 = 取りに行かない (2026-11-12)。 Super・3000 ラン・同じシードで、 0.35 (取りに行く) 596 勝 < 9 (行かない) 627 勝だった。
@@ -778,6 +782,7 @@ namespace AutoTest
                  + $"/ 縄張りを避ける道の保証 {(pursuerLeavesTerritory ? "効かない (旧い作り)" : territoryKeepBypass ? "あり (縄張りを削る)" : "なし (削らない・旧い作り)")} (territoryKeepBypass={territoryKeepBypass}) "
                  + $"/ 灰燼の王を倒した記録 {(ashKingBeatenEver ? "あり (深さ 6 の基地は再訪の版・手記を開いて深さ 7 へ)" : "なし (基地は〈徒労〉の 1 択・第 4 層のクリアで終わる)")} (ashKingBeatenEver={ashKingBeatenEver}) "
                  + $"/ 天候 {(stormEnabled ? "嵐 (輪が縮む・始点は外周・ボスは伏せる)" : "前線 (旧い作り)")} (stormEnabled={stormEnabled}) "
+                 + $"/ 嵐の時計 {(!stormEnabled ? "効かない (前線)" : stormClock == MapSystem.FreeMove.StormClock.Turns ? "手番 (storm-boss の作り)" : "不安定化 (取るほど進む)")} (stormClock={stormClock}) "
                  + $"/ 端子の撃破のボーナス {(terminalKillNeedsAttack ? "攻撃したターンだけ (旧い条件)" : "経路を問わない")} "
                  + $"/ 手札 {(handCarry == CombatSystem.HandCarryMode.Pick ? "印を付けた端子だけ残す (Pick)" : handCarry == CombatSystem.HandCarryMode.All ? "挿さなかった端子は全部残る (All)" : "毎ターン捨てる (Off・旧い規則)")}"
                  + $"{(handCarry == CombatSystem.HandCarryMode.Pick ? " 残す方策 " + EffectiveHandKeepPolicy + " (handKeepPolicy=" + handKeepPolicy + ")" : "")} "
