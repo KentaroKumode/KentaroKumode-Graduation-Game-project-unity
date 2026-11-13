@@ -35,8 +35,9 @@ namespace CombatSystem
     /// ボスの数値の正本 (機構パラメータの基準値・固有面ダイス) と、 敵データへの適用。
     ///
     /// <para><b>本体は基準値だけで完結する。</b> 外から値を差し替える口は <see cref="Overrides"/> だけで、
-    /// 既定は null (= 基準値)。 BOT・測定が値を差し込むときは AutoRunner の起動時にだけここへ入れる
-    /// (差し込んでいた L3 ボス調整器 AutoTest.BossTuning は 2026-11-12 に削除・#126。 いまは口だけで、 入れる側は無い)。
+    /// 既定は null (= 基準値)。 BOT・測定が値を差し込むときは AutoRunner の側からだけここへ入れる
+    /// (差し込んでいた L3 ボス調整器 AutoTest.BossTuning は 2026-11-12 に削除・#126。 2026-11-14 から測定の口 AutoRunner.bossParamSpec が
+    /// 毎ランの始めに入れ、 ラン終了で null へ戻す ── 書式は "id:名前:値"・実数値)。
     /// 本体から AutoTest の型を参照しないための境界 (2026-10-29)。</para>
     /// </summary>
     public static class BossParams

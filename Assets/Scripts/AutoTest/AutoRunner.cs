@@ -797,6 +797,7 @@ namespace AutoTest
                  + $"/ 深さ 3 のボスの大技 {(depth3Heavy ? "あり" : "なし (旧い作り)")} "
                  + $"/ 博士の時計 {(vescaClockHeld ? "ランの最初から預かる (ヴェスカの各段に目盛り +" + CombatSystem.BossParams.VescaClockNotch.ToString("0.00") + ")" : "預からない (イベントで選んだ時だけ)")} (vescaClockHeld={vescaClockHeld}) "
                  + $"/ 攻撃なしの手の主攻撃 (旧の式) {(v3.oldNoAttackBaseDmg ? "素火力を数える (旧い挙動)" : "0")} "
+                 + AshKingEffectiveText()
                  + $"/ 縄張りの宝 {territoryTreasure} (BOT のしきい値 {territoryTreasureHpMargin:0.##}) / 縄張りを避ける遠回り {(navTerritoryDetour < 0 ? "使わない" : "+" + navTerritoryDetour + "歩まで")}"
                  + (DeckLookaheadDiagLine().Length > 0 ? System.Environment.NewLine + DeckLookaheadDiagLine() : "")
                  + (CombatSystem.BossDownDiag.Line().Length > 0 ? System.Environment.NewLine + CombatSystem.BossDownDiag.Line() : "")
@@ -1080,6 +1081,40 @@ namespace AutoTest
         public string enemyAttackSpec = "";
         /// <summary>較正スイープ専用: 敵の最大 HP の上書き ("id:hp,...")。 EnemyDatabase.HpOverrideSpec。</summary>
         public string enemyHpSpec = "";
+        /// <summary>[測定 2026-11-14] ボスの機構の値 (<see cref="CombatSystem.BossParam"/>) の差し替え。 <c>"id:名前:値,…"</c> 形式
+        /// (例 <c>"boss_layer6:JudgmentDice:12,boss_layer6:FuryAttack:5,boss_layer6:RegrowthRate:0.03"</c>)。 値は実数値 (倍率ではない)。
+        /// 空 (既定) = 口を開けない (<see cref="CombatSystem.BossParams.Overrides"/> は null のまま = 本番と同じ)。
+        /// 毎ランの始めに本体へ入れ、 ラン終了で null へ戻す。 灰燼の王の最大 HP・基礎の攻撃は <see cref="enemyHpSpec"/> / <see cref="enemyAttackSpec"/> で振る。</summary>
+        public string bossParamSpec = "";
+        private BossParamSpec _bossParamOverrides;
+        private string _bossParamParsedFrom;
+        /// <summary>bossParamSpec を読んだもの (書式が同じなら読み直さない)。 空なら null。</summary>
+        private BossParamSpec BossParamOverrides
+        {
+            get
+            {
+                if (_bossParamParsedFrom != bossParamSpec) { _bossParamOverrides = BossParamSpec.Parse(bossParamSpec); _bossParamParsedFrom = bossParamSpec; }
+                return _bossParamOverrides;
+            }
+        }
+
+        /// <summary>[測定 2026-11-14] 灰燼の王の 5 つの値 (基礎の攻撃・最大 HP・予兆・憤怒・再生) の効いている値。 どれも上書きしていない時は空。</summary>
+        private string AshKingEffectiveText()
+        {
+            string id = GameLoop.BossIds.Layer6Ash;
+            var o = BossParamOverrides;
+            bool touched = (o != null && o.Touches(id))
+                || (enemyAttackSpec ?? "").Contains(id + ":") || (enemyHpSpec ?? "").Contains(id + ":")
+                || Mathf.Abs(enemyAttackMul - 1f) >= 0.0001f || Mathf.Abs(enemyHpMul - 1f) >= 0.0001f;
+            if (!touched) return "";
+            var e = CombatSystem.EnemyDatabase.Get(id);
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            return $"/ 灰燼の王 (上書きあり) 基礎の攻撃 {(e != null ? e.baseAttack.ToString() : "?")} 最大 HP {(e != null ? e.maxHP.ToString() : "?")}"
+                 + $" 予兆 +{BossParamSpec.Effective(o, id, CombatSystem.BossParam.JudgmentDice).ToString("0.##", ci)}"
+                 + $" 憤怒 +{BossParamSpec.Effective(o, id, CombatSystem.BossParam.FuryAttack).ToString("0.##", ci)}"
+                 + $" 再生 {(BossParamSpec.Effective(o, id, CombatSystem.BossParam.RegrowthRate) * 100f).ToString("0.##", ci)}%"
+                 + $" (enemyAttackSpec='{enemyAttackSpec}' enemyHpSpec='{enemyHpSpec}' bossParamSpec='{bossParamSpec}') ";
+        }
 
         /// <summary>全敵の攻撃側 (baseAttack/ロール上下限/threat) へ掛ける倍率。 1.0 = 素のまま。
         /// <b>応答は極端に非線形 (§13-5)。 0.1 刻みより粗く振らないこと。</b></summary>

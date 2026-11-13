@@ -5,7 +5,7 @@ namespace AutoTest
 {
     /// <summary>
     /// 本体の差し込み口 (<see cref="GameHooks"/>) へ BOT を繋ぐ。 ボスの数値の差し替え口 <see cref="CombatSystem.BossParams.Overrides"/> は
-    /// 口だけ残っている (差し込んでいた L3 ボス調整器は 2026-11-12 に削除・#126)。
+    /// ここでは触らない (差し込んでいた L3 ボス調整器は 2026-11-12 に削除・#126。 2026-11-14 から測定の口 AutoRunner.bossParamSpec が毎ラン入れ外しする)。
     /// AutoRunner の生成時に <see cref="Install"/>、 破棄時に <see cref="Uninstall"/>。
     /// </summary>
     public static class BotHooks
