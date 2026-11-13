@@ -118,5 +118,32 @@ namespace EventSystem.TimedEffects
 
         /// <summary>画面に残りの数を出すか (減らない形の〈徒労〉 = LayerLong・UntilKing は出さない)。</summary>
         public static bool ShowsCharges(string id, ToilMode mode) => !(id == ToilName && mode != ToilMode.Stacks);
+
+        // ── 〈徒労〉の戦闘のデバフ (2026-11-14・測定の口 GameHooks.ToilDamageDownPct・既定 0 = デバフなし・値は未決) ──
+        //   持っている間、 すべての戦闘でプレイヤーが敵に与えるダメージ −N%。 枠は大罪:怠惰の「与えるダメージ −N%」と同じ
+        //   (MetaDebuffApplicator.ApplyOutgoingCut・主攻撃はすべての倍率の後・敵の防御の前、 主攻撃以外は敵の HP を減らす口)。
+        //   同じ枠の決まり (CombatManager.Damage.cs の〈練度不足〉の注記「同種のデバフは重ねがけせず厳しい方 1 つ」) に合わせ、 怠惰と重なった時は大きい方だけ。
+
+        /// <summary>〈徒労〉の戦闘のデバフの既定 (%)。 0 = デバフなし (2026-11-14 までの〈徒労〉と同じ)。</summary>
+        public const int DefaultToilDamageDownPct = 0;
+
+        /// <summary>〈徒労〉による与ダメージの削り (%)。 持っていなければ 0。 値は 0〜100 に収める。</summary>
+        public static int ToilDamageDownPct(bool hasToil, int pct) => hasToil ? System.Math.Max(0, System.Math.Min(100, pct)) : 0;
+
+        /// <summary>与ダメージの削りの枠 (%): 大罪:怠惰と〈徒労〉の厳しい方 1 つ (足さない・掛けない)。</summary>
+        public static int OutgoingCutPct(int slothPct, int toilPct) => System.Math.Max(System.Math.Max(0, slothPct), System.Math.Max(0, toilPct));
+
+        /// <summary>与ダメージに削りの枠を掛ける (切り捨て)。 0 以下のダメージと削り 0 % は素通し (大罪:怠惰の旧い式 dmg × (100 − 30) / 100 と同じ形)。</summary>
+        public static int ApplyOutgoingCut(int dmg, int cutPct) => dmg > 0 && cutPct > 0 ? dmg * (100 - System.Math.Min(100, cutPct)) / 100 : dmg;
+
+        /// <summary>〈徒労〉の説明の後ろに付ける戦闘のデバフの句 (「与えるダメージ −N%」)。 0 % なら空 (句を出さない)。</summary>
+        public static string ToilDamageClause(int pct) => pct > 0 ? "与えるダメージ −" + pct + "%。" : "";
+
+        /// <summary>画面に出す説明 (形と戦闘のデバフを見る版)。 〈徒労〉で <paramref name="toilDamageDownPct"/> &gt; 0 なら「与えるダメージ −N%。」を後ろに付ける。</summary>
+        public static string DescriptionOf(string id, ToilMode mode, int toilDamageDownPct)
+        {
+            string d = DescriptionOf(id, mode);
+            return d != null && id == ToilName ? d + ToilDamageClause(System.Math.Max(0, System.Math.Min(100, toilDamageDownPct))) : d;
+        }
     }
 }

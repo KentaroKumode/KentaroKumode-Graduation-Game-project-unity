@@ -57,9 +57,26 @@ namespace MetaProgression
         public static bool HasSinWrath => CardV(ChallengeCards.SinWrath) > 0f;
         /// <summary>大罪:怠惰 ── 全部の出目から引く量 (下限 1)。</summary>
         public static int GetSlothDicePenalty() => CardI(ChallengeCards.SinSloth);
-        /// <summary>大罪:怠惰 ── プレイヤーが敵に与えるダメージ −N% (主攻撃・毒・出血・爆発・固定ダメ・反射・品の直接、 全部・2026-11-11)。 受けていなければ素通し。</summary>
-        public static int ApplySlothCut(int dmg)
-            => dmg > 0 && GetSlothDicePenalty() > 0 ? dmg * (100 - ChallengeCards.SinSlothDamageCutPct) / 100 : dmg;
+        /// <summary>大罪:怠惰の与ダメージの削り (%)。 受けていなければ 0。</summary>
+        public static int GetSlothDamageCutPct() => GetSlothDicePenalty() > 0 ? ChallengeCards.SinSlothDamageCutPct : 0;
+
+        /// <summary>〈徒労〉の戦闘のデバフ (%・2026-11-14・GameHooks.ToilDamageDownPct)。 〈徒労〉を持っていなければ 0。</summary>
+        public static int GetToilDamageCutPct()
+        {
+            int pct = GameHooks.ToilDamageDownPct;
+            if (pct <= 0) return 0;
+            var d = GameManager.Instance?.Run?.timedDebuffs;
+            bool has = d != null && d.TryGetValue(EventSystem.TimedEffects.BattleBoonRule.ToilName, out int n) && n > 0;
+            return EventSystem.TimedEffects.BattleBoonRule.ToilDamageDownPct(has, pct);
+        }
+
+        /// <summary>与ダメージの削りの枠 (%): 大罪:怠惰と〈徒労〉の厳しい方 1 つ (BattleBoonRule.OutgoingCutPct)。</summary>
+        public static int GetOutgoingCutPct() => EventSystem.TimedEffects.BattleBoonRule.OutgoingCutPct(GetSlothDamageCutPct(), GetToilDamageCutPct());
+
+        /// <summary>プレイヤーが敵に与えるダメージ −N% (主攻撃・毒・出血・爆発・固定ダメ・反射・品の直接、 全部)。 大罪:怠惰 (2026-11-11) と〈徒労〉の戦闘のデバフ (2026-11-14) の枠。
+        /// 重なったら厳しい方 1 つ。 どちらも無ければ素通し。 (旧名 ApplySlothCut)</summary>
+        public static int ApplyOutgoingCut(int dmg)
+            => dmg > 0 ? EventSystem.TimedEffects.BattleBoonRule.ApplyOutgoingCut(dmg, GetOutgoingCutPct()) : dmg;
 
         // ── 敵の耐久 ──
 

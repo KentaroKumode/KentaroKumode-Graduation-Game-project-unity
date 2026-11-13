@@ -110,6 +110,10 @@ namespace GameLoop
         /// <summary>[測定 2026-11-14] 〈徒労〉の別の形 (LayerLong) で宝箱が空になる確率 (%)。 既定 50。 Stacks・UntilKing では読まない。
         /// AutoRunner.toilChestEmptyPct が毎ランの始めに入れ、 ラン終了で既定へ戻す。</summary>
         public static int ToilChestEmptyPct = EventSystem.TimedEffects.BattleBoonRule.DefaultChestEmptyPct;
+        /// <summary>[測定 2026-11-14] 〈徒労〉の戦闘のデバフ (%): 〈徒労〉を持っている間、 すべての戦闘でプレイヤーが敵に与えるダメージ −N% (主攻撃・毒・出血・爆発・固定ダメなど・
+        /// 枠は大罪:怠惰と同じ <see cref="MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut"/>・重なったら厳しい方)。 既定 0 = デバフなし (main と 1 ランも変わらない)。 値は未決 (測定の後に作者が決める)。
+        /// 形 (<see cref="ToilMode"/>) を問わず、 〈徒労〉を持っている間だけ効く。 AutoRunner.toilDamageDownPct が毎ランの始めに入れ、 ラン終了で既定へ戻す。</summary>
+        public static int ToilDamageDownPct = EventSystem.TimedEffects.BattleBoonRule.DefaultToilDamageDownPct;
         /// <summary>[測定 2026-11-13] true (既定) = 天候は「嵐」(<see cref="MapSystem.FreeMove.Storm"/>・GAME.md §5-12): 静かな時間のあとに輪が縮み、
         /// 輪の外 (嵐の中) の点へ動くと HP を払う・嵐の中で始まった戦闘の敵は〈嵐〉・始点は最外周から選び直し・ボスの点は種別を隠す。
         /// false = 旧い作り (左から右へ進む前線・崩れる地平と沈み続ける湖面あり・始点は左端・ボスは最初から見える)。 main と 1 ランも変わらない。
