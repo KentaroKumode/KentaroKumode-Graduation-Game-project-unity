@@ -513,6 +513,8 @@ namespace AutoTest.ParallelSweep
                 "toilMode", "toilChestEmptyPct",
                 // 2026-11-14: 〈徒労〉の戦闘のデバフ (与えるダメージ −N%・既定 50 (同日 0 から)・0 = なし)
                 "toilDamageDownPct",
+                // 2026-11-14: 航行が〈徒労〉を読むか (True = 既定・持っている間 通常の戦闘の点は報酬なし・False = 旧い動き)
+                "navToilAware",
                 // 2026-11-14: ボスの機構の値の差し替え (id:名前:値・灰燼の王の予兆 JudgmentDice / 憤怒 FuryAttack / 再生 RegrowthRate)。
                 //   灰燼の王の基礎の攻撃・最大 HP は上の enemyAttackSpec / enemyHpSpec (boss_layer6:N)。 足りなかった enemyHpMul も並べる
                 "bossParamSpec", "enemyHpMul",

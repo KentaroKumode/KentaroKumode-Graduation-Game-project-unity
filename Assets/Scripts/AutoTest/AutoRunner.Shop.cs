@@ -301,6 +301,9 @@ namespace AutoTest
                 if (elite && !low && !EliteAffordable(node, hpRatio, run)) low = true;
                 if (low) return elite ? (crit ? 98f : 95f) : (crit ? 96f : 93f); // 低HP/危機: 強く忌避
                 if (averse) return elite ? 93f : 90f;
+                // 〈徒労〉(2026-11-14・口 navToilAware): 通常の戦闘の報酬が止まっている間は、 通常の戦闘を避けたい点と同じ扱いにする
+                //   (Rank は報酬と危険が 1 つの点数なので、 上の averse と同じ形)。 行き先に選ばないだけで、 出口への道の上なら踏む。 エリートは報酬が止まらないので変えない
+                if (!elite && NavToilRewardless(run) > 0) return 90f;
 
                 // ── エリート vs 通常戦の基準値 (2026-09-15 修正) ──
                 //   **旧: `elite ? 2f : 1f` ＝ 通常戦がエリートより常に上位という固定順位。**

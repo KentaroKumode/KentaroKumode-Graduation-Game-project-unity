@@ -383,6 +383,32 @@ static class Program
         ToilLayerLong(root);
         ToilUntilKing(root);
         ToilCombat(root);
+        ToilNav(root);
+    }
+
+    /// <summary>BOT の航行の〈徒労〉(2026-11-14・口 navToilAware・AutoTest.ToilNavRule は本物をコンパイル): 報酬が止まる形 (UntilKing・Stacks) で持っている間だけ
+    /// 通常の戦闘の点を報酬なしと見る・別の形 LayerLong (ゴールドは出る) と口 False と持っていない時は 0 (今までと同じ)・Stacks は計画の中で勝つたび減る。</summary>
+    static void ToilNav(string root)
+    {
+        var U = EventSystem.TimedEffects.ToilMode.UntilKing; var S = EventSystem.TimedEffects.ToilMode.Stacks; var L = EventSystem.TimedEffects.ToilMode.LayerLong;
+        Check(AutoTest.ToilNavRule.RewardlessLeft(true, 1, U) == 1 && AutoTest.ToilNavRule.RewardlessLeft(true, 3, S) == 3,
+              "徒労 (航行): 報酬が止まる形 (UntilKing・Stacks) で持っている間は通常の戦闘の点を報酬なしと見る");
+        Check(AutoTest.ToilNavRule.RewardlessLeft(false, 1, U) == 0 && AutoTest.ToilNavRule.RewardlessLeft(true, 0, U) == 0
+              && AutoTest.ToilNavRule.RewardlessLeft(true, 1, L) == 0,
+              "徒労 (航行): 口 False・持っていない・別の形 LayerLong (ゴールドは出る) は 0 = 今までと同じ値付け");
+        Check(AutoTest.ToilNavRule.AfterNormalWin(1, U) == 1 && AutoTest.ToilNavRule.AfterNormalWin(3, S) == 2 && AutoTest.ToilNavRule.AfterNormalWin(0, S) == 0,
+              "徒労 (航行): 計画の中で通常の戦闘に勝つと、 旧い形 Stacks だけ 1 つ減る (UntilKing は減らない)");
+        // 消費側 (原文): Super の計画は通常の戦闘のゴールドを 0 にし、 Rank は避けたい点 (90) にする・エリートの値付けは変えない・口の既定 True と監視リスト
+        string Src(string p) => File.ReadAllText(Path.Combine(root, p));
+        string mac = Src("Assets/Scripts/AutoTest/AutoRunner.Macro.cs"), shop = Src("Assets/Scripts/AutoTest/AutoRunner.Shop.cs");
+        string ar = Src("Assets/Scripts/AutoTest/AutoRunner.cs"), wp = Src("Assets/Scripts/AutoTest/Parallel/RankMarginWorkerProtocol.cs");
+        Check(mac.Contains("toil = NavToilRewardless(run),") && mac.Contains("return MacroFight(layer, 'N', key, wHp, wGold, 0f, ref s, noReward);")
+              && mac.Contains("float gold = noReward ? 0f : kind == 'E' ? 20f : 10f;")
+              && mac.Contains("return MacroFight(layer, 'E', key, wHp, wGold, CombatRewards.EliteDropRate * wItem, ref s);"),
+              "徒労 (航行): Super の計画は通常の戦闘だけ報酬のゴールドを 0 と見る (被ダメ・死の項は残す・エリートは変えない)");
+        Check(shop.Contains("if (!elite && NavToilRewardless(run) > 0) return 90f;"), "徒労 (航行): Rank は通常の戦闘を避けたい点 (averse と同じ 90) にする・エリートは変えない");
+        Check(ar.Contains("public bool navToilAware = true;") && ar.Contains("(navToilAware={navToilAware})") && wp.Contains("\"navToilAware\","),
+              "徒労 (航行): 口 navToilAware の既定は True・実効状態の行とワーカーの監視リストに出る");
     }
 
     /// <summary>〈徒労〉の戦闘のデバフ (2026-11-14・GameHooks.ToilDamageDownPct・既定 50・測定の口 toilDamageDownPct で 0 にすれば切れる): 持っている間、 すべての戦闘で与えるダメージ −N%。

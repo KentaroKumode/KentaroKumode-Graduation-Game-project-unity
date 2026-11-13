@@ -188,7 +188,7 @@ namespace AutoTest
         /// <summary>[測定 2026-11-14] 〈徒労〉の形。 本体の GameHooks.ToilMode へ流す (ラン終了で UntilKing へ)。 UntilKing (既定・2026-11-14 の作者の決定) = 勝っても減らず、
         /// 灰燼の王を倒すまで通常の戦闘は何も得られない (宝箱はそのまま)。 Stacks = 旧い形 (3 つ持ち・通常の戦闘の勝ちで 1 つ減り・その戦闘は何も得られない)。
         /// LayerLong = 深さ 6 にいる間ずっと・通常の戦闘は品を落とさない (ゴールド・強化素材・物資は出る)・宝箱は <see cref="toilChestEmptyPct"/> % で空・層を出たら消える。
-        /// 〈徒労〉を受けるのは「はじめて」の版だけなので、 ashKingBeatenEver = False の腕で振る。 BOT はどちらの形でも〈徒労〉を値付けに入れない。</summary>
+        /// 〈徒労〉を受けるのは「はじめて」の版だけなので、 ashKingBeatenEver = False の腕で振る。 BOT の航行は <see cref="navToilAware"/> で〈徒労〉を読む (2026-11-14〜・買い物・イベントの値付けには入れない)。</summary>
         public EventSystem.TimedEffects.ToilMode toilMode = EventSystem.TimedEffects.ToilMode.UntilKing;
         /// <summary>[測定 2026-11-14] 〈徒労〉の別の形 (LayerLong) で宝箱が空になる確率 (%・既定 50)。 本体の GameHooks.ToilChestEmptyPct へ流す。 Stacks・UntilKing では効かない。</summary>
         public int toilChestEmptyPct = EventSystem.TimedEffects.BattleBoonRule.DefaultChestEmptyPct;
@@ -196,6 +196,11 @@ namespace AutoTest
         /// 〈徒労〉を持っている間、 すべての戦闘でプレイヤーが敵に与えるダメージ −N% (大罪:怠惰と同じ枠・重なったら厳しい方)。 形 (toilMode) を問わない。
         /// 〈徒労〉を受けるのは「はじめて」の版だけなので、 ashKingBeatenEver = False の腕で振る。</summary>
         public int toilDamageDownPct = EventSystem.TimedEffects.BattleBoonRule.DefaultToilDamageDownPct;
+        /// <summary>[2026-11-14] 航行が〈徒労〉を読むか。 true (既定) = 〈徒労〉で通常の戦闘の報酬が止まっている間 (<see cref="ToilNavRule.RewardlessLeft"/>)、
+        /// 通常の戦闘の点を「得るものなし・損だけ」と見る ── Super の計画 (MacroGain) は報酬のゴールドの見込みを 0 にし (被ダメ・死の見込みは残す)、
+        /// Rank の航行は避けたい点 (averse と同じ 90) にする。 行き先に選ばないだけで、 出口への道の上の点は踏む (禁止ではない)。
+        /// false = 今までと完全に同じ動き。 乱数は引かない。 エリート・宝・店・休憩・イベントの値付けは変えない。</summary>
+        public bool navToilAware = true;
         /// <summary>[測定 2026-11-13] 天候の作り。 本体の GameHooks.StormEnabled へ流す (ラン終了で true へ)。
         /// true (既定) = 嵐 (静かな時間のあとに輪が縮む・嵐の中の点への移動で HP・嵐の中の戦闘は敵に〈嵐〉・始点は最外周から・ボスの点は伏せる・GAME.md §5-12)。
         /// BOT は終点の位置を今までどおり知っていて、 フェーズ 3 で出口へ切り替え、 出口までの見積もりに嵐の HP を足す (最小の対応)。
@@ -795,6 +800,7 @@ namespace AutoTest
                  + $"/ 灰燼の王を倒した記録 {(ashKingBeatenEver ? "あり (深さ 6 の基地は再訪の版・手記を開いて深さ 7 へ)" : "なし (基地は〈徒労〉の 1 択・第 4 層のクリアで終わる)")} (ashKingBeatenEver={ashKingBeatenEver}) "
                  + $"/ 〈徒労〉の形 {(toilMode == EventSystem.TimedEffects.ToilMode.LayerLong ? "層の間ずっと (通常の戦闘は品を落とさない・宝箱は " + toilChestEmptyPct + "% で空)" : toilMode == EventSystem.TimedEffects.ToilMode.Stacks ? "3 つ持ち (旧い形・勝つたび 1 つ減り何も得られない)" : "灰燼の王を倒すまで (既定・通常の戦闘は何も得られない)")} (toilMode={toilMode}・toilChestEmptyPct={toilChestEmptyPct}) "
                  + $"/ 〈徒労〉の戦闘のデバフ {(toilDamageDownPct > 0 ? "与えるダメージ −" + toilDamageDownPct + "% (持っている間・すべての戦闘" + (toilDamageDownPct == EventSystem.TimedEffects.BattleBoonRule.DefaultToilDamageDownPct ? "・既定" : "") + ")" : "なし (口で 0)")} (toilDamageDownPct={toilDamageDownPct}) "
+                 + $"/ 航行の〈徒労〉 {(navToilAware ? "読む (持っている間 通常の戦闘の点は報酬なし・損だけ)" : "読まない (旧い動き)")} (navToilAware={navToilAware}) "
                  + $"/ 天候 {(stormEnabled ? "嵐 (輪が縮む・始点は外周・ボスは伏せる)" : "前線 (旧い作り)")} (stormEnabled={stormEnabled}) "
                  + $"/ 嵐の時計 {(!stormEnabled ? "効かない (前線)" : stormClock == MapSystem.FreeMove.StormClock.Turns ? "手番 (storm-boss の作り)" : "不安定化 (取るほど進む)")} (stormClock={stormClock}) "
                  + $"/ 端子の撃破のボーナス {(terminalKillNeedsAttack ? "攻撃したターンだけ (旧い条件)" : "経路を問わない")} "
