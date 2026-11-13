@@ -588,6 +588,17 @@ static class Program
         bool subset = true;
         foreach (var id in GameLoop.ItemIds.Undroppable) subset &= GameLoop.ItemIds.ProgressionItems.Contains(id);
         Check(subset, "手放せない品は全部、 進行用の品 (〈門〉・大罪・学習から外す) にも入っている");
+        Check(!GameLoop.ItemIds.CountsAsTakenRelic(GameLoop.ConvictionSystem.IdConviction) && !GameLoop.ItemIds.CountsAsTakenRelic(GameLoop.ConvictionSystem.IdResolve)
+              && !GameLoop.ItemIds.CountsAsTakenRelic(GameLoop.ConvictionSystem.IdTruth) && GameLoop.ItemIds.CountsAsTakenRelic(GameLoop.ItemIds.VescaClock),
+              "不安定化: 進行の資格の品 (確信の 3 品) は「秘宝を得た」に数えない・預かり物の時計は数える (2026-11-13)");
+        {
+            string exe = File.ReadAllText(Path.Combine(root, "Assets/Scripts/EventSystem/EventEffectExecutor.cs"));
+            string ins = File.ReadAllText(Path.Combine(root, "Assets/Scripts/GameLoop/GameManager.Instability.cs"));
+            int gt = exe.IndexOf("case EventEffectType.GainTruth:", StringComparison.Ordinal);
+            Check(Regex.Matches(exe, @"CountsAsTakenRelic\(").Count == 2 && ins.Contains("if (!ItemIds.CountsAsTakenRelic(itemId)) return 0;")
+                  && gt > 0 && !exe.Substring(gt, Math.Min(400, exe.Length - gt)).Contains("relicsGained"),
+                  "不安定化: イベントの秘宝獲得 (名指し・品の指定)・報酬の秘宝が進行の資格の品を除く・「真理を得る」は数えない");
+        }
 
         // 経路が判定を呼んでいるか (原文)
         string Src(string p) => File.ReadAllText(Path.Combine(root, p));

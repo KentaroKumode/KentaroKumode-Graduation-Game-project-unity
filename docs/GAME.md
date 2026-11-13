@@ -654,7 +654,7 @@ lore 的には「ギルド管轄も 5 層まで」「5 層を抜けた時点で�
 | 行動 | ポイント | 呼ぶ所 |
 |---|---:|---|
 | 宝の点を開ける・縄張りの宝を取る | +3 | `OpenTreasure` / `TakeTerritoryTreasure`（中身の品が秘宝でも重ねない） |
-| 秘宝を 1 つ得る（イベント・戦闘の報酬・番人の報酬・〈強奪〉〈剛胆〉の戦利品・観測所の写しの上乗せ） | +3 ずつ | `GrantRewardItem` ほか（秘宝 = items.json の category が Passive） |
+| 秘宝を 1 つ得る（イベント・戦闘の報酬・番人の報酬・〈強奪〉〈剛胆〉の戦利品・観測所の写しの上乗せ） | +3 ずつ | `GrantRewardItem` ほか（秘宝 = items.json の category が Passive）。**進行の資格の品（確信の 3 品・`ItemIds.QualificationItems`）は数えない**（大穴から取った物ではない・2026-11-13・`ItemIds.CountsAsTakenRelic`）── 〈灰に埋もれた基地〉の「真理を得る」・「災厄の予兆」の〈根拠のない確信〉は +0 |
 | エリートを倒す・追跡者（番人）を倒す | +2 | `ConfirmBattleResult` / `HandlePursuerWon` |
 | 通常の戦闘（使い魔・イベントの戦闘も）に勝つ | +1 | 同上 |
 | イベントで何かを得る（得の効果が 1 つ以上起きた・秘宝を得た時は +3 だけ） | +1 | `SettleEventInstability`（選んだ効果と「勝利後」の効果で +1 は重ねない） |

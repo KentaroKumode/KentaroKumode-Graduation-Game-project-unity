@@ -208,7 +208,7 @@ namespace EventSystem
                     {
                         ItemSystem.Helpers.PassiveAddHelper.AddPassiveItem(run, id);
                         result.log.Add($"秘宝獲得: {ResolveLabel(id)}");      // 画面に出す言い方 (データの書式「パッシブアイテム獲得」は EventParser が読むので変えない)
-                        result.relicsGained++;
+                        if (GameLoop.ItemIds.CountsAsTakenRelic(id)) result.relicsGained++;   // 進行の資格の品 (確信の 3 品) は不安定化に数えない (2026-11-13)
                         ApplyPassiveAcquisitionBonus(run, id, result);
                     }
                     break;
@@ -234,7 +234,8 @@ namespace EventSystem
                     {
                         GameLoop.Loadout.Gain(run, eff.param);   // 武器なら 1 本だけ (入れ替えるかを聞く・2026-11-11)
                         result.log.Add($"アイテム獲得: {ResolveLabel(eff.param)}");
-                        if (ItemDatabase.Instance?.GetItem(eff.param)?.category == ItemCategory.Passive) result.relicsGained++; else result.otherGains++;
+                        if (ItemDatabase.Instance?.GetItem(eff.param)?.category == ItemCategory.Passive) { if (GameLoop.ItemIds.CountsAsTakenRelic(eff.param)) result.relicsGained++; }
+                        else result.otherGains++;
                         ApplyPassiveAcquisitionBonus(run, eff.param, result);
                     }
                     break;
