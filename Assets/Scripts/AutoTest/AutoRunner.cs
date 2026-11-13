@@ -868,6 +868,7 @@ namespace AutoTest
                  + $"/ 縄張りの宝 {territoryTreasure} (BOT のしきい値 {territoryTreasureHpMargin:0.##}) / 縄張りを避ける遠回り {(navTerritoryDetour < 0 ? "使わない" : "+" + navTerritoryDetour + "歩まで")}"
                  + (DeckLookaheadDiagLine().Length > 0 ? System.Environment.NewLine + DeckLookaheadDiagLine() : "")
                  + (CombatSystem.BossDownDiag.Line().Length > 0 ? System.Environment.NewLine + CombatSystem.BossDownDiag.Line() : "")
+                 + (CombatSystem.HeavyHitDiag.Line().Length > 0 ? System.Environment.NewLine + CombatSystem.HeavyHitDiag.Line() : "")   // [計装 2026-11-14] 大技の被ダメ
                  + (NoAttackChoiceLine().Length > 0 ? System.Environment.NewLine + NoAttackChoiceLine() : "")
                  + (DownAimLine().Length > 0 ? System.Environment.NewLine + DownAimLine() : "")                 // [#141]
                  + (DownBreakDiagLine().Length > 0 ? System.Environment.NewLine + DownBreakDiagLine() : "")     // [診断 2026-11-14] 目盛りの割り時

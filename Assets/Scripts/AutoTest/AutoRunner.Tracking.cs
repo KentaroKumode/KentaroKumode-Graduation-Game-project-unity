@@ -131,6 +131,8 @@ namespace AutoTest
             System.Array.Copy(CombatSystem.EnemyHpLedger.Cum, _ledAtStart, _ledAtStart.Length);
             _pendingShownFloor = gm?.Run?.currentFloor ?? 0;
             _downsAtStart = CombatSystem.BossDownDiag.TotalDowns;   // [計装 2026-11-14] この戦闘 (段) のダウンの数は終わりとの差
+            _heavyHitsAtStart = CombatSystem.HeavyHitDiag.TotalHeavyHits; _heavyTakenAtStart = CombatSystem.HeavyHitDiag.TotalHeavyTaken;   // [計装 2026-11-14] 大技の被ダメ
+            CombatSystem.HeavyHitDiag.SegmentHeavyMax = 0;
             _pendingAxis = new int[ItemSystem.PassiveSkills.AxisRules.Ranked.Length];
             for (int ai = 0; ai < _pendingAxis.Length; ai++)
                 _pendingAxis[ai] = ItemSystem.PassiveSkills.AxisRules.Count(gm?.Run, ItemSystem.PassiveSkills.AxisRules.Ranked[ai]);
@@ -148,6 +150,7 @@ namespace AutoTest
         private readonly double[] _ledAtStart = new double[CombatSystem.EnemyHpLedger.Length];
         private int _pendingShownFloor;
         private long _downsAtStart;
+        private long _heavyHitsAtStart, _heavyTakenAtStart;
         private int[] _pendingAxis;
 
         private float[] LedgerSinceStart()
@@ -221,6 +224,9 @@ namespace AutoTest
                 encounterKey = _pendingEncounterKey,
                 escRises = gm?.EscalationRisesThisCombat ?? 0, instEsc = gm?.InstabilityFromEscalationThisCombat ?? 0,   // [計装 2026-11-13]
                 downs = (int)(CombatSystem.BossDownDiag.TotalDowns - _downsAtStart),   // [計装 2026-11-14]
+                heavyHits = (int)(CombatSystem.HeavyHitDiag.TotalHeavyHits - _heavyHitsAtStart),   // [計装 2026-11-14] 大技の被ダメ
+                heavyTaken = (int)(CombatSystem.HeavyHitDiag.TotalHeavyTaken - _heavyTakenAtStart),
+                heavyMax = CombatSystem.HeavyHitDiag.SegmentHeavyMax,
             };
             _cur.combats.Add(rec);
             _cur.totalCombats++;

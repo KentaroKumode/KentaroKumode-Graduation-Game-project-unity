@@ -47,6 +47,7 @@ namespace CombatSystem
             //   `isCombatActive = false` は元からこの関数の末尾にあるので、 それを入口の番人にする。
             if (!isCombatActive) { SkillDiag.FinishCombatReentry++; return; }
             BossDownDiag.EndFight();   // [計装 2026-11-13] ボスのダウン
+            HeavyHitDiag.EndFight(playerHP <= 0);   // [計装 2026-11-14] 大技の被ダメ (このボスでの負けの数)
 
             // [計装] 対象層のボス戦の締め。 既定は無効。
             CombatSystem.BossCombatTrace.EndFight(enemyHP <= 0 && playerHP > 0,

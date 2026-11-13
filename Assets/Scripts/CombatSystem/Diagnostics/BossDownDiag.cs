@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace CombatSystem
@@ -139,6 +140,135 @@ namespace CombatSystem
                     sb.Append(System.Environment.NewLine).Append("    ")
                       .Append($"割れ方 (旧い判定 AnyDamage) 割れた {a[Slot.AnyBreaks]}・うち主攻撃の直後には割れておらず通常攻撃以外で割れた {a[Slot.AnyNonMainBreaks]}")
                       .Append($" ({100.0 * a[Slot.AnyNonMainBreaks] / a[Slot.AnyBreaks]:0.0}%)");
+            }
+            return sb.ToString();
+        }
+    }
+
+    /// <summary>
+    /// [計装 2026-11-14・作者の依頼「大技をモロに受けた時にどれくらい受けているか」] 大技を持つボスの、 実際に撃たれた大技 / 小技 / チャージのターンの被ダメ。
+    /// 結果を変えない・乱数を引かない。 サマリーの <c>[大技の被ダメ]</c> 行 (<see cref="Line"/>)。 並列ワーカーのチャンクを足せるよう、 合計・回数・ヒストグラムも出す。
+    /// 大技 = 取り消されず・ダウンでも〈封じ・揃〉でもなく・敵が倒れる前に撃った大技のターン (灰燼の王の〈業火〉も)。 被ダメ = 防御・シールドの後の HP の減り
+    /// (敵の攻撃の枝の中: 主攻撃 + プレイヤーの状態の固定ダメ + 〈業火〉の烈炎の分。 ターン終了時の削りは入れない)。
+    /// </summary>
+    public static class HeavyHitDiag
+    {
+        /// <summary>5 HP 刻みのヒストグラムの数 (最後は 200 以上)。 割合 (最大 HP 比) は 1% 刻み・最後は 100% 以上。</summary>
+        public const int HpBin = 5, HpBins = 41, PctBins = 101;
+
+        public sealed class Acc
+        {
+            public long n, atkPre, taken, zero, half, deaths, blockDice, max;
+            public double pctMax, pctHead;
+            public readonly long[] hist = new long[HpBins], pctHist = new long[PctBins];
+            // 〈業火〉: 攻撃の分 (主攻撃の防御・シールドの後) / 烈炎の分 (軽減無視・シールドの後) / 撃った時の烈炎の数
+            public long atkPart, burstPart, blazeStacks, burstTurns;
+            public void Add(int atkPreDef, int takenHp, int maxHp, int hpHead, bool dead, int blockDiceN, int atkPartHp, int burstHp, int stacks)
+            {
+                n++; atkPre += Math.Max(0, atkPreDef); taken += Math.Max(0, takenHp); if (takenHp > max) max = takenHp;
+                if (takenHp <= 0) zero++;
+                if (atkPreDef > 0 && takenHp * 2 <= atkPreDef) half++;
+                if (dead) deaths++;
+                blockDice += Math.Max(0, blockDiceN);
+                double pm = maxHp > 0 ? (double)Math.Max(0, takenHp) / maxHp : 0, ph = hpHead > 0 ? (double)Math.Max(0, takenHp) / hpHead : 0;
+                pctMax += pm; pctHead += ph;
+                hist[Math.Min(HpBins - 1, Math.Max(0, takenHp) / HpBin)]++;
+                pctHist[Math.Min(PctBins - 1, (int)(pm * 100))]++;
+                atkPart += Math.Max(0, atkPartHp); burstPart += Math.Max(0, burstHp); blazeStacks += Math.Max(0, stacks); if (burstHp > 0 || stacks > 0) burstTurns++;
+            }
+        }
+
+        /// <summary>ボス id → [0 大技・1 チャージ・2 小技]。 チャージは taken = そのターンの HP の減り (ターン終了時の削りも含む・ターンの頭からターンの終わり)。</summary>
+        public static readonly Dictionary<string, Acc[]> ByBoss = new Dictionary<string, Acc[]>();
+        /// <summary>ボス id → [戦闘数, プレイヤーが負けた戦闘数] (目盛りや大技の有無を問わない・大技を持つボスだけ表に出る)。</summary>
+        public static readonly Dictionary<string, long[]> Fights = new Dictionary<string, long[]>();
+        /// <summary>プロセスを通した通算 (Reset で戻さない・戦闘ごとの数は読む側が始めとの差で取る): 撃たれた大技の回数 / 大技で受けた HP の合計。</summary>
+        public static long TotalHeavyHits, TotalHeavyTaken;
+        /// <summary>今の戦闘 (段) の最大の 1 発 (読む側が戦闘の始めに 0 へ戻す)。</summary>
+        public static int SegmentHeavyMax;
+
+        private static string _id;
+        public static void Reset() { ByBoss.Clear(); Fights.Clear(); _id = null; }
+
+        /// <summary>戦闘の始め・形態の交代 (ヴェスカの段)。 前の段が開いたままなら、 倒して移った段として負けなしで閉じる。</summary>
+        public static void BeginFight(string id) { if (_id != null) EndFight(false); _id = GameLoop.BossIds.IsBoss(id) ? id : null; }
+
+        public static void EndFight(bool playerDied)
+        {
+            if (_id == null) return;
+            if (!Fights.TryGetValue(_id, out var f)) { f = new long[2]; Fights[_id] = f; }
+            f[0]++; if (playerDied) f[1]++;
+            _id = null;
+        }
+
+        private static Acc Get(int kind)
+        {
+            if (_id == null || kind < 0 || kind > 2) return null;
+            if (!ByBoss.TryGetValue(_id, out var a)) { a = new[] { new Acc(), new Acc(), new Acc() }; ByBoss[_id] = a; }
+            return a[kind];
+        }
+
+        /// <summary>大技 (0) / 小技 (2) のターン: 敵の攻撃の枝を通った後。 <paramref name="atkPreDef"/> = 敵の攻撃値 (プレイヤーの防御の前) / <paramref name="taken"/> = 受けた HP の減り。</summary>
+        public static void NoteHit(int kind, int atkPreDef, int taken, int maxHp, int hpHead, bool dead, int blockDiceN, int atkPartHp, int burstHp, int stacks)
+        {
+            var a = Get(kind);
+            if (a == null) return;
+            a.Add(atkPreDef, taken, maxHp, hpHead, dead, blockDiceN, atkPartHp, burstHp, stacks);
+            if (kind == 0)
+            {
+                TotalHeavyHits++; TotalHeavyTaken += Math.Max(0, taken);
+                if (taken > SegmentHeavyMax) SegmentHeavyMax = taken;
+            }
+        }
+
+        /// <summary>チャージのターン: ターンの頭からターンの終わりまでの HP の減り (攻撃は無い・ターン終了時の削りなど)。</summary>
+        public static void NoteCharge(int lost, int maxHp, int hpHead, bool dead)
+        {
+            var a = Get(1);
+            if (a == null) return;
+            a.Add(0, lost, maxHp, hpHead, dead, 0, 0, 0, 0);
+        }
+
+        private static double Q(long[] hist, long n, double q, double binW)
+        {
+            if (n <= 0) return 0;
+            long target = (long)Math.Ceiling(q * n), c = 0;
+            for (int i = 0; i < hist.Length; i++) { c += hist[i]; if (c >= target) return (i + 0.5) * binW; }
+            return (hist.Length - 0.5) * binW;
+        }
+
+        /// <summary>サマリーの行 (大技を持つボスが居なければ空)。</summary>
+        public static string Line()
+        {
+            if (ByBoss.Count == 0) return "";
+            var sb = new System.Text.StringBuilder("[大技の被ダメ] (被ダメ = 防御・シールドの後の HP の減り・中央値と P90 は 5 HP / 1% 刻みのヒストグラムから・hist は 5 HP 刻み 0..200+・合計と回数はチャンクを足せる)");
+            var ids = new List<string>(ByBoss.Keys); ids.Sort(StringComparer.Ordinal);
+            foreach (var id in ids)
+            {
+                var a = ByBoss[id];
+                Fights.TryGetValue(id, out var f);
+                long fights = f != null ? f[0] : 0, lost = f != null ? f[1] : 0;
+                var h = a[0]; var l = a[2]; var c = a[1];
+                double D(long x, long n) => n > 0 ? (double)x / n : 0;
+                sb.Append(Environment.NewLine).Append("  ").Append(id).Append($": 戦闘 {fights} (負け {lost})");
+                sb.Append(Environment.NewLine).Append("    大技 ")
+                  .Append($"{h.n} 回 (1 戦 {D(h.n, fights):0.00}) / 攻撃 (防御の前) 平均 {D(h.atkPre, h.n):0.0}")
+                  .Append($" / 被ダメ 平均 {D(h.taken, h.n):0.0}・中央値 {Q(h.hist, h.n, 0.5, HpBin):0}・P90 {Q(h.hist, h.n, 0.9, HpBin):0}・最大 {h.max}")
+                  .Append($" / ÷最大 HP 平均 {100 * (h.n > 0 ? h.pctMax / h.n : 0):0.0}%・中央値 {Q(h.pctHist, h.n, 0.5, 1):0}% / ÷敵の攻撃の前の HP 平均 {100 * (h.n > 0 ? h.pctHead / h.n : 0):0.0}%")
+                  .Append($" / 完全に防いだ {100 * D(h.zero, h.n):0.0}%・半分以上防いだ {100 * D(h.half, h.n):0.0}%")
+                  .Append($" / そのターンに死んだ {h.deaths} ({100 * D(h.deaths, h.n):0.0}%・このボスの負けの {100 * D(h.deaths, lost):0.0}%)")
+                  .Append($" / 防御へ挿した出目 平均 {D(h.blockDice, h.n):0.00}");
+                if (h.burstTurns > 0)
+                    sb.Append($" / 〈業火〉 攻撃の分 平均 {D(h.atkPart, h.n):0.0}・烈炎の分 (軽減無視) 平均 {D(h.burstPart, h.n):0.0}・烈炎の数 平均 {D(h.blazeStacks, h.n):0.00}");
+                sb.Append($" / 合計 被ダメ {h.taken}・攻撃 {h.atkPre}・死 {h.deaths}・完全 {h.zero}・半分 {h.half}・出目 {h.blockDice}・攻撃の分 {h.atkPart}・烈炎の分 {h.burstPart}・烈炎 {h.blazeStacks}")
+                  .Append(" / hist5=").Append(string.Join(",", h.hist));
+                sb.Append(Environment.NewLine).Append("    小技 ")
+                  .Append($"{l.n} 回 (1 戦 {D(l.n, fights):0.00}) / 攻撃 (防御の前) 平均 {D(l.atkPre, l.n):0.0}")
+                  .Append($" / 被ダメ 平均 {D(l.taken, l.n):0.0}・中央値 {Q(l.hist, l.n, 0.5, HpBin):0}・最大 {l.max} / ÷最大 HP 平均 {100 * (l.n > 0 ? l.pctMax / l.n : 0):0.0}%")
+                  .Append($" / 完全に防いだ {100 * D(l.zero, l.n):0.0}% / そのターンに死んだ {l.deaths} / 防御へ挿した出目 平均 {D(l.blockDice, l.n):0.00}")
+                  .Append($" / 合計 被ダメ {l.taken}・攻撃 {l.atkPre}・完全 {l.zero} / hist5=").Append(string.Join(",", l.hist));
+                sb.Append(Environment.NewLine).Append("    チャージ ")
+                  .Append($"{c.n} 回 / そのターンの HP の減り (ターン終了時の削りなど) 平均 {D(c.taken, c.n):0.0} / 合計 {c.taken} / そのターンに死んだ {c.deaths}");
             }
             return sb.ToString();
         }

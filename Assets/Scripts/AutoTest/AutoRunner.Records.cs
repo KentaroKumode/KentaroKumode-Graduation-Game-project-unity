@@ -82,6 +82,9 @@ namespace AutoTest
             public int escRises, instEsc;
             /// <summary>[計装 2026-11-14] この戦闘 (ヴェスカは段) でボスがダウンしたターンの数 (BossDownDiag.TotalDowns の差)。</summary>
             public int downs;
+            /// <summary>[計装 2026-11-14] この戦闘 (ヴェスカは段) で実際に撃たれた大技を受けた回数 / 大技で受けた HP の合計 (防御・シールドの後) / 最大の 1 発。
+            /// 大技 = 取り消されず・ダウンでなく・敵が倒れる前に撃った大技のターン (灰燼の王の〈業火〉は烈炎の分も含む)。 CombatSystem.HeavyHitDiag。</summary>
+            public int heavyHits, heavyTaken, heavyMax;
         }
 
         /// <summary><see cref="RunRec.stormNav"/> の 1 層の列の数。</summary>

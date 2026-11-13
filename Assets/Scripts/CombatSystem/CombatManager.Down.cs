@@ -29,6 +29,7 @@ namespace CombatSystem
             BossDown.ActiveNow = false; BossDown.TakenMulNow = false;
             if (newCombat) { Escalation.HeavyCycleOffset = 0; Escalation.HeavyHpRatio = 1f; }
             BossDownDiag.BeginFight(enemy?.id, _down.Enabled);
+            HeavyHitDiag.BeginFight(enemy?.id);   // [計装 2026-11-14] 大技の被ダメ
         }
 
         /// <summary>ターン <paramref name="turn"/> がダウンだったら、 敵の周期 (大技・構え・〈業火の予兆〉) を取り消して頭に戻すか (<see cref="BossDown.CancelsCycle"/>)。
@@ -48,8 +49,13 @@ namespace CombatSystem
         /// <summary>ターンの頭 (ターン番号を進めた後・敵が振る前): 待っているダウンがあれば、 このターンをダウンにする。
         /// ダウンがチャージのターンか山場 (大技・構え・予兆) のターンに重なった時だけ、 その大技は取り消し、 周期は次のターンから頭に戻す
         /// (<see cref="Escalation.HeavyCycleOffset"/>・<see cref="DownCancelsCycleAt"/>・2026-11-14 の作者の決定)。 それ以外のダウンは周期に触らない。</summary>
+        /// <summary>[計装 2026-11-14] ターンの頭の自 HP / このターンはチャージだった (HeavyHitDiag のチャージのターンの HP の減り)。</summary>
+        private int _diagHpTurnHead;
+        private bool _diagChargeTurn;
+
         private void BeginBossDownTurn(CombatContext ctx)
         {
+            _diagHpTurnHead = playerHP; _diagChargeTurn = false;
             // 灰燼の王の〈業火〉の周期は HP 50% で 4 → 3 ターン (2026-11-14)。 このターンの周期の数え方に使う HP の割合をターンの頭に決める (取り消しの判定より前)
             Escalation.HeavyHpRatio = currentEnemy != null ? enemyHP / (float)System.Math.Max(1, EnemyMaxHP) : 1f;
             BossDown.ActiveNow = false; BossDown.TakenMulNow = false;
@@ -119,6 +125,7 @@ namespace CombatSystem
         /// 新しい判定 (MainAttackOnly) = HP が目盛り以下の未割りの目盛りにひびを入れ、 猶予の切れたひびを割る (弱いダウン)・目盛りの上へ戻っていればひびを消す。</summary>
         private void NoteBossDownTurnEnd()
         {
+            if (_diagChargeTurn) { HeavyHitDiag.NoteCharge(_diagHpTurnHead - playerHP, playerMaxHP, _diagHpTurnHead, playerHP <= 0); _diagChargeTurn = false; }   // [計装 2026-11-14]
             if (!_down.Enabled || currentEnemy == null || enemyHP <= 0) { _downMainWouldBreak = 0; return; }
             int turn = PassiveSkillManager.Instance?.Context?.currentTurn ?? 0;
             if (GameLoop.GameHooks.DownBreak == DownBreakRule.AnyDamage)

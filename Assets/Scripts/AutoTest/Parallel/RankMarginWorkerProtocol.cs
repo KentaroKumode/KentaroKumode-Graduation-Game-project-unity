@@ -144,6 +144,7 @@ namespace AutoTest.ParallelSweep
                     mainPred = c.mainPred, mainPredCorr = c.mainPredCorr, mainActual = c.mainActual,
                     atkHist = c.atkHist ?? Array.Empty<int>(), dawnShots = c.dawnShots ?? Array.Empty<int>(),
                     escRises = c.escRises, instEsc = c.instEsc, downs = c.downs,
+                    heavyHits = c.heavyHits, heavyTaken = c.heavyTaken, heavyMax = c.heavyMax,
                 };
             }
             return a;
@@ -196,6 +197,8 @@ namespace AutoTest.ParallelSweep
         public int escRises, instEsc;
         /// <summary>[計装 2026-11-14] この戦闘 (ヴェスカは段) でボスがダウンしたターンの数。 Tools/boss_loss_report.py が読む。</summary>
         public int downs;
+        /// <summary>[計装 2026-11-14] この戦闘 (段) で撃たれた大技を受けた回数 / 大技で受けた HP の合計 (防御・シールドの後) / 最大の 1 発 (AutoRunner.CombatRecord と同じ)。</summary>
+        public int heavyHits, heavyTaken, heavyMax;
     }
 
     [Serializable]
