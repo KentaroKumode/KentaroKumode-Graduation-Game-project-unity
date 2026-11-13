@@ -50,7 +50,8 @@ My project — Unity 3D ローグライク（ボードゲーム調・ダイス�
 - **アイテム・スキルの id = 表示名**（2026-09-22〜）。**id から構造を読み取らない** ──
   家系・段・系統・ユニークは items.json の `family` / `tier` / `consFamily` / `unique` を読む。
   綴りでパースすると、調整で品名を変えた瞬間にロジックが黙って壊れる。例外は出目パーツ（`facepart_*`）のみ。
-  旧 id は `ItemDatabase.LegacyIdMap` が解決する（消さない）。
+  旧 id の対応表は 2026-11-14 に削除（発売前・後方互換なし）。品名を変えたら、参照している所を同じコミットで書き換える。
+  発売後に改名する時は、その時点から対応表を作り直す。
 - **ID 文字列を直書きしない**: 複数ファイルから参照する ID・日本語 ID・ロジック分岐に使う ID/prefix は
   [Assets/Scripts/GameLoop/Ids.cs](Assets/Scripts/GameLoop/Ids.cs)（`ItemIds` / `BossIds`）か `ClassStarter` の定数を経由する。
   ボス判定は `BossIds.IsBoss(id)`。新しい ID を跨ファイル参照する時は先に定数を足す。

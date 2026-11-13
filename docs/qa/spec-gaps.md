@@ -101,7 +101,7 @@ base: origin/main 6ea741d
 | G-44 | 矛 | 軽 | §9-4「`equippedWeaponId`（空 = デフォルト 2d6）」。ダイスは 3 個・職業の武器が必ず配られる。空になる道があるかは未確認 | GAME.md:1347 |
 | G-55 | 矛 | 軽 | §16-3・§16-4 の〈商人の符牒〉（半額・売却不可）。`Ids.cs` は 2026-07-18 に削除と書く | GAME.md:2867,2874 ／ `GameLoop/Ids.cs:14` |
 | G-56 | 未 | 軽 | §16-5 の除外にある「レイピア」（シュヴァリエの武器）。items.json の武器 13 品に無い。どこで定義されるかは未確認 | GAME.md:2881-2883 |
-| G-31 | 疑 | 重 | `ItemDatabase.LegacyIdMap` 171 組のうち、読み替え先が items.json に無いもの 7 組: `BladeEdge_2`・`Counter_1`・`Grievous_1`・内から落ちた城盾・凱旋の記憶・希望の欠片・湯気の立つ椀。旧 id を持つ記録・学習データ・イベントを読んだ時に何が起きるか仕様に無い | `ItemSystem/Items/ItemDatabase.cs:331-` |
+| G-31 | 疑 | 重 | **（2026-11-14 に対応表ごと削除・GAME.md §24。以下は削除前の記録）** `ItemDatabase.LegacyIdMap` 171 組のうち、読み替え先が items.json に無いもの 7 組: `BladeEdge_2`・`Counter_1`・`Grievous_1`・内から落ちた城盾・凱旋の記憶・希望の欠片・湯気の立つ椀。旧 id を持つ記録・学習データ・イベントを読んだ時に何が起きるか仕様に無い | `ItemSystem/Items/ItemDatabase.cs:331-` |
 | G-50 | 無 | 軽 | §17 の効果の種類に `ArmorDurabilityLoss`（防具は独立の枠でない・§9-4）と `CircusHandover`（廃止・無効）が残る。前者を書いた選択肢が来た時の効果が仕様から読めない | GAME.md:2961-2967・1360 |
 
 ### イベント

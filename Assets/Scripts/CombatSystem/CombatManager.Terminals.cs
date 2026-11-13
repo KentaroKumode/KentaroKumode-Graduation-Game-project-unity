@@ -46,7 +46,6 @@ namespace CombatSystem
             if (run != null)
             {
                 if (run.terminalDeck == null || run.terminalDeck.Count == 0) run.terminalDeck = TerminalCards.StartingDeck();
-                TerminalCards.NormalizeIds(run.terminalDeck);   // 旧 id (〈保持器〉など) を今の id へ
                 runDeck = run.terminalDeck;
             }
             else runDeck = TerminalCards.StartingDeck();
