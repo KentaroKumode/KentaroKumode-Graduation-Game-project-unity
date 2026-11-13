@@ -515,6 +515,8 @@ namespace AutoTest
             GameLoop.GameHooks.TerminalKillBonusNeedsAttack = false;            // [測定 2026-11-13・#117]
             GameLoop.GameHooks.HandCarry = CombatSystem.HandCarryMode.Pick;     // [測定 2026-11-13] 手札の規則を既定 (Pick) へ
             GameLoop.GameHooks.BossDownDisabled = false;                        // [測定 2026-11-13] ボスのダウンを既定 (あり) へ
+            GameLoop.GameHooks.DownCancel = CombatSystem.DownCancelRule.ChargeOrHeavy;   // [測定 2026-11-14] ダウンの取り消しの規則を既定へ
+            GameLoop.GameHooks.HeavyChargeNoAttack = true;                      // [測定 2026-11-14] チャージは攻撃しない (既定) へ
             GameLoop.GameHooks.Depth3HeavyDisabled = false;                     // [測定 2026-11-13] 深さ 3 のボスの大技を既定 (あり) へ
             GameLoop.GameHooks.VescaClockHeldAtStart = false;                   // [測定 2026-11-13] 博士の時計を既定 (預からない) へ
             CombatSystem.BossParams.Overrides = null;                           // [測定 2026-11-14] ボスの機構の値を既定 (基準値) へ
