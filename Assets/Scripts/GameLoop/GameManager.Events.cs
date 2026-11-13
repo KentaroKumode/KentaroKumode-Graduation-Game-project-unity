@@ -42,67 +42,61 @@ namespace GameLoop
         /// **ここを触ると出現頻度が直に変わる。** 30〜50 ラン に 1 度が設計意図。</summary>
         public const float ObservatoryChance = 0.002f;
 
-        /// <summary>安全弁で出した「裂け目の記録」を閉じたら、 地図へ戻らずにボス戦へ入る (<see cref="ConfirmEventEncounter"/>)。</summary>
-        private bool _bossAfterRiftRecord;
+        /// <summary>安全弁で出した〈灰に埋もれた基地〉を閉じたら、 地図へ戻らずにボス戦へ入る (<see cref="ConfirmEventEncounter"/>)。</summary>
+        private bool _bossAfterAshBase;
 
-        /// <summary>[計測] 安全弁 (終点に着いた時にまだ「裂け目の記録」が起きていなかった) が働いた回数 (プロセス通算)。
-        /// 終点へは必ず隣り合う点を通るので 0 のはず。 0 でなければ地図の作りに穴がある。</summary>
-        public static int RiftValveFiredCount;
+        /// <summary>[計測] 安全弁 (イベントマスを 1 つも踏まずに深さ 6 の終点に着き、 ボス戦の前に〈灰に埋もれた基地〉を出した) が働いた回数 (プロセス通算)。</summary>
+        public static int AshBaseValveCount;
 
-        /// <summary>終点 (ボス) の点を起動する。 深さ 6 (画面の第 4 層) で隣り合う点を全部イベントにした層 (今の作り) で、
-        /// まだ「裂け目の記録」が起きていなければ (地図の形で隣り合う点を経ずに着いた・万一の安全弁)、 ボス戦の前にそれを出す。</summary>
-        private void StartBossTileOrRiftRecord()
+        /// <summary>終点 (ボス) の点を起動する。 深さ 6 (画面の第 4 層) で、 まだ〈灰に埋もれた基地〉が起きていなければ
+        /// (イベントマスを 1 つも踏まずに着いた・安全弁)、 ボス戦の前にそれを出し、 閉じたらそのままボス戦へ入る。 イベントなしの測定では出さない。</summary>
+        private void StartBossTileOrAshBase()
         {
-            var map = MapManager.Instance?.CurrentMap;
             if (Run != null
-                && MapSystem.FreeMove.RiftGate.ValveNeeded(Run.Depth, SuppressEvents, map?.layout, ConvictionSystem.RiftRecordSeen(Run),
-                                                           ConvictionSystem.HasResolveOrBetter(Run), ConvictionSystem.HasTruth(Run)))
+                && MapSystem.FreeMove.AshBase.Forces(Run.Depth, SuppressEvents, AshBaseEvent.Seen(Run),
+                                                     ConvictionSystem.HasResolveOrBetter(Run), ConvictionSystem.HasTruth(Run)))
             {
-                RiftValveFiredCount++;
-                Debug.LogWarning($"[裂け目の記録] 安全弁: 終点に着いた時にまだ起きていない (通算 {RiftValveFiredCount}) ── ボス戦の前に出す");
-                BeginEventEncounter(riftAtBossValve: true);
+                AshBaseValveCount++;
+                Log($"灰に埋もれた基地: イベントマスを踏まずに終点へ着いた ── ボス戦の前に出す (安全弁・通算 {AshBaseValveCount})");
+                BeginEventEncounter(ashBaseValve: true);
                 return;
             }
             StartBossTile();
         }
 
-        private void BeginEventEncounter(bool riftAtBossValve = false)
+        private void BeginEventEncounter(bool ashBaseValve = false)
         {
             eventChoiceResolved = false;
             returnToMapAfterEventCombat = false;
-            _bossAfterRiftRecord = riftAtBossValve;
+            _bossAfterAshBase = ashBaseValve;
 
             var ee = EventEncounter.Instance;
             if (ee == null)
             {
                 Debug.LogWarning("[GameManager] EventEncounter シングルトン未配置 — マップに戻る");
-                if (riftAtBossValve) { _bossAfterRiftRecord = false; StartBossTile(); return; }   // 終点ではボス戦へ (ソフトロックにしない)
+                if (ashBaseValve) { _bossAfterAshBase = false; StartBossTile(); return; }   // 終点ではボス戦へ (ソフトロックにしない)
                 SetPhase(GamePhase.MapNavigation);
                 return;
             }
             ee.TakePendingTurns();   // 前のイベントで進め損ねた分は持ち越さない
             ee.TakePendingNav();     // 航行の効果も同じ (戦闘になった選択肢など・2026-11-12)
 
-            // 深さ 6 (画面の第 4 層) の「裂け目の記録」は〈真理〉へ至る専用イベント。 BeginWith は EventDatabase.Pick を通らないため乱数列を消費しない。
-            //   今の作り (2026-11-13): 終点 (ボス) に隣り合うイベントマス (MapNode.isRiftGate) の、 最初に踏んだ 1 つで起きる。
-            //     済んだ後 (最後の頁を開いた / 手記を閉じた) の隣り合う点は、 通常のイベントマス (下の抽選へ落ちる)。
-            //   旧い作り (riftRecordAtBoss = False): 生成時に決めた固定の点 (MapNode.isFixedEvent・2026-09-28)。
-            //   riftAtBossValve: 終点に着いた時にまだ起きていなかった (安全弁・StartBossTileOrRiftRecord)。
+            // 深さ 6 (画面の第 4 層) の〈灰に埋もれた基地〉(2026-11-13・GAME.md §4-2): この層で最初に踏んだイベントマスで、 通常の抽選の代わりに出す
+            //   (点は決め打ちしない)。 2 つ目以降のイベントマスは下の抽選へ落ちる。 ashBaseValve = イベントマスを踏まずに終点へ着いた (安全弁・StartBossTileOrAshBase)。
+            //   版 (はじめて / 灰燼の王を倒したことがある) はランの外の記録で選ぶ (AshBaseEvent.NameFor)。 BeginWith は EventDatabase.Pick を通らないため乱数列を消費しない。
+            //   規則の正本は MapSystem.FreeMove.AshBase.Forces (検算 Tools/freemap_check と同じ式)。
             EventSystem.EventDefinition forced = null;
-            var eventNode = MapManager.Instance?.CurrentNode;
-            //   規則の正本は MapSystem.FreeMove.RiftGate.ForcesRecord (検算 Tools/freemap_check と同じ式)。
             if (Run != null
-                && MapSystem.FreeMove.RiftGate.ForcesRecord(Run.Depth, eventNode != null && eventNode.freeMap,
-                                                            eventNode != null && eventNode.isFixedEvent, eventNode != null && eventNode.isRiftGate,
-                                                            riftAtBossValve, ConvictionSystem.RiftRecordSeen(Run),
-                                                            ConvictionSystem.HasResolveOrBetter(Run), ConvictionSystem.HasTruth(Run)))
+                && MapSystem.FreeMove.AshBase.Forces(Run.Depth, SuppressEvents, AshBaseEvent.Seen(Run),
+                                                     ConvictionSystem.HasResolveOrBetter(Run), ConvictionSystem.HasTruth(Run)))
             {
-                forced = EventSystem.EventDatabase.GetByName(ConvictionSystem.Layer7RevelationEventName);
+                forced = EventSystem.EventDatabase.GetByName(AshBaseEvent.NameFor());
+                if (forced == null) Debug.LogError($"[灰に埋もれた基地] 定義が無い: {AshBaseEvent.NameFor()} ── 通常のイベントへ落とす");
             }
-            if (riftAtBossValve && forced == null)
+            if (ashBaseValve && forced == null)
             {
                 // 安全弁で呼んだのに出せない (定義欠け) ── ボス戦へそのまま進む (ソフトロックにしない)
-                _bossAfterRiftRecord = false;
+                _bossAfterAshBase = false;
                 StartBossTile();
                 return;
             }
@@ -150,7 +144,7 @@ namespace GameLoop
             if (!ok || ee.Current == null)
             {
                 // イベント0件/抽選失敗なら何もせずマップへ（ソフトロック防止）。 安全弁で呼んだ時はボス戦へ
-                if (riftAtBossValve) { _bossAfterRiftRecord = false; StartBossTile(); return; }
+                if (ashBaseValve) { _bossAfterAshBase = false; StartBossTile(); return; }
                 SetPhase(GamePhase.MapNavigation);
                 return;
             }
@@ -173,15 +167,8 @@ namespace GameLoop
             eventChoiceResolved = true;
             if (result == null) return;
 
-            // 専用イベントは選択を確定した時点で7層資格を立てる。
-            // 選択効果とは分離し、イベント本文を調整しても進行フラグが壊れないようにする。
-            if (index == 0
-                && ee.Current.name == ConvictionSystem.Layer7RevelationEventName
-                && ConvictionSystem.RevealTruthInLayer6(Run))
-            {
-                MetaProgression.Achievements.AchievementService.NoteFinalPageOpened();
-                Log("裂け目の記録を読み終えた。〈決意〉は〈真理〉へ変わった");
-            }
+            // 〈灰に埋もれた基地・再訪〉の「手記の最後の頁を開く」で〈真理〉を立てるのは、 選択肢の効果「真理を得る」(EventEffectType.GainTruth・
+            //   EventEffectExecutor) ── 選択肢の並びにも名前にも依存しない。
 
             // 戦闘トリガがあれば即時遷移（フレーバー表示は後回し）
             if (result.triggerEliteCombat)
@@ -221,10 +208,10 @@ namespace GameLoop
             bool curNull = EventEncounter.Instance == null || EventEncounter.Instance.Current == null;
             if (!eventChoiceResolved && !curNull) return;
             EventEncounter.Instance?.Clear();
-            if (_bossAfterRiftRecord)
+            if (_bossAfterAshBase)
             {
-                // 安全弁で終点で出した「裂け目の記録」: 地図へ戻らずにそのままボス戦 (この専用イベントはターンも航行の効果も持たない)
-                _bossAfterRiftRecord = false;
+                // 安全弁で終点で出した〈灰に埋もれた基地〉: 地図へ戻らずにそのままボス戦 (この専用イベントはターンも航行の効果も持たない)
+                _bossAfterAshBase = false;
                 StartBossTile();
                 return;
             }

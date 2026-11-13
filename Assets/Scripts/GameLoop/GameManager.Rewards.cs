@@ -161,6 +161,10 @@ namespace GameLoop
                 Run.bossDefeatedThisFloor = true;
                 Run.lastBossId = CurrentEnemy?.id ?? Run.lastBossId; // エンディング分岐用（最後に撃破したボス）
 
+                // 灰燼の王 (深さ 6 = 画面の第 4 層のボス) を倒した瞬間に、 ランの外の記録へ立てる (2026-11-13・結末の種類によらない)。
+                //   次のランから深さ 6 の〈灰に埋もれた基地〉が再訪の版になる (AshBaseEvent)
+                if (CurrentEnemy != null && CurrentEnemy.id == BossIds.Layer6Ash) AshBaseEvent.NoteAshKingBeaten();
+
                 // 5層裏ボス撃破フラグ: 以降のレイピア解除に会心+9 が付くようになる
                 if (CurrentEnemy != null && CurrentEnemy.id == BossIds.Layer5Hidden)
                 {

@@ -36,11 +36,8 @@ namespace MapSystem
         public int index = -1;
         /// <summary>座標 (距離の単位。 点どうしの標準の間隔 ≒ 1)。 離散マップでは 0。</summary>
         public float x, y;
-        /// <summary>深さ 6 (画面の第 4 層) の「裂け目の記録」の固定の点 (旧い作り・<c>riftRecordAtBoss = False</c> の時だけ立つ)。</summary>
+        /// <summary>深さ 6 (画面の第 4 層) の固定のイベントの点 (<c>FreeMapLayout.fixedEvent</c>・〈真理〉を持って入った層 = イベントなしの測定の時だけ立つ)。</summary>
         public bool isFixedEvent;
-        /// <summary>深さ 6 (画面の第 4 層) の終点 (ボス) に隣り合うイベントマス (2026-11-13・<c>FreeMapLayout.riftGate</c>)。
-        /// この層で「裂け目の記録」がまだ起きていなければ、 踏んだ時に固定でそれが起きる。 起きた後は通常のイベントマス。</summary>
-        public bool isRiftGate;
         /// <summary>危険の帯 (<see cref="FreeMove.FreeMapParams.BandSafe"/> ほか)。 -1 = 横の位置 <see cref="x"/> から決める (今までどおり)。
         /// 嵐の層 (2026-11-13) は始点を選び直すので、 生成時に始点と終点からの距離で決めた帯 (<see cref="FreeMove.FreeMapLayout.BandOf"/>) を入れる。</summary>
         public int band = -1;

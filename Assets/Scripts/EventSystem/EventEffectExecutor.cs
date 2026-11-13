@@ -238,6 +238,15 @@ namespace EventSystem
                     if (GameLoop.VescaClock.Take(run)) result.log.Add($"秘宝獲得: {ResolveLabel(GameLoop.ItemIds.VescaClock)}");
                     break;
 
+                case EventEffectType.GainTruth:
+                    // 〈灰に埋もれた基地・再訪〉の「手記の最後の頁を開く」(2026-11-13)。 〈決意〉が無いラン (起きないはず) では何もしない
+                    if (GameLoop.ConvictionSystem.RevealTruthInLayer6(run))
+                    {
+                        MetaProgression.Achievements.AchievementService.NoteFinalPageOpened();
+                        result.log.Add($"〈{GameLoop.ConvictionSystem.IdResolve}〉が〈{GameLoop.ConvictionSystem.IdTruth}〉に変わった（七層へ進める）");
+                    }
+                    break;
+
                 case EventEffectType.DiscardFlag:
                     run.ownedFlags.Remove(eff.param);
                     result.log.Add($"フラグアイテム廃棄: {eff.param}");

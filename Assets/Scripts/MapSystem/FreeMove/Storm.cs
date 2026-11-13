@@ -130,13 +130,12 @@ namespace MapSystem.FreeMove
         /// 追跡者の居る深さでは縄張りの全部の点から直線で <see cref="FreeMapParams.TerritoryStartClearance"/> 以上の点から、 専用の乱数 (<see cref="RngKey"/>) で 1 つ。
         /// 候補が無ければ生成の始点のまま。 選んだ点と生成の始点 (添字 0) の種別を入れ替える。</item>
         /// <item><b>ボスの点 (終点) を選び直す</b> (2026-11-13・作者「外周 2 ノードではないノードで、 ランダムに」): 外周の 1 層目・2 層目 (<see cref="OuterRings"/>) に入らない「内側」の点のうち、
-        /// 始点でない・縄張りの中でない・道が 2 本以上・(深さ 6 の旧い作りの) 固定の点でない・始点から道で <see cref="FreeMapParams.StormBossMinHops"/> 歩以上の点から、
+        /// 始点でない・縄張りの中でない・道が 2 本以上・(深さ 6 のイベントなしの測定の) 固定のイベントの点でない・始点から道で <see cref="FreeMapParams.StormBossMinHops"/> 歩以上の点から、
         /// 専用の乱数 (<see cref="BossRngKey"/>) で 1 つ。 満たす点が無ければ下限を 1 歩ずつ下げる (<see cref="FreeMapLayout.stormBossHopsUsed"/>)。
         /// 内側の点が無ければ生成の終点のまま。 選んだ点と生成の終点 (添字 1) の種別を入れ替える。 始点を先に決め、 距離の下限はボスの側だけで確かめる (順序を循環させない)。</item>
         /// <item><b>危険の帯を始点と終点からの距離で読み直す</b> (<see cref="FreeMapLayout.BandOf"/>)。 新しい安全な帯のエリートは通常の戦闘へ替える。</item>
         /// <item><b>フェーズ 2 の終わりの輪の中心のずらし</b> (<see cref="FreeMapLayout.stormOffset"/>)。</item>
         /// </list>
-        /// 深さ 6 の「裂け目の記録」(ボスに隣り合う点を全部イベントに) は、 この後に生成器が新しい終点で置く (<see cref="FreeMapGenerator.Generate"/>)。
         /// 縄張りを避ける道 (<see cref="TerritoryBypass"/>) は始点・終点を <see cref="FreeMapLayout.start"/> / <see cref="FreeMapLayout.goal"/> で読むので、 新しい点でそのまま働く。
         /// </summary>
         public static void Apply(FreeMapLayout L)

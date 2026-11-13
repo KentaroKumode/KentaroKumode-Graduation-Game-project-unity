@@ -53,13 +53,11 @@ namespace MapSystem.FreeMove
         public List<Mountain> mountains = new List<Mountain>();
         public int start;
         public int goal;
-        /// <summary>深さ 6 (画面の第 4 層) の「裂け目の記録」の固定の点 ── <b>旧い作り</b> (層の 3 分の 1 あたりの 1 点・踏まずに終点へ行けた)。
-        /// 今の作り (<see cref="riftGate"/>) の層と、 無い層は -1。</summary>
+        /// <summary>深さ 6 (画面の第 4 層) の固定のイベントの点 (層の 3 分の 1 あたりの 1 点)。 <b>〈真理〉を持って深さ 6 に入った層だけ</b>に置く
+        /// (イベントなしの測定 <c>SuppressEvents</c> / <c>SuppressConvictionChain</c> は層に入る時に〈真理〉を配る) ── その測定の地図を
+        /// 2026-11-13 までの作りと 1 点も変えないため (<see cref="FreeMapGenerator.Generate"/>)。 ふだんの層と、 他の層は -1。
+        /// (〈灰に埋もれた基地〉は点を決め打ちしない ── 深さ 6 で最初に踏んだイベントマスで起きる・<see cref="AshBase"/>)</summary>
         public int fixedEvent = -1;
-        /// <summary>深さ 6 (画面の第 4 層) の終点 (ボス) に道で隣り合う点の全部 (2026-11-13・GAME.md §4-2)。 どれもイベントマスで、
-        /// 最初に踏んだ 1 つで「裂け目の記録」が起き、 残りは通常のイベントマスとして働く。 終点へは必ずどれかを通る。
-        /// 旧い作り (<see cref="fixedEvent"/>) の層と、 他の層は空。</summary>
-        public List<int> riftGate = new List<int>();
         /// <summary>5 層 (直線) の〈門〉のイベント点。 無い層は -1。 (効果は未実装 ── 旧い〈門〉の 3 つの代償を、 ここへ移す予定)</summary>
         public int gate = -1;
 

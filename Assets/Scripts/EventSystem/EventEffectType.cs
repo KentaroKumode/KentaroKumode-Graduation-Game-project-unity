@@ -78,5 +78,10 @@ namespace EventSystem
         /// 各段のダウンの目盛りが 1 つ増える (<see cref="GameLoop.VescaClock"/>)。 秘宝なので次の潜行には持ち越さない (中断セーブには残る)。
         /// 結果の行は「秘宝獲得: 止まらない時計」(GainPassiveItem と同じ書式)。</summary>
         VescaClockTake,
+
+        /// <summary>真理を得る (2026-11-13・〈灰に埋もれた基地・再訪〉の「手記の最後の頁を開く」だけ): 〈決意〉を〈真理〉へ書き換え、 深さ 7 への資格
+        /// (<c>layer7Unlocked</c>) を立てる (<see cref="GameLoop.ConvictionSystem.RevealTruthInLayer6"/>)。 選択肢の並びや名前でなく、 この効果で判定する。
+        /// 〈真理〉はランをまたいで残らない。 結果の行は「〈決意〉が〈真理〉に変わった」。</summary>
+        GainTruth,
     }
 }

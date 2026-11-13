@@ -318,7 +318,7 @@ namespace AutoTest
 
         /// <summary>band レベル k を踏む階層。 R1a〜R1d(=band 1) は 1〜2層をまとめている。
         /// band 5 (4Fボス死) と 8 (5Fクリア) は実測で出現しないが、 欠けても壊れない。
-        /// band 10 は Null Point で死亡 (R10) と、 深さ 6 クリアで終了 (R10b・#137・riftRecordAtBoss=False の腕だけ) を含む ── どちらも「ヴェスカを倒していない」。</summary>
+        /// band 10 は Null Point で死亡 (R10) と、 深さ 6 クリアで終了 (R10b・#137・ashKingBeatenEver=False の腕だけ) を含む ── どちらも「ヴェスカを倒していない」。</summary>
         private static readonly int[] FloorOfLevel = { 0, 2, 3, 3, 4, 4, 5, 5, 5, 6, 7, 7 };
         private const int MaxLevel = 11;
         /// <summary>付与層の台。 <see cref="AutoRunner"/> は 1〜5 から一様に引く。</summary>

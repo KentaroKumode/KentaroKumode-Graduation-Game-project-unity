@@ -478,7 +478,7 @@ namespace AutoTest
             GameLoop.GameHooks.PursuerLeavesTerritory = false;                  // [測定 2026-11-12] 縄張りの作りを既定へ
             GameLoop.GameHooks.TerritoryTreasure = GameLoop.TerritoryTreasureKind.Forge;
             GameLoop.GameHooks.TerritoryKeepBypass = true;                       // [測定 2026-11-13] 縄張りを避ける道の保証を既定へ
-            GameLoop.GameHooks.RiftRecordAtBoss = true;                          // [測定 2026-11-13] 深さ 6 の「裂け目の記録」の置き方を既定へ
+            GameLoop.GameHooks.AshKingBeatenEver = null;                         // [測定 2026-11-13] 灰燼の王を倒した記録の扱いを既定 (ランの外の記録を読む) へ
             GameLoop.GameHooks.StormEnabled = true;                              // [測定 2026-11-13] 天候の作りを既定 (嵐) へ
             GameLoop.GameHooks.TerminalHealMulOverride = 0;                      // [測定 2026-11-12・#102]
             GameLoop.GameHooks.TerminalArresterNeedOverride = 0;
@@ -577,12 +577,12 @@ namespace AutoTest
         /// </code>
         /// <para><b>R10b (#137)。</b> 旧 R8b は 8 点で、 灰燼の王に負けた R9 (9 点) より低かった。 生きて第 4 層の結末へ着いたランは
         /// 灰燼の王を越えているので R9 より上、 ヴェスカは倒していないので R11 より下の 10 点 (R10 と同点) に置く。
-        /// <b>既定の測定 (riftRecordAtBoss = True) ではこの帯に入るランは無い</b>: 深さ 6 は〈決意〉を持って入る層で、
-        /// 終点に隣り合う点は全部「裂け目の記録」の口になり (ConvictionSystem.RiftGateAtBoss・FreeMapGenerator)、
-        /// 踏まずに終点へ着いても安全弁がボス戦の前に出す (GameManager.StartBossTileOrRiftRecord)。 BOT は必ず最後の頁 (選択肢 0) を
-        /// 開くので (PickSafeChoice・アブレーションでも潰さない) 〈真理〉が立ち、 HandleFloorClear の「深さ 6 で〈真理〉なし」の終了を通らない。
+        /// <b>既定の測定 (ashKingBeatenEver = True) ではこの帯に入るランは無い</b>: 深さ 6 は〈決意〉を持って入る層で、
+        /// 最初に踏んだイベントマスで〈灰に埋もれた基地〉が起き (踏まずに終点へ着いても安全弁がボス戦の前に出す・GameManager.StartBossTileOrAshBase)、
+        /// 倒したことがある記録では再訪の版になる。 BOT は必ず手記の最後の頁 (効果「真理を得る」) を開くので (PickSafeChoice・アブレーションでも潰さない)
+        /// 〈真理〉が立ち、 HandleFloorClear の「深さ 6 で〈真理〉なし」の終了を通らない。
         /// イベントなしの測定 (SuppressEvents / SuppressConvictionChain) は深さ 6 に入る時に〈真理〉を配る。
-        /// 入るのは旧い作りへ戻した腕 (riftRecordAtBoss = False) だけ。</para></summary>
+        /// 入るのは「はじめて」の腕 (ashKingBeatenEver = False・基地は〈徒労〉の 1 択) で深さ 6 のボスを倒したランだけ。</para></summary>
         private void Classify(RunRec r)
         {
             if (r.outcome == Outcome.Crash) { r.band = "CRASH"; r.bandLabel = "クラッシュ(例外)"; return; }

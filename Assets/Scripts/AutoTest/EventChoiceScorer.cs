@@ -325,6 +325,10 @@ namespace AutoTest
                     return V_OBSERVATORY_COPY;
                 }
 
+                case EventEffectType.GainTruth:
+                    // 〈真理〉(2026-11-13): BOT は〈灰に埋もれた基地・再訪〉で必ず手記を開く (AutoRunner.PickSafeChoice の名指し)。 ここは値を作らない
+                    return 0f;
+
                 case EventEffectType.VescaClockTake:
                     // 博士の時計 (2026-11-13): 価値は七層のヴェスカに着いた時だけ・出る条件は数百ランに 1 度で学習に乗らない。
                     //   新しい値を作らず、 いちばん安い得の単位 (強化素材 1 つ) を仮に置く ── 0 より少し上・ほかの 4 つの荷 (品や薬) よりずっと下なので、

@@ -5,7 +5,7 @@ namespace GameLoop
     /// <summary>
     /// 確信パッシブと独立した深層ゲートを管理するヘルパー。
     /// 災厄の予兆で stage=1、エリート戦勝利毎に+1されるが、段階値だけではゲートを開かない。
-    /// 5層ボス撃破で〈決意〉(6F)、6層「裂け目の記録」の選択で〈真理〉(7F)へ変化する。
+    /// 5層ボス撃破で〈決意〉(6F)、6層〈灰に埋もれた基地・再訪〉の「手記の最後の頁を開く」(効果「真理を得る」) で〈真理〉(7F)へ変化する。
     /// </summary>
     public static class ConvictionSystem
     {
@@ -15,23 +15,13 @@ namespace GameLoop
 
         public const int StageResolve = 2;
         public const int StageTruth   = 4;
-        public const string Layer7RevelationEventName = "裂け目の記録";
 
-        /// <summary>深さ 6 (画面の第 4 層) の「裂け目の記録」を、 終点 (ボス) に隣り合う点に置くか (2026-11-13・GAME.md §4-2)。 層を作る時に読む。
-        /// <para>true = 今の作り: 隣り合う点を全部イベントマスにし、 最初に踏んだ 1 つで固定で起きる (踏まずにボスへ行けない)。
-        /// false = 旧い作り: 層の 3 分の 1 あたりの固定の点 1 つ (踏まずにボスへ行けた)。 どちらも乱数を引かない。</para>
-        /// <para>測定の口 <see cref="GameHooks.RiftRecordAtBoss"/> が false の時と、 層に入った時に〈真理〉を持っている時 (イベントなしの測定
-        /// <c>SuppressEvents</c> / <c>SuppressConvictionChain</c> は層に入る時に無償で配る) は旧い作り ── そのとき地図は今までと 1 点も変わらない。</para></summary>
-        public static bool RiftGateAtBoss(RunState run)
-            => GameHooks.RiftRecordAtBoss && !GameManager.SuppressEvents && !HasTruth(run);
-
-        /// <summary>このランで「裂け目の記録」の選択を済ませたか (最後の頁を開いた / 手記を閉じた)。 一度のみの記録 (<c>seenOnceEvents</c>・中断セーブに乗る) を読む。</summary>
-        public static bool RiftRecordSeen(RunState run)
-        {
-            if (run?.seenOnceEvents == null) return false;
-            var def = EventSystem.EventDatabase.GetByName(Layer7RevelationEventName);
-            return def != null && run.seenOnceEvents.Contains(def.id);
-        }
+        /// <summary>深さ 6 (画面の第 4 層) に、 層の 3 分の 1 あたりの固定のイベントの点を置くか (<c>FreeMapLayout.fixedEvent</c>・乱数を引かない)。 層を作る時に読む。
+        /// <para>置くのは、 層に入った時に〈真理〉を持っている時 (イベントなしの測定 <c>SuppressEvents</c> / <c>SuppressConvictionChain</c> は層に入る時に無償で配る) と
+        /// イベントなしの測定の時だけ ── その測定の地図を 2026-11-13 までの作りと 1 点も変えないため。 ふだんの深さ 6 は生成どおりの種別
+        /// (〈灰に埋もれた基地〉は最初に踏んだイベントマスで起きる・<see cref="AshBaseEvent"/>)。</para></summary>
+        public static bool KeepsFixedEventPoint(RunState run)
+            => GameManager.SuppressEvents || HasTruth(run);
 
         /// <summary>〈決意〉以上を所持しているか (6F進入可能か)。</summary>
         public static bool HasResolveOrBetter(RunState run)
@@ -52,7 +42,8 @@ namespace GameLoop
             return true;
         }
 
-        /// <summary>6層の専用イベントで〈真理〉を得て7層資格を立てる。</summary>
+        /// <summary>6層の専用イベント (〈灰に埋もれた基地・再訪〉の効果「真理を得る」) で〈真理〉を得て7層資格を立てる。
+        /// イベントなしの測定では深さ 6 に入る時に呼ぶ (GameManager.EnterFloor)。 〈真理〉はランをまたいで残らない。</summary>
         public static bool RevealTruthInLayer6(RunState run)
         {
             if (run == null || !HasResolveOrBetter(run)) return false;
@@ -78,7 +69,7 @@ namespace GameLoop
                 return;
             }
             // エリート撃破は確信の強さだけを積む。層ゲートの名称変化は
-            // 5層ボス／6層専用イベントという物語上の試練でのみ起こす。
+            // 5層ボス／6層専用イベント (灰に埋もれた基地) という物語上の試練でのみ起こす。
             string newId = run.layer7Unlocked ? IdTruth
                          : run.layer6Unlocked ? IdResolve
                          : IdConviction;
