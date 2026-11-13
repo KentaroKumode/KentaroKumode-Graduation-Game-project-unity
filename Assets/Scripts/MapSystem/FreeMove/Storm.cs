@@ -8,7 +8,7 @@ namespace MapSystem.FreeMove
     /// 嵐 (2026-11-13・天候の作り直し・docs/GAME.md §5-12)。 旧い「前線」(左から右へ進む壁) の置き換え。
     ///
     /// <para><b>2026-11-13 (二版): 嵐を進めるのは「不安定化ポイント」の累計</b> (<see cref="Instability"/>・取るほど不安定になる)。
-    /// 累計 10 で崩れ始め (フェーズ 1)、 20 でフェーズ 2・30 で 3・35 で 4。 輪の形と段の中身は下のとおりで、 時計の単位だけが違う。
+    /// 累計 15 で崩れ始め (フェーズ 1)、 30 でフェーズ 2・45 で 3・50 で 4 (境目は FreeMapParams.InstabilityPhase*At)。 輪の形と段の中身は下のとおりで、 時計の単位だけが違う。
     /// 手番で進む嵐 (下の段落) は測定の口 GameHooks.StormClock = Turns で残してある。</para>
     ///
     /// <para>(手番の時計) 層に入ると、 静かな時間 (<see cref="FreeMapParams.StormQuietTurns"/> 手番・深さ 6 は 0) のあとに嵐が来る。

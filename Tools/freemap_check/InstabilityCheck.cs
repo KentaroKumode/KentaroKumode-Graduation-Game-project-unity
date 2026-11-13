@@ -17,7 +17,7 @@ class TurnWallet : TR.IFreeMapWallet
 
 /// <summary>不安定化の時計 (2026-11-13 二版・GAME.md §5-12) の検算。
 /// (1) 測定の口 stormClock = Turns が storm-boss と 1 手も変わらない (生成・操作列・写し・財布・乱数の引く回数)。
-/// (2) ポイントの溜まり方の表・境目の輪・崩れ始める前は歩いても溜まらない・深さ 6 は 10 から・遠ざけるで減る・ボス戦と深さ 0/7 は溜まらない・中断セーブの往復・点も道も消えない・終点へ着ける。
+/// (2) ポイントの溜まり方の表・境目の輪・崩れ始める前は歩いても溜まらない・深さ 6 は崩れ始める境目から・遠ざけるで減る・ボス戦と深さ 0/7 は溜まらない・中断セーブの往復・点も道も消えない・終点へ着ける。
 /// (3) 歩き方 A/B/C を手番の時計 (前の版) と不安定化の時計 (戦闘 1 回のエスカレーション 0/1/2 段) で比べる。</summary>
 static partial class T
 {
@@ -123,7 +123,7 @@ static partial class T
         {
             int layers = 0, diff = 0, drawDiff = 0; string firstDiff = null;
             foreach (int floor in new[] { 0, 1, 3, 5, 6, 7 })
-                for (int salt = 1; salt <= 3000; salt++)
+                for (int salt = 1; salt <= N(3000, 1000); salt++)
                 {
                     GameLoop.GameRng.Salt = (ulong)salt * 7919; GameLoop.GameRng.Draws.Clear();
                     var La = FreeMapGenerator.Generate(floor, true, true); var da = SnapDraws();
@@ -140,7 +140,7 @@ static partial class T
         {
             int runs = 0, bad = 0, drawBad = 0; string first = null;
             foreach (int floor in StormDepths)
-                for (int salt = 1; salt <= 1000; salt++)
+                for (int salt = 1; salt <= N(1000, 400); salt++)
                 {
                     bad += ReplayTurns(salt, floor, 200, out string f);
                     if (f != null) first ??= $"深さ{floor} 種{salt} {f}";
@@ -182,12 +182,17 @@ static partial class T
                    && Instability.ArrivalPoints(TileType.Event, out bool m3) == 0 && m3
                    && Instability.ArrivalPoints(TileType.Shop, out bool m4) == 0 && !m4 && Instability.ArrivalPoints(TileType.Rest, out _) == 0
                    && Instability.ArrivalPoints(TileType.Exchange, out _) == 0 && Instability.ArrivalPoints(TileType.Boss, out _) == 0;
-            Check(ok, "不安定化: 表のとおり (宝・秘宝 +3 / エリート・番人 +2 / 通常の戦闘・イベントの得 +1 (秘宝を得たイベントは +3 だけ・+1 は重ねない) / 激化 +1 段ごと・ボス戦 0 / イベントのターン +N / 歩く +手番 / 嵐を動かす ±N / 店・休憩・交換・ボスの点 0)");
+            // イベントの「何かを得た +1」は持ち物が増えた時だけ (2026-11-13 三版)
+            var counted = new[] { EventGainKind.Gold, EventGainKind.Consumable, EventGainKind.Material, EventGainKind.Provision, EventGainKind.Item, EventGainKind.Flag };
+            bool gainOk = ((EventGainKind[])Enum.GetValues(typeof(EventGainKind))).All(g => Instability.CountsAsEventGain(g) == counted.Contains(g));
+            Check(ok && gainOk, "不安定化: 表のとおり (宝・秘宝 +3 / エリート・番人 +2 / 通常の戦闘・イベントの得 +1 (持ち物が増えた時だけ = ゴールド・消耗品・素材・物資・品・フラグ。 HP・最大 HP・時限バフ・航行・値引き・休憩の上乗せ・観測所の写しは 0 / 秘宝を得たイベントは +3 だけ・+1 は重ねない) / 激化 +1 段ごと・ボス戦 0 / イベントのターン +N / 歩く +手番 / 嵐を動かす ±N / 店・休憩・交換・ボスの点 0)");
         }
 
         // ── 4. 境目と輪 (累計 → 段 → 輪・段の途中は線形) ──
         {
-            bool ph = new[] { (0, 0), (9, 0), (10, 1), (19, 1), (20, 2), (29, 2), (30, 3), (34, 3), (35, 4), (60, 4) }.All(p => Instability.PhaseOf(p.Item1) == p.Item2);
+            const int P1 = FreeMapParams.InstabilityPhase1At, P2 = FreeMapParams.InstabilityPhase2At, P3 = FreeMapParams.InstabilityPhase3At, P4 = FreeMapParams.InstabilityPhase4At;
+            bool ph = P1 == 15 && P2 == 30 && P3 == 45 && P4 == 50   // 2026-11-13 の 2 度目の置き値 (変えたらここも直す)
+                   && new[] { (0, 0), (P1 - 1, 0), (P1, 1), (P2 - 1, 1), (P2, 2), (P3 - 1, 2), (P3, 3), (P4 - 1, 3), (P4, 4), (P4 + 25, 4) }.All(p => Instability.PhaseOf(p.Item1) == p.Item2);
             int layers = 0, bad = 0; string first = null;
             foreach (int floor in StormDepths)
                 for (int salt = 1; salt <= 1000; salt++)
@@ -195,34 +200,36 @@ static partial class T
                     var s = MakeInst(salt, floor); var L = s.Layout; layers++;
                     double r0 = Storm.FullRadius(L);
                     var K = Instability.Schedule;
-                    Storm.RingAt(L, Instability.TimeOf(10), K, out var c10, out double r10);
-                    Storm.RingAt(L, Instability.TimeOf(15), K, out var c15, out double r15);
-                    Storm.RingAt(L, Instability.TimeOf(20), K, out var c20, out double r20);
-                    Storm.RingAt(L, Instability.TimeOf(25), K, out var c25, out double r25);
-                    Storm.RingAt(L, Instability.TimeOf(30), K, out var c30, out double r30);
+                    // 段の長さは偶数でなくてよいので、 「途中」は実数の補間で見る (段の真ん中は (始まり + 終わり) / 2 の累計で、 長さが奇数なら半分の位置の値)
+                    Storm.RingAt(L, Instability.TimeOf(P1), K, out var c10, out double r10);
+                    Storm.RingAt(L, Instability.TimeOf(P1 + (P2 - P1) / 2), K, out var c15, out double r15);
+                    Storm.RingAt(L, Instability.TimeOf(P2), K, out var c20, out double r20);
+                    Storm.RingAt(L, Instability.TimeOf(P2 + (P3 - P2) / 2), K, out var c25, out double r25);
+                    Storm.RingAt(L, Instability.TimeOf(P3), K, out var c30, out double r30);
+                    double f1 = (double)((P2 - P1) / 2) / (P2 - P1), f2 = (double)((P3 - P2) / 2) / (P3 - P2);
                     string e = null;
-                    if (Math.Abs(r10 - r0) > 1e-9 || Vec2.Dist(c10, Storm.MapCenter) > 1e-9) e = "10";
-                    else if (Math.Abs(r15 - (r0 + r0 * FreeMapParams.StormPhase1EndRadius) / 2) > 1e-9) e = "15 (線形)";
-                    else if (Math.Abs(r20 - r0 * FreeMapParams.StormPhase1EndRadius) > 1e-9 || Vec2.Dist(c20, Storm.MapCenter) > 1e-9) e = "20";
-                    else if (Vec2.Dist(c25, Vec2.Lerp(Storm.MapCenter, Storm.Phase2Center(L), 0.5)) > 1e-9) e = "25 (中心が寄る)";
-                    else if (Math.Abs(r30 - r0 * FreeMapParams.StormPhase2EndRadius) > 1e-9 || Vec2.Dist(c30, Storm.Phase2Center(L)) > 1e-9) e = "30";
-                    else if (Enumerable.Range(0, L.Count).Any(i => Storm.InStorm(L, i, Instability.TimeOf(9), K))) e = "9 で嵐";
-                    else if (Enumerable.Range(0, L.Count).Any(i => Storm.InStorm(L, i, Instability.TimeOf(35), K) != (i != L.goal))) e = "35 (フェーズ 4)";
-                    else if (Enumerable.Range(0, 60).Any(p => Storm.InStorm(L, L.goal, Instability.TimeOf(p), K))) e = "ボスの点が嵐の中";
+                    if (Math.Abs(r10 - r0) > 1e-9 || Vec2.Dist(c10, Storm.MapCenter) > 1e-9) e = P1 + "";
+                    else if (Math.Abs(r15 - (r0 + (r0 * FreeMapParams.StormPhase1EndRadius - r0) * f1)) > 1e-9) e = "フェーズ 1 の途中 (線形)";
+                    else if (Math.Abs(r20 - r0 * FreeMapParams.StormPhase1EndRadius) > 1e-9 || Vec2.Dist(c20, Storm.MapCenter) > 1e-9) e = P2 + "";
+                    else if (Vec2.Dist(c25, Vec2.Lerp(Storm.MapCenter, Storm.Phase2Center(L), f2)) > 1e-9) e = "フェーズ 2 の途中 (中心が寄る)";
+                    else if (Math.Abs(r30 - r0 * FreeMapParams.StormPhase2EndRadius) > 1e-9 || Vec2.Dist(c30, Storm.Phase2Center(L)) > 1e-9) e = P3 + "";
+                    else if (Enumerable.Range(0, L.Count).Any(i => Storm.InStorm(L, i, Instability.TimeOf(P1 - 1), K))) e = (P1 - 1) + " で嵐";
+                    else if (Enumerable.Range(0, L.Count).Any(i => Storm.InStorm(L, i, Instability.TimeOf(P4), K) != (i != L.goal))) e = P4 + " (フェーズ 4)";
+                    else if (Enumerable.Range(0, P4 + 25).Any(p => Storm.InStorm(L, L.goal, Instability.TimeOf(p), K))) e = "ボスの点が嵐の中";
                     // 中身の読み取りが同じ関数を通る (累計を足して段・輪・嵐の中が揃う)
                     if (e == null)
                     {
-                        s.AddInstability(InstabilitySource.Treasure, 9);   // 27 (深さ 6 は 37)
+                        s.AddInstability(InstabilitySource.Treasure, 9);   // 27 (深さ 6 は 42)
                         int p = s.Instability, t = Instability.TimeOf(p);
                         if (s.StormPhase != Instability.PhaseOf(p) || s.StormTime != t || s.StormTurnsToNext != Storm.TurnsToNext(t, K)
                             || Enumerable.Range(0, L.Count).Any(i => s.InStorm(i) != Storm.InStorm(L, i, t, K))) e = "中身";
                     }
                     if (e != null) { bad++; first ??= $"深さ{floor} 種{salt} {e}"; }
                 }
-            Check(ph && bad == 0, $"不安定化: 境目 0〜9 静か / 10 フェーズ 1 (全部を含む輪・地図の中心) / 20 フェーズ 2 (60%) / 30 フェーズ 3 (30%・中心はボスをずらした点) / 35 フェーズ 4 (ボスの点のほか全部)・段の途中は線形・ボスの点はいつも外 ({layers} 層・違反 {bad}{(first != null ? " 最初 " + first : "")})");
+            Check(ph && bad == 0, $"不安定化: 境目 0〜{P1 - 1} 静か / {P1} フェーズ 1 (全部を含む輪・地図の中心) / {P2} フェーズ 2 (60%) / {P3} フェーズ 3 (30%・中心はボスをずらした点) / {P4} フェーズ 4 (ボスの点のほか全部)・段の途中は線形・ボスの点はいつも外 ({layers} 層・違反 {bad}{(first != null ? " 最初 " + first : "")})");
         }
 
-        // ── 5. 崩れ始める前は歩いても溜まらない / 後は 1 歩・待つ・偵察で溜まる (雪の嵐の中へは +2・近道と〈補給線〉は 0) / 深さ 6 は 10 から / 深さ 0・7 は溜まらない ──
+        // ── 5. 崩れ始める前は歩いても溜まらない / 後は 1 歩・待つ・偵察で溜まる (雪の嵐の中へは +2・近道と〈補給線〉は 0) / 深さ 6 は崩れ始める境目から / 深さ 0・7 は溜まらない ──
         {
             bool quiet = true, after = true, snow = true, free = true, d6 = true, d07 = true, ext = true; int layers = 0;
             foreach (int floor in new[] { 1, 3, 5 })
@@ -240,7 +247,7 @@ static partial class T
                     quiet &= s.Instability == 0 && s.InstabilityParts.All(x => x == 0);
                     ext &= s.PassTurnsExternal(2) >= 0 && s.Instability == 0;                                // 休憩の「多めに回復」は 0
                     if (s.InFight) continue;
-                    s.AddInstability(InstabilitySource.Treasure, 4);                                          // 12 (崩れ始めた)
+                    s.AddInstability(InstabilitySource.Treasure, 5);                                          // 15 (崩れ始めた)
                     int p0 = s.Instability;
                     var cand = s.Neighbors(s.Me).Where(v => v != s.Layout.goal).ToList();
                     if (cand.Count == 0) continue;
@@ -263,17 +270,17 @@ static partial class T
             {
                 var w = new Wallet { Provision = 100000, Hp = 100000 };
                 var s = MakeInst(salt, 5, w, WeatherKind.Snow);
-                s.AddInstability(InstabilitySource.Treasure, 12);                                             // 36 (フェーズ 4)
+                s.AddInstability(InstabilitySource.Treasure, 17);                                             // 51 (フェーズ 4)
                 int j = s.Neighbors(s.Me).First(v => v != s.Layout.goal);
                 int p = s.Instability; bool inS = s.InStorm(j);
                 s.MoveTo(j);
                 if (!s.InFight) snow &= inS && s.Instability == p + FreeMapParams.StormSnowTurns;
             }
-            // 深さ 6 は 10 から (入った時からフェーズ 1)
+            // 深さ 6 は崩れ始める境目 (15) から (入った時からフェーズ 1)
             for (int salt = 1; salt <= 100; salt++)
             {
                 var s = MakeInst(salt, 6);
-                d6 &= s.Instability == FreeMapParams.InstabilityDepth6Start && s.StormPhase == 1 && s.Collapsing && s.InstabilityParts.All(x => x == 0);
+                d6 &= FreeMapParams.InstabilityDepth6Start == FreeMapParams.InstabilityPhase1At && s.Instability == FreeMapParams.InstabilityDepth6Start && s.StormPhase == 1 && s.Collapsing && s.InstabilityParts.All(x => x == 0);
                 var nb = s.Neighbors(s.Me); s.MoveTo(nb[0]);
                 if (!s.InFight) d6 &= s.Instability == FreeMapParams.InstabilityDepth6Start + 1;
             }
@@ -289,20 +296,20 @@ static partial class T
                 d07 &= !s.StormMode && !s.InstabilityMode && s.Instability == 0 && s.StormPhase == 0;
             }
             Check(quiet && after && snow && free && d6 && d07 && ext,
-                $"不安定化: 崩れ始める前は歩く・待つ・偵察で溜まらない ({layers} 層)・後は 1 歩・待つ・偵察で +1 (雪の嵐の中へは +2)・近道と〈補給線〉と休憩の手番は 0・イベントのターン+3 は +3・深さ 6 は 10 から・深さ 0/7 は溜まらない ({quiet}/{after}/{snow}/{free}/{ext}/{d6}/{d07})");
+                $"不安定化: 崩れ始める前は歩く・待つ・偵察で溜まらない ({layers} 層)・後は 1 歩・待つ・偵察で +1 (雪の嵐の中へは +2)・近道と〈補給線〉と休憩の手番は 0・イベントのターン+3 は +3・深さ 6 は {FreeMapParams.InstabilityDepth6Start} から・深さ 0/7 は溜まらない ({quiet}/{after}/{snow}/{free}/{ext}/{d6}/{d07})");
         }
 
         // ── 6. 遠ざける / 近づける・段の知らせ・フェーズ 3 でボスが見える ──
         {
             var s = MakeInst(21, 3);
-            s.AddInstability(InstabilitySource.Treasure, 4);              // 12
-            var e1 = s.ShiftFront(-3); bool a = s.Instability == 9 && s.StormPhase == 0 && (e1 & FreeMapEvent.StormAdvanced) != 0 && s.Turn == 0;
+            s.AddInstability(InstabilitySource.Treasure, 5);              // 15
+            var e1 = s.ShiftFront(-3); bool a = s.Instability == 12 && s.StormPhase == 0 && (e1 & FreeMapEvent.StormAdvanced) != 0 && s.Turn == 0;
             s.ShiftFront(-20); bool b = s.Instability == 0;              // 0 未満にしない
-            var e2 = s.ShiftFront(+30); bool c = s.Instability == 30 && s.StormPhase == 3 && (e2 & FreeMapEvent.StormAdvanced) != 0 && s.Known[s.Layout.goal];
-            bool d = s.InstabilityParts[Instability.PartShift] == -12 + 30 && s.InstabilityParts[Instability.PartTake] == 12;
+            var e2 = s.ShiftFront(+45); bool c = s.Instability == 45 && s.StormPhase == 3 && (e2 & FreeMapEvent.StormAdvanced) != 0 && s.Known[s.Layout.goal];
+            bool d = s.InstabilityParts[Instability.PartShift] == -15 + 45 && s.InstabilityParts[Instability.PartTake] == 15;
             var s2 = MakeInst(22, 5); bool hidden = !s2.Known[s2.Layout.goal];
-            s2.AddInstability(InstabilitySource.Treasure, 9); bool hid2 = s2.StormPhase == 2 && (!s2.Known[s2.Layout.goal] || s2.HopsFrom(s2.Me)[s2.Layout.goal] <= 1);
-            s2.AddInstability(InstabilitySource.Battle, 3); bool seen = s2.StormPhase == 3 && s2.Known[s2.Layout.goal];
+            s2.AddInstability(InstabilitySource.Treasure, 11); bool hid2 = s2.StormPhase == 2 && (!s2.Known[s2.Layout.goal] || s2.HopsFrom(s2.Me)[s2.Layout.goal] <= 1);
+            s2.AddInstability(InstabilitySource.Battle, 12); bool seen = s2.StormPhase == 3 && s2.Known[s2.Layout.goal];
             Check(a && b && c && d && hidden && hid2 && seen, $"不安定化: 遠ざける+N は −N (0 未満にしない・境目を下回れば静かへ戻る)・近づける+N は +N・段が変わると知らせる・手番は進まない・フェーズ 3 でボスの点が見える ({a}/{b}/{c}/{d}/{hidden}/{hid2}/{seen})");
         }
 
@@ -347,7 +354,7 @@ static partial class T
             Check(saveBad == 0 && oldBad == 0 && lost == 0 && notReached == 0, $"不安定化: 中断セーブの往復で累計・内訳・輪が同じ・古いセーブは層の始まりから・点も道も消えない・終点へ必ず着ける ({layers} 層・往復の違い {saveBad}・古いセーブ {oldBad}・消えた {lost}・着けない {notReached})");
         }
 
-        WalkCompareInstability();
+        // 歩き方の比べ (WalkCompareInstability) は run.py --walk に分けた (2026-11-13・10 分前後かかる)
     }
 
     // =====================================================================

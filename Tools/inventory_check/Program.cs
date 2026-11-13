@@ -5,6 +5,7 @@
 //      全部の品に、 矢印と送りで届く・吹き出しが窓の中 (= 480×270 の中) で升目に重ならない
 //   3. items.json の全件: 詳細の欄 (説明文 + フレーバー文・売値と印は最長の形) が、 欄の幅で折り返して頁に割っても字を 1 つも落とさない・
 //      吹き出し (品名 + 説明文) が窓の高さに入る
+//   5. 戦闘の画面の入口 [持ち物] (BattleHudLayout.Inv): 480×270 の中で、 ほかの部品 (予告の枠・上の帯・ステータス・役・出目・操作・手札・敵) に重ならず、 字が入る
 //   4. アイコンの無い品 (Resources/Icons/Items/<id>.png が無い品) の仮の字: 升目の内側に収まり、 アイコンの無い品どうしで (字・レア度) が重ならない
 using System;
 using System.Collections.Generic;
@@ -74,6 +75,21 @@ static class Program
         string sub = "HP 9999/9999  物資 999/999  99999G";
         int titleW = Width("持ち物");
         Check(titleW + 12 + Width(sub) <= c.w, $"題と副題 {titleW + 12 + Width(sub)} dot ≦ {c.w}");
+        // 上下の余白がそろう (2026-11-13: 上端 2 dot に張り付いて見えた)
+        int top = InventoryLayout.WindowY, bottom = InventoryLayout.ScreenH - (InventoryLayout.WindowY + InventoryLayout.H);
+        Check(top == bottom && top >= 4, $"窓の上下の余白がそろう (上 {top}・下 {bottom} dot・4 以上)");
+    }
+
+    // ===== 5. 戦闘の画面の入口 =====
+    static void BattleEntry()
+    {
+        var screen = new Box(0, 0, InventoryLayout.ScreenW, InventoryLayout.ScreenH);
+        var inv = BattleHudLayout.Inv;
+        var hit = BattleHudLayout.Others.Where(o => inv.Overlaps(o)).ToList();
+        Console.WriteLine($"戦闘の画面の入口 [{BattleHudLayout.InvLabel}] {inv} (キー {BattleHudLayout.InvKeyName})");
+        Check(inv.Inside(screen), $"戦闘の画面の入口 {inv} が 480×270 の中");
+        Check(hit.Count == 0, "戦闘の画面の入口が、 予告の枠・上の帯・ステータス・役・出目 (9 個の幅)・操作・手札・敵に重ならない" + (hit.Count > 0 ? ": " + string.Join(" ", hit) : ""));
+        Check(Width(BattleHudLayout.InvLabel) + 6 <= inv.w && LineH <= inv.h + 1, $"入口の字「{BattleHudLayout.InvLabel}」{Width(BattleHudLayout.InvLabel)} dot が入口 ({inv.w}×{inv.h}) に入る");
     }
 
     // ===== 2. 品の数 =====
@@ -93,7 +109,7 @@ static class Program
         int cols = InventoryLayout.Cols(LineH);
         var tl = tipCard.TooltipLines(InventoryLayout.TipTextW, Adv).Select(x => x.text).ToList();
         InventoryLayout.TipSize(tl, Adv, LineH, out int tw, out int th);
-        int bad = 0, unreachable = 0, tipBad = 0, cases = 0, keyBad = 0;
+        int bad = 0, unreachable = 0, tipBad = 0, cases = 0, keyBad = 0, tipSide = 0;
         foreach (int n in new[] { 0, 1, 12, 60, 200 })
             for (int how = 0; how < 3; how++)
             {
@@ -116,6 +132,11 @@ static class Program
                         // 吹き出し (いちばん大きい物) が窓の中・升目に重ならない
                         var tip = InventoryLayout.TipBox(kv.Value, tw, th);
                         if (!tip.Inside(InventoryLayout.TipBounds) || !Shift(tip).Inside(screen) || tip.Overlaps(kv.Value)) { tipBad++; if (tipBad < 5) Console.WriteLine($"  NG 吹き出し {tip} (升目 {kv.Value})"); }
+                        // 左右のどちらかに、 送りの棒と詳細の欄にかからずに置けるなら、 かからない (2026-11-13: 右端の列で右に出て重なっていた)
+                        var side = new Box(g.Right - InventoryLayout.BarW, 0, InventoryLayout.W - (g.Right - InventoryLayout.BarW), InventoryLayout.H);
+                        bool canAvoid = kv.Value.Right + 3 + tw <= InventoryLayout.GridTipRight || kv.Value.x - 3 - tw >= InventoryLayout.TipBounds.x;
+                        if (canAvoid && tip.Overlaps(side)) { tipSide++; if (tipSide < 5) Console.WriteLine($"  NG 吹き出しが送りの棒・詳細の欄にかかる {tip} (升目 {kv.Value})"); }
+                        if (kv.Value.Right + InventoryLayout.Pitch > g.Right - InventoryLayout.BarW && tip.x > kv.Value.x) { tipSide++; if (tipSide < 5) Console.WriteLine($"  NG 右端の列の吹き出しが右に出る {tip} (升目 {kv.Value})"); }
                     }
                     for (int a = 0; a < boxes.Count; a++)
                         for (int b = a + 1; b < boxes.Count; b++)
@@ -151,6 +172,7 @@ static class Program
         Check(unreachable == 0, $"どの品にもフォーカスと送りで届く (NG {unreachable})");
         Check(keyBad == 0, $"矢印のフォーカスが端で止まり、 → ↓ で最後まで届く (NG {keyBad})");
         Check(tipBad == 0, $"いちばん大きい吹き出し ({longestTipItem}・{tw}×{th}) が、 どの升目に出しても窓 (= 480×270) の中で、 升目に重ならない (NG {tipBad})");
+        Check(tipSide == 0, $"右端の列の吹き出しは左に出る・左右どちらかに置ける時は送りの棒と詳細の欄にかからない (NG {tipSide})");
     }
 
     // ===== 3. items.json の全件 =====
@@ -179,7 +201,7 @@ static class Program
     static ItemCardInfo AllItems(List<Item> items, out string longestTip)
     {
         int perPage = InventoryLayout.DetailPerPage(LineH), dw = InventoryLayout.DetailTextW;
-        int lost = 0, wide = 0, pagesMax = 0, tipBad = 0, tipHMax = 0; string pagesWhat = "", tipWhat = ""; ItemCardInfo tipCard = null;
+        int lost = 0, wide = 0, pagesMax = 0, tipBad = 0, tipHMax = 0, metaBad = 0; string pagesWhat = "", tipWhat = ""; ItemCardInfo tipCard = null;
         var missing = new SortedSet<char>();
         foreach (var it in items)
         {
@@ -191,6 +213,9 @@ static class Program
             if (got != want) { lost++; Console.WriteLine($"  NG 字が落ちる: {it.id}\n     want {want}\n     got  {got}"); }
             foreach (var p in pages) { if (p.Count > perPage) lost++; foreach (var l in p) if (Width(l.text) > dw) { wide++; Console.WriteLine($"  NG 幅を超える行: {it.id} 「{l.text}」"); } }
             if (pages.Count > pagesMax) { pagesMax = pages.Count; pagesWhat = it.id + " (" + lines.Count + " 行)"; }
+            // 付記 (種類・段・個数・売値 …) は項目の区切りで折り返す: 幅に入る項目は 1 行の中に丸ごと (単位だけが次の行へこぼれない・2026-11-13)
+            var metaLines = lines.Where(l => l.role == 1 && l.text.Length > 0).Select(l => l.text).ToList();
+            foreach (var part in c.MetaParts()) if (Width(part) <= dw && !metaLines.Any(l => l.Contains(part))) { metaBad++; if (metaBad < 5) Console.WriteLine($"  NG 付記の項目が行をまたぐ: {it.id} 「{part}」 / {string.Join(" | ", metaLines)}"); }
             var tl = c.TooltipLines(InventoryLayout.TipTextW, Adv).Select(x => x.text).ToList();
             InventoryLayout.TipSize(tl, Adv, LineH, out int tw, out int th);
             if (th > InventoryLayout.TipBounds.h || tw > InventoryLayout.TipMaxW || tl.Any(s => Width(s) > InventoryLayout.TipTextW)) { tipBad++; Console.WriteLine($"  NG 吹き出しが入らない: {it.id} {tw}×{th}"); }
@@ -201,6 +226,7 @@ static class Program
         if (missing.Count > 0) Console.WriteLine($"  (情報) ドット字に無い字 {missing.Count}: {string.Concat(missing)} ── items.json の文の字。 この画面で新しく足した字ではない");
         Check(lost == 0 && wide == 0, $"全 {items.Count} 品の詳細 (品名・付記・印・説明文・フレーバー文) が、 幅 {dw} dot で折り返して 1 頁 {perPage} 行に割っても字を落とさない (NG {lost + wide})");
         Check(tipBad == 0, $"全 {items.Count} 品の吹き出し (品名 ×999 + 説明文) が幅 {InventoryLayout.TipMaxW}・窓の高さに入る (NG {tipBad})");
+        Check(metaBad == 0, $"全 {items.Count} 品の付記 (売値・個数は最長の形) が項目の区切りで折り返す ── 項目が行をまたがない (NG {metaBad})");
         longestTip = tipWhat;
         return tipCard;
     }
@@ -243,13 +269,15 @@ static class Program
         string root = args.Length > 0 ? args[0] : ".";
         LoadFont(root);
         Frame();
+        BattleEntry();
         var items = LoadItems(root);
         var tipCard = AllItems(items, out string tipWhat);
         Counts(tipWhat, tipCard);
         Placeholders(root, items);
         // 画面で足した字 (見出し・案内・付記・印・空の時の字) がドット字にある
         string ui = string.Concat(ItemCardInfo.KindNames) + "持ち物ステータス使う閉じる矢印で選ぶSpace詳細を送るEsc升目を押すと、ここに詳しく出る。何も持っていない。"
-                  + "軸家系段個数売値手放せない預かり物今は使えない:強化素材休憩で武器を強化する時に払う。銅銀金伝説剣斧短剣盾・×〜G()1/2持ち物へ";
+                  + "軸家系段個数売値手放せない預かり物今は使えない:強化素材休憩で武器を強化する時に払う。銅銀金伝説剣斧短剣盾・×〜G()1/2持ち物へ"
+                  + "戦闘中は [道具] から使う";
         var miss = ui.Where(ch => ch > ' ' && !Have.Contains(ch)).Distinct().ToList();
         Check(miss.Count == 0, "画面で足した字がドット字にある" + (miss.Count > 0 ? ": " + string.Concat(miss) : ""));
         Console.WriteLine(fails == 0 ? "ALL OK" : $"{fails} 件 NG");

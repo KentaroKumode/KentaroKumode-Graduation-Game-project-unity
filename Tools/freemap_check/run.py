@@ -5,7 +5,10 @@ UnityEngine 非依存の FreeMove/*.cs だけを Unity 同梱の Roslyn (csc) �
 (生成の不変条件・決定性・巡回・補足・捕まる・逃げる・囮罠・照明・偵察・天候・物資不足・猟犬と使い魔・
 直行する素朴な BOT の捕まり率)。 最後の行が `ALL OK` なら全部通っている。
 
-使い方 (リポジトリのルートで): python Tools/freemap_check/run.py
+使い方 (リポジトリのルートで):
+  python Tools/freemap_check/run.py          規則の検算と口の一致 (層の数を絞る・3 分以内)
+  python Tools/freemap_check/run.py --full   口の一致を全数で (嵐の前の main・storm-boss と突き合わせる層を全部)
+  python Tools/freemap_check/run.py --walk   歩かせる検算だけ (歩き方 A/B/C × 時計 × 深さ 1/3/5/6 × 1000 層・10 分前後)
 """
 import glob
 import os
@@ -88,7 +91,7 @@ def main():
         sys.exit(1)
     with open(os.path.join(out, 'check.runtimeconfig.json'), 'w', encoding='utf-8') as f:
         f.write('{ "runtimeOptions": { "tfm": "netcoreapp3.1", "framework": { "name": "Microsoft.NETCore.App", "version": "3.1.0" } } }\n')
-    r = subprocess.run(['dotnet', os.path.join(out, 'check.dll')], capture_output=True)
+    r = subprocess.run(['dotnet', os.path.join(out, 'check.dll')] + [a for a in sys.argv[1:] if a in ('--full', '--walk')], capture_output=True)
     sys.stdout.buffer.write(r.stdout)
     sys.stdout.buffer.flush()
     sys.exit(r.returncode)

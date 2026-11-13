@@ -529,6 +529,7 @@ namespace AutoTest.EditorTools
 
             var recs = new List<AutoRunner.RunRec>(_st.runsPerRound);
             var danger = new List<(string, double, bool)>();   // 戦闘名ごとの危険度の学習 (2026-11-05)
+            var stormLayers = new List<IList<int>>(); var stormFights = new List<(int, int, bool)>();   // [計装 2026-11-13] 不安定化の内訳
             foreach (var s in _slots)
             {
                 var file = JsonUtility.FromJson<LearnRunFile>(File.ReadAllText(s.learnPath, Encoding.UTF8));
@@ -537,6 +538,8 @@ namespace AutoTest.EditorTools
                 foreach (var row in file.runs)
                 {
                     recs.Add(row.ToRunRec());
+                    if (row.stormLayers != null) stormLayers.Add(row.stormLayers);
+                    if (row.fights != null) foreach (var f in row.fights) if (f.end) stormFights.Add((f.escRises, f.instEsc, f.isBoss));
                     if (row.fights != null)
                         foreach (var f in row.fights)
                             if (f.end && !string.IsNullOrEmpty(f.key) && f.maxHp > 0)
@@ -561,7 +564,10 @@ namespace AutoTest.EditorTools
                         + $" / 学習 {stats?.totalBatches ?? 0} バッチ {stats?.totalRuns ?? 0} ラン / {min:F1} 分"
                         + LearningReadSummary();
             File.AppendAllText(Path.Combine(_root, "rounds.txt"), line + "\n", new UTF8Encoding(false));
-            Debug.Log("[学習並列] " + line + "\n  " + LearnedPriorityProvider.LastLoadedSummary);
+            // [計装 2026-11-13] 不安定化の内訳 (層ごとの抜けた時の累計・フェーズ・内訳 / 戦闘 1 回あたりの激化の段)
+            string storm = AutoRunner.StormInstabilityLines(stormLayers, stormFights);
+            File.AppendAllText(Path.Combine(_root, "rounds.txt"), "  " + storm.Replace("\n", "\n  ") + "\n", new UTF8Encoding(false));
+            Debug.Log("[学習並列] " + line + "\n  " + storm + "\n  " + LearnedPriorityProvider.LastLoadedSummary);
             // 記録 (learn_runs.json) は残す ── 死因・戦闘ごとの診断に読む。 生成物は prune_outputs.py が刈る。
 
             _st.round++;

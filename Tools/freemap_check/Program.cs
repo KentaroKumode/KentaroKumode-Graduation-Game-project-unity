@@ -60,9 +60,22 @@ static partial class T
     static bool FoeInsideTerritory(FreeMapSim s)
         => !s.FoeAlive || (s.InTerritory(s.FoeNode) && s.Familiars.All(f => s.InTerritory(f.pos)));
 
-    static void Main()
+    /// <summary>口の一致を全数で回す (run.py --full)。 ふだんは層の数を絞る (確認役の待ちを 3 分以内に・2026-11-13)。</summary>
+    static bool Full;
+    /// <summary>層の数: ふだんは <paramref name="quick"/>、 --full では <paramref name="full"/>。</summary>
+    static int N(int full, int quick) => Full ? full : quick;
+
+    static void Main(string[] args)
     {
         Console.OutputEncoding = System.Text.Encoding.UTF8;
+        Full = args.Contains("--full");
+        if (args.Contains("--walk"))
+        {
+            // 歩かせる検算 (歩き方 A/B/C × 時計 × 4 層 × 1000 層・10 分前後)。 ふだんの検算からは外した (2026-11-13)。
+            WalkCompareInstability();
+            Console.WriteLine(fails == 0 ? "ALL OK" : $"FAILED {fails}");
+            return;
+        }
         // --- 生成の不変条件 ---
         {
             int bad = 0; var shortest = new List<int>(); int edgesSum = 0;

@@ -383,7 +383,7 @@ namespace UI.Game2D
         }
 
         /// <summary>嵐の帯の文 (2026-11-13): 「霧 嵐まで 12」/「嵐 フェーズ 2・次まで 4 霧」/「嵐 フェーズ 4 霧」。 種類なしは「嵐」だけ。
-        /// 二版 (不安定化の時計): 静かな間は「不安定 7/10」(あと 3 で崩れ始める)、 崩れ始めたら「嵐 フェーズ k・次まで N」(N は不安定化ポイント)。</summary>
+        /// 二版 (不安定化の時計): 静かな間は「不安定 7/15」(境目は FreeMapParams.InstabilityPhase1At・あと 8 で崩れ始める)、 崩れ始めたら「嵐 フェーズ k・次まで N」(N は不安定化ポイント)。</summary>
         internal static string StormLabel(FreeMapSim sim)
         {
             int ph = sim.StormPhase, n = sim.StormTurnsToNext;

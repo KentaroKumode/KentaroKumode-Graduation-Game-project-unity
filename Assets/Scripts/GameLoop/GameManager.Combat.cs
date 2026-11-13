@@ -268,6 +268,7 @@ namespace GameLoop
 
         private void StartBossTile()
         {
+            NoteBossEntryInstability();   // [計装 2026-11-13] 層を抜けた時の不安定化 (数えるだけ)
             if (Run != null)
             {
                 int fi = Mathf.Clamp(Run.Depth, 1, 8);
