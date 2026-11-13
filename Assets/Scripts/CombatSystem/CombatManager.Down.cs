@@ -134,8 +134,8 @@ namespace CombatSystem
             }
             _downMainWouldBreak = 0;
             int c = _down.NoteTurnEndCracks(enemyHP, currentEnemy.maxHP, turn, GameLoop.GameHooks.DownCrackGrace, GameLoop.GameHooks.DownCrackWeak,
-                                            out int newCracks, out int healed);
-            BossDownDiag.NoteCracks(newCracks, healed, c);
+                                            out int newCracks);
+            BossDownDiag.NoteCracks(newCracks, c);
             if (newCracks > 0) Debug.Log($"[ダウン] 通常攻撃以外で目盛りを下回った: ひび {newCracks} (HP {enemyHP}/{currentEnemy.maxHP})");
             if (c > 0) Debug.Log($"[ダウン] ひびの猶予が切れて目盛りが {c} つひとりでに割れた → 次のターンからダウン {_down.pending} ターン");
         }

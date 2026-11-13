@@ -597,6 +597,16 @@ static class T
             Check(r4 == "小|小|チャージ(0)|大|小|小|チャージ(0)|大", "周期 4: 小・小・チャージ(0)・大 → " + r4);
             Check(r5 == "小|小|小|チャージ(0)|大|小|小|小|チャージ(0)|大", "周期 5: 小・小・小・チャージ(0)・大 → " + r5);
             Check(r2 == "チャージ(0)|大|チャージ(0)|大", "周期 2: チャージ(0)・大 (小技なし) → " + r2);
+            string r6 = Row(6, 6), r7 = Row(7, 7);
+            float m6 = HeavyCycle.CycleMean(6, 0.8f, 3.0f, true), m7 = HeavyCycle.CycleMean(7, 0.8f, 3.0f, true);
+            var sp67 = HeavyCycle.ParseSpec("*:0.8:3.0:6,boss_layer7:0.8:3.0:7");
+            bool can67 = true;
+            foreach (int P in new[] { 6, 7 })
+                for (int c = 1; c <= P; c++)
+                    can67 &= BossDown.CancelsCycle(DownCancelRule.ChargeOrHeavy, HeavyCycle.TurnsToHeavy(P, c), -1, -1) == (c >= P - 1);
+            Check(r6 == "小|小|小|小|チャージ(0)|大" && r7 == "小|小|小|小|小|チャージ(0)|大" && Math.Abs(m6 - 6.2f / 6) < 1e-4 && Math.Abs(m7 - 7.0f / 7) < 1e-4
+                  && sp67.Count == 2 && sp67[0].period == 6 && sp67[1].period == 7 && can67,
+                  $"周期 6・7: {r6} / {r7}・1 周期の平均 ×{m6:0.00} / ×{m7:0.00}・口で読める・取り消しはチャージか大技のターンだけ");
             float m3 = HeavyCycle.CycleMean(3, 0.8f, 3.0f, true), m4 = HeavyCycle.CycleMean(4, 0.8f, 3.0f, true), m5 = HeavyCycle.CycleMean(5, 0.8f, 3.0f, true);
             Check(Math.Abs(m3 - 3.8f / 3) < 1e-4 && Math.Abs(m4 - 4.6f / 4) < 1e-4 && Math.Abs(m5 - 5.4f / 5) < 1e-4,
                   $"1 周期の平均: 周期 3 ×{m3:0.00}・4 ×{m4:0.00}・5 ×{m5:0.00} (大技の山 ×3.0 は残る)");
@@ -622,7 +632,7 @@ static class T
             Check(s5b == "小|ダウン|小|チャージ|大|小|小|小|チャージ|大", "周期 5・小技のダウン: 周期はそのまま → " + s5b);
             Check(s2 == "ダウン|チャージ|大|チャージ|大|チャージ", "周期 2・チャージのダウン: 頭から (チャージ・大) → " + s2);
             // 待つ得の式 (DownKeepRules.HoldGainChargeOrHeavy) は周期によらずシミュレーションの平均と一致する
-            foreach (int P in new[] { 2, 4, 5 })
+            foreach (int P in new[] { 2, 4, 5, 6, 7 })
             {
                 float Base(int c) => HeavyCycle.TurnsToHeavy(P, c) == 0 ? 30f : HeavyCycle.IsCharge(P, c) ? 0f : 8f;
                 for (int c1 = 1; c1 <= P; c1++)
@@ -660,7 +670,7 @@ static class T
             var NN = new[] { 0.75f, 0.5f }; const int M = 1000;
             // 毒で下回っても割れない → 次のターンの通常攻撃で割れる (満額)
             var a = new BossDownState(); a.Reset(NN);
-            int c1 = a.NoteTurnEndCracks(740, M, 3, 1, true, out int nc1, out _);
+            int c1 = a.NoteTurnEndCracks(740, M, 3, 1, true, out int nc1);
             bool noDown1 = !a.BeginTurn();
             int m1 = a.NoteMainHit(735, M, 5, 4, out int cb1, out int cw1);
             bool down1 = a.BeginTurn() && !a.downWeakNow;
@@ -668,42 +678,42 @@ static class T
                   "毒で目盛りを下回ってもその場では割れない (ひび) → 次のターンの通常攻撃で割れ、 満額のダウン (ひびから 1 ターン)");
             // 主攻撃のダメージ 0 (回避) では割れない → 猶予 1 が切れて、 次のターンの終わりにひとりでに割れる (弱いダウン)
             var b = new BossDownState(); b.Reset(NN);
-            b.NoteTurnEndCracks(740, M, 3, 1, true, out _, out _); b.BeginTurn();
+            b.NoteTurnEndCracks(740, M, 3, 1, true, out _); b.BeginTurn();
             int m2 = b.NoteMainHit(740, M, 0, 4, out _, out _);
-            int c2 = b.NoteTurnEndCracks(738, M, 4, 1, true, out _, out _);
+            int c2 = b.NoteTurnEndCracks(738, M, 4, 1, true, out _);
             bool weak2 = b.BeginTurn() && b.downWeakNow;
             Check(m2 == 0 && c2 == 1 && weak2 && b.broken == 1, "主攻撃 0 では割れない・ひびは次のターンの終わりにひとりでに割れ、 弱いダウン (被ダメ ×1.5 なし)");
-            // 回復で目盛りの上へ戻ればひびは消える (猶予の数え直し)
+            // 回復で目盛りの上へ戻ってもひびは消えない (2026-11-14・作者の決定): 上にいる間の通常攻撃では割れず、 猶予が切れたらひびとして割れる (弱い)
             var h = new BossDownState(); h.Reset(NN);
-            h.NoteTurnEndCracks(740, M, 3, 1, true, out _, out _);
-            int c3 = h.NoteTurnEndCracks(760, M, 4, 1, true, out _, out int healed);
-            int c3b = h.NoteTurnEndCracks(745, M, 5, 1, true, out int nc3, out _);
-            int c3c = h.NoteTurnEndCracks(745, M, 6, 1, true, out _, out _);
-            Check(c3 == 0 && healed == 1 && c3b == 0 && nc3 == 1 && c3c == 1, "回復で目盛りの上へ戻るとひびは消え、 また下回ったターンから数え直す (T5 にひび → T6 の終わりに割れる)");
+            h.NoteTurnEndCracks(740, M, 3, 1, true, out _); h.BeginTurn();
+            int m3 = h.NoteMainHit(755, M, 5, 4, out _, out _);                 // 回復で 760 へ戻った後の通常攻撃 (HP 755 > 750)
+            int c3 = h.NoteTurnEndCracks(755, M, 4, 1, true, out int nc3);
+            bool w3 = h.BeginTurn() && h.downWeakNow;
+            Check(m3 == 0 && c3 == 1 && nc3 == 0 && w3, "回復で目盛りの上へ戻ってもひびは消えない・上にいる間の通常攻撃では割れず、 猶予が切れた T4 の終わりにひびとして割れる (弱いダウン)");
             // 猶予 2 / 猶予 0 / ひびでは割れない (負)
             var g2 = new BossDownState(); g2.Reset(NN);
-            bool g2a = g2.NoteTurnEndCracks(740, M, 3, 2, true, out _, out _) == 0 && g2.NoteTurnEndCracks(740, M, 4, 2, true, out _, out _) == 0
-                    && g2.NoteTurnEndCracks(740, M, 5, 2, true, out _, out _) == 1;
+            bool g2a = g2.NoteTurnEndCracks(740, M, 3, 2, true, out _) == 0 && g2.NoteTurnEndCracks(740, M, 4, 2, true, out _) == 0
+                    && g2.NoteTurnEndCracks(740, M, 5, 2, true, out _) == 1;
             var g0 = new BossDownState(); g0.Reset(NN);
-            bool g0a = g0.NoteTurnEndCracks(740, M, 3, 0, true, out _, out _) == 1 && g0.BeginTurn() && g0.downWeakNow;
+            bool g0a = g0.NoteTurnEndCracks(740, M, 3, 0, true, out _) == 1 && g0.BeginTurn() && g0.downWeakNow;
             var gn = new BossDownState(); gn.Reset(NN);
-            bool gna = gn.NoteTurnEndCracks(740, M, 3, -1, true, out _, out _) == 0 && gn.NoteTurnEndCracks(700, M, 9, -1, true, out _, out _) == 0
+            bool gna = gn.NoteTurnEndCracks(740, M, 3, -1, true, out _) == 0 && gn.NoteTurnEndCracks(700, M, 9, -1, true, out _) == 0
                     && gn.TopCracked && gn.NoteMainHit(690, M, 10, 10, out _, out _) == 1 && gn.BeginTurn() && !gn.downWeakNow;
             Check(g2a && g0a && gna, "猶予 2 = 2 ターン後の終わりに割れる・猶予 0 = そのターンの終わりに割れる (弱い)・負 = ひびでは割れず、 通常攻撃で割れる (満額)");
             // downCrackWeak=False: ひびのダウンも満額
             var w = new BossDownState(); w.Reset(NN);
-            bool wa = w.NoteTurnEndCracks(740, M, 3, 0, false, out _, out _) == 1 && w.BeginTurn() && !w.downWeakNow;
+            bool wa = w.NoteTurnEndCracks(740, M, 3, 0, false, out _) == 1 && w.BeginTurn() && !w.downWeakNow;
             Check(wa, "downCrackWeak=False: ひびで割れたダウンも被ダメ ×1.5 (満額)");
             // 1 回の主攻撃で 2 つまたぐ → 2 ターン続けて満額のダウン / 通常攻撃 → ひびの順に積む
             var t2 = new BossDownState(); t2.Reset(NN);
             bool two = t2.NoteMainHit(400, M, 600, 1, out _, out _) == 2 && t2.BeginTurn() && !t2.downWeakNow && t2.BeginTurn() && !t2.downWeakNow && !t2.BeginTurn();
             var mix = new BossDownState(); mix.Reset(NN);
-            bool mixed = mix.NoteMainHit(700, M, 300, 1, out _, out _) == 1 && mix.NoteTurnEndCracks(480, M, 1, 0, true, out _, out _) == 1
+            bool mixed = mix.NoteMainHit(700, M, 300, 1, out _, out _) == 1 && mix.NoteTurnEndCracks(480, M, 1, 0, true, out _) == 1
                       && mix.BeginTurn() && !mix.downWeakNow && mix.BeginTurn() && mix.downWeakNow;
             Check(two && mixed, "1 回の主攻撃で 2 つまたぐと 2 ターン続けて満額のダウン・同じターンの通常攻撃とひびは割れた順 (満額 → 弱い)");
             // 撃破した主攻撃・倒れたターンは割らない
             var k = new BossDownState(); k.Reset(NN);
-            Check(k.NoteMainHit(0, M, 999, 1, out _, out _) == 0 && k.NoteTurnEndCracks(0, M, 1, 0, true, out _, out _) == 0, "倒した主攻撃・倒れたターンでは割らない");
+            Check(k.NoteMainHit(0, M, 999, 1, out _, out _) == 0 && k.NoteTurnEndCracks(0, M, 1, 0, true, out _) == 0, "倒した主攻撃・倒れたターンでは割らない");
             // 旧い判定 (AnyDamage): ターンの終わりの HP で割る・満額
             var o = new BossDownState(); o.Reset(NN);
             Check(o.NoteTurnEnd(740, M) == 1 && o.BeginTurn() && !o.downWeakNow, "AnyDamage (旧い判定): 毒で下回っても、 ターンの終わりの HP で割れて満額のダウン");
@@ -727,7 +737,7 @@ static class T
                             s.NoteMainHit(hp, M, main, turn, out _, out _);
                             hp = Math.Min(M, hp - chip + heal);
                             if (hp <= 0) break;
-                            s.NoteTurnEndCracks(hp, M, turn, grace, weak, out _, out _);
+                            s.NoteTurnEndCracks(hp, M, turn, grace, weak, out _);
                             steps++;
                             bool nextDown = s.pending > 0, nextWeak = nextDown && s.PendingHeadWeak;
                             bool eq = f.nextDown == nextDown && f.nextWeak == nextWeak && f.brokenAfter == s.broken;

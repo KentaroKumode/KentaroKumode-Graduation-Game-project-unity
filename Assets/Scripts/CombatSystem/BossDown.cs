@@ -19,7 +19,7 @@ namespace CombatSystem
     /// 通常攻撃以外 (毒・出血・爆発・固定ダメージ・反射・品の直接・ターン終了時の削り・ヴェスカの〈裂け目〉) で下回った目盛りには、
     /// <b>ターンの終わりに HP が目盛り以下ならひびが入り</b> (そのターンのどこで下回ったかは問わない)、 ひびが入ったターンから数えて
     /// 猶予 (<see cref="CrackGraceTurns"/>・既定 1) ターン後のターンの終わりに、 まだ割れていなければ<b>ひとりでに割れる</b> (猶予 1 = 次のターンの終わり)。
-    /// その間に通常攻撃が当たれば、 その時点で普通に割れる。 ターンの終わりに HP が目盛りの上へ戻っていれば (回復)、 ひびは消える。
+    /// その間に通常攻撃が当たれば、 その時点で普通に割れる。 一度入ったひびは、 回復で HP が目盛りの上へ戻っても消えない (2026-11-14・作者の決定・その間の通常攻撃では割れず、 猶予が切れた時に割れる)。
     /// ひとりでに割れた目盛りのダウンは<b>弱い</b>: 敵は攻撃しないが、 受けるダメージ ×<see cref="TakenMul"/> は付かない (口 downCrackWeak)。
     /// 口 downBreakRule = AnyDamage で旧い判定 (ターンの終わりの HP で割る・ひびなし・全部 満額のダウン)。</para>
     ///
@@ -102,7 +102,7 @@ namespace CombatSystem
         }
 
         /// <summary>このターンに、 主攻撃 <paramref name="mainDmg"/> (HP に入る量) が当たり、 その後に通常攻撃以外 <paramref name="afterMainDmg"/> が入った時の、 目盛りの割れ方
-        /// (新しい判定では <paramref name="afterMainDmg"/> が負 = 差し引きの回復も読む・ひびが消える)。
+        /// (新しい判定では <paramref name="afterMainDmg"/> が負 = 差し引きの回復も読む・ひびは回復では消えない)。
         /// <paramref name="hpStart"/> = 主攻撃の前の HP / <paramref name="pendingNow"/> = このターンの頭でダウンを 1 つ使った後に残っている数 /
         /// <paramref name="pendingHeadWeak"/> = 残っているダウンの先頭が弱いか / <paramref name="crackTurns"/> = 目盛りごとのひびの入ったターン (−1 = なし・null 可) /
         /// <paramref name="turn"/> = このターンの番号。 <see cref="DownBreakRule.AnyDamage"/> は旧い判定 (<see cref="NextTurnIsDown"/> と同じ・ひびなし・全部 満額)。
@@ -132,14 +132,12 @@ namespace CombatSystem
                 bool expiring = grace >= 0;
                 for (int i = b; i < notches.Length; i++)
                 {
-                    if (hpEnd <= NotchHp(maxHp, notches[i]))
-                    {
-                        int ct = crackTurns != null && i < crackTurns.Length && crackTurns[i] >= 0 ? crackTurns[i] : turn;
-                        if (expiring && turn - ct >= grace) { f.crackAdded++; if (after != null) after[i] = -1; continue; }
-                        expiring = false;   // 割れるのは上から順 (割れない目盛りの下は、 このターンには割れない)
-                        if (after != null) after[i] = ct;
-                    }
-                    else { expiring = false; if (after != null) after[i] = -1; }   // 目盛りの上 (回復で戻った) = ひびは消える
+                    int had = crackTurns != null && i < crackTurns.Length ? crackTurns[i] : -1;
+                    // 目盛り以下ならひび (無ければこのターン)。 目盛りの上でも、 一度入ったひびは消えない (2026-11-14・作者の決定)
+                    int ct = had >= 0 ? had : hpEnd <= NotchHp(maxHp, notches[i]) ? turn : -1;
+                    if (ct >= 0 && expiring && turn - ct >= grace) { f.crackAdded++; if (after != null) after[i] = -1; continue; }
+                    expiring = false;   // 割れるのは上から順 (割れない目盛りの下は、 このターンには割れない)
+                    if (after != null) after[i] = ct;
                 }
             }
             f.brokenAfter = b + f.crackAdded;
@@ -259,19 +257,17 @@ namespace CombatSystem
             return d;
         }
 
-        /// <summary>[新しい判定 MainAttackOnly] ターンの終わり: まだ割っていない目盛りのうち、 HP が目盛り以下のものにひびを入れ (入っていなければこのターン)、
-        /// 目盛りの上なら消す (回復で戻った)。 ひびが入ったターンから <paramref name="grace"/> ターン後のターンの終わりに達したものを、 上から順に割る
-        /// (<paramref name="grace"/> &lt; 0 = ひびでは割れない)。 割ったダウンは <paramref name="crackWeak"/> なら弱い。 戻り値 = ひびで割った数。 倒れた (HP ≤ 0) なら何もしない。
-        /// <paramref name="newCracks"/> = このターンに新しく入ったひび / <paramref name="healed"/> = 回復で消えたひび (計装)。 規則は <see cref="BossDown.ForecastTurn"/> と同じ。</summary>
-        public int NoteTurnEndCracks(int hp, int maxHp, int turn, int grace, bool crackWeak, out int newCracks, out int healed)
+        /// <summary>[新しい判定 MainAttackOnly] ターンの終わり: まだ割っていない目盛りのうち、 HP が目盛り以下でひびの無いものにひびを入れる (このターン)。
+        /// 一度入ったひびは回復で目盛りの上へ戻っても消さない (2026-11-14・作者の決定)。 ひびが入ったターンから <paramref name="grace"/> ターン後のターンの終わりに達したものを、
+        /// 上から順に割る (<paramref name="grace"/> &lt; 0 = ひびでは割れない)。 割ったダウンは <paramref name="crackWeak"/> なら弱い。 戻り値 = ひびで割った数。 倒れた (HP ≤ 0) なら何もしない。
+        /// <paramref name="newCracks"/> = このターンに新しく入ったひび (計装)。 規則は <see cref="BossDown.ForecastTurn"/> と同じ。</summary>
+        public int NoteTurnEndCracks(int hp, int maxHp, int turn, int grace, bool crackWeak, out int newCracks)
         {
-            newCracks = 0; healed = 0;
+            newCracks = 0;
             if (!Enabled || hp <= 0) return 0;
+            // 一度入ったひびは、 回復で目盛りの上へ戻っても消さない (2026-11-14・作者の決定)
             for (int i = broken; i < notches.Length; i++)
-            {
-                if (hp <= BossDown.NotchHp(maxHp, notches[i])) { if (crackTurn[i] < 0) { crackTurn[i] = turn; newCracks++; } }
-                else if (crackTurn[i] >= 0) { crackTurn[i] = -1; healed++; }
-            }
+                if (hp <= BossDown.NotchHp(maxHp, notches[i]) && crackTurn[i] < 0) { crackTurn[i] = turn; newCracks++; }
             int d = 0;
             if (grace >= 0)
                 while (broken < notches.Length && crackTurn[broken] >= 0 && turn - crackTurn[broken] >= grace)

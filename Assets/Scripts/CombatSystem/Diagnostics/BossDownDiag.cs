@@ -44,7 +44,7 @@ namespace CombatSystem
             public const int HeavyTurns = 10, HeavyTaken = 11, LightTurns = 12, LightTaken = 13, ChargeTurns = 14;
             // 割れ方 (2026-11-14・目盛りを割れるのは通常攻撃だけ・ひび)
             public const int MainBroken = 15, CrackBroken = 16, MainDownCanceled = 17, CrackDownCanceled = 18;
-            public const int CrackThenMain = 19, CrackWaitSum = 20, CracksMade = 21, CracksHealed = 22;
+            public const int CrackThenMain = 19, CrackWaitSum = 20, CracksMade = 21, CracksHealedRetired = 22;   // 22 = 回復で消えたひび (廃止・2026-11-14 にひびは回復で消えなくなった)
             // 旧い判定 (AnyDamage) の時: ターンの終わりに割れた数 / そのうち主攻撃だけでは割れていなかった数 (主攻撃以外で割れた)
             public const int AnyBreaks = 23, AnyNonMainBreaks = 24;
             public const int Length = 25;
@@ -80,11 +80,11 @@ namespace CombatSystem
             _cur[Slot.MainBroken] += d; _cur[Slot.CrackThenMain] += crackedBroken; _cur[Slot.CrackWaitSum] += waitSum;
         }
 
-        /// <summary>ターンの終わり: 新しく入ったひび / 回復で消えたひび / ひびの猶予が切れて割れた数。</summary>
-        public static void NoteCracks(int made, int healed, int crackBroken)
+        /// <summary>ターンの終わり: 新しく入ったひび / ひびの猶予が切れて割れた数。</summary>
+        public static void NoteCracks(int made, int crackBroken)
         {
             if (_cur == null) return;
-            _cur[Slot.CracksMade] += made; _cur[Slot.CracksHealed] += healed; _cur[Slot.CrackBroken] += crackBroken;
+            _cur[Slot.CracksMade] += made; _cur[Slot.CrackBroken] += crackBroken;
         }
 
         /// <summary>旧い判定 (AnyDamage): ターンの終わりに <paramref name="d"/> 個割れ、 そのうち主攻撃の直後の HP で割れていたのは <paramref name="byMain"/> 個。</summary>
@@ -133,7 +133,7 @@ namespace CombatSystem
                 if (a[Slot.MainBroken] + a[Slot.CrackBroken] + a[Slot.CracksMade] > 0)
                     sb.Append(System.Environment.NewLine).Append("    ")
                       .Append($"割れ方 通常攻撃 {a[Slot.MainBroken]} (そのダウンで大技を消した {a[Slot.MainDownCanceled]})・ひび {a[Slot.CrackBroken]} (大技を消した {a[Slot.CrackDownCanceled]})")
-                      .Append($" / 通常攻撃以外で下回った (ひび) {a[Slot.CracksMade]}・回復で消えた {a[Slot.CracksHealed]}")
+                      .Append($" / 通常攻撃以外で下回った (ひび) {a[Slot.CracksMade]}")
                       .Append($"・ひびの後に通常攻撃で割った {a[Slot.CrackThenMain]} (平均 {(a[Slot.CrackThenMain] > 0 ? (double)a[Slot.CrackWaitSum] / a[Slot.CrackThenMain] : 0):0.00} ターン後)");
                 if (a[Slot.AnyBreaks] > 0)
                     sb.Append(System.Environment.NewLine).Append("    ")

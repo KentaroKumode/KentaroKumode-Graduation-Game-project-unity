@@ -889,7 +889,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          割れ方 (2026-11-14・作者の決定・口 downBreakRule・既定 MainAttackOnly):
            ・通常攻撃 (主攻撃) が 1 以上のダメージで当たった直後 (HpLossDiag.Lose(…, "通常攻撃") の直後・固定ダメの枠より前・CombatManager.NoteBossDownMainHit) の
              敵の HP ≤ floor(最大 HP × 目盛り) の、 まだ割っていない目盛りを全部割る (満額のダウン)。 回避・吸収で 0・撃破 (HP 0) では割らない。
-           ・ターンの終わり (FinishTurnCommon のターン終了時の削りを拾った後・NoteBossDownTurnEnd): HP が未割りの目盛り以下ならひびを入れる (そのターン)・目盛りの上なら消す。
+           ・ターンの終わり (FinishTurnCommon のターン終了時の削りを拾った後・NoteBossDownTurnEnd): HP が未割りの目盛り以下ならひびを入れる (そのターン)。 一度入ったひびは回復で目盛りの上へ戻っても消えない (2026-11-14・作者の決定)。
              ひびが入ったターン c から、 c + 猶予 (BossDown.CrackGraceTurns = 1・口 downCrackGrace・負 = ひびでは割れない) のターンの終わりに、 上から順にひとりでに割れる
              (弱いダウン = 攻撃しないが ×1.5 なし・口 downCrackWeak=False で満額)。 1 ターンに両方割れたら、 通常攻撃の分が先・ひびの分が後 (BossDownState.pendingWeak)。
            ・BOT の見込みは同じ規則の BossDown.ForecastTurn (本体の進め方との一致は Tools/rules_check の 14)。
