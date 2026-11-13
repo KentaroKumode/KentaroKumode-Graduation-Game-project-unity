@@ -260,7 +260,8 @@ namespace CombatSystem
             if (kb.stripper) { TerminalDiag.Note(TerminalIds.Stripper, TerminalDiag.KillBonus); run.terminalExtraChoices += TerminalCards.StripperChoices; Debug.Log($"[端子/剥ぎ取り] 戦闘後の端子の選択肢 +{TerminalCards.StripperChoices} (計 +{run.terminalExtraChoices})"); }
         }
 
-        /// <summary>使うとランの山札から抜ける端子 (〈応急箱〉・<see cref="TerminalCards.LeavesRunDeck"/>) を、 使ったターンの終わりにランの山札から 1 枚ずつ抜く。
+        /// <summary>[測定の口の時だけ] 使うとランの山札から抜ける端子 (〈応急箱〉・<see cref="TerminalCards.LeavesRunDeck"/>・既定では抜けない = 2026-11-14〜) を、
+        /// 使ったターンの終わりにランの山札から 1 枚ずつ抜く。
         /// この戦闘の中は使い捨てと同じく戻らない (<see cref="TerminalDeckState.FinishTurn"/>)。 山札が <see cref="TerminalCards.MinDeckSize"/> 枚以下なら抜かない
         /// (店・休憩の抜き方と同じ下限 ── 出目 3 個を挿す先が足りなくならない枚数)。</summary>
         private void RemoveUsedFromRunDeck(TerminalOutcome o)

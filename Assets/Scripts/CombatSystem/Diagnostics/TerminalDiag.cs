@@ -24,7 +24,7 @@ namespace CombatSystem
         /// <para>[#106] 報酬: [12〜15] 提示された回数 (通常 / エリート / ボス / 店) / [16〜19] 取った回数 (同じ順・店は買った回数) /
         /// [20] 提示された場面で何も取られなかった回数 (報酬の見送り・店で端子を 1 枚も買わなかった来店) /
         /// [21] ランの終わりに山札に 1 枚以上あったラン数 / [22] ランの終わりの山札の枚数の合計 /
-        /// [23] 店で抜かれた / [24] 休憩で抜かれた / [25] 使ってランの山札から抜けた (〈応急箱〉)。</para></summary>
+        /// [23] 店で抜かれた / [24] 休憩で抜かれた / [25] 使ってランの山札から抜けた (〈応急箱〉・測定の口 terminalFirstAidLeavesRunDeck の時だけ・既定では 0)。</para></summary>
         public const int Width = 26;
         public const int InDeck = 0, OnBoard = 1, Fired = 2, KillBonus = 3, AsCopy = 4, AsBurn = 5, AsRetain = 6, KillNewOnly = 7;
         public const int Drawn = 8, Stopped = 9, NotPlugged = 10, PluggedNoFire = 11;

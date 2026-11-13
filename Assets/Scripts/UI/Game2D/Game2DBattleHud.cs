@@ -750,7 +750,10 @@ namespace UI.Game2D
             }
             else
             {
-                if (!sim.IsPicker(f)) return "出目に挿すと、 挿していない手札の端子を対象に選べる";
+                if (!sim.IsPicker(f))
+                    return id == CombatSystem.TerminalIds.BurnOut      // 〈焼き切り〉(2026-11-14): 外す端子が無ければ挿しても不発
+                        ? "出目に挿すと、 挿していない手札の端子を外す対象に選べる (外す端子が無いと発動しない)"
+                        : "出目に挿すと、 挿していない手札の端子を対象に選べる";
                 t = sim.TargetOf(f);
             }
             return t >= 0 && t < sim.board.Count ? "対象: 〈" + sim.board[t] + "〉" : "対象: なし (空けた端子が無い)";

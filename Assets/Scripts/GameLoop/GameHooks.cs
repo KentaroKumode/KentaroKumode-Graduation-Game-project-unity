@@ -102,11 +102,12 @@ namespace GameLoop
         /// / false = はじめて (基地は〈徒労〉の 1 択・第 4 層のクリアで終わる)。 BOT は毎回空の記録で走るので、 AutoRunner.ashKingBeatenEver (既定 True) が毎ランの始めに入れ、
         /// ラン終了で null へ戻す。</summary>
         public static bool? AshKingBeatenEver;
-        /// <summary>[測定 2026-11-14] 〈徒労〉の形 (<see cref="EventSystem.TimedEffects.ToilMode"/>・GAME.md §17)。 既定 Stacks = 今の形 (main と 1 ランも変わらない)。
-        /// LayerLong = 深さ 6 にいる間ずっと・通常の戦闘は品を落とさない (ゴールド・強化素材・物資は出る)・宝箱は <see cref="ToilChestEmptyPct"/> % で空・層を出たら消える。
-        /// AutoRunner.toilMode が毎ランの始めに入れ、 ラン終了で Stacks へ戻す。</summary>
-        public static EventSystem.TimedEffects.ToilMode ToilMode = EventSystem.TimedEffects.ToilMode.Stacks;
-        /// <summary>[測定 2026-11-14] 〈徒労〉の別の形 (LayerLong) で宝箱が空になる確率 (%)。 既定 50。 Stacks では読まない。
+        /// <summary>〈徒労〉の形 (<see cref="EventSystem.TimedEffects.ToilMode"/>・GAME.md §17)。 既定 UntilKing (2026-11-14・作者の決定) = 勝っても減らず、 灰燼の王を倒すまで
+        /// 通常の戦闘は何も得られない。 測定で比べる口: Stacks = 旧い形 (3 つ持ち・勝つたび 1 つ減る) / LayerLong = 深さ 6 にいる間ずっと・通常の戦闘は品を落とさない
+        /// (ゴールド・強化素材・物資は出る)・宝箱は <see cref="ToilChestEmptyPct"/> % で空・層を出たら消える。
+        /// AutoRunner.toilMode が毎ランの始めに入れ、 ラン終了で UntilKing へ戻す。</summary>
+        public static EventSystem.TimedEffects.ToilMode ToilMode = EventSystem.TimedEffects.ToilMode.UntilKing;
+        /// <summary>[測定 2026-11-14] 〈徒労〉の別の形 (LayerLong) で宝箱が空になる確率 (%)。 既定 50。 Stacks・UntilKing では読まない。
         /// AutoRunner.toilChestEmptyPct が毎ランの始めに入れ、 ラン終了で既定へ戻す。</summary>
         public static int ToilChestEmptyPct = EventSystem.TimedEffects.BattleBoonRule.DefaultChestEmptyPct;
         /// <summary>[測定 2026-11-13] true (既定) = 天候は「嵐」(<see cref="MapSystem.FreeMove.Storm"/>・GAME.md §5-12): 静かな時間のあとに輪が縮み、
@@ -134,9 +135,10 @@ namespace GameLoop
         /// 〈治癒〉の倍率 (<see cref="CombatSystem.TerminalCards.HealMul"/>) / 〈避雷器〉の溜める量 (<see cref="CombatSystem.TerminalCards.ArresterNeed"/>)。
         /// AutoRunner.terminalHealMul / terminalArresterNeed が毎ランの始めに入れ、 ラン終了で 0 へ戻す。 画面の説明文は今の値のまま (測定の口なので)。</summary>
         public static int TerminalHealMulOverride, TerminalArresterNeedOverride;
-        /// <summary>[測定 2026-11-12・#102] true = 〈応急箱〉を使ってもランの山札から抜かない (旧の作り = その戦闘中だけ戻らない)。
-        /// AutoRunner.terminalFirstAidBattleOnly が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
-        public static bool TerminalFirstAidBattleOnly;
+        /// <summary>[測定 2026-11-14] true = 〈応急箱〉を使うとランの山札から抜ける (2026-11-12〜11-14 の旧い決まり)。 既定 false = 今の決まり
+        /// (使い捨ての端子と同じく、 その戦闘中だけ戻らない)。 既定を入れ替えた時、 旧い口 TerminalFirstAidBattleOnly (true = 戦闘中だけ) は既定と同じ意味になったので、
+        /// この口へ置き換えた。 AutoRunner.terminalFirstAidLeavesRunDeck が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
+        public static bool TerminalFirstAidLeavesRunDeck;
         /// <summary>[測定 2026-11-13・#117] true = 端子の撃破のボーナス (〈収穫機〉〈研ぎ澄まし〉〈戦利品箱〉〈剥ぎ取り〉) を旧い条件で配る
         /// (攻撃の端子に出目を挿したターンの、 主攻撃までの撃破だけ・ターン終了時の撃破には配らない)。 既定 false = 説明文どおり、 撃破の経路を問わない。
         /// AutoRunner.terminalKillNeedsAttack が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
@@ -191,7 +193,7 @@ namespace GameLoop
             RelicSetBonusOffMask = 0;
             TerminalHealMulOverride = 0;
             TerminalArresterNeedOverride = 0;
-            TerminalFirstAidBattleOnly = false;
+            TerminalFirstAidLeavesRunDeck = false;
             TerminalKillBonusNeedsAttack = false;
             HandCarry = CombatSystem.HandCarryMode.Pick;
             BossDownDisabled = false;

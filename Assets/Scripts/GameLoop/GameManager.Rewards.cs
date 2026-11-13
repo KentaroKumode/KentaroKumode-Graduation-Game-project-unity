@@ -164,7 +164,14 @@ namespace GameLoop
 
                 // 灰燼の王 (深さ 6 = 画面の第 4 層のボス) を倒した瞬間に、 ランの外の記録へ立てる (2026-11-13・結末の種類によらない)。
                 //   次のランから深さ 6 の〈灰に埋もれた基地〉が再訪の版になる (AshBaseEvent)
-                if (CurrentEnemy != null && CurrentEnemy.id == BossIds.Layer6Ash) AshBaseEvent.NoteAshKingBeaten();
+                if (CurrentEnemy != null && CurrentEnemy.id == BossIds.Layer6Ash)
+                {
+                    AshBaseEvent.NoteAshKingBeaten();
+                    // 〈徒労〉(既定の形 UntilKing・2026-11-14): 灰燼の王を倒した時に消える (旧い形 Stacks・別の形 LayerLong では何もしない)
+                    if (EventSystem.TimedEffects.BattleBoonRule.ToilClearsOnKingBeaten(GameHooks.ToilMode)
+                        && Run.timedDebuffs != null && Run.timedDebuffs.Remove(EventSystem.TimedEffects.BattleBoonRule.ToilName))
+                        Log($"〈{EventSystem.TimedEffects.BattleBoonRule.ToilName}〉が晴れた (灰燼の王を倒した)");
+                }
 
                 // 5層裏ボス撃破フラグ: 以降のレイピア解除に会心+9 が付くようになる
                 if (CurrentEnemy != null && CurrentEnemy.id == BossIds.Layer5Hidden)
@@ -327,6 +334,8 @@ namespace GameLoop
                     case EventSystem.TimedEffects.BattleBoon.Toil:
                         return GameHooks.ToilMode == EventSystem.TimedEffects.ToilMode.LayerLong
                             ? $"〈{T}〉のせいで、 この戦闘では品が出なかった"   // 別の形 (2026-11-14・測定用): ゴールド・強化素材・物資は出る・層の間ずっと
+                            : GameHooks.ToilMode == EventSystem.TimedEffects.ToilMode.UntilKing
+                            ? $"〈{T}〉のせいで、 この戦闘では何も得られなかった"   // 既定の形 (2026-11-14): 減らないので残りは出さない (灰燼の王を倒すまで)
                             : $"〈{T}〉のせいで、 この戦闘では何も得られなかった（残り {Left(Run?.timedDebuffs, T)}）";
                     case EventSystem.TimedEffects.BattleBoon.Insight: return $"〈{R}〉で、 ゴールドとドロップと強化素材が {EventSystem.TimedEffects.BattleBoonRule.InsightMultiplier} 倍（残り {Left(Run?.timedBuffs, R)}）";
                     default:                                            return null;
@@ -362,7 +371,7 @@ namespace GameLoop
                         Left(Run.timedDebuffs, EventSystem.TimedEffects.BattleBoonRule.ToilName),
                         Left(Run.timedBuffs, EventSystem.TimedEffects.BattleBoonRule.InsightName));
             if (b == EventSystem.TimedEffects.BattleBoon.None) return;
-            // 別の形 (LayerLong・2026-11-14): 〈徒労〉は層にいる間ずっと続く ── 減らす前の残りを覚えて戻す (〈開眼〉は今までどおり減る)
+            // 既定の形 (UntilKing)・別の形 (LayerLong) (2026-11-14): 〈徒労〉は減らない ── 減らす前の残りを覚えて戻す (〈開眼〉は今までどおり減る)
             const string T = EventSystem.TimedEffects.BattleBoonRule.ToilName;
             int keepToil = EventSystem.TimedEffects.BattleBoonRule.ToilCountsDown(GameHooks.ToilMode) ? 0 : Left(Run.timedDebuffs, T);
             EventSystem.TimedEffects.TimedEffectManager.OnNormalBattleWon(Run);   // 持っている〈徒労〉〈開眼〉をそれぞれ 1 つ減らす (既存の時限効果の減らし方)

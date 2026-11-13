@@ -67,11 +67,12 @@ namespace CombatSystem
         public bool basic;
         /// <summary>層ボスの報酬に出る。</summary>
         public bool rare;
-        /// <summary>使い捨て: 使うと、 その戦闘中は山札に戻らない。</summary>
+        /// <summary>使い捨て: 使うと、 その戦闘中は山札に戻らない (次の戦闘ではまた山札に入っている)。 使い捨ての決まりはこれだけ (2026-11-14・作者の決定)。</summary>
         public bool disposable;
-        /// <summary>使うと、 そのランの山札からも抜ける (〈応急箱〉・2026-11-12)。 <see cref="disposable"/> と組む (戦闘中も戻らない)。
+        /// <summary>[測定用] 測定の口 <see cref="GameLoop.GameHooks.TerminalFirstAidLeavesRunDeck"/> が立っている時だけ、 使うとそのランの山札からも抜ける
+        /// (〈応急箱〉の 2026-11-12〜11-14 の決まり・2026-11-14 に取り下げ = 既定では使い捨てと同じ)。 <see cref="disposable"/> と組む。
         /// 抜くのは本体の <c>CombatManager.FinishTerminalTurn</c>。 山札が <see cref="TerminalCards.MinDeckSize"/> 枚以下なら抜かない (店・休憩の抜き方と同じ下限)。
-        /// 判定は <see cref="TerminalCards.LeavesRunDeck"/> を通す (測定の口で旧の作りへ戻せる)。</summary>
+        /// 判定は <see cref="TerminalCards.LeavesRunDeck"/> を通す。</summary>
         public bool leavesRunDeck;
         /// <summary>常設: 一度引くとその戦闘中ずっと場に残り、 手札の枠を使わない。</summary>
         public bool permanent;
@@ -220,6 +221,8 @@ namespace CombatSystem
         public const float AmplifierPerPip = 0.16f, ResonatorMul = 1.5f, VacuumCritMult = 2.0f;
         public const int CounterEvery = 10; public const float CounterPct = 0.10f;
         public const int TwinShotMul = 3, DetonatorMul = 4, FirstAidMul = 2, HealMul = 1, BatteryBonus = 2, InsulatorBonus = 4;
+        /// <summary>〈焼き切り〉: 挿した出目の合計に掛けて攻撃に足す倍率 (2026-11-14・作者の決定)。</summary>
+        public const int BurnOutMul = 2;
         public const int HarvesterMaxHp = 2, WhetGain = 1, LootGold = 5;
         /// <summary>〈剥ぎ取り〉: 撃破したターンに、 戦闘後の端子の選択肢が増える数 (RunState.terminalExtraChoices に足す)。</summary>
         public const int StripperChoices = 1;
@@ -236,6 +239,8 @@ namespace CombatSystem
         //   避雷器 −0.35 / −1.12 → 溜める量 12→8 (下げるほど発動が増える = 強くなる向き。 机上: 敵の攻撃 20 で出目 1 あたりの軽減が 2.9 → 4.4 になり、
         //     基本の防御 (出目 1 個 = 平均 3.5) を少し上回る)。
         //   主幹・決死・増圧・充填・接地・剥ぎ取り・焼き切りは据え置き。 腕から元の値へ戻す口は GameHooks.Terminal* (AutoRunner.terminal*)。
+        // 2026-11-14: 〈応急箱〉の「使うとランの山札から抜ける」を取り下げた (作者の決定:「使い捨ては全部『その戦闘で山札に戻らない』でいい」)。
+        //   使い捨ての決まりは disposable だけ。 旧い決まりへ戻す測定の口は GameHooks.TerminalFirstAidLeavesRunDeck (AutoRunner.terminalFirstAidLeavesRunDeck)。
         /// <summary>〈主幹〉: この戦闘で使うたび、 以後の攻撃 +N。 / 〈配電盤〉: 次のターンに多く引く枚数。</summary>
         public const int MainsPerUse = 1, SwitchboardDraw = 2;
 
@@ -244,10 +249,11 @@ namespace CombatSystem
         /// <summary>〈避雷器〉の溜める量 (測定の口 <see cref="GameLoop.GameHooks.TerminalArresterNeedOverride"/> があればその値)。 効果と BOT はこれを読む。</summary>
         public static int ArresterNeedNow => GameLoop.GameHooks.TerminalArresterNeedOverride > 0 ? GameLoop.GameHooks.TerminalArresterNeedOverride : ArresterNeed;
 
-        /// <summary>使った時に、 そのランの山札から抜けるか (<see cref="TerminalDef.leavesRunDeck"/>・測定の口
-        /// <see cref="GameLoop.GameHooks.TerminalFirstAidBattleOnly"/> が立っていれば抜けない)。 本体 (CombatManager.FinishTerminalTurn) と BOT が読む。</summary>
+        /// <summary>使った時に、 そのランの山札から抜けるか。 既定では抜けない (2026-11-14〜・使い捨ては全部「その戦闘で山札に戻らない」だけ)。
+        /// 測定の口 <see cref="GameLoop.GameHooks.TerminalFirstAidLeavesRunDeck"/> が立っていれば、 <see cref="TerminalDef.leavesRunDeck"/> の端子 (〈応急箱〉) は
+        /// 旧い決まり (2026-11-12) どおり抜ける。 本体 (CombatManager.FinishTerminalTurn) と BOT が読む。</summary>
         public static bool LeavesRunDeck(TerminalDef d)
-            => d != null && d.leavesRunDeck && !GameLoop.GameHooks.TerminalFirstAidBattleOnly;
+            => d != null && d.leavesRunDeck && GameLoop.GameHooks.TerminalFirstAidLeavesRunDeck;
 
         /// <summary>手札の持ち越し (2026-11-13): 挿さなかった端子は捨て札へ行かず、 次のターンも手札に残る。 次のターンは手札が規定の枚数になるまで引く。
         /// 測定の口 <see cref="GameLoop.GameHooks.HandCarryDisabled"/> が立っていれば旧い規則 (前の手札を全部捨てて引き直す)。
@@ -278,6 +284,7 @@ namespace CombatSystem
         private static TerminalDef Basic(TerminalDef d) { d.basic = true; return d; }
         private static TerminalDef Rare(TerminalDef d) { d.rare = true; return d; }
         private static TerminalDef Once(TerminalDef d) { d.disposable = true; return d; }
+        /// <summary>使い捨て + 測定の口で旧い決まり (使うとランの山札から抜ける) へ戻せる印。 既定の挙動は <see cref="Once"/> と同じ。</summary>
         private static TerminalDef RunOnce(TerminalDef d) { d.disposable = true; d.leavesRunDeck = true; return d; }
         private static TerminalDef Cost(TerminalDef d, int n) { d.chargeCost = n; return d; }
         private static TerminalDef Cap(TerminalDef d, int n) { d.capacity = n; return d; }
@@ -357,11 +364,13 @@ namespace CombatSystem
                 Once(D(TerminalIds.Detonator, A, "出目 ×" + DetonatorMul + " を攻撃に。")),
                 Once(D(TerminalIds.Piercer, A, "出目を攻撃に。このターン敵の防御を無視。")),
                 Once(D(TerminalIds.ReliefValve, B, "このターンの被ダメージ −" + ReliefCutPct + "%。")),
-                RunOnce(D(TerminalIds.FirstAid, S, "HP +出目 ×" + FirstAidMul + "。使うと、そのランの山札から抜ける。")),
+                RunOnce(D(TerminalIds.FirstAid, S, "HP +出目 ×" + FirstAidMul + "。")),
                 Once(D(TerminalIds.FullCharge, C, "充電を上限まで満たす。")),
                 Once(D(TerminalIds.CoolShot, S, "エスカレーションの段階を 1 つ戻す。")),
-                Once(D(TerminalIds.Copier, S, "挿さずに空けた手札の端子を 1 枚、この戦闘中だけ複製して山札に加える。")),
-                Once(D(TerminalIds.BurnOut, S, "挿さずに空けた手札の端子を 1 枚、この戦闘中だけ山札から取り除く。")),
+                Once(D(TerminalIds.Copier, S, "挿さずに空けた手札の端子を 1 枚、この戦闘中だけ複製して、次のターンの手札に加える。")),
+                // 〈焼き切り〉: 2026-11-14 に作り直し (作者の決定)。 旧: 補助で「空けた端子を 1 枚この戦闘から外す」だけ (測定で発動 1.7%・GAME.md §24)。
+                //   外す端子が無いターン (候補 0) は挿しても不発 (Resolve の 4.)・使い捨ても消費しない
+                Once(D(TerminalIds.BurnOut, A, "出目 ×" + BurnOutMul + " を攻撃に。挿さずに空けた手札の端子を 1 枚、この戦闘から外す。")),
             };
         }
 
@@ -510,6 +519,10 @@ namespace CombatSystem
                     if (IsCandidate(board, o, self, s)) return s;
                 return -1;
             }
+            //   〈焼き切り〉(2026-11-14): 外す端子 (候補) が無ければ不発 ── 挿した出目を外す (条件に合わない・充電が足りない時と同じ扱い・使い捨ても消費しない)。
+            //   〈写し取り〉と旧い規則の〈呼び戻し〉は今までどおり、 対象が無くても発動する (効果が無いだけ)。
+            for (int s = 0; s < m; s++)
+                if (board[s] == TerminalIds.BurnOut && Plugged(o.slotOfDie, s) && Empty(s) < 0) Unplug(o.slotOfDie, s);
 
             // ── 5. 効果 ──
             bool doubler = false;
@@ -692,7 +705,7 @@ namespace CombatSystem
                 case TerminalIds.FullCharge: o.chargeFill = true; break;
                 case TerminalIds.CoolShot: o.retreatStage = true; break;
                 case TerminalIds.Copier: o.copyTarget = empty(slot); break;
-                case TerminalIds.BurnOut: o.burnTarget = empty(slot); break;
+                case TerminalIds.BurnOut: o.attackAdd += sum * BurnOutMul; o.burnTarget = empty(slot); break;   // 候補は 4. で確かめ済み (無ければ不発)
             }
         }
     }
@@ -717,7 +730,7 @@ namespace CombatSystem
         /// <summary>戦闘の始め: ランの山札を写して切る。</summary>
         public void BeginBattle(List<string> runDeck)
         {
-            draw.Clear(); discard.Clear(); hand.Clear(); permanent.Clear(); exiled.Clear(); board.Clear(); _usedLastTurn.Clear(); recallNext = null; keepNext.Clear(); LastKept.Clear();
+            draw.Clear(); discard.Clear(); hand.Clear(); permanent.Clear(); exiled.Clear(); board.Clear(); _usedLastTurn.Clear(); recallNext = null; copyNext = null; keepNext.Clear(); LastKept.Clear();
             if (runDeck != null) draw.AddRange(runDeck);
             Shuffle(draw);
         }
@@ -791,6 +804,9 @@ namespace CombatSystem
                 if (stop) stoppedHand.Add(hand.Count);
                 hand.Add(id);
             }
+            // 〈写し取り〉の写し (2026-11-14): 引く枚数とは別に、 手札の最後へ 1 枚足す (引く枚数を減らさない・止まる対象でもない)。
+            //   使わなければほかの手札と同じに次のターンの頭で捨て札へ行き、 この戦闘の山札を回る (戦闘が終われば消える = BeginBattle で作り直す)
+            if (copyNext != null) { hand.Add(copyNext); copyNext = null; }
             board.Clear(); board.AddRange(permanent); board.AddRange(hand);
             if (stoppedPerm.Count + stoppedHand.Count > 0)
             {
@@ -815,6 +831,10 @@ namespace CombatSystem
         /// <summary>〈呼び戻し〉(手札の持ち越しの規則) が次のターンの手札に戻す端子 (null = 戻さない)。 配線の後に CombatManager が
         /// <see cref="RecallPick"/> で決め、 次の <see cref="DrawTurn"/> が捨て札から手札へ移して空にする。</summary>
         public string recallNext;
+
+        /// <summary>〈写し取り〉が次のターンの手札に足す写し (null = 無し)。 <see cref="FinishTurn"/> が入れ、 次の <see cref="DrawTurn"/> が
+        /// 引き終えた手札の最後へ足して空にする (引く枚数とは別 ── 次のターンは手札が 1 枚多い)。 2026-11-14〜 (旧: 捨て札へ入れた)。</summary>
+        public string copyNext;
 
         /// <summary>残す印 (手札の規則 Pick): 次のターンも手札に残す端子の名前 (このターンに挿さなかった手札の端子だけ)。 配線の後に CombatManager が
         /// <see cref="KeepFromMarks"/> で入れ、 次の <see cref="DrawTurn"/> が読んで空にする。</summary>
@@ -927,13 +947,14 @@ namespace CombatSystem
             return heldCount;
         }
 
-        /// <summary>ターンの終わり: 結果を山札へ反映する (使い捨て・写し取り・焼き切り)。 戻り値 = 次のターンも手札に残す端子 (無ければ null)。</summary>
+        /// <summary>ターンの終わり: 結果を山札へ反映する (使い捨て・写し取り (次のターンの手札へ)・焼き切り)。 戻り値 = 次のターンも手札に残す端子 (無ければ null)。</summary>
         public string FinishTurn(TerminalOutcome o)
         {
             _usedLastTurn.Clear();
             _usedLastTurn.AddRange(UsedFromHand(board, permanent.Count, o));
             string retain = o.retainTarget >= 0 && o.retainTarget < board.Count ? board[o.retainTarget] : null;
-            if (o.copyTarget >= 0 && o.copyTarget < board.Count) discard.Add(board[o.copyTarget]);
+            // 〈写し取り〉: 写しは次のターンの手札に入る (DrawTurn が引いた後に足す・2026-11-14。 旧: 捨て札へ入れたので、 山札を一巡しないと引けなかった)
+            copyNext = o.copyTarget >= 0 && o.copyTarget < board.Count ? board[o.copyTarget] : null;
             string burn = o.burnTarget >= 0 && o.burnTarget < board.Count ? board[o.burnTarget] : null;
             // 使った使い捨てを手札から外す (この戦闘には戻らない)
             foreach (int s in o.fired)
