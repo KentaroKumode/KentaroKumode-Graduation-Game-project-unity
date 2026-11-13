@@ -506,6 +506,7 @@ namespace AutoTest
             GameLoop.GameHooks.AshKingBeatenEver = null;                         // [測定 2026-11-13] 灰燼の王を倒した記録の扱いを既定 (ランの外の記録を読む) へ
             GameLoop.GameHooks.ToilMode = EventSystem.TimedEffects.ToilMode.UntilKing;   // [測定 2026-11-14] 〈徒労〉の形を既定 (灰燼の王を倒すまで) へ
             GameLoop.GameHooks.ToilChestEmptyPct = EventSystem.TimedEffects.BattleBoonRule.DefaultChestEmptyPct;
+            GameLoop.GameHooks.ToilDamageDownPct = EventSystem.TimedEffects.BattleBoonRule.DefaultToilDamageDownPct;   // [測定 2026-11-14] 〈徒労〉の戦闘のデバフを既定 (0) へ
             GameLoop.GameHooks.StormEnabled = true;                              // [測定 2026-11-13] 天候の作りを既定 (嵐) へ
             GameLoop.GameHooks.StormClock = MapSystem.FreeMove.StormClock.Instability;   // [測定 2026-11-13 二版] 嵐の時計を既定 (不安定化) へ
             GameLoop.GameHooks.TerminalHealMulOverride = 0;                      // [測定 2026-11-12・#102]
