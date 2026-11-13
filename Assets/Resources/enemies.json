@@ -1403,7 +1403,7 @@
       "displayName": "灰燼の王",
       "description": "灰と燃え残りで形を成す古き王。半身を焼かれてなお燃え上がり、削れば削るほど残り火が荒れ狂う。",
       "floor": 6,
-      "maxHP": 1945,
+      "maxHP": 3800,
       "criticalNumerator": 0,
       "threat": 7,
       "killingIntentSuppressionLevel": 10,
@@ -1439,7 +1439,7 @@
           "flavorText": "盾を構えるほど、灰は厚く積もる。焼かれているのは腕ではなく、迷っている時間の方だ。"
         }
       ],
-      "baseAttack": 6,
+      "baseAttack": 21,
       "attackRollMin": 2,
       "attackRollMax": 6
     },

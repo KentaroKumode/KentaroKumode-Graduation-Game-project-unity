@@ -1055,7 +1055,7 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>業火の予兆 — HP>50% は T1/5/9/13... の周期 4T、 HP≤50% は周期 3T で発動。
-    /// 予兆ターンは敵の攻撃を上乗せ (BossParam.JudgmentDice・基準 +8・測定の口 AutoRunner.bossParamSpec で差し替えられる)。 予告が前ターンに出るので配線で対策可能。
+    /// 予兆ターンは敵の攻撃を上乗せ (BossParam.JudgmentDice・基準 +12・測定の口 AutoRunner.bossParamSpec で差し替えられる)。 予告が前ターンに出るので配線で対策可能。
     /// <para>2026-11-11 #104 で修正: 上乗せは「予兆ターンだけ」になるよう、 〈焦土契約〉と同じ差分更新にした。
     /// 毎ターン頭に「このターン積むべき量」(予兆ターンなら JudgmentDice、 それ以外は 0) を出し、 前ターンに自分が
     /// enemyDiceTotalBonus へ積んだ量 (<see cref="KeyApplied"/>) との差だけを足し引きする (他のパッシブの寄与は消さない)。
@@ -1092,7 +1092,7 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>灰の再生 (2026-07-16 二相化 / 2026-08-11 に 3% → **2%**) —
-    /// HP>50% で毎T 最大HP × <see cref="CombatSystem.BossParam.RegrowthRate"/> (基準 0.02 = 2%) 回復 (Phase1: 灰をまといながら耐える)。
+    /// HP>50% で毎T 最大HP × <see cref="CombatSystem.BossParam.RegrowthRate"/> (基準 0.03 = 3%) 回復 (Phase1: 灰をまといながら耐える)。
     ///
     /// 5% の頃は HP1200 に対し 60/T の再生で、 これを上回る素ダメージが出ないビルドは
     /// **HP を 1 も削れない**二値の壁になっていた (6層勝率 5.7%)。 2% まで下げ、難度は攻撃側で担保する。
@@ -1111,7 +1111,7 @@ namespace ItemSystem.PassiveSkills.Effects
 
             if (EmberOmenTiming.IsOmen(ctx.currentTurn, r)) return; // 予兆Tは回復なし
 
-            // 割合は BossParam.RegrowthRate (基準 0.02f = 2%・2026-11-14 に直書きから移した・測定の口で差し替えられる)
+            // 割合は BossParam.RegrowthRate (基準 0.03f = 3%・2026-11-14 に直書き 0.02f から移し、 同日 0.03 へ・測定の口で差し替えられる)
             float rate = CombatSystem.BossParams.Param(ctx.bossId, CombatSystem.BossParam.RegrowthRate);
             int heal = ctx.ReduceEnemyHeal(System.Math.Max(1,
                 UnityEngine.Mathf.FloorToInt(ctx.playerMaxHP * rate)));
@@ -1124,7 +1124,7 @@ namespace ItemSystem.PassiveSkills.Effects
         }
     }
 
-    /// <summary>憤怒の残滓 (EmberFury) — 2026-07-16 追加。 HP≤50% のターン、 敵の攻撃 +<see cref="CombatSystem.BossParam.FuryAttack"/> (基準 3・2026-11-14 に定数 Bonus から移した)。
+    /// <summary>憤怒の残滓 (EmberFury) — 2026-07-16 追加。 HP≤50% のターン、 敵の攻撃 +<see cref="CombatSystem.BossParam.FuryAttack"/> (基準 5・2026-11-14 に定数 Bonus = 3 から移し、 同日 5 へ)。
     /// Phase2 突入で「再生ゼロ・高火力連打」の後半戦を演出する。
     /// EmberOmen (周期3Tに加速) + AshRegrowth (停止) と合わせて瞬発力勝負を強制。
     /// <para>2026-11-11 #104 で修正: 〈業火の予兆〉と同じ差分更新。 ターン頭の HP が 50% 以下のターンは +3、 50% を超えるターンは 0
