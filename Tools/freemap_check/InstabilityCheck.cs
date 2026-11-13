@@ -123,7 +123,7 @@ static partial class T
         {
             int layers = 0, diff = 0, drawDiff = 0; string firstDiff = null;
             foreach (int floor in new[] { 0, 1, 3, 5, 6, 7 })
-                for (int salt = 1; salt <= 3000; salt++)
+                for (int salt = 1; salt <= N(3000, 1000); salt++)
                 {
                     GameLoop.GameRng.Salt = (ulong)salt * 7919; GameLoop.GameRng.Draws.Clear();
                     var La = FreeMapGenerator.Generate(floor, true, true); var da = SnapDraws();
@@ -140,7 +140,7 @@ static partial class T
         {
             int runs = 0, bad = 0, drawBad = 0; string first = null;
             foreach (int floor in StormDepths)
-                for (int salt = 1; salt <= 1000; salt++)
+                for (int salt = 1; salt <= N(1000, 400); salt++)
                 {
                     bad += ReplayTurns(salt, floor, 200, out string f);
                     if (f != null) first ??= $"深さ{floor} 種{salt} {f}";
@@ -351,7 +351,7 @@ static partial class T
             Check(saveBad == 0 && oldBad == 0 && lost == 0 && notReached == 0, $"不安定化: 中断セーブの往復で累計・内訳・輪が同じ・古いセーブは層の始まりから・点も道も消えない・終点へ必ず着ける ({layers} 層・往復の違い {saveBad}・古いセーブ {oldBad}・消えた {lost}・着けない {notReached})");
         }
 
-        WalkCompareInstability();
+        // 歩き方の比べ (WalkCompareInstability) は run.py --walk に分けた (2026-11-13・10 分前後かかる)
     }
 
     // =====================================================================

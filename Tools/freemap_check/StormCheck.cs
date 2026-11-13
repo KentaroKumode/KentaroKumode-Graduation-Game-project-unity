@@ -171,7 +171,7 @@ static partial class T
         {
             int layers = 0, diff = 0, drawDiff = 0; string firstDiff = null;
             foreach (int floor in new[] { 0, 1, 3, 5, 6, 7 })
-                for (int salt = 1; salt <= 5000; salt++)
+                for (int salt = 1; salt <= N(5000, 1500); salt++)
                 {
                     foreach (bool rift in floor == 6 && salt <= 500 ? new[] { true, false } : new[] { true })
                     {
@@ -191,7 +191,7 @@ static partial class T
         {
             int runs = 0, bad = 0, drawBad = 0; string first = null;
             foreach (int floor in StormDepths)
-                for (int salt = 1; salt <= 1000; salt++)
+                for (int salt = 1; salt <= N(1000, 400); salt++)
                 {
                     GameLoop.GameRng.Draws.Clear();
                     bad += ReplayDiff(salt, floor, 160, out string f);
