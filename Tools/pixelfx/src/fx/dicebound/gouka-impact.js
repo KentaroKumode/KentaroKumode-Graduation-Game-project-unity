@@ -31,7 +31,7 @@ export const meta = {
   },
 };
 
-const SY = 0.36, BURST = 0.05, SPREAD = 0.55, SOOT = hex("#0d0a12"), SOOT2 = hex("#17121d"), WARM = rgb(255, 176, 96);
+const SY = 0.17, BURST = 0.05, SPREAD = 0.55, SOOT = hex("#0d0a12"), SOOT2 = hex("#17121d"), WARM = rgb(255, 176, 96);
 // 消えかけの炎: 赤と朱だけ・白い芯なし (fire-ring の EMBER_LAYERS)
 const EMBER_LAYERS = [[1, 1, 7], [0.7, 0.8, 6], [0.4, 0.55, 5]];
 
@@ -42,7 +42,7 @@ export function create(o) {
   const front = (t) => REACH * ease.outCubic(clamp((t - BURST) / SPREAD));
   const reachedAt = (d) => BURST + SPREAD * (1 - Math.cbrt(1 - Math.min(1, d / REACH)));
   // 奥行き: 床の楕円の上で、 奥 (z = −1) は小さく暗く、 手前 (z = +1) は大きく
-  const depth = (y) => clamp(y / (REACH * SY), -1, 1), near = (z) => 0.5 + 0.65 * (z + 1);
+  const depth = (y) => clamp(y / (REACH * SY), -1, 1), near = (z) => 0.85 + 0.2 * (z + 1);
 
   // 床の炎の置き場所: 輪を 11 px おきに。 前線が来た時に点火し、 中心は一瞬で消え、 縁は長く燃える
   const sites = [];
@@ -53,7 +53,7 @@ export function create(o) {
       const x = Math.cos(a) * rr, y = Math.sin(a) * rr * SY, z = depth(y), s = near(z);
       if (y < 0 && Math.abs(x) < o.body) continue;      // 敵の体の後ろ
       if (R.chance(0.45 * (1 - q))) continue;           // 中心に近いほど、 まばらに
-      sites.push({ x, y, z, far: y < 0, t0: reachedAt(rr) + R.range(0, 0.04), life: (0.14 + 1.15 * Math.pow(q, 2.2)) * R.range(0.85, 1.2) * (1 + 0.05 * ASH),
+      sites.push({ x, y, z, far: y < 0, t0: reachedAt(rr) + R.range(0, 0.04), life: (q > 0.88 ? R.range(0.75, 1.15) * (1 + 0.05 * ASH) : R.range(0.14, 0.22)),      // 走る間は一瞬だけ燃え、 いちばん外の輪だけが燃え残る (輪を薄く)
         h: R.range(10, 17) * (0.6 + 0.55 * q) * s, w: R.range(1.9, 2.8) * (0.75 + 0.3 * q) * s, n: R.int(0, 1e5) });
     }
   }
@@ -106,13 +106,13 @@ export function create(o) {
           p.light(x, y, H[4], 0.3 * hot);
           continue;
         }
-        p.blend(x, y, h < 0.5 ? SOOT : SOOT2, Math.min(1, since * 3) * (0.5 - (d / REACH) * 0.22) * end);
+        p.blend(x, y, h < 0.5 ? SOOT : SOOT2, Math.min(1, since * 3) * (0.42 - (d / REACH) * 0.2) * end);
       }
   };
   const ring = (p, far) => {
     const k = (t - BURST) / (SPREAD + 0.1);
     if (k < 0 || k >= 1) return;
-    band(p, 0, 0, front(t) + 2, SY, Math.max(1.5, 7 * (1 - k)), k < 0.75 ? 1 : (1 - k) / 0.25, [H[6], H[4], H[2], H[1]], (g) => (Math.sin(g) < 0) === far, k < 0.14);
+    band(p, 0, 0, front(t) + 2, SY, Math.max(1, 3 * (1 - k)), k < 0.75 ? 1 : (1 - k) / 0.25, [H[6], H[4], H[2], H[1]], (g) => (Math.sin(g) < 0) === far, k < 0.14);
   };
   // 灰の塊: 光の当たる面と影の面のある、 角ばった灰色の破片
   const crust = (p, b) => {
