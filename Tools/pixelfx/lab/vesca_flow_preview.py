@@ -10,6 +10,7 @@ W, H, EX, FLOOR, SC = 480, 270, 240, 196, 2
 FONT = ImageFont.truetype(r"C:/Windows/Fonts/meiryo.ttc", 18)
 DARK, LEAD = 0.55, 1.0
 GLITCH = 0.9                     # 4 段目: 画面が乱れてから、 信号が切れる (vesca-off) へ替えるまでの秒
+HOLD_AT, HOLD_N = 3, 8           # 4 段目: 乱れの 3 コマ目 (黒い帯が入り始め、 敵も盤もまだ見えている所) で絵を止め、 8 コマ (1 秒) そのまま。 帯だけがゆっくりずれ続ける
 SHAKE = [(0, 4), (-3, -2), (3, 2), (-2, -1), (1, 1), (0, -1)]
 
 
@@ -50,16 +51,26 @@ def shaken(b, j):
     c = Image.new("RGB", (W, H), (5, 4, 10)); c.paste(b, SHAKE[j]); return c
 
 
-def tear_bands(n_frames, seed=7):
+def tear_bands(plan, seed=7):
     """4 段目: 画面そのものの乱れ (効果を重ねるのではなく、 出来上がった画面を帯ごとに横へずらす ── 敵の側もプレイヤーの盤も一緒に)。
-    コマごとの帯の一覧を作る (ゲーム側も同じ表を使う: Captures/fxlib/_vesca/tear.json)。 強さ: 溜めで 0.1 → 0.7・乱れの間 1.0・絵が戻った直後 0.5 → 0。"""
-    R = random.Random(seed); out = []
-    for i in range(n_frames):
-        k = TEAR[i] if i < len(TEAR) else 0.0; bands = []
+    コマごとの帯の一覧を作る (ゲーム側も同じ表を使う: library/dicebound/vesca-tear.json)。
+    plan = コマごとの強さ (0〜1)。 "hold" のコマは、 直前に決めた帯の組をそのまま使い、 1 コマごとに少しずつ横へずらす (止まった画面が、 ゆっくりずれていく)。"""
+    R = random.Random(seed); out = []; held = None
+    def pick(k):
+        bands = []
         for _ in range(int(k * 9 + (1 if k > 0.05 else 0))):
             h = R.choice([2, 3, 4, 6, 9, 14, 22, 30]); y = R.randrange(0, H - h); dx = int(R.choice([-1, 1]) * R.uniform(3, 96) * k)
             bands.append({"y": y, "h": h, "dx": dx, "kind": R.choices(["shift", "smear", "ghost"], [6, 2, 2])[0]})
-        out.append(bands)
+        return bands
+    for k in plan:
+        if k == "hold":
+            if held is None:
+                held = [dict(b, v=R.choice([-1, 1]) * R.choice([1, 2, 2, 3, 4, 5])) for b in pick(1.0) + pick(0.6)]   # 帯を多めに。 v = 1 コマごとのずれ (px)
+                for b in held: b["kind"] = "shift" if b["kind"] == "smear" else b["kind"]                                # 引き伸ばしは止まって見えるので使わない
+            else:
+                for b in held: b["dx"] += b["v"]
+            out.append([{q: b[q] for q in ("y", "h", "dx", "kind")} for b in held])
+        else: held = None; out.append(pick(k))
     return out
 
 
@@ -112,12 +123,13 @@ for r in range(1):
 cards = []
 n1 = int(LEAD * 8)
 # 4 段目の乱れの強さ (大技のターンの頭からのコマごと): 溜め 8 コマ・乱れ 7 コマ・信号が切れて戻るまで (黒い間は見えない)・戻った直後の 5 コマ
-TEAR = [0.1, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75] + [1.0] * int(GLITCH * 8) + [0.0] * 6 + [0.7, 0.6, 0.5, 0.4, 0.3, 0.22, 0.14, 0.08, 0.04]
-BANDS = tear_bands(len(TEAR))
+# 溜め 8 コマ・乱れ 4 コマ・止まって 8 コマ (帯だけずれ続ける)・乱れの残り・信号が切れて戻るまで (黒い間は見えない)・戻った直後
+TEAR = [0.1, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75] + [1.0] * HOLD_AT + ["hold"] * (HOLD_N + 1) + [1.0] * (int(GLITCH * 8) - HOLD_AT - 1) + [0.0] * 6 + [0.7, 0.6, 0.5, 0.4, 0.3, 0.22, 0.14, 0.08, 0.04]
+BANDS = tear_bands(TEAR)
 io.open(os.path.join(OUT, "tear.json"), "w", encoding="utf-8").write(json.dumps({"fps": 8, "w": W, "h": H, "frames": BANDS}))
 for key, title, lead, parts in (
         ("p123", "1〜3 段目: 時が止まり、 凍った画面が砕ける", stop, [(sha, "ヴェスカの大技 (1〜3 段目): 画面が凍る → ひび → 砕ける", 4)]),
-        ("p4", "4 段目 (天与) だけ: 時が壊れ、 画面が乱れて、 信号が切れる", lost, [(gli[:int(GLITCH * 8)], "ヴェスカの大技 (4 段目): 画面が乱れる", 0), (off, "ヴェスカの大技 (4 段目): 信号が切れる → 戻る", -1)])):
+        ("p4", "4 段目 (天与) だけ: 時が壊れ、 画面が乱れて、 信号が切れる", lost, [(gli[:HOLD_AT], "ヴェスカの大技 (4 段目): 画面が乱れる", -1), ([gli[HOLD_AT]] * (HOLD_N + 1), "ヴェスカの大技 (4 段目): 乱れたまま止まる (ゆっくりずれていく)", -1), (gli[HOLD_AT + 1:int(GLITCH * 8)], "ヴェスカの大技 (4 段目): 画面が乱れる", -1), (off, "ヴェスカの大技 (4 段目): 信号が切れる → 戻る", -1)])):
     seq = list(head); h0 = len(seq)
     for i in range(n1):
         b = dark(base.copy(), DARK); f = lead[min(i, len(lead) - 1)]; b.paste(f, (0, 0), f)
