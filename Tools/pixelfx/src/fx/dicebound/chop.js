@@ -21,12 +21,13 @@ export const meta = {
     palette: ["#1d1620", "#3a3440", "#5c5664", "#8a8494", "#b8b2c0", "#e4e0ea", "#ffffff"],
     sparks: ["#ffffff", "#e4e0ea", "#b8b2c0", "#8a8494"],
     heavy: false,   // 会心: 太く・長く残る・残像が 1 本付く
+    bloom: null,    // 斬った跡と刃のまわりのブルームの強さ (既定: 通常 1.1・会心 1.9)
     flow: 2.4,      // 何倍に広げて使うか (筋の細かさを、 広げた後の画面のドットに合わせる)
     seed: 4,
   },
 };
 
-function chopSlash(p, s, t, FLOW) {
+function chopSlash(p, s, t, FLOW, BLOOM = 1) {
   const u = t - s.t0;
   if (u < 0) return;
   const R = s.ramp, n = R.length, life = s.sweep + s.hold + s.trail;
@@ -50,10 +51,11 @@ function chopSlash(p, s, t, FLOW) {
     });
     glowAlong(p, s, s.R - W * 0.4, T, U, 7 + W, R[n - 3], (uu) => 0.42 * (1 - age) * ((uu - T) / (U - T)), 0, 0.3);
     glowAlong(p, s, s.R - 0.5, T, U, 6, R[n - 1], (uu) => 0.6 * (1 - age) * Math.min(1, ((uu - T) / (U - T)) * 2), 0, 0.2);   // 縁に沿った、 白い光
+    glowAlong(p, s, s.R - W * 0.3, T, U, 10 + 8 * BLOOM, R[n - 3], (uu) => 0.3 * BLOOM * (1 - age * 0.6), 0, 0.35);   // 刃のまわりのブルーム
   }
   const th = 0.85 * (1 - clamp((u - s.sweep - s.hold) / (s.trail + 0.45)));
   // 縁の残像 (通った跡の線): 点線ではなく明るい線で残し、 光らせる
-  if (tail > 0.02 && th > 0) { trace(p, s, s.R - 0.5, 0, T, R[n - 2], (uu) => Math.min(1, th * 1.4) * (0.5 + 0.5 * uu / s.span), 0, 0.3); trace(p, s, s.R - 1.4, 0, T, R[n - 4], (uu) => th * (0.4 + 0.6 * uu / s.span), 0, 0.3); glowAlong(p, s, s.R - 0.5, 0, T, 6, R[n - 2], (uu) => 0.55 * th * (0.4 + 0.6 * uu / s.span), 0, 0.25); }
+  if (tail > 0.02 && th > 0) { trace(p, s, s.R - 0.5, 0, T, R[n - 2], (uu) => Math.min(1, th * 1.4) * (0.5 + 0.5 * uu / s.span), 0, 0.3); trace(p, s, s.R - 1.4, 0, T, R[n - 4], (uu) => th * (0.4 + 0.6 * uu / s.span), 0, 0.3); glowAlong(p, s, s.R - 0.5, 0, T, 5 + 4 * BLOOM, R[n - 2], (uu) => Math.min(1, 0.6 * BLOOM) * th * (0.5 + 0.5 * uu / s.span), 0, 0.2); glowAlong(p, s, s.R - 0.5, 0, T, 9 + 9 * BLOOM, R[n - 3], (uu) => 0.3 * BLOOM * th * (0.5 + 0.5 * uu / s.span), 0, 0.35); }   // 斬った跡のブルーム: 細く明るい芯と、 広く淡いにじみ
 }
 
 export function create(o) {
@@ -75,8 +77,9 @@ export function create(o) {
       ps.update(dt);
     },
     draw(p) {
-      if (E) chopSlash(p, E, t, o.flow);
-      chopSlash(p, A, t, o.flow);
+      const bl = o.bloom ?? (big ? 1.9 : 1.1);
+      if (E) chopSlash(p, E, t, o.flow, bl * 0.6);
+      chopSlash(p, A, t, o.flow, bl);
       const g = t - A.sweep * 0.6;
       if (g > 0 && g < 0.22) sparkle(p, end.x, end.y, (big ? 12 : 9) * ease.outBack(Math.min(1, g / 0.05)) * (1 - g / 0.22), C[5], C[3], 0.6);
       if (t < 0.3) { const [x, y] = onSwing(A, A.R - 4, A.span * ease.outExpo(clamp(t / A.sweep))); p.glow(x, y, 46, C[3], 0.6 * (1 - t / 0.3)); p.glow(x, y, 16, C[5], 0.5 * (1 - t / 0.3)); }
