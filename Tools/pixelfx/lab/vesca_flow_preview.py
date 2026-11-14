@@ -60,7 +60,7 @@ def tear_bands(plan, seed=7):
         bands = []
         for _ in range(int(k * 9 + (1 if k > 0.05 else 0))):
             h = R.choice([2, 3, 4, 6, 9, 14, 22, 30]); y = R.randrange(0, H - h); dx = int(R.choice([-1, 1]) * R.uniform(3, 96) * k)
-            bands.append({"y": y, "h": h, "dx": dx, "kind": R.choices(["shift", "smear", "ghost"], [6, 2, 2])[0]})
+            bands.append({"y": y, "h": h, "dx": dx, "kind": R.choices(["shift", "smear", "ghost"], [6, 2, 2])[0], "ca": min(9, 2 + abs(dx) // 10)})   # ca = 色収差 (赤と青を左右へ離す px)
         return bands
     for k in plan:
         if k == "hold":
@@ -69,20 +69,23 @@ def tear_bands(plan, seed=7):
                 for b in held: b["kind"] = "shift" if b["kind"] == "smear" else b["kind"]                                # 引き伸ばしは止まって見えるので使わない
             else:
                 for b in held: b["dx"] += b["v"]
-            out.append([{q: b[q] for q in ("y", "h", "dx", "kind")} for b in held])
+            out.append([{q: b[q] for q in ("y", "h", "dx", "kind", "ca")} for b in held])
         else: held = None; out.append(pick(k))
     return out
 
 
 def torn(im, bands):
-    """shift = 帯を横へずらす (はみ出た分は反対側から出る)・smear = 帯の左端の 1 列を横へ引き伸ばす・ghost = ずらした帯を、 元の上に明るい方だけ重ねる (二重像)。"""
+    """shift = 帯を横へずらす (はみ出た分は反対側から出る)・smear = 帯の左端の 1 列を横へ引き伸ばす・ghost = ずらした帯を、 元の上に明るい方だけ重ねる (二重像)。
+    どの帯にも色収差を掛ける: 赤を左へ・青を右へ ca ドット離す (縁に赤紫と青緑のにじみが出る)。 (2026-11-14 作者の指定)"""
     out = im.copy()
     for b in bands:
         box = (0, b["y"], W, b["y"] + b["h"]); strip = im.crop(box)
-        if b["kind"] == "shift": out.paste(ImageChops.offset(strip, b["dx"], 0), box)
+        if b["kind"] == "shift": strip = ImageChops.offset(strip, b["dx"], 0)
         elif b["kind"] == "smear":
-            x0 = abs(b["dx"]) * 3 % W; out.paste(strip.crop((x0, 0, x0 + 1, b["h"])).resize((W - x0, b["h"])), (x0, b["y"]))
-        else: out.paste(ImageChops.lighter(strip, ImageChops.offset(strip, b["dx"], 0)), box)
+            x0 = abs(b["dx"]) * 3 % W; strip.paste(strip.crop((x0, 0, x0 + 1, b["h"])).resize((W - x0, b["h"])), (x0, 0))
+        else: strip = ImageChops.lighter(strip, ImageChops.offset(strip, b["dx"], 0))
+        r, g, bl = strip.split(); ca = b.get("ca", 0)
+        out.paste(Image.merge("RGB", (ImageChops.offset(r, -ca, 0), g, ImageChops.offset(bl, ca, 0))), box)
     return out
 
 
