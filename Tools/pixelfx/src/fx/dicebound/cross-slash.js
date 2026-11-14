@@ -40,7 +40,8 @@ export function ringSlash(p, s, t, tFlare) {
   if (f < 0 && U > 0.02) {
     smear(p, s, 0, U, s.W, (uu, r, out) => {
       const age = u - passed(uu / s.span), lead = U - uu;
-      const w = s.W * Math.pow(clamp(lead / (s.span * 0.22)), 0.5) * (0.3 + 0.7 * Math.exp(-age / 0.075)) * Math.pow(clamp(uu / (s.span * 0.3)), 0.7);
+      // s.sharp: 両端を鋭く (頭も尾も、 長く細く尖らせる)。 既定は元の spin-slash と同じ丸み
+      const w = s.W * (s.sharp ? Math.pow(clamp(lead / (s.span * 0.4)), 1.3) : Math.pow(clamp(lead / (s.span * 0.22)), 0.5)) * (0.3 + 0.7 * Math.exp(-age / 0.075)) * Math.pow(clamp(uu / (s.span * (s.sharp ? 0.45 : 0.3))), s.sharp ? 1.4 : 0.7);
       if (w < 0.45) return;
       const q = (s.R - r) / w;
       if (q < 0 || q > 1) return;
@@ -52,14 +53,14 @@ export function ringSlash(p, s, t, tFlare) {
   } else if (f >= 0 && f < 1) {
     const RR = s.R + 0.8 * ease.outCubic(f), th = f < 0.13 ? s.W * 0.56 : Math.max(1, s.W * 0.375 * Math.pow(1 - f, 1.5) + 0.5), S = { ...s, R: RR }, step = f < 0.13 ? 6 : f < 0.3 ? 5 : f < 0.55 ? 4 : 3;
     smear(p, S, 0, U, th, (uu, r, out) => {
-      const w = th * Math.pow(Math.sin(Math.PI * clamp(uu / s.span)), 0.5);   // 両端は細る (弧は閉じた輪ではないので)
+      const w = th * Math.pow(Math.sin(Math.PI * clamp(uu / s.span)), s.sharp ? 1.7 : 0.5);   // 両端は細る (弧は閉じた輪ではないので)。 sharp なら、 針のように尖る
       if (w < 0.4) return;
       const q = (RR - r) / w;
       if (q < 0 || q > 1) return;
       out.c = f < 0.13 ? (q < 0.6 ? WHITE : R[5]) : q < 0.45 ? R[step] : R[step - 1];
       out.a = f < 0.4 ? 1 : 1.3 - f;
     });
-    glowAlong(p, S, RR - 2, 0, U, 14, R[4], 0.32 * (1 - f) * (1 - f), 0, 0.3);
+    glowAlong(p, S, RR - 2, 0, U, 14, R[4], s.sharp ? (uu) => 0.32 * (1 - f) * (1 - f) * Math.pow(Math.sin(Math.PI * clamp(uu / s.span)), 1.5) : 0.32 * (1 - f) * (1 - f), 0, 0.3);
   }
   const k = 1 - clamp((t - tFlare - 0.06) / 0.4);
   if (f >= 0 && k > 0) trace(p, s, s.R - 0.5, 0, s.span, R[4], (uu) => clamp(k * 1.5 - rand(Math.floor(uu * 30), 5) * 0.8) * 0.95);

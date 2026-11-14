@@ -39,7 +39,7 @@ export function create(o) {
   const C = fit(o.palette, 7), Rg = new Rng(o.seed), ps = new Particles({ rng: Rg, ground: () => 0, sparks: o.sparks }), lights = new Lights();
   const T_OFF = o.wide ? 0.3 : 0;   // 会心は、 大きな一太刀のあとに連撃
   // 真横の大きな斬撃 (会心): 連撃の締めの一太刀 (big) と同じ形を、 大きく。 右から左へ
-  const WIDE = o.wide ? swing({ cx: 26, cy: -27, R: 48, sy: 0.3, k: 0.2, rot: -0.1, a0: 0.15, dir: 1, span: 2.85, W: 15, t0: 0, sweep: 0.07, hold: 0.06, trail: 0.24, ramp: C }) : null;
+  const WIDE = o.wide ? swing({ cx: 26, cy: -27, R: 48, sy: 0.3, k: 0.2, rot: -0.1, a0: 0.15, dir: 1, span: 3.0, W: 15, t0: 0, sweep: 0.07, hold: 0.06, trail: 0.24, ramp: C, sharp: true }) : null;   // sharp: 両端を針のように尖らせる (作者: どちらの端も丸くて、 シャープさが足りない)
   const small = CUTS.map(([x, y, rot, dir], i) => swing({ cx: x, cy: y, R: Rg.range(12, 15), sy: Rg.range(0.55, 0.75), rot, a0: Rg.range(-2.8, -2.2), dir, span: Rg.range(2.3, 2.8), W: Rg.range(5.2, 6.4), t0: T_OFF + i * EVERY, sweep: 0.035, hold: 0.03, trail: 0.13, ramp: C }));
   // the finisher: one wide flat cut right across the front, left to right
   const big = swing({ cx: 24, cy: -26, R: 30, sy: 0.36, k: 0.24, rot: 0.12, a0: 3.0, dir: -1, span: 2.85, W: 11, t0: T_OFF + small.length * EVERY + 0.04, sweep: 0.055, hold: 0.06, trail: 0.24, ramp: C });
@@ -70,7 +70,7 @@ export function create(o) {
         // spin-slash と同じ中空の作り (dicebound/cross-slash の ringSlash): 頭の後ろだけ太い → 振り抜いた瞬間に白い帯で光る → 細って点線にほどける。 光る間は、 帯に沿って光を足す
         ringSlash(p, WIDE, t, WIDE.sweep + 0.02);
         const f = (t - WIDE.sweep - 0.02) / 0.3;
-        if (f > -0.3 && f < 1) glowAlong(p, WIDE, WIDE.R - 1, 0, WIDE.span, 7, C[6], 0.35 * (1 - Math.max(0, f)) * o.bloom, 0, 0.12);
+        if (f > -0.3 && f < 1) glowAlong(p, WIDE, WIDE.R - 1, 0, WIDE.span, 7, C[6], (uu) => 0.35 * (1 - Math.max(0, f)) * o.bloom * Math.pow(Math.sin(Math.PI * uu / WIDE.span), 1.6), 0, 0.12);   // 光も、 両端では絞る (端が丸く見えないように)
       }
       for (const s of all) glowSlash(p, s, t, o.flow, o.bloom);
       all.forEach((s, i) => {
