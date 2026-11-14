@@ -126,18 +126,22 @@ namespace UI.Game2D.Battle
             }
             if (!_guiFxWas) Game2DGuiRt.RequestWeightMap();      // 区間の頭で 1 回: GUI の形から、 液晶からの距離の重みを作る
             _guiFxWas = true;
-            float white = 0f; Color wc = Color.white;
+            float white = 0f, dark = _boss.GuiDark; Color wc = Color.white;
             if (_boss.InHeavy)
             {
-                var fb = _c.FB; long n = 0, sr = 0, sg = 0, sb = 0;
+                var fb = _c.FB; long n = 0, sr = 0, sg = 0, sb = 0, nb = 0;
                 for (int i = 0; i < fb.Length; i++)
                 {
                     uint v = fb[i]; uint r = v & 255, g = (v >> 8) & 255, b = (v >> 16) & 255;
                     if (r >= 230 && g >= 220 && b >= 200) { n++; sr += r; sg += g; sb += b; }
+                    else if (r <= 12 && g <= 12 && b <= 12) nb++;
                 }
                 if (n > 0) { white = n / (float)fb.Length; wc = new Color(sr / (255f * n), sg / (255f * n), sb / (255f * n)); }
+                // 絵そのものが画面を黒く塗る暗転 (ヴェスカ 4 段目の消灯 vesca-off): 暗幕の値は 1 のままなので、 液晶の絵のうち真っ黒な画素
+                //   (赤緑青とも 12 以下) の割合を暗さとして渡す。 暗幕が掛かっている間は測らない (暗幕で落ちた画素を二重に数えない)
+                if (dark >= 0.999f) dark = 1f - nb / (float)fb.Length;
             }
-            Game2DGuiRt.SetBossFx(true, _boss.GuiDark, _boss.GuiRed, white, wc, _boss.GuiShake);
+            Game2DGuiRt.SetBossFx(true, dark, _boss.GuiRed, white, wc, _boss.GuiShake);
         } private string _enemyMoveName;
 
         /// <summary>[実機の確認用] 流れで流した技・武器・大技の絵の履歴 (ターンの番号つき・新しい物が後ろ・最大 40 件)。 開発ビルドとエディタだけ記録する。</summary>

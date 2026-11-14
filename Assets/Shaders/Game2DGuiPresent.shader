@@ -68,7 +68,10 @@ Shader "Game2D/GuiPresent"
                 if (_FxOn > 0.5)
                 {
                     fxW = tex2D(_FxWeight, i.uv).r;
-                    i.uv += float2(-_FxShake.x * dot1.x, _FxShake.y * dot1.y) * fxW;
+                    // 画面の端の 6 dot は揺れを弱めて 0 へ: ずらした先が RT の外になると、 端の行 (影・透明) が引き伸ばされ、 下地の帯が見えた (2026-11-14)
+                    float2 edgeDots = min(i.uv, 1.0 - i.uv) / dot1;
+                    float edge = saturate(min(edgeDots.x, edgeDots.y) / 6.0);
+                    i.uv += float2(-_FxShake.x * dot1.x, _FxShake.y * dot1.y) * fxW * edge;
                 }
                 float4 g = tex2D(_GuiTex, i.uv);
                 float cov = sqrt(saturate(g.a));
