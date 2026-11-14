@@ -47,6 +47,12 @@ namespace CombatSystem
             //   `isCombatActive = false` は元からこの関数の末尾にあるので、 それを入口の番人にする。
             if (!isCombatActive) { SkillDiag.FinishCombatReentry++; return; }
             BossDownDiag.EndFight();   // [計装 2026-11-13] ボスのダウン
+            {
+                // [計装 2026-11-14] 灰燼の王の〈烈炎〉: この戦闘で積もった烈炎の通算と、 主攻撃をシールドが肩代わりした量の通算 (EndFight の前)
+                var ctxBz = PassiveSkillManager.Instance?.Context;
+                if (ctxBz != null && ctxBz.GetAccumulated(ItemSystem.PassiveSkills.Effects.BlazeBrand.ActiveKey) > 0f)
+                    HeavyHitDiag.NoteBlazeFight((int)ctxBz.GetAccumulated(ItemSystem.PassiveSkills.Effects.BlazeBrand.GainedKey), ctxBz.dbgShieldToNormal);
+            }
             HeavyHitDiag.EndFight(playerHP <= 0);   // [計装 2026-11-14] 大技の被ダメ (このボスでの負けの数)
 
             // [計装] 対象層のボス戦の締め。 既定は無効。

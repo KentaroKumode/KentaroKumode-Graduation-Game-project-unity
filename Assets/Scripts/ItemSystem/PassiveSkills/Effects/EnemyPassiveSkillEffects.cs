@@ -835,7 +835,10 @@ namespace ItemSystem.PassiveSkills.Effects
     }
 
     /// <summary>灰燼の王 — 烈炎 (2026-08-04): **亀戦法への罰**。
-    ///   ・ブロック端子へ <see cref="BlockDiceThreshold"/> 本以上配線したターン終了時、 烈炎スタック +1
+    ///   ・2026-11-14〜 (作者の決定): ターン終了時、 そのターンに敵の主攻撃をシールドで肩代わりした量
+    ///     (<see cref="CombatContext.shieldAbsorbedAttackThisTurn"/>) の BossParam.BlazePerShield (基準 10) ごとに烈炎 +1 (切り捨て・端数は持ち越さない・
+    ///     式は <see cref="CombatSystem.HeavyCycle.BlazeGain"/>)。 軽減無視 (業火の烈炎の分など) をシールドが肩代わりした分は数えない
+    ///   ・旧 (測定の口 blazeStackRule=Guard2): ブロック端子へ <see cref="BlockDiceThreshold"/> 本以上配線したターン終了時、 烈炎スタック +1
     ///   ・2026-11-14〜: 積もった烈炎は王の大技〈業火〉で「烈炎の数 × BlazeBurstPerStack」の軽減無視ダメージになって返り、 撃ったら 0
     ///     (CombatManager.ApplyBlazeBurst)。 業火がダウンで取り消された時は 0 に戻さない (次の業火へ持ち越す)。
     ///   ・旧: ターン開始時、 スタック分の軽減無視ダメージ (測定の口 blazeTickEachTurn=True で残せる)
@@ -860,6 +863,8 @@ namespace ItemSystem.PassiveSkills.Effects
         public const int BlockDiceThreshold = 2;
         public const string StackKey = "blaze_stack";
         public const string ActiveKey = "blaze_active";
+        /// <summary>[計装 2026-11-14] この戦闘で積もった烈炎の通算 (業火で 0 に戻しても減らない・accumulatedValues は戦闘ごとに作り直される)。</summary>
+        public const string GainedKey = "blaze_gained_total";
         /// <summary>配線本数の参照先 (CombatManager が毎ターン書き込む)。</summary>
         private const string BlockCountKey = "mutualBlockDiceCount";
 
@@ -883,12 +888,19 @@ namespace ItemSystem.PassiveSkills.Effects
             }
             else if (trigger == PassiveSkillTrigger.OnTurnEnd)
             {
+                // 2026-11-14〜 既定 (Shield): このターンに主攻撃をシールドで受けた量 N ごとに +1。 旧い条件 (Guard2) は防御の端子に 2 個以上
                 ctx.accumulatedValues.TryGetValue(BlockCountKey, out var blk);
-                if ((int)blk >= BlockDiceThreshold)
+                int perShield = CombatSystem.BossParams.ParamInt(ctx.bossId, CombatSystem.BossParam.BlazePerShield);
+                int gain = CombatSystem.HeavyCycle.BlazeGain(GameLoop.GameHooks.BlazeStack, ctx.shieldAbsorbedAttackThisTurn, perShield, (int)blk, BlockDiceThreshold);
+                if (gain > 0)
                 {
                     ctx.accumulatedValues.TryGetValue(StackKey, out var stack);
-                    ctx.accumulatedValues[StackKey] = stack + 1f;
-                    UnityEngine.Debug.Log($"[烈炎] ブロック{(int)blk}本 → スタック {(int)stack}→{(int)stack + 1}");
+                    ctx.accumulatedValues[StackKey] = stack + gain;
+                    ctx.accumulatedValues.TryGetValue(GainedKey, out var tot);
+                    ctx.accumulatedValues[GainedKey] = tot + gain;
+                    UnityEngine.Debug.Log(GameLoop.GameHooks.BlazeStack == CombatSystem.BlazeStackRule.Guard2
+                        ? $"[烈炎] ブロック{(int)blk}本 → スタック {(int)stack}→{(int)stack + gain}"
+                        : $"[烈炎] シールドで {ctx.shieldAbsorbedAttackThisTurn} 受けた ({perShield} ごとに +1) → スタック {(int)stack}→{(int)stack + gain}");
                 }
             }
         }

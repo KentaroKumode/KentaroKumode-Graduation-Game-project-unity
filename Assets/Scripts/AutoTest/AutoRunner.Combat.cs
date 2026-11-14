@@ -572,6 +572,9 @@ namespace AutoTest
             public bool blazeBurst;
             /// <summary>烈炎 1 つあたりの業火の軽減無視ダメージ (BossParam.BlazeBurstPerStack・本体と同じ値) / いまの業火の周期 (Escalation.HeavyPeriodNow)。</summary>
             public int blazeBurstPer, heavyPeriodNow;
+            /// <summary>[2026-11-14] 〈烈炎〉が積もる量: 主攻撃をシールドで肩代わりした量 この値 ごとに +1 (BossParam.BlazePerShield・本体と同じ値)。
+            /// 積もり方の規則は本体と同じ口 GameHooks.BlazeStack (旧い条件 Guard2 では読まない)。</summary>
+            public int blazePerShield;
         }
 
         /// <summary>先のターンの被ダメの見積もりに使う敵の攻撃: 普段はこのターンの予告値。 ダウンのターンは予告が 0 なので、 ダウンが明けた後の見込み。</summary>
@@ -762,6 +765,7 @@ namespace AutoTest
             public int dmgUsed;          // [V3 mainCorr] 効用に使った主攻撃の見積もり (実績の比を掛ける前・ヴェスカの防御の前)
             public int enemyHeal;        // [#107] 敵〈吸血〉で、 このターンの終わりに敵 HP が戻る量 (撃破しないときだけ)
             public bool balancePlus;     // [#107] このターンの収支プラスの見込み (〈反撃態勢〉〈暴走〉が次のターンに乗る)
+            public int blazeGain;        // [2026-11-14] このターンの終わりに積もる烈炎の見込み (本体と同じ式 HeavyCycle.BlazeGain)
         }
 
         /// <summary>配線から出た「端子ごとの合計と個数」と、 端子の山札 (ADR-0014) の結果の追加の効果。 <see cref="OptimalUtilityCore"/> の入力。
@@ -1088,20 +1092,30 @@ namespace AutoTest
                 fbCovers = coversFight; fbKills = killsNow;
             }
 
-            // 烈炎 (6 層ボス): ブロック端子へ閾値以上配線すると毎ターン スタック+1、
-            //   ターン開始時にスタック分の軽減無視ダメ。 **配線側がこれを見られないと
+            // 烈炎 (6 層ボス): ターンの終わりにスタックが積もり、 **配線側がこれを見られないと
             //   ただの一方的な税になる**ので、 撃破までの累積を効用へ入れる。
+            //   2026-11-14〜 (作者の決定): 積もる数 = このターンに敵の主攻撃をシールドで肩代わりする見込み ÷ BlazePerShield (切り捨て)。
+            //   式は本体と同じ HeavyCycle.BlazeGain (口 blazeStackRule=Guard2 = 旧い「ブロック端子へ 2 本以上で +1」・その時は今までと同じ値付け)。
+            //   シールドの見込み = min(敵の攻撃の前のシールド (持ち越し + このターンの端子・バッシュで使い切った分は除く), ブロックの後の主攻撃 (1 回目 + 〈多頭攻撃〉の 2 回目))
+            //   ── 収支の見積もり (上の pool) と同じ近似。 撃破するターン・チャージ・ダウンは敵が攻撃しないので 0。
             //   2026-11-14〜: 毎ターンの削りは既定で無し (口 blazeTickEachTurn=True で残す)。 代わりに積もった烈炎は王の大技〈業火〉で
             //   × BlazeBurstPerStack にまとめて返り、 撃ったら 0 (本体 CombatManager.ApplyBlazeBurst)。 値付けは「撃破より前に業火が来るなら、 その時の烈炎 × 1 つあたり」。
+            int blazeGain = 0;
             if (tele.blazePenalizesBlock)
             {
                 int s0 = tele.blazeStacks;
-                bool adds = bCount >= ItemSystem.PassiveSkills.Effects.BlazeBrand.BlockDiceThreshold;
+                int shieldAbs = 0;
+                if (effDmg < enemyHp)
+                {
+                    float tmB = ws.takenMul < 1f ? ws.takenMul : 1f;
+                    int hitsB = Mathf.RoundToInt((hit1Raw + hit2Raw) * tmB);
+                    shieldAbs = System.Math.Min((bashSpent ? 0 : myShield) + ws.shield, hitsB);
+                }
+                blazeGain = CombatSystem.HeavyCycle.BlazeGain(GameLoop.GameHooks.BlazeStack, shieldAbs, s.blazePerShield,
+                                                              bCount, ItemSystem.PassiveSkills.Effects.BlazeBrand.BlockDiceThreshold);
                 if (GameLoop.GameHooks.BlazeTickEachTurn)
                 {
-                    float blaze = adds
-                                ? s0 * ttk + ttk * (ttk + 1) * 0.5f   // 積み続ける
-                                : s0 * ttk;                            // 据え置き
+                    float blaze = s0 * ttk + blazeGain * ttk * (ttk + 1) * 0.5f;   // 積み続ける (積もらないなら据え置き)
                     u -= blaze;
                 }
                 if (s.blazeBurst && tele.turnsToHeavy >= 0 && !s.enemyDown)
@@ -1110,7 +1124,7 @@ namespace AutoTest
                     // このターンが業火: 撃つ前に倒せなければ、 今の烈炎がこのターンに返る (軽減無視)。 撃った後の烈炎は 0 から
                     if (th == 0 && effDmg < enemyHp) u -= s0 * s.blazeBurstPer;
                     int nextIn = th == 0 ? System.Math.Max(1, s.heavyPeriodNow) : th;
-                    int stacksThen = (th == 0 ? 0 : s0) + (adds ? 1 : 0);
+                    int stacksThen = (th == 0 ? 0 : s0) + blazeGain;   // このターンの分はターンの終わり (業火を撃った後) に積もる
                     if (nextIn <= ttk) u -= stacksThen * s.blazeBurstPer;   // 次の業火まで生きている見込みなら、 そこで返る
                 }
             }
@@ -1131,7 +1145,7 @@ namespace AutoTest
             }
             outcome = new OptimalTurnOutcome { effDmg = effDmg, mainDmg = mainEff, taken = taken, block = block, aCount = aCount, bCount = bCount, bashSpent = bashSpent,
                                                freeBlock = fbCovers, killsNow = fbKills, dmgOld = dmgOld, dmgNew = dmgNew, rawNew = rawNew,
-                                               dmgUsed = aCount > 0 ? dmgUsed : 0, enemyHeal = enemyHeal, balancePlus = balancePlus };
+                                               dmgUsed = aCount > 0 ? dmgUsed : 0, enemyHeal = enemyHeal, balancePlus = balancePlus, blazeGain = blazeGain };
             return u;
         }
 
@@ -1348,9 +1362,8 @@ namespace AutoTest
             ns.steadfastReady = plan.steadfastOn && plan.turn + 1 >= readyTurn;
             // 敵の防御: 持続分はダメージを入れたターンの終わりに割れる/積み上がる・構えの増減は次のターン番号で決まる
             ns.eDefNow = System.Math.Max(0, plan.armor.DefAt(plan.armor.EndOfTurn(plan.baseDef, o.effDmg > 0), plan.turn + 1));
-            // 烈炎: ブロック端子を閾値以上に挿すとスタックが増える
-            ns.tele.blazeStacks = plan.nextBlazeBase
-                + ((st.tele.blazePenalizesBlock && o.bCount >= ItemSystem.PassiveSkills.Effects.BlazeBrand.BlockDiceThreshold) ? 1 : 0);
+            // 烈炎: このターンの終わりに積もる分 (効用と同じ見込み・2026-11-14〜 シールドで受けた量 ÷ N / 旧い条件 Guard2 はブロック端子 2 本以上で +1)
+            ns.tele.blazeStacks = plan.nextBlazeBase + o.blazeGain;
 
             // memo の鍵の最後の要素: 烈炎のスタック × 2 + [#107] 次のターンに〈反撃態勢〉〈暴走〉が乗るか
             plusNext = (o.balancePlus && (st.nextHitOnPlus > 0 || st.nextAtkOnPlus > 0f)) ? 1 : 0;
@@ -1554,6 +1567,9 @@ namespace AutoTest
                     DownSequenceAfterNextTurn(cm.CurrentEnemy, ctxRoles, in tele, st.downNextAtk, (float)cm.EnemyHP / st.downMaxHp,
                                               out st.downEraseAtk, out st.downAfterAtk);
             }
+            // 〈烈炎〉の積もる量 (2026-11-14): 主攻撃をシールドで N 受けるごとに +1。 N は本体と同じ値
+            if (cm?.CurrentEnemy != null && tele.blazePenalizesBlock)
+                st.blazePerShield = CombatSystem.BossParams.ParamInt(cm.CurrentEnemy.id, CombatSystem.BossParam.BlazePerShield);
             // 灰燼の王の大技〈業火〉(2026-11-14): 烈炎は業火で返る。 1 つあたりと周期は本体と同じ値
             if (cm?.CurrentEnemy != null && tele.blazePenalizesBlock && !GameLoop.GameHooks.AshKingHeavyDisabled && cm.CurrentEnemy.heavyPeriod > 0)
             {

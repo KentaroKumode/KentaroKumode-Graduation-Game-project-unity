@@ -502,10 +502,12 @@ static class T
             Check(p3 == "ダウン|チャージ|大|小|チャージ|大|小", "周期 3: 小技のターンのダウンは周期を動かさない → " + p3);
 
             // 周期の倍率: 小技 → チャージ (攻撃しない = 0) → 大技。 旧い値・旧い作り (チャージも攻撃) に戻すと旧い並び
-            float[] F(float hm, float lm, bool noAtk) => new[] { 1, 2, 3, 4 }.Select(c => HeavyCycle.Factor(3, c, hm, hm, lm, noAtk)).ToArray();
-            var fn = F(3.0f, 0.8f, true); var fo = F(2.0f, 0.7f, false);
-            Check(fn[0] == 0.8f && fn[1] == 0f && fn[2] == 3.0f && fn[3] == 0.8f, $"新しい並び (周期 3): 小技 ×{fn[0]}・チャージ ×{fn[1]} (攻撃しない)・大技 ×{fn[2]}");
-            Check(fo[0] == 0.7f && fo[1] == 0.7f && fo[2] == 2.0f, $"旧い値と旧い作り: ×{fo[0]}・×{fo[1]}・×{fo[2]} (チャージも小技の倍率で攻撃)");
+            float[] F(int per, float hm, float lm, bool noAtk) => Enumerable.Range(1, per + 1).Select(c => HeavyCycle.Factor(per, c, hm, hm, lm, noAtk)).ToArray();
+            // 2026-11-14 (作者の決定): データの既定の周期は 5 (小技・小技・小技・チャージ・大技)。 旧い値・旧い作りは周期 3
+            var fn = F(5, 3.0f, 0.8f, true); var fo = F(3, 2.0f, 0.7f, false);
+            Check(fn[0] == 0.8f && fn[1] == 0.8f && fn[2] == 0.8f && fn[3] == 0f && fn[4] == 3.0f && fn[5] == 0.8f,
+                  $"新しい並び (データの既定 周期 5): 小技 ×{fn[0]} ×3・チャージ ×{fn[3]} (攻撃しない)・大技 ×{fn[4]}");
+            Check(fo[0] == 0.7f && fo[1] == 0.7f && fo[2] == 2.0f, $"旧い値と旧い作り (周期 3): ×{fo[0]}・×{fo[1]}・×{fo[2]} (チャージも小技の倍率で攻撃)");
             Check(HeavyCycle.Factor(0, 2, 3f, 3f, 0.8f, true) == 1f && HeavyCycle.Factor(3, 0, 3f, 3f, 0.8f, true) == 0.8f && HeavyCycle.TurnsToHeavy(3, 0) == -1
                   && !HeavyCycle.IsCharge(1, 1) && HeavyCycle.Factor(1, 1, 3f, 3f, 0.8f, true) == 3f,
                   "大技の無い敵は 1・起点のターン (周期の 0 番目) は小技・周期 1 にはチャージが無い");
@@ -753,6 +755,38 @@ static class T
                     anySame &= BossDown.ForecastTurn(DownBreakRule.AnyDamage, 1, true, NN, M, 0, 0, false, null, 1, hp0, dmg / 2, dmg - dmg / 2).nextDown
                                == BossDown.NextTurnIsDown(NN, M, 0, 0, hp0 - dmg);
             Check(anySame, "ForecastTurn (AnyDamage) = 旧い NextTurnIsDown (与ダメの後の HP で判定)");
+        }
+
+        // 15. 灰燼の王の〈烈炎〉はシールドで積もる (2026-11-14・作者の決定): そのターンに主攻撃をシールドで肩代わりした量 N (BlazePerShield・既定 10) ごとに +1
+        {
+            const int PS = 10, GT = 2;   // PS = BlazePerShield の既定・GT = 旧い条件の防御の端子の個数 (BlazeBrand.BlockDiceThreshold)
+            Check(HeavyCycle.BlazeGain(BlazeStackRule.Shield, 25, PS, 0, GT) == 2 && HeavyCycle.BlazeGain(BlazeStackRule.Shield, 9, PS, 0, GT) == 0
+                  && HeavyCycle.BlazeGain(BlazeStackRule.Shield, 10, PS, 0, GT) == 1 && HeavyCycle.BlazeGain(BlazeStackRule.Shield, 0, PS, 3, GT) == 0,
+                  "Shield (N=10): シールドで 25 受けたターン → +2・9 → +0・10 → +1・防御の端子の個数は読まない (3 個でもシールド 0 なら +0)");
+            Check(HeavyCycle.BlazeGain(BlazeStackRule.Shield, 9, PS, 0, GT) + HeavyCycle.BlazeGain(BlazeStackRule.Shield, 9, PS, 0, GT) == 0
+                  && HeavyCycle.BlazeGain(BlazeStackRule.Shield, 25, 0, 0, GT) == 0 && HeavyCycle.BlazeGain(BlazeStackRule.Shield, 5, 5, 0, GT) == 1
+                  && HeavyCycle.BlazeGain(BlazeStackRule.Shield, 25, 20, 0, GT) == 1,
+                  "端数は持ち越さない (9 + 9 → +0)・N が 0 以下なら積もらない・N = 5 / 20 で読み替わる");
+            Check(HeavyCycle.BlazeGain(BlazeStackRule.Guard2, 0, PS, 2, GT) == 1 && HeavyCycle.BlazeGain(BlazeStackRule.Guard2, 100, PS, 1, GT) == 0
+                  && HeavyCycle.BlazeGain(BlazeStackRule.Guard2, 0, PS, 3, GT) == 1,
+                  "Guard2 (旧い条件): 防御の端子に 2 個以上で +1・1 個ならシールドで 100 受けても +0");
+            // 本体の進め方の写し: 主攻撃 (シールドが肩代わり) → 業火のターンなら烈炎の分を入れて 0 へ → ターン終了時に積もる
+            //   T1 小技 シールド 25 → 2 / T2 チャージ (攻撃なし) → 2 / T3 業火: 2 × 5 = 10 を入れて 0・業火の主攻撃をシールドで 30 → 3 / T4 業火がダウンで取り消し → 3 を持ち越す
+            int stacks = 0, burstSum = 0;
+            int[] shieldBy = { 25, 0, 30, 0 }; bool[] heavy = { false, false, true, true }; bool[] fired = { false, false, true, false };
+            var trace = new List<string>();
+            for (int t = 0; t < 4; t++)
+            {
+                if (heavy[t])
+                {
+                    if (fired[t]) burstSum += HeavyCycle.BlazeBurst(stacks, 5);
+                    stacks = HeavyCycle.BlazeStacksAfter(stacks, fired[t]);
+                }
+                stacks += HeavyCycle.BlazeGain(BlazeStackRule.Shield, shieldBy[t], PS, 0, GT);
+                trace.Add(stacks.ToString());
+            }
+            string tr = string.Join("|", trace);
+            Check(tr == "2|2|3|3" && burstSum == 10, $"業火で烈炎 × 5 が入り 0 に戻る (2 × 5 = {burstSum})・その業火の主攻撃をシールドで受けた分は次へ積もる・取り消された業火は持ち越す → {tr}");
         }
 
         Console.WriteLine(fails == 0 ? "ALL OK" : fails + " FAILED");

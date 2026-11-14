@@ -190,6 +190,8 @@ total = ProcessDamage結果
 playerDamageNegateCharges>0 → total=0(獣の絆)
 コントラタック(player_contre): total半減 + 軽減量×2を敵へ反射
 − consShield(消費シールド吸収。 盾は T2 以降のターン頭に半減 ── ③-D)
+  吸収した量は ctx.shieldAbsorbedAttackThisTurn ([perTurn]・2026-11-14) にも積む ── 灰燼の王の〈烈炎〉がターン終了時に読む (敵パッシブ表の BlazeBrand)。
+  ここ (主攻撃: 1 回目・〈連撃〉/2 体戦の 2 回目) の吸収だけで、 ③-C の軽減無視の肩代わりは積まない
 痛覚遮断剤【職業/狂戦士 2026-06-28】: painkillerArmedThisTurn && total≥playerHP → total=playerHP−1（HP=1踏みとどまり・チェーン**最後**）
 → (ダメージ適用直前) 仕込み刃【職業/暗殺者 2026-06-28・2026-09-22 に倍率 1→5】: daggerArmed && total>0 → total=0 ＋ **その 5 倍**を enemyHP へ軽減不能で返す（`CombatManager` の仕込み刃の反撃倍率）。使ったターン限りで、被弾しなくても失効
 → 古い手紙【消耗品 2026-10-31】: accumulatedValues[Consumables.OldLetterGuardKey] > 0 → total=0（反撃なし）。仕込み刃の直後・同じく使ったターン限り。1 枚で 3 回使える
@@ -700,7 +702,7 @@ ProcessDamage の中の OnPreDealDamage は「その陣営が攻撃している�
 | AshRegrowth(灰の再生) | OnTurnStart | HP>50% かつ業火でもチャージでもないT（2026-11-14〜・作者の決定: 業火のターンとその 1 ターン前のチャージのターンは回復なし。旧い形 = 口 `ashKingHeavy=False` は予兆Tだけ回復なし）: 最大HP × RegrowthRate（基準 0.03 = 3%・`BossParams`）回復（切り捨て・最低1）。2026-11-14 に直書きの 0.02f を `BossParam.RegrowthRate` へ移し（式は同じ）、同日 0.03 へ |
 | EmberFury(憤怒の残滓) | OnTurnStart | T頭の HP≤50% のT: 攻撃 +FuryAttack（基準 5・2026-11-14 に定数 `EmberFury.Bonus` = 3 から `BossParam.FuryAttack` へ移し、同日 5 へ）（それ以外 0）。**[#104 修正]** 業火の予兆と同じ差分更新（`ember_fury_applied`）。旧: 毎ターン `+=` で積み上がっていた |
 | ScorchedPact(焦土契約) | OnRollWin/OnTurnStart | 収支負けでスタック+1（上限5）。毎T 差分更新で `enemyDiceTotalBonus` に現在スタック×1 を反映（累積しない） |
-| BlazeBrand(烈炎) | OnTurnEnd/OnTurnStart | ブロック端子へ 2 本以上のT終了時に烈炎+1。2026-11-14〜: T開始時の削りは無し（積もった烈炎は〈業火〉で × BlazeBurstPerStack にまとめて返り、撃ったら 0。業火がダウン・〈封じ・揃〉で撃たれなければ持ち越す）。口 `blazeTickEachTurn=True` で旧い削り（T開始時に烈炎の数だけ軽減無視ダメ）も残す |
+| BlazeBrand(烈炎) | OnTurnEnd/OnTurnStart | **2026-11-14〜 (作者の決定)**: T終了時、 そのTに主攻撃をシールドが肩代わりした量 (`ctx.shieldAbsorbedAttackThisTurn`・③-B) ÷ `BlazePerShield` (基準 10・`BossParams`) の切り捨てだけ烈炎+ (端数は持ち越さない・式は `HeavyCycle.BlazeGain`)。軽減無視の肩代わり (③-C・業火の烈炎の分を含む) は数えない。旧い条件 (口 `blazeStackRule=Guard2`): ブロック端子へ 2 本以上のT終了時に烈炎+1。2026-11-14〜: T開始時の削りは無し（積もった烈炎は〈業火〉で × BlazeBurstPerStack にまとめて返り、撃ったら 0。業火がダウン・〈封じ・揃〉で撃たれなければ持ち越す）。口 `blazeTickEachTurn=True` で旧い削り（T開始時に烈炎の数だけ軽減無視ダメ）も残す |
 | Decree13th(13番目の宣告) | OnTurnStart/OnTurnEnd | 1/13でフラグ、本体が生存していれば成就で ceil((playerDiceTotal+enemyDiceTotal)×2.0) を軽減無視で実プレイヤーへ（2.0 は定数。プレイヤーの criticalMultiplier は 2026-08-08 から読まない・シールドは肩代わり） |
 | SaintGeorgesPhases(シュヴァリエ) | 多数 | 開幕プリオリテ1。形態1: シールド = 140−28×プリオリテ（最低28）が主攻撃を吸う・収支プラスのTに (プレイヤーの出目の合計+プリオリテ×7) の不可避反撃＋シールド−25 / 形態2: 連勝報酬（次T ボスの攻撃+4、そのTも収支プラスならボスへ15）・ボスの収支 3 勝で形態1帰還 / 帰還ごとにプリオリテ+1。**[#104 修正]** 形態1の 0d0（`extraDice=−4`）: `EnemyData.RollAttack` が引く回数を max(0, 1 + extra) にしたので、形態1は攻撃ロールを引かない（**基礎攻撃 × 大技・段階の倍率は残る**・「攻撃しない」とは読んでいない）。反撃のHP減と形態2の「ボスへ15」: 収支トリガーの後に CombatManager が ctx の HP を拾う（§9.3）ので残る。旧: 引く回数が max(1, …) で負の値が効かず、HP の増減は FinishTurnCommon の書き戻しで消えていた |
 | RelicScholar(遺物学者) | OnTurnStart/OnTurnEnd | 毎T 遺物を 1 枚抽選（段の切り替え直後は新等級から・天与の才の次Tは 2 枚）。`enemyDiceTotalBonus` = 遺物 + 溜め打ち を `=` で一括代入（停滞の加算は 2026-11-12 #103 で無くなった）。OnTurnEnd で大出血の tick。抽選結果は `MutualTurnTelegraph.drawnRelics` に載るが画面は未配線 |
@@ -927,9 +929,9 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                          / それ以外 → heavyLightMul (小技・2026-11-14 に heavyWindupMul から改名。 それまでは大技以外の全ターン = チャージも含めた倍率だった)
                        式の正本は HeavyCycle.Factor。 チャージのターンは攻撃値 0 で、 解決はダウンと同じ「攻撃しない」の枝 (下の「敵攻撃」)。
                        周期は冷却材の遅延を受けない実ターンで数える (ボスのダウンで起点が戻る・上)。 予告に turnsToHeavy / heavyMul / enemyCharging を出す。
-                       値 (2026-11-14・仮置き): 5 層・5 層裏・ヴェスカ p1〜p4 = 周期 3・小技 ×0.8・チャージ 攻撃なし・大技 ×3.0
+                       値 (2026-11-14・倍率は仮置き): 5 層・5 層裏・ヴェスカ p1〜p4 = 周期 5 (11-14 に 3 → 5・作者の決定)・小技 ×0.8・チャージ 攻撃なし・大技 ×3.0
                          (それまで 小技 = チャージ ×0.7・大技 ×2.0 / ヴェスカ ×1.75)。 深さ 3 のボス = 周期 3・小技 ×0.6・大技 ×2.0 (BossParams.Depth3Heavy*)。
-                       測定の口 enemyHeavySpec="id:小技:大技[:周期],…" (id に * で大技を持つ全員・周期は省略可 = データのまま・2026-11-14) で上書き。
+                       測定の口 enemyHeavySpec="id:小技:大技[:周期],…" (id に * で大技を持つ全員・周期は省略可 = データのまま・2026-11-14) で上書き。 旧い周期 3 へ戻すには周期を明示する ("*:0.8:3.0:3")。
                          周期 N の並びは「小技 × (N−2)・チャージ・大技」(N = 2 はチャージ・大技 / N = 1 は毎ターン大技でチャージなし)。
                          1 周期の平均 (小技 0.8・大技 3.0・チャージ 0): 周期 3 = ×1.27 / 4 = ×1.15 / 5 = ×1.08 (HeavyCycle.CycleMean)。 灰燼の王の周期 (ember) は変えない。
                        対象: 5 層以降のボス (5 層・5 層裏・ヴェスカ p1〜p4)・深さ 3 のボス (BossParams.Depth3Heavy)・6 層 灰燼の王 (2026-11-14〜 大技〈業火〉:

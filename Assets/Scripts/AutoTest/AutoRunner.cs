@@ -271,13 +271,15 @@ namespace AutoTest
         public bool heavyChargeNoAttack = true;
         /// <summary>[測定 2026-11-14] 大技の周期の倍率と周期の上書き ("id:小技:大技[:周期],…"・id に * で大技を持つ敵全部・周期は省略可・CombatSystem.EnemyDatabase.HeavyOverrideSpec)。
         /// 例 "*:0.8:3.0:4" = 大技を持つ全員を周期 4 (小技・小技・チャージ・大技) に (灰燼の王の周期は変えない)。
-        /// 空 (既定) = enemies.json のまま。 旧い値 (2e76c46 の main) は "boss_layer5:0.7:2.0,boss_layer5_hidden:0.7:2.0,boss_layer7:0.7:1.75,boss_layer7_p2:0.7:1.75,boss_layer7_p3:0.7:1.75,boss_layer7_p4:0.7:1.75"。</summary>
+        /// 空 (既定) = enemies.json のまま (2026-11-14〜 周期 5)。 旧い値 (2e76c46 の main・周期 3) は周期を明示して
+        /// "boss_layer5:0.7:2.0:3,boss_layer5_hidden:0.7:2.0:3,boss_layer7:0.7:1.75:3,boss_layer7_p2:0.7:1.75:3,boss_layer7_p3:0.7:1.75:3,boss_layer7_p4:0.7:1.75:3"
+        /// (周期を省くとデータの周期 5 のまま)。 周期 3 だけ戻す (倍率は今のまま) なら "*:0.8:3.0:3"。</summary>
         public string enemyHeavySpec = "";
 
         /// <summary>[測定 2026-11-14] 実効状態の行の「大技の倍率と周期」: 項目ごとに 小技・大技・周期 (省略はデータのまま) と 1 周期の平均の倍率。</summary>
         private string HeavySpecEffectiveText()
         {
-            if (string.IsNullOrEmpty(enemyHeavySpec)) return "enemies.json のまま (周期 3・灰燼の王は HP で 4 / 3)";
+            if (string.IsNullOrEmpty(enemyHeavySpec)) return "enemies.json のまま (周期 5・灰燼の王は HP で 4 / 3)";
             var bad = new List<string>();
             var ci = System.Globalization.CultureInfo.InvariantCulture;
             var parts = new List<string>();
@@ -291,10 +293,14 @@ namespace AutoTest
             return "上書き [" + string.Join(" / ", parts) + "] (灰燼の王の周期は変えない・深さ 3 のボスには効かない)";
         }
         /// <summary>[測定 2026-11-14] 灰燼の王の大技〈業火〉(既定 true)。 false = 旧い形 (大技なし・〈業火の予兆〉の予兆ターンに攻撃 +JudgmentDice)。 本体の GameHooks.AshKingHeavyDisabled へ流す。
-        /// 2e76c46 の main と同じ王は <c>ashKingHeavy=False blazeTickEachTurn=True</c>。</summary>
+        /// 2e76c46 の main と同じ王は <c>ashKingHeavy=False blazeTickEachTurn=True blazeStackRule=Guard2</c>。</summary>
         public bool ashKingHeavy = true;
         /// <summary>[測定 2026-11-14] 〈烈炎〉のターン開始時の削り (烈炎の数だけ軽減無視) を残すか。 既定 false = 削らない (業火でまとめて返る)。 本体の GameHooks.BlazeTickEachTurn へ流す。</summary>
         public bool blazeTickEachTurn = false;
+        /// <summary>[測定 2026-11-14] 灰燼の王の〈烈炎〉が積もる条件 (CombatSystem.BlazeStackRule)。 既定 Shield = そのターンに敵の主攻撃をシールドで肩代わりした量
+        /// N (BossParam.BlazePerShield・既定 10・bossParamSpec "boss_layer6:BlazePerShield:N" で振る) ごとに +1 (作者の決定)。 Guard2 = 旧い条件 (出目 2 個以上を防御の端子に挿したターン +1)。
+        /// 本体の GameHooks.BlazeStack へ流す。 BOT の烈炎の値付けも同じ口を読む。</summary>
+        public CombatSystem.BlazeStackRule blazeStackRule = CombatSystem.BlazeStackRule.Shield;
         /// <summary>[測定 2026-11-13] 深さ 3 のボス 3 体の大技の周期 (CombatSystem.BossParams.Depth3Heavy)。 既定 true = 足す。 false = 旧い作り (大技なし)。
         /// 本体の GameHooks.Depth3HeavyDisabled へ流す。</summary>
         public bool depth3Heavy = true;
@@ -877,6 +883,7 @@ namespace AutoTest
                  + $"/ 大技の倍率と周期 {HeavySpecEffectiveText()} (enemyHeavySpec='{enemyHeavySpec}') "
                  + $"/ 灰燼の王 {(ashKingHeavy ? "大技〈業火〉(攻撃 ×大技 + 烈炎 × 業火の倍率・チャージは攻撃しない)" : "旧い形 (予兆のターンに攻撃 +N)")} (ashKingHeavy={ashKingHeavy}) "
                  + $"/ 烈炎の毎ターンの削り {(blazeTickEachTurn ? "あり (旧い形)" : "なし")} (blazeTickEachTurn={blazeTickEachTurn}) "
+                 + $"/ 烈炎の積もり方 {(blazeStackRule == CombatSystem.BlazeStackRule.Guard2 ? "出目 2 個以上を防御に挿したターン +1 (旧い条件)" : "主攻撃をシールドで " + BossParamSpec.Effective(BossParamOverrides, GameLoop.BossIds.Layer6Ash, CombatSystem.BossParam.BlazePerShield).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " 受けるごとに +1")} (blazeStackRule={blazeStackRule}) "
                  + $"/ ダウンの狙い {(downAimPolicy == DownAimPolicy.Aim ? (downCancelRule == CombatSystem.DownCancelRule.Always ? "大技が 2 ターン後なら待って大技に重ねる手も比べる" : "待つとダウンがチャージか大技に重なるなら待つ手も比べる") : "割れる時に割る (今まで)")} (downAimPolicy={downAimPolicy}・待つ得の割引 {(downAimGainShare >= 0f ? downAimGainShare.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) : "帳簿と同じ " + v3.ledgerFutureShare.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))} (downAimGainShare={downAimGainShare.ToString(System.Globalization.CultureInfo.InvariantCulture)})) "
                  + $"/ 深さ 3 のボスの大技 {(depth3Heavy ? "あり" : "なし (旧い作り)")} "
                  + $"/ 博士の時計 {(vescaClockHeld ? "ランの最初から預かる (ヴェスカの各段に目盛り +" + CombatSystem.BossParams.VescaClockNotch.ToString("0.00") + ")" : "預からない (イベントで選んだ時だけ)")} (vescaClockHeld={vescaClockHeld}) "
@@ -1186,7 +1193,7 @@ namespace AutoTest
             }
         }
 
-        /// <summary>[測定 2026-11-14] 灰燼の王の 5 つの値 (基礎の攻撃・最大 HP・予兆・憤怒・再生) の効いている値。 どれも上書きしていない時は空。</summary>
+        /// <summary>[測定 2026-11-14] 灰燼の王の値 (基礎の攻撃・最大 HP・予兆・業火の烈炎・烈炎の積もり・憤怒・再生) の効いている値。 どれも上書きしていない時は空。</summary>
         private string AshKingEffectiveText()
         {
             string id = GameLoop.BossIds.Layer6Ash;
@@ -1200,6 +1207,7 @@ namespace AutoTest
             return $"/ 灰燼の王 (上書きあり) 基礎の攻撃 {(e != null ? e.baseAttack.ToString() : "?")} 最大 HP {(e != null ? e.maxHP.ToString() : "?")}"
                  + $" 予兆 +{BossParamSpec.Effective(o, id, CombatSystem.BossParam.JudgmentDice).ToString("0.##", ci)}{(ashKingHeavy ? " (業火の形では使わない)" : "")}"
                  + $" 業火の烈炎 1 つあたり {BossParamSpec.Effective(o, id, CombatSystem.BossParam.BlazeBurstPerStack).ToString("0.##", ci)}{(ashKingHeavy ? "" : " (旧い形では使わない)")}"
+                 + $" 烈炎の積もり シールド {BossParamSpec.Effective(o, id, CombatSystem.BossParam.BlazePerShield).ToString("0.##", ci)} ごとに +1{(blazeStackRule == CombatSystem.BlazeStackRule.Shield ? "" : " (Guard2 では使わない)")}"
                  + $" 憤怒 +{BossParamSpec.Effective(o, id, CombatSystem.BossParam.FuryAttack).ToString("0.##", ci)}"
                  + $" 再生 {(BossParamSpec.Effective(o, id, CombatSystem.BossParam.RegrowthRate) * 100f).ToString("0.##", ci)}%"
                  + $" (enemyAttackSpec='{enemyAttackSpec}' enemyHpSpec='{enemyHpSpec}' bossParamSpec='{bossParamSpec}') ";

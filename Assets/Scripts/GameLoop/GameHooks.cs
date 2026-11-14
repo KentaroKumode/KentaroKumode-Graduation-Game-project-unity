@@ -178,6 +178,10 @@ namespace GameLoop
         /// <summary>[測定 2026-11-14] true = 〈烈炎〉のターン開始時の削り (烈炎の数だけ軽減無視) を残す (旧い形)。 既定 false = 削らない (積もった烈炎は〈業火〉でまとめて返る)。
         /// AutoRunner.blazeTickEachTurn が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
         public static bool BlazeTickEachTurn;
+        /// <summary>[測定 2026-11-14] 灰燼の王の〈烈炎〉が積もる条件 (<see cref="CombatSystem.HeavyCycle.BlazeGain"/>)。 既定 Shield = そのターンに敵の主攻撃を
+        /// シールドで肩代わりした量 N (<see cref="CombatSystem.BossParam.BlazePerShield"/>) ごとに +1 (作者の決定)。 Guard2 = 旧い条件 (出目 2 個以上を防御の端子に挿したターン +1)。
+        /// AutoRunner.blazeStackRule が毎ランの始めに入れ、 ラン終了で Shield へ戻す。 BOT の値付けも同じ口を読む。</summary>
+        public static CombatSystem.BlazeStackRule BlazeStack = CombatSystem.BlazeStackRule.Shield;
         /// <summary>[測定 2026-11-13] true = 深さ 3 のボス 3 体に大技の周期を足さない旧い作り。 既定 false = 足す
         /// (<see cref="CombatSystem.BossParams.Depth3Heavy"/>)。 AutoRunner.depth3Heavy が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
         public static bool Depth3HeavyDisabled;

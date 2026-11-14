@@ -44,6 +44,16 @@ namespace CombatSystem
         /// <summary>〈業火〉のターンの後の烈炎: 撃った (<paramref name="fired"/>) なら 0、 撃たなかった (ダウン・チャージ・〈封じ・揃〉で攻撃しなかった) なら持ち越す。</summary>
         public static int BlazeStacksAfter(int stacks, bool fired) => fired ? 0 : stacks;
 
+        /// <summary>〈烈炎〉がターン終了時に積もる数 (2026-11-14・作者の決定)。 本体 (BlazeBrand)・BOT の値付け・検算が同じ式を通す。
+        /// <see cref="BlazeStackRule.Shield"/> (既定) = そのターンに敵の主攻撃をシールドで肩代わりした量 <paramref name="shieldAbsorbed"/> を
+        /// <paramref name="perShield"/> で割った数 (切り捨て・端数は次のターンへ持ち越さない・<paramref name="perShield"/> が 0 以下なら 0)。
+        /// <see cref="BlazeStackRule.Guard2"/> (旧い条件) = 防御の端子に挿した出目の個数 <paramref name="guardDice"/> が <paramref name="guardThreshold"/> 以上なら 1。</summary>
+        public static int BlazeGain(BlazeStackRule rule, int shieldAbsorbed, int perShield, int guardDice, int guardThreshold)
+        {
+            if (rule == BlazeStackRule.Guard2) return guardDice >= guardThreshold ? 1 : 0;
+            return perShield > 0 && shieldAbsorbed > 0 ? shieldAbsorbed / perShield : 0;
+        }
+
         // ---- 測定の口 enemyHeavySpec の読み方 (2026-11-14・Unity なしの検算と共有) ----
 
         /// <summary>enemyHeavySpec の 1 項目。 <see cref="period"/> = 0 なら周期は敵データのまま。</summary>
@@ -86,5 +96,14 @@ namespace CombatSystem
             for (int c = 1; c <= period; c++) sum += Factor(period, c, heavyMul, heavyMul, lightMul, chargeNoAttack);
             return sum / period;
         }
+    }
+
+    /// <summary>灰燼の王の〈烈炎〉が積もる条件 (2026-11-14・測定の口 <c>blazeStackRule</c>・<see cref="HeavyCycle.BlazeGain"/>)。</summary>
+    public enum BlazeStackRule
+    {
+        /// <summary>既定 (2026-11-14〜・作者の決定): そのターンに敵の主攻撃をシールドで肩代わりした量 N (BossParam.BlazePerShield) ごとに +1。</summary>
+        Shield = 0,
+        /// <summary>旧い条件 (2026-08-04〜11-14): 出目 2 個以上を防御の端子に挿したターン +1。</summary>
+        Guard2 = 1,
     }
 }

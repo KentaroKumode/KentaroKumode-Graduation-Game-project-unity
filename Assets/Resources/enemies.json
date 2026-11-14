@@ -1362,7 +1362,7 @@
       "baseAttack": 10,
       "attackRollMin": 2,
       "attackRollMax": 4,
-      "heavyPeriod": 3,
+      "heavyPeriod": 5,
       "heavyMul": 3.0,
       "heavyLightMul": 0.8
     },
@@ -1393,7 +1393,7 @@
       "baseAttack": 10,
       "attackRollMin": 2,
       "attackRollMax": 3,
-      "heavyPeriod": 3,
+      "heavyPeriod": 5,
       "heavyMul": 3.0,
       "heavyLightMul": 0.8
     },
@@ -1435,7 +1435,7 @@
         {
           "internalName": "BlazeBrand",
           "skillName": "烈炎",
-          "description": "出目2個以上に防御の端子を挿したターン終了時、烈炎+1。積もった烈炎は業火で返ってくる。",
+          "description": "ターン終了時、そのターンにシールドで受けた攻撃{BlazePerShield}ごとに烈炎+1。積もった烈炎は業火で返ってくる。",
           "flavorText": "盾を構えるほど、灰は厚く積もる。焼かれているのは腕ではなく、迷っている時間の方だ。"
         }
       ],
@@ -1492,7 +1492,7 @@
       "baseAttack": 10,
       "attackRollMin": 2,
       "attackRollMax": 6,
-      "heavyPeriod": 3,
+      "heavyPeriod": 5,
       "heavyMul": 3.0,
       "heavyLightMul": 0.8
     },
@@ -1541,7 +1541,7 @@
       "baseAttack": 10,
       "attackRollMin": 2,
       "attackRollMax": 5,
-      "heavyPeriod": 3,
+      "heavyPeriod": 5,
       "heavyMul": 3.0,
       "heavyLightMul": 0.8
     },
@@ -1590,7 +1590,7 @@
       "baseAttack": 10,
       "attackRollMin": 2,
       "attackRollMax": 7,
-      "heavyPeriod": 3,
+      "heavyPeriod": 5,
       "heavyMul": 3.0,
       "heavyLightMul": 0.8
     },
@@ -1639,7 +1639,7 @@
       "baseAttack": 10,
       "attackRollMin": 2,
       "attackRollMax": 9,
-      "heavyPeriod": 3,
+      "heavyPeriod": 5,
       "heavyMul": 3.0,
       "heavyLightMul": 0.8
     }
