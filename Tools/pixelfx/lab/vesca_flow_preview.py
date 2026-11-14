@@ -117,23 +117,34 @@ subprocess.run(["node", "lab/shard_dump.mjs", os.path.join(OUT, "shards.json")],
 GEOM = json.load(io.open(os.path.join(OUT, "shards.json"), encoding="utf-8"))["frames"]
 while len(sha) > 1 and empty(sha[-1]): sha.pop()
 while len(off) > 1 and empty(off[-1]): off.pop()
-base = stage(); head = [(base.copy(), "ヴェスカのチャージのターン")] * 3
-for i, f in enumerate(chg):
-    b = dark(base.copy(), DARK * min(1.0, i / 6.0)); b.paste(f, (0, 0), f); head.append((b, "ヴェスカのチャージのターン: チャージ"))
-for r in range(1):
-    for f in idle:
-        b = dark(base.copy(), DARK); b.paste(f, (0, 0), f); head.append((b, "プレイヤーの手番: 待機 (ループ)"))
+base = stage()
+chg4 = frames("flow_charge4", "dicebound/vesca-charge", {"broken": True}); idle4 = frames("flow_idle4", "dicebound/vesca-charged", {"broken": True})
+def head_of(c, d):
+    h = [(base.copy(), "ヴェスカのチャージのターン")] * 3
+    for i, f in enumerate(c):
+        b = dark(base.copy(), DARK * min(1.0, i / 6.0)); b.paste(f, (0, 0), f); h.append((b, "ヴェスカのチャージのターン: チャージ"))
+    for f in d:
+        b = dark(base.copy(), DARK); b.paste(f, (0, 0), f); h.append((b, "プレイヤーの手番: 待機 (ループ)"))
+    return h
+head = head_of(chg, idle); head4 = head_of(chg4, idle4)
+# 4 段目は、 チャージと待機の間も、 画面そのものがときどき乱れる (弱く・短く)。 チャージ = 後半へ向けて少しずつ増える・待機 = 6 コマに 1 回、 1〜2 コマだけ
+TEAR_CHARGE = [0.0] * 6 + [0.08, 0, 0.1, 0, 0, 0.14, 0.1, 0, 0.18, 0, 0.2, 0.25, 0.4, 0.3, 0.12, 0, 0.1]
+TEAR_IDLE = [0.22 if i % 6 == 2 else 0.12 if i % 6 == 3 else 0.0 for i in range(len(idle4))]
+BANDS_CHARGE = tear_bands(TEAR_CHARGE, seed=11); BANDS_IDLE = tear_bands(TEAR_IDLE, seed=12)
+for i, bd in enumerate(BANDS_CHARGE + BANDS_IDLE):
+    if bd and 3 + i < len(head4): head4[3 + i] = (torn(head4[3 + i][0], bd), head4[3 + i][1])
 cards = []
 n1 = int(LEAD * 8)
 # 4 段目の乱れの強さ (大技のターンの頭からのコマごと): 溜め 8 コマ・乱れ 7 コマ・信号が切れて戻るまで (黒い間は見えない)・戻った直後の 5 コマ
 # 溜め 8 コマ・乱れ 4 コマ・止まって 8 コマ (帯だけずれ続ける)・乱れの残り・信号が切れて戻るまで (黒い間は見えない)・戻った直後
-TEAR = [0.1, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75] + [1.0] * HOLD_AT + ["hold"] * (HOLD_N + 1) + [1.0] * (int(GLITCH * 8) - HOLD_AT - 1) + [0.0] * 6 + [0.7, 0.6, 0.5, 0.4, 0.3, 0.22, 0.14, 0.08, 0.04]
+TEAR = [0.1, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75] + [1.0] * HOLD_AT + ["hold"] * (HOLD_N + 1) + [1.0] * (int(GLITCH * 8) - HOLD_AT - 1) + [0.0] * 16 + [0.7, 0.6, 0.5, 0.4, 0.3, 0.22, 0.14, 0.08, 0.04]
 BANDS = tear_bands(TEAR)
-io.open(os.path.join(OUT, "tear.json"), "w", encoding="utf-8").write(json.dumps({"fps": 8, "w": W, "h": H, "frames": BANDS}))
+# 帯の表: charge = チャージの 23 コマ・idle = 待機の 24 コマ (ループ)・frames = 大技のターンの頭から
+io.open(os.path.join(OUT, "tear.json"), "w", encoding="utf-8").write(json.dumps({"fps": 8, "w": W, "h": H, "charge": BANDS_CHARGE, "idle": BANDS_IDLE, "frames": BANDS}))
 for key, title, lead, parts in (
         ("p123", "1〜3 段目: 時が止まり、 凍った画面が砕ける", stop, [(sha, "ヴェスカの大技 (1〜3 段目): 画面が凍る → ひび → 砕ける", 4)]),
         ("p4", "4 段目 (天与) だけ: 時が壊れ、 画面が乱れて、 信号が切れる", lost, [(gli[:HOLD_AT], "ヴェスカの大技 (4 段目): 画面が乱れる", -1), ([gli[HOLD_AT]] * (HOLD_N + 1), "ヴェスカの大技 (4 段目): 乱れたまま止まる (ゆっくりずれていく)", -1), (gli[HOLD_AT + 1:int(GLITCH * 8)], "ヴェスカの大技 (4 段目): 画面が乱れる", -1), (off, "ヴェスカの大技 (4 段目): 信号が切れる → 戻る", -1)])):
-    seq = list(head); h0 = len(seq)
+    seq = list(head4 if key == "p4" else head); h0 = len(seq)
     for i in range(n1):
         b = dark(base.copy(), DARK); f = lead[min(i, len(lead) - 1)]; b.paste(f, (0, 0), f)
         seq.append((b, "ヴェスカの大技のターン: " + ("針が遅くなって止まる" if key == "p123" else "針が暴れ、 文字盤がずれる")))
@@ -155,13 +166,14 @@ for key, title, lead, parts in (
     for q, i in enumerate(picks): o.paste(seq[i][0], ((q % 4) * W, (q // 4) * H))
     o.save(os.path.join(OUT, key + "_contact.png"))
     cards.append('<h2>%s</h2><img src="%s.gif"><p>大技のターンのコマの抜き出し</p><div class="s"><img loading="lazy" src="%s_contact.png"></div>' % (title, key, key))
-o = Image.new("RGB", (W * 4, H), (0, 0, 0))
-for q, i in enumerate([3 + 12, 3 + 14, 3 + len(chg) + 1, 3 + len(chg) + 13]): o.paste(head[i][0], (q * W, 0))
+o = Image.new("RGB", (W * 4, H * 2), (0, 0, 0))
+for r, hd in enumerate((head, head4)):
+    for q, i in enumerate([3 + 10, 3 + 14, 3 + len(chg) + 1, 3 + len(chg) + 13]): o.paste(hd[i][0], (q * W, r * H))
 o.save(os.path.join(OUT, "charge_contact.png"))
 io.open(os.path.join(OUT, "flow.html"), "w", encoding="utf-8").write('''<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>ヴェスカ 一連の流れ</title>
 <style>body{margin:0;background:#100e14;color:#e4def0;font:14px/1.6 "Yu Gothic UI",sans-serif}main{max-width:1960px;margin:0 auto;padding:16px 16px 80px}
 h1{font-size:20px;margin:0}h2{font-size:17px;margin:30px 0 6px}p{color:#a39ab4;margin:6px 0 0}img{image-rendering:pixelated;display:block;max-width:100%}.s{overflow-x:auto;margin-top:6px}.s img{max-width:none}</style></head><body><main>
 <h1>ヴェスカの大技: 一連の流れ (試作・2 本)</h1>
 <p>チャージと待機 (虚の玉の上に時計の文字盤・長針は逆回り、 短針は順回り) は共通。 大技は、 1〜3 段目で 1 つ、 4 段目だけの物が 1 つ。 1 秒 8 コマ・2 倍・背景と敵と下の枠は仮。</p>
-<h2>チャージ完了の前後と、 待機</h2><div class="s"><img src="charge_contact.png"></div>''' + "".join(cards) + "</main></body></html>")
+<h2>チャージ完了の前後と、 待機 (上 = 1〜3 段目・下 = 4 段目の壊れかけ)</h2><div class="s"><img src="charge_contact.png"></div>''' + "".join(cards) + "</main></body></html>")
 print(len(chg), len(idle), len(stop), len(sha), len(lost), len(gli), len(off))

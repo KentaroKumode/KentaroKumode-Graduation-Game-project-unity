@@ -6,7 +6,7 @@
 //   針はカチカチ進めず滑らかに回す・まわりの粒を止めない (止まった粒は安っぽい)。
 // The gathering streaks, grit and rings are adapted from this repository's explosions/implosion; the orb, vortex and motes are its shadow/void-orb, drawn as is;
 // the clock face follows its arcane/time-stop (after Sprite Fusion's open-source effects, https://www.spritefusion.com/pixel-art-vfx), MIT License, Copyright (c) 2026 Hugo Duprez.
-import { Particles, P, Rng, fit, hex, mix, clamp, ease, TAU, WHITE } from "../../core/index.js";
+import { Particles, P, Rng, fit, hex, mix, clamp, ease, rand, TAU, WHITE } from "../../core/index.js";
 import * as ORB from "../shadow/void-orb.js";
 
 export const VIOLET = ["#0a0614", "#1c1236", "#3a2470", "#5a3aa8", "#8a64e0", "#b89cf8", "#e4d8ff", "#ffffff"];
@@ -21,7 +21,8 @@ export const meta = {
   loop: false,
   fps: 30,
   bg: "dark",
-  options: { palette: VIOLET, seed: 6 },
+  // broken = 4 段目 (天与) 用: 壊れかけの時計。 吸い込みが震え、 文字盤の輪が欠け、 針が 3 本になって、 1 本は飛び飛びに跳ね、 1 本は速く逆回りし、 ときどき二重にぶれる
+  options: { palette: VIOLET, broken: false, seed: 6 },
 };
 
 const HANDOFF = 2.75 + 1 / 8;   // 待機の 0 秒 = 最後のコマの 1 コマ後 (library/dicebound/judge-flow.md の「道具の罠」)
@@ -50,10 +51,12 @@ function bar(p, x0, y0, ang, a0, a1, w0, w1, col) {
 }
 
 /** 時計の文字盤: 2 ドットの輪・12 の目盛り (3 時間ごとは太く長い)・長針と短針 (根もとが太く、 先が細い・短い尾)・中心の留め。 open = 開き具合。 col = 全部この色で (白く抜く時)。 */
-export function clock(p, C, x0, y0, aLong, aShort, open = 1, col = null) {
+export function clock(p, C, x0, y0, aLong, aShort, open = 1, col = null, aThird = null) {
   const R = RC * open;
   if (R < 4) return;
-  p.ring(x0, y0, R, 2, col ?? C[5]);
+  // aThird があれば壊れかけ: 輪が 2 か所欠け、 細い 3 本目の針が付く
+  p.ring(x0, y0, R, 2, col ?? C[5], aThird === null ? 1 : (v, g) => { const a = ((g % TAU) + TAU) % TAU; return (a > 0.7 && a < 1.25) || (a > 3.6 && a < 3.85) ? 0 : 1; });
+  if (aThird !== null) bar(p, x0, y0, aThird, -2, R * 0.95, 1.2, 1.2, col ?? C[4]);
   p.ring(x0, y0, R + 4, 1, col ?? C[3], (v, g) => (Math.floor((g / TAU) * 60) % 2 ? 0.9 : 0));   // 外の破線の輪
   for (let i = 0; i < 12; i++) {
     const big = i % 3 === 0;
@@ -66,14 +69,19 @@ export function clock(p, C, x0, y0, aLong, aShort, open = 1, col = null) {
 }
 
 /** 溜まった状態の姿 (待機のループ 1 コマぶん)。 玉の上に文字盤。 長針は逆回り・短針は順回りで、 1 周 (3 秒) に 1 回転ずつ ── 滑らかに回り続ける。 */
-export function held(p, C, tv, open = 1, col = null) {
-  orb(p, C, tv, Math.min(1, open));
+export function held(p, C, tv, open = 1, col = null, broken = false) {
   const a = (TAU * tv) / HELD;
-  clock(p, C, 0, 0, NOON - a, NOON + a, open, col);
+  if (!broken) { orb(p, C, tv, Math.min(1, open)); clock(p, C, 0, 0, NOON - a, NOON + a, open, col); return; }
+  // 壊れかけ (4 段目): 渦は 2 倍の速さ。 長針は 2 コマごとに、 でたらめな目盛りへ跳ぶ。 短針は 3 倍の速さで逆回り。 細い 3 本目が 2 倍で順回り。
+  // 6 コマに 1 回ほど、 文字盤が横へぶれて二重に見える (1 コマだけ)。 どれも 1 周 (24 コマ) で同じ並びに戻るので、 ループは継ぎ目なく回る
+  const f = ((Math.floor(tv * 8 + 1e-4) % 24) + 24) % 24, jump = Math.floor(rand(f >> 1, 3, 41) * 12), blur = rand(f, 5, 41) < 0.17 ? Math.round((rand(f, 6, 41) - 0.5) * 22) : 0;
+  orb(p, C, tv * 2, Math.min(1, open));
+  if (blur) clock(p, C, blur, 0, NOON + (jump * TAU) / 12 + 0.6, NOON - a * 3 - 0.5, open, col ?? C[3], NOON + a * 2);
+  clock(p, C, blur ? -Math.sign(blur) * 2 : 0, 0, NOON + (jump * TAU) / 12, NOON - a * 3, open, col, NOON + a * 2);
 }
 
 export function create(o) {
-  const C = fit(o.palette, 8), R = new Rng(o.seed);
+  const C = fit(o.palette, 8), R = new Rng(o.seed), BR = !!o.broken;
   const ps = new Particles({ rng: R, sparks: [C[7], C[6], C[5], C[4]] });
   const grit = Array.from({ length: 100 }, () => {
     const t0 = R.range(0, SUCK - 0.5);
@@ -99,13 +107,18 @@ export function create(o) {
         for (let i = 0; i < 4; i++) {
           const u = (t - i * 0.32) / 0.62;
           if (u <= 0 || u >= 1) continue;
-          p.ring(0, 0, (150 - i * 18) * (1 - ease.inQuad(u)) + 8, 1, u > 0.7 ? C[6] : u > 0.4 ? C[5] : C[3], 0.35 + 0.65 * u);
+          // 壊れかけ: 輪は切れ切れで、 1 コマごとに中心が数ドットずれる
+          const f8 = Math.floor(t * 8), jx = BR ? Math.round((rand(f8, i, 1) - 0.5) * 14) : 0, al = 0.35 + 0.65 * u;
+          p.ring(jx, 0, (150 - i * 18) * (1 - ease.inQuad(u)) + 8, 1, u > 0.7 ? C[6] : u > 0.4 ? C[5] : C[3], BR ? (v, g) => (Math.floor((g / TAU) * 14 + f8) % 3 ? al : 0) : al);
         }
         for (const q of grit) {
           const u = (t - q.t0) / q.T;
           if (u <= 0 || u >= 1) continue;
           const d = q.d * (1 - ease.inCubic(u)), a = q.a + q.spin * ease.inQuad(u) * 2, d2 = d + 5 * u * u + 0.5;
-          p.line(Math.cos(a - q.spin * 0.1) * d2, Math.sin(a - q.spin * 0.1) * d2 * 0.75, Math.cos(a) * d, Math.sin(a) * d * 0.75, (v) => (v < 0.5 ? mix(q.c, VOID, 0.4) : q.c));
+          // 壊れかけ: 粒が 1 コマごとに横へ震え、 3 つに 1 つは二重に見える
+          const gi = Math.round(q.d * 7), jx = BR ? Math.round((rand(Math.floor(t * 8), gi, 2) - 0.5) * 10) : 0;
+          if (BR && gi % 3 === 0) p.line(Math.cos(a - q.spin * 0.1) * d2 - jx * 2 + 6, Math.sin(a - q.spin * 0.1) * d2 * 0.75, Math.cos(a) * d - jx * 2 + 6, Math.sin(a) * d * 0.75, C[3]);
+          p.line(Math.cos(a - q.spin * 0.1) * d2 + jx, Math.sin(a - q.spin * 0.1) * d2 * 0.75, Math.cos(a) * d + jx, Math.sin(a) * d * 0.75, (v) => (v < 0.5 ? mix(q.c, VOID, 0.4) : q.c));
         }
         // 芯: 集まるほど大きい、 黒い玉 (縁だけ明るい)。 完了で虚の玉になる
         const cr = 2 + 9 * k * k;
@@ -115,8 +128,10 @@ export function create(o) {
       } else {
         // チャージ完了: 玉が濃くなりながら、 文字盤が開く (0.3 秒・少し行き過ぎて戻る)。 白い輪が 1 つ広がって消える。 ここからは待機と同じ絵
         const q = clamp((t - SUCK) / 0.3);
-        held(p, C, t - HANDOFF, q >= 1 ? 1 : ease.outBack(q) * 0.999);
+        held(p, C, t - HANDOFF, q >= 1 ? 1 : ease.outBack(q) * 0.999, null, BR);
         if (q < 1) p.ring(0, 0, RC + 80 * q, 2, WHITE, 1 - q);
+        // 壊れかけ: 開く瞬間、 文字盤が左右に二重三重にぶれる
+        if (BR && q < 1) for (const dx of [-26, 18, -9]) clock(p, C, dx * (1 - q), 0, NOON + dx, NOON - dx, 1, C[3], NOON + dx * 2);
       }
       ps.draw(p);
     },

@@ -15,9 +15,9 @@ export const meta = {
   loop: true,
   fps: 30,
   bg: "dark",
-  options: { palette: VIOLET },
+  options: { palette: VIOLET, broken: false },   // broken = 4 段目用 (壊れかけの時計・vesca-charge.js の held())
 };
 
 export function draw(p, t, o) {
-  held(p, fit(o.palette, 8), t, 1);
+  held(p, fit(o.palette, 8), t, 1, null, !!o.broken);
 }
