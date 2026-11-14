@@ -22,6 +22,9 @@ namespace UI.Game2D
     ///
     /// <para>既定は画面のフレームごとに描き直す (<see cref="fps"/> = 0)。 出している間は地図と GameManager のキー入力を止める
     /// (<see cref="GameManager.InputBlockedByScreen"/>)。 BOT がランを動かしている間は出さない。</para>
+    ///
+    /// <para><b>層の演出の絵を読む待ち時間を兼ねる</b> (2026-11-15): 出す瞬間に <see cref="Battle.FxLayerPreload.BeginLayer"/> がその層で使い得る絵を読み始め
+    /// (止まらない・主スレッドの外)、 読み終わるまで「クリックで進む」を受けない (測量の 3.5 秒より長く掛かる時だけ、 待ちが延びる)。</para>
     /// </summary>
     public class Game2DLoadingScreen : MonoBehaviour
     {
@@ -164,6 +167,7 @@ namespace UI.Game2D
             if (gm.CurrentPhase == GameManager.GamePhase.MapNavigation && run != null && (run != _lastRun || run.currentFloor != _lastFloor) && gm.FreeMap != null)
             {
                 _lastRun = run; _lastFloor = run.currentFloor;
+                Battle.FxLayerPreload.BeginLayer(run);                         // この層の演出の絵を読み始める (止まらない・読み終わるまでクリックを受けない)
                 Play(gm.FreeMap, "第 " + run.currentFloor + " 層");
             }
             if (gm.CurrentPhase == GameManager.GamePhase.Title) { _lastRun = null; _lastFloor = int.MinValue; }
@@ -188,8 +192,9 @@ namespace UI.Game2D
                     break;
                 case Stage.Show:
                     // クリックで進む (時間では閉じない)。 **測量が最後まで終わるまでは受けない** ── 受理の押し込みやダブルクリックの余りで
-                    // 途中から抜けてしまわないように (2026-11-01)。 押した瞬間の入力は地図へ流さない
-                    if (press && _t >= sweepSeconds) { GameManager.ScreenUsedSpaceFrame = Time.frameCount; _stage = Stage.Exit; _stageT = 0f; Game2DSfx.Play("ui_confirm"); }
+                    // 途中から抜けてしまわないように (2026-11-01)。 押した瞬間の入力は地図へ流さない。
+                    //   2026-11-15〜 この層の演出の絵 (Battle.FxLayerPreload) を読み終わるまでも受けない ── 戦闘の入り・戦闘中に読まないため
+                    if (press && Ready) { GameManager.ScreenUsedSpaceFrame = Time.frameCount; _stage = Stage.Exit; _stageT = 0f; Game2DSfx.Play("ui_confirm"); }
                     break;
                 case Stage.Exit:
                     if (_stageT >= exitSeconds) { Stop(); return; }
@@ -350,10 +355,14 @@ namespace UI.Game2D
             int tipLines = (TipBox.height - 32 - Game2DJpFont.Cell - 4) / Game2DJpFont.LineH;
             JpWrap(_tip, TipBox.x, TipBox.y + 32, TipBox.width, Ink, tipLines);
             // 進む合図: 測り終えたら明滅 (クリックを待っている)
-            if (!done || (int)(tt * 2.5f) % 2 == 0) Jp("クリックで進む", TipBox.x, TipBox.yMax - Game2DJpFont.Cell, done ? Ink : Dim);
+            bool ready = done && !Battle.FxLayerPreload.Busy;                // 演出の絵を読み終わるまでは、 測り終えても暗いまま (押せない)
+            if (!ready || (int)(tt * 2.5f) % 2 == 0) Jp("クリックで進む", TipBox.x, TipBox.yMax - Game2DJpFont.Cell, ready ? Ink : Dim);
 
             _tex.SetPixels32(_out); _tex.Apply(false);
         }
+
+        /// <summary>進んでよいか: 測量が最後まで終わり、 この層の演出の絵を読み終えた。</summary>
+        private bool Ready => _t >= sweepSeconds && !Battle.FxLayerPreload.Busy;
 
         private bool Seen(int i, float sweep, bool done) => done || _ang[i] <= sweep;
 

@@ -61,6 +61,7 @@ namespace UI.Game2D.Battle
             Runner.Cancel(); Runner.State = "idle";      // 前の戦闘の go= を残さない
             Fx?.QaClear();                               // 前のボスの待機・暗幕・流れている絵を消す
             Game2DBattleFx.QaMoveLog.Clear();
+            FxLayerPreload.LoadForEnemyNow(enemyId, run.equippedWeaponId);      // 層を経ないので、 その敵と武器の絵をここで止まって読む (戦闘中に読まないように)
             bool ok = gm.QaStartCombat(enemyId);
             Sim?.QaNewCombat();                          // 戦闘の画面を入り直させる (HP・武器・敵を読み直す。 戦闘開始の知らせの購読に頼らない)
             Game2DLoadingScreen.QaDismiss();      // 新しいランの「第 N 層」のロード画面を出さない (戦闘の画面を覆い、 閉じるまで Go が効かない)
@@ -146,27 +147,34 @@ namespace UI.Game2D.Battle
         /// 例: <c>UI.Game2D.Battle.QaBattle.DumpGuiWeight("C:/tmp/w.png")</c>。 地図がまだ無ければ false。</summary>
         public static bool DumpGuiWeight(string path) => Game2DGuiRt.QaDumpWeight(path);
 
-        /// <summary>いま読み込んである絵の一覧: 名前・持っている量の見積もり (バイト)・帯にしなかった時の量・読み込みに掛かった時間 (ミリ秒)。 大きい順・最後に合計。
+        /// <summary>いま読み込んである絵の一覧: 名前・持っている量の見積もり (バイト)・帯にしなかった時の量・読み込みに掛かった時間 (ミリ秒・頼んでから使えるまで) と、 そのうち主スレッドで使った時間。 大きい順・最後に合計。
         /// 例: <c>UI.Game2D.Battle.QaBattle.FxMemory()</c></summary>
         public static string FxMemory()
         {
             var l = new System.Collections.Generic.List<FxSheet>(FxSheet.Loaded);
             l.Sort((a, b) => b.Bytes.CompareTo(a.Bytes));
-            var sb = new System.Text.StringBuilder(); long sum = 0, plain = 0; float ms = 0f;
-            foreach (var s in l) { sb.Append($"{s.Name}\t{s.Bytes}\t(帯なし {s.BytesPlain})\t{s.LoadMs:0.0} ms\n"); sum += s.Bytes; plain += s.BytesPlain; ms += s.LoadMs; }
-            sb.Append($"合計 {l.Count} 枚\t{sum} B ({sum / 1048576f:0.0} MB)\t(帯なし {plain / 1048576f:0.0} MB)\t読み込み {ms:0} ms");
+            var sb = new System.Text.StringBuilder(); long sum = 0, plain = 0; float ms = 0f, main = 0f;
+            foreach (var s in l) { sb.Append($"{s.Name}\t{s.Bytes}\t(帯なし {s.BytesPlain})\t{s.LoadMs:0.0} ms (主スレッド {s.MainMs:0.0} ms)\n"); sum += s.Bytes; plain += s.BytesPlain; ms += s.LoadMs; main += s.MainMs; }
+            sb.Append($"合計 {l.Count} 枚\t{sum} B ({sum / 1048576f:0.0} MB)\t(帯なし {plain / 1048576f:0.0} MB)\t読み込み {ms:0} ms (頼んでから使えるまでの和・並行に進む)\t主スレッド {main:0} ms");
             return sb.ToString();
         }
 
         /// <summary>直近の大技の間の、 1 フレームの最大時間 (ミリ秒) と、 戦闘演出の部品の処理の最大時間。 例: "frame=33.4 fx=6.1"。</summary>
         public static string HeavyFrameMs() => $"frame={Game2DBattleFx.QaHeavyMaxFrameMs:0.0} fx={Game2DBattleFx.QaHeavyMaxFxMs:0.0}";
 
+        /// <summary>戦闘の入り (切り替わりと敵の出現) が終わってから今までの、 1 フレームの最大時間 (ミリ秒) と、 その時に使う瞬間に読んだ絵 (sheet=- なら絵の読み込みではない) と、
+        /// 入りの終わりからの秒。 チャージのターンの入りの引っかかりもここに出る。 次の戦闘の入りの終わりで 0 に戻る。 例: "frame=17.2 sheet=- at=12.4s"。</summary>
+        public static string BattleMaxFrame() => $"frame={Game2DBattleFx.QaBattleMaxFrameMs:0.0} sheet={Game2DBattleFx.QaBattleMaxSheet ?? "-"} at={Game2DBattleFx.QaBattleMaxAt:0.0}s";
+
+        /// <summary>直近の層の頭の読み込み: 層・枚数・頼んでから全部読めるまでの時間 (ミリ秒・読みかけなら読みかけの数)。 例: "floor 7 (depth 7) 64 枚 1830 ms"。</summary>
+        public static string LayerLoad() => FxLayerPreload.Busy ? $"{FxLayerPreload.QaLayerName} {FxLayerPreload.QaLayerCount} 枚 読みかけ {FxSheet.PendingCount}" : $"{FxLayerPreload.QaLayerName} {FxLayerPreload.QaLayerCount} 枚 {FxLayerPreload.QaLayerMs:0} ms";
+
         /// <summary>今の状態を 1 行で (フェーズ・敵・ターン・予告・演出が空いているか・Go の進み)。</summary>
         public static string Status()
         {
             var gm = GameManager.Instance; var s = Sim; var f = Fx; var cm = CombatManager.Instance;
             return $"phase={gm?.CurrentPhase} enemy={cm?.CurrentEnemy?.id} turn={cm?.CurrentCombatTurn} sim={s?.phase} heavyIn={s?.heavyIn} charging={s?.charging} down={s?.down} " +
-                   $"hp={s?.playerHp}/{s?.playerMax} fxIdle={f?.IsIdle} bossIdling={f?.BossIdling} go={Runner.State} loading={Game2DLoadingScreen.Blocking} saveSuppressed={SaveGuard.Suppressed} " +
+                   $"hp={s?.playerHp}/{s?.playerMax} vescaShield={ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context?.vescaShield} fxIdle={f?.IsIdle} bossIdling={f?.BossIdling} go={Runner.State} loading={Game2DLoadingScreen.Blocking} saveSuppressed={SaveGuard.Suppressed} " +
                    $"gui=[on={Game2DGuiRt.FxOn} weight={Game2DGuiRt.FxWeightReady} dark={Game2DGuiRt.FxDark:0.00} red={Game2DGuiRt.FxRed:0.00} white={Game2DGuiRt.FxWhite:0.00} shake={Game2DGuiRt.FxShake}]";
         }
 

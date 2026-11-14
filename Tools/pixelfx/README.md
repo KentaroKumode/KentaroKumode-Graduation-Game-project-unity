@@ -19,8 +19,10 @@
 |---|---|
 | `dicebound/lcd_export.mjs` | 書き出し。本家のコードには手を入れず、手前で液晶の見た目へ寄せる: 光のぼかし → 網点の点 / 色を明るさの段で指定の 5 色へ / 半透明は網点で描く・描かないに分ける。`--tofu`（今の仮の敵の形）か `--actor 形.json`（敵の絵の形）を人物として渡せる |
 | `dicebound/make_actor.py` | 敵の絵（透明背景の PNG）から `--actor` に渡す形の JSON を作る（足もと中心が原点） |
-| `dicebound/export_game.py` | ゲームに入れているエフェクト (会心・毒・出血) を書き出し直して `Assets/Resources/Game2DFx/` へ置く。**どの効果をどの色で入れたかの一覧はここ** |
-| `dicebound/export_fx.py` | ボスの大技・通常の技・プレイヤーの武器の攻撃 (2026-11-14 に作者が決めた物・#350〜#355) を書き出して `Assets/Resources/Game2DFx/` へ置く。絵は見本と同じ `lab/lcd_frames.mjs` で焼き、画素を変えずにコマごとの中身のある範囲だけ切り出して並べる (組み立て直して元のコマと画素で一致するかを毎回確かめる)。**どの効果をどの設定・色の組で入れたかの一覧はここ** (正本は各 `lab/*_preview.py`) |
+| `dicebound/export_game.py` | ゲームに入れているエフェクト (会心・毒・出血) を書き出し直して `dicebound/sheets/` へ置き、`.fxb` まで焼く。**どの効果をどの色で入れたかの一覧はここ** |
+| `dicebound/export_fx.py` | ボスの大技・通常の技・プレイヤーの武器の攻撃 (2026-11-14 に作者が決めた物・#350〜#355) を書き出して `dicebound/sheets/` へ置き、`.fxb` まで焼く。絵は見本と同じ `lab/lcd_frames.mjs` で焼き、画素を変えずにコマごとの中身のある範囲だけ切り出して並べる (組み立て直して元のコマと画素で一致するかを毎回確かめる)。**どの効果をどの設定・色の組で入れたかの一覧はここ** (正本は各 `lab/*_preview.py`) |
+| `dicebound/bake_fxb.py` | 書き出した絵 (`dicebound/sheets/<名前>.png.bytes` + `.json`) を、ゲームが読み込んだ後の形 (コマごとの帯・画素の位置・色の番号) まで作って圧縮し、`Assets/Resources/Game2DFx/<名前>.fxb.bytes` に置く (2026-11-15)。ゲームが読むのはこれだけ。毎回読み戻して PNG と画素で突き合わせる。上の 2 つが最後に呼ぶ |
+| `dicebound/sheets/` | 書き出した絵 (PNG と json)。ビルドに入れない (`.fxb` の元・突き合わせ用) |
 | `src/fx/dicebound/poison-tick.js` | 毒が効いた瞬間の 1 回の演出（1.6 秒）。元は `status/poisoned` |
 | `src/fx/dicebound/bleed-tick.js` | 出血が効いた瞬間の 1 回の演出（1.8 秒）。元は `status/bleeding` |
 | `src/fx/dicebound/_lib.js` | 上の 2 つが共有する道具（形に穴や切れ目があっても位置がはみ出さない） |
@@ -33,7 +35,7 @@
 Node.js 18 以降が要る（依存パッケージは無い）。
 
 ```sh
-# ゲームに入れているものを書き出し直す (Assets/Resources/Game2DFx/ へ)
+# ゲームに入れているものを書き出し直す (dicebound/sheets/ へ書き出し、 Assets/Resources/Game2DFx/ へ .fxb を焼く)
 python Tools/pixelfx/dicebound/export_game.py
 python Tools/pixelfx/dicebound/export_fx.py          # ボスと武器 (名前の頭で絞れる: export_fx.py gouka judge)
 

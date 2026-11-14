@@ -179,10 +179,7 @@ namespace GameLoop
         public static string BossIdForFloor(int floor, int nodeIdx)
         {
             if (floor == 3)
-            {
-                string[] pool = { BossIds.Layer3Marsh, BossIds.Layer3Goblin, BossIds.Layer3Mirror };
-                return pool[GameRng.Range(0, pool.Length, "boss.pool", nodeIdx)];
-            }
+                return Layer3Pool[GameRng.Range(0, Layer3Pool.Length, "boss.pool", nodeIdx)];
             // **8 層 (Null Point) のボスは boss_layer7 = ヴェスカ。** 2026-09-14 に
             //   7 層からボスを外して門の転移先へ移したが、 <b>ID は据え置く</b> ──
             //   学習ファイル・Tier 表・boss_tuning.json のキーが ID 基準で、
@@ -192,6 +189,20 @@ namespace GameLoop
             if (floor == 1 || floor == 5 || floor == 6)
                 return BossIds.LayerPrefix + floor;
             return null;   // 2 層 / 4 層 / 7 層 にボスマスは無い
+        }
+
+        private static readonly string[] Layer3Pool = { BossIds.Layer3Marsh, BossIds.Layer3Goblin, BossIds.Layer3Mirror };
+
+        /// <summary>その層で戦い得るボスの ID の全部 (乱数を引かない・<see cref="BossIdForFloor"/> と同じ対応)。
+        /// 3 層 = 3 体プールの全部・5 層 = 審判官と裏ボス (シュヴァリエ・到着時にレイピアで差し替わる)・8 層 (floor 7) = ヴェスカの 4 段。
+        /// 層に入った時に演出の絵をまとめて読む所 (UI.Game2D.Battle.FxLayerPreload) が使う。 戦闘の相手を決める所では使わない。</summary>
+        public static string[] BossCandidatesForFloor(int floor)
+        {
+            if (floor == 3) return (string[])Layer3Pool.Clone();
+            if (floor == 7) return new[] { BossIds.VescaP1, BossIds.VescaP2, BossIds.VescaP3, BossIds.VescaFinal };
+            if (floor == 5) return new[] { BossIds.Layer5Judgment, BossIds.Layer5Hidden };
+            var id = BossIdForFloor(floor, 0);      // 3 層以外は乱数を引かない
+            return id != null ? new[] { id } : new string[0];
         }
 
         /// <summary>マップに出す戦闘名。 未開示なら null (呼び出し側で「？」を出す)。

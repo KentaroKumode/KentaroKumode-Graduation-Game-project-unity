@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace UI.Game2D.Battle
@@ -10,30 +9,25 @@ namespace UI.Game2D.Battle
     /// 会心・毒・出血は Tools/pixelfx/dicebound/export_game.py、 ボスの大技・通常の技・武器の攻撃は export_fx.py
     /// (見本と同じ Tools/pixelfx/lab/lcd_frames.mjs で焼き、 画素を変えずにコマごとの中身のある範囲だけ切り出して並べた物)。
     ///
-    /// <para>置き場所は Resources/Game2DFx/: 絵は <c>名前.png.bytes</c> (中身は PNG。 .png は git の管理外なので bytes で持つ)、
-    /// コマの位置は <c>名前.json</c> (Aseprite 形式・meta.pixelfx に fps と基準点)。 切り出した物は、 コマの中の位置を
-    /// <c>spriteSourceSize</c> に持つ (無ければ 0,0 = コマ全体)。 拡縮はしない (1 画素 = 1 dot)。</para>
+    /// <para><b>置き場所</b> (2026-11-15 に替えた): 書き出した絵 (<c>名前.png.bytes</c> + <c>名前.json</c>) は Tools/pixelfx/dicebound/sheets/ に置き、
+    /// ゲームが読むのは Resources/Game2DFx/<c>名前.fxb.bytes</c> = 読み込んだ後の形 (下の「持ち方」) まで書き出しの時に作って詰めた物
+    /// (Tools/pixelfx/dicebound/bake_fxb.py・形の説明もそこ)。 ゲームの中で PNG を展開して画素を走査すると大きい絵 1 枚で 100〜250 ms 止まったため。
+    /// 読む側は解凍して配列へ写すだけで、 Unity の API を使わないので主スレッドの外でできる (<see cref="FromFxb"/>)。 拡縮はしない (1 画素 = 1 dot)。</para>
     ///
-    /// <para><b>持ち方</b> (2026-11-14 に軽くした): 読み込んだ後は、 コマごとに「不透明な画素の位置と色」を持つ (書き出しは不透明か透明かの 2 つだけ)。
+    /// <para><b>持ち方</b> (2026-11-14 に軽くした): コマごとに「不透明な画素の位置と色」を持つ (書き出しは不透明か透明かの 2 つだけ)。
     /// ただし、 コマの中で一番多い色が横に続いている所 (<see cref="RunMin"/> 画素以上) は、 1 画素ずつではなく「横の帯 (始まりと長さ) + その色 1 つ」で持つ
     /// (白飛び・消灯・暗転のべた塗りが 1 行 1 本の帯になる)。 帯にした方が軽い時だけ選ぶ。 帯と残りの画素は重ならず、 どれも上から塗る (または足す) だけなので、
-    /// 貼った結果は 1 画素ずつ持った時と同じ (順番に依らない)。</para>
+    /// 貼った結果は 1 画素ずつ持った時と同じ (順番に依らない)。 色は絵ごとの一覧の番号 1 バイト (256 色を超える絵は 4 バイト)。
+    /// どれを帯にするか・色の番号の振り方の規則は bake_fxb.py が持つ (2026-11-15 まではここで PNG から作っていた・同じ規則)。</para>
     ///
-    /// <para><b>読み込みと捨て方</b>: <see cref="Preload"/> = 先に読む (戦闘の入りなど)・<see cref="Load"/> = 使う瞬間 (先に読めていなければここで読み、
-    /// エディタと開発ビルドでは 1 行の警告)。 戦闘が終わったら <see cref="UnloadAfterBattle"/> が、 毎戦闘使う小さな絵 (<see cref="KeepAcrossBattles"/>) 以外を捨てる。</para>
+    /// <para><b>読み込みと捨て方</b>は FxSheet.Loading.cs。</para>
     /// </summary>
-    public sealed class FxSheet
+    public sealed partial class FxSheet
     {
-        [System.Serializable] private class R { public int x, y, w, h; }
-        [System.Serializable] private class F { public R frame; public R spriteSourceSize; public int duration; }
-        [System.Serializable] private class P { public int fps; public int frames; public int[] frameSize; public int[] pivot; public bool loop; }
-        [System.Serializable] private class M { public P pixelfx; }
-        [System.Serializable] private class J { public F[] frames; public M meta; }
-
-        /// <summary>帯にする最短の長さ (画素)。 これより短い同色の並びは 1 画素ずつ持つ。</summary>
+        /// <summary>帯にする最短の長さ (画素)。 これより短い同色の並びは 1 画素ずつ持つ (bake_fxb.py の RUN_MIN)。</summary>
         public const int RunMin = 4;
 
-        /// <summary>コマ 1 枚: 不透明な画素の、 コマの中の位置 (x | y &lt;&lt; 16) と色 (<see cref="BattleCanvas.Pack"/> と同じ形)、
+        /// <summary>コマ 1 枚: 不透明な画素の、 コマの中の位置 (x | y &lt;&lt; 16) と色 (<see cref="BattleCanvas.Pack"/> と同じ形・または色の一覧の番号)、
         /// と、 下地の色 <c>runCol</c> の横の帯 (始まり x | y &lt;&lt; 16 と長さ)。 帯が無いコマは runPos = null。</summary>
         private struct Frame { public int[] pos; public uint[] col; public byte[] ci; public int[] runPos; public ushort[] runLen; public uint runCol; }
         /// <summary>この絵の色の一覧 (色が 256 以下の時・コマの画素は番号 1 バイトで持つ)。 null = 色を 4 バイトで持つ。</summary>
@@ -43,7 +37,7 @@ namespace UI.Game2D.Battle
         public readonly bool Loop;
         public readonly string Name;
 
-        /// <summary>1 コマの長さ (秒)。 書き出しの fps (既定 1 秒 8 コマ・王の着弾だけ 24 コマ)。</summary>
+        /// <summary>1 コマの長さ (秒)。 書き出しの fps (2026-11-15〜 全部 1 秒 24 コマ)。</summary>
         public readonly float FrameSeconds;
         public int FrameCount => _frames.Length;
         /// <summary>1 秒のコマ数 (書き出しの fps・整数)。 経過秒からコマを出す時はこれを掛ける (1/24 の float で割ると、 ちょうどの時刻で 1 コマ前に落ちる)。</summary>
@@ -52,152 +46,73 @@ namespace UI.Game2D.Battle
         public double Seconds => _frames.Length / (double)Fps;
         public float Duration => _frames.Length * FrameSeconds;
 
-        /// <summary>読み込んだ後に持っている量の見積もり (バイト・配列の中身だけ) / 帯を使わなかった時の量 / 読み込みに掛かった時間 (ミリ秒)。</summary>
+        /// <summary>読み込んだ後に持っている量の見積もり (バイト・配列の中身だけ) / 帯も色の番号も使わなかった時の量 (1 画素 8 バイト) /
+        /// 読み込みに掛かった時間 (ミリ秒・頼んでから使えるようになるまで) / そのうち主スレッドで使った時間 (ミリ秒)。</summary>
         public long Bytes { get; private set; }
         public long BytesPlain { get; private set; }
         public float LoadMs { get; private set; }
+        public float MainMs { get; private set; }
 
-        private FxSheet(string name, Color32[] px, int sw, int sh, J j)
+        private FxSheet(string name, int w, int h, int px, int py, int fps, bool loop, uint[] palette, Frame[] frames)
         {
-            Name = name;
-            var p = j.meta.pixelfx;
-            W = p.frameSize[0]; H = p.frameSize[1]; PivotX = p.pivot[0]; PivotY = p.pivot[1]; Loop = p.loop;
-            Fps = Mathf.Max(1, p.fps); FrameSeconds = 1f / Fps;
-            _frames = new Frame[j.frames.Length];
-            var pos = new List<int>(); var col = new List<uint>(); var rp = new List<int>(); var rl = new List<int>();
-            var count = new Dictionary<uint, int>();
-            for (int k = 0; k < j.frames.Length; k++)
+            Name = name; W = w; H = h; PivotX = px; PivotY = py; Loop = loop;
+            Fps = System.Math.Max(1, fps); FrameSeconds = 1f / Fps;
+            _palette = palette; _frames = frames;
+            foreach (var f in _frames)
             {
-                var r = j.frames[k].frame; var s = j.frames[k].spriteSourceSize;
-                int ox = s != null ? s.x : 0, oy = s != null ? s.y : 0;
-                // 一番多い色 (下地の候補)
-                count.Clear(); uint top = 0; int topN = 0, opaque = 0;
-                for (int y = 0; y < r.h; y++)
-                {
-                    int row = (sh - 1 - (r.y + y)) * sw;      // GetPixels32 は下の行から
-                    for (int x = 0; x < r.w; x++)
-                    {
-                        var c = px[row + r.x + x]; if (c.a == 0) continue;
-                        uint v = BattleCanvas.Pack(c.r, c.g, c.b); opaque++;
-                        count.TryGetValue(v, out int n); count[v] = ++n;
-                        if (n > topN) { topN = n; top = v; }
-                    }
-                }
-                pos.Clear(); col.Clear(); rp.Clear(); rl.Clear();
-                for (int y = 0; y < r.h; y++)
-                {
-                    int row = (sh - 1 - (r.y + y)) * sw;
-                    for (int x = 0; x < r.w; x++)
-                    {
-                        var c = px[row + r.x + x]; if (c.a == 0) continue;
-                        uint v = BattleCanvas.Pack(c.r, c.g, c.b);
-                        if (v == top && topN >= RunMin)
-                        {
-                            int e = x; while (e + 1 < r.w) { var d = px[row + r.x + e + 1]; if (d.a == 0 || BattleCanvas.Pack(d.r, d.g, d.b) != top) break; e++; }
-                            if (e - x + 1 >= RunMin) { rp.Add((ox + x) | ((oy + y) << 16)); rl.Add(e - x + 1); x = e; continue; }
-                        }
-                        pos.Add((ox + x) | ((oy + y) << 16)); col.Add(v);
-                    }
-                }
-                long plain = opaque * 8L, withRuns = pos.Count * 8L + rp.Count * 8L;
-                BytesPlain += plain;
-                if (rp.Count > 0 && withRuns < plain)
-                {
-                    _frames[k] = new Frame { pos = pos.ToArray(), col = col.ToArray(), runPos = rp.ToArray(), runLen = rl.ConvertAll(v => (ushort)v).ToArray(), runCol = top };
-                    Bytes += withRuns;
-                }
-                else
-                {
-                    // 帯が得にならないコマ (まばらな網点など): 今までどおり 1 画素ずつ。 帯にした画素を戻す
-                    pos.Clear(); col.Clear();
-                    for (int y = 0; y < r.h; y++)
-                    {
-                        int row = (sh - 1 - (r.y + y)) * sw;
-                        for (int x = 0; x < r.w; x++)
-                        {
-                            var c = px[row + r.x + x]; if (c.a == 0) continue;
-                            pos.Add((ox + x) | ((oy + y) << 16)); col.Add(BattleCanvas.Pack(c.r, c.g, c.b));
-                        }
-                    }
-                    _frames[k] = new Frame { pos = pos.ToArray(), col = col.ToArray() };
-                    Bytes += plain;
-                }
+                long opaque = f.pos.Length; if (f.runLen != null) foreach (var l in f.runLen) opaque += l;
+                BytesPlain += opaque * 8L;
+                Bytes += f.pos.Length * (4L + (f.ci != null ? 1 : 4)) + (f.runPos != null ? f.runPos.Length * 6L : 0);
             }
-            // 色を番号 1 バイトにする (2026-11-15・1 秒 24 コマにしてコマ数が 3 倍になったので軽くする)。 絵の色は液晶の 5 色の段なので、 1 枚に 256 色を超えない。
-            //   貼る時は番号から元の色を引くだけ (貼った結果は変わらない)。 256 色を超える絵は 4 バイトのまま
-            var pal = new Dictionary<uint, int>();
-            foreach (var f in _frames) { foreach (var v in f.col) if (!pal.ContainsKey(v)) pal[v] = pal.Count; if (f.runPos != null && !pal.ContainsKey(f.runCol)) pal[f.runCol] = pal.Count; }
-            if (pal.Count <= 256)
+        }
+
+        /// <summary>bake_fxb.py が作った <c>.fxb</c> の中身から絵を組み立てる。 Unity の API を使わない (主スレッドの外で呼んでよい)。 形が違えば例外。</summary>
+        public static FxSheet FromFxb(string name, byte[] data)
+        {
+            if (data == null || data.Length < 8 || data[0] != 'F' || data[1] != 'X' || data[2] != 'B' || data[3] != '1') throw new System.IO.InvalidDataException("[FxSheet] " + name + ": .fxb の形でない");
+            int rawLen = System.BitConverter.ToInt32(data, 4);
+            var b = new byte[rawLen];
+            using (var z = new System.IO.Compression.DeflateStream(new System.IO.MemoryStream(data, 8, data.Length - 8), System.IO.Compression.CompressionMode.Decompress))
             {
-                _palette = new uint[pal.Count]; foreach (var kv in pal) _palette[kv.Value] = kv.Key;
-                for (int k = 0; k < _frames.Length; k++)
-                {
-                    var f = _frames[k]; var ci = new byte[f.col.Length];
-                    for (int q = 0; q < ci.Length; q++) ci[q] = (byte)pal[f.col[q]];
-                    f.ci = ci; f.col = null; _frames[k] = f;
-                }
+                int got = 0; while (got < rawLen) { int r = z.Read(b, got, rawLen - got); if (r <= 0) throw new System.IO.InvalidDataException("[FxSheet] " + name + ": .fxb が途中で切れている"); got += r; }
             }
-            Bytes = 0;
-            foreach (var f in _frames) Bytes += f.pos.Length * (4L + (f.ci != null ? 1 : 4)) + (f.runPos != null ? f.runPos.Length * 6L : 0);
+            int o = 0;
+            int I32() { int v = System.BitConverter.ToInt32(b, o); o += 4; return v; }
+            int w = I32(), h = I32(), px = I32(), py = I32(), fps = I32(); bool loop = b[o++] != 0; int nf = I32(), np = I32();
+            uint[] pal = null;
+            if (np > 0) { pal = new uint[np]; System.Buffer.BlockCopy(b, o, pal, 0, np * 4); o += np * 4; }
+            var frames = new Frame[nf];
+            for (int k = 0; k < nf; k++)
+            {
+                int n = I32(), m = I32();
+                var f = new Frame();
+                if (m > 0) { if (pal != null) f.runCol = pal[b[o++]]; else { f.runCol = System.BitConverter.ToUInt32(b, o); o += 4; } }
+                f.pos = Positions(b, ref o, n, w);
+                if (pal != null) { f.ci = new byte[n]; System.Buffer.BlockCopy(b, o, f.ci, 0, n); o += n; }
+                else { f.col = new uint[n]; System.Buffer.BlockCopy(b, o, f.col, 0, n * 4); o += n * 4; }
+                if (m > 0)
+                {
+                    f.runPos = Positions(b, ref o, m, w);
+                    f.runLen = new ushort[m]; System.Buffer.BlockCopy(b, o, f.runLen, 0, m * 2); o += m * 2;
+                }
+                frames[k] = f;
+            }
+            if (o != rawLen) throw new System.IO.InvalidDataException("[FxSheet] " + name + ": .fxb の長さが合わない");
+            return new FxSheet(name, w, h, px, py, fps, loop, pal, frames);
         }
 
-        private static readonly Dictionary<string, FxSheet> Cache = new Dictionary<string, FxSheet>();
-
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() => Cache.Clear();
-
-        /// <summary>使う瞬間に読む。 先に読めていなければここで読み、 エディタと開発ビルドでは 1 行の警告を出す (どの絵を何ミリ秒で)。 無ければ null (警告を 1 度だけ出す)。</summary>
-        public static FxSheet Load(string name) => Get(name, true);
-
-        /// <summary>先に読んでおく (戦闘の入りなど・止まっても目立たない所で)。 読んだ物を返す。</summary>
-        public static FxSheet Preload(string name) => Get(name, false);
-
-        /// <summary>もう読んであるか。</summary>
-        public static bool IsLoaded(string name) => !string.IsNullOrEmpty(name) && Cache.ContainsKey(name);
-
-        private static FxSheet Get(string name, bool late)
+        /// <summary>位置の差分 (幅 2 / 4 バイト・y * w + x の 1 つ前との差) → x | y &lt;&lt; 16。</summary>
+        private static int[] Positions(byte[] b, ref int o, int n, int w)
         {
-            if (string.IsNullOrEmpty(name)) return null;
-            if (Cache.TryGetValue(name, out var s)) return s;
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            var img = Resources.Load<TextAsset>("Game2DFx/" + name + ".png");
-            var json = Resources.Load<TextAsset>("Game2DFx/" + name);
-            if (img == null || json == null) { Debug.LogWarning("[FxSheet] Resources/Game2DFx/" + name + " が無い"); return Cache[name] = null; }
-            var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-            tex.LoadImage(img.bytes);
-            s = new FxSheet(name, tex.GetPixels32(), tex.width, tex.height, JsonUtility.FromJson<J>(json.text));
-            Object.Destroy(tex);
-            Resources.UnloadAsset(img); Resources.UnloadAsset(json);
-            s.LoadMs = (float)sw.Elapsed.TotalMilliseconds;
-            WarnLate(late, s);
-            return Cache[name] = s;
+            int wide = b[o++]; var r = new int[n]; int lin = 0;
+            for (int i = 0; i < n; i++)
+            {
+                if (wide == 2) { lin += b[o] | (b[o + 1] << 8); o += 2; }
+                else { lin += System.BitConverter.ToInt32(b, o); o += 4; }
+                int y = lin / w; r[i] = (lin - y * w) | (y << 16);
+            }
+            return r;
         }
-
-        [System.Diagnostics.Conditional("UNITY_EDITOR"), System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
-        private static void WarnLate(bool late, FxSheet s)
-        {
-            if (late) Debug.LogWarning($"[FxSheet] 先に読めていない絵を使う瞬間に読んだ: {s.Name} ({s.LoadMs:0.0} ms)");
-        }
-
-        // ── 捨てる基準 (1 か所) ──
-
-        /// <summary>戦闘をまたいで残す絵 (小さくて毎戦闘使う物): 武器・会心・毒・出血。 それ以外 (ボスの大技・技の絵) は戦闘が終わったら捨てる。</summary>
-        public static bool KeepAcrossBattles(string name)
-            => name.StartsWith("weapon-") || name == "crit-hit" || name == "poison-tick" || name == "bleed-tick";
-
-        /// <summary>戦闘が終わった時: <see cref="KeepAcrossBattles"/> 以外をキャッシュから外す (持っている参照が無くなれば GC が回収する)。</summary>
-        public static void UnloadAfterBattle()
-        {
-            var drop = new List<string>();
-            foreach (var k in Cache.Keys) if (!KeepAcrossBattles(k)) drop.Add(k);
-            foreach (var k in drop) Cache.Remove(k);
-        }
-
-        /// <summary>1 枚をキャッシュから外す (天与の発動の絵のように大きく、 戦闘の中でも次に使うとは限らない物)。</summary>
-        public static void Unload(string name) { if (!string.IsNullOrEmpty(name)) Cache.Remove(name); }
-
-        /// <summary>読み込んである絵 (確認用・null = 無かった絵は除く)。</summary>
-        public static IEnumerable<FxSheet> Loaded { get { foreach (var s in Cache.Values) if (s != null) yield return s; } }
 
         // ── 貼る ──
 
