@@ -86,15 +86,19 @@ namespace UI.Game2D.Battle
         public bool InHeavy => _seg == Seg.Heavy;
 
         /// <summary>全部やめて、 暗幕も外す (戦闘の終わり・次の敵・ダウンで大技が取り消された時)。</summary>
-        public void Clear() { _seg = Seg.None; _heavyPending = false; _kind = Kind.None; _frozen = null; }
+        public void Clear()
+        {
+            _seg = Seg.None; _heavyPending = false; _kind = Kind.None; _frozen = null;
+            _charge = _idle = _rel = _scr = _imp = _ver2 = _shatter = _glitch = _off = null; _p4 = null;      // 絵の参照を放す (戦闘が終わった後、 キャッシュから外した絵を GC が回収できるように)
+        }
 
         /// <summary>大技が取り消された (ダウン): 待機のループを止めて暗幕を戻す (霧散の絵はまだ無い)。</summary>
         public void Cancel() { if (_seg == Seg.Idle || _heavyPending) { _seg = Seg.None; _heavyPending = false; } }
 
         private static string Ash(int ash) => "-a" + Mathf.Clamp(ash, 0, ASH_MAX);
 
-        /// <summary>絵を先に読んでおく (全画面のコマが多く、 読むのに一瞬かかる)。 チャージのターン・大技のターンの頭 (プレイヤーの手番の前) に呼ぶ。</summary>
-        public static void Preload(Kind k, int ash, bool heavy)
+        /// <summary>そのボスの大技の絵の名前 (heavy = false: チャージと待機 / true: 大技)。 先に読む一覧 (<see cref="Game2DBattleFx.QueuePreload"/>) に使う。</summary>
+        public static string[] SheetNames(Kind k, int ash, bool heavy)
         {
             string[] names;
             switch (k)
@@ -104,9 +108,22 @@ namespace UI.Game2D.Battle
                 case Kind.Chevalier: names = heavy ? new[] { "chevalier-slash" } : new[] { "chevalier-charge", "chevalier-charged" }; break;
                 case Kind.Vesca: names = heavy ? new[] { "vesca-stop-p0", "vesca-stop-p1", "vesca-stop-p2", "vesca-stop-p3", "vesca-shatter" } : new[] { "vesca-charge", "vesca-charged" }; break;
                 case Kind.VescaFinal: names = heavy ? new[] { "vesca-lost-p0", "vesca-lost-p1", "vesca-lost-p2", "vesca-lost-p3", "vesca-glitch", "vesca-off" } : new[] { "vesca-charge-broken", "vesca-charged-broken" }; break;
-                default: return;
+                default: return new string[0];
             }
-            foreach (var n in names) FxSheet.Load(n);
+            return names;
+        }
+
+        /// <summary>そのボスの、 大技以外の技の絵の名前 (戦闘の入りに先に読む)。</summary>
+        public static string[] MoveNames(Kind k)
+        {
+            switch (k)
+            {
+                case Kind.King: return new[] { "move-king-attack", "move-king-regen" };
+                case Kind.Judge: return new[] { "move-judge-flame" };
+                case Kind.Chevalier: return new[] { "move-chev-thrust", "move-chev-stance" };
+                case Kind.Vesca: case Kind.VescaFinal: return new[] { "move-relic-strike", "move-relic-guard", "move-relic-hex" };
+                default: return new string[0];
+            }
         }
 
         /// <summary>チャージのターン: チャージを流し、 終わったら待機のループへ。 ash = 烈炎の数 (王だけ)。</summary>

@@ -135,6 +135,21 @@ namespace UI.Game2D.Battle
         /// 例: <c>UI.Game2D.Battle.QaBattle.DumpGuiWeight("C:/tmp/w.png")</c>。 地図がまだ無ければ false。</summary>
         public static bool DumpGuiWeight(string path) => Game2DGuiRt.QaDumpWeight(path);
 
+        /// <summary>いま読み込んである絵の一覧: 名前・持っている量の見積もり (バイト)・帯にしなかった時の量・読み込みに掛かった時間 (ミリ秒)。 大きい順・最後に合計。
+        /// 例: <c>UI.Game2D.Battle.QaBattle.FxMemory()</c></summary>
+        public static string FxMemory()
+        {
+            var l = new System.Collections.Generic.List<FxSheet>(FxSheet.Loaded);
+            l.Sort((a, b) => b.Bytes.CompareTo(a.Bytes));
+            var sb = new System.Text.StringBuilder(); long sum = 0, plain = 0; float ms = 0f;
+            foreach (var s in l) { sb.Append($"{s.Name}\t{s.Bytes}\t(帯なし {s.BytesPlain})\t{s.LoadMs:0.0} ms\n"); sum += s.Bytes; plain += s.BytesPlain; ms += s.LoadMs; }
+            sb.Append($"合計 {l.Count} 枚\t{sum} B ({sum / 1048576f:0.0} MB)\t(帯なし {plain / 1048576f:0.0} MB)\t読み込み {ms:0} ms");
+            return sb.ToString();
+        }
+
+        /// <summary>直近の大技の間の、 1 フレームの最大時間 (ミリ秒) と、 戦闘演出の部品の処理の最大時間。 例: "frame=33.4 fx=6.1"。</summary>
+        public static string HeavyFrameMs() => $"frame={Game2DBattleFx.QaHeavyMaxFrameMs:0.0} fx={Game2DBattleFx.QaHeavyMaxFxMs:0.0}";
+
         /// <summary>今の状態を 1 行で (フェーズ・敵・ターン・予告・演出が空いているか・Go の進み)。</summary>
         public static string Status()
         {

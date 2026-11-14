@@ -112,6 +112,41 @@ namespace UI.Game2D.Battle
         /// <summary>戦闘の流れを止める絵 (審判の炎) が終わる時刻 (<see cref="_clockU"/>)。</summary>
         private float _blockUntil, _clockU;
         private int _bossTaken;
+
+        // ── 絵を先に読む (2026-11-14・FxSheet.Preload) ──
+        private readonly Queue<string> _preload = new Queue<string>();
+
+        /// <summary>先に読む絵を並べる (戦闘の入り・チャージや大技のターンの頭)。 1 フレームに 1 枚ずつ読む (全部を 1 フレームで読むと固まる)。 読んであれば何もしない。</summary>
+        public void QueuePreload(IEnumerable<string> names) { foreach (var n in names) if (!string.IsNullOrEmpty(n) && !FxSheet.IsLoaded(n) && !_preload.Contains(n)) _preload.Enqueue(n); }
+
+        /// <summary>戦闘の画面を離れた時: 先に読む予定を消し、 持っている絵の参照を放す (キャッシュからは FxSheet.UnloadAfterBattle が外す)。</summary>
+        public void ClearPreload() { _preload.Clear(); _boss.Clear(); _boss.OnHit = null; _fx.Clear(); _weaponSheet = null; _enemyMoveSheet = null; }
+
+        private void PreloadStep()
+        {
+            while (_preload.Count > 0)
+            {
+                var n = _preload.Dequeue();
+                if (FxSheet.IsLoaded(n)) continue;
+                FxSheet.Preload(n);
+                break;      // 1 フレームに 1 枚
+            }
+        }
+
+        // ── 大技の間の 1 フレームの最大時間 (確認用) ──
+        /// <summary>直近の大技 (BossHeavy から大技が終わるまで) の間の、 1 フレームの最大時間 (ミリ秒・Time.unscaledDeltaTime) と、 この部品の処理 (LateUpdate) の最大時間。</summary>
+        public static float QaHeavyMaxFrameMs, QaHeavyMaxFxMs;
+        private readonly System.Diagnostics.Stopwatch _frameSw = new System.Diagnostics.Stopwatch();
+        private bool _heavyMeasuring;
+        private void NoteHeavyFrame()
+        {
+            bool on = _boss.Busy || _boss.InHeavy;
+            if (on && !_heavyMeasuring) { QaHeavyMaxFrameMs = 0f; QaHeavyMaxFxMs = 0f; }
+            _heavyMeasuring = on;
+            if (!on) return;
+            QaHeavyMaxFrameMs = Mathf.Max(QaHeavyMaxFrameMs, Time.unscaledDeltaTime * 1000f);
+            QaHeavyMaxFxMs = Mathf.Max(QaHeavyMaxFxMs, (float)_frameSw.Elapsed.TotalMilliseconds);
+        }
         private bool _guiFxWas;
 
         /// <summary>ボスの大技の揺れ・暗転・赤・白飛びを、 外枠の GUI にも掛ける (2026-11-14・作者の指定・<see cref="Game2DGuiRt.SetBossFx"/>)。
@@ -327,9 +362,11 @@ namespace UI.Game2D.Battle
 
         private void LateUpdate()
         {
+            _frameSw.Restart();
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             DebugKeys();
 #endif
+            PreloadStep();
             if (!Showing) { if (plotQuad != null) plotQuad.enabled = false; if (_guiFxWas) { _guiFxWas = false; Game2DGuiRt.SetBossFx(false, 1f, 0f, 0f, Color.white, Vector2.zero); } return; }
             Init();
             float rawDt = Mathf.Min(0.05f, Time.unscaledDeltaTime);
@@ -339,6 +376,7 @@ namespace UI.Game2D.Battle
             Frame();
             PushGuiFx();
             Upload();
+            NoteHeavyFrame();
             if (plotQuad != null) plotQuad.enabled = true;
         }
 
