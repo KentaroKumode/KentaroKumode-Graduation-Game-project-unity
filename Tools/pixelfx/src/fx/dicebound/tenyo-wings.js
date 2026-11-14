@@ -21,7 +21,7 @@ export const meta = {
   fps: 30,
   bg: "ground",
   actor: 2,
-  options: { palette: GOLD, ash: ASH, seed: 5 },
+  options: { palette: GOLD, ash: ASH, wings: true, halo: true, seed: 5 },   // wings / halo = 翼・光輪を出すか (2026-11-14 作者: 消してみて)
 };
 
 const DOWN = { turn: 0.9, crouch: 8, lean: 6, hy: 2, fx: -4, fy: -10, bx: 9, by: -10, ffx: 8, fbx: -7 };
@@ -315,23 +315,23 @@ export function create(o) {
         }
       }
       // motes spiral in to make the halo
-      if (t > H0 - 0.2 && t < H0 + 0.1 && R.chance(0.6)) {
+      if (o.halo && t > H0 - 0.2 && t < H0 + 0.1 && R.chance(0.6)) {
         const g = R.range(0, TAU), D = R.range(14, 24), x = HX + Math.cos(g) * D, y = HY + Math.sin(g) * D * 0.5, tx = HX + Math.cos(g + 0.6) * HRX, ty = HY + Math.sin(g + 0.6) * HRY;
         const T = R.range(0.16, 0.24), l = Math.hypot(tx - x, ty - y) || 1, v = (l * 3) / (Math.exp(3 * T) - 1);
         ps.spawn(P.STREAK, x, y, ((tx - x) / l) * v, ((ty - y) / l) * v, T, R.chance(0.5) ? C[6] : C[5]);
       }
-      if (!formed && t >= H1) {
+      if (o.halo && !formed && t >= H1) {
         formed = true;
         lights.add(HX, HY, 30, C[6], 0.8, 0.3);
       }
       // the wings burst open with a scatter of light
-      if (t > W0 && t < W0 + 0.35 && R.chance(0.5))
+      if (o.wings && t > W0 && t < W0 + 0.35 && R.chance(0.5))
         for (const side of [-1, 1]) {
           const f = R.pick(wing(t, side).out);
           if (f) ps.spawn(P.STAR, f.x + Math.cos(f.ang) * f.len, f.y + Math.sin(f.ang) * f.len, side * R.range(5, 25), -R.range(5, 25), R.range(0.3, 0.6), R.chance(0.5) ? WHITE : C[6], R.range(0.6, 1.6));
         }
       // while the wings hold, light twinkles on the tips and motes lift off them
-      if (t > W0 + 0.45 && t < SC)
+      if (o.wings && t > W0 + 0.45 && t < SC)
         for (const side of [-1, 1]) {
           if (R.chance(0.045)) {
             const f = R.pick(wing(t, side).out.filter((w) => w.q.kind === 0));
@@ -343,7 +343,7 @@ export function create(o) {
           }
         }
       // the downstroke: a gust along the floor, light flung off the tips, a few feathers shaken loose
-      if (!beaten && t >= B2 - 0.03) {
+      if (o.wings && !beaten && t >= B2 - 0.03) {
         beaten = true;
         for (const side of [-1, 1]) {
           lights.add(side * 30, -34, 46, C[5], 0.6, 0.4);
@@ -361,7 +361,7 @@ export function create(o) {
         }
       }
       // the wings come apart, tips first: each feather flashes and breaks into small ones and motes
-      for (const side of [-1, 1]) {
+      if (o.wings) for (const side of [-1, 1]) {
         const si = side > 0 ? 0 : 1;
         for (const q of quills) {
           if (q.gone[si] || t < q.off[si]) continue;
@@ -378,7 +378,7 @@ export function create(o) {
         }
       }
       // the halo melts into rising motes
-      if (t > 3.35 && t < 3.75 && R.chance(0.4)) {
+      if (o.halo && t > 3.35 && t < 3.75 && R.chance(0.4)) {
         const g = R.range(0, TAU);
         ps.spawn(P.EMBER, HX + Math.cos(g) * HRX, HY + Math.sin(g) * HRY, R.range(-6, 6), -R.range(10, 25), R.range(0.5, 0.9), C[5]);
       }
@@ -390,7 +390,7 @@ export function create(o) {
       shaft(p);
       pool(p, true);
       if (t > POUR && t < POUR + 0.4) band(p, 0, 0, 4 + 32 * ease.outCubic(seg(t, POUR, POUR + 0.4)), 0.18, 2.5 * (1 - seg(t, POUR, POUR + 0.4)) + 0.5, 1.1 - seg(t, POUR, POUR + 0.4), C.slice(3), FAR, t < POUR + 0.06);
-      for (const side of [-1, 1]) drawWing(p, side);
+      if (o.wings) for (const side of [-1, 1]) drawWing(p, side);
       loose.draw(p, WING, "back");
       ps.draw(p, "back");
     },
@@ -409,7 +409,7 @@ export function create(o) {
         for (const [x, y] of S.out) if (y < -8) p.light(x, y, C[5], 0.55 * wk);
         p.glow(0, -34, 76, C[4], 0.14 * wk);
       }
-      halo(p);
+      if (o.halo) halo(p);
       if (t >= CL1 && t < CL1 + 0.22) flare(p, 0, S.top - 1, 22 * (1 - (t - CL1) / 0.22), 1 - (t - CL1) / 0.22, C.slice(3));
       loose.draw(p, WING, "front");
       ps.draw(p, "front");

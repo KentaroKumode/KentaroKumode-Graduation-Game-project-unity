@@ -76,7 +76,7 @@ export function create(o) {
   const RUBBLE = ["CHUNK", "GRIT", "FLAKE"], FINE = { SMOKE: [0.45, 3], DUST: [0.6, 2] }, FINER = { SMOKE: [0.32, 4], DUST: [0.5, 2] };
   const shRays = gift === "shield" ? scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, opts: {} }) : null;
   // 盾の発動の後: holy/resurrection (注ぐ光・光の翼が開く・光輪・大きな羽ばたき・羽根に散る) を、 敵の体の大きさで重ねる (作者: 発動後が弱い)。 光が注ぐ頭は飛ばして、 翼が開く所から
-  const shWings = gift === "shield" ? scaledFx(RESURRECT, { K: 2.6, at: [240, 196], start: 0.95, delay: TH + SHIELD.open + 0.1 - T0, glow: 0.6, opts: { palette: GOLD } }) : null;
+  const shWings = gift === "shield" ? scaledFx(RESURRECT, { K: 2.6, at: [240, 196], start: 0.95, delay: TH + SHIELD.open + 0.1 - T0, glow: 0.6, opts: { palette: GOLD, wings: false, halo: false } }) : null;   // 翼と光輪は出さない (作者: 消してみて)。 残るのは、 注ぐ光・床の光・きらめき
   // 発動の後の球: holy/divine-shield を、 そのまま (作者: 球の見た目は Divine shield を正確に写す)。 式も設定も元のまま、 大きさだけ (元の半径 29 → 87)。 前の版の、 moves の tenyo-shield (光の柱を足した物) は使わない
   const shBubble = gift === "shield" ? scaledFx(DSHIELD, { K: 3, at: [240, 202], life: 2.2, delay: TH + SHIELD.open + 0.2 - T0, opts: {} }) : null;
   // 羽根が弾ける (holy/feather-burst): 範囲を広く・量を少なく (作者の指定)。 広げて置き (3.6 倍)、 羽根は 3 枚に 1 枚だけ出させる (元のコードは触らず、 羽根を足す口を、 作る間だけ間引く)
