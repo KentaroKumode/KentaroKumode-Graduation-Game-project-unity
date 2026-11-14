@@ -40,7 +40,25 @@ const RAMP = (INKS[flags.ink ?? "warm"]).map(rgb3), BAYER = [0, 8, 2, 10, 12, 4,
 const lum = (R, G, B) => (0.299 * R + 0.587 * G + 0.114 * B) / 255, step = (L) => Math.max(0, Math.min(RAMP.length - 1, Math.round(L * (RAMP.length - 1))));
 
 const fx = await fxlib.loadEffect(id);
-const r = fxlib.renderFrames(fx, { fps: +(flags.fps ?? 8), bg: "none", options: flags.opts ? JSON.parse(flags.opts) : {} });
+const OPTS = { bg: "none", options: flags.opts ? JSON.parse(flags.opts) : {} };
+let r;
+if (flags.pfps) {
+  // --pfps 24: 形 (斬撃・光・輪など) は --fps (既定 8) のコマで止め、 粒 (Particles・Bits) だけを pfps で動かす (2026-11-14 作者: 粒のコマの速さが合っていない)。
+  // 作り: pfps で 2 回書き出す (粒あり / 粒なし)。 粒 = 2 つの差がある画素。 形は、 粒なしの方を、 fps のコマごとに止めて使う。 pfps は fps の整数倍。
+  const core = await import(pathToFileURL(join(ROOT, "src", "core", "index.js")).href);
+  const PF = +flags.pfps, HOLD = Math.round(PF / +(flags.fps ?? 8)), full = fxlib.renderFrames(fx, { fps: PF, ...OPTS });
+  const pd = core.Particles.prototype.draw, bd = core.Bits.prototype.draw;
+  core.Particles.prototype.draw = function () {}; core.Bits.prototype.draw = function () {};
+  const bare = fxlib.renderFrames(fx, { fps: PF, ...OPTS });
+  core.Particles.prototype.draw = pd; core.Bits.prototype.draw = bd;
+  full.frames.forEach((f, fi) => {
+    const b = bare.frames[fi], hold = bare.frames[fi - (fi % HOLD)], raw = new Uint32Array(hold.raw), light = new Uint32Array(hold.light);
+    for (let i = 0; i < raw.length; i++) if (f.raw[i] !== b.raw[i] || f.light[i] !== b.light[i]) { raw[i] = f.raw[i]; light[i] = f.light[i]; }
+    f.raw2 = raw; f.light2 = light;
+  });
+  full.frames.forEach((f) => { f.raw = f.raw2; f.light = f.light2; });
+  r = full;
+} else r = fxlib.renderFrames(fx, { fps: +(flags.fps ?? 8), ...OPTS });
 const { w, h, n } = r, sheet = new Uint8ClampedArray(n * w * h * 4);
 r.frames.forEach((f, fi) => {
   for (let y = 0; y < h; y++)
