@@ -25,6 +25,7 @@ export const meta = {
     palette: ["#4a1712", "#8a1f17", "#c9281f", "#f2561d", "#ff8a2a", "#ffc23d", "#ffe26b", "#fff3a6", "#ffffff"],
     ashes: ["#a39cab", "#7b7484", "#5c5664", "#433e4b"],
     color: "#0b0a10",   // 焼けた跡 (焦げ) の色
+    mode: "in",         // "in" = 縁から焼け込んで、 止まって冷める / "out" = 当たった時にはもう燃えていて、 外へ燃え尽きる (白く飛んだコマから続ける)
     depth: 1,           // どこまで焼け込むか (1 = 既定。 下は画面の 1/3 ほど・左右と上は縁だけ)
     lead: 0.9,          // 溜め (秒): 当たる前に、 縁がじわっと赤く焼け始め、 火の粉がゆっくり上がる
     rush: 0.8,          // 焼け込みにかける秒
@@ -99,12 +100,16 @@ export function create(o) {
   // 前線の位置: 0.3 秒で一気に焼け込み (速く始まって止まる)、 そこで止まる。 そのあと全体が冷めて消える
   const BURST = Math.max(0.05, o.lead), RUSH = o.rush, HOLD = BURST + RUSH + o.hold, END = HOLD + o.cool + 0.06 * ASH;
   const PEAK = A.lo + (22 + 20 * o.depth), BASE = A.lo + 5;
-  const kAt = (t) => t < BURST ? A.lo - 8 + 13 * smooth(0, BURST, t) : BASE + (PEAK - BASE) * ease.outCubic(clamp((t - BURST) / RUSH)) + 7 * clamp((t - BURST - RUSH) / Math.max(0.01, o.hold + o.cool));
-  const fadeAt = (t) => 1 - smooth(HOLD, END, t);
+  const OUT = o.mode === "out", GONE = A.lo - 12, T_OUT = BURST + o.hold + RUSH + o.cool;
+  // out: 白く飛んでいる間に、 もう深くまで燃えている。 しばらく燃えてから、 火の線が外 (縁) へ退いて、 燃え尽きる
+  const kOut = (t) => PEAK + 3 * Math.sin((t - BURST) * 3) * (1 - smooth(0, 1, clamp((t - BURST - o.hold) / (RUSH + o.cool)))) - (PEAK - GONE) * smooth(0, 1, clamp((t - BURST - o.hold) / (RUSH + o.cool)));
+  const kIn = (t) => t < BURST ? A.lo - 8 + 13 * smooth(0, BURST, t) : BASE + (PEAK - BASE) * ease.outCubic(clamp((t - BURST) / RUSH)) + 7 * clamp((t - BURST - RUSH) / Math.max(0.01, o.hold + o.cool));
+  const kAt = (t) => (OUT && t >= BURST ? kOut(t) : kIn(t));
+  const fadeAt = (t) => (OUT ? 1 - smooth(T_OUT - 0.35, T_OUT, t) : 1 - smooth(HOLD, END, t));
 
   const ps = new Particles({ rng: R, sparks: [F[7], F[6], F[4], F[2]] }), ash = new Particles({ rng: R, sparks: ASHC }), lights = new Lights();
   const line = [];
-  let t = 0, pin = 0, burst = false, pre = 0;
+  let t = 0, pin = 0, burst = false, pre = 0, jumped = false;
   const left = (life) => Math.min(life, meta.duration - 0.05 - t);
   // 前線が通った画素が出す物: [火の塊, 残り火, 煙, 灰, 光] (画素 1 つあたりの確率)
   const RATE = [0.01, 0.0035, 0.0012, 0.0009 * ASH, 0.0005];
@@ -132,7 +137,12 @@ export function create(o) {
         for (let i = 0; i < ASH * 14; i++) ash.spawn(P.EMBER, R.range(0, W), H + R.range(0, 30), R.range(-50, 50), -R.range(140, 380), R.range(0.8, 1.6), 0, R.chance(0.35) ? 2 : 1, R.range(0, 0.4));
       }
       const k = kAt(t);
-      while (pin < A.order.length && A.f[A.order[pin]] <= k) shed(A.order[pin++]);
+      if (OUT && t >= BURST) {
+        // 線が外へ退く: 通り過ぎた画素から、 火の粉や灰が出る (切り替わった瞬間のぶんは出さない)
+        if (!jumped) { jumped = true; pin = A.below(k); }
+        while (pin > 0 && A.f[A.order[pin - 1]] > k) shed(A.order[--pin]);
+        while (pin < A.order.length && A.f[A.order[pin]] <= k) pin++;
+      } else while (pin < A.order.length && A.f[A.order[pin]] <= k) shed(A.order[pin++]);
       ps.update(dt);
       ash.update(dt);
       lights.update(dt);
