@@ -138,6 +138,11 @@ namespace ItemSystem.PassiveSkills.Effects
             //   経緯は CapForStage の doc を参照。
         };
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        /// <summary>[実機の確認用] 次のターンの抽選の 1 枚目の種類 ("攻撃" / "防御" / "妨害")。 null = 指定なし (既定)。 使ったら null に戻る。</summary>
+        public static string QaForceRole;
+#endif
+
         public const string KeyChargedFistPending = "vesca_chargedfist_pending";
         public const string KeyChargedFistStacks  = "vesca_chargedfist_stacks";
         /// <summary>このターン、 遺物が積んだ敵出目ボーナスの合計 (RelicScholar が集計してから一括で書き出す)。</summary>
@@ -323,6 +328,16 @@ namespace ItemSystem.PassiveSkills.Effects
                 picked.Add(cand);
             }
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // [実機の確認用・2026-11-14] 次の抽選の 1 枚目を、 指定した種類 (攻撃 / 防御 / 妨害) のその段の先頭の遺物に差し替える (1 ターン限り)。
+            //   既定 null = 何もしない (乱数の消費も抽選も今までどおり)。 立てるのは UI.Game2D.Battle.QaBattle.ForceRelic だけ
+            if (VescaRelicPool.QaForceRole != null && picked.Count > 0)
+            {
+                var forced = pool.Find(x => x.role == VescaRelicPool.QaForceRole);
+                if (forced != null) picked[0] = forced;
+                VescaRelicPool.QaForceRole = null;
+            }
+#endif
             foreach (var r in picked)
             {
                 r.apply(ctx);

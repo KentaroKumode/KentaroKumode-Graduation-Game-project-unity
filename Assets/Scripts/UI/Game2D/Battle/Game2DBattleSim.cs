@@ -839,6 +839,12 @@ namespace UI.Game2D.Battle
         private bool _flameShown;
 
         /// <summary>ターンの頭 (判断で止まった所): 大技の取り消し・〈灰の再生〉・ヴェスカの遺物・シュヴァリエの構え。 値は読むだけ。</summary>
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        /// <summary>[実機の確認用] 戦闘が始め直されたことにする (QaBattle.Restart が戦闘中に別の戦闘を始めた時)。
+        /// 戦闘開始の知らせ (OnCombatStart) の購読は OnEnable の時に CombatManager があった時だけ張られるので、 それに頼らず次の Update で入り直す。</summary>
+        public void QaNewCombat() { _combatSerial++; }
+#endif
+
         private void TurnStartFx(CombatManager cm, int regen)
         {
             var kind = BossFx.KindOf(cm.CurrentEnemy?.id);
@@ -858,7 +864,11 @@ namespace UI.Game2D.Battle
                 if (_chevPhase > 0 && ph > 0 && ph != _chevPhase) fx.PlayMove("move-chev-stance");
                 _chevPhase = ph;
             }
-            if ((kind == BossFx.Kind.Vesca || kind == BossFx.Kind.VescaFinal) && cm.PendingDecision?.tele.drawnRelics is string[] relics)
+            // 遺物は ctx から読む (2026-11-14 修正): 最初の判断が振り直しの時、 その予告は仮組み (CombatManager.Mechanics.cs の振り直しの予告) で
+            //   drawnRelics を持たない (null)。 人が振り直せるターンはほぼ毎ターンこの形なので、 予告から読むと遺物の絵が一度も出なかった。
+            //   抽選 (RelicScholar・OnTurnStart) は最初の判断より前に済んでいて、 ctx.vescaDrawnRelics は毎ターンの頭に作り直される
+            var relics = ctx?.vescaDrawnRelics;
+            if ((kind == BossFx.Kind.Vesca || kind == BossFx.Kind.VescaFinal) && relics != null && relics.Count > 0)
             {
                 // 抽選された遺物: 種類 (攻撃 / 防御 / 妨害) で汎用の 3 本を出し分ける。 2 枚の時は続けて流す。
                 // 種類は遺物の表 (VescaRelicPool.All の role) を名前で引く (名前を綴りで切らない)。 天与の 3 品の絵は、 遺物が 2026-08-16 に廃止されているので掛けない

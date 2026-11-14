@@ -111,7 +111,20 @@ namespace UI.Game2D.Battle
         private FxSheet _enemyMoveSheet;
         /// <summary>戦闘の流れを止める絵 (審判の炎) が終わる時刻 (<see cref="_clockU"/>)。</summary>
         private float _blockUntil, _clockU;
-        private int _bossTaken;
+        private int _bossTaken; private string _enemyMoveName;
+
+        /// <summary>[実機の確認用] 流れで流した技・武器・大技の絵の履歴 (ターンの番号つき・新しい物が後ろ・最大 40 件)。 開発ビルドとエディタだけ記録する。</summary>
+        public static readonly List<string> QaMoveLog = new List<string>();
+        [System.Diagnostics.Conditional("UNITY_EDITOR"), System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+        private static void QaNote(string name)
+        {
+            QaMoveLog.Add($"T{CombatSystem.CombatManager.Instance?.CurrentCombatTurn ?? 0} {name}");
+            if (QaMoveLog.Count > 40) QaMoveLog.RemoveAt(0);
+        }
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        /// <summary>[実機の確認用] 大技の待機・暗幕と、 流れている 1 回きりの絵を全部消す (QaBattle.Restart が敵を替える時)。</summary>
+        public void QaClear() { Init(); ResetEnemy(); }
+#endif
         private BossFx.Kind _demoKind = BossFx.Kind.King; private bool _sheetsInTest = true;      // 試験用のキー (K・J・H)
 
         /// <summary>装備している武器の家系 (items.json の family)。 剣・斧・短剣・盾の時だけ絵を流す (それ以外・素手・竜閃は null)。 戦闘の流れ (Game2DBattleSim) が入れる。</summary>
@@ -168,7 +181,7 @@ namespace UI.Game2D.Battle
         public void EnemyAttack(int taken, string moveSheet)
         {
             Init(); FlushDot(); _taken = taken; _phase = Phase.EAttack; _t = 0; _hitDone = false; Showing = true; EnemyHitLanded = false;
-            _enemyMoveSheet = moveSheet != null ? FxSheet.Load(moveSheet) : null;
+            _enemyMoveSheet = moveSheet != null ? FxSheet.Load(moveSheet) : null; _enemyMoveName = moveSheet;
             Game2DSfx.PlayDelayed("slash_swing", EWind * 0.7f, 0.8f, 0.7f);
         }
 
@@ -180,6 +193,7 @@ namespace UI.Game2D.Battle
             Init(); Showing = true;
             var s = FxSheet.Load(name); if (s == null) return;
             _fx.Add(new FxPlay { s = s, t = -delay, x = s.PivotX, y = s.PivotY, add = false });
+            QaNote(name + (delay > 0 ? $" (+{delay:0.00}s)" : ""));
             if (block) _blockUntil = Mathf.Max(_blockUntil, _clockU + delay + s.Duration);
         }
 
@@ -191,7 +205,7 @@ namespace UI.Game2D.Battle
         public void BossCharge(BossFx.Kind kind, int ash, int taken)
         {
             Init(); FlushDot(); Showing = true;
-            _boss.Charge(kind, ash);
+            _boss.Charge(kind, ash); QaNote("charge:" + kind);
             if (_boss.Current == BossFx.Kind.None) { EnemyAttack(taken); return; }
             _phase = Phase.Idle; _t = 0; EnemyHitLanded = true;
             if (taken > 0) { _dmgs.Add(new Dmg { x = EX, y = 178, v = taken, c = Col.Hex("#ff6a5a") }); Game2DSfx.Play("hit_enemy"); }
@@ -208,7 +222,7 @@ namespace UI.Game2D.Battle
                 _dmgs.Add(new Dmg { x = EX, y = 178, v = _bossTaken, c = Col.Hex("#ff6a5a"), life = 1.6f });
                 Game2DSfx.Play(_bossTaken > 0 ? "hit_enemy" : "block");
             };
-            _boss.Heavy(kind, ash);
+            _boss.Heavy(kind, ash); QaNote("heavy:" + kind);
             if (!_boss.Busy) { _boss.OnHit = null; EnemyAttack(taken); return; }      // 絵が無い
             _phase = Phase.Idle; _t = 0;
         }
@@ -426,6 +440,7 @@ namespace UI.Game2D.Battle
                     // 武器の絵 (2026-11-14・#355): 最初にダメージが入る着弾から 1 回流す。 画面全体の絵なので左上に合わせて上から塗る
                     _weaponSheetDone = true; _critFxDone = true;
                     _fx.Add(new FxPlay { s = _weaponSheet, x = _weaponSheet.PivotX, y = _weaponSheet.PivotY, add = false });
+                    QaNote("weapon-" + WeaponSheetFamily + (_crit ? "-crit" : "-normal"));
                 }
                 if (_crit && !_critFxDone)
                 {
@@ -535,6 +550,7 @@ namespace UI.Game2D.Battle
                 {
                     // ボスの通常攻撃の絵 (2026-11-14・#354): 当たった瞬間に 1 回流す。 手描きの赤い斬撃と火花は出さない
                     _fx.Add(new FxPlay { s = _enemyMoveSheet, x = _enemyMoveSheet.PivotX, y = _enemyMoveSheet.PivotY, add = false });
+                    QaNote(_enemyMoveName);
                     _enemyMoveSheet = null;
                 }
                 else

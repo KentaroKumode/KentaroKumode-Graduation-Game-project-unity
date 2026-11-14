@@ -58,8 +58,11 @@ namespace UI.Game2D.Battle
                 run.equippedWeaponId = w.id;
             }
             if (hp > 0) { run.playerMaxHP = hp; run.playerHP = hp; }      // SaveGuard を立てた後 (ランの値を直接書く・確認専用)
-            Runner.Cancel();
+            Runner.Cancel(); Runner.State = "idle";      // 前の戦闘の go= を残さない
+            Fx?.QaClear();                               // 前のボスの待機・暗幕・流れている絵を消す
+            Game2DBattleFx.QaMoveLog.Clear();
             bool ok = gm.QaStartCombat(enemyId);
+            Sim?.QaNewCombat();                          // 戦闘の画面を入り直させる (HP・武器・敵を読み直す。 戦闘開始の知らせの購読に頼らない)
             Game2DLoadingScreen.QaDismiss();      // 新しいランの「第 N 層」のロード画面を出さない (戦闘の画面を覆い、 閉じるまで Go が効かない)
             Debug.Log($"[QaBattle] 戦闘 {enemyId} / 武器 {run.equippedWeaponId ?? "なし"} / HP {run.playerHP}/{run.playerMaxHP} / セーブ停止 {SaveGuard.Suppressed} → {(ok ? "開始" : "失敗")}");
             return ok;
@@ -106,6 +109,26 @@ namespace UI.Game2D.Battle
             Escalation.HeavyCycleOffset = bestOff;
             Debug.Log($"[QaBattle] 大技の起点 {keep} → {bestOff} (T{cur + bestK} がチャージ・T{cur + bestK + 1} が大技)");
             return bestK;
+        }
+
+        /// <summary>流れで流した技・武器・大技の絵の履歴 (「T3 move-relic-guard」の形・古い順・最大 40 件)。 turn を渡すとそのターンの分だけ (0 以下 = 全部)。
+        /// 例: <c>UI.Game2D.Battle.QaBattle.MoveLog()</c></summary>
+        public static string MoveLog(int turn = 0)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (var e in Game2DBattleFx.QaMoveLog)
+                if (turn <= 0 || e.StartsWith("T" + turn + " ")) sb.Append(e).Append(" | ");
+            return sb.Length > 0 ? sb.ToString(0, sb.Length - 3) : "(なし)";
+        }
+
+        /// <summary>ヴェスカが次のターンに使う遺物の 1 枚目の種類を決める: "攻撃" / "防御" / "妨害" (英語 strike / guard / hex も可)。
+        /// その段のプールの、 その種類の先頭の遺物に差し替える (1 ターン限り・効果も本物)。 判断待ちの間に呼ぶと、 次のターンの頭に効く。</summary>
+        public static bool ForceRelic(string role)
+        {
+            string r = role == "strike" ? "攻撃" : role == "guard" ? "防御" : role == "hex" ? "妨害" : role;
+            if (r != "攻撃" && r != "防御" && r != "妨害") return false;
+            ItemSystem.PassiveSkills.Effects.VescaRelicPool.QaForceRole = r;
+            return true;
         }
 
         /// <summary>今の状態を 1 行で (フェーズ・敵・ターン・予告・演出が空いているか・Go の進み)。</summary>
