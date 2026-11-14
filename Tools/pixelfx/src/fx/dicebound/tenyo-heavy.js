@@ -6,20 +6,19 @@
 //   盾:   足もとから金の環が 1 枚ずつ積み上がる → 環が白く光って球が閉じる → 外へ衝撃の輪 → 厚い金の球 (moves の tenyo-shield)。 攻撃しないので白飛びは弱い
 //   指輪: 盤の上に、 大きな金の輪が走って描かれ、 宝石が灯る → 輪が白く光る → 落ちて盤を締める (moves の tenyo-ring) + 締まる瞬間に下半分が金に飛ぶ
 // part = "flow" (見本用: 全部を続けて) / "charge" / "charged" / "heavy" (ゲーム用に切り分ける時)。
-import { Particles, P, Rng, resolveOptions, clamp, ease, rand, TAU, WHITE, fit } from "../../core/index.js";
+import { Particles, P, Rng, resolveOptions, clamp, smooth, ease, rand, hex, TAU, WHITE, fit } from "../../core/index.js";
 import { held as coreHeld, HELD_SEED } from "./gouka-charge.js";   // 王のチャージの「溜まった芯」(白い玉・十字の光・渦を巻いて寄る火の粉)。 式はそのまま、 色を金に
 import { GOLD } from "../holy/_lib.js";
 import { W, H, BOARD, beam, oval, diamond, wash } from "./_kit.js";
 import * as MOVES from "./moves.js";
 import * as ECLIPSE from "../shadow/eclipse.js";
-import * as BLESSING from "../holy/blessing.js";
 import { glint } from "./chevalier-charge.js";
 import { scaledFx } from "./_scaled.js";
 
 export const T_CHARGE = 1.4, T_HELD = 1.5, T_LEAD = 0.45;   // チャージ・待機の 1 周・発動の溜め (光る → 落ちる → 白)
 const BODY = [240, 136], RING_Y = 96, SUCK = 1.05;   // SUCK = 吸い込みが終わる時刻 (その後 0.35 秒で、 待機の姿に落ち着く)
 const GUARD_Y = 24, BLADE = 118, SR = 88;
-const SUN = [240, 44], SUN_K = 1.5;   // 剣: 頭上の日食の中心と倍率 (元の月の半径 19 → 28)   // 剣のつばの高さ・刃の長さ・盾の球の半径
+const SUN = [240, 42], SUN_K = 1.15;   // 剣: 頭上の日食の中心と倍率 (元の月の半径 19 → 22。 作者: もう少し小さく)   // 剣のつばの高さ・刃の長さ・盾の球の半径
 
 export const meta = {
   name: "Tenyo heavy (DICE BOUND)",
@@ -61,9 +60,37 @@ export function create(o) {
   const F = fit(o.palette, 9);
   const [gx, gy] = gift === "sword" ? SUN : gift === "shield" ? BODY : [240, RING_Y];   // 粒が集まる先: 剣 = 頭上の日食・盾 = 体の中心・指輪 = 輪の中心
   // 剣のチャージ (作者の指定): ヴェスカに holy/blessing (上から注ぐ光の円錐) + 頭上に shadow/eclipse (色は Blessing の金を基準) + 粒が集まる。 2 つとも式はそのまま、 大きさと色だけ (_scaled.js)
-  const SUNPAL = ["#0b0608", "#3b1d2a", "#7a3a2c", "#c4652e", "#f0a040", "#ffd25e", "#fff0a0", "#ffffff"];
-  const ecl = gift === "sword" ? scaledFx(ECLIPSE, { K: SUN_K, at: SUN, speed: 4 / 3, opts: { palette: SUNPAL, pearl: ["#f0a040", "#ffd25e", "#fff0a0", "#fffbe0"] } }) : null;
-  const bless = gift === "sword" ? scaledFx(BLESSING, { K: 2.4, at: [240, 196], opts: { palette: GOLD } }) : null;
+  // 色は、 この液晶の 5 つの段に 1 つずつ落ちるように、 明るさを大きく離して選ぶ (作者: 縁の発光が、 このゲームの色遣いにすると潰れる)。
+  //   月 = 一番暗い段 / 冠の外 = 2 段目 / 冠の中ほど = 3 段目 / 冠の根もと = 4 段目 / 月の縁の細い輪と光の玉 = 白
+  const SUNPAL = ["#0b0608", "#2a1810", "#3a2414", "#4a3018", "#5c3c1c", "#8a5c26", "#f0d68a", "#ffffff"];
+  const ecl = gift === "sword" ? scaledFx(ECLIPSE, { K: SUN_K, at: SUN, speed: 4 / 3, glow: 0.3, opts: { palette: SUNPAL, pearl: ["#6a4a20", "#b8862e", "#f0d68a", "#ffffff"] } }) : null;
+  // 注ぐ光 (holy/blessing の円錐): 明るさの式 (4 本の光の筋が、 それぞれ 1 周に整数回ゆらぐ) は元のまま。 塗り方だけ変えた ──
+  // 元は淡い半透明の重ね塗りで、 この液晶の 5 つの段では、 まだらな網点に潰れる (作者: もっとめりはりを付けてシャープに)。 ここでは明るさを 4 つの段に切って、 べたの色で塗る:
+  //   筋の芯 = 白 / 筋 = 明るい金 / 筋のまわり = 金 (半分の網点) / 円錐の地 = 暗い金 (まばらな網点)。 きらめきは、 にじみ無しの 1 ドットの十字。
+  const RAYS = [[-0.62, 0.16, 1, 0.3], [-0.2, 0.2, 2, 1.7], [0.22, 0.14, 1, 4.1], [0.6, 0.18, 2, 2.6]], CT = 3, CONE_TOP = SUN[1] + 20, CONE_BOT = 199;
+  const halfW = (y) => 9 + 39 * ((y - CONE_TOP) / (CONE_BOT - CONE_TOP));
+  const rayI = (q, tt) => { let I = 0.3 * Math.max(0, 1 - q * q); for (const [o2, w, k, ph] of RAYS) I += Math.exp(-(((q - o2) / w) ** 2)) * (0.55 + 0.45 * Math.sin((tt / CT) * TAU * k + ph)) * 0.6; return I * smooth(1.25, 0.75, Math.abs(q)); };
+  const CG = [hex("#6a5c48"), hex("#b8923e"), hex("#f0d68a")];
+  function cone(p, tt, k) {
+    if (k <= 0.02) return;
+    const yb = CONE_TOP + (CONE_BOT - CONE_TOP) * clamp(k * 1.4);   // 上から降りて来る
+    p.shade(240 - 50, CONE_TOP, 240 + 50, yb, (x, y, o2) => {
+      const I = rayI((x - 240) / halfW(y), tt) * (0.7 + 0.3 * smooth(CONE_TOP, CONE_BOT, y)) * smooth(CONE_TOP, CONE_TOP + 10, y) * (y > yb - 8 ? (yb - y) / 8 : 1);
+      if (I < 0.2) return;
+      if (I > 0.86) { o2.c = WHITE; o2.a = 1; } else if (I > 0.6) { o2.c = CG[2]; o2.a = 1; } else if (I > 0.4) { o2.c = CG[1]; o2.a = 0.5; } else { o2.c = CG[0]; o2.a = 0.3; }
+    });
+    // 筋の上を、 光の粒が下へ走る (元の「2 本の筋に沿って光が流れる」)
+    for (const [o2, , kk, ph] of [RAYS[1], RAYS[2]]) for (let y = CONE_TOP + 6; y < yb; y++) { const pulse = 0.5 + 0.5 * Math.sin(y * 0.11 - (tt / CT) * TAU * 3 + ph); if (pulse > 0.9) p.dot(240 + o2 * halfW(y), y, WHITE); }
+    // 降りて来るきらめき: 1 ドット、 またたく時だけ十字 (にじみは付けない)
+    for (let i = 0; i < 16; i++) {
+      const a = ((tt / CT) + rand(i, 1)) % 1, q = (rand(i, 2) - 0.5) * 1.7, y = CONE_TOP + 8 + a * (CONE_BOT - CONE_TOP - 10), x = 240 + q * halfW(y) + Math.sin(a * 9 + i) * 2, tw = Math.sin(a * TAU * (3 + (i % 3)) + i);
+      if (y > yb) continue;
+      p.dot(x, y, WHITE);
+      if (tw > 0.5) { p.dot(x - 1, y, CG[2]); p.dot(x + 1, y, CG[2]); p.dot(x, y - 1, CG[2]); p.dot(x, y + 1, CG[2]); }
+    }
+    // 足もと: 光の当たる線
+    if (k >= 0.7) for (let x = -44; x <= 44; x++) { const u = Math.abs(x) / 44; p.dot(240 + x, CONE_BOT, u < 0.35 ? WHITE : u < 0.7 ? CG[2] : CG[1]); if (u < 0.5) p.dot(240 + x, CONE_BOT + 1, CG[1]); }
+  }
   const ps = new Particles({ rng: R, sparks: [WHITE, C[6], C[5], C[3]] });
   // 渦を巻いて寄る粒 (王のチャージと同じ作り・数も同じくらい)
   const grit = Array.from({ length: 70 }, () => { const t0 = R.range(0, SUCK - 0.4); return { a: R.range(0, TAU), d: R.range(70, 250), t0, T: R.range(0.4, Math.max(0.45, SUCK - 0.05 - t0)), spin: R.sign() * R.range(0.4, 1.2), c: R.pick([C[3], C[4], C[5], C[6]]) }; });
@@ -99,7 +126,7 @@ export function create(o) {
     if (gift === "sword") {
       // ヴェスカに注ぐ光 (Blessing): 日食が出来てから、 後半で降りて来る。 頭上の日食 (Eclipse): 吸い込みと一緒に現れる。 完了の瞬間と発動の溜めでは、 縁の光の玉 (ダイヤモンドリング) が強く走る
       const f = p.fade;
-      p.fade = f * clamp((grow - 0.45) / 0.5); bless.draw(p); bless.draw(p);   // 2 度重ねる: 元の光は淡く、 この液晶の色の段では円錐がまだらにしか出ないため (光を倍に)
+      cone(p, ph * HELD_T, clamp((grow - 0.45) / 0.5));
       p.fade = f * clamp(grow * 1.6); ecl.draw(p);
       p.fade = f;
       const bxx = SUN[0] + Math.cos(-0.72) * 19.4 * SUN_K, byy = SUN[1] + Math.sin(-0.72) * 19.4 * SUN_K;
@@ -138,7 +165,7 @@ export function create(o) {
       t += dt;
       if (t < SUCK - 0.15) { const k = t / SUCK; for (let n = 0; n < 1 + Math.floor(k * 5); n++) { if (!R.chance(0.85)) continue; const a = R.range(0, TAU), D = R.range(80, 240) * (1 - 0.25 * k), T = R.range(0.2, 0.36), v = (D * 3) / (Math.exp(3 * T) - 1); ps.spawn(P.STREAK, gx + Math.cos(a) * D, gy + Math.sin(a) * D * 0.7, -Math.cos(a) * v, -Math.sin(a) * v * 0.7, T, R.chance(0.5) ? C[6] : C[4]); } }
       ps.update(dt);
-      if (ecl) { ecl.update(dt); bless.update(dt); }
+      if (ecl) ecl.update(dt);
       if (t > TP) { const d = Math.min(dt, t - TP); payT += d; pay.update(d); }
     },
     draw(p) {
