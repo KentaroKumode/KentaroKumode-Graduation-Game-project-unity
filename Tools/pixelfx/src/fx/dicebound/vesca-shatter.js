@@ -35,7 +35,7 @@ function paneY(t) {
 
 // the break: jagged rays out of the impact crossed by rings, every crack shared by the two cells it splits
 function pattern(R) {
-  const Ix = 240, Iy = 130,   /* 割れる中心 = ヴェスカの玉の中心 (元は画面の中ほどの乱数) */ NR = 13, RING = [0, 9, 21, 37, 58, 86, 122, 168, 232];
+  const Ix = 240, Iy = 130,   /* 割れる中心 = ヴェスカの玉の中心 (元は画面の中ほどの乱数) */ NR = 13, RING = [0, 9, 21, 37, 58, 90, 134, 200, 340];   // 一番外を 232 → 340 に (割れる中心 (240,130) から画面の隅まで 303。 元の大きさのままだと、 左右の端に破片の無い隙間が出る)
   const ang = Array.from({ length: NR }, (_, i) => ((i + R.range(-0.3, 0.3)) / NR) * TAU), speed = ang.map(() => R.range(800, 1300));
   const V = ang.map((a) => RING.map((r, j) => {
     if (!j) return [Ix, Iy];
