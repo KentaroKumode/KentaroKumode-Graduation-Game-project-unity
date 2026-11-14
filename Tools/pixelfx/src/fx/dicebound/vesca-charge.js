@@ -25,7 +25,7 @@ export const meta = {
   options: { palette: VIOLET, broken: false, seed: 6 },
 };
 
-const HANDOFF = 2.75 + 1 / 8;   // 待機の 0 秒 = 最後のコマの 1 コマ後 (library/dicebound/judge-flow.md の「道具の罠」)
+const HANDOFF = 2.75 + 1 / 24;   // 2026-11-15: 1 秒 24 コマで書き出すので、 待機の 0 秒 = 最後のコマの 1/24 秒後 (旧 1/8・library/dicebound/judge-flow.md の「道具の罠」)
 const SUCK = 1.6, VOID = hex("#05040a");
 const ORB_Y = 62, ORB_D = 3.2;   // void-orb は、 原点の 62 上に玉を描く・3.2 秒で 1 周
 export const HELD = 3, RC = 27, NOON = -Math.PI / 2;   // 待機の 1 周 (秒・1 秒 8 コマで 24 コマ)・文字盤の半径・12 時の向き

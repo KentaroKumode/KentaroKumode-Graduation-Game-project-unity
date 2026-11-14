@@ -23,7 +23,7 @@ export const meta = {
 };
 
 // 待機へ渡す時刻: 最後のコマの 1 コマ後 (1 秒 8 コマ) が、 待機の 0 秒 (library/dicebound/judge-flow.md の「道具の罠」)
-const HANDOFF = 2.75 + 1 / 8;
+const HANDOFF = 2.75 + 1 / 24;   // 2026-11-15: 1 秒 24 コマで書き出すので、 待機の 0 秒 = 最後のコマの 1/24 秒後 (旧 1/8)
 const SUCK = 1.6, VOID = hex("#05060c");
 export const HELD = 1.5, REST = 36;   // 待機の 1 周 (秒) と、 きらめきの長さ (横の片側・px)
 

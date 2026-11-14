@@ -64,6 +64,7 @@ namespace CombatSystem
             int extra = _deck.state.BeginTurn();
             // ヴェスカ〈停滞する時間〉: 引いた端子 1 枚ごとに確率で止める (持たない敵は 0)
             float stop = ItemSystem.PassiveSkills.Effects.StagnantTime.StopChance(currentEnemy);
+            if (ctx != null && TenyoHeavy.RingStopsAt(ctx.currentTurn)) stop = 1f;      // 天与の指輪 (2026-11-15): 大技の次のターンは、 引いた端子を全部止める
             _deck.DrawTurn(TerminalCards.HandSize + extra, _termRetain, stop);
             TerminalDiag.NoteDrawn(_deck.LastDrawnIds);   // [計装 #106] 新しく引いた端子
             if (TerminalCards.HandCarry && ctx != null && ctx.currentTurn > 1) BossDownDiag.NoteCarry(_deck.LastCarriedCount);   // [計装 2026-11-13] 持ち越した枚数 (戦闘の 1 ターン目は除く)

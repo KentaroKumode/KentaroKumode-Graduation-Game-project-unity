@@ -27,7 +27,7 @@ namespace CombatSystem
                 Debug.Log("[戦闘] " + GameLoop.VescaClock.BattleLine);
             if (VescaClockActive) Debug.Log($"[ダウン] 〈{GameLoop.VescaClock.Name}〉: {enemy?.displayName} の目盛りに {BossParams.VescaClockNotch * 100f:0}% を足した");
             BossDown.ActiveNow = false; BossDown.TakenMulNow = false;
-            if (newCombat) { Escalation.HeavyCycleOffset = 0; Escalation.HeavyHpRatio = 1f; }
+            if (newCombat) { Escalation.HeavyCycleOffset = 0; Escalation.HeavyHpRatio = 1f; TenyoHeavy.Reset(); }
             BossDownDiag.BeginFight(enemy?.id, _down.Enabled);
             HeavyHitDiag.BeginFight(enemy?.id);   // [計装 2026-11-14] 大技の被ダメ
         }
@@ -95,6 +95,7 @@ namespace CombatSystem
             if (_down.downNow) { t.enemyAttackValue = 0; t.secondaryAttackValue = 0; }
             // 大技のチャージ (2026-11-14): 攻撃しない。 攻撃値は Escalation.HeavyFactor が 0 にしてある (予告も BOT の見込みも同じ関数)。 ここは画面の印だけ
             t.enemyCharging = !_down.downNow && Escalation.IsChargeNoAttack(currentEnemy, t.turn);
+            t.tenyoGift = (int)TenyoHeavy.TelegraphAt(currentEnemy, t.turn, _down.downNow);      // ヴェスカの天与 (2026-11-15): チャージと大技のターンに、 どれが来るか
             // 灰燼の王の〈業火〉(2026-11-14): このターンが業火なら、 烈炎の分 (軽減無視・撃ったら烈炎 0)。 ダウンのターンは撃たない
             t.heavyBurst = _down.downNow ? 0 : BlazeBurstAt(currentEnemy, t.turn, BlazeStacks(ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context));
         }

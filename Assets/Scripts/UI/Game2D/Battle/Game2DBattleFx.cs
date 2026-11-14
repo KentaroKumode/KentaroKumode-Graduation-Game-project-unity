@@ -298,17 +298,17 @@ namespace UI.Game2D.Battle
 
         /// <summary>大技のチャージのターン (敵はこのターン攻撃しない): チャージを流し、 終わったら待機のループ。 ash = 烈炎の数 (王だけ)。
         /// taken = このターンに受けたダメージ (審判の炎など・0 なら数字を出さない)。 絵の無いボスは、 ふつうの敵の攻撃の演出。</summary>
-        public void BossCharge(BossFx.Kind kind, int ash, int taken)
+        public void BossCharge(BossFx.Kind kind, int ash, int taken, int tenyo = 0)
         {
             Init(); FlushDot(); Showing = true;
-            _boss.Charge(kind, ash); QaNote("charge:" + kind);
+            _boss.Charge(kind, ash, tenyo); QaNote("charge:" + kind + (tenyo > 0 ? ":" + CombatSystem.TenyoHeavy.NameOf((CombatSystem.TenyoHeavy.Gift)tenyo) : ""));
             if (_boss.Current == BossFx.Kind.None) { EnemyAttack(taken); return; }
             _phase = Phase.Idle; _t = 0; EnemyHitLanded = true;
             if (taken > 0) { _dmgs.Add(new Dmg { x = EX, y = 178, v = taken, c = Col.Hex("#ff6a5a") }); Game2DSfx.Play("hit_enemy"); }
         }
 
         /// <summary>大技のターンの敵の行動: 待機を入ってよいコマまで回してから大技を流し、 当たる拍子にダメージの数字を出す。 ash = 撃つ前の烈炎の数 (王だけ)。</summary>
-        public void BossHeavy(BossFx.Kind kind, int ash, int taken)
+        public void BossHeavy(BossFx.Kind kind, int ash, int taken, int tenyo = 0)
         {
             Init(); FlushDot(); Showing = true;
             _bossTaken = taken; EnemyHitLanded = false;
@@ -318,13 +318,23 @@ namespace UI.Game2D.Battle
                 _dmgs.Add(new Dmg { x = EX, y = 178, v = _bossTaken, c = Col.Hex("#ff6a5a"), life = 1.6f });
                 Game2DSfx.Play(_bossTaken > 0 ? "hit_enemy" : "block");
             };
-            _boss.Heavy(kind, ash); QaNote("heavy:" + kind);
+            _boss.Heavy(kind, ash, tenyo); QaNote("heavy:" + kind + (tenyo > 0 ? ":" + CombatSystem.TenyoHeavy.NameOf((CombatSystem.TenyoHeavy.Gift)tenyo) : ""));
             if (!_boss.Busy) { _boss.OnHit = null; EnemyAttack(taken); return; }      // 絵が無い
             _phase = Phase.Idle; _t = 0;
         }
 
         /// <summary>大技が取り消された (ダウン): 待機のループを止め、 暗幕を戻す。</summary>
         public void BossCancel() => _boss.Cancel();
+
+        /// <summary>ヴェスカの形態移行の演出 (2026-11-15・ダメージ無し): final = false なら 1→2・2→3 (止まって砕ける) / true なら 3→4 (乱れて信号が切れる)。
+        /// 終わるまで戦闘の流れを止める。 前の段の大技の待機が出ていたら消して、 敵を出し直す (倒した演出の途中でも)。</summary>
+        public void VescaTransition(bool final)
+        {
+            Init(); FlushDot(); Showing = true;
+            _phase = Phase.Idle; _t = 0; _dissolve = 0; _boss.OnHit = null;
+            _boss.Clear(); _boss.Transition(final);
+            QaNote("transition:" + (final ? "3→4" : "→2/3"));
+        }
 
         /// <summary>毒 (bleed = false) / 出血が効いた演出 (1 回きり)。 dmg = そのダメージ (粒がはじける拍子に数字に出し、 HP を減らす)。
         /// 終わると Idle へ戻る (HP が尽きていれば撃破の演出へ)。 絵の残りは次の演出と重なって流れきる。</summary>

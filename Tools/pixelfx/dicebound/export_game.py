@@ -24,7 +24,7 @@ def main():
     os.makedirs(DEST, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
         for name, fid, inks, extra in GAME_FX:
-            subprocess.run(["node", os.path.join(HERE, "lcd_export.mjs"), fid, tmp, inks, "8", *extra], check=True)
+            subprocess.run(["node", os.path.join(HERE, "lcd_export.mjs"), fid, tmp, inks, "24", *extra], check=True)      # 2026-11-15: 1 秒 24 コマ (旧 8)
             base = os.path.join(tmp, *fid.split("/"), fid.split("/")[1])
             shutil.copyfile(base + ".png", os.path.join(DEST, name + ".png.bytes"))
             shutil.copyfile(base + ".json", os.path.join(DEST, name + ".json"))

@@ -222,6 +222,7 @@ namespace CombatSystem
         public static float HeavyFactor(EnemyData e, int combatTurn)
         {
             if (e == null || e.heavyPeriod <= 0) return 1f;
+            if (TenyoHeavy.NoAttackAt(e, combatTurn)) return 0f;      // ヴェスカの天与の盾・指輪 (2026-11-15): 攻撃しない大技
             int toHeavy = TurnsToHeavy(e, combatTurn);
             float heavyWithBonus = toHeavy == 0 && e.heavyMul > 0f
                 ? e.heavyMul + MetaProgression.MetaDebuffApplicator.GetHeavyMulBonus() : 0f;   // 挑戦カード: 大技の倍率 +N

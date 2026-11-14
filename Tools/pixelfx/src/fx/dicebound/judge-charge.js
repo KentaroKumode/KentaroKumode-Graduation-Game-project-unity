@@ -22,7 +22,7 @@ export const meta = {
 };
 
 // 待機へ渡す時刻: 最後のコマ (2.75 秒) の 1 コマ後 (1 秒 8 コマ) が、 待機の 0 秒。 ここがずれると、 つなぎ目で時刻が戻って逆回しが 1 コマ挟まる
-const HANDOFF = 2.75 + 1 / 8;
+const HANDOFF = 2.75 + 1 / 24;   // 2026-11-15: 1 秒 24 コマで書き出すので、 待機の 0 秒 = 最後のコマの 1/24 秒後 (旧 1/8)
 const SUCK = 1.6, VOID = hex("#0a0806");
 export const SUN_T = 4, SUN_SEED = 3;   // 日輪の 1 周 (秒・1 秒 8 コマで 32 コマ) と、 きらめきの種
 const frac = (x) => x - Math.floor(x);

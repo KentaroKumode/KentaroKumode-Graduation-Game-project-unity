@@ -31,6 +31,9 @@ namespace CombatSystem
         BlazeBurstPerStack, // 6層 灰燼の王・大技〈業火〉の烈炎 1 つあたりの軽減無視ダメージ (業火 = 攻撃 × heavyMul + 烈炎 × これ・撃ったら烈炎 0)。 基準5 (2026-11-14・作者の決定)
         BlazePerShield,    // 6層 灰燼の王・〈烈炎〉が積もる量: そのターンに敵の主攻撃をシールドで肩代わりした量 この値 ごとに烈炎 +1 (切り捨て・HeavyCycle.BlazeGain)。
                            //   基準10 (2026-11-14・作者の決定・未測定)。 測定の口 blazeStackRule=Guard2 (旧い「防御 2 個以上」) では読まない
+        // 2026-11-15: ヴェスカの大技 = 天与 (CombatSystem.TenyoHeavy・3・4 段目)。 仮の値 (作者の決定・未測定)
+        TenyoShieldPct,    // 天与の盾: ヴェスカが得るシールド = 最大 HP × この値 / 100。 基準20
+        TenyoSwordBite,    // 天与の剣: 大技が当たったら、 こちらの最大 HP をこの値だけ削る (〈灼〉の vescaMaxHpBiteOnHit と同じ仕組み・〈灼〉3 の 2 倍)。 基準6
         // 2026-11-12 (#126): RobeStacks (天衣無縫・読む側なし)・StanceAtkMult / WeakRollRatio (敵スタンス ADR-0005・呼ぶ所なし) を削除。
         //   番号で保存している所は無い (調整値の boss_tuning.json は名前で持ち、 L3 ボス調整器ごと削除)。
     }
@@ -85,6 +88,8 @@ namespace CombatSystem
                 case BossParam.BlazeBurstPerStack: return new ParamSpec( 5f, 0f, 20f);
                 case BossParam.BlazePerShield:    return new ParamSpec(10f, 1f, 100f);   // 2026-11-14: 烈炎はシールドで受けた量で積もる (作者の決定)
                 case BossParam.RegrowthRate:      return new ParamSpec(0.03f, 0f, 0.10f);
+                case BossParam.TenyoShieldPct:    return new ParamSpec(20f, 0f, 100f);   // 2026-11-15 天与の盾 (仮)
+                case BossParam.TenyoSwordBite:    return new ParamSpec( 6f, 0f, 50f);    // 2026-11-15 天与の剣 (仮・〈灼〉の 2 倍)
                 default:                          return new ParamSpec( 1f, 0f,  1f);
             }
         }

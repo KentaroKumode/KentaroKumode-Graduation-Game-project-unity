@@ -123,6 +123,17 @@ namespace UI.Game2D.Battle
 
         /// <summary>ヴェスカが次のターンに使う遺物の 1 枚目の種類を決める: "攻撃" / "防御" / "妨害" (英語 strike / guard / hex も可)。
         /// その段のプールの、 その種類の先頭の遺物に差し替える (1 ターン限り・効果も本物)。 判断待ちの間に呼ぶと、 次のターンの頭に効く。</summary>
+        /// <summary>ヴェスカ (3・4 段目) が次のチャージのターンに選ぶ天与を決める: "sword" / "shield" / "ring" (1 回限り)。 判断待ちの間に呼ぶ。</summary>
+        public static bool ForceTenyo(string gift)
+        {
+            var g = gift == "sword" ? CombatSystem.TenyoHeavy.Gift.Sword : gift == "shield" ? CombatSystem.TenyoHeavy.Gift.Shield : gift == "ring" ? CombatSystem.TenyoHeavy.Gift.Ring : CombatSystem.TenyoHeavy.Gift.None;
+            if (g == CombatSystem.TenyoHeavy.Gift.None) return false;
+            CombatSystem.TenyoHeavy.QaForce = g; return true;
+        }
+
+        /// <summary>敵の HP を変える (1 以上・最大まで・確認専用)。 ヴェスカなら HP 1 にして <see cref="Go"/> すると、 次の段へ移り、 形態移行の演出が流れる。</summary>
+        public static void SetEnemyHp(int hp) => CombatManager.Instance?.QaSetEnemyHp(hp);
+
         public static bool ForceRelic(string role)
         {
             string r = role == "strike" ? "攻撃" : role == "guard" ? "防御" : role == "hex" ? "妨害" : role;
@@ -207,13 +218,19 @@ namespace UI.Game2D.Battle
         // ── 演出だけを直接流す (戦闘の流れを通さない・キーと同じ) ──
 
         private static BossFx.Kind _demo = BossFx.Kind.King;
+        private static int _demoTenyo;
+
+        /// <summary>試験のボスの天与 (ヴェスカで流す時): "sword" / "shield" / "ring" / "none" (時計の絵)。</summary>
+        public static void DemoTenyo(string gift) => _demoTenyo = gift == "sword" ? 1 : gift == "shield" ? 2 : gift == "ring" ? 3 : 0;
+        /// <summary>形態移行の演出だけを流す (final = 3→4)。</summary>
+        public static void DemoTransition(bool final) => Fx?.VescaTransition(final);
 
         /// <summary>試験のボスを選ぶ (キー K): "King" / "Judge" / "Chevalier" / "Vesca" / "VescaFinal"。</summary>
         public static void DemoBoss(string kind) { if (System.Enum.TryParse(kind, out BossFx.Kind k)) _demo = k; }
         /// <summary>チャージ → 待機 (キー J の 1 回目)。</summary>
-        public static void DemoCharge(int ash = 3) => Fx?.BossCharge(_demo, ash, 0);
+        public static void DemoCharge(int ash = 3) => Fx?.BossCharge(_demo, ash, 0, _demoTenyo);
         /// <summary>大技 (キー J の 2 回目・待機が出ていれば、 入ってよいコマまで回してから)。</summary>
-        public static void DemoHeavy(int ash = 3, int taken = 12) => Fx?.BossHeavy(_demo, ash, taken);
+        public static void DemoHeavy(int ash = 3, int taken = 12) => Fx?.BossHeavy(_demo, ash, taken, _demoTenyo);
         /// <summary>待機を止める (ダウンで取り消した時と同じ)。</summary>
         public static void DemoCancel() => Fx?.BossCancel();
         /// <summary>ボスの通常の技の絵を 1 回 (名前は Resources/Game2DFx の move-*: "move-king-attack" など)。</summary>
