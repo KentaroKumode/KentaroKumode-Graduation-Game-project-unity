@@ -20,6 +20,8 @@ namespace UI.Game2D.Battle
     {
         private static Game2DBattleSim Sim => Object.FindObjectOfType<Game2DBattleSim>(true);
         private static Game2DBattleFx Fx => Object.FindObjectOfType<Game2DBattleFx>(true);
+        /// <summary>戦闘の GUI の格納のばねの値 (0.00 = 出ている / 1.00 = 画面の外)。</summary>
+        private static string StowNow() { var h = Object.FindObjectOfType<Game2DBattleHud>(true); return h != null ? h.StowValue(1000f).ToString("0.00") : "-"; }
 
         /// <summary>確認で使う HP の既定 (最大 HP・今の HP)。 ボス相手に負けないよう大きくしてある。</summary>
         public const int DefaultHp = 9999;
@@ -169,13 +171,17 @@ namespace UI.Game2D.Battle
         /// <summary>直近の層の頭の読み込み: 層・枚数・頼んでから全部読めるまでの時間 (ミリ秒・読みかけなら読みかけの数)。 例: "floor 7 (depth 7) 64 枚 1830 ms"。</summary>
         public static string LayerLoad() => FxLayerPreload.Busy ? $"{FxLayerPreload.QaLayerName} {FxLayerPreload.QaLayerCount} 枚 読みかけ {FxSheet.PendingCount}" : $"{FxLayerPreload.QaLayerName} {FxLayerPreload.QaLayerCount} 枚 {FxLayerPreload.QaLayerMs:0} ms";
 
+        /// <summary>GUI の格納を手で決める (2026-11-15): 1 = 格納したまま / 0 = 出したまま / −1 = 自動 (ボスの大技の発動とヴェスカの形態移行の間だけ・既定)。
+        /// <c>Start</c> / <c>Restart</c> で自動に戻る。 例: <c>UI.Game2D.Battle.QaBattle.ForceStow(1)</c></summary>
+        public static void ForceStow(int mode) => Game2DBattleFx.QaStow = mode < 0 ? -1 : mode > 0 ? 1 : 0;
+
         /// <summary>今の状態を 1 行で (フェーズ・敵・ターン・予告・演出が空いているか・Go の進み)。</summary>
         public static string Status()
         {
             var gm = GameManager.Instance; var s = Sim; var f = Fx; var cm = CombatManager.Instance;
             return $"phase={gm?.CurrentPhase} enemy={cm?.CurrentEnemy?.id} turn={cm?.CurrentCombatTurn} sim={s?.phase} heavyIn={s?.heavyIn} charging={s?.charging} down={s?.down} " +
                    $"hp={s?.playerHp}/{s?.playerMax} vescaShield={ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context?.vescaShield} fxIdle={f?.IsIdle} bossIdling={f?.BossIdling} go={Runner.State} loading={Game2DLoadingScreen.Blocking} saveSuppressed={SaveGuard.Suppressed} " +
-                   $"gui=[on={Game2DGuiRt.FxOn} weight={Game2DGuiRt.FxWeightReady} dark={Game2DGuiRt.FxDark:0.00} red={Game2DGuiRt.FxRed:0.00} white={Game2DGuiRt.FxWhite:0.00} shake={Game2DGuiRt.FxShake}]";
+                   $"stow=[{(f != null && f.GuiStowed ? "格納" : "出")} hud={StowNow()} force={Game2DBattleFx.QaStow}] gui=[on={Game2DGuiRt.FxOn} weight={Game2DGuiRt.FxWeightReady} dark={Game2DGuiRt.FxDark:0.00} red={Game2DGuiRt.FxRed:0.00} white={Game2DGuiRt.FxWhite:0.00} shake={Game2DGuiRt.FxShake}]";
         }
 
         // ── Go を次のフレーム以降で押し切る係 ──

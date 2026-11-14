@@ -138,6 +138,14 @@ public class Game2DFxTestWindow : EditorWindow
             if (GUILayout.Button("形態移行 (→2・3: 砕ける)")) { QaBattle.DemoTransition(false); _last = "形態移行 →2/3"; }
             if (GUILayout.Button("形態移行 (3→4: 信号が切れる)")) { QaBattle.DemoTransition(true); _last = "形態移行 3→4"; }
         }
+        // GUI の格納 (2026-11-15): 大技の発動・形態移行の間は自動で格納する。 見え方を確かめる時は手で切り替える (戦闘を始め直すと自動に戻る)
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            EditorGUILayout.LabelField("GUI の格納", GUILayout.Width(70));
+            if (GUILayout.Button("格納")) { QaBattle.ForceStow(1); _last = "GUI を格納"; }
+            if (GUILayout.Button("戻す")) { QaBattle.ForceStow(0); _last = "GUI を戻す"; }
+            if (GUILayout.Button("自動 (発動の間だけ)")) { QaBattle.ForceStow(-1); _last = "GUI の格納は自動"; }
+        }
 
         // ── 武器 ──
         EditorGUILayout.Space();

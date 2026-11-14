@@ -141,7 +141,17 @@ namespace UI.Game2D
             if (_drag == null) _drag = Make("drag", new RectInt(0, 0, UsbBody, UsbLong), out _td);
         }
 
-        private Game2DSpring _spL, _spR, _spT; private bool _spInit;
+        private Game2DSpring _spL, _spR, _spT, _spS; private bool _spInit;
+
+        // ── 大技の発動の間の格納 (2026-11-15・作者の決定「大技発動演出中 (ループ待機を除く) は GUI が格納されるように」) ──
+        //   Game2DBattleFx.GuiStowed の間、 入りと同じばね (0.25 秒前後で収まる) で、 左の列は左へ・予告の枠と手札は右へ・上の帯は上へ、 画面の外まで滑らせる
+        //   (動かすのは位置だけ・整数 dot・拡大縮小しない)。 下の資源バーは Game2DHud が同じ値 (StowValue) で下へ滑らせる。 格納の間は操作を受けない。
+        /// <summary>格納で動かす距離 (dot): 左の列 (出目が 9 個の時の幅 260 + 余白) / 予告の枠 / 手札 / 上の帯 / 下の資源バー (Game2DHud)。</summary>
+        public const int StowLeft = 270, StowRight = 120, StowHand = 170, StowTop = 62, StowBottom = 56;
+        /// <summary>格納のばねの値 (0 = 出ている / 1 = 画面の外)。 dist = 動かす距離 (行き過ぎを dist に対して 3 dot 以内に収める)。</summary>
+        public float StowValue(float dist) => _spInit ? _spS.Value(dist) : 0f;
+        /// <summary>格納に向かっている、 または まだ戻り切っていない (この間は操作を受けない)。</summary>
+        public bool Stowed => _spInit && (_spS.tgt > 0.5f || _spS.x > 0.02f);
         /// <summary>入り・出の途中を含めて、 どれかが見えている。</summary>
         public bool Visible => !_spInit || !(_spL.tgt < 0.5f && _spR.tgt < 0.5f && _spT.tgt < 0.5f && _spL.x < 0.005f && _spR.x < 0.005f && _spT.x < 0.005f && _spL.Settled && _spR.Settled && _spT.Settled);
 
@@ -150,21 +160,23 @@ namespace UI.Game2D
         {
             if (_right == null) return;
             EnsurePanels();
-            if (!_spInit) { _spL.Set(0); _spR.Set(0); _spT.Set(0); _spInit = true; }
+            if (!_spInit) { _spL.Set(0); _spR.Set(0); _spT.Set(0); _spS.Set(0); _spInit = true; }
             float t = on ? 1f : 0f;
             _spL.Go(t, on ? 0.03f : 0f); _spT.Go(t, on ? 0.07f : 0.03f); _spR.Go(t, on ? 0.12f : 0.06f);
-            _spL.Step(dt); _spT.Step(dt); _spR.Step(dt);
+            _spS.Go(on && fx != null && fx.GuiStowed ? 1f : 0f, 0f);      // 戦闘の画面を離れたら必ず戻す (引っ込んだまま残さない)
+            _spL.Step(dt); _spT.Step(dt); _spR.Step(dt); _spS.Step(dt);
             _slide = _spL.x;
-            float inL = Mathf.Round((1f - _spL.Value(200f)) * 200f), inR = Mathf.Round((1f - _spR.Value(170f)) * 170f);
-            _right.anchoredPosition = new Vector2(Right.x + Mathf.Round((1f - _spR.Value(120f)) * 120f), -Right.y);
-            _top.anchoredPosition = new Vector2(Top.x, -Top.y + Mathf.Round((1f - _spT.Value(62f)) * 62f));
+            float sL = Mathf.Round(StowValue(StowLeft) * StowLeft), sR = Mathf.Round(StowValue(StowRight) * StowRight), sH = Mathf.Round(StowValue(StowHand) * StowHand), sT = Mathf.Round(StowValue(StowTop) * StowTop);
+            float inL = Mathf.Round((1f - _spL.Value(200f)) * 200f) + sL, inR = Mathf.Round((1f - _spR.Value(170f)) * 170f) + sH;
+            _right.anchoredPosition = new Vector2(Right.x + Mathf.Round((1f - _spR.Value(120f)) * 120f) + sR, -Right.y);
+            _top.anchoredPosition = new Vector2(Top.x, -Top.y + Mathf.Round((1f - _spT.Value(62f)) * 62f) + sT);
             _stat.anchoredPosition = new Vector2(Stat.x - inL, -Stat.y);
             _ports.anchoredPosition = new Vector2(Ports.x - inL, -Ports.y);
             _ctl.anchoredPosition = new Vector2(Ctl.x - inL, -Ctl.y);
             _hand.anchoredPosition = new Vector2(Hand.x + inR, -Hand.y);
             _role.anchoredPosition = new Vector2(RoleR.x - inL, -RoleR.y);
             _inv.anchoredPosition = new Vector2(InvR.x - inL, -InvR.y);
-            if (_spL.x < 0.95f) { Show(_tip, false); CancelDrag(); }      // 説明の帯・つかみは、 パネルが収まっている間だけ
+            if (_spL.x < 0.95f || Stowed) { Show(_tip, false); CancelDrag(); }      // 説明の帯・つかみは、 パネルが収まっている間だけ (格納の間も出さない)
         }
 
         private void Update()
@@ -173,9 +185,9 @@ namespace UI.Game2D
             // 配線を決める間だけ読み直す (その後は本判定に取り込まれて二重に数えるので、 最後の値を出し続ける)
             if (sim.CanOperate && CombatSystem.CombatManager.Instance != null)
             { _hs = CombatSystem.CombatManager.Instance.PreviewHudStats(); _hsKnown = true; }
-            bool ptr = _slide > 0.95f && !Game2DModal.Active && screen != null;
+            bool ptr = _slide > 0.95f && !Stowed && !Game2DModal.Active && screen != null;      // 格納の間は、 画面の外のボタンを押せない
             // 持ち物の画面 (見るだけ・2026-11-13): キー I。 窓が出ている間・つかんでいる間・BOT が動かしている間は開かない
-            if (_slide > 0.95f && !Game2DModal.Active && !PointerBusy && !Game2DTutorial.Blocking && Input.GetKeyDown(KeyCode.I)) OpenInventory();
+            if (_slide > 0.95f && !Stowed && !Game2DModal.Active && !PointerBusy && !Game2DTutorial.Blocking && Input.GetKeyDown(KeyCode.I)) OpenInventory();
             Vector2 d = default; bool hasDot = ptr && Game2DPointer.TryDot(screen, out d);
             DeckPointer(hasDot, d);
             // 引いてくる動きの間は毎フレーム描き直す
@@ -235,7 +247,7 @@ namespace UI.Game2D
             if (pw != _portsTexW) { if (_tp != null) Destroy(_tp); _tp = null; _portsTexW = pw; _ports.sizeDelta = new Vector2(pw, Ports.height); }
             Ensure(ref _tp, _ports, new RectInt(Ports.x, Ports.y, pw, Ports.height)); Ensure(ref _tc, _ctl, Ctl); Ensure(ref _th, _hand, Hand);
             DrawPorts(_tp, pw); DrawCtl(_tc); DrawHand(_th); bool tip = DrawTip();
-            Show(_ports, true); Show(_ctl, true); Show(_hand, true); Show(_tip, tip && _slide > 0.95f);
+            Show(_ports, true); Show(_ctl, true); Show(_hand, true); Show(_tip, tip && _slide > 0.95f && !Stowed);
             DrawRight(_tr); DrawTop(_tt);
             Ensure(ref _ts, _stat, Stat); DrawStat(_ts);
             Ensure(ref _trl, _role, RoleR); Show(_role, DrawRole(_trl));

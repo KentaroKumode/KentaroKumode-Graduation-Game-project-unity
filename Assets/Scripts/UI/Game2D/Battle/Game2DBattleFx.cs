@@ -117,7 +117,11 @@ namespace UI.Game2D.Battle
         /// <summary>[演出テストの窓] 演出の時計の速さ (1 = 普段・0 = 一時停止) と、 次のフレームに 1 回だけ足す秒 (1 コマ送り = 0.125)。</summary>
         public static float QaSpeed = 1f, QaStepSeconds;
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void QaResetSpeed() { QaSpeed = 1f; QaStepSeconds = 0f; }
+        private static void QaResetSpeed() { QaSpeed = 1f; QaStepSeconds = 0f; QaStow = -1; }
+
+        /// <summary>[演出テストの窓・QaBattle.ForceStow] GUI の格納を手で決める: −1 = 自動 (大技の発動の間だけ) / 0 = 出したまま / 1 = 格納したまま。
+        /// 戦闘を始め直す (<see cref="QaClear"/>) と自動に戻る。</summary>
+        public static int QaStow = -1;
 
         /// <summary>[演出テストの窓] 任意の絵を 1 回流す。 画面全体の絵は左上に合わせ、 それより小さい絵は基準点を (ax, ay) に置く。 ループの絵は loopSeconds 秒で外す。</summary>
         public void QaPlaySheet(string name, int ax, int ay, float loopSeconds = 4f)
@@ -180,6 +184,8 @@ namespace UI.Game2D.Battle
             }
             if (!_guiFxWas) Game2DGuiRt.RequestWeightMap();      // 区間の頭で 1 回: GUI の形から、 液晶からの距離の重みを作る
             _guiFxWas = true;
+            // GUI を格納している間 (大技の発動・形態移行) は、 GUI が見えないので掛けない (白飛びの測る走査もしない)。 待機の間の暗転は GUI が出ているので今までどおり掛ける
+            if (GuiStowed) { if (Game2DGuiRt.FxOn) Game2DGuiRt.SetBossFx(false, 1f, 0f, 0f, Color.white, Vector2.zero); return; }
             float white = 0f, dark = _boss.GuiDark; Color wc = Color.white;
             if (_boss.InHeavy)
             {
@@ -208,7 +214,7 @@ namespace UI.Game2D.Battle
         }
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         /// <summary>[実機の確認用] 大技の待機・暗幕と、 流れている 1 回きりの絵を全部消す (QaBattle.Restart が敵を替える時)。</summary>
-        public void QaClear() { Init(); ResetEnemy(); }
+        public void QaClear() { Init(); ResetEnemy(); QaStow = -1; }
 #endif
         private BossFx.Kind _demoKind = BossFx.Kind.King; private bool _sheetsInTest = true;      // 試験用のキー (K・J・H)
 
@@ -218,6 +224,20 @@ namespace UI.Game2D.Battle
         public bool EnemyHitLanded { get; private set; }
         /// <summary>チャージの後の待機を出しているか。</summary>
         public bool BossIdling => _boss.Idling;
+        /// <summary>戦闘の外側の GUI を画面の外へ格納するか (2026-11-15・<see cref="BossFx.StowGui"/>: ボスの大技の発動とヴェスカの形態移行の間)。
+        /// Game2DBattleHud (左・右・上のパネル) と Game2DHud (下の資源バー) が読んで、 近い辺へ滑らせる。 戦闘の演出を出していない時は false
+        /// (戦闘が途中で終わる・ダウンで取り消す・始め直すと、 区間が消えて自然に false = GUI が戻る)。</summary>
+        public bool GuiStowed
+        {
+            get
+            {
+                if (!Showing) return false;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                if (QaStow >= 0) return QaStow == 1;
+#endif
+                return _boss.StowGui;
+            }
+        }
 
         private BattleCanvas _c;
         private BSprite _bg; private BSprite[] _wspr;
