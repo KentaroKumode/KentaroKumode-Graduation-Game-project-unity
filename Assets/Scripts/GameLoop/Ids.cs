@@ -267,7 +267,7 @@ namespace GameLoop
         public const string Layer3Goblin = "boss_layer2";
         /// <summary>3 層ボス: 鏡の双子 (旧 4 層ボスを流用)。</summary>
         public const string Layer3Mirror = "boss_layer4";
-        /// <summary>5 層ボス: 業火の審判官。 〈審判の炎〉(軽減無視の毎ターン確定ダメ) を持つ。</summary>
+        /// <summary>5 層ボス: 審判官。 〈審判の炎〉(軽減無視の毎ターン確定ダメ) を持つ。</summary>
         public const string Layer5Judgment = "boss_layer5";
         /// <summary>5 層 隠しボス: シュヴァリエ・サン=ジョリオラ。 レイピア所持時のみ 5 層ボスと差し替わる。
         /// 計測では <c>GameManager.SuppressLayer5HiddenBoss</c> で遮断する (既定 ON)。</summary>

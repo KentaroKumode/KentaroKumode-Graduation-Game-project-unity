@@ -1338,7 +1338,7 @@
     {
       "id": "boss_layer5",
       "defense": 3,
-      "displayName": "業火の審判官",
+      "displayName": "審判官",
       "description": "罪人を裁く炎の審判官。罪深きほどその業火は強く燃え盛る。",
       "floor": 5,
       "maxHP": 1835,

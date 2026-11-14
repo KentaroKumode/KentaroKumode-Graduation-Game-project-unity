@@ -15,7 +15,7 @@ namespace CombatSystem
                            //   2026-11-14〜 既定の形 (王の大技〈業火〉) では読まない。 測定の口 ashKingHeavy=False (旧い形) の時だけ効く
         JudgmentCoefBase,  // 業火の断罪の係数基礎。 係数 = base + 2n。 基準2 (1回目=4)
                            //   [読む敵なし] JudgmentBlaze はどの敵も持っていない (効果のクラスは残っている)
-        ChipCap,           // 業火の審判官・審判の炎の 1 回 (毎ターン) あたりの上限。 基準10
+        ChipCap,           // 審判官・審判の炎の 1 回 (毎ターン) あたりの上限。 基準10
         RegenReduction,    // 灰燼・灰塵の鎧の被ダメ軽減量 (タンク性/ジリ貧)。 基準9
                            //   [読む敵なし] AshArmor はどの敵も持っていない
         Stagnation,        // 停滞する時間: 引いた端子 1 枚あたりの止まる確率 (%)。 基準は段ごと p1 10 / p2 15 / p3 20 / p4 25 (2026-11-12 #103〜)
@@ -201,7 +201,7 @@ namespace CombatSystem
         /// <summary>固有面ダイスの面 (正本)。</summary>
         private static readonly Dictionary<string, int[]> _signatureDefaults = new Dictionary<string, int[]>
         {
-            // 5層 業火の審判官「裁火のダイス」: 二極(赦免/断罪) 平均4.83 ×5 = E24.2
+            // 5層 審判官「裁火のダイス」: 二極(赦免/断罪) 平均4.83 ×5 = E24.2
             { "boss_layer5",        new[] { 2, 3, 3, 6, 7, 8 } },
             // 5層裏 シュヴァリエ「決闘のダイス」: 低分散・規律 平均5.5 ×5 = E27.5
             { "boss_layer5_hidden", new[] { 4, 5, 5, 6, 6, 7 } },
