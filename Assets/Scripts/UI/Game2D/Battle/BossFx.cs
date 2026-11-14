@@ -73,6 +73,18 @@ namespace UI.Game2D.Battle
         public bool Idling => _seg == Seg.Idle;
         public Kind Current => _kind;
 
+        // ── GUI (外枠の板) へ渡す値 (2026-11-14・作者の指定: 揺れ・暗転・赤・白飛びを GUI にも掛ける。 乱れと割れは掛けない) ──
+        /// <summary>このフレームの暗幕の倍率 (1 = 暗くしない・−1 = 真っ黒の板)。 <see cref="PreDark"/> が書く。</summary>
+        public float GuiDark { get; private set; } = 1f;
+        /// <summary>このフレームの赤いフィルターの強さ a (0 = 無し・王だけ)。</summary>
+        public float GuiRed { get; private set; }
+        /// <summary>このフレームの揺れ (dot)。</summary>
+        public Vector2Int GuiShake { get; private set; }
+        /// <summary>大技の区間 (チャージ・待機・大技) か。 false の時、 GUI へは何も掛けない。</summary>
+        public bool Active => _seg != Seg.None;
+        /// <summary>大技 (チャージ・待機でない) の区間か。 白飛びはこの間だけ測る。</summary>
+        public bool InHeavy => _seg == Seg.Heavy;
+
         /// <summary>全部やめて、 暗幕も外す (戦闘の終わり・次の敵・ダウンで大技が取り消された時)。</summary>
         public void Clear() { _seg = Seg.None; _heavyPending = false; _kind = Kind.None; _frozen = null; }
 
@@ -286,6 +298,7 @@ namespace UI.Game2D.Battle
         public void PreDark(BattleCanvas c)
         {
             double m = DarkMul();
+            GuiDark = (float)m; GuiRed = 0f; GuiShake = Vector2Int.zero;      // GUI へ渡す値 (このフレーム・Post まで書き足す)
             if (m < 0) { uint k = BattleCanvas.Pack(2, 3, 8); for (int i = 0; i < c.FB.Length; i++) c.FB[i] = k; return; }      // #020308 = 色の組 steel の一番暗い色・黒い 2 枚と同じ
             if (m < 1.0) Dark(c, m);
         }
@@ -312,7 +325,8 @@ namespace UI.Game2D.Battle
                     int j = i - OffK; double e1 = LEAD_K + RUSH + HOLD;
                     if (_impIdx != null && j >= 0 && j < _impIdx.Length) Paste(c, _imp, _impIdx[j], EX, FLOOR);
                     if (_scr != null) Paste(c, _scr, i, 0, 0);
-                    Red(c, (t < LEAD_K ? 0.45 * Sm(0, LEAD_K, t) : 0.55 + 0.45 * (1 - Sm(LEAD_K, LEAD_K + 0.5, t))) * (1 - Sm(e1, e1 + COOL, t)));
+                    double ra = (t < LEAD_K ? 0.45 * Sm(0, LEAD_K, t) : 0.55 + 0.45 * (1 - Sm(LEAD_K, LEAD_K + 0.5, t))) * (1 - Sm(e1, e1 + COOL, t));
+                    Red(c, ra); GuiRed = ra > 0.01 ? (float)ra : 0f;
                     Paste(c, _rel, i, 0, 0);      // 発光は赤いフィルターの上 (白く飛ぶ)
                     break;
                 }
@@ -384,6 +398,7 @@ namespace UI.Game2D.Battle
         /// <summary>見本の paste(b, (dx, dy)) を地の色の板へ: 絵を (dx, dy) ずらし、 空いた所は fill。</summary>
         private void Shift(BattleCanvas c, int dx, int dy, uint fill)
         {
+            GuiShake = new Vector2Int(dx, dy);
             if (dx == 0 && dy == 0) return;
             if (_tmp == null) _tmp = new uint[W * H];
             Array.Copy(c.FB, _tmp, _tmp.Length);
