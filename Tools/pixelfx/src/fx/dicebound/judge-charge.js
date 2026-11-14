@@ -18,7 +18,7 @@ export const meta = {
   loop: false,
   fps: 30,
   bg: "dark",
-  options: { palette: GOLD, rays: 8, scale: 1, seed: 4 },
+  options: { palette: GOLD, rays: 8, scale: 1, beams: 1, seed: 4 },   // beams = 待機の柔らかい光の帯の強さ (0 = 出さない)
 };
 
 // 待機へ渡す時刻: 最後のコマ (2.75 秒) の 1 コマ後 (1 秒 8 コマ) が、 待機の 0 秒。 ここがずれると、 つなぎ目で時刻が戻って逆回しが 1 コマ挟まる
@@ -43,12 +43,41 @@ function ray(p, C, a, R0, L, w0, k) {
   p.glowLine(ca * R0, sa * R0, ca * (R0 + L * 0.8), sa * (R0 + L * 0.8), 5, C[5], 0.16 * k);
 }
 
+// 柔らかい光の帯 (weather/god-rays の shafts): [向き (rad), 半幅 (rad・細め), 強さ, 1 周あたりの呼吸の回数, 揺れ (rad)]。
+// 幅を角度で持つので、 中心から離れるほど広がる (末広がり)。 並びは不規則 (日輪の光条とは揃えない)。 回さない ── 呼吸と揺れだけ (ループが継ぎ目なく回る)
+const BEAMS = [[0.21, 0.03, 0.8, 1, 0.012], [0.78, 0.018, 0.55, 2, 0.008], [1.32, 0.036, 1, 1, 0.014], [1.86, 0.02, 0.6, 3, 0.008], [2.5, 0.032, 0.85, 2, 0.012], [3.2, 0.022, 0.6, 1, 0.01],
+  [3.74, 0.034, 0.9, 2, 0.012], [4.31, 0.018, 0.5, 1, 0.008], [4.82, 0.03, 0.75, 3, 0.012], [5.45, 0.024, 0.65, 2, 0.01], [5.98, 0.02, 0.55, 1, 0.008]];
+
+/** 中心から外へ出る、 柔らかい光の帯。 光だけ (色は置かない) なので、 液晶では網点の淡い帯になる。 k = 全体の強さ。 */
+function beams(p, C, t, S, k) {
+  if (k <= 0.01) return;
+  const [OX, OY] = meta.origin, [W, H] = meta.size, T = SUN_T, ph = (TAU * t) / T, REACH = 300 * S, R0 = 12 * S;
+  const sh = BEAMS.map(([c, h, kk, b, sw], i) => [c + sw * Math.sin(ph + i * 1.3), 1 / (h * (1 + 0.15 * Math.sin(ph * b + i))), kk * (0.7 + 0.3 * Math.sin(ph * b + i * 2.1))]);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const dx = x + 0.5 - OX, dy = y + 0.5 - OY, r = Math.hypot(dx, dy);
+      if (r < R0 || r > REACH) continue;
+      let ang = Math.atan2(dy, dx), e = 0;
+      if (ang < 0) ang += TAU;
+      for (const [c, ih, kk] of sh) {
+        let d = Math.abs(ang - c);
+        if (d > Math.PI) d = TAU - d;
+        const q = d * ih;
+        if (q < 1) { const w = 1 - q * q; e += kk * w * Math.sqrt(w); }   // 縁は柔らかく
+      }
+      if (e <= 0) continue;
+      const fall = Math.min(1, (r - R0) / (10 * S)) * Math.pow(1 - r / REACH, 0.8);   // 外へ行くほど淡く
+      p.add(x, y, C[4], 0.55 * e * fall * k);
+    }
+}
+
 /**
  * 日輪 (待機のループ 1 コマぶん)。 チャージの終わりと待機の両方がこれを描く。 原点が中心。
  * ti = 待機の時刻 (負でもよい)。 open = 0〜1: 開き具合 (0 = 芯だけ・1 = 開き切った姿)。 S = 大きさの倍率。
  */
-export function sun(p, C, ti, rays, S = 1, open = 1) {
+export function sun(p, C, ti, rays, S = 1, open = 1, beam = 1) {
   const T = SUN_T, t = ((ti % T) + T) % T, N = rays * 2, rot = (t / T) * ((2 * TAU) / N), CORE = 4.5 * S, RING = 7.5 * S, R0 = 9 * S;
+  beams(p, C, t, S, beam * Math.min(1, open));
   p.glow(0, 0, 62 * S * (0.4 + 0.6 * open), C[4], 0.3 + 0.06 * Math.sin((t / T) * TAU * 2));
   // 光条の間の細い糸
   for (let i = 0; i < N; i++) {
@@ -128,7 +157,7 @@ export function create(o) {
       } else {
         // チャージ完了: 日輪が開く (0.35 秒・少し行き過ぎて戻る)。 ここからは待機と同じ絵。 待機の時刻は、 このチャージの終わりが 0 秒になるように合わせる
         const q = clamp((t - SUCK) / 0.35);
-        sun(p, C, t - HANDOFF, o.rays, S, q >= 1 ? 1 : ease.outBack(q) * 0.999);
+        sun(p, C, t - HANDOFF, o.rays, S, q >= 1 ? 1 : ease.outBack(q) * 0.999, o.beams * clamp((t - SUCK) / 0.6));   // 光の帯は 0.6 秒かけて差して来る
         if (q < 1) p.glow(0, 0, 90 * (1 - q) + 20, WHITE, 0.6 * (1 - q));
       }
       ps.draw(p);

@@ -14,9 +14,9 @@ export const meta = {
   loop: true,
   fps: 30,
   bg: "dark",
-  options: { palette: CHARGE.options.palette, rays: 8, scale: 1 },
+  options: { palette: CHARGE.options.palette, rays: 8, scale: 1, beams: 1 },
 };
 
 export function draw(p, t, o) {
-  sun(p, fit(o.palette, 8), t, o.rays, o.scale, 1);
+  sun(p, fit(o.palette, 8), t, o.rays, o.scale, 1, o.beams);
 }
