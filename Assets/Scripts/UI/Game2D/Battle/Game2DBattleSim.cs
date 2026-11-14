@@ -11,7 +11,7 @@ namespace UI.Game2D.Battle
     /// 1 ターン: 敵の攻撃が予告される → 自分のダイスが出る → (充電を払って振り直す) → 配線 → [GO!] → 自分の攻撃 → 敵の攻撃 → 次のターン。
     /// HP・出目・配線・ダメージはすべて本物で、 この部品は値を作らない (見せる順番と間だけを持つ)。
     /// 操作: [GO! / NEXT] ボタンか Space / 出目のクリックか 1〜9 / [REROLL] ボタンか E / Q = おまかせ。
-    /// 端子の山札 (ADR-0014): 出目ごとの挿し先 (<see cref="slot"/>) と、 〈写し取り〉〈焼き切り〉〈呼び戻し〉の対象 (<see cref="target"/>) を持ち、
+    /// 端子の山札 (ADR-0014): 出目ごとの挿し先 (<see cref="slot"/>) と、 〈影写し〉〈火葬の剣〉〈有効活用〉の対象 (<see cref="target"/>) を持ち、
     /// 決定で AnswerWiringSlots へ渡す。 出目の個数に上限は置かない (振った個数だけ並べる)。
     /// BOT がランを動かしている間 (<see cref="GameHooks.BotDriving"/>) は手を出さない。
     /// </summary>
@@ -462,7 +462,7 @@ namespace UI.Game2D.Battle
 
         /// <summary>出目ごとの挿し先 (場の添字・−1 = 挿さない)。 長さ = 出目の個数。</summary>
         public int[] slot = { -1, -1, -1 };
-        /// <summary>〈写し取り〉〈焼き切り〉〈呼び戻し〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置・−1 = 選んでいない = 左端の候補)。 長さ = 場の枚数。</summary>
+        /// <summary>〈影写し〉〈火葬の剣〉〈有効活用〉の対象 (添字 = その端子の場の位置・値 = 対象の場の位置・−1 = 選んでいない = 左端の候補)。 長さ = 場の枚数。</summary>
         public int[] target = new int[0];
         /// <summary>手札の規則 Pick (2026-11-13): 次のターンも手札に残す印 (添字 = 場の位置)。 挿していない手札の端子を押すと付け外しする。 長さ = 場の枚数。</summary>
         public bool[] keepMark = new bool[0];
@@ -514,7 +514,7 @@ namespace UI.Game2D.Battle
         }
 
         /// <summary>出目 i を端子 s に挿せるか (挿せる数・払う充電・出目の条件)。 他の出目との関係を見る条件は、 そろう見込みがあれば通す
-        /// (〈双発〉の 1 個目を挿せるように)。 本当に発動するかは見込み (Resolve) が決める。</summary>
+        /// (〈十字斬り〉の 1 個目を挿せるように)。 本当に発動するかは見込み (Resolve) が決める。</summary>
         public bool Accepts(int i, int s)
         {
             if (!TermInputs(out var dice, out var env, out var st) || i < 0 || i >= dice.Length || i >= slot.Length || s < 0 || s >= board.Count) return false;
@@ -526,7 +526,7 @@ namespace UI.Game2D.Battle
             if (d.chargeCost > 0 && env.charge < d.chargeCost) return false;
             if (board[s] == TerminalIds.BigDischarge && env.charge <= 0) return false;
             if (st.ignoreCond) return true;
-            // 〈増圧〉: 他の出目が増圧に挿さっていれば、 その数だけ +1
+            // 〈号令の剣〉: 他の出目が号令の剣に挿さっていれば、 その数だけ +1
             int v = dice[i];
             for (int j = 0; j < slot.Length && j < dice.Length; j++)
                 if (j != i && slot[j] >= 0 && slot[j] < board.Count && board[slot[j]] == TerminalIds.Grinder) v++;
@@ -659,7 +659,7 @@ namespace UI.Game2D.Battle
             if (focusSlot >= 0) Game2DTutorial.Request(TutorialTopics.Kinds);      // 手引き「端子の種類」: 初めて端子の説明を開いた (issue #86)
         }
 
-        // ── 〈写し取り〉〈焼き切り〉〈呼び戻し〉の対象 ──
+        // ── 〈影写し〉〈火葬の剣〉〈有効活用〉の対象 ──
         //   これらに出目を挿すと (見込みで発動すると)、 手札の「挿していない端子」が候補になる。 候補の USB をその端子の上へ落とすと対象が決まる。
         //   選んでいない・選んだ端子が候補でなくなった時は左端の候補 (候補が 1 枚なら自動でそれ)。 判定は見込み (Resolve) と同じ関数で行う。
 
@@ -694,7 +694,7 @@ namespace UI.Game2D.Battle
             return any;
         }
 
-        // ── 〈呼び戻し〉(手札の持ち越しの規則): 捨て札から 1 枚を選ぶ ──
+        // ── 〈有効活用〉(手札の持ち越しの規則): 捨て札から 1 枚を選ぶ ──
         //   対象は場ではなく捨て札 (場に見えていない) なので、 画面は窓で選ぶ (Game2DBattleHud.OpenRecall)。 値は target[その端子の場の位置] = 捨て札の添字。
         //   選ばなければ本体の既定 (最後に捨てた 1 枚・TerminalDeckState.RecallPick)。 選んだ値も既定も、 本体と同じ関数で読む。
 
@@ -732,7 +732,7 @@ namespace UI.Game2D.Battle
         /// <summary>今の捨て札 (読むだけ)。 null あり。</summary>
         public List<string> Discard => CombatManager.Instance?.TerminalDeck?.discard;
 
-        /// <summary>場の s が、 見込みで発動する〈呼び戻し〉(捨て札から選ぶ) か。 捨て札が空なら false (選ぶ操作を出さない)。</summary>
+        /// <summary>場の s が、 見込みで発動する〈有効活用〉(捨て札から選ぶ) か。 捨て札が空なら false (選ぶ操作を出さない)。</summary>
         public bool IsRecaller(int s)
         {
             var o = preview; var disc = Discard;
@@ -740,7 +740,7 @@ namespace UI.Game2D.Battle
                 && disc != null && disc.Count > 0;
         }
 
-        /// <summary>〈呼び戻し〉s が戻す捨て札の添字 (選んだ添字が正しければそれ・でなければ最後に捨てた 1 枚・空なら −1)。 本体の RecallPick と同じ選び方。</summary>
+        /// <summary>〈有効活用〉s が戻す捨て札の添字 (選んだ添字が正しければそれ・でなければ最後に捨てた 1 枚・空なら −1)。 本体の RecallPick と同じ選び方。</summary>
         public int RecallOf(int s)
         {
             var disc = Discard; if (disc == null || disc.Count == 0) return -1;
@@ -748,7 +748,7 @@ namespace UI.Game2D.Battle
             return want >= 0 && want < disc.Count ? want : disc.Count - 1;
         }
 
-        /// <summary>〈呼び戻し〉s が戻す 1 枚を捨て札の添字 idx にする。 できなければ false。</summary>
+        /// <summary>〈有効活用〉s が戻す 1 枚を捨て札の添字 idx にする。 できなければ false。</summary>
         public bool SetRecall(int s, int idx)
         {
             var disc = Discard;

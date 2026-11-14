@@ -48,7 +48,7 @@ namespace UI.Game2D
     {
         public string id, title, sub, icon, footer;
         public int w = 360, h = 0, cols = 1, budget;
-        /// <summary>開いた時に選んでいる行 (既定 0)。 〈呼び戻し〉の窓が、 選ばずに確定した時に戻る 1 枚を最初から選んでおくのに使う。</summary>
+        /// <summary>開いた時に選んでいる行 (既定 0)。 〈有効活用〉の窓が、 選ばずに確定した時に戻る 1 枚を最初から選んでおくのに使う。</summary>
         public int sel0;       // h = 0 は中身から自動で決める       // budget > 0 の時は、 行の count の合計 / budget を足元に出す (整備パネル)
         public string[] tabs; public int tab;
         public List<List<ModalItem>> tabItems = new List<List<ModalItem>>();

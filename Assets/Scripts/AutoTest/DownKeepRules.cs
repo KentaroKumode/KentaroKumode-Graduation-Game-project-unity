@@ -171,7 +171,7 @@ namespace AutoTest
             return res;
         }
 
-        /// <summary>〈呼び戻し〉で捨て札から戻す 1 枚の添字。 <paramref name="prefer"/> の種類 (次のターンの当て) があればその中で点の最大、
+        /// <summary>〈有効活用〉で捨て札から戻す 1 枚の添字。 <paramref name="prefer"/> の種類 (次のターンの当て) があればその中で点の最大、
         /// 無ければ全体で点の最大 (同点は後に捨てた方 = 添字の大きい方・<c>AutoRunner.RecallBest</c> と同じ)。 空なら −1。</summary>
         public static int RecallIndex(IReadOnlyList<TerminalKind> kinds, IReadOnlyList<float> worths, TerminalKind? prefer)
         {

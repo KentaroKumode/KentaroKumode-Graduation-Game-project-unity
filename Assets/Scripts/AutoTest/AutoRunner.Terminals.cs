@@ -28,7 +28,7 @@ namespace AutoTest
         // =====================================================================
         /// <summary>充電の価値の単位: 充電 3.5 (出目の平均) = 旧い配線の充電 1 本。 旧い効用の充電の項 (wChg × 2 × 本数) をそのまま使うため。</summary>
         private const float DeckChargePipsPerDie = 3.5f;
-        /// <summary>次の攻撃に乗る攻撃 (〈充填〉〈受け太刀〉の溜め) を、 今の与ダメの 7 割と見る (次に攻撃するまでに戦闘が終わる・倒し過ぎる分)。</summary>
+        /// <summary>次の攻撃に乗る攻撃 (〈力溜め〉〈後の先〉の溜め) を、 今の与ダメの 7 割と見る (次に攻撃するまでに戦闘が終わる・倒し過ぎる分)。</summary>
         private const float DeckFutureAttackShare = 0.7f;
         /// <summary>溜める端子の溜まり 1 あたりの価値 = 発動 1 回の価値 ÷ 必要量 × 0.5 (溜め切る前に戦闘が終わることが多い)。
         /// 発動した回の価値は別に数えるので、 発動で溜まりが減る分は負の溜まりとして相殺される (溜めるほど得・発動すれば満額)。</summary>
@@ -36,29 +36,29 @@ namespace AutoTest
         /// <summary>「残りターン」の見積もりの上限 (撃破までのターンを 1 ターンの与ダメの見込みで割った値を、 ここで頭打ち)。</summary>
         private const int DeckTurnsCap = 6;
         /// <summary>エスカレーションを 1 ターン遅らせる価値 = 敵の攻撃の 1 割 × 残りターン (1 段の伸びを 1 割と見る・先の HP なので割り引く)。
-        /// 〈冷却弾〉(段階を 1 つ戻す) はその 2 倍と見る。</summary>
+        /// 〈氷結瓶〉(段階を 1 つ戻す) はその 2 倍と見る。</summary>
         private const float DeckEscStepShare = 0.1f, DeckRetreatTurns = 2f;
-        /// <summary>次のターンに効く補助 (与ダメ相当): 条件を無視 (〈予熱器〉) 3 / 多く引く 1 枚につき 4 (〈配電盤〉は SwitchboardDraw 枚) / 手札に残す (〈呼び戻し〉) 2。</summary>
+        /// <summary>次のターンに効く補助 (与ダメ相当): 条件を無視 (〈無形の構え〉) 3 / 多く引く 1 枚につき 4 (〈先読み〉は SwitchboardDraw 枚) / 手札に残す (〈有効活用〉) 2。</summary>
         private const float DeckPreheatDmg = 3f, DeckDrawDmg = 4f, DeckRetainDmg = 2f;
-        /// <summary>〈写し取り〉: 基本以外を複製 6 / 基本を複製 1。 〈焼き切り〉: 基本を抜く 6 (山札が締まる) / 基本以外を抜く −4 (与ダメ相当)。</summary>
+        /// <summary>〈影写し〉: 基本以外を複製 6 / 基本を複製 1。 〈火葬の剣〉: 基本を抜く 6 (山札が締まる) / 基本以外を抜く −4 (与ダメ相当)。</summary>
         private const float DeckCopyGoodDmg = 6f, DeckCopyBasicDmg = 1f, DeckBurnBasicDmg = 6f, DeckBurnGoodDmg = -4f;
         /// <summary>別枠のダメージ (毒・臨界・出血) 1 あたり 0.5 与ダメ相当。 式は見ていない控えめな定数 (値付けの規則 4: 別枠は量を控えめに)。</summary>
         private const float DeckPoisonDmg = 0.5f, DeckHeatDmg = 0.5f, DeckBleedDmg = 0.5f;
         /// <summary>使い捨ての端子を使う費用 (この戦闘ではもう使えない): 攻撃の種類は与ダメ相当 8 (出目 2 個ぶん)・それ以外は HP 相当 3。
-        /// 弱い目で起爆筒を切らず、 良い目・危ないターンに回すための足切り。</summary>
+        /// 弱い目で火薬樽を切らず、 良い目・危ないターンに回すための足切り。</summary>
         private const float DeckDisposableDmgCost = 8f, DeckDisposableHpCost = 3f;
         /// <summary>[測定の口 terminalFirstAidLeavesRunDeck の時だけ] 使うとランの山札から抜ける端子 (〈応急箱〉) を使う費用の上乗せ (HP 相当・今の HP の単位・2026-11-12・仮・未測定)。
         /// 既定 (2026-11-14〜) では〈応急箱〉もランの山札から抜けないので引かない (費用はほかの使い捨てと同じ <see cref="DeckDisposableHpCost"/> だけ)。
         /// 先の戦闘で使える 1 回の回復の見込み (出目の平均 3.5 × <see cref="TerminalCards.FirstAidMul"/>) の半分 ── 引けない・満タンで余る分を半分と見る。
         /// これを超える回復 (最大 HP で切った後の量) が出るターンにだけ使う。</summary>
         private const float DeckRunLeaveHpCost = 3.5f * TerminalCards.FirstAidMul * 0.5f;
-        /// <summary>〈停止信号〉: 次のターンの敵の攻撃 × 0.5 を今の HP で見る (2026-11-12)。 次のターンはほぼ確実に来るので先の割引 (帳簿の 0.2) は掛けない。
+        /// <summary>〈石化の瞳〉: 次のターンの敵の攻撃 × 0.5 を今の HP で見る (2026-11-12)。 次のターンはほぼ確実に来るので先の割引 (帳簿の 0.2) は掛けない。
         /// 半分にするのは、 止めなくてもブロックで一部は受けられるから。 旧: × 0.9 × 先の割引 で、 使い捨ての費用を超えず一度も使われなかった。</summary>
         private const float DeckStunShare = 0.5f;
-        /// <summary>端子の「素の点」1 点 = 1 回使うたびの与ダメ相当 3.5 (出目 1 個の平均)。 写し取り・焼き切り・呼び戻しの値付けに使う (2026-11-12)。
+        /// <summary>端子の「素の点」1 点 = 1 回使うたびの与ダメ相当 3.5 (出目 1 個の平均)。 影写し・火葬の剣・有効活用の値付けに使う (2026-11-12)。
         /// 素の点は 基本 1 / コモン 2 / レア 3 なので、 コモン 1 枚は基本より 1 回あたり 3.5 ほど得、 という見方。</summary>
         private const float DeckCardDmgPerPoint = 3.5f;
-        /// <summary>撃破のボーナス (HP 相当・恒久なので割り引かない): 最大 HP +1 = 1.5 / 研ぎ澄まし +1 = 3 / ゴールド 1 = 0.15 / 報酬の選択肢 +1 = 1.5。</summary>
+        /// <summary>撃破のボーナス (HP 相当・恒久なので割り引かない): 最大 HP +1 = 1.5 / 処刑の刃 +1 = 3 / ゴールド 1 = 0.15 / 報酬の選択肢 +1 = 1.5。</summary>
         private const float DeckKillMaxHpWorth = 1.5f, DeckKillWhetWorth = 3f, DeckKillGoldWorth = 0.15f, DeckKillExtraChoiceWorth = 1.5f;
 
         /// <summary>未来の与ダメ 1 の価値。 帳簿: 1 ダメージで撃破が早まり減る先の被ダメ (ledgerFutureShare × 敵の攻撃 ÷ 1 ターンの与ダメの見込み)。 旧の効用: wAtk。</summary>
@@ -102,7 +102,7 @@ namespace AutoTest
             int turns = DeckEstTurns(in s, k);
             float escDelayWorth = DeckEscStepShare * Math.Max(0, s.enemyAtk) * turns * fw;
             float flat = 0f;
-            // 次の攻撃に乗る攻撃 (〈充填〉が発動した分・〈受け太刀〉)。 今ターン攻撃して使った分は attackAdd に入っているので、 減った分は負で相殺
+            // 次の攻撃に乗る攻撃 (〈力溜め〉が発動した分・〈後の先〉)。 今ターン攻撃して使った分は attackAdd に入っているので、 減った分は負で相殺
             int stored0 = before.storedAttack + before.storedAttackNext, stored1 = after.storedAttack + after.storedAttackNext;
             flat += (stored1 - stored0) * DeckFutureAttackShare * dw;
             // 溜まり (発動前の分)
@@ -121,24 +121,24 @@ namespace AutoTest
                 }
                 flat += d * perPip * DeckGaugeShare;
             }
-            // 〈鋳造口〉が発動した: この戦闘中の出目 +1 (個数 × 残りターン・攻撃に挿す割合を 7 割と見る)
+            // 〈打ち直し〉が発動した: この戦闘中の出目 +1 (個数 × 残りターン・攻撃に挿す割合を 7 割と見る)
             flat += (after.foundryBonus - before.foundryBonus) * k * turns * DeckFutureAttackShare * dw;
-            // エスカレーションの段階を戻す (〈冷却弾〉・溜まり切った〈冷却材〉)
+            // エスカレーションの段階を戻す (〈氷結瓶〉・溜まり切った〈鎮静香〉)
             if (o.retreatStage) flat += DeckRetreatTurns * escDelayWorth;
             // 次のターンの補助
             if (after.ignoreCondNext && !before.ignoreCondNext) flat += DeckPreheatDmg * dw;
             flat += Math.Max(0, after.extraDrawNext - before.extraDrawNext) * DeckDrawDmg * dw;
-            // 〈主幹〉: 使うたび以後の攻撃 +N (残りターンの半分で使えると見る)
+            // 〈千刃〉: 使うたび以後の攻撃 +N (残りターンの半分で使えると見る)
             flat += (after.mainsUses - before.mainsUses) * TerminalCards.MainsPerUse * turns * 0.5f * DeckFutureAttackShare * dw;
             if (o.enemyStunNext) flat += DeckStunShare * Math.Max(0, s.enemyAtk) * (s.ledger ? 1f : s.wDef);
             // 別枠のダメージ
             flat += (o.poison * DeckPoisonDmg + o.heat * DeckHeatDmg) * dw;
             if (o.attackDice > 0) flat += o.bleedOnHit * DeckBleedDmg * dw;
-            // 〈計数器〉: 基本以外の発動 1 回 = 与ダメ +(10% ÷ 10 回) を残りターンずっと (山札に入っている時だけ効く・本体 DrawTerminalHand)
+            // 〈柔軟な戦略〉: 基本以外の発動 1 回 = 与ダメ +(10% ÷ 10 回) を残りターンずっと (山札に入っている時だけ効く・本体 DrawTerminalHand)
             if (deckHasCounter)
                 flat += o.firedNonBasic * (TerminalCards.CounterPct / TerminalCards.CounterEvery) * DeckPerTurnDamage(in s, k) * turns * dw;
             // 手札の操作 (対象は ChooseDeckTargets が選んだ端子・選ばなければ左端の候補)。 2026-11-12: この戦闘で山札を引く回数から値付けする。
-            //   旧: 定数 (写し取り 6 / 焼き切り 6 × 未来の与ダメの価値) で、 使い捨ての費用 (HP 3) をほぼ超えず、 発動率が 0.1〜0.2% だった。
+            //   旧: 定数 (影写し 6 / 火葬の剣 6 × 未来の与ダメの価値) で、 使い捨ての費用 (HP 3) をほぼ超えず、 発動率が 0.1〜0.2% だった。
             //   引く回数 = 残りターン × 手札 ÷ 山札の残り (この戦闘で同じ 1 枚をあと何回引くか・残りターンで頭打ち)。
             var runNow = GameManager.Instance?.Run;
             var dkNow = CombatManager.Instance?.TerminalDeck;
@@ -148,14 +148,14 @@ namespace AutoTest
                 ? DeckCardDmgPerPoint * Math.Max(0f, TargetWorth(TerminalCards.Get(board[slot]), runNow) - 1f) : 0f;
             // 次のターンにもう 1 回使える。 手札の持ち越し (TerminalCards.HandCarry) では挿さなかった端子は全部残るので、 残す効果に値打ちは無い
             if (o.retainTarget >= 0 && !TerminalCards.HandCarry) flat += (DeckRetainDmg + PerUse(o.retainTarget)) * dw;
-            // 〈呼び戻し〉(持ち越しの規則): 捨て札から戻す 1 枚 (方策と同じ選び方) を、 次のターンにもう 1 回使える分として見る
+            // 〈有効活用〉(持ち越しの規則): 捨て札から戻す 1 枚 (方策と同じ選び方) を、 次のターンにもう 1 回使える分として見る
             if (o.recall)
             {
                 var disc = dkNow?.discard;
                 int rp = RecallBest(disc, runNow, _recallPrefer);
                 if (rp >= 0) flat += (DeckRetainDmg + DeckCardDmgPerPoint * Math.Max(0f, TargetWorth(TerminalCards.Get(disc[rp]), runNow) - 1f)) * dw;
             }
-            // 〈写し取り〉(2026-11-14): 写しは次のターンの手札に入る ── 次のターンに必ず 1 回使える (戦闘が続けば・残りターン 1 なら 0)。
+            // 〈影写し〉(2026-11-14): 写しは次のターンの手札に入る ── 次のターンに必ず 1 回使える (戦闘が続けば・残りターン 1 なら 0)。
             //   その後は捨て札からこの戦闘の山札を回るので、 引く回数 (draws) の分も足す。 全体は残りターン − 1 (次のターン以降) で頭打ち。
             //   旧 (捨て札へ入れた時): draws × 1 回あたりの得 (山札を一巡しないと引けなかった)。
             if (o.copyTarget >= 0 && o.copyTarget < board.Count) flat += Math.Min(turns - 1, 1f + draws) * PerUse(o.copyTarget) * dw;
@@ -163,7 +163,7 @@ namespace AutoTest
             {
                 // 抜いた分だけ、 山札の平均の端子を引く回数が増える (対象が平均より悪いほど得・良い端子を抜けば損)。
                 //   2026-11-14 の作り直しの後も同じ物差し (外すのは必ず起きる・外す端子が無ければ Resolve が不発にする)。 出目 ×2 の攻撃は ws.aSum に入って効用の Core が見る。
-                //   使い捨ての費用は攻撃の種類 (DeckDisposableDmgCost × dw・〈起爆筒〉〈貫通弾〉と同じ) になった (旧: 補助で DeckDisposableHpCost × fw)
+                //   使い捨ての費用は攻撃の種類 (DeckDisposableDmgCost × dw・〈火薬樽〉〈貫通弾〉と同じ) になった (旧: 補助で DeckDisposableHpCost × fw)
                 float avg = 0f; foreach (var id in runNow.terminalDeck) avg += TargetWorth(TerminalCards.Get(id), runNow);
                 avg /= runNow.terminalDeck.Count;
                 flat += draws * DeckCardDmgPerPoint * (avg - TargetWorth(TerminalCards.Get(board[o.burnTarget]), runNow)) * dw;
@@ -387,8 +387,8 @@ namespace AutoTest
                 st = BuildOptimalTurnState(rolls, tele),
                 deckHasCounter = run?.terminalDeck != null && run.terminalDeck.Contains(TerminalIds.Counter),
             };
-            _recallPrefer = RecallPreferFor(tele);   // [#141] 〈呼び戻し〉の当て (方策 Planned の時だけ・それ以外は null = 今までの選び方)
-            // 会心の効果 (〈真空管〉〈照星〉〈急所読み〉) を旧の式でも見積もれるよう、 会心率と倍率は常に読む (readOut の切り替えは変えない)
+            _recallPrefer = RecallPreferFor(tele);   // [#141] 〈有効活用〉の当て (方策 Planned の時だけ・それ以外は null = 今までの選び方)
+            // 会心の効果 (〈致命の一撃〉〈一閃〉〈弱点看破〉) を旧の式でも見積もれるよう、 会心率と倍率は常に読む (readOut の切り替えは変えない)
             if (ctx != null && !ev.st.readOut && !ev.st.traceBoth) FillReadOut(ref ev.st, cm, ctx, run, tele.playerAttackPenalty);
             return ev;
         }
@@ -403,7 +403,7 @@ namespace AutoTest
         {
             after = ev.deck.state.Clone();
             o = TerminalCards.Resolve(ev.board, cand, rolls, ev.env, after);
-            // 〈写し取り〉〈焼き切り〉〈呼び戻し〉が発動する挿し方なら、 対象を方策で選び直して解き直す (対象は今ターンの攻防を変えない)
+            // 〈影写し〉〈火葬の剣〉〈有効活用〉が発動する挿し方なら、 対象を方策で選び直して解き直す (対象は今ターンの攻防を変えない)
             tgts = ChooseDeckTargets(ev.board, o, ev.run, _recallPrefer);
             if (tgts != null)
             {
@@ -429,12 +429,12 @@ namespace AutoTest
             return TerminalWiring.MostValuablePair(fixedUp, w => EvalDeckWiring(ev, rolls, w, out _, out _, out _));
         }
 
-        /// <summary>対象を取る端子の対象の方策 (読むだけ)。 写し取り = 山札に増やして一番得な端子 (素の点の最大) / 焼き切り = 一番要らない端子 (最小) /
-        /// 呼び戻し = 次のターンに一番使いたい端子 (最大)。 点は報酬の素の点 (<see cref="RewardBaseScore"/>)・基本の端子は 1。 対象を取る端子が発動しなければ null。</summary>
+        /// <summary>対象を取る端子の対象の方策 (読むだけ)。 影写し = 山札に増やして一番得な端子 (素の点の最大) / 火葬の剣 = 一番要らない端子 (最小) /
+        /// 有効活用 = 次のターンに一番使いたい端子 (最大)。 点は報酬の素の点 (<see cref="RewardBaseScore"/>)・基本の端子は 1。 対象を取る端子が発動しなければ null。</summary>
         private static int[] ChooseDeckTargets(List<string> board, TerminalOutcome o, RunState run, TerminalKind? recallPrefer = null)
         {
             int[] res = null;
-            // 〈呼び戻し〉(手札の持ち越しの規則): 捨て札から次のターンに一番使いたい 1 枚 (素の点の最大・同点は後に捨てた方) を選ぶ (値は捨て札の添字)
+            // 〈有効活用〉(手札の持ち越しの規則): 捨て札から次のターンに一番使いたい 1 枚 (素の点の最大・同点は後に捨てた方) を選ぶ (値は捨て札の添字)
             //   [#141] 方策 Planned の時は、 次のターンの当ての種類 (recallPrefer) の中で点の最大 (無ければ全体で)
             if (o.recall)
             {
@@ -466,7 +466,7 @@ namespace AutoTest
             return res;
         }
 
-        /// <summary>[〈呼び戻し〉] 捨て札で素の点が最大の 1 枚の添字 (同点は後に捨てた方・空なら −1)。 先読みでも同じ選び方 (次のターンの効用での選び直しはしない・仮)。</summary>
+        /// <summary>[〈有効活用〉] 捨て札で素の点が最大の 1 枚の添字 (同点は後に捨てた方・空なら −1)。 先読みでも同じ選び方 (次のターンの効用での選び直しはしない・仮)。</summary>
         private static int RecallBest(List<string> disc, RunState run, TerminalKind? prefer = null)
         {
             if (disc == null) return -1;
@@ -486,10 +486,10 @@ namespace AutoTest
             return pick;
         }
 
-        /// <summary>[#141] 〈呼び戻し〉の当ての種類 (この 1 回の判断のあいだ持つ)。 null = 今までの選び方 (方策 Planned 以外は必ず null)。</summary>
+        /// <summary>[#141] 〈有効活用〉の当ての種類 (この 1 回の判断のあいだ持つ)。 null = 今までの選び方 (方策 Planned 以外は必ず null)。</summary>
         private TerminalKind? _recallPrefer;
 
-        /// <summary>[#141] 〈呼び戻し〉の当て (方策 Planned の時だけ): 次のターンがダウン (前に割った分が残っている・予告の downPending) なら攻撃、
+        /// <summary>[#141] 〈有効活用〉の当て (方策 Planned の時だけ): 次のターンがダウン (前に割った分が残っている・予告の downPending) なら攻撃、
         /// 次のターンが大技 (予告の turnsToHeavy = 1) なら防御、 どちらでもなければ null (点の最大)。
         /// このターンの挿し方で目盛りを割って次がダウンになる場合は見ない (挿し方ごとに当てが変わり、 対象の選び直しが挿し方の評価と絡むため・仮)。</summary>
         private TerminalKind? RecallPreferFor(MutualTurnTelegraph tele)
@@ -504,7 +504,7 @@ namespace AutoTest
         //  手札の規則 Pick (2026-11-13): 次のターンも手札に残す端子の方策
         // =====================================================================
         /// <summary>残す印の BOT の方策。 Auto = 既定 (どの技量でも None・2026-11-13 の 2 回目の測定から)。 Greedy / Lookahead / Planned は腕で明示した時だけ。
-        /// Planned (#141・2026-11-14) = 次のターンに使う当てがある端子だけ残す (<see cref="DownKeepRules.PlanKeep"/>)。 〈呼び戻し〉の選び方も同じ当てで選ぶ。</summary>
+        /// Planned (#141・2026-11-14) = 次のターンに使う当てがある端子だけ残す (<see cref="DownKeepRules.PlanKeep"/>)。 〈有効活用〉の選び方も同じ当てで選ぶ。</summary>
         public enum HandKeepPolicy { Auto = -1, None = 0, Greedy = 1, Lookahead = 2, Planned = 3 }
 
         /// <summary>[測定 2026-11-13] 残す印の方策 (手札の規則 Pick の時だけ効く)。 None = 何も残さない (Off と同じ結果になるはず)。</summary>
@@ -870,7 +870,7 @@ namespace AutoTest
         // =====================================================================
         //  挑戦カード〈金で殴る〉(#6・2026-11-12) の払い方 (効果の定義は ChallengeCards.GoldPunchAttack)
         // =====================================================================
-        //  金の値段 = goldPunchHpPerGold (HP 相当 / 1G)。 既定 0.15 は〈戦利品箱〉の撃破ボーナスの値付け (DeckKillGoldWorth) と同じ ──
+        //  金の値段 = goldPunchHpPerGold (HP 相当 / 1G)。 既定 0.15 は〈賞金狩り〉の撃破ボーナスの値付け (DeckKillGoldWorth) と同じ ──
         //  この BOT が金を HP に換える率は 1 つにそろえる。 効用 (HP の帳簿) で「金で上げた攻撃が減らす被ダメ」と「払った金 × 値段」を比べ、 得な方を取る。
         //   A. とどめ: 攻撃する挿し方のうち、 所持金を全部払えば今ターン撃破できるものについて、 撃破に要る最小の金額 (二分探索) を払う案。
         //      撃破のターンは敵が攻撃しないので、 今ターンの被ダメと先の被ダメの見込みが全部消える ── 金の主な使い道はここ。
@@ -985,8 +985,8 @@ namespace AutoTest
         //    挿し方 w の値 = 今ターンの効用 U_now(w) + 次のターンの最良効用の期待値 E[max U_next]。 割引なし・新しい重みなし。
         //    今ターンで撃破・死亡する挿し方は先読みせず U_now のまま。 振り直しは次のターンの見積もりに入れない。
         //  次のターンの盤面は w で今ターンを解いた後 (E8 と同じ NextTurnStateFrom) に、 山札の状態を足したもの:
-        //    端子の状態 (溜まり・〈予熱器〉・〈配電盤〉の多く引く・〈受け太刀〉〈充填〉の溜め・〈鋳造口〉…) = Resolve の写し (after) に BeginTurn を掛ける
-        //    山札 = 本体の FinishTurn (使い捨て・写し取り・焼き切り・保持) と DrawTurn (止まっていた手札を残す・捨てる・引く・常設は場へ) を写しで回す
+        //    端子の状態 (溜まり・〈無形の構え〉・〈先読み〉の多く引く・〈後の先〉〈力溜め〉の溜め・〈打ち直し〉…) = Resolve の写し (after) に BeginTurn を掛ける
+        //    山札 = 本体の FinishTurn (使い捨て・影写し・火葬の剣・保持) と DrawTurn (止まっていた手札を残す・捨てる・引く・常設は場へ) を写しで回す
         //    盤面の数 (充電・シールド・HP・毒・出血・敵の攻撃) = 今ターンの結果から (敵の攻撃は E8 と同じ公開規則の期待値)
         //  **先の情報は知らない**: 山の並び (GameRng で切った順) は読まず、 山の中身 (枚数と種類 = 人も数えられる) から一様に引く。
         //    次の出目も面から引く。 どちらも専用の System.Random (ランの番号・ターン・HP・出目から作る種) で、 GameRng を消費しない。
@@ -1091,7 +1091,7 @@ namespace AutoTest
         {
             var st = ev.st;
             int k = rolls.Length;
-            // 敵の攻撃の前の HP とシールド (効用の Core と同じ: 払った HP は 1 未満にならない・回復は最大まで / 〈盾押し口〉で払う分を先に引く)
+            // 敵の攻撃の前の HP とシールド (効用の Core と同じ: 払った HP は 1 未満にならない・回復は最大まで / 〈重装突撃〉で払う分を先に引く)
             int hpStart = Math.Min(st.myMaxHp, Math.Max(1, st.myHp - o.selfDamage) + o.heal);
             if (outc.effDmg >= st.enemyHp || outc.taken >= hpStart) return 0f;
             int pool = Math.Max(0, st.myShield - o.shieldSpend) + o.shield;
@@ -1123,7 +1123,7 @@ namespace AutoTest
                 int extra = nst.BeginTurn();
                 var nb = SampleNextBoard(ev.deck, ev.board, o, TerminalCards.HandSize + extra, la.stopChance, rng, out var stopped, keep, _recallPrefer);
                 nst.stopped = stopped;
-                // 〈鋳造口〉の出目 +N は振った後に足される (本体 DrawTerminalHand → FoundryBonusKey)
+                // 〈打ち直し〉の出目 +N は振った後に足される (本体 DrawTerminalHand → FoundryBonusKey)
                 var dice = new int[k];
                 for (int i = 0; i < k; i++) dice[i] = faces[rng.Next(faces.Length)] + nst.foundryBonus;
                 System.Array.Sort(dice);
@@ -1166,7 +1166,7 @@ namespace AutoTest
             var discard = new List<string>(dk.discard);
             var hand = new List<string>(dk.hand);
             var perm = new List<string>(dk.permanent);
-            // ---- FinishTurn: 残す 1 枚・写し取り (次のターンの手札へ・引いた後に足す)・使い捨てと焼き切り (この戦闘から外す) ----
+            // ---- FinishTurn: 残す 1 枚・影写し (次のターンの手札へ・引いた後に足す)・使い捨てと火葬の剣 (この戦闘から外す) ----
             string retain = o.retainTarget >= 0 && o.retainTarget < board.Count ? board[o.retainTarget] : null;
             string copy = o.copyTarget >= 0 && o.copyTarget < board.Count ? board[o.copyTarget] : null;
             foreach (int s in o.fired)
@@ -1180,7 +1180,7 @@ namespace AutoTest
             var kept = new List<string>();
             TerminalDeckState.SplitHand(hand, board, perm.Count, dk.state.stopped, retain,
                                         TerminalDeckState.UsedFromHand(board, perm.Count, o), TerminalCards.CarryMode, kept, discard, keep);
-            // 〈呼び戻し〉(持ち越しの規則): 本体と同じ選び方・同じ関数で、 捨て札から 1 枚を手札へ戻す
+            // 〈有効活用〉(持ち越しの規則): 本体と同じ選び方・同じ関数で、 捨て札から 1 枚を手札へ戻す
             if (o.recall && TerminalCards.HandCarry)
                 TerminalDeckState.ApplyRecall(TerminalDeckState.RecallPick(dk.discard, RecallBest(dk.discard, GameManager.Instance?.Run, recallPrefer)), kept, discard, size);
             hand.Clear(); hand.AddRange(kept);
@@ -1202,7 +1202,7 @@ namespace AutoTest
                 if (stop) stopHand.Add(hand.Count);
                 hand.Add(id);
             }
-            if (copy != null) hand.Add(copy);      // 〈写し取り〉の写し: 本体の DrawTurn と同じく、 引く枚数とは別に手札の最後へ
+            if (copy != null) hand.Add(copy);      // 〈影写し〉の写し: 本体の DrawTurn と同じく、 引く枚数とは別に手札の最後へ
             var nb = new List<string>(perm.Count + hand.Count);
             nb.AddRange(perm); nb.AddRange(hand);
             stopped = null;
@@ -1329,7 +1329,7 @@ namespace AutoTest
             }
             switch (d.id)
             {
-                // 〈剥ぎ取り〉: 2026-11-13 に攻撃の端子になったので、 ほかの撃破のボーナスの端子 (収穫機・研ぎ澄まし・戦利品箱) と同じくレアの 3 (下の既定)。
+                // 〈剥ぎ取り〉: 2026-11-13 に攻撃の端子になったので、 ほかの撃破のボーナスの端子 (魂狩り・処刑の刃・賞金狩り) と同じくレアの 3 (下の既定)。
                 //   撃破のボーナスの価値は挿す時の値付け (DeckSums の DeckKillExtraChoiceWorth) で見る。 旧: 補助で 1.5 (1.0 では一度も取られなかった)
                 case TerminalIds.Retainer:    return 2.0f;      // 出目をブロックに入れたうえで 1 枚残す (2026-11-12 の作り替えの後・旧 1.0)
                 case TerminalIds.Heal:        return 1.2f;      // 3 以下だけ・攻撃にならない
@@ -1338,7 +1338,7 @@ namespace AutoTest
                 case TerminalIds.Switchboard: return 1.5f;
             }
             if (d.rare) return d.disposable ? 2.5f : 3f;
-            // 使い捨てのコモンは 1.5。 〈焼き切り〉(2026-11-14 に攻撃の端子へ作り直し) もここで、 使い捨ての攻撃の端子〈起爆筒〉(出目 ×4)・〈貫通弾〉と同じ点
+            // 使い捨てのコモンは 1.5。 〈火葬の剣〉(2026-11-14 に攻撃の端子へ作り直し) もここで、 使い捨ての攻撃の端子〈火薬樽〉(出目 ×4)・〈貫通弾〉と同じ点
             return d.disposable ? 1.5f : 2f;
         }
 

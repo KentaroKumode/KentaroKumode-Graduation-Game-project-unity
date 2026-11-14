@@ -239,7 +239,7 @@ namespace AutoTest
         /// −1 = 縄張りを気にしない (この規則を入れる前の動き)。 追跡者を避けない方策 (Naive) と旧い作り (縄張りの外まで追う) には効かない。 仮置き。</summary>
         public int navTerritoryDetour = 3;
         /// <summary>[測定 2026-11-12・#102] 端子の調整を元の値へ戻す腕。 本体の GameHooks.Terminal* へ流す (ラン終了で既定へ)。
-        /// terminalHealMul: 〈治癒〉の倍率 (0 = 差し替えない = 今の値・旧は 2)。 terminalArresterNeed: 〈避雷器〉の溜める量 (0 = 今の値・旧は 12)。</summary>
+        /// terminalHealMul: 〈包帯〉の倍率 (0 = 差し替えない = 今の値・旧は 2)。 terminalArresterNeed: 〈防御陣〉の溜める量 (0 = 今の値・旧は 12)。</summary>
         public int terminalHealMul = 0, terminalArresterNeed = 0;
         /// <summary>[測定 2026-11-14] true = 〈応急箱〉を使うとランの山札から抜ける (2026-11-12〜11-14 の旧い決まり)。 既定 false = 今の決まり (その戦闘中だけ戻らない)。
         /// 旧い口 terminalFirstAidBattleOnly (true = 戦闘中だけ) は既定と同じ意味になったので消した (送られても「未知の設定フィールド」の警告だけ)。</summary>

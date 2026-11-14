@@ -15,7 +15,7 @@ namespace UI.Game2D
     /// 航行用の GUI が引っ込むのと入れ替わりに、 左・右・上からばねで入ってくる (<see cref="Drive"/>)。 座標は 480×270 の格子 (左上が原点)。
     /// <para>端子の山札 (ADR-0014): 左に 3 枚を積む: Ports (出目とそれぞれの差し込み口・出目が 4 個以上なら 3 個ずつの列を右へ足す) / ステータス / Ctl (操作)。
     /// 右下 (Hand) にこのターンに引いた端子 (USB メモリの形) を並べ、 つかんで出目の差し込み口へ落とすと装着する (<see cref="Game2DBattleSim.Plug"/>)。
-    /// 〈写し取り〉〈焼き切り〉〈呼び戻し〉に出目を挿すと、 挿していない手札の端子に「候補」の印が付き、 候補をその端子の上へ落とすと対象が決まる
+    /// 〈影写し〉〈火葬の剣〉〈有効活用〉に出目を挿すと、 挿していない手札の端子に「候補」の印が付き、 候補をその端子の上へ落とすと対象が決まる
     /// (<see cref="Game2DBattleSim.SetTarget"/>)。 名前・条件・効果は USB にマウスを乗せた時だけ帯 (Tip) で出す。 発動の見込みは
     /// <see cref="CombatSystem.TerminalCards.Resolve"/> を状態の写しで呼んだ値 (<see cref="Game2DBattleSim.preview"/>)。</para>
     /// (旧い配線の画面 ── 左のパネルに出目 3 個と攻撃・防御・充電・特殊の板 ── は 2026-11-11 に削除。 戦闘は常に山札で戦う)
@@ -349,7 +349,7 @@ namespace UI.Game2D
         //   右下の手札の USB をつかんで (左ボタンを押したまま動かす)、 左の出目の差し込み口へ落とす = その出目をその端子に挿す。
         //   挿さった USB もつかめる: 別の出目の口へ落とす = 移す / 口の外で離す = 手札へ戻す。 口の上で右クリック = 外す。
         //   別の USB を挿さっている口へ落とす = 入れ替え (前の USB は手札へ)。 落とせない口で離したら手札へ戻る。
-        //   対象を選ぶ: 〈写し取り〉〈焼き切り〉〈呼び戻し〉が挿さっている口 (か手札の抜け殻) へ、 候補の USB を落とす = 対象に決める
+        //   対象を選ぶ: 〈影写し〉〈火葬の剣〉〈有効活用〉が挿さっている口 (か手札の抜け殻) へ、 候補の USB を落とす = 対象に決める
         //   (その口への「入れ替え」より先に効く。 入れ替えたい時は右クリックで外してから挿す)。
         //   出目を押す = 行き先を順に変える (右クリックで逆・1〜9 キーと同じ)。 Q = おまかせ・Space = 決める (Sim のキー)。
 
@@ -450,7 +450,7 @@ namespace UI.Game2D
             CancelDrag();
             if (!moved || s < 0)
             {
-                // 押しただけ: 挿してある〈呼び戻し〉なら、 戻す 1 枚を選ぶ窓を開く (それ以外は何もしない)
+                // 押しただけ: 挿してある〈有効活用〉なら、 戻す 1 枚を選ぶ窓を開く (それ以外は何もしない)
                 if (s >= 0 && from >= 0 && sim.IsRecaller(s)) OpenRecall(s);
                 // 手札の端子を押した: 手札の規則 Pick なら「次のターンも残す」の印を付け外し
                 else if (s >= 0 && from < 0) sim.ToggleKeep(s);
@@ -464,7 +464,7 @@ namespace UI.Game2D
                 if (port == from) return;
                 if (sim.Plug(port, s, from))
                 {
-                    if (from < 0 && sim.IsRecaller(s)) OpenRecall(s);      // 〈呼び戻し〉を挿した: 捨て札から戻す 1 枚を選ぶ窓 (選ばずに閉じれば最後に捨てた 1 枚)
+                    if (from < 0 && sim.IsRecaller(s)) OpenRecall(s);      // 〈有効活用〉を挿した: 捨て札から戻す 1 枚を選ぶ窓 (選ばずに閉じれば最後に捨てた 1 枚)
                     return;
                 }
                 Game2DSfx.Play("ui_click");      // 落とせない口: 手札へ戻る
@@ -493,7 +493,7 @@ namespace UI.Game2D
         {
             var l = new List<KeyValuePair<int, int>>(); divider = -1;
             int m = sim.board.Count, j = 0, q = 0;
-            // 手札は 5 枚が基本 (2026-11-11)。 場に残る端子や〈配電盤〉で枠に収まらない時は、 間隔を詰めて並べる
+            // 手札は 5 枚が基本 (2026-11-11)。 場に残る端子や〈先読み〉で枠に収まらない時は、 間隔を詰めて並べる
             int nHand = 0, nPerm = 0;
             for (int s = 0; s < m; s++) { var d0 = CombatSystem.TerminalCards.Get(sim.board[s]); if (d0 != null && d0.permanent) nPerm++; else nHand++; }
             int avail = Hand.width - 2 * HandPad - nPerm * HandStep - (nPerm > 0 ? 4 : 0);
@@ -699,7 +699,7 @@ namespace UI.Game2D
         }
 
         /// <summary>説明の帯 (USB にマウスを乗せた時だけ・つかんでいる間は出さない): 1 行目 = 名前 (種類の色) と印 / 続けて効果 /
-        /// 対象 (〈写し取り〉など) / 誓約の封じ。 出すものが無ければ false。</summary>
+        /// 対象 (〈影写し〉など) / 誓約の封じ。 出すものが無ければ false。</summary>
         private bool DrawTip()
         {
             int m = sim.board.Count, f = _hoverS;
@@ -711,7 +711,7 @@ namespace UI.Game2D
             string head = d.id + "（" + Game2DTerminalLook.Marks(d, run) + "）";
             var headLines = Game2DJpFont.Lines(head, iw);
             var body = new List<string>(Game2DJpFont.Lines(d.description, iw));
-            // 対象 (〈写し取り〉など) と誓約の封じの行
+            // 対象 (〈影写し〉など) と誓約の封じの行
             var extra = new List<string>();
             if (sim.IsStopped(f))
                 extra.AddRange(Game2DJpFont.Lines(d.permanent ? "止まっている (このターンは挿せない)"
@@ -749,7 +749,7 @@ namespace UI.Game2D
         private string TargetLine(int f)
         {
             string id = sim.board[f];
-            // 〈呼び戻し〉(手札の持ち越しの規則): 捨て札から戻す 1 枚
+            // 〈有効活用〉(手札の持ち越しの規則): 捨て札から戻す 1 枚
             if (CombatSystem.TerminalCards.PicksDiscard(id))
             {
                 if (sim.ShowingResult) return null;
@@ -770,7 +770,7 @@ namespace UI.Game2D
             else
             {
                 if (!sim.IsPicker(f))
-                    return id == CombatSystem.TerminalIds.BurnOut      // 〈焼き切り〉(2026-11-14): 外す端子が無ければ挿しても不発
+                    return id == CombatSystem.TerminalIds.BurnOut      // 〈火葬の剣〉(2026-11-14): 外す端子が無ければ挿しても不発
                         ? "出目に挿すと、 挿していない手札の端子を外す対象に選べる (外す端子が無いと発動しない)"
                         : "出目に挿すと、 挿していない手札の端子を対象に選べる";
                 t = sim.TargetOf(f);
@@ -838,10 +838,10 @@ namespace UI.Game2D
             return false;
         }
 
-        // ── 〈呼び戻し〉の窓 (捨て札から 1 枚・仮の見た目 = 道具の窓と同じ部品) ──
-        //   開く: 〈呼び戻し〉を出目に挿した時 / 挿してある〈呼び戻し〉を押した (動かさずに放した) 時。 捨て札が空なら開かない。
+        // ── 〈有効活用〉の窓 (捨て札から 1 枚・仮の見た目 = 道具の窓と同じ部品) ──
+        //   開く: 〈有効活用〉を出目に挿した時 / 挿してある〈有効活用〉を押した (動かさずに放した) 時。 捨て札が空なら開かない。
         //   最初から「今戻る 1 枚」(選んでいなければ最後に捨てた 1 枚) を選んでおき、 その行に「戻す」の印を付ける。
-        //   [これを戻す] = 選んだ行に決める / [閉じる] = 今の 1 枚のまま。 決めた値は sim.target[〈呼び戻し〉の場の位置] = 捨て札の添字。
+        //   [これを戻す] = 選んだ行に決める / [閉じる] = 今の 1 枚のまま。 決めた値は sim.target[〈有効活用〉の場の位置] = 捨て札の添字。
 
         private void OpenRecall(int s)
         {

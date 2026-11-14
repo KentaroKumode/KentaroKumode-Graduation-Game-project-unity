@@ -566,13 +566,13 @@ namespace CombatSystem
             }
 
 
-            // 大罪:怠惰 (挑戦カード IV・2026-11-10): 全部の出目 −N (下限 1)。 値を減らすだけで面は変えない (〈鋳造口〉の加算と同じ扱い)
+            // 大罪:怠惰 (挑戦カード IV・2026-11-10): 全部の出目 −N (下限 1)。 値を減らすだけで面は変えない (〈打ち直し〉の加算と同じ扱い)
             {
                 int sloth = MetaProgression.MetaDebuffApplicator.GetSlothDicePenalty();
                 if (sloth > 0) for (int i = 0; i < playerDice.Length; i++) playerDice[i] = Math.Max(1, playerDice[i] - sloth);
             }
 
-            // 端子〈鋳造口〉(ADR-0014): 前ターンまでに溜めた分の、 この戦闘中の出目 +N (DrawTerminalHand が置く)。 出目を減らすデバフ (大罪:怠惰) の後に置く。
+            // 端子〈打ち直し〉(ADR-0014): 前ターンまでに溜めた分の、 この戦闘中の出目 +N (DrawTerminalHand が置く)。 出目を減らすデバフ (大罪:怠惰) の後に置く。
             {
                 int foundry = (int)ctx.GetAccumulated(FoundryBonusKey);
                 if (foundry > 0)
@@ -644,7 +644,7 @@ namespace CombatSystem
             psm.FireEnemyTrigger(PassiveSkillTrigger.OnPostRoll);
 
             // --- 2. 予告 (柱3: 完全情報テレグラフ) ---
-            // 〈冷却材〉(§6-5) の遅延を差し引いたターンで段階を引く。 予告にもそのまま出るので、
+            // 〈鎮静香〉(§6-5) の遅延を差し引いたターンで段階を引く。 予告にもそのまま出るので、
             // 「何ターン稼いだか」が盤面から読める (完全情報テレグラフ・柱3)。
             int escTurn = EscalationTurn(ctx);
             NoteEscalationForInstability(Escalation.StageOf(escTurn));
@@ -780,12 +780,12 @@ namespace CombatSystem
                 if (slots == null) slots = TerminalWiring.Auto(_deck.board, playerDice, tenv, _deck.state, _catDie, _catSlot);
                 // 猫の 1 組は答えに関わらず入れる (外した答え・同じ口に挿しすぎた答えは、 猫の組を残して直す)
                 if (_catDie >= 0) slots = TerminalWiring.WithPair(slots, playerDice.Length, _deck.board, _catDie, _catSlot);
-                // 〈写し取り〉〈焼き切り〉〈呼び戻し〉の対象: 人 = 画面で選んだ端子 / BOT = 方策 / どちらも無ければ左端の候補
+                // 〈影写し〉〈火葬の剣〉〈有効活用〉の対象: 人 = 画面で選んだ端子 / BOT = 方策 / どちらも無ければ左端の候補
                 term = TerminalCards.Resolve(_deck.board, slots, playerDice, tenv, _deck.state, targets);
                 _termWanted = (int[])slots.Clone();   // [計装 #106] 直す前の挿し方 (挿したが不発の数え)
                 mutualWiring = term.kindOfDie;
                 _termOutcome = term;
-                // 〈呼び戻し〉(手札の持ち越しの規則): 捨て札から次のターンの手札に戻す 1 枚。 対象 (targets の値) は捨て札の添字・選ばなければ最後に捨てた 1 枚
+                // 〈有効活用〉(手札の持ち越しの規則): 捨て札から次のターンの手札に戻す 1 枚。 対象 (targets の値) は捨て札の添字・選ばなければ最後に捨てた 1 枚
                 _deck.recallNext = term.recall ? TerminalDeckState.RecallPick(_deck.discard, TerminalWiring.RecallWant(_deck.board, term, targets)) : null;
                 // 手札の規則 Pick: 残す印 (挿さなかった手札の端子だけ・人 = 画面 / BOT = 方策)。 Off・All では読まない
                 _deck.keepNext.Clear();
@@ -847,7 +847,7 @@ namespace CombatSystem
             // 充電: **接続ダイスの出目合計**を獲得 (2026-07-28 に「個数」から変更)。
             //   旧: 1 本 = 1 充電。 だが消費側は 雷撃 3 / 火花 1 / 過充電閾値 7 と桁が合わず、
             //       雷撃を毎ターン撃つだけで 5 本中 3 本を充電に固定する必要があった。
-            //   山札 (ADR-0014) では、 充電に入る量は端子ごとに違う (〈蓄電池〉は 出目 +2 など)。 chargeSum は端子の結果の合計。
+            //   山札 (ADR-0014) では、 充電に入る量は端子ごとに違う (〈雷溜め〉は 出目 +2 など)。 chargeSum は端子の結果の合計。
             if (chargeSum > 0) ctx.AddCharge(chargeSum);
             // 〈電流〉の②: 充電端子に挿した出目の一部が攻撃にも加わる (2026-11-07)。 攻撃に 1 個も挿していないターンは攻撃しないので乗らない。
             if (ctx.chargeToAttackPct > 0f && chargeSum > 0)
@@ -1087,7 +1087,7 @@ namespace CombatSystem
             if (!skipAttack && ctx.nullifyPursuitDamage && roleOutcome.extraDamageRatio > 0f)
                 Debug.Log("[追撃無効] この敵は追撃ダメージを受けない ── 役〈追撃〉の追加ダメージを入れない");
             else if (!skipAttack) ApplyRoleExtraDamage(ctx, ref dealtDmg, ref dealtFixed, roleOutcome);
-            if (term.bleedOnHit > 0 && dealtDmg > 0) ctx.AddEnemyBleed(term.bleedOnHit);      // 端子〈返し針〉: 攻撃が通れば出血
+            if (term.bleedOnHit > 0 && dealtDmg > 0) ctx.AddEnemyBleed(term.bleedOnHit);      // 端子〈鉤爪〉: 攻撃が通れば出血
             ctx.lastPlayerDamage = dealtDmg + dealtFixed;
             // 固定ダメの枠は、 ここで取り出した (dealtFixed) ので空に戻す (2026-11-05)。
             //   戻さないと、 この後の敵の攻撃側の ProcessDamage が同じ枠をそのまま返し、 反撃固定として
@@ -1623,7 +1623,7 @@ namespace CombatSystem
                 psm.FireEnemyTrigger(PassiveSkillTrigger.OnRollDraw);
             SyncHPFromContext(ctx);
 
-            // 端子の山札: 撃破のボーナスと、 使い捨て・写し取り・焼き切り・保持の反映
+            // 端子の山札: 撃破のボーナスと、 使い捨て・影写し・火葬の剣・保持の反映
             FinishTerminalTurn(term);
 
             // --- 7. ターン終了処理 (共通終端) ---

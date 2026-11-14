@@ -751,7 +751,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
 
 ```
 0. ターン開始       : BeginTurn / DoT / OnTurnStart / SyncHP / フロア敵回復
-   端子の手札         : DrawTerminalHand (ADR-0014) ── 前の手札を捨てて HandSize(5) + 〈配電盤〉の分を引く (振り直しの判断より前)
+   端子の手札         : DrawTerminalHand (ADR-0014) ── 前の手札を捨てて HandSize(5) + 〈先読み〉の分を引く (振り直しの判断より前)
                         ヴェスカ〈停滞する時間〉: 前のターンに止まった端子は捨てずに手札に残し (解ける)、 新しく引いた 1 枚ごとに確率 p で止める
 1. 敵ロール         : スタンスなし → 敵ダイスを振る
 3. 自ロール         : 自ダイスを振る（旧法と同一の RollDice）
@@ -786,19 +786,19 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          数値は TerminalCards の定数、 端子の一覧は TerminalCards.Build()。 ここには「どの値がどこへ入るか」だけを書く。
          Resolve の順:
            0. 止まった端子 (ヴェスカ〈停滞する時間〉・state.stopped) を挿した出目と、 挿せる数 (capacity・既定 1) を超えた出目を外す
-           1. 〈増圧〉を挿した出目があれば、 他の出目すべて +1 (以降の条件と量はこの値で見る)
+           1. 〈号令の剣〉を挿した出目があれば、 他の出目すべて +1 (以降の条件と量はこの値で見る)
            2. 条件 (3 以下 / 5 以上 / 6 以上 / 偶数 / 奇数 / 同じ目が他の端子に / 同じ目 2 個)。 合わない出目は外す。
-              〈予熱器〉の次のターンは条件を無視 (同じ目 2 個の端子も 2 個そろっていれば通る)
-           3. 充電の支払い (場の順)。 足りなければその端子は不発。 〈大放電〉は充電 1 以上で通り、 効果の所で全部払う
-           4. 〈焼き切り〉(2026-11-14): 外す端子の候補 (下の「対象」) が無ければ不発 (挿した出目を外す・使い捨ても消費しない)
-           5. 効果 (場の順)。 〈倍電圧〉が発動していれば他の端子の効果を 2 回走らせる
-           6. 他の端子を見る効果: 〈継電器〉攻撃 + RelayPerFired × (基本以外の発動数 − 1)、 〈変圧器〉攻撃 + (攻撃の種類の端子を挿した出目の合計)
-              溜めた攻撃 (〈充填〉〈受け太刀〉) は、 攻撃の種類の端子を 1 枚以上挿したターンに attackAdd へ足して 0 に戻す
+              〈無形の構え〉の次のターンは条件を無視 (同じ目 2 個の端子も 2 個そろっていれば通る)
+           3. 充電の支払い (場の順)。 足りなければその端子は不発。 〈裁きの雷〉は充電 1 以上で通り、 効果の所で全部払う
+           4. 〈火葬の剣〉(2026-11-14): 外す端子の候補 (下の「対象」) が無ければ不発 (挿した出目を外す・使い捨ても消費しない)
+           5. 効果 (場の順)。 〈残響〉が発動していれば他の端子の効果を 2 回走らせる
+           6. 他の端子を見る効果: 〈連係斬り〉攻撃 + RelayPerFired × (基本以外の発動数 − 1)、 〈剛腕〉攻撃 + (攻撃の種類の端子を挿した出目の合計)
+              溜めた攻撃 (〈力溜め〉〈後の先〉) は、 攻撃の種類の端子を 1 枚以上挿したターンに attackAdd へ足して 0 に戻す
            7. 誓約の封じ (TerminalEnv.seal* = ctx.poisonSealed などの写し): 封じた資源を足す分だけを結果から落とす
               (毒 → poison=0 / 出血 → bleedOnHit=0 / 臨界 → heat=0 / 充電 → chargeAdd=0・chargeFill=false / シールド → shield=0 / 会心 → forceCrit・critMultAdd)。
               本体の口 (AddStatus・AddEnemyBleed・Kw.AddHeat・AddCharge・consShield・会心の判定) も同じ物を止めるので、 落とすのは見込み (画面・BOT) と揃えるため。
               攻撃・ブロックへ入る量は落とさない。 充電を落とすので、 封じた戦闘では〈電流〉の② (chargeToAttackPct) にも端子の充電は乗らない (2026-11-11〜)
-         〈写し取り〉〈焼き切り〉〈保持器〉の対象: Resolve の wantTarget (人 = 画面で選んだ端子 / BOT = WiringPlan.targets)。
+         〈影写し〉〈火葬の剣〉〈保持器〉の対象: Resolve の wantTarget (人 = 画面で選んだ端子 / BOT = WiringPlan.targets)。
            候補 = 自分でない・常設でない・止まっていない・挿し方を直した後に出目が 1 個も無い手札の端子 (TerminalCards.IsCandidate)。 選ばない・候補でない時は左端の候補
          結果 (TerminalOutcome) の行き先:
            attackAdd / blockAdd / chargeAdd → attackSum / blockSum / chargeSum (出目をそのまま足さない ── 端子ごとに入る量が違う)
@@ -808,11 +808,11 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          ApplyTerminalOutcome (配線の時点・堅牢の環/傲慢/端子調律より前) が戦闘へ配る:
            damageMul      → _termDamageMul (主攻撃の別枠の掛け算・下の自攻撃を参照)。 毎ターン 1 に戻す
            chargeSpend    → ctx.ConsumeCharge(min(払う量, 今の充電))     chargeFill → ctx.AddCharge(ChargeCap)
-           heal           → HealPlayer        selfDamage → playerHP = max(1, playerHP − 量)  (〈決死〉は Resolve の時点で HP−1 までに切る)
-           shieldSpend    → ctx.consShield = max(0, consShield − 量) (〈盾押し口〉が攻撃に足した分・shield より先に引く)
+           heal           → HealPlayer        selfDamage → playerHP = max(1, playerHP − 量)  (〈諸刃の剣〉は Resolve の時点で HP−1 までに切る)
+           shieldSpend    → ctx.consShield = max(0, consShield − 量) (〈重装突撃〉が攻撃に足した分・shield より先に引く)
            shield         → ctx.consShield += 量 (shieldGainedTotal にも足す)
            poison         → Rw.Poison(ctx, 量)       heat → Kw.EnableHeat + Kw.AddHeat(ctx, 量)
-           retreatStage   → AddEscalationDelay(TurnsToRetreatOneStage) (段階を 1 つ戻す・〈冷却弾〉と、 溜まりが CoolantNeed に届いた〈冷却材〉。 遅延のキーは CoolantDelayKey・役〈時間〉と共有)
+           retreatStage   → AddEscalationDelay(TurnsToRetreatOneStage) (段階を 1 つ戻す・〈氷結瓶〉と、 溜まりが CoolantNeed に届いた〈鎮静香〉。 遅延のキーは CoolantDelayKey・役〈時間〉と共有)
            enemyStunNext  → nextTurnBuffs[EnemyStunKey] (次のターン敵は行動しない)
            ignoreDefense  → ctx.playerArmorPen += DefenseFormula.IgnoreAll
            forceCrit      → ctx.forceCritical = true       critMultAdd → ctx.criticalMultiplier += 量 (毎ターン組み直されるのでこのターンだけ)
@@ -821,16 +821,16 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                             2 体目の攻撃・〈連撃〉の 2 回目 (_secondaryAtkThisTurn) にも同じ率
            takenMul       → 役〈守り〉の口へ合成: damageTakenCutPct = round(100 − (100 − cut) × takenMul)
                             → ApplyRoleGuard で takenDmg = round(takenDmg × (1 − cut/100)) (敵の直接攻撃パケットだけ・固定ダメの枠は触らない)
-           bleedOnHit     → 主攻撃の dealtDmg > 0 のとき ctx.AddEnemyBleed(量) (〈返し針〉)
-         ターンの頭 (DrawTerminalHand): 〈鋳造口〉の出目 +N を accumulatedValues[termFoundryBonus] へ置き、 自ロールの後 (大罪:怠惰の後) に全部の出目へ足す。
-           〈計数器〉が山札に入っていれば ctx.AddOutgoingPct(CounterPct × floor(基本以外の発動の累計 ÷ CounterEvery))
+           bleedOnHit     → 主攻撃の dealtDmg > 0 のとき ctx.AddEnemyBleed(量) (〈鉤爪〉)
+         ターンの頭 (DrawTerminalHand): 〈打ち直し〉の出目 +N を accumulatedValues[termFoundryBonus] へ置き、 自ロールの後 (大罪:怠惰の後) に全部の出目へ足す。
+           〈柔軟な戦略〉が山札に入っていれば ctx.AddOutgoingPct(CounterPct × floor(基本以外の発動の累計 ÷ CounterEvery))
          ターンの終わり (FinishTerminalTurn): 発動した端子の撃破のボーナス
-           (〈収穫機〉最大 HP + / 〈研ぎ澄まし〉RunState.terminalWhetBonus + / 〈戦利品箱〉ゴールド + / 〈剥ぎ取り〉次の報酬の選択肢 +1)。
+           (〈魂狩り〉最大 HP + / 〈処刑の刃〉RunState.terminalWhetBonus + / 〈賞金狩り〉ゴールド + / 〈剥ぎ取り〉次の報酬の選択肢 +1)。
            撃破の経路は問わない (#117・2026-11-13)。 ここで敵 HP ≤ 0 なら配り、 まだ倒れていなければ控えておき、
            FinishTurnCommon の 2 か所 (OnTurnEnd の後・SwapEnemy の前 / SyncHPFromContext の後・TryAdvanceVescaChain の前) で敵 HP ≤ 0 なら配る
            (〈絞り出し〉〈百断〉などターン終了時の撃破)。 2 体戦の 2 体目だけが倒れたターンは数えない (戦闘の撃破 = 1 体目)。
            旧: 敵 HP ≤ 0 かつ攻撃の種類の端子を 1 枚以上挿したターンの、 ここまでの撃破だけ (測定の口 GameHooks.TerminalKillBonusNeedsAttack)。
-           その後、 使い捨て・〈写し取り〉(写しは次のターンの手札へ・引く枚数とは別・2026-11-14)・〈焼き切り〉・〈保持器〉を山札へ反映
+           その後、 使い捨て・〈影写し〉(写しは次のターンの手札へ・引く枚数とは別・2026-11-14)・〈火葬の剣〉・〈保持器〉を山札へ反映
 
 役 (ADR-0011・配線集計の直後 / 攻防の解決より**前**)
          ResolveRoles: 振った 3 個から **目 × {2 個そろい, ゾロ目}** の 18 種を判定する。
@@ -871,7 +871,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          → ProcessDamage(atkBase, pursuitDamage, playerCriticalNumerator)
          → ApplyWinDamageModifiers（旧勝利分岐と同一チェーン）
            その末尾 (練度不足の後・大罪:怠惰と敵の軽減パッシブの前) で **端子の別枠**:
-           totalDmg = max(1, round(totalDmg × _termDamageMul))  (〈増幅器〉1 + AmplifierPerPip × 出目・〈共振器〉ResonatorMul。 _termDamageMul ≠ 1 かつ totalDmg > 0 のときだけ)
+           totalDmg = max(1, round(totalDmg × _termDamageMul))  (〈激昂〉1 + AmplifierPerPip × 出目・〈共鳴〉ResonatorMul。 _termDamageMul ≠ 1 かつ totalDmg > 0 のときだけ)
          → 物資の疲労（15% で**最終ダメージ半減**。 isCrit は落とさない）
          → 敵HP -= dealtDmg + dealtFixed
          → 鋼の皮膚
@@ -928,7 +928,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
                          / 大技の 1 ターン前 (チャージ・予告 turnsToHeavy = 1) → 0 (攻撃しない・2026-11-14・口 heavyChargeNoAttack=False で小技の倍率に戻る)
                          / それ以外 → heavyLightMul (小技・2026-11-14 に heavyWindupMul から改名。 それまでは大技以外の全ターン = チャージも含めた倍率だった)
                        式の正本は HeavyCycle.Factor。 チャージのターンは攻撃値 0 で、 解決はダウンと同じ「攻撃しない」の枝 (下の「敵攻撃」)。
-                       周期は冷却材の遅延を受けない実ターンで数える (ボスのダウンで起点が戻る・上)。 予告に turnsToHeavy / heavyMul / enemyCharging を出す。
+                       周期は鎮静香の遅延を受けない実ターンで数える (ボスのダウンで起点が戻る・上)。 予告に turnsToHeavy / heavyMul / enemyCharging を出す。
                        値 (2026-11-14・倍率は仮置き): 5 層・5 層裏・ヴェスカ p3・p4 = 周期 5 (11-14 に 3 → 5・作者の決定)・小技 ×0.8・チャージ 攻撃なし・大技 ×3.0
                          (2026-11-15: ヴェスカ p1・p2 は大技なし = heavyPeriod 0・小技の倍率も掛からない (×1.0)。 p3・p4 の大技は天与 (TenyoHeavy・下))
                          ヴェスカの天与 (2026-11-15・CombatSystem.TenyoHeavy): チャージのターンの頭に剣 / 盾 / 指輪を抽選 (直前と同じ物は続けない・GameRng "vesca.tenyo")。
@@ -972,7 +972,7 @@ boss6_ashen）は撤去した。** 罰は敵強化ではなく**プレイヤー�
          → ctx の HP を playerHP / enemyHP へ揃え、 ctx.finalDamage = takenDmg にして敵の OnPostDealDamage (〈吸血〉)
            → SyncHPFromContext (2026-11-11 #104)
 
-充電     chargeSum = 端子の結果の chargeAdd      ← 個数ではない (基本の〈充電〉は出目そのまま・〈蓄電池〉出目 +2 など)
+充電     chargeSum = 端子の結果の chargeAdd      ← 個数ではない (基本の〈充電〉は出目そのまま・〈雷溜め〉出目 +2 など)
          → ctx.AddCharge(chargeSum)  (上限 ChargeMax=**30** + メタ種火r2 で +5)
          ※ ChargeMax は ADR-0010 で 10→30。 充電が**リロールの原資**になったため
          ※ chargeDiceCount(個数) も併算されるが AddCharge には渡らない
