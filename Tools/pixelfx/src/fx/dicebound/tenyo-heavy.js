@@ -53,10 +53,10 @@ export function irisR(a) { if (a >= SHIELD.close) return 0; const u = clamp(a / 
 // 指輪の発動の時刻 (待機の終わりからの秒)
 export const RING = {
   idleDark: 0.5,                        // チャージ完了から待機の間の、 画面の暗さ
-  dark: [[0, 0.5], [1.0, 0.5], [1.3, 0]],   // 発動の間の暗さ: God rays の間は保ち、 インパクトフレームで解ける
-  rays: [0, 1.0],                       // God rays が出て来る区間
-  impact: 1.0,                          // インパクトフレーム
-  white: 1.3,                           // 白飛び。 ここから、 今の着弾の絵 (輪が落ちて盤を締める) と Magic circle cast
+  dark: [[0, 0.5], [0.5, 1], [1.3, 1], [1.8, 0]],   // 発動の間の暗さ: God rays の直前に真っ黒 (作者の指定。 輪も一緒に消える) → God rays が出そろうまで保つ → 解ける
+  rays: [0.5, 1.5],                     // God rays が出て来る区間
+  impact: 1.8,                          // インパクトフレーム (中心は、 下の着弾点 = こちらの盤)
+  white: 2.0,                           // 白飛び (インパクトフレームの線が引き切る前に重ねる: 間に素の画面を挟まない)。 ここから、 今の着弾の絵 (輪が落ちて盤を締める) と Magic circle cast
 };
 const SUN = [240, 42], SUN_K = 1.15;   // 剣: 頭上の日食の中心と倍率 (元の月の半径 19 → 22。 作者: もう少し小さく)   // 剣のつばの高さ・刃の長さ・盾の球の半径
 
@@ -87,7 +87,7 @@ export function create(o) {
   // 指輪の発動の部品: God rays・インパクトフレーム・arcane/magic-circle-cast (床に円が描かれ、 文字が 1 つずつ灯り、 光って、 光の柱が立って砕ける) を金色で、 こちらの盤の上に
   const rg = gift !== "ring" ? null : {
     rays: scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, opts: {} }),
-    impact: scaledFx(IMPACT, { K: 1.5, at: [240, 135], delay: TH + RING.impact - T0, opts: {} }),
+    impact: scaledFx(IMPACT, { K: 2.8, at: [BOARD[0], BOARD[1]], delay: TH + RING.impact - T0, opts: {} }),   // 集中線の中心を着弾点に。 中心を下げても画面の上まで覆うよう、 大きく
     circle: scaledFx(MAGIC, { K: 3.6, at: [BOARD[0], BOARD[1] + 4], speed: 1.6, delay: TH + RING.white - T0, glow: 0.8, opts: { palette: GOLD } }),
     // 着弾をもっと派手に (作者の指定): 輪が盤を締める瞬間 (白飛びから 0.26 秒) に、 着地の衝撃 (impacts/ground-slam・瓦礫なし・煙は細かく) を 2 つ重ねる
     slam: scaledFx(SLAM, { K: 3, at: [BOARD[0], BOARD[1]], delay: TH + RING.white + 0.26 - T0, glow: 1.3, drop: ["CHUNK", "GRIT", "FLAKE"], puff: { SMOKE: [0.45, 3], DUST: [0.6, 2] }, opts: { palette: GOLD } }),
@@ -261,7 +261,8 @@ export function create(o) {
         const f = p.fade, b = a - RING.white;
         p.fade = f * clamp((a - RING.rays[0]) / (RING.rays[1] - RING.rays[0])) * (1 - clamp((a - RING.impact) / 0.25)); if (p.fade > 0) rg.rays.draw(p);
         p.fade = f;
-        if (a < RING.white) held(p, a, 0, clamp(a / 0.5));
+        const dk = clamp((a - RING.dark[0][0]) / (RING.dark[1][0] - RING.dark[0][0]));   // 真っ黒になるまでの間に、 輪も一緒に消える。 その後は出さない (着弾の絵の輪が、 白飛びの後に上から落ちて来る)
+        p.fade = f * (1 - dk); if (a < RING.dark[1][0]) held(p, a, 0, clamp(a / 0.5)); p.fade = f;
         rg.impact.draw(p);
         if (b >= 0) {
           rg.slam2.draw(p); rg.slam.draw(p); rg.circle.draw(p); pay.draw(p);

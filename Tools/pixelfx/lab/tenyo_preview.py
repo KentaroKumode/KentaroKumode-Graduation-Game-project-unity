@@ -7,7 +7,7 @@ W, H, EX, FLOOR, SC = 480, 270, 240, 196, 2
 src = io.open(os.path.join(PFX, "lab", "moves_board.py"), encoding="utf-8").read()
 exec(src[src.index("def stage():"):src.index("def frames(")])
 base = stage(); html = []
-for gid, name, note in (("sword", "天与の剣", "ヴェスカに Blessing・頭上に Eclipse・集まる粒 → 日食で暗転 → God rays → 暗転が解ける → Holy smite + Ground pound + インパクトフレーム → 白飛び"), ("shield", "天与の盾", "足もとから環が積み上がる → 待機は若干の暗転と中心の光 → 円の絞りが閉じて真っ暗 → God rays → 暗転が解ける → インパクトフレーム + 球が閉じる・衝撃の輪・金の球"), ("ring", "天与の指輪", "中心から輪が広がる → 宝石が 1 つずつ灯りながら回る → 待機は暗転 → God rays → インパクトフレーム → 白飛び → 輪が落ちて盤を締める + 金の魔法陣")):
+for gid, name, note in (("sword", "天与の剣", "ヴェスカに Blessing・頭上に Eclipse・集まる粒 → 日食で暗転 → God rays → 暗転が解ける → Holy smite + Ground pound + インパクトフレーム → 白飛び"), ("shield", "天与の盾", "足もとから環が積み上がる → 待機は若干の暗転と中心の光 → 円の絞りが閉じて真っ暗 → God rays → 暗転が解ける → インパクトフレーム + 球が閉じる・衝撃の輪・金の球"), ("ring", "天与の指輪", "中心から輪が広がる → 宝石が 1 つずつ灯りながら回る → 待機は暗転 → 真っ黒 → God rays → 暗転が解ける → インパクトフレーム (中心は盤) → 白飛び → 輪が落ちて盤を締める + 着地の衝撃 + 金の魔法陣")):
     png = os.path.join(OUT, gid + "_sheet.png")
     subprocess.run(["node", "lab/lcd_frames.mjs", "dicebound/tenyo-heavy", png, "--ink", "holy", "--fps", "24", "--opts", json.dumps({"gift": gid})], cwd=PFX, check=True, stdout=subprocess.DEVNULL)
     m = json.load(io.open(png[:-4] + ".json", encoding="utf-8")); sh = Image.open(png).convert("RGBA")
@@ -28,7 +28,7 @@ for gid, name, note in (("sword", "天与の剣", "ヴェスカに Blessing・�
             d = 0.65 * min(1, max(0, (tt - 1.05) / 0.35)) if a < 0.98 else 1 if a < 1.8 else max(0, 1 - (a - 1.8) / 0.5)
         if gid == "ring":   # 指輪: 待機は暗転 (RING.idleDark) → God rays の間は保つ → インパクトフレームで解ける (RING.dark)
             a = tt - 4.5   # 指輪のチャージは 3.0 秒・待機 1.5 秒
-            d = 0.5 * min(1, max(0, (tt - 2.65) / 0.35)) if a < 1.0 else 0.5 * max(0, 1 - (a - 1.0) / 0.3)
+            d = 0.5 * min(1, max(0, (tt - 2.65) / 0.35)) if a < 0 else 0.5 + 0.5 * min(1, a / 0.5) if a < 1.3 else max(0, 1 - (a - 1.3) / 0.5)
         b = base.copy() if d <= 0.01 else base.point(lambda v: int(v * (1 - d)))
         b.paste(f, (0, 0), f)
         if gid == "shield" and 0 <= tt - 2.9 < 0.98:   # 円の絞り: 半径 + 縁 より外を黒く (tenyo-heavy.js の irisR と同じ式)
