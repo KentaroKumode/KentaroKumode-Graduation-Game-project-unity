@@ -12,12 +12,25 @@ import { GOLD } from "../holy/_lib.js";
 import { W, H, BOARD, beam, oval, diamond, wash } from "./_kit.js";
 import * as MOVES from "./moves.js";
 import * as ECLIPSE from "../shadow/eclipse.js";
+import * as GODRAYS from "./tenyo-rays.js";   // weather/god-rays の写し (日食から下へ広がる)
+import * as SMITE from "../holy/smite.js";          // moves/holy-smite の中身 (術者の動きを除いた、 落ちる光)
+import * as SLAM from "../impacts/ground-slam.js";  // moves/ground-pound の中身 (着地の衝撃)
+import * as IMPACT from "../impacts/impact-frame.js";
 import { glint } from "./chevalier-charge.js";
 import { scaledFx } from "./_scaled.js";
 
 export const T_CHARGE = 1.4, T_HELD = 1.5, T_LEAD = 0.45;   // チャージ・待機の 1 周・発動の溜め (光る → 落ちる → 白)
 const BODY = [240, 136], RING_Y = 96, SUCK = 1.05;   // SUCK = 吸い込みが終わる時刻 (その後 0.35 秒で、 待機の姿に落ち着く)
 const GUARD_Y = 24, BLADE = 118, SR = 88;
+// 剣の発動の時刻 (待機の終わりからの秒)。 ゲームの側の暗転も、 この表で掛ける (SWORD.dark)
+export const SWORD = {
+  dark: [[0, 0], [0.5, 0.8], [1.3, 0.8], [1.8, 0]],   // 画面の暗さ (0〜1): 日食で暗くなる → God rays が出そろうまで保つ → 解ける
+  rays: [0.5, 1.5],     // God rays が出て来る区間 (この間に 0 → 1)
+  mark: 1.8,            // 落ちる所に印 (Holy smite の頭)
+  land: 1.8 + 0.47,     // 光が落ちて着く (Holy smite の BOLT)。 ここで Ground pound の衝撃と、 インパクトフレーム
+  white: 1.8 + 0.47 + 0.3,   // インパクトフレームの後、 白飛び
+  end: 1.8 + 0.47 + 0.3 + 2.4,
+};
 const SUN = [240, 42], SUN_K = 1.15;   // 剣: 頭上の日食の中心と倍率 (元の月の半径 19 → 22。 作者: もう少し小さく)   // 剣のつばの高さ・刃の長さ・盾の球の半径
 
 export const meta = {
@@ -26,36 +39,26 @@ export const meta = {
   tags: ["dicebound", "boss", "heavy", "one-shot"],
   size: [W, H],
   origin: [0, 0],
-  duration: T_CHARGE + 3 + T_LEAD + 2.0,
+  duration: T_CHARGE + 3 + 1.8 + 0.47 + 0.3 + 2.4,
   loop: false,
   fps: 30,
   bg: "dark",
   options: { gift: "sword", part: "flow", palette: GOLD, seed: 5 },
 };
 
-// 光の剣: 切っ先が下 (こちら向き)。 (x, y0) = つばの位置・len = 刃の長さ・w = 刃の幅の半分。 hot = 白く燃える
-function sword(p, C, x, y0, len, w, hot = 0, k = 1) {
-  if (len < 2) return;
-  p.shade(x - w * 3 - 2, y0 - 12, x + w * 3 + 2, y0 + len + 2, (px, py, o) => {
-    const dx = Math.abs(px - x), dy = py - y0;
-    let hw = -1;
-    if (dy >= 0) { const v = dy / len; hw = v > 1 ? -1 : w * (v < 0.78 ? 1 - 0.18 * v : (1 - 0.18 * 0.78) * (1 - (v - 0.78) / 0.22)); }   // 刃: ゆっくり細り、 最後に切っ先へ
-    else if (dy >= -3) hw = w * 2.8 * (1 - Math.abs(dy + 1.5) / 6);   // つば
-    else if (dy >= -11) hw = Math.max(1, w * 0.45);   // 柄
-    if (hw < 0 || dx > hw + 0.5) return;
-    const q = dx / Math.max(0.6, hw);
-    o.c = hot > 0.5 || q < 0.34 ? WHITE : q < 0.7 ? C[6] : C[5]; o.a = k;
-    o.l = C[5]; o.k = 0.5 * k;
-  });
-  p.glowLine(x, y0, x, y0 + len, 7 + 10 * hot, C[5], (0.3 + 0.4 * hot) * k);
-}
-
 export function create(o) {
   const C = fit(o.palette, 8), R = new Rng(o.seed), gift = o.gift, part = o.part;
   const HELD_T = gift === "sword" ? 3 : T_HELD;   // 待機の 1 周: 剣は 3 秒 (Blessing の 1 周 3 秒・Eclipse は 4 秒を 3 秒に速めて揃える)
   const T0 = part === "charged" ? T_CHARGE : part === "heavy" ? T_CHARGE + HELD_T : 0;   // どこから流すか
   const TH = T_CHARGE + HELD_T, TP = TH + T_LEAD;   // 発動の始まり・全画面の始まり
-  const pay = MOVES.create(resolveOptions(MOVES.meta, { move: "tenyo-" + gift, seed: o.seed }));
+  const pay = gift === "sword" ? null : MOVES.create(resolveOptions(MOVES.meta, { move: "tenyo-" + gift, seed: o.seed }));
+  // 剣の発動の部品 (元の効果を、 式を触らずに置く): God rays (全画面)・落ちる光 (Holy smite)・着地の衝撃 (Ground pound)・インパクトフレーム (全画面)
+  const sw = gift !== "sword" ? null : {
+    rays: scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, opts: {} }),   // 出どころ (0,−142) × 1.5 = 画面の (240, 42) = 日食
+    smite: scaledFx(SMITE, { K: 2.2, at: [BOARD[0], BOARD[1]], delay: TH + SWORD.mark - T0, opts: { palette: GOLD } }),
+    slam: scaledFx(SLAM, { K: 1.7, at: [BOARD[0], BOARD[1]], delay: TH + SWORD.land - T0, opts: { palette: GOLD } }),
+    impact: scaledFx(IMPACT, { K: 1.5, at: [240, 135], delay: TH + SWORD.land - T0, opts: {} }),
+  };
   // 集まる粒: 行き先へ、 外から吸い込まれる (王のチャージと同じ考え方。 数は少なく、 ゆっくり)
   const F = fit(o.palette, 9);
   const [gx, gy] = gift === "sword" ? SUN : gift === "shield" ? BODY : [240, RING_Y];   // 粒が集まる先: 剣 = 頭上の日食・盾 = 体の中心・指輪 = 輪の中心
@@ -166,7 +169,8 @@ export function create(o) {
       if (t < SUCK - 0.15) { const k = t / SUCK; for (let n = 0; n < 1 + Math.floor(k * 5); n++) { if (!R.chance(0.85)) continue; const a = R.range(0, TAU), D = R.range(80, 240) * (1 - 0.25 * k), T = R.range(0.2, 0.36), v = (D * 3) / (Math.exp(3 * T) - 1); ps.spawn(P.STREAK, gx + Math.cos(a) * D, gy + Math.sin(a) * D * 0.7, -Math.cos(a) * v, -Math.sin(a) * v * 0.7, T, R.chance(0.5) ? C[6] : C[4]); } }
       ps.update(dt);
       if (ecl) ecl.update(dt);
-      if (t > TP) { const d = Math.min(dt, t - TP); payT += d; pay.update(d); }
+      if (sw) for (const k in sw) sw[k].update(dt);
+      if (pay && t > TP) { const d = Math.min(dt, t - TP); payT += d; pay.update(d); }
     },
     draw(p) {
       if (t < T_CHARGE) {
@@ -179,26 +183,32 @@ export function create(o) {
       }
       if (t < TH) { held(p, t - T_CHARGE); return; }
       const a = t - TH;
+      if (sw) {
+        // 剣: 日食が強まって画面が暗くなる (暗さはゲームの側で掛ける) → God rays が徐々に出る → 暗さが解ける → 印 → 光が落ちる + 着地の衝撃 + インパクトフレーム → 白飛び
+        const f = p.fade, hot = clamp(a / 0.5), rk = clamp((a - SWORD.rays[0]) / (SWORD.rays[1] - SWORD.rays[0])), gone = clamp((a - SWORD.land) / 0.5);
+        p.fade = f * rk * (1 - clamp((a - SWORD.white) / 0.6)); sw.rays.draw(p);
+        p.fade = f * (1 - gone); if (gone < 1) held(p, a, 0, hot);
+        p.fade = f;
+        sw.smite.draw(p); sw.slam.draw(p); sw.impact.draw(p);
+        const wt = a - SWORD.white, wk = wt < 0 ? 0 : clamp(1 - (wt - 0.15) / 0.3);
+        if (wk > 0) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { p.put(x, y, WHITE, wk * wk); p.add(x, y, WHITE, wk * wk); }
+        return;
+      }
       if (a < T_LEAD) {
         // 溜め: 白く燃える (0.25 秒) → 落ちる / 閉じる (0.1 秒) → 白 (0.1 秒〜)
         const hot = clamp(a / 0.25), go = clamp((a - 0.25) / 0.1), f = p.fade;
         for (let y = 0; y < H; y++) for (let x = (y & 1); x < W; x += 2) p.add(x, y, C[5], 0.35 * hot * hot);
         if (go <= 0) held(p, a, 0, hot);
-        else if (gift === "sword") beam(p, C, 240, -10, 240, 14 + (250 - 14) * ease.inQuad(go), 16, 34, 1);
         else if (gift === "shield") { held(p, a, 0, 1); oval(p, 240, BODY[1], SR + 60 * go, SR + 60 * go, 3, WHITE, 1 - go * 0.5); }
         else held(p, a, 0, 1);
         p.fade = f;
       }
       // 白飛び: 剣は全面を白く (0.15 秒)・指輪は締まる瞬間に下半分・盾は弱く
-      const wt = a - 0.33, wk = gift === "sword" ? clamp(1 - (wt - 0.15) / 0.2) : gift === "shield" ? 0.55 * clamp(1 - wt / 0.3) : 0;
+      const wt = a - 0.33, wk = gift === "shield" ? 0.55 * clamp(1 - wt / 0.3) : 0;
       if (a >= T_LEAD) {
         pay.draw(p);
         const b = a - T_LEAD;
-        if (gift === "sword") {
-          // 左右にも光の柱が落ち、 盤を輪が走る
-          for (const [x, d] of [[128, 0.12], [352, 0.2], [64, 0.32], [416, 0.4]]) { const q = b - d; if (q > 0 && q < 0.7) beam(p, C, x, -10, x, 250, 10 * (1 - q / 0.7) + 2, 22 * (1 - q / 0.7) + 3, 1 - q / 0.7); }
-          for (const d of [0, 0.14, 0.3]) { const q = (b - d) / 0.6; if (q > 0 && q < 1) oval(p, BOARD[0], BOARD[1], 40 + 260 * ease.outCubic(q), 6 + 30 * ease.outCubic(q), 2, q < 0.4 ? WHITE : C[5], 1 - q); }
-        } else if (gift === "shield") {
+        if (gift === "shield") {
           for (const d of [0, 0.12, 0.26]) { const q = (b - d) / 0.55; if (q > 0 && q < 1) oval(p, 240, BODY[1], SR + 240 * ease.outCubic(q), SR + 240 * ease.outCubic(q), 3 * (1 - q) + 1, q < 0.35 ? WHITE : C[5], 1 - q); }
           for (let i = 0; i < 12; i++) { const g = (i / 12) * TAU + 0.26, q = b / 0.5; if (q < 1) beam(p, C, 240 + Math.cos(g) * SR, BODY[1] + Math.sin(g) * SR, 240 + Math.cos(g) * (SR + 150 * ease.outCubic(q)), BODY[1] + Math.sin(g) * (SR + 150 * ease.outCubic(q)), 4, 1, 1 - q); }
         } else {

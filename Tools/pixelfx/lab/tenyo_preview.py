@@ -7,15 +7,22 @@ W, H, EX, FLOOR, SC = 480, 270, 240, 196, 2
 src = io.open(os.path.join(PFX, "lab", "moves_board.py"), encoding="utf-8").read()
 exec(src[src.index("def stage():"):src.index("def frames(")])
 base = stage(); html = []
-for gid, name, note in (("sword", "天与の剣", "頭上に光の剣 → 落ちる → 白飛び → 天から金の光・左右の柱・盤を走る輪"), ("shield", "天与の盾", "足もとから環が積み上がる → 球が閉じる → 外へ衝撃の輪 → 金の球"), ("ring", "天与の指輪", "盤の上に輪が描かれ宝石が灯る → 落ちて盤を締める → 下半分が金に飛ぶ・光の格子")):
+for gid, name, note in (("sword", "天与の剣", "ヴェスカに Blessing・頭上に Eclipse・集まる粒 → 日食で暗転 → God rays → 暗転が解ける → Holy smite + Ground pound + インパクトフレーム → 白飛び"), ("shield", "天与の盾", "足もとから環が積み上がる → 球が閉じる → 外へ衝撃の輪 → 金の球"), ("ring", "天与の指輪", "盤の上に輪が描かれ宝石が灯る → 落ちて盤を締める → 下半分が金に飛ぶ・光の格子")):
     png = os.path.join(OUT, gid + "_sheet.png")
     subprocess.run(["node", "lab/lcd_frames.mjs", "dicebound/tenyo-heavy", png, "--ink", "holy", "--fps", "24", "--opts", json.dumps({"gift": gid})], cwd=PFX, check=True, stdout=subprocess.DEVNULL)
     m = json.load(io.open(png[:-4] + ".json", encoding="utf-8")); sh = Image.open(png).convert("RGBA")
     fr = [sh.crop((i * W, 0, (i + 1) * W, H)) for i in range(m["n"])]
     while len(fr) > 1 and fr[-1].getchannel("A").getbbox() is None: fr.pop()
     seq = []
-    for f in fr:
-        b = base.copy(); b.paste(f, (0, 0), f); seq.append(b)
+    DARK = [(0, 0), (0.5, 0.8), (1.3, 0.8), (1.8, 0)] if gid == "sword" else []   # tenyo-heavy.js の SWORD.dark と同じ表 (待機の終わり = 4.4 秒からの秒)
+    def dark(t):
+        a = t - 4.4
+        for (t0, v0), (t1, v1) in zip(DARK, DARK[1:]):
+            if t0 <= a <= t1: return v0 + (v1 - v0) * (a - t0) / (t1 - t0)
+        return 0
+    for i, f in enumerate(fr):
+        d = dark(i / 24.0); b = base.copy() if d <= 0.01 else base.point(lambda v: int(v * (1 - 0.75 * d)))
+        b.paste(f, (0, 0), f); seq.append(b)
     seq += [base.copy()] * 9
     big = [x.resize((W * SC, H * SC), Image.NEAREST) for x in seq]
     big[0].save(os.path.join(OUT, gid + ".gif"), save_all=True, append_images=big[1:], duration=40, loop=0)
