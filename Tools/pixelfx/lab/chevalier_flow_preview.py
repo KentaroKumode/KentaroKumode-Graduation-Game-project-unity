@@ -1,5 +1,5 @@
 # シュヴァリエの大技の一連の流れ: チャージ → 完了で画面をかなり暗く落とす → 待機 (鋭いきらめきだけ) → きらめきが伸びて消える → 刃が画面を切り裂く。
-# 暗転は、 刃の縁の後ろから晴れる (闇ごと切られる)。 480×270 の舞台・1 秒 8 コマ・2 倍・鋼の色の組。 出力は Captures/fxlib/_chevalier/flow.html (git 管理外)。
+# 黒は、 切り口から左右に割れて離れる。 480×270 の舞台・1 秒 8 コマ・2 倍・鋼の色の組。 出力は Captures/fxlib/_chevalier/flow.html (git 管理外)。
 import io, json, os, subprocess
 from PIL import Image, ImageDraw, ImageFont
 PFX = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -33,15 +33,10 @@ def dark(im, a): return im if a <= 0.01 else im.point(lambda v: int(v * (1 - a))
 def framed(im, cap):
     o = Image.new("RGB", (W * SC, H * SC + 30), (18, 18, 22)); o.paste(im.resize((W * SC, H * SC), Image.NEAREST), (0, 0))
     ImageDraw.Draw(o).text((8, H * SC + 3), cap, font=FONT, fill=(225, 228, 236)); return o
-def cut_mask(t):
-    """刃の縁の後ろ (もう切られた側) が 255 のマスク。 縁の式は chevalier-slash.js と同じ。"""
-    u = max(0.0, min(1.0, (t - LEAD) / SWEEP)); e = E0 + (E1 - E0) * (1 - (1 - u) ** 3)
-    m = Image.new("L", (W, H), 0); d = ImageDraw.Draw(m)
-    if t >= LEAD: d.polygon([(-10, 0), (e + (H / 2) * SL, 0), (e - (H / 2) * SL, H), (-10, H)], fill=255)
-    return m
+CUT, SPLIT = LEAD - 0.06, LEAD - 0.06 + 0.24      # 一閃が走り始める時刻・割れ始める時刻 (chevalier-slash.js の timing)
 
 
-chg = frames("flow_charge", "dicebound/chevalier-charge", {}); idle = frames("flow_idle", "dicebound/chevalier-charged", {}); sla = frames("flow_slash", "dicebound/chevalier-slash", {"lead": LEAD, "sweep": SWEEP})
+chg = frames("flow_charge", "dicebound/chevalier-charge", {}); idle = frames("flow_idle", "dicebound/chevalier-charged", {}); sla = frames("flow_slash", "dicebound/chevalier-slash", {"lead": LEAD})
 base = stage(); seq = [(base.copy(), "シュヴァリエのチャージのターン")] * 3
 for i, f in enumerate(chg):
     a = 0.3 * min(1.0, i / 6.0) + (DARK - 0.3) * max(0.0, min(1.0, (i - 13) / 3.0))      # 完了 (13 コマ目) から 3 コマで、 かなり暗く
@@ -49,19 +44,20 @@ for i, f in enumerate(chg):
 for r in range(2):
     for f in idle:
         b = dark(base.copy(), DARK); b.paste(f, (0, 0), f); seq.append((b, "プレイヤーの手番: 待機 (ループ)"))
-h0 = len(seq); cut0 = int(LEAD * 8)
+h0 = len(seq)
 for i, f in enumerate(sla):
     t = i / 8.0
-    b = Image.composite(base, dark(base.copy(), DARK if t < LEAD else DARK), cut_mask(t))     # 縁の後ろは晴れる
+    # 暗幕: きらめきが消える (lead の 8 割) までは待機の暗さ → 真っ黒 → 一閃のコマで外す (そこからは効果が黒い 2 枚を描く)
+    b = base.copy() if t >= CUT else Image.new("RGB", (W, H), (2, 3, 8)) if t >= LEAD * 0.8 else dark(base.copy(), DARK)
     b.paste(f, (0, 0), f)
-    j = i - cut0 - 1
+    j = i - int(SPLIT * 8) - 1
     if 0 <= j < len(SHAKE):
-        dx, dy = SHAKE[j]; c = Image.new("RGB", (W, H), (24, 24, 30)); c.paste(b, (dx, dy)); b = c
-    seq.append((b, "シュヴァリエの大技のターン: きらめきが伸びて消える" if t < LEAD else "シュヴァリエの大技のターン: 切り裂く"))
+        dx, dy = SHAKE[j]; c = Image.new("RGB", (W, H), (2, 3, 8)); c.paste(b, (dx, dy)); b = c
+    seq.append((b, "シュヴァリエの大技のターン: きらめきが伸びて消える" if t < LEAD * 0.8 else "シュヴァリエの大技のターン: 黒い一拍" if t < CUT else "シュヴァリエの大技のターン: 一閃 → 黒が左右に割れる"))
 seq += [(base.copy(), "")] * 4
 big = [framed(a, c) for a, c in seq]
 big[0].save(os.path.join(OUT, "flow.gif"), save_all=True, append_images=big[1:], duration=125, loop=0)
-picks = [3 + 12, 3 + 14, 3 + 16, 3 + 22, h0 + 2, h0 + 4, h0 + 5, h0 + 6, h0 + 7, h0 + 8, h0 + 9, h0 + 11]
+picks = [3 + 14, 3 + 22, h0 + 2, h0 + 4, h0 + 5, h0 + 6, h0 + 7, h0 + 8, h0 + 9, h0 + 10, h0 + 11, h0 + 12]
 o = Image.new("RGB", (W * 4, H * 3), (0, 0, 0))
 for q, i in enumerate(picks):
     if i < len(seq): o.paste(seq[i][0], ((q % 4) * W, (q // 4) * H))
@@ -70,6 +66,6 @@ io.open(os.path.join(OUT, "flow.html"), "w", encoding="utf-8").write('''<!doctyp
 <style>body{margin:0;background:#101014;color:#e1e4ec;font:14px/1.6 "Yu Gothic UI",sans-serif}main{max-width:1960px;margin:0 auto;padding:16px 16px 80px}
 h1{font-size:20px;margin:0}h2{font-size:17px;margin:26px 0 6px}p{color:#9aa0b0;margin:4px 0 0}img{image-rendering:pixelated;display:block;max-width:100%}.s{overflow-x:auto;margin-top:8px}.s img{max-width:none}</style></head><body><main>
 <h1>シュヴァリエの大技: 一連の流れ (試作)</h1>
-<p>チャージ → 完了で画面をかなり暗く落とす (中心だけ鋭く光る) → 待機 (2 周) → きらめきが伸びて消え、 暗い一拍 → 刃が画面全体を切り裂く (暗転は刃の後ろから晴れる)。 1 秒 8 コマ・2 倍・背景と敵と下の枠は仮。</p>
+<p>チャージ → 完了で画面をかなり暗く落とす (中心だけ鋭く光る) → 待機 (2 周) → きらめきが伸びて消え、 真っ黒な一拍 → 白い一閃 → 黒い画面が切り口から左右に割れて離れる。 1 秒 8 コマ・2 倍・背景と敵と下の枠は仮。</p>
 <h2>通し</h2><img src="flow.gif"><h2>コマの抜き出し (上段 = チャージ完了の前後・中下段 = 大技)</h2><div class="s"><img src="flow_contact.png"></div></main></body></html>''')
 print(len(chg), len(idle), len(sla), len(seq))

@@ -24,7 +24,8 @@ const INKS = {
   // 審判官: 石の灰色から金、 白へ (案)
   holy: ["#2a2622", "#6a5c48", "#b8923e", "#f0d68a", "#fffbe8"],
   // シュヴァリエ: 鋼の青から白へ (案)
-  steel: ["#1c2030", "#3c4a6a", "#5a8ac0", "#b8d0ec", "#ffffff"],
+  // 一番暗い色は黒 (大技で、 黒い画面が 2 枚に割れて動く。 その黒)
+  steel: ["#020308", "#3c4a6a", "#5a8ac0", "#b8d0ec", "#ffffff"],
 };
 const RAMP = (INKS[flags.ink ?? "warm"]).map(rgb3), BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5], LIGHT_GAIN = 1.6;
 const lum = (R, G, B) => (0.299 * R + 0.587 * G + 0.114 * B) / 255, step = (L) => Math.max(0, Math.min(RAMP.length - 1, Math.round(L * (RAMP.length - 1))));
