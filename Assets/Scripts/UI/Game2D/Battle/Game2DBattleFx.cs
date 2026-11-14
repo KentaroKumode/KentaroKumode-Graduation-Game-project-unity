@@ -12,7 +12,11 @@ namespace UI.Game2D.Battle
     /// Unity の液晶 (Game2D/LcdScreen と Game2DLcdGhost) に任せる。
     ///
     /// <para>呼び出し: <see cref="PlayerAttack"/> / <see cref="EnemyAttack"/>。 試験用のキー (エディタ・開発ビルド): F8 = 表示の入り切り / Space = 攻撃 / ←→ = 武器 /
-    /// C = 会心 (確率・常に・なし) / T = 攻撃の速さ (1・0.5・0.25・0.1) / R = 敵を戻す。</para>
+    /// C = 会心 (確率・常に・なし) / T = 攻撃の速さ (1・0.5・0.25・0.1) / R = 敵を戻す /
+    /// K = 試験のボスを替える・J = そのボスのチャージ → 待機の間にもう一度で大技 / H = 武器の絵の入り切り (2026-11-14)。</para>
+    /// <para>2026-11-14〜: ボスの大技 (<see cref="BossFx"/>)・ボスの通常の技・剣/斧/短剣/盾の攻撃は、 作者が合格を出した pixelfx の絵を流す
+    /// (Resources/Game2DFx・Tools/pixelfx/dicebound/export_fx.py)。 武器の絵は最初にダメージが入る着弾から流し、 その攻撃の手描きの痕・輪・瓦礫・火花・閃光は出さない
+    /// (武器の動き・数字・揺れ・止め・音は残す)。 素手・竜閃・4 家系以外は手描きのまま。</para>
     /// </summary>
     public class Game2DBattleFx : MonoBehaviour
     {
@@ -97,6 +101,26 @@ namespace UI.Game2D.Battle
         private FxSheet _poisonFx, _bleedFx;
         private int _dotDmg; private float _dotHitAt, _dotEnd; private bool _dotPending; private Col _dotCol;
 
+        // ── ボスと武器の絵 (2026-11-14・#350〜#355) ──
+        //   大技 (チャージ → 待機 → 大技) は BossFx が重ね方を持つ。 通常の技・武器の攻撃は 1 回きりの絵を _fx に足して、 画面の左上に合わせて上から塗る
+        //   (書き出したコマは画面と同じ 480×270 ── 見本の paste(f, (0, 0), f) と同じ)。
+        private readonly BossFx _boss = new BossFx();
+        /// <summary>この攻撃で流す武器の絵 (null = 今の手描きの演出のまま: 素手・竜閃・4 家系以外)。 当たった時は手描きの斬撃痕・輪・瓦礫・火花・会心の絵・白い閃光を出さない。</summary>
+        private FxSheet _weaponSheet; private bool _weaponSheetDone;
+        /// <summary>この敵の攻撃で流す技の絵 (王・シュヴァリエの通常攻撃)。 当たった時は手描きの赤い斬撃と火花を出さない。</summary>
+        private FxSheet _enemyMoveSheet;
+        /// <summary>戦闘の流れを止める絵 (審判の炎) が終わる時刻 (<see cref="_clockU"/>)。</summary>
+        private float _blockUntil, _clockU;
+        private int _bossTaken;
+        private BossFx.Kind _demoKind = BossFx.Kind.King; private bool _sheetsInTest = true;      // 試験用のキー (K・J・H)
+
+        /// <summary>装備している武器の家系 (items.json の family)。 剣・斧・短剣・盾の時だけ絵を流す (それ以外・素手・竜閃は null)。 戦闘の流れ (Game2DBattleSim) が入れる。</summary>
+        public string WeaponSheetFamily;
+        /// <summary>敵の攻撃が当たった (ダメージの数字が出た) か。 戦闘の流れが HP の表示を減らす拍子に使う (大技は当たるまでが長い)。</summary>
+        public bool EnemyHitLanded { get; private set; }
+        /// <summary>チャージの後の待機を出しているか。</summary>
+        public bool BossIdling => _boss.Idling;
+
         private BattleCanvas _c;
         private BSprite _bg; private BSprite[] _wspr;
         private uint[] _base;
@@ -115,7 +139,8 @@ namespace UI.Game2D.Battle
         /// <summary>戦闘の流れ (Game2DBattleSim) が操作を握っている間 true。 試験用のキー (Space・←→) は効かなくなる。</summary>
         public bool SimDriven;
         public int WeaponIndex { get => _wi; set => _wi = Mathf.Clamp(value, 0, Weapons.Length - 1); }
-        public bool IsIdle => _phase == Phase.Idle;
+        /// <summary>次へ進んでよいか。 ボスのチャージ・大技 (待機へ入るのを待つ間を含む)・審判の炎の間は false。</summary>
+        public bool IsIdle => _phase == Phase.Idle && !_boss.Busy && _clockU >= _blockUntil;
         /// <summary>戦闘への切り替わり・敵の出現の演出中。</summary>
         public bool IsIntro => _phase == Phase.Intro;
         public bool IsWon => _phase == Phase.Won;
@@ -129,6 +154,7 @@ namespace UI.Game2D.Battle
         {
             Init(); FlushDot(); _wi = Mathf.Clamp(weaponIndex, 0, Weapons.Length - 1); _crit = crit; _dealt = dealt; _dealtSoFar = 0; _hitIdx = 0; _hitAgo = null; _critFxDone = false; _critT = -999f;
             var w = Weapons[_wi];
+            _weaponSheet = WeaponSheetFamily != null && !IsDragon(_wi) ? FxSheet.Load("weapon-" + WeaponSheetFamily + (crit ? "-crit" : "-normal")) : null; _weaponSheetDone = false;
             _anim = BattleMotion.MakePlan(IsDragon(_wi) && crit ? "dragon" : w.fam, crit, w.fam == "sword" && UnityEngine.Random.value < 0.5f);
             _phase = Phase.PAttack; _t = 0; _hitDone = false; _ghosts.Clear(); _cp.Clear(); Showing = true;
             if (w.fam == "shield") Game2DSfx.PlayDelayed(crit ? "charge_shield_crit" : "charge_shield", 0.18f);      // 盾 = チャージ (チャージの演出の始まりから、 命中の瞬間まで音が上がる) → 命中で解放音 (hit_shield / crit_shield)
@@ -136,11 +162,59 @@ namespace UI.Game2D.Battle
         }
 
         /// <summary>敵の攻撃の演出 (敵が手前へ飛び込み、 赤い斬撃と画面の縁の赤)。 taken = 受けたダメージ。</summary>
-        public void EnemyAttack(int taken)
+        public void EnemyAttack(int taken) => EnemyAttack(taken, null);
+
+        /// <summary>敵の攻撃の演出。 moveSheet = 当たった瞬間に流す技の絵 (Resources/Game2DFx の名前・王とシュヴァリエの通常攻撃)。 無ければ手描きの赤い斬撃。</summary>
+        public void EnemyAttack(int taken, string moveSheet)
         {
-            Init(); FlushDot(); _taken = taken; _phase = Phase.EAttack; _t = 0; _hitDone = false; Showing = true;
+            Init(); FlushDot(); _taken = taken; _phase = Phase.EAttack; _t = 0; _hitDone = false; Showing = true; EnemyHitLanded = false;
+            _enemyMoveSheet = moveSheet != null ? FxSheet.Load(moveSheet) : null;
             Game2DSfx.PlayDelayed("slash_swing", EWind * 0.7f, 0.8f, 0.7f);
         }
+
+        // ── ボスの技 (2026-11-14) ──
+
+        /// <summary>ボスの技の絵を 1 回流す (画面全体の絵・左上に合わせて上から塗る)。 delay 秒後に始める。 block = 終わるまで戦闘の流れを止める (審判の炎)。</summary>
+        public void PlayMove(string name, float delay = 0f, bool block = false)
+        {
+            Init(); Showing = true;
+            var s = FxSheet.Load(name); if (s == null) return;
+            _fx.Add(new FxPlay { s = s, t = -delay, x = s.PivotX, y = s.PivotY, add = false });
+            if (block) _blockUntil = Mathf.Max(_blockUntil, _clockU + delay + s.Duration);
+        }
+
+        /// <summary>絵の長さ (秒・無ければ 0)。 続けて流す時の間に使う。</summary>
+        public static float MoveDuration(string name) { var s = FxSheet.Load(name); return s != null ? s.Duration : 0f; }
+
+        /// <summary>大技のチャージのターン (敵はこのターン攻撃しない): チャージを流し、 終わったら待機のループ。 ash = 烈炎の数 (王だけ)。
+        /// taken = このターンに受けたダメージ (審判の炎など・0 なら数字を出さない)。 絵の無いボスは、 ふつうの敵の攻撃の演出。</summary>
+        public void BossCharge(BossFx.Kind kind, int ash, int taken)
+        {
+            Init(); FlushDot(); Showing = true;
+            _boss.Charge(kind, ash);
+            if (_boss.Current == BossFx.Kind.None) { EnemyAttack(taken); return; }
+            _phase = Phase.Idle; _t = 0; EnemyHitLanded = true;
+            if (taken > 0) { _dmgs.Add(new Dmg { x = EX, y = 178, v = taken, c = Col.Hex("#ff6a5a") }); Game2DSfx.Play("hit_enemy"); }
+        }
+
+        /// <summary>大技のターンの敵の行動: 待機を入ってよいコマまで回してから大技を流し、 当たる拍子にダメージの数字を出す。 ash = 撃つ前の烈炎の数 (王だけ)。</summary>
+        public void BossHeavy(BossFx.Kind kind, int ash, int taken)
+        {
+            Init(); FlushDot(); Showing = true;
+            _bossTaken = taken; EnemyHitLanded = false;
+            _boss.OnHit = () =>
+            {
+                EnemyHitLanded = true;
+                _dmgs.Add(new Dmg { x = EX, y = 178, v = _bossTaken, c = Col.Hex("#ff6a5a"), life = 1.6f });
+                Game2DSfx.Play(_bossTaken > 0 ? "hit_enemy" : "block");
+            };
+            _boss.Heavy(kind, ash);
+            if (!_boss.Busy) { _boss.OnHit = null; EnemyAttack(taken); return; }      // 絵が無い
+            _phase = Phase.Idle; _t = 0;
+        }
+
+        /// <summary>大技が取り消された (ダウン): 待機のループを止め、 暗幕を戻す。</summary>
+        public void BossCancel() => _boss.Cancel();
 
         /// <summary>毒 (bleed = false) / 出血が効いた演出 (1 回きり)。 dmg = そのダメージ (粒がはじける拍子に数字に出し、 HP を減らす)。
         /// 終わると Idle へ戻る (HP が尽きていれば撃破の演出へ)。 絵の残りは次の演出と重なって流れきる。</summary>
@@ -185,7 +259,7 @@ namespace UI.Game2D.Battle
         private float _revealT0 = 0.38f, _introEnd = 0.9f;      // 切り替え (ブラインド) が開ききってから姿が見え始める。 ブラインドなしの時 (次の敵) はすぐ
         private void StartIntro(bool blinds) { if (blinds) Game2DSfx.Play("battle_start"); Game2DSfx.PlayDelayed("enemy_appear", blinds ? 0.3f : 0f, 0.9f); _phase = Phase.Intro; _t = 0; _introBlinds = blinds; _landed = false; _revealT0 = blinds ? 0.38f : 0.08f; _introEnd = _revealT0 + RevealDur + 0.07f; if (blinds) _flashW = 1f; }
 
-        public void ResetEnemy() { _ehp = _eMax; _phase = Phase.Idle; _t = 0; _dissolve = 0; _streaks.Clear(); _marks.Clear(); _rings.Clear(); _sparks.Clear(); _debris.Clear(); _dmgs.Clear(); _fx.Clear(); _dotPending = false; _anim = null; _hitAgo = null; }
+        public void ResetEnemy() { _ehp = _eMax; _phase = Phase.Idle; _t = 0; _dissolve = 0; _streaks.Clear(); _marks.Clear(); _rings.Clear(); _sparks.Clear(); _debris.Clear(); _dmgs.Clear(); _fx.Clear(); _dotPending = false; _anim = null; _hitAgo = null; _boss.Clear(); _boss.OnHit = null; _blockUntil = 0; EnemyHitLanded = false; }
 
         private void Init()
         {
@@ -213,7 +287,9 @@ namespace UI.Game2D.Battle
 #endif
             if (!Showing) { if (plotQuad != null) plotQuad.enabled = false; return; }
             Init();
-            float dt = Mathf.Min(0.05f, Time.unscaledDeltaTime) * (_phase == Phase.PAttack ? _timeScale : 1f);
+            float rawDt = Mathf.Min(0.05f, Time.unscaledDeltaTime);
+            float dt = rawDt * (_phase == Phase.PAttack ? _timeScale : 1f);
+            _clockU += rawDt; _boss.Tick(rawDt);      // ボスの絵はヒットストップ・攻撃の速さ (T) に左右されない
             Tick(dt);
             Frame();
             Upload();
@@ -227,10 +303,17 @@ namespace UI.Game2D.Battle
             if (!Showing) return;
             if (Input.GetKeyDown(KeyCode.Space) && !SimDriven)
             {
-                if (_phase == Phase.Idle) { bool crit = _critMode == 1 || (_critMode == 0 && UnityEngine.Random.value < 0.2f); PlayerAttack(_wi, crit, Mathf.RoundToInt(Weapons[_wi].atk + UnityEngine.Random.Range(3, 19)) * (crit ? 3 : 2) / 2); }
+                if (_phase == Phase.Idle) { bool crit = _critMode == 1 || (_critMode == 0 && UnityEngine.Random.value < 0.2f); WeaponSheetFamily = _sheetsInTest && !IsDragon(_wi) ? Weapons[_wi].fam : null; PlayerAttack(_wi, crit, Mathf.RoundToInt(Weapons[_wi].atk + UnityEngine.Random.Range(3, 19)) * (crit ? 3 : 2) / 2); }
                 else if (_phase == Phase.Won) ResetEnemy();
             }
             if (Input.GetKeyDown(KeyCode.R)) ResetEnemy();
+            if (!SimDriven)
+            {
+                // ボスと武器の絵の試験 (2026-11-14): K = ボスを替える / J = チャージ → (待機) → もう一度で大技 / H = 武器の絵の入り切り (Space の攻撃)
+                if (Input.GetKeyDown(KeyCode.K)) { _demoKind = _demoKind >= BossFx.Kind.VescaFinal ? BossFx.Kind.King : _demoKind + 1; _boss.Clear(); Debug.Log("[Game2DBattleFx] 試験のボス: " + _demoKind); }
+                if (Input.GetKeyDown(KeyCode.J) && !_boss.Busy) { if (_boss.Idling) BossHeavy(_demoKind, 3, 12); else BossCharge(_demoKind, 3, 0); }
+                if (Input.GetKeyDown(KeyCode.H)) { _sheetsInTest = !_sheetsInTest; Debug.Log("[Game2DBattleFx] 武器の絵: " + (_sheetsInTest ? "あり" : "なし (手描き)")); }
+            }
             if (Input.GetKeyDown(KeyCode.C)) _critMode = (_critMode + 1) % 3;
             if (Input.GetKeyDown(KeyCode.T)) { int i = Array.IndexOf(Speeds, _timeScale); _timeScale = Speeds[(i + 1) % Speeds.Length]; }
             if (_phase == Phase.Idle && !SimDriven)
@@ -279,7 +362,7 @@ namespace UI.Game2D.Battle
             else if (_phase == Phase.EAttack) UpdateEnemyAttack();
             else if (_phase == Phase.Intro) UpdateIntro();
             else if (_phase == Phase.Dot) UpdateDot();
-            else if (_phase == Phase.Dying) { _dissolve = Mathf.Clamp01(_t / 1f); if (_t >= 1f) { _phase = Phase.Won; _t = 0; } }
+            else if (_phase == Phase.Dying) { _boss.Clear(); _dissolve = Mathf.Clamp01(_t / 1f); if (_t >= 1f) { _phase = Phase.Won; _t = 0; } }
         }
 
         private void Burst(float x, float y, int n, Col[] cols)
@@ -328,7 +411,8 @@ namespace UI.Game2D.Battle
                     if (h.fs && _hitAgo == null) _hitAgo = 0; _flashE = 0.3f;
                     var o = h.off ?? new float[] { 0, 0, 15 };
                     var m = new Streak { a = h.angFixed ? h.ang : isSword ? BattleMotion.TipAngle(A, h.t) : h.ang, t = 0, life = 9, w = 3, thin = true, hold = true, sc = isSword ? 2 : 1, cx = EX + o[0], cy = EY + o[1], bow = o[2] };
-                    _streaks.Add(m); _marks.Add(m); Game2DSfx.Hit(A.fam, "slash", false, A.fam == "dagger" ? 1.1f : 1f); continue;      // 斬撃痕が出た瞬間に、 通常の命中音 (最後の会心の演出で hit_crit)。 薄い痕だけ (消さずに蓄積・ヒットストップ・数字・火花・閃光は無し)
+                    if (_weaponSheet == null) { _streaks.Add(m); _marks.Add(m); }      // 武器の絵を流す時は、 手描きの痕を出さない
+                    Game2DSfx.Hit(A.fam, "slash", false, A.fam == "dagger" ? 1.1f : 1f); continue;      // 斬撃痕が出た瞬間に、 通常の命中音 (最後の会心の演出で hit_crit)。 薄い痕だけ (消さずに蓄積・ヒットストップ・数字・火花・閃光は無し)
                 }
                 if (_hitAgo == null) _hitAgo = 0;
                 Game2DSfx.Hit(A.fam, h.kind, _crit, A.fam == "dagger" ? 1.1f : 1f);
@@ -337,6 +421,12 @@ namespace UI.Game2D.Battle
                 _dealtSoFar += part; _ehp = Mathf.Max(0, _ehp - part);
                 bool big = h.kind == "chop" || h.kind == "slam" || h.kind == "finish" || h.kind == "dragon"; float c = _crit ? 1.5f : 1f;
                 if (_crit) _guiShake = big ? 1f : 0.45f;      // 会心だけ、 GUI が衝撃で揺れる
+                if (_weaponSheet != null && !_weaponSheetDone)
+                {
+                    // 武器の絵 (2026-11-14・#355): 最初にダメージが入る着弾から 1 回流す。 画面全体の絵なので左上に合わせて上から塗る
+                    _weaponSheetDone = true; _critFxDone = true;
+                    _fx.Add(new FxPlay { s = _weaponSheet, x = _weaponSheet.PivotX, y = _weaponSheet.PivotY, add = false });
+                }
                 if (_crit && !_critFxDone)
                 {
                     _critFxDone = true;      // 1 回の攻撃で 1 度だけ (連撃の 2 発目以降は出さない)
@@ -352,6 +442,7 @@ namespace UI.Game2D.Battle
                 if (_crit && first) { _critX = Mathf.RoundToInt(dmgX); _critY = Mathf.RoundToInt(dmgY) - 4 - 27; }
                 _dmgs.Add(new Dmg { x = dmgX, y = dmgY, v = part, c = _crit ? Col.Hex("#ffb347") : Col.Hex("#ffe27a"),
                                     pct = pct, crit = _crit, cnt = cnt, life = _crit ? 1.5f : 1.2f });
+                if (_weaponSheet != null) { _streaks.RemoveAll(x => x.hold); _marks.Clear(); continue; }      // 武器の絵が形を受け持つ: 手描きの火花・斬撃痕・輪・瓦礫・白い閃光は出さない (数字・揺れ・止め・音は残す)
                 Burst(EX, EY, Mathf.RoundToInt((big ? 28 : 14) * c), Yel);
                 if (h.kind == "dragon")
                 {
@@ -437,11 +528,20 @@ namespace UI.Game2D.Battle
         {
             if (!_hitDone && _t >= EWind + ELunge)
             {
-                _hitDone = true; _flashR = 1; _shake = 1.3f; _freeze = 0.06f;
+                _hitDone = true; _flashR = 1; _shake = 1.3f; _freeze = 0.06f; EnemyHitLanded = true;
                 if (_taken > 0) { Game2DSfx.Play("hit_enemy"); } else Game2DSfx.Play("block");
                 _dmgs.Add(new Dmg { x = EX, y = 178, v = _taken, c = Col.Hex("#ff6a5a") });
-                _streaks.Add(new Streak { a = 28, life = 0.3f, w = 3, red = true, low = true }); _streaks.Add(new Streak { a = 34, t = -0.04f, life = 0.3f, w = 3, red = true, low = true }); _streaks.Add(new Streak { a = 22, t = -0.08f, life = 0.3f, w = 3, red = true, low = true });
-                Burst(EX, 205, 14, RedC);
+                if (_enemyMoveSheet != null)
+                {
+                    // ボスの通常攻撃の絵 (2026-11-14・#354): 当たった瞬間に 1 回流す。 手描きの赤い斬撃と火花は出さない
+                    _fx.Add(new FxPlay { s = _enemyMoveSheet, x = _enemyMoveSheet.PivotX, y = _enemyMoveSheet.PivotY, add = false });
+                    _enemyMoveSheet = null;
+                }
+                else
+                {
+                    _streaks.Add(new Streak { a = 28, life = 0.3f, w = 3, red = true, low = true }); _streaks.Add(new Streak { a = 34, t = -0.04f, life = 0.3f, w = 3, red = true, low = true }); _streaks.Add(new Streak { a = 22, t = -0.08f, life = 0.3f, w = 3, red = true, low = true });
+                    Burst(EX, 205, 14, RedC);
+                }
             }
             if (_t >= EWind + ELunge + ERecover) { _phase = Phase.Idle; _t = 0; }
         }
@@ -521,14 +621,16 @@ namespace UI.Game2D.Battle
                 }
                 else Tofu(EX + ep.dx, FLOOR + bob + ep.y, 100, 120, tone, _flashE, ep.glow);
             }
+            _boss.PreDark(_c);      // 大技の暗幕 (見本で、 効果を貼る前の舞台に掛けている物)
             DrawEffects();
+            _boss.DrawLayers(_c);   // 大技のコマ・王の赤いフィルター・ヴェスカの凍った画面と破片
             if (_flashR > 0)
                 for (int y = 0; y < H; y++) for (int x = 0; x < W; x++)
                     {
                         float dx = (x - W / 2f) / 240f, dy = (y - H / 2f) / 135f, d = Mathf.Sqrt(dx * dx + dy * dy), lv = Cl((d - 0.55f) / 0.7f, 0, 1) * _flashR * 14;
                         if (lv > BattleCanvas.Bayer[(y & 3) * 4 + (x & 3)]) _c.Put(x, y, new Col(170, 24, 12), 0.7f);      // 被弾の赤い縁 (網点)
                     }
-            if (SimDriven && (_phase == Phase.Idle || _phase == Phase.Dot)) DrawMarks(EX + ep.dx, FLOOR + bob + ep.y);
+            if (SimDriven && (_phase == Phase.Idle || _phase == Phase.Dot) && !_boss.Busy) DrawMarks(EX + ep.dx, FLOOR + bob + ep.y);
             foreach (var d in _dmgs)
             {
                 if (d.t >= d.life || (d.life - d.t < 0.16f && ((int)(d.t * 30) & 1) == 0)) continue;      // 消え際は明滅
@@ -574,6 +676,7 @@ namespace UI.Game2D.Battle
                 var tmp = (uint[])_c.FB.Clone();
                 for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) _c.FB[y * W + x] = tmp[(int)Cl(y - sy, 0, H - 1) * W + (int)Cl(x - sx, 0, W - 1)];      // 描き終えた配列ごと 1 dot 単位でずらす
             }
+            _boss.Post(_c);         // 大技の揺れ (見本の表どおり)・ヴェスカ 4 段目の帯のずれ (出来上がった画面全体に最後に掛ける)
         }
 
         /// <summary>竜閃: 横一線のライン。 端から端へ一瞬で走り、 着弾まで細く残り、 着弾の瞬間に太く閃いて消える。</summary>
