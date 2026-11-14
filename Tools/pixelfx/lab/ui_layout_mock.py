@@ -26,7 +26,7 @@ class Mock:
         self.d.text((x * S, y * S - 4), s, font=f, fill=COL[c], anchor=anchor, stroke_width=3, stroke_fill=(10, 12, 16, 255))
     def bar(self, x, y, w, h, frac, c="hp", marks=()):
         self.d.rectangle([x * S, y * S, (x + w) * S - 1, (y + h) * S - 1], fill=(14, 16, 20, 255), outline=COL["line"], width=S)
-        self.d.rectangle([(x + 1) * S, (y + 1) * S, (x + 1 + int((w - 2) * frac)) * S - 1, (y + h - 1) * S - 1], fill=COL[c])
+        if frac > 0: self.d.rectangle([(x + 1) * S, (y + 1) * S, (x + 1 + int((w - 2) * frac)) * S - 1, (y + h - 1) * S - 1], fill=COL[c])
         for m in marks: self.d.rectangle([(x + int(w * m)) * S, (y + 1) * S, (x + int(w * m) + 1) * S - 1, (y + h - 1) * S - 1], fill=COL["gold"])
     def die(self, x, y, n, sz=22):
         self.d.rectangle([x * S, y * S, (x + sz) * S - 1, (y + sz) * S - 1], fill=COL["die"], outline=(40, 40, 40, 255), width=S)
@@ -199,7 +199,103 @@ def planD(frame, name, title, stow=False):
         m.bar(150, 260, 180, 8, 0.6, "hp"); m.text(336, 258, "62", "txt", F8); m.md.rectangle([150, 258, 350, 269], fill=255)
     return m.save(name, title)
 
+# ================================================================ パターン集 (2026-11-15・考え方の違う物をいくつも)
+def top(m):   # 共通: 激化の灯り (上の縁) と、 隅の入口
+    m.pips(214, 4, 5, 1, "warn", 6, 3); m.text(4, 2, "袋", "dim", F8)
+def ehp(m, x=180, y=198, w=120, cut=(0.50, 0.62)):   # 敵の HP と、 この手で削れる分
+    m.bar(x, y, w, 7, cut[1], "hp", (0.33, 0.66)); m.d.rectangle([(x + 1 + int((w - 2) * cut[0])) * S, (y + 1) * S, (x + 1 + int((w - 2) * cut[1])) * S - 1, (y + 6) * S - 1], fill=(250, 220, 120, 255)); m.md.rectangle([x, y, x + w, y + 7], fill=255)
+def myhp(m, x, y, w, frac=0.8, lose=0.2):
+    m.bar(x, y, w, 8, frac, "hp"); m.d.rectangle([(x + 1 + int((w - 2) * (frac - lose))) * S, (y + 1) * S, (x + 1 + int((w - 2) * frac)) * S - 1, (y + 7) * S - 1], fill=(250, 150, 130, 255)); m.md.rectangle([x, y, x + w, y + 8], fill=255)
+def ok(m, x, y, w=70, h=22):
+    m.box(x, y, w, h, COL["ok"], "line"); m.text(x + w // 2, y + (h - 12) // 2, "決める", "txt", F10, "ma")
+def chip(m, x, y, kind, label, on=True, w=30, h=14):
+    c = {"攻": "atk", "防": "def", "充": "chg"}[kind]; f = COL[c] if on else (COL[c][0] // 3, COL[c][1] // 3, COL[c][2] // 3, 255)
+    m.d.rectangle([x * S, y * S, (x + w) * S - 1, (y + h) * S - 1], fill=f, outline=(16, 16, 20, 255), width=S); m.md.rectangle([x, y, x + w - 1, y + h - 1], fill=255); m.text(x + w // 2, y + 1, label, "txt" if on else "dim", F8, "ma")
+
+# ---- P2 棒で比べる: 数字を読ませず、 同じ物差しの棒で「与える」「受ける」を見せる
+def planE(frame, name, title):
+    m = Mock(frame); top(m); ehp(m)
+    X, Wd = 96, 288
+    m.text(X - 4, 208, "攻", "atk", F10, "ra"); m.bar(X, 208, Wd, 10, 0.0, "atk"); m.d.rectangle([(X + 1) * S, 209 * S, (X + 1 + 96) * S - 1, 217 * S - 1], fill=COL["gold"]); m.text(X + 100, 206, "34", "gold", F10)
+    chip(m, X + 150, 206, "攻", "×1.2"); chip(m, X + 184, 206, "攻", "×1.0", False)
+    m.text(X - 4, 224, "敵", "warn", F10, "ra"); m.bar(X, 224, Wd, 10, 0.0, "hp"); m.d.rectangle([(X + 1) * S, 225 * S, (X + 1 + 80) * S - 1, 233 * S - 1], fill=COL["warn"]); m.d.rectangle([(X + 1) * S, 225 * S, (X + 1 + 23) * S - 1, 233 * S - 1], fill=COL["def"]); m.text(X + 84, 222, "28", "warn", F10); m.text(X + 26, 236, "8 で受ける", "def", F8)
+    chip(m, X + 150, 222, "防", "+4"); chip(m, X + 184, 222, "防", "×1.0", False); chip(m, X + 222, 214, "充", "+3", False)
+    m.md.rectangle([X - 20, 204, X + Wd, 236], fill=255)
+    for i, n in enumerate((5, 2, 4)): m.die(180 + i * 30, 242, n, 22)
+    m.md.rectangle([178, 240, 268, 266], fill=255); m.text(170, 248, "振直3", "dim", F8, "ra"); myhp(m, 20, 258, 130); ok(m, 404, 242)
+    return m.save(name, title)
+
+# ---- P3 盤上の陣: 出目そのものを場に置く。 前の列 = 攻め (敵の足もと)・後ろの列 = 守り (手前)
+def planF(frame, name, title):
+    m = Mock(frame); top(m); ehp(m, 180, 190)
+    def tile(x, y, kind, label, die=None):
+        c = {"攻": "atk", "防": "def", "充": "chg"}[kind]; m.d.rectangle([x * S, y * S, (x + 36) * S - 1, (y + 24) * S - 1], fill=(COL[c][0] // 2, COL[c][1] // 2, COL[c][2] // 2, 255), outline=COL[c], width=S); m.md.rectangle([x, y, x + 36, y + 24], fill=255)
+        m.text(x + 18, y + 13, label, "txt", F8, "ma")
+        if die: m.die(x + 8, y - 12, die, 20)
+    m.text(150, 208, "攻め", "atk", F8, "ra"); tile(156, 204, "攻", "×1.2", 5); tile(196, 204, "攻", "×1.0", 2); tile(236, 204, "攻", "×1.0"); m.text(300, 204, "▲ 34", "gold", F14)
+    m.text(150, 242, "守り", "def", F8, "ra"); tile(156, 240, "防", "+4", 4); tile(196, 240, "防", "×1.0"); m.text(300, 234, "▼ 28", "warn", F14); m.text(356, 240, "→ 20", "warn", F10)
+    tile(60, 240, "充", "+3"); m.pips(60, 230, 10, 3, "chg", 3, 1)
+    myhp(m, 156, 266, 170, 0.8, 0.2); ok(m, 404, 240)
+    return m.save(name, title)
+
+# ---- P4 計器: 敵を囲む弧。 左の弧 = こちらの攻め・右の弧 = 敵の攻撃と、 受ける分
+def planG(frame, name, title):
+    m = Mock(frame); top(m)
+    cx, cy, R = 240, 140, 104
+    def arc(a0, a1, c, w=4, r=R): m.d.arc([(cx - r) * S, (cy - r) * S, (cx + r) * S, (cy + r) * S], a0, a1, fill=COL[c] if isinstance(c, str) else c, width=w * S)
+    arc(110, 250, (50, 54, 60, 255), 5); arc(110, 182, "gold", 5); m.text(cx - R - 6, cy - 4, "34", "gold", F14, "ra")
+    arc(290, 70, (50, 54, 60, 255), 5); arc(290, 12, "warn", 5); arc(290, 316, "def", 5); m.text(cx + R + 6, cy - 4, "28", "warn", F14); m.text(cx + R + 6, cy + 14, "受 20", "warn", F8)
+    arc(70, 110, (40, 16, 16, 255), 6); arc(70, 95, "hp", 6); arc(95, 100, "gold", 6)
+    for i, (kind, lab, on) in enumerate((("攻", "×1.2", True), ("攻", "×1.0", True))): chip(m, 118, 196 + i * 16, kind, lab, on)
+    for i, (kind, lab, on) in enumerate((("防", "+4", True), ("防", "×1.0", False))): chip(m, 332, 196 + i * 16, kind, lab, on)
+    chip(m, 60, 250, "充", "+3", False); m.pips(94, 255, 10, 3, "chg", 4, 1)
+    for i, n in enumerate((5, 2, 4)): m.die(204 + i * 26, 238, n, 22)
+    m.md.rectangle([202, 236, 282, 262], fill=255); myhp(m, 180, 262, 120); ok(m, 404, 244)
+    return m.save(name, title)
+
+# ---- P5 式: 1 ターンを 1 行の式として読む。 出目と端子が式の項で、 項を入れ替えると答えが変わる
+def planH(frame, name, title):
+    m = Mock(frame); top(m); ehp(m)
+    y = 238; m.box(0, y - 6, 480, 38, "soft", None)
+    x = 10; m.die(x, y, 5, 22); chip(m, x + 24, y + 4, "攻", "×1.2"); m.text(x + 58, y + 4, "+", "txt", F10); m.die(x + 70, y, 2, 22); chip(m, x + 94, y + 4, "攻", "×1.0"); m.text(x + 128, y + 4, "=", "txt", F10); m.text(x + 140, y + 1, "34", "gold", F14); m.text(x + 168, y + 4, "▶敵", "atk", F8)
+    x = 250; m.text(x, y + 1, "28", "warn", F14); m.text(x + 28, y + 4, "−", "txt", F10); m.die(x + 40, y, 4, 22); chip(m, x + 64, y + 4, "防", "+4"); m.text(x + 98, y + 4, "=", "txt", F10); m.text(x + 110, y + 1, "20", "warn", F14); m.text(x + 138, y + 4, "▶自分", "warn", F8)
+    m.text(10, 220, "空き:", "dim", F8); chip(m, 40, 218, "防", "×1.0", False); chip(m, 74, 218, "充", "+3", False); m.pips(112, 222, 10, 3, "chg", 4, 1); m.text(160, 220, "振り直す 3", "dim", F8)
+    myhp(m, 250, 222, 150); ok(m, 408, 216, 66, 18)
+    return m.save(name, title)
+
+# ---- P6 机と舞台: 左が自分の机 (出目と口を、 手で触る物として大きく)・右が舞台
+def planI(frame, name, title):
+    m = Mock(frame); base = m.im.copy(); m.im.paste((10, 10, 14, 255), (0, 0, W * S, H * S)); m.im.paste(base.crop((0, 0, (W - 78) * S, H * S)), (78 * S, 0))
+    m.pips(292, 4, 5, 1, "warn", 6, 3); ehp(m, 258, 198)
+    m.box(0, 0, 156, 270); m.text(8, 6, "袋", "dim", F8)
+    for i, n in enumerate((5, 2, 4)): m.die(14 + i * 46, 22, n, 34)
+    m.text(78, 62, "振り直す 3", "dim", F8, "ma"); m.pips(40, 76, 10, 3, "chg", 6, 2)
+    m.text(8, 96, "攻め", "atk", F10); chip(m, 8, 112, "攻", "×1.2 ←5", True, 66, 22); chip(m, 80, 112, "攻", "×1.0 ←2", True, 66, 22); m.text(150, 96, "34", "gold", F14, "ra")
+    m.text(8, 146, "守り", "def", F10); chip(m, 8, 162, "防", "+4 ←4", True, 66, 22); chip(m, 80, 162, "防", "×1.0", False, 66, 22); m.text(150, 146, "8", "def", F14, "ra")
+    chip(m, 8, 196, "充", "+3", False, 66, 20)
+    m.text(8, 228, "HP", "txt", F8); myhp(m, 26, 229, 122); ok(m, 8, 242, 140, 22)
+    m.box(352, 96, 44, 26, "soft", "line"); m.text(356, 97, "次", "dim", F8); m.text(392, 102, "28", "warn", F14, "ra"); m.text(374, 126, "受 20", "warn", F8, "ma")
+    return m.save(name, title)
+
+# ---- P7 触るまで出ない: 常設は出目と HP だけ。 出目に触ると、 そのまわりに端子が開く。 割り振った出目は、 攻めなら敵の側へ上がり、 守りなら手前に残る
+def planJ(frame, name, title):
+    m = Mock(frame); top(m); ehp(m)
+    m.text(334, 100, "28", "warn", F14); m.text(334, 120, "受 20", "warn", F8)
+    m.die(150, 176, 5, 24); m.d.rectangle([148 * S, 174 * S, 176 * S, 202 * S], outline=COL["atk"], width=2 * S); m.text(162, 204, "×1.2", "atk", F8, "ma"); wire(m, [(176, 180), (200, 160)], "atk"); m.text(150, 158, "34", "gold", F14, "ma"); m.md.rectangle([146, 172, 178, 214], fill=255)
+    m.die(300, 232, 4, 24); m.d.rectangle([298 * S, 230 * S, 326 * S, 258 * S], outline=COL["def"], width=2 * S); m.text(312, 260, "+4", "def", F8, "ma"); m.md.rectangle([296, 228, 328, 268], fill=255)
+    m.die(228, 232, 2, 24); m.d.rectangle([226 * S, 230 * S, 254 * S, 258 * S], outline=COL["txt"], width=2 * S); m.md.rectangle([226, 230, 254, 258], fill=255)
+    for (dx, dy, kind, lab, on) in ((-52, -22, "攻", "×1.0", True), (-18, -34, "防", "×1.0", True), (18, -34, "充", "+3", True)): chip(m, 240 + dx - 15, 232 + dy, kind, lab, on)
+    m.text(240, 262, "▲ 触った出目のまわりに開く", "dim", F8, "ma")
+    myhp(m, 20, 258, 130); ok(m, 404, 244)
+    return m.save(name, title)
+
 IDLE, HIT = 60, 166
+planE(IDLE, "E_bars", "P2 棒で比べる ── 数字ではなく、 同じ物差しの長さで見せる")
+planF(IDLE, "F_ranks", "P3 盤上の陣 ── 出目を場に置く。 前の列が攻め・後ろの列が守り")
+planG(IDLE, "G_gauge", "P4 計器 ── 敵を囲む弧。 左がこちらの攻め・右が敵の攻撃")
+planH(IDLE, "H_formula", "P5 式 ── 1 ターンを 1 行の式として読む")
+planI(IDLE, "I_desk", "P6 机と舞台 ── 左が自分の机・右が舞台")
+planJ(IDLE, "J_touch", "P7 触るまで出ない ── 出目に触ると、 そのまわりに端子が開く")
 res = {}
 res["D"] = planD(IDLE, "D_decide", "案 D 回路・判断の間 (出目を挿した線が、 そのまま見込みになる)"); res["D2"] = planD(HIT, "D_resolve", "案 D・解決の間", stow=True)
 res["now"] = current(IDLE, "0_now_decide", "今 (2026-11-15 の変更後)・判断の間")
