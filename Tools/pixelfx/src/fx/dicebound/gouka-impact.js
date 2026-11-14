@@ -26,6 +26,7 @@ export const meta = {
     ashes: ["#2a2630", "#4b4650", "#77717a", "#a39c9f", "#cfc8c4"],
     ash: 3,          // 烈炎の数 (0 = 灰なし・火だけ)
     reach: 176,      // 火が床を走る半径 (横)。 縦は SY 倍に潰れる
+    flame: 1,        // 床の炎の大きさの倍率 (1 = 半径に比例して元の炎の輪と同じ見え方)
     ring: "fire-ring",   // 床の輪の作り: "fire-ring" = fire/fire-ring の値をそのまま (床の潰し 0.2・輪 9 px おき・炎 8.5 px おき・寿命 0.3 + q²) / "thin" = 薄く詰めた輪
     body: 52,        // 敵の体の半幅。 奥の火は、 体の後ろ (この幅の内側) には描かない
     seed: 7,
@@ -37,7 +38,7 @@ const BURST = 0.05, SPREAD = 0.55, SOOT = hex("#0d0a12"), SOOT2 = hex("#17121d")
 const EMBER_LAYERS = [[1, 1, 7], [0.7, 0.8, 6], [0.4, 0.55, 5]];
 
 export function create(o) {
-  const F = fit(o.palette, 9), H = hotFirst(F), A = fit(o.ashes, 5).map(hex), REACH = o.reach, FR = o.ring !== "thin", SY = FR ? 0.2 : 0.17, ASH = Math.max(0, o.ash), R = new Rng(o.seed), floor = () => 0, S = o.seed * 7;
+  const F = fit(o.palette, 9), H = hotFirst(F), A = fit(o.ashes, 5).map(hex), REACH = o.reach, FR = o.ring !== "thin", SY = FR ? 0.2 : 0.17, K = FR ? (REACH / 92) * (o.flame ?? 1) : 1 /* K: 元の炎の輪 (半径 92) に対する大きさの比。 半径を伸ばした分、 炎も同じ比で大きくする */, ASH = Math.max(0, o.ash), R = new Rng(o.seed), floor = () => 0, S = o.seed * 7;
   const ps = new Particles({ rng: R, ground: floor, sparks: [H[1], H[2], H[4], H[5]] }), bits = new Bits({ ground: floor }), lights = new Lights();
   const GLOW = mix(mix(H[3], H[4], 0.5), WHITE, 0.25);
   const front = (t) => REACH * ease.outCubic(clamp((t - BURST) / SPREAD));
@@ -47,15 +48,15 @@ export function create(o) {
 
   // 床の炎の置き場所: 輪を 11 px おきに。 前線が来た時に点火し、 中心は一瞬で消え、 縁は長く燃える
   const sites = [];
-  for (let r = FR ? 10 : 22; r <= REACH; r += FR ? 9 : 13) {
-    const per = TAU * Math.sqrt((r * r + (r * SY) ** 2) / 2), n = FR ? Math.max(5, Math.round(per / 8.5)) : Math.max(8, Math.round(per / 5.5));      // 輪に沿って詰める (薄い輪でも、 炎が途切れて見えないように)
+  for (let r = FR ? 10 * K : 22; r <= REACH; r += FR ? 9 * K : 13) {
+    const per = TAU * Math.sqrt((r * r + (r * SY) ** 2) / 2), n = FR ? Math.max(5, Math.round(per / (8.5 * K))) : Math.max(8, Math.round(per / 5.5));      // 輪に沿って詰める (薄い輪でも、 炎が途切れて見えないように)
     for (let k = 0; k < n; k++) {
-      const a = ((k + R.range(0.15, 0.85)) / n) * TAU, rr = r + R.range(-3, 3), q = Math.min(1, rr / REACH);
+      const a = ((k + R.range(0.15, 0.85)) / n) * TAU, rr = r + R.range(-3, 3) * K, q = Math.min(1, rr / REACH);
       const x = Math.cos(a) * rr, y = Math.sin(a) * rr * SY, z = depth(y), s = near(z);
       if (y < 0 && Math.abs(x) < o.body) continue;      // 敵の体の後ろ
       if (!FR && R.chance(0.5 * (1 - q) * (1 - q))) continue;  // 中心のごく近くだけ、 まばらに
       sites.push({ x, y, z, far: y < 0, t0: reachedAt(rr) + R.range(0, 0.04), life: FR ? (0.3 + 1.0 * q * q) * R.range(0.85, 1.2) * (1 + 0.05 * ASH) : (q > 0.78 ? R.range(0.75, 1.15) * (1 + 0.05 * ASH) : R.range(0.2, 0.32)),      // 走る間は一瞬だけ燃え、 いちばん外の輪だけが燃え残る (輪を薄く)
-        h: (FR ? R.range(9, 15) : R.range(10, 17)) * (0.6 + 0.55 * q) * s, w: (FR ? R.range(1.8, 2.7) : R.range(1.9, 2.8)) * (0.75 + 0.3 * q) * s, n: R.int(0, 1e5) });
+        h: (FR ? R.range(9, 15) * K : R.range(10, 17)) * (0.6 + 0.55 * q) * s, w: (FR ? R.range(1.8, 2.7) * K : R.range(1.9, 2.8)) * (0.75 + 0.3 * q) * s, n: R.int(0, 1e5) });
     }
   }
   sites.sort((a, b) => a.y - b.y);
@@ -88,7 +89,7 @@ export function create(o) {
       const h = s.h * rise * fade * (0.7 + 0.55 * rand(Math.floor(t * 8), s.n)) * (1 + 0.5 * Math.max(0, noise(t * 2.6, s.n + 70) - 0.55));
       if (h < 1) continue;
       const w = s.w * (0.6 + 0.4 * fade);
-      const L = u < 0.3 ? (far ? BACK_LAYERS : !FR && w > 2.2 ? BIG_LAYERS : LAYERS) : u < 0.65 ? BACK_LAYERS : EMBER_LAYERS;
+      const L = u < 0.3 ? (far ? BACK_LAYERS : w > 2.2 ? BIG_LAYERS : LAYERS) : u < 0.65 ? BACK_LAYERS : EMBER_LAYERS;
       // 先端は外へ流れる (中心から吹かれている)
       flameTongue(p, s.x, s.y, h, w, NZ(2.2, s.n + 40) * 1.5 - (FR ? s.x * 0.02 : -s.x * 0.015 * h * 0.2), NZ, s.n, H, L);
     }
@@ -178,7 +179,7 @@ export function create(o) {
           const s = R.pick(sites), age = t - s.t0;
           if (age < 0 || age > s.life * 0.7) continue;
           const k = near(s.z);
-          ps.spawn(P.FIRE, s.x + R.range(-1, 1), s.y - s.h * 0.6, R.range(-5, 5) + s.x * 0.04, -R.range(45, 95), R.range(0.2, 0.42), 0, R.range(1.3, 2.6) * k, 0, (R.chance(0.5) ? PF.SMOKES | (ASH >= 5 ? PF.BIG : 0) : 0) | (s.far ? PF.BACK : 0));
+          ps.spawn(P.FIRE, s.x + R.range(-1, 1), s.y - s.h * 0.6, R.range(-5, 5) + s.x * 0.04, -R.range(45, 95), R.range(0.2, 0.42), 0, R.range(1.3, 2.6) * k * Math.pow(K, 0.7), 0, (R.chance(0.5) ? PF.SMOKES | (ASH >= 5 ? PF.BIG : 0) : 0) | (s.far ? PF.BACK : 0));
           if (R.chance(0.14)) ps.spawn(P.EMBER, s.x, s.y - s.h * 0.5, R.range(-15, 15), -R.range(30, 70), R.range(0.6, 1.3), H[3], 1, 0, s.far ? PF.BACK : 0);
           if (ASH > 0 && R.chance(0.05 * ASH)) ps.spawn(P.FLAKE, s.x, s.y - s.h * 0.4, R.range(-12, 12), -R.range(20, 50), R.range(0.9, 1.8), R.pick([A[2], A[3]]), 1, 0, s.far ? PF.BACK : 0);
         }
@@ -193,7 +194,7 @@ export function create(o) {
       simDraw(p, ps, H, "back");
       // 前線と一緒に床を走る光
       const fr = front(t), k = t < BURST ? 0 : 1 - smooth(BURST + SPREAD, BURST + SPREAD + 1.3, t);
-      if (k > 0) for (let i = 0; i < 16; i++) p.glow(Math.cos((i / 16) * TAU) * fr, Math.sin((i / 16) * TAU) * fr * SY - 3, FR ? 16 : 20, GLOW, 0.2 * k);
+      if (k > 0) for (let i = 0; i < 16; i++) p.glow(Math.cos((i / 16) * TAU) * fr, Math.sin((i / 16) * TAU) * fr * SY - 3, FR ? 16 * K : 20, GLOW, 0.2 * k);
     },
     draw(p) {
       ring(p, false);
