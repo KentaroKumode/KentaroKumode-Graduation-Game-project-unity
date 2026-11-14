@@ -16,6 +16,10 @@ import * as GODRAYS from "./tenyo-rays.js";   // weather/god-rays の写し (日
 import * as SMITE from "../holy/smite.js";          // moves/holy-smite の中身 (術者の動きを除いた、 落ちる光)
 import * as SLAM from "../impacts/ground-slam.js";  // moves/ground-pound の中身 (着地の衝撃)
 import * as IMPACT from "../impacts/impact-frame.js";
+import * as RESURRECT from "../holy/resurrection.js";
+import * as DSHIELD from "../holy/divine-shield.js";
+import * as FEATHERS from "../holy/feather-burst.js";
+import { Feathers } from "../holy/_lib.js";
 import { glint } from "./chevalier-charge.js";
 import { scaledFx } from "./_scaled.js";
 
@@ -65,11 +69,18 @@ export function create(o) {
   const T0 = part === "charged" ? T_CHARGE : part === "heavy" ? T_CHARGE + HELD_T : 0;   // どこから流すか
   const OFF = gift === "shield" ? SHIELD.open - 0.25 : 0;   // 盾: 今の発動の絵 (白く燃える 0.25 秒は絞りの間に済むので飛ばす) を、 真っ暗の拍の後ろへずらす
   const TH = T_CHARGE + HELD_T, TP = TH + T_LEAD + OFF;   // 発動の始まり・全画面の始まり
-  const pay = gift === "sword" ? null : MOVES.create(resolveOptions(MOVES.meta, { move: "tenyo-" + gift, seed: o.seed }));
+  const pay = gift !== "ring" ? null : MOVES.create(resolveOptions(MOVES.meta, { move: "tenyo-" + gift, seed: o.seed }));
   // 剣の発動の部品 (元の効果を、 式を触らずに置く): God rays (全画面)・落ちる光 (Holy smite)・着地の衝撃 (Ground pound)・インパクトフレーム (全画面)
   // 瓦礫 (跳ねる岩・砂利・欠片) は出さない。 煙は粒を小さく分ける (作者: 瓦礫はいらない・煙は野暮ったいので粒度を下げて)
   const RUBBLE = ["CHUNK", "GRIT", "FLAKE"], FINE = { SMOKE: [0.45, 3], DUST: [0.6, 2] }, FINER = { SMOKE: [0.32, 4], DUST: [0.5, 2] };
   const shRays = gift === "shield" ? scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, opts: {} }) : null;
+  // 盾の発動の後: holy/resurrection (注ぐ光・光の翼が開く・光輪・大きな羽ばたき・羽根に散る) を、 敵の体の大きさで重ねる (作者: 発動後が弱い)。 光が注ぐ頭は飛ばして、 翼が開く所から
+  const shWings = gift === "shield" ? scaledFx(RESURRECT, { K: 2.6, at: [240, 196], start: 0.95, delay: TH + SHIELD.open + 0.1 - T0, glow: 0.6, opts: { palette: GOLD } }) : null;
+  // 発動の後の球: holy/divine-shield を、 そのまま (作者: 球の見た目は Divine shield を正確に写す)。 式も設定も元のまま、 大きさだけ (元の半径 29 → 87)。 前の版の、 moves の tenyo-shield (光の柱を足した物) は使わない
+  const shBubble = gift === "shield" ? scaledFx(DSHIELD, { K: 3, at: [240, 202], life: 2.2, delay: TH + SHIELD.open + 0.2 - T0, opts: {} }) : null;
+  // 羽根が弾ける (holy/feather-burst): 範囲を広く・量を少なく (作者の指定)。 広げて置き (3.6 倍)、 羽根は 3 枚に 1 枚だけ出させる (元のコードは触らず、 羽根を足す口を、 作る間だけ間引く)
+  let shFeathers = null;
+  if (gift === "shield") { const add = Feathers.prototype.add; let n = 0; Feathers.prototype.add = function (f) { return n++ % 3 === 0 ? add.call(this, f) : undefined; }; try { shFeathers = scaledFx(FEATHERS, { K: 3.6, at: [240, 124], delay: TH + SHIELD.open + 0.35 - T0, glow: 0.5, opts: {} }); } finally { Feathers.prototype.add = add; } }
   const shImpact = gift === "shield" ? scaledFx(IMPACT, { K: 1.5, at: [240, 135], delay: TH + SHIELD.open - T0, opts: {} }) : null;
   const sw = gift !== "sword" ? null : {
     rays: scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, opts: {} }),   // 出どころ (0,−170) × 1.5 = 画面の一番上の真ん中
@@ -193,7 +204,7 @@ export function create(o) {
       if (ecl) ecl.update(dt);
       if (sw) for (const k in sw) sw[k].update(dt);
       if (shImpact) {
-        shImpact.update(dt); shRays.update(dt);
+        shImpact.update(dt); shRays.update(dt); shWings.update(dt); shBubble.update(dt); shFeathers.update(dt);
         const a = t - TH, r = irisR(a);   // 縁から金の粒がこぼれる (star-iris の、 先からこぼれる粒)
         if (a > 0 && a < SHIELD.close && r > 6 && r < 280) for (let n = 0; n < 3; n++) if (R.chance(0.5)) { const g = R.range(0, TAU), x = BODY[0] + Math.cos(g) * r, y = BODY[1] + Math.sin(g) * r; if (x > 0 && y > 0 && x < W && y < H) ps.spawn(R.chance(0.6) ? P.STAR : P.MOTE, x, y, -Math.cos(g) * R.range(20, 70), -Math.sin(g) * R.range(20, 70), R.range(0.25, 0.5), R.chance(0.5) ? C[6] : C[5], R.range(0.6, 1.8)); }
       }
@@ -257,7 +268,8 @@ export function create(o) {
       // 白飛び: 剣は全面を白く (0.15 秒)・指輪は締まる瞬間に下半分・盾は弱く
       const wt = a - 0.33, wk = gift === "shield" ? 0.55 * clamp(1 - wt / 0.3) : 0;
       if (a >= T_LEAD) {
-        pay.draw(p);
+        if (pay) pay.draw(p);
+        if (shWings) { shWings.draw(p); shBubble.draw(p); shFeathers.draw(p); }   // 光の翼 → その上に球
         const b = a - T_LEAD;
         if (gift === "shield") {
           for (const d of [0, 0.12, 0.26]) { const q = (b - d) / 0.55; if (q > 0 && q < 1) oval(p, 240, BODY[1], SR + 240 * ease.outCubic(q), SR + 240 * ease.outCubic(q), 3 * (1 - q) + 1, q < 0.35 ? WHITE : C[5], 1 - q); }
