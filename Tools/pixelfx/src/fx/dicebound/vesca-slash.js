@@ -14,7 +14,7 @@ export const meta = {
   desc: "Vesca uses a relic weapon: a great tilted crescent whips round in front of her and down onto the viewer's board, cools from white to deep violet as it trails off, glints at the tip and throws sparks.",
   tags: ["dicebound", "boss", "relic", "slash", "one-shot"],
   size: [480, 270],
-  origin: [240, 322],   // 元の効果の原点 (人物の足もと)。 弧の中心はここから (6, −26) × K 上。 切っ先がこちらの盤 (300,246 あたり) に着く位置に合わせた
+  origin: [218, 250],   // 元の効果の原点 (人物の足もと)。 弧の中心はここから (6, −26) × K 上。 切っ先がこちらの盤 (300,246 あたり) に着く位置に合わせた
   duration: 1.25,
   loop: false,
   fps: 30,
@@ -49,14 +49,14 @@ function crescent(p, s, ta, L, W, age) {
     // ---- ここだけ元と違う (2026-11-14 作者: 大きくすると、 べた塗りが目立って安っぽい。 流れに合った筋で速さを出し、 縁をぱきっと光らせる)
     // 流れに沿った筋: 弧に沿っては長く、 太さの向きには細かいノイズ。 時間で頭の方へ流れる。 明るい筋は 1 段明るく、 暗い筋は 1 段暗く
     const d = s.R - r, along = u * s.R * 0.04 - age * 10, strand = noise2(along, r * 0.5, 31), fine = noise2(along * 2.4 + 7, r * 1.15, 57);
-    const wi = w * (0.84 + 0.16 * fine);   // 内の縁は、 筋に沿ってぎざぎざに
+    const wi = w * (0.9 + 0.1 * fine);   // 内の縁は、 筋に沿ってぎざぎざに
     if (d < 0 || d > wi) return;
     const q = d / wi, young = age < 0.6;
     // 外の縁: 白 2 ドット + いちばん明るい色 1 ドット (太さの割合ではなく、 ドットで決める ── 大きくしても細く鋭いまま)。 その内側は元の段に、 筋を足す
-    const ci = d < 2.2 && young ? 0 : d < 3.4 && young ? 1 : Math.round(q * (n - 1) * 0.75 + age * 2.4 - v * 0.8 + 0.4 + (strand > 0.22 ? -1.3 : strand < -0.28 ? 1.1 : 0));
+    const ci = d < 2.2 && young ? 0 : d < 3.4 && young ? 1 : Math.round(q * (n - 1) * 0.75 + age * 2.4 - v * 0.8 + 0.4 + (strand > 0.42 ? -1.1 : strand < -0.5 ? 0.9 : 0));   // 筋は控えめに (作者: ノイズ感はもう少し薄く)
     out.c = R[n - 1 - clamp(ci, 0, n - 1)];
     // 尾の方では、 内側が筋にほどけて抜ける (べたの面を残さない)
-    out.a = q > 0.28 && fine < -0.1 - v * 0.7 ? 0 : Math.min(1, v / 0.4);
+    out.a = q > 0.35 && fine < -0.38 - v * 0.7 ? 0 : Math.min(1, v / 0.4);
     if (d < 3 && young) { out.l = R[n - 1]; out.k = 0.7 * (1 - age); }   // 縁の光
   });
   for (let u = 0; u <= span; u += 0.3) {
@@ -90,7 +90,8 @@ export function create(o) {
   const C = fit(o.palette, 7), Rg = new Rng(o.seed), ps = new Particles({ rng: Rg, sparks: o.sparks });
   const R0 = o.radius, a0 = -2.55, a1 = 0.95;
   // the main smear, and a thinner echo just inside it a beat behind
-  const A = { cx: 6 * K, cy: -26 * K, R: R0, sy: 0.6, rot: -0.38, a0, a1, W: 12 * K, t0: 0, sweep: 0.07, hold: 0.12, trail: 0.5, ramp: C };
+  // 下向き (2026-11-14 作者の指定): 楕円を上下に返す (sy を負に・傾きも逆に)。 弧が上ではなく下をまわり、 白い縁がこちらの盤の側を向く
+  const A = { cx: 6 * K, cy: -26 * K, R: R0, sy: -0.6, rot: 0.38, a0, a1, W: 12 * K, t0: 0, sweep: 0.07, hold: 0.12, trail: 0.5, ramp: C };
   const E = { ...A, R: R0 * (33 / 42), W: R0 * (4.5 / 42), a0: a0 + (a1 - a0) * 0.1, a1: a1 - (a1 - a0) * (0.15 / 3.5), t0: 0.017, hold: 0.08, trail: 0.42, ramp: C.slice(0, 6) };
   const tip = tipOf(A);
   let t = 0, landed = false;
