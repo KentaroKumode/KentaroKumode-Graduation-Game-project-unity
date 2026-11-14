@@ -25,6 +25,11 @@ export const meta = {
     wide: false,   // 会心: 最初に、 真横の大きな斬撃が 1 本 (光った一瞬のあと、 中が抜ける)
     flow: 2.5,     // 何倍に広げて使うか
     bloom: 1,
+    // 敵の汎用の斬撃 (foes.js の dagger) 用: 既定は今までどおり
+    count: 6,       // 小さな斬撃の数
+    every: 0.055,   // 斬撃の間
+    finish: true,   // 締めの一太刀
+    clumsy: 0,      // 拙さ (1 で: 間がばらつく・振りが遅い・弧が短く太い)
     seed: 12,
   },
 };
@@ -40,10 +45,11 @@ export function create(o) {
   const T_OFF = o.wide ? 0.3 : 0;   // 会心は、 大きな一太刀のあとに連撃
   // 真横の大きな斬撃 (会心): 連撃の締めの一太刀 (big) と同じ形を、 大きく。 右から左へ
   const WIDE = o.wide ? swing({ cx: 26, cy: -27, R: 48, sy: 0.3, k: 0.2, rot: -0.1, a0: 0.15, dir: 1, span: 3.0, W: 15, t0: 0, sweep: 0.07, hold: 0.06, trail: 0.24, ramp: C, sharp: true }) : null;   // sharp: 両端を針のように尖らせる (作者: どちらの端も丸くて、 シャープさが足りない)
-  const small = CUTS.map(([x, y, rot, dir], i) => swing({ cx: x, cy: y, R: Rg.range(12, 15), sy: Rg.range(0.55, 0.75), rot, a0: Rg.range(-2.8, -2.2), dir, span: Rg.range(2.3, 2.8), W: Rg.range(5.2, 6.4), t0: T_OFF + i * EVERY, sweep: 0.035, hold: 0.03, trail: 0.13, ramp: C }));
+  const small = CUTS.slice(0, o.count).map(([x, y, rot, dir], i) => swing({ cx: x, cy: y, R: Rg.range(12, 15), sy: Rg.range(0.55, 0.75), rot, a0: Rg.range(-2.8, -2.2), dir, span: Rg.range(2.3, 2.8), W: Rg.range(5.2, 6.4), t0: T_OFF + i * o.every, sweep: 0.035, hold: 0.03, trail: 0.13, ramp: C }));
   // the finisher: one wide flat cut right across the front, left to right
-  const big = swing({ cx: 24, cy: -26, R: 30, sy: 0.36, k: 0.24, rot: 0.12, a0: 3.0, dir: -1, span: 2.85, W: 11, t0: T_OFF + small.length * EVERY + 0.04, sweep: 0.055, hold: 0.06, trail: 0.24, ramp: C });
-  const all = [...small, big], ends = all.map(slashEnd), done = all.map(() => false);
+  const big = swing({ cx: 24, cy: -26, R: 30, sy: 0.36, k: 0.24, rot: 0.12, a0: 3.0, dir: -1, span: 2.85, W: 11, t0: T_OFF + small.length * o.every + 0.04, sweep: 0.055, hold: 0.06, trail: 0.24, ramp: C });
+  if (o.clumsy) small.forEach((q) => { q.t0 += Rg.range(0, o.every * 0.7) * o.clumsy; q.sweep *= 1 + 1.4 * o.clumsy; q.hold *= 1 + o.clumsy; q.span *= 1 - 0.3 * o.clumsy; q.W *= 1 + 0.35 * o.clumsy; });
+  const all = o.finish ? [...small, big] : small, ends = all.map(slashEnd), done = all.map(() => false);
   const slivers = [-2.6, -1.5, -0.4, 0.7].map((a) => ({ a: a + Rg.range(-0.2, 0.2), r: Rg.range(4, 7), v: Rg.range(70, 110), arc: Rg.range(0.4, 0.7) }));
   let t = 0;
   return {
@@ -84,7 +90,7 @@ export function create(o) {
         }
       });
       // the finisher throws slivers off its end
-      const q = t - big.t0 - big.sweep;
+      const q = o.finish ? t - big.t0 - big.sweep : -1;
       if (q > 0.02 && q < 0.14) {
         const k = (q - 0.02) / 0.12, e = ends[ends.length - 1];
         for (const s of slivers) sliver(p, e.x, e.y, s.a + Math.atan2(e.dy, e.dx), s.r + s.v * (q - 0.02), s.arc * (1 - 0.4 * k), k < 0.4 ? C[6] : k < 0.7 ? C[5] : C[4], 1 - k);

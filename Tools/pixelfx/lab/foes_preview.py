@@ -12,7 +12,7 @@ PLAN = [("攻撃", "iron", [("longsword", "斬撃・ロングソード系", "騎
         ("13 番目の死", "null", [("decree", "宣告", "Curse ── 敵の頭上"), ("decree-reap", "宣告アタック", "Scythe reap")]),
         ("補助", "steel", [("heal", "小さな回復", "Healing ring"), ("drain", "吸血", "Life steal"), ("hex-gray", "弱体・コボルド", "Holy pillar を数か所に + 鎖・灰色"), ("hex-curse", "弱体・怨嗟の影", "同じ形・呪いの色"),
                          ("guard", "構え・装甲", "Shield block を敵全体に"), ("armor-break", "装甲が割れる", "Freeze の後半"), ("mirror", "反射", "Portal の中をべた塗り・青磁色・反射"), ("poison", "毒", "Toxic puddle"), ("rage", "自己強化", "Rage (怒りマーク抜き)")])]
-INK = {"claw": "blood", "decree": "null", "decree-reap": "null", "fire": "warm", "heal": "poison", "drain": "blood", "poison": "poison", "missile": "null", "mirror": "celadon", "rage": "red", "hex-gray": "iron", "hex-curse": "null", "armor-break": "iron"}
+INK = {"claw": "blood", "decree": "null", "decree-reap": "null", "fire": "warm", "heal": "poison", "drain": "blood", "poison": "poison", "missile": "null", "mirror": "celadon", "rage": "red", "hex-gray": "iron", "hex-curse": "null", "armor-break": "iron", "blunt": "earth"}
 ONLY = sys.argv[1:]
 base = stage(); html = []; thumbs = []
 for fam, ink, moves in PLAN:

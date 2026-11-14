@@ -33,7 +33,8 @@ const INKS = {
   null: ["#05040a", "#3a2c5c", "#7c5cc4", "#c8b4f2", "#ffffff"],
   // 敵の汎用の技 (見本用の仮の色の組): 鉄の灰・青磁
   iron: ["#0c0c10", "#3a3840", "#77747e", "#b9b6c0", "#f2f0f6"],
-  celadon: ["#06100e", "#2c5a52", "#6aa898", "#b4dccc", "#f4fff8"],
+  celadon: ["#0b1211", "#536862", "#93ada5", "#c9dad3", "#f7fdfa"],   // 鏡: 薄い青磁 (作者: 色味はもう少し薄く)
+  earth: ["#1a120c", "#4a3626", "#8a6844", "#c8a878", "#f4e8d0"],   // 土
 };
 const RAMP = (INKS[flags.ink ?? "warm"]).map(rgb3), BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5], LIGHT_GAIN = 1.6;
 const lum = (R, G, B) => (0.299 * R + 0.587 * G + 0.114 * B) / 255, step = (L) => Math.max(0, Math.min(RAMP.length - 1, Math.round(L * (RAMP.length - 1))));

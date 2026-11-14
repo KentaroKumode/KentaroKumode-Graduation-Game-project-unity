@@ -29,7 +29,7 @@ export function create(o) {
   const fan = [-2.36, -0.79, 2.6, 0.54, Math.PI, 0];   // 四方へ: 左上・右上・左下・右下・左・右
   const bolts = fan.map((a, i) => {
     a += R.range(-0.12, 0.12);
-    const sp = R.range(230, 290);
+    const sp = R.range(300, 360);
     return { t0: 0.05 + i * 0.05, s: 1, x: HX, y: HY, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, trail: [], hit: -1, on: false, tx: TX + (i - 2.5) * 34 + R.range(-8, 8), ty: TY + R.range(-6, 6), tw: R.range(0, TAU), acc: 0 };
   });
   const pops = [];
@@ -115,7 +115,7 @@ export function create(o) {
           for (let i = 0; i < 4; i++) ps.spawn(P.MOTE, HX, HY, Math.cos(Math.atan2(b.vy, b.vx) + R.range(-0.6, 0.6)) * R.range(60, 140), Math.sin(Math.atan2(b.vy, b.vx) + R.range(-0.6, 0.6)) * R.range(60, 140), R.range(0.12, 0.25), C[6], 0.6);
         }
         const age = t - b.t0; b.s = 1 + 1.8 * clamp(age / 0.8); const dx = b.tx - b.x, dy = b.ty - b.y, d = Math.hypot(dx, dy) || 1;
-        const sp = 260 + 1100 * age * age, steer = Math.min(1, (0.15 + 17 * age * age) * dt);   // 初めは外へ流れ、 だんだん強くこちらへ曲がる
+        const sp = 260 + 1100 * age * age, steer = Math.min(1, (0.04 + 24 * Math.max(0, age - 0.16) ** 2) * dt);   // 初めは外へ流れ、 だんだん強くこちらへ曲がる
         b.vx += ((dx / d) * sp - b.vx) * steer;
         b.vy += ((dy / d) * sp - b.vy) * steer;
         b.x += b.vx * dt;

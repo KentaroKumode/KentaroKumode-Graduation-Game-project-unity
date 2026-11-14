@@ -21,14 +21,14 @@ export const meta = {
   options: {
     palette: ["#151a3d", "#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#a6ecff", "#dcfbff", "#ffffff"],
     sparks: ["#fff3a6", "#ffe26b", "#ff8a2a", "#f2561d"],
-    rx: 64,    // 敵の体の半分の幅 + 余白
-    ry: 136,   // 敵の体の高さ + 余白
+    rx: 104,   // 敵の体の半分の幅 + 余白 (横に広い、 低い半球に)
+    ry: 132,   // 敵の体の高さ + 余白
     seed: 12,
   },
 };
 
 let CX = 0, RX = 64, RY = 136;
-const GRID = 3.4; // lattice density
+const GRID = 4.4; // lattice density
 const HIT = { lon: 0, lat: 0.6 }, GONE = 0.8; // where the ripple starts; when the dome starts to blink out
 
 // a point on the dome's surface (lon round from facing us, lat up from the floor) to local space
@@ -56,13 +56,13 @@ export function create(o) {
         const z = Math.sqrt(1 - q) * (back ? -1 : 1), lon = Math.atan2(u, z), lat = Math.asin(clamp(v));
         // the lattice, and which cell this is: each cell keeps its own clock for blinking out
         const a = (lon + lat) * GRID, b = (lon - lat) * GRID, fa = a - Math.floor(a), fb = b - Math.floor(b);
-        const cell = rand(Math.floor(a), Math.floor(b), 31), line = Math.min(fa, 1 - fa, fb, 1 - fb) < 0.13;
+        const cell = rand(Math.floor(a), Math.floor(b), 31), line = Math.min(fa, 1 - fa, fb, 1 - fb) < 0.045;   // 格子の線を細く (作者の指定。 元は 0.13)
         const gone = GONE + cell * 0.35;
         if (t > gone) continue;
         // how far over the surface from the blow, and the two ripples running out from it
         const d = Math.acos(clamp(Math.cos(lat) * Math.cos(HIT.lat) * Math.cos(lon - HIT.lon) + Math.sin(lat) * Math.sin(HIT.lat), -1, 1));
         let hit = 0;
-        for (const [t0, k0] of [[0, 1], [0.12, 0.55]]) {
+        for (const [t0, k0] of [[0, 0.5], [0.12, 0.3]]) {   // 波紋は弱く (殴られたのではなく、 構えただけ。 元は 1 と 0.55)
           const k = t - t0, front = k * 3.6;
           if (k < 0 || k > 0.55) continue;
           if (Math.abs(d - front) < 0.2) hit = Math.max(hit, k0 * (1 - k / 0.55));
@@ -73,7 +73,7 @@ export function create(o) {
           if (line) p.dot(x, y, C[3], 0.5 * fade);
           continue;
         }
-        if (q > 0.9) p.dot(x, y, flash || hit > 0.5 ? WHITE : C[6], fade);
+        if (q > 0.965) p.dot(x, y, flash || hit > 0.5 ? WHITE : C[6], fade);
         else if (line) p.dot(x, y, flash || blink || hit > 0.5 ? WHITE : hit > 0.2 || sheen ? C[6] : rim > 0.7 ? C[5] : rim > 0.35 ? C[4] : C[3], fade);
         else p.blend(x, y, flash || hit > 0.35 ? C[6] : C[3], fade * Math.min(0.85, (flash ? 0.35 : 0.1 + 0.25 * rim * rim) + hit * 0.65));
         if (((x * 7 + y * 3) & 15) === 0) p.light(x, y, C[4], 0.15 + 0.5 * hit);
