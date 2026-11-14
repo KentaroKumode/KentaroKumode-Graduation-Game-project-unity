@@ -1,5 +1,5 @@
 // DICE BOUND 用 (2026-11-14): ヴェスカ 1〜3 段目の大技の、 画面全体の部分。 transitions/shatter-wipe を 480×270 に写した物 (中身はそのまま・./_screen.js が画面の大きさ)。
-// 変えた所: 色を紫に・硝子の色を暗い紫に (黒ではなく「凍った時」の色)・start 秒目から始める (硝子が落ちて来る所を飛ばし、 いきなり画面が凍る → ひび → 砕けて落ちる)。
+// 変えた所: 色を紫に・硝子は黒に近い色 + 割れるまで続く斜めの照り返し・割れる中心を玉の中心 (240,130) に・start 秒目から始める (硝子が落ちて来る所を飛ばし、 いきなり画面が凍る → ひび → 砕けて落ちる)。
 // 時計が止まる所 (dicebound/vesca-stop) の最後のコマから流す。 始めて 0.17 秒でひび、 0.47 秒で砕ける。 絵が無くなるのは約 1.65 秒後 (meta.duration は元のまま 2.8)。
 // The impact flash, cracks racing out from the impact, the white flash before the burst, and the glass
 // splinters, glints and cold light of the burst are adapted from Sprite Fusion's open-source ice shatter
@@ -12,7 +12,7 @@ export const meta = screenMeta({
   desc: "A dark glass pane drops over the screen and bounces; cracks race out from an impact with a flash, then it bursts into tumbling glass shards with lit edges that fall away.",
   tags: ["shatter", "glass", "break", "shards", "wipe"],
   duration: 2.8,
-  options: { palette: ["#0a0614", "#1c1236", "#3a2470", "#5a3aa8", "#8a64e0", "#b89cf8", "#e4d8ff", "#ffffff"], color: "#40305e", start: 1.15, seed: 2 },   // color = 凍った時の硝子 (紫)・start = 元の効果の何秒目から始めるか (1.15 = 硝子がもう画面を覆って止まっている所)
+  options: { palette: ["#0a0614", "#1c1236", "#3a2470", "#5a3aa8", "#8a64e0", "#b89cf8", "#e4d8ff", "#ffffff"], color: "#0c0818", start: 1.15, seed: 2 },   // color = 凍った時の硝子 (紫)・start = 元の効果の何秒目から始めるか (1.15 = 硝子がもう画面を覆って止まっている所)
 });
 
 const D = meta.duration, LAND = 0.55, GP = (2 * H) / (LAND * LAND), REST = 0.3, CRACK = 1.32, BREAK = 1.62, WAVE = 520;
@@ -34,7 +34,7 @@ function paneY(t) {
 
 // the break: jagged rays out of the impact crossed by rings, every crack shared by the two cells it splits
 function pattern(R) {
-  const Ix = W * R.range(0.4, 0.6), Iy = H * R.range(0.36, 0.54), NR = 13, RING = [0, 9, 21, 37, 58, 86, 122, 168, 232];
+  const Ix = 240, Iy = 130,   /* 割れる中心 = ヴェスカの玉の中心 (元は画面の中ほどの乱数) */ NR = 13, RING = [0, 9, 21, 37, 58, 86, 122, 168, 232];
   const ang = Array.from({ length: NR }, (_, i) => ((i + R.range(-0.3, 0.3)) / NR) * TAU), speed = ang.map(() => R.range(800, 1300));
   const V = ang.map((a) => RING.map((r, j) => {
     if (!j) return [Ix, Iy];
@@ -190,6 +190,13 @@ export function create(o) {
         const yb = paneY(t) + H, r1 = Math.min(H, Math.floor(yb));
         if (r1 > 0) {
           rect(p0, 0, 0, W, r1, ink);
+          // 硝子の照り返し: 斜めの帯を、 割れるまで出し続ける (2026-11-14 作者の指摘: 一色のべた塗りは安っぽい)。
+          // 太い暗い帯 + 細い明るい線の組を 2 つ。 元の効果の照り返しは半透明で、 硝子が止まると消える ── 液晶の色の段では見えないので、 色として置く
+          for (const [x0, off, w, c] of [[0.2, 0, 26, C[2]], [0.2, 34, 4, C[4]], [0.2, 44, 1, C[6]], [0.66, 0, 14, C[2]], [0.66, 20, 2, C[4]], [0.66, 60, 40, C[1]], [0.66, 108, 1, C[5]]])
+            for (let y = 0; y < r1; y++) {
+              const xc = W * x0 + off + (H - y) * 0.7;
+              for (let x = Math.max(0, Math.floor(xc - w / 2)); x < Math.min(W, Math.ceil(xc + w / 2)); x++) p0.put(x, y, c);
+            }
           const shine = 1 - smooth(0.98, 1.22, t), y0 = yb - H;
           if (shine > 0) {
             for (const [off, w, a] of [[0, 16, 0.05], [22, 3, 0.1], [30, 1, 0.12]])
