@@ -8,9 +8,9 @@ src = io.open(os.path.join(PFX, "lab", "moves_board.py"), encoding="utf-8").read
 exec(src[src.index("def stage():"):src.index("def frames(")])      # 舞台を借りる
 # (技の名前, 見出し, 色の組, 効果, 設定)
 def M(mv, title): return (mv, title, None, "dicebound/moves", {"move": mv})
-PLAN = [("ヴェスカ", "null", [M("relic-strike", "遺物・攻撃: 盤を斜めに断つ斬撃"), M("relic-guard", "遺物・防御: 光の球に包まれる (合格・変更なし)"),
+PLAN = [("ヴェスカ", "null", [("relic-strike", "遺物・攻撃: 大きな三日月の斬撃 (Sword slash を大きくした物)", None, "dicebound/vesca-slash", {}), M("relic-guard", "遺物・防御: 光の球に包まれる (合格・変更なし)"),
                                ("relic-hex", "遺物・妨害: ヴェスカの正面に、 大きな印が描かれて燃え崩れる (最初の Hex sigil を大きくした物)", None, "dicebound/vesca-hex", {}),
-                               ("tenyo-sword", "天与の剣: 金の斬撃が 3 つ (×と、 横一文字)・光の柱", "holy", "dicebound/moves", {"move": "tenyo-sword"}),
+                               ("tenyo-sword", "天与の剣: 天から金の光の扇が盤へ集まる (Holy pillar を大きく派手にした物・上の日輪なし)", "holy", "dicebound/tenyo-sword", {}),
                                ("tenyo-shield", "天与の盾: 金の球・回る光の柱と輪", "holy", "dicebound/moves", {"move": "tenyo-shield"}),
                                ("tenyo-ring", "天与の指輪: 厚い金の輪が降りて盤を締める・宝石・光の壁・鎖", "holy", "dicebound/moves", {"move": "tenyo-ring"})]),
         ("灰燼の王", "ash", [M("king-attack", "通常攻撃: 火の三日月が盤を薙ぐ・炎が暴れる・火の塊が爆ぜる"), M("king-regen", "灰の再生: 体の内側から光が漏れ出る")]),

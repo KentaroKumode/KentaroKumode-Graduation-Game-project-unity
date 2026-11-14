@@ -16,7 +16,7 @@
 // The shield bubble is this repository's holy/divine-shield, drawn as is; the shapes follow its slash, smite, ground-slam and fire effects
 // (after Sprite Fusion's open-source effects, https://www.spritefusion.com/pixel-art-vfx), MIT License, Copyright (c) 2026 Hugo Duprez.
 import { Particles, P, Rng, fit, clamp, ease, noise, rand, sparkle, TAU, WHITE } from "../../core/index.js";
-import { through, slashEnd, shavings, onSwing, travel } from "../melee/_lib.js";
+import { swing, through, slashEnd, shavings, onSwing, travel } from "../melee/_lib.js";
 import * as SHIELD from "../holy/divine-shield.js";
 import { flameTongue, LAYERS, BIG_LAYERS } from "../fire/_lib.js";
 import { GOLD } from "../holy/_lib.js";
@@ -65,7 +65,10 @@ export function create(o) {
   //   半径の割合 (元は 33/42) で置くと、 大きい斬撃では 70 ドットも離れて「2 つ目の斬撃」に見えた (作者の指摘)。 太さの割合で置く。
   // 残る時間: 元は 30 コマ/秒で、 斬撃が 10 コマほど残って冷め、 縁の点線がさらに残る。 1 秒 8 コマで同じ長さ (0.39 秒) だと 3 コマで消える (作者: 一瞬で消える) ── hold / trail を約 2 倍・点線 (linger) を 0.75 秒に
   // 遺物・攻撃: 左上から右下へ、 盤を通る大きな一太刀
-  const CUTS = move === "relic-strike" ? [mk(250, 224, 0.34, -1, 520, 0.86, 0.58, 24, 0)]
+  // 遺物・攻撃: 元の sword-slash と同じ形 ── 傾いた楕円 (縦 0.6・傾き −0.38) の上を、 左の細い尾から、 上をまわって、 右下の切っ先まで 200 度。 半径だけ 42 → 165 に。
+  //   三日月に見えるのは、 弧が大きくまわるから。 大きな半径の短い弧では、 反りの無い「毛束」になった。 残像 (内側の細い 2 本目) は出さない ── この大きさでは二俣に見える (作者の指摘)
+  const moon = () => { const A = swing({ cx: 232, cy: 196, R: 165, sy: 0.6, rot: -0.38, a0: -2.55, dir: 1, span: 3.5, W: 40, t0: 0, sweep: 0.07, hold: 0.12, trail: 0.5, linger: 0.75, ramp: RAMP }); return { A, E: null, end: slashEnd(A) }; };
+  const CUTS = move === "relic-strike" ? [moon()]
     // 天与の剣: ×に交わる 2 太刀と、 盤を横に払う低い一太刀 (spear-sweep の「低く平たい払い」)
     : move === "tenyo-sword" ? [mk(240, 192, 0.52, -1, 700, 0.74, 0.55, 32, 0), mk(240, 192, Math.PI - 0.52, 1, 700, 0.74, 0.55, 32, 0.18),   /* 半径を大きく・弧を短く (小さい半径で長い弧だと、 斜めの一太刀ではなく U 字になる) */ mk(240, 246, 0, -1, 1100, 0.44, 0.5, 26, 0.38, 0.09)] : [];
   const THR = [[0, 196, false], [0.09, 286, false], [0.19, 240, true]];   // 突き: [始まる秒, 届く x, 決めの一突きか]
@@ -143,7 +146,8 @@ export function create(o) {
         for (const c of CUTS) {
           const A = c.A, u = t - A.t0;
           if (u < 0) continue;
-          bladeSlash(p, c.E, t); bladeSlash(p, A, t);
+          if (c.E) bladeSlash(p, c.E, t);
+          bladeSlash(p, A, t);
           // 切っ先のきらめき・頭に乗る光
           const g = u - A.sweep * 0.6;
           if (g > 0 && g < 0.24) sparkle(p, c.end.x, c.end.y, (big ? 30 : 20) * ease.outBack(Math.min(1, g / 0.05)) * (1 - g / 0.24), RAMP[5], RAMP[3], 0.7);
