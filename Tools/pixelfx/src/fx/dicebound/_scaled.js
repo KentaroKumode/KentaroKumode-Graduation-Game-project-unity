@@ -30,7 +30,8 @@ function muted(drop, fn) {
   if (!drop || !drop.length) return fn();
   const add = Bits.prototype.add, spawn = Particles.prototype.spawn, chunk = drop.includes("CHUNK"), grit = drop.includes("GRIT");
   Bits.prototype.add = function (b) { if (chunk && b && b.kind === B.CHUNK) return undefined; return add.call(this, b); };
-  Particles.prototype.spawn = function (k, ...rest) { if (grit && k === P.GRIT) return undefined; return spawn.call(this, k, ...rest); };
+  const kinds = drop.filter((n) => n !== "CHUNK" && n !== "GRIT" && P[n] !== undefined).map((n) => P[n]);   // ほかの粒 ("STAR" など) も名前で止められる
+  Particles.prototype.spawn = function (k, ...rest) { if ((grit && k === P.GRIT) || kinds.includes(k)) return undefined; return spawn.call(this, k, ...rest); };
   try { return fn(); } finally { Bits.prototype.add = add; Particles.prototype.spawn = spawn; }
 }
 
@@ -38,19 +39,21 @@ function muted(drop, fn) {
  * 元の効果 SRC を、 K 倍・画面の at に (元の座標の anchor が来るように)・speed 倍の速さで流す物を作る。
  * opts = 元の効果へ渡す設定 (palette など)。 返り値は create() が返す形 ({ update, draw })。
  */
-export function scaledFx(SRC, { K = 3, at = [240, 136], anchor = [0, 0], speed = 1, delay = 0, life = 0, drop = null, rot = 0, opts = {} } = {}) {   // rot = 回す角度 (anchor を中心に)   // life = ループの効果を、 何秒で消すか (最後の 0.25 秒で網点で薄くなる)
+export function scaledFx(SRC, { K = 3, at = [240, 136], anchor = [0, 0], speed = 1, delay = 0, life = 0, drop = null, rot = 0, start = 0, end = 0, opts = {} } = {}) {   // start = 元の効果の何秒目から流すか (前半を飛ばす)・end = 何秒目で止めるか   // rot = 回す角度 (anchor を中心に)   // life = ループの効果を、 何秒で消すか (最後の 0.25 秒で網点で薄くなる)
   const o = resolveOptions(SRC.meta, opts), inner = SRC.create ? muted(drop, () => SRC.create(o)) : null, cr = Math.cos(rot), sr = Math.sin(rot), x = at[0] - (anchor[0] * cr - anchor[1] * sr) * K, y = at[1] - (anchor[0] * sr + anchor[1] * cr) * K, D = SRC.meta.duration;
   let t = -delay;
+  if (start > 0) { if (inner && inner.update) muted(drop, () => { for (let q = 0; q < start; q += 1 / 120) inner.update(1 / 120); }); }
+  const T0 = start, END = end || D;
   return {
-    done: () => t > D,
+    done: () => t + T0 > END,
     update(dt) { const was = t; t += dt * speed; if (t > 0 && inner && inner.update) muted(drop, () => inner.update(was < 0 ? t : dt * speed)); },
     draw(p) {
-      if (t < 0 || (!SRC.meta.loop && t > D) || (life && t > life)) return;
+      if (t < 0 || (!SRC.meta.loop && t + T0 > END) || (life && t > life)) return;
       const f = p.fade;
       if (life) p.fade = f * Math.min(1, t / 0.15, (life - t) / 0.25);
       withScale(p, K, x, y, () => {
         if (inner) { if (inner.drawBack) inner.drawBack(p); inner.draw(p); }
-        else { if (SRC.drawBack) SRC.drawBack(p, t, o); SRC.draw(p, t, o); }
+        else { if (SRC.drawBack) SRC.drawBack(p, t + T0, o); SRC.draw(p, t + T0, o); }
       }, rot);
       p.fade = f;
     },

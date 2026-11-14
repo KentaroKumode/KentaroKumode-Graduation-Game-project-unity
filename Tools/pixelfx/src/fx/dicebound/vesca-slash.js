@@ -23,6 +23,15 @@ export const meta = {
     palette: ["#1c1236", "#3a2470", "#5a3aa8", "#8a64e0", "#b89cf8", "#e4d8ff", "#ffffff"],
     sparks: ["#ffffff", "#e4d8ff", "#b89cf8", "#8a64e0"],
     radius: 42 * K,
+    // 敵の汎用の斬撃 (foes.js の longsword) 用: 既定は今までどおり
+    noise: 1,        // 流れの筋の強さ
+    glow: 1,         // 縁の光・頭の光・きらめきの強さ
+    echo: true,      // 内側の細い残像
+    glints: true,    // 縁の上でまたたく十字
+    a0: -2.55, a1: 0.95,   // 弧の始まりと終わり
+    sy: -0.6, rot: 0.38,   // 楕円のつぶれと傾き
+    width: 12 * K,   // 太さ
+    sweep: 0.07,     // 振り抜く時間
     seed: 2,
   },
 };
@@ -37,7 +46,7 @@ function onArc(s, r, a) {
 // cooling down the ramp with age and towards the tail; the tail dissolves through the dither
 function crescent(p, s, ta, L, W, age) {
   if (Math.abs(L) < 0.02 || W < 0.3) return;
-  const R = s.ramp, n = R.length, dir = Math.sign(L), span = Math.abs(L), c = Math.cos(s.rot), sn = Math.sin(s.rot), B = s.R + 2;
+  const R = s.ramp, n = R.length, dir = Math.sign(L), span = Math.abs(L), c = Math.cos(s.rot), sn = Math.sin(s.rot), B = s.R + 2, NZ = s.noise ?? 1, GL = s.glow ?? 1;
   p.shade(s.cx - B, s.cy - B, s.cx + B, s.cy + B, (x, y, out) => {
     const dx = x - s.cx, dy = y - s.cy, lx = dx * c + dy * sn, ly = (-dx * sn + dy * c) / s.sy, r = Math.hypot(lx, ly);
     if (r > s.R + 0.5 || r < s.R - W - 1) return;
@@ -53,15 +62,15 @@ function crescent(p, s, ta, L, W, age) {
     if (d < 0 || d > wi) return;
     const q = d / wi, young = age < 0.6;
     // 外の縁: 白 2 ドット + いちばん明るい色 1 ドット (太さの割合ではなく、 ドットで決める ── 大きくしても細く鋭いまま)。 その内側は元の段に、 筋を足す
-    const ci = d < 2.2 && young ? 0 : d < 3.4 && young ? 1 : Math.round(q * (n - 1) * 0.75 + age * 2.4 - v * 0.8 + 0.4 + (strand > 0.42 ? -1.1 : strand < -0.5 ? 0.9 : 0));   // 筋は控えめに (作者: ノイズ感はもう少し薄く)
+    const ci = d < 2.2 && young ? 0 : d < 3.4 && young ? 1 : Math.round(q * (n - 1) * 0.75 + age * 2.4 - v * 0.8 + 0.4 + (NZ >= 1 ? (strand > 0.42 ? -1.1 : strand < -0.5 ? 0.9 : 0) : (strand > 0.42 + (1 - NZ) * 0.3 ? -1 : 0)));   // 筋は控えめに (作者: ノイズ感はもう少し薄く)
     out.c = R[n - 1 - clamp(ci, 0, n - 1)];
     // 尾の方では、 内側が筋にほどけて抜ける (べたの面を残さない)
-    out.a = q > 0.35 && fine < -0.38 - v * 0.7 ? 0 : Math.min(1, v / 0.4);
-    if (d < 3 && young) { out.l = R[n - 1]; out.k = 0.7 * (1 - age); }   // 縁の光
+    out.a = q > 0.35 && fine < -0.38 - v * 0.7 - (1 - NZ) * 0.45 ? 0 : Math.min(1, v / 0.4);
+    if (d < 3 && young) { out.l = R[n - 1]; out.k = 0.7 * GL * (1 - age); }   // 縁の光
   });
   for (let u = 0; u <= span; u += 0.3) {
     const [x, y] = onArc(s, s.R - W * 0.4, ta + dir * u);
-    p.glow(x, y, 5 + W, R[n - 3], 0.22 * (1 - age) * (u / span));
+    p.glow(x, y, 5 + W, R[n - 3], 0.22 * GL * (1 - age) * (u / span));
   }
 }
 
@@ -88,10 +97,10 @@ function tipOf(s) {
 
 export function create(o) {
   const C = fit(o.palette, 7), Rg = new Rng(o.seed), ps = new Particles({ rng: Rg, sparks: o.sparks });
-  const R0 = o.radius, a0 = -2.55, a1 = 0.95;
+  const R0 = o.radius, a0 = o.a0, a1 = o.a1;
   // the main smear, and a thinner echo just inside it a beat behind
   // 下向き (2026-11-14 作者の指定): 楕円を上下に返す (sy を負に・傾きも逆に)。 弧が上ではなく下をまわり、 白い縁がこちらの盤の側を向く
-  const A = { cx: 6 * K, cy: -26 * K, R: R0, sy: -0.6, rot: 0.38, a0, a1, W: 12 * K, t0: 0, sweep: 0.07, hold: 0.12, trail: 0.5, ramp: C };
+  const A = { cx: 6 * K, cy: -26 * K, R: R0, sy: o.sy, rot: o.rot, a0, a1, W: o.width, t0: 0, sweep: o.sweep, hold: 0.12, trail: 0.5, ramp: C, noise: o.noise, glow: o.glow };
   const E = { ...A, R: R0 * (33 / 42), W: R0 * (4.5 / 42), a0: a0 + (a1 - a0) * 0.1, a1: a1 - (a1 - a0) * (0.15 / 3.5), t0: 0.017, hold: 0.08, trail: 0.42, ramp: C.slice(0, 6) };
   const tip = tipOf(A);
   let t = 0, landed = false;
@@ -118,17 +127,17 @@ export function create(o) {
       ps.update(dt);
     },
     draw(p) {
-      drawSlash(p, E, t);
+      if (o.echo) drawSlash(p, E, t);
       drawSlash(p, A, t);
       // the tip glints as the edge arrives
       const g = t - A.sweep * 0.6;
-      if (g > 0 && g < 0.3) sparkle(p, tip.x, tip.y, 9 * K * ease.outBack(Math.min(1, g / 0.05)) * (1 - g / 0.3), C[5], C[3], 0.6);
+      if (g > 0 && g < 0.3) sparkle(p, tip.x, tip.y, 9 * K * o.glow * ease.outBack(Math.min(1, g / 0.05)) * (1 - g / 0.3), C[5], C[3], 0.6);
       // 輝き: 縁の上の 4 か所で、 十字のきらめきが順にまたたく (頭が通った直後から)
-      for (const [k, d] of [[0.42, 0.05], [0.6, 0.09], [0.76, 0.13], [0.9, 0.17]]) { const g2 = t - d; if (g2 > 0 && g2 < 0.3) { const [x, y] = onArc(A, A.R - 1, A.a0 + (A.a1 - A.a0) * k); sparkle(p, x, y, 14 * Math.sin((g2 / 0.3) * Math.PI), C[6], C[4], 0.6); } }
+      if (o.glints) for (const [k, d] of [[0.42, 0.05], [0.6, 0.09], [0.76, 0.13], [0.9, 0.17]]) { const g2 = t - d; if (g2 > 0 && g2 < 0.3) { const [x, y] = onArc(A, A.R - 1, A.a0 + (A.a1 - A.a0) * k); sparkle(p, x, y, 14 * Math.sin((g2 / 0.3) * Math.PI), C[6], C[4], 0.6); } }
       // light rides the head of the swing
       if (t < 0.3) {
         const [x, y] = onArc(A, A.R - 4, A.a0 + (A.a1 - A.a0) * ease.outExpo(clamp(t / A.sweep)));
-        p.glow(x, y, 40 * K * 0.7, C[3], 0.5 * (1 - t / 0.3));
+        p.glow(x, y, 40 * K * 0.7, C[3], 0.5 * o.glow * (1 - t / 0.3));
       }
       ps.draw(p);
     },
