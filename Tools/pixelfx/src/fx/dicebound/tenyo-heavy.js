@@ -55,8 +55,10 @@ export function create(o) {
   // 剣の発動の部品 (元の効果を、 式を触らずに置く): God rays (全画面)・落ちる光 (Holy smite)・着地の衝撃 (Ground pound)・インパクトフレーム (全画面)
   const sw = gift !== "sword" ? null : {
     rays: scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, opts: {} }),   // 出どころ (0,−170) × 1.5 = 画面の一番上の真ん中
-    smite: scaledFx(SMITE, { K: 2.2, at: [BOARD[0], BOARD[1]], delay: TH + SWORD.mark - T0, opts: { palette: GOLD } }),
-    slam: scaledFx(SLAM, { K: 1.7, at: [BOARD[0], BOARD[1]], delay: TH + SWORD.land - T0, opts: { palette: GOLD } }),
+    // 落ちる光と着地の衝撃は、 God rays とインパクトフレームに負けないよう、 大きく・重ねて (作者の指定): 光は 3.6 倍・衝撃は 2.8 倍 + 一拍遅れてもっと大きい 2 つ目
+    smite: scaledFx(SMITE, { K: 3.6, at: [BOARD[0], BOARD[1]], delay: TH + SWORD.mark - T0, glow: 1.4, opts: { palette: GOLD } }),
+    slam: scaledFx(SLAM, { K: 2.8, at: [BOARD[0], BOARD[1]], delay: TH + SWORD.land - T0, glow: 1.3, opts: { palette: GOLD } }),
+    slam2: scaledFx(SLAM, { K: 4.2, at: [BOARD[0], BOARD[1] + 6], delay: TH + SWORD.land + 0.14 - T0, opts: { palette: GOLD, seed: 11 } }),
     impact: scaledFx(IMPACT, { K: 1.5, at: [240, 135], delay: TH + SWORD.land - T0, opts: {} }),
   };
   // 集まる粒: 行き先へ、 外から吸い込まれる (王のチャージと同じ考え方。 数は少なく、 ゆっくり)
@@ -186,12 +188,12 @@ export function create(o) {
       if (sw) {
         // 剣: 日食が強まって画面が暗くなる (暗さはゲームの側で掛ける) → God rays が徐々に出る → 暗さが解ける → 印 → 光が落ちる + 着地の衝撃 + インパクトフレーム → 白飛び
         const f = p.fade, hot = clamp(a / 0.5), rk = clamp((a - SWORD.rays[0]) / (SWORD.rays[1] - SWORD.rays[0])), gone = clamp((a - SWORD.land) / 0.5);
-        p.fade = f * rk * (1 - clamp((a - SWORD.white) / 0.6)); sw.rays.draw(p);
+        p.fade = f * rk * (1 - clamp((a - SWORD.land) / 0.25)); sw.rays.draw(p);   // 光が着いたら、 God rays は引く (着弾を主役に)
         // 暗転は、 日食も含めて全部を黒くする (作者の指定): 日食と注ぐ光も、 画面と同じ暗さで消える。 黒の中に God rays だけが出て来る
         let dk = 0; for (let i = 1; i < SWORD.dark.length; i++) { const [t0, v0] = SWORD.dark[i - 1], [t1, v1] = SWORD.dark[i]; if (a >= t0 && a <= t1) dk = v0 + (v1 - v0) * (a - t0) / (t1 - t0); }
         p.fade = f * (1 - dk); if (a < SWORD.dark[1][0]) held(p, a, 0, hot);   // 真っ黒になった後は、 日食も注ぐ光も出さない (作者: 暗転後は日食を消してよい)
         p.fade = f;
-        sw.smite.draw(p); sw.slam.draw(p); sw.impact.draw(p);
+        sw.impact.draw(p); sw.slam2.draw(p); sw.slam.draw(p); sw.smite.draw(p);   // インパクトフレームは下に敷き、 落ちる光と衝撃を上に
         const wt = a - SWORD.white, wk = wt < 0 ? 0 : clamp(1 - (wt - 0.15) / 0.3);
         if (wk > 0) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { p.put(x, y, WHITE, wk * wk); p.add(x, y, WHITE, wk * wk); }
         return;
