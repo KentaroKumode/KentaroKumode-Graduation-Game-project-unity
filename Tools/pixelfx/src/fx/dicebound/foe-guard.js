@@ -28,7 +28,7 @@ export const meta = {
 };
 
 let CX = 0, RX = 64, RY = 136;
-const GRID = 4.4; // lattice density
+const GRID = 2.3;   // 網目は荒く・線はか細く (作者の指定) // lattice density
 const HIT = { lon: 0, lat: 0.6 }, GONE = 0.8; // where the ripple starts; when the dome starts to blink out
 
 // a point on the dome's surface (lon round from facing us, lat up from the floor) to local space
@@ -56,7 +56,7 @@ export function create(o) {
         const z = Math.sqrt(1 - q) * (back ? -1 : 1), lon = Math.atan2(u, z), lat = Math.asin(clamp(v));
         // the lattice, and which cell this is: each cell keeps its own clock for blinking out
         const a = (lon + lat) * GRID, b = (lon - lat) * GRID, fa = a - Math.floor(a), fb = b - Math.floor(b);
-        const cell = rand(Math.floor(a), Math.floor(b), 31), line = Math.min(fa, 1 - fa, fb, 1 - fb) < 0.045;   // 格子の線を細く (作者の指定。 元は 0.13)
+        const cell = rand(Math.floor(a), Math.floor(b), 31), line = Math.min(fa, 1 - fa, fb, 1 - fb) < 0.022;   // 格子の線を細く (作者の指定。 元は 0.13)
         const gone = GONE + cell * 0.35;
         if (t > gone) continue;
         // how far over the surface from the blow, and the two ripples running out from it

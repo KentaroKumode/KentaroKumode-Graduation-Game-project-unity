@@ -35,14 +35,14 @@ const PLAN = {
   // ロングソード (騎士・スケルトン・蛇鱗の戦士): ヴェスカの斬撃を、 武骨に。 筋と光を弱め、 残像ときらめきを外し、 弧を短く・太く・少し遅く (上手すぎて見えないように)
   "longsword": [[VSLASH, { K: 1, at: [196, 250], anchor: [0, 0], drop: ["STAR", "MOTE"], opts: { noise: 0.3, glow: 0.3, echo: false, glints: false, a0: -2.15, a1: 0.5, sy: -0.48, rot: 0.52, width: 54, sweep: 0.1, radius: 136 } }]],
   // ダガー (その他の刃物): 短剣の通常を大きく。 3 太刀だけ・間がばらつく・振りが遅い・締めの一太刀なし・光は弱く (達人に見えないように)
-  "dagger": [[DAGGER, { K: 5, at: [240, 196], anchor: [28, -27], speed: 0.75, drop: ["STAR"], opts: { palette: IRON, sparks: ["#ffffff", "#e4e0ea", "#b8b2c0", "#8a8494"], flow: 5, bloom: 0.25, count: 3, every: 0.15, finish: false, clumsy: 1 } }]],
-  "claw": [[CLAW, { K: 4.2, at: HIT, anchor: [40, -24], speed: 0.7, opts: {} }]],
+  "dagger": [[DAGGER, { K: 5, at: [240, 196], anchor: [28, -27], speed: 0.75, drop: ["STAR"], opts: { palette: IRON, sparks: ["#ffffff", "#e4e0ea", "#b8b2c0", "#8a8494"], flow: 5, bloom: 0.25, count: 3, every: 0.1, gather: 0.3, finish: false, clumsy: 1 } }]],
+  "claw": [[CLAW, { K: 4.2, at: [266, 205], anchor: [40, -24], speed: 0.7, opts: {} }]],
   "blunt": [[HAMMER, { K: 3, at: [240, 228], anchor: [26, 0], speed: 1, start: 0.15, drop: DEBRIS, opts: {} }]],   // 振りかぶりは流さず、 当たった所から
   "missile": [[MISSILES, { K: 1, at: [0, 0], anchor: [0, 0], opts: {} }]],
   "fire": [[SUMMON, { K: 2.4, at: FEET, anchor: [0, 0], speed: 2.6, end: 1.35, opts: {} }], [FIRERING, { K: 1, at: FEET, anchor: [0, 0], speed: 1.5, delay: 0.4, opts: { reach: 150 } }]],   // 敵の足もと
   // ---- 13 番目の死
   "decree": [[CURSE, { K: 1.6, at: FEET, anchor: [0, 0], speed: 1.3, opts: { width: 62, height: 75 } }]],   // どくろは、 敵の体の高さ (height × K) の上に出る
-  "decree-reap": [[SCYTHE, { K: 3.4, at: [240, 222], anchor: [30, -14], speed: 0.8, opts: {} }]],
+  "decree-reap": [[SCYTHE, { K: 3.4, at: [282, 222], anchor: [30, -14], speed: 0.8, opts: {} }]],
   // ---- 補助
   "heal": [[HEALRING, { K: 1.5, at: FEET, anchor: [0, 0], speed: 1.6, opts: {} }]],
   "drain": [[DRAIN, { K: 3, at: [240, 238], anchor: [0, 0], speed: 1.1, opts: {} }], [CROSSES, { K: 3, at: FEET, anchor: [0, 0], opts: { t0: 0.7, count: 16, width: 40, height: 42 } }]],
