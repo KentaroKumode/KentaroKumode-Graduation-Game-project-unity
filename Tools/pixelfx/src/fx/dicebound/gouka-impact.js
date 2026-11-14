@@ -47,12 +47,12 @@ export function create(o) {
   // 床の炎の置き場所: 輪を 11 px おきに。 前線が来た時に点火し、 中心は一瞬で消え、 縁は長く燃える
   const sites = [];
   for (let r = 22; r <= REACH; r += 13) {
-    const per = TAU * Math.sqrt((r * r + (r * SY) ** 2) / 2), n = Math.max(6, Math.round(per / 12));
+    const per = TAU * Math.sqrt((r * r + (r * SY) ** 2) / 2), n = Math.max(8, Math.round(per / 5.5));      // 輪に沿って詰める (薄い輪でも、 炎が途切れて見えないように)
     for (let k = 0; k < n; k++) {
       const a = ((k + R.range(0.15, 0.85)) / n) * TAU, rr = r + R.range(-3.5, 3.5), q = Math.min(1, rr / REACH);
       const x = Math.cos(a) * rr, y = Math.sin(a) * rr * SY, z = depth(y), s = near(z);
       if (y < 0 && Math.abs(x) < o.body) continue;      // 敵の体の後ろ
-      if (R.chance(0.45 * (1 - q))) continue;           // 中心に近いほど、 まばらに
+      if (R.chance(0.5 * (1 - q) * (1 - q))) continue;  // 中心のごく近くだけ、 まばらに
       sites.push({ x, y, z, far: y < 0, t0: reachedAt(rr) + R.range(0, 0.04), life: (q > 0.88 ? R.range(0.75, 1.15) * (1 + 0.05 * ASH) : R.range(0.14, 0.22)),      // 走る間は一瞬だけ燃え、 いちばん外の輪だけが燃え残る (輪を薄く)
         h: R.range(10, 17) * (0.6 + 0.55 * q) * s, w: R.range(1.9, 2.8) * (0.75 + 0.3 * q) * s, n: R.int(0, 1e5) });
     }
