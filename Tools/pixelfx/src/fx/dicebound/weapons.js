@@ -32,8 +32,8 @@ const PLAN = {
   "sword-normal": [[BLADE, { K: 2.6, at: E, anchor: [10, -28], speed: 0.65, opts: { palette: STEEL } }]],
   "sword-crit": [[SPIN, { K: 3.2, at: E, anchor: [0, -26], speed: 0.65, opts: { palette: GOLD } }], [DOUBLE, { K: 3.2, at: E, anchor: [34, -23], speed: 0.65, delay: 0.3, opts: { palette: GOLD } }]],
   // 斧: 縦に振り下ろす (作者: 横から殴らない)。 刃の軌跡 (chop) が真上から敵の足もとへ落ち、 着いた所に 通常 = heavy-landing / 会心 = ground-slam
-  "axe-normal": [[LANDING, { K: 2.6, at: FEET, anchor: [0, 0], speed: 1.3, delay: 0.1, opts: { palette: IRON } }], [CHOP, { K: 2.4, at: FEET, anchor: [-8, 0], speed: 0.65, opts: { palette: IRON, flow: 2.4 } }]],
-  "axe-crit": [[SLAM, { K: 1.9, at: FEET, anchor: [0, 0], speed: 2.0, delay: 0.1, opts: { palette: BLOOD } }], [CHOP, { K: 2.8, at: FEET, anchor: [-8, 0], speed: 0.65, opts: { palette: BLOOD, heavy: true, flow: 2.8, sparks: ["#ffffff", "#ffd0c0", "#ff7a5a", "#e0302c"] } }]],
+  "axe-normal": [[LANDING, { K: 2.6, at: FEET, anchor: [0, 0], speed: 1.3, delay: 0.1, opts: { palette: STEEL } }], [CHOP, { K: 2.4, at: FEET, anchor: [-8, 0], speed: 0.65, opts: { palette: STEEL, flow: 2.4, sparks: ["#ffffff", "#e8f1ff", "#b8c9e8", "#62c8f4"] } }]],   // 色は剣の通常と同じ (鋼の青白)
+  "axe-crit": [[SLAM, { K: 1.9, at: FEET, anchor: [0, 0], speed: 2.0, delay: 0.1, opts: { palette: GOLD } }], [CHOP, { K: 2.8, at: FEET, anchor: [-8, 0], speed: 0.65, opts: { palette: GOLD, heavy: true, flow: 2.8, sparks: ["#ffffff", "#fff0a0", "#ffd25e", "#f0a040"] } }]],   // 色は剣の会心と同じ (金)
   "dagger-normal": [[FLURRY, { K: 2.4, at: E, anchor: [34, -28], speed: 0.75, opts: { palette: VENOM } }]],
   "dagger-crit": [[REAP, { K: 2.6, at: E, anchor: [20, -30], speed: 1.5, opts: { palette: NIGHT } }], [FLURRY, { K: 2.8, at: E, anchor: [34, -28], speed: 0.8, delay: 0.35, opts: { palette: NIGHT } }]],
   "shield-normal": [[BLUNT, { K: 3.4, at: E, anchor: [0, -22], speed: 0.75, opts: {} }]],

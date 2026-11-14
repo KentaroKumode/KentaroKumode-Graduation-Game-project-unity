@@ -8,10 +8,10 @@ src = io.open(os.path.join(PFX, "lab", "moves_board.py"), encoding="utf-8").read
 exec(src[src.index("def stage():"):src.index("def frames(")])      # 舞台を借りる
 # (武器, 色の組, [(id, 見出し, 絵の一言)])
 PLAN = [("剣", "steel", [("sword-normal", "通常", "一太刀 (Sword slash + 流れの筋を少し)"), ("sword-crit", "会心", "ぐるりと一周 + 交差する二太刀 (Spin slash + Double slash)・金")]),
-        ("斧", "ash", [("axe-normal", "通常", "縦に振り下ろす + 着地の土煙 (Heavy landing)"), ("axe-crit", "会心", "太く縦に振り下ろす + 地面が割れる (Ground slam)・血の色")]),
+        ("斧", "steel", [("axe-normal", "通常", "縦に振り下ろす + 着地の土煙 (Heavy landing)・剣の通常と同じ色"), ("axe-crit", "会心", "太く縦に振り下ろす + 地面が割れる (Ground slam)・剣の会心と同じ金")]),
         ("短剣", "poison", [("dagger-normal", "通常", "小さな連撃 (Dagger flurry)・毒の緑"), ("dagger-crit", "会心", "刈り取る三日月 + 連撃 (Scythe reap + Dagger flurry)・夜の紫")]),
         ("盾", "steel", [("shield-normal", "通常", "盾で殴る (Blunt hit)"), ("shield-crit", "会心", "受けた重さを返す (Parry + Blunt hit)・金")])]
-INK = {"sword-crit": "holy", "axe-crit": "blood", "dagger-crit": "null", "shield-crit": "holy"}
+INK = {"sword-crit": "holy", "axe-crit": "holy", "dagger-crit": "null", "shield-crit": "holy"}
 base = stage(); html = []; thumbs = []
 for fam, ink, moves in PLAN:
     html.append("<h2>%s</h2>" % fam)

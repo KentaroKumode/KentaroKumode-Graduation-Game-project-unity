@@ -42,8 +42,10 @@ function chopSlash(p, s, t, FLOW) {
       const ci = q < 0.22 && age < 0.5 ? 0 : Math.round(q * (n - 1) * 0.75 + age * 2.4 - v * 0.8 + 0.4 + (strand > 0.45 ? -1 : strand < -0.55 ? 0.9 : 0));
       out.c = R[n - 1 - clamp(ci, 0, n - 1)];
       out.a = Math.min(1, v / 0.4);
+      // 縁の発光 (2026-11-14 作者: 剣のように発光を足す): 外の縁の細い帯に、 光を乗せる
+      if (s.R - r < 1 && age < 0.65) { out.l = R[n - 1]; out.k = 0.8 * (1 - age); }
     });
-    glowAlong(p, s, s.R - W * 0.4, T, U, 5 + W, R[n - 3], (uu) => 0.24 * (1 - age) * ((uu - T) / (U - T)), 0, 0.3);
+    glowAlong(p, s, s.R - W * 0.4, T, U, 7 + W, R[n - 3], (uu) => 0.42 * (1 - age) * ((uu - T) / (U - T)), 0, 0.3);
   }
   const th = 0.7 * (1 - clamp((u - s.sweep - s.hold) / (s.trail + 0.2)));
   if (tail > 0.02 && th > 0) trace(p, s, s.R - 0.5, 0, T, R[2], (uu) => th * (0.4 + 0.6 * uu / s.span));
@@ -72,7 +74,7 @@ export function create(o) {
       chopSlash(p, A, t, o.flow);
       const g = t - A.sweep * 0.6;
       if (g > 0 && g < 0.22) sparkle(p, end.x, end.y, (big ? 12 : 9) * ease.outBack(Math.min(1, g / 0.05)) * (1 - g / 0.22), C[5], C[3], 0.6);
-      if (t < 0.3) { const [x, y] = onSwing(A, A.R - 4, A.span * ease.outExpo(clamp(t / A.sweep))); p.glow(x, y, 40, C[3], 0.5 * (1 - t / 0.3)); }
+      if (t < 0.3) { const [x, y] = onSwing(A, A.R - 4, A.span * ease.outExpo(clamp(t / A.sweep))); p.glow(x, y, 46, C[3], 0.6 * (1 - t / 0.3)); p.glow(x, y, 16, C[5], 0.5 * (1 - t / 0.3)); }
       ps.draw(p);
     },
   };
