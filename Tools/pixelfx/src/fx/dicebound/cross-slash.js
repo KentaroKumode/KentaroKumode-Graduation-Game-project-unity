@@ -1,10 +1,10 @@
 // DICE BOUND 用 (2026-11-14): 交差する二太刀 (剣の段 3・段 4)。 melee/double-slash の写しで、 **違うのは斬撃の塗りだけ**。
 // 元は、 斬撃の中を色の段で塗る。 この画面の大きさに広げると、 内側のべた塗りが目立って見た目が悪い (作者の指摘)。
-// 回転切り (spin-slash) のように: 振り抜く一瞬と、 ×が閉じて白く光る一瞬だけべたに塗り、 そのあとは**中を抜いて、 外の縁と内の縁だけ**を残す (中空 = 抜き感)。
+// 回転切り (spin-slash) と同じ作りにした: 太いのは頭のすぐ後ろだけで、 通った所はすぐ痩せる → ×が閉じると全体が白い帯で光る → 細って、 冷めて、 点線にほどける (中空 = 抜き感)。
 // 動き・形・火花・交点の光は元のまま。 _scaled.js で大きくして使う (weapons.js)。
 // The crescent, trace, glint and spark recipe is adapted from Sprite Fusion's open-source slash
 // (https://www.spritefusion.com/pixel-art-vfx/slash), MIT License, Copyright (c) 2026 Hugo Duprez.
-import { Particles, Lights, P, Rng, fit, sparkle, flare, clamp, smooth, ease, WHITE } from "../../core/index.js";
+import { Particles, Lights, P, Rng, fit, sparkle, flare, clamp, ease, rand, WHITE } from "../../core/index.js";
 import { through, smear, trace, glowAlong, slashEnd, shavings, sliver } from "../melee/_lib.js";
 
 export const meta = {
@@ -24,33 +24,45 @@ export const meta = {
   },
 };
 
-const RIM = 0.9;   // 縁の太さ (元の座標で。 2.8 倍に広げて、 画面の 2.5 ドットほど)
+const FLARE = 0.3;   // ×が閉じてから、 白く光って、 細って、 点にほどけるまで (spin-slash と同じ)
 
-/** melee/_lib の slash() と同じ動き。 塗りだけ違う: solid (振り抜く一瞬と、 白く光る間) はべた、 それ以外は外の縁と内の縁だけ。 */
-function hollowSlash(p, s, t) {
+/**
+ * melee/spin-slash の中空の作り方を、 そのまま 1 本の斬撃に当てた物 (2026-11-14 作者: 中空の方法は Spin slash をしっかり参照)。 spin-slash は「縁だけ残す」のではなく:
+ *   1. 振っている間: 太いのは頭のすぐ後ろだけ。 縁が通ってから時間が経った所は、 幅が 3 割まで痩せる (exp(−経過 / 0.075))。 色も、 経過で一気に冷める (経過 × 13 段)。
+ *   2. 閉じた瞬間 (tFlare): 弧の全体が、 太い白い帯になって光る (最初の 13%)。 少し外へ膨らみながら、 (1 − f)^1.5 で細り、 1 段ずつ冷め、 最後は網点で薄くなる。
+ *   3. そのあと: 通った跡の点線が、 所々欠けながら残って消える。
+ */
+function ringSlash(p, s, t, tFlare) {
   const u = t - s.t0;
   if (u < 0) return;
-  const R = s.ramp, n = R.length, life = s.sweep + s.hold + s.trail, hot = s.hot ?? 0;
-  const head = ease.outExpo(clamp(u / s.sweep)), tail = smooth(s.sweep + s.hold, life, u), age = clamp(u / life);
-  const U = s.span * head, T = s.span * tail, W = s.W * (1 - tail * 0.55), solid = hot > 0 || u < s.sweep + 0.03;
-  if (tail < 1 && U - T > 0.01) {
-    smear(p, s, T, U, W, (uu, r, out) => {
-      const v = (uu - T) / (U - T), w = W * Math.pow(Math.sin(Math.PI * v), 0.75);   // 真ん中が一番太い (元の lens)
-      if (w < 0.35) return;
-      const d = s.R - r, q = d / w;
+  const R = s.ramp, n = R.length, head = ease.outExpo(clamp(u / s.sweep)), U = s.span * head, f = (t - tFlare) / FLARE;
+  const passed = (frac) => s.sweep * Math.min(1, -Math.log2(Math.max(1e-3, 1 - frac)) / 10);   // 縁が、 弧の frac の所を通った時刻 (outExpo の逆)
+  if (f < 0 && U > 0.02) {
+    smear(p, s, 0, U, s.W, (uu, r, out) => {
+      const age = u - passed(uu / s.span), lead = U - uu;
+      const w = s.W * Math.pow(clamp(lead / (s.span * 0.22)), 0.5) * (0.3 + 0.7 * Math.exp(-age / 0.075)) * Math.pow(clamp(uu / (s.span * 0.3)), 0.7);
+      if (w < 0.45) return;
+      const q = (s.R - r) / w;
       if (q < 0 || q > 1) return;
-      const outer = d < RIM, inner = d > w - RIM * 0.7 && w > RIM * 2.4;
-      if (!solid && !outer && !inner) return;   // 中空
-      let ci;
-      if (solid) ci = (q < 0.22 && age < 0.5) || q < hot * 0.7 ? 0 : Math.round(q * (n - 1) * 0.75 + age * 2.4 - v * 0.8 + 0.4 - hot * 3);
-      else ci = outer ? (age < 0.45 ? 0 : age < 0.75 ? 1 : 2) : 2 + Math.round(age * 2);   // 外の縁は白 → 冷める・内の縁は 2 段暗い
+      const ci = q < 0.26 && age < 0.06 ? 0 : Math.round(q * (n - 1) * 0.7 + age * 13 + 0.4);
       out.c = R[n - 1 - clamp(ci, 0, n - 1)];
-      out.a = Math.min(1, v / 0.1);
+      out.a = Math.min(1, uu / (s.span * 0.3) + 0.2);
     });
-    glowAlong(p, s, s.R - W * 0.4, T, U, 5 + W, R[n - 3], (uu) => (0.22 + hot * 0.3) * (1 - age) * ((uu - T) / (U - T)), 0, 0.3);
+    glowAlong(p, s, s.R - s.W * 0.3, 0, U, 14, R[3], (uu) => 0.3 * Math.exp(-(u - passed(uu / s.span)) / 0.08), 0, 0.3);
+  } else if (f >= 0 && f < 1) {
+    const RR = s.R + 2.2 * ease.outCubic(f), th = f < 0.13 ? s.W * 0.56 : Math.max(1, s.W * 0.375 * Math.pow(1 - f, 1.5) + 0.5), S = { ...s, R: RR }, step = f < 0.13 ? 6 : f < 0.3 ? 5 : f < 0.55 ? 4 : 3;
+    smear(p, S, 0, U, th, (uu, r, out) => {
+      const w = th * Math.pow(Math.sin(Math.PI * clamp(uu / s.span)), 0.5);   // 両端は細る (弧は閉じた輪ではないので)
+      if (w < 0.4) return;
+      const q = (RR - r) / w;
+      if (q < 0 || q > 1) return;
+      out.c = f < 0.13 ? (q < 0.6 ? WHITE : R[5]) : q < 0.45 ? R[step] : R[step - 1];
+      out.a = f < 0.4 ? 1 : 1.3 - f;
+    });
+    glowAlong(p, S, RR - 2, 0, U, 14, R[4], 0.32 * (1 - f) * (1 - f), 0, 0.3);
   }
-  const th = 0.7 * (1 - clamp((u - s.sweep - s.hold) / (s.trail + 0.2)));
-  if (tail > 0.02 && th > 0) trace(p, s, s.R - 0.5, 0, T, R[2], (uu) => th * (0.4 + 0.6 * uu / s.span));
+  const k = 1 - clamp((t - tFlare - 0.06) / 0.4);
+  if (f >= 0 && k > 0) trace(p, s, s.R - 0.5, 0, s.span, R[4], (uu) => clamp(k * 1.5 - rand(Math.floor(uu * 30), 5) * 0.8) * 0.95);
 }
 
 const UP = 0.14; // the second cut starts
@@ -98,8 +110,9 @@ export function create(o) {
       // both strokes flash white for two frames when the X closes
       const flash = t >= CLOSE && t < CLOSE + 0.07 ? 1 : 0;
       down.hot = up.hot = flash;
-      hollowSlash(p, down, t);
-      hollowSlash(p, up, t);
+      // ×が閉じる = 2 太刀目が交点を越えた頃。 2 本とも、 そこで白く光る
+      ringSlash(p, down, t, CLOSE + 0.03);
+      ringSlash(p, up, t, CLOSE + 0.03);
       // glints at the ends of the strokes
       for (const [s, e] of [[down, ends[0]], [up, ends[1]]]) {
         const g = t - s.t0 - s.sweep * 0.6;
