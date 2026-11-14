@@ -79,9 +79,9 @@ export function create(o) {
   const shWings = gift === "shield" ? scaledFx(RESURRECT, { K: 2.6, at: [240, 196], start: 0.95, delay: TH + SHIELD.open + 0.1 - T0, glow: 0.6, opts: { palette: GOLD, wings: false, halo: false } }) : null;   // 翼と光輪は出さない (作者: 消してみて)。 残るのは、 注ぐ光・床の光・きらめき
   // 発動の後の球: holy/divine-shield を、 そのまま (作者: 球の見た目は Divine shield を正確に写す)。 式も設定も元のまま、 大きさだけ (元の半径 29 → 87)。 前の版の、 moves の tenyo-shield (光の柱を足した物) は使わない
   const shBubble = gift === "shield" ? scaledFx(DSHIELD, { K: 3, at: [240, 202], life: 2.2, delay: TH + SHIELD.open + 0.2 - T0, opts: {} }) : null;
-  // 羽根が弾ける (holy/feather-burst): 範囲を広く・量を少なく (作者の指定)。 広げて置き (3.6 倍)、 羽根は 3 枚に 1 枚だけ出させる (元のコードは触らず、 羽根を足す口を、 作る間だけ間引く)
+  // 羽根が弾ける (holy/feather-burst): 範囲を広く・量を少なく (作者の指定)。 広げて置き (3.6 倍)、 羽根は 3 枚に 2 枚出させ、 大きさは広げた大きさの 4 分の 1 (作者: 量を 2 倍・大きさを半分に) (元のコードは触らず、 羽根を足す口を、 作る間だけ間引く)
   let shFeathers = null;
-  if (gift === "shield") { const add = Feathers.prototype.add; let n = 0; Feathers.prototype.add = function (f) { return n++ % 3 === 0 ? add.call(this, f) : undefined; }; try { shFeathers = scaledFx(FEATHERS, { K: 3.6, at: [240, 124], delay: TH + SHIELD.open + 0.35 - T0, glow: 0.5, opts: {} }); } finally { Feathers.prototype.add = add; } }
+  if (gift === "shield") { const add = Feathers.prototype.add; let n = 0; Feathers.prototype.add = function (f) { return n++ % 3 !== 2 ? add.call(this, f) : undefined; }; try { shFeathers = scaledFx(FEATHERS, { K: 3.6, at: [240, 124], delay: TH + SHIELD.open + 0.35 - T0, glow: 0.5, opts: {} }); } finally { Feathers.prototype.add = add; } }
   const shImpact = gift === "shield" ? scaledFx(IMPACT, { K: 1.5, at: [240, 135], delay: TH + SHIELD.open - T0, opts: {} }) : null;
   const sw = gift !== "sword" ? null : {
     rays: scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, opts: {} }),   // 出どころ (0,−170) × 1.5 = 画面の一番上の真ん中
@@ -270,7 +270,7 @@ export function create(o) {
       const wt = a - 0.33, wk = gift === "shield" ? 0.55 * clamp(1 - wt / 0.3) : 0;
       if (a >= T_LEAD) {
         if (pay) pay.draw(p);
-        if (shWings) { fineFeathers(1 / 2.6, 0.7, () => shWings.draw(p)); shBubble.draw(p); fineFeathers(1 / 3.6, 0.5, () => shFeathers.draw(p)); }   // 散る羽根は、 飛ぶ範囲はそのまま、 羽根だけ小さく・細い線で   // 光の翼 → その上に球
+        if (shWings) { fineFeathers(1 / 2.6, 0.7, () => shWings.draw(p)); shBubble.draw(p); fineFeathers(1 / 3.6, 0.25, () => shFeathers.draw(p)); }   // 散る羽根は、 飛ぶ範囲はそのまま、 羽根だけ小さく・細い線で   // 光の翼 → その上に球
         const b = a - T_LEAD;
         if (gift === "shield") {
           for (const d of [0, 0.12, 0.26]) { const q = (b - d) / 0.55; if (q > 0 && q < 1) oval(p, 240, BODY[1], SR + 240 * ease.outCubic(q), SR + 240 * ease.outCubic(q), 3 * (1 - q) + 1, q < 0.35 ? WHITE : C[5], 1 - q); }
