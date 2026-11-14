@@ -11,10 +11,15 @@ import { held as coreHeld, HELD_SEED } from "./gouka-charge.js";   // 王のチ�
 import { GOLD } from "../holy/_lib.js";
 import { W, H, BOARD, beam, oval, diamond, wash } from "./_kit.js";
 import * as MOVES from "./moves.js";
+import * as ECLIPSE from "../shadow/eclipse.js";
+import * as BLESSING from "../holy/blessing.js";
+import { glint } from "./chevalier-charge.js";
+import { scaledFx } from "./_scaled.js";
 
 export const T_CHARGE = 1.4, T_HELD = 1.5, T_LEAD = 0.45;   // チャージ・待機の 1 周・発動の溜め (光る → 落ちる → 白)
 const BODY = [240, 136], RING_Y = 96, SUCK = 1.05;   // SUCK = 吸い込みが終わる時刻 (その後 0.35 秒で、 待機の姿に落ち着く)
-const GUARD_Y = 24, BLADE = 118, SR = 88;   // 剣のつばの高さ・刃の長さ・盾の球の半径
+const GUARD_Y = 24, BLADE = 118, SR = 88;
+const SUN = [240, 44], SUN_K = 1.5;   // 剣: 頭上の日食の中心と倍率 (元の月の半径 19 → 28)   // 剣のつばの高さ・刃の長さ・盾の球の半径
 
 export const meta = {
   name: "Tenyo heavy (DICE BOUND)",
@@ -22,7 +27,7 @@ export const meta = {
   tags: ["dicebound", "boss", "heavy", "one-shot"],
   size: [W, H],
   origin: [0, 0],
-  duration: T_CHARGE + T_HELD + T_LEAD + 2.0,
+  duration: T_CHARGE + 3 + T_LEAD + 2.0,
   loop: false,
   fps: 30,
   bg: "dark",
@@ -48,12 +53,17 @@ function sword(p, C, x, y0, len, w, hot = 0, k = 1) {
 
 export function create(o) {
   const C = fit(o.palette, 8), R = new Rng(o.seed), gift = o.gift, part = o.part;
-  const T0 = part === "charged" ? T_CHARGE : part === "heavy" ? T_CHARGE + T_HELD : 0;   // どこから流すか
-  const TH = T_CHARGE + T_HELD, TP = TH + T_LEAD;   // 発動の始まり・全画面の始まり
+  const HELD_T = gift === "sword" ? 3 : T_HELD;   // 待機の 1 周: 剣は 3 秒 (Blessing の 1 周 3 秒・Eclipse は 4 秒を 3 秒に速めて揃える)
+  const T0 = part === "charged" ? T_CHARGE : part === "heavy" ? T_CHARGE + HELD_T : 0;   // どこから流すか
+  const TH = T_CHARGE + HELD_T, TP = TH + T_LEAD;   // 発動の始まり・全画面の始まり
   const pay = MOVES.create(resolveOptions(MOVES.meta, { move: "tenyo-" + gift, seed: o.seed }));
   // 集まる粒: 行き先へ、 外から吸い込まれる (王のチャージと同じ考え方。 数は少なく、 ゆっくり)
   const F = fit(o.palette, 9);
-  const [gx, gy] = gift === "sword" ? [240, GUARD_Y] : gift === "shield" ? BODY : [240, RING_Y];   // 芯 (白い玉と十字) の位置: 剣 = つば・盾 = 体の中心・指輪 = 輪の中心
+  const [gx, gy] = gift === "sword" ? SUN : gift === "shield" ? BODY : [240, RING_Y];   // 粒が集まる先: 剣 = 頭上の日食・盾 = 体の中心・指輪 = 輪の中心
+  // 剣のチャージ (作者の指定): ヴェスカに holy/blessing (上から注ぐ光の円錐) + 頭上に shadow/eclipse (色は Blessing の金を基準) + 粒が集まる。 2 つとも式はそのまま、 大きさと色だけ (_scaled.js)
+  const SUNPAL = ["#0b0608", "#3b1d2a", "#7a3a2c", "#c4652e", "#f0a040", "#ffd25e", "#fff0a0", "#ffffff"];
+  const ecl = gift === "sword" ? scaledFx(ECLIPSE, { K: SUN_K, at: SUN, speed: 4 / 3, opts: { palette: SUNPAL, pearl: ["#f0a040", "#ffd25e", "#fff0a0", "#fffbe0"] } }) : null;
+  const bless = gift === "sword" ? scaledFx(BLESSING, { K: 2.4, at: [240, 196], opts: { palette: GOLD } }) : null;
   const ps = new Particles({ rng: R, sparks: [WHITE, C[6], C[5], C[3]] });
   // 渦を巻いて寄る粒 (王のチャージと同じ作り・数も同じくらい)
   const grit = Array.from({ length: 70 }, () => { const t0 = R.range(0, SUCK - 0.4); return { a: R.range(0, TAU), d: R.range(70, 250), t0, T: R.range(0.4, Math.max(0.45, SUCK - 0.05 - t0)), spin: R.sign() * R.range(0.4, 1.2), c: R.pick([C[3], C[4], C[5], C[6]]) }; });
@@ -80,22 +90,21 @@ export function create(o) {
       p.line(gx + Math.cos(a - q.spin * 0.1) * d2, gy + Math.sin(a - q.spin * 0.1) * d2 * 0.7, x, y, q.c);
     }
     const cr = 1.5 + 5 * k * k;
-    p.circle(gx, gy, cr + 1.6, k > 0.6 ? C[5] : C[3]); p.circle(gx, gy, cr, k > 0.35 ? WHITE : C[6]);
+    if (gift !== "sword") { p.circle(gx, gy, cr + 1.6, k > 0.6 ? C[5] : C[3]); p.circle(gx, gy, cr, k > 0.35 ? WHITE : C[6]); }
     p.glow(gx, gy, 14 + 40 * k, C[4], 0.25 + 0.5 * k);
   }
   // 待機の姿 (チャージの終わりと、 待機のループの両方がこれを描く。 位置は動かない)。 ti = ループの時刻・boost = 完了の瞬間・hot = 発動の溜め
   function held(p, ti, boost = 0, hot = 0, grow = 1) {
-    const ph = ((ti % T_HELD) + T_HELD) % T_HELD / T_HELD, pulse = 0.5 + 0.5 * Math.sin(ph * TAU * 2);
+    const ph = ((ti % HELD_T) + HELD_T) % HELD_T / HELD_T, pulse = 0.5 + 0.5 * Math.sin(ph * TAU * 2);
     if (gift === "sword") {
-      const len = BLADE * grow, y0 = GUARD_Y;
-      if (grow >= 1) {   // 切っ先から盤へ光が落ち、 盤の上に狙いの輪が脈を打つ (ここへ落ちる)
-        beam(p, C, 240, y0 + len, 240, 250, 3, 16, 0.2 + 0.12 * pulse + 0.4 * hot);
-        for (const [rr, kk] of [[70, 1], [46, 0.7]]) { const r = rr * (0.9 + 0.1 * pulse); oval(p, BOARD[0], BOARD[1], r, r * 0.2, 2, kk > 0.8 ? C[6] : C[4], 0.5 + 0.4 * pulse); }
-        for (let i = 0; i < 12; i++) { const g = (i / 12) * TAU + ph * TAU; p.dot(BOARD[0] + Math.cos(g) * 70, BOARD[1] + Math.sin(g) * 14, WHITE); p.dot(BOARD[0] + Math.cos(g) * 70 + 1, BOARD[1] + Math.sin(g) * 14, WHITE); }
-        p.glow(BOARD[0], BOARD[1], 60, C[4], 0.14 + 0.1 * pulse);
-      }
-      sword(p, C, 240, y0, len, 9 + 3 * hot, hot + boost, 1);
-      for (let i = 0; i < 14; i++) { const a = (ph + i / 14) % 1, x = 240 + (rand(i, 3) - 0.5) * 34, y = y0 + len - a * (len + 14); p.dot(x, y, a < 0.5 ? WHITE : C[6], (1 - a) * grow); }   // 刃に沿って昇るきらめき
+      // ヴェスカに注ぐ光 (Blessing): 日食が出来てから、 後半で降りて来る。 頭上の日食 (Eclipse): 吸い込みと一緒に現れる。 完了の瞬間と発動の溜めでは、 縁の光の玉 (ダイヤモンドリング) が強く走る
+      const f = p.fade;
+      p.fade = f * clamp((grow - 0.45) / 0.5); bless.draw(p); bless.draw(p);   // 2 度重ねる: 元の光は淡く、 この液晶の色の段では円錐がまだらにしか出ないため (光を倍に)
+      p.fade = f * clamp(grow * 1.6); ecl.draw(p);
+      p.fade = f;
+      const bxx = SUN[0] + Math.cos(-0.72) * 19.4 * SUN_K, byy = SUN[1] + Math.sin(-0.72) * 19.4 * SUN_K;
+      if (boost > 0.02 || hot > 0.02) glint(p, C, bxx, byy, 12 + 120 * boost * boost + 40 * hot);
+      p.glow(SUN[0], SUN[1], 70 + 60 * boost + 40 * hot, C[4], 0.12 * grow + 0.35 * boost + 0.3 * hot);
     } else if (gift === "shield") {
       rings.forEach((r, i) => {
         const on = clamp((grow * 1.1 - r.at) / 0.1);
@@ -121,7 +130,7 @@ export function create(o) {
       if (grow >= 1) { oval(p, BOARD[0], BOARD[1], 200 * (0.96 + 0.04 * pulse), 22, 1, C[4], 0.4 + 0.3 * pulse); for (let i = 0; i < 16; i++) { const g = (i / 16) * TAU - ph * TAU / 2; p.dot(BOARD[0] + Math.cos(g) * 200, BOARD[1] + Math.sin(g) * 22, WHITE); } }   // 盤の上に、 締まる先の輪がうっすら
       p.glow(240, y, 60 + 80 * boost, C[4], 0.1 + 0.3 * boost + 0.2 * hot);
     }
-    if (grow >= 1) core(p, ti, boost);
+    if (grow >= 1 && gift !== "sword") core(p, ti, boost);   // 剣は、 芯の代わりに日食がある
   }
 
   return {
@@ -129,6 +138,7 @@ export function create(o) {
       t += dt;
       if (t < SUCK - 0.15) { const k = t / SUCK; for (let n = 0; n < 1 + Math.floor(k * 5); n++) { if (!R.chance(0.85)) continue; const a = R.range(0, TAU), D = R.range(80, 240) * (1 - 0.25 * k), T = R.range(0.2, 0.36), v = (D * 3) / (Math.exp(3 * T) - 1); ps.spawn(P.STREAK, gx + Math.cos(a) * D, gy + Math.sin(a) * D * 0.7, -Math.cos(a) * v, -Math.sin(a) * v * 0.7, T, R.chance(0.5) ? C[6] : C[4]); } }
       ps.update(dt);
+      if (ecl) { ecl.update(dt); bless.update(dt); }
       if (t > TP) { const d = Math.min(dt, t - TP); payT += d; pay.update(d); }
     },
     draw(p) {
