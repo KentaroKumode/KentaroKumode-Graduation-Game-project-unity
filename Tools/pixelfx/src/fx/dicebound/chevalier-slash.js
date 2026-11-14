@@ -2,7 +2,7 @@
 // きらめきが鋭く伸びる → 一点に消えて、 真っ暗な一拍 → 白く焼けた刃の縁が、 画面全体を斜めに切り裂いて抜ける (transitions/slash-wipe の前半)。
 // 画面全体 (480×270)・原点は左上 (ここでは全部、 画面の左上からの座標)。
 // 作り (transitions/slash-wipe の前半 = 1 太刀目): 斜めの刃の縁 (白い 1 ドット → 冷める色の段の尾)・縁の前の光・縁が噛む所から後ろへ噴く火花と削り屑・縁に乗る光・一拍遅れの点線。
-// 変えた所: 画面を覆う黒を置かない (切られた後ろは素通し ── ゲーム側の暗転を、 縁の後ろから晴らす)・尾を太く (最大 8 → 46 ドット。 480 幅で 1 秒 8 コマでも読めるように)・2 太刀目と割れる所は使わない。
+// 変えた所: 縁の後ろを、 黒ではなく青白い光で満たす (闇を切り開いた中が光っている。 刃が抜けたら消える ── ゲーム側の暗転は、 縁の後ろから晴らす)・尾を太く (最大 8 → 46 ドット。 480 幅で 1 秒 8 コマでも読めるように)・2 太刀目と割れる所は使わない。
 // The blade edge, its cooling smear, the light ahead of it, the sparks and shavings and the dotted echo are adapted from this repository's transitions/slash-wipe
 // (after Sprite Fusion's open-source slash, https://www.spritefusion.com/pixel-art-vfx/slash), MIT License, Copyright (c) 2026 Hugo Duprez.
 import { Particles, Lights, P, Rng, fit, clamp, ease, WHITE } from "../../core/index.js";
@@ -26,6 +26,7 @@ export const meta = {
     lead: 0.75,     // 切る前の溜め (秒): きらめきが伸びて、 消えて、 暗い一拍
     sweep: 0.45,    // 刃が画面を渡る秒 (速く始まって、 抜け際に遅くなる)。 キレ優先で短く (元の slash-wipe は 0.62)
     tail: 46,       // 尾の太さの上限 (px)
+    fade: 0.25,     // 刃が抜けた後、 切り開かれた側の光が消えるまでの秒
     seed: 2,
   },
 };
@@ -67,6 +68,20 @@ export function create(o) {
         return;
       }
       const e = edgeAt(t), sp = speedAt(t), Ls = clamp(sp * 0.03, 3, o.tail), echo = clamp(sp / 900) * 0.6;
+      // 切り開かれた側 (縁の後ろ) は、 青白い光で満ちる (2026-11-14 作者の指摘: 後ろが素通しだと、 切り開いたのに片側が欠けて見える)。
+      // 縁に近いほど白く濃く、 離れるほど青く、 網点でほどけていく。 刃が抜けた後、 0.25 秒で全体が消える
+      const K = 1 - clamp((t - T0 - SWEEP) / o.fade), far = W * 0.9;
+      if (K > 0)
+        for (let y = 0; y < H; y++) {
+          const xe = xAt(e, y + 0.5), ia = clamp(Math.floor(xe - 4 / CS), 0, W), streak = ((y * 37) % 11 === 0 ? 1 : 0) + ((y * 53) % 17 === 0 ? 1 : 0);
+          for (let x = 0; x < ia; x++) {
+            const u = clamp(((xe - (x + 0.5)) * CS - 4) / far);   // 0 = 縁のすぐ後ろ・1 = 遠い
+            // 行ごとの筋 (速さの線): 所々の行だけ 1 段明るい
+            const lv = clamp(Math.round(6 - u * 3.2) + (streak && u < 0.75 ? 1 : 0), 3, 7);
+            p.put(x, y, C[lv], (1 - 0.55 * u) * K);
+            p.add(x, y, C[5], 0.3 * (1 - u) * K);
+          }
+        }
       if (sp > 0)
         for (let y = 0; y < H; y++) {
           const xe = xAt(e, y + 0.5), ia = clamp(Math.floor(xe - (Ls + 12) / CS), 0, W), ib = clamp(Math.ceil(xe + HALO / CS), 0, W);
@@ -82,10 +97,7 @@ export function create(o) {
             if (d < 2) p.put(x, y, WHITE);
             else if (d < 4) p.put(x, y, C[6]);
             else {
-              // 尾: 縁から離れるほど冷める。 最後は網点でほどける (黒では覆わない)
-              const q = (d - 4) / Ls;
-              if (q < 1) p.put(x, y, q < 0.3 ? C[5] : q < 0.55 ? C[4] : q < 0.8 ? C[3] : C[2], q < 0.6 ? 1 : 1 - (q - 0.6) / 0.4);
-              if (echo > 0 && Math.abs(d - Ls - 9) < 0.5 && (x + y) % 3 === 0) p.put(x, y, C[4], echo);   // 一拍遅れの点線
+              // 縁の後ろは、 上で塗った光がそのまま続く (白 → 青白 → 青。 元の「冷める尾」は、 光の中で暗い帯になるので使わない)
             }
             if (d < Ls + 4) p.add(x, y, C[5], 0.3 * (1 - d / (Ls + 4)));
           }
