@@ -3,7 +3,7 @@
 // 作り: 元の効果を、 式を書き直さずに、 この画面の大きさで流す (_scaled.js)。 変えるのは、 大きさ・置く場所・色・速さだけ。 会心は、 大きく・手数が多く・色が強い。
 //   剣:   通常 = 一太刀 (sword-slash + 流れの筋) / 会心 = ぐるりと一周 (spin-slash) + 交差する二太刀 (double-slash を中空に)・金
 //   斧:   通常 = 縦の振り下ろし (chop) + 着地の土煙 (heavy-landing) / 会心 = 太い縦の振り下ろし + 地面が割れる (ground-slam)・血の色
-//   短剣: 通常 = 小さな連撃 (dagger-flurry)・毒の緑 / 会心 = 刈り取る大きな三日月 (scythe-reap) + 連撃・夜の紫
+//   短剣: 通常 = 小さな連撃 (dagger-flurry・縁が光る塗り) / 会心 = 真横の大きな斬撃 (中空) + 連撃・金
 //   盾:   通常 = 盾で殴る (blunt-hit) / 会心 = 受けた重さを返す (parry + blunt-hit)・金
 // (最初は段 2 / 3 / 4 の 12 個で作った。 段 3 の絵 ── 交差する二太刀だけ・血の色の振り下ろし・突き・盤を包む球 ── は、 この版では使っていない)
 import * as BLADE from "./blade-slash.js";   // melee/sword-slash の写し (流れの筋を少し足した版)
@@ -12,8 +12,7 @@ import * as SPIN from "../melee/spin-slash.js";
 import * as CHOP from "./chop.js";
 import * as LANDING from "../impacts/heavy-landing.js";
 import * as SLAM from "../impacts/ground-slam.js";
-import * as FLURRY from "../melee/dagger-flurry.js";
-import * as REAP from "../melee/scythe-reap.js";
+import * as DAGGER from "./dagger.js";   // melee/dagger-flurry の写し (縁が光る塗り・会心は真横の大きな斬撃つき)
 import * as BLUNT from "../impacts/blunt-hit.js";
 import * as PARRY from "../impacts/parry.js";
 import { scaledFx } from "./_scaled.js";
@@ -35,8 +34,8 @@ const PLAN = {
   // 斧: 縦に振り下ろす (作者: 横から殴らない)。 刃の軌跡 (chop) が真上から敵の足もとへ落ち、 着いた所に 通常 = heavy-landing / 会心 = ground-slam
   "axe-normal": [[LANDING, { K: 2.6, at: FEET, anchor: [0, 0], speed: 1.3, delay: 0.1, drop: DEBRIS, opts: { palette: STEEL } }], [CHOP, { K: 2.4, at: FEET, anchor: [-8, 0], speed: 0.65, opts: { palette: STEEL, flow: 2.4, sparks: ["#ffffff", "#e8f1ff", "#b8c9e8", "#62c8f4"] } }]],   // 色は剣の通常と同じ (鋼の青白)
   "axe-crit": [[SLAM, { K: 1.9, at: FEET, anchor: [0, 0], speed: 2.0, delay: 0.1, drop: DEBRIS, opts: { palette: GOLD } }], [CHOP, { K: 2.8, at: FEET, anchor: [-8, 0], speed: 0.65, opts: { palette: GOLD, heavy: true, flow: 2.8, sparks: ["#ffffff", "#fff0a0", "#ffd25e", "#f0a040"] } }]],   // 色は剣の会心と同じ (金)
-  "dagger-normal": [[FLURRY, { K: 2.4, at: E, anchor: [34, -28], speed: 0.75, opts: { palette: VENOM } }]],
-  "dagger-crit": [[REAP, { K: 2.6, at: E, anchor: [20, -30], speed: 1.5, opts: { palette: NIGHT } }], [FLURRY, { K: 2.8, at: E, anchor: [34, -28], speed: 0.8, delay: 0.35, opts: { palette: NIGHT } }]],
+  "dagger-normal": [[DAGGER, { K: 2.6, at: E, anchor: [28, -27], speed: 0.75, opts: { palette: STEEL, sparks: ["#ffffff", "#e8f1ff", "#b8c9e8", "#62c8f4"], flow: 2.6 } }]],   // 色は剣の通常と同じ
+  "dagger-crit": [[DAGGER, { K: 3.0, at: E, anchor: [27, -27], speed: 0.72, opts: { palette: GOLD, sparks: ["#ffffff", "#fff0a0", "#ffd25e", "#f0a040"], wide: true, flow: 3, bloom: 1.7 } }]],   // 色は剣の会心と同じ
   "shield-normal": [[BLUNT, { K: 3.4, at: E, anchor: [0, -22], speed: 0.75, opts: {} }]],
   "shield-crit": [[PARRY, { K: 3.4, at: E, anchor: [0, -30], speed: 0.75, opts: { palette: GOLD } }], [BLUNT, { K: 3.8, at: E, anchor: [0, -22], speed: 0.8, delay: 0.12, opts: {} }]],
 };

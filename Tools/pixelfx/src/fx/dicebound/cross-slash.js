@@ -32,7 +32,7 @@ const FLARE = 0.3;   // ×が閉じてから、 白く光って、 細って、 
  *   2. 閉じた瞬間 (tFlare): 弧の全体が、 太い白い帯になって光る (最初の 13%)。 少し外へ膨らみながら、 (1 − f)^1.5 で細り、 1 段ずつ冷め、 最後は網点で薄くなる。
  *   3. そのあと: 通った跡の点線が、 所々欠けながら残って消える。
  */
-function ringSlash(p, s, t, tFlare) {
+export function ringSlash(p, s, t, tFlare) {
   const u = t - s.t0;
   if (u < 0) return;
   const R = s.ramp, n = R.length, head = ease.outExpo(clamp(u / s.sweep)), U = s.span * head, f = (t - tFlare) / FLARE;
