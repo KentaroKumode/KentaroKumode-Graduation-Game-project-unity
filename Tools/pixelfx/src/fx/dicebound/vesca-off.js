@@ -10,8 +10,8 @@ export const meta = screenMeta({
   name: "Vesca signal lost (DICE BOUND)",
   desc: "The picture squeezes into a white-hot glowing line, the line into a dot that lingers as a fading afterglow; then it switches back on, dot to line to picture, with a warm-up glow.",
   tags: ["crt", "tv", "retro", "switch", "wipe"],
-  duration: 2.0,
-  options: { palette: ["#0a0614", "#1c1236", "#3a2470", "#5a3aa8", "#8a64e0", "#b89cf8", "#e4d8ff", "#ffffff"], color: "#05040a", start: 0.34, seed: 1 },   // start = 元の効果の何秒目から始めるか (0.34 = 絵がもう 1 本の線に潰れた所)
+  duration: 3.4,
+  options: { palette: ["#0a0614", "#1c1236", "#3a2470", "#5a3aa8", "#8a64e0", "#b89cf8", "#e4d8ff", "#ffffff"], color: "#05040a", start: 0.34, dark: 1.3, seed: 1 },   // dark = 消えた後、 点き直すまで真っ暗なままの秒 (余韻。 元の効果は 0.2 秒で点き直す ── 2026-11-14 作者の指摘: 再起動が早すぎる)   // start = 元の効果の何秒目から始めるか (0.34 = 絵がもう 1 本の線に潰れた所)
 });
 
 const YC = H / 2, XC = W / 2;
@@ -29,7 +29,9 @@ function shape(t) {
 }
 
 export function draw(p0, t0, o) {
-  const t = t0 + (o.start ?? 0);
+  // 点が消えた所 (DOT1 の少し後) で時刻を止めて、 dark 秒待つ。 その間、 中心に残光がごく薄く残って、 ゆっくり消える
+  const raw = t0 + (o.start ?? 0), STOP = DOT1 + 0.1, dark = o.dark ?? 0, t = raw <= STOP ? raw : Math.max(STOP, raw - dark);
+  if (raw > STOP && raw < STOP + dark) { const u = (raw - STOP) / dark; clipTo(p0).glow(XC, YC, 26 - 14 * u, fit(o.palette, 8)[4], 0.3 * (1 - u) ** 2); }
   const C = fit(o.palette, 8), ink = hex(o.color), p = clipTo(p0), { h, w } = shape(t), fl = 0.85 + 0.15 * rand(Math.floor(t * 30), 7, o.seed);
   if (t >= OPEN1 + 0.02 && t < OPEN1 + 0.6) {
     // switched on: a warm-up glow over the picture, a bright refresh band rolling down it once, scanlines

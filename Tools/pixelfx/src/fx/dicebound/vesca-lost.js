@@ -24,6 +24,6 @@ export function draw(p, t, o) {
   if (k > 0.25) clock(p, C, -dx * 1.6, 0, NOON - a + 0.5, NOON + a - 0.4, 1, C[3]);   // 影 (逆へずれる・暗い)
   if (k > 0.55) clock(p, C, dx * 2.2, 0, NOON - a - 0.7, NOON + a + 0.9, 1, C[4]);
   const tx = p.tx; p.tx = tx + dx;
-  held(p, C, tv, 1, k > 0.85 && f % 2 ? WHITE : null);
+  held(p, C, tv, 1, k > 0.85 && f % 2 ? WHITE : null, true);   // 4 段目の待機 (壊れかけ) から続く
   p.tx = tx;
 }
