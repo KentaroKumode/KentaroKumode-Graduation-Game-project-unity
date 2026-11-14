@@ -129,7 +129,7 @@ namespace UI.Game2D.Battle
             GameManager.BattleResultHeldByScreen = want && Active && phase != P.Won && phase != P.Lost;
             if (!want)
             {
-                if (Active) { Active = false; fx.SimDriven = false; if (Game2DBattleFx.Showing) fx.Show(false); }
+                if (Active) { Active = false; fx.SimDriven = false; if (Game2DBattleFx.Showing) fx.Show(false); fx.ClearPreload(); FxSheet.UnloadAfterBattle(); }      // 戦闘の画面を離れた: 大きい絵 (ボスの大技・技) を捨てる
                 return;
             }
             if (!Active)
@@ -200,6 +200,7 @@ namespace UI.Game2D.Battle
             fx.SetEnemyHp(cm.EnemyHP, cm.EnemyMaxHP);
             fx.WeaponIndex = WeaponIndexOf(GameManager.Instance?.Run?.equippedWeaponId);
             fx.WeaponSheetFamily = SheetFamilyOf(GameManager.Instance?.Run?.equippedWeaponId);
+            PreloadForFight(cm);
             _chevPhase = -1; _blazeStacks = 0; _flameShown = false;
             for (int i = 0; i < slot.Length; i++) slot[i] = -1;
             board.Clear(); target = new int[0]; preview = null; lastOutcome = null; focusSlot = -1;
@@ -855,8 +856,8 @@ namespace UI.Game2D.Battle
             // ダウン (または周期がずれた) で大技が来なくなった: 待機を止めて暗幕を戻す
             if (fx.BossIdling && (down || heavyIn != 0)) fx.BossCancel();
             // 絵を先に読む (全画面のコマが多い・敵の行動の瞬間に読むと一瞬止まる): チャージのターン = チャージと待機 / 大技のターン = 大技
-            if (charging) BossFx.Preload(kind, _blazeStacks, false);
-            else if (heavyIn == 0 && !down) BossFx.Preload(kind, _blazeStacks, true);
+            if (charging) fx.QueuePreload(BossFx.SheetNames(kind, _blazeStacks, false));
+            else if (heavyIn == 0 && !down) fx.QueuePreload(BossFx.SheetNames(kind, _blazeStacks, true));      // 王の烈炎の数が戦闘の入りと違う時の絵 (1 フレーム 1 枚・手番の間に読み終わる)
             if (kind == BossFx.Kind.King && regen > 0) fx.PlayMove("move-king-regen");
             if (kind == BossFx.Kind.Chevalier)
             {
@@ -881,6 +882,18 @@ namespace UI.Game2D.Battle
                     fx.PlayMove(sheet, at); at += Game2DBattleFx.MoveDuration(sheet);
                 }
             }
+        }
+
+        /// <summary>戦闘の入り (切り替わりと敵の出現の演出の間) に、 その戦闘で使う絵を先に読む: 毒・出血・会心・今の武器の家系の通常と会心・
+        /// ボスなら大技一式 (烈炎の数 0 の版・ヴェスカは 1〜3 段目と 4 段目の両方) と技の絵。 1 フレームに 1 枚ずつ (Game2DBattleFx.QueuePreload)。</summary>
+        private void PreloadForFight(CombatManager cm)
+        {
+            var list = new List<string> { "poison-tick", "bleed-tick", "crit-hit" };
+            if (fx.WeaponSheetFamily != null) { list.Add("weapon-" + fx.WeaponSheetFamily + "-normal"); list.Add("weapon-" + fx.WeaponSheetFamily + "-crit"); }
+            var kind = BossFx.KindOf(cm.CurrentEnemy?.id);
+            var kinds = kind == BossFx.Kind.Vesca ? new[] { BossFx.Kind.Vesca, BossFx.Kind.VescaFinal } : new[] { kind };
+            foreach (var k in kinds) { list.AddRange(BossFx.MoveNames(k)); list.AddRange(BossFx.SheetNames(k, 0, false)); list.AddRange(BossFx.SheetNames(k, 0, true)); }
+            fx.QueuePreload(list);
         }
 
         /// <summary>武器の絵の家系: items.json の family が剣・斧・短剣・盾の時だけ (id を綴りで切らない)。 素手・竜閃・それ以外は null (手描きの演出のまま)。</summary>

@@ -93,7 +93,7 @@ namespace UI.Game2D.Battle
         private static readonly float[] Speeds = { 1f, 0.5f, 0.25f, 0.1f };
         private float _guiShake;      // 会心の衝撃で GUI を揺らす強さ (1 → 0)
         // スプライトシートのエフェクト (FxSheet・試作 2026-11-01): 会心の命中で pixelfx の crit-hit を 1 回出す
-        private sealed class FxPlay { public FxSheet s; public float t; public int x, y; public bool add = true; }
+        private sealed class FxPlay { public FxSheet s; public float t; public int x, y; public bool add = true; public float life = -1f; }      // life ≥ 0 = その秒数で外す (ループの絵の試験再生)
         private readonly List<FxPlay> _fx = new List<FxPlay>();
         private FxSheet _critFx; private bool _critFxDone;
         private const int CritFxLift = 26;      // crit-hit の星は基準点 (足もと) から 26 dot 上 (書き出しの height)
@@ -112,6 +112,58 @@ namespace UI.Game2D.Battle
         /// <summary>戦闘の流れを止める絵 (審判の炎) が終わる時刻 (<see cref="_clockU"/>)。</summary>
         private float _blockUntil, _clockU;
         private int _bossTaken;
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        /// <summary>[演出テストの窓] 演出の時計の速さ (1 = 普段・0 = 一時停止) と、 次のフレームに 1 回だけ足す秒 (1 コマ送り = 0.125)。</summary>
+        public static float QaSpeed = 1f, QaStepSeconds;
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void QaResetSpeed() { QaSpeed = 1f; QaStepSeconds = 0f; }
+
+        /// <summary>[演出テストの窓] 任意の絵を 1 回流す。 画面全体の絵は左上に合わせ、 それより小さい絵は基準点を (ax, ay) に置く。 ループの絵は loopSeconds 秒で外す。</summary>
+        public void QaPlaySheet(string name, int ax, int ay, float loopSeconds = 4f)
+        {
+            Init(); Showing = true;
+            var s = FxSheet.Load(name); if (s == null) return;
+            bool full = s.W == W && s.H == H;
+            _fx.Add(new FxPlay { s = s, x = full ? s.PivotX : ax, y = full ? s.PivotY : ay, add = false, life = s.Loop ? loopSeconds : -1f });
+            QaNote(name + " (試験)");
+        }
+#endif
+
+        // ── 絵を先に読む (2026-11-14・FxSheet.Preload) ──
+        private readonly Queue<string> _preload = new Queue<string>();
+
+        /// <summary>先に読む絵を並べる (戦闘の入り・チャージや大技のターンの頭)。 1 フレームに 1 枚ずつ読む (全部を 1 フレームで読むと固まる)。 読んであれば何もしない。</summary>
+        public void QueuePreload(IEnumerable<string> names) { foreach (var n in names) if (!string.IsNullOrEmpty(n) && !FxSheet.IsLoaded(n) && !_preload.Contains(n)) _preload.Enqueue(n); }
+
+        /// <summary>戦闘の画面を離れた時: 先に読む予定を消し、 持っている絵の参照を放す (キャッシュからは FxSheet.UnloadAfterBattle が外す)。</summary>
+        public void ClearPreload() { _preload.Clear(); _boss.Clear(); _boss.OnHit = null; _fx.Clear(); _weaponSheet = null; _enemyMoveSheet = null; }
+
+        private void PreloadStep()
+        {
+            while (_preload.Count > 0)
+            {
+                var n = _preload.Dequeue();
+                if (FxSheet.IsLoaded(n)) continue;
+                FxSheet.Preload(n);
+                break;      // 1 フレームに 1 枚
+            }
+        }
+
+        // ── 大技の間の 1 フレームの最大時間 (確認用) ──
+        /// <summary>直近の大技 (BossHeavy から大技が終わるまで) の間の、 1 フレームの最大時間 (ミリ秒・Time.unscaledDeltaTime) と、 この部品の処理 (LateUpdate) の最大時間。</summary>
+        public static float QaHeavyMaxFrameMs, QaHeavyMaxFxMs;
+        private readonly System.Diagnostics.Stopwatch _frameSw = new System.Diagnostics.Stopwatch();
+        private bool _heavyMeasuring;
+        private void NoteHeavyFrame()
+        {
+            bool on = _boss.Busy || _boss.InHeavy;
+            if (on && !_heavyMeasuring) { QaHeavyMaxFrameMs = 0f; QaHeavyMaxFxMs = 0f; }
+            _heavyMeasuring = on;
+            if (!on) return;
+            QaHeavyMaxFrameMs = Mathf.Max(QaHeavyMaxFrameMs, Time.unscaledDeltaTime * 1000f);
+            QaHeavyMaxFxMs = Mathf.Max(QaHeavyMaxFxMs, (float)_frameSw.Elapsed.TotalMilliseconds);
+        }
         private bool _guiFxWas;
 
         /// <summary>ボスの大技の揺れ・暗転・赤・白飛びを、 外枠の GUI にも掛ける (2026-11-14・作者の指定・<see cref="Game2DGuiRt.SetBossFx"/>)。
@@ -327,18 +379,25 @@ namespace UI.Game2D.Battle
 
         private void LateUpdate()
         {
+            _frameSw.Restart();
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             DebugKeys();
 #endif
+            PreloadStep();
             if (!Showing) { if (plotQuad != null) plotQuad.enabled = false; if (_guiFxWas) { _guiFxWas = false; Game2DGuiRt.SetBossFx(false, 1f, 0f, 0f, Color.white, Vector2.zero); } return; }
             Init();
             float rawDt = Mathf.Min(0.05f, Time.unscaledDeltaTime);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // 演出テストの窓 (Tools/DICE BOUND/演出テスト) の速さ・一時停止・1 コマ送り。 既定 (速さ 1・送り 0) は何も変えない
+            if (QaSpeed != 1f || QaStepSeconds > 0f) { rawDt = rawDt * QaSpeed + QaStepSeconds; QaStepSeconds = 0f; }
+#endif
             float dt = rawDt * (_phase == Phase.PAttack ? _timeScale : 1f);
             _clockU += rawDt; _boss.Tick(rawDt);      // ボスの絵はヒットストップ・攻撃の速さ (T) に左右されない
             Tick(dt);
             Frame();
             PushGuiFx();
             Upload();
+            NoteHeavyFrame();
             if (plotQuad != null) plotQuad.enabled = true;
         }
 
@@ -835,7 +894,7 @@ namespace UI.Game2D.Battle
                 if (d.sz >= 5) _c.Rect(Mathf.RoundToInt(d.x) + 1, Mathf.RoundToInt(d.y) + 1, d.sz - 2, d.sz - 2, new Col(255, 255, 245), a, true);      // 大きい破片は芯が白い
             }
             foreach (var p in _sparks) { float a = Cl(1 - p.t / p.life, 0, 1); _c.Rect(Mathf.RoundToInt(p.x), Mathf.RoundToInt(p.y), 2, 2, p.c, a, true); }
-            _fx.RemoveAll(f => !f.s.Draw(_c, f.t, f.x, f.y, f.add));
+            _fx.RemoveAll(f => (f.life >= 0f && f.t >= f.life) || !f.s.Draw(_c, f.t, f.x, f.y, f.add));
         }
 
         // ── 敵の周りの印 (2026-11-11) ──
