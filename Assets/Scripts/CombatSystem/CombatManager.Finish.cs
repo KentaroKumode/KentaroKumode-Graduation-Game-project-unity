@@ -39,8 +39,15 @@ namespace CombatSystem
         public const int DaggerReflectMultiplier = 5;
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        /// <summary>[実機の確認用・2026-11-14] 今の戦闘を、 決着の処理 (OnCombatEnd・報酬・計装) を通さずに打ち切る。
-        /// 呼ぶのは <c>UI.Game2D.Battle.QaBattle.Restart</c> だけ (敵を替えて戦闘を始め直す前)。 判断待ちのターンも捨てる。</summary>
+        /// <summary>[実機の確認用・2026-11-15] 敵の HP を変える (1〜最大)。 呼ぶのは <c>UI.Game2D.Battle.QaBattle.SetEnemyHp</c> だけ (ヴェスカの形態移行を起こす時など)。</summary>
+        public void QaSetEnemyHp(int hp)
+        {
+            var ctx = PassiveSkillManager.Instance?.Context; if (!isCombatActive || ctx == null) return;
+            enemyHP = Math.Max(1, Math.Min(hp, EnemyMaxHP)); ctx.enemyCurrentHP = enemyHP;
+            Debug.Log($"[QaBattle] 敵の HP を {enemyHP} にした (確認専用)");
+        }
+
+        /// <summary>[実機の確認用・2026-11-14] 今の戦闘を、 決着の処理 (OnCombatEnd・報酬・計装) を通さずに打ち切る。</summary>
         public void QaAbortCombat()
         {
             if (!isCombatActive) return;

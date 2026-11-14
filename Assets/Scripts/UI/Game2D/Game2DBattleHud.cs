@@ -942,7 +942,8 @@ namespace UI.Game2D
             int en = live ? sim.enemyDiceCount : 3;
             for (int i = 0; i < en; i++) DrawDie(p, new RectInt(14 + i * 20, 16, 17, 17), live ? sim.ed[i] : i + 3, true);
             if (known && sim.down) p.Text(sim.downWeak ? "ダウン(ひび):攻撃なし" : "ダウン:攻撃なし", 14, 36, MarkHeavyHud);      // ボスのダウン (2026-11-13): 止まるのは攻撃だけ (パッシブは動く)・ひびで割れた弱いダウンは (ひび) (2026-11-14)
-            else if (known && sim.charging) p.Text("チャージ:攻撃なし", 14, 36, MarkHeavyHud);   // 大技のチャージ (2026-11-14): 攻撃しない (次のターンが大技・下の「次: 大技」)
+            else if (known && sim.charging) p.Text(sim.tenyo > 0 ? "チャージ:" + CombatSystem.TenyoHeavy.NameOf((CombatSystem.TenyoHeavy.Gift)sim.tenyo) : "チャージ:攻撃なし", 14, 36, MarkHeavyHud);      // ヴェスカの天与 (2026-11-15): どれが来るか
+            else if (known && sim.heavyIn == 0 && sim.tenyo > 0 && sim.eatk == 0) p.Text(CombatSystem.TenyoHeavy.NameOf((CombatSystem.TenyoHeavy.Gift)sim.tenyo) + ":攻撃なし", 14, 36, MarkHeavyHud);      // 天与の盾・指輪は攻撃しない   // 大技のチャージ (2026-11-14): 攻撃しない (次のターンが大技・下の「次: 大技」)
             else p.Text(known ? "攻撃 " + sim.eatk + (sim.burst > 0 ? "+" + sim.burst : "") : "攻撃 ??", 14, 36, known ? Atk : Dim);   // 〈業火〉の烈炎の分は軽減無視なので足し算で別に見せる
             if (known) p.Text("出目 " + sim.EnemyDiceSum, 14, 49, Dim);
             if (known && sim.edef > 0) p.Text("防御 " + sim.edef, 14, 62, Ink);      // 敵の防御 (構え・割れる/積み上がる装甲を反映した今の値)

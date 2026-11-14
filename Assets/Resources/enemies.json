@@ -1492,7 +1492,7 @@
       "baseAttack": 10,
       "attackRollMin": 2,
       "attackRollMax": 6,
-      "heavyPeriod": 5,
+      "heavyPeriod": 0,
       "heavyMul": 3.0,
       "heavyLightMul": 0.8
     },
@@ -1541,7 +1541,7 @@
       "baseAttack": 10,
       "attackRollMin": 2,
       "attackRollMax": 5,
-      "heavyPeriod": 5,
+      "heavyPeriod": 0,
       "heavyMul": 3.0,
       "heavyLightMul": 0.8
     },

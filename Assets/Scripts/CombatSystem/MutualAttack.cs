@@ -54,6 +54,8 @@ namespace CombatSystem
         /// <summary>このターンは大技のチャージで、 敵は攻撃しない (<see cref="Escalation.IsChargeNoAttack"/>・2026-11-14)。 攻撃値は 0 で載っている。
         /// ダウンのターンは false (ダウンの欄が出る)。</summary>
         public bool enemyCharging;
+        /// <summary>ヴェスカの天与 (2026-11-15・<see cref="TenyoHeavy.Gift"/> の番号・0 = 無し)。 チャージのターンと大技のターンに、 どの天与が来るか。</summary>
+        public int tenyoGift;
         /// <summary>このターンが灰燼の王の大技〈業火〉なら、 主攻撃とは別に入る烈炎の分 (烈炎の数 × BossParam.BlazeBurstPerStack・軽減無視・撃ったら烈炎 0・2026-11-14)。
         /// それ以外は 0。 <see cref="enemyAttackValue"/> には含まない (ブロックで減らない)。</summary>
         public int heavyBurst;

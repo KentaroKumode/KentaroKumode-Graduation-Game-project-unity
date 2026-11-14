@@ -10,7 +10,7 @@
 出力: <名前>.png.bytes (中身は PNG) と <名前>.json ({ frames: [{ frame, spriteSourceSize }], meta: { pixelfx: { id, fps, frames, frameSize, pivot, loop } } })。
 読む側は Assets/Scripts/UI/Game2D/Battle/FxSheet.cs。 ヴェスカの破片の形 (lab/shard_dump.mjs) と帯の表 (library/dicebound/vesca-tear.json) も同じ所へ写す。
 """
-import io, json, os, shutil, subprocess, sys, tempfile
+import io, json, math, os, shutil, subprocess, sys, tempfile
 from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -27,7 +27,10 @@ VESCA_PHASES = [0, 0.75, 1.5, 2.25]                             # 待機 (24 コ
 PLAN = []
 # 2026-11-15 (作者の決定「他のも 24 コマにする」): 全部 1 秒 24 コマで焼く (効果の式は 30 fps で動いているので、 焼く刻みだけが変わる)
 FPS = 24
-def add(name, fid, ink, opts=None, fps=FPS, loop=False): PLAN.append((name, fid, ink, fps, opts or {}, loop))
+KEEP = {}   # 名前 → 残すコマの数 (part を指定して焼く天与の絵: 効果の meta.duration は通しの長さなので、 その区切りの長さだけ残す)
+def add(name, fid, ink, opts=None, fps=FPS, loop=False, keep=None):
+    PLAN.append((name, fid, ink, fps, opts or {}, loop))
+    if keep: KEEP[name] = keep
 
 # ── #350 灰燼の王〈業火〉 (gouka_flow_preview.py) ──
 for a in range(ASH_MAX + 1):
@@ -56,6 +59,14 @@ for k, p in enumerate(VESCA_PHASES):
 add("vesca-shatter", "dicebound/vesca-shatter", "null", {})
 add("vesca-glitch", "dicebound/vesca-glitch", "null", {})
 add("vesca-off", "dicebound/vesca-off", "null", {})
+# ── ヴェスカの大技 = 天与の剣 / 盾 / 指輪 (2026-11-15・tenyo_preview.py・library/dicebound/tenyo-flow.md) ──
+#   part = charge / charged (ループ) / heavy (phase 0〜3 = 待機の 1 周の 0 / 1/4 / 2/4 / 3/4 から続く版)。 切り分けの時刻は tenyo-heavy.js の partTimes(gift) と同じ表:
+#   チャージ = 剣・盾 1.4 秒 / 指輪 3.0 秒・待機の 1 周 = 剣 3 秒 / 盾・指輪 1.5 秒・発動 = 剣 SWORD.end 4.97 / 盾 SHIELD.open + 3.4 = 5.7 / 指輪 RING.white + 3.0 = 5.0 秒
+TENYO = {"sword": (1.4, 3.0, 4.97), "shield": (1.4, 1.5, 5.7), "ring": (3.0, 1.5, 5.0)}
+for g, (ch, held, heavy) in TENYO.items():
+    add("tenyo-%s-charge" % g, "dicebound/tenyo-heavy", "holy", {"gift": g, "part": "charge"}, keep=int(math.ceil(ch * FPS - 1e-9)))
+    add("tenyo-%s-charged" % g, "dicebound/tenyo-heavy", "holy", {"gift": g, "part": "charged"}, loop=True, keep=int(round(held * FPS)))
+    for k in range(4): add("tenyo-%s-heavy-p%d" % (g, k), "dicebound/tenyo-heavy", "holy", {"gift": g, "part": "heavy", "phase": k}, keep=int(math.ceil(heavy * FPS - 1e-9)))
 # ── #354 ボスの通常の技 (moves_preview.py) ──
 add("move-relic-strike", "dicebound/vesca-slash", "null", {})
 add("move-relic-guard", "dicebound/moves", "null", {"move": "relic-guard"})
@@ -117,6 +128,7 @@ def main(argv):
         for name, fid, ink, fps, opts, loop in PLAN:
             if only and not any(name.startswith(o) for o in only): continue
             frames, m = render(fid, ink, fps, opts, tmp)
+            if name in KEEP: frames = frames[:KEEP[name]]
             if not loop:
                 while len(frames) > 1 and frames[-1].getchannel("A").getbbox() is None: frames.pop()
             sheet, rects = pack(frames)

@@ -46,6 +46,8 @@ namespace UI.Game2D.Battle
         public bool charging;
         /// <summary>灰燼の王の〈業火〉のターンの烈炎の分 (軽減無視・予告 MutualTurnTelegraph.heavyBurst の写し・2026-11-14)。 0 = 無し。</summary>
         public int burst;
+        /// <summary>ヴェスカの天与 (2026-11-15・予告 MutualTurnTelegraph.tenyoGift の写し・TenyoHeavy.Gift の番号・0 = 無し)。 チャージのターンと大技のターンに、 どれが来るか。</summary>
+        public int tenyo;
         public int version;
         public bool rolled;                  // 今のターンのダイスが出ているか (合計の表示に使う)
         /// <summary>振り直しの判断で止まっているか / 払う充電。</summary>
@@ -201,7 +203,7 @@ namespace UI.Game2D.Battle
             fx.WeaponIndex = WeaponIndexOf(GameManager.Instance?.Run?.equippedWeaponId);
             fx.WeaponSheetFamily = SheetFamilyOf(GameManager.Instance?.Run?.equippedWeaponId);
             PreloadForFight(cm);
-            _chevPhase = -1; _blazeStacks = 0; _flameShown = false;
+            _chevPhase = -1; _blazeStacks = 0; _flameShown = false; _vescaStage = BossIds.VescaStageOf(cm.CurrentEnemy?.id);
             for (int i = 0; i < slot.Length; i++) slot[i] = -1;
             board.Clear(); target = new int[0]; preview = null; lastOutcome = null; focusSlot = -1;
             Touch();
@@ -258,7 +260,7 @@ namespace UI.Game2D.Battle
             var p = cm.PendingDecision; if (p == null) return;
             var tele = p.tele;
             turn = tele.turn; eatk = tele.enemyAttackValue; stage = tele.escalationStage; edef = tele.enemyDefense; guardIn = tele.turnsToGuard; heavyIn = tele.turnsToHeavy;
-            down = tele.enemyDown; charging = tele.enemyCharging; burst = tele.heavyBurst; downPending = tele.downPending; downNotchHp = tele.downNextNotchHp; downNotches = tele.downNotches; downBroken = tele.downBroken;
+            down = tele.enemyDown; charging = tele.enemyCharging; burst = tele.heavyBurst; tenyo = tele.tenyoGift; downPending = tele.downPending; downNotchHp = tele.downNextNotchHp; downNotches = tele.downNotches; downBroken = tele.downBroken;
             downWeak = tele.enemyDownWeak; downNextWeak = tele.downPendingHeadWeak; downCracks = tele.downCrackTurns; crackBreakTurn = tele.downCrackBreakTurn;
             if (downNotches != null) Game2DTutorial.Request(TutorialTopics.BossDown);      // 手引き「ボスのダウン」: 目盛りのあるボスとの初めての戦闘 (第 2 層のボスから)
             nextStageIn = tele.nextThresholdTurn > 0 ? tele.nextThresholdTurn - tele.turn : -1;
@@ -819,6 +821,8 @@ namespace UI.Game2D.Battle
             if (_bleedPending > 0) { fx.DotTick(true, _bleedPending); _bleedPending = 0; phase = P.Dot; t = 0; Touch(); return; }
             if (_mistPending > 0) { fx.DotTick(false, _mistPending); _mistPending = 0; phase = P.Dot; t = 0; Touch(); return; }
             fx.SetEnemyHp(_tr.enemyHPAfter, cm.EnemyMaxHP > 0 ? cm.EnemyMaxHP : _enemyMaxBefore);
+            // ヴェスカの段が移った (〈連続実験〉・2026-11-15): 形態移行の演出 (ダメージ無し) を流して、 終わってから敵の行動へ (この関数へ戻ってくる)
+            if (cm.IsCombatActive && VescaStageMoved(cm)) { phase = P.PAttack; t = 0; Touch(); return; }
             if (!cm.IsCombatActive) EndFight(cm);
             else StartEnemyAttack(cm);
         }
@@ -829,8 +833,8 @@ namespace UI.Game2D.Battle
             _flameShown = false;
             // ボスの演出 (2026-11-14・#350〜#354): チャージのターン = チャージ (攻撃しない) / 大技のターン = 大技 / それ以外 = 通常攻撃 (王・シュヴァリエは技の絵)
             var kind = BossFx.KindOf(cm.CurrentEnemy?.id);
-            if (kind != BossFx.Kind.None && charging) fx.BossCharge(kind, _blazeStacks, lastTaken);
-            else if (kind != BossFx.Kind.None && heavyIn == 0 && !down) fx.BossHeavy(kind, _blazeStacks, lastTaken);
+            if (kind != BossFx.Kind.None && charging) fx.BossCharge(kind, _blazeStacks, lastTaken, tenyo);
+            else if (kind != BossFx.Kind.None && heavyIn == 0 && !down) fx.BossHeavy(kind, _blazeStacks, lastTaken, tenyo);      // ヴェスカ 3・4 段目は天与 (tenyo)
             else fx.EnemyAttack(lastTaken, down ? null : kind == BossFx.Kind.King ? "move-king-attack" : kind == BossFx.Kind.Chevalier ? "move-chev-thrust" : null);      // ダウンのターンは攻撃しないので技の絵は出さない
             phase = P.EAttack; t = 0; _eHit = false; Touch();
         }
@@ -856,7 +860,10 @@ namespace UI.Game2D.Battle
             // ダウン (または周期がずれた) で大技が来なくなった: 待機を止めて暗幕を戻す
             if (fx.BossIdling && (down || heavyIn != 0)) fx.BossCancel();
             // 絵を先に読む (全画面のコマが多い・敵の行動の瞬間に読むと一瞬止まる): チャージのターン = チャージと待機 / 大技のターン = 大技
-            if (charging) fx.QueuePreload(BossFx.SheetNames(kind, _blazeStacks, false));
+            bool vesca = kind == BossFx.Kind.Vesca || kind == BossFx.Kind.VescaFinal;
+            if (vesca && VescaStageMoved(cm)) { }      // 敵の行動の間に段が移った (裂け目など): ターンの頭で形態移行の演出 (流れは止めない)
+            if (vesca) { if (charging) { fx.QueuePreload(BossFx.TenyoSheetNames(tenyo, false)); fx.QueuePreload(BossFx.TenyoSheetNames(tenyo, true)); } else if (heavyIn == 0 && !down) fx.QueuePreload(BossFx.TenyoSheetNames(tenyo, true)); }      // 天与は、 チャージのターンにどれか決まる
+            else if (charging) fx.QueuePreload(BossFx.SheetNames(kind, _blazeStacks, false));
             else if (heavyIn == 0 && !down) fx.QueuePreload(BossFx.SheetNames(kind, _blazeStacks, true));      // 王の烈炎の数が戦闘の入りと違う時の絵 (1 フレーム 1 枚・手番の間に読み終わる)
             if (kind == BossFx.Kind.King && regen > 0) fx.PlayMove("move-king-regen");
             if (kind == BossFx.Kind.Chevalier)
@@ -886,6 +893,19 @@ namespace UI.Game2D.Battle
 
         /// <summary>戦闘の入り (切り替わりと敵の出現の演出の間) に、 その戦闘で使う絵を先に読む: 毒・出血・会心・今の武器の家系の通常と会心・
         /// ボスなら大技一式 (烈炎の数 0 の版・ヴェスカは 1〜3 段目と 4 段目の両方) と技の絵。 1 フレームに 1 枚ずつ (Game2DBattleFx.QueuePreload)。</summary>
+        private int _vescaStage;
+
+        /// <summary>ヴェスカの段が、 前に見た段より進んでいたら、 形態移行の演出を流して true (1→2・2→3 = 砕ける / 3→4 = 信号が切れる)。</summary>
+        private bool VescaStageMoved(CombatManager cm)
+        {
+            int st = BossIds.VescaStageOf(cm.CurrentEnemy?.id);
+            if (st <= 0 || _vescaStage <= 0 || st <= _vescaStage) { if (st > 0) _vescaStage = st; return false; }
+            _vescaStage = st;
+            fx.VescaTransition(st == 4);
+            fx.SetEnemyHp(cm.EnemyHP, cm.EnemyMaxHP);
+            return true;
+        }
+
         private void PreloadForFight(CombatManager cm)
         {
             var list = new List<string> { "poison-tick", "bleed-tick", "crit-hit" };

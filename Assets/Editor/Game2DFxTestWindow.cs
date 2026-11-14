@@ -17,6 +17,8 @@ public class Game2DFxTestWindow : EditorWindow
     private static readonly string[] BossKinds = { "King", "Judge", "Chevalier", "Vesca", "VescaFinal" };
     private static readonly string[] Cats = { "全部", "大技", "通常の技", "武器", "その他" };
     private static readonly string[] Relics = { "攻撃", "防御", "妨害" };
+    private static readonly string[] Tenyos = { "none", "sword", "shield", "ring" };
+    private int _tenyo, _forceTenyo = 1;
     private static readonly float[] Speeds = { 1f, 0.5f, 0.25f };
 
     private string[] _enemies = new string[0];
@@ -110,6 +112,12 @@ public class Game2DFxTestWindow : EditorWindow
         }
         using (new EditorGUILayout.HorizontalScope())
         {
+            _forceTenyo = EditorGUILayout.Popup("ヴェスカの次の天与", _forceTenyo, Tenyos);
+            if (GUILayout.Button("指定", GUILayout.Width(60))) _last = "ForceTenyo → " + QaBattle.ForceTenyo(Tenyos[_forceTenyo]);
+            if (GUILayout.Button("敵の HP を 1 に", GUILayout.Width(100))) { QaBattle.SetEnemyHp(1); _last = "SetEnemyHp(1)"; }
+        }
+        using (new EditorGUILayout.HorizontalScope())
+        {
             _relic = EditorGUILayout.Popup("ヴェスカの次の遺物", _relic, Relics);
             if (GUILayout.Button("指定", GUILayout.Width(60))) _last = "ForceRelic → " + QaBattle.ForceRelic(Relics[_relic]);
         }
@@ -123,6 +131,13 @@ public class Game2DFxTestWindow : EditorWindow
             if (GUILayout.Button("チャージ")) { QaBattle.DemoBoss(BossKinds[_boss]); QaBattle.DemoCharge(); _last = "チャージ " + BossKinds[_boss]; }
             if (GUILayout.Button("大技")) { QaBattle.DemoBoss(BossKinds[_boss]); QaBattle.DemoHeavy(); _last = "大技 " + BossKinds[_boss]; }
             if (GUILayout.Button("取り消し")) { QaBattle.DemoCancel(); _last = "取り消し"; }
+        }
+        _tenyo = EditorGUILayout.Popup("天与 (ヴェスカの時)", _tenyo, Tenyos);
+        QaBattle.DemoTenyo(Tenyos[_tenyo]);
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            if (GUILayout.Button("形態移行 (→2・3: 砕ける)")) { QaBattle.DemoTransition(false); _last = "形態移行 →2/3"; }
+            if (GUILayout.Button("形態移行 (3→4: 信号が切れる)")) { QaBattle.DemoTransition(true); _last = "形態移行 3→4"; }
         }
 
         // ── 武器 ──

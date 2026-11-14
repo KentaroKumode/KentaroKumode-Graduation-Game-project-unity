@@ -860,6 +860,7 @@ namespace CombatSystem
             enemyHP = newEnemy.maxHP;
             // ボスのダウン (2026-11-13): 段ごとに目盛りを入れ直す (割った数・待ちは前の段から持ち越さない。 大技の周期は戦闘を通して数えるので起点はそのまま)
             ResetBossDown(newEnemy, newCombat: false);
+            TenyoHeavy.OnStageSwap(newEnemy, PassiveSkillManager.Instance?.Context?.currentTurn ?? 0);      // ヴェスカの天与 (2026-11-15): 大技を持つ段 (3・4) は、 入れ替わったターンから周期を数える
 
             var psm = PassiveSkillManager.Instance;
             if (psm == null) { Debug.LogError("[CombatManager.SwapEnemy] PSM null"); return false; }

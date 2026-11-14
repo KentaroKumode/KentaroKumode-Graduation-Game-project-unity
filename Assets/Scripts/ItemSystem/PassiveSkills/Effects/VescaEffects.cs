@@ -292,6 +292,15 @@ namespace ItemSystem.PassiveSkills.Effects
                 UnityEngine.Debug.Log($"[溜め打ちの拳套] 永続 出目+1 (計 +{s}/5)");
             }
 
+            // --- 天与 (2026-11-15・3・4 段目の大技): チャージのターンは天与を抽選し、 大技のターンは天与の効果を入れる。 この 2 つのターンは、 ほかの遺物を使わない
+            //   (抽選を止める。 〈天与の才〉の 2 枚引きの印 vescaDoubleDrawNextTurn は倒さずに、 次のふつうのターンへ送る)
+            if (CombatSystem.TenyoHeavy.OnTurnStart(CombatSystem.CombatManager.Instance?.CurrentEnemy, ctx))
+            {
+                int keep = (int)ctx.GetAccumulated(VescaRelicPool.KeyChargedFistStacks);      // 溜め打ちの拳套の永続分だけは、 いつもどおり攻撃に乗せる
+                ctx.enemyDiceTotalBonus = keep;
+                return;
+            }
+
             // --- 抽選 ---
             int stage = VescaRelicPool.ResolveStage();
             bool stageJustChanged = (int)ctx.GetAccumulated(KeyLastStage) != stage;
