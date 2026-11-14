@@ -43,19 +43,24 @@ function chopSlash(p, s, t, FLOW) {
       out.c = R[n - 1 - clamp(ci, 0, n - 1)];
       out.a = Math.min(1, v / 0.4);
       // 縁の発光 (2026-11-14 作者: 剣のように発光を足す): 外の縁の細い帯に、 光を乗せる
-      if (s.R - r < 1 && age < 0.65) { out.l = R[n - 1]; out.k = 0.8 * (1 - age); }
+      // 縁は強く光らせる: 外の縁 1.8 (元の座標) の帯は、 色も白に寄せ、 光を強く乗せる。 その内側 2 つぶんにも、 弱い光
+      const dr = s.R - r;
+      if (dr < 1.8 && age < 0.8) { if (dr < 0.9) out.c = R[n - 1]; out.l = R[n - 1]; out.k = 1.3 * (1 - age * 0.8); }
+      else if (dr < 4 && age < 0.6) { out.l = R[n - 2]; out.k = 0.5 * (1 - age); }
     });
     glowAlong(p, s, s.R - W * 0.4, T, U, 7 + W, R[n - 3], (uu) => 0.42 * (1 - age) * ((uu - T) / (U - T)), 0, 0.3);
+    glowAlong(p, s, s.R - 0.5, T, U, 6, R[n - 1], (uu) => 0.6 * (1 - age) * Math.min(1, ((uu - T) / (U - T)) * 2), 0, 0.2);   // 縁に沿った、 白い光
   }
-  const th = 0.7 * (1 - clamp((u - s.sweep - s.hold) / (s.trail + 0.2)));
-  if (tail > 0.02 && th > 0) trace(p, s, s.R - 0.5, 0, T, R[2], (uu) => th * (0.4 + 0.6 * uu / s.span));
+  const th = 0.85 * (1 - clamp((u - s.sweep - s.hold) / (s.trail + 0.45)));
+  // 縁の残像 (通った跡の線): 点線ではなく明るい線で残し、 光らせる
+  if (tail > 0.02 && th > 0) { trace(p, s, s.R - 0.5, 0, T, R[n - 2], (uu) => Math.min(1, th * 1.4) * (0.5 + 0.5 * uu / s.span), 0, 0.3); trace(p, s, s.R - 1.4, 0, T, R[n - 4], (uu) => th * (0.4 + 0.6 * uu / s.span), 0, 0.3); glowAlong(p, s, s.R - 0.5, 0, T, 6, R[n - 2], (uu) => 0.55 * th * (0.4 + 0.6 * uu / s.span), 0, 0.25); }
 }
 
 export function create(o) {
   const C = fit(o.palette, 7), Rg = new Rng(o.seed), ps = new Particles({ rng: Rg, sparks: o.sparks }), big = !!o.heavy;
   // 真上から足もとへ: (0, −46) を真下向きに通る、 半径 150 の弧 (ほぼまっすぐ・わずかに右へ反る)。 長さ 0.66 rad ≈ 100
   const A = through(0, -46, Math.PI / 2, 1, 150, 0.66, 0.5, { W: big ? 17 : 13, t0: 0, sweep: 0.07, hold: big ? 0.12 : 0.08, trail: big ? 0.34 : 0.26, ramp: C });
-  const E = big ? { ...A, R: A.R - A.W * 0.75, W: A.W * 0.38, t0: 0.02, hold: 0.06, trail: 0.24, ramp: C.slice(0, 6) } : null;
+  const E = { ...A, R: A.R - A.W * 0.75, W: A.W * (big ? 0.38 : 0.28), t0: 0.02, hold: 0.06, trail: 0.24, ramp: C.slice(0, 6) };   // 内側の残像 (通常にも付ける・細く)
   const end = slashEnd(A);
   let t = 0, landed = false;
   return {
