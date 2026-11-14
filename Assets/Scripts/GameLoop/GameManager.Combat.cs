@@ -332,6 +332,23 @@ namespace GameLoop
             CombatManager.Instance.StartCombat(CurrentEnemy, Run.playerHP, dc, dm, cr, df, str_, ft_);
         }
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        /// <summary>[実機の確認用・2026-11-14] 今のランのまま、 指定した敵との戦闘をボス戦と同じ手順で始める (マスを踏まない・報酬や集計の前処理はしない)。
+        /// 呼ぶのは <c>UI.Game2D.Battle.QaBattle.Start</c> だけ (セーブを止めた後)。 敵が無ければ false。</summary>
+        public bool QaStartCombat(string enemyId)
+        {
+            if (Run == null || CombatManager.Instance == null) return false;
+            var enemy = CombatSystem.EnemyDatabase.Get(enemyId);
+            if (enemy == null) { Debug.LogWarning($"[QaBattle] 敵 '{enemyId}' が無い"); return false; }
+            CurrentEnemy = enemy; CurrentEnemySecondary = null;
+            OnEnemyEncountered?.Invoke(CurrentEnemy);
+            var (dc, dm, cr, df, ft_, str_) = GatherPlayerCombatStats();
+            SetPhase(GamePhase.Combat);
+            CombatManager.Instance.StartCombat(CurrentEnemy, Run.playerHP, dc, dm, cr, df, str_, ft_);
+            return true;
+        }
+#endif
+
         /// <summary>[検証用] 現在の Run ビルドのまま、指定フロアのボスと1戦だけ即決着し結果を返す。
         /// AutoRunner の「5Fボス勝率スイープ」専用。通常のフロア遷移・報酬・OnBattleEnded は介さず、
         /// CombatManager を直接駆動する（GameManager の集計イベントを発火しない）。</summary>

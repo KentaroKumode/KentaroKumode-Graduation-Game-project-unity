@@ -57,10 +57,10 @@ namespace UI
         {
             var d = Defs[(int)k]; v = Mathf.Clamp(v, d.min, d.max);
             if (V[(int)k] == v) return;
-            V[(int)k] = v; PlayerPrefs.SetInt(d.pref, v); Version++;
+            V[(int)k] = v; GameLoop.SaveGuard.SetInt(d.pref, v); Version++;
         }
 
-        public static void Save() => PlayerPrefs.Save();
+        public static void Save() => GameLoop.SaveGuard.Save();
 
         // ── 効かせる側が読む値 ──
         public static float Master01 => Get(Key.Master) / 100f;

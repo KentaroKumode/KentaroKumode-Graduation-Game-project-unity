@@ -162,8 +162,8 @@ namespace UI
             isMuted = m;
             if (!string.IsNullOrEmpty(mutePrefKey))
             {
-                PlayerPrefs.SetInt(mutePrefKey, m ? 1 : 0);
-                PlayerPrefs.Save();
+                GameLoop.SaveGuard.SetInt(mutePrefKey, m ? 1 : 0);
+                GameLoop.SaveGuard.Save();
             }
         }
 

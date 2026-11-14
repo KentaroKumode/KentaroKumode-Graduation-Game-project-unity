@@ -146,7 +146,7 @@ namespace GameLoop
         /// ── 控えが残ると、 次の起動で読み込みが控えから復帰して、 終わったランが生き返る。</summary>
         public static void Delete()
         {
-            if (Disabled) return;
+            if (Disabled || SaveGuard.Suppressed) return;      // SaveGuard: 実機の確認中は消さない
             if (!SafeFile.DeleteAll(FilePath, out var err)) Debug.LogWarning($"[RunSave] 中断セーブを消せない: {err}");
         }
 
@@ -165,7 +165,7 @@ namespace GameLoop
             {
                 case SafeFile.ReadResult.Ok:
                     data = parsed;
-                    if (used != FilePath)
+                    if (used != FilePath && !SaveGuard.Suppressed)      // SaveGuard: 控えを本番の名前へ戻すのも書き込み
                     {
                         Debug.LogWarning($"[RunSave] 本番の中断セーブが無い・壊れているので、 {label} ({Path.GetFileName(used)}) から復帰した");
                         if (!SafeFile.Promote(FilePath, used, out var perr)) Debug.LogWarning($"[RunSave] 復帰した記録を本番の名前へ戻せない (中身は使う): {perr}");
@@ -209,6 +209,7 @@ namespace GameLoop
         {
             why = null;
             if (Disabled) { why = "BOT の実行中"; return false; }
+            if (SaveGuard.Suppressed) { why = "セーブを止めている (SaveGuard)"; return false; }
             try
             {
                 SafeFile.WriteAtomic(FilePath, JsonUtility.ToJson(data));
