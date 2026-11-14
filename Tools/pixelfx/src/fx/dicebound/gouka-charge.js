@@ -54,8 +54,7 @@ export const HELD = 1.5, HELD_SEED = 6;   // 待機の 1 周 (秒) と、 火の
  */
 export function held(p, F, CY, seed, ti, boost = 0) {
   const t = ((ti % HELD) + HELD) % HELD, pulse = 0.5 + 0.5 * Math.sin((t / HELD) * TAU * 2);
-  // 6 コマに 1 回、 1 ドット震える (溜まり切っていて不安定)
-  const f = Math.floor(t * 8 + 1e-4), jit = f % 6 === 2 ? 1 : f % 6 === 3 ? -1 : 0;
+  const jit = 0;   // 位置は動かさない (2026-11-14 作者の決定: 待機は光の伸縮だけ・上下左右の振動なし)
   // 火の粉: まばらに、 ゆっくり、 渦を巻いて芯へ
   cycle(t, HELD, 16, seed * 3 + 1, (g) => g.range(0.8, 1.3), (age, life, R) => {
     const a0 = R.range(0, TAU), d0 = R.range(50, 130), spin = R.sign() * R.range(0.5, 1.2), c = R.pick([F[4], F[5], F[6]]);
