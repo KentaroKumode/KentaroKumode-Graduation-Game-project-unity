@@ -19,6 +19,7 @@ import * as PARRY from "../impacts/parry.js";
 import { scaledFx } from "./_scaled.js";
 
 const E = [240, 136], B = [240, 247], FEET = [240, 197];   // 敵の体の中心・こちらの盤・敵の足もと
+const DEBRIS = ["CHUNK", "GRIT"];   // 飛び散る岩・小石・砂利は出さない (2026-11-14 作者の指定)
 const STEEL = ["#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#b8c9e8", "#e8f1ff", "#ffffff"];
 const GOLD = ["#3b1d2a", "#7a3a2c", "#c4652e", "#f0a040", "#ffd25e", "#fff0a0", "#ffffff"];
 const BLOOD = ["#2a0510", "#5c0a1c", "#a3142a", "#e0302c", "#ff7a5a", "#ffd0c0", "#ffffff"];
@@ -32,8 +33,8 @@ const PLAN = {
   "sword-normal": [[BLADE, { K: 2.6, at: E, anchor: [10, -28], speed: 0.65, opts: { palette: STEEL } }]],
   "sword-crit": [[SPIN, { K: 3.2, at: E, anchor: [0, -26], speed: 0.65, opts: { palette: GOLD } }], [DOUBLE, { K: 3.2, at: E, anchor: [34, -23], speed: 0.65, delay: 0.3, opts: { palette: GOLD } }]],
   // 斧: 縦に振り下ろす (作者: 横から殴らない)。 刃の軌跡 (chop) が真上から敵の足もとへ落ち、 着いた所に 通常 = heavy-landing / 会心 = ground-slam
-  "axe-normal": [[LANDING, { K: 2.6, at: FEET, anchor: [0, 0], speed: 1.3, delay: 0.1, opts: { palette: STEEL } }], [CHOP, { K: 2.4, at: FEET, anchor: [-8, 0], speed: 0.65, opts: { palette: STEEL, flow: 2.4, sparks: ["#ffffff", "#e8f1ff", "#b8c9e8", "#62c8f4"] } }]],   // 色は剣の通常と同じ (鋼の青白)
-  "axe-crit": [[SLAM, { K: 1.9, at: FEET, anchor: [0, 0], speed: 2.0, delay: 0.1, opts: { palette: GOLD } }], [CHOP, { K: 2.8, at: FEET, anchor: [-8, 0], speed: 0.65, opts: { palette: GOLD, heavy: true, flow: 2.8, sparks: ["#ffffff", "#fff0a0", "#ffd25e", "#f0a040"] } }]],   // 色は剣の会心と同じ (金)
+  "axe-normal": [[LANDING, { K: 2.6, at: FEET, anchor: [0, 0], speed: 1.3, delay: 0.1, drop: DEBRIS, opts: { palette: STEEL } }], [CHOP, { K: 2.4, at: FEET, anchor: [-8, 0], speed: 0.65, opts: { palette: STEEL, flow: 2.4, sparks: ["#ffffff", "#e8f1ff", "#b8c9e8", "#62c8f4"] } }]],   // 色は剣の通常と同じ (鋼の青白)
+  "axe-crit": [[SLAM, { K: 1.9, at: FEET, anchor: [0, 0], speed: 2.0, delay: 0.1, drop: DEBRIS, opts: { palette: GOLD } }], [CHOP, { K: 2.8, at: FEET, anchor: [-8, 0], speed: 0.65, opts: { palette: GOLD, heavy: true, flow: 2.8, sparks: ["#ffffff", "#fff0a0", "#ffd25e", "#f0a040"] } }]],   // 色は剣の会心と同じ (金)
   "dagger-normal": [[FLURRY, { K: 2.4, at: E, anchor: [34, -28], speed: 0.75, opts: { palette: VENOM } }]],
   "dagger-crit": [[REAP, { K: 2.6, at: E, anchor: [20, -30], speed: 1.5, opts: { palette: NIGHT } }], [FLURRY, { K: 2.8, at: E, anchor: [34, -28], speed: 0.8, delay: 0.35, opts: { palette: NIGHT } }]],
   "shield-normal": [[BLUNT, { K: 3.4, at: E, anchor: [0, -22], speed: 0.75, opts: {} }]],

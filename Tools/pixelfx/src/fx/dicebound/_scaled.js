@@ -5,7 +5,7 @@
 //   線 (line) は、 両端を K 倍の位置へ移してから、 画面の上で 1 ドットの線を引く。 点 (px / dot) は 1 ドットのまま、 K 倍の位置に出る。
 //   光 (glow / glowLine / glowRing) は半径を画面のドットで持っているので、 半径に K を掛ける。
 // 形の比率は元のまま大きくなる (色の段の幅も K 倍)。 べた塗りが目立つ物は、 写しを作って縁と筋を直す (library/dicebound/moves.md の決まり 2)。
-import { resolveOptions } from "../../core/index.js";
+import { resolveOptions, Bits, Particles, P, B } from "../../core/index.js";
 
 const KEYS = ["toX", "toY", "fromX", "fromY", "cellX", "cellY", "glow", "glowLine", "glowRing", "rect"];
 
@@ -23,15 +23,27 @@ export function withScale(p, K, x, y, fn) {
 }
 
 /**
+ * fn の間だけ、 元の効果が出す粒の一部を出させない (元のコードは触らない)。 drop = ["CHUNK" (跳ねる岩・小石), "GRIT" (砂利)] など。
+ * 元の効果は、 生成の時と update の中で粒を出すので、 その両方をこれで包む。
+ */
+function muted(drop, fn) {
+  if (!drop || !drop.length) return fn();
+  const add = Bits.prototype.add, spawn = Particles.prototype.spawn, chunk = drop.includes("CHUNK"), grit = drop.includes("GRIT");
+  Bits.prototype.add = function (b) { if (chunk && b && b.kind === B.CHUNK) return undefined; return add.call(this, b); };
+  Particles.prototype.spawn = function (k, ...rest) { if (grit && k === P.GRIT) return undefined; return spawn.call(this, k, ...rest); };
+  try { return fn(); } finally { Bits.prototype.add = add; Particles.prototype.spawn = spawn; }
+}
+
+/**
  * 元の効果 SRC を、 K 倍・画面の at に (元の座標の anchor が来るように)・speed 倍の速さで流す物を作る。
  * opts = 元の効果へ渡す設定 (palette など)。 返り値は create() が返す形 ({ update, draw })。
  */
-export function scaledFx(SRC, { K = 3, at = [240, 136], anchor = [0, 0], speed = 1, delay = 0, life = 0, opts = {} } = {}) {   // life = ループの効果を、 何秒で消すか (最後の 0.25 秒で網点で薄くなる)
-  const o = resolveOptions(SRC.meta, opts), inner = SRC.create ? SRC.create(o) : null, x = at[0] - anchor[0] * K, y = at[1] - anchor[1] * K, D = SRC.meta.duration;
+export function scaledFx(SRC, { K = 3, at = [240, 136], anchor = [0, 0], speed = 1, delay = 0, life = 0, drop = null, opts = {} } = {}) {   // life = ループの効果を、 何秒で消すか (最後の 0.25 秒で網点で薄くなる)
+  const o = resolveOptions(SRC.meta, opts), inner = SRC.create ? muted(drop, () => SRC.create(o)) : null, x = at[0] - anchor[0] * K, y = at[1] - anchor[1] * K, D = SRC.meta.duration;
   let t = -delay;
   return {
     done: () => t > D,
-    update(dt) { const was = t; t += dt * speed; if (t > 0 && inner && inner.update) inner.update(was < 0 ? t : dt * speed); },
+    update(dt) { const was = t; t += dt * speed; if (t > 0 && inner && inner.update) muted(drop, () => inner.update(was < 0 ? t : dt * speed)); },
     draw(p) {
       if (t < 0 || (!SRC.meta.loop && t > D) || (life && t > life)) return;
       const f = p.fade;
