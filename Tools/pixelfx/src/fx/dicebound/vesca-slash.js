@@ -5,7 +5,7 @@
 //   盤に着く所で欠片が跳ね上がる (spear-sweep の、 床から巻き上がる屑)。 形・塗り (色の段の割合)・残像の位置は、 元の式のまま。
 // The crescent, echo, trail, glint and spark recipe is adapted from Sprite Fusion's open-source slash
 // (https://www.spritefusion.com/pixel-art-vfx/slash), MIT License, Copyright (c) 2026 Hugo Duprez.
-import { Particles, P, Rng, fit, sparkle, clamp, smooth, ease, TAU } from "../../core/index.js";
+import { Particles, P, Rng, fit, sparkle, clamp, smooth, ease, noise2, TAU } from "../../core/index.js";
 
 const K = 3.6;   // 元の何倍の大きさか
 
@@ -46,12 +46,18 @@ function crescent(p, s, ta, L, W, age) {
     if (u > span) return;
     const v = u / span, w = W * Math.pow(Math.sin(Math.PI * Math.pow(v, 2.2)), 0.6);
     if (w < 0.35) return;
-    const q = (s.R - r) / w;
-    if (q < 0 || q > 1) return;
-    // brightest step at the rim while it's young, then darker steps inward, with age and towards the tail
-    const ci = q < 0.22 && age < 0.5 ? 0 : Math.round(q * (n - 1) * 0.75 + age * 2.4 - v * 0.8 + 0.4);
+    // ---- ここだけ元と違う (2026-11-14 作者: 大きくすると、 べた塗りが目立って安っぽい。 流れに合った筋で速さを出し、 縁をぱきっと光らせる)
+    // 流れに沿った筋: 弧に沿っては長く、 太さの向きには細かいノイズ。 時間で頭の方へ流れる。 明るい筋は 1 段明るく、 暗い筋は 1 段暗く
+    const d = s.R - r, along = u * s.R * 0.04 - age * 10, strand = noise2(along, r * 0.5, 31), fine = noise2(along * 2.4 + 7, r * 1.15, 57);
+    const wi = w * (0.84 + 0.16 * fine);   // 内の縁は、 筋に沿ってぎざぎざに
+    if (d < 0 || d > wi) return;
+    const q = d / wi, young = age < 0.6;
+    // 外の縁: 白 2 ドット + いちばん明るい色 1 ドット (太さの割合ではなく、 ドットで決める ── 大きくしても細く鋭いまま)。 その内側は元の段に、 筋を足す
+    const ci = d < 2.2 && young ? 0 : d < 3.4 && young ? 1 : Math.round(q * (n - 1) * 0.75 + age * 2.4 - v * 0.8 + 0.4 + (strand > 0.22 ? -1.3 : strand < -0.28 ? 1.1 : 0));
     out.c = R[n - 1 - clamp(ci, 0, n - 1)];
-    out.a = Math.min(1, v / 0.4);
+    // 尾の方では、 内側が筋にほどけて抜ける (べたの面を残さない)
+    out.a = q > 0.28 && fine < -0.1 - v * 0.7 ? 0 : Math.min(1, v / 0.4);
+    if (d < 3 && young) { out.l = R[n - 1]; out.k = 0.7 * (1 - age); }   // 縁の光
   });
   for (let u = 0; u <= span; u += 0.3) {
     const [x, y] = onArc(s, s.R - W * 0.4, ta + dir * u);
@@ -102,6 +108,8 @@ export function create(o) {
           const a = a0 + (a1 - a0) * Rg.range(0.3, 1), [x, y] = onArc(A, A.R, a);
           const ox = x - A.cx, oy = y - A.cy, l = Math.hypot(ox, oy) || 1, sp = Rg.range(60, 260);
           ps.spawn(P.MOTE, x, y, (ox / l) * sp, (oy / l) * sp - 10, Rg.range(0.3, 0.7), C[4 + Rg.int(0, 1)], 1);
+          // 輝き: 弧の上に、 遅れてまたたく星 (作者: 輝きの粒は自己判断で足してよい)
+          if (i % 3 === 0) ps.spawn(P.STAR, x + Rg.range(-4, 4), y + Rg.range(-4, 4), 0, -Rg.range(4, 18), Rg.range(0.3, 0.7), i % 2 ? C[6] : C[5], Rg.range(1.5, 3.4), Rg.range(0, 0.45));
           // 盤に切っ先が着く所では、 欠片が跳ね上がる (spear-sweep の、 床から巻き上がる屑)
           if (y > 205 && i % 2 === 0) ps.spawn(P.FLAKE, x, y, Rg.range(-90, 90), -Rg.range(80, 260), Rg.range(0.5, 1), C[3 + Rg.int(0, 2)], Rg.range(1, 2.2));
         }
@@ -114,6 +122,8 @@ export function create(o) {
       // the tip glints as the edge arrives
       const g = t - A.sweep * 0.6;
       if (g > 0 && g < 0.3) sparkle(p, tip.x, tip.y, 9 * K * ease.outBack(Math.min(1, g / 0.05)) * (1 - g / 0.3), C[5], C[3], 0.6);
+      // 輝き: 縁の上の 4 か所で、 十字のきらめきが順にまたたく (頭が通った直後から)
+      for (const [k, d] of [[0.42, 0.05], [0.6, 0.09], [0.76, 0.13], [0.9, 0.17]]) { const g2 = t - d; if (g2 > 0 && g2 < 0.3) { const [x, y] = onArc(A, A.R - 1, A.a0 + (A.a1 - A.a0) * k); sparkle(p, x, y, 14 * Math.sin((g2 / 0.3) * Math.PI), C[6], C[4], 0.6); } }
       // light rides the head of the swing
       if (t < 0.3) {
         const [x, y] = onArc(A, A.R - 4, A.a0 + (A.a1 - A.a0) * ease.outExpo(clamp(t / A.sweep)));
