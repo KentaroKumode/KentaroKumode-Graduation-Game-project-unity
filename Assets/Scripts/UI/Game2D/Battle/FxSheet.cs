@@ -35,7 +35,9 @@ namespace UI.Game2D.Battle
 
         /// <summary>コマ 1 枚: 不透明な画素の、 コマの中の位置 (x | y &lt;&lt; 16) と色 (<see cref="BattleCanvas.Pack"/> と同じ形)、
         /// と、 下地の色 <c>runCol</c> の横の帯 (始まり x | y &lt;&lt; 16 と長さ)。 帯が無いコマは runPos = null。</summary>
-        private struct Frame { public int[] pos; public uint[] col; public int[] runPos, runLen; public uint runCol; }
+        private struct Frame { public int[] pos; public uint[] col; public byte[] ci; public int[] runPos; public ushort[] runLen; public uint runCol; }
+        /// <summary>この絵の色の一覧 (色が 256 以下の時・コマの画素は番号 1 バイトで持つ)。 null = 色を 4 バイトで持つ。</summary>
+        private readonly uint[] _palette;
         private readonly Frame[] _frames;
         public readonly int W, H, PivotX, PivotY;
         public readonly bool Loop;
@@ -44,6 +46,10 @@ namespace UI.Game2D.Battle
         /// <summary>1 コマの長さ (秒)。 書き出しの fps (既定 1 秒 8 コマ・王の着弾だけ 24 コマ)。</summary>
         public readonly float FrameSeconds;
         public int FrameCount => _frames.Length;
+        /// <summary>1 秒のコマ数 (書き出しの fps・整数)。 経過秒からコマを出す時はこれを掛ける (1/24 の float で割ると、 ちょうどの時刻で 1 コマ前に落ちる)。</summary>
+        public readonly int Fps;
+        /// <summary>全部のコマの長さ (秒・倍精度)。</summary>
+        public double Seconds => _frames.Length / (double)Fps;
         public float Duration => _frames.Length * FrameSeconds;
 
         /// <summary>読み込んだ後に持っている量の見積もり (バイト・配列の中身だけ) / 帯を使わなかった時の量 / 読み込みに掛かった時間 (ミリ秒)。</summary>
@@ -56,7 +62,7 @@ namespace UI.Game2D.Battle
             Name = name;
             var p = j.meta.pixelfx;
             W = p.frameSize[0]; H = p.frameSize[1]; PivotX = p.pivot[0]; PivotY = p.pivot[1]; Loop = p.loop;
-            FrameSeconds = 1f / Mathf.Max(1, p.fps);
+            Fps = Mathf.Max(1, p.fps); FrameSeconds = 1f / Fps;
             _frames = new Frame[j.frames.Length];
             var pos = new List<int>(); var col = new List<uint>(); var rp = new List<int>(); var rl = new List<int>();
             var count = new Dictionary<uint, int>();
@@ -97,7 +103,7 @@ namespace UI.Game2D.Battle
                 BytesPlain += plain;
                 if (rp.Count > 0 && withRuns < plain)
                 {
-                    _frames[k] = new Frame { pos = pos.ToArray(), col = col.ToArray(), runPos = rp.ToArray(), runLen = rl.ToArray(), runCol = top };
+                    _frames[k] = new Frame { pos = pos.ToArray(), col = col.ToArray(), runPos = rp.ToArray(), runLen = rl.ConvertAll(v => (ushort)v).ToArray(), runCol = top };
                     Bytes += withRuns;
                 }
                 else
@@ -117,6 +123,22 @@ namespace UI.Game2D.Battle
                     Bytes += plain;
                 }
             }
+            // 色を番号 1 バイトにする (2026-11-15・1 秒 24 コマにしてコマ数が 3 倍になったので軽くする)。 絵の色は液晶の 5 色の段なので、 1 枚に 256 色を超えない。
+            //   貼る時は番号から元の色を引くだけ (貼った結果は変わらない)。 256 色を超える絵は 4 バイトのまま
+            var pal = new Dictionary<uint, int>();
+            foreach (var f in _frames) { foreach (var v in f.col) if (!pal.ContainsKey(v)) pal[v] = pal.Count; if (f.runPos != null && !pal.ContainsKey(f.runCol)) pal[f.runCol] = pal.Count; }
+            if (pal.Count <= 256)
+            {
+                _palette = new uint[pal.Count]; foreach (var kv in pal) _palette[kv.Value] = kv.Key;
+                for (int k = 0; k < _frames.Length; k++)
+                {
+                    var f = _frames[k]; var ci = new byte[f.col.Length];
+                    for (int q = 0; q < ci.Length; q++) ci[q] = (byte)pal[f.col[q]];
+                    f.ci = ci; f.col = null; _frames[k] = f;
+                }
+            }
+            Bytes = 0;
+            foreach (var f in _frames) Bytes += f.pos.Length * (4L + (f.ci != null ? 1 : 4)) + (f.runPos != null ? f.runPos.Length * 6L : 0);
         }
 
         private static readonly Dictionary<string, FxSheet> Cache = new Dictionary<string, FxSheet>();
@@ -180,7 +202,7 @@ namespace UI.Game2D.Battle
         /// add = 光として足し込む (会心の光。 戦闘演出の発光と同じ加算) / false = 上から塗る (毒・出血の滴・ボスと武器の絵 ── 見本の paste と同じ)。</summary>
         public bool Draw(BattleCanvas c, float t, int x, int y, bool add = true)
         {
-            int k = Mathf.FloorToInt(t / FrameSeconds);
+            int k = (int)System.Math.Floor(t * (double)Fps + 1e-6);      // 1/24 の float で割ると、 ちょうどの時刻で 1 コマ前に落ちる
             if (k < 0) return true;
             if (k >= _frames.Length) { if (!Loop) return false; k %= _frames.Length; }
             DrawFrame(c, k, x - PivotX, y - PivotY, add);
@@ -211,8 +233,9 @@ namespace UI.Game2D.Battle
             {
                 int x = left + (f.pos[i] & 0xffff), y = top + (f.pos[i] >> 16);
                 if (x < 0 || y < 0 || x >= BattleCanvas.W || y >= BattleCanvas.H) continue;
-                if (add) { uint v = f.col[i]; c.PutRgb(x, y, v & 255, (v >> 8) & 255, (v >> 16) & 255, 1f, true); }
-                else if (c.clipY0 < 0 || (y >= c.clipY0 && y < c.clipY1)) fb[y * BattleCanvas.W + x] = f.col[i];
+                uint cv = f.ci != null ? _palette[f.ci[i]] : f.col[i];
+                if (add) c.PutRgb(x, y, cv & 255, (cv >> 8) & 255, (cv >> 16) & 255, 1f, true);
+                else if (c.clipY0 < 0 || (y >= c.clipY0 && y < c.clipY1)) fb[y * BattleCanvas.W + x] = cv;
             }
         }
 

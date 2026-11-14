@@ -40,7 +40,6 @@ namespace UI.Game2D.Battle
 
         // ── 見本の定数 ──
         private const double LEAD_K = 1.4, RUSH = 1.2, HOLD = 1.0, COOL = 1.6;                  // gouka_flow_preview.py
-        private const int SLOW = 6;
         private const double LEAD_J = 1.4;                                                       // judge_flow_preview.py
         private const double DARK_C = 0.85, LEAD_C = 0.75;                                       // chevalier_flow_preview.py
         private const double CUT_C = LEAD_C - 0.06, SPLIT_C = LEAD_C - 0.06 + 0.24;
@@ -60,7 +59,6 @@ namespace UI.Game2D.Battle
         private bool _heavyPending, _hitDone;
         private int _ver;                 // 大技へ入った待機のコマの位相 (審判官 = ÷8・ヴェスカ = ÷6 の版)
         private FxSheet _charge, _idle, _rel, _scr, _imp, _ver2, _shatter, _glitch, _off;
-        private int[] _impIdx;
         private uint[] _frozen, _tmp;
         private bool _frozenTinted;
 
@@ -89,7 +87,7 @@ namespace UI.Game2D.Battle
         public void Clear()
         {
             _seg = Seg.None; _heavyPending = false; _kind = Kind.None; _frozen = null;
-            _charge = _idle = _rel = _scr = _imp = _ver2 = _shatter = _glitch = _off = null; _p4 = null;      // 絵の参照を放す (戦闘が終わった後、 キャッシュから外した絵を GC が回収できるように)
+            _charge = _idle = _rel = _scr = _imp = _ver2 = _shatter = _glitch = _off = null;      // 絵の参照を放す (戦闘が終わった後、 キャッシュから外した絵を GC が回収できるように)
         }
 
         /// <summary>大技が取り消された (ダウン): 待機のループを止めて暗幕を戻す (霧散の絵はまだ無い)。</summary>
@@ -153,13 +151,6 @@ namespace UI.Game2D.Battle
             {
                 case Kind.King:
                     _rel = FxSheet.Load("gouka-release"); _scr = FxSheet.Load("gouka-screen" + Ash(ash)); _imp = FxSheet.Load("gouka-impact" + Ash(ash));
-                    _impIdx = null;
-                    if (_imp != null)
-                    {
-                        var idx = new List<int>(); int q = 0;
-                        while (q < _imp.FrameCount) { idx.Add(q); int n = idx.Count; q += n <= SLOW ? 1 : n <= SLOW + 2 ? 2 : 3; }
-                        _impIdx = idx.ToArray();
-                    }
                     break;
                 case Kind.Judge: _ver2 = FxSheet.Load("judge-verdict"); break;
                 case Kind.Chevalier: _rel = FxSheet.Load("chevalier-slash"); break;
@@ -170,14 +161,24 @@ namespace UI.Game2D.Battle
             if (_seg != Seg.Idle && _seg != Seg.Charge) StartHeavy(0, _clock);
         }
 
-        private int EntryStep => _kind == Kind.Judge ? 8 : 6;
+        // ── 時刻 (2026-11-15: 絵を 1 秒 24 コマにした。 見本の式は 8 コマのコマ番号 i で書かれているので、 t = i / 8 を秒に直して同じ値を出す) ──
+        /// <summary>画面に出すコマの刻み (1 秒のコマ数)。 時刻はこの刻みに丸めてから式に入れる (60 fps で描いても、 見える絵は 24 コマの絵)。</summary>
+        public const double FPS = 24.0;
+        /// <summary>見本の 8 コマ刻みの 1 コマ (秒)。 揺れの表・帯のずれの表・ヴェスカ 4 段目の止める長さは、 見本どおり 8 コマ刻みのまま。</summary>
+        private const double S8 = 1.0 / 8.0;
+        /// <summary>待機から大技へ入ってよい待機の位置の刻み (秒): 王・シュヴァリエ = 0 と 0.75 の 2 か所・審判官 = 1 秒ごと (4 版)・ヴェスカ = 0.75 秒ごと (4 版)。</summary>
+        private double EntryStepSec => _kind == Kind.Judge ? 1.0 : 0.75;
+        private int EntryStepFrames => _idle != null ? Math.Max(1, (int)Math.Round(EntryStepSec * _idle.Fps)) : 1;
         private bool EntryOk(int idleFrame)
-            => _kind == Kind.King || _kind == Kind.Chevalier ? idleFrame == 0 || idleFrame == 6 : idleFrame % EntryStep == 0;
+        {
+            int st = EntryStepFrames;
+            return _kind == Kind.King || _kind == Kind.Chevalier ? idleFrame == 0 || idleFrame == st : idleFrame % st == 0;
+        }
 
         private void StartHeavy(int idleFrame, double t0)
         {
             _heavyPending = false; _hitDone = false; _frozen = null; _frozenTinted = false;
-            int v = _kind == Kind.King || _kind == Kind.Chevalier ? 0 : idleFrame / EntryStep;
+            int v = _kind == Kind.King || _kind == Kind.Chevalier ? 0 : idleFrame / EntryStepFrames;
             _ver = v;
             if (_kind == Kind.Judge) _rel = FxSheet.Load("judge-release-p" + v);
             else if (_kind == Kind.Vesca) _rel = FxSheet.Load("vesca-stop-p" + v);
@@ -186,75 +187,71 @@ namespace UI.Game2D.Battle
             _seg = Seg.Heavy; _t0 = t0;
         }
 
-        /// <summary>いまの区間のコマの番号 (1 秒 8 コマ)。</summary>
-        private int FrameI => (int)Math.Floor((_clock - _t0) * 8.0 + 1e-6);
+        /// <summary>いまの区間の経過 (秒・1 秒 24 コマに丸めた値)。</summary>
+        private double T => Math.Floor((_clock - _t0) * FPS + 1e-6) / FPS;
+        /// <summary>絵 s の、 経過 t 秒のコマの番号。</summary>
+        private static int Fr(FxSheet s, double t) => s == null ? -1 : (int)Math.Floor(t * s.Fps + 1e-6);
 
         public void Tick(float dt)
         {
             _clock += dt;
-            if (_seg == Seg.Charge && FrameI >= _charge.FrameCount) { _t0 += _charge.FrameCount / 8.0; _seg = Seg.Idle; _lastIdleI = -1; }
+            if (_seg == Seg.Charge && _clock - _t0 >= _charge.Seconds - 1e-9) { _t0 += _charge.Seconds; _seg = Seg.Idle; _lastIdleI = -1; }
             if (_seg == Seg.Idle)
             {
-                int i = FrameI, k = i % _idle.FrameCount;
-                if (_heavyPending && i != _lastIdleI && EntryOk(k)) StartHeavy(k, _t0 + i / 8.0);
+                int i = Fr(_idle, _clock - _t0), k = i % _idle.FrameCount;
+                if (_heavyPending && i != _lastIdleI && EntryOk(k)) StartHeavy(k, _t0 + i / (double)_idle.Fps);
                 else _lastIdleI = i;
             }
             if (_seg == Seg.Heavy)
             {
-                int i = FrameI;
-                if (!_hitDone && i >= HitFrame) { _hitDone = true; OnHit?.Invoke(); }
-                if (i >= HeavyLength) { _seg = Seg.None; if (!_hitDone) { _hitDone = true; OnHit?.Invoke(); } }
+                double t = T;
+                if (!_hitDone && t >= HitSec - 1e-9) { _hitDone = true; OnHit?.Invoke(); }
+                if (t >= HeavySec - 1e-9) { _seg = Seg.None; if (!_hitDone) { _hitDone = true; OnHit?.Invoke(); } }
             }
         }
 
-        // ── 大技の長さと当たる拍子 (見本の 1 秒 8 コマのコマ番号) ──
-        private int OffK => (int)Math.Round(LEAD_K * 8);
-        private int HeavyLength
+        // ── 大技の長さと当たる拍子 (秒・見本の 8 コマのコマ番号 ÷ 8) ──
+        private const double OffK = 11 * S8;                 // 王: 着弾の始まり = round(LEAD 1.4 × 8) = 11 コマ目
+        private const double OffJ = 11 * S8;                 // 審判官: 降りる光の始まり (白く飛ぶコマの 1 つ前)
+        private const double SplitC = 8 * S8;                // シュヴァリエ: int(SPLIT × 8) + 1 = 8 コマ目 (割れ始めの次・揺れの始まり)
+        private const double LeadV = LEAD_V;                 // ヴェスカ: 溜め 8 コマ = 1 秒
+        // 4 段目の乱れ: 0〜3/8 秒は乱れを流す → 3/8 秒の絵を 12/8 秒まで止める (見本: 3 コマ目を 9 コマ) → 4/8〜6/8 秒の絵を 12/8〜15/8 秒に → 15/8 秒から消灯
+        private const double HoldA = HOLD_AT * S8, HoldB = (HOLD_AT + HOLD_N + 1) * S8, GlitchEnd = (HOLD_AT + HOLD_N + 1 + ((int)(GLITCH * 8) - HOLD_AT - 1)) * S8;
+
+        /// <summary>王の着弾の、 始まりから τ 秒のコマ (24 コマの絵の番号・小数)。 見本の拾い方 (最初の 6 コマ 1 つずつ → 2 つ飛ばし × 2 → 3 つ飛ばし・8 コマ刻み) を秒の折れ線にした物:
+        /// τ &lt; 0.75 = τ × 8 (1/3 の速さ)・τ &lt; 1.0 = 6 + (τ − 0.75) × 16・それ以降 = 10 + (τ − 1.0) × 24 (8 コマ刻みの点で見本の 0,1,…,5,6,8,10,13,… と一致)。</summary>
+        private static double ImpactContent(double tau) => tau < 0.75 ? tau * 8 : tau < 1.0 ? 6 + (tau - 0.75) * 16 : 10 + (tau - 1.0) * 24;
+        private static double ImpactEnd(int frames) => frames <= 6 ? frames / 8.0 : frames <= 10 ? 0.75 + (frames - 6) / 16.0 : 1.0 + (frames - 10) / 24.0;
+
+        private double HeavySec
         {
             get
             {
                 switch (_kind)
                 {
-                    case Kind.King: return Math.Max(Math.Max((_impIdx?.Length ?? 0) + OffK, _scr?.FrameCount ?? 0), _rel.FrameCount);
-                    case Kind.Judge: return Math.Max(_rel.FrameCount, (int)Math.Round(LEAD_J * 8) + (_ver2?.FrameCount ?? 0));
-                    case Kind.Chevalier: return Math.Max(_rel.FrameCount, (int)(SPLIT_C * 8) + 1 + 6);      // 揺れは絵の後ろの空のコマ (捨てた) まで続く
-                    case Kind.Vesca: return (int)(LEAD_V * 8) + (_shatter?.FrameCount ?? 0);
-                    case Kind.VescaFinal: return (int)(LEAD_V * 8) + P4Parts.Count + 4;      // 見本: 戻った後も 4 コマ (帯の乱れが残る)
+                    case Kind.King: return Math.Max(Math.Max(OffK + (_imp != null ? ImpactEnd(_imp.FrameCount) : 0), _scr?.Seconds ?? 0), _rel.Seconds);
+                    case Kind.Judge: return Math.Max(_rel.Seconds, OffJ + (_ver2?.Seconds ?? 0));
+                    case Kind.Chevalier: return Math.Max(_rel.Seconds, SplitC + 6 * S8);      // 揺れは絵の後ろの空のコマ (捨てた) まで続く
+                    case Kind.Vesca: return LeadV + (_shatter?.Seconds ?? 0);
+                    case Kind.VescaFinal: return LeadV + GlitchEnd + (_off?.Seconds ?? 0) + 4 * S8;      // 見本: 戻った後も 4 コマ (帯の乱れが残る)
                     default: return 0;
                 }
             }
         }
-        /// <summary>王 = 白く飛ぶコマ (着弾の始まり)・審判官 = 光が降りて白く飛ぶコマ・シュヴァリエ = 割れ始め (揺れの始まり)・
-        /// ヴェスカ 1〜3 段目 = 砕けるコマ (揺れの始まり)・4 段目 = 乱れの始まり。</summary>
-        private int HitFrame
+        /// <summary>王 = 白く飛ぶ所 (着弾の始まり)・審判官 = 光が降りて白く飛ぶ所・シュヴァリエ = 割れ始め (揺れの始まり)・
+        /// ヴェスカ 1〜3 段目 = 砕ける所 (揺れの始まり)・4 段目 = 乱れの始まり。</summary>
+        private double HitSec
         {
             get
             {
                 switch (_kind)
                 {
                     case Kind.King: return OffK;
-                    case Kind.Judge: return (int)Math.Round(LEAD_J * 8) + 1;
-                    case Kind.Chevalier: return (int)(SPLIT_C * 8) + 1;
-                    case Kind.Vesca: return (int)(LEAD_V * 8) + 4;
-                    default: return (int)(LEAD_V * 8);
+                    case Kind.Judge: return OffJ + S8;
+                    case Kind.Chevalier: return SplitC;
+                    case Kind.Vesca: return LeadV + 4 * S8;
+                    default: return LeadV;
                 }
-            }
-        }
-
-        // 4 段目の全画面の効果の並び: 乱れの 0〜2 コマ目 → 3 コマ目を HOLD_N + 1 コマ止める → 4〜6 コマ目 → 消灯 (vesca_flow_preview.py の parts)
-        private List<KeyValuePair<FxSheet, int>> _p4;
-        private List<KeyValuePair<FxSheet, int>> P4Parts
-        {
-            get
-            {
-                if (_p4 != null && _p4.Count > 0 && _p4[_p4.Count - 1].Key == _off) return _p4;
-                _p4 = new List<KeyValuePair<FxSheet, int>>();
-                if (_glitch == null || _off == null) return _p4;
-                for (int k = 0; k < HOLD_AT; k++) _p4.Add(new KeyValuePair<FxSheet, int>(_glitch, k));
-                for (int k = 0; k < HOLD_N + 1; k++) _p4.Add(new KeyValuePair<FxSheet, int>(_glitch, HOLD_AT));
-                for (int k = HOLD_AT + 1; k < (int)(GLITCH * 8); k++) _p4.Add(new KeyValuePair<FxSheet, int>(_glitch, k));
-                for (int k = 0; k < _off.FrameCount; k++) _p4.Add(new KeyValuePair<FxSheet, int>(_off, k));
-                return _p4;
             }
         }
 
@@ -284,18 +281,19 @@ namespace UI.Game2D.Battle
             for (int i = 0; i < fb.Length; i++) { uint p = fb[i]; fb[i] = BattleCanvas.Pack(lr[p & 255], lg[(p >> 8) & 255], lb[(p >> 16) & 255]); }
         }
 
-        /// <summary>暗幕の倍率 (見本の dark の a を m = 1 − 0.5a / 1 − a にした物)。 1 = 暗くしない。 −1 = 真っ黒の板 (シュヴァリエの一拍)。</summary>
+        /// <summary>暗幕の倍率 (見本の dark の a を m = 1 − 0.5a / 1 − a にした物)。 1 = 暗くしない。 −1 = 真っ黒の板 (シュヴァリエの一拍)。
+        /// 見本はチャージを 8 コマのコマ番号 i で書いているので、 f8 = t × 8 (小数) を入れる。</summary>
         private double DarkMul()
         {
             if (_seg == Seg.None) return 1.0;
-            int i = FrameI; double t = i / 8.0;
+            double t = T, f8 = t * 8.0;
             bool half = _kind == Kind.King || _kind == Kind.Judge;
             double a;
             if (_seg == Seg.Charge)
             {
-                if (_kind == Kind.Chevalier) a = 0.3 * Math.Min(1.0, i / 6.0) + (DARK_C - 0.3) * Math.Max(0.0, Math.Min(1.0, (i - 13) / 3.0));
-                else if (half) a = Math.Min(1.0, i / 6.0);
-                else a = DARK_V * Math.Min(1.0, i / 6.0);
+                if (_kind == Kind.Chevalier) a = 0.3 * Math.Min(1.0, f8 / 6.0) + (DARK_C - 0.3) * Math.Max(0.0, Math.Min(1.0, (f8 - 13) / 3.0));
+                else if (half) a = Math.Min(1.0, f8 / 6.0);
+                else a = DARK_V * Math.Min(1.0, f8 / 6.0);
             }
             else if (_seg == Seg.Idle) a = _kind == Kind.Chevalier ? DARK_C : half ? 1.0 : DARK_V;
             else
@@ -305,7 +303,7 @@ namespace UI.Game2D.Battle
                     case Kind.King: a = 1 - Sm(LEAD_K, LEAD_K + 0.4, t); break;
                     case Kind.Judge: a = 1 - Sm(LEAD_J, LEAD_J + 0.4, t); break;
                     case Kind.Chevalier: if (t >= CUT_C) return 1.0; if (t >= LEAD_C * 0.8) return -1.0; a = DARK_C; break;
-                    default: a = i < (int)(LEAD_V * 8) ? DARK_V : 0.0; break;
+                    default: a = t < LeadV - 1e-9 ? DARK_V : 0.0; break;
                 }
             }
             return half ? 1 - 0.5 * a : 1 - a;
@@ -331,84 +329,88 @@ namespace UI.Game2D.Battle
         public void DrawLayers(BattleCanvas c)
         {
             if (_seg == Seg.None) return;
-            int i = FrameI;
-            if (_seg == Seg.Charge) { Paste(c, _charge, i, VX, VY); return; }
-            if (_seg == Seg.Idle) { Paste(c, _idle, i % _idle.FrameCount, VX, VY); return; }
-            double t = i / 8.0;
+            double t = T;
+            if (_seg == Seg.Charge) { Paste(c, _charge, Fr(_charge, t), VX, VY); return; }
+            if (_seg == Seg.Idle) { Paste(c, _idle, Fr(_idle, t) % _idle.FrameCount, VX, VY); return; }
             switch (_kind)
             {
                 case Kind.King:
                 {
-                    int j = i - OffK; double e1 = LEAD_K + RUSH + HOLD;
-                    if (_impIdx != null && j >= 0 && j < _impIdx.Length) Paste(c, _imp, _impIdx[j], EX, FLOOR);
-                    if (_scr != null) Paste(c, _scr, i, 0, 0);
+                    double tau = t - OffK, e1 = LEAD_K + RUSH + HOLD;
+                    if (_imp != null && tau >= -1e-9) { int k = (int)Math.Floor(ImpactContent(Math.Max(0, tau)) + 1e-6); if (k < _imp.FrameCount) Paste(c, _imp, k, EX, FLOOR); }
+                    if (_scr != null) Paste(c, _scr, Fr(_scr, t), 0, 0);
                     double ra = (t < LEAD_K ? 0.45 * Sm(0, LEAD_K, t) : 0.55 + 0.45 * (1 - Sm(LEAD_K, LEAD_K + 0.5, t))) * (1 - Sm(e1, e1 + COOL, t));
                     Red(c, ra); GuiRed = ra > 0.01 ? (float)ra : 0f;
-                    Paste(c, _rel, i, 0, 0);      // 発光は赤いフィルターの上 (白く飛ぶ)
+                    Paste(c, _rel, Fr(_rel, t), 0, 0);      // 発光は赤いフィルターの上 (白く飛ぶ)
                     break;
                 }
                 case Kind.Judge:
                 {
-                    int j = i - (int)Math.Round(LEAD_J * 8);
-                    if (_ver2 != null && j >= 0) Paste(c, _ver2, j, 0, 0);
-                    Paste(c, _rel, i, 0, 0);
+                    double j = t - OffJ;
+                    if (_ver2 != null && j >= -1e-9) Paste(c, _ver2, Fr(_ver2, Math.Max(0, j)), 0, 0);
+                    Paste(c, _rel, Fr(_rel, t), 0, 0);
                     break;
                 }
-                case Kind.Chevalier: Paste(c, _rel, i, 0, 0); break;
+                case Kind.Chevalier: Paste(c, _rel, Fr(_rel, t), 0, 0); break;
                 case Kind.Vesca:
                 {
-                    int n1 = (int)(LEAD_V * 8);
-                    if (i < n1)
+                    if (t < LeadV - 1e-9)
                     {
-                        Paste(c, _rel, Math.Min(i, _rel.FrameCount - 1), VX, VY);
+                        Paste(c, _rel, Math.Min(Fr(_rel, t), _rel.FrameCount - 1), VX, VY);
                         // 止まった瞬間の画面の写し: 溜めの最後のコマ (見本の seq[-1])。 描くたびに写し直し、 最後に描いた物が残る (コマを飛ばした時も直前のコマが残る)
                         if (_frozen == null) _frozen = new uint[W * H];
                         Array.Copy(c.FB, _frozen, _frozen.Length); _frozenTinted = false;
                         break;
                     }
-                    int jj = i - n1;
+                    double jj = t - LeadV;
                     if (_frozen != null)
                     {
                         if (!_frozenTinted) { FrozenTint(_frozen); _frozenTinted = true; }
-                        var geom = _shards != null && jj < _shards.Count ? _shards[jj] : null;
+                        int gi = (int)Math.Floor(jj * _shardsFps + 1e-6);
+                        var geom = _shards != null && gi < _shards.Count ? _shards[gi] : null;
                         if (geom == null) Array.Copy(_frozen, c.FB, _frozen.Length);      // 割れる前は 1 枚
                         else Shattered(c, geom);                                            // 割れたら破片 (後ろは動いているふつうの画面)
                     }
-                    if (_shatter != null) Paste(c, _shatter, jj, 0, 0);
+                    if (_shatter != null) Paste(c, _shatter, Fr(_shatter, jj), 0, 0);
                     break;
                 }
                 case Kind.VescaFinal:
                 {
-                    int n1 = (int)(LEAD_V * 8);
-                    if (i < n1) { Paste(c, _rel, Math.Min(i, _rel.FrameCount - 1), VX, VY); break; }
-                    var parts = P4Parts; int jj = i - n1;
-                    if (jj < parts.Count) Paste(c, parts[jj].Key, parts[jj].Value, 0, 0);
+                    if (t < LeadV - 1e-9) { Paste(c, _rel, Math.Min(Fr(_rel, t), _rel.FrameCount - 1), VX, VY); break; }
+                    double tau = t - LeadV;
+                    if (tau < GlitchEnd - 1e-9)
+                    {
+                        double g = tau < HoldA ? tau : tau < HoldB ? HoldA : tau - (HoldB - (HOLD_AT + 1) * S8);      // 止めた後は 4/8 秒の絵から
+                        Paste(c, _glitch, Fr(_glitch, g), 0, 0);
+                    }
+                    else if (_off != null) Paste(c, _off, Fr(_off, tau - GlitchEnd), 0, 0);
                     break;
                 }
             }
         }
 
-        /// <summary>全部描いた後に呼ぶ: 揺れ (空いた所は見本の地の色) と、 ヴェスカ 4 段目の帯のずれ。</summary>
+        /// <summary>全部描いた後に呼ぶ: 揺れ (空いた所は見本の地の色) と、 ヴェスカ 4 段目の帯のずれ (帯の表は 8 コマ刻み)。</summary>
         public void Post(BattleCanvas c)
         {
             if (_seg == Seg.None) return;
-            int i = FrameI;
+            double t = T;
+            int i8 = (int)Math.Floor(t * 8.0 + 1e-6);
             if (_kind == Kind.VescaFinal && _tear != null)
             {
                 List<Band> bands = null;
-                if (_seg == Seg.Charge) bands = i < _tearCharge.Count ? _tearCharge[i] : null;
-                else if (_seg == Seg.Idle) bands = _tearIdle.Count > 0 ? _tearIdle[(i % _idle.FrameCount) % _tearIdle.Count] : null;
-                else if (_seg == Seg.Heavy) bands = i < _tear.Count ? _tear[i] : null;
+                if (_seg == Seg.Charge) bands = i8 < _tearCharge.Count ? _tearCharge[i8] : null;
+                else if (_seg == Seg.Idle) bands = _tearIdle.Count > 0 ? _tearIdle[(i8 % _tearIdle.Count + _tearIdle.Count) % _tearIdle.Count] : null;
+                else if (_seg == Seg.Heavy) bands = i8 < _tear.Count ? _tear[i8] : null;
                 if (bands != null && bands.Count > 0) Torn(c, bands);
                 return;
             }
             if (_seg != Seg.Heavy) return;
             switch (_kind)
             {
-                case Kind.King: { int j = i - OffK - 2; if (j >= 0 && j < 7) Shift(c, Shake7[j, 0], Shake7[j, 1], FillK); break; }
-                case Kind.Judge: { int j = i - (int)Math.Round(LEAD_J * 8) - 2; if (j >= 0 && j < 7) Shift(c, Shake7[j, 0], Shake7[j, 1], FillJ); break; }
-                case Kind.Chevalier: { int j = i - (int)(SPLIT_C * 8) - 1; if (j >= 0 && j < 6) Shift(c, Shake6C[j, 0], Shake6C[j, 1], FillC); break; }
-                case Kind.Vesca: { int j = i - (int)(LEAD_V * 8) - 4; if (j >= 0 && j < 6) Shift(c, Shake6V[j, 0], Shake6V[j, 1], FillV); break; }
+                case Kind.King: { int j = (int)Math.Floor((t - OffK) * 8.0 + 1e-6) - 2; if (j >= 0 && j < 7) Shift(c, Shake7[j, 0], Shake7[j, 1], FillK); break; }
+                case Kind.Judge: { int j = (int)Math.Floor((t - OffJ) * 8.0 + 1e-6) - 2; if (j >= 0 && j < 7) Shift(c, Shake7[j, 0], Shake7[j, 1], FillJ); break; }
+                case Kind.Chevalier: { int j = (int)Math.Floor((t - SplitC) * 8.0 + 1e-6); if (j >= 0 && j < 6) Shift(c, Shake6C[j, 0], Shake6C[j, 1], FillC); break; }
+                case Kind.Vesca: { int j = (int)Math.Floor((t - LeadV) * 8.0 + 1e-6) - 4; if (j >= 0 && j < 6) Shift(c, Shake6V[j, 0], Shake6V[j, 1], FillV); break; }
             }
         }
 
@@ -443,6 +445,7 @@ namespace UI.Game2D.Battle
 
         private sealed class Shard { public double[] sx, sy, dx, dy; }
         private List<List<Shard>> _shards;
+        private double _shardsFps = 8.0;
 
         private void LoadShards()
         {
@@ -450,6 +453,7 @@ namespace UI.Game2D.Battle
             var a = Resources.Load<TextAsset>("Game2DFx/vesca-shards");
             if (a == null) { Debug.LogWarning("[BossFx] Resources/Game2DFx/vesca-shards が無い"); return; }
             var root = FxJson.Parse(a.text) as Dictionary<string, object>;
+            _shardsFps = root.TryGetValue("fps", out var fo) ? Math.Max(1, FxJson.Num(fo)) : 8.0;      // 破片の形の表のコマの刻み (書き出しと同じ 24)
             foreach (var f in (List<object>)root["frames"])
             {
                 if (f == null) { _shards.Add(null); continue; }

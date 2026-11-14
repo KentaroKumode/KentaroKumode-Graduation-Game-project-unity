@@ -12,7 +12,7 @@
     "w": 220,
     "h": 210
    },
-   "duration": 125
+   "duration": 42
   },
   {
    "filename": "poison-tick 1",
@@ -26,7 +26,7 @@
     "w": 220,
     "h": 210
    },
-   "duration": 125
+   "duration": 42
   },
   {
    "filename": "poison-tick 2",
@@ -40,7 +40,7 @@
     "w": 220,
     "h": 210
    },
-   "duration": 125
+   "duration": 42
   },
   {
    "filename": "poison-tick 3",
@@ -54,13 +54,13 @@
     "w": 220,
     "h": 210
    },
-   "duration": 125
+   "duration": 42
   },
   {
    "filename": "poison-tick 4",
    "frame": {
-    "x": 0,
-    "y": 210,
+    "x": 880,
+    "y": 0,
     "w": 220,
     "h": 210
    },
@@ -68,13 +68,13 @@
     "w": 220,
     "h": 210
    },
-   "duration": 125
+   "duration": 42
   },
   {
    "filename": "poison-tick 5",
    "frame": {
-    "x": 220,
-    "y": 210,
+    "x": 1100,
+    "y": 0,
     "w": 220,
     "h": 210
    },
@@ -82,13 +82,13 @@
     "w": 220,
     "h": 210
    },
-   "duration": 125
+   "duration": 42
   },
   {
    "filename": "poison-tick 6",
    "frame": {
-    "x": 440,
-    "y": 210,
+    "x": 1320,
+    "y": 0,
     "w": 220,
     "h": 210
    },
@@ -96,11 +96,53 @@
     "w": 220,
     "h": 210
    },
-   "duration": 125
+   "duration": 42
   },
   {
    "filename": "poison-tick 7",
    "frame": {
+    "x": 0,
+    "y": 210,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 8",
+   "frame": {
+    "x": 220,
+    "y": 210,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 9",
+   "frame": {
+    "x": 440,
+    "y": 210,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 10",
+   "frame": {
     "x": 660,
     "y": 210,
     "w": 220,
@@ -110,10 +152,52 @@
     "w": 220,
     "h": 210
    },
-   "duration": 125
+   "duration": 42
   },
   {
-   "filename": "poison-tick 8",
+   "filename": "poison-tick 11",
+   "frame": {
+    "x": 880,
+    "y": 210,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 12",
+   "frame": {
+    "x": 1100,
+    "y": 210,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 13",
+   "frame": {
+    "x": 1320,
+    "y": 210,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 14",
    "frame": {
     "x": 0,
     "y": 420,
@@ -124,10 +208,10 @@
     "w": 220,
     "h": 210
    },
-   "duration": 125
+   "duration": 42
   },
   {
-   "filename": "poison-tick 9",
+   "filename": "poison-tick 15",
    "frame": {
     "x": 220,
     "y": 420,
@@ -138,10 +222,10 @@
     "w": 220,
     "h": 210
    },
-   "duration": 125
+   "duration": 42
   },
   {
-   "filename": "poison-tick 10",
+   "filename": "poison-tick 16",
    "frame": {
     "x": 440,
     "y": 420,
@@ -152,10 +236,10 @@
     "w": 220,
     "h": 210
    },
-   "duration": 125
+   "duration": 42
   },
   {
-   "filename": "poison-tick 11",
+   "filename": "poison-tick 17",
    "frame": {
     "x": 660,
     "y": 420,
@@ -166,10 +250,52 @@
     "w": 220,
     "h": 210
    },
-   "duration": 125
+   "duration": 42
   },
   {
-   "filename": "poison-tick 12",
+   "filename": "poison-tick 18",
+   "frame": {
+    "x": 880,
+    "y": 420,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 19",
+   "frame": {
+    "x": 1100,
+    "y": 420,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 20",
+   "frame": {
+    "x": 1320,
+    "y": 420,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 21",
    "frame": {
     "x": 0,
     "y": 630,
@@ -180,10 +306,10 @@
     "w": 220,
     "h": 210
    },
-   "duration": 125
+   "duration": 42
   },
   {
-   "filename": "poison-tick 13",
+   "filename": "poison-tick 22",
    "frame": {
     "x": 220,
     "y": 630,
@@ -194,20 +320,244 @@
     "w": 220,
     "h": 210
    },
-   "duration": 125
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 23",
+   "frame": {
+    "x": 440,
+    "y": 630,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 24",
+   "frame": {
+    "x": 660,
+    "y": 630,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 25",
+   "frame": {
+    "x": 880,
+    "y": 630,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 26",
+   "frame": {
+    "x": 1100,
+    "y": 630,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 27",
+   "frame": {
+    "x": 1320,
+    "y": 630,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 28",
+   "frame": {
+    "x": 0,
+    "y": 840,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 29",
+   "frame": {
+    "x": 220,
+    "y": 840,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 30",
+   "frame": {
+    "x": 440,
+    "y": 840,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 31",
+   "frame": {
+    "x": 660,
+    "y": 840,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 32",
+   "frame": {
+    "x": 880,
+    "y": 840,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 33",
+   "frame": {
+    "x": 1100,
+    "y": 840,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 34",
+   "frame": {
+    "x": 1320,
+    "y": 840,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 35",
+   "frame": {
+    "x": 0,
+    "y": 1050,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 36",
+   "frame": {
+    "x": 220,
+    "y": 1050,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 37",
+   "frame": {
+    "x": 440,
+    "y": 1050,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
+  },
+  {
+   "filename": "poison-tick 38",
+   "frame": {
+    "x": 660,
+    "y": 1050,
+    "w": 220,
+    "h": 210
+   },
+   "sourceSize": {
+    "w": 220,
+    "h": 210
+   },
+   "duration": 42
   }
  ],
  "meta": {
   "app": "pixelfx + lcd_export",
   "image": "poison-tick.png",
   "size": {
-   "w": 880,
-   "h": 840
+   "w": 1540,
+   "h": 1260
   },
   "pixelfx": {
    "id": "dicebound/poison-tick",
-   "fps": 8,
-   "frames": 14,
+   "fps": 24,
+   "frames": 39,
    "frameSize": [
     220,
     210

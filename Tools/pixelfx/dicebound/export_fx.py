@@ -25,13 +25,15 @@ VESCA_PHASES = [0, 0.75, 1.5, 2.25]                             # 待機 (24 コ
 
 # (ゲームでの名前, 効果の id, 色の組, fps, 設定, ループか)
 PLAN = []
-def add(name, fid, ink, opts=None, fps=8, loop=False): PLAN.append((name, fid, ink, fps, opts or {}, loop))
+# 2026-11-15 (作者の決定「他のも 24 コマにする」): 全部 1 秒 24 コマで焼く (効果の式は 30 fps で動いているので、 焼く刻みだけが変わる)
+FPS = 24
+def add(name, fid, ink, opts=None, fps=FPS, loop=False): PLAN.append((name, fid, ink, fps, opts or {}, loop))
 
 # ── #350 灰燼の王〈業火〉 (gouka_flow_preview.py) ──
 for a in range(ASH_MAX + 1):
     add("gouka-charge-a%d" % a, "dicebound/gouka-charge", "ash", {"ash": a})
     add("gouka-screen-a%d" % a, "dicebound/gouka-screen", "ash", dict(ash=a, depth=0.85, bias=0.2, mode="out", **GOUKA_O))
-    add("gouka-impact-a%d" % a, "dicebound/gouka-impact", "ash", {"ash": a, "ring": "fire-ring", "flame": 1}, fps=24)
+    add("gouka-impact-a%d" % a, "dicebound/gouka-impact", "ash", {"ash": a, "ring": "fire-ring", "flame": 1})
 add("gouka-charged", "dicebound/gouka-charged", "ash", {}, loop=True)
 add("gouka-release", "dicebound/gouka-release", "ash", {"lead": 1.4})
 # ── #351 審判官 (judge_flow_preview.py・judge_phase_preview.py) ──
@@ -132,7 +134,7 @@ def main(argv):
             print("%-26s %3d コマ (%d) %4dx%-4d %7.1f KB" % (name, len(frames), m["n"], sheet.width, sheet.height, len(data) / 1024.0))
         if not only or any("vesca".startswith(o) or o.startswith("vesca") for o in only):
             shards = os.path.join(tmp, "shards.json")
-            subprocess.run(["node", "lab/shard_dump.mjs", shards], cwd=PFX, check=True, stdout=subprocess.DEVNULL)
+            subprocess.run(["node", "lab/shard_dump.mjs", shards, "--fps", str(FPS)], cwd=PFX, check=True, stdout=subprocess.DEVNULL)
             shutil.copyfile(shards, os.path.join(DEST, "vesca-shards.json"))
             shutil.copyfile(os.path.join(PFX, "library", "dicebound", "vesca-tear.json"), os.path.join(DEST, "vesca-tear.json"))
             print("vesca-shards.json / vesca-tear.json")

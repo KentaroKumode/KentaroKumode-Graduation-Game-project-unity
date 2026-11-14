@@ -12,7 +12,7 @@
     "w": 260,
     "h": 170
    },
-   "duration": 125
+   "duration": 42
   },
   {
    "filename": "bleed-tick 1",
@@ -26,7 +26,7 @@
     "w": 260,
     "h": 170
    },
-   "duration": 125
+   "duration": 42
   },
   {
    "filename": "bleed-tick 2",
@@ -40,7 +40,7 @@
     "w": 260,
     "h": 170
    },
-   "duration": 125
+   "duration": 42
   },
   {
    "filename": "bleed-tick 3",
@@ -54,13 +54,13 @@
     "w": 260,
     "h": 170
    },
-   "duration": 125
+   "duration": 42
   },
   {
    "filename": "bleed-tick 4",
    "frame": {
-    "x": 0,
-    "y": 170,
+    "x": 1040,
+    "y": 0,
     "w": 260,
     "h": 170
    },
@@ -68,13 +68,13 @@
     "w": 260,
     "h": 170
    },
-   "duration": 125
+   "duration": 42
   },
   {
    "filename": "bleed-tick 5",
    "frame": {
-    "x": 260,
-    "y": 170,
+    "x": 1300,
+    "y": 0,
     "w": 260,
     "h": 170
    },
@@ -82,12 +82,12 @@
     "w": 260,
     "h": 170
    },
-   "duration": 125
+   "duration": 42
   },
   {
    "filename": "bleed-tick 6",
    "frame": {
-    "x": 520,
+    "x": 0,
     "y": 170,
     "w": 260,
     "h": 170
@@ -96,11 +96,39 @@
     "w": 260,
     "h": 170
    },
-   "duration": 125
+   "duration": 42
   },
   {
    "filename": "bleed-tick 7",
    "frame": {
+    "x": 260,
+    "y": 170,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 8",
+   "frame": {
+    "x": 520,
+    "y": 170,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 9",
+   "frame": {
     "x": 780,
     "y": 170,
     "w": 260,
@@ -110,41 +138,13 @@
     "w": 260,
     "h": 170
    },
-   "duration": 125
-  },
-  {
-   "filename": "bleed-tick 8",
-   "frame": {
-    "x": 0,
-    "y": 340,
-    "w": 260,
-    "h": 170
-   },
-   "sourceSize": {
-    "w": 260,
-    "h": 170
-   },
-   "duration": 125
-  },
-  {
-   "filename": "bleed-tick 9",
-   "frame": {
-    "x": 260,
-    "y": 340,
-    "w": 260,
-    "h": 170
-   },
-   "sourceSize": {
-    "w": 260,
-    "h": 170
-   },
-   "duration": 125
+   "duration": 42
   },
   {
    "filename": "bleed-tick 10",
    "frame": {
-    "x": 520,
-    "y": 340,
+    "x": 1040,
+    "y": 170,
     "w": 260,
     "h": 170
    },
@@ -152,13 +152,13 @@
     "w": 260,
     "h": 170
    },
-   "duration": 125
+   "duration": 42
   },
   {
    "filename": "bleed-tick 11",
    "frame": {
-    "x": 780,
-    "y": 340,
+    "x": 1300,
+    "y": 170,
     "w": 260,
     "h": 170
    },
@@ -166,12 +166,96 @@
     "w": 260,
     "h": 170
    },
-   "duration": 125
+   "duration": 42
   },
   {
    "filename": "bleed-tick 12",
    "frame": {
     "x": 0,
+    "y": 340,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 13",
+   "frame": {
+    "x": 260,
+    "y": 340,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 14",
+   "frame": {
+    "x": 520,
+    "y": 340,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 15",
+   "frame": {
+    "x": 780,
+    "y": 340,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 16",
+   "frame": {
+    "x": 1040,
+    "y": 340,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 17",
+   "frame": {
+    "x": 1300,
+    "y": 340,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 18",
+   "frame": {
+    "x": 0,
     "y": 510,
     "w": 260,
     "h": 170
@@ -180,10 +264,10 @@
     "w": 260,
     "h": 170
    },
-   "duration": 125
+   "duration": 42
   },
   {
-   "filename": "bleed-tick 13",
+   "filename": "bleed-tick 19",
    "frame": {
     "x": 260,
     "y": 510,
@@ -194,10 +278,10 @@
     "w": 260,
     "h": 170
    },
-   "duration": 125
+   "duration": 42
   },
   {
-   "filename": "bleed-tick 14",
+   "filename": "bleed-tick 20",
    "frame": {
     "x": 520,
     "y": 510,
@@ -208,20 +292,342 @@
     "w": 260,
     "h": 170
    },
-   "duration": 125
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 21",
+   "frame": {
+    "x": 780,
+    "y": 510,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 22",
+   "frame": {
+    "x": 1040,
+    "y": 510,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 23",
+   "frame": {
+    "x": 1300,
+    "y": 510,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 24",
+   "frame": {
+    "x": 0,
+    "y": 680,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 25",
+   "frame": {
+    "x": 260,
+    "y": 680,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 26",
+   "frame": {
+    "x": 520,
+    "y": 680,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 27",
+   "frame": {
+    "x": 780,
+    "y": 680,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 28",
+   "frame": {
+    "x": 1040,
+    "y": 680,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 29",
+   "frame": {
+    "x": 1300,
+    "y": 680,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 30",
+   "frame": {
+    "x": 0,
+    "y": 850,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 31",
+   "frame": {
+    "x": 260,
+    "y": 850,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 32",
+   "frame": {
+    "x": 520,
+    "y": 850,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 33",
+   "frame": {
+    "x": 780,
+    "y": 850,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 34",
+   "frame": {
+    "x": 1040,
+    "y": 850,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 35",
+   "frame": {
+    "x": 1300,
+    "y": 850,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 36",
+   "frame": {
+    "x": 0,
+    "y": 1020,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 37",
+   "frame": {
+    "x": 260,
+    "y": 1020,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 38",
+   "frame": {
+    "x": 520,
+    "y": 1020,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 39",
+   "frame": {
+    "x": 780,
+    "y": 1020,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 40",
+   "frame": {
+    "x": 1040,
+    "y": 1020,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 41",
+   "frame": {
+    "x": 1300,
+    "y": 1020,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 42",
+   "frame": {
+    "x": 0,
+    "y": 1190,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
+  },
+  {
+   "filename": "bleed-tick 43",
+   "frame": {
+    "x": 260,
+    "y": 1190,
+    "w": 260,
+    "h": 170
+   },
+   "sourceSize": {
+    "w": 260,
+    "h": 170
+   },
+   "duration": 42
   }
  ],
  "meta": {
   "app": "pixelfx + lcd_export",
   "image": "bleed-tick.png",
   "size": {
-   "w": 1040,
-   "h": 680
+   "w": 1560,
+   "h": 1360
   },
   "pixelfx": {
    "id": "dicebound/bleed-tick",
-   "fps": 8,
-   "frames": 15,
+   "fps": 24,
+   "frames": 44,
    "frameSize": [
     260,
     170
