@@ -251,9 +251,22 @@ namespace UI.Game2D.Battle
             Init(); FlushDot(); _wi = Mathf.Clamp(weaponIndex, 0, Weapons.Length - 1); _crit = crit; _dealt = dealt; _dealtSoFar = 0; _hitIdx = 0; _hitAgo = null; _critFxDone = false; _critT = -999f;
             var w = Weapons[_wi];
             _weaponSheet = WeaponSheetFamily != null && !IsDragon(_wi) ? FxSheet.Load("weapon-" + WeaponSheetFamily + (crit ? "-crit" : "-normal")) : null; _weaponSheetDone = false;
-            _anim = BattleMotion.MakePlan(IsDragon(_wi) && crit ? "dragon" : w.fam, crit, w.fam == "sword" && UnityEngine.Random.value < 0.5f);
+            // 2026-11-15 (作者の決定「武器のモーションは不要、 パーティクルだけでいい」): 武器の演出の絵があれば、 武器を振る動き (武器の絵・軌跡・斬撃痕) は出さず、
+            //   攻撃の頭から絵を流す。 ダメージの数字・音・揺れ・止めは、 絵の当たる所の時刻 (BattleMotion.WeaponSheetHits) に合わせる。
+            //   竜閃・素手・絵が読めなかった時は、 今までの動き (MakePlan)
+            var sheetPlan = _weaponSheet != null ? BattleMotion.SheetPlan(WeaponSheetFamily, crit, _weaponSheet.ActiveSeconds(BattleMotion.SheetTailFrac)) : null;
+            if (sheetPlan != null)
+            {
+                _anim = sheetPlan; _weaponSheetDone = true; _critFxDone = true;
+                _fx.Add(new FxPlay { s = _weaponSheet, x = _weaponSheet.PivotX, y = _weaponSheet.PivotY, add = false });
+                QaNote("weapon-" + WeaponSheetFamily + (crit ? "-crit" : "-normal"));
+            }
+            else
+            {
+                _anim = BattleMotion.MakePlan(IsDragon(_wi) && crit ? "dragon" : w.fam, crit, w.fam == "sword" && UnityEngine.Random.value < 0.5f);
+            }
             _phase = Phase.PAttack; _t = 0; _hitDone = false; _ghosts.Clear(); _cp.Clear(); Showing = true;
-            if (w.fam == "shield") Game2DSfx.PlayDelayed(crit ? "charge_shield_crit" : "charge_shield", 0.18f);      // 盾 = チャージ (チャージの演出の始まりから、 命中の瞬間まで音が上がる) → 命中で解放音 (hit_shield / crit_shield)
+            if (w.fam == "shield") Game2DSfx.PlayDelayed(crit ? "charge_shield_crit" : "charge_shield", sheetPlan != null ? 0f : 0.18f);      // 盾 = チャージ (チャージの演出の始まりから、 命中の瞬間まで音が上がる) → 命中で解放音 (hit_shield / crit_shield)
             else Game2DSfx.Play("slash_swing", 1f, w.fam == "axe" ? 0.75f : crit ? 0.9f : 1f);
         }
 

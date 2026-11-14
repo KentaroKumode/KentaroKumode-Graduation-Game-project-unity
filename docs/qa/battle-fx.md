@@ -12,5 +12,6 @@
 7. **演出だけを直接流す**（キー K / J / H / Space と同じ・戦闘の流れを通さない）: `DemoBoss("Judge")` → `DemoCharge()` → 待機が出たら `DemoHeavy()`。`DemoMove("move-king-regen")`・`DemoAttack("dagger", true)`。種類は `King` / `Judge` / `Chevalier` / `Vesca` / `VescaFinal`。
 8. **大技を GUI にも掛ける**（2026-11-14）: 揺れ・暗転・赤・白飛びが、左右のパネル・下の帯にも、液晶に近い所ほど強く掛かる（遠い所はほぼ掛からない）。`Status()` の `gui=[on=… weight=… dark=… red=… white=… shake=…]` が今 GUI に渡している値（`weight=False` の間は重みがまだ無く、GUI には何も掛からない）。大技でない時は `on=False`。乱れ・割れは GUI に掛からないのが正しい（4 段目の消灯は暗転なので掛かる）。重みは中央の戦闘の窓に接した所で 1、`Game2DGuiRt.HalfDots`（32 dot）ごとに半分（左右のパネルの奥の端で約 0.1）。地図そのものは `QaBattle.DumpGuiWeight("C:/…/w.png")` で PNG に書き出せる（白 = 1）。
 9. **絵の重さを測る**（2026-11-14）: `QaBattle.FxMemory()` = いま読み込んである絵（名前・持っている量 B・帯にしなかった時の量・読み込み ms・合計）。`QaBattle.HeavyFrameMs()` = 直近の大技の間の 1 フレームの最大時間（`frame=` 全体・`fx=` 戦闘演出の部品の処理）。絵は戦闘の入りに 1 フレーム 1 枚ずつ先に読み、戦闘の画面を離れたら武器・会心・毒・出血以外を捨てる。先に読めずに使う瞬間に読んだ時は、Console に `[FxSheet] 先に読めていない絵を使う瞬間に読んだ: 名前 (N ms)` が出る。
-10. **何が見えれば正しいか**は `docs/GAME.md` §23-5 の「戦闘演出」の行と、fx-integrate の報告（敵ごとの手順）。見本の GIF は `Captures/fxlib/_gouka/flow.html` ほか（git 管理外）。
-11. 新しく永続化の書き込み（PlayerPrefs・ファイル）を足す時は、`SaveGuard` を通すこと（通さないと、この確認でセーブが書き換わる）。
+10. **プレイヤーの攻撃**（2026-11-15〜）: 剣・斧・短剣・盾は武器を振らず、攻撃の頭から武器の絵が流れる。ダメージの数字・命中の音・揺れは絵の当たる所で出る（`BattleMotion.WeaponSheetHits`・剣 0.09 / 剣の会心 0.61 / 斧 0.11 / 短剣 0.57 / 短剣の会心 1.01 / 盾 0.14 秒。連撃の太刀は音と敵の白い光だけ）。`MoveLog()` には攻撃の頭で `weapon-…` が記録される。竜閃・素手は今までどおり武器を振る。
+11. **何が見えれば正しいか**は `docs/GAME.md` §23-5 の「戦闘演出」の行と、fx-integrate の報告（敵ごとの手順）。見本の GIF は `Captures/fxlib/_gouka/flow.html` ほか（git 管理外）。
+12. 新しく永続化の書き込み（PlayerPrefs・ファイル）を足す時は、`SaveGuard` を通すこと（通さないと、この確認でセーブが書き換わる）。

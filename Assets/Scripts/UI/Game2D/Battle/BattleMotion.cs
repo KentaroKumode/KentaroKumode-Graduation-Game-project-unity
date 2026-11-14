@@ -109,6 +109,54 @@ namespace UI.Game2D.Battle
             return Mathf.Atan2(pb.y - pa.y, pb.x - pa.x) * 180f / Mathf.PI;
         }
 
+        // =====================================================================
+        //  武器の演出の絵だけで攻撃する (2026-11-15・作者の決定「武器のモーションは不要、 パーティクルだけでいい」)
+        // =====================================================================
+
+        /// <summary>武器の演出の絵 (weapon-家系-normal / crit) の「当たる所」の時刻 (秒・絵の頭から)。 <b>調整はこの表だけ</b>。
+        /// kind: cut = 薄い当たり (命中の音と敵の白い光だけ・ダメージ無し) / それ以外 = ダメージが入る当たり (最後の 1 つにまとめて入れる)。
+        /// 初期値は絵を作ったコード (Tools/pixelfx/src/fx/dicebound/weapons.js の PLAN) から割り出した: 絵の上の時刻 = delay + 元の効果の時刻 ÷ speed。
+        /// <list type="bullet">
+        /// <item>剣・通常: 一太刀 (blade-slash) が振り切る sweep 0.06 ÷ 0.65 = 0.092</item>
+        /// <item>剣・会心: ぐるりと一周 (spin-slash) の輪が閉じる SW 0.17 ÷ 0.65 = 0.262 (薄い) → 交差の二太刀 (cross-slash・delay 0.3) の 1 太刀目 0.3 + 0.06 ÷ 0.65 = 0.392 (薄い)
+        ///   → 2 太刀目 0.3 + (UP 0.14 + 0.06) ÷ 0.65 = 0.608 (本当たり)</item>
+        /// <item>斧: 縦の刃 (chop) が足もとへ届く sweep 0.07 ÷ 0.65 = 0.108 (着地の土煙・地面の割れは delay 0.1 で、 ほぼ同時)</item>
+        /// <item>短剣・通常: 小さな斬撃 6 つ (dagger・t0 = i × 0.055・sweep 0.035) ÷ 0.75 = 0.047 / 0.120 / 0.193 / 0.267 / 0.340 / 0.413 (薄い)
+        ///   → 締めの一太刀 (t0 = 6 × 0.055 + 0.04・sweep 0.055) ÷ 0.75 = 0.567 (本当たり)</item>
+        /// <item>短剣・会心: 真横の大きな斬撃 sweep 0.07 ÷ 0.72 = 0.097 (薄い) → 小さな斬撃 6 つ (T_OFF 0.3 から) ÷ 0.72 = 0.465〜0.847 (薄い) → 締め 1.007 (本当たり)</item>
+        /// <item>盾: 柱 (slam-column) が落ちきる drop 0.14 = 下向きの突き (thrust・OUT 0.07 ÷ 0.5) = 着地の土煙の delay 0.14</item>
+        /// </list></summary>
+        public static readonly Dictionary<string, (float t, string kind)[]> WeaponSheetHits = new Dictionary<string, (float, string)[]>
+        {
+            { "sword-normal", new[] { (0.092f, "chop") } },
+            { "sword-crit", new[] { (0.262f, "cut"), (0.392f, "cut"), (0.608f, "finish") } },
+            { "axe-normal", new[] { (0.108f, "chop") } },
+            { "axe-crit", new[] { (0.108f, "chop") } },
+            { "dagger-normal", new[] { (0.047f, "cut"), (0.120f, "cut"), (0.193f, "cut"), (0.267f, "cut"), (0.340f, "cut"), (0.413f, "cut"), (0.567f, "finish") } },
+            { "dagger-crit", new[] { (0.097f, "cut"), (0.465f, "cut"), (0.542f, "cut"), (0.618f, "cut"), (0.694f, "cut"), (0.771f, "cut"), (0.847f, "cut"), (1.007f, "finish") } },
+            { "shield-normal", new[] { (0.14f, "slam") } },
+            { "shield-crit", new[] { (0.14f, "slam") } },
+        };
+
+        /// <summary>攻撃の長さに数える絵の末尾: 画素の数が一番多いコマの この割合 を下回った後のコマは待たない (絵は重ねて流れ続ける)。</summary>
+        public const float SheetTailFrac = 0.1f;
+
+        /// <summary>武器の演出の絵だけの攻撃: 姿勢 (武器の絵・軌跡) は持たず、 当たりの時刻だけを持つ。 total = 攻撃の長さ (絵の長さと、 最後の当たりの 0.05 秒後の長い方)。
+        /// 表に無ければ null (呼ぶ側は今までの動きにする)。</summary>
+        public static Plan SheetPlan(string fam, bool crit, float sheetSeconds)
+        {
+            if (fam == null || !WeaponSheetHits.TryGetValue(fam + (crit ? "-crit" : "-normal"), out var hs)) return null;
+            var P = new Plan { fam = fam };
+            float last = 0f;
+            foreach (var (t, kind) in hs)
+            {
+                P.hits.Add(new Hit { t = t, kind = kind, frac = kind == "cut" ? 0f : 1f, angFixed = true, fs = false });
+                last = Mathf.Max(last, t);
+            }
+            P.total = Mathf.Max(sheetSeconds, last + 0.05f);
+            return P;
+        }
+
         public static Pose PoseAt(Plan A, float t)
         {
             for (int i = 0; i < A.segs.Count; i++)
