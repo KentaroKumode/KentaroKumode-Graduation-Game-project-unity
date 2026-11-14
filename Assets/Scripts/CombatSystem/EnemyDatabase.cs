@@ -211,6 +211,9 @@ namespace CombatSystem
             return data;
         }
 
+        /// <summary>全ての敵の id (確認用の窓・演出テストが一覧に出す)。</summary>
+        public static List<string> AllIds() { EnsureInitialized(); return new List<string>(database.Keys); }
+
         /// <summary>
         /// 指定階層に出現する敵一覧を取得
         /// </summary>

@@ -93,7 +93,7 @@ namespace UI.Game2D.Battle
         private static readonly float[] Speeds = { 1f, 0.5f, 0.25f, 0.1f };
         private float _guiShake;      // 会心の衝撃で GUI を揺らす強さ (1 → 0)
         // スプライトシートのエフェクト (FxSheet・試作 2026-11-01): 会心の命中で pixelfx の crit-hit を 1 回出す
-        private sealed class FxPlay { public FxSheet s; public float t; public int x, y; public bool add = true; }
+        private sealed class FxPlay { public FxSheet s; public float t; public int x, y; public bool add = true; public float life = -1f; }      // life ≥ 0 = その秒数で外す (ループの絵の試験再生)
         private readonly List<FxPlay> _fx = new List<FxPlay>();
         private FxSheet _critFx; private bool _critFxDone;
         private const int CritFxLift = 26;      // crit-hit の星は基準点 (足もと) から 26 dot 上 (書き出しの height)
@@ -112,6 +112,23 @@ namespace UI.Game2D.Battle
         /// <summary>戦闘の流れを止める絵 (審判の炎) が終わる時刻 (<see cref="_clockU"/>)。</summary>
         private float _blockUntil, _clockU;
         private int _bossTaken;
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        /// <summary>[演出テストの窓] 演出の時計の速さ (1 = 普段・0 = 一時停止) と、 次のフレームに 1 回だけ足す秒 (1 コマ送り = 0.125)。</summary>
+        public static float QaSpeed = 1f, QaStepSeconds;
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void QaResetSpeed() { QaSpeed = 1f; QaStepSeconds = 0f; }
+
+        /// <summary>[演出テストの窓] 任意の絵を 1 回流す。 画面全体の絵は左上に合わせ、 それより小さい絵は基準点を (ax, ay) に置く。 ループの絵は loopSeconds 秒で外す。</summary>
+        public void QaPlaySheet(string name, int ax, int ay, float loopSeconds = 4f)
+        {
+            Init(); Showing = true;
+            var s = FxSheet.Load(name); if (s == null) return;
+            bool full = s.W == W && s.H == H;
+            _fx.Add(new FxPlay { s = s, x = full ? s.PivotX : ax, y = full ? s.PivotY : ay, add = false, life = s.Loop ? loopSeconds : -1f });
+            QaNote(name + " (試験)");
+        }
+#endif
 
         // ── 絵を先に読む (2026-11-14・FxSheet.Preload) ──
         private readonly Queue<string> _preload = new Queue<string>();
@@ -370,6 +387,10 @@ namespace UI.Game2D.Battle
             if (!Showing) { if (plotQuad != null) plotQuad.enabled = false; if (_guiFxWas) { _guiFxWas = false; Game2DGuiRt.SetBossFx(false, 1f, 0f, 0f, Color.white, Vector2.zero); } return; }
             Init();
             float rawDt = Mathf.Min(0.05f, Time.unscaledDeltaTime);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // 演出テストの窓 (Tools/DICE BOUND/演出テスト) の速さ・一時停止・1 コマ送り。 既定 (速さ 1・送り 0) は何も変えない
+            if (QaSpeed != 1f || QaStepSeconds > 0f) { rawDt = rawDt * QaSpeed + QaStepSeconds; QaStepSeconds = 0f; }
+#endif
             float dt = rawDt * (_phase == Phase.PAttack ? _timeScale : 1f);
             _clockU += rawDt; _boss.Tick(rawDt);      // ボスの絵はヒットストップ・攻撃の速さ (T) に左右されない
             Tick(dt);
@@ -873,7 +894,7 @@ namespace UI.Game2D.Battle
                 if (d.sz >= 5) _c.Rect(Mathf.RoundToInt(d.x) + 1, Mathf.RoundToInt(d.y) + 1, d.sz - 2, d.sz - 2, new Col(255, 255, 245), a, true);      // 大きい破片は芯が白い
             }
             foreach (var p in _sparks) { float a = Cl(1 - p.t / p.life, 0, 1); _c.Rect(Mathf.RoundToInt(p.x), Mathf.RoundToInt(p.y), 2, 2, p.c, a, true); }
-            _fx.RemoveAll(f => !f.s.Draw(_c, f.t, f.x, f.y, f.add));
+            _fx.RemoveAll(f => (f.life >= 0f && f.t >= f.life) || !f.s.Draw(_c, f.t, f.x, f.y, f.add));
         }
 
         // ── 敵の周りの印 (2026-11-11) ──

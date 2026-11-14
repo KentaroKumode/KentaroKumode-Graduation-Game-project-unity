@@ -218,6 +218,19 @@ namespace UI.Game2D.Battle
         public static void DemoCancel() => Fx?.BossCancel();
         /// <summary>ボスの通常の技の絵を 1 回 (名前は Resources/Game2DFx の move-*: "move-king-attack" など)。</summary>
         public static void DemoMove(string name) => Fx?.PlayMove(name);
+        /// <summary>任意の絵 (Resources/Game2DFx の名前) を 1 回流す (戦闘の流れを通さない)。 画面全体の絵は左上に合わせる。 小さい絵は基準点を、
+        /// ヴェスカの時計 (vesca-*) なら玉の中心 (240,130)・それ以外は敵の足もと (240,196) に置く (見本の舞台と同じ)。 ループの絵は loopSeconds 秒。</summary>
+        public static void DemoSheet(string name, float loopSeconds = 4f)
+        {
+            bool vesca = name != null && name.StartsWith("vesca-");
+            Fx?.QaPlaySheet(name, 240, vesca ? 130 : 196, loopSeconds);
+        }
+
+        /// <summary>演出の速さ (1 = 普段・0.5・0.25・0 = 一時停止)。 戦闘の演出の時計だけ (Time.timeScale は触らない)。</summary>
+        public static void SetSpeed(float speed) => Game2DBattleFx.QaSpeed = Mathf.Max(0f, speed);
+        /// <summary>1 コマ (1/8 秒) だけ進める (一時停止の間に使う)。</summary>
+        public static void StepFrame() => Game2DBattleFx.QaStepSeconds += 0.125f;
+
         /// <summary>自分の攻撃 (キー Space)。 family = sword / axe / dagger / shield (絵を流す) か null (手描き)。</summary>
         public static void DemoAttack(string family, bool crit, int dealt = 20)
         {
