@@ -136,7 +136,8 @@ namespace UI.Game2D.Battle
         {
             var gm = GameManager.Instance; var s = Sim; var f = Fx; var cm = CombatManager.Instance;
             return $"phase={gm?.CurrentPhase} enemy={cm?.CurrentEnemy?.id} turn={cm?.CurrentCombatTurn} sim={s?.phase} heavyIn={s?.heavyIn} charging={s?.charging} down={s?.down} " +
-                   $"hp={s?.playerHp}/{s?.playerMax} fxIdle={f?.IsIdle} bossIdling={f?.BossIdling} go={Runner.State} loading={Game2DLoadingScreen.Blocking} saveSuppressed={SaveGuard.Suppressed}";
+                   $"hp={s?.playerHp}/{s?.playerMax} fxIdle={f?.IsIdle} bossIdling={f?.BossIdling} go={Runner.State} loading={Game2DLoadingScreen.Blocking} saveSuppressed={SaveGuard.Suppressed} " +
+                   $"gui=[on={Game2DGuiRt.FxOn} weight={Game2DGuiRt.FxWeightReady} dark={Game2DGuiRt.FxDark:0.00} red={Game2DGuiRt.FxRed:0.00} white={Game2DGuiRt.FxWhite:0.00} shake={Game2DGuiRt.FxShake}]";
         }
 
         // ── Go を次のフレーム以降で押し切る係 ──

@@ -111,7 +111,34 @@ namespace UI.Game2D.Battle
         private FxSheet _enemyMoveSheet;
         /// <summary>戦闘の流れを止める絵 (審判の炎) が終わる時刻 (<see cref="_clockU"/>)。</summary>
         private float _blockUntil, _clockU;
-        private int _bossTaken; private string _enemyMoveName;
+        private int _bossTaken;
+        private bool _guiFxWas;
+
+        /// <summary>ボスの大技の揺れ・暗転・赤・白飛びを、 外枠の GUI にも掛ける (2026-11-14・作者の指定・<see cref="Game2DGuiRt.SetBossFx"/>)。
+        /// 値は液晶に掛けた物そのまま (GUI 側で、 液晶からの距離の重みで弱める)。 白飛びは、 大技の区間の間だけ、 液晶の絵のうち白く飛んだ画素
+        /// (赤 230・緑 220・青 200 以上) の割合と平均の色で測る。 大技の区間でない時は何も掛けない (GUI は今までと 1 ビットも変わらない)。</summary>
+        private void PushGuiFx()
+        {
+            if (!_boss.Active)
+            {
+                if (_guiFxWas) { _guiFxWas = false; Game2DGuiRt.SetBossFx(false, 1f, 0f, 0f, Color.white, Vector2.zero); }
+                return;
+            }
+            if (!_guiFxWas) Game2DGuiRt.RequestWeightMap();      // 区間の頭で 1 回: GUI の形から、 液晶からの距離の重みを作る
+            _guiFxWas = true;
+            float white = 0f; Color wc = Color.white;
+            if (_boss.InHeavy)
+            {
+                var fb = _c.FB; long n = 0, sr = 0, sg = 0, sb = 0;
+                for (int i = 0; i < fb.Length; i++)
+                {
+                    uint v = fb[i]; uint r = v & 255, g = (v >> 8) & 255, b = (v >> 16) & 255;
+                    if (r >= 230 && g >= 220 && b >= 200) { n++; sr += r; sg += g; sb += b; }
+                }
+                if (n > 0) { white = n / (float)fb.Length; wc = new Color(sr / (255f * n), sg / (255f * n), sb / (255f * n)); }
+            }
+            Game2DGuiRt.SetBossFx(true, _boss.GuiDark, _boss.GuiRed, white, wc, _boss.GuiShake);
+        } private string _enemyMoveName;
 
         /// <summary>[実機の確認用] 流れで流した技・武器・大技の絵の履歴 (ターンの番号つき・新しい物が後ろ・最大 40 件)。 開発ビルドとエディタだけ記録する。</summary>
         public static readonly List<string> QaMoveLog = new List<string>();
@@ -299,13 +326,14 @@ namespace UI.Game2D.Battle
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             DebugKeys();
 #endif
-            if (!Showing) { if (plotQuad != null) plotQuad.enabled = false; return; }
+            if (!Showing) { if (plotQuad != null) plotQuad.enabled = false; if (_guiFxWas) { _guiFxWas = false; Game2DGuiRt.SetBossFx(false, 1f, 0f, 0f, Color.white, Vector2.zero); } return; }
             Init();
             float rawDt = Mathf.Min(0.05f, Time.unscaledDeltaTime);
             float dt = rawDt * (_phase == Phase.PAttack ? _timeScale : 1f);
             _clockU += rawDt; _boss.Tick(rawDt);      // ボスの絵はヒットストップ・攻撃の速さ (T) に左右されない
             Tick(dt);
             Frame();
+            PushGuiFx();
             Upload();
             if (plotQuad != null) plotQuad.enabled = true;
         }

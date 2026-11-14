@@ -15,6 +15,13 @@ Shader "Game2D/GuiPresent"
         _ShadowDy ("影のずれ (dot)", Float) = 2
         _ShadeTop ("上の暗さ", Range(0, 1)) = 0.0
         _ShadeBottom ("下の暗さ", Range(0, 1)) = 0.20
+        // ボスの大技を GUI にも掛ける (2026-11-14・Game2DGuiRt.SetBossFx が毎フレーム入れる)。 _FxOn = 0 の間は今までと同じ計算だけ
+        [HideInInspector] _FxOn ("大技の画面処理 (0 = 切)", Float) = 0
+        [HideInInspector] _FxDark ("暗幕の倍率", Float) = 1
+        [HideInInspector] _FxRed ("赤いフィルターの a", Float) = 0
+        [HideInInspector] _FxWhite ("白飛び (色・強さ)", Vector) = (1, 1, 1, 0)
+        [HideInInspector] _FxShake ("揺れ (dot)", Vector) = (0, 0, 0, 0)
+        [HideInInspector] _FxWeight ("液晶からの距離の重み", 2D) = "black" {}
     }
     SubShader
     {
@@ -32,6 +39,7 @@ Shader "Game2D/GuiPresent"
             sampler2D _GuiTex;
             float4 _RtSize;
             float _ShadowA, _AoA, _ShadowLen, _ShadowDy, _ShadeTop, _ShadeBottom;
+            float _FxOn, _FxDark, _FxRed; float4 _FxWhite, _FxShake; sampler2D _FxWeight;
 
             struct appdata { float4 vertex : POSITION; float2 uv : TEXCOORD0; };
             struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
@@ -54,6 +62,14 @@ Shader "Game2D/GuiPresent"
             fixed4 frag (v2f i) : SV_Target
             {
                 float2 dot1 = 2.0 / _RtSize.xy;                 // GUI の 1 dot (RT の 2 画素) の uv
+                // ボスの大技の揺れ (2026-11-14): 液晶に近い画素ほど大きくずらす (重み w = 液晶に接した所 1 → 離れるほど小さく)。
+                //   液晶の揺れは絵を (dx, dy) ずらす = ここでは (−dx, +dy) の向きから読む (uv の y は上向き)
+                float fxW = 0;
+                if (_FxOn > 0.5)
+                {
+                    fxW = tex2D(_FxWeight, i.uv).r;
+                    i.uv += float2(-_FxShake.x * dot1.x, _FxShake.y * dot1.y) * fxW;
+                }
                 float4 g = tex2D(_GuiTex, i.uv);
                 float cov = sqrt(saturate(g.a));
 
@@ -74,6 +90,16 @@ Shader "Game2D/GuiPresent"
                 // GUI の色: 上が少し明るく下が暗い (色はかぶり率を掛けてある = 色 × 黒の係数でそのまま暗くできる)
                 float t = 1.0 - i.uv.y;                           // 上 = 0 / 下 = 1
                 float3 rgb = g.rgb * (1.0 - lerp(_ShadeTop, _ShadeBottom, t));
+
+                // ボスの大技の暗転・赤いフィルター・白飛び (2026-11-14): 液晶と同じ式を、 重み fxW で弱めて GUI の色に掛ける (色はかぶり率を掛けた値なので、 上限もかぶり率)。
+                //   順は液晶と同じ: 暗幕 → 赤 (王) → 白 (発光は赤の上)。 暗幕の倍率が負 (シュヴァリエの真っ黒の一拍) は 0 = 黒
+                if (_FxOn > 0.5)
+                {
+                    rgb *= lerp(1.0, max(_FxDark, 0.0), fxW);
+                    float3 red = float3(min(cov, rgb.r + 26.0 / 255.0 * _FxRed * cov), rgb.g * (1.0 - 0.45 * _FxRed), rgb.b * (1.0 - 0.6 * _FxRed));
+                    rgb = lerp(rgb, red, fxW);
+                    rgb = lerp(rgb, _FxWhite.rgb * cov, saturate(_FxWhite.a * fxW));
+                }
 
                 // 合成: 色は GUI だけ (影は黒 = 色に足さず alpha だけ)
                 float a = cov + shadow * (1.0 - cov);
