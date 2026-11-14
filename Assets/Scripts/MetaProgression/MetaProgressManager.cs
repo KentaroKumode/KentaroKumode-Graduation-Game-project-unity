@@ -78,6 +78,7 @@ namespace MetaProgression
             if (State == null) return;
             // 並列ワーカーは保存しない (PlayerPrefs は全プロセスで共有され、 次の測定へ状態が持ち込まれる・GameHooks の説明)
             if (GameLoop.GameHooks.MetaPersistenceDisabled) return;
+            if (GameLoop.SaveGuard.Suppressed) return;      // 実機の確認中は書かない (手元の State はそのまま)
             var json = JsonUtility.ToJson(State);
 #if UNITY_EDITOR
             // エディタは起動のたびに空で始めて読み込まない (Load) ので、 控えは作らない (エディタの測定の動きを旧いまま保つ)。
@@ -93,7 +94,7 @@ namespace MetaProgression
         {
 #if UNITY_EDITOR
             // エディタ起動時はメタ進行を毎回初期状態へリセット (UI 開発中の便宜)。
-            PlayerPrefs.DeleteKey(PrefsKey);
+            GameLoop.SaveGuard.DeleteKey(PrefsKey);
             State = new MetaProgressState();
             State.tokens = 3000;
             State.EnsurePanelInitialized();
@@ -118,7 +119,7 @@ namespace MetaProgression
             if (State == null) State = new MetaProgressState();
             if (src == BackedPrefs.LoadSource.Backup) Debug.LogWarning($"[MetaProgress] {note}");
             else if (src == BackedPrefs.LoadSource.CorruptReset) Debug.LogError($"[MetaProgress] {note}");
-            if (src == BackedPrefs.LoadSource.Backup || src == BackedPrefs.LoadSource.CorruptReset) PlayerPrefs.Save();   // 退避した値をディスクへ
+            if (src == BackedPrefs.LoadSource.Backup || src == BackedPrefs.LoadSource.CorruptReset) GameLoop.SaveGuard.Save();   // 退避した値をディスクへ (SaveGuard の間は書かない)
             State.EnsurePanelInitialized();
             State.MigrateFromLegacyTrackIfNeeded();
             State.ClampRanksToMax();   // #113: 枠から外したトラックの段が古いセーブから残って効くのを防ぐ
@@ -129,7 +130,7 @@ namespace MetaProgression
         {
             State = new MetaProgressState();
             // 控えも消す (残すと、 やり直した後に古い値が戻る道ができる)。 退避した壊れた値 (.corrupt) は残す。
-            BackedPrefs.DeleteAll(PlayerPrefsStore.I, PrefsKey);
+            if (!GameLoop.SaveGuard.Suppressed) BackedPrefs.DeleteAll(PlayerPrefsStore.I, PrefsKey);
             OnStateChanged?.Invoke();
         }
 

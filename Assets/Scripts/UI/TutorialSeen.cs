@@ -33,16 +33,16 @@ namespace UI
         public static void Mark(string topic)
         {
             if (string.IsNullOrEmpty(topic) || !Set.Add(topic)) return;
-            PlayerPrefs.SetString(Pref, string.Join("\n", Set));
-            PlayerPrefs.Save();
+            GameLoop.SaveGuard.SetString(Pref, string.Join("\n", Set));      // SaveGuard: 実機の確認中は手元だけ
+            GameLoop.SaveGuard.Save();
         }
 
         /// <summary>全部の見た印を消す (次にその場面へ来た時、 また出る)。</summary>
         public static void Clear()
         {
             Set.Clear();
-            PlayerPrefs.DeleteKey(Pref);
-            PlayerPrefs.Save();
+            GameLoop.SaveGuard.DeleteKey(Pref);
+            GameLoop.SaveGuard.Save();
         }
 
         public static int Count => Set.Count;

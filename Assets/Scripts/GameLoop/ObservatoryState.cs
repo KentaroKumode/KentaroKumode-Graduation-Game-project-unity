@@ -21,16 +21,16 @@ namespace GameLoop
         /// <summary>博士に会った回数。0 = 初対面。</summary>
         public static int Meetings
         {
-            get => PlayerPrefs.GetInt(MeetingsKey, 0);
-            private set => PlayerPrefs.SetInt(MeetingsKey, value);
+            get => SaveGuard.GetInt(MeetingsKey, 0);
+            private set => SaveGuard.SetInt(MeetingsKey, value);      // SaveGuard: 止めている間は手元だけ
         }
 
         /// <summary>〈観測所の写し〉を持ち帰ったか。
         /// **次の再訪 1 回でだけ**追加報酬になり、そこで消費される。</summary>
         public static bool CopyHeld
         {
-            get => PlayerPrefs.GetInt(CopyKey, 0) != 0;
-            private set => PlayerPrefs.SetInt(CopyKey, value ? 1 : 0);
+            get => SaveGuard.GetInt(CopyKey, 0) != 0;
+            private set => SaveGuard.SetInt(CopyKey, value ? 1 : 0);
         }
 
         public static bool IsRevisit => Meetings > 0;
@@ -54,8 +54,8 @@ namespace GameLoop
         /// <summary>計測用: 全部戻す。</summary>
         public static void ResetAll()
         {
-            PlayerPrefs.DeleteKey(MeetingsKey);
-            PlayerPrefs.DeleteKey(CopyKey);
+            SaveGuard.DeleteKey(MeetingsKey);
+            SaveGuard.DeleteKey(CopyKey);
         }
     }
 }
