@@ -272,7 +272,12 @@ namespace UI.Game2D.Battle
             {
                 double t = T;
                 if (!_hitDone && t >= HitSec - 1e-9) { _hitDone = true; if (!_transition) OnHit?.Invoke(); }
-                if (t >= HeavySec - 1e-9) { _seg = Seg.None; if (!_hitDone) { _hitDone = true; if (!_transition) OnHit?.Invoke(); } _transition = false; }
+                if (t >= HeavySec - 1e-9)
+                {
+                    _seg = Seg.None; if (!_hitDone) { _hitDone = true; if (!_transition) OnHit?.Invoke(); } _transition = false;
+                    // 天与の発動の絵は 1 版 10〜15 MB と大きく、 次の大技はまた抽選なので、 撃ち終わったら 4 版とも捨てる (次の大技のターンの頭に読み直す)
+                    if (_gift > 0) { foreach (var n in TenyoSheetNames(_gift, true)) FxSheet.Unload(n); _rel = null; }
+                }
             }
         }
 

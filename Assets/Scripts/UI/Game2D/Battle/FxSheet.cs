@@ -193,6 +193,9 @@ namespace UI.Game2D.Battle
             foreach (var k in drop) Cache.Remove(k);
         }
 
+        /// <summary>1 枚をキャッシュから外す (天与の発動の絵のように大きく、 戦闘の中でも次に使うとは限らない物)。</summary>
+        public static void Unload(string name) { if (!string.IsNullOrEmpty(name)) Cache.Remove(name); }
+
         /// <summary>読み込んである絵 (確認用・null = 無かった絵は除く)。</summary>
         public static IEnumerable<FxSheet> Loaded { get { foreach (var s in Cache.Values) if (s != null) yield return s; } }
 

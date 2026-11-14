@@ -862,7 +862,7 @@ namespace UI.Game2D.Battle
             // 絵を先に読む (全画面のコマが多い・敵の行動の瞬間に読むと一瞬止まる): チャージのターン = チャージと待機 / 大技のターン = 大技
             bool vesca = kind == BossFx.Kind.Vesca || kind == BossFx.Kind.VescaFinal;
             if (vesca && VescaStageMoved(cm)) { }      // 敵の行動の間に段が移った (裂け目など): ターンの頭で形態移行の演出 (流れは止めない)
-            if (vesca) { if (charging) { fx.QueuePreload(BossFx.TenyoSheetNames(tenyo, false)); fx.QueuePreload(BossFx.TenyoSheetNames(tenyo, true)); } else if (heavyIn == 0 && !down) fx.QueuePreload(BossFx.TenyoSheetNames(tenyo, true)); }      // 天与は、 チャージのターンにどれか決まる
+            if (vesca) { if (charging) fx.QueuePreload(BossFx.TenyoSheetNames(tenyo, false)); else if (heavyIn == 0 && !down) fx.QueuePreload(BossFx.TenyoSheetNames(tenyo, true)); }      // 天与は、 チャージのターンにどれか決まる
             else if (charging) fx.QueuePreload(BossFx.SheetNames(kind, _blazeStacks, false));
             else if (heavyIn == 0 && !down) fx.QueuePreload(BossFx.SheetNames(kind, _blazeStacks, true));      // 王の烈炎の数が戦闘の入りと違う時の絵 (1 フレーム 1 枚・手番の間に読み終わる)
             if (kind == BossFx.Kind.King && regen > 0) fx.PlayMove("move-king-regen");
