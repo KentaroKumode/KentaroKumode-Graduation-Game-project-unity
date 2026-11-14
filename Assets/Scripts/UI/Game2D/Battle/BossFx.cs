@@ -99,7 +99,7 @@ namespace UI.Game2D.Battle
 
         private static string Ash(int ash) => "-a" + Mathf.Clamp(ash, 0, ASH_MAX);
 
-        /// <summary>そのボスの大技の絵の名前 (heavy = false: チャージと待機 / true: 大技)。 先に読む一覧 (<see cref="Game2DBattleFx.QueuePreload"/>) に使う。</summary>
+        /// <summary>そのボスの大技の絵の名前 (heavy = false: チャージと待機 / true: 大技)。 層の頭に読む一覧 (<see cref="AllSheetNames"/>) に使う。</summary>
         public static string[] SheetNames(Kind k, int ash, bool heavy)
         {
             string[] names;
@@ -127,6 +127,31 @@ namespace UI.Game2D.Battle
                 default: return new string[0];
             }
         }
+
+        /// <summary>そのボスの戦闘で使い得る絵の全部 (層の頭にまとめて読む・<see cref="FxLayerPreload"/>): 技の絵・チャージと待機・大技を、
+        /// 王は烈炎の数 0〜<see cref="ASH_MAX"/> の全版、 ヴェスカは 1〜3 段目と 4 段目 (形態移行の絵) と天与の 3 つ (チャージ・待機・発動の 4 版)。</summary>
+        public static List<string> AllSheetNames(Kind k)
+        {
+            var l = new List<string>();
+            if (k == Kind.None) return l;
+            var kinds = k == Kind.Vesca || k == Kind.VescaFinal ? new[] { Kind.Vesca, Kind.VescaFinal } : new[] { k };
+            foreach (var kk in kinds)
+            {
+                l.AddRange(MoveNames(kk));
+                for (int a = 0; a <= (kk == Kind.King ? ASH_MAX : 0); a++) { l.AddRange(SheetNames(kk, a, false)); l.AddRange(SheetNames(kk, a, true)); }
+            }
+            if (kinds.Length == 2) for (int g = 1; g < Tenyo.Length; g++) { l.AddRange(TenyoSheetNames(g, false)); l.AddRange(TenyoSheetNames(g, true)); }
+            var seen = new HashSet<string>(); l.RemoveAll(n => !seen.Add(n));
+            return l;
+        }
+
+        /// <summary>ヴェスカの破片の形と帯の表 (json) を読んでおく (層の頭・止まってよい所)。 読んであれば何もしない。</summary>
+        public static void PreloadTables() { if (_shards == null) LoadShards(); if (_tear == null) LoadTear(); }
+        /// <summary>層を出る時: 表を捨てる。</summary>
+        public static void DropTables() { _shards = null; _tear = _tearCharge = _tearIdle = null; }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() => DropTables();
 
         // ── 天与 (2026-11-15): 絵の名前と、 ゲームの側で掛ける処理の時刻の表 (正本は Tools/pixelfx/src/fx/dicebound/tenyo-heavy.js の partTimes・SWORD・SHIELD・RING・irisR、
         //   見本 lab/tenyo_preview.py)。 絵を差し替える時は、 ここの名前 (と export_fx.py の TENYO) だけを替える ──
@@ -275,8 +300,8 @@ namespace UI.Game2D.Battle
                 if (t >= HeavySec - 1e-9)
                 {
                     _seg = Seg.None; if (!_hitDone) { _hitDone = true; if (!_transition) OnHit?.Invoke(); } _transition = false;
-                    // 天与の発動の絵は 1 版 10〜15 MB と大きく、 次の大技はまた抽選なので、 撃ち終わったら 4 版とも捨てる (次の大技のターンの頭に読み直す)
-                    if (_gift > 0) { foreach (var n in TenyoSheetNames(_gift, true)) FxSheet.Unload(n); _rel = null; }
+                    // (2026-11-15〜 天与の発動の絵は層の頭で 12 版とも読み、 層を出るまで持つ = 撃ち終わっても捨てない・FxLayerPreload)
+                    if (_gift > 0) _rel = null;
                 }
             }
         }
@@ -543,10 +568,11 @@ namespace UI.Game2D.Battle
         }
 
         private sealed class Shard { public double[] sx, sy, dx, dy; }
-        private List<List<Shard>> _shards;
-        private double _shardsFps = 8.0;
+        // 表は絵と同じく層の頭で読んで層を出るまで持つ (static・BossFx は 1 つ)
+        private static List<List<Shard>> _shards;
+        private static double _shardsFps = 8.0;
 
-        private void LoadShards()
+        private static void LoadShards()
         {
             _shards = new List<List<Shard>>();
             var a = Resources.Load<TextAsset>("Game2DFx/vesca-shards");
@@ -658,9 +684,9 @@ namespace UI.Game2D.Battle
         // ── ヴェスカ 4 段目: 画面全体を帯ごとにずらす (vesca_flow_preview.py の torn・帯の表 vesca-tear.json) ──
 
         private struct Band { public int y, h, dx, kind, ca; }      // kind: 0 = shift / 1 = smear / 2 = ghost
-        private List<List<Band>> _tear, _tearCharge, _tearIdle;
+        private static List<List<Band>> _tear, _tearCharge, _tearIdle;
 
-        private void LoadTear()
+        private static void LoadTear()
         {
             _tear = new List<List<Band>>(); _tearCharge = new List<List<Band>>(); _tearIdle = new List<List<Band>>();
             var a = Resources.Load<TextAsset>("Game2DFx/vesca-tear");

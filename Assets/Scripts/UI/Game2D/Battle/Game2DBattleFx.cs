@@ -130,25 +130,10 @@ namespace UI.Game2D.Battle
         }
 #endif
 
-        // ── 絵を先に読む (2026-11-14・FxSheet.Preload) ──
-        private readonly Queue<string> _preload = new Queue<string>();
+        // ── 絵の読み込み (2026-11-15〜 層の頭で全部読む・FxLayerPreload。 ここでは読まない) ──
 
-        /// <summary>先に読む絵を並べる (戦闘の入り・チャージや大技のターンの頭)。 1 フレームに 1 枚ずつ読む (全部を 1 フレームで読むと固まる)。 読んであれば何もしない。</summary>
-        public void QueuePreload(IEnumerable<string> names) { foreach (var n in names) if (!string.IsNullOrEmpty(n) && !FxSheet.IsLoaded(n) && !_preload.Contains(n)) _preload.Enqueue(n); }
-
-        /// <summary>戦闘の画面を離れた時: 先に読む予定を消し、 持っている絵の参照を放す (キャッシュからは FxSheet.UnloadAfterBattle が外す)。</summary>
-        public void ClearPreload() { _preload.Clear(); _boss.Clear(); _boss.OnHit = null; _fx.Clear(); _weaponSheet = null; _enemyMoveSheet = null; }
-
-        private void PreloadStep()
-        {
-            while (_preload.Count > 0)
-            {
-                var n = _preload.Dequeue();
-                if (FxSheet.IsLoaded(n)) continue;
-                FxSheet.Preload(n);
-                break;      // 1 フレームに 1 枚
-            }
-        }
+        /// <summary>戦闘の画面を離れた時: 持っている絵の参照を放す (キャッシュからは FxSheet.UnloadAfterBattle が、 層の一覧に無い物だけ外す)。</summary>
+        public void ReleaseSheets() { _boss.Clear(); _boss.OnHit = null; _fx.Clear(); _weaponSheet = null; _enemyMoveSheet = null; }
 
         // ── 大技の間の 1 フレームの最大時間 (確認用) ──
         /// <summary>直近の大技 (BossHeavy から大技が終わるまで) の間の、 1 フレームの最大時間 (ミリ秒・Time.unscaledDeltaTime) と、 この部品の処理 (LateUpdate) の最大時間。</summary>
@@ -163,6 +148,23 @@ namespace UI.Game2D.Battle
             if (!on) return;
             QaHeavyMaxFrameMs = Mathf.Max(QaHeavyMaxFrameMs, Time.unscaledDeltaTime * 1000f);
             QaHeavyMaxFxMs = Mathf.Max(QaHeavyMaxFxMs, (float)_frameSw.Elapsed.TotalMilliseconds);
+        }
+        // ── 戦闘の入りが終わってからの 1 フレームの最大時間 (確認用・2026-11-15) ──
+        /// <summary>戦闘の入り (切り替わりと敵の出現) が終わってから今までの、 1 フレームの最大時間 (ミリ秒・Time.unscaledDeltaTime) と、
+        /// そのフレームか 1 つ前のフレームで使う瞬間に読んだ絵 (無ければ null = 絵の読み込みではない) と、 その時刻 (入りの終わりからの秒)。 次の戦闘の入りの終わりで 0 に戻る。</summary>
+        public static float QaBattleMaxFrameMs, QaBattleMaxAt; public static string QaBattleMaxSheet;
+        private bool _battleMeasuring; private float _battleClock;
+        private void NoteBattleFrame()
+        {
+            bool on = Showing && SimDriven && !IsIntro;
+            if (on && !_battleMeasuring) { QaBattleMaxFrameMs = 0f; QaBattleMaxSheet = null; QaBattleMaxAt = 0f; _battleClock = 0f; _battleMeasuring = true; return; }      // 入りが終わった最初のフレームは入りの分を含むので数えない
+            if (!on) { _battleMeasuring = false; return; }
+            float ms = Time.unscaledDeltaTime * 1000f; _battleClock += Time.unscaledDeltaTime;
+            if (ms > QaBattleMaxFrameMs)
+            {
+                QaBattleMaxFrameMs = ms; QaBattleMaxAt = _battleClock;
+                QaBattleMaxSheet = FxSheet.QaLastLoadFrame >= Time.frameCount - 1 ? FxSheet.QaLastLoadName : null;
+            }
         }
         private bool _guiFxWas;
 
@@ -406,7 +408,7 @@ namespace UI.Game2D.Battle
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             DebugKeys();
 #endif
-            PreloadStep();
+            NoteBattleFrame();
             if (!Showing) { if (plotQuad != null) plotQuad.enabled = false; if (_guiFxWas) { _guiFxWas = false; Game2DGuiRt.SetBossFx(false, 1f, 0f, 0f, Color.white, Vector2.zero); } return; }
             Init();
             float rawDt = Mathf.Min(0.05f, Time.unscaledDeltaTime);

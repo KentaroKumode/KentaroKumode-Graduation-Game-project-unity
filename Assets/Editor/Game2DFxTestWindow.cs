@@ -38,15 +38,14 @@ public class Game2DFxTestWindow : EditorWindow
     private void OnPlayMode(PlayModeStateChange s) { if (s == PlayModeStateChange.ExitingPlayMode || s == PlayModeStateChange.EnteredEditMode) { ResetSpeed(); _paused = false; _speed = 0; } }
     private static void ResetSpeed() { if (Application.isPlaying) QaBattle.SetSpeed(1f); }
 
-    /// <summary>Resources/Game2DFx の絵 (json と png.bytes の組) を全部並べる。 絵を置くだけで一覧に出る。</summary>
+    /// <summary>Resources/Game2DFx の絵 (<c>名前.fxb.bytes</c>・2026-11-15〜) を全部並べる。 絵を置くだけで一覧に出る。</summary>
     private void RefreshSheets()
     {
         _sheets.Clear();
         if (!Directory.Exists(FxDir)) return;
-        foreach (var f in Directory.GetFiles(FxDir, "*.json"))
+        foreach (var f in Directory.GetFiles(FxDir, "*.fxb.bytes"))
         {
-            string n = Path.GetFileNameWithoutExtension(f);
-            if (File.Exists(Path.Combine(FxDir, n + ".png.bytes"))) _sheets.Add(n);
+            string n = Path.GetFileName(f); _sheets.Add(n.Substring(0, n.Length - ".fxb.bytes".Length));
         }
         _sheets.Sort(System.StringComparer.Ordinal);
     }

@@ -1,4 +1,5 @@
-"""ボスの大技・通常の技・武器の攻撃の絵 (2026-11-14 に作者が決めた物) を、 見本と同じ道具で書き出して Assets/Resources/Game2DFx/ へ置く。
+"""ボスの大技・通常の技・武器の攻撃の絵 (2026-11-14 に作者が決めた物) を、 見本と同じ道具で書き出して Tools/pixelfx/dicebound/sheets/ へ置き、
+ゲームが読む形 (Assets/Resources/Game2DFx/<名前>.fxb.bytes・bake_fxb.py) まで焼く。
 
   python Tools/pixelfx/dicebound/export_fx.py            # 全部
   python Tools/pixelfx/dicebound/export_fx.py gouka      # 名前の頭で絞る
@@ -7,16 +8,19 @@
   ・コマごとに、 中身のある範囲 (不透明な画素の外接矩形) だけを切り出して 1 枚の絵に並べ、 切り出した位置を json に持つ
   ・1 回きりの効果は、 後ろの空のコマを捨てる (ループは捨てない・コマの数が周期なので)
   ・書き出した後に、 並べた絵からコマを組み立て直して lcd_frames.mjs の出力と画素で突き合わせる (1 つでも違えば止まる)
-出力: <名前>.png.bytes (中身は PNG) と <名前>.json ({ frames: [{ frame, spriteSourceSize }], meta: { pixelfx: { id, fps, frames, frameSize, pivot, loop } } })。
-読む側は Assets/Scripts/UI/Game2D/Battle/FxSheet.cs。 ヴェスカの破片の形 (lab/shard_dump.mjs) と帯の表 (library/dicebound/vesca-tear.json) も同じ所へ写す。
+出力: sheets/<名前>.png.bytes (中身は PNG) と sheets/<名前>.json ({ frames: [{ frame, spriteSourceSize }], meta: { pixelfx: { id, fps, frames, frameSize, pivot, loop } } })。
+→ bake_fxb.py が Resources/Game2DFx/<名前>.fxb.bytes を作る (読む側は Assets/Scripts/UI/Game2D/Battle/FxSheet.cs)。
+ヴェスカの破片の形 (lab/shard_dump.mjs) と帯の表 (library/dicebound/vesca-tear.json) は Resources/Game2DFx/ へそのまま写す。
 """
 import io, json, math, os, shutil, subprocess, sys, tempfile
 from PIL import Image
+import bake_fxb
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PFX = os.path.dirname(HERE)
 PROJ = os.path.abspath(os.path.join(PFX, "..", ".."))
-DEST = os.path.join(PROJ, "Assets", "Resources", "Game2DFx")
+DEST = os.path.join(PROJ, "Assets", "Resources", "Game2DFx")      # ゲームが読む物 (.fxb と表の json)
+SHEETS = bake_fxb.SRC                                               # 書き出した絵 (PNG と json・ビルドに入れない)
 
 # 烈炎の数 (ash) は戦闘で変わるので、 数ごとに焼く。 ASH_MAX を超えた分は ASH_MAX の絵を使う (ゲーム側で頭打ち)
 ASH_MAX = 8
@@ -121,7 +125,7 @@ def rebuild(sheet, rects, w, h):
 
 
 def main(argv):
-    os.makedirs(DEST, exist_ok=True)
+    os.makedirs(DEST, exist_ok=True); os.makedirs(SHEETS, exist_ok=True)
     only = argv[1:] if len(argv) > 1 else None
     total = 0
     with tempfile.TemporaryDirectory() as tmp:
@@ -140,17 +144,18 @@ def main(argv):
                   "meta": {"app": "pixelfx lab/lcd_frames.mjs + export_fx.py", "pixelfx": {"id": fid, "ink": ink, "opts": json.dumps(opts), "fps": fps, "frames": len(frames),
                                                                                        "frameSize": [m["w"], m["h"]], "pivot": m["pivot"], "loop": loop}}}
             bio = io.BytesIO(); sheet.save(bio, "PNG", optimize=True); data = bio.getvalue()
-            io.open(os.path.join(DEST, name + ".png.bytes"), "wb").write(data)
-            io.open(os.path.join(DEST, name + ".json"), "w", encoding="utf-8").write(json.dumps(js, separators=(",", ":"), ensure_ascii=False))
-            total += len(data)
-            print("%-26s %3d コマ (%d) %4dx%-4d %7.1f KB" % (name, len(frames), m["n"], sheet.width, sheet.height, len(data) / 1024.0))
+            io.open(os.path.join(SHEETS, name + ".png.bytes"), "wb").write(data)
+            io.open(os.path.join(SHEETS, name + ".json"), "w", encoding="utf-8").write(json.dumps(js, separators=(",", ":"), ensure_ascii=False))
+            fxb, _ = bake_fxb.bake(name)      # ゲームが読む形まで焼く (読み戻して PNG と画素で突き合わせる)
+            total += fxb
+            print("%-26s %3d コマ (%d) %4dx%-4d %7.1f KB (.fxb %7.1f KB)" % (name, len(frames), m["n"], sheet.width, sheet.height, len(data) / 1024.0, fxb / 1024.0))
         if not only or any("vesca".startswith(o) or o.startswith("vesca") for o in only):
             shards = os.path.join(tmp, "shards.json")
             subprocess.run(["node", "lab/shard_dump.mjs", shards, "--fps", str(FPS)], cwd=PFX, check=True, stdout=subprocess.DEVNULL)
             shutil.copyfile(shards, os.path.join(DEST, "vesca-shards.json"))
             shutil.copyfile(os.path.join(PFX, "library", "dicebound", "vesca-tear.json"), os.path.join(DEST, "vesca-tear.json"))
             print("vesca-shards.json / vesca-tear.json")
-    print("合計 %.1f MB" % (total / 1048576.0))
+    print("合計 (.fxb) %.1f MB" % (total / 1048576.0))
 
 
 if __name__ == "__main__":
