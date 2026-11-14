@@ -64,3 +64,84 @@ ann("fire/meteor.js", [
     ("      const f = (t - HIT) / 0.08;\n      if (f > 0 && f < 1) {", "      p.tag = \"hero-flash\";\n      const f = (t - HIT) / 0.08;\n      if (f > 0 && f < 1) {"),
     ("      const fr = (t - HIT) / 0.24;", "      p.tag = \"hero-flare\";\n      const fr = (t - HIT) / 0.24;"),
 ])
+
+# ---- 吐く炎 (円錐)
+ann("fire/fire-breath.js", [
+    ("  for (const [sa, x, y, q] of smoke) smokePuff(p, x, y, 1 - sa / q.sl, q.s * 1.1, SMOKE, true, 0.7);\n  fire.sort((a, b) => b[0] - a[0]);\n",
+     "  p.tag = \"cone-smoke\";\n  for (const [sa, x, y, q] of smoke) smokePuff(p, x, y, 1 - sa / q.sl, q.s * 1.1, SMOKE, true, 0.7);\n  fire.sort((a, b) => b[0] - a[0]);\n  p.tag = \"cone-billows\";\n"),
+    ("    if (tear > 0) {\n      const n = Math.floor(q.f * 1e5),", "    if (tear > 0) {\n      p.tag = \"cone-tear-tongues\";\n      const n = Math.floor(q.f * 1e5),"),
+    ("      flameTongue(p, x, y + size * 0.3, h, size * 0.5 * (1.1 - heat * 0.5), -h * 0.4 + N(2.5, n + 1) * 2, N, n, H, heat < 0.45 ? LAYERS : heat < 0.72 ? BACK_LAYERS : COOL_LAYERS);\n    }",
+     "      flameTongue(p, x, y + size * 0.3, h, size * 0.5 * (1.1 - heat * 0.5), -h * 0.4 + N(2.5, n + 1) * 2, N, n, H, heat < 0.45 ? LAYERS : heat < 0.72 ? BACK_LAYERS : COOL_LAYERS);\n      p.tag = \"cone-billows\";\n    }"),
+    ("  // licks curling off the edges of the cone\n", "  p.tag = \"edge-licks\";\n  // licks curling off the edges of the cone\n"),
+    ("  // the roar: bright streaks racing out through the heart of the cone\n", "  p.tag = \"roar-streaks\";\n  // the roar: bright streaks racing out through the heart of the cone\n"),
+    ("  // the jet at the lips: white-hot, overlapping tongues that flutter as the breath roars\n", "  p.tag = \"lip-jet\";\n  // the jet at the lips: white-hot, overlapping tongues that flutter as the breath roars\n"),
+    ("  // sparks flung out ahead and falling; embers lifting off the far end\n", "  p.tag = \"sparks\";\n  // sparks flung out ahead and falling; embers lifting off the far end\n"),
+    ("  looped(t, D, 18, S + 400,", "  p.tag = \"embers\";\n  looped(t, D, 18, S + 400,"),
+    ("  // light: a flare at the lips, light all along the cone widening with it, a broad halo\n", "  p.tag = \"light\";\n  // light: a flare at the lips, light all along the cone widening with it, a broad halo\n"),
+])
+
+# ---- 火球 (飛んでいる玉)
+ann("fire/fireball.js", [
+    ("  for (const [sa, x, y, q] of smoke) smokePuff(p, x, y, 1 - sa / q.sl, q.s * 0.9, SMOKE);\n  fire.sort((a, b) => b[0] - a[0]);\n",
+     "  p.tag = \"tail-smoke\";\n  for (const [sa, x, y, q] of smoke) smokePuff(p, x, y, 1 - sa / q.sl, q.s * 0.9, SMOKE);\n  fire.sort((a, b) => b[0] - a[0]);\n  p.tag = \"tail-puffs\";\n"),
+    ("  // the body: tongues of flame rooted in the head streaming back, and a corona licking round it\n", "  p.tag = \"body-tongues\";\n  // the body: tongues of flame rooted in the head streaming back, and a corona licking round it\n"),
+    ("  CORONA.forEach(([a, len, w], i) => {", "  p.tag = \"corona\";\n  CORONA.forEach(([a, len, w], i) => {"),
+    ("  head(p, H, t, R0, S, hx, hy);\n", "  p.tag = \"head\";\n  head(p, H, t, R0, S, hx, hy);\n  p.tag = \"motes\";\n"),
+    ("  // embers left behind: streaks that the head outruns, falling as they cool\n", "  p.tag = \"trail-embers\";\n  // embers left behind: streaks that the head outruns, falling as they cool\n"),
+    ("  // light: a hot heart, a warm halo, light running down the tail\n", "  p.tag = \"light\";\n  // light: a hot heart, a warm halo, light running down the tail\n"),
+])
+
+# ---- 炎の竜巻
+ann("fire/fire-tornado.js", [
+    ("  // smoke spiralling off the top\n", "  p.tag = \"top-smoke\";\n  // smoke spiralling off the top\n"),
+    ("  floorLight(p, 0, 0.5, 40, 8, GLOW, 0.4);\n  embers(false);\n  ring(false);\n", "  p.tag = \"floor-light\";\n  floorLight(p, 0, 0.5, 40, 8, GLOW, 0.4);\n  p.tag = \"orbit-embers-far\";\n  embers(false);\n  p.tag = \"foot-ring-far\";\n  ring(false);\n  p.tag = \"funnel\";\n"),
+    ("    if (y % 10 === 0 && v <= 1) p.glow(c, y, r * 2 + 8, GLOW, 0.22 * fl);", "    if (y % 10 === 0 && v <= 1) (p.tag = \"funnel-light\"), p.glow(c, y, r * 2 + 8, GLOW, 0.22 * fl), (p.tag = \"funnel\");"),
+    ("  // flame flung off the spinning sides, cooling as it flies, some into smoke\n", "  p.tag = \"flung-puffs\";\n  // flame flung off the spinning sides, cooling as it flies, some into smoke\n"),
+    ("  ring(true);\n  embers(true);\n", "  p.tag = \"foot-ring-near\";\n  ring(true);\n  p.tag = \"orbit-embers-near\";\n  embers(true);\n  p.tag = \"wash-light\";\n"),
+])
+
+# ---- 火炎放射
+ann("fire/flamethrower.js", [
+    ("  for (const [u, x, y, q] of smoke) smokePuff(p, x, y, 1 - u, q.s * 1.2, SMOKE, true, 0.85);\n  fire.sort((a, b) => b[0] - a[0]);\n",
+     "  p.tag = \"curl-smoke\";\n  for (const [u, x, y, q] of smoke) smokePuff(p, x, y, 1 - u, q.s * 1.2, SMOKE, true, 0.85);\n  fire.sort((a, b) => b[0] - a[0]);\n  p.tag = \"curl-puffs\";\n"),
+    ("  // flames licking up off the burning fuel, riding along the stream, swept back by the wind of it\n", "  p.tag = \"stream-licks\";\n  // flames licking up off the burning fuel, riding along the stream, swept back by the wind of it\n"),
+    ("  // the stream: a white core in yellow, orange and a red skin, surges racing down it\n", "  p.tag = \"stream\";\n  // the stream: a white core in yellow, orange and a red skin, surges racing down it\n"),
+    ("  // the pilot at the nozzle: a blue cone of gas where it lights\n", "  p.tag = \"pilot\";\n  // the pilot at the nozzle: a blue cone of gas where it lights\n"),
+    ("  // burning drops shaken off the stream: they arc down trailing flame and burn out\n", "  p.tag = \"drops\";\n  // burning drops shaken off the stream: they arc down trailing flame and burn out\n"),
+    ("  // the cough: when the jet sputters the nozzle spits sparks and a puff of smoke\n", "  p.tag = \"cough\";\n  // the cough: when the jet sputters the nozzle spits sparks and a puff of smoke\n"),
+    ("  // light: the pilot, the stream, the burning tip\n", "  p.tag = \"light\";\n  // light: the pilot, the stream, the burning tip\n"),
+])
+
+# ---- 霊の炎 (冷たい色・層を逆にした舌)
+ann("fire/spirit-flame.js", [
+    ("  // the glow it casts, cold and slow\n", "  p.tag = \"halo-light\";\n  // the glow it casts, cold and slow\n"),
+    ("  // curls breaking off the tips and drifting up, thinning out\n", "  p.tag = \"curls\";\n  // curls breaking off the tips and drifting up, thinning out\n"),
+    ("  // two thin wisps trailing off the sides, then the body\n", "  p.tag = \"side-wisps\";\n  // two thin wisps trailing off the sides, then the body\n"),
+    ("  ghostTongue(p, 0, y0, H0, 8.6, (v, r) => wave(v, r), N, S * 11, H, GHOST, 0.6);\n", "  p.tag = \"body\";\n  ghostTongue(p, 0, y0, H0, 8.6, (v, r) => wave(v, r), N, S * 11, H, GHOST, 0.6);\n  p.tag = \"heart-strands\";\n"),
+    ("  // light along the body\n", "  p.tag = \"body-light\";\n  // light along the body\n"),
+    ("  // cold sparks rising off it, twinkling\n", "  p.tag = \"cold-sparks\";\n  // cold sparks rising off it, twinkling\n"),
+])
+
+# ---- ろうそく
+ann("fire/candle.js", [
+    ("  // a pool of warm light on the floor and the halo behind the flame\n", "  p.tag = \"halo-light\";\n  // a pool of warm light on the floor and the halo behind the flame\n"),
+    ("  dish(p, B, H, fl);\n  candle(p, X, H, fl);\n", "  p.tag = \"prop\";\n  dish(p, B, H, fl);\n  candle(p, X, H, fl);\n"),
+    ("  // the flame and its blue root\n", "  p.tag = \"flame\";\n  // the flame and its blue root\n"),
+    ("  for (let dx = -2; dx <= 2; dx++) {\n    const a = 1 - Math.abs(dx) * 0.2;", "  p.tag = \"blue-root\";\n  for (let dx = -2; dx <= 2; dx++) {\n    const a = 1 - Math.abs(dx) * 0.2;"),
+    ("  // a thread of smoke now and then off the tip\n", "  p.tag = \"smoke-thread\";\n  // a thread of smoke now and then off the tip\n"),
+    ("  // motes drifting in the candlelight, catching it as they pass close\n", "  p.tag = \"dust-motes\";\n  // motes drifting in the candlelight, catching it as they pass close\n"),
+    ("  // the hot core of the light\n", "  p.tag = \"core-light\";\n  // the hot core of the light\n"),
+])
+
+# ---- 火鉢・松明 (燃える所は共通の burn。 ここは道具の側だけ)
+ann("fire/brazier.js", [
+    ("  floorLight(p, 0, 0.5, 40, 7, GLOW, 0.32 * fl);\n  stand(p, I, H, fl);\n", "  p.tag = \"floor-light\";\n  floorLight(p, 0, 0.5, 40, 7, GLOW, 0.32 * fl);\n  p.tag = \"prop\";\n  stand(p, I, H, fl);\n"),
+    ("  burn(p, t, TONGUES, {", "  p.tag = \"\";\n  burn(p, t, TONGUES, {"),
+    ("    mid: () => {\n      coals(p, I, H, t, S);\n      bowl(p, I, H, fl);\n    },", "    mid: () => {\n      p.tag = \"coals\";\n      coals(p, I, H, t, S);\n      p.tag = \"prop\";\n      bowl(p, I, H, fl);\n    },"),
+    ("  // sparks streaming up in the draught: fast streaks that slow, wander and cool to embers high above\n", "  p.tag = \"draught-sparks\";\n  // sparks streaming up in the draught: fast streaks that slow, wander and cool to embers high above\n"),
+])
+ann("fire/torch.js", [
+    ("  plate(p, I, H, fl0);\n", "  p.tag = \"prop\";\n  plate(p, I, H, fl0);\n"),
+    ("  burn(p, t, TONGUES, {", "  p.tag = \"\";\n  burn(p, t, TONGUES, {"),
+    ("    mid: () => wrap(p, W, I, H, t),", "    mid: () => { p.tag = \"prop\"; wrap(p, W, I, H, t); },"),
+])
