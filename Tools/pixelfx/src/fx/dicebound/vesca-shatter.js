@@ -1,5 +1,6 @@
 // DICE BOUND 用 (2026-11-14): ヴェスカ 1〜3 段目の大技の、 画面全体の部分。 transitions/shatter-wipe を 480×270 に写した物 (中身はそのまま・./_screen.js が画面の大きさ)。
-// 変えた所: 色を紫に・硝子は黒に近い色 + 割れるまで続く斜めの照り返し・割れる中心を玉の中心 (240,130) に・start 秒目から始める (硝子が落ちて来る所を飛ばし、 いきなり画面が凍る → ひび → 砕けて落ちる)。
+// 変えた所: 色を紫に・割れる中心を玉の中心 (240,130) に・start 秒目から始める・硝子の面を塗らない (glass: "clear"・2026-11-14 作者の指定:
+//   黒い画面が出るのは微妙 ── **割れる寸前の画面そのものに、 ひびが入って砕ける**)。 面は、 ゲームが凍った画面の写しを破片の形 (geom()) に貼って動かす (硝子が落ちて来る所を飛ばし、 いきなり画面が凍る → ひび → 砕けて落ちる)。
 // 時計が止まる所 (dicebound/vesca-stop) の最後のコマから流す。 始めて 0.17 秒でひび、 0.47 秒で砕ける。 絵が無くなるのは約 1.65 秒後 (meta.duration は元のまま 2.8)。
 // The impact flash, cracks racing out from the impact, the white flash before the burst, and the glass
 // splinters, glints and cold light of the burst are adapted from Sprite Fusion's open-source ice shatter
@@ -12,7 +13,7 @@ export const meta = screenMeta({
   desc: "A dark glass pane drops over the screen and bounces; cracks race out from an impact with a flash, then it bursts into tumbling glass shards with lit edges that fall away.",
   tags: ["shatter", "glass", "break", "shards", "wipe"],
   duration: 2.8,
-  options: { palette: ["#0a0614", "#1c1236", "#3a2470", "#5a3aa8", "#8a64e0", "#b89cf8", "#e4d8ff", "#ffffff"], color: "#0c0818", start: 1.15, seed: 2 },   // color = 凍った時の硝子 (紫)・start = 元の効果の何秒目から始めるか (1.15 = 硝子がもう画面を覆って止まっている所)
+  options: { palette: ["#0a0614", "#1c1236", "#3a2470", "#5a3aa8", "#8a64e0", "#b89cf8", "#e4d8ff", "#ffffff"], color: "#0c0818", glass: "clear", start: 1.15, seed: 2 },   // color = 凍った時の硝子 (紫)・start = 元の効果の何秒目から始めるか (1.15 = 硝子がもう画面を覆って止まっている所)
 });
 
 const D = meta.duration, LAND = 0.55, GP = (2 * H) / (LAND * LAND), REST = 0.3, CRACK = 1.32, BREAK = 1.62, WAVE = 520;
@@ -99,6 +100,9 @@ export function create(o) {
   const C = fit(o.palette, 8), ink = hex(o.color), R = new Rng(o.seed), pat = pattern(R), { Ix, Iy } = pat;
   const ps = new Particles({ rng: R, sparks: [C[7], C[6], C[5], C[4]], haze: C[5] });
   const bits = new Bits(), lights = new Lights();
+  // glass: "clear" = 硝子の面を塗らない。 ひびと、 破片の縁・照り・火花だけを描く ── 面は、 ゲームが「凍った画面の写し」を破片の形に貼って動かす (geom())。
+  //        "dark" = 面を黒い硝子で塗る (この効果だけで完結する・最初の版)
+  const CLEAR = o.glass === "clear";
   let t = o.start ?? 0, bounce = -1, struck = false, burst = false;
   const end = D - 0.05;
 
@@ -112,6 +116,15 @@ export function create(o) {
   const glint = (x, y, s = R.range(1, 2.4)) => ps.spawn(P.STAR, x, y, R.range(-8, 8), R.range(-10, 4), Math.min(R.range(0.3, 0.6), end - t), R.chance(0.5) ? WHITE : C[6], s);
 
   return {
+    /**
+     * 今のコマの破片の形 (面を、 ゲーム側が凍った画面の写しで貼るための物)。 割れる前は null (画面全体が 1 枚)。
+     * [{ src: 元の位置の多角形, dst: 今の位置の多角形 (動いていない破片は src と同じ), z: 奥行き (大きいほど奥。 奥から順に描く) }]
+     * src → dst は、 破片ごとに 1 つのアフィン変換 (回転・傾き・拡縮・移動)。
+     */
+    geom() {
+      if (t < BREAK) return null;
+      return pat.cells.filter((s) => !s.gone).map((s) => ({ src: s.pts, dst: s.broke ? shardPts(s) : s.pts, z: s.broke ? s.z : -1e9 })).sort((a, b) => b.z - a.z);
+    },
     update(dt) {
       t += dt;
       // each landing: chips spring off the bottom edge, glints, a cold flash along it
@@ -188,7 +201,7 @@ export function create(o) {
       if (t < BREAK) {
         // the pane: dark glass, a lit bevel along its falling edge, faint reflections that fade once it settles
         const yb = paneY(t) + H, r1 = Math.min(H, Math.floor(yb));
-        if (r1 > 0) {
+        if (r1 > 0 && !CLEAR) {
           rect(p0, 0, 0, W, r1, ink);
           // 硝子の照り返し: 斜めの帯を、 割れるまで出し続ける (2026-11-14 作者の指摘: 一色のべた塗りは安っぽい)。
           // 太い暗い帯 + 細い明るい線の組を 2 つ。 元の効果の照り返しは半透明で、 硝子が止まると消える ── 液晶の色の段では見えないので、 色として置く
@@ -237,8 +250,8 @@ export function create(o) {
       } else {
         // shards still in place first (the pane breaking up outward), then the falling ones, nearest last
         const fall = pat.cells.filter((s) => s.broke && !s.gone).sort((a, b) => b.z - a.z);
-        for (const s of pat.cells) if (!s.broke) drawShard(p, p0, s, C, ink, true);
-        for (const s of fall) drawShard(p, p0, s, C, ink, false);
+        for (const s of pat.cells) if (!s.broke) drawShard(p, p0, s, C, CLEAR ? 0 : ink, true);
+        for (const s of fall) drawShard(p, p0, s, C, CLEAR ? 0 : ink, false);
       }
       bits.draw(p);
       ps.draw(p);
@@ -249,6 +262,15 @@ export function create(o) {
 
 // a shard: dark glass that tumbles about an axis in its plane (squashing as it turns, a bright sliver
 // edge-on), its edges lit where they face the light, its face catching a cool sheen as it turns to it
+// 飛んでいる破片の、 今の多角形 (drawShard と同じ式)
+function shardPts(s) {
+  const cp = Math.cos(s.phi), ci = Math.cos(s.psi), si = Math.sin(s.psi), ca = Math.cos(s.a), sa = Math.sin(s.a), k = 1 / (1 + s.z);
+  return s.lp.map(([x, y]) => {
+    const u = x * ci + y * si, v = (-x * si + y * ci) * cp, qx = u * ci - v * si, qy = u * si + v * ci;
+    return [s.cx + (qx * ca - qy * sa) * k, s.cy + (qx * sa + qy * ca) * k];
+  });
+}
+
 function drawShard(p, p0, s, C, ink, still) {
   let pts, face = ink, sliver = false, gl = 0;
   if (still) pts = s.pts;
@@ -268,7 +290,7 @@ function drawShard(p, p0, s, C, ink, still) {
     sliver = Math.abs(cp) < 0.2;
     if (Math.abs(cp) * s.r < 1.5) face = C[5];
   }
-  fillConvex(p0, pts, face);
+  if (ink) fillConvex(p0, pts, face);   // ink = 0 (面を塗らない) の時は、 縁だけ
   let a2 = 0;
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) a2 += pts[j][0] * pts[i][1] - pts[i][0] * pts[j][1];
   const sg = a2 > 0 ? 1 : -1;

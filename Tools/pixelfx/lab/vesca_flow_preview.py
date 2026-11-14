@@ -1,6 +1,7 @@
 # ヴェスカの大技の一連の流れ (2 本): 1〜3 段目 = 時が止まり、 凍った画面が砕ける / 4 段目 = 時が壊れ、 画面が乱れて信号が切れる。
 # チャージと待機は共通。 480×270 の舞台・1 秒 8 コマ・2 倍・紫の色の組。 出力は Captures/fxlib/_vesca/flow.html (git 管理外)。
 import io, json, os, subprocess
+import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 PFX = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = r"C:/Users/kumod/My project/Captures/fxlib/_vesca"; os.makedirs(OUT, exist_ok=True)
@@ -44,9 +45,32 @@ def shaken(b, j):
     c = Image.new("RGB", (W, H), (5, 4, 10)); c.paste(b, SHAKE[j]); return c
 
 
+def frozen_tint(im):
+    """凍った画面: 色を抜いて、 紫がかった灰色に (時が止まった)。 明るさは少し上げる (暗いままだと、 砕けても見えない)。"""
+    g = im.convert("L").point(lambda v: min(255, int(v * 1.5 + 14)))
+    return Image.merge("RGB", (g.point(lambda v: int(v * 0.86)), g.point(lambda v: int(v * 0.8)), g))
+
+
+def shattered(frozen, live, geom):
+    """凍った画面の写しを、 破片の形に貼って動かす (ゲーム側がやる処理の見本)。 geom = その時の破片 (奥から順)。 破片ごとに 1 つのアフィン変換。"""
+    out = live.copy()
+    for sh in geom:
+        src, dst = np.array(sh["src"], float), np.array(sh["dst"], float)
+        x, y = dst[:, 0], dst[:, 1]
+        if abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1))) < 6: continue          # ほぼ真横を向いた破片は見えない
+        A = np.c_[dst, np.ones(len(dst))]
+        cx, cy = np.linalg.lstsq(A, src[:, 0], rcond=None)[0], np.linalg.lstsq(A, src[:, 1], rcond=None)[0]   # 今の位置 → 元の位置
+        piece = frozen.transform((W, H), Image.AFFINE, (cx[0], cx[1], cx[2], cy[0], cy[1], cy[2]), Image.NEAREST, fillcolor=frozen.getpixel((2, 2)))   # 画面の外へはみ出た破片の部分は、 縁の色で埋める
+        m = Image.new("L", (W, H), 0); ImageDraw.Draw(m).polygon([tuple(q) for q in dst], fill=255)
+        out.paste(piece, (0, 0), m)
+    return out
+
+
 chg = frames("flow_charge", "dicebound/vesca-charge", {}); idle = frames("flow_idle", "dicebound/vesca-charged", {})
 stop = frames("flow_stop", "dicebound/vesca-stop", {}); sha = frames("flow_shatter", "dicebound/vesca-shatter", {})
 lost = frames("flow_lost", "dicebound/vesca-lost", {}); gli = frames("flow_glitch", "dicebound/vesca-glitch", {}); off = frames("flow_off", "dicebound/vesca-off", {})
+subprocess.run(["node", "lab/shard_dump.mjs", os.path.join(OUT, "shards.json")], cwd=PFX, check=True, stdout=subprocess.DEVNULL)
+GEOM = json.load(io.open(os.path.join(OUT, "shards.json"), encoding="utf-8"))["frames"]
 while len(sha) > 1 and empty(sha[-1]): sha.pop()
 while len(off) > 1 and empty(off[-1]): off.pop()
 base = stage(); head = [(base.copy(), "ヴェスカのチャージのターン")] * 3
@@ -58,15 +82,18 @@ for r in range(1):
 cards = []
 n1 = int(LEAD * 8)
 for key, title, lead, parts in (
-        ("p123", "1〜3 段目: 時が止まり、 凍った画面が砕ける", stop, [(sha, "ヴェスカの大技 (1〜3 段目): 画面が凍る → ひび → 砕ける", 3)]),
+        ("p123", "1〜3 段目: 時が止まり、 凍った画面が砕ける", stop, [(sha, "ヴェスカの大技 (1〜3 段目): 画面が凍る → ひび → 砕ける", 4)]),
         ("p4", "4 段目 (天与) だけ: 時が壊れ、 画面が乱れて、 信号が切れる", lost, [(gli[:int(GLITCH * 8)], "ヴェスカの大技 (4 段目): 画面が乱れる", 0), (off, "ヴェスカの大技 (4 段目): 信号が切れる → 戻る", -1)])):
     seq = list(head); h0 = len(seq)
     for i in range(n1):
         b = dark(base.copy(), DARK); f = lead[min(i, len(lead) - 1)]; b.paste(f, (0, 0), f)
         seq.append((b, "ヴェスカの大技のターン: " + ("針が遅くなって止まる" if key == "p123" else "針が暴れ、 文字盤がずれる")))
     for fr, cap, sh0 in parts:
+        frozen = frozen_tint(seq[-1][0]) if key == "p123" else None      # 止まった瞬間の画面の写し
         for j, f in enumerate(fr):
-            b = base.copy(); b.paste(f, (0, 0), f); seq.append((shaken(b, j - sh0) if sh0 >= 0 else b, cap))
+            if frozen is None: b = base.copy()
+            else: b = frozen.copy() if GEOM[j] is None else shattered(frozen, base, GEOM[j])   # 割れる前は 1 枚・割れたら破片
+            b.paste(f, (0, 0), f); seq.append((shaken(b, j - sh0) if sh0 >= 0 else b, cap))
     seq += [(base.copy(), "")] * 4
     big = [framed(a, c) for a, c in seq]
     big[0].save(os.path.join(OUT, key + ".gif"), save_all=True, append_images=big[1:], duration=125, loop=0)
