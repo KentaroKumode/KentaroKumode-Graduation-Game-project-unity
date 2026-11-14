@@ -271,13 +271,15 @@ namespace AutoTest
         public bool heavyChargeNoAttack = true;
         /// <summary>[測定 2026-11-14] 大技の周期の倍率と周期の上書き ("id:小技:大技[:周期],…"・id に * で大技を持つ敵全部・周期は省略可・CombatSystem.EnemyDatabase.HeavyOverrideSpec)。
         /// 例 "*:0.8:3.0:4" = 大技を持つ全員を周期 4 (小技・小技・チャージ・大技) に (灰燼の王の周期は変えない)。
-        /// 空 (既定) = enemies.json のまま。 旧い値 (2e76c46 の main) は "boss_layer5:0.7:2.0,boss_layer5_hidden:0.7:2.0,boss_layer7:0.7:1.75,boss_layer7_p2:0.7:1.75,boss_layer7_p3:0.7:1.75,boss_layer7_p4:0.7:1.75"。</summary>
+        /// 空 (既定) = enemies.json のまま (2026-11-14〜 周期 5)。 旧い値 (2e76c46 の main・周期 3) は周期を明示して
+        /// "boss_layer5:0.7:2.0:3,boss_layer5_hidden:0.7:2.0:3,boss_layer7:0.7:1.75:3,boss_layer7_p2:0.7:1.75:3,boss_layer7_p3:0.7:1.75:3,boss_layer7_p4:0.7:1.75:3"
+        /// (周期を省くとデータの周期 5 のまま)。 周期 3 だけ戻す (倍率は今のまま) なら "*:0.8:3.0:3"。</summary>
         public string enemyHeavySpec = "";
 
         /// <summary>[測定 2026-11-14] 実効状態の行の「大技の倍率と周期」: 項目ごとに 小技・大技・周期 (省略はデータのまま) と 1 周期の平均の倍率。</summary>
         private string HeavySpecEffectiveText()
         {
-            if (string.IsNullOrEmpty(enemyHeavySpec)) return "enemies.json のまま (周期 3・灰燼の王は HP で 4 / 3)";
+            if (string.IsNullOrEmpty(enemyHeavySpec)) return "enemies.json のまま (周期 5・灰燼の王は HP で 4 / 3)";
             var bad = new List<string>();
             var ci = System.Globalization.CultureInfo.InvariantCulture;
             var parts = new List<string>();

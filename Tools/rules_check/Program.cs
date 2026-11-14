@@ -502,10 +502,12 @@ static class T
             Check(p3 == "ダウン|チャージ|大|小|チャージ|大|小", "周期 3: 小技のターンのダウンは周期を動かさない → " + p3);
 
             // 周期の倍率: 小技 → チャージ (攻撃しない = 0) → 大技。 旧い値・旧い作り (チャージも攻撃) に戻すと旧い並び
-            float[] F(float hm, float lm, bool noAtk) => new[] { 1, 2, 3, 4 }.Select(c => HeavyCycle.Factor(3, c, hm, hm, lm, noAtk)).ToArray();
-            var fn = F(3.0f, 0.8f, true); var fo = F(2.0f, 0.7f, false);
-            Check(fn[0] == 0.8f && fn[1] == 0f && fn[2] == 3.0f && fn[3] == 0.8f, $"新しい並び (周期 3): 小技 ×{fn[0]}・チャージ ×{fn[1]} (攻撃しない)・大技 ×{fn[2]}");
-            Check(fo[0] == 0.7f && fo[1] == 0.7f && fo[2] == 2.0f, $"旧い値と旧い作り: ×{fo[0]}・×{fo[1]}・×{fo[2]} (チャージも小技の倍率で攻撃)");
+            float[] F(int per, float hm, float lm, bool noAtk) => Enumerable.Range(1, per + 1).Select(c => HeavyCycle.Factor(per, c, hm, hm, lm, noAtk)).ToArray();
+            // 2026-11-14 (作者の決定): データの既定の周期は 5 (小技・小技・小技・チャージ・大技)。 旧い値・旧い作りは周期 3
+            var fn = F(5, 3.0f, 0.8f, true); var fo = F(3, 2.0f, 0.7f, false);
+            Check(fn[0] == 0.8f && fn[1] == 0.8f && fn[2] == 0.8f && fn[3] == 0f && fn[4] == 3.0f && fn[5] == 0.8f,
+                  $"新しい並び (データの既定 周期 5): 小技 ×{fn[0]} ×3・チャージ ×{fn[3]} (攻撃しない)・大技 ×{fn[4]}");
+            Check(fo[0] == 0.7f && fo[1] == 0.7f && fo[2] == 2.0f, $"旧い値と旧い作り (周期 3): ×{fo[0]}・×{fo[1]}・×{fo[2]} (チャージも小技の倍率で攻撃)");
             Check(HeavyCycle.Factor(0, 2, 3f, 3f, 0.8f, true) == 1f && HeavyCycle.Factor(3, 0, 3f, 3f, 0.8f, true) == 0.8f && HeavyCycle.TurnsToHeavy(3, 0) == -1
                   && !HeavyCycle.IsCharge(1, 1) && HeavyCycle.Factor(1, 1, 3f, 3f, 0.8f, true) == 3f,
                   "大技の無い敵は 1・起点のターン (周期の 0 番目) は小技・周期 1 にはチャージが無い");
