@@ -9,12 +9,12 @@ import { resolveOptions, Bits, Particles, P, B } from "../../core/index.js";
 
 const KEYS = ["toX", "toY", "fromX", "fromY", "cellX", "cellY", "glow", "glowLine", "glowRing", "rect"];
 
-/** fn の中の描画を、 画面の (x, y) を原点に、 K 倍の大きさで行う。 回転と左右反転は考えない。 */
-export function withScale(p, K, x, y, fn) {
-  const tx = p.tx + x, ty = p.ty + y, P = Object.getPrototypeOf(p);
-  p.toX = (lx) => tx + lx * K; p.toY = (lx, ly) => ty + ly * K;
-  p.fromX = (sx) => (sx - tx) / K; p.fromY = (sx, sy) => (sy - ty) / K;
-  p.cellX = (lx) => Math.floor(tx + lx * K); p.cellY = (lx, ly) => Math.floor(ty + ly * K);
+/** fn の中の描画を、 画面の (x, y) を原点に、 K 倍の大きさで、 rot ラジアン回して行う (rot > 0 で時計回り。 元が右向きの絵を π/2 で下向きに)。 左右反転は考えない。 */
+export function withScale(p, K, x, y, fn, rot = 0) {
+  const tx = p.tx + x, ty = p.ty + y, P = Object.getPrototypeOf(p), c = Math.cos(rot), s = Math.sin(rot);
+  p.toX = (lx, ly) => tx + (lx * c - ly * s) * K; p.toY = (lx, ly) => ty + (lx * s + ly * c) * K;
+  p.fromX = (sx, sy) => ((sx - tx) * c + (sy - ty) * s) / K; p.fromY = (sx, sy) => (-(sx - tx) * s + (sy - ty) * c) / K;
+  p.cellX = (lx, ly) => Math.floor(p.toX(lx, ly)); p.cellY = (lx, ly) => Math.floor(p.toY(lx, ly));
   p.glow = (gx, gy, r, c, k) => P.glow.call(p, gx, gy, r * K, c, k);
   p.glowLine = (x0, y0, x1, y1, r, c, k) => P.glowLine.call(p, x0, y0, x1, y1, r * K, c, k);
   p.glowRing = (gx, gy, R, r, c, k) => P.glowRing.call(p, gx, gy, R * K, r * K, c, k);
@@ -38,8 +38,8 @@ function muted(drop, fn) {
  * 元の効果 SRC を、 K 倍・画面の at に (元の座標の anchor が来るように)・speed 倍の速さで流す物を作る。
  * opts = 元の効果へ渡す設定 (palette など)。 返り値は create() が返す形 ({ update, draw })。
  */
-export function scaledFx(SRC, { K = 3, at = [240, 136], anchor = [0, 0], speed = 1, delay = 0, life = 0, drop = null, opts = {} } = {}) {   // life = ループの効果を、 何秒で消すか (最後の 0.25 秒で網点で薄くなる)
-  const o = resolveOptions(SRC.meta, opts), inner = SRC.create ? muted(drop, () => SRC.create(o)) : null, x = at[0] - anchor[0] * K, y = at[1] - anchor[1] * K, D = SRC.meta.duration;
+export function scaledFx(SRC, { K = 3, at = [240, 136], anchor = [0, 0], speed = 1, delay = 0, life = 0, drop = null, rot = 0, opts = {} } = {}) {   // rot = 回す角度 (anchor を中心に)   // life = ループの効果を、 何秒で消すか (最後の 0.25 秒で網点で薄くなる)
+  const o = resolveOptions(SRC.meta, opts), inner = SRC.create ? muted(drop, () => SRC.create(o)) : null, cr = Math.cos(rot), sr = Math.sin(rot), x = at[0] - (anchor[0] * cr - anchor[1] * sr) * K, y = at[1] - (anchor[0] * sr + anchor[1] * cr) * K, D = SRC.meta.duration;
   let t = -delay;
   return {
     done: () => t > D,
@@ -51,7 +51,7 @@ export function scaledFx(SRC, { K = 3, at = [240, 136], anchor = [0, 0], speed =
       withScale(p, K, x, y, () => {
         if (inner) { if (inner.drawBack) inner.drawBack(p); inner.draw(p); }
         else { if (SRC.drawBack) SRC.drawBack(p, t, o); SRC.draw(p, t, o); }
-      });
+      }, rot);
       p.fade = f;
     },
   };

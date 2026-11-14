@@ -4,7 +4,7 @@
 //   剣:   通常 = 一太刀 (sword-slash + 流れの筋) / 会心 = ぐるりと一周 (spin-slash) + 交差する二太刀 (double-slash を中空に)・金
 //   斧:   通常 = 縦の振り下ろし (chop) + 着地の土煙 (heavy-landing) / 会心 = 太い縦の振り下ろし + 地面が割れる (ground-slam)・血の色
 //   短剣: 通常 = 小さな連撃 (dagger-flurry・縁が光る塗り) / 会心 = 真横の大きな斬撃 (中空) + 連撃・金
-//   盾:   通常 = 盾で殴る (blunt-hit) / 会心 = 受けた重さを返す (parry + blunt-hit)・金
+//   盾:   通常 = 上から叩きつける (重い柱 + thrust を下向きに・ゆっくり) + 足もとの土煙 (heavy-landing) / 会心 = 同じ形を大きく・金・地面が割れる (ground-slam)
 // (最初は段 2 / 3 / 4 の 12 個で作った。 段 3 の絵 ── 交差する二太刀だけ・血の色の振り下ろし・突き・盤を包む球 ── は、 この版では使っていない)
 import * as BLADE from "./blade-slash.js";   // melee/sword-slash の写し (流れの筋を少し足した版)
 import * as DOUBLE from "./cross-slash.js";   // melee/double-slash の写し (中を抜いた版)
@@ -13,8 +13,8 @@ import * as CHOP from "./chop.js";
 import * as LANDING from "../impacts/heavy-landing.js";
 import * as SLAM from "../impacts/ground-slam.js";
 import * as DAGGER from "./dagger.js";   // melee/dagger-flurry の写し (縁が光る塗り・会心は真横の大きな斬撃つき)
-import * as BLUNT from "../impacts/blunt-hit.js";
-import * as PARRY from "../impacts/parry.js";
+import * as THRUST from "../melee/thrust.js";
+import * as COLUMN from "./slam-column.js";
 import { scaledFx } from "./_scaled.js";
 
 const E = [240, 136], B = [240, 247], FEET = [240, 197];   // 敵の体の中心・こちらの盤・敵の足もと
@@ -36,8 +36,14 @@ const PLAN = {
   "axe-crit": [[SLAM, { K: 1.9, at: FEET, anchor: [0, 0], speed: 2.0, delay: 0.1, drop: DEBRIS, opts: { palette: GOLD } }], [CHOP, { K: 2.8, at: FEET, anchor: [-8, 0], speed: 0.65, opts: { palette: GOLD, heavy: true, flow: 2.8, sparks: ["#ffffff", "#fff0a0", "#ffd25e", "#f0a040"] } }]],   // 色は剣の会心と同じ (金)
   "dagger-normal": [[DAGGER, { K: 2.6, at: E, anchor: [28, -27], speed: 0.75, opts: { palette: STEEL, sparks: ["#ffffff", "#e8f1ff", "#b8c9e8", "#62c8f4"], flow: 2.6 } }]],   // 色は剣の通常と同じ
   "dagger-crit": [[DAGGER, { K: 3.0, at: E, anchor: [27, -27], speed: 0.72, opts: { palette: GOLD, sparks: ["#ffffff", "#fff0a0", "#ffd25e", "#f0a040"], wide: true, flow: 3, bloom: 1.7 } }]],   // 色は剣の会心と同じ
-  "shield-normal": [[BLUNT, { K: 3.4, at: E, anchor: [0, -22], speed: 0.75, opts: {} }]],
-  "shield-crit": [[PARRY, { K: 3.4, at: E, anchor: [0, -30], speed: 0.75, opts: { palette: GOLD } }], [BLUNT, { K: 3.8, at: E, anchor: [0, -22], speed: 0.8, delay: 0.12, opts: {} }]],
+  // 盾 (2026-11-14 作り直し・作者: Thrust を、 上から下へ叩きつける形で、 もっと鈍重に)。 melee/thrust は横向きの突きなので、 90 度回して下向きにする。
+  //   鈍重に = ゆっくり (0.5 倍の速さ)・大きく。 着いた所に、 足もとの土煙 (impacts/blunt-hit の白い塊と棘は外した ── 作者の指定) (通常 = heavy-landing・会心 = ground-slam・瓦礫なし)
+  "shield-normal": [[LANDING, { K: 2.8, at: FEET, anchor: [0, 0], speed: 1.2, delay: 0.14, drop: DEBRIS, opts: { palette: STEEL } }],
+    [COLUMN, { K: 1, at: [240, 186], anchor: [0, 0], speed: 1, opts: { palette: [...STEEL, "#ffffff"], width: 44 } }],
+    [THRUST, { K: 3.4, at: [240, 186], anchor: [69, -20], rot: Math.PI / 2, speed: 0.5, opts: { palette: STEEL, sparks: ["#ffffff", "#e8f1ff", "#b8c9e8", "#62c8f4"], reach: 60 } }]],
+  "shield-crit": [[SLAM, { K: 2.0, at: FEET, anchor: [0, 0], speed: 2.0, delay: 0.14, drop: DEBRIS, opts: { palette: GOLD } }],
+    [COLUMN, { K: 1, at: [240, 190], anchor: [0, 0], speed: 1, opts: { palette: [...GOLD, "#ffffff"], width: 64 } }],
+    [THRUST, { K: 4.2, at: [240, 190], anchor: [69, -20], rot: Math.PI / 2, speed: 0.5, opts: { palette: GOLD, sparks: ["#ffffff", "#fff0a0", "#ffd25e", "#f0a040"], reach: 60 } }]],
 };
 
 export const meta = {
