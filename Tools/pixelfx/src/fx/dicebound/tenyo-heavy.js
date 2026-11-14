@@ -66,7 +66,7 @@ export const meta = {
   tags: ["dicebound", "boss", "heavy", "one-shot"],
   size: [W, H],
   origin: [0, 0],
-  duration: T_CHARGE + 3 + 1.8 + 0.47 + 0.3 + 2.4,
+  duration: 8.6,
   loop: false,
   fps: 30,
   bg: "dark",
@@ -76,9 +76,10 @@ export const meta = {
 export function create(o) {
   const C = fit(o.palette, 8), R = new Rng(o.seed), gift = o.gift, part = o.part;
   const HELD_T = gift === "sword" ? 3 : T_HELD;   // 待機の 1 周: 剣は 3 秒 (Blessing の 1 周 3 秒・Eclipse は 4 秒を 3 秒に速めて揃える)
-  const T0 = part === "charged" ? T_CHARGE : part === "heavy" ? T_CHARGE + HELD_T : 0;   // どこから流すか
+  const CH = gift === "ring" ? 3.0 : T_CHARGE, SK = CH - 0.35;   // チャージの長さと、 吸い込みが終わる時刻。 指輪は長い (作者: 回転と、 宝石が灯るのは、 もっとゆっくり)
+  const T0 = part === "charged" ? CH : part === "heavy" ? CH + HELD_T : 0;   // どこから流すか
   const OFF = gift === "shield" ? SHIELD.open - 0.25 : 0;   // 盾: 今の発動の絵 (白く燃える 0.25 秒は絞りの間に済むので飛ばす) を、 真っ暗の拍の後ろへずらす
-  const TH = T_CHARGE + HELD_T, TP = gift === "ring" ? TH + RING.white : TH + T_LEAD + OFF;   // 発動の始まり・全画面の始まり
+  const TH = CH + HELD_T, TP = gift === "ring" ? TH + RING.white : TH + T_LEAD + OFF;   // 発動の始まり・全画面の始まり
   const pay = gift !== "ring" ? null : MOVES.create(resolveOptions(MOVES.meta, { move: "tenyo-" + gift, seed: o.seed }));
   // 剣の発動の部品 (元の効果を、 式を触らずに置く): God rays (全画面)・落ちる光 (Holy smite)・着地の衝撃 (Ground pound)・インパクトフレーム (全画面)
   // 瓦礫 (跳ねる岩・砂利・欠片) は出さない。 煙は粒を小さく分ける (作者: 瓦礫はいらない・煙は野暮ったいので粒度を下げて)
@@ -87,7 +88,10 @@ export function create(o) {
   const rg = gift !== "ring" ? null : {
     rays: scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, opts: {} }),
     impact: scaledFx(IMPACT, { K: 1.5, at: [240, 135], delay: TH + RING.impact - T0, opts: {} }),
-    circle: scaledFx(MAGIC, { K: 2.6, at: [BOARD[0], BOARD[1] + 4], speed: 1.6, delay: TH + RING.white - T0, glow: 0.6, opts: { palette: GOLD } }),
+    circle: scaledFx(MAGIC, { K: 3.6, at: [BOARD[0], BOARD[1] + 4], speed: 1.6, delay: TH + RING.white - T0, glow: 0.8, opts: { palette: GOLD } }),
+    // 着弾をもっと派手に (作者の指定): 輪が盤を締める瞬間 (白飛びから 0.26 秒) に、 着地の衝撃 (impacts/ground-slam・瓦礫なし・煙は細かく) を 2 つ重ねる
+    slam: scaledFx(SLAM, { K: 3, at: [BOARD[0], BOARD[1]], delay: TH + RING.white + 0.26 - T0, glow: 1.3, drop: ["CHUNK", "GRIT", "FLAKE"], puff: { SMOKE: [0.45, 3], DUST: [0.6, 2] }, opts: { palette: GOLD } }),
+    slam2: scaledFx(SLAM, { K: 4.4, at: [BOARD[0], BOARD[1] + 6], delay: TH + RING.white + 0.4 - T0, drop: ["CHUNK", "GRIT", "FLAKE"], puff: { SMOKE: [0.32, 4], DUST: [0.5, 2] }, opts: { palette: GOLD, seed: 11 } }),
   };
   const shRays = gift === "shield" ? scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, opts: {} }) : null;
   // 盾の発動の後: holy/resurrection (注ぐ光・光の翼が開く・光輪・大きな羽ばたき・羽根に散る) を、 敵の体の大きさで重ねる (作者: 発動後が弱い)。 光が注ぐ頭は飛ばして、 翼が開く所から
@@ -143,7 +147,7 @@ export function create(o) {
   }
   const ps = new Particles({ rng: R, sparks: [WHITE, C[6], C[5], C[3]] });
   // 渦を巻いて寄る粒 (王のチャージと同じ作り・数も同じくらい)
-  const grit = Array.from({ length: 70 }, () => { const t0 = R.range(0, SUCK - 0.4); return { a: R.range(0, TAU), d: R.range(70, 250), t0, T: R.range(0.4, Math.max(0.45, SUCK - 0.05 - t0)), spin: R.sign() * R.range(0.4, 1.2), c: R.pick([C[3], C[4], C[5], C[6]]) }; });
+  const grit = Array.from({ length: 70 }, () => { const t0 = R.range(0, SK - 0.4); return { a: R.range(0, TAU), d: R.range(70, 250), t0, T: R.range(0.4, Math.max(0.45, SK - 0.05 - t0)), spin: R.sign() * R.range(0.4, 1.2), c: R.pick([C[3], C[4], C[5], C[6]]) }; });
   // 盾の環: 球 (中心 BODY・半径 74) を輪切りにした 5 枚。 足もとから順に
   const rings = [58, 30, 2, -26, -54, -78].map((dy, i) => ({ y: BODY[1] + dy, rx: Math.sqrt(Math.max(1, SR * SR - dy * dy)), at: 0.1 + i * 0.16, dir: i % 2 ? 1 : -1 }));
   const gems = Array.from({ length: 8 }, (_, i) => (i / 8) * TAU + 0.2);
@@ -153,7 +157,7 @@ export function create(o) {
   function core(p, ti, boost) { const ox = p.tx, oy = p.ty; p.tx += gx; p.ty += gy; coreHeld(p, F, 0, HELD_SEED, ti, boost); p.tx = ox; p.ty = oy; }
   // チャージ (王と同じ 4 つ): 画面じゅうから芯へ走る光の筋 (update で出す)・渦を巻いて寄る粒・芯へ縮む輪・潰れて白くなる芯
   function gather(p) {
-    const k = clamp(t / SUCK);
+    const k = clamp(t / SK);
     for (let i = 0; i < 4; i++) {
       const u = (t - i * 0.22) / 0.5;
       if (u <= 0 || u >= 1) continue;
@@ -197,12 +201,12 @@ export function create(o) {
         oval(p, 240, BODY[1], SR + 2, SR + 2, 2, C[5], 0.5 + 0.3 * pulse + 0.4 * hot); p.glow(240, BODY[1], SR * (1.1 + 0.6 * boost), C[4], 0.14 + 0.1 * pulse + 0.3 * boost + 0.3 * hot); }
     } else {
       // チャージ (作者の指定): 中心からリングが拡大する (前半) → 宝石が 1 つずつ灯りながら、 輪ごと回って止まる (後半)。 待機 (grow = 1) は、 止まった姿 = 今までの待機の絵
-      const ex = grow < 1 ? ease.outCubic(clamp(grow / 0.5)) : 1, y = RING_Y, rx = 216 * ex, ry = 13.5 * ex, hotc = hot > 0.4 || boost > 0.3;
-      const rot = grow < 1 ? -(1 - ease.outCubic(clamp((grow - 0.5) / 0.5))) * TAU * 0.75 : 0;
-      if (rx > 2) { oval(p, 240, y + 3, rx, ry, 2, C[2]); oval(p, 240, y, rx, ry, 4, hotc || grow < 0.5 ? WHITE : C[5]); oval(p, 240, y - 2, rx, ry, 1, WHITE); }
-      if (grow >= 0.5) {
+      const ex = grow < 1 ? ease.outCubic(clamp(grow / 0.25)) : 1, y = RING_Y, rx = 216 * ex, ry = 13.5 * ex, hotc = hot > 0.4 || boost > 0.3;
+      const rot = grow < 1 ? -(1 - ease.outQuad(clamp((grow - 0.25) / 0.75))) * TAU * 0.5 : 0;   // 半回転を、 約 2 秒かけて、 ゆっくり止まる
+      if (rx > 2) { oval(p, 240, y + 3, rx, ry, 2, C[2]); oval(p, 240, y, rx, ry, 4, hotc || grow < 0.25 ? WHITE : C[5]); oval(p, 240, y - 2, rx, ry, 1, WHITE); }
+      if (grow >= 0.25) {
         for (let i = 0; i < 36; i++) { const g = (i / 36) * TAU + ph * TAU / 3 + rot; p.dot(240 + Math.cos(g) * (rx - 8), y + Math.sin(g) * (ry - 1.5), i % 3 ? C[3] : WHITE); }
-        gems.forEach((g0, i) => { const on = (grow - 0.5 - i * 0.055) / 0.04; if (on <= 0) return; const g = g0 + rot, x = 240 + Math.cos(g) * rx, yy = y + Math.sin(g) * ry, fresh = grow < 1 ? clamp(1 - (on - 1) / 3) : 0; diamond(p, x, yy, 4, WHITE, C[3]); p.glow(x, yy, 8 + 5 * pulse + 14 * boost + 16 * fresh, fresh > 0.3 ? WHITE : C[6], 0.5 + 0.3 * boost + 0.4 * fresh); });
+        gems.forEach((g0, i) => { const on = (grow - 0.28 - i * 0.085) / 0.03; if (on <= 0) return; const g = g0 + rot, x = 240 + Math.cos(g) * rx, yy = y + Math.sin(g) * ry, fresh = grow < 1 ? clamp(1 - (on - 1) / 3) : 0; diamond(p, x, yy, 4, WHITE, C[3]); p.glow(x, yy, 8 + 5 * pulse + 14 * boost + 16 * fresh, fresh > 0.3 ? WHITE : C[6], 0.5 + 0.3 * boost + 0.4 * fresh); });
       }
       if (grow >= 1) for (let i = 0; i < 24; i++) { const g = (i / 24) * TAU, x = 240 + Math.cos(g) * rx, yy = y + Math.sin(g) * ry, h = (10 + 14 * rand(i, 9)) * (0.6 + 0.4 * Math.sin(ph * TAU + i)); if (Math.sin(g) > -0.2) beam(p, C, x, yy, x, yy + h, 2, 1, 0.22 + 0.3 * hot); }   // 輪から下へ垂れる光
       if (grow >= 1) { oval(p, BOARD[0], BOARD[1], 200 * (0.96 + 0.04 * pulse), 22, 1, C[4], 0.4 + 0.3 * pulse); for (let i = 0; i < 16; i++) { const g = (i / 16) * TAU - ph * TAU / 2; p.dot(BOARD[0] + Math.cos(g) * 200, BOARD[1] + Math.sin(g) * 22, WHITE); } }   // 盤の上に、 締まる先の輪がうっすら
@@ -216,7 +220,7 @@ export function create(o) {
   return {
     update(dt) {
       t += dt;
-      if (t < SUCK - 0.15) { const k = t / SUCK; for (let n = 0; n < 1 + Math.floor(k * 5); n++) { if (!R.chance(0.85)) continue; const a = R.range(0, TAU), D = R.range(80, 240) * (1 - 0.25 * k), T = R.range(0.2, 0.36), v = (D * 3) / (Math.exp(3 * T) - 1); ps.spawn(P.STREAK, gx + Math.cos(a) * D, gy + Math.sin(a) * D * 0.7, -Math.cos(a) * v, -Math.sin(a) * v * 0.7, T, R.chance(0.5) ? C[6] : C[4]); } }
+      if (t < SK - 0.15) { const k = t / SK; for (let n = 0; n < 1 + Math.floor(k * 5); n++) { if (!R.chance(0.85)) continue; const a = R.range(0, TAU), D = R.range(80, 240) * (1 - 0.25 * k), T = R.range(0.2, 0.36), v = (D * 3) / (Math.exp(3 * T) - 1); ps.spawn(P.STREAK, gx + Math.cos(a) * D, gy + Math.sin(a) * D * 0.7, -Math.cos(a) * v, -Math.sin(a) * v * 0.7, T, R.chance(0.5) ? C[6] : C[4]); } }
       ps.update(dt);
       if (ecl) ecl.update(dt);
       if (sw) for (const k in sw) sw[k].update(dt);
@@ -229,15 +233,15 @@ export function create(o) {
       if (pay && t > TP) { const d = Math.min(dt, t - TP); payT += d; pay.update(d); }
     },
     draw(p) {
-      if (t < T_CHARGE) {
-        // 吸い込み (SUCK まで) → 完了: 待機と同じ絵を、 完了の瞬間だけ強く (十字が長く走る)。 形 (剣・環・輪) は吸い込みの間に伸びていく
-        const grow = ease.outCubic(clamp((t / SUCK - 0.1) / 0.85));
-        if (t < SUCK) { gather(p); held(p, t - T_CHARGE, 0, 0, Math.min(0.999, grow)); }
-        else held(p, t - T_CHARGE, 1 - clamp((t - SUCK) / 0.3), 0, 1);
+      if (t < CH) {
+        // 吸い込み (SK まで) → 完了: 待機と同じ絵を、 完了の瞬間だけ強く (十字が長く走る)。 形 (剣・環・輪) は吸い込みの間に伸びていく
+        const grow = gift === "ring" ? clamp(t / SK) : ease.outCubic(clamp((t / SK - 0.1) / 0.85));   // 指輪は一定の速さで進める (宝石が等しい間で灯る)
+        if (t < SK) { gather(p); held(p, t - CH, 0, 0, Math.min(0.999, grow)); }
+        else held(p, t - CH, 1 - clamp((t - SK) / 0.3), 0, 1);
         ps.draw(p);
         return;
       }
-      if (t < TH) { held(p, t - T_CHARGE); return; }
+      if (t < TH) { held(p, t - CH); return; }
       let a = t - TH;
       if (sw) {
         // 剣: 日食が強まって画面が暗くなる (暗さはゲームの側で掛ける) → God rays が徐々に出る → 暗さが解ける → 印 → 光が落ちる + 着地の衝撃 + インパクトフレーム → 白飛び
@@ -260,10 +264,10 @@ export function create(o) {
         if (a < RING.white) held(p, a, 0, clamp(a / 0.5));
         rg.impact.draw(p);
         if (b >= 0) {
-          rg.circle.draw(p); pay.draw(p);
+          rg.slam2.draw(p); rg.slam.draw(p); rg.circle.draw(p); pay.draw(p);
           const q = (b - 0.26) / 0.35;   // 輪が盤に着いて締まる瞬間 (moves の tenyo-ring の 0.26 秒): 下半分が白く飛ぶ
-          if (q > 0 && q < 1) for (let y = 150; y < H; y++) for (let x = 0; x < W; x++) { const k = (1 - q) * (1 - q) * clamp((y - 150) / 60); p.put(x, y, WHITE, k); p.add(x, y, WHITE, k); }
-          for (let i = 0; i < 10; i++) { const x = 60 + i * 40, q2 = (b - 0.3 - i * 0.02) / 0.9; if (q2 > 0 && q2 < 1) beam(p, C, x, 250, x, 250 - 230 * ease.outCubic(Math.min(1, q2 * 3)), 3, 1, (1 - q2) * 0.8); }   // 盤から上へ立つ光の格子 (縛られる)
+          if (q > 0 && q < 1) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const k = (1 - q) * (1 - q) * Math.max(0.55, clamp((y - 150) / 60)); p.put(x, y, WHITE, k); p.add(x, y, WHITE, k); }   // 締まる瞬間: 画面全体が白く飛ぶ (下半分は強く)
+          for (let i = 0; i < 19; i++) { const x = 60 + i * 20, q2 = (b - 0.3 - i * 0.012) / 1.0; if (q2 > 0 && q2 < 1) beam(p, C, x, 252, x, 252 - 250 * ease.outCubic(Math.min(1, q2 * 3)), i % 2 ? 3 : 7, i % 2 ? 1 : 2, (1 - q2) * 0.9); }   // 盤から上へ立つ光の格子 (縛られる): 本数を倍に・太い柱と細い柱を交互に
         }
         const wk = b < 0 ? 0 : clamp(1 - (b - 0.15) / 0.3);
         if (wk > 0) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { p.put(x, y, WHITE, wk * wk); p.add(x, y, WHITE, wk * wk); }

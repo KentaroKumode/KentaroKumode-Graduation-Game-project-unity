@@ -27,8 +27,8 @@ for gid, name, note in (("sword", "天与の剣", "ヴェスカに Blessing・�
             a = tt - 2.9
             d = 0.65 * min(1, max(0, (tt - 1.05) / 0.35)) if a < 0.98 else 1 if a < 1.8 else max(0, 1 - (a - 1.8) / 0.5)
         if gid == "ring":   # 指輪: 待機は暗転 (RING.idleDark) → God rays の間は保つ → インパクトフレームで解ける (RING.dark)
-            a = tt - 2.9
-            d = 0.5 * min(1, max(0, (tt - 1.05) / 0.35)) if a < 1.0 else 0.5 * max(0, 1 - (a - 1.0) / 0.3)
+            a = tt - 4.5   # 指輪のチャージは 3.0 秒・待機 1.5 秒
+            d = 0.5 * min(1, max(0, (tt - 2.65) / 0.35)) if a < 1.0 else 0.5 * max(0, 1 - (a - 1.0) / 0.3)
         b = base.copy() if d <= 0.01 else base.point(lambda v: int(v * (1 - d)))
         b.paste(f, (0, 0), f)
         if gid == "shield" and 0 <= tt - 2.9 < 0.98:   # 円の絞り: 半径 + 縁 より外を黒く (tenyo-heavy.js の irisR と同じ式)
