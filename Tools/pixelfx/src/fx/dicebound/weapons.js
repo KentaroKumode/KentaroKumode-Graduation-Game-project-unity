@@ -1,12 +1,12 @@
 // DICE BOUND 用 (2026-11-14): プレイヤーの武器の攻撃 (たたき台)。 剣・斧・短剣・盾 × 段 2 / 3 / 4 の 12 個。 weapon で出し分ける (例: "sword-2")。
 // 画面全体 (480×270)・原点は左上・1 回きり。 プレイヤーの攻撃なので、 絵は敵の体の上に出る (盾の 3 段目だけ、 こちらの盤の上)。
 // 作り: 元の効果を、 式を書き直さずに、 この画面の大きさで流す (_scaled.js)。 変えるのは、 大きさ・置く場所・色・速さだけ。 段が上がるほど、 大きく・手数が多く・色が強い。
-//   剣:   2 = sword-slash (一太刀) / 3 = double-slash (交差する二太刀) / 4 = spin-slash (ぐるりと一周) + 二太刀
+//   剣:   2 = sword-slash (一太刀) / 3 = cross-slash (交差する二太刀。 melee/double-slash の写しで、 光った一瞬のあとは中を抜く) / 4 = spin-slash (ぐるりと一周) + 二太刀
 //   斧:   2 = heavy-cleave (重い振り下ろし) / 3 = 同・血の色で大きく / 4 = spin-slash (廻天) + 振り下ろし
 //   短剣: 2 = dagger-flurry (小さな連撃) / 3 = thrust (鎧の隙間を抜く突き) / 4 = scythe-reap (刈り取る大きな三日月) + 連撃
 //   盾:   2 = blunt-hit (盾で殴る) / 3 = divine-shield (盾がもう一枚立つ・こちらの盤を包む球。 impacts/shield-block は点で描く作りで、 大きくすると点がまばらになるので使えない) / 4 = parry (受けた重さを返す・金)
 import * as SWORD from "../melee/sword-slash.js";
-import * as DOUBLE from "../melee/double-slash.js";
+import * as DOUBLE from "./cross-slash.js";   // melee/double-slash の写し (中を抜いた版)
 import * as SPIN from "../melee/spin-slash.js";
 import * as CLEAVE from "../melee/heavy-cleave.js";
 import * as FLURRY from "../melee/dagger-flurry.js";
