@@ -18,7 +18,7 @@ export const meta = {
   loop: false,
   fps: 30,
   bg: "dark",
-  options: { palette: GOLD, rays: 8, scale: 1, seed: 4 },
+  options: { palette: GOLD, rays: 8, scale: 1, burst: 1, seed: 4 },   // burst = 完了の瞬間に走る光の筋の長さの倍率 (0 = 出さない)
 };
 
 // 待機へ渡す時刻: 最後のコマ (2.75 秒) の 1 コマ後 (1 秒 8 コマ) が、 待機の 0 秒。 ここがずれると、 つなぎ目で時刻が戻って逆回しが 1 コマ挟まる
@@ -128,6 +128,12 @@ export function create(o) {
       } else {
         // チャージ完了: 日輪が開く (0.35 秒・少し行き過ぎて戻る)。 ここからは待機と同じ絵。 待機の時刻は、 このチャージの終わりが 0 秒になるように合わせる
         const q = clamp((t - SUCK) / 0.35);
+        // 完了の瞬間: 中心から、 長い光の筋が四方へ、 画面の外まで走って消える (0.75 秒)。 日輪の光条と同じ向き (長短が交互)
+        const qb = clamp((t - SUCK) / 0.75);
+        if (qb < 1 && o.burst > 0) {
+          const N = o.rays * 2, T = SUN_T, tt = (((t - HANDOFF) % T) + T) % T, rot = (tt / T) * ((2 * TAU) / N), reach = ease.outCubic(clamp(qb * 2.5)), k = 1 - clamp((qb - 0.3) / 0.7);
+          for (let i = 0; i < N; i++) ray(p, C, rot + (i * TAU) / N, 9 * S, (i % 2 === 0 ? 620 : 420) * o.burst * reach, (i % 2 === 0 ? 5 : 3) * S, k);
+        }
         sun(p, C, t - HANDOFF, o.rays, S, q >= 1 ? 1 : ease.outBack(q) * 0.999);
         if (q < 1) p.glow(0, 0, 90 * (1 - q) + 20, WHITE, 0.6 * (1 - q));
       }
