@@ -2,7 +2,8 @@
 # チャージと待機は共通。 480×270 の舞台・1 秒 8 コマ・2 倍・紫の色の組。 出力は Captures/fxlib/_vesca/flow.html (git 管理外)。
 import io, json, os, subprocess
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+import random
+from PIL import Image, ImageChops, ImageDraw, ImageFont
 PFX = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = r"C:/Users/kumod/My project/Captures/fxlib/_vesca"; os.makedirs(OUT, exist_ok=True)
 W, H, EX, FLOOR, SC = 480, 270, 240, 196, 2
@@ -19,7 +20,11 @@ def stage():
     for y in range(120):
         k = int(y / 119.0 * 5) / 5.0
         d.line([(x0, y0 + y), (x0 + 99, y0 + y)], fill=tuple(int(a + (b - a) * k) for a, b in zip((74, 68, 86), (29, 26, 34))))
-    d.rectangle([40, 232, 440, 262], outline=(64, 56, 78)); return im
+    d.rectangle([40, 232, 440, 262], outline=(64, 56, 78))
+    # こちら側 (プレイヤーの盤) の仮の部品: 出目 3 つ・端子の枠・左上の体力の帯 (4 段目の乱れが、 ここにも及ぶのを見るため)
+    for k in range(3): d.rectangle([60 + k * 34, 237, 60 + k * 34 + 20, 257], fill=(92, 84, 110), outline=(150, 140, 176))
+    for k in range(4): d.rectangle([250 + k * 44, 239, 250 + k * 44 + 36, 255], outline=(96, 86, 118))
+    d.rectangle([12, 10, 132, 18], outline=(96, 86, 118)); d.rectangle([14, 12, 96, 16], fill=(150, 140, 176)); return im
 
 
 def frames(name, eid, opts):
@@ -43,6 +48,31 @@ def framed(im, cap):
 def shaken(b, j):
     if not (0 <= j < len(SHAKE)): return b
     c = Image.new("RGB", (W, H), (5, 4, 10)); c.paste(b, SHAKE[j]); return c
+
+
+def tear_bands(n_frames, seed=7):
+    """4 段目: 画面そのものの乱れ (効果を重ねるのではなく、 出来上がった画面を帯ごとに横へずらす ── 敵の側もプレイヤーの盤も一緒に)。
+    コマごとの帯の一覧を作る (ゲーム側も同じ表を使う: Captures/fxlib/_vesca/tear.json)。 強さ: 溜めで 0.1 → 0.7・乱れの間 1.0・絵が戻った直後 0.5 → 0。"""
+    R = random.Random(seed); out = []
+    for i in range(n_frames):
+        k = TEAR[i] if i < len(TEAR) else 0.0; bands = []
+        for _ in range(int(k * 9 + (1 if k > 0.05 else 0))):
+            h = R.choice([2, 3, 4, 6, 9, 14, 22, 30]); y = R.randrange(0, H - h); dx = int(R.choice([-1, 1]) * R.uniform(3, 96) * k)
+            bands.append({"y": y, "h": h, "dx": dx, "kind": R.choices(["shift", "smear", "ghost"], [6, 2, 2])[0]})
+        out.append(bands)
+    return out
+
+
+def torn(im, bands):
+    """shift = 帯を横へずらす (はみ出た分は反対側から出る)・smear = 帯の左端の 1 列を横へ引き伸ばす・ghost = ずらした帯を、 元の上に明るい方だけ重ねる (二重像)。"""
+    out = im.copy()
+    for b in bands:
+        box = (0, b["y"], W, b["y"] + b["h"]); strip = im.crop(box)
+        if b["kind"] == "shift": out.paste(ImageChops.offset(strip, b["dx"], 0), box)
+        elif b["kind"] == "smear":
+            x0 = abs(b["dx"]) * 3 % W; out.paste(strip.crop((x0, 0, x0 + 1, b["h"])).resize((W - x0, b["h"])), (x0, b["y"]))
+        else: out.paste(ImageChops.lighter(strip, ImageChops.offset(strip, b["dx"], 0)), box)
+    return out
 
 
 def frozen_tint(im):
@@ -81,6 +111,10 @@ for r in range(1):
         b = dark(base.copy(), DARK); b.paste(f, (0, 0), f); head.append((b, "プレイヤーの手番: 待機 (ループ)"))
 cards = []
 n1 = int(LEAD * 8)
+# 4 段目の乱れの強さ (大技のターンの頭からのコマごと): 溜め 8 コマ・乱れ 7 コマ・信号が切れて戻るまで (黒い間は見えない)・戻った直後の 5 コマ
+TEAR = [0.1, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75] + [1.0] * int(GLITCH * 8) + [0.0] * 6 + [0.7, 0.6, 0.5, 0.4, 0.3, 0.22, 0.14, 0.08, 0.04]
+BANDS = tear_bands(len(TEAR))
+io.open(os.path.join(OUT, "tear.json"), "w", encoding="utf-8").write(json.dumps({"fps": 8, "w": W, "h": H, "frames": BANDS}))
 for key, title, lead, parts in (
         ("p123", "1〜3 段目: 時が止まり、 凍った画面が砕ける", stop, [(sha, "ヴェスカの大技 (1〜3 段目): 画面が凍る → ひび → 砕ける", 4)]),
         ("p4", "4 段目 (天与) だけ: 時が壊れ、 画面が乱れて、 信号が切れる", lost, [(gli[:int(GLITCH * 8)], "ヴェスカの大技 (4 段目): 画面が乱れる", 0), (off, "ヴェスカの大技 (4 段目): 信号が切れる → 戻る", -1)])):
@@ -94,10 +128,14 @@ for key, title, lead, parts in (
             if frozen is None: b = base.copy()
             else: b = frozen.copy() if GEOM[j] is None else shattered(frozen, base, GEOM[j])   # 割れる前は 1 枚・割れたら破片
             b.paste(f, (0, 0), f); seq.append((shaken(b, j - sh0) if sh0 >= 0 else b, cap))
+    if key == "p4":                                         # 画面そのものを乱す (効果を重ね終えた後の画面に掛ける)
+        seq += [(base.copy(), "ヴェスカの大技 (4 段目): 戻った後も、 しばらく乱れが残る")] * 4
+        for i in range(h0, len(seq)):
+            if i - h0 < len(BANDS) and BANDS[i - h0]: seq[i] = (torn(seq[i][0], BANDS[i - h0]), seq[i][1])
     seq += [(base.copy(), "")] * 4
     big = [framed(a, c) for a, c in seq]
     big[0].save(os.path.join(OUT, key + ".gif"), save_all=True, append_images=big[1:], duration=125, loop=0)
-    m = len(seq) - h0 - 4; picks = [h0 + int(m * q / 12) for q in range(12)]
+    m = len(seq) - h0 - (8 if key == "p4" else 4); picks = [h0 + int(m * q / 12) for q in range(12)]
     o = Image.new("RGB", (W * 4, H * 3), (0, 0, 0))
     for q, i in enumerate(picks): o.paste(seq[i][0], ((q % 4) * W, (q // 4) * H))
     o.save(os.path.join(OUT, key + "_contact.png"))
