@@ -8,7 +8,7 @@
 // (最初の版は 1 太刀目だけを使い、 刃の前だけに黒があって、 後ろ側が欠けていた ── 「斜めに切ったなら黒は両側へ離れるはず」)
 // The cut's smear, the tip glint, the two halves slipping and parting with white-hot cut faces, and the sparks out of the seam are adapted from this repository's
 // transitions/slash-wipe (after Sprite Fusion's open-source slash, https://www.spritefusion.com/pixel-art-vfx/slash), MIT License, Copyright (c) 2026 Hugo Duprez.
-import { Particles, P, Rng, fit, hex, clamp, smooth, ease, sparkle, WHITE } from "../../core/index.js";
+import { Particles, P, Rng, fit, hex, clamp, smooth, ease, sparkle, rand, WHITE } from "../../core/index.js";
 import { STEEL, glint, REST } from "./chevalier-charge.js";
 
 const W = 480, H = 270, CX = 240, CY = 130;
@@ -25,11 +25,12 @@ export const meta = {
   bg: "dark",
   options: {
     palette: STEEL,
-    sparks: ["#fff3a6", "#ffe26b", "#ff8a2a", "#f2561d"],
+    sparks: ["#ffffff", "#e8f1ff", "#b8c9e8", "#62c8f4"],   // 青白い火花 (元の slash-wipe は暖色。 鋼の色に合わせた)
     color: "#020308",   // 黒い 2 枚の色 (ゲームの暗幕 100% と同じ色に)
     lead: 0.75,         // 切る前の溜め (秒): きらめきが伸びて、 消えて、 黒い一拍
-    angle: 60,          // 切り口の傾き (度。 90 = 垂直)。 左下から右上へ
+    slant: 60,          // 切り口の傾き (度。 90 = 垂直)。 左下から右上へ。 (名前を angle にしてはいけない ── 道具が「効果全体を回す角度 (ラジアン)」として使う名前で、 粒や光が画面の外へ回される)
     accel: 3000,        // 2 枚が離れる加速 (px/秒²。 元の slash-wipe は 1500)
+    face: "bands",      // 切り口の面の描き方 (見比べ用): bands = 1 ドットずつ等間隔に冷める段 / hard = 白い 1 本だけ / bloom = 白い 1 本 + 黒の上ににじむ光 / streak = 所々だけ深く焼けた筋
     seed: 2,
   },
 };
@@ -43,7 +44,7 @@ export function create(o) {
   const C = fit(o.palette, 8), n = C.length, ink = hex(o.color), R = new Rng(o.seed), T0 = o.lead - PRE;
   const ps = new Particles({ rng: R, sparks: o.sparks });
   // 切り口: 画面の中央を通る線。 u = 線の向き (左下 → 右上)・nrm = 線に直角 (左上向き)
-  const th = (-o.angle * Math.PI) / 180, ux = Math.cos(th), uy = Math.sin(th), nx = uy, ny = -ux, cx = W / 2, cy = H / 2;
+  const th = (-o.slant * Math.PI) / 180, ux = Math.cos(th), uy = Math.sin(th), nx = uy, ny = -ux, cx = W / 2, cy = H / 2;
   const [A, B] = [-1, 1].map((s) => {
     let lo = 0, hi = 600;
     for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2, x = cx + s * ux * m, y = cy + s * uy * m; if (x >= 0 && x <= W && y >= 0 && y <= H) lo = m; else hi = m; }
@@ -65,18 +66,19 @@ export function create(o) {
       // 一閃が抜けた: 切っ先から先へ火花、 線に沿って削り屑
       if (!tipped && u >= CSW) {
         tipped = true;
-        for (let i = 0; i < 16; i++) { const a = Math.atan2(uy, ux) + R.range(-0.5, 0.5), v = R.range(180, 460); ps.spawn(P.SPARK, B[0] - ux * 2, B[1] - uy * 2, Math.cos(a) * v, Math.sin(a) * v, R.range(0.1, 0.28)); }
+        for (let i = 0; i < 16; i++) { const a = Math.atan2(uy, ux) + R.range(-0.5, 0.5), v = R.range(180, 460); ps.spawn(P.SPARK, B[0] - ux * 2, B[1] - uy * 2, Math.cos(a) * v, Math.sin(a) * v, R.range(0.25, 0.5)); }
         for (let i = 0; i < 26; i++) {
           const k = R.range(0.1, 1), s = R.sign(), v = R.range(30, 110);
-          ps.spawn(P.MOTE, A[0] + (B[0] - A[0]) * k, A[1] + (B[1] - A[1]) * k, s * nx * v + ux * 20, s * ny * v - 10, R.range(0.2, 0.4), R.chance(0.5) ? C[5] : C[4], 0.7);
+          ps.spawn(P.MOTE, A[0] + (B[0] - A[0]) * k, A[1] + (B[1] - A[1]) * k, s * nx * v + ux * 20, s * ny * v - 10, R.range(0.3, 0.6), R.chance(0.5) ? C[6] : C[5], 0.8);
         }
       }
-      // 割れる: 継ぎ目から、 両側へ火花が噴く (短命 ── 切った後に残さない)
+      // 割れる: 継ぎ目から、 両側へ青白い火花が噴く (元の slash-wipe と同じ出し方・色だけ鋼の青白に)
       if (!split && u >= SPLIT) {
         split = true;
-        for (let i = 0; i < 80; i++) {
-          const k = R.range(0, 1), s = R.sign(), v = R.range(100, 380), a = Math.atan2(s * ny, s * nx) + R.range(-0.7, 0.7);
-          ps.spawn(P.SPARK, A[0] + (B[0] - A[0]) * k, A[1] + (B[1] - A[1]) * k, Math.cos(a) * v, Math.sin(a) * v, R.range(0.12, 0.35));
+        for (let i = 0; i < 110; i++) {
+          const k = R.range(0, 1), s = R.sign(), v = R.range(80, 340), a = Math.atan2(s * ny, s * nx) + R.range(-0.8, 0.8);
+          ps.spawn(P.SPARK, A[0] + (B[0] - A[0]) * k, A[1] + (B[1] - A[1]) * k, Math.cos(a) * v, Math.sin(a) * v, R.range(0.15, 0.45));
+          if (i % 3 === 0) ps.spawn(P.MOTE, A[0] + (B[0] - A[0]) * k, A[1] + (B[1] - A[1]) * k, Math.cos(a) * v * 0.5, Math.sin(a) * v * 0.5 - 15, R.range(0.25, 0.5), R.chance(0.5) ? C[6] : C[5], 0.8);
         }
       }
       ps.update(dt);
@@ -101,7 +103,19 @@ export function create(o) {
               const d = ((lx - cx) * nx + (ly - cy) * ny) * hf.s;
               if (d < 0) continue;
               const deep = clamp(1 + q.sep * 0.12, 1, 6);
-              if (d < deep) { p.put(x, y, rim[Math.floor(d)]); if (d < 3) p.add(x, y, C[5], 0.4 * heat * (1 - d / 3)); }
+              const hot = heat > 0.55 ? WHITE : heat > 0.25 ? C[6] : C[5];
+              if (o.face === "hard") p.put(x, y, d < 1 ? hot : ink);
+              else if (o.face === "bloom") {
+                // 白い 1 本。 その奥は黒のまま、 光だけがにじむ (色の段を置かない ── 液晶では網点の淡い光になる)
+                p.put(x, y, d < 1 ? hot : ink);
+                if (d < 14) p.add(x, y, C[5], 0.75 * heat * (1 - d / 14) ** 2);
+              } else if (o.face === "streak") {
+                // 切り口に沿って、 所々だけ深く焼けている (3 ドット幅の筋ごとに深さが違う)。 浅い所は白い 1 本だけ
+                const along = Math.floor(((lx - cx) * ux + (ly - cy) * uy) / 3), r = rand(along, hf.s + 7, o.seed), dep = 1 + (r > 0.62 ? (r - 0.62) * 26 * (0.3 + 0.7 * heat) : 0);
+                if (d < 1) p.put(x, y, hot);
+                else if (d < dep) { const q = (d - 1) / (dep - 1); p.put(x, y, q < 0.25 ? C[6] : q < 0.6 ? C[4] : C[3]); p.add(x, y, C[5], 0.3 * heat * (1 - q)); }
+                else p.put(x, y, ink);
+              } else if (d < deep) { p.put(x, y, rim[Math.floor(d)]); if (d < 3) p.add(x, y, C[5], 0.4 * heat * (1 - d / 3)); }
               else p.put(x, y, ink);
               break;
             }
