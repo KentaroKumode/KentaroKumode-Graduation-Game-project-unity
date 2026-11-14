@@ -22,7 +22,7 @@ export const meta = {
   },
 };
 
-const D = 10, SX = 0, SY = -142, FAN = 2.6;   // 光の出どころ = 頭上の日食 (元は画面の左上の外)・FAN = 扇を何倍に広げるか (元は ±15 度)
+const D = 10, SX = 0, SY = -170, FAN = 2.6;   // 光の出どころ = 画面の一番上の真ん中 (元は画面の左上の外。 作者: 画面の一番上からでいい)・FAN = 扇を何倍に広げるか (元は ±15 度)
 // the fan's axis (down and to the right) and its normal; a pixel's place across the fan is its angle from it
 const AX = 0, AY = 1, NX = -AY, NY = AX;   // 扇の軸は真下 (元は右下)
 // the shafts: angle off the axis, half width (radians), strength, breathing (cycles a loop), sway

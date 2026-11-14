@@ -54,7 +54,7 @@ export function create(o) {
   const pay = gift === "sword" ? null : MOVES.create(resolveOptions(MOVES.meta, { move: "tenyo-" + gift, seed: o.seed }));
   // 剣の発動の部品 (元の効果を、 式を触らずに置く): God rays (全画面)・落ちる光 (Holy smite)・着地の衝撃 (Ground pound)・インパクトフレーム (全画面)
   const sw = gift !== "sword" ? null : {
-    rays: scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, opts: {} }),   // 出どころ (0,−142) × 1.5 = 画面の (240, 42) = 日食
+    rays: scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, opts: {} }),   // 出どころ (0,−170) × 1.5 = 画面の一番上の真ん中
     smite: scaledFx(SMITE, { K: 2.2, at: [BOARD[0], BOARD[1]], delay: TH + SWORD.mark - T0, opts: { palette: GOLD } }),
     slam: scaledFx(SLAM, { K: 1.7, at: [BOARD[0], BOARD[1]], delay: TH + SWORD.land - T0, opts: { palette: GOLD } }),
     impact: scaledFx(IMPACT, { K: 1.5, at: [240, 135], delay: TH + SWORD.land - T0, opts: {} }),
@@ -187,9 +187,9 @@ export function create(o) {
         // 剣: 日食が強まって画面が暗くなる (暗さはゲームの側で掛ける) → God rays が徐々に出る → 暗さが解ける → 印 → 光が落ちる + 着地の衝撃 + インパクトフレーム → 白飛び
         const f = p.fade, hot = clamp(a / 0.5), rk = clamp((a - SWORD.rays[0]) / (SWORD.rays[1] - SWORD.rays[0])), gone = clamp((a - SWORD.land) / 0.5);
         p.fade = f * rk * (1 - clamp((a - SWORD.white) / 0.6)); sw.rays.draw(p);
-        // 暗転は、 日食も含めて全部を黒くする (作者の指定): 日食と注ぐ光も、 画面と同じ暗さで消える。 黒の中に God rays だけが出て来て、 暗転が解けると日食が戻る
+        // 暗転は、 日食も含めて全部を黒くする (作者の指定): 日食と注ぐ光も、 画面と同じ暗さで消える。 黒の中に God rays だけが出て来る
         let dk = 0; for (let i = 1; i < SWORD.dark.length; i++) { const [t0, v0] = SWORD.dark[i - 1], [t1, v1] = SWORD.dark[i]; if (a >= t0 && a <= t1) dk = v0 + (v1 - v0) * (a - t0) / (t1 - t0); }
-        p.fade = f * (1 - gone) * (1 - dk); if (gone < 1 && dk < 1) held(p, a, 0, hot);
+        p.fade = f * (1 - dk); if (a < SWORD.dark[1][0]) held(p, a, 0, hot);   // 真っ黒になった後は、 日食も注ぐ光も出さない (作者: 暗転後は日食を消してよい)
         p.fade = f;
         sw.smite.draw(p); sw.slam.draw(p); sw.impact.draw(p);
         const wt = a - SWORD.white, wk = wt < 0 ? 0 : clamp(1 - (wt - 0.15) / 0.3);
