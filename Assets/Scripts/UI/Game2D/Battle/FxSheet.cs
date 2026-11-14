@@ -216,6 +216,23 @@ namespace UI.Game2D.Battle
             }
         }
 
+        /// <summary>コマ k の不透明な画素の数 (帯の分を含む)。</summary>
+        public int PixelCount(int k)
+        {
+            if (k < 0 || k >= _frames.Length) return 0;
+            var f = _frames[k]; int n = f.pos.Length;
+            if (f.runLen != null) foreach (var l in f.runLen) n += l;
+            return n;
+        }
+
+        /// <summary>絵の実質の長さ (秒): 画素の数が一番多いコマの tailFrac を下回る末尾のコマを数えない。</summary>
+        public float ActiveSeconds(float tailFrac)
+        {
+            int max = 0; for (int k = 0; k < _frames.Length; k++) max = Mathf.Max(max, PixelCount(k));
+            int last = -1; for (int k = 0; k < _frames.Length; k++) if (PixelCount(k) >= max * tailFrac) last = k;
+            return (last + 1) * FrameSeconds;
+        }
+
         /// <summary>コマ k に画素が 1 つも無いか (範囲外も true)。</summary>
         public bool Empty(int k) => k < 0 || k >= _frames.Length || (_frames[k].pos.Length == 0 && _frames[k].runPos == null);
     }
