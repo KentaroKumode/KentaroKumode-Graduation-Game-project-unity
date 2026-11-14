@@ -131,6 +131,10 @@ namespace UI.Game2D.Battle
             return true;
         }
 
+        /// <summary>GUI に大技を掛ける時の重みの地図を PNG (480×270・白 = 1 = 窓に接した所・黒 = 0) で書き出す。 地図は大技の区間 (チャージ・大技) の頭で作られる。
+        /// 例: <c>UI.Game2D.Battle.QaBattle.DumpGuiWeight("C:/tmp/w.png")</c>。 地図がまだ無ければ false。</summary>
+        public static bool DumpGuiWeight(string path) => Game2DGuiRt.QaDumpWeight(path);
+
         /// <summary>今の状態を 1 行で (フェーズ・敵・ターン・予告・演出が空いているか・Go の進み)。</summary>
         public static string Status()
         {
