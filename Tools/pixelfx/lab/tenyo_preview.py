@@ -14,9 +14,10 @@ for gid, name, note in (("sword", "天与の剣", "ヴェスカに Blessing・�
     fr = [sh.crop((i * W, 0, (i + 1) * W, H)) for i in range(m["n"])]
     while len(fr) > 1 and fr[-1].getchannel("A").getbbox() is None: fr.pop()
     seq = []
-    DARK = [(0, 0), (0.5, 1), (1.3, 1), (1.8, 0)] if gid == "sword" else []   # tenyo-heavy.js の SWORD.dark と同じ表 (待機の終わり = 4.4 秒からの秒)
+    DARK = [(0, 0.5), (0.5, 1), (1.3, 1), (1.8, 0)] if gid == "sword" else []   # tenyo-heavy.js の SWORD.dark と同じ表 (待機の終わり = 4.4 秒からの秒)
     def dark(t):
         a = t - 4.4
+        if DARK and a < 0: return 0.5 * min(1, max(0, (t - 1.05) / 0.35))   # チャージ完了 (1.05〜1.4 秒) で暗くなり、 待機の間は保つ (SWORD.idleDark)
         for (t0, v0), (t1, v1) in zip(DARK, DARK[1:]):
             if t0 <= a <= t1: return v0 + (v1 - v0) * (a - t0) / (t1 - t0)
         return 0
