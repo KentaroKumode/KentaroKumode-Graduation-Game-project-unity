@@ -70,13 +70,21 @@ export const meta = {
   loop: false,
   fps: 30,
   bg: "dark",
-  options: { gift: "sword", part: "flow", palette: GOLD, seed: 5 },
+  options: { gift: "sword", part: "flow", phase: 0, palette: GOLD, seed: 5 },   // phase = 発動 (part: "heavy") を、 待機のループの何 / 4 周目から始めるか (0〜3)。 ゲームは、 待機の今の位置に一番近い版を流す
 };
+
+/** 切り分けて書き出す時の時刻 (秒): チャージ [0, charge)・待機 [charge, heavy) を 1 周・発動 [heavy, end)。 待機の長さ = heavy − charge。 */
+export function partTimes(gift) {
+  const ch = gift === "ring" ? 3.0 : T_CHARGE, held = gift === "sword" ? 3 : T_HELD, th = ch + held;
+  const end = th + (gift === "sword" ? SWORD.end : gift === "shield" ? SHIELD.open + 3.4 : RING.white + 3.0);
+  return { charge: ch, heavy: th, end, held };
+}
 
 export function create(o) {
   const C = fit(o.palette, 8), R = new Rng(o.seed), gift = o.gift, part = o.part;
   const HELD_T = gift === "sword" ? 3 : T_HELD;   // 待機の 1 周: 剣は 3 秒 (Blessing の 1 周 3 秒・Eclipse は 4 秒を 3 秒に速めて揃える)
-  const CH = gift === "ring" ? 3.0 : T_CHARGE, SK = CH - 0.35;   // チャージの長さと、 吸い込みが終わる時刻。 指輪は長い (作者: 回転と、 宝石が灯るのは、 もっとゆっくり)
+  const CH = gift === "ring" ? 3.0 : T_CHARGE, SK = CH - 0.35;
+  const PH = part === "heavy" ? ((o.phase | 0) % 4) / 4 : 0;   // 発動を始める位相 (待機の 1 周に対する割合)   // チャージの長さと、 吸い込みが終わる時刻。 指輪は長い (作者: 回転と、 宝石が灯るのは、 もっとゆっくり)
   const T0 = part === "charged" ? CH : part === "heavy" ? CH + HELD_T : 0;   // どこから流すか
   const OFF = gift === "shield" ? SHIELD.open - 0.25 : 0;   // 盾: 今の発動の絵 (白く燃える 0.25 秒は絞りの間に済むので飛ばす) を、 真っ暗の拍の後ろへずらす
   const TH = CH + HELD_T, TP = gift === "ring" ? TH + RING.white : TH + T_LEAD + OFF;   // 発動の始まり・全画面の始まり
@@ -117,7 +125,7 @@ export function create(o) {
   // 色は、 この液晶の 5 つの段に 1 つずつ落ちるように、 明るさを大きく離して選ぶ (作者: 縁の発光が、 このゲームの色遣いにすると潰れる)。
   //   月 = 一番暗い段 / 冠の外 = 2 段目 / 冠の中ほど = 3 段目 / 冠の根もと = 4 段目 / 月の縁の細い輪と光の玉 = 白
   const SUNPAL = ["#0b0608", "#2a1810", "#3a2414", "#4a3018", "#5c3c1c", "#8a5c26", "#f0d68a", "#ffffff"];
-  const ecl = gift === "sword" ? scaledFx(ECLIPSE, { K: SUN_K, at: SUN, speed: 4 / 3, glow: 0.3, opts: { palette: SUNPAL, pearl: ["#6a4a20", "#b8862e", "#f0d68a", "#ffffff"] } }) : null;
+  const ecl = gift === "sword" ? scaledFx(ECLIPSE, { K: SUN_K, at: SUN, speed: 4 / 3, glow: 0.3, start: (((T0 + PH * HELD_T) * 4) / 3) % 4, opts: { palette: SUNPAL, pearl: ["#6a4a20", "#b8862e", "#f0d68a", "#ffffff"] } }) : null;
   // 注ぐ光 (holy/blessing の円錐): 明るさの式 (4 本の光の筋が、 それぞれ 1 周に整数回ゆらぐ) は元のまま。 塗り方だけ変えた ──
   // 元は淡い半透明の重ね塗りで、 この液晶の 5 つの段では、 まだらな網点に潰れる (作者: もっとめりはりを付けてシャープに)。 ここでは明るさを 4 つの段に切って、 べたの色で塗る:
   //   筋の芯 = 白 / 筋 = 明るい金 / 筋のまわり = 金 (半分の網点) / 円錐の地 = 暗い金 (まばらな網点)。 きらめきは、 にじみ無しの 1 ドットの十字。
@@ -248,8 +256,8 @@ export function create(o) {
         const f = p.fade, hot = clamp(a / 0.5), rk = clamp((a - SWORD.rays[0]) / (SWORD.rays[1] - SWORD.rays[0])), gone = clamp((a - SWORD.land) / 0.5);
         p.fade = f * rk * (1 - clamp((a - SWORD.land) / 0.25)); sw.rays.draw(p);   // 光が着いたら、 God rays は引く (着弾を主役に)
         // 暗転は、 日食も含めて全部を黒くする (作者の指定): 日食と注ぐ光も、 画面と同じ暗さで消える。 黒の中に God rays だけが出て来る
-        let dk = 0; for (let i = 1; i < SWORD.dark.length; i++) { const [t0, v0] = SWORD.dark[i - 1], [t1, v1] = SWORD.dark[i]; if (a >= t0 && a <= t1) dk = v0 + (v1 - v0) * (a - t0) / (t1 - t0); }
-        p.fade = f * (1 - dk); if (a < SWORD.dark[1][0]) held(p, a, 0, hot);   // 真っ黒になった後は、 日食も注ぐ光も出さない (作者: 暗転後は日食を消してよい)
+        const dk = clamp(a / SWORD.dark[1][0]);   // 絵 (日食・注ぐ光) は、 発動の頭の濃さ 1 から、 真っ黒になる時刻までに消える (画面の暗さの表 SWORD.dark とは別: あちらは待機の暗さ 0.5 から始まる)
+        p.fade = f * (1 - dk); if (a < SWORD.dark[1][0]) held(p, a + PH * HELD_T, 0, hot);   // 真っ黒になった後は、 日食も注ぐ光も出さない (作者: 暗転後は日食を消してよい)
         p.fade = f;
         sw.impact.draw(p); sw.slam2.draw(p); sw.slam.draw(p); sw.smite.draw(p);   // インパクトフレームは下に敷き、 落ちる光と衝撃を上に
         const wt = a - SWORD.white, wk = wt < 0 ? 0 : clamp(1 - (wt - 0.15) / 0.3);
@@ -262,7 +270,7 @@ export function create(o) {
         p.fade = f * clamp((a - RING.rays[0]) / (RING.rays[1] - RING.rays[0])) * (1 - clamp((a - RING.impact) / 0.25)); if (p.fade > 0) rg.rays.draw(p);
         p.fade = f;
         const dk = clamp((a - RING.dark[0][0]) / (RING.dark[1][0] - RING.dark[0][0]));   // 真っ黒になるまでの間に、 輪も一緒に消える。 その後は出さない (着弾の絵の輪が、 白飛びの後に上から落ちて来る)
-        p.fade = f * (1 - dk); if (a < RING.dark[1][0]) held(p, a, 0, clamp(a / 0.5)); p.fade = f;
+        p.fade = f * (1 - dk); if (a < RING.dark[1][0]) held(p, a + PH * HELD_T, 0, clamp(a / 0.5)); p.fade = f;
         rg.impact.draw(p);
         if (b >= 0) {
           rg.slam2.draw(p); rg.slam.draw(p); rg.circle.draw(p); pay.draw(p);
@@ -278,7 +286,7 @@ export function create(o) {
         // 盾の発動の頭 (transitions/star-iris を、 星ではなく円で): 金の縁の円が、 体の中心へ閉じていく。 外は黒 (ゲームの側)。 閉じ切ると真っ暗の拍、 中心にきらめき
         const r = irisR(a);
         if (a < SHIELD.close) {
-          held(p, a, 0, clamp(a / 0.5));
+          held(p, a + PH * HELD_T, 0, clamp(a / 0.5));
           p.shade(BODY[0] - r - 6, BODY[1] - r - 6, BODY[0] + r + 6, BODY[1] + r + 6, (x, y, o2) => {
             const dx = x - BODY[0], dy = y - BODY[1], d = Math.hypot(dx, dy) - r;
             if (d < 0 || d >= SHIELD.rim) return;
@@ -300,9 +308,9 @@ export function create(o) {
         // 溜め: 白く燃える (0.25 秒) → 落ちる / 閉じる (0.1 秒) → 白 (0.1 秒〜)
         const hot = clamp(a / 0.25), go = clamp((a - 0.25) / 0.1), f = p.fade;
         for (let y = 0; y < H; y++) for (let x = (y & 1); x < W; x += 2) p.add(x, y, C[5], 0.35 * hot * hot);
-        if (go <= 0) held(p, a, 0, hot);
-        else if (gift === "shield") { held(p, a, 0, 1); oval(p, 240, BODY[1], SR + 60 * go, SR + 60 * go, 3, WHITE, 1 - go * 0.5); }
-        else held(p, a, 0, 1);
+        if (go <= 0) held(p, a + PH * HELD_T, 0, hot);
+        else if (gift === "shield") { held(p, a + PH * HELD_T, 0, 1); oval(p, 240, BODY[1], SR + 60 * go, SR + 60 * go, 3, WHITE, 1 - go * 0.5); }
+        else held(p, a + PH * HELD_T, 0, 1);
         p.fade = f;
       }
       // 白飛び: 剣は全面を白く (0.15 秒)・指輪は締まる瞬間に下半分・盾は弱く
