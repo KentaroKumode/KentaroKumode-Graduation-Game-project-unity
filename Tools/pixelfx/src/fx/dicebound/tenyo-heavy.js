@@ -36,7 +36,9 @@ export const SWORD = {
 export const SHIELD = {
   idleDark: 0.65,       // チャージ完了から待機の間の、 画面の暗さ (作者: もっと強く)
   close: 0.98,          // 円が閉じ切る (transitions/star-iris の CLOSE)
-  open: 1.16,           // 真っ暗の拍の終わり (star-iris の OPEN0)。 ここでインパクトフレームと、 発動の絵
+  rays: [1.0, 2.0],     // 真っ暗の中に、 God rays が出て来る区間 (剣と同じ)
+  dark: [[0.98, 1], [1.8, 1], [2.3, 0]],   // 閉じ切った後の画面の暗さ: 真っ黒を保つ → God rays が出そろったら解ける
+  open: 2.3,            // 暗転が解け切る。 ここでインパクトフレームと、 発動の絵
   rmax: 290,            // 円の初めの半径 (画面の隅まで届く)
   rim: 4,               // 金の縁の太さ (黒くするのは、 半径 + この太さ より外)
 };
@@ -67,6 +69,7 @@ export function create(o) {
   // 剣の発動の部品 (元の効果を、 式を触らずに置く): God rays (全画面)・落ちる光 (Holy smite)・着地の衝撃 (Ground pound)・インパクトフレーム (全画面)
   // 瓦礫 (跳ねる岩・砂利・欠片) は出さない。 煙は粒を小さく分ける (作者: 瓦礫はいらない・煙は野暮ったいので粒度を下げて)
   const RUBBLE = ["CHUNK", "GRIT", "FLAKE"], FINE = { SMOKE: [0.45, 3], DUST: [0.6, 2] }, FINER = { SMOKE: [0.32, 4], DUST: [0.5, 2] };
+  const shRays = gift === "shield" ? scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, opts: {} }) : null;
   const shImpact = gift === "shield" ? scaledFx(IMPACT, { K: 1.5, at: [240, 135], delay: TH + SHIELD.open - T0, opts: {} }) : null;
   const sw = gift !== "sword" ? null : {
     rays: scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, opts: {} }),   // 出どころ (0,−170) × 1.5 = 画面の一番上の真ん中
@@ -190,7 +193,7 @@ export function create(o) {
       if (ecl) ecl.update(dt);
       if (sw) for (const k in sw) sw[k].update(dt);
       if (shImpact) {
-        shImpact.update(dt);
+        shImpact.update(dt); shRays.update(dt);
         const a = t - TH, r = irisR(a);   // 縁から金の粒がこぼれる (star-iris の、 先からこぼれる粒)
         if (a > 0 && a < SHIELD.close && r > 6 && r < 280) for (let n = 0; n < 3; n++) if (R.chance(0.5)) { const g = R.range(0, TAU), x = BODY[0] + Math.cos(g) * r, y = BODY[1] + Math.sin(g) * r; if (x > 0 && y > 0 && x < W && y < H) ps.spawn(R.chance(0.6) ? P.STAR : P.MOTE, x, y, -Math.cos(g) * R.range(20, 70), -Math.sin(g) * R.range(20, 70), R.range(0.25, 0.5), R.chance(0.5) ? C[6] : C[5], R.range(0.6, 1.8)); }
       }
@@ -236,9 +239,11 @@ export function create(o) {
         }
         const u = a - SHIELD.close;
         if (u > -0.05 && u < 0.2) glint(p, C, BODY[0], BODY[1], 30 * (1 - Math.abs(u) / 0.2));
+        // 真っ暗の中に、 上から God rays が徐々に出て来る (剣と同じ)
+        const f = p.fade; p.fade = f * clamp((a - SHIELD.rays[0]) / (SHIELD.rays[1] - SHIELD.rays[0])); if (p.fade > 0) shRays.draw(p); p.fade = f;
         return;
       }
-      if (shImpact) shImpact.draw(p);   // インパクトフレームを下に敷き、 今の発動の絵をその上に
+      if (shImpact) { const f = p.fade; p.fade = f * (1 - clamp((a - SHIELD.open) / 0.25)); if (p.fade > 0) shRays.draw(p); p.fade = f; shImpact.draw(p); }   // 発動で God rays は引く。 インパクトフレームを下に敷き、 今の発動の絵をその上に
       a -= OFF;
       if (a < T_LEAD) {
         // 溜め: 白く燃える (0.25 秒) → 落ちる / 閉じる (0.1 秒) → 白 (0.1 秒〜)
