@@ -45,16 +45,17 @@ class Mock:
         o = Image.new("RGB", (im.size[0], im.size[1] + 54), (18, 17, 22)); o.paste(im, (0, 54)); ImageDraw.Draw(o).text((14, 8), cap, font=ImageFont.truetype(r"C:/Windows/Fonts/meiryob.ttc", 28), fill=(230, 226, 238))
         o.save(os.path.join(OUT, name + ".png")); return a
 
-def enemy_tag(m, x, y):   # 敵の予告: 敵のそばに出す小さな札 (液晶の中)
-    m.box(x, y, 70, 38, "soft", "line", count=True)
-    m.text(x + 4, y + 2, "次の攻撃", "dim", F8); m.text(x + 4, y + 12, "28", "warn", F14); m.text(x + 34, y + 16, "出目4", "txt", F8); m.text(x + 4, y + 27, "防御3  毒2", "dim", F8)
+def enemy_tag(m, x, y):   # 敵の予告: 次の攻撃の値だけ (出目は値にもう入っている・防御は敵の詳細の窓で見る ── 2026-11-15 作者)。 毒などは印で
+    m.box(x, y, 46, 26, "soft", "line", count=True)
+    m.text(x + 4, y + 1, "次", "dim", F8); m.text(x + 42, y + 6, "28", "warn", F14, "ra")
+    m.pips(x + 2, y + 29, 2, 2, "chg", 5, 2)   # 状態の印 (毒 2 など)
 
 def enemy_hp(m):   # 敵の HP: 足もとのすぐ下に棒、 数字は棒の右 (下の帯に掛からないよう 1 行で)
     m.bar(180, 198, 100, 6, 0.62, "hp", (0.33, 0.66)); m.text(283, 196, "884", "txt", F8)
 
-def clock(m, x, y):       # ターンと激化の時計 (細い 1 行)
-    m.box(x, y, 132, 12, "soft", None)
-    m.text(x + 3, y + 1, "T3", "txt", F8); m.text(x + 24, y + 1, "激化", "dim", F8); m.pips(x + 50, y + 3, 5, 1, "warn", 6, 2); m.text(x + 92, y + 1, "あと2", "txt", F8)
+def clock(m, x, y):       # 激化の時計 (細い 1 行)。 ターンの数は出さない: 効くのは「次の段まであと何ターンか」だけ
+    x += 26; m.box(x, y, 80, 12, "soft", None)
+    m.text(x + 3, y + 1, "激化", "dim", F8); m.pips(x + 29, y + 3, 5, 1, "warn", 6, 2); m.text(x + 72, y + 1, "2", "txt", F8)
 
 def preview(m, x1, x2, y):   # 収支の見込み: 与える / 受ける
     m.box(x1, y, 76, 22, "soft", None); m.text(x1 + 4, y + 1, "与える", "dim", F8); m.text(x1 + 72, y + 3, "34", "gold", F14, "ra")
