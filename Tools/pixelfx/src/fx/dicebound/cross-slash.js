@@ -50,7 +50,7 @@ function ringSlash(p, s, t, tFlare) {
     });
     glowAlong(p, s, s.R - s.W * 0.3, 0, U, 14, R[3], (uu) => 0.3 * Math.exp(-(u - passed(uu / s.span)) / 0.08), 0, 0.3);
   } else if (f >= 0 && f < 1) {
-    const RR = s.R + 2.2 * ease.outCubic(f), th = f < 0.13 ? s.W * 0.56 : Math.max(1, s.W * 0.375 * Math.pow(1 - f, 1.5) + 0.5), S = { ...s, R: RR }, step = f < 0.13 ? 6 : f < 0.3 ? 5 : f < 0.55 ? 4 : 3;
+    const RR = s.R + 0.8 * ease.outCubic(f), th = f < 0.13 ? s.W * 0.56 : Math.max(1, s.W * 0.375 * Math.pow(1 - f, 1.5) + 0.5), S = { ...s, R: RR }, step = f < 0.13 ? 6 : f < 0.3 ? 5 : f < 0.55 ? 4 : 3;
     smear(p, S, 0, U, th, (uu, r, out) => {
       const w = th * Math.pow(Math.sin(Math.PI * clamp(uu / s.span)), 0.5);   // 両端は細る (弧は閉じた輪ではないので)
       if (w < 0.4) return;
@@ -74,7 +74,9 @@ export function create(o) {
   const C = fit(o.palette, 7), Rg = new Rng(o.seed), ps = new Particles({ rng: Rg, ground: () => 0, sparks: o.sparks }), lights = new Lights();
   const X = 34, Y = -23;
   const down = cut(X, Y, 0.72, 1, 0.84, { W: 10, t0: 0, sweep: 0.06, hold: 0.07, trail: 0.24, ramp: C, lens: true });
-  const up = cut(X, Y, -0.66, -1, 0.84, { W: 11, t0: UP, sweep: 0.06, hold: 0.06, trail: 0.26, ramp: C, lens: true });
+  // 2 太刀目は、 1 太刀目を左右に返した物 (2026-11-14: 元は右下から左上へ斬り上げる・角度も太さも 1 太刀目と違う ── 横から見た剣士の動きには合うが、 正面から見ると×が歪んで見える)。
+  //   右上から左下へ、 同じ角度・同じ反り・同じ太さで。 交点は弧のちょうど同じ所
+  const up = cut(X, Y, Math.PI - 0.72, -1, 0.84, { W: 10, t0: UP, sweep: 0.06, hold: 0.07, trail: 0.24, ramp: C, lens: true });
   const ends = [slashEnd(down), slashEnd(up)], slivers = [-2.4, -1.1, 0.2, 1.6].map((a) => ({ a: a + Rg.range(-0.2, 0.2), r: Rg.range(5, 8), v: Rg.range(70, 120), arc: Rg.range(0.4, 0.7) }));
   const CLOSE = UP + 0.012;
   let t = 0, cut1 = false, cut2 = false, closed = false;

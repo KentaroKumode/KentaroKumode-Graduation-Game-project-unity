@@ -28,8 +28,8 @@ const NIGHT = ["#0a0614", "#1c1236", "#3a2470", "#5a3aa8", "#8a64e0", "#d8c8ff",
 // 技の中身: [元の効果, { K 倍率, at 画面の位置, anchor 元の座標のどこをそこへ合わせるか, speed, delay, opts }] の並び (重ねて流す)
 const PLAN = {
   "sword-2": [[SWORD, { K: 2.6, at: E, anchor: [10, -28], speed: 0.65, opts: { palette: STEEL } }]],
-  "sword-3": [[DOUBLE, { K: 2.8, at: E, anchor: [24, -30], speed: 0.65, opts: { palette: STEEL } }]],
-  "sword-4": [[SPIN, { K: 3.2, at: E, anchor: [0, -26], speed: 0.65, opts: { palette: GOLD } }], [DOUBLE, { K: 3.2, at: E, anchor: [24, -30], speed: 0.65, delay: 0.3, opts: { palette: GOLD } }]],
+  "sword-3": [[DOUBLE, { K: 2.8, at: E, anchor: [34, -23], speed: 0.65, opts: { palette: STEEL } }]],
+  "sword-4": [[SPIN, { K: 3.2, at: E, anchor: [0, -26], speed: 0.65, opts: { palette: GOLD } }], [DOUBLE, { K: 3.2, at: E, anchor: [34, -23], speed: 0.65, delay: 0.3, opts: { palette: GOLD } }]],
   "axe-2": [[CLEAVE, { K: 2.2, at: [240, 196], anchor: [34, 0], speed: 1.3, opts: { palette: IRON } }]],
   "axe-3": [[CLEAVE, { K: 2.7, at: [240, 196], anchor: [34, 0], speed: 1.3, opts: { palette: BLOOD } }]],
   "axe-4": [[SPIN, { K: 3.4, at: E, anchor: [0, -26], speed: 0.65, opts: { palette: BLOOD } }], [CLEAVE, { K: 2.9, at: [240, 196], anchor: [34, 0], speed: 1.4, delay: 0.25, opts: { palette: BLOOD } }]],
