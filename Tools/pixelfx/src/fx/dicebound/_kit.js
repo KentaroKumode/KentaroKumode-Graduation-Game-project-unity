@@ -96,3 +96,40 @@ export function onces() {
   const done = new Set();
   return (key, when, fn) => { if (when && !done.has(key)) { done.add(key); fn(); } };
 }
+
+/** 斬撃: (x0,y0) → (x1,y1) へ、 bow だけ反った弧。 真ん中が一番太い (w)。 片側の縁が白く、 反対へ色が落ちる。 prog = 0〜1 で、 どこまで描くか。 */
+export function slash(p, C, x0, y0, x1, y1, bow, w, k = 1, prog = 1) {
+  if (k <= 0 || w < 0.5) return;
+  const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L, mx = (x0 + x1) / 2 + nx * bow, my = (y0 + y1) / 2 + ny * bow, n = Math.ceil(L * 1.6), to = n * clamp(prog);
+  for (let j = 0; j <= to; j++) {
+    const u = j / n, a = 1 - u, x = a * a * x0 + 2 * a * u * mx + u * u * x1, y = a * a * y0 + 2 * a * u * my + u * u * y1, wd = w * Math.pow(Math.sin(Math.PI * u), 0.6);
+    for (let d = -wd * 0.35; d <= wd * 0.65; d += 0.6) {
+      const q = (d + wd * 0.35) / Math.max(1, wd);
+      p.dot(x + nx * d, y + ny * d, q < 0.3 ? WHITE : q < 0.6 ? C[6] : q < 0.85 ? C[5] : C[4], k * (q < 0.85 ? 1 : 0.6));
+    }
+    if (j % 6 === 0) p.glow(x, y, 5 + wd * 0.5, C[5], 0.25 * k);
+  }
+}
+
+/** 斬撃の上の点 (火花を出す位置などに使う)。 u = 0〜1。 */
+export function slashAt(x0, y0, x1, y1, bow, u) {
+  const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy) || 1, mx = (x0 + x1) / 2 - (dy / L) * bow, my = (y0 + y1) / 2 + (dx / L) * bow, a = 1 - u;
+  return [a * a * x0 + 2 * a * u * mx + u * u * x1, a * a * y0 + 2 * a * u * my + u * u * y1];
+}
+
+/** 当たりの閃光: 横に長い光の玉 (白い芯・明るい縁) と、 その中心を通る細い横の光の筋。 星形 (棘の炸裂) は使わない ── ×や四角に見えて安っぽい (2026-11-14 作者の指摘)。 */
+export function lens(p, C, x0, y0, rx, ry, k = 1) {
+  if (rx < 2 || k <= 0) return;
+  p.shade(x0 - rx - 1, y0 - ry - 1, x0 + rx + 1, y0 + ry + 1, (x, y, o) => {
+    const d = Math.hypot((x - x0) / rx, (y - y0) / ry);
+    if (d > 1) return;
+    o.c = d < 0.5 ? WHITE : d < 0.8 ? C[6] : C[5]; o.a = k; o.l = C[5]; o.k = 0.5 * k;
+  });
+  p.glow(x0, y0, rx * 1.3, C[5], 0.4 * k);
+  for (let x = -rx * 2.2; x <= rx * 2.2; x++) { const u = Math.abs(x) / (rx * 2.2); p.dot(x0 + x, y0, u < 0.5 ? WHITE : C[6], k * (1 - u)); }
+}
+
+/** 小さな菱形 (宝石・楔の頭)。 */
+export function diamond(p, x0, y0, r, c, rim) {
+  for (let dy = -r; dy <= r; dy++) for (let dx = -(r - Math.abs(dy)); dx <= r - Math.abs(dy); dx++) p.dot(x0 + dx, y0 + dy, Math.abs(dx) + Math.abs(dy) === r ? rim : c);
+}
