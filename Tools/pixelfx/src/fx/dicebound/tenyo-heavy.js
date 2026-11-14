@@ -7,7 +7,7 @@
 //   指輪: 盤の上に、 大きな金の輪が走って描かれ、 宝石が灯る → 輪が白く光る → 落ちて盤を締める (moves の tenyo-ring) + 締まる瞬間に下半分が金に飛ぶ
 // part = "flow" (見本用: 全部を続けて) / "charge" / "charged" / "heavy" (ゲーム用に切り分ける時)。
 import { Particles, P, Rng, resolveOptions, clamp, smooth, ease, rand, hex, TAU, WHITE, fit } from "../../core/index.js";
-import { held as coreHeld, HELD_SEED } from "./gouka-charge.js";   // 王のチャージの「溜まった芯」(白い玉・十字の光・渦を巻いて寄る火の粉)。 式はそのまま、 色を金に
+import { held as coreHeld, cross as coreCross, HELD_SEED } from "./gouka-charge.js";   // 王のチャージの「溜まった芯」(白い玉・十字の光・渦を巻いて寄る火の粉)。 式はそのまま、 色を金に
 import { GOLD } from "../holy/_lib.js";
 import { W, H, BOARD, beam, oval, diamond, wash } from "./_kit.js";
 import * as MOVES from "./moves.js";
@@ -34,7 +34,7 @@ export const SWORD = {
 };
 // 盾の発動の時刻 (待機の終わりからの秒) と、 円の絞り。 絞りの外を黒くするのは、 ゲームの側の処理 (この液晶の色の段には真っ黒が無いので、 絵としては描けない)
 export const SHIELD = {
-  idleDark: 0.3,        // チャージ完了から待機の間の、 画面の暗さ (若干の暗転)
+  idleDark: 0.65,       // チャージ完了から待機の間の、 画面の暗さ (作者: もっと強く)
   close: 0.98,          // 円が閉じ切る (transitions/star-iris の CLOSE)
   open: 1.16,           // 真っ暗の拍の終わり (star-iris の OPEN0)。 ここでインパクトフレームと、 発動の絵
   rmax: 290,            // 円の初めの半径 (画面の隅まで届く)
@@ -178,7 +178,8 @@ export function create(o) {
       p.glow(240, y, 60 + 80 * boost, C[4], 0.1 + 0.3 * boost + 0.2 * hot);
     }
     if (grow >= 1 && gift === "shield") { p.glow(BODY[0], BODY[1], 96 + 10 * pulse, C[5], 0.3 + 0.1 * pulse); p.glow(BODY[0], BODY[1], 44 + 8 * pulse, WHITE, 0.4 + 0.15 * pulse); }   // 盾: 中心の光を強調 (作者の指定)
-    if (grow >= 1 && gift !== "sword") core(p, ti, gift === "shield" ? Math.max(boost, 0.5) : boost);   // 剣は、 芯の代わりに日食がある。 盾は、 芯を待機の間も大きく保つ (十字が長く・玉が大きい)
+    if (grow >= 1 && gift !== "sword") core(p, ti, gift === "shield" ? Math.max(boost, 0.5) : boost);
+    if (grow >= 1 && gift === "shield") { coreCross(p, F, BODY[0], BODY[1], 128 + 14 * pulse + 60 * boost, 0.38); coreCross(p, F, BODY[0], BODY[1] + 1, 128 + 14 * pulse, 0); coreCross(p, F, BODY[0] + 1, BODY[1], 128 + 14 * pulse, 0); p.glowLine(BODY[0] - 120, BODY[1], BODY[0] + 120, BODY[1], 6, C[5], 0.4); p.glowLine(BODY[0], BODY[1] - 76, BODY[0], BODY[1] + 76, 6, C[5], 0.35); }   // 盾: 光の十字を大きく・太く (作者: もっと目立っていい)。 斜めの短い腕も   // 剣は、 芯の代わりに日食がある。 盾は、 芯を待機の間も大きく保つ (十字が長く・玉が大きい)
   }
 
   return {

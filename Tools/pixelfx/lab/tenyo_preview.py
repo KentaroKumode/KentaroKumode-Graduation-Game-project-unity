@@ -23,7 +23,7 @@ for gid, name, note in (("sword", "天与の剣", "ヴェスカに Blessing・�
         return 0
     for i, f in enumerate(fr):
         tt = i / 24.0; d = dark(tt)
-        if gid == "shield": d = 0.3 * min(1, max(0, (tt - 1.05) / 0.35)) if tt < 2.9 + 1.16 else 0.3 * max(0, 1 - (tt - 4.06) / 0.2)   # 盾: 待機の間は若干の暗転 (SHIELD.idleDark)・発動の絵が出たら解ける
+        if gid == "shield": d = 0.65 * min(1, max(0, (tt - 1.05) / 0.35)) if tt < 2.9 + 1.16 else 0.65 * max(0, 1 - (tt - 4.06) / 0.2)   # 盾: 待機の間は若干の暗転 (SHIELD.idleDark)・発動の絵が出たら解ける
         b = base.copy() if d <= 0.01 else base.point(lambda v: int(v * (1 - d)))
         b.paste(f, (0, 0), f)
         if gid == "shield" and 2.9 <= tt < 2.9 + 1.16:   # 盾: 円の絞り。 半径 + 縁 より外を黒く (tenyo-heavy.js の irisR と同じ式)。 閉じ切ったら全部黒
