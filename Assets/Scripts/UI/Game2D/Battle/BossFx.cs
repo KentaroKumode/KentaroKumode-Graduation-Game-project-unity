@@ -81,6 +81,22 @@ namespace UI.Game2D.Battle
 
         private static string Ash(int ash) => "-a" + Mathf.Clamp(ash, 0, ASH_MAX);
 
+        /// <summary>絵を先に読んでおく (全画面のコマが多く、 読むのに一瞬かかる)。 チャージのターン・大技のターンの頭 (プレイヤーの手番の前) に呼ぶ。</summary>
+        public static void Preload(Kind k, int ash, bool heavy)
+        {
+            string[] names;
+            switch (k)
+            {
+                case Kind.King: names = heavy ? new[] { "gouka-release", "gouka-screen" + Ash(ash), "gouka-impact" + Ash(ash) } : new[] { "gouka-charge" + Ash(ash), "gouka-charged" }; break;
+                case Kind.Judge: names = heavy ? new[] { "judge-release-p0", "judge-release-p1", "judge-release-p2", "judge-release-p3", "judge-verdict" } : new[] { "judge-charge", "judge-charged" }; break;
+                case Kind.Chevalier: names = heavy ? new[] { "chevalier-slash" } : new[] { "chevalier-charge", "chevalier-charged" }; break;
+                case Kind.Vesca: names = heavy ? new[] { "vesca-stop-p0", "vesca-stop-p1", "vesca-stop-p2", "vesca-stop-p3", "vesca-shatter" } : new[] { "vesca-charge", "vesca-charged" }; break;
+                case Kind.VescaFinal: names = heavy ? new[] { "vesca-lost-p0", "vesca-lost-p1", "vesca-lost-p2", "vesca-lost-p3", "vesca-glitch", "vesca-off" } : new[] { "vesca-charge-broken", "vesca-charged-broken" }; break;
+                default: return;
+            }
+            foreach (var n in names) FxSheet.Load(n);
+        }
+
         /// <summary>チャージのターン: チャージを流し、 終わったら待機のループへ。 ash = 烈炎の数 (王だけ)。</summary>
         public void Charge(Kind k, int ash)
         {

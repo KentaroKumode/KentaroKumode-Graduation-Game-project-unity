@@ -830,7 +830,7 @@ namespace UI.Game2D.Battle
             var kind = BossFx.KindOf(cm.CurrentEnemy?.id);
             if (kind != BossFx.Kind.None && charging) fx.BossCharge(kind, _blazeStacks, lastTaken);
             else if (kind != BossFx.Kind.None && heavyIn == 0 && !down) fx.BossHeavy(kind, _blazeStacks, lastTaken);
-            else fx.EnemyAttack(lastTaken, kind == BossFx.Kind.King ? "move-king-attack" : kind == BossFx.Kind.Chevalier ? "move-chev-thrust" : null);
+            else fx.EnemyAttack(lastTaken, down ? null : kind == BossFx.Kind.King ? "move-king-attack" : kind == BossFx.Kind.Chevalier ? "move-chev-thrust" : null);      // ダウンのターンは攻撃しないので技の絵は出さない
             phase = P.EAttack; t = 0; _eHit = false; Touch();
         }
 
@@ -848,6 +848,9 @@ namespace UI.Game2D.Battle
             _blazeStacks = ctx != null ? (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.BlazeBrand.StackKey) : 0;
             // ダウン (または周期がずれた) で大技が来なくなった: 待機を止めて暗幕を戻す
             if (fx.BossIdling && (down || heavyIn != 0)) fx.BossCancel();
+            // 絵を先に読む (全画面のコマが多い・敵の行動の瞬間に読むと一瞬止まる): チャージのターン = チャージと待機 / 大技のターン = 大技
+            if (charging) BossFx.Preload(kind, _blazeStacks, false);
+            else if (heavyIn == 0 && !down) BossFx.Preload(kind, _blazeStacks, true);
             if (kind == BossFx.Kind.King && regen > 0) fx.PlayMove("move-king-regen");
             if (kind == BossFx.Kind.Chevalier)
             {
