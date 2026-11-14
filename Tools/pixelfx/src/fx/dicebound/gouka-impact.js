@@ -53,7 +53,7 @@ export function create(o) {
       const x = Math.cos(a) * rr, y = Math.sin(a) * rr * SY, z = depth(y), s = near(z);
       if (y < 0 && Math.abs(x) < o.body) continue;      // 敵の体の後ろ
       if (R.chance(0.5 * (1 - q) * (1 - q))) continue;  // 中心のごく近くだけ、 まばらに
-      sites.push({ x, y, z, far: y < 0, t0: reachedAt(rr) + R.range(0, 0.04), life: (q > 0.88 ? R.range(0.75, 1.15) * (1 + 0.05 * ASH) : R.range(0.14, 0.22)),      // 走る間は一瞬だけ燃え、 いちばん外の輪だけが燃え残る (輪を薄く)
+      sites.push({ x, y, z, far: y < 0, t0: reachedAt(rr) + R.range(0, 0.04), life: (q > 0.78 ? R.range(0.75, 1.15) * (1 + 0.05 * ASH) : R.range(0.2, 0.32)),      // 走る間は一瞬だけ燃え、 いちばん外の輪だけが燃え残る (輪を薄く)
         h: R.range(10, 17) * (0.6 + 0.55 * q) * s, w: R.range(1.9, 2.8) * (0.75 + 0.3 * q) * s, n: R.int(0, 1e5) });
     }
   }
@@ -112,7 +112,7 @@ export function create(o) {
   const ring = (p, far) => {
     const k = (t - BURST) / (SPREAD + 0.1);
     if (k < 0 || k >= 1) return;
-    band(p, 0, 0, front(t) + 2, SY, Math.max(1, 3 * (1 - k)), k < 0.75 ? 1 : (1 - k) / 0.25, [H[6], H[4], H[2], H[1]], (g) => (Math.sin(g) < 0) === far, k < 0.14);
+    band(p, 0, 0, front(t) + 2, SY, Math.max(1.5, 4.5 * (1 - k)), k < 0.75 ? 1 : (1 - k) / 0.25, [H[6], H[4], H[2], H[1]], (g) => (Math.sin(g) < 0) === far, k < 0.14);
   };
   // 灰の塊: 光の当たる面と影の面のある、 角ばった灰色の破片
   const crust = (p, b) => {
