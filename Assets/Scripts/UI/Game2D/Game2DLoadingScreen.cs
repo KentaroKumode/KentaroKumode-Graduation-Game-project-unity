@@ -256,6 +256,11 @@ namespace UI.Game2D
             Graphics.Blit(src, _snap);
         }
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        /// <summary>[実機の確認用・2026-11-14] 出ているロード画面をすぐ閉じる (<c>UI.Game2D.Battle.QaBattle</c> が戦闘へ直接入る時)。</summary>
+        public static void QaDismiss() { foreach (var s in FindObjectsOfType<Game2DLoadingScreen>()) if (s._active) s.Stop(); }
+#endif
+
         private void Stop()
         {
             _active = false; _instanceActive = false; _endFrame = Time.frameCount; _stage = Stage.Off;
