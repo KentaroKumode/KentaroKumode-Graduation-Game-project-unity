@@ -212,7 +212,7 @@ export function create(o) {
       } else if (move === "king-attack") {
         // 画面を横切って盤を薙ぐ、 大きな火の三日月 (0.18 秒)。 一拍遅れて、 細い 2 本目。 通った跡に、 高さも間もばらばらの炎が立つ
         const pr = clamp(t / 0.18), k = 1 - clamp((t - 0.22) / 0.35);
-        if (k > 0) { crescent(p, C, 240, -45, 285, 2.35, 0.8, 36 * k + 2, 1, pr); if (t > 0.05) crescent(p, C, 228, -58, 268, 2.3, 0.86, 12 * k + 1, 0.9, clamp((t - 0.05) / 0.18)); }
+        if (k > 0) { crescent(p, C, 240, -45, 285, 2.35, 0.8, 36 * k + 2, 1, pr, 1, 0.6, t * 10); if (t > 0.05) crescent(p, C, 228, -58, 268, 2.3, 0.86, 12 * k + 1, 0.9, clamp((t - 0.05) / 0.18)); }   // 流れに沿った筋を少し (作者の指定)
         for (const q of tongues) {
           const a = t - 0.06 - q.d - q.u * 0.12;
           if (a <= 0 || a >= q.life) continue;

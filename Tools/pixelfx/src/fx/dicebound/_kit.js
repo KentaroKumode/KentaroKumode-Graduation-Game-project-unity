@@ -2,7 +2,7 @@
 // 元の効果は横スクロールの小さい人物に合わせた大きさ (高さ 30〜60 ドット) で、 そのまま置くと小さすぎる (作者の指摘)。 拡大はしない (ドットの大きさが揃わなくなる) ──
 // 大きい形を、 はじめからこの大きさで描く。 粒 (火花・残り火・煙・灰・星) は core の Particles の種類を、 技ごとに組み合わせて出す。
 // 形の描き方は、 元の効果から学んだ物: 光の槍 = transitions/slash-wipe の一閃・炸裂 = impacts/crit-hit の星形・印 = shadow/hex-sigil・三日月 = melee の斬撃・輪 = fire/fire-ring の band。
-import { clamp, smooth, ease, TAU, WHITE } from "../../core/index.js";
+import { clamp, smooth, ease, noise2, TAU, WHITE } from "../../core/index.js";
 import { smear, trace, glowAlong } from "../melee/_lib.js";
 
 export const W = 480, H = 270, CHEST = [240, 130], FOOT = [240, 196], HEAD = [240, 60], BOARD = [240, 247];
@@ -48,13 +48,20 @@ export function oval(p, x0, y0, rx, ry, th, c, k = 1, a0 = 0, a1 = TAU) {
 }
 
 /** 三日月の斬撃: 中心 (cx,cy)・半径 R の弧 a0→a1。 真ん中が一番太い (w)。 外の縁が白く、 内へ色が落ちる。 prog = 0〜1 で、 弧のどこまで描くか。 sy = 縦の潰し。 */
-export function crescent(p, C, cx, cy, R, a0, a1, w, k = 1, prog = 1, sy = 1) {
+export function crescent(p, C, cx, cy, R, a0, a1, w, k = 1, prog = 1, sy = 1, flow = 0, ph = 0) {
+  // flow > 0: 流れに沿った筋を入れる (弧に沿っては長く、 太さの向きには細かいむら。 ph で頭の方へ流す)。 外の縁の 2 ドットは白のまま (dicebound/vesca-slash と同じ考え方)
+  const LV = [WHITE, C[6], C[5], C[4]], len = R * Math.abs(a1 - a0);
   const n = Math.ceil(R * Math.abs(a1 - a0) * 1.6) + 2, to = n * clamp(prog);
   for (let j = 0; j <= to; j++) {
     const u = j / n, g = a0 + (a1 - a0) * u, wd = w * Math.pow(Math.sin(Math.PI * u), 0.7), c = Math.cos(g), s = Math.sin(g);
     for (let d = 0; d <= wd; d += 0.6) {
       const q = d / Math.max(1, wd);
-      p.dot(cx + c * (R - d), cy + s * (R - d) * sy, q < 0.3 ? WHITE : q < 0.6 ? C[6] : q < 0.85 ? C[5] : C[4], k * (q < 0.85 ? 1 : 0.6));
+      let lv = q < 0.3 ? 0 : q < 0.6 ? 1 : q < 0.85 ? 2 : 3;
+      if (flow > 0) {
+        if (d < 2.2) lv = 0;
+        else { const n = noise2(u * len * 0.04 - ph, d * 0.5, 31); lv = clamp(Math.max(1, lv) + (n > 0.62 - 0.25 * flow ? -1 : n < -(0.7 - 0.25 * flow) ? 1 : 0), 0, 3); }
+      }
+      p.dot(cx + c * (R - d), cy + s * (R - d) * sy, LV[lv], k * (q < 0.85 ? 1 : 0.6));
     }
     if (j % 5 === 0) p.glow(cx + c * R, cy + s * R * sy, 5 + wd * 0.5, C[5], 0.25 * k);
   }
