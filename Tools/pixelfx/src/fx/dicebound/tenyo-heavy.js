@@ -94,14 +94,14 @@ export function create(o) {
   const RUBBLE = ["CHUNK", "GRIT", "FLAKE"], FINE = { SMOKE: [0.45, 3], DUST: [0.6, 2] }, FINER = { SMOKE: [0.32, 4], DUST: [0.5, 2] };
   // 指輪の発動の部品: God rays・インパクトフレーム・arcane/magic-circle-cast (床に円が描かれ、 文字が 1 つずつ灯り、 光って、 光の柱が立って砕ける) を金色で、 こちらの盤の上に
   const rg = gift !== "ring" ? null : {
-    rays: scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, opts: {} }),
+    rays: scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, start: T0 % 10, opts: {} }),
     impact: scaledFx(IMPACT, { K: 2.8, at: [BOARD[0], BOARD[1]], delay: TH + RING.impact - T0, opts: {} }),   // 集中線の中心を着弾点に。 中心を下げても画面の上まで覆うよう、 大きく
-    circle: scaledFx(MAGIC, { K: 3.6, at: [BOARD[0], BOARD[1] + 4], speed: 1.6, delay: TH + RING.white - T0, glow: 0.8, opts: { palette: GOLD } }),
+    circle: scaledFx(MAGIC, { K: 3.6, at: [BOARD[0], BOARD[1] + 4], speed: 1.6, delay: (TH + RING.white - T0) * 1.6, glow: 0.8, opts: { palette: GOLD } }),   // _scaled.js の delay は「効果の時計」で数えるので、 速さを掛けておく (掛けないと、 白飛びより前に始まって、 着弾の時にはもう終わっている ── 2026-11-15 に見つけた不具合)
     // 着弾をもっと派手に (作者の指定): 輪が盤を締める瞬間 (白飛びから 0.26 秒) に、 着地の衝撃 (impacts/ground-slam・瓦礫なし・煙は細かく) を 2 つ重ねる
     slam: scaledFx(SLAM, { K: 3, at: [BOARD[0], BOARD[1]], delay: TH + RING.white + 0.26 - T0, glow: 1.3, drop: ["CHUNK", "GRIT", "FLAKE"], puff: { SMOKE: [0.45, 3], DUST: [0.6, 2] }, opts: { palette: GOLD } }),
     slam2: scaledFx(SLAM, { K: 4.4, at: [BOARD[0], BOARD[1] + 6], delay: TH + RING.white + 0.4 - T0, drop: ["CHUNK", "GRIT", "FLAKE"], puff: { SMOKE: [0.32, 4], DUST: [0.5, 2] }, opts: { palette: GOLD, seed: 11 } }),
   };
-  const shRays = gift === "shield" ? scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, opts: {} }) : null;
+  const shRays = gift === "shield" ? scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, start: T0 % 10, opts: {} }) : null;
   // 盾の発動の後: holy/resurrection (注ぐ光・光の翼が開く・光輪・大きな羽ばたき・羽根に散る) を、 敵の体の大きさで重ねる (作者: 発動後が弱い)。 光が注ぐ頭は飛ばして、 翼が開く所から
   const shWings = gift === "shield" ? scaledFx(RESURRECT, { K: 2.6, at: [240, 196], start: 0.95, delay: TH + SHIELD.open + 0.1 - T0, glow: 0.6, opts: { palette: GOLD, wings: false, halo: false } }) : null;   // 翼と光輪は出さない (作者: 消してみて)。 残るのは、 注ぐ光・床の光・きらめき
   // 発動の後の球: holy/divine-shield を、 そのまま (作者: 球の見た目は Divine shield を正確に写す)。 式も設定も元のまま、 大きさだけ (元の半径 29 → 87)。 前の版の、 moves の tenyo-shield (光の柱を足した物) は使わない
@@ -111,7 +111,7 @@ export function create(o) {
   if (gift === "shield") { const add = Feathers.prototype.add; let n = 0; Feathers.prototype.add = function (f) { return n++ % 3 !== 2 ? add.call(this, f) : undefined; }; try { shFeathers = scaledFx(FEATHERS, { K: 3.6, at: [240, 124], delay: TH + SHIELD.open + 0.35 - T0, glow: 0.5, opts: {} }); } finally { Feathers.prototype.add = add; } }
   const shImpact = gift === "shield" ? scaledFx(IMPACT, { K: 1.5, at: [240, 135], delay: TH + SHIELD.open - T0, opts: {} }) : null;
   const sw = gift !== "sword" ? null : {
-    rays: scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, opts: {} }),   // 出どころ (0,−170) × 1.5 = 画面の一番上の真ん中
+    rays: scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, start: T0 % 10, opts: {} }),   // 出どころ (0,−170) × 1.5 = 画面の一番上の真ん中
     // 落ちる光と着地の衝撃は、 God rays とインパクトフレームに負けないよう、 大きく・重ねて (作者の指定): 光は 3.6 倍・衝撃は 2.8 倍 + 一拍遅れてもっと大きい 2 つ目
     smite: scaledFx(SMITE, { K: 3.6, at: [BOARD[0], BOARD[1]], delay: TH + SWORD.mark - T0, glow: 1.4, drop: RUBBLE, puff: FINE, opts: { palette: GOLD } }),
     slam: scaledFx(SLAM, { K: 2.8, at: [BOARD[0], BOARD[1]], delay: TH + SWORD.land - T0, glow: 1.3, drop: RUBBLE, puff: FINE, opts: { palette: GOLD } }),
