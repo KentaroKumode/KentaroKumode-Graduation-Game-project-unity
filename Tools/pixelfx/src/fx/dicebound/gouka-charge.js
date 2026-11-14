@@ -6,7 +6,7 @@
 // The gathering streaks, spiralling grit, contracting rings and the crushed core are adapted from this repository's explosions/implosion
 // (after Sprite Fusion's open-source energy charge, https://www.spritefusion.com/pixel-art-vfx/energy), and the flames from its fire
 // (https://www.spritefusion.com/pixel-art-vfx/fire), MIT License, Copyright (c) 2026 Hugo Duprez.
-import { Particles, Lights, P, Rng, fit, hex, mix, clamp, smooth, ease, noise, rand, sparkle, TAU, WHITE } from "../../core/index.js";
+import { Particles, Lights, P, Rng, fit, cycle, hex, mix, clamp, smooth, ease, noise, rand, sparkle, TAU, WHITE } from "../../core/index.js";
 import { flameTongue, floorLight, LAYERS, BIG_LAYERS } from "../fire/_lib.js";
 
 export const meta = {
@@ -44,6 +44,29 @@ export function cross(p, F, x0, y0, L, diag = 0) {
       if (u < 0.3 && m >= 0.6) { p.dot(x + dy, y + dx, F[7], 1); p.dot(x - dy, y - dx, F[7], 1); }
     }
   }
+}
+
+export const HELD = 1.5, HELD_SEED = 6;   // 待機の 1 周 (秒) と、 火の粉の種
+
+/**
+ * 溜まった状態の姿 (待機のループ 1 コマぶん)。 チャージの終わりと、 待機 (gouka-charged) の両方がこれを描くので、 見た目が必ず一致する。
+ * ti = 待機の時刻 (負でもよい)。 boost = 0〜1: チャージ完了の瞬間の強さ (十字が長く、 光が強く、 芯が大きい)。
+ */
+export function held(p, F, CY, seed, ti, boost = 0) {
+  const t = ((ti % HELD) + HELD) % HELD, pulse = 0.5 + 0.5 * Math.sin((t / HELD) * TAU * 2);
+  // 6 コマに 1 回、 1 ドット震える (溜まり切っていて不安定)
+  const f = Math.floor(t * 8 + 1e-4), jit = f % 6 === 2 ? 1 : f % 6 === 3 ? -1 : 0;
+  // 火の粉: まばらに、 ゆっくり、 渦を巻いて芯へ
+  cycle(t, HELD, 16, seed * 3 + 1, (g) => g.range(0.8, 1.3), (age, life, R) => {
+    const a0 = R.range(0, TAU), d0 = R.range(50, 130), spin = R.sign() * R.range(0.5, 1.2), c = R.pick([F[4], F[5], F[6]]);
+    const pos = (q) => { const a = a0 + spin * q, d = d0 * (1 - ease.inQuad(q)) + 4; return [Math.cos(a) * d, CY + Math.sin(a) * d * 0.7]; };
+    const q = age / life, [x, y] = pos(q), [x2, y2] = pos(Math.max(0, q - 0.05));
+    p.line(x2, y2, x, y, c, Math.min(1, q * 4) * (1 - boost));
+  });
+  ball(p, F, jit, CY, 3 + 0.7 * pulse + 3 * boost);
+  cross(p, F, jit, CY, REST + 7 * pulse + 110 * boost * boost);
+  p.glow(0, CY, 30 + 8 * pulse + 40 * boost, F[5], 0.3 + 0.12 * pulse + 0.4 * boost);
+  p.glow(0, CY, 12, WHITE, 0.4 + 0.15 * pulse);
 }
 
 /** 白く焼けた芯: 暗い縁・橙の輪・白い玉。 r = 玉の半径。 */
@@ -84,7 +107,7 @@ export function create(o) {
       const k = clamp(t / SUCK), still = t > SUCK, N = (rate, n, off = 0) => noise(t * rate + off, n);
       // 床の明かり: 輪と一緒に縮む
       const RR = 104 * (1 - ease.inCubic(k)) + 20;
-      floorLight(p, 0, 0, RR * 1.5, RR * 1.5 * SY + 4, F[4], 0.34 * (1 - 0.7 * k));
+      floorLight(p, 0, 0, RR * 1.5, RR * 1.5 * SY + 4, F[4], 0.34 * (1 - 0.7 * k) * (still ? Math.max(0, 1 - (t - SUCK) / 0.3) : 1));
       // 輪が足もとへ縮む。 4 本、 順に。 寄るほど明るい
       if (!still) for (let i = 0; i < 4; i++) {
         const u = (t - i * 0.32) / 0.62;
@@ -108,17 +131,17 @@ export function create(o) {
         // 先が芯の方へ引かれる
         flameTongue(p, x, y, h, w, -Math.sign(x) * (1.5 + 6 * k) * (h / 20), N, f.n, H, w > 3.2 ? BIG_LAYERS : LAYERS, 0.5, 1.1);
       }
-      // 芯: 潰されるほど熱く。 静けさの間は、 白い一点が震える
-      const jit = still ? (Math.floor(t * 16) % 2 ? 1 : -1) : 0, cr = still ? 3 : 1.5 + 5 * k * k;
-      p.disc(jit, CY, cr + 4, VOID, 0.8);
-      p.circle(jit, CY, cr + 1.6, k > 0.6 ? F[5] : F[3]);
-      p.circle(jit, CY, cr, k > 0.35 ? WHITE : F[7]);
-      p.glow(0, CY, 14 + 40 * k, F[4], 0.25 + 0.5 * k);
-      if (still) { p.glow(0, CY, 12, WHITE, 0.4 + 0.2 * Math.sin(t * 50)); 
-        // チャージ完了: 芯に十字の光。 完了の瞬間に長く走って縮み、 そのあとは待機 (gouka-charged) と同じ大きさで脈を打つ
-        const q = clamp((t - SUCK) / 0.3);
-        cross(p, F, jit, CY, REST + 110 * Math.pow(1 - q, 2) + 5 * Math.sin(t * 9));
-        p.glow(0, CY, 30 + 40 * (1 - q), F[5], 0.3 + 0.4 * (1 - q));
+      if (!still) {
+        // 芯: 潰されるほど熱く
+        const cr = 1.5 + 5 * k * k;
+        p.disc(0, CY, cr + 4, VOID, 0.8);
+        p.circle(0, CY, cr + 1.6, k > 0.6 ? F[5] : F[3]);
+        p.circle(0, CY, cr, k > 0.35 ? WHITE : F[7]);
+        p.glow(0, CY, 14 + 40 * k, F[4], 0.25 + 0.5 * k);
+      } else {
+        // チャージ完了: ここからは待機 (gouka-charged) と同じ絵を描く。 完了の瞬間だけ、 十字が長く走り、 光が強い (0.3 秒で待機の姿に落ち着く)。
+        // 待機の時刻は、 このチャージの終わりが待機の 0 秒になるように合わせる (つないだ時に、 脈も火の粉も途切れない)
+        held(p, F, CY, HELD_SEED, t - meta.duration, 1 - clamp((t - SUCK) / 0.3));
       }
       ps.draw(p);
       lights.draw(p);
