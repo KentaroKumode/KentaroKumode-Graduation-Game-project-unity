@@ -16,7 +16,8 @@ import * as GODRAYS from "./tenyo-rays.js";   // weather/god-rays の写し (日
 import * as SMITE from "../holy/smite.js";          // moves/holy-smite の中身 (術者の動きを除いた、 落ちる光)
 import * as SLAM from "../impacts/ground-slam.js";  // moves/ground-pound の中身 (着地の衝撃)
 import * as IMPACT from "../impacts/impact-frame.js";
-import * as RESURRECT from "../holy/resurrection.js";
+import * as RESURRECT from "./tenyo-wings.js";   // holy/resurrection の写し (羽根を細かく)
+import { fineFeathers } from "./_feather.js";
 import * as DSHIELD from "../holy/divine-shield.js";
 import * as FEATHERS from "../holy/feather-burst.js";
 import { Feathers } from "../holy/_lib.js";
@@ -269,7 +270,7 @@ export function create(o) {
       const wt = a - 0.33, wk = gift === "shield" ? 0.55 * clamp(1 - wt / 0.3) : 0;
       if (a >= T_LEAD) {
         if (pay) pay.draw(p);
-        if (shWings) { shWings.draw(p); shBubble.draw(p); shFeathers.draw(p); }   // 光の翼 → その上に球
+        if (shWings) { fineFeathers(1 / 2.6, 0.7, () => shWings.draw(p)); shBubble.draw(p); fineFeathers(1 / 3.6, 0.5, () => shFeathers.draw(p)); }   // 散る羽根は、 飛ぶ範囲はそのまま、 羽根だけ小さく・細い線で   // 光の翼 → その上に球
         const b = a - T_LEAD;
         if (gift === "shield") {
           for (const d of [0, 0.12, 0.26]) { const q = (b - d) / 0.55; if (q > 0 && q < 1) oval(p, 240, BODY[1], SR + 240 * ease.outCubic(q), SR + 240 * ease.outCubic(q), 3 * (1 - q) + 1, q < 0.35 ? WHITE : C[5], 1 - q); }
