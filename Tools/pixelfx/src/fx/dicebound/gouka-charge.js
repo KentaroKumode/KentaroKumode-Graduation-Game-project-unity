@@ -15,7 +15,7 @@ export const meta = {
   tags: ["fire", "dicebound", "boss", "charge", "screen", "one-shot"],
   size: [480, 270],
   origin: [240, 196],
-  duration: 2.7,
+  duration: 2.75,       // 1 秒 8 コマで 23 コマ (最後のコマが 2.75 秒)
   loop: false,
   fps: 30,
   bg: "dark",
@@ -29,6 +29,8 @@ export const meta = {
   },
 };
 
+// 待機へ渡す時刻: 最後のコマ (2.75 秒) の 1 コマ後 (1 秒 8 コマ) が、 待機の 0 秒。 ここがずれると、 つなぎ目で時刻が戻って逆回しが 1 コマ挟まる
+const HANDOFF = 2.75 + 1 / 8;
 const SUCK = 1.6, SY = 0.22, VOID = hex("#07050a");
 export const REST = 44;   // 溜まった状態の十字の長さ (横の片側・px)
 
@@ -140,7 +142,7 @@ export function create(o) {
       } else {
         // チャージ完了: ここからは待機 (gouka-charged) と同じ絵を描く。 完了の瞬間だけ、 十字が長く走り、 光が強い (0.3 秒で待機の姿に落ち着く)。
         // 待機の時刻は、 このチャージの終わりが待機の 0 秒になるように合わせる (つないだ時に、 脈も火の粉も途切れない)
-        held(p, F, CY, HELD_SEED, t - meta.duration, 1 - clamp((t - SUCK) / 0.3));
+        held(p, F, CY, HELD_SEED, t - HANDOFF, 1 - clamp((t - SUCK) / 0.3));
       }
       ps.draw(p);
       lights.draw(p);

@@ -14,13 +14,15 @@ export const meta = {
   tags: ["holy", "dicebound", "boss", "charge", "screen", "one-shot"],
   size: [480, 270],
   origin: [240, 52],     // 敵の足もと (240,196) の 144 上 = 頭 (高さ 120) の少し上
-  duration: 2.7,
+  duration: 2.75,       // 1 秒 8 コマで 23 コマ (最後のコマが 2.75 秒)
   loop: false,
   fps: 30,
   bg: "dark",
   options: { palette: GOLD, rays: 8, scale: 1, seed: 4 },
 };
 
+// 待機へ渡す時刻: 最後のコマ (2.75 秒) の 1 コマ後 (1 秒 8 コマ) が、 待機の 0 秒。 ここがずれると、 つなぎ目で時刻が戻って逆回しが 1 コマ挟まる
+const HANDOFF = 2.75 + 1 / 8;
 const SUCK = 1.6, VOID = hex("#0a0806");
 export const SUN_T = 4, SUN_SEED = 3;   // 日輪の 1 周 (秒・1 秒 8 コマで 32 コマ) と、 きらめきの種
 const frac = (x) => x - Math.floor(x);
@@ -126,7 +128,7 @@ export function create(o) {
       } else {
         // チャージ完了: 日輪が開く (0.35 秒・少し行き過ぎて戻る)。 ここからは待機と同じ絵。 待機の時刻は、 このチャージの終わりが 0 秒になるように合わせる
         const q = clamp((t - SUCK) / 0.35);
-        sun(p, C, t - meta.duration, o.rays, S, q >= 1 ? 1 : ease.outBack(q) * 0.999);
+        sun(p, C, t - HANDOFF, o.rays, S, q >= 1 ? 1 : ease.outBack(q) * 0.999);
         if (q < 1) p.glow(0, 0, 90 * (1 - q) + 20, WHITE, 0.6 * (1 - q));
       }
       ps.draw(p);
