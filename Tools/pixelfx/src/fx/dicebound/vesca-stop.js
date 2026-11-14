@@ -1,29 +1,26 @@
-// DICE BOUND 用 (2026-11-14): ヴェスカ 1〜3 段目の大技の溜め。 待機 (dicebound/vesca-charged) の 0 コマ目から続く。
-// 針が進む ── 1 目盛りごとに間が延びていき (0 / 0.12 / 0.28 / 0.5 / 0.8 秒)、 止まる。 文字盤が白くなる。 その次のコマで、 画面全体が凍って砕ける (dicebound/vesca-shatter)。
-// 画面全体 (480×270)・原点は文字盤の中心。 作り: 間が延びていく針 = arcane/time-stop の TICKS。
-import { fit, clamp, ease, WHITE } from "../../core/index.js";
-import { meta as CHARGE, clock, hung, NOON, TICK } from "./vesca-charge.js";
+// DICE BOUND 用 (2026-11-14): ヴェスカ 1〜3 段目の大技の溜め。 待機 (dicebound/vesca-charged) の phase 秒目から続く。
+// 針も渦も、 滑らかに遅くなって、 止まる (0.8 秒)。 止まった文字盤が白く抜ける。 その次のコマで、 画面全体が凍って砕ける (dicebound/vesca-shatter)。
+// 玉のまわりだけ (240×176)・原点は玉の中心。 作り: 時刻そのものを遅くして held() を描く (arcane/time-stop の「時の流れが 0 へ落ちる」)。
+import { fit, WHITE } from "../../core/index.js";
+import { VIOLET, held, RC } from "./vesca-charge.js";
 
 export const meta = {
   name: "Vesca time stop (DICE BOUND)",
-  desc: "Vesca's clock runs down: the hand ticks on, each tick later than the last, and stops; the face blanches white.",
+  desc: "Vesca's clock runs down: hands and vortex slow smoothly to a dead stop, and the face blanches white.",
   tags: ["time", "dicebound", "boss", "charge", "one-shot"],
-  size: CHARGE.size,
-  origin: CHARGE.origin,
+  size: [240, 176],
+  origin: [120, 88],
   duration: 1.0,
   loop: false,
   fps: 30,
   bg: "dark",
-  options: { palette: CHARGE.options.palette, lead: 1.0 },
+  // phase = 待機の何秒目から続けるか (0 / 0.75 / 1.5 / 2.25 = 待機の 0 / 6 / 12 / 18 コマ目。 4 本焼く)。 slow = 止まるまでの秒
+  options: { palette: VIOLET, phase: 0, slow: 0.8, lead: 1.0 },
 };
 
-const TICKS = [0, 0.12, 0.28, 0.5, 0.8];
-
 export function draw(p, t, o) {
-  const C = fit(o.palette, 8);
-  let a = 0;
-  for (const tk of TICKS) if (t >= tk) a += ease.outBack(clamp((t - tk) / 0.07), 3);
-  hung(p, C, 11, 1, 0);
-  // 最後の 1 目盛りの後 (0.9 秒〜) は、 文字盤が白く抜ける
-  clock(p, C, 0, 0, NOON + a * TICK, 1, t >= o.lead - 0.1 ? WHITE : null);
+  const C = fit(o.palette, 8), u = Math.min(t, o.slow), tv = o.phase + u - (u * u) / (2 * o.slow);   // 速さが 1 → 0 へ、 まっすぐ落ちる
+  const white = t >= o.lead - 0.12;
+  held(p, C, tv, 1, white ? WHITE : null);
+  if (white) p.ring(0, 0, RC + 2, 3, WHITE);
 }

@@ -1,18 +1,20 @@
 // DICE BOUND 用 (2026-11-14): ヴェスカの大技のチャージ (攻撃しないターン)。 画面全体 (480×270)・原点はチャージの中心 (胸の前)。
-// 運びは灰燼の王・審判官・シュヴァリエと同じ (画面じゅうの光の筋と粒が一点へ吸い込まれる)。 違いは完了の姿: **時計の文字盤**が開く (ヴェスカの〈停滞する時間〉)。
-// 待機 (dicebound/vesca-charged) では、 針が 1 目盛り進んでは戻る (時が引っかかっている)。 まわりの粒は宙に止まったまま、 動かない。 ほかの 3 体の待機は脈を打つが、 ここは「止まっている」のが差。
-// 完了後は待機と同じ関数 clockHeld() で描く。
-// 作り: 吸い込み = explosions/implosion (ほかの 3 体のチャージと同じ)・文字盤 = arcane/time-stop の時計 (輪・12 の目盛り・1 本の針・宙に止まる粒) を、 線と点だけで描き直した物。
-// The gathering streaks, grit and rings are adapted from this repository's explosions/implosion and the clock face from its arcane/time-stop
-// (after Sprite Fusion's open-source energy charge, https://www.spritefusion.com/pixel-art-vfx/energy), MIT License, Copyright (c) 2026 Hugo Duprez.
-import { Particles, P, Rng, fit, hex, mix, clamp, ease, rng, TAU, WHITE } from "../../core/index.js";
+// 運びはほかの 3 体と同じ (画面じゅうの光の筋と粒が一点へ吸い込まれる)。 完了の姿が違う: **虚の玉 (shadow/void-orb) の上に、 時計の文字盤**が開く (〈停滞する時間〉)。
+// 待機 (dicebound/vesca-charged) では、 玉のまわりで渦が巻き、 粒が吸い込まれ続け、 文字盤の長針が逆に、 短針が順に、 滑らかに回る。 完了後は待機と同じ関数 held() で描く。
+// 作り: 吸い込み = explosions/implosion・玉と渦と粒 = shadow/void-orb を**そのまま呼ぶ** (位置だけずらす)・文字盤 = arcane/time-stop の時計を描き直した物。
+// 文字盤の作り (2026-11-14 作者の指摘で直した): 線を 1 ドットで揃えない (輪 2 ドット・大きい目盛りは太い・針は根もとが太く先が細い)・針は中心から対称に描く・
+//   針はカチカチ進めず滑らかに回す・まわりの粒を止めない (止まった粒は安っぽい)。
+// The gathering streaks, grit and rings are adapted from this repository's explosions/implosion; the orb, vortex and motes are its shadow/void-orb, drawn as is;
+// the clock face follows its arcane/time-stop (after Sprite Fusion's open-source effects, https://www.spritefusion.com/pixel-art-vfx), MIT License, Copyright (c) 2026 Hugo Duprez.
+import { Particles, P, Rng, fit, hex, mix, clamp, ease, TAU, WHITE } from "../../core/index.js";
+import * as ORB from "../shadow/void-orb.js";
 
 export const VIOLET = ["#0a0614", "#1c1236", "#3a2470", "#5a3aa8", "#8a64e0", "#b89cf8", "#e4d8ff", "#ffffff"];
 
 export const meta = {
   name: "Vesca charge (DICE BOUND)",
-  desc: "Vesca gathers stopped time: light from the whole screen streaks and spirals to a point before her chest, and a clock face springs open there.",
-  tags: ["time", "dicebound", "boss", "charge", "screen", "one-shot"],
+  desc: "Vesca gathers stopped time: light from the whole screen streaks and spirals to a point before her chest, and a void orb opens there under a clock face.",
+  tags: ["time", "void", "dicebound", "boss", "charge", "screen", "one-shot"],
   size: [480, 270],
   origin: [240, 130],    // 敵の足もと (240,196) の 66 上
   duration: 2.75,        // 1 秒 8 コマで 23 コマ (最後のコマが 2.75 秒)
@@ -24,40 +26,50 @@ export const meta = {
 
 const HANDOFF = 2.75 + 1 / 8;   // 待機の 0 秒 = 最後のコマの 1 コマ後 (library/dicebound/judge-flow.md の「道具の罠」)
 const SUCK = 1.6, VOID = hex("#05040a");
-export const HELD = 1.5, RC = 24, NOON = -Math.PI / 2, TICK = TAU / 12;   // 待機の 1 周 (秒)・文字盤の半径・12 時の向き・1 目盛り
+const ORB_Y = 62, ORB_D = 3.2;   // void-orb は、 原点の 62 上に玉を描く・3.2 秒で 1 周
+export const HELD = 3, RC = 27, NOON = -Math.PI / 2;   // 待機の 1 周 (秒・1 秒 8 コマで 24 コマ)・文字盤の半径・12 時の向き
 
-/** 時計の文字盤: 輪・12 の目盛り (3 時間ごとは長い)・針 1 本・中心の点。 hand = 針の向き (rad)・open = 開き具合 (0〜1)・x0 = 横のずれ。 */
-export function clock(p, C, x0, y0, hand, open = 1, col = null) {
-  const R = RC * open, hi = col ?? C[6], mid = col ?? C[5], lo = col ?? C[4];
-  if (R < 2) { p.circle(x0, y0, 2, WHITE); return; }
-  p.disc(x0, y0, R, VOID, 0.55);
-  p.ring(x0, y0, R, 1, mid);
-  p.ring(x0, y0, R + 4, 1, lo, (v, g) => (Math.floor((g / TAU) * 48) % 2 ? 0.8 : 0));   // 外の破線の輪
+/** 虚の玉 (渦・曲がる光・吸い込まれる粒と筋・玉) を、 原点が玉の中心になるように描く。 tv = 玉の時刻 (待機の秒)。 k = 濃さ (網点)。 */
+export function orb(p, C, tv, k = 1) {
+  if (k <= 0.02) return;
+  const ty = p.ty, f = p.fade, o = { palette: C, seed: 5 }, t = ((((tv * ORB_D) / HELD) % ORB_D) + ORB_D) % ORB_D;
+  p.ty = ty + ORB_Y; p.fade = f * k;
+  ORB.drawBack(p, t, o); ORB.draw(p, t, o);
+  p.ty = ty; p.fade = f;
+}
+
+// 針 / 目盛り: 中心 (x0,y0) から向き ang へ。 a0〜a1 の範囲・幅は w0 (a0 側) から w1 (a1 側) へ細る。 中心線に対称に塗る
+function bar(p, x0, y0, ang, a0, a1, w0, w1, col) {
+  const ca = Math.cos(ang), sa = Math.sin(ang), r = Math.max(Math.abs(a0), Math.abs(a1)) + 3;
+  p.shade(x0 - r, y0 - r, x0 + r, y0 + r, (x, y, out) => {
+    const dx = x - x0, dy = y - y0, al = dx * ca + dy * sa;
+    if (al < a0 || al > a1) return;
+    if (Math.abs(-dx * sa + dy * ca) > (w0 + ((w1 - w0) * (al - a0)) / (a1 - a0)) / 2) return;
+    out.c = col;
+  });
+}
+
+/** 時計の文字盤: 2 ドットの輪・12 の目盛り (3 時間ごとは太く長い)・長針と短針 (根もとが太く、 先が細い・短い尾)・中心の留め。 open = 開き具合。 col = 全部この色で (白く抜く時)。 */
+export function clock(p, C, x0, y0, aLong, aShort, open = 1, col = null) {
+  const R = RC * open;
+  if (R < 4) return;
+  p.ring(x0, y0, R, 2, col ?? C[5]);
+  p.ring(x0, y0, R + 4, 1, col ?? C[3], (v, g) => (Math.floor((g / TAU) * 60) % 2 ? 0.9 : 0));   // 外の破線の輪
   for (let i = 0; i < 12; i++) {
-    const a = i * TICK, r0 = R - (i % 3 === 0 ? 6 : 3), c = Math.cos(a), s = Math.sin(a);
-    p.line(x0 + c * r0, y0 + s * r0, x0 + c * (R - 1), y0 + s * (R - 1), i % 3 === 0 ? hi : lo);
+    const big = i % 3 === 0;
+    bar(p, x0, y0, (i * TAU) / 12, R - (big ? 7 : 4), R - 1.5, big ? 3 : 1.2, big ? 3 : 1.2, col ?? (big ? C[6] : C[4]));
   }
-  p.line(x0, y0, x0 + Math.cos(hand) * R * 0.78, y0 + Math.sin(hand) * R * 0.78, WHITE);
-  p.circle(x0, y0, 1.5, WHITE);
-  p.glow(x0, y0, R * 0.9, C[4], 0.22);
+  bar(p, x0, y0, aShort, -3, R * 0.5, 4, 2.2, col ?? C[6]);
+  bar(p, x0, y0, aLong, -5, R * 0.84, 3.2, 1.2, WHITE);
+  p.circle(x0, y0, 2.2, col ?? C[4]);
+  p.circle(x0, y0, 1.1, WHITE);
 }
 
-/** 宙に止まった粒 (動かない)。 1 つだけ、 ごくゆっくり明滅する。 */
-export function hung(p, C, seed, k = 1, tw = 1) {
-  for (let i = 0; i < 16; i++) {
-    const R = rng(seed, i), a = R.range(0, TAU), d = R.range(RC + 12, 110), x = Math.cos(a) * d, y = Math.sin(a) * d * 0.75, c = R.pick([C[4], C[5], C[6]]);
-    if (R.next() > k) continue;
-    // 吸い込まれる途中で止まった筋: 中心を向いた短い線
-    p.line(x, y, x - Math.cos(a) * R.range(2, 6), y - Math.sin(a) * 0.75 * R.range(2, 6), i === 3 ? (tw > 0.5 ? WHITE : c) : c);
-  }
-}
-
-/** 溜まった状態の姿 (待機のループ 1 コマぶん)。 針は 12 時から 1 目盛り進んで (0〜0.75 秒)、 戻る (0.75〜1.5 秒)。 行き過ぎて止まる (カチッ)。 */
-export function clockHeld(p, C, ti, open = 1) {
-  const t = ((ti % HELD) + HELD) % HELD, half = HELD / 2;
-  const a = t < half ? ease.outBack(clamp(t / 0.09), 3) : 1 - ease.outBack(clamp((t - half) / 0.09), 3);
-  hung(p, C, 11, Math.min(1, open), t < half ? 1 : 0);
-  clock(p, C, 0, 0, NOON + a * TICK, open);
+/** 溜まった状態の姿 (待機のループ 1 コマぶん)。 玉の上に文字盤。 長針は逆回り・短針は順回りで、 1 周 (3 秒) に 1 回転ずつ ── 滑らかに回り続ける。 */
+export function held(p, C, tv, open = 1, col = null) {
+  orb(p, C, tv, Math.min(1, open));
+  const a = (TAU * tv) / HELD;
+  clock(p, C, 0, 0, NOON - a, NOON + a, open, col);
 }
 
 export function create(o) {
@@ -95,16 +107,16 @@ export function create(o) {
           const d = q.d * (1 - ease.inCubic(u)), a = q.a + q.spin * ease.inQuad(u) * 2, d2 = d + 5 * u * u + 0.5;
           p.line(Math.cos(a - q.spin * 0.1) * d2, Math.sin(a - q.spin * 0.1) * d2 * 0.75, Math.cos(a) * d, Math.sin(a) * d * 0.75, (v) => (v < 0.5 ? mix(q.c, VOID, 0.4) : q.c));
         }
-        const cr = 1.2 + 2.5 * k * k;
-        p.disc(0, 0, cr + 3, VOID, 0.8);
-        p.circle(0, 0, cr + 1, k > 0.6 ? C[5] : C[3]);
-        p.circle(0, 0, cr, k > 0.35 ? WHITE : C[6]);
-        p.glow(0, 0, 10 + 18 * k, C[4], 0.2 + 0.35 * k);
+        // 芯: 集まるほど大きい、 黒い玉 (縁だけ明るい)。 完了で虚の玉になる
+        const cr = 2 + 9 * k * k;
+        p.disc(0, 0, cr + 1, VOID, 1);
+        p.ring(0, 0, cr + 1, 1, k > 0.6 ? C[6] : C[4]);
+        p.glow(0, 0, 14 + 26 * k, C[4], 0.2 + 0.3 * k);
       } else {
-        // チャージ完了: 文字盤が開く (0.3 秒・少し行き過ぎて戻る)。 白い輪が 1 つ広がって消える。 ここからは待機と同じ絵
+        // チャージ完了: 玉が濃くなりながら、 文字盤が開く (0.3 秒・少し行き過ぎて戻る)。 白い輪が 1 つ広がって消える。 ここからは待機と同じ絵
         const q = clamp((t - SUCK) / 0.3);
-        clockHeld(p, C, t - HANDOFF, q >= 1 ? 1 : ease.outBack(q) * 0.999);
-        if (q < 1) p.ring(0, 0, RC + 70 * q, 1, WHITE, 1 - q);
+        held(p, C, t - HANDOFF, q >= 1 ? 1 : ease.outBack(q) * 0.999);
+        if (q < 1) p.ring(0, 0, RC + 80 * q, 2, WHITE, 1 - q);
       }
       ps.draw(p);
     },

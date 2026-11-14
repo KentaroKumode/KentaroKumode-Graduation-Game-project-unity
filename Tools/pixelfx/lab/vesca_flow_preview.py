@@ -25,7 +25,13 @@ def frames(name, eid, opts):
     png = os.path.join(OUT, name + "_sheet.png")
     subprocess.run(["node", "lab/lcd_frames.mjs", eid, png, "--ink", "null", "--fps", "8", "--opts", json.dumps(opts)], cwd=PFX, check=True, stdout=subprocess.DEVNULL)
     m = json.load(io.open(png[:-4] + ".json", encoding="utf-8")); sh = Image.open(png).convert("RGBA")
-    return [sh.crop((i * m["w"], 0, (i + 1) * m["w"], m["h"])) for i in range(m["n"])]
+    # 画面全体でない物 (玉のまわりだけ) は、 画面の大きさの透明な板に、 原点を玉の中心 (240,130) に合わせて置く
+    out = []
+    for i in range(m["n"]):
+        f = sh.crop((i * m["w"], 0, (i + 1) * m["w"], m["h"]))
+        if m["w"] != W: g = Image.new("RGBA", (W, H), (0, 0, 0, 0)); g.paste(f, (240 - m["pivot"][0], 130 - m["pivot"][1])); f = g
+        out.append(f)
+    return out
 
 
 def dark(im, a): return im if a <= 0.01 else im.point(lambda v: int(v * (1 - a)))
@@ -46,7 +52,7 @@ while len(off) > 1 and empty(off[-1]): off.pop()
 base = stage(); head = [(base.copy(), "ヴェスカのチャージのターン")] * 3
 for i, f in enumerate(chg):
     b = dark(base.copy(), DARK * min(1.0, i / 6.0)); b.paste(f, (0, 0), f); head.append((b, "ヴェスカのチャージのターン: チャージ"))
-for r in range(2):
+for r in range(1):
     for f in idle:
         b = dark(base.copy(), DARK); b.paste(f, (0, 0), f); head.append((b, "プレイヤーの手番: 待機 (ループ)"))
 cards = []
@@ -70,12 +76,12 @@ for key, title, lead, parts in (
     o.save(os.path.join(OUT, key + "_contact.png"))
     cards.append('<h2>%s</h2><img src="%s.gif"><p>大技のターンのコマの抜き出し</p><div class="s"><img loading="lazy" src="%s_contact.png"></div>' % (title, key, key))
 o = Image.new("RGB", (W * 4, H), (0, 0, 0))
-for q, i in enumerate([3 + 13, 3 + 15, 3 + len(chg) + 1, 3 + len(chg) + 7]): o.paste(head[i][0], (q * W, 0))
+for q, i in enumerate([3 + 12, 3 + 14, 3 + len(chg) + 1, 3 + len(chg) + 13]): o.paste(head[i][0], (q * W, 0))
 o.save(os.path.join(OUT, "charge_contact.png"))
 io.open(os.path.join(OUT, "flow.html"), "w", encoding="utf-8").write('''<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>ヴェスカ 一連の流れ</title>
 <style>body{margin:0;background:#100e14;color:#e4def0;font:14px/1.6 "Yu Gothic UI",sans-serif}main{max-width:1960px;margin:0 auto;padding:16px 16px 80px}
 h1{font-size:20px;margin:0}h2{font-size:17px;margin:30px 0 6px}p{color:#a39ab4;margin:6px 0 0}img{image-rendering:pixelated;display:block;max-width:100%}.s{overflow-x:auto;margin-top:6px}.s img{max-width:none}</style></head><body><main>
 <h1>ヴェスカの大技: 一連の流れ (試作・2 本)</h1>
-<p>チャージと待機 (時計の文字盤・針が進んでは戻る) は共通。 大技は、 1〜3 段目で 1 つ、 4 段目だけの物が 1 つ。 1 秒 8 コマ・2 倍・背景と敵と下の枠は仮。</p>
+<p>チャージと待機 (虚の玉の上に時計の文字盤・長針は逆回り、 短針は順回り) は共通。 大技は、 1〜3 段目で 1 つ、 4 段目だけの物が 1 つ。 1 秒 8 コマ・2 倍・背景と敵と下の枠は仮。</p>
 <h2>チャージ完了の前後と、 待機</h2><div class="s"><img src="charge_contact.png"></div>''' + "".join(cards) + "</main></body></html>")
 print(len(chg), len(idle), len(stop), len(sha), len(lost), len(gli), len(off))
