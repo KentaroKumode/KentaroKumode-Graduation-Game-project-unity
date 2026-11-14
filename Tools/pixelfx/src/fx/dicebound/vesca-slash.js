@@ -14,7 +14,7 @@ export const meta = {
   desc: "Vesca uses a relic weapon: a great tilted crescent whips round in front of her and down onto the viewer's board, cools from white to deep violet as it trails off, glints at the tip and throws sparks.",
   tags: ["dicebound", "boss", "relic", "slash", "one-shot"],
   size: [480, 270],
-  origin: [258, 364],   // 元の効果の原点 (人物の足もと)。 弧の中心はここから (6, −26) × K 上。 切っ先がこちらの盤 (300,246 あたり) に着く位置に合わせた
+  origin: [240, 322],   // 元の効果の原点 (人物の足もと)。 弧の中心はここから (6, −26) × K 上。 切っ先がこちらの盤 (300,246 あたり) に着く位置に合わせた
   duration: 1.25,
   loop: false,
   fps: 30,
