@@ -26,6 +26,7 @@ export const meta = {
     ashes: ["#a39cab", "#7b7484", "#5c5664", "#433e4b"],
     color: "#0b0a10",   // 焼けた跡 (焦げ) の色
     mode: "in",         // "in" = 縁から焼け込んで、 止まって冷める / "out" = 当たった時にはもう燃えていて、 外へ燃え尽きる (白く飛んだコマから続ける)
+    bias: 1,            // 下への偏り (1 = 下が深い・0 = 上下が均等)
     depth: 1,           // どこまで焼け込むか (1 = 既定。 下は画面の 1/3 ほど・左右と上は縁だけ)
     lead: 0.9,          // 溜め (秒): 当たる前に、 縁がじわっと赤く焼け始め、 火の粉がゆっくり上がる
     rush: 0.8,          // 焼け込みにかける秒
@@ -81,12 +82,12 @@ function tongue(p, F, x, y, h, w, sway, t, n) {
 }
 
 export function create(o) {
-  const F = fit(o.palette, 9), ASHC = fit(o.ashes, 4), ink = hex(o.color), R = new Rng(o.seed), seed = o.seed * 13, ASH = Math.max(0, o.ash);
+  const F = fit(o.palette, 9), ASHC = fit(o.ashes, 4), ink = hex(o.color), R = new Rng(o.seed), seed = o.seed * 13, ASH = Math.max(0, o.ash), BIAS = o.bias;
   const CHAR = mix(ink, F[0], 0.45), SCORCH = mix(ink, hex("#3a2216"), 0.6), WARM = mix(F[4], F[5], 0.4), SMOKE = mix(hex("#8a7276"), F[2], 0.2);
   // 焼ける順: 縁から内へ (角が先)。 下ほど値が小さい = 先に・深く焼ける (火は下から来る)。 2 つの大きさのノイズで線をぎざぎざに
   const A = field((x, y) => {
     const ux = (x - W / 2) / (W / 2), uy = (y - H / 2) / (H / 2), m = Math.pow(ux ** 4 + uy ** 4, 0.25);
-    return (1 - m) * SC + 14 * fbm(x / 44, y / 44, seed, 3) + 2.4 * fbm(x / 7, y / 7, seed + 9, 2) - 46 * smooth(0.35, 1, y / H) + 10 * smooth(0.5, 0, y / H);
+    return (1 - m) * SC + 14 * fbm(x / 44, y / 44, seed, 3) + 2.4 * fbm(x / 7, y / 7, seed + 9, 2) + BIAS * (-46 * smooth(0.35, 1, y / H) + 10 * smooth(0.5, 0, y / H));
   });
   const heat = new Float32Array(W * H), ph = new Uint8Array(W * H), fleck = new Float32Array(W * H), jit = new Float32Array(W * H);
   for (let i = 0; i < W * H; i++) {
