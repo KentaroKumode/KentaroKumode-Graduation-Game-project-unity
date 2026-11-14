@@ -57,16 +57,16 @@ const SECT = TAU / 8;
 const MORE = [[0.85, 0.024, 0.8], [2.3, 0.03, 0.9], [4.1, 0.02, 0.7], [5.1, 0.034, 1], [0.05, 0.018, 0.6], [1.5, 0.036, 1], [3.15, 0.026, 0.8], [5.95, 0.028, 0.9],
   [2.65, 0.018, 0.7], [3.85, 0.032, 1], [0.6, 0.03, 0.9], [4.4, 0.022, 0.8], [1.95, 0.028, 0.9], [5.4, 0.02, 0.7]];
 
-/** more = 0〜1: 大技の直前。 帯が消えなくなり、 本数が増え、 濃く、 遠くまで届く。 */
-function beams(p, C, t, S, k, more = 0) {
+/** more = 0〜1: 大技の直前。 帯の本数が増え、 濃く、 遠くまで届く。 */
+function beams(p, C, t, S, k, more = 0, tm = t) {   // tm = 増える帯を回す時刻 (ループで巻き戻さない時刻。 巻き戻すと、 ループの終わりをまたぐ時に帯が 45 度飛ぶ)
   if (k <= 0.01) return;
   const [OX, OY] = meta.origin, [W, H] = meta.size, T = SUN_T, ph = (TAU * t) / T, REACH = 300 * S * (1 + 0.9 * more), R0 = 12 * S;
   const sh = [];
   for (const [c, h, kk, off, turn] of BEAMS) {
-    const u = (t / T + off) % 1, env = Math.min(1, u / 0.3) * Math.min(1, (1 - u) / 0.3), e = Math.max(env * env * (3 - 2 * env), Math.min(1, more * 3));   // ゆっくり差して、 ゆっくり消える (大技の直前は消えない)
+    const u = (t / T + off) % 1, env = Math.min(1, u / 0.3) * Math.min(1, (1 - u) / 0.3), e = env * env * (3 - 2 * env);   // ゆっくり差して、 ゆっくり消える (大技の直前も同じ拍で続く ── 消えなくすると、 元の向きへ戻る所が見えてしまう)
     if (e > 0.01) sh.push([(c + SECT * turn * u) % TAU, 1 / h, kk * e]);
   }
-  MORE.forEach(([c, h, kk], j) => { const a = Math.max(0, Math.min(1, (more - j / (MORE.length + 3)) * 5)); if (a > 0) sh.push([(c + (SECT * t) / T) % TAU, 1 / h, kk * a]); });
+  MORE.forEach(([c, h, kk], j) => { const a = Math.max(0, Math.min(1, (more - j / (MORE.length + 3)) * 5)); if (a > 0) sh.push([(((c + (SECT * tm) / T) % TAU) + TAU) % TAU, 1 / h, kk * a]); });
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
       const dx = x + 0.5 - OX, dy = y + 0.5 - OY, r = Math.hypot(dx, dy);
@@ -91,7 +91,7 @@ function beams(p, C, t, S, k, more = 0) {
  */
 export function sun(p, C, ti, rays, S = 1, open = 1, beam = 1, more = 0) {
   const T = SUN_T, t = ((ti % T) + T) % T, N = rays * 2, rot = (t / T) * ((2 * TAU) / N), CORE = 4.5 * S, RING = 7.5 * S, R0 = 9 * S;
-  beams(p, C, t, S, beam * (more > 0 ? 1 : Math.min(1, open)), more);
+  beams(p, C, t, S, beam * (more > 0 ? 1 : Math.min(1, open)), more, ti);
   p.glow(0, 0, 62 * S * (0.4 + 0.6 * open), C[4], 0.3 + 0.06 * Math.sin((t / T) * TAU * 2));
   // 光条の間の細い糸
   for (let i = 0; i < N; i++) {

@@ -14,7 +14,9 @@ export const meta = {
   loop: false,
   fps: 30,
   bg: "dark",
-  options: { palette: CHARGE.options.palette, rays: 8, scale: 1, lead: 1.4, shrink: 0.4 },   // shrink = 白く飛ぶ前、 日輪が縮むのにかける秒
+  // phase = 待機のループの何秒目から続けるか。 プレイヤーがいつターンを終えるかは分からないので、 0 / 1 / 2 / 3 秒目 (待機の 0 / 8 / 16 / 24 コマ目) の 4 本を焼いておき、
+  // ゲームは待機が次にそのコマへ来るまで回してから (最大 0.9 秒)、 その版を流す (2026-11-14 作者の決定)
+  options: { palette: CHARGE.options.palette, rays: 8, scale: 1, lead: 1.4, shrink: 0.4, phase: 0 },   // shrink = 白く飛ぶ前、 日輪が縮むのにかける秒
 };
 
 export function draw(p, t, o) {
@@ -22,7 +24,7 @@ export function draw(p, t, o) {
   if (t < LEAD) {
     const more = clamp(t / (LEAD - o.shrink * 0.5)), q = clamp((t - (LEAD - o.shrink)) / o.shrink);
     // 日輪は、 最後の shrink 秒で芯へ縮む (速く始まらず、 最後に一気に)
-    sun(p, C, t, o.rays, o.scale, 1 - 0.92 * ease.inCubic(q), 1, Math.max(0.001, more));
+    sun(p, C, o.phase + t, o.rays, o.scale, 1 - 0.92 * ease.inCubic(q), 1, Math.max(0.001, more));
     if (q > 0) p.glow(0, 0, 16 + 30 * q, WHITE, 0.3 + 0.5 * q);
     // 放つ直前: 画面全体が明るむ
     const pre = clamp((t - (LEAD - 0.25)) / 0.25);
