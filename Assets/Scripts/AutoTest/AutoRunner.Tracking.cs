@@ -556,6 +556,7 @@ namespace AutoTest
             GameLoop.GameHooks.HeavyChargeNoAttack = true;                      // [測定 2026-11-14] チャージは攻撃しない (既定) へ
             GameLoop.GameHooks.AshKingHeavyDisabled = false;                    // [測定 2026-11-14] 灰燼の王の大技〈業火〉を既定 (あり) へ
             GameLoop.GameHooks.BlazeTickEachTurn = false;                       // [測定 2026-11-14] 烈炎の毎ターンの削りを既定 (なし) へ
+            GameLoop.GameHooks.BlazeStack = CombatSystem.BlazeStackRule.Shield; // [測定 2026-11-14] 烈炎の積もり方を既定 (シールド) へ
             GameLoop.GameHooks.Depth3HeavyDisabled = false;                     // [測定 2026-11-13] 深さ 3 のボスの大技を既定 (あり) へ
             GameLoop.GameHooks.VescaClockHeldAtStart = false;                   // [測定 2026-11-13] 博士の時計を既定 (預からない) へ
             CombatSystem.BossParams.Overrides = null;                           // [測定 2026-11-14] ボスの機構の値を既定 (基準値) へ

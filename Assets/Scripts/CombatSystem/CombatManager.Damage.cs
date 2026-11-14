@@ -395,6 +395,7 @@ namespace CombatSystem
                 totalDmg -= absorbed;
                 if (GuardDiag.InVesca()) GuardDiag.Cut7F[7] += absorbed;   // [計装 2026-11-11]
                 ctx.dbgShieldToNormal += absorbed;   // [計装] チップ側との配分を見る
+                ctx.shieldAbsorbedAttackThisTurn += absorbed;   // 灰燼の王の〈烈炎〉が読む (主攻撃の肩代わりだけ・2026-11-14)
                 Debug.Log($"[CombatManager] シールド吸収 {absorbed} (残{ctx.consShield})");
                 int reflect = (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Keywords.Kw.ReflectKey);
                 if (reflect > 0)

@@ -29,6 +29,8 @@ namespace CombatSystem
         FuryAttack,        // 6層 灰燼の王・〈憤怒の残滓〉の HP 50% 以下のターンの敵攻撃上乗せ。 基準5 (2026-11-14〜・旧 3・旧 EmberFury.Bonus)
         RegrowthRate,      // 6層 灰燼の王・〈灰の再生〉の毎ターンの回復 = 最大 HP × この値 (割合・%ではない)。 基準0.03 (= 3%・2026-11-14〜・旧 0.02)
         BlazeBurstPerStack, // 6層 灰燼の王・大技〈業火〉の烈炎 1 つあたりの軽減無視ダメージ (業火 = 攻撃 × heavyMul + 烈炎 × これ・撃ったら烈炎 0)。 基準5 (2026-11-14・作者の決定)
+        BlazePerShield,    // 6層 灰燼の王・〈烈炎〉が積もる量: そのターンに敵の主攻撃をシールドで肩代わりした量 この値 ごとに烈炎 +1 (切り捨て・HeavyCycle.BlazeGain)。
+                           //   基準10 (2026-11-14・作者の決定・未測定)。 測定の口 blazeStackRule=Guard2 (旧い「防御 2 個以上」) では読まない
         // 2026-11-12 (#126): RobeStacks (天衣無縫・読む側なし)・StanceAtkMult / WeakRollRatio (敵スタンス ADR-0005・呼ぶ所なし) を削除。
         //   番号で保存している所は無い (調整値の boss_tuning.json は名前で持ち、 L3 ボス調整器ごと削除)。
     }
@@ -81,6 +83,7 @@ namespace CombatSystem
                 //   (% で持って実行時に /100f すると Mono の float で丸めが割れることがある)。
                 case BossParam.FuryAttack:        return new ParamSpec( 5f, 0f, 20f);
                 case BossParam.BlazeBurstPerStack: return new ParamSpec( 5f, 0f, 20f);
+                case BossParam.BlazePerShield:    return new ParamSpec(10f, 1f, 100f);   // 2026-11-14: 烈炎はシールドで受けた量で積もる (作者の決定)
                 case BossParam.RegrowthRate:      return new ParamSpec(0.03f, 0f, 0.10f);
                 default:                          return new ParamSpec( 1f, 0f,  1f);
             }

@@ -187,8 +187,20 @@ namespace CombatSystem
         /// <summary>今の戦闘 (段) の最大の 1 発 (読む側が戦闘の始めに 0 へ戻す)。</summary>
         public static int SegmentHeavyMax;
 
+        /// <summary>[2026-11-14] 〈烈炎〉を持つボス id → [戦闘数, 積もった烈炎の合計, 敵の主攻撃をシールドが肩代わりした量の合計] (1 戦あたりは読む側が割る)。</summary>
+        public static readonly Dictionary<string, long[]> Blaze = new Dictionary<string, long[]>();
+
         private static string _id;
-        public static void Reset() { ByBoss.Clear(); Fights.Clear(); _id = null; }
+        public static void Reset() { ByBoss.Clear(); Fights.Clear(); Blaze.Clear(); _id = null; }
+
+        /// <summary>[2026-11-14] 〈烈炎〉を持つボスとの戦闘 (段) の終わり (<see cref="EndFight"/> の前に呼ぶ): この戦闘で積もった烈炎の通算と、
+        /// 敵の主攻撃をシールドが肩代わりした量の通算 (CombatContext.dbgShieldToNormal)。</summary>
+        public static void NoteBlazeFight(int gained, int shieldAbsorbed)
+        {
+            if (_id == null) return;
+            if (!Blaze.TryGetValue(_id, out var b)) { b = new long[3]; Blaze[_id] = b; }
+            b[0]++; b[1] += Math.Max(0, gained); b[2] += Math.Max(0, shieldAbsorbed);
+        }
 
         /// <summary>戦闘の始め・形態の交代 (ヴェスカの段)。 前の段が開いたままなら、 倒して移った段として負けなしで閉じる。</summary>
         public static void BeginFight(string id) { if (_id != null) EndFight(false); _id = GameLoop.BossIds.IsBoss(id) ? id : null; }
@@ -260,6 +272,9 @@ namespace CombatSystem
                   .Append($" / 防御へ挿した出目 平均 {D(h.blockDice, h.n):0.00}");
                 if (h.burstTurns > 0)
                     sb.Append($" / 〈業火〉 攻撃の分 平均 {D(h.atkPart, h.n):0.0}・烈炎の分 (軽減無視) 平均 {D(h.burstPart, h.n):0.0}・烈炎の数 平均 {D(h.blazeStacks, h.n):0.00}");
+                if (Blaze.TryGetValue(id, out var bz) && bz[0] > 0)
+                    sb.Append($" / 烈炎 1 戦あたり 積もった {D(bz[1], bz[0]):0.00}・主攻撃をシールドで肩代わり {D(bz[2], bz[0]):0.0}")
+                      .Append($" (戦闘 {bz[0]}・合計 積もった {bz[1]}・肩代わり {bz[2]}・積もり方 {GameLoop.GameHooks.BlazeStack})");
                 sb.Append($" / 合計 被ダメ {h.taken}・攻撃 {h.atkPre}・死 {h.deaths}・完全 {h.zero}・半分 {h.half}・出目 {h.blockDice}・攻撃の分 {h.atkPart}・烈炎の分 {h.burstPart}・烈炎 {h.blazeStacks}")
                   .Append(" / hist5=").Append(string.Join(",", h.hist));
                 sb.Append(Environment.NewLine).Append("    小技 ")

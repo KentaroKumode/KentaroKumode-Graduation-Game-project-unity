@@ -89,6 +89,7 @@ namespace AutoTest
             GameLoop.GameHooks.HeavyChargeNoAttack = heavyChargeNoAttack;                // [測定 2026-11-14] 大技のチャージは攻撃しない
             GameLoop.GameHooks.AshKingHeavyDisabled = !ashKingHeavy;                     // [測定 2026-11-14] 灰燼の王の大技〈業火〉
             GameLoop.GameHooks.BlazeTickEachTurn = blazeTickEachTurn;                    // [測定 2026-11-14] 烈炎の毎ターンの削り
+            GameLoop.GameHooks.BlazeStack = blazeStackRule;                              // [測定 2026-11-14] 烈炎の積もり方 (シールド / 旧い防御 2 個以上)
             GameLoop.GameHooks.Depth3HeavyDisabled = !depth3Heavy;                       // [測定 2026-11-13] 深さ 3 のボスの大技
             GameLoop.GameHooks.VescaClockHeldAtStart = vescaClockHeld;                   // [測定 2026-11-13] 博士の時計 (StartNewRun が読む)
             CombatSystem.BossParams.Overrides = BossParamOverrides;                      // [測定 2026-11-14] ボスの機構の値 (bossParamSpec・空なら null = 本番と同じ)

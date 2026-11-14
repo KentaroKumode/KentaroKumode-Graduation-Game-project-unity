@@ -746,6 +746,11 @@ namespace ItemSystem.PassiveSkills
             }
         }
         private int _consShield;
+        /// <summary>[perTurn] (BeginNewTurn の Phase B で 0) このターンに<b>敵の主攻撃</b>をシールドが肩代わりした量 (2026-11-14)。
+        /// 書くのは CombatManager.ApplyLossDamageModifiers のシールド吸収 (1 回目・〈連撃〉/2 体戦の 2 回目の両方) だけ。
+        /// 軽減無視 (〈業火〉の烈炎の分・審判の炎・〈蝕み〉など EnemyDealUnmitigable) の肩代わりは数えない。
+        /// 灰燼の王の〈烈炎〉がターン終了時に読む (<see cref="CombatSystem.HeavyCycle.BlazeGain"/>・N ごとに +1)。 戦闘の通算は <see cref="dbgShieldToNormal"/>。</summary>
+        public int shieldAbsorbedAttackThisTurn;
         public int consShieldExpireTurn;  // [decay] (減算は CombatManager.Turn.cs (BeginNewTurn の外)) この番号を超えるターンで失効。-1=無制限/0=無
         public int consDmgMultPct;        // [decay] (残ターンが尽きると CombatManager.Turn.cs が 0 (BeginNewTurn の外)) 与ダメ +X%
         /// <summary>[decay] cons_dmg 効果の残ターン数。0=無効, -1=戦闘中永続, N=残 N ターン。
@@ -1029,6 +1034,7 @@ namespace ItemSystem.PassiveSkills
 
 
             // ダメージ処理の単ターンフラグ
+            shieldAbsorbedAttackThisTurn = 0;   // 〈烈炎〉が読む: このターンに主攻撃をシールドが肩代わりした量 (2026-11-14)
             nullifyAllDamage = false;
             nullifyPursuitDamage = false;
             nullifyScratchDamage = false;
