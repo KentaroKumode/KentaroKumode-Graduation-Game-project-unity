@@ -31,6 +31,9 @@ const INKS = {
   poison: ["#0a1410", "#2c4a34", "#4e9a4a", "#b4e08a", "#f4ffe0"],
   // ヴェスカ: 黒から紫、 白へ (案)
   null: ["#05040a", "#3a2c5c", "#7c5cc4", "#c8b4f2", "#ffffff"],
+  // 敵の汎用の技 (見本用の仮の色の組): 鉄の灰・青磁
+  iron: ["#0c0c10", "#3a3840", "#77747e", "#b9b6c0", "#f2f0f6"],
+  celadon: ["#06100e", "#2c5a52", "#6aa898", "#b4dccc", "#f4fff8"],
 };
 const RAMP = (INKS[flags.ink ?? "warm"]).map(rgb3), BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5], LIGHT_GAIN = 1.6;
 const lum = (R, G, B) => (0.299 * R + 0.587 * G + 0.114 * B) / 255, step = (L) => Math.max(0, Math.min(RAMP.length - 1, Math.round(L * (RAMP.length - 1))));

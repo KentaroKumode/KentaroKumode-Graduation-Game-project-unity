@@ -1,0 +1,107 @@
+// DICE BOUND 用 (2026-11-14): 敵の構え・装甲が増える (大盾の番兵の構え・石喰いの蟲の積み上がる装甲)。 impacts/shield-block の写し。
+// (作者: Shield block を、 敵全体に掛ける用に)。 元は、 構えた側 (右) の 4 分の 1 の球。 ここでは体をまるごと包む半球にし、 大きさを敵の体 (rx・ry) で決める。
+// 殴られた星と火花は外した (受けたのではなく、 構えた)。 格子・縁・走る光・波紋・ますが消えて光の粒が上がる所は、 元の式のまま。
+// 画素を 1 つずつ打つ作りなので、 _scaled.js で広げず、 この画面の大きさのまま置く (広げると点が間引かれる)。
+// Mapping a lattice onto a dome by longitude and latitude, the ripple measured over its surface, the rim light
+// and the glancing sparks are adapted from Sprite Fusion's open-source shield
+// (https://www.spritefusion.com/pixel-art-vfx/shield), MIT License, Copyright (c) 2026 Hugo Duprez.
+import { Particles, Lights, P, Rng, fit, clamp, smooth, rand, TAU, WHITE } from "../../core/index.js";
+import { star, spikes } from "../impacts/_lib.js";
+
+export const meta = {
+  name: "Foe guard (DICE BOUND)",
+  desc: "A lattice dome closes over the whole enemy, ripples from its face, then blinks out cell by cell.",
+  tags: ["dicebound", "enemy", "guard", "one-shot"],
+  size: [240, 200],
+  origin: [120, 180],
+  duration: 1.4,
+  loop: false,
+  fps: 30,
+  bg: "dark",
+  options: {
+    palette: ["#151a3d", "#212f6b", "#2c58aa", "#3a8bd8", "#62c8f4", "#a6ecff", "#dcfbff", "#ffffff"],
+    sparks: ["#fff3a6", "#ffe26b", "#ff8a2a", "#f2561d"],
+    rx: 64,    // 敵の体の半分の幅 + 余白
+    ry: 136,   // 敵の体の高さ + 余白
+    seed: 12,
+  },
+};
+
+let CX = 0, RX = 64, RY = 136;
+const GRID = 3.4; // lattice density
+const HIT = { lon: 0, lat: 0.6 }, GONE = 0.8; // where the ripple starts; when the dome starts to blink out
+
+// a point on the dome's surface (lon round from facing us, lat up from the floor) to local space
+const onDome = (lon, lat) => [CX + RX * Math.cos(lat) * Math.sin(lon), -RY * Math.sin(lat)];
+
+export function create(o) {
+  CX = 0; RX = o.rx; RY = o.ry;
+  const C = fit(o.palette, 8), S = fit(o.sparks, 4), R = new Rng(o.seed), floor = () => 0;
+  const ps = new Particles({ rng: R, ground: floor, sparks: S });
+  const lights = new Lights();
+  const [hx, hy] = onDome(HIT.lon, HIT.lat);
+
+  lights.add(hx, hy, 40, S[1], 0.7, 0.2);
+  lights.add(hx, hy, 12, WHITE, 0.7, 0.06);
+  let t = 0;
+  // the dome, front (back = false) or the far side seen through it (back = true): a glassy fill, a diamond
+  // lattice, a bright rim where it turns away, a sheen sweeping up it
+  const dome = (p, back) => {
+    const fade = 1 - smooth(GONE + 0.35, GONE + 0.55, t);
+    if (fade <= 0) return;
+    for (let y = -RY - 1; y < 0; y++)
+      for (let x = CX - RX - 1; x <= CX + RX + 1; x++) {   // 元は右半分 (構えた側) だけ。 ここでは体をまるごと包む
+        const u = (x + 0.5 - CX) / RX, v = -(y + 0.5) / RY, q = u * u + v * v;
+        if (q > 1 || v < 0) continue;
+        const z = Math.sqrt(1 - q) * (back ? -1 : 1), lon = Math.atan2(u, z), lat = Math.asin(clamp(v));
+        // the lattice, and which cell this is: each cell keeps its own clock for blinking out
+        const a = (lon + lat) * GRID, b = (lon - lat) * GRID, fa = a - Math.floor(a), fb = b - Math.floor(b);
+        const cell = rand(Math.floor(a), Math.floor(b), 31), line = Math.min(fa, 1 - fa, fb, 1 - fb) < 0.13;
+        const gone = GONE + cell * 0.35;
+        if (t > gone) continue;
+        // how far over the surface from the blow, and the two ripples running out from it
+        const d = Math.acos(clamp(Math.cos(lat) * Math.cos(HIT.lat) * Math.cos(lon - HIT.lon) + Math.sin(lat) * Math.sin(HIT.lat), -1, 1));
+        let hit = 0;
+        for (const [t0, k0] of [[0, 1], [0.12, 0.55]]) {
+          const k = t - t0, front = k * 3.6;
+          if (k < 0 || k > 0.55) continue;
+          if (Math.abs(d - front) < 0.2) hit = Math.max(hit, k0 * (1 - k / 0.55));
+          else if (d < front) hit = Math.max(hit, 0.3 * k0 * (1 - k / 0.55));
+        }
+        const rim = 1 - Math.abs(z), flash = t < 0.05, blink = t > gone - 0.06, sheen = Math.abs(((lat * 0.8 - lon * 0.3 - t * 1.6) % 1 + 1) % 1 - 0.5) < 0.05;
+        if (back) {
+          if (line) p.dot(x, y, C[3], 0.5 * fade);
+          continue;
+        }
+        if (q > 0.9) p.dot(x, y, flash || hit > 0.5 ? WHITE : C[6], fade);
+        else if (line) p.dot(x, y, flash || blink || hit > 0.5 ? WHITE : hit > 0.2 || sheen ? C[6] : rim > 0.7 ? C[5] : rim > 0.35 ? C[4] : C[3], fade);
+        else p.blend(x, y, flash || hit > 0.35 ? C[6] : C[3], fade * Math.min(0.85, (flash ? 0.35 : 0.1 + 0.25 * rim * rim) + hit * 0.65));
+        if (((x * 7 + y * 3) & 15) === 0) p.light(x, y, C[4], 0.15 + 0.5 * hit);
+      }
+  };
+
+  return {
+    update(dt) {
+      t += dt;
+      // as cells blink out, little motes of light lift off
+      if (t > GONE && t < GONE + 0.38 && R.chance(0.5)) {
+        const lon = R.range(-Math.PI / 2, Math.PI / 2), lat = R.range(0.05, 1.4), [x, y] = onDome(lon, lat);
+        ps.spawn(P.STAR, x, y, R.range(-10, 10), -R.range(10, 40), R.range(0.2, 0.36), R.chance(0.5) ? C[6] : C[5], R.range(0.6, 1.4));
+      }
+      ps.update(dt);
+      lights.update(dt);
+    },
+    drawBack(p) {
+      dome(p, true);
+    },
+    draw(p) {
+      dome(p, false);
+      // where the dome meets the floor
+      const fade = 1 - smooth(GONE + 0.3, GONE + 0.55, t);
+      if (fade > 0) for (let x = CX - RX; x <= CX + RX; x++) p.dot(x, 0, t < 0.05 ? WHITE : C[5], fade * (0.6 + 0.4 * (Math.abs(x - CX) / RX)));
+      ps.draw(p);
+      p.glow(CX, -RY * 0.45, RY * 0.9, C[4], 0.2 * (1 - smooth(GONE, GONE + 0.55, t)) + 0.35 * Math.exp(-t / 0.08));
+      lights.draw(p);
+    },
+  };
+}
