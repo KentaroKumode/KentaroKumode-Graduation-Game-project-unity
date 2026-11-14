@@ -24,7 +24,7 @@ const BODY = [240, 136], RING_Y = 96, SUCK = 1.05;   // SUCK = 吸い込みが�
 const GUARD_Y = 24, BLADE = 118, SR = 88;
 // 剣の発動の時刻 (待機の終わりからの秒)。 ゲームの側の暗転も、 この表で掛ける (SWORD.dark)
 export const SWORD = {
-  dark: [[0, 0], [0.5, 1], [1.3, 1], [1.8, 0]],   // 画面の暗さ (0〜1・1 = 真っ黒。 作者: 本物の暗転に): 日食で真っ暗になる → God rays が出そろうまで保つ → 解ける。 効果の絵 (日食・光) は暗くしない
+  dark: [[0, 0], [0.5, 1], [1.3, 1], [1.8, 0]],   // 画面の暗さ (0〜1・1 = 真っ黒。 作者: 本物の暗転に): 日食で真っ暗になる → God rays が出そろうまで保つ → 解ける。 日食と注ぐ光も一緒に消える (効果の側で消す)。 God rays は暗くしない
   rays: [0.5, 1.5],     // God rays が出て来る区間 (この間に 0 → 1)
   mark: 1.8,            // 落ちる所に印 (Holy smite の頭)
   land: 1.8 + 0.47,     // 光が落ちて着く (Holy smite の BOLT)。 ここで Ground pound の衝撃と、 インパクトフレーム
@@ -187,7 +187,9 @@ export function create(o) {
         // 剣: 日食が強まって画面が暗くなる (暗さはゲームの側で掛ける) → God rays が徐々に出る → 暗さが解ける → 印 → 光が落ちる + 着地の衝撃 + インパクトフレーム → 白飛び
         const f = p.fade, hot = clamp(a / 0.5), rk = clamp((a - SWORD.rays[0]) / (SWORD.rays[1] - SWORD.rays[0])), gone = clamp((a - SWORD.land) / 0.5);
         p.fade = f * rk * (1 - clamp((a - SWORD.white) / 0.6)); sw.rays.draw(p);
-        p.fade = f * (1 - gone); if (gone < 1) held(p, a, 0, hot);
+        // 暗転は、 日食も含めて全部を黒くする (作者の指定): 日食と注ぐ光も、 画面と同じ暗さで消える。 黒の中に God rays だけが出て来て、 暗転が解けると日食が戻る
+        let dk = 0; for (let i = 1; i < SWORD.dark.length; i++) { const [t0, v0] = SWORD.dark[i - 1], [t1, v1] = SWORD.dark[i]; if (a >= t0 && a <= t1) dk = v0 + (v1 - v0) * (a - t0) / (t1 - t0); }
+        p.fade = f * (1 - gone) * (1 - dk); if (gone < 1 && dk < 1) held(p, a, 0, hot);
         p.fade = f;
         sw.smite.draw(p); sw.slam.draw(p); sw.impact.draw(p);
         const wt = a - SWORD.white, wk = wt < 0 ? 0 : clamp(1 - (wt - 0.15) / 0.3);
