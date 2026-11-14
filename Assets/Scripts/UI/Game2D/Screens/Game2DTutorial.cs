@@ -379,7 +379,7 @@ namespace UI.Game2D
         //   画面全体を幕で暗くし、 範囲の内側だけ幕を抜いて枠で囲む。 文面の板は範囲に重ならない所へ置く。 部品が無い節は幕だけ (板は中央)。
 
         /// <summary>強調する部品の種類。</summary>
-        private enum Focus { None, NavTop, Radar, Intent, BattleTop, Ports, Stat, Ctl, Hand }
+        private enum Focus { None, NavTop, Radar, Intent, BattleGauge, Ports, Stat, Ctl, Hand }
 
         /// <summary>節 → 強調する部品。 ここに無い節は強調しない (幕だけ)。</summary>
         private static Focus FocusOf(string title)
@@ -393,7 +393,7 @@ namespace UI.Game2D
                 case TutorialTopics.Deck:
                 case TutorialTopics.Kinds: return Focus.Hand;              // 手札の端子
                 case TutorialTopics.Long:
-                case TutorialTopics.Charge: return Focus.BattleTop;        // 充電・エスカレーション・敵 HP の帯
+                case TutorialTopics.Charge: return Focus.BattleGauge;      // 充電・激化の板 (左下・2026-11-15 に上の帯から移した)
                 case TutorialTopics.Crit:
                 case TutorialTopics.ForceCrit: return Focus.Stat;          // 会心率
                 case TutorialTopics.Flee: return Focus.Ctl;                // 逃げる のボタン
@@ -415,7 +415,7 @@ namespace UI.Game2D
             switch (f)
             {
                 case Focus.Intent: return _hud.PartRect(Game2DBattleHud.Part.Intent);
-                case Focus.BattleTop: return _hud.PartRect(Game2DBattleHud.Part.Top);
+                case Focus.BattleGauge: return _hud.PartRect(Game2DBattleHud.Part.Gauge);
                 case Focus.Ports: return _hud.PartRect(Game2DBattleHud.Part.Ports);
                 case Focus.Stat: return _hud.PartRect(Game2DBattleHud.Part.Stat);
                 case Focus.Ctl: return _hud.PartRect(Game2DBattleHud.Part.Ctl);

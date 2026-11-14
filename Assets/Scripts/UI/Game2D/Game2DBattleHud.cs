@@ -9,7 +9,9 @@ namespace UI.Game2D
     /// <summary>
     /// 戦闘の GUI (<b>仮置き</b>・2026-10-24)。 枠・ダイスの面・ボタン・ランプ・ゲージ・丸ボタンは PixelLab (参考画像の切り抜き + パレット抽出) で作った絵
     /// (Assets/gui2d/battle_ui/・<see cref="Game2DKitAssets"/>)。 枠は 1 枚の絵を 9 分割してパネルの大きさに合わせる。
-    /// 右 = 敵の出目と攻撃値 (予告の枠) / 上の帯 = 充電・エスカレーション・敵 HP。 状態は <see cref="Game2DBattleSim"/> (実戦闘の流れ) から読む。
+    /// 右 = 敵の出目と攻撃値 (予告の枠) / 左下 = 充電・激化 (<see cref="BattleHudLayout.Gauge"/>)。 敵の HP は液晶の中の敵の足もとの下 (Game2DBattleFx)。
+    /// (上の帯 ── 充電・激化・敵 HP ── は 2026-11-15 に無くした・敵の頭上の絵を隠していたため。 シーンにある "top" の部品は出さない。)
+    /// 状態は <see cref="Game2DBattleSim"/> (実戦闘の流れ) から読む。
     /// 航行用の GUI が引っ込むのと入れ替わりに、 左・右・上からばねで入ってくる (<see cref="Drive"/>)。 座標は 480×270 の格子 (左上が原点)。
     /// <para>端子の山札 (ADR-0014): 左に 3 枚を積む: Ports (出目とそれぞれの差し込み口・出目が 4 個以上なら 3 個ずつの列を右へ足す) / ステータス / Ctl (操作)。
     /// 右下 (Hand) にこのターンに引いた端子 (USB メモリの形) を並べ、 つかんで出目の差し込み口へ落とすと装着する (<see cref="Game2DBattleSim.Plug"/>)。
@@ -21,21 +23,22 @@ namespace UI.Game2D
     public class Game2DBattleHud : MonoBehaviour
     {
         // 配置 (dot)
-        // 2026-11-11: 字を既定のフォント (高さ 12) にしたので、 右の枠を広げ、 上の帯を高くし、 右は帯の下から始める
+        // 2026-11-11: 字を既定のフォント (高さ 12) にしたので、 右の枠を広げ、 上の帯を高くし、 右は帯の下から始める (上の帯は 2026-11-15 に無くした)
         //   場所の値は BattleHudLayout (Unity 非依存・検算 Tools/inventory_check が入口 [持ち物] とほかの部品の重なりを数える)
         private static RectInt R(InventoryLayout.Box b) => new RectInt(b.x, b.y, b.w, b.h);
-        private static readonly RectInt Right = R(BattleHudLayout.Right), Top = R(BattleHudLayout.Top);
+        private static readonly RectInt Right = R(BattleHudLayout.Right), Gauge = R(BattleHudLayout.Gauge);
         private const int FrameB = 12;
-        /// <summary>自分のステータス (会心率・攻撃・防御): 左下 (Ports と Ctl の間・左と同じばね)。</summary>
+        /// <summary>自分のステータス (会心率・攻撃・防御): 左 (Ports と充電・激化の板の間・左と同じばね)。</summary>
         private static readonly RectInt Stat = R(BattleHudLayout.Stat);
-        /// <summary>成立した役 (ADR-0011): Ports の上の空き (上の帯の左・左と同じばね)。 役が無いターンは出さない。</summary>
+        /// <summary>成立した役 (ADR-0011): 右上 (予告の枠の上・予告の枠と同じばね・2026-11-15 に左上から移した)。 役が無いターンは出さない。</summary>
         private static readonly RectInt RoleR = R(BattleHudLayout.Role);
-        /// <summary>持ち物の画面の入口 [持ち物] (2026-11-13): 役の板の上の空き (上の帯の左・左と同じばね)。 キー I でも開く。 見るだけ (Game2DNavExtras.OpenInventoryInBattle)。</summary>
+        /// <summary>持ち物の画面の入口 [持ち物] (2026-11-13): 左上の角 (出目の上・左と同じばね)。 キー I でも開く。 見るだけ (Game2DNavExtras.OpenInventoryInBattle)。</summary>
         private static readonly RectInt InvR = R(BattleHudLayout.Inv);
 
         // ── 端子の山札 (ADR-0014・2026-11-11) の配置 ──
-        //   Ports (2,60,108,98)   = 出目と、 出目ごとの差し込み口 (挿した USB は横向きに挿さった絵で残る)。 3 個ずつ縦に並べ、 4 個目からは列を右へ足す。
-        //   Stat (2,162,108,48)   = 会心・攻撃・防御/貫通。
+        //   Ports (2,20,108,98)   = 出目と、 出目ごとの差し込み口 (挿した USB は横向きに挿さった絵で残る)。 3 個ずつ縦に並べ、 4 個目からは列を右へ足す。
+        //   Stat (2,122,108,46)   = 会心・攻撃・防御/貫通。
+        //   Gauge (2,170,142,40)  = 充電・激化 (2026-11-15 に上の帯から移した)。
         //   Ctl (2,214,108,52)    = 振り直す・おまかせ / 道具・逃げる・決める。 x 110 まで = 資源バー (x 110〜・y 215〜) にかからない。
         //   Hand (318,184,160,80) = このターンに引いた端子 (縦向きの USB・左から) と常設 (右の端・仕切りの右)・山/捨ての枚数。 敵 (x 190〜290) と予告の枠 (Right・y 〜180) の外。
         //   Tip (幅 200)          = USB にマウスを乗せた時だけ。 予告の枠 (Right) と敵の頭上の予告 (y 〜78) に重ねない:
@@ -56,7 +59,7 @@ namespace UI.Game2D
         private const int HandY = 18, HandStep = 28, HandPad = 6;
         private static readonly RectInt CReroll = new RectInt(5, 5, 56, 20), CAuto = new RectInt(63, 5, 40, 20),
             CItem = new RectInt(5, 27, 24, 20), CFlee = new RectInt(31, 27, 36, 20), CGo = new RectInt(69, 27, 34, 20);
-        private RectTransform _ports, _ctl, _hand, _tip, _drag, _role, _inv; private Texture2D _tp, _tc, _th, _tt2, _td, _trl, _tinv;
+        private RectTransform _ports, _ctl, _hand, _tip, _drag, _role, _inv, _gauge; private Texture2D _tp, _tc, _th, _tt2, _td, _trl, _tinv, _tg;
         private int _portsTexW = -1;
 
         /// <summary>端子のアイコン (16×16・行優先・左上から・0 = 透明 / 1 = 暗 / 2 = 中 / 3 = 明)。 無ければ null。</summary>
@@ -70,7 +73,7 @@ namespace UI.Game2D
 
         [SerializeField] private RectTransform _right, _top;
         private RectTransform _stat;
-        private Texture2D _tr, _tt, _ts;
+        private Texture2D _tr, _ts;
         private int _drawn = -1; private float _slide;
         private KitSrc _bGo; private bool _srcInit;
 
@@ -88,7 +91,7 @@ namespace UI.Game2D
         private static bool _busyDrag; private static int _releaseFrame = -10;
 
         /// <summary>手引きの強調 (issue #109) が範囲を読む部品。</summary>
-        public enum Part { Intent, Top, Ports, Stat, Ctl, Hand }
+        public enum Part { Intent, Gauge, Ports, Stat, Ctl, Hand }
 
         /// <summary>部品の RectTransform (まだ作っていなければ null)。 位置はばねで動くので、 読む側が毎フレーム読み直す。</summary>
         public RectTransform PartRect(Part p)
@@ -96,7 +99,7 @@ namespace UI.Game2D
             switch (p)
             {
                 case Part.Intent: return _right;
-                case Part.Top: return _top;
+                case Part.Gauge: return _gauge;
                 case Part.Ports: return _ports;
                 case Part.Stat: return _stat;
                 case Part.Ctl: return _ctl;
@@ -107,7 +110,7 @@ namespace UI.Game2D
         /// <summary>見た目を作る (builder から 1 度呼ぶ)。 親は 480×270 の格子の枠。</summary>
         public void Build()
         {
-            _right = Make("right", Right, out _tr); _top = Make("top", Top, out _tt);
+            _right = Make("right", Right, out _tr);
             _stat = Make("stat", Stat, out _ts);
         }
 
@@ -123,7 +126,7 @@ namespace UI.Game2D
 
         private void OnDestroy()
         {
-            foreach (var t in new[] { _tr, _tt, _ts, _tp, _tc, _th, _tt2, _td, _trl, _tinv }) if (t != null) Destroy(t);
+            foreach (var t in new[] { _tr, _ts, _tp, _tc, _th, _tt2, _td, _trl, _tinv, _tg }) if (t != null) Destroy(t);
             _busyDrag = false;
         }
 
@@ -136,35 +139,49 @@ namespace UI.Game2D
             if (_ctl == null) _ctl = Make("ctl", Ctl, out _tc);
             if (_hand == null) _hand = Make("hand", Hand, out _th);
             if (_role == null) _role = Make("role", RoleR, out _trl);
+            if (_gauge == null) _gauge = Make("gauge", Gauge, out _tg);
+            if (_top != null) Show(_top, false);      // 上の帯は 2026-11-15 に無くした (シーンに残っている部品は出さない)
             if (_inv == null) _inv = Make("inv", InvR, out _tinv);
             if (_tip == null) _tip = Make("tip", new RectInt(0, 0, TipW, TipH), out _tt2);
             if (_drag == null) _drag = Make("drag", new RectInt(0, 0, UsbBody, UsbLong), out _td);
         }
 
-        private Game2DSpring _spL, _spR, _spT; private bool _spInit;
+        private Game2DSpring _spL, _spR, _spS; private bool _spInit;
+
+        // ── 大技の発動の間の格納 (2026-11-15・作者の決定「大技発動演出中 (ループ待機を除く) は GUI が格納されるように」) ──
+        //   Game2DBattleFx.GuiStowed の間、 入りと同じばね (0.25 秒前後で収まる) で、 左の列 (充電と激化を含む) は左へ・予告の枠・役の板・手札は右へ、 画面の外まで滑らせる
+        //   (動かすのは位置だけ・整数 dot・拡大縮小しない)。 下の資源バーは Game2DHud が同じ値 (StowValue) で下へ滑らせる。 格納の間は操作を受けない。
+        /// <summary>格納で動かす距離 (dot): 左の列 (出目が 9 個の時の幅 260 + 余白) / 予告の枠と役の板 / 手札 / 下の資源バー (Game2DHud)。</summary>
+        public const int StowLeft = 270, StowRight = 120, StowHand = 170, StowBottom = 56;
+        /// <summary>格納のばねの値 (0 = 出ている / 1 = 画面の外)。 dist = 動かす距離 (行き過ぎを dist に対して 3 dot 以内に収める)。</summary>
+        public float StowValue(float dist) => _spInit ? _spS.Value(dist) : 0f;
+        /// <summary>格納に向かっている、 または まだ戻り切っていない (この間は操作を受けない)。</summary>
+        public bool Stowed => _spInit && (_spS.tgt > 0.5f || _spS.x > 0.02f);
         /// <summary>入り・出の途中を含めて、 どれかが見えている。</summary>
-        public bool Visible => !_spInit || !(_spL.tgt < 0.5f && _spR.tgt < 0.5f && _spT.tgt < 0.5f && _spL.x < 0.005f && _spR.x < 0.005f && _spT.x < 0.005f && _spL.Settled && _spR.Settled && _spT.Settled);
+        public bool Visible => !_spInit || !(_spL.tgt < 0.5f && _spR.tgt < 0.5f && _spL.x < 0.005f && _spR.x < 0.005f && _spL.Settled && _spR.Settled);
 
         /// <summary>戦闘の GUI をばねで出し入れする (毎フレーム)。 入る順は 左 → 上 → 右 で、 少しずつずらす。 行き過ぎは 3 dot 以内。</summary>
         public void Drive(bool on, float dt)
         {
             if (_right == null) return;
             EnsurePanels();
-            if (!_spInit) { _spL.Set(0); _spR.Set(0); _spT.Set(0); _spInit = true; }
+            if (!_spInit) { _spL.Set(0); _spR.Set(0); _spS.Set(0); _spInit = true; }
             float t = on ? 1f : 0f;
-            _spL.Go(t, on ? 0.03f : 0f); _spT.Go(t, on ? 0.07f : 0.03f); _spR.Go(t, on ? 0.12f : 0.06f);
-            _spL.Step(dt); _spT.Step(dt); _spR.Step(dt);
+            _spL.Go(t, on ? 0.03f : 0f); _spR.Go(t, on ? 0.12f : 0.06f);
+            _spS.Go(on && fx != null && fx.GuiStowed ? 1f : 0f, 0f);      // 戦闘の画面を離れたら必ず戻す (引っ込んだまま残さない)
+            _spL.Step(dt); _spR.Step(dt); _spS.Step(dt);
             _slide = _spL.x;
-            float inL = Mathf.Round((1f - _spL.Value(200f)) * 200f), inR = Mathf.Round((1f - _spR.Value(170f)) * 170f);
-            _right.anchoredPosition = new Vector2(Right.x + Mathf.Round((1f - _spR.Value(120f)) * 120f), -Right.y);
-            _top.anchoredPosition = new Vector2(Top.x, -Top.y + Mathf.Round((1f - _spT.Value(62f)) * 62f));
+            float sL = Mathf.Round(StowValue(StowLeft) * StowLeft), sR = Mathf.Round(StowValue(StowRight) * StowRight), sH = Mathf.Round(StowValue(StowHand) * StowHand);
+            float inL = Mathf.Round((1f - _spL.Value(200f)) * 200f) + sL, inR = Mathf.Round((1f - _spR.Value(170f)) * 170f) + sH;
+            _right.anchoredPosition = new Vector2(Right.x + Mathf.Round((1f - _spR.Value(120f)) * 120f) + sR, -Right.y);
             _stat.anchoredPosition = new Vector2(Stat.x - inL, -Stat.y);
             _ports.anchoredPosition = new Vector2(Ports.x - inL, -Ports.y);
             _ctl.anchoredPosition = new Vector2(Ctl.x - inL, -Ctl.y);
             _hand.anchoredPosition = new Vector2(Hand.x + inR, -Hand.y);
-            _role.anchoredPosition = new Vector2(RoleR.x - inL, -RoleR.y);
+            _role.anchoredPosition = new Vector2(RoleR.x + Mathf.Round((1f - _spR.Value(120f)) * 120f) + sR, -RoleR.y);      // 役の板は右上 (2026-11-15): 予告の枠と同じばね
+            _gauge.anchoredPosition = new Vector2(Gauge.x - inL, -Gauge.y);
             _inv.anchoredPosition = new Vector2(InvR.x - inL, -InvR.y);
-            if (_spL.x < 0.95f) { Show(_tip, false); CancelDrag(); }      // 説明の帯・つかみは、 パネルが収まっている間だけ
+            if (_spL.x < 0.95f || Stowed) { Show(_tip, false); CancelDrag(); }      // 説明の帯・つかみは、 パネルが収まっている間だけ (格納の間も出さない)
         }
 
         private void Update()
@@ -173,9 +190,9 @@ namespace UI.Game2D
             // 配線を決める間だけ読み直す (その後は本判定に取り込まれて二重に数えるので、 最後の値を出し続ける)
             if (sim.CanOperate && CombatSystem.CombatManager.Instance != null)
             { _hs = CombatSystem.CombatManager.Instance.PreviewHudStats(); _hsKnown = true; }
-            bool ptr = _slide > 0.95f && !Game2DModal.Active && screen != null;
+            bool ptr = _slide > 0.95f && !Stowed && !Game2DModal.Active && screen != null;      // 格納の間は、 画面の外のボタンを押せない
             // 持ち物の画面 (見るだけ・2026-11-13): キー I。 窓が出ている間・つかんでいる間・BOT が動かしている間は開かない
-            if (_slide > 0.95f && !Game2DModal.Active && !PointerBusy && !Game2DTutorial.Blocking && Input.GetKeyDown(KeyCode.I)) OpenInventory();
+            if (_slide > 0.95f && !Stowed && !Game2DModal.Active && !PointerBusy && !Game2DTutorial.Blocking && Input.GetKeyDown(KeyCode.I)) OpenInventory();
             Vector2 d = default; bool hasDot = ptr && Game2DPointer.TryDot(screen, out d);
             DeckPointer(hasDot, d);
             // 引いてくる動きの間は毎フレーム描き直す
@@ -229,14 +246,14 @@ namespace UI.Game2D
         private void Redraw()
         {
             InitSrc(); EnsurePanels();
-            Ensure(ref _tr, _right, Right); Ensure(ref _tt, _top, Top);
+            Ensure(ref _tr, _right, Right); Ensure(ref _tg, _gauge, Gauge);
             // 出目の個数で Ports の幅が変わる: 絵を作り直す
             int pw = PortsW(sim.DiceCount);
             if (pw != _portsTexW) { if (_tp != null) Destroy(_tp); _tp = null; _portsTexW = pw; _ports.sizeDelta = new Vector2(pw, Ports.height); }
             Ensure(ref _tp, _ports, new RectInt(Ports.x, Ports.y, pw, Ports.height)); Ensure(ref _tc, _ctl, Ctl); Ensure(ref _th, _hand, Hand);
             DrawPorts(_tp, pw); DrawCtl(_tc); DrawHand(_th); bool tip = DrawTip();
-            Show(_ports, true); Show(_ctl, true); Show(_hand, true); Show(_tip, tip && _slide > 0.95f);
-            DrawRight(_tr); DrawTop(_tt);
+            Show(_ports, true); Show(_ctl, true); Show(_hand, true); Show(_tip, tip && _slide > 0.95f && !Stowed);
+            DrawRight(_tr); DrawGauge(_tg); Show(_gauge, true);
             Ensure(ref _ts, _stat, Stat); DrawStat(_ts);
             Ensure(ref _trl, _role, RoleR); Show(_role, DrawRole(_trl));
             Ensure(ref _tinv, _inv, InvR); DrawInv(_tinv); Show(_inv, true);
@@ -975,27 +992,17 @@ namespace UI.Game2D
             else p.Box(x, y, size, size, lit ? col : Off, Dark);
         }
 
-        private void DrawTop(Texture2D t)
+        /// <summary>充電と激化 (2026-11-15 に上の帯から左下へ移した・<see cref="BattleHudLayout.Gauge"/>)。 1 行目 = 「充電」と 10 個のランプ (1 個 = 充電 3)・
+        /// 2 行目 = 「激化 あと N」(次の段まで) と 5 個のランプ (今の段)。 ランプの絵と大きさ (10 dot)・色は上の帯の時のまま。</summary>
+        private void DrawGauge(Texture2D t)
         {
-            var p = Frame(Top); bool live = sim != null && Game2DBattleSim.Active;
+            var p = Frame(Gauge); bool live = sim != null && Game2DBattleSim.Active;
             int pips = live ? Mathf.Min(10, sim.charge / 3) : 4;
-            p.Text("充電", 14, 13, Chg);
-            for (int i = 0; i < 10; i++) DrawLamp(p, 38 + i * 10, 14, 10, i < pips, Chg);
+            p.Text("充電", 8, 5, Chg);
+            for (int i = 0; i < 10; i++) DrawLamp(p, 34 + i * 10, 6, 10, i < pips, Chg);
             string esc = live ? "激化 " + (sim.NextStageIn >= 0 ? "あと" + sim.NextStageIn : "最大") : "激化";
-            p.Text(esc, 146, 13, Dim);
-            if (live) for (int i = 0; i < 5; i++) DrawLamp(p, 214 + i * 10, 14, 10, i < sim.Stage, Atk);
-            int cur = fx != null ? fx.EnemyHp : 56, max = fx != null ? fx.EnemyMax : 80;
-            p.Text("敵", 14, 29, Ink); p.GaugeBar(Game2DKit.Gauge, 30, 31, 192, 10, Mathf.Clamp01(cur / (float)Mathf.Max(1, max)), Hp);
-            // ボスのダウンの目盛り (2026-11-13・仮の印): 棒に 1 ドットの刻み。 まだ割っていない目盛りは明るく、 割った目盛りは暗く (状態は色で表す)
-            if (live && sim.downNotches != null)
-                for (int i = 0; i < sim.downNotches.Length; i++)
-                {
-                    int nx = 30 + Mathf.Clamp(Mathf.RoundToInt(192 * sim.downNotches[i]), 1, 190);
-                    bool cracked = i >= sim.downBroken && sim.downCracks != null && i < sim.downCracks.Length && sim.downCracks[i] >= 0;
-                    if (cracked) { p.Rect(nx, 30, 1, 4, MarkHeavyHud); p.Rect(nx, 38, 1, 4, MarkHeavyHud); }   // ひび (2026-11-14): 刻みの中ほどを欠く (状態は形で表す・倍率は使わない)
-                    else p.Rect(nx, 30, 1, 12, i < sim.downBroken ? Dim : MarkHeavyHud);
-                }
-            p.Text(cur + "/" + max, 228, 29, Ink);
+            p.Text(esc, 8, 21, Dim);
+            if (live) for (int i = 0; i < 5; i++) DrawLamp(p, 84 + i * 10, 22, 10, i < sim.Stage, Atk);
             p.Apply(t);
         }
     }

@@ -75,6 +75,7 @@ namespace UI.Game2D.Battle
             else if (known && charging) m.guard = guardIn == 0;
             var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
             if (ctx != null) { m.poison = ctx.EnemyPoison; m.bleed = ctx.enemyBleedStacks; }
+            m.notches = downNotches; m.notchBroken = downBroken; m.cracks = downCracks;      // 敵の HP の棒の目盛り (液晶の中・2026-11-15)
             return m;
         }
         public int NextStageIn => nextStageIn;

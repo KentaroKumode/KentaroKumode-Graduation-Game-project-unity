@@ -32,7 +32,7 @@ namespace UI.Game2D
         private Game2DMapView _view;
         private bool _battle;
         private Game2DSpring _spNav, _spGold;      // 航行用の GUI の引っ込み具合 (0 = 出ている / 1 = 画面の外)
-        private Vector2 _goldBase; private bool _radarInit;
+        private Vector2 _goldBase, _resBase, _radarBase; private bool _radarInit;
         /// <summary>会心の衝撃で GUI 全体を揺らす量 (dot)。 戦闘演出 (Game2DBattleFx) が毎フレーム入れる。</summary>
         public static Vector2 ShakeDots;
         private int _lastShownPhase = -1;
@@ -182,11 +182,18 @@ namespace UI.Game2D
             if (!_radarInit)
             {
                 if (gold != null) _goldBase = ((RectTransform)gold.transform).anchoredPosition;
+                if (resBar != null) _resBase = ((RectTransform)resBar.transform).anchoredPosition;
+                if (radar != null) _radarBase = ((RectTransform)radar.transform).anchoredPosition;
                 _radarInit = true;
             }
             if (gold != null) ((RectTransform)gold.transform).anchoredPosition = _goldBase + new Vector2(0, Mathf.Round(_spGold.Value(110f) * 110f));      // GOLD の入れ物は戦闘中は出さない (上へ引っ込む)
             if (extras != null) extras.Drive(_spNav.Value(100f));
             if (battleHud != null) { battleHud.Drive(_battle, dt); if (battleOnly != null) battleOnly.SetActive(battleHud.Visible); }      // 戦闘の GUI は、 入ってくる間・出ていく間も生かす
+            // 大技の発動の間の格納 (2026-11-15): 下の資源バー (戦闘中は HP とシールドの帯) を、 戦闘の GUI と同じばねで下へ。
+            //   レーダーは資源バーの右の窓に載っている部品なので一緒に下げる (分けると窓の無い所に浮く)
+            float down = battleHud != null ? Mathf.Round(battleHud.StowValue(Game2DBattleHud.StowBottom) * Game2DBattleHud.StowBottom) : 0f;
+            if (resBar != null) ((RectTransform)resBar.transform).anchoredPosition = _resBase - new Vector2(0, down);
+            if (radar != null) ((RectTransform)radar.transform).anchoredPosition = _radarBase - new Vector2(0, down);
             if (root != null)
             {
                 var hr = (RectTransform)root.transform; var sk = new Vector2(Mathf.Round(ShakeDots.x), -Mathf.Round(ShakeDots.y));
