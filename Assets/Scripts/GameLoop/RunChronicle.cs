@@ -201,7 +201,7 @@ namespace GameLoop
         public static long CombatsSeen, DamageTakenPct, HealInCombat, RunsSeen, ShieldGained;
 
         /// <summary>[計装 2026-08-15] 軽減無視をシールドで肩代わりできるようにした変更の追跡。
-        /// 添字 0 = 全戦闘 / 1 = 5層ボス(業火の審判官)戦のみ。 **異常はこの敵にだけ出ている**ので
+        /// 添字 0 = 全戦闘 / 1 = 5層ボス(審判官)戦のみ。 **異常はこの敵にだけ出ている**ので
         /// 全体平均と分けて採らないと、 他の 40 種以上の戦闘に薄められて見えなくなる。</summary>
         public static readonly long[] ShieldToChip = new long[2];
         public static readonly long[] ShieldToNormal = new long[2];
@@ -217,7 +217,7 @@ namespace GameLoop
         public static readonly long[] LethalShieldLeft = new long[2];
         public static readonly long[] Losses = new long[2];
 
-        /// <summary>1 戦分の計装を積む。 <paramref name="isLayer5Boss"/> は業火の審判官戦か。</summary>
+        /// <summary>1 戦分の計装を積む。 <paramref name="isLayer5Boss"/> は審判官戦か。</summary>
         public static void NoteShieldSplit(bool isLayer5Boss, int toChip, int toNormal,
                                            int leftOver, int chipRaw, int chipToHp,
                                            bool lost, int lethalTurnDamage, int shieldAtEnd)
@@ -397,7 +397,7 @@ namespace GameLoop
             {
                 double n = System.Math.Max(1, FightsSeen[i]);
                 double l = System.Math.Max(1, Losses[i]);
-                sb.AppendLine(i == 0 ? "  ── 全戦闘" : "  ── 5層ボス(業火の審判官)戦のみ");
+                sb.AppendLine(i == 0 ? "  ── 全戦闘" : "  ── 5層ボス(審判官)戦のみ");
                 sb.AppendLine($"     戦闘数 {FightsSeen[i]} / 敗北 {Losses[i]}");
                 sb.AppendLine($"     盾→チップ {ShieldToChip[i]} (1戦 {ShieldToChip[i] / n:F2})"
                             + $" / 盾→通常攻撃 {ShieldToNormal[i]} (1戦 {ShieldToNormal[i] / n:F2})"
