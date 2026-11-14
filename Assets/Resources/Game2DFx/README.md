@@ -7,4 +7,6 @@
 [NOTICE-pixelfx.md](NOTICE-pixelfx.md)（どちらも `Tools/pixelfx/` の原本の写し）。ビルドに入るのは `Assets` の中だけなので、
 配る物にも MIT の表示と本文が入るよう、ここにも置いている。**消さない。**
 
-手で描き換えない。書き出し直す時は `python Tools/pixelfx/dicebound/export_game.py`（手順は `Tools/pixelfx/README.md`）。
+手で描き換えない。書き出し直す時は `python Tools/pixelfx/dicebound/export_game.py`（会心・毒・出血）と
+`python Tools/pixelfx/dicebound/export_fx.py`（ボスの大技 `gouka-*` `judge-*` `chevalier-*` `vesca-*`・通常の技 `move-*`・武器 `weapon-*`・
+ヴェスカの破片の形 `vesca-shards.json`・帯の表 `vesca-tear.json`）。手順は `Tools/pixelfx/README.md`。

@@ -175,7 +175,12 @@ namespace UI.Game2D.Battle
                     if (t > 0.05f && (fx.IsIdle || fx.IsWon)) AfterPlayerAttack(cm);
                     break;
                 case P.EAttack:
-                    if (!_eHit && t >= 0.54f) { _eHit = true; playerHp = _tr.playerHPAfter; Touch(); }
+                    if (!_eHit && fx.EnemyHitLanded) { _eHit = true; playerHp = _tr.playerHPAfter; Touch(); }      // 当たった拍子 (ふつうの攻撃は 0.54 秒・大技は絵の当たるコマ)
+                    if (t > 0.1f && fx.IsIdle && !_flameShown && cm.IsCombatActive && BossFx.KindOf(cm.CurrentEnemy?.id) == BossFx.Kind.Judge)
+                    {
+                        // 審判官〈審判の炎〉(毎ターン末・#354): 敵の攻撃の後に流し、 終わるまで次のターンへ進まない (ダメージは攻撃の数字に含めて出している)
+                        _flameShown = true; fx.PlayMove("move-judge-flame", 0f, true); t = 0; break;
+                    }
                     if (t > 0.1f && fx.IsIdle)
                     {
                         playerHp = _tr.playerHPAfter;
@@ -194,6 +199,8 @@ namespace UI.Game2D.Battle
             playerHp = cm.PlayerHP; playerMax = Mathf.Max(1, cm.PlayerMaxHP); baseAtk = cm.PlayerAttackPower;
             fx.SetEnemyHp(cm.EnemyHP, cm.EnemyMaxHP);
             fx.WeaponIndex = WeaponIndexOf(GameManager.Instance?.Run?.equippedWeaponId);
+            fx.WeaponSheetFamily = SheetFamilyOf(GameManager.Instance?.Run?.equippedWeaponId);
+            _chevPhase = -1; _blazeStacks = 0; _flameShown = false;
             for (int i = 0; i < slot.Length; i++) slot[i] = -1;
             board.Clear(); target = new int[0]; preview = null; lastOutcome = null; focusSlot = -1;
             Touch();
@@ -229,6 +236,7 @@ namespace UI.Game2D.Battle
             rolled = false; _eHit = false; roles.Clear();
             _countDots = true; _poisonSeen = _bleedSeen = 0;
             bool paused = cm.BeginInteractiveTurn();
+            int regen = cm.EnemyHP - _enemyBefore + _poisonSeen;      // ターン頭に敵が回復した量 (毒で減った分を足し戻す・〈灰の再生〉の絵を出すか)
             // 端子の山札: このターンの場 (常設 + 手札) を写す。 判断なしで解決したターンも、 発動の表示はこの並びの添字で読む
             TakeBoard(cm);
             // ターンの頭の毒: ここで見せて HP の表示を先に減らす (本当の HP は攻撃と一緒に減るので、 尽きる分は残す)
@@ -238,6 +246,7 @@ namespace UI.Game2D.Battle
             if (!paused) { Resolve(cm); return; }      // 判断なしで解決したターン (逃走・刻限など)
             if (board.Count > 0) Game2DTutorial.Request(TutorialTopics.Deck);      // 手引き「端子の山札」: 最初の手札 (issue #86)
             SyncDecision(cm, true);
+            TurnStartFx(cm, regen);
             Game2DSfx.DiceRoll(4, 0.45f, 0.55f);
             phase = P.PRoll; t = 0; Touch();
         }
@@ -816,7 +825,60 @@ namespace UI.Game2D.Battle
         private void StartEnemyAttack(CombatManager cm)
         {
             lastTaken = Mathf.Max(0, _hpBefore - _tr.playerHPAfter);
-            fx.EnemyAttack(lastTaken); phase = P.EAttack; t = 0; _eHit = false; Touch();
+            _flameShown = false;
+            // ボスの演出 (2026-11-14・#350〜#354): チャージのターン = チャージ (攻撃しない) / 大技のターン = 大技 / それ以外 = 通常攻撃 (王・シュヴァリエは技の絵)
+            var kind = BossFx.KindOf(cm.CurrentEnemy?.id);
+            if (kind != BossFx.Kind.None && charging) fx.BossCharge(kind, _blazeStacks, lastTaken);
+            else if (kind != BossFx.Kind.None && heavyIn == 0 && !down) fx.BossHeavy(kind, _blazeStacks, lastTaken);
+            else fx.EnemyAttack(lastTaken, down ? null : kind == BossFx.Kind.King ? "move-king-attack" : kind == BossFx.Kind.Chevalier ? "move-chev-thrust" : null);      // ダウンのターンは攻撃しないので技の絵は出さない
+            phase = P.EAttack; t = 0; _eHit = false; Touch();
+        }
+
+        // ── ボスの演出の契機 (2026-11-14) ──
+        private int _blazeStacks, _chevPhase = -1;
+        private bool _flameShown;
+
+        /// <summary>ターンの頭 (判断で止まった所): 大技の取り消し・〈灰の再生〉・ヴェスカの遺物・シュヴァリエの構え。 値は読むだけ。</summary>
+        private void TurnStartFx(CombatManager cm, int regen)
+        {
+            var kind = BossFx.KindOf(cm.CurrentEnemy?.id);
+            if (kind == BossFx.Kind.None) return;
+            var ctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
+            // 烈炎の数 (王の絵の ash)。 業火のターンは撃つ前の数 = ここで読んだ値
+            _blazeStacks = ctx != null ? (int)ctx.GetAccumulated(ItemSystem.PassiveSkills.Effects.BlazeBrand.StackKey) : 0;
+            // ダウン (または周期がずれた) で大技が来なくなった: 待機を止めて暗幕を戻す
+            if (fx.BossIdling && (down || heavyIn != 0)) fx.BossCancel();
+            // 絵を先に読む (全画面のコマが多い・敵の行動の瞬間に読むと一瞬止まる): チャージのターン = チャージと待機 / 大技のターン = 大技
+            if (charging) BossFx.Preload(kind, _blazeStacks, false);
+            else if (heavyIn == 0 && !down) BossFx.Preload(kind, _blazeStacks, true);
+            if (kind == BossFx.Kind.King && regen > 0) fx.PlayMove("move-king-regen");
+            if (kind == BossFx.Kind.Chevalier)
+            {
+                int ph = ItemSystem.PassiveSkills.Effects.SaintGeorgesPhases.PhaseOf(ctx);
+                if (_chevPhase > 0 && ph > 0 && ph != _chevPhase) fx.PlayMove("move-chev-stance");
+                _chevPhase = ph;
+            }
+            if ((kind == BossFx.Kind.Vesca || kind == BossFx.Kind.VescaFinal) && cm.PendingDecision?.tele.drawnRelics is string[] relics)
+            {
+                // 抽選された遺物: 種類 (攻撃 / 防御 / 妨害) で汎用の 3 本を出し分ける。 2 枚の時は続けて流す。
+                // 種類は遺物の表 (VescaRelicPool.All の role) を名前で引く (名前を綴りで切らない)。 天与の 3 品の絵は、 遺物が 2026-08-16 に廃止されているので掛けない
+                float at = 0f;
+                foreach (var name in relics)
+                {
+                    var r = ItemSystem.PassiveSkills.Effects.VescaRelicPool.All.Find(x => x.name == name);
+                    string sheet = r == null ? null : r.role == "攻撃" ? "move-relic-strike" : r.role == "防御" ? "move-relic-guard" : r.role == "妨害" ? "move-relic-hex" : null;
+                    if (sheet == null) continue;
+                    fx.PlayMove(sheet, at); at += Game2DBattleFx.MoveDuration(sheet);
+                }
+            }
+        }
+
+        /// <summary>武器の絵の家系: items.json の family が剣・斧・短剣・盾の時だけ (id を綴りで切らない)。 素手・竜閃・それ以外は null (手描きの演出のまま)。</summary>
+        private static string SheetFamilyOf(string id)
+        {
+            if (string.IsNullOrEmpty(id) || id == ItemIds.Ryusen) return null;
+            var f = ItemSystem.ItemDatabase.Instance?.GetItem(id)?.family;
+            return f == "sword" || f == "axe" || f == "dagger" || f == "shield" ? f : null;
         }
 
         private void EndFight(CombatManager cm)

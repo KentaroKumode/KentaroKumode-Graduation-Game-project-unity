@@ -1324,6 +1324,9 @@ namespace ItemSystem.PassiveSkills.Effects
         private const string KP2ExtendPending = "sg_p2_extend_pending"; // P2: 帰還1T延長予約
         private const string KPrioriteStacks  = "sg_priorite_stacks";   // プリオリテ累積（往復ペナルティ）
 
+        /// <summary>いまの形態 (1 = コントラタック / 2 = オポジション / 0 = 戦闘の外)。 画面の演出 (構えの絵) が読むだけ・値は変えない (2026-11-14)。</summary>
+        public static int PhaseOf(CombatContext ctx) => ctx != null ? (int)ctx.GetAccumulated(KPhase) : 0;
+
         private const int BaseDiceCount   = 4; // 形態1で extraDice = −4 → 攻撃ロールを引く回数 max(0, 1 − 4) = 0 (EnemyData.RollAttack)
         private const int BaseShield      = 140; // HP +40% に比例して上方修正
         private const int MinShield       = 28; // プリオリテ削減後の下限 (20→28, +40%)
