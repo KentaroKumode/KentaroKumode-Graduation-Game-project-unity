@@ -110,9 +110,9 @@ base: origin/main 6ea741d
 | F-D-03 | 振り直し | 全部振り直す・費用は充電で 個数×回目・回目は戦闘中に戻らない | `CombatManager.RerollPhase` | ― | 両 | 仕（§6-3・DCR §1⓪） | 固 |
 | F-D-04 | 端子の山札 | 開始 5 枚（攻撃 2・防御 2・充電 1）・手札 5 枚・切り直し | `CombatSystem/TerminalCards.cs`・`TerminalDeckState` | 端子 60 種（攻撃 24・防御 9・充電 5・補助 21・レア 14）[^term] | 両 | 仕（§6-4・ADR-0014） | 動（25回） |
 | F-D-05 | 手札の残す印 | 挿さなかった端子に印を付けると次も残る（Pick） | `TerminalDeckState.SplitHand/KeepFromMarks` | 規則 3 形（Off/All/Pick） | 両 | 仕（§6-4） | 動（11-13） |
-| F-D-06 | 〈呼び戻し〉 | 捨て札の 1 枚を次の手札へ | `TerminalDeckState.RecallPick/ApplyRecall`・`Game2DBattleHud.OpenRecall` | 1 | 両 | 仕（§6-4） | 動（11-13） |
+| F-D-06 | 〈有効活用〉 | 捨て札の 1 枚を次の手札へ | `TerminalDeckState.RecallPick/ApplyRecall`・`Game2DBattleHud.OpenRecall` | 1 | 両 | 仕（§6-4） | 動（11-13） |
 | F-D-07 | 挿す条件 | 3 以下・5 以上・6 以上・偶数・奇数・同じ目・同じ目 2 個 | `TerminalCond` | 7＋なし[^cond] | 両 | コ | 動 |
-| F-D-08 | 使い捨て・常設 | 使い捨ては戦闘から外れる (次の戦闘ではまた山札に入る・〈応急箱〉も同じ・2026-11-14〜)・〈主幹〉は場に残る | `TerminalDef.disposable`・`TerminalDeckState.FinishTurn` | ― | ロ | 仕（§6-4） | 動 |
+| F-D-08 | 使い捨て・常設 | 使い捨ては戦闘から外れる (次の戦闘ではまた山札に入る・〈応急箱〉も同じ・2026-11-14〜)・〈千刃〉は場に残る | `TerminalDef.disposable`・`TerminalDeckState.FinishTurn` | ― | ロ | 仕（§6-4） | 動 |
 | F-D-09 | 撃破のボーナスの端子 | 撃破の経路を問わず入る | `TerminalCards.Resolve` | 4 種 | ロ | 仕（§6-4） | 動（#117） |
 | F-D-10 | 端子の報酬・店・休憩で抜く | 通常 2 択・エリート 3 択・ボスはレア 3 択・下限 `MinDeckSize` 3 | `GameManager.OfferTerminalReward`・`GameManager.Terminals.cs` | ― | 両 | 仕（§6-4） | 仮 |
 | F-D-11 | 役 | 目 1〜9 × {2 個そろい, ゾロ目}・面の Tier で成立 | `CombatSystem/YachtRoles.cs`・`YachtRoleEffects.cs` | 18 | 両 | 仕（§6-13） | 固（0回）・数値は仮 |

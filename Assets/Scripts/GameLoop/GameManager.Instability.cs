@@ -104,7 +104,7 @@ namespace GameLoop
         /// <summary>戦闘が始まった (CombatManager.StartCombat から)。 この戦闘のエスカレーションの分を 0 に戻す。</summary>
         public void NoteCombatStartedForInstability() { InstabilityFromEscalationThisCombat = 0; InstabilityThisBattle = 0; EscalationRisesThisCombat = 0; }
 
-        /// <summary>[計装 2026-11-13] この戦闘でエスカレーションの段が上がった数 (ボス戦も・嵐の無い層も数える・〈冷却材〉で下がってまた上がった段は数え直さない)。
+        /// <summary>[計装 2026-11-13] この戦闘でエスカレーションの段が上がった数 (ボス戦も・嵐の無い層も数える・〈鎮静香〉で下がってまた上がった段は数え直さない)。
         /// 数えるだけで動きに使わない (AutoRunner が戦闘の記録に写す)。 戦闘が始まる時に 0。</summary>
         public int EscalationRisesThisCombat { get; private set; }
 

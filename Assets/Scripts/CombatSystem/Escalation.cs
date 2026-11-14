@@ -128,7 +128,7 @@ namespace CombatSystem
         ///   2. **このターンのダイス合計値** (パッシブ補正込みの実値をそのまま加算)
         ///   3. パッシブ等の追加分・倍率・バフ/デバフ (エスカレーション段階倍率を含む)
         /// この結果がそのまま予告値になる。</summary>
-        /// <param name="combatTurn">大技サイクルを数える実ターン (冷却材の遅延を受けない)。 省略時は turn。</param>
+        /// <param name="combatTurn">大技サイクルを数える実ターン (鎮静香の遅延を受けない)。 省略時は turn。</param>
         public static int EnemyAttackValue(EnemyData e, int turn, int diceRollTotal, int combatTurn = -1)
         {
             float raw = e.EffectiveBaseAttack + diceRollTotal;

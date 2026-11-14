@@ -581,7 +581,7 @@ namespace AutoTest
         private static int FutureEnemyAtk(in OptimalTurnState s) => s.enemyDown ? s.downNextAtk : s.charging ? s.chargeNextAtk : s.enemyAtk;
 
         /// <summary>[ボスのダウン] 目盛りを割って次のターンをダウンにする価値の割合 (次のターンの敵の攻撃 × これ を今の HP で見る・仮・未測定)。
-        /// 〈停止信号〉(DeckStunShare) と同じ形: 半分にするのは、 割らなくてもブロックで一部は受けられるから。</summary>
+        /// 〈石化の瞳〉(DeckStunShare) と同じ形: 半分にするのは、 割らなくてもブロックで一部は受けられるから。</summary>
         private const float DownNextTurnShare = 0.5f;
 
         /// <summary>[V3 readOutgoingMult] 配線時点で分かる範囲で、 本体と同じ順に主攻撃 (ヴェスカの防御の前) の期待値を出す。
@@ -613,7 +613,7 @@ namespace AutoTest
                 }
                 if (outMul > 0f && System.Math.Abs(outMul - 1f) > 0.001f) d = Mathf.CeilToInt(d * outMul);
                 d += consBurst;
-                if (termMul != 1f && d > 0) d = System.Math.Max(1, Mathf.RoundToInt(d * termMul));   // 〈増幅器〉〈共振器〉: 本体と同じ位置 (攻撃バーストの後・物差しの前)
+                if (termMul != 1f && d > 0) d = System.Math.Max(1, Mathf.RoundToInt(d * termMul));   // 〈激昂〉〈共鳴〉: 本体と同じ位置 (攻撃バーストの後・物差しの前)
                 d = CombatSystem.EnemyHpLedger.ProbeMain(d);   // [測定用の物差し 2026-11-10] 本体と同じ位置 (攻撃バーストの後・防御の前)
                 d = MetaProgression.MetaDebuffApplicator.ApplyOutgoingCut(d);   // [#121] 〈大罪:怠惰〉: 本体と同じ位置 (物差しの直後・防御の前・CombatManager.Damage.cs)
                 d = CombatSystem.BossDown.ApplyTaken(d, down);               // ボスのダウン ×1.5: 本体と同じ位置 (怠惰の直後)
@@ -789,7 +789,7 @@ namespace AutoTest
             public float takenMul;       // このターンの被ダメに掛ける (1 = なし)
             public float enemyAtkMul;    // このターンの敵の攻撃に掛ける (1 = なし)
             public int shield, heal, selfDamage;
-            /// <summary>今ターン撃破したときだけ足す分 (〈収穫機〉〈研ぎ澄まし〉〈戦利品箱〉〈剥ぎ取り〉)。</summary>
+            /// <summary>今ターン撃破したときだけ足す分 (〈魂狩り〉〈処刑の刃〉〈賞金狩り〉〈剥ぎ取り〉)。</summary>
             public float killBonus;
 
             public static WiredSums None() => new WiredSums { damageMul = 1f, takenMul = 1f, enemyAtkMul = 1f };
@@ -839,9 +839,9 @@ namespace AutoTest
             float bashRate = s.bashRate, bulwarkRate = s.bulwarkRate;
             int aCount = ws.aCount, bCount = ws.bCount, aSum = ws.aSum, blockRaw = ws.blockRaw, chargeRaw = ws.chargeRaw, maxBlockDie = ws.maxBlockDie;
             float c = ws.chargeUnits, specFlat = ws.specFlat;
-            // 端子の山札: このターンの敵の攻撃 ×N (〈遮断器〉)。 本体は防御の後の予告の値に掛ける (CombatManager.ApplyTerminalOutcome)。
+            // 端子の山札: このターンの敵の攻撃 ×N (〈大結界〉)。 本体は防御の後の予告の値に掛ける (CombatManager.ApplyTerminalOutcome)。
             if (ws.enemyAtkMul < 1f) enemyAtk = System.Math.Max(0, Mathf.RoundToInt(enemyAtk * ws.enemyAtkMul));
-            // 端子の山札: HP を払う (〈決死〉・HP は 1 未満にならない) / 回復 (〈治癒〉〈応急箱〉)。 どちらも敵の攻撃の前に入る。
+            // 端子の山札: HP を払う (〈諸刃の剣〉・HP は 1 未満にならない) / 回復 (〈包帯〉〈応急箱〉)。 どちらも敵の攻撃の前に入る。
             int myHpEff = myHp;
             if (ws.selfDamage > 0 || ws.heal > 0)
                 myHpEff = System.Math.Min(myMaxHp, System.Math.Max(1, myHp - ws.selfDamage) + ws.heal);
@@ -944,7 +944,7 @@ namespace AutoTest
             if (tele.playerBlockIgnored)
                 block = System.Math.Max(0, block - enemyAtk * CombatSystem.CombatManager.PierceAwlPerAttack);
 
-            // 端子の山札: このターンに得たシールド (〈絶縁体〉〈当て板〉) はこのターンの被弾から吸う / 被ダメ −N% (〈接地〉〈避雷器〉〈非常弁〉)
+            // 端子の山札: このターンに得たシールド (〈二重障壁〉〈装甲板〉) はこのターンの被弾から吸う / 被ダメ −N% (〈受け流し〉〈防御陣〉〈身代わり札〉)
             int taken = System.Math.Max(0, enemyAtk - block - ws.shield);
             // 敵の攻撃が通った時の上乗せ (〈剛力〉〈闇技〉〈研ぎ澄まし〉・2026-11-12)。 本体はブロックの後に 1 以上残る時だけ、 プレイヤーの軽減の前に足す
             if (s.enemyHitBonus > 0 && enemyAtk - block > 0) taken += s.enemyHitBonus;

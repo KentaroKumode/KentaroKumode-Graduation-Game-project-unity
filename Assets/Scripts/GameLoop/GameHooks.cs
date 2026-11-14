@@ -136,19 +136,19 @@ namespace GameLoop
         public static Func<string, int, int> EnemyArmorPenOverride;
 
         /// <summary>[測定 2026-11-12・#102] 端子の調整を腕から元の値へ戻す口 (0 = 差し替えない = 今の値)。
-        /// 〈治癒〉の倍率 (<see cref="CombatSystem.TerminalCards.HealMul"/>) / 〈避雷器〉の溜める量 (<see cref="CombatSystem.TerminalCards.ArresterNeed"/>)。
+        /// 〈包帯〉の倍率 (<see cref="CombatSystem.TerminalCards.HealMul"/>) / 〈防御陣〉の溜める量 (<see cref="CombatSystem.TerminalCards.ArresterNeed"/>)。
         /// AutoRunner.terminalHealMul / terminalArresterNeed が毎ランの始めに入れ、 ラン終了で 0 へ戻す。 画面の説明文は今の値のまま (測定の口なので)。</summary>
         public static int TerminalHealMulOverride, TerminalArresterNeedOverride;
         /// <summary>[測定 2026-11-14] true = 〈応急箱〉を使うとランの山札から抜ける (2026-11-12〜11-14 の旧い決まり)。 既定 false = 今の決まり
         /// (使い捨ての端子と同じく、 その戦闘中だけ戻らない)。 既定を入れ替えた時、 旧い口 TerminalFirstAidBattleOnly (true = 戦闘中だけ) は既定と同じ意味になったので、
         /// この口へ置き換えた。 AutoRunner.terminalFirstAidLeavesRunDeck が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
         public static bool TerminalFirstAidLeavesRunDeck;
-        /// <summary>[測定 2026-11-13・#117] true = 端子の撃破のボーナス (〈収穫機〉〈研ぎ澄まし〉〈戦利品箱〉〈剥ぎ取り〉) を旧い条件で配る
+        /// <summary>[測定 2026-11-13・#117] true = 端子の撃破のボーナス (〈魂狩り〉〈処刑の刃〉〈賞金狩り〉〈剥ぎ取り〉) を旧い条件で配る
         /// (攻撃の端子に出目を挿したターンの、 主攻撃までの撃破だけ・ターン終了時の撃破には配らない)。 既定 false = 説明文どおり、 撃破の経路を問わない。
         /// AutoRunner.terminalKillNeedsAttack が毎ランの始めに入れ、 ラン終了で false へ戻す。</summary>
         public static bool TerminalKillBonusNeedsAttack;
         /// <summary>[測定 2026-11-13] 手札の規則 (<see cref="CombatSystem.HandCarryMode"/>・GAME.md §6-4)。 既定 Pick = 残す印を付けた端子だけ残る。
-        /// Off = 旧い規則 (全部捨てる・印の仕組みも無い・〈呼び戻し〉は旧い〈保持器〉の動き) / All = 挿さなかった端子は全部残る (測定用)。
+        /// Off = 旧い規則 (全部捨てる・印の仕組みも無い・〈有効活用〉は旧い〈保持器〉の動き) / All = 挿さなかった端子は全部残る (測定用)。
         /// AutoRunner.handCarry が毎ランの始めに入れ、 ラン終了で Pick へ戻す。</summary>
         public static CombatSystem.HandCarryMode HandCarry = CombatSystem.HandCarryMode.Pick;
         /// <summary>[測定 2026-11-13] true = ボスのダウン (HP の目盛り・<see cref="CombatSystem.BossDown"/>) を入れない旧い作り。 既定 false = ダウンあり。

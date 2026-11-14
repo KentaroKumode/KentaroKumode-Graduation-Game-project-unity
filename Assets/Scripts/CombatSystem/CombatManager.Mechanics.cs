@@ -351,9 +351,9 @@ namespace CombatSystem
 
         // 端子の状態のうち、 戦闘の情報 (accumulatedValues) を通して渡すキー。 **フィールドを増やさない**
         //   (CombatContext の 3 区分規約: set/read が 1〜2 箇所なら辞書へ)。
-        /// <summary>エスカレーションの遅延ターン数のキー。 端子〈冷却材〉〈冷却弾〉(ADR-0014) と役〈時間〉(目 6) が共有する。</summary>
+        /// <summary>エスカレーションの遅延ターン数のキー。 端子〈鎮静香〉〈氷結瓶〉(ADR-0014) と役〈時間〉(目 6) が共有する。</summary>
         public const string CoolantDelayKey = "termCoolantDelay";
-        /// <summary>端子〈鋳造口〉(ADR-0014) で増えた、 この戦闘中の出目 +N (DrawTerminalHand が置き、 自ロールの後に足す)。</summary>
+        /// <summary>端子〈打ち直し〉(ADR-0014) で増えた、 この戦闘中の出目 +N (DrawTerminalHand が置き、 自ロールの後に足す)。</summary>
         private const string FoundryBonusKey = "termFoundryBonus";
 
         /// <summary>ADR-0011 〈守り〉(目 5): このターンの被ダメを N% 減らす。 T4 は減らした分の半分をシールドにする。
@@ -441,7 +441,7 @@ namespace CombatSystem
                     + (outcome.extraDamageTrue ? " (確定)" : "") + (crit ? " 会心" : ""));
         }
 
-        /// <summary>この戦闘で予告に出た一番高いエスカレーションの段 (不安定化の数え口・戦闘が始まる時に 0)。 〈冷却材〉で段が下がって
+        /// <summary>この戦闘で予告に出た一番高いエスカレーションの段 (不安定化の数え口・戦闘が始まる時に 0)。 〈鎮静香〉で段が下がって
         /// また上がっても、 一度数えた段は数え直さない (一番高い段を超えた分だけを数える)。</summary>
         private int _instabilityEscStage;
 
@@ -455,7 +455,7 @@ namespace CombatSystem
             GameLoop.GameManager.Instance?.NoteEscalationRise(rises, Escalation.BossFight);
         }
 
-        /// <summary>エスカレーション判定に使うターン。 〈冷却材〉の遅延を差し引く。
+        /// <summary>エスカレーション判定に使うターン。 〈鎮静香〉の遅延を差し引く。
         /// **1 を下回らせない** ── 段階 0 より前は存在しない。</summary>
         private int EscalationTurn(CombatContext ctx)
         {

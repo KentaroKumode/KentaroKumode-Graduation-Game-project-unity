@@ -35,7 +35,7 @@ namespace ItemSystem.PassiveSkills.Keywords
 
         /// <summary>このターン、 爆発で次の攻撃に乗る回数 (アクセス用キー・[perTurn] ではなく使ったら 0)。</summary>
         public const string BurstCountKey = "kw.burstCount";
-        /// <summary>[persistent・戦闘開始で 0] この戦闘で爆発した回数の累計 (端子〈余熱板〉が読む・ADR-0014)。</summary>
+        /// <summary>[persistent・戦闘開始で 0] この戦闘で爆発した回数の累計 (端子〈爆炎斬り〉が読む・ADR-0014)。</summary>
         public const string BurstTotalKey = "kw.burstTotal";
         /// <summary>閾値を超えて溜まっていた臨界 (〈溢れ取りの鋳型〉が読む)。</summary>
         public const string BurstExcessKey = "kw.burstExcess";

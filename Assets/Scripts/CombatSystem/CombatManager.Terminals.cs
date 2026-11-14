@@ -13,9 +13,9 @@ namespace CombatSystem
         private TerminalDeckState _deck;
         /// <summary>このターンの端子の結果 (配線の前は null)。</summary>
         private TerminalOutcome _termOutcome;
-        /// <summary>次のターンも手札に残す端子 (〈呼び戻し〉)。</summary>
+        /// <summary>次のターンも手札に残す端子 (〈有効活用〉)。</summary>
         private string _termRetain;
-        /// <summary>このターンの主攻撃に掛ける別枠の倍率 (〈増幅器〉〈共振器〉)。 毎ターン 1 に戻す。</summary>
+        /// <summary>このターンの主攻撃に掛ける別枠の倍率 (〈激昂〉〈共鳴〉)。 毎ターン 1 に戻す。</summary>
         private float _termDamageMul = 1f;
         /// <summary>[計装 #106] このターンに方策 / 画面が返した挿し方 (Resolve が直す前)。 ターンの始めに null へ戻す。 判断には使わない。</summary>
         private int[] _termWanted;
@@ -76,9 +76,9 @@ namespace CombatSystem
             }
             _termRetain = null; _termOutcome = null; _termDamageMul = 1f;
             if (ctx == null) return;
-            // 〈鋳造口〉: この戦闘中の出目 +N (自ロールの後に足す既存の口へ渡す)
+            // 〈打ち直し〉: この戦闘中の出目 +N (自ロールの後に足す既存の口へ渡す)
             ctx.accumulatedValues[FoundryBonusKey] = _deck.state.foundryBonus;
-            // 〈計数器〉: 基本以外の発動が累計 N 回ごとに与ダメージ +10% (山札に入っていれば効く)
+            // 〈柔軟な戦略〉: 基本以外の発動が累計 N 回ごとに与ダメージ +10% (山札に入っていれば効く)
             var run = GameLoop.GameManager.Instance?.Run;
             if (run?.terminalDeck != null && run.terminalDeck.Contains(TerminalIds.Counter))
             {
@@ -185,7 +185,7 @@ namespace CombatSystem
         /// を <see cref="SettleTerminalKillBonus"/> で拾う。 null = 待っていない。 ターンの終わり (FinishTurnCommon) までに必ず null へ戻る。</summary>
         private TermKillBonus _termKillPending;
 
-        /// <summary>ターンの終わり: 撃破のボーナスと、 山札への反映 (使い捨て・写し取り・焼き切り・保持)。
+        /// <summary>ターンの終わり: 撃破のボーナスと、 山札への反映 (使い捨て・影写し・火葬の剣・保持)。
         /// 撃破のボーナスは「このターンに敵を倒すと」(説明文) のとおり、 撃破の経路を問わない (#117・2026-11-13)。
         /// 主攻撃までに倒れていればここで配り、 まだ倒れていなければターン終了時の削りを待つ (<see cref="SettleTerminalKillBonus"/>)。
         /// 旧: 攻撃の端子に出目を挿したターンの、 ここまでの撃破だけ (<see cref="GameLoop.GameHooks.TerminalKillBonusNeedsAttack"/> で戻せる)。
@@ -253,10 +253,10 @@ namespace CombatSystem
                 // ターン終了時の撃破では FinishTurnCommon の SyncHPFromContext が ctx から最大 HP を拾い直すので、 ctx にも入れる
                 var hctx = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context;
                 if (hctx != null) hctx.playerMaxHP = playerMaxHP;
-                Debug.Log($"[端子/収穫機] 最大 HP +{TerminalCards.HarvesterMaxHp}");
+                Debug.Log($"[端子/魂狩り] 最大 HP +{TerminalCards.HarvesterMaxHp}");
             }
-            if (kb.whet) { TerminalDiag.Note(TerminalIds.Whet, TerminalDiag.KillBonus); run.terminalWhetBonus += TerminalCards.WhetGain; Debug.Log($"[端子/研ぎ澄まし] 攻撃 +{TerminalCards.WhetGain} (計 {run.terminalWhetBonus})"); }
-            if (kb.loot) { TerminalDiag.Note(TerminalIds.LootBox, TerminalDiag.KillBonus); run.coins += TerminalCards.LootGold; Debug.Log($"[端子/戦利品箱] ゴールド +{TerminalCards.LootGold}"); }
+            if (kb.whet) { TerminalDiag.Note(TerminalIds.Whet, TerminalDiag.KillBonus); run.terminalWhetBonus += TerminalCards.WhetGain; Debug.Log($"[端子/処刑の刃] 攻撃 +{TerminalCards.WhetGain} (計 {run.terminalWhetBonus})"); }
+            if (kb.loot) { TerminalDiag.Note(TerminalIds.LootBox, TerminalDiag.KillBonus); run.coins += TerminalCards.LootGold; Debug.Log($"[端子/賞金狩り] ゴールド +{TerminalCards.LootGold}"); }
             if (kb.stripper) { TerminalDiag.Note(TerminalIds.Stripper, TerminalDiag.KillBonus); run.terminalExtraChoices += TerminalCards.StripperChoices; Debug.Log($"[端子/剥ぎ取り] 戦闘後の端子の選択肢 +{TerminalCards.StripperChoices} (計 +{run.terminalExtraChoices})"); }
         }
 
@@ -284,7 +284,7 @@ namespace CombatSystem
     /// <summary>挿し方の列挙と、 既定の挿し方 (方策も画面も答えを出さなかった時・人の「おまかせ」)。 ADR-0014。</summary>
     public static class TerminalWiring
     {
-        /// <summary>〈呼び戻し〉(手札の持ち越しの規則) の対象として選ばれた捨て札の添字 (発動した〈呼び戻し〉の場の位置の targets の値・選ばれていなければ −1)。</summary>
+        /// <summary>〈有効活用〉(手札の持ち越しの規則) の対象として選ばれた捨て札の添字 (発動した〈有効活用〉の場の位置の targets の値・選ばれていなければ −1)。</summary>
         public static int RecallWant(List<string> board, TerminalOutcome o, int[] targets)
         {
             if (board == null || o == null || targets == null) return -1;

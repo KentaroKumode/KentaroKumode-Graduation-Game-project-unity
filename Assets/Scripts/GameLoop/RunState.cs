@@ -310,7 +310,7 @@ namespace GameLoop
         public List<string> pendingTerminalOffer = new List<string>();
         /// <summary>端子の山札 (ADR-0014)。 ラン単位。 開始は攻撃 2・防御 2・充電 1。 戦闘のたびに写して切る (CombatSystem.TerminalDeckState)。</summary>
         public List<string> terminalDeck = new List<string>();
-        /// <summary>端子〈研ぎ澄まし〉の恒久の攻撃 (このターンに敵を倒すたび +1・同じ名前の端子で共有)。</summary>
+        /// <summary>端子〈処刑の刃〉の恒久の攻撃 (このターンに敵を倒すたび +1・同じ名前の端子で共有)。</summary>
         public int terminalWhetBonus;
         /// <summary>端子〈剥ぎ取り〉: 次の戦闘後の端子の選択肢を増やす数 (報酬を出したら 0 に戻す)。</summary>
         public int terminalExtraChoices;

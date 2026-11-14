@@ -483,7 +483,7 @@ namespace ItemSystem.PassiveSkills
             // ロール勝負は無い (ADR-0009 相互攻撃モデル・GAME.md §6)。 ここで出目の合計を比べて勝敗を決め、
             //   引き分けなら両者のダイスを振り直していた処理は旧ロール勝負の残りなので外した (2026-11-12 #112)。
             //   - 振り直しは RerollPhase (プレイヤーの判断) の後に出目を黙って入れ替え、 playerFaceIdx を同期せず、
-            //     怠惰・〈鋳造口〉・〈天与の指輪〉・メタの出目加算・OnPostRoll の加算も乗らなかった。
+            //     怠惰・〈打ち直し〉・〈天与の指輪〉・メタの出目加算・OnPostRoll の加算も乗らなかった。
             //   - playerWonRoll / playerLostRoll は CombatManager が攻撃の計算の直前と収支の確定後に上書きする
             //     (CombatManager.Turn.cs の ExecuteTurnMutual)。 その間に読む効果は無い。
             //   - プレイヤー側に OnRollWin/Lose/Draw を持つ効果は無い (敵の収支トリガーは CombatManager が FireEnemyTrigger で鳴らす)。
