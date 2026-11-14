@@ -53,12 +53,14 @@ export function create(o) {
   const TH = T_CHARGE + HELD_T, TP = TH + T_LEAD;   // 発動の始まり・全画面の始まり
   const pay = gift === "sword" ? null : MOVES.create(resolveOptions(MOVES.meta, { move: "tenyo-" + gift, seed: o.seed }));
   // 剣の発動の部品 (元の効果を、 式を触らずに置く): God rays (全画面)・落ちる光 (Holy smite)・着地の衝撃 (Ground pound)・インパクトフレーム (全画面)
+  // 瓦礫 (跳ねる岩・砂利・欠片) は出さない。 煙は粒を小さく分ける (作者: 瓦礫はいらない・煙は野暮ったいので粒度を下げて)
+  const RUBBLE = ["CHUNK", "GRIT", "FLAKE"], FINE = { SMOKE: [0.45, 3], DUST: [0.6, 2] }, FINER = { SMOKE: [0.32, 4], DUST: [0.5, 2] };
   const sw = gift !== "sword" ? null : {
     rays: scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, opts: {} }),   // 出どころ (0,−170) × 1.5 = 画面の一番上の真ん中
     // 落ちる光と着地の衝撃は、 God rays とインパクトフレームに負けないよう、 大きく・重ねて (作者の指定): 光は 3.6 倍・衝撃は 2.8 倍 + 一拍遅れてもっと大きい 2 つ目
-    smite: scaledFx(SMITE, { K: 3.6, at: [BOARD[0], BOARD[1]], delay: TH + SWORD.mark - T0, glow: 1.4, opts: { palette: GOLD } }),
-    slam: scaledFx(SLAM, { K: 2.8, at: [BOARD[0], BOARD[1]], delay: TH + SWORD.land - T0, glow: 1.3, opts: { palette: GOLD } }),
-    slam2: scaledFx(SLAM, { K: 4.2, at: [BOARD[0], BOARD[1] + 6], delay: TH + SWORD.land + 0.14 - T0, opts: { palette: GOLD, seed: 11 } }),
+    smite: scaledFx(SMITE, { K: 3.6, at: [BOARD[0], BOARD[1]], delay: TH + SWORD.mark - T0, glow: 1.4, drop: RUBBLE, puff: FINE, opts: { palette: GOLD } }),
+    slam: scaledFx(SLAM, { K: 2.8, at: [BOARD[0], BOARD[1]], delay: TH + SWORD.land - T0, glow: 1.3, drop: RUBBLE, puff: FINE, opts: { palette: GOLD } }),
+    slam2: scaledFx(SLAM, { K: 4.2, at: [BOARD[0], BOARD[1] + 6], delay: TH + SWORD.land + 0.14 - T0, drop: RUBBLE, puff: FINER, opts: { palette: GOLD, seed: 11 } }),
     impact: scaledFx(IMPACT, { K: 1.5, at: [240, 135], delay: TH + SWORD.land - T0, opts: {} }),
   };
   // 集まる粒: 行き先へ、 外から吸い込まれる (王のチャージと同じ考え方。 数は少なく、 ゆっくり)
