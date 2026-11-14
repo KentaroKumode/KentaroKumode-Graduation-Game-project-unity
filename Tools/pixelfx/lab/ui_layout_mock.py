@@ -151,8 +151,57 @@ def planC(frame, name, title, stow=False):
         m.box(0, 258, 480, 12, "soft", None); m.text(5, 259, "HP", "txt", F8); m.bar(22, 261, 150, 6, 0.68, "hp"); m.text(176, 259, "68/100", "txt", F8)
     return m.save(name, title)
 
+# ---------------------------------------------------------------- 案 D: 回路 (今の部品を並べ直すのではなく、 1 ターンのやり取りそのものを画面にする)
+#   攻撃の線 (左): 出目 → 攻撃の端子 → 敵。 守りの線 (右): 敵の次の攻撃 → 守りの端子 ← 出目。 見込みは、 数字の枠ではなく、 HP の棒の上の「削れる分」で見せる
+def wire(m, pts, c, w=2, dash=False):
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+        if dash:
+            n = max(1, int(max(abs(x1 - x0), abs(y1 - y0)) / 6))
+            for i in range(0, n, 2): m.d.line([((x0 + (x1 - x0) * i / n) * S, (y0 + (y1 - y0) * i / n) * S), ((x0 + (x1 - x0) * (i + 1) / n) * S, (y0 + (y1 - y0) * (i + 1) / n) * S)], fill=COL[c], width=w * S)
+        else: m.d.line([(x0 * S, y0 * S), (x1 * S, y1 * S)], fill=COL[c], width=w * S)
+def node(m, x, y, kind, label, val=None, on=True):   # 端子: 場に開いている口。 出目が入ると、 効き目の数字が出る
+    c = {"攻": "atk", "防": "def", "充": "chg"}[kind]; w, h = 40, 18
+    fill = COL[c] if on else (COL[c][0] // 3, COL[c][1] // 3, COL[c][2] // 3, 255)
+    m.d.rectangle([(x - w // 2) * S, (y - h // 2) * S, (x + w // 2) * S - 1, (y + h // 2) * S - 1], fill=fill, outline=(16, 16, 20, 255), width=S); m.md.rectangle([x - w // 2, y - h // 2, x + w // 2 - 1, y + h // 2 - 1], fill=255)
+    m.text(x - 17, y - 6, label, "txt" if on else "dim", F8)
+    if val: m.text(x + 18, y - 6, val, "txt", F8, "ra")
+
+def planD(frame, name, title, stow=False):
+    m = Mock(frame)
+    # 激化の時計 (上の縁・灯りだけ) と、 隅の小さな入口
+    m.pips(214, 4, 5, 1, "warn", 6, 3); m.text(262, 1, "2", "dim", F8); m.text(4, 2, "袋 道具 逃げる", "dim", F8)
+    # 敵の HP: 足もとの棒。 今の手で削れる分を、 棒の上で明るく見せる (数字の枠は作らない)
+    m.bar(180, 198, 120, 7, 0.62, "hp", (0.33, 0.66)); m.d.rectangle([(180 + 1 + int(118 * 0.50)) * S, 199 * S, (180 + 1 + int(118 * 0.62)) * S - 1, 204 * S - 1], fill=(250, 220, 120, 255))
+    if not stow:
+        # ---- 攻撃の線 (左): 出目 5 → 攻撃 ×1.2 → 敵。 出目 2 → 攻撃 ×1.0 → 敵
+        wire(m, [(206, 236), (150, 236), (150, 170), (118, 170)], "atk"); wire(m, [(78, 170), (60, 170), (60, 128), (176, 128)], "atk")
+        wire(m, [(240, 228), (240, 214), (140, 214), (140, 196), (118, 196)], "atk"); wire(m, [(78, 196), (52, 196), (52, 120), (176, 120)], "atk")
+        node(m, 98, 170, "攻", "×1.2", "6"); node(m, 98, 196, "攻", "×1.0", "2")
+        m.text(124, 106, "34", "gold", F14, "ma"); m.text(150, 110, "▶", "atk", F8)
+        m.text(100, 150, "会心 15%", "dim", F8, "ma")
+        # ---- 守りの線 (右): 敵の次の攻撃 28 が降りて来る。 出目 4 → 守り +4 で受ける
+        m.text(356, 96, "28", "warn", F14, "ma"); wire(m, [(304, 124), (428, 124), (428, 160)], "warn", 2, True); m.text(326, 110, "◀", "warn", F8)
+        wire(m, [(274, 236), (330, 236), (330, 170), (362, 170)], "def")
+        node(m, 382, 170, "防", "+4", "8"); node(m, 382, 196, "防", "×1.0", None, on=False)
+        wire(m, [(402, 170), (428, 170)], "def"); m.d.rectangle([(420) * S, 160 * S, (436) * S - 1, 180 * S - 1], outline=COL["def"], width=S)
+        wire(m, [(428, 180), (428, 222), (340, 222), (340, 258)], "warn", 2, True); m.text(446, 196, "20", "warn", F14, "ma")
+        # ---- 充電の口 (左下): 振り直しの通貨なので、 振り直すのそばに
+        node(m, 40, 244, "充", "+3", None, on=False); m.pips(66, 241, 10, 3, "chg", 5, 2); m.text(66, 250, "振り直す 3", "txt", F8)
+        # ---- 手もと: 出目だけを大きく、 真ん中の下に
+        for i, n in enumerate((5, 2, 4)): m.die(206 + i * 34 - 12, 228, n, 26)
+        m.md.rectangle([190, 226, 290, 256], fill=255)
+        # 自分の HP: 画面の下の縁。 この手で受ける分を、 棒の上で赤く欠いて見せる
+        m.bar(150, 260, 180, 8, 0.8, "hp"); m.d.rectangle([(151 + int(178 * 0.6)) * S, 261 * S, (151 + int(178 * 0.8)) * S - 1, 267 * S - 1], fill=(250, 150, 130, 255)); m.text(336, 258, "82", "txt", F8)
+        m.md.rectangle([150, 258, 350, 269], fill=255)
+        # 決める
+        m.box(398, 240, 76, 24, COL["ok"], "line"); m.text(436, 246, "決める", "txt", F10, "ma")
+    else:
+        m.bar(150, 260, 180, 8, 0.6, "hp"); m.text(336, 258, "62", "txt", F8); m.md.rectangle([150, 258, 350, 269], fill=255)
+    return m.save(name, title)
+
 IDLE, HIT = 60, 166
 res = {}
+res["D"] = planD(IDLE, "D_decide", "案 D 回路・判断の間 (出目を挿した線が、 そのまま見込みになる)"); res["D2"] = planD(HIT, "D_resolve", "案 D・解決の間", stow=True)
 res["now"] = current(IDLE, "0_now_decide", "今 (2026-11-15 の変更後)・判断の間")
 current(HIT, "0_now_resolve", "今・大技の発動の間 (GUI を格納)", stow=True)
 res["A"] = planA(IDLE, "A_decide", "案 A 下の帯・判断の間"); res["A2"] = planA(HIT, "A_resolve", "案 A・解決の間 (帯は下へ引っ込み、 HP の細い帯だけ)", stow=True)
