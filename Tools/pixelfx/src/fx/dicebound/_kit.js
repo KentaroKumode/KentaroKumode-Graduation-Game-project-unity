@@ -1,0 +1,98 @@
+// DICE BOUND 用 (2026-11-14): ボスの技を、 このゲームの画面 (480×270) の大きさで描くための部品。
+// 元の効果は横スクロールの小さい人物に合わせた大きさ (高さ 30〜60 ドット) で、 そのまま置くと小さすぎる (作者の指摘)。 拡大はしない (ドットの大きさが揃わなくなる) ──
+// 大きい形を、 はじめからこの大きさで描く。 粒 (火花・残り火・煙・灰・星) は core の Particles の種類を、 技ごとに組み合わせて出す。
+// 形の描き方は、 元の効果から学んだ物: 光の槍 = transitions/slash-wipe の一閃・炸裂 = impacts/crit-hit の星形・印 = shadow/hex-sigil・三日月 = melee の斬撃・輪 = fire/fire-ring の band。
+import { clamp, TAU, WHITE } from "../../core/index.js";
+
+export const W = 480, H = 270, CHEST = [240, 130], FOOT = [240, 196], HEAD = [240, 60], BOARD = [240, 247];
+
+/** 光の槍 / 光線: (x0,y0) → (x1,y1)。 幅は w0 → w1 (こちらへ近いほど太く、 が基本)。 白い芯・明るい縁・淡いにじみ。 */
+export function beam(p, C, x0, y0, x1, y1, w0, w1, k = 1) {
+  if (Math.hypot(x1 - x0, y1 - y0) < 2 || k <= 0) return;   // まだ伸びていない
+  const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L, pad = Math.max(w0, w1) * 0.9 + 2;
+  p.shade(Math.min(x0, x1) - pad, Math.min(y0, y1) - pad, Math.max(x0, x1) + pad, Math.max(y0, y1) + pad, (x, y, o) => {
+    const al = (x - x0) * ux + (y - y0) * uy;
+    if (al < 0 || al > L) return;
+    const hw = Math.max(0.5, (w0 + ((w1 - w0) * al) / L) / 2), d = Math.abs(-(x - x0) * uy + (y - y0) * ux) / hw;
+    if (d > 1.7) return;
+    if (d <= 1.15) { o.c = d < 0.45 ? WHITE : d < 0.8 ? C[6] : C[5]; o.a = k; }
+    else { o.c = C[4]; o.a = 0.5 * k; }
+    o.l = C[5]; o.k = 0.55 * k * (1 - d / 1.7);
+  });
+}
+
+/** 星形の炸裂: n 本の棘。 中心は白く、 縁へ色が落ちる。 R = 棘の長さ・rot = 向き・sy = 縦の潰し (床に寝かせる時 < 1)。 */
+export function starburst(p, C, x0, y0, R, n, rot, k = 1, sy = 1) {
+  if (R < 2 || k <= 0) return;
+  const sec = TAU / n;
+  p.shade(x0 - R - 1, y0 - R * sy - 1, x0 + R + 1, y0 + R * sy + 1, (x, y, o) => {
+    const dx = x - x0, dy = (y - y0) / sy, d = Math.hypot(dx, dy);
+    if (d > R) return;
+    const a = (((Math.atan2(dy, dx) - rot) % sec) + sec) % sec, tri = Math.abs(a / sec - 0.5) * 2, rr = R * (0.22 + 0.78 * Math.pow(tri, 2.4));   // 棘の真ん中で tri = 1
+    if (d > rr) return;
+    const u = d / rr;
+    o.c = u < 0.5 ? WHITE : u < 0.78 ? C[6] : C[5]; o.a = k;
+    o.l = C[5]; o.k = 0.5 * k;
+  });
+}
+
+/** 楕円の輪 (床に寝た輪・盤を囲む輪)。 a0〜a1 の範囲だけ描ける (走って描かれる輪)。 */
+export function oval(p, x0, y0, rx, ry, th, c, k = 1, a0 = 0, a1 = TAU) {
+  if (rx < 1 || k <= 0) return;
+  const n = Math.ceil(rx * 3.2 * Math.abs(a1 - a0) / TAU) + 2;
+  for (let j = 0; j <= n; j++) {
+    const g = a0 + ((a1 - a0) * j) / n, cx = Math.cos(g), sy = Math.sin(g);
+    for (let d = 0; d < th; d++) p.dot(x0 + cx * (rx - d), y0 + sy * (ry - d * (ry / rx)), c, k);
+  }
+}
+
+/** 三日月の斬撃: 中心 (cx,cy)・半径 R の弧 a0→a1。 真ん中が一番太い (w)。 外の縁が白く、 内へ色が落ちる。 prog = 0〜1 で、 弧のどこまで描くか。 sy = 縦の潰し。 */
+export function crescent(p, C, cx, cy, R, a0, a1, w, k = 1, prog = 1, sy = 1) {
+  const n = Math.ceil(R * Math.abs(a1 - a0) * 1.6) + 2, to = n * clamp(prog);
+  for (let j = 0; j <= to; j++) {
+    const u = j / n, g = a0 + (a1 - a0) * u, wd = w * Math.pow(Math.sin(Math.PI * u), 0.7), c = Math.cos(g), s = Math.sin(g);
+    for (let d = 0; d <= wd; d += 0.6) {
+      const q = d / Math.max(1, wd);
+      p.dot(cx + c * (R - d), cy + s * (R - d) * sy, q < 0.3 ? WHITE : q < 0.6 ? C[6] : q < 0.85 ? C[5] : C[4], k * (q < 0.85 ? 1 : 0.6));
+    }
+    if (j % 5 === 0) p.glow(cx + c * R, cy + s * R * sy, 5 + wd * 0.5, C[5], 0.25 * k);
+  }
+}
+
+/**
+ * 印: 2 重の輪・その間の文様・中に n 点の星 (step つ飛ばしで結ぶ)・中心の目。 prog = 0〜1 で、 輪 → 星 → 文様の順に描かれる。 hot = 白く燃える (0〜1)。
+ * sy = 縦の潰し (盤の上に寝かせる)。 線は 2 ドット。
+ */
+export function sigil(p, C, x0, y0, R, sy, prog, hot = 0, n = 7, step = 3, rot = -Math.PI / 2) {
+  const col = hot > 0.4 ? WHITE : C[6], dim = hot > 0.4 ? WHITE : C[4], ring = clamp(prog / 0.35), star = clamp((prog - 0.3) / 0.45), gl = clamp((prog - 0.7) / 0.3);
+  oval(p, x0, y0, R, R * sy, 2, col, 1, rot, rot + TAU * ring);
+  oval(p, x0, y0, R * 0.84, R * 0.84 * sy, 1, dim, 1, rot + TAU, rot + TAU - TAU * ring);
+  const pt = (i) => [x0 + Math.cos(rot + (i * TAU) / n) * R * 0.82, y0 + Math.sin(rot + (i * TAU) / n) * R * 0.82 * sy];
+  for (let i = 0; i < n; i++) {
+    const u = clamp(star * n - i);
+    if (u <= 0) break;
+    const [ax, ay] = pt(i * step), [bx, by] = pt((i + 1) * step), ex = ax + (bx - ax) * u, ey = ay + (by - ay) * u;
+    p.line(ax, ay, ex, ey, col); p.line(ax, ay + 1, ex, ey + 1, dim);
+    if (u < 1) p.glow(ex, ey, 6, WHITE, 0.6);
+  }
+  // 輪の間の文様: 小さな印を n*2 個
+  for (let i = 0; i < n * 2 * gl; i++) {
+    const g = rot + ((i + 0.5) * TAU) / (n * 2), gx = x0 + Math.cos(g) * R * 0.92, gy = y0 + Math.sin(g) * R * 0.92 * sy;
+    p.dot(gx, gy, col); p.dot(gx + 1, gy, col); p.dot(gx, gy - 1, i % 2 ? col : dim); if (i % 3 === 0) p.dot(gx - 1, gy + 1, dim);
+  }
+  if (star >= 1) { p.circle(x0, y0, 3, col); p.circle(x0, y0, 1.2, C[1]); }
+  if (hot > 0) p.glow(x0, y0, R * 0.9, C[5], 0.5 * hot);
+}
+
+/** 画面の一部を光で満たす (盤が照らされる・当たりの余光)。 x の中心から離れるほど弱い。 */
+export function wash(p, c, x0, y0, x1, y1, k) {
+  if (k <= 0.01) return;
+  const mx = (x0 + x1) / 2, hw = (x1 - x0) / 2;
+  for (let y = y0; y < y1; y += 2) for (let x = x0 + (y & 2 ? 1 : 0); x < x1; x += 2) p.add(x, y, c, k * (1 - Math.abs(x - mx) / hw) ** 0.7);
+}
+
+/** 時刻 at に 1 回だけ fn を呼ぶための小道具: const once = onces(); once("burst", t >= 0.1, () => …) */
+export function onces() {
+  const done = new Set();
+  return (key, when, fn) => { if (when && !done.has(key)) { done.add(key); fn(); } };
+}
