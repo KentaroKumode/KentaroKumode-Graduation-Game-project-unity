@@ -21,6 +21,8 @@ const INKS = {
   red: ["#3a2424", "#8a3a2c", "#c8553f", "#d9a24a", "#f2ecd8"],
   // 灰燼の王: 灰 (暗い灰 → 明るい灰) と残り火の橙を 1 つの段に (案)
   ash: ["#2e2622", "#6e5a4e", "#c8612a", "#f0a850", "#fff4dc"],
+  // 審判官: 石の灰色から金、 白へ (案)
+  holy: ["#2a2622", "#6a5c48", "#b8923e", "#f0d68a", "#fffbe8"],
 };
 const RAMP = (INKS[flags.ink ?? "warm"]).map(rgb3), BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5], LIGHT_GAIN = 1.6;
 const lum = (R, G, B) => (0.299 * R + 0.587 * G + 0.114 * B) / 255, step = (L) => Math.max(0, Math.min(RAMP.length - 1, Math.round(L * (RAMP.length - 1))));
