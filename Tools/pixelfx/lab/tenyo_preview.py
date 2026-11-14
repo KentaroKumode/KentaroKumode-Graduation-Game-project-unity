@@ -7,7 +7,7 @@ W, H, EX, FLOOR, SC = 480, 270, 240, 196, 2
 src = io.open(os.path.join(PFX, "lab", "moves_board.py"), encoding="utf-8").read()
 exec(src[src.index("def stage():"):src.index("def frames(")])
 base = stage(); html = []
-for gid, name, note in (("sword", "天与の剣", "ヴェスカに Blessing・頭上に Eclipse・集まる粒 → 日食で暗転 → God rays → 暗転が解ける → Holy smite + Ground pound + インパクトフレーム → 白飛び"), ("shield", "天与の盾", "足もとから環が積み上がる → 球が閉じる → 外へ衝撃の輪 → 金の球"), ("ring", "天与の指輪", "盤の上に輪が描かれ宝石が灯る → 落ちて盤を締める → 下半分が金に飛ぶ・光の格子")):
+for gid, name, note in (("sword", "天与の剣", "ヴェスカに Blessing・頭上に Eclipse・集まる粒 → 日食で暗転 → God rays → 暗転が解ける → Holy smite + Ground pound + インパクトフレーム → 白飛び"), ("shield", "天与の盾", "足もとから環が積み上がる → 待機は若干の暗転と中心の光 → 円の絞りが閉じて真っ暗 → インパクトフレーム + 球が閉じる・衝撃の輪・金の球"), ("ring", "天与の指輪", "盤の上に輪が描かれ宝石が灯る → 落ちて盤を締める → 下半分が金に飛ぶ・光の格子")):
     png = os.path.join(OUT, gid + "_sheet.png")
     subprocess.run(["node", "lab/lcd_frames.mjs", "dicebound/tenyo-heavy", png, "--ink", "holy", "--fps", "24", "--opts", json.dumps({"gift": gid})], cwd=PFX, check=True, stdout=subprocess.DEVNULL)
     m = json.load(io.open(png[:-4] + ".json", encoding="utf-8")); sh = Image.open(png).convert("RGBA")
@@ -22,8 +22,19 @@ for gid, name, note in (("sword", "天与の剣", "ヴェスカに Blessing・�
             if t0 <= a <= t1: return v0 + (v1 - v0) * (a - t0) / (t1 - t0)
         return 0
     for i, f in enumerate(fr):
-        d = dark(i / 24.0); b = base.copy() if d <= 0.01 else base.point(lambda v: int(v * (1 - d)))
-        b.paste(f, (0, 0), f); seq.append(b)
+        tt = i / 24.0; d = dark(tt)
+        if gid == "shield": d = 0.3 * min(1, max(0, (tt - 1.05) / 0.35)) if tt < 2.9 + 1.16 else 0.3 * max(0, 1 - (tt - 4.06) / 0.2)   # 盾: 待機の間は若干の暗転 (SHIELD.idleDark)・発動の絵が出たら解ける
+        b = base.copy() if d <= 0.01 else base.point(lambda v: int(v * (1 - d)))
+        b.paste(f, (0, 0), f)
+        if gid == "shield" and 2.9 <= tt < 2.9 + 1.16:   # 盾: 円の絞り。 半径 + 縁 より外を黒く (tenyo-heavy.js の irisR と同じ式)。 閉じ切ったら全部黒
+            a = tt - 2.9; u = min(1, a / 0.98); e = 2 * u * u if u < 0.5 else 1 - 2 * (1 - u) * (1 - u); r = 0 if a >= 0.98 else 290 * (1 - e) ** 1.3
+            m = Image.new("L", (W, H), 0)
+            if r > 0: ImageDraw.Draw(m).ellipse([240 - r - 4, 136 - r - 4, 240 + r + 4, 136 + r + 4], fill=255)
+            keep = None
+            if a >= 0.98: keep = f   # 真っ暗の拍でも、 中心のきらめきは見せる
+            b = Image.composite(b, Image.new("RGB", (W, H), (0, 0, 0)), m)
+            if keep is not None: b.paste(keep, (0, 0), keep)
+        seq.append(b)
     seq += [base.copy()] * 9
     big = [x.resize((W * SC, H * SC), Image.NEAREST) for x in seq]
     big[0].save(os.path.join(OUT, gid + ".gif"), save_all=True, append_images=big[1:], duration=40, loop=0)

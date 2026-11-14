@@ -32,6 +32,16 @@ export const SWORD = {
   white: 1.8 + 0.47 + 0.3,   // インパクトフレームの後、 白飛び
   end: 1.8 + 0.47 + 0.3 + 2.4,
 };
+// 盾の発動の時刻 (待機の終わりからの秒) と、 円の絞り。 絞りの外を黒くするのは、 ゲームの側の処理 (この液晶の色の段には真っ黒が無いので、 絵としては描けない)
+export const SHIELD = {
+  idleDark: 0.3,        // チャージ完了から待機の間の、 画面の暗さ (若干の暗転)
+  close: 0.98,          // 円が閉じ切る (transitions/star-iris の CLOSE)
+  open: 1.16,           // 真っ暗の拍の終わり (star-iris の OPEN0)。 ここでインパクトフレームと、 発動の絵
+  rmax: 290,            // 円の初めの半径 (画面の隅まで届く)
+  rim: 4,               // 金の縁の太さ (黒くするのは、 半径 + この太さ より外)
+};
+/** 絞りの円の半径 (待機の終わりからの秒 a)。 式は star-iris の starAt の半径と同じ。 閉じ切った後は 0。 */
+export function irisR(a) { if (a >= SHIELD.close) return 0; const u = clamp(a / SHIELD.close), e = u < 0.5 ? 2 * u * u : 1 - 2 * (1 - u) * (1 - u); return SHIELD.rmax * Math.pow(1 - e, 1.3); }
 const SUN = [240, 42], SUN_K = 1.15;   // 剣: 頭上の日食の中心と倍率 (元の月の半径 19 → 22。 作者: もう少し小さく)   // 剣のつばの高さ・刃の長さ・盾の球の半径
 
 export const meta = {
@@ -51,11 +61,13 @@ export function create(o) {
   const C = fit(o.palette, 8), R = new Rng(o.seed), gift = o.gift, part = o.part;
   const HELD_T = gift === "sword" ? 3 : T_HELD;   // 待機の 1 周: 剣は 3 秒 (Blessing の 1 周 3 秒・Eclipse は 4 秒を 3 秒に速めて揃える)
   const T0 = part === "charged" ? T_CHARGE : part === "heavy" ? T_CHARGE + HELD_T : 0;   // どこから流すか
-  const TH = T_CHARGE + HELD_T, TP = TH + T_LEAD;   // 発動の始まり・全画面の始まり
+  const OFF = gift === "shield" ? SHIELD.open - 0.25 : 0;   // 盾: 今の発動の絵 (白く燃える 0.25 秒は絞りの間に済むので飛ばす) を、 真っ暗の拍の後ろへずらす
+  const TH = T_CHARGE + HELD_T, TP = TH + T_LEAD + OFF;   // 発動の始まり・全画面の始まり
   const pay = gift === "sword" ? null : MOVES.create(resolveOptions(MOVES.meta, { move: "tenyo-" + gift, seed: o.seed }));
   // 剣の発動の部品 (元の効果を、 式を触らずに置く): God rays (全画面)・落ちる光 (Holy smite)・着地の衝撃 (Ground pound)・インパクトフレーム (全画面)
   // 瓦礫 (跳ねる岩・砂利・欠片) は出さない。 煙は粒を小さく分ける (作者: 瓦礫はいらない・煙は野暮ったいので粒度を下げて)
   const RUBBLE = ["CHUNK", "GRIT", "FLAKE"], FINE = { SMOKE: [0.45, 3], DUST: [0.6, 2] }, FINER = { SMOKE: [0.32, 4], DUST: [0.5, 2] };
+  const shImpact = gift === "shield" ? scaledFx(IMPACT, { K: 1.5, at: [240, 135], delay: TH + SHIELD.open - T0, opts: {} }) : null;
   const sw = gift !== "sword" ? null : {
     rays: scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, opts: {} }),   // 出どころ (0,−170) × 1.5 = 画面の一番上の真ん中
     // 落ちる光と着地の衝撃は、 God rays とインパクトフレームに負けないよう、 大きく・重ねて (作者の指定): 光は 3.6 倍・衝撃は 2.8 倍 + 一拍遅れてもっと大きい 2 つ目
@@ -165,7 +177,8 @@ export function create(o) {
       if (grow >= 1) { oval(p, BOARD[0], BOARD[1], 200 * (0.96 + 0.04 * pulse), 22, 1, C[4], 0.4 + 0.3 * pulse); for (let i = 0; i < 16; i++) { const g = (i / 16) * TAU - ph * TAU / 2; p.dot(BOARD[0] + Math.cos(g) * 200, BOARD[1] + Math.sin(g) * 22, WHITE); } }   // 盤の上に、 締まる先の輪がうっすら
       p.glow(240, y, 60 + 80 * boost, C[4], 0.1 + 0.3 * boost + 0.2 * hot);
     }
-    if (grow >= 1 && gift !== "sword") core(p, ti, boost);   // 剣は、 芯の代わりに日食がある
+    if (grow >= 1 && gift === "shield") { p.glow(BODY[0], BODY[1], 96 + 10 * pulse, C[5], 0.3 + 0.1 * pulse); p.glow(BODY[0], BODY[1], 44 + 8 * pulse, WHITE, 0.4 + 0.15 * pulse); }   // 盾: 中心の光を強調 (作者の指定)
+    if (grow >= 1 && gift !== "sword") core(p, ti, gift === "shield" ? Math.max(boost, 0.5) : boost);   // 剣は、 芯の代わりに日食がある。 盾は、 芯を待機の間も大きく保つ (十字が長く・玉が大きい)
   }
 
   return {
@@ -175,6 +188,11 @@ export function create(o) {
       ps.update(dt);
       if (ecl) ecl.update(dt);
       if (sw) for (const k in sw) sw[k].update(dt);
+      if (shImpact) {
+        shImpact.update(dt);
+        const a = t - TH, r = irisR(a);   // 縁から金の粒がこぼれる (star-iris の、 先からこぼれる粒)
+        if (a > 0 && a < SHIELD.close && r > 6 && r < 280) for (let n = 0; n < 3; n++) if (R.chance(0.5)) { const g = R.range(0, TAU), x = BODY[0] + Math.cos(g) * r, y = BODY[1] + Math.sin(g) * r; if (x > 0 && y > 0 && x < W && y < H) ps.spawn(R.chance(0.6) ? P.STAR : P.MOTE, x, y, -Math.cos(g) * R.range(20, 70), -Math.sin(g) * R.range(20, 70), R.range(0.25, 0.5), R.chance(0.5) ? C[6] : C[5], R.range(0.6, 1.8)); }
+      }
       if (pay && t > TP) { const d = Math.min(dt, t - TP); payT += d; pay.update(d); }
     },
     draw(p) {
@@ -187,7 +205,7 @@ export function create(o) {
         return;
       }
       if (t < TH) { held(p, t - T_CHARGE); return; }
-      const a = t - TH;
+      let a = t - TH;
       if (sw) {
         // 剣: 日食が強まって画面が暗くなる (暗さはゲームの側で掛ける) → God rays が徐々に出る → 暗さが解ける → 印 → 光が落ちる + 着地の衝撃 + インパクトフレーム → 白飛び
         const f = p.fade, hot = clamp(a / 0.5), rk = clamp((a - SWORD.rays[0]) / (SWORD.rays[1] - SWORD.rays[0])), gone = clamp((a - SWORD.land) / 0.5);
@@ -201,6 +219,26 @@ export function create(o) {
         if (wk > 0) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { p.put(x, y, WHITE, wk * wk); p.add(x, y, WHITE, wk * wk); }
         return;
       }
+      if (gift === "shield" && a < SHIELD.open) {
+        // 盾の発動の頭 (transitions/star-iris を、 星ではなく円で): 金の縁の円が、 体の中心へ閉じていく。 外は黒 (ゲームの側)。 閉じ切ると真っ暗の拍、 中心にきらめき
+        const r = irisR(a);
+        if (a < SHIELD.close) {
+          held(p, a, 0, clamp(a / 0.5));
+          p.shade(BODY[0] - r - 6, BODY[1] - r - 6, BODY[0] + r + 6, BODY[1] + r + 6, (x, y, o2) => {
+            const dx = x - BODY[0], dy = y - BODY[1], d = Math.hypot(dx, dy) - r;
+            if (d < 0 || d >= SHIELD.rim) return;
+            const lit = (dx * -0.6 + dy * -0.8) / (r + d + 0.01) > 0.1;   // 光の当たる側 (左上) の縁は白
+            o2.c = d < 1 ? (lit ? WHITE : C[6]) : d < 2 ? C[5] : d < 3 ? C[4] : C[3]; o2.a = 1; o2.l = C[5]; o2.k = 0.3;
+          });
+          if (r < 140) p.glow(BODY[0], BODY[1], r * 0.7 + 8, C[5], 0.35 * (1 - r / 140));
+          ps.draw(p);
+        }
+        const u = a - SHIELD.close;
+        if (u > -0.05 && u < 0.2) glint(p, C, BODY[0], BODY[1], 30 * (1 - Math.abs(u) / 0.2));
+        return;
+      }
+      if (shImpact) shImpact.draw(p);   // インパクトフレームを下に敷き、 今の発動の絵をその上に
+      a -= OFF;
       if (a < T_LEAD) {
         // 溜め: 白く燃える (0.25 秒) → 落ちる / 閉じる (0.1 秒) → 白 (0.1 秒〜)
         const hot = clamp(a / 0.25), go = clamp((a - 0.25) / 0.1), f = p.fade;
