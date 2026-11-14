@@ -19,6 +19,7 @@ import * as IMPACT from "../impacts/impact-frame.js";
 import * as RESURRECT from "./tenyo-wings.js";   // holy/resurrection の写し (羽根を細かく)
 import { fineFeathers } from "./_feather.js";
 import * as DSHIELD from "../holy/divine-shield.js";
+import * as MAGIC from "../arcane/magic-circle-cast.js";
 import * as FEATHERS from "../holy/feather-burst.js";
 import { Feathers } from "../holy/_lib.js";
 import { glint } from "./chevalier-charge.js";
@@ -49,6 +50,14 @@ export const SHIELD = {
 };
 /** 絞りの円の半径 (待機の終わりからの秒 a)。 式は star-iris の starAt の半径と同じ。 閉じ切った後は 0。 */
 export function irisR(a) { if (a >= SHIELD.close) return 0; const u = clamp(a / SHIELD.close), e = u < 0.5 ? 2 * u * u : 1 - 2 * (1 - u) * (1 - u); return SHIELD.rmax * Math.pow(1 - e, 1.3); }
+// 指輪の発動の時刻 (待機の終わりからの秒)
+export const RING = {
+  idleDark: 0.5,                        // チャージ完了から待機の間の、 画面の暗さ
+  dark: [[0, 0.5], [1.0, 0.5], [1.3, 0]],   // 発動の間の暗さ: God rays の間は保ち、 インパクトフレームで解ける
+  rays: [0, 1.0],                       // God rays が出て来る区間
+  impact: 1.0,                          // インパクトフレーム
+  white: 1.3,                           // 白飛び。 ここから、 今の着弾の絵 (輪が落ちて盤を締める) と Magic circle cast
+};
 const SUN = [240, 42], SUN_K = 1.15;   // 剣: 頭上の日食の中心と倍率 (元の月の半径 19 → 22。 作者: もう少し小さく)   // 剣のつばの高さ・刃の長さ・盾の球の半径
 
 export const meta = {
@@ -69,11 +78,17 @@ export function create(o) {
   const HELD_T = gift === "sword" ? 3 : T_HELD;   // 待機の 1 周: 剣は 3 秒 (Blessing の 1 周 3 秒・Eclipse は 4 秒を 3 秒に速めて揃える)
   const T0 = part === "charged" ? T_CHARGE : part === "heavy" ? T_CHARGE + HELD_T : 0;   // どこから流すか
   const OFF = gift === "shield" ? SHIELD.open - 0.25 : 0;   // 盾: 今の発動の絵 (白く燃える 0.25 秒は絞りの間に済むので飛ばす) を、 真っ暗の拍の後ろへずらす
-  const TH = T_CHARGE + HELD_T, TP = TH + T_LEAD + OFF;   // 発動の始まり・全画面の始まり
+  const TH = T_CHARGE + HELD_T, TP = gift === "ring" ? TH + RING.white : TH + T_LEAD + OFF;   // 発動の始まり・全画面の始まり
   const pay = gift !== "ring" ? null : MOVES.create(resolveOptions(MOVES.meta, { move: "tenyo-" + gift, seed: o.seed }));
   // 剣の発動の部品 (元の効果を、 式を触らずに置く): God rays (全画面)・落ちる光 (Holy smite)・着地の衝撃 (Ground pound)・インパクトフレーム (全画面)
   // 瓦礫 (跳ねる岩・砂利・欠片) は出さない。 煙は粒を小さく分ける (作者: 瓦礫はいらない・煙は野暮ったいので粒度を下げて)
   const RUBBLE = ["CHUNK", "GRIT", "FLAKE"], FINE = { SMOKE: [0.45, 3], DUST: [0.6, 2] }, FINER = { SMOKE: [0.32, 4], DUST: [0.5, 2] };
+  // 指輪の発動の部品: God rays・インパクトフレーム・arcane/magic-circle-cast (床に円が描かれ、 文字が 1 つずつ灯り、 光って、 光の柱が立って砕ける) を金色で、 こちらの盤の上に
+  const rg = gift !== "ring" ? null : {
+    rays: scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, opts: {} }),
+    impact: scaledFx(IMPACT, { K: 1.5, at: [240, 135], delay: TH + RING.impact - T0, opts: {} }),
+    circle: scaledFx(MAGIC, { K: 2.6, at: [BOARD[0], BOARD[1] + 4], speed: 1.6, delay: TH + RING.white - T0, glow: 0.6, opts: { palette: GOLD } }),
+  };
   const shRays = gift === "shield" ? scaledFx(GODRAYS, { K: 1.5, at: [240, 255], glow: 0.4, opts: {} }) : null;
   // 盾の発動の後: holy/resurrection (注ぐ光・光の翼が開く・光輪・大きな羽ばたき・羽根に散る) を、 敵の体の大きさで重ねる (作者: 発動後が弱い)。 光が注ぐ頭は飛ばして、 翼が開く所から
   const shWings = gift === "shield" ? scaledFx(RESURRECT, { K: 2.6, at: [240, 196], start: 0.95, delay: TH + SHIELD.open + 0.1 - T0, glow: 0.6, opts: { palette: GOLD, wings: false, halo: false } }) : null;   // 翼と光輪は出さない (作者: 消してみて)。 残るのは、 注ぐ光・床の光・きらめき
@@ -181,14 +196,15 @@ export function create(o) {
         for (let i = 0; i < 18; i++) { const a = (ph + i / 18) % 1, g = rand(i, 5) * TAU, rr = SR * (0.5 + 0.5 * rand(i, 7)); p.dot(240 + Math.cos(g) * rr, BODY[1] + SR - a * SR * 2, a < 0.5 ? WHITE : C[6], 1 - a); }   // 昇る粒
         oval(p, 240, BODY[1], SR + 2, SR + 2, 2, C[5], 0.5 + 0.3 * pulse + 0.4 * hot); p.glow(240, BODY[1], SR * (1.1 + 0.6 * boost), C[4], 0.14 + 0.1 * pulse + 0.3 * boost + 0.3 * hot); }
     } else {
-      const a1 = TAU * clamp(grow / 0.7), y = RING_Y, rx = 216, ry = 13.5, hotc = hot > 0.4 || boost > 0.3;
-      oval(p, 240, y + 3, rx, ry, 2, C[2], 1, -Math.PI / 2, -Math.PI / 2 + a1); oval(p, 240, y, rx, ry, 4, hotc ? WHITE : C[5], 1, -Math.PI / 2, -Math.PI / 2 + a1); oval(p, 240, y - 2, rx, ry, 1, WHITE, 1, -Math.PI / 2, -Math.PI / 2 + a1);
-      if (grow < 0.7) { const g = -Math.PI / 2 + a1; p.glow(240 + Math.cos(g) * rx, y + Math.sin(g) * ry, 12, WHITE, 0.8); }   // 輪を描いて走る頭
-      else {
-        for (let i = 0; i < 36; i++) { const g = (i / 36) * TAU + ph * TAU / 3; p.dot(240 + Math.cos(g) * (rx - 8), y + Math.sin(g) * (ry - 1.5), i % 3 ? C[3] : WHITE); }
-        gems.forEach((g, i) => { const on = clamp((grow - 0.7 - i * 0.03) / 0.05); if (on <= 0) return; const x = 240 + Math.cos(g) * rx, yy = y + Math.sin(g) * ry; diamond(p, x, yy, 4, WHITE, C[3]); p.glow(x, yy, 8 + 5 * pulse + 14 * boost, C[6], 0.5 + 0.3 * boost); });
-        for (let i = 0; i < 24; i++) { const g = (i / 24) * TAU, x = 240 + Math.cos(g) * rx, yy = y + Math.sin(g) * ry, h = (10 + 14 * rand(i, 9)) * (0.6 + 0.4 * Math.sin(ph * TAU + i)); if (Math.sin(g) > -0.2) beam(p, C, x, yy, x, yy + h, 2, 1, 0.22 + 0.3 * hot); }   // 輪から下へ垂れる光
+      // チャージ (作者の指定): 中心からリングが拡大する (前半) → 宝石が 1 つずつ灯りながら、 輪ごと回って止まる (後半)。 待機 (grow = 1) は、 止まった姿 = 今までの待機の絵
+      const ex = grow < 1 ? ease.outCubic(clamp(grow / 0.5)) : 1, y = RING_Y, rx = 216 * ex, ry = 13.5 * ex, hotc = hot > 0.4 || boost > 0.3;
+      const rot = grow < 1 ? -(1 - ease.outCubic(clamp((grow - 0.5) / 0.5))) * TAU * 0.75 : 0;
+      if (rx > 2) { oval(p, 240, y + 3, rx, ry, 2, C[2]); oval(p, 240, y, rx, ry, 4, hotc || grow < 0.5 ? WHITE : C[5]); oval(p, 240, y - 2, rx, ry, 1, WHITE); }
+      if (grow >= 0.5) {
+        for (let i = 0; i < 36; i++) { const g = (i / 36) * TAU + ph * TAU / 3 + rot; p.dot(240 + Math.cos(g) * (rx - 8), y + Math.sin(g) * (ry - 1.5), i % 3 ? C[3] : WHITE); }
+        gems.forEach((g0, i) => { const on = (grow - 0.5 - i * 0.055) / 0.04; if (on <= 0) return; const g = g0 + rot, x = 240 + Math.cos(g) * rx, yy = y + Math.sin(g) * ry, fresh = grow < 1 ? clamp(1 - (on - 1) / 3) : 0; diamond(p, x, yy, 4, WHITE, C[3]); p.glow(x, yy, 8 + 5 * pulse + 14 * boost + 16 * fresh, fresh > 0.3 ? WHITE : C[6], 0.5 + 0.3 * boost + 0.4 * fresh); });
       }
+      if (grow >= 1) for (let i = 0; i < 24; i++) { const g = (i / 24) * TAU, x = 240 + Math.cos(g) * rx, yy = y + Math.sin(g) * ry, h = (10 + 14 * rand(i, 9)) * (0.6 + 0.4 * Math.sin(ph * TAU + i)); if (Math.sin(g) > -0.2) beam(p, C, x, yy, x, yy + h, 2, 1, 0.22 + 0.3 * hot); }   // 輪から下へ垂れる光
       if (grow >= 1) { oval(p, BOARD[0], BOARD[1], 200 * (0.96 + 0.04 * pulse), 22, 1, C[4], 0.4 + 0.3 * pulse); for (let i = 0; i < 16; i++) { const g = (i / 16) * TAU - ph * TAU / 2; p.dot(BOARD[0] + Math.cos(g) * 200, BOARD[1] + Math.sin(g) * 22, WHITE); } }   // 盤の上に、 締まる先の輪がうっすら
       p.glow(240, y, 60 + 80 * boost, C[4], 0.1 + 0.3 * boost + 0.2 * hot);
     }
@@ -204,6 +220,7 @@ export function create(o) {
       ps.update(dt);
       if (ecl) ecl.update(dt);
       if (sw) for (const k in sw) sw[k].update(dt);
+      if (rg) for (const k in rg) rg[k].update(dt);
       if (shImpact) {
         shImpact.update(dt); shRays.update(dt); shWings.update(dt); shBubble.update(dt); shFeathers.update(dt);
         const a = t - TH, r = irisR(a);   // 縁から金の粒がこぼれる (star-iris の、 先からこぼれる粒)
@@ -232,6 +249,23 @@ export function create(o) {
         p.fade = f;
         sw.impact.draw(p); sw.slam2.draw(p); sw.slam.draw(p); sw.smite.draw(p);   // インパクトフレームは下に敷き、 落ちる光と衝撃を上に
         const wt = a - SWORD.white, wk = wt < 0 ? 0 : clamp(1 - (wt - 0.15) / 0.3);
+        if (wk > 0) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { p.put(x, y, WHITE, wk * wk); p.add(x, y, WHITE, wk * wk); }
+        return;
+      }
+      if (rg) {
+        // 指輪: 待機の暗さのまま God rays が出て来る → インパクトフレーム → 白飛び → 輪が落ちて盤を締める (moves の tenyo-ring) + 盤の上に金の魔法陣 (magic-circle-cast)
+        const f = p.fade, b = a - RING.white;
+        p.fade = f * clamp((a - RING.rays[0]) / (RING.rays[1] - RING.rays[0])) * (1 - clamp((a - RING.impact) / 0.25)); if (p.fade > 0) rg.rays.draw(p);
+        p.fade = f;
+        if (a < RING.white) held(p, a, 0, clamp(a / 0.5));
+        rg.impact.draw(p);
+        if (b >= 0) {
+          rg.circle.draw(p); pay.draw(p);
+          const q = (b - 0.26) / 0.35;   // 輪が盤に着いて締まる瞬間 (moves の tenyo-ring の 0.26 秒): 下半分が白く飛ぶ
+          if (q > 0 && q < 1) for (let y = 150; y < H; y++) for (let x = 0; x < W; x++) { const k = (1 - q) * (1 - q) * clamp((y - 150) / 60); p.put(x, y, WHITE, k); p.add(x, y, WHITE, k); }
+          for (let i = 0; i < 10; i++) { const x = 60 + i * 40, q2 = (b - 0.3 - i * 0.02) / 0.9; if (q2 > 0 && q2 < 1) beam(p, C, x, 250, x, 250 - 230 * ease.outCubic(Math.min(1, q2 * 3)), 3, 1, (1 - q2) * 0.8); }   // 盤から上へ立つ光の格子 (縛られる)
+        }
+        const wk = b < 0 ? 0 : clamp(1 - (b - 0.15) / 0.3);
         if (wk > 0) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { p.put(x, y, WHITE, wk * wk); p.add(x, y, WHITE, wk * wk); }
         return;
       }
