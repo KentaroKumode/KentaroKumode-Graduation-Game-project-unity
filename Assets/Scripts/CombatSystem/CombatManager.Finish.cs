@@ -38,6 +38,20 @@ namespace CombatSystem
         /// <summary>仕込み刃の反撃倍率 (2026-09-22: 1 → 5)。 無効化した被ダメの何倍を軽減不可で返すか。</summary>
         public const int DaggerReflectMultiplier = 5;
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        /// <summary>[実機の確認用・2026-11-14] 今の戦闘を、 決着の処理 (OnCombatEnd・報酬・計装) を通さずに打ち切る。
+        /// 呼ぶのは <c>UI.Game2D.Battle.QaBattle.Restart</c> だけ (敵を替えて戦闘を始め直す前)。 判断待ちのターンも捨てる。</summary>
+        public void QaAbortCombat()
+        {
+            if (!isCombatActive) return;
+            _activeTurn = null; _interactiveTurn = false;
+            isCombatActive = false;
+            EndBossDown();
+            PassiveSkillManager.Instance?.EndCombat();
+            Debug.Log("[QaBattle] 戦闘を打ち切った (決着の処理は通さない)");
+        }
+#endif
+
         private void FinishCombat()
         {
             // **冪等にする** (2026-09-20)。 呼び出し口が 7 箇所あり、 どれも
