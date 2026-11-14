@@ -2,7 +2,8 @@
 // 元の効果は横スクロールの小さい人物に合わせた大きさ (高さ 30〜60 ドット) で、 そのまま置くと小さすぎる (作者の指摘)。 拡大はしない (ドットの大きさが揃わなくなる) ──
 // 大きい形を、 はじめからこの大きさで描く。 粒 (火花・残り火・煙・灰・星) は core の Particles の種類を、 技ごとに組み合わせて出す。
 // 形の描き方は、 元の効果から学んだ物: 光の槍 = transitions/slash-wipe の一閃・炸裂 = impacts/crit-hit の星形・印 = shadow/hex-sigil・三日月 = melee の斬撃・輪 = fire/fire-ring の band。
-import { clamp, TAU, WHITE } from "../../core/index.js";
+import { clamp, smooth, ease, TAU, WHITE } from "../../core/index.js";
+import { smear, trace, glowAlong } from "../melee/_lib.js";
 
 export const W = 480, H = 270, CHEST = [240, 130], FOOT = [240, 196], HEAD = [240, 60], BOARD = [240, 247];
 
@@ -132,4 +133,34 @@ export function lens(p, C, x0, y0, rx, ry, k = 1) {
 /** 小さな菱形 (宝石・楔の頭)。 */
 export function diamond(p, x0, y0, r, c, rim) {
   for (let dy = -r; dy <= r; dy++) for (let dx = -(r - Math.abs(dy)); dx <= r - Math.abs(dy); dx++) p.dot(x0 + dx, y0 + dy, Math.abs(dx) + Math.abs(dy) === r ? rim : c);
+}
+
+/**
+ * 大きな斬撃 (melee/sword-slash の作りを、 この画面の大きさで)。 s = melee/_lib の swing に { span, W, t0, sweep, hold, trail, ramp (暗い → 白の 7 色) }。
+ * 元の slash() との違いは塗りだけ: 元は太さ 12 ドットで、 色の段を幅の割合で決めている。 それを太くすると、 同じ幅の帯が並ぶ縞になる (作者: 等比グラデで安っぽい)。
+ * 元の見え方は「外の縁の白が 1〜2 ドット・淡い胴が広い・内の縁だけ暗い 2 ドット」なので、 **縁はドットの幅で決める**:
+ *   外の縁 = 白 2.5 ドット / 胴 = 淡い色 (内寄りの 4 割は 1 段深い) / 内の縁 = 暗い色 2 ドット。
+ * 時間が経つと 1 段ずつ冷め (白が消え、 胴が深くなる)、 尾 (後ろ 1/4) も 1 段冷める。 尾は網点でほどける。 頭のすぐ後ろが一番太いのは元と同じ。
+ */
+export function bladeSlash(p, s, t, half = 0) {
+  const u = t - s.t0;
+  if (u < 0) return;
+  const R = s.ramp, n = R.length, LV = [R[n - 1], R[n - 2], R[n - 3], R[n - 4], R[Math.max(0, n - 6)]];   // 白・淡・中・深・暗
+  const life = s.sweep + s.hold + s.trail, head = ease.outExpo(clamp(u / s.sweep)), tail = smooth(s.sweep + s.hold, life, u), age = clamp(u / life);
+  const U = s.span * head, T = s.span * tail, W = s.W * (1 - tail * 0.55), cool = (age > 0.3 ? 1 : 0) + (age > 0.55 ? 1 : 0) + (age > 0.8 ? 1 : 0);
+  if (tail < 1 && U - T > 0.01) {
+    smear(p, s, T, U, W, (uu, r, out) => {
+      const v = (uu - T) / (U - T), w = W * Math.pow(Math.sin(Math.PI * Math.pow(v, 2.2)), 0.6);
+      if (w < 0.35) return;
+      const d = s.R - r;   // 外の縁からのドット数
+      if (d < 0 || d > w) return;
+      const lv = d < 2.5 ? 0 : d > w - 2 && w > 6 ? 3 : d < 2.5 + (w - 4.5) * 0.6 ? 1 : 2;
+      out.c = LV[Math.min(4, lv + cool + (v < 0.25 ? 1 : 0))];
+      out.a = Math.min(1, v / 0.4);
+    }, half);
+    glowAlong(p, s, s.R - W * 0.4, T, U, 6 + W * 0.5, R[n - 3], (uu) => 0.24 * (1 - age) * ((uu - T) / (U - T)), half, 0.3);
+  }
+  // 縁の点線: 斬撃が通り過ぎた所に残り、 しばらくして消える (元と同じ。 残る長さは s.linger 秒・無ければ元の trail + 0.2)。 大きい斬撃では、 外の縁と、 そのすぐ内の 2 本
+  const th = 0.85 * (1 - clamp((u - s.sweep - s.hold) / ((s.linger ?? 0) + s.trail + (s.linger ? 0 : 0.2))));
+  if (tail > 0.02 && th > 0) { trace(p, s, s.R - 0.5, 0, T, R[n - 4], (uu) => th * (0.4 + 0.6 * uu / s.span), half); if (s.linger && s.W > 8) trace(p, s, s.R - 2.5, 0, T, R[2], (uu) => th * 0.7 * (0.4 + 0.6 * uu / s.span), half, 1.2); }
 }

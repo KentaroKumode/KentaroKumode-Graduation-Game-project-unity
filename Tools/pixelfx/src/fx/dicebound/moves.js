@@ -16,13 +16,13 @@
 // The shield bubble is this repository's holy/divine-shield, drawn as is; the shapes follow its slash, smite, ground-slam and fire effects
 // (after Sprite Fusion's open-source effects, https://www.spritefusion.com/pixel-art-vfx), MIT License, Copyright (c) 2026 Hugo Duprez.
 import { Particles, P, Rng, fit, clamp, ease, noise, rand, sparkle, TAU, WHITE } from "../../core/index.js";
-import { through, slash as cutSlash, slashEnd, shavings, onSwing, travel } from "../melee/_lib.js";
+import { through, slashEnd, shavings, onSwing, travel } from "../melee/_lib.js";
 import * as SHIELD from "../holy/divine-shield.js";
 import { flameTongue, LAYERS, BIG_LAYERS } from "../fire/_lib.js";
 import { GOLD } from "../holy/_lib.js";
 import { VIOLET } from "./vesca-charge.js";
 import { STEEL, glint } from "./chevalier-charge.js";
-import { W, H, CHEST, FOOT, BOARD, beam, oval, crescent, slash, slashAt, lens, diamond, wash, onces } from "./_kit.js";
+import { W, H, CHEST, FOOT, BOARD, beam, oval, crescent, slash, slashAt, lens, diamond, wash, onces, bladeSlash } from "./_kit.js";
 
 const FIRE = ["#4a1712", "#8a1f17", "#c9281f", "#f2561d", "#ff8a2a", "#ffc23d", "#fff3a6", "#ffffff"];
 const PAL = { relic: VIOLET, tenyo: GOLD, king: FIRE, judge: GOLD, chev: STEEL };
@@ -60,11 +60,14 @@ export function create(o) {
   // 斬撃 (melee/sword-slash・spear-sweep の作り: 傾いた円の弧を、 頭が一気に走り、 尾が遅れて追う。 頭のすぐ後ろが一番太く、 外の縁が白く、 時間と尾へ向けて色が冷める。
   //   一拍遅れの細い残像・通った跡の点線・切っ先のきらめき・頭に乗る光・切っ先から飛ぶ火花・弧の外へ飛ぶ削り屑)。 through(通る点, 向き, 回る向き, 半径, 弧の長さ, 通る点が弧の何割目か)
   const RAMP = fit(o.palette ?? PAL[move.split("-")[0]], 7);
-  const mk = (x, y, th, dir, Rr, span, at, Wd, t0, sweep = 0.07) => { const A = through(x, y, th, dir, Rr, span, at, { W: Wd, t0, sweep, hold: 0.06, trail: 0.26, ramp: RAMP }); return { A, E: { ...A, R: Rr * 0.8, W: Wd * 0.38, t0: t0 + 0.02, hold: 0.03, trail: 0.2, ramp: RAMP.slice(0, 6) }, end: slashEnd(A) }; };
+  const mk = (x, y, th, dir, Rr, span, at, Wd, t0, sweep = 0.07) => { const A = through(x, y, th, dir, Rr, span, at, { W: Wd, t0, sweep, hold: 0.12, trail: 0.5, linger: 0.75, ramp: RAMP }); return { A, E: { ...A, R: Rr - Wd * 0.75, W: Wd * 0.38, t0: t0 + 0.017, hold: 0.08, trail: 0.42, linger: 0.75, ramp: RAMP.slice(0, 6) }, end: slashEnd(A) }; };
+  // 残像 (E): 元の sword-slash では、 本体の一番太い所の内側 3/4 にあって、 本体の下に描かれる ── 太い所では隠れ、 細くなる頭と尾でだけ内側に覗く (刃の内側の光)。
+  //   半径の割合 (元は 33/42) で置くと、 大きい斬撃では 70 ドットも離れて「2 つ目の斬撃」に見えた (作者の指摘)。 太さの割合で置く。
+  // 残る時間: 元は 30 コマ/秒で、 斬撃が 10 コマほど残って冷め、 縁の点線がさらに残る。 1 秒 8 コマで同じ長さ (0.39 秒) だと 3 コマで消える (作者: 一瞬で消える) ── hold / trail を約 2 倍・点線 (linger) を 0.75 秒に
   // 遺物・攻撃: 左上から右下へ、 盤を通る大きな一太刀
-  const CUTS = move === "relic-strike" ? [mk(250, 226, 0.3, -1, 340, 1.3, 0.6, 46, 0)]
+  const CUTS = move === "relic-strike" ? [mk(250, 224, 0.34, -1, 520, 0.86, 0.58, 24, 0)]
     // 天与の剣: ×に交わる 2 太刀と、 盤を横に払う低い一太刀 (spear-sweep の「低く平たい払い」)
-    : move === "tenyo-sword" ? [mk(240, 196, 0.42, -1, 380, 1.4, 0.58, 60, 0), mk(240, 196, Math.PI - 0.42, 1, 380, 1.4, 0.58, 60, 0.18), mk(240, 246, 0, -1, 1100, 0.44, 0.5, 40, 0.38, 0.09)] : [];
+    : move === "tenyo-sword" ? [mk(240, 192, 0.52, -1, 700, 0.74, 0.55, 32, 0), mk(240, 192, Math.PI - 0.52, 1, 700, 0.74, 0.55, 32, 0.18),   /* 半径を大きく・弧を短く (小さい半径で長い弧だと、 斜めの一太刀ではなく U 字になる) */ mk(240, 246, 0, -1, 1100, 0.44, 0.5, 26, 0.38, 0.09)] : [];
   const THR = [[0, 196, false], [0.09, 286, false], [0.19, 240, true]];   // 突き: [始まる秒, 届く x, 決めの一突きか]
   const gems = Array.from({ length: 8 }, (_, i) => (i / 8) * TAU + 0.2);
   const curtain = Array.from({ length: 46 }, () => ({ g: R.range(0, TAU), h: R.range(34, 96), d: R.range(0, 0.1) }));
@@ -74,7 +77,7 @@ export function create(o) {
       CUTS.forEach((c, i) => {
         const A = c.A, big = move === "tenyo-sword", u = t - A.t0;
         // 刃の風が、 通った所の床から塵と欠片を巻き上げる (spear-sweep の wake)。 盤の高さを通る間だけ
-        if (u > 0 && u < A.sweep * 1.2) { const U = A.span * ease.outExpo(clamp(u / A.sweep)), U0 = A.span * ease.outExpo(clamp((u - dt) / A.sweep)); for (let q = U0; q < U; q += 0.012) { const tr = travel(A, q); if (tr.y < 205 || tr.x < 0 || tr.x > W) continue; ps.spawn(P.SMOKE, tr.x, tr.y - R.range(0, 3), tr.dx * R.range(30, 90), -R.range(6, 24), R.range(0.5, 0.9), C[2], R.range(4, 8), R.range(0, 0.05)); if (R.chance(0.7)) ps.spawn(P.FLAKE, tr.x, tr.y, tr.dx * R.range(60, 160) + R.range(-30, 30), -R.range(60, 220), R.range(0.5, 1), R.pick([C[4], C[5], C[3]]), R.range(1, 2.2)); } }
+        if (u > 0 && u < A.sweep * 1.2) { const U = A.span * ease.outExpo(clamp(u / A.sweep)), U0 = A.span * ease.outExpo(clamp((u - dt) / A.sweep)); for (let q = U0; q < U; q += 0.012) { const tr = travel(A, q); if (tr.y < 205 || tr.x < 0 || tr.x > W) continue; if (R.chance(0.7)) ps.spawn(P.FLAKE, tr.x, tr.y, tr.dx * R.range(60, 160) + R.range(-30, 30), -R.range(60, 220), R.range(0.5, 1), R.pick([C[4], C[5], C[3]]), R.range(1, 2.2)); } }
         once("land" + i, u >= A.sweep, () => {
           // 切っ先から先へ飛ぶ火花・弧の外へ飛ぶ削り屑 (sword-slash)・きらめき
           for (let k = 0; k < (big ? 46 : 30); k++) { const a = Math.atan2(c.end.dy, c.end.dx) + R.range(-0.5, 0.5), v = R.range(180, 560); ps.spawn(P.SPARK, c.end.x, c.end.y, Math.cos(a) * v, Math.sin(a) * v, R.range(0.15, 0.4)); }
@@ -140,7 +143,7 @@ export function create(o) {
         for (const c of CUTS) {
           const A = c.A, u = t - A.t0;
           if (u < 0) continue;
-          cutSlash(p, c.E, t); cutSlash(p, A, t);
+          bladeSlash(p, c.E, t); bladeSlash(p, A, t);
           // 切っ先のきらめき・頭に乗る光
           const g = u - A.sweep * 0.6;
           if (g > 0 && g < 0.24) sparkle(p, c.end.x, c.end.y, (big ? 30 : 20) * ease.outBack(Math.min(1, g / 0.05)) * (1 - g / 0.24), RAMP[5], RAMP[3], 0.7);
