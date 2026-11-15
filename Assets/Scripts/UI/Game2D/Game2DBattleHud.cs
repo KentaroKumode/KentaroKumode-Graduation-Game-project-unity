@@ -59,7 +59,8 @@ namespace UI.Game2D
         private const int HandY = 18, HandStep = 28, HandPad = 6;
         private static readonly RectInt CReroll = new RectInt(5, 5, 56, 20), CAuto = new RectInt(63, 5, 40, 20),
             CItem = new RectInt(5, 27, 24, 20), CFlee = new RectInt(31, 27, 36, 20), CGo = new RectInt(69, 27, 34, 20);
-        private RectTransform _ports, _ctl, _hand, _tip, _drag, _role, _inv, _gauge; private Texture2D _tp, _tc, _th, _tt2, _td, _trl, _tinv, _tg;
+        private RectTransform _ports, _ctl, _hand, _tip, _drag, _role, _inv, _gauge, _relicBar; private Texture2D _tp, _tc, _th, _tt2, _td, _trl, _tinv, _tg, _trb;
+        private static readonly RectInt RelicR = R(BattleHudLayout.RelicBar);
         private int _portsTexW = -1;
 
         /// <summary>端子のアイコン (16×16・行優先・左上から・0 = 透明 / 1 = 暗 / 2 = 中 / 3 = 明)。 無ければ null。</summary>
@@ -126,7 +127,8 @@ namespace UI.Game2D
 
         private void OnDestroy()
         {
-            foreach (var t in new[] { _tr, _ts, _tp, _tc, _th, _tt2, _td, _trl, _tinv, _tg }) if (t != null) Destroy(t);
+            foreach (var t in new[] { _tr, _ts, _tp, _tc, _th, _tt2, _td, _trl, _tinv, _tg, _trb }) if (t != null) Destroy(t);
+            if (_relicHooked) { ItemSystem.PassiveSkills.RelicFireProbe.OnRelicFired -= OnRelicFired; _relicHooked = false; }
             _busyDrag = false;
         }
 
@@ -140,6 +142,7 @@ namespace UI.Game2D
             if (_hand == null) _hand = Make("hand", Hand, out _th);
             if (_role == null) _role = Make("role", RoleR, out _trl);
             if (_gauge == null) _gauge = Make("gauge", Gauge, out _tg);
+            if (_relicBar == null) _relicBar = Make("relics", RelicR, out _trb);
             if (_top != null) Show(_top, false);      // 上の帯は 2026-11-15 に無くした (シーンに残っている部品は出さない)
             if (_inv == null) _inv = Make("inv", InvR, out _tinv);
             if (_tip == null) _tip = Make("tip", new RectInt(0, 0, TipW, TipH), out _tt2);
@@ -152,7 +155,7 @@ namespace UI.Game2D
         //   Game2DBattleFx.GuiStowed の間、 入りと同じばね (0.25 秒前後で収まる) で、 左の列 (充電と激化を含む) は左へ・予告の枠・役の板・手札は右へ、 画面の外まで滑らせる
         //   (動かすのは位置だけ・整数 dot・拡大縮小しない)。 下の資源バーは Game2DHud が同じ値 (StowValue) で下へ滑らせる。 格納の間は操作を受けない。
         /// <summary>格納で動かす距離 (dot): 左の列 (出目が 9 個の時の幅 260 + 余白) / 予告の枠と役の板 / 手札 / 下の資源バー (Game2DHud)。</summary>
-        public const int StowLeft = 270, StowRight = 120, StowHand = 170, StowBottom = 56;
+        public const int StowLeft = 270, StowRight = 120, StowHand = 170, StowBottom = 56, StowRelic = 24;
         /// <summary>格納のばねの値 (0 = 出ている / 1 = 画面の外)。 dist = 動かす距離 (行き過ぎを dist に対して 3 dot 以内に収める)。</summary>
         public float StowValue(float dist) => _spInit ? _spS.Value(dist) : 0f;
         /// <summary>格納に向かっている、 または まだ戻り切っていない (この間は操作を受けない)。</summary>
@@ -181,6 +184,8 @@ namespace UI.Game2D
             _role.anchoredPosition = new Vector2(RoleR.x + Mathf.Round((1f - _spR.Value(120f)) * 120f) + sR, -RoleR.y);      // 役の板は右上 (2026-11-15): 予告の枠と同じばね
             _gauge.anchoredPosition = new Vector2(Gauge.x - inL, -Gauge.y);
             _inv.anchoredPosition = new Vector2(InvR.x - inL, -InvR.y);
+            // 秘宝の列 (#320): 入りは左の列と同じばね・大技の発動の間は上へ格納する (上の辺が近い)
+            _relicBar.anchoredPosition = new Vector2(RelicR.x - inL, -RelicR.y + Mathf.Round(StowValue(StowRelic) * StowRelic));
             if (_spL.x < 0.95f || Stowed) { Show(_tip, false); CancelDrag(); }      // 説明の帯・つかみは、 パネルが収まっている間だけ (格納の間も出さない)
         }
 
@@ -195,12 +200,14 @@ namespace UI.Game2D
             if (_slide > 0.95f && !Stowed && !Game2DModal.Active && !PointerBusy && !Game2DTutorial.Blocking && Input.GetKeyDown(KeyCode.I)) OpenInventory();
             Vector2 d = default; bool hasDot = ptr && Game2DPointer.TryDot(screen, out d);
             DeckPointer(hasDot, d);
+            RelicPointer(hasDot, d);
             // 引いてくる動きの間は毎フレーム描き直す
             if (sim.boardSerial != _dealSerial) { _dealSerial = sim.boardSerial; _dealT0 = Time.unscaledTime; }
             bool dealing = Time.unscaledTime - _dealT0 < DealTime(sim.board.Count);
             int ehp = fx != null ? fx.EnemyHp : 0, ver = sim.version * 31 + ehp * 7 + sim.charge
                 + (_hsKnown ? Mathf.RoundToInt(_hs.critRate * 1000f) * 131 + _hs.attack * 17 + _hs.outgoingPct * 7 + _hs.defense * 3 + _hs.pen + _hs.consOutgoingPct * 7919 + _hs.toilCutPct * 104729 : 0)
-                + 977 + DeckCountsHash() + sim.DiceCount * 7577 + (dealing ? Time.frameCount * 7919 : 0);
+                + 977 + DeckCountsHash() + sim.DiceCount * 7577 + (dealing ? Time.frameCount * 7919 : 0)
+                + RelicVersion();
             if (ver != _drawn) { _drawn = ver; Redraw(); }
         }
 
@@ -252,7 +259,9 @@ namespace UI.Game2D
             if (pw != _portsTexW) { if (_tp != null) Destroy(_tp); _tp = null; _portsTexW = pw; _ports.sizeDelta = new Vector2(pw, Ports.height); }
             Ensure(ref _tp, _ports, new RectInt(Ports.x, Ports.y, pw, Ports.height)); Ensure(ref _tc, _ctl, Ctl); Ensure(ref _th, _hand, Hand);
             DrawPorts(_tp, pw); DrawCtl(_tc); DrawHand(_th); bool tip = DrawTip();
+            if (!tip) tip = DrawRelicTip();      // 秘宝の列に乗っている時 (#320)
             Show(_ports, true); Show(_ctl, true); Show(_hand, true); Show(_tip, tip && _slide > 0.95f && !Stowed);
+            Ensure(ref _trb, _relicBar, RelicR); Show(_relicBar, DrawRelics(_trb));
             DrawRight(_tr); DrawGauge(_tg); Show(_gauge, true);
             Ensure(ref _ts, _stat, Stat); DrawStat(_ts);
             Ensure(ref _trl, _role, RoleR); Show(_role, DrawRole(_trl));
@@ -1004,6 +1013,149 @@ namespace UI.Game2D
             p.Text(esc, 8, 21, Dim);
             if (live) for (int i = 0; i < 5; i++) DrawLamp(p, 84 + i * 10, 22, 10, i < sim.Stage, Atk);
             p.Apply(t);
+        }
+
+        // ── 秘宝の列 (#320・2026-11-15・作者「出す。 スレスパ式で左上に表示でもいいかも」) ──
+        //   持っている秘宝 (武器・消耗品を除くランの持ち物) のアイコン (Resources/Icons/Items/<id>.png・16×16 をそのまま打つ・拡大縮小しない) を取った順に 1 列。
+        //   入りきらない分は最後の枠を「+N」にまとめる。 発動した秘宝 (ItemSystem.PassiveSkills.RelicFireProbe: 効果で値が変わった時だけ) は
+        //   0.5 秒 (1 秒 8 コマの 4 コマ) 光る: アイコンの画素に暖色の光を足す (加算・強さ 1 → 3/4 → 1/2 → 1/4)。 大きさは変えない。
+        //   マウスを乗せると説明の帯 (端子と同じ帯) に名前と効果。 音は軽い ui_tab を高く小さく (BOT の間は鳴らさない)。
+        private readonly List<string> _relics = new List<string>();
+        private readonly Dictionary<string, float> _relicFlashAt = new Dictionary<string, float>();
+        private int _hoverRelic = -1, _relicCountSig = -1; private bool _relicHooked;
+        private const float RelicFlashSec = 0.5f;
+        private static readonly Color32 RelicGlow = new Color32(0xff, 0xc8, 0x78, 255);
+
+        private void OnRelicFired(string id)
+        {
+            if (string.IsNullOrEmpty(id) || !Game2DBattleSim.Active) return;
+            _relicFlashAt[id] = Time.unscaledTime;
+            if (!GameHooks.BotDriving) Game2DSfx.Play("ui_tab", 0.5f, 1.3f);
+        }
+
+        /// <summary>持っている秘宝の一覧を作り直す (持ち物の数が変わった時だけ)。</summary>
+        private void RefreshRelics()
+        {
+            if (!_relicHooked) { ItemSystem.PassiveSkills.RelicFireProbe.OnRelicFired += OnRelicFired; _relicHooked = true; }
+            var own = GameManager.Instance?.Run?.ownedPassiveItems;
+            int sig = own == null ? 0 : own.Count * 7919 + (own.Count > 0 ? (own[own.Count - 1] ?? "").GetHashCode() : 0);
+            if (sig == _relicCountSig) return;
+            _relicCountSig = sig; _relics.Clear();
+            if (own == null) return;
+            var db = ItemSystem.ItemDatabase.Instance;
+            foreach (var id in own)
+            {
+                var data = db != null ? db.GetItem(id) : null;
+                if (data != null && data.category == ItemSystem.ItemCategory.Weapon) continue;      // 武器は攻撃の絵で見えるので並べない
+                if (!_relics.Contains(id)) _relics.Add(id);
+            }
+        }
+
+        /// <summary>描き直しの版: 一覧が変わった時・乗っている枠が変わった時と、 光っている間は 1 秒 8 コマごと。</summary>
+        private int RelicVersion()
+        {
+            RefreshRelics();
+            int v = _relicCountSig * 3 + _hoverRelic * 17;
+            float now = Time.unscaledTime;
+            foreach (var kv in _relicFlashAt) if (now - kv.Value < RelicFlashSec + 0.05f) { v += (int)(now * 8f) * 31; break; }
+            return v;
+        }
+
+        /// <summary>1 列に出す枠の数と、 「+N」の数 (0 = まとめない)。</summary>
+        private void RelicLayout(out int shown, out int more)
+        {
+            int slots = BattleHudLayout.RelicSlots, n = _relics.Count;
+            if (n <= slots) { shown = n; more = 0; } else { shown = slots - 1; more = n - shown; }
+        }
+
+        private static RectInt RelicSlotR(int i) => new RectInt(BattleHudLayout.RelicPad - 1 + i * BattleHudLayout.RelicPitch, 0, BattleHudLayout.RelicPitch, BattleHudLayout.RelicBar.h);
+
+        private float RelicFlash(string id)
+        {
+            if (!_relicFlashAt.TryGetValue(id, out var t0)) return 0f;
+            int step = (int)((Time.unscaledTime - t0) * 8f);      // 1 秒 8 コマ
+            return step < 0 || step >= 4 ? 0f : (4 - step) / 4f;
+        }
+
+        private bool DrawRelics(Texture2D t)
+        {
+            RefreshRelics();
+            if (_relics.Count == 0 || t == null) return false;
+            RelicLayout(out int shown, out int more);
+            int used = Mathf.Min(RelicR.width, (shown + (more > 0 ? 1 : 0)) * BattleHudLayout.RelicPitch + 2 * BattleHudLayout.RelicPad - 2);
+            var p = new KitPix(RelicR.width, RelicR.height);      // 使わない右の部分は透明のまま
+            if (Game2DKit.Tab != null) p.NineSlice(Game2DKit.Tab, 5, Well, 0, 0, used, RelicR.height); else p.Box(0, 0, used, RelicR.height, Well, Dark);
+            int y = (RelicR.height - BattleHudLayout.RelicIcon) / 2;
+            for (int i = 0; i < shown; i++)
+            {
+                var id = _relics[i];
+                int x = BattleHudLayout.RelicPad + i * BattleHudLayout.RelicPitch;
+                var icon = Game2DKit.ItemIcon(id);
+                if (icon != null) p.Sprite(icon, x, y, BattleHudLayout.RelicIcon, BattleHudLayout.RelicIcon);
+                else { string nm = ItemSystem.ItemDatabase.DisplayNameOf(id) ?? id; p.Text(nm.Length > 0 ? nm.Substring(0, 1) : "?", x + 2, y + 2, Ink); }      // 絵の無い品は名前の 1 字
+                float k = RelicFlash(id);
+                if (k > 0f) Glow(p, x, y, BattleHudLayout.RelicIcon, BattleHudLayout.RelicIcon, k);
+                if (_hoverRelic == i) p.Rect(x, y + BattleHudLayout.RelicIcon, BattleHudLayout.RelicIcon, 1, Ink);      // 乗っている枠の下に 1 dot の線
+            }
+            if (more > 0)
+            {
+                int x = BattleHudLayout.RelicPad + shown * BattleHudLayout.RelicPitch;
+                bool any = false; for (int i = shown; i < _relics.Count; i++) if (RelicFlash(_relics[i]) > 0f) { any = true; break; }
+                p.Text("+" + more, x, (RelicR.height - Game2DJpFont.Cell) / 2 + 1, any ? Chg : Dim);      // まとめた中の秘宝が発動したら、 字の色で知らせる
+            }
+            p.Apply(t);
+            return true;
+        }
+
+        /// <summary>光を足す (加算・不透明な画素だけ)。 k = 強さ (0〜1)。</summary>
+        private static void Glow(KitPix p, int x, int y, int w, int h, float k)
+        {
+            for (int j = 0; j < h; j++)
+                for (int i = 0; i < w; i++)
+                {
+                    int px = x + i, py = y + j; if (px < 0 || py < 0 || px >= p.w || py >= p.h) continue;
+                    int idx = (p.h - 1 - py) * p.w + px; var c = p.px[idx]; if (c.a < 128) continue;
+                    p.px[idx] = new Color32((byte)Mathf.Min(255, c.r + RelicGlow.r * k), (byte)Mathf.Min(255, c.g + RelicGlow.g * k), (byte)Mathf.Min(255, c.b + RelicGlow.b * k), 255);
+                }
+        }
+
+        /// <summary>マウスが乗っている秘宝の枠 (−1 = 無し・「+N」の枠も −1)。</summary>
+        private void RelicPointer(bool hasDot, Vector2 d)
+        {
+            int h = -1;
+            if (hasDot && _relicBar != null && _relics.Count > 0)
+            {
+                RelicLayout(out int shown, out _);
+                for (int i = 0; i < shown; i++) if (In(d, RelicR, RelicSlotR(i))) { h = i; break; }
+            }
+            if (h != _hoverRelic) { _hoverRelic = h; _drawn = -1; }
+        }
+
+        /// <summary>秘宝の説明の帯: 1 行目 = 名前 / 続き = 効果 (品の効果の説明・無ければ品の説明)。 列のすぐ下に出す。</summary>
+        private bool DrawRelicTip()
+        {
+            if (_hoverRelic < 0 || _hoverRelic >= _relics.Count || _tip == null) return false;
+            var id = _relics[_hoverRelic];
+            var data = ItemSystem.ItemDatabase.Instance?.GetItem(id);
+            Ensure(ref _tt2, _tip, new RectInt(0, 0, TipW, TipH));
+            int iw = TipW - 10;
+            var lines = new List<string>(Game2DJpFont.Lines(ItemSystem.ItemDatabase.DisplayNameOf(id) ?? id, iw));
+            int head = lines.Count;
+            if (data != null)
+            {
+                bool any = false;
+                if (data.passiveSkills != null) foreach (var ps in data.passiveSkills) if (!string.IsNullOrEmpty(ps.description)) { lines.AddRange(Game2DJpFont.Lines(ps.description, iw)); any = true; }
+                if (!any && !string.IsNullOrEmpty(data.description)) lines.AddRange(Game2DJpFont.Lines(data.description, iw));
+            }
+            int n = Mathf.Min(TipLinesMax, lines.Count), h = 6 + n * Game2DJpFont.LineH + 3;
+            var p = new KitPix(TipW, TipH);
+            p.Box(0, 0, TipW, h, Well, Chg);
+            for (int i = 0; i < n; i++) Game2DJpFont.Draw(p, lines[i], 5, 4 + i * Game2DJpFont.LineH, i < head ? Chg : Ink);
+            p.Apply(_tt2);
+            int x0 = Mathf.Clamp(RelicR.x + RelicSlotR(_hoverRelic).x, 2, Right.x - 2 - TipW), y0 = RelicR.y + RelicR.height + 2;
+            _tip.anchoredPosition = new Vector2(x0, -y0);
+            _tip.SetAsLastSibling();
+            return true;
         }
     }
 }

@@ -31,6 +31,14 @@ namespace UI.Game2D
 
         /// <summary>持ち物の画面の入口 [持ち物] (2026-11-13)。 左上の角 (出目の上)。 キーは <see cref="InvKeyName"/>。</summary>
         public static readonly InventoryLayout.Box Inv = new InventoryLayout.Box(2, 2, 56, 17);
+        /// <summary>秘宝の列 (#320・2026-11-15・作者「スレスパ式で左上に」): 入口 [持ち物] の右・画面の上の端 (上の帯は 2026-11-15 に無くした)。
+        /// 役の板 (<see cref="Role"/>・y 20〜) の上を通って画面の右端の手前まで。 アイコン 16×16 を <see cref="RelicPitch"/> dot おきに 1 列。</summary>
+        public static readonly InventoryLayout.Box RelicBar = new InventoryLayout.Box(60, 1, 418, 18);
+        /// <summary>秘宝の列の 1 枠の送り (アイコン 16 + 間 2)・左端の余白・アイコンの大きさ。</summary>
+        public const int RelicPitch = 18, RelicPad = 3, RelicIcon = 16;
+        /// <summary>1 列に入る枠の数 (これを超えたら最後の枠を「+N」にまとめる)。</summary>
+        public static int RelicSlots => (RelicBar.w - 2 * RelicPad + 2) / RelicPitch;
+
         /// <summary>入口のキーの名前 (画面の字・ボタンには出さない)。</summary>
         public const string InvKeyName = "I";
         /// <summary>入口の字。</summary>
@@ -44,7 +52,7 @@ namespace UI.Game2D
         /// <summary>入口と重なってはいけない部品 (出目は 9 個の時の幅で見る)。</summary>
         public static InventoryLayout.Box[] Others => new[]
         {
-            Right, Stat, Gauge, Role, new InventoryLayout.Box(Ports.x, Ports.y, PortsWidth(9), Ports.h), Ctl, Hand, Enemy,
+            Right, Stat, Gauge, Role, new InventoryLayout.Box(Ports.x, Ports.y, PortsWidth(9), Ports.h), Ctl, Hand, Enemy, RelicBar,
         };
 
         // ── 敵の HP (液晶の中・Game2DBattleFx が描く・2026-11-15) ──

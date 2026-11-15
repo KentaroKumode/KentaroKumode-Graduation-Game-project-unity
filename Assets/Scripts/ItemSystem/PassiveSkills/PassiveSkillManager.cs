@@ -115,6 +115,7 @@ namespace ItemSystem.PassiveSkills
         public void RefreshActiveSkills(List<CompleteItemData> equippedItems)
         {
             ClearActiveSkills();
+            skillOwner.Clear();
 
             if (equippedItems == null) return;
 
@@ -132,6 +133,7 @@ namespace ItemSystem.PassiveSkills
                 {
                     if (string.IsNullOrEmpty(ps.internalName)) continue;
                     collected.Add((ps.internalName, ps.skillName));
+                    if (!string.IsNullOrEmpty(item.internalName) && !skillOwner.ContainsKey(ps.internalName)) skillOwner[ps.internalName] = item.internalName;      // 発動の表示 (#320)
                 }
             }
 
@@ -152,6 +154,11 @@ namespace ItemSystem.PassiveSkills
 
             Debug.Log($"[PassiveSkillManager] Active skills refreshed: {activeSkillNames.Count} skills (収集{collected.Count}, 同名抑制後{uniqueIds.Count})");
         }
+
+        /// <summary>効果 (スキルの internalName) → その効果を持つ品の id (最初に見つけた品・<see cref="RefreshActiveSkills"/> が作る)。 秘宝の発動の表示 (#320) が読む。</summary>
+        private readonly Dictionary<string, string> skillOwner = new Dictionary<string, string>();
+        /// <summary>効果の持ち主の品の id (無ければ null・武器の段階式で足した効果など)。</summary>
+        public string OwnerItemOf(string skillId) => !string.IsNullOrEmpty(skillId) && skillOwner.TryGetValue(skillId, out var id) ? id : null;
 
         /// <summary>internalName を直接指定してスキルを登録（武器の段階式動的付与用）。</summary>
         public void AddSkillById(string internalName, string displayName = null)
@@ -395,7 +402,9 @@ namespace ItemSystem.PassiveSkills
                     int hlFixed = context.fixedDamageToEnemy;                                              // [計装 2026-11-05]
                     int hlPend = (int)context.GetAccumulated(Keywords.Kw.PendingEnemyDamageKey);
                     int ledHp = context.enemyCurrentHP;   // [計装 2026-11-10] ctx を通した削りの品別
+                    bool probe = RelicFireProbe.Active; ulong fp = probe ? RelicFireProbe.Take(context) : 0;      // 秘宝の発動の表示 (#320・画面が見ている時だけ)
                     skills[i].Execute(trigger, context);
+                    if (probe) RelicFireProbe.After(skills[i].SkillId, fp, context);
                     CombatSystem.EnemyHpLedger.NoteCtxSource(skills[i].SkillId, ledHp, context.enemyCurrentHP);
                     CombatSystem.DmgSourceDiag.Attribute(skills[i].SkillId, dsBefore, context);
                     CombatSystem.HpLossDiag.NoteSource(skills[i].SkillId, context.fixedDamageToEnemy - hlFixed,
@@ -438,7 +447,9 @@ namespace ItemSystem.PassiveSkills
                     try
                     {
                         CombatContext.CurrentSkillId = s.SkillId;
+                        bool probe = RelicFireProbe.Active; ulong fp = probe ? RelicFireProbe.Take(context) : 0;      // 秘宝の発動の表示 (#320)
                         s.Execute(trigger, context);
+                        if (probe) RelicFireProbe.After(s.SkillId, fp, context);
                         CombatContext.CurrentSkillId = "";
                         triggeredPlayerSkills.Add(s.SkillId);
                     }
