@@ -35,6 +35,8 @@ namespace UI.Game2D
         {
             if (_host != null) return true;
             if (!Application.isPlaying) return false;
+            // 前の Play の係が残っていれば使い直す (HideAndDontSave はエディタで Play を抜けても消えないことがある・2026-11-15)
+            foreach (var h in Resources.FindObjectsOfTypeAll<Game2DSfxHost>()) if (h != null && h.isActiveAndEnabled) { _host = h; return true; }
             var go = new GameObject("Game2DSfx") { hideFlags = HideFlags.HideAndDontSave };
             Object.DontDestroyOnLoad(go);
             _host = go.AddComponent<Game2DSfxHost>();
@@ -56,6 +58,9 @@ namespace UI.Game2D
         /// 音 (ui_error・筐体の部品なので Tools/sfx_analog.py の実物寄りの音) がまだ無ければ、 ui_click を低く鳴らす。</summary>
         public static void Error()
         {
+            // 押した時に先に鳴った選ぶ音 (窓のボタンは成否を見る前に ui_confirm / ui_click を鳴らす) を止めて、 失敗の音だけにする (2026-11-15)
+            if (_host != null) { _host.Cut(Get("ui_confirm")); _host.Cut(Get("ui_click")); }
+            Last.Remove("ui_click");
             if (Get("ui_error") != null) Play("ui_error");
             else Play("ui_click", 0.9f, 0.7f);
         }

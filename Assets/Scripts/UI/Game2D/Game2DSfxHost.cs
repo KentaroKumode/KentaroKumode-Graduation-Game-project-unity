@@ -28,6 +28,16 @@ namespace UI.Game2D
             s.pitch = pitch; s.volume = Mathf.Clamp01(vol); s.clip = c; s.Play();
         }
 
+        /// <summary>鳴り始めたばかり (0.1 秒以内) の同じ音を止める。 失敗の音で、 先に鳴った選ぶ音を打ち消すため。</summary>
+        public void Cut(AudioClip c)
+        {
+            if (c == null) return;
+            foreach (var s in _src) if (s.isPlaying && s.clip == c && s.time < 0.1f) s.Stop();
+        }
+
+        // エディタで Play を抜けても HideAndDontSave の係が残り、 Play のたびに増えていたので、 終わる時に消す (2026-11-15)
+        private void OnApplicationQuit() { Destroy(gameObject); }
+
         public void Later(AudioClip c, float sec, float vol, float pitch) { _jobs.Add(new Job { c = c, at = Time.unscaledTime + sec, vol = vol, pitch = pitch }); }
 
         // ── ループの音 (#316・2026-11-15) ──
