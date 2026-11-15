@@ -10,6 +10,17 @@ namespace UI.Game2D
     /// </summary>
     public static class BattleLcdLayout
     {
+        // ── 端から安全に見える範囲 (2026-11-16・実機確認で端の物が切れた) ──
+        //   液晶のシェーダ (Assets/Shaders/Game2DLcdScreen.shader の frag の頭・樽型の湾曲 「元 = 中心 × (1 + k·r²) / (1 + 2k)」) は、 四隅をちょうど絵の端に合わせ、
+        //   縁の中央ほど内側を見る (= 縁の中央の近くの絵は画面の外へ押し出される)。 k = _Curve は Assets/Settings/Game2DLcdScreen.mat で 0.07 (設定の「湾曲」で 0〜2 倍・上限 0.2)。
+        //   k = 0.07 で見える範囲 (計算): 上下は x 240 で y 8〜261・x 96 で y 5〜264 / 左右は y 135 で x 15〜464・y 200 で x 11〜468。
+        //   部品はこの矩形の内側に置く (隅に近い物ほど余裕がある)。 設定で湾曲を強めると (k 0.1 以上) 下の札の底がまた欠ける ── 設定の上限を下げるかは未決。
+        /// <summary>安全に見える矩形 (左・上・右・下の端の dot・含む)。</summary>
+        public const int SafeX0 = 16, SafeY0 = 9, SafeX1 = 464, SafeY1 = 259;
+        /// <summary>液晶の中で動かす部品 (手札の引っ込み・格納) の 1 コマの最大の移動 (dot)。 液晶の残像 (シェーダの _Ghost・前のコマを 38% で lighten) が
+        /// 離れた 2 段に見えないよう、 1 コマで大きく飛ばさない (2026-11-16・実機確認で手札が 2 段に見えた)。</summary>
+        public const int MaxStepPerFrame = 6;
+
         // ── カード (仮の枠: 見本と同じ単純な枠をコードで描く) ──
         /// <summary>カードの大きさ。</summary>
         public const int CardW = 64, CardH = 52;
@@ -19,14 +30,14 @@ namespace UI.Game2D
         public const int ArtX = 1, ArtY = 14, ArtW = 62, ArtH = 36;
         /// <summary>出目の差し口 (カードの左上から・左下に置く)。 中に 18×18 の出目 (<see cref="Game2DDiceRoll.Face"/>) が入る。 2 個挿せる札は右へ <see cref="SockStep"/> ずらして 2 つ目を置く (仮)。</summary>
         public const int SockX = 1, SockY = 31, SockSize = 20, SockStep = 21;
-        /// <summary>挿したカードを持ち上げる量 (dot)。</summary>
-        public const int Lift = 5;
+        /// <summary>挿したカードを持ち上げる量 (dot)。 2026-11-16: 5 → 3 (札の底を安全な範囲に入れるために行を上げ、 敵の足もとの棒との間を詰めた)。</summary>
+        public const int Lift = 3;
         /// <summary>手札の並び: 左端・右端 (この間に並べる)・基準の送り・行の上端 (弧の分を足す)。</summary>
-        public const int HandX0 = 96, HandX1 = 426, HandStep = 66, HandY = 216;
+        public const int HandX0 = 96, HandX1 = 426, HandStep = 66, HandY = 207;      // 2026-11-16: 216 → 207 (真ん中の札の底 y 258・端の札は弧で y 260)
         /// <summary>弧 (端ほど下げる) の最大。 5 枚の時に見本の [2, 1, 0, 1, 2]。</summary>
         public const int Arc = 2;
-        /// <summary>解決の間に手札を引っ込める距離 (下へ)。</summary>
-        public const int HandHide = 64;
+        /// <summary>解決の間に手札を引っ込める距離 (下へ・画面の外まで)。</summary>
+        public const int HandHide = 66;
         /// <summary>札の上の印 (「残す」「停止」など) の字の上端 (カードの上端からのずれ)。</summary>
         public const int LabelDy = -13;
 
@@ -36,31 +47,32 @@ namespace UI.Game2D
 
         // ── 敵の棒 (足もと) ──
         /// <summary>棒 (枠 1 dot + 中身 5 dot) の左端と上端 (敵の体の中心・足もとからのずれ) と幅。</summary>
-        public const int EBarDx = -50, EBarDy = 0, EBarW = 102, EBarH = 7;
+        /// 2026-11-16: 足もとの下 (y 204〜) → 足もとの上 (y 197〜203・体の下端に 7 dot 重ねる)。 札の行を上げたので、 持ち上げた札 (y 204〜) と重ならないように。
+        public const int EBarDx = -50, EBarDy = -7, EBarW = 102, EBarH = 7;
         /// <summary>数字の左端 (棒の右端から) と上端 (棒の上端から)。</summary>
         public const int ENumGap = 5, ENumDy = -4;
 
         // ── 左下: 自分 ──
         /// <summary>自分の HP の棒 (左端・右端・中身の上端)。</summary>
-        public const int MBarX0 = 8, MBarX1 = 90, MBarY = 257;
+        public const int MBarX0 = 16, MBarX1 = 92, MBarY = 252;
         /// <summary>HP の数字の行の上端。</summary>
-        public const int MNumY = 242;
+        public const int MNumY = 238;
         /// <summary>充電の玉の中心と半径・横の「振り直す」の字の左端。</summary>
-        public const int OrbX = 22, OrbY = 228, OrbR = 10, RerollTextX = 36;
+        public const int OrbX = 28, OrbY = 224, OrbR = 10, RerollTextX = 42;
         /// <summary>シールドの行・与ダメの補正の行 (どちらも出す物がある時だけ)。</summary>
-        public const int ShieldY = 205, ModY = 192;
+        public const int ShieldY = 202, ModY = 189, LeftX = 16;
 
         // ── 右 ──
         /// <summary>「決める」の字の中心 x と上端・下線の y と幅。</summary>
-        public const int GoCx = 452, GoY = 238, GoLineY = 254, GoLineW = 40;
+        public const int GoCx = 440, GoY = 236, GoLineY = 252, GoLineW = 36;
         /// <summary>右の列の小さな操作 (おまかせ・道具・逃げる・仮置き) の右端と 1 行目の上端と送り。</summary>
-        public const int SideRight = 476, SideY = 176, SideStep = 15;
+        public const int SideRight = 460, SideY = 176, SideStep = 15;
         /// <summary>山と捨て札の枚数 (右上・右端と上端)。</summary>
-        public const int DeckRight = 476, DeckY = 3;
+        public const int DeckRight = 464, DeckY = 10;
 
         // ── 左上 ──
         /// <summary>[持ち物] の字の左上 (仮置き) と、 秘宝の列の左端・上端・送り・右の止め。</summary>
-        public const int InvX = 4, InvY = 3, RelicX = 44, RelicY = 2, RelicPitch = 18, RelicRight = 396;
+        public const int InvX = 16, InvY = 10, RelicX = 52, RelicY = 9, RelicPitch = 18, RelicRight = 380;
 
         // ── 敵の頭上 ──
         /// <summary>予告の行 (Game2DBattleFx.DrawMarks と同じ行・足もとから) と、 その上の前触れの行。</summary>

@@ -54,7 +54,10 @@ namespace UI.Game2D
             KeepMark = Game2DTerminalLook.Mix(Game2DKit.Amber, Game2DKit.Ivory, 0.3f), StopMark = Game2DTerminalLook.Mix(Game2DKit.Blue, Game2DKit.Ivory, 0.45f);
 
         // ── 状態 ──
-        private Game2DSpring _spHand, _spStow; private bool _spInit;
+        private Game2DSpring _spHand, _spStow, _spExtra; private bool _spInit;
+        /// <summary>今のコマで描く ずれ (dot・ばねの値を 1 コマ <see cref="BattleLcdLayout.MaxStepPerFrame"/> までで追う): 手札 (下へ) / 左の列 (左へ) / 右の列 (右へ) / 上の行 (上へ) / 「決める」(右へ)。</summary>
+        private int _handOff = BattleLcdLayout.HandHide, _leftOff, _rightOff, _topOff, _goOff;
+        private const int LeftHide = 100, RightHide = 70, TopHide = 30;
         private Vector2 _mouse; private bool _hasMouse;
         private int _hoverCard = -1, _hoverRelic = -1; private Zone _hoverZone;
         private int _dragDie = -1, _pressDie = -1, _pressCard = -1, _dragCard = -1; private bool _moved; private Vector2 _pressDot;
@@ -93,11 +96,17 @@ namespace UI.Game2D
 #endif
             Bind();
             float dt = Mathf.Min(0.05f, Time.unscaledDeltaTime);
-            if (!_spInit) { _spHand.Set(1f); _spStow.Set(0f); _spInit = true; }
+            if (!_spInit) { _spHand.Set(1f); _spStow.Set(0f); _spExtra.Set(1f); _spInit = true; }
             bool live = Drawing && _sim != null && _fx != null;
             bool handOn = live && !_fx.IsIntro && (_sim.phase == Game2DBattleSim.P.PRoll || _sim.phase == Game2DBattleSim.P.Wire);
-            _spHand.Go(handOn ? 0f : 1f, handOn ? 0.05f : 0f); _spStow.Go(live && _fx.GuiStowed ? 1f : 0f, 0f);
-            _spHand.Step(dt); _spStow.Step(dt);
+            // 解決の間 (作者の決定「手札が引っ込み、 敵と HP の棒だけが残る」): 手札・床の出目に加えて、 左の列 (充電の玉・振り直す・シールド・補正)・右の列・上の行 (秘宝・持ち物・山と捨て札) も引っ込める。
+            //   「決める」は 次へ / 終わる の間も出す (大技の格納の間だけ引っ込む)。 2026-11-16・実機確認で勝った後に玉が残った
+            _spHand.Go(handOn ? 0f : 1f, handOn ? 0.05f : 0f); _spStow.Go(live && _fx.GuiStowed ? 1f : 0f, 0f); _spExtra.Go(handOn ? 0f : 1f, handOn ? 0.05f : 0f);
+            _spHand.Step(dt); _spStow.Step(dt); _spExtra.Step(dt);
+            float ex = Mathf.Max(_spStow.Value(1f, 0f), _spExtra.Value(1f, 0f));
+            _handOff = StepTo(_handOff, Mathf.RoundToInt(_spHand.Value(1f, 0f) * BattleLcdLayout.HandHide));
+            _leftOff = StepTo(_leftOff, Mathf.RoundToInt(ex * LeftHide)); _rightOff = StepTo(_rightOff, Mathf.RoundToInt(ex * RightHide));
+            _topOff = StepTo(_topOff, Mathf.RoundToInt(ex * TopHide)); _goOff = StepTo(_goOff, Mathf.RoundToInt(_spStow.Value(1f, 0f) * RightHide));
             if (!live) { CancelAll(); return; }
             // 自分のステータスは配線を決める間だけ読み直す (その後は本判定に取り込まれて二重に数えるので、 最後の値を出し続ける・旧画面と同じ)
             if (_sim.CanOperate && CombatManager.Instance != null) { _hs = CombatManager.Instance.PreviewHudStats(); _hsKnown = true; }
@@ -106,6 +115,7 @@ namespace UI.Game2D
 
             bool ready = !Stowed && !Game2DModal.Active && _screen != null;
             _hasMouse = ready && Game2DPointer.TryDot(_screen, out _mouse);
+            if (_hasMouse) _mouse = LcdDot(_mouse);
             // 持ち物の画面 (見るだけ): キー I。 窓が出ている間・つかんでいる間は開かない (旧画面と同じ条件)
             if (ready && !PointerBusy && !Game2DTutorial.Blocking && Input.GetKeyDown(KeyCode.I)) OpenInventory();
             if (!_hasMouse) { _hoverCard = _hoverRelic = -1; _hoverZone = Zone.None; if (!ready) CancelAll(); return; }
@@ -114,7 +124,24 @@ namespace UI.Game2D
         }
 
         private bool Stowed => _spStow.tgt > 0.5f || _spStow.x > 0.02f;
-        private bool HandUp => _spHand.x < 0.05f && _spHand.tgt < 0.5f;
+        private bool HandUp => _handOff == 0 && _spHand.tgt < 0.5f;
+        /// <summary>左右・上の列が出ているか (押せるか・触った時の帯を出してよいか)。</summary>
+        private bool ExtrasUp => _leftOff == 0 && _rightOff == 0 && _topOff == 0;
+        private static int StepTo(int cur, int target) => cur + Mathf.Clamp(target - cur, -BattleLcdLayout.MaxStepPerFrame, BattleLcdLayout.MaxStepPerFrame);
+
+        /// <summary>画面の位置 (GUI の格子の dot) → 液晶の絵 (480×270) の dot。 液晶は樽型に湾曲している (Game2D/LcdScreen の _Curve) ので、
+        /// 見えている点が絵のどこを映しているかをシェーダと同じ式で求める (Game2DMapView.ScreenToMapDot と同じ)。 当たり判定を見た目に合わせる。</summary>
+        private Vector2 LcdDot(Vector2 d)
+        {
+            float k = 0f;
+            var q = _screen != null ? _screen.lcdQuad : null;
+            if (q != null) { var mr = q.GetComponent<MeshRenderer>(); if (mr != null && mr.sharedMaterial != null && mr.sharedMaterial.HasProperty("_Curve")) k = mr.sharedMaterial.GetFloat("_Curve"); }
+            if (k <= 0f) return d;
+            const float W = Game2DLayout.Width, H = Game2DLayout.Height;
+            float cx = d.x / W * 2f - 1f, cy = (1f - d.y / H) * 2f - 1f;
+            float f = (1f + k * (cx * cx + cy * cy)) / (1f + 2f * k);
+            return new Vector2((cx * f * 0.5f + 0.5f) * W, (1f - (cy * f * 0.5f + 0.5f)) * H);
+        }
 
         private void CancelAll()
         {
@@ -140,7 +167,7 @@ namespace UI.Game2D
                 return;
             }
             _hoverCard = HandUp ? CardAt(d, -1) : -1;
-            _hoverRelic = RelicAt(d);
+            _hoverRelic = ExtrasUp ? RelicAt(d) : -1;
             _hoverZone = In(d, HeadRect()) ? Zone.Head : In(d, OrbRect()) || In(d, RerollRect()) ? Zone.Orb : In(d, HpRect()) ? Zone.Hp : In(d, DeckRect()) ? Zone.Deck : Zone.None;
             if (Input.GetMouseButtonDown(0))
             {
@@ -152,9 +179,9 @@ namespace UI.Game2D
                     return;
                 }
                 if (_hoverCard >= 0) { if (sim.CanOperate) { _pressCard = _hoverCard; _pressDot = d; _moved = false; } return; }
-                if (In(d, InvRect())) { OpenInventory(); return; }
-                if (sim.CanOperate && (In(d, OrbRect()) || In(d, RerollRect()))) { if (sim.CanRerollNow) sim.Reroll(); else Game2DSfx.Play("ui_click"); return; }
-                if (sim.CanOperate)
+                if (ExtrasUp && In(d, InvRect())) { OpenInventory(); return; }
+                if (ExtrasUp && sim.CanOperate && (In(d, OrbRect()) || In(d, RerollRect()))) { if (sim.CanRerollNow) sim.Reroll(); else Game2DSfx.Play("ui_click"); return; }
+                if (ExtrasUp && sim.CanOperate)
                 {
                     if (In(d, SideRect(0))) { sim.AutoWire(); return; }
                     if (In(d, SideRect(1))) { if (_hud != null) _hud.OpenItems(); return; }
@@ -220,10 +247,10 @@ namespace UI.Game2D
         // =====================================================================
 
         private static bool In(Vector2 d, RectInt r) => d.x >= r.x && d.x < r.x + r.width && d.y >= r.y && d.y < r.y + r.height;
-        private int HandOff => Mathf.RoundToInt(_spHand.Value(BattleLcdLayout.HandHide) * BattleLcdLayout.HandHide);
-        private int LeftOff => -Mathf.RoundToInt(_spStow.Value(100f) * 100f);
-        private int RightOff => Mathf.RoundToInt(_spStow.Value(70f) * 70f);
-        private int TopOff => -Mathf.RoundToInt(_spStow.Value(24f) * 24f);
+        private int HandOff => _handOff;
+        private int LeftOff => -_leftOff;
+        private int RightOff => _rightOff;
+        private int TopOff => -_topOff;
 
         private bool HasDie(int s) { for (int i = 0; i < _sim.slot.Length; i++) if (_sim.slot[i] == s && i != _dragDie) return true; return false; }
 
@@ -268,7 +295,7 @@ namespace UI.Game2D
         private RectInt OrbRect() => new RectInt(BattleLcdLayout.OrbX - BattleLcdLayout.OrbR + LeftOff, BattleLcdLayout.OrbY - BattleLcdLayout.OrbR, BattleLcdLayout.OrbR * 2 + 1, BattleLcdLayout.OrbR * 2 + 1);
         private string RerollLabel => _sim.canReroll ? "振り直す -" + _sim.rerollCost : "振り直す";
         private RectInt RerollRect() => new RectInt(BattleLcdLayout.RerollTextX + LeftOff, BattleLcdLayout.OrbY - 7, Game2DJpFont.Width(RerollLabel) + 2, Game2DJpFont.Cell + 2);
-        private static RectInt HpRect() => new RectInt(2, BattleLcdLayout.MNumY - 2, 92, 270 - BattleLcdLayout.MNumY + 2);
+        private static RectInt HpRect() => new RectInt(BattleLcdLayout.MBarX0 - 2, BattleLcdLayout.MNumY - 2, BattleLcdLayout.MBarX1 - BattleLcdLayout.MBarX0 + 4, BattleLcdLayout.MBarY + 7 - BattleLcdLayout.MNumY + 2);
         private RectInt DeckRect() { string s = DeckText(); int w = Game2DJpFont.Width(s); return new RectInt(BattleLcdLayout.DeckRight - w + RightOff, BattleLcdLayout.DeckY + TopOff, w, Game2DJpFont.Cell); }
         private RectInt InvRect() => new RectInt(BattleLcdLayout.InvX + LeftOff, BattleLcdLayout.InvY + TopOff, Game2DJpFont.Width(BattleHudLayout.InvLabel) + 2, Game2DJpFont.Cell + 2);
         private RectInt HeadRect() => new RectInt(BattleMotion.EX - 70, BattleMotion.FloorY + BattleLcdLayout.HeadNextDy - 2, 140, -BattleLcdLayout.HeadNextDy + BattleLcdLayout.HeadIntentDy + Game2DJpFont.Cell + 4);
@@ -281,7 +308,7 @@ namespace UI.Game2D
             return new RectInt(BattleLcdLayout.SideRight - w + RightOff, BattleLcdLayout.SideY + k * BattleLcdLayout.SideStep, w, Game2DJpFont.Cell + 2);
         }
         private bool GoVisible => _sim.phase == Game2DBattleSim.P.Wire || _sim.phase == Game2DBattleSim.P.Won || _sim.phase == Game2DBattleSim.P.Lost;
-        private RectInt GoRect() => new RectInt(BattleLcdLayout.GoCx - BattleLcdLayout.GoLineW / 2 + RightOff, BattleLcdLayout.GoY - 12, BattleLcdLayout.GoLineW, BattleLcdLayout.GoLineY - BattleLcdLayout.GoY + 15);
+        private RectInt GoRect() => new RectInt(BattleLcdLayout.GoCx - BattleLcdLayout.GoLineW / 2 + _goOff, BattleLcdLayout.GoY - 12, BattleLcdLayout.GoLineW, BattleLcdLayout.GoLineY - BattleLcdLayout.GoY + 15);
 
         private static string DeckText()
         {
@@ -296,7 +323,7 @@ namespace UI.Game2D
             switch (p)
             {
                 case Game2DBattleHud.Part.Intent: return HeadRect();
-                case Game2DBattleHud.Part.Gauge: return escalation ? HeadRect() : new RectInt(2, BattleLcdLayout.OrbY - BattleLcdLayout.OrbR - 2, 92, BattleLcdLayout.OrbR * 2 + 5);
+                case Game2DBattleHud.Part.Gauge: return escalation ? HeadRect() : new RectInt(BattleLcdLayout.LeftX, BattleLcdLayout.OrbY - BattleLcdLayout.OrbR - 2, 80, BattleLcdLayout.OrbR * 2 + 5);
                 case Game2DBattleHud.Part.Ports:
                 {
                     int n = Mathf.Max(1, _sim.DiceCount); int x0 = 999, y0 = 999, x1 = 0, y1 = 0;
@@ -305,7 +332,7 @@ namespace UI.Game2D
                 }
                 case Game2DBattleHud.Part.Stat: return HpRect();
                 case Game2DBattleHud.Part.Ctl: return new RectInt(BattleLcdLayout.SideRight - 52, BattleLcdLayout.SideY, 54, BattleLcdLayout.GoLineY - BattleLcdLayout.SideY + 2);
-                default: return new RectInt(BattleLcdLayout.HandX0, BattleLcdLayout.HandY - BattleLcdLayout.Lift, BattleLcdLayout.HandX1 - BattleLcdLayout.HandX0, 270 - BattleLcdLayout.HandY + BattleLcdLayout.Lift);
+                default: return new RectInt(BattleLcdLayout.HandX0, BattleLcdLayout.HandY - BattleLcdLayout.Lift, BattleLcdLayout.HandX1 - BattleLcdLayout.HandX0, BattleLcdLayout.SafeY1 + 2 - BattleLcdLayout.HandY + BattleLcdLayout.Lift);
             }
         }
 
@@ -409,7 +436,8 @@ namespace UI.Game2D
             Rect(x, y, w, h, Edge); Rect(x + 1, y + 1, inner, h - 2, BarEmpty);
             int fill = Mathf.Clamp(Mathf.CeilToInt(inner * ehp / (float)emax), ehp > 0 ? 1 : 0, inner);
             if (fill > 0) { Rect(x + 1, y + 1, fill, h - 2, RedC); Rect(x + 1, y + 1, fill, 1, RedHi); }
-            // この手で削れる分 (仮: 見込みの攻撃値・<see cref="Game2DBattleSim.GetWired"/>)。 判断の間だけ
+            // この手で削れる分 = 見込みの攻撃値 (Game2DBattleSim.GetWired の atk)。 判断の間だけ。
+            //   2026-11-16 作者の決定「すべては攻撃力に統合」: 本体に見込みの関数は足さず、 敵の防御・会心・倍率の前の攻撃の値のまま出す (仮置きではない)
             int cut = _sim.CanOperate ? Mathf.Min(ehp, _sim.GetWired().atk) : 0;
             if (cut > 0 && fill > 0)
             {
@@ -439,12 +467,12 @@ namespace UI.Game2D
             _c = c; _dark = _fx.LcdDark; if (_dark <= 0.02f) return;
             var s = _sim;
             DrawPlayer();
-            if (_spStow.x < 0.98f)
-            {
-                DrawRelics(); DrawInvAndDeck(); DrawLeftCtl(); DrawRight();
-            }
-            if (_spHand.x < 0.98f && s.board.Count > 0) for (int k = 0; k < s.board.Count; k++) DrawCard(k);
-            if (_spHand.x < 0.5f) DrawFloor();
+            // 引っ込んだ部品は、 ずれで液晶の外へ出る。 1 コマの動きは MaxStepPerFrame まで (残像が 2 段に見えないように)
+            if (_topOff < TopHide) { DrawRelics(); DrawInvAndDeck(); }
+            if (_leftOff < LeftHide) DrawLeftCtl();
+            DrawRight();
+            if (_handOff < BattleLcdLayout.HandHide && s.board.Count > 0) for (int k = 0; k < s.board.Count; k++) DrawCard(k);
+            if (_spHand.tgt < 0.5f) DrawFloor();      // 床の出目は札と一緒には動かさない (振り始めから見せる)
             DrawDragGhost();
             DrawTip();
         }
@@ -480,12 +508,12 @@ namespace UI.Game2D
         {
             var s = _sim; int ox = LeftOff;
             int sh = Shield;
-            if (sh > 0) Txt("シールド " + sh, 4 + ox, BattleLcdLayout.ShieldY, BlueC);
+            if (sh > 0) Txt("シールド " + sh, BattleLcdLayout.LeftX + ox, BattleLcdLayout.ShieldY, BlueC);
             if (_hsKnown && (_hs.consOutgoingPct > 0 || _hs.toilCutPct > 0))
             {
                 string add = (_hs.consOutgoingPct > 0 ? "与ダメ+" + _hs.consOutgoingPct + "%" : "")
                            + (_hs.toilCutPct > 0 ? (_hs.consOutgoingPct > 0 ? " " : "") + EventSystem.TimedEffects.BattleBoonRule.ToilName + "−" + _hs.toilCutPct + "%" : "");
-                Txt(Game2DJpFont.Clip(add, 90), 4 + ox, BattleLcdLayout.ModY, Gold2);
+                Txt(Game2DJpFont.Clip(add, 78), BattleLcdLayout.LeftX + ox, BattleLcdLayout.ModY, Gold2);
             }
             // 充電の玉: 中の数 = 今の充電・扇 = 充電 30 で満ちる (旧画面のランプ 10 個 × 3)
             int cx = BattleLcdLayout.OrbX + ox, cy = BattleLcdLayout.OrbY, r = BattleLcdLayout.OrbR;
@@ -513,7 +541,7 @@ namespace UI.Game2D
         private void DrawRight()
         {
             var s = _sim; int ox = RightOff;
-            if (s.CanOperate)
+            if (s.CanOperate && _rightOff < RightHide)
             {
                 bool[] on = { s.CanOperate, _hud != null && _hud.AnyUsable(), s.CanFlee };
                 for (int k = 0; k < 3; k++) { var r = SideRect(k); Txt(SideLabel(k), r.x + 1, r.y + 1, k == 2 && _fleeArmed ? RedC : on[k] ? Bone : DimC); }
@@ -522,7 +550,7 @@ namespace UI.Game2D
             bool en = s.ButtonEnabled;
             bool ready = en && (s.phase != Game2DBattleSim.P.Wire || AnyPlugged());
             var col = ready ? Gold2 : en ? Bone : DimC;
-            int cx = BattleLcdLayout.GoCx + ox;
+            int cx = BattleLcdLayout.GoCx + _goOff;
             TxtC(s.ButtonLabel, cx, BattleLcdLayout.GoY, col);
             int lx = cx - BattleLcdLayout.GoLineW / 2;
             Rect(lx - 1, BattleLcdLayout.GoLineY - 1, BattleLcdLayout.GoLineW + 2, 3, Edge); Rect(lx, BattleLcdLayout.GoLineY, BattleLcdLayout.GoLineW, 1, col);
@@ -693,6 +721,14 @@ namespace UI.Game2D
 
         // ── 説明の帯 ──
 
+        /// <summary>敵の足もとの棒と、 その右の数 (今の HP・−削れる分) の範囲。 説明の帯はここに被せない。</summary>
+        private static RectInt BarZone()
+        {
+            int x = BattleMotion.EX + BattleLcdLayout.EBarDx, y = BattleMotion.FloorY + BattleLcdLayout.EBarDy;
+            int top = Mathf.Min(y - 3, y + BattleLcdLayout.ENumDy) - 1, bottom = Mathf.Max(y + BattleLcdLayout.EBarH + 3, y + BattleLcdLayout.ENumDy + Game2DJpFont.Cell + 2);
+            return new RectInt(x - 2, top, BattleLcdLayout.EBarW + BattleLcdLayout.ENumGap + 64, bottom - top);
+        }
+
         private void DrawTip()
         {
             if (_dragDie >= 0 || _dragCard >= 0 || !_hasMouse) return;
@@ -702,21 +738,29 @@ namespace UI.Game2D
                 var d = TerminalCards.Get(_sim.board[_hoverCard]); if (d == null) return;
                 lines = CardTipLines(_hoverCard, d, out head); edge = headCol = Game2DTerminalLook.KindColor(d.kind); anchor = CardRect(_hoverCard);
             }
-            else if (_hoverRelic >= 0 && _hoverRelic < _relics.Count && _spStow.x < 0.5f)
+            else if (_hoverRelic >= 0 && _hoverRelic < _relics.Count && ExtrasUp)
             {
                 lines = RelicTipLines(_relics[_hoverRelic], out head); edge = headCol = Chg; anchor = RelicRect(_hoverRelic); above = false;
             }
             else if (_hoverZone == Zone.Head) { lines = EnemyTipLines(); edge = RedC; headCol = Bone; anchor = HeadRect(); above = false; }
             else if (_hoverZone == Zone.Hp) { lines = HpTipLines(); edge = GreenC; headCol = Bone; anchor = HpRect(); }
-            else if (_hoverZone == Zone.Orb && _spStow.x < 0.5f) { lines = OrbTipLines(); edge = headCol = Chg; anchor = OrbRect(); }
-            else if (_hoverZone == Zone.Deck && _spStow.x < 0.5f) { lines = DeckTipLines(); edge = DimC; anchor = DeckRect(); above = false; }
+            else if (_hoverZone == Zone.Orb && ExtrasUp) { lines = OrbTipLines(); edge = headCol = Chg; anchor = OrbRect(); }
+            else if (_hoverZone == Zone.Deck && ExtrasUp) { lines = DeckTipLines(); edge = DimC; anchor = DeckRect(); above = false; }
             if (lines == null || lines.Count == 0) return;
             int n = Mathf.Min(BattleLcdLayout.TipLinesMax, lines.Count), lh = Game2DJpFont.LineH;
             int tw = 0; for (int i = 0; i < n; i++) tw = Mathf.Max(tw, Game2DJpFont.Width(lines[i]));
             int w = tw + 10, h = 6 + n * lh + 2;
-            int x = Mathf.Clamp(anchor.x + anchor.width / 2 - w / 2, 3, 477 - w);
+            int x = Mathf.Clamp(anchor.x + anchor.width / 2 - w / 2, BattleLcdLayout.SafeX0, BattleLcdLayout.SafeX1 + 1 - w);
             int y = above ? anchor.y - h - 3 : anchor.y + anchor.height + 3;
-            y = Mathf.Clamp(y, 2, 268 - h);
+            y = Mathf.Clamp(y, BattleLcdLayout.SafeY0, BattleLcdLayout.SafeY1 + 1 - h);
+            // 敵の足もとの棒 (と右の数) に被るなら、 棒の上へ逃がす (2026-11-16・実機確認で行の多い帯が棒に被った)。 頭上の予告の行には被せない (体には重なってよい)
+            var bar = BarZone();
+            if (new RectInt(x, y, w, h).Overlaps(bar))
+            {
+                y = bar.y - h - 2;
+                var hr = HeadRect();
+                if (new RectInt(x, y, w, h).Overlaps(hr)) y = hr.yMax + 1;
+            }
             Rect(x - 1, y - 1, w + 2, h + 2, Edge); Box(x, y, w, h, TipBg, edge);
             for (int i = 0; i < n; i++) Txt(lines[i], x + 5, y + 4 + i * lh, i < head ? headCol : Bone, false);
         }

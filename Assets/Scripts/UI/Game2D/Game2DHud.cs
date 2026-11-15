@@ -31,8 +31,10 @@ namespace UI.Game2D
 
         private Game2DMapView _view;
         private bool _battle;
-        /// <summary>新しい戦闘の画面の間に資源バーとレーダーを下へ隠すばね (0 = 出ている / 1 = 画面の外) と、 隠す距離 (資源バーの上端 y 219・レーダーの上端 y 213 より大きく)。</summary>
-        private Game2DSpring _spBottom; private const float BattleBottomHide = 62f;
+        /// <summary>新しい戦闘の画面の間に資源バーとレーダーを下へ隠すばね (0 = 出ている / 1 = 画面の外) と、 隠す距離。
+        /// 距離は絵の実際の上端から決める: 土台 bar_layer1.png の不透明な範囲は y 205〜 (丸い窓の台・x 97〜370)・レーダーは y 213〜。
+        /// 270 − 205 = 65 に、 会心の衝撃の GUI の揺れ (Game2DHud.ShakeDots・数 dot) の分を足して 72 (2026-11-16・62 では窓の台の上の 3 dot が残った)。</summary>
+        private Game2DSpring _spBottom; private const float BattleBottomHide = 72f;
         private Game2DSpring _spNav, _spGold;      // 航行用の GUI の引っ込み具合 (0 = 出ている / 1 = 画面の外)
         private Vector2 _goldBase, _resBase, _radarBase; private bool _radarInit;
         /// <summary>会心の衝撃で GUI 全体を揺らす量 (dot)。 戦闘演出 (Game2DBattleFx) が毎フレーム入れる。</summary>
