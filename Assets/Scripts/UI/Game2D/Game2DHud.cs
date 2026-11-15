@@ -74,7 +74,7 @@ namespace UI.Game2D
         private void Start()
         {
             if (panel == null) return;
-            panel.actions[0].AddListener(() => { var gm = GameManager.Instance; if (gm != null && gm.Run != null) { Consumables.Use(gm.Run, ItemIds.Lure); Game2DSfx.Play("lure_set"); } });
+            panel.actions[0].AddListener(() => { var gm = GameManager.Instance; if (gm != null && gm.Run != null) Consumables.Use(gm.Run, ItemIds.Lure); });      // 音は置けた時だけ (GameManager.NavFx.Lure・#323)
             panel.actions[1].AddListener(() => GameManager.Instance?.UseFlare());
             panel.actions[2].AddListener(() => GameManager.Instance?.ReconTurn());
         }

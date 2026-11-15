@@ -177,6 +177,10 @@ namespace UI.Game2D
         /// <summary>足元に一言出す (買えない・足りない など)。</summary>
         public void ShowToast(string s) => Toast(s);
 
+        /// <summary>できない操作の一言 (買えない・足りない・使えない など・#324): 失敗の音 (<see cref="Game2DSfx.Error"/>) を鳴らして足元に出す。
+        /// 失敗はこれで出す (音を呼び出し側でばらばらに鳴らさない)。 案内・成功の一言は <see cref="ShowToast"/>。</summary>
+        public void ShowError(string s) { Game2DSfx.Error(); Toast(s); }
+
         private static Texture2D Resize(Texture2D t, int w, int h)
         {
             if (t != null && t.width == w && t.height == h) return t;

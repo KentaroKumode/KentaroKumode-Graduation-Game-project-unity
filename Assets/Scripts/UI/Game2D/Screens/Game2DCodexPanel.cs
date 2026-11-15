@@ -211,7 +211,7 @@ namespace UI.Game2D
                     {
                         int idx = first + sel;
                         if (sel < 0 || idx >= n) return;
-                        if (!_entries[idx].open) { modal.ShowToast(_entries[idx].hint); return; }
+                        if (!_entries[idx].open) { modal.ShowError(_entries[idx].hint); return; }
                         _reading = true; _readIdx = idx; _readPage = 0; Game2DSfx.Play("ui_confirm");
                         Rebuild();
                         return;

@@ -20,13 +20,23 @@ for name, rel in APPROVED.items():
     shutil.copyfile(os.path.join(ROOT, 'sfx_real', rel), os.path.join(DST, name + '.wav'))
     print('反映:', name, '<-', rel)
 
-# コードから呼ばれていない音を消す (合成のスクリプトが作った使わない音の掃除)。 名前を変数で組み立てる音 (dice_ radar_ wx_) は残す
+# コードから呼ばれていない音を消す (合成のスクリプトが作った使わない音の掃除)。
+# 名前を組み立てて鳴らす音 (dice_1〜3 など) の頭の表は Game2DSfx.ComposedPrefixes (Assets/Scripts/UI/Game2D/Game2DSfx.cs) の 1 か所に置き、 ここはそれを読む (#326・2026-11-15)。
+# 新しい音を名前の組み立てで鳴らす時は、 その表に頭を足す (足さないと、 ここで消される)。
 import glob, re
 code = ''
 for f in glob.glob(os.path.join(ROOT, '..', 'Assets', 'Scripts', '**', '*.cs'), recursive=True): code += open(f, encoding='utf-8', errors='ignore').read()
+_sfx_cs = open(os.path.join(ROOT, '..', 'Assets', 'Scripts', 'UI', 'Game2D', 'Game2DSfx.cs'), encoding='utf-8').read()
+_m = re.search(r'ComposedPrefixes\s*=\s*\{([^}]*)\}', _sfx_cs)
+if not _m: raise SystemExit('Game2DSfx.cs に ComposedPrefixes が見つからない (消す前に止める)')
+PREFIXES = tuple(re.findall(r'"([^"]+)"', _m.group(1)))
+print('名前を組み立てる音の頭 (残す):', PREFIXES)
+# 今は鳴らさないが消さない音 (wav は git の管理外で、 消すと戻せない)。 消すかどうかはユーザーが決める (#333・#335)。
+#   crumble / sink = 〈崩れる地平〉〈沈み続ける湖面〉の音 (現象の廃止で呼び出しを消した・#330)
+KEEP_UNUSED = ('crumble', 'sink')
 for f in glob.glob(os.path.join(DST, '*.wav')):
     n = os.path.splitext(os.path.basename(f))[0]
-    if ('"%s"' % n) not in code and not n.startswith(('dice_', 'radar_', 'wx_', 'coin_few_')):
+    if ('"%s"' % n) not in code and not n.startswith(PREFIXES) and n not in KEEP_UNUSED:
         os.remove(f); m = f + '.meta'
         if os.path.exists(m): os.remove(m)
         print('未使用のため削除:', n)

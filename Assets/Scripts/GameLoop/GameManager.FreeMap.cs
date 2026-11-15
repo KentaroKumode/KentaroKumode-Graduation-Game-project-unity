@@ -27,8 +27,15 @@ namespace GameLoop
         public event System.Action<FreeMapEvent> OnFreeMapEvent;
 
         /// <summary>航行の画面演出の合図 (偵察・照明)。 ターンを進めない照明や、 イベントを返さない偵察でも鳴る。 Game2DMapFx が購読する。</summary>
-        public enum NavFx { Recon, Flare }
+        /// <summary>航行の操作の合図 (音を鳴らす係が拾う)。 ボタンでもキーでも同じ関数 (<see cref="ReconTurn"/>・<see cref="UseFlare"/>・<see cref="TryPlaceLure"/>・<see cref="WaitTurn"/>) が、
+        /// できた時だけ出す (#321・#323・2026-11-15 に Lure と Wait を足した)。</summary>
+        public enum NavFx { Recon, Flare, Lure, Wait }
         public event System.Action<NavFx> OnNavFx;
+
+        /// <summary>航行で HP を払った (物資切れの歩行・嵐・雹・#318)。 引数 = 減った HP と理由 (<see cref="FreeMapSim.HpPayReason"/>)。 払いは MapManager の財布 (FreeMapSim の IFreeMapWallet) が行う。</summary>
+        public event System.Action<int, string> OnNavHpPaid;
+        /// <summary>財布が HP を払った時に呼ぶ (合図を出すだけ)。</summary>
+        public void NoteNavHpPaid(int amount, string reason) { if (amount > 0) OnNavHpPaid?.Invoke(amount, reason); }
 
         // ── 追跡者との戦闘 ──
         private bool _inPursuerFight;
@@ -86,6 +93,7 @@ namespace GameLoop
             if (sim == null) return false;
             Log("待つ（1ターン）");
             RunFreeMapOp(s => s.Wait());
+            OnNavFx?.Invoke(NavFx.Wait);
             return true;
         }
 
@@ -119,6 +127,7 @@ namespace GameLoop
             Log($"囮罠を仕掛けた（{FreeMapParams.LureLife}ターンのあいだ有効・踏んだ追跡者は{FreeMapParams.LureHoldTurns}ターン足止めされる）");
             NavDiag.NoteLure(false);   // [計装]
             RunFreeMapOp(s => s.PlaceLure());
+            OnNavFx?.Invoke(NavFx.Lure);      // 置けた時だけ (#323)
             return true;
         }
 

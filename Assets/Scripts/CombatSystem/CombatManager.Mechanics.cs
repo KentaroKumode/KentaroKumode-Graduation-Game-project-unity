@@ -333,6 +333,7 @@ namespace CombatSystem
 
                 YachtRoleEffects.Apply(k, tier, ctx, ref outcome);
                 ctx.firedRolesThisTurn.Add(k);
+                RaiseCue(CombatCue.Role, YachtRoles.NameOf(k));      // 合図 (#319)
                 YachtRoleEffects.FiredCount[(int)k]++;
                 // [計装 2026-08-15] ダイス別の発動は戦闘単位で FinishCombat が積む
                 //   (役の発動地点から GameManager.Instance を引かないため)。
@@ -444,11 +445,15 @@ namespace CombatSystem
         /// <summary>この戦闘で予告に出た一番高いエスカレーションの段 (不安定化の数え口・戦闘が始まる時に 0)。 〈鎮静香〉で段が下がって
         /// また上がっても、 一度数えた段は数え直さない (一番高い段を超えた分だけを数える)。</summary>
         private int _instabilityEscStage;
+        /// <summary>合図 (#319) のための、 前に予告に出た激化の段 (下がった時も追う)。 戦闘の始まりで int.MinValue (= まだ見ていない)。</summary>
+        private int _cueEscStage;
 
         /// <summary>予告の段 <paramref name="stage"/> が、 この戦闘で見た一番高い段を超えたら、 超えた段の数だけ本体へ知らせる
         /// (不安定化 +1 / 段・2026-11-13・GAME.md §5-12)。 ボス戦は本体が数えない (<see cref="Escalation.BossFight"/>)。 戦闘の規則には何も効かない。</summary>
         private void NoteEscalationForInstability(int stage)
         {
+            if (_cueEscStage != int.MinValue && stage > _cueEscStage) RaiseCue(CombatCue.EscalationUp, stage.ToString());      // 合図 (#319): 下がってまた上がった時も知らせる (戦闘の最初の予告では鳴らさない)
+            _cueEscStage = stage;
             if (stage <= _instabilityEscStage) return;
             int rises = stage - _instabilityEscStage;
             _instabilityEscStage = stage;

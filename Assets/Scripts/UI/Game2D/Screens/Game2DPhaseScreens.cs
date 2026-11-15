@@ -295,7 +295,7 @@ namespace UI.Game2D
                 else if (a == "remove" && sel >= 0 && sel < faces.Count)
                 {
                     if (gm.RestRemoveFace(faces[sel])) { _restFaces = false; Game2DSfx.Play("ui_confirm"); }
-                    else modal.ShowToast("外せない (ゴールドか素材が足りない)");
+                    else modal.ShowError("外せない (ゴールドか素材が足りない)");
                 }
                 Refresh();
             };
@@ -384,11 +384,11 @@ namespace UI.Game2D
                         if (sel == removeRow)
                         {
                             if (canRemove && price <= run.coins) { _termPick = TermPick.Shop; _termDeckPage = 0; }
-                            else modal.ShowToast(canRemove ? "所持金が足りない" : "これ以上は抜けない");
+                            else modal.ShowError(canRemove ? "所持金が足りない" : "これ以上は抜けない");
                         }
                         else if (sel >= 0 && sel < shelf.Count)
                         {
-                            if (gm.ShopBuyTerminal(sel)) Game2DSfx.Play("ui_confirm"); else modal.ShowToast("買えない (所持金が足りない・売り切れ)");
+                            if (gm.ShopBuyTerminal(sel)) Game2DSfx.Play("ui_confirm"); else modal.ShowError("買えない (所持金が足りない・売り切れ)");
                         }
                         break;
                     case "deck": _termPick = TermPick.View; _termDeckPage = 0; break;
@@ -452,8 +452,8 @@ namespace UI.Game2D
                 {
                     case "buy":
                     {
-                        if (sel == packRow) { if (sm != null && sm.TryBuyProvisionPack(run)) Game2DSfx.Play("ui_confirm"); else modal.ShowToast(run.provision >= run.provisionCap ? "物資は満タン" : "買えない (所持金が足りない・品切れ)"); break; }
-                        if (sel == lureRow) { if (sm != null && sm.TryBuyLure(run)) Game2DSfx.Play("ui_confirm"); else modal.ShowToast("買えない (所持金が足りない・持ちきれない)"); break; }
+                        if (sel == packRow) { if (sm != null && sm.TryBuyProvisionPack(run)) Game2DSfx.Play("ui_confirm"); else modal.ShowError(run.provision >= run.provisionCap ? "物資は満タン" : "買えない (所持金が足りない・品切れ)"); break; }
+                        if (sel == lureRow) { if (sm != null && sm.TryBuyLure(run)) Game2DSfx.Play("ui_confirm"); else modal.ShowError("買えない (所持金が足りない・持ちきれない)"); break; }
                         if (_shopSupply) break;
                         // 武器は 1 本だけ: 別の武器を持っている時は、 1 度目の「買う」で入れ替えの警告を出し、 2 度目で買う
                         if (inv != null && sel >= 0 && sel < inv.slots.Count && inv.slots[sel].kind == ShopSlotKind.Weapon && !inv.slots[sel].sold
@@ -461,13 +461,13 @@ namespace UI.Game2D
                         { _weaponArmed = sel; modal.ShowToast("「" + WeaponLabel(run.equippedWeaponId) + "」を下取りに出して乗り換える"); break; }
                         _weaponArmed = -1;
                         int before = run.coins; gm.ShopBuy(sel);
-                        if (run.coins == before && sel >= 0 && inv != null && sel < inv.slots.Count && !inv.slots[sel].sold) modal.ShowToast("買えない (所持金が足りない・売り切れ)");
+                        if (run.coins == before && sel >= 0 && inv != null && sel < inv.slots.Count && !inv.slots[sel].sold) modal.ShowError("買えない (所持金が足りない・売り切れ)");
                         else Game2DSfx.Play("ui_confirm");
                         break;
                     }
                     case "supply": _shopSupply = !_shopSupply; break;
                     case "term": _shopTerm = true; _shopSupply = false; break;
-                    case "reroll": if (!gm.ShopReroll()) modal.ShowToast("振り直せない (所持金が足りない)"); break;
+                    case "reroll": if (!gm.ShopReroll()) modal.ShowError("振り直せない (所持金が足りない)"); break;
                     case "sellmode": _shopSell = true; _sellPage = 0; if (!gm.ShopSellMode) gm.ToggleShopSellMode(); break;
                     case "rob": if (!_robArmed) _robArmed = true; else { _robArmed = false; gm.ShopRobbery(); } break;
                     case "leave": gm.ExitShop(); break;
@@ -585,7 +585,7 @@ namespace UI.Game2D
                     int at = deck.IndexOf(names[first + sel]);
                     bool ok = _termPick == TermPick.Shop ? gm.ShopRemoveTerminal(at) : gm.RestRemoveTerminal(at);
                     if (ok) { Game2DSfx.Play("ui_confirm"); _termPick = TermPick.None; }
-                    else modal.ShowToast("抜けない (所持金が足りない・山札が手札の枚数を下回る)");
+                    else modal.ShowError("抜けない (所持金が足りない・山札が手札の枚数を下回る)");
                 }
                 Refresh();
             };
@@ -632,10 +632,10 @@ namespace UI.Game2D
                         // GameManager の売却は「売る対象の種類」を切り替えてから番号で売る (キー操作と同じ口)
                         if (!gm.ShopSellMode) gm.ToggleShopSellMode();
                         for (int k = 0; k < 3 && gm.ShopSellSource != e.src; k++) gm.CycleSellSource();      // 種類は 3 つ (パッシブ・消耗品・素材) を回る
-                        if (gm.ShopSellSource != e.src) { modal.ShowToast("売れない"); break; }
+                        if (gm.ShopSellSource != e.src) { modal.ShowError("売れない"); break; }
                         gm.ShopSell(e.index);
                         if ((run.ownedPassiveItems?.Count ?? 0) + (run.ownedConsumables?.Count ?? 0) + run.weaponMaterials < held) { Game2DSfx.Play("ui_confirm"); modal.ShowToast(e.name + " を売った +" + (run.coins - before) + "G"); }
-                        else modal.ShowToast("売れない");
+                        else modal.ShowError("売れない");
                         break;
                     }
                     case "page": _sellPage = (_sellPage + 1) % pages; break;
@@ -764,7 +764,7 @@ namespace UI.Game2D
             var ev = EventEncounter.Instance != null ? EventEncounter.Instance.Current : null;
             if (ev == null) return;
             for (int i = 0; i < Mathf.Min(ev.choices.Count, 9); i++)
-                if (Input.GetKeyDown(KeyCode.Alpha1 + i)) { gm.ResolveEventChoice(i); Refresh(); return; }
+                if (Input.GetKeyDown(KeyCode.Alpha1 + i)) { Game2DSfx.Play("ui_confirm"); gm.ResolveEventChoice(i); Refresh(); return; }      // ボタン「選ぶ」(窓が ui_confirm を鳴らす) と同じ音 (#321)
         }
 
         /// <summary>報酬の窓に「不安定 +N（累計 M）」(この戦闘で溜まった分・<see cref="GameManager.BattleInstabilityLine"/>) を足す。 溜まっていなければ何もしない。

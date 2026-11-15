@@ -104,7 +104,7 @@ namespace UI.Game2D
                 for (int i = 0; i < 3; i++) if (In(hd, SlotRect(i))) _hoverSlot = i;
             if (free && Input.GetMouseButtonDown(0) && screen != null && Game2DPointer.TryDot(screen, out var dot))
             {
-                if (In(dot, new RectInt(TopR.x + WaitR.x, TopR.y + WaitR.y, WaitR.width, WaitR.height))) { if (gm.WaitTurn()) Game2DSfx.Play("ui_click"); }
+                if (In(dot, new RectInt(TopR.x + WaitR.x, TopR.y + WaitR.y, WaitR.width, WaitR.height))) gm.WaitTurn();      // 音は WaitTurn の合図 (GameManager.NavFx.Wait・キーの Space と同じ・#321)
                 else if (In(dot, LeftR)) OpenInventory(gm);
                 else if (_hoverSlot >= 0) UseSlot(gm, _hoverSlot);
             }
@@ -377,9 +377,9 @@ namespace UI.Game2D
                         var c = _grid.Focused;
                         if (c == null || !c.usable) return;
                         string why = Consumables.BlockReason(run, c.key);
-                        if (why != null) { Game2DSfx.Play("ui_click"); modal.ShowToast(why); return; }
+                        if (why != null) { modal.ShowError(why); return; }
                         if (Consumables.Use(run, c.key)) { Game2DSfx.Play("ui_confirm"); modal.ShowToast("使った"); }
-                        else { modal.ShowToast("今は使えない"); return; }
+                        else { modal.ShowError("今は使えない"); return; }
                         break;
                     }
                 }

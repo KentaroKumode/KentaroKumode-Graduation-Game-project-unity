@@ -76,7 +76,8 @@ namespace UI.Game2D
             d.onAction = (a, _) =>
             {
                 if (a == "close") { Close(); return; }
-                if (a == "buy" && ProvisionSystem.TryBuyAtDepot(GameManager.Instance?.Run)) { _def = Build(GameManager.Instance.Run); modal.Open(_def); }   // 買ったら数字を描き直す
+                if (a == "buy" && ProvisionSystem.TryBuyAtDepot(GameManager.Instance?.Run)) { _def = Build(GameManager.Instance.Run); modal.Replace(_def); }   // 買ったら数字を描き直す (窓は開き直さない = ui_open を鳴らさない・#323)
+                else if (a == "buy") modal.ShowError("買えない");
             };
             return d;
         }

@@ -93,13 +93,13 @@ namespace UI.Game2D
                     case "back": Game2DMetaPanel.Show(); return;
                     case "page": _page = (_page + 1) % pages; break;
                     case "equip":
-                        if (!valid) { _modal.ShowToast("遺物を選ぶ"); break; }
+                        if (!valid) { _modal.ShowError("遺物を選ぶ"); break; }
                         st.ToggleEquip(idx); mpm.Save(); Game2DSfx.Play("ui_confirm");
                         break;
                     case "enhance":
-                        if (!valid) { _modal.ShowToast("遺物を選ぶ"); break; }
-                        if (!owned[idx].CanEnhance) { _modal.ShowToast("これ以上は強化できない"); break; }
-                        if (st.relicMaterial <= 0) { _modal.ShowToast("素材が足りない (遺物を分解すると 1 つ)"); break; }
+                        if (!valid) { _modal.ShowError("遺物を選ぶ"); break; }
+                        if (!owned[idx].CanEnhance) { _modal.ShowError("これ以上は強化できない"); break; }
+                        if (st.relicMaterial <= 0) { _modal.ShowError("素材が足りない (遺物を分解すると 1 つ)"); break; }
                         if (RelicRoller.Enhance(owned[idx], _rng))
                         {
                             st.relicMaterial--;
@@ -108,7 +108,7 @@ namespace UI.Game2D
                         }
                         break;
                     case "dismantle":
-                        if (!valid) { _modal.ShowToast("遺物を選ぶ"); break; }
+                        if (!valid) { _modal.ShowError("遺物を選ぶ"); break; }
                         st.DismantleRelic(idx); mpm.Save(); _modal.ShowToast("分解した (素材 +1)");
                         break;
                     case "bulk":

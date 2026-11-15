@@ -79,6 +79,29 @@ namespace CombatSystem
         public static event Action<DotKind, int> OnDotDamage;
         internal static void RaiseDotDamage(DotKind kind, int dmg) { if (dmg > 0) OnDotDamage?.Invoke(kind, dmg); }
 
+        /// <summary>戦闘の出来事の合図の種類 (#319・2026-11-15)。 画面が値を毎フレーム読むだけだった出来事を、 起きた瞬間に知らせる (音・演出の係が拾う)。</summary>
+        public enum CombatCue
+        {
+            /// <summary>予告の激化の段が上がった (arg = 新しい段)。 〈鎮静香〉で下がってまた上がった時も鳴る。</summary>
+            EscalationUp,
+            /// <summary>ボスのダウンが始まった / 解けた (arg = null)。</summary>
+            BossDownStart, BossDownEnd,
+            /// <summary>役が発動した (arg = 役の名前)。</summary>
+            Role,
+            /// <summary>端子が発動した (arg = 端子の id)。 使い捨てなら続けて <see cref="DisposableUsed"/>。</summary>
+            TerminalFired,
+            /// <summary>使い捨ての端子を使った (arg = 端子の id)。</summary>
+            DisposableUsed,
+            /// <summary>〈火葬の剣〉が端子を 1 枚この戦闘から外した (arg = 外した端子の id)。</summary>
+            BurnOut,
+            /// <summary>ヴェスカの段が移った (arg = 新しい段 2〜4)。</summary>
+            VescaStage,
+        }
+
+        /// <summary>戦闘の出来事の合図 (#319)。 戦闘の結果・乱数には何も効かない (知らせるだけ)。 BOT の周回でも鳴るので、 受ける側が BotDriving を見る。</summary>
+        public static event Action<CombatCue, string> OnCue;
+        internal static void RaiseCue(CombatCue cue, string arg = null) => OnCue?.Invoke(cue, arg);
+
         // ===== 戦闘状態 =====
         private EnemyData currentEnemy;
         /// <summary>戦闘開始時の HP 率 (0-100)。 行動台帳の blowout 判定に要る
@@ -449,7 +472,7 @@ namespace CombatSystem
             Escalation.BossFight = enemy != null && GameLoop.BossIds.IsBoss(enemy.id);
             Escalation.PhaseStartTurn = 1;
             // 不安定化 (2026-11-13・GAME.md §5-12): エスカレーションの段が上がるたびに +1 (ボス戦は除く)。 この戦闘で見た一番高い段を 0 から数える
-            _instabilityEscStage = 0;
+            _instabilityEscStage = 0; _cueEscStage = int.MinValue;
             GameLoop.GameManager.Instance?.NoteCombatStartedForInstability();
             // ボスのダウン (2026-11-13・HP の目盛り): 目盛りを入れ、 大技の周期の起点を 0 に戻す (目盛りの無い敵は何もしない)
             ResetBossDown(enemy, newCombat: true);
@@ -860,7 +883,8 @@ namespace CombatSystem
             enemyHP = newEnemy.maxHP;
             // ボスのダウン (2026-11-13): 段ごとに目盛りを入れ直す (割った数・待ちは前の段から持ち越さない。 大技の周期は戦闘を通して数えるので起点はそのまま)
             ResetBossDown(newEnemy, newCombat: false);
-            TenyoHeavy.OnStageSwap(newEnemy, PassiveSkillManager.Instance?.Context?.currentTurn ?? 0);      // ヴェスカの天与 (2026-11-15): 大技を持つ段 (3・4) は、 入れ替わったターンから周期を数える
+            TenyoHeavy.OnStageSwap(newEnemy, PassiveSkillManager.Instance?.Context?.currentTurn ?? 0);
+            { int vst = GameLoop.BossIds.VescaStageOf(newEnemy.id); if (vst > 1) RaiseCue(CombatCue.VescaStage, vst.ToString()); }      // 合図 (#319)      // ヴェスカの天与 (2026-11-15): 大技を持つ段 (3・4) は、 入れ替わったターンから周期を数える
 
             var psm = PassiveSkillManager.Instance;
             if (psm == null) { Debug.LogError("[CombatManager.SwapEnemy] PSM null"); return false; }

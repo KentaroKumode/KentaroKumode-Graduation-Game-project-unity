@@ -11,6 +11,11 @@ namespace UI
     ///   ・旧スキルツリーの画面用の SkillTree モード (skill_tree.wav) は 2026-11-13 に画面ごと削除 (#132)
     ///
     /// 付け先: タイトル常駐の任意 GameObject。 既存の <c>clip</c> フィールドは Day BGM として継続利用。
+    ///
+    /// <para><b>タイトルの間だけ鳴る</b> (#314・2026-11-15): GameManager のフェーズがタイトル以外になったら <see cref="phaseFade"/> 秒で消えて止まり (一時停止)、
+    /// タイトルへ戻ったら続きから戻る。 タイトル以外の場面の曲は <see cref="UI.Game2D.Game2DBgm"/>。</para>
+    /// <para><b>音量は設定の BGM の音量だけ</b> (#315・2026-11-15): 独自の消音 (PlayerPrefs の TitleBgm.Muted・シーンの isMuted・ホットキー) は廃止した。
+    /// 消したい時は設定の BGM の音量を下げる (<see cref="GameSettings.Bgm01"/>)。</para>
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(AudioSource))]
@@ -46,17 +51,23 @@ namespace UI
         [Header("起動時のモード")]
         public BgmMode startMode = BgmMode.Day;
 
-        [Header("ミュート (BGM オフ)")]
-        [Tooltip("ON で全 BGM を消音。 PlayerPrefs に状態が保存され、 次回起動時に復元される。")]
-        public bool isMuted;
-        [Tooltip("ホットキーでミュートをトグル。 None で無効。")]
-        public KeyCode muteHotkey = KeyCode.None;
-        [Tooltip("PlayerPrefs に保存する Key。 同一プロジェクトで複数 BGM 系統があれば変える。")]
-        public string mutePrefKey = "TitleBgm.Muted";
+        [Header("タイトル以外の場面")]
+        [Tooltip("タイトル以外のフェーズになった時 (ランが始まった等) に消えていく秒数。 タイトルへ戻った時も同じ秒数で戻る。")]
+        [Range(0.05f, 5f)] public float phaseFade = 1.0f;
 
-        /// <summary>実際に鳴らす音量 = Inspector の <see cref="volume"/> × 設定の BGM の音量 (<see cref="GameSettings"/>・2026-11-11)。
+        /// <summary>実際に鳴らす音量 = Inspector の <see cref="volume"/> × 設定の BGM の音量 (<see cref="GameSettings"/>・2026-11-11) × タイトルの間か (#314)。
         /// メインの音量は AudioListener 側で掛かる。</summary>
-        private float Vol => volume * GameSettings.Bgm01;
+        private float Vol => volume * GameSettings.Bgm01 * _phaseK;
+
+        /// <summary>タイトルの間 = 1 / それ以外 = 0 へ <see cref="phaseFade"/> 秒で動く。 0 になったら一時停止する。</summary>
+        private float _phaseK = 1f;
+        private bool _phasePaused;
+
+        /// <summary>タイトルの曲を鳴らす場面か: GameManager が無い (タイトルのシーンだけの時) か、 フェーズがタイトル。</summary>
+        private static bool TitlePhase
+        {
+            get { var gm = GameLoop.GameManager.Instance; return gm == null || gm.CurrentPhase == GameLoop.GameManager.GamePhase.Title; }
+        }
 
         public BgmMode CurrentMode { get; private set; } = BgmMode.Day;
         public BgmMode PreviousMode { get; private set; } = BgmMode.Day;
@@ -77,10 +88,6 @@ namespace UI
             }
             ApplySpatialSettings();
             if (dontDestroyOnLoad) DontDestroyOnLoad(gameObject);
-
-            // ミュート状態を PlayerPrefs から復元
-            if (!string.IsNullOrEmpty(mutePrefKey))
-                isMuted = PlayerPrefs.GetInt(mutePrefKey, isMuted ? 1 : 0) != 0;
 
             // 全クリップを事前にロードしておく（モード切替時の初回 Play で固まらないように）
             foreach (var pc in new[] { clip, nightClip })
@@ -155,21 +162,6 @@ namespace UI
             _xfActive = true;
         }
 
-        /// <summary>BGM のミュート状態を設定する (PlayerPrefs にも保存)。</summary>
-        public void SetMuted(bool m)
-        {
-            if (isMuted == m) return;
-            isMuted = m;
-            if (!string.IsNullOrEmpty(mutePrefKey))
-            {
-                GameLoop.SaveGuard.SetInt(mutePrefKey, m ? 1 : 0);
-                GameLoop.SaveGuard.Save();
-            }
-        }
-
-        /// <summary>BGM のミュートをトグルする。</summary>
-        public void ToggleMute() => SetMuted(!isMuted);
-
         private void OnDisable()
         {
             if (_srcA != null && _srcA.isPlaying) _srcA.Stop();
@@ -188,9 +180,11 @@ namespace UI
         {
             if (_srcA == null) return;
 
-            // ホットキーでミュート切替
-            if (muteHotkey != KeyCode.None && Input.GetKeyDown(muteHotkey))
-                ToggleMute();
+            // タイトル以外の場面では消えて止まる (#314)。 タイトルへ戻ったら続きから戻る
+            _phaseK = Mathf.MoveTowards(_phaseK, TitlePhase ? 1f : 0f, Time.unscaledDeltaTime / Mathf.Max(0.05f, phaseFade));
+            if (_phaseK <= 0f && !_phasePaused) { _srcA.Pause(); if (_srcB != null) _srcB.Pause(); _phasePaused = true; }
+            else if (_phaseK > 0f && _phasePaused) { _srcA.UnPause(); if (_srcB != null && _xfActive) _srcB.UnPause(); _phasePaused = false; }
+            if (_phasePaused) return;
 
             // 音源位置を sourcePoint に追従
             if (sourcePoint != null && transform.position != sourcePoint.position)
@@ -222,13 +216,6 @@ namespace UI
             else if (_srcA.isPlaying && Mathf.Abs(_srcA.volume - Vol) > 0.001f)
             {
                 _srcA.volume = Vol;
-            }
-
-            // ミュート中は最終的に音量を 0 に上書き (フェード/クロスフェードの値を尊重したまま消音)
-            if (isMuted)
-            {
-                if (_srcA != null) _srcA.volume = 0f;
-                if (_srcB != null) _srcB.volume = 0f;
             }
         }
     }

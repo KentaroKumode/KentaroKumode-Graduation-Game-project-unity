@@ -64,7 +64,7 @@ namespace UI.Game2D
                         if (sel != 0) break;
                         int goal = System.Math.Max(0, System.Math.Min(Game2DModal.SlideTarget, ChallengeCards.MaxDifficulty));
                         int cap = MaxSelectable(st);
-                        if (goal > cap) { _modal.ShowToast("難易度 " + goal + " は、 " + (goal - 1) + " を踏破すると選べる"); goal = cap; }
+                        if (goal > cap) { _modal.ShowError("難易度 " + goal + " は、 " + (goal - 1) + " を踏破すると選べる"); goal = cap; }
                         if (goal != st.challengeDifficulty)
                         {
                             st.challengeDifficulty = goal;

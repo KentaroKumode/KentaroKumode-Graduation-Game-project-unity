@@ -869,7 +869,7 @@ namespace UI.Game2D
             {
                 if (a == "close") { _modal.Close(); return; }
                 if (a != "pick") return;
-                if (!sim.SetRecall(s, sel)) { Game2DSfx.Play("ui_click"); _modal.ShowToast("今は選べない"); return; }
+                if (!sim.SetRecall(s, sel)) { _modal.ShowError("今は選べない"); return; }
                 _drawn = -1;
                 _modal.Close();
             };
@@ -934,12 +934,12 @@ namespace UI.Game2D
                     case "use":
                     {
                         if (sel < 0 || sel >= rows.Count) return;
-                        if (!sim.CanUseItems) { _modal.ShowToast("今は使えない"); return; }
+                        if (!sim.CanUseItems) { _modal.ShowError("今は使えない"); return; }
                         var r = rows[sel]; var rs = GameManager.Instance?.Run;
                         string why = rs != null ? RowBlock(rs, r) : "使えない";
-                        if (why != null) { Game2DSfx.Play("ui_click"); _modal.ShowToast(why); return; }
+                        if (why != null) { _modal.ShowError(why); return; }
                         bool ok = r.rapier ? sim.UseRapier() : sim.UseItem(r.id);
-                        if (!ok) { Game2DSfx.Play("ui_click"); _modal.ShowToast("今は使えない"); return; }
+                        if (!ok) { _modal.ShowError("今は使えない"); return; }
                         Game2DSfx.Play("ui_confirm"); _modal.ShowToast(r.rapier ? (Consumables.RapierContreOn() ? "構えた" : "構えを解いた") : "使った");
                         _drawn = -1;
                         if (CombatItems().Count == 0) { _modal.Close(); return; }
