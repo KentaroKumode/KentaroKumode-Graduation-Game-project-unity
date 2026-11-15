@@ -2,7 +2,7 @@ namespace ItemSystem.PassiveSkills
 {
     /// <summary>
     /// 秘宝の列 (#320) に出す、 品 1 つの今の見え方 (2026-11-15 作り直し・作者の方針「条件を満たしている状態なら光り続ける、 満たしていなければ光らない」)。
-    /// 値は効果のクラスが自分の状態から作る (<see cref="IRelicDisplay"/>)。 画面 (Game2DBattleHud) はこれを読むだけで、 品と数のキーの対応を持たない。
+    /// 値は効果のクラスが自分の状態から作る (<see cref="IRelicDisplay"/>)。 画面 (UI.Game2D.Game2DBattleLcd の秘宝の列) はこれを読むだけで、 品と数のキーの対応を持たない。
     /// </summary>
     public struct RelicView
     {

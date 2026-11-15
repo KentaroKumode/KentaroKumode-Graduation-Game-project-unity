@@ -1,66 +1,35 @@
 namespace UI.Game2D
 {
     /// <summary>
-    /// 戦闘の画面 (<see cref="Game2DBattleHud"/>) の部品の場所 (480×270 の格子の dot・左上が原点・入りきった時の位置)。 2026-11-13。
-    /// <para>2026-11-15 (作者の決定「敵 HP は上のバーじゃなくて敵の下あたりに表示できるし、 激化も充電も左下に移植できると思う」・
-    /// 「敵 HP はゲーム内 GUI にしよう」): <b>上の帯を無くした</b> (敵の頭上 = 天与の剣の日食・審判官の日輪などの絵を隠していた)。
-    /// 敵の HP は液晶の中の敵の足もとの下 (<see cref="EnemyHpDx"/> ほか・Game2DBattleFx が描く)、 充電と激化は左下の <see cref="Gauge"/> へ。
-    /// 左の列を組み替えた: 出目 (Ports) を入口の下へ上げ、 ステータス → 充電と激化 → 操作 (位置と大きさは変えない) の順。 役の板は右上 (予告の枠の上) へ。</para>
-    /// <b>UnityEngine に依存しない</b> ── 検算 Tools/inventory_check がこのファイルをそのままコンパイルして、 持ち物の入口 (<see cref="Inv"/>) が
-    /// ほかの部品と重ならず 480×270 の中にあることを数える。 Game2DBattleHud はここの値から RectInt を作る (写しを持たない)。
+    /// 戦闘の画面の入口 [持ち物] と、 敵の詳細の窓を開く範囲 (480×270 の格子の dot・左上が原点)。
+    /// <para>2026-11-16 に旧い戦闘の HUD (液晶の外のパネル群: 予告の枠・ステータス・充電と激化の板・出目と差し込み口・操作・手札・役の板・秘宝の列) を消し、
+    /// 戦闘の画面は液晶の中 (<see cref="Game2DBattleLcd"/>・寸法の正本は <see cref="BattleLcdLayout"/>) になった。 ここに残すのは、
+    /// 検算 Tools/inventory_check が数える入口と、 その周りの部品の範囲だけ (値は BattleLcdLayout から作る・写しを持たない)。</para>
+    /// <b>UnityEngine に依存しない</b> ── 検算がこのファイルと BattleLcdLayout.cs をそのままコンパイルして、 入口がほかの部品と重ならず、 液晶の安全に見える範囲の中にあることを数える。
     /// </summary>
     public static class BattleHudLayout
     {
-        /// <summary>予告の枠 (右)。</summary>
-        public static readonly InventoryLayout.Box Right = new InventoryLayout.Box(370, 60, 108, 120);
-        /// <summary>自分のステータス (会心・攻撃・防御/貫通)。 2026-11-15: (2,162,108,48) → 出目の下へ上げた。</summary>
-        public static readonly InventoryLayout.Box Stat = new InventoryLayout.Box(2, 122, 108, 46);
-        /// <summary>充電 (10 個のランプ) と激化 (「あと N」と 5 個のランプ)。 2026-11-15 に上の帯から移した。 左の列 (108) より広く、 液晶の左下の端に 34 dot かかる
-        /// (ランプ 10 個 = 100 dot と「充電」の字が 1 行に入る幅)。</summary>
-        public static readonly InventoryLayout.Box Gauge = new InventoryLayout.Box(2, 170, 142, 40);
-        /// <summary>成立した役 (役があるターンだけ)。 2026-11-15: 左上 (2,20) → 右上 (予告の枠の上・上の帯が無くなって空いた所)。</summary>
-        public static readonly InventoryLayout.Box Role = new InventoryLayout.Box(386, 20, 92, 37);
-        /// <summary>出目と差し込み口 (出目 3 個の時の幅。 4 個目からは列を右へ足す・<see cref="PortsWidth"/>)。 2026-11-15: y 60 → 20 (入口の下)。</summary>
-        public static readonly InventoryLayout.Box Ports = new InventoryLayout.Box(2, 20, 108, 98);
-        /// <summary>振り直す・おまかせ / 道具・逃げる・決める。</summary>
-        public static readonly InventoryLayout.Box Ctl = new InventoryLayout.Box(2, 214, 108, 52);
-        /// <summary>手札の端子。</summary>
-        public static readonly InventoryLayout.Box Hand = new InventoryLayout.Box(318, 184, 160, 80);
-        /// <summary>敵の絵の範囲 (敵の詳細の窓を開く所・Game2DEnemyPanel.EnemyArea と同じ値)。</summary>
+        /// <summary>入口 [持ち物] の押せる範囲 (液晶の中の左上の字・<see cref="BattleLcdLayout.InvX"/>)。</summary>
+        public static readonly InventoryLayout.Box Inv = new InventoryLayout.Box(BattleLcdLayout.InvX, BattleLcdLayout.InvY - 1, BattleLcdLayout.RelicX - BattleLcdLayout.InvX - 2, 14);
+        /// <summary>敵の絵の範囲 (敵の詳細の窓を開く所・Game2DEnemyPanel)。</summary>
         public static readonly InventoryLayout.Box Enemy = new InventoryLayout.Box(190, 84, 100, 120);
-
-        /// <summary>持ち物の画面の入口 [持ち物] (2026-11-13)。 左上の角 (出目の上)。 キーは <see cref="InvKeyName"/>。</summary>
-        public static readonly InventoryLayout.Box Inv = new InventoryLayout.Box(2, 2, 56, 17);
-        /// <summary>秘宝の列 (#320・2026-11-15・作者「スレスパ式で左上に」): 入口 [持ち物] の右・画面の上の端 (上の帯は 2026-11-15 に無くした)。
-        /// 役の板 (<see cref="Role"/>・y 20〜) の上を通って画面の右端の手前まで。 アイコン 16×16 を <see cref="RelicPitch"/> dot おきに 1 列。</summary>
-        public static readonly InventoryLayout.Box RelicBar = new InventoryLayout.Box(60, 1, 418, 18);
-        /// <summary>秘宝の列の 1 枠の送り (アイコン 16 + 間 2)・左端の余白・アイコンの大きさ。</summary>
-        public const int RelicPitch = 18, RelicPad = 3, RelicIcon = 16;
-        /// <summary>1 列に入る枠の数 (これを超えたら最後の枠を「+N」にまとめる)。</summary>
-        public static int RelicSlots => (RelicBar.w - 2 * RelicPad + 2) / RelicPitch;
+        /// <summary>液晶の安全に見える範囲 (<see cref="BattleLcdLayout.SafeX0"/> ほか)。 入口はこの中に置く。</summary>
+        public static readonly InventoryLayout.Box Safe = new InventoryLayout.Box(BattleLcdLayout.SafeX0, BattleLcdLayout.SafeY0,
+            BattleLcdLayout.SafeX1 - BattleLcdLayout.SafeX0 + 1, BattleLcdLayout.SafeY1 - BattleLcdLayout.SafeY0 + 1);
 
         /// <summary>入口のキーの名前 (画面の字・ボタンには出さない)。</summary>
         public const string InvKeyName = "I";
         /// <summary>入口の字。</summary>
         public const string InvLabel = "持ち物";
 
-        /// <summary>差し込み口の列の幅と、 1 列の出目の数 (Game2DBattleHud と同じ)。</summary>
-        public const int PortRows = 3, PortColW = 76;
-        /// <summary>出目 n 個の時の Ports の幅。</summary>
-        public static int PortsWidth(int n) => Ports.w + (System.Math.Max(1, (n + PortRows - 1) / PortRows) - 1) * PortColW;
-
-        /// <summary>入口と重なってはいけない部品 (出目は 9 個の時の幅で見る)。</summary>
+        /// <summary>入口と重なってはいけない部品: 秘宝の列・山と捨て札の数 (右上・幅は多めに 80)・敵・手札の行・床の出目 (9 個)。</summary>
         public static InventoryLayout.Box[] Others => new[]
         {
-            Right, Stat, Gauge, Role, new InventoryLayout.Box(Ports.x, Ports.y, PortsWidth(9), Ports.h), Ctl, Hand, Enemy, RelicBar,
+            new InventoryLayout.Box(BattleLcdLayout.RelicX - 1, BattleLcdLayout.RelicY - 1, BattleLcdLayout.RelicRight - BattleLcdLayout.RelicX + 2, 18),
+            new InventoryLayout.Box(BattleLcdLayout.DeckRight - 80, BattleLcdLayout.DeckY, 80, 13),
+            Enemy,
+            new InventoryLayout.Box(BattleLcdLayout.HandX0, BattleLcdLayout.HandY - BattleLcdLayout.Lift, BattleLcdLayout.HandX1 - BattleLcdLayout.HandX0, BattleLcdLayout.CardH + BattleLcdLayout.Lift + BattleLcdLayout.Arc),
+            new InventoryLayout.Box(BattleLcdLayout.FloorX, BattleLcdLayout.FloorY - 2 * BattleLcdLayout.FloorRowStep, 3 * BattleLcdLayout.FloorStepX + BattleLcdLayout.FloorStepX / 2, 2 * BattleLcdLayout.FloorRowStep + 18 + BattleLcdLayout.FloorZig),
         };
-
-        // ── 敵の HP (液晶の中・Game2DBattleFx が描く・2026-11-15) ──
-        //   敵の足もと (BattleMotion.FloorY = 196) のすぐ下に、 棒 (枠 1 dot + 中身) と、 その下の中央に「今/最大」の数字。
-        //   足もとの下で液晶が見えている所は x 170〜290 の y 〜218 (その下は資源バーの物資・シールドの板 y 219〜・x 290〜 は丸い窓の台 y 205〜) なので、 その中に収める。
-        /// <summary>棒の位置 (敵の体の中心 x と足もとの y からのずれ) と大きさ (dot)。 中身は (w − 2)×(h − 2)。 y 199〜204。</summary>
-        public const int EnemyHpDx = -50, EnemyHpDy = 3, EnemyHpW = 100, EnemyHpH = 6;
-        /// <summary>数字の上端 (棒の上端からのずれ・棒の中央にそろえる)。 y 206〜217 (影は 218 まで)。</summary>
-        public const int EnemyHpTextDy = EnemyHpH + 1;
     }
 }

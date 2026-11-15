@@ -225,7 +225,7 @@ namespace UI.Game2D.Battle
         /// <summary>チャージの後の待機を出しているか。</summary>
         public bool BossIdling => _boss.Idling;
         /// <summary>戦闘の外側の GUI を画面の外へ格納するか (2026-11-15・<see cref="BossFx.StowGui"/>: ボスの大技の発動とヴェスカの形態移行の間)。
-        /// Game2DBattleHud (左・右・上のパネル) と Game2DHud (下の資源バー) が読んで、 近い辺へ滑らせる。 戦闘の演出を出していない時は false
+        /// Game2DBattleLcd (液晶の中の戦闘の画面) が読んで、 部品を近い辺へ滑らせる。 戦闘の演出を出していない時は false
         /// (戦闘が途中で終わる・ダウンで取り消す・始め直すと、 区間が消えて自然に false = GUI が戻る)。</summary>
         public bool GuiStowed
         {
@@ -789,10 +789,10 @@ namespace UI.Game2D.Battle
                         float dx = (x - W / 2f) / 240f, dy = (y - H / 2f) / 135f, d = Mathf.Sqrt(dx * dx + dy * dy), lv = Cl((d - 0.55f) / 0.7f, 0, 1) * _flashR * 14;
                         if (lv > BattleCanvas.Bayer[(y & 3) * 4 + (x & 3)]) _c.Put(x, y, new Col(170, 24, 12), 0.7f);      // 被弾の赤い縁 (網点)
                     }
-            // 新しい戦闘の画面 (Game2DBattleLcd・2026-11-16): 頭上の前触れ・足もとの棒・手札と操作を、 この作図面へ直接描く (旧画面の間は null)
+            // 戦闘の画面 (Game2DBattleLcd・2026-11-16〜): 頭上の前触れ・足もとの棒・手札と操作を、 この作図面へ直接描く (戦闘の流れが動いていない時は null)
             var lcd = Game2DBattleLcd.Drawing ? Game2DBattleLcd.Instance : null;
             if (SimDriven && (_phase == Phase.Idle || _phase == Phase.Dot) && !_boss.Busy) { DrawMarks(EX + ep.dx, FLOOR + bob + ep.y); if (lcd != null) lcd.DrawHead(_c, EX + ep.dx, FLOOR + bob + ep.y); }
-            if (SimDriven && _phase != Phase.Intro && _phase != Phase.Won) { if (lcd != null) lcd.DrawFoot(_c); else DrawEnemyHp(); }      // 演出の絵 (大技のコマ) より手前・ダメージの数字より奥
+            if (SimDriven && _phase != Phase.Intro && _phase != Phase.Won) { if (lcd != null) lcd.DrawFoot(_c); }      // 演出の絵 (大技のコマ) より手前・ダメージの数字より奥
             if (SimDriven && lcd != null) lcd.DrawUi(_c);      // 手札・出目・左下・右下 (ダメージの数字より奥)
             foreach (var d in _dmgs)
             {
@@ -996,35 +996,7 @@ namespace UI.Game2D.Battle
             if (m.guard) { const string g = "構え"; int gw = Game2DJpFont.Width(g); Text35(g, x0 - 54 - gw, fe - 50, 1, MarkBuff, 0); }      // バフ: 体の左下 (構えは絵が無いので字)
         }
 
-        // ── 敵の HP (2026-11-15・作者の決定「敵 HP はゲーム内 GUI にしよう」) ──
-        //   上の帯 (外側の GUI) から、 液晶の中の敵の足もとの下へ移した。 描き方は液晶の中のほかの表示 (予告・毒・出血の印・ダメージの数字) と同じ:
-        //   作図面へ直接、 長方形 (BattleCanvas.Rect) とドット字 (Text35・影つき) で打つ。 外側の GUI の絵 (枠・ゲージ) は使わない。
-        //   場所と大きさは BattleHudLayout.EnemyHp* (足もと = BattleMotion.FloorY・敵の体の中心 = EX に固定 ── 体の揺れ・飛び込みでは動かない)。
-        //   大技の暗幕 (GuiDark) が掛かっている間は同じ割合で暗くし、 真っ黒になる間は消える。 大技の揺れ・帯のずれは画面ごと一緒に掛かる。
-        //   GUI を格納しても (大技の発動) これは液晶の中なので残り、 大技で HP が減る所が見える。
-        private static readonly Col HpFill = Col.Hex("#d1503c"), HpEmpty = Col.Hex("#2a1414"), HpEdge = Col.Hex("#0c0c0c"), HpNotchDone = Col.Hex("#6a5a48");
-        private void DrawEnemyHp()
-        {
-            float a = Mathf.Clamp01(_boss.Active ? _boss.GuiDark : 1f);
-            if (a <= 0.02f) return;
-            int x = EX + BattleHudLayout.EnemyHpDx, y = FLOOR + BattleHudLayout.EnemyHpDy, w = BattleHudLayout.EnemyHpW, h = BattleHudLayout.EnemyHpH;
-            Col Dk(Col c) => new Col((int)(c.r * a), (int)(c.g * a), (int)(c.b * a));
-            _c.Rect(x, y, w, h, Dk(HpEdge));
-            int inner = w - 2, fill = Mathf.Clamp(Mathf.CeilToInt(inner * _ehp / (float)Mathf.Max(1, _eMax)), _ehp > 0 ? 1 : 0, inner);
-            _c.Rect(x + 1, y + 1, inner, h - 2, Dk(HpEmpty));
-            if (fill > 0) _c.Rect(x + 1, y + 1, fill, h - 2, Dk(HpFill));
-            // ボスのダウンの目盛り: 棒の高さいっぱいの 1 dot の刻み。 まだ割っていない = 明るい橙・割った = 暗い・ひび = 刻みの中ほどを欠く (状態は色と形・大きさは変えない)
-            var m = marks;
-            if (m.notches != null)
-                for (int i = 0; i < m.notches.Length; i++)
-                {
-                    int nx = x + 1 + Mathf.Clamp(Mathf.RoundToInt(inner * m.notches[i]), 1, inner - 2);
-                    bool cracked = i >= m.notchBroken && m.cracks != null && i < m.cracks.Length && m.cracks[i] >= 0;
-                    if (cracked) { _c.Rect(nx, y - 1, 1, 2, Dk(MarkHeavy)); _c.Rect(nx, y + h - 1, 1, 2, Dk(MarkHeavy)); }
-                    else _c.Rect(nx, y - 1, 1, h + 2, Dk(i < m.notchBroken ? HpNotchDone : MarkHeavy));
-                }
-            Text35(_ehp + "/" + _eMax, x + w / 2, y + BattleHudLayout.EnemyHpTextDy, 1, Dk(MarkAtk), 1);
-        }
+        // ── 敵の HP の棒は、 液晶の中の戦闘の画面 (Game2DBattleLcd.DrawFoot) が描く (2026-11-16〜・旧 DrawEnemyHp は旧い戦闘の HUD と一緒に削除) ──
 
         private int MarkItem(string icon, int n, int x, int y, Col col)
         {

@@ -7,7 +7,7 @@ namespace UI.Game2D
 {
     /// <summary>
     /// 敵の詳細 (#15・<b>仮置き</b>・2026-11-11)。 戦闘中に、 いま戦っている敵の HP・防御・攻撃の幅・パッシブの名前と説明・今の状態 (毒・出血・構え・大技・激化) を
-    /// 共通の板のモーダルで見る。 戦闘の HUD (<see cref="Game2DBattleHud"/>) の配置には手を付けず、 上に重ねるだけ。
+    /// 共通の板のモーダルで見る。 戦闘の画面 (<see cref="Game2DBattleLcd"/>) の配置には手を付けず、 上に重ねるだけ。
     /// <para>開き方: Tab か、 液晶の中央の敵 (x 190〜290・y 84〜204 の範囲) をクリック。 閉じる: Tab・Esc・「閉じる」。 開いている間は戦闘のキー操作を止める
     /// (<see cref="Game2DBattleSim"/> が <see cref="Game2DModal.Active"/> を見る)。 値は開いている間も追って描き直す。 戦闘が終わったら閉じる。</para>
     /// 本番の絵は別 issue (#101)。
@@ -51,7 +51,7 @@ namespace UI.Game2D
             if (modal.IsOpen || Game2DModal.Active || !InCombat()) return;
             // 手札・出目をつかんでいる間と、 落とした瞬間は開かない (2026-11-11)。 敵の範囲は手札 (x 318〜)・差し込み口 (x 〜186) と重ならないので
             //   押した所からつかみは始まらないが、 Tab と、 フレームの順で押下と離しが前後する場合のために、 戦闘の画面の印を見る
-            if (Game2DBattleHud.PointerBusy) return;
+            if (Game2DBattleLcd.PointerBusy) return;
             if (Input.GetKeyDown(KeyCode.Tab) || (Input.GetMouseButtonDown(0) && ClickedEnemy())) Open();
         }
 

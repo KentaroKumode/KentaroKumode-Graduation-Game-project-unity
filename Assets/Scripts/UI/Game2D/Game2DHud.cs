@@ -21,9 +21,7 @@ namespace UI.Game2D
         public Game2DNavPanel panel;
 
         [Header("戦闘だけ")]
-        public GameObject battleOnly;
         [Tooltip("航行の計器の足りない分 (天気・層・警告・待つ・職業・状態異常・アイテム枠・脱出)。 戦闘中は引っ込む")] public Game2DNavExtras extras;
-        [Tooltip("戦闘の GUI (仮置き)。 航行用の GUI と入れ替わりに入ってくる")] public Game2DBattleHud battleHud;
         [Tooltip("戦闘の流れ (試作)。 動いている間は HP とシールドの表示をこちらの値にする")] public Battle.Game2DBattleSim battleSim;
 
         [Header("全体")]
@@ -192,18 +190,12 @@ namespace UI.Game2D
             }
             if (gold != null) ((RectTransform)gold.transform).anchoredPosition = _goldBase + new Vector2(0, Mathf.Round(_spGold.Value(110f) * 110f));      // GOLD の入れ物は戦闘中は出さない (上へ引っ込む)
             if (extras != null) extras.Drive(_spNav.Value(100f));
-            // 新しい戦闘の画面 (液晶の中・Game2DBattleLcd・2026-11-16) を使う間は、 旧画面のパネル (Game2DBattleHud) を出さない
-            bool lcd = Game2DBattleLcd.Use;
-            if (battleHud != null) { battleHud.Drive(_battle && !lcd, dt); if (battleOnly != null) battleOnly.SetActive(battleHud.Visible); }      // 戦闘の GUI は、 入ってくる間・出ていく間も生かす
-            // 大技の発動の間の格納 (2026-11-15): 下の資源バー (戦闘中は HP とシールドの帯) を、 戦闘の GUI と同じばねで下へ。
-            //   レーダーは資源バーの右の窓に載っている部品なので一緒に下げる (分けると窓の無い所に浮く)
-            float down = battleHud != null ? Mathf.Round(battleHud.StowValue(Game2DBattleHud.StowBottom) * Game2DBattleHud.StowBottom) : 0f;
-            // 新しい戦闘の画面の間 (2026-11-16・作者の決定「戦闘中は筐体の下の HP 帯とレーダーを別の部品として出さない」):
+            // 戦闘の画面は液晶の中 (Game2DBattleLcd・2026-11-16〜)。 作者の決定「戦闘中は筐体の下の HP 帯とレーダーを別の部品として出さない」:
             //   HP とシールドは液晶の中の左下へ移したので、 戦闘の入りで資源バーとレーダーを下へ滑らせて隠し、 出で戻す (航行の GUI の出し入れと同じばね)。
             //   レーダー (魔石) は航行の地図の追跡者の歩数と方角 (FreeMapSim.Stone) で、 戦闘の中では変わらず戦闘の判断にも使わないので、 液晶の中へは移さない。
-            //   旧画面へ切り替えた時 (F12・見比べ用) は今までどおり出る
-            _spBottom.Go(_battle && lcd ? 1f : 0f, _battle ? 0.06f : 0.1f); _spBottom.Step(dt);
-            down = Mathf.Max(down, Mathf.Round(_spBottom.Value(BattleBottomHide) * BattleBottomHide));
+            //   レーダーは資源バーの右の窓に載っている部品なので一緒に下げる (分けると窓の無い所に浮く)
+            _spBottom.Go(_battle ? 1f : 0f, _battle ? 0.06f : 0.1f); _spBottom.Step(dt);
+            float down = Mathf.Round(_spBottom.Value(BattleBottomHide) * BattleBottomHide);
             if (resBar != null) ((RectTransform)resBar.transform).anchoredPosition = _resBase - new Vector2(0, down);
             if (radar != null) ((RectTransform)radar.transform).anchoredPosition = _radarBase - new Vector2(0, down);
             if (root != null)

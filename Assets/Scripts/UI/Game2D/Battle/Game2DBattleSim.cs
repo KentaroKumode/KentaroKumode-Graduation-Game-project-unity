@@ -7,7 +7,7 @@ namespace UI.Game2D.Battle
 {
     /// <summary>
     /// 戦闘の流れ (<b>仮置き</b>・2026-10-31 に実戦闘へ接続)。 <see cref="CombatManager"/> の「人が操作するターン」
-    /// (<see cref="CombatManager.BeginInteractiveTurn"/>) を進め、 <see cref="Game2DBattleFx"/> の演出と <see cref="Game2DBattleHud"/> の GUI をつなぐ。
+    /// (<see cref="CombatManager.BeginInteractiveTurn"/>) を進め、 <see cref="Game2DBattleFx"/> の演出と <see cref="Game2DBattleLcd"/> (液晶の中の戦闘の画面) をつなぐ。
     /// 1 ターン: 敵の攻撃が予告される → 自分のダイスが出る → (充電を払って振り直す) → 配線 → [GO!] → 自分の攻撃 → 敵の攻撃 → 次のターン。
     /// HP・出目・配線・ダメージはすべて本物で、 この部品は値を作らない (見せる順番と間だけを持つ)。
     /// 操作: [GO! / NEXT] ボタンか Space / 出目のクリックか 1〜9 / [REROLL] ボタンか E / Q = おまかせ。
@@ -736,7 +736,7 @@ namespace UI.Game2D.Battle
         }
 
         // ── 〈有効活用〉(手札の持ち越しの規則): 捨て札から 1 枚を選ぶ ──
-        //   対象は場ではなく捨て札 (場に見えていない) なので、 画面は窓で選ぶ (Game2DBattleHud.OpenRecall)。 値は target[その端子の場の位置] = 捨て札の添字。
+        //   対象は場ではなく捨て札 (場に見えていない) なので、 画面は窓で選ぶ (BattleWindows.OpenRecall)。 値は target[その端子の場の位置] = 捨て札の添字。
         //   選ばなければ本体の既定 (最後に捨てた 1 枚・TerminalDeckState.RecallPick)。 選んだ値も既定も、 本体と同じ関数で読む。
 
         // ── 手札の規則 Pick: 残す印 ──

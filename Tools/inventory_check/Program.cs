@@ -5,7 +5,7 @@
 //      全部の品に、 矢印と送りで届く・吹き出しが窓の中 (= 480×270 の中) で升目に重ならない
 //   3. items.json の全件: 詳細の欄 (説明文 + フレーバー文・売値と印は最長の形) が、 欄の幅で折り返して頁に割っても字を 1 つも落とさない・
 //      吹き出し (品名 + 説明文) が窓の高さに入る
-//   5. 戦闘の画面の入口 [持ち物] (BattleHudLayout.Inv): 480×270 の中で、 ほかの部品 (予告の枠・上の帯・ステータス・役・出目・操作・手札・敵) に重ならず、 字が入る
+//   5. 戦闘の画面の入口 [持ち物] (BattleHudLayout.Inv・液晶の中の左上): 液晶の安全に見える範囲の中で、 ほかの部品 (秘宝の列・山と捨て札・敵・手札・床の出目) に重ならず、 字が入る
 //   4. アイコンの無い品 (Resources/Icons/Items/<id>.png が無い品) の仮の字: 升目の内側に収まり、 アイコンの無い品どうしで (字・レア度) が重ならない
 using System;
 using System.Collections.Generic;
@@ -88,7 +88,8 @@ static class Program
         var hit = BattleHudLayout.Others.Where(o => inv.Overlaps(o)).ToList();
         Console.WriteLine($"戦闘の画面の入口 [{BattleHudLayout.InvLabel}] {inv} (キー {BattleHudLayout.InvKeyName})");
         Check(inv.Inside(screen), $"戦闘の画面の入口 {inv} が 480×270 の中");
-        Check(hit.Count == 0, "戦闘の画面の入口が、 予告の枠・上の帯・ステータス・役・出目 (9 個の幅)・操作・手札・敵に重ならない" + (hit.Count > 0 ? ": " + string.Join(" ", hit) : ""));
+        Check(inv.Inside(BattleHudLayout.Safe), $"戦闘の画面の入口 {inv} が液晶の安全に見える範囲 {BattleHudLayout.Safe} の中 (湾曲で縁が欠けない)");
+        Check(hit.Count == 0, "戦闘の画面の入口が、 秘宝の列・山と捨て札・敵・手札・床の出目に重ならない" + (hit.Count > 0 ? ": " + string.Join(" ", hit) : ""));
         Check(Width(BattleHudLayout.InvLabel) + 6 <= inv.w && LineH <= inv.h + 1, $"入口の字「{BattleHudLayout.InvLabel}」{Width(BattleHudLayout.InvLabel)} dot が入口 ({inv.w}×{inv.h}) に入る");
     }
 

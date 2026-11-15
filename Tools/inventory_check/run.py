@@ -22,7 +22,7 @@ CSC = UNITY + '/DotNetSdkRoslyn/csc.dll'
 RUNTIME = 'C:/Program Files/dotnet/shared/Microsoft.NETCore.App'
 SOURCES = ['Assets/Scripts/UI/Game2D/JpTextLayout.cs', 'Assets/Scripts/UI/Game2D/Screens/ModalJpMetrics.cs',
            'Assets/Scripts/UI/Game2D/Screens/InventoryLayout.cs', 'Assets/Scripts/UI/Game2D/Screens/ItemCardInfo.cs',
-           'Assets/Scripts/UI/Game2D/BattleHudLayout.cs']
+           'Assets/Scripts/UI/Game2D/BattleHudLayout.cs', 'Assets/Scripts/UI/Game2D/BattleLcdLayout.cs']
 
 
 def fwd(p):

@@ -8,7 +8,7 @@ namespace UI.Game2D
 {
     /// <summary>
     /// 液晶の中に描く戦闘の画面 (2026-11-16・大規模改修の第 1 段・ブランチ battle-ui-lcd)。
-    /// 旧画面 (<see cref="Game2DBattleHud"/>: 液晶の外の層に浮くパネル群 + 筐体の下の HP 帯) をやめ、 戦闘の表示と操作を<b>液晶の中の 1 枚の絵</b>として描く
+    /// 旧画面 (Game2DBattleHud: 液晶の外の層に浮くパネル群 + 筐体の下の HP 帯・2026-11-16 に削除・GAME.md §24) をやめ、 戦闘の表示と操作を<b>液晶の中の 1 枚の絵</b>として描く
     /// (演出 <see cref="Game2DBattleFx"/> の作図面 480×270 へ、 敵・背景・演出と同じ dot で打つ ── 走査線などの液晶の効果も同じく掛かる)。
     /// 見本は Captures/ui_layout/scene/still.png・tip.png・turn.gif (座標の正本は <see cref="BattleLcdLayout"/>)。
     ///
@@ -30,18 +30,19 @@ namespace UI.Game2D
     /// 食われる分 = 予告の攻撃値 (ブロックの前・防御の後) + 〈業火〉の烈炎、 覆った分 = 見込みのブロック + シールド (旧画面の資源バーの「守り」と同じ値) を出す。
     /// 本当の見込みは本体に関数を足してから差し替える。</para>
     ///
-    /// <para>新旧は <see cref="Use"/> 1 つで選ぶ。 <b>このブランチの既定は新しい画面</b>。 エディタと開発ビルドでは F12 で旧画面と見比べられる (見比べ用の仮の口・作者の判断が済んだら消す)。
-    /// 旧画面の時は、 筐体の下の HP 帯とレーダーも元どおり出る (<see cref="Game2DHud"/>)。 BOT がランを動かしている間は戦闘の流れ (<see cref="Game2DBattleSim"/>) が動かないので、 この画面も出ない。</para>
+    /// <para>戦闘中は筐体の下の HP 帯とレーダーを常に隠す (<see cref="Game2DHud"/>)。 道具・〈有効活用〉・持ち物の窓は <see cref="BattleWindows"/>。
+    /// BOT がランを動かしている間は戦闘の流れ (<see cref="Game2DBattleSim"/>) が動かないので、 この画面も出ない。</para>
     /// </summary>
     public class Game2DBattleLcd : MonoBehaviour
     {
-        /// <summary>新しい画面を使うか (false = 旧 HUD)。 このブランチの既定は true。</summary>
-        public static bool Use = true;
         public static Game2DBattleLcd Instance { get; private set; }
         /// <summary>新しい画面が戦闘を受け持っているか (戦闘の流れが動いている)。</summary>
-        public static bool Drawing => Use && Instance != null && Game2DBattleSim.Active;
+        public static bool Drawing => Instance != null && Game2DBattleSim.Active;
 
-        private Game2DBattleSim _sim; private Game2DBattleFx _fx; private Game2DBattleHud _hud; private Game2DScreen _screen;
+        /// <summary>手引きの強調 (issue #109) が範囲を読む部品。</summary>
+        public enum Part { Intent, Gauge, Ports, Stat, Ctl, Hand }
+
+        private Game2DBattleSim _sim; private Game2DBattleFx _fx; private BattleWindows _win; private Game2DScreen _screen;
 
         // ── 色 (見本の ui_scene_mock.py の値) ──
         private static readonly Color32 Bone = new Color32(242, 236, 216, 255), Gold = new Color32(244, 200, 92, 255), Gold2 = new Color32(255, 232, 160, 255),
@@ -66,7 +67,7 @@ namespace UI.Game2D
         private static int _releaseFrame = -10;
         private enum Zone { None, Head, Hp, Orb, Deck }
 
-        /// <summary>出目・カードをつかんでいる間と、 離したフレーム (の次まで) は true (敵の詳細の窓を開かない・<see cref="Game2DBattleHud.PointerBusy"/>)。</summary>
+        /// <summary>出目・カードをつかんでいる間と、 離したフレーム (の次まで) は true (敵の詳細の窓 Game2DEnemyPanel を開かない)。</summary>
         public static bool PointerBusy => Instance != null && (Instance._dragDie >= 0 || Instance._dragCard >= 0 || Instance._pressDie >= 0 || Instance._pressCard >= 0 || Time.frameCount <= _releaseFrame + 1);
 
         private void OnEnable() { Instance = this; }
@@ -80,8 +81,8 @@ namespace UI.Game2D
         {
             if (_sim == null) _sim = GetComponent<Game2DBattleSim>();
             if (_fx == null && _sim != null) _fx = _sim.fx;
-            if (_hud == null) _hud = FindObjectOfType<Game2DBattleHud>(true);
-            if (_screen == null) _screen = _hud != null && _hud.screen != null ? _hud.screen : FindObjectOfType<Game2DScreen>();
+            if (_win == null && _sim != null) _win = new BattleWindows(_sim, null);
+            if (_screen == null) _screen = FindObjectOfType<Game2DScreen>();
         }
 
         // =====================================================================
@@ -90,10 +91,6 @@ namespace UI.Game2D
 
         private void Update()
         {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-            // 見比べ用の仮の口 (2026-11-16): F12 で新旧の画面を切り替える。 作者の判断が済んだら消す
-            if (Input.GetKeyDown(KeyCode.F12)) { Use = !Use; CancelAll(); Debug.Log("[Game2DBattleLcd] 戦闘の画面: " + (Use ? "新 (液晶の中)" : "旧 (液晶の外のパネル)")); }
-#endif
             Bind();
             float dt = Mathf.Min(0.05f, Time.unscaledDeltaTime);
             if (!_spInit) { _spHand.Set(1f); _spStow.Set(0f); _spExtra.Set(1f); _spInit = true; }
@@ -124,6 +121,8 @@ namespace UI.Game2D
         }
 
         private bool Stowed => _spStow.tgt > 0.5f || _spStow.x > 0.02f;
+        /// <summary>大技の格納のばねの値 (0 = 出ている / 1 = 格納・QA の口 QaBattle が読む)。</summary>
+        public float StowValue => _spStow.x;
         private bool HandUp => _handOff == 0 && _spHand.tgt < 0.5f;
         /// <summary>左右・上の列が出ているか (押せるか・触った時の帯を出してよいか)。</summary>
         private bool ExtrasUp => _leftOff == 0 && _rightOff == 0 && _topOff == 0;
@@ -184,7 +183,7 @@ namespace UI.Game2D
                 if (ExtrasUp && sim.CanOperate)
                 {
                     if (In(d, SideRect(0))) { sim.AutoWire(); return; }
-                    if (In(d, SideRect(1))) { if (_hud != null) _hud.OpenItems(); return; }
+                    if (In(d, SideRect(1))) { if (_win != null) _win.OpenItems(); return; }
                     if (In(d, SideRect(2))) { PressFlee(); return; }
                 }
                 if (GoVisible && In(d, GoRect())) { if (sim.ButtonEnabled) { _fleeArmed = false; sim.Button(); } return; }
@@ -207,7 +206,7 @@ namespace UI.Game2D
                 if (die >= 0) sim.CycleWire(die, 1);
                 else if (card >= 0)
                 {
-                    if (sim.IsRecaller(card)) { if (_hud != null) _hud.OpenRecall(card); }
+                    if (sim.IsRecaller(card)) { if (_win != null) _win.OpenRecall(card); }
                     else if (sim.CanKeep(card)) sim.ToggleKeep(card);
                     else Game2DSfx.Play("ui_click");
                 }
@@ -220,7 +219,7 @@ namespace UI.Game2D
                 {
                     if (sim.slot[dragDie] == over) return;
                     bool wasRecall = sim.IsRecaller(over);
-                    if (sim.PlugDie(dragDie, over)) { if (!wasRecall && sim.IsRecaller(over) && _hud != null) _hud.OpenRecall(over); }
+                    if (sim.PlugDie(dragDie, over)) { if (!wasRecall && sim.IsRecaller(over) && _win != null) _win.OpenRecall(over); }
                     else Game2DSfx.Play("ui_click");      // 挿せない札: 出目は元の所に残る
                 }
                 else if (sim.slot[dragDie] >= 0) sim.Unplug(dragDie);      // 札の外で離した = 床へ戻す
@@ -239,7 +238,7 @@ namespace UI.Game2D
 
         private void OpenInventory()
         {
-            if (_hud != null) _hud.OpenInventory();
+            if (_win != null) _win.OpenInventory();
         }
 
         // =====================================================================
@@ -317,21 +316,21 @@ namespace UI.Game2D
         }
 
         /// <summary>手引きの強調 (issue #109) の範囲 (格子の dot)。 部品が無ければ null。 escalation = 「戦闘の長期化」(激化は敵の頭上)。</summary>
-        public RectInt? FocusRect(Game2DBattleHud.Part p, bool escalation)
+        public RectInt? FocusRect(Part p, bool escalation)
         {
             if (!Drawing || _sim == null) return null;
             switch (p)
             {
-                case Game2DBattleHud.Part.Intent: return HeadRect();
-                case Game2DBattleHud.Part.Gauge: return escalation ? HeadRect() : new RectInt(BattleLcdLayout.LeftX, BattleLcdLayout.OrbY - BattleLcdLayout.OrbR - 2, 80, BattleLcdLayout.OrbR * 2 + 5);
-                case Game2DBattleHud.Part.Ports:
+                case Part.Intent: return HeadRect();
+                case Part.Gauge: return escalation ? HeadRect() : new RectInt(BattleLcdLayout.LeftX, BattleLcdLayout.OrbY - BattleLcdLayout.OrbR - 2, 80, BattleLcdLayout.OrbR * 2 + 5);
+                case Part.Ports:
                 {
                     int n = Mathf.Max(1, _sim.DiceCount); int x0 = 999, y0 = 999, x1 = 0, y1 = 0;
                     for (int i = 0; i < n; i++) { BattleLcdLayout.FloorPos(i, out int x, out int y); x0 = Mathf.Min(x0, x); y0 = Mathf.Min(y0, y); x1 = Mathf.Max(x1, x + 18); y1 = Mathf.Max(y1, y + 18); }
                     return new RectInt(x0, y0, x1 - x0, y1 - y0);
                 }
-                case Game2DBattleHud.Part.Stat: return HpRect();
-                case Game2DBattleHud.Part.Ctl: return new RectInt(BattleLcdLayout.SideRight - 52, BattleLcdLayout.SideY, 54, BattleLcdLayout.GoLineY - BattleLcdLayout.SideY + 2);
+                case Part.Stat: return HpRect();
+                case Part.Ctl: return new RectInt(BattleLcdLayout.SideRight - 52, BattleLcdLayout.SideY, 54, BattleLcdLayout.GoLineY - BattleLcdLayout.SideY + 2);
                 default: return new RectInt(BattleLcdLayout.HandX0, BattleLcdLayout.HandY - BattleLcdLayout.Lift, BattleLcdLayout.HandX1 - BattleLcdLayout.HandX0, BattleLcdLayout.SafeY1 + 2 - BattleLcdLayout.HandY + BattleLcdLayout.Lift);
             }
         }
@@ -543,7 +542,7 @@ namespace UI.Game2D
             var s = _sim; int ox = RightOff;
             if (s.CanOperate && _rightOff < RightHide)
             {
-                bool[] on = { s.CanOperate, _hud != null && _hud.AnyUsable(), s.CanFlee };
+                bool[] on = { s.CanOperate, _win != null && _win.AnyUsable(), s.CanFlee };
                 for (int k = 0; k < 3; k++) { var r = SideRect(k); Txt(SideLabel(k), r.x + 1, r.y + 1, k == 2 && _fleeArmed ? RedC : on[k] ? Bone : DimC); }
             }
             if (!GoVisible) return;
@@ -776,7 +775,7 @@ namespace UI.Game2D
             if (sim.IsStopped(f)) extra.AddRange(Game2DJpFont.Lines(d.permanent ? "止まっている (このターンは挿せない)" : "止まっている (このターンは挿せない・次のターンまで手札に残る)", iw));
             if (sim.IsKept(f)) extra.AddRange(Game2DJpFont.Lines("次のターンも手札に残す (押して外す)", iw));
             else if (sim.CanKeep(f) && !sim.ShowingResult && sim.Remaining(f) > 0) extra.AddRange(Game2DJpFont.Lines("押すと、 挿さなかった時に次のターンも手札に残す", iw));
-            string tgt = _hud != null ? _hud.TargetLine(f) : null;
+            string tgt = _win != null ? _win.TargetLine(f) : null;
             if (tgt != null) extra.AddRange(Game2DJpFont.Lines(tgt, iw));
             if (sim.IsTargetCandidate(f, out _)) extra.AddRange(Game2DJpFont.Lines("つかんで、 対象を取る札の上へ落とすと対象に決まる", iw));
             for (int q = 0; q < sim.board.Count && !sim.ShowingResult; q++)
@@ -836,7 +835,7 @@ namespace UI.Game2D
         }
 
         // ── 秘宝の列 (#320 の左上の列を液晶の中へ移した・仮置き) ──
-        //   中身は旧画面 (Game2DBattleHud の秘宝の列) の写し。 旧画面を消す時はこちらだけ残す。
+        //   中身は旧画面 (2026-11-16 に削除) の秘宝の列のまま。
         //   見え方は本体 (ItemSystem.PassiveSkills.RelicLookup) が品ごとに返す: 状態 = 光っている間は縁を光らせ絵を少し明るく・数・使用済みは暗く /
         //   出来事に反応する品 = 0.5 秒 (1 秒 8 コマの 4 コマ) 縁が光る / 【規則】の品 = 光らせない。
 
