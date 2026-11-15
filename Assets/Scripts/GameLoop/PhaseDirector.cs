@@ -57,6 +57,26 @@ namespace GameLoop
 
         private void OnPhaseChanged(GameManager.GamePhase _) => Apply();
 
+        /// <summary>実行時に、 <paramref name="t"/> を写す表示の欄 (欄の target が t 自身か t の祖先) に、 表示するフェーズを足す (シーンの設定は書き換えない・2026-11-15 #328)。
+        /// エンディングの画面は液晶の中身のカメラ (シーンでは踏破 RunClear・裂け目の一択 RiftChoice のフェーズで止めていた) に写るので、 その間もカメラを生かす。 足したら今のフェーズで当て直す。</summary>
+        public static void AlsoShowFor(Transform t, params GameManager.GamePhase[] phases)
+        {
+            if (t == null || phases == null) return;
+            foreach (var d in FindObjectsOfType<PhaseDirector>(true))
+            {
+                if (d.entries == null) continue;
+                bool changed = false;
+                foreach (var e in d.entries)
+                {
+                    if (e == null || e.target == null || !(t == e.target.transform || t.IsChildOf(e.target.transform))) continue;
+                    var list = new System.Collections.Generic.List<GameManager.GamePhase>(e.visibleInPhases ?? new GameManager.GamePhase[0]);
+                    foreach (var p in phases) if (!list.Contains(p)) { list.Add(p); changed = true; }
+                    e.visibleInPhases = list.ToArray();
+                }
+                if (changed) d.Apply();
+            }
+        }
+
         private void Apply()
         {
             var gm = GameManager.Instance;

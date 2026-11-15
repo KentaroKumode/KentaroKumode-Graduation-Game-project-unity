@@ -175,12 +175,41 @@ namespace UI.Game2D.Battle
         /// <c>Start</c> / <c>Restart</c> で自動に戻る。 例: <c>UI.Game2D.Battle.QaBattle.ForceStow(1)</c></summary>
         public static void ForceStow(int mode) => Game2DBattleFx.QaStow = mode < 0 ? -1 : mode > 0 ? 1 : 0;
 
+        /// <summary>エンディングの画面を直接出す (#328・<see cref="Game2DEndingScreen.QaShow"/>・セーブを止める・フェーズは変えない)。
+        /// id = end1 / end2 / end3 / end_true (後日談つき) / end_good / epilogue。 例: <c>UI.Game2D.Battle.QaBattle.ShowEnding("end_true")</c></summary>
+        public static bool ShowEnding(string id) => Game2DEndingScreen.QaShow(id);
+
+        /// <summary>本物と同じ経路でエンディングを出す (#328): セーブを止め、 ランが無ければ始め、 最後に倒したボスと裂け目の選択を id に合わせて入れて踏破 (RunClear) のフェーズへ入る。
+        /// 戦闘中なら打ち切ってから。 id = end1 / end2 / end3 / end_true / end_good。 閉じると「踏破」の窓 → タイトルへ (ランの記録・実績・解放は通さない)。
+        /// 例: <c>UI.Game2D.Battle.QaBattle.ShowEndingInRunClear("end_true")</c>。 無い id なら false。</summary>
+        public static bool ShowEndingInRunClear(string id)
+        {
+            SaveGuard.Suppressed = true;
+            var gm = GameManager.Instance; if (gm == null || !Application.isPlaying) return false;
+            string boss; bool open = false;
+            switch (id)
+            {
+                case "end1": boss = BossIds.Layer5Judgment; break;
+                case "end2": boss = BossIds.Layer5Hidden; break;
+                case "end3": boss = BossIds.Layer6Ash; break;
+                case Endings.EndTrueId: boss = BossIds.VescaP1; break;
+                case Endings.EndGoodId: boss = BossIds.VescaP1; open = true; break;
+                default: return false;
+            }
+            MarkAllTutorialsSeen();
+            if (gm.Run == null || gm.CurrentPhase == GameManager.GamePhase.Title || gm.CurrentPhase == GameManager.GamePhase.GameOver) gm.StartNewRun();
+            CombatManager.Instance?.QaAbortCombat();
+            Game2DLoadingScreen.QaDismiss();
+            gm.QaEnterRunClear(boss, open);
+            return gm.CurrentPhase == GameManager.GamePhase.RunClear;
+        }
+
         /// <summary>今の状態を 1 行で (フェーズ・敵・ターン・予告・演出が空いているか・Go の進み)。</summary>
         public static string Status()
         {
             var gm = GameManager.Instance; var s = Sim; var f = Fx; var cm = CombatManager.Instance;
             return $"phase={gm?.CurrentPhase} enemy={cm?.CurrentEnemy?.id} turn={cm?.CurrentCombatTurn} sim={s?.phase} heavyIn={s?.heavyIn} charging={s?.charging} down={s?.down} " +
-                   $"hp={s?.playerHp}/{s?.playerMax} vescaShield={ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context?.vescaShield} fxIdle={f?.IsIdle} bossIdling={f?.BossIdling} go={Runner.State} loading={Game2DLoadingScreen.Blocking} saveSuppressed={SaveGuard.Suppressed} " +
+                   $"hp={s?.playerHp}/{s?.playerMax} vescaShield={ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context?.vescaShield} fxIdle={f?.IsIdle} bossIdling={f?.BossIdling} go={Runner.State} loading={Game2DLoadingScreen.Blocking} ending={Game2DEndingScreen.Blocking} modal={Game2DModal.Active} saveSuppressed={SaveGuard.Suppressed} " +
                    $"stow=[{(f != null && f.GuiStowed ? "格納" : "出")} hud={StowNow()} force={Game2DBattleFx.QaStow}] gui=[on={Game2DGuiRt.FxOn} weight={Game2DGuiRt.FxWeightReady} dark={Game2DGuiRt.FxDark:0.00} red={Game2DGuiRt.FxRed:0.00} white={Game2DGuiRt.FxWhite:0.00} shake={Game2DGuiRt.FxShake}]";
         }
 
