@@ -162,15 +162,12 @@ namespace UI.Game2D.Battle
                     break;
                 case P.PRoll:
                 {
-                    float k = t / 0.5f;
+                    // 出目は立体で転がる (Game2DDiceRoll・2026-11-15)。 値は最初から本当の出目を持ち、 転がっている間は画面が立方体を描く
                     var real = cm.PendingDecision?.playerDice;
                     if (real != null) EnsureDice(real.Length);
-                    for (int i = 0; i < pd.Length; i++)
-                    {
-                        int fin = real != null && i < real.Length ? real[i] : 0;
-                        if (k < 0.5f + i * 0.14f) { if (Random.value < 0.55f) pd[i] = Random.Range(1, 7); } else pd[i] = fin;
-                    }
-                    if (t >= 0.5f) { SyncDecision(cm, false); phase = P.Wire; rolled = true; t = 0; TutorialOnWire(); }
+                    for (int i = 0; i < pd.Length; i++) pd[i] = real != null && i < real.Length ? real[i] : 0;
+                    SyncFaces(cm);
+                    if (t * Game2DDiceRoll.Fps >= RollFramesOf(pd.Length - 1)) { SyncDecision(cm, false); phase = P.Wire; rolled = true; t = 0; TutorialOnWire(); }
                     Touch(); break;
                 }
                 case P.PAttack:
@@ -223,6 +220,28 @@ namespace UI.Game2D.Battle
         }
 
         /// <summary>出目の個数を n に合わせる (挿し先は持ち越せる分だけ持ち越す)。 個数の上限は置かない。</summary>
+        // ── 出目が転がる絵 (Game2DDiceRoll) ──
+        /// <summary>転がるコマの数: 最初のダイスは 5 コマ (1 秒 8 コマ)、 後のダイスほど 1 コマずつ遅く止まる (4 個目からは同じ)。</summary>
+        public static int RollFramesOf(int i) => 5 + Mathf.Clamp(i, 0, 3);
+        /// <summary>ダイス i が今転がっているなら、 そのコマ (0〜)。 止まっていれば -1。</summary>
+        public int RollFrame(int i)
+        {
+            if (phase != P.PRoll) return -1;
+            int f = (int)(t * Game2DDiceRoll.Fps);
+            return f >= RollFramesOf(i) - 1 ? -1 : f;      // 最後のコマ = 正面 = いつもの出目の絵
+        }
+        /// <summary>このダイスの面の一覧 (出目の値・面の数は 6 とは限らない)。 分からなければ null (画面は 1〜6 で回す)。</summary>
+        public int[] faceVals;
+        /// <summary>ダイスごとの、 止まった面の添字 (<see cref="faceVals"/> の中)。 分からなければ -1。</summary>
+        public int[] landedFace = new int[0];
+        private void SyncFaces(CombatManager cm)
+        {
+            faceVals = ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context?.equippedDiceFaces;
+            var fi = cm.PendingDecision?.playerFaceIdx;
+            if (landedFace.Length != pd.Length) landedFace = new int[pd.Length];
+            for (int i = 0; i < pd.Length; i++) landedFace[i] = fi != null && i < fi.Length ? fi[i] : -1;
+        }
+
         private void EnsureDice(int n)
         {
             if (n < 0) n = 0;
