@@ -21,6 +21,8 @@ namespace UI.Game2D.Battle
     public class Game2DBattleFx : MonoBehaviour
     {
         public MeshRenderer plotQuad;
+        /// <summary>仮の背景 (旧・docs/design/battle-assets/backdrop.png)。 2026-11-16〜 戦闘ごとの背景 (<see cref="SetBackdrop"/>・<see cref="BattleBackdrops"/>) が読めない時と、
+        /// 戦闘の流れを通さない試験 (F8・QaBattle の Demo*) の最初だけ使う。</summary>
         public Texture2D backdrop;
         [Tooltip("武器の絵 (Weapons の並びと同じ 13 枚。 Game2DBuilder が sword_t2..shield_t4, dragon の順に入れる)")] public Texture2D[] weaponTex;
 
@@ -242,6 +244,12 @@ namespace UI.Game2D.Battle
         private BattleCanvas _c;
         private BSprite _bg; private BSprite[] _wspr;
         private uint[] _base;
+        /// <summary>仮の背景 (<see cref="backdrop"/> に暖色の暗がり・光だまり・四隅の暗がりを掛けた物)。 戦闘ごとの背景が無い時に戻す。</summary>
+        private uint[] _baseDefault;
+        /// <summary>今の背景の名前 (<see cref="BattleBackdrops"/>・null = 仮の背景)。</summary>
+        private string _bgName;
+        /// <summary>ヴェスカ 4 段への形態移行で、 信号が切れた所 (画面が黒い間) で替える背景 (null = 無し)。</summary>
+        private string _bgAfterOff;
         private Texture2D _tex; private Color32[] _out;
         private float[] _trb;
         private readonly Dictionary<int, List<Vector2Int>> _pix = new Dictionary<int, List<Vector2Int>>();
@@ -271,6 +279,20 @@ namespace UI.Game2D.Battle
         public int EnemyMax => _eMax;
         /// <summary>液晶の中の GUI (敵の HP の棒・新しい戦闘の画面) を暗くする割合 (1 = そのまま・大技の暗幕 GuiDark に合わせる)。</summary>
         public float LcdDark => _boss.Active ? Mathf.Clamp01(_boss.GuiDark) : 1f;
+        /// <summary>今の背景の名前 (Resources/Game2DBackdrops の bg_*・null = 仮の背景)。 形態移行で替える予定の背景は <see cref="PendingBackdropName"/>。</summary>
+        public string BackdropName => _bgName;
+        public string PendingBackdropName => _bgAfterOff;
+
+        /// <summary>戦闘の背景を替える (戦闘の入り・<see cref="BattleBackdrops.NameFor"/>)。 絵は 1 画素ずつそのまま写す (加工しない)。
+        /// name = null か、 読めない時は仮の背景。 形態移行で替える予定があれば取り消す。</summary>
+        public void SetBackdrop(string name)
+        {
+            Init(); _bgAfterOff = null;
+            var px = BattleBackdrops.Load(name);
+            if (px == null) { _bgName = null; _base = _baseDefault; return; }
+            _bgName = name; _base = px;
+        }
+
         /// <summary>敵の HP を本物の値に合わせる (実戦闘につないだ時)。 攻撃の演出はここから dealt ぶん減らす。</summary>
         public void SetEnemyHp(int cur, int max) { _eMax = Mathf.Max(1, max); _ehp = Mathf.Clamp(cur, 0, _eMax); }
 
@@ -356,12 +378,16 @@ namespace UI.Game2D.Battle
         public void BossCancel() => _boss.Cancel();
 
         /// <summary>ヴェスカの形態移行の演出 (2026-11-15・ダメージ無し): final = false なら 1→2・2→3 (止まって砕ける) / true なら 3→4 (乱れて信号が切れる)。
-        /// 終わるまで戦闘の流れを止める。 前の段の大技の待機が出ていたら消して、 敵を出し直す (倒した演出の途中でも)。</summary>
-        public void VescaTransition(bool final)
+        /// 終わるまで戦闘の流れを止める。 前の段の大技の待機が出ていたら消して、 敵を出し直す (倒した演出の途中でも)。
+        /// <para>backdropAfter = 移行の後の背景 (<see cref="BattleBackdrops"/> の名前・null = 替えない)。 3→4 は信号が切れて画面が黒い間に替え
+        /// (<see cref="BossFx.SignalOff"/>)、 1→2・2→3 (と演出が流れなかった時) は演出が終わった所で替える。</para></summary>
+        public void VescaTransition(bool final, string backdropAfter = null)
         {
             Init(); FlushDot(); Showing = true;
             _phase = Phase.Idle; _t = 0; _dissolve = 0; _boss.OnHit = null;
             _boss.Clear(); _boss.Transition(final);
+            _bgAfterOff = backdropAfter != null && backdropAfter != _bgName ? backdropAfter : null;
+            if (_bgAfterOff != null) BattleBackdrops.Load(_bgAfterOff);      // 替える瞬間に PNG を戻さないよう、 先に戻しておく
             QaNote("transition:" + (final ? "3→4" : "→2/3"));
         }
 
@@ -408,7 +434,7 @@ namespace UI.Game2D.Battle
         private float _revealT0 = 0.38f, _introEnd = 0.9f;      // 切り替え (ブラインド) が開ききってから姿が見え始める。 ブラインドなしの時 (次の敵) はすぐ
         private void StartIntro(bool blinds) { if (blinds) Game2DSfx.Play("battle_start"); Game2DSfx.PlayDelayed("enemy_appear", blinds ? 0.3f : 0f, 0.9f); _phase = Phase.Intro; _t = 0; _introBlinds = blinds; _landed = false; _revealT0 = blinds ? 0.38f : 0.08f; _introEnd = _revealT0 + RevealDur + 0.07f; if (blinds) _flashW = 1f; }
 
-        public void ResetEnemy() { _ehp = _eMax; _phase = Phase.Idle; _t = 0; _dissolve = 0; _streaks.Clear(); _marks.Clear(); _rings.Clear(); _sparks.Clear(); _debris.Clear(); _dmgs.Clear(); _fx.Clear(); _dotPending = false; _anim = null; _hitAgo = null; _boss.Clear(); _boss.OnHit = null; _blockUntil = 0; EnemyHitLanded = false; }
+        public void ResetEnemy() { _ehp = _eMax; _phase = Phase.Idle; _t = 0; _dissolve = 0; _streaks.Clear(); _marks.Clear(); _rings.Clear(); _sparks.Clear(); _debris.Clear(); _dmgs.Clear(); _fx.Clear(); _dotPending = false; _anim = null; _hitAgo = null; _boss.Clear(); _boss.OnHit = null; _blockUntil = 0; EnemyHitLanded = false; _bgAfterOff = null; }
 
         private void Init()
         {
@@ -423,7 +449,7 @@ namespace UI.Game2D.Battle
             {
                 var mpb = new MaterialPropertyBlock(); plotQuad.GetPropertyBlock(mpb); mpb.SetTexture("_MainTex", _tex); plotQuad.SetPropertyBlock(mpb);
             }
-            BuildBase();
+            BuildBase(); _baseDefault = _base;
         }
 
         private void OnDestroy() { if (_tex != null) Destroy(_tex); Showing = false; }
@@ -445,6 +471,7 @@ namespace UI.Game2D.Battle
 #endif
             float dt = rawDt * (_phase == Phase.PAttack ? _timeScale : 1f);
             _clockU += rawDt; _boss.Tick(rawDt);      // ボスの絵はヒットストップ・攻撃の速さ (T) に左右されない
+            if (_bgAfterOff != null && (_boss.SignalOff || !_boss.Active)) { var next = _bgAfterOff; SetBackdrop(next); }      // ヴェスカ 4 段の背景: 信号が切れて黒い間に替える
             Tick(dt);
             Frame();
             PushGuiFx();
@@ -713,7 +740,7 @@ namespace UI.Game2D.Battle
         private static float Cl(float v, float a, float b) => Mathf.Max(a, Mathf.Min(b, v));
         private static float EaseOutF(float t) => 1 - (1 - t) * (1 - t);
 
-        /// <summary>動かない下地 (背景 + 暖色の暗がり + 白熱灯の光だまり + 四隅の暗がり) は 1 度だけ作る。</summary>
+        /// <summary>仮の背景の下地 (背景 + 暖色の暗がり + 白熱灯の光だまり + 四隅の暗がり) は 1 度だけ作る。 戦闘ごとの背景 (<see cref="SetBackdrop"/>) はこれを通さず、 絵のまま。</summary>
         private void BuildBase()
         {
             _base = new uint[W * H];

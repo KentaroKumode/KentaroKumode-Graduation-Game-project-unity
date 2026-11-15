@@ -71,6 +71,21 @@ namespace UI.Game2D.Battle
             return ok;
         }
 
+        /// <summary>ランの見せる層の番号 (<c>RunState.currentFloor</c>・0 = 序層 / 1〜5 = 第一〜第五層) を替える (確認専用・セーブを止める)。 戦闘の背景はこの番号で選ぶ
+        /// (<see cref="BattleBackdrops"/>)。 <see cref="Start"/> の新しいランは 0 層なので、 層の背景を見る時は Start の後にこれを呼んでから <see cref="Restart"/>。
+        /// 例: <c>UI.Game2D.Battle.QaBattle.SetFloor(3); UI.Game2D.Battle.QaBattle.Restart("boss_layer5")</c>。 ランが無ければ false。</summary>
+        public static bool SetFloor(int floor)
+        {
+            SaveGuard.Suppressed = true;
+            var run = GameManager.Instance?.Run; if (run == null) { Debug.LogWarning("[QaBattle] ランが無い (先に Start)"); return false; }
+            run.currentFloor = Mathf.Clamp(floor, MapSystem.FreeMove.FloorPlan.FarmFloor, MapSystem.FreeMove.FloorPlan.LastOrdinal);
+            Debug.Log($"[QaBattle] 層 {run.currentFloor} (深さ {run.Depth}) → 背景 {BattleBackdrops.ForFloor(run.currentFloor)}");
+            return true;
+        }
+
+        /// <summary>今の戦闘の背景 (Resources/Game2DBackdrops の名前・"-" = 仮の背景) と、 ヴェスカ 4 段への移行で替える予定の背景。 例: "bg_vesca (次 bg_vesca_p4)"。</summary>
+        public static string Backdrop() { var f = Fx; if (f == null) return "(戦闘の画面が無い)"; return (f.BackdropName ?? "-") + (f.PendingBackdropName != null ? " (次 " + f.PendingBackdropName + ")" : ""); }
+
         /// <summary>手引きを全部「見た」にする (手元だけ・SaveGuard で書かない)。 戦闘の画面の上に手引きの窓が出て止まらないように。</summary>
         private static void MarkAllTutorialsSeen()
         {
@@ -208,7 +223,7 @@ namespace UI.Game2D.Battle
         public static string Status()
         {
             var gm = GameManager.Instance; var s = Sim; var f = Fx; var cm = CombatManager.Instance;
-            return $"phase={gm?.CurrentPhase} enemy={cm?.CurrentEnemy?.id} turn={cm?.CurrentCombatTurn} sim={s?.phase} heavyIn={s?.heavyIn} charging={s?.charging} down={s?.down} " +
+            return $"phase={gm?.CurrentPhase} floor={gm?.Run?.currentFloor} bg={Backdrop()} enemy={cm?.CurrentEnemy?.id} turn={cm?.CurrentCombatTurn} sim={s?.phase} heavyIn={s?.heavyIn} charging={s?.charging} down={s?.down} " +
                    $"hp={s?.playerHp}/{s?.playerMax} vescaShield={ItemSystem.PassiveSkills.PassiveSkillManager.Instance?.Context?.vescaShield} fxIdle={f?.IsIdle} bossIdling={f?.BossIdling} go={Runner.State} loading={Game2DLoadingScreen.Blocking} ending={Game2DEndingScreen.Blocking} modal={Game2DModal.Active} saveSuppressed={SaveGuard.Suppressed} " +
                    $"stow=[{(f != null && f.GuiStowed ? "格納" : "出")} hud={StowNow()} force={Game2DBattleFx.QaStow}] gui=[on={Game2DGuiRt.FxOn} weight={Game2DGuiRt.FxWeightReady} dark={Game2DGuiRt.FxDark:0.00} red={Game2DGuiRt.FxRed:0.00} white={Game2DGuiRt.FxWhite:0.00} shake={Game2DGuiRt.FxShake}]";
         }

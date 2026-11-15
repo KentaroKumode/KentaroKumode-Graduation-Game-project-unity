@@ -201,6 +201,7 @@ namespace UI.Game2D.Battle
             _poisonShown = _bleedPending = _mistPending = 0; _countDots = false;
             playerHp = cm.PlayerHP; playerMax = Mathf.Max(1, cm.PlayerMaxHP); baseAtk = cm.PlayerAttackPower;
             fx.SetEnemyHp(cm.EnemyHP, cm.EnemyMaxHP);
+            fx.SetBackdrop(BattleBackdrops.NameForCurrent(cm.CurrentEnemy?.id));      // 層とボスの背景 (見せる層の番号 currentFloor で引く・2026-11-16)
             fx.WeaponIndex = WeaponIndexOf(GameManager.Instance?.Run?.equippedWeaponId);
             fx.WeaponSheetFamily = FxLayerPreload.WeaponFamilyOf(GameManager.Instance?.Run?.equippedWeaponId);      // 絵は層の頭で読んである (FxLayerPreload・戦闘の入りには読まない)
             _chevPhase = -1; _blazeStacks = 0; _flameShown = false; _vescaStage = BossIds.VescaStageOf(cm.CurrentEnemy?.id);
@@ -940,7 +941,7 @@ namespace UI.Game2D.Battle
             int st = BossIds.VescaStageOf(cm.CurrentEnemy?.id);
             if (st <= 0 || _vescaStage <= 0 || st <= _vescaStage) { if (st > 0) _vescaStage = st; return false; }
             _vescaStage = st;
-            fx.VescaTransition(st == 4);
+            fx.VescaTransition(st == 4, BattleBackdrops.NameForCurrent(cm.CurrentEnemy?.id));      // 4 段へは信号が切れた所で背景も替える
             fx.SetEnemyHp(cm.EnemyHP, cm.EnemyMaxHP);
             return true;
         }
