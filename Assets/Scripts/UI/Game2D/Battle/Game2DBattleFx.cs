@@ -269,6 +269,8 @@ namespace UI.Game2D.Battle
         public bool IsWon => _phase == Phase.Won;
         public int EnemyHp => _ehp;
         public int EnemyMax => _eMax;
+        /// <summary>液晶の中の GUI (敵の HP の棒・新しい戦闘の画面) を暗くする割合 (1 = そのまま・大技の暗幕 GuiDark に合わせる)。</summary>
+        public float LcdDark => _boss.Active ? Mathf.Clamp01(_boss.GuiDark) : 1f;
         /// <summary>敵の HP を本物の値に合わせる (実戦闘につないだ時)。 攻撃の演出はここから dealt ぶん減らす。</summary>
         public void SetEnemyHp(int cur, int max) { _eMax = Mathf.Max(1, max); _ehp = Mathf.Clamp(cur, 0, _eMax); }
 
@@ -787,8 +789,11 @@ namespace UI.Game2D.Battle
                         float dx = (x - W / 2f) / 240f, dy = (y - H / 2f) / 135f, d = Mathf.Sqrt(dx * dx + dy * dy), lv = Cl((d - 0.55f) / 0.7f, 0, 1) * _flashR * 14;
                         if (lv > BattleCanvas.Bayer[(y & 3) * 4 + (x & 3)]) _c.Put(x, y, new Col(170, 24, 12), 0.7f);      // 被弾の赤い縁 (網点)
                     }
-            if (SimDriven && (_phase == Phase.Idle || _phase == Phase.Dot) && !_boss.Busy) DrawMarks(EX + ep.dx, FLOOR + bob + ep.y);
-            if (SimDriven && _phase != Phase.Intro && _phase != Phase.Won) DrawEnemyHp();      // 演出の絵 (大技のコマ) より手前・ダメージの数字より奥
+            // 新しい戦闘の画面 (Game2DBattleLcd・2026-11-16): 頭上の前触れ・足もとの棒・手札と操作を、 この作図面へ直接描く (旧画面の間は null)
+            var lcd = Game2DBattleLcd.Drawing ? Game2DBattleLcd.Instance : null;
+            if (SimDriven && (_phase == Phase.Idle || _phase == Phase.Dot) && !_boss.Busy) { DrawMarks(EX + ep.dx, FLOOR + bob + ep.y); if (lcd != null) lcd.DrawHead(_c, EX + ep.dx, FLOOR + bob + ep.y); }
+            if (SimDriven && _phase != Phase.Intro && _phase != Phase.Won) { if (lcd != null) lcd.DrawFoot(_c); else DrawEnemyHp(); }      // 演出の絵 (大技のコマ) より手前・ダメージの数字より奥
+            if (SimDriven && lcd != null) lcd.DrawUi(_c);      // 手札・出目・左下・右下 (ダメージの数字より奥)
             foreach (var d in _dmgs)
             {
                 if (d.t >= d.life || (d.life - d.t < 0.16f && ((int)(d.t * 30) & 1) == 0)) continue;      // 消え際は明滅

@@ -88,7 +88,7 @@ namespace UI.Game2D
         private static readonly Color32 StopMark = Game2DTerminalLook.Mix(Game2DKit.Blue, Game2DKit.Ivory, 0.45f);
 
         /// <summary>手札・出目をつかんでいる間と、 離したフレーム (の次まで) は true。 敵の詳細の窓 (<see cref="Game2DEnemyPanel"/>) はこの間は開かない。</summary>
-        public static bool PointerBusy => _busyDrag || Time.frameCount <= _releaseFrame + 1;
+        public static bool PointerBusy => _busyDrag || Time.frameCount <= _releaseFrame + 1 || Game2DBattleLcd.PointerBusy;      // 新しい画面 (液晶の中) のつかみも数える
         private static bool _busyDrag; private static int _releaseFrame = -10;
 
         /// <summary>手引きの強調 (issue #109) が範囲を読む部品。</summary>
@@ -193,6 +193,7 @@ namespace UI.Game2D
         private void Update()
         {
             if (_right == null || sim == null || !Game2DBattleSim.Active) { CancelDrag(); return; }
+            if (Game2DBattleLcd.Use) { CancelDrag(); return; }      // 新しい画面 (液晶の中・Game2DBattleLcd) が受け持っている間は、 旧画面は描かず操作も受けない
             // 配線を決める間だけ読み直す (その後は本判定に取り込まれて二重に数えるので、 最後の値を出し続ける)
             if (sim.CanOperate && CombatSystem.CombatManager.Instance != null)
             { _hs = CombatSystem.CombatManager.Instance.PreviewHudStats(); _hsKnown = true; }
@@ -324,7 +325,7 @@ namespace UI.Game2D
         }
 
         /// <summary>持ち物の画面を開く (見るだけ・消耗品の [使う] は出さない ── 戦闘中に使うのは [道具] の窓)。 戦闘の進行・乱数・判断待ちには触らない。</summary>
-        private void OpenInventory()
+        public void OpenInventory()
         {
             if (GameHooks.BotDriving || Game2DModal.Active) return;
             if (Game2DNavExtras.OpenInventoryInBattle(GameManager.Instance)) Game2DSfx.Play("ui_click");
@@ -787,7 +788,7 @@ namespace UI.Game2D
         }
 
         /// <summary>対象を取る端子の「対象: 〈◯◯〉」の行 (対象を取る端子でなければ null)。 解決の後は結果の対象を出す。</summary>
-        private string TargetLine(int f)
+        public string TargetLine(int f)
         {
             string id = sim.board[f];
             // 〈有効活用〉(手札の持ち越しの規則): 捨て札から戻す 1 枚
@@ -871,7 +872,7 @@ namespace UI.Game2D
             => r.rapier ? (Consumables.CanUseRapier(run) ? null : "今は切り替えられない") : Consumables.BlockReason(run, r.id);
 
         /// <summary>[道具] を明るく出すか: 判断の間で、 使える品が 1 つでもある。</summary>
-        private bool AnyUsable()
+        public bool AnyUsable()
         {
             if (!sim.CanUseItems) return false;
             var run = GameManager.Instance?.Run; if (run == null) return false;
@@ -884,7 +885,7 @@ namespace UI.Game2D
         //   最初から「今戻る 1 枚」(選んでいなければ最後に捨てた 1 枚) を選んでおき、 その行に「戻す」の印を付ける。
         //   [これを戻す] = 選んだ行に決める / [閉じる] = 今の 1 枚のまま。 決めた値は sim.target[〈有効活用〉の場の位置] = 捨て札の添字。
 
-        private void OpenRecall(int s)
+        public void OpenRecall(int s)
         {
             if (!sim.CanOperate || !sim.IsRecaller(s)) return;
             if (_modal == null) _modal = FindObjectOfType<Game2DModal>();
@@ -921,7 +922,7 @@ namespace UI.Game2D
         private const int ItemsPerPage = 10;
 
         /// <summary>消耗品を選んで使う窓 (判断の間だけ)。 使っても窓は閉じずに中身を写し直す (続けて使える・HP とシールドは題の下に出す)。</summary>
-        private void OpenItems()
+        public void OpenItems()
         {
             if (!sim.CanUseItems) { Game2DSfx.Play("ui_click"); return; }
             if (_modal == null) _modal = FindObjectOfType<Game2DModal>();

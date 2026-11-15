@@ -92,6 +92,9 @@ namespace UI.Game2D.Battle
 
         private void Touch() { version++; }
 
+        /// <summary>液晶の中に描く新しい戦闘の画面 (<see cref="Game2DBattleLcd"/>・2026-11-16) を同じ GameObject に付ける (シーンには保存しない)。</summary>
+        private void Awake() { if (GetComponent<Game2DBattleLcd>() == null) gameObject.AddComponent<Game2DBattleLcd>(); }
+
         private void OnEnable()
         {
             var cm = CombatManager.Instance;
@@ -612,6 +615,32 @@ namespace UI.Game2D.Battle
             Game2DSfx.Play("wire", 1f, d != null ? 1f + (int)d.kind * 0.12f : 1f);
             RecomputePreview(); Touch();
             return true;
+        }
+
+        /// <summary>新しい戦闘の画面 (<see cref="Game2DBattleLcd"/>・出目をつかんで札へ運ぶ): 出目 die を札 s へ挿せるか。
+        /// s がもう埋まっていれば、 先に挿さっていた出目 (〈猫の手〉の出目は除く・後ろから) を 1 個床へ戻せば挿せるかを見て、 その出目を bumped に返す (入れ替え)。</summary>
+        public bool CanPlugDie(int die, int s, out int bumped)
+        {
+            bumped = -1;
+            if (!CanOperate || !IsDie(die) || IsCatLocked(die) || s < 0 || s >= board.Count || slot[die] == s) return false;
+            if (CanPlug(die, s)) return true;
+            for (int j = slot.Length - 1; j >= 0; j--)
+            {
+                if (j == die || slot[j] != s || IsCatLocked(j)) continue;
+                slot[j] = -1; bool ok = CanPlug(die, s); slot[j] = s;
+                if (ok) { bumped = j; return true; }
+            }
+            return false;
+        }
+
+        /// <summary>出目 die を札 s へ挿す (<see cref="CanPlugDie"/> の入れ替えを含む・前の挿し先からは外れる)。 挿せなければ false (何も変えない)。</summary>
+        public bool PlugDie(int die, int s)
+        {
+            if (!CanPlugDie(die, s, out int b)) return false;
+            if (b >= 0) slot[b] = -1;
+            if (Plug(die, s)) return true;
+            if (b >= 0) slot[b] = s;
+            return false;
         }
 
         /// <summary>出目 die から端子を外す (手札へ戻す)。</summary>

@@ -428,6 +428,28 @@ namespace UI.Game2D
         /// <summary>部品の範囲 (格子の dot・左上が原点・余白 <see cref="FocusPad"/> 込み・画面の内側に切る)。 部品が無い・隠れている・ほとんど画面の外なら null。</summary>
         private RectInt? FocusRect(string title)
         {
+            // 新しい戦闘の画面 (液晶の中・Game2DBattleLcd・2026-11-16): 部品は RectTransform を持たないので、 画面が範囲を返す
+            if (Game2DBattleLcd.Drawing && Game2DBattleLcd.Instance != null)
+            {
+                var f = FocusOf(title); Game2DBattleHud.Part? part = null;
+                switch (f)
+                {
+                    case Focus.Intent: part = Game2DBattleHud.Part.Intent; break;
+                    case Focus.BattleGauge: part = Game2DBattleHud.Part.Gauge; break;
+                    case Focus.Ports: part = Game2DBattleHud.Part.Ports; break;
+                    case Focus.Stat: part = Game2DBattleHud.Part.Stat; break;
+                    case Focus.Ctl: part = Game2DBattleHud.Part.Ctl; break;
+                    case Focus.Hand: part = Game2DBattleHud.Part.Hand; break;
+                }
+                if (part.HasValue)
+                {
+                    var r = Game2DBattleLcd.Instance.FocusRect(part.Value, title == TutorialTopics.Long);      // 「戦闘の長期化」= 激化 (敵の頭上)
+                    if (!r.HasValue) return null;
+                    var q = r.Value; int lx0 = Mathf.Max(0, q.x - FocusPad), ly0 = Mathf.Max(0, q.y - FocusPad);
+                    int lx1 = Mathf.Min(Game2DLayout.Width, q.xMax + FocusPad), ly1 = Mathf.Min(Game2DLayout.Height, q.yMax + FocusPad);
+                    return new RectInt(lx0, ly0, lx1 - lx0, ly1 - ly0);
+                }
+            }
             var src = FocusSource(title);
             if (src == null || !src.gameObject.activeInHierarchy) return null;
             var grid = transform.parent as RectTransform; if (grid == null) return null;
